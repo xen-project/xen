@@ -102,7 +102,7 @@ static inline void mask_evtchn(int port)
 static inline void unmask_evtchn(int port)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
-	vcpu_info_t *vcpu_info = &s->vcpu_data[smp_processor_id()];
+	vcpu_info_t *vcpu_info = &s->vcpu_info[smp_processor_id()];
 
 	synch_clear_bit(port, &s->evtchn_mask[0]);
 

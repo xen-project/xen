@@ -51,14 +51,38 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
     int errors = 0;
     int shadow_refcounts = !!shadow_mode_refcounts(d);
     int shadow_enabled = !!shadow_mode_enabled(d);
-    int l2limit;
+
+    int l2limit( unsigned long mfn )
+    {
+
+        if ( shadow_mode_external(d) )
+            return L2_PAGETABLE_ENTRIES;
+
+#ifdef __i386__
+#ifdef CONFIG_X86_PAE
+        /* 32b PAE */
+        if ( (( frame_table[mfn].u.inuse.type_info & PGT_va_mask ) 
+	    >> PGT_va_shift) == 3 )
+            return l2_table_offset(HYPERVISOR_VIRT_START); 
+        else
+            return L2_PAGETABLE_ENTRIES;
+#else
+        /* 32b non-PAE */
+        return DOMAIN_ENTRIES_PER_L2_PAGETABLE;
+#endif
+#else
+        /* 64b */
+        return 0; /* XXX x86/64 XXX */
+#endif
+    }
 
     void _adjust(struct pfn_info *page, int adjtype ADJUST_EXTRA_ARGS)
     {
+        int count;
+
         if ( adjtype )
         {
-            // adjust the type count
-            //
+            /* adjust the type count */
             int tcount = page->u.inuse.type_info & PGT_count_mask;
             tcount += dir;
             ttot++;
@@ -92,10 +116,8 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                 page->u.inuse.type_info += dir;
         }
 
-        // adjust the general count
-        //
-        int count = page->count_info & PGC_count_mask;
-        count += dir;
+        /* adjust the general count */
+        count = (page->count_info & PGC_count_mask) + dir;
         ctot++;
 
         if ( count < 0 )
@@ -122,14 +144,15 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
     void adjust_l2_page(unsigned long mfn, int shadow)
     {
-        unsigned long *pt = map_domain_page(mfn);
+        l2_pgentry_t *pt = map_domain_page(mfn);
         int i;
+        u32 page_type;
 
-        for ( i = 0; i < l2limit; i++ )
+        for ( i = 0; i < l2limit(mfn); i++ )
         {
-            if ( pt[i] & _PAGE_PRESENT )
+            if ( l2e_get_flags(pt[i]) & _PAGE_PRESENT )
             {
-                unsigned long l1mfn = pt[i] >> PAGE_SHIFT;
+	        unsigned long l1mfn = l2e_get_pfn(pt[i]);
                 struct pfn_info *l1page = pfn_to_page(l1mfn);
 
                 if ( noisy )
@@ -147,8 +170,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                             continue;
                         }
 
-                        u32 page_type = l1page->u.inuse.type_info & PGT_type_mask;
-
+                        page_type = l1page->u.inuse.type_info & PGT_type_mask;
                         if ( page_type != PGT_l1_shadow )
                         {
                             printk("Audit %d: [Shadow L2 mfn=%lx i=%x] "
@@ -174,8 +196,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                             continue;
                         }
 
-                        u32 page_type = l1page->u.inuse.type_info & PGT_type_mask;
-
+                        page_type = l1page->u.inuse.type_info & PGT_type_mask;
                         if ( page_type == PGT_l2_page_table )
                         {
                             printk("Audit %d: [%x] Found %s Linear PT "
@@ -201,7 +222,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         if ( shadow_mode_translate(d) && !shadow_mode_external(d) )
         {
             unsigned long hl2mfn =
-                pt[l2_table_offset(LINEAR_PT_VIRT_START)] >> PAGE_SHIFT;
+                l2e_get_pfn(pt[l2_table_offset(LINEAR_PT_VIRT_START)]);
             struct pfn_info *hl2page = pfn_to_page(hl2mfn);
             adjust(hl2page, 0);
         }
@@ -211,14 +232,14 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
     void adjust_hl2_page(unsigned long hl2mfn)
     {
-        unsigned long *pt = map_domain_page(hl2mfn);
+        l2_pgentry_t *pt = map_domain_page(hl2mfn);
         int i;
 
-        for ( i = 0; i < l2limit; i++ )
+        for ( i = 0; i < l2limit(hl2mfn); i++ )
         {
-            if ( pt[i] & _PAGE_PRESENT )
+            if ( l2e_get_flags(pt[i]) & _PAGE_PRESENT )
             {
-                unsigned long gmfn = pt[i] >> PAGE_SHIFT;
+                unsigned long gmfn = l2e_get_pfn(pt[i]);
                 struct pfn_info *gpage = pfn_to_page(gmfn);
 
                 if ( gmfn < 0x100 )
@@ -258,14 +279,14 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
     void adjust_l1_page(unsigned long l1mfn)
     {
-        unsigned long *pt = map_domain_page(l1mfn);
+        l1_pgentry_t *pt = map_domain_page(l1mfn);
         int i;
 
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         {
-            if ( pt[i] & _PAGE_PRESENT )
+            if ( l1e_get_flags(pt[i]) & _PAGE_PRESENT )
             {
-                unsigned long gmfn = pt[i] >> PAGE_SHIFT;
+                unsigned long gmfn = l1e_get_pfn(pt[i]);
                 struct pfn_info *gpage = pfn_to_page(gmfn);
 
                 if ( gmfn < 0x100 )
@@ -282,7 +303,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
                 if ( noisy )
                 {
-                    if ( pt[i] & _PAGE_RW )
+                    if ( l1e_get_flags(pt[i]) & _PAGE_RW )
                     {
                         // If it's not a writable page, complain.
                         //
@@ -322,7 +343,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                     }
                 }
 
-                adjust(gpage, (pt[i] & _PAGE_RW) ? 1 : 0);
+                adjust(gpage, (l1e_get_flags(pt[i]) & _PAGE_RW) ? 1 : 0);
             }
         }
 
@@ -474,13 +495,6 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                             errors++;
                         }
 
-                        if ( (page->u.inuse.type_info & PGT_pinned) != PGT_pinned )
-                        {
-                            printk("Audit %d: L2 mfn=%lx not pinned t=%"
-				   PRtype_info "\n",
-                                   d->domain_id, mfn, page->u.inuse.type_info);
-                            errors++;
-                        }
                     }
                 }
 
@@ -553,15 +567,6 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         }
     }
 
-#ifdef __i386__
-    if ( shadow_mode_external(d) )
-        l2limit = L2_PAGETABLE_ENTRIES;
-    else
-        l2limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
-#else
-    l2limit = 0; /* XXX x86/64 XXX */
-#endif
-
     adjust_for_pgtbase();
 
     adjust_guest_pages();
@@ -613,16 +618,17 @@ void _audit_domain(struct domain *d, int flags)
                              unsigned long mfn)
     {
         struct pfn_info *page = &frame_table[mfn];
-        unsigned long *pt = map_domain_page(mfn);
+        l1_pgentry_t *pt = map_domain_page(mfn);
         int i;
 
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         {
-            if ( (pt[i] & _PAGE_PRESENT) && ((pt[i] >> PAGE_SHIFT) == xmfn) )
+            if ( (l1e_get_flags(pt[i]) & _PAGE_PRESENT) && 
+                 (l1e_get_pfn(pt[i]) == xmfn) )
                 printk("     found dom=%d mfn=%lx t=%" PRtype_info " c=%08x "
-                       "pt[i=%x]=%lx\n",
+                       "pt[i=%x]=%" PRIpte "\n",
                        d->domain_id, mfn, page->u.inuse.type_info,
-                       page->count_info, i, pt[i]);
+                       page->count_info, i, l1e_get_intpte(pt[i]));
         }
 
         unmap_domain_page(pt);           
@@ -741,6 +747,7 @@ void _audit_domain(struct domain *d, int flags)
     while ( list_ent != &d->page_list )
     {
         u32 page_type;
+        unsigned long pfn;
 
         page = list_entry(list_ent, struct pfn_info, list);
         mfn = page_to_pfn(page);
@@ -797,7 +804,7 @@ void _audit_domain(struct domain *d, int flags)
                 printk("out of sync page mfn=%lx is not a page table\n", mfn);
                 errors++;
             }
-            unsigned long pfn = __mfn_to_gpfn(d, mfn);
+            pfn = __mfn_to_gpfn(d, mfn);
             if ( !__shadow_status(d, pfn, PGT_snapshot) )
             {
                 printk("out of sync page mfn=%lx doesn't have a snapshot\n",

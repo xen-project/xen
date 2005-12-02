@@ -81,7 +81,7 @@ VM_MASK		= 0x00020000
 #define evtchn_upcall_pending		/* 0 */
 #define evtchn_upcall_mask		1
 
-#define sizeof_vcpu_shift		4
+#define sizeof_vcpu_shift		6
 
 #ifdef CONFIG_SMP
 #define preempt_disable(reg)	incl TI_preempt_count(reg)

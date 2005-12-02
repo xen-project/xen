@@ -115,7 +115,7 @@ struct vcpu *alloc_vcpu(
 
     if ( vcpu_id != 0 )
     {
-        v->vcpu_info = &d->shared_info->vcpu_data[vcpu_id];
+        v->vcpu_info = &d->shared_info->vcpu_info[vcpu_id];
         d->vcpu[v->vcpu_id-1]->next_in_list = v;
         set_bit(_VCPUF_down, &v->vcpu_flags);
     }

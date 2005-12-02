@@ -155,7 +155,7 @@ irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     unsigned int   l1i, l2i, port;
     irqreturn_t (*handler)(int, void *, struct pt_regs *);
     shared_info_t *s = HYPERVISOR_shared_info;
-    vcpu_info_t   *vcpu_info = &s->vcpu_data[smp_processor_id()];
+    vcpu_info_t   *vcpu_info = &s->vcpu_info[smp_processor_id()];
 
     vcpu_info->evtchn_upcall_mask = 1;
     vcpu_info->evtchn_upcall_pending = 0;
@@ -203,7 +203,7 @@ int evtchn_irq = 0xe9;
 void __init evtchn_init(void)
 {
     shared_info_t *s = HYPERVISOR_shared_info;
-    vcpu_info_t   *vcpu_info = &s->vcpu_data[smp_processor_id()];
+    vcpu_info_t   *vcpu_info = &s->vcpu_info[smp_processor_id()];
 
 #if 0
     int ret;

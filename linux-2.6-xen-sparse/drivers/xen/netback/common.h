@@ -45,24 +45,20 @@ typedef struct netif_st {
 	u8               fe_dev_addr[6];
 
 	/* Physical parameters of the comms window. */
-	u16              tx_shmem_handle;
+	grant_handle_t   tx_shmem_handle;
 	grant_ref_t      tx_shmem_ref; 
-	u16              rx_shmem_handle;
+	grant_handle_t   rx_shmem_handle;
 	grant_ref_t      rx_shmem_ref; 
 	unsigned int     evtchn;
 	unsigned int     irq;
 
 	/* The shared rings and indexes. */
-	netif_tx_interface_t *tx;
-	netif_rx_interface_t *rx;
+	netif_tx_back_ring_t tx;
+	netif_rx_back_ring_t rx;
 	struct vm_struct *comms_area;
 
-	/* Private indexes into shared ring. */
-	NETIF_RING_IDX rx_req_cons;
-	NETIF_RING_IDX rx_resp_prod; /* private version of shared variable */
-	NETIF_RING_IDX rx_resp_prod_copy;
-	NETIF_RING_IDX tx_req_cons;
-	NETIF_RING_IDX tx_resp_prod; /* private version of shared variable */
+	/* Allow netif_be_start_xmit() to peek ahead in the rx request ring. */
+	RING_IDX rx_req_cons_peek;
 
 	/* Transmit shaping: allow 'credit_bytes' every 'credit_usec'. */
 	unsigned long   credit_bytes;
@@ -80,6 +76,9 @@ typedef struct netif_st {
 
 	struct work_struct free_work;
 } netif_t;
+
+#define NET_TX_RING_SIZE __RING_SIZE((netif_tx_sring_t *)0, PAGE_SIZE)
+#define NET_RX_RING_SIZE __RING_SIZE((netif_rx_sring_t *)0, PAGE_SIZE)
 
 void netif_creditlimit(netif_t *netif);
 int  netif_disconnect(netif_t *netif);

@@ -291,7 +291,7 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	int write;
 	siginfo_t info;
 
-	address = HYPERVISOR_shared_info->vcpu_data[
+	address = HYPERVISOR_shared_info->vcpu_info[
 		smp_processor_id()].arch.cr2;
 
 	/* Set the "privileged fault" bit to something sane. */

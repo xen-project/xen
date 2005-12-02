@@ -27,6 +27,7 @@
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/fixmap.h>
+#include <public/memory.h>
 
 extern l1_pgentry_t *mapcache;
 
@@ -106,7 +107,10 @@ void __init paging_init(void)
         idle_pg_table_l2[l2_linear_offset(RO_MPT_VIRT_START) + i] =
             l2e_from_page(pg, (__PAGE_HYPERVISOR | _PAGE_PSE) & ~_PAGE_RW);
     }
-    memset((void *)RDWR_MPT_VIRT_START, 0x55, mpt_size);
+
+    /* Fill with an obvious debug pattern. */
+    for ( i = 0; i < (mpt_size / BYTES_PER_LONG); i++)
+        set_pfn_from_mfn(i, 0x55555555);
 
     /* Create page tables for ioremap(). */
     for ( i = 0; i < (IOREMAP_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
@@ -181,6 +185,41 @@ void subarch_init_memory(struct domain *dom_xen)
     }
 }
 
+long arch_memory_op(int op, void *arg)
+{
+    struct xen_machphys_mfn_list xmml;
+    unsigned long mfn;
+    unsigned int i, max;
+    long rc = 0;
+
+    switch ( op )
+    {
+    case XENMEM_machphys_mfn_list:
+        if ( copy_from_user(&xmml, arg, sizeof(xmml)) )
+            return -EFAULT;
+
+        max = min_t(unsigned int, xmml.max_extents, mpt_size >> 21);
+
+        for ( i = 0; i < max; i++ )
+        {
+            mfn = l2e_get_pfn(idle_pg_table_l2[l2_linear_offset(
+                RDWR_MPT_VIRT_START + (i << 21))]) + l1_table_offset(i << 21);
+            if ( put_user(mfn, &xmml.extent_start[i]) )
+                return -EFAULT;
+        }
+
+        if ( put_user(i, &((struct xen_machphys_mfn_list *)arg)->nr_extents) )
+            return -EFAULT;
+
+        break;
+
+    default:
+        rc = -ENOSYS;
+        break;
+    }
+
+    return rc;
+}
 
 long do_stack_switch(unsigned long ss, unsigned long esp)
 {

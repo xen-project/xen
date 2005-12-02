@@ -1283,6 +1283,11 @@ int dev_queue_xmit(struct sk_buff *skb)
 			skb->csum = offsetof(struct udphdr, check);
 			break;
 		default:
+			if (net_ratelimit())
+				printk(KERN_ERR "Attempting to checksum a non-"
+				       "TCP/UDP packet, dropping a protocol"
+				       " %d packet", skb->nh.iph->protocol);
+			rc = -EPROTO;
 			goto out_kfree_skb;
 		}
 		if ((skb->h.raw + skb->csum + 2) > skb->tail)

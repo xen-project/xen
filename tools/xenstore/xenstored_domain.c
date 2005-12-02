@@ -41,7 +41,7 @@
 #include <xen/linux/evtchn.h>
 
 static int *xc_handle;
-static int virq_port;
+static evtchn_port_t virq_port;
 
 int eventchn_fd = -1; 
 
@@ -53,11 +53,11 @@ struct domain
 	unsigned int domid;
 
 	/* Event channel port */
-	uint16_t port;
+	evtchn_port_t port;
 
 	/* The remote end of the event channel, used only to validate
 	   repeated domain introductions. */
-	uint16_t remote_port;
+	evtchn_port_t remote_port;
 
 	/* The mfn associated with the event channel, used only to validate
 	   repeated domain introductions. */
@@ -224,7 +224,7 @@ static void domain_cleanup(void)
 /* We scan all domains rather than use the information given here. */
 void handle_event(void)
 {
-	uint16_t port;
+	evtchn_port_t port;
 
 	if (read(eventchn_fd, &port, sizeof(port)) != sizeof(port))
 		barf_perror("Failed to read from event fd");
@@ -314,7 +314,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 	char *vec[3];
 	unsigned int domid;
 	unsigned long mfn;
-	uint16_t port;
+	evtchn_port_t port;
 
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec)) {
 		send_error(conn, EINVAL);
@@ -460,7 +460,8 @@ void restore_existing_connections(void)
 
 static int dom0_init(void) 
 { 
-        int rc, fd, port; 
+        int rc, fd;
+	evtchn_port_t port; 
         unsigned long mfn; 
         char str[20]; 
         struct domain *dom0; 

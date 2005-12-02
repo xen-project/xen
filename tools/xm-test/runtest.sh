@@ -14,6 +14,7 @@ usage() {
     echo "  -q          : run a quick test set"
     echo "  -e <email>  : set email address for report"
     echo "  -s <report> : just submit report <report>"
+    echo "  -h | --help : show this help"
 }
 
 # Just submit the report
@@ -86,6 +87,15 @@ runnable_tests() {
 	exit 1
     fi
 
+    # Run a few sample tests to make sure things are working
+    # before we take the plunge
+    echo "Running sanity checks..."
+    make -C tests/_sanity check 2>&1 | grep REASON
+    if [ $? -eq 0 ]; then
+	echo "Sanity checks failed"
+	exit 1
+    fi
+
 }
 
 # Get contact info if needed
@@ -119,7 +129,7 @@ get_contact_info() {
 # Run the tests
 run_tests() {
     output=$1
-    echo Running tests...
+    echo Running real tests...
     TEST_VERBOSE=1 make -k check > $output 2>&1
 }
 
@@ -209,6 +219,10 @@ while [ $# -gt 0 ]
       -s)
 	  run=no
 	  ;;
+      -h|--help)
+          usage
+          exit 0
+          ;;
       *)
 	  REPORT=$1
 	  break

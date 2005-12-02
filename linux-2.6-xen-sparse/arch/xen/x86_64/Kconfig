@@ -224,21 +224,21 @@ config SMP
 
 	  If you don't know what to do here, say N.
 
-config PREEMPT
-	bool "Preemptible Kernel"
-	---help---
-	  This option reduces the latency of the kernel when reacting to
-	  real-time or interactive events by allowing a low priority process to
-	  be preempted even if it is in kernel mode executing a system call.
-	  This allows applications to run more reliably even when the system is
-	  under load. On contrary it may also break your drivers and add
-	  priority inheritance problems to your system. Don't select it if
-	  you rely on a stable system or have slightly obscure hardware.
-	  It's also not very well tested on x86-64 currently.
-	  You have been warned.
-
-	  Say Y here if you are feeling brave and building a kernel for a
-	  desktop, embedded or real-time system.  Say N if you are unsure.
+#config PREEMPT
+#	bool "Preemptible Kernel"
+#	---help---
+#	  This option reduces the latency of the kernel when reacting to
+#	  real-time or interactive events by allowing a low priority process to
+#	  be preempted even if it is in kernel mode executing a system call.
+#	  This allows applications to run more reliably even when the system is
+#	  under load. On contrary it may also break your drivers and add
+#	  priority inheritance problems to your system. Don't select it if
+#	  you rely on a stable system or have slightly obscure hardware.
+#	  It's also not very well tested on x86-64 currently.
+#	  You have been warned.
+#
+#	  Say Y here if you are feeling brave and building a kernel for a
+#	  desktop, embedded or real-time system.  Say N if you are unsure.
 
 config SCHED_SMT
 	bool "SMT (Hyperthreading) scheduler support"
@@ -288,10 +288,10 @@ config HAVE_DEC_LOCK
 # actually 64 maximum, but you need to fix the APIC code first
 # to use clustered mode or whatever your big iron needs
 config NR_CPUS
-	int "Maximum number of CPUs (2-8)"
-	range 2 8
+	int "Maximum number of CPUs (2-255)"
+	range 2 255
 	depends on SMP
-	default "8"
+	default "16"
 	help
 	  This allows you to specify the maximum number of CPUs which this
 	  kernel will support.  The maximum supported value is 32 and the

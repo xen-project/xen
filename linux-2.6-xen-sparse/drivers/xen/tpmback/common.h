@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <asm-xen/evtchn.h>
 #include <asm-xen/driver_util.h>
+#include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/xen-public/io/tpmif.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
@@ -28,7 +29,7 @@
 #endif
 
 typedef struct tpmif_st {
-        struct list_head tpmif_list;
+	struct list_head tpmif_list;
 	/* Unique identifier for this interface. */
 	domid_t domid;
 	unsigned int handle;
@@ -54,7 +55,7 @@ typedef struct tpmif_st {
 
 	struct work_struct work;
 
-	u16 shmem_handle;
+	grant_handle_t shmem_handle;
 	grant_ref_t shmem_ref;
 } tpmif_t;
 
@@ -82,6 +83,11 @@ int vtpm_release_packets(tpmif_t * tpmif, int send_msgs);
 extern int num_frontends;
 
 #define MMAP_VADDR(t,_req) ((t)->mmap_vstart + ((_req) * PAGE_SIZE))
+
+#ifndef TRUE
+#define TRUE 1
+#define FALSE 0
+#endif
 
 #endif /* __TPMIF__BACKEND__COMMON_H__ */
 

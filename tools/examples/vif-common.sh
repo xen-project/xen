@@ -63,6 +63,7 @@ function frob_iptable()
   fi
 
   iptables "$c" FORWARD -m physdev --physdev-in "$vif" "$@" -j ACCEPT ||
+    [ "$c" == "-D" ] ||
     log err \
      "iptables $c FORWARD -m physdev --physdev-in $vif $@ -j ACCEPT failed.
 If you are using iptables, this may affect networking for guest domains."
@@ -82,7 +83,7 @@ function handle_iptable()
   # binary is not sufficient, because the user may not have the appropriate
   # modules installed.  If iptables is not working, then there's no need to do
   # anything with it, so we can just return.
-  if ! iptables -L >&/dev/null
+  if ! iptables -L -n >&/dev/null
   then
     return
   fi
@@ -101,4 +102,38 @@ function handle_iptable()
       # No IP addresses have been specified, so allow anything.
       frob_iptable
   fi
+}
+
+
+##
+# ip_of interface
+#
+# Print the IP address currently in use at the given interface, or nothing if
+# the interface is not up.
+#
+function ip_of()
+{
+  ip addr show "$1" | sed -n 's/^.*inet \([0-9.]*\).*$/\1/p'
+}
+
+
+##
+# dom0_ip
+#
+# Print the IP address of the interface in dom0 through which we are routing.
+# This is the IP address on the interface specified as "netdev" as a parameter
+# to these scripts, or eth0 by default.  This function will call fatal if no
+# such interface could be found.
+#
+function dom0_ip()
+{
+  local nd=${netdev:-eth0}
+  local result=$(ip_of "$nd")
+  if [ -z "$result" ]
+  then
+      fatal
+"$netdev is not up.  Bring it up or specify another interface with " \
+"netdev=<if> as a parameter to $0."
+  fi
+  echo "$result"
 }

@@ -18,8 +18,7 @@ import xen.util.auxbin
 
 import xen.lowlevel.xc
 
-from xen.xend.xenstore.xsutil import IntroduceDomain
-
+import balloon
 from XendError import XendError
 from XendLogging import log
 
@@ -33,7 +32,7 @@ sizeof_int = calcsize("i")
 sizeof_unsigned_long = calcsize("L")
 
 
-xc = xen.lowlevel.xc.new()
+xc = xen.lowlevel.xc.xc()
 
 
 def write_exact(fd, buf, errmsg):
@@ -41,10 +40,18 @@ def write_exact(fd, buf, errmsg):
         raise XendError(errmsg)
 
 def read_exact(fd, size, errmsg):
-    buf = os.read(fd, size)
-    if len(buf) != size:
-        raise XendError(errmsg)
+    buf  = '' 
+    while size != 0: 
+        str = os.read(fd, size)
+        if not len(str):
+            log.error("read_exact: EOF trying to read %d (buf='%s')" % \
+                      (size, buf))
+            raise XendError(errmsg)
+        size = size - len(str)
+        buf  = buf + str
     return buf
+
+
 
 def save(fd, dominfo, live):
     write_exact(fd, SIGNATURE, "could not write guest state file: signature")
@@ -128,10 +135,12 @@ def restore(xd, fd):
     try:
         l = read_exact(fd, sizeof_unsigned_long,
                        "not a valid guest state file: pfn count read")
-        nr_pfns = unpack("=L", l)[0]   # XXX endianess
+        nr_pfns = unpack("L", l)[0]    # native sizeof long
         if nr_pfns > 16*1024*1024:     # XXX 
             raise XendError(
                 "not a valid guest state file: pfn count out of range")
+
+        balloon.free(xc.pages_to_kib(nr_pfns))
 
         cmd = map(str, [xen.util.auxbin.pathTo(XC_RESTORE),
                         xc.handle(), fd, dominfo.getDomid(), nr_pfns,
@@ -215,4 +224,4 @@ def slurp(infile):
         if line == "":
             break
         else:
-            log.error('%s', line)
+            log.error('%s', line.strip())

@@ -6,6 +6,9 @@ case "$XENBUS_TYPE" in
   vbd)
     /etc/xen/scripts/block "$ACTION"
     ;;
+  vtpm)
+    /etc/xen/scripts/vtpm "$ACTION"
+    ;;
   vif)
     [ -n "$script" ] && $script "$ACTION"
     ;;
@@ -15,6 +18,9 @@ case "$ACTION" in
   add)
     ;;
   remove)
+    # remove device frontend store entries
+    xenstore-rm -t $(xenstore-read "$XENBUS_PATH/frontend") || true
+
     # remove device backend store entries
     xenstore-rm -t "$XENBUS_PATH"       || true
     xenstore-rm -t "error/$XENBUS_PATH" || true

@@ -521,9 +521,9 @@ get_page_from_l3e(
     l3_pgentry_t l3e, unsigned long pfn,
     struct domain *d, unsigned long vaddr)
 {
-    ASSERT( !shadow_mode_refcounts(d) );
-
     int rc;
+
+    ASSERT(!shadow_mode_refcounts(d));
 
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
         return 1;
@@ -594,23 +594,26 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
         return;
 
     e = page_get_owner(page);
-    if ( unlikely(e != d) )
+
+    /*
+     * Check if this is a mapping that was established via a grant reference.
+     * If it was then we should not be here: we require that such mappings are
+     * explicitly destroyed via the grant-table interface.
+     * 
+     * The upshot of this is that the guest can end up with active grants that
+     * it cannot destroy (because it no longer has a PTE to present to the
+     * grant-table interface). This can lead to subtle hard-to-catch bugs,
+     * hence a special grant PTE flag can be enabled to catch the bug early.
+     * 
+     * (Note that the undestroyable active grants are not a security hole in
+     * Xen. All active grants can safely be cleaned up when the domain dies.)
+     */
+    if ( (l1e_get_flags(l1e) & _PAGE_GNTTAB) &&
+         !(d->domain_flags & (DOMF_shutdown|DOMF_dying)) )
     {
-        /*
-         * Unmap a foreign page that may have been mapped via a grant table.
-         * Note that this can fail for a privileged domain that can map foreign
-         * pages via MMUEXT_SET_FOREIGNDOM. Such domains can have some mappings
-         * counted via a grant entry and some counted directly in the page
-         * structure's reference count. Note that reference counts won't get
-         * dangerously confused as long as we always try to decrement the
-         * grant entry first. We may end up with a mismatch between which
-         * mappings and which unmappings are counted via the grant entry, but
-         * really it doesn't matter as privileged domains have carte blanche.
-         */
-        if (likely(gnttab_check_unmap(e, d, pfn,
-                                      !(l1e_get_flags(l1e) & _PAGE_RW))))
-            return;
-        /* Assume this mapping was made via MMUEXT_SET_FOREIGNDOM... */
+        MEM_LOG("Attempt to implicitly unmap a granted PTE %" PRIpte,
+                l1e_get_intpte(l1e));
+        domain_crash(d);
     }
 
     if ( l1e_get_flags(l1e) & _PAGE_RW )
@@ -1286,6 +1289,11 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
 
 int alloc_page_type(struct pfn_info *page, unsigned long type)
 {
+    struct domain *owner = page_get_owner(page);
+
+    if ( owner != NULL )
+        mark_dirty(owner, page_to_pfn(page));
+
     switch ( type & PGT_type_mask )
     {
     case PGT_l1_page_table:
@@ -1315,16 +1323,14 @@ void free_page_type(struct pfn_info *page, unsigned long type)
     struct domain *owner = page_get_owner(page);
     unsigned long gpfn;
 
-    if ( owner != NULL )
+    if ( unlikely((owner != NULL) && shadow_mode_enabled(owner)) )
     {
+        mark_dirty(owner, page_to_pfn(page));
         if ( unlikely(shadow_mode_refcounts(owner)) )
             return;
-        if ( unlikely(shadow_mode_enabled(owner)) )
-        {
-            gpfn = __mfn_to_gpfn(owner, page_to_pfn(page));
-            ASSERT(VALID_M2P(gpfn));
-            remove_shadow(owner, gpfn, type & PGT_type_mask);
-        }
+        gpfn = __mfn_to_gpfn(owner, page_to_pfn(page));
+        ASSERT(VALID_M2P(gpfn));
+        remove_shadow(owner, gpfn, type & PGT_type_mask);
     }
 
     switch ( type & PGT_type_mask )
@@ -1877,19 +1883,18 @@ int do_mmuext_op(
 
         case MMUEXT_SET_LDT:
         {
+            unsigned long ptr  = op.arg1.linear_addr;
+            unsigned long ents = op.arg2.nr_ents;
+
             if ( shadow_mode_external(d) )
             {
                 MEM_LOG("ignoring SET_LDT hypercall from external "
                         "domain %u", d->domain_id);
                 okay = 0;
-                break;
             }
-
-            unsigned long ptr  = op.arg1.linear_addr;
-            unsigned long ents = op.arg2.nr_ents;
-            if ( ((ptr & (PAGE_SIZE-1)) != 0) || 
-                 (ents > 8192) ||
-                 !array_access_ok(ptr, ents, LDT_ENTRY_SIZE) )
+            else if ( ((ptr & (PAGE_SIZE-1)) != 0) || 
+                      (ents > 8192) ||
+                      !array_access_ok(ptr, ents, LDT_ENTRY_SIZE) )
             {
                 okay = 0;
                 MEM_LOG("Bad args to SET_LDT: ptr=%lx, ents=%lx", ptr, ents);
@@ -2201,8 +2206,7 @@ int do_mmu_update(
                     {
                         shadow_lock(d);
 
-                        if ( shadow_mode_log_dirty(d) )
-                            __mark_dirty(d, mfn);
+                        __mark_dirty(d, mfn);
 
                         if ( page_is_page_table(page) &&
                              !page_out_of_sync(page) )
@@ -2261,13 +2265,7 @@ int do_mmu_update(
             set_pfn_from_mfn(mfn, gpfn);
             okay = 1;
 
-            /*
-             * If in log-dirty mode, mark the corresponding
-             * page as dirty.
-             */
-            if ( unlikely(shadow_mode_log_dirty(FOREIGNDOM)) &&
-                 mark_dirty(FOREIGNDOM, mfn) )
-                FOREIGNDOM->arch.shadow_dirty_block_count++;
+            mark_dirty(FOREIGNDOM, mfn);
 
             put_page(&frame_table[mfn]);
             break;
@@ -2304,7 +2302,7 @@ int do_mmu_update(
 }
 
 
-int update_grant_pte_mapping(
+static int create_grant_pte_mapping(
     unsigned long pte_addr, l1_pgentry_t _nl1e, struct vcpu *v)
 {
     int rc = GNTST_okay;
@@ -2317,7 +2315,6 @@ int update_grant_pte_mapping(
 
     ASSERT(spin_is_locked(&d->big_lock));
     ASSERT(!shadow_mode_refcounts(d));
-    ASSERT((l1e_get_flags(_nl1e) & L1_DISALLOW_MASK) == 0);
 
     gpfn = pte_addr >> PAGE_SHIFT;
     mfn = __gpfn_to_mfn(d, gpfn);
@@ -2367,7 +2364,7 @@ int update_grant_pte_mapping(
     return rc;
 }
 
-int clear_grant_pte_mapping(
+static int destroy_grant_pte_mapping(
     unsigned long addr, unsigned long frame, struct domain *d)
 {
     int rc = GNTST_okay;
@@ -2444,7 +2441,7 @@ int clear_grant_pte_mapping(
 }
 
 
-int update_grant_va_mapping(
+static int create_grant_va_mapping(
     unsigned long va, l1_pgentry_t _nl1e, struct vcpu *v)
 {
     l1_pgentry_t *pl1e, ol1e;
@@ -2452,7 +2449,6 @@ int update_grant_va_mapping(
     
     ASSERT(spin_is_locked(&d->big_lock));
     ASSERT(!shadow_mode_refcounts(d));
-    ASSERT((l1e_get_flags(_nl1e) & L1_DISALLOW_MASK) == 0);
 
     /*
      * This is actually overkill - we don't need to sync the L1 itself,
@@ -2475,7 +2471,8 @@ int update_grant_va_mapping(
     return GNTST_okay;
 }
 
-int clear_grant_va_mapping(unsigned long addr, unsigned long frame)
+static int destroy_grant_va_mapping(
+    unsigned long addr, unsigned long frame)
 {
     l1_pgentry_t *pl1e, ol1e;
     
@@ -2508,6 +2505,74 @@ int clear_grant_va_mapping(unsigned long addr, unsigned long frame)
     return 0;
 }
 
+int create_grant_host_mapping(
+    unsigned long addr, unsigned long frame, unsigned int flags)
+{
+    l1_pgentry_t pte = l1e_from_pfn(frame, GRANT_PTE_FLAGS);
+        
+    if ( (flags & GNTMAP_application_map) )
+        l1e_add_flags(pte,_PAGE_USER);
+    if ( !(flags & GNTMAP_readonly) )
+        l1e_add_flags(pte,_PAGE_RW);
+
+    if ( flags & GNTMAP_contains_pte )
+        return create_grant_pte_mapping(addr, pte, current);
+    return create_grant_va_mapping(addr, pte, current);
+}
+
+int destroy_grant_host_mapping(
+    unsigned long addr, unsigned long frame, unsigned int flags)
+{
+    if ( flags & GNTMAP_contains_pte )
+        return destroy_grant_pte_mapping(addr, frame, current->domain);
+    return destroy_grant_va_mapping(addr, frame);
+}
+
+int steal_page_for_grant_transfer(
+    struct domain *d, struct pfn_info *page)
+{
+    u32 _d, _nd, x, y;
+
+    spin_lock(&d->page_alloc_lock);
+
+    /*
+     * The tricky bit: atomically release ownership while there is just one 
+     * benign reference to the page (PGC_allocated). If that reference 
+     * disappears then the deallocation routine will safely spin.
+     */
+    _d  = pickle_domptr(d);
+    _nd = page->u.inuse._domain;
+    y   = page->count_info;
+    do {
+        x = y;
+        if (unlikely((x & (PGC_count_mask|PGC_allocated)) !=
+                     (1 | PGC_allocated)) || unlikely(_nd != _d)) { 
+            DPRINTK("gnttab_transfer: Bad page %p: ed=%p(%u), sd=%p,"
+                    " caf=%08x, taf=%" PRtype_info "\n", 
+                    (void *) page_to_pfn(page),
+                    d, d->domain_id, unpickle_domptr(_nd), x, 
+                    page->u.inuse.type_info);
+            spin_unlock(&d->page_alloc_lock);
+            return -1;
+        }
+        __asm__ __volatile__(
+            LOCK_PREFIX "cmpxchg8b %2"
+            : "=d" (_nd), "=a" (y),
+            "=m" (*(volatile u64 *)(&page->count_info))
+            : "0" (_d), "1" (x), "c" (NULL), "b" (x) );
+    } while (unlikely(_nd != _d) || unlikely(y != x));
+
+    /*
+     * Unlink from 'd'. At least one reference remains (now anonymous), so 
+     * noone else is spinning to try to delete this page from 'd'.
+     */
+    d->tot_pages--;
+    list_del(&page->list);
+
+    spin_unlock(&d->page_alloc_lock);
+
+    return 0;
+}
 
 int do_update_va_mapping(unsigned long va, u64 val64,
                          unsigned long flags)
@@ -2772,8 +2837,7 @@ long do_update_descriptor(u64 pa, u64 desc)
     {
         shadow_lock(dom);
 
-        if ( shadow_mode_log_dirty(dom) )
-            __mark_dirty(dom, mfn);
+        __mark_dirty(dom, mfn);
 
         if ( page_is_page_table(page) && !page_out_of_sync(page) )
             shadow_mark_mfn_out_of_sync(current, gpfn, mfn);

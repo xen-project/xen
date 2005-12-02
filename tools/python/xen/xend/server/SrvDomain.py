@@ -55,6 +55,10 @@ class SrvDomain(SrvDir):
         req.setResponseCode(http.ACCEPTED)
         req.setHeader("Location", "%s/.." % req.prePathURL())
 
+    def op_rename(self, _, req):
+        self.acceptCommand(req)
+        return self.dom.setName(req.args['name'][0])
+
     def op_shutdown(self, _, req):
         self.acceptCommand(req)
         return self.dom.shutdown(req.args['reason'][0])

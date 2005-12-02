@@ -44,6 +44,9 @@ static unsigned long *live_p2m = NULL;
 /* Live mapping of system MFN to PFN table. */
 static unsigned long *live_m2p = NULL;
 
+/* grep fodder: machine_to_phys */
+
+#define mfn_to_pfn(_mfn) live_m2p[(_mfn)]
 
 /*
  * Returns TRUE if the given machine frame number has a unique mapping
@@ -51,8 +54,8 @@ static unsigned long *live_m2p = NULL;
  */
 #define MFN_IS_IN_PSEUDOPHYS_MAP(_mfn)          \
 (((_mfn) < (max_mfn)) &&                        \
- ((live_m2p[_mfn] < (max_pfn)) &&               \
-  (live_p2m[live_m2p[_mfn]] == (_mfn))))
+ ((mfn_to_pfn(_mfn) < (max_pfn)) &&               \
+  (live_p2m[mfn_to_pfn(_mfn)] == (_mfn))))
     
  
 /* Returns TRUE if MFN is successfully converted to a PFN. */
@@ -63,7 +66,7 @@ static unsigned long *live_m2p = NULL;
     if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )                       \
         _res = 0;                                               \
     else                                                        \
-        *(_pmfn) = live_m2p[mfn];                               \
+        *(_pmfn) = mfn_to_pfn(mfn);                             \
     _res;                                                       \
 })
 
@@ -454,6 +457,15 @@ void canonicalize_pagetable(unsigned long type, unsigned long pfn,
             xen_start = (hvirt_start >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff; 
     }
 
+    if (pt_levels == 4 && type == L4TAB) { 
+        /*
+        ** XXX SMH: should compute these from hvirt_start (which we have) 
+        ** and hvirt_end (which we don't) 
+        */
+        xen_start = 256; 
+        xen_end   = 272; 
+    }
+
     /* Now iterate through the page table, canonicalizing each PTE */
     for (i = 0; i < pte_last; i++ ) {
 
@@ -470,19 +482,14 @@ void canonicalize_pagetable(unsigned long type, unsigned long pfn,
         if (pte & _PAGE_PRESENT) {
             
             mfn = (pte >> PAGE_SHIFT) & 0xfffffff;      
-            pfn = live_m2p[mfn];
-            
             if (!MFN_IS_IN_PSEUDOPHYS_MAP(mfn)) {
-                /* I don't think this should ever happen */
-                DPRINTF("FNI: [%08lx,%d] pte=%llx,"
-                        " mfn=%08lx, pfn=%08lx [mfn]=%08lx\n",
-                        type, i, (unsigned long long)pte, mfn, 
-                        live_m2p[mfn],
-                        (live_m2p[mfn] < max_pfn) ? 
-                        live_p2m[live_m2p[mfn]] : 0xdeadbeaf);
-                
-                pfn = 0; /* be suspicious */
-            }
+                /* This will happen if the type info is stale which 
+                   is quite feasible under live migration */
+                DPRINTF("PT Race: [%08lx,%d] pte=%llx, mfn=%08lx\n",
+                        type, i, (unsigned long long)pte, mfn); 
+                pfn = 0; /* zap it - we'll retransmit this page later */
+            } else 
+                pfn = mfn_to_pfn(mfn);
             
             pte &= 0xffffff0000000fffULL;
             pte |= (uint64_t)pfn << PAGE_SHIFT;
@@ -504,7 +511,7 @@ static unsigned long *xc_map_m2p(int xc_handle,
                                  unsigned long max_mfn, 
                                  int prot) 
 { 
-    privcmd_m2pmfns_t m2p_mfns; 
+    struct xen_machphys_mfn_list xmml;
     privcmd_mmap_t ioctlx; 
     privcmd_mmap_entry_t *entries; 
     unsigned long m2p_chunks, m2p_size; 
@@ -514,50 +521,45 @@ static unsigned long *xc_map_m2p(int xc_handle,
     m2p_size   = M2P_SIZE(max_mfn); 
     m2p_chunks = M2P_CHUNKS(max_mfn); 
 
-
-    m2p_mfns.num = m2p_chunks; 
-
-    if(!(m2p_mfns.arr = malloc(m2p_chunks * sizeof(unsigned long)))) { 
-        ERR("failed to allocate space for m2p mfns!\n"); 
+    xmml.max_extents = m2p_chunks;
+    if (!(xmml.extent_start = malloc(m2p_chunks * sizeof(unsigned long)))) { 
+        ERR("failed to allocate space for m2p mfns"); 
         return NULL; 
     } 
 
-    if (ioctl(xc_handle, IOCTL_PRIVCMD_GET_MACH2PHYS_MFNS, &m2p_mfns) < 0) {
-        ERR("xc_get_m2p_mfns:"); 
+    if (xc_memory_op(xc_handle, XENMEM_machphys_mfn_list, &xmml) ||
+        (xmml.nr_extents != m2p_chunks)) {
+        ERR("xc_get_m2p_mfns"); 
         return NULL;
     }
 
-    if((m2p = mmap(NULL, m2p_size, prot, 
-                   MAP_SHARED, xc_handle, 0)) == MAP_FAILED) {
+    if ((m2p = mmap(NULL, m2p_size, prot, 
+                    MAP_SHARED, xc_handle, 0)) == MAP_FAILED) {
         ERR("failed to mmap m2p"); 
         return NULL; 
     } 
-    
 
-    if(!(entries = malloc(m2p_chunks * sizeof(privcmd_mmap_entry_t)))) { 
-        ERR("failed to allocate space for mmap entries!\n"); 
+    if (!(entries = malloc(m2p_chunks * sizeof(privcmd_mmap_entry_t)))) { 
+        ERR("failed to allocate space for mmap entries"); 
         return NULL; 
     } 
-
 
     ioctlx.num   = m2p_chunks;
     ioctlx.dom   = DOMID_XEN; 
     ioctlx.entry = entries; 
     
-    for(i=0; i < m2p_chunks; i++) { 
-        
+    for (i=0; i < m2p_chunks; i++) { 
         entries[i].va = (unsigned long)(((void *)m2p) + (i * M2P_CHUNK_SIZE)); 
-        entries[i].mfn = m2p_mfns.arr[i]; 
+        entries[i].mfn = xmml.extent_start[i];
         entries[i].npages = M2P_CHUNK_SIZE >> PAGE_SHIFT;
-
     }
 
-    if((rc = ioctl(xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx)) < 0) {
+    if ((rc = ioctl(xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx)) < 0) {
         ERR("ioctl_mmap failed (rc = %d)", rc); 
         return NULL; 
     }
-        
-    free(m2p_mfns.arr); 
+
+    free(xmml.extent_start);
     free(entries); 
 
     return m2p; 
@@ -675,7 +677,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                              live_shinfo->arch.pfn_to_mfn_frame_list_list);
 
     if (!live_p2m_frame_list_list) {
-        ERR("Couldn't map p2m_frame_list_list");
+        ERR("Couldn't map p2m_frame_list_list (errno %d)", errno);
         goto out;
     }
 
@@ -728,12 +730,6 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     /* Domain is still running at this point */
-
-    if (live && (pt_levels != 2)) {
-        ERR("Live migration supported only for 32-bit non-pae");
-        goto out;
-    }
-
     if (live) {
 
         if (xc_shadow_control(xc_handle, dom, 
@@ -798,6 +794,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     pfn_batch = calloc(MAX_BATCH_SIZE, sizeof(unsigned long));
 
     if ((pfn_type == NULL) || (pfn_batch == NULL)) {
+        ERR("failed to alloc memory for pfn_type and/or pfn_batch arrays"); 
         errno = ENOMEM;
         goto out;
     }
@@ -817,9 +814,9 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         for (i = 0; i < max_pfn; i++) {
 
             mfn = live_p2m[i];
-            if((live_m2p[mfn] != i) && (mfn != 0xffffffffUL)) { 
+            if((mfn != INVALID_P2M_ENTRY) && (mfn_to_pfn(mfn) != i)) { 
                 DPRINTF("i=0x%x mfn=%lx live_m2p=%lx\n", i, 
-                        mfn, live_m2p[mfn]);
+                        mfn, mfn_to_pfn(mfn));
                 err++;
             }
         }
@@ -884,7 +881,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                     DPRINTF("%d pfn= %08lx mfn= %08lx %d  [mfn]= %08lx\n",
                             iter, (unsigned long)n, live_p2m[n],
                             test_bit(n, to_send), 
-                            live_m2p[live_p2m[n]&0xFFFFF]);
+                            mfn_to_pfn(live_p2m[n]&0xFFFFF));
                 }
                 
                 if (!last_iter && test_bit(n, to_send)&& test_bit(n, to_skip)) 
@@ -912,7 +909,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                        unless its sent sooner anyhow */
 
                     set_bit(n, to_fix);
-                    if(iter > 1)
+                    if( (iter > 1) && IS_REAL_PFN(n) )
                         DPRINTF("netbuf race: iter %d, pfn %x. mfn %lx\n",
                                 iter, n, pfn_type[batch]);
                     continue;
@@ -956,7 +953,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                             iter, 
                             (pfn_type[j] & LTAB_MASK) | pfn_batch[j],
                             pfn_type[j],
-                            live_m2p[pfn_type[j]&(~LTAB_MASK)],
+                            mfn_to_pfn(pfn_type[j]&(~LTAB_MASK)),
                             csum_page(region_base + (PAGE_SIZE*j)));
                 
                 /* canonicalise mfn->pfn */
@@ -1030,7 +1027,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
         if (last_iter && debug){
             int minusone = -1;
-            memset( to_send, 0xff, (max_pfn+8)/8 );
+            memset(to_send, 0xff, BITMAP_SIZE); 
             debug = 0;
             fprintf(stderr, "Entering debug resend-all mode\n");
     
@@ -1143,7 +1140,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         ERR("PT base is not in range of pseudophys map");
         goto out;
     }
-    ctxt.ctrlreg[3] = live_m2p[ctxt.ctrlreg[3] >> PAGE_SHIFT] <<
+    ctxt.ctrlreg[3] = mfn_to_pfn(ctxt.ctrlreg[3] >> PAGE_SHIFT) <<
         PAGE_SHIFT;
 
     if (!write_exact(io_fd, &ctxt, sizeof(ctxt)) ||
@@ -1157,6 +1154,13 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
  out:
 
+    if (live) {
+        if(xc_shadow_control(xc_handle, dom, DOM0_SHADOW_CONTROL_OP_OFF, 
+                             NULL, 0, NULL ) < 0) { 
+            DPRINTF("Warning - couldn't disable shadow mode");
+        }
+    }
+    
     if (live_shinfo)
         munmap(live_shinfo, PAGE_SIZE);
     

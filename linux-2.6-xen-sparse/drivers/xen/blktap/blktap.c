@@ -177,8 +177,8 @@ extern inline domid_t ID_TO_DOM(unsigned long id)
  */
 struct grant_handle_pair
 {
-	u16  kernel;
-	u16  user;
+	grant_handle_t kernel;
+	grant_handle_t user;
 };
 static struct grant_handle_pair pending_grant_handles[MMAP_PAGES];
 #define pending_handle(_idx, _i) \
@@ -375,7 +375,7 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 static unsigned int blktap_poll(struct file *file, poll_table *wait)
 {
 	poll_wait(file, &blktap_wait, wait);
-	if (RING_HAS_UNPUSHED_REQUESTS(&blktap_ufe_ring)) {
+	if (blktap_ufe_ring.req_prod_pvt != blktap_ufe_ring.sring->req_prod) {
 		flush_tlb_all();
 		RING_PUSH_REQUESTS(&blktap_ufe_ring);
 		return POLLIN | POLLRDNORM;
@@ -713,7 +713,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 		/* Map the remote page to kernel. */
 		map[op].host_addr = kvaddr;
 		map[op].dom   = blkif->domid;
-		map[op].ref   = blkif_gref_from_fas(req->frame_and_sects[i]);
+		map[op].ref   = req->seg[i].gref;
 		map[op].flags = GNTMAP_host_map;
 		/* This needs a bit more thought in terms of interposition: 
 		 * If we want to be able to modify pages during write using 
@@ -733,7 +733,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 
 		map[op].host_addr = ptep;
 		map[op].dom       = blkif->domid;
-		map[op].ref       = blkif_gref_from_fas(req->frame_and_sects[i]);
+		map[op].ref       = req->seg[i].gref;
 		map[op].flags     = GNTMAP_host_map | GNTMAP_application_map
 			| GNTMAP_contains_pte;
 		/* Above interposition comment applies here as well. */
@@ -755,17 +755,17 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 		uvaddr = MMAP_VADDR(user_vstart, pending_idx, i/2);
 		kvaddr = MMAP_VADDR(mmap_vstart, pending_idx, i/2);
 
-		if (unlikely(map[i].handle < 0)) {
+		if (unlikely(map[i].status)) {
 			DPRINTK("Error on kernel grant mapping (%d)\n",
-				map[i].handle);
-			ret = map[i].handle;
+				map[i].status);
+			ret = map[i].status;
 			cancel = 1;
 		}
 
-		if (unlikely(map[i+1].handle < 0)) {
+		if (unlikely(map[i+1].status)) {
 			DPRINTK("Error on user grant mapping (%d)\n",
-				map[i+1].handle);
-			ret = map[i+1].handle;
+				map[i+1].status);
+			ret = map[i+1].status;
 			cancel = 1;
 		}
 

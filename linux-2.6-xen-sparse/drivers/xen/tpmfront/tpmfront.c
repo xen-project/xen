@@ -38,12 +38,13 @@
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
-#include <linux/tpmfe.h>
+#include <asm-xen/tpmfe.h>
 #include <linux/err.h>
 
 #include <asm/semaphore.h>
 #include <asm/io.h>
 #include <asm-xen/evtchn.h>
+#include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/xen-public/io/tpmif.h>
 #include <asm/uaccess.h>
 #include <asm-xen/xenbus.h>
@@ -73,7 +74,8 @@ static void tpmif_rx_action(unsigned long unused);
 static void tpmif_connect(u16 evtchn, domid_t domid);
 static DECLARE_TASKLET(tpmif_rx_tasklet, tpmif_rx_action, 0);
 static int tpm_allocate_buffers(struct tpm_private *tp);
-static void tpmif_set_connected_state(struct tpm_private *tp, int newstate);
+static void tpmif_set_connected_state(struct tpm_private *tp,
+                                      u8 newstate);
 static int tpm_xmit(struct tpm_private *tp,
                     const u8 * buf, size_t count, int userbuffer,
                     void *remember);
@@ -212,87 +214,46 @@ static int tpm_fe_send_upperlayer(const u8 * buf, size_t count,
  XENBUS support code
 **************************************************************/
 
-static void watch_for_status(struct xenbus_watch *watch,
-			     const char **vec, unsigned int len)
-{
-	struct tpmfront_info *info;
-	int err;
-	unsigned long ready;
-	struct tpm_private *tp = &my_private;
-	const char *node = vec[XS_WATCH_PATH];
-
-	info = container_of(watch, struct tpmfront_info, watch);
-	node += strlen(watch->node);
-
-	if (tp->connected)
-		return;
-
-	err = xenbus_gather(NULL, watch->node,
-	                    "ready", "%lu", &ready,
-	                    NULL);
-	if (err) {
-		xenbus_dev_error(info->dev, err, "reading 'ready' field");
-		return;
-	}
-
-	tpmif_set_connected_state(tp, 1);
-
-	xenbus_dev_ok(info->dev);
-}
-
-
 static int setup_tpmring(struct xenbus_device *dev,
-                         struct tpmfront_info * info,
-                         domid_t backend_id)
+                         struct tpmfront_info * info)
 {
 	tpmif_tx_interface_t *sring;
 	struct tpm_private *tp = &my_private;
 	int err;
-	evtchn_op_t op = {
-		.cmd = EVTCHNOP_alloc_unbound,
-		.u.alloc_unbound.dom = DOMID_SELF,
-		.u.alloc_unbound.remote_dom = backend_id } ;
 
 	sring = (void *)__get_free_page(GFP_KERNEL);
 	if (!sring) {
-		xenbus_dev_error(dev, -ENOMEM, "allocating shared ring");
+		xenbus_dev_fatal(dev, -ENOMEM, "allocating shared ring");
 		return -ENOMEM;
 	}
 	tp->tx = sring;
 
 	tpm_allocate_buffers(tp);
 
-	err = gnttab_grant_foreign_access(backend_id,
-					  (virt_to_machine(tp->tx) >> PAGE_SHIFT),
-					  0);
-
-	if (err == -ENOSPC) {
+	err = xenbus_grant_ring(dev, virt_to_mfn(tp->tx));
+	if (err < 0) {
 		free_page((unsigned long)sring);
 		tp->tx = NULL;
-		xenbus_dev_error(dev, err, "allocating grant reference");
-		return err;
+		xenbus_dev_fatal(dev, err, "allocating grant reference");
+		goto fail;
 	}
 	info->ring_ref = err;
 
-	err = HYPERVISOR_event_channel_op(&op);
-	if (err) {
-		gnttab_end_foreign_access(info->ring_ref, 0,
-					  (unsigned long)sring);
-		tp->tx = NULL;
-		xenbus_dev_error(dev, err, "allocating event channel");
-		return err;
-	}
+	err = xenbus_alloc_evtchn(dev, &tp->evtchn);
+	if (err)
+		goto fail;
 
-	tpmif_connect(op.u.alloc_unbound.port, backend_id);
+	tpmif_connect(tp->evtchn, dev->otherend_id);
 
 	return 0;
+fail:
+	return err;
 }
 
 
 static void destroy_tpmring(struct tpmfront_info *info, struct tpm_private *tp)
 {
-	tpmif_set_connected_state(tp,0);
-
+	tpmif_set_connected_state(tp, FALSE);
 	if ( tp->tx != NULL ) {
 		gnttab_end_foreign_access(info->ring_ref, 0,
 					  (unsigned long)tp->tx);
@@ -308,42 +269,20 @@ static void destroy_tpmring(struct tpmfront_info *info, struct tpm_private *tp)
 static int talk_to_backend(struct xenbus_device *dev,
                            struct tpmfront_info *info)
 {
-	char *backend;
-	const char *message;
+	const char *message = NULL;
 	int err;
-	int backend_id;
 	struct xenbus_transaction *xbt;
 
-	backend = NULL;
-	err = xenbus_gather(NULL, dev->nodename,
-			    "backend-id", "%i", &backend_id,
-			    "backend", NULL, &backend,
-			    NULL);
-	if (XENBUS_EXIST_ERR(err))
-		goto out;
-	if (backend && strlen(backend) == 0) {
-		err = -ENOENT;
-		goto out;
-	}
-	if (err < 0) {
-		xenbus_dev_error(dev, err, "reading %s/backend or backend-id",
-				 dev->nodename);
-		goto out;
-	}
-
-	info->backend_id      = backend_id;
-	my_private.backend_id = backend_id;
-
-	err = setup_tpmring(dev, info, backend_id);
+	err = setup_tpmring(dev, info);
 	if (err) {
-		xenbus_dev_error(dev, err, "setting up ring");
+		xenbus_dev_fatal(dev, err, "setting up ring");
 		goto out;
 	}
 
 again:
 	xbt = xenbus_transaction_start();
 	if (IS_ERR(xbt)) {
-		xenbus_dev_error(dev, err, "starting transaction");
+		xenbus_dev_fatal(dev, err, "starting transaction");
 		goto destroy_tpmring;
 	}
 
@@ -361,34 +300,60 @@ again:
 		goto abort_transaction;
 	}
 
+	err = xenbus_switch_state(dev, xbt, XenbusStateInitialised);
+	if (err) {
+		goto abort_transaction;
+	}
+
 	err = xenbus_transaction_end(xbt, 0);
 	if (err == -EAGAIN)
 		goto again;
 	if (err) {
-		xenbus_dev_error(dev, err, "completing transaction");
+		xenbus_dev_fatal(dev, err, "completing transaction");
 		goto destroy_tpmring;
 	}
-
-	info->watch.node = backend;
-	info->watch.callback = watch_for_status;
-	err = register_xenbus_watch(&info->watch);
-	if (err) {
-		xenbus_dev_error(dev, err, "registering watch on backend");
-		goto destroy_tpmring;
-	}
-
-	info->backend = backend;
-
 	return 0;
 
 abort_transaction:
 	xenbus_transaction_end(xbt, 1);
-	xenbus_dev_error(dev, err, "%s", message);
+	if (message)
+		xenbus_dev_error(dev, err, "%s", message);
 destroy_tpmring:
 	destroy_tpmring(info, &my_private);
 out:
-	kfree(backend);
 	return err;
+}
+
+/**
+ * Callback received when the backend's state changes.
+ */
+static void backend_changed(struct xenbus_device *dev,
+			    XenbusState backend_state)
+{
+	struct tpm_private *tp = &my_private;
+	DPRINTK("\n");
+
+	switch (backend_state) {
+	case XenbusStateInitialising:
+	case XenbusStateInitWait:
+	case XenbusStateInitialised:
+	case XenbusStateUnknown:
+		break;
+
+	case XenbusStateConnected:
+		tpmif_set_connected_state(tp, TRUE);
+		break;
+
+	case XenbusStateClosing:
+		tpmif_set_connected_state(tp, FALSE);
+		break;
+
+	case XenbusStateClosed:
+        	if (tp->is_suspended == FALSE) {
+        	        device_unregister(&dev->dev);
+        	}
+	        break;
+	}
 }
 
 
@@ -398,8 +363,6 @@ static int tpmfront_probe(struct xenbus_device *dev,
 	int err;
 	struct tpmfront_info *info;
 	int handle;
-	int len = max(XS_WATCH_PATH, XS_WATCH_TOKEN) + 1;
-	const char *vec[len];
 
 	err = xenbus_scanf(NULL, dev->nodename,
 	                   "handle", "%i", &handle);
@@ -407,19 +370,19 @@ static int tpmfront_probe(struct xenbus_device *dev,
 		return err;
 
 	if (err < 0) {
-		xenbus_dev_error(dev,err,"reading virtual-device");
+		xenbus_dev_fatal(dev,err,"reading virtual-device");
 		return err;
 	}
 
 	info = kmalloc(sizeof(*info), GFP_KERNEL);
 	if (!info) {
-		xenbus_dev_error(dev,err,"allocating info structure");
+		err = -ENOMEM;
+		xenbus_dev_fatal(dev,err,"allocating info structure");
 		return err;
 	}
 	memset(info, 0x0, sizeof(*info));
 
 	info->dev = dev;
-	info->handle = handle;
 	dev->data = info;
 
 	err = talk_to_backend(dev, info);
@@ -428,41 +391,33 @@ static int tpmfront_probe(struct xenbus_device *dev,
 		dev->data = NULL;
 		return err;
 	}
-
-	vec[XS_WATCH_PATH]  = info->watch.node;
-	vec[XS_WATCH_TOKEN] = NULL;
-	watch_for_status(&info->watch, vec, len);
-
 	return 0;
 }
+
 
 static int tpmfront_remove(struct xenbus_device *dev)
 {
 	struct tpmfront_info *info = dev->data;
-	if (info->backend)
-		unregister_xenbus_watch(&info->watch);
 
 	destroy_tpmring(info, &my_private);
 
-	kfree(info->backend);
 	kfree(info);
-
 	return 0;
 }
 
 static int
 tpmfront_suspend(struct xenbus_device *dev)
 {
-	struct tpmfront_info *info = dev->data;
 	struct tpm_private *tp = &my_private;
 	u32 ctr = 0;
 
 	/* lock, so no app can send */
 	down(&suspend_lock);
+	tp->is_suspended = TRUE;
 
 	while (atomic_read(&tp->tx_busy) && ctr <= 25) {
-	        if ((ctr % 10) == 0)
-			printk("INFO: Waiting for outstanding request.\n");
+		if ((ctr % 10) == 0)
+			printk("TPM-FE [INFO]: Waiting for outstanding request.\n");
 		/*
 		 * Wait for a request to be responded to.
 		 */
@@ -474,14 +429,9 @@ tpmfront_suspend(struct xenbus_device *dev)
 		/*
 		 * A temporary work-around.
 		 */
-		printk("WARNING: Resetting busy flag.");
+		printk("TPM-FE [WARNING]: Resetting busy flag.");
 		atomic_set(&tp->tx_busy, 0);
 	}
-
-	unregister_xenbus_watch(&info->watch);
-
-	kfree(info->backend);
-	info->backend = NULL;
 
 	return 0;
 }
@@ -492,8 +442,6 @@ tpmfront_resume(struct xenbus_device *dev)
 	struct tpmfront_info *info = dev->data;
 	int err = talk_to_backend(dev, info);
 
-	/* unlock, so apps can resume sending */
-	up(&suspend_lock);
 
 	return err;
 }
@@ -530,12 +478,13 @@ static struct xenbus_driver tpmfront = {
 	.probe = tpmfront_probe,
 	.remove =  tpmfront_remove,
 	.resume = tpmfront_resume,
+	.otherend_changed = backend_changed,
 	.suspend = tpmfront_suspend,
 };
 
 static void __init init_tpm_xenbus(void)
 {
-	xenbus_register_driver(&tpmfront);
+	xenbus_register_frontend(&tpmfront);
 }
 
 
@@ -628,12 +577,13 @@ tpm_xmit(struct tpm_private *tp,
 	spin_lock_irq(&tp->tx_lock);
 
 	if (unlikely(atomic_read(&tp->tx_busy))) {
-		printk("There's an outstanding request/response on the way!\n");
+		printk("tpm_xmit: There's an outstanding request/response "
+		       "on the way!\n");
 		spin_unlock_irq(&tp->tx_lock);
 		return -EBUSY;
 	}
 
-	if (tp->connected != 1) {
+	if (tp->is_connected != TRUE) {
 		spin_unlock_irq(&tp->tx_lock);
 		return -EIO;
 	}
@@ -705,24 +655,40 @@ static void tpmif_notify_upperlayer(struct tpm_private *tp)
 	down(&upperlayer_lock);
 
 	if (upperlayer_tpmfe != NULL) {
-		switch (tp->connected) {
-			case 1:
-				upperlayer_tpmfe->status(TPMFE_STATUS_CONNECTED);
-			break;
-
-			default:
-				upperlayer_tpmfe->status(0);
-			break;
+		if (tp->is_connected) {
+			upperlayer_tpmfe->status(TPMFE_STATUS_CONNECTED);
+		} else {
+			upperlayer_tpmfe->status(0);
 		}
 	}
 	up(&upperlayer_lock);
 }
 
 
-static void tpmif_set_connected_state(struct tpm_private *tp, int newstate)
+static void tpmif_set_connected_state(struct tpm_private *tp, u8 is_connected)
 {
-	if (newstate != tp->connected) {
-		tp->connected = newstate;
+	/*
+	 * Don't notify upper layer if we are in suspend mode and
+	 * should disconnect - assumption is that we will resume
+	 * The semaphore keeps apps from sending.
+	 */
+	if (is_connected == FALSE && tp->is_suspended == TRUE) {
+		return;
+	}
+
+	/*
+	 * Unlock the semaphore if we are connected again
+	 * after being suspended - now resuming.
+	 * This also removes the suspend state.
+	 */
+	if (is_connected == TRUE && tp->is_suspended == TRUE) {
+		tp->is_suspended = FALSE;
+		/* unlock, so apps can resume sending */
+		up(&suspend_lock);
+	}
+
+	if (is_connected != tp->is_connected) {
+		tp->is_connected = is_connected;
 		tpmif_notify_upperlayer(tp);
 	}
 }

@@ -15,7 +15,7 @@ int xc_domain_create(int xc_handle,
                      uint32_t *pdomid)
 {
     int err;
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
 
     op.cmd = DOM0_CREATEDOMAIN;
     op.u.createdomain.domain = (domid_t)*pdomid;
@@ -32,7 +32,7 @@ int xc_domain_create(int xc_handle,
 int xc_domain_pause(int xc_handle, 
                     uint32_t domid)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     op.cmd = DOM0_PAUSEDOMAIN;
     op.u.pausedomain.domain = (domid_t)domid;
     return do_dom0_op(xc_handle, &op);
@@ -42,7 +42,7 @@ int xc_domain_pause(int xc_handle,
 int xc_domain_unpause(int xc_handle,
                       uint32_t domid)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     op.cmd = DOM0_UNPAUSEDOMAIN;
     op.u.unpausedomain.domain = (domid_t)domid;
     return do_dom0_op(xc_handle, &op);
@@ -52,7 +52,7 @@ int xc_domain_unpause(int xc_handle,
 int xc_domain_destroy(int xc_handle,
                       uint32_t domid)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     op.cmd = DOM0_DESTROYDOMAIN;
     op.u.destroydomain.domain = (domid_t)domid;
     return do_dom0_op(xc_handle, &op);
@@ -63,7 +63,7 @@ int xc_domain_pincpu(int xc_handle,
                      int vcpu,
                      cpumap_t cpumap)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     op.cmd = DOM0_PINCPUDOMAIN;
     op.u.pincpudomain.domain  = (domid_t)domid;
     op.u.pincpudomain.vcpu    = vcpu;
@@ -79,7 +79,7 @@ int xc_domain_getinfo(int xc_handle,
 {
     unsigned int nr_doms;
     uint32_t next_domid = first_domid;
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     int rc = 0; 
 
     memset(info, 0, max_doms*sizeof(xc_dominfo_t));
@@ -134,7 +134,7 @@ int xc_domain_getinfolist(int xc_handle,
                           xc_domaininfo_t *info)
 {
     int ret = 0;
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
 
     if ( mlock(info, max_domains*sizeof(xc_domaininfo_t)) != 0 )
         return -1;
@@ -161,7 +161,7 @@ int xc_domain_get_vcpu_context(int xc_handle,
                                vcpu_guest_context_t *ctxt)
 {
     int rc;
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
 
     op.cmd = DOM0_GETVCPUCONTEXT;
     op.u.getvcpucontext.domain = (domid_t)domid;
@@ -187,7 +187,7 @@ int xc_shadow_control(int xc_handle,
                       xc_shadow_control_stats_t *stats )
 {
     int rc;
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     op.cmd = DOM0_SHADOW_CONTROL;
     op.u.shadow_control.domain = (domid_t)domid;
     op.u.shadow_control.op     = sop;
@@ -250,7 +250,7 @@ int xc_domain_setmaxmem(int xc_handle,
                         uint32_t domid, 
                         unsigned int max_memkb)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     op.cmd = DOM0_SETDOMAINMAXMEM;
     op.u.setdomainmaxmem.domain = (domid_t)domid;
     op.u.setdomainmaxmem.max_memkb = max_memkb;
@@ -328,7 +328,7 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
 
 int xc_domain_max_vcpus(int xc_handle, uint32_t domid, unsigned int max)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     op.cmd = DOM0_MAX_VCPUS;
     op.u.max_vcpus.domain = (domid_t)domid;
     op.u.max_vcpus.max    = max;
@@ -338,7 +338,7 @@ int xc_domain_max_vcpus(int xc_handle, uint32_t domid, unsigned int max)
 int xc_domain_sethandle(int xc_handle, uint32_t domid, 
                         xen_domain_handle_t handle)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     op.cmd = DOM0_SETDOMAINHANDLE;
     op.u.setdomainhandle.domain = (domid_t)domid;
     memcpy(op.u.setdomainhandle.handle, handle, sizeof(xen_domain_handle_t));
@@ -351,8 +351,7 @@ int xc_domain_get_vcpu_info(int xc_handle,
                             xc_vcpuinfo_t *info)
 {
     int rc;
-    dom0_op_t op;
-
+    DECLARE_DOM0_OP;
     op.cmd = DOM0_GETVCPUINFO;
     op.u.getvcpuinfo.domain = (domid_t)domid;
     op.u.getvcpuinfo.vcpu   = (uint16_t)vcpu;
@@ -366,11 +365,11 @@ int xc_domain_get_vcpu_info(int xc_handle,
 
 int xc_domain_ioport_permission(int xc_handle,
                                 uint32_t domid,
-                                uint16_t first_port,
-                                uint16_t nr_ports,
-                                uint16_t allow_access)
+                                uint32_t first_port,
+                                uint32_t nr_ports,
+                                uint32_t allow_access)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
 
     op.cmd = DOM0_IOPORT_PERMISSION;
     op.u.ioport_permission.domain = (domid_t)domid;

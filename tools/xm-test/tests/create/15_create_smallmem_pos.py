@@ -17,6 +17,7 @@ except DomainError, e:
 
 try:
     console = XmConsole(domain.getName())
+    console.setLimit(65536)
     console.sendInput("input")
     console.runCmd("ls")
 except ConsoleError, e:

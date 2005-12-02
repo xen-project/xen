@@ -127,6 +127,12 @@ struct blkfront_info
 	struct gnttab_free_callback callback;
 	struct blk_shadow shadow[BLK_RING_SIZE];
 	unsigned long shadow_free;
+
+	/**
+	 * The number of people holding this device open.  We won't allow a
+	 * hot-unplug unless this is 0.
+	 */
+	int users;
 };
 
 extern spinlock_t blkif_io_lock;
@@ -140,6 +146,9 @@ extern int blkif_revalidate(dev_t dev);
 extern void do_blkif_request (request_queue_t *rq); 
 
 /* Virtual block-device subsystem. */
+/* Note that xlvbd_add doesn't call add_disk for you: you're expected
+   to call add_disk on info->gd once the disk is properly connected
+   up. */
 int xlvbd_add(blkif_sector_t capacity, int device,
 	      u16 vdisk_info, u16 sector_size, struct blkfront_info *info);
 void xlvbd_del(struct blkfront_info *info);

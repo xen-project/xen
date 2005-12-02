@@ -17,7 +17,7 @@ do_gnttab_op(int xc_handle,
              unsigned long count)
 {
     int ret = -1;
-    privcmd_hypercall_t hypercall;
+    DECLARE_HYPERCALL;
 
     hypercall.op     = __HYPERVISOR_grant_table_op;
     hypercall.arg[0] = cmd;
@@ -42,9 +42,10 @@ do_gnttab_op(int xc_handle,
 int xc_gnttab_map_grant_ref(int         xc_handle,
                             uint64_t    host_virt_addr,
                             uint32_t    dom,
-                            uint16_t    ref,
+                            grant_ref_t ref,
                             uint16_t    flags,
-                            int16_t    *handle,
+                            int16_t    *status,
+                            grant_handle_t *handle,
                             uint64_t   *dev_bus_addr)
 {
     struct gnttab_map_grant_ref op;
@@ -58,6 +59,7 @@ int xc_gnttab_map_grant_ref(int         xc_handle,
     if ( (rc = do_gnttab_op(xc_handle, GNTTABOP_map_grant_ref,
                             &op, 1)) == 0 )
     {
+        *status         = op.status;
         *handle         = op.handle;
         *dev_bus_addr   = op.dev_bus_addr;
     }
@@ -69,7 +71,7 @@ int xc_gnttab_map_grant_ref(int         xc_handle,
 int xc_gnttab_unmap_grant_ref(int       xc_handle,
                               uint64_t  host_virt_addr,
                               uint64_t  dev_bus_addr,
-                              uint16_t  handle,
+                              grant_handle_t handle,
                               int16_t  *status)
 {
     struct gnttab_unmap_grant_ref op;

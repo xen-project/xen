@@ -31,7 +31,7 @@
 #include <xen/sched.h>
 #include <public/io/ioreq.h>
 #include <asm/vmx.h>
-#include <public/io/vmx_vpic.h>
+#include <asm/vmx_vpic.h>
 #include <asm/current.h>
 #include <asm/vmx_vioapic.h>
 #include <asm/vmx_vlapic.h>

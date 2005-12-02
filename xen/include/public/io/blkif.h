@@ -11,6 +11,18 @@
 
 #include "ring.h"
 
+/*
+ * Front->back notifications: When enqueuing a new request, sending a
+ * notification can be made conditional on req_event (i.e., the generic
+ * hold-off mechanism provided by the ring macros). Backends must set
+ * req_event appropriately (e.g., using RING_FINAL_CHECK_FOR_REQUESTS()).
+ * 
+ * Back->front notifications: When enqueuing a new response, sending a
+ * notification can be made conditional on rsp_event (i.e., the generic
+ * hold-off mechanism provided by the ring macros). Frontends must set
+ * rsp_event appropriately (e.g., using RING_FINAL_CHECK_FOR_RESPONSES()).
+ */
+
 #ifndef blkif_vdev_t
 #define blkif_vdev_t   uint16_t
 #endif
@@ -18,9 +30,6 @@
 
 #define BLKIF_OP_READ      0
 #define BLKIF_OP_WRITE     1
-
-/* NB. Ring size must be small enough for sizeof(blkif_ring_t) <= PAGE_SIZE. */
-#define BLKIF_RING_SIZE        64
 
 /*
  * Maximum scatter/gather segments per request.
@@ -33,33 +42,24 @@ typedef struct blkif_request {
     uint8_t        operation;    /* BLKIF_OP_???                         */
     uint8_t        nr_segments;  /* number of segments                   */
     blkif_vdev_t   handle;       /* only for read/write requests         */
-    unsigned long  id;           /* private guest value, echoed in resp  */
+    uint64_t       id;           /* private guest value, echoed in resp  */
     blkif_sector_t sector_number;/* start sector idx on disk (r/w only)  */
-    /* @f_a_s[4:0]=last_sect ; @f_a_s[9:5]=first_sect                        */
-    /* @f_a_s[:16]= grant reference (16 bits)                                */
-    /* @first_sect: first sector in frame to transfer (inclusive).           */
-    /* @last_sect: last sector in frame to transfer (inclusive).             */
-    unsigned long  frame_and_sects[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+    struct blkif_request_segment {
+        grant_ref_t gref;        /* reference to I/O buffer frame        */
+        /* @first_sect: first sector in frame to transfer (inclusive).   */
+        /* @last_sect: last sector in frame to transfer (inclusive).     */
+        uint8_t     first_sect, last_sect;
+    } seg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 } blkif_request_t;
 
-#define blkif_fas(_addr, _fs, _ls) ((_addr)|((_fs)<<5)|(_ls))
-#define blkif_first_sect(_fas) (((_fas)>>5)&31)
-#define blkif_last_sect(_fas)  ((_fas)&31)
-
-#define blkif_fas_from_gref(_gref, _fs, _ls) (((_gref)<<16)|((_fs)<<5)|(_ls))
-#define blkif_gref_from_fas(_fas) ((_fas)>>16)
-
 typedef struct blkif_response {
-    unsigned long   id;              /* copied from request */
+    uint64_t        id;              /* copied from request */
     uint8_t         operation;       /* copied from request */
     int16_t         status;          /* BLKIF_RSP_???       */
 } blkif_response_t;
 
 #define BLKIF_RSP_ERROR  -1 /* non-specific 'error' */
 #define BLKIF_RSP_OKAY    0 /* non-specific 'okay'  */
-
-#define BLKIF_MAJOR(dev) ((dev)>>8)
-#define BLKIF_MINOR(dev) ((dev) & 0xff)
 
 /*
  * Generate blkif ring structures and types.

@@ -297,13 +297,11 @@ void free_monitor_pagetable(struct vcpu *v)
 
     /*
      * free monitor_table.
-     * Note: for VMX guest, only BSP need do this free.
      */
-    if (!(VMX_DOMAIN(v) && v->vcpu_id)) {
-        mfn = pagetable_get_pfn(v->arch.monitor_table);
-        unmap_domain_page(v->arch.monitor_vtable);
-        free_domheap_page(&frame_table[mfn]);
-    }
+    mfn = pagetable_get_pfn(v->arch.monitor_table);
+    unmap_domain_page(v->arch.monitor_vtable);
+    free_domheap_page(&frame_table[mfn]);
+
     v->arch.monitor_table = mk_pagetable(0);
     v->arch.monitor_vtable = 0;
 }
@@ -392,22 +390,17 @@ void free_monitor_pagetable(struct vcpu *v)
         put_shadow_ref(mfn);
     }
 
-    unmap_domain_page(mpl2e);
-
     /*
      * Then free monitor_table.
-     * Note: for VMX guest, only BSP need do this free.
      */
-    if (!(VMX_DOMAIN(v) && v->vcpu_id)) {
-        mfn = pagetable_get_pfn(v->arch.monitor_table);
-        unmap_domain_page(v->arch.monitor_vtable);
-        free_domheap_page(&frame_table[mfn]);
-    }
+    mfn = pagetable_get_pfn(v->arch.monitor_table);
+    unmap_domain_page(v->arch.monitor_vtable);
+    free_domheap_page(&frame_table[mfn]);
 
     v->arch.monitor_table = mk_pagetable(0);
     v->arch.monitor_vtable = 0;
 }
-#endif 
+#endif
 
 static void
 shadow_free_snapshot(struct domain *d, struct out_of_sync_entry *entry)
@@ -786,6 +779,7 @@ void free_shadow_pages(struct domain *d)
     int                   i;
     struct shadow_status *x;
     struct vcpu          *v;
+    struct list_head *list_ent, *tmp;
 
     /*
      * WARNING! The shadow page table must not currently be in use!
@@ -884,15 +878,14 @@ void free_shadow_pages(struct domain *d)
         xfree(mfn_list);
     }
 
-    // Now free the pre-zero'ed pages from the domain
-    //
-    struct list_head *list_ent, *tmp;
+    /* Now free the pre-zero'ed pages from the domain. */
     list_for_each_safe(list_ent, tmp, &d->arch.free_shadow_frames)
     {
+        struct pfn_info *page = list_entry(list_ent, struct pfn_info, list);
+
         list_del(list_ent);
         perfc_decr(free_l1_pages);
 
-        struct pfn_info *page = list_entry(list_ent, struct pfn_info, list);
         if (d->arch.ops->guest_paging_levels == PAGING_L2)
         {
 #if CONFIG_PAGING_LEVELS >=4
@@ -912,6 +905,11 @@ void free_shadow_pages(struct domain *d)
 
 void __shadow_mode_disable(struct domain *d)
 {
+    struct vcpu *v;
+#ifndef NDEBUG
+    int i;
+#endif
+
     if ( unlikely(!shadow_mode_enabled(d)) )
         return;
 
@@ -919,7 +917,6 @@ void __shadow_mode_disable(struct domain *d)
     free_writable_pte_predictions(d);
 
 #ifndef NDEBUG
-    int i;
     for ( i = 0; i < shadow_ht_buckets; i++ )
     {
         if ( d->arch.shadow_ht[i].gpfn_and_flags != 0 )
@@ -936,11 +933,8 @@ void __shadow_mode_disable(struct domain *d)
     free_shadow_ht_entries(d);
     free_out_of_sync_entries(d);
 
-    struct vcpu *v;
     for_each_vcpu(d, v)
-    {
         update_pagetables(v);
-    }
 }
 
 
@@ -1083,36 +1077,40 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
     //
     free_shadow_pages(d);
 
-    /*
-     * Tear down it's counts by disassembling its page-table-based ref counts.
-     * Also remove CR3's gcount/tcount.
-     * That leaves things like GDTs and LDTs and external refs in tact.
-     *
-     * Most pages will be writable tcount=0.
-     * Some will still be L1 tcount=0 or L2 tcount=0.
-     * Maybe some pages will be type none tcount=0.
-     * Pages granted external writable refs (via grant tables?) will
-     * still have a non-zero tcount.  That's OK.
-     *
-     * gcounts will generally be 1 for PGC_allocated.
-     * GDTs and LDTs will have additional gcounts.
-     * Any grant-table based refs will still be in the gcount.
-     *
-     * We attempt to grab writable refs to each page (thus setting its type).
-     * Immediately put back those type refs.
-     *
-     * Assert that no pages are left with L1/L2/L3/L4 type.
-     */
-    audit_adjust_pgtables(d, -1, 1);
-
     d->arch.shadow_mode = mode;
 
     if ( shadow_mode_refcounts(d) )
     {
-        struct list_head *list_ent = d->page_list.next;
-        while ( list_ent != &d->page_list )
-        {
-            struct pfn_info *page = list_entry(list_ent, struct pfn_info, list);
+        struct list_head *list_ent; 
+        struct pfn_info *page;
+
+        /*
+         * Tear down its counts by disassembling its page-table-based refcounts
+         * Also remove CR3's gcount/tcount.
+         * That leaves things like GDTs and LDTs and external refs in tact.
+         *
+         * Most pages will be writable tcount=0.
+         * Some will still be L1 tcount=0 or L2 tcount=0.
+         * Maybe some pages will be type none tcount=0.
+         * Pages granted external writable refs (via grant tables?) will
+         * still have a non-zero tcount.  That's OK.
+         *
+         * gcounts will generally be 1 for PGC_allocated.
+         * GDTs and LDTs will have additional gcounts.
+         * Any grant-table based refs will still be in the gcount.
+         *
+         * We attempt to grab writable refs to each page thus setting its type
+         * Immediately put back those type refs.
+         *
+         * Assert that no pages are left with L1/L2/L3/L4 type.
+         */
+        audit_adjust_pgtables(d, -1, 1);
+
+
+        for (list_ent = d->page_list.next; list_ent != &d->page_list; 
+             list_ent = page->list.next) {
+            
+            page = list_entry(list_ent, struct pfn_info, list);
             if ( !get_page_type(page, PGT_writable_page) )
                 BUG();
             put_page_type(page);
@@ -1120,13 +1118,13 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
              * We use tlbflush_timestamp as back pointer to smfn, and need to
              * clean up it.
              */
-            if ( shadow_mode_external(d) )
+            if (shadow_mode_external(d))
                 page->tlbflush_timestamp = 0;
-            list_ent = page->list.next;
         }
+        
+        audit_adjust_pgtables(d, 1, 1);
+  
     }
-
-    audit_adjust_pgtables(d, 1, 1);
 
     return 0;
 
@@ -1182,8 +1180,6 @@ static int shadow_mode_table_op(
 
         d->arch.shadow_fault_count       = 0;
         d->arch.shadow_dirty_count       = 0;
-        d->arch.shadow_dirty_net_count   = 0;
-        d->arch.shadow_dirty_block_count = 0;
 
         break;
    
@@ -1192,15 +1188,10 @@ static int shadow_mode_table_op(
 
         sc->stats.fault_count       = d->arch.shadow_fault_count;
         sc->stats.dirty_count       = d->arch.shadow_dirty_count;
-        sc->stats.dirty_net_count   = d->arch.shadow_dirty_net_count;
-        sc->stats.dirty_block_count = d->arch.shadow_dirty_block_count;
 
         d->arch.shadow_fault_count       = 0;
         d->arch.shadow_dirty_count       = 0;
-        d->arch.shadow_dirty_net_count   = 0;
-        d->arch.shadow_dirty_block_count = 0;
  
-
         if ( (sc->dirty_bitmap == NULL) || 
              (d->arch.shadow_dirty_bitmap == NULL) )
         {
@@ -1235,8 +1226,6 @@ static int shadow_mode_table_op(
     case DOM0_SHADOW_CONTROL_OP_PEEK:
         sc->stats.fault_count       = d->arch.shadow_fault_count;
         sc->stats.dirty_count       = d->arch.shadow_dirty_count;
-        sc->stats.dirty_net_count   = d->arch.shadow_dirty_net_count;
-        sc->stats.dirty_block_count = d->arch.shadow_dirty_block_count;
  
         if ( (sc->dirty_bitmap == NULL) || 
              (d->arch.shadow_dirty_bitmap == NULL) )
@@ -1290,8 +1279,11 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
     switch ( op )
     {
     case DOM0_SHADOW_CONTROL_OP_OFF:
-        __shadow_sync_all(d);
-        __shadow_mode_disable(d);
+        if ( shadow_mode_enabled(d) )
+        {
+            __shadow_sync_all(d);
+            __shadow_mode_disable(d);
+        }
         break;
 
     case DOM0_SHADOW_CONTROL_OP_ENABLE_TEST:
@@ -1433,7 +1425,7 @@ alloc_p2m_table(struct domain *d)
 
 void shadow_l1_normal_pt_update(
     struct domain *d,
-    unsigned long pa, l1_pgentry_t gpte,
+    physaddr_t pa, l1_pgentry_t gpte,
     struct domain_mmap_cache *cache)
 {
     unsigned long sl1mfn;    
@@ -1458,7 +1450,7 @@ void shadow_l1_normal_pt_update(
 
 void shadow_l2_normal_pt_update(
     struct domain *d,
-    unsigned long pa, l2_pgentry_t gpde,
+    physaddr_t pa, l2_pgentry_t gpde,
     struct domain_mmap_cache *cache)
 {
     unsigned long sl2mfn;
@@ -1483,7 +1475,7 @@ void shadow_l2_normal_pt_update(
 #if CONFIG_PAGING_LEVELS >= 3
 void shadow_l3_normal_pt_update(
     struct domain *d,
-    unsigned long pa, l3_pgentry_t l3e,
+    physaddr_t pa, l3_pgentry_t l3e,
     struct domain_mmap_cache *cache)
 {
     unsigned long sl3mfn;
@@ -1510,7 +1502,7 @@ void shadow_l3_normal_pt_update(
 #if CONFIG_PAGING_LEVELS >= 4
 void shadow_l4_normal_pt_update(
     struct domain *d,
-    unsigned long pa, l4_pgentry_t l4e,
+    physaddr_t pa, l4_pgentry_t l4e,
     struct domain_mmap_cache *cache)
 {
     unsigned long sl4mfn;
@@ -1603,36 +1595,40 @@ remove_shadow(struct domain *d, unsigned long gpfn, u32 stype)
 }
 
 unsigned long
-gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
+get_mfn_from_pfn_foreign(struct domain *d, unsigned long gpfn)
 {
-    ASSERT( shadow_mode_translate(d) );
+    unsigned long va, tabpfn;
+    l1_pgentry_t *l1, l1e;
+    l2_pgentry_t *l2, l2e;
 
-    perfc_incrc(gpfn_to_mfn_foreign);
+    ASSERT(shadow_mode_translate(d));
 
-    unsigned long va = gpfn << PAGE_SHIFT;
-    unsigned long tabpfn = pagetable_get_pfn(d->arch.phys_table);
-    l2_pgentry_t *l2 = map_domain_page(tabpfn);
-    l2_pgentry_t l2e = l2[l2_table_offset(va)];
+    perfc_incrc(get_mfn_from_pfn_foreign);
+
+    va = gpfn << PAGE_SHIFT;
+    tabpfn = pagetable_get_pfn(d->arch.phys_table);
+    l2 = map_domain_page(tabpfn);
+    l2e = l2[l2_table_offset(va)];
     unmap_domain_page(l2);
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
     {
-        printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => 0 l2e=%" PRIpte "\n",
-               d->domain_id, gpfn, l2e_get_intpte(l2e));
+        printk("%s(d->id=%d, gpfn=%lx) => 0 l2e=%" PRIpte "\n",
+               __func__, d->domain_id, gpfn, l2e_get_intpte(l2e));
         return INVALID_MFN;
     }
-    l1_pgentry_t *l1 = map_domain_page(l2e_get_pfn(l2e));
-    l1_pgentry_t l1e = l1[l1_table_offset(va)];
+    l1 = map_domain_page(l2e_get_pfn(l2e));
+    l1e = l1[l1_table_offset(va)];
     unmap_domain_page(l1);
 
 #if 0
-    printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => %lx tabpfn=%lx l2e=%lx l1tab=%lx, l1e=%lx\n",
-           d->domain_id, gpfn, l1_pgentry_val(l1e) >> PAGE_SHIFT, tabpfn, l2e, l1tab, l1e);
+    printk("%s(d->id=%d, gpfn=%lx) => %lx tabpfn=%lx l2e=%lx l1tab=%lx, l1e=%lx\n",
+           __func__, d->domain_id, gpfn, l1_pgentry_val(l1e) >> PAGE_SHIFT, tabpfn, l2e, l1tab, l1e);
 #endif
 
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
     {
-        printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => 0 l1e=%" PRIpte "\n",
-               d->domain_id, gpfn, l1e_get_intpte(l1e));
+        printk("%s(d->id=%d, gpfn=%lx) => 0 l1e=%" PRIpte "\n",
+               __func__, d->domain_id, gpfn, l1e_get_intpte(l1e));
         return INVALID_MFN;
     }
 

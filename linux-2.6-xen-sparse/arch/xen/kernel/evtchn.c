@@ -154,7 +154,7 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 	unsigned int   l1i, l2i, port;
 	int            irq, cpu = smp_processor_id();
 	shared_info_t *s = HYPERVISOR_shared_info;
-	vcpu_info_t   *vcpu_info = &s->vcpu_data[cpu];
+	vcpu_info_t   *vcpu_info = &s->vcpu_info[cpu];
 
 	vcpu_info->evtchn_upcall_pending = 0;
 

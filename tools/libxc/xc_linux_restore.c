@@ -78,6 +78,7 @@ int uncanonicalize_pagetable(unsigned long type, void *page)
             pfn = (pte >> PAGE_SHIFT) & 0xffffffff;
             
             if(pfn >= max_pfn) { 
+                /* This "page table page" is probably not one; bail. */
                 ERR("Frame number in type %lu page table is out of range: "
                     "i=%d pfn=0x%lx max_pfn=%lu", 
                     type >> 28, i, pfn, max_pfn);
@@ -106,11 +107,12 @@ int xc_linux_restore(int xc_handle, int io_fd,
                      unsigned int store_evtchn, unsigned long *store_mfn,
                      unsigned int console_evtchn, unsigned long *console_mfn)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     int rc = 1, i, n;
     unsigned long mfn, pfn; 
     unsigned int prev_pc, this_pc;
     int verify = 0;
+    int nraces = 0; 
 
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
@@ -219,7 +221,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     
     if(xc_domain_memory_increase_reservation(
            xc_handle, dom, max_pfn, 0, 0, NULL) != 0) { 
-        ERR("Failed to increase reservation by %lx KB\n", PFN_TO_KB(max_pfn));
+        ERR("Failed to increase reservation by %lx KB", PFN_TO_KB(max_pfn));
         errno = ENOMEM;
         goto out;
     }
@@ -344,8 +346,15 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 if(pt_levels != 3 || pagetype != L1TAB) { 
 
                     if(!uncanonicalize_pagetable(pagetype, page)) {
-                        ERR("failed uncanonicalize pt!\n"); 
-                        goto out; 
+                        /* 
+                        ** Failing to uncanonicalize a page table can be ok
+                        ** under live migration since the pages type may have
+                        ** changed by now (and we'll get an update later). 
+                        */
+                        DPRINTF("PT L%ld race on pfn=%08lx mfn=%08lx\n", 
+                                pagetype >> 28, pfn, mfn); 
+                        nraces++; 
+                        continue; 
                     }
 
                 } 
@@ -394,7 +403,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
         n+= j; /* crude stats */
     }
 
-    DPRINTF("Received all pages\n");
+    DPRINTF("Received all pages (%d races)\n", nraces);
 
     if(pt_levels == 3) { 
 
@@ -478,7 +487,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 for(k = 0; k < j; k++) {
                     if(!uncanonicalize_pagetable(L1TAB, 
                                                  region_base + k*PAGE_SIZE)) {
-                        ERR("failed uncanonicalize pt!\n"); 
+                        ERR("failed uncanonicalize pt!"); 
                         goto out; 
                     } 
                 }
@@ -662,7 +671,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     memset(&(shared_info->evtchn_pending[0]), 0,
            sizeof (shared_info->evtchn_pending));
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        shared_info->vcpu_data[i].evtchn_pending_sel = 0;
+        shared_info->vcpu_info[i].evtchn_pending_sel = 0;
 
     /* Copy saved contents of shared-info page. No checking needed. */
     page = xc_map_foreign_range(

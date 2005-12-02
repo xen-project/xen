@@ -10,7 +10,7 @@
 #define PROGRESS 0
 
 #define ERR(_f, _a...) do {                     \
-    fprintf(stderr, _f "\n" , ## _a);           \
+    fprintf(stderr, _f ": %d\n" , ## _a, errno);\
     fflush(stderr); }                           \
 while (0)
 
@@ -64,7 +64,6 @@ static int get_platform_info(int xc_handle, uint32_t dom,
 { 
     xen_capabilities_info_t xen_caps = "";
     xen_platform_parameters_t xen_params;
-    
 
     if (xc_version(xc_handle, XENVER_platform_parameters, &xen_params) != 0)
         return 0;
@@ -72,8 +71,7 @@ static int get_platform_info(int xc_handle, uint32_t dom,
     if (xc_version(xc_handle, XENVER_capabilities, &xen_caps) != 0)
         return 0;
 
-    if (xc_memory_op(xc_handle, XENMEM_maximum_ram_page, max_mfn) != 0)
-        return 0; 
+    *max_mfn = xc_memory_op(xc_handle, XENMEM_maximum_ram_page, NULL);
     
     *hvirt_start = xen_params.virt_start;
 
@@ -124,6 +122,12 @@ static int get_platform_info(int xc_handle, uint32_t dom,
 
 /* Number of entries in the pfn_to_mfn_frame_list_list */
 #define P2M_FLL_ENTRIES (((max_pfn)+(ulpp*ulpp)-1)/(ulpp*ulpp))
+
+/* Current guests allow 8MB 'slack' in their P2M */
+#define NR_SLACK_ENTRIES   ((8 * 1024 * 1024) / PAGE_SIZE)
+
+/* Is the given PFN within the 'slack' region at the top of the P2M? */
+#define IS_REAL_PFN(_pfn)  ((max_pfn - (_pfn)) > NR_SLACK_ENTRIES) 
 
 /* Returns TRUE if the PFN is currently mapped */
 #define is_mapped(pfn_type) (!((pfn_type) & 0x80000000UL))

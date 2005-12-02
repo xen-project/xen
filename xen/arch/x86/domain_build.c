@@ -597,7 +597,7 @@ int construct_dom0(struct domain *d,
 
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
+        d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
 
     for ( i = 1; i < num_online_cpus(); i++ )
         (void)alloc_vcpu(d, i, i);

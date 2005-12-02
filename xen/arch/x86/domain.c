@@ -266,7 +266,7 @@ void arch_do_createdomain(struct vcpu *v)
 
     d->shared_info = alloc_xenheap_page();
     memset(d->shared_info, 0, PAGE_SIZE);
-    v->vcpu_info = &d->shared_info->vcpu_data[v->vcpu_id];
+    v->vcpu_info = &d->shared_info->vcpu_info[v->vcpu_id];
     v->cpumap = CPUMAP_RUNANYWHERE;
     SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
 
@@ -413,9 +413,6 @@ int arch_set_info_guest(
         if ( !pagetable_get_paddr(d->arch.phys_table) )
             d->arch.phys_table = v->arch.guest_table;
         v->arch.guest_table = mk_pagetable(0);
-
-        /* Initialize monitor page table */
-        v->arch.monitor_table = mk_pagetable(0);
 
         vmx_final_setup_guest(v);
     }
@@ -960,8 +957,7 @@ void domain_relinquish_resources(struct domain *d)
 
     ptwr_destroy(d);
 
-    /* Release device mappings of other domains */
-    gnttab_release_dev_mappings(d->grant_table);
+    gnttab_release_mappings(d);
 
     /* Drop the in-use references to page-table bases. */
     for_each_vcpu ( d, v )

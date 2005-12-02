@@ -9,6 +9,8 @@
 #ifndef __XEN_PUBLIC_EVENT_CHANNEL_H__
 #define __XEN_PUBLIC_EVENT_CHANNEL_H__
 
+typedef uint32_t evtchn_port_t;
+
 /*
  * EVTCHNOP_alloc_unbound: Allocate a port in domain <dom> and mark as
  * accepting interdomain bindings from domain <remote_dom>. A fresh port
@@ -20,9 +22,9 @@
 #define EVTCHNOP_alloc_unbound    6
 typedef struct evtchn_alloc_unbound {
     /* IN parameters */
-    domid_t  dom, remote_dom;
+    domid_t dom, remote_dom;
     /* OUT parameters */
-    uint32_t port;
+    evtchn_port_t port;
 } evtchn_alloc_unbound_t;
 
 /*
@@ -37,10 +39,10 @@ typedef struct evtchn_alloc_unbound {
 #define EVTCHNOP_bind_interdomain 0
 typedef struct evtchn_bind_interdomain {
     /* IN parameters. */
-    domid_t  remote_dom;
-    uint32_t remote_port;
+    domid_t remote_dom;
+    evtchn_port_t remote_port;
     /* OUT parameters. */
-    uint32_t local_port;
+    evtchn_port_t local_port;
 } evtchn_bind_interdomain_t;
 
 /*
@@ -57,7 +59,7 @@ typedef struct evtchn_bind_virq {
     uint32_t virq;
     uint32_t vcpu;
     /* OUT parameters. */
-    uint32_t port;
+    evtchn_port_t port;
 } evtchn_bind_virq_t;
 
 /*
@@ -73,7 +75,7 @@ typedef struct evtchn_bind_pirq {
 #define BIND_PIRQ__WILL_SHARE 1
     uint32_t flags; /* BIND_PIRQ__* */
     /* OUT parameters. */
-    uint32_t port;
+    evtchn_port_t port;
 } evtchn_bind_pirq_t;
 
 /*
@@ -86,7 +88,7 @@ typedef struct evtchn_bind_pirq {
 typedef struct evtchn_bind_ipi {
     uint32_t vcpu;
     /* OUT parameters. */
-    uint32_t port;
+    evtchn_port_t port;
 } evtchn_bind_ipi_t;
 
 /*
@@ -97,7 +99,7 @@ typedef struct evtchn_bind_ipi {
 #define EVTCHNOP_close            3
 typedef struct evtchn_close {
     /* IN parameters. */
-    uint32_t port;
+    evtchn_port_t port;
 } evtchn_close_t;
 
 /*
@@ -107,7 +109,7 @@ typedef struct evtchn_close {
 #define EVTCHNOP_send             4
 typedef struct evtchn_send {
     /* IN parameters. */
-    uint32_t port;
+    evtchn_port_t port;
 } evtchn_send_t;
 
 /*
@@ -122,7 +124,7 @@ typedef struct evtchn_send {
 typedef struct evtchn_status {
     /* IN parameters */
     domid_t  dom;
-    uint32_t port;
+    evtchn_port_t port;
     /* OUT parameters */
 #define EVTCHNSTAT_closed       0  /* Channel is not in use.                 */
 #define EVTCHNSTAT_unbound      1  /* Channel is waiting interdom connection.*/
@@ -134,11 +136,11 @@ typedef struct evtchn_status {
     uint32_t vcpu;                 /* VCPU to which this channel is bound.   */
     union {
         struct {
-            domid_t  dom;
+            domid_t dom;
         } unbound; /* EVTCHNSTAT_unbound */
         struct {
-            domid_t  dom;
-            uint32_t port;
+            domid_t dom;
+            evtchn_port_t port;
         } interdomain; /* EVTCHNSTAT_interdomain */
         uint32_t pirq;      /* EVTCHNSTAT_pirq        */
         uint32_t virq;      /* EVTCHNSTAT_virq        */
@@ -158,7 +160,7 @@ typedef struct evtchn_status {
 #define EVTCHNOP_bind_vcpu        8
 typedef struct evtchn_bind_vcpu {
     /* IN parameters. */
-    uint32_t port;
+    evtchn_port_t port;
     uint32_t vcpu;
 } evtchn_bind_vcpu_t;
 

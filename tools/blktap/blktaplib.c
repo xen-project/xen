@@ -244,8 +244,8 @@ int blktap_listen(void)
     RING_IDX          rp, i, pfd_count; 
     
     /* pending rings */
-    blkif_request_t req_pending[BLKIF_RING_SIZE];
-    /* blkif_response_t rsp_pending[BLKIF_RING_SIZE] */;
+    blkif_request_t req_pending[BLK_RING_SIZE];
+    /* blkif_response_t rsp_pending[BLK_RING_SIZE] */;
     
     /* handler hooks: */
     request_hook_t   *req_hook;

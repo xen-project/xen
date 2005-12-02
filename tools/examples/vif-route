@@ -23,7 +23,7 @@
 dir=$(dirname "$0")
 . "$dir/vif-common.sh"
 
-main_ip=$(ip addr show eth0 | sed -e '/inet /!d;s/^.*inet \([^\s*]\)\s.*$/\1/')
+main_ip=$(dom0_ip)
 
 case "$command" in
     online)
@@ -47,4 +47,8 @@ fi
 
 handle_iptable
 
-success
+log debug "Successful vif-route $command for $vif."
+if [ "$command" == "online" ]
+then
+  success
+fi

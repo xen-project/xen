@@ -56,7 +56,7 @@ void lock_vm_area(struct vm_struct *area)
 	 * page-fault path will copy the page directory pointers from init_mm.
 	 */
 	for (i = 0; i < area->size; i += PAGE_SIZE)
-		(void)__get_user(c, (char *)area->addr + i);
+		(void)__get_user(c, (char __user *)area->addr + i);
 }
 
 void unlock_vm_area(struct vm_struct *area)

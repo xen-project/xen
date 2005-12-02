@@ -131,10 +131,10 @@ extern int set_p2m_entry(
 extern void remove_shadow(struct domain *d, unsigned long gpfn, u32 stype);
 
 extern void shadow_l1_normal_pt_update(struct domain *d,
-                                       unsigned long pa, l1_pgentry_t l1e,
+                                       physaddr_t pa, l1_pgentry_t l1e,
                                        struct domain_mmap_cache *cache);
 extern void shadow_l2_normal_pt_update(struct domain *d,
-                                       unsigned long pa, l2_pgentry_t l2e,
+                                       physaddr_t pa, l2_pgentry_t l2e,
                                        struct domain_mmap_cache *cache);
 #if CONFIG_PAGING_LEVELS >= 3
 #include <asm/page-guest32.h>
@@ -148,12 +148,12 @@ extern void shadow_l2_normal_pt_update(struct domain *d,
 
 extern unsigned long gva_to_gpa(unsigned long gva);
 extern void shadow_l3_normal_pt_update(struct domain *d,
-                                       unsigned long pa, l3_pgentry_t l3e,
+                                       physaddr_t pa, l3_pgentry_t l3e,
                                        struct domain_mmap_cache *cache);
 #endif
 #if CONFIG_PAGING_LEVELS >= 4
 extern void shadow_l4_normal_pt_update(struct domain *d,
-                                       unsigned long pa, l4_pgentry_t l4e,
+                                       physaddr_t pa, l4_pgentry_t l4e,
                                        struct domain_mmap_cache *cache);
 #endif
 extern int shadow_do_update_va_mapping(unsigned long va,
@@ -173,11 +173,12 @@ extern void vmx_shadow_clear_state(struct domain *);
 static inline int page_is_page_table(struct pfn_info *page)
 {
     struct domain *owner = page_get_owner(page);
+    u32 type_info;
 
     if ( owner && shadow_mode_refcounts(owner) )
         return page->count_info & PGC_page_table;
 
-    u32 type_info = page->u.inuse.type_info & PGT_type_mask;
+    type_info = page->u.inuse.type_info & PGT_type_mask;
     return type_info && (type_info <= PGT_l4_page_table);
 }
 
@@ -284,23 +285,19 @@ static inline void shadow_mode_disable(struct domain *d)
 
 #define __mfn_to_gpfn(_d, mfn)                         \
     ( (shadow_mode_translate(_d))                      \
-      ? get_pfn_from_mfn(mfn)                                   \
+      ? get_pfn_from_mfn(mfn)                          \
       : (mfn) )
 
 #define __gpfn_to_mfn(_d, gpfn)                        \
     ({                                                 \
-        ASSERT(current->domain == (_d));               \
-        (shadow_mode_translate(_d))                    \
-        ? get_mfn_from_pfn(gpfn)                \
+        unlikely(shadow_mode_translate(_d))            \
+        ? (likely(current->domain == (_d))             \
+           ? get_mfn_from_pfn(gpfn)                    \
+           : get_mfn_from_pfn_foreign(_d, gpfn))       \
         : (gpfn);                                      \
     })
 
-#define __gpfn_to_mfn_foreign(_d, gpfn)                \
-    ( (shadow_mode_translate(_d))                      \
-      ? gpfn_to_mfn_foreign(_d, gpfn)                  \
-      : (gpfn) )
-
-extern unsigned long gpfn_to_mfn_foreign(
+extern unsigned long get_mfn_from_pfn_foreign(
     struct domain *d, unsigned long gpfn);
 
 /************************************************************************/
@@ -320,7 +317,7 @@ struct out_of_sync_entry {
     unsigned long gpfn;    /* why is this here? */
     unsigned long gmfn;
     unsigned long snapshot_mfn;
-    unsigned long writable_pl1e; /* NB: this is a machine address */
+    physaddr_t writable_pl1e; /* NB: this is a machine address */
     unsigned long va;
 };
 
@@ -341,19 +338,15 @@ extern int shadow_status_noswap;
 #define SHADOW_REFLECTS_SNAPSHOT _PAGE_AVAIL0
 #endif
 
-#ifdef VERBOSE
+#if SHADOW_VERBOSE_DEBUG
 #define SH_LOG(_f, _a...)                                               \
     printk("DOM%uP%u: SH_LOG(%d): " _f "\n",                            \
        current->domain->domain_id , current->processor, __LINE__ , ## _a )
-#else
-#define SH_LOG(_f, _a...) ((void)0)
-#endif
-
-#if SHADOW_VERBOSE_DEBUG
 #define SH_VLOG(_f, _a...)                                              \
     printk("DOM%uP%u: SH_VLOG(%d): " _f "\n",                           \
            current->domain->domain_id, current->processor, __LINE__ , ## _a )
 #else
+#define SH_LOG(_f, _a...) ((void)0)
 #define SH_VLOG(_f, _a...) ((void)0)
 #endif
 
@@ -466,21 +459,18 @@ static inline void shadow_put_page(struct domain *d,
 
 /************************************************************************/
 
-static inline int __mark_dirty(struct domain *d, unsigned long mfn)
+static inline void __mark_dirty(struct domain *d, unsigned long mfn)
 {
     unsigned long pfn;
-    int           rc = 0;
 
     ASSERT(shadow_lock_is_acquired(d));
+
+    if ( likely(!shadow_mode_log_dirty(d)) || !VALID_MFN(mfn) )
+        return;
+
     ASSERT(d->arch.shadow_dirty_bitmap != NULL);
 
-    if ( !VALID_MFN(mfn) )
-        return rc;
-
-    // N.B. This doesn't use __mfn_to_gpfn().
-    // This wants the nice compact set of PFNs from 0..domain's max,
-    // which __mfn_to_gpfn() only returns for translated domains.
-    //
+    /* We /really/ mean PFN here, even for non-translated guests. */
     pfn = get_pfn_from_mfn(mfn);
 
     /*
@@ -489,16 +479,13 @@ static inline int __mark_dirty(struct domain *d, unsigned long mfn)
      * Nothing to do here...
      */
     if ( unlikely(IS_INVALID_M2P_ENTRY(pfn)) )
-        return rc;
+        return;
 
-    if ( likely(pfn < d->arch.shadow_dirty_bitmap_size) )
+    /* N.B. Can use non-atomic TAS because protected by shadow_lock. */
+    if ( likely(pfn < d->arch.shadow_dirty_bitmap_size) &&
+         !__test_and_set_bit(pfn, d->arch.shadow_dirty_bitmap) )
     {
-        /* N.B. Can use non-atomic TAS because protected by shadow_lock. */
-        if ( !__test_and_set_bit(pfn, d->arch.shadow_dirty_bitmap) )
-        {
-            d->arch.shadow_dirty_count++;
-            rc = 1;
-        }
+        d->arch.shadow_dirty_count++;
     }
 #ifndef NDEBUG
     else if ( mfn < max_page )
@@ -511,18 +498,17 @@ static inline int __mark_dirty(struct domain *d, unsigned long mfn)
                frame_table[mfn].u.inuse.type_info );
     }
 #endif
-
-    return rc;
 }
 
 
-static inline int mark_dirty(struct domain *d, unsigned int mfn)
+static inline void mark_dirty(struct domain *d, unsigned int mfn)
 {
-    int rc;
-    shadow_lock(d);
-    rc = __mark_dirty(d, mfn);
-    shadow_unlock(d);
-    return rc;
+    if ( unlikely(shadow_mode_log_dirty(d)) )
+    {
+        shadow_lock(d);
+        __mark_dirty(d, mfn);
+        shadow_unlock(d);
+    }
 }
 
 
@@ -564,8 +550,7 @@ __guest_set_l2e(
     if ( unlikely(shadow_mode_translate(d)) )
         update_hl2e(v, va);
 
-    if ( unlikely(shadow_mode_log_dirty(d)) )
-        __mark_dirty(d, pagetable_get_pfn(v->arch.guest_table));
+    __mark_dirty(d, pagetable_get_pfn(v->arch.guest_table));
 }
 
 static inline void
@@ -606,8 +591,8 @@ update_hl2e(struct vcpu *v, unsigned long va)
         if ( need_flush )
         {
             perfc_incrc(update_hl2e_invlpg);
-            // SMP BUG???
-            local_flush_tlb_one(&linear_pg_table[l1_linear_offset(va)]);
+            flush_tlb_one_mask(v->domain->cpumask,
+                               &linear_pg_table[l1_linear_offset(va)]);
         }
     }
 }
@@ -785,8 +770,7 @@ static inline int l1pte_write_fault(
     SH_VVLOG("l1pte_write_fault: updating spte=0x%" PRIpte " gpte=0x%" PRIpte,
              l1e_get_intpte(spte), l1e_get_intpte(gpte));
 
-    if ( shadow_mode_log_dirty(d) )
-        __mark_dirty(d, gmfn);
+    __mark_dirty(d, gmfn);
 
     if ( mfn_is_page_table(gmfn) )
         shadow_mark_va_out_of_sync(v, gpfn, gmfn, va);
@@ -871,18 +855,7 @@ static inline void hl2e_propagate_from_guest(
 
     if ( l2e_get_flags(gpde) & _PAGE_PRESENT )
     {
-        if ( unlikely((current->domain != d) && !shadow_mode_external(d)) )
-        {
-            // Can't use __gpfn_to_mfn() if we don't have one of this domain's
-            // page tables currently installed.
-            // This isn't common -- it only happens during shadow mode setup
-            // and mode changes.
-            //
-            mfn = gpfn_to_mfn_foreign(d, pfn);
-        }
-        else
-            mfn = __gpfn_to_mfn(d, pfn);
-
+        mfn = __gpfn_to_mfn(d, pfn);
         if ( VALID_MFN(mfn) && (mfn < max_page) )
             hl2e = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
     }
@@ -1322,46 +1295,6 @@ shadow_max_pgtable_type(struct domain *d, unsigned long gpfn,
 
     return pttype;
 }
-
-/*
- * N.B. We can make this locking more fine grained (e.g., per shadow page) if
- * it ever becomes a problem, but since we need a spin lock on the hash table 
- * anyway it's probably not worth being too clever.
- */
-static inline unsigned long get_shadow_status(
-    struct domain *d, unsigned long gpfn, unsigned long stype)
-{
-    unsigned long res;
-
-    ASSERT(shadow_mode_enabled(d));
-
-    /*
-     * If we get here we know that some sort of update has happened to the
-     * underlying page table page: either a PTE has been updated, or the page
-     * has changed type. If we're in log dirty mode, we should set the
-     * appropriate bit in the dirty bitmap.
-     * N.B. The VA update path doesn't use this and is handled independently. 
-     *
-     * XXX need to think this through for vmx guests, but probably OK
-     */
-
-    shadow_lock(d);
-
-    if ( shadow_mode_log_dirty(d) )
-        __mark_dirty(d, __gpfn_to_mfn(d, gpfn));
-
-    if ( !(res = __shadow_status(d, gpfn, stype)) )
-        shadow_unlock(d);
-
-    return res;
-}
-
-
-static inline void put_shadow_status(struct domain *d)
-{
-    shadow_unlock(d);
-}
-
 
 static inline void delete_shadow_status(
     struct domain *d, unsigned long gpfn, unsigned long gmfn, unsigned int stype)

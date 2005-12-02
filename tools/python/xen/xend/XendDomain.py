@@ -24,6 +24,7 @@
 
 import logging
 import os
+import socket
 import sys
 import threading
 
@@ -35,11 +36,10 @@ from xen.xend import XendRoot
 from xen.xend import XendCheckpoint
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
-from xen.xend.server import relocate
 from xen.xend.xenstore.xswatch import xswatch
 
 
-xc = xen.lowlevel.xc.new()
+xc = xen.lowlevel.xc.xc()
 xroot = XendRoot.instance()
 
 
@@ -54,15 +54,16 @@ class XendDomain:
     ## public:
     
     def __init__(self):
-        # Hack alert. Python does not support mutual imports, but XendDomainInfo
-        # needs access to the XendDomain instance to look up domains. Attempting
-        # to import XendDomain from XendDomainInfo causes unbounded recursion.
-        # So we stuff the XendDomain instance (self) into xroot's components.
-        xroot.add_component("xen.xend.XendDomain", self)
-
         self.domains = {}
         self.domains_lock = threading.RLock()
 
+
+    # This must be called only the once, by instance() below.  It is separate
+    # from the constructor because XendDomainInfo calls back into this class
+    # in order to check the uniqueness of domain names.  This means that
+    # instance() must be able to return a valid instance of this class even
+    # during this initialisation.
+    def init(self):
         self.domains_lock.acquire()
         try:
             self._add_domain(
@@ -114,7 +115,7 @@ class XendDomain:
 
     ## private:
 
-    def onReleaseDomain(self):
+    def onReleaseDomain(self, _):
         self.domains_lock.acquire()
         try:
             self.refresh()
@@ -201,7 +202,7 @@ class XendDomain:
                             "%d.  Destroying it in the hope of "
                             "recovery.", d)
                         try:
-                            xc.domain_destroy(dom = d)
+                            xc.domain_destroy(d)
                         except:
                             log.exception('Destruction of %d failed.', d)
 
@@ -378,7 +379,7 @@ class XendDomain:
             val = dominfo.destroy()
         else:
             try:
-                val = xc.domain_destroy(dom=domid)
+                val = xc.domain_destroy(domid)
             except Exception, ex:
                 raise XendError(str(ex))
         return val       
@@ -389,10 +390,16 @@ class XendDomain:
         dominfo = self.domain_lookup(domid)
 
         port = xroot.get_xend_relocation_port()
-        sock = relocate.setupRelocation(dst, port)
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((dst, port))
+        except socket.error, err:
+            raise XendError("can't connect: %s" % err[1])
 
+        sock.send("receive\n")
+        sock.recv(80) 
         XendCheckpoint.save(sock.fileno(), dominfo, live)
-        
+
 
     def domain_save(self, domid, dst):
         """Start saving a domain to file.
@@ -480,8 +487,7 @@ class XendDomain:
         dominfo = self.domain_lookup(domid)
         maxmem = int(mem) * 1024
         try:
-            return xc.domain_setmaxmem(dominfo.getDomid(),
-                                       maxmem_kb = maxmem)
+            return xc.domain_setmaxmem(dominfo.getDomid(), maxmem)
         except Exception, ex:
             raise XendError(str(ex))
 
@@ -528,4 +534,5 @@ def instance():
         inst
     except:
         inst = XendDomain()
+        inst.init()
     return inst

@@ -43,7 +43,7 @@ static __inline void apic_write(unsigned long reg, u32 v)
 
 static __inline void apic_write_atomic(unsigned long reg, u32 v)
 {
-	xchg((volatile u32 *)(APIC_BASE+reg), v);
+	(void)xchg((volatile u32 *)(APIC_BASE+reg), v);
 }
 
 static __inline u32 apic_read(unsigned long reg)

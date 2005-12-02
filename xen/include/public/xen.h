@@ -266,10 +266,31 @@ typedef struct
  */
 #define NR_EVENT_CHANNELS (sizeof(unsigned long) * sizeof(unsigned long) * 64)
 
-/*
- * Per-VCPU information goes here. This will be cleaned up more when Xen 
- * actually supports multi-VCPU guests.
- */
+typedef struct vcpu_time_info {
+    /*
+     * Updates to the following values are preceded and followed by an
+     * increment of 'version'. The guest can therefore detect updates by
+     * looking for changes to 'version'. If the least-significant bit of
+     * the version number is set then an update is in progress and the guest
+     * must wait to read a consistent set of values.
+     * The correct way to interact with the version number is similar to
+     * Linux's seqlock: see the implementations of read_seqbegin/read_seqretry.
+     */
+    uint32_t version;
+    uint32_t pad0;
+    uint64_t tsc_timestamp;   /* TSC at last update of time vals.  */
+    uint64_t system_time;     /* Time, in nanosecs, since boot.    */
+    /*
+     * Current system time:
+     *   system_time + ((tsc - tsc_timestamp) << tsc_shift) * tsc_to_system_mul
+     * CPU frequency (Hz):
+     *   ((10^9 << 32) / tsc_to_system_mul) >> tsc_shift
+     */
+    uint32_t tsc_to_system_mul;
+    int8_t   tsc_shift;
+    int8_t   pad1[3];
+} vcpu_time_info_t; /* 32 bytes */
+
 typedef struct vcpu_info {
     /*
      * 'evtchn_upcall_pending' is written non-zero by Xen to indicate
@@ -300,39 +321,15 @@ typedef struct vcpu_info {
     uint8_t evtchn_upcall_mask;
     unsigned long evtchn_pending_sel;
     arch_vcpu_info_t arch;
-} vcpu_info_t;
-
-typedef struct vcpu_time_info {
-    /*
-     * Updates to the following values are preceded and followed by an
-     * increment of 'version'. The guest can therefore detect updates by
-     * looking for changes to 'version'. If the least-significant bit of
-     * the version number is set then an update is in progress and the guest
-     * must wait to read a consistent set of values.
-     * The correct way to interact with the version number is similar to
-     * Linux's seqlock: see the implementations of read_seqbegin/read_seqretry.
-     */
-    uint32_t version;
-    uint64_t tsc_timestamp;   /* TSC at last update of time vals.  */
-    uint64_t system_time;     /* Time, in nanosecs, since boot.    */
-    /*
-     * Current system time:
-     *   system_time + ((tsc - tsc_timestamp) << tsc_shift) * tsc_to_system_mul
-     * CPU frequency (Hz):
-     *   ((10^9 << 32) / tsc_to_system_mul) >> tsc_shift
-     */
-    uint32_t tsc_to_system_mul;
-    int8_t  tsc_shift;
-} vcpu_time_info_t;
+    vcpu_time_info_t time;
+} vcpu_info_t; /* 64 bytes (x86) */
 
 /*
  * Xen/kernel shared data -- pointer provided in start_info.
  * NB. We expect that this struct is smaller than a page.
  */
 typedef struct shared_info {
-    vcpu_info_t vcpu_data[MAX_VIRT_CPUS];
-
-    vcpu_time_info_t vcpu_time[MAX_VIRT_CPUS];
+    vcpu_info_t vcpu_info[MAX_VIRT_CPUS];
 
     /*
      * A domain can create "event channels" on which it can send and receive
@@ -413,9 +410,9 @@ typedef struct start_info {
     unsigned long shared_info;  /* MACHINE address of shared info struct. */
     uint32_t flags;             /* SIF_xxx flags.                         */
     unsigned long store_mfn;    /* MACHINE page number of shared page.    */
-    uint16_t store_evtchn;      /* Event channel for store communication. */
+    uint32_t store_evtchn;      /* Event channel for store communication. */
     unsigned long console_mfn;  /* MACHINE address of console page.       */
-    uint16_t console_evtchn;    /* Event channel for console messages.    */
+    uint32_t console_evtchn;    /* Event channel for console messages.    */
     /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).     */
     unsigned long pt_base;      /* VIRTUAL address of page directory.     */
     unsigned long nr_pt_frames; /* Number of bootstrap p.t. frames.       */

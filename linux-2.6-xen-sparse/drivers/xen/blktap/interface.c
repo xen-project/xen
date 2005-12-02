@@ -43,9 +43,9 @@ static int map_frontend_page(blkif_t *blkif, unsigned long shared_page)
 	unlock_vm_area(blkif->blk_ring_area);
 	BUG_ON(ret);
 
-	if (op.handle < 0) {
+	if (op.status) {
 		DPRINTK(" Grant table operation failure !\n");
-		return op.handle;
+		return op.status;
 	}
 
 	blkif->shmem_ref    = shared_page;
@@ -97,7 +97,6 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 	blkif->evtchn = op.u.bind_interdomain.local_port;
 
 	sring = (blkif_sring_t *)blkif->blk_ring_area->addr;
-	SHARED_RING_INIT(sring);
 	BACK_RING_INIT(&blkif->blk_ring, sring, PAGE_SIZE);
 
 	blkif->irq = bind_evtchn_to_irqhandler(

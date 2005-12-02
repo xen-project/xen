@@ -35,6 +35,7 @@ AC_CONFIG_FILES([
     Makefile 
     ramdisk/Makefile
     tests/Makefile
+    tests/_sanity/Makefile
     tests/block-list/Makefile
     tests/block-create/Makefile
     tests/block-destroy/Makefile
@@ -50,6 +51,7 @@ AC_CONFIG_FILES([
     tests/memmax/Makefile
     tests/memset/Makefile
     tests/migrate/Makefile
+    tests/network-attach/Makefile
     tests/pause/Makefile
     tests/reboot/Makefile
     tests/restore/Makefile

@@ -1,5 +1,5 @@
-#ifndef __X86_32_PAGE_3L_H__
-#define __X86_32_PAGE_3L_H__
+#ifndef __X86_32_PAGE_3LEVEL_H__
+#define __X86_32_PAGE_3LEVEL_H__
 
 #define L1_PAGETABLE_SHIFT      12
 #define L2_PAGETABLE_SHIFT      21
@@ -65,8 +65,8 @@ typedef l3_pgentry_t root_pgentry_t;
 #define get_pte_flags(x) (((int)((x) >> 32) & ~0xFFF) | ((int)(x) & 0xFFF))
 #define put_pte_flags(x) (((intpte_t)((x) & ~0xFFF) << 32) | ((x) & 0xFFF))
 
-#define L1_DISALLOW_MASK (0xFFFFF180U & ~_PAGE_NX) /* PAT/GLOBAL */
-#define L2_DISALLOW_MASK (0xFFFFF180U & ~_PAGE_NX) /* PSE/GLOBAL */
-#define L3_DISALLOW_MASK (0xFFFFF1E6U)             /* must-be-zero */
+#define L1_DISALLOW_MASK BASE_DISALLOW_MASK
+#define L2_DISALLOW_MASK BASE_DISALLOW_MASK
+#define L3_DISALLOW_MASK 0xFFFFF1E6U /* must-be-zero */
 
-#endif /* __X86_32_PAGE_3L_H__ */
+#endif /* __X86_32_PAGE_3LEVEL_H__ */

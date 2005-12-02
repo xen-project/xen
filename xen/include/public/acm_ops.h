@@ -63,7 +63,7 @@ struct acm_getssid {
         ssidref_t    ssidref;
     } id;
     void *ssidbuf;
-    uint16_t ssidbuf_size;
+    uint32_t ssidbuf_size;
 };
 
 #define ACM_GETDECISION        8

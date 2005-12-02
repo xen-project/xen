@@ -36,6 +36,10 @@ waitForBoot()
 
 try:
     console = XmConsole(domain.getName(), historySaveCmds=True)
+except ConsoleError, e:
+    FAIL(str(e))
+
+try:
 #    console.debugMe = True
     console.sendInput("foo")
     run = console.runCmd("ls")

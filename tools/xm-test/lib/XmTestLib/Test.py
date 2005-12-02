@@ -161,6 +161,31 @@ def timeStamp():
     print "*** Test %s started at %s %s" % (name, t,
                                             time.tzname[time.daylight])
 
+#
+# Try to start a domain and attach a console to it to see if
+# the console system is working
+#
+def isConsoleDead():
+
+    from XmTestLib import XmTestDomain, DomainError, XmConsole, ConsoleError
+
+    domain = XmTestDomain()
+
+    try:
+        domain.start()
+        console = XmConsole(domain.getName())
+        console.runCmd("ls")
+    except DomainError, e:
+        return True
+    except ConsoleError, e:
+        domain.destroy()
+        return True
+
+    domain.destroy()
+
+    return False
+    
+
 if __name__ == "__main__":
 
     timeStamp()

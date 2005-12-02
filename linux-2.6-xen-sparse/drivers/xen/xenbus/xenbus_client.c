@@ -97,14 +97,17 @@ int xenbus_switch_state(struct xenbus_device *dev,
 	/* We check whether the state is currently set to the given value, and
 	   if not, then the state is set.  We don't want to unconditionally
 	   write the given state, because we don't want to fire watches
-	   unnecessarily.
+	   unnecessarily.  Furthermore, if the node has gone, we don't write
+	   to it, as the device will be tearing down, and we don't want to
+	   resurrect that directory.
 	 */
 
 	int current_state;
 
 	int err = xenbus_scanf(xbt, dev->nodename, "state", "%d",
 			       &current_state);
-	if (err == 1 && (XenbusState)current_state == state)
+	if ((err == 1 && (XenbusState)current_state == state) ||
+	    err == -ENOENT)
 		return 0;
 
 	err = xenbus_printf(xbt, dev->nodename, "state", "%d", state);

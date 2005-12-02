@@ -57,7 +57,7 @@ $(TARGET): delete-unfresh-files
 	$(MAKE) include/asm-$(TARGET_ARCH)/asm-offsets.h
 	$(MAKE) -C common
 	$(MAKE) -C drivers
-ifneq ($(ACM_USE_SECURITY_POLICY),ACM_NULL_POLICY)
+ifeq ($(ACM_SECURITY),y)
 	$(MAKE) -C acm
 endif
 	$(MAKE) -C arch/$(TARGET_ARCH)
@@ -79,8 +79,8 @@ include/xen/acm_policy.h:
 	  echo " *"; \
 	  echo " */"; \
 	  echo ""; \
-	  echo "#ifndef ACM_USE_SECURITY_POLICY"; \
-	  echo "#define ACM_USE_SECURITY_POLICY $(ACM_USE_SECURITY_POLICY)"; \
+	  echo "#ifndef ACM_DEFAULT_SECURITY_POLICY"; \
+	  echo "#define ACM_DEFAULT_SECURITY_POLICY $(ACM_DEFAULT_SECURITY_POLICY)"; \
 	  echo "#endif") >$@
 
 # compile.h contains dynamic build info. Rebuilt on every 'make' invocation.

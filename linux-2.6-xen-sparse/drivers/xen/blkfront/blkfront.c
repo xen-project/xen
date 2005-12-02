@@ -32,7 +32,6 @@
  * IN THE SOFTWARE.
  */
 
-
 #if 1
 #define ASSERT(p)							   \
 	if (!(p)) { printk("Assertion '%s' failed, line %d, file %s", #p , \
@@ -40,7 +39,6 @@
 #else
 #define ASSERT(_p)
 #endif
-
 
 #include <linux/version.h>
 #include "block.h"
@@ -54,15 +52,13 @@
 #include <asm-xen/gnttab.h>
 #include <asm/hypervisor.h>
 
-
 #define BLKIF_STATE_DISCONNECTED 0
 #define BLKIF_STATE_CONNECTED    1
 #define BLKIF_STATE_SUSPENDED    2
 
 #define MAXIMUM_OUTSTANDING_BLOCK_REQS \
-    (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
+    (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLK_RING_SIZE)
 #define GRANT_INVALID_REF	0
-
 
 static void connect(struct blkfront_info *);
 static void blkfront_closing(struct xenbus_device *);
@@ -116,6 +112,8 @@ static int blkfront_probe(struct xenbus_device *dev,
 	for (i = 0; i < BLK_RING_SIZE; i++)
 		info->shadow[i].req.id = i+1;
 	info->shadow[BLK_RING_SIZE-1].req.id = 0x0fffffff;
+
+	info->users = 0;
 
 	/* Front end dir is a number, which is used as the id. */
 	info->handle = simple_strtoul(strrchr(dev->nodename,'/')+1, NULL, 0);
@@ -265,6 +263,7 @@ static void backend_changed(struct xenbus_device *dev,
 			    XenbusState backend_state)
 {
 	struct blkfront_info *info = dev->data;
+	struct block_device *bd;
 
 	DPRINTK("blkfront:backend_changed.\n");
 
@@ -281,7 +280,18 @@ static void backend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		blkfront_closing(dev);
+		bd = bdget(info->dev);
+		if (bd == NULL)
+			xenbus_dev_fatal(dev, -ENODEV, "bdget failed");
+
+		down(&bd->bd_sem);
+		if (info->users > 0)
+			xenbus_dev_error(dev, -EBUSY,
+					 "Device in use; refusing to close");
+		else
+			blkfront_closing(dev);
+		up(&bd->bd_sem);
+		bdput(bd);
 		break;
 	}
 }
@@ -290,6 +300,10 @@ static void backend_changed(struct xenbus_device *dev,
 /* ** Connection ** */
 
 
+/* 
+** Invoked when the backend is finally 'ready' (and has told produced 
+** the details about the physical device - #sectors, size, etc). 
+*/
 static void connect(struct blkfront_info *info)
 {
 	unsigned long sectors, sector_size;
@@ -297,7 +311,7 @@ static void connect(struct blkfront_info *info)
 	int err;
 
         if( (info->connected == BLKIF_STATE_CONNECTED) || 
-	    (info->connected == BLKIF_STATE_SUSPENDED) ) 
+	    (info->connected == BLKIF_STATE_SUSPENDED) )
 		return;
 
 	DPRINTK("blkfront.c:connect:%s.\n", info->xbdev->otherend);
@@ -313,20 +327,19 @@ static void connect(struct blkfront_info *info)
 				 info->xbdev->otherend);
 		return;
 	}
-	
-        info->connected = BLKIF_STATE_CONNECTED;
+
         xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
-	
-	err = xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected);
-	if (err)
-		return;
-	
+
+	(void)xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected); 
+
 	/* Kick pending requests. */
 	spin_lock_irq(&blkif_io_lock);
+	info->connected = BLKIF_STATE_CONNECTED;
 	kick_pending_request_queues(info);
 	spin_unlock_irq(&blkif_io_lock);
-}
 
+	add_disk(info->gd);
+}
 
 /**
  * Handle the change of state of the backend to Closing.  We must delete our
@@ -384,8 +397,12 @@ static inline void ADD_ID_TO_FREELIST(
 
 static inline void flush_requests(struct blkfront_info *info)
 {
-	RING_PUSH_REQUESTS(&info->ring);
-	notify_remote_via_irq(info->irq);
+	int notify;
+
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&info->ring, notify);
+
+	if (notify)
+		notify_remote_via_irq(info->irq);
 }
 
 static void kick_pending_request_queues(struct blkfront_info *info)
@@ -414,12 +431,26 @@ static void blkif_restart_queue_callback(void *arg)
 
 int blkif_open(struct inode *inode, struct file *filep)
 {
+	struct blkfront_info *info = inode->i_bdev->bd_disk->private_data;
+	info->users++;
 	return 0;
 }
 
 
 int blkif_release(struct inode *inode, struct file *filep)
 {
+	struct blkfront_info *info = inode->i_bdev->bd_disk->private_data;
+	info->users--;
+	if (info->users == 0) {
+		/* Check whether we have been instructed to close.  We will
+		   have ignored this request initially, as the device was
+		   still mounted. */
+		struct xenbus_device * dev = info->xbdev;
+		XenbusState state = xenbus_read_driver_state(dev->otherend);
+
+		if (state == XenbusStateClosing)
+			blkfront_closing(dev);
+	}
 	return 0;
 }
 
@@ -441,7 +472,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
 	case CDROMMULTISESSION:
 		DPRINTK("FIXME: support multisession CDs later\n");
 		for (i = 0; i < sizeof(struct cdrom_multisession); i++)
-			if (put_user(0, (char *)(argument + i)))
+			if (put_user(0, (char __user *)(argument + i)))
 				return -EFAULT;
 		return 0;
 
@@ -523,8 +554,11 @@ static int blkif_queue_request(struct request *req)
 			info->shadow[id].frame[ring_req->nr_segments] =
 				mfn_to_pfn(buffer_mfn);
 
-			ring_req->frame_and_sects[ring_req->nr_segments] =
-				blkif_fas_from_gref(ref, fsect, lsect);
+			ring_req->seg[ring_req->nr_segments] =
+				(struct blkif_request_segment) {
+					.gref       = ref,
+					.first_sect = fsect, 
+					.last_sect  = lsect };
 
 			ring_req->nr_segments++;
 		}
@@ -556,7 +590,6 @@ void do_blkif_request(request_queue_t *rq)
 
 	while ((req = elv_next_request(rq)) != NULL) {
 		info = req->rq_disk->private_data;
-
 		if (!blk_fs_request(req)) {
 			end_request(req, 0);
 			continue;
@@ -604,6 +637,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 		return IRQ_HANDLED;
 	}
 
+ again:
 	rp = info->ring.sring->rsp_prod;
 	rmb(); /* Ensure we see queued responses up to 'rp'. */
 
@@ -639,6 +673,15 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
 	info->ring.rsp_cons = i;
 
+	if (i != info->ring.req_prod_pvt) {
+		int more_to_do;
+		RING_FINAL_CHECK_FOR_RESPONSES(&info->ring, more_to_do);
+		if (more_to_do)
+			goto again;
+	} else {
+		info->ring.sring->rsp_event = i + 1;
+	}
+
 	kick_pending_request_queues(info);
 
 	spin_unlock_irqrestore(&blkif_io_lock, flags);
@@ -671,8 +714,7 @@ static void blkif_completion(struct blk_shadow *s)
 {
 	int i;
 	for (i = 0; i < s->req.nr_segments; i++)
-		gnttab_end_foreign_access(
-			blkif_gref_from_fas(s->req.frame_and_sects[i]), 0, 0UL);
+		gnttab_end_foreign_access(s->req.seg[i].gref, 0, 0UL);
 }
 
 static void blkif_recover(struct blkfront_info *info)
@@ -712,7 +754,7 @@ static void blkif_recover(struct blkfront_info *info)
 		/* Rewrite any grant references invalidated by susp/resume. */
 		for (j = 0; j < req->nr_segments; j++)
 			gnttab_grant_foreign_access_ref(
-				blkif_gref_from_fas(req->frame_and_sects[j]),
+				req->seg[j].gref,
 				info->xbdev->otherend_id,
 				pfn_to_mfn(info->shadow[req->id].frame[j]),
 				rq_data_dir(
@@ -725,14 +767,20 @@ static void blkif_recover(struct blkfront_info *info)
 
 	kfree(copy);
 
-	/* info->ring->req_prod will be set when we flush_requests().*/
-	wmb();
+	(void)xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected); 
+	
+	/* Now safe for us to use the shared ring */
+	spin_lock_irq(&blkif_io_lock);
+        info->connected = BLKIF_STATE_CONNECTED;
+	spin_unlock_irq(&blkif_io_lock);
 
-	/* Kicks things back into life. */
+	/* Send off requeued requests */
 	flush_requests(info);
 
-	/* Now safe to let other people use the interface. */
-	info->connected = BLKIF_STATE_CONNECTED;
+	/* Kick any other new requests queued since we resumed */
+	spin_lock_irq(&blkif_io_lock);
+	kick_pending_request_queues(info);
+	spin_unlock_irq(&blkif_io_lock);
 }
 
 

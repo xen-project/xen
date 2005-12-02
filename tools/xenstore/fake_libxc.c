@@ -34,7 +34,7 @@
 
 static int sigfd;
 static int xs_test_pid;
-static uint16_t port;
+static evtchn_port_t port;
 
 /* The event channel maps to a signal, shared page to an mmapped file. */
 void evtchn_notify(int local_port)

@@ -16,7 +16,7 @@ HDRS     = $(wildcard *.h)
 TARGETS  = xenperf xc_shadow
 
 INSTALL_BIN  = $(TARGETS) xencons
-INSTALL_SBIN = netfix xm xend xenperf
+INSTALL_SBIN = netfix xm xen-bugtool xend xenperf
 
 all: build
 build: $(TARGETS)

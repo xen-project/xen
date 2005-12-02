@@ -4,6 +4,7 @@
  * Talks to Xen Store to figure out what devices we have.
  *
  * Copyright (C) 2005 Rusty Russell, IBM Corporation
+ * Copyright (C) 2005 XenSource Ltd.
  * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -33,6 +34,7 @@
 #include <linux/device.h>
 #include <linux/notifier.h>
 #include <asm/semaphore.h>
+#include <asm-xen/xen-public/io/xenbus.h>
 #include <asm-xen/xen-public/io/xs_wire.h>
 
 /* Register callback to watch this node. */
@@ -47,27 +49,6 @@ struct xenbus_watch
 	void (*callback)(struct xenbus_watch *,
 			 const char **vec, unsigned int len);
 };
-
-
-/* The state of either end of the Xenbus, i.e. the current communication
-   status of initialisation across the bus.  States here imply nothing about
-   the state of the connection between the driver and the kernel's device
-   layers.  */
-typedef enum
-{
-  XenbusStateUnknown      = 0,
-  XenbusStateInitialising = 1,
-  XenbusStateInitWait     = 2,  /* Finished early initialisation, but waiting
-                                   for information from the peer or hotplug
-				   scripts. */
-  XenbusStateInitialised  = 3,  /* Initialised and waiting for a connection
-				   from the peer. */
-  XenbusStateConnected    = 4,
-  XenbusStateClosing      = 5,  /* The device is being closed due to an error
-				   or an unplug event. */
-  XenbusStateClosed       = 6
-
-} XenbusState;
 
 
 /* A xenbus device. */

@@ -12,21 +12,21 @@ CFLAGS_XML2BIN += $(shell xml2-config --cflags --libs )
 XML2VERSION = $(shell xml2-config --version )
 VALIDATE_SCHEMA=$(shell if [[ $(XML2VERSION) < 2.6.20 ]]; then echo ""; else echo "-DVALIDATE_SCHEMA"; fi; )
 
-ifeq ($(ACM_USE_SECURITY_POLICY),ACM_NULL_POLICY)
+ifeq ($(ACM_DEFAULT_SECURITY_POLICY),ACM_NULL_POLICY)
 POLICY=null
 endif
-ifeq ($(ACM_USE_SECURITY_POLICY),ACM_CHINESE_WALL_POLICY)
+ifeq ($(ACM_DEFAULT_SECURITY_POLICY),ACM_CHINESE_WALL_POLICY)
 POLICY=chwall
 endif
-ifeq ($(ACM_USE_SECURITY_POLICY),ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY)
+ifeq ($(ACM_DEFAULT_SECURITY_POLICY),ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY)
 POLICY=ste
 endif
-ifeq ($(ACM_USE_SECURITY_POLICY),ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY)
+ifeq ($(ACM_DEFAULT_SECURITY_POLICY),ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY)
 POLICY=chwall_ste
 endif
 POLICYFILE=./policies/$(POLICY)/$(POLICY).bin
 
-ifneq ($(ACM_USE_SECURITY_POLICY), ACM_NULL_POLICY)
+ifeq ($(ACM_SECURITY),y)
 all: build
 
 install:all
@@ -55,7 +55,7 @@ secpol_xml2bin : secpol_xml2bin.c secpol_xml2bin.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(CFLAGS_XML2BIN) $(VALIDATE_SCHEMA) -o $@ $<
 
 clean:
-	rm -rf secpol_tool secpol_xml2bin xen
+	rm -rf secpol_tool secpol_xml2bin xen get_decision
 
 policy_clean:
 	rm -rf policies/*/*.bin policies/*/*.map
@@ -69,14 +69,3 @@ $(POLICYFILE) : build
 boot_install: $(POLICYFILE)
 	@cp $(POLICYFILE) /boot
 	@./updategrub.sh $(POLICY) $(PWD)/$(XEN_ROOT)
-
-LINUX_ROOT := $(XEN_ROOT)/linux-2.6-xen-sparse
-mk-symlinks:
-	[ -e xen/linux ] || mkdir -p xen/linux
-	[ -e xen/io ]    || mkdir -p xen/io
-	( cd xen >/dev/null ; \
-	  ln -sf ../$(XEN_ROOT)/xen/include/public/*.h . )
-	( cd xen/io >/dev/null ; \
-	  ln -sf ../../$(XEN_ROOT)/xen/include/public/io/*.h . )
-	( cd xen/linux >/dev/null ; \
-	  ln -sf ../../$(LINUX_ROOT)/include/asm-xen/linux-public/*.h . )

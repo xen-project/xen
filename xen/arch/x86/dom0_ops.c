@@ -144,7 +144,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         unsigned int p;
 
         ret = -EINVAL;
-        if ( (fp + np) >= 65536 )
+        if ( (fp + np) > 65536 )
             break;
 
         ret = -ESRCH;
@@ -248,7 +248,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 
     case DOM0_GETPAGEFRAMEINFO2:
     {
-#define GPF2_BATCH 128
+#define GPF2_BATCH (PAGE_SIZE / sizeof(unsigned long)) 
         int n,j;
         int num = op->u.getpageframeinfo2.num;
         domid_t dom = op->u.getpageframeinfo2.domain;
@@ -285,12 +285,9 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
                 struct pfn_info *page;
                 unsigned long mfn = l_arr[j];
 
-                if ( unlikely(mfn >= max_page) )
-                    goto e2_err;
-
                 page = &frame_table[mfn];
-  
-                if ( likely(get_page(page, d)) )
+
+                if ( likely(pfn_valid(mfn) && get_page(page, d)) ) 
                 {
                     unsigned long type = 0;
 
@@ -316,10 +313,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
                     put_page(page);
                 }
                 else
-                {
-                e2_err:
                     l_arr[j] |= XTAB;
-                }
 
             }
 
@@ -329,7 +323,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
                 break;
             }
 
-            n += j;
+            n += k;
         }
 
         free_xenheap_page(l_arr);

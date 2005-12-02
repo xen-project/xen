@@ -87,7 +87,10 @@ class Var:
         """Execute the check and set the variable to the new value.
         """
         if not self.check: return
-        env[self.name] = self.check(self.name, env.get(self.name))
+        try: 
+            env[self.name] = self.check(self.name, env.get(self.name))
+        except StandardError, ex:
+            raise sys.exc_type, self.name + " - " + str(ex)
 
     def doHelp(self, out):
         """Print help for the variable.

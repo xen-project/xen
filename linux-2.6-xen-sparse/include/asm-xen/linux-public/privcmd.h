@@ -30,6 +30,10 @@
 #ifndef __LINUX_PUBLIC_PRIVCMD_H__
 #define __LINUX_PUBLIC_PRIVCMD_H__
 
+#ifndef __user
+#define __user
+#endif
+
 typedef struct privcmd_hypercall
 {
 	unsigned long op;
@@ -45,20 +49,15 @@ typedef struct privcmd_mmap_entry {
 typedef struct privcmd_mmap {
 	int num;
 	domid_t dom; /* target domain */
-	privcmd_mmap_entry_t *entry;
+	privcmd_mmap_entry_t __user *entry;
 } privcmd_mmap_t; 
 
 typedef struct privcmd_mmapbatch {
 	int num;     /* number of pages to populate */
 	domid_t dom; /* target domain */
 	unsigned long addr;  /* virtual address */
-	unsigned long *arr; /* array of mfns - top nibble set on err */
+	unsigned long __user *arr; /* array of mfns - top nibble set on err */
 } privcmd_mmapbatch_t; 
-
-typedef struct privcmd_m2pmfns { 
-	int num;    /* max number of mfns to return */
-	unsigned long *arr; /* array of mfns */
-} privcmd_m2pmfns_t; 
 
 typedef struct privcmd_blkmsg
 {
@@ -78,8 +77,6 @@ typedef struct privcmd_blkmsg
 	_IOC(_IOC_NONE, 'P', 2, sizeof(privcmd_mmap_t))
 #define IOCTL_PRIVCMD_MMAPBATCH					\
 	_IOC(_IOC_NONE, 'P', 3, sizeof(privcmd_mmapbatch_t))
-#define IOCTL_PRIVCMD_GET_MACH2PHYS_MFNS			\
-	_IOC(_IOC_READ, 'P', 4, sizeof(unsigned long))
 
 #endif /* __LINUX_PUBLIC_PRIVCMD_H__ */
 

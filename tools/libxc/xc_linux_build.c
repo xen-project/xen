@@ -657,7 +657,7 @@ static int setup_guest(int xc_handle,
     memset(shared_info, 0, sizeof(shared_info_t));
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
+        shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
 
     munmap(shared_info, PAGE_SIZE);
 
@@ -692,7 +692,8 @@ int xc_linux_build(int xc_handle,
                    unsigned int console_evtchn,
                    unsigned long *console_mfn)
 {
-    dom0_op_t launch_op, op;
+    dom0_op_t launch_op;
+    DECLARE_DOM0_OP;
     int initrd_fd = -1;
     gzFile initrd_gfd = NULL;
     int rc, i;
@@ -727,6 +728,10 @@ int xc_linux_build(int xc_handle,
             goto error_out;
         }
     }
+
+#ifdef VALGRIND
+    memset(&st_ctxt, 0, sizeof(st_ctxt));
+#endif
 
     if ( mlock(&st_ctxt, sizeof(st_ctxt) ) )
     {   

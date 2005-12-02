@@ -71,8 +71,8 @@ class NetifController(DevController):
         script = os.path.join(xroot.network_script_dir,
                               sxp.child_value(config, 'script',
                                               xroot.get_vif_script()))
-        type = sxp.child_value(config, 'type')
-        if type == 'ioemu':
+        typ = sxp.child_value(config, 'type')
+        if typ == 'ioemu':
             return (None,{},{})
         bridge = sxp.child_value(config, 'bridge')
         mac    = sxp.child_value(config, 'mac')

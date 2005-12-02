@@ -220,11 +220,9 @@ gopts.var('netif', val='no|yes',
           fn=set_bool, default=0,
           use="Make the domain a network interface backend.")
 
-gopts.var('tpmif', val='frontend=DOM',
-          fn=append_value, default=[],
-          use="""Make the domain a TPM interface backend. If frontend is given,
-          the frontend in that domain is connected to this backend (not
-          completely implemented, yet)""")
+gopts.var('tpmif', val='no|yes',
+          fn=append_value, default=0,
+          use="Make the domain a TPM interface backend.")
 
 gopts.var('disk', val='phy:DEV,VDEV,MODE[,DOM]',
           fn=append_value, default=[],
@@ -273,9 +271,13 @@ gopts.var('vif', val="type=TYPE,mac=MAC,be_mac=MAC,bridge=BRIDGE,script=SCRIPT,b
 
 gopts.var('vtpm', val="instance=INSTANCE,backend=DOM",
           fn=append_value, default=[],
-          use="""Add a tpm interface. On the backend side us the the given
-          instance as virtual TPM instance. Use the backend in the given
-          domain.""")
+          use="""Add a TPM interface. On the backend side use the given
+          instance as virtual TPM instance. The given number is merely the
+          preferred instance number. The hotplug script will determine
+          which instance number will actually be assigned to the domain.
+          The associtation between virtual machine and the TPM instance
+          number can be found in /etc/xen/vtpm.db. Use the backend in the
+          given domain.""")
 
 gopts.var('nics', val="NUM",
           fn=set_int, default=1,
@@ -465,33 +467,19 @@ def configure_vtpm(config_devs, vals):
             if instance == "VTPMD":
                 instance = "0"
             else:
-                try:
-                    if int(instance) == 0:
-                        err('VM config error: vTPM instance must not be 0.')
-                except ValueError:
-                    err('Vm config error: could not parse instance number.')
+                if instance != None:
+                    try:
+                        if int(instance) == 0:
+                            err('VM config error: vTPM instance must not be 0.')
+                    except ValueError:
+                        err('Vm config error: could not parse instance number.')
             backend = d.get('backend')
             config_vtpm = ['vtpm']
             if instance:
-                config_vtpm.append(['instance', instance])
+                config_vtpm.append(['pref_instance', instance])
             if backend:
                 config_vtpm.append(['backend', backend])
             config_devs.append(['device', config_vtpm])
-
-def configure_tpmif(config_devs, vals):
-    """Create the config for virtual TPM interfaces.
-    """
-    tpmif = vals.tpmif
-    tpmif_n = 1
-    for idx in range(0, tpmif_n):
-        if idx < len(tpmif):
-            d = tpmif[idx]
-            frontend = d.get('frontend')
-            config_tpmif = ['tpmif']
-            if frontend:
-                config_tpmif.append(['frontend', frontend])
-            config_devs.append(['device', config_tpmif])
-
 
 def configure_vifs(config_devs, vals):
     """Create the config for virtual network interfaces.
@@ -685,22 +673,6 @@ def preprocess_vtpm(vals):
         vtpms.append(d)
     vals.vtpm = vtpms
 
-def preprocess_tpmif(vals):
-    if not vals.tpmif: return
-    tpmifs = []
-    for tpmif in vals.tpmif:
-        d = {}
-        a = tpmif.split(',')
-        for b in a:
-            (k, v) = b.strip().split('=', 1)
-            k = k.strip()
-            v = v.strip()
-            if k not in ['frontend']:
-                err('Invalid tpmif specifier: ' + vtpm)
-            d[k] = v
-        tpmifs.append(d)
-    vals.tpmif = tpmifs
-
 def preprocess_ip(vals):
     if vals.ip or vals.dhcp != 'off':
         dummy_nfs_server = '1.2.3.4'
@@ -791,7 +763,6 @@ def preprocess(vals):
     preprocess_nfs(vals)
     preprocess_vnc(vals)
     preprocess_vtpm(vals)
-    preprocess_tpmif(vals)
          
 def make_domain(opts, config):
     """Create, build and start a domain.
@@ -827,92 +798,41 @@ def make_domain(opts, config):
     opts.info("Started domain %s" % (dom))
     return int(sxp.child_value(dominfo, 'domid'))
 
-def get_dom0_alloc():
-    """Return current allocation memory of dom0 (in MB). Return 0 on error"""
-    PROC_XEN_BALLOON = "/proc/xen/balloon"
-
-    f = open(PROC_XEN_BALLOON, "r")
-    line = f.readline()
-    for x in line.split():
-        for n in x:
-            if not n.isdigit():
-                break
-        else:
-            f.close()
-            return int(x)/1024
-    f.close()
-    return 0
-
-def balloon_out(dom0_min_mem, opts):
-    """Balloon out memory from dom0 if necessary"""
-    SLACK = 4
-    timeout = 20 # 2s
-    ret = 1
-
-    xc = xen.lowlevel.xc.new()
-    free_mem = xc.physinfo()['free_pages'] / 256
-    domU_need_mem = opts.vals.memory + SLACK 
-
-    # we already have enough free memory, return success
-    if free_mem >= domU_need_mem:
-        del xc
-        return 0
-
-    dom0_cur_alloc = get_dom0_alloc()
-    dom0_new_alloc = dom0_cur_alloc - (domU_need_mem - free_mem)
-    if dom0_new_alloc < dom0_min_mem:
-        dom0_new_alloc = dom0_min_mem
-
-    server.xend_domain_mem_target_set(0, dom0_new_alloc)
-
-    while timeout > 0:
-        time.sleep(0.1) # sleep 100ms
-
-        free_mem = xc.physinfo()['free_pages'] / 256
-        if free_mem >= domU_need_mem:
-            ret = 0
-            break
-        timeout -= 1
-
-    del xc
-    return ret
-
-
 def parseCommandLine(argv):
-    opts = gopts
-    args = opts.parse(argv)
-    if opts.vals.help:
-        opts.usage()
-    if opts.vals.help or opts.vals.help_config:
-        opts.load_defconfig(help=1)
-    if opts.vals.help or opts.vals.help_config:
+    gopts.reset()
+    args = gopts.parse(argv)
+    if gopts.vals.help:
+        gopts.usage()
+    if gopts.vals.help or gopts.vals.help_config:
+        gopts.load_defconfig(help=1)
+    if gopts.vals.help or gopts.vals.help_config:
         return (None, None)
 
-    if not opts.vals.display:
-        opts.vals.display = os.getenv("DISPLAY")
+    if not gopts.vals.display:
+        gopts.vals.display = os.getenv("DISPLAY")
 
     # Process remaining args as config variables.
     for arg in args:
         if '=' in arg:
             (var, val) = arg.strip().split('=', 1)
             gopts.setvar(var.strip(), val.strip())
-    if opts.vals.config:
-        config = opts.vals.config
+    if gopts.vals.config:
+        config = gopts.vals.config
     else:
-        opts.load_defconfig()
-        preprocess(opts.vals)
-        if not opts.getopt('name') and opts.getopt('defconfig'):
-            opts.setopt('name', os.path.basename(opts.getopt('defconfig')))
-        config = make_config(opts.vals)
+        gopts.load_defconfig()
+        preprocess(gopts.vals)
+        if not gopts.getopt('name') and gopts.getopt('defconfig'):
+            gopts.setopt('name', os.path.basename(gopts.getopt('defconfig')))
+        config = make_config(gopts.vals)
 
-    if type(config) == str:
-        config = sxp.parse(file(config))[0]
-
-    return (opts, config)
+    return (gopts, config)
 
 
 def main(argv):
-    (opts, config) = parseCommandLine(argv)
+    try:
+        (opts, config) = parseCommandLine(argv)
+    except StandardError, ex:
+        err(str(ex))
 
     if not opts:
         return
@@ -920,16 +840,6 @@ def main(argv):
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
     else:
-        from xen.xend import XendRoot
-
-        xroot = XendRoot.instance()
-
-        dom0_min_mem = xroot.get_dom0_min_mem()
-        if dom0_min_mem != 0:
-            if balloon_out(dom0_min_mem, opts):
-                print >>sys.stderr, "error: cannot allocate enough memory for domain"
-                sys.exit(1)
-
         dom = make_domain(opts, config)
         if opts.vals.console_autoconnect:
             console.execConsole(dom)

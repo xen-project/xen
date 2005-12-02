@@ -24,9 +24,8 @@
 import os
 import os.path
 import sys
-import commands
 import re
-from getopt import getopt
+import getopt
 import socket
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -39,6 +38,14 @@ from xen.xend import sxp
 from xen.xm.opts import *
 
 import console
+
+
+# getopt.gnu_getopt is better, but only exists in Python 2.3+.  Use
+# getopt.getopt if gnu_getopt is not available.  This will mean that options
+# may only be specified before positional arguments.
+if not hasattr(getopt, 'gnu_getopt'):
+    getopt.gnu_getopt = getopt.getopt
+
 
 # Strings for shorthelp
 console_help = "console <DomId>                  Attach to domain DomId's console."
@@ -71,7 +78,8 @@ vcpu_list_help = "vcpu-list <DomId>                List the VCPUs for a domain (
 vcpu_pin_help = "vcpu-pin <DomId> <VCPU> <CPUs>   Set which cpus a VCPU can use" 
 dmesg_help =   "dmesg [--clear]                  Read or clear Xen's message buffer"
 info_help =    "info                             Get information about the xen host"
-log_help = "log      Print the xend log"
+rename_help =  "rename <DomId> <New Name>        Rename a domain"
+log_help =     "log                              Print the xend log"
 sched_bvt_help = """sched-bvt <Parameters>           Set Borrowed Virtual Time scheduler
                                     parameters"""
 sched_bvt_ctxallow_help = """sched-bvt-ctxallow <Allow>       Set the BVT scheduler context switch
@@ -96,25 +104,88 @@ vnet_create_help = "vnet-create <config>             create a vnet from a config
 vnet_delete_help = "vnet-delete <vnetid>             delete a vnet"
 
 
+short_command_list = [
+    "console",
+    "create",
+    "destroy",
+    "help",
+    "list",
+    "mem-max",
+    "mem-set",
+    "migrate",
+    "pause",
+    "reboot",
+    "restore",
+    "save",
+    "shutdown",
+    "top",
+    "unpause",
+    ]
+
+domain_commands = [
+    "console",
+    "create",
+    "destroy",
+    "domid",
+    "domname",
+    "list",
+    "mem-max",
+    "mem-set",
+    "migrate",
+    "pause",
+    "reboot",
+    "rename",
+    "restore",
+    "save",
+    "shutdown",
+    "sysrq",
+    "top",
+    "unpause",
+    "set-vcpus",
+    "vcpu-pin",
+    ]
+
+host_commands = [
+    "dmesg",
+    "info",
+    "log",
+    "top",
+    ]
+
+scheduler_commands = [
+    "sched-bvt",
+    "sched-bvt-ctxallow",
+    "sched-sedf",
+    ]
+
+device_commands = [
+    "block-attach",
+    "block-detach",
+    "block-list",
+    "network-attach",
+    "network-detach",
+    "network-list",
+    ]
+
+vnet_commands = [
+    "vnet-list",
+    "vnet-create",
+    "vnet-delete",
+    ]
+
+all_commands = (domain_commands + host_commands + scheduler_commands +
+                device_commands + vnet_commands)
+
+
+def commandToHelp(cmd):
+    return eval(cmd.replace("-", "_") + "_help")
+
+
 shorthelp = """Usage: xm <subcommand> [args]
     Control, list, and manipulate Xen guest instances
 
-xm common subcommands:"""  + help_spacer \
-+ console_help + help_spacer \
-+ create_help + help_spacer \
-+ destroy_help + help_spacer \
-+ help_help    + help_spacer \
-+ list_help    + help_spacer \
-+ mem_max_help + help_spacer \
-+ mem_set_help + help_spacer \
-+ migrate_help + help_spacer \
-+ pause_help   + help_spacer \
-+ reboot_help  + help_spacer \
-+ restore_help + help_spacer \
-+ save_help    + help_spacer \
-+ shutdown_help + help_spacer \
-+ top_help     + help_spacer \
-+ unpause_help + """
+xm common subcommands:
+   """  + help_spacer.join(map(commandToHelp, short_command_list))  + """
 
 <DomName> can be substituted for <DomId> in xm subcommands.
 
@@ -127,50 +198,20 @@ longhelp = """Usage: xm <subcommand> [args]
 
 xm full list of subcommands:
 
-  Domain Commands: """ + help_spacer \
-+ console_help + help_spacer \
-+ create_help + help_spacer \
-+ destroy_help + help_spacer \
-+ domid_help   + help_spacer \
-+ domname_help   + help_spacer \
-+ list_help    + help_spacer \
-+ mem_max_help + help_spacer \
-+ mem_set_help + help_spacer \
-+ migrate_help + help_spacer \
-+ pause_help   + help_spacer \
-+ reboot_help  + help_spacer \
-+ restore_help + help_spacer \
-+ save_help    + help_spacer \
-+ shutdown_help + help_spacer \
-+ sysrq_help + help_spacer \
-+ top_help     + help_spacer \
-+ unpause_help + help_spacer \
-+ set_vcpus_help + help_spacer \
-+ vcpu_pin_help + """
+  Domain Commands:
+   """ + help_spacer.join(map(commandToHelp,  domain_commands)) + """
 
-   Xen Host Commands: """ + help_spacer \
-+ dmesg_help + help_spacer \
-+ info_help + help_spacer \
-+ log_help  + help_spacer \
-+ top_help  + """
+  Xen Host Commands:
+   """ + help_spacer.join(map(commandToHelp,  host_commands)) + """
 
-  Scheduler Commands: """ + help_spacer \
-+ sched_bvt_help + help_spacer \
-+ sched_bvt_ctxallow_help + help_spacer \
-+ sched_sedf_help + """
+  Scheduler Commands:
+   """ + help_spacer.join(map(commandToHelp,  scheduler_commands)) + """
 
-  Virtual Device Commands:"""  + help_spacer \
-+ block_attach_help + help_spacer \
-+ block_detach_help + help_spacer \
-+ block_list_help + help_spacer \
-+ network_attach_help + help_spacer \
-+ network_detach_help + help_spacer \
-+ network_list_help + """
+  Virtual Device Commands:
+   """  + help_spacer.join(map(commandToHelp, device_commands)) + """
 
-  Vnet commands: """ + help_spacer \
-+ vnet_list_help + help_spacer \
-+ vnet_create_help + help_spacer \
-+ vnet_delete_help + """
+  Vnet commands:
+   """ + help_spacer.join(map(commandToHelp,  vnet_commands)) + """
 
 <DomName> can be substituted for <DomId> in xm subcommands.
 
@@ -180,48 +221,14 @@ For more help on xm create, see the xmdomain.cfg(5) man page"""
 
 # array for xm help <command>
 help = {
-    "--long": longhelp,
-    "console": console_help,
-    "create": create_help,
-    "destroy": destroy_help,
-    "domid ": domid_help,
-    "domname": domname_help,
-    "list": list_help,
-    "mem-max": mem_max_help,
-    "mem-set": mem_set_help,
-    "migrate": migrate_help,
-    "pause": pause_help,
-    "reboot": reboot_help,
-    "restore": restore_help,
-    "save":  save_help,
-    "shutdown": shutdown_help,
-    "sysrq": sysrq_help,
-    "unpause": unpause_help,
-    "set-vcpus": set_vcpus_help,
-    "vcpu-list": vcpu_list_help,
-    "vcpu-pin": vcpu_pin_help,
-#  Xen Host Commands:
-    "dmesg": dmesg_help,
-    "info":  info_help,
-    "log":   log_help,
-    "top":  top_help,
-#  Scheduler Commands:
-    "sched-bvt": sched_bvt_help,
-    "sched-bvt-ctxallow": sched_bvt_ctxallow_help,
-    "sched-sedf":  sched_sedf_help,
+    "--long": longhelp
+    }
 
-#  Virtual Device Commands:
-    "block-attach": block_attach_help,
-    "block-detach": block_detach_help,
-    "block-list": block_list_help,
-    "network-attach": network_attach_help,
-    "network-detach": network_detach_help,
-    "network-list":  network_list_help,
-# Vnet commands:
-    "vnet-list": vnet_list_help,
-    "vnet-create": vnet_create_help,
-    "vnet-delete": vnet_delete_help
-   }
+for command in all_commands:
+    # create is handled specially
+    if (command != 'create'):
+        help[command] = commandToHelp(command)
+
 
 ####################################################################
 #
@@ -229,10 +236,20 @@ help = {
 #
 ####################################################################
 
-def arg_check(args,num,name):
-    if len(args) < num:
-        err("'xm %s' requires %s argument(s)!\n" % (name, num))
-        usage(name)
+def arg_check(args, name, lo, hi = -1):
+    n = len(args)
+    
+    if hi == -1:
+        if n != lo:
+            err("'xm %s' requires %d argument%s.\n" % (name, lo,
+                                                       lo > 1 and 's' or ''))
+            usage(name)
+    else:
+        if n < lo or n > hi:
+            err("'xm %s' requires between %d and %d arguments.\n" %
+                (name, lo, hi))
+            usage(name)
+
 
 def unit(c):
     if not c.isalpha():
@@ -262,14 +279,17 @@ def int_unit(str, dest):
 def err(msg):
     print >>sys.stderr, "Error:", msg
 
-def handle_xend_error(cmd, dom, ex):
+def handle_xend_error(cmd, args, ex):
+    non_option = filter(lambda x: x[0] != '-', args)
+    dom = len(non_option) > 0 and non_option[0] or None
+
     error = str(ex)
     if error == "Not found" and dom != None:
         err("Domain '%s' not found when running 'xm %s'" % (dom, cmd))
-        sys.exit(1)
     else:
         err(error)
-        sys.exit(1)
+
+    sys.exit(1)
     
 
 #########################################################################
@@ -279,7 +299,7 @@ def handle_xend_error(cmd, dom, ex):
 #########################################################################
 
 def xm_save(args):
-    arg_check(args,2,"save")
+    arg_check(args, "save", 2)
 
     dom = args[0] # TODO: should check if this exists
     savefile = os.path.abspath(args[1])
@@ -292,7 +312,7 @@ def xm_save(args):
     server.xend_domain_save(dom, savefile)
     
 def xm_restore(args):
-    arg_check(args,1,"restore")
+    arg_check(args, "restore", 1)
 
     savefile = os.path.abspath(args[0])
 
@@ -320,8 +340,8 @@ def xm_list(args):
     use_long = 0
     show_vcpus = 0
     try:
-        (options, params) = getopt(args, 'lv', ['long','vcpus'])
-    except GetoptError, opterr:
+        (options, params) = getopt.gnu_getopt(args, 'lv', ['long','vcpus'])
+    except getopt.GetoptError, opterr:
         err(opterr)
         sys.exit(1)
     
@@ -482,29 +502,33 @@ def xm_vcpu_list(args):
 
 
 def xm_reboot(args):
-    arg_check(args,1,"reboot")
+    arg_check(args, "reboot", 1, 4)
     from xen.xm import shutdown
-    # ugly hack because the opt parser apparently wants
-    # the subcommand name just to throw it away!
-    shutdown.main(["bogus", "-R"] + args)
+    shutdown.main(["shutdown", "-R"] + args)
 
 def xm_pause(args):
-    arg_check(args, 1, "pause")
+    arg_check(args, "pause", 1)
     dom = args[0]
 
     from xen.xend.XendClient import server
     server.xend_domain_pause(dom)
 
 def xm_unpause(args):
-    arg_check(args, 1, "unpause")
+    arg_check(args, "unpause", 1)
     dom = args[0]
 
     from xen.xend.XendClient import server
     server.xend_domain_unpause(dom)
 
+def xm_rename(args):
+    arg_check(args, "rename", 2)
+
+    from xen.xend.XendClient import server
+    server.xend_domain_rename(args[0], args[1])
+
 def xm_subcommand(command, args):
     cmd = __import__(command, globals(), locals(), 'xen.xm')
-    cmd.main(["bogus"] + args)
+    cmd.main([command] + args)
 
 
 #############################################################
@@ -522,7 +546,7 @@ def cpu_make_map(cpulist):
     return cpus
 
 def xm_vcpu_pin(args):
-    arg_check(args, 3, "vcpu-pin")
+    arg_check(args, "vcpu-pin", 3)
 
     dom  = args[0]
     vcpu = int(args[1])
@@ -532,7 +556,7 @@ def xm_vcpu_pin(args):
     server.xend_domain_pincpu(dom, vcpu, cpumap)
 
 def xm_mem_max(args):
-    arg_check(args, 2, "mem-max")
+    arg_check(args, "mem-max", 2)
 
     dom = args[0]
     mem = int_unit(args[1], 'm')
@@ -541,7 +565,7 @@ def xm_mem_max(args):
     server.xend_domain_maxmem_set(dom, mem)
     
 def xm_mem_set(args):
-    arg_check(args, 2, "mem-set")
+    arg_check(args, "mem-set", 2)
 
     dom = args[0]
     mem_target = int_unit(args[1], 'm')
@@ -550,13 +574,13 @@ def xm_mem_set(args):
     server.xend_domain_mem_target_set(dom, mem_target)
     
 def xm_set_vcpus(args):
-    arg_check(args, 2, "set-vcpus")
+    arg_check(args, "set-vcpus", 2)
     
     from xen.xend.XendClient import server
     server.xend_domain_set_vcpus(args[0], int(args[1]))
 
 def xm_domid(args):
-    arg_check(args, 1, "domid")
+    arg_check(args, "domid", 1)
 
     name = args[0]
 
@@ -565,7 +589,7 @@ def xm_domid(args):
     print sxp.child_value(dom, 'domid')
     
 def xm_domname(args):
-    arg_check(args, 1, "domname")
+    arg_check(args, "domname", 1)
 
     name = args[0]
 
@@ -574,21 +598,21 @@ def xm_domname(args):
     print sxp.child_value(dom, 'name')
 
 def xm_sched_bvt(args):
-    arg_check(args, 6, "sched-bvt")
+    arg_check(args, "sched-bvt", 6)
     dom = args[0]
     v = map(long, args[1:6])
     from xen.xend.XendClient import server
     server.xend_domain_cpu_bvt_set(dom, *v)
 
 def xm_sched_bvt_ctxallow(args):
-    arg_check(args, 1, "sched-bvt-ctxallow")
+    arg_check(args, "sched-bvt-ctxallow", 1)
 
     slice = int(args[0])
     from xen.xend.XendClient import server
     server.xend_node_cpu_bvt_slice_set(slice)
 
 def xm_sched_sedf(args):
-    arg_check(args, 6, "sched-sedf")
+    arg_check(args, "sched-sedf", 6)
     
     dom = args[0]
     v = map(int, args[1:6])
@@ -605,9 +629,8 @@ def xm_info(args):
         else: 
             print "%-23s:" % x[0], x[1]
 
-# TODO: remove as soon as console server shows up
 def xm_console(args):
-    arg_check(args,1,"console")
+    arg_check(args, "console", 1)
 
     dom = args[0]
     from xen.xend.XendClient import server
@@ -632,7 +655,7 @@ its contents if the [-c|--clear] flag is specified.
               use="Clear the contents of the Xen message buffer.")
     # Work around for gopts
     myargs = args
-    myargs.insert(0, "bogus")
+    myargs.insert(0, 'dmesg')
     gopts.parse(myargs)
     if not (1 <= len(myargs) <= 2):
         err('Invalid arguments: ' + str(myargs))
@@ -644,11 +667,13 @@ its contents if the [-c|--clear] flag is specified.
         server.xend_node_clear_dmesg()
 
 def xm_log(args):
+    arg_check(args, 'xm-log', 0)
+    
     from xen.xend.XendClient import server
     print server.xend_node_log()
 
 def xm_network_list(args):
-    arg_check(args,1,"network-list")
+    arg_check(args, "network-list", 1)
     dom = args[0]
     from xen.xend.XendClient import server
     for x in server.xend_domain_devices(dom, 'vif'):
@@ -656,7 +681,7 @@ def xm_network_list(args):
         print
 
 def xm_block_list(args):
-    arg_check(args,1,"block-list")
+    arg_check(args, "block-list", 1)
     dom = args[0]
     from xen.xend.XendClient import server
     for x in server.xend_domain_devices(dom, 'vbd'):
@@ -664,20 +689,14 @@ def xm_block_list(args):
         print
 
 def xm_block_attach(args):
-    n = len(args)
-    if n == 0:
-        usage("block-attach")
-        
-    if n < 4 or n > 5:
-        err("%s: Invalid argument(s)" % args[0])
-        usage("block-attach")
+    arg_check(args, 'block-attach', 4, 5)
 
     dom = args[0]
     vbd = ['vbd',
            ['uname', args[1]],
            ['dev',   args[2]],
            ['mode',  args[3]]]
-    if n == 5:
+    if len(args) == 5:
         vbd.append(['backend', args[4]])
 
     from xen.xend.XendClient import server
@@ -685,10 +704,8 @@ def xm_block_attach(args):
 
 
 def xm_network_attach(args):
-    n = len(args)
-    if n == 0:
-        usage("network-attach")
-        
+    arg_check(args, 'network-attach', 1, 10000)
+
     dom = args[0]
     vif = ['vif']
 
@@ -700,7 +717,7 @@ def xm_network_attach(args):
 
 
 def detach(args, command, deviceClass):
-    arg_check(args, 2, command)
+    arg_check(args, command, 2)
 
     dom = args[0]
     dev = args[1]
@@ -720,8 +737,8 @@ def xm_network_detach(args):
 def xm_vnet_list(args):
     from xen.xend.XendClient import server
     try:
-        (options, params) = getopt(args, 'l', ['long'])
-    except GetoptError, opterr:
+        (options, params) = getopt.gnu_getopt(args, 'l', ['long'])
+    except getopt.GetoptError, opterr:
         err(opterr)
         sys.exit(1)
     
@@ -747,7 +764,7 @@ def xm_vnet_list(args):
             print vnet, ex
 
 def xm_vnet_create(args):
-    arg_check(args, 1, "vnet-create")
+    arg_check(args, "vnet-create", 1)
     conf = args[0]
     if not os.access(conf, os.R_OK):
         print "File not found: %s" % conf
@@ -757,7 +774,7 @@ def xm_vnet_create(args):
     server.xend_vnet_create(conf)
 
 def xm_vnet_delete(args):
-    arg_check(args, 1, "vnet-delete")
+    arg_check(args, "vnet-delete", 1)
     vnet = args[0]
     from xen.xend.XendClient import server
     server.xend_vnet_delete(vnet)
@@ -770,6 +787,7 @@ commands = {
     # domain commands
     "domid": xm_domid,
     "domname": xm_domname,
+    "rename": xm_rename,
     "restore": xm_restore,
     "save": xm_save,
     "reboot": xm_reboot,
@@ -846,6 +864,10 @@ def deprecated(old,new):
     err('Option %s is the new replacement, see "xm help %s" for more info' % (new, new))
 
 def usage(cmd=None):
+    if cmd == 'create':
+        mycmd = xm_lookup_cmd(cmd)
+        mycmd( ['--help'] )
+        sys.exit(1)
     if help.has_key(cmd):
         print "   " + help[cmd]
     else:
@@ -889,7 +911,7 @@ def main(argv=sys.argv):
             sys.exit(1)
         except xen.xend.XendError.XendError, ex:
             if len(args) > 0:
-                handle_xend_error(argv[1], args[0], ex)
+                handle_xend_error(argv[1], args, ex)
             else:
                 print "Unexpected error:", sys.exc_info()[0]
                 print
@@ -897,7 +919,7 @@ def main(argv=sys.argv):
                 raise
         except xen.xend.XendProtocol.XendError, ex:
             if len(args) > 0:
-                handle_xend_error(argv[1], args[0], ex)
+                handle_xend_error(argv[1], args, ex)
             else:
                 print "Unexpected error:", sys.exc_info()[0]
                 print

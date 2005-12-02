@@ -47,20 +47,13 @@ class XmError(Exception):
 def domid(name):
     status, output = traceCommand("xm domid " + name);
 
-    if re.search("Traceback", output):
-        print "*** xm domid failed with:"
-        print output
-        for i in range(0,10):
-            status, output = traceCommand("xm list")
-            status, output = traceCommand("xm domid " + name);
-            if not re.search("Traceback", output):
-                break
-        
+    if status != 0 or "Traceback" in output:
+        return -1
     try:
-        id = int(output);
+        return int(output)
     except:
-        id = -1;
-    return id;
+        raise XmError("xm domid failed", trace=output, status=status)
+
 
 def domname(id):
     status, output = traceCommand("xm domname " + str(id));
@@ -75,7 +68,7 @@ def isDomainRunning(domain):
 
 def getRunningDomains():
     status, output = traceCommand("xm list");
-    if "Traceback" in output:
+    if status != 0 or "Traceback" in output:
         raise XmError("xm failed", trace=output, status=status)
     
     lines = output.splitlines();

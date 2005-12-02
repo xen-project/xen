@@ -33,18 +33,19 @@
 #include <asm-xen/xen_proc.h>
 
 static struct proc_dir_entry *privcmd_intf;
+static struct proc_dir_entry *capabilities_intf;
 
 static int privcmd_ioctl(struct inode *inode, struct file *file,
                          unsigned int cmd, unsigned long data)
 {
 	int ret = -ENOSYS;
+	void __user *udata = (void __user *) data;
 
 	switch (cmd) {
 	case IOCTL_PRIVCMD_HYPERCALL: {
 		privcmd_hypercall_t hypercall;
   
-		if (copy_from_user(&hypercall, (void *)data,
-				   sizeof(hypercall)))
+		if (copy_from_user(&hypercall, udata, sizeof(hypercall)))
 			return -EFAULT;
 
 #if defined(__i386__)
@@ -97,10 +98,11 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	case IOCTL_PRIVCMD_MMAP: {
 #define PRIVCMD_MMAP_SZ 32
 		privcmd_mmap_t mmapcmd;
-		privcmd_mmap_entry_t msg[PRIVCMD_MMAP_SZ], *p;
+		privcmd_mmap_entry_t msg[PRIVCMD_MMAP_SZ];
+		privcmd_mmap_entry_t __user *p;
 		int i, rc;
 
-		if (copy_from_user(&mmapcmd, (void *)data, sizeof(mmapcmd)))
+		if (copy_from_user(&mmapcmd, udata, sizeof(mmapcmd)))
 			return -EFAULT;
 
 		p = mmapcmd.entry;
@@ -146,12 +148,12 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		mmu_update_t u;
 		privcmd_mmapbatch_t m;
 		struct vm_area_struct *vma = NULL;
-		unsigned long *p, addr;
-		unsigned long mfn; 
+		unsigned long __user *p;
+		unsigned long addr, mfn; 
 		uint64_t ptep;
 		int i;
 
-		if (copy_from_user(&m, (void *)data, sizeof(m))) {
+		if (copy_from_user(&m, udata, sizeof(m))) {
 			ret = -EFAULT;
 			goto batch_err;
 		}
@@ -212,43 +214,6 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	break;
 #endif
 
-#ifndef __ia64__
-	case IOCTL_PRIVCMD_GET_MACH2PHYS_MFNS: {
-		pgd_t *pgd; 
-		pud_t *pud; 
-		pmd_t *pmd; 
-		unsigned long m2pv, m2p_mfn; 	
-		privcmd_m2pmfns_t m; 
-		unsigned long *p; 
-		int i; 
-
-		if (copy_from_user(&m, (void *)data, sizeof(m)))
-			return -EFAULT;
-
-		m2pv = (unsigned long)machine_to_phys_mapping;
-
-		p = m.arr; 
-
-		for (i=0; i < m.num; i++) { 
-			pgd = pgd_offset_k(m2pv);
-			pud = pud_offset(pgd, m2pv);
-			pmd = pmd_offset(pud, m2pv);
-			m2p_mfn  = (*(uint64_t *)pmd >> PAGE_SHIFT)&0xFFFFFFFF;
-			m2p_mfn += pte_index(m2pv);
-
-			if (put_user(m2p_mfn, p + i))
-				return -EFAULT;
-
-			m2pv += (1 << 21); 
-		}
-
-		ret = 0; 
-		break; 
-
-	}
-	break;
-#endif
-
 	default:
 		ret = -EINVAL;
 		break;
@@ -270,12 +235,28 @@ static struct file_operations privcmd_file_ops = {
 	.mmap  = privcmd_mmap,
 };
 
+static int capabilities_read(char *page, char **start, off_t off,
+                        int count, int *eof, void *data)
+{
+	int len = 0;
+	*page = 0;
+
+	if (xen_start_info->flags & SIF_INITDOMAIN)
+		len = sprintf( page, "control_d\n" );
+
+	*eof = 1;
+	return len;
+}
 
 static int __init privcmd_init(void)
 {
 	privcmd_intf = create_xen_proc_entry("privcmd", 0400);
 	if (privcmd_intf != NULL)
 		privcmd_intf->proc_fops = &privcmd_file_ops;
+
+	capabilities_intf = create_xen_proc_entry("capabilities", 0400 );
+	if (capabilities_intf != NULL)
+		capabilities_intf->read_proc = capabilities_read;
 
 	return 0;
 }

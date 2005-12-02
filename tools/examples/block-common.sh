@@ -21,9 +21,7 @@ dir=$(dirname "$0")
 
 findCommand "$@"
 
-if [ "$command" != "online" ]  &&
-   [ "$command" != "offline" ] &&
-   [ "$command" != "add" ]     &&
+if [ "$command" != "add" ] &&
    [ "$command" != "remove" ]
 then
   log err "Invalid command: $command"
@@ -34,28 +32,42 @@ fi
 XENBUS_PATH="${XENBUS_PATH:?}"
 
 
+ebusy()
+{
+  xenstore_write "$XENBUS_PATH/hotplug-error" "$*" \
+                 "$XENBUS_PATH/hotplug-status" busy
+  log err "$@"
+  exit 1
+}
+
+
 ##
-# Write physical-device = 0xMMmm and node = device to the store, where MM
-# and mm are the major and minor numbers of device.
+# Print the given device's major and minor numbers, written in hex and
+# separated by a colon.
+device_major_minor()
+{
+  stat -L -c %t:%T "$1"
+}
+
+
+##
+# Write physical-device = MM,mm to the store, where MM and mm are the major 
+# and minor numbers of device respectively.
 #
 # @param device The device from which major and minor numbers are read, which
 #               will be written into the store.
 #
 write_dev() {
-  local major
-  local minor
-  local pdev
+  local mm
   
-  major=$(stat -L -c %t "$1")
-  minor=$(stat -L -c %T "$1")
+  mm=$(device_major_minor "$1")
  
-  if [ -z $major  -o -z $minor ]; then
+  if [ -z $mm ]
+  then
     fatal "Backend device does not exist"
   fi
  
-  pdev=$(printf "0x%02x%02x" "0x$major" "0x$minor")
-  xenstore_write "$XENBUS_PATH"/physical-device "$pdev" \
-                 "$XENBUS_PATH"/node "$1"
+  xenstore_write "$XENBUS_PATH/physical-device" "$mm"
 
   success
 }

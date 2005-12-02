@@ -33,6 +33,9 @@
 #include <linux/blkdev.h>
 #include <linux/list.h>
 
+#define BLKIF_MAJOR(dev) ((dev)>>8)
+#define BLKIF_MINOR(dev) ((dev) & 0xff)
+
 /*
  * For convenience we distinguish between ide, scsi and 'other' (i.e.,
  * potentially combinations of the two) in the naming scheme and in a few other
@@ -258,7 +261,6 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
 	if (vdisk_info & VDISK_CDROM)
 		gd->flags |= GENHD_FL_CD;
 
-	add_disk(gd);
 	info->gd = gd;
 
 	return 0;

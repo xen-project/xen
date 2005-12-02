@@ -586,7 +586,7 @@ void __init e820_reserve_resources(void)
 	free_bootmem(__pa(map), PAGE_SIZE);
 
 	if (!found) {
-		HYPERVISOR_memory_op(XENMEM_maximum_ram_page, &gapstart);
+		gapstart = HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL);
 		gapstart = (gapstart << PAGE_SHIFT) + 1024*1024;
 		printk(KERN_ERR "PCI: Warning: Cannot find a gap in the 32bit address range\n"
 		       KERN_ERR "PCI: Unassigned devices with 32bit resource registers may break!\n");

@@ -18,11 +18,13 @@
 #include <xen/io/domain_controller.h>
 #include <xs.h>
 
+#define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, PAGE_SIZE)
+
 /* /dev/xen/blktap resides at device number major=10, minor=202        */ 
 #define BLKTAP_MINOR 202
 
 /* size of the extra VMA area to map in attached pages. */
-#define BLKTAP_VMA_PAGES BLKIF_RING_SIZE
+#define BLKTAP_VMA_PAGES BLK_RING_SIZE
 
 /* blktap IOCTLs:                                                      */
 #define BLKTAP_IOCTL_KICK_FE         1

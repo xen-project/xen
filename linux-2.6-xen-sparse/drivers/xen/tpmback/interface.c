@@ -91,9 +91,9 @@ map_frontend_page(tpmif_t *tpmif, unsigned long shared_page)
 	unlock_vm_area(tpmif->tx_area);
 	BUG_ON(ret);
 
-	if (op.handle < 0) {
+	if (op.status) {
 		DPRINTK(" Grant table operation failure !\n");
-		return op.handle;
+		return op.status;
 	}
 
 	tpmif->shmem_ref = shared_page;
@@ -127,6 +127,10 @@ tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 		.u.bind_interdomain.remote_dom = tpmif->domid,
 		.u.bind_interdomain.remote_port = evtchn };
 
+        if (tpmif->irq) {
+                return 0;
+        }
+
 	if ((tpmif->tx_area = alloc_vm_area(PAGE_SIZE)) == NULL)
 		return -ENOMEM;
 
@@ -149,7 +153,6 @@ tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 
 	tpmif->irq = bind_evtchn_to_irqhandler(
 		tpmif->evtchn, tpmif_be_int, 0, "tpmif-backend", tpmif);
-	tpmif->status = CONNECTED;
 	tpmif->shmem_ref = shared_page;
 	tpmif->active = 1;
 

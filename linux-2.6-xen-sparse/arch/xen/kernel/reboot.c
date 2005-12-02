@@ -189,17 +189,16 @@ static int __do_suspend(void *ignore)
 #endif
 
 	/* 
-	** Only resume xenbus /after/ we've prepared our VCPUs; otherwise
-	** the VCPU hotplug callback can race with our vcpu_prepare
-	*/
+	 * Only resume xenbus /after/ we've prepared our VCPUs; otherwise
+	 * the VCPU hotplug callback can race with our vcpu_prepare
+	 */
 	xenbus_resume();
-
 
 #ifdef CONFIG_SMP
  out_reenable_cpus:
 	for_each_cpu_mask(i, prev_online_cpus) {
 		j = cpu_up(i);
-		if (j != 0) {
+		if ((j != 0) && !cpu_online(i)) {
 			printk(KERN_CRIT "Failed to bring cpu "
 			       "%d back up (%d).\n",
 			       i, j);

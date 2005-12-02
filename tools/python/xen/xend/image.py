@@ -27,7 +27,7 @@ from xen.xend.XendLogging import log
 from xen.xend.server.netif import randomMAC
 
 
-xc = xen.lowlevel.xc.new()
+xc = xen.lowlevel.xc.xc()
 
 
 MAX_GUEST_CMDLINE = 1024
@@ -293,7 +293,7 @@ class VmxImageHandler(ImageHandler):
                ret.append("-bridge")
                ret.append("%s" % bridge)
             if name == 'vtpm':
-               instance = sxp.child_value(info, 'instance')
+               instance = sxp.child_value(info, 'pref_instance')
                ret.append("-instance")
                ret.append("%s" % instance)
         return ret

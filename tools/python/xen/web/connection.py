@@ -14,6 +14,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd.
 #============================================================================
 
 import sys
@@ -46,13 +47,10 @@ class SocketServerConnection:
         self.server = server
         self.buffer_n = 1024
         self.thread = None
-        self.connected = True
-        protocol.setTransport(self)
-        protocol.connectionMade(addr)
+        self.protocol.setTransport(self)
 
     def run(self):
         self.thread = threading.Thread(target=self.main)
-        #self.thread.setDaemon(True)
         self.thread.start()
 
     def main(self):
@@ -91,10 +89,6 @@ class SocketServerConnection:
                 return True
 
     def dataReceived(self, data):
-        if not self.connected:
-            return True
-        if not self.protocol:
-            return True
         try:
             self.protocol.dataReceived(data)
         except SystemExit:
@@ -110,7 +104,6 @@ class SocketServerConnection:
     def loseConnection(self, reason=None):
         self.thread = None
         self.closeSocket(reason)
-        self.closeProtocol(reason)
 
     def closeSocket(self, reason):
         try:
@@ -120,32 +113,15 @@ class SocketServerConnection:
         except:
             pass
 
-    def closeProtocol(self, reason):
-        try:
-            if self.connected:
-                self.connected = False
-                if self.protocol:
-                    self.protocol.connectionLost(reason)
-        except SystemExit:
-            raise
-        except:
-            pass
-
-    def getHost(self):
-        return self.sock.getsockname()
-
-    def getPeer(self):
-        return self.addr
-
 class SocketListener:
     """A server socket, running listen in a thread.
     Accepts connections and runs a thread for each one.
     """
 
-    def __init__(self, factory, backlog=None):
+    def __init__(self, protocol_class, backlog=None):
         if backlog is None:
             backlog = 5
-        self.factory = factory
+        self.protocol_class = protocol_class
         self.sock = None
         self.backlog = backlog
         self.thread = None
@@ -171,9 +147,7 @@ class SocketListener:
         self.loseConnection(reason)
 
     def run(self):
-        self.factory.doStart()
         self.thread = threading.Thread(target=self.main)
-        #self.thread.setDaemon(True)
         self.thread.start()
 
     def main(self):
@@ -206,18 +180,12 @@ class SocketListener:
                 return True
 
     def accepted(self, sock, addr):
-        protocol = self.factory.buildProtocol(addr)
-        if protocol is None:
-            self.loseConnection()
-            return True
-        connection = self.acceptConnection(sock, protocol, addr)
-        connection.run()
+        self.acceptConnection(sock, self.protocol_class(), addr).run()
         return False
 
     def loseConnection(self, reason=None):
         self.thread = None
         self.closeSocket(reason)
-        self.closeFactory(reason)
 
     def closeSocket(self, reason):
         try:
@@ -227,13 +195,6 @@ class SocketListener:
         except Exception, ex:
             pass
 
-    def closeFactory(self, reason):
-        try:
-            self.factory.doStop()
-        except SystemExit:
-            raise
-        except:
-            pass
 
 class SocketClientConnection:
     """A connection to a server from a client.
@@ -246,7 +207,6 @@ class SocketClientConnection:
         self.addr = None
         self.connector = connector
         self.buffer_n = 1024
-        self.connected = False
 
     def createSocket (self):
         raise NotImplementedError()
@@ -263,8 +223,7 @@ class SocketClientConnection:
             sock = self.createSocket()
             sock.connect(self.addr)
             self.sock = sock
-            self.connected = True
-            self.protocol = self.connector.buildProtocol(self.addr)
+            self.protocol = self.connector.protocol_class()
             self.protocol.setTransport(self)
         except SystemExit:
             raise
@@ -335,8 +294,6 @@ class SocketClientConnection:
     def loseConnection(self, reason=None):
         self.thread = None
         self.closeSocket(reason)
-        self.closeProtocol(reason)
-        self.closeConnector(reason)
 
     def closeSocket(self, reason):
         try:
@@ -347,71 +304,14 @@ class SocketClientConnection:
         except:
             pass
 
-    def closeProtocol(self, reason):
-        try:
-            if self.connected:
-                self.connected = False
-                if self.protocol:
-                    self.protocol.connectionLost(reason)
-        except SystemExit:
-            raise
-        except:
-            pass
-        self.protocol = None
-
-    def closeConnector(self, reason):
-        try:
-            self.connector.connectionLost(reason)
-        except SystemExit:
-            raise
-        except:
-            pass
-        
 class SocketConnector:
     """A client socket. Connects to a server and runs the client protocol
     in a thread.
     """
 
-    def __init__(self, factory):
-        self.factoryStarted = False
-        self.clientLost = False
-        self.clientFailed = False
-        self.factory = factory
-        self.state = "disconnected"
+    def __init__(self, protocol_class):
+        self.protocol_class = protocol_class
         self.transport = None
 
-    def connectTransport(self):
-        raise NotImplementedError()
-
     def connect(self):
-        if self.state != "disconnected":
-            raise socket.error(EINVAL, "cannot connect in state " + self.state)
-        self.state = "connecting"
-        self.clientLost = False
-        self.clientFailed = False
-        if not self.factoryStarted:
-            self.factoryStarted = True
-            self.factory.doStart()
-        self.factory.startedConnecting(self)
-        self.connectTransport()
-        self.state = "connected"
-
-    def stopConnecting(self):
-        if self.state != "connecting":
-            return
-        self.state = "disconnected"
-        self.transport.disconnect()
-
-    def buildProtocol(self, addr):
-        return self.factory.buildProtocol(addr)
-
-    def connectionLost(self, reason=None):
-        if not self.clientLost:
-            self.clientLost = True
-            self.factory.clientConnectionLost(self, reason)
-
-    def connectionFailed(self, reason=None):
-        if not self.clientFailed:
-            self.clientFailed = True
-            self.factory.clientConnectionFailed(self, reason)
-        
+        pass

@@ -229,20 +229,29 @@ gnttab_grant_foreign_transfer_ref(grant_ref_t ref, domid_t domid)
 unsigned long
 gnttab_end_foreign_transfer_ref(grant_ref_t ref)
 {
-	unsigned long frame = 0;
+	unsigned long frame;
 	u16           flags;
 
-	flags = shared[ref].flags;
-
 	/*
-	 * If a transfer is committed then wait for the frame address to
-	 * appear. Otherwise invalidate the grant entry against future use.
-	 */
-	if (likely(flags != GTF_accept_transfer) ||
-	    (synch_cmpxchg(&shared[ref].flags, flags, 0) !=
-	     GTF_accept_transfer))
-		while (unlikely((frame = shared[ref].frame) == 0))
-			cpu_relax();
+         * If a transfer is not even yet started, try to reclaim the grant
+         * reference and return failure (== 0).
+         */
+	while (!((flags = shared[ref].flags) & GTF_transfer_committed)) {
+		if ( synch_cmpxchg(&shared[ref].flags, flags, 0) == flags )
+			return 0;
+		cpu_relax();
+	}
+
+	/* If a transfer is in progress then wait until it is completed. */
+	while (!(flags & GTF_transfer_completed)) {
+		flags = shared[ref].flags;
+		cpu_relax();
+	}
+
+	/* Read the frame number /after/ reading completion status. */
+	rmb();
+	frame = shared[ref].frame;
+	BUG_ON(frame == 0);
 
 	return frame;
 }

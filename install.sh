@@ -27,7 +27,10 @@ echo "Installing Xen from '$src' to '$dst'..."
 cp -fdRL $src/etc/init.d/* $dst/etc/init.d/
 echo "All done."
 
-if [ -x /sbin/udev ] && [ ! -z `/sbin/udev -V` ] && [ `/sbin/udev -V` -ge 059 ]; then
+[ -x "$(which udevinfo)" ] && \
+  UDEV_VERSION=$(udevinfo -V | sed -e 's/^[^0-9]* \([0-9]\{1,\}\)[^0-9]\{0,\}/\1/')
+
+if [ -n "$UDEV_VERSION" ] && [ $UDEV_VERSION -ge 059 ]; then
   cp -f $src/etc/udev/rules.d/*.rules $dst/etc/udev/rules.d/
 else
   cp -f $src/etc/hotplug/*.agent $dst/etc/hotplug/

@@ -273,6 +273,24 @@ extern void paging_init(void);
 #define _PAGE_AVAIL2   0x800U
 #define _PAGE_AVAIL    0xE00U
 
+/*
+ * Debug option: Ensure that granted mappings are not implicitly unmapped.
+ * WARNING: This will need to be disabled to run OSes that use the spare PTE
+ * bits themselves (e.g., *BSD).
+ */
+#ifndef NDEBUG
+#define _PAGE_GNTTAB   _PAGE_AVAIL2
+#else
+#define _PAGE_GNTTAB   0
+#endif
+
+/*
+ * Disallow unused flag bits plus PAT, PSE and GLOBAL. Also disallow GNTTAB
+ * if we are using it for grant-table debugging. Permit the NX bit if the
+ * hardware supports it.
+ */
+#define BASE_DISALLOW_MASK ((0xFFFFF180U | _PAGE_GNTTAB) & ~_PAGE_NX)
+
 #define __PAGE_HYPERVISOR \
     (_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED)
 #define __PAGE_HYPERVISOR_NOCACHE \

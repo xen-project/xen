@@ -43,8 +43,8 @@
 #endif
 #include <public/sched.h>
 #include <public/io/ioreq.h>
-#include <public/io/vmx_vpic.h>
-#include <public/io/vmx_vlapic.h>
+#include <asm/vmx_vpic.h>
+#include <asm/vmx_vlapic.h>
 
 int hvm_enabled;
 
@@ -61,23 +61,30 @@ void vmx_final_setup_guest(struct vcpu *v)
 {
     v->arch.schedule_tail = arch_vmx_do_launch;
 
-    if ( v == v->domain->vcpu[0] )
+    if ( v->vcpu_id == 0 )
     {
-        v->domain->arch.vmx_platform.lapic_enable =
-            v->arch.guest_context.user_regs.ecx;
+        struct domain *d = v->domain;
+        struct vcpu *vc;
+
+        d->arch.vmx_platform.lapic_enable = v->arch.guest_context.user_regs.ecx;
         v->arch.guest_context.user_regs.ecx = 0;
         VMX_DBG_LOG(DBG_LEVEL_VLAPIC, "lapic enable is %d.\n",
-                    v->domain->arch.vmx_platform.lapic_enable);
+                    d->arch.vmx_platform.lapic_enable);
+
+        /* Initialize monitor page table */
+        for_each_vcpu(d, vc)
+            vc->arch.monitor_table = mk_pagetable(0);
+
         /*
          * Required to do this once per domain
          * XXX todo: add a seperate function to do these.
          */
-        memset(&v->domain->shared_info->evtchn_mask[0], 0xff,
-               sizeof(v->domain->shared_info->evtchn_mask));
+        memset(&d->shared_info->evtchn_mask[0], 0xff,
+               sizeof(d->shared_info->evtchn_mask));
 
         /* Put the domain in shadow mode even though we're going to be using
          * the shared 1:1 page table initially. It shouldn't hurt */
-        shadow_mode_enable(v->domain,
+        shadow_mode_enable(d,
                            SHM_enable|SHM_refcounts|
                            SHM_translate|SHM_external|SHM_wr_pt_pte);
     }
@@ -129,15 +136,14 @@ static u32 msr_data_index[VMX_MSR_COUNT] =
  */
 void vmx_load_msrs(struct vcpu *n)
 {
-    struct msr_state *host_state;
-    host_state = &percpu_msr[smp_processor_id()];
+    struct msr_state *host_state = &percpu_msr[smp_processor_id()];
+    int i;
 
     if ( !vmx_switch_on )
         return;
 
-    while (host_state->flags){
-        int i;
-
+    while ( host_state->flags )
+    {
         i = find_first_set_bit(host_state->flags);
         wrmsrl(msr_data_index[i], host_state->msr_items[i]);
         clear_bit(i, &host_state->flags);
@@ -146,11 +152,10 @@ void vmx_load_msrs(struct vcpu *n)
 
 static void vmx_save_init_msrs(void)
 {
-    struct msr_state *host_state;
-    host_state = &percpu_msr[smp_processor_id()];
+    struct msr_state *host_state = &percpu_msr[smp_processor_id()];
     int i;
 
-    for (i = 0; i < VMX_MSR_COUNT; i++)
+    for ( i = 0; i < VMX_MSR_COUNT; i++ )
         rdmsrl(msr_data_index[i], host_state->msr_items[i]);
 }
 
@@ -516,23 +521,20 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
 
     cpuid(input, &eax, &ebx, &ecx, &edx);
 
-    if (input == 1) {
+    if ( input == 1 )
+    {
         if ( vmx_apic_support(v->domain) &&
-                !vlapic_global_enabled((VLAPIC(v))) )
+             !vlapic_global_enabled((VLAPIC(v))) )
             clear_bit(X86_FEATURE_APIC, &edx);
-#ifdef __i386__
-        clear_bit(X86_FEATURE_PSE, &edx);
-        clear_bit(X86_FEATURE_PAE, &edx);
-        clear_bit(X86_FEATURE_PSE36, &edx);
-#else
-        struct vcpu *v = current;
-        if (v->domain->arch.ops->guest_paging_levels == PAGING_L2)
+
+#ifdef __x86_64__
+        if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
+#endif
         {
             clear_bit(X86_FEATURE_PSE, &edx);
             clear_bit(X86_FEATURE_PAE, &edx);
             clear_bit(X86_FEATURE_PSE36, &edx);
         }
-#endif
 
         /* Unsupportable for virtualised CPUs. */
         clear_bit(X86_FEATURE_VMXE & 31, &ecx);
@@ -1084,6 +1086,7 @@ static int vmx_set_cr0(unsigned long value)
     unsigned long eip;
     int paging_enabled;
     unsigned long vm_entry_value;
+
     /*
      * CR0: We don't want to lose PE and PG.
      */
@@ -1140,14 +1143,17 @@ static int vmx_set_cr0(unsigned long value)
 #endif
         }
 
-        unsigned long crn;
-        /* update CR4's PAE if needed */
-        __vmread(GUEST_CR4, &crn);
-        if ( (!(crn & X86_CR4_PAE)) &&
-             test_bit(VMX_CPU_STATE_PAE_ENABLED,
-                      &v->arch.arch_vmx.cpu_state)){
-            VMX_DBG_LOG(DBG_LEVEL_1, "enable PAE on cr4\n");
-            __vmwrite(GUEST_CR4, crn | X86_CR4_PAE);
+        {
+            unsigned long crn;
+            /* update CR4's PAE if needed */
+            __vmread(GUEST_CR4, &crn);
+            if ( (!(crn & X86_CR4_PAE)) &&
+                 test_bit(VMX_CPU_STATE_PAE_ENABLED,
+                          &v->arch.arch_vmx.cpu_state) )
+            {
+                VMX_DBG_LOG(DBG_LEVEL_1, "enable PAE on cr4\n");
+                __vmwrite(GUEST_CR4, crn | X86_CR4_PAE);
+            }
         }
 #endif
         /*

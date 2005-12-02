@@ -49,8 +49,6 @@ struct arch_domain
 
     unsigned int shadow_fault_count;
     unsigned int shadow_dirty_count;
-    unsigned int shadow_dirty_net_count;
-    unsigned int shadow_dirty_block_count;
 
     /* full shadow mode */
     struct out_of_sync_entry *out_of_sync; /* list of out-of-sync pages */

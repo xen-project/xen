@@ -13,11 +13,12 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd.
 #============================================================================
 
 """Object-oriented command-line option support.
 """
-from getopt import getopt, GetoptError
+import getopt
 import os
 import os.path
 import sys
@@ -59,6 +60,14 @@ class Opt:
         self.specified_val = None
         self.value = None
         self.set(default)
+
+
+    def reset(self):
+        self.specified_opt = None
+        self.specified_val = None
+        self.value = None
+        self.set(self.default)
+
 
     def __repr__(self):
         return self.name + '=' + str(self.specified_val)
@@ -223,6 +232,14 @@ class Opts:
         # Option to use for bare words.
         self.default_opt = None
 
+
+    def reset(self):
+        self.vals = OptVals()
+        self.vars = {}
+        for opt in self.options:
+            opt.reset()
+
+
     def __repr__(self):
         return '\n'.join(map(str, self.options))
 
@@ -317,9 +334,10 @@ class Opts:
         while args:
             # let getopt parse whatever it feels like -- if anything
             try:
-                (xvals, args) = getopt(args[0:],
-                                       self.short_opts(), self.long_opts())
-            except GetoptError, err:
+                (xvals, args) = getopt.getopt(args[0:],
+                                              self.short_opts(),
+                                              self.long_opts())
+            except getopt.GetoptError, err:
                 self.err(str(err))
                 
             for (k, v) in xvals:
@@ -416,22 +434,22 @@ class Opts:
         are used to set options with the same names.
         Variables are not used to set options that are already specified.
         """
-        # Create global and lobal dicts for the file.
+        # Create global and local dicts for the file.
         # Initialize locals to the vars.
         # Use exec to do the standard imports and
         # define variables we are passing to the script.
-        globals = {}
-        locals = {}
-        locals.update(self.vars)
+        globs = {}
+        locs = {}
+        locs.update(self.vars)
         cmd = '\n'.join(self.imports + 
                         [ "from xen.xm.help import Vars",
                           "xm_file = '%s'" % defconfig,
                           "xm_help = %d" % help,
                           "xm_vars = Vars(xm_file, xm_help, locals())"
                           ])
-        exec cmd in globals, locals
+        exec cmd in globs, locs
         try:
-            execfile(defconfig, globals, locals)
+            execfile(defconfig, globs, locs)
         except:
             if not help: raise
         if help:
@@ -444,7 +462,7 @@ class Opts:
                    types.IntType,
                    types.FloatType
                    ]
-        for (k, v) in locals.items():
+        for (k, v) in locs.items():
             if self.specified(k): continue
             if not(type(v) in vtypes): continue
             self.setopt(k, v)

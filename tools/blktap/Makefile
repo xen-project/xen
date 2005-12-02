@@ -47,17 +47,6 @@ all: mk-symlinks libblktap.so #blkdump
 		$(MAKE) -C $$subdir $@;       \
 	done
 
-LINUX_ROOT := $(wildcard $(XEN_ROOT)/linux-2.6.*-xen-sparse)
-mk-symlinks:
-	[ -e xen/linux ] || mkdir -p xen/linux
-	[ -e xen/io ]    || mkdir -p xen/io
-	( cd xen >/dev/null ; \
-	  ln -sf ../$(XEN_ROOT)/xen/include/public/*.h . )
-	( cd xen/io >/dev/null ; \
-	   ln -sf ../../$(XEN_ROOT)/xen/include/public/io/*.h . )
-	( cd xen/linux >/dev/null ; \
-	  ln -sf ../../$(LINUX_ROOT)/include/asm-xen/linux-public/*.h . )
-
 install: all
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/include

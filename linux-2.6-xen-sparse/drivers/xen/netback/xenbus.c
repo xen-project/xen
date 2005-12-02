@@ -216,13 +216,14 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosed:
-		device_unregister(&be->dev->dev);
+		kobject_hotplug(&dev->dev.kobj, KOBJ_OFFLINE);
+		device_unregister(&dev->dev);
 		break;
 
 	case XenbusStateUnknown:
 	case XenbusStateInitWait:
 	default:
-		xenbus_dev_fatal(be->dev, -EINVAL, "saw state %d at frontend",
+		xenbus_dev_fatal(dev, -EINVAL, "saw state %d at frontend",
 				 frontend_state);
 		break;
 	}

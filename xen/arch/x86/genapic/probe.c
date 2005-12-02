@@ -29,6 +29,25 @@ struct genapic *apic_probe[] __initdata = {
 	NULL,
 };
 
+static int cmdline_apic;
+
+void __init generic_bigsmp_probe(void)
+{
+	/*
+	 * This routine is used to switch to bigsmp mode when
+	 * - There is no apic= option specified by the user
+	 * - generic_apic_probe() has choosen apic_default as the sub_arch
+	 * - we find more than 8 CPUs in acpi LAPIC listing with xAPIC support
+	 */
+
+	if (!cmdline_apic && genapic == &apic_default)
+		if (apic_bigsmp.probe()) {
+			genapic = &apic_bigsmp;
+			printk(KERN_INFO "Overriding APIC driver with %s\n",
+			       genapic->name);
+		}
+}
+
 static void __init genapic_apic_force(char *str)
 {
 	int i;
@@ -41,7 +60,7 @@ custom_param("apic", genapic_apic_force);
 void __init generic_apic_probe(void) 
 { 
 	int i;
-	int changed = (genapic != NULL);
+	int changed = cmdline_apic = (genapic != NULL);
 
 	for (i = 0; !changed && apic_probe[i]; i++) { 
 		if (apic_probe[i]->probe()) {

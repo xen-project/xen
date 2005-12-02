@@ -69,3 +69,29 @@ else
     true
   }
 fi
+
+
+first_file()
+{
+  t="$1"
+  shift
+  for file in $@
+  do
+    if [ "$t" "$file" ]
+    then
+      echo "$file"
+      return
+    fi
+  done
+}
+
+find_dhcpd_conf_file()
+{
+  first_file -f /etc/dhcp3/dhcpd.conf /etc/dhcpd.conf
+}
+
+
+find_dhcpd_init_file()
+{
+  first_file -x /etc/init.d/dhcp3-server /etc/init.d/dhcp
+}

@@ -293,11 +293,7 @@ void domain_pause(struct domain *d)
     struct vcpu *v;
 
     for_each_vcpu( d, v )
-    {
-        BUG_ON(v == current);
-        atomic_inc(&v->pausecnt);
-        vcpu_sleep_sync(v);
-    }
+        vcpu_pause(v);
 
     sync_pagetable_state(d);
 }
@@ -376,14 +372,10 @@ int set_info_guest(struct domain *d, dom0_setdomaininfo_t *setdomaininfo)
 int boot_vcpu(struct domain *d, int vcpuid, struct vcpu_guest_context *ctxt) 
 {
     struct vcpu *v = d->vcpu[vcpuid];
-    int rc;
 
     BUG_ON(test_bit(_VCPUF_initialised, &v->vcpu_flags));
 
-    if ( (rc = arch_set_info_guest(v, ctxt)) != 0 )
-        return rc;
-
-    return rc;
+    return arch_set_info_guest(v, ctxt);
 }
 
 long do_vcpu_op(int cmd, int vcpuid, void *arg)

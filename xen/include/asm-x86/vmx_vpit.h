@@ -8,7 +8,7 @@
 #include <xen/errno.h>
 #include <xen/ac_timer.h>
 #include <asm/vmx_vmcs.h>
-#include <public/io/vmx_vpic.h>
+#include <asm/vmx_vpic.h>
 
 #define PIT_FREQ 1193181
 

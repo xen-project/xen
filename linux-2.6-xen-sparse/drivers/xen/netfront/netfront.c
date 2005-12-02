@@ -61,6 +61,9 @@
 
 #define GRANT_INVALID_REF	0
 
+#define NET_TX_RING_SIZE __RING_SIZE((netif_tx_sring_t *)0, PAGE_SIZE)
+#define NET_RX_RING_SIZE __RING_SIZE((netif_rx_sring_t *)0, PAGE_SIZE)
+
 #ifndef __GFP_NOWARN
 #define __GFP_NOWARN 0
 #endif
@@ -76,22 +79,9 @@
 /* Allow headroom on each rx pkt for Ethernet header, alignment padding, ... */
 #define RX_HEADROOM 200
 
-/*
- * If the backend driver is pipelining transmit requests then we can be very
- * aggressive in avoiding new-packet notifications -- only need to send a
- * notification if there are no outstanding unreceived responses.
- * If the backend may be buffering our transmit buffers for any reason then we
- * are rather more conservative.
- */
-#ifdef CONFIG_XEN_NETDEV_FRONTEND_PIPELINED_TRANSMITTER
-#define TX_TEST_IDX resp_prod /* aggressive: any outstanding responses? */
-#else
-#define TX_TEST_IDX req_cons  /* conservative: not seen all our requests? */
-#endif
-
-static unsigned long rx_pfn_array[NETIF_RX_RING_SIZE];
-static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE+1];
-static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE];
+static unsigned long rx_pfn_array[NET_RX_RING_SIZE];
+static multicall_entry_t rx_mcl[NET_RX_RING_SIZE+1];
+static mmu_update_t rx_mmu[NET_RX_RING_SIZE];
 
 struct netfront_info
 {
@@ -99,11 +89,10 @@ struct netfront_info
 	struct net_device *netdev;
 
 	struct net_device_stats stats;
-	NETIF_RING_IDX rx_resp_cons, tx_resp_cons;
 	unsigned int tx_full;
     
-	netif_tx_interface_t *tx;
-	netif_rx_interface_t *rx;
+	netif_tx_front_ring_t tx;
+	netif_rx_front_ring_t rx;
 
 	spinlock_t   tx_lock;
 	spinlock_t   rx_lock;
@@ -124,7 +113,7 @@ struct netfront_info
 
 	/* Receive-ring batched refills. */
 #define RX_MIN_TARGET 8
-#define RX_MAX_TARGET NETIF_RX_RING_SIZE
+#define RX_MAX_TARGET NET_RX_RING_SIZE
 	int rx_min_target, rx_max_target, rx_target;
 	struct sk_buff_head rx_batch;
 
@@ -132,13 +121,13 @@ struct netfront_info
 	 * {tx,rx}_skbs store outstanding skbuffs. The first entry in each
 	 * array is an index into a chain of free entries.
 	 */
-	struct sk_buff *tx_skbs[NETIF_TX_RING_SIZE+1];
-	struct sk_buff *rx_skbs[NETIF_RX_RING_SIZE+1];
+	struct sk_buff *tx_skbs[NET_TX_RING_SIZE+1];
+	struct sk_buff *rx_skbs[NET_RX_RING_SIZE+1];
 
 	grant_ref_t gref_tx_head;
-	grant_ref_t grant_tx_ref[NETIF_TX_RING_SIZE + 1]; 
+	grant_ref_t grant_tx_ref[NET_TX_RING_SIZE + 1]; 
 	grant_ref_t gref_rx_head;
-	grant_ref_t grant_rx_ref[NETIF_TX_RING_SIZE + 1]; 
+	grant_ref_t grant_rx_ref[NET_TX_RING_SIZE + 1]; 
 
 	struct xenbus_device *xbdev;
 	int tx_ring_ref;
@@ -337,37 +326,45 @@ again:
 
 static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 {
+	netif_tx_sring_t *txs;
+	netif_rx_sring_t *rxs;
 	int err;
 	struct net_device *netdev = info->netdev;
 
 	info->tx_ring_ref = GRANT_INVALID_REF;
 	info->rx_ring_ref = GRANT_INVALID_REF;
-	info->rx = NULL;
-	info->tx = NULL;
+	info->rx.sring = NULL;
+	info->tx.sring = NULL;
 	info->irq = 0;
 
-	info->tx = (netif_tx_interface_t *)__get_free_page(GFP_KERNEL);
-	if (!info->tx) {
+	txs = (netif_tx_sring_t *)__get_free_page(GFP_KERNEL);
+	if (!txs) {
 		err = -ENOMEM;
 		xenbus_dev_fatal(dev, err, "allocating tx ring page");
 		goto fail;
 	}
-	info->rx = (netif_rx_interface_t *)__get_free_page(GFP_KERNEL);
-	if (!info->rx) {
+	rxs = (netif_rx_sring_t *)__get_free_page(GFP_KERNEL);
+	if (!rxs) {
 		err = -ENOMEM;
 		xenbus_dev_fatal(dev, err, "allocating rx ring page");
 		goto fail;
 	}
-	memset(info->tx, 0, PAGE_SIZE);
-	memset(info->rx, 0, PAGE_SIZE);
+	memset(txs, 0, PAGE_SIZE);
+	memset(rxs, 0, PAGE_SIZE);
 	info->backend_state = BEST_DISCONNECTED;
 
-	err = xenbus_grant_ring(dev, virt_to_mfn(info->tx));
+	SHARED_RING_INIT(txs);
+	FRONT_RING_INIT(&info->tx, txs, PAGE_SIZE);
+
+	SHARED_RING_INIT(rxs);
+	FRONT_RING_INIT(&info->rx, rxs, PAGE_SIZE);
+
+	err = xenbus_grant_ring(dev, virt_to_mfn(txs));
 	if (err < 0)
 		goto fail;
 	info->tx_ring_ref = err;
 
-	err = xenbus_grant_ring(dev, virt_to_mfn(info->rx));
+	err = xenbus_grant_ring(dev, virt_to_mfn(rxs));
 	if (err < 0)
 		goto fail;
 	info->rx_ring_ref = err;
@@ -454,7 +451,7 @@ static int network_open(struct net_device *dev)
 	np->user_state = UST_OPEN;
 
 	network_alloc_rx_buffers(dev);
-	np->rx->event = np->rx_resp_cons + 1;
+	np->rx.sring->rsp_event = np->rx.rsp_cons + 1;
 
 	netif_start_queue(dev);
 
@@ -463,7 +460,7 @@ static int network_open(struct net_device *dev)
 
 static void network_tx_buf_gc(struct net_device *dev)
 {
-	NETIF_RING_IDX i, prod;
+	RING_IDX i, prod;
 	unsigned short id;
 	struct netfront_info *np = netdev_priv(dev);
 	struct sk_buff *skb;
@@ -472,11 +469,11 @@ static void network_tx_buf_gc(struct net_device *dev)
 		return;
 
 	do {
-		prod = np->tx->resp_prod;
+		prod = np->tx.sring->rsp_prod;
 		rmb(); /* Ensure we see responses up to 'rp'. */
 
-		for (i = np->tx_resp_cons; i != prod; i++) {
-			id  = np->tx->ring[MASK_NETIF_TX_IDX(i)].resp.id;
+		for (i = np->tx.rsp_cons; i != prod; i++) {
+			id  = RING_GET_RESPONSE(&np->tx, i)->id;
 			skb = np->tx_skbs[id];
 			if (unlikely(gnttab_query_foreign_access(
 				np->grant_tx_ref[id]) != 0)) {
@@ -494,7 +491,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 			dev_kfree_skb_irq(skb);
 		}
         
-		np->tx_resp_cons = prod;
+		np->tx.rsp_cons = prod;
         
 		/*
 		 * Set a new event, then check for race with update of tx_cons.
@@ -504,12 +501,14 @@ static void network_tx_buf_gc(struct net_device *dev)
 		 * data is outstanding: in such cases notification from Xen is
 		 * likely to be the only kick that we'll get.
 		 */
-		np->tx->event = prod + ((np->tx->req_prod - prod) >> 1) + 1;
+		np->tx.sring->rsp_event =
+			prod + ((np->tx.sring->req_prod - prod) >> 1) + 1;
 		mb();
-	} while (prod != np->tx->resp_prod);
+	} while (prod != np->tx.sring->rsp_prod);
 
  out: 
-	if (np->tx_full && ((np->tx->req_prod - prod) < NETIF_TX_RING_SIZE)) {
+	if (np->tx_full &&
+	    ((np->tx.sring->req_prod - prod) < NET_TX_RING_SIZE)) {
 		np->tx_full = 0;
 		if (np->user_state == UST_OPEN)
 			netif_wake_queue(dev);
@@ -523,7 +522,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	struct netfront_info *np = netdev_priv(dev);
 	struct sk_buff *skb;
 	int i, batch_target;
-	NETIF_RING_IDX req_prod = np->rx->req_prod;
+	RING_IDX req_prod = np->rx.req_prod_pvt;
 	struct xen_memory_reservation reservation;
 	grant_ref_t ref;
 
@@ -536,7 +535,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	 * allocator, so should reduce the chance of failed allocation requests
 	 *  both for ourself and for other kernel subsystems.
 	 */
-	batch_target = np->rx_target - (req_prod - np->rx_resp_cons);
+	batch_target = np->rx_target - (req_prod - np->rx.rsp_cons);
 	for (i = skb_queue_len(&np->rx_batch); i < batch_target; i++) {
 		skb = alloc_xen_skb(dev->mtu + RX_HEADROOM);
 		if (skb == NULL)
@@ -558,13 +557,13 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
 		np->rx_skbs[id] = skb;
         
-		np->rx->ring[MASK_NETIF_RX_IDX(req_prod + i)].req.id = id;
+		RING_GET_REQUEST(&np->rx, req_prod + i)->id = id;
 		ref = gnttab_claim_grant_reference(&np->gref_rx_head);
 		BUG_ON((signed short)ref < 0);
 		np->grant_rx_ref[id] = ref;
 		gnttab_grant_foreign_transfer_ref(ref,
 						  np->xbdev->otherend_id);
-		np->rx->ring[MASK_NETIF_RX_IDX(req_prod + i)].req.gref = ref;
+		RING_GET_REQUEST(&np->rx, req_prod + i)->gref = ref;
 		rx_pfn_array[i] = virt_to_mfn(skb->head);
 
 		/* Remove this page from map before passing back to Xen. */
@@ -599,10 +598,11 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 		panic("Unable to reduce memory reservation\n");
 
 	/* Above is a suitable barrier to ensure backend will see requests. */
-	np->rx->req_prod = req_prod + i;
+	np->rx.req_prod_pvt = req_prod + i;
+	RING_PUSH_REQUESTS(&np->rx);
 
 	/* Adjust our fill target if we risked running out of buffers. */
-	if (((req_prod - np->rx->resp_prod) < (np->rx_target / 4)) &&
+	if (((req_prod - np->rx.sring->rsp_prod) < (np->rx_target / 4)) &&
 	    ((np->rx_target *= 2) > np->rx_max_target))
 		np->rx_target = np->rx_max_target;
 }
@@ -613,9 +613,10 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	unsigned short id;
 	struct netfront_info *np = netdev_priv(dev);
 	netif_tx_request_t *tx;
-	NETIF_RING_IDX i;
+	RING_IDX i;
 	grant_ref_t ref;
 	unsigned long mfn;
+	int notify;
 
 	if (unlikely(np->tx_full)) {
 		printk(KERN_ALERT "%s: full queue wasn't stopped!\n",
@@ -643,12 +644,12 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		goto drop;
 	}
 
-	i = np->tx->req_prod;
+	i = np->tx.req_prod_pvt;
 
 	id = GET_ID_FROM_FREELIST(np->tx_skbs);
 	np->tx_skbs[id] = skb;
 
-	tx = &np->tx->ring[MASK_NETIF_TX_IDX(i)].req;
+	tx = RING_GET_REQUEST(&np->tx, i);
 
 	tx->id   = id;
 	ref = gnttab_claim_grant_reference(&np->gref_tx_head);
@@ -659,14 +660,16 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	tx->gref = np->grant_tx_ref[id] = ref;
 	tx->offset = (unsigned long)skb->data & ~PAGE_MASK;
 	tx->size = skb->len;
-	tx->csum_blank = (skb->ip_summed == CHECKSUM_HW);
+	tx->flags = (skb->ip_summed == CHECKSUM_HW) ? NETTXF_csum_blank : 0;
 
-	wmb(); /* Ensure that backend will see the request. */
-	np->tx->req_prod = i + 1;
+	np->tx.req_prod_pvt = i + 1;
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&np->tx, notify);
+	if (notify)
+		notify_remote_via_irq(np->irq);
 
 	network_tx_buf_gc(dev);
 
-	if ((i - np->tx_resp_cons) == (NETIF_TX_RING_SIZE - 1)) {
+	if (RING_FULL(&np->tx)) {
 		np->tx_full = 1;
 		netif_stop_queue(dev);
 	}
@@ -675,11 +678,6 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	np->stats.tx_bytes += skb->len;
 	np->stats.tx_packets++;
-
-	/* Only notify Xen if we really have to. */
-	mb();
-	if (np->tx->TX_TEST_IDX == i)
-		notify_remote_via_irq(np->irq);
 
 	return 0;
 
@@ -699,7 +697,7 @@ static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	network_tx_buf_gc(dev);
 	spin_unlock_irqrestore(&np->tx_lock, flags);
 
-	if ((np->rx_resp_cons != np->rx->resp_prod) &&
+	if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx) &&
 	    (np->user_state == UST_OPEN))
 		netif_rx_schedule(dev);
 
@@ -712,7 +710,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	struct netfront_info *np = netdev_priv(dev);
 	struct sk_buff *skb, *nskb;
 	netif_rx_response_t *rx;
-	NETIF_RING_IDX i, rp;
+	RING_IDX i, rp;
 	mmu_update_t *mmu = rx_mmu;
 	multicall_entry_t *mcl = rx_mcl;
 	int work_done, budget, more_to_do = 1;
@@ -732,46 +730,42 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 
 	if ((budget = *pbudget) > dev->quota)
 		budget = dev->quota;
-	rp = np->rx->resp_prod;
+	rp = np->rx.sring->rsp_prod;
 	rmb(); /* Ensure we see queued responses up to 'rp'. */
 
-	for (i = np->rx_resp_cons, work_done = 0; 
+	for (i = np->rx.rsp_cons, work_done = 0; 
 	     (i != rp) && (work_done < budget);
 	     i++, work_done++) {
-		rx = &np->rx->ring[MASK_NETIF_RX_IDX(i)].resp;
+		rx = RING_GET_RESPONSE(&np->rx, i);
+
 		/*
-		 * An error here is very odd. Usually indicates a backend bug,
-		 * low-mem condition, or we didn't have reservation headroom.
-		 */
-		if (unlikely(rx->status <= 0)) {
+                 * This definitely indicates a bug, either in this driver or
+                 * in the backend driver. In future this should flag the bad
+                 * situation to the system controller to reboot the backed.
+                 */
+		if ((ref = np->grant_rx_ref[rx->id]) == GRANT_INVALID_REF) {
+			WPRINTK("Bad rx response id %d.\n", rx->id);
+			work_done--;
+			continue;
+		}
+
+		/* Memory pressure, insufficient buffer headroom, ... */
+		if ((mfn = gnttab_end_foreign_transfer_ref(ref)) == 0) {
 			if (net_ratelimit())
-				printk(KERN_WARNING "Bad rx buffer "
-				       "(memory squeeze?).\n");
-			np->rx->ring[MASK_NETIF_RX_IDX(np->rx->req_prod)].
-				req.id = rx->id;
-			wmb();
-			np->rx->req_prod++;
+				WPRINTK("Unfulfilled rx req (id=%d, st=%d).\n",
+					rx->id, rx->status);
+			RING_GET_REQUEST(&np->rx, np->rx.req_prod_pvt)->id =
+				rx->id;
+			RING_GET_REQUEST(&np->rx, np->rx.req_prod_pvt)->gref =
+				ref;
+			np->rx.req_prod_pvt++;
+			RING_PUSH_REQUESTS(&np->rx);
 			work_done--;
 			continue;
 		}
 
-		ref = np->grant_rx_ref[rx->id]; 
-
-		if(ref == GRANT_INVALID_REF) { 
-			printk(KERN_WARNING "Bad rx grant reference %d "
-			       "from dom %d.\n",
-			       ref, np->xbdev->otherend_id);
-			np->rx->ring[MASK_NETIF_RX_IDX(np->rx->req_prod)].
-				req.id = rx->id;
-			wmb();
-			np->rx->req_prod++;
-			work_done--;
-			continue;
-		}
-
-		np->grant_rx_ref[rx->id] = GRANT_INVALID_REF;
-		mfn = gnttab_end_foreign_transfer_ref(ref);
 		gnttab_release_grant_reference(&np->gref_rx_head, ref);
+		np->grant_rx_ref[rx->id] = GRANT_INVALID_REF;
 
 		skb = np->rx_skbs[rx->id];
 		ADD_ID_TO_FREELIST(np->rx_skbs, rx->id);
@@ -781,7 +775,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		skb->len  = rx->status;
 		skb->tail = skb->data + skb->len;
 
-		if ( rx->csum_valid )
+		if ( rx->flags & NETRXF_csum_valid )
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
 
 		np->stats.rx_packets++;
@@ -867,11 +861,11 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		dev->last_rx = jiffies;
 	}
 
-	np->rx_resp_cons = i;
+	np->rx.rsp_cons = i;
 
 	/* If we get a callback with very few responses, reduce fill target. */
 	/* NB. Note exponential increase, linear decrease. */
-	if (((np->rx->req_prod - np->rx->resp_prod) >
+	if (((np->rx.req_prod_pvt - np->rx.sring->rsp_prod) >
 	     ((3*np->rx_target) / 4)) &&
 	    (--np->rx_target < np->rx_min_target))
 		np->rx_target = np->rx_min_target;
@@ -884,14 +878,9 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	if (work_done < budget) {
 		local_irq_save(flags);
 
-		np->rx->event = i + 1;
-    
-		/* Deal with hypervisor racing our resetting of rx_event. */
-		mb();
-		if (np->rx->resp_prod == i) {
+		RING_FINAL_CHECK_FOR_RESPONSES(&np->rx, more_to_do);
+		if (!more_to_do)
 			__netif_rx_complete(dev);
-			more_to_do = 0;
-		}
 
 		local_irq_restore(flags);
 	}
@@ -931,8 +920,7 @@ static void network_connect(struct net_device *dev)
 	/* Recovery procedure: */
 
 	/* Step 1: Reinitialise variables. */
-	np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
-	np->rx->event = np->tx->event = 1;
+	np->tx_full = 0;
 
 	/*
 	 * Step 2: Rebuild the RX and TX ring contents.
@@ -952,13 +940,14 @@ static void network_connect(struct net_device *dev)
 	 * to avoid this but maybe it doesn't matter so much given the
 	 * interface has been down.
 	 */
-	for (requeue_idx = 0, i = 1; i <= NETIF_TX_RING_SIZE; i++) {
+	for (requeue_idx = 0, i = 1; i <= NET_TX_RING_SIZE; i++) {
 		if ((unsigned long)np->tx_skbs[i] < __PAGE_OFFSET)
 			continue;
 
 		skb = np->tx_skbs[i];
 
-		tx = &np->tx->ring[requeue_idx++].req;
+		tx = RING_GET_REQUEST(&np->tx, requeue_idx);
+		requeue_idx++;
 
 		tx->id = i;
 		gnttab_grant_foreign_access_ref(
@@ -968,27 +957,30 @@ static void network_connect(struct net_device *dev)
 		tx->gref = np->grant_tx_ref[i];
 		tx->offset = (unsigned long)skb->data & ~PAGE_MASK;
 		tx->size = skb->len;
-		tx->csum_blank = (skb->ip_summed == CHECKSUM_HW);
+		tx->flags = (skb->ip_summed == CHECKSUM_HW) ?
+			NETTXF_csum_blank : 0;
 
 		np->stats.tx_bytes += skb->len;
 		np->stats.tx_packets++;
 	}
-	wmb();
-	np->tx->req_prod = requeue_idx;
+
+	np->tx.req_prod_pvt = requeue_idx;
+	RING_PUSH_REQUESTS(&np->tx);
 
 	/* Rebuild the RX buffer freelist and the RX ring itself. */
-	for (requeue_idx = 0, i = 1; i <= NETIF_RX_RING_SIZE; i++) { 
+	for (requeue_idx = 0, i = 1; i <= NET_RX_RING_SIZE; i++) { 
 		if ((unsigned long)np->rx_skbs[i] < __PAGE_OFFSET)
 			continue;
 		gnttab_grant_foreign_transfer_ref(
 			np->grant_rx_ref[i], np->xbdev->otherend_id);
-		np->rx->ring[requeue_idx].req.gref =
+		RING_GET_REQUEST(&np->rx, requeue_idx)->gref =
 			np->grant_rx_ref[i];
-		np->rx->ring[requeue_idx].req.id = i;
+		RING_GET_REQUEST(&np->rx, requeue_idx)->id = i;
 		requeue_idx++; 
 	}
-	wmb();                
-	np->rx->req_prod = requeue_idx;
+
+	np->rx.req_prod_pvt = requeue_idx;
+	RING_PUSH_REQUESTS(&np->rx);
 
 	/*
 	 * Step 3: All public and private state should now be sane.  Get
@@ -997,7 +989,6 @@ static void network_connect(struct net_device *dev)
 	 * packets.
 	 */
 	np->backend_state = BEST_CONNECTED;
-	wmb();
 	notify_remote_via_irq(np->irq);
 	network_tx_buf_gc(dev);
 
@@ -1072,25 +1063,25 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 	np->rx_max_target = RX_MAX_TARGET;
 
 	/* Initialise {tx,rx}_skbs as a free chain containing every entry. */
-	for (i = 0; i <= NETIF_TX_RING_SIZE; i++) {
+	for (i = 0; i <= NET_TX_RING_SIZE; i++) {
 		np->tx_skbs[i] = (void *)((unsigned long) i+1);
 		np->grant_tx_ref[i] = GRANT_INVALID_REF;
 	}
 
-	for (i = 0; i <= NETIF_RX_RING_SIZE; i++) {
+	for (i = 0; i <= NET_RX_RING_SIZE; i++) {
 		np->rx_skbs[i] = (void *)((unsigned long) i+1);
 		np->grant_rx_ref[i] = GRANT_INVALID_REF;
 	}
 
 	/* A grant for every tx ring slot */
-	if (gnttab_alloc_grant_references(NETIF_TX_RING_SIZE,
+	if (gnttab_alloc_grant_references(NET_TX_RING_SIZE,
 					  &np->gref_tx_head) < 0) {
 		printk(KERN_ALERT "#### netfront can't alloc tx grant refs\n");
 		err = -ENOMEM;
 		goto exit;
 	}
 	/* A grant for every rx ring slot */
-	if (gnttab_alloc_grant_references(NETIF_RX_RING_SIZE,
+	if (gnttab_alloc_grant_references(NET_RX_RING_SIZE,
 					  &np->gref_rx_head) < 0) {
 		printk(KERN_ALERT "#### netfront can't alloc rx grant refs\n");
 		gnttab_free_grant_references(np->gref_tx_head);
@@ -1218,12 +1209,12 @@ static void netif_disconnect_backend(struct netfront_info *info)
 	spin_unlock(&info->rx_lock);
 	spin_unlock_irq(&info->tx_lock);
     
-	end_access(info->tx_ring_ref, info->tx);
-	end_access(info->rx_ring_ref, info->rx);
+	end_access(info->tx_ring_ref, info->tx.sring);
+	end_access(info->rx_ring_ref, info->rx.sring);
 	info->tx_ring_ref = GRANT_INVALID_REF;
 	info->rx_ring_ref = GRANT_INVALID_REF;
-	info->tx = NULL;
-	info->rx = NULL;
+	info->tx.sring = NULL;
+	info->rx.sring = NULL;
 
 	if (info->irq)
 		unbind_from_irqhandler(info->irq, info->netdev);

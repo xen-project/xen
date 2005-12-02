@@ -48,13 +48,11 @@ class BlkifController(DevController):
         devid = blkif.blkdev_name_to_number(dev)
 
         (typ, params) = string.split(sxp.child_value(config, 'uname'), ':', 1)
-        back = { 'dev' : dev,
-                 'type' : typ,
-                 'params' : params
+        back = { 'dev'    : dev,
+                 'type'   : typ,
+                 'params' : params,
+                 'mode'   : sxp.child_value(config, 'mode', 'r')
                  }
-
-        if 'r' == sxp.child_value(config, 'mode', 'r'):
-            back['read-only'] = ""  # existence indicates read-only
 
         front = { 'virtual-device' : "%i" % devid }
 
@@ -66,18 +64,16 @@ class BlkifController(DevController):
 
         result = DevController.configuration(self, devid)
 
-        (dev, typ, params, ro) = self.readBackend(devid,
-                                                  'dev', 'type', 'params',
-                                                  'read-only')
+        (dev, typ, params, mode) = self.readBackend(devid,
+                                                    'dev', 'type', 'params',
+                                                    'mode')
 
         if dev:
             result.append(['dev', dev])
         if typ and params:
             result.append(['uname', typ + ":" + params])
-        if ro:
-            result.append(['mode', 'r'])
-        else:
-            result.append(['mode', 'w'])
+        if mode:
+            result.append(['mode', mode])
 
         return result
 
@@ -93,8 +89,11 @@ class BlkifController(DevController):
         try:
             DevController.destroyDevice(self, int(devid))
         except ValueError:
+            devid_end = type(devid) is str and devid.split('/')[-1] or None
+
             for i in self.deviceIDs():
-                if self.readBackend(i, 'dev') == devid:
+                d = self.readBackend(i, 'dev')
+                if d == devid or (devid_end and d == devid_end):
                     DevController.destroyDevice(self, i)
                     return
             raise VmError("Device %s not connected" % devid)

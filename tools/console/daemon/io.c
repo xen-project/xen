@@ -62,7 +62,7 @@ struct domain
 	struct domain *next;
 	char *conspath;
 	int ring_ref;
-	int local_port;
+	evtchn_port_t local_port;
 	int evtchn_fd;
 	struct xencons_interface *interface;
 };
@@ -376,9 +376,6 @@ static void remove_domain(struct domain *dom)
 
 static void cleanup_domain(struct domain *d)
 {
-	if (!buffer_empty(&d->buffer))
-		return;
-
 	if (d->tty_fd != -1) {
 		close(d->tty_fd);
 		d->tty_fd = -1;
@@ -491,7 +488,7 @@ static void handle_tty_write(struct domain *dom)
 
 static void handle_ring_read(struct domain *dom)
 {
-	uint16_t v;
+	evtchn_port_t v;
 
 	if (!read_sync(dom->evtchn_fd, &v, sizeof(v)))
 		return;

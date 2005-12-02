@@ -12,7 +12,7 @@
 static int do_evtchn_op(int xc_handle, evtchn_op_t *op)
 {
     int ret = -1;
-    privcmd_hypercall_t hypercall;
+    DECLARE_HYPERCALL;
 
     hypercall.op     = __HYPERVISOR_event_channel_op;
     hypercall.arg[0] = (unsigned long)op;
@@ -51,7 +51,7 @@ int xc_evtchn_alloc_unbound(int xc_handle,
 
 int xc_evtchn_status(int xc_handle,
                      uint32_t dom,
-                     int port,
+                     evtchn_port_t port,
                      xc_evtchn_status_t *status)
 {
     int         rc;

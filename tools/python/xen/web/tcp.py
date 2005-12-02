@@ -24,13 +24,10 @@ import errno
 from connection import *
 from protocol import *
 
-class TCPServerConnection(SocketServerConnection):
-    pass
-
 class TCPListener(SocketListener):
 
-    def __init__(self, port, factory, backlog=None, interface=''):
-        SocketListener.__init__(self, factory, backlog=backlog)
+    def __init__(self, port, protocol, backlog=None, interface=''):
+        SocketListener.__init__(self, protocol, backlog=backlog)
         self.port = port
         self.interface = interface
         
@@ -53,7 +50,7 @@ class TCPListener(SocketListener):
                     raise
 
     def acceptConnection(self, sock, protocol, addr):
-        return TCPServerConnection(sock, protocol, addr, self)
+        return SocketServerConnection(sock, protocol, addr, self)
 
 class TCPClientConnection(SocketClientConnection):
 
@@ -70,8 +67,8 @@ class TCPClientConnection(SocketClientConnection):
     
 class TCPConnector(SocketConnector):
 
-    def __init__(self, host, port, factory, timeout=None, bindAddress=None):
-        SocketConnector.__init__(self, factory)
+    def __init__(self, host, port, protocol, timeout=None, bindAddress=None):
+        SocketConnector.__init__(self, protocol)
         self.host = host
         self.port = self.servicePort(port)
         self.bindAddress = bindAddress
@@ -85,33 +82,18 @@ class TCPConnector(SocketConnector):
                 raise IOError("unknown service: " + ex)
         return port
 
-    def connectTransport(self):
+    def connect(self):
         self.transport = TCPClientConnection(
             self.host, self.port, self.bindAddress, self)
         self.transport.connect(self.timeout)
 
-def listenTCP(port, factory, interface='', backlog=None):
-    l = TCPListener(port, factory, interface=interface, backlog=backlog)
+def listenTCP(port, protocol, interface='', backlog=None):
+    l = TCPListener(port, protocol, interface=interface, backlog=backlog)
     l.startListening()
     return l
 
-def connectTCP(host, port, factory, timeout=None, bindAddress=None):
-    c = TCPConnector(host, port, factory, timeout=timeout, bindAddress=bindAddress)
+def connectTCP(host, port, protocol, timeout=None, bindAddress=None):
+    c = TCPConnector(host, port, protocol, timeout=timeout,
+                     bindAddress=bindAddress)
     c.connect()
     return c
-
-def main(argv):
-    host = 'localhost'
-    port = 8005
-    if argv[1] == "client":
-        c = connectTCP(host, port, TestClientFactory())
-        print 'client:', c
-    else:
-        s = listenTCP(port, TestServerFactory())
-        print 'server:', s
-        
-if __name__ == "__main__":
-    main(sys.argv)
-
-        
-

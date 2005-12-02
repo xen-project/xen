@@ -420,6 +420,12 @@ void __init smp_cpus_done(unsigned int max_cpus)
 {
 }
 
+int setup_profiling_timer(unsigned int multiplier)
+{
+	/* Dummy function. */
+	return 0;
+}
+
 /*
  * Local variables:
  *  c-file-style: "linux"

@@ -39,7 +39,7 @@
 #include <xen/sched.h>
 #include <public/io/ioreq.h>
 #include <asm/vmx.h>
-#include <public/io/vmx_vpic.h>
+#include <asm/vmx_vpic.h>
 #include <asm/current.h>
 
 static void ioapic_enable(vmx_vioapic_t *s, uint8_t enable)
@@ -52,8 +52,6 @@ static void ioapic_enable(vmx_vioapic_t *s, uint8_t enable)
 
 static void ioapic_dump_redir(vmx_vioapic_t *s, uint8_t entry)
 {
-    ASSERT(s);
-
     RedirStatus redir = s->redirtbl[entry];
 
     VMX_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_dump_redir "

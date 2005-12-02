@@ -58,6 +58,8 @@ IOCOUNT = "I/O Count"
 EXCOUNT = "Exec Count"
 
 # globals
+dom_in_use = []
+
 # our curses screen
 stdscr = None
 
@@ -88,18 +90,18 @@ def setup_cmdline_parser():
 # encapsulate information about a domain
 class DomainInfo:
     def __init__(self):
-        self.allocated_samples = []
-        self.gotten_samples = []
-        self.blocked_samples = []
-        self.waited_samples = []
-        self.execcount_samples = []
-        self.iocount_samples = []
+        self.allocated_sum = 0
+        self.gotten_sum = 0
+        self.blocked_sum = 0
+        self.waited_sum = 0
+        self.exec_count = 0;
+        self.iocount_sum = 0
         self.ffp_samples = []
 
     def gotten_stats(self, passed):
-        total = float(sum(self.gotten_samples))
+        total = float(self.gotten_sum)
         per = 100*total/passed
-        exs = sum(self.execcount_samples)
+        exs = self.exec_count
         if exs > 0:
             avg = total/exs
         else:
@@ -107,9 +109,9 @@ class DomainInfo:
         return [total/(float(passed)/10**9), per, avg]
 
     def waited_stats(self, passed):
-        total = float(sum(self.waited_samples))
+        total = float(self.waited_sum)
         per = 100*total/passed
-        exs = sum(self.execcount_samples)
+        exs = self.exec_count
         if exs > 0:
             avg = total/exs
         else:
@@ -117,9 +119,9 @@ class DomainInfo:
         return [total/(float(passed)/10**9), per, avg]
 
     def blocked_stats(self, passed):
-        total = float(sum(self.blocked_samples))
+        total = float(self.blocked_sum)
         per = 100*total/passed
-        ios = sum(self.iocount_samples)
+        ios = self.iocount_sum
         if ios > 0:
             avg = total/float(ios)
         else:
@@ -127,20 +129,20 @@ class DomainInfo:
         return [total/(float(passed)/10**9), per, avg]
 
     def allocated_stats(self, passed):
-        total = sum(self.allocated_samples)
-        exs = sum(self.execcount_samples)
+        total = self.allocated_sum
+        exs = self.exec_count
         if exs > 0:
             return float(total)/exs
         else:
             return 0
 
     def ec_stats(self, passed):
-        total = float(sum(self.execcount_samples))/(float(passed)/10**9)
-        return total
+        total = float(self.exec_count/(float(passed)/10**9))
+	return total
 
     def io_stats(self, passed):
-        total = float(sum(self.iocount_samples))
-        exs = sum(self.execcount_samples)
+        total = float(self.iocount_sum)
+        exs = self.exec_count
         if exs > 0:
             avg = total/exs
         else:
@@ -165,12 +167,13 @@ def summarize(startat, endat, duration, samples):
     
     while passed < duration:
         for i in range(0, NDOMAINS):
-            dominfos[i].gotten_samples.append(samples[curid][0*NDOMAINS + i])
-            dominfos[i].allocated_samples.append(samples[curid][1*NDOMAINS + i])
-            dominfos[i].waited_samples.append(samples[curid][2*NDOMAINS + i])
-            dominfos[i].blocked_samples.append(samples[curid][3*NDOMAINS + i])
-            dominfos[i].execcount_samples.append(samples[curid][4*NDOMAINS + i])
-            dominfos[i].iocount_samples.append(samples[curid][5*NDOMAINS + i])
+            if dom_in_use[i]:
+                dominfos[i].gotten_sum += samples[curid][0*NDOMAINS + i]
+                dominfos[i].allocated_sum += samples[curid][1*NDOMAINS + i]
+                dominfos[i].waited_sum += samples[curid][2*NDOMAINS + i]
+                dominfos[i].blocked_sum += samples[curid][3*NDOMAINS + i]
+                dominfos[i].exec_count += samples[curid][4*NDOMAINS + i]
+                dominfos[i].iocount_sum += samples[curid][5*NDOMAINS + i]
     
         passed += samples[curid][6*NDOMAINS]
         lost_samples.append(samples[curid][6*NDOMAINS + 2])
@@ -187,7 +190,13 @@ def summarize(startat, endat, duration, samples):
 
     lostinfo = [min(lost_samples), sum(lost_samples), max(lost_samples)]
     ffpinfo = [min(ffp_samples), sum(ffp_samples), max(ffp_samples)]
-    ldoms = map(lambda x: dominfos[x].stats(passed), range(0, NDOMAINS))
+
+    ldoms = []
+    for x in range(0, NDOMAINS):
+        if dom_in_use[x]:
+            ldoms.append(dominfos[x].stats(passed))
+        else:
+            ldoms.append(0)
 
     return [ldoms, lostinfo, ffpinfo]
 
@@ -222,6 +231,7 @@ def show_livestats():
     cpu = 0          # cpu of interest to display data for
     ncpu = 1         # number of cpu's on this platform
     slen = 0         # size of shared data structure, incuding padding
+    global dom_in_use
     
     # mmap the (the first chunk of the) file
     shmf = open(SHM_FILE, "r+")
@@ -229,6 +239,7 @@ def show_livestats():
 
     samples = []
     doms = []
+    dom_in_use = []
 
     # initialize curses
     stdscr = _c.initscr()
@@ -238,9 +249,7 @@ def show_livestats():
     stdscr.keypad(1)
     stdscr.timeout(1000)
     [maxy, maxx] = stdscr.getmaxyx()
-
     
-
     # display in a loop
     while True:
 
@@ -264,6 +273,11 @@ def show_livestats():
                 len = struct.calcsize(ST_DOM_INFO)
                 dom = struct.unpack(ST_DOM_INFO, shm[idx:idx+len])
                 doms.append(dom)
+#		(last_update_time, start_time, runnable_start_time, blocked_start_time,
+#		 ns_since_boot, ns_oncpu_since_boot, runnable_at_last_update,
+#		 runnable, in_use, domid, name) = dom
+#		dom_in_use.append(in_use)
+                dom_in_use.append(dom[8])
                 idx += len
 
             len = struct.calcsize("4i")
@@ -293,6 +307,7 @@ def show_livestats():
         [h1, l1, f1] = summarize(startat, endat, 10**9, samples)
         [h2, l2, f2] = summarize(startat, endat, 10 * 10**9, samples)
 
+
         # the actual display code
         row = 0
         display(stdscr, row, 1, "CPU = %d" % cpu, _c.A_STANDOUT)
@@ -305,6 +320,9 @@ def show_livestats():
         total_h2_cpu = 0
 
         for dom in range(0, NDOMAINS):
+            if not dom_in_use[dom]:
+                continue
+
             if h1[dom][0][1] > 0 or dom == NDOMAINS - 1:
                 # display gotten
                 row += 1 
@@ -475,6 +493,7 @@ class Delayed(file):
 
 def writelog():
     global options
+    global dom_in_use
 
     ncpu = 1        # number of cpu's
     slen = 0        # size of shared structure inc. padding
@@ -490,11 +509,13 @@ def writelog():
 
     while options.duration == 0 or interval < (options.duration * 1000):
         for cpuidx in range(0, ncpu):
+
             idx = cpuidx * slen      # offset needed in mmap file
 
 
             samples = []
             doms = []
+            dom_in_use = []
 
             for i in range(0, NSAMPLES):
                 len = struct.calcsize(ST_QDATA)
@@ -505,7 +526,11 @@ def writelog():
             for i in range(0, NDOMAINS):
                 len = struct.calcsize(ST_DOM_INFO)
                 dom = struct.unpack(ST_DOM_INFO, shm[idx:idx+len])
-                doms.append(dom)
+#                doms.append(dom)
+#		(last_update_time, start_time, runnable_start_time, blocked_start_time,
+#		 ns_since_boot, ns_oncpu_since_boot, runnable_at_last_update,
+#		 runnable, in_use, domid, name) = dom
+                dom_in_use.append(dom[8])
                 idx += len
 
             len = struct.calcsize("4i")
@@ -524,6 +549,8 @@ def writelog():
 
             [h1,l1, f1] = summarize(startat, endat, options.interval * 10**6, samples)
             for dom in range(0, NDOMAINS):
+                if not dom_in_use[dom]:
+                    continue
                 if h1[dom][0][1] > 0 or dom == NDOMAINS - 1:
                     outfiles[dom].write("%.3f %d %d %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n" %
                                      (interval, cpuidx, dom,

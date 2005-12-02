@@ -72,13 +72,16 @@ typedef l4_pgentry_t root_pgentry_t;
 /* Bit 23 of a 24-bit flag mask. This corresponds to bit 63 of a pte.*/
 #define _PAGE_NX (cpu_has_nx ? (1U<<23) : 0U)
 
-#define L1_DISALLOW_MASK (0xFFFFF180U & ~_PAGE_NX) /* PAT/GLOBAL */
-#define L2_DISALLOW_MASK (0xFFFFF180U & ~_PAGE_NX) /* PSE/GLOBAL */
-#define L3_DISALLOW_MASK (0xFFFFF180U & ~_PAGE_NX) /* must-be-zero */
-#define L4_DISALLOW_MASK (0xFFFFF180U & ~_PAGE_NX) /* must-be-zero */
+#define L1_DISALLOW_MASK BASE_DISALLOW_MASK
+#define L2_DISALLOW_MASK BASE_DISALLOW_MASK
+#define L3_DISALLOW_MASK (BASE_DISALLOW_MASK | 0x180U /* must-be-zero */)
+#define L4_DISALLOW_MASK (BASE_DISALLOW_MASK | 0x180U /* must-be-zero */)
 
 #define PAGE_HYPERVISOR         (__PAGE_HYPERVISOR         | _PAGE_GLOBAL)
 #define PAGE_HYPERVISOR_NOCACHE (__PAGE_HYPERVISOR_NOCACHE | _PAGE_GLOBAL)
+
+#define GRANT_PTE_FLAGS \
+    (_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_GNTTAB|_PAGE_USER)
 
 #endif /* __X86_64_PAGE_H__ */
 

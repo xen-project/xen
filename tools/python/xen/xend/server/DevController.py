@@ -25,15 +25,18 @@ from xen.xend.XendLogging import log
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
 
-DEVICE_CREATE_TIMEOUT = 5
+DEVICE_CREATE_TIMEOUT = 10
 HOTPLUG_STATUS_NODE = "hotplug-status"
+HOTPLUG_ERROR_NODE  = "hotplug-error"
 HOTPLUG_STATUS_ERROR = "error"
+HOTPLUG_STATUS_BUSY  = "busy"
 
 Connected = 1
 Died      = 2
 Error     = 3
 Missing   = 4
 Timeout   = 5
+Busy      = 6
 
 xenbusState = {
     'Unknown'      : 0,
@@ -79,9 +82,37 @@ class DevController:
         if devid is None:
             return 0
 
-        self.writeDetails(config, devid, back, front)
+        (backpath, frontpath) = self.addStoreEntries(config, devid, back,
+                                                     front)
 
-        return devid
+        while True:
+            t = xstransact()
+            try:
+                if devid in self.deviceIDs(t):
+                    if 'dev' in back:
+                        dev_str = '%s (%d, %s)' % (back['dev'], devid,
+                                                   self.deviceClass)
+                    else:
+                        dev_str = '%s (%s)' % (devid, self.deviceClass)
+                    
+                    raise VmError("Device %s is already connected." % dev_str)
+
+                log.debug('DevController: writing %s to %s.', str(front),
+                          frontpath)
+                log.debug('DevController: writing %s to %s.', str(back),
+                          backpath)
+
+                t.remove(frontpath)
+                t.remove(backpath)
+
+                t.write2(frontpath, front)
+                t.write2(backpath,  back)
+
+                if t.commit():
+                    return devid
+            except:
+                t.abort()
+                raise
 
 
     def waitForDevices(self):
@@ -98,23 +129,38 @@ class DevController:
         if status == Timeout:
             self.destroyDevice(devid)
             raise VmError("Device %s (%s) could not be connected. "
-                          "Hotplug scripts not working" %
+                          "Hotplug scripts not working." %
                           (devid, self.deviceClass))
 
         elif status == Error:
             self.destroyDevice(devid)
             raise VmError("Device %s (%s) could not be connected. "
-                          "Backend device not found" %
+                          "Backend device not found." %
                           (devid, self.deviceClass))
 
         elif status == Missing:
+            # Don't try to destroy the device; it's already gone away.
             raise VmError("Device %s (%s) could not be connected. "
-                          "Device not found" % (devid, self.deviceClass))
+                          "Device not found." % (devid, self.deviceClass))
 
         elif status == Died:
             self.destroyDevice(devid)
             raise VmError("Device %s (%s) could not be connected. "
-                          "Device has died" % (devid, self.deviceClass))
+                          "Device has died." % (devid, self.deviceClass))
+
+        elif status == Busy:
+            err = None
+            frontpath = self.frontendPath(devid)
+            backpath = xstransact.Read(frontpath, "backend")
+            if backpath:
+                err = xstransact.Read(backpath, HOTPLUG_ERROR_NODE)
+            if not err:
+                err = "Busy."
+                
+            self.destroyDevice(devid)
+            raise VmError("Device %s (%s) could not be connected.\n%s" %
+                          (devid, self.deviceClass, err))
+
 
 
     def reconfigureDevice(self, devid, config):
@@ -245,21 +291,29 @@ class DevController:
             raise VmError("Device %s not connected" % devid)
 
 
-    def deviceIDs(self):
+    def deviceIDs(self, transaction = None):
         """@return The IDs of each of the devices currently configured for
         this instance's deviceClass.
         """
-        return map(int, xstransact.List(self.frontendRoot()))
+        fe = self.frontendRoot()
+        if transaction:
+            return map(lambda x: int(x.split('/')[-1]), transaction.list(fe))
+        else:
+            return map(int, xstransact.List(fe))
 
 
 ## private:
 
-    def writeDetails(self, config, devid, backDetails, frontDetails):
-        """Write the details in the store to trigger creation of a device.
-        The backend domain ID is taken from the given config, paths for
-        frontend and backend are computed, and these are written to the store
-        appropriately, including references from frontend to backend and vice
-        versa.
+    def addStoreEntries(self, config, devid, backDetails, frontDetails):
+        """Add to backDetails and frontDetails the entries to be written in
+        the store to trigger creation of a device.  The backend domain ID is
+        taken from the given config, paths for frontend and backend are
+        computed, and these are added to the backDetails and frontDetails
+        dictionaries for writing to the store, including references from
+        frontend to backend and vice versa.
+
+        @return A pair of (backpath, frontpath).  backDetails and frontDetails
+        will have been updated appropriately, also.
 
         @param config The configuration of the device, as given to
         {@link #createDevice}.
@@ -298,24 +352,7 @@ class DevController:
             'state' : str(xenbusState['Initialising'])
             })
 
-        log.debug('DevController: writing %s to %s.', str(frontDetails),
-                  frontpath)
-        log.debug('DevController: writing %s to %s.', str(backDetails),
-                  backpath)
-
-        while True:
-            t = xstransact()
-            try:
-                t.remove2(backpath, HOTPLUG_STATUS_NODE)
-
-                t.write2(frontpath, frontDetails)
-                t.write2(backpath,  backDetails)
-
-                if t.commit():
-                    return
-            except:
-                t.abort()
-                raise
+        return (backpath, frontpath)
 
 
     def waitForBackend(self, devid):
@@ -328,7 +365,7 @@ class DevController:
             ev = Event()
             result = { 'status': Timeout }
             
-            xswatch(statusPath, hotplugStatusCallback, statusPath, ev, result)
+            xswatch(statusPath, hotplugStatusCallback, ev, result)
 
             ev.wait(DEVICE_CREATE_TIMEOUT)
             return result['status']
@@ -366,6 +403,8 @@ def hotplugStatusCallback(statusPath, ev, result):
         if status is not None:
             if status == HOTPLUG_STATUS_ERROR:
                 result['status'] = Error
+            elif status == HOTPLUG_STATUS_BUSY:
+                result['status'] = Busy
             else:
                 result['status'] = Connected
         else:

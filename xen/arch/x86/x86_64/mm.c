@@ -28,6 +28,7 @@
 #include <asm/flushtlb.h>
 #include <asm/fixmap.h>
 #include <asm/msr.h>
+#include <public/memory.h>
 
 struct pfn_info *alloc_xen_pagetable(void)
 {
@@ -172,6 +173,50 @@ void subarch_init_memory(struct domain *dom_xen)
             page_set_owner(&frame_table[m2p_start_mfn+i], dom_xen);
         }
     }
+}
+
+long arch_memory_op(int op, void *arg)
+{
+    struct xen_machphys_mfn_list xmml;
+    l3_pgentry_t l3e;
+    l2_pgentry_t l2e;
+    unsigned long mfn, v;
+    unsigned int i;
+    long rc = 0;
+
+    switch ( op )
+    {
+    case XENMEM_machphys_mfn_list:
+        if ( copy_from_user(&xmml, arg, sizeof(xmml)) )
+            return -EFAULT;
+
+        for ( i = 0, v = RDWR_MPT_VIRT_START;
+              (i != xmml.max_extents) && (v != RDWR_MPT_VIRT_END);
+              i++, v += 1 << 21 )
+        {
+            l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(v)])[
+                l3_table_offset(v)];
+            if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+                break;
+            l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
+            if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+                break;
+            mfn = l2e_get_pfn(l2e) + l1_table_offset(v);
+            if ( put_user(mfn, &xmml.extent_start[i]) )
+                return -EFAULT;
+        }
+
+        if ( put_user(i, &((struct xen_machphys_mfn_list *)arg)->nr_extents) )
+            return -EFAULT;
+
+        break;
+
+    default:
+        rc = -ENOSYS;
+        break;
+    }
+
+    return rc;
 }
 
 long do_stack_switch(unsigned long ss, unsigned long esp)

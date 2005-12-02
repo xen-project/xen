@@ -233,8 +233,7 @@ int ublkback_request(blkif_t *blkif, blkif_request_t *req, int batch_done)
     case BLKIF_OP_WRITE:
     {
         unsigned long size;
-        
-        
+
         batch_count++;
 
         idx = ID_TO_IDX(req->id);
@@ -247,18 +246,17 @@ int ublkback_request(blkif_t *blkif, blkif_request_t *req, int batch_done)
             
             sector = req->sector_number + (8*i);
             
-            size = blkif_last_sect (req->frame_and_sects[i]) -
-                   blkif_first_sect(req->frame_and_sects[i]) + 1;
+            size = req->seg[i].last_sect - req->seg[i].first_sect + 1;
             
-            if (blkif_first_sect(req->frame_and_sects[i]) != 0)
-            DPRINTF("iWR: sec_nr: %10llu sec: %10llu (%1lu,%1lu) pos: %15lu\n",
-                    req->sector_number, sector, 
-                    blkif_first_sect(req->frame_and_sects[i]),
-                    blkif_last_sect (req->frame_and_sects[i]),
-                    (long)(sector << SECTOR_SHIFT));
+            if (req->seg[i].first_sect != 0)
+                DPRINTF("iWR: sec_nr: %10llu sec: %10llu (%1lu,%1lu) "
+                        "pos: %15lu\n",
+                        req->sector_number, sector, 
+                        req->seg[i].first_sect, req->seg[i].last_sect,
+                        (long)(sector << SECTOR_SHIFT));
                         
             spage  = (char *)MMAP_VADDR(ID_TO_IDX(req->id), i);
-            spage += blkif_first_sect(req->frame_and_sects[i]) << SECTOR_SHIFT;
+            spage += req->seg[i].first_sect << SECTOR_SHIFT;
             
             /*convert size and sector to byte offsets */
             size   <<= SECTOR_SHIFT;
@@ -297,19 +295,17 @@ int ublkback_request(blkif_t *blkif, blkif_request_t *req, int batch_done)
             
             sector  = req->sector_number + (8*i);
             
-            size = blkif_last_sect (req->frame_and_sects[i]) -
-                   blkif_first_sect(req->frame_and_sects[i]) + 1;
-            
+            size = req->seg[i].last_sect - req->seg[i].first_sect + 1;
+
             dpage  = (char *)MMAP_VADDR(ID_TO_IDX(req->id), i);
-            dpage += blkif_first_sect(req->frame_and_sects[i]) << SECTOR_SHIFT;
+            dpage += req->seg[i].first_sect << SECTOR_SHIFT;
             
-            if (blkif_first_sect(req->frame_and_sects[i]) != 0)
-            DPRINTF("iRD : sec_nr: %10llu sec: %10llu (%1lu,%1lu) "
-                    "pos: %15lu dpage: %p\n", 
-                    req->sector_number, sector, 
-                    blkif_first_sect(req->frame_and_sects[i]),
-                    blkif_last_sect (req->frame_and_sects[i]),
-                    (long)(sector << SECTOR_SHIFT), dpage);
+            if (req->seg[i].first_sect != 0)
+                DPRINTF("iRD : sec_nr: %10llu sec: %10llu (%1lu,%1lu) "
+                        "pos: %15lu dpage: %p\n", 
+                        req->sector_number, sector, 
+                        req->seg[i].first_sect, req->seg[i].last_sect,
+                        (long)(sector << SECTOR_SHIFT), dpage);
             
             /*convert size and sector to byte offsets */
             size   <<= SECTOR_SHIFT;
