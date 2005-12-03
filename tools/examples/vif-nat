@@ -91,8 +91,6 @@ vif_int=$(( $(echo "((($vif_ip" | sed -e 's#\.#)\*256\+#g') ))
 netmask=$(dotted_quad $intmask)
 network=$(dotted_quad $(( $vif_int & $intmask )) )
 
-main_ip=$(dom0_ip)
-
 
 dhcp_remove_entry()
 {
@@ -140,7 +138,7 @@ case "$command" in
 
         do_or_die ip link set "$vif" up arp on
         do_or_die ip addr add "$router_ip" dev "$vif"
-        do_or_die ip route add "$vif_ip" dev "$vif" src "$main_ip"
+        do_or_die ip route add "$vif_ip" dev "$vif" src "$router_ip"
         echo 1 >/proc/sys/net/ipv4/conf/${vif}/proxy_arp
         [ "$dhcp" != 'no' ] && dhcp_up
         ;;

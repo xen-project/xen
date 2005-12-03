@@ -43,7 +43,7 @@ import XendRoot
 from xen.xend.XendBootloader import bootloader
 from xen.xend.XendError import XendError, VmError
 
-from xen.xend.xenstore.xstransact import xstransact
+from xen.xend.xenstore.xstransact import xstransact, complete
 from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain
 from xen.xend.xenstore.xswatch import xswatch
 
@@ -83,8 +83,6 @@ STATE_DOM_OK       = 1
 STATE_DOM_SHUTDOWN = 2
 
 SHUTDOWN_TIMEOUT = 30
-
-VMROOT  = '/vm/'
 
 ZOMBIE_PREFIX = 'Zombie-'
 
@@ -234,7 +232,7 @@ def recreate(xeninfo, priv):
             log.warn(str(exn))
 
         vm = XendDomainInfo(xeninfo, domid, dompath, True, priv)
-        vm.removeDom()
+        vm.recreateDom()
         vm.removeVm()
         vm.storeVmDetails()
         vm.storeDomDetails()
@@ -288,6 +286,7 @@ def parseConfig(config):
         result[e[0]] = get_cfg(e[0], e[1])
 
     result['cpu']       = get_cfg('cpu',       int)
+    result['cpus']      = get_cfg('cpus',      str)
     result['image']     = get_cfg('image')
 
     try:
@@ -300,6 +299,43 @@ def parseConfig(config):
         raise VmError(
             'Invalid configuration setting: vcpus = %s: %s' %
             (sxp.child_value(result['image'], 'vcpus', 1), str(exn)))
+
+    try:
+        # support legacy config files with 'cpu' parameter
+        # NB: prepending to list to support previous behavior
+        #     where 'cpu' parameter pinned VCPU0.
+        if result['cpu']:
+           if result['cpus']:
+               result['cpus'] = "%s,%s" % (str(result['cpu']), result['cpus'])
+           else:
+               result['cpus'] = str(result['cpu'])
+
+        # convert 'cpus' string to list of ints
+        # 'cpus' supports a list of ranges (0-3), seperated by
+        # commas, and negation, (^1).  
+        # Precedence is settled by  order of the string:
+        #     "0-3,^1"   -> [0,2,3]
+        #     "0-3,^1,1" -> [0,1,2,3]
+        if result['cpus']:
+            cpus = []
+            for c in result['cpus'].split(','):
+                if c.find('-') != -1:             
+                    (x,y) = c.split('-')
+                    for i in range(int(x),int(y)+1):
+                        cpus.append(int(i))
+                else:
+                    # remove this element from the list 
+                    if c[0] == '^':
+                        cpus = [x for x in cpus if x != int(c[1])]
+                    else:
+                        cpus.append(int(c))
+
+            result['cpus'] = cpus
+        
+    except ValueError, exn:
+        raise VmError(
+            'Invalid configuration setting: cpus = %s: %s' %
+            (result['cpus'], exn))
 
     result['backend'] = []
     for c in sxp.children(config, 'backend'):
@@ -385,7 +421,7 @@ class XendDomainInfo:
         else:
             self.domid = None
 
-        self.vmpath  = VMROOT + self.info['uuid']
+        self.vmpath  = XendDomain.VMROOT + self.info['uuid']
         self.dompath = dompath
 
         if augment:
@@ -488,6 +524,7 @@ class XendDomainInfo:
             defaultInfo('on_reboot',    lambda: "restart")
             defaultInfo('on_crash',     lambda: "restart")
             defaultInfo('cpu',          lambda: None)
+            defaultInfo('cpus',         lambda: [])
             defaultInfo('cpu_weight',   lambda: 1.0)
 
             # some domains don't have a config file (e.g. dom0 )
@@ -569,6 +606,14 @@ class XendDomainInfo:
 
     def removeDom(self, *args):
         return xstransact.Remove(self.dompath, *args)
+
+    def recreateDom(self):
+        complete(self.dompath, lambda t: self._recreateDom(t))
+
+    def _recreateDom(self, t):
+        t.remove()
+        t.mkdir()
+        t.set_permissions({ 'dom' : self.domid })
 
 
     ## private:
@@ -769,7 +814,10 @@ class XendDomainInfo:
                     if reason == 'suspend':
                         self.state_set(STATE_DOM_SHUTDOWN)
                         # Don't destroy the domain.  XendCheckpoint will do
-                        # this once it has finished.
+                        # this once it has finished.  However, stop watching
+                        # the VM path now, otherwise we will end up with one
+                        # watch for the old domain, and one for the new.
+                        self.unwatchVm()
                     elif reason in ['poweroff', 'reboot']:
                         restart_reason = reason
                     else:
@@ -968,9 +1016,9 @@ class XendDomainInfo:
         if self.infoIsSet('image'):
             sxpr.append(['image', self.info['image']])
 
-        if self.infoIsSet('device'):
-            for (_, c) in self.info['device']:
-                sxpr.append(['device', c])
+        for cls in controllerClasses:
+            for config in self.getDeviceConfigurations(cls):
+                sxpr.append(['device', config])
 
         def stateChar(name):
             if name in self.info:
@@ -1084,7 +1132,7 @@ class XendDomainInfo:
 
         self.dompath = GetDomainPath(self.domid)
 
-        self.removeDom()
+        self.recreateDom()
 
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['vcpus']))
@@ -1121,9 +1169,15 @@ class XendDomainInfo:
             xc.domain_setmaxmem(self.domid, m)
             xc.domain_memory_increase_reservation(self.domid, m, 0, 0)
 
-            cpu = self.info['cpu']
-            if cpu is not None and cpu != -1:
-                xc.domain_pincpu(self.domid, 0, 1 << cpu)
+            # repin domain vcpus if a restricted cpus list is provided
+            # this is done prior to memory allocation to aide in memory
+            # distribution for NUMA systems.
+            cpus = self.info['cpus']
+            if cpus is not None and len(cpus) > 0:
+                for v in range(0, self.info['max_vcpu_id']+1):
+                    # pincpu takes a list of ints
+                    cpu = [ int( cpus[v % len(cpus)] ) ]
+                    xc.domain_pincpu(self.domid, v, cpu)
 
             self.createChannels()
 
@@ -1179,18 +1233,31 @@ class XendDomainInfo:
     def cleanupVm(self):
         """Cleanup VM resources.  Idempotent.  Nothrow guarantee."""
 
-        try:
-            try:
-                if self.vmWatch:
-                    self.vmWatch.unwatch()
-                self.vmWatch = None
-            except:
-                log.exception("Unwatching VM path failed.")
+        self.unwatchVm()
 
+        try:
             self.removeVm()
         except:
             log.exception("Removing VM path failed.")
 
+
+    ## private:
+
+    def unwatchVm(self):
+        """Remove the watch on the VM path, if any.  Idempotent.  Nothrow
+        guarantee."""
+
+        try:
+            try:
+                if self.vmWatch:
+                    self.vmWatch.unwatch()
+            finally:
+                self.vmWatch = None
+        except:
+            log.exception("Unwatching VM path failed.")
+
+
+    ## public:
 
     def destroy(self):
         """Cleanup VM and destroy domain.  Nothrow guarantee."""
@@ -1345,6 +1412,7 @@ class XendDomainInfo:
             if rename:
                 self.preserveForRestart()
             else:
+                self.unwatchVm()
                 self.destroyDomain()
 
             # new_dom's VM will be the same as this domain's VM, except where
@@ -1381,10 +1449,11 @@ class XendDomainInfo:
         log.info("Renaming dead domain %s (%d, %s) to %s (%s).",
                  self.info['name'], self.domid, self.info['uuid'],
                  new_name, new_uuid)
+        self.unwatchVm()
         self.release_devices()
         self.info['name'] = new_name
         self.info['uuid'] = new_uuid
-        self.vmpath = VMROOT + new_uuid
+        self.vmpath = XendDomain.VMROOT + new_uuid
         self.storeVmDetails()
         self.preserve()
 
@@ -1392,6 +1461,7 @@ class XendDomainInfo:
     def preserve(self):
         log.info("Preserving dead domain %s (%d).", self.info['name'],
                  self.domid)
+        self.unwatchVm()
         self.storeDom('xend/shutdown_completed', 'True')
         self.state_set(STATE_DOM_SHUTDOWN)
 

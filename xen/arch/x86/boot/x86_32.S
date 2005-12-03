@@ -74,16 +74,16 @@ __start:
         cmp     $0x2BADB002,%eax
         jne     not_multiboot
 
-        /* Save the Multiboot info structure for later use. */
-	add     $__PAGE_OFFSET,%ebx
-        push    %ebx
-
         /* Initialize BSS (no nasty surprises!) */
         mov     $__bss_start-__PAGE_OFFSET,%edi
         mov     $_end-__PAGE_OFFSET,%ecx
         sub     %edi,%ecx
         xor     %eax,%eax
         rep     stosb
+
+        /* Save the Multiboot info structure for later use. */
+        add     $__PAGE_OFFSET,%ebx
+        push    %ebx
 
 #ifdef CONFIG_X86_PAE
         /* Initialize low and high mappings of all memory with 2MB pages */
@@ -238,27 +238,28 @@ ENTRY(gdt_table)
         .fill 2*NR_CPUS,8,0          /* space for TSS and LDT per CPU    */
 
         .org 0x2000
-/* Maximum STACK_ORDER for x86/32 is 1. We must therefore ensure that the */
-/* CPU0 stack is aligned on an even page boundary!                        */
-ENTRY(cpu0_stack)
-        .org 0x2000 + STACK_SIZE
 
 #ifdef CONFIG_X86_PAE
-
 ENTRY(idle_pg_table)
 ENTRY(idle_pg_table_l3)
-        .quad 0x100000 + 0x2000 + STACK_SIZE + 1*PAGE_SIZE + 0x01
-        .quad 0x100000 + 0x2000 + STACK_SIZE + 2*PAGE_SIZE + 0x01
-        .quad 0x100000 + 0x2000 + STACK_SIZE + 3*PAGE_SIZE + 0x01
-        .quad 0x100000 + 0x2000 + STACK_SIZE + 4*PAGE_SIZE + 0x01
-        .org 0x2000 + STACK_SIZE + 1*PAGE_SIZE
+        .long idle_pg_table_l2 + 0*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
+        .long idle_pg_table_l2 + 1*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
+        .long idle_pg_table_l2 + 2*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
+        .long idle_pg_table_l2 + 3*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
+.section ".bss.page_aligned","w"
 ENTRY(idle_pg_table_l2)
-        .org 0x2000 + STACK_SIZE + 5*PAGE_SIZE
-
-#else /* CONFIG_X86_PAE */
-
+        .fill 4*PAGE_SIZE,1,0
+#else
+.section ".bss.page_aligned","w"
 ENTRY(idle_pg_table)
-ENTRY(idle_pg_table_l2) # Initial page directory is 4kB
-        .org 0x2000 + STACK_SIZE + PAGE_SIZE
+ENTRY(idle_pg_table_l2)
+        .fill 1*PAGE_SIZE,1,0
+#endif
 
-#endif /* CONFIG_X86_PAE */
+#if (STACK_ORDER == 0)
+.section ".bss.page_aligned","w"
+#else
+.section ".bss.twopage_aligned","w"
+#endif
+ENTRY(cpu0_stack)
+        .fill STACK_SIZE,1,0

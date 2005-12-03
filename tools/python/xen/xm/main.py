@@ -459,7 +459,9 @@ def xm_vcpu_list(args):
             for x in server.xend_node()[1:]:
                 if len(x) > 1 and x[0] == 'nr_cpus':
                     nr_cpus = int(x[1])
-                    cpumap = filter(lambda x: x < nr_cpus, cpumap)
+                    # normalize cpumap by modulus nr_cpus, and drop duplicates
+                    cpumap = dict.fromkeys(
+                                map(lambda x: x % nr_cpus, cpumap)).keys()
                     if len(cpumap) == nr_cpus:
                         return "any cpu"
                     break

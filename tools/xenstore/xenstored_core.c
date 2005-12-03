@@ -1401,7 +1401,7 @@ void dump_connection(void)
 static void manual_node(const char *name, const char *child)
 {
 	struct node *node;
-	struct xs_permissions perms = { .id = 0, .perms = XS_PERM_READ };
+	struct xs_permissions perms = { .id = 0, .perms = XS_PERM_NONE };
 
 	node = talloc(NULL, struct node);
 	node->name = name;
@@ -1442,6 +1442,7 @@ static void setup_structure(void)
 		   the balloon driver, this can be fatal.
 		*/
 		internal_rm("/local");
+		manual_node("/", "local");
 	}
 	else {
 		tdb_ctx = tdb_open(tdbname, 7919, TDB_FLAGS, O_RDWR|O_CREAT,

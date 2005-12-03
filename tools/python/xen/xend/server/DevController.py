@@ -22,7 +22,7 @@ from xen.xend import sxp
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
 
-from xen.xend.xenstore.xstransact import xstransact
+from xen.xend.xenstore.xstransact import xstransact, complete
 from xen.xend.xenstore.xswatch import xswatch
 
 DEVICE_CREATE_TIMEOUT = 10
@@ -85,6 +85,8 @@ class DevController:
         (backpath, frontpath) = self.addStoreEntries(config, devid, back,
                                                      front)
 
+        import xen.xend.XendDomain
+        count = 0
         while True:
             t = xstransact()
             try:
@@ -97,19 +99,31 @@ class DevController:
                     
                     raise VmError("Device %s is already connected." % dev_str)
 
-                log.debug('DevController: writing %s to %s.', str(front),
-                          frontpath)
-                log.debug('DevController: writing %s to %s.', str(back),
-                          backpath)
+                if count == 0:
+                    log.debug('DevController: writing %s to %s.', str(front),
+                              frontpath)
+                    log.debug('DevController: writing %s to %s.', str(back),
+                              backpath)
+                elif count % 50 == 0:
+                    log.debug(
+                      'DevController: still waiting to write device entries.')
 
                 t.remove(frontpath)
                 t.remove(backpath)
+
+                t.mkdir(backpath)
+                t.set_permissions(backpath,
+                                  {'dom': xen.xend.XendDomain.PRIV_DOMAIN },
+                                  {'dom'  : self.vm.getDomid(),
+                                   'read' : True })
 
                 t.write2(frontpath, front)
                 t.write2(backpath,  back)
 
                 if t.commit():
                     return devid
+
+                count += 1
             except:
                 t.abort()
                 raise
@@ -266,20 +280,17 @@ class DevController:
         the device configuration instead.
         """
         path = self.frontendMiscPath()
-        while True:
-            t = xstransact(path)
-            try:
-                result = t.read("nextDeviceID")
-                if result:
-                    result = int(result)
-                else:
-                    result = 0
-                t.write("nextDeviceID", str(result + 1))
-                if t.commit():
-                    return result
-            except:
-                t.abort()
-                raise
+        return complete(path, self._allocateDeviceID)
+
+
+    def _allocateDeviceID(self, t):
+        result = t.read("nextDeviceID")
+        if result:
+            result = int(result)
+        else:
+            result = 0
+        t.write("nextDeviceID", str(result + 1))
+        return result
 
 
     def readBackend(self, devid, *args):

@@ -249,13 +249,8 @@ ENTRY(idle_pg_table_4)
 ENTRY(idle_pg_table_l3)
         .quad idle_pg_table_l2 - __PAGE_OFFSET + 7
 
-        .org 0x4000
-/* Maximum STACK_ORDER for x86/64 is 2. We must therefore ensure that the */
-/* CPU0 stack is aligned on a 4-page boundary.                            */
-ENTRY(cpu0_stack)
-
 /* Initial PDE -- level-2 page table. Maps first 64MB physical memory. */
-        .org 0x4000 + STACK_SIZE
+        .org 0x4000
 ENTRY(idle_pg_table_l2)
         .macro identmap from=0, count=32
         .if \count-1
@@ -265,7 +260,15 @@ ENTRY(idle_pg_table_l2)
         .quad 0x00000000000001e3 + \from
         .endif
         .endm
-        identmap /* Too orangey for crows :-) */
+        identmap
 
-        .org 0x4000 + STACK_SIZE + PAGE_SIZE
+        .org 0x4000 + PAGE_SIZE
         .code64
+
+#if (STACK_ORDER == 0)
+.section ".bss.page_aligned","w"
+#else
+.section ".bss.twopage_aligned","w"
+#endif
+ENTRY(cpu0_stack)
+        .fill STACK_SIZE,1,0

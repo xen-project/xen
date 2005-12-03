@@ -154,7 +154,11 @@ gopts.var('maxmem', val='MEMORY',
 
 gopts.var('cpu', val='CPU',
           fn=set_int, default=None,
-          use="CPU to run the domain on.")
+          use="CPU to run the VCPU0 on.")
+
+gopts.var('cpus', val='CPUS',
+          fn=set_int, default=None,
+          use="CPUS to run the domain on.")
 
 gopts.var('lapic', val='LAPIC',
           fn=set_int, default=0,
@@ -572,6 +576,8 @@ def make_config(vals):
     
     if vals.cpu is not None:
         config.append(['cpu', vals.cpu])
+    if vals.cpus is not None:
+        config.append(['cpus', vals.cpus])
     if vals.cpu_weight is not None:
         config.append(['cpu_weight', vals.cpu_weight])
     if vals.blkif:

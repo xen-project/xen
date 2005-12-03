@@ -128,8 +128,9 @@ static int mod_l1_entry(l1_pgentry_t *, l1_pgentry_t);
 
 /* Used to defer flushing of memory structures. */
 static struct {
-#define DOP_FLUSH_TLB   (1<<0) /* Flush the TLB.                 */
-#define DOP_RELOAD_LDT  (1<<1) /* Reload the LDT shadow mapping. */
+#define DOP_FLUSH_TLB      (1<<0) /* Flush the local TLB.                    */
+#define DOP_FLUSH_ALL_TLBS (1<<1) /* Flush TLBs of all VCPUs of current dom. */
+#define DOP_RELOAD_LDT     (1<<2) /* Reload the LDT shadow mapping.          */
     unsigned int   deferred_ops;
     /* If non-NULL, specifies a foreign subject domain for some operations. */
     struct domain *foreign;
@@ -1323,14 +1324,28 @@ void free_page_type(struct pfn_info *page, unsigned long type)
     struct domain *owner = page_get_owner(page);
     unsigned long gpfn;
 
-    if ( unlikely((owner != NULL) && shadow_mode_enabled(owner)) )
+    if ( likely(owner != NULL) )
     {
-        mark_dirty(owner, page_to_pfn(page));
-        if ( unlikely(shadow_mode_refcounts(owner)) )
-            return;
-        gpfn = __mfn_to_gpfn(owner, page_to_pfn(page));
-        ASSERT(VALID_M2P(gpfn));
-        remove_shadow(owner, gpfn, type & PGT_type_mask);
+        /*
+         * We have to flush before the next use of the linear mapping
+         * (e.g., update_va_mapping()) or we could end up modifying a page
+         * that is no longer a page table (and hence screw up ref counts).
+         */
+        percpu_info[smp_processor_id()].deferred_ops |= DOP_FLUSH_ALL_TLBS;
+
+        if ( unlikely(shadow_mode_enabled(owner)) )
+        {
+            /* Raw page tables are rewritten during save/restore. */
+            if ( !shadow_mode_translate(owner) )
+                mark_dirty(owner, page_to_pfn(page));
+
+            if ( shadow_mode_refcounts(owner) )
+                return;
+
+            gpfn = __mfn_to_gpfn(owner, page_to_pfn(page));
+            ASSERT(VALID_M2P(gpfn));
+            remove_shadow(owner, gpfn, type & PGT_type_mask);
+        }
     }
 
     switch ( type & PGT_type_mask )
@@ -1600,11 +1615,14 @@ static void process_deferred_ops(unsigned int cpu)
     deferred_ops = percpu_info[cpu].deferred_ops;
     percpu_info[cpu].deferred_ops = 0;
 
-    if ( deferred_ops & DOP_FLUSH_TLB )
+    if ( deferred_ops & (DOP_FLUSH_ALL_TLBS|DOP_FLUSH_TLB) )
     {
         if ( shadow_mode_enabled(d) )
             shadow_sync_all(d);
-        local_flush_tlb();
+        if ( deferred_ops & DOP_FLUSH_ALL_TLBS )
+            flush_tlb_mask(d->cpumask);
+        else
+            local_flush_tlb();
     }
         
     if ( deferred_ops & DOP_RELOAD_LDT )

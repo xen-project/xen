@@ -59,6 +59,8 @@ extern struct semaphore xenwatch_mutex;
 
 #define streq(a, b) (strcmp((a), (b)) == 0)
 
+static char *kasprintf(const char *fmt, ...);
+
 static struct notifier_block *xenstore_chain;
 
 /* If something in array of ids matches this device, return it. */
@@ -226,8 +228,11 @@ static int xenbus_hotplug_backend(struct device *dev, char **envp,
 				  int num_envp, char *buffer, int buffer_size)
 {
 	struct xenbus_device *xdev;
+	struct xenbus_driver *drv = NULL;
 	int i = 0;
 	int length = 0;
+	char *basepath_end;
+	char *frontend_id;
 
 	DPRINTK("");
 
@@ -238,6 +243,9 @@ static int xenbus_hotplug_backend(struct device *dev, char **envp,
 	if (xdev == NULL)
 		return -ENODEV;
 
+	if (dev->driver)
+		drv = to_xenbus_driver(dev->driver);
+
 	/* stuff we want to pass to /sbin/hotplug */
 	add_hotplug_env_var(envp, num_envp, &i,
 			    buffer, buffer_size, &length,
@@ -247,6 +255,25 @@ static int xenbus_hotplug_backend(struct device *dev, char **envp,
 			    buffer, buffer_size, &length,
 			    "XENBUS_PATH=%s", xdev->nodename);
 
+	add_hotplug_env_var(envp, num_envp, &i,
+			    buffer, buffer_size, &length,
+			    "XENBUS_BASE_PATH=%s", xdev->nodename);
+
+	basepath_end = strrchr(envp[i - 1], '/');
+	length -= strlen(basepath_end);
+	*basepath_end = '\0';
+	basepath_end = strrchr(envp[i - 1], '/');
+	length -= strlen(basepath_end);
+	*basepath_end = '\0';
+
+	basepath_end++;
+	frontend_id = kmalloc(strlen(basepath_end) + 1, GFP_KERNEL);
+	strcpy(frontend_id, basepath_end);
+	add_hotplug_env_var(envp, num_envp, &i,
+			    buffer, buffer_size, &length,
+			    "XENBUS_FRONTEND_ID=%s", frontend_id);
+	kfree(frontend_id);
+
 	/* terminate, set to next free slot, shrink available space */
 	envp[i] = NULL;
 	envp = &envp[i];
@@ -254,9 +281,9 @@ static int xenbus_hotplug_backend(struct device *dev, char **envp,
 	buffer = &buffer[length];
 	buffer_size -= length;
 
-	if (dev->driver && to_xenbus_driver(dev->driver)->hotplug)
-		return to_xenbus_driver(dev->driver)->hotplug
-			(xdev, envp, num_envp, buffer, buffer_size);
+	if (drv && drv->hotplug)
+		return drv->hotplug(xdev, envp, num_envp, buffer,
+				    buffer_size);
 
 	return 0;
 }
