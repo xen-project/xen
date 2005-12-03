@@ -43,7 +43,7 @@
  */
 #define IO_TLB_SHIFT 11
 
-int swiotlb_force;
+static int swiotlb_force;
 static char *iotlb_virt_start;
 static unsigned long iotlb_nslabs;
 
@@ -101,10 +101,13 @@ setup_io_tlb_npages(char *str)
 		++str;
 	/*
          * NB. 'force' enables the swiotlb, but doesn't force its use for
-         * every DMA like it does on native Linux.
+         * every DMA like it does on native Linux. 'off' forcibly disables
+         * use of the swiotlb.
          */
 	if (!strcmp(str, "force"))
 		swiotlb_force = 1;
+	else if (!strcmp(str, "off"))
+		swiotlb_force = -1;
 	return 1;
 }
 __setup("swiotlb=", setup_io_tlb_npages);
@@ -179,23 +182,21 @@ void
 swiotlb_init(void)
 {
 	long ram_end;
+	size_t defsz = 64 * (1 << 20); /* 64MB default size */
 
-	/* The user can forcibly enable swiotlb. */
-	if (swiotlb_force)
+	if (swiotlb_force == 1) {
 		swiotlb = 1;
-
-	/*
-         * Otherwise, enable for domain 0 if the machine has 'lots of memory',
-         * which we take to mean more than 2GB.
-         */
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
+	} else if ((swiotlb_force != -1) &&
+		   (xen_start_info->flags & SIF_INITDOMAIN)) {
+		/* Domain 0 always has a swiotlb. */
 		ram_end = HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL);
-		if (ram_end > 0x7ffff)
-			swiotlb = 1;
+		if (ram_end <= 0x7ffff)
+			defsz = 2 * (1 << 20); /* 2MB on <2GB on systems. */
+		swiotlb = 1;
 	}
 
 	if (swiotlb)
-		swiotlb_init_with_default_size(64 * (1<<20));
+		swiotlb_init_with_default_size(defsz);
 	else
 		printk(KERN_INFO "Software IO TLB disabled\n");
 }
