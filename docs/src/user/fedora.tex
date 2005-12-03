@@ -1,66 +1,102 @@
-\chapter{Installing Xen on Red~Hat or Fedora~Core}
+\chapter{Installing Xen on Fedora~Core 4}
 
-\section{Tips}
-Here are a few pointers about using Xen / XenLinux on a Red~Hat or
-Fedora~Core distribution:
+This section will help you in installing Xen 3 on Fedora Core 4 using various methods.
 
-\begin{enumerate}
-\item Note that, because domains greater than~0 don't have any
-  privileged access at all, certain commands in the default boot
-  sequence will fail e.g.\ attempts to update the hwclock, change the
-  console font, update the keytable map, start apmd (power management),
-  or gpm (mouse cursor). Either ignore the errors (they should be
-  harmless), or remove them from the startup scripts. Deleting the
-  following links are a good start: {\path{S24pcmcia}},
-  {\path{S09isdn}}, {\path{S17keytable}}, {\path{S26apmd}},
-  {\path{S85gpm}}.
+\section{Installing Xen from Source Package and binary package}
 
-\item If you want to use a single root file system that works cleanly
-  for both domain~0 and unprivileged domains, a useful trick is to use
-  different `init' run levels. For example, use run level 3 for
-  domain~0, and run level 4 for other domains. This enables different
-  startup scripts to be run in depending on the run level number passed
-  on the kernel command line.
+\subsection{Required Packages}
+bridge\_utils
 
-\item If using NFS root files systems mounted either from an external
-  server or from domain0 there are a couple of other gotchas. The
-  default {\path{/etc/sysconfig/iptables}} rules block NFS, so part way
-  through the boot sequence things will suddenly go dead.
 
-\item If you're planning on having a separate NFS {\path{/usr}}
-  partition, the RH9 boot scripts don't make life easy - they attempt to
-  mount NFS file systems way to late in the boot process. The easiest
-  way I found to do this was to have a {\path{/linuxrc}} script run
-  ahead of {\path{/sbin/init}} that mounts {\path{/usr}}:
+\subsection{Installing}
 
-  \begin{quote}
-    \begin{small}\begin{verbatim}
- #!/bin/bash
- /sbin/ipconfig lo 127.0.0.1
- /sbin/portmap
- /bin/mount /usr
- exec /sbin/init "$@" <>/dev/console 2>&1
-\end{verbatim}\end{small}
-  \end{quote}
+Download the source or binary tarballs available at \begin{quote} {\tt http://www.xensource.com/downloads } \end{quote}.
 
-%% $ XXX SMH: font lock fix :-)
+Extract the archive using following command:
 
-  The one slight complication with the above is that
-  {\path{/sbin/portmap}} is dynamically linked against
-  {\path{/usr/lib/libwrap.so.0}} Since this is in {\path{/usr}}, it
-  won't work. This can be solved by copying the file (and link) below
-  the {\path{/usr}} mount point, and just let the file be `covered' when
-  the mount happens.
+\begin{verbatim}
+tar -zxvf xen-*****-***.tgz
+\end{verbatim}
 
-\item In some installations, where a shared read-only {\path{/usr}} is
-  being used, it may be desirable to move other large directories over
-  into the read-only {\path{/usr}}. For example, you might replace
-  {\path{/bin}}, {\path{/lib}} and {\path{/sbin}} with links into
-  {\path{/usr/root/bin}}, {\path{/usr/root/lib}} and
-  {\path{/usr/root/sbin}} respectively. This creates other problems for
-  running the {\path{/linuxrc}} script, requiring bash, portmap, mount,
-  ifconfig, and a handful of other shared libraries to be copied below
-  the mount point --- a simple statically-linked C program would solve
-  this problem.
+cd into the xen directory.
 
-\end{enumerate}
+To compile and install the source do
+
+\begin{verbatim}
+     make dist
+     make install
+\end{verbatim}
+
+
+To install the binary tarball, all you need to do is run the \path{install.sh} script.
+
+\begin{verbatim}
+     #./install.sh
+\end{verbatim}
+
+\subsection{Installing Xen using yum}
+
+To install xen, type the command
+
+\begin{verbatim}
+#yum install xen
+\end{verbatim}
+
+This will download the following rpms and install them:
+
+\begin{itemize}
+\item xen
+\item bridge-utils
+\item sysfsutils
+\end{itemize}
+
+Next we need to install kernel-xen0 and kernel-xenU. Type the command:
+
+\begin{verbatim}
+ yum install kernel-xen0 kernel-xenU 
+\end{verbatim}
+
+Note: This installs xen0 and xenU kernels and adds an entry in the grub configuration.
+Getting Xen up and running
+
+Once this finishes, you have xen0 and xenU kernels installed in the /boot filesystem. To boot into Dom0, edit the grub configuration file, which is menu.lst
+
+Note: Installation using yum doesn't require the configuration of grub as mentioned below.
+
+An example grub entry would be like:
+
+{\small
+\begin{verbatim}
+title Xen Unstable(From Fedora Core 4)
+          root (hd0,0)
+          kernel /fedora/xen.gz dom0\_mem=230000 console=vga
+          module /fedora/vmlinuz-2.6-xen0 root=/dev/Vol1/LV3 ro console=tty0
+          module /fedora/initrd-2.6.11-1.1369\_FC4smp.img
+\end{verbatim}
+}
+
+Also make sure that \path{/var/run/xenstored} and \path{/var/lib/xenstored} directories have been created. If they are not, manually create them.
+
+Now reboot and select the xen0 option from the GRUB menu.
+
+To check whether you are running the xen0 kernel, type \path{uname -r}
+
+Now start the xend process:
+
+\begin{verbatim}
+xend start
+\end{verbatim}
+
+To check whether xend process is running or not, type the following command which lists the running domains.
+
+\begin{verbatim}
+#xm list
+      Name              Id  Mem(MB)  CPU VCPU(s)  State  Time(s)
+      Domain-0           0      219    0      1   r-----     28.9
+\end{verbatim}
+
+Since you haven't created any guest domains yet, you would see only Domain0.
+
+Further Help and documentations
+
+Besides the usual resources, see the Fedora Quickstart Guide \begin{quote} {\tt http://www.fedoraproject.org/wiki/FedoraXenQuickstart } \end{quote}

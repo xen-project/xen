@@ -1,3 +1,127 @@
-\chapter{Installing Xen on Red Hat Enterprise Linux (RHEL)}
+\chapter{Installing Xen on Red Hat Enterprise Linux (RHEL) 4.1}
 
-Placeholder.
+RedHat Enterprise Linux is the enterprise-grade, certified version of the Red Hat distribution. This section includes resolving dependencies using yum, installing Xen, and creating an initrd for Xen.
+
+Stable binary release install
+Source install
+\section{Stable binary release install}
+
+\subsection{Setup yum repository}
+
+Setup your yum repository to Dag's Yum Repository or similar. Dag's is recommended.
+
+\subsection{Required Packages}
+
+These packages are required:
+
+\begin{itemize}
+\item bridge-utils
+\item curl
+\item libidn
+\item sysfsutils
+\end{itemize}
+
+Use yum to install these packages.
+
+\begin{verbatim}
+yum install bridge-utils curl libidn sysfsutils
+\end{verbatim}
+
+\subsection{Download Xen}
+
+\subsection{Download the binary tarball}
+Download the Xen 3.0 binary tarball from the XenSource downloads page:
+
+\begin{quote} {\tt http://www.xensource.com/downloads/}
+\end{quote}
+
+\subsection{Extract and Install}
+
+\begin{verbatim}
+tar zxvf xen-unstable-install-x86\_32.tgz
+
+cd xen-unstable-install
+
+./install.sh 
+\end{verbatim}
+
+
+\subsection{Disable TLS}
+
+\begin{verbatim}
+mv /lib/tls /lib/tls.disabled
+\end{verbatim}
+
+\subsection{Creating initrd}
+
+You can use the distro's initrd. The following steps show you how to create one yourself for dom0 and domU. The example uses a Domain0 image, so to adatp it, simply use the appropriate image for DomainU.
+
+\begin{verbatim}
+run depmod 2.x.y-xen0 to re-create modules dependency
+
+mkinitrd  /boot/initrd-2.x.y-xen0.img  2.x.y-xen0 
+\end{verbatim}
+
+If you get an error
+
+\begin{verbatim}
+   "No module xxx found for kernel 2.x.y-xen0, aborting."
+\end{verbatim}
+
+uncheck xxx in \path{/etc/modprobe.conf} if you don't want support for xxx. If you know that its built into kernel (to check \path{grep -i xxx config-2.6.12-xen0}) you can do
+
+\begin{verbatim}
+mkinitrd  --builtin=aic7xxx  ./2.6.12-xen0.img  2.6.12-xen0
+\end{verbatim}
+
+If another yyy module is reported as "not found,"
+
+\begin{verbatim}
+mkinitrd  --builtin=xxx --builtin=yyy ./2.6.12-xen0.img  2.6.12-xen0
+\end{verbatim}
+
+\subsection{Grub Configuration}
+
+As usual, you need to make entry in grub configuration file for Xen. Here's a sample grub entry.
+
+{\small
+\begin{verbatim}
+title  Xen/RHEL 4.1
+       kernel (hd0,5)/boot/xen.gz dom0\_mem=256000
+       module (hd0,5)/boot/vmlinuz-2.6.11.12-xen0 root=/dev/hda6
+       module (hd0,5)/boot/initrd-2.6.11.12-xen0.img
+\end{verbatim}
+}
+
+\section{Source install}
+
+
+\subsection{Download Source Tarball}
+
+\subsection{Download the binary tarball}
+Download the Xen 3.0 binary tarball from the XenSource downloads page:
+
+\begin{quote} {\tt http://www.xensource.com/downloads/}
+\end{quote}
+
+\subsection{Pre-requisites to build from source}
+
+Make sure you have all packages. If you had chosen to install Development tools during the distro installation, you should not need to install any extra packages. If not, install the following:
+
+\begin{itemize}
+\item gcc-3.4.3-22.1
+\item python-devel-2.3.4-14.1
+\item zlib-devel-1.2.1.2-1
+\item curl-devel-7.12.1-5.rhel4
+\end{itemize}
+
+\subsection{Install Xen}
+
+\begin{verbatim}
+tar zxvf xen-unstable-src.tgz
+cd xen-unstable/
+make world
+make install
+\end{verbatim}
+
+The rest of the steps follow as with the binary tarball installation.

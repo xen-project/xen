@@ -1,158 +1,173 @@
-\chapter{Installing Xen on Debian}
+\chapter{Installing Xen/XenLinux on Debian}
 
-The Debian project provides a tool called \path{debootstrap} which
-allows a base Debian system to be installed into a filesystem without
-requiring the host system to have any Debian-specific software (such as
-\path{apt}).
+This appendix describes installing Xen 3.0 on Debian Linux.
 
-Here's some info on how to install Debian 3.1 (Sarge) for an
-unprivileged Xen domain:
+Xen can be installed on Debian GNU/Linux using the following methods:
 
-\section{Filesystem Setup}
-\begin{enumerate}
-\item Set up Xen and test that it's working, as described earlier in
-  this manual.
+\begin{itemize}
+\item From a binary tarball
+\item From source 
+\item From debs
+\end{itemize}
 
-\item Create disk images for rootfs and swap. Alternatively, you might
-  create dedicated partitions, LVM logical volumes, etc.\ if that suits
-  your setup.
-\begin{verbatim}
-dd if=/dev/zero of=/path/diskimage bs=1024k count=size_in_mbytes
-dd if=/dev/zero of=/path/swapimage bs=1024k count=size_in_mbytes
-\end{verbatim}
-  If you're going to use this filesystem / disk image only as a
-  `template' for other vm disk images, something like 300 MB should be
-  enough. (of course it depends what kind of packages you are planning
-  to install to the template)
+\section{Installing from a binary tarball}
+This section describes the process of installing Xen on Debian Sarge using the stable binary release tarball.
 
-\item Create the filesystem and initialise the swap image
-\begin{verbatim}
-mkfs.ext3 /path/diskimage
-mkswap /path/swapimage
-\end{verbatim}
+\subsection{Required Packages}
+Install these Debian packages:
 
-\item Mount the disk image for installation
-\begin{verbatim}
-mount -o loop /path/diskimage /mnt/disk
-\end{verbatim}
-\end{enumerate}
-\section{Bootstrapping}
-\begin{enumerate}
-\item Install \path{debootstrap}. Make sure you have debootstrap
-  installed on the host. If you are running Debian Sarge (3.1 / testing)
-  or unstable you can install it by running \path{apt-get install
-    debootstrap}. Otherwise, it can be downloaded from the Debian
-  project website.
-
-\item Install Debian base to the disk image:
-\begin{verbatim}
-debootstrap --arch i386 sarge /mnt/disk  \
-            http://ftp.<countrycode>.debian.org/debian
-\end{verbatim}
-  You may use any Debian mirror that you want.
-\end{enumerate}
-
-\section{Configuration}
-\begin{enumerate}
-\item When debootstrap completes successfully, modify settings:
-\begin{verbatim}
-chroot /mnt/disk /bin/bash
-\end{verbatim}
-
-  Edit the following files using vi or nano and make any required
-  changes:
-\begin{verbatim}
-/etc/hostname
-/etc/hosts
-/etc/resolv.conf
-/etc/network/interfaces
-/etc/networks
-\end{verbatim}
-
-  Set up access to the services. Edit:
-\begin{verbatim}
-/etc/hosts.deny
-/etc/hosts.allow
-/etc/inetd.conf
-\end{verbatim}
-
-  Add Debian mirror to:
-\begin{verbatim}
-/etc/apt/sources.list
-\end{verbatim}
-
-  Create fstab like this:
-\begin{verbatim}
-/dev/sda1       /       ext3    errors=remount-ro       0       1
-/dev/sda2       none    swap    sw                      0       0
-proc            /proc   proc    defaults                0       0
-\end{verbatim}
-
-  Logout
-
-\item Unmount the disk image
-\begin{verbatim}
-umount /mnt/disk
-\end{verbatim}
-
-\item Create Xen 3.0 configuration file for the new domain. You may use
-  the example-configurations provided with Xen as a template.
-
-  Make sure you have the correctly configured:
-\begin{verbatim}
-disk = [ 'file:/path/diskimage,sda1,w', 'file:/path/swapimage,sda2,w' ]
-root = "/dev/sda1 ro"
-\end{verbatim}
-\end{enumerate}
-
-\section{Starting the New Domain}
-\begin{enumerate}
-\item Start the new domain
-\begin{verbatim}
-xm create -f domain_config_file
-\end{verbatim}
-
-  Check that the new domain is running:
-\begin{verbatim}
-xm list
-\end{verbatim}
-
-\item Attach to the console of the new domain. You should see something
-  like this when starting the new domain:
+\begin{itemize}
+\item bridge-utils
+\item libcurl3-dev
+\item iproute
+\item zlib1g-dev
+\item python-dev
+\end{itemize}
 
 \begin{verbatim}
-Started domain testdomain2, console on port 9626
+apt-get install bridge-utils   libcurl3-dev iproute  zlib1g-dev python-dev
 \end{verbatim}
-        
-  You can see the ID of the console: 26. You can also list the consoles
-  with \path{xm consoles}. ID is the last two digits of the port number.
 
-  Attach to the console:
+
+\subsection{Download the binary tarball}
+Download the Xen 3.0 binary tarball from the XenSource downloads
+page:
+
+\begin{quote} {\tt http://www.xensource.com/downloads/}
+\end{quote}
+ 
+\subsection{Extract and Install}
+\begin{verbatim}
+#  tar zxvf 
+xen-2.0.7-install-x86_32.tgz
+# cd xen-2.0.7-install-x86_32.tgz
+# ./install.sh
+\end{verbatim}
+
+If everything goes well, you should something like
 
 \begin{verbatim}
-xm console 26
+Installing Xen from 
+'./install' to '/'...
+    All done.
+    Checking to see whether prerequisite tools are installed...
+    All done.
 \end{verbatim}
 
-  or by telnetting to the port 9626 of localhost. The xm console program
-  works better.
 
-\item Log in and run base-config
+\subsection{Configure grub}
+Make an entry in your grub configuration like below.
 
-  By default there is no password set for root.
+{\small
+\begin{verbatim}
+title          Xen on Debian
+kernel         (hd0,5)/boot/xen.gz dom0_mem=131000
+module         (hd0,5)/boot/vmlinuz-2.6-xen0 root=/dex/hda6 ro console=tty0
+\end{verbatim}
+}
 
-  Check that everything looks OK, and the system started without errors.
-  Check that the swap is active, and the network settings are correct.
+You can now boot into Xen by by choosing the right option from grub menu.
 
-  Run \path{/usr/sbin/base-config} to configure the Debian settings.
+\section{Installing from source}
+\subsection{Required Packages}
+Besides packages mentioned under binary tarball install, you will need:
 
-  Set the password for root using \path{passwd}.
+\begin{itemize}
+\item gcc v3.2.x or v3.3.x
+\item binutils
+\item GNU make
+\end{itemize}
 
-\item Done. You may exit the console by pressing {\path{Ctrl + ]}}
 
-\end{enumerate}
+\subsection{Download the source tree}
+The Xen source tree is available as either a compressed source tarball
+or as a clone of our master Mercurial repository.
 
-If you need to create new domains, you can copy the contents of the
-`template'-image to the new disk images, either by mounting the template
-and the new image, and using \path{cp -a} or \path{tar} or by simply
-copying the image file. Once this is done, modify the image-specific
-settings (hostname, network settings, etc).
+\begin{description}
+\item[Obtaining the Source Tarball]\mbox{} \\
+  Stable versions and daily snapshots of the Xen source tree are
+  available from the Xen download page:
+  \begin{quote} {\tt http://www.xensource.com/downloads/}
+  \end{quote}
+\item[Obtaining the source via Mercurial]\mbox{} \\
+  The source tree may also be obtained via the public Mercurial
+  repository hosted at:
+  \begin{quote}{\tt http://xenbits.xensource.com}.
+  \end{quote} See the instructions and the Getting Started Guide
+  referenced at:
+  \begin{quote}
+    {\tt http://www.xensource.com/downloads/}.
+  \end{quote}
+\end{description}
+
+\subsection{Extract, build and install}
+
+\begin{verbatim}
+# tar zxvf xen-3.0.0-src.tgz
+# cd xen-3.0
+# make dist
+#./install.sh
+\end{verbatim}
+
+\section{Installing from debs}
+This section describes the process of installing Xen on Debian Sarge using debs created by Edward Despard.
+
+\subsection{Edward's announcement to xen-user list}
+"For part of my Google Summer of Code work I've put together debs for xen of 2.0.7 and of unstable. The unstable debs are built off of yesterday's hg tree, but I try to update them fairly regularly when new developments occur." 
+
+\subsection{Adding apt source}
+Add the following lines to \path{/etc/apt/sources.list}:
+
+\begin{quote}
+{\small
+\begin{verbatim}
+deb http://tinyurl.com/8tpup
+\end{verbatim}
+}
+\end{quote}
+   
+Note: On Ubuntu, simple replace debian with ubuntu in the above. Replace xen-unstable with with xen-stable for a stable version.
+
+Now run \path{aptitude update} or \path{apt-get update}. Doing \path{apt-cache search xen}, you should see following packages in the output.
+
+\begin{itemize}
+\item kernel-image-2.6.12-xen0 - Xen 2.6 kernel image
+\item kernel-image-2.6.12-xenu - Xen 2.6 kernel image
+\item kernel-patch-xen-2.6.12 - patch to kernel to support xen
+\item libxen3.0 - control libraries for Xen
+\item libxen-dev - development libraries for Xen
+\item xen-doc - documentation for Xen
+\item xen-hypervisor - Xen hypervisor kernel
+\item xen-kernels - Xen kernels
+\item xen - Package to install all of Xen
+\item xen-tools - Tools for managing xen domains
+\end{itemize}
+
+\subsection{Installing Xen}
+You can now install xen using \path{apt-get}, \path{aptitude}, \path{synaptic}, etc. 
+ 
+After doing \path{apt-get install xen}, you will have a working dom0 and should be able boot into it without any problem. By doing \path{apt-cache depends xen}, you will find that the following packages were also installed as a result of dependency.
+
+\begin{verbatim}
+#  apt-cache  
+depends  xen
+       xen
+           Depends: xen-doc
+           Depends: xen-kernels
+           Depends: xen-hypervisor
+           Depends: xen-tools
+\end{verbatim}
+
+
+\subsection{xenkernels.conf}
+To automate grub entry for xen, \path{/etc/xenkernels.conf} is used which is installed when the package in installed. Below is a sample entry
+
+\begin{verbatim}
+label=Xen(3.0-unstable082205)/Linux(2.6.12)--
+          xen=/boot/xen-3.0-unstable082205.gz
+          kernel=/boot/xen/dom0/vmlinuz-2.6.12-xen0
+          mem=256000
+          root=/dev/hda4
+\end{verbatim}
+
+You have to run run \path{update-grub-xen} every time \path{xenkernels.conf} is modified. Read \path{man update-grub-xen} for more information.

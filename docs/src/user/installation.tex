@@ -35,9 +35,10 @@ if you wish to build from source.
 Once you have satisfied these prerequisites, you can now install either
 a binary or source distribution of Xen.
 
+
 \section{Installing from Binary Tarball}
 
-Pre-built tarballs are available for download from the XenSource downloads
+Pre-built tarballs are available for download from the Xen download
 page:
 \begin{quote} {\tt http://www.xensource.com/downloads/}
 \end{quote}
@@ -52,22 +53,7 @@ Once you've downloaded the tarball, simply unpack and install:
 Once you've installed the binaries you need to configure your system as
 described in Section~\ref{s:configure}.
 
-\section{Installing from RPMs}
-Pre-built RPMs are available for download from the XenSource downloads
-page:
-\begin{quote} {\tt http://www.xensource.com/downloads/}
-\end{quote}
 
-Once you've downloaded the RPMs, you typically install them via the RPM commands:
-\begin{verbatim}
-# rpm -ivh \emph{rpmname}
-\end{verbatim}
-
-See the instructions and the Release Notes for each RPM set referenced at:
-  \begin{quote}
-    {\tt http://www.xensource.com/downloads/}.
-  \end{quote}
- 
 \section{Installing from Source}
 
 This section describes how to obtain, build and install Xen from source.
@@ -102,9 +88,9 @@ or as a clone of our master Mercurial repository.
 % \item[\path{tools/}] Xen node controller daemon (Xend), command line
 %   tools, control libraries
 % \item[\path{xen/}] The Xen VMM.
-% \item[\path{buildconfigs/}] Build configuration files
 % \item[\path{linux-*-xen-sparse/}] Xen support for Linux.
-% \item[\path{patches/}] Experimental patches for Linux.
+% \item[\path{linux-*-patches/}] Experimental patches for Linux.
+% \item[\path{netbsd-*-xen-sparse/}] Xen support for NetBSD.
 % \item[\path{docs/}] Various documentation files for users and
 %   developers.
 % \item[\path{extras/}] Bonus extras.
@@ -235,7 +221,7 @@ destinations.
 
 %% Files in \path{install/boot/} include:
 %% \begin{itemize}
-%% \item \path{install/boot/xen-3.0.gz} Link to the Xen 3.0 'kernel'
+%% \item \path{install/boot/xen-2.0.gz} Link to the Xen 'kernel'
 %% \item \path{install/boot/vmlinuz-2.6-xen0} Link to domain 0
 %%   XenLinux kernel
 %% \item \path{install/boot/vmlinuz-2.6-xenU} Link to unprivileged
@@ -301,11 +287,9 @@ When installing a new kernel, it is recommended that you do not delete
 existing menu options from \path{menu.lst}, as you may wish to boot your
 old Linux kernel in future, particularly if you have problems.
 
-%% KMS: Additional configurations as an Appendix?
-
 \subsection{Serial Console (optional)}
 
-%% kernel /boot/xen-3.0.gz dom0_mem=131072 com1=115200,8n1
+%% kernel /boot/xen-2.0.gz dom0_mem=131072 com1=115200,8n1
 %% module /boot/vmlinuz-2.6-xen0 root=/dev/sda4 ro
 
 In order to configure Xen serial console output, it is necessary to add
@@ -327,9 +311,9 @@ necessary to add a line into \path{/etc/inittab}. Add the line:
 \begin{quote} {\small {\tt c:2345:respawn:/sbin/mingetty ttyS0}}
 \end{quote}
 
-run \path{init q} to force init to re-examine \path{/etc/inittab}, and
-you should be able to log in.  Add \path{ttyS0} to \path{/etc/securetty}
-to allow root logins over serial console, if it is not already there.
+and you should be able to log in. To successfully log in as root over
+the serial line will require adding \path{ttyS0} to
+\path{/etc/securetty} if it is not already there.
 
 \subsection{TLS Libraries}
 
