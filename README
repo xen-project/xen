@@ -1,30 +1,31 @@
-###############################
-__  __            ____    ___
-\ \/ /___ _ __   |___ \  / _ \
- \  // _ \ '_ \    __) || | | |
- /  \  __/ | | |  / __/ | |_| |
-/_/\_\___|_| |_| |_____(_)___/
+################################
+ __  __            _____  ___  
+ \ \/ /___ _ __   |___ / / _ \ 
+  \  // _ \ '_ \    |_ \| | | |
+  /  \  __/ | | |  ___) | |_| |
+ /_/\_\___|_| |_| |____(_)___/ 
 
-###############################
+################################
 
-University of Cambridge Computer Laboratory
-3 November 2004
-
-http://www.cl.cam.ac.uk/netos/xen/
+http://www.xensource.com/xen/about.html
 
 What is Xen?
 ============
 
 Xen is a Virtual Machine Monitor (VMM) originally developed by the
 Systems Research Group of the University of Cambridge Computer
-Laboratory, as part of the UK-EPSRC funded XenoServers project.
-Xen is freely-distributable Open Source software, released under the
-GNU GPL.
+Laboratory, as part of the UK-EPSRC funded XenoServers project.  Xen
+is freely-distributable Open Source software, released under the GNU
+GPL. Since its initial public release, Xen has grown a large
+development community, spearheaded by XenSource Inc, a company created
+by the original Xen development team to build enterprise products
+around Xen.
 
-The 2.0 release offers excellent performance, hardware support and
-enterprise-grade features such as live migration. Linux 2.6 and
-NetBSD 2.0 are already available for Xen, with more operating system
-ports on the way.
+The 3.0 release offers excellent performance, hardware support and
+enterprise-grade features such as x86_32-PAE, x86_64, SMP gusets and
+live relocation of VMs. This install tree contains source for a Linux
+2.6 guest; ports to Linux 2.4, NetBSD, FreeBSD and Solaris will follow
+later (and are already available for previous Xen releases).
 
 This file contains some quick-start instructions to install Xen on
 your system. For full documentation, see the Xen User Manual. If this
@@ -43,29 +44,40 @@ performed with root privileges.]
 
     # sh ./install.sh
 
-   Amongst other things, this will install Xen and XenLinux kernel
-   files in /boot, kernel modules and Python packages in /lib, and
-   various control tools in standard 'bin' directories.
+   Among other things, this will install Xen and Xen-ready Linux
+   kernel files in /boot, kernel modules and Python packages in /lib,
+   and various control tools in standard 'bin' directories.
 
 2. Configure your bootloader to boot Xen and an initial Linux virtual
-   machine. Note that Xen currently only works with GRUB: less common
-   alternatives such as LILO are *not* supported. You can most likely
-   find your GRUB menu file at /boot/grub/menu.lst: edit this file to
-   include an entry like the following:
+   machine. Note that Xen currently only works with GRUB and pxelinux
+   derived boot loaders: less common alternatives such as LILO are
+   *not* supported. You can most likely find your GRUB menu file at
+   /boot/grub/menu.lst: edit this file to include an entry like the
+   following:
 
-    # title Xen 2.0 / XenLinux 2.6
-    #   kernel /boot/xen-2.0.gz dom0_mem=<mem-kb> console=vga
-    #   module /boot/vmlinuz-2.6-xen0 root=<root-dev> ro console=tty0
+    title Xen 3.0 / XenLinux 2.6
+       kernel /boot/xen-3.0.gz console=vga
+       module /boot/vmlinuz-2.6-xen root=<root-dev> ro console=tty0
+       module /boot/initrd-2.6-xen.img
 
-   For <mem-kb> you should specify the amount of memory, in kilobytes,
-   to allocate for use by your initial XenLinux virtual machine. Note
-   that Xen itself reserves about 32MB memory for internal use, which
-   is not available for allocation to virtual machines.
-   For <root-dev>, specify your usual root partition (e.g., /dev/hda1).
+   NB: Not all kernel configs need an initial ram disk (initrd), but
+   if you do specify one you need you'll need to use 'module' grub
+   directive rather than 'initrd'.
 
-3. Reboot your system and select the "Xen 2.0 / XenLinux 2.6" menu
-   option. After booting Xen, XenLinux will start and your
-   initialisation scripts should execute in the usual way.
+   The linux command line takes all the usual options, such as
+   root=<root-dev> to specify your usual root partition (e.g.,
+   /dev/hda1).  
+
+   The Xen command line takes a number of optional arguments described
+   in the manual. The most common is 'dom0_mem=xxxM' which sets the
+   amount of memory to allocate for use by your initial virtual
+   machine (known as domain 0). Note that Xen itself reserves about
+   32MB memory for internal use, which is not available for allocation
+   to virtual machines.  
+
+3. Reboot your system and select the "Xen 3.0 / XenLinux 2.6" menu
+   option. After booting Xen, Linux will start and your initialisation
+   scripts should execute in the usual way.
 
 Quick-Start Guide - Source Release
 ==================================
@@ -77,9 +89,11 @@ provided by your Linux distributor:
     * GCC (preferably v3.2.x or v3.3.x; older versions are unsupported) 
     * GNU Make
     * GNU Binutils
-    * Development install of libcurl (e.g., libcurl-dev)
     * Development install of zlib (e.g., zlib-dev)
-    * Development install of Python v2.2 or later (e.g., python-dev)
+    * Development install of Python v2.3 or later (e.g., python-dev)
+    * bridge-utils package (/sbin/brctl)
+    * iproute package (/sbin/ip)
+    * hotplug or udev
 
 [NB. Unless noted otherwise, all the following steps should be
 performed with root privileges.]
@@ -105,16 +119,26 @@ On Linux:
 3. For the very first build, or if you want to destroy existing
    .configs and build trees, perform the following steps:
 
-    # make world
+    # make KERNELS=linux-2.6-xen world
     # make install
 
-   This will create the directories linux-2.6-xen0/ and
-   linux-2.6-xenU/ after first cleaning everything. It will
-   create and install into the dist/ directory which is the
-   default install location. It will build the xen binary
-   (xen.gz), the boot images for dom0 and an unprivileged
-   guest kernel (vmlinuz-2.6.x-xen0 and vmlinuz-2.6.x-xenU
-   respectively), the tools and the documentation.
+   It will create and install into the dist/ directory which is the
+   default install location. It will build the xen binary (xen.gz),
+   and a linux kernel and modules that can be used in both dom0 and an
+   unprivileged guest kernel (vmlinuz-2.6.x-xen), the tools and the
+   documentation.
+
+   If you don't specify KERNELS= on the make command line it will
+   default to building two kernels, vmlinuz-2.6.x-xen0 and
+   vmlinuz-2.6.x-xenU. These are smaller builds with just selected
+   modules, intended primarilly for developers that don't like to wait
+   for a -xen kernel to build. The -xenU kernel is particularly small
+   as it does not contain any physical device drivers, and hence is
+   only useful for guest domains.
+
+   If you want to build an x86_32 PAE capable xen and kernel to work
+   on machines with >= 4GB of memory, use XEN_TARGET_X86_PAE=y on the
+   make command line.
 
 4. To rebuild an existing tree without modifying the config:
     # make dist
@@ -124,20 +148,22 @@ On Linux:
 
 5. To rebuild a kernel with a modified config:
 
-    # cd linux-2.6-xen0            # or linux-2.6-xenU
+    # cd linux-2.6.12-xen          # or linux-2.6.12-xen0 etc.
     # make ARCH=xen menuconfig     # or xconfig
     # cd ..
     # make dist
     # make install
 
-   You can copy your own config into linux-2.6-xen0 first.
    Alternatively, you can also copy your config file to
    dist/install/boot/config-$version-xen0/U.  This is picked up
    when a make dist is done. Include the ARCH=xen directive for
    all make commands when building the kernels.
 
-6. To see a full list of targets and a brief description, type:
-    # make help
+   NB: The need to specify ARCH=xen when building linux is likely to
+   disappear soon: the Xen patch is being rearranged to become just
+   another config option rather than a separate 'architecture'.
 
-7. Edit your grub.conf file as described above to have an
-   appropriate entry for your new kernel.
+   Depending on your config, you may need to use 'mkinitrd' to create
+   an initial ram disk, just like a native system e.g. 
+    # depmod 2.6.12.6-xen
+    # mkinitrd -v -f --with=aacraid --with=sd_mod --with=scsi_mod initrd-2.6.12.6-xen.img 2.6.12.6-xen

@@ -105,7 +105,7 @@
 # Dom0 will balloon out when needed to free memory for domU.
 # dom0-min-mem is the lowest memory level (in MB) dom0 will get down to.
 # If dom0-min-mem=0, dom0 will never balloon out.
-(dom0-min-mem 0)
+(dom0-min-mem 196)
 
 # In SMP system, dom0 will use dom0-cpus # of CPUS
 # If dom0-cpus = 0, dom0 will take all cpus available
