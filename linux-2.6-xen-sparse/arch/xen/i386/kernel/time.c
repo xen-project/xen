@@ -560,7 +560,8 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 	while (!time_values_up_to_date(cpu));
 
-	if (unlikely(delta < -1000000LL) || unlikely(delta_cpu < 0)) {
+	if ((unlikely(delta < -1000000LL) || unlikely(delta_cpu < 0))
+	    && printk_ratelimit()) {
 		printk("Timer ISR/%d: Time went backwards: "
 		       "delta=%lld cpu_delta=%lld shadow=%lld "
 		       "off=%lld processed=%lld cpu_processed=%lld\n",
