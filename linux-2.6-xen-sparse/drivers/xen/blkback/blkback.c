@@ -483,23 +483,22 @@ static void make_response(blkif_t *blkif, unsigned long id,
 	blkif_back_ring_t *blk_ring = &blkif->blk_ring;
 	int notify;
 
-	/* Place on the response ring for the relevant domain. */ 
 	spin_lock_irqsave(&blkif->blk_ring_lock, flags);
+
+	/* Place on the response ring for the relevant domain. */ 
 	resp = RING_GET_RESPONSE(blk_ring, blk_ring->rsp_prod_pvt);
 	resp->id        = id;
 	resp->operation = op;
 	resp->status    = st;
 	blk_ring->rsp_prod_pvt++;
 	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(blk_ring, notify);
-	spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
 
 	/*
          * Tail check for pending requests. Allows frontend to avoid
          * notifications if requests are already in flight (lower overheads
          * and promotes batching).
          */
-	mb();
-	if (!__on_blkdev_list(blkif)) {
+	if (blk_ring->rsp_prod_pvt == blk_ring->req_cons) {
 		int more_to_do;
 		RING_FINAL_CHECK_FOR_REQUESTS(blk_ring, more_to_do);
 		if (more_to_do) {
@@ -507,6 +506,8 @@ static void make_response(blkif_t *blkif, unsigned long id,
 			maybe_trigger_blkio_schedule();
 		}
 	}
+
+	spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
 
 	if (notify)
 		notify_remote_via_irq(blkif->irq);
