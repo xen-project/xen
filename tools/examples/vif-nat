@@ -42,14 +42,15 @@ then
 fi
 
 
+domid=$(echo "$XENBUS_PATH" | sed -n 's#.*/\([0-9]*\)/[0-9]*$#\1#p')
+vifid=$(echo "$XENBUS_PATH" | sed -n 's#.*/[0-9]*/\([0-9]*\)$#\1#p')
+vifid=$(( $vifid + 1 ))
+
+
 ip_from_dom()
 {
-  local domid=$(echo "$XENBUS_PATH" | sed -n 's#.*/\([0-9]*\)/[0-9]*$#\1#p')
-  local vifid=$(echo "$XENBUS_PATH" | sed -n 's#.*/[0-9]*/\([0-9]*\)$#\1#p')
-
   local domid1=$(( $domid / 256 ))
   local domid2=$(( $domid % 256 ))
-  vifid=$(( $vifid + 1 ))
 
   echo "10.$domid1.$domid2.$vifid/16"
 }
@@ -92,10 +93,17 @@ netmask=$(dotted_quad $intmask)
 network=$(dotted_quad $(( $vif_int & $intmask )) )
 
 
+hostname=$(xenstore_read "$XENBUS_PATH/domain" | tr -- '_.:/+' '-----')
+if [ "$vifid" != "1" ]
+then
+  hostname="$hostname-$vifid"
+fi
+
+
 dhcp_remove_entry()
 {
   local tmpfile=$(mktemp)
-  grep -v "host Xen-${vif/./-}" "$dhcpd_conf_file" >"$tmpfile"
+  grep -v "host $hostname" "$dhcpd_conf_file" >"$tmpfile"
   if diff "$tmpfile" "$dhcpd_conf_file" >/dev/null
   then
     rm "$tmpfile"
@@ -107,18 +115,21 @@ dhcp_remove_entry()
 
 dhcp_up()
 {
+  claim_lock "vif-nat-dhcp"
   dhcp_remove_entry
   mac=$(xenstore_read "$XENBUS_PATH/mac")
   echo >>"$dhcpd_conf_file" \
-"host Xen-${vif/./-} { hardware ethernet $mac; fixed-address $vif_ip; option routers $router_ip; }"
-
-  "$dhcpd_init_file" restart
+"host $hostname { hardware ethernet $mac; fixed-address $vif_ip; option routers $router_ip; option host-name \"$hostname\"; }"
+  release_lock "vif-nat-dhcp"
+  "$dhcpd_init_file" restart || true
 }
 
 
 dhcp_down()
 {
+  claim_lock "vif-nat-dhcp"
   dhcp_remove_entry
+  release_lock "vif-nat-dhcp"
   "$dhcpd_init_file" restart || true # We need to ignore failure because
                                      # ISC dhcpd 3 borks if there is nothing
                                      # for it to do, which is the case if
