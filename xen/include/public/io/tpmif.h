@@ -16,7 +16,7 @@
 #ifndef __XEN_PUBLIC_IO_TPMIF_H__
 #define __XEN_PUBLIC_IO_TPMIF_H__
 
-#include "../gnttab.h" /* for grant_ref_t */
+#include "../grant_table.h"
 
 typedef struct {
     unsigned long addr;   /* Machine address of packet.   */
