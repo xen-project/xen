@@ -250,7 +250,7 @@ case "$command" in
       file)
         # Canonicalise the file, for sharing check comparison, and the mode
         # for ease of use here.
-        file=$(readlink -f "$p")
+        file=$(readlink -f "$p") || fatal "$p does not exist."
         mode=$(canonicalise_mode "$mode")
 
         claim_lock "block"
@@ -271,8 +271,7 @@ mount it read-write in a guest domain."
             continue
           fi
 
-          f=$(losetup "$dev" 2>/dev/null) || f='()'
-          f=$(echo "$f" | sed -e 's/.*(\(.*\)).*/\1/g')
+          f=$(losetup "$dev" 2>/dev/null) || f=''
 
           if [ "$f" ]
           then
@@ -280,6 +279,38 @@ mount it read-write in a guest domain."
             if [ "$mode" == '!' ]
             then
               continue
+            fi
+
+            f=$(echo "$f" | sed -e 's/.*(\(.*\)).*/\1/g')
+
+            # $f is the filename, as read from losetup, but the loopback
+            # driver truncates filenames at 64 characters, so we need to go
+            # trawling through the store if it's longer than that.  Truncation
+            # is indicated by an asterisk at the end of the filename.
+            if expr index "$f" '*' >/dev/null
+            then
+              found=""
+              for dom in $(xenstore-list "$XENBUS_BASE_PATH")
+              do
+                for domdev in $(xenstore-list "$XENBUS_BASE_PATH/$dom")
+                do
+                  d=$(xenstore_read_default \
+                        "$XENBUS_BASE_PATH/$dom/$domdev/node" "")
+                  if [ "$d" == "$dev" ]
+                  then
+                    f=$(xenstore_read "$XENBUS_BASE_PATH/$dom/$domdev/params")
+                    found=1
+                    break 2
+                  fi
+                done
+              done
+
+              if [ ! "$found" ]
+              then
+                # This loopback device is in use by someone else, so skip it.
+                log debug "Loopback sharing check skips device $dev."
+                continue
+              fi
             fi
 
             f=$(readlink -f "$f")
