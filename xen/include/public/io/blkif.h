@@ -10,8 +10,7 @@
 #define __XEN_PUBLIC_IO_BLKIF_H__
 
 #include "ring.h"
-
-#include <asm-xen/gnttab.h>	/* for grant_ref_t */
+#include "../gnttab.h" /* for grant_ref_t */
 
 /*
  * Front->back notifications: When enqueuing a new request, sending a

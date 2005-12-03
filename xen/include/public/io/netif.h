@@ -10,6 +10,7 @@
 #define __XEN_PUBLIC_IO_NETIF_H__
 
 #include "ring.h"
+#include "../gnttab.h" /* for grant_ref_t */
 
 /*
  * Note that there is *never* any need to notify the backend when enqueuing
