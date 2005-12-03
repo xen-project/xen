@@ -296,22 +296,23 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
 {
 	blkif_back_ring_t *blk_ring = &blkif->blk_ring;
 	blkif_request_t *req;
-	RING_IDX i, rp;
+	RING_IDX rc, rp;
 	int more_to_do = 0;
 
+	rc = blk_ring->req_cons;
 	rp = blk_ring->sring->req_prod;
 	rmb(); /* Ensure we see queued requests up to 'rp'. */
 
-	for (i = blk_ring->req_cons; 
-	     (i != rp) && !RING_REQUEST_CONS_OVERFLOW(blk_ring, i);
-	     i++) {
+	while ((rc != rp) && !RING_REQUEST_CONS_OVERFLOW(blk_ring, rc)) {
 		if ((max_to_do-- == 0) ||
 		    (NR_PENDING_REQS == MAX_PENDING_REQS)) {
 			more_to_do = 1;
 			break;
 		}
-        
-		req = RING_GET_REQUEST(blk_ring, i);
+
+		req = RING_GET_REQUEST(blk_ring, rc);
+		blk_ring->req_cons = ++rc; /* before make_response() */
+
 		switch (req->operation) {
 		case BLKIF_OP_READ:
 		case BLKIF_OP_WRITE:
@@ -327,7 +328,6 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
 		}
 	}
 
-	blk_ring->req_cons = i;
 	return more_to_do;
 }
 
