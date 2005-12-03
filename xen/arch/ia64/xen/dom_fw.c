@@ -13,11 +13,12 @@
 #include <asm/io.h>
 #include <asm/pal.h>
 #include <asm/sal.h>
+#include <xen/compile.h>
 #include <xen/acpi.h>
 
 #include <asm/dom_fw.h>
 
-struct ia64_boot_param *dom_fw_init(struct domain *, char *,int,char *,int);
+static struct ia64_boot_param *dom_fw_init(struct domain *, char *,int,char *,int);
 extern unsigned long domain_mpa_to_imva(struct domain *,unsigned long mpaddr);
 extern struct domain *dom0;
 extern unsigned long dom0_start;
@@ -55,13 +56,22 @@ void dom_efi_hypercall_patch(struct domain *d, unsigned long paddr, unsigned lon
 
 
 // builds a hypercall bundle at domain physical address
-void dom_fw_hypercall_patch(struct domain *d, unsigned long paddr, unsigned long hypercall,unsigned long ret)
+static void dom_fw_hypercall_patch(struct domain *d, unsigned long paddr, unsigned long hypercall,unsigned long ret)
 {
 	unsigned long imva;
 
-	if (d == dom0) paddr += dom0_start;
 	imva = domain_mpa_to_imva(d,paddr);
 	build_hypercall_bundle(imva,d->arch.breakimm,hypercall,ret);
+}
+
+static void dom_fw_pal_hypercall_patch(struct domain *d, unsigned long paddr)
+{
+	unsigned long *imva;
+
+	imva = (unsigned long *)domain_mpa_to_imva(d,paddr);
+
+	build_pal_hypercall_bundles (imva, d->arch.breakimm,
+				      FW_HYPERCALL_PAL_CALL);
 }
 
 
@@ -153,8 +163,6 @@ offtime (unsigned long t, efi_time_t *tp)
 	tp->day = days + 1;
 	return 1;
 }
-
-extern struct ia64_pal_retval pal_emulator_static (unsigned long);
 
 /* Macro to emulate SAL call using legacy IN and OUT calls to CF8, CFC etc.. */
 
@@ -292,11 +300,6 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 	long status = -1;
 
 	if (running_on_sim) return pal_emulator_static(index);
-	if (index >= PAL_COPY_PAL) {
-		// build_hypercall_bundle needs to be modified to generate
-		// a second bundle that conditionally does a br.ret
-		panic("xen_pal_emulator: stacked calls not supported!!\n");
-	}
 	printk("xen_pal_emulator: index=%d\n",index);
 	// pal code must be mapped by a TR when pal is called, however
 	// calls are rare enough that we will map it lazily rather than
@@ -389,9 +392,26 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 	    case PAL_VM_TR_READ:	/* FIXME: vcpu_get_tr?? */
 		printk("PAL_VM_TR_READ NOT IMPLEMENTED, IGNORED!\n");
 		break;
-	    case PAL_HALT_INFO:		/* inappropriate info for guest? */
-		printk("PAL_HALT_INFO NOT IMPLEMENTED, IGNORED!\n");
+	    case PAL_HALT_INFO:
+	        {
+		    /* 1000 cycles to enter/leave low power state,
+		       consumes 10 mW, implemented and cache/TLB coherent.  */
+		    unsigned long res = 1000UL | (1000UL << 16) | (10UL << 32)
+			    | (1UL << 61) | (1UL << 60);
+		    if (copy_to_user ((void *)in1, &res, sizeof (res)))
+			    status = PAL_STATUS_EINVAL;    
+		    else
+			    status = PAL_STATUS_SUCCESS;
+	        }
 		break;
+	    case PAL_HALT:
+		    if (current->domain == dom0) {
+			    printf ("Domain0 halts the machine\n");
+			    (*efi.reset_system)(EFI_RESET_SHUTDOWN,0,0,NULL);
+		    }
+		    else
+			    domain_shutdown (current->domain, 0);
+		    break;
 	    default:
 		printk("xen_pal_emulator: UNIMPLEMENTED PAL CALL %d!!!!\n",
 				index);
@@ -399,6 +419,7 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 	}
 	return ((struct ia64_pal_retval) {status, r9, r10, r11});
 }
+
 
 #define NFUNCPTRS 20
 
@@ -437,29 +458,29 @@ acpi_update_lsapic (acpi_table_entry_header *header)
 	return 0;
 }
 
+static u8
+generate_acpi_checksum(void *tbl, unsigned long len)
+{
+	u8 *ptr, sum = 0;
+
+	for (ptr = tbl; len > 0 ; len--, ptr++)
+		sum += *ptr;
+
+	return 0 - sum;
+}
+
 static int
 acpi_update_madt_checksum (unsigned long phys_addr, unsigned long size)
 {
-	u8 checksum=0;
-    	u8* ptr;
-	int len;
 	struct acpi_table_madt* acpi_madt;
 
 	if (!phys_addr || !size)
 		return -EINVAL;
 
 	acpi_madt = (struct acpi_table_madt *) __va(phys_addr);
-	acpi_madt->header.checksum=0;
+	acpi_madt->header.checksum = 0;
+	acpi_madt->header.checksum = generate_acpi_checksum(acpi_madt, size);
 
-    	/* re-calculate MADT checksum */
-	ptr = (u8*)acpi_madt;
-    	len = acpi_madt->header.length;
-	while (len>0){
-		checksum = (u8)( checksum + (*ptr++) );
-		len--;
-	}
-    	acpi_madt->header.checksum = 0x0 - checksum;	
-	
 	return 0;
 }
 
@@ -473,8 +494,140 @@ void touch_acpi_table(void)
 	return;
 }
 
+struct fake_acpi_tables {
+	struct acpi20_table_rsdp rsdp;
+	struct xsdt_descriptor_rev2 xsdt;
+	u64 madt_ptr;
+	struct fadt_descriptor_rev2 fadt;
+	struct facs_descriptor_rev2 facs;
+	struct acpi_table_header dsdt;
+	u8 aml[16];
+	struct acpi_table_madt madt;
+	struct acpi_table_lsapic lsapic;
+	u8 pm1a_evt_blk[4];
+	u8 pm1a_cnt_blk[1];
+	u8 pm_tmr_blk[4];
+};
 
-struct ia64_boot_param *
+/* Create enough of an ACPI structure to make the guest OS ACPI happy. */
+void
+dom_fw_fake_acpi(struct fake_acpi_tables *tables)
+{
+	struct acpi20_table_rsdp *rsdp = &tables->rsdp;
+	struct xsdt_descriptor_rev2 *xsdt = &tables->xsdt;
+	struct fadt_descriptor_rev2 *fadt = &tables->fadt;
+	struct facs_descriptor_rev2 *facs = &tables->facs;
+	struct acpi_table_header *dsdt = &tables->dsdt;
+	struct acpi_table_madt *madt = &tables->madt;
+	struct acpi_table_lsapic *lsapic = &tables->lsapic;
+
+	memset(tables, 0, sizeof(struct fake_acpi_tables));
+
+	/* setup XSDT (64bit version of RSDT) */
+	strncpy(xsdt->signature, XSDT_SIG, 4);
+	/* XSDT points to both the FADT and the MADT, so add one entry */
+	xsdt->length = sizeof(struct xsdt_descriptor_rev2) + sizeof(u64);
+	xsdt->revision = 1;
+	strcpy(xsdt->oem_id, "XEN");
+	strcpy(xsdt->oem_table_id, "Xen/ia64");
+	strcpy(xsdt->asl_compiler_id, "XEN");
+	xsdt->asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
+
+	xsdt->table_offset_entry[0] = dom_pa(fadt);
+	tables->madt_ptr = dom_pa(madt);
+
+	xsdt->checksum = generate_acpi_checksum(xsdt, xsdt->length);
+
+	/* setup FADT */
+	strncpy(fadt->signature, FADT_SIG, 4);
+	fadt->length = sizeof(struct fadt_descriptor_rev2);
+	fadt->revision = FADT2_REVISION_ID;
+	strcpy(fadt->oem_id, "XEN");
+	strcpy(fadt->oem_table_id, "Xen/ia64");
+	strcpy(fadt->asl_compiler_id, "XEN");
+	fadt->asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
+
+	strncpy(facs->signature, FACS_SIG, 4);
+	facs->version = 1;
+	facs->length = sizeof(struct facs_descriptor_rev2);
+
+	fadt->xfirmware_ctrl = dom_pa(facs);
+	fadt->Xdsdt = dom_pa(dsdt);
+
+	/*
+	 * All of the below FADT entries are filled it to prevent warnings
+	 * from sanity checks in the ACPI CA.  Emulate required ACPI hardware
+	 * registers in system memory.
+	 */
+	fadt->pm1_evt_len = 4;
+	fadt->xpm1a_evt_blk.address_space_id = ACPI_ADR_SPACE_SYSTEM_MEMORY;
+	fadt->xpm1a_evt_blk.register_bit_width = 8;
+	fadt->xpm1a_evt_blk.address = dom_pa(&tables->pm1a_evt_blk);
+	fadt->pm1_cnt_len = 1;
+	fadt->xpm1a_cnt_blk.address_space_id = ACPI_ADR_SPACE_SYSTEM_MEMORY;
+	fadt->xpm1a_cnt_blk.register_bit_width = 8;
+	fadt->xpm1a_cnt_blk.address = dom_pa(&tables->pm1a_cnt_blk);
+	fadt->pm_tm_len = 4;
+	fadt->xpm_tmr_blk.address_space_id = ACPI_ADR_SPACE_SYSTEM_MEMORY;
+	fadt->xpm_tmr_blk.register_bit_width = 8;
+	fadt->xpm_tmr_blk.address = dom_pa(&tables->pm_tmr_blk);
+
+	fadt->checksum = generate_acpi_checksum(fadt, fadt->length);
+
+	/* setup RSDP */
+	strncpy(rsdp->signature, RSDP_SIG, 8);
+	strcpy(rsdp->oem_id, "XEN");
+	rsdp->revision = 2; /* ACPI 2.0 includes XSDT */
+	rsdp->length = sizeof(struct acpi20_table_rsdp);
+	rsdp->xsdt_address = dom_pa(xsdt);
+
+	rsdp->checksum = generate_acpi_checksum(rsdp,
+	                                        ACPI_RSDP_CHECKSUM_LENGTH);
+	rsdp->ext_checksum = generate_acpi_checksum(rsdp, rsdp->length);
+
+	/* setup DSDT with trivial namespace. */ 
+	strncpy(dsdt->signature, DSDT_SIG, 4);
+	dsdt->revision = 1;
+	dsdt->length = sizeof(struct acpi_table_header) + sizeof(tables->aml);
+	strcpy(dsdt->oem_id, "XEN");
+	strcpy(dsdt->oem_table_id, "Xen/ia64");
+	strcpy(dsdt->asl_compiler_id, "XEN");
+	dsdt->asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
+
+	/* Trivial namespace, avoids ACPI CA complaints */
+	tables->aml[0] = 0x10; /* Scope */
+	tables->aml[1] = 0x12; /* length/offset to next object */
+	strncpy(&tables->aml[2], "_SB_", 4);
+
+	/* The processor object isn't absolutely necessary, revist for SMP */
+	tables->aml[6] = 0x5b; /* processor object */
+	tables->aml[7] = 0x83;
+	tables->aml[8] = 0x0b; /* next */
+	strncpy(&tables->aml[9], "CPU0", 4);
+
+	dsdt->checksum = generate_acpi_checksum(dsdt, dsdt->length);
+
+	/* setup MADT */
+	strncpy(madt->header.signature, APIC_SIG, 4);
+	madt->header.revision = 2;
+	madt->header.length = sizeof(struct acpi_table_madt) +
+	                      sizeof(struct acpi_table_lsapic);
+	strcpy(madt->header.oem_id, "XEN");
+	strcpy(madt->header.oem_table_id, "Xen/ia64");
+	strcpy(madt->header.asl_compiler_id, "XEN");
+	madt->header.asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
+
+	/* A single LSAPIC entry describes the CPU.  Revisit for SMP guests */
+	lsapic->header.type = ACPI_MADT_LSAPIC;
+	lsapic->header.length = sizeof(struct acpi_table_lsapic);
+	lsapic->flags.enabled = 1;
+
+	madt->header.checksum = generate_acpi_checksum(madt,
+	                                               madt->header.length);
+	return;
+}
+
+static struct ia64_boot_param *
 dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_size)
 {
 	efi_system_table_t *efi_systab;
@@ -482,7 +635,6 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 	efi_config_table_t *efi_tables;
 	struct ia64_sal_systab *sal_systab;
 	efi_memory_desc_t *efi_memmap, *md;
-	unsigned long *pal_desc, *sal_desc;
 	struct ia64_sal_desc_entry_point *sal_ed;
 	struct ia64_boot_param *bp;
 	unsigned long *pfn;
@@ -490,7 +642,7 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 	char *cp, *cmd_line, *fw_vendor;
 	int i = 0;
 	unsigned long maxmem = (d->max_pages - d->arch.sys_pgnr) * PAGE_SIZE;
-	unsigned long start_mpaddr = ((d==dom0)?dom0_start:0);
+	const unsigned long start_mpaddr = ((d==dom0)?dom0_start:0);
 
 #	define MAKE_MD(typ, attr, start, end, abs) 	\	
 	do {						\
@@ -512,13 +664,6 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 	}
 */
 	memset(fw_mem, 0, fw_mem_size);
-
-#ifdef USE_PAL_EMULATOR
-	pal_desc = (unsigned long *) &pal_emulator_static;
-#else
-	pal_desc = (unsigned long *) &xen_pal_emulator;
-#endif
-	sal_desc = (unsigned long *) &sal_emulator;
 
 	cp = fw_mem;
 	efi_systab  = (void *) cp; cp += sizeof(*efi_systab);
@@ -562,7 +707,7 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 #define EFI_HYPERCALL_PATCH(tgt,call) do { \
     dom_efi_hypercall_patch(d,FW_HYPERCALL_##call##_PADDR,FW_HYPERCALL_##call); \
     tgt = dom_pa(pfn); \
-    *pfn++ = FW_HYPERCALL_##call##_PADDR + ((d==dom0)?dom0_start:0); \
+    *pfn++ = FW_HYPERCALL_##call##_PADDR + start_mpaddr; \
     *pfn++ = 0; \
     } while (0)
 
@@ -620,6 +765,22 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 			i++;
 		}
 		printf("\n");
+	} else {
+		i = 1;
+
+		if ((unsigned long)fw_mem + fw_mem_size - (unsigned long)cp >=
+		    sizeof(struct fake_acpi_tables)) {
+			struct fake_acpi_tables *acpi_tables;
+
+			acpi_tables = (void *)cp;
+			cp += sizeof(struct fake_acpi_tables);
+			dom_fw_fake_acpi(acpi_tables);
+
+			efi_tables[i].guid = ACPI_20_TABLE_GUID;
+			efi_tables[i].table = dom_pa(acpi_tables);
+			printf(" ACPI 2.0=%0xlx",efi_tables[i].table);
+			i++;
+		}
 	}
 
 	/* fill in the SAL system table: */
@@ -634,12 +795,10 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 
 	/* fill in an entry point: */
 	sal_ed->type = SAL_DESC_ENTRY_POINT;
-#define FW_HYPERCALL_PATCH(tgt,call,ret) do { \
-    dom_fw_hypercall_patch(d,FW_HYPERCALL_##call##_PADDR,FW_HYPERCALL_##call,ret); \
-    tgt = FW_HYPERCALL_##call##_PADDR + ((d==dom0)?dom0_start:0); \
-    } while (0)
-	FW_HYPERCALL_PATCH(sal_ed->pal_proc,PAL_CALL,0);
-	FW_HYPERCALL_PATCH(sal_ed->sal_proc,SAL_CALL,1);
+	sal_ed->pal_proc = FW_HYPERCALL_PAL_CALL_PADDR + start_mpaddr;
+	dom_fw_pal_hypercall_patch (d, sal_ed->pal_proc);
+	sal_ed->sal_proc = FW_HYPERCALL_SAL_CALL_PADDR + start_mpaddr;
+	dom_fw_hypercall_patch (d, sal_ed->sal_proc, FW_HYPERCALL_SAL_CALL, 1);
 	sal_ed->gp = 0;  // will be ignored
 
 	for (cp = (char *) sal_systab; cp < (char *) efi_memmap; ++cp)

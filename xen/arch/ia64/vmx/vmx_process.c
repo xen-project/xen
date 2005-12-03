@@ -47,13 +47,12 @@
 #include <asm/kregs.h>
 #include <asm/vmx.h>
 #include <asm/vmx_mm_def.h>
+#include <asm/vmx_phy_mode.h>
 #include <xen/mm.h>
 /* reset all PSR field to 0, except up,mfl,mfh,pk,dt,rt,mc,it */
 #define INITIAL_PSR_VALUE_AT_INTERRUPTION 0x0000001808028034
 
 
-extern struct ia64_sal_retval pal_emulator_static(UINT64);
-extern struct ia64_sal_retval sal_emulator(UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64);
 extern void rnat_consumption (VCPU *vcpu);
 #define DOMN_PAL_REQUEST    0x110000
 
@@ -109,14 +108,15 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 	}
 #endif
 	if (iim == d->arch.breakimm) {
-		struct ia64_sal_retval x;
+		struct ia64_pal_retval y;
+		struct sal_ret_values x;
 		switch (regs->r2) {
 		    case FW_HYPERCALL_PAL_CALL:
 			//printf("*** PAL hypercall: index=%d\n",regs->r28);
 			//FIXME: This should call a C routine
-			x = pal_emulator_static(VCPU(v, vgr[12]));
-			regs->r8 = x.status; regs->r9 = x.v0;
-			regs->r10 = x.v1; regs->r11 = x.v2;
+			y = pal_emulator_static(VCPU(v, vgr[12]));
+			regs->r8 = y.status; regs->r9 = y.v0;
+			regs->r10 = y.v1; regs->r11 = y.v2;
 #if 0
 			if (regs->r8)
 				printk("Failed vpal emulation, with index:0x%lx\n",
@@ -130,8 +130,8 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 					 sal_param[2], sal_param[3],
 					 sal_param[4], sal_param[5],
 					 sal_param[6], sal_param[7]);
-			regs->r8 = x.status; regs->r9 = x.v0;
-			regs->r10 = x.v1; regs->r11 = x.v2;
+			regs->r8 = x.r8; regs->r9 = x.r9;
+			regs->r10 = x.r10; regs->r11 = x.r11;
 #if 0
 			if (regs->r8)
 				printk("Failed vsal emulation, with index:0x%lx\n",
@@ -267,6 +267,12 @@ void leave_hypervisor_tail(struct pt_regs *regs)
 
 extern ia64_rr vmx_vcpu_rr(VCPU *vcpu,UINT64 vadr);
 
+static int vmx_handle_lds(REGS* regs)
+{
+    regs->cr_ipsr |=IA64_PSR_ED;
+    return IA64_FAULT;
+}
+
 /* We came here because the H/W VHPT walker failed to find an entry */
 void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
 {
@@ -294,18 +300,19 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
         return;
     }
 */
-
-    if((vec==1)&&(!vpsr.it)){
-        physical_itlb_miss(v, vadr);
-        return;
-    }
-    if((vec==2)&&(!vpsr.dt)){
-        if(v->domain!=dom0&&__gpfn_is_io(v->domain,(vadr<<1)>>(PAGE_SHIFT+1))){
-            emulate_io_inst(v,((vadr<<1)>>1),4);   //  UC
-        }else{
-            physical_dtlb_miss(v, vadr);
+    if(is_physical_mode(v)&&(!(vadr<<1>>62))){
+        if(vec==1){
+            physical_itlb_miss(v, vadr);
+            return;
         }
-        return;
+        if(vec==2){
+            if(v->domain!=dom0&&__gpfn_is_io(v->domain,(vadr<<1)>>(PAGE_SHIFT+1))){
+                emulate_io_inst(v,((vadr<<1)>>1),4);   //  UC
+            }else{
+                physical_dtlb_miss(v, vadr);
+            }
+            return;
+        }
     }
     vrr = vmx_vcpu_rr(v, vadr);
     if(vec == 1) type = ISIDE_TLB;
@@ -336,7 +343,8 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
             } else{
                 if(misr.sp){
                     //TODO  lds emulation
-                    panic("Don't support speculation load");
+                    //panic("Don't support speculation load");
+                    return vmx_handle_lds(regs);
                 }else{
                     nested_dtlb(v);
                     return IA64_FAULT;
@@ -353,8 +361,9 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
                     return IA64_FAULT;
                 }else{
                     if(misr.sp){
-                        //TODO  lds emulation
-                        panic("Don't support speculation load");
+                    //TODO  lds emulation
+                    //panic("Don't support speculation load");
+                    return vmx_handle_lds(regs);
                     }else{
                         nested_dtlb(v);
                         return IA64_FAULT;
@@ -367,8 +376,9 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
                     return IA64_FAULT;
                 }else{
                     if(misr.sp){
-                        //TODO  lds emulation
-                        panic("Don't support speculation load");
+                    //TODO  lds emulation
+                    //panic("Don't support speculation load");
+                    return vmx_handle_lds(regs);
                     }else{
                         nested_dtlb(v);
                         return IA64_FAULT;

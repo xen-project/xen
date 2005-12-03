@@ -8,7 +8,7 @@
 #undef pfn_valid
 #undef page_to_pfn
 #undef pfn_to_page
-# define pfn_valid(_pfn)		((_pfn) > max_page)
+# define pfn_valid(_pfn)	((_pfn) < max_page)
 # define page_to_pfn(_page)	((unsigned long) ((_page) - frame_table))
 # define pfn_to_page(_pfn)	(frame_table + (_pfn))
 

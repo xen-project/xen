@@ -40,13 +40,6 @@ cp arch/ia64/xen/drivers/coreMakefile drivers/xen/core/Makefile
 cp arch/ia64/xen/drivers/xenia64_init.c drivers/xen/core
 cp arch/ia64/xen/drivers/evtchn_ia64.c drivers/xen/core
 
-#this is a one-line change to avoid a nasty kernel crash resulting
-#from a use of the FADT entry in the ACPI tree.  The fake ACPI
-#tree that Xen sets up for guests has a NULL FADT.  This is a bug
-#that needs to be fixed, at which point this can go away.  In the
-#meantime, this file needs to be updated if the real motherboard.c is
-cp arch/ia64/xen/drivers/motherboard.c drivers/acpi/motherboard.c
-
 #still a few x86-ism's in various drivers/xen files, patch them
 #cd drivers/xen
 #if [ ! -e ia64.patch.semaphore ]

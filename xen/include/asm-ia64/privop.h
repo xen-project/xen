@@ -100,6 +100,11 @@ typedef union U_INST64_M36 {
     struct { unsigned long qp:6, r1:7, :14, x6:6, x3:3, :1, major:4; }; 
 } INST64_M36;
 
+typedef union U_INST64_M37 {
+    IA64_INST inst;
+    struct { unsigned long qp:6, imm20a:20,:1, x4:4,x2:2,x3:3, i:1, major:4; };
+} INST64_M37;
+
 typedef union U_INST64_M41 {
     IA64_INST inst;
     struct { unsigned long qp:6, :7, r2:7, :7, x6:6, x3:3, :1, major:4; }; 
@@ -190,6 +195,7 @@ typedef union U_INST64 {
     INST64_M33 M33;	// mov from cr
     INST64_M35 M35;	// mov to psr
     INST64_M36 M36;	// mov from psr
+    INST64_M37 M37;	// break.m
     INST64_M41 M41;	// translation cache insert
     INST64_M42 M42;	// mov to indirect reg/translation reg insert
     INST64_M43 M43;	// mov from indirect reg

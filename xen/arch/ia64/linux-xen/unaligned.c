@@ -378,7 +378,7 @@ get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, unsigne
     if (ridx >= sof) {
         /* read of out-of-frame register returns an undefined value; 0 in our case.  */
         DPRINT("ignoring read from r%lu; only %lu registers are allocated!\n", r1, sof);
-        panic("wrong stack register number");
+        panic("wrong stack register number (iip=%p)\n", regs->cr_iip);
     }
 
     if (ridx < sor)

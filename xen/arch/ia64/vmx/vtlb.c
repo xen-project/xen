@@ -391,6 +391,7 @@ void vtlb_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
 #if 1
     vrr=vmx_vcpu_rr(current, va);
     if (vrr.ps != entry->ps) {
+        machine_tlb_insert(hcb->vcpu, entry);
 	printk("not preferred ps with va: 0x%lx\n", va);
 	return;
     }

@@ -162,7 +162,7 @@ static thash_cb_t *init_domain_vhpt(struct vcpu *d)
     vhpt->ht = THASH_VHPT;
     vhpt->vcpu = d;
     vhpt->hash_func = machine_thash;
-    vs -= sizeof (vhpt_special);
+    vcur -= sizeof (vhpt_special);
     vs = vcur;
 
     /* Setup guest pta */
@@ -438,20 +438,23 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code)
     thash_data_t    *tlb;
     ia64_rr vrr;
     u64     mfn;
-    
+
     if ( !(VCPU(vcpu, vpsr) & IA64_PSR_IT) ) {   // I-side physical mode
         gpip = gip;
     }
     else {
         vmx_vcpu_get_rr(vcpu, gip, &vrr.rrval);
-        tlb = vtlb_lookup_ex (vmx_vcpu_get_vtlb(vcpu), 
+        tlb = vtlb_lookup_ex (vmx_vcpu_get_vtlb(vcpu),
                 vrr.rid, gip, ISIDE_TLB );
-        if ( tlb == NULL ) panic("No entry found in ITLB\n");
+        if( tlb == NULL )
+             tlb = vtlb_lookup_ex (vmx_vcpu_get_vtlb(vcpu),
+                vrr.rid, gip, DSIDE_TLB );
+        if ( tlb == NULL ) panic("No entry found in ITLB and DTLB\n");
         gpip = (tlb->ppn << 12) | ( gip & (PSIZE(tlb->ps)-1) );
     }
     mfn = __gpfn_to_mfn(vcpu->domain, gpip >>PAGE_SHIFT);
     if ( mfn == INVALID_MFN ) return 0;
-    
+ 
     mpa = (gpip & (PAGE_SIZE-1)) | (mfn<<PAGE_SHIFT);
     *code = *(u64*)__va(mpa);
     return 1;

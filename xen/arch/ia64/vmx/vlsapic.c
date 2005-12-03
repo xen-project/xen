@@ -529,7 +529,7 @@ int vmx_check_pending_irq(VCPU *vcpu)
     int injected=0;
     uint64_t    isr;
     IA64_PSR    vpsr;
-
+    REGS *regs=vcpu_regs(vcpu);
     local_irq_save(spsr);
     h_pending = highest_pending_irq(vcpu);
     if ( h_pending == NULL_VECTOR ) goto chk_irq_exit;
@@ -541,7 +541,7 @@ int vmx_check_pending_irq(VCPU *vcpu)
         isr = vpsr.val & IA64_PSR_RI;
         if ( !vpsr.ic )
             panic("Interrupt when IC=0\n");
-        vmx_reflect_interruption(0,isr,0, 12 ); // EXT IRQ
+        vmx_reflect_interruption(0,isr,0, 12, regs ); // EXT IRQ
         injected = 1;
     }
     else if ( mask == IRQ_MASKED_BY_INSVC ) {
@@ -601,13 +601,13 @@ static void generate_exirq(VCPU *vcpu)
 {
     IA64_PSR    vpsr;
     uint64_t    isr;
-    
+    REGS *regs=vcpu_regs(vcpu);
     vpsr.val = vmx_vcpu_get_psr(vcpu);
     update_vhpi(vcpu, NULL_VECTOR);
     isr = vpsr.val & IA64_PSR_RI;
     if ( !vpsr.ic )
         panic("Interrupt when IC=0\n");
-    vmx_reflect_interruption(0,isr,0, 12 ); // EXT IRQ
+    vmx_reflect_interruption(0,isr,0, 12, regs); // EXT IRQ
 }
 
 vhpi_detection(VCPU *vcpu)

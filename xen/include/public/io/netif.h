@@ -10,6 +10,7 @@
 #define __XEN_PUBLIC_IO_NETIF_H__
 
 #include "ring.h"
+#include "../grant_table.h"
 
 /*
  * Note that there is *never* any need to notify the backend when enqueuing

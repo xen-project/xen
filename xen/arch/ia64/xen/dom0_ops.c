@@ -194,7 +194,29 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         }
     }
     break;
+
+    case DOM0_PHYSINFO:
+    {
+        dom0_physinfo_t *pi = &op->u.physinfo;
+
+        pi->threads_per_core = smp_num_siblings;
+        pi->cores_per_socket = 1; // FIXME
+        pi->sockets_per_node = 
+            num_online_cpus() / (pi->threads_per_core * pi->cores_per_socket);
+        pi->nr_nodes         = 1;
+        pi->total_pages      = 99;  // FIXME
+        pi->free_pages       = avail_domheap_pages();
+        pi->cpu_khz          = 100;  // FIXME cpu_khz;
+        memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
+        //memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
+        ret = 0;
+        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+	    ret = -EFAULT;
+    }
+    break;
+
     default:
+printf("arch_do_dom0_op: unrecognized dom0 op: %d!!!\n",op->cmd);
         ret = -ENOSYS;
 
     }
