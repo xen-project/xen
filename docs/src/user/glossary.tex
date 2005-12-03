@@ -57,14 +57,19 @@
 
 \item[Shadow pagetables] A technique for hiding the layout of machine
   memory from a virtual machine's operating system.  Used in some {\bf
-    VMMs} to provide the illusion of contiguous physical memory, in
+  VMMs} to provide the illusion of contiguous physical memory, in
   Xen this is used during {\bf live migration}.
+
+\item[Virtual Block Device] Persistant storage available to a virtual
+  machine, providing the abstraction of an actual block storage device.
+  {\bf VBD}s may be actual block devices, filesystem images, or
+  remote/network storage.
 
 \item[Virtual Machine] The environment in which a hosted operating
   system runs, providing the abstraction of a dedicated machine.  A
   virtual machine may be identical to the underlying hardware (as in
   {\bf full virtualisation}, or it may differ, as in {\bf
-    paravirtualisation}).
+  paravirtualisation}).
 
 \item[VMM] Virtual Machine Monitor - the software that allows multiple
   virtual machines to be multiplexed on a single physical machine.

@@ -8,7 +8,7 @@ close-to-native performance. The virtual machine technology facilitates
 enterprise-grade functionality, including:
 
 \begin{itemize}
-\item Virtual machines with performance close to native hardware.
+\item Virtual machines with performance typically 94-98\% of native hardware.
 \item Live migration of running virtual machines between physical hosts.
 \item Excellent hardware support. Supports most Linux device drivers.
 \item Sand-boxed, re-startable device drivers.
@@ -26,12 +26,25 @@ underlying native hardware. Even though operating system kernels must
 explicitly support Xen, a key feature is that user space applications
 and libraries \emph{do not} require modification.
 
-Xen support is available for increasingly many operating systems: right
-now, Linux and NetBSD are available for Xen 3.0. A FreeBSD port is
+With hardware CPU virtualization as provided by Intel VT and AMD
+Pacifica technology, the ability to run an unmodified guest OS kernel is
+available.  No porting of the OS is required; however some additional
+driver support is necessary within Xen itself.  Unlike traditional full
+virtualization hypervisors, which suffer a tremendous performance
+overhead, the combination of Xen and VT or Xen and Pacifica technology
+complement one another to offer superb performance for para-virtualized
+guest operating systems and full support for unmodified guests, which
+run natively on the processor without need for emulation, under VT.
+Full support for VT and Pacifica chipsets will appear in early 2006.
+
+Xen support is available for increasingly many operating systems:
+currently, Linux and NetBSD are available for Xen 3.0. A FreeBSD port is
 undergoing testing and will be incorporated into the release soon. Other
 OS ports, including Plan 9, are in progress. We hope that that arch-xen
 patches will be incorporated into the mainstream releases of these
 operating systems in due course (as has already happened for NetBSD).
+
+%% KMSelf Thu Dec  1 14:59:02 PST 2005 PPC port status?
 
 Possible usage scenarios for Xen include:
 

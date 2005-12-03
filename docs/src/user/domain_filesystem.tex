@@ -1,9 +1,17 @@
 \chapter{Storage and File System Management}
 
-It is possible to directly export any Linux block device in dom0 to
-another domain, or to export filesystems / devices to virtual machines
-using standard network protocols (e.g.\ NBD, iSCSI, NFS, etc.).  This
-chapter covers some of the possibilities.
+Storage can be made available to virtual machines in a number of
+different ways.  This chapter covers some possible configurations.
+
+The most straightforward method is to export a physical block device (a
+hard drive or partition) from dom0 directly to the guest domain as a
+virtual block device (VBD).
+
+Storage may also be exported from a filesystem image or a partitioned
+filesystem image as a \emph{file-backed VBD}.
+
+Finally, standard network storage protocols such as NBD, iSCSI, NFS,
+etc., can be used to provide storage to virtual machines.
 
 
 \section{Exporting Physical Devices as VBDs}

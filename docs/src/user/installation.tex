@@ -35,10 +35,9 @@ if you wish to build from source.
 Once you have satisfied these prerequisites, you can now install either
 a binary or source distribution of Xen.
 
-
 \section{Installing from Binary Tarball}
 
-Pre-built tarballs are available for download from the Xen download
+Pre-built tarballs are available for download from the XenSource downloads
 page:
 \begin{quote} {\tt http://www.xensource.com/downloads/}
 \end{quote}
@@ -53,7 +52,22 @@ Once you've downloaded the tarball, simply unpack and install:
 Once you've installed the binaries you need to configure your system as
 described in Section~\ref{s:configure}.
 
+\section{Installing from RPMs}
+Pre-built RPMs are available for download from the XenSource downloads
+page:
+\begin{quote} {\tt http://www.xensource.com/downloads/}
+\end{quote}
 
+Once you've downloaded the RPMs, you typically install them via the RPM commands:
+\begin{verbatim}
+# rpm -ivh \emph{rpmname}
+\end{verbatim}
+
+See the instructions and the Release Notes for each RPM set referenced at:
+  \begin{quote}
+    {\tt http://www.xensource.com/downloads/}.
+  \end{quote}
+ 
 \section{Installing from Source}
 
 This section describes how to obtain, build and install Xen from source.
@@ -88,9 +102,9 @@ or as a clone of our master Mercurial repository.
 % \item[\path{tools/}] Xen node controller daemon (Xend), command line
 %   tools, control libraries
 % \item[\path{xen/}] The Xen VMM.
+% \item[\path{buildconfigs/}] Build configuration files
 % \item[\path{linux-*-xen-sparse/}] Xen support for Linux.
-% \item[\path{linux-*-patches/}] Experimental patches for Linux.
-% \item[\path{netbsd-*-xen-sparse/}] Xen support for NetBSD.
+% \item[\path{patches/}] Experimental patches for Linux.
 % \item[\path{docs/}] Various documentation files for users and
 %   developers.
 % \item[\path{extras/}] Bonus extras.
@@ -221,7 +235,7 @@ destinations.
 
 %% Files in \path{install/boot/} include:
 %% \begin{itemize}
-%% \item \path{install/boot/xen-2.0.gz} Link to the Xen 'kernel'
+%% \item \path{install/boot/xen-3.0.gz} Link to the Xen 'kernel'
 %% \item \path{install/boot/vmlinuz-2.6-xen0} Link to domain 0
 %%   XenLinux kernel
 %% \item \path{install/boot/vmlinuz-2.6-xenU} Link to unprivileged
@@ -249,10 +263,12 @@ An entry should be added to \path{grub.conf} (often found under
 This file is sometimes called \path{menu.lst}, depending on your
 distribution. The entry should look something like the following:
 
+%% KMSelf Thu Dec  1 19:06:13 PST 2005 262144 is useful for RHEL/RH and
+%% related Dom0s.
 {\small
 \begin{verbatim}
 title Xen 3.0 / XenLinux 2.6
-  kernel /boot/xen-3.0.gz dom0_mem=131072
+  kernel /boot/xen-3.0.gz dom0_mem=262144
   module /boot/vmlinuz-2.6-xen0 root=/dev/sda4 ro console=tty0
 \end{verbatim}
 }
@@ -265,7 +281,7 @@ Section~\ref{s:xboot}.
 
 The module line of the configuration describes the location of the
 XenLinux kernel that Xen should start and the parameters that should be
-passed to it. Tthese are standard Linux parameters, identifying the root
+passed to it. These are standard Linux parameters, identifying the root
 device and specifying it be initially mounted read only and instructing
 that console output be sent to the screen. Some distributions such as
 SuSE do not require the \path{ro} parameter.
@@ -276,18 +292,81 @@ SuSE do not require the \path{ro} parameter.
 %%     kernel command line, since the partition won't be remounted rw
 %%     during boot.  }}
 
-If you want to use an initrd, just add another \path{module} line to the
-configuration, like: {\small
+To use an initrd, add another \path{module} line to the configuration,
+like: {\small
 \begin{verbatim}
   module /boot/my_initrd.gz
 \end{verbatim}
 }
+
+%% KMSelf Thu Dec  1 19:05:30 PST 2005 Other configs as an appendix?
 
 When installing a new kernel, it is recommended that you do not delete
 existing menu options from \path{menu.lst}, as you may wish to boot your
 old Linux kernel in future, particularly if you have problems.
 
 \subsection{Serial Console (optional)}
+
+Serial console access allows you to manage, monitor, and interact with
+your system over a serial console.  This can allow access from another
+nearby system via a null-modem ("LapLink") cable, remotely via a serial
+concentrator, or for debugging an emulator such as Qemu.
+
+You system's BIOS, bootloader (GRUB), Xen, Linux, and login access must
+each be individually configured for serial console access.  It is
+\emph{not} strictly necessary to have each component fully functional,
+but it can be quite useful.
+
+For general information on serial console configuration under Linux,
+refer to the ``Remote Serial Console HOWTO'' at The Linux Documentation
+Project:  {\tt http://www.tldp.org}.
+
+\subsubsection{Serial Console BIOS configuration}
+
+Enabling system serial console output neither enables nor disables
+serial capabilities in GRUB, Xen, or Linux, but may make remote
+management of your system more convenient by displaying POST and other
+boot messages over serial port and allowing remote BIOS configuration.
+
+Refer to your hardware vendor's documentation for capabilities and
+procedures to enable BIOS serial redirection.
+
+
+\subsubsection{Serial Console GRUB configuration}
+
+Placeholder
+
+Enabling GRUB serial console output neither enables nor disables Xen or
+Linux serial capabilities, but may made remote management of your system
+more convenient by displaying GRUB prompts, menus, and actions over
+serial port and allowing remote GRUB management.
+
+Adding the following two lines to your GRUB configuration file,
+typically \path{/boot/grub/menu.lst} or \path{/boot/grub/grub.conf}
+depending on your distro, will enable GRUB serial output.
+
+\begin{quote} {\small \begin{verbatim}
+  serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1
+  terminal --timeout=10 serial console
+\end{verbatim}}
+\end{quote}
+
+Note that when both the serial port and the local monitor and keyboard
+are enabled, the text "Press any key to continue." will appear at both.
+Pressing a key on one device will cause GRUB to display to that device.
+The other device will see no output.  If no key is pressed before the
+timeout period expires, the system will boot to the default GRUB boot
+entry.
+
+Please refer to the GRUB info documentation for further information.
+
+
+\subsubsection{Serial Console Xen configuration}
+
+Enabling Xen serial console output neither enables nor disables Linux
+kernel output or logging in to Linux over serial port.  It does however
+allow you to monitor and log the Xen boot process via serial console and
+can be very useful in debugging.
 
 %% kernel /boot/xen-2.0.gz dom0_mem=131072 com1=115200,8n1
 %% module /boot/vmlinuz-2.6-xen0 root=/dev/sda4 ro
@@ -306,14 +385,44 @@ stop bit and no parity. Modify these parameters for your environment.
 One can also configure XenLinux to share the serial console; to achieve
 this append ``\path{console=ttyS0}'' to your module line.
 
-If you wish to be able to log in over the XenLinux serial console it is
-necessary to add a line into \path{/etc/inittab}. Add the line:
-\begin{quote} {\small {\tt c:2345:respawn:/sbin/mingetty ttyS0}}
-\end{quote}
 
-and you should be able to log in. To successfully log in as root over
-the serial line will require adding \path{ttyS0} to
-\path{/etc/securetty} if it is not already there.
+\subsubsection{Serial Console Linux configuration}
+
+Enabling Linux serial console output at boot neither enables nor
+disables logging in to Linux over serial port.  It does however allow
+you to monitor and log the Linux boot process via serial console and can be
+very useful in debugging.
+
+To enable Linux output at boot time, add the parameter
+\path{console=ttyS0} (or ttyS1, ttyS2, etc.) to your kernel GRUB line.
+Under Xen, this might be:
+\begin{quote} {\small \begin{verbatim}
+  module /vmlinuz-2.6-xen0 ro root=/dev/VolGroup00/LogVol00 console=ttyS0, 115200
+\end{verbatim}}
+\end{quote}
+to enable output over ttyS0 at 115200 baud.
+
+
+
+\subsubsection{Serial Console Login configuration}
+
+Logging in to Linux via serial console, under Xen or otherwise, requires
+specifying a login prompt be started on the serial port.  To permit root
+logins over serial console, the serial port must be added to
+\path{/etc/securetty}.
+
+To automatically start a login prompt over serial port, 
+Add the line: \begin{quote} {\small {\tt c:2345:respawn:/sbin/mingetty
+ttyS0}} \end{quote} to \path{/etc/inittab}.   Run \path{init q} to force
+a reload of your inttab and start getty.
+
+To enable root logins, add \path{ttyS0} to \path{/etc/securetty} if not
+already present.
+
+Your distribution may use an alternate getty, options include getty,
+mgetty, agetty, and others.  Consult your distribution's documentation
+for further information.
+
 
 \subsection{TLS Libraries}
 
@@ -353,4 +462,4 @@ usually use.
 
 When the boot completes, you should be able to log into your system as
 usual. If you are unable to log in, you should still be able to reboot
-with your normal Linux kernel.
+with your normal Linux kernel by selecting it at the GRUB prompt.
