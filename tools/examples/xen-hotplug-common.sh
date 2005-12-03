@@ -119,7 +119,7 @@ _claim_lock()
   local owner=$(_lock_owner "$lockdir")
   local retries=0
 
-  while expr $retries '<' $LOCK_RETRIES
+  while [ $retries -lt $LOCK_RETRIES ]
   do
     mkdir "$lockdir" && trap "release_lock $1; sigerr" ERR &&
       _update_lock_info "$lockdir" && return
@@ -131,7 +131,7 @@ _claim_lock()
       retries=0
     fi
 
-    if expr $retries '>' $LOCK_SPINNING_RETRIES
+    if [ $retries -gt $LOCK_SPINNING_RETRIES ]
     then
       sleep $LOCK_SLEEPTIME
     else
