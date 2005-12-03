@@ -259,6 +259,7 @@ class VmxImageHandler(ImageHandler):
 
         # Handle disk/network related options
         mac = None
+        ret.append("-domain-name %s" % self.vm.info['name'])
         for (name, info) in deviceConfig:
             if name == 'vbd':
                uname = sxp.child_value(info, 'uname')
