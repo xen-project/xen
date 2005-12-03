@@ -637,6 +637,11 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
         gpl1e = (guest_l1_pgentry_t *) map_domain_page(tmp_gmfn);
 
         /* If the PGT_l1_shadow has two continual pages */
+#if CONFIG_PAGING_LEVELS >=3
+        if (d->arch.ops->guest_paging_levels == PAGING_L2)
+            __shadow_get_l2e(v,  va & ~((1<<L2_PAGETABLE_SHIFT_32) - 1), &tmp_sl2e);
+        else
+#endif
         __shadow_get_l2e(v, va, &tmp_sl2e);
         spl1e = (l1_pgentry_t *) map_domain_page(l2e_get_pfn(tmp_sl2e));
 
@@ -1809,9 +1814,12 @@ static void sync_all(struct domain *d)
     }
 #endif
 
-    need_flush |= resync_all(d, PGT_l2_shadow);
-
 #if CONFIG_PAGING_LEVELS >= 3
+    if (d->arch.ops->guest_paging_levels == PAGING_L2)
+        need_flush |= resync_all(d, PGT_l4_shadow);
+    else
+        need_flush |= resync_all(d, PGT_l2_shadow);
+
     if (d->arch.ops->guest_paging_levels >= PAGING_L3) 
     {
         need_flush |= resync_all(d, PGT_l3_shadow);
@@ -2943,6 +2951,8 @@ validate_bl2e_change(
        sl2_p[sl2_idx + 1] =
             entry_from_pfn(sl1mfn + 1, entry_get_flags(sl2_p[sl2_idx]));
     }
+    else
+        sl2_p[sl2_idx + 1] = (pgentry_64_t){0};
     unmap_domain_page(sl2_p);
 
 }
@@ -3528,9 +3538,9 @@ static void shadow_invlpg_64(struct vcpu *v, unsigned long va)
 
     __shadow_sync_va(v, va);
 
-    if ( __shadow_get_l1e(v, va, &old_sl1e) )
+    if ( shadow_mode_external(d) && __shadow_get_l1e(v, va, &old_sl1e) )
         if ( l1e_get_flags(old_sl1e) & _PAGE_PRESENT )
-            shadow_put_page_from_l1e(old_sl1e, d);
+            put_page_from_l1e(old_sl1e, d);
 
     sl1e = l1e_empty();
     __shadow_set_l1e(v, va, &sl1e);

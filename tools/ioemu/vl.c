@@ -125,6 +125,7 @@ static char network_script[1024];
 int pit_min_timer_count = 0;
 int nb_nics;
 char bridge[16];
+char domain_name[1024] = { 'V', 'T', 'X', 'E', 'N', '-'};
 NetDriverState nd_table[MAX_NICS];
 QEMUTimer *gui_timer;
 QEMUTimer *polling_timer;
@@ -2238,6 +2239,7 @@ void help(void)
            "-s              wait gdb connection to port %d\n"
            "-p port         ioreq port for xen\n"
            "-d domain       domain that we're serving\n"
+           "-domain-namn    domain name that we're serving\n"
            "-hdachs c,h,s   force hard disk 0 geometry (usually qemu can guess it)\n"
            "-L path         set the directory for the BIOS and VGA BIOS\n"
 #ifdef USE_CODE_COPY
@@ -2335,6 +2337,7 @@ enum {
     QEMU_OPTION_g,
     QEMU_OPTION_std_vga,
     QEMU_OPTION_monitor,
+    QEMU_OPTION_domainname,
     QEMU_OPTION_serial,
     QEMU_OPTION_loadvm,
     QEMU_OPTION_full_screen,
@@ -2408,6 +2411,7 @@ const QEMUOption qemu_options[] = {
     { "isa", 0, QEMU_OPTION_isa },
     { "std-vga", 0, QEMU_OPTION_std_vga },
     { "monitor", 1, QEMU_OPTION_monitor },
+    { "domain-name", 1, QEMU_OPTION_domainname },
     { "serial", 1, QEMU_OPTION_serial },
     { "loadvm", HAS_ARG, QEMU_OPTION_loadvm },
     { "full-screen", 0, QEMU_OPTION_full_screen },
@@ -3024,6 +3028,10 @@ int main(int argc, char **argv)
             case QEMU_OPTION_full_screen:
                 full_screen = 1;
                 break;
+            case QEMU_OPTION_domainname:
+                strncat(domain_name, optarg, sizeof(domain_name) - 20);
+                break;
+
             }
         }
     }

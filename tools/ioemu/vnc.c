@@ -526,7 +526,7 @@ void vnc_display_init(DisplayState *ds, int useAlsoSDL,
 	} else
 		screen->frameBuffer = malloc(640*400*2);
 
-	screen->desktopName = "QEMU/VNC";
+	screen->desktopName = domain_name;
 	screen->cursor = 0;
 	screen->kbdAddEvent = vnc_process_key;
 	screen->ptrAddEvent = vnc_process_mouse;

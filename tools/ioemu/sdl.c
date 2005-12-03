@@ -358,14 +358,14 @@ static void sdl_process_key(SDL_KeyboardEvent *ev)
 static void sdl_update_caption(void)
 {
     char buf[1024];
-    strcpy(buf, "VTXen");
+    strcpy(buf, domain_name);
     if (!vm_running) {
         strcat(buf, " [Stopped]");
     }
     if (gui_grab) {
         strcat(buf, " - Press Ctrl-Alt to exit grab");
     }
-    SDL_WM_SetCaption(buf, "VTXen");
+    SDL_WM_SetCaption(buf, domain_name);
 }
 
 static void sdl_grab_start(void)

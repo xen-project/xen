@@ -238,7 +238,9 @@ class VmxImageHandler(ImageHandler):
     # xm config file
     def parseDeviceModelArgs(self, imageConfig, deviceConfig):
         dmargs = [ 'cdrom', 'boot', 'fda', 'fdb', 'ne2000', 
-                   'localtime', 'serial', 'stdvga', 'isa', 'vcpus' ]
+                   'localtime', 'serial', 'stdvga', 'isa', 'vcpus',
+                   'nics'
+                   ]
         ret = []
         for a in dmargs:
             v = sxp.child_value(imageConfig, a)
@@ -259,6 +261,7 @@ class VmxImageHandler(ImageHandler):
 
         # Handle disk/network related options
         mac = None
+        ret.append("-domain-name %s" % self.vm.info['name'])
         for (name, info) in deviceConfig:
             if name == 'vbd':
                uname = sxp.child_value(info, 'uname')

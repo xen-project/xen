@@ -796,4 +796,5 @@ int gdbserver_start(int port);
 void update_select_wakeup_events(void);
 void tun_receive_handler();
 
+extern char domain_name[];
 #endif /* VL_H */

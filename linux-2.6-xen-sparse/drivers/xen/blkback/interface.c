@@ -123,11 +123,10 @@ static void free_blkif(void *arg)
 	blkif_t *blkif = (blkif_t *)arg;
 
 	/* Already disconnected? */
-	if (!blkif->irq)
-		return;
-
-	unbind_from_irqhandler(blkif->irq, blkif);
-	blkif->irq = 0;
+	if (blkif->irq) {
+		unbind_from_irqhandler(blkif->irq, blkif);
+		blkif->irq = 0;
+	}
 
 	vbd_free(&blkif->vbd);
 

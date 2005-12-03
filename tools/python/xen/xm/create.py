@@ -543,7 +543,8 @@ def configure_vmx(config_image, vals):
     """
     args = [ 'device_model', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic',
-             'vnc', 'vncviewer', 'sdl', 'display', 'ne2000', 'lapic']
+             'vnc', 'vncviewer', 'sdl', 'display', 'ne2000', 'lapic',
+             'nics']
     for a in args:
         if (vals.__dict__[a]):
             config_image.append([a, vals.__dict__[a]])
