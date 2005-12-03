@@ -131,7 +131,7 @@ same_vm()
   local thisdom="$XENBUS_FRONTEND_ID"
   local otherdom="$1"
   local thisvm=$(xenstore-read "/local/domain/$thisdom/vm")
-  local othervm=$(xenstore-read "/local/domain/otherdom/vm")
+  local othervm=$(xenstore-read "/local/domain/$otherdom/vm")
 
   return [ "$thisvm" == "$othervm" ]
 }
