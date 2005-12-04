@@ -1,20 +1,98 @@
 \chapter{Domain Management Tools}
 
-The previous chapter described a simple example of how to configure
-and start a domain.  This chapter summarises the tools available to
-manage running domains.
+This chapter summarises the tools available to manage running domains.
 
 
-\section{Command-line Management}
+\section{\Xend\ }
+\label{s:xend}
+
+The Xen Daemon (\Xend) (node control daemon) performs system management
+functions related to virtual machines. It forms a central point of
+control for a machine and can be controlled using an HTTP-based
+protocol. \Xend\ must be running in order to start and manage virtual
+machines.
+
+\Xend\ must be run as root because it needs access to privileged system
+management functions. A small set of commands may be issued on the
+\xend\ command line:
+
+\begin{tabular}{ll}
+  \verb!# xend start! & start \xend, if not already running \\
+  \verb!# xend stop!  & stop \xend\ if already running       \\
+  \verb!# xend restart! & restart \xend\ if running, otherwise start it \\
+  % \verb!# xend trace_start! & start \xend, with very detailed debug logging \\
+  \verb!# xend status! & indicates \xend\ status by its return code
+\end{tabular}
+
+A SysV init script called {\tt xend} is provided to start \xend\ at boot
+time. {\tt make install} installs this script in \path{/etc/init.d}. To
+enable it, you have to make symbolic links in the appropriate runlevel
+directories or use the {\tt chkconfig} tool, where available.
+
+Once \xend\ is running, more sophisticated administration can be done
+using the xm tool (see Section~\ref{s:xm}) and the experimental Xensv
+web interface (see Section~\ref{s:xensv}).
+
+As \xend\ runs, events will be logged to \path{/var/log/xend.log} and,
+if the migration assistant daemon (\path{xfrd}) has been started,
+\path{/var/log/xfrd.log}. These may be of use for troubleshooting
+problems.
+
+\section{Xm}
+\label{s:xm}
 
 Command line management tasks are also performed using the \path{xm}
-tool.  For online help for the commands available, type:
+tool. For online help for the commands available, type:
+
 \begin{quote}
-  \verb_# xm help_
+\begin{verbatim}
+# xm help
+\end{verbatim}
 \end{quote}
 
-You can also type \path{xm help $<$command$>$} for more information on
-a given command.
+You can also type \path{xm help $<$command$>$} for more information on a
+given command.
+
+The xm tool is the primary tool for managing Xen from the console. The
+general format of an xm command line is:
+
+\begin{verbatim}
+# xm command [switches] [arguments] [variables]
+\end{verbatim}
+
+The available \emph{switches} and \emph{arguments} are dependent on the
+\emph{command} chosen. The \emph{variables} may be set using
+declarations of the form {\tt variable=value} and command line
+declarations override any of the values in the configuration file being
+used, including the standard variables described above and any custom
+variables (for instance, the \path{xmdefconfig} file uses a {\tt vmid}
+variable).
+
+The available commands are as follows:
+
+\begin{description}
+\item[mem-set] Request a domain to adjust its memory footprint.
+\item[create] Create a new domain.
+\item[destroy] Kill a domain immediately.
+\item[list] List running domains.
+\item[shutdown] Ask a domain to shutdown.
+\item[dmesg] Fetch the Xen (not Linux!) boot output.
+\item[consoles] Lists the available consoles.
+\item[console] Connect to the console for a domain.
+\item[help] Get help on xm commands.
+\item[save] Suspend a domain to disk.
+\item[restore] Restore a domain from disk.
+\item[pause] Pause a domain's execution.
+\item[unpause] Un-pause a domain.
+\item[pincpu] Pin a domain to a CPU.
+\item[bvt] Set BVT scheduler parameters for a domain.
+\item[bvt\_ctxallow] Set the BVT context switching allowance for the
+  system.
+\item[atropos] Set the atropos parameters for a domain.
+\item[rrobin] Set the round robin time slice for the system.
+\item[info] Get information about the Xen host.
+\item[call] Call a \xend\ HTTP API function directly.
+\end{description}
 
 \subsection{Basic Management Commands}
 
@@ -82,122 +160,6 @@ following:
 # xencons localhost 9605
 \end{verbatim}
 
-\section{Domain Save and Restore}
+\section{xenstored}
 
-The administrator of a Xen system may suspend a virtual machine's
-current state into a disk file in domain~0, allowing it to be resumed
-at a later time.
-
-The ttylinux domain described earlier can be suspended to disk using
-the command:
-\begin{verbatim}
-# xm save ttylinux ttylinux.xen
-\end{verbatim}
-
-This will stop the domain named `ttylinux' and save its current state
-into a file called \path{ttylinux.xen}.
-
-To resume execution of this domain, use the \path{xm restore} command:
-\begin{verbatim}
-# xm restore ttylinux.xen
-\end{verbatim}
-
-This will restore the state of the domain and restart it.  The domain
-will carry on as before and the console may be reconnected using the
-\path{xm console} command, as above.
-
-\section{Live Migration}
-
-Live migration is used to transfer a domain between physical hosts
-whilst that domain continues to perform its usual activities --- from
-the user's perspective, the migration should be imperceptible.
-
-To perform a live migration, both hosts must be running Xen / \xend\
-and the destination host must have sufficient resources (e.g.\ memory
-capacity) to accommodate the domain after the move. Furthermore we
-currently require both source and destination machines to be on the
-same L2 subnet.
-
-Currently, there is no support for providing automatic remote access
-to filesystems stored on local disk when a domain is migrated.
-Administrators should choose an appropriate storage solution (i.e.\
-SAN, NAS, etc.) to ensure that domain filesystems are also available
-on their destination node. GNBD is a good method for exporting a
-volume from one machine to another. iSCSI can do a similar job, but is
-more complex to set up.
-
-When a domain migrates, it's MAC and IP address move with it, thus it
-is only possible to migrate VMs within the same layer-2 network and IP
-subnet. If the destination node is on a different subnet, the
-administrator would need to manually configure a suitable etherip or
-IP tunnel in the domain~0 of the remote node.
-
-A domain may be migrated using the \path{xm migrate} command.  To live
-migrate a domain to another machine, we would use the command:
-
-\begin{verbatim}
-# xm migrate --live mydomain destination.ournetwork.com
-\end{verbatim}
-
-Without the \path{--live} flag, \xend\ simply stops the domain and
-copies the memory image over to the new node and restarts it. Since
-domains can have large allocations this can be quite time consuming,
-even on a Gigabit network. With the \path{--live} flag \xend\ attempts
-to keep the domain running while the migration is in progress,
-resulting in typical `downtimes' of just 60--300ms.
-
-For now it will be necessary to reconnect to the domain's console on
-the new machine using the \path{xm console} command.  If a migrated
-domain has any open network connections then they will be preserved,
-so SSH connections do not have this limitation.
-
-
-\section{Managing Domain Memory}
-
-XenLinux domains have the ability to relinquish / reclaim machine
-memory at the request of the administrator or the user of the domain.
-
-\subsection{Setting memory footprints from dom0}
-
-The machine administrator can request that a domain alter its memory
-footprint using the \path{xm mem-set} command.  For instance, we can
-request that our example ttylinux domain reduce its memory footprint
-to 32 megabytes.
-
-\begin{verbatim}
-# xm mem-set ttylinux 32
-\end{verbatim}
-
-We can now see the result of this in the output of \path{xm list}:
-
-\begin{verbatim}
-# xm list
-Name              Id  Mem(MB)  CPU  State  Time(s)  Console
-Domain-0           0      251    0  r----    172.2        
-ttylinux           5       31    0  -b---      4.3    9605
-\end{verbatim}
-
-The domain has responded to the request by returning memory to Xen. We
-can restore the domain to its original size using the command line:
-
-\begin{verbatim}
-# xm mem-set ttylinux 64
-\end{verbatim}
-
-\subsection{Setting memory footprints from within a domain}
-
-The virtual file \path{/proc/xen/balloon} allows the owner of a domain
-to adjust their own memory footprint.  Reading the file (e.g.\
-\path{cat /proc/xen/balloon}) prints out the current memory footprint
-of the domain.  Writing the file (e.g.\ \path{echo new\_target >
-  /proc/xen/balloon}) requests that the kernel adjust the domain's
-memory footprint to a new value.
-
-\subsection{Setting memory limits}
-
-Xen associates a memory size limit with each domain.  By default, this
-is the amount of memory the domain is originally started with,
-preventing the domain from ever growing beyond this size.  To permit a
-domain to grow beyond its original allocation or to prevent a domain
-you've shrunk from reclaiming the memory it relinquished, use the
-\path{xm maxmem} command.
+Placeholder.
