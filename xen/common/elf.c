@@ -71,7 +71,7 @@ int parseelfimage(struct domain_setup_info *dsi)
             return -EINVAL;
         }
 
-        if ( (strstr(guestinfo, "XEN_VER=3.0") == NULL) )
+        if ( (strstr(guestinfo, "XEN_VER=xen-3.0") == NULL) )
         {
             printk("ERROR: Xen will only load images built for Xen v3.0\n");
             return -EINVAL;

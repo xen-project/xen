@@ -3,7 +3,7 @@
 
 .section __xen_guest
 	.ascii	"GUEST_OS=linux,GUEST_VER=2.6"
-	.ascii	",XEN_VER=3.0"
+	.ascii	",XEN_VER=xen-3.0"
 	.ascii	",VIRT_BASE=0xC0000000"
 #ifdef CONFIG_X86_PAE
 	.ascii	",PAE=yes"

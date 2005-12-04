@@ -16,7 +16,7 @@
 #include <linux/linkage.h>
 
 .section __xen_guest
-	.ascii	"GUEST_OS=linux,GUEST_VER=2.6,XEN_VER=3.0,VIRT_BASE=0xffffffff80000000"
+	.ascii	"GUEST_OS=linux,GUEST_VER=2.6,XEN_VER=xen-3.0,VIRT_BASE=0xffffffff80000000"
 	.ascii	",LOADER=generic"
 /*	.ascii	",PT_MODE_WRITABLE" */
 	.byte	0
