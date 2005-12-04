@@ -493,18 +493,24 @@ static void make_response(blkif_t *blkif, unsigned long id,
 	blk_ring->rsp_prod_pvt++;
 	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(blk_ring, notify);
 
-	/*
-         * Tail check for pending requests. Allows frontend to avoid
-         * notifications if requests are already in flight (lower overheads
-         * and promotes batching).
-         */
 	if (blk_ring->rsp_prod_pvt == blk_ring->req_cons) {
+		/*
+		 * Tail check for pending requests. Allows frontend to avoid
+		 * notifications if requests are already in flight (lower
+		 * overheads and promotes batching).
+		 */
 		int more_to_do;
 		RING_FINAL_CHECK_FOR_REQUESTS(blk_ring, more_to_do);
 		if (more_to_do) {
 			add_to_blkdev_list_tail(blkif);
 			maybe_trigger_blkio_schedule();
 		}
+	}
+	else if (!__on_blkdev_list(blkif)
+		 && RING_HAS_UNCONSUMED_REQUESTS(blk_ring)) {
+		/* Keep pulling requests as they become available... */
+		add_to_blkdev_list_tail(blkif);
+		maybe_trigger_blkio_schedule();
 	}
 
 	spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
