@@ -344,6 +344,14 @@ static long __evtchn_close(struct domain *d1, int port1)
         }
         else if ( d2 != chn1->u.interdomain.remote_dom )
         {
+            /*
+             * We can only get here if the port was closed and re-bound after
+             * unlocking d1 but before locking d2 above. We could retry but
+             * it is easier to return the same error as if we had seen the
+             * port in ECS_CLOSED. It must have passed through that state for
+             * us to end up here, so it's a valid error to return.
+             */
+            BUG_ON(d1 != current->domain);
             rc = -EINVAL;
             goto out;
         }
