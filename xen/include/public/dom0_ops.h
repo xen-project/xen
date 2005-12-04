@@ -19,7 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA1014
+#define DOM0_INTERFACE_VERSION   0x03000000
 
 /************************************************************************/
 

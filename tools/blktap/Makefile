@@ -1,4 +1,4 @@
-MAJOR    = 2.0
+MAJOR    = 3.0
 MINOR    = 0
 SONAME   = libblktap.so.$(MAJOR)
 
