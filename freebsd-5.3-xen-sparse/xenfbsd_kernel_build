@@ -1,7 +1,0 @@
-#!/bin/csh -f
-cd i386-xen/conf
-config XENCONF
-cd ../compile/XENCONF
-make kernel-clean
-ln -s ../../include/xen-public/io/ring.h
-make kernel-depend; make -j4 kernel
