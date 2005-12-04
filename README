@@ -22,7 +22,7 @@ by the original Xen development team to build enterprise products
 around Xen.
 
 The 3.0 release offers excellent performance, hardware support and
-enterprise-grade features such as x86_32-PAE, x86_64, SMP gusets and
+enterprise-grade features such as x86_32-PAE, x86_64, SMP guests and
 live relocation of VMs. This install tree contains source for a Linux
 2.6 guest; ports to Linux 2.4, NetBSD, FreeBSD and Solaris will follow
 later (and are already available for previous Xen releases).
@@ -61,8 +61,8 @@ performed with root privileges.]
        module /boot/initrd-2.6-xen.img
 
    NB: Not all kernel configs need an initial ram disk (initrd), but
-   if you do specify one you need you'll need to use 'module' grub
-   directive rather than 'initrd'.
+   if you do specify one you'll need to use the 'module' grub directive
+   rather than 'initrd'.
 
    The linux command line takes all the usual options, such as
    root=<root-dev> to specify your usual root partition (e.g.,
@@ -148,20 +148,9 @@ On Linux:
 
 5. To rebuild a kernel with a modified config:
 
-    # cd linux-2.6.12-xen          # or linux-2.6.12-xen0 etc.
-    # make ARCH=xen menuconfig     # or xconfig
-    # cd ..
-    # make dist
-    # make install
-
-   Alternatively, you can also copy your config file to
-   dist/install/boot/config-$version-xen0/U.  This is picked up
-   when a make dist is done. Include the ARCH=xen directive for
-   all make commands when building the kernels.
-
-   NB: The need to specify ARCH=xen when building linux is likely to
-   disappear soon: the Xen patch is being rearranged to become just
-   another config option rather than a separate 'architecture'.
+    # make linux-2.6-xen-config CONFIGMODE=menuconfig     (or xconfig)
+    # make linux-2.6-xen-build
+    # make linux-2.6-xen-install
 
    Depending on your config, you may need to use 'mkinitrd' to create
    an initial ram disk, just like a native system e.g. 
