@@ -72,8 +72,7 @@ help_spacer = """
 sysrq_help =   "sysrq   <DomId> <letter>         Send a sysrq to a domain"
 domid_help =   "domid <DomName>                  Converts a domain name to a domain id"
 domname_help = "domname <DomId>                  Convert a domain id to a domain name"
-set_vcpus_help = """set-vcpus <DomId> <VCPUs>        Enable the specified number of VCPUs in a
-                                    domain"""
+vcpu_set_help = """vcpu-set <DomId> <VCPUs>         Set the number of VCPUs for a domain"""
 vcpu_list_help = "vcpu-list <DomId>                List the VCPUs for a domain (or all domains)"
 vcpu_pin_help = "vcpu-pin <DomId> <VCPU> <CPUs>   Set which cpus a VCPU can use" 
 dmesg_help =   "dmesg [--clear]                  Read or clear Xen's message buffer"
@@ -110,7 +109,6 @@ short_command_list = [
     "destroy",
     "help",
     "list",
-    "mem-max",
     "mem-set",
     "migrate",
     "pause",
@@ -120,6 +118,7 @@ short_command_list = [
     "shutdown",
     "top",
     "unpause",
+    "vcpu-set",
     ]
 
 domain_commands = [
@@ -141,8 +140,9 @@ domain_commands = [
     "sysrq",
     "top",
     "unpause",
-    "set-vcpus",
+    "vcpu-list",
     "vcpu-pin",
+    "vcpu-set",
     ]
 
 host_commands = [
@@ -575,8 +575,8 @@ def xm_mem_set(args):
     from xen.xend.XendClient import server
     server.xend_domain_mem_target_set(dom, mem_target)
     
-def xm_set_vcpus(args):
-    arg_check(args, "set-vcpus", 2)
+def xm_vcpu_set(args):
+    arg_check(args, "vcpu-set", 2)
     
     from xen.xend.XendClient import server
     server.xend_domain_set_vcpus(args[0], int(args[1]))
@@ -799,8 +799,8 @@ commands = {
     "mem-set": xm_mem_set,
     # cpu commands
     "vcpu-pin": xm_vcpu_pin,
-    "set-vcpus": xm_set_vcpus,
     "vcpu-list": xm_vcpu_list,
+    "vcpu-set": xm_vcpu_set,
     # special
     "pause": xm_pause,
     "unpause": xm_unpause,
@@ -840,6 +840,7 @@ for c in subcommands:
 
 aliases = {
     "balloon": "mem-set",
+    "set-vcpus": "vcpu-set",
     "vif-list": "network-list",
     "vbd-create": "block-create",
     "vbd-destroy": "block-destroy",
@@ -862,8 +863,8 @@ def xm_lookup_cmd(cmd):
         usage()
 
 def deprecated(old,new):
-    err('Option %s is deprecated, and will be removed in future!!!' % old)
-    err('Option %s is the new replacement, see "xm help %s" for more info' % (new, new))
+    print >>sys.stderr, (
+        "Command %s is deprecated.  Please use xm %s instead." % (old, new))
 
 def usage(cmd=None):
     if cmd == 'create':
