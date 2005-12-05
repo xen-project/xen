@@ -1,13 +1,13 @@
-\batchmode
 \documentclass[11pt,twoside,final,openright]{report}
-\usepackage{a4,graphicx,html,parskip,setspace,times,xspace}
+\usepackage{a4,graphicx,html,parskip,setspace,times,xspace,url}
 \setstretch{1.15}
 
+\renewcommand{\ttdefault}{pcr}
 
 \def\Xend{{Xend}\xspace}
 \def\xend{{xend}\xspace}
 
-\latexhtml{\newcommand{\path}[1]{{\small {\tt #1}}}}{\newcommand{\path}[1]{{\tt #1}}}
+\latexhtml{\renewcommand{\path}[1]{{\small {\tt #1}}}}{\renewcommand{\path}[1]{{\tt #1}}}
 
 
 \begin{document}
@@ -23,17 +23,17 @@
 \begin{tabular}{l}
 {\Huge \bf Users' Manual} \\[4mm]
 {\huge Xen v3.0} \\[80mm]
-
 {\Large Xen is Copyright (c) 2002-2005, The Xen Team} \\[3mm]
 {\Large University of Cambridge, UK} \\[20mm]
 \end{tabular}
 \end{center}
 
-{\bf DISCLAIMER: This documentation is currently under active
-  development and as such there may be mistakes and omissions --- watch
-  out for these and please report any you find to the developers'
-  mailing list. Contributions of material, suggestions and corrections
-  are welcome.}
+{\bf DISCLAIMER: This documentation is always under active development
+and as such there may be mistakes and omissions --- watch out for
+these and please report any you find to the developers' mailing list,
+xen-devel@lists.xensource.com. The latest version is always available
+on-line. Contributions of material, suggestions and corrections are
+welcome.}
 
 \vfill
 \cleardoublepage
@@ -62,112 +62,1745 @@
 
 
 %% Chapter Introduction moved to introduction.tex
-\include{src/user/introduction}
+\chapter{Introduction}
+
+
+Xen is an open-source \emph{para-virtualizing} virtual machine monitor
+(VMM), or ``hypervisor'', for the x86 processor architecture. Xen can
+securely execute multiple virtual machines on a single physical system
+with close-to-native performance.  Xen facilitates enterprise-grade
+functionality, including:
+
+\begin{itemize}
+\item Virtual machines with performance close to native hardware.
+\item Live migration of running virtual machines between physical hosts.
+\item Up to 32 virtual CPUs per guest virtual machine, with VCPU hotplug.
+\item x86/32, x86/32 with PAE, and x86/64 platform support.
+\item Intel Virtualization Technology (VT-x) for unmodified guest operating systems (including Microsoft Windows).
+\item Excellent hardware support (supports almost all Linux device
+  drivers). 
+\end{itemize}
+
+Xen is licensed under the GNU General Public License (GPL2).
+
+
+\section{Usage Scenarios}
+
+Usage scenarios for Xen include:
+
+\begin{description}
+\item [Server Consolidation.] Move multiple servers onto a single
+  physical host with performance and fault isolation provided at the
+  virtual machine boundaries.
+\item [Hardware Independence.] Allow legacy applications and operating 
+  systems to exploit new hardware.
+\item [Multiple OS configurations.] Run multiple operating systems
+  simultaneously, for development or testing purposes.
+\item [Kernel Development.] Test and debug kernel modifications in a
+  sand-boxed virtual machine --- no need for a separate test machine.
+\item [Cluster Computing.] Management at VM granularity provides more
+  flexibility than separately managing each physical host, but better
+  control and isolation than single-system image solutions,
+  particularly by using live migration for load balancing.
+\item [Hardware support for custom OSes.] Allow development of new
+  OSes while benefiting from the wide-ranging hardware support of
+  existing OSes such as Linux.
+\end{description}
+
+
+\section{Operating System Support}
+
+Para-virtualization permits very high performance virtualization, even
+on architectures like x86 that are traditionally very hard to
+virtualize.
+
+This approach requires operating systems to be \emph{ported} to run on
+Xen. Porting an OS to run on Xen is similar to supporting a new
+hardware platform, however the process is simplified because the
+para-virtual machine architecture is very similar to the underlying
+native hardware. Even though operating system kernels must explicitly
+support Xen, a key feature is that user space applications and
+libraries \emph{do not} require modification.
+
+With hardware CPU virtualization as provided by Intel VT and AMD
+Pacifica technology, the ability to run an unmodified guest OS kernel
+is available.  No porting of the OS is required, although some
+additional driver support is necessary within Xen itself.  Unlike
+traditional full virtualization hypervisors, which suffer a tremendous
+performance overhead, the combination of Xen and VT or Xen and
+Pacifica technology complement one another to offer superb performance
+for para-virtualized guest operating systems and full support for
+unmodified guests running natively on the processor.  Full support for
+VT and Pacifica chipsets will appear in early 2006.
+
+Paravirtualized Xen support is available for increasingly many
+operating systems: currently, mature Linux support is available and
+included in the standard distribution.  Other OS ports---including
+NetBSD, FreeBSD and Solaris x86 v10---are nearing completion. 
+
+
+\section{Hardware Support}
+
+Xen currently runs on the x86 architecture, requiring a ``P6'' or
+newer processor (e.g.\ Pentium Pro, Celeron, Pentium~II, Pentium~III,
+Pentium~IV, Xeon, AMD~Athlon, AMD~Duron). Multiprocessor machines are
+supported, and there is support for HyperThreading (SMT).  In 
+addition, ports to IA64 and Power architectures are in progress.
+
+The default 32-bit Xen supports up to 4GB of memory. However Xen 3.0
+adds support for Intel's Physical Addressing Extensions (PAE), which
+enable x86/32 machines to address up to 64 GB of physical memory.  Xen
+3.0 also supports x86/64 platforms such as Intel EM64T and AMD Opteron
+which can currently address up to 1TB of physical memory.
+
+Xen offloads most of the hardware support issues to the guest OS
+running in the \emph{Domain~0} management virtual machine. Xen itself
+contains only the code required to detect and start secondary
+processors, set up interrupt routing, and perform PCI bus
+enumeration. Device drivers run within a privileged guest OS rather
+than within Xen itself. This approach provides compatibility with the
+majority of device hardware supported by Linux. The default XenLinux
+build contains support for most server-class network and disk
+hardware, but you can add support for other hardware by configuring
+your XenLinux kernel in the normal way.
+
+
+\section{Structure of a Xen-Based System}
+
+A Xen system has multiple layers, the lowest and most privileged of
+which is Xen itself.
+
+Xen may host multiple \emph{guest} operating systems, each of which is
+executed within a secure virtual machine. In Xen terminology, a
+\emph{domain}. Domains are scheduled by Xen to make effective use of the
+available physical CPUs. Each guest OS manages its own applications.
+This management includes the responsibility of scheduling each
+application within the time allotted to the VM by Xen.
+
+The first domain, \emph{domain~0}, is created automatically when the
+system boots and has special management privileges. Domain~0 builds
+other domains and manages their virtual devices. It also performs
+administrative tasks such as suspending, resuming and migrating other
+virtual machines.
+
+Within domain~0, a process called \emph{xend} runs to manage the system.
+\Xend\ is responsible for managing virtual machines and providing access
+to their consoles. Commands are issued to \xend\ over an HTTP interface,
+via a command-line tool.
+
+
+\section{History}
+
+Xen was originally developed by the Systems Research Group at the
+University of Cambridge Computer Laboratory as part of the XenoServers
+project, funded by the UK-EPSRC\@.
+
+XenoServers aim to provide a ``public infrastructure for global
+distributed computing''. Xen plays a key part in that, allowing one to
+efficiently partition a single machine to enable multiple independent
+clients to run their operating systems and applications in an
+environment. This environment provides protection, resource isolation
+and accounting. The project web page contains further information along
+with pointers to papers and technical reports:
+\path{http://www.cl.cam.ac.uk/xeno}
+
+Xen has grown into a fully-fledged project in its own right, enabling us
+to investigate interesting research issues regarding the best techniques
+for virtualizing resources such as the CPU, memory, disk and network.
+Project contributors now include XenSource, Intel, IBM, HP, AMD, Novell,
+RedHat.
+
+Xen was first described in a paper presented at SOSP in
+2003\footnote{\tt
+  http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf}, and the first
+public release (1.0) was made that October. Since then, Xen has
+significantly matured and is now used in production scenarios on many
+sites.
+
+\section{What's New}
+
+Xen 3.0.0 offers:
+
+\begin{itemize}
+\item Support for up to 32-way SMP guest operating systems
+\item Intel (Physical Addressing Extensions) PAE to support 32-bit
+  servers with more than 4GB physical memory
+\item x86/64 support (Intel EM64T, AMD Opteron)
+\item Intel VT-x support to enable the running of unmodified guest
+operating systems (Windows XP/2003, Legacy Linux)
+\item Enhanced control tools
+\item Improved ACPI support
+\item AGP/DRM graphics
+\end{itemize}
+
+
+Xen 3.0 features greatly enhanced hardware support, configuration
+flexibility, usability and a larger complement of supported operating
+systems.  This latest release takes Xen a step closer to being the 
+definitive open source solution for virtualization.
+
 
 
 \part{Installation}
 
 %% Chapter Basic Installation
-\include{src/user/installation}
+\chapter{Basic Installation}
 
-%% Chapter Installing Xen on Debian
-\include{src/user/debian}
+The Xen distribution includes three main components: Xen itself, ports
+of Linux and NetBSD to run on Xen, and the userspace tools required to
+manage a Xen-based system. This chapter describes how to install the
+Xen~3.0 distribution from source. Alternatively, there may be pre-built
+packages available as part of your operating system distribution.
 
-%% Chapter Installing Xen on Fedora Core
-\include{src/user/fedora}
 
-%% Chapter Installing Xen on Gentoo Linux
-\include{src/user/gentoo}
+\section{Prerequisites}
+\label{sec:prerequisites}
 
-%% Chapter Installing Xen on SuSE or SuSE SLES
-\include{src/user/suse}
+The following is a full list of prerequisites. Items marked `$\dag$' are
+required by the \xend\ control tools, and hence required if you want to
+run more than one virtual machine; items marked `$*$' are only required
+if you wish to build from source.
+\begin{itemize}
+\item A working Linux distribution using the GRUB bootloader and running
+  on a P6-class or newer CPU\@.
+\item [$\dag$] The \path{iproute2} package.
+\item [$\dag$] The Linux bridge-utils\footnote{Available from {\tt
+      http://bridge.sourceforge.net}} (e.g., \path{/sbin/brctl})
+\item [$\dag$] The Linux hotplug system\footnote{Available from {\tt
+      http://linux-hotplug.sourceforge.net/}} (e.g.,
+  \path{/sbin/hotplug} and related scripts)
+\item [$*$] Build tools (gcc v3.2.x or v3.3.x, binutils, GNU make).
+\item [$*$] Development installation of zlib (e.g.,\ zlib-dev).
+\item [$*$] Development installation of Python v2.2 or later (e.g.,\
+  python-dev).
+\item [$*$] \LaTeX\ and transfig are required to build the
+  documentation.
+\end{itemize}
 
-%% Chapter Installing Xen on Red Hat Enterprise Linux (RHEL)
-\include{src/user/rhel}
+Once you have satisfied these prerequisites, you can now install either
+a binary or source distribution of Xen.
 
-% Chapter dom0 Installation
-\include{src/user/dom0_installation}
+\section{Installing from Binary Tarball}
 
-% Chapter domU Installation
-\include{src/user/domU_installation}
+Pre-built tarballs are available for download from the XenSource downloads
+page:
+\begin{quote} {\tt http://www.xensource.com/downloads/}
+\end{quote}
 
-% Building Xen
-\include{src/user/building_xen}
+Once you've downloaded the tarball, simply unpack and install:
+\begin{verbatim}
+# tar zxvf xen-3.0-install.tgz
+# cd xen-3.0-install
+# sh ./install.sh
+\end{verbatim}
+
+Once you've installed the binaries you need to configure your system as
+described in Section~\ref{s:configure}.
+
+\section{Installing from RPMs}
+Pre-built RPMs are available for download from the XenSource downloads
+page:
+\begin{quote} {\tt http://www.xensource.com/downloads/}
+\end{quote}
+
+Once you've downloaded the RPMs, you typically install them via the 
+RPM commands: 
+
+\verb|# rpm -iv rpmname| 
+
+See the instructions and the Release Notes for each RPM set referenced at:
+  \begin{quote}
+    {\tt http://www.xensource.com/downloads/}.
+  \end{quote}
+ 
+\section{Installing from Source}
+
+This section describes how to obtain, build and install Xen from source.
+
+\subsection{Obtaining the Source}
+
+The Xen source tree is available as either a compressed source tarball
+or as a clone of our master Mercurial repository.
+
+\begin{description}
+\item[Obtaining the Source Tarball]\mbox{} \\
+  Stable versions and daily snapshots of the Xen source tree are
+  available from the Xen download page:
+  \begin{quote} {\tt \tt http://www.xensource.com/downloads/}
+  \end{quote}
+\item[Obtaining the source via Mercurial]\mbox{} \\
+  The source tree may also be obtained via the public Mercurial
+  repository at:
+  \begin{quote}{\tt http://xenbits.xensource.com}
+  \end{quote} See the instructions and the Getting Started Guide
+  referenced at:
+  \begin{quote}
+    {\tt http://www.xensource.com/downloads/}
+  \end{quote}
+\end{description}
+
+% \section{The distribution}
+%
+% The Xen source code repository is structured as follows:
+%
+% \begin{description}
+% \item[\path{tools/}] Xen node controller daemon (Xend), command line
+%   tools, control libraries
+% \item[\path{xen/}] The Xen VMM.
+% \item[\path{buildconfigs/}] Build configuration files
+% \item[\path{linux-*-xen-sparse/}] Xen support for Linux.
+% \item[\path{patches/}] Experimental patches for Linux.
+% \item[\path{docs/}] Various documentation files for users and
+%   developers.
+% \item[\path{extras/}] Bonus extras.
+% \end{description}
+
+\subsection{Building from Source}
+
+The top-level Xen Makefile includes a target ``world'' that will do the
+following:
+
+\begin{itemize}
+\item Build Xen.
+\item Build the control tools, including \xend.
+\item Download (if necessary) and unpack the Linux 2.6 source code, and
+  patch it for use with Xen.
+\item Build a Linux kernel to use in domain~0 and a smaller unprivileged
+  kernel, which can be used for unprivileged virtual machines.
+\end{itemize}
+
+After the build has completed you should have a top-level directory
+called \path{dist/} in which all resulting targets will be placed. Of
+particular interest are the two XenLinux kernel images, one with a
+``-xen0'' extension which contains hardware device drivers and drivers
+for Xen's virtual devices, and one with a ``-xenU'' extension that
+just contains the virtual ones. These are found in
+\path{dist/install/boot/} along with the image for Xen itself and the
+configuration files used during the build.
+
+%The NetBSD port can be built using:
+%\begin{quote}
+%\begin{verbatim}
+%# make netbsd20
+%\end{verbatim}\end{quote}
+%NetBSD port is built using a snapshot of the netbsd-2-0 cvs branch.
+%The snapshot is downloaded as part of the build process if it is not
+%yet present in the \path{NETBSD\_SRC\_PATH} search path.  The build
+%process also downloads a toolchain which includes all of the tools
+%necessary to build the NetBSD kernel under Linux.
+
+To customize the set of kernels built you need to edit the top-level
+Makefile. Look for the line:
+\begin{quote}
+\begin{verbatim}
+KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
+\end{verbatim}
+\end{quote}
+
+You can edit this line to include any set of operating system kernels
+which have configurations in the top-level \path{buildconfigs/}
+directory.
+
+%% Inspect the Makefile if you want to see what goes on during a
+%% build.  Building Xen and the tools is straightforward, but XenLinux
+%% is more complicated.  The makefile needs a `pristine' Linux kernel
+%% tree to which it will then add the Xen architecture files.  You can
+%% tell the makefile the location of the appropriate Linux compressed
+%% tar file by
+%% setting the LINUX\_SRC environment variable, e.g. \\
+%% \verb!# LINUX_SRC=/tmp/linux-2.6.11.tar.bz2 make world! \\ or by
+%% placing the tar file somewhere in the search path of {\tt
+%%   LINUX\_SRC\_PATH} which defaults to `{\tt .:..}'.  If the
+%% makefile can't find a suitable kernel tar file it attempts to
+%% download it from kernel.org (this won't work if you're behind a
+%% firewall).
+
+%% After untaring the pristine kernel tree, the makefile uses the {\tt
+%%   mkbuildtree} script to add the Xen patches to the kernel.
+
+%% \framebox{\parbox{5in}{
+%%     {\bf Distro specific:} \\
+%%     {\it Gentoo} --- if not using udev (most installations,
+%%     currently), you'll need to enable devfs and devfs mount at boot
+%%     time in the xen0 config.  }}
+
+\subsection{Custom Kernels}
+
+% If you have an SMP machine you may wish to give the {\tt '-j4'}
+% argument to make to get a parallel build.
+
+If you wish to build a customized XenLinux kernel (e.g.\ to support
+additional devices or enable distribution-required features), you can
+use the standard Linux configuration mechanisms, specifying that the
+architecture being built for is \path{xen}, e.g:
+\begin{quote}
+\begin{verbatim}
+# cd linux-2.6.12-xen0
+# make ARCH=xen xconfig
+# cd ..
+# make
+\end{verbatim}
+\end{quote}
+
+You can also copy an existing Linux configuration (\path{.config}) into
+e.g.\ \path{linux-2.6.12-xen0} and execute:
+\begin{quote}
+\begin{verbatim}
+# make ARCH=xen oldconfig
+\end{verbatim}
+\end{quote}
+
+You may be prompted with some Xen-specific options. We advise accepting
+the defaults for these options.
+
+Note that the only difference between the two types of Linux kernels
+that are built is the configuration file used for each. The ``U''
+suffixed (unprivileged) versions don't contain any of the physical
+hardware device drivers, leading to a 30\% reduction in size; hence you
+may prefer these for your non-privileged domains. The ``0'' suffixed
+privileged versions can be used to boot the system, as well as in driver
+domains and unprivileged domains.
+
+\subsection{Installing Generated Binaries}
+
+The files produced by the build process are stored under the
+\path{dist/install/} directory. To install them in their default
+locations, do:
+\begin{quote}
+\begin{verbatim}
+# make install
+\end{verbatim}
+\end{quote}
+
+Alternatively, users with special installation requirements may wish to
+install them manually by copying the files to their appropriate
+destinations.
+
+%% Files in \path{install/boot/} include:
+%% \begin{itemize}
+%% \item \path{install/boot/xen-3.0.gz} Link to the Xen 'kernel'
+%% \item \path{install/boot/vmlinuz-2.6-xen0} Link to domain 0
+%%   XenLinux kernel
+%% \item \path{install/boot/vmlinuz-2.6-xenU} Link to unprivileged
+%%   XenLinux kernel
+%% \end{itemize}
+
+The \path{dist/install/boot} directory will also contain the config
+files used for building the XenLinux kernels, and also versions of Xen
+and XenLinux kernels that contain debug symbols such as
+(\path{xen-syms-3.0.0} and \path{vmlinux-syms-2.6.12.6-xen0}) which are
+essential for interpreting crash dumps. Retain these files as the
+developers may wish to see them if you post on the mailing list.
+
+
+\section{Configuration}
+\label{s:configure}
+
+Once you have built and installed the Xen distribution, it is simple to
+prepare the machine for booting and running Xen.
+
+\subsection{GRUB Configuration}
+
+An entry should be added to \path{grub.conf} (often found under
+\path{/boot/} or \path{/boot/grub/}) to allow Xen / XenLinux to boot.
+This file is sometimes called \path{menu.lst}, depending on your
+distribution. The entry should look something like the following:
+
+%% KMSelf Thu Dec  1 19:06:13 PST 2005 262144 is useful for RHEL/RH and
+%% related Dom0s.
+{\small
+\begin{verbatim}
+title Xen 3.0 / XenLinux 2.6
+  kernel /boot/xen-3.0.gz dom0_mem=262144
+  module /boot/vmlinuz-2.6-xen0 root=/dev/sda4 ro console=tty0
+\end{verbatim}
+}
+
+The kernel line tells GRUB where to find Xen itself and what boot
+parameters should be passed to it (in this case, setting the domain~0
+memory allocation in kilobytes and the settings for the serial port).
+For more details on the various Xen boot parameters see
+Section~\ref{s:xboot}.
+
+The module line of the configuration describes the location of the
+XenLinux kernel that Xen should start and the parameters that should be
+passed to it. These are standard Linux parameters, identifying the root
+device and specifying it be initially mounted read only and instructing
+that console output be sent to the screen. Some distributions such as
+SuSE do not require the \path{ro} parameter.
+
+%% \framebox{\parbox{5in}{
+%%     {\bf Distro specific:} \\
+%%     {\it SuSE} --- Omit the {\tt ro} option from the XenLinux
+%%     kernel command line, since the partition won't be remounted rw
+%%     during boot.  }}
+
+To use an initrd, add another \path{module} line to the configuration,
+like: {\small
+\begin{verbatim}
+  module /boot/my_initrd.gz
+\end{verbatim}
+}
+
+%% KMSelf Thu Dec  1 19:05:30 PST 2005 Other configs as an appendix?
+
+When installing a new kernel, it is recommended that you do not delete
+existing menu options from \path{menu.lst}, as you may wish to boot your
+old Linux kernel in future, particularly if you have problems.
+
+\subsection{Serial Console (optional)}
+
+Serial console access allows you to manage, monitor, and interact with
+your system over a serial console.  This can allow access from another
+nearby system via a null-modem (``LapLink'') cable or remotely via a serial
+concentrator.
+
+You system's BIOS, bootloader (GRUB), Xen, Linux, and login access must
+each be individually configured for serial console access.  It is
+\emph{not} strictly necessary to have each component fully functional,
+but it can be quite useful.
+
+For general information on serial console configuration under Linux,
+refer to the ``Remote Serial Console HOWTO'' at The Linux Documentation
+Project: \url{http://www.tldp.org} 
+
+\subsubsection{Serial Console BIOS configuration}
+
+Enabling system serial console output neither enables nor disables
+serial capabilities in GRUB, Xen, or Linux, but may make remote
+management of your system more convenient by displaying POST and other
+boot messages over serial port and allowing remote BIOS configuration.
+
+Refer to your hardware vendor's documentation for capabilities and
+procedures to enable BIOS serial redirection.
+
+
+\subsubsection{Serial Console GRUB configuration}
+
+Enabling GRUB serial console output neither enables nor disables Xen or
+Linux serial capabilities, but may made remote management of your system
+more convenient by displaying GRUB prompts, menus, and actions over
+serial port and allowing remote GRUB management.
+
+Adding the following two lines to your GRUB configuration file,
+typically either \path{/boot/grub/menu.lst} or \path{/boot/grub/grub.conf}
+depending on your distro, will enable GRUB serial output.
+
+\begin{quote} 
+{\small \begin{verbatim}
+  serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1
+  terminal --timeout=10 serial console
+\end{verbatim}}
+\end{quote}
+
+Note that when both the serial port and the local monitor and keyboard
+are enabled, the text ``\emph{Press any key to continue}'' will appear
+at both.  Pressing a key on one device will cause GRUB to display to
+that device.  The other device will see no output.  If no key is
+pressed before the timeout period expires, the system will boot to the
+default GRUB boot entry.
+
+Please refer to the GRUB documentation for further information.
+
+
+\subsubsection{Serial Console Xen configuration}
+
+Enabling Xen serial console output neither enables nor disables Linux
+kernel output or logging in to Linux over serial port.  It does however
+allow you to monitor and log the Xen boot process via serial console and
+can be very useful in debugging.
+
+%% kernel /boot/xen-2.0.gz dom0_mem=131072 com1=115200,8n1
+%% module /boot/vmlinuz-2.6-xen0 root=/dev/sda4 ro
+
+In order to configure Xen serial console output, it is necessary to
+add a boot option to your GRUB config; e.g.\ replace the previous
+example kernel line with:
+\begin{quote} {\small \begin{verbatim}
+   kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
+\end{verbatim}}
+\end{quote}
+
+This configures Xen to output on COM1 at 115,200 baud, 8 data bits, 1
+stop bit and no parity. Modify these parameters for your environment.
+
+One can also configure XenLinux to share the serial console; to achieve
+this append ``\path{console=ttyS0}'' to your module line.
+
+
+\subsubsection{Serial Console Linux configuration}
+
+Enabling Linux serial console output at boot neither enables nor
+disables logging in to Linux over serial port.  It does however allow
+you to monitor and log the Linux boot process via serial console and can be
+very useful in debugging.
+
+To enable Linux output at boot time, add the parameter
+\path{console=ttyS0} (or ttyS1, ttyS2, etc.) to your kernel GRUB line.
+Under Xen, this might be:
+\begin{quote} 
+{\footnotesize \begin{verbatim}
+  module /vmlinuz-2.6-xen0 ro root=/dev/VolGroup00/LogVol00 \
+  console=ttyS0, 115200
+\end{verbatim}}
+\end{quote}
+to enable output over ttyS0 at 115200 baud.
+
+
+
+\subsubsection{Serial Console Login configuration}
+
+Logging in to Linux via serial console, under Xen or otherwise, requires
+specifying a login prompt be started on the serial port.  To permit root
+logins over serial console, the serial port must be added to
+\path{/etc/securetty}.
+
+\newpage
+To automatically start a login prompt over the serial port, 
+add the line: \begin{quote} {\small {\tt c:2345:respawn:/sbin/mingetty
+ttyS0}} \end{quote} to \path{/etc/inittab}.   Run \path{init q} to force
+a reload of your inttab and start getty.
+
+To enable root logins, add \path{ttyS0} to \path{/etc/securetty} if not
+already present.
+
+Your distribution may use an alternate getty; options include getty,
+mgetty and agetty.  Consult your distribution's documentation
+for further information.
+
+
+\subsection{TLS Libraries}
+
+Users of the XenLinux 2.6 kernel should disable Thread Local Storage
+(TLS) (e.g.\ by doing a \path{mv /lib/tls /lib/tls.disabled}) before
+attempting to boot a XenLinux kernel\footnote{If you boot without first
+  disabling TLS, you will get a warning message during the boot process.
+  In this case, simply perform the rename after the machine is up and
+  then run \path{/sbin/ldconfig} to make it take effect.}. You can
+always reenable TLS by restoring the directory to its original location
+(i.e.\ \path{mv /lib/tls.disabled /lib/tls}).
+
+The reason for this is that the current TLS implementation uses
+segmentation in a way that is not permissible under Xen. If TLS is not
+disabled, an emulation mode is used within Xen which reduces performance
+substantially. To ensure full performance you should install a 
+`Xen-friendly' (nosegneg) version of the library. 
+
+
+\section{Booting Xen}
+
+It should now be possible to restart the system and use Xen. Reboot and
+choose the new Xen option when the Grub screen appears.
+
+What follows should look much like a conventional Linux boot. The first
+portion of the output comes from Xen itself, supplying low level
+information about itself and the underlying hardware. The last portion
+of the output comes from XenLinux.
+
+You may see some error messages during the XenLinux boot. These are not
+necessarily anything to worry about---they may result from kernel
+configuration differences between your XenLinux kernel and the one you
+usually use.
+
+When the boot completes, you should be able to log into your system as
+usual. If you are unable to log in, you should still be able to reboot
+with your normal Linux kernel by selecting it at the GRUB prompt.
+
 
 % Booting Xen
-\include{src/user/booting_xen}
+\chapter{Booting a Xen System}
+
+Booting the system into Xen will bring you up into the privileged
+management domain, Domain0. At that point you are ready to create
+guest domains and ``boot'' them using the \texttt{xm create} command.
+
+\section{Booting Domain0}
+
+After installation and configuration is complete, reboot the system
+and and choose the new Xen option when the Grub screen appears.
+
+What follows should look much like a conventional Linux boot.  The
+first portion of the output comes from Xen itself, supplying low level
+information about itself and the underlying hardware.  The last
+portion of the output comes from XenLinux.
+
+%% KMSelf Wed Nov 30 18:09:37 PST 2005:  We should specify what these are.
+
+When the boot completes, you should be able to log into your system as
+usual.  If you are unable to log in, you should still be able to
+reboot with your normal Linux kernel by selecting it at the GRUB prompt.
+
+The first step in creating a new domain is to prepare a root
+filesystem for it to boot.  Typically, this might be stored in a normal
+partition, an LVM or other volume manager partition, a disk file or on
+an NFS server.  A simple way to do this is simply to boot from your
+standard OS install CD and install the distribution into another
+partition on your hard drive.
+
+To start the \xend\ control daemon, type
+\begin{quote}
+  \verb!# xend start!
+\end{quote}
+
+If you wish the daemon to start automatically, see the instructions in
+Section~\ref{s:xend}. Once the daemon is running, you can use the
+\path{xm} tool to monitor and maintain the domains running on your
+system. This chapter provides only a brief tutorial. We provide full
+details of the \path{xm} tool in the next chapter.
+
+% \section{From the web interface}
+%
+% Boot the Xen machine and start Xensv (see Chapter~\ref{cha:xensv}
+% for more details) using the command: \\
+% \verb_# xensv start_ \\
+% This will also start Xend (see Chapter~\ref{cha:xend} for more
+% information).
+%
+% The domain management interface will then be available at {\tt
+%   http://your\_machine:8080/}.  This provides a user friendly wizard
+% for starting domains and functions for managing running domains.
+%
+% \section{From the command line}
+\section{Booting Guest Domains}
+
+\subsection{Creating a Domain Configuration File}
+
+Before you can start an additional domain, you must create a
+configuration file. We provide two example files which you can use as
+a starting point:
+\begin{itemize}
+\item \path{/etc/xen/xmexample1} is a simple template configuration
+  file for describing a single VM\@.
+\item \path{/etc/xen/xmexample2} file is a template description that
+  is intended to be reused for multiple virtual machines.  Setting the
+  value of the \path{vmid} variable on the \path{xm} command line
+  fills in parts of this template.
+\end{itemize}
+
+There are also a number of other examples which you may find useful.
+Copy one of these files and edit it as appropriate.  Typical values
+you may wish to edit include:
+
+\begin{quote}
+\begin{description}
+\item[kernel] Set this to the path of the kernel you compiled for use
+  with Xen (e.g.\ \path{kernel = ``/boot/vmlinuz-2.6-xenU''})
+\item[memory] Set this to the size of the domain's memory in megabytes
+  (e.g.\ \path{memory = 64})
+\item[disk] Set the first entry in this list to calculate the offset
+  of the domain's root partition, based on the domain ID\@.  Set the
+  second to the location of \path{/usr} if you are sharing it between
+  domains (e.g.\ \path{disk = ['phy:your\_hard\_drive\%d,sda1,w' \%
+    (base\_partition\_number + vmid),
+    'phy:your\_usr\_partition,sda6,r' ]}
+\item[dhcp] Uncomment the dhcp variable, so that the domain will
+  receive its IP address from a DHCP server (e.g.\ \path{dhcp=``dhcp''})
+\end{description}
+\end{quote}
+
+You may also want to edit the {\bf vif} variable in order to choose
+the MAC address of the virtual ethernet interface yourself.  For
+example:
+
+\begin{quote}
+\verb_vif = ['mac=00:16:3E:F6:BB:B3']_
+\end{quote}
+If you do not set this variable, \xend\ will automatically generate a
+random MAC address from the range 00:16:3E:xx:xx:xx, assigned by IEEE to
+XenSource as an OUI (organizationally unique identifier).  XenSource
+Inc. gives permission for anyone to use addresses randomly allocated
+from this range for use by their Xen domains.
+
+For a list of IEEE OUI assignments, see 
+\url{http://standards.ieee.org/regauth/oui/oui.txt} 
+
+
+\subsection{Booting the Guest Domain}
+
+The \path{xm} tool provides a variety of commands for managing
+domains.  Use the \path{create} command to start new domains. Assuming
+you've created a configuration file \path{myvmconf} based around
+\path{/etc/xen/xmexample2}, to start a domain with virtual machine
+ID~1 you should type:
+
+\begin{quote}
+\begin{verbatim}
+# xm create -c myvmconf vmid=1
+\end{verbatim}
+\end{quote}
+
+The \path{-c} switch causes \path{xm} to turn into the domain's
+console after creation.  The \path{vmid=1} sets the \path{vmid}
+variable used in the \path{myvmconf} file.
+
+You should see the console boot messages from the new domain appearing
+in the terminal in which you typed the command, culminating in a login
+prompt.
+
+
+\section{Starting / Stopping Domains Automatically}
+
+It is possible to have certain domains start automatically at boot
+time and to have dom0 wait for all running domains to shutdown before
+it shuts down the system.
+
+To specify a domain is to start at boot-time, place its configuration
+file (or a link to it) under \path{/etc/xen/auto/}.
+
+A Sys-V style init script for Red Hat and LSB-compliant systems is
+provided and will be automatically copied to \path{/etc/init.d/}
+during install.  You can then enable it in the appropriate way for
+your distribution.
+
+For instance, on Red Hat:
+
+\begin{quote}
+  \verb_# chkconfig --add xendomains_
+\end{quote}
+
+By default, this will start the boot-time domains in runlevels 3, 4
+and 5.
+
+You can also use the \path{service} command to run this script
+manually, e.g:
+
+\begin{quote}
+  \verb_# service xendomains start_
+
+  Starts all the domains with config files under /etc/xen/auto/.
+\end{quote}
+
+\begin{quote}
+  \verb_# service xendomains stop_
+
+  Shuts down all running Xen domains.
+\end{quote}
+
 
 
 \part{Configuration and Management}
 
 %% Chapter Domain Management Tools and Daemons
-\include{src/user/domain_mgmt}
+\chapter{Domain Management Tools}
 
-%% Chapter Starting Additional Domains
-\include{src/user/start_addl_dom}
+This chapter summarizes the management software and tools available.
+
+
+\section{\Xend\ }
+\label{s:xend}
+
+The Xen Daemon (\Xend) performs system management functions related to
+virtual machines. It forms a central point of control for a machine
+and can be controlled using an HTTP-based protocol. \Xend\ must be
+running in order to start and manage virtual machines.
+
+\Xend\ must be run as root because it needs access to privileged system
+management functions. A small set of commands may be issued on the
+\xend\ command line:
+
+\begin{tabular}{ll}
+  \verb!# xend start! & start \xend, if not already running \\
+  \verb!# xend stop!  & stop \xend\ if already running       \\
+  \verb!# xend restart! & restart \xend\ if running, otherwise start it \\
+  % \verb!# xend trace_start! & start \xend, with very detailed debug logging \\
+  \verb!# xend status! & indicates \xend\ status by its return code
+\end{tabular}
+
+A SysV init script called {\tt xend} is provided to start \xend\ at
+boot time. {\tt make install} installs this script in
+\path{/etc/init.d}. To enable it, you have to make symbolic links in
+the appropriate runlevel directories or use the {\tt chkconfig} tool,
+where available.  Once \xend\ is running, administration can be done
+using the \texttt{xm} tool.
+
+As \xend\ runs, events will be logged to \path{/var/log/xend.log}
+and \path{/var/log/xend-debug.log}. These, along with the standard 
+syslog files, are useful when troubleshooting problems.
+
+\section{Xm}
+\label{s:xm}
+
+Command line management tasks are performed using the \path{xm}
+tool. For online help for the commands available, type:
+
+\begin{quote}
+\begin{verbatim}
+# xm help
+\end{verbatim}
+\end{quote}
+
+You can also type \path{xm help $<$command$>$} for more information on a
+given command.
+
+The xm tool is the primary tool for managing Xen from the console. The
+general format of an xm command line is:
+
+\begin{verbatim}
+# xm command [switches] [arguments] [variables]
+\end{verbatim}
+
+The available \emph{switches} and \emph{arguments} are dependent on the
+\emph{command} chosen. The \emph{variables} may be set using
+declarations of the form {\tt variable=value} and command line
+declarations override any of the values in the configuration file being
+used, including the standard variables described above and any custom
+variables (for instance, the \path{xmdefconfig} file uses a {\tt vmid}
+variable).
+
+\subsection{Basic Management Commands}
+
+A complete list of \path{xm} commands is obtained by typing \texttt{xm
+  help}. One useful command is \verb_# xm list_ which lists all
+  domains running in rows of the following format:
+\begin{center} {\tt name domid memory vcpus state cputime}
+\end{center}
+
+The meaning of each field is as follows: 
+\begin{quote}
+  \begin{description}
+  \item[name] The descriptive name of the virtual machine.
+  \item[domid] The number of the domain ID this virtual machine is
+    running in.
+  \item[memory] Memory size in megabytes.
+  \item[vcpus] The number of virtual CPUs this domain has.
+  \item[state] Domain state consists of 5 fields:
+    \begin{description}
+    \item[r] running
+    \item[b] blocked
+    \item[p] paused
+    \item[s] shutdown
+    \item[c] crashed
+    \end{description}
+  \item[cputime] How much CPU time (in seconds) the domain has used so
+    far.
+  \end{description}
+\end{quote}
+
+The \path{xm list} command also supports a long output format when the
+\path{-l} switch is used.  This outputs the fulls details of the
+running domains in \xend's SXP configuration format.
+
+
+You can get access to the console of a particular domain using 
+the \verb_# xm console_ command  (e.g.\ \verb_# xm console myVM_). 
+
+
 
 %% Chapter Domain Configuration
-\include{src/user/domain_configuration}
+\chapter{Domain Configuration}
+\label{cha:config}
 
-% Chapter Console Management
-\include{src/user/console_management}
+The following contains the syntax of the domain configuration files
+and description of how to further specify networking, driver domain
+and general scheduling behavior.
 
-% Chapter Network Management
-\include{src/user/network_management}
+
+\section{Configuration Files}
+\label{s:cfiles}
+
+Xen configuration files contain the following standard variables.
+Unless otherwise stated, configuration items should be enclosed in
+quotes: see the configuration scripts in \path{/etc/xen/} 
+for concrete examples. 
+
+\begin{description}
+\item[kernel] Path to the kernel image.
+\item[ramdisk] Path to a ramdisk image (optional).
+  % \item[builder] The name of the domain build function (e.g.
+  %   {\tt'linux'} or {\tt'netbsd'}.
+\item[memory] Memory size in megabytes.
+\item[vcpus] The number of virtual CPUs. 
+\item[console] Port to export the domain console on (default 9600 +
+  domain ID).
+\item[nics] Number of virtual network interfaces.
+\item[vif] List of MAC addresses (random addresses are assigned if not
+  given) and bridges to use for the domain's network interfaces, e.g.\ 
+\begin{verbatim}
+vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0',
+        'bridge=xen-br1' ]
+\end{verbatim}
+  to assign a MAC address and bridge to the first interface and assign
+  a different bridge to the second interface, leaving \xend\ to choose
+  the MAC address.
+\item[disk] List of block devices to export to the domain e.g. 
+  \verb_disk = [ 'phy:hda1,sda1,r' ]_ 
+  exports physical device \path{/dev/hda1} to the domain as
+  \path{/dev/sda1} with read-only access. Exporting a disk read-write
+  which is currently mounted is dangerous -- if you are \emph{certain}
+  you wish to do this, you can specify \path{w!} as the mode.
+\item[dhcp] Set to {\tt `dhcp'} if you want to use DHCP to configure
+  networking.
+\item[netmask] Manually configured IP netmask.
+\item[gateway] Manually configured IP gateway.
+\item[hostname] Set the hostname for the virtual machine.
+\item[root] Specify the root device parameter on the kernel command
+  line.
+\item[nfs\_server] IP address for the NFS server (if any).
+\item[nfs\_root] Path of the root filesystem on the NFS server (if
+  any).
+\item[extra] Extra string to append to the kernel command line (if
+  any)
+\end{description}
+
+Additional fields are documented in the example configuration files 
+(e.g. to configure virtual TPM functionality). 
+
+For additional flexibility, it is also possible to include Python
+scripting commands in configuration files.  An example of this is the
+\path{xmexample2} file, which uses Python code to handle the
+\path{vmid} variable.
+
+
+%\part{Advanced Topics}
+
+
+\section{Network Configuration}
+
+For many users, the default installation should work ``out of the
+box''.  More complicated network setups, for instance with multiple
+Ethernet interfaces and/or existing bridging setups will require some
+special configuration.
+
+The purpose of this section is to describe the mechanisms provided by
+\xend\ to allow a flexible configuration for Xen's virtual networking.
+
+\subsection{Xen virtual network topology}
+
+Each domain network interface is connected to a virtual network
+interface in dom0 by a point to point link (effectively a ``virtual
+crossover cable'').  These devices are named {\tt
+  vif$<$domid$>$.$<$vifid$>$} (e.g.\ {\tt vif1.0} for the first
+interface in domain~1, {\tt vif3.1} for the second interface in
+domain~3).
+
+Traffic on these virtual interfaces is handled in domain~0 using
+standard Linux mechanisms for bridging, routing, rate limiting, etc.
+Xend calls on two shell scripts to perform initial configuration of
+the network and configuration of new virtual interfaces.  By default,
+these scripts configure a single bridge for all the virtual
+interfaces.  Arbitrary routing / bridging configurations can be
+configured by customizing the scripts, as described in the following
+section.
+
+\subsection{Xen networking scripts}
+
+Xen's virtual networking is configured by two shell scripts (by
+default \path{network} and \path{vif-bridge}).  These are called
+automatically by \xend\ when certain events occur, with arguments to
+the scripts providing further contextual information.  These scripts
+are found by default in \path{/etc/xen/scripts}.  The names and
+locations of the scripts can be configured in
+\path{/etc/xen/xend-config.sxp}.
+
+\begin{description}
+\item[network:] This script is called whenever \xend\ is started or
+  stopped to respectively initialize or tear down the Xen virtual
+  network. In the default configuration initialization creates the
+  bridge `xen-br0' and moves eth0 onto that bridge, modifying the
+  routing accordingly. When \xend\ exits, it deletes the Xen bridge
+  and removes eth0, restoring the normal IP and routing configuration.
+
+  %% In configurations where the bridge already exists, this script
+  %% could be replaced with a link to \path{/bin/true} (for instance).
+
+\item[vif-bridge:] This script is called for every domain virtual
+  interface and can configure firewalling rules and add the vif to the
+  appropriate bridge. By default, this adds and removes VIFs on the
+  default Xen bridge.
+\end{description}
+
+For more complex network setups (e.g.\ where routing is required or
+integrate with existing bridges) these scripts may be replaced with
+customized variants for your site's preferred configuration.
+
+%% There are two possible types of privileges: IO privileges and
+%% administration privileges.
+
+
+
 
 % Chapter Storage and FileSytem Management
-\include{src/user/domain_filesystem}
+\chapter{Storage and File System Management}
 
-% Chapter Memory Management
-\include{src/user/memory_management}
+Storage can be made available to virtual machines in a number of
+different ways.  This chapter covers some possible configurations.
 
-% Chapter CPU Management
-\include{src/user/cpu_management}
+The most straightforward method is to export a physical block device (a
+hard drive or partition) from dom0 directly to the guest domain as a
+virtual block device (VBD).
 
-% Chapter Scheduler Management
-\include{src/user/scheduler_management}
+Storage may also be exported from a filesystem image or a partitioned
+filesystem image as a \emph{file-backed VBD}.
 
-% Chapter Migrating Domains
-\include{src/user/migrating_domains}
+Finally, standard network storage protocols such as NBD, iSCSI, NFS,
+etc., can be used to provide storage to virtual machines.
+
+
+\section{Exporting Physical Devices as VBDs}
+\label{s:exporting-physical-devices-as-vbds}
+
+One of the simplest configurations is to directly export individual
+partitions from domain~0 to other domains. To achieve this use the
+\path{phy:} specifier in your domain configuration file. For example a
+line like
+\begin{quote}
+  \verb_disk = ['phy:hda3,sda1,w']_
+\end{quote}
+specifies that the partition \path{/dev/hda3} in domain~0 should be
+exported read-write to the new domain as \path{/dev/sda1}; one could
+equally well export it as \path{/dev/hda} or \path{/dev/sdb5} should
+one wish.
+
+In addition to local disks and partitions, it is possible to export
+any device that Linux considers to be ``a disk'' in the same manner.
+For example, if you have iSCSI disks or GNBD volumes imported into
+domain~0 you can export these to other domains using the \path{phy:}
+disk syntax. E.g.:
+\begin{quote}
+  \verb_disk = ['phy:vg/lvm1,sda2,w']_
+\end{quote}
+
+\begin{center}
+  \framebox{\bf Warning: Block device sharing}
+\end{center}
+\begin{quote}
+  Block devices should typically only be shared between domains in a
+  read-only fashion otherwise the Linux kernel's file systems will get
+  very confused as the file system structure may change underneath
+  them (having the same ext3 partition mounted \path{rw} twice is a
+  sure fire way to cause irreparable damage)!  \Xend\ will attempt to
+  prevent you from doing this by checking that the device is not
+  mounted read-write in domain~0, and hasn't already been exported
+  read-write to another domain.  If you want read-write sharing,
+  export the directory to other domains via NFS from domain~0 (or use
+  a cluster file system such as GFS or ocfs2).
+\end{quote}
+
+
+\section{Using File-backed VBDs}
+
+It is also possible to use a file in Domain~0 as the primary storage
+for a virtual machine.  As well as being convenient, this also has the
+advantage that the virtual block device will be \emph{sparse} ---
+space will only really be allocated as parts of the file are used.  So
+if a virtual machine uses only half of its disk space then the file
+really takes up half of the size allocated.
+
+For example, to create a 2GB sparse file-backed virtual block device
+(actually only consumes 1KB of disk):
+\begin{quote}
+  \verb_# dd if=/dev/zero of=vm1disk bs=1k seek=2048k count=1_
+\end{quote}
+
+Make a file system in the disk file:
+\begin{quote}
+  \verb_# mkfs -t ext3 vm1disk_
+\end{quote}
+
+(when the tool asks for confirmation, answer `y')
+
+Populate the file system e.g.\ by copying from the current root:
+\begin{quote}
+\begin{verbatim}
+# mount -o loop vm1disk /mnt
+# cp -ax /{root,dev,var,etc,usr,bin,sbin,lib} /mnt
+# mkdir /mnt/{proc,sys,home,tmp}
+\end{verbatim}
+\end{quote}
+
+Tailor the file system by editing \path{/etc/fstab},
+\path{/etc/hostname}, etc.\ Don't forget to edit the files in the
+mounted file system, instead of your domain~0 filesystem, e.g.\ you
+would edit \path{/mnt/etc/fstab} instead of \path{/etc/fstab}.  For
+this example put \path{/dev/sda1} to root in fstab.
+
+Now unmount (this is important!):
+\begin{quote}
+  \verb_# umount /mnt_
+\end{quote}
+
+In the configuration file set:
+\begin{quote}
+  \verb_disk = ['file:/full/path/to/vm1disk,sda1,w']_
+\end{quote}
+
+As the virtual machine writes to its `disk', the sparse file will be
+filled in and consume more space up to the original 2GB.
+
+{\bf Note that file-backed VBDs may not be appropriate for backing
+  I/O-intensive domains.}  File-backed VBDs are known to experience
+substantial slowdowns under heavy I/O workloads, due to the I/O
+handling by the loopback block device used to support file-backed VBDs
+in dom0.  Better I/O performance can be achieved by using either
+LVM-backed VBDs (Section~\ref{s:using-lvm-backed-vbds}) or physical
+devices as VBDs (Section~\ref{s:exporting-physical-devices-as-vbds}).
+
+Linux supports a maximum of eight file-backed VBDs across all domains
+by default.  This limit can be statically increased by using the
+\emph{max\_loop} module parameter if CONFIG\_BLK\_DEV\_LOOP is
+compiled as a module in the dom0 kernel, or by using the
+\emph{max\_loop=n} boot option if CONFIG\_BLK\_DEV\_LOOP is compiled
+directly into the dom0 kernel.
+
+
+\section{Using LVM-backed VBDs}
+\label{s:using-lvm-backed-vbds}
+
+A particularly appealing solution is to use LVM volumes as backing for
+domain file-systems since this allows dynamic growing/shrinking of
+volumes as well as snapshot and other features.
+
+To initialize a partition to support LVM volumes:
+\begin{quote}
+\begin{verbatim}
+# pvcreate /dev/sda10           
+\end{verbatim} 
+\end{quote}
+
+Create a volume group named `vg' on the physical partition:
+\begin{quote}
+\begin{verbatim}
+# vgcreate vg /dev/sda10
+\end{verbatim} 
+\end{quote}
+
+Create a logical volume of size 4GB named `myvmdisk1':
+\begin{quote}
+\begin{verbatim}
+# lvcreate -L4096M -n myvmdisk1 vg
+\end{verbatim}
+\end{quote}
+
+You should now see that you have a \path{/dev/vg/myvmdisk1} Make a
+filesystem, mount it and populate it, e.g.:
+\begin{quote}
+\begin{verbatim}
+# mkfs -t ext3 /dev/vg/myvmdisk1
+# mount /dev/vg/myvmdisk1 /mnt
+# cp -ax / /mnt
+# umount /mnt
+\end{verbatim}
+\end{quote}
+
+Now configure your VM with the following disk configuration:
+\begin{quote}
+\begin{verbatim}
+ disk = [ 'phy:vg/myvmdisk1,sda1,w' ]
+\end{verbatim}
+\end{quote}
+
+LVM enables you to grow the size of logical volumes, but you'll need
+to resize the corresponding file system to make use of the new space.
+Some file systems (e.g.\ ext3) now support online resize.  See the LVM
+manuals for more details.
+
+You can also use LVM for creating copy-on-write (CoW) clones of LVM
+volumes (known as writable persistent snapshots in LVM terminology).
+This facility is new in Linux 2.6.8, so isn't as stable as one might
+hope.  In particular, using lots of CoW LVM disks consumes a lot of
+dom0 memory, and error conditions such as running out of disk space
+are not handled well. Hopefully this will improve in future.
+
+To create two copy-on-write clone of the above file system you would
+use the following commands:
+
+\begin{quote}
+\begin{verbatim}
+# lvcreate -s -L1024M -n myclonedisk1 /dev/vg/myvmdisk1
+# lvcreate -s -L1024M -n myclonedisk2 /dev/vg/myvmdisk1
+\end{verbatim}
+\end{quote}
+
+Each of these can grow to have 1GB of differences from the master
+volume. You can grow the amount of space for storing the differences
+using the lvextend command, e.g.:
+\begin{quote}
+\begin{verbatim}
+# lvextend +100M /dev/vg/myclonedisk1
+\end{verbatim}
+\end{quote}
+
+Don't let the `differences volume' ever fill up otherwise LVM gets
+rather confused. It may be possible to automate the growing process by
+using \path{dmsetup wait} to spot the volume getting full and then
+issue an \path{lvextend}.
+
+In principle, it is possible to continue writing to the volume that
+has been cloned (the changes will not be visible to the clones), but
+we wouldn't recommend this: have the cloned volume as a `pristine'
+file system install that isn't mounted directly by any of the virtual
+machines.
+
+
+\section{Using NFS Root}
+
+First, populate a root filesystem in a directory on the server
+machine. This can be on a distinct physical machine, or simply run
+within a virtual machine on the same node.
+
+Now configure the NFS server to export this filesystem over the
+network by adding a line to \path{/etc/exports}, for instance:
+
+\begin{quote}
+  \begin{small}
+\begin{verbatim}
+/export/vm1root      1.2.3.4/24 (rw,sync,no_root_squash)
+\end{verbatim}
+  \end{small}
+\end{quote}
+
+Finally, configure the domain to use NFS root.  In addition to the
+normal variables, you should make sure to set the following values in
+the domain's configuration file:
+
+\begin{quote}
+  \begin{small}
+\begin{verbatim}
+root       = '/dev/nfs'
+nfs_server = '2.3.4.5'       # substitute IP address of server
+nfs_root   = '/path/to/root' # path to root FS on the server
+\end{verbatim}
+  \end{small}
+\end{quote}
+
+The domain will need network access at boot time, so either statically
+configure an IP address using the config variables \path{ip},
+\path{netmask}, \path{gateway}, \path{hostname}; or enable DHCP
+(\path{dhcp='dhcp'}).
+
+Note that the Linux NFS root implementation is known to have stability
+problems under high load (this is not a Xen-specific problem), so this
+configuration may not be appropriate for critical servers.
+
+
+\chapter{CPU Management}
+
+%% KMS Something sage about CPU / processor management.
+
+Xen allows a domain's virtual CPU(s) to be associated with one or more
+host CPUs.  This can be used to allocate real resources among one or
+more guests, or to make optimal use of processor resources when
+utilizing dual-core, hyperthreading, or other advanced CPU technologies.
+
+Xen enumerates physical CPUs in a `depth first' fashion.  For a system
+with both hyperthreading and multiple cores, this would be all the
+hyperthreads on a given core, then all the cores on a given socket,
+and then all sockets.  I.e.  if you had a two socket, dual core,
+hyperthreaded Xeon the CPU order would be:
+
+
+\begin{center}
+\begin{tabular}{l|l|l|l|l|l|l|r}
+\multicolumn{4}{c|}{socket0}     &  \multicolumn{4}{c}{socket1} \\ \hline
+\multicolumn{2}{c|}{core0}  &  \multicolumn{2}{c|}{core1}  &
+\multicolumn{2}{c|}{core0}  &  \multicolumn{2}{c}{core1} \\ \hline
+ht0 & ht1 & ht0 & ht1 & ht0 & ht1 & ht0 & ht1 \\
+\#0 & \#1 & \#2 & \#3 & \#4 & \#5 & \#6 & \#7 \\
+\end{tabular}
+\end{center}
+
+
+Having multiple vcpus belonging to the same domain mapped to the same
+physical CPU is very likely to lead to poor performance. It's better to
+use `vcpus-set' to hot-unplug one of the vcpus and ensure the others are
+pinned on different CPUs.
+
+If you are running IO intensive tasks, its typically better to dedicate
+either a hyperthread or whole core to running domain 0, and hence pin
+other domains so that they can't use CPU 0. If your workload is mostly
+compute intensive, you may want to pin vcpus such that all physical CPU
+threads are available for guest domains.
+
+\chapter{Migrating Domains}
+
+\section{Domain Save and Restore}
+
+The administrator of a Xen system may suspend a virtual machine's
+current state into a disk file in domain~0, allowing it to be resumed at
+a later time.
+
+For example you can suspend a domain called ``VM1'' to disk using the
+command:
+\begin{verbatim}
+# xm save VM1 VM1.chk
+\end{verbatim}
+
+This will stop the domain named ``VM1'' and save its current state
+into a file called \path{VM1.chk}.
+
+To resume execution of this domain, use the \path{xm restore} command:
+\begin{verbatim}
+# xm restore VM1.chk
+\end{verbatim}
+
+This will restore the state of the domain and resume its execution.
+The domain will carry on as before and the console may be reconnected
+using the \path{xm console} command, as described earlier.
+
+\section{Migration and Live Migration}
+
+Migration is used to transfer a domain between physical hosts. There
+are two varieties: regular and live migration. The former moves a
+virtual machine from one host to another by pausing it, copying its
+memory contents, and then resuming it on the destination. The latter
+performs the same logical functionality but without needing to pause
+the domain for the duration. In general when performing live migration
+the domain continues its usual activities and---from the user's
+perspective---the migration should be imperceptible.
+
+To perform a live migration, both hosts must be running Xen / \xend\ and
+the destination host must have sufficient resources (e.g.\ memory
+capacity) to accommodate the domain after the move. Furthermore we
+currently require both source and destination machines to be on the same
+L2 subnet.
+
+Currently, there is no support for providing automatic remote access
+to filesystems stored on local disk when a domain is migrated.
+Administrators should choose an appropriate storage solution (i.e.\
+SAN, NAS, etc.) to ensure that domain filesystems are also available
+on their destination node. GNBD is a good method for exporting a
+volume from one machine to another. iSCSI can do a similar job, but is
+more complex to set up.
+
+When a domain migrates, it's MAC and IP address move with it, thus it is
+only possible to migrate VMs within the same layer-2 network and IP
+subnet. If the destination node is on a different subnet, the
+administrator would need to manually configure a suitable etherip or IP
+tunnel in the domain~0 of the remote node.
+
+A domain may be migrated using the \path{xm migrate} command. To live
+migrate a domain to another machine, we would use the command:
+
+\begin{verbatim}
+# xm migrate --live mydomain destination.ournetwork.com
+\end{verbatim}
+
+Without the \path{--live} flag, \xend\ simply stops the domain and
+copies the memory image over to the new node and restarts it. Since
+domains can have large allocations this can be quite time consuming,
+even on a Gigabit network. With the \path{--live} flag \xend\ attempts
+to keep the domain running while the migration is in progress, resulting
+in typical down times of just 60--300ms.
+
+For now it will be necessary to reconnect to the domain's console on the
+new machine using the \path{xm console} command. If a migrated domain
+has any open network connections then they will be preserved, so SSH
+connections do not have this limitation.
+
 
 %% Chapter Securing Xen
-\include{src/user/securing_xen}
+\chapter{Securing Xen}
+
+This chapter describes how to secure a Xen system. It describes a number
+of scenarios and provides a corresponding set of best practices. It
+begins with a section devoted to understanding the security implications
+of a Xen system.
 
 
-\part{Monitoring and Troubleshooting}
+\section{Xen Security Considerations}
 
-%% Chapter Monitoring Xen
-\include{src/user/monitoring_xen}
+When deploying a Xen system, one must be sure to secure the management
+domain (Domain-0) as much as possible. If the management domain is
+compromised, all other domains are also vulnerable. The following are a
+set of best practices for Domain-0:
 
-% Chapter xenstat
-\include{src/user/xenstat}
+\begin{enumerate}
+\item \textbf{Run the smallest number of necessary services.} The less
+  things that are present in a management partition, the better.
+  Remember, a service running as root in the management domain has full
+  access to all other domains on the system.
+\item \textbf{Use a firewall to restrict the traffic to the management
+    domain.} A firewall with default-reject rules will help prevent
+  attacks on the management domain.
+\item \textbf{Do not allow users to access Domain-0.} The Linux kernel
+  has been known to have local-user root exploits. If you allow normal
+  users to access Domain-0 (even as unprivileged users) you run the risk
+  of a kernel exploit making all of your domains vulnerable.
+\end{enumerate}
 
-% Chapter Log Files
-\include{src/user/logfiles}
-
-%% Chapter Debugging
-\include{src/user/debugging}
-
-% Chapter xentrace
-\include{src/user/xentrace}
-
-%% Chapter Known Problems
-\include{src/user/known_problems}
-
-%% Chapter Testing Xen
-\include{src/user/testing}
+\section{Security Scenarios}
 
 
-\part{Reference Documentation}
+\subsection{The Isolated Management Network}
 
-%% Chapter Control Software
-\include{src/user/control_software}
+In this scenario, each node has two network cards in the cluster. One
+network card is connected to the outside world and one network card is a
+physically isolated management network specifically for Xen instances to
+use.
+
+As long as all of the management partitions are trusted equally, this is
+the most secure scenario. No additional configuration is needed other
+than forcing Xend to bind to the management interface for relocation.
+
+
+\subsection{A Subnet Behind a Firewall}
+
+In this scenario, each node has only one network card but the entire
+cluster sits behind a firewall. This firewall should do at least the
+following:
+
+\begin{enumerate}
+\item Prevent IP spoofing from outside of the subnet.
+\item Prevent access to the relocation port of any of the nodes in the
+  cluster except from within the cluster.
+\end{enumerate}
+
+The following iptables rules can be used on each node to prevent
+migrations to that node from outside the subnet assuming the main
+firewall does not do this for you:
+
+\begin{verbatim}
+# this command disables all access to the Xen relocation
+# port:
+iptables -A INPUT -p tcp --destination-port 8002 -j REJECT
+
+# this command enables Xen relocations only from the specific
+# subnet:
+iptables -I INPUT -p tcp -{}-source 192.168.1.1/8 \
+    --destination-port 8002 -j ACCEPT
+\end{verbatim}
+
+\subsection{Nodes on an Untrusted Subnet}
+
+Migration on an untrusted subnet is not safe in current versions of Xen.
+It may be possible to perform migrations through a secure tunnel via an
+VPN or SSH. The only safe option in the absence of a secure tunnel is to
+disable migration completely. The easiest way to do this is with
+iptables:
+
+\begin{verbatim}
+# this command disables all access to the Xen relocation port
+iptables -A INPUT -p tcp -{}-destination-port 8002 -j REJECT
+\end{verbatim}
+
+\part{Reference}
 
 %% Chapter Build and Boot Options
-\include{src/user/options}
+\chapter{Build and Boot Options} 
+
+This chapter describes the build- and boot-time options which may be
+used to tailor your Xen system.
+
+\section{Top-level Configuration Options} 
+
+Top-level configuration is achieved by editing one of two 
+files: \path{Config.mk} and \path{Makefile}. 
+
+The former allows the overall build target architecture to be 
+specified. You will typically not need to modify this unless 
+you are cross-compiling or if you wish to build a PAE-enabled 
+Xen system. Additional configuration options are documented 
+in the \path{Config.mk} file. 
+
+The top-level \path{Makefile} is chiefly used to customize the set of
+kernels built. Look for the line: 
+\begin{quote}
+\begin{verbatim}
+KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
+\end{verbatim}
+\end{quote}
+
+Allowable options here are any kernels which have a corresponding 
+build configuration file in the \path{buildconfigs/} directory. 
+
+
+
+\section{Xen Build Options}
+
+Xen provides a number of build-time options which should be set as
+environment variables or passed on make's command-line.
+
+\begin{description}
+\item[verbose=y] Enable debugging messages when Xen detects an
+  unexpected condition.  Also enables console output from all domains.
+\item[debug=y] Enable debug assertions.  Implies {\bf verbose=y}.
+  (Primarily useful for tracing bugs in Xen).
+\item[debugger=y] Enable the in-Xen debugger. This can be used to
+  debug Xen, guest OSes, and applications.
+\item[perfc=y] Enable performance counters for significant events
+  within Xen. The counts can be reset or displayed on Xen's console
+  via console control keys.
+\end{description}
+
+
+\section{Xen Boot Options}
+\label{s:xboot}
+
+These options are used to configure Xen's behaviour at runtime.  They
+should be appended to Xen's command line, either manually or by
+editing \path{grub.conf}.
+
+\begin{description}
+\item [ noreboot ] Don't reboot the machine automatically on errors.
+  This is useful to catch debug output if you aren't catching console
+  messages via the serial line.
+\item [ nosmp ] Disable SMP support.  This option is implied by
+  `ignorebiostables'.
+\item [ watchdog ] Enable NMI watchdog which can report certain
+  failures.
+\item [ noirqbalance ] Disable software IRQ balancing and affinity.
+  This can be used on systems such as Dell 1850/2850 that have
+  workarounds in hardware for IRQ-routing issues.
+\item [ badpage=$<$page number$>$,$<$page number$>$, \ldots ] Specify
+  a list of pages not to be allocated for use because they contain bad
+  bytes. For example, if your memory tester says that byte 0x12345678
+  is bad, you would place `badpage=0x12345' on Xen's command line.
+\item [ com1=$<$baud$>$,DPS,$<$io\_base$>$,$<$irq$>$
+  com2=$<$baud$>$,DPS,$<$io\_base$>$,$<$irq$>$ ] \mbox{}\\
+  Xen supports up to two 16550-compatible serial ports.  For example:
+  `com1=9600, 8n1, 0x408, 5' maps COM1 to a 9600-baud port, 8 data
+  bits, no parity, 1 stop bit, I/O port base 0x408, IRQ 5.  If some
+  configuration options are standard (e.g., I/O base and IRQ), then
+  only a prefix of the full configuration string need be specified. If
+  the baud rate is pre-configured (e.g., by the bootloader) then you
+  can specify `auto' in place of a numeric baud rate.
+\item [ console=$<$specifier list$>$ ] Specify the destination for Xen
+  console I/O.  This is a comma-separated list of, for example:
+  \begin{description}
+  \item[ vga ] Use VGA console and allow keyboard input.
+  \item[ com1 ] Use serial port com1.
+  \item[ com2H ] Use serial port com2. Transmitted chars will have the
+    MSB set. Received chars must have MSB set.
+  \item[ com2L] Use serial port com2. Transmitted chars will have the
+    MSB cleared. Received chars must have MSB cleared.
+  \end{description}
+  The latter two examples allow a single port to be shared by two
+  subsystems (e.g.\ console and debugger). Sharing is controlled by
+  MSB of each transmitted/received character.  [NB. Default for this
+  option is `com1,vga']
+\item [ sync\_console ] Force synchronous console output. This is
+  useful if you system fails unexpectedly before it has sent all
+  available output to the console. In most cases Xen will
+  automatically enter synchronous mode when an exceptional event
+  occurs, but this option provides a manual fallback.
+\item [ conswitch=$<$switch-char$><$auto-switch-char$>$ ] Specify how
+  to switch serial-console input between Xen and DOM0. The required
+  sequence is CTRL-$<$switch-char$>$ pressed three times. Specifying
+  the backtick character disables switching.  The
+  $<$auto-switch-char$>$ specifies whether Xen should auto-switch
+  input to DOM0 when it boots --- if it is `x' then auto-switching is
+  disabled.  Any other value, or omitting the character, enables
+  auto-switching.  [NB. Default switch-char is `a'.]
+\item [ nmi=xxx ]
+  Specify what to do with an NMI parity or I/O error. \\
+  `nmi=fatal':  Xen prints a diagnostic and then hangs. \\
+  `nmi=dom0':   Inform DOM0 of the NMI. \\
+  `nmi=ignore': Ignore the NMI.
+\item [ mem=xxx ] Set the physical RAM address limit. Any RAM
+  appearing beyond this physical address in the memory map will be
+  ignored. This parameter may be specified with a B, K, M or G suffix,
+  representing bytes, kilobytes, megabytes and gigabytes respectively.
+  The default unit, if no suffix is specified, is kilobytes.
+\item [ dom0\_mem=xxx ] Set the amount of memory to be allocated to
+  domain0. In Xen 3.x the parameter may be specified with a B, K, M or
+  G suffix, representing bytes, kilobytes, megabytes and gigabytes
+  respectively; if no suffix is specified, the parameter defaults to
+  kilobytes. In previous versions of Xen, suffixes were not supported
+  and the value is always interpreted as kilobytes.
+\item [ tbuf\_size=xxx ] Set the size of the per-cpu trace buffers, in
+  pages (default 1).  Note that the trace buffers are only enabled in
+  debug builds.  Most users can ignore this feature completely.
+\item [ sched=xxx ] Select the CPU scheduler Xen should use.  The
+  current possibilities are `sedf' (default) and `bvt'.
+\item [ apic\_verbosity=debug,verbose ] Print more detailed
+  information about local APIC and IOAPIC configuration.
+\item [ lapic ] Force use of local APIC even when left disabled by
+  uniprocessor BIOS.
+\item [ nolapic ] Ignore local APIC in a uniprocessor system, even if
+  enabled by the BIOS.
+\item [ apic=bigsmp,default,es7000,summit ] Specify NUMA platform.
+  This can usually be probed automatically.
+\end{description}
+
+In addition, the following options may be specified on the Xen command
+line. Since domain 0 shares responsibility for booting the platform,
+Xen will automatically propagate these options to its command line.
+These options are taken from Linux's command-line syntax with
+unchanged semantics.
+
+\begin{description}
+\item [ acpi=off,force,strict,ht,noirq,\ldots ] Modify how Xen (and
+  domain 0) parses the BIOS ACPI tables.
+\item [ acpi\_skip\_timer\_override ] Instruct Xen (and domain~0) to
+  ignore timer-interrupt override instructions specified by the BIOS
+  ACPI tables.
+\item [ noapic ] Instruct Xen (and domain~0) to ignore any IOAPICs
+  that are present in the system, and instead continue to use the
+  legacy PIC.
+\end{description} 
+
+
+\section{XenLinux Boot Options}
+
+In addition to the standard Linux kernel boot options, we support:
+\begin{description}
+\item[ xencons=xxx ] Specify the device node to which the Xen virtual
+  console driver is attached. The following options are supported:
+  \begin{center}
+    \begin{tabular}{l}
+      `xencons=off': disable virtual console \\
+      `xencons=tty': attach console to /dev/tty1 (tty0 at boot-time) \\
+      `xencons=ttyS': attach console to /dev/ttyS0
+    \end{tabular}
+\end{center}
+The default is ttyS for dom0 and tty for all other domains.
+\end{description}
+
 
 %% Chapter Further Support
-\include{src/user/further_support}
+\chapter{Further Support}
+
+If you have questions that are not answered by this manual, the
+sources of information listed below may be of interest to you.  Note
+that bug reports, suggestions and contributions related to the
+software (or the documentation) should be sent to the Xen developers'
+mailing list (address below).
+
+
+\section{Other Documentation}
+
+For developers interested in porting operating systems to Xen, the
+\emph{Xen Interface Manual} is distributed in the \path{docs/}
+directory of the Xen source distribution.
+
+
+\section{Online References}
+
+The official Xen web site can be found at:
+\begin{quote} {\tt http://www.xensource.com}
+\end{quote}
+
+This contains links to the latest versions of all online
+documentation, including the latest version of the FAQ.
+
+Information regarding Xen is also available at the Xen Wiki at
+\begin{quote} {\tt http://wiki.xensource.com/xenwiki/}\end{quote}
+The Xen project uses Bugzilla as its bug tracking system. You'll find
+the Xen Bugzilla at http://bugzilla.xensource.com/bugzilla/.
+
+
+\section{Mailing Lists}
+
+There are several mailing lists that are used to discuss Xen related
+topics. The most widely relevant are listed below. An official page of
+mailing lists and subscription information can be found at \begin{quote}
+  {\tt http://lists.xensource.com/} \end{quote}
+
+\begin{description}
+\item[xen-devel@lists.xensource.com] Used for development
+  discussions and bug reports.  Subscribe at: \\
+  {\small {\tt http://lists.xensource.com/xen-devel}}
+\item[xen-users@lists.xensource.com] Used for installation and usage
+  discussions and requests for help.  Subscribe at: \\
+  {\small {\tt http://lists.xensource.com/xen-users}}
+\item[xen-announce@lists.xensource.com] Used for announcements only.
+  Subscribe at: \\
+  {\small {\tt http://lists.xensource.com/xen-announce}}
+\item[xen-changelog@lists.xensource.com] Changelog feed
+  from the unstable and 2.0 trees - developer oriented.  Subscribe at: \\
+  {\small {\tt http://lists.xensource.com/xen-changelog}}
+\end{description}
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -175,7 +1808,72 @@
 \appendix
 
 %% Chapter Glossary of Terms moved to glossary.tex
-\include{src/user/glossary}
+\chapter{Glossary of Terms}
+
+\begin{description}
+
+\item[BVT] The BVT scheduler is used to give proportional fair shares
+  of the CPU to domains.
+
+\item[Domain] A domain is the execution context that contains a
+  running {\bf virtual machine}.  The relationship between virtual
+  machines and domains on Xen is similar to that between programs and
+  processes in an operating system: a virtual machine is a persistent
+  entity that resides on disk (somewhat like a program).  When it is
+  loaded for execution, it runs in a domain.  Each domain has a {\bf
+    domain ID}.
+
+\item[Domain 0] The first domain to be started on a Xen machine.
+  Domain 0 is responsible for managing the system.
+
+\item[Domain ID] A unique identifier for a {\bf domain}, analogous to
+  a process ID in an operating system.
+
+\item[Full virtualization] An approach to virtualization which
+  requires no modifications to the hosted operating system, providing
+  the illusion of a complete system of real hardware devices.
+
+\item[Hypervisor] An alternative term for {\bf VMM}, used because it
+  means `beyond supervisor', since it is responsible for managing
+  multiple `supervisor' kernels.
+
+\item[Live migration] A technique for moving a running virtual machine
+  to another physical host, without stopping it or the services
+  running on it.
+
+\item[Paravirtualization] An approach to virtualization which requires
+  modifications to the operating system in order to run in a virtual
+  machine.  Xen uses paravirtualization but preserves binary
+  compatibility for user space applications.
+
+\item[Shadow pagetables] A technique for hiding the layout of machine
+  memory from a virtual machine's operating system.  Used in some {\bf
+  VMMs} to provide the illusion of contiguous physical memory, in
+  Xen this is used during {\bf live migration}.
+
+\item[Virtual Block Device] Persistant storage available to a virtual
+  machine, providing the abstraction of an actual block storage device.
+  {\bf VBD}s may be actual block devices, filesystem images, or
+  remote/network storage.
+
+\item[Virtual Machine] The environment in which a hosted operating
+  system runs, providing the abstraction of a dedicated machine.  A
+  virtual machine may be identical to the underlying hardware (as in
+  {\bf full virtualization}, or it may differ, as in {\bf
+  paravirtualization}).
+
+\item[VMM] Virtual Machine Monitor - the software that allows multiple
+  virtual machines to be multiplexed on a single physical machine.
+
+\item[Xen] Xen is a paravirtualizing virtual machine monitor,
+  developed primarily by the Systems Research Group at the University
+  of Cambridge Computer Laboratory.
+
+\item[XenLinux] A name for the port of the Linux kernel that
+  runs on Xen.
+
+\end{description}
+
 
 \end{document}
 
