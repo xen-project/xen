@@ -23,8 +23,6 @@
 \begin{tabular}{l}
 {\Huge \bf Users' Manual} \\[4mm]
 {\huge Xen v3.0} \\[80mm]
-{\Large Xen is Copyright (c) 2002-2005, The Xen Team} \\[3mm]
-{\Large University of Cambridge, UK} \\[20mm]
 \end{tabular}
 \end{center}
 
@@ -36,6 +34,24 @@ on-line. Contributions of material, suggestions and corrections are
 welcome.}
 
 \vfill
+\clearpage
+
+
+% COPYRIGHT NOTICE
+\pagestyle{empty}
+
+\vspace*{\fill}
+
+Xen is Copyright \copyright  2002-2005, University of Cambridge, UK, XenSource
+Inc., IBM Corp., Hewlett-Packard Co., Intel Corp., AMD Inc., and others.  All
+rights reserved.
+
+Xen is an open-source project.  Most portions of Xen are licensed for copying
+under the terms of the GNU General Public License, version 2.  Other portions
+are licensed under the terms of the GNU Lesser General Public License, the
+Zope Public License 2.0, or under ``BSD-style'' licenses.  Please refer to the
+COPYING file for details.
+
 \cleardoublepage
 
 
@@ -80,8 +96,6 @@ functionality, including:
 \item Excellent hardware support (supports almost all Linux device
   drivers). 
 \end{itemize}
-
-Xen is licensed under the GNU General Public License (GPL2).
 
 
 \section{Usage Scenarios}
@@ -268,7 +282,9 @@ if you wish to build from source.
       http://bridge.sourceforge.net}} (e.g., \path{/sbin/brctl})
 \item [$\dag$] The Linux hotplug system\footnote{Available from {\tt
       http://linux-hotplug.sourceforge.net/}} (e.g.,
-  \path{/sbin/hotplug} and related scripts)
+      \path{/sbin/hotplug} and related scripts).  On newer distributions,
+      this is included alongside the Linux udev system\footnote{See {\tt
+      http://www.kernel.org/pub/linux/utils/kernel/hotplug/udev.html/}}.
 \item [$*$] Build tools (gcc v3.2.x or v3.3.x, binutils, GNU make).
 \item [$*$] Development installation of zlib (e.g.,\ zlib-dev).
 \item [$*$] Development installation of Python v2.2 or later (e.g.,\
@@ -920,18 +936,6 @@ syslog files, are useful when troubleshooting problems.
 \section{Xm}
 \label{s:xm}
 
-Command line management tasks are performed using the \path{xm}
-tool. For online help for the commands available, type:
-
-\begin{quote}
-\begin{verbatim}
-# xm help
-\end{verbatim}
-\end{quote}
-
-You can also type \path{xm help $<$command$>$} for more information on a
-given command.
-
 The xm tool is the primary tool for managing Xen from the console. The
 general format of an xm command line is:
 
@@ -947,11 +951,22 @@ used, including the standard variables described above and any custom
 variables (for instance, the \path{xmdefconfig} file uses a {\tt vmid}
 variable).
 
+For online help for the commands available, type:
+
+\begin{quote}
+\begin{verbatim}
+# xm help
+\end{verbatim}
+\end{quote}
+
+This will list the most commonly used commands.  The full list can be obtained
+using \verb_xm help --long_.  You can also type \path{xm help $<$command$>$}
+for more information on a given command.
+
 \subsection{Basic Management Commands}
 
-A complete list of \path{xm} commands is obtained by typing \texttt{xm
-  help}. One useful command is \verb_# xm list_ which lists all
-  domains running in rows of the following format:
+One useful command is \verb_# xm list_ which lists all domains running in rows
+of the following format:
 \begin{center} {\tt name domid memory vcpus state cputime}
 \end{center}
 
@@ -1016,7 +1031,7 @@ for concrete examples.
 \item[vif] List of MAC addresses (random addresses are assigned if not
   given) and bridges to use for the domain's network interfaces, e.g.\ 
 \begin{verbatim}
-vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0',
+vif = [ 'mac=00:16:3E:00:00:11, bridge=xen-br0',
         'bridge=xen-br1' ]
 \end{verbatim}
   to assign a MAC address and bridge to the first interface and assign
@@ -1085,7 +1100,7 @@ section.
 \subsection{Xen networking scripts}
 
 Xen's virtual networking is configured by two shell scripts (by
-default \path{network} and \path{vif-bridge}).  These are called
+default \path{network-bridge} and \path{vif-bridge}).  These are called
 automatically by \xend\ when certain events occur, with arguments to
 the scripts providing further contextual information.  These scripts
 are found by default in \path{/etc/xen/scripts}.  The names and
@@ -1093,7 +1108,7 @@ locations of the scripts can be configured in
 \path{/etc/xen/xend-config.sxp}.
 
 \begin{description}
-\item[network:] This script is called whenever \xend\ is started or
+\item[network-bridge:] This script is called whenever \xend\ is started or
   stopped to respectively initialize or tear down the Xen virtual
   network. In the default configuration initialization creates the
   bridge `xen-br0' and moves eth0 onto that bridge, modifying the
@@ -1109,6 +1124,8 @@ locations of the scripts can be configured in
   default Xen bridge.
 \end{description}
 
+Other example scripts are available (\path{network-route} and
+\path{vif-route}, \path{network-nat} and \path{vif-nat}).
 For more complex network setups (e.g.\ where routing is required or
 integrate with existing bridges) these scripts may be replaced with
 customized variants for your site's preferred configuration.
@@ -1301,7 +1318,7 @@ hope.  In particular, using lots of CoW LVM disks consumes a lot of
 dom0 memory, and error conditions such as running out of disk space
 are not handled well. Hopefully this will improve in future.
 
-To create two copy-on-write clone of the above file system you would
+To create two copy-on-write clones of the above file system you would
 use the following commands:
 
 \begin{quote}
