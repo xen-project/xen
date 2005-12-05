@@ -131,11 +131,11 @@ def becomeNonRoot():
             FAIL("Could not become a non-root user")
 
 def FAIL(reason):
-    print "REASON: %s" % reason
+    print "\nREASON: %s" % reason
     sys.exit(TEST_FAIL)
 
 def SKIP(reason):
-    print "REASON: %s" % reason
+    print "\nREASON: %s" % reason
     sys.exit(TEST_SKIP)
 
 def saveLog(logText, filename=None):
