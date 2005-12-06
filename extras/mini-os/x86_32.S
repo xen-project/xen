@@ -3,7 +3,11 @@
 
 
 .section __xen_guest
-        .asciz  "XEN_VER=3.0,LOADER=generic,PT_MODE_WRITABLE"
+	.ascii	"GUEST_OS=Mini-OS"
+	.ascii	",XEN_VER=xen-3.0"
+	.ascii	",LOADER=generic"
+	.ascii	",PT_MODE_WRITABLE"
+	.byte	0
 .text
 
 .globl _start, shared_info

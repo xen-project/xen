@@ -70,7 +70,7 @@ void trap_init(void);
 #define __cli()								\
 do {									\
 	vcpu_info_t *_vcpu;						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
 	_vcpu->evtchn_upcall_mask = 1;					\
 	barrier();							\
 } while (0)
@@ -79,7 +79,7 @@ do {									\
 do {									\
 	vcpu_info_t *_vcpu;						\
 	barrier();							\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
 	_vcpu->evtchn_upcall_mask = 0;					\
 	barrier(); /* unmask then check (avoid races) */		\
 	if ( unlikely(_vcpu->evtchn_upcall_pending) )			\
@@ -89,7 +89,7 @@ do {									\
 #define __save_flags(x)							\
 do {									\
 	vcpu_info_t *_vcpu;						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
 	(x) = _vcpu->evtchn_upcall_mask;				\
 } while (0)
 
@@ -97,7 +97,7 @@ do {									\
 do {									\
 	vcpu_info_t *_vcpu;						\
 	barrier();							\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
 	if ((_vcpu->evtchn_upcall_mask = (x)) == 0) {			\
 		barrier(); /* unmask then check (avoid races) */	\
 		if ( unlikely(_vcpu->evtchn_upcall_pending) )		\
@@ -110,7 +110,7 @@ do {									\
 #define __save_and_cli(x)						\
 do {									\
 	vcpu_info_t *_vcpu;						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
 	(x) = _vcpu->evtchn_upcall_mask;				\
 	_vcpu->evtchn_upcall_mask = 1;					\
 	barrier();							\
@@ -123,7 +123,7 @@ do {									\
 #define local_irq_enable()	__sti()
 
 #define irqs_disabled()			\
-    HYPERVISOR_shared_info->vcpu_data[smp_processor_id()].evtchn_upcall_mask
+    HYPERVISOR_shared_info->vcpu_info[smp_processor_id()].evtchn_upcall_mask
 
 /* This is a barrier for the compiler only, NOT the processor! */
 #define barrier() __asm__ __volatile__("": : :"memory")

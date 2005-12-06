@@ -73,7 +73,7 @@ static struct shadow_time_info shadow;
 
 static inline int time_values_up_to_date(void)
 {
-	struct vcpu_time_info *src = &HYPERVISOR_shared_info->vcpu_time[0]; 
+	struct vcpu_time_info *src = &HYPERVISOR_shared_info->vcpu_info[0].time; 
 
 	return (shadow.version == src->version);
 }
@@ -127,7 +127,7 @@ static unsigned long get_nsec_offset(void)
 
 static void get_time_values_from_xen(void)
 {
-	struct vcpu_time_info    *src = &HYPERVISOR_shared_info->vcpu_time[0];
+	struct vcpu_time_info    *src = &HYPERVISOR_shared_info->vcpu_info[0].time;
 
  	do {
 		shadow.version = src->version;
