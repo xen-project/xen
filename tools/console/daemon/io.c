@@ -180,6 +180,9 @@ static int domain_create_tty(struct domain *dom)
 		free(path);
 		if (!success)
 			goto out;
+
+		if (fcntl(master, F_SETFL, O_NONBLOCK) == -1)
+			goto out;
 	}
 
 	return master;
