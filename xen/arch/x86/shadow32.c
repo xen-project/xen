@@ -2203,7 +2203,7 @@ int shadow_remove_all_write_access(
     }
     
     if ( shadow_mode_external(d) ) {
-        if (write_refs-- == 0) 
+        if (--write_refs == 0) 
             return 0;
 
          // Use the back pointer to locate the shadow page that can contain
