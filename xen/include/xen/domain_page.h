@@ -10,19 +10,22 @@
 #include <xen/config.h>
 #include <xen/mm.h>
 
+#define map_domain_page(pfn)   map_domain_pages(pfn,0)
+#define unmap_domain_page(va)  unmap_domain_pages(va,0)
+
 #ifdef CONFIG_DOMAIN_PAGE
 
 /*
- * Maps a given page frame, returning the mmap'ed virtual address. The page is 
- * now accessible until a corresponding call to unmap_domain_page().
+ * Maps a given range of page frames, returning the mapped virtual address. The
+ * pages are now accessible until a corresponding call to unmap_domain_page().
  */
-extern void *map_domain_page(unsigned long pfn);
+extern void *map_domain_pages(unsigned long pfn, unsigned int order);
 
 /*
- * Pass a VA within a page previously mapped with map_domain_page().
- * That page will then be removed from the mapping lists.
+ * Pass a VA within the first page of a range previously mapped with
+ * map_omain_pages(). Those pages will then be removed from the mapping lists.
  */
-extern void unmap_domain_page(void *va);
+extern void unmap_domain_pages(void *va, unsigned int order);
 
 #define DMCACHE_ENTRY_VALID 1U
 #define DMCACHE_ENTRY_HELD  2U
@@ -84,8 +87,8 @@ domain_mmap_cache_destroy(struct domain_mmap_cache *cache)
 
 #else /* !CONFIG_DOMAIN_PAGE */
 
-#define map_domain_page(pfn)                phys_to_virt((pfn)<<PAGE_SHIFT)
-#define unmap_domain_page(va)               ((void)(va))
+#define map_domain_pages(pfn,order)         phys_to_virt((pfn)<<PAGE_SHIFT)
+#define unmap_domain_pages(va,order)        ((void)((void)(va),(void)(order)))
 
 struct domain_mmap_cache { 
 };
