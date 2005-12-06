@@ -54,6 +54,7 @@
 #include <asm/debugger.h>
 #include <asm/msr.h>
 #include <asm/x86_emulate.h>
+#include <asm/nmi.h>
 
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
@@ -1131,10 +1132,8 @@ static void unknown_nmi_error(unsigned char reason)
     printk("Do you have a strange power saving mode enabled?\n");
 }
 
-asmlinkage void do_nmi(struct cpu_user_regs *regs, unsigned long reason)
+static void default_do_nmi(struct cpu_user_regs *regs, unsigned long reason)
 {
-    ++nmi_count(smp_processor_id());
-
     if ( nmi_watchdog )
         nmi_watchdog_tick(regs);
 
@@ -1144,6 +1143,33 @@ asmlinkage void do_nmi(struct cpu_user_regs *regs, unsigned long reason)
         io_check_error(regs);
     else if ( !nmi_watchdog )
         unknown_nmi_error((unsigned char)(reason&0xff));
+}
+
+static int dummy_nmi_callback(struct cpu_user_regs *regs, int cpu)
+{
+	return 0;
+}
+ 
+static nmi_callback_t nmi_callback = dummy_nmi_callback;
+ 
+asmlinkage void do_nmi(struct cpu_user_regs *regs, unsigned long reason)
+{
+    unsigned int cpu = smp_processor_id();
+
+    ++nmi_count(cpu);
+
+	if ( !nmi_callback(regs, cpu) )
+		default_do_nmi(regs, reason);
+}
+
+void set_nmi_callback(nmi_callback_t callback)
+{
+    nmi_callback = callback;
+}
+
+void unset_nmi_callback(void)
+{
+	nmi_callback = dummy_nmi_callback;
 }
 
 asmlinkage int math_state_restore(struct cpu_user_regs *regs)

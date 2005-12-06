@@ -1,6 +1,8 @@
 #ifndef __ASM_MSR_H
 #define __ASM_MSR_H
 
+#ifndef __ASSEMBLY__
+
 #define rdmsr(msr,val1,val2) \
      __asm__ __volatile__("rdmsr" \
 			  : "=a" (val1), "=d" (val2) \
@@ -18,7 +20,13 @@
 			  : /* no outputs */ \
 			  : "c" (msr), "a" (val1), "d" (val2))
 
-#define wrmsrl(msr,val) wrmsr(msr,(__u32)((__u64)(val)),((__u64)(val))>>32) 
+static inline void wrmsrl(unsigned int msr, __u64 val)
+{
+        __u32 lo, hi;
+        lo = (__u32)val;
+        hi = (__u32)(val >> 32);
+        wrmsr(msr, lo, hi);
+}
 
 #define rdmsr_user(msr,val1,val2) ({\
     int _rc; \
@@ -73,6 +81,8 @@
      __asm__ __volatile__("rdpmc" \
 			  : "=a" (low), "=d" (high) \
 			  : "c" (counter))
+
+#endif /* !__ASSEMBLY__ */
 
 /* symbolic names for some interesting MSRs */
 /* Intel defined MSRs. */
