@@ -48,6 +48,7 @@
 struct buffer
 {
 	char *data;
+	size_t consumed;
 	size_t size;
 	size_t capacity;
 	size_t max_capacity;
@@ -109,12 +110,17 @@ static void buffer_append(struct domain *dom)
 
 	if (buffer->max_capacity &&
 	    buffer->size > buffer->max_capacity) {
-		memmove(buffer->data + (buffer->size -
-					buffer->max_capacity),
-			buffer->data, buffer->max_capacity);
-		buffer->data = realloc(buffer->data,
-				       buffer->max_capacity);
+		/* Discard the middle of the data. */
+
+		size_t over = buffer->size - buffer->max_capacity;
+		char *maxpos = buffer->data + buffer->max_capacity;
+
+		memmove(maxpos - over, maxpos, over);
+		buffer->data = realloc(buffer->data, buffer->max_capacity);
 		buffer->size = buffer->capacity = buffer->max_capacity;
+
+		if (buffer->consumed > buffer->max_capacity - over)
+			buffer->consumed = buffer->max_capacity - over;
 	}
 }
 
@@ -123,11 +129,13 @@ static bool buffer_empty(struct buffer *buffer)
 	return buffer->size == 0;
 }
 
-static void buffer_advance(struct buffer *buffer, size_t size)
+static void buffer_advance(struct buffer *buffer, size_t len)
 {
-	size = MIN(size, buffer->size);
-	memmove(buffer->data, buffer + size, buffer->size - size);
-	buffer->size -= size;
+	buffer->consumed += len;
+	if (buffer->consumed == buffer->size) {
+		buffer->consumed = 0;
+		buffer->size = 0;
+	}
 }
 
 static bool domain_is_valid(int domid)
@@ -327,6 +335,7 @@ static struct domain *create_domain(int domid)
 	dom->tty_fd = -1;
 	dom->is_dead = false;
 	dom->buffer.data = 0;
+	dom->buffer.consumed = 0;
 	dom->buffer.size = 0;
 	dom->buffer.capacity = 0;
 	dom->buffer.max_capacity = 0;
@@ -474,8 +483,12 @@ static void handle_tty_write(struct domain *dom)
 {
 	ssize_t len;
 
-	len = write(dom->tty_fd, dom->buffer.data, dom->buffer.size);
-	if (len < 1) {
+	len = write(dom->tty_fd, dom->buffer.data + dom->buffer.consumed,
+		    dom->buffer.size - dom->buffer.consumed);
+ 	if (len < 1) {
+		dolog(LOG_DEBUG, "Write failed on domain %d: %d, %d\n",
+		      dom->domid, len, errno);
+
 		close(dom->tty_fd);
 		dom->tty_fd = -1;
 
