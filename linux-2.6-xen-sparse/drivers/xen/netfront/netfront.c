@@ -76,9 +76,6 @@
         skb_shinfo(_skb)->frag_list = NULL;           \
     } while (0)
 
-/* Allow headroom on each rx pkt for Ethernet header, alignment padding, ... */
-#define RX_HEADROOM 200
-
 static unsigned long rx_pfn_array[NET_RX_RING_SIZE];
 static multicall_entry_t rx_mcl[NET_RX_RING_SIZE+1];
 static mmu_update_t rx_mmu[NET_RX_RING_SIZE];
@@ -153,14 +150,15 @@ static char *be_state_name[] = {
 #endif
 
 #ifdef DEBUG
-#define DPRINTK(fmt, args...) \
-	printk(KERN_ALERT "netfront (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
+#define DPRINTK(fmt, args...)						\
+	printk(KERN_ALERT "netfront (%s:%d) " fmt, __FUNCTION__,	\
+	       __LINE__, ##args)
 #else
 #define DPRINTK(fmt, args...) ((void)0)
 #endif
-#define IPRINTK(fmt, args...) \
+#define IPRINTK(fmt, args...)				\
 	printk(KERN_INFO "netfront: " fmt, ##args)
-#define WPRINTK(fmt, args...) \
+#define WPRINTK(fmt, args...)				\
 	printk(KERN_WARNING "netfront: " fmt, ##args)
 
 
@@ -537,7 +535,13 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	 */
 	batch_target = np->rx_target - (req_prod - np->rx.rsp_cons);
 	for (i = skb_queue_len(&np->rx_batch); i < batch_target; i++) {
-		skb = alloc_xen_skb(dev->mtu + RX_HEADROOM);
+		/*
+		 * Subtract dev_alloc_skb headroom (16 bytes) and shared info
+		 * tailroom then round down to SKB_DATA_ALIGN boundary.
+		 */
+		skb = alloc_xen_skb(
+			(PAGE_SIZE - 16 - sizeof(struct skb_shared_info)) &
+			(-SKB_DATA_ALIGN(1)));
 		if (skb == NULL)
 			break;
 		__skb_queue_tail(&np->rx_batch, skb);
@@ -567,7 +571,8 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 		rx_pfn_array[i] = virt_to_mfn(skb->head);
 
 		/* Remove this page from map before passing back to Xen. */
-		set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT, INVALID_P2M_ENTRY);
+		set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT,
+				    INVALID_P2M_ENTRY);
 
 		MULTI_update_va_mapping(rx_mcl+i, (unsigned long)skb->head,
 					__pte(0), 0);
@@ -809,36 +814,43 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	}
 
 	while ((skb = __skb_dequeue(&rxq)) != NULL) {
+		if (skb->len > (dev->mtu + ETH_HLEN)) {
+			if (net_ratelimit())
+				printk(KERN_INFO "Received packet too big for "
+				       "MTU (%d > %d)\n",
+				       skb->len - ETH_HLEN, dev->mtu);
+			skb->len  = 0;
+			skb->tail = skb->data;
+			init_skb_shinfo(skb);
+			dev_kfree_skb(skb);
+			continue;
+		}
+
 		/*
 		 * Enough room in skbuff for the data we were passed? Also,
 		 * Linux expects at least 16 bytes headroom in each rx buffer.
 		 */
 		if (unlikely(skb->tail > skb->end) || 
 		    unlikely((skb->data - skb->head) < 16)) {
-			nskb = NULL;
-
-			/* Only copy the packet if it fits in the MTU. */
-			if (skb->len <= (dev->mtu + ETH_HLEN)) {
-				if ((skb->tail > skb->end) && net_ratelimit())
+			if (net_ratelimit()) {
+				if (skb->tail > skb->end)
 					printk(KERN_INFO "Received packet "
-					       "needs %zd bytes more "
-					       "headroom.\n",
+					       "is %zd bytes beyond tail.\n",
 					       skb->tail - skb->end);
-
-				nskb = alloc_xen_skb(skb->len + 2);
-				if (nskb != NULL) {
-					skb_reserve(nskb, 2);
-					skb_put(nskb, skb->len);
-					memcpy(nskb->data,
-					       skb->data,
-					       skb->len);
-					nskb->dev = skb->dev;
-				}
+				else
+					printk(KERN_INFO "Received packet "
+					       "is %zd bytes before head.\n",
+					       16 - (skb->data - skb->head));
 			}
-			else if (net_ratelimit())
-				printk(KERN_INFO "Received packet too big for "
-				       "MTU (%d > %d)\n",
-				       skb->len - ETH_HLEN, dev->mtu);
+
+			nskb = alloc_xen_skb(skb->len + 2);
+			if (nskb != NULL) {
+				skb_reserve(nskb, 2);
+				skb_put(nskb, skb->len);
+				memcpy(nskb->data, skb->data, skb->len);
+				nskb->dev = skb->dev;
+				nskb->ip_summed = skb->ip_summed;
+			}
 
 			/* Reinitialise and then destroy the old skbuff. */
 			skb->len  = 0;

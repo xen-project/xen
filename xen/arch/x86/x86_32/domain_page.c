@@ -40,10 +40,10 @@ static void flush_all_ready_maps(void)
             cache[i] = l1e_empty();
 }
 
-void *map_domain_page(unsigned long pfn)
+void *map_domain_pages(unsigned long pfn, unsigned int order)
 {
     unsigned long va;
-    unsigned int idx, cpu = smp_processor_id();
+    unsigned int idx, i, flags, cpu = smp_processor_id();
     l1_pgentry_t *cache = mapcache;
 #ifndef NDEBUG
     unsigned int flush_count = 0;
@@ -72,10 +72,15 @@ void *map_domain_page(unsigned long pfn)
             local_flush_tlb();
             shadow_epoch[cpu] = ++epoch;
         }
-    }
-    while ( l1e_get_flags(cache[idx]) & _PAGE_PRESENT );
 
-    cache[idx] = l1e_from_pfn(pfn, __PAGE_HYPERVISOR);
+        flags = 0;
+        for ( i = 0; i < (1U << order); i++ )
+            flags |= l1e_get_flags(cache[idx+i]);
+    }
+    while ( flags & _PAGE_PRESENT );
+
+    for ( i = 0; i < (1U << order); i++ )
+        cache[idx+i] = l1e_from_pfn(pfn+i, __PAGE_HYPERVISOR);
 
     spin_unlock(&map_lock);
 
@@ -83,11 +88,12 @@ void *map_domain_page(unsigned long pfn)
     return (void *)va;
 }
 
-void unmap_domain_page(void *va)
+void unmap_domain_pages(void *va, unsigned int order)
 {
-    unsigned int idx;
+    unsigned int idx, i;
     ASSERT((void *)MAPCACHE_VIRT_START <= va);
     ASSERT(va < (void *)MAPCACHE_VIRT_END);
     idx = ((unsigned long)va - MAPCACHE_VIRT_START) >> PAGE_SHIFT;
-    l1e_add_flags(mapcache[idx], READY_FOR_TLB_FLUSH);
+    for ( i = 0; i < (1U << order); i++ )
+        l1e_add_flags(mapcache[idx+i], READY_FOR_TLB_FLUSH);
 }

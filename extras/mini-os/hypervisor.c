@@ -39,7 +39,7 @@ void do_hypervisor_callback(struct pt_regs *regs)
     unsigned int   l1i, l2i, port;
     int            cpu = 0;
     shared_info_t *s = HYPERVISOR_shared_info;
-    vcpu_info_t   *vcpu_info = &s->vcpu_data[cpu];
+    vcpu_info_t   *vcpu_info = &s->vcpu_info[cpu];
 
     vcpu_info->evtchn_upcall_pending = 0;
     
@@ -71,7 +71,7 @@ inline void mask_evtchn(u32 port)
 inline void unmask_evtchn(u32 port)
 {
     shared_info_t *s = HYPERVISOR_shared_info;
-    vcpu_info_t *vcpu_info = &s->vcpu_data[smp_processor_id()];
+    vcpu_info_t *vcpu_info = &s->vcpu_info[smp_processor_id()];
 
     synch_clear_bit(port, &s->evtchn_mask[0]);
 

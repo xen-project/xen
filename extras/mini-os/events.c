@@ -77,6 +77,7 @@ int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *) )
 	/* Try to bind the virq to a port */
 	op.cmd = EVTCHNOP_bind_virq;
 	op.u.bind_virq.virq = virq;
+	op.u.bind_virq.vcpu = smp_processor_id();
 
 	if ( HYPERVISOR_event_channel_op(&op) != 0 )
 	{
