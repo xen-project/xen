@@ -535,8 +535,12 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	 */
 	batch_target = np->rx_target - (req_prod - np->rx.rsp_cons);
 	for (i = skb_queue_len(&np->rx_batch); i < batch_target; i++) {
+		/*
+		 * Subtract dev_alloc_skb headroom (16 bytes) and shared info
+		 * tailroom then round down to SKB_DATA_ALIGN boundary.
+		 */
 		skb = alloc_xen_skb(
-			(PAGE_SIZE - sizeof(struct skb_shared_info)) &
+			(PAGE_SIZE - 16 - sizeof(struct skb_shared_info)) &
 			(-SKB_DATA_ALIGN(1)));
 		if (skb == NULL)
 			break;
