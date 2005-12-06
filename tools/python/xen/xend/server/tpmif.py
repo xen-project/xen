@@ -50,10 +50,9 @@ class TPMifController(DevController):
 
         result = DevController.configuration(self, devid)
 
-        (instance,) = self.readBackend(devid, 'instance')
+        instance = self.readBackend(devid, 'instance')
 
         if instance:
             result.append(['instance', instance])
-            log.info("configuration: instance=%d." % instance)
 
         return result
