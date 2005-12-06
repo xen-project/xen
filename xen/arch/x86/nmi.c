@@ -9,7 +9,8 @@
  *  Mikael Pettersson	: AMD K7 support for local APIC NMI watchdog.
  *  Mikael Pettersson	: Power Management for local APIC NMI watchdog.
  *  Mikael Pettersson	: Pentium 4 support for local APIC NMI watchdog.
- *  Keir Fraser         : Pentium 4 Hyperthreading support
+ *  Pavel Machek and
+ *  Mikael Pettersson	: PM converted to driver model. Disable/enable API.
  */
 
 #include <xen/config.h>
@@ -27,6 +28,7 @@
 #include <asm/msr.h>
 #include <asm/mpspec.h>
 #include <asm/debugger.h>
+#include <asm/div64.h>
 
 unsigned int nmi_watchdog = NMI_NONE;
 static unsigned int nmi_hz = HZ;
@@ -34,6 +36,28 @@ static unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
 static unsigned int nmi_p4_cccr_val;
 static struct ac_timer nmi_timer[NR_CPUS];
 static unsigned int nmi_timer_ticks[NR_CPUS];
+
+/*
+ * lapic_nmi_owner tracks the ownership of the lapic NMI hardware:
+ * - it may be reserved by some other driver, or not
+ * - when not reserved by some other driver, it may be used for
+ *   the NMI watchdog, or not
+ *
+ * This is maintained separately from nmi_active because the NMI
+ * watchdog may also be driven from the I/O APIC timer.
+ */
+static DEFINE_SPINLOCK(lapic_nmi_owner_lock);
+static unsigned int lapic_nmi_owner;
+#define LAPIC_NMI_WATCHDOG	(1<<0)
+#define LAPIC_NMI_RESERVED	(1<<1)
+
+/* nmi_active:
+ * +1: the lapic NMI watchdog is active, but can be disabled
+ *  0: the lapic NMI watchdog has not been set up, and cannot
+ *     be enabled
+ * -1: the lapic NMI watchdog is disabled, but can be enabled
+ */
+int nmi_active;
 
 #define K7_EVNTSEL_ENABLE	(1 << 22)
 #define K7_EVNTSEL_INT		(1 << 20)
@@ -111,8 +135,73 @@ static void nmi_timer_fn(void *unused)
     set_ac_timer(&nmi_timer[cpu], NOW() + MILLISECS(1000));
 }
 
-static inline void nmi_pm_init(void) { }
-#define __pminit	__init
+static void disable_lapic_nmi_watchdog(void)
+{
+    if (nmi_active <= 0)
+        return;
+    switch (boot_cpu_data.x86_vendor) {
+    case X86_VENDOR_AMD:
+        wrmsr(MSR_K7_EVNTSEL0, 0, 0);
+        break;
+    case X86_VENDOR_INTEL:
+        switch (boot_cpu_data.x86) {
+        case 6:
+            if (boot_cpu_data.x86_model > 0xd)
+                break;
+
+            wrmsr(MSR_P6_EVNTSEL0, 0, 0);
+            break;
+        case 15:
+            if (boot_cpu_data.x86_model > 0x4)
+                break;
+
+            wrmsr(MSR_P4_IQ_CCCR0, 0, 0);
+            wrmsr(MSR_P4_CRU_ESCR0, 0, 0);
+            break;
+        }
+        break;
+    }
+    nmi_active = -1;
+    /* tell do_nmi() and others that we're not active any more */
+    nmi_watchdog = 0;
+}
+
+static void enable_lapic_nmi_watchdog(void)
+{
+    if (nmi_active < 0) {
+        nmi_watchdog = NMI_LOCAL_APIC;
+        setup_apic_nmi_watchdog();
+    }
+}
+
+int reserve_lapic_nmi(void)
+{
+    unsigned int old_owner;
+
+    spin_lock(&lapic_nmi_owner_lock);
+    old_owner = lapic_nmi_owner;
+    lapic_nmi_owner |= LAPIC_NMI_RESERVED;
+    spin_unlock(&lapic_nmi_owner_lock);
+    if (old_owner & LAPIC_NMI_RESERVED)
+        return -EBUSY;
+    if (old_owner & LAPIC_NMI_WATCHDOG)
+        disable_lapic_nmi_watchdog();
+    return 0;
+}
+
+void release_lapic_nmi(void)
+{
+    unsigned int new_owner;
+
+    spin_lock(&lapic_nmi_owner_lock);
+    new_owner = lapic_nmi_owner & ~LAPIC_NMI_RESERVED;
+    lapic_nmi_owner = new_owner;
+    spin_unlock(&lapic_nmi_owner_lock);
+    if (new_owner & LAPIC_NMI_WATCHDOG)
+        enable_lapic_nmi_watchdog();
+}
+
+#define __pminit __init
 
 /*
  * Activate the NMI watchdog via the local APIC.
@@ -122,8 +211,19 @@ static inline void nmi_pm_init(void) { }
 static void __pminit clear_msr_range(unsigned int base, unsigned int n)
 {
     unsigned int i;
-    for ( i = 0; i < n; i++ )
+
+    for (i = 0; i < n; i++)
         wrmsr(base+i, 0, 0);
+}
+
+static inline void write_watchdog_counter(const char *descr)
+{
+    u64 count = (u64)cpu_khz * 1000;
+
+    do_div(count, nmi_hz);
+    if(descr)
+        Dprintk("setting %s to -0x%08Lx\n", descr, count);
+    wrmsrl(nmi_perfctr_msr, 0 - count);
 }
 
 static void __pminit setup_k7_watchdog(void)
@@ -141,8 +241,7 @@ static void __pminit setup_k7_watchdog(void)
         | K7_NMI_EVENT;
 
     wrmsr(MSR_K7_EVNTSEL0, evntsel, 0);
-    Dprintk("setting K7_PERFCTR0 to %08lx\n", -(cpu_khz/nmi_hz*1000));
-    wrmsr(MSR_K7_PERFCTR0, -(cpu_khz/nmi_hz*1000), -1);
+    write_watchdog_counter("K7_PERFCTR0");
     apic_write(APIC_LVTPC, APIC_DM_NMI);
     evntsel |= K7_EVNTSEL_ENABLE;
     wrmsr(MSR_K7_EVNTSEL0, evntsel, 0);
@@ -163,8 +262,7 @@ static void __pminit setup_p6_watchdog(void)
         | P6_NMI_EVENT;
 
     wrmsr(MSR_P6_EVNTSEL0, evntsel, 0);
-    Dprintk("setting P6_PERFCTR0 to %08lx\n", -(cpu_khz/nmi_hz*1000));
-    wrmsr(MSR_P6_PERFCTR0, -(cpu_khz/nmi_hz*1000), 0);
+    write_watchdog_counter("P6_PERFCTR0");
     apic_write(APIC_LVTPC, APIC_DM_NMI);
     evntsel |= P6_EVNTSEL0_ENABLE;
     wrmsr(MSR_P6_EVNTSEL0, evntsel, 0);
@@ -187,7 +285,13 @@ static int __pminit setup_p4_watchdog(void)
         clear_msr_range(0x3F1, 2);
     /* MSR 0x3F0 seems to have a default value of 0xFC00, but current
        docs doesn't fully define it, so leave it alone for now. */
-    clear_msr_range(0x3A0, 31);
+    if (boot_cpu_data.x86_model >= 0x3) {
+        /* MSR_P4_IQ_ESCR0/1 (0x3ba/0x3bb) removed */
+        clear_msr_range(0x3A0, 26);
+        clear_msr_range(0x3BC, 3);
+    } else {
+        clear_msr_range(0x3A0, 31);
+    }
     clear_msr_range(0x3C0, 6);
     clear_msr_range(0x3C8, 6);
     clear_msr_range(0x3E0, 2);
@@ -196,11 +300,9 @@ static int __pminit setup_p4_watchdog(void)
         
     wrmsr(MSR_P4_CRU_ESCR0, P4_NMI_CRU_ESCR0, 0);
     wrmsr(MSR_P4_IQ_CCCR0, P4_NMI_IQ_CCCR0 & ~P4_CCCR_ENABLE, 0);
-    Dprintk("setting P4_IQ_PERFCTR0 to 0x%08lx\n", -(cpu_khz/nmi_hz*1000));
-    wrmsr(MSR_P4_IQ_PERFCTR0, -(cpu_khz/nmi_hz*1000), -1);
+    write_watchdog_counter("P4_IQ_COUNTER0");
     apic_write(APIC_LVTPC, APIC_DM_NMI);
     wrmsr(MSR_P4_IQ_CCCR0, nmi_p4_cccr_val, 0);
-
     return 1;
 }
 
@@ -220,9 +322,15 @@ void __pminit setup_apic_nmi_watchdog(void)
     case X86_VENDOR_INTEL:
         switch (boot_cpu_data.x86) {
         case 6:
+            if (boot_cpu_data.x86_model > 0xd)
+                return;
+
             setup_p6_watchdog();
             break;
         case 15:
+            if (boot_cpu_data.x86_model > 0x4)
+                return;
+
             if (!setup_p4_watchdog())
                 return;
             break;
@@ -234,11 +342,11 @@ void __pminit setup_apic_nmi_watchdog(void)
         return;
     }
 
+    lapic_nmi_owner = LAPIC_NMI_WATCHDOG;
+    nmi_active = 1;
+
     init_ac_timer(&nmi_timer[cpu], nmi_timer_fn, NULL, cpu);
-
-    nmi_pm_init();
 }
-
 
 static unsigned int
 last_irq_sums [NR_CPUS],
@@ -329,6 +437,6 @@ void nmi_watchdog_tick(struct cpu_user_regs * regs)
              */
             apic_write(APIC_LVTPC, APIC_DM_NMI);
         }
-        wrmsr(nmi_perfctr_msr, -(cpu_khz/nmi_hz*1000), -1);
+        write_watchdog_counter(NULL);
     }
 }
