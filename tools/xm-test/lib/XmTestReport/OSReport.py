@@ -102,6 +102,11 @@ class Machine:
         xen = self.__getXenInfo(xenValues)
         cpu = self.__getCpuInfo(cpuValues)
 
+        if cpu["model_name"] == "Unknown":   
+            cpuValues={"arch"  : "Unknown",
+                       "features": "Unknown"}
+            cpu=self.__getCpuInfo(cpuValues)
+
         for k in xen.keys():
             self.values[k] = xen[k]
             if xen[k] == "Unknown":
