@@ -545,7 +545,6 @@ void handle_io(void)
 
 	do {
 		struct domain *d, *n;
-		struct timeval tv = { 100, 0 };
 		int max_fd = -1;
 
 		FD_ZERO(&readfds);
@@ -570,7 +569,7 @@ void handle_io(void)
 			}
 		}
 
-		ret = select(max_fd + 1, &readfds, &writefds, 0, &tv);
+		ret = select(max_fd + 1, &readfds, &writefds, 0, NULL);
 
 		if (FD_ISSET(xs_fileno(xs), &readfds))
 			handle_xs(xs_fileno(xs));
