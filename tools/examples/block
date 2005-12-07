@@ -89,12 +89,12 @@ check_sharing()
     fi
   done
 
-  for dom in $(xenstore-list "$XENBUS_BASE_PATH")
+  local base_path="$XENBUS_BASE_PATH/$XENBUS_TYPE"
+  for dom in $(xenstore-list "$base_path")
   do
-    for dev in $(xenstore-list "$XENBUS_BASE_PATH/$dom")
+    for dev in $(xenstore-list "$base_path/$dom")
     do
-      d=$(xenstore_read_default \
-            "$XENBUS_BASE_PATH/$dom/$dev/physical-device" "")
+      d=$(xenstore_read_default "$base_path/$dom/$dev/physical-device" "")
 
       if [ "$d" == "$devmm" ]
       then
@@ -106,7 +106,7 @@ check_sharing()
             return
           fi
         else
-          local m=$(xenstore_read "$XENBUS_BASE_PATH/$dom/$dev/mode")
+          local m=$(xenstore_read "$base_path/$dom/$dev/mode")
           m=$(canonicalise_mode "$m")
 
           if [ "$m" == 'w' ]
@@ -128,12 +128,10 @@ check_sharing()
 
 same_vm()
 {
-  local thisdom="$XENBUS_FRONTEND_ID"
   local otherdom="$1"
-  local thisvm=$(xenstore-read "/local/domain/$thisdom/vm")
   local othervm=$(xenstore-read "/local/domain/$otherdom/vm")
 
-  [ "$thisvm" == "$othervm" ]
+  [ "$FRONTEND_UUID" == "$othervm" ]
 }
 
 
@@ -240,6 +238,9 @@ case "$command" in
     case $t in 
       phy)
         dev=$(expand_dev $p)
+        FRONTEND_ID=$(xenstore_read "$XENBUS_PATH/frontend-id")
+        FRONTEND_UUID=$(xenstore_read_default \
+            "/local/domain/$FRONTEND_ID/vm" 'unknown')
         claim_lock "block"
         check_device_sharing "$dev" "$mode"
 	write_dev "$dev"
