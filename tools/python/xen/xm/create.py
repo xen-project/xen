@@ -424,8 +424,10 @@ def configure_image(vals):
         config_image.append(['root', cmdline_root])
     if vals.extra:
         config_image.append(['args', vals.extra])
-    if vals.vcpus:
-        config_image.append(['vcpus', vals.vcpus])
+
+    if vals.builder == 'vmx':
+        configure_vmx(config_image, vals)
+        
     return config_image
     
 def configure_disks(config_devs, vals):
@@ -573,7 +575,7 @@ def make_config(vals):
                 config.append([n, v])
 
     map(add_conf, ['name', 'memory', 'ssidref', 'maxmem', 'restart',
-                   'on_poweroff', 'on_reboot', 'on_crash'])
+                   'on_poweroff', 'on_reboot', 'on_crash', 'vcpus'])
     
     if vals.cpu is not None:
         config.append(['cpu', vals.cpu])
@@ -593,7 +595,6 @@ def make_config(vals):
         config_image = run_bootloader(vals)
     else:
         config_image = configure_image(vals)
-    configure_vmx(config_image, vals)
     config.append(['image', config_image])
 
     config_devs = []

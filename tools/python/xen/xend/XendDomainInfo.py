@@ -285,16 +285,18 @@ def parseConfig(config):
     for e in ROUNDTRIPPING_CONFIG_ENTRIES:
         result[e[0]] = get_cfg(e[0], e[1])
 
-    result['cpu']       = get_cfg('cpu',       int)
-    result['cpus']      = get_cfg('cpus',      str)
-    result['image']     = get_cfg('image')
+    result['cpu']   = get_cfg('cpu',  int)
+    result['cpus']  = get_cfg('cpus', str)
+    result['image'] = get_cfg('image')
 
     try:
         if result['image']:
-            result['vcpus'] = int(sxp.child_value(result['image'],
-                                                  'vcpus', 1))
-        else:
-            result['vcpus'] = 1
+            v = sxp.child_value(result['image'], 'vcpus')
+            if v is not None and int(v) != result['vcpus']:
+                log.warn(('Image VCPUs setting overrides vcpus=%d elsewhere.'
+                          '  Using %s VCPUs for VM %s.') %
+                         (result['vcpus'], v, result['uuid']))
+                result['vcpus'] = int(v)
     except TypeError, exn:
         raise VmError(
             'Invalid configuration setting: vcpus = %s: %s' %
