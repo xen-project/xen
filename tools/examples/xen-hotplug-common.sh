@@ -73,7 +73,7 @@ xenstore_read() {
 # path is not present.
 #
 xenstore_read_default() {
-  xenstore-read "$1" || echo "$2"
+  xenstore-read "$1" 2>/dev/null || echo "$2"
 }
 
 
@@ -146,7 +146,7 @@ _claim_lock()
 _release_lock()
 {
   trap sigerr ERR
-  rm -rf "$1" || true
+  rm -rf "$1" 2>/dev/null || true
 }
 
 

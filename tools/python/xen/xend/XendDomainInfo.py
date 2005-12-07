@@ -1041,7 +1041,6 @@ class XendDomainInfo:
             sxpr.append(['shutdown_reason', reason])
         if self.infoIsSet('cpu_time'):
             sxpr.append(['cpu_time', self.info['cpu_time']/1e9])
-        sxpr.append(['vcpus', self.info['vcpus']])
         sxpr.append(['online_vcpus', self.info['online_vcpus']])
             
         if self.infoIsSet('start_time'):

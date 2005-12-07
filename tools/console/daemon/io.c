@@ -486,7 +486,7 @@ static void handle_tty_write(struct domain *dom)
 	len = write(dom->tty_fd, dom->buffer.data + dom->buffer.consumed,
 		    dom->buffer.size - dom->buffer.consumed);
  	if (len < 1) {
-		dolog(LOG_DEBUG, "Write failed on domain %d: %d, %d\n",
+		dolog(LOG_DEBUG, "Write failed on domain %d: %zd, %d\n",
 		      dom->domid, len, errno);
 
 		close(dom->tty_fd);
