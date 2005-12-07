@@ -20,6 +20,17 @@ XENDOMAINS_SYSRQ=""
 #
 XENDOMAINS_USLEEP=100000
 
+## Type: integer
+## Default: 5000000
+#
+# When creating a guest domain, it is sensible to allow a little time for it
+# to get started before creating another domain or proceeding through the
+# boot process.  Without this, the booting guests will thrash the disk as they
+# start up.  This timeout (in microseconds) specifies the delay after guest
+# domain creation.
+#
+XENDOMAINS_CREATE_USLEEP=5000000
+
 ## Type: string
 ## Default: ""
 #
