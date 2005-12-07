@@ -321,11 +321,7 @@ def xm_restore(args):
         sys.exit(1)
 
     from xen.xend.XendClient import server
-    info = server.xend_domain_restore(savefile)
-    PrettyPrint.prettyprint(info)
-    id = sxp.child_value(info, 'domid')
-    if id is not None:
-        server.xend_domain_unpause(domid)
+    server.xend_domain_restore(savefile)
 
 
 def getDomains(domain_names):
