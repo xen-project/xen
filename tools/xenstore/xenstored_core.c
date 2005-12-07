@@ -823,7 +823,7 @@ static struct node *construct_node(struct connection *conn, const char *name)
 	node->num_perms = parent->num_perms;
 	node->perms = talloc_memdup(node, parent->perms,
 				    node->num_perms * sizeof(node->perms[0]));
-	if (conn->id)
+	if (conn && conn->id)
 		node->perms[0].id = conn->id;
 
 	/* No children, no data */
@@ -1441,8 +1441,10 @@ static void setup_structure(void)
 		   balloon driver will pick up stale entries.  In the case of
 		   the balloon driver, this can be fatal.
 		*/
+		char *tlocal = talloc_strdup(talloc_autofree_context(),
+					     "/local");
 		internal_rm("/local");
-		manual_node("/", "local");
+		create_node(NULL, tlocal, NULL, 0);
 	}
 	else {
 		tdb_ctx = tdb_open(tdbname, 7919, TDB_FLAGS, O_RDWR|O_CREAT,
