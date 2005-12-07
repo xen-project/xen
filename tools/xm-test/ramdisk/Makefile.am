@@ -29,6 +29,7 @@ $(BR_IMG): $(BR_SRC)
 	cd $(BR_SRC) && make oldconfig && make
 
 $(XMTEST_VER_IMG): $(BR_IMG)
+	chmod a+x skel/etc/init.d/rcS
 	(cd skel; tar cf - .) | (cd $(BR_SRC)/$(BR_ROOT); tar xvf -)
 	cd $(BR_SRC) && make
 	cp $(BR_IMG) initrd-$(XMTEST_MAJ_VER).img
