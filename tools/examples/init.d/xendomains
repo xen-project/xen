@@ -152,7 +152,8 @@ contains_something()
 # read name from xen config file
 rdname()
 {
-    NM=`grep '^name *=' $1 | sed -e 's/^name *= *"\([^"]*\)".*$/\1/' -e 's/%[id]/[0-9]*/g'`
+    NM=$(xm create --quiet --dryrun --defconfig "$1" |
+         sed -n 's/^.*(name \(.*\))$/\1/p')
 }
 
 rdnames()
@@ -220,6 +221,7 @@ start()
 		rm $dom
 	    fi
 	done
+	echo .
     fi
 
     if contains_something "$XENDOMAINS_AUTO"
