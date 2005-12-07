@@ -905,14 +905,21 @@ This chapter summarizes the management software and tools available.
 \section{\Xend\ }
 \label{s:xend}
 
-The Xen Daemon (\Xend) performs system management functions related to
-virtual machines. It forms a central point of control for a machine
-and can be controlled using an HTTP-based protocol. \Xend\ must be
-running in order to start and manage virtual machines.
 
-\Xend\ must be run as root because it needs access to privileged system
-management functions. A small set of commands may be issued on the
-\xend\ command line:
+The \Xend\ node control daemon performs system management functions
+related to virtual machines. It forms a central point of control of
+virtualized resources, and must be running in order to start and manage
+virtual machines. \Xend\ must be run as root because it needs access to
+privileged system management functions.
+
+An initialization script named \texttt{/etc/init.d/xend} is provided to
+start \Xend\ at boot time. Use the tool appropriate (i.e. chkconfig) for
+your Linux distribution to specify the runlevels at which this script
+should be executed, or manually create symbolic links in the correct
+runlevel directories.
+
+\Xend\ can be started on the command line as well, and supports the
+following set of parameters:
 
 \begin{tabular}{ll}
   \verb!# xend start! & start \xend, if not already running \\
@@ -929,9 +936,62 @@ the appropriate runlevel directories or use the {\tt chkconfig} tool,
 where available.  Once \xend\ is running, administration can be done
 using the \texttt{xm} tool.
 
-As \xend\ runs, events will be logged to \path{/var/log/xend.log}
-and \path{/var/log/xend-debug.log}. These, along with the standard 
-syslog files, are useful when troubleshooting problems.
+\subsection{Logging}
+
+As \xend\ runs, events will be logged to \path{/var/log/xend.log} and
+(less frequently) to \path{/var/log/xend-debug.log}. These, along with
+the standard syslog files, are useful when troubleshooting problems.
+
+\subsection{Configuring \Xend\ }
+
+\Xend\ is written in Python. At startup, it reads its configuration
+information from the file \path{/etc/xen/xend-config.sxp}. The Xen
+installation places an example \texttt{xend-config.sxp} file in the
+\texttt{/etc/xen} subdirectory which should work for most installations.
+
+See the example configuration file \texttt{xend-debug.sxp} and the
+section 5 man page \texttt{xend-config.sxp} for a full list of
+parameters and more detailed information. Some of the most important
+parameters are discussed below.
+
+An HTTP interface and a Unix domain socket API are available to
+communicate with \Xend. This allows remote users to pass commands to the
+daemon. By default, \Xend does not start an HTTP server. It does start a
+Unix domain socket management server, as the low level utility
+\texttt{xm} requires it. For support of cross-machine migration, \Xend\
+can start a relocation server. This support is not enabled by default
+for security reasons.
+
+Note: the example \texttt{xend} configuration file modifies the defaults and
+starts up \Xend\ as an HTTP server as well as a relocation server.
+
+From the file:
+
+\begin{verbatim}
+#(xend-http-server no)
+(xend-http-server yes)
+#(xend-unix-server yes)
+#(xend-relocation-server no)
+(xend-relocation-server yes)
+\end{verbatim}
+
+Comment or uncomment lines in that file to disable or enable features
+that you require.
+
+Connections from remote hosts are disabled by default:
+
+\begin{verbatim}
+# Address xend should listen on for HTTP connections, if xend-http-server is
+# set.
+# Specifying 'localhost' prevents remote connections.
+# Specifying the empty string '' (the default) allows all connections.
+#(xend-address '')
+(xend-address localhost)
+\end{verbatim}
+
+It is recommended that if migration support is not needed, the
+\texttt{xend-relocation-server} parameter value be changed to
+``\texttt{no}'' or commented out.
 
 \section{Xm}
 \label{s:xm}
@@ -992,7 +1052,7 @@ The meaning of each field is as follows:
 \end{quote}
 
 The \path{xm list} command also supports a long output format when the
-\path{-l} switch is used.  This outputs the fulls details of the
+\path{-l} switch is used.  This outputs the full details of the
 running domains in \xend's SXP configuration format.
 
 
