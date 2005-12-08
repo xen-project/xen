@@ -33,6 +33,10 @@ struct wait_queue name = {                              \
 }
 
 
+static inline void init_waitqueue_head(struct wait_queue_head *h)
+{
+  INIT_LIST_HEAD(&h->thread_list);
+}
 
 static inline void init_waitqueue_entry(struct wait_queue *q, struct thread *thread)
 {

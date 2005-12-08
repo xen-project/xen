@@ -35,6 +35,7 @@
 #include <lib.h>
 #include <sched.h>
 #include <xenbus.h>
+#include "xenbus/xenbus_comms.h"
 
 /*
  * Shared page for communicating with the hypervisor.

@@ -56,7 +56,7 @@ int do_event(u32 port, struct pt_regs *regs)
 
 }
 
-void bind_evtchn( u32 port, void (*handler)(int, struct pt_regs *) )
+int bind_evtchn( u32 port, void (*handler)(int, struct pt_regs *) )
 {
  	if(ev_actions[port].handler)
         printk("WARN: Handler for port %d already registered, replacing\n",
@@ -67,6 +67,16 @@ void bind_evtchn( u32 port, void (*handler)(int, struct pt_regs *) )
  
 	/* Finally unmask the port */
 	unmask_evtchn(port);
+
+	return port;
+}
+
+void unbind_evtchn( u32 port )
+{
+	if (!ev_actions[port].handler)
+		printk("WARN: No handler for port %d when unbinding\n", port);
+	ev_actions[port].handler = NULL;
+	ev_actions[port].status |= EVS_DISABLED;
 }
 
 int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *) )
@@ -90,6 +100,10 @@ out:
 	return ret;
 }
 
+void unbind_virq( u32 port )
+{
+	unbind_evtchn(port);
+}
 
 
 /*
