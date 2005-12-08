@@ -132,8 +132,8 @@ ROUNDTRIPPING_CONFIG_ENTRIES += VM_CONFIG_PARAMS
 
 
 ##
-# All entries written to the store.  This is VM_CONFIGURATION_PARAMS, plus
-# those entries written to the store that cannot be reconfigured on-the-fly.
+# All entries written to the store.  This is VM_CONFIG_PARAMS, plus those
+# entries written to the store that cannot be reconfigured on-the-fly.
 #
 VM_STORE_ENTRIES = [
     ('uuid',       str),
@@ -142,6 +142,7 @@ VM_STORE_ENTRIES = [
     ('vcpu_avail', int),
     ('memory',     int),
     ('maxmem',     int),
+    ('start_time', int),
     ]
 
 VM_STORE_ENTRIES += VM_CONFIG_PARAMS
@@ -448,7 +449,7 @@ class XendDomainInfo:
     ## private:
 
     def readVMDetails(self, params):
-        """Read from the store all of those entries that we consider 
+        """Read the specified parameters from the store.
         """
         try:
             return self.gatherVm(*params)
@@ -475,6 +476,13 @@ class XendDomainInfo:
 
         map(f, VM_CONFIG_PARAMS, self.readVMDetails(VM_CONFIG_PARAMS))
 
+        im = self.readVm('image')
+        current_im = self.info['image']
+        if (im is not None and
+            (current_im is None or sxp.to_string(current_im) != im)):
+            self.info['image'] = sxp.from_string(im)
+            changed = True
+
         if changed:
             # Update the domain section of the store, as this contains some
             # parameters derived from the VM configuration.
@@ -498,6 +506,7 @@ class XendDomainInfo:
             entries.remove(('maxmem', int))
         else:
             entries = VM_STORE_ENTRIES
+        entries.append(('image', str))
 
         map(lambda x, y: useIfNeeded(x[0], y), entries,
             self.readVMDetails(entries))
@@ -650,9 +659,6 @@ class XendDomainInfo:
 
         if self.infoIsSet('image'):
             to_store['image'] = sxp.to_string(self.info['image'])
-
-        if self.infoIsSet('start_time'):
-            to_store['start_time'] = str(self.info['start_time'])
 
         log.debug("Storing VM details: %s", to_store)
 
