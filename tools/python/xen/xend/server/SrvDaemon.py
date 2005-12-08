@@ -123,9 +123,18 @@ class Daemon:
 
     def daemonize(self):
         if not XEND_DAEMONIZE: return
+ 
         # Detach from TTY.
+
+        # Become the group leader (already a child process)
         os.setsid()
 
+        # Fork, this allows the group leader to exit,
+        # which means the child can never again regain control of the
+        # terminal
+        if self.fork_pid(XEND_PID_FILE):
+            self.exit()
+ 
         # Detach from standard file descriptors, and redirect them to
         # /dev/null or the log as appropriate.
         os.close(0)
@@ -164,7 +173,7 @@ class Daemon:
         # we can avoid a race condition during startup
         
         r,w = os.pipe()
-        if self.fork_pid(XEND_PID_FILE):
+        if os.fork():
             os.close(w)
             r = os.fdopen(r, 'r')
             try:
@@ -178,6 +187,7 @@ class Daemon:
         else:
             os.close(r)
             # Child
+            self.daemonize()
             self.tracing(trace)
             self.run(os.fdopen(w, 'w'))
 
@@ -274,7 +284,6 @@ class Daemon:
 
             relocate.listenRelocation()
             servers = SrvServer.create()
-            self.daemonize()
             servers.start(status)
         except Exception, ex:
             print >>sys.stderr, 'Exception starting xend:', ex
