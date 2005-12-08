@@ -13,6 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (c) 2005 XenSource Ltd.
 #============================================================================
 
 """Domain migration.
@@ -22,9 +23,6 @@ import sys
 
 from xen.xend.XendClient import server
 from xen.xm.opts import *
-
-DOM0_NAME = 'Domain-0'
-DOM0_ID = '0'
 
 gopts = Opts(use="""[options] DOM HOST
 
@@ -58,7 +56,4 @@ def main(argv):
         opts.err('Invalid arguments: ' + str(args))
     dom = args[0]
     dst = args[1]
-    if dom in [DOM0_NAME, DOM0_ID]:
-        opts.err('Cannot migrate ' + dom)
     server.xend_domain_migrate(dom, dst, opts.vals.live, opts.vals.resource)
-        

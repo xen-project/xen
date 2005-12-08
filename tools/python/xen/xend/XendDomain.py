@@ -395,6 +395,9 @@ class XendDomain:
 
         dominfo = self.domain_lookup(domid)
 
+        if dominfo.getDomid() == PRIV_DOMAIN:
+            raise XendError("Cannot migrate privileged domain %i" % domid)
+
         port = xroot.get_xend_relocation_port()
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -415,6 +418,9 @@ class XendDomain:
 
         try:
             dominfo = self.domain_lookup(domid)
+
+            if dominfo.getDomid() == PRIV_DOMAIN:
+                raise XendError("Cannot save privileged domain %i" % domid)
 
             fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
             try:
