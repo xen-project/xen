@@ -1450,6 +1450,7 @@ static int resync_all(struct domain *d, u32 stype)
     int changed;
     u32 min_max_shadow, min_max_snapshot;
     int min_shadow, max_shadow, min_snapshot, max_snapshot;
+    struct vcpu *v;
 
     ASSERT(shadow_lock_is_acquired(d));
 
@@ -1739,6 +1740,9 @@ static int resync_all(struct domain *d, u32 stype)
 
         if ( unlikely(unshadow) )
         {
+            for_each_vcpu(d, v)
+                if(smfn == pagetable_get_pfn(v->arch.shadow_table))
+                    return need_flush;
             perfc_incrc(unshadow_l2_count);
             shadow_unpin(smfn);
 #if CONFIG_PAGING_LEVELS == 2
