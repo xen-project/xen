@@ -390,12 +390,13 @@ class XendDomain:
                 raise XendError(str(ex))
         return val       
 
-    def domain_migrate(self, domid, dst, live=False, resource=0):
+    def domain_migrate(self, domid, dst, live=False, resource=0, port=0):
         """Start domain migration."""
 
         dominfo = self.domain_lookup(domid)
 
-        port = xroot.get_xend_relocation_port()
+        if port == 0:
+            port = xroot.get_xend_relocation_port()
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect((dst, port))
