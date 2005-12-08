@@ -793,29 +793,39 @@ static __inline__ int find_highest_irq(u32 *pintr)
     return __fls(pintr[0]);
 }
 
+void set_tsc_shift(struct vcpu *v,struct vmx_virpit *vpit)
+{
+    u64   drift;
+
+    if ( vpit->first_injected )
+        drift = vpit->period_cycles * vpit->pending_intr_nr;
+    else 
+        drift = 0;
+    drift = v->arch.arch_vmx.tsc_offset - drift;
+    __vmwrite(TSC_OFFSET, drift);
+
+#if defined (__i386__)
+    __vmwrite(TSC_OFFSET_HIGH, (drift >> 32));
+#endif
+}
+
 #define BSP_CPU(v)    (!(v->vcpu_id))
 static inline void
 interrupt_post_injection(struct vcpu * v, int vector, int type)
 {
     struct vmx_virpit *vpit = &(v->domain->arch.vmx_platform.vmx_pit);
-    u64    drift;
 
     if ( is_pit_irq(v, vector, type) ) {
         if ( !vpit->first_injected ) {
-            vpit->first_injected = 1;
             vpit->pending_intr_nr = 0;
+            vpit->scheduled = NOW() + vpit->period;
+            set_ac_timer(&vpit->pit_timer, vpit->scheduled);
+            vpit->first_injected = 1;
         } else {
             vpit->pending_intr_nr--;
         }
         vpit->inject_point = NOW();
-        drift = vpit->period_cycles * vpit->pending_intr_nr;
-        drift = v->arch.arch_vmx.tsc_offset - drift;
-        __vmwrite(TSC_OFFSET, drift);
-
-#if defined (__i386__)
-        __vmwrite(TSC_OFFSET_HIGH, (drift >> 32));
-#endif
-
+        set_tsc_shift (v, vpit);
     }
 
     switch(type)
@@ -982,8 +992,10 @@ void vmx_do_resume(struct vcpu *v)
             vmx_wait_io();
     }
     /* pick up the elapsed PIT ticks and re-enable pit_timer */
-    if ( vpit->ticking )
+    if ( vpit->first_injected ) {
         pickup_deactive_ticks(vpit);
+    }
+    set_tsc_shift(v,vpit);
 
     /* We can't resume the guest if we're waiting on I/O */
     ASSERT(!test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags));

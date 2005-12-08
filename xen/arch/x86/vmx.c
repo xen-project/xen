@@ -108,7 +108,7 @@ void vmx_relinquish_resources(struct vcpu *v)
     destroy_vmcs(&v->arch.arch_vmx);
     free_monitor_pagetable(v);
     vpit = &v->domain->arch.vmx_platform.vmx_pit;
-    if ( vpit->ticking && active_ac_timer(&(vpit->pit_timer)) )
+    if ( active_ac_timer(&(vpit->pit_timer)) )
         rem_ac_timer(&vpit->pit_timer);
     if ( active_ac_timer(&v->arch.arch_vmx.hlt_timer) ) {
         rem_ac_timer(&v->arch.arch_vmx.hlt_timer);

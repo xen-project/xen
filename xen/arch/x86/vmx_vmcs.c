@@ -290,6 +290,7 @@ static void vmx_do_launch(struct vcpu *v)
 /* Update CR3, GDT, LDT, TR */
     unsigned int  error = 0;
     unsigned long cr0, cr4;
+    u64     host_tsc;
 
     if (v->vcpu_id == 0)
         vmx_setup_platform(v->domain);
@@ -337,6 +338,10 @@ static void vmx_do_launch(struct vcpu *v)
     __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());
 
     v->arch.schedule_tail = arch_vmx_do_resume;
+    /* init guest tsc to start from 0 */
+    rdtscll(host_tsc);
+    v->arch.arch_vmx.tsc_offset = 0 - host_tsc;
+    set_tsc_shift (v, &v->domain->arch.vmx_platform.vmx_pit);
 }
 
 /*
@@ -366,7 +371,6 @@ static inline int construct_init_vmcs_guest(cpu_user_regs_t *regs)
     error |= __vmwrite(PAGE_FAULT_ERROR_CODE_MATCH, 0);
 
     /* TSC */
-    error |= __vmwrite(TSC_OFFSET, 0);
     error |= __vmwrite(CR3_TARGET_COUNT, 0);
 
     /* Guest Selectors */
