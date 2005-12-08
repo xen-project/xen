@@ -113,7 +113,7 @@ function handle_iptable()
 #
 function ip_of()
 {
-  ip addr show "$1" | sed -n 's/^.*inet \([0-9.]*\).*$/\1/p'
+  ip addr show "$1" | awk "/^.*inet.*$1\$/{print \$2}" | sed 's,/.*,,'
 }
 
 
