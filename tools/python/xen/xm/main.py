@@ -577,6 +577,13 @@ def xm_vcpu_set(args):
     from xen.xend.XendClient import server
     server.xend_domain_set_vcpus(args[0], int(args[1]))
 
+
+def xm_destroy(args):
+    arg_check(args, "destroy", 1)
+    from xen.xend.XendClient import server
+    server.xend_domain_destroy(args[0])
+
+
 def xm_domid(args):
     arg_check(args, "domid", 1)
 
@@ -783,6 +790,7 @@ commands = {
     # xenstat commands
     "top": xm_top,
     # domain commands
+    "destroy": xm_destroy,
     "domid": xm_domid,
     "domname": xm_domname,
     "rename": xm_rename,
@@ -825,7 +833,6 @@ commands = {
 ## The commands supported by a separate argument parser in xend.xm.
 subcommands = [
     'create',
-    'destroy',
     'migrate',
     'sysrq',
     'shutdown'
