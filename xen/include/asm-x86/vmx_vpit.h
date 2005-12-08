@@ -27,7 +27,6 @@ struct vmx_virpit {
     unsigned int pending_intr_nr; /* the couner for pending timer interrupts */
     u32 period;		/* pit frequency in ns */
     int first_injected;                 /* flag to prevent shadow window */
-    int ticking;    /* indicating it is ticking */
 
     /* virtual PIT state for handle related I/O */
     int read_state;
@@ -51,5 +50,6 @@ static __inline__ s_time_t get_pit_scheduled(
     else
         return -1;
 }
+extern void set_tsc_shift(struct vcpu *v,struct vmx_virpit *vpit);
 
 #endif /* _VMX_VIRPIT_H_ */

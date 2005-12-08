@@ -355,34 +355,27 @@ HYPERVISOR_multicall(
 #endif
     return 1;
 }
+#endif
 
 static inline int
 HYPERVISOR_update_va_mapping(
     unsigned long va, pte_t new_val, unsigned long flags)
 {
-#if 0
-    int ret;
-    unsigned long ign1, ign2, ign3;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3)
-	: "0" (__HYPERVISOR_update_va_mapping), 
-          "1" (va), "2" ((new_val).pte_low), "3" (flags)
-	: "memory" );
-
-    if ( unlikely(ret < 0) )
-    {
-        printk(KERN_ALERT "Failed update VA mapping: %08lx, %08lx, %08lx\n",
-               va, (new_val).pte_low, flags);
-        BUG();
-    }
-
-    return ret;
-#endif
+    /* no-op */
     return 1;
 }
-#endif
+
+static inline int
+HYPERVISOR_memory_op(
+    unsigned int cmd, void *arg)
+{
+    int ret;
+    __asm__ __volatile__ ( ";; mov r14=%2 ; mov r15=%3 ; mov r2=%1 ; break 0x1000 ;; mov %0=r8 ;;"
+        : "=r" (ret)
+        : "i" (__HYPERVISOR_console_io), "r"(cmd), "r"(arg)
+        : "r14","r15","r2","r8","memory" );
+    return ret;
+}
 
 static inline int
 HYPERVISOR_event_channel_op(

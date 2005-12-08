@@ -7,6 +7,9 @@
 /* Allocate space for array of typed objects. */
 #define xmalloc_array(_type, _num) ((_type *)_xmalloc_array(sizeof(_type), __alignof__(_type), _num))
 
+#define malloc(size) _xmalloc(size, 4)
+#define free(ptr) xfree(ptr)
+
 /* Free any of the above. */
 extern void xfree(const void *);
 

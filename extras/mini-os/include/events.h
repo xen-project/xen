@@ -40,10 +40,12 @@ typedef struct _ev_action_t {
 /* prototypes */
 int do_event(u32 port, struct pt_regs *regs);
 int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *) );
-void bind_evtchn( u32 virq, void (*handler)(int, struct pt_regs *) );
+int bind_evtchn( u32 virq, void (*handler)(int, struct pt_regs *) );
+void unbind_evtchn( u32 port );
 void init_events(void);
+void unbind_virq( u32 port );
 
-static inline int notify_via_evtchn(int port)
+static inline int notify_remote_via_evtchn(int port)
 {
     evtchn_op_t op;
     op.cmd = EVTCHNOP_send;

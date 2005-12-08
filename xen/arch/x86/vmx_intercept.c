@@ -387,7 +387,6 @@ void vmx_hooks_assist(struct vcpu *v)
         }
         else {
             init_ac_timer(&vpit->pit_timer, pit_timer_fn, v, v->processor);
-            vpit->ticking = 1;
         }
 
         /* init count for this channel */

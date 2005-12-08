@@ -108,7 +108,7 @@ void vmx_relinquish_resources(struct vcpu *v)
     destroy_vmcs(&v->arch.arch_vmx);
     free_monitor_pagetable(v);
     vpit = &v->domain->arch.vmx_platform.vmx_pit;
-    if ( vpit->ticking && active_ac_timer(&(vpit->pit_timer)) )
+    if ( active_ac_timer(&(vpit->pit_timer)) )
         rem_ac_timer(&vpit->pit_timer);
     if ( active_ac_timer(&v->arch.arch_vmx.hlt_timer) ) {
         rem_ac_timer(&v->arch.arch_vmx.hlt_timer);
@@ -905,7 +905,7 @@ vmx_world_save(struct vcpu *v, struct vmx_assist_context *c)
 int
 vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
 {
-    unsigned long mfn, old_cr4;
+    unsigned long mfn, old_cr4, old_base_mfn;
     int error = 0;
 
     error |= __vmwrite(GUEST_RIP, c->eip);
@@ -945,7 +945,12 @@ vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
             return 0;
         }
         mfn = get_mfn_from_pfn(c->cr3 >> PAGE_SHIFT);
+        if(!get_page(pfn_to_page(mfn), v->domain))
+                return 0;
+        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
         v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+        if (old_base_mfn)
+             put_page(pfn_to_page(old_base_mfn));
         update_pagetables(v);
         /*
          * arch.shadow_table should now hold the next CR3 for shadow
@@ -1174,9 +1179,11 @@ static int vmx_set_cr0(unsigned long value)
     }
 
     if(!((value & X86_CR0_PE) && (value & X86_CR0_PG)) && paging_enabled)
-        if(v->arch.arch_vmx.cpu_cr3)
+        if(v->arch.arch_vmx.cpu_cr3){
             put_page(pfn_to_page(get_mfn_from_pfn(
                       v->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT)));
+            v->arch.guest_table = mk_pagetable(0);
+        }
 
     /*
      * VMX does not implement real-mode virtualization. We emulate

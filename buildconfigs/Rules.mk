@@ -21,6 +21,7 @@ endif
 
 # Expand Linux series to Linux version
 LINUX_SERIES	?= 2.6
+LINUX_VER	?= $(shell grep "^LINUX_VER" buildconfigs/mk.linux-2.6-xen | sed -e 's/.*=[ ]*//')
 
 # Setup Linux search path
 LINUX_SRC_PATH	?= .:..
@@ -108,6 +109,13 @@ endif
 
 %-config:
 	$(MAKE) -f buildconfigs/mk.$* config
+
+linux-2.6-xen.patch: ref-linux-$(LINUX_VER)/.valid-ref
+	rm -rf tmp-$@
+	cp -al $(<D) tmp-$@
+	( cd linux-2.6-xen-sparse && ./mkbuildtree ../tmp-$@ )	
+	diff -Nurp $(<D) tmp-$@ > $@ || true
+	rm -rf tmp-$@
 
 %-xen.patch: ref-%/.valid-ref
 	rm -rf tmp-$@
