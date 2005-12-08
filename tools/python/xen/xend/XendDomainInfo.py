@@ -1171,11 +1171,6 @@ class XendDomainInfo:
 
             xc.domain_setcpuweight(self.domid, self.info['cpu_weight'])
 
-            m = self.image.getDomainMemory(self.info['memory'] * 1024)
-            balloon.free(m)
-            xc.domain_setmaxmem(self.domid, m)
-            xc.domain_memory_increase_reservation(self.domid, m, 0, 0)
-
             # repin domain vcpus if a restricted cpus list is provided
             # this is done prior to memory allocation to aide in memory
             # distribution for NUMA systems.
@@ -1185,6 +1180,11 @@ class XendDomainInfo:
                     # pincpu takes a list of ints
                     cpu = [ int( cpus[v % len(cpus)] ) ]
                     xc.domain_pincpu(self.domid, v, cpu)
+
+            m = self.image.getDomainMemory(self.info['memory'] * 1024)
+            balloon.free(m)
+            xc.domain_setmaxmem(self.domid, m)
+            xc.domain_memory_increase_reservation(self.domid, m, 0, 0)
 
             self.createChannels()
 
