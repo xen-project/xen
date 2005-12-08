@@ -142,7 +142,7 @@ VM_STORE_ENTRIES = [
     ('vcpu_avail', int),
     ('memory',     int),
     ('maxmem',     int),
-    ('start_time', int),
+    ('start_time', float),
     ]
 
 VM_STORE_ENTRIES += VM_CONFIG_PARAMS
