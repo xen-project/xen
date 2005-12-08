@@ -192,8 +192,8 @@ static int increase_reservation(unsigned long nr_pages)
 		page = balloon_retrieve();
 		BUG_ON(page == NULL);
 
-		pfn = page - mem_map;
-		BUG_ON(phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY);
+		pfn = page_to_pfn(page);
+		BUG_ON(phys_to_machine_mapping_valid(pfn));
 
 		/* Update P->M and M->P tables. */
 		set_phys_to_machine(pfn, mfn_list[i]);
@@ -253,8 +253,8 @@ static int decrease_reservation(unsigned long nr_pages)
 			break;
 		}
 
-		pfn = page - mem_map;
-		mfn_list[i] = phys_to_machine_mapping[pfn];
+		pfn = page_to_pfn(page);
+		mfn_list[i] = pfn_to_mfn(pfn);
 
 		if (!PageHighMem(page)) {
 			v = phys_to_virt(pfn << PAGE_SHIFT);
@@ -444,6 +444,9 @@ static int __init balloon_init(void)
 
 	IPRINTK("Initialising balloon driver.\n");
 
+	if (xen_init() < 0)
+		return -1;
+
 	current_pages = min(xen_start_info->nr_pages, max_pfn);
 	target_pages  = current_pages;
 	balloon_low   = 0;
@@ -465,7 +468,7 @@ static int __init balloon_init(void)
     
 	/* Initialise the balloon with excess memory space. */
 	for (pfn = xen_start_info->nr_pages; pfn < max_pfn; pfn++) {
-		page = &mem_map[pfn];
+		page = pfn_to_page(pfn);
 		if (!PageReserved(page))
 			balloon_append(page);
 	}

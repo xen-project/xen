@@ -52,4 +52,19 @@ void force_evtchn_callback(void);
 #define	mfn_to_pfn(x)	(x)
 #define machine_to_phys_mapping 0
 
+// for drivers/xen/balloon/balloon.c
+#ifdef CONFIG_XEN_SCRUB_PAGES
+#define scrub_pages(_p,_n) memset((void *)(_p), 0, (_n) << PAGE_SHIFT)
+#else
+#define scrub_pages(_p,_n) ((void)0)
+#endif
+#define	pte_mfn(_x)	pte_pfn(_x)
+#define INVALID_P2M_ENTRY	(~0UL)
+#define __pte_ma(_x)	((pte_t) {(_x)})
+#define phys_to_machine_mapping_valid(_x)	(1)
+#define	kmap_flush_unused()	do {} while (0)
+#define set_phys_to_machine(_x,_y)	do {} while (0)
+#define xen_machphys_update(_x,_y)	do {} while (0)
+#define pfn_pte_ma(_x,_y)	__pte_ma(0)
+
 #endif /* __HYPERVISOR_H__ */

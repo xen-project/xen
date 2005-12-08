@@ -65,6 +65,8 @@
 extern unsigned long *phys_to_machine_mapping;
 #define pfn_to_mfn(pfn)	\
 (phys_to_machine_mapping[(unsigned int)(pfn)] & ~(1UL<<31))
+#define	phys_to_machine_mapping_valid(pfn) \
+	(phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY)
 static inline unsigned long mfn_to_pfn(unsigned long mfn)
 {
 	unsigned long pfn;
