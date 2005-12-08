@@ -24,6 +24,8 @@ blkif_t *alloc_blkif(domid_t domid)
 	blkif->status = DISCONNECTED;
 	spin_lock_init(&blkif->blk_ring_lock);
 	atomic_set(&blkif->refcnt, 1);
+	init_waitqueue_head(&blkif->wq);
+	blkif->st_print = jiffies;
 
 	return blkif;
 }
