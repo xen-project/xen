@@ -44,15 +44,15 @@ class RelocationProtocol(protocol.Protocol):
                 res = self.dispatch(val)
                 self.send_result(res)
             if self.parser.at_eof():
-                self.loseConnection()
+                self.close()
         except SystemExit:
             raise
         except:
             self.send_error()
 
-    def loseConnection(self):
+    def close(self):
         if self.transport:
-            self.transport.loseConnection()
+            self.transport.close()
 
     def send_reply(self, sxpr):
         io = StringIO.StringIO()
@@ -100,15 +100,13 @@ class RelocationProtocol(protocol.Protocol):
         return l
 
     def op_quit(self, _1, _2):
-        self.loseConnection()
+        self.close()
 
     def op_receive(self, name, _):
         if self.transport:
             self.send_reply(["ready", name])
-            self.transport.sock.setblocking(1)
             XendDomain.instance().domain_restore_fd(
                 self.transport.sock.fileno())
-            self.transport.sock.setblocking(0)
         else:
             log.error(name + ": no transport")
             raise XendError(name + ": no transport")
@@ -122,5 +120,4 @@ def listenRelocation():
     if xroot.get_xend_relocation_server():
         port = xroot.get_xend_relocation_port()
         interface = xroot.get_xend_relocation_address()
-        l = tcp.listenTCP(port, RelocationProtocol, interface=interface)
-        l.setCloExec()
+        tcp.listenTCP(port, RelocationProtocol, interface=interface)

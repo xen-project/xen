@@ -25,7 +25,7 @@ class Protocol:
         self.transport = transport
 
     def dataReceived(self, data):
-        print 'Protocol>dataReceived>'
+        raise NotImplementedError()
 
     def write(self, data):
         if self.transport:

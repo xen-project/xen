@@ -13,16 +13,16 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd.
 #============================================================================
 
-import sys
+
 import socket
-import types
 import time
 import errno
 
 from connection import *
-from protocol import *
+
 
 class TCPListener(SocketListener):
 
@@ -52,48 +52,8 @@ class TCPListener(SocketListener):
     def acceptConnection(self, sock, protocol, addr):
         return SocketServerConnection(sock, protocol, addr, self)
 
-class TCPClientConnection(SocketClientConnection):
-
-    def __init__(self, host, port, bindAddress, connector):
-        SocketClientConnection.__init__(self, connector)
-        self.addr = (host, port)
-        self.bindAddress = bindAddress
-
-    def createSocket(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        if self.bindAddress is not None:
-            sock.bind(self.bindAddress)
-        return sock
-    
-class TCPConnector(SocketConnector):
-
-    def __init__(self, host, port, protocol, timeout=None, bindAddress=None):
-        SocketConnector.__init__(self, protocol)
-        self.host = host
-        self.port = self.servicePort(port)
-        self.bindAddress = bindAddress
-        self.timeout = timeout
-
-    def servicePort(self, port):
-        if isinstance(port, types.StringTypes):
-            try:
-                port = socket.getservbyname(port, 'tcp')
-            except socket.error, ex:
-                raise IOError("unknown service: " + ex)
-        return port
-
-    def connect(self):
-        self.transport = TCPClientConnection(
-            self.host, self.port, self.bindAddress, self)
-        self.transport.connect(self.timeout)
 
 def listenTCP(port, protocol, interface='', backlog=None):
     l = TCPListener(port, protocol, interface=interface, backlog=backlog)
-    l.startListening()
-    return l
-
-def connectTCP(host, port, protocol, timeout=None, bindAddress=None):
-    c = TCPConnector(host, port, protocol, timeout=timeout,
-                     bindAddress=bindAddress)
-    c.connect()
-    return c
+    l.listen()
+    l.setCloExec()
