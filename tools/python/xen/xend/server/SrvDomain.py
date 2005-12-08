@@ -90,7 +90,8 @@ class SrvDomain(SrvDir):
                     [['dom',         'int'],
                      ['destination', 'str'],
                      ['live',        'int'],
-                     ['resource',    'int']])
+                     ['resource',    'int'],
+                     ['port',        'int']])
         return fn(req.args, {'dom': self.dom.domid})
 
     def op_pincpu(self, _, req):
