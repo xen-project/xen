@@ -243,9 +243,6 @@ static void vmx_setup_platform(struct domain* d)
 {
     struct vmx_platform *platform;
 
-    if (!(VMX_DOMAIN(current) && (current->vcpu_id == 0)))
-        return;
-
     vmx_map_io_shared_page(d);
     vmx_set_vcpu_nr(d);
 

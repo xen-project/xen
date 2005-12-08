@@ -748,7 +748,7 @@ void vmx_check_events(struct vcpu *v)
 {
     /* clear the event *before* checking for work. This should avoid
        the set-and-check races */
-    if (vmx_clear_pending_io_event(current))
+    if (vmx_clear_pending_io_event(v))
         vmx_io_assist(v);
 }
 
