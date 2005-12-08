@@ -17,7 +17,7 @@
  * sHype policy translation tool. This tool takes an XML
  * policy specification as input and produces a binary
  * policy file that can be loaded into Xen through the
- * ACM operations (secpol_tool loadpolicy) interface or at
+ * ACM operations (xensec_tool loadpolicy) interface or at
  * boot time (grub module parameter)
  *
  * indent -i4 -kr -nut
@@ -102,12 +102,22 @@ int have_chwall = 0;
 /* input/output file names */
 char *policy_filename = NULL,
     *label_filename = NULL,
-    *binary_filename = NULL, *mapping_filename = NULL;
+    *binary_filename = NULL, *mapping_filename = NULL,
+    *schema_filename = NULL;
 
 void usage(char *prg)
 {
-    printf("usage:\n%s policyname[-policy.xml/-security_label_template.xml]\n",
-         prg);
+    printf("Usage: %s [OPTIONS] POLICYNAME\n", prg);
+    printf("POLICYNAME is the directory name within the policy directory\n");
+    printf("that contains the policy files.  The default policy directory\n");
+    printf("is '%s' (see the '-d' option below to change it)\n", POLICY_DIR);
+    printf("The policy files contained in the POLICYNAME directory must be named:\n");
+    printf("\tPOLICYNAME-security_policy.xml\n");
+    printf("\tPOLICYNAME-security_label_template.xml\n\n");
+    printf("OPTIONS:\n");
+    printf("\t-d POLICYDIR\n");
+    printf("\t\tUse POLICYDIR as the policy directory. This directory must contain\n");
+    printf("\t\tthe policy schema file 'security_policy.xsd'\n");
     exit(EXIT_FAILURE);
 }
 
@@ -1237,7 +1247,7 @@ int is_valid(xmlDocPtr doc)
     xmlSchemaParserCtxtPtr schemaparser_ctxt = NULL;
     xmlSchemaValidCtxtPtr schemavalid_ctxt = NULL;
 
-    schemaparser_ctxt = xmlSchemaNewParserCtxt(SCHEMA_FILENAME);
+    schemaparser_ctxt = xmlSchemaNewParserCtxt(schema_filename);
     schema_ctxt = xmlSchemaParse(schemaparser_ctxt);
     schemavalid_ctxt = xmlSchemaNewValidCtxt(schema_ctxt);
 
@@ -1246,12 +1256,12 @@ int is_valid(xmlDocPtr doc)
     if ((err = xmlSchemaIsValid(schemavalid_ctxt)) != 1)
     {
         printf("ERROR: Invalid schema file %s (err=%d)\n",
-               SCHEMA_FILENAME, err);
+               schema_filename, err);
         err = -EIO;
         goto out;
     }
     else
-        printf("XML Schema %s valid.\n", SCHEMA_FILENAME);
+        printf("XML Schema %s valid.\n", schema_filename);
 #endif
     if ((err = xmlSchemaValidateDoc(schemavalid_ctxt, doc)))
     {
@@ -1275,37 +1285,59 @@ int main(int argc, char **argv)
     char *file_prefix;
     int prefix_len;
 
+    int opt_char;
+    char *policy_dir = POLICY_DIR;
+
     if (ACM_POLICY_VERSION != WRITTEN_AGAINST_ACM_POLICY_VERSION)
     {
         printf("ERROR: This program was written against an older ACM version.\n");
         exit(EXIT_FAILURE);
     }
 
-    if (argc != 2)
+    while ((opt_char = getopt(argc, argv, "d:")) != -1) {
+        switch (opt_char) {
+        case 'd':
+            policy_dir = malloc(strlen(optarg) + 2); // null terminator and possibly "/"
+            if (!policy_dir) {
+                printf("ERROR allocating directory name memory.\n");
+                exit(EXIT_FAILURE);
+            }
+            strcpy(policy_dir, optarg);
+            if (policy_dir[strlen(policy_dir) - 1] != '/')
+                strcat(policy_dir, "/");
+            break;
+
+        default:
+            usage(basename(argv[0]));
+        }
+    }
+
+    if ((argc - optind) != 1)
         usage(basename(argv[0]));
 
-    prefix_len = strlen(POLICY_SUBDIR) +
-        strlen(argv[1]) + 1 /* "/" */  +
-        strlen(argv[1]) + 1 /* "/" */ ;
+    prefix_len = strlen(policy_dir) +
+        strlen(argv[optind]) + 1 /* "/" */  +
+        strlen(argv[optind]) + 1 /* null terminator */ ;
 
     file_prefix = malloc(prefix_len);
     policy_filename = malloc(prefix_len + strlen(POLICY_EXTENSION));
     label_filename = malloc(prefix_len + strlen(LABEL_EXTENSION));
     binary_filename = malloc(prefix_len + strlen(BINARY_EXTENSION));
     mapping_filename = malloc(prefix_len + strlen(MAPPING_EXTENSION));
+    schema_filename = malloc(strlen(policy_dir) + strlen(SCHEMA_FILENAME) + 1);
 
     if (!file_prefix || !policy_filename || !label_filename ||
-        !binary_filename || !mapping_filename)
+        !binary_filename || !mapping_filename || !schema_filename)
     {
         printf("ERROR allocating file name memory.\n");
         goto out2;
     }
 
     /* create input/output filenames out of prefix */
-    strcat(file_prefix, POLICY_SUBDIR);
-    strcat(file_prefix, argv[1]);
+    strcpy(file_prefix, policy_dir);
+    strcat(file_prefix, argv[optind]);
     strcat(file_prefix, "/");
-    strcat(file_prefix, argv[1]);
+    strcat(file_prefix, argv[optind]);
 
     strcpy(policy_filename, file_prefix);
     strcpy(label_filename, file_prefix);
@@ -1317,11 +1349,14 @@ int main(int argc, char **argv)
     strcat(binary_filename, BINARY_EXTENSION);
     strcat(mapping_filename, MAPPING_EXTENSION);
 
+    strcpy(schema_filename, policy_dir);
+    strcat(schema_filename, SCHEMA_FILENAME);
+
     labeldoc = xmlParseFile(label_filename);
 
     if (labeldoc == NULL)
     {
-        printf("Error: could not parse file %s.\n", argv[1]);
+        printf("Error: could not parse file %s.\n", argv[optind]);
         goto out2;
     }
 
@@ -1337,7 +1372,7 @@ int main(int argc, char **argv)
 
     if (policydoc == NULL)
     {
-        printf("Error: could not parse file %s.\n", argv[1]);
+        printf("Error: could not parse file %s.\n", argv[optind]);
         goto out1;
     }
 

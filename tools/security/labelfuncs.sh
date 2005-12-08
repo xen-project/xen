@@ -17,10 +17,53 @@
 #
 
 
+#Some global variables for tools using this module
+ACM_DEFAULT_ROOT="/etc/xen/acm-security"
+
+# Set the policy and policydir variables
+# Parameters:
+# 1st : possible policy name
+# 2nd : possible policy directory
+# Results:
+# The variables policy and policydir will hold the values for locating
+# policy information
+# If there are no errors, the functions returns a '1',
+# a '0' otherwise.
+setPolicyVars ()
+{
+	local ret
+	# Set default values
+	policydir="$ACM_DEFAULT_ROOT/policies"
+	policy=""
+
+	if [ "$1" == "" ]; then
+		findGrubConf
+		ret=$?
+		if [ $ret -eq 0 ]; then
+			echo "Could not find grub.conf."
+			return 0;
+		fi
+		findPolicyInGrub $grubconf
+		if [ "$policy" == "" ]; then
+			echo "Could not find policy in grub.conf. Looked for entry using kernel $linux."
+			return 0;
+		fi
+		echo "Assuming policy to be '$policy'.";
+	else
+		policy=$1
+		if [ "$2" != "" ]; then
+			policydir=$2
+		fi
+	fi
+
+	return 1
+}
+
 # Find the mapfile given a policy nmame
 # Parameters:
 # 1st : the name of the policy whose map file is to be found, i.e.,
 #       chwall
+# 2nd : the policy directory for locating the map file
 # Results:
 # The variable mapfile will hold the realtive path to the mapfile
 # for the given policy.
@@ -28,16 +71,10 @@
 # a '0' otherwise.
 findMapFile ()
 {
-	mapfile="./$1.map"
+	mapfile="$2/$1/$1.map"
 	if [ -r "$mapfile" ]; then
 		return 1
 	fi
-
-	mapfile="./policies/$1/$1.map"
-	if [ -r "$mapfile" ]; then
-		return 1
-	fi
-
 	return 0
 }
 
@@ -50,7 +87,7 @@ findMapFile ()
 # The variable primary will hold the name of the primary policy
 getPrimaryPolicy ()
 {
-	mapfile=$1
+	local mapfile=$1
 	primary=`cat $mapfile  |   \
 	         awk '             \
 	          {                \
@@ -71,7 +108,7 @@ getPrimaryPolicy ()
 # The variable secondary will hold the name of the secondary policy
 getSecondaryPolicy ()
 {
-	mapfile=$1
+	local mapfile=$1
 	secondary=`cat $mapfile  |   \
 	         awk '             \
 	          {                \
@@ -86,6 +123,10 @@ getSecondaryPolicy ()
 
 #Return where the grub.conf file is.
 #I only know of one place it can be.
+#Returns:
+# 1 : if the file is writeable and readable
+# 2 : if the file is only readable
+# 0 : if the file does not exist
 findGrubConf()
 {
 	grubconf="/boot/grub/grub.conf"
@@ -112,16 +153,37 @@ findGrubConf()
 # kernel, i.e., 'vmlinuz-2.6.12-xen0'
 getLinuxVersion ()
 {
-	path=$1
+	local path
+	local versionfile
+	local lnx
+	if [ "$1" == "" ]; then
+		path="/lib/modules/*-xen0"
+	else
+		path="/lib/modules/$1"
+	fi
+
 	linux=""
 	for f in $path/linux-*-xen0 ; do
-		versionfile=$f/include/linux/version.h
+		versionfile=$f/build/include/linux/version.h
 		if [ -r $versionfile ]; then
 			lnx=`cat $versionfile | \
 			     grep UTS_RELEASE | \
 			     awk '{             \
 			       len=length($3);  \
-			       print substr($3,2,len-2) }'`
+			       version=substr($3,2,len-2);     \
+			       split(version,numbers,".");     \
+			       if (numbers[4]=="") {           \
+			         printf("%s.%s.%s",            \
+			                 numbers[1],           \
+			                 numbers[2],           \
+			                 numbers[3]);          \
+			       } else {                        \
+			         printf("%s.%s.%s[.0-9]*-xen0",\
+			                numbers[1],            \
+			                numbers[2],            \
+			                numbers[3]);           \
+			       }                               \
+			     }'`
 		fi
 		if [ "$lnx" != "" ]; then
 			linux="[./0-9a-zA-z]*$lnx"
@@ -137,11 +199,12 @@ getLinuxVersion ()
 # Find out with which policy the hypervisor was booted with.
 # Parameters
 # 1st : The complete path to grub.conf, i.e., /boot/grub/grub.conf
-#
+# Result:
+# Sets the variable 'policy' to the name of the policy
 findPolicyInGrub ()
 {
-	grubconf=$1
-	linux=`uname -r`
+	local grubconf=$1
+	local linux=`uname -r`
 	policy=`cat $grubconf |                        \
 	         awk -vlinux=$linux '{                 \
 	           if ( $1 == "title" ) {              \
@@ -184,9 +247,9 @@ findPolicyInGrub ()
 # The funtion returns '1' on success, '0' on failure
 getSSIDUsingSecpolTool ()
 {
-	domid=$1
+	local domid=$1
 	export PATH=$PATH:.
-	ssid=`secpol_tool getssid -d $domid -f | \
+	ssid=`xensec_tool getssid -d $domid -f | \
 	        grep -E "SSID:" |          \
 	        awk '{ print $4 }'`
 
@@ -206,7 +269,7 @@ getSSIDUsingSecpolTool ()
 # high ssid values as integers.
 getSSIDLOHI ()
 {
-	ssid=$1
+	local ssid=$1
 	ssidlo_int=`echo $ssid | awk          \
 	            '{                        \
 	               len=length($0);        \
@@ -289,11 +352,11 @@ getSSIDLOHI ()
 #
 updateGrub ()
 {
-	grubconf=$1
-	policyfile=$2
-	linux=$3
+	local grubconf=$1
+	local policyfile=$2
+	local linux=$3
 
-	tmpfile="/tmp/new_grub.conf"
+	local tmpfile="/tmp/new_grub.conf"
 
 	cat $grubconf |                                \
 	         awk -vpolicy=$policyfile              \
@@ -343,7 +406,59 @@ updateGrub ()
 		echo "Could not create temporary file! Aborting."
 		exit -1
 	fi
-	mv -f $tmpfile $grubconf
+	diff $tmpfile $grubconf > /dev/null
+	RES=$?
+	if [ "$RES" == "0" ]; then
+		echo "No changes were made to $grubconf."
+	else
+		echo "Successfully updated $grubconf."
+		mv -f $tmpfile $grubconf
+	fi
+}
+
+
+#Compile a policy into its binary representation
+# Parameters:
+# 1st: The directory where the ./policies directory is located at
+# 2nd: The name of the policy
+genBinPolicy ()
+{
+	local root=$1
+	local policy=$2
+	pushd $root > /dev/null
+	xensec_xml2bin -d policies $policy > /dev/null
+	popd > /dev/null
+}
+
+
+# Copy the bootpolicy into the destination directory
+# Generate the policy's .bin and .map files if necessary
+# Parameters:
+# 1st: Destination directory
+# 2nd: The root directory of the security tools; this is where the
+#      policies directory is located at
+# 3rd: The policy name
+# Returns  '1' on success, '0' on failure.
+cpBootPolicy ()
+{
+	local dest=$1
+	local root=$2
+	local policy=$3
+	local binfile=$root/policies/$policy/$policy.bin
+	local dstfile=$dest/$policy.bin
+	if [ ! -e $binfile ]; then
+		genBinPolicy $root $policy
+		if [ ! -e $binfile ]; then
+			echo "Could not compile policy '$policy'."
+			return 0
+		fi
+	fi
+
+	if [ ! -e $dstfile -o \
+	     $binfile -nt $dstfile ]; then
+		cp -f $binfile $dstfile
+	fi
+	return 1
 }
 
 
@@ -352,7 +467,11 @@ updateGrub ()
 # 1st: Full or relative path to the policy's mapfile
 showLabels ()
 {
-	mapfile=$1
+	local mapfile=$1
+	local line
+	local ITEM
+	local found=0
+
 	if [ ! -r "$mapfile" -o "$mapfile" == "" ]; then
 		echo "Cannot read from vm configuration file $vmfile."
 		return -1
@@ -417,8 +536,8 @@ showLabels ()
 # 2nd: the name of the policy
 getDefaultSsid ()
 {
-	mapfile=$1
-	pol=$2
+	local mapfile=$1
+	local pol=$2
 	RES=`cat $mapfile    \
 	     awk -vpol=$pol  \
 	      {              \
@@ -446,10 +565,13 @@ getDefaultSsid ()
 #      other     : Prompts the user whether to proceed
 relabel ()
 {
-	vmfile=$1
-	label=$2
-	mapfile=$3
-	mode=$4
+	local vmfile=$1
+	local label=$2
+	local mapfile=$3
+	local mode=$4
+	local SSIDLO
+	local SSIDHI
+	local RES
 
 	if [ ! -r "$vmfile" ]; then
 		echo "Cannot read from vm configuration file $vmfile."
@@ -556,8 +678,8 @@ relabel ()
 	fi
 
 	#Write the output
-	vmtmp1="/tmp/__setlabel.tmp1"
-	vmtmp2="/tmp/__setlabel.tmp2"
+	local vmtmp1="/tmp/__setlabel.tmp1"
+	local vmtmp2="/tmp/__setlabel.tmp2"
 	touch $vmtmp1
 	touch $vmtmp2
 	if [ ! -w "$vmtmp1" -o ! -w "$vmtmp2" ]; then
@@ -584,8 +706,10 @@ relabel ()
 # 2nd: Full or relative path to the policy's mapfile
 translateSSIDREF ()
 {
-	ssidref=$1
-	mapfile=$2
+	local ssidref=$1
+	local mapfile=$2
+	local line1
+	local line2
 
 	if [ ! -r "$mapfile" -o "$mapfile" == "" ]; then
 		echo "Cannot read from vm configuration file $vmfile."

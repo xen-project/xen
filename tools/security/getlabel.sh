@@ -32,20 +32,24 @@ fi
 
 
 export PATH=$PATH:.
-source labelfuncs.sh
+dir=`dirname $0`
+source $dir/labelfuncs.sh
 
 usage ()
 {
+	prg=`basename $0`
 echo "Use this tool to display the label of a domain or the label that is
 corresponding to an ssidref given the name of the running policy.
 
-Usage: $0 -sid <ssidref> [<policy name>] or
-       $0 -dom <domid>   [<policy name>]
+Usage: $prg -sid <ssidref> [<policy name> [<policy dir>]] or
+       $prg -dom <domid>   [<policy name> [<policy dir>]]
 
 policy name : the name of the policy, i.e. 'chwall'
               If the policy name is omitted, the grub.conf
               entry of the running system is tried to be read
               and the policy name determined from there.
+policy dir  : the directory where the <policy name> policy is located
+              The default location is '/etc/xen/acm-security/policies'
 ssidref     : an ssidref in hex or decimal format, i.e., '0x00010002'
               or '65538'
 domid       : id of the domain, i.e., '1'; Use numbers from the 2nd
@@ -55,79 +59,36 @@ domid       : id of the domain, i.e., '1'; Use numbers from the 2nd
 
 
 
-if [ "$1" == "-?" ]; then
-	mode="usage"
+if [ "$1" == "-h" ]; then
+	usage
+	exit 0
 elif [ "$1" == "-dom" ]; then
 	mode="domid"
 	shift
 elif [ "$1" == "-sid" ]; then
 	mode="sid"
 	shift
-elif [ "$1" == "" ]; then
+else
 	usage
 	exit -1
 fi
 
+setPolicyVars $2 $3
+findMapFile $policy $policydir
+ret=$?
+if [ $ret -eq 0 ]; then
+	echo "Could not find map file for policy '$policy'."
+	exit -1
+fi
 
-if [ "$mode" == "usage" ]; then
-	usage
-elif [ "$mode" == "domid" ]; then
-	if [ "$2" == "" ]; then
-		findGrubConf
-		ret=$?
-		if [ $ret -eq 0 ]; then
-			echo "Could not find grub.conf"
-			exit -1;
-		fi
-		findPolicyInGrub $grubconf
-		if [ "$policy" != "" ]; then
-			echo "Assuming policy to be '$policy'.";
-		else
-			echo "Could not find policy."
-			exit -1;
-		fi
-	else
-		policy=$2
+if [ "$mode" == "domid" ]; then
+	getSSIDUsingSecpolTool $1
+	ret=$?
+	if [ $ret -eq 0 ]; then
+		echo "Could not determine the SSID of the domain."
+		exit -1
 	fi
-	findMapFile $policy
-	res=$?
-	if [ "$res" != "0" ]; then
-		getSSIDUsingSecpolTool $1
-		res=$?
-		if [ "$res" != "0" ]; then
-			translateSSIDREF $ssid $mapfile
-		else
-			echo "Could not determine the SSID of the domain."
-		fi
-	else
-		echo "Could not find map file for policy '$policy'."
-	fi
-elif [ "$mode" == "sid" ]; then
-	if [ "$2" == "" ]; then
-		findGrubConf
-		ret=$?
-		if [ $ret -eq 0 ]; then
-			echo "Could not find grub.conf"
-			exit -1;
-		fi
-		findPolicyInGrub $grubconf
-		if [ "$policy" != "" ]; then
-			echo "Assuming policy to be '$policy'.";
-		else
-			echo "Could not find policy."
-			exit -1;
-		fi
-	else
-		policy=$2
-	fi
-	findMapFile $policy
-	res=$?
-	if [ "$res" != "0" ]; then
-		translateSSIDREF $1 $mapfile
-	else
-		echo "Could not find map file for policy '$policy'."
-	fi
-
-else
-    usage
+	translateSSIDREF $ssid $mapfile
+else # mode == sid
+	translateSSIDREF $1 $mapfile
 fi

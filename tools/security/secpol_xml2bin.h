@@ -12,7 +12,7 @@
  * License.
  *
  */
-#define POLICY_SUBDIR       "policies/"
+#define POLICY_DIR          "/etc/xen/acm-security/policies/"
 #define POLICY_EXTENSION    "-security_policy.xml"
 #define LABEL_EXTENSION     "-security_label_template.xml"
 #define BINARY_EXTENSION    ".bin"
@@ -20,7 +20,7 @@
 #define PRIMARY_COMPONENT_ATTR_NAME "order"
 #define BOOTSTRAP_LABEL_ATTR_NAME   "bootstrap"
 #define PRIMARY_COMPONENT   "PrimaryPolicyComponent"
-#define SCHEMA_FILENAME     "policies/security_policy.xsd"
+#define SCHEMA_FILENAME     "security_policy.xsd"
 
 /* basic states (used as 1 << X) */
 #define XML2BIN_SECPOL		    0   /* policy tokens */

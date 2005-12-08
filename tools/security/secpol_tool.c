@@ -44,12 +44,13 @@ fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a ,	\
 
 void usage(char *progname)
 {
-    printf("Use: %s \n"
+    printf("Usage: %s ACTION\n"
+           "ACTION is one of:\n"
            "\t getpolicy\n"
            "\t dumpstats\n"
            "\t loadpolicy <binary policy file>\n"
            "\t getssid -d <domainid> [-f]\n"
-		   "\t getssid -s <ssidref> [-f]\n", progname);
+           "\t getssid -s <ssidref> [-f]\n", progname);
     exit(-1);
 }
 
@@ -85,6 +86,7 @@ static inline int do_acm_op(int xc_handle, struct acm_op * op)
 
     if ((ret = do_xen_hypercall(xc_handle, &hypercall)) < 0)
     {
+        printf( "ACM operation failed: errno=%d\n", errno );
         if (errno == EACCES)
             fprintf(stderr, "ACM operation failed -- need to"
                     " rebuild the user-space tool set?\n");

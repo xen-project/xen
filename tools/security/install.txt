@@ -41,11 +41,11 @@ exclusively (chwall_ste --> {chwall, ste}).
        # make
 
        manual steps (alternative to make boot_install):
-       #./secpol_xml2bin chwall_ste
-       #cp policies/chwall_ste/chwall_ste.bin /boot
-       #edit /boot/grub/grub.conf
+       # ./xensec_xml2bin -d policies/ chwall_ste
+       # cp policies/chwall_ste/chwall_ste.bin /boot
+       # edit /boot/grub/grub.conf
         add the follwoing line to your xen boot entry:
-       "module chwall_ste.bin"
+       "module /boot/chwall_ste.bin"
 
        alternatively, you can try our automatic translation and
        installation of the policy:
@@ -61,9 +61,9 @@ exclusively (chwall_ste --> {chwall, ste}).
 3. reboot into the newly compiled hypervisor
 
         after boot
-	#xm dmesg should show an entry about the policy being loaded
+	# xm dmesg should show an entry about the policy being loaded
             during the boot process
 
-        #tools/security/secpol_tool getpolicy
+        # xensec_tool getpolicy
             should print the new chwall_ste binary policy representation
 
