@@ -155,7 +155,7 @@ case "$command" in
         ;;
     offline)
         [ "$dhcp" != 'no' ] && dhcp_down
-        ifconfig "$vif" down || true
+        do_without_error ifconfig "$vif" down
         ;;
 esac
 
