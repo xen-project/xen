@@ -412,7 +412,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 		pending_handle(pending_req, i) = map[i].handle;
 #ifdef __ia64__
-		pending_vaddrs[vaddr_pagenr(req, seg)] =
+		pending_vaddrs[vaddr_pagenr(pending_req, i)] =
 			= gnttab_map_vaddr(map[i]);
 #else
 		set_phys_to_machine(__pa(vaddr(
