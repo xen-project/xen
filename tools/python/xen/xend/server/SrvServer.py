@@ -68,7 +68,8 @@ class XendServers:
         # Running the network script will spawn another process, which takes
         # the status fd with it unless we set FD_CLOEXEC.  Failing to do this
         # causes the read in SrvDaemon to hang even when we have written here.
-        fcntl.fcntl(status, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
+        if status:
+            fcntl.fcntl(status, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
         
         Vifctl.network('start')
         threads = []
@@ -93,8 +94,9 @@ class XendServers:
             if threads_left:
                 time.sleep(.5)
 
-        status.write('0')
-        status.close()
+        if status:
+            status.write('0')
+            status.close()
 
         for t in threads:
             t.join()
