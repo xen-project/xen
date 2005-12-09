@@ -46,6 +46,10 @@ do_or_die() {
   "$@" || fatal "$@ failed"
 }
 
+do_without_error() {
+  "$@" 2>/dev/null || log debug "$@ failed"
+}
+
 sigerr() {
   fatal "$0 failed; error detected."
 }
@@ -121,7 +125,7 @@ _claim_lock()
 
   while [ $retries -lt $LOCK_RETRIES ]
   do
-    mkdir "$lockdir" && trap "release_lock $1; sigerr" ERR &&
+    mkdir "$lockdir" 2>/dev/null && trap "release_lock $1; sigerr" ERR &&
       _update_lock_info "$lockdir" && return
 
     local new_owner=$(_lock_owner "$lockdir")
