@@ -61,9 +61,8 @@ case "$command" in
         ;;
 
     offline)
-        brctl delif "$bridge" "$vif" ||
-          log debug "brctl delif $bridge $vif failed"
-        ifconfig "$vif" down || log debug "ifconfig $vif down failed"
+        do_without_error brctl delif "$bridge" "$vif"
+        do_without_error ifconfig "$vif" down
         ;;
 esac
 
