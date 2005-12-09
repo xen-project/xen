@@ -117,14 +117,14 @@ static int map_frontend_pages(
 	struct gnttab_map_grant_ref op;
 	int ret;
 
-	op.host_addr = (unsigned long)netif->comms_area->addr;
+	op.host_addr = (unsigned long)netif->tx_comms_area->addr;
 	op.flags     = GNTMAP_host_map;
 	op.ref       = tx_ring_ref;
 	op.dom       = netif->domid;
     
-	lock_vm_area(netif->comms_area);
+	lock_vm_area(netif->tx_comms_area);
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1);
-	unlock_vm_area(netif->comms_area);
+	unlock_vm_area(netif->tx_comms_area);
 	BUG_ON(ret);
 
 	if (op.status) { 
@@ -135,14 +135,14 @@ static int map_frontend_pages(
 	netif->tx_shmem_ref    = tx_ring_ref;
 	netif->tx_shmem_handle = op.handle;
 
-	op.host_addr = (unsigned long)netif->comms_area->addr + PAGE_SIZE;
+	op.host_addr = (unsigned long)netif->rx_comms_area->addr;
 	op.flags     = GNTMAP_host_map;
 	op.ref       = rx_ring_ref;
 	op.dom       = netif->domid;
 
-	lock_vm_area(netif->comms_area);
+	lock_vm_area(netif->rx_comms_area);
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1);
-	unlock_vm_area(netif->comms_area);
+	unlock_vm_area(netif->rx_comms_area);
 	BUG_ON(ret);
 
 	if (op.status) {
@@ -161,22 +161,22 @@ static void unmap_frontend_pages(netif_t *netif)
 	struct gnttab_unmap_grant_ref op;
 	int ret;
 
-	op.host_addr    = (unsigned long)netif->comms_area->addr;
+	op.host_addr    = (unsigned long)netif->tx_comms_area->addr;
 	op.handle       = netif->tx_shmem_handle;
 	op.dev_bus_addr = 0;
 
-	lock_vm_area(netif->comms_area);
+	lock_vm_area(netif->tx_comms_area);
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1);
-	unlock_vm_area(netif->comms_area);
+	unlock_vm_area(netif->tx_comms_area);
 	BUG_ON(ret);
 
-	op.host_addr    = (unsigned long)netif->comms_area->addr + PAGE_SIZE;
+	op.host_addr    = (unsigned long)netif->rx_comms_area->addr;
 	op.handle       = netif->rx_shmem_handle;
 	op.dev_bus_addr = 0;
 
-	lock_vm_area(netif->comms_area);
+	lock_vm_area(netif->rx_comms_area);
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1);
-	unlock_vm_area(netif->comms_area);
+	unlock_vm_area(netif->rx_comms_area);
 	BUG_ON(ret);
 }
 
@@ -195,20 +195,23 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	if (netif->irq)
 		return 0;
 
-	netif->comms_area = alloc_vm_area(2*PAGE_SIZE);
-	if (netif->comms_area == NULL)
+	netif->tx_comms_area = alloc_vm_area(PAGE_SIZE);
+	netif->rx_comms_area = alloc_vm_area(PAGE_SIZE);
+	if (netif->tx_comms_area == NULL || netif->rx_comms_area == NULL)
 		return -ENOMEM;
 
 	err = map_frontend_pages(netif, tx_ring_ref, rx_ring_ref);
 	if (err) {
-		free_vm_area(netif->comms_area);
+		free_vm_area(netif->tx_comms_area);
+		free_vm_area(netif->rx_comms_area);
 		return err;
 	}
 
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
 		unmap_frontend_pages(netif);
-		free_vm_area(netif->comms_area);
+		free_vm_area(netif->tx_comms_area);
+		free_vm_area(netif->rx_comms_area);
 		return err;
 	}
 
@@ -218,11 +221,11 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 		netif->evtchn, netif_be_int, 0, netif->dev->name, netif);
 	disable_irq(netif->irq);
 
-	txs = (netif_tx_sring_t *)netif->comms_area->addr;
+	txs = (netif_tx_sring_t *)netif->tx_comms_area->addr;
 	BACK_RING_INIT(&netif->tx, txs, PAGE_SIZE);
 
 	rxs = (netif_rx_sring_t *)
-		((char *)netif->comms_area->addr + PAGE_SIZE);
+		((char *)netif->rx_comms_area->addr);
 	BACK_RING_INIT(&netif->rx, rxs, PAGE_SIZE);
 
 	netif->rx_req_cons_peek = 0;
@@ -255,7 +258,8 @@ static void free_netif_callback(void *arg)
 
 	if (netif->tx.sring) {
 		unmap_frontend_pages(netif);
-		free_vm_area(netif->comms_area);
+		free_vm_area(netif->tx_comms_area);
+		free_vm_area(netif->rx_comms_area);
 	}
 
 	free_netdev(netif->dev);

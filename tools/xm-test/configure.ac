@@ -52,6 +52,7 @@ AC_CONFIG_FILES([
     tests/memset/Makefile
     tests/migrate/Makefile
     tests/network-attach/Makefile
+    tests/network/Makefile
     tests/pause/Makefile
     tests/reboot/Makefile
     tests/restore/Makefile

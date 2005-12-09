@@ -20,6 +20,7 @@
 
 #include <stdarg.h>
 #include <linux/module.h>
+#include <linux/kthread.h>
 #include <asm-xen/xenbus.h>
 #include "common.h"
 
@@ -92,6 +93,8 @@ static int blkback_remove(struct xenbus_device *dev)
 	}
 	if (be->blkif) {
 		be->blkif->status = DISCONNECTED; 
+		if (be->blkif->xenblkd)
+			kthread_stop(be->blkif->xenblkd);
 		blkif_put(be->blkif);
 		be->blkif = NULL;
 	}
@@ -217,6 +220,17 @@ static void backend_changed(struct xenbus_watch *watch,
 			be->major = 0;
 			be->minor = 0;
 			xenbus_dev_fatal(dev, err, "creating vbd structure");
+			return;
+		}
+
+		be->blkif->xenblkd = kthread_run(blkif_schedule, be->blkif,
+						 "xvd %d %02x:%02x",
+						 be->blkif->domid,
+						 be->major, be->minor);
+		if (IS_ERR(be->blkif->xenblkd)) {
+			err = PTR_ERR(be->blkif->xenblkd);
+			be->blkif->xenblkd = NULL;
+			xenbus_dev_error(dev, err, "start xenblkd");
 			return;
 		}
 

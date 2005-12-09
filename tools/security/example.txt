@@ -9,23 +9,23 @@
 # and to label domains and resources.
 ##
 
-We will show how to install and use the chwall_ste policy.
+We will show how to install and use the example chwall_ste policy.
 Other policies work similarly. Feedback welcome!
 
 
 
-1. Using secpol_xml2bin to translate the chwall_ste policy:
+1. Using xensec_xml2bin to translate the chwall_ste policy:
 ===========================================================
 
-#tools/security/secpol_xml2bin chwall_ste
+#xensec_xml2bin chwall_ste
 
 Successful execution should print:
 
-    [root@laptopxn security]# ./secpol_xml2bin chwall_ste
-    Validating label file policies/chwall_ste/chwall_ste-security_label_template.xml...
-    XML Schema policies/security_policy.xsd valid.
-    Validating policy file policies/chwall_ste/chwall_ste-security_policy.xml...
-    XML Schema policies/security_policy.xsd valid.
+    [root@laptopxn security]# xensec_xml2bin chwall_ste
+    Validating label file /etc/xen/acm-security/policies/chwall_ste/chwall_ste-security_label_template.xml...
+    XML Schema /etc/xen/acm-security/policies/security_policy.xsd valid.
+    Validating policy file /etc/xen/acm-security/policies/chwall_ste/chwall_ste-security_policy.xml...
+    XML Schema /etc/xen/acm-security/policies/security_policy.xsd valid.
     Creating ssid mappings ...
     Creating label mappings ...
     Max chwall labels:  7
@@ -35,10 +35,15 @@ Successful execution should print:
     Max ste-types:      6
     Max ste-ssids:      10
 
-The tool looks in directory policies/chwall_ste for
+By default, the tool looks in directory /etc/xen/acm-security/policies
+for a directory that matches the policy name (i.e. chwall_ste) to find
 the label and policy files.
+The '-d' option can be used to override the /etc/xen/acm-security/policies
+directory, for example if running the tool in the Xen security tool build
+directory.
 
-The default policy directory structure under tools/security looks like:
+The default policy directory structure under /etc/xen/acm-security (and
+the Xen security tool build directory - tools/security) looks like:
 
 policies
 |-- security_policy.xsd
@@ -55,25 +60,25 @@ policies
     |-- ste-security_label_template.xml
     `-- ste-security_policy.xml
 
-policies/security_policy.xsd contains the schema against which both the
+The security_policy.xsd file contains the schema against which both the
 label-template and the policy files must validate during translation.
 
-policies/chwall_ste/chwall_ste-security_policy.xml defines the
-policies and the types known to the policies.
+The files ending in -security_policy.xml define the policies and the
+types known to the policies.
 
-policies/chwall_ste/chwall_ste-security_label_template.xml contains
-label definitions that group chwall and ste types together and make
-them easier to use for users
+The files ending in -security_label_template.xml contain the label
+definitions that group types together and make them easier to use for
+users.
 
-After executing the above secpol_xml2bin command, you will find 2 new
-files in the policies/chwall_ste sub-directory:
+After executing the above xensec_xml2bin command, you will find 2 new
+files in the /etc/xen/acm-security/policies/chwall_ste sub-directory:
 
-policies/chwall_ste/chwall_ste.map ... this file includes the mapping
-of names from the xml files into their binary code representation.
+  chwall_ste.map ... this file includes the mapping
+    of names from the xml files into their binary code representation.
 
-policies/chwall_ste/chwall_ste.bin ... this is the binary policy file,
-the result of parsing the xml files and using the mapping to extract a
-binary version that can be loaded into the hypervisor.
+  chwall_ste.bin ... this is the binary policy file,
+    the result of parsing the xml files and using the mapping to extract a
+    binary version that can be loaded into the hypervisor.
 
 
 
@@ -85,13 +90,13 @@ please refer to install.txt for instructions.
 
 To activate the policy from the command line (assuming that the
 currently established policy is the minimal boot-policy that is
-hard-coded into the hypervisor:
+hard-coded into the hypervisor):
 
-# ./secpol_tool loadpolicy policies/chwall_ste/chwall_ste.bin
+# xensec_tool loadpolicy /etc/xen/acm-security/policies/chwall_ste/chwall_ste.bin
 
 To activate the policy at next reboot:
 
-# cp policies/chwall_ste/chwall_ste.bin /boot
+# cp /etc/xen/acm-security/policies/chwall_ste/chwall_ste.bin /boot
 
 Add a module line to your /boot/grub/grub.conf Xen entry.
 My boot entry with chwall_ste enabled looks like this:
@@ -129,12 +134,12 @@ assign labels to user domains.
 
 To show available labels for the chwall_ste policy:
 
-#tools/security/setlabel.sh -l
+# /etc/xen/acm-security/scripts/setlabel.sh -l
 
 lists all available labels. For the default chwall_ste it should print
 the following:
 
-    [root@laptopxn security]# ./setlabel.sh -l chwall_ste
+    [root@laptopxn security]# /etc/xen/acm-security/scripts/setlabel.sh -l chwall_ste
     The following labels are available:
     dom_SystemManagement
     dom_HomeBanking
@@ -156,8 +161,8 @@ Setlabel.sh only prints VM labels (which we have prefixed with "dom_")
 since only those are used at this time.
 
 If you would like to assign the dom_HomeBanking label to one of your
-user domains (which you hopefully keep clean), look at an example
-domain configuration homebanking.xm:
+user domains (which you hopefully keep clean), look at the hypothetical
+domain configuration contained in /etc/xen/homebanking.xm:
 
     #------HOMEBANKING---------
     kernel = "/boot/vmlinuz-2.6.12-xenU"
@@ -172,7 +177,7 @@ domain configuration homebanking.xm:
 
 Now we label this domain
 
-[root@laptopxn security]# ./setlabel.sh homebanking.xm dom_HomeBanking chwall_ste
+[root@laptopxn security]# /etc/xen/acm-securit/scripts/setlabel.sh /etc/xen/homebanking.xm dom_HomeBanking chwall_ste
 Mapped label 'dom_HomeBanking' to ssidref '0x00020002'.
 
 The domain configuration my look now like:
@@ -223,9 +228,8 @@ because of the defined conflict set
 				<type>cw_Distrusted</type>
 			</conflictset>
 
-(in policies/chwall_ste/chwall_ste-security_policy.xml), which says
-that only one of the types cw_sensitive and cw_Distrusted can run at a
-time.
+(in chwall_ste-security_policy.xml), which says that only one of the
+types cw_Sensitive and cw_Distrusted can run at a time.
 
 If you save or shutdown the HomeBanking domain, you will be able to
 start the "Fun" domain. You can look into the Xen log to see if a
@@ -255,15 +259,15 @@ a) the policy definition (types etc.) file
 b) the label template definition (labels etc.) file
 
 If your policy name is "mypolicy", you need to create a
-subdirectory mypolicy in tools/security/policies.
+subdirectory mypolicy in /etc/xen/acm-security/policies.
 
 Then you create
-tools/security/policies/mypolicy/mypolicy-security_policy.xml and
-tools/security/policies/mypolicy/mypolicy-security_label_template.xml.
+/etc/xen/acm-security/policies/mypolicy/mypolicy-security_policy.xml and
+/etc/xen/acm-security/policies/mypolicy/mypolicy-security_label_template.xml.
 
 You need to keep to the schema as defined in
-tools/security/security_policy.xsd since the translation tool
-secpol_xml2bin is written against this schema.
+/etc/xen/acm-security/security_policy.xsd since the translation tool
+xensec_xml2bin is written against this schema.
 
 If you keep to the security policy schema, then you can use all the
 tools described above. Refer to install.txt to install it.

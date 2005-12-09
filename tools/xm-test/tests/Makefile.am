@@ -13,6 +13,7 @@ SUBDIRS = 	               	\
 		list		\
 		memmax		\
 		memset		\
+		network		\
 		network-attach	\
 		pause		\
 		reboot 		\

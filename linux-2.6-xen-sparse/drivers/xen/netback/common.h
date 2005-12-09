@@ -55,7 +55,8 @@ typedef struct netif_st {
 	/* The shared rings and indexes. */
 	netif_tx_back_ring_t tx;
 	netif_rx_back_ring_t rx;
-	struct vm_struct *comms_area;
+	struct vm_struct *tx_comms_area;
+	struct vm_struct *rx_comms_area;
 
 	/* Allow netif_be_start_xmit() to peek ahead in the rx request ring. */
 	RING_IDX rx_req_cons_peek;

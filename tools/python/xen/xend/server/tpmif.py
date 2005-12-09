@@ -38,10 +38,14 @@ class TPMifController(DevController):
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
 
-        devid = int(sxp.child_value(config, 'pref_instance', '0'))
-        log.info("The domain has a TPM with instance %d." % devid)
+        devid = self.allocateDeviceID()
+        inst = int(sxp.child_value(config, 'pref_instance', '-1'))
+        if inst == -1:
+            inst = int(sxp.child_value(config, 'instance' , '0'))
 
-        back  = { 'pref_instance' : "%i" % devid }
+        log.info("The domain has a TPM with instance %d and devid %d.",
+                 inst, devid)
+        back  = { 'pref_instance' : "%i" % inst }
         front = { 'handle' : "%i" % devid }
 
         return (devid, back, front)

@@ -4,6 +4,7 @@
 #
 
 from Console import *
+from Network import *
 from Test import *
 from Xm import *
 from XenDomain import *
