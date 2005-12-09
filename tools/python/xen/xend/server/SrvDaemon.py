@@ -23,73 +23,37 @@ import relocate
 from params import *
 
 
+XEND_PROCESS_NAME = 'xend'
+
+
 class Daemon:
     """The xend daemon.
     """
     def __init__(self):
-        self.shutdown = 0
-        self.traceon = 0
+        self.traceon = False
         self.tracefile = None
         self.traceindent = 0
         self.child = 0 
-        
-    def read_pid(self, pidfile):
-        """Read process id from a file.
 
-        @param pidfile: file to read
-        @return pid or 0
-        """
-        if os.path.isfile(pidfile) and os.path.getsize(pidfile):
-            try:
-                f = open(pidfile, 'r')
-                try:
-                    return int(f.read())
-                finally:
-                    f.close()
-            except:
-                return 0
-        else:
-            return 0
 
-    def find_process(self, pid, name):
-        """Search for a process.
-
-        @param pid: process id
-        @param name: process name
-        @return: pid if found, 0 otherwise
-        """
-        running = 0
-        if pid:
-            lines = os.popen('ps %d 2>/dev/null' % pid).readlines()
-            exp = '^ *%d.+%s' % (pid, name)
-            for line in lines:
-                if re.search(exp, line):
-                    running = pid
-                    break
-        return running
-
-    def cleanup_process(self, pidfile, name, kill):
-        """Clean up the pidfile for a process.
+    def cleanup_xend(self, kill):
+        """Clean up the Xend pidfile.
         If a running process is found, kills it if 'kill' is true.
 
-        @param pidfile: pid file
-        @param name: process name
         @param kill: whether to kill the process
         @return running process id or 0
         """
         running = 0
-        pid = self.read_pid(pidfile)
-        if self.find_process(pid, name):
+        pid = read_pid(XEND_PID_FILE)
+        if find_process(pid, XEND_PROCESS_NAME):
             if kill:
-                os.kill(pid, 1)
+                os.kill(pid, signal.SIGTERM)
             else:
                 running = pid
-        if running == 0 and os.path.isfile(pidfile):
-            os.remove(pidfile)
+        if running == 0 and os.path.isfile(XEND_PID_FILE):
+            os.remove(XEND_PID_FILE)
         return running
 
-    def cleanup_xend(self, kill):
-        return self.cleanup_process(XEND_PID_FILE, "xend", kill)
 
     def status(self):
         """Returns the status of the xend daemon.
@@ -97,15 +61,15 @@ class Daemon:
         0  Running
         3  Not running
         """
-        if self.cleanup_process(XEND_PID_FILE, "xend", False) == 0:
+        if self.cleanup_xend(False) == 0:
             return 3
         else:
             return 0
 
-    def fork_pid(self, pidfile):
-        """Fork and write the pid of the child to 'pidfile'.
 
-        @param pidfile: pid file
+    def fork_pid(self):
+        """Fork and write the pid of the child to XEND_PID_FILE.
+
         @return: pid of child in parent, 0 in child
         """
 
@@ -113,7 +77,7 @@ class Daemon:
 
         if self.child:
             # Parent
-            pidfile = open(pidfile, 'w')
+            pidfile = open(XEND_PID_FILE, 'w')
             try:
                 pidfile.write(str(self.child))
             finally:
@@ -121,10 +85,20 @@ class Daemon:
 
         return self.child
 
+
     def daemonize(self):
         if not XEND_DAEMONIZE: return
+ 
         # Detach from TTY.
+
+        # Become the group leader (already a child process)
         os.setsid()
+
+        # Fork, this allows the group leader to exit,
+        # which means the child can never again regain control of the
+        # terminal
+        if os.fork():
+            os._exit(0)
 
         # Detach from standard file descriptors, and redirect them to
         # /dev/null or the log as appropriate.
@@ -164,7 +138,7 @@ class Daemon:
         # we can avoid a race condition during startup
         
         r,w = os.pipe()
-        if self.fork_pid(XEND_PID_FILE):
+        if os.fork():
             os.close(w)
             r = os.fdopen(r, 'r')
             try:
@@ -178,8 +152,43 @@ class Daemon:
         else:
             os.close(r)
             # Child
+            self.daemonize()
             self.tracing(trace)
-            self.run(os.fdopen(w, 'w'))
+
+            # If Xend proper segfaults, then we want to restart it.  Thus,
+            # we fork a child for running Xend itself, and if it segfaults
+            # (or exits any way other than cleanly) then we run it again.
+            # The first time through we want the server to write to the (r,w)
+            # pipe created above, so that we do not exit until the server is
+            # ready to receive requests.  All subsequent restarts we don't
+            # want this behaviour, or the pipe will eventually fill up, so
+            # we just pass None into run in subsequent cases (by clearing w
+            # in the parent of the first fork).
+            while True:
+                pid = self.fork_pid()
+                if pid:
+                    os.close(w)
+                    w = False
+
+                    (_, status) = os.waitpid(pid, 0)
+
+                    if os.WIFEXITED(status):
+                        code = os.WEXITSTATUS(status)
+                        log.info('Xend exited with status %d.', code)
+                        sys.exit(code)
+
+                    if os.WIFSIGNALED(status):
+                        sig = os.WTERMSIG(status)
+
+                        if sig in (signal.SIGINT, signal.SIGTERM):
+                            log.info('Xend stopped due to signal %d.', sig)
+                            sys.exit(0)
+                        else:
+                            log.fatal(
+                                'Xend died due to signal %d!  Restarting it.',
+                                sig)
+                else:
+                    self.run(w and os.fdopen(w, 'w') or None)
 
         return ret
 
@@ -274,25 +283,17 @@ class Daemon:
 
             relocate.listenRelocation()
             servers = SrvServer.create()
-            self.daemonize()
             servers.start(status)
         except Exception, ex:
             print >>sys.stderr, 'Exception starting xend:', ex
             if XEND_DEBUG:
                 traceback.print_exc()
             log.exception("Exception starting xend (%s)" % ex)
-            status.write('1')
-            status.close()
-            self.exit(1)
+            if status:
+                status.write('1')
+                status.close()
+            sys.exit(1)
             
-    def exit(self, rc=0):
-        # Calling sys.exit() raises a SystemExit exception, which only
-        # kills the current thread. Calling os._exit() makes the whole
-        # Python process exit immediately. There doesn't seem to be another
-        # way to exit a Python with running threads.
-        #sys.exit(rc)
-        os._exit(rc)
-
 def instance():
     global inst
     try:
@@ -302,10 +303,47 @@ def instance():
     return inst
 
 
+def read_pid(pidfile):
+    """Read process id from a file.
+
+    @param pidfile: file to read
+    @return pid or 0
+    """
+    if os.path.isfile(pidfile) and os.path.getsize(pidfile):
+        try:
+            f = open(pidfile, 'r')
+            try:
+                return int(f.read())
+            finally:
+                f.close()
+        except:
+            return 0
+    else:
+        return 0
+
+
+def find_process(pid, name):
+    """Search for a process.
+
+    @param pid: process id
+    @param name: process name
+    @return: pid if found, 0 otherwise
+    """
+    running = 0
+    if pid:
+        lines = os.popen('ps %d 2>/dev/null' % pid).readlines()
+        exp = '^ *%d.+%s' % (pid, name)
+        for line in lines:
+            if re.search(exp, line):
+                running = pid
+                break
+    return running
+
+
 def main(argv = None):
     global XEND_DAEMONIZE
     
-    XEND_DAEMONIZE = 0
+    XEND_DAEMONIZE = False
     if argv is None:
         argv = sys.argv
 

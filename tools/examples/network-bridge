@@ -89,6 +89,31 @@ legacy_mask_to_prefix() {
     exit 1
 }
 
+parse_kernel_ip() {
+    if egrep 'ip=[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:' /proc/cmdline; then
+	kip=`sed -e 's!.*ip=\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\):.*!\1!' /proc/cmdline`
+	kmask=`sed -e 's!.*ip=[^:]*:[^:]*:[^:]*:\([^:]*\):.*!\1!' /proc/cmdline` 
+	kgate=`sed -e 's!.*ip=[^:]*:[^:]*:\([^:]*\):.*!\1!' /proc/cmdline`
+    fi
+}
+
+do_ifup() {
+    if ! ifup $1 ; then
+        if [ ${kip} ] ; then
+            # use the addresses we grocked from /proc/cmdline
+            if [ -z "${kmask}" ]; then 
+                PREFIX=32
+            else 
+                legacy_mask_to_prefix ${kmask}
+            fi
+            ip addr flush $1
+            ip addr add ${kip}/${PREFIX} dev $1
+            ip link set dev $1 up
+            [ ${kgate} ] && ip route add default via ${kgate}
+        fi
+    fi
+}
+
 # Usage: transfer_addrs src dst
 # Copy all IP addresses (including aliases) from device $src to device $dst.
 transfer_addrs () {
@@ -234,14 +259,11 @@ using loopback.nloopbacks=<N> on the domain 0 kernel command line.
 	preiftransfer ${netdev}
 	transfer_addrs ${netdev} ${vdev}
 	if ! ifdown ${netdev}; then
-	    # if ifup didn't work, see if we have an ip= on cmd line
-	    if egrep 'ip=[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:' /proc/cmdline; then
-		kip=`sed -e 's!.*ip=\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\):.*!\1!' /proc/cmdline`
-		kmask=`sed -e 's!.*ip=[^:]*:[^:]*:[^:]*:\([^:]*\):.*!\1!' /proc/cmdline` 
-		kgate=`sed -e 's!.*ip=[^:]*:[^:]*:\([^:]*\):.*!\1!' /proc/cmdline`
-		ip link set ${netdev} down
-		ip addr flush ${netdev}
-	    fi
+	    # If ifdown fails, take the IP details from the kernel command
+	    # line.
+	    parse_kernel_ip
+	    ip link set ${netdev} down
+	    ip addr flush ${netdev}
 	fi
 	ip link set ${netdev} name ${pdev}
 	ip link set ${vdev} name ${netdev}
@@ -253,20 +275,8 @@ using loopback.nloopbacks=<N> on the domain 0 kernel command line.
 	add_to_bridge ${bridge} ${pdev}
 	ip link set ${bridge} up
 	ip link set ${vif0} up
-	ip link set ${pdev} up 
-	if ! ifup ${netdev} ; then
-	    if [ ${kip} ] ; then
-		# use the addresses we grocked from /proc/cmdline
-		if [ -z "${kmask}" ]; then 
-		    PREFIX=32; 
-		else 
-		    legacy_mask_to_prefix ${kmask};
-		fi
-		ip addr add ${kip}/${PREFIX} dev ${netdev}
-		ip link set dev ${netdev} up
-		[ ${kgate} ] && ip route add default via ${kgate}
-	    fi
-	fi
+	ip link set ${pdev} up
+	do_ifup ${netdev}
     else
 	# old style without ${vdev}
 	transfer_addrs  ${netdev} ${bridge}
@@ -290,7 +300,9 @@ op_stop () {
 	ip link set dev ${vif0} down
 	mac=`ip link show ${netdev} | grep 'link\/ether' | sed -e 's/.*ether \(..:..:..:..:..:..\).*/\1/'`
 	transfer_addrs ${netdev} ${pdev}
-	ifdown ${netdev}
+	if ! ifdown ${netdev}; then
+	    parse_kernel_ip
+	fi
 	ip link set ${netdev} down arp off
 	ip link set ${netdev} addr fe:ff:ff:ff:ff:ff
 	ip link set ${pdev} down
@@ -303,8 +315,7 @@ op_stop () {
 
 	ip link set ${netdev} name ${vdev}
 	ip link set ${pdev} name ${netdev}
-	ifup ${netdev}
-
+	do_ifup ${netdev}
     else
 	transfer_routes ${bridge} ${netdev}
 	ip link set ${bridge} down
