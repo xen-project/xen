@@ -15,13 +15,14 @@ RD_PATH=../../ramdisk
 TENV="PYTHONPATH=$PYTHONPATH:$TESTLIB:/usr/lib/python RD_PATH=$RD_PATH"
 
 AC_ARG_ENABLE(vmx-support,
-	[[  --enable-vmx-support           use block devices instead of ramdisks]],
+	[[  --enable-vmx-support           enable hardware virtual machine assist]],
 	[
 		ENABLE_VMX=True
 	],[
 		ENABLE_VMX=False
 	])
 
+AM_CONDITIONAL(VMX, test x$ENABLE_VMX = xTrue)
 AC_SUBST(ENABLE_VMX)
 
 AC_SUBST(TENV)

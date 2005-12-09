@@ -21,7 +21,7 @@ status, output = traceCommand("xm block-list %s" % domain.getId())
 if status != 0:
     FAIL("xm block-list returned bad status, expected 0, status is %i" % status)
 
-if USE_BLKDEV_FOR_ROOT:
+if ENABLE_VMX_SUPPORT:
     SKIP("Using block device for root, so this case does not apply")
 
 if output != "":

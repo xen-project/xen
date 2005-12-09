@@ -9,10 +9,16 @@ BR_IMG = $(BR_SRC)/rootfs.i386.ext2
 
 BR_ROOT = build_i386/root
 
+VMX_SCRIPT = bin/create_disk_image
+
 XMTEST_MAJ_VER = $(shell echo @PACKAGE_VERSION@ | perl -pe 's/(\d+)\.(\d+)\.\d+/\1.\2/')
 XMTEST_VER_IMG = initrd-$(XMTEST_MAJ_VER).img
 
+if VMX
+all: initrd.img disk.img
+else
 all: initrd.img
+endif
 
 $(BR_TAR):
 	wget $(BR_URL)
@@ -37,6 +43,10 @@ $(XMTEST_VER_IMG): $(BR_IMG)
 initrd.img: $(XMTEST_VER_IMG)
 	ln -sf $(XMTEST_VER_IMG) initrd.img
 
+disk.img: $(XMTEST_VER_IMG)
+	chmod a+x $(VMX_SCRIPT)
+	$(VMX_SCRIPT) -r $(XMTEST_VER_IMG) -i disk.img
+
 existing:
 	@[ -f $(XMTEST_VER_IMG) ] && ln -sf $(XMTEST_VER_IMG) initrd.img || \
 	echo Error, $(XMTEST_VER_IMG) not found
@@ -49,3 +59,4 @@ am_config_clean-local:
 	rm -f initrd.img
 	rm -f $(BR_TAR)
 	rm -Rf patches make.d
+	rm -f disk.img

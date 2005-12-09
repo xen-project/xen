@@ -23,13 +23,18 @@ import commands
 import os
 import re
 import time
-import random
 
 from Xm import *
 from Test import *
 from config import *
 
-BLOCK_ROOT_DEV = "hdd1"
+BLOCK_ROOT_DEV = "hda"
+
+def XmTestDomain(name=None, extraOpts=None, config="/dev/null"):
+    if ENABLE_VMX_SUPPORT:
+        return XmTestVmxDomain(name, extraOpts, config)
+    else:
+        return XmTestPvDomain(name, extraOpts, config)
 
 def getDefaultKernel():
     dom0Ver = commands.getoutput("uname -r");
@@ -77,7 +82,21 @@ class XenDomain:
             c += " %s=%s" % (k, self.opts[k])
         
         return c
-        
+
+    def getUniqueName(self):
+        #
+        # We avoid multiple duplicate names
+        # here because they stick around in xend
+        # too long
+        #
+        unixtime = int(time.time())
+        test_name = sys.argv[0]
+        test_name = re.sub("\.test", "", test_name)
+        test_name = re.sub("[\/\.]", "", test_name)
+        name = "%s-%i" % (test_name, unixtime)
+
+        return name
+
     def start(self):
 
         if self.configVals:
@@ -135,6 +154,18 @@ class XenDomain:
 
         self.configVals["disk"].append("%s,%s,%s" % (pdev,vdev,acc))
 
+    def configAddVif(self, type, mac, bridge):
+        if not self.configVals:
+            self.configVals = {}
+
+        if not self.configVals.has_key("vif"):
+            self.configVals["vif"] = []
+
+        if mac:
+            self.configVals["vif"].append("%s,%s,%s" % (type,mac,bridge))
+        else:
+            self.configVals["vif"].append("%s,%s" % (type,bridge))
+
     def __writeConfig(self, configFileName):
 
         conf = file(configFileName, "w")
@@ -144,46 +175,84 @@ class XenDomain:
 
         conf.close()
 
-
-class XmTestDomain(XenDomain):
-
-    def __getUniqueName(self):
-        #
-        # We avoid multiple duplicate names
-        # here because they stick around in xend
-        # too long
-        #
-        unixtime = int(time.time())
-        test_name = sys.argv[0]
-        test_name = re.sub("\.test", "", test_name)
-        test_name = re.sub("[\/\.]", "", test_name)
-        name = "%s-%i" % (test_name, unixtime)
-
-        return name
-
-    def __randomize(self):
-        # Random amount of memory between min and free_memory/2
-        freeMem = int(getInfo("free_memory"))
-        self.defaults["memory"] = random.randint(self.minSafeMem(),
-                                                 freeMem/2)
-        
-        self.defaults["vcpus"] = random.randint(1, 16)
-
-        self.defaults["nics"] = random.randint(0, 8)
-
-        if verbose:
-            print "*** Defaults after randomization:"
-            for k in self.defaults.keys():
-                print "***  %10s : %s" % (k, self.defaults[k])
+class XmTestVmxDomain(XenDomain):
 
     def __prepareBlockRoot(self, rdpath):
-        image = os.path.abspath(rdpath + "/initrd.img")
-        self.configAddDisk("file:%s" % image, BLOCK_ROOT_DEV, "w")
-        self.defaults["root"] = "/dev/%s" % BLOCK_ROOT_DEV
-        del self.defaults["ramdisk"]
+        image = os.path.abspath(rdpath + "/disk.img")
+        self.configAddDisk("file:%s" % image, "ioemu:%s" % BLOCK_ROOT_DEV, "w")
 
-    def __init__(self, name=None, extraOpts=None, config="/dev/null",
-                 random=False):
+    def __prepareVif(self):
+        self.configAddVif("type=ioemu", None, "bridge=xenbr0")
+
+    def __prepareDeviceModel(self):
+        arch = os.uname()[4]
+        if re.search('64', arch):
+            self.configSetVar("device_model", "\"/usr/lib64/xen/bin/qemu-dm\"")
+        else:
+            self.configSetVar("device_model", "\"/usr/lib/xen/bin/qemu-dm\"")
+
+    def __init__(self, name=None, extraOpts=None, config="/dev/null"):
+
+        rdpath = os.environ.get("RD_PATH")
+        if not rdpath:
+            rdpath = "../../ramdisk"
+
+        self.opts = {}
+        self.configVals = {}
+
+        # Defaults
+        self.defaults = {"memory"    : 64,
+                         "vcpus"     : 1,
+                         "nics"      : 0,
+                         "kernel"    : "/usr/lib/xen/boot/vmxloader",
+                         "builder"   : "\'vmx\'",
+                         "name"      : name or self.getUniqueName()
+                         }
+
+        self.domID = None;
+        self.config = config;
+
+        self.__prepareBlockRoot(rdpath)
+	#self.__prepareVif()
+        self.__prepareDeviceModel()
+        #self.configSetVar("boot","\'c\'")
+        self.configSetVar("sdl","0")
+        self.configSetVar("vnc","0")
+        self.configSetVar("vncviewer","0")
+        self.configSetVar("nographic","1")
+        self.configSetVar("serial","\'pty\'")
+
+        # Copy over defaults
+        for key in self.defaults.keys():
+            self.opts[key] = self.defaults[key]
+
+        # Merge in extra options
+        if extraOpts:
+            for key in extraOpts.keys():
+                self.opts[key] = extraOpts[key]
+
+    def start(self):
+        """We know how about how long everyone will need to wait
+        for our disk image to come up, so we do it here as a convenience"""
+
+#        for i in range(0,5):
+#            status, output = traceCommand("xm list")
+
+        XenDomain.start(self)
+        waitForBoot()
+
+    def startNow(self):
+        XenDomain.start(self)
+
+    def getMem(self):
+        return int(self.opts["memory"])
+
+    def minSafeMem(self):
+        return 16
+
+class XmTestPvDomain(XenDomain):
+
+    def __init__(self, name=None, extraOpts=None, config="/dev/null"):
 
         rdpath = os.environ.get("RD_PATH")
         if not rdpath:
@@ -198,19 +267,13 @@ class XmTestDomain(XenDomain):
                          "nics"    : 0,
                          "kernel"  : getDefaultKernel(),
                          "root"    : "/dev/ram0",
-                         "name"    : name or self.__getUniqueName(),
+                         "name"    : name or self.getUniqueName(),
                          "ramdisk" : rdpath + "/initrd.img"
                          }
 
         self.domID = None;
         self.config = config;
 
-        if random:
-            self.__randomize()
-
-        if USE_BLKDEV_FOR_ROOT:
-            self.__prepareBlockRoot(rdpath)
-        
         # Copy over defaults
         for key in self.defaults.keys():
             self.opts[key] = self.defaults[key]
