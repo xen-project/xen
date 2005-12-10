@@ -216,7 +216,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = 0;
 
         op->u.createdomain.domain = d->domain_id;
-        copy_to_user(u_dom0_op, op, sizeof(*op));
+        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+            ret = -EFAULT;
     }
     break;
 
@@ -341,14 +342,16 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_SCHEDCTL:
     {
         ret = sched_ctl(&op->u.schedctl);
-        copy_to_user(u_dom0_op, op, sizeof(*op));
+        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+            ret = -EFAULT;
     }
     break;
 
     case DOM0_ADJUSTDOM:
     {
         ret = sched_adjdom(&op->u.adjustdom);
-        copy_to_user(u_dom0_op, op, sizeof(*op));
+        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+            ret = -EFAULT;
     }
     break;
 
@@ -376,7 +379,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         getdomaininfo(d, &op->u.getdomaininfo);
 
         if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )     
-            ret = -EINVAL;
+            ret = -EFAULT;
 
         put_domain(d);
     }
@@ -411,7 +414,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
             if ( copy_to_user(buffer, &info, sizeof(dom0_getdomaininfo_t)) )
             {
-                ret = -EINVAL;
+                ret = -EFAULT;
                 break;
             }
             
@@ -427,7 +430,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         op->u.getdomaininfolist.num_domains = num_domains;
 
         if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
-            ret = -EINVAL;
+            ret = -EFAULT;
     }
     break;
 
@@ -520,7 +523,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_TBUFCONTROL:
     {
         ret = tb_control(&op->u.tbufcontrol);
-        copy_to_user(u_dom0_op, op, sizeof(*op));
+        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+            ret = -EFAULT;
     }
     break;
     
@@ -530,15 +534,18 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             &op->u.readconsole.buffer, 
             &op->u.readconsole.count,
             op->u.readconsole.clear); 
-        copy_to_user(u_dom0_op, op, sizeof(*op));
+        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+            ret = -EFAULT;
     }
     break;
 
     case DOM0_SCHED_ID:
     {
         op->u.sched_id.sched_id = sched_id();
-        copy_to_user(u_dom0_op, op, sizeof(*op));
-        ret = 0;        
+        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+            ret = -EFAULT;
+        else
+            ret = 0;
     }
     break;
 
@@ -576,7 +583,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     {
         extern int perfc_control(dom0_perfccontrol_t *);
         ret = perfc_control(&op->u.perfccontrol);
-        copy_to_user(u_dom0_op, op, sizeof(*op));
+        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+            ret = -EFAULT;
     }
     break;
 #endif
