@@ -872,8 +872,9 @@ void local_setup_timer(unsigned int cpu)
 
 	do {
 		seq = read_seqbegin(&xtime_lock);
+		/* Use cpu0 timestamp: cpu's shadow is not initialised yet. */
 		per_cpu(processed_system_time, cpu) = 
-			per_cpu(shadow_time, cpu).system_timestamp;
+			per_cpu(shadow_time, 0).system_timestamp;
 	} while (read_seqretry(&xtime_lock, seq));
 
 	sprintf(timer_name[cpu], "timer%d", cpu);
