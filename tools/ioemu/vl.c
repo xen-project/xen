@@ -428,9 +428,9 @@ void hw_error(const char *fmt, ...)
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
     if (logfile) {
-	fprintf(logfile, "qemu: hardware error: ");
-	vfprintf(logfile, fmt, ap);
-	fprintf(logfile, "\n");
+        fprintf(logfile, "qemu: hardware error: ");
+        vfprintf(logfile, fmt, ap);
+        fprintf(logfile, "\n");
     }
     va_end(ap);
     abort();
@@ -526,8 +526,8 @@ int64_t cpu_get_real_ticks(void)
 
 #elif defined(__ia64__)
 #include "ia64_intrinsic.h"
-#define cpu_get_real_ticks()	\
-	__ia64_getreg(_IA64_REG_AR_ITC)
+#define cpu_get_real_ticks()    \
+    __ia64_getreg(_IA64_REG_AR_ITC)
 
 #else
 #error unsupported CPU
@@ -2645,6 +2645,7 @@ int main(int argc, char **argv)
     char monitor_device[128];
     char serial_devices[MAX_SERIAL_PORTS][128];
     int serial_device_index;
+    char qemu_dm_logfilename[64];
     const char *loadvm = NULL;
     unsigned long nr_pages, extra_pages, ram_pages, *page_array;
     extern void *shared_page;
@@ -2695,6 +2696,8 @@ int main(int argc, char **argv)
     macaddr[5] = 0x56;
 
     /* init debug */
+    sprintf(qemu_dm_logfilename, "/var/log/qemu-dm.%d.log", getpid());
+    cpu_set_log_filename(qemu_dm_logfilename);
     cpu_set_log(0);
 
     optind = 1;

@@ -142,10 +142,9 @@ void cpu_set_log(int log_flags)
 #else
         setvbuf(logfile, NULL, _IOLBF, 0);
 #endif
-/*
-    	stdout = logfile;
-    	stderr = logfile;
-*/
+
+        stdout = logfile;
+        stderr = logfile;
     }
 }
 
