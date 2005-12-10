@@ -276,7 +276,7 @@ int check_descriptor(struct desc_struct *d);
 #define VALID_MFN(_mfn)         (!((_mfn) & (1U<<31)))
 
 #define set_mfn_from_pfn(pfn, mfn) (phys_to_machine_mapping[(pfn)] = (mfn))
-static inline unsigned long get_mfn_from_pfn(unsigned long pfn) 
+static inline unsigned long get_mfn_from_pfn(unsigned long pfn)
 {
     unsigned long mfn;
     l1_pgentry_t pte;
@@ -284,11 +284,11 @@ static inline unsigned long get_mfn_from_pfn(unsigned long pfn)
     if ( (__copy_from_user(&pte, &phys_to_machine_mapping[pfn],
                            sizeof(pte)) == 0) &&
          (l1e_get_flags(pte) & _PAGE_PRESENT) )
-	mfn = l1e_get_pfn(pte);
+        mfn = l1e_get_pfn(pte);
     else
-	mfn = INVALID_MFN;
-    
-    return mfn; 
+        mfn = INVALID_MFN;
+
+    return mfn;
 }
 
 #ifdef MEMORY_GUARD
@@ -331,8 +331,8 @@ struct ptwr_info {
 int  ptwr_init(struct domain *);
 void ptwr_destroy(struct domain *);
 void ptwr_flush(struct domain *, const int);
-int  ptwr_do_page_fault(struct domain *, unsigned long, 
-			struct cpu_user_regs *);
+int  ptwr_do_page_fault(struct domain *, unsigned long,
+                        struct cpu_user_regs *);
 int  revalidate_l1(struct domain *, l1_pgentry_t *, l1_pgentry_t *);
 
 void cleanup_writable_pagetable(struct domain *d);

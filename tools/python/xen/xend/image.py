@@ -365,13 +365,13 @@ class VmxImageHandler(ImageHandler):
 
     def getDomainMemory(self, mem):
         """@see ImageHandler.getDomainMemory"""
-	page_kb = 4
-	if os.uname()[4] == 'ia64':
-	    page_kb = 16
+        page_kb = 4
+        if os.uname()[4] == 'ia64':
+            page_kb = 16
         # for ioreq_t and xenstore
         static_pages = 2
         return mem + (self.getPageTableSize(mem / 1024) + static_pages) * page_kb
-            
+
     def getPageTableSize(self, mem_mb):
         """Return the pages of memory needed for 1:1 page tables for physical
            mode.
