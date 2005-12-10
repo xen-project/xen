@@ -180,14 +180,18 @@ uninstall:
 	rm -rf $(D)/usr/bin/xen* $(D)/usr/bin/lomount
 	rm -rf $(D)/usr/bin/cpuperf-perfcntr $(D)/usr/bin/cpuperf-xen
 	rm -rf $(D)/usr/bin/xc_shadow
-	rm -rf $(D)/usr/include/xenctrl.h
+	rm -rf $(D)/usr/bin/pygrub
+	rm -rf $(D)/usr/bin/setsize $(D)/usr/bin/tbctl
+	rm -rf $(D)/usr/bin/xsls
+	rm -rf $(D)/usr/include/xenctrl.h $(D)/usr/include/xenguest.h
 	rm -rf $(D)/usr/include/xs_lib.h $(D)/usr/include/xs.h
 	rm -rf $(D)/usr/include/xen
 	rm -rf $(D)/usr/$(LIBDIR)/libxenctrl* $(D)/usr/$(LIBDIR)/libxenguest*
 	rm -rf $(D)/usr/$(LIBDIR)/libxenstore*
-	rm -rf $(D)/usr/$(LIBDIR)/python/xen $(D)/usr/$(LIBDIR)/xen 
+	rm -rf $(D)/usr/$(LIBDIR)/python/xen $(D)/usr/$(LIBDIR)/python/grub
 	rm -rf $(D)/usr/$(LIBDIR)/xen/
 	rm -rf $(D)/usr/lib/xen/
+	rm -rf $(D)/usr/local/sbin/setmask $(D)/usr/local/sbin/xen*
 	rm -rf $(D)/usr/sbin/xen* $(D)/usr/sbin/netfix $(D)/usr/sbin/xm
 	rm -rf $(D)/usr/share/doc/xen
 	rm -rf $(D)/usr/share/xen
