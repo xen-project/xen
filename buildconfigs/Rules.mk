@@ -90,6 +90,9 @@ ref-%/.valid-ref: pristine-%/.valid-pristine
 	touch $@ # update timestamp to avoid rebuild
 endif
 
+%-prep:
+	$(MAKE) -f buildconfigs/mk.$* prep
+
 %-install:
 	$(MAKE) -f buildconfigs/mk.$* build
 

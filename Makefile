@@ -59,6 +59,9 @@ tools: dist-tools
 kernels: dist-kernels
 docs: dist-docs
 
+prep-kernels:
+	for i in $(XKERNELS) ; do $(MAKE) $$i-prep || exit 1; done
+
 install-xen:
 	$(MAKE) -C xen install
 
@@ -156,6 +159,7 @@ help:
 	@echo '  install-iptables - install iptables tools'
 	@echo ''
 	@echo 'Miscellaneous targets:'
+	@echo '  prep-kernels     - prepares kernel directories, does not build'
 	@echo '  mkpatches        - make patches against vanilla kernels from'
 	@echo '                     sparse trees'
 	@echo '  uninstall        - attempt to remove installed Xen tools (use'

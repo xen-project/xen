@@ -40,6 +40,8 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
 	  rm -f Makefile ; mv Mk.tmp Makefile )
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) oldconfig
 
+prep: $(LINUX_DIR)/include/linux/autoconf.h
+
 config: CONFIGMODE = menuconfig
 config: $(LINUX_DIR)/include/linux/autoconf.h
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) $(CONFIGMODE)
