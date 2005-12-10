@@ -236,26 +236,24 @@ static pagetable_t page_table_convert(struct domain *d)
     l4_pgentry_t *l4;
     l3_pgentry_t *l3, *pae_l3;
     int i;
-    
+
     l4page = alloc_domheap_page(NULL);
     if (l4page == NULL)
-        domain_crash(d);
+        domain_crash_synchronous();
     l4 = map_domain_page(page_to_pfn(l4page));
     memset(l4, 0, PAGE_SIZE);
 
     l3page = alloc_domheap_page(NULL);
     if (l3page == NULL)
-        domain_crash(d);
-    l3 =  map_domain_page(page_to_pfn(l3page));
+        domain_crash_synchronous();
+    l3 = map_domain_page(page_to_pfn(l3page));
     memset(l3, 0, PAGE_SIZE);
 
     l4[0] = l4e_from_page(l3page, __PAGE_HYPERVISOR);
-    pae_l3 = map_domain_page(pagetable_get_pfn(d->arch.phys_table));
 
-    for (i = 0; i < PDP_ENTRIES; i++) {
-        l3[i] = pae_l3[i];
-        l3e_add_flags(l3[i], 0x67);
-    }
+    pae_l3 = map_domain_page(pagetable_get_pfn(d->arch.phys_table));
+    for (i = 0; i < PDP_ENTRIES; i++)
+        l3[i] = l3e_from_pfn(l3e_get_pfn(pae_l3[i]), __PAGE_HYPERVISOR);
 
     unmap_domain_page(l4);
     unmap_domain_page(l3);
@@ -276,17 +274,18 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     mmfn_info = alloc_domheap_page(NULL);
     ASSERT( mmfn_info );
 
-    mmfn = (unsigned long) (mmfn_info - frame_table);
+    mmfn = page_to_pfn(mmfn_info);
     mpl4e = (l4_pgentry_t *) map_domain_page(mmfn);
     memcpy(mpl4e, &idle_pg_table[0], PAGE_SIZE);
     mpl4e[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_paddr(__pa(d->arch.mm_perdomain_l3), __PAGE_HYPERVISOR);
+
     /* map the phys_to_machine map into the per domain Read-Only MPT space */
     phys_table = page_table_convert(d);
-
     mpl4e[l4_table_offset(RO_MPT_VIRT_START)] =
         l4e_from_paddr(pagetable_get_paddr(phys_table),
                        __PAGE_HYPERVISOR);
+
     v->arch.monitor_table = mk_pagetable(mmfn << PAGE_SHIFT);
     v->arch.monitor_vtable = (l2_pgentry_t *) mpl4e;
 }

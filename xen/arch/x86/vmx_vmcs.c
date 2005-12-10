@@ -157,13 +157,13 @@ static void vmx_map_io_shared_page(struct domain *d)
     mpfn = get_mfn_from_pfn(E820_MAP_PAGE >> PAGE_SHIFT);
     if (mpfn == INVALID_MFN) {
         printk("Can not find E820 memory map page for VMX domain.\n");
-        domain_crash(d);
+        domain_crash_synchronous();
     }
 
     p = map_domain_page(mpfn);
     if (p == NULL) {
         printk("Can not map E820 memory map page for VMX domain.\n");
-        domain_crash(d);
+        domain_crash_synchronous();
     }
 
     e820_map_nr = *(p + E820_MAP_NR_OFFSET);
@@ -182,7 +182,7 @@ static void vmx_map_io_shared_page(struct domain *d)
         printk("Can not get io request shared page"
                " from E820 memory map for VMX domain.\n");
         unmap_domain_page(p);
-        domain_crash(d);
+        domain_crash_synchronous();
     }
     unmap_domain_page(p);
 
@@ -190,13 +190,13 @@ static void vmx_map_io_shared_page(struct domain *d)
     mpfn = get_mfn_from_pfn(gpfn);
     if (mpfn == INVALID_MFN) {
         printk("Can not find io request shared page for VMX domain.\n");
-        domain_crash(d);
+        domain_crash_synchronous();
     }
 
     p = map_domain_page(mpfn);
     if (p == NULL) {
         printk("Can not map io request shared page for VMX domain.\n");
-        domain_crash(d);
+        domain_crash_synchronous();
     }
     d->arch.vmx_platform.shared_page_va = (unsigned long)p;
 
