@@ -62,7 +62,8 @@ function frob_iptable()
     local c="-D"
   fi
 
-  iptables "$c" FORWARD -m physdev --physdev-in "$vif" "$@" -j ACCEPT ||
+  iptables "$c" FORWARD -m physdev --physdev-in "$vif" "$@" -j ACCEPT \
+    2>/dev/null ||
     [ "$c" == "-D" ] ||
     log err \
      "iptables $c FORWARD -m physdev --physdev-in $vif $@ -j ACCEPT failed.
