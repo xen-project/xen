@@ -40,6 +40,7 @@
 # todo Support command-line args.
 
 import fcntl
+import time
 from threading import Thread
 
 from xen.web.httpserver import HttpServer, UnixHttpServer
@@ -48,7 +49,6 @@ from xen.xend import XendRoot
 from xen.xend import Vifctl
 from xen.xend.XendLogging import log
 from xen.web.SrvDir import SrvDir
-import time
 
 from SrvRoot import SrvRoot
 
