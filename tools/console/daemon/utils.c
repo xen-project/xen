@@ -90,6 +90,12 @@ void daemonize(const char *pidfile)
 
 	setsid();
 
+	if ((pid = fork()) > 0) {
+		exit(0);
+	} else if (pid == -1) {
+		err(errno, "fork() failed");
+	}
+
 	/* redirect fd 0,1,2 to /dev/null */
 	if ((fd = open("/dev/null",O_RDWR)) == -1) {
 		exit(1);

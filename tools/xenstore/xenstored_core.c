@@ -1491,6 +1491,13 @@ static void daemonize(void)
 
 	/* Session leader so ^C doesn't whack us. */
 	setsid();
+
+	/* Let session leader exit so child cannot regain CTTY */
+	if ((pid = fork()) < 0)
+		barf_perror("Failed to fork daemon");
+	if (pid != 0)
+		exit(0);
+
 #ifndef TESTING	/* Relative paths for socket names */
 	/* Move off any mount points we might be in. */
 	chdir("/");
