@@ -696,13 +696,16 @@ def to_string(sxpr):
     io.close()
     return val
 
-def from_string(str):
+def from_string(s):
     """Create an sxpr by parsing a string.
 
-    str string
+    s string
     returns sxpr
     """
-    io = StringIO(str)
+    if s == '':
+        return []
+
+    io = StringIO(s)
     vals = parse(io)
     if vals is []:
         return None
@@ -710,13 +713,13 @@ def from_string(str):
         return vals[0]
     
 
-def all_from_string(str):
+def all_from_string(s):
     """Create an sxpr list by parsing a string.
 
-    str string
+    s string
     returns sxpr list
     """
-    io = StringIO(str)
+    io = StringIO(s)
     vals = parse(io)
     return vals
 
