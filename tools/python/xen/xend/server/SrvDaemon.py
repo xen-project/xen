@@ -16,10 +16,10 @@ import traceback
 
 import xen.lowlevel.xc
 
-from xen.xend.server import SrvServer
 from xen.xend.XendLogging import log
 
 import relocate
+import SrvServer
 from params import *
 
 
