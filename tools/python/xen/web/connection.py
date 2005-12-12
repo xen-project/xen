@@ -19,7 +19,6 @@
 
 import sys
 import threading
-import select
 import socket
 import fcntl
 
@@ -31,21 +30,17 @@ for TCP and unix-domain sockets (see tcp.py and unix.py).
 """
 
 BUFFER_SIZE = 1024
+BACKLOG = 5
 
 
 class SocketServerConnection:
     """An accepted connection to a server.
     """
 
-    def __init__(self, sock, protocol, addr, server):
+    def __init__(self, sock, protocol_class):
         self.sock = sock
-        self.protocol = protocol
-        self.addr = addr
-        self.server = server
+        self.protocol = protocol_class()
         self.protocol.setTransport(self)
-
-
-    def run(self):
         threading.Thread(target=self.main).start()
 
 
@@ -68,6 +63,10 @@ class SocketServerConnection:
                 pass
 
 
+    def close(self):
+        self.sock.close()
+
+
     def write(self, data):
         self.sock.send(data)
 
@@ -77,52 +76,38 @@ class SocketListener:
     Accepts connections and runs a thread for each one.
     """
 
-    def __init__(self, protocol_class, backlog=None):
-        if backlog is None:
-            backlog = 5
+    def __init__(self, protocol_class, hosts_allow = ''):
         self.protocol_class = protocol_class
-        self.sock = None
-        self.backlog = backlog
-        self.thread = None
+        self.sock = self.createSocket()
+        threading.Thread(target=self.main).start()
+
+
+    def close(self):
+        try:
+            self.sock.close()
+        except:
+            pass
 
 
     def createSocket(self):
         raise NotImplementedError()
 
 
-    def setCloExec(self):
-        fcntl.fcntl(self.sock.fileno(), fcntl.F_SETFD, fcntl.FD_CLOEXEC)
-
-
     def acceptConnection(self, sock, protocol, addr):
-        return SocketServerConnection(sock, protocol, addr, self)
-
-
-    def listen(self):
-        if self.sock or self.thread:
-            raise IOError("already listening")
-        self.sock = self.createSocket()
-        self.sock.listen(self.backlog)
-        self.run()
-
-
-    def run(self):
-        self.thread = threading.Thread(target=self.main)
-        self.thread.start()
+        raise NotImplementedError()
 
 
     def main(self):
         try:
+            fcntl.fcntl(self.sock.fileno(), fcntl.F_SETFD, fcntl.FD_CLOEXEC)
+            self.sock.listen(BACKLOG)
+
             while True:
                 try:
                     (sock, addr) = self.sock.accept()
-                    self.acceptConnection(sock, self.protocol_class(),
-                                          addr).run()
+                    self.acceptConnection(sock, addr)
                 except socket.error, ex:
                     if ex.args[0] not in (EWOULDBLOCK, EAGAIN, EINTR):
                         break
         finally:
-            try:
-                self.sock.close()
-            except:
-                pass
+            self.close()

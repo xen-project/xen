@@ -17,20 +17,25 @@
 #============================================================================
 
 
+import errno
+import re
 import socket
 import time
-import errno
 
-from connection import *
+import connection
+
+from xen.xend.XendLogging import log
 
 
-class TCPListener(SocketListener):
+class TCPListener(connection.SocketListener):
 
-    def __init__(self, port, protocol, backlog=None, interface=''):
-        SocketListener.__init__(self, protocol, backlog=backlog)
+    def __init__(self, protocol_class, port, interface, hosts_allow):
         self.port = port
         self.interface = interface
-        
+        self.hosts_allow = hosts_allow
+        connection.SocketListener.__init__(self, protocol_class)
+
+
     def createSocket(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -49,11 +54,23 @@ class TCPListener(SocketListener):
                 else:
                     raise
 
-    def acceptConnection(self, sock, protocol, addr):
-        return SocketServerConnection(sock, protocol, addr, self)
 
+    def acceptConnection(self, sock, addrport):
+        addr = addrport[0]
+        if self.hosts_allow is None:
+                connection.SocketServerConnection(sock, self.protocol_class)
+        else:
+            fqdn = socket.getfqdn(addr)
+            for h in self.hosts_allow:
+                if h.match(fqdn) or h.match(addr):
+                    log.debug("Match %s %s", fqdn, h.pattern)
+                    connection.SocketServerConnection(sock,
+                                                      self.protocol_class)
+                    return
 
-def listenTCP(port, protocol, interface='', backlog=None):
-    l = TCPListener(port, protocol, interface=interface, backlog=backlog)
-    l.listen()
-    l.setCloExec()
+            try:
+                log.warn("Rejected connection from %s:%d (%s) for port %d.",
+                         addr, addrport[1], fqdn, self.port)
+                sock.close()
+            except:
+                pass

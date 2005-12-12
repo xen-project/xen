@@ -21,15 +21,15 @@ import socket
 import os
 import os.path
 
-from connection import *
+import connection
 
 
-class UnixListener(SocketListener):
-
-    def __init__(self, path, protocol, backlog=None):
-        SocketListener.__init__(self, protocol, backlog=backlog)
+class UnixListener(connection.SocketListener):
+    def __init__(self, path, protocol_class):
         self.path = path
-        
+        connection.SocketListener.__init__(self, protocol_class)
+
+
     def createSocket(self):
         pathdir = os.path.dirname(self.path)
         if not os.path.exists(pathdir):
@@ -45,9 +45,6 @@ class UnixListener(SocketListener):
         sock.bind(self.path)
         return sock
 
-    def acceptConnection(self, sock, protocol, addr):
-        return SocketServerConnection(sock, protocol, self.path, self)
 
-
-def listenUNIX(path, protocol, backlog=None):
-    UnixListener(path, protocol, backlog=backlog).listen()
+    def acceptConnection(self, sock, _):
+        connection.SocketServerConnection(sock, self.protocol_class)
