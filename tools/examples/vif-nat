@@ -81,17 +81,6 @@ router_ip=$(routing_ip "$ip")
 
 # Split the given IP/bits pair.
 vif_ip=`echo ${ip} | awk -F/ '{print $1}'`
-bits=`echo ${ip} | awk -F/ '{print $2}'`
-
-# Convert $bits and $vif_ip to integers, mask appropriately to get a network
-# address, and convert them both to dotted quads.
-
-intmask=$(( (0xFFFFFFFF << (32 - $bits)) & 0xFFFFFFFF ))
-vif_int=$(( $(echo "((($vif_ip" | sed -e 's#\.#)\*256\+#g') ))
-
-netmask=$(dotted_quad $intmask)
-network=$(dotted_quad $(( $vif_int & $intmask )) )
-
 
 hostname=$(xenstore_read "$XENBUS_PATH/domain" | tr -- '_.:/+' '-----')
 if [ "$vifid" != "1" ]
