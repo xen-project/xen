@@ -540,8 +540,8 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 		 * tailroom then round down to SKB_DATA_ALIGN boundary.
 		 */
 		skb = alloc_xen_skb(
-			(PAGE_SIZE - 16 - sizeof(struct skb_shared_info)) &
-			(-SKB_DATA_ALIGN(1)));
+			((PAGE_SIZE - sizeof(struct skb_shared_info)) &
+			 (-SKB_DATA_ALIGN(1))) - 16);
 		if (skb == NULL)
 			break;
 		__skb_queue_tail(&np->rx_batch, skb);
