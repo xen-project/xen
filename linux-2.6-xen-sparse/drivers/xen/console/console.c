@@ -213,9 +213,6 @@ static int __init xen_console_init(void)
 		return __RETCODE;
 	}
 
-	/* We only bind to one device index (-1 means all indexes). */
-	kcons_info.index = xc_num;
-
 	wbuf = alloc_bootmem(wbuf_size);
 
 	register_console(&kcons_info);
