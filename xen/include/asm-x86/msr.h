@@ -88,6 +88,7 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 /* Intel defined MSRs. */
 #define MSR_IA32_P5_MC_ADDR		0
 #define MSR_IA32_P5_MC_TYPE		1
+#define MSR_IA32_TIME_STAMP_COUNTER	0x10
 #define MSR_IA32_PLATFORM_ID		0x17
 #define MSR_IA32_EBL_CR_POWERON		0x2a
 
