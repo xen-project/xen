@@ -354,7 +354,7 @@ class Xend:
 def getHttpServer(srv=None):
     """Create and return a xend client.
     """
-    return Xend(srv=srv, client=XendClientProtocol())
+    return Xend(srv=srv, client=HttpXendClientProtocol())
 
 def getUnixServer(srv=None):
     """Create and return a unix-domain xend client.
