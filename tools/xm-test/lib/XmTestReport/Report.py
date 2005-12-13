@@ -31,10 +31,12 @@ import os
 import xml.dom.minidom
 import httplib
 import urllib
+import re
 
 #REPORT_HOST = "xmtest-dev.dague.org"
 REPORT_HOST = "xmtest.dague.org"
 REPORT_URL  = "/cgi-bin/report-results";
+VIEW_URL = "cgi-bin/display?view=single&testid="
 
 class XmTestReport:
 
@@ -101,16 +103,21 @@ def postResults(results):
     conn.request("POST", REPORT_URL, body, headers)
     
     resp = conn.getresponse()
+    data = resp.read()
+
     if resp.status == 200:
         print >>sys.stderr, "Your results have been submitted successfully!"
+        match = re.match("^id=([0-9]+)$", data.split("\n")[1])
+        if match:
+            id = match.group(1)
+            print >>sys.stderr, "See your report at:"
+            print >>sys.stderr, "http://%s/%s%s" % (REPORT_HOST, VIEW_URL, id)
     else:
         print >>sys.stderr, "Unable to submit results:"
         print >>sys.stderr, "[http://%s%s] said %i: %s" % (REPORT_HOST,
                                                            REPORT_URL,
                                                            resp.status,
                                                            resp.reason)
-
-        data = resp.read()
         print >>sys.stderr, data
 
 if __name__ == "__main__":

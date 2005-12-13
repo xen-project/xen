@@ -5,9 +5,8 @@
 
 from XmTestLib import *
 
-domain = XmTestDomain()
-
-domain.configAddDisk("phy:/dev/ram0", "hda1", "w")
+config = {"disk":"phy:/dev/ram0,hda1,w"}
+domain = XmTestDomain(extraConfig=config)
 
 try:
     domain.start()

@@ -612,6 +612,7 @@ void pci_pcnet_init(PCIBus *bus, NetDriverState *nd);
 
 void kbd_init(void);
 extern const char* keyboard_layout;
+extern int repeat_key;
 
 /* mc146818rtc.c */
 

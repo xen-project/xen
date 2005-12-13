@@ -7,12 +7,9 @@ from XmTestLib import *
 
 import re
 
-domain = XmTestDomain()
-
-domain.configSetVar('vif', "[ '', '' ]")
-
-domain.configAddDisk("phy:/dev/ram0", "hda1", "w")
-domain.configAddDisk("phy:/dev/ram1", "hdb2", "w")
+config = {"disk": ["phy:/dev/ram0,hda1,w", "phy:/dev/ram1,hdb2,w"],
+          "vif":  ['', '']}
+domain = XmTestDomain(extraConfig=config)
 
 s, o = traceCommand("mke2fs -q /dev/ram0")
 if s != 0:

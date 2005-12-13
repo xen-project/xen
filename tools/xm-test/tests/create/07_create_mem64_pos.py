@@ -23,15 +23,8 @@ if mem < 64:
 	SKIP("This test needs 64 MB of free memory (%i MB avail)" % mem)
 
 #create a domain with mem=64
-opts =  {
-            "name"    : "MEM64",
-            "memory"  : 64,
-            "kernel"  : getDefaultKernel(),
-            "root"    : "/dev/ram0",
-            "ramdisk" : rdpath + "/initrd.img",
-            }
-
-domain_mem64=XenDomain(opts)
+config = {"memory": 64}
+domain_mem64=XmTestDomain(extraConfig=config)
 
 #start it
 try:

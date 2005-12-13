@@ -1476,6 +1476,15 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
                 (unsigned long)regs->ecx, (unsigned long)regs->eax,
                 (unsigned long)regs->edx);
     switch (regs->ecx) {
+    case MSR_IA32_TIME_STAMP_COUNTER:
+    {
+        struct vmx_virpit *vpit;
+
+        rdtscll(msr_content);
+        vpit = &(v->domain->arch.vmx_platform.vmx_pit);
+        msr_content += vpit->shift;
+        break;
+    }
     case MSR_IA32_SYSENTER_CS:
         __vmread(GUEST_SYSENTER_CS, (u32 *)&msr_content);
         break;
@@ -1516,6 +1525,23 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
     msr_content = (regs->eax & 0xFFFFFFFF) | ((u64)regs->edx << 32);
 
     switch (regs->ecx) {
+    case MSR_IA32_TIME_STAMP_COUNTER:
+    {
+        struct vmx_virpit *vpit;
+        u64 host_tsc, drift;
+
+        rdtscll(host_tsc);
+        vpit = &(v->domain->arch.vmx_platform.vmx_pit);
+        drift = v->arch.arch_vmx.tsc_offset - vpit->shift;
+        vpit->shift = msr_content - host_tsc;
+        v->arch.arch_vmx.tsc_offset = vpit->shift + drift;
+        __vmwrite(TSC_OFFSET, vpit->shift);
+
+#if defined (__i386__)
+        __vmwrite(TSC_OFFSET_HIGH, ((vpit->shift)>>32));
+#endif
+        break;
+    }
     case MSR_IA32_SYSENTER_CS:
         __vmwrite(GUEST_SYSENTER_CS, msr_content);
         break;

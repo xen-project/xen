@@ -20,8 +20,8 @@ except DomainError, e:
     FAIL(str(e))
 
 times = random.randint(10,50)
-origmem = domain.getMem()
-currmem = domain.getMem()
+origmem = domain.config.getOpt("memory")
+currmem = domain.config.getOpt("memory")
 
 try:
     console = XmConsole(domain.getName())

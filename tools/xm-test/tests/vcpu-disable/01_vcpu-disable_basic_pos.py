@@ -39,7 +39,7 @@ if smpConcurrencyLevel() <= 1:
     SKIP("Host not capable of running test")
 
 # Start a XmTestDomain with 2 VCPUs
-domain = XmTestDomain(extraOpts = {"vcpus":"2"})
+domain = XmTestDomain(extraConfig={"vcpus":2})
 
 try:
     domain.start()

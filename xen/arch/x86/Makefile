@@ -62,6 +62,8 @@ asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c $(HDRS)
 boot/mkelf32: boot/mkelf32.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 
+shadow_guest32.o: shadow.c
+
 clean:
 	rm -f *.o *.s *~ core boot/*.o boot/*~ boot/core boot/mkelf32
 	rm -f x86_32/*.o x86_32/*~ x86_32/core

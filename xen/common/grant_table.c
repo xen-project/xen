@@ -579,7 +579,7 @@ gnttab_setup_table(
         (void)put_user(GNTST_okay, &uop->status);
         for ( i = 0; i < op.nr_frames; i++ )
             (void)put_user(gnttab_shared_mfn(d, d->grant_table, i),
-                           &uop->frame_list[i]);
+                           &op.frame_list[i]);
     }
 
     put_domain(d);

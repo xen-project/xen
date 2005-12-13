@@ -592,7 +592,8 @@ void sdl_display_init(DisplayState *ds, int full_screen)
 
     sdl_resize(ds, 640, 400);
     sdl_update_caption();
-    SDL_EnableKeyRepeat(250, 50);
+    if(repeat_key)
+        SDL_EnableKeyRepeat(250, 50);
     SDL_EnableUNICODE(1);
     gui_grab = 0;
 

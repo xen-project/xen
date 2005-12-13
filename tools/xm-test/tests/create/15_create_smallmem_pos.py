@@ -7,8 +7,8 @@ from XmTestLib import *
 
 MEM = 16
 
-domain = XmTestDomain(extraOpts={"memory":"%i" % MEM,
-                                 "extra" :"mem=%iM" % MEM})
+domain = XmTestDomain(extraConfig={"memory": MEM,
+                                   "extra" :"mem=%iM" % MEM})
 
 try:
     domain.start()

@@ -34,7 +34,7 @@ if verbose:
 
 for d in range(0, NUM_DOMS):
     dom = XmTestDomain(name="11_create_%i" % d,
-                       extraOpts={"memory":str(MEM_PER_DOM)})
+                       extraConfig={"memory":MEM_PER_DOM})
 
     try:
         dom.start()
