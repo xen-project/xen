@@ -3,7 +3,7 @@
  * 
  * Event notifications from VIRQs, PIRQs, and other domains.
  * 
- * Copyright (c) 2003-2004, K A Fraser.
+ * Copyright (c) 2003-2005, K A Fraser.
  * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -541,6 +541,41 @@ static long evtchn_bind_vcpu(evtchn_bind_vcpu_t *bind)
     return rc;
 }
 
+static long evtchn_unmask(evtchn_unmask_t *unmask)
+{
+    struct domain *d = current->domain;
+    shared_info_t *s = d->shared_info;
+    int            port = unmask->port;
+    struct vcpu   *v;
+
+    spin_lock(&d->evtchn_lock);
+
+    if ( unlikely(!port_is_valid(d, port)) )
+    {
+        spin_unlock(&d->evtchn_lock);
+        return -EINVAL;
+    }
+
+    v = d->vcpu[evtchn_from_port(d, port)->notify_vcpu_id];
+
+    /*
+     * These operations must happen in strict order. Based on
+     * include/xen/event.h:evtchn_set_pending(). 
+     */
+    if ( test_and_clear_bit(port, &s->evtchn_mask[0]) &&
+         test_bit          (port, &s->evtchn_pending[0]) &&
+         !test_and_set_bit (port / BITS_PER_LONG,
+                            &v->vcpu_info->evtchn_pending_sel) &&
+         !test_and_set_bit (0, &v->vcpu_info->evtchn_upcall_pending) )
+    {
+        evtchn_notify(v);
+    }
+
+    spin_unlock(&d->evtchn_lock);
+
+    return 0;
+}
+
 long do_event_channel_op(evtchn_op_t *uop)
 {
     long rc;
@@ -600,6 +635,10 @@ long do_event_channel_op(evtchn_op_t *uop)
 
     case EVTCHNOP_bind_vcpu:
         rc = evtchn_bind_vcpu(&op.u.bind_vcpu);
+        break;
+
+    case EVTCHNOP_unmask:
+        rc = evtchn_unmask(&op.u.unmask);
         break;
 
     default:
