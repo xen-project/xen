@@ -37,9 +37,7 @@ vcpus=1
 
 # Optionally define mac and/or bridge for the network interfaces.
 # Random MACs are assigned if not given.
-# nics default is 1
-#vif = [ 'type=ioemu, mac=aa:00:00:00:00:11, bridge=xenbr0' ]
-nics=1 
+#vif = [ 'type=ioemu, mac=00:16:3e:00:00:11, bridge=xenbr0' ]
 # type=ioemu specify the NIC is an ioemu device not netfront
 vif = [ 'type=ioemu, bridge=xenbr0' ]
 

@@ -28,7 +28,7 @@ ip   = Net.ip("dom1", "eth0")
 mask = Net.mask("dom1", "eth0")
 
 # Fire up a guest domain w/1 nic
-domain = XmTestDomain(extraOpts={ 'nics' : 1 })
+domain = XmTestDomain()
 try:
     domain.configSetVar('vif', " [ 'ip=" + ip + "' ]")
     domain.start()

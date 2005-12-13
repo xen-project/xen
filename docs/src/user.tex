@@ -1087,16 +1087,17 @@ for concrete examples.
 \item[vcpus] The number of virtual CPUs. 
 \item[console] Port to export the domain console on (default 9600 +
   domain ID).
-\item[nics] Number of virtual network interfaces.
-\item[vif] List of MAC addresses (random addresses are assigned if not
-  given) and bridges to use for the domain's network interfaces, e.g.\ 
+\item[vif] Network interface configuration.  This may simply contain
+an empty string for each desired interface, or may override various
+settings, e.g.\ 
 \begin{verbatim}
 vif = [ 'mac=00:16:3E:00:00:11, bridge=xen-br0',
         'bridge=xen-br1' ]
 \end{verbatim}
   to assign a MAC address and bridge to the first interface and assign
   a different bridge to the second interface, leaving \xend\ to choose
-  the MAC address.
+  the MAC address.  The settings that may be overridden in this way are
+  type, mac, bridge, ip, script, backend, and vifname.
 \item[disk] List of block devices to export to the domain e.g. 
   \verb_disk = [ 'phy:hda1,sda1,r' ]_ 
   exports physical device \path{/dev/hda1} to the domain as

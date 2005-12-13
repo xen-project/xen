@@ -7,7 +7,9 @@ from XmTestLib import *
 
 import re
 
-domain = XmTestDomain(extraOpts={"nics":2})
+domain = XmTestDomain()
+
+domain.configSetVar('vif', "[ '', '' ]")
 
 domain.configAddDisk("phy:/dev/ram0", "hda1", "w")
 domain.configAddDisk("phy:/dev/ram1", "hdb2", "w")

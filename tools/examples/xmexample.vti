@@ -28,12 +28,9 @@ name = "ExampleVMXDomain"
 #cpus = "0"        # all vcpus run on CPU0
 #cpus = "0-3,5,^1" # run on cpus 0,2,3,5
 
-# Disable vif for now
-nics=0
-
 # Optionally define mac and/or bridge for the network interfaces.
 # Random MACs are assigned if not given.
-#vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0' ]
+#vif = [ 'mac=00:16:3e:00:00:11, bridge=xen-br0' ]
 
 #----------------------------------------------------------------------------
 # Define the disk devices you want the domain to have access to, and

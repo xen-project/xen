@@ -64,12 +64,20 @@ vcpus = 4 # make your domain a 4-way
 #----------------------------------------------------------------------------
 # Define network interfaces.
 
-# Number of network interfaces. Default is 1.
-#nics=1
+# By default, no network interfaces are configured.  You may have one created
+# with sensible defaults using an empty vif clause:
+#
+# vif = [ '' ]
+#
+# or optionally override backend, bridge, ip, mac, script, type, or vifname:
+#
+# vif = [ 'mac=00:16:3e:00:00:11, bridge=xenbr0' ]
+#
+# or more than one interface may be configured:
+#
+# vif = [ '', 'bridge=xenbr1' ]
 
-# Optionally define mac and/or bridge for the network interfaces.
-# Random MACs are assigned if not given.
-#vif = [ 'mac=aa:00:00:00:00:11, bridge=xenbr0' ]
+vif = [ '' ]
 
 #----------------------------------------------------------------------------
 # Define the disk devices you want the domain to have access to, and

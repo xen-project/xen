@@ -21,7 +21,7 @@ from XmTestLib import *
 
 
 def netDomain(ip):
-    dom = XmTestDomain(extraOpts={ 'nics' : 1 })
+    dom = XmTestDomain()
     try:
         dom.configSetVar('vif', " [ 'ip=" + ip + "' ]")
         dom.start()

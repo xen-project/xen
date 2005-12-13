@@ -203,7 +203,6 @@ class XmTestVmxDomain(XenDomain):
         # Defaults
         self.defaults = {"memory"    : 64,
                          "vcpus"     : 1,
-                         "nics"      : 0,
                          "kernel"    : "/usr/lib/xen/boot/vmxloader",
                          "builder"   : "\'vmx\'",
                          "name"      : name or self.getUniqueName()
@@ -264,7 +263,6 @@ class XmTestPvDomain(XenDomain):
         # Defaults
         self.defaults = {"memory"  : 64,
                          "vcpus"   : 1,
-                         "nics"    : 0,
                          "kernel"  : getDefaultKernel(),
                          "root"    : "/dev/ram0",
                          "name"    : name or self.getUniqueName(),
