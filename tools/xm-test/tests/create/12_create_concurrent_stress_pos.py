@@ -14,7 +14,7 @@ DUR=60
 domains = []
 
 for i in range(0,DOMS):
-    dom = XmTestDomain(extraOpts={"memory" : str(MEM)})
+    dom = XmTestDomain(extraConfig={"memory" : MEM})
 
     try:
         dom.start()

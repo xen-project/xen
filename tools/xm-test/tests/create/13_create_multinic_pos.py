@@ -6,8 +6,8 @@
 from XmTestLib import *
 
 for i in range(0,10):
-    domain = XmTestDomain()
-    domain.configSetVar('vif', str(['' for _ in range(0, i)]))
+    config = {"vif": ['' for _ in range(0, i)]}
+    domain = XmTestDomain(extraConfig=config)
 
     try:
         domain.start()

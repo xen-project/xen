@@ -31,9 +31,9 @@ except NetworkError, e:
         FAIL(str(e))
 
 # Fire up a guest domain w/1 nic
-domain = XmTestDomain()
+config = {"vif"  : ["ip=%s" % ip]}
+domain = XmTestDomain(extraConfig=config)
 try:
-    domain.configSetVar('vif', " [ 'ip=" + ip + "' ]")
     domain.start()
 except DomainError, e:
     if verbose:

@@ -7,7 +7,7 @@ from XmTestLib import *
 
 sedf_opts = "20000000 5000000 0 0 0"
 
-domain = XmTestDomain(extraOpts = {"sched":"sedf"})
+domain = XmTestDomain(extraConfig = {"sched":"sedf"})
 
 try:
     domain.start()

@@ -15,15 +15,12 @@
 pingsizes = [ 1, 48, 64, 512, 1440, 1500, 1505, 4096, 4192, 
               32767, 65507 ]
 
-
-
 from XmTestLib import *
 
-
 def netDomain(ip):
-    dom = XmTestDomain()
+    config = {"vif"  : ["ip=%s" % ip]}
+    domain = XmTestDomain(extraConfig=config)
     try:
-        dom.configSetVar('vif', " [ 'ip=" + ip + "' ]")
         dom.start()
     except DomainError, e:
         if verbose:

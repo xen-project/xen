@@ -12,9 +12,9 @@ from XmTestLib import *
 # Create a domain (default XmTestDomain, with our ramdisk)
 domain = XmTestDomain()
 
-if int(getInfo("free_memory")) < domain.getMem():
+if int(getInfo("free_memory")) < domain.config.getOpt("memory"):
     SKIP("This test needs %i MB of free memory (%i MB avail)" %
-         (domain.getMem(), int(getInfo("free_memory"))))
+         (domain.config.getOpt("memory"), int(getInfo("free_memory"))))
 
 # Start it
 try:

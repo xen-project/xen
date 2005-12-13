@@ -5,11 +5,11 @@
 
 from XmTestLib import *
 
-dom1 = XmTestDomain()
-dom2 = XmTestDomain(dom1.getName() + "-2")
+config = {"disk":"phy:/dev/ram0,hda1,w"}
 
-dom1.configAddDisk("phy:/dev/ram0", "hda1", "w")
-dom2.configAddDisk("phy:/dev/ram0", "hda1", "w")
+dom1 = XmTestDomain(extraConfig=config)
+dom2 = XmTestDomain(dom1.getName() + "-2",
+                    extraConfig=config)
 
 try:
     dom1.start()

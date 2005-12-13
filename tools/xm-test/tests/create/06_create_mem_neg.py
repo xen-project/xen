@@ -19,15 +19,8 @@ if not rdpath:
 	rdpath = "../ramdisk"
 
 # Test 1: create a domain with mem=0
-opts1 =  {
-            "name"    : "default",
-            "memory"  : 0,
-            "kernel"  : getDefaultKernel(),
-            "root"    : "/dev/ram0",
-            "ramdisk" : rdpath + "/initrd.img",
-            }
-
-domain1=XenDomain(opts1)
+config1 = {"memory": 0}
+domain1=XmTestDomain(extraConfig=config1)
 
 try:
     domain1.start()
@@ -43,17 +36,10 @@ if eyecatcher1 != "Fail":
 # Test 2: create a domain with mem>sys_mem
 
 mem = int(getInfo("total_memory"))
-extreme_mem = str(mem + 100)
+extreme_mem = mem + 100
 
-opts2=  {
-            "name"    : "default",
-            "memory"  : extreme_mem,
-            "kernel"  : getDefaultKernel(),
-            "root"    : "/dev/ram0",
-            "ramdisk" : rdpath + "/initrd.img",
-            }
-
-domain2=XenDomain(opts2)
+config2 = {"memory": extreme_mem}
+domain2=XmTestDomain(extraConfig=config2)
 
 try:
     domain2.start()

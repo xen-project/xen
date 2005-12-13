@@ -6,10 +6,9 @@
 from XmTestLib import *
 
 import os
+import time
 
-CONF_FILE = "/tmp/14_create_blockroot_pos.conf"
-
-rdpath = os.path.abspath(os.environ.get("RD_PATH"))
+rdpath = getRdPath()
 
 # status, output = traceCommand("losetup -f %s" % rdpath)
 # if status != 0:
@@ -17,22 +16,26 @@ rdpath = os.path.abspath(os.environ.get("RD_PATH"))
 # 
 # if verbose:
 #     print "Using %s" % output
- 
-opts = {"memory" : "64",
-        "root"   : "/dev/hda1",
-        "name"   : "14_create_blockroot",
-        "kernel" : getDefaultKernel() }
 
-domain = XenDomain(opts=opts)
-
-domain.configAddDisk("file:%s/initrd.img" % rdpath, "hda1", "w")
+if ENABLE_VMX_SUPPORT:
+    domain = XmTestDomain(name="14_create_blockroot")
+else:
+    config = {"memory" : "64",
+              "root"   : "/dev/hda1",
+              "name"   : "14_create_blockroot",
+              "kernel" : getDefaultKernel(),
+              "disk"   : "file:%s/initrd.img,hda1,w" % rdpath
+              }
+    domConfig = XenConfig()
+    domConfig.setOpts(config)
+    domain = XenDomain(name=domConfig.getOpt("name"), config=domConfig)
 
 try:
     domain.start()
 except DomainError, e:
       FAIL(str(e))
 
-waitForBoot()
+#waitForBoot()
 
 try:
     console = XmConsole(domain.getName(), historySaveCmds=True)
