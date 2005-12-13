@@ -168,7 +168,7 @@ static void kcons_write_dom0(
 
 static struct tty_driver *kcons_device(struct console *c, int *index)
 {
-	*index = c->index;
+	*index = 0;
 	return xencons_driver;
 }
 
@@ -212,6 +212,9 @@ static int __init xen_console_init(void)
 	default:
 		return __RETCODE;
 	}
+
+	/* We only bind to one device index (-1 means all indexes). */
+	kcons_info.index = xc_num;
 
 	wbuf = alloc_bootmem(wbuf_size);
 
