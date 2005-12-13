@@ -21,6 +21,7 @@ struct vmx_virpit {
     /* for simulation of counter 0 in mode 2*/
     u64 period_cycles;	                /* pit frequency in cpu cycles */
     u64 inject_point; /* the time inject virt intr */
+    u64 shift;  /* save the value of offset - drift */
     s_time_t scheduled;                 /* scheduled timer interrupt */
     struct ac_timer pit_timer;  /* periodic timer for mode 2*/
     unsigned int channel;  /* the pit channel, counter 0~2 */

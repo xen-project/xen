@@ -801,11 +801,11 @@ void set_tsc_shift(struct vcpu *v,struct vmx_virpit *vpit)
         drift = vpit->period_cycles * vpit->pending_intr_nr;
     else 
         drift = 0;
-    drift = v->arch.arch_vmx.tsc_offset - drift;
-    __vmwrite(TSC_OFFSET, drift);
+    vpit->shift = v->arch.arch_vmx.tsc_offset - drift;
+    __vmwrite(TSC_OFFSET, vpit->shift);
 
 #if defined (__i386__)
-    __vmwrite(TSC_OFFSET_HIGH, (drift >> 32));
+    __vmwrite(TSC_OFFSET_HIGH, ((vpit->shift)>> 32));
 #endif
 }
 

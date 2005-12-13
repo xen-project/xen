@@ -145,6 +145,7 @@ int graphic_width = 800;
 int graphic_height = 600;
 int graphic_depth = 15;
 int full_screen = 0;
+int repeat_key = 1;
 TextConsole *vga_console;
 CharDriverState *serial_hds[MAX_SERIAL_PORTS];
 int xc_handle;
@@ -2250,6 +2251,7 @@ void help(void)
            "-std-vga        simulate a standard VGA card with VESA Bochs Extensions\n"
            "                (default is CL-GD5446 PCI VGA)\n"
            "-vgaacc [0|1]   1 to accelerate CL-GD5446 speed, default is 1\n"
+           "-no-repeatkey   disable key repeat feature for SDL keyboard simulation"
 #endif
            "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
            "\n"
@@ -2342,6 +2344,7 @@ enum {
     QEMU_OPTION_loadvm,
     QEMU_OPTION_full_screen,
     QEMU_OPTION_vgaacc,
+    QEMU_OPTION_repeatkey,
 };
 
 typedef struct QEMUOption {
@@ -2421,6 +2424,7 @@ const QEMUOption qemu_options[] = {
     { "nic-ne2000", 0, QEMU_OPTION_nic_ne2000 },
     { "cirrusvga", 0, QEMU_OPTION_cirrusvga },
     { "vgaacc", HAS_ARG, QEMU_OPTION_vgaacc },
+    { "no-repeatkey", 0, QEMU_OPTION_repeatkey },
     { NULL },
 };
 
@@ -2975,6 +2979,9 @@ int main(int argc, char **argv)
                         exit(1);
                     }
                 }
+                break;
+            case QEMU_OPTION_repeatkey:
+                repeat_key = 0;
                 break;
             case QEMU_OPTION_std_vga:
                 cirrus_vga_enabled = 0;
