@@ -53,6 +53,17 @@ XENBUS_PATH="${XENBUS_PATH:?}"
 vif="${vif:?}"
 
 
+vifname=$(xenstore_read_default "$XENBUS_PATH/vifname" "")
+if [ "$vifname" ]
+then
+  if [ "$command" == "online" ] && ! ip link show "$vifname" >&/dev/null
+  then
+    do_or_die ip link set "$vif" name "$vifname"
+  fi
+  vif="$vifname"
+fi
+
+
 function frob_iptable()
 {
   if [ "$command" == "online" ]
