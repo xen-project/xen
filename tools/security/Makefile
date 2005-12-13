@@ -35,7 +35,7 @@ OBJS_XML2BIN := $(patsubst %.c,%.o,$(filter %.c,$(SRCS_XML2BIN)))
 SRCS_GETD     = get_decision.c
 OBJS_GETD    := $(patsubst %.c,%.o,$(filter %.c,$(SRCS_GETD)))
 
-ACM_INST_TOOLS    = xensec_tool xensec_xml2bin
+ACM_INST_TOOLS    = xensec_tool xensec_xml2bin xensec_gen
 ACM_NOINST_TOOLS  = get_decision
 ACM_OBJS          = $(OBJS_TOOL) $(OBJS_XML2BIN) $(OBJS_GETD)
 ACM_SCRIPTS       = getlabel.sh setlabel.sh updategrub.sh labelfuncs.sh
@@ -43,6 +43,12 @@ ACM_SCRIPTS       = getlabel.sh setlabel.sh updategrub.sh labelfuncs.sh
 ACM_CONFIG_DIR    = /etc/xen/acm-security
 ACM_POLICY_DIR    = $(ACM_CONFIG_DIR)/policies
 ACM_SCRIPT_DIR    = $(ACM_CONFIG_DIR)/scripts
+
+ACM_INST_HTML     = python/xensec_gen/index.html
+ACM_INST_CGI      = python/xensec_gen/cgi-bin/policy.cgi \
+                    python/xensec_gen/cgi-bin/policylabel.cgi
+ACM_SECGEN_HTMLDIR= /var/lib/xensec_gen
+ACM_SECGEN_CGIDIR = $(ACM_SECGEN_HTMLDIR)/cgi-bin
 
 ACM_SCHEMA        = security_policy.xsd
 ACM_EXAMPLES      = null chwall ste chwall_ste
@@ -65,6 +71,15 @@ install: all $(ACM_CONFIG_FILE)
 	done
 	$(INSTALL_DIR) -p $(DESTDIR)$(ACM_SCRIPT_DIR)
 	$(INSTALL_PROG) -p $(ACM_SCRIPTS) $(DESTDIR)$(ACM_SCRIPT_DIR)
+	$(INSTALL_DIR) -p $(DESTDIR)$(ACM_SECGEN_HTMLDIR)
+	$(INSTALL_DATA) -p $(ACM_INST_HTML) $(DESTDIR)$(ACM_SECGEN_HTMLDIR)
+	$(INSTALL_DIR) -p $(DESTDIR)$(ACM_SECGEN_CGIDIR)
+	$(INSTALL_PROG) -p $(ACM_INST_CGI) $(DESTDIR)$(ACM_SECGEN_CGIDIR)
+ifndef XEN_PYTHON_NATIVE_INSTALL
+	python python/setup.py install --home="$(DESTDIR)/usr"
+else
+	python python/setup.py install --root="$(DESTDIR)"
+endif
 else
 all:
 
@@ -72,22 +87,27 @@ install:
 endif
 
 build: mk-symlinks $(ACM_INST_TOOLS) $(ACM_NOINST_TOOLS)
+	python python/setup.py build
 	chmod 700 $(ACM_SCRIPTS)
 
 xensec_tool: $(OBJS_TOOL)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 xensec_xml2bin: $(OBJS_XML2BIN)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 get_decision: $(OBJS_GETD)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+
+xensec_gen: xensec_gen.py
+	cp -f $^ $@
 
 clean:
 	$(RM) $(ACM_INST_TOOLS) $(ACM_NOINST_TOOLS)
 	$(RM) $(ACM_OBJS)
 	$(RM) $(PROG_DEPS)
 	$(RM) -r xen
+	$(RM) -r build
 
 mrproper: clean
 

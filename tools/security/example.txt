@@ -271,3 +271,112 @@ xensec_xml2bin is written against this schema.
 
 If you keep to the security policy schema, then you can use all the
 tools described above. Refer to install.txt to install it.
+
+You can hand-edit the xml files to create your policy or you can use the
+xensec_gen utility.
+
+
+5. Generating policy files using xensec_gen:
+============================================
+
+The xensec_gen utility starts a web-server that can be used to generate the
+XML policy files needed to create a policy.
+
+By default, xensec_gen runs as a daemon and listens on port 7777 for HTTP
+requests.  The xensec_gen command supports command line options to change the
+listen port, run in the foreground, and a few others.  Type 'xensec_gen -h'
+to see the full list of options available.
+
+Once the xensec_gen utility is running, point a browser at the host and port
+on which the utility is running (e.g. http://localhost:7777/).  You will be
+presented with a web page that allows you to create or modify the XML policy
+files:
+
+  - The Security Policy section allows you to create or modify a policy
+    definition file
+
+  - The Security Policy Labeling section allows you to create or modify a
+    label template definition file
+
+  Security Policy:
+  ----------------
+  The Security Policy section allows you to modify an existing policy definition
+  file or create a new policy definition file.  To modify an existing policy
+  definition, enter the full path to the existing file (the "Browse" button can
+  be used to aid in this) in the Policy File entry field.  To create a new
+  policy definition file leave the Policy File entry field blank.  At this point
+  click the "Create" button to begin modifying or creating your policy definition.
+
+  You will then be presented with a web page that will allow you to create either
+  Simple Type Enforcement types or Chinese Wall types or both.
+
+  As an example:
+    - To add a Simple Type Enforcement type:
+      - Enter the name of a new type under the Simple Type Enforcement Types
+        section in the entry field above the "New" button.
+      - Click the "New" button and the type will be added to the list of defined
+        Simple Type Enforcement types.
+    - To remove a Simple Type Enforcement type:
+      - Click on the type to be removed in the list of defined Simple Type
+        Enforcement types.
+      - Click the "Delete" button to remove the type.
+
+  Follow the same process to add Chinese Wall types.  If you define Chinese Wall
+  types you need to define at least one Chinese Wall Conflict Set.  The Chinese
+  Wall Conflict Set will allow you to add Chinese Wall types from the list of
+  defined Chinese Wall types.
+
+  To create your policy definition file, click on the "Generate XML" button on
+  the top of the page.  This will present you with a dialog box to save the
+  generated XML file on your system.  The default name will be security_policy.xml
+  which you should change to follow the policy file naming conventions based on
+  the policy name that you choose to use.
+
+  To get a feel for the tool, you could use one of the example policy definition
+  files from /etc/xen/acm-security/policies as input.
+
+
+  Security Policy Labeling:
+  -------------------------
+  The Security Policy Labeling section allows you to modify an existing label
+  template definition file or create a new label template definition file.  To
+  modify an existing label template definition, enter the full path to the
+  existing file (the "Browse" button can be used to aid in this) in the Policy
+  Labeling File entry field.  Whether creating a new label template definition
+  file or modifying an existing one, you will need to specify the policy
+  definition file that is or will be associated with this label template
+  definition file.  At this point click the "Create" button to begin modifying
+  or creating your label template definition file.
+
+  You will then be presented with a web page that will allow you to create labels
+  for classes of virtual machines.  The input policy definition file will provide
+  the available types (Simple Type Enforcement and/or Chinese Wall) that can be
+  assigned to a virtual machine class.
+
+  As an example:
+    - To add a Virtual Machine class (the name entered will become the label
+      that will be used to identify the class):
+      - Enter the name of a new class under the Virtual Machine Classes section
+        in the entry field above the "New" button.
+      - Click the "New" button and the class will be added to the table of defined
+        Virtual Machine classes.
+    - To remove a Virtual Machine class:
+      - Click the "Delete" link associated with the class in the table of Virtual
+        Machine classes.
+
+  Once you have defined one or more Virtual Machine classes, you will be able to
+  add any of the defined Simple Type Enforcement types or Chinese Wall types to a
+  particular Virtual Machine.
+
+  You must also define which Virtual Machine class is to be associated with the
+  bootstrap domain (or Dom0 domain).  By default, the first Virtual Machine class
+  created will be associated as the bootstrap domain.
+
+  To create your label template definition file, click on the "Generate XML" button
+  on the top of the page.  This will present you with a dialog box to save the
+  generated XML file on your system.  The default name will be
+  security_label_template.xml which you should change to follow the policy file
+  naming conventions based on the policy name that you choose to use.
+
+  To get a feel for the tool, you could use one of the example policy definition
+  and label template definition files from /etc/xen/acm-security/policies as input.
