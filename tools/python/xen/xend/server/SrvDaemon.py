@@ -16,10 +16,10 @@ import traceback
 
 import xen.lowlevel.xc
 
-from xen.xend.server import SrvServer
 from xen.xend.XendLogging import log
 
 import relocate
+import SrvServer
 from params import *
 
 
@@ -167,8 +167,9 @@ class Daemon:
             while True:
                 pid = self.fork_pid()
                 if pid:
-                    os.close(w)
-                    w = False
+                    if w is not None:
+                        os.close(w)
+                        w = None
 
                     (_, status) = os.waitpid(pid, 0)
 

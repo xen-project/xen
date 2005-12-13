@@ -253,17 +253,12 @@ gopts.var('usb', val='PATH',
           use="""Add a physical USB port to a domain, as specified by the path
           to that port.  This option may be repeated to add more than one port.""")
 
-gopts.var('ipaddr', val="IPADDR",
-          fn=append_value, default=[],
-          use="Add an IP address to the domain.")
-
-gopts.var('vif', val="type=TYPE,mac=MAC,be_mac=MAC,bridge=BRIDGE,script=SCRIPT,backend=DOM,vifname=NAME",
+gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT,backend=DOM,vifname=NAME",
           fn=append_value, default=[],
           use="""Add a network interface with the given MAC address and bridge.
           The vif is configured by calling the given configuration script.
           If type is not specified, default is netfront not ioemu device.
           If mac is not specified a random MAC address is used.
-          The MAC address of the backend interface can be selected with be_mac.
           If not specified then the network backend chooses it's own MAC address.
           If bridge is not specified the first bridge found is used.
           If script is not specified the default script is used.
@@ -284,8 +279,10 @@ gopts.var('vtpm', val="instance=INSTANCE,backend=DOM",
           given domain.""")
 
 gopts.var('nics', val="NUM",
-          fn=set_int, default=1,
-          use="""Set the number of network interfaces.
+          fn=set_int, default=-1,
+          use="""DEPRECATED.  Use empty vif entries instead.
+
+          Set the number of network interfaces.
           Use the vif option to define interface parameters, otherwise
           defaults are used. Specifying vifs will increase the
           number of interfaces as needed.""")
@@ -487,58 +484,38 @@ def configure_vtpm(config_devs, vals):
                 config_vtpm.append(['backend', backend])
             config_devs.append(['device', config_vtpm])
 
+
 def configure_vifs(config_devs, vals):
     """Create the config for virtual network interfaces.
     """
-    vifs = vals.vif
-    vifs_n = max(vals.nics, len(vifs))
 
-    for idx in range(0, vifs_n):
-        if idx < len(vifs):
-            d = vifs[idx]
-            mac = d.get('mac')
-            be_mac = d.get('be_mac')
-            bridge = d.get('bridge')
-            script = d.get('script')
-            backend = d.get('backend')
-            ip = d.get('ip')
-            vifname = d.get('vifname')
-            type = d.get('type')
-        else:
-            mac = None
-            be_mac = None
-            bridge = None
-            script = None
-            backend = None
-            ip = None
-            vifname = None
-            type = None
+    vifs = vals.vif
+    vifs_n = len(vifs)
+
+    if hasattr(vals, 'nics'):
+        if vals.nics > 0:
+            warn("The nics option is deprecated.  Please use an empty vif "
+                 "entry instead:\n\n  vif = [ '' ]\n")
+            for _ in range(vifs_n, vals.nics):
+                vifs.append('')
+            vifs_n = len(vifs)
+        elif vals.nics == 0:
+            warn("The nics option is deprecated.  Please remove it.")
+
+    for c in vifs:
+        d = comma_sep_kv_to_dict(c)
         config_vif = ['vif']
-        if mac:
-            config_vif.append(['mac', mac])
-        if vifname:
-            config_vif.append(['vifname', vifname])
-        if be_mac:
-            config_vif.append(['be_mac', be_mac])
-        if bridge:
-            config_vif.append(['bridge', bridge])
-        if script:
-            config_vif.append(['script', script])
-        if backend:
-            config_vif.append(['backend', backend])
-        if ip:
-            config_vif.append(['ip', ip])
-        if type:
-            config_vif.append(['type', type])
+
+        def f(k):
+            if k not in ['backend', 'bridge', 'ip', 'mac', 'script', 'type',
+                         'vifname']:
+                err('Invalid vif option: ' + k)
+
+            config_vif.append([k, d[k]])
+
+        map(f, d.keys())
         config_devs.append(['device', config_vif])
 
-def configure_vfr(config, vals):
-     if not vals.ipaddr: return
-     config_vfr = ['vfr']
-     idx = 0 # No way of saying which IP is for which vif?
-     for ip in vals.ipaddr:
-         config_vfr.append(['vif', ['id', idx], ['ip', ip]])
-     config.append(config_vfr)
 
 def configure_vmx(config_image, vals):
     """Create the config for VMX devices.
@@ -648,22 +625,6 @@ def preprocess_ioports(vals):
         ioports.append(hexd)
     vals.ioports = ioports
         
-def preprocess_vifs(vals):
-    if not vals.vif: return
-    vifs = []
-    for vif in vals.vif:
-        d = {}
-        a = vif.split(',')
-        for b in a:
-            (k, v) = b.strip().split('=', 1)
-            k = k.strip()
-            v = v.strip()
-            if k not in ['type', 'mac', 'be_mac', 'bridge', 'script', 'backend', 'ip', 'vifname']:
-                err('Invalid vif specifier: ' + vif)
-            d[k] = v
-        vifs.append(d)
-    vals.vif = vifs
-
 def preprocess_vtpm(vals):
     if not vals.vtpm: return
     vtpms = []
@@ -765,12 +726,30 @@ def preprocess(vals):
     preprocess_disk(vals)
     preprocess_pci(vals)
     preprocess_ioports(vals)
-    preprocess_vifs(vals)
     preprocess_ip(vals)
     preprocess_nfs(vals)
     preprocess_vnc(vals)
     preprocess_vtpm(vals)
-         
+
+
+def comma_sep_kv_to_dict(c):
+    """Convert comma-separated, equals-separated key-value pairs into a
+    dictionary.
+    """
+    d = {}
+    c = c.strip()
+    if len(c) > 0:
+        a = c.split(',')
+        for b in a:
+            if b.find('=') == -1:
+                err("%s should be a pair, separated by an equals sign." % b)
+            (k, v) = b.split('=', 1)
+            k = k.strip()
+            v = v.strip()
+            d[k] = v
+    return d
+
+
 def make_domain(opts, config):
     """Create, build and start a domain.
 

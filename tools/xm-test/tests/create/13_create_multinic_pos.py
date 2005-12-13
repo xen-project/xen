@@ -6,7 +6,8 @@
 from XmTestLib import *
 
 for i in range(0,10):
-    domain = XmTestDomain(extraOpts={"nics":"%i" % i})
+    domain = XmTestDomain()
+    domain.configSetVar('vif', str(['' for _ in range(0, i)]))
 
     try:
         domain.start()

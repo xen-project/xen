@@ -40,7 +40,20 @@
 # xend-relocation-server is set.
 # Meaning and default as for xend-address above.
 #(xend-relocation-address '')
-(xend-relocation-address localhost)
+
+# The hosts allowed to talk to the relocation port.  If this is empty (the
+# default), then all connections are allowed (assuming that the connection
+# arrives on a port and interface on which we are listening; see
+# xend-relocation-port and xend-relocation-address above).  Otherwise, this
+# should be a space-separated sequence of regular expressions.  Any host with
+# a fully-qualified domain name or an IP address that matches one of these
+# regular expressions will be accepted.
+#
+# For example:
+#  (xend-relocation-hosts-allow '^localhost$ ^.*\.example\.org$')
+#
+#(xend-relocation-hosts-allow '')
+(xend-relocation-hosts-allow '^localhost$')
 
 # The limit (in kilobytes) on the size of the console buffer
 #(console-limit 1024)

@@ -75,6 +75,8 @@ class XendRoot:
     """Default port xend serves relocation at. """
     xend_relocation_port_default = '8002'
 
+    xend_relocation_hosts_allow_default = ''
+
     """Default for the flag indicating whether xend should run a unix-domain server."""
     xend_unix_server_default = 'yes'
 
@@ -193,6 +195,10 @@ class XendRoot:
         """Get the port xend listens at for connection to its relocation server.
         """
         return self.get_config_int('xend-relocation-port', self.xend_relocation_port_default)
+
+    def get_xend_relocation_hosts_allow(self):
+        return self.get_config_value("xend-relocation-hosts-allow",
+                                     self.xend_relocation_hosts_allow_default)
 
     def get_xend_address(self):
         """Get the address xend listens at for its HTTP port.

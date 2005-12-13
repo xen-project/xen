@@ -60,9 +60,6 @@ cpus = "%s" % vmid # set based on vmid (mod number of CPUs)
 #----------------------------------------------------------------------------
 # Define network interfaces.
 
-# Number of network interfaces. Default is 1.
-#nics=1
-
 # Optionally define mac and/or bridge for the network interfaces.
 # Random MACs are assigned if not given.
 

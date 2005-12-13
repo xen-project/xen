@@ -36,7 +36,7 @@ class test_create(unittest.TestCase):
         (fd, fname) = tempfile.mkstemp()
         os.close(fd)
         self.t('-f %s kernel=/mykernel display=fakedisplay '
-               'macaddr=ab:cd:ef:ed nics=0' % fname,
+               'macaddr=ab:cd:ef:ed' % fname,
                { 'name'      : os.path.basename(fname),
                  'xm_file'   : fname,
                  'defconfig' : fname,
@@ -50,6 +50,7 @@ class test_create(unittest.TestCase):
                  'interface' : 'eth0',
                  'path'      : '.:/etc/xen',
                  'builder'   : 'linux',
+                 'nics'      : -1,
                  })
 
 
@@ -62,7 +63,6 @@ kernel = "/boot/vmlinuz-xenU-smp"
 memory = 768
 name = "dom1"
 vcpus = 4
-nics = 1
 disk = ['phy:/dev/virt-blkdev-backend/dom1,sda1,w',
 'phy:/dev/virt-blkdev-backend/usr,sda2,r']
 root = "/dev/sda1 ro"
@@ -79,7 +79,7 @@ on_crash    = 'destroy'
                  'memory'      : 768,
                  'name'        : 'dom1',
                  'vcpus'       : 4,
-                 'nics'        : 1,
+                 'nics'        : -1,
                  'root'        : '/dev/sda1 ro',
                  'extra'       : ' profile=1 GATEWAY=10.0.1.254 NETMASK=255.255.0.0 IPADDR=10.0.134.1 HOSTNAME=dom1',
                  'on_poweroff' : 'destroy',
@@ -118,7 +118,7 @@ cpu_weight = 0.75
         finally:
             os.close(fd)
 
-        self.t('-f %s display=fakedisplay macaddr=ab:cd:ef:ed nics=0' %
+        self.t('-f %s display=fakedisplay macaddr=ab:cd:ef:ed' %
           fname,
                { 'name'       : 'testname',
                  'xm_file'    : fname,
@@ -137,6 +137,7 @@ cpu_weight = 0.75
                  'interface'  : 'eth0',
                  'path'       : '.:/etc/xen',
                  'builder'    : 'linux',
+                 'nics'       : -1,
                  })
             
 

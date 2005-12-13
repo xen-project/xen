@@ -16,6 +16,7 @@
 # Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
+import re
 import sys
 import StringIO
 
@@ -116,8 +117,16 @@ def listenRelocation():
     xroot = XendRoot.instance()
     if xroot.get_xend_unix_server():
         path = '/var/lib/xend/relocation-socket'
-        unix.listenUNIX(path, RelocationProtocol)
+        unix.UnixListener(path, RelocationProtocol)
     if xroot.get_xend_relocation_server():
         port = xroot.get_xend_relocation_port()
         interface = xroot.get_xend_relocation_address()
-        tcp.listenTCP(port, RelocationProtocol, interface=interface)
+
+        hosts_allow = xroot.get_xend_relocation_hosts_allow()
+        if hosts_allow == '':
+            hosts_allow = None
+        else:
+            hosts_allow = map(re.compile, hosts_allow.split(" "))
+
+        tcp.TCPListener(RelocationProtocol, port, interface = interface,
+                        hosts_allow = hosts_allow)
