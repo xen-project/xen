@@ -42,6 +42,8 @@ vcpus=1
 nics=1 
 # type=ioemu specify the NIC is an ioemu device not netfront
 vif = [ 'type=ioemu, bridge=xenbr0' ]
+# for multiple NICs in device model, 3 in this example
+#vif = [ 'type=ioemu, bridge=xenbr0', 'type=ioemu', 'type=ioemu']
 
 #----------------------------------------------------------------------------
 # Define the disk devices you want the domain to have access to, and
