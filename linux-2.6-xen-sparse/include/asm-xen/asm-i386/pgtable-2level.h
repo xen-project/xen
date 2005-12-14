@@ -15,26 +15,19 @@
  */
 #define set_pte(pteptr, pteval) (*(pteptr) = pteval)
 
-inline static void set_pte_at(struct mm_struct *mm, unsigned long addr, 
-		       pte_t *ptep, pte_t val )
-{
-    if ( ((mm != current->mm) && (mm != &init_mm)) ||
-	 HYPERVISOR_update_va_mapping( (addr), (val), 0 ) )
-    {
-        set_pte(ptep, val);
-    }
-}
+#define set_pte_at(_mm,addr,ptep,pteval) do {				\
+	if (((_mm) != current->mm && (_mm) != &init_mm) ||		\
+	    HYPERVISOR_update_va_mapping((addr), (pteval), 0))		\
+		set_pte((ptep), (pteval));				\
+} while (0)
 
-inline static void set_pte_at_sync(struct mm_struct *mm, unsigned long addr, 
-		       pte_t *ptep, pte_t val )
-{
-    if ( ((mm != current->mm) && (mm != &init_mm)) ||
-	 HYPERVISOR_update_va_mapping( (addr), (val), UVMF_INVLPG ) )
-    {
-        set_pte(ptep, val);
-	xen_invlpg(addr);
-    }
-}
+#define set_pte_at_sync(_mm,addr,ptep,pteval) do {			\
+	if (((_mm) != current->mm && (_mm) != &init_mm) ||		\
+	    HYPERVISOR_update_va_mapping((addr), (pteval), UVMF_INVLPG)) { \
+		set_pte((ptep), (pteval));				\
+		xen_invlpg((addr));					\
+	}								\
+} while (0)
 
 #define set_pte_atomic(pteptr, pteval) set_pte(pteptr,pteval)
 
