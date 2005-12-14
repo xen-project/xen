@@ -202,6 +202,18 @@ struct vlapic
     struct domain      *domain;
 };
 
+static inline int vlapic_set_irq(struct vlapic *t, uint8_t vec, uint8_t trig)
+{
+    int ret;
+
+    ret = test_and_set_bit(vec, &t->irr[0]);
+    if (trig)
+	test_and_set_bit(vec, &t->tmr[0]);
+
+    /* We may need to wake up target vcpu, besides set pending bit here */
+    return ret;
+}
+
 static inline int  vlapic_timer_active(struct vlapic *vlapic)
 {
     return  active_ac_timer(&(vlapic->vlapic_timer));

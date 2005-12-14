@@ -55,6 +55,12 @@ extern uint64_t dummy_tmr[];
 #define VLAPIC_ID(l) (uint16_t)(VCPU((l)->vcpu, lid) >> 16)
 #define VLAPIC_IRR(l) VCPU((l)->vcpu, irr[0])
 
+extern int vmx_vcpu_pend_interrupt(struct vcpu *vcpu, uint8_t vector);
+static inline int vlapic_set_irq(struct vlapic *t, uint8_t vec, uint8_t trig)
+{
+    return vmx_vcpu_pend_interrupt(t->vcpu, vec);
+}
+
 /* As long as we register vlsapic to ioapic controller, it's said enabled */
 #define vlapic_enabled(l) 1
 #define vmx_apic_support(d) 1
