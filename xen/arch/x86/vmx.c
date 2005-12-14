@@ -1094,11 +1094,21 @@ static int vmx_set_cr0(unsigned long value)
     unsigned long eip;
     int paging_enabled;
     unsigned long vm_entry_value;
+    unsigned long old_cr0;
 
     /*
      * CR0: We don't want to lose PE and PG.
      */
-    paging_enabled = vmx_paging_enabled(v);
+    __vmread_vcpu(v, CR0_READ_SHADOW, &old_cr0);
+    paging_enabled = (old_cr0 & X86_CR0_PE) && (old_cr0 & X86_CR0_PG);
+    /* If OS don't use clts to clear TS bit...*/
+    if((old_cr0 & X86_CR0_TS) && !(value & X86_CR0_TS))
+    {
+            clts();
+            setup_fpu(v);
+    }
+
+
     __vmwrite(GUEST_CR0, value | X86_CR0_PE | X86_CR0_PG | X86_CR0_NE);
     __vmwrite(CR0_READ_SHADOW, value);
 
