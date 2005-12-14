@@ -10,7 +10,6 @@
 .*\.tar\.bz2$
 .*\.tar\.gz$
 .*~$
-^build.*$
 ^dist/.*$
 ^docs/.*\.aux$
 ^docs/.*\.dvi$
