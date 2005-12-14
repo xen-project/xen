@@ -46,6 +46,7 @@ setup(name            = 'xen',
 
                          'xen.xend.tests',
                          'xen.xend.server.tests',
+                         'xen.xend.xenstore.tests',
                          'xen.xm.tests'
                          ],
       ext_package = "xen.lowlevel",
