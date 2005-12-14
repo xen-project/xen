@@ -628,6 +628,7 @@ static int __init xencons_init(void)
 	if (xencons_driver == NULL)
 		return -ENOMEM;
 
+	DRV(xencons_driver)->name            = "xencons";
 	DRV(xencons_driver)->major           = TTY_MAJOR;
 	DRV(xencons_driver)->type            = TTY_DRIVER_TYPE_SERIAL;
 	DRV(xencons_driver)->subtype         = SERIAL_TYPE_NORMAL;
