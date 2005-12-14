@@ -21,9 +21,9 @@ endif
 CFLAGS  += -msoft-float
 
 # Disable PIE/SSP if GCC supports them. They can break us.
-CFLAGS  += $(call test-gcc-flag,-nopie)
-CFLAGS  += $(call test-gcc-flag,-fno-stack-protector)
-CFLAGS  += $(call test-gcc-flag,-fno-stack-protector-all)
+CFLAGS  += $(call test-gcc-flag,$(CC),-nopie)
+CFLAGS  += $(call test-gcc-flag,$(CC),-fno-stack-protector)
+CFLAGS  += $(call test-gcc-flag,$(CC),-fno-stack-protector-all)
 
 ifeq ($(TARGET_SUBARCH),x86_32)
 CFLAGS  += -m32 -march=i686
