@@ -347,6 +347,7 @@ stop()
 	    echo -n "(save)"
 	    watchdog_xm save &
 	    WDOG_PID=$!
+	    mkdir -p "$XENDOMAINS_SAVE"
 	    xm save $id $XENDOMAINS_SAVE/$name
 	    if test $? -ne 0; then
 		rc_failed $?
