@@ -639,6 +639,44 @@ void notify_remote_via_irq(int irq)
 }
 EXPORT_SYMBOL(notify_remote_via_irq);
 
+void mask_evtchn(int port)
+{
+	shared_info_t *s = HYPERVISOR_shared_info;
+	synch_set_bit(port, &s->evtchn_mask[0]);
+}
+EXPORT_SYMBOL(mask_evtchn);
+
+void unmask_evtchn(int port)
+{
+	shared_info_t *s = HYPERVISOR_shared_info;
+	unsigned int cpu = smp_processor_id();
+	vcpu_info_t *vcpu_info = &s->vcpu_info[cpu];
+
+	/* Slow path (hypercall) if this is a non-local port. */
+	if (unlikely(cpu != cpu_from_evtchn(port))) {
+		evtchn_op_t op = { .cmd = EVTCHNOP_unmask,
+				   .u.unmask.port = port };
+		(void)HYPERVISOR_event_channel_op(&op);
+		return;
+	}
+
+	synch_clear_bit(port, &s->evtchn_mask[0]);
+
+	/*
+	 * The following is basically the equivalent of 'hw_resend_irq'. Just
+	 * like a real IO-APIC we 'lose the interrupt edge' if the channel is
+	 * masked.
+	 */
+	if (synch_test_bit(port, &s->evtchn_pending[0]) && 
+	    !synch_test_and_set_bit(port / BITS_PER_LONG,
+				    &vcpu_info->evtchn_pending_sel)) {
+		vcpu_info->evtchn_upcall_pending = 1;
+		if (!vcpu_info->evtchn_upcall_mask)
+			force_evtchn_callback();
+	}
+}
+EXPORT_SYMBOL(unmask_evtchn);
+
 void irq_resume(void)
 {
 	evtchn_op_t op;

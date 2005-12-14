@@ -13,10 +13,12 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd.
 #============================================================================
 
 import socket
 import httplib
+import time
 import types
 
 from encode import *
@@ -165,23 +167,37 @@ class HttpXendClientProtocol(XendClientProtocol):
         @param method: http method: POST or GET
         @param args:   request arguments (dict)
         """
-        self.request = self.makeRequest(url, method, args)
-        conn = self.makeConnection(url)
-        if DEBUG: conn.set_debuglevel(1)
-        conn.request(method, url.fullpath(), self.request.data, self.request.headers)
-        resp = conn.getresponse()
-        self.resp = resp
-        val = self.handleStatus(resp.version, resp.status, resp.reason)
-        if val is None:
-            data = None
-        else:
-            data = resp.read()
-        conn.close()
-        val = self.handleResponse(data)
-        return val
+        retries = 0
+        while retries < 2:
+            self.request = self.makeRequest(url, method, args)
+            conn = self.makeConnection(url)
+            try:
+                if DEBUG: conn.set_debuglevel(1)
+                conn.request(method, url.fullpath(), self.request.data,
+                             self.request.headers)
+                try:
+                    resp = conn.getresponse()
+                    self.resp = resp
+                    val = self.handleStatus(resp.version, resp.status,
+                                            resp.reason)
+                    if val is None:
+                        data = None
+                    else:
+                        data = resp.read()
+                    val = self.handleResponse(data)
+                    return val
+                except httplib.BadStatusLine:
+                    retries += 1
+                    time.sleep(5)
+            finally:
+                conn.close()
+
+        raise XendError("Received invalid response from Xend, twice.")
+
 
     def getHeader(self, key):
         return self.resp.getheader(key)
+
 
 class UnixConnection(httplib.HTTPConnection):
     """Subclass of Python library HTTPConnection that uses a unix-domain socket.

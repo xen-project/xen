@@ -74,9 +74,10 @@ class NetifController(DevController):
         typ = sxp.child_value(config, 'type')
         if typ == 'ioemu':
             return (None,{},{})
-        bridge = sxp.child_value(config, 'bridge')
-        mac    = sxp.child_value(config, 'mac')
-        ipaddr = _get_config_ipaddr(config)
+        bridge  = sxp.child_value(config, 'bridge')
+        mac     = sxp.child_value(config, 'mac')
+        vifname = sxp.child_value(config, 'vifname')
+        ipaddr  = _get_config_ipaddr(config)
 
         devid = self.allocateDeviceID()
 
@@ -90,6 +91,8 @@ class NetifController(DevController):
             back['ip'] = ' '.join(ipaddr)
         if bridge:
             back['bridge'] = bridge
+        if vifname:
+            back['vifname'] = vifname
 
         front = { 'handle' : "%i" % devid,
                   'mac'    : mac }
@@ -102,9 +105,8 @@ class NetifController(DevController):
 
         result = DevController.configuration(self, devid)
 
-        (script, ip, bridge, mac) = self.readBackend(devid,
-                                                     'script', 'ip', 'bridge',
-                                                     'mac')
+        (script, ip, bridge, mac, typ, vifname) = self.readBackend(
+            devid, 'script', 'ip', 'bridge', 'mac', 'type', 'vifname')
 
         if script:
             result.append(['script',
@@ -116,5 +118,9 @@ class NetifController(DevController):
             result.append(['bridge', bridge])
         if mac:
             result.append(['mac', mac])
+        if typ:
+            result.append(['type', typ])
+        if vifname:
+            result.append(['vifname', vifname])
 
         return result
