@@ -3,7 +3,7 @@
  * 
  * A nice interface for passing asynchronous events to guest OSes.
  * 
- * Copyright (c) 2002, K A Fraser
+ * Copyright (c) 2002-2005, K A Fraser
  */
 
 #ifndef __XEN_EVENT_H__

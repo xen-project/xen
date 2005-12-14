@@ -79,46 +79,16 @@ extern int bind_ipi_to_irqhandler(
  */
 extern void unbind_from_irqhandler(unsigned int irq, void *dev_id);
 
-/*
- * Unlike notify_remote_via_evtchn(), this is safe to use across
- * save/restore. Notifications on a broken connection are silently dropped.
- */
-void notify_remote_via_irq(int irq);
-
 extern void irq_resume(void);
 
 /* Entry point for notifications into Linux subsystems. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs);
 
 /* Entry point for notifications into the userland character device. */
-void evtchn_device_upcall(int port);
+extern void evtchn_device_upcall(int port);
 
-static inline void mask_evtchn(int port)
-{
-	shared_info_t *s = HYPERVISOR_shared_info;
-	synch_set_bit(port, &s->evtchn_mask[0]);
-}
-
-static inline void unmask_evtchn(int port)
-{
-	shared_info_t *s = HYPERVISOR_shared_info;
-	vcpu_info_t *vcpu_info = &s->vcpu_info[smp_processor_id()];
-
-	synch_clear_bit(port, &s->evtchn_mask[0]);
-
-	/*
-	 * The following is basically the equivalent of 'hw_resend_irq'. Just
-	 * like a real IO-APIC we 'lose the interrupt edge' if the channel is
-	 * masked.
-	 */
-	if (synch_test_bit(port, &s->evtchn_pending[0]) && 
-	    !synch_test_and_set_bit(port / BITS_PER_LONG,
-				    &vcpu_info->evtchn_pending_sel)) {
-		vcpu_info->evtchn_upcall_pending = 1;
-		if (!vcpu_info->evtchn_upcall_mask)
-			force_evtchn_callback();
-	}
-}
+extern void mask_evtchn(int port);
+extern void unmask_evtchn(int port);
 
 static inline void clear_evtchn(int port)
 {
@@ -133,6 +103,12 @@ static inline void notify_remote_via_evtchn(int port)
 	op.u.send.port = port;
 	(void)HYPERVISOR_event_channel_op(&op);
 }
+
+/*
+ * Unlike notify_remote_via_evtchn(), this is safe to use across
+ * save/restore. Notifications on a broken connection are silently dropped.
+ */
+extern void notify_remote_via_irq(int irq);
 
 #endif /* __ASM_EVTCHN_H__ */
 

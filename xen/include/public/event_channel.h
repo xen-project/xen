@@ -164,6 +164,16 @@ typedef struct evtchn_bind_vcpu {
     uint32_t vcpu;
 } evtchn_bind_vcpu_t;
 
+/*
+ * EVTCHNOP_unmask: Unmask the specified local event-channel port and deliver
+ * a notification to the appropriate VCPU if an event is pending.
+ */
+#define EVTCHNOP_unmask           9
+typedef struct evtchn_unmask {
+    /* IN parameters. */
+    evtchn_port_t port;
+} evtchn_unmask_t;
+
 typedef struct evtchn_op {
     uint32_t cmd; /* EVTCHNOP_* */
     union {
@@ -176,6 +186,7 @@ typedef struct evtchn_op {
         evtchn_send_t             send;
         evtchn_status_t           status;
         evtchn_bind_vcpu_t        bind_vcpu;
+        evtchn_unmask_t           unmask;
     } u;
 } evtchn_op_t;
 
