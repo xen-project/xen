@@ -38,10 +38,10 @@ EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
 EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBDIR)
 endif
 
-test-gcc-flag = $(shell $(CC) -v --help 2>&1 | grep -q " $(1) " && echo $(1))
+test-gcc-flag = $(shell $(1) -v --help 2>&1 | grep -q " $(2) " && echo $(2))
 
-HOSTCFLAGS += $(call test-gcc-flag,-Wdeclaration-after-statement)
-CFLAGS     += $(call test-gcc-flag,-Wdeclaration-after-statement)
+HOSTCFLAGS += $(call test-gcc-flag,$(HOSTCC),-Wdeclaration-after-statement)
+CFLAGS     += $(call test-gcc-flag,$(CC),-Wdeclaration-after-statement)
 
 LDFLAGS += $(foreach i, $(EXTRA_LIB), -L$(i)) 
 CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
