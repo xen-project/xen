@@ -46,6 +46,9 @@ def dettach(devname):
 
     return 0, None
 	
+if ENABLE_VMX_SUPPORT:
+    SKIP("Block-attach not supported for VMX domains")
+
 # Create a domain (default XmTestDomain, with our ramdisk)
 domain = XmTestDomain()
 

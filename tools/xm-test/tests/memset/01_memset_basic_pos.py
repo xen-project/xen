@@ -20,6 +20,9 @@ import re
 import time 
 from XmTestLib import * 
 
+if ENABLE_VMX_SUPPORT:
+    SKIP("Mem-set not supported for VMX domains")
+
 # Create a domain (default XmTestDomain, with our ramdisk)
 domain = XmTestDomain() 
 

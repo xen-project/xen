@@ -8,6 +8,9 @@
 
 from XmTestLib import *
 
+if ENABLE_VMX_SUPPORT:
+    SKIP("Block-list not supported for VMX domains")
+
 domain = XmTestDomain()
 
 try:
@@ -20,9 +23,6 @@ except DomainError, e:
 status, output = traceCommand("xm block-list %s" % domain.getId())
 if status != 0:
     FAIL("xm block-list returned bad status, expected 0, status is %i" % status)
-
-if ENABLE_VMX_SUPPORT:
-    SKIP("Using block device for root, so this case does not apply")
 
 if output != "":
     FAIL("xm block-list should not list anything for domain with no block devices")

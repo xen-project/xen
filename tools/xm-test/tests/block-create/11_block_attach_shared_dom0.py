@@ -5,6 +5,9 @@
 
 from XmTestLib import *
 
+if ENABLE_VMX_SUPPORT:
+    SKIP("Block-attach not supported for VMX domains")
+
 # Mount /dev/ram0
 
 s, o = traceCommand("mkfs /dev/ram0")

@@ -9,6 +9,9 @@ import time
 
 from XmTestLib import *
 
+if ENABLE_VMX_SUPPORT:
+    SKIP("Sysrq not supported for VMX domains")
+
 # Create a domain (default XmTestDomain, with our ramdisk)
 domain = XmTestDomain()
 

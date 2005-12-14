@@ -8,6 +8,9 @@
 
 from XmTestLib import *
 
+if ENABLE_VMX_SUPPORT:
+    SKIP("Block-list not supported for VMX domains")
+
 domain = XmTestDomain()
                                                                                               
 try:

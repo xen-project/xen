@@ -10,6 +10,9 @@ import time
 
 from XmTestLib import *
 
+if ENABLE_VMX_SUPPORT:
+    SKIP("Save currently not supported for VMX domains")
+
 domain = XmTestDomain()
 
 try:

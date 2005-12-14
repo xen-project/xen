@@ -5,6 +5,9 @@
 
 from XmTestLib import *
 
+if ENABLE_VMX_SUPPORT:
+    SKIP("Block-attach not supported for VMX domains")
+
 config = {"disk":"phy:/dev/ram0,hda1,w"}
 
 dom1 = XmTestDomain(extraConfig=config)

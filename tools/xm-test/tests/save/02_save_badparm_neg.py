@@ -12,6 +12,9 @@ import re
 
 from XmTestLib import *
 
+if ENABLE_VMX_SUPPORT:
+    SKIP("Save currently not supported for VMX domains")
+
 status, output = traceCommand("xm save -x")
 eyecatcher1 = "Error:"
 eyecatcher2 = "Traceback"

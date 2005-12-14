@@ -18,6 +18,9 @@ import re
 
 from XmTestLib import * 
 
+if ENABLE_VMX_SUPPORT:
+    SKIP("Mem-set not supported for VMX domains")
+
 # destroy no parm input - negative test
 status, output = traceCommand("xm mem-set")
 eyecatcher = "Error:"

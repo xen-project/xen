@@ -26,6 +26,9 @@ def checkXmLongList(domain):
     else:
         return False
 
+if ENABLE_VMX_SUPPORT:
+    SKIP("Block-detach not supported for VMX domains")
+
 domain = XmTestDomain()
 
 try:

@@ -5,6 +5,9 @@
 
 from XmTestLib import *
 
+if ENABLE_VMX_SUPPORT:
+    SKIP("Block-attach not supported for VMX domains")
+
 status, output = traceCommand("xm block-attach NOT-EXIST phy:ram1 sdb1 w")
 
 eyecatcher = "Error"

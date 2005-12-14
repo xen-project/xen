@@ -7,6 +7,9 @@ from XmTestLib import *
 
 import re
 
+if ENABLE_VMX_SUPPORT:
+    SKIP("Restore currently not supported for VMX domains")
+
 config = {"disk": ["phy:/dev/ram0,hda1,w", "phy:/dev/ram1,hdb2,w"],
           "vif":  ['', '']}
 domain = XmTestDomain(extraConfig=config)

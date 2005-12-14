@@ -7,6 +7,9 @@ from XmTestLib import *
 
 import time
 
+if ENABLE_VMX_SUPPORT:
+    SKIP("Sysrq not supported for VMX domains")
+
 domain = XmTestDomain()
 
 try:

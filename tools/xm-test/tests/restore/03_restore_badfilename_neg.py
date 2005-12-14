@@ -12,6 +12,9 @@ import re
 
 from XmTestLib import *
 
+if ENABLE_VMX_SUPPORT:
+    SKIP("Restore currently not supported for VMX domains")
+
 status, output = traceCommand("xm restore /tmp/NON_EXIST")
 eyecatcher1 = "Error:"
 eyecatcher2 = "Traceback"
