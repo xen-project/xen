@@ -57,7 +57,10 @@ def shutdown(opts, doms, mode, wait):
     dom0_name = sxp.child_value(server.xend_domain(0), 'name')
     for x in [dom0_name, DOM0_ID]:
         if x in doms:
-            doms.remove(x)
+            if opts.vals.all:
+                doms.remove(x)
+            else:
+                opts.err("Can't specify Domain-0")
     for d in doms:
         server.xend_domain_shutdown(d, mode)
     if wait:
