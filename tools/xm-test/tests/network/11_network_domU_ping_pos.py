@@ -19,7 +19,7 @@ from XmTestLib import *
 
 def netDomain(ip):
     config = {"vif"  : ["ip=%s" % ip]}
-    domain = XmTestDomain(extraConfig=config)
+    dom = XmTestDomain(extraConfig=config)
     try:
         dom.start()
     except DomainError, e:
