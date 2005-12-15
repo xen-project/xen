@@ -338,14 +338,6 @@ static int xenbus_dev_probe(struct device *_dev)
 
 	DPRINTK("");
 
-	err = talk_to_otherend(dev);
-	if (err) {
-		printk(KERN_WARNING
-		       "xenbus_probe: talk_to_otherend on %s failed.\n",
-		       dev->nodename);
-		return err;
-	}
-
 	if (!drv->probe) {
 		err = -ENODEV;
 		goto fail;
@@ -360,6 +352,14 @@ static int xenbus_dev_probe(struct device *_dev)
 	err = drv->probe(dev, id);
 	if (err)
 		goto fail;
+
+	err = talk_to_otherend(dev);
+	if (err) {
+		printk(KERN_WARNING
+		       "xenbus_probe: talk_to_otherend on %s failed.\n",
+		       dev->nodename);
+		return err;
+	}
 
 	return 0;
 fail:
