@@ -148,8 +148,8 @@ typedef union thash_cch_mem {
 /*
  * Use to calculate the HASH index of thash_data_t.
  */
-typedef u64 *(THASH_FN)(PTA pta, u64 va, u64 rid, u64 ps);
-typedef u64 *(TTAG_FN)(PTA pta, u64 va, u64 rid, u64 ps);
+typedef u64 *(THASH_FN)(PTA pta, u64 va);
+typedef u64 *(TTAG_FN)(PTA pta, u64 va);
 typedef u64 *(GET_MFN_FN)(domid_t d, u64 gpfn, u64 pages);
 typedef void *(REM_NOTIFIER_FN)(struct hash_cb *hcb, thash_data_t *entry);
 typedef void (RECYCLE_FN)(struct hash_cb *hc, u64 para);
@@ -329,8 +329,8 @@ extern int thash_lock_tc(thash_cb_t *hcb, u64 va, u64 size, int rid, char cl, in
 
 #define   ITIR_RV_MASK      (((1UL<<32)-1)<<32 | 0x3)
 #define   PAGE_FLAGS_RV_MASK    (0x2 | (0x3UL<<50)|(((1UL<<11)-1)<<53))
-extern u64 machine_ttag(PTA pta, u64 va, u64 rid, u64 ps);
-extern u64 machine_thash(PTA pta, u64 va, u64 rid, u64 ps);
+extern u64 machine_ttag(PTA pta, u64 va);
+extern u64 machine_thash(PTA pta, u64 va);
 extern void purge_machine_tc_by_domid(domid_t domid);
 extern void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb);
 extern ia64_rr vmmu_get_rr(struct vcpu *vcpu, u64 va);

@@ -68,8 +68,7 @@ static void cch_free(thash_cb_t *hcb, thash_data_t *cch)
 static int __is_translated(thash_data_t *tlb, u64 rid, u64 va, CACHE_LINE_TYPE cl)
 {
     u64  size1,sa1,ea1;
-
-    if ( tlb->rid != rid || tlb->cl != cl )
+    if ( tlb->rid != rid ||(!tlb->tc && tlb->cl != cl) )
         return 0;
     size1 = PSIZE(tlb->ps);
     sa1 = tlb->vadr & ~(size1-1);   // mask the low address bits
@@ -89,7 +88,7 @@ __is_tlb_overlap(thash_cb_t *hcb,thash_data_t *entry,int rid, char cl, u64 sva, 
 {
     uint64_t size1,size2,sa1,ea1,ea2;
 
-    if ( entry->invalid || entry->rid != rid || entry->cl != cl ) {
+    if ( entry->invalid || entry->rid != rid || (!entry->tc && entry->cl != cl ) ) {
         return 0;
     }
     size1=PSIZE(entry->ps);
@@ -292,8 +291,7 @@ int __tlb_to_vhpt(thash_cb_t *hcb,
     if ( mfn == INVALID_MFN ) return 0;
 
     // TODO with machine discontinuous address space issue.
-    vhpt->etag = (hcb->vs->tag_func)( hcb->pta,
-            tlb->vadr, tlb->rid, tlb->ps);
+    vhpt->etag = (hcb->vs->tag_func)( hcb->pta, tlb->vadr);
     //vhpt->ti = 0;
     vhpt->itir = tlb->itir & ~ITIR_RV_MASK;
     vhpt->page_flags = tlb->page_flags & ~PAGE_FLAGS_RV_MASK;
@@ -331,6 +329,17 @@ void thash_tr_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va, int idx)
     rep_tr(hcb, entry, idx);
     return ;
 }
+thash_data_t *vtlb_alloc_chain(thash_cb_t *hcb,thash_data_t *entry)
+{
+    thash_data_t *cch;
+    
+    cch = cch_alloc(hcb);
+    if(cch == NULL){
+        thash_purge_all(hcb);
+    }
+    return cch;
+}
+ 
 
 thash_data_t *__alloc_chain(thash_cb_t *hcb,thash_data_t *entry)
 {
@@ -365,15 +374,14 @@ void vtlb_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
     u64 gppn;
     u64 ppns, ppne;
 
-    hash_table = (hcb->hash_func)(hcb->pta,
-                        va, entry->rid, entry->ps);
+    hash_table = (hcb->hash_func)(hcb->pta, va);
     if( INVALID_ENTRY(hcb, hash_table) ) {
         *hash_table = *entry;
         hash_table->next = 0;
     }
     else {
         // TODO: Add collision chain length limitation.
-        cch = __alloc_chain(hcb,entry);
+        cch = vtlb_alloc_chain(hcb,entry);
         if(cch == NULL){
             *hash_table = *entry;
             hash_table->next = 0;
@@ -415,8 +423,7 @@ static void vhpt_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
     if ( !__tlb_to_vhpt(hcb, entry, va, &vhpt_entry) ) {
         panic("Can't convert to machine VHPT entry\n");
     }
-    hash_table = (hcb->hash_func)(hcb->pta,
-                        va, entry->rid, entry->ps);
+    hash_table = (hcb->hash_func)(hcb->pta, va);
     if( INVALID_ENTRY(hcb, hash_table) ) {
         *hash_table = vhpt_entry;
         hash_table->next = 0;
@@ -581,9 +588,7 @@ static thash_data_t *vtlb_find_overlap(thash_cb_t *hcb,
     priv->rid = rid;
     vrr = (hcb->get_rr_fn)(hcb->vcpu,va);
     priv->ps = vrr.ps;
-    hash_table = (hcb->hash_func)(hcb->pta,
-        priv->_curva, rid, priv->ps);
-
+    hash_table = (hcb->hash_func)(hcb->pta, priv->_curva);
     priv->s_sect = s_sect;
     priv->cl = cl;
     priv->_tr_idx = 0;
@@ -605,11 +610,8 @@ static thash_data_t *vhpt_find_overlap(thash_cb_t *hcb,
     priv->rid = rid;
     vrr = (hcb->get_rr_fn)(hcb->vcpu,va);
     priv->ps = vrr.ps;
-    hash_table = (hcb->hash_func)( hcb->pta,
-        priv->_curva, rid, priv->ps);
-    tag = (hcb->vs->tag_func)( hcb->pta,
-        priv->_curva, rid, priv->ps);
-
+    hash_table = (hcb->hash_func)( hcb->pta, priv->_curva);
+    tag = (hcb->vs->tag_func)( hcb->pta, priv->_curva);
     priv->tag = tag;
     priv->hash_base = hash_table;
     priv->cur_cch = hash_table;
@@ -671,8 +673,7 @@ static thash_data_t *vtlb_next_overlap(thash_cb_t *hcb)
             }
         }
         priv->_curva += rr_psize;
-        priv->hash_base = (hcb->hash_func)( hcb->pta,
-            priv->_curva, priv->rid, priv->ps);
+        priv->hash_base = (hcb->hash_func)( hcb->pta, priv->_curva);
         priv->cur_cch = priv->hash_base;
     }
     return NULL;
@@ -697,10 +698,8 @@ static thash_data_t *vhpt_next_overlap(thash_cb_t *hcb)
             }
         }
         priv->_curva += rr_psize;
-        priv->hash_base = (hcb->hash_func)( hcb->pta,
-            priv->_curva, priv->rid, priv->ps);
-        priv->tag = (hcb->vs->tag_func)( hcb->pta,
-                priv->_curva, priv->rid, priv->ps);
+        priv->hash_base = (hcb->hash_func)( hcb->pta, priv->_curva);
+        priv->tag = (hcb->vs->tag_func)( hcb->pta, priv->_curva);
         priv->cur_cch = priv->hash_base;
     }
     return NULL;
@@ -771,7 +770,26 @@ void thash_purge_and_insert(thash_cb_t *hcb, thash_data_t *in)
 #endif
     (hcb->ins_hash)(hcb, in, in->vadr);
 }
-
+/*
+ * Purge one hash line (include the entry in hash table).
+ * Can only be called by thash_purge_all.
+ * Input:
+ *  hash: The head of collision chain (hash table)
+ *
+ */
+static void thash_purge_line(thash_cb_t *hcb, thash_data_t *hash)
+{
+    if ( INVALID_ENTRY(hcb, hash) ) return;
+    thash_data_t *prev, *next;
+    next=hash->next;
+    while ( next ) {
+        prev=next;
+        next=next->next;
+        cch_free(hcb, prev);
+    }
+    // Then hash table itself.
+    INVALIDATE_HASH(hcb, hash);
+}
 /*
  * Purge all TCs or VHPT entries including those in Hash table.
  *
@@ -792,10 +810,17 @@ void thash_purge_all(thash_cb_t *hcb)
 #endif
 
     hash_table = (thash_data_t*)((u64)hcb->hash + hcb->hash_sz);
-    
     for (--hash_table;(u64)hash_table >= (u64)hcb->hash;hash_table--) {
-        thash_rem_line(hcb, hash_table);
+        thash_purge_line(hcb, hash_table);
     }
+    if(hcb->ht== THASH_TLB) {
+        hcb = hcb->ts->vhpt;
+        hash_table = (thash_data_t*)((u64)hcb->hash + hcb->hash_sz);
+        for (--hash_table;(u64)hash_table >= (u64)hcb->hash;hash_table--) {
+            thash_purge_line(hcb, hash_table);
+        }
+    }
+    local_flush_tlb_all();
 }
 
 
@@ -826,7 +851,7 @@ thash_data_t *vtlb_lookup_ex(thash_cb_t *hcb,
     if ( cch ) return cch;
 
     vrr = (hcb->get_rr_fn)(hcb->vcpu,va);
-    hash_table = (hcb->hash_func)( hcb->pta,va, rid, vrr.ps);
+    hash_table = (hcb->hash_func)( hcb->pta, va);
 
     if ( INVALID_ENTRY(hcb, hash_table ) )
         return NULL;
@@ -893,7 +918,7 @@ void tlb_remove_notifier(thash_cb_t *hcb, thash_data_t *entry)
     
     s_sect.v = 0;
     thash_purge_entries(hcb->ts->vhpt, entry, s_sect);
-    machine_tlb_purge(entry->rid, entry->vadr, entry->ps);
+    machine_tlb_purge(entry->vadr, entry->ps);
 }
 
 /*
