@@ -110,12 +110,12 @@ void vmx_relinquish_resources(struct vcpu *v)
     vpit = &v->domain->arch.vmx_platform.vmx_pit;
     if ( active_ac_timer(&(vpit->pit_timer)) )
         rem_ac_timer(&vpit->pit_timer);
-    if ( active_ac_timer(&v->arch.arch_vmx.hlt_timer) ) {
+    if ( active_ac_timer(&v->arch.arch_vmx.hlt_timer) )
         rem_ac_timer(&v->arch.arch_vmx.hlt_timer);
-    }
-    if ( vmx_apic_support(v->domain) ) {
-        rem_ac_timer( &(VLAPIC(v)->vlapic_timer) );
-        xfree( VLAPIC(v) );
+    if ( vmx_apic_support(v->domain) && (VLAPIC(v) != NULL) )
+    {
+        rem_ac_timer(&VLAPIC(v)->vlapic_timer);
+        xfree(VLAPIC(v));
     }
 }
 
