@@ -743,6 +743,13 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 			printf("ia64_handle_reflection: handling regNaT fault");
 			vector = IA64_NAT_CONSUMPTION_VECTOR; break;
 		}
+#if 1
+		// pass null pointer dereferences through with no error
+		// but retain debug output for non-zero ifa
+		if (!ifa) {
+			vector = IA64_NAT_CONSUMPTION_VECTOR; break;
+		}
+#endif
 printf("*** NaT fault... attempting to handle as privop\n");
 printf("isr=%p, ifa=%p,iip=%p,ipsr=%p\n",isr,ifa,regs->cr_iip,psr);
 		//regs->eml_unat = 0;  FIXME: DO WE NEED THIS???
