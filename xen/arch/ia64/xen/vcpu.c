@@ -676,6 +676,7 @@ UINT64 vcpu_check_pending_interrupts(VCPU *vcpu)
 	 * event injection without handle. Later guest may throw out
 	 * the event itself.
 	 */
+check_start:
 	if (event_pending(vcpu) && 
 		!test_bit(vcpu->vcpu_info->arch.evtchn_vector,
 			&PSCBX(vcpu, insvc[0])))
@@ -702,6 +703,15 @@ UINT64 vcpu_check_pending_interrupts(VCPU *vcpu)
 //printf("XXXXXXX vcpu_check_pending_interrupts: got bitnum=%p...",bitnum);
 	vector = bitnum+(i*64);
 	mask = 1L << bitnum;
+	/* sanity check for guest timer interrupt */
+	if (vector == (PSCB(vcpu,itv) & 0xff)) {
+		uint64_t now = ia64_get_itc();
+		if (now < PSCBX(vcpu,domain_itm)) {
+			printk("Ooops, pending guest timer before its due\n");
+			PSCBX(vcpu,irr[i]) &= ~mask;
+			goto check_start;
+		}
+	}
 //printf("XXXXXXX vcpu_check_pending_interrupts: got vector=%p...",vector);
 	if (*r >= mask) {
 		// masked by equal inservice
@@ -798,6 +808,13 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 		firsttime[vector]=0;
 	}
 #endif
+	/* if delivering a timer interrupt, remember domain_itm, which
+	 * needs to be done before clearing irr
+	 */
+	if (vector == (PSCB(vcpu,itv) & 0xff)) {
+		PSCBX(vcpu,domain_itm_last) = PSCBX(vcpu,domain_itm);
+	}
+
 	i = vector >> 6;
 	mask = 1L << (vector & 0x3f);
 //printf("ZZZZZZ vcpu_get_ivr: setting insvc mask for vector %ld\n",vector);
@@ -805,10 +822,6 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 	PSCBX(vcpu,irr[i]) &= ~mask;
 	//PSCB(vcpu,pending_interruption)--;
 	*pval = vector;
-	// if delivering a timer interrupt, remember domain_itm
-	if (vector == (PSCB(vcpu,itv) & 0xff)) {
-		PSCBX(vcpu,domain_itm_last) = PSCBX(vcpu,domain_itm);
-	}
 	return IA64_NO_FAULT;
 }
 
