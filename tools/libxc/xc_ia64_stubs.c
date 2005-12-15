@@ -182,18 +182,26 @@ static int load_hob(int xc_handle,uint32_t dom, void *hob_buf);
 
 int xc_ia64_build_hob(int xc_handle, uint32_t dom, unsigned long memsize){
 
-    char   hob_buf[GFW_HOB_SIZE];
+    char   *hob_buf;
+
+    hob_buf = malloc (GFW_HOB_SIZE);
+    if (hob_buf == NULL) {
+        PERROR("Could not allocate hob");
+        return -1;
+    }
 
     if ( build_hob( hob_buf, GFW_HOB_SIZE, memsize<<20) < 0){
+        free (hob_buf);
         PERROR("Could not build hob");
         return -1;
     }
 
     if ( load_hob( xc_handle, dom, hob_buf) <0){
+        free (hob_buf);
         PERROR("Could not load hob");
        return -1;
     }
-
+    free (hob_buf);
     return 0;
 
 }
