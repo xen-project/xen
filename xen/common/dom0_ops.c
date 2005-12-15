@@ -577,6 +577,22 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         }
     }
     break;
+    case DOM0_SETDEBUGGING:
+    {
+        struct domain *d; 
+        ret = -ESRCH;
+        d = find_domain_by_id(op->u.setdebugging.domain);
+        if ( d != NULL )
+        {
+            if ( op->u.setdebugging.enable )
+                set_bit(_DOMF_debugging, &d->domain_flags);
+            else
+                clear_bit(_DOMF_debugging, &d->domain_flags);
+            put_domain(d);
+            ret = 0;
+        }
+    }
+    break;
 
 #ifdef PERF_COUNTERS
     case DOM0_PERFCCONTROL:

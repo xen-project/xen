@@ -393,6 +393,10 @@ extern struct domain *domain_list;
  /* Domain is paused by controller software. */
 #define _DOMF_ctrl_pause       6
 #define DOMF_ctrl_pause        (1UL<<_DOMF_ctrl_pause)
+ /* Domain is being debugged by controller software. */
+#define _DOMF_debugging        7
+#define DOMF_debugging         (1UL<<_DOMF_debugging)
+
 
 static inline int domain_runnable(struct vcpu *v)
 {

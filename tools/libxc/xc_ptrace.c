@@ -345,8 +345,6 @@ xc_ptrace(
     void           *addr = (char *)eaddr;
     void           *data = (char *)edata;
 
-    op.interface_version = DOM0_INTERFACE_VERSION;
-
     cpu = (request != PTRACE_ATTACH) ? domid_tid : 0;
     
     switch ( request )
@@ -434,6 +432,13 @@ xc_ptrace(
                 }
             }
         }
+        if ( request == PTRACE_DETACH )
+        {
+            op.cmd = DOM0_SETDEBUGGING;
+            op.u.setdebugging.domain = current_domid;
+            op.u.setdebugging.enable = 0;
+            retval = do_dom0_op(xc_handle, &op);
+        }
         regs_valid = 0;
         xc_domain_unpause(xc_handle, current_domid > 0 ? current_domid : -current_domid);
         break;
@@ -453,10 +458,15 @@ xc_ptrace(
             printf("domain currently paused\n");
         } else
             retval = xc_domain_pause(xc_handle, current_domid);
-    if (get_online_cpumap(xc_handle, &op.u.getdomaininfo, &cpumap))
-        printf("get_online_cpumap failed\n");
-    if (online_cpumap != cpumap)
-        online_vcpus_changed(cpumap);
+        op.cmd = DOM0_SETDEBUGGING;
+        op.u.setdebugging.domain = current_domid;
+        op.u.setdebugging.enable = 1;
+        retval = do_dom0_op(xc_handle, &op);
+
+        if (get_online_cpumap(xc_handle, &op.u.getdomaininfo, &cpumap))
+            printf("get_online_cpumap failed\n");
+        if (online_cpumap != cpumap)
+            online_vcpus_changed(cpumap);
         break;
 
     case PTRACE_SETFPREGS:

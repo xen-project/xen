@@ -231,11 +231,6 @@ linux_wait (char *status)
   if (myxcwait(xc_handle, current_domid, &w, 0))
       return -1;
   
-  if (w & (DOMFLAGS_SHUTDOWN|DOMFLAGS_DYING)) {
-      *status = 'W';
-      return 0;
-  }
-
   linux_set_inferior();
 
   *status = 'T';

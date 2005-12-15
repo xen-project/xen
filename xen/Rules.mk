@@ -6,7 +6,6 @@ verbose     ?= n
 debug       ?= n
 perfc       ?= n
 perfc_arrays?= n
-domu_debug  ?= n
 crash_debug ?= n
 
 XEN_ROOT=$(BASEDIR)/..
@@ -52,10 +51,6 @@ CFLAGS += -DVERBOSE
 endif
 else
 CFLAGS += -g -DVERBOSE
-endif
-
-ifeq ($(domu_debug),y)
-CFLAGS += -DDOMU_DEBUG
 endif
 
 ifeq ($(crash_debug),y)
