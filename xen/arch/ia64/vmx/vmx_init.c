@@ -133,10 +133,6 @@ vmx_init_env(void)
 	else
 		ASSERT(tmp_base != __vsa_base);
 
-#ifdef XEN_DBL_MAPPING
-	/* Init stub for rr7 switch */
-	vmx_init_double_mapping_stub();
-#endif 
 }
 
 typedef union {
@@ -198,25 +194,6 @@ vmx_create_vp(struct vcpu *v)
 		panic("ia64_pal_vp_create failed. \n");
 }
 
-#ifdef XEN_DBL_MAPPING
-void vmx_init_double_mapping_stub(void)
-{
-	u64 base, psr;
-	extern void vmx_switch_rr7(void);
-
-	base = (u64) &vmx_switch_rr7;
-	base = *((u64*)base);
-
-	psr = ia64_clear_ic();
-	ia64_itr(0x1, IA64_TR_RR7_SWITCH_STUB, XEN_RR7_SWITCH_STUB,
-		 pte_val(pfn_pte(__pa(base) >> PAGE_SHIFT, PAGE_KERNEL)),
-		 RR7_SWITCH_SHIFT);
-	ia64_set_psr(psr);
-	ia64_srlz_i();
-	printk("Add TR mapping for rr7 switch stub, with physical: 0x%lx\n", (u64)(__pa(base)));
-}
-#endif
-
 /* Other non-context related tasks can be done in context switch */
 void
 vmx_save_state(struct vcpu *v)
@@ -229,14 +206,6 @@ vmx_save_state(struct vcpu *v)
 	if (status != PAL_STATUS_SUCCESS)
 		panic("Save vp status failed\n");
 
-#ifdef XEN_DBL_MAPPING
-	/* FIXME: Do we really need purge double mapping for old vcpu?
-	 * Since rid is completely different between prev and next,
-	 * it's not overlap and thus no MCA possible... */
-	dom_rr7 = vmx_vrrtomrr(v, VMX(v, vrr[7]));
-        vmx_purge_double_mapping(dom_rr7, KERNEL_START,
-				 (u64)v->arch.vtlb->ts->vhpt->hash);
-#endif
 
 	/* Need to save KR when domain switch, though HV itself doesn;t
 	 * use them.
@@ -264,15 +233,6 @@ vmx_load_state(struct vcpu *v)
 	if (status != PAL_STATUS_SUCCESS)
 		panic("Restore vp status failed\n");
 
-#ifdef XEN_DBL_MAPPING
-	dom_rr7 = vmx_vrrtomrr(v, VMX(v, vrr[7]));
-	pte_xen = pte_val(pfn_pte((xen_pstart >> PAGE_SHIFT), PAGE_KERNEL));
-	pte_vhpt = pte_val(pfn_pte((__pa(v->arch.vtlb->ts->vhpt->hash) >> PAGE_SHIFT), PAGE_KERNEL));
-	vmx_insert_double_mapping(dom_rr7, KERNEL_START,
-				  (u64)v->arch.vtlb->ts->vhpt->hash,
-				  pte_xen, pte_vhpt);
-#endif
-
 	ia64_set_kr(0, v->arch.arch_vmx.vkr[0]);
 	ia64_set_kr(1, v->arch.arch_vmx.vkr[1]);
 	ia64_set_kr(2, v->arch.arch_vmx.vkr[2]);
@@ -284,25 +244,6 @@ vmx_load_state(struct vcpu *v)
 	/* Guest vTLB is not required to be switched explicitly, since
 	 * anchored in vcpu */
 }
-
-#ifdef XEN_DBL_MAPPING
-/* Purge old double mapping and insert new one, due to rr7 change */
-void
-vmx_change_double_mapping(struct vcpu *v, u64 oldrr7, u64 newrr7)
-{
-	u64 pte_xen, pte_vhpt, vhpt_base;
-
-    vhpt_base = (u64)v->arch.vtlb->ts->vhpt->hash;
-    vmx_purge_double_mapping(oldrr7, KERNEL_START,
-				 vhpt_base);
-
-	pte_xen = pte_val(pfn_pte((xen_pstart >> PAGE_SHIFT), PAGE_KERNEL));
-	pte_vhpt = pte_val(pfn_pte((__pa(vhpt_base) >> PAGE_SHIFT), PAGE_KERNEL));
-	vmx_insert_double_mapping(newrr7, KERNEL_START,
-				  vhpt_base,
-				  pte_xen, pte_vhpt);
-}
-#endif // XEN_DBL_MAPPING
 
 /*
  * Initialize VMX envirenment for guest. Only the 1st vp/vcpu

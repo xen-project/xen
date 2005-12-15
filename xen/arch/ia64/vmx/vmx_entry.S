@@ -373,34 +373,6 @@ vmx_dorfirfi_back:
     br.cond.sptk b0         // call the service
     ;;
 switch_rr7:
-#ifdef XEN_DBL_MAPPING
-// switch rr7 and rr5
-    adds r24=SWITCH_MRR5_OFFSET, r21
-    adds r26=SWITCH_MRR6_OFFSET, r21
-    adds r16=SWITCH_MRR7_OFFSET ,r21
-    movl r25=(5<<61)
-    movl r27=(6<<61)
-    movl r17=(7<<61)
-    ;;
-    ld8 r24=[r24]
-    ld8 r26=[r26]
-    ld8 r16=[r16]
-    ;;
-    mov rr[r25]=r24
-    mov rr[r27]=r26
-    mov rr[r17]=r16
-    ;;
-    srlz.i
-    ;;
-    add r24=SWITCH_MPTA_OFFSET, r21
-    ;;
-    ld8 r24=[r24]
-    ;;
-    mov cr.pta=r24
-    ;;
-    srlz.i
-    ;;
-#endif
 // fall through
 GLOBAL_ENTRY(ia64_vmm_entry)
 /*

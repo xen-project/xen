@@ -125,31 +125,8 @@
  * Note that psr.ic is NOT turned on by this macro.  This is so that
  * we can pass interruption state as arguments to a handler.
  */
-#ifdef XEN_DBL_MAPPING
-#define SAVE_MIN_CHANGE_RR  \
-/*  switch rr7 */       \
-    movl r16=((ia64_rid(IA64_REGION_ID_KERNEL, (7<<61)) << 8) | (IA64_GRANULE_SHIFT << 2)); \
-    movl r17=(7<<61);        \
-    movl r20=((ia64_rid(IA64_REGION_ID_KERNEL, (6<<61)) << 8) | (IA64_GRANULE_SHIFT << 2)); \
-    movl r22=(6<<61);        \
-    movl r18=((ia64_rid(IA64_REGION_ID_KERNEL, (5<<61)) << 8) | (PAGE_SHIFT << 2) | 1);     \
-    movl r23=(5<<61);   \
-    ;;              \
-    mov rr[r17]=r16;             \
-    mov rr[r22]=r20;         \
-    mov rr[r23]=r18;         \
-    ;;      \
-    srlz.i;      \
-    ;;
-
-#else
-
-#define SAVE_MIN_CHANGE_RR
-
-#endif
 
 #define VMX_DO_SAVE_MIN(COVER,SAVE_IFS,EXTRA)                           \
-    SAVE_MIN_CHANGE_RR;      \
     VMX_MINSTATE_GET_CURRENT(r16);  /* M (or M;;I) */                   \
     mov r27=ar.rsc;         /* M */                         \
     mov r20=r1;         /* A */                         \

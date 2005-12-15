@@ -32,13 +32,6 @@ extern void vmx_final_setup_guest(struct vcpu *v);
 extern void vmx_save_state(struct vcpu *v);
 extern void vmx_load_state(struct vcpu *v);
 extern void vmx_setup_platform(struct domain *d, struct vcpu_guest_context *c);
-#ifdef XEN_DBL_MAPPING
-extern vmx_insert_double_mapping(u64,u64,u64,u64,u64);
-extern void vmx_purge_double_mapping(u64, u64, u64);
-extern void vmx_change_double_mapping(struct vcpu *v, u64 oldrr7, u64 newrr7);
-extern void vmx_init_double_mapping_stub(void);
-#endif
-
 extern void vmx_wait_io(void);
 extern void vmx_io_assist(struct vcpu *v);
 

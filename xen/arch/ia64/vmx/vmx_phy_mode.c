@@ -260,7 +260,6 @@ vmx_load_all_rr(VCPU *vcpu)
 			     vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN4])));
 	}
 
-#if 1
 	/* rr567 will be postponed to last point when resuming back to guest */
 	ia64_set_rr((VRN1 << VRN_SHIFT),
 		     vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN1])));
@@ -268,18 +267,15 @@ vmx_load_all_rr(VCPU *vcpu)
 		     vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN2])));
 	ia64_set_rr((VRN3 << VRN_SHIFT),
 		     vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN3])));
-#endif
-#ifndef XEN_DBL_MAPPING
-    extern void * pal_vaddr;
     ia64_set_rr((VRN5 << VRN_SHIFT),
             vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN5])));
     ia64_set_rr((VRN6 << VRN_SHIFT),
             vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN6])));
+    extern void * pal_vaddr;
     vmx_switch_rr7(vmx_vrrtomrr(vcpu,VMX(vcpu, vrr[VRN7])),(void *)vcpu->domain->shared_info,
                 (void *)vcpu->arch.privregs,
                 ( void *)vcpu->arch.vtlb->ts->vhpt->hash, pal_vaddr );
     ia64_set_pta(vcpu->arch.arch_vmx.mpta);
-#endif
 
 	ia64_srlz_d();
 	ia64_set_psr(psr);
