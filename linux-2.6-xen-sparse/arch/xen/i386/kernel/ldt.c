@@ -186,8 +186,7 @@ static int read_default_ldt(void __user * ptr, unsigned long bytecount)
 static int write_ldt(void __user * ptr, unsigned long bytecount, int oldmode)
 {
 	struct mm_struct * mm = current->mm;
-	__u32 entry_1, entry_2, *lp;
-	maddr_t mach_lp;
+	__u32 entry_1, entry_2;
 	int error;
 	struct user_desc ldt_info;
 
@@ -215,9 +214,6 @@ static int write_ldt(void __user * ptr, unsigned long bytecount, int oldmode)
 			goto out_unlock;
 	}
 
-	lp = (__u32 *) ((ldt_info.entry_number << 3) + (char *) mm->context.ldt);
-	mach_lp = arbitrary_virt_to_machine(lp);
-
    	/* Allow LDTs to be cleared by the user. */
    	if (ldt_info.base_addr == 0 && ldt_info.limit == 0) {
 		if (oldmode || LDT_empty(&ldt_info)) {
@@ -234,8 +230,8 @@ static int write_ldt(void __user * ptr, unsigned long bytecount, int oldmode)
 
 	/* Install the new entry ...  */
 install:
-	error = HYPERVISOR_update_descriptor(
-		mach_lp, (u64)entry_1 | ((u64)entry_2<<32));
+	error = write_ldt_entry(mm->context.ldt, ldt_info.entry_number,
+				entry_1, entry_2);
 
 out_unlock:
 	up(&mm->context.sem);

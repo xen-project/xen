@@ -438,6 +438,16 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	balloon_unlock(flags);
 }
 
+#ifdef __i386__
+int write_ldt_entry(void *ldt, int entry, __u32 entry_a, __u32 entry_b)
+{
+	__u32 *lp = (__u32 *)((char *)ldt + entry * 8);
+	maddr_t mach_lp = arbitrary_virt_to_machine(lp);
+	return HYPERVISOR_update_descriptor(
+		mach_lp, (u64)entry_a | ((u64)entry_b<<32));
+}
+#endif
+
 /*
  * Local variables:
  *  c-file-style: "linux"
