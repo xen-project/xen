@@ -315,15 +315,16 @@ static void otherend_changed(struct xenbus_watch *watch,
 static int talk_to_otherend(struct xenbus_device *dev)
 {
 	struct xenbus_driver *drv = to_xenbus_driver(dev->dev.driver);
-	int err;
 
 	free_otherend_watch(dev);
 	free_otherend_details(dev);
 
-	err = drv->read_otherend_details(dev);
-	if (err)
-		return err;
+	return drv->read_otherend_details(dev);
+}
 
+
+static int watch_otherend(struct xenbus_device *dev)
+{
 	return xenbus_watch_path2(dev, dev->otherend, "state",
 				  &dev->otherend_watch, otherend_changed);
 }
@@ -349,14 +350,22 @@ static int xenbus_dev_probe(struct device *_dev)
 		goto fail;
 	}
 
-	err = drv->probe(dev, id);
-	if (err)
-		goto fail;
-
 	err = talk_to_otherend(dev);
 	if (err) {
 		printk(KERN_WARNING
 		       "xenbus_probe: talk_to_otherend on %s failed.\n",
+		       dev->nodename);
+		return err;
+	}
+
+	err = drv->probe(dev, id);
+	if (err)
+		goto fail;
+
+	err = watch_otherend(dev);
+	if (err) {
+		printk(KERN_WARNING
+		       "xenbus_probe: watch_otherend on %s failed.\n",
 		       dev->nodename);
 		return err;
 	}
@@ -823,6 +832,14 @@ static int resume_dev(struct device *dev, void *data)
 		printk(KERN_WARNING
 		       "xenbus: resume (talk_to_otherend) %s failed: %i\n",
 		       dev->bus_id, err);
+		return err;
+	}
+
+	err = watch_otherend(xdev);
+	if (err) {
+		printk(KERN_WARNING
+		       "xenbus_probe: resume (watch_otherend) %s failed: "
+		       "%d.\n", dev->bus_id, err);
 		return err;
 	}
 
