@@ -273,6 +273,7 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
             return 0;
 
+#ifdef CONFIG_IA64_SPLIT_CACHE
 	/* Sync d/i cache conservatively */
 	if (!running_on_sim) {
 	    ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
@@ -280,6 +281,7 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	        panic("PAL CACHE FLUSH failed for domain.\n");
 	    printk("Sync i/d cache for dom0 image SUCC\n");
 	}
+#endif
 
 	if (c->flags & VGCF_VMX_GUEST) {
 	    if (!vmx_enabled) {
