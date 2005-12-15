@@ -34,3 +34,5 @@ try:
     FAIL("Bug #331: Started a DomU with write access to a rw mounted block device")
 except DomainError, e:
     s, o = traceCommand("umount mnt")
+
+domain.destroy()
