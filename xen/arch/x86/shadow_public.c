@@ -1747,6 +1747,24 @@ void shadow_sync_and_drop_references(
     shadow_unlock(d);
 }
 
+void clear_all_shadow_status(struct domain *d)
+{
+    shadow_lock(d);
+    free_shadow_pages(d);
+    free_shadow_ht_entries(d);
+    d->arch.shadow_ht = 
+        xmalloc_array(struct shadow_status, shadow_ht_buckets);
+    if ( d->arch.shadow_ht == NULL ) {
+        printk("clear all shadow status:xmalloc fail\n");
+        domain_crash_synchronous();
+    }
+    memset(d->arch.shadow_ht, 0,
+           shadow_ht_buckets * sizeof(struct shadow_status));
+
+    free_out_of_sync_entries(d);
+    shadow_unlock(d);
+}
+
 /*
  * Local variables:
  * mode: C

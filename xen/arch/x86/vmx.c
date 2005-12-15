@@ -1223,6 +1223,7 @@ static int vmx_set_cr0(unsigned long value)
             }
         }
 
+        clear_all_shadow_status(v->domain);
         if (vmx_assist(v, VMX_ASSIST_INVOKE)) {
             set_bit(VMX_CPU_STATE_ASSIST_ENABLED, &v->arch.arch_vmx.cpu_state);
             __vmread(GUEST_RIP, &eip);

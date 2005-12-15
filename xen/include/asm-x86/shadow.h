@@ -1707,6 +1707,8 @@ static inline void update_pagetables(struct vcpu *v)
     }
 }
 
+void clear_all_shadow_status(struct domain *d);
+
 #if SHADOW_DEBUG
 extern int _check_pagetable(struct vcpu *v, char *s);
 extern int _check_all_pagetables(struct vcpu *v, char *s);
