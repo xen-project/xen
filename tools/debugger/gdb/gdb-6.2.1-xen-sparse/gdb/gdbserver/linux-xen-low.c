@@ -36,11 +36,26 @@
 #include <unistd.h>
 #include <errno.h>
 #include <xenctrl.h>
+#include <thread_db.h>
+#include <xc_ptrace.h>
+
 #define TRACE_ENTER /* printf("enter %s\n", __FUNCTION__) */
 
 long (*myptrace)(int xc_handle, enum __ptrace_request, uint32_t, long, long);
 int (*myxcwait)(int xc_handle, int domain, int *status, int options) ;
 static int xc_handle;
+
+static inline int
+curvcpuid()
+{
+  struct process_info *process;
+  if (current_inferior == NULL)
+      return 0;
+  process = get_thread_process(current_inferior);
+  return (process->thread_known ? process->tid : 0);
+
+}
+
 
 #define DOMFLAGS_DYING     (1<<0) /* Domain is scheduled to die.             */
 #define DOMFLAGS_SHUTDOWN  (1<<2) /* The guest OS has shut down.             */
@@ -48,11 +63,14 @@ static int xc_handle;
 #define DOMFLAGS_BLOCKED   (1<<4) /* Currently blocked pending an event.     */
 #define DOMFLAGS_RUNNING   (1<<5) /* Domain is currently running.            */
 
+
+
 struct inferior_list all_processes;
-static int current_domain;
+static int current_domid;
 static int expect_signal = 0;
 static int signal_to_send = 0; 
 static void linux_resume (struct thread_resume *resume_info);
+static void linux_set_inferior (void);
 
 int debug_threads;
 int using_threads;
@@ -96,7 +114,6 @@ static int use_regsets_p = 1;
    point at the following instruction.  If we continue and hit a
    breakpoint instruction, our PC will point at the breakpoint
    instruction.  */
-#if 0
 static CORE_ADDR
 get_stop_pc (void)
 {
@@ -107,9 +124,9 @@ get_stop_pc (void)
   else
     return stop_pc - the_low_target.decr_pc_after_break;
 }
-#endif
+
 static void *
-add_process (int pid)
+add_process (int pid, long tid)
 {
   struct process_info *process;
 
@@ -118,9 +135,8 @@ add_process (int pid)
 
   process->head.id = pid;
 
-  /* Default to tid == lwpid == pid.  */
-  process->tid = pid;
-  process->lwpid = pid;
+  process->tid = tid;
+  process->lwpid = tid;
 
   add_inferior_to_list (&all_processes, &process->head);
 
@@ -143,23 +159,25 @@ linux_create_inferior (char *program, char **allargs)
 }
 
 int
-linux_attach (int domain)
+linux_attach (int domid)
 {
     struct process_info *new_process;
-    current_domain = domain;
-    if (myptrace (xc_handle, PTRACE_ATTACH, domain, 0, 0) != 0) {
-	fprintf (stderr, "Cannot attach to domain %d: %s (%d)\n", domain,
+    current_domid = domid;
+    /* this is handled for all active vcpus in PTRACE_ATTACH via the thread_create_callback */
+    new_process = (struct process_info *) add_process (domid, curvcpuid());
+    /* Don't ignore the initial SIGSTOP if we just attached to this process.  */
+    /* vcpuid == 0 */
+    add_thread (0, new_process);
+    new_process->stop_expected = 0;
+
+    if (myptrace (xc_handle, PTRACE_ATTACH, domid, 0, 0) != 0) {
+	fprintf (stderr, "Cannot attach to domain %d: %s (%d)\n", domid,
 		 strerror (errno), errno);
 	fflush (stderr);
-	_exit (0177);
+	if (!using_threads)
+	    _exit (0177);
     }
-    
-    new_process = (struct process_info *) add_process (domain);
-    add_thread (domain, new_process);
 
-    /* Don't ignore the initial SIGSTOP if we just attached to this process.  */
-    new_process->stop_expected = 0;
-    
     return 0;
 }
 
@@ -173,20 +191,18 @@ linux_kill_one_process (struct inferior_list_entry *entry)
   myptrace (xc_handle, PTRACE_KILL, pid_of (process), 0, 0);
 }
 
+
 static void
 linux_kill (void)
 {
   for_each_inferior (&all_threads, linux_kill_one_process);
 }
 
-
 static void
 linux_detach_one_process (struct inferior_list_entry *entry)
 {
-  struct thread_info *thread = (struct thread_info *) entry;
-  struct process_info *process = get_thread_process (thread);
 
-  myptrace (xc_handle, PTRACE_DETACH, pid_of (process), 0, 0);
+  myptrace (xc_handle, PTRACE_DETACH, current_domid, 0, 0);
 }
 
 
@@ -212,7 +228,7 @@ static unsigned char
 linux_wait (char *status)
 {
   int w;
-  if (myxcwait(xc_handle, current_domain, &w, 0))
+  if (myxcwait(xc_handle, current_domid, &w, 0))
       return -1;
   
   if (w & (DOMFLAGS_SHUTDOWN|DOMFLAGS_DYING)) {
@@ -220,6 +236,7 @@ linux_wait (char *status)
       return 0;
   }
 
+  linux_set_inferior();
 
   *status = 'T';
   if (expect_signal)
@@ -236,8 +253,10 @@ linux_resume (struct thread_resume *resume_info)
   TRACE_ENTER;
   expect_signal = resume_info->sig;
   for_each_inferior(&all_threads, regcache_invalidate_one);
-
-  myptrace (xc_handle, step ? PTRACE_SINGLESTEP : PTRACE_CONT, current_domain, 0, 0);
+  if (debug_threads)
+    fprintf(stderr, "step: %d\n", step);
+  myptrace (xc_handle, step ? PTRACE_SINGLESTEP : PTRACE_CONT, 
+	    resume_info->thread, 0, 0);
 
 }
 
@@ -261,7 +280,9 @@ regsets_fetch_inferior_registers ()
 	}
 
       buf = malloc (regset->size);
-      res = myptrace (xc_handle, regset->get_request, inferior_pid, 0, (PTRACE_XFER_TYPE)buf);
+      res = myptrace (xc_handle, regset->get_request, 
+		      curvcpuid(),
+		      0, (PTRACE_XFER_TYPE)buf);
       if (res < 0)
 	{
 	  if (errno == EIO)
@@ -313,7 +334,7 @@ regsets_store_inferior_registers ()
 
       buf = malloc (regset->size);
       regset->fill_function (buf);
-      res = myptrace (xc_handle, regset->set_request, inferior_pid, 0, (PTRACE_XFER_TYPE)buf);
+      res = myptrace (xc_handle, regset->set_request, curvcpuid(), 0, (PTRACE_XFER_TYPE)buf);
       if (res < 0)
 	{
 	  if (errno == EIO)
@@ -391,7 +412,7 @@ linux_read_memory (CORE_ADDR memaddr, char *myaddr, int len)
   for (i = 0; i < count; i++, addr += sizeof (PTRACE_XFER_TYPE))
     {
       errno = 0;
-      buffer[i] = myptrace (xc_handle, PTRACE_PEEKTEXT, inferior_pid, (PTRACE_ARG3_TYPE) addr, 0);
+      buffer[i] = myptrace (xc_handle, PTRACE_PEEKTEXT, curvcpuid(), (PTRACE_ARG3_TYPE) addr, 0);
       if (errno)
 	return errno;
     }
@@ -424,13 +445,13 @@ linux_write_memory (CORE_ADDR memaddr, const char *myaddr, int len)
 
   /* Fill start and end extra bytes of buffer with existing memory data.  */
 
-  buffer[0] = myptrace (xc_handle, PTRACE_PEEKTEXT, inferior_pid,
+  buffer[0] = myptrace (xc_handle, PTRACE_PEEKTEXT, curvcpuid(),
 		      (PTRACE_ARG3_TYPE) addr, 0);
 
   if (count > 1)
     {
       buffer[count - 1]
-	= myptrace (xc_handle, PTRACE_PEEKTEXT, inferior_pid,
+	= myptrace (xc_handle, PTRACE_PEEKTEXT, curvcpuid(),
 		  (PTRACE_ARG3_TYPE) (addr + (count - 1)
 				      * sizeof (PTRACE_XFER_TYPE)),
 		  0);
@@ -444,7 +465,8 @@ linux_write_memory (CORE_ADDR memaddr, const char *myaddr, int len)
   for (i = 0; i < count; i++, addr += sizeof (PTRACE_XFER_TYPE))
     {
       errno = 0;
-      myptrace (xc_handle, PTRACE_POKETEXT, inferior_pid, (PTRACE_ARG3_TYPE) addr, buffer[i]);
+      myptrace (xc_handle, PTRACE_POKETEXT, curvcpuid(), 
+		(PTRACE_ARG3_TYPE) addr, buffer[i]);
       if (errno)
 	return errno;
     }
@@ -455,9 +477,11 @@ linux_write_memory (CORE_ADDR memaddr, const char *myaddr, int len)
 static void
 linux_look_up_symbols (void)
 {
-#if 0
+  if (using_threads) 
+    return;
+
   using_threads = thread_db_init ();
-#endif
+
 }
 
 static void
@@ -535,6 +559,7 @@ linux_init_signals ()
 void
 initialize_low (void)
 {
+  using_threads = 0;
   xc_handle = xc_interface_open();
   set_target_ops (&linux_xen_target_ops);
   set_breakpoint_data (the_low_target.breakpoint,
@@ -548,5 +573,122 @@ initialize_low (void)
       myptrace = xc_ptrace;
       myxcwait = xc_waitdomain;
   }
+  using_threads = thread_db_init ();
 
 }
+
+
+static void
+thread_create_callback(long vcpuid)
+{
+  struct thread_info *inferior;
+  struct process_info *process;
+
+  /*  If we are attaching to our first thread, things are a little
+   *  different.  
+   */
+  if (all_threads.head == all_threads.tail)
+    {
+      inferior = (struct thread_info *) all_threads.head;
+      process = get_thread_process (inferior);
+      if (process->thread_known == 0)
+	{
+	  /* Switch to indexing the threads list by TID.  */
+	  change_inferior_id (&all_threads, vcpuid);
+	  goto found;
+	}
+    }
+  if (debug_threads)
+    fprintf (stderr, "looking up thread %ld\n",
+	     vcpuid);
+  inferior = (struct thread_info *) find_inferior_id (&all_threads,
+						      vcpuid);
+  /* if vcpu alread registered - do nothing */
+  if (inferior != NULL) 
+    return;
+
+  if (debug_threads)
+    fprintf (stderr, "Attaching to thread %ld\n",
+	     vcpuid);
+
+  process = add_process(current_domid, vcpuid);
+
+  add_thread(vcpuid, process);
+  inferior = (struct thread_info *) find_inferior_id (&all_threads,
+						      vcpuid);
+  if (inferior == NULL)
+    {
+      warning ("Could not attach to thread %ld\n",
+	       vcpuid);
+      return;
+    }
+
+
+found:
+  if (debug_threads)
+    fprintf (stderr, "notifying of new thread %ld\n",
+	     vcpuid);
+  new_thread_notify (vcpuid);
+
+  process->tid = vcpuid;
+  process->lwpid = vcpuid;
+
+  process->thread_known = 1;
+}
+
+static void
+thread_death_callback(long vcpuid)
+{
+    if (debug_threads)
+      fprintf (stderr, "Buuurp...! CPU down event.\n");
+}
+
+int
+thread_db_init(void)
+{
+  debug_threads = 0;
+  xc_register_event_handler(thread_create_callback, TD_CREATE);
+  xc_register_event_handler(thread_death_callback, TD_DEATH);
+  return 1;
+}
+
+/* XXX GAG ME */
+static int breakpoint_found;
+static void
+set_breakpoint_inferior (struct inferior_list_entry *entry)
+{
+  struct thread_info *thread = (struct thread_info *) entry;
+  struct thread_info *saved_inferior = current_inferior;
+  CORE_ADDR eip;
+  unsigned char buf[2] = {0, 0};
+  current_inferior = thread;
+  if (!breakpoint_found) {
+    eip = get_stop_pc();
+    linux_read_memory(eip, buf, 1);
+    if (buf[0] == 0xcc) {
+      breakpoint_found = 1;
+      return;
+    }
+  } else if (breakpoint_found == 2) {
+    if (get_thread_process (current_inferior)->stepping) {
+      printf("stepping\n");
+      breakpoint_found = 1;
+      return;
+    } 
+  }
+  current_inferior = saved_inferior;
+
+
+}
+
+static void
+linux_set_inferior (void)
+{
+  breakpoint_found = 0;
+  for_each_inferior (&all_threads, set_breakpoint_inferior);
+  if (!breakpoint_found) {
+    breakpoint_found = 2;
+    for_each_inferior (&all_threads, set_breakpoint_inferior);
+  }
+}
+

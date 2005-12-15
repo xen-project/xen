@@ -94,25 +94,12 @@ typedef struct xc_core_header {
 } xc_core_header_t;
 
 
-long xc_ptrace(
-    int xc_handle,
-    enum __ptrace_request request, 
-    uint32_t  domid,
-    long addr, 
-    long data);
-
 long xc_ptrace_core(
     int xc_handle,
     enum __ptrace_request request, 
     uint32_t domid, 
     long addr, 
     long data);
-
-int xc_waitdomain(
-    int xc_handle,
-    int domain, 
-    int *status, 
-    int options);
 
 int xc_waitdomain_core(
     int xc_handle,
@@ -219,6 +206,20 @@ int xc_domain_getinfo(int xc_handle,
                       unsigned int max_doms,
                       xc_dominfo_t *info);
 
+
+/**
+ * This function will set the vcpu context for the specified domain.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm domid the domain to set the vcpu context for
+ * @parm vcpu the vcpu number for the context
+ * @parm ctxt pointer to the the cpu context with the values to set
+ * @return the number of domains enumerated or -1 on error
+ */
+int xc_domain_setinfo(int xc_handle,
+                      uint32_t domid,
+                      uint32_t vcpu,
+                      vcpu_guest_context_t *ctxt);
 /**
  * This function will return information about one or more domains, using a
  * single hypercall.  The domain information will be stored into the supplied
