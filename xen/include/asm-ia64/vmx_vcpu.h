@@ -112,7 +112,7 @@ extern int vmx_check_pending_irq(VCPU *vcpu);
 extern void guest_write_eoi(VCPU *vcpu);
 extern uint64_t guest_read_vivr(VCPU *vcpu);
 extern void vmx_inject_vhpi(VCPU *vcpu, u8 vec);
-extern void vmx_vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector);
+extern int vmx_vcpu_pend_interrupt(VCPU *vcpu, uint8_t vector);
 extern struct virutal_platform_def *vmx_vcpu_get_plat(VCPU *vcpu);
 extern void memread_p(VCPU *vcpu, u64 *src, u64 *dest, size_t s);
 extern void memread_v(VCPU *vcpu, thash_data_t *vtlb, u64 *src, u64 *dest, size_t s);
@@ -474,4 +474,7 @@ vmx_vrrtomrr(VCPU *v, unsigned long val)
 #endif 
 
 }
+
+#define check_work_pending(v)	\
+    (event_pending((v)) || ((v)->arch.irq_new_pending))
 #endif

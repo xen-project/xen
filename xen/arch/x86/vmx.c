@@ -503,6 +503,8 @@ static void vmx_do_no_device_fault(void)
     __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
 }
 
+/* Reserved bits: [31:15], [12:11], [9], [6], [2:1] */
+#define VMX_VCPU_CPUID_L1_RESERVED 0xffff9a46 
 
 static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
 {
@@ -537,6 +539,7 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
         }
 
         /* Unsupportable for virtualised CPUs. */
+        ecx &= ~VMX_VCPU_CPUID_L1_RESERVED; /* mask off reserved bits */
         clear_bit(X86_FEATURE_VMXE & 31, &ecx);
         clear_bit(X86_FEATURE_MWAIT & 31, &ecx);
     }
@@ -1091,11 +1094,21 @@ static int vmx_set_cr0(unsigned long value)
     unsigned long eip;
     int paging_enabled;
     unsigned long vm_entry_value;
+    unsigned long old_cr0;
 
     /*
      * CR0: We don't want to lose PE and PG.
      */
-    paging_enabled = vmx_paging_enabled(v);
+    __vmread_vcpu(v, CR0_READ_SHADOW, &old_cr0);
+    paging_enabled = (old_cr0 & X86_CR0_PE) && (old_cr0 & X86_CR0_PG);
+    /* If OS don't use clts to clear TS bit...*/
+    if((old_cr0 & X86_CR0_TS) && !(value & X86_CR0_TS))
+    {
+            clts();
+            setup_fpu(v);
+    }
+
+
     __vmwrite(GUEST_CR0, value | X86_CR0_PE | X86_CR0_PG | X86_CR0_NE);
     __vmwrite(CR0_READ_SHADOW, value);
 
