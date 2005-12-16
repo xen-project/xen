@@ -544,6 +544,13 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
         clear_bit(X86_FEATURE_VMXE & 31, &ecx);
         clear_bit(X86_FEATURE_MWAIT & 31, &ecx);
     }
+#ifdef __i386__
+    else if ( input == 0x80000001 )
+    {
+        /* Mask feature for Intel ia32e or AMD long mode. */
+        clear_bit(X86_FEATURE_LM & 31, &edx);
+    }
+#endif
 
     regs->eax = (unsigned long) eax;
     regs->ebx = (unsigned long) ebx;
