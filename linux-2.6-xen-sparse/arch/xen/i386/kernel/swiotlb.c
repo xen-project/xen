@@ -24,6 +24,7 @@
 #include <asm/io.h>
 #include <asm/pci.h>
 #include <asm/dma.h>
+#include <asm/uaccess.h>
 #include <asm-xen/xen-public/memory.h>
 
 #define OFFSET(val,align) ((unsigned long)((val) & ( (align) - 1)))
@@ -201,6 +202,12 @@ swiotlb_init(void)
 		printk(KERN_INFO "Software IO TLB disabled\n");
 }
 
+/*
+ * We use __copy_to_user to transfer to the host buffer because the buffer
+ * may be mapped read-only (e.g, in blkback driver) but lower-level
+ * drivers map the buffer for DMA_BIDIRECTIONAL access. This causes an
+ * unnecessary copy from the aperture to the host buffer, and a page fault.
+ */
 static void
 __sync_single(struct phys_addr buffer, char *dma_addr, size_t size, int dir)
 {
@@ -214,9 +221,11 @@ __sync_single(struct phys_addr buffer, char *dma_addr, size_t size, int dir)
 			kmp  = kmap_atomic(buffer.page, KM_SWIOTLB);
 			dev  = dma_addr + size - len;
 			host = kmp + buffer.offset;
-			memcpy((dir == DMA_FROM_DEVICE) ? host : dev,
-			       (dir == DMA_FROM_DEVICE) ? dev : host,
-			       bytes);
+			if (dir == DMA_FROM_DEVICE) {
+				if (__copy_to_user(host, dev, bytes))
+					return; /* inaccessible */
+			} else
+				memcpy(dev, host, bytes);
 			kunmap_atomic(kmp, KM_SWIOTLB);
 			len -= bytes;
 			buffer.page++;
@@ -225,9 +234,10 @@ __sync_single(struct phys_addr buffer, char *dma_addr, size_t size, int dir)
 	} else {
 		char *host = (char *)phys_to_virt(
 			page_to_pseudophys(buffer.page)) + buffer.offset;
-		if (dir == DMA_FROM_DEVICE)
-			memcpy(host, dma_addr, size);
-		else if (dir == DMA_TO_DEVICE)
+		if (dir == DMA_FROM_DEVICE) {
+			if (__copy_to_user(host, dma_addr, size))
+				return; /* inaccessible */
+		} else if (dir == DMA_TO_DEVICE)
 			memcpy(dma_addr, host, size);
 	}
 }
