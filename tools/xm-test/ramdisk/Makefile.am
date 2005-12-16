@@ -45,7 +45,7 @@ initrd.img: $(XMTEST_VER_IMG)
 
 disk.img: $(XMTEST_VER_IMG)
 	chmod a+x $(VMX_SCRIPT)
-	$(VMX_SCRIPT) -r $(XMTEST_VER_IMG) -i disk.img
+	$(VMX_SCRIPT) -r $(XMTEST_VER_IMG)
 
 existing:
 	@[ -f $(XMTEST_VER_IMG) ] && ln -sf $(XMTEST_VER_IMG) initrd.img || \
