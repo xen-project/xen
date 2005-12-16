@@ -4,9 +4,9 @@
 # Xend configuration file.
 #
 
-# This example configuration is appropriate for an installation that trusts
-# only localhost connections, and is otherwise fully functional, with a
-# bridged network configuration.
+# This example configuration is appropriate for an installation that 
+# utilizes a bridged network configuration. Access to xend via http
+# is disabled.  
 
 # Commented out entries show the default for that entry, unless otherwise
 # specified.
@@ -15,7 +15,6 @@
 #(loglevel DEBUG)
 
 #(xend-http-server no)
-(xend-http-server yes)
 #(xend-unix-server yes)
 #(xend-relocation-server no)
 (xend-relocation-server yes)
@@ -34,7 +33,7 @@
 # Specifying 'localhost' prevents remote connections.
 # Specifying the empty string '' (the default) allows all connections.
 #(xend-address '')
-(xend-address localhost)
+#(xend-address localhost)
 
 # Address xend should listen on for relocation-socket connections, if
 # xend-relocation-server is set.
