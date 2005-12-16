@@ -55,6 +55,26 @@ you should not attempt to use a ramdisk from a previous minor version
 of xm-test (i.e., don't use a ramdisk from 0.4.0 with 0.5.0.  0.5.0
 should work for 0.5.3 though)
 
+If you'd like to build and run this with hardware virtual machine assist
+(HVM) support to test fully virtualized disk images on VMX hardware, 
+please add the --enable-vmx-support option to configure:
+
+  # ./autogen
+  # ./configure --enable-vmx-support
+  # make
+
+The ramdisk/bin/create_disk_image script, which builds the full virt
+disk.img, requires Lilo 22.7+ to be installed on the system. Lilo is 
+used to install the bootloader on the disk.img.
+
+If HVM / VMX support is enabled, the ramdisk/bin/create_disk_image script
+will be run to create a full virt disk.img in the ramdisk directory. The
+script, by default, will look in /boot for the first non-Xen kernel it
+runs across. If you wish to use a different kernel or the script fails
+to find a kernel, please run the script manually to make a disk.img 
+using the -k option. Xm-test will look for disk.img in the ramdisk
+directory when run by default.
+
 
 Running
 =======
