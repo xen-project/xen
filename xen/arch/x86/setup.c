@@ -264,7 +264,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
     physaddr_t s, e;
-    int i, e820_raw_nr = 0, bytes = 0;
+    int i, e820_warn = 0, e820_raw_nr = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,
         .parity    = 'n',
@@ -313,6 +313,26 @@ void __init __start_xen(multiboot_info_t *mbi)
         while ( bytes < mbi->mmap_length )
         {
             memory_map_t *map = __va(mbi->mmap_addr + bytes);
+
+            /*
+             * This is a gross workaround for a BIOS/GRUB bug. GRUB does
+             * not write e820 map entries into pre-zeroed memory. This is
+             * okay if the BIOS fills in all fields of the map entry, but
+             * some broken BIOSes do not bother to write the high word of
+             * the length field if the length is smaller than 4GB. We
+             * detect and fix this by flagging sections below 4GB that
+             * appear to be larger than 4GB in size. We disable this check
+             * for mbootpack and syslinux (which we can detect because they
+             * place the mmap_addr list above 1MB in memory).
+             */
+            if ( (mbi->mmap_addr < 0x100000) &&
+                 (map->base_addr_high == 0) &&
+                 (map->length_high != 0) )
+            {
+                e820_warn = 1;
+                map->length_high = 0;
+            }
+
             e820_raw[e820_raw_nr].addr = 
                 ((u64)map->base_addr_high << 32) | (u64)map->base_addr_low;
             e820_raw[e820_raw_nr].size = 
@@ -320,6 +340,7 @@ void __init __start_xen(multiboot_info_t *mbi)
             e820_raw[e820_raw_nr].type = 
                 (map->type > E820_SHARED_PAGE) ? E820_RESERVED : map->type;
             e820_raw_nr++;
+
             bytes += map->size + 4;
         }
     }
@@ -338,6 +359,10 @@ void __init __start_xen(multiboot_info_t *mbi)
         printk("FATAL ERROR: Bootloader provided no memory information.\n");
         for ( ; ; ) ;
     }
+
+    if ( e820_warn )
+        printk("WARNING: Buggy e820 map detected and fixed "
+               "(truncated length fields).\n");
 
     max_page = init_e820(e820_raw, &e820_raw_nr);
 
