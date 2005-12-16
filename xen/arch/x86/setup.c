@@ -315,19 +315,15 @@ void __init __start_xen(multiboot_info_t *mbi)
             memory_map_t *map = __va(mbi->mmap_addr + bytes);
 
             /*
-             * This is a gross workaround for a BIOS/GRUB bug. GRUB does
+             * This is a gross workaround for a BIOS bug. Some bootloaders do
              * not write e820 map entries into pre-zeroed memory. This is
              * okay if the BIOS fills in all fields of the map entry, but
              * some broken BIOSes do not bother to write the high word of
              * the length field if the length is smaller than 4GB. We
              * detect and fix this by flagging sections below 4GB that
-             * appear to be larger than 4GB in size. We disable this check
-             * for mbootpack and syslinux (which we can detect because they
-             * place the mmap_addr list above 1MB in memory).
+             * appear to be larger than 4GB in size.
              */
-            if ( (mbi->mmap_addr < 0x100000) &&
-                 (map->base_addr_high == 0) &&
-                 (map->length_high != 0) )
+            if ( (map->base_addr_high == 0) && (map->length_high != 0) )
             {
                 e820_warn = 1;
                 map->length_high = 0;
