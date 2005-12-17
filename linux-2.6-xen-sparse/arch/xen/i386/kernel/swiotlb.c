@@ -223,7 +223,7 @@ __sync_single(struct phys_addr buffer, char *dma_addr, size_t size, int dir)
 			host = kmp + buffer.offset;
 			if (dir == DMA_FROM_DEVICE) {
 				if (__copy_to_user(host, dev, bytes))
-					return; /* inaccessible */
+					/* inaccessible */;
 			} else
 				memcpy(dev, host, bytes);
 			kunmap_atomic(kmp, KM_SWIOTLB);
@@ -236,7 +236,7 @@ __sync_single(struct phys_addr buffer, char *dma_addr, size_t size, int dir)
 			page_to_pseudophys(buffer.page)) + buffer.offset;
 		if (dir == DMA_FROM_DEVICE) {
 			if (__copy_to_user(host, dma_addr, size))
-				return; /* inaccessible */
+				/* inaccessible */;
 		} else if (dir == DMA_TO_DEVICE)
 			memcpy(dma_addr, host, size);
 	}
