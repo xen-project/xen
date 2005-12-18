@@ -358,12 +358,17 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_GETDOMAININFO:
     { 
         struct domain *d;
+        domid_t dom;
+
+        dom = op->u.getdomaininfo.domain;
+        if ( dom == DOMID_SELF )
+            dom = current->domain->domain_id;
 
         read_lock(&domlist_lock);
 
         for_each_domain ( d )
         {
-            if ( d->domain_id >= op->u.getdomaininfo.domain )
+            if ( d->domain_id >= dom )
                 break;
         }
 
