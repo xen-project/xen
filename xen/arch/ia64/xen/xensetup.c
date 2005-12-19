@@ -191,7 +191,7 @@ void start_kernel(void)
     firsthole_start = 0;
     efi_memmap_walk(xen_find_first_hole, &firsthole_start);
 
-    if (ia64_boot_param->domain_start == 0
+    if (running_on_sim || ia64_boot_param->domain_start == 0
 	|| ia64_boot_param->domain_size == 0) {
 	    /* This is possible only with the old elilo, which does not support
 	       a vmm.  Fix now, and continue without initrd.  */
