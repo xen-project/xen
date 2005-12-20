@@ -238,8 +238,8 @@ __gnttab_map_grant_ref(
 
         if ( unlikely(!pfn_valid(frame)) ||
              unlikely(!((dev_hst_ro_flags & GNTMAP_readonly) ?
-                        get_page(&frame_table[frame], rd) :
-                        get_page_and_type(&frame_table[frame], rd,
+                        get_page(pfn_to_page(frame), rd) :
+                        get_page_and_type(pfn_to_page(frame), rd,
                                           PGT_writable_page))) )
         {
             clear_bit(_GTF_writing, &sha->flags);
@@ -301,7 +301,7 @@ __gnttab_map_grant_ref(
                 sflags = prev_sflags;
             }
 
-            if ( unlikely(!get_page_type(&frame_table[frame],
+            if ( unlikely(!get_page_type(pfn_to_page(frame),
                                          PGT_writable_page)) )
             {
                 clear_bit(_GTF_writing, &sha->flags);
@@ -347,14 +347,14 @@ __gnttab_map_grant_ref(
                 if ( (act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) == 0 )
                 {
                     clear_bit(_GTF_writing, &sha->flags);
-                    put_page_type(&frame_table[frame]);
+                    put_page_type(pfn_to_page(frame));
                 }
             }
 
             if ( act->pin == 0 )
             {
                 clear_bit(_GTF_reading, &sha->flags);
-                put_page(&frame_table[frame]);
+                put_page(pfn_to_page(frame));
             }
 
             spin_unlock(&rd->grant_table->lock);
@@ -500,14 +500,14 @@ __gnttab_unmap_grant_ref(
          !(flags & GNTMAP_readonly) )
     {
         clear_bit(_GTF_writing, &sha->flags);
-        put_page_type(&frame_table[frame]);
+        put_page_type(pfn_to_page(frame));
     }
 
     if ( act->pin == 0 )
     {
         act->frame = 0xdeadbeef;
         clear_bit(_GTF_reading, &sha->flags);
-        put_page(&frame_table[frame]);
+        put_page(pfn_to_page(frame));
     }
 
  unmap_out:
@@ -691,7 +691,7 @@ gnttab_transfer(
         }
 
         /* Check the passed page frame for basic validity. */
-        page = &frame_table[gop.mfn];
+        page = pfn_to_page(gop.mfn);
         if ( unlikely(!pfn_valid(gop.mfn) || IS_XEN_HEAP_FRAME(page)) )
         { 
             DPRINTK("gnttab_transfer: out-of-range or xen frame %lx\n",
@@ -1016,14 +1016,14 @@ gnttab_release_mappings(
             if ( (act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0 )
             {
                 clear_bit(_GTF_writing, &sha->flags);
-                put_page_type(&frame_table[act->frame]);
+                put_page_type(pfn_to_page(act->frame));
             }
         }
 
         if ( act->pin == 0 )
         {
             clear_bit(_GTF_reading, &sha->flags);
-            put_page(&frame_table[act->frame]);
+            put_page(pfn_to_page(act->frame));
         }
 
         spin_unlock(&rd->grant_table->lock);

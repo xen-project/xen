@@ -177,10 +177,11 @@ void subarch_init_memory(struct domain *dom_xen)
             idle_pg_table_l2[l2_linear_offset(RDWR_MPT_VIRT_START) + i]);
         for ( j = 0; j < L2_PAGETABLE_ENTRIES; j++ )
         {
-            frame_table[m2p_start_mfn+j].count_info = PGC_allocated | 1;
+            struct pfn_info *page = pfn_to_page(m2p_start_mfn + j);
+            page->count_info = PGC_allocated | 1;
             /* Ensure it's only mapped read-only by domains. */
-            frame_table[m2p_start_mfn+j].u.inuse.type_info = PGT_gdt_page | 1;
-            page_set_owner(&frame_table[m2p_start_mfn+j], dom_xen);
+            page->u.inuse.type_info = PGT_gdt_page | 1;
+            page_set_owner(page, dom_xen);
         }
     }
 }

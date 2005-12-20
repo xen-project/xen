@@ -405,7 +405,7 @@ int construct_dom0(struct domain *d,
         *l1tab = l1e_from_pfn(mfn, L1_PROT);
         l1tab++;
         
-        page = &frame_table[mfn];
+        page = pfn_to_page(mfn);
         if ( !get_page_and_type(page, d, PGT_writable_page) )
             BUG();
 
@@ -418,7 +418,7 @@ int construct_dom0(struct domain *d,
     l1tab += l1_table_offset(vpt_start);
     for ( count = 0; count < nr_pt_pages; count++ ) 
     {
-        page = &frame_table[l1e_get_pfn(*l1tab)];
+        page = pfn_to_page(l1e_get_pfn(*l1tab));
         if ( !opt_dom0_shadow )
             l1e_remove_flags(*l1tab, _PAGE_RW);
         else
@@ -548,7 +548,7 @@ int construct_dom0(struct domain *d,
         *l1tab = l1e_from_pfn(mfn, L1_PROT);
         l1tab++;
 
-        page = &frame_table[mfn];
+        page = pfn_to_page(mfn);
         if ( (page->u.inuse.type_info == 0) &&
              !get_page_and_type(page, d, PGT_writable_page) )
             BUG();
@@ -567,7 +567,7 @@ int construct_dom0(struct domain *d,
     for ( count = 0; count < nr_pt_pages; count++ ) 
     {
         l1e_remove_flags(*l1tab, _PAGE_RW);
-        page = &frame_table[l1e_get_pfn(*l1tab)];
+        page = pfn_to_page(l1e_get_pfn(*l1tab));
 
         /* Read-only mapping + PGC_allocated + page-table page. */
         page->count_info         = PGC_allocated | 3;

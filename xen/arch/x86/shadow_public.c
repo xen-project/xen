@@ -168,14 +168,14 @@ free_shadow_tables(struct domain *d, unsigned long smfn, u32 level)
 #if CONFIG_PAGING_LEVELS >=3
     if ( d->arch.ops->guest_paging_levels == PAGING_L2 )
     {
-        struct pfn_info *page = &frame_table[smfn];
+        struct pfn_info *page = pfn_to_page(smfn);
         for ( i = 0; i < PDP_ENTRIES; i++ )
         {
             if ( entry_get_flags(ple[i]) & _PAGE_PRESENT )
                 free_fake_shadow_l2(d,entry_get_pfn(ple[i]));
         }
 
-        page = &frame_table[entry_get_pfn(ple[0])];
+        page = pfn_to_page(entry_get_pfn(ple[0]));
         free_domheap_pages(page, SL2_ORDER);
         unmap_domain_page(ple);
     }
@@ -208,7 +208,7 @@ free_shadow_tables(struct domain *d, unsigned long smfn, u32 level)
                     break;
                 if ( level == PAGING_L2 )
                 {
-                    struct pfn_info *page = &frame_table[smfn]; 
+                    struct pfn_info *page = pfn_to_page(smfn);
                     if ( is_xen_l2_slot(page->u.inuse.type_info, i) )
                         continue;
                 }
@@ -299,7 +299,7 @@ void free_monitor_pagetable(struct vcpu *v)
      */
     mfn = pagetable_get_pfn(v->arch.monitor_table);
     unmap_domain_page(v->arch.monitor_vtable);
-    free_domheap_page(&frame_table[mfn]);
+    free_domheap_page(pfn_to_page(mfn));
 
     v->arch.monitor_table = mk_pagetable(0);
     v->arch.monitor_vtable = 0;
@@ -394,7 +394,7 @@ void free_monitor_pagetable(struct vcpu *v)
      */
     mfn = pagetable_get_pfn(v->arch.monitor_table);
     unmap_domain_page(v->arch.monitor_vtable);
-    free_domheap_page(&frame_table[mfn]);
+    free_domheap_page(pfn_to_page(mfn));
 
     v->arch.monitor_table = mk_pagetable(0);
     v->arch.monitor_vtable = 0;
@@ -411,7 +411,7 @@ shadow_free_snapshot(struct domain *d, struct out_of_sync_entry *entry)
 
     // Clear the out_of_sync bit.
     //
-    clear_bit(_PGC_out_of_sync, &frame_table[entry->gmfn].count_info);
+    clear_bit(_PGC_out_of_sync, &pfn_to_page(entry->gmfn)->count_info);
 
     // XXX Need to think about how to protect the domain's
     // information less expensively.
@@ -428,7 +428,7 @@ release_out_of_sync_entry(struct domain *d, struct out_of_sync_entry *entry)
 {
     struct pfn_info *page;
 
-    page = &frame_table[entry->gmfn];
+    page = pfn_to_page(entry->gmfn);
         
     // Decrement ref count of guest & shadow pages
     //
@@ -501,11 +501,11 @@ shadow_demote(struct domain *d, unsigned long gpfn, unsigned long gmfn)
     if ( !shadow_mode_refcounts(d) )
         return;
 
-    ASSERT(frame_table[gmfn].count_info & PGC_page_table);
+    ASSERT(pfn_to_page(gmfn)->count_info & PGC_page_table);
 
     if ( shadow_max_pgtable_type(d, gpfn, NULL) == PGT_none )
     {
-        clear_bit(_PGC_page_table, &frame_table[gmfn].count_info);
+        clear_bit(_PGC_page_table, &pfn_to_page(gmfn)->count_info);
 
         if ( page_out_of_sync(pfn_to_page(gmfn)) )
         {
@@ -600,7 +600,7 @@ void free_fake_shadow_l2(struct domain *d, unsigned long smfn)
 
 void free_shadow_page(unsigned long smfn)
 {
-    struct pfn_info *page = &frame_table[smfn];
+    struct pfn_info *page = pfn_to_page(smfn);
 
     unsigned long gmfn = page->u.inuse.type_info & PGT_mfn_mask;
     struct domain *d = page_get_owner(pfn_to_page(gmfn));
@@ -1067,8 +1067,8 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         {
             // external guests provide their own memory for their P2M maps.
             //
-            ASSERT( d == page_get_owner(
-                &frame_table[pagetable_get_pfn(d->arch.phys_table)]) );
+            ASSERT(d == page_get_owner(pfn_to_page(pagetable_get_pfn(
+                d->arch.phys_table))));
         }
     }
 
@@ -1643,7 +1643,7 @@ static u32 remove_all_access_in_page(
     int i;
     u32 count = 0;
     int is_l1_shadow =
-        ((frame_table[l1mfn].u.inuse.type_info & PGT_type_mask) ==
+        ((pfn_to_page(l1mfn)->u.inuse.type_info & PGT_type_mask) ==
          PGT_l1_shadow);
 
     match = l1e_from_pfn(forbidden_gmfn, flags);
@@ -1660,7 +1660,7 @@ static u32 remove_all_access_in_page(
         if ( is_l1_shadow )
             shadow_put_page_from_l1e(ol2e, d);
         else /* must be an hl2 page */
-            put_page(&frame_table[forbidden_gmfn]);
+            put_page(pfn_to_page(forbidden_gmfn));
     }
 
     unmap_domain_page(pl1e);

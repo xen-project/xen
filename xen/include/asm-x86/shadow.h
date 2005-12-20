@@ -493,9 +493,9 @@ static inline void __mark_dirty(struct domain *d, unsigned long mfn)
         SH_VLOG("mark_dirty OOR! mfn=%x pfn=%lx max=%x (dom %p)",
                mfn, pfn, d->arch.shadow_dirty_bitmap_size, d);
         SH_VLOG("dom=%p caf=%08x taf=%" PRtype_info, 
-               page_get_owner(&frame_table[mfn]),
-               frame_table[mfn].count_info, 
-               frame_table[mfn].u.inuse.type_info );
+                page_get_owner(pfn_to_page(mfn)),
+                pfn_to_page(mfn)->count_info, 
+                pfn_to_page(mfn)->u.inuse.type_info );
     }
 #endif
 }
@@ -648,20 +648,20 @@ get_shadow_ref(unsigned long smfn)
 
     ASSERT(pfn_valid(smfn));
 
-    x = frame_table[smfn].count_info;
+    x = pfn_to_page(smfn)->count_info;
     nx = x + 1;
 
     if ( unlikely(nx == 0) )
     {
         printk("get_shadow_ref overflow, gmfn=%" PRtype_info  " smfn=%lx\n",
-               frame_table[smfn].u.inuse.type_info & PGT_mfn_mask,
+               pfn_to_page(smfn)->u.inuse.type_info & PGT_mfn_mask,
                smfn);
         BUG();
     }
     
     // Guarded by the shadow lock...
     //
-    frame_table[smfn].count_info = nx;
+    pfn_to_page(smfn)->count_info = nx;
 
     return 1;
 }
@@ -678,7 +678,7 @@ put_shadow_ref(unsigned long smfn)
 
     ASSERT(pfn_valid(smfn));
 
-    x = frame_table[smfn].count_info;
+    x = pfn_to_page(smfn)->count_info;
     nx = x - 1;
 
     if ( unlikely(x == 0) )
@@ -686,14 +686,14 @@ put_shadow_ref(unsigned long smfn)
         printk("put_shadow_ref underflow, smfn=%lx oc=%08x t=%" 
                PRtype_info "\n",
                smfn,
-               frame_table[smfn].count_info,
-               frame_table[smfn].u.inuse.type_info);
+               pfn_to_page(smfn)->count_info,
+               pfn_to_page(smfn)->u.inuse.type_info);
         BUG();
     }
 
     // Guarded by the shadow lock...
     //
-    frame_table[smfn].count_info = nx;
+    pfn_to_page(smfn)->count_info = nx;
 
     if ( unlikely(nx == 0) )
     {
@@ -704,9 +704,9 @@ put_shadow_ref(unsigned long smfn)
 static inline void
 shadow_pin(unsigned long smfn)
 {
-    ASSERT( !(frame_table[smfn].u.inuse.type_info & PGT_pinned) );
+    ASSERT( !(pfn_to_page(smfn)->u.inuse.type_info & PGT_pinned) );
 
-    frame_table[smfn].u.inuse.type_info |= PGT_pinned;
+    pfn_to_page(smfn)->u.inuse.type_info |= PGT_pinned;
     if ( unlikely(!get_shadow_ref(smfn)) )
         BUG();
 }
@@ -714,9 +714,9 @@ shadow_pin(unsigned long smfn)
 static inline void
 shadow_unpin(unsigned long smfn)
 {
-    ASSERT( (frame_table[smfn].u.inuse.type_info & PGT_pinned) );
+    ASSERT( (pfn_to_page(smfn)->u.inuse.type_info & PGT_pinned) );
 
-    frame_table[smfn].u.inuse.type_info &= ~PGT_pinned;
+    pfn_to_page(smfn)->u.inuse.type_info &= ~PGT_pinned;
     put_shadow_ref(smfn);
 }
 
@@ -732,9 +732,9 @@ static inline void set_guest_back_ptr(
 
         ASSERT(shadow_lock_is_acquired(d));
         gmfn = l1e_get_pfn(spte);
-        frame_table[gmfn].tlbflush_timestamp = smfn;
-        frame_table[gmfn].u.inuse.type_info &= ~PGT_va_mask;
-        frame_table[gmfn].u.inuse.type_info |= (unsigned long) index << PGT_va_shift;
+        pfn_to_page(gmfn)->tlbflush_timestamp = smfn;
+        pfn_to_page(gmfn)->u.inuse.type_info &= ~PGT_va_mask;
+        pfn_to_page(gmfn)->u.inuse.type_info |= (unsigned long) index << PGT_va_shift;
     }
 }
 
@@ -941,7 +941,7 @@ validate_pte_change(
             //
             perfc_incrc(validate_pte_changes2);
             if ( likely(l1e_get_flags(new_spte) & _PAGE_PRESENT) )
-                shadow_put_page_type(d, &frame_table[l1e_get_pfn(new_spte)]);
+                shadow_put_page_type(d, pfn_to_page(l1e_get_pfn(new_spte)));
         }
         else if ( ((l1e_get_flags(old_spte) | l1e_get_flags(new_spte)) &
                    _PAGE_PRESENT ) &&
@@ -1216,8 +1216,8 @@ static inline unsigned long __shadow_status(
             printk("d->id=%d gpfn=%lx gmfn=%lx stype=%lx c=%x t=%" PRtype_info " "
                    "mfn_out_of_sync(gmfn)=%d mfn_is_page_table(gmfn)=%d\n",
                    d->domain_id, gpfn, gmfn, stype,
-                   frame_table[gmfn].count_info,
-                   frame_table[gmfn].u.inuse.type_info,
+                   pfn_to_page(gmfn)->count_info,
+                   pfn_to_page(gmfn)->u.inuse.type_info,
                    mfn_out_of_sync(gmfn), mfn_is_page_table(gmfn));
             BUG();
         }
@@ -1597,7 +1597,7 @@ shadow_mode_page_writable(unsigned long va, struct cpu_user_regs *regs, unsigned
     struct vcpu *v = current;
     struct domain *d = v->domain;
     unsigned long mfn = __gpfn_to_mfn(d, gpfn);
-    u32 type = frame_table[mfn].u.inuse.type_info & PGT_type_mask;
+    u32 type = pfn_to_page(mfn)->u.inuse.type_info & PGT_type_mask;
 
     if ( shadow_mode_refcounts(d) &&
          (type == PGT_writable_page) )
