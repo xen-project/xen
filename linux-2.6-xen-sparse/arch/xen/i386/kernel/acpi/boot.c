@@ -660,8 +660,6 @@ acpi_find_rsdp (void)
 	if (!rsdp_phys)
 		rsdp_phys = acpi_scan_rsdp (0xE0000, 0x20000);
 
-	set_fixmap(FIX_ACPI_RSDP_PAGE, rsdp_phys);
-
 	return rsdp_phys;
 }
 
