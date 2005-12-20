@@ -601,15 +601,7 @@ ENTRY(nmi)
 	pushl %eax
 	SAVE_ALL_NOSEGREGS(a)
 
-        # Check for hardware problems.
-        inb   $0x61,%al
-        testb $0x80,%al
-        jne   nmi_parity_err
-        testb $0x40,%al
-        jne   nmi_io_err
-        movl  %eax,%ebx
-        
-        # Okay, its almost a normal NMI tick. We can only process it if:
+        # We can only process the NMI if:
         #  A. We are the outermost Xen activation (in which case we have
         #     the selectors safely saved on our stack)
         #  B. DS and ES contain sane Xen values.
@@ -619,7 +611,7 @@ ENTRY(nmi)
         movl  UREGS_eflags(%esp),%eax
         movb  UREGS_cs(%esp),%al
         testl $(3|X86_EFLAGS_VM),%eax
-        jnz   do_watchdog_tick
+        jnz   continue_nmi
         movl  %ds,%eax
         cmpw  $(__HYPERVISOR_DS),%ax
         jne   defer_nmi
@@ -627,15 +619,14 @@ ENTRY(nmi)
         cmpw  $(__HYPERVISOR_DS),%ax
         jne   defer_nmi
 
-do_watchdog_tick:
+continue_nmi:
         movl  $(__HYPERVISOR_DS),%edx
         movl  %edx,%ds
         movl  %edx,%es
         movl  %esp,%edx
-        pushl %ebx   # reason
-        pushl %edx   # regs
+        pushl %edx
         call  do_nmi
-        addl  $8,%esp
+        addl  $4,%esp
         jmp   ret_from_intr
 
 defer_nmi:
@@ -648,55 +639,6 @@ defer_nmi:
         movl  $(APIC_DM_FIXED | APIC_DEST_SELF | APIC_DEST_LOGICAL | \
                 TRAP_deferred_nmi),%ss:APIC_ICR(%eax)
         jmp   restore_all_xen
-
-nmi_parity_err:
-        # Clear and disable the parity-error line
-        andb $0xf,%al
-        orb  $0x4,%al
-        outb %al,$0x61
-        cmpb $'i',%ss:opt_nmi # nmi=ignore
-        je   nmi_out
-        bts  $0,%ss:nmi_softirq_reason
-        bts  $NMI_SOFTIRQ,%ss:irq_stat
-        cmpb $'d',%ss:opt_nmi # nmi=dom0
-        je   nmi_out
-        movl $(__HYPERVISOR_DS),%edx       # nmi=fatal
-        movl %edx,%ds
-        movl %edx,%es
-        movl %esp,%edx
-        push %edx
-        call mem_parity_error
-        addl $4,%esp
-nmi_out:movl  %ss:UREGS_eflags(%esp),%eax
-        movb  %ss:UREGS_cs(%esp),%al
-        testl $(3|X86_EFLAGS_VM),%eax
-        jz    restore_all_xen
-        movl  $(__HYPERVISOR_DS),%edx
-        movl  %edx,%ds
-        movl  %edx,%es
-        GET_CURRENT(%ebx)
-        jmp   test_all_events
-                
-nmi_io_err: 
-        # Clear and disable the I/O-error line
-        andb $0xf,%al
-        orb  $0x8,%al
-        outb %al,$0x61
-        cmpb $'i',%ss:opt_nmi # nmi=ignore
-        je   nmi_out
-        bts  $1,%ss:nmi_softirq_reason
-        bts  $NMI_SOFTIRQ,%ss:irq_stat
-        cmpb $'d',%ss:opt_nmi # nmi=dom0
-        je   nmi_out
-        movl $(__HYPERVISOR_DS),%edx       # nmi=fatal
-        movl %edx,%ds
-        movl %edx,%es
-        movl %esp,%edx
-        push %edx
-        call io_check_error                        
-        addl $4,%esp
-        jmp  nmi_out
-
 
 ENTRY(setup_vm86_frame)
         # Copies the entire stack frame forwards by 16 bytes.

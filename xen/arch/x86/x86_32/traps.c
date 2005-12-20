@@ -160,9 +160,9 @@ asmlinkage void do_double_fault(void)
 BUILD_SMP_INTERRUPT(deferred_nmi, TRAP_deferred_nmi)
 asmlinkage void smp_deferred_nmi(struct cpu_user_regs regs)
 {
-    asmlinkage void do_nmi(struct cpu_user_regs *, unsigned long);
+    asmlinkage void do_nmi(struct cpu_user_regs *);
     ack_APIC_irq();
-    do_nmi(&regs, 0);
+    do_nmi(&regs);
 }
 
 void __init percpu_traps_init(void)

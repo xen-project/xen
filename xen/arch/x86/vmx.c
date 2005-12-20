@@ -335,7 +335,7 @@ static inline int  long_mode_do_msr_write(struct cpu_user_regs *regs){
 
 extern long evtchn_send(int lport);
 extern long do_block(void);
-void do_nmi(struct cpu_user_regs *, unsigned long);
+void do_nmi(struct cpu_user_regs *);
 
 static int check_vmx_controls(ctrls, msr)
 {
@@ -1850,7 +1850,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
             break;
         }
         case TRAP_nmi:
-            do_nmi(&regs, 0);
+            do_nmi(&regs);
             break;
         default:
             vmx_reflect_exception(v);
