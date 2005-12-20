@@ -119,7 +119,7 @@ static void cmos_init_hd(int type_ofs, int info_ofs, BlockDriverState *hd)
 }
 
 /* hd_table must contain 4 block drivers */
-static void cmos_init(int ram_size, int boot_device, BlockDriverState **hd_table)
+static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_table)
 {
     RTCState *s = rtc_state;
     int val;
@@ -375,7 +375,7 @@ static int serial_irq[MAX_SERIAL_PORTS] = { 4, 3, 4, 3 };
 #define NOBIOS 1
 
 /* PC hardware initialisation */
-void pc_init(int ram_size, int vga_ram_size, int boot_device,
+void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
              DisplayState *ds, const char **fd_filename, int snapshot,
              const char *kernel_filename, const char *kernel_cmdline,
              const char *initrd_filename)

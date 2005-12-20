@@ -288,11 +288,11 @@ static int setup_guest(int xc_handle,
     l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
     unsigned long *page_array = NULL;
 #ifdef __x86_64__
-    l3_pgentry_t *vl3tab=NULL, *vl3e=NULL;
+    l3_pgentry_t *vl3tab=NULL;
     unsigned long l3tab;
 #endif
-    unsigned long l2tab;
-    unsigned long l1tab;
+    unsigned long l2tab = 0;
+    unsigned long l1tab = 0;
     unsigned long count, i;
     shared_info_t *shared_info;
     void *e820_page;
@@ -323,7 +323,7 @@ static int setup_guest(int xc_handle,
     }
 
     /* memsize is in megabytes */
-    v_end              = memsize << 20;
+    v_end              = (unsigned long)memsize << 20;
 
 #ifdef __i386__
     nr_pt_pages = 1 + ((memsize + 3) >> 2);
@@ -435,15 +435,16 @@ static int setup_guest(int xc_handle,
             goto error_out;
         memset(vl2tab, 0, PAGE_SIZE);
         munmap(vl2tab, PAGE_SIZE);
+        vl2tab = NULL;
         vl3tab[i] = l2tab | L3_PROT;
     }
 
-    vl3e = &vl3tab[l3_table_offset(0)];
     for ( count = 0; count < (v_end >> PAGE_SHIFT); count++ )
     {
-        if (!(count & (1 << (L3_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)))){
+        if ( !(count & ((1 << (L3_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)) - 1)) )
+        {
             l2tab = vl3tab[count >> (L3_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)]
-                & PAGE_MASK;
+                    & PAGE_MASK;
 
             if (vl2tab != NULL)
                 munmap(vl2tab, PAGE_SIZE);
