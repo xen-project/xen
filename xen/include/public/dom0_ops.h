@@ -404,6 +404,12 @@ typedef struct {
     xen_domain_handle_t handle;
 } dom0_setdomainhandle_t;
 
+#define DOM0_SETDEBUGGING 45
+typedef struct {
+    domid_t domain;
+    uint8_t enable;
+} dom0_setdebugging_t;
+
 typedef struct {
     uint32_t cmd;
     uint32_t interface_version; /* DOM0_INTERFACE_VERSION */
@@ -440,7 +446,8 @@ typedef struct {
         dom0_platform_quirk_t    platform_quirk;
         dom0_physical_memory_map_t physical_memory_map;
         dom0_max_vcpus_t         max_vcpus;
-        dom0_setdomainhandle_t   setdomainhandle;
+        dom0_setdomainhandle_t   setdomainhandle;        
+        dom0_setdebugging_t      setdebugging;
         uint8_t                  pad[128];
     } u;
 } dom0_op_t;

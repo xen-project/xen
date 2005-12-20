@@ -102,7 +102,8 @@ void vmx_relinquish_resources(struct vcpu *v)
     if (v->vcpu_id == 0) {
         /* unmap IO shared page */
         struct domain *d = v->domain;
-        unmap_domain_page((void *)d->arch.vmx_platform.shared_page_va);
+        if ( d->arch.vmx_platform.shared_page_va )
+            unmap_domain_page((void *)d->arch.vmx_platform.shared_page_va);
     }
 
     destroy_vmcs(&v->arch.arch_vmx);
@@ -110,12 +111,12 @@ void vmx_relinquish_resources(struct vcpu *v)
     vpit = &v->domain->arch.vmx_platform.vmx_pit;
     if ( active_ac_timer(&(vpit->pit_timer)) )
         rem_ac_timer(&vpit->pit_timer);
-    if ( active_ac_timer(&v->arch.arch_vmx.hlt_timer) ) {
+    if ( active_ac_timer(&v->arch.arch_vmx.hlt_timer) )
         rem_ac_timer(&v->arch.arch_vmx.hlt_timer);
-    }
-    if ( vmx_apic_support(v->domain) ) {
-        rem_ac_timer( &(VLAPIC(v)->vlapic_timer) );
-        xfree( VLAPIC(v) );
+    if ( vmx_apic_support(v->domain) && (VLAPIC(v) != NULL) )
+    {
+        rem_ac_timer(&VLAPIC(v)->vlapic_timer);
+        xfree(VLAPIC(v));
     }
 }
 
@@ -334,7 +335,7 @@ static inline int  long_mode_do_msr_write(struct cpu_user_regs *regs){
 
 extern long evtchn_send(int lport);
 extern long do_block(void);
-void do_nmi(struct cpu_user_regs *, unsigned long);
+void do_nmi(struct cpu_user_regs *);
 
 static int check_vmx_controls(ctrls, msr)
 {
@@ -543,6 +544,13 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
         clear_bit(X86_FEATURE_VMXE & 31, &ecx);
         clear_bit(X86_FEATURE_MWAIT & 31, &ecx);
     }
+#ifdef __i386__
+    else if ( input == 0x80000001 )
+    {
+        /* Mask feature for Intel ia32e or AMD long mode. */
+        clear_bit(X86_FEATURE_LM & 31, &edx);
+    }
+#endif
 
     regs->eax = (unsigned long) eax;
     regs->ebx = (unsigned long) ebx;
@@ -1223,6 +1231,7 @@ static int vmx_set_cr0(unsigned long value)
             }
         }
 
+        clear_all_shadow_status(v->domain);
         if (vmx_assist(v, VMX_ASSIST_INVOKE)) {
             set_bit(VMX_CPU_STATE_ASSIST_ENABLED, &v->arch.arch_vmx.cpu_state);
             __vmread(GUEST_RIP, &eip);
@@ -1841,7 +1850,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
             break;
         }
         case TRAP_nmi:
-            do_nmi(&regs, 0);
+            do_nmi(&regs);
             break;
         default:
             vmx_reflect_exception(v);

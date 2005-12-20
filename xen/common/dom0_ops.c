@@ -358,12 +358,17 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_GETDOMAININFO:
     { 
         struct domain *d;
+        domid_t dom;
+
+        dom = op->u.getdomaininfo.domain;
+        if ( dom == DOMID_SELF )
+            dom = current->domain->domain_id;
 
         read_lock(&domlist_lock);
 
         for_each_domain ( d )
         {
-            if ( d->domain_id >= op->u.getdomaininfo.domain )
+            if ( d->domain_id >= dom )
                 break;
         }
 
@@ -572,6 +577,22 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         {
             memcpy(d->handle, op->u.setdomainhandle.handle,
                    sizeof(xen_domain_handle_t));
+            put_domain(d);
+            ret = 0;
+        }
+    }
+    break;
+    case DOM0_SETDEBUGGING:
+    {
+        struct domain *d; 
+        ret = -ESRCH;
+        d = find_domain_by_id(op->u.setdebugging.domain);
+        if ( d != NULL )
+        {
+            if ( op->u.setdebugging.enable )
+                set_bit(_DOMF_debugging, &d->domain_flags);
+            else
+                clear_bit(_DOMF_debugging, &d->domain_flags);
             put_domain(d);
             ret = 0;
         }

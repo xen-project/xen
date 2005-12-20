@@ -163,11 +163,10 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 	while (l1 != 0) {
 		l1i = __ffs(l1);
 		l1 &= ~(1UL << l1i);
-        
+
 		while ((l2 = active_evtchns(cpu, s, l1i)) != 0) {
 			l2i = __ffs(l2);
-			l2 &= ~(1UL << l2i);
-            
+
 			port = (l1i * BITS_PER_LONG) + l2i;
 			if ((irq = evtchn_to_irq[port]) != -1)
 				do_IRQ(irq, regs);

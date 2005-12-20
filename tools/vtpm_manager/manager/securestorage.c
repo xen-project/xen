@@ -54,31 +54,28 @@
 #include "buffer.h"
 #include "log.h"
 
-TPM_RESULT VTPM_Handle_Save_NVM(VTPM_DMI_RESOURCE *myDMI, 
-				const buffer_t *inbuf, 
-				buffer_t *outbuf) {
-  
+TPM_RESULT envelope_encrypt(const buffer_t     *inbuf,
+                            CRYPTO_INFO  *asymkey,
+                            buffer_t           *sealed_data) {
   TPM_RESULT status = TPM_SUCCESS;
   symkey_t    symkey;
-  buffer_t    state_cipher = NULL_BUF,
+  buffer_t    data_cipher = NULL_BUF,
               symkey_cipher = NULL_BUF;
-  int fh;
-  long bytes_written;
-  BYTE *sealed_NVM=NULL;
-  UINT32 sealed_NVM_size, i;
-  struct pack_constbuf_t symkey_cipher32, state_cipher32;
   
-  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Save_NVMing[%d]: 0x", buffer_len(inbuf));
+  UINT32 i;
+  struct pack_constbuf_t symkey_cipher32, data_cipher32;
+  
+  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Enveloping[%d]: 0x", buffer_len(inbuf));
   for (i=0; i< buffer_len(inbuf); i++)
     vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", inbuf->bytes[i]);
   vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "\n");
   
   // Generate a sym key and encrypt state with it
   TPMTRY(TPM_ENCRYPT_ERROR, Crypto_symcrypto_genkey (&symkey) );
-  TPMTRY(TPM_ENCRYPT_ERROR, Crypto_symcrypto_encrypt (&symkey, inbuf, &state_cipher) );
+  TPMTRY(TPM_ENCRYPT_ERROR, Crypto_symcrypto_encrypt (&symkey, inbuf, &data_cipher) );
   
   // Encrypt symmetric key
-  TPMTRYRETURN( VTSP_Bind(    &vtpm_globals->storageKey, 
+  TPMTRYRETURN( VTSP_Bind(    asymkey, 
 			      &symkey.key, 
 			      &symkey_cipher) );
   
@@ -87,15 +84,108 @@ TPM_RESULT VTPM_Handle_Save_NVM(VTPM_DMI_RESOURCE *myDMI,
   symkey_cipher32.size = buffer_len(&symkey_cipher);
   symkey_cipher32.data = symkey_cipher.bytes;
   
-  state_cipher32.size = buffer_len(&state_cipher);
-  state_cipher32.data = state_cipher.bytes;
+  data_cipher32.size = buffer_len(&data_cipher);
+  data_cipher32.data = data_cipher.bytes;
   
-  sealed_NVM = (BYTE *) malloc( 2 * sizeof(UINT32) + symkey_cipher32.size + state_cipher32.size);
+  TPMTRYRETURN( buffer_init(sealed_data, 2 * sizeof(UINT32) + symkey_cipher32.size + data_cipher32.size, NULL));
   
-  sealed_NVM_size = BSG_PackList(sealed_NVM, 2,
-				 BSG_TPM_SIZE32_DATA, &symkey_cipher32,
-				 BSG_TPM_SIZE32_DATA, &state_cipher32);
+  BSG_PackList(sealed_data->bytes, 2,
+	       BSG_TPM_SIZE32_DATA, &symkey_cipher32,
+	       BSG_TPM_SIZE32_DATA, &data_cipher32);
+
+  vtpmloginfo(VTPM_LOG_VTPM, "Saved %d bytes of E(symkey) + %d bytes of E(data)\n", buffer_len(&symkey_cipher), buffer_len(&data_cipher));
+  goto egress;
+
+ abort_egress:
+  vtpmlogerror(VTPM_LOG_VTPM, "Failed to envelope encrypt\n.");
   
+ egress:
+  
+  buffer_free ( &data_cipher);
+  buffer_free ( &symkey_cipher);
+  Crypto_symcrypto_freekey (&symkey);
+  
+  return status;
+}
+
+TPM_RESULT envelope_decrypt(const long         cipher_size,
+                            const BYTE         *cipher,
+                            TCS_CONTEXT_HANDLE TCSContext,
+			    TPM_HANDLE         keyHandle,
+			    const TPM_AUTHDATA *key_usage_auth,
+                            buffer_t           *unsealed_data) {
+
+  TPM_RESULT status = TPM_SUCCESS;
+  symkey_t    symkey;
+  buffer_t    data_cipher = NULL_BUF, 
+              symkey_clear = NULL_BUF, 
+              symkey_cipher = NULL_BUF;
+  struct pack_buf_t symkey_cipher32, data_cipher32;
+  int i;
+
+  memset(&symkey, 0, sizeof(symkey_t));
+
+  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "envelope decrypting[%ld]: 0x", cipher_size);
+  for (i=0; i< cipher_size; i++)
+    vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", cipher[i]);
+  vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "\n");
+  
+  BSG_UnpackList(cipher, 2,
+		 BSG_TPM_SIZE32_DATA, &symkey_cipher32,
+		 BSG_TPM_SIZE32_DATA, &data_cipher32);
+  
+  TPMTRYRETURN( buffer_init_convert (&symkey_cipher, 
+				     symkey_cipher32.size, 
+				     symkey_cipher32.data) );
+  
+  TPMTRYRETURN( buffer_init_convert (&data_cipher, 
+				     data_cipher32.size, 
+				     data_cipher32.data) );
+
+  // Decrypt Symmetric Key
+  TPMTRYRETURN( VTSP_Unbind(  TCSContext,
+			      keyHandle,
+			      &symkey_cipher,
+			      key_usage_auth,
+			      &symkey_clear,
+			      &(vtpm_globals->keyAuth) ) );
+  
+  // create symmetric key using saved bits
+  Crypto_symcrypto_initkey (&symkey, &symkey_clear);
+  
+  // Decrypt State
+  TPMTRY(TPM_DECRYPT_ERROR, Crypto_symcrypto_decrypt (&symkey, &data_cipher, unsealed_data) );
+  
+  goto egress;
+  
+ abort_egress:
+  vtpmlogerror(VTPM_LOG_VTPM, "Failed to envelope decrypt data\n.");
+  
+ egress:
+  buffer_free ( &data_cipher);
+  buffer_free ( &symkey_clear);
+  buffer_free ( &symkey_cipher);
+  Crypto_symcrypto_freekey (&symkey);
+  
+  return status;
+}
+
+TPM_RESULT VTPM_Handle_Save_NVM(VTPM_DMI_RESOURCE *myDMI, 
+				const buffer_t *inbuf, 
+				buffer_t *outbuf) {
+  
+  TPM_RESULT status = TPM_SUCCESS;
+  int fh;
+  long bytes_written;
+  buffer_t sealed_NVM;
+  
+  
+  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Save_NVMing[%d]: 0x\n", buffer_len(inbuf));
+
+  TPMTRYRETURN( envelope_encrypt(inbuf,
+                                 &vtpm_globals->storageKey,
+                                 &sealed_NVM) );
+				  
   // Mark DMI Table so new save state info will get pushed to disk on return.
   vtpm_globals->DMI_table_dirty = TRUE;
   
@@ -104,28 +194,22 @@ TPM_RESULT VTPM_Handle_Save_NVM(VTPM_DMI_RESOURCE *myDMI,
   //       after writing the file? We can't get the old one back.
   // TODO: Backup old file and try and recover that way.
   fh = open(myDMI->NVMLocation, O_WRONLY | O_CREAT, S_IREAD | S_IWRITE);
-  if ( (bytes_written = write(fh, sealed_NVM, sealed_NVM_size) ) != (long) sealed_NVM_size) {
-    vtpmlogerror(VTPM_LOG_VTPM, "We just overwrote a DMI_NVM and failed to finish. %ld/%ld bytes.\n", bytes_written, (long)sealed_NVM_size);
+  if ( (bytes_written = write(fh, sealed_NVM.bytes, buffer_len(&sealed_NVM) ) != (long) buffer_len(&sealed_NVM))) {
+    vtpmlogerror(VTPM_LOG_VTPM, "We just overwrote a DMI_NVM and failed to finish. %ld/%ld bytes.\n", bytes_written, (long)buffer_len(&sealed_NVM));
     status = TPM_IOERROR;
     goto abort_egress;
   }
   close(fh);
   
-  Crypto_SHA1Full (sealed_NVM, sealed_NVM_size, (BYTE *) &myDMI->NVM_measurement);   
+  Crypto_SHA1Full (sealed_NVM.bytes, buffer_len(&sealed_NVM), (BYTE *) &myDMI->NVM_measurement);   
   
-  vtpmloginfo(VTPM_LOG_VTPM, "Saved %d bytes of E(symkey) + %d bytes of E(NVM)\n", buffer_len(&symkey_cipher), buffer_len(&state_cipher));
   goto egress;
   
  abort_egress:
-  vtpmlogerror(VTPM_LOG_VTPM, "Failed to load NVM\n.");
+  vtpmlogerror(VTPM_LOG_VTPM, "Failed to save NVM\n.");
   
  egress:
-  
-  buffer_free ( &state_cipher);
-  buffer_free ( &symkey_cipher);
-  free(sealed_NVM);
-  Crypto_symcrypto_freekey (&symkey);
-  
+  buffer_free(&sealed_NVM);
   return status;
 }
 
@@ -136,11 +220,7 @@ TPM_RESULT VTPM_Handle_Load_NVM(VTPM_DMI_RESOURCE *myDMI,
 				buffer_t *outbuf) {
   
   TPM_RESULT status = TPM_SUCCESS;
-  symkey_t    symkey;
-  buffer_t    state_cipher = NULL_BUF, 
-              symkey_clear = NULL_BUF, 
-              symkey_cipher = NULL_BUF;
-  struct pack_buf_t symkey_cipher32, state_cipher32;
+
   
   UINT32 sealed_NVM_size;
   BYTE *sealed_NVM = NULL;
@@ -148,9 +228,7 @@ TPM_RESULT VTPM_Handle_Load_NVM(VTPM_DMI_RESOURCE *myDMI,
   int fh, stat_ret, i;
   struct stat file_stat;
   TPM_DIGEST sealedNVMHash;
-  
-  memset(&symkey, 0, sizeof(symkey_t));
-  
+   
   if (myDMI->NVMLocation == NULL) {
     vtpmlogerror(VTPM_LOG_VTPM, "Unable to load NVM because the file name NULL.\n");
     status = TPM_AUTHFAIL;
@@ -168,28 +246,14 @@ TPM_RESULT VTPM_Handle_Load_NVM(VTPM_DMI_RESOURCE *myDMI,
   }
   
   sealed_NVM = (BYTE *) malloc(fh_size);
+  sealed_NVM_size = (UINT32) fh_size;
   if (read(fh, sealed_NVM, fh_size) != fh_size) {
     status = TPM_IOERROR;
     goto abort_egress;
   }
   close(fh);
   
-  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Load_NVMing[%ld]: 0x", fh_size);
-  for (i=0; i< fh_size; i++)
-    vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", sealed_NVM[i]);
-  vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "\n");
-  
-  sealed_NVM_size = BSG_UnpackList(sealed_NVM, 2,
-				   BSG_TPM_SIZE32_DATA, &symkey_cipher32,
-				   BSG_TPM_SIZE32_DATA, &state_cipher32);
-  
-  TPMTRYRETURN( buffer_init_convert (&symkey_cipher, 
-				     symkey_cipher32.size, 
-				     symkey_cipher32.data) );
-  
-  TPMTRYRETURN( buffer_init_convert (&state_cipher, 
-				     state_cipher32.size, 
-				     state_cipher32.data) );
+  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Load_NVMing[%ld],\n", fh_size);
   
   Crypto_SHA1Full(sealed_NVM, sealed_NVM_size, (BYTE *) &sealedNVMHash);    
   
@@ -210,32 +274,19 @@ TPM_RESULT VTPM_Handle_Load_NVM(VTPM_DMI_RESOURCE *myDMI,
     goto abort_egress;
   }
   
-  // Decrypt Symmetric Key
-  TPMTRYRETURN( VTSP_Unbind(  myDMI->TCSContext,
-			      vtpm_globals->storageKeyHandle,
-			      &symkey_cipher,
-			      (const TPM_AUTHDATA*)&vtpm_globals->storage_key_usage_auth,
-			      &symkey_clear,
-			      &(vtpm_globals->keyAuth) ) );
-  
-  // create symmetric key using saved bits
-  Crypto_symcrypto_initkey (&symkey, &symkey_clear);
-  
-  // Decrypt State
-  TPMTRY(TPM_DECRYPT_ERROR, Crypto_symcrypto_decrypt (&symkey, &state_cipher, outbuf) );
-  
+    TPMTRYRETURN( envelope_decrypt(fh_size,
+                                 sealed_NVM,
+                                 myDMI->TCSContext,
+		        	 vtpm_globals->storageKeyHandle,
+			         (const TPM_AUTHDATA*)&vtpm_globals->storage_key_usage_auth,
+                                 outbuf) );  
   goto egress;
   
  abort_egress:
   vtpmlogerror(VTPM_LOG_VTPM, "Failed to load NVM\n.");
   
  egress:
-  
-  buffer_free ( &state_cipher);
-  buffer_free ( &symkey_clear);
-  buffer_free ( &symkey_cipher);
   free( sealed_NVM );
-  Crypto_symcrypto_freekey (&symkey);
   
   return status;
 }

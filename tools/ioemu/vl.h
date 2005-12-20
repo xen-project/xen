@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include "audio/audio.h"
 
 #ifndef O_LARGEFILE
 #define O_LARGEFILE 0
@@ -116,7 +117,7 @@ extern int audio_enabled;
 extern int sb16_enabled;
 extern int adlib_enabled;
 extern int gus_enabled;
-extern int ram_size;
+extern uint64_t ram_size;
 extern int bios_size;
 extern int rtc_utc;
 extern int cirrus_vga_enabled;
@@ -649,7 +650,7 @@ int pit_get_gate(PITState *pit, int channel);
 int pit_get_out(PITState *pit, int channel, int64_t current_time);
 
 /* pc.c */
-void pc_init(int ram_size, int vga_ram_size, int boot_device,
+void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
              DisplayState *ds, const char **fd_filename, int snapshot,
              const char *kernel_filename, const char *kernel_cmdline,
              const char *initrd_filename);

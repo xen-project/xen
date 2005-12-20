@@ -210,7 +210,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
              unlikely((d = find_domain_by_id(dom)) == NULL) )
             break;
 
-        page = &frame_table[pfn];
+        page = pfn_to_page(pfn);
 
         if ( likely(get_page(page, d)) )
         {
@@ -285,7 +285,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
                 struct pfn_info *page;
                 unsigned long mfn = l_arr[j];
 
-                page = &frame_table[mfn];
+                page = pfn_to_page(mfn);
 
                 if ( likely(pfn_valid(mfn) && get_page(page, d)) ) 
                 {
@@ -350,15 +350,14 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             list_ent = d->page_list.next;
             for ( i = 0; (i < max_pfns) && (list_ent != &d->page_list); i++ )
             {
-                pfn = list_entry(list_ent, struct pfn_info, list) - 
-                    frame_table;
+                pfn = page_to_pfn(list_entry(list_ent, struct pfn_info, list));
                 if ( put_user(pfn, buffer) )
                 {
                     ret = -EFAULT;
                     break;
                 }
                 buffer++;
-                list_ent = frame_table[pfn].list.next;
+                list_ent = pfn_to_page(pfn)->list.next;
             }
             spin_unlock(&d->page_alloc_lock);
 

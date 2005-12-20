@@ -166,11 +166,12 @@ void subarch_init_memory(struct domain *dom_xen)
 
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         {
-            frame_table[m2p_start_mfn+i].count_info = PGC_allocated | 1;
+            struct pfn_info *page = pfn_to_page(m2p_start_mfn + i);
+            page->count_info = PGC_allocated | 1;
             /* gdt to make sure it's only mapped read-only by non-privileged
                domains. */
-            frame_table[m2p_start_mfn+i].u.inuse.type_info = PGT_gdt_page | 1;
-            page_set_owner(&frame_table[m2p_start_mfn+i], dom_xen);
+            page->u.inuse.type_info = PGT_gdt_page | 1;
+            page_set_owner(page, dom_xen);
         }
     }
 }

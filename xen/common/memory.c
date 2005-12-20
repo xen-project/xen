@@ -102,7 +102,7 @@ decrease_reservation(
                 return i;
             }
             
-            page = &frame_table[mpfn + j];
+            page = pfn_to_page(mpfn + j);
             if ( unlikely(!get_page(page, d)) )
             {
                 DPRINTK("Bad page free for domain %u\n", d->domain_id);

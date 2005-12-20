@@ -61,7 +61,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 #ifdef __i386__
 #ifdef CONFIG_X86_PAE
         /* 32b PAE */
-        if ( (( frame_table[mfn].u.inuse.type_info & PGT_va_mask ) 
+        if ( (( pfn_to_page(mfn)->u.inuse.type_info & PGT_va_mask ) 
 	    >> PGT_va_shift) == 3 )
             return l2_table_offset(HYPERVISOR_VIRT_START); 
         else
@@ -364,7 +364,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             {
                 gmfn = __gpfn_to_mfn(d, a->gpfn_and_flags & PGT_mfn_mask);
                 smfn = a->smfn;
-                page = &frame_table[smfn];
+                page = pfn_to_page(smfn);
 
                 switch ( a->gpfn_and_flags & PGT_type_mask ) {
                 case PGT_writable_pred:
@@ -433,11 +433,13 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         for_each_vcpu(d, v)
         {
             if ( pagetable_get_paddr(v->arch.guest_table) )
-                adjust(&frame_table[pagetable_get_pfn(v->arch.guest_table)], !shadow_mode_refcounts(d));
+                adjust(pfn_to_page(pagetable_get_pfn(v->arch.guest_table)),
+                       !shadow_mode_refcounts(d));
             if ( pagetable_get_paddr(v->arch.shadow_table) )
-                adjust(&frame_table[pagetable_get_pfn(v->arch.shadow_table)], 0);
+                adjust(pfn_to_page(pagetable_get_pfn(v->arch.shadow_table)),
+                       0);
             if ( v->arch.monitor_shadow_ref )
-                adjust(&frame_table[v->arch.monitor_shadow_ref], 0);
+                adjust(pfn_to_page(v->arch.monitor_shadow_ref), 0);
         }
     }
 
@@ -617,7 +619,7 @@ void _audit_domain(struct domain *d, int flags)
     void scan_for_pfn_in_mfn(struct domain *d, unsigned long xmfn,
                              unsigned long mfn)
     {
-        struct pfn_info *page = &frame_table[mfn];
+        struct pfn_info *page = pfn_to_page(mfn);
         l1_pgentry_t *pt = map_domain_page(mfn);
         int i;
 

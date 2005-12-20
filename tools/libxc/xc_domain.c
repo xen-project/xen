@@ -380,6 +380,30 @@ int xc_domain_ioport_permission(int xc_handle,
     return do_dom0_op(xc_handle, &op);
 }
 
+int xc_domain_setinfo(int xc_handle,
+                      uint32_t domid,
+                      uint32_t vcpu,
+                      vcpu_guest_context_t *ctxt)
+{
+    dom0_op_t op;
+    int rc;
+
+    op.cmd = DOM0_SETDOMAININFO;
+    op.u.setdomaininfo.domain = domid;
+    op.u.setdomaininfo.vcpu = vcpu;
+    op.u.setdomaininfo.ctxt = ctxt;
+
+    if ( (rc = mlock(ctxt, sizeof(*ctxt))) != 0 )
+        return rc;
+
+    rc = do_dom0_op(xc_handle, &op);
+
+    safe_munlock(ctxt, sizeof(*ctxt));
+
+    return rc;
+
+}
+
 /*
  * Local variables:
  * mode: C
