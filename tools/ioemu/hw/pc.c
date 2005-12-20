@@ -563,6 +563,15 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
 
     kbd_init();
     DMA_init(0);
+   
+    if (audio_enabled) {
+        AUD_init();
+#ifdef USE_SB16
+        if (sb16_enabled)
+            SB16_init();
+#endif
+    }
+    
 
     floppy_controller = fdctrl_init(6, 2, 0, 0x3f0, fd_table);
 

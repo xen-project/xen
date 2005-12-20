@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include "audio/audio.h"
 
 #ifndef O_LARGEFILE
 #define O_LARGEFILE 0
