@@ -13,6 +13,7 @@
 #include <asm/io.h>
 #include <asm/pal.h>
 #include <asm/sal.h>
+#include <asm/meminit.h>
 #include <xen/compile.h>
 #include <xen/acpi.h>
 
@@ -95,12 +96,7 @@ unsigned long dom_fw_setup(struct domain *d, char *args, int arglen)
 #define MB	(1024*1024UL)
 
 #define NUM_EFI_SYS_TABLES 6
-#define PASS_THRU_IOPORT_SPACE
-#ifdef PASS_THRU_IOPORT_SPACE
-# define NUM_MEM_DESCS	4
-#else
-# define NUM_MEM_DESCS	3
-#endif
+# define NUM_MEM_DESCS	5
 
 
 #define SECS_PER_HOUR   (60 * 60)
@@ -806,30 +802,53 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 
 	sal_systab->checksum = -checksum;
 
-	/* simulate 1MB free memory at physical address zero */
 	i = 0;
-	MAKE_MD(EFI_BOOT_SERVICES_DATA,EFI_MEMORY_WB,0*MB,1*MB, 0);
-	/* hypercall patches live here, masquerade as reserved PAL memory */
-	MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB,HYPERCALL_START,HYPERCALL_END, 0);
-	MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,HYPERCALL_END,maxmem, 0);
-#ifdef PASS_THRU_IOPORT_SPACE
-	if (d == dom0 && !running_on_sim) {
+	if (d == dom0) {
+		/*
+		 * This is a bad hack.  Dom0 may share other domains' memory
+		 * through a dom0 physical address.  Unfortunately, this
+		 * address may be used in phys_to_page (e.g. in the loopback
+		 * driver) but when Linux initializes memory it only creates
+		 * page structs for the physical memory it knows about.  And
+		 * on ia64, only for full writeback granules.  So, we reserve
+		 * the last full granule of Xen's memory for dom0 (in
+		 * start_kernel) to ensure dom0 creates a large enough memmap
+		 */
+		unsigned long last_start = max_page << PAGE_SHIFT;
+		unsigned long last_end = last_start + IA64_GRANULE_SIZE;
+
+		/* simulate 1MB free memory at physical address zero */
+		MAKE_MD(EFI_LOADER_DATA,EFI_MEMORY_WB,0*MB,1*MB, 0);
+		/* hypercall patches live here, masquerade as reserved PAL memory */
+		MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB,HYPERCALL_START,HYPERCALL_END, 0);
+		MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,HYPERCALL_END,maxmem-IA64_GRANULE_SIZE, 0);
+/* hack */	MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,last_start,last_end,1);
+
 		/* pass through the I/O port space */
-		efi_memory_desc_t *efi_get_io_md(void);
-		efi_memory_desc_t *ia64_efi_io_md = efi_get_io_md();
-		u32 type;
-		u64 iostart, ioend, ioattr;
-		
-		type = ia64_efi_io_md->type;
-		iostart = ia64_efi_io_md->phys_addr;
-		ioend = ia64_efi_io_md->phys_addr +
-			(ia64_efi_io_md->num_pages << 12);
-		ioattr = ia64_efi_io_md->attribute;
-		MAKE_MD(type,ioattr,iostart,ioend, 1);
+		if (!running_on_sim) {
+			efi_memory_desc_t *efi_get_io_md(void);
+			efi_memory_desc_t *ia64_efi_io_md;
+			u32 type;
+			u64 iostart, ioend, ioattr;
+
+			ia64_efi_io_md = efi_get_io_md();
+			type = ia64_efi_io_md->type;
+			iostart = ia64_efi_io_md->phys_addr;
+			ioend = ia64_efi_io_md->phys_addr +
+				(ia64_efi_io_md->num_pages << 12);
+			ioattr = ia64_efi_io_md->attribute;
+			MAKE_MD(type,ioattr,iostart,ioend, 1);
+		}
+		else MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
 	}
-	else
+	else {
+		MAKE_MD(EFI_LOADER_DATA,EFI_MEMORY_WB,0*MB,1*MB, 1);
+		/* hypercall patches live here, masquerade as reserved PAL memory */
+		MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB,HYPERCALL_START,HYPERCALL_END, 1);
+		MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,HYPERCALL_END,maxmem, 1);
 		MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
-#endif
+		MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
+	}
 
 	bp->efi_systab = dom_pa(fw_mem);
 	bp->efi_memmap = dom_pa(efi_memmap);
