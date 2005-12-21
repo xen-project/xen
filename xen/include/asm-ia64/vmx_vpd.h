@@ -63,8 +63,16 @@ typedef struct {
 	unsigned long	rsv6[46];
 } cr_t;
 
+#ifdef VTI_DEBUG
+struct ivt_debug{
+    unsigned long iip;
+    unsigned long ipsr;
+    unsigned long ifa;
+    unsigned long vector;
+};
+#define IVT_DEBUG_MAX 128
+#endif
 struct arch_vmx_struct {
-//    struct virutal_platform_def     vmx_platform;
 //	vpd_t       *vpd;
     vtime_t	    vtm;
     struct vlapic   vlapic;
@@ -85,6 +93,10 @@ struct arch_vmx_struct {
 //    unsigned long   rfi_ifs;
 //	unsigned long	in_service[4];	// vLsapic inservice IRQ bits
 	unsigned long   flags;
+#ifdef VTI_DEBUG
+    unsigned long  ivt_current;
+    struct ivt_debug ivt_debug[IVT_DEBUG_MAX];
+#endif
 };
 
 #define vmx_schedule_tail(next)         \

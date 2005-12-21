@@ -34,7 +34,10 @@ void foo(void)
 	DEFINE(UNW_FRAME_INFO_SIZE, sizeof (struct unw_frame_info));
 
 	BLANK();
-
+#ifdef   VTI_DEBUG
+	DEFINE(IVT_CUR_OFS, offsetof(struct vcpu, arch.arch_vmx.ivt_current));
+	DEFINE(IVT_DBG_OFS, offsetof(struct vcpu, arch.arch_vmx.ivt_debug));
+#endif
 	DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
 	DEFINE(TI_PRE_COUNT, offsetof(struct thread_info, preempt_count));
 

@@ -27,6 +27,7 @@ CFLAGS  += -Wno-pointer-arith -Wredundant-decls
 CFLAGS  += -DIA64 -DXEN -DLINUX_2_6 -DV_IOSAPIC_READY
 CFLAGS	+= -ffixed-r13 -mfixed-range=f12-f15,f32-f127
 CFLAGS	+= -w -g
+#CFLAGS  += -DVTI_DEBUG
 ifeq ($(VALIDATE_VT),y)
 CFLAGS  += -DVALIDATE_VT
 endif
