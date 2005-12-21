@@ -111,6 +111,7 @@ unsigned long translate_domain_pte(unsigned long pteval,
 		}
 	}
 	else if ((mpaddr >> PAGE_SHIFT) > d->max_pages) {
+		if ((mpaddr & ~0x1fffL ) != (1L << 40))
 		printf("translate_domain_pte: bad mpa=%p (> %p),vadr=%p,pteval=%p,itir=%p\n",
 			mpaddr,d->max_pages<<PAGE_SHIFT,address,pteval,itir);
 		tdpfoo();
