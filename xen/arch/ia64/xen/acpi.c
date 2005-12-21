@@ -604,17 +604,8 @@ acpi_boot_init (void)
 	if (acpi_table_parse_madt(ACPI_MADT_LAPIC_ADDR_OVR, acpi_parse_lapic_addr_ovr, 0) < 0)
 		printk(KERN_ERR PREFIX "Error parsing LAPIC address override entry\n");
 
-#ifdef CONFIG_SMP
-	int count;
-	if ((count = acpi_table_count_madt(ACPI_MADT_LSAPIC)) < 1) {
-		printk(KERN_ERR PREFIX "Error parsing MADT - no LSAPIC entries\n");
-	} else {
-		acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_parse_lsapic, count);
-	}
-#else
 	if (acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_parse_lsapic, NR_CPUS) < 1)
 		printk(KERN_ERR PREFIX "Error parsing MADT - no LSAPIC entries\n");
-#endif
 
 	if (acpi_table_parse_madt(ACPI_MADT_LAPIC_NMI, acpi_parse_lapic_nmi, 0) < 0)
 		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
