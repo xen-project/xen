@@ -27,6 +27,12 @@
  * IN THE SOFTWARE.
  */
 
+#include <asm-xen/evtchn.h>
+#include <asm-xen/gnttab.h>
+#include <asm-xen/xenbus.h>
+
+/* xenbus_probe.c */
+extern char *kasprintf(const char *fmt, ...);
 
 #if 0
 #define DPRINTK(fmt, args...) \
@@ -34,11 +40,6 @@
 #else
 #define DPRINTK(fmt, args...) ((void)0)
 #endif
-
-
-#include <asm-xen/evtchn.h>
-#include <asm-xen/gnttab.h>
-#include <asm-xen/xenbus.h>
 
 
 int xenbus_watch_path(struct xenbus_device *dev, const char *path,
@@ -63,7 +64,6 @@ int xenbus_watch_path(struct xenbus_device *dev, const char *path,
 }
 EXPORT_SYMBOL(xenbus_watch_path);
 
-extern char *kasprintf(const char *fmt, ...);
 
 int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
 		       const char *path2, struct xenbus_watch *watch, 

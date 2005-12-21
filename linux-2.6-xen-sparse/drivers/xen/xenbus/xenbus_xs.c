@@ -41,6 +41,9 @@
 #include <asm-xen/xenbus.h>
 #include "xenbus_comms.h"
 
+/* xenbus_probe.c */
+extern char *kasprintf(const char *fmt, ...);
+
 #define streq(a, b) (strcmp((a), (b)) == 0)
 
 struct xs_stored_msg {
