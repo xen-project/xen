@@ -505,7 +505,7 @@ static void xenbus_dev_release(struct device *dev)
 }
 
 /* Simplified asprintf. */
-static char *kasprintf(const char *fmt, ...)
+char *kasprintf(const char *fmt, ...)
 {
 	va_list ap;
 	unsigned int len;

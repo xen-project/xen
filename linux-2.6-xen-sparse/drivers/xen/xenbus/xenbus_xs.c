@@ -276,18 +276,11 @@ static char *join(const char *dir, const char *name)
 {
 	char *buffer;
 
-	buffer = kmalloc(strlen(dir) + strlen("/") + strlen(name) + 1,
-			 GFP_KERNEL);
-	if (buffer == NULL)
-		return ERR_PTR(-ENOMEM);
-
-	strcpy(buffer, dir);
-	if (!streq(name, "")) {
-		strcat(buffer, "/");
-		strcat(buffer, name);
-	}
-
-	return buffer;
+	if (strlen(name) == 0)
+		buffer = kasprintf("%s", dir);
+	else
+		buffer = kasprintf("%s/%s", dir, name);
+	return (!buffer) ? ERR_PTR(-ENOMEM) : buffer;
 }
 
 static char **split(char *strings, unsigned int len, unsigned int *num)
