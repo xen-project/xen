@@ -84,23 +84,11 @@ typedef struct {
     spinlock_t            lock;
 } grant_table_t;
 
-/* Start-of-day system initialisation. */
-void grant_table_init(
-    void);
-
 /* Create/destroy per-domain grant table context. */
 int grant_table_create(
     struct domain *d);
 void grant_table_destroy(
     struct domain *d);
-
-/*
- * Check that the given grant reference (rd,ref) allows 'ld' to transfer
- * ownership of a page frame. If so, lock down the grant entry.
- */
-int 
-gnttab_prepare_for_transfer(
-    struct domain *rd, struct domain *ld, grant_ref_t ref);
 
 /* Domain death release of granted mappings of other domains' memory. */
 void

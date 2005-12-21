@@ -27,6 +27,12 @@
  * IN THE SOFTWARE.
  */
 
+#include <asm-xen/evtchn.h>
+#include <asm-xen/gnttab.h>
+#include <asm-xen/xenbus.h>
+
+/* xenbus_probe.c */
+extern char *kasprintf(const char *fmt, ...);
 
 #if 0
 #define DPRINTK(fmt, args...) \
@@ -34,11 +40,6 @@
 #else
 #define DPRINTK(fmt, args...) ((void)0)
 #endif
-
-
-#include <asm-xen/evtchn.h>
-#include <asm-xen/gnttab.h>
-#include <asm-xen/xenbus.h>
 
 
 int xenbus_watch_path(struct xenbus_device *dev, const char *path,
@@ -70,16 +71,11 @@ int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
 					const char **, unsigned int))
 {
 	int err;
-	char *state =
-		kmalloc(strlen(path) + 1 + strlen(path2) + 1, GFP_KERNEL);
+	char *state = kasprintf("%s/%s", path, path2);
 	if (!state) {
 		xenbus_dev_fatal(dev, -ENOMEM, "allocating path for watch");
 		return -ENOMEM;
 	}
-	strcpy(state, path);
-	strcat(state, "/");
-	strcat(state, path2);
-
 	err = xenbus_watch_path(dev, state, watch, callback);
 
 	if (err) {
@@ -126,16 +122,7 @@ EXPORT_SYMBOL(xenbus_switch_state);
  */
 static char *error_path(struct xenbus_device *dev)
 {
-	char *path_buffer = kmalloc(strlen("error/") + strlen(dev->nodename) +
-				    1, GFP_KERNEL);
-	if (path_buffer == NULL) {
-		return NULL;
-	}
-
-	strcpy(path_buffer, "error/");
-	strcpy(path_buffer + strlen("error/"), dev->nodename);
-
-	return path_buffer;
+	return kasprintf("error/%s", dev->nodename);
 }
 
 

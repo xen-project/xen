@@ -145,10 +145,6 @@
  * cmd: MMUEXT_SET_LDT
  * linear_addr: Linear address of LDT base (NB. must be page-aligned).
  * nr_ents: Number of entries in LDT.
- * 
- * cmd: MMUEXT_REASSIGN_PAGE
- * mfn: Machine frame number to be reassigned to the FD.
- *      (NB. page must currently belong to the calling domain).
  */
 #define MMUEXT_PIN_L1_TABLE      0
 #define MMUEXT_PIN_L2_TABLE      1
@@ -164,14 +160,13 @@
 #define MMUEXT_INVLPG_ALL       11
 #define MMUEXT_FLUSH_CACHE      12
 #define MMUEXT_SET_LDT          13
-#define MMUEXT_REASSIGN_PAGE    14
 #define MMUEXT_NEW_USER_BASEPTR 15
 
 #ifndef __ASSEMBLY__
 struct mmuext_op {
     unsigned int cmd;
     union {
-        /* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR, REASSIGN_PAGE */
+        /* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR */
         unsigned long mfn;
         /* INVLPG_LOCAL, INVLPG_ALL, SET_LDT */
         unsigned long linear_addr;

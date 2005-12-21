@@ -488,8 +488,6 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     start_of_day();
 
-    grant_table_init();
-
     shadow_mode_init();
 
     /* initialize access control security module */
