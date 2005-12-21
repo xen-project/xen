@@ -254,6 +254,36 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
+    printf("%-40s", "Testing movsxbd (%%eax),%%ecx...");
+    instr[0] = 0x0f; instr[1] = 0xbe; instr[2] = 0x08;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.ecx    = 0x12345678;
+    cr2         = (unsigned long)&res;
+    res         = 0x82;
+    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);
+    if ( (rc != 0) ||
+         (res != 0x82) ||
+         (regs.ecx != 0xFFFFFF82) ||
+         ((regs.eflags&0x240) != 0x200) ||
+         (regs.eip != (unsigned long)&instr[3]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing movzxwd (%%eax),%%ecx...");
+    instr[0] = 0x0f; instr[1] = 0xb7; instr[2] = 0x08;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.ecx    = 0x12345678;
+    cr2         = (unsigned long)&res;
+    res         = 0x1234aa82;
+    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);
+    if ( (rc != 0) ||
+         (res != 0x1234aa82) ||
+         (regs.ecx != 0xaa82) ||
+         ((regs.eflags&0x240) != 0x200) ||
+         (regs.eip != (unsigned long)&instr[3]) )
+        goto fail;
+    printf("okay\n");
+
     return 0;
 
  fail:
