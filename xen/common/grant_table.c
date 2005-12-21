@@ -614,6 +614,91 @@ gnttab_dump_table(
     return 0;
 }
 
+/*
+ * Check that the given grant reference (rd,ref) allows 'ld' to transfer
+ * ownership of a page frame. If so, lock down the grant entry.
+ */
+static int 
+gnttab_prepare_for_transfer(
+    struct domain *rd, struct domain *ld, grant_ref_t ref)
+{
+    grant_table_t *rgt;
+    grant_entry_t *sha;
+    domid_t        sdom;
+    u16            sflags;
+    u32            scombo, prev_scombo;
+    int            retries = 0;
+    unsigned long  target_pfn;
+
+    if ( unlikely((rgt = rd->grant_table) == NULL) ||
+         unlikely(ref >= NR_GRANT_ENTRIES) )
+    {
+        DPRINTK("Dom %d has no g.t., or ref is bad (%d).\n",
+                rd->domain_id, ref);
+        return 0;
+    }
+
+    spin_lock(&rgt->lock);
+
+    sha = &rgt->shared[ref];
+    
+    sflags = sha->flags;
+    sdom   = sha->domid;
+
+    for ( ; ; )
+    {
+        target_pfn = sha->frame;
+
+        if ( unlikely(target_pfn >= max_page ) )
+        {
+            DPRINTK("Bad pfn (%lx)\n", target_pfn);
+            goto fail;
+        }
+
+        if ( unlikely(sflags != GTF_accept_transfer) ||
+             unlikely(sdom != ld->domain_id) )
+        {
+            DPRINTK("Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
+                    sflags, sdom, ld->domain_id);
+            goto fail;
+        }
+
+        /* Merge two 16-bit values into a 32-bit combined update. */
+        /* NB. Endianness! */
+        prev_scombo = scombo = ((u32)sdom << 16) | (u32)sflags;
+
+        /* NB. prev_scombo is updated in place to seen value. */
+        if ( unlikely(cmpxchg_user((u32 *)&sha->flags, prev_scombo, 
+                                   prev_scombo | GTF_transfer_committed)) )
+        {
+            DPRINTK("Fault while modifying shared flags and domid.\n");
+            goto fail;
+        }
+
+        /* Did the combined update work (did we see what we expected?). */
+        if ( likely(prev_scombo == scombo) )
+            break;
+
+        if ( retries++ == 4 )
+        {
+            DPRINTK("Shared grant entry is unstable.\n");
+            goto fail;
+        }
+
+        /* Didn't see what we expected. Split out the seen flags & dom. */
+        /* NB. Endianness! */
+        sflags = (u16)prev_scombo;
+        sdom   = (u16)(prev_scombo >> 16);
+    }
+
+    spin_unlock(&rgt->lock);
+    return 1;
+
+ fail:
+    spin_unlock(&rgt->lock);
+    return 0;
+}
+
 static long
 gnttab_transfer(
     gnttab_transfer_t *uop, unsigned int count)
@@ -763,87 +848,6 @@ do_grant_table_op(
 }
 
 int 
-gnttab_prepare_for_transfer(
-    struct domain *rd, struct domain *ld, grant_ref_t ref)
-{
-    grant_table_t *rgt;
-    grant_entry_t *sha;
-    domid_t        sdom;
-    u16            sflags;
-    u32            scombo, prev_scombo;
-    int            retries = 0;
-    unsigned long  target_pfn;
-
-    if ( unlikely((rgt = rd->grant_table) == NULL) ||
-         unlikely(ref >= NR_GRANT_ENTRIES) )
-    {
-        DPRINTK("Dom %d has no g.t., or ref is bad (%d).\n",
-                rd->domain_id, ref);
-        return 0;
-    }
-
-    spin_lock(&rgt->lock);
-
-    sha = &rgt->shared[ref];
-    
-    sflags = sha->flags;
-    sdom   = sha->domid;
-
-    for ( ; ; )
-    {
-        target_pfn = sha->frame;
-
-        if ( unlikely(target_pfn >= max_page ) )
-        {
-            DPRINTK("Bad pfn (%lx)\n", target_pfn);
-            goto fail;
-        }
-
-        if ( unlikely(sflags != GTF_accept_transfer) ||
-             unlikely(sdom != ld->domain_id) )
-        {
-            DPRINTK("Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
-                    sflags, sdom, ld->domain_id);
-            goto fail;
-        }
-
-        /* Merge two 16-bit values into a 32-bit combined update. */
-        /* NB. Endianness! */
-        prev_scombo = scombo = ((u32)sdom << 16) | (u32)sflags;
-
-        /* NB. prev_scombo is updated in place to seen value. */
-        if ( unlikely(cmpxchg_user((u32 *)&sha->flags, prev_scombo, 
-                                   prev_scombo | GTF_transfer_committed)) )
-        {
-            DPRINTK("Fault while modifying shared flags and domid.\n");
-            goto fail;
-        }
-
-        /* Did the combined update work (did we see what we expected?). */
-        if ( likely(prev_scombo == scombo) )
-            break;
-
-        if ( retries++ == 4 )
-        {
-            DPRINTK("Shared grant entry is unstable.\n");
-            goto fail;
-        }
-
-        /* Didn't see what we expected. Split out the seen flags & dom. */
-        /* NB. Endianness! */
-        sflags = (u16)prev_scombo;
-        sdom   = (u16)(prev_scombo >> 16);
-    }
-
-    spin_unlock(&rgt->lock);
-    return 1;
-
- fail:
-    spin_unlock(&rgt->lock);
-    return 0;
-}
-
-int 
 grant_table_create(
     struct domain *d)
 {
@@ -943,7 +947,8 @@ gnttab_release_mappings(
             {
                 BUG_ON(!(act->pin & GNTPIN_hstr_mask));
                 act->pin -= GNTPIN_hstr_inc;
-                put_page(pfn_to_page(act->frame));
+                /* Done implicitly when page tables are destroyed. */
+                /* put_page(pfn_to_page(act->frame)); */
             }
         }
         else
@@ -959,7 +964,8 @@ gnttab_release_mappings(
             {
                 BUG_ON(!(act->pin & GNTPIN_hstw_mask));
                 act->pin -= GNTPIN_hstw_inc;
-                put_page_and_type(pfn_to_page(act->frame));
+                /* Done implicitly when page tables are destroyed. */
+                /* put_page_and_type(pfn_to_page(act->frame)); */
             }
 
             if ( (act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0 )
@@ -982,24 +988,17 @@ void
 grant_table_destroy(
     struct domain *d)
 {
-    grant_table_t *t;
+    grant_table_t *t = d->grant_table;
 
-    if ( (t = d->grant_table) != NULL )
-    {
-        /* Free memory relating to this grant table. */
-        d->grant_table = NULL;
-        free_xenheap_pages(t->shared, ORDER_GRANT_FRAMES);
-        free_xenheap_page(t->maptrack);
-        xfree(t->active);
-        xfree(t);
-    }
-}
+    if ( t == NULL )
+        return;
+    
+    free_xenheap_pages(t->shared, ORDER_GRANT_FRAMES);
+    free_xenheap_page(t->maptrack);
+    xfree(t->active);
+    xfree(t);
 
-void
-grant_table_init(
-    void)
-{
-    /* Nothing. */
+    d->grant_table = NULL;
 }
 
 /*
