@@ -1074,29 +1074,35 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
     return 0;
 }
 
-unsigned long nmi_softirq_reason;
-static void nmi_softirq(void)
+
+/* Defer dom0 notification to softirq context (unsafe in NMI context). */
+static unsigned long nmi_dom0_softirq_reason;
+#define NMI_DOM0_PARITY_ERR 0
+#define NMI_DOM0_IO_ERR     1
+#define NMI_DOM0_UNKNOWN    2
+
+static void nmi_dom0_softirq(void)
 {
     if ( dom0 == NULL )
         return;
 
-    if ( test_and_clear_bit(0, &nmi_softirq_reason) )
+    if ( test_and_clear_bit(NMI_DOM0_PARITY_ERR, &nmi_dom0_softirq_reason) )
         send_guest_virq(dom0->vcpu[0], VIRQ_PARITY_ERR);
 
-    if ( test_and_clear_bit(1, &nmi_softirq_reason) )
+    if ( test_and_clear_bit(NMI_DOM0_IO_ERR, &nmi_dom0_softirq_reason) )
         send_guest_virq(dom0->vcpu[0], VIRQ_IO_ERR);
+
+    if ( test_and_clear_bit(NMI_DOM0_UNKNOWN, &nmi_dom0_softirq_reason) )
+        send_guest_virq(dom0->vcpu[0], VIRQ_NMI);
 }
 
 asmlinkage void mem_parity_error(struct cpu_user_regs *regs)
 {
-    /* Clear and disable the parity-error line. */
-    outb((inb(0x61)&15)|4,0x61);
-
     switch ( opt_nmi[0] )
     {
     case 'd': /* 'dom0' */
-        set_bit(0, &nmi_softirq_reason);
-        raise_softirq(NMI_SOFTIRQ);
+        set_bit(NMI_DOM0_PARITY_ERR, &nmi_dom0_softirq_reason);
+        raise_softirq(NMI_DOM0_SOFTIRQ);
     case 'i': /* 'ignore' */
         break;
     default:  /* 'fatal' */
@@ -1104,18 +1110,19 @@ asmlinkage void mem_parity_error(struct cpu_user_regs *regs)
         printk("\n\nNMI - MEMORY ERROR\n");
         fatal_trap(TRAP_nmi, regs);
     }
+
+    outb((inb(0x61) & 0x0f) | 0x04, 0x61); /* clear-and-disable parity check */
+    mdelay(1);
+    outb((inb(0x61) & 0x0b) | 0x00, 0x61); /* enable parity check */
 }
 
 asmlinkage void io_check_error(struct cpu_user_regs *regs)
 {
-    /* Clear and disable the I/O-error line. */
-    outb((inb(0x61)&15)|8,0x61);
-
     switch ( opt_nmi[0] )
     {
     case 'd': /* 'dom0' */
-        set_bit(0, &nmi_softirq_reason);
-        raise_softirq(NMI_SOFTIRQ);
+        set_bit(NMI_DOM0_IO_ERR, &nmi_dom0_softirq_reason);
+        raise_softirq(NMI_DOM0_SOFTIRQ);
     case 'i': /* 'ignore' */
         break;
     default:  /* 'fatal' */
@@ -1123,43 +1130,59 @@ asmlinkage void io_check_error(struct cpu_user_regs *regs)
         printk("\n\nNMI - I/O ERROR\n");
         fatal_trap(TRAP_nmi, regs);
     }
+
+    outb((inb(0x61) & 0x0f) | 0x08, 0x61); /* clear-and-disable IOCK */
+    mdelay(1);
+    outb((inb(0x61) & 0x07) | 0x00, 0x61); /* enable IOCK */
 }
 
 static void unknown_nmi_error(unsigned char reason)
 {
-    printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
-    printk("Dazed and confused, but trying to continue\n");
-    printk("Do you have a strange power saving mode enabled?\n");
-}
-
-static void default_do_nmi(struct cpu_user_regs *regs, unsigned long reason)
-{
-    if ( nmi_watchdog )
-        nmi_watchdog_tick(regs);
-
-    if ( reason & 0x80 )
-        mem_parity_error(regs);
-    else if ( reason & 0x40 )
-        io_check_error(regs);
-    else if ( !nmi_watchdog )
-        unknown_nmi_error((unsigned char)(reason&0xff));
+    switch ( opt_nmi[0] )
+    {
+    case 'd': /* 'dom0' */
+        set_bit(NMI_DOM0_UNKNOWN, &nmi_dom0_softirq_reason);
+        raise_softirq(NMI_DOM0_SOFTIRQ);
+    case 'i': /* 'ignore' */
+        break;
+    default:  /* 'fatal' */
+        printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
+        printk("Dazed and confused, but trying to continue\n");
+        printk("Do you have a strange power saving mode enabled?\n");
+    }
 }
 
 static int dummy_nmi_callback(struct cpu_user_regs *regs, int cpu)
 {
-	return 0;
+    return 0;
 }
  
 static nmi_callback_t nmi_callback = dummy_nmi_callback;
  
-asmlinkage void do_nmi(struct cpu_user_regs *regs, unsigned long reason)
+asmlinkage void do_nmi(struct cpu_user_regs *regs)
 {
     unsigned int cpu = smp_processor_id();
+    unsigned char reason;
 
     ++nmi_count(cpu);
 
-	if ( !nmi_callback(regs, cpu) )
-		default_do_nmi(regs, reason);
+    if ( nmi_callback(regs, cpu) )
+        return;
+
+    if ( nmi_watchdog )
+        nmi_watchdog_tick(regs);
+
+    /* Only the BSP gets external NMIs from the system. */
+    if ( cpu == 0 )
+    {
+        reason = inb(0x61);
+        if ( reason & 0x80 )
+            mem_parity_error(regs);
+        else if ( reason & 0x40 )
+            io_check_error(regs);
+        else if ( !nmi_watchdog )
+            unknown_nmi_error((unsigned char)(reason&0xff));
+    }
 }
 
 void set_nmi_callback(nmi_callback_t callback)
@@ -1169,7 +1192,7 @@ void set_nmi_callback(nmi_callback_t callback)
 
 void unset_nmi_callback(void)
 {
-	nmi_callback = dummy_nmi_callback;
+    nmi_callback = dummy_nmi_callback;
 }
 
 asmlinkage int math_state_restore(struct cpu_user_regs *regs)
@@ -1318,7 +1341,7 @@ void __init trap_init(void)
 
     cpu_init();
 
-    open_softirq(NMI_SOFTIRQ, nmi_softirq);
+    open_softirq(NMI_DOM0_SOFTIRQ, nmi_dom0_softirq);
 }
 
 

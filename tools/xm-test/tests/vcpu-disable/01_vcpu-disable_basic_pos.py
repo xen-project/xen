@@ -50,7 +50,7 @@ except DomainError, e:
     FAIL(str(e))
 
 # Disable VCPU 1
-cmd = "xm set-vcpus %s 1" % domain.getName()
+cmd = "xm vcpu-set %s 1" % domain.getName()
 status, output = safecmd(cmd)
 if check_status and status != 0:
     FAIL("\"%s\" returned invalid %i != 0" %(cmd,status))
@@ -68,7 +68,7 @@ if domUvcpu1 is not None:
     FAIL("failed to disable VCPU1")
 
 # Enable VCPU 1
-cmd = "xm set-vcpus %s 2" % domain.getName()
+cmd = "xm vcpu-set %s 2" % domain.getName()
 status, output = safecmd(cmd)
 if check_status and status != 0:
     FAIL("\"%s\" returned invalid %i != 0" %(cmd,status))

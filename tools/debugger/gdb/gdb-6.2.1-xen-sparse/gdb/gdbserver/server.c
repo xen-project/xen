@@ -20,7 +20,7 @@
    Boston, MA 02111-1307, USA.  */
 
 #include "server.h"
-
+#include "linux-low.h"
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
@@ -102,7 +102,15 @@ handle_query (char *own_buf)
       strcpy (own_buf, "OK");
       return;
     }
+  if (strcmp ("qC", own_buf) == 0)
+    {
+      struct process_info *process;
+      if (current_inferior == NULL)
+	return;
+      process = get_thread_process(current_inferior);
+      sprintf(own_buf, "QC%x", process->thread_known ? process->tid : 0);
 
+    }
   if (strcmp ("qfThreadInfo", own_buf) == 0)
     {
       thread_ptr = all_threads.head;

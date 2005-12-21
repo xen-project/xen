@@ -306,14 +306,8 @@ static int ioapic_inj_irq(vmx_vioapic_t *s,
     switch (delivery_mode) {
     case VLAPIC_DELIV_MODE_FIXED:
     case VLAPIC_DELIV_MODE_LPRI:
-        if (test_and_set_bit(vector, &VLAPIC_IRR(target)) && trig_mode == 1) {
-            /* the level interrupt should not happen before it is cleard */
+        if (vlapic_set_irq(target, vector, trig_mode) && (trig_mode == 1))
             printk("<ioapic_inj_irq> level interrupt happen before cleard\n");
-        }
-#ifndef __ia64__
-        if (trig_mode)
-            test_and_set_bit(vector, &target->tmr[0]);
-#endif
         result = 1;
         break;
     default:

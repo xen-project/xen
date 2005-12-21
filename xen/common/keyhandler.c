@@ -112,8 +112,11 @@ static void do_task_queues(unsigned char key)
         printk("Xen: DOM %u, flags=%lx refcnt=%d nr_pages=%d "
                "xenheap_pages=%d\n", d->domain_id, d->domain_flags,
                atomic_read(&d->refcnt), d->tot_pages, d->xenheap_pages);
-        printk("     handle=%02x%02x%02x%02x-%02x%02x%02x%02x-"
-               "%02x%02x%02x%02x-%02x%02x%02x%02x\n",
+        /* The handle is printed according to the OSF DCE UUID spec., even
+           though it is not necessarily such a thing, for ease of use when it
+           _is_ one of those. */
+        printk("     handle=%02x%02x%02x%02x-%02x%02x-%02x%02x-"
+               "%02x%02x-%02x%02x%02x%02x%02x%02x\n",
                d->handle[ 0], d->handle[ 1], d->handle[ 2], d->handle[ 3],
                d->handle[ 4], d->handle[ 5], d->handle[ 6], d->handle[ 7],
                d->handle[ 8], d->handle[ 9], d->handle[10], d->handle[11],

@@ -476,19 +476,20 @@ static int irq_masked(VCPU *vcpu, int h_pending, int h_inservice)
  * May come from virtualization fault or
  * nested host interrupt.
  */
-void vmx_vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
+int vmx_vcpu_pend_interrupt(VCPU *vcpu, uint8_t vector)
 {
     uint64_t    spsr;
+    int ret;
 
     if (vector & ~0xff) {
         DPRINTK("vmx_vcpu_pend_interrupt: bad vector\n");
         return;
     }
     local_irq_save(spsr);
-    VCPU(vcpu,irr[vector>>6]) |= 1UL<<(vector&63);
-    //vlapic_update_shared_irr(vcpu);
+    ret = test_and_set_bit(vector, &VCPU(vcpu, irr[0]));
     local_irq_restore(spsr);
     vcpu->arch.irq_new_pending = 1;
+    return ret;
 }
 
 /*
@@ -505,7 +506,6 @@ void vmx_vcpu_pend_batch_interrupt(VCPU *vcpu, UINT64 *pend_irr)
     for (i=0 ; i<4; i++ ) {
         VCPU(vcpu,irr[i]) |= pend_irr[i];
     }
-    //vlapic_update_shared_irr(vcpu);
     local_irq_restore(spsr);
     vcpu->arch.irq_new_pending = 1;
 }
@@ -592,7 +592,6 @@ uint64_t guest_read_vivr(VCPU *vcpu)
     VLSAPIC_INSVC(vcpu,vec>>6) |= (1UL <<(vec&63));
     VCPU(vcpu, irr[vec>>6]) &= ~(1UL <<(vec&63));
     update_vhpi(vcpu, NULL_VECTOR);     // clear VHPI till EOI or IRR write
-    //vlapic_update_shared_irr(vcpu);
     local_irq_restore(spsr);
     return (uint64_t)vec;
 }

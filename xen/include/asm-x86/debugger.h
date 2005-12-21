@@ -30,6 +30,8 @@
 #ifndef __X86_DEBUGGER_H__
 #define __X86_DEBUGGER_H__
 
+#include <xen/sched.h>
+#include <asm/regs.h>
 #include <asm/processor.h>
 
 /* The main trap handlers use these helper macros which include early bail. */
@@ -41,9 +43,10 @@
 #if defined(CRASH_DEBUG)
 
 extern int __trap_to_cdb(struct cpu_user_regs *r);
-#define debugger_trap_entry(_v, _r) (0)
 
-static inline int debugger_trap_fatal(
+#define __debugger_trap_entry(_v, _r) (0)
+
+static inline int __debugger_trap_fatal(
     unsigned int vector, struct cpu_user_regs *regs)
 {
     (void)__trap_to_cdb(regs);
@@ -51,60 +54,52 @@ static inline int debugger_trap_fatal(
 }
 
 /* Int3 is a trivial way to gather cpu_user_regs context. */
-#define debugger_trap_immediate() __asm__ __volatile__ ( "int3" );
-
-#elif defined(DOMU_DEBUG)
-
-#include <xen/sched.h>
-#include <asm/regs.h>
-
-static inline int debugger_trap_entry(
-    unsigned int vector, struct cpu_user_regs *regs)
-{
-    struct vcpu *v = current;
-
-    if ( !KERNEL_MODE(v, regs) || (v->domain->domain_id == 0) )
-        return 0;
-    
-    switch ( vector )
-    {
-    case TRAP_int3:
-    case TRAP_debug:
-        domain_pause_for_debugger();
-        return 1;
-    }
-
-    return 0;
-}
-
-#define debugger_trap_fatal(_v, _r) (0)
-#define debugger_trap_immediate()
+#define __debugger_trap_immediate() __asm__ __volatile__ ( "int3" );
 
 #elif 0
 
 extern int kdb_trap(int, int, struct cpu_user_regs *);
 
-static inline int debugger_trap_entry(
+static inline int __debugger_trap_entry(
     unsigned int vector, struct cpu_user_regs *regs)
 {
     return 0;
 }
 
-static inline int debugger_trap_fatal(
+static inline int __debugger_trap_fatal(
     unsigned int vector, struct cpu_user_regs *regs)
 {
     return kdb_trap(vector, 0, regs);
 }
 
 /* Int3 is a trivial way to gather cpu_user_regs context. */
-#define debugger_trap_immediate() __asm__ __volatile__ ( "int3" );
+#define __debugger_trap_immediate() __asm__ __volatile__ ( "int3" )
 
 #else
 
-#define debugger_trap_entry(_v, _r) (0)
-#define debugger_trap_fatal(_v, _r) (0)
-#define debugger_trap_immediate()
+#define __debugger_trap_entry(_v, _r) (0)
+#define __debugger_trap_fatal(_v, _r) (0)
+#define __debugger_trap_immediate()   ((void)0)
 
 #endif
+
+static inline int debugger_trap_entry(
+    unsigned int vector, struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+
+    if ( KERNEL_MODE(v, regs) &&
+         test_bit(_DOMF_debugging, &v->domain->domain_flags) &&
+         ((vector == TRAP_int3) || (vector == TRAP_debug)) )
+    {
+        domain_pause_for_debugger();
+        return 1;
+    }
+
+    return __debugger_trap_entry(vector, regs);
+}
+
+#define debugger_trap_fatal(v, r) (__debugger_trap_fatal(v, r))
+#define debugger_trap_immediate() (__debugger_trap_immediate())
 
 #endif /* __X86_DEBUGGER_H__ */

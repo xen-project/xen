@@ -119,7 +119,7 @@ const char* vncconnect; /* do a reverse connect to this host*/
 const char* keyboard_layout = 0;
 int64_t ticks_per_sec;
 int boot_device = 'c';
-int ram_size;
+uint64_t ram_size;
 int domid = -1;
 static char network_script[1024];
 int pit_min_timer_count = 0;
@@ -2906,7 +2906,7 @@ int main(int argc, char **argv)
                 help();
                 break;
             case QEMU_OPTION_m:
-                ram_size = atoi(optarg) * 1024 * 1024;
+                ram_size = atol(optarg) * 1024 * 1024;
                 if (ram_size <= 0)
                     help();
                 break;

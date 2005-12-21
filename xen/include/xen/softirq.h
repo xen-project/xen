@@ -6,7 +6,7 @@
 #define SCHEDULE_SOFTIRQ                  1
 #define NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ 2
 #define KEYPRESS_SOFTIRQ                  3
-#define NMI_SOFTIRQ                       4
+#define NMI_DOM0_SOFTIRQ                  4
 #define PAGE_SCRUB_SOFTIRQ                5
 #define DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ  6
 #define NR_SOFTIRQS                       7

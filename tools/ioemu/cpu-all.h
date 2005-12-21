@@ -668,7 +668,7 @@ static __inline__ void atomic_clear_bit(long nr, volatile void *addr)
 #endif
 /* memory API */
 
-extern int phys_ram_size;
+extern uint64_t phys_ram_size;
 extern int phys_ram_fd;
 extern uint8_t *phys_ram_base;
 extern uint8_t *phys_ram_dirty;

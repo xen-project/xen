@@ -190,7 +190,7 @@ void dump_pageframe_info(struct domain *d)
         list_for_each_entry ( page, &d->page_list, list )
         {
             printk("Page %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
-                   _p(page_to_phys(page)), _p(page - frame_table),
+                   _p(page_to_phys(page)), _p(page_to_pfn(page)),
                    page->count_info, page->u.inuse.type_info);
         }
     }
@@ -198,13 +198,13 @@ void dump_pageframe_info(struct domain *d)
     list_for_each_entry ( page, &d->xenpage_list, list )
     {
         printk("XenPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
-               _p(page_to_phys(page)), _p(page - frame_table),
+               _p(page_to_phys(page)), _p(page_to_pfn(page)),
                page->count_info, page->u.inuse.type_info);
     }
 
     page = virt_to_page(d->shared_info);
     printk("Shared_info@%p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
-           _p(page_to_phys(page)), _p(page - frame_table), page->count_info,
+           _p(page_to_phys(page)), _p(page_to_pfn(page)), page->count_info,
            page->u.inuse.type_info);
 }
 
@@ -391,19 +391,19 @@ int arch_set_info_guest(
 
     if ( shadow_mode_refcounts(d) )
     {
-        if ( !get_page(&frame_table[phys_basetab>>PAGE_SHIFT], d) )
+        if ( !get_page(pfn_to_page(phys_basetab>>PAGE_SHIFT), d) )
             return -EINVAL;
     }
     else if ( !(c->flags & VGCF_VMX_GUEST) )
     {
-        if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d,
+        if ( !get_page_and_type(pfn_to_page(phys_basetab>>PAGE_SHIFT), d,
                                 PGT_base_page_table) )
             return -EINVAL;
     }
 
     if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
     {
-        put_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT]);
+        put_page_and_type(pfn_to_page(phys_basetab>>PAGE_SHIFT));
         return rc;
     }
 

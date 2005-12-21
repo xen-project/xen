@@ -372,6 +372,10 @@ gopts.var('ne2000', val='no|yes',
           fn=set_bool, default=0,
           use="Should device models use ne2000?")
 
+gopts.var('audio', val='no|yes',
+          fn=set_bool, default=0,
+          use="Should device models enable audio?")
+
 gopts.var('vnc', val='',
           fn=set_value, default=None,
           use="""Should the device model use VNC?""")
@@ -521,7 +525,7 @@ def configure_vmx(config_image, vals):
     """Create the config for VMX devices.
     """
     args = [ 'device_model', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
-             'localtime', 'serial', 'stdvga', 'isa', 'nographic',
+             'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'audio',
              'vnc', 'vncviewer', 'sdl', 'display', 'ne2000', 'lapic']
     for a in args:
         if (vals.__dict__[a]):

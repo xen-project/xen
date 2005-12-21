@@ -202,7 +202,7 @@ void arch_init_memory(void)
     /* First 1MB of RAM is historically marked as I/O. */
     for ( i = 0; i < 0x100; i++ )
     {
-        page = &frame_table[i];
+        page = pfn_to_page(i);
         page->count_info        = PGC_allocated | 1;
         page->u.inuse.type_info = PGT_writable_page | PGT_validated | 1;
         page_set_owner(page, dom_io);
@@ -216,10 +216,10 @@ void arch_init_memory(void)
         /* Every page from cursor to start of next RAM region is I/O. */
         rstart_pfn = PFN_UP(e820.map[i].addr);
         rend_pfn   = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
-        while ( pfn < rstart_pfn )
+        for ( ; pfn < rstart_pfn; pfn++ )
         {
             BUG_ON(!pfn_valid(pfn));
-            page = &frame_table[pfn++];
+            page = pfn_to_page(pfn);
             page->count_info        = PGC_allocated | 1;
             page->u.inuse.type_info = PGT_writable_page | PGT_validated | 1;
             page_set_owner(page, dom_io);
@@ -253,7 +253,7 @@ void invalidate_shadow_ldt(struct vcpu *v)
         pfn = l1e_get_pfn(v->arch.perdomain_ptes[i]);
         if ( pfn == 0 ) continue;
         v->arch.perdomain_ptes[i] = l1e_empty();
-        page = &frame_table[pfn];
+        page = pfn_to_page(pfn);
         ASSERT_PAGE_IS_TYPE(page, PGT_ldt_page);
         ASSERT_PAGE_IS_DOMAIN(page, v->domain);
         put_page_and_type(page);
@@ -320,13 +320,13 @@ int map_ldt_shadow_page(unsigned int off)
     if ( unlikely(!VALID_MFN(gmfn)) )
         return 0;
 
-    res = get_page_and_type(&frame_table[gmfn], d, PGT_ldt_page);
+    res = get_page_and_type(pfn_to_page(gmfn), d, PGT_ldt_page);
 
     if ( !res && unlikely(shadow_mode_refcounts(d)) )
     {
         shadow_lock(d);
         shadow_remove_all_write_access(d, gpfn, gmfn);
-        res = get_page_and_type(&frame_table[gmfn], d, PGT_ldt_page);
+        res = get_page_and_type(pfn_to_page(gmfn), d, PGT_ldt_page);
         shadow_unlock(d);
     }
 
@@ -344,7 +344,7 @@ int map_ldt_shadow_page(unsigned int off)
 
 static int get_page_from_pagenr(unsigned long page_nr, struct domain *d)
 {
-    struct pfn_info *page = &frame_table[page_nr];
+    struct pfn_info *page = pfn_to_page(page_nr);
 
     if ( unlikely(!pfn_valid(page_nr)) || unlikely(!get_page(page, d)) )
     {
@@ -360,7 +360,7 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
                                          unsigned long type,
                                          struct domain *d)
 {
-    struct pfn_info *page = &frame_table[page_nr];
+    struct pfn_info *page = pfn_to_page(page_nr);
 
     if ( unlikely(!get_page_from_pagenr(page_nr, d)) )
         return 0;
@@ -412,7 +412,7 @@ get_linear_pagetable(
          * Make sure that the mapped frame is an already-validated L2 table. 
          * If so, atomically increment the count (checking for overflow).
          */
-        page = &frame_table[pfn];
+        page = pfn_to_page(pfn);
         y = page->u.inuse.type_info;
         do {
             x = y;
@@ -435,7 +435,7 @@ get_page_from_l1e(
     l1_pgentry_t l1e, struct domain *d)
 {
     unsigned long mfn = l1e_get_pfn(l1e);
-    struct pfn_info *page = &frame_table[mfn];
+    struct pfn_info *page = pfn_to_page(mfn);
     int okay;
     extern int domain_iomem_in_pfn(struct domain *d, unsigned long pfn);
 
@@ -587,7 +587,7 @@ get_page_from_l4e(
 void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
 {
     unsigned long    pfn  = l1e_get_pfn(l1e);
-    struct pfn_info *page = &frame_table[pfn];
+    struct pfn_info *page = pfn_to_page(pfn);
     struct domain   *e;
     struct vcpu     *v;
 
@@ -645,7 +645,7 @@ static void put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
 {
     if ( (l2e_get_flags(l2e) & _PAGE_PRESENT) && 
          (l2e_get_pfn(l2e) != pfn) )
-        put_page_and_type(&frame_table[l2e_get_pfn(l2e)]);
+        put_page_and_type(pfn_to_page(l2e_get_pfn(l2e)));
 }
 
 
@@ -655,7 +655,7 @@ static void put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn)
 {
     if ( (l3e_get_flags(l3e) & _PAGE_PRESENT) && 
          (l3e_get_pfn(l3e) != pfn) )
-        put_page_and_type(&frame_table[l3e_get_pfn(l3e)]);
+        put_page_and_type(pfn_to_page(l3e_get_pfn(l3e)));
 }
 
 #endif
@@ -666,7 +666,7 @@ static void put_page_from_l4e(l4_pgentry_t l4e, unsigned long pfn)
 {
     if ( (l4e_get_flags(l4e) & _PAGE_PRESENT) && 
          (l4e_get_pfn(l4e) != pfn) )
-        put_page_and_type(&frame_table[l4e_get_pfn(l4e)]);
+        put_page_and_type(pfn_to_page(l4e_get_pfn(l4e)));
 }
 
 #endif
@@ -1584,9 +1584,9 @@ int new_guest_cr3(unsigned long mfn)
         write_ptbase(v);
 
         if ( shadow_mode_refcounts(d) )
-            put_page(&frame_table[old_base_mfn]);
+            put_page(pfn_to_page(old_base_mfn));
         else
-            put_page_and_type(&frame_table[old_base_mfn]);
+            put_page_and_type(pfn_to_page(old_base_mfn));
 
         /* CR3 also holds a ref to its shadow... */
         if ( shadow_mode_enabled(d) )
@@ -1595,7 +1595,7 @@ int new_guest_cr3(unsigned long mfn)
                 put_shadow_ref(v->arch.monitor_shadow_ref);
             v->arch.monitor_shadow_ref =
                 pagetable_get_pfn(v->arch.monitor_table);
-            ASSERT(!page_get_owner(&frame_table[v->arch.monitor_shadow_ref]));
+            ASSERT(!page_get_owner(pfn_to_page(v->arch.monitor_shadow_ref)));
             get_shadow_ref(v->arch.monitor_shadow_ref);
         }
     }
@@ -1763,7 +1763,7 @@ int do_mmuext_op(
 
         okay = 1;
         mfn  = op.arg1.mfn;
-        page = &frame_table[mfn];
+        page = pfn_to_page(mfn);
 
         switch ( op.cmd )
         {
@@ -1845,7 +1845,7 @@ int do_mmuext_op(
                     pagetable_get_pfn(v->arch.guest_table_user);
                 v->arch.guest_table_user = mk_pagetable(mfn << PAGE_SHIFT);
                 if ( old_mfn != 0 )
-                    put_page_and_type(&frame_table[old_mfn]);
+                    put_page_and_type(pfn_to_page(old_mfn));
             }
             break;
 #endif
@@ -2145,7 +2145,7 @@ int do_mmu_update(
             va = map_domain_page_with_cache(mfn, &mapcache);
             va = (void *)((unsigned long)va +
                           (unsigned long)(req.ptr & ~PAGE_MASK));
-            page = &frame_table[mfn];
+            page = pfn_to_page(mfn);
 
             switch ( (type_info = page->u.inuse.type_info) & PGT_type_mask )
             {
@@ -2285,7 +2285,7 @@ int do_mmu_update(
 
             mark_dirty(FOREIGNDOM, mfn);
 
-            put_page(&frame_table[mfn]);
+            put_page(pfn_to_page(mfn));
             break;
 
         default:
@@ -2728,7 +2728,7 @@ void destroy_gdt(struct vcpu *v)
     for ( i = 0; i < FIRST_RESERVED_GDT_PAGE; i++ )
     {
         if ( (pfn = l1e_get_pfn(v->arch.perdomain_ptes[i])) != 0 )
-            put_page_and_type(&frame_table[pfn]);
+            put_page_and_type(pfn_to_page(pfn));
         v->arch.perdomain_ptes[i] = l1e_empty();
         v->arch.guest_context.gdt_frames[i] = 0;
     }
@@ -2753,7 +2753,7 @@ long set_gdt(struct vcpu *v,
     for ( i = 0; i < nr_pages; i++ ) {
         pfn = frames[i];
         if ((pfn >= max_page) ||
-            !get_page_and_type(&frame_table[pfn], d, PGT_gdt_page) )
+            !get_page_and_type(pfn_to_page(pfn), d, PGT_gdt_page) )
             goto fail;
     }
 
@@ -2773,7 +2773,7 @@ long set_gdt(struct vcpu *v,
 
  fail:
     while ( i-- > 0 )
-        put_page_and_type(&frame_table[frames[i]]);
+        put_page_and_type(pfn_to_page(frames[i]));
     return -EINVAL;
 }
 
@@ -2827,7 +2827,7 @@ long do_update_descriptor(u64 pa, u64 desc)
         return -EINVAL;
     }
 
-    page = &frame_table[mfn];
+    page = pfn_to_page(mfn);
     if ( unlikely(!get_page(page, dom)) )
     {
         UNLOCK_BIGLOCK(dom);
@@ -3037,7 +3037,7 @@ int revalidate_l1(
         if ( likely(l1e_get_intpte(ol1e) == (l1e_get_intpte(nl1e)|_PAGE_RW)) )
         {
             if ( likely(l1e_get_flags(nl1e) & _PAGE_PRESENT) )
-                put_page_type(&frame_table[l1e_get_pfn(nl1e)]);
+                put_page_type(pfn_to_page(l1e_get_pfn(nl1e)));
             continue;
         }
 
@@ -3220,7 +3220,7 @@ static int ptwr_emulated_update(
     }
 
     pfn  = l1e_get_pfn(pte);
-    page = &frame_table[pfn];
+    page = pfn_to_page(pfn);
 
     /* We are looking only for read-only mappings of p.t. pages. */
     if ( ((l1e_get_flags(pte) & (_PAGE_RW|_PAGE_PRESENT)) != _PAGE_PRESENT) ||
@@ -3331,7 +3331,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     }
 
     pfn  = l1e_get_pfn(pte);
-    page = &frame_table[pfn];
+    page = pfn_to_page(pfn);
 
 #ifdef CONFIG_X86_64
 #define WRPT_PTE_FLAGS (_PAGE_RW | _PAGE_PRESENT | _PAGE_USER)

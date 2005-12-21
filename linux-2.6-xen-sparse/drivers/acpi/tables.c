@@ -566,8 +566,7 @@ acpi_table_get_sdt (
  * result: sdt_entry[] is initialized
  */
 #if defined(CONFIG_XEN_X86) || defined(CONFIG_XEN_X86_64)
-#define acpi_rsdp_phys_to_va(rsdp_phys) (__fix_to_virt(FIX_ACPI_RSDP_PAGE) + \
-					   (rsdp_phys & ~PAGE_MASK))
+#define acpi_rsdp_phys_to_va(rsdp_phys) isa_bus_to_virt(rsdp_phys)
 #else
 #define acpi_rsdp_phys_to_va(rsdp_phys) __va(rsdp_phys)
 #endif

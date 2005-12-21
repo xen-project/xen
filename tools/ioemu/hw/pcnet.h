@@ -92,7 +92,7 @@
 #define CSR_NRBA(S)      ((S)->csr[22] | ((S)->csr[23] << 16))
 #define CSR_BADR(S)      ((S)->csr[24] | ((S)->csr[25] << 16))
 #define CSR_NRDA(S)      ((S)->csr[26] | ((S)->csr[27] << 16))
-#define CSR_CRDA(S)      ((S)->csr[28] | ((S)->csr[29] << 16))
+#define CSR_CRDA(S)      ((S)->csr[28] | (((uint32_t)((S)->csr[29])) << 16))
 #define CSR_BADX(S)      ((S)->csr[30] | ((S)->csr[31] << 16))
 #define CSR_NXDA(S)      ((S)->csr[32] | ((S)->csr[33] << 16))
 #define CSR_CXDA(S)      ((S)->csr[34] | ((S)->csr[35] << 16))
@@ -102,7 +102,7 @@
 #define CSR_NXBA(S)      ((S)->csr[64] | ((S)->csr[65] << 16))
 
 #define PHYSADDR(S,A) \
-  (BCR_SSIZE32(S) ? (A) : (A) | ((0xff00 & (uint32_t)(s)->csr[2])<<16))
+  (BCR_SSIZE32(S) ? (A) : (A) | ((0xff00 & (uint32_t)(S)->csr[2])<<16))
 
 struct pcnet_initblk16 {
     uint16_t mode;

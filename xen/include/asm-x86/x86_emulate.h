@@ -164,6 +164,6 @@ x86_emulate_memop(
  */
 extern void *
 decode_register(
-    u8 modrm_reg, struct cpu_user_regs *regs, int highbyte_regs);
+    uint8_t modrm_reg, struct cpu_user_regs *regs, int highbyte_regs);
 
 #endif /* __X86_EMULATE_H__ */

@@ -567,9 +567,7 @@ ENTRY(double_fault)
 ENTRY(nmi)
         pushq $0
         SAVE_ALL
-        inb   $0x61,%al
-        movl  %eax,%esi # reason
-        movq  %rsp,%rdi # regs
+        movq  %rsp,%rdi
         call  do_nmi
 	jmp   restore_all_xen
 

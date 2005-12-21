@@ -67,12 +67,13 @@
  */
 #define VIRQ_TIMER      0  /* Timebase update, and/or requested timeout.  */
 #define VIRQ_DEBUG      1  /* Request guest to dump debug info.           */
-#define VIRQ_CONSOLE    2  /* (DOM0) bytes received on emergency console. */
+#define VIRQ_CONSOLE    2  /* (DOM0) Bytes received on emergency console. */
 #define VIRQ_DOM_EXC    3  /* (DOM0) Exceptional event for some domain.   */
-#define VIRQ_PARITY_ERR 4  /* (DOM0) NMI parity error.                    */
-#define VIRQ_IO_ERR     5  /* (DOM0) NMI I/O error.                       */
+#define VIRQ_PARITY_ERR 4  /* (DOM0) NMI parity error (port 0x61, bit 7). */
+#define VIRQ_IO_ERR     5  /* (DOM0) NMI I/O error    (port 0x61, bit 6). */
 #define VIRQ_DEBUGGER   6  /* (DOM0) A domain has paused for debugging.   */
-#define NR_VIRQS        7
+#define VIRQ_NMI        7  /* (DOM0) Unknown NMI (not from ISA port 0x61).*/
+#define NR_VIRQS        8
 
 /*
  * MMU-UPDATE REQUESTS

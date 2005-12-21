@@ -87,6 +87,8 @@ static inline void set_ldt_desc(unsigned int cpu, void *addr, unsigned int size)
 	(info)->seg_not_present	== 1	&& \
 	(info)->useable		== 0	)
 
+extern int write_ldt_entry(void *ldt, int entry, __u32 entry_a, __u32 entry_b);
+
 #if TLS_SIZE != 24
 # error update this code.
 #endif

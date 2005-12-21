@@ -17,8 +17,13 @@
 #============================================================================
 
 
-"""Universal(ly) Unique Identifiers (UUIDs).
-"""
+"""Universal Unique Identifiers (UUIDs).  By default, UUIDs generated here are
+purely random, with no internal structure.  However, they are the same size,
+and are formatted by the same conventions, as the UUIDs in the Open Software
+Foundation's Distributed Computing Environment (OSF DCE).  This allows Xend to
+be used with UUIDs generated as per the DCE specification, should that be
+required.  These UUIDs are also, by no coincidence, the same size as the
+'handle' stored by the Xen hypervisor along with the domain structure."""
 
 
 import commands
@@ -54,7 +59,8 @@ def create():
 
 
 def toString(u):
-    return "-".join(["%02x" * 4] * 4) % tuple(u)
+    return "-".join(["%02x" * 4, "%02x" * 2, "%02x" * 2, "%02x" * 2,
+                     "%02x" * 6]) % tuple(u)
 
 def fromString(s):
     s = s.replace('-', '')
