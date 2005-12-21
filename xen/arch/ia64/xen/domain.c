@@ -367,10 +367,13 @@ void new_thread(struct vcpu *v,
 		    regs->r28 = dom_fw_setup(d,saved_command_line,256L);
 		else {
 		    regs->ar_rsc |= (2 << 2); /* force PL2/3 */
-		    //regs->r28 = dom_fw_setup(d,d->arch.cmdline,256L);
-printf("construct domU: d->arch.cmdline=%p, firstchar=%d\n",
-d->arch.cmdline,*(d->arch.cmdline));
-		    regs->r28 = dom_fw_setup(d,"nomca nosmp xencons=tty0 console=tty0 root=/dev/hda1",256L);  //FIXME
+		    if (*d->arch.cmdline == '\0') {
+#define DEFAULT_CMDLINE "nomca nosmp xencons=tty0 console=tty0 root=/dev/hda1"
+			regs->r28 = dom_fw_setup(d,DEFAULT_CMDLINE,256L);
+			printf("domU command line defaulted to"
+				DEFAULT_CMDLINE "\n");
+		    }
+		    else regs->r28 = dom_fw_setup(d,d->arch.cmdline,256L);
 		}
 		VCPU(v, banknum) = 1;
 		VCPU(v, metaphysical_mode) = 1;
