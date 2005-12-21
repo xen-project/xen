@@ -272,17 +272,6 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	printf("arch_set_info_guest\n");
 	if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
             return 0;
-
-#ifdef CONFIG_IA64_SPLIT_CACHE
-	/* Sync d/i cache conservatively */
-	if (!running_on_sim) {
-	    ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
-	    if (ret != PAL_STATUS_SUCCESS)
-	        panic("PAL CACHE FLUSH failed for domain.\n");
-	    printk("Sync i/d cache for dom0 image SUCC\n");
-	}
-#endif
-
 	if (c->flags & VGCF_VMX_GUEST) {
 	    if (!vmx_enabled) {
 		printk("No VMX hardware feature for vmx domain.\n");
@@ -299,6 +288,16 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	d->arch.sys_pgnr = c->sys_pgnr;
 	new_thread(v, regs->cr_iip, 0, 0);
 
+#ifdef CONFIG_IA64_SPLIT_CACHE
+    /* Sync d/i cache conservatively */
+    if (!running_on_sim) {
+        ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
+        if ((ret!=PAL_STATUS_SUCCESS)&& (ret!=PAL_STATUS_UNIMPLEMENTED))
+            printk("PAL CACHE FLUSH failed for dom0.\n");
+        else
+            printk("Sync i/d cache for guest SUCC\n");
+    }
+#endif
  	v->vcpu_info->arch.evtchn_vector = c->vcpu.evtchn_vector;
 	if ( c->vcpu.privregs && copy_from_user(v->arch.privregs,
 			   c->vcpu.privregs, sizeof(mapped_regs_t))) {
@@ -898,13 +897,6 @@ int construct_dom0(struct domain *d,
 	//if ( initrd_len != 0 )
 	//    memcpy((void *)vinitrd_start, initrd_start, initrd_len);
 
-	/* Sync d/i cache conservatively */
-	if (!running_on_sim) {
-	    ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
-	    if (ret != PAL_STATUS_SUCCESS)
-	        panic("PAL CACHE FLUSH failed for dom0.\n");
-	    printk("Sync i/d cache for dom0 image SUCC\n");
-	}
 
 	/* Set up start info area. */
 	si = (start_info_t *)alloc_xenheap_page();
@@ -958,6 +950,16 @@ int construct_dom0(struct domain *d,
 
 	new_thread(v, pkern_entry, 0, 0);
 	physdev_init_dom0(d);
+#ifdef CONFIG_IA64_SPLIT_CACHE
+    /* Sync d/i cache conservatively */
+    if (!running_on_sim) {
+        ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
+        if ((ret!=PAL_STATUS_SUCCESS)&& (ret!=PAL_STATUS_UNIMPLEMENTED))
+            printk("PAL CACHE FLUSH failed for dom0.\n");
+        else
+            printk("Sync i/d cache for guest SUCC\n");
+    }
+#endif
 
 	// FIXME: Hack for keyboard input
 #ifdef CLONE_DOMAIN0
@@ -1016,6 +1018,16 @@ int construct_domU(struct domain *d,
 #endif
 	new_thread(v, pkern_entry, 0, 0);
 	printk("new_thread returns\n");
+#ifdef CONFIG_IA64_SPLIT_CACHE
+    /* Sync d/i cache conservatively */
+    if (!running_on_sim) {
+        ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
+        if ((ret!=PAL_STATUS_SUCCESS)&& (ret!=PAL_STATUS_UNIMPLEMENTED))
+            printk("PAL CACHE FLUSH failed for dom0.\n");
+        else
+            printk("Sync i/d cache for guest SUCC\n");
+    }
+#endif
 	__set_bit(0x30, VCPU(v, delivery_mask));
 
 	return 0;
@@ -1029,6 +1041,16 @@ void reconstruct_domU(struct vcpu *v)
 		v->domain->domain_id);
 	loaddomainelfimage(v->domain,v->domain->arch.image_start);
 	new_thread(v, v->domain->arch.entry, 0, 0);
+#ifdef CONFIG_IA64_SPLIT_CACHE
+    /* Sync d/i cache conservatively */
+    if (!running_on_sim) {
+        ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
+        if ((ret!=PAL_STATUS_SUCCESS)&& (ret!=PAL_STATUS_UNIMPLEMENTED))
+            printk("PAL CACHE FLUSH failed for dom0.\n");
+        else
+            printk("Sync i/d cache for guest SUCC\n");
+    }
+#endif
 }
 #endif
 
