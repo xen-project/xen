@@ -390,6 +390,7 @@ int acpi_table_parse_srat (enum acpi_srat_entry_id id, acpi_madt_entry_handler h
 void acpi_table_print (struct acpi_table_header *header, unsigned long phys_addr);
 void acpi_table_print_madt_entry (acpi_table_entry_header *madt);
 void acpi_table_print_srat_entry (acpi_table_entry_header *srat);
+int acpi_table_count_madt (enum acpi_madt_entry_id id);
 
 /* the following four functions are architecture-dependent */
 void acpi_numa_slit_init (struct acpi_table_slit *slit);

@@ -203,12 +203,18 @@ acpi_parse_lsapic (acpi_table_entry_header *header, const unsigned long end)
 	else {
 		printk(" enabled");
 #ifdef CONFIG_SMP
-		smp_boot_data.cpu_phys_id[available_cpus] = (lsapic->id << 8) | lsapic->eid;
-		if (hard_smp_processor_id()
-		    == (unsigned int) smp_boot_data.cpu_phys_id[available_cpus])
-			printk(" (BSP)");
-#endif
+		if (available_cpus < NR_CPUS) {
+			smp_boot_data.cpu_phys_id[available_cpus] = (lsapic->id << 8) | lsapic->eid;
+			if (hard_smp_processor_id()
+			    == (unsigned int) smp_boot_data.cpu_phys_id[available_cpus])
+				printk(" (BSP)");
+			++available_cpus;
+		} else {
+			printk(" - however, ignored...");
+		}
+#else
 		++available_cpus;
+#endif
 	}
 
 	printk("\n");
@@ -598,8 +604,17 @@ acpi_boot_init (void)
 	if (acpi_table_parse_madt(ACPI_MADT_LAPIC_ADDR_OVR, acpi_parse_lapic_addr_ovr, 0) < 0)
 		printk(KERN_ERR PREFIX "Error parsing LAPIC address override entry\n");
 
+#ifdef CONFIG_SMP
+	int count;
+	if ((count = acpi_table_count_madt(ACPI_MADT_LSAPIC)) < 1) {
+		printk(KERN_ERR PREFIX "Error parsing MADT - no LSAPIC entries\n");
+	} else {
+		acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_parse_lsapic, count);
+	}
+#else
 	if (acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_parse_lsapic, NR_CPUS) < 1)
-		printk(KERN_ERR PREFIX "Error parsing MADT - no LAPIC entries\n");
+		printk(KERN_ERR PREFIX "Error parsing MADT - no LSAPIC entries\n");
+#endif
 
 	if (acpi_table_parse_madt(ACPI_MADT_LAPIC_NMI, acpi_parse_lapic_nmi, 0) < 0)
 		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
