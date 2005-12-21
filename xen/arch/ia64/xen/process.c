@@ -715,9 +715,9 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 	unsigned long check_lazy_cover = 0;
 	unsigned long psr = regs->cr_ipsr;
 
-	if (!(psr & IA64_PSR_CPL)) {
-		printk("ia64_handle_reflection: reflecting with priv=0!!\n");
-	}
+	/* Following faults shouldn'g be seen from Xen itself */
+	if (!(psr & IA64_PSR_CPL)) BUG();
+
 	switch(vector) {
 	    case 8:
 		vector = IA64_DIRTY_BIT_VECTOR; break;
