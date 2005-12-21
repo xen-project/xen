@@ -73,7 +73,7 @@ void smp_send_event_check_mask(cpumask_t mask)
     if (cpus_empty(mask))
         return;
 
-    printf("smp_send_event_check_mask called\n");
+    //printf("smp_send_event_check_mask called\n");
 
     for (cpu = 0; cpu < NR_CPUS; ++cpu)
         if (cpu_isset(cpu, mask))

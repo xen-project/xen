@@ -117,9 +117,6 @@ vmx_ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 		local_irq_disable();
 		ia64_setreg(_IA64_REG_CR_TPR, saved_tpr);
 	    }
-	    else {
-                printf("Oops: RESCHEDULE IPI absorbed by HV\n");
-            }
 	    ia64_eoi();
 	    vector = ia64_get_ivr();
 	}
