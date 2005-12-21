@@ -296,9 +296,13 @@ static int setup_guest(int xc_handle,
     unsigned long *page_array = NULL;
     struct load_funcs load_funcs;
     struct domain_setup_info dsi;
+    unsigned long vinitrd_start;
+    unsigned long vinitrd_end;
+    unsigned long v_end;
     unsigned long start_page, pgnr;
     start_info_t *start_info;
     int rc;
+    unsigned long i;
 
     rc = probeimageformat(image, image_size, &load_funcs);
     if ( rc != 0 )
@@ -310,11 +314,13 @@ static int setup_guest(int xc_handle,
     if ( rc != 0 )
         goto error_out;
 
-    dsi.v_start = round_pgdown(dsi.v_start);
-    dsi.v_end   = round_pgup(dsi.v_end);
+    dsi.v_start      = round_pgdown(dsi.v_start);
+    vinitrd_start    = round_pgup(dsi.v_end);
+    vinitrd_end      = vinitrd_start + initrd_len;
+    v_end            = round_pgup(vinitrd_end);
 
     start_page = dsi.v_start >> PAGE_SHIFT;
-    pgnr = (dsi.v_end - dsi.v_start) >> PAGE_SHIFT;
+    pgnr = (v_end - dsi.v_start) >> PAGE_SHIFT;
     if ( (page_array = malloc(pgnr * sizeof(unsigned long))) == NULL )
     {
         PERROR("Could not allocate memory");
@@ -327,8 +333,37 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
+#define _p(a) ((void *) (a))
+
+    printf("VIRTUAL MEMORY ARRANGEMENT:\n"
+           " Loaded kernel: %p->%p\n"
+           " Init. ramdisk: %p->%p\n"
+           " TOTAL:         %p->%p\n",
+           _p(dsi.v_kernstart), _p(dsi.v_kernend), 
+           _p(vinitrd_start),   _p(vinitrd_end),
+           _p(dsi.v_start),     _p(v_end));
+    printf(" ENTRY ADDRESS: %p\n", _p(dsi.v_kernentry));
+
     (load_funcs.loadimage)(image, image_size, xc_handle, dom, page_array,
                            &dsi);
+
+    /* Load the initial ramdisk image. */
+    if ( initrd_len != 0 )
+    {
+        for ( i = (vinitrd_start - dsi.v_start);
+              i < (vinitrd_end - dsi.v_start); i += PAGE_SIZE )
+        {
+            char page[PAGE_SIZE];
+            if ( gzread(initrd_gfd, page, PAGE_SIZE) == -1 )
+            {
+                PERROR("Error reading initrd image, could not");
+                goto error_out;
+            }
+            xc_copy_to_domain_page(xc_handle, dom,
+                                   page_array[i>>PAGE_SHIFT], page);
+        }
+    }
+
 
     *pvke = dsi.v_kernentry;
 
@@ -358,6 +393,13 @@ static int setup_guest(int xc_handle,
     start_info->store_evtchn = store_evtchn;
     start_info->console_mfn   = nr_pages - 1;
     start_info->console_evtchn = console_evtchn;
+    if ( initrd_len != 0 )
+    {
+        ctxt->initrd.start    = vinitrd_start;
+        ctxt->initrd.size     = initrd_len;
+    }
+    strncpy((char *)ctxt->cmdline, cmdline, IA64_COMMAND_LINE_SIZE);
+    ctxt->cmdline[IA64_COMMAND_LINE_SIZE-1] = '\0';
     munmap(start_info, PAGE_SIZE);
 
     free(page_array);

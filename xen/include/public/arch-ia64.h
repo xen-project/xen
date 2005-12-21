@@ -276,6 +276,12 @@ typedef struct {
     unsigned long start_info_pfn;
 } arch_shared_info_t;
 
+typedef struct {
+    unsigned long start;
+    unsigned long size; 
+} arch_initrd_info_t;
+
+#define IA64_COMMAND_LINE_SIZE 512
 typedef struct vcpu_guest_context {
 #define VGCF_FPU_VALID (1<<0)
 #define VGCF_VMX_GUEST (1<<1)
@@ -289,6 +295,8 @@ typedef struct vcpu_guest_context {
     cpu_user_regs_t regs;
     arch_vcpu_info_t vcpu;
     arch_shared_info_t shared;
+    arch_initrd_info_t initrd;
+    char cmdline[IA64_COMMAND_LINE_SIZE];
 } vcpu_guest_context_t;
 
 #endif /* !__ASSEMBLY__ */

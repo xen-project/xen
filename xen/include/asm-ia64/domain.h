@@ -38,6 +38,9 @@ struct arch_domain {
     u64 image_len;
     u64 entry;
 #endif
+    unsigned long initrd_start;
+    unsigned long initrd_len;
+    char *cmdline;
 };
 #define xen_vastart arch.xen_vastart
 #define xen_vaend arch.xen_vaend

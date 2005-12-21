@@ -286,6 +286,9 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 
 	*regs = c->regs;
 	d->arch.sys_pgnr = c->sys_pgnr;
+	d->arch.initrd_start = c->initrd.start;
+	d->arch.initrd_len   = c->initrd.size;
+	d->arch.cmdline      = c->cmdline;
 	new_thread(v, regs->cr_iip, 0, 0);
 
 #ifdef CONFIG_IA64_SPLIT_CACHE
@@ -364,6 +367,9 @@ void new_thread(struct vcpu *v,
 		    regs->r28 = dom_fw_setup(d,saved_command_line,256L);
 		else {
 		    regs->ar_rsc |= (2 << 2); /* force PL2/3 */
+		    //regs->r28 = dom_fw_setup(d,d->arch.cmdline,256L);
+printf("construct domU: d->arch.cmdline=%p, firstchar=%d\n",
+d->arch.cmdline,*(d->arch.cmdline));
 		    regs->r28 = dom_fw_setup(d,"nomca nosmp xencons=tty0 console=tty0 root=/dev/hda1",256L);  //FIXME
 		}
 		VCPU(v, banknum) = 1;
