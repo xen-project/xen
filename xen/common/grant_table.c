@@ -177,17 +177,19 @@ __gnttab_map_grant_ref(
 
     spin_lock(&rd->grant_table->lock);
 
-    if ( act->pin == 0 )
+    if ( !act->pin ||
+         (!(dev_hst_ro_flags & GNTMAP_readonly) &&
+          !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask))) )
     {
-        /* CASE 1: Activating a previously inactive entry. */
-
         sflags = sha->flags;
         sdom   = sha->domid;
 
-        /* This loop attempts to set the access (reading/writing) flags
+        /*
+         * This loop attempts to set the access (reading/writing) flags
          * in the grant table entry.  It tries a cmpxchg on the field
          * up to five times, and then fails under the assumption that 
-         * the guest is misbehaving. */
+         * the guest is misbehaving.
+         */
         for ( ; ; )
         {
             u32 scombo, prev_scombo, new_scombo;
@@ -196,7 +198,7 @@ __gnttab_map_grant_ref(
                  unlikely(sdom != led->domain->domain_id) )
                 PIN_FAIL(unlock_out, GNTST_general_error,
                          "Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
-                        sflags, sdom, led->domain->domain_id);
+                         sflags, sdom, led->domain->domain_id);
 
             /* Merge two 16-bit values into a 32-bit combined update. */
             /* NB. Endianness! */
@@ -232,132 +234,50 @@ __gnttab_map_grant_ref(
             sdom   = (u16)(prev_scombo >> 16);
         }
 
-        /* rmb(); */ /* not on x86 */
-
-        frame = __gpfn_to_mfn(rd, sha->frame);
-
-        if ( unlikely(!pfn_valid(frame)) ||
-             unlikely(!((dev_hst_ro_flags & GNTMAP_readonly) ?
-                        get_page(pfn_to_page(frame), rd) :
-                        get_page_and_type(pfn_to_page(frame), rd,
-                                          PGT_writable_page))) )
+        if ( !act->pin )
         {
-            clear_bit(_GTF_writing, &sha->flags);
-            clear_bit(_GTF_reading, &sha->flags);
-            PIN_FAIL(unlock_out, GNTST_general_error,
-                     "Could not pin the granted frame (%lx)!\n", frame);
+            act->domid = sdom;
+            act->frame = __gpfn_to_mfn(rd, sha->frame);
         }
-
-        if ( dev_hst_ro_flags & GNTMAP_device_map )
-            act->pin += (dev_hst_ro_flags & GNTMAP_readonly) ?
-                GNTPIN_devr_inc : GNTPIN_devw_inc;
-        if ( dev_hst_ro_flags & GNTMAP_host_map )
-            act->pin += (dev_hst_ro_flags & GNTMAP_readonly) ?
-                GNTPIN_hstr_inc : GNTPIN_hstw_inc;
-        act->domid = sdom;
-        act->frame = frame;
     }
-    else 
-    {
-        /* CASE 2: Active modications to an already active entry. */
+    else if ( (act->pin & 0x80808080U) != 0 )
+        PIN_FAIL(unlock_out, ENOSPC,
+                 "Risk of counter overflow %08x\n", act->pin);
 
-        /*
-         * A cheesy check for possible pin-count overflow.
-         * A more accurate check cannot be done with a single comparison.
-         */
-        if ( (act->pin & 0x80808080U) != 0 )
-            PIN_FAIL(unlock_out, ENOSPC,
-                     "Risk of counter overflow %08x\n", act->pin);
-
-        sflags = sha->flags;
-        frame  = act->frame;
-
-        if ( !(dev_hst_ro_flags & GNTMAP_readonly) &&
-             !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
-        {
-            for ( ; ; )
-            {
-                u16 prev_sflags;
-                
-                if ( unlikely(sflags & GTF_readonly) )
-                    PIN_FAIL(unlock_out, GNTST_general_error,
-                             "Attempt to write-pin a r/o grant entry.\n");
-
-                prev_sflags = sflags;
-
-                /* NB. prev_sflags is updated in place to seen value. */
-                if ( unlikely(cmpxchg_user(&sha->flags, prev_sflags, 
-                                           prev_sflags | GTF_writing)) )
-                    PIN_FAIL(unlock_out, GNTST_general_error,
-                         "Fault while modifying shared flags.\n");
-
-                if ( likely(prev_sflags == sflags) )
-                    break;
-
-                if ( retries++ == 4 )
-                    PIN_FAIL(unlock_out, GNTST_general_error,
-                             "Shared grant entry is unstable.\n");
-
-                sflags = prev_sflags;
-            }
-
-            if ( unlikely(!get_page_type(pfn_to_page(frame),
-                                         PGT_writable_page)) )
-            {
-                clear_bit(_GTF_writing, &sha->flags);
-                PIN_FAIL(unlock_out, GNTST_general_error,
-                         "Attempt to write-pin a unwritable page.\n");
-            }
-        }
-
-        if ( dev_hst_ro_flags & GNTMAP_device_map )
-            act->pin += (dev_hst_ro_flags & GNTMAP_readonly) ? 
-                GNTPIN_devr_inc : GNTPIN_devw_inc;
-
-        if ( dev_hst_ro_flags & GNTMAP_host_map )
-            act->pin += (dev_hst_ro_flags & GNTMAP_readonly) ?
-                GNTPIN_hstr_inc : GNTPIN_hstw_inc;
-    }
-
-    /*
-     * At this point:
-     * act->pin updated to reference count mappings.
-     * sha->flags updated to indicate to granting domain mapping done.
-     * frame contains the mfn.
-     */
+    if ( dev_hst_ro_flags & GNTMAP_device_map )
+        act->pin += (dev_hst_ro_flags & GNTMAP_readonly) ?
+            GNTPIN_devr_inc : GNTPIN_devw_inc;
+    if ( dev_hst_ro_flags & GNTMAP_host_map )
+        act->pin += (dev_hst_ro_flags & GNTMAP_readonly) ?
+            GNTPIN_hstr_inc : GNTPIN_hstw_inc;
 
     spin_unlock(&rd->grant_table->lock);
+
+    frame = act->frame;
+    if ( unlikely(!pfn_valid(frame)) ||
+         unlikely(!((dev_hst_ro_flags & GNTMAP_readonly) ?
+                    get_page(pfn_to_page(frame), rd) :
+                    get_page_and_type(pfn_to_page(frame), rd,
+                                      PGT_writable_page))) )
+        PIN_FAIL(undo_out, GNTST_general_error,
+                 "Could not pin the granted frame (%lx)!\n", frame);
 
     if ( dev_hst_ro_flags & GNTMAP_host_map )
     {
         rc = create_grant_host_mapping(addr, frame, dev_hst_ro_flags);
-        if ( rc < 0 )
+        if ( rc != GNTST_okay )
         {
-            /* Failure: undo and abort. */
+            if ( !(dev_hst_ro_flags & GNTMAP_readonly) )
+                put_page_type(pfn_to_page(frame));
+            put_page(pfn_to_page(frame));
+            goto undo_out;
+        }
 
-            spin_lock(&rd->grant_table->lock);
-
-            if ( dev_hst_ro_flags & GNTMAP_readonly )
-            {
-                act->pin -= GNTPIN_hstr_inc;
-            }
-            else
-            {
-                act->pin -= GNTPIN_hstw_inc;
-                if ( (act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) == 0 )
-                {
-                    clear_bit(_GTF_writing, &sha->flags);
-                    put_page_type(pfn_to_page(frame));
-                }
-            }
-
-            if ( act->pin == 0 )
-            {
-                clear_bit(_GTF_reading, &sha->flags);
-                put_page(pfn_to_page(frame));
-            }
-
-            spin_unlock(&rd->grant_table->lock);
+        if ( dev_hst_ro_flags & GNTMAP_device_map )
+        {
+            (void)get_page(pfn_to_page(frame), rd);
+            if ( !(dev_hst_ro_flags & GNTMAP_readonly) )
+                get_page_type(pfn_to_page(frame), PGT_writable_page);
         }
     }
 
@@ -375,6 +295,24 @@ __gnttab_map_grant_ref(
     put_domain(rd);
     return rc;
 
+ undo_out:
+    spin_lock(&rd->grant_table->lock);
+
+    if ( dev_hst_ro_flags & GNTMAP_device_map )
+        act->pin -= (dev_hst_ro_flags & GNTMAP_readonly) ?
+            GNTPIN_devr_inc : GNTPIN_devw_inc;
+    if ( dev_hst_ro_flags & GNTMAP_host_map )
+        act->pin -= (dev_hst_ro_flags & GNTMAP_readonly) ?
+            GNTPIN_hstr_inc : GNTPIN_hstw_inc;
+
+    if ( !(dev_hst_ro_flags & GNTMAP_readonly) &&
+         !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
+        clear_bit(_GTF_writing, &sha->flags);
+
+    if ( !act->pin )
+        clear_bit(_GTF_reading, &sha->flags);
+
+    spin_unlock(&rd->grant_table->lock);
 
  unlock_out:
     spin_unlock(&rd->grant_table->lock);
@@ -465,27 +403,42 @@ __gnttab_unmap_grant_ref(
             PIN_FAIL(unmap_out, GNTST_general_error,
                      "Bad frame number doesn't match gntref.\n");
         if ( flags & GNTMAP_device_map )
-            act->pin -= (flags & GNTMAP_readonly) ? GNTPIN_devr_inc
-                                                  : GNTPIN_devw_inc;
-
-        map->ref_and_flags &= ~GNTMAP_device_map;
-        (void)__put_user(0, &uop->dev_bus_addr);
+        {
+            ASSERT(act->pin & (GNTPIN_devw_mask | GNTPIN_devr_mask));
+            map->ref_and_flags &= ~GNTMAP_device_map;
+            if ( flags & GNTMAP_readonly )
+            {
+                act->pin -= GNTPIN_devr_inc;
+                put_page(pfn_to_page(frame));
+            }
+            else
+            {
+                act->pin -= GNTPIN_devw_inc;
+                put_page_and_type(pfn_to_page(frame));
+            }
+        }
     }
 
-    if ( (addr != 0) &&
-         (flags & GNTMAP_host_map) &&
-         ((act->pin & (GNTPIN_hstw_mask | GNTPIN_hstr_mask)) > 0))
+    if ( (addr != 0) && (flags & GNTMAP_host_map) )
     {
         if ( (rc = destroy_grant_host_mapping(addr, frame, flags)) < 0 )
             goto unmap_out;
 
+        ASSERT(act->pin & (GNTPIN_hstw_mask | GNTPIN_hstr_mask));
         map->ref_and_flags &= ~GNTMAP_host_map;
-
-        act->pin -= (flags & GNTMAP_readonly) ? GNTPIN_hstr_inc
-                                              : GNTPIN_hstw_inc;
+        if ( flags & GNTMAP_readonly )
+        {
+            act->pin -= GNTPIN_hstr_inc;
+            put_page(pfn_to_page(frame));
+        }
+        else
+        {
+            act->pin -= GNTPIN_hstw_inc;
+            put_page_and_type(pfn_to_page(frame));
+        }
     }
 
-    if ( (map->ref_and_flags & (GNTMAP_device_map|GNTMAP_host_map)) == 0)
+    if ( (map->ref_and_flags & (GNTMAP_device_map|GNTMAP_host_map)) == 0 )
     {
         map->ref_and_flags = 0;
         put_maptrack_handle(ld->grant_table, handle);
@@ -495,20 +448,12 @@ __gnttab_unmap_grant_ref(
     if ( !(flags & GNTMAP_readonly) )
          gnttab_log_dirty(rd, frame);
 
-    /* If the last writable mapping has been removed, put_page_type */
     if ( ((act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0) &&
          !(flags & GNTMAP_readonly) )
-    {
         clear_bit(_GTF_writing, &sha->flags);
-        put_page_type(pfn_to_page(frame));
-    }
 
     if ( act->pin == 0 )
-    {
-        act->frame = 0xdeadbeef;
         clear_bit(_GTF_reading, &sha->flags);
-        put_page(pfn_to_page(frame));
-    }
 
  unmap_out:
     (void)__put_user(rc, &uop->status);
@@ -989,42 +934,40 @@ gnttab_release_mappings(
         {
             if ( map->ref_and_flags & GNTMAP_device_map )
             {
-                BUG_ON((act->pin & GNTPIN_devr_mask) == 0);
+                BUG_ON(!(act->pin & GNTPIN_devr_mask));
                 act->pin -= GNTPIN_devr_inc;
+                put_page(pfn_to_page(act->frame));
             }
 
             if ( map->ref_and_flags & GNTMAP_host_map )
             {
-                BUG_ON((act->pin & GNTPIN_hstr_mask) == 0);
+                BUG_ON(!(act->pin & GNTPIN_hstr_mask));
                 act->pin -= GNTPIN_hstr_inc;
+                put_page(pfn_to_page(act->frame));
             }
         }
         else
         {
             if ( map->ref_and_flags & GNTMAP_device_map )
             {
-                BUG_ON((act->pin & GNTPIN_devw_mask) == 0);
+                BUG_ON(!(act->pin & GNTPIN_devw_mask));
                 act->pin -= GNTPIN_devw_inc;
+                put_page_and_type(pfn_to_page(act->frame));
             }
 
             if ( map->ref_and_flags & GNTMAP_host_map )
             {
-                BUG_ON((act->pin & GNTPIN_hstw_mask) == 0);
+                BUG_ON(!(act->pin & GNTPIN_hstw_mask));
                 act->pin -= GNTPIN_hstw_inc;
+                put_page_and_type(pfn_to_page(act->frame));
             }
 
             if ( (act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0 )
-            {
                 clear_bit(_GTF_writing, &sha->flags);
-                put_page_type(pfn_to_page(act->frame));
-            }
         }
 
         if ( act->pin == 0 )
-        {
             clear_bit(_GTF_reading, &sha->flags);
-            put_page(pfn_to_page(act->frame));
-        }
 
         spin_unlock(&rd->grant_table->lock);
 
