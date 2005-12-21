@@ -1718,8 +1718,7 @@ int do_mmuext_op(
     unsigned long mfn, type, done = 0;
     struct pfn_info *page;
     struct vcpu *v = current;
-    struct domain *d = v->domain, *e;
-    u32 x, y, _d, _nd;
+    struct domain *d = v->domain;
 
     LOCK_BIGLOCK(d);
 
