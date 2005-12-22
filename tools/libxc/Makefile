@@ -27,6 +27,11 @@ SRCS       += xc_tbuf.c
 ifeq ($(XEN_TARGET_ARCH),x86_32)
 SRCS       += xc_ptrace.c
 SRCS       += xc_ptrace_core.c
+SRCS       += xc_pagetab.c
+endif
+
+ifeq ($(XEN_TARGET_ARCH),x86_64)
+SRCS       += xc_pagetab.c
 endif
 
 BUILD_SRCS :=

@@ -416,6 +416,19 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
 void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
                            unsigned long *arr, int num );
 
+/**
+ * Translates a virtual address in the context of a given domain and
+ * vcpu returning the machine page frame number of the associated
+ * page.
+ *
+ * @parm xc_handle a handle on an open hypervisor interface
+ * @parm dom the domain to perform the translation in
+ * @parm vcpu the vcpu to perform the translation on
+ * @parm virt the virtual address to translate
+ */
+unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
+					   int vcpu, unsigned long long virt);
+
 int xc_get_pfn_list(int xc_handle, uint32_t domid, unsigned long *pfn_buf, 
                     unsigned long max_pfns);
 
