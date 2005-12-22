@@ -75,7 +75,7 @@ domname_help = "domname <DomId>                  Convert a domain id to a domain
 vcpu_set_help = """vcpu-set <DomId> <VCPUs>         Set the number of VCPUs for a domain"""
 vcpu_list_help = "vcpu-list <DomId>                List the VCPUs for a domain (or all domains)"
 vcpu_pin_help = "vcpu-pin <DomId> <VCPU> <CPUs>   Set which cpus a VCPU can use" 
-dmesg_help =   "dmesg [--clear]                  Read or clear Xen's message buffer"
+dmesg_help =   "dmesg [-c|--clear]               Read or clear Xen's message buffer"
 info_help =    "info                             Get information about the xen host"
 rename_help =  "rename <DomId> <New Name>        Rename a domain"
 log_help =     "log                              Print the xend log"
@@ -672,7 +672,7 @@ its contents if the [-c|--clear] flag is specified.
         server.xend_node_clear_dmesg()
 
 def xm_log(args):
-    arg_check(args, 'xm-log', 0)
+    arg_check(args, "log", 0)
     
     from xen.xend.XendClient import server
     print server.xend_node_log()
@@ -845,8 +845,8 @@ aliases = {
     "balloon": "mem-set",
     "set-vcpus": "vcpu-set",
     "vif-list": "network-list",
-    "vbd-create": "block-create",
-    "vbd-destroy": "block-destroy",
+    "vbd-create": "block-attach",
+    "vbd-destroy": "block-detach",
     "vbd-list": "block-list",
     }
 
