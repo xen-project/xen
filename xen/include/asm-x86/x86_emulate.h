@@ -141,6 +141,12 @@ x86_emulate_write_std(
 
 struct cpu_user_regs;
 
+/* Current execution mode, passed to the emulator. */
+#define X86EMUL_MODE_REAL     0
+#define X86EMUL_MODE_PROT16   2
+#define X86EMUL_MODE_PROT32   4
+#define X86EMUL_MODE_PROT64   8
+
 /*
  * x86_emulate_memop: Emulate an instruction that faulted attempting to
  *                    read/write a 'special' memory area.
@@ -149,6 +155,8 @@ struct cpu_user_regs;
  *  @ops:  Interface to access special memory.
  *  @mode: Current execution mode, represented by the default size of memory
  *         addresses, in bytes. Valid values are 2, 4 and 8 (x86/64 only).
+ *         Alternatively use the appropriate X86EMUL_MODE value (which also
+ *         includes a value for emulating real mode).
  */
 extern int
 x86_emulate_memop(
