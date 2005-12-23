@@ -885,7 +885,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         switch ( modrm_reg )
         {
         case 0: /* Read CR0 */
-            *reg = v->arch.guest_context.ctrlreg[0];
+            *reg = (read_cr0() & ~X86_CR0_TS) |
+                v->arch.guest_context.ctrlreg[0];
             break;
 
         case 2: /* Read CR2 */
@@ -927,6 +928,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         switch ( modrm_reg )
         {
         case 0: /* Write CR0 */
+            if ( (*reg ^ read_cr0()) & ~X86_CR0_TS )
+            {
+                DPRINTK("Attempt to change unmodifiable CR0 flags.\n");
+                goto fail;
+            }
             (void)do_fpu_taskswitch(!!(*reg & X86_CR0_TS));
             break;
 
@@ -939,6 +945,14 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             LOCK_BIGLOCK(v->domain);
             (void)new_guest_cr3(*reg);
             UNLOCK_BIGLOCK(v->domain);
+            break;
+
+        case 4:
+            if ( *reg != (read_cr4() & ~(X86_CR4_PGE|X86_CR4_PSE)) )
+            {
+                DPRINTK("Attempt to change CR4 flags.\n");
+                goto fail;
+            }
             break;
 
         default:
