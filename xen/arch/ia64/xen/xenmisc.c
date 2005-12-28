@@ -368,3 +368,23 @@ loop:
 		goto loop;
 	}
 }
+
+/* FIXME: for the forseeable future, all cpu's that enable VTi have split
+ *  caches and all cpu's that have split caches enable VTi.  This may
+ *  eventually be untrue though. */
+#define cpu_has_split_cache	vmx_enabled
+extern unsigned int vmx_enabled;
+
+void sync_split_caches(void)
+{
+	unsigned long ret, progress;
+
+	if (cpu_has_split_cache) {
+		/* Sync d/i cache conservatively */
+		ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
+		if ((ret!=PAL_STATUS_SUCCESS)&& (ret!=PAL_STATUS_UNIMPLEMENTED))
+			printk("PAL CACHE FLUSH failed\n");
+		else printk("Sync i/d cache for guest SUCC\n");
+	}
+	else printk("sync_split_caches ignored for CPU with no split cache\n");
+}
