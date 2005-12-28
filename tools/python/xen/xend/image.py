@@ -194,6 +194,7 @@ class VmxImageHandler(ImageHandler):
         if not self.device_model:
             raise VmError("vmx: missing device model")
         self.display = sxp.child_value(imageConfig, 'display')
+        self.xauthority = sxp.child_value(imageConfig, 'xauthority')
 
         self.vm.storeVm(("image/dmargs", " ".join(self.dmargs)),
                         ("image/device-model", self.device_model),
@@ -340,6 +341,8 @@ class VmxImageHandler(ImageHandler):
         env = dict(os.environ)
         if self.display:
             env['DISPLAY'] = self.display
+        if self.xauthority:
+            env['XAUTHORITY'] = self.xauthority
         log.info("spawning device models: %s %s", self.device_model, args)
         self.pid = os.spawnve(os.P_NOWAIT, self.device_model, args, env)
         log.info("device model pid: %d", self.pid)
