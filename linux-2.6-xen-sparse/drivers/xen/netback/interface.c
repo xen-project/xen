@@ -196,9 +196,13 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 		return 0;
 
 	netif->tx_comms_area = alloc_vm_area(PAGE_SIZE);
-	netif->rx_comms_area = alloc_vm_area(PAGE_SIZE);
-	if (netif->tx_comms_area == NULL || netif->rx_comms_area == NULL)
+	if (netif->tx_comms_area == NULL)
 		return -ENOMEM;
+	netif->rx_comms_area = alloc_vm_area(PAGE_SIZE);
+	if (netif->rx_comms_area == NULL) {
+		free_vm_area(netif->tx_comms_area);
+		return -ENOMEM;
+	}
 
 	err = map_frontend_pages(netif, tx_ring_ref, rx_ring_ref);
 	if (err) {
