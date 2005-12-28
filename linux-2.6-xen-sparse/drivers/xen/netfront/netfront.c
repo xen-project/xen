@@ -1209,33 +1209,14 @@ static int netfront_remove(struct xenbus_device *dev)
 
 	DPRINTK("%s\n", dev->nodename);
 
-	netif_free(info);
-	kfree(info);
+	netif_disconnect_backend(info);
+	free_netdev(info->netdev);
 
 	return 0;
 }
 
 
-static void netif_free(struct netfront_info *info)
-{
-	netif_disconnect_backend(info);
-	close_netdev(info);
-}
-
-
 static void close_netdev(struct netfront_info *info)
-{
-	if (info->netdev) {
-#ifdef CONFIG_PROC_FS
-		xennet_proc_delif(info->netdev);
-#endif
-		unregister_netdev(info->netdev);
-		info->netdev = NULL;
-	}
-}
-
-
-static void netif_disconnect_backend(struct netfront_info *info)
 {
 	/* Stop old i/f to prevent errors whilst we rebuild the state. */
 	spin_lock_irq(&info->tx_lock);
@@ -1245,18 +1226,36 @@ static void netif_disconnect_backend(struct netfront_info *info)
 	spin_unlock(&info->rx_lock);
 	spin_unlock_irq(&info->tx_lock);
 
-	end_access(info->tx_ring_ref, info->tx.sring);
-	end_access(info->rx_ring_ref, info->rx.sring);
-	info->tx_ring_ref = GRANT_INVALID_REF;
-	info->rx_ring_ref = GRANT_INVALID_REF;
-	info->tx.sring = NULL;
-	info->rx.sring = NULL;
+#ifdef CONFIG_PROC_FS
+	xennet_proc_delif(info->netdev);
+#endif
 
 	if (info->irq)
 		unbind_from_irqhandler(info->irq, info->netdev);
 	info->evtchn = info->irq = 0;
 
 	del_timer_sync(&info->rx_refill_timer);
+
+	unregister_netdev(info->netdev);
+}
+
+
+static void netif_disconnect_backend(struct netfront_info *info)
+{
+	end_access(info->tx_ring_ref, info->tx.sring);
+	end_access(info->rx_ring_ref, info->rx.sring);
+	info->tx_ring_ref = GRANT_INVALID_REF;
+	info->rx_ring_ref = GRANT_INVALID_REF;
+	info->tx.sring = NULL;
+	info->rx.sring = NULL;
+}
+
+
+static void netif_free(struct netfront_info *info)
+{
+	close_netdev(info);
+	netif_disconnect_backend(info);
+	free_netdev(info->netdev);
 }
 
 
