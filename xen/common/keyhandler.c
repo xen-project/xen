@@ -11,6 +11,7 @@
 #include <xen/sched.h>
 #include <xen/softirq.h>
 #include <xen/domain.h>
+#include <xen/rangeset.h>
 #include <asm/debugger.h>
 
 #define KEY_MAX 256
@@ -121,6 +122,8 @@ static void do_task_queues(unsigned char key)
                d->handle[ 4], d->handle[ 5], d->handle[ 6], d->handle[ 7],
                d->handle[ 8], d->handle[ 9], d->handle[10], d->handle[11],
                d->handle[12], d->handle[13], d->handle[14], d->handle[15]);
+
+        rangeset_domain_printk(d);
 
         dump_pageframe_info(d);
                

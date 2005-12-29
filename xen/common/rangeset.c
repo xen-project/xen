@@ -1,0 +1,356 @@
+/******************************************************************************
+ * rangeset.c
+ * 
+ * Creation, maintenance and automatic destruction of per-domain sets of
+ * numeric ranges.
+ * 
+ * Copyright (c) 2005, K A Fraser
+ */
+
+#include <xen/sched.h>
+#include <xen/rangeset.h>
+
+/* An inclusive range [s,e] and pointer to next range in ascending order. */
+struct range {
+    struct list_head list;
+    unsigned long s, e;
+};
+
+struct rangeset {
+    /* Owning domain and threaded list of rangesets. */
+    struct list_head rangeset_list;
+    struct domain   *domain;
+
+    /* Ordered list of ranges contained in this set, and protecting lock. */
+    struct list_head range_list;
+    spinlock_t       lock;
+
+    /* Pretty-printing name. */
+    char             name[32];
+
+    /* RANGESETF_??? */
+    unsigned int     flags;
+};
+
+/* Find highest range lower than or containing s. NULL if no such range. */
+static struct range *find_range(
+    struct rangeset *r, unsigned long s)
+{
+    struct range *x = NULL, *y;
+
+    list_for_each_entry ( y, &r->range_list, list )
+    {
+        if ( y->s > s )
+            break;
+        x = y;
+    }
+
+    return x;
+}
+
+/* Remove a range from its list and free it. */
+static void destroy_range(
+    struct range *x)
+{
+    list_del(&x->list);
+    xfree(x);
+}
+
+int rangeset_add_range(
+    struct rangeset *r, unsigned long s, unsigned long e)
+{
+    struct range *x, *y;
+    int rc = 0;
+
+    spin_lock(&r->lock);
+
+    x = find_range(r, s);
+    y = find_range(r, e);
+
+    if ( x == y )
+    {
+        if ( (x == NULL) || ((x->e < s) && ((x->e + 1) != s)) )
+        {
+            x = xmalloc(struct range);
+            if ( x == NULL )
+            {
+                rc = -ENOMEM;
+                goto out;
+            }
+
+            x->s = s;
+            x->e = e;
+
+            list_add(&x->list, (y != NULL) ? &y->list : &r->range_list);
+        }
+        
+        if ( x->e < e )
+            x->e = e;
+    }
+    else
+    {
+        if ( x == NULL )
+        {
+            x = list_entry(r->range_list.next, struct range, list);
+            x->s = s;
+        }
+        else if ( (x->e < s) && ((x->e + 1) != s) )
+        {
+            x = list_entry(x->list.next, struct range, list);
+            x->s = s;
+        }
+        
+        x->e = (y->e > e) ? y->e : e;
+
+        for ( ; ; )
+        {
+            y = list_entry(x->list.next, struct range, list);
+            if ( (x->list.next == &r->range_list) || (y->e > x->e) )
+                break;
+            destroy_range(y);
+        }
+    }
+
+    y = list_entry(x->list.next, struct range, list);
+    if ( (x->list.next != &r->range_list) && ((x->e + 1) == y->s) )
+    {
+        x->e = y->e;
+        destroy_range(y);
+    }
+
+ out:
+    spin_unlock(&r->lock);
+    return rc;
+}
+
+int rangeset_remove_range(
+    struct rangeset *r, unsigned long s, unsigned long e)
+{
+    struct range *x, *y, *t;
+    int rc = 0;
+
+    spin_lock(&r->lock);
+
+    x = find_range(r, s);
+    y = find_range(r, e);
+
+    if ( x == y )
+    {
+        if ( (x == NULL) || (x->e < s) )
+            goto out;
+
+        if ( (x->s < s) && (x->e > e) )
+        {
+            y = xmalloc(struct range);
+            if ( y == NULL )
+            {
+                rc = -ENOMEM;
+                goto out;
+            }
+            y->s = e + 1;
+            y->e = x->e;
+            x->e = s - 1;
+            list_add(&y->list, &x->list);
+        }
+        else if ( (x->s == s) && (x->e <= e) )
+            destroy_range(x);
+        else if ( x->s == s )
+            x->s = e + 1;
+        else if ( x->e <= e )
+            x->e = s - 1;
+    }
+    else
+    {
+        if ( x == NULL )
+            x = list_entry(r->range_list.next, struct range, list);
+
+        if ( x->s < s )
+        {
+            x->e = s - 1;
+            x = list_entry(x->list.next, struct range, list);
+        }
+
+        while ( x != y )
+        {
+            t = x;
+            x = list_entry(x->list.next, struct range, list);
+            destroy_range(t);
+        }
+
+        x->s = e + 1;
+        if ( x->s > x->e )
+            destroy_range(x);
+    }
+
+ out:
+    spin_unlock(&r->lock);
+    return rc;
+}
+
+int rangeset_contains_range(
+    struct rangeset *r, unsigned long s, unsigned long e)
+{
+    struct range *x;
+    int contains;
+
+    spin_lock(&r->lock);
+    x = find_range(r, s);
+    contains = (x && (x->e >= e));
+    spin_unlock(&r->lock);
+
+    return contains;
+}
+
+int rangeset_add_singleton(
+    struct rangeset *r, unsigned long s)
+{
+    return rangeset_add_range(r, s, s);
+}
+
+int rangeset_remove_singleton(
+    struct rangeset *r, unsigned long s)
+{
+    return rangeset_remove_range(r, s, s);
+}
+
+int rangeset_contains_singleton(
+    struct rangeset *r, unsigned long s)
+{
+    return rangeset_contains_range(r, s, s);
+}
+
+struct rangeset *rangeset_new(
+    struct domain *d, char *name, unsigned int flags)
+{
+    struct rangeset *r;
+
+    r = xmalloc(struct rangeset);
+    if ( r == NULL )
+        return NULL;
+
+    spin_lock_init(&r->lock);
+    INIT_LIST_HEAD(&r->range_list);
+
+    BUG_ON(flags & ~RANGESETF_prettyprint_hex);
+    r->flags = flags;
+
+    if ( name != NULL )
+    {
+        strncpy(r->name, name, sizeof(r->name));
+        r->name[sizeof(r->name)-1] = '\0';
+    }
+    else
+    {
+        sprintf(r->name, "(no name)");
+    }
+
+    if ( (r->domain = d) != NULL )
+    {
+        spin_lock(&d->rangesets_lock);
+        list_add(&r->rangeset_list, &d->rangesets);
+        spin_unlock(&d->rangesets_lock);
+    }
+
+    return r;
+}
+
+void rangeset_destroy(
+    struct rangeset *r)
+{
+    if ( r == NULL )
+        return;
+
+    if ( r->domain != NULL )
+    {
+        spin_lock(&r->domain->rangesets_lock);
+        list_del(&r->rangeset_list);
+        spin_unlock(&r->domain->rangesets_lock);
+    }
+
+    while ( !list_empty(&r->range_list) )
+    {
+        struct range *x = list_entry(r->range_list.next, struct range, list);
+        destroy_range(x);
+    }
+
+    xfree(r);
+}
+
+void rangeset_domain_initialise(
+    struct domain *d)
+{
+    INIT_LIST_HEAD(&d->rangesets);
+    spin_lock_init(&d->rangesets_lock);
+}
+
+void rangeset_domain_destroy(
+    struct domain *d)
+{
+    struct rangeset *r;
+
+    while ( !list_empty(&d->rangesets) )
+    {
+        r = list_entry(d->rangesets.next, struct rangeset, rangeset_list);
+
+        BUG_ON(r->domain != d);
+        r->domain = NULL;
+        list_del(&r->rangeset_list);
+
+        rangeset_destroy(r);
+    }
+}
+
+static void print_limit(struct rangeset *r, unsigned long s)
+{
+    printk((r->flags & RANGESETF_prettyprint_hex) ? "%lx" : "%lu", s);
+}
+
+void rangeset_printk(
+    struct rangeset *r)
+{
+    int nr_printed = 0;
+    struct range *x;
+
+    spin_lock(&r->lock);
+
+    printk("%10s {", r->name);
+
+    list_for_each_entry ( x, &r->range_list, list )
+    {
+        if ( nr_printed++ )
+            printk(",");
+        printk(" ");
+        print_limit(r, x->s);
+        if ( x->s != x->e )
+        {
+            printk("-");
+            print_limit(r, x->e);
+        }
+    }
+
+    printk(" }");
+
+    spin_unlock(&r->lock);
+}
+
+void rangeset_domain_printk(
+    struct domain *d)
+{
+    struct rangeset *r;
+
+    printk("Rangesets belonging to domain %d:\n", d->domain_id);
+
+    spin_lock(&d->rangesets_lock);
+
+    if ( list_empty(&d->rangesets) )
+        printk("    None\n");
+
+    list_for_each_entry ( r, &d->rangesets, rangeset_list )
+    {
+        printk("    ");
+        rangeset_printk(r);
+        printk("\n");
+    }
+
+    spin_unlock(&d->rangesets_lock);
+}

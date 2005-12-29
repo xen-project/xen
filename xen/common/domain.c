@@ -16,6 +16,7 @@
 #include <xen/console.h>
 #include <xen/softirq.h>
 #include <xen/domain_page.h>
+#include <xen/rangeset.h>
 #include <asm/debugger.h>
 #include <public/dom0_ops.h>
 #include <public/sched.h>
@@ -65,6 +66,8 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
         free_domain(d);
         return NULL;
     }
+
+    rangeset_domain_initialise(d);
 
     arch_do_createdomain(v);
     
@@ -270,6 +273,8 @@ void domain_destruct(struct domain *d)
         pd = &(*pd)->next_in_hashbucket;
     *pd = d->next_in_hashbucket;
     write_unlock(&domlist_lock);
+
+    rangeset_domain_destroy(d);
 
     evtchn_destroy(d);
     grant_table_destroy(d);

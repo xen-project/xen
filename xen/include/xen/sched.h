@@ -110,6 +110,9 @@ struct domain
     struct domain   *next_in_list;
     struct domain   *next_in_hashbucket;
 
+    struct list_head rangesets;
+    spinlock_t       rangesets_lock;
+
     /* Event channel information. */
     struct evtchn   *evtchn[NR_EVTCHN_BUCKETS];
     spinlock_t       evtchn_lock;
