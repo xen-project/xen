@@ -389,6 +389,30 @@ grant_write(struct file *file, const char __user *buffer, unsigned long count,
 	return -ENOSYS;
 }
 
+static int __init
+gnttab_proc_init(void)
+{
+	/*
+	 *  /proc/xen/grant : used by libxc to access grant tables
+	 */
+	if ((grant_pde = create_xen_proc_entry("grant", 0600)) == NULL) {
+		WPRINTK("Unable to create grant xen proc entry\n");
+		return -1;
+	}
+
+	grant_file_ops.read   = grant_pde->proc_fops->read;
+	grant_file_ops.write  = grant_pde->proc_fops->write;
+
+	grant_pde->proc_fops  = &grant_file_ops;
+
+	grant_pde->read_proc  = &grant_read;
+	grant_pde->write_proc = &grant_write;
+
+	return 0;
+}
+
+device_initcall(gnttab_proc_init);
+
 #endif /* CONFIG_PROC_FS */
 
 int
@@ -446,29 +470,11 @@ gnttab_init(void)
 	gnttab_free_count = NR_GRANT_ENTRIES - NR_RESERVED_ENTRIES;
 	gnttab_free_head  = NR_RESERVED_ENTRIES;
 
-#ifdef CONFIG_PROC_FS
-	/*
-	 *  /proc/xen/grant : used by libxc to access grant tables
-	 */
-	if ((grant_pde = create_xen_proc_entry("grant", 0600)) == NULL) {
-		WPRINTK("Unable to create grant xen proc entry\n");
-		return -1;
-	}
-
-	grant_file_ops.read   = grant_pde->proc_fops->read;
-	grant_file_ops.write  = grant_pde->proc_fops->write;
-
-	grant_pde->proc_fops  = &grant_file_ops;
-
-	grant_pde->read_proc  = &grant_read;
-	grant_pde->write_proc = &grant_write;
-#endif
-
 	printk("Grant table initialized\n");
 	return 0;
 }
 
-__initcall(gnttab_init);
+core_initcall(gnttab_init);
 
 /*
  * Local variables:
