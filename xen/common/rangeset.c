@@ -28,7 +28,7 @@ struct rangeset {
     /* Pretty-printing name. */
     char             name[32];
 
-    /* RANGESETF_??? */
+    /* RANGESETF flags. */
     unsigned int     flags;
 };
 
@@ -46,6 +46,24 @@ static struct range *find_range(
     }
 
     return x;
+}
+
+/* Return the lowest range in the set r, or NULL if r is empty. */
+static struct range *first_range(
+    struct rangeset *r)
+{
+    if ( list_empty(&r->range_list) )
+        return NULL;
+    return list_entry(r->range_list.next, struct range, list);
+}
+
+/* Return range following x in ascending order, or NULL if x is the highest. */
+static struct range *next_range(
+    struct rangeset *r, struct range *x)
+{
+    if ( x->list.next == &r->range_list )
+        return NULL;
+    return list_entry(x->list.next, struct range, list);
 }
 
 /* Remove a range from its list and free it. */
@@ -91,12 +109,12 @@ int rangeset_add_range(
     {
         if ( x == NULL )
         {
-            x = list_entry(r->range_list.next, struct range, list);
+            x = first_range(r);
             x->s = s;
         }
         else if ( (x->e < s) && ((x->e + 1) != s) )
         {
-            x = list_entry(x->list.next, struct range, list);
+            x = next_range(r, x);
             x->s = s;
         }
         
@@ -104,15 +122,15 @@ int rangeset_add_range(
 
         for ( ; ; )
         {
-            y = list_entry(x->list.next, struct range, list);
-            if ( (x->list.next == &r->range_list) || (y->e > x->e) )
+            y = next_range(r, x);
+            if ( (y == NULL) || (y->e > x->e) )
                 break;
             destroy_range(y);
         }
     }
 
-    y = list_entry(x->list.next, struct range, list);
-    if ( (x->list.next != &r->range_list) && ((x->e + 1) == y->s) )
+    y = next_range(r, x);
+    if ( (y != NULL) && ((x->e + 1) == y->s) )
     {
         x->e = y->e;
         destroy_range(y);
@@ -162,18 +180,18 @@ int rangeset_remove_range(
     else
     {
         if ( x == NULL )
-            x = list_entry(r->range_list.next, struct range, list);
+            x = first_range(r);
 
         if ( x->s < s )
         {
             x->e = s - 1;
-            x = list_entry(x->list.next, struct range, list);
+            x = next_range(r, x);
         }
 
         while ( x != y )
         {
             t = x;
-            x = list_entry(x->list.next, struct range, list);
+            x = next_range(r, x);
             destroy_range(t);
         }
 
@@ -257,6 +275,8 @@ struct rangeset *rangeset_new(
 void rangeset_destroy(
     struct rangeset *r)
 {
+    struct range *x;
+
     if ( r == NULL )
         return;
 
@@ -267,11 +287,8 @@ void rangeset_destroy(
         spin_unlock(&r->domain->rangesets_lock);
     }
 
-    while ( !list_empty(&r->range_list) )
-    {
-        struct range *x = list_entry(r->range_list.next, struct range, list);
+    while ( (x = first_range(r)) != NULL )
         destroy_range(x);
-    }
 
     xfree(r);
 }
