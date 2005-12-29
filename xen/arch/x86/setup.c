@@ -138,10 +138,18 @@ static void __init do_initcalls(void)
         (*call)();
 }
 
-static void __init start_of_day(void)
+/* Variables handed off from __start_xen() to start_of_day(). */
+static unsigned long initial_images_start, initial_images_end;
+static multiboot_info_t *mbi;
+
+void __init start_of_day(void)
 {
     int i;
     unsigned long vgdt, gdt_pfn;
+    char *cmdline;
+    unsigned long _initrd_start = 0, _initrd_len = 0;
+    unsigned int initrdidx = 1;
+    module_t *mod = (module_t *)__va(mbi->mods_addr);
 
     early_cpu_init();
 
@@ -249,20 +257,93 @@ static void __init start_of_day(void)
     schedulers_start();
 
     watchdog_enable();
+
+    shadow_mode_init();
+
+    /* initialize access control security module */
+    acm_init(&initrdidx, mbi, initial_images_start);
+
+    /* Create initial domain 0. */
+    dom0 = do_createdomain(0, 0);
+    if ( dom0 == NULL )
+        panic("Error creating domain 0\n");
+
+    set_bit(_DOMF_privileged, &dom0->domain_flags);
+    /* post-create hooks sets security label */
+    acm_post_domain0_create(dom0->domain_id);
+
+    /* Grab the DOM0 command line. */
+    cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);
+    if ( cmdline != NULL )
+    {
+        static char dom0_cmdline[MAX_GUEST_CMDLINE];
+
+        /* Skip past the image name and copy to a local buffer. */
+        while ( *cmdline == ' ' ) cmdline++;
+        if ( (cmdline = strchr(cmdline, ' ')) != NULL )
+        {
+            while ( *cmdline == ' ' ) cmdline++;
+            strcpy(dom0_cmdline, cmdline);
+        }
+
+        cmdline = dom0_cmdline;
+
+        /* Append any extra parameters. */
+        if ( skip_ioapic_setup && !strstr(cmdline, "noapic") )
+            strcat(cmdline, " noapic");
+        if ( acpi_skip_timer_override &&
+             !strstr(cmdline, "acpi_skip_timer_override") )
+            strcat(cmdline, " acpi_skip_timer_override");
+        if ( (strlen(acpi_param) != 0) && !strstr(cmdline, "acpi=") )
+        {
+            strcat(cmdline, " acpi=");
+            strcat(cmdline, acpi_param);
+        }
+    }
+
+    if ( (initrdidx > 0) && (initrdidx < mbi->mods_count) )
+    {
+        _initrd_start = initial_images_start +
+            (mod[initrdidx].mod_start - mod[0].mod_start);
+        _initrd_len   = mod[initrdidx].mod_end - mod[initrdidx].mod_start;
+    }
+
+    /*
+     * We're going to setup domain0 using the module(s) that we stashed safely
+     * above our heap. The second module, if present, is an initrd ramdisk.
+     */
+    if ( construct_dom0(dom0,
+                        initial_images_start, 
+                        mod[0].mod_end-mod[0].mod_start,
+                        _initrd_start,
+                        _initrd_len,
+                        cmdline) != 0)
+        panic("Could not set up DOM0 guest OS\n");
+
+    /* Scrub RAM that is still free and so may go to an unprivileged domain. */
+    scrub_heap_pages();
+
+    init_trace_bufs();
+
+    /* Give up the VGA console if DOM0 is configured to grab it. */
+    console_endboot(cmdline && strstr(cmdline, "tty0"));
+
+    /* Hide UART from DOM0 if we're using it */
+    serial_endboot();
+
+    domain_unpause_by_systemcontroller(dom0);
+
+    startup_cpu_idle_loop();
 }
 
 #define EARLY_FAIL() for ( ; ; ) __asm__ __volatile__ ( "hlt" )
 
 static struct e820entry e820_raw[E820MAX];
 
-void __init __start_xen(multiboot_info_t *mbi)
+void __init __start_xen(multiboot_info_t *__mbi)
 {
-    char *cmdline;
-    module_t *mod = (module_t *)__va(mbi->mods_addr);
+    module_t *mod = (module_t *)__va(__mbi->mods_addr);
     unsigned long nr_pages, modules_length;
-    unsigned long initial_images_start, initial_images_end;
-    unsigned long _initrd_start = 0, _initrd_len = 0;
-    unsigned int initrdidx = 1;
     physaddr_t s, e;
     int i, e820_warn = 0, e820_raw_nr = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
@@ -270,6 +351,8 @@ void __init __start_xen(multiboot_info_t *mbi)
         .parity    = 'n',
         .stop_bits = 1
     };
+
+    mbi = __mbi;
 
     /* Parse the command-line options. */
     if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
@@ -486,84 +569,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     early_boot = 0;
 
-    start_of_day();
-
-    shadow_mode_init();
-
-    /* initialize access control security module */
-    acm_init(&initrdidx, mbi, initial_images_start);
-
-    /* Create initial domain 0. */
-    dom0 = do_createdomain(0, 0);
-    if ( dom0 == NULL )
-        panic("Error creating domain 0\n");
-
-    set_bit(_DOMF_privileged, &dom0->domain_flags);
-    /* post-create hooks sets security label */
-    acm_post_domain0_create(dom0->domain_id);
-
-    /* Grab the DOM0 command line. */
-    cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);
-    if ( cmdline != NULL )
-    {
-        static char dom0_cmdline[MAX_GUEST_CMDLINE];
-
-        /* Skip past the image name and copy to a local buffer. */
-        while ( *cmdline == ' ' ) cmdline++;
-        if ( (cmdline = strchr(cmdline, ' ')) != NULL )
-        {
-            while ( *cmdline == ' ' ) cmdline++;
-            strcpy(dom0_cmdline, cmdline);
-        }
-
-        cmdline = dom0_cmdline;
-
-        /* Append any extra parameters. */
-        if ( skip_ioapic_setup && !strstr(cmdline, "noapic") )
-            strcat(cmdline, " noapic");
-        if ( acpi_skip_timer_override &&
-             !strstr(cmdline, "acpi_skip_timer_override") )
-            strcat(cmdline, " acpi_skip_timer_override");
-        if ( (strlen(acpi_param) != 0) && !strstr(cmdline, "acpi=") )
-        {
-            strcat(cmdline, " acpi=");
-            strcat(cmdline, acpi_param);
-        }
-    }
-
-    if ( (initrdidx > 0) && (initrdidx < mbi->mods_count) )
-    {
-        _initrd_start = initial_images_start +
-            (mod[initrdidx].mod_start - mod[0].mod_start);
-        _initrd_len   = mod[initrdidx].mod_end - mod[initrdidx].mod_start;
-    }
-
-    /*
-     * We're going to setup domain0 using the module(s) that we stashed safely
-     * above our heap. The second module, if present, is an initrd ramdisk.
-     */
-    if ( construct_dom0(dom0,
-                        initial_images_start, 
-                        mod[0].mod_end-mod[0].mod_start,
-                        _initrd_start,
-                        _initrd_len,
-                        cmdline) != 0)
-        panic("Could not set up DOM0 guest OS\n");
-
-    /* Scrub RAM that is still free and so may go to an unprivileged domain. */
-    scrub_heap_pages();
-
-    init_trace_bufs();
-
-    /* Give up the VGA console if DOM0 is configured to grab it. */
-    console_endboot(cmdline && strstr(cmdline, "tty0"));
-
-    /* Hide UART from DOM0 if we're using it */
-    serial_endboot();
-
-    domain_unpause_by_systemcontroller(dom0);
-
-    startup_cpu_idle_loop();
+    reset_stack_and_jump(start_of_day);
 }
 
 void arch_get_xen_caps(xen_capabilities_info_t info)

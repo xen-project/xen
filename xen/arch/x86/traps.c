@@ -192,7 +192,8 @@ static void show_trace(struct cpu_user_regs *regs)
 
     /* Bounds for range of valid frame pointer. */
     low  = (unsigned long)(ESP_BEFORE_EXCEPTION(regs) - 2);
-    high = (low & ~(STACK_SIZE - 1)) + (STACK_SIZE - sizeof(struct cpu_info));
+    high = (low & ~(STACK_SIZE - 1)) + 
+        (STACK_SIZE - sizeof(struct cpu_info) - 2*sizeof(unsigned long));
 
     /* The initial frame pointer. */
     next = regs->ebp;
@@ -200,14 +201,14 @@ static void show_trace(struct cpu_user_regs *regs)
     for ( ; ; )
     {
         /* Valid frame pointer? */
-        if ( (next < low) || (next > high) )
+        if ( (next < low) || (next >= high) )
         {
             /*
              * Exception stack frames have a different layout, denoted by an
              * inverted frame pointer.
              */
             next = ~next;
-            if ( (next < low) || (next > high) )
+            if ( (next < low) || (next >= high) )
                 break;
             frame = (unsigned long *)next;
             next  = frame[0];

@@ -189,7 +189,7 @@ ignore_int:
 /*** STACK LOCATION ***/
         
 ENTRY(stack_start)
-        .long cpu0_stack + STACK_SIZE - 200 - __PAGE_OFFSET
+        .long cpu0_stack + STACK_SIZE - __PAGE_OFFSET
         .long __HYPERVISOR_DS
         
 /*** DESCRIPTOR TABLES ***/
@@ -256,10 +256,6 @@ ENTRY(idle_pg_table_l2)
         .fill 1*PAGE_SIZE,1,0
 #endif
 
-#if (STACK_ORDER == 0)
-.section ".bss.page_aligned","w"
-#else
-.section ".bss.twopage_aligned","w"
-#endif
+.section ".bss.stack_aligned","w"
 ENTRY(cpu0_stack)
         .fill STACK_SIZE,1,0

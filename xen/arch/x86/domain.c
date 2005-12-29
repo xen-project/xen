@@ -98,7 +98,7 @@ void startup_cpu_idle_loop(void)
     cpu_set(smp_processor_id(), v->domain->cpumask);
     v->arch.schedule_tail = continue_idle_task;
 
-    idle_loop();
+    reset_stack_and_jump(idle_loop);
 }
 
 static long no_idt[2];

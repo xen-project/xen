@@ -219,7 +219,7 @@ idt:
         .quad   idt_table
 
 ENTRY(stack_start)
-        .quad   cpu0_stack + STACK_SIZE - 200
+        .quad   cpu0_stack + STACK_SIZE
 
 high_start:
         .quad   __high_start
@@ -265,10 +265,6 @@ ENTRY(idle_pg_table_l2)
         .org 0x4000 + PAGE_SIZE
         .code64
 
-#if (STACK_ORDER == 0)
-.section ".bss.page_aligned","w"
-#else
-.section ".bss.twopage_aligned","w"
-#endif
+.section ".bss.stack_aligned","w"
 ENTRY(cpu0_stack)
         .fill STACK_SIZE,1,0
