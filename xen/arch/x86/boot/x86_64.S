@@ -142,7 +142,7 @@ __high_start:
         lidt    idt_descr(%rip)
                 
         cmp     $(SECONDARY_CPU_FLAG),%ebx
-        je      start_secondary
+        je      init_secondary
 
         /* Initialize BSS (no nasty surprises!) */
         lea     __bss_start(%rip),%rdi

@@ -429,7 +429,7 @@ static void construct_percpu_idt(unsigned int cpu)
 /*
  * Activate a secondary processor.
  */
-void __init start_secondary(void *unused)
+void __init start_secondary(void)
 {
 	unsigned int cpu = cpucount;
 
@@ -470,6 +470,11 @@ void __init start_secondary(void *unused)
 
 	wmb();
 	startup_cpu_idle_loop();
+}
+
+void __init init_secondary(void)
+{
+    reset_stack_and_jump(start_secondary);
 }
 
 extern struct {
@@ -788,11 +793,10 @@ static int __init do_boot_cpu(int apicid)
 
 	stack = alloc_xenheap_pages(STACK_ORDER);
 #if defined(__i386__)
-	stack_start.esp = (void *)__pa(stack);
+	stack_start.esp = (void *)__pa(stack) + STACK_SIZE;
 #elif defined(__x86_64__)
-	stack_start.esp = stack;
+	stack_start.esp = stack + STACK_SIZE;
 #endif
-	stack_start.esp += STACK_SIZE - sizeof(struct cpu_info);
 
 	/* Debug build: detect stack overflow by setting up a guard page. */
 	memguard_guard_stack(stack);

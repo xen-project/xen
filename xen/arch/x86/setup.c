@@ -138,212 +138,21 @@ static void __init do_initcalls(void)
         (*call)();
 }
 
-/* Variables handed off from __start_xen() to start_of_day(). */
-static unsigned long initial_images_start, initial_images_end;
+#define EARLY_FAIL() for ( ; ; ) __asm__ __volatile__ ( "hlt" )
+
+static struct e820entry e820_raw[E820MAX];
+
 static multiboot_info_t *mbi;
 
 void __init start_of_day(void)
 {
-    int i;
     unsigned long vgdt, gdt_pfn;
     char *cmdline;
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
-
-    early_cpu_init();
-
-    paging_init();
-
-    /* Unmap the first page of CPU0's stack. */
-    memguard_guard_stack(cpu0_stack);
-
-    open_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ, new_tlbflush_clock_period);
-
-    if ( opt_watchdog ) 
-        nmi_watchdog = NMI_LOCAL_APIC;
-
-    sort_exception_tables();
-
-    arch_do_createdomain(current);
-    
-    /*
-     * Map default GDT into its final positions in the idle page table. As
-     * noted in arch_do_createdomain(), we must map for every possible VCPU#.
-     */
-    vgdt = GDT_VIRT_START(current) + FIRST_RESERVED_GDT_BYTE;
-    gdt_pfn = virt_to_phys(gdt_table) >> PAGE_SHIFT;
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-    {
-        map_pages_to_xen(vgdt, gdt_pfn, 1, PAGE_HYPERVISOR);
-        vgdt += 1 << PDPT_VCPU_VA_SHIFT;
-    }
-
-    find_smp_config();
-
-    smp_alloc_memory();
-
-    dmi_scan_machine();
-
-    generic_apic_probe();
-
-    acpi_boot_table_init();
-    acpi_boot_init();
-
-    if ( smp_found_config ) 
-        get_smp_config();
-
-    init_apic_mappings();
-
-    init_IRQ();
-
-    trap_init();
-
-    ac_timer_init();
-
-    early_time_init();
-
-    arch_init_memory();
-
-    scheduler_init();
-
-    identify_cpu(&boot_cpu_data);
-    if ( cpu_has_fxsr )
-        set_in_cr4(X86_CR4_OSFXSR);
-    if ( cpu_has_xmm )
-        set_in_cr4(X86_CR4_OSXMMEXCPT);
-
-    if ( opt_nosmp )
-    {
-        max_cpus = 0;
-        smp_num_siblings = 1;
-        boot_cpu_data.x86_num_cores = 1;
-    }
-
-    smp_prepare_cpus(max_cpus);
-
-    /* We aren't hotplug-capable yet. */
-    BUG_ON(!cpus_empty(cpu_present_map));
-    for_each_cpu ( i )
-        cpu_set(i, cpu_present_map);
-
-    /*
-     * Initialise higher-level timer functions. We do this fairly late
-     * (post-SMP) because the time bases and scale factors need to be updated 
-     * regularly, and SMP initialisation can cause a long delay with 
-     * interrupts not yet enabled.
-     */
-    init_xen_time();
-
-    initialize_keytable();
-
-    serial_init_postirq();
-
-    BUG_ON(!local_irq_is_enabled());
-
-    for_each_present_cpu ( i )
-    {
-        if ( num_online_cpus() >= max_cpus )
-            break;
-        if ( !cpu_online(i) )
-            __cpu_up(i);
-    }
-
-    printk("Brought up %ld CPUs\n", (long)num_online_cpus());
-    smp_cpus_done(max_cpus);
-
-    do_initcalls();
-
-    schedulers_start();
-
-    watchdog_enable();
-
-    shadow_mode_init();
-
-    /* initialize access control security module */
-    acm_init(&initrdidx, mbi, initial_images_start);
-
-    /* Create initial domain 0. */
-    dom0 = do_createdomain(0, 0);
-    if ( dom0 == NULL )
-        panic("Error creating domain 0\n");
-
-    set_bit(_DOMF_privileged, &dom0->domain_flags);
-    /* post-create hooks sets security label */
-    acm_post_domain0_create(dom0->domain_id);
-
-    /* Grab the DOM0 command line. */
-    cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);
-    if ( cmdline != NULL )
-    {
-        static char dom0_cmdline[MAX_GUEST_CMDLINE];
-
-        /* Skip past the image name and copy to a local buffer. */
-        while ( *cmdline == ' ' ) cmdline++;
-        if ( (cmdline = strchr(cmdline, ' ')) != NULL )
-        {
-            while ( *cmdline == ' ' ) cmdline++;
-            strcpy(dom0_cmdline, cmdline);
-        }
-
-        cmdline = dom0_cmdline;
-
-        /* Append any extra parameters. */
-        if ( skip_ioapic_setup && !strstr(cmdline, "noapic") )
-            strcat(cmdline, " noapic");
-        if ( acpi_skip_timer_override &&
-             !strstr(cmdline, "acpi_skip_timer_override") )
-            strcat(cmdline, " acpi_skip_timer_override");
-        if ( (strlen(acpi_param) != 0) && !strstr(cmdline, "acpi=") )
-        {
-            strcat(cmdline, " acpi=");
-            strcat(cmdline, acpi_param);
-        }
-    }
-
-    if ( (initrdidx > 0) && (initrdidx < mbi->mods_count) )
-    {
-        _initrd_start = initial_images_start +
-            (mod[initrdidx].mod_start - mod[0].mod_start);
-        _initrd_len   = mod[initrdidx].mod_end - mod[initrdidx].mod_start;
-    }
-
-    /*
-     * We're going to setup domain0 using the module(s) that we stashed safely
-     * above our heap. The second module, if present, is an initrd ramdisk.
-     */
-    if ( construct_dom0(dom0,
-                        initial_images_start, 
-                        mod[0].mod_end-mod[0].mod_start,
-                        _initrd_start,
-                        _initrd_len,
-                        cmdline) != 0)
-        panic("Could not set up DOM0 guest OS\n");
-
-    /* Scrub RAM that is still free and so may go to an unprivileged domain. */
-    scrub_heap_pages();
-
-    init_trace_bufs();
-
-    /* Give up the VGA console if DOM0 is configured to grab it. */
-    console_endboot(cmdline && strstr(cmdline, "tty0"));
-
-    /* Hide UART from DOM0 if we're using it */
-    serial_endboot();
-
-    domain_unpause_by_systemcontroller(dom0);
-
-    startup_cpu_idle_loop();
-}
-
-#define EARLY_FAIL() for ( ; ; ) __asm__ __volatile__ ( "hlt" )
-
-static struct e820entry e820_raw[E820MAX];
-
-void __init __start_xen(multiboot_info_t *__mbi)
-{
-    module_t *mod = (module_t *)__va(__mbi->mods_addr);
     unsigned long nr_pages, modules_length;
+    unsigned long initial_images_start, initial_images_end;
     physaddr_t s, e;
     int i, e820_warn = 0, e820_raw_nr = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
@@ -351,8 +160,6 @@ void __init __start_xen(multiboot_info_t *__mbi)
         .parity    = 'n',
         .stop_bits = 1
     };
-
-    mbi = __mbi;
 
     /* Parse the command-line options. */
     if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
@@ -569,6 +376,194 @@ void __init __start_xen(multiboot_info_t *__mbi)
 
     early_boot = 0;
 
+    early_cpu_init();
+
+    paging_init();
+
+    /* Unmap the first page of CPU0's stack. */
+    memguard_guard_stack(cpu0_stack);
+
+    open_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ, new_tlbflush_clock_period);
+
+    if ( opt_watchdog ) 
+        nmi_watchdog = NMI_LOCAL_APIC;
+
+    sort_exception_tables();
+
+    arch_do_createdomain(current);
+    
+    /*
+     * Map default GDT into its final positions in the idle page table. As
+     * noted in arch_do_createdomain(), we must map for every possible VCPU#.
+     */
+    vgdt = GDT_VIRT_START(current) + FIRST_RESERVED_GDT_BYTE;
+    gdt_pfn = virt_to_phys(gdt_table) >> PAGE_SHIFT;
+    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+    {
+        map_pages_to_xen(vgdt, gdt_pfn, 1, PAGE_HYPERVISOR);
+        vgdt += 1 << PDPT_VCPU_VA_SHIFT;
+    }
+
+    find_smp_config();
+
+    smp_alloc_memory();
+
+    dmi_scan_machine();
+
+    generic_apic_probe();
+
+    acpi_boot_table_init();
+    acpi_boot_init();
+
+    if ( smp_found_config ) 
+        get_smp_config();
+
+    init_apic_mappings();
+
+    init_IRQ();
+
+    trap_init();
+
+    ac_timer_init();
+
+    early_time_init();
+
+    arch_init_memory();
+
+    scheduler_init();
+
+    identify_cpu(&boot_cpu_data);
+    if ( cpu_has_fxsr )
+        set_in_cr4(X86_CR4_OSFXSR);
+    if ( cpu_has_xmm )
+        set_in_cr4(X86_CR4_OSXMMEXCPT);
+
+    if ( opt_nosmp )
+    {
+        max_cpus = 0;
+        smp_num_siblings = 1;
+        boot_cpu_data.x86_num_cores = 1;
+    }
+
+    smp_prepare_cpus(max_cpus);
+
+    /* We aren't hotplug-capable yet. */
+    BUG_ON(!cpus_empty(cpu_present_map));
+    for_each_cpu ( i )
+        cpu_set(i, cpu_present_map);
+
+    /*
+     * Initialise higher-level timer functions. We do this fairly late
+     * (post-SMP) because the time bases and scale factors need to be updated 
+     * regularly, and SMP initialisation can cause a long delay with 
+     * interrupts not yet enabled.
+     */
+    init_xen_time();
+
+    initialize_keytable();
+
+    serial_init_postirq();
+
+    BUG_ON(!local_irq_is_enabled());
+
+    for_each_present_cpu ( i )
+    {
+        if ( num_online_cpus() >= max_cpus )
+            break;
+        if ( !cpu_online(i) )
+            __cpu_up(i);
+    }
+
+    printk("Brought up %ld CPUs\n", (long)num_online_cpus());
+    smp_cpus_done(max_cpus);
+
+    do_initcalls();
+
+    schedulers_start();
+
+    watchdog_enable();
+
+    shadow_mode_init();
+
+    /* initialize access control security module */
+    acm_init(&initrdidx, mbi, initial_images_start);
+
+    /* Create initial domain 0. */
+    dom0 = do_createdomain(0, 0);
+    if ( dom0 == NULL )
+        panic("Error creating domain 0\n");
+
+    set_bit(_DOMF_privileged, &dom0->domain_flags);
+    /* post-create hooks sets security label */
+    acm_post_domain0_create(dom0->domain_id);
+
+    /* Grab the DOM0 command line. */
+    cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);
+    if ( cmdline != NULL )
+    {
+        static char dom0_cmdline[MAX_GUEST_CMDLINE];
+
+        /* Skip past the image name and copy to a local buffer. */
+        while ( *cmdline == ' ' ) cmdline++;
+        if ( (cmdline = strchr(cmdline, ' ')) != NULL )
+        {
+            while ( *cmdline == ' ' ) cmdline++;
+            strcpy(dom0_cmdline, cmdline);
+        }
+
+        cmdline = dom0_cmdline;
+
+        /* Append any extra parameters. */
+        if ( skip_ioapic_setup && !strstr(cmdline, "noapic") )
+            strcat(cmdline, " noapic");
+        if ( acpi_skip_timer_override &&
+             !strstr(cmdline, "acpi_skip_timer_override") )
+            strcat(cmdline, " acpi_skip_timer_override");
+        if ( (strlen(acpi_param) != 0) && !strstr(cmdline, "acpi=") )
+        {
+            strcat(cmdline, " acpi=");
+            strcat(cmdline, acpi_param);
+        }
+    }
+
+    if ( (initrdidx > 0) && (initrdidx < mbi->mods_count) )
+    {
+        _initrd_start = initial_images_start +
+            (mod[initrdidx].mod_start - mod[0].mod_start);
+        _initrd_len   = mod[initrdidx].mod_end - mod[initrdidx].mod_start;
+    }
+
+    /*
+     * We're going to setup domain0 using the module(s) that we stashed safely
+     * above our heap. The second module, if present, is an initrd ramdisk.
+     */
+    if ( construct_dom0(dom0,
+                        initial_images_start, 
+                        mod[0].mod_end-mod[0].mod_start,
+                        _initrd_start,
+                        _initrd_len,
+                        cmdline) != 0)
+        panic("Could not set up DOM0 guest OS\n");
+
+    /* Scrub RAM that is still free and so may go to an unprivileged domain. */
+    scrub_heap_pages();
+
+    init_trace_bufs();
+
+    /* Give up the VGA console if DOM0 is configured to grab it. */
+    console_endboot(cmdline && strstr(cmdline, "tty0"));
+
+    /* Hide UART from DOM0 if we're using it */
+    serial_endboot();
+
+    domain_unpause_by_systemcontroller(dom0);
+
+    startup_cpu_idle_loop();
+}
+
+void __init __start_xen(multiboot_info_t *__mbi)
+{
+    mbi = __mbi;
     reset_stack_and_jump(start_of_day);
 }
 

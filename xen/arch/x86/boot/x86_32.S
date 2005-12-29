@@ -167,7 +167,7 @@ no_execute_disable:
         lidt    idt_descr
                 
         cmp     $(SECONDARY_CPU_FLAG),%ebx
-        je      start_secondary
+        je      init_secondary
 
         /* Call into main C routine. This should never return.*/
        	call	__start_xen
