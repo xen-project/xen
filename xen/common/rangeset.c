@@ -32,6 +32,10 @@ struct rangeset {
     unsigned int     flags;
 };
 
+/*****************************
+ * Private range functions hide the underlying linked-list implemnetation.
+ */
+
 /* Find highest range lower than or containing s. NULL if no such range. */
 static struct range *find_range(
     struct rangeset *r, unsigned long s)
@@ -66,6 +70,13 @@ static struct range *next_range(
     return list_entry(x->list.next, struct range, list);
 }
 
+/* Insert range y after range x in r. Insert as first range if x is NULL. */
+static void insert_range(
+    struct rangeset *r, struct range *x, struct range *y)
+{
+    list_add(&y->list, (x != NULL) ? &x->list : &r->range_list);
+}
+
 /* Remove a range from its list and free it. */
 static void destroy_range(
     struct range *x)
@@ -73,6 +84,10 @@ static void destroy_range(
     list_del(&x->list);
     xfree(x);
 }
+
+/*****************************
+ * Core public functions
+ */
 
 int rangeset_add_range(
     struct rangeset *r, unsigned long s, unsigned long e)
@@ -99,10 +114,9 @@ int rangeset_add_range(
             x->s = s;
             x->e = e;
 
-            list_add(&x->list, (y != NULL) ? &y->list : &r->range_list);
+            insert_range(r, y, x);
         }
-        
-        if ( x->e < e )
+        else if ( x->e < e )
             x->e = e;
     }
     else
@@ -165,10 +179,12 @@ int rangeset_remove_range(
                 rc = -ENOMEM;
                 goto out;
             }
+
             y->s = e + 1;
             y->e = x->e;
             x->e = s - 1;
-            list_add(&y->list, &x->list);
+
+            insert_range(r, x, y);
         }
         else if ( (x->s == s) && (x->e <= e) )
             destroy_range(x);
@@ -317,6 +333,10 @@ void rangeset_domain_destroy(
     }
 }
 
+/*****************************
+ * Pretty-printing functions
+ */
+
 static void print_limit(struct rangeset *r, unsigned long s)
 {
     printk((r->flags & RANGESETF_prettyprint_hex) ? "%lx" : "%lu", s);
@@ -332,7 +352,7 @@ void rangeset_printk(
 
     printk("%10s {", r->name);
 
-    list_for_each_entry ( x, &r->range_list, list )
+    for ( x = first_range(r); x != NULL; x = next_range(r, x) )
     {
         if ( nr_printed++ )
             printk(",");
