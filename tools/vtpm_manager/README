@@ -53,11 +53,6 @@ DUMMY_BACKEND                -> vtpm_manager listens on /tmp/in.fifo and
 
 MANUAL_DM_LAUNCH             -> Must manually launch & kill VTPMs
 
-WELL_KNOWN_SRK_AUTH          -> Rather than randomly generating the password for the SRK,
-                                use a well known value. This is necessary for sharing use
-                                of the SRK across applications. Such as VTPM and Dom0
-                                measurement software.
-
 WELL_KNOWN_OWNER_AUTH        -> Rather than randomly generating the password for the owner,
                                 use a well known value. This is useful for debugging and for
                                 poor bios which do not support clearing TPM if OwnerAuth is

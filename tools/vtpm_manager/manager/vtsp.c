@@ -563,63 +563,69 @@ TPM_RESULT VTSP_LoadKey(const TCS_CONTEXT_HANDLE    hContext,
                         const TPM_AUTHDATA          *parentAuth,
                         TPM_HANDLE                  *newKeyHandle,
                         TCS_AUTH                    *auth,
-                        CRYPTO_INFO                 *cryptoinfo /*= NULL*/) {
+                        CRYPTO_INFO                 *cryptoinfo,
+                        const BOOL                  skipTPMLoad) { 
   
   
-  vtpmloginfo(VTPM_LOG_VTSP, "Loading Key.\n%s","");
+  vtpmloginfo(VTPM_LOG_VTSP, "Loading Key %s.\n", (!skipTPMLoad ? "into TPM" : "only into memory"));
   
   TPM_RESULT status = TPM_SUCCESS;
   TPM_COMMAND_CODE command = TPM_ORD_LoadKey;
-  
-  BYTE *paramText;        // Digest to make Auth.
+
+  BYTE *paramText=NULL;        // Digest to make Auth.
   UINT32 paramTextSize;
+
+  // SkipTPMLoad stops key from being loaded into TPM, but still generates CRYPTO_INFO for it
+  if (! skipTPMLoad) { 
   
-  if ((rgbWrappedKeyBlob == NULL) || (parentAuth == NULL) || 
-      (newKeyHandle==NULL) || (auth==NULL)) {
-    status = TPM_BAD_PARAMETER;
-    goto abort_egress;
-  }
+    if ((rgbWrappedKeyBlob == NULL) || (parentAuth == NULL) || 
+        (newKeyHandle==NULL) || (auth==NULL)) {
+      status = TPM_BAD_PARAMETER;
+      goto abort_egress;
+    }
   
-  // Generate Extra TCS Parameters
-  TPM_HANDLE phKeyHMAC;
+    // Generate Extra TCS Parameters
+    TPM_HANDLE phKeyHMAC;
   
-  // Generate HMAC
-  Crypto_GetRandom(&auth->NonceOdd, sizeof(TPM_NONCE) );
+    // Generate HMAC
+    Crypto_GetRandom(&auth->NonceOdd, sizeof(TPM_NONCE) );
   
-  paramText = (BYTE *) malloc(sizeof(BYTE) *  TCPA_MAX_BUFFER_LENGTH);
+    paramText = (BYTE *) malloc(sizeof(BYTE) *  TCPA_MAX_BUFFER_LENGTH);
   
-  paramTextSize = BSG_PackList(paramText, 1,
-			       BSG_TPM_COMMAND_CODE, &command);
+    paramTextSize = BSG_PackList(paramText, 1,
+  			         BSG_TPM_COMMAND_CODE, &command);
   
-  memcpy(paramText + paramTextSize, rgbWrappedKeyBlob->bytes, buffer_len(rgbWrappedKeyBlob));
-  paramTextSize += buffer_len(rgbWrappedKeyBlob);
+    memcpy(paramText + paramTextSize, rgbWrappedKeyBlob->bytes, buffer_len(rgbWrappedKeyBlob));
+    paramTextSize += buffer_len(rgbWrappedKeyBlob);
   
-  TPMTRYRETURN( GenerateAuth( paramText, paramTextSize,
+    TPMTRYRETURN( GenerateAuth( paramText, paramTextSize,
 			      parentAuth, auth) );
   
-  // Call TCS
-  TPMTRYRETURN( TCSP_LoadKeyByBlob(  hContext,
-				     hUnwrappingKey,
-				     buffer_len(rgbWrappedKeyBlob),
-				     rgbWrappedKeyBlob->bytes,
-				     auth,
-				     newKeyHandle,
-				     &phKeyHMAC) );
+    // Call TCS
+    TPMTRYRETURN( TCSP_LoadKeyByBlob(  hContext,
+				       hUnwrappingKey,
+				       buffer_len(rgbWrappedKeyBlob),
+				       rgbWrappedKeyBlob->bytes,
+				       auth,
+				       newKeyHandle,
+				       &phKeyHMAC) );
   
-  // Verify Auth
-  paramTextSize = BSG_PackList(paramText, 3,
-			       BSG_TPM_RESULT, &status,
-			       BSG_TPM_COMMAND_CODE, &command,
-			       BSG_TPM_HANDLE, newKeyHandle);
+    // Verify Auth
+    paramTextSize = BSG_PackList(paramText, 3,
+			         BSG_TPM_RESULT, &status,
+			         BSG_TPM_COMMAND_CODE, &command,
+			         BSG_TPM_HANDLE, newKeyHandle);
   
-  TPMTRYRETURN( VerifyAuth( paramText, paramTextSize,
-			    parentAuth, auth, 
-			    hContext) );
+    TPMTRYRETURN( VerifyAuth( paramText, paramTextSize,
+			      parentAuth, auth, 
+			      hContext) );
+  } 
   
-  // Unpack/return key structure
+  // Build cryptoinfo structure for software crypto function. 
   if (cryptoinfo != NULL) {
     TPM_KEY newKey;
     
+    // Unpack/return key structure
     BSG_Unpack(BSG_TPM_KEY, rgbWrappedKeyBlob->bytes , &newKey);
     TPM_RSA_KEY_PARMS rsaKeyParms;
     

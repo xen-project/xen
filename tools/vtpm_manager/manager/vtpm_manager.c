@@ -74,16 +74,15 @@ VTPM_GLOBALS *vtpm_globals=NULL;
 #endif
 
 // --------------------------- Well Known Auths --------------------------
-#ifdef WELL_KNOWN_SRK_AUTH
-static BYTE FIXED_SRK_AUTH[20] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+const TPM_AUTHDATA SRK_AUTH = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                                   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-#endif
 
 #ifdef WELL_KNOWN_OWNER_AUTH
 static BYTE FIXED_OWNER_AUTH[20] =  {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                                   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 #endif
-                                  
+
+
 // -------------------------- Hash table functions --------------------
 
 static unsigned int hashfunc32(void *ky) {
@@ -100,13 +99,7 @@ TPM_RESULT VTPM_Create_Service(){
   
   TPM_RESULT status = TPM_SUCCESS;
   
-  // Generate Auth's for SRK & Owner
-#ifdef WELL_KNOWN_SRK_AUTH 
-  memcpy(vtpm_globals->srk_usage_auth, FIXED_SRK_AUTH, sizeof(TPM_AUTHDATA));
-#else    
-  Crypto_GetRandom(vtpm_globals->srk_usage_auth, sizeof(TPM_AUTHDATA) );  
-#endif
-  
+  // Generate Auth for Owner
 #ifdef WELL_KNOWN_OWNER_AUTH 
   memcpy(vtpm_globals->owner_usage_auth, FIXED_OWNER_AUTH, sizeof(TPM_AUTHDATA));
 #else    
@@ -116,14 +109,14 @@ TPM_RESULT VTPM_Create_Service(){
   // Take Owership of TPM
   CRYPTO_INFO ek_cryptoInfo;
   
-  vtpmloginfo(VTPM_LOG_VTPM, "Attempting Pubek Read. NOTE: Failure is ok.\n");
   status = VTSP_ReadPubek(vtpm_globals->manager_tcs_handle, &ek_cryptoInfo);
   
   // If we can read PubEK then there is no owner and we should take it.
   if (status == TPM_SUCCESS) { 
+    vtpmloginfo(VTPM_LOG_VTPM, "Failed to readEK meaning TPM has an owner. Creating Keys off existing SRK.\n");
     TPMTRYRETURN(VTSP_TakeOwnership(vtpm_globals->manager_tcs_handle,
 				    (const TPM_AUTHDATA*)&vtpm_globals->owner_usage_auth, 
-				    (const TPM_AUTHDATA*)&vtpm_globals->srk_usage_auth,
+				    &SRK_AUTH,
 				    &ek_cryptoInfo,
 				    &vtpm_globals->keyAuth)); 
   
@@ -142,7 +135,7 @@ TPM_RESULT VTPM_Create_Service(){
   TPMTRYRETURN( VTSP_OSAP(vtpm_globals->manager_tcs_handle,
 			  TPM_ET_KEYHANDLE,
 			  TPM_SRK_KEYHANDLE, 
-			  (const TPM_AUTHDATA*)&vtpm_globals->srk_usage_auth,
+			  &SRK_AUTH,
 			  &sharedsecret, 
 			  &osap) ); 
 
@@ -157,8 +150,43 @@ TPM_RESULT VTPM_Create_Service(){
 				    &vtpm_globals->storageKeyWrap,
 				    &osap) );
   
-  vtpm_globals->keyAuth.fContinueAuthSession = TRUE;
+  // Generate boot key's auth
+  Crypto_GetRandom(  &vtpm_globals->storage_key_usage_auth, 
+		     sizeof(TPM_AUTHDATA) );
   
+  TPM_AUTHDATA bootKeyWrapAuth;
+  memset(&bootKeyWrapAuth, 0, sizeof(bootKeyWrapAuth));
+  
+  TPMTRYRETURN( VTSP_OSAP(vtpm_globals->manager_tcs_handle,
+			  TPM_ET_KEYHANDLE,
+			  TPM_SRK_KEYHANDLE, 
+			  &SRK_AUTH,
+			  &sharedsecret, 
+			  &osap) ); 
+
+  osap.fContinueAuthSession = FALSE;
+ 
+  // FIXME: This key protects the global secrets on disk. It should use TPM
+  //        PCR bindings to limit its use to legit configurations.
+  //        Current binds are open, implying a Trusted VM contains this code.
+  //        If this VM is not Trusted, use measurement and PCR bindings.
+  TPMTRYRETURN( VTSP_CreateWrapKey( vtpm_globals->manager_tcs_handle,
+				    TPM_KEY_BIND,
+				    (const TPM_AUTHDATA*)&bootKeyWrapAuth,
+				    TPM_SRK_KEYHANDLE, 
+				    (const TPM_AUTHDATA*)&sharedsecret,
+				    &vtpm_globals->bootKeyWrap,
+				    &osap) );
+
+  // Populate CRYPTO_INFO vtpm_globals->bootKey. This does not load it into the TPM
+  TPMTRYRETURN( VTSP_LoadKey( vtpm_globals->manager_tcs_handle,
+                              TPM_SRK_KEYHANDLE,
+                              &vtpm_globals->bootKeyWrap,
+                              NULL,
+                              NULL,
+                              NULL,
+                              &vtpm_globals->bootKey,
+                              TRUE ) );
   goto egress;
   
  abort_egress:
@@ -278,24 +306,26 @@ void *VTPM_Service_Handler(void *threadTypePtr){
 #endif
 
     // Check status of rx_fh. If necessary attempt to re-open it.    
+    char* s = NULL;
     if (*rx_fh < 0) {
 #ifdef VTPM_MULTI_VM
-      *rx_fh = open(VTPM_BE_DEV, O_RDWR);
+      s = VTPM_BE_DEV;
 #else
       if (threadType == BE_LISTENER_THREAD) 
   #ifdef DUMMY_BACKEND
-	*rx_fh = open("/tmp/in.fifo", O_RDWR);
+	s = "/tmp/in.fifo";
   #else
-        *rx_fh = open(VTPM_BE_DEV, O_RDWR);
+      s = VTPM_BE_DEV;
   #endif
       else  // DMI Listener   
-	*rx_fh = open(VTPM_RX_FIFO, O_RDWR);
+	s = VTPM_RX_FIFO;
+      *rx_fh = open(s, O_RDWR);
 #endif    
     }
     
     // Respond to failures to open rx_fh
     if (*rx_fh < 0) {
-      vtpmhandlerlogerror(VTPM_LOG_VTPM, "Can't open inbound fh.\n");
+      vtpmhandlerlogerror(VTPM_LOG_VTPM, "Can't open inbound fh for %s.\n", s);
 #ifdef VTPM_MULTI_VM
       return TPM_IOERROR; 
 #else
@@ -713,7 +743,7 @@ void *VTPM_Service_Handler(void *threadTypePtr){
 
 ///////////////////////////////////////////////////////////////////////////////
 TPM_RESULT VTPM_Init_Service() {
-  TPM_RESULT status = TPM_FAIL;   
+  TPM_RESULT status = TPM_FAIL, serviceStatus;   
   BYTE *randomsead;
   UINT32 randomsize;
 
@@ -737,7 +767,7 @@ TPM_RESULT VTPM_Init_Service() {
   
   // Create new TCS Object
   vtpm_globals->manager_tcs_handle = 0;
-  
+ 
   TPMTRYRETURN(TCS_create());
   
   // Create TCS Context for service
@@ -756,17 +786,24 @@ TPM_RESULT VTPM_Init_Service() {
   vtpm_globals->keyAuth.fContinueAuthSession = TRUE;
 
 	// If failed, create new Service.
-  if (VTPM_LoadService() != TPM_SUCCESS)
+  serviceStatus = VTPM_LoadService();
+  if (serviceStatus == TPM_IOERROR) {
+    vtpmloginfo(VTPM_LOG_VTPM, "Failed to read service file. Assuming first time initialization.\n");
     TPMTRYRETURN( VTPM_Create_Service() );    
+  } else if (serviceStatus != TPM_SUCCESS) {
+    vtpmlogerror(VTPM_LOG_VTPM, "Failed to read existing service file");
+    exit(1);
+  }
 
   //Load Storage Key 
   TPMTRYRETURN( VTSP_LoadKey( vtpm_globals->manager_tcs_handle,
 			      TPM_SRK_KEYHANDLE,
 			      &vtpm_globals->storageKeyWrap,
-			      (const TPM_AUTHDATA*)&vtpm_globals->srk_usage_auth,
+			      &SRK_AUTH,
 			      &vtpm_globals->storageKeyHandle,
 			      &vtpm_globals->keyAuth,
-			      &vtpm_globals->storageKey) );
+			      &vtpm_globals->storageKey,
+                              FALSE ) );
 
   // Create entry for Dom0 for control messages
   TPMTRYRETURN( VTPM_Handle_New_DMI(NULL) );
@@ -797,12 +834,11 @@ void VTPM_Stop_Service() {
 		free (dmi_itr);
   }
   
-	
-  TCS_CloseContext(vtpm_globals->manager_tcs_handle);
-  
-  if ( (vtpm_globals->DMI_table_dirty) &&
-       (VTPM_SaveService() != TPM_SUCCESS) )
+  if ( (vtpm_globals->DMI_table_dirty) && (VTPM_SaveService() != TPM_SUCCESS) )
     vtpmlogerror(VTPM_LOG_VTPM, "Unable to save manager data.\n");
+
+  TCS_CloseContext(vtpm_globals->manager_tcs_handle);
+  TCS_destroy();
   
   hashtable_destroy(vtpm_globals->dmi_map, 1);
   free(vtpm_globals);

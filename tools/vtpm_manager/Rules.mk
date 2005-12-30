@@ -56,8 +56,7 @@ CFLAGS += -DLOGGING_MODULES="(BITMASK(VTPM_LOG_TCS)|BITMASK(VTPM_LOG_VTSP)|BITMA
 # Do not have manager launch DMs.
 #CFLAGS += -DMANUAL_DM_LAUNCH
 
-# Fixed SRK
-CFLAGS += -DWELL_KNOWN_SRK_AUTH
+# Fixed OwnerAuth
 #CFLAGS += -DWELL_KNOWN_OWNER_AUTH
 
 # TPM Hardware Device or TPM Simulator
