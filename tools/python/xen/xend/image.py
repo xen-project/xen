@@ -189,6 +189,10 @@ class VmxImageHandler(ImageHandler):
     def configure(self, imageConfig, deviceConfig):
         ImageHandler.configure(self, imageConfig, deviceConfig)
 
+        info = xc.xeninfo()
+        if not 'hvm' in info['xen_caps']:
+            raise VmError("vmx: not an Intel VT platform, we stop creating!")
+
         self.dmargs = self.parseDeviceModelArgs(imageConfig, deviceConfig)
         self.device_model = sxp.child_value(imageConfig, 'device_model')
         if not self.device_model:

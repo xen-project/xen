@@ -35,7 +35,6 @@
 #include <xen/console.h>
 #include <xen/elf.h>
 #include <asm/vmx.h>
-#include <asm/vmx_vmcs.h>
 #include <asm/msr.h>
 #include <asm/physdev.h>
 #include <xen/kernel.h>
@@ -348,6 +347,8 @@ int arch_set_info_guest(
              ((c->user_regs.ss & 3) == 0) )
             return -EINVAL;
     }
+    else if ( !hvm_enabled )
+        return -EINVAL;
 
     clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
     if ( c->flags & VGCF_I387_VALID )

@@ -574,29 +574,6 @@ static int setup_guest(int xc_handle,
     return -1;
 }
 
-#define VMX_FEATURE_FLAG 0x20
-
-static int vmx_identify(void)
-{
-    int eax, ecx;
-
-    __asm__ __volatile__ (
-#if defined(__i386__)
-                          "push %%ebx; cpuid; pop %%ebx"
-#elif defined(__x86_64__)
-                          "push %%rbx; cpuid; pop %%rbx"
-#endif
-                          : "=a" (eax), "=c" (ecx)
-                          : "0" (1)
-                          : "dx");
-
-    if (!(ecx & VMX_FEATURE_FLAG)) {
-        return -1;
-    }
-
-    return 0;
-}
-
 int xc_vmx_build(int xc_handle,
                  uint32_t domid,
                  int memsize,
@@ -613,10 +590,18 @@ int xc_vmx_build(int xc_handle,
     unsigned long nr_pages;
     char         *image = NULL;
     unsigned long image_size;
+    xen_capabilities_info_t xen_caps;
 
-    if ( vmx_identify() < 0 )
+    if ( (rc = xc_version(xc_handle, XENVER_capabilities, &xen_caps)) != 0 )
     {
-        PERROR("CPU doesn't support VMX Extensions");
+        PERROR("Failed to get xen version info");
+        goto error_out;
+    }
+
+    if ( !strstr(xen_caps, "hvm") )
+    {
+        PERROR("CPU doesn't support VMX Extensions or "
+               "CPU VMX Extensions are not turned on");
         goto error_out;
     }
 
