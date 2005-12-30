@@ -25,8 +25,9 @@ int xen_init(void)
 
 	xen_start_info = __va(s->arch.start_info_pfn << PAGE_SHIFT);
 	xen_start_info->flags = s->arch.flags;
-	printk("Running on Xen! start_info_pfn=0x%lx lags=0x%x\n",
-		s->arch.start_info_pfn, xen_start_info->flags);
+	printk("Running on Xen! start_info_pfn=0x%lx nr_pages=%d flags=0x%x\n",
+		s->arch.start_info_pfn, xen_start_info->nr_pages,
+		xen_start_info->flags);
 
 	evtchn_init();
 	initialized = 1;

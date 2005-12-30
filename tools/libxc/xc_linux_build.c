@@ -393,6 +393,7 @@ static int setup_guest(int xc_handle,
     start_info->store_evtchn = store_evtchn;
     start_info->console_mfn   = nr_pages - 1;
     start_info->console_evtchn = console_evtchn;
+    start_info->nr_pages       = nr_pages;	// FIXME?: nr_pages - 2 ????
     if ( initrd_len != 0 )
     {
         ctxt->initrd.start    = vinitrd_start;

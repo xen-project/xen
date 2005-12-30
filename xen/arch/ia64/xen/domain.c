@@ -903,9 +903,9 @@ int construct_dom0(struct domain *d,
 	memset(si, 0, PAGE_SIZE);
 	d->shared_info->arch.start_info_pfn = __pa(si) >> PAGE_SHIFT;
 	sprintf(si->magic, "xen-%i.%i-ia64", XEN_VERSION, XEN_SUBVERSION);
+	si->nr_pages     = d->tot_pages;
 
 #if 0
-	si->nr_pages     = d->tot_pages;
 	si->shared_info  = virt_to_phys(d->shared_info);
 	si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
 	//si->pt_base      = vpt_start;
