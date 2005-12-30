@@ -1,5 +1,6 @@
 #include <xen/config.h>
 #include <public/xen.h>
+#include <asm/asm_defns.h>
 #include <asm/desc.h>
 #include <asm/page.h>
 #include <asm/msr.h>
@@ -121,7 +122,8 @@ skip_boot_checks:
         mov     %rcx,%cr4
 
         mov     stack_start(%rip),%rsp
-        
+        or      $(STACK_SIZE-CPUINFO_sizeof),%rsp
+
         /* Reset EFLAGS (subsumes CLI and CLD). */
         pushq   $0
         popf
@@ -140,9 +142,9 @@ __high_start:
         mov     %ecx,%ss
 
         lidt    idt_descr(%rip)
-                
+
         cmp     $(SECONDARY_CPU_FLAG),%ebx
-        je      init_secondary
+        je      start_secondary
 
         /* Initialize BSS (no nasty surprises!) */
         lea     __bss_start(%rip),%rdi
@@ -219,7 +221,7 @@ idt:
         .quad   idt_table
 
 ENTRY(stack_start)
-        .quad   cpu0_stack + STACK_SIZE
+        .quad   cpu0_stack
 
 high_start:
         .quad   __high_start

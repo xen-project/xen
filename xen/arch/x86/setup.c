@@ -142,9 +142,7 @@ static void __init do_initcalls(void)
 
 static struct e820entry e820_raw[E820MAX];
 
-static multiboot_info_t *mbi;
-
-void __init start_of_day(void)
+void __init __start_xen(multiboot_info_t *mbi)
 {
     unsigned long vgdt, gdt_pfn;
     char *cmdline;
@@ -559,12 +557,6 @@ void __init start_of_day(void)
     domain_unpause_by_systemcontroller(dom0);
 
     startup_cpu_idle_loop();
-}
-
-void __init __start_xen(multiboot_info_t *__mbi)
-{
-    mbi = __mbi;
-    reset_stack_and_jump(start_of_day);
 }
 
 void arch_get_xen_caps(xen_capabilities_info_t info)

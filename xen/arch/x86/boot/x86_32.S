@@ -1,5 +1,6 @@
 #include <xen/config.h>
 #include <public/xen.h>
+#include <asm/asm_defns.h>
 #include <asm/desc.h>
 #include <asm/page.h>
 #include <asm/msr.h>
@@ -53,6 +54,7 @@ __start:
         mov     %ecx,%gs
         ljmp    $(__HYPERVISOR_CS),$(1f)-__PAGE_OFFSET
 1:      lss     stack_start-__PAGE_OFFSET,%esp
+        add     $(STACK_SIZE-CPUINFO_sizeof-__PAGE_OFFSET),%esp
 
         /* Reset EFLAGS (subsumes CLI and CLD). */
 	pushl	$0
@@ -167,7 +169,7 @@ no_execute_disable:
         lidt    idt_descr
                 
         cmp     $(SECONDARY_CPU_FLAG),%ebx
-        je      init_secondary
+        je      start_secondary
 
         /* Call into main C routine. This should never return.*/
        	call	__start_xen
@@ -189,7 +191,7 @@ ignore_int:
 /*** STACK LOCATION ***/
         
 ENTRY(stack_start)
-        .long cpu0_stack + STACK_SIZE - __PAGE_OFFSET
+        .long cpu0_stack
         .long __HYPERVISOR_DS
         
 /*** DESCRIPTOR TABLES ***/
