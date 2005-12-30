@@ -377,7 +377,7 @@ extern unsigned int vmx_enabled;
 
 void sync_split_caches(void)
 {
-	unsigned long ret, progress;
+	unsigned long ret, progress = 0;
 
 	if (cpu_has_split_cache) {
 		/* Sync d/i cache conservatively */
