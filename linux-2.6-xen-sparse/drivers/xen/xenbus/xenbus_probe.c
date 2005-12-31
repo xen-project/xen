@@ -542,14 +542,6 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 			     const char *type,
 			     const char *nodename)
 {
-#define CHECK_FAIL				\
-	do {					\
-		if (err)			\
-			goto fail;		\
-	}					\
-	while (0)				\
-
-
 	int err;
 	struct xenbus_device *xendev;
 	size_t stringlen;
@@ -584,19 +576,18 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 	xendev->dev.release = xenbus_dev_release;
 
 	err = bus->get_bus_id(xendev->dev.bus_id, xendev->nodename);
-	CHECK_FAIL;
+	if (err)
+		goto fail;
 
 	/* Register with generic device framework. */
 	err = device_register(&xendev->dev);
-	CHECK_FAIL;
+	if (err)
+		goto fail;
 
 	device_create_file(&xendev->dev, &dev_attr_nodename);
 	device_create_file(&xendev->dev, &dev_attr_devtype);
 
 	return 0;
-
-#undef CHECK_FAIL
-
 fail:
 	xenbus_dev_free(xendev);
 	return err;
