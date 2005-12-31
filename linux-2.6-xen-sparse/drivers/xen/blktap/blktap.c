@@ -388,12 +388,12 @@ void blktap_kick_user(void)
 }
 
 static struct file_operations blktap_fops = {
-	owner:    THIS_MODULE,
-	poll:     blktap_poll,
-	ioctl:    blktap_ioctl,
-	open:     blktap_open,
-	release:  blktap_release,
-	mmap:     blktap_mmap,
+	.owner   = THIS_MODULE,
+	.poll    = blktap_poll,
+	.ioctl   = blktap_ioctl,
+	.open    = blktap_open,
+	.release = blktap_release,
+	.mmap    = blktap_mmap,
 };
 
 
