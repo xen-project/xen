@@ -381,7 +381,7 @@ void rangeset_domain_printk(
 {
     struct rangeset *r;
 
-    printk("Rangesets belonging to domain %d:\n", d->domain_id);
+    printk("Rangesets belonging to domain %u:\n", d->domain_id);
 
     spin_lock(&d->rangesets_lock);
 

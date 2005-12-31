@@ -184,11 +184,17 @@ void dump_pageframe_info(struct domain *d)
 {
     struct pfn_info *page;
 
-    if ( d->tot_pages < 10 )
+    printk("Memory pages belonging to domain %u:\n", d->domain_id);
+
+    if ( d->tot_pages >= 10 )
+    {
+        printk("    DomPage list too long to display\n");
+    }
+    else
     {
         list_for_each_entry ( page, &d->page_list, list )
         {
-            printk("Page %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
+            printk("    DomPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
                    _p(page_to_phys(page)), _p(page_to_pfn(page)),
                    page->count_info, page->u.inuse.type_info);
         }
@@ -196,15 +202,10 @@ void dump_pageframe_info(struct domain *d)
 
     list_for_each_entry ( page, &d->xenpage_list, list )
     {
-        printk("XenPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
+        printk("    XenPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
                _p(page_to_phys(page)), _p(page_to_pfn(page)),
                page->count_info, page->u.inuse.type_info);
     }
-
-    page = virt_to_page(d->shared_info);
-    printk("Shared_info@%p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
-           _p(page_to_phys(page)), _p(page_to_pfn(page)), page->count_info,
-           page->u.inuse.type_info);
 }
 
 struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
