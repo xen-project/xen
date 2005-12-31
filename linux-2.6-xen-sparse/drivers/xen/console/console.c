@@ -314,39 +314,31 @@ static void __xencons_tx_flush(void)
 {
 	int sent, sz, work_done = 0;
 
-	if (xen_start_info->flags & SIF_INITDOMAIN) {
-		if (x_char) {
+	if (x_char) {
+		if (xen_start_info->flags & SIF_INITDOMAIN) {
+			while (x_char)
+				if (xencons_ring_send(&x_char, 1) == 1)
+					break;
+		} else
 			kcons_write_dom0(NULL, &x_char, 1);
-			x_char = 0;
-			work_done = 1;
-		}
+		x_char = 0;
+		work_done = 1;
+	}
 
-		while (wc != wp) {
-			sz = wp - wc;
-			if (sz > (wbuf_size - WBUF_MASK(wc)))
-				sz = wbuf_size - WBUF_MASK(wc);
+	while (wc != wp) {
+		sz = wp - wc;
+		if (sz > (wbuf_size - WBUF_MASK(wc)))
+			sz = wbuf_size - WBUF_MASK(wc);
+		if (xen_start_info->flags & SIF_INITDOMAIN) {
 			kcons_write_dom0(NULL, &wbuf[WBUF_MASK(wc)], sz);
 			wc += sz;
-			work_done = 1;
-		}
-	} else {
-		while (x_char) {
-			if (xencons_ring_send(&x_char, 1) == 1) {
-				x_char = 0;
-				work_done = 1;
-			}
-		}
-
-		while (wc != wp) {
-			sz = wp - wc;
-			if (sz > (wbuf_size - WBUF_MASK(wc)))
-				sz = wbuf_size - WBUF_MASK(wc);
+		} else {
 			sent = xencons_ring_send(&wbuf[WBUF_MASK(wc)], sz);
 			if (sent == 0)
 				break;
 			wc += sent;
-			work_done = 1;
 		}
+		work_done = 1;
 	}
 
 	if (work_done && (xencons_tty != NULL)) {
