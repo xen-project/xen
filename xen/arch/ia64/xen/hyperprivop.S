@@ -543,6 +543,13 @@ GLOBAL_ENTRY(fast_break_reflect)
 	extr.u r21=r30,IA64_PSR_PP_BIT,1 ;;
 	cmp.ne p7,p0=r21,r0 ;;
 (p7)	br.spnt.few dispatch_break_fault ;;
+        movl r20=IA64_PSR_CPL ;; 
+        and r22=r20,r30 ;;
+        cmp.ne p7,p0=r22,r0
+(p7)    br.spnt.many 1f ;;
+        cmp.eq p7,p0=r17,r0
+(p7)    br.spnt.few dispatch_break_fault ;;
+1:
 #if 1 /* special handling in case running on simulator */
 	movl r20=first_break;;
 	ld4 r23=[r20];;

@@ -839,6 +839,8 @@ ENTRY(break_fault)
 	mov r17=cr.iim
 	mov r31=pr
 	;;
+	cmp.eq p7,p0=r17,r0
+(p7)	br.spnt.few dispatch_break_fault ;;
 	movl r18=XSI_PSR_IC
 	;;
 	ld8 r19=[r18]
