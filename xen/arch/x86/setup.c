@@ -388,8 +388,9 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     sort_exception_tables();
 
-    arch_do_createdomain(current);
-    
+    if ( arch_do_createdomain(current) != 0 )
+        BUG();
+
     /*
      * Map default GDT into its final positions in the idle page table. As
      * noted in arch_do_createdomain(), we must map for every possible VCPU#.

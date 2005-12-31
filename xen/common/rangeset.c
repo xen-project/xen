@@ -350,7 +350,7 @@ void rangeset_printk(
 
     spin_lock(&r->lock);
 
-    printk("%10s {", r->name);
+    printk("%-10s {", r->name);
 
     for ( x = first_range(r); x != NULL; x = next_range(r, x) )
     {

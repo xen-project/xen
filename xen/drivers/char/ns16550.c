@@ -13,6 +13,7 @@
 #include <xen/irq.h>
 #include <xen/sched.h>
 #include <xen/serial.h>
+#include <xen/iocap.h>
 #include <asm/io.h>
 
 /*
@@ -233,11 +234,10 @@ static void ns16550_init_postirq(struct serial_port *port)
 }
 
 #ifdef CONFIG_X86
-#include <asm/physdev.h>
 static void ns16550_endboot(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
-    physdev_modify_ioport_access_range(dom0, 0, uart->io_base, 8);
+    ioport_range_deny(dom0, uart->io_base, uart->io_base + 7);
 }
 #else
 #define ns16550_endboot NULL

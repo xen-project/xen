@@ -20,6 +20,7 @@
 #include <xen/delay.h>
 #include <xen/softirq.h>
 #include <xen/grant_table.h>
+#include <xen/iocap.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
@@ -36,7 +37,6 @@
 #include <xen/elf.h>
 #include <asm/vmx.h>
 #include <asm/msr.h>
-#include <asm/physdev.h>
 #include <xen/kernel.h>
 #include <xen/multicall.h>
 
@@ -249,21 +249,34 @@ void free_perdomain_pt(struct domain *d)
 #endif
 }
 
-void arch_do_createdomain(struct vcpu *v)
+int arch_do_createdomain(struct vcpu *v)
 {
     struct domain *d = v->domain;
     l1_pgentry_t gdt_l1e;
-    int vcpuid, pdpt_order;
+    int vcpuid, pdpt_order, rc;
 #ifdef __x86_64__
     int i;
 #endif
 
     if ( is_idle_task(d) )
-        return;
+        return 0;
+
+    d->arch.ioport_caps = 
+        rangeset_new(d, "I/O Ports", RANGESETF_prettyprint_hex);
+    if ( d->arch.ioport_caps == NULL )
+        return -ENOMEM;
+
+    if ( (d->shared_info = alloc_xenheap_page()) == NULL )
+        return -ENOMEM;
+
+    if ( (rc = ptwr_init(d)) != 0 )
+    {
+        free_xenheap_page(d->shared_info);
+        return rc;
+    }
 
     v->arch.schedule_tail = continue_nonidle_task;
 
-    d->shared_info = alloc_xenheap_page();
     memset(d->shared_info, 0, PAGE_SIZE);
     v->vcpu_info = &d->shared_info->vcpu_info[v->vcpu_id];
     v->cpumap = CPUMAP_RUNANYWHERE;
@@ -307,10 +320,10 @@ void arch_do_createdomain(struct vcpu *v)
                             __PAGE_HYPERVISOR);
 #endif
 
-    (void)ptwr_init(d);
-
     shadow_lock_init(d);
     INIT_LIST_HEAD(&d->arch.free_shadow_frames);
+
+    return 0;
 }
 
 void vcpu_migrate_cpu(struct vcpu *v, int newcpu)
@@ -953,8 +966,6 @@ void domain_relinquish_resources(struct domain *d)
     unsigned long pfn;
 
     BUG_ON(!cpus_empty(d->cpumask));
-
-    physdev_destroy_state(d);
 
     ptwr_destroy(d);
 

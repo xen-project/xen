@@ -13,9 +13,9 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id);
 
 extern void free_vcpu_struct(struct vcpu *v);
 
-extern void arch_do_createdomain(struct vcpu *v);
+extern int arch_do_createdomain(struct vcpu *v);
 
-extern int  arch_set_info_guest(
+extern int arch_set_info_guest(
     struct vcpu *v, struct vcpu_guest_context *c);
 
 extern void vcpu_migrate_cpu(struct vcpu *v, int newcpu);

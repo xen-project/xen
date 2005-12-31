@@ -14,20 +14,6 @@
 extern int ioapic_guest_read(int apicid, int address, u32 *pval);
 extern int ioapic_guest_write(int apicid, int address, u32 pval);
 
-void physdev_modify_ioport_access_range(
-    struct domain *d, int enable, int port, int num)
-{
-    int i;
-    for ( i = port; i < (port + num); i++ )
-        (enable ? clear_bit : set_bit)(i, d->arch.iobmp_mask);
-}
-
-void physdev_destroy_state(struct domain *d)
-{
-    xfree(d->arch.iobmp_mask);
-    d->arch.iobmp_mask = NULL;
-}
-
 /* Check if a domain controls a device with IO memory within frame @pfn.
  * Returns: 1 if the domain should be allowed to map @pfn, 0 otherwise.  */
 int domain_iomem_in_pfn(struct domain *p, unsigned long pfn)
@@ -119,18 +105,6 @@ long do_physdev_op(physdev_op_t *uop)
 
     return ret;
 }
-
-/* Domain 0 has read access to all devices. */
-void physdev_init_dom0(struct domain *d)
-{
-    /* Access to all I/O ports. */
-    d->arch.iobmp_mask = xmalloc_array(u8, IOBMP_BYTES);
-    BUG_ON(d->arch.iobmp_mask == NULL);
-    memset(d->arch.iobmp_mask, 0, IOBMP_BYTES);
-
-    set_bit(_DOMF_physdev_access, &d->domain_flags);
-}
-
 
 /*
  * Local variables:

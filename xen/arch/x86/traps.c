@@ -41,6 +41,7 @@
 #include <xen/softirq.h>
 #include <xen/domain_page.h>
 #include <xen/symbols.h>
+#include <xen/iocap.h>
 #include <asm/shadow.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -622,17 +623,7 @@ static inline int admin_io_okay(
     unsigned int port, unsigned int bytes,
     struct vcpu *v, struct cpu_user_regs *regs)
 {
-    struct domain *d = v->domain;
-    u16 x;
-
-    if ( d->arch.iobmp_mask != NULL )
-    {
-        x = *(u16 *)(d->arch.iobmp_mask + (port >> 3));
-        if ( (x & (((1<<bytes)-1) << (port&7))) == 0 )
-            return 1;
-    }
-
-    return 0;
+    return ioport_range_access_permitted(v->domain, port, port + bytes - 1);
 }
 
 /* Check admin limits. Silently fail the access if it is disallowed. */
