@@ -225,7 +225,7 @@ static int blktap_open(struct inode *inode, struct file *filp)
 	/* Allocate the fe ring. */
 	sring = (blkif_sring_t *)get_zeroed_page(GFP_KERNEL);
 	if (sring == NULL)
-		goto fail_nomem;
+		return -ENOMEM;
 
 	SetPageReserved(virt_to_page(sring));
     
@@ -233,9 +233,6 @@ static int blktap_open(struct inode *inode, struct file *filp)
 	FRONT_RING_INIT(&blktap_ufe_ring, sring, PAGE_SIZE);
 
 	return 0;
-
- fail_nomem:
-	return -ENOMEM;
 }
 
 static int blktap_release(struct inode *inode, struct file *filp)
