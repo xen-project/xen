@@ -237,7 +237,8 @@ static void ns16550_init_postirq(struct serial_port *port)
 static void ns16550_endboot(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
-    ioport_range_deny(dom0, uart->io_base, uart->io_base + 7);
+    if ( ioports_deny_access(dom0, uart->io_base, uart->io_base + 7) != 0 )
+        BUG();
 }
 #else
 #define ns16550_endboot NULL

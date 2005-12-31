@@ -11,6 +11,7 @@
 #include <xen/time.h>
 #include <xen/ac_timer.h>
 #include <xen/grant_table.h>
+#include <xen/rangeset.h>
 #include <asm/domain.h>
 
 extern unsigned long volatile jiffies;
@@ -127,6 +128,10 @@ struct domain
 #define NR_PIRQS 256 /* Put this somewhere sane! */
     u16              pirq_to_evtchn[NR_PIRQS];
     u32              pirq_mask[NR_PIRQS/32];
+
+    /* I/O capabilities (access to IRQs and memory-mapped I/O). */
+    struct rangeset *iomem_caps;
+    struct rangeset *irq_caps;
 
     unsigned long    domain_flags;
     unsigned long    vm_assist;
@@ -381,23 +386,20 @@ extern struct domain *domain_list;
  /* Is this domain privileged? */
 #define _DOMF_privileged       1
 #define DOMF_privileged        (1UL<<_DOMF_privileged)
- /* May this domain do IO to physical devices? */
-#define _DOMF_physdev_access   2
-#define DOMF_physdev_access    (1UL<<_DOMF_physdev_access)
  /* Guest shut itself down for some reason. */
-#define _DOMF_shutdown         3
+#define _DOMF_shutdown         2
 #define DOMF_shutdown          (1UL<<_DOMF_shutdown)
  /* Guest is in process of shutting itself down (becomes DOMF_shutdown). */
-#define _DOMF_shuttingdown     4
+#define _DOMF_shuttingdown     3
 #define DOMF_shuttingdown      (1UL<<_DOMF_shuttingdown)
  /* Death rattle. */
-#define _DOMF_dying            5
+#define _DOMF_dying            4
 #define DOMF_dying             (1UL<<_DOMF_dying)
  /* Domain is paused by controller software. */
-#define _DOMF_ctrl_pause       6
+#define _DOMF_ctrl_pause       5
 #define DOMF_ctrl_pause        (1UL<<_DOMF_ctrl_pause)
  /* Domain is being debugged by controller software. */
-#define _DOMF_debugging        7
+#define _DOMF_debugging        6
 #define DOMF_debugging         (1UL<<_DOMF_debugging)
 
 
@@ -425,8 +427,6 @@ static inline void vcpu_unblock(struct vcpu *v)
 
 #define IS_PRIV(_d)                                         \
     (test_bit(_DOMF_privileged, &(_d)->domain_flags))
-#define IS_CAPABLE_PHYSDEV(_d)                              \
-    (test_bit(_DOMF_physdev_access, &(_d)->domain_flags))
 
 #define VM_ASSIST(_d,_t) (test_bit((_t), &(_d)->vm_assist))
 

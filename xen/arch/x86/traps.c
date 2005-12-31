@@ -623,7 +623,7 @@ static inline int admin_io_okay(
     unsigned int port, unsigned int bytes,
     struct vcpu *v, struct cpu_user_regs *regs)
 {
-    return ioport_range_access_permitted(v->domain, port, port + bytes - 1);
+    return ioports_access_permitted(v->domain, port, port + bytes - 1);
 }
 
 /* Check admin limits. Silently fail the access if it is disallowed. */
@@ -863,7 +863,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0x09: /* WBINVD */
         /* Ignore the instruction if unprivileged. */
-        if ( !IS_CAPABLE_PHYSDEV(v->domain) )
+        if ( !cache_flush_permitted(v->domain) )
             DPRINTK("Non-physdev domain attempted WBINVD.\n");
         else
             wbinvd();

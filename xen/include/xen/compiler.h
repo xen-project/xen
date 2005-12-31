@@ -19,4 +19,10 @@
 #define __attribute_used__ __attribute__((__unused__))
 #endif
 
+#if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
+#define __must_check __attribute__((warn_unused_result))
+#else
+#define __must_check
+#endif
+
 #endif /* __LINUX_COMPILER_H */

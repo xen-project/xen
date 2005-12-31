@@ -152,14 +152,12 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             op->u.ioport_permission.domain)) == NULL) )
             break;
 
-        ret = 0;
-        if ( np > 0 )
-        {
-            if ( op->u.ioport_permission.allow_access )
-                ioport_range_permit(d, fp, fp + np - 1);
-            else
-                ioport_range_deny(d, fp, fp + np - 1);
-        }
+        if ( np == 0 )
+            ret = 0;
+        else if ( op->u.ioport_permission.allow_access )
+            ret = ioports_permit_access(d, fp, fp + np - 1);
+        else
+            ret = ioports_deny_access(d, fp, fp + np - 1);
 
         put_domain(d);
     }

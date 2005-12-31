@@ -774,6 +774,52 @@ static PyObject *pyxc_domain_ioport_permission(XcObject *self,
     return zero;
 }
 
+static PyObject *pyxc_domain_irq_permission(PyObject *self,
+                                            PyObject *args,
+                                            PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    uint32_t dom;
+    int pirq, allow_access, ret;
+
+    static char *kwd_list[] = { "dom", "pirq", "allow_access", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iii", kwd_list, 
+                                      &dom, &pirq, &allow_access) )
+        return NULL;
+
+    ret = xc_domain_irq_permission(
+        xc->xc_handle, dom, pirq, allow_access);
+    if ( ret != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    Py_INCREF(zero);
+    return zero;
+}
+
+static PyObject *pyxc_domain_iomem_permission(PyObject *self,
+                                               PyObject *args,
+                                               PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    uint32_t dom;
+    unsigned long first_pfn, nr_pfns, allow_access, ret;
+
+    static char *kwd_list[] = { "dom", "first_pfn", "nr_pfns", "allow_access", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "illi", kwd_list, 
+                                      &dom, &first_pfn, &nr_pfns, &allow_access) )
+        return NULL;
+
+    ret = xc_domain_iomem_permission(
+        xc->xc_handle, dom, first_pfn, nr_pfns, allow_access);
+    if ( ret != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    Py_INCREF(zero);
+    return zero;
+}
+
 
 static PyObject *dom_op(XcObject *self, PyObject *args,
                         int (*fn)(int, uint32_t))
@@ -1067,6 +1113,25 @@ static PyMethodDef pyxc_methods[] = {
       " dom          [int]: Identifier of domain to be allowed access.\n"
       " first_port   [int]: First IO port\n"
       " nr_ports     [int]: Number of IO ports\n"
+      " allow_access [int]: Non-zero means enable access; else disable access\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_irq_permission",
+      (PyCFunction)pyxc_domain_irq_permission,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Allow a domain access to a physical IRQ\n"
+      " dom          [int]: Identifier of domain to be allowed access.\n"
+      " pirq         [int]: The Physical IRQ\n"
+      " allow_access [int]: Non-zero means enable access; else disable access\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_iomem_permission",
+      (PyCFunction)pyxc_domain_iomem_permission,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Allow a domain access to a range of IO memory pages\n"
+      " dom          [int]: Identifier of domain to be allowed access.\n"
+      " first_pfn   [long]: First page of I/O Memory\n"
+      " nr_pfns     [long]: Number of pages of I/O Memory (>0)\n"
       " allow_access [int]: Non-zero means enable access; else disable access\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 

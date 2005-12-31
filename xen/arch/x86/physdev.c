@@ -14,13 +14,6 @@
 extern int ioapic_guest_read(int apicid, int address, u32 *pval);
 extern int ioapic_guest_write(int apicid, int address, u32 pval);
 
-/* Check if a domain controls a device with IO memory within frame @pfn.
- * Returns: 1 if the domain should be allowed to map @pfn, 0 otherwise.  */
-int domain_iomem_in_pfn(struct domain *p, unsigned long pfn)
-{
-    return 0;
-}
-
 /*
  * Demuxing hypercall.
  */

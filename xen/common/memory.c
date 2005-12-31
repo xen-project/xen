@@ -15,6 +15,7 @@
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <xen/shadow.h>
+#include <xen/iocap.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
 #include <public/memory.h>
@@ -35,7 +36,8 @@ increase_reservation(
          !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
         return 0;
 
-    if ( (extent_order != 0) && !IS_CAPABLE_PHYSDEV(current->domain) )
+    if ( (extent_order != 0) &&
+         !multipage_allocation_permitted(current->domain) )
     {
         DPRINTK("Only I/O-capable domains may allocate multi-page extents.\n");
         return 0;

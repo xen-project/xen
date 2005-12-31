@@ -94,7 +94,7 @@ static struct pfn_info *alloc_chunk(struct domain *d, unsigned long max_pages)
     return page;
 }
 
-static void process_dom0_ioports_disable()
+static void process_dom0_ioports_disable(void)
 {
     unsigned long io_from, io_to;
     char *t, *u, *s = opt_dom0_ioports_disable;
@@ -126,7 +126,8 @@ static void process_dom0_ioports_disable()
         printk("Disabling dom0 access to ioport range %04lx-%04lx\n",
             io_from, io_to);
 
-        ioport_range_deny(dom0, io_from, io_to);
+        if ( ioports_deny_access(dom0, io_from, io_to) != 0 )
+            BUG();
     }
 }
 
@@ -741,23 +742,28 @@ int construct_dom0(struct domain *d,
         printk("dom0: shadow setup done\n");
     }
 
+    i = 0;
+
     /* DOM0 is permitted full I/O capabilities. */
-    ioport_range_permit(dom0, 0, 0xFFFF);
-    set_bit(_DOMF_physdev_access, &dom0->domain_flags);
+    i |= ioports_permit_access(dom0, 0, 0xFFFF);
+    i |= iomem_permit_access(dom0, 0UL, ~0UL);
+    i |= irqs_permit_access(dom0, 0, NR_PIRQS-1);
 
     /*
      * Modify I/O port access permissions.
      */
     /* Master Interrupt Controller (PIC). */
-    ioport_range_deny(dom0, 0x20, 0x21);
+    i |= ioports_deny_access(dom0, 0x20, 0x21);
     /* Slave Interrupt Controller (PIC). */
-    ioport_range_deny(dom0, 0xA0, 0xA1);
+    i |= ioports_deny_access(dom0, 0xA0, 0xA1);
     /* Interval Timer (PIT). */
-    ioport_range_deny(dom0, 0x40, 0x43);
+    i |= ioports_deny_access(dom0, 0x40, 0x43);
     /* PIT Channel 2 / PC Speaker Control. */
-    ioport_range_deny(dom0, 0x61, 0x61);
+    i |= ioports_deny_access(dom0, 0x61, 0x61);
     /* Command-line I/O ranges. */
     process_dom0_ioports_disable();
+
+    BUG_ON(i != 0);
 
     return 0;
 }

@@ -380,6 +380,17 @@ int xc_domain_ioport_permission(int xc_handle,
                                 uint32_t nr_ports,
                                 uint32_t allow_access);
 
+int xc_domain_irq_permission(int xc_handle,
+                             uint32_t domid,
+                             uint8_t pirq,
+                             uint8_t allow_access);
+
+int xc_domain_iomem_permission(int xc_handle,
+                               uint32_t domid,
+                               unsigned long first_pfn,
+                               unsigned long nr_pfns,
+                               uint8_t allow_access);
+
 unsigned long xc_make_page_below_4G(int xc_handle, uint32_t domid, 
 				    unsigned long mfn);
 

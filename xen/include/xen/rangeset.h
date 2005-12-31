@@ -43,20 +43,23 @@ void rangeset_destroy(
 #define _RANGESETF_prettyprint_hex 0
 #define RANGESETF_prettyprint_hex  (1U << _RANGESETF_prettyprint_hex)
 
+int __must_check rangeset_is_empty(
+    struct rangeset *r);
+
 /* Add/remove/query a numeric range. */
-int rangeset_add_range(
+int __must_check rangeset_add_range(
     struct rangeset *r, unsigned long s, unsigned long e);
-int rangeset_remove_range(
+int __must_check rangeset_remove_range(
     struct rangeset *r, unsigned long s, unsigned long e);
-int rangeset_contains_range(
+int __must_check rangeset_contains_range(
     struct rangeset *r, unsigned long s, unsigned long e);
 
 /* Add/remove/query a single number. */
-int rangeset_add_singleton(
+int __must_check rangeset_add_singleton(
     struct rangeset *r, unsigned long s);
-int rangeset_remove_singleton(
+int __must_check rangeset_remove_singleton(
     struct rangeset *r, unsigned long s);
-int rangeset_contains_singleton(
+int __must_check rangeset_contains_singleton(
     struct rangeset *r, unsigned long s);
 
 /* Rangeset pretty printing. */

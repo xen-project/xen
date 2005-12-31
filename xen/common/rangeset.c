@@ -253,6 +253,12 @@ int rangeset_contains_singleton(
     return rangeset_contains_range(r, s, s);
 }
 
+int rangeset_is_empty(
+    struct rangeset *r)
+{
+    return list_empty(&r->range_list);
+}
+
 struct rangeset *rangeset_new(
     struct domain *d, char *name, unsigned int flags)
 {

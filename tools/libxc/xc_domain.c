@@ -404,6 +404,38 @@ int xc_domain_setinfo(int xc_handle,
 
 }
 
+int xc_domain_irq_permission(int xc_handle,
+                             uint32_t domid,
+                             uint8_t pirq,
+                             uint8_t allow_access)
+{
+    dom0_op_t op;
+
+    op.cmd = DOM0_IRQ_PERMISSION;
+    op.u.irq_permission.domain = domid;
+    op.u.irq_permission.pirq = pirq;
+    op.u.irq_permission.allow_access = allow_access;
+
+    return do_dom0_op(xc_handle, &op);
+}
+
+int xc_domain_iomem_permission(int xc_handle,
+                               uint32_t domid,
+                               unsigned long first_pfn,
+                               unsigned long nr_pfns,
+                               uint8_t allow_access)
+{
+    dom0_op_t op;
+
+    op.cmd = DOM0_IOMEM_PERMISSION;
+    op.u.iomem_permission.domain = domid;
+    op.u.iomem_permission.first_pfn = first_pfn;
+	op.u.iomem_permission.nr_pfns = nr_pfns;
+    op.u.iomem_permission.allow_access = allow_access;
+
+    return do_dom0_op(xc_handle, &op);
+}
+
 /*
  * Local variables:
  * mode: C

@@ -765,7 +765,10 @@ void alloc_dom0(void)
  */
 void physdev_init_dom0(struct domain *d)
 {
-	set_bit(_DOMF_physdev_access, &d->domain_flags);
+	if (iomem_permit_access(d, 0UL, ~0UL))
+		BUG();
+	if (irqs_permit_access(d, 0, NR_PIRQS-1))
+		BUG();
 }
 
 unsigned int vmx_dom0 = 0;

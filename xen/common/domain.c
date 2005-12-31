@@ -60,7 +60,12 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 
     rangeset_domain_initialise(d);
 
-    if ( arch_do_createdomain(v) != 0 )
+    d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
+    d->irq_caps   = rangeset_new(d, "Interrupts", 0);
+
+    if ( (d->iomem_caps == NULL) ||
+         (d->irq_caps == NULL) ||
+         (arch_do_createdomain(v) != 0) )
         goto fail3;
 
     if ( !is_idle_task(d) )
