@@ -24,7 +24,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 # The emulator code lives in ROM space
 TEXTADDR=0x000D0000
 
-DEFINES=-DDEBUG -D_ACPI_ -DTEXTADDR=$(TEXTADDR)
+DEFINES=-DDEBUG -DTEXTADDR=$(TEXTADDR)
 XENINC=-I$(XEN_ROOT)/tools/libxc
 
 LD       = ld

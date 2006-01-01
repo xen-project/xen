@@ -364,19 +364,20 @@ static PyObject *pyxc_vmx_build(XcObject *self,
     int control_evtchn, store_evtchn;
     int vcpus = 1;
     int lapic = 0;
+    int acpi = 0;
     int memsize;
     unsigned long store_mfn = 0;
 
     static char *kwd_list[] = { "dom", "control_evtchn", "store_evtchn",
-                                "memsize", "image", "lapic", "vcpus", NULL };
+                                "memsize", "image", "lapic", "vcpus", "acpi",NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiisii", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiisiii", kwd_list,
                                       &dom, &control_evtchn, &store_evtchn,
-                                      &memsize, &image, &lapic, &vcpus) )
+                                      &memsize, &image, &lapic, &vcpus,&acpi) )
         return NULL;
 
     if ( xc_vmx_build(self->xc_handle, dom, memsize, image, control_evtchn,
-                      lapic, vcpus, store_evtchn, &store_mfn) != 0 )
+                      lapic, vcpus, acpi, store_evtchn, &store_mfn) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return Py_BuildValue("{s:i}", "store_mfn", store_mfn);

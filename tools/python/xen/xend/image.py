@@ -214,6 +214,8 @@ class VmxImageHandler(ImageHandler):
         if not lapic is None:
             self.lapic = int(lapic)
 
+        self.acpi = int(sxp.child_value(imageConfig, 'acpi', 0))
+        
     def buildDomain(self):
         # Create an event channel
         self.device_channel = xc.evtchn_alloc_unbound(dom=self.vm.getDomid(),
@@ -229,6 +231,7 @@ class VmxImageHandler(ImageHandler):
         log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
         log.debug("lapic          = %d", self.lapic)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
+        log.debug("acpi           = %d", self.acpi)
 
         return xc.vmx_build(dom            = self.vm.getDomid(),
                             image          = self.kernel,
@@ -236,8 +239,8 @@ class VmxImageHandler(ImageHandler):
                             store_evtchn   = store_evtchn,
                             memsize        = self.vm.getMemoryTarget() / 1024,
                             lapic          = self.lapic,
+                            acpi           = self.acpi,
                             vcpus          = self.vm.getVCpuCount())
-
 
     # Return a list of cmd line args to the device models based on the
     # xm config file
