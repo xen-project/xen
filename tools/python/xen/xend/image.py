@@ -272,44 +272,44 @@ class VmxImageHandler(ImageHandler):
         nics = 0
         for (name, info) in deviceConfig:
             if name == 'vbd':
-               uname = sxp.child_value(info, 'uname')
-               typedev = sxp.child_value(info, 'dev')
-               (_, vbdparam) = string.split(uname, ':', 1)
-               if re.match('^ioemu:', typedev):
-                  (emtype, vbddev) = string.split(typedev, ':', 1)
-               else:
-                  emtype = 'vbd'
-                  vbddev = typedev
-               if emtype != 'ioemu':
-                  continue;
-               vbddev_list = ['hda', 'hdb', 'hdc', 'hdd']
-               if vbddev not in vbddev_list:
-                  raise VmError("vmx: for qemu vbd type=file&dev=hda~hdd")
-               ret.append("-%s" % vbddev)
-               ret.append("%s" % vbdparam)
+                uname = sxp.child_value(info, 'uname')
+                typedev = sxp.child_value(info, 'dev')
+                (_, vbdparam) = string.split(uname, ':', 1)
+                if 'ioemu:' in typedev:
+                    (emtype, vbddev) = string.split(typedev, ':', 1)
+                else:
+                    emtype = 'vbd'
+                    vbddev = typedev
+                if emtype == 'vbd':
+                    continue;
+                vbddev_list = ['hda', 'hdb', 'hdc', 'hdd']
+                if vbddev not in vbddev_list:
+                    raise VmError("vmx: for qemu vbd type=file&dev=hda~hdd")
+                ret.append("-%s" % vbddev)
+                ret.append("%s" % vbdparam)
             if name == 'vif':
-               type = sxp.child_value(info, 'type')
-               if type != 'ioemu':
-                   continue
-               nics += 1
-               if mac != None:
-                   continue
-               mac = sxp.child_value(info, 'mac')
-               bridge = sxp.child_value(info, 'bridge')
-               if mac == None:
-                   mac = randomMAC()
-               if bridge == None:
-                   bridge = 'xenbr0'
-               ret.append("-macaddr")
-               ret.append("%s" % mac)
-               ret.append("-bridge")
-               ret.append("%s" % bridge)
+                type = sxp.child_value(info, 'type')
+                if type != 'ioemu':
+                    continue
+                nics += 1
+                if mac != None:
+                    continue
+                mac = sxp.child_value(info, 'mac')
+                bridge = sxp.child_value(info, 'bridge')
+                if mac == None:
+                    mac = randomMAC()
+                if bridge == None:
+                    bridge = 'xenbr0'
+                ret.append("-macaddr")
+                ret.append("%s" % mac)
+                ret.append("-bridge")
+                ret.append("%s" % bridge)
             if name == 'vtpm':
-               instance = sxp.child_value(info, 'pref_instance')
-               ret.append("-instance")
-               ret.append("%s" % instance)
+                instance = sxp.child_value(info, 'pref_instance')
+                ret.append("-instance")
+                ret.append("%s" % instance)
         ret.append("-nics")
-        ret.append("%d" % nics) 
+        ret.append("%d" % nics)
         return ret
 
     def configVNC(self, config):

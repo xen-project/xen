@@ -31,7 +31,7 @@ class BlkifController(DevController):
     """Block device interface controller. Handles all block devices
     for a domain.
     """
-    
+
     def __init__(self, vm):
         """Create a block device controller.
         """
@@ -40,9 +40,9 @@ class BlkifController(DevController):
 
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
-        
+
         dev = sxp.child_value(config, 'dev')
-        if re.match('^ioemu:', dev):
+        if 'ioemu:' in dev:
             return (None,{},{})
 
         devid = blkif.blkdev_name_to_number(dev)
