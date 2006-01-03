@@ -17,6 +17,7 @@
 #include <asm/msr.h>
 #include <xen/trace.h>
 #include <xen/console.h>
+#include <xen/iocap.h>
 #include <asm/shadow.h>
 #include <asm/irq.h>
 #include <asm/processor.h>
@@ -141,7 +142,6 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         struct domain *d;
         unsigned int fp = op->u.ioport_permission.first_port;
         unsigned int np = op->u.ioport_permission.nr_ports;
-        unsigned int p;
 
         ret = -EINVAL;
         if ( (fp + np) > 65536 )
@@ -152,26 +152,12 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             op->u.ioport_permission.domain)) == NULL) )
             break;
 
-        ret = -ENOMEM;
-        if ( d->arch.iobmp_mask != NULL )
-        {
-            if ( (d->arch.iobmp_mask = xmalloc_array(
-                u8, IOBMP_BYTES)) == NULL )
-            {
-                put_domain(d);
-                break;
-            }
-            memset(d->arch.iobmp_mask, 0xFF, IOBMP_BYTES);
-        }
-
-        ret = 0;
-        for ( p = fp; p < (fp + np); p++ )
-        {
-            if ( op->u.ioport_permission.allow_access )
-                clear_bit(p, d->arch.iobmp_mask);
-            else
-                set_bit(p, d->arch.iobmp_mask);
-        }
+        if ( np == 0 )
+            ret = 0;
+        else if ( op->u.ioport_permission.allow_access )
+            ret = ioports_permit_access(d, fp, fp + np - 1);
+        else
+            ret = ioports_deny_access(d, fp, fp + np - 1);
 
         put_domain(d);
     }

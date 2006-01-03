@@ -2948,6 +2948,7 @@ int main(int argc, char **argv)
             case QEMU_OPTION_vcpus:
                 vcpus = atoi(optarg);
                 fprintf(logfile, "qemu: the number of cpus is %d\n", vcpus);
+                break;
             case QEMU_OPTION_pci:
                 pci_enabled = 1;
                 break;

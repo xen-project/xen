@@ -22,6 +22,7 @@
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <xen/irq.h>
+#include <xen/iocap.h>
 #include <asm/current.h>
 
 #include <public/xen.h>
@@ -241,6 +242,9 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 
     if ( pirq >= ARRAY_SIZE(d->pirq_to_evtchn) )
         return -EINVAL;
+
+    if ( !irq_access_permitted(d, pirq) )
+        return -EPERM;
 
     spin_lock(&d->evtchn_lock);
 

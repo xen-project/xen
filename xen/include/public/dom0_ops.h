@@ -410,6 +410,21 @@ typedef struct {
     uint8_t enable;
 } dom0_setdebugging_t;
 
+#define DOM0_IRQ_PERMISSION 46
+typedef struct {
+    domid_t domain;          /* domain to be affected */
+    uint8_t pirq;
+    uint8_t allow_access;    /* flag to specify enable/disable of IRQ access */
+} dom0_irq_permission_t;
+
+#define DOM0_IOMEM_PERMISSION 47
+typedef struct {
+    domid_t  domain;          /* domain to be affected */
+    unsigned long first_pfn;  /* first page (physical page number) in range */
+    unsigned long nr_pfns;    /* number of pages in range (>0) */
+    uint8_t allow_access;     /* allow (!0) or deny (0) access to range? */
+} dom0_iomem_permission_t;
+ 
 typedef struct {
     uint32_t cmd;
     uint32_t interface_version; /* DOM0_INTERFACE_VERSION */
@@ -448,6 +463,8 @@ typedef struct {
         dom0_max_vcpus_t         max_vcpus;
         dom0_setdomainhandle_t   setdomainhandle;        
         dom0_setdebugging_t      setdebugging;
+        dom0_irq_permission_t    irq_permission;
+        dom0_iomem_permission_t  iomem_permission;
         uint8_t                  pad[128];
     } u;
 } dom0_op_t;

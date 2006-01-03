@@ -16,6 +16,7 @@
 #include <xen/console.h>
 #include <xen/softirq.h>
 #include <xen/domain_page.h>
+#include <xen/rangeset.h>
 #include <asm/debugger.h>
 #include <public/dom0_ops.h>
 #include <public/sched.h>
@@ -52,22 +53,21 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 
     if ( !is_idle_task(d) &&
          ((evtchn_init(d) != 0) || (grant_table_create(d) != 0)) )
-    {
-        evtchn_destroy(d);
-        free_domain(d);
-        return NULL;
-    }
+        goto fail1;
     
     if ( (v = alloc_vcpu(d, 0, cpu)) == NULL )
-    {
-        grant_table_destroy(d);
-        evtchn_destroy(d);
-        free_domain(d);
-        return NULL;
-    }
+        goto fail2;
 
-    arch_do_createdomain(v);
-    
+    rangeset_domain_initialise(d);
+
+    d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
+    d->irq_caps   = rangeset_new(d, "Interrupts", 0);
+
+    if ( (d->iomem_caps == NULL) ||
+         (d->irq_caps == NULL) ||
+         (arch_do_createdomain(v) != 0) )
+        goto fail3;
+
     if ( !is_idle_task(d) )
     {
         write_lock(&domlist_lock);
@@ -83,6 +83,15 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     }
 
     return d;
+
+ fail3:
+    rangeset_domain_destroy(d);
+ fail2:
+    grant_table_destroy(d);
+ fail1:
+    evtchn_destroy(d);
+    free_domain(d);
+    return NULL;
 }
 
 
@@ -270,6 +279,8 @@ void domain_destruct(struct domain *d)
         pd = &(*pd)->next_in_hashbucket;
     *pd = d->next_in_hashbucket;
     write_unlock(&domlist_lock);
+
+    rangeset_domain_destroy(d);
 
     evtchn_destroy(d);
     grant_table_destroy(d);

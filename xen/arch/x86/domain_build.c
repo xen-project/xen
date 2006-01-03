@@ -16,13 +16,13 @@
 #include <xen/kernel.h>
 #include <xen/domain.h>
 #include <xen/compile.h>
+#include <xen/iocap.h>
 #include <asm/regs.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/i387.h>
-#include <asm/physdev.h>
 #include <asm/shadow.h>
 
 static long dom0_nrpages;
@@ -94,9 +94,9 @@ static struct pfn_info *alloc_chunk(struct domain *d, unsigned long max_pages)
     return page;
 }
 
-static void process_dom0_ioports_disable()
+static void process_dom0_ioports_disable(void)
 {
-    unsigned long io_from, io_to, io_nr;
+    unsigned long io_from, io_to;
     char *t, *u, *s = opt_dom0_ioports_disable;
 
     if ( *s == '\0' )
@@ -126,8 +126,8 @@ static void process_dom0_ioports_disable()
         printk("Disabling dom0 access to ioport range %04lx-%04lx\n",
             io_from, io_to);
 
-        io_nr = io_to - io_from + 1;
-        physdev_modify_ioport_access_range(dom0, 0, io_from, io_nr);
+        if ( ioports_deny_access(dom0, io_from, io_to) != 0 )
+            BUG();
     }
 }
 
@@ -183,7 +183,6 @@ int construct_dom0(struct domain *d,
     /* Machine address of next candidate page-table page. */
     unsigned long mpt_alloc;
 
-    extern void physdev_init_dom0(struct domain *);
     extern void translate_l2pgtable(
         struct domain *d, l1_pgentry_t *p2m, unsigned long l2mfn);
 
@@ -692,9 +691,6 @@ int construct_dom0(struct domain *d,
     zap_low_mappings(l2start);
     zap_low_mappings(idle_pg_table_l2);
 #endif
-    
-    /* DOM0 gets access to everything. */
-    physdev_init_dom0(d);
 
     init_domain_time(d);
 
@@ -746,19 +742,28 @@ int construct_dom0(struct domain *d,
         printk("dom0: shadow setup done\n");
     }
 
+    i = 0;
+
+    /* DOM0 is permitted full I/O capabilities. */
+    i |= ioports_permit_access(dom0, 0, 0xFFFF);
+    i |= iomem_permit_access(dom0, 0UL, ~0UL);
+    i |= irqs_permit_access(dom0, 0, NR_PIRQS-1);
+
     /*
      * Modify I/O port access permissions.
      */
     /* Master Interrupt Controller (PIC). */
-    physdev_modify_ioport_access_range(dom0, 0, 0x20, 2);
+    i |= ioports_deny_access(dom0, 0x20, 0x21);
     /* Slave Interrupt Controller (PIC). */
-    physdev_modify_ioport_access_range(dom0, 0, 0xA0, 2);
+    i |= ioports_deny_access(dom0, 0xA0, 0xA1);
     /* Interval Timer (PIT). */
-    physdev_modify_ioport_access_range(dom0, 0, 0x40, 4);
+    i |= ioports_deny_access(dom0, 0x40, 0x43);
     /* PIT Channel 2 / PC Speaker Control. */
-    physdev_modify_ioport_access_range(dom0, 0, 0x61, 1);
-    /* Command-line passed i/o ranges */
+    i |= ioports_deny_access(dom0, 0x61, 0x61);
+    /* Command-line I/O ranges. */
     process_dom0_ioports_disable();
+
+    BUG_ON(i != 0);
 
     return 0;
 }

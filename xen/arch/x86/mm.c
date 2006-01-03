@@ -96,6 +96,7 @@
 #include <xen/softirq.h>
 #include <xen/domain_page.h>
 #include <xen/event.h>
+#include <xen/iocap.h>
 #include <asm/shadow.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
@@ -437,7 +438,6 @@ get_page_from_l1e(
     unsigned long mfn = l1e_get_pfn(l1e);
     struct pfn_info *page = pfn_to_page(mfn);
     int okay;
-    extern int domain_iomem_in_pfn(struct domain *d, unsigned long pfn);
 
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
         return 1;
@@ -455,8 +455,7 @@ get_page_from_l1e(
         if ( d == dom_io )
             d = current->domain;
 
-        if ( (!IS_PRIV(d)) &&
-             (!IS_CAPABLE_PHYSDEV(d) || !domain_iomem_in_pfn(d, mfn)) )
+        if ( !iomem_access_permitted(d, mfn, mfn) )
         {
             MEM_LOG("Non-privileged attempt to map I/O space %08lx", mfn);
             return 0;
@@ -1887,7 +1886,7 @@ int do_mmuext_op(
             break;
 
         case MMUEXT_FLUSH_CACHE:
-            if ( unlikely(!IS_CAPABLE_PHYSDEV(d)) )
+            if ( unlikely(!cache_flush_permitted(d)) )
             {
                 MEM_LOG("Non-physdev domain tried to FLUSH_CACHE.");
                 okay = 0;

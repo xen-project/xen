@@ -371,6 +371,21 @@ do{ __asm__ __volatile__ (                                              \
    (_type)_x; \
 })
 
+/* Access/update address held in a register, based on addressing mode. */
+#define register_address(sel, reg)                                      \
+    ((ad_bytes == sizeof(unsigned long)) ? (reg) :                      \
+     ((mode == X86EMUL_MODE_REAL) ? /* implies ad_bytes == 2 */         \
+      (((unsigned long)(sel) << 4) + ((reg) & 0xffff)) :                \
+      ((reg) & ((1UL << (ad_bytes << 3)) - 1))))
+#define register_address_increment(reg, inc)                            \
+do {                                                                    \
+    if ( ad_bytes == sizeof(unsigned long) )                            \
+        (reg) += (inc);                                                 \
+    else                                                                \
+        (reg) = ((reg) & ~((1UL << (ad_bytes << 3)) - 1)) |             \
+                (((reg) + (inc)) & ((1UL << (ad_bytes << 3)) - 1));     \
+} while (0)
+
 void *
 decode_register(
     uint8_t modrm_reg, struct cpu_user_regs *regs, int highbyte_regs)
@@ -420,13 +435,32 @@ x86_emulate_memop(
 {
     uint8_t b, d, sib, twobyte = 0, rex_prefix = 0;
     uint8_t modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
-    unsigned int op_bytes = (mode == 8) ? 4 : mode, ad_bytes = mode;
-    unsigned int lock_prefix = 0, rep_prefix = 0, i;
+    uint16_t *seg = NULL; /* override segment */
+    unsigned int op_bytes, ad_bytes, lock_prefix = 0, rep_prefix = 0, i;
     int rc = 0;
     struct operand src, dst;
 
     /* Shadow copy of register state. Committed on successful emulation. */
     struct cpu_user_regs _regs = *regs;
+
+    switch ( mode )
+    {
+    case X86EMUL_MODE_REAL:
+    case X86EMUL_MODE_PROT16:
+        op_bytes = ad_bytes = 2;
+        break;
+    case X86EMUL_MODE_PROT32:
+        op_bytes = ad_bytes = 4;
+        break;
+#ifdef __x86_64__
+    case X86EMUL_MODE_PROT64:
+        op_bytes = 4;
+        ad_bytes = 8;
+        break;
+#endif
+    default:
+        return -1;
+    }
 
     /* Legacy prefixes. */
     for ( i = 0; i < 8; i++ )
@@ -434,18 +468,31 @@ x86_emulate_memop(
         switch ( b = insn_fetch(uint8_t, 1, _regs.eip) )
         {
         case 0x66: /* operand-size override */
-            op_bytes ^= 6;                    /* switch between 2/4 bytes */
+            op_bytes ^= 6;      /* switch between 2/4 bytes */
             break;
         case 0x67: /* address-size override */
-            ad_bytes ^= (mode == 8) ? 12 : 6; /* switch between 2/4/8 bytes */
+            if ( mode == X86EMUL_MODE_PROT64 )
+                ad_bytes ^= 12; /* switch between 4/8 bytes */
+            else
+                ad_bytes ^= 6;  /* switch between 2/4 bytes */
             break;
         case 0x2e: /* CS override */
+            seg = &_regs.cs;
+            break;
         case 0x3e: /* DS override */
+            seg = &_regs.ds;
+            break;
         case 0x26: /* ES override */
+            seg = &_regs.es;
+            break;
         case 0x64: /* FS override */
+            seg = &_regs.fs;
+            break;
         case 0x65: /* GS override */
+            seg = &_regs.gs;
+            break;
         case 0x36: /* SS override */
-            DPRINTF("Warning: ignoring a segment override.\n");
+            seg = &_regs.ss;
             break;
         case 0xf0: /* LOCK */
             lock_prefix = 1;
@@ -461,8 +508,12 @@ x86_emulate_memop(
     }
  done_prefixes:
 
+    /* Note quite the same as 80386 real mode, but hopefully good enough. */
+    if ( (mode == X86EMUL_MODE_REAL) && (ad_bytes != 2) )
+        goto cannot_emulate;
+
     /* REX prefix. */
-    if ( (mode == 8) && ((b & 0xf0) == 0x40) )
+    if ( (mode == X86EMUL_MODE_PROT64) && ((b & 0xf0) == 0x40) )
     {
         rex_prefix = b;
         if ( b & 8 )
@@ -674,7 +725,7 @@ x86_emulate_memop(
         emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
         break;
     case 0x63: /* movsxd */
-        if ( mode != 8 ) /* x86/64 long mode only */
+        if ( mode != X86EMUL_MODE_PROT64 )
             goto cannot_emulate;
         dst.val = (int32_t)src.val;
         break;
@@ -721,12 +772,13 @@ x86_emulate_memop(
         dst.val = src.val;
         break;
     case 0x8f: /* pop (sole member of Grp1a) */
-        /* 64-bit mode: POP defaults to 64-bit operands. */
-        if ( (mode == 8) && (dst.bytes == 4) )
+        /* 64-bit mode: POP always pops a 64-bit operand. */
+        if ( mode == X86EMUL_MODE_PROT64 )
             dst.bytes = 8;
-        if ( (rc = ops->read_std(_regs.esp, &dst.val, dst.bytes)) != 0 )
+        if ( (rc = ops->read_std(register_address(_regs.ss, _regs.esp),
+                                 &dst.val, dst.bytes)) != 0 )
             goto done;
-        _regs.esp += dst.bytes;
+        register_address_increment(_regs.esp, dst.bytes);
         break;
     case 0xc0 ... 0xc1: grp2: /* Grp2 */
         switch ( modrm_reg )
@@ -797,16 +849,17 @@ x86_emulate_memop(
             emulate_1op("dec", dst, _regs.eflags);
             break;
         case 6: /* push */
-            /* 64-bit mode: PUSH defaults to 64-bit operands. */
-            if ( (mode == 8) && (dst.bytes == 4) )
+            /* 64-bit mode: PUSH always pushes a 64-bit operand. */
+            if ( mode == X86EMUL_MODE_PROT64 )
             {
                 dst.bytes = 8;
                 if ( (rc = ops->read_std((unsigned long)dst.ptr,
                                          &dst.val, 8)) != 0 )
                     goto done;
             }
-            _regs.esp -= dst.bytes;
-            if ( (rc = ops->write_std(_regs.esp, dst.val, dst.bytes)) != 0 )
+            register_address_increment(_regs.esp, -dst.bytes);
+            if ( (rc = ops->write_std(register_address(_regs.ss, _regs.esp),
+                                      dst.val, dst.bytes)) != 0 )
                 goto done;
             dst.val = dst.orig_val; /* skanky: disable writeback */
             break;
@@ -873,19 +926,22 @@ x86_emulate_memop(
         {
             /* Write fault: destination is special memory. */
             dst.ptr = (unsigned long *)cr2;
-            if ( (rc = ops->read_std(_regs.esi - _regs.edi + cr2, 
+            if ( (rc = ops->read_std(register_address(seg ? *seg : _regs.ds,
+                                                      _regs.esi),
                                      &dst.val, dst.bytes)) != 0 )
                 goto done;
         }
         else
         {
             /* Read fault: source is special memory. */
-            dst.ptr = (unsigned long *)(_regs.edi - _regs.esi + cr2);
+            dst.ptr = (unsigned long *)register_address(_regs.es, _regs.edi);
             if ( (rc = ops->read_emulated(cr2, &dst.val, dst.bytes)) != 0 )
                 goto done;
         }
-        _regs.esi += (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes;
-        _regs.edi += (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes;
+        register_address_increment(
+            _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+        register_address_increment(
+            _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
         break;
     case 0xa6 ... 0xa7: /* cmps */
         DPRINTF("Urk! I don't handle CMPS.\n");
@@ -895,7 +951,8 @@ x86_emulate_memop(
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.ptr   = (unsigned long *)cr2;
         dst.val   = _regs.eax;
-        _regs.edi += (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes;
+        register_address_increment(
+            _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
         break;
     case 0xac ... 0xad: /* lods */
         dst.type  = OP_REG;
@@ -903,7 +960,8 @@ x86_emulate_memop(
         dst.ptr   = (unsigned long *)&_regs.eax;
         if ( (rc = ops->read_emulated(cr2, &dst.val, dst.bytes)) != 0 )
             goto done;
-        _regs.esi += (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes;
+        register_address_increment(
+            _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
         break;
     case 0xae ... 0xaf: /* scas */
         DPRINTF("Urk! I don't handle SCAS.\n");

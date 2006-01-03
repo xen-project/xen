@@ -196,9 +196,13 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 		return 0;
 
 	netif->tx_comms_area = alloc_vm_area(PAGE_SIZE);
-	netif->rx_comms_area = alloc_vm_area(PAGE_SIZE);
-	if (netif->tx_comms_area == NULL || netif->rx_comms_area == NULL)
+	if (netif->tx_comms_area == NULL)
 		return -ENOMEM;
+	netif->rx_comms_area = alloc_vm_area(PAGE_SIZE);
+	if (netif->rx_comms_area == NULL) {
+		free_vm_area(netif->tx_comms_area);
+		return -ENOMEM;
+	}
 
 	err = map_frontend_pages(netif, tx_ring_ref, rx_ring_ref);
 	if (err) {
@@ -247,13 +251,9 @@ static void free_netif_callback(void *arg)
 {
 	netif_t *netif = (netif_t *)arg;
 
-	/* Already disconnected? */
-	if (!netif->irq)
-		return;
-
-	unbind_from_irqhandler(netif->irq, netif);
-	netif->irq = 0;
-
+	if (netif->irq)
+		unbind_from_irqhandler(netif->irq, netif);
+	
 	unregister_netdev(netif->dev);
 
 	if (netif->tx.sring) {
@@ -290,10 +290,10 @@ void netif_creditlimit(netif_t *netif)
 #endif
 }
 
-int netif_disconnect(netif_t *netif)
+void netif_disconnect(netif_t *netif)
 {
-
-	if (netif->status == CONNECTED) {
+	switch (netif->status) {
+	case CONNECTED:
 		rtnl_lock();
 		netif->status = DISCONNECTING;
 		wmb();
@@ -301,10 +301,14 @@ int netif_disconnect(netif_t *netif)
 			__netif_down(netif);
 		rtnl_unlock();
 		netif_put(netif);
-		return 0; /* Caller should not send response message. */
+		break;
+	case DISCONNECTED:
+		BUG_ON(atomic_read(&netif->refcnt) != 0);
+		free_netif(netif);
+		break;
+	default:
+		BUG();
 	}
-
-	return 1;
 }
 
 /*

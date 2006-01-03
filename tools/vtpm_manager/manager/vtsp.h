@@ -86,7 +86,8 @@ TPM_RESULT VTSP_LoadKey(const TCS_CONTEXT_HANDLE    hContext,
                         const TPM_AUTHDATA          *parentAuth,
                         TPM_HANDLE                  *newKeyHandle,
                         TCS_AUTH                    *pAuth,
-                        CRYPTO_INFO                 *cryptoinfo);
+                        CRYPTO_INFO                 *cryptoinfo,
+                        const BOOL                  skipTPMLoad);
 
 TPM_RESULT VTSP_Unbind( const TCS_CONTEXT_HANDLE    hContext,
                         const TPM_KEY_HANDLE        key_handle,

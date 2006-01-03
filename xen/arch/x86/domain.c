@@ -20,6 +20,7 @@
 #include <xen/delay.h>
 #include <xen/softirq.h>
 #include <xen/grant_table.h>
+#include <xen/iocap.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
@@ -35,9 +36,7 @@
 #include <xen/console.h>
 #include <xen/elf.h>
 #include <asm/vmx.h>
-#include <asm/vmx_vmcs.h>
 #include <asm/msr.h>
-#include <asm/physdev.h>
 #include <xen/kernel.h>
 #include <xen/multicall.h>
 
@@ -98,7 +97,7 @@ void startup_cpu_idle_loop(void)
     cpu_set(smp_processor_id(), v->domain->cpumask);
     v->arch.schedule_tail = continue_idle_task;
 
-    idle_loop();
+    reset_stack_and_jump(idle_loop);
 }
 
 static long no_idt[2];
@@ -185,11 +184,17 @@ void dump_pageframe_info(struct domain *d)
 {
     struct pfn_info *page;
 
-    if ( d->tot_pages < 10 )
+    printk("Memory pages belonging to domain %u:\n", d->domain_id);
+
+    if ( d->tot_pages >= 10 )
+    {
+        printk("    DomPage list too long to display\n");
+    }
+    else
     {
         list_for_each_entry ( page, &d->page_list, list )
         {
-            printk("Page %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
+            printk("    DomPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
                    _p(page_to_phys(page)), _p(page_to_pfn(page)),
                    page->count_info, page->u.inuse.type_info);
         }
@@ -197,15 +202,10 @@ void dump_pageframe_info(struct domain *d)
 
     list_for_each_entry ( page, &d->xenpage_list, list )
     {
-        printk("XenPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
+        printk("    XenPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
                _p(page_to_phys(page)), _p(page_to_pfn(page)),
                page->count_info, page->u.inuse.type_info);
     }
-
-    page = virt_to_page(d->shared_info);
-    printk("Shared_info@%p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
-           _p(page_to_phys(page)), _p(page_to_pfn(page)), page->count_info,
-           page->u.inuse.type_info);
 }
 
 struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
@@ -250,21 +250,34 @@ void free_perdomain_pt(struct domain *d)
 #endif
 }
 
-void arch_do_createdomain(struct vcpu *v)
+int arch_do_createdomain(struct vcpu *v)
 {
     struct domain *d = v->domain;
     l1_pgentry_t gdt_l1e;
-    int vcpuid, pdpt_order;
+    int vcpuid, pdpt_order, rc;
 #ifdef __x86_64__
     int i;
 #endif
 
     if ( is_idle_task(d) )
-        return;
+        return 0;
+
+    d->arch.ioport_caps = 
+        rangeset_new(d, "I/O Ports", RANGESETF_prettyprint_hex);
+    if ( d->arch.ioport_caps == NULL )
+        return -ENOMEM;
+
+    if ( (d->shared_info = alloc_xenheap_page()) == NULL )
+        return -ENOMEM;
+
+    if ( (rc = ptwr_init(d)) != 0 )
+    {
+        free_xenheap_page(d->shared_info);
+        return rc;
+    }
 
     v->arch.schedule_tail = continue_nonidle_task;
 
-    d->shared_info = alloc_xenheap_page();
     memset(d->shared_info, 0, PAGE_SIZE);
     v->vcpu_info = &d->shared_info->vcpu_info[v->vcpu_id];
     v->cpumap = CPUMAP_RUNANYWHERE;
@@ -308,10 +321,10 @@ void arch_do_createdomain(struct vcpu *v)
                             __PAGE_HYPERVISOR);
 #endif
 
-    (void)ptwr_init(d);
-
     shadow_lock_init(d);
     INIT_LIST_HEAD(&d->arch.free_shadow_frames);
+
+    return 0;
 }
 
 void vcpu_migrate_cpu(struct vcpu *v, int newcpu)
@@ -348,6 +361,8 @@ int arch_set_info_guest(
              ((c->user_regs.ss & 3) == 0) )
             return -EINVAL;
     }
+    else if ( !hvm_enabled )
+        return -EINVAL;
 
     clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
     if ( c->flags & VGCF_I387_VALID )
@@ -952,8 +967,6 @@ void domain_relinquish_resources(struct domain *d)
     unsigned long pfn;
 
     BUG_ON(!cpus_empty(d->cpumask));
-
-    physdev_destroy_state(d);
 
     ptwr_destroy(d);
 

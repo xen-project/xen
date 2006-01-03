@@ -108,6 +108,7 @@ typedef struct tdVTPM_GLOBALS {
   TCS_CONTEXT_HANDLE  manager_tcs_handle;     // TCS Handle used by manager
   TPM_HANDLE          storageKeyHandle;       // Key used by persistent store
   CRYPTO_INFO         storageKey;             // For software encryption
+  CRYPTO_INFO         bootKey;                // For saving table
   TCS_AUTH            keyAuth;                // OIAP session for storageKey 
   BOOL                DMI_table_dirty;        // Indicates that a command
                                               // has updated the DMI table
@@ -115,15 +116,17 @@ typedef struct tdVTPM_GLOBALS {
     
   // Persistent Data
   TPM_AUTHDATA        owner_usage_auth;       // OwnerAuth of real TPM
-  TPM_AUTHDATA        srk_usage_auth;         // SRK Auth of real TPM    
   buffer_t            storageKeyWrap;         // Wrapped copy of storageKey
-
+  TPM_AUTHDATA        srk_usage_auth;
   TPM_AUTHDATA        storage_key_usage_auth; 
-    
+
+  buffer_t            bootKeyWrap;            // Wrapped copy of boot key 
+
 }VTPM_GLOBALS;
 
-//Global dmi map
-extern VTPM_GLOBALS *vtpm_globals;
+// --------------------------- Global Values --------------------------
+extern VTPM_GLOBALS *vtpm_globals;   // Key info and DMI states
+extern const TPM_AUTHDATA SRK_AUTH;  // SRK Well Known Auth Value
 
 // ********************** Command Handler Prototypes ***********************
 TPM_RESULT VTPM_Handle_Load_NVM(       VTPM_DMI_RESOURCE *myDMI, 

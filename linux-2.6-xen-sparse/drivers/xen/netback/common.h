@@ -82,7 +82,7 @@ typedef struct netif_st {
 #define NET_RX_RING_SIZE __RING_SIZE((netif_rx_sring_t *)0, PAGE_SIZE)
 
 void netif_creditlimit(netif_t *netif);
-int  netif_disconnect(netif_t *netif);
+void netif_disconnect(netif_t *netif);
 
 netif_t *alloc_netif(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN]);
 void free_netif(netif_t *netif);

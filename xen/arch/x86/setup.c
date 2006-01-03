@@ -138,131 +138,19 @@ static void __init do_initcalls(void)
         (*call)();
 }
 
-static void __init start_of_day(void)
-{
-    int i;
-    unsigned long vgdt, gdt_pfn;
-
-    early_cpu_init();
-
-    paging_init();
-
-    /* Unmap the first page of CPU0's stack. */
-    memguard_guard_stack(cpu0_stack);
-
-    open_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ, new_tlbflush_clock_period);
-
-    if ( opt_watchdog ) 
-        nmi_watchdog = NMI_LOCAL_APIC;
-
-    sort_exception_tables();
-
-    arch_do_createdomain(current);
-    
-    /*
-     * Map default GDT into its final positions in the idle page table. As
-     * noted in arch_do_createdomain(), we must map for every possible VCPU#.
-     */
-    vgdt = GDT_VIRT_START(current) + FIRST_RESERVED_GDT_BYTE;
-    gdt_pfn = virt_to_phys(gdt_table) >> PAGE_SHIFT;
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-    {
-        map_pages_to_xen(vgdt, gdt_pfn, 1, PAGE_HYPERVISOR);
-        vgdt += 1 << PDPT_VCPU_VA_SHIFT;
-    }
-
-    find_smp_config();
-
-    smp_alloc_memory();
-
-    dmi_scan_machine();
-
-    generic_apic_probe();
-
-    acpi_boot_table_init();
-    acpi_boot_init();
-
-    if ( smp_found_config ) 
-        get_smp_config();
-
-    init_apic_mappings();
-
-    init_IRQ();
-
-    trap_init();
-
-    ac_timer_init();
-
-    early_time_init();
-
-    arch_init_memory();
-
-    scheduler_init();
-
-    identify_cpu(&boot_cpu_data);
-    if ( cpu_has_fxsr )
-        set_in_cr4(X86_CR4_OSFXSR);
-    if ( cpu_has_xmm )
-        set_in_cr4(X86_CR4_OSXMMEXCPT);
-
-    if ( opt_nosmp )
-    {
-        max_cpus = 0;
-        smp_num_siblings = 1;
-        boot_cpu_data.x86_num_cores = 1;
-    }
-
-    smp_prepare_cpus(max_cpus);
-
-    /* We aren't hotplug-capable yet. */
-    BUG_ON(!cpus_empty(cpu_present_map));
-    for_each_cpu ( i )
-        cpu_set(i, cpu_present_map);
-
-    /*
-     * Initialise higher-level timer functions. We do this fairly late
-     * (post-SMP) because the time bases and scale factors need to be updated 
-     * regularly, and SMP initialisation can cause a long delay with 
-     * interrupts not yet enabled.
-     */
-    init_xen_time();
-
-    initialize_keytable();
-
-    serial_init_postirq();
-
-    BUG_ON(!local_irq_is_enabled());
-
-    for_each_present_cpu ( i )
-    {
-        if ( num_online_cpus() >= max_cpus )
-            break;
-        if ( !cpu_online(i) )
-            __cpu_up(i);
-    }
-
-    printk("Brought up %ld CPUs\n", (long)num_online_cpus());
-    smp_cpus_done(max_cpus);
-
-    do_initcalls();
-
-    schedulers_start();
-
-    watchdog_enable();
-}
-
 #define EARLY_FAIL() for ( ; ; ) __asm__ __volatile__ ( "hlt" )
 
 static struct e820entry e820_raw[E820MAX];
 
 void __init __start_xen(multiboot_info_t *mbi)
 {
+    unsigned long vgdt, gdt_pfn;
     char *cmdline;
+    unsigned long _initrd_start = 0, _initrd_len = 0;
+    unsigned int initrdidx = 1;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, modules_length;
     unsigned long initial_images_start, initial_images_end;
-    unsigned long _initrd_start = 0, _initrd_len = 0;
-    unsigned int initrdidx = 1;
     physaddr_t s, e;
     int i, e820_warn = 0, e820_raw_nr = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
@@ -486,7 +374,113 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     early_boot = 0;
 
-    start_of_day();
+    early_cpu_init();
+
+    paging_init();
+
+    /* Unmap the first page of CPU0's stack. */
+    memguard_guard_stack(cpu0_stack);
+
+    open_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ, new_tlbflush_clock_period);
+
+    if ( opt_watchdog ) 
+        nmi_watchdog = NMI_LOCAL_APIC;
+
+    sort_exception_tables();
+
+    if ( arch_do_createdomain(current) != 0 )
+        BUG();
+
+    /*
+     * Map default GDT into its final positions in the idle page table. As
+     * noted in arch_do_createdomain(), we must map for every possible VCPU#.
+     */
+    vgdt = GDT_VIRT_START(current) + FIRST_RESERVED_GDT_BYTE;
+    gdt_pfn = virt_to_phys(gdt_table) >> PAGE_SHIFT;
+    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+    {
+        map_pages_to_xen(vgdt, gdt_pfn, 1, PAGE_HYPERVISOR);
+        vgdt += 1 << PDPT_VCPU_VA_SHIFT;
+    }
+
+    find_smp_config();
+
+    smp_alloc_memory();
+
+    dmi_scan_machine();
+
+    generic_apic_probe();
+
+    acpi_boot_table_init();
+    acpi_boot_init();
+
+    if ( smp_found_config ) 
+        get_smp_config();
+
+    init_apic_mappings();
+
+    init_IRQ();
+
+    trap_init();
+
+    ac_timer_init();
+
+    early_time_init();
+
+    arch_init_memory();
+
+    scheduler_init();
+
+    identify_cpu(&boot_cpu_data);
+    if ( cpu_has_fxsr )
+        set_in_cr4(X86_CR4_OSFXSR);
+    if ( cpu_has_xmm )
+        set_in_cr4(X86_CR4_OSXMMEXCPT);
+
+    if ( opt_nosmp )
+    {
+        max_cpus = 0;
+        smp_num_siblings = 1;
+        boot_cpu_data.x86_num_cores = 1;
+    }
+
+    smp_prepare_cpus(max_cpus);
+
+    /* We aren't hotplug-capable yet. */
+    BUG_ON(!cpus_empty(cpu_present_map));
+    for_each_cpu ( i )
+        cpu_set(i, cpu_present_map);
+
+    /*
+     * Initialise higher-level timer functions. We do this fairly late
+     * (post-SMP) because the time bases and scale factors need to be updated 
+     * regularly, and SMP initialisation can cause a long delay with 
+     * interrupts not yet enabled.
+     */
+    init_xen_time();
+
+    initialize_keytable();
+
+    serial_init_postirq();
+
+    BUG_ON(!local_irq_is_enabled());
+
+    for_each_present_cpu ( i )
+    {
+        if ( num_online_cpus() >= max_cpus )
+            break;
+        if ( !cpu_online(i) )
+            __cpu_up(i);
+    }
+
+    printk("Brought up %ld CPUs\n", (long)num_online_cpus());
+    smp_cpus_done(max_cpus);
+
+    do_initcalls();
+
+    schedulers_start();
+
+    watchdog_enable();
 
     shadow_mode_init();
 

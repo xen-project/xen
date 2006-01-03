@@ -331,7 +331,12 @@ static void connect(struct blkfront_info *info)
 		return;
 	}
 
-        xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
+	err = xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
+	if (err) {
+		xenbus_dev_fatal(info->xbdev, err, "xlvbd_add at %s",
+		                 info->xbdev->otherend);
+		return;
+	}
 
 	(void)xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected); 
 

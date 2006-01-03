@@ -181,7 +181,7 @@ static void init_switch_stack(struct vcpu *v)
 	memset(v->arch._thread.fph,0,sizeof(struct ia64_fpreg)*96);
 }
 
-void arch_do_createdomain(struct vcpu *v)
+int arch_do_createdomain(struct vcpu *v)
 {
 	struct domain *d = v->domain;
 	struct thread_info *ti = alloc_thread_info(v);
@@ -248,7 +248,9 @@ void arch_do_createdomain(struct vcpu *v)
 		}
 	} else
  		d->arch.mm = NULL;
- 	printf ("arch_do_create_domain: domain=%p\n", d);
+	printf ("arch_do_create_domain: domain=%p\n", d);
+
+	return 0;
 }
 
 void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
@@ -754,7 +756,10 @@ void alloc_dom0(void)
  */
 void physdev_init_dom0(struct domain *d)
 {
-	set_bit(_DOMF_physdev_access, &d->domain_flags);
+	if (iomem_permit_access(d, 0UL, ~0UL))
+		BUG();
+	if (irqs_permit_access(d, 0, NR_PIRQS-1))
+		BUG();
 }
 
 unsigned int vmx_dom0 = 0;

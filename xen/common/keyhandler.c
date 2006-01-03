@@ -11,6 +11,7 @@
 #include <xen/sched.h>
 #include <xen/softirq.h>
 #include <xen/domain.h>
+#include <xen/rangeset.h>
 #include <asm/debugger.h>
 
 #define KEY_MAX 256
@@ -109,31 +110,32 @@ static void do_task_queues(unsigned char key)
 
     for_each_domain ( d )
     {
-        printk("Xen: DOM %u, flags=%lx refcnt=%d nr_pages=%d "
-               "xenheap_pages=%d\n", d->domain_id, d->domain_flags,
-               atomic_read(&d->refcnt), d->tot_pages, d->xenheap_pages);
-        /* The handle is printed according to the OSF DCE UUID spec., even
-           though it is not necessarily such a thing, for ease of use when it
-           _is_ one of those. */
-        printk("     handle=%02x%02x%02x%02x-%02x%02x-%02x%02x-"
+        printk("General information for domain %u:\n", d->domain_id);
+        printk("    flags=%lx refcnt=%d nr_pages=%d xenheap_pages=%d\n",
+               d->domain_flags, atomic_read(&d->refcnt),
+               d->tot_pages, d->xenheap_pages);
+        printk("    handle=%02x%02x%02x%02x-%02x%02x-%02x%02x-"
                "%02x%02x-%02x%02x%02x%02x%02x%02x\n",
                d->handle[ 0], d->handle[ 1], d->handle[ 2], d->handle[ 3],
                d->handle[ 4], d->handle[ 5], d->handle[ 6], d->handle[ 7],
                d->handle[ 8], d->handle[ 9], d->handle[10], d->handle[11],
                d->handle[12], d->handle[13], d->handle[14], d->handle[15]);
 
+        rangeset_domain_printk(d);
+
         dump_pageframe_info(d);
                
+        printk("VCPU information and callbacks for domain %u:\n",
+               d->domain_id);
         for_each_vcpu ( d, v ) {
-            printk("Guest: %p CPU %d [has=%c] flags=%lx "
-                   "upcall_pend = %02x, upcall_mask = %02x\n", v,
-                   v->processor,
+            printk("    VCPU%d: CPU%d [has=%c] flags=%lx "
+                   "upcall_pend = %02x, upcall_mask = %02x\n",
+                   v->vcpu_id, v->processor,
                    test_bit(_VCPUF_running, &v->vcpu_flags) ? 'T':'F',
                    v->vcpu_flags,
                    v->vcpu_info->evtchn_upcall_pending, 
                    v->vcpu_info->evtchn_upcall_mask);
-            printk("Notifying guest... %d/%d\n", d->domain_id, v->vcpu_id); 
-            printk("port %d/%d stat %d %d %d\n",
+            printk("    Notifying guest (virq %d, port %d, stat %d/%d/%d)\n",
                    VIRQ_DEBUG, v->virq_to_evtchn[VIRQ_DEBUG],
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 
                             &d->shared_info->evtchn_pending[0]),

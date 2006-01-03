@@ -164,6 +164,10 @@ gopts.var('lapic', val='LAPIC',
           fn=set_int, default=0,
           use="Disable or enable local APIC of VMX domain.")
 
+gopts.var('acpi', val='ACPI',
+          fn=set_int, default=0,
+          use="Disable or enable ACPI of VMX domain.")
+
 gopts.var('vcpus', val='VCPUS',
           fn=set_int, default=1,
           use="# of Virtual CPUS in domain.")
@@ -388,6 +392,10 @@ gopts.var('display', val='DISPLAY',
           fn=set_value, default=None,
           use="X11 display to use")
 
+gopts.var('xauthority', val='XAUTHORITY',
+          fn=set_value, default=None,
+          use="X11 Authority to use")
+
 
 def err(msg):
     """Print an error to stderr and exit.
@@ -526,7 +534,8 @@ def configure_vmx(config_image, vals):
     """
     args = [ 'device_model', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'audio',
-             'vnc', 'vncviewer', 'sdl', 'display', 'ne2000', 'lapic']
+             'vnc', 'vncviewer', 'sdl', 'display', 'ne2000', 'lapic',
+             'xauthority', 'acpi' ]
     for a in args:
         if (vals.__dict__[a]):
             config_image.append([a, vals.__dict__[a]])
@@ -800,6 +809,9 @@ def parseCommandLine(argv):
 
     if not gopts.vals.display:
         gopts.vals.display = os.getenv("DISPLAY")
+
+    if not gopts.vals.xauthority:
+        gopts.vals.xauthority = os.getenv("XAUTHORITY")
 
     # Process remaining args as config variables.
     for arg in args:

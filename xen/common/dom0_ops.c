@@ -16,6 +16,7 @@
 #include <xen/domain_page.h>
 #include <xen/trace.h>
 #include <xen/console.h>
+#include <xen/iocap.h>
 #include <asm/current.h>
 #include <public/dom0_ops.h>
 #include <public/sched_ctl.h>
@@ -582,6 +583,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         }
     }
     break;
+
     case DOM0_SETDEBUGGING:
     {
         struct domain *d; 
@@ -596,6 +598,53 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             put_domain(d);
             ret = 0;
         }
+    }
+    break;
+
+    case DOM0_IRQ_PERMISSION:
+    {
+        struct domain *d;
+        unsigned int pirq = op->u.irq_permission.pirq;
+
+        ret = -EINVAL;
+        if ( pirq >= NR_PIRQS )
+            break;
+
+        ret = -ESRCH;
+        d = find_domain_by_id(op->u.irq_permission.domain);
+        if ( d == NULL )
+            break;
+
+        if ( op->u.irq_permission.allow_access )
+            ret = irq_permit_access(d, pirq);
+        else
+            ret = irq_deny_access(d, pirq);
+
+        put_domain(d);
+    }
+    break;
+
+    case DOM0_IOMEM_PERMISSION:
+    {
+        struct domain *d;
+        unsigned long pfn = op->u.iomem_permission.first_pfn;
+        unsigned long nr_pfns = op->u.iomem_permission.nr_pfns;
+
+        ret = -EINVAL;
+        if ( (pfn + nr_pfns - 1) < pfn ) /* wrap? */
+            break;
+
+        ret = -ESRCH;
+        d = find_domain_by_id(op->u.iomem_permission.domain);
+        if ( d == NULL )
+            break;
+
+        if ( op->u.iomem_permission.allow_access )
+            ret = iomem_permit_access(d, pfn, pfn + nr_pfns - 1);
+        else
+            ret = iomem_deny_access(d, pfn, pfn + nr_pfns - 1);
+
+        put_domain(d);
     }
     break;
 

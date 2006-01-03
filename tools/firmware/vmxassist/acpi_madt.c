@@ -24,23 +24,75 @@
 
 extern int puts(const char *s);
 
-#define VCPU_NR_PAGE        0x0009F000
-#define VCPU_NR_OFFSET      0x00000800
-#define VCPU_MAGIC          0x76637075  /* "vcpu" */
+#define HVM_INFO_PAGE	0x0009F000
+#define HVM_INFO_OFFSET	0x00000800
 
-/* xc_vmx_builder wrote vcpu block at 0x9F800. Return it. */
+struct hvm_info_table {
+	char     signature[8]; /* "HVM INFO" */
+	uint32_t length;
+	uint8_t  checksum;
+	uint8_t  acpi_enabled;
+	uint8_t  pad[2];
+	uint32_t nr_vcpus;
+};
+
+static struct hvm_info_table *table = NULL;
+
 static int
-get_vcpu_nr(void)
+checksum_valid(uint8_t *ptr, int len)
 {
-	unsigned int *vcpus;
+	uint8_t sum=0;
+	int i;
 
-	vcpus = (unsigned int *)(VCPU_NR_PAGE + VCPU_NR_OFFSET);
-	if (vcpus[0] != VCPU_MAGIC) {
-		puts("Bad vcpus magic, set vcpu number to 1 by default.\n");
-		return 1;
+	for (i = 0; i < len; i++)
+		sum += ptr[i];
+
+	return (sum == 0);
+}
+
+/* xc_vmx_builder wrote hvm info at 0x9F800. Return it. */
+static struct hvm_info_table *
+get_hvm_info_table(void)
+{
+	struct hvm_info_table *t;
+	char signature[] = "HVM INFO";
+	int i;
+
+	if (table != NULL)
+		return table;
+
+	t = (struct hvm_info_table *)(HVM_INFO_PAGE + HVM_INFO_OFFSET);
+
+	/* strncmp(t->signature, "HVM INFO", 8) */
+	for (i = 0; i < 8; i++) {
+		if (signature[i] != t->signature[i]) {
+			puts("Bad hvm info signature\n");
+			return NULL;
+		}
 	}
 
-	return vcpus[1];
+	if (!checksum_valid((uint8_t *)t, t->length)) {
+		puts("Bad hvm info checksum\n");
+		return NULL;
+	}
+
+	table = t;
+
+	return table;
+}
+
+int
+get_vcpu_nr(void)
+{
+	struct hvm_info_table *t = get_hvm_info_table();
+	return (t ? t->nr_vcpus : 1); /* default 1 vcpu */
+}
+
+int
+get_acpi_enabled(void)
+{
+	struct hvm_info_table *t = get_hvm_info_table();
+	return (t ? t->acpi_enabled : 0); /* default no acpi */
 }
 
 static void *

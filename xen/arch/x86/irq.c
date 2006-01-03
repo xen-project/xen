@@ -199,15 +199,11 @@ int pirq_guest_unmask(struct domain *d)
 int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
 {
     unsigned int        vector = irq_to_vector(irq);
-    struct domain      *d = v->domain;
     irq_desc_t         *desc = &irq_desc[vector];
     irq_guest_action_t *action;
     unsigned long       flags;
     int                 rc = 0;
     cpumask_t           cpumask = CPU_MASK_NONE;
-
-    if ( !IS_CAPABLE_PHYSDEV(d) )
-        return -EPERM;
 
     if ( vector == 0 )
         return -EBUSY;

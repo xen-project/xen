@@ -117,6 +117,8 @@ struct netfront_info
 	int rx_min_target, rx_max_target, rx_target;
 	struct sk_buff_head rx_batch;
 
+	struct timer_list rx_refill_timer;
+
 	/*
 	 * {tx,rx}_skbs store outstanding skbuffs. The first entry in each
 	 * array is an index into a chain of free entries.
@@ -517,6 +519,13 @@ static void network_tx_buf_gc(struct net_device *dev)
 }
 
 
+static void rx_refill_timeout(unsigned long data)
+{
+	struct net_device *dev = (struct net_device *)data;
+	netif_rx_schedule(dev);
+}
+
+
 static void network_alloc_rx_buffers(struct net_device *dev)
 {
 	unsigned short id;
@@ -534,7 +543,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	 * Allocate skbuffs greedily, even though we batch updates to the
 	 * receive ring. This creates a less bursty demand on the memory
 	 * allocator, so should reduce the chance of failed allocation requests
-	 *  both for ourself and for other kernel subsystems.
+	 * both for ourself and for other kernel subsystems.
 	 */
 	batch_target = np->rx_target - (req_prod - np->rx.rsp_cons);
 	for (i = skb_queue_len(&np->rx_batch); i < batch_target; i++) {
@@ -545,8 +554,15 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 		skb = alloc_xen_skb(
 			((PAGE_SIZE - sizeof(struct skb_shared_info)) &
 			 (-SKB_DATA_ALIGN(1))) - 16);
-		if (skb == NULL)
-			break;
+		if (skb == NULL) {
+			/* Any skbuffs queued for refill? Force them out. */
+			if (i != 0)
+				goto refill;
+			/* Could not allocate any skbuffs. Try again later. */
+			mod_timer(&np->rx_refill_timer,
+				  jiffies + (HZ/10));
+			return;
+		}
 		__skb_queue_tail(&np->rx_batch, skb);
 	}
 
@@ -554,6 +570,12 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	if (i < (np->rx_target/2))
 		return;
 
+	/* Adjust our fill target if we risked running out of buffers. */
+	if (((req_prod - np->rx.sring->rsp_prod) < (np->rx_target / 4)) &&
+	    ((np->rx_target *= 2) > np->rx_max_target))
+		np->rx_target = np->rx_max_target;
+
+ refill:
 	for (i = 0; ; i++) {
 		if ((skb = __skb_dequeue(&np->rx_batch)) == NULL)
 			break;
@@ -608,11 +630,6 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	/* Above is a suitable barrier to ensure backend will see requests. */
 	np->rx.req_prod_pvt = req_prod + i;
 	RING_PUSH_REQUESTS(&np->rx);
-
-	/* Adjust our fill target if we risked running out of buffers. */
-	if (((req_prod - np->rx.sring->rsp_prod) < (np->rx_target / 4)) &&
-	    ((np->rx_target *= 2) > np->rx_max_target))
-		np->rx_target = np->rx_max_target;
 }
 
 
@@ -1077,6 +1094,10 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 	np->rx_min_target = RX_MIN_TARGET;
 	np->rx_max_target = RX_MAX_TARGET;
 
+	init_timer(&np->rx_refill_timer);
+	np->rx_refill_timer.data = (unsigned long)netdev;
+	np->rx_refill_timer.function = rx_refill_timeout;
+
 	/* Initialise {tx,rx}_skbs as a free chain containing every entry. */
 	for (i = 0; i <= NET_TX_RING_SIZE; i++) {
 		np->tx_skbs[i] = (void *)((unsigned long) i+1);
@@ -1188,33 +1209,14 @@ static int netfront_remove(struct xenbus_device *dev)
 
 	DPRINTK("%s\n", dev->nodename);
 
-	netif_free(info);
-	kfree(info);
+	netif_disconnect_backend(info);
+	free_netdev(info->netdev);
 
 	return 0;
 }
 
 
-static void netif_free(struct netfront_info *info)
-{
-	netif_disconnect_backend(info);
-	close_netdev(info);
-}
-
-
 static void close_netdev(struct netfront_info *info)
-{
-	if (info->netdev) {
-#ifdef CONFIG_PROC_FS
-		xennet_proc_delif(info->netdev);
-#endif
-		unregister_netdev(info->netdev);
-		info->netdev = NULL;
-	}
-}
-
-
-static void netif_disconnect_backend(struct netfront_info *info)
 {
 	/* Stop old i/f to prevent errors whilst we rebuild the state. */
 	spin_lock_irq(&info->tx_lock);
@@ -1223,17 +1225,37 @@ static void netif_disconnect_backend(struct netfront_info *info)
 	/* info->backend_state = BEST_DISCONNECTED; */
 	spin_unlock(&info->rx_lock);
 	spin_unlock_irq(&info->tx_lock);
-    
+
+#ifdef CONFIG_PROC_FS
+	xennet_proc_delif(info->netdev);
+#endif
+
+	if (info->irq)
+		unbind_from_irqhandler(info->irq, info->netdev);
+	info->evtchn = info->irq = 0;
+
+	del_timer_sync(&info->rx_refill_timer);
+
+	unregister_netdev(info->netdev);
+}
+
+
+static void netif_disconnect_backend(struct netfront_info *info)
+{
 	end_access(info->tx_ring_ref, info->tx.sring);
 	end_access(info->rx_ring_ref, info->rx.sring);
 	info->tx_ring_ref = GRANT_INVALID_REF;
 	info->rx_ring_ref = GRANT_INVALID_REF;
 	info->tx.sring = NULL;
 	info->rx.sring = NULL;
+}
 
-	if (info->irq)
-		unbind_from_irqhandler(info->irq, info->netdev);
-	info->evtchn = info->irq = 0;
+
+static void netif_free(struct netfront_info *info)
+{
+	close_netdev(info);
+	netif_disconnect_backend(info);
+	free_netdev(info->netdev);
 }
 
 

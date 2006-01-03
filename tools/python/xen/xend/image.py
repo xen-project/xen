@@ -189,11 +189,16 @@ class VmxImageHandler(ImageHandler):
     def configure(self, imageConfig, deviceConfig):
         ImageHandler.configure(self, imageConfig, deviceConfig)
 
+        info = xc.xeninfo()
+        if not 'hvm' in info['xen_caps']:
+            raise VmError("vmx: not an Intel VT platform, we stop creating!")
+
         self.dmargs = self.parseDeviceModelArgs(imageConfig, deviceConfig)
         self.device_model = sxp.child_value(imageConfig, 'device_model')
         if not self.device_model:
             raise VmError("vmx: missing device model")
         self.display = sxp.child_value(imageConfig, 'display')
+        self.xauthority = sxp.child_value(imageConfig, 'xauthority')
 
         self.vm.storeVm(("image/dmargs", " ".join(self.dmargs)),
                         ("image/device-model", self.device_model),
@@ -209,6 +214,8 @@ class VmxImageHandler(ImageHandler):
         if not lapic is None:
             self.lapic = int(lapic)
 
+        self.acpi = int(sxp.child_value(imageConfig, 'acpi', 0))
+        
     def buildDomain(self):
         # Create an event channel
         self.device_channel = xc.evtchn_alloc_unbound(dom=self.vm.getDomid(),
@@ -224,6 +231,7 @@ class VmxImageHandler(ImageHandler):
         log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
         log.debug("lapic          = %d", self.lapic)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
+        log.debug("acpi           = %d", self.acpi)
 
         return xc.vmx_build(dom            = self.vm.getDomid(),
                             image          = self.kernel,
@@ -231,8 +239,8 @@ class VmxImageHandler(ImageHandler):
                             store_evtchn   = store_evtchn,
                             memsize        = self.vm.getMemoryTarget() / 1024,
                             lapic          = self.lapic,
+                            acpi           = self.acpi,
                             vcpus          = self.vm.getVCpuCount())
-
 
     # Return a list of cmd line args to the device models based on the
     # xm config file
@@ -264,44 +272,44 @@ class VmxImageHandler(ImageHandler):
         nics = 0
         for (name, info) in deviceConfig:
             if name == 'vbd':
-               uname = sxp.child_value(info, 'uname')
-               typedev = sxp.child_value(info, 'dev')
-               (_, vbdparam) = string.split(uname, ':', 1)
-               if re.match('^ioemu:', typedev):
-                  (emtype, vbddev) = string.split(typedev, ':', 1)
-               else:
-                  emtype = 'vbd'
-                  vbddev = typedev
-               if emtype != 'ioemu':
-                  continue;
-               vbddev_list = ['hda', 'hdb', 'hdc', 'hdd']
-               if vbddev not in vbddev_list:
-                  raise VmError("vmx: for qemu vbd type=file&dev=hda~hdd")
-               ret.append("-%s" % vbddev)
-               ret.append("%s" % vbdparam)
+                uname = sxp.child_value(info, 'uname')
+                typedev = sxp.child_value(info, 'dev')
+                (_, vbdparam) = string.split(uname, ':', 1)
+                if 'ioemu:' in typedev:
+                    (emtype, vbddev) = string.split(typedev, ':', 1)
+                else:
+                    emtype = 'vbd'
+                    vbddev = typedev
+                if emtype == 'vbd':
+                    continue;
+                vbddev_list = ['hda', 'hdb', 'hdc', 'hdd']
+                if vbddev not in vbddev_list:
+                    raise VmError("vmx: for qemu vbd type=file&dev=hda~hdd")
+                ret.append("-%s" % vbddev)
+                ret.append("%s" % vbdparam)
             if name == 'vif':
-               type = sxp.child_value(info, 'type')
-               if type != 'ioemu':
-                   continue
-               nics += 1
-               if mac != None:
-                   continue
-               mac = sxp.child_value(info, 'mac')
-               bridge = sxp.child_value(info, 'bridge')
-               if mac == None:
-                   mac = randomMAC()
-               if bridge == None:
-                   bridge = 'xenbr0'
-               ret.append("-macaddr")
-               ret.append("%s" % mac)
-               ret.append("-bridge")
-               ret.append("%s" % bridge)
+                type = sxp.child_value(info, 'type')
+                if type != 'ioemu':
+                    continue
+                nics += 1
+                if mac != None:
+                    continue
+                mac = sxp.child_value(info, 'mac')
+                bridge = sxp.child_value(info, 'bridge')
+                if mac == None:
+                    mac = randomMAC()
+                if bridge == None:
+                    bridge = 'xenbr0'
+                ret.append("-macaddr")
+                ret.append("%s" % mac)
+                ret.append("-bridge")
+                ret.append("%s" % bridge)
             if name == 'vtpm':
-               instance = sxp.child_value(info, 'pref_instance')
-               ret.append("-instance")
-               ret.append("%s" % instance)
+                instance = sxp.child_value(info, 'pref_instance')
+                ret.append("-instance")
+                ret.append("%s" % instance)
         ret.append("-nics")
-        ret.append("%d" % nics) 
+        ret.append("%d" % nics)
         return ret
 
     def configVNC(self, config):
@@ -340,6 +348,8 @@ class VmxImageHandler(ImageHandler):
         env = dict(os.environ)
         if self.display:
             env['DISPLAY'] = self.display
+        if self.xauthority:
+            env['XAUTHORITY'] = self.xauthority
         log.info("spawning device models: %s %s", self.device_model, args)
         self.pid = os.spawnve(os.P_NOWAIT, self.device_model, args, env)
         log.info("device model pid: %d", self.pid)

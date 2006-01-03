@@ -65,7 +65,7 @@ TPM_RESULT envelope_encrypt(const buffer_t     *inbuf,
   UINT32 i;
   struct pack_constbuf_t symkey_cipher32, data_cipher32;
   
-  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Enveloping[%d]: 0x", buffer_len(inbuf));
+  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Enveloping Input[%d]: 0x", buffer_len(inbuf));
   for (i=0; i< buffer_len(inbuf); i++)
     vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", inbuf->bytes[i]);
   vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "\n");
@@ -94,6 +94,12 @@ TPM_RESULT envelope_encrypt(const buffer_t     *inbuf,
 	       BSG_TPM_SIZE32_DATA, &data_cipher32);
 
   vtpmloginfo(VTPM_LOG_VTPM, "Saved %d bytes of E(symkey) + %d bytes of E(data)\n", buffer_len(&symkey_cipher), buffer_len(&data_cipher));
+
+  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Enveloping Output[%d]: 0x", buffer_len(sealed_data));
+  for (i=0; i< buffer_len(sealed_data); i++)
+    vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", sealed_data->bytes[i]);
+  vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "\n");
+
   goto egress;
 
  abort_egress:
@@ -125,7 +131,7 @@ TPM_RESULT envelope_decrypt(const long         cipher_size,
 
   memset(&symkey, 0, sizeof(symkey_t));
 
-  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "envelope decrypting[%ld]: 0x", cipher_size);
+  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Envelope Decrypt Input[%ld]: 0x", cipher_size);
   for (i=0; i< cipher_size; i++)
     vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", cipher[i]);
   vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "\n");
@@ -155,6 +161,11 @@ TPM_RESULT envelope_decrypt(const long         cipher_size,
   
   // Decrypt State
   TPMTRY(TPM_DECRYPT_ERROR, Crypto_symcrypto_decrypt (&symkey, &data_cipher, unsealed_data) );
+
+  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Envelope Decrypte Output[%d]: 0x", buffer_len(unsealed_data));
+  for (i=0; i< buffer_len(unsealed_data); i++)
+    vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", unsealed_data->bytes[i]);
+  vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "\n");
   
   goto egress;
   
@@ -291,124 +302,175 @@ TPM_RESULT VTPM_Handle_Load_NVM(VTPM_DMI_RESOURCE *myDMI,
   return status;
 }
 
+
 TPM_RESULT VTPM_SaveService(void) {
   TPM_RESULT status=TPM_SUCCESS;
   int fh, dmis=-1;
-  
-  BYTE *flat_global;
-  int flat_global_size, bytes_written;
+
+  BYTE *flat_boot_key, *flat_dmis, *flat_enc;
+  buffer_t clear_flat_global, enc_flat_global;
   UINT32 storageKeySize = buffer_len(&vtpm_globals->storageKeyWrap);
+  UINT32 bootKeySize = buffer_len(&vtpm_globals->bootKeyWrap);
   struct pack_buf_t storage_key_pack = {storageKeySize, vtpm_globals->storageKeyWrap.bytes};
-  
+  struct pack_buf_t boot_key_pack = {bootKeySize, vtpm_globals->bootKeyWrap.bytes};
+
   struct hashtable_itr *dmi_itr;
   VTPM_DMI_RESOURCE *dmi_res;
-  
-  UINT32 flat_global_full_size;
-  
-  // Global Values needing to be saved
-  flat_global_full_size = 3*sizeof(TPM_DIGEST) + // Auths
-    sizeof(UINT32) +       // storagekeysize
-    storageKeySize +       // storage key
-    hashtable_count(vtpm_globals->dmi_map) * // num DMIS
-    (sizeof(UINT32) + 2*sizeof(TPM_DIGEST)); // Per DMI info
-  
-  
-  flat_global = (BYTE *) malloc( flat_global_full_size);
-  
-  flat_global_size = BSG_PackList(flat_global, 4,
-				  BSG_TPM_AUTHDATA, &vtpm_globals->owner_usage_auth,
-				  BSG_TPM_AUTHDATA, &vtpm_globals->srk_usage_auth,
-				  BSG_TPM_SECRET,   &vtpm_globals->storage_key_usage_auth,
-				  BSG_TPM_SIZE32_DATA, &storage_key_pack);
-  
+
+  UINT32 boot_key_size, flat_dmis_size;
+
+  // Initially fill these with buffer sizes for each data type. Later fill
+  // in actual size, once flattened.
+  boot_key_size =  sizeof(UINT32) +       // bootkeysize
+                   bootKeySize;           // boot key
+
+  TPMTRYRETURN(buffer_init(&clear_flat_global, 3*sizeof(TPM_DIGEST) + // Auths
+                                              sizeof(UINT32) +// storagekeysize
+                                              storageKeySize, NULL) ); // storage key
+
+  flat_dmis_size = (hashtable_count(vtpm_globals->dmi_map) - 1) * // num DMIS (-1 for Dom0)
+                   (sizeof(UINT32) + 2*sizeof(TPM_DIGEST)); // Per DMI info
+
+  flat_boot_key = (BYTE *) malloc( boot_key_size );
+  flat_enc = (BYTE *) malloc( sizeof(UINT32) );
+  flat_dmis = (BYTE *) malloc( flat_dmis_size );
+
+  boot_key_size = BSG_PackList(flat_boot_key, 1,
+                               BSG_TPM_SIZE32_DATA, &boot_key_pack);
+
+  BSG_PackList(clear_flat_global.bytes, 3,
+                BSG_TPM_AUTHDATA, &vtpm_globals->owner_usage_auth,
+                BSG_TPM_SECRET,   &vtpm_globals->storage_key_usage_auth,
+                BSG_TPM_SIZE32_DATA, &storage_key_pack);
+
+  TPMTRYRETURN(envelope_encrypt(&clear_flat_global,
+                                &vtpm_globals->bootKey,
+                                &enc_flat_global) );
+
+  BSG_PackConst(buffer_len(&enc_flat_global), 4, flat_enc);
+
   // Per DMI values to be saved
   if (hashtable_count(vtpm_globals->dmi_map) > 0) {
-    
+
     dmi_itr = hashtable_iterator(vtpm_globals->dmi_map);
     do {
       dmi_res = (VTPM_DMI_RESOURCE *) hashtable_iterator_value(dmi_itr);
       dmis++;
 
       // No need to save dmi0.
-      if (dmi_res->dmi_id == 0) 	
-	continue;
-      
-      
-      flat_global_size += BSG_PackList( flat_global + flat_global_size, 3,
-					BSG_TYPE_UINT32, &dmi_res->dmi_id,
-					BSG_TPM_DIGEST, &dmi_res->NVM_measurement,
-					BSG_TPM_DIGEST, &dmi_res->DMI_measurement);
-      
+      if (dmi_res->dmi_id == 0)
+        continue;
+
+
+      flat_dmis_size += BSG_PackList( flat_dmis + flat_dmis_size, 3,
+                                        BSG_TYPE_UINT32, &dmi_res->dmi_id,
+                                        BSG_TPM_DIGEST, &dmi_res->NVM_measurement,
+                                        BSG_TPM_DIGEST, &dmi_res->DMI_measurement);
+
     } while (hashtable_iterator_advance(dmi_itr));
   }
-  
-  //FIXME: Once we have a way to protect a TPM key, we should use it to 
-  //       encrypt this blob. BUT, unless there is a way to ensure the key is
-  //       not used by other apps, this encryption is useless.
+
   fh = open(STATE_FILE, O_WRONLY | O_CREAT, S_IREAD | S_IWRITE);
   if (fh == -1) {
     vtpmlogerror(VTPM_LOG_VTPM, "Unable to open %s file for write.\n", STATE_FILE);
     status = TPM_IOERROR;
     goto abort_egress;
   }
-  
-  if ( (bytes_written = write(fh, flat_global, flat_global_size)) != flat_global_size ) {
-    vtpmlogerror(VTPM_LOG_VTPM, "Failed to save service data. %d/%d bytes written.\n", bytes_written, flat_global_size);
+
+  if ( ( write(fh, flat_boot_key, boot_key_size) != boot_key_size ) ||
+       ( write(fh, flat_enc, sizeof(UINT32)) != sizeof(UINT32) ) ||
+       ( write(fh, enc_flat_global.bytes, buffer_len(&enc_flat_global)) != buffer_len(&enc_flat_global) ) ||
+       ( write(fh, flat_dmis, flat_dmis_size) != flat_dmis_size ) ) {
+    vtpmlogerror(VTPM_LOG_VTPM, "Failed to completely write service data.\n");
     status = TPM_IOERROR;
     goto abort_egress;
-  }
-  vtpm_globals->DMI_table_dirty = FALSE; 
-  
+ }
+
+  vtpm_globals->DMI_table_dirty = FALSE;
+
   goto egress;
-  
+
  abort_egress:
  egress:
-  
-  free(flat_global);
+
+  free(flat_boot_key);
+  free(flat_enc);
+  buffer_free(&enc_flat_global);
+  free(flat_dmis);
   close(fh);
-  
+
   vtpmloginfo(VTPM_LOG_VTPM, "Saved VTPM Service state (status = %d, dmis = %d)\n", (int) status, dmis);
   return status;
 }
 
 TPM_RESULT VTPM_LoadService(void) {
-  
+
   TPM_RESULT status=TPM_SUCCESS;
   int fh, stat_ret, dmis=0;
   long fh_size = 0, step_size;
-  BYTE *flat_global=NULL;
-  struct pack_buf_t storage_key_pack;
-  UINT32 *dmi_id_key;
-  
+  BYTE *flat_table=NULL;
+  buffer_t  unsealed_data;
+  struct pack_buf_t storage_key_pack, boot_key_pack;
+  UINT32 *dmi_id_key, enc_size;
+
   VTPM_DMI_RESOURCE *dmi_res;
   struct stat file_stat;
-  
+
+  TPM_HANDLE boot_key_handle;
+  TPM_AUTHDATA boot_usage_auth;
+  memset(&boot_usage_auth, 0, sizeof(TPM_AUTHDATA));
+
   fh = open(STATE_FILE, O_RDONLY );
   stat_ret = fstat(fh, &file_stat);
-  if (stat_ret == 0) 
+  if (stat_ret == 0)
     fh_size = file_stat.st_size;
   else {
     status = TPM_IOERROR;
     goto abort_egress;
   }
-  
-  flat_global = (BYTE *) malloc(fh_size);
-  
-  if ((long) read(fh, flat_global, fh_size) != fh_size ) {
+
+  flat_table = (BYTE *) malloc(fh_size);
+
+  if ((long) read(fh, flat_table, fh_size) != fh_size ) {
     status = TPM_IOERROR;
     goto abort_egress;
   }
-  
+
+  // Read Boot Key
+  step_size = BSG_UnpackList( flat_table, 2,
+                              BSG_TPM_SIZE32_DATA, &boot_key_pack,
+                              BSG_TYPE_UINT32, &enc_size);
+
+  TPMTRYRETURN(buffer_init(&vtpm_globals->bootKeyWrap, 0, 0) );
+  TPMTRYRETURN(buffer_append_raw(&vtpm_globals->bootKeyWrap, boot_key_pack.size, boot_key_pack.data) );
+
+  //Load Boot Key
+  TPMTRYRETURN( VTSP_LoadKey( vtpm_globals->manager_tcs_handle,
+                              TPM_SRK_KEYHANDLE,
+                              &vtpm_globals->bootKeyWrap,
+                              &SRK_AUTH,
+                              &boot_key_handle,
+                              &vtpm_globals->keyAuth,
+                              &vtpm_globals->bootKey,
+                              FALSE) );
+
+  TPMTRYRETURN( envelope_decrypt(enc_size,
+                                 flat_table + step_size,
+                                 vtpm_globals->manager_tcs_handle,
+                                 boot_key_handle,
+                                 (const TPM_AUTHDATA*) &boot_usage_auth,
+                                 &unsealed_data) );
+  step_size += enc_size;
+
   // Global Values needing to be saved
-  step_size = BSG_UnpackList( flat_global, 4,
-			      BSG_TPM_AUTHDATA, &vtpm_globals->owner_usage_auth,
-			      BSG_TPM_AUTHDATA, &vtpm_globals->srk_usage_auth,
-			      BSG_TPM_SECRET,   &vtpm_globals->storage_key_usage_auth,
-			      BSG_TPM_SIZE32_DATA, &storage_key_pack);
-  
+  BSG_UnpackList( unsealed_data.bytes, 3,
+                  BSG_TPM_AUTHDATA, &vtpm_globals->owner_usage_auth,
+                  BSG_TPM_SECRET,   &vtpm_globals->storage_key_usage_auth,
+                  BSG_TPM_SIZE32_DATA, &storage_key_pack);
+
   TPMTRYRETURN(buffer_init(&vtpm_globals->storageKeyWrap, 0, 0) );
   TPMTRYRETURN(buffer_append_raw(&vtpm_globals->storageKeyWrap, storage_key_pack.size, storage_key_pack.data) );
-  
+
   // Per DMI values to be saved
   while ( step_size < fh_size ){
     if (fh_size - step_size < (long) (sizeof(UINT32) + 2*sizeof(TPM_DIGEST))) {
@@ -417,35 +479,38 @@ TPM_RESULT VTPM_LoadService(void) {
     } else {
       dmi_res = (VTPM_DMI_RESOURCE *) malloc(sizeof(VTPM_DMI_RESOURCE));
       dmis++;
-      
+
       dmi_res->connected = FALSE;
-      
-      step_size += BSG_UnpackList(flat_global + step_size, 3,
-				  BSG_TYPE_UINT32, &dmi_res->dmi_id, 
-				  BSG_TPM_DIGEST, &dmi_res->NVM_measurement,
-				  BSG_TPM_DIGEST, &dmi_res->DMI_measurement);
-      
+
+      step_size += BSG_UnpackList(flat_table + step_size, 3,
+                                 BSG_TYPE_UINT32, &dmi_res->dmi_id,
+                                 BSG_TPM_DIGEST, &dmi_res->NVM_measurement,
+                                 BSG_TPM_DIGEST, &dmi_res->DMI_measurement);
+
       // install into map
       dmi_id_key = (UINT32 *) malloc (sizeof(UINT32));
       *dmi_id_key = dmi_res->dmi_id;
       if (!hashtable_insert(vtpm_globals->dmi_map, dmi_id_key, dmi_res)) {
-	status = TPM_FAIL;
-	goto abort_egress;
+        status = TPM_FAIL;
+        goto abort_egress;
       }
-      
+
     }
-    
+
   }
-  
+
   vtpmloginfo(VTPM_LOG_VTPM, "Loaded saved state (dmis = %d).\n", dmis);
   goto egress;
-  
+
  abort_egress:
   vtpmlogerror(VTPM_LOG_VTPM, "Failed to load service data with error = %s\n", tpm_get_error_name(status));
  egress:
-  
-  free(flat_global);
+
+  free(flat_table);
   close(fh);
-  
+
+  // TODO: Could be nice and evict BootKey. (Need to add EvictKey to VTSP.
+
   return status;
 }
+
