@@ -390,7 +390,6 @@ def xm_brief_list(doms):
 
 
 def xm_vcpu_list(args):
-    print 'Name                              ID  VCPU  CPU  State  Time(s)  CPU Affinity'
 
     from xen.xend.XendClient import server
     if args:
@@ -400,6 +399,8 @@ def xm_vcpu_list(args):
         dominfo = map(
             lambda x: server.xend_domain_vcpuinfo(sxp.child_value(x, 'name')),
             doms)
+
+    print 'Name                              ID  VCPU  CPU  State  Time(s)  CPU Affinity'
 
     for dom in dominfo:
         def get_info(n):
