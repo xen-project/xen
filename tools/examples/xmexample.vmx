@@ -28,10 +28,13 @@ name = "ExampleVMXDomain"
 
 #-----------------------------------------------------------------------------
 # the number of cpus guest platform has, default=1
-vcpus=1
+#vcpus=1
 
 # enable/disalbe vmx guest ACPI, default=0 (disabled)
 #acpi=0
+
+# enable/disalbe vmx guest APIC, default=0 (disabled)
+#apic=0
 
 # List of which CPUS this domain is allowed to use, default Xen picks
 #cpus = ""         # leave to Xen to pick

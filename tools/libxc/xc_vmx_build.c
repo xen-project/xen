@@ -33,18 +33,6 @@
 #define E820_MAP_NR_OFFSET  0x000001E8
 #define E820_MAP_OFFSET     0x000002D0
 
-#define HVM_INFO_PAGE        0x0009F000
-#define HVM_INFO_OFFSET      0x00000800
-
-struct hvm_info_table {
-    char     signature[8]; /* "HVM INFO" */
-    uint32_t length;
-    uint8_t  checksum;
-    uint8_t  acpi_enabled;
-    uint8_t  pad[2];
-    uint32_t nr_vcpus;
-};
-
 struct e820entry {
     uint64_t addr;
     uint64_t size;
@@ -128,7 +116,7 @@ static unsigned char build_e820map(void *e820_page, unsigned long mem_size)
     return (*(((unsigned char *)e820_page) + E820_MAP_NR_OFFSET) = nr_map);
 }
 
-static void 
+static void
 set_hvm_info_checksum(struct hvm_info_table *t)
 {
     uint8_t *ptr = (uint8_t *)t, sum = 0;
@@ -148,7 +136,7 @@ set_hvm_info_checksum(struct hvm_info_table *t)
  */
 static int set_hvm_info(int xc_handle, uint32_t dom,
                         unsigned long *pfn_list, unsigned int vcpus,
-                        unsigned int acpi)
+                        unsigned int acpi, unsigned int apic)
 {
     char *va_map;
     struct hvm_info_table *va_hvm;
@@ -164,8 +152,9 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
     strncpy(va_hvm->signature, "HVM INFO", 8);
     va_hvm->length       = sizeof(struct hvm_info_table);
     va_hvm->acpi_enabled = acpi;
+    va_hvm->apic_enabled = apic;
     va_hvm->nr_vcpus     = vcpus;
-    
+
     set_hvm_info_checksum(va_hvm);
 
     munmap(va_map, PAGE_SIZE);
@@ -307,9 +296,9 @@ static int setup_guest(int xc_handle,
                        vcpu_guest_context_t *ctxt,
                        unsigned long shared_info_frame,
                        unsigned int control_evtchn,
-                       unsigned int lapic,
                        unsigned int vcpus,
                        unsigned int acpi,
+                       unsigned int apic,
                        unsigned int store_evtchn,
                        unsigned long *store_mfn)
 {
@@ -519,20 +508,14 @@ static int setup_guest(int xc_handle,
             goto error_out;
     }
 
-    if (set_hvm_info(xc_handle, dom, page_array, vcpus, acpi)) {
+    if ( set_hvm_info(xc_handle, dom, page_array, vcpus, acpi, apic) ) {
         fprintf(stderr, "Couldn't set hvm info for VMX guest.\n");
         goto error_out;
     }
 
-    *store_mfn = page_array[(v_end-2) >> PAGE_SHIFT];
-    if ( xc_clear_domain_page(xc_handle, dom, *store_mfn) )
-        goto error_out;
-
-    shared_page_frame = (v_end - PAGE_SIZE) >> PAGE_SHIFT;
-
-    if ((e820_page = xc_map_foreign_range(
-        xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
-        page_array[E820_MAP_PAGE >> PAGE_SHIFT])) == 0)
+    if ( (e820_page = xc_map_foreign_range(
+         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
+         page_array[E820_MAP_PAGE >> PAGE_SHIFT])) == 0 )
         goto error_out;
     memset(e820_page, 0, PAGE_SIZE);
     e820_map_nr = build_e820map(e820_page, v_end);
@@ -547,25 +530,29 @@ static int setup_guest(int xc_handle,
     munmap(e820_page, PAGE_SIZE);
 
     /* shared_info page starts its life empty. */
-    if ((shared_info = xc_map_foreign_range(
-        xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
-        shared_info_frame)) == 0)
+    if ( (shared_info = xc_map_foreign_range(
+         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
+         shared_info_frame)) == 0 )
         goto error_out;
     memset(shared_info, 0, sizeof(shared_info_t));
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
-
     munmap(shared_info, PAGE_SIZE);
 
     /* Populate the event channel port in the shared page */
-    if ((sp = (shared_iopage_t *) xc_map_foreign_range(
-        xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
-        page_array[shared_page_frame])) == 0)
+    shared_page_frame = page_array[(v_end >> PAGE_SHIFT) - 1];
+    if ( (sp = (shared_iopage_t *) xc_map_foreign_range(
+         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
+         shared_page_frame)) == 0 )
         goto error_out;
     memset(sp, 0, PAGE_SIZE);
     sp->sp_global.eport = control_evtchn;
     munmap(sp, PAGE_SIZE);
+
+    *store_mfn = page_array[(v_end >> PAGE_SHIFT) - 2];
+    if ( xc_clear_domain_page(xc_handle, dom, *store_mfn) )
+        goto error_out;
 
     /* Send the page update requests down to the hypervisor. */
     if ( xc_finish_mmu_updates(xc_handle, mmu) )
@@ -588,7 +575,7 @@ static int setup_guest(int xc_handle,
     ctxt->user_regs.eax = 0;
     ctxt->user_regs.esp = 0;
     ctxt->user_regs.ebx = 0; /* startup_32 expects this to be 0 to signal boot cpu */
-    ctxt->user_regs.ecx = lapic;
+    ctxt->user_regs.ecx = 0;
     ctxt->user_regs.esi = 0;
     ctxt->user_regs.edi = 0;
     ctxt->user_regs.ebp = 0;
@@ -608,9 +595,9 @@ int xc_vmx_build(int xc_handle,
                  int memsize,
                  const char *image_name,
                  unsigned int control_evtchn,
-                 unsigned int lapic,
                  unsigned int vcpus,
                  unsigned int acpi,
+                 unsigned int apic,
                  unsigned int store_evtchn,
                  unsigned long *store_mfn)
 {
@@ -674,7 +661,7 @@ int xc_vmx_build(int xc_handle,
 
     if ( setup_guest(xc_handle, domid, memsize, image, image_size, nr_pages,
                      ctxt, op.u.getdomaininfo.shared_info_frame, control_evtchn,
-                     lapic, vcpus, acpi, store_evtchn, store_mfn) < 0)
+                     vcpus, acpi, apic, store_evtchn, store_mfn) < 0)
     {
         ERROR("Error constructing guest OS");
         goto error_out;

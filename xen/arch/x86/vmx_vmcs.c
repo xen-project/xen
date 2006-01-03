@@ -206,35 +206,55 @@ static void vmx_map_io_shared_page(struct domain *d)
               &d->shared_info->evtchn_mask[0]);
 }
 
-#define VCPU_NR_PAGE        0x0009F000
-#define VCPU_NR_OFFSET      0x00000800
-#define VCPU_MAGIC          0x76637075  /* "vcpu" */
+static int validate_hvm_info(struct hvm_info_table *t)
+{
+    char signature[] = "HVM INFO";
+    uint8_t *ptr = (uint8_t *)t;
+    uint8_t sum = 0;
+    int i;
 
-static void vmx_set_vcpu_nr(struct domain *d)
+    /* strncmp(t->signature, "HVM INFO", 8) */
+    for ( i = 0; i < 8; i++ ) {
+        if ( signature[i] != t->signature[i] ) {
+            printk("Bad hvm info signature\n");
+            return 0;
+        }
+    }
+
+    for ( i = 0; i < t->length; i++ )
+        sum += ptr[i];
+
+    return (sum == 0);
+}
+
+static void vmx_get_hvm_info(struct domain *d)
 {
     unsigned char *p;
     unsigned long mpfn;
-    unsigned int *vcpus;
+    struct hvm_info_table *t;
 
-    mpfn = get_mfn_from_pfn(VCPU_NR_PAGE >> PAGE_SHIFT);
-    if (mpfn == INVALID_MFN) {
-        printk("Can not get vcpu number page mfn for VMX domain.\n");
+    mpfn = get_mfn_from_pfn(HVM_INFO_PAGE >> PAGE_SHIFT);
+    if ( mpfn == INVALID_MFN ) {
+        printk("Can not get hvm info page mfn for VMX domain.\n");
         domain_crash_synchronous();
     }
 
     p = map_domain_page(mpfn);
-    if (p == NULL) {
-        printk("Can not map vcpu number page for VMX domain.\n");
+    if ( p == NULL ) {
+        printk("Can not map hvm info page for VMX domain.\n");
         domain_crash_synchronous();
     }
 
-    vcpus = (unsigned int *)(p + VCPU_NR_OFFSET);
-    if (vcpus[0] != VCPU_MAGIC) {
-        printk("Bad vcpus magic, set vcpu number to 1 by default.\n");
-        d->arch.vmx_platform.nr_vcpu = 1;
-    }
+    t = (struct hvm_info_table *)(p + HVM_INFO_OFFSET);
 
-    d->arch.vmx_platform.nr_vcpu = vcpus[1];
+    if ( validate_hvm_info(t) ) {
+        d->arch.vmx_platform.nr_vcpus = t->nr_vcpus;
+        d->arch.vmx_platform.apic_enabled = t->apic_enabled;
+    } else {
+        printk("Bad hvm info table\n");
+        d->arch.vmx_platform.nr_vcpus = 1;
+        d->arch.vmx_platform.apic_enabled = 0;
+    }
 
     unmap_domain_page(p);
 }
@@ -244,10 +264,10 @@ static void vmx_setup_platform(struct domain* d)
     struct vmx_platform *platform;
 
     vmx_map_io_shared_page(d);
-    vmx_set_vcpu_nr(d);
+    vmx_get_hvm_info(d);
 
     platform = &d->arch.vmx_platform;
-    pic_init(&platform->vmx_pic,  pic_irq_request, 
+    pic_init(&platform->vmx_pic,  pic_irq_request,
              &platform->interrupt_request);
     register_pic_io_hook();
 

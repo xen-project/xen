@@ -38,21 +38,21 @@
 /*
  * VMExit dispatcher should cooperate with instruction decoder to
  * prepare this structure and notify service OS and DM by sending
- * virq 
+ * virq
  */
 typedef struct {
-    uint64_t addr;   /*  physical address            */
-    uint64_t size;   /*  size in bytes               */
-    uint64_t count;  /*  for rep prefixes            */
+    uint64_t addr;          /*  physical address            */
+    uint64_t size;          /*  size in bytes               */
+    uint64_t count;         /*  for rep prefixes            */
     union {
-        uint64_t data;           /*  data                        */
-        void    *pdata;          /*  pointer to data             */
+        uint64_t data;      /*  data                        */
+        void    *pdata;     /*  pointer to data             */
     } u;
     uint8_t state:4;
-    uint8_t pdata_valid:1; /* if 1, use pdata above  */
-    uint8_t dir:1;   /*  1=read, 0=write             */
+    uint8_t pdata_valid:1;  /* if 1, use pdata above        */
+    uint8_t dir:1;          /*  1=read, 0=write             */
     uint8_t df:1;
-    uint8_t type;    /* I/O type                     */
+    uint8_t type;           /* I/O type                     */
 } ioreq_t;
 
 #define MAX_VECTOR      256
@@ -61,22 +61,34 @@ typedef struct {
 #define INTR_LEN_32     (MAX_VECTOR/(BITS_PER_BYTE * sizeof(uint32_t)))
 
 typedef struct {
-    uint16_t  pic_elcr;
-    uint16_t   pic_irr;
-    uint16_t   pic_last_irr;
-    uint16_t   pic_clear_irr;
-    int      eport; /* Event channel port */
+    uint16_t    pic_elcr;
+    uint16_t    pic_irr;
+    uint16_t    pic_last_irr;
+    uint16_t    pic_clear_irr;
+    int         eport; /* Event channel port */
 } global_iodata_t;
 
 typedef struct {
-    ioreq_t       vp_ioreq;
-    unsigned long vp_intr[INTR_LEN];
+    ioreq_t     vp_ioreq;
 } vcpu_iodata_t;
 
 typedef struct {
     global_iodata_t sp_global;
     vcpu_iodata_t   vcpu_iodata[1];
 } shared_iopage_t;
+
+#define HVM_INFO_PAGE        0x0009F000
+#define HVM_INFO_OFFSET      0x00000800
+
+struct hvm_info_table {
+    char        signature[8]; /* "HVM INFO" */
+    uint32_t    length;
+    uint8_t     checksum;
+    uint8_t     acpi_enabled;
+    uint8_t     apic_enabled;
+    uint8_t     pad[1];
+    uint32_t    nr_vcpus;
+};
 
 #endif /* _IOREQ_H_ */
 

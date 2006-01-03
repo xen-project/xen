@@ -66,11 +66,6 @@ void vmx_final_setup_guest(struct vcpu *v)
         struct domain *d = v->domain;
         struct vcpu *vc;
 
-        d->arch.vmx_platform.lapic_enable = v->arch.guest_context.user_regs.ecx;
-        v->arch.guest_context.user_regs.ecx = 0;
-        VMX_DBG_LOG(DBG_LEVEL_VLAPIC, "lapic enable is %d.\n",
-                    d->arch.vmx_platform.lapic_enable);
-
         /* Initialize monitor page table */
         for_each_vcpu(d, vc)
             vc->arch.monitor_table = mk_pagetable(0);
@@ -95,7 +90,7 @@ void vmx_final_setup_guest(struct vcpu *v)
 void vmx_relinquish_resources(struct vcpu *v)
 {
     struct vmx_virpit *vpit;
-    
+
     if ( !VMX_DOMAIN(v) )
         return;
 

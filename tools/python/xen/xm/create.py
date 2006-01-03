@@ -160,13 +160,13 @@ gopts.var('cpus', val='CPUS',
           fn=set_int, default=None,
           use="CPUS to run the domain on.")
 
-gopts.var('lapic', val='LAPIC',
-          fn=set_int, default=0,
-          use="Disable or enable local APIC of VMX domain.")
-
 gopts.var('acpi', val='ACPI',
           fn=set_int, default=0,
           use="Disable or enable ACPI of VMX domain.")
+
+gopts.var('apic', val='APIC',
+          fn=set_int, default=0,
+          use="Disable or enable APIC of VMX domain.")
 
 gopts.var('vcpus', val='VCPUS',
           fn=set_int, default=1,
@@ -534,8 +534,8 @@ def configure_vmx(config_image, vals):
     """
     args = [ 'device_model', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'audio',
-             'vnc', 'vncviewer', 'sdl', 'display', 'ne2000', 'lapic',
-             'xauthority', 'acpi' ]
+             'vnc', 'vncviewer', 'sdl', 'display', 'ne2000', 'acpi', 'apic',
+             'xauthority' ]
     for a in args:
         if (vals.__dict__[a]):
             config_image.append([a, vals.__dict__[a]])
