@@ -26,7 +26,7 @@
 #include <asm/vmx_vmcs.h>
 #include <asm/i387.h>
 
-#include <public/io/ioreq.h>
+#include <public/hvm/ioreq.h>
 
 extern int hvm_enabled;
 

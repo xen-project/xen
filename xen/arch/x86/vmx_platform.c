@@ -27,7 +27,7 @@
 #include <xen/trace.h>
 #include <asm/vmx.h>
 #include <asm/vmx_platform.h>
-#include <public/io/ioreq.h>
+#include <public/hvm/ioreq.h>
 
 #include <xen/lib.h>
 #include <xen/sched.h>

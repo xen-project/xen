@@ -77,19 +77,6 @@ typedef struct {
     vcpu_iodata_t   vcpu_iodata[1];
 } shared_iopage_t;
 
-#define HVM_INFO_PAGE        0x0009F000
-#define HVM_INFO_OFFSET      0x00000800
-
-struct hvm_info_table {
-    char        signature[8]; /* "HVM INFO" */
-    uint32_t    length;
-    uint8_t     checksum;
-    uint8_t     acpi_enabled;
-    uint8_t     apic_enabled;
-    uint8_t     pad[1];
-    uint32_t    nr_vcpus;
-};
-
 #endif /* _IOREQ_H_ */
 
 /*

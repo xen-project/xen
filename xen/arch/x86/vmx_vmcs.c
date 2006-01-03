@@ -32,7 +32,7 @@
 #include <asm/flushtlb.h>
 #include <xen/event.h>
 #include <xen/kernel.h>
-#include <public/io/ioreq.h>
+#include <public/hvm/hvm_info_table.h>
 #if CONFIG_PAGING_LEVELS >= 4
 #include <asm/shadow_64.h>
 #endif
@@ -233,7 +233,7 @@ static void vmx_get_hvm_info(struct domain *d)
     unsigned long mpfn;
     struct hvm_info_table *t;
 
-    mpfn = get_mfn_from_pfn(HVM_INFO_PAGE >> PAGE_SHIFT);
+    mpfn = get_mfn_from_pfn(HVM_INFO_PFN);
     if ( mpfn == INVALID_MFN ) {
         printk("Can not get hvm info page mfn for VMX domain.\n");
         domain_crash_synchronous();

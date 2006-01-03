@@ -6,7 +6,7 @@
 #include <xen/lib.h>
 #include <xen/time.h>
 #include <xen/errno.h>
-#include <public/io/ioreq.h>
+#include <public/hvm/ioreq.h>
 
 #define MAX_IO_HANDLER              8
 

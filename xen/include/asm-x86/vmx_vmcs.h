@@ -23,7 +23,7 @@
 #include <asm/vmx_cpu.h>
 #include <asm/vmx_platform.h>
 #include <asm/vmx_vlapic.h>
-#include <public/vmx_assist.h>
+#include <public/hvm/vmx_assist.h>
 
 extern int start_vmx(void);
 extern void stop_vmx(void);

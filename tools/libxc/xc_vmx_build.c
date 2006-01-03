@@ -9,7 +9,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <zlib.h>
-#include <xen/io/ioreq.h>
+#include <xen/hvm/hvm_info_table.h>
+#include <xen/hvm/ioreq.h>
 
 #define VMX_LOADER_ENTR_ADDR  0x00100000
 
@@ -141,9 +142,13 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
     char *va_map;
     struct hvm_info_table *va_hvm;
 
-    va_map = xc_map_foreign_range(xc_handle, dom,
-                                  PAGE_SIZE, PROT_READ|PROT_WRITE,
-                                  pfn_list[HVM_INFO_PAGE >> PAGE_SHIFT]);
+    va_map = xc_map_foreign_range(
+        xc_handle,
+        dom,
+        PAGE_SIZE,
+        PROT_READ|PROT_WRITE,
+        pfn_list[HVM_INFO_PFN]);
+    
     if ( va_map == NULL )
         return -1;
 

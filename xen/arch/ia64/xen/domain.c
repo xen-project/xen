@@ -45,7 +45,7 @@
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx_vpd.h>
 #include <asm/pal.h>
-#include <public/io/ioreq.h>
+#include <public/hvm/ioreq.h>
 
 #define CONFIG_DOMAIN0_CONTIGUOUS
 unsigned long dom0_start = -1L;

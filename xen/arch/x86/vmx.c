@@ -42,7 +42,7 @@
 #include <asm/shadow_64.h>
 #endif
 #include <public/sched.h>
-#include <public/io/ioreq.h>
+#include <public/hvm/ioreq.h>
 #include <asm/vmx_vpic.h>
 #include <asm/vmx_vlapic.h>
 

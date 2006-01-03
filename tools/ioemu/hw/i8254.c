@@ -23,7 +23,7 @@
  */
 #include "vl.h"
 #include <xenctrl.h>
-#include <xen/io/ioreq.h>
+#include <xen/hvm/ioreq.h>
 
 //#define DEBUG_PIT
 

@@ -32,7 +32,7 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <asm/current.h>
-#include <public/io/ioreq.h>
+#include <public/hvm/ioreq.h>
 
 #ifdef CONFIG_VMX
 

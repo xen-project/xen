@@ -17,25 +17,15 @@
  * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
+
 #include "../acpi/acpi2_0.h"
 #include "../acpi/acpi_madt.h"
+
+#include <xen/hvm/hvm_info_table.h>
 
 #define NULL ((void*)0)
 
 extern int puts(const char *s);
-
-#define HVM_INFO_PAGE	0x0009F000
-#define HVM_INFO_OFFSET	0x00000800
-
-struct hvm_info_table {
-	char     signature[8]; /* "HVM INFO" */
-	uint32_t length;
-	uint8_t  checksum;
-	uint8_t  acpi_enabled;
-	uint8_t  apic_enabled;
-	uint8_t  pad[1];
-	uint32_t nr_vcpus;
-};
 
 static struct hvm_info_table *table = NULL;
 
@@ -70,7 +60,7 @@ get_hvm_info_table(void)
 	if (table != NULL)
 		return table;
 
-	t = (struct hvm_info_table *)(HVM_INFO_PAGE + HVM_INFO_OFFSET);
+	t = (struct hvm_info_table *)HVM_INFO_PADDR;
 
 	if (!validate_hvm_info(t)) {
 		puts("Bad hvm info table\n");
