@@ -625,6 +625,8 @@ def xm_sched_sedf(args):
     server.xend_domain_cpu_sedf_set(dom, *v)
 
 def xm_info(args):
+    arg_check(args, "info", 0)
+
     from xen.xend.XendClient import server
     info = server.xend_node()
     
@@ -645,9 +647,12 @@ def xm_console(args):
 
 
 def xm_top(args):
+    arg_check(args, "top", 0)
+
     os.execvp('xentop', ['xentop'])
 
 def xm_dmesg(args):
+    arg_check(args, "dmesg", 0)
     
     gopts = Opts(use="""[-c|--clear]
 
