@@ -1417,7 +1417,6 @@ GLOBAL_ENTRY(ia64_prepare_handle_unaligned)
 	br.cond.sptk.many rp				// goes to ia64_leave_kernel
 END(ia64_prepare_handle_unaligned)
 
-#ifndef XEN
 	//
 	// unw_init_running(void (*callback)(info, arg), void *arg)
 	//
@@ -1463,6 +1462,7 @@ GLOBAL_ENTRY(unw_init_running)
 	br.ret.sptk.many rp
 END(unw_init_running)
 
+#ifndef XEN
 	.rodata
 	.align 8
 	.globl sys_call_table

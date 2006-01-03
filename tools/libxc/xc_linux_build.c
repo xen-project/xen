@@ -393,10 +393,14 @@ static int setup_guest(int xc_handle,
     start_info->store_evtchn = store_evtchn;
     start_info->console_mfn   = nr_pages - 1;
     start_info->console_evtchn = console_evtchn;
+    start_info->nr_pages       = nr_pages;	// FIXME?: nr_pages - 2 ????
     if ( initrd_len != 0 )
     {
         ctxt->initrd.start    = vinitrd_start;
         ctxt->initrd.size     = initrd_len;
+    } else {
+        ctxt->initrd.start    = 0;
+        ctxt->initrd.size     = 0;
     }
     strncpy((char *)ctxt->cmdline, cmdline, IA64_COMMAND_LINE_SIZE);
     ctxt->cmdline[IA64_COMMAND_LINE_SIZE-1] = '\0';

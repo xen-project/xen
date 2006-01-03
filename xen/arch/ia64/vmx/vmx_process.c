@@ -53,6 +53,7 @@
 #define INITIAL_PSR_VALUE_AT_INTERRUPTION 0x0000001808028034
 
 
+extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 extern void rnat_consumption (VCPU *vcpu);
 #define DOMN_PAL_REQUEST    0x110000
 
@@ -185,8 +186,11 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 	}else if(iim == DOMN_PAL_REQUEST){
         pal_emul(current);
 		vmx_vcpu_increment_iip(current);
-    }  else
+    } else {
+		if (iim == 0) 
+			die_if_kernel("bug check", regs, iim);
 		vmx_reflect_interruption(ifa,isr,iim,11,regs);
+    }
 }
 
 

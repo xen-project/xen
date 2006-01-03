@@ -33,6 +33,7 @@
 #include <xen/multicall.h>
 
 extern unsigned long vcpu_get_itir_on_fault(struct vcpu *, UINT64);
+extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 
 extern unsigned long dom0_start, dom0_size;
 
@@ -686,6 +687,8 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 			vcpu_increment_iip(current);
 	}
 	else {
+		if (iim == 0) 
+			die_if_kernel("bug check", regs, iim);
 		PSCB(v,iim) = iim;
 		reflect_interruption(isr,regs,IA64_BREAK_VECTOR);
 	}

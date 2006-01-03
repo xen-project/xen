@@ -19,6 +19,7 @@
 #include <xen/delay.h>
 #include <xen/softirq.h>
 #include <xen/mm.h>
+#include <xen/iocap.h>
 #include <asm/ptrace.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -293,16 +294,7 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	d->arch.cmdline      = c->cmdline;
 	new_thread(v, regs->cr_iip, 0, 0);
 
-#ifdef CONFIG_IA64_SPLIT_CACHE
-    /* Sync d/i cache conservatively */
-    if (!running_on_sim) {
-        ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
-        if ((ret!=PAL_STATUS_SUCCESS)&& (ret!=PAL_STATUS_UNIMPLEMENTED))
-            printk("PAL CACHE FLUSH failed for dom0.\n");
-        else
-            printk("Sync i/d cache for guest SUCC\n");
-    }
-#endif
+	sync_split_caches();
  	v->vcpu_info->arch.evtchn_vector = c->vcpu.evtchn_vector;
 	if ( c->vcpu.privregs && copy_from_user(v->arch.privregs,
 			   c->vcpu.privregs, sizeof(mapped_regs_t))) {
@@ -430,7 +422,7 @@ extern unsigned long vhpt_paddr, vhpt_pend;
 		{
 			p = alloc_domheap_page(d);
 			// zero out pages for security reasons
-			memset(__va(page_to_phys(p)),0,PAGE_SIZE);
+			if (p) memset(__va(page_to_phys(p)),0,PAGE_SIZE);
 		}
 		if (unlikely(!p)) {
 printf("map_new_domain_page: Can't alloc!!!! Aaaargh!\n");
@@ -917,9 +909,9 @@ int construct_dom0(struct domain *d,
 	memset(si, 0, PAGE_SIZE);
 	d->shared_info->arch.start_info_pfn = __pa(si) >> PAGE_SHIFT;
 	sprintf(si->magic, "xen-%i.%i-ia64", XEN_VERSION, XEN_SUBVERSION);
+	si->nr_pages     = d->tot_pages;
 
 #if 0
-	si->nr_pages     = d->tot_pages;
 	si->shared_info  = virt_to_phys(d->shared_info);
 	si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
 	//si->pt_base      = vpt_start;
@@ -964,16 +956,7 @@ int construct_dom0(struct domain *d,
 
 	new_thread(v, pkern_entry, 0, 0);
 	physdev_init_dom0(d);
-#ifdef CONFIG_IA64_SPLIT_CACHE
-    /* Sync d/i cache conservatively */
-    if (!running_on_sim) {
-        ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
-        if ((ret!=PAL_STATUS_SUCCESS)&& (ret!=PAL_STATUS_UNIMPLEMENTED))
-            printk("PAL CACHE FLUSH failed for dom0.\n");
-        else
-            printk("Sync i/d cache for guest SUCC\n");
-    }
-#endif
+	sync_split_caches();
 
 	// FIXME: Hack for keyboard input
 #ifdef CLONE_DOMAIN0
@@ -1032,16 +1015,7 @@ int construct_domU(struct domain *d,
 #endif
 	new_thread(v, pkern_entry, 0, 0);
 	printk("new_thread returns\n");
-#ifdef CONFIG_IA64_SPLIT_CACHE
-    /* Sync d/i cache conservatively */
-    if (!running_on_sim) {
-        ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
-        if ((ret!=PAL_STATUS_SUCCESS)&& (ret!=PAL_STATUS_UNIMPLEMENTED))
-            printk("PAL CACHE FLUSH failed for dom0.\n");
-        else
-            printk("Sync i/d cache for guest SUCC\n");
-    }
-#endif
+	sync_split_caches();
 	__set_bit(0x30, VCPU(v, delivery_mask));
 
 	return 0;
@@ -1055,16 +1029,7 @@ void reconstruct_domU(struct vcpu *v)
 		v->domain->domain_id);
 	loaddomainelfimage(v->domain,v->domain->arch.image_start);
 	new_thread(v, v->domain->arch.entry, 0, 0);
-#ifdef CONFIG_IA64_SPLIT_CACHE
-    /* Sync d/i cache conservatively */
-    if (!running_on_sim) {
-        ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
-        if ((ret!=PAL_STATUS_SUCCESS)&& (ret!=PAL_STATUS_UNIMPLEMENTED))
-            printk("PAL CACHE FLUSH failed for dom0.\n");
-        else
-            printk("Sync i/d cache for guest SUCC\n");
-    }
-#endif
+	sync_split_caches();
 }
 #endif
 

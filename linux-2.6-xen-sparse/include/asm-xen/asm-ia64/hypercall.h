@@ -372,7 +372,7 @@ HYPERVISOR_memory_op(
     int ret;
     __asm__ __volatile__ ( ";; mov r14=%2 ; mov r15=%3 ; mov r2=%1 ; break 0x1000 ;; mov %0=r8 ;;"
         : "=r" (ret)
-        : "i" (__HYPERVISOR_console_io), "r"(cmd), "r"(arg)
+        : "i" (__HYPERVISOR_memory_op), "r"(cmd), "r"(arg)
         : "r14","r15","r2","r8","memory" );
     return ret;
 }

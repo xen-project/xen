@@ -25,7 +25,6 @@ unsigned long wait_init_idle;
 int phys_proc_id[NR_CPUS];
 unsigned long loops_per_jiffy = (1<<12);	// from linux/init/main.c
 
-void unw_init(void) { printf("unw_init() skipped (NEED FOR KERNEL UNWIND)\n"); }
 void ia64_mca_init(void) { printf("ia64_mca_init() skipped (Machine check abort handling)\n"); }
 void ia64_mca_cpu_init(void *x) { }
 void ia64_patch_mckinley_e9(unsigned long a, unsigned long b) { }
@@ -180,11 +179,6 @@ void pgtable_quicklist_free(void *pgtable_entry)
 // from arch/ia64/traps.c
 ///////////////////////////////
 
-void show_registers(struct pt_regs *regs)
-{
-	printf("*** ADD REGISTER DUMP HERE FOR DEBUGGING\n");
-}
-
 int is_kernel_text(unsigned long addr)
 {
 	extern char _stext[], _etext[];
@@ -236,7 +230,13 @@ void sys_exit(void)
 
 void die_if_kernel(char *str, struct pt_regs *regs, long err) /* __attribute__ ((noreturn)) */
 {
-	printk("die_if_kernel: called, not implemented\n");
+	if (user_mode(regs))
+		return;
+
+	printk("%s: %s %ld\n", __func__, str, err);
+	debugtrace_dump();
+	show_registers(regs);
+	domain_crash_synchronous();
 }
 
 long
@@ -367,4 +367,24 @@ loop:
 		while(i--);
 		goto loop;
 	}
+}
+
+/* FIXME: for the forseeable future, all cpu's that enable VTi have split
+ *  caches and all cpu's that have split caches enable VTi.  This may
+ *  eventually be untrue though. */
+#define cpu_has_split_cache	vmx_enabled
+extern unsigned int vmx_enabled;
+
+void sync_split_caches(void)
+{
+	unsigned long ret, progress = 0;
+
+	if (cpu_has_split_cache) {
+		/* Sync d/i cache conservatively */
+		ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
+		if ((ret!=PAL_STATUS_SUCCESS)&& (ret!=PAL_STATUS_UNIMPLEMENTED))
+			printk("PAL CACHE FLUSH failed\n");
+		else printk("Sync i/d cache for guest SUCC\n");
+	}
+	else printk("sync_split_caches ignored for CPU with no split cache\n");
 }
