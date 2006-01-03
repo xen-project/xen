@@ -16,7 +16,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
-#include "xc_private.h"
+#include "xenctrl.h"
 
 /* Needed for Python versions earlier than 2.3. */
 #ifndef PyMODINIT_FUNC
