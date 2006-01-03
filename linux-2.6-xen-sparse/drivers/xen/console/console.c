@@ -315,12 +315,12 @@ static void __xencons_tx_flush(void)
 	int sent, sz, work_done = 0;
 
 	if (x_char) {
-		if (xen_start_info->flags & SIF_INITDOMAIN) {
+		if (xen_start_info->flags & SIF_INITDOMAIN)
+			kcons_write_dom0(NULL, &x_char, 1);
+		else
 			while (x_char)
 				if (xencons_ring_send(&x_char, 1) == 1)
 					break;
-		} else
-			kcons_write_dom0(NULL, &x_char, 1);
 		x_char = 0;
 		work_done = 1;
 	}
