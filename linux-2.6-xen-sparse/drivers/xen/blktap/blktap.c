@@ -208,7 +208,7 @@ static struct page *blktap_nopage(struct vm_area_struct *vma,
 }
 
 struct vm_operations_struct blktap_vm_ops = {
-	nopage:   blktap_nopage,
+	.nopage = blktap_nopage,
 };
 
 /******************************************************************
