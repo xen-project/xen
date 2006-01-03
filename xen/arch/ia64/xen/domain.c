@@ -19,6 +19,7 @@
 #include <xen/delay.h>
 #include <xen/softirq.h>
 #include <xen/mm.h>
+#include <xen/iocap.h>
 #include <asm/ptrace.h>
 #include <asm/system.h>
 #include <asm/io.h>
