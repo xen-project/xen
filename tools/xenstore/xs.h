@@ -68,7 +68,7 @@ bool xs_mkdir(struct xs_handle *h, struct xs_transaction_handle *t,
 	      const char *path);
 
 /* Destroy a file or directory (and children).
- * Returns false on failure, or success if it doesn't exist.
+ * Returns false on failure, or if it doesn't exist.
  */
 bool xs_rm(struct xs_handle *h, struct xs_transaction_handle *t,
 	   const char *path);
