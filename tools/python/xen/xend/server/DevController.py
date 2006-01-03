@@ -32,11 +32,10 @@ HOTPLUG_STATUS_ERROR = "error"
 HOTPLUG_STATUS_BUSY  = "busy"
 
 Connected = 1
-Died      = 2
-Error     = 3
-Missing   = 4
-Timeout   = 5
-Busy      = 6
+Error     = 2
+Missing   = 3
+Timeout   = 4
+Busy      = 5
 
 xenbusState = {
     'Unknown'      : 0,
@@ -156,11 +155,6 @@ class DevController:
             # Don't try to destroy the device; it's already gone away.
             raise VmError("Device %s (%s) could not be connected. "
                           "Device not found." % (devid, self.deviceClass))
-
-        elif status == Died:
-            self.destroyDevice(devid)
-            raise VmError("Device %s (%s) could not be connected. "
-                          "Device has died." % (devid, self.deviceClass))
 
         elif status == Busy:
             err = None
@@ -408,20 +402,17 @@ class DevController:
 def hotplugStatusCallback(statusPath, ev, result):
     log.debug("hotplugStatusCallback %s.", statusPath)
 
-    try:
-        status = xstransact.Read(statusPath)
+    status = xstransact.Read(statusPath)
 
-        if status is not None:
-            if status == HOTPLUG_STATUS_ERROR:
-                result['status'] = Error
-            elif status == HOTPLUG_STATUS_BUSY:
-                result['status'] = Busy
-            else:
-                result['status'] = Connected
+    if status is not None:
+        if status == HOTPLUG_STATUS_ERROR:
+            result['status'] = Error
+        elif status == HOTPLUG_STATUS_BUSY:
+            result['status'] = Busy
         else:
-            return 1
-    except VmError:
-        result['status'] = Died
+            result['status'] = Connected
+    else:
+        return 1
 
     log.debug("hotplugStatusCallback %d.", result['status'])
 
