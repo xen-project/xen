@@ -419,7 +419,7 @@ extern unsigned long vhpt_paddr, vhpt_pend;
 		{
 			p = alloc_domheap_page(d);
 			// zero out pages for security reasons
-			memset(__va(page_to_phys(p)),0,PAGE_SIZE);
+			if (p) memset(__va(page_to_phys(p)),0,PAGE_SIZE);
 		}
 		if (unlikely(!p)) {
 printf("map_new_domain_page: Can't alloc!!!! Aaaargh!\n");
