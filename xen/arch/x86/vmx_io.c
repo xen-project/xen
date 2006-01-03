@@ -37,7 +37,7 @@
 #include <asm/shadow.h>
 #include <asm/vmx_vpic.h>
 #include <asm/vmx_vlapic.h>
-#include <public/io/ioreq.h>
+#include <public/hvm/ioreq.h>
 
 #ifdef CONFIG_VMX
 #if defined (__i386__)

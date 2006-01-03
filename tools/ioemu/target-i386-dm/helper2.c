@@ -48,7 +48,7 @@
 #include <sys/ioctl.h>
 
 #include <xenctrl.h>
-#include <xen/io/ioreq.h>
+#include <xen/hvm/ioreq.h>
 #include <xen/linux/evtchn.h>
 
 #include "cpu.h"

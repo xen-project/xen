@@ -209,13 +209,9 @@ class VmxImageHandler(ImageHandler):
 
         self.dmargs += self.configVNC(imageConfig)
 
-        self.lapic = 0
-        lapic = sxp.child_value(imageConfig, 'lapic')
-        if not lapic is None:
-            self.lapic = int(lapic)
-
         self.acpi = int(sxp.child_value(imageConfig, 'acpi', 0))
-        
+        self.apic = int(sxp.child_value(imageConfig, 'apic', 0))
+
     def buildDomain(self):
         # Create an event channel
         self.device_channel = xc.evtchn_alloc_unbound(dom=self.vm.getDomid(),
@@ -229,18 +225,18 @@ class VmxImageHandler(ImageHandler):
         log.debug("control_evtchn = %d", self.device_channel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
-        log.debug("lapic          = %d", self.lapic)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
         log.debug("acpi           = %d", self.acpi)
+        log.debug("apic           = %d", self.apic)
 
         return xc.vmx_build(dom            = self.vm.getDomid(),
                             image          = self.kernel,
                             control_evtchn = self.device_channel,
                             store_evtchn   = store_evtchn,
                             memsize        = self.vm.getMemoryTarget() / 1024,
-                            lapic          = self.lapic,
+                            vcpus          = self.vm.getVCpuCount(),
                             acpi           = self.acpi,
-                            vcpus          = self.vm.getVCpuCount())
+                            apic           = self.apic)
 
     # Return a list of cmd line args to the device models based on the
     # xm config file

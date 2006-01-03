@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <zlib.h>
 #include "xen/arch-ia64.h"
-#include <xen/io/ioreq.h>
+#include <xen/hvm/ioreq.h>
 
 /* this is a very ugly way of getting FPSR_DEFAULT.  struct ia64_fpreg is
  * mysteriously declared in two places: /usr/include/asm/fpu.h and

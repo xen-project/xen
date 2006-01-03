@@ -540,6 +540,9 @@ static int __init blkif_init(void)
 	pending_vaddrs        = kmalloc(sizeof(pending_vaddrs[0]) *
 					mmap_pages, GFP_KERNEL);
 	if (!pending_reqs || !pending_grant_handles || !pending_vaddrs) {
+		kfree(pending_reqs);
+		kfree(pending_grant_handles);
+		kfree(pending_vaddrs);
 		printk("%s: out of memory\n", __FUNCTION__);
 		return -1;
 	}

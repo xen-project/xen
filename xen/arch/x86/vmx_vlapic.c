@@ -32,7 +32,7 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <asm/current.h>
-#include <public/io/ioreq.h>
+#include <public/hvm/ioreq.h>
 
 #ifdef CONFIG_VMX
 
@@ -62,7 +62,7 @@ int vlapic_find_highest_irr(struct vlapic *vlapic)
 
 int vmx_apic_support(struct domain *d)
 {
-    return d->arch.vmx_platform.lapic_enable;
+    return d->arch.vmx_platform.apic_enabled;
 }
 
 s_time_t get_apictime_scheduled(struct vcpu *v)

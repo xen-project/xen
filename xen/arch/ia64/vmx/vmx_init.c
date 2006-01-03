@@ -42,7 +42,7 @@
 #include <xen/lib.h>
 #include <asm/vmmu.h>
 #include <public/arch-ia64.h>
-#include <public/io/ioreq.h>
+#include <public/hvm/ioreq.h>
 #include <asm/vmx_phy_mode.h>
 #include <asm/processor.h>
 #include <asm/vmx.h>
