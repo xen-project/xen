@@ -12,6 +12,7 @@
 #include <xen/irq.h>
 #include <xen/perfc.h>
 #include <xen/sched.h>
+#include <xen/keyhandler.h>
 #include <asm/current.h>
 #include <asm/smpboot.h>
 
@@ -198,15 +199,21 @@ int pirq_guest_unmask(struct domain *d)
 
 int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
 {
-    unsigned int        vector = irq_to_vector(irq);
-    irq_desc_t         *desc = &irq_desc[vector];
+    unsigned int        vector;
+    irq_desc_t         *desc;
     irq_guest_action_t *action;
     unsigned long       flags;
     int                 rc = 0;
     cpumask_t           cpumask = CPU_MASK_NONE;
 
+    if ( (irq < 0) || (irq >= NR_IRQS) )
+        return -EINVAL;
+
+    vector = irq_to_vector(irq);
     if ( vector == 0 )
-        return -EBUSY;
+        return -EINVAL;
+
+    desc = &irq_desc[vector];
 
     spin_lock_irqsave(&desc->lock, flags);
 
@@ -305,3 +312,54 @@ int pirq_guest_unbind(struct domain *d, int irq)
     spin_unlock_irqrestore(&desc->lock, flags);    
     return 0;
 }
+
+static void dump_irqs(unsigned char key)
+{
+    int i, irq, vector;
+    irq_desc_t *desc;
+    irq_guest_action_t *action;
+    struct domain *d;
+    unsigned long flags;
+
+    for ( irq = 0; irq < NR_IRQS; irq++ )
+    {
+        vector = irq_to_vector(irq);
+        if ( vector == 0 )
+            continue;
+
+        desc = &irq_desc[vector];
+
+        spin_lock_irqsave(&desc->lock, flags);
+
+        if ( desc->status & IRQ_GUEST )
+        {
+            action = (irq_guest_action_t *)desc->action;
+
+            printk("IRQ%3d Vec%3d: type=%-15s in-flight=%d domain-list=",
+                   irq, vector, desc->handler->typename, action->in_flight);
+
+            for ( i = 0; i < action->nr_guests; i++ )
+            {
+                d = action->guest[i];
+                printk("%u(%c%c)",
+                       d->domain_id,
+                       (test_bit(d->pirq_to_evtchn[irq],
+                                 &d->shared_info->evtchn_mask[0]) ? 'M' : '-'),
+                       (test_bit(irq, &d->pirq_mask) ? 'M' : '-'));
+                if ( i != action->nr_guests )
+                    printk(",");
+            }
+
+            printk("\n");
+        }
+
+        spin_unlock_irqrestore(&desc->lock, flags);
+    }
+}
+
+static int __init setup_dump_irqs(void)
+{
+    register_keyhandler('i', dump_irqs, "dump interrupt bindings");
+    return 0;
+}
+__initcall(setup_dump_irqs);
