@@ -335,17 +335,28 @@ static void dump_irqs(unsigned char key)
         {
             action = (irq_guest_action_t *)desc->action;
 
-            printk("IRQ%3d Vec%3d: type=%-15s in-flight=%d domain-list=",
-                   irq, vector, desc->handler->typename, action->in_flight);
+            printk("IRQ%3d Vec%3d: type=%-15s status=%08x "
+                   "in-flight=%d domain-list=",
+                   irq, vector, desc->handler->typename,
+                   desc->status, action->in_flight);
 
             for ( i = 0; i < action->nr_guests; i++ )
             {
                 d = action->guest[i];
-                printk("%u(%c%c)",
+                printk("%u(%c%c%c%c)",
                        d->domain_id,
                        (test_bit(d->pirq_to_evtchn[irq],
-                                 &d->shared_info->evtchn_mask[0]) ? 'M' : '-'),
-                       (test_bit(irq, &d->pirq_mask) ? 'M' : '-'));
+                                 &d->shared_info->evtchn_pending[0]) ?
+                        'P' : '-'),
+                       (test_bit(d->pirq_to_evtchn[irq]/BITS_PER_LONG,
+                                 &d->shared_info->vcpu_info[0].
+                                 evtchn_pending_sel) ?
+                        'S' : '-'),
+                       (test_bit(d->pirq_to_evtchn[irq],
+                                 &d->shared_info->evtchn_mask[0]) ?
+                        'M' : '-'),
+                       (test_bit(irq, &d->pirq_mask) ?
+                        'M' : '-'));
                 if ( i != action->nr_guests )
                     printk(",");
             }
