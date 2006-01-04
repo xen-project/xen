@@ -67,8 +67,11 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 	op.u.add_memtype.pfn     = base;
 	op.u.add_memtype.nr_pfns = size;
 	op.u.add_memtype.type    = type;
-	if ((error = HYPERVISOR_dom0_op(&op)))
+	error = HYPERVISOR_dom0_op(&op);
+	if (error) {
+		BUG_ON(error > 0);
 		return error;
+	}
 
 	if (increment)
 		++usage_table[op.u.add_memtype.reg];
@@ -121,8 +124,12 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 	if (--usage_table[reg] < 1) {
 		op.cmd = DOM0_DEL_MEMTYPE;
 		op.u.del_memtype.handle = 0;
-		op.u.add_memtype.reg    = reg;
-		(void)HYPERVISOR_dom0_op(&op);
+		op.u.del_memtype.reg    = reg;
+		error = HYPERVISOR_dom0_op(&op);
+		if (error) {
+			BUG_ON(error > 0);
+			goto out;
+		}
 	}
 	error = reg;
  out:
