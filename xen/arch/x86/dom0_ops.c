@@ -103,12 +103,27 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             op->u.add_memtype.nr_pfns,
             op->u.add_memtype.type,
             1);
+        if (ret > 0)
+        {
+            (void)__put_user(0, &u_dom0_op->u.add_memtype.handle);
+            (void)__put_user(ret, &u_dom0_op->u.add_memtype.reg);
+            ret = 0;
+        }
     }
     break;
 
     case DOM0_DEL_MEMTYPE:
     {
-        ret = mtrr_del_page(op->u.del_memtype.reg, 0, 0);
+        if (op->u.del_memtype.handle == 0
+            /* mtrr/main.c otherwise does a lookup */
+            && (int)op->u.del_memtype.reg >= 0)
+        {
+            ret = mtrr_del_page(op->u.del_memtype.reg, 0, 0);
+            if (ret > 0)
+                ret = 0;
+        }
+        else
+            ret = -EINVAL;
     }
     break;
 
@@ -179,7 +194,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
         ret = 0;
         if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
-	    ret = -EFAULT;
+            ret = -EFAULT;
     }
     break;
     
