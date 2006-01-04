@@ -313,6 +313,8 @@ int pirq_guest_unbind(struct domain *d, int irq)
     return 0;
 }
 
+extern void dump_ioapic_irq_info(void);
+
 static void dump_irqs(unsigned char key)
 {
     int i, irq, vector;
@@ -320,6 +322,8 @@ static void dump_irqs(unsigned char key)
     irq_guest_action_t *action;
     struct domain *d;
     unsigned long flags;
+
+    printk("Guest interrupt information:\n");
 
     for ( irq = 0; irq < NR_IRQS; irq++ )
     {
@@ -335,7 +339,7 @@ static void dump_irqs(unsigned char key)
         {
             action = (irq_guest_action_t *)desc->action;
 
-            printk("IRQ%3d Vec%3d: type=%-15s status=%08x "
+            printk("    IRQ%3d Vec%3d: type=%-15s status=%08x "
                    "in-flight=%d domain-list=",
                    irq, vector, desc->handler->typename,
                    desc->status, action->in_flight);
@@ -366,6 +370,8 @@ static void dump_irqs(unsigned char key)
 
         spin_unlock_irqrestore(&desc->lock, flags);
     }
+
+    dump_ioapic_irq_info();
 }
 
 static int __init setup_dump_irqs(void)
