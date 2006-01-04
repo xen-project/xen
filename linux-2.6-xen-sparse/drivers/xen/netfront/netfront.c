@@ -1218,21 +1218,13 @@ static int netfront_remove(struct xenbus_device *dev)
 
 static void close_netdev(struct netfront_info *info)
 {
-	/* Stop old i/f to prevent errors whilst we rebuild the state. */
-	spin_lock_irq(&info->tx_lock);
-	spin_lock(&info->rx_lock);
+	spin_lock_irq(&info->netdev->xmit_lock);
 	netif_stop_queue(info->netdev);
-	/* info->backend_state = BEST_DISCONNECTED; */
-	spin_unlock(&info->rx_lock);
-	spin_unlock_irq(&info->tx_lock);
+	spin_unlock_irq(&info->netdev->xmit_lock);
 
 #ifdef CONFIG_PROC_FS
 	xennet_proc_delif(info->netdev);
 #endif
-
-	if (info->irq)
-		unbind_from_irqhandler(info->irq, info->netdev);
-	info->evtchn = info->irq = 0;
 
 	del_timer_sync(&info->rx_refill_timer);
 
@@ -1242,6 +1234,17 @@ static void close_netdev(struct netfront_info *info)
 
 static void netif_disconnect_backend(struct netfront_info *info)
 {
+	/* Stop old i/f to prevent errors whilst we rebuild the state. */
+	spin_lock_irq(&info->tx_lock);
+	spin_lock(&info->rx_lock);
+	info->backend_state = BEST_DISCONNECTED;
+	spin_unlock(&info->rx_lock);
+	spin_unlock_irq(&info->tx_lock);
+
+	if (info->irq)
+		unbind_from_irqhandler(info->irq, info->netdev);
+	info->evtchn = info->irq = 0;
+
 	end_access(info->tx_ring_ref, info->tx.sring);
 	end_access(info->rx_ring_ref, info->rx.sring);
 	info->tx_ring_ref = GRANT_INVALID_REF;
