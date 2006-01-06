@@ -110,13 +110,13 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     switch ( op->cmd )
     {
 
-    case DOM0_SETDOMAININFO:
+    case DOM0_SETVCPUCONTEXT:
     {
-        struct domain *d = find_domain_by_id(op->u.setdomaininfo.domain);
+        struct domain *d = find_domain_by_id(op->u.setvcpucontext.domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
-            ret = set_info_guest(d, &op->u.setdomaininfo);
+            ret = set_info_guest(d, &op->u.setvcpucontext);
             put_domain(d);
         }
     }
@@ -284,9 +284,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
-    case DOM0_PINCPUDOMAIN:
+    case DOM0_SETVCPUAFFINITY:
     {
-        domid_t dom = op->u.pincpudomain.domain;
+        domid_t dom = op->u.setvcpuaffinity.domain;
         struct domain *d = find_domain_by_id(dom);
         struct vcpu *v;
 
@@ -296,15 +296,15 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
         
-        if ( (op->u.pincpudomain.vcpu >= MAX_VIRT_CPUS) ||
-             !d->vcpu[op->u.pincpudomain.vcpu] )
+        if ( (op->u.setvcpuaffinity.vcpu >= MAX_VIRT_CPUS) ||
+             !d->vcpu[op->u.setvcpuaffinity.vcpu] )
         {
             ret = -EINVAL;
             put_domain(d);
             break;
         }
 
-        v = d->vcpu[op->u.pincpudomain.vcpu];
+        v = d->vcpu[op->u.setvcpuaffinity.vcpu];
         if ( v == NULL )
         {
             ret = -ESRCH;
@@ -320,9 +320,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         }
 
         memcpy(cpus_addr(v->cpu_affinity),
-               &op->u.pincpudomain.cpumap,
+               &op->u.setvcpuaffinity.cpumap,
                min((int)BITS_TO_LONGS(NR_CPUS),
-                   (int)sizeof(op->u.pincpudomain.cpumap)));
+                   (int)sizeof(op->u.setvcpuaffinity.cpumap)));
 
         vcpu_pause(v);
         vcpu_migrate_cpu(v, first_cpu(v->cpu_affinity));

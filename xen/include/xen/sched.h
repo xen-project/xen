@@ -221,7 +221,7 @@ extern int construct_dom0(
     unsigned long image_start, unsigned long image_len, 
     unsigned long initrd_start, unsigned long initrd_len,
     char *cmdline);
-extern int set_info_guest(struct domain *d, dom0_setdomaininfo_t *);
+extern int set_info_guest(struct domain *d, dom0_setvcpucontext_t *);
 
 struct domain *find_domain_by_id(domid_t dom);
 extern void domain_destruct(struct domain *d);

@@ -382,7 +382,7 @@ static int suspend_and_state(int xc_handle, int io_fd, int dom,
         return -1;
     }
 
-    if ( xc_domain_get_vcpu_context(xc_handle, dom, 0 /* XXX */, ctxt)) 
+    if ( xc_vcpu_getcontext(xc_handle, dom, 0 /* XXX */, ctxt)) 
         ERR("Could not get vcpu context");
 
 
@@ -643,7 +643,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
     
     /* Only have to worry about vcpu 0 even for SMP */
-    if (xc_domain_get_vcpu_context(xc_handle, dom, 0, &ctxt)) {
+    if (xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt)) {
         ERR("Could not get vcpu context");
         goto out;
     }

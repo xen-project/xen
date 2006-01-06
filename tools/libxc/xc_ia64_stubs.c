@@ -664,7 +664,7 @@ int xc_vmx_build(int xc_handle,
         goto error_out;
     }
 
-    if ( xc_domain_get_vcpu_context(xc_handle, domid, 0, ctxt) ){
+    if ( xc_vcpu_getcontext(xc_handle, domid, 0, ctxt) ){
         PERROR("Could not get vcpu context");
         goto error_out;
     }
@@ -688,11 +688,11 @@ int xc_vmx_build(int xc_handle,
 
     memset( &launch_op, 0, sizeof(launch_op) );
 
-    launch_op.u.setdomaininfo.domain = (domid_t)domid;
-    launch_op.u.setdomaininfo.vcpu   = 0;
-    launch_op.u.setdomaininfo.ctxt   = ctxt;
+    launch_op.u.setvcpucontext.domain = (domid_t)domid;
+    launch_op.u.setvcpucontext.vcpu   = 0;
+    launch_op.u.setvcpucontext.ctxt   = ctxt;
 
-    launch_op.cmd = DOM0_SETDOMAININFO;
+    launch_op.cmd = DOM0_SETVCPUCONTEXT;
     rc = do_dom0_op(xc_handle, &launch_op);
     return rc;
 

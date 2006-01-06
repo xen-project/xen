@@ -135,9 +135,9 @@ static PyObject *pyxc_domain_destroy(XcObject *self, PyObject *args)
 }
 
 
-static PyObject *pyxc_domain_pincpu(XcObject *self,
-                                    PyObject *args,
-                                    PyObject *kwds)
+static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
+                                       PyObject *args,
+                                       PyObject *kwds)
 {
     uint32_t dom;
     int vcpu = 0, i;
@@ -157,7 +157,7 @@ static PyObject *pyxc_domain_pincpu(XcObject *self,
             cpumap |= (cpumap_t)1 << PyInt_AsLong(PyList_GetItem(cpulist, i));
     }
   
-    if ( xc_domain_pincpu(self->xc_handle, dom, vcpu, cpumap) != 0 )
+    if ( xc_vcpu_setaffinity(self->xc_handle, dom, vcpu, cpumap) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
@@ -297,7 +297,7 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
                                       &dom, &vcpu) )
         return NULL;
 
-    rc = xc_domain_get_vcpu_info(self->xc_handle, dom, vcpu, &info);
+    rc = xc_vcpu_getinfo(self->xc_handle, dom, vcpu, &info);
     if ( rc < 0 )
         return PyErr_SetFromErrno(xc_error);
 
@@ -890,8 +890,8 @@ static PyMethodDef pyxc_methods[] = {
       " dom [int]:    Identifier of domain to be destroyed.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_pincpu", 
-      (PyCFunction)pyxc_domain_pincpu, 
+    { "vcpu_setaffinity", 
+      (PyCFunction)pyxc_vcpu_setaffinity, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Pin a VCPU to a specified set CPUs.\n"
       " dom [int]:     Identifier of domain to which VCPU belongs.\n"

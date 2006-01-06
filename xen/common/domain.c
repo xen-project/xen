@@ -357,11 +357,11 @@ void domain_unpause_by_systemcontroller(struct domain *d)
  * of domains other than domain 0. ie. the domains that are being built by 
  * the userspace dom0 domain builder.
  */
-int set_info_guest(struct domain *d, dom0_setdomaininfo_t *setdomaininfo)
+int set_info_guest(struct domain *d, dom0_setvcpucontext_t *setvcpucontext)
 {
     int rc = 0;
     struct vcpu_guest_context *c = NULL;
-    unsigned long vcpu = setdomaininfo->vcpu;
+    unsigned long vcpu = setvcpucontext->vcpu;
     struct vcpu *v; 
 
     if ( (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
@@ -374,7 +374,7 @@ int set_info_guest(struct domain *d, dom0_setdomaininfo_t *setdomaininfo)
         return -ENOMEM;
 
     rc = -EFAULT;
-    if ( copy_from_user(c, setdomaininfo->ctxt, sizeof(*c)) == 0 )
+    if ( copy_from_user(c, setvcpucontext->ctxt, sizeof(*c)) == 0 )
         rc = arch_set_info_guest(v, c);
 
     xfree(c);

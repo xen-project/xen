@@ -171,7 +171,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
 
     /* Only have to worry about vcpu 0 even for SMP */
-    if (xc_domain_get_vcpu_context( xc_handle, dom, 0, &ctxt)) {
+    if (xc_vcpu_getcontext( xc_handle, dom, 0, &ctxt)) {
         ERR("Could not get vcpu context");
         goto out;
     }
@@ -735,10 +735,10 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     DPRINTF("Domain ready to be built.\n");
 
-    op.cmd = DOM0_SETDOMAININFO;
-    op.u.setdomaininfo.domain = (domid_t)dom;
-    op.u.setdomaininfo.vcpu   = 0;
-    op.u.setdomaininfo.ctxt   = &ctxt;
+    op.cmd = DOM0_SETVCPUCONTEXT;
+    op.u.setvcpucontext.domain = (domid_t)dom;
+    op.u.setvcpucontext.vcpu   = 0;
+    op.u.setvcpucontext.ctxt   = &ctxt;
     rc = xc_dom0_op(xc_handle, &op);
 
     if (rc != 0) {

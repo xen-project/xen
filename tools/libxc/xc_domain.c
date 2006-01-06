@@ -58,16 +58,16 @@ int xc_domain_destroy(int xc_handle,
     return do_dom0_op(xc_handle, &op);
 }
 
-int xc_domain_pincpu(int xc_handle,
-                     uint32_t domid, 
-                     int vcpu,
-                     cpumap_t cpumap)
+int xc_vcpu_setaffinity(int xc_handle,
+                        uint32_t domid, 
+                        int vcpu,
+                        cpumap_t cpumap)
 {
     DECLARE_DOM0_OP;
-    op.cmd = DOM0_PINCPUDOMAIN;
-    op.u.pincpudomain.domain  = (domid_t)domid;
-    op.u.pincpudomain.vcpu    = vcpu;
-    op.u.pincpudomain.cpumap  = cpumap;
+    op.cmd = DOM0_SETVCPUAFFINITY;
+    op.u.setvcpuaffinity.domain  = (domid_t)domid;
+    op.u.setvcpuaffinity.vcpu    = vcpu;
+    op.u.setvcpuaffinity.cpumap  = cpumap;
     return do_dom0_op(xc_handle, &op);
 }
 
@@ -155,7 +155,7 @@ int xc_domain_getinfolist(int xc_handle,
     return ret;
 }
 
-int xc_domain_get_vcpu_context(int xc_handle,
+int xc_vcpu_getcontext(int xc_handle,
                                uint32_t domid,
                                uint32_t vcpu,
                                vcpu_guest_context_t *ctxt)
@@ -345,10 +345,10 @@ int xc_domain_sethandle(int xc_handle, uint32_t domid,
     return do_dom0_op(xc_handle, &op);
 }
 
-int xc_domain_get_vcpu_info(int xc_handle,
-                            uint32_t domid,
-                            uint32_t vcpu,
-                            xc_vcpuinfo_t *info)
+int xc_vcpu_getinfo(int xc_handle,
+                    uint32_t domid,
+                    uint32_t vcpu,
+                    xc_vcpuinfo_t *info)
 {
     int rc;
     DECLARE_DOM0_OP;
@@ -380,18 +380,18 @@ int xc_domain_ioport_permission(int xc_handle,
     return do_dom0_op(xc_handle, &op);
 }
 
-int xc_domain_setinfo(int xc_handle,
-                      uint32_t domid,
-                      uint32_t vcpu,
-                      vcpu_guest_context_t *ctxt)
+int xc_vcpu_setcontext(int xc_handle,
+                       uint32_t domid,
+                       uint32_t vcpu,
+                       vcpu_guest_context_t *ctxt)
 {
     dom0_op_t op;
     int rc;
 
-    op.cmd = DOM0_SETDOMAININFO;
-    op.u.setdomaininfo.domain = domid;
-    op.u.setdomaininfo.vcpu = vcpu;
-    op.u.setdomaininfo.ctxt = ctxt;
+    op.cmd = DOM0_SETVCPUCONTEXT;
+    op.u.setvcpucontext.domain = domid;
+    op.u.setvcpucontext.vcpu = vcpu;
+    op.u.setvcpucontext.ctxt = ctxt;
 
     if ( (rc = mlock(ctxt, sizeof(*ctxt))) != 0 )
         return rc;
