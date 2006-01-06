@@ -51,12 +51,12 @@ struct percpu_ctxt {
 } __cacheline_aligned;
 static struct percpu_ctxt percpu_ctxt[NR_CPUS];
 
-static void continue_idle_task(struct vcpu *v)
+static void continue_idle_domain(struct vcpu *v)
 {
     reset_stack_and_jump(idle_loop);
 }
 
-static void continue_nonidle_task(struct vcpu *v)
+static void continue_nonidle_domain(struct vcpu *v)
 {
     reset_stack_and_jump(ret_from_intr);
 }
@@ -92,10 +92,10 @@ void startup_cpu_idle_loop(void)
 {
     struct vcpu *v = current;
 
-    ASSERT(is_idle_task(v->domain));
+    ASSERT(is_idle_domain(v->domain));
     percpu_ctxt[smp_processor_id()].curr_vcpu = v;
     cpu_set(smp_processor_id(), v->domain->cpumask);
-    v->arch.schedule_tail = continue_idle_task;
+    v->arch.schedule_tail = continue_idle_domain;
 
     reset_stack_and_jump(idle_loop);
 }
@@ -259,7 +259,7 @@ int arch_do_createdomain(struct vcpu *v)
     int i;
 #endif
 
-    if ( is_idle_task(d) )
+    if ( is_idle_domain(d) )
         return 0;
 
     d->arch.ioport_caps = 
@@ -276,11 +276,10 @@ int arch_do_createdomain(struct vcpu *v)
         return rc;
     }
 
-    v->arch.schedule_tail = continue_nonidle_task;
+    v->arch.schedule_tail = continue_nonidle_domain;
 
     memset(d->shared_info, 0, PAGE_SIZE);
     v->vcpu_info = &d->shared_info->vcpu_info[v->vcpu_id];
-    v->cpumap = CPUMAP_RUNANYWHERE;
     SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
 
     pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
@@ -705,7 +704,7 @@ static void __context_switch(void)
     struct vcpu          *p = percpu_ctxt[cpu].curr_vcpu;
     struct vcpu          *n = current;
 
-    if ( !is_idle_task(p->domain) )
+    if ( !is_idle_domain(p->domain) )
     {
         memcpy(&p->arch.guest_context.user_regs,
                stack_regs,
@@ -714,7 +713,7 @@ static void __context_switch(void)
         save_segments(p);
     }
 
-    if ( !is_idle_task(n->domain) )
+    if ( !is_idle_domain(n->domain) )
     {
         memcpy(stack_regs,
                &n->arch.guest_context.user_regs,
@@ -767,7 +766,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     set_current(next);
 
-    if ( (percpu_ctxt[cpu].curr_vcpu != next) && !is_idle_task(next->domain) )
+    if ( (percpu_ctxt[cpu].curr_vcpu != next) &&
+         !is_idle_domain(next->domain) )
     {
         __context_switch();
         percpu_ctxt[cpu].context_not_finalised = 1;

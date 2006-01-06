@@ -252,7 +252,7 @@ void deliver_pending_interrupt(struct pt_regs *regs)
 	struct domain *d = current->domain;
 	struct vcpu *v = current;
 	// FIXME: Will this work properly if doing an RFI???
-	if (!is_idle_task(d) && user_mode(regs)) {
+	if (!is_idle_domain(d) && user_mode(regs)) {
 		//vcpu_poke_timer(v);
 		if (vcpu_deliverable_interrupts(v))
 			reflect_extint(regs);

@@ -92,7 +92,7 @@ unsigned long mmu_cr4_features = X86_CR4_PSE;
 #endif
 EXPORT_SYMBOL(mmu_cr4_features);
 
-struct vcpu *idle_task[NR_CPUS] = { &idle0_vcpu };
+struct vcpu *idle_domain[NR_CPUS] = { &idle0_vcpu };
 
 int acpi_disabled;
 

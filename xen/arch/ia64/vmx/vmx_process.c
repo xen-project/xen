@@ -231,7 +231,7 @@ void leave_hypervisor_tail(struct pt_regs *regs)
 	struct domain *d = current->domain;
 	struct vcpu *v = current;
 	// FIXME: Will this work properly if doing an RFI???
-	if (!is_idle_task(d) ) {	// always comes from guest
+	if (!is_idle_domain(d) ) {	// always comes from guest
 	        extern void vmx_dorfirfi(void);
 		struct pt_regs *user_regs = vcpu_regs(current);
  		if (local_softirq_pending())

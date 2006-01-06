@@ -320,7 +320,7 @@ if (!i--) { printk("+",id); i = 1000000; }
 	ia64_set_iva(&ia64_ivt);
 	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
 		VHPT_ENABLED);
-    	if (!is_idle_task(current->domain)) {
+    	if (!is_idle_domain(current->domain)) {
 	    	load_region_regs(current);
 	    	vcpu_load_kernel_regs(current);
 		    if (vcpu_timer_expired(current)) vcpu_pend_timer(current);

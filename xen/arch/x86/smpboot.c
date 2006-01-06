@@ -435,7 +435,7 @@ void __init start_secondary(void *unused)
 
 	extern void percpu_traps_init(void);
 
-	set_current(idle_task[cpu]);
+	set_current(idle_domain[cpu]);
 	set_processor_id(cpu);
 
 	percpu_traps_init();
@@ -773,7 +773,7 @@ static int __init do_boot_cpu(int apicid)
 	if ( (idle = do_createdomain(IDLE_DOMAIN_ID, cpu)) == NULL )
 		panic("failed 'createdomain' for CPU %d", cpu);
 
-	v = idle_task[cpu] = idle->vcpu[0];
+	v = idle_domain[cpu] = idle->vcpu[0];
 
 	set_bit(_DOMF_idle_domain, &idle->domain_flags);
 

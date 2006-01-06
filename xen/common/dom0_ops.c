@@ -319,22 +319,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
 
-        v->cpumap = op->u.pincpudomain.cpumap;
+        memcpy(cpus_addr(v->cpu_affinity),
+               &op->u.pincpudomain.cpumap,
+               min((int)BITS_TO_LONGS(NR_CPUS),
+                   (int)sizeof(op->u.pincpudomain.cpumap)));
 
-        if ( v->cpumap == CPUMAP_RUNANYWHERE )
-        {
-            clear_bit(_VCPUF_cpu_pinned, &v->vcpu_flags);
-        }
-        else
-        {
-            /* pick a new cpu from the usable map */
-            int new_cpu;
-            new_cpu = (int)find_first_set_bit(v->cpumap) % num_online_cpus();
-            vcpu_pause(v);
-            vcpu_migrate_cpu(v, new_cpu);
-            set_bit(_VCPUF_cpu_pinned, &v->vcpu_flags);
-            vcpu_unpause(v);
-        }
+        vcpu_pause(v);
+        vcpu_migrate_cpu(v, first_cpu(v->cpu_affinity));
+        vcpu_unpause(v);
 
         put_domain(d);
     }
@@ -506,7 +498,11 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         op->u.getvcpuinfo.running  = test_bit(_VCPUF_running, &v->vcpu_flags);
         op->u.getvcpuinfo.cpu_time = v->cpu_time;
         op->u.getvcpuinfo.cpu      = v->processor;
-        op->u.getvcpuinfo.cpumap   = v->cpumap;
+        op->u.getvcpuinfo.cpumap   = 0;
+        memcpy(&op->u.getvcpuinfo.cpumap,
+               cpus_addr(v->cpu_affinity),
+               min((int)BITS_TO_LONGS(NR_CPUS),
+                   (int)sizeof(op->u.getvcpuinfo.cpumap)));
         ret = 0;
 
         if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )     

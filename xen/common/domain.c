@@ -51,7 +51,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     else
         set_bit(_DOMF_ctrl_pause, &d->domain_flags);
 
-    if ( !is_idle_task(d) &&
+    if ( !is_idle_domain(d) &&
          ((evtchn_init(d) != 0) || (grant_table_create(d) != 0)) )
         goto fail1;
     
@@ -68,7 +68,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
          (arch_do_createdomain(v) != 0) )
         goto fail3;
 
-    if ( !is_idle_task(d) )
+    if ( !is_idle_domain(d) )
     {
         write_lock(&domlist_lock);
         pd = &domain_list; /* NB. domain_list maintained in order of dom_id. */

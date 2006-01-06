@@ -218,7 +218,7 @@ void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
  */
 void vtm_domain_out(VCPU *vcpu)
 {
-    if(!is_idle_task(vcpu->domain))
+    if(!is_idle_domain(vcpu->domain))
 	rem_ac_timer(&vcpu->arch.arch_vmx.vtm.vtm_timer);
 }
 
@@ -230,7 +230,7 @@ void vtm_domain_in(VCPU *vcpu)
 {
     vtime_t     *vtm;
 
-    if(!is_idle_task(vcpu->domain)) {
+    if(!is_idle_domain(vcpu->domain)) {
 	vtm=&(vcpu->arch.arch_vmx.vtm);
 	vtm_interruption_update(vcpu, vtm);
     }

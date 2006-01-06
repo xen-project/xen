@@ -26,7 +26,7 @@ unsigned long xenheap_phys_end;
 
 char saved_command_line[COMMAND_LINE_SIZE];
 
-struct vcpu *idle_task[NR_CPUS] = { &idle0_vcpu };
+struct vcpu *idle_domain[NR_CPUS] = { &idle0_vcpu };
 
 cpumask_t cpu_present_map;
 
@@ -382,8 +382,7 @@ printk("About to call do_createdomain()\n");
         panic("Could not set up DOM0 guest OS\n");
 
     /* PIN domain0 on CPU 0.  */
-    dom0->vcpu[0]->cpumap=1;
-    set_bit(_VCPUF_cpu_pinned, &dom0->vcpu[0]->vcpu_flags);
+    dom0->vcpu[0]->cpumask = cpumask_of_cpu(0);
 
 #ifdef CLONE_DOMAIN0
     {

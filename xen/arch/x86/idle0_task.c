@@ -11,6 +11,7 @@ struct domain idle0_domain = {
 
 struct vcpu idle0_vcpu = {
     processor:   0,
+    cpu_affinity:CPU_MASK_CPU0,
     domain:      &idle0_domain
 };
 

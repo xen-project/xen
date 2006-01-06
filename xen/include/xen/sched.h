@@ -51,8 +51,6 @@ struct evtchn
 int  evtchn_init(struct domain *d);
 void evtchn_destroy(struct domain *d);
 
-#define CPUMAP_RUNANYWHERE 0xFFFFFFFF
-
 struct vcpu 
 {
     int              vcpu_id;
@@ -80,7 +78,7 @@ struct vcpu
 
     atomic_t         pausecnt;
 
-    cpumap_t         cpumap;        /* which cpus this domain can run on */
+    cpumask_t        cpu_affinity;
 
     struct arch_vcpu arch;
 };
@@ -173,9 +171,9 @@ struct domain_setup_info
 extern struct domain idle0_domain;
 extern struct vcpu idle0_vcpu;
 
-extern struct vcpu *idle_task[NR_CPUS];
+extern struct vcpu *idle_domain[NR_CPUS];
 #define IDLE_DOMAIN_ID   (0x7FFFU)
-#define is_idle_task(_d) (test_bit(_DOMF_idle_domain, &(_d)->domain_flags))
+#define is_idle_domain(_d) (test_bit(_DOMF_idle_domain, &(_d)->domain_flags))
 
 struct vcpu *alloc_vcpu(
     struct domain *d, unsigned int vcpu_id, unsigned int cpu_id);
@@ -364,17 +362,14 @@ extern struct domain *domain_list;
  /* Currently running on a CPU? */
 #define _VCPUF_running         3
 #define VCPUF_running          (1UL<<_VCPUF_running)
- /* Disables auto-migration between CPUs. */
-#define _VCPUF_cpu_pinned      4
-#define VCPUF_cpu_pinned       (1UL<<_VCPUF_cpu_pinned)
  /* Domain migrated between CPUs. */
-#define _VCPUF_cpu_migrated    5
+#define _VCPUF_cpu_migrated    4
 #define VCPUF_cpu_migrated     (1UL<<_VCPUF_cpu_migrated)
  /* Initialization completed. */
-#define _VCPUF_initialised     6
+#define _VCPUF_initialised     5
 #define VCPUF_initialised      (1UL<<_VCPUF_initialised)
  /* VCPU is not-runnable */
-#define _VCPUF_down            7
+#define _VCPUF_down            6
 #define VCPUF_down             (1UL<<_VCPUF_down)
 
 /*
