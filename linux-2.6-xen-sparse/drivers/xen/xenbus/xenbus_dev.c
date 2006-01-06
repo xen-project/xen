@@ -140,6 +140,8 @@ static ssize_t xenbus_dev_write(struct file *filp,
 
 		if (u->u.msg.type == XS_TRANSACTION_START) {
 			trans = kmalloc(sizeof(*trans), GFP_KERNEL);
+			if (!trans)
+				return -ENOMEM;
 			trans->handle = (struct xenbus_transaction *)
 				simple_strtoul(reply, NULL, 0);
 			list_add(&trans->list, &u->transactions);
