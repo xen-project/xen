@@ -179,7 +179,7 @@ static void domain_shutdown_finalise(void)
     /* Make sure that every vcpu is descheduled before we finalise. */
     for_each_vcpu ( d, v )
         vcpu_sleep_sync(v);
-    BUG_ON(!cpus_empty(d->cpumask));
+    BUG_ON(!cpus_empty(d->domain_dirty_cpumask));
 
     sync_pagetable_state(d);
 

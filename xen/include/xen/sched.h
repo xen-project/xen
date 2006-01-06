@@ -78,7 +78,11 @@ struct vcpu
 
     atomic_t         pausecnt;
 
+    /* Bitmask of CPUs on which this VCPU may run. */
     cpumask_t        cpu_affinity;
+
+    /* Bitmask of CPUs which are holding onto this VCPU's state. */
+    cpumask_t        vcpu_dirty_cpumask;
 
     struct arch_vcpu arch;
 };
@@ -139,7 +143,7 @@ struct domain
     struct vcpu *vcpu[MAX_VIRT_CPUS];
 
     /* Bitmask of CPUs which are holding onto this domain's state. */
-    cpumask_t        cpumask;
+    cpumask_t        domain_dirty_cpumask;
 
     struct arch_domain arch;
 

@@ -94,7 +94,8 @@ void startup_cpu_idle_loop(void)
 
     ASSERT(is_idle_domain(v->domain));
     percpu_ctxt[smp_processor_id()].curr_vcpu = v;
-    cpu_set(smp_processor_id(), v->domain->cpumask);
+    cpu_set(smp_processor_id(), v->domain->domain_dirty_cpumask);
+    cpu_set(smp_processor_id(), v->vcpu_dirty_cpumask);
     v->arch.schedule_tail = continue_idle_domain;
 
     reset_stack_and_jump(idle_loop);
@@ -724,7 +725,8 @@ static void __context_switch(void)
     }
 
     if ( p->domain != n->domain )
-        cpu_set(cpu, n->domain->cpumask);
+        cpu_set(cpu, n->domain->domain_dirty_cpumask);
+    cpu_set(cpu, n->vcpu_dirty_cpumask);
 
     write_ptbase(n);
 
@@ -737,7 +739,8 @@ static void __context_switch(void)
     }
 
     if ( p->domain != n->domain )
-        cpu_clear(cpu, p->domain->cpumask);
+        cpu_clear(cpu, p->domain->domain_dirty_cpumask);
+    cpu_clear(cpu, n->vcpu_dirty_cpumask);
 
     percpu_ctxt[cpu].curr_vcpu = n;
 }
@@ -812,20 +815,11 @@ int __sync_lazy_execstate(void)
 
 void sync_vcpu_execstate(struct vcpu *v)
 {
-    unsigned int cpu = v->processor;
-
-    if ( !cpu_isset(cpu, v->domain->cpumask) )
-        return;
-
-    if ( cpu == smp_processor_id() )
-    {
+    if ( cpu_isset(smp_processor_id(), v->vcpu_dirty_cpumask) )
         (void)__sync_lazy_execstate();
-    }
-    else
-    {
-        /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
-        flush_tlb_mask(cpumask_of_cpu(cpu));
-    }
+
+    /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
+    flush_tlb_mask(v->vcpu_dirty_cpumask);
 }
 
 unsigned long __hypercall_create_continuation(
@@ -951,7 +945,7 @@ void domain_relinquish_resources(struct domain *d)
     struct vcpu *v;
     unsigned long pfn;
 
-    BUG_ON(!cpus_empty(d->cpumask));
+    BUG_ON(!cpus_empty(d->domain_dirty_cpumask));
 
     ptwr_destroy(d);
 

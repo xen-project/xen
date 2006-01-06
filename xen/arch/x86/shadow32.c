@@ -2586,7 +2586,7 @@ void __shadow_sync_all(struct domain *d)
     }
 
     /* Other VCPUs mustn't use the revoked writable mappings. */
-    other_vcpus_mask = d->cpumask;
+    other_vcpus_mask = d->domain_dirty_cpumask;
     cpu_clear(smp_processor_id(), other_vcpus_mask);
     flush_tlb_mask(other_vcpus_mask);
 

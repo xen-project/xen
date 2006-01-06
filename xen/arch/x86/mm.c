@@ -1457,7 +1457,8 @@ int get_page_type(struct pfn_info *page, unsigned long type)
                      * was GDT/LDT) but those circumstances should be
                      * very rare.
                      */
-                    cpumask_t mask = page_get_owner(page)->cpumask;
+                    cpumask_t mask =
+                        page_get_owner(page)->domain_dirty_cpumask;
                     tlbflush_filter(mask, page->tlbflush_timestamp);
 
                     if ( unlikely(!cpus_empty(mask)) )
@@ -1619,7 +1620,7 @@ static void process_deferred_ops(unsigned int cpu)
         if ( shadow_mode_enabled(d) )
             shadow_sync_all(d);
         if ( deferred_ops & DOP_FLUSH_ALL_TLBS )
-            flush_tlb_mask(d->cpumask);
+            flush_tlb_mask(d->domain_dirty_cpumask);
         else
             local_flush_tlb();
     }
@@ -1691,7 +1692,7 @@ static inline cpumask_t vcpumask_to_pcpumask(
     struct domain *d, unsigned long vmask)
 {
     unsigned int vcpu_id;
-    cpumask_t    pmask;
+    cpumask_t    pmask = CPU_MASK_NONE;
     struct vcpu *v;
 
     while ( vmask != 0 )
@@ -1700,7 +1701,7 @@ static inline cpumask_t vcpumask_to_pcpumask(
         vmask &= ~(1UL << vcpu_id);
         if ( (vcpu_id < MAX_VIRT_CPUS) &&
              ((v = d->vcpu[vcpu_id]) != NULL) )
-            cpu_set(v->processor, pmask);
+            cpus_or(pmask, pmask, v->vcpu_dirty_cpumask);
     }
 
     return pmask;
@@ -1869,7 +1870,6 @@ int do_mmuext_op(
                 break;
             }
             pmask = vcpumask_to_pcpumask(d, vmask);
-            cpus_and(pmask, pmask, d->cpumask);
             if ( op.cmd == MMUEXT_TLB_FLUSH_MULTI )
                 flush_tlb_mask(pmask);
             else
@@ -1878,11 +1878,11 @@ int do_mmuext_op(
         }
 
         case MMUEXT_TLB_FLUSH_ALL:
-            flush_tlb_mask(d->cpumask);
+            flush_tlb_mask(d->domain_dirty_cpumask);
             break;
     
         case MMUEXT_INVLPG_ALL:
-            flush_tlb_one_mask(d->cpumask, op.arg1.linear_addr);
+            flush_tlb_one_mask(d->domain_dirty_cpumask, op.arg1.linear_addr);
             break;
 
         case MMUEXT_FLUSH_CACHE:
@@ -2548,13 +2548,12 @@ int do_update_va_mapping(unsigned long va, u64 val64,
             local_flush_tlb();
             break;
         case UVMF_ALL:
-            flush_tlb_mask(d->cpumask);
+            flush_tlb_mask(d->domain_dirty_cpumask);
             break;
         default:
             if ( unlikely(get_user(vmask, (unsigned long *)bmap_ptr)) )
                 rc = -EFAULT;
             pmask = vcpumask_to_pcpumask(d, vmask);
-            cpus_and(pmask, pmask, d->cpumask);
             flush_tlb_mask(pmask);
             break;
         }
@@ -2569,13 +2568,12 @@ int do_update_va_mapping(unsigned long va, u64 val64,
             local_flush_tlb_one(va);
             break;
         case UVMF_ALL:
-            flush_tlb_one_mask(d->cpumask, va);
+            flush_tlb_one_mask(d->domain_dirty_cpumask, va);
             break;
         default:
             if ( unlikely(get_user(vmask, (unsigned long *)bmap_ptr)) )
                 rc = -EFAULT;
             pmask = vcpumask_to_pcpumask(d, vmask);
-            cpus_and(pmask, pmask, d->cpumask);
             flush_tlb_one_mask(pmask, va);
             break;
         }
@@ -3018,7 +3016,7 @@ void ptwr_flush(struct domain *d, const int which)
 
     /* Ensure that there are no stale writable mappings in any TLB. */
     /* NB. INVLPG is a serialising instruction: flushes pending updates. */
-    flush_tlb_one_mask(d->cpumask, l1va);
+    flush_tlb_one_mask(d->domain_dirty_cpumask, l1va);
     PTWR_PRINTK("[%c] disconnected_l1va at %p now %"PRIpte"\n",
                 PTWR_PRINT_WHICH, ptep, pte.l1);
 
@@ -3342,7 +3340,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     if ( which == PTWR_PT_ACTIVE )
     {
         l2e_remove_flags(*pl2e, _PAGE_PRESENT);
-        flush_tlb_mask(d->cpumask);
+        flush_tlb_mask(d->domain_dirty_cpumask);
     }
     
     /* Temporarily map the L1 page, and make a copy of it. */

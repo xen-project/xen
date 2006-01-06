@@ -591,7 +591,7 @@ update_hl2e(struct vcpu *v, unsigned long va)
         if ( need_flush )
         {
             perfc_incrc(update_hl2e_invlpg);
-            flush_tlb_one_mask(v->domain->cpumask,
+            flush_tlb_one_mask(v->domain->domain_dirty_cpumask,
                                &linear_pg_table[l1_linear_offset(va)]);
         }
     }

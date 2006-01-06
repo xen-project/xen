@@ -471,7 +471,7 @@ gnttab_unmap_grant_ref(
     for ( i = 0; i < count; i++ )
         (void)__gnttab_unmap_grant_ref(&uop[i]);
 
-    flush_tlb_mask(current->domain->cpumask);
+    flush_tlb_mask(current->domain->domain_dirty_cpumask);
 
     return 0;
 }

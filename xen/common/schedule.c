@@ -339,18 +339,23 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
     do {
         succ = 0;
         __clear_cpu_bits(have_lock);
-        for_each_vcpu(d, v) {
+        for_each_vcpu ( d, v )
+        {
             cpu = v->processor;
-            if (!__get_cpu_bit(cpu, have_lock)) {
+            if ( !__get_cpu_bit(cpu, have_lock) )
+            {
                 /* if we don't have a lock on this CPU: acquire it*/
-                if (spin_trylock(&schedule_data[cpu].schedule_lock)) {
+                if ( spin_trylock(&schedule_data[cpu].schedule_lock) )
+                {
                     /*we have this lock!*/
                     __set_cpu_bit(cpu, have_lock);
                     succ = 1;
-                } else {
+                }
+                else
+                {
                     /*we didn,t get this lock -> free all other locks too!*/
-                    for (cpu = 0; cpu < NR_CPUS; cpu++)
-                        if (__get_cpu_bit(cpu, have_lock))
+                    for ( cpu = 0; cpu < NR_CPUS; cpu++ )
+                        if ( __get_cpu_bit(cpu, have_lock) )
                             spin_unlock(&schedule_data[cpu].schedule_lock);
                     /* and start from the beginning! */
                     succ = 0;
@@ -363,8 +368,8 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
 
     SCHED_OP(adjdom, d, cmd);
 
-    for (cpu = 0; cpu < NR_CPUS; cpu++)
-        if (__get_cpu_bit(cpu, have_lock))
+    for ( cpu = 0; cpu < NR_CPUS; cpu++ )
+        if ( __get_cpu_bit(cpu, have_lock) )
             spin_unlock(&schedule_data[cpu].schedule_lock);
     __clear_cpu_bits(have_lock);
 
@@ -380,8 +385,8 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
  */
 static void __enter_scheduler(void)
 {
-    struct vcpu *prev = current, *next = NULL;
-    int                 cpu = prev->processor;
+    struct vcpu        *prev = current, *next = NULL;
+    int                 cpu = smp_processor_id();
     s_time_t            now;
     struct task_slice   next_slice;
     s32                 r_time;     /* time for new dom to run */
@@ -502,7 +507,7 @@ static void s_timer_fn(void *unused)
 static void t_timer_fn(void *unused)
 {
     struct vcpu  *v  = current;
-    unsigned int  cpu = v->processor;
+    unsigned int  cpu = smp_processor_id();
 
     schedule_data[cpu].tick++;
 

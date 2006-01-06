@@ -190,7 +190,7 @@ extern void dodgy_tsc(void);
 #ifdef CONFIG_X86_HT
 extern void detect_ht(struct cpuinfo_x86 *c);
 #else
-static inline void detect_ht(struct cpuinfo_x86 *c) {}
+static always_inline void detect_ht(struct cpuinfo_x86 *c) {}
 #endif
 
 /*
@@ -209,7 +209,7 @@ static inline void detect_ht(struct cpuinfo_x86 *c) {}
 /*
  * CPUID functions returning a single datum
  */
-static inline unsigned int cpuid_eax(unsigned int op)
+static always_inline unsigned int cpuid_eax(unsigned int op)
 {
     unsigned int eax;
 
@@ -219,7 +219,7 @@ static inline unsigned int cpuid_eax(unsigned int op)
             : "bx", "cx", "dx");
     return eax;
 }
-static inline unsigned int cpuid_ebx(unsigned int op)
+static always_inline unsigned int cpuid_ebx(unsigned int op)
 {
     unsigned int eax, ebx;
 
@@ -229,7 +229,7 @@ static inline unsigned int cpuid_ebx(unsigned int op)
             : "cx", "dx" );
     return ebx;
 }
-static inline unsigned int cpuid_ecx(unsigned int op)
+static always_inline unsigned int cpuid_ecx(unsigned int op)
 {
     unsigned int eax, ecx;
 
@@ -239,7 +239,7 @@ static inline unsigned int cpuid_ecx(unsigned int op)
             : "bx", "dx" );
     return ecx;
 }
-static inline unsigned int cpuid_edx(unsigned int op)
+static always_inline unsigned int cpuid_edx(unsigned int op)
 {
     unsigned int eax, edx;
 
@@ -281,7 +281,7 @@ static inline unsigned int cpuid_edx(unsigned int op)
  */
 extern unsigned long mmu_cr4_features;
 
-static inline void set_in_cr4 (unsigned long mask)
+static always_inline void set_in_cr4 (unsigned long mask)
 {
     unsigned long dummy;
     mmu_cr4_features |= mask;
@@ -292,7 +292,7 @@ static inline void set_in_cr4 (unsigned long mask)
         : "=&r" (dummy) : "irg" (mask) );
 }
 
-static inline void clear_in_cr4 (unsigned long mask)
+static always_inline void clear_in_cr4 (unsigned long mask)
 {
     unsigned long dummy;
     mmu_cr4_features &= ~mask;
@@ -334,7 +334,7 @@ static inline void clear_in_cr4 (unsigned long mask)
 	outb((data), 0x23); \
 } while (0)
 
-static inline void __monitor(const void *eax, unsigned long ecx,
+static always_inline void __monitor(const void *eax, unsigned long ecx,
 		unsigned long edx)
 {
 	/* "monitor %eax,%ecx,%edx;" */
@@ -343,7 +343,7 @@ static inline void __monitor(const void *eax, unsigned long ecx,
 		: :"a" (eax), "c" (ecx), "d"(edx));
 }
 
-static inline void __mwait(unsigned long eax, unsigned long ecx)
+static always_inline void __mwait(unsigned long eax, unsigned long ecx)
 {
 	/* "mwait %eax,%ecx;" */
 	asm volatile(
@@ -460,7 +460,7 @@ struct extended_sigtable {
 };
 
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
-static inline void rep_nop(void)
+static always_inline void rep_nop(void)
 {
     __asm__ __volatile__ ( "rep;nop" : : : "memory" );
 }
@@ -471,7 +471,7 @@ static inline void rep_nop(void)
 #ifdef 	CONFIG_MPENTIUMIII
 
 #define ARCH_HAS_PREFETCH
-extern inline void prefetch(const void *x)
+extern always_inline void prefetch(const void *x)
 {
     __asm__ __volatile__ ("prefetchnta (%0)" : : "r"(x));
 }
@@ -482,12 +482,12 @@ extern inline void prefetch(const void *x)
 #define ARCH_HAS_PREFETCHW
 #define ARCH_HAS_SPINLOCK_PREFETCH
 
-extern inline void prefetch(const void *x)
+extern always_inline void prefetch(const void *x)
 {
     __asm__ __volatile__ ("prefetch (%0)" : : "r"(x));
 }
 
-extern inline void prefetchw(const void *x)
+extern always_inline void prefetchw(const void *x)
 {
     __asm__ __volatile__ ("prefetchw (%0)" : : "r"(x));
 }
