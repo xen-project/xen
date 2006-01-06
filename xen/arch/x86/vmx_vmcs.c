@@ -355,6 +355,8 @@ static void vmx_do_launch(struct vcpu *v)
     __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());
 
     v->arch.schedule_tail = arch_vmx_do_resume;
+    v->arch.arch_vmx.launch_cpu = smp_processor_id();
+
     /* init guest tsc to start from 0 */
     rdtscll(host_tsc);
     v->arch.arch_vmx.tsc_offset = 0 - host_tsc;
@@ -637,11 +639,21 @@ void vm_resume_fail(unsigned long eflags)
 
 void arch_vmx_do_resume(struct vcpu *v)
 {
-    u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
-
-    load_vmcs(&v->arch.arch_vmx, vmcs_phys_ptr);
-    vmx_do_resume(v);
-    reset_stack_and_jump(vmx_asm_do_resume);
+    if ( v->arch.arch_vmx.launch_cpu == smp_processor_id() )
+    {
+        load_vmcs(&v->arch.arch_vmx, virt_to_phys(v->arch.arch_vmx.vmcs));
+        vmx_do_resume(v);
+        reset_stack_and_jump(vmx_asm_do_resume);
+    }
+    else
+    {
+        __vmpclear(virt_to_phys(v->arch.arch_vmx.vmcs));
+        load_vmcs(&v->arch.arch_vmx, virt_to_phys(v->arch.arch_vmx.vmcs));
+        vmx_do_resume(v);
+        vmx_set_host_env(v);
+        v->arch.arch_vmx.launch_cpu = smp_processor_id();
+        reset_stack_and_jump(vmx_asm_do_relaunch);
+    }
 }
 
 void arch_vmx_do_launch(struct vcpu *v)
@@ -661,18 +673,6 @@ void arch_vmx_do_launch(struct vcpu *v)
     }
     vmx_do_launch(v);
     reset_stack_and_jump(vmx_asm_do_launch);
-}
-
-void arch_vmx_do_relaunch(struct vcpu *v)
-{
-    u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
-
-    load_vmcs(&v->arch.arch_vmx, vmcs_phys_ptr);
-    vmx_do_resume(v);
-    vmx_set_host_env(v);
-    v->arch.schedule_tail = arch_vmx_do_resume;
-
-    reset_stack_and_jump(vmx_asm_do_relaunch);
 }
 
 #endif /* CONFIG_VMX */

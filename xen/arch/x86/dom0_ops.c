@@ -36,13 +36,13 @@ static unsigned long msr_hi;
 
 static void write_msr_for(void *unused)
 {
-    if ( ((1 << current->processor) & msr_cpu_mask) )
+    if ( ((1 << smp_processor_id()) & msr_cpu_mask) )
         (void)wrmsr_user(msr_addr, msr_lo, msr_hi);
 }
 
 static void read_msr_for(void *unused)
 {
-    if ( ((1 << current->processor) & msr_cpu_mask) )
+    if ( ((1 << smp_processor_id()) & msr_cpu_mask) )
         (void)rdmsr_user(msr_addr, msr_lo, msr_hi);
 }
 

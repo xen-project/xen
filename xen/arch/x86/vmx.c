@@ -53,7 +53,7 @@ unsigned int opt_vmx_debug_level = 0;
 integer_param("vmx_debug", opt_vmx_debug_level);
 
 static unsigned long trace_values[NR_CPUS][4];
-#define TRACE_VMEXIT(index,value) trace_values[current->processor][index]=value
+#define TRACE_VMEXIT(index,value) trace_values[smp_processor_id()][index]=value
 
 static int vmx_switch_on;
 
@@ -1950,9 +1950,12 @@ asmlinkage void load_cr2(void)
 
 asmlinkage void trace_vmentry (void)
 {
-    TRACE_5D(TRC_VMENTRY,trace_values[current->processor][0],
-             trace_values[current->processor][1],trace_values[current->processor][2],
-             trace_values[current->processor][3],trace_values[current->processor][4]);
+    TRACE_5D(TRC_VMENTRY,
+             trace_values[smp_processor_id()][0],
+             trace_values[smp_processor_id()][1],
+             trace_values[smp_processor_id()][2],
+             trace_values[smp_processor_id()][3],
+             trace_values[smp_processor_id()][4]);
     TRACE_VMEXIT(0,9);
     TRACE_VMEXIT(1,9);
     TRACE_VMEXIT(2,9);

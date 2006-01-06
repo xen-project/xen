@@ -341,10 +341,10 @@ extern int shadow_status_noswap;
 #if SHADOW_VERBOSE_DEBUG
 #define SH_LOG(_f, _a...)                                               \
     printk("DOM%uP%u: SH_LOG(%d): " _f "\n",                            \
-       current->domain->domain_id , current->processor, __LINE__ , ## _a )
+       current->domain->domain_id , smp_processor_id(), __LINE__ , ## _a )
 #define SH_VLOG(_f, _a...)                                              \
     printk("DOM%uP%u: SH_VLOG(%d): " _f "\n",                           \
-           current->domain->domain_id, current->processor, __LINE__ , ## _a )
+           current->domain->domain_id, smp_processor_id(), __LINE__ , ## _a )
 #else
 #define SH_LOG(_f, _a...) ((void)0)
 #define SH_VLOG(_f, _a...) ((void)0)
@@ -353,7 +353,7 @@ extern int shadow_status_noswap;
 #if SHADOW_VVERBOSE_DEBUG
 #define SH_VVLOG(_f, _a...)                                             \
     printk("DOM%uP%u: SH_VVLOG(%d): " _f "\n",                          \
-           current->domain->domain_id, current->processor, __LINE__ , ## _a )
+           current->domain->domain_id, smp_processor_id(), __LINE__ , ## _a )
 #else
 #define SH_VVLOG(_f, _a...) ((void)0)
 #endif
@@ -361,7 +361,7 @@ extern int shadow_status_noswap;
 #if SHADOW_VVVERBOSE_DEBUG
 #define SH_VVVLOG(_f, _a...)                                            \
     printk("DOM%uP%u: SH_VVVLOG(%d): " _f "\n",                         \
-           current->domain->domain_id, current->processor, __LINE__ , ## _a )
+           current->domain->domain_id, smp_processor_id(), __LINE__ , ## _a )
 #else
 #define SH_VVVLOG(_f, _a...) ((void)0)
 #endif
@@ -369,7 +369,7 @@ extern int shadow_status_noswap;
 #if FULLSHADOW_DEBUG
 #define FSH_LOG(_f, _a...)                                              \
     printk("DOM%uP%u: FSH_LOG(%d): " _f "\n",                           \
-           current->domain->domain_id, current->processor, __LINE__ , ## _a )
+           current->domain->domain_id, smp_processor_id(), __LINE__ , ## _a )
 #else
 #define FSH_LOG(_f, _a...) ((void)0)
 #endif

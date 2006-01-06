@@ -289,6 +289,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         domid_t dom = op->u.setvcpuaffinity.domain;
         struct domain *d = find_domain_by_id(dom);
         struct vcpu *v;
+        cpumask_t new_affinity;
 
         if ( d == NULL )
         {
@@ -319,14 +320,13 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
 
-        memcpy(cpus_addr(v->cpu_affinity),
+        new_affinity = v->cpu_affinity;
+        memcpy(cpus_addr(new_affinity),
                &op->u.setvcpuaffinity.cpumap,
                min((int)BITS_TO_LONGS(NR_CPUS),
                    (int)sizeof(op->u.setvcpuaffinity.cpumap)));
 
-        vcpu_pause(v);
-        vcpu_migrate_cpu(v, first_cpu(v->cpu_affinity));
-        vcpu_unpause(v);
+        ret = vcpu_set_affinity(v, &new_affinity);
 
         put_domain(d);
     }

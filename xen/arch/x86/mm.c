@@ -2497,7 +2497,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     l1_pgentry_t   val = l1e_from_intpte(val64);
     struct vcpu   *v   = current;
     struct domain *d   = v->domain;
-    unsigned int   cpu = v->processor;
+    unsigned int   cpu = smp_processor_id();
     unsigned long  vmask, bmap_ptr;
     cpumask_t      pmask;
     int            rc  = 0;

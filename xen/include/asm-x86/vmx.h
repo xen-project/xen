@@ -38,7 +38,6 @@ extern void pic_irq_request(int *interrupt_request, int level);
 
 extern void arch_vmx_do_launch(struct vcpu *);
 extern void arch_vmx_do_resume(struct vcpu *);
-extern void arch_vmx_do_relaunch(struct vcpu *);
 
 extern unsigned int cpu_rev;
 

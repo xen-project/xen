@@ -202,10 +202,17 @@ void vcpu_wake(struct vcpu *v)
         SCHED_OP(wake, v);
         v->wokenup = NOW();
     }
-    clear_bit(_VCPUF_cpu_migrated, &v->vcpu_flags);
     spin_unlock_irqrestore(&schedule_data[v->processor].schedule_lock, flags);
 
     TRACE_2D(TRC_SCHED_WAKE, v->domain->domain_id, v->vcpu_id);
+}
+
+int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
+{
+    if ( cpus_empty(*affinity) )
+        return -EINVAL;
+
+    return SCHED_OP(set_affinity, v, affinity);
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */

@@ -362,14 +362,11 @@ extern struct domain *domain_list;
  /* Currently running on a CPU? */
 #define _VCPUF_running         3
 #define VCPUF_running          (1UL<<_VCPUF_running)
- /* Domain migrated between CPUs. */
-#define _VCPUF_cpu_migrated    4
-#define VCPUF_cpu_migrated     (1UL<<_VCPUF_cpu_migrated)
  /* Initialization completed. */
-#define _VCPUF_initialised     5
+#define _VCPUF_initialised     4
 #define VCPUF_initialised      (1UL<<_VCPUF_initialised)
  /* VCPU is not-runnable */
-#define _VCPUF_down            6
+#define _VCPUF_down            5
 #define VCPUF_down             (1UL<<_VCPUF_down)
 
 /*
@@ -384,17 +381,14 @@ extern struct domain *domain_list;
  /* Guest shut itself down for some reason. */
 #define _DOMF_shutdown         2
 #define DOMF_shutdown          (1UL<<_DOMF_shutdown)
- /* Guest is in process of shutting itself down (becomes DOMF_shutdown). */
-#define _DOMF_shuttingdown     3
-#define DOMF_shuttingdown      (1UL<<_DOMF_shuttingdown)
  /* Death rattle. */
-#define _DOMF_dying            4
+#define _DOMF_dying            3
 #define DOMF_dying             (1UL<<_DOMF_dying)
  /* Domain is paused by controller software. */
-#define _DOMF_ctrl_pause       5
+#define _DOMF_ctrl_pause       4
 #define DOMF_ctrl_pause        (1UL<<_DOMF_ctrl_pause)
  /* Domain is being debugged by controller software. */
-#define _DOMF_debugging        6
+#define _DOMF_debugging        5
 #define DOMF_debugging         (1UL<<_DOMF_debugging)
 
 
@@ -402,8 +396,7 @@ static inline int domain_runnable(struct vcpu *v)
 {
     return ( (atomic_read(&v->pausecnt) == 0) &&
              !(v->vcpu_flags & (VCPUF_blocked|VCPUF_down)) &&
-             !(v->domain->domain_flags &
-               (DOMF_shutdown|DOMF_shuttingdown|DOMF_ctrl_pause)) );
+             !(v->domain->domain_flags & (DOMF_shutdown|DOMF_ctrl_pause)) );
 }
 
 void vcpu_pause(struct vcpu *v);
@@ -413,6 +406,8 @@ void domain_unpause(struct domain *d);
 void domain_pause_by_systemcontroller(struct domain *d);
 void domain_unpause_by_systemcontroller(struct domain *d);
 void cpu_init(void);
+
+int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity);
 
 static inline void vcpu_unblock(struct vcpu *v)
 {

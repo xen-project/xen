@@ -31,7 +31,8 @@ struct bvt_vcpu_info
     struct list_head    run_list;         /* runqueue list pointers */
     u32                 avt;              /* actual virtual time */
     u32                 evt;              /* effective virtual time */
-    struct vcpu  *vcpu;
+    int                 migrated;         /* migrated to a new CPU */
+    struct vcpu         *vcpu;
     struct bvt_dom_info *inf;
 };
 
@@ -250,9 +251,11 @@ static void bvt_wake(struct vcpu *v)
 
     /* Set the BVT parameters. AVT should always be updated 
        if CPU migration ocurred.*/
-    if ( einf->avt < CPU_SVT(cpu) || 
-         unlikely(test_bit(_VCPUF_cpu_migrated, &v->vcpu_flags)) )
+    if ( (einf->avt < CPU_SVT(cpu)) || einf->migrated )
+    {
         einf->avt = CPU_SVT(cpu);
+        einf->migrated = 0;
+    }
 
     /* Deal with warping here. */
     einf->evt = calc_evt(v, einf->avt);
@@ -279,6 +282,22 @@ static void bvt_sleep(struct vcpu *v)
     else  if ( __task_on_runqueue(v) )
         __del_from_runqueue(v);
 }
+
+
+static int bvt_set_affinity(struct vcpu *v, cpumask_t *affinity)
+{
+    if ( v == current )
+        return cpu_isset(v->processor, *affinity) ? 0 : -EBUSY;
+
+    vcpu_pause(v);
+    v->cpu_affinity = *affinity;
+    v->processor = first_cpu(v->cpu_affinity);
+    EBVT_INFO(v)->migrated = 1;
+    vcpu_unpause(v);
+
+    return 0;
+}
+
 
 /**
  * bvt_free_task - free BVT private structures for a task
@@ -557,6 +576,7 @@ struct scheduler sched_bvt_def = {
     .dump_cpu_state = bvt_dump_cpu_state,
     .sleep          = bvt_sleep,
     .wake           = bvt_wake,
+    .set_affinity   = bvt_set_affinity
 };
 
 /*

@@ -326,21 +326,6 @@ int arch_do_createdomain(struct vcpu *v)
     return 0;
 }
 
-void vcpu_migrate_cpu(struct vcpu *v, int newcpu)
-{
-    if ( v->processor == newcpu )
-        return;
-
-    set_bit(_VCPUF_cpu_migrated, &v->vcpu_flags);
-    v->processor = newcpu;
-
-    if ( VMX_DOMAIN(v) )
-    {
-        __vmpclear(virt_to_phys(v->arch.arch_vmx.vmcs));
-        v->arch.schedule_tail = arch_vmx_do_relaunch;
-    }
-}
-
 /* This is called by arch_final_setup_guest and do_boot_vcpu */
 int arch_set_info_guest(
     struct vcpu *v, struct vcpu_guest_context *c)

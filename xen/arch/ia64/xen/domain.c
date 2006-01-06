@@ -1070,15 +1070,6 @@ void domain_pend_keyboard_interrupt(int irq)
 	vcpu_pend_interrupt(dom0->vcpu[0],irq);
 }
 
-void vcpu_migrate_cpu(struct vcpu *v, int newcpu)
-{
-	if ( v->processor == newcpu )
-		return;
-
-	set_bit(_VCPUF_cpu_migrated, &v->vcpu_flags);
-	v->processor = newcpu;
-}
-
 void sync_vcpu_execstate(struct vcpu *v)
 {
 	ia64_save_fpu(v->arch._thread.fph);

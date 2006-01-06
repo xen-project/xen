@@ -382,7 +382,7 @@ printk("About to call do_createdomain()\n");
         panic("Could not set up DOM0 guest OS\n");
 
     /* PIN domain0 on CPU 0.  */
-    dom0->vcpu[0]->cpumask = cpumask_of_cpu(0);
+    dom0->vcpu[0]->cpu_affinity = cpumask_of_cpu(0);
 
 #ifdef CLONE_DOMAIN0
     {
