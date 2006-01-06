@@ -111,7 +111,6 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	struct xenbus_dev_data *u = filp->private_data;
 	struct xenbus_dev_transaction *trans;
 	void *reply;
-	int err = 0;
 
 	if ((len + u->len) > sizeof(u->u.buffer))
 		return -EINVAL;
@@ -136,41 +135,34 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	case XS_RM:
 	case XS_SET_PERMS:
 		reply = xenbus_dev_request_and_reply(&u->u.msg);
-		if (IS_ERR(reply)) {
-			err = PTR_ERR(reply);
-		} else {
-			if (u->u.msg.type == XS_TRANSACTION_START) {
-				trans = kmalloc(sizeof(*trans), GFP_KERNEL);
-				trans->handle = (struct xenbus_transaction *)
-					simple_strtoul(reply, NULL, 0);
-				list_add(&trans->list, &u->transactions);
-			} else if (u->u.msg.type == XS_TRANSACTION_END) {
-				list_for_each_entry(trans, &u->transactions,
-						    list)
-					if ((unsigned long)trans->handle ==
-					    (unsigned long)u->u.msg.tx_id)
-						break;
-				BUG_ON(&trans->list == &u->transactions);
-				list_del(&trans->list);
-				kfree(trans);
-			}
-			queue_reply(u, (char *)&u->u.msg, sizeof(u->u.msg));
-			queue_reply(u, (char *)reply, u->u.msg.len);
-			kfree(reply);
+		if (IS_ERR(reply))
+			return PTR_ERR(reply);
+
+		if (u->u.msg.type == XS_TRANSACTION_START) {
+			trans = kmalloc(sizeof(*trans), GFP_KERNEL);
+			trans->handle = (struct xenbus_transaction *)
+				simple_strtoul(reply, NULL, 0);
+			list_add(&trans->list, &u->transactions);
+		} else if (u->u.msg.type == XS_TRANSACTION_END) {
+			list_for_each_entry(trans, &u->transactions, list)
+				if ((unsigned long)trans->handle ==
+				    (unsigned long)u->u.msg.tx_id)
+					break;
+			BUG_ON(&trans->list == &u->transactions);
+			list_del(&trans->list);
+			kfree(trans);
 		}
+		queue_reply(u, (char *)&u->u.msg, sizeof(u->u.msg));
+		queue_reply(u, (char *)reply, u->u.msg.len);
+		kfree(reply);
 		break;
 
 	default:
-		err = -EINVAL;
-		break;
+		return -EINVAL;
 	}
 
-	if (err == 0) {
-		u->len = 0;
-		err = len;
-	}
-
-	return err;
+	u->len = 0;
+	return len;
 }
 
 static int xenbus_dev_open(struct inode *inode, struct file *filp)
