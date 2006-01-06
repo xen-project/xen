@@ -71,12 +71,10 @@ void schedule_tail(struct vcpu *next)
 	//printk("current=%lx,shared_info=%lx\n",current,current->vcpu_info);
 	//printk("next=%lx,shared_info=%lx\n",next,next->vcpu_info);
 
-    // TG: Real HACK FIXME.
-    // This is currently necessary because when a new domain is started, 
-    // the context_switch function of xen/common/schedule.c(__enter_scheduler)
-    // never returns.  Therefore, the lock must be released.
-    // schedule_tail is only called when a domain is started.
-    spin_unlock_irq(&schedule_data[current->processor].schedule_lock);
+    // This is necessary because when a new domain is started, our
+    // implementation of context_switch() does not return (switch_to() has
+    // special and peculiar behaviour in this case).
+    context_switch_done();
 
 	/* rr7 will be postponed to last point when resuming back to guest */
     if(VMX_DOMAIN(current)){

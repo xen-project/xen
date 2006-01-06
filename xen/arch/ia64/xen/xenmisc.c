@@ -329,11 +329,6 @@ if (!i--) { printk("+",id); i = 1000000; }
     }
 }
 
-void context_switch_finalise(struct vcpu *next)
-{
-	/* nothing to do */
-}
-
 void continue_running(struct vcpu *same)
 {
 	/* nothing to do */

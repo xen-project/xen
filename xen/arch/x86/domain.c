@@ -46,7 +46,6 @@ boolean_param("noreboot", opt_noreboot);
 
 struct percpu_ctxt {
     struct vcpu *curr_vcpu;
-    unsigned int context_not_finalised;
     unsigned int dirty_segment_mask;
 } __cacheline_aligned;
 static struct percpu_ctxt percpu_ctxt[NR_CPUS];
@@ -758,21 +757,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
          !is_idle_domain(next->domain) )
     {
         __context_switch();
-        percpu_ctxt[cpu].context_not_finalised = 1;
-    }
-}
 
-void context_switch_finalise(struct vcpu *next)
-{
-    unsigned int cpu = smp_processor_id();
-
-    ASSERT(local_irq_is_enabled());
-
-    if ( percpu_ctxt[cpu].context_not_finalised )
-    {
-        percpu_ctxt[cpu].context_not_finalised = 0;
-
-        BUG_ON(percpu_ctxt[cpu].curr_vcpu != next);
+        context_switch_done();
+        ASSERT(local_irq_is_enabled());
 
         if ( VMX_DOMAIN(next) )
         {
@@ -784,6 +771,10 @@ void context_switch_finalise(struct vcpu *next)
             load_segments(next);
             vmx_load_msrs(next);
         }
+    }
+    else
+    {
+        context_switch_done();
     }
 
     schedule_tail(next);

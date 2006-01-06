@@ -474,11 +474,18 @@ static void __enter_scheduler(void)
              prev->domain->domain_id, prev->vcpu_id,
              next->domain->domain_id, next->vcpu_id);
 
+    schedule_data[cpu].context_switch_in_progress = 1;
     context_switch(prev, next);
+    if ( schedule_data[cpu].context_switch_in_progress )
+        context_switch_done();
+}
 
+void context_switch_done(void)
+{
+    unsigned int cpu = smp_processor_id();
+    ASSERT(schedule_data[cpu].context_switch_in_progress);
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);
-
-    context_switch_finalise(next);
+    schedule_data[cpu].context_switch_in_progress = 0;
 }
 
 /* No locking needed -- pointer comparison is safe :-) */

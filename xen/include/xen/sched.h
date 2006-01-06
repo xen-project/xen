@@ -287,13 +287,17 @@ extern void context_switch(
     struct vcpu *next);
 
 /*
- * On some architectures (notably x86) it is not possible to entirely load
- * @next's context with interrupts disabled. These may implement a function to
- * finalise loading the new context after interrupts are re-enabled. This
- * function is not given @prev and is not permitted to access it.
+ * If context_switch() does not return to the caller, or you need to perform
+ * some aspects of state restoration with interrupts enabled, then you must
+ * call context_switch_done() at a suitable safe point.
+ * 
+ * As when returning from context_switch(), the caller must ensure that the
+ * local CPU is no longer running in the previous VCPU's context, and that the
+ * context is saved to memory. Alternatively, if implementing lazy context
+ * switching, ensure that invoking sync_vcpu_execstate() will switch and
+ * commit the previous VCPU's state.
  */
-extern void context_switch_finalise(
-    struct vcpu *next);
+extern void context_switch_done(void);
 
 /* Called by the scheduler to continue running the current VCPU. */
 extern void continue_running(

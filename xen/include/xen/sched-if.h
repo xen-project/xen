@@ -13,11 +13,12 @@
 
 struct schedule_data {
     spinlock_t          schedule_lock;  /* spinlock protecting curr        */
-    struct vcpu *curr;           /* current task                    */
-    struct vcpu *idle;           /* idle task for this cpu          */
+    struct vcpu        *curr;           /* current task                    */
+    struct vcpu        *idle;           /* idle task for this cpu          */
     void               *sched_priv;
     struct ac_timer     s_timer;        /* scheduling timer                */
     unsigned long       tick;           /* current periodic 'tick'         */
+    int                 context_switch_in_progress;
 #ifdef BUCKETS
     u32                 hist[BUCKETS];  /* for scheduler latency histogram */
 #endif
