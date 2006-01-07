@@ -97,13 +97,22 @@ static void halt_machine(unsigned char key, struct cpu_user_regs *regs)
     machine_restart(NULL); 
 }
 
-static void do_task_queues(unsigned char key)
+static void cpuset_print(char *set, int size, cpumask_t mask)
+{
+    *set++ = '{';
+    set += cpulist_scnprintf(set, size-2, mask);
+    *set++ = '}';
+    *set++ = '\0';
+}
+
+static void dump_domains(unsigned char key)
 {
     struct domain *d;
     struct vcpu   *v;
     s_time_t       now = NOW();
+    char           cpuset[100];
 
-    printk("'%c' pressed -> dumping task queues (now=0x%X:%08X)\n", key,
+    printk("'%c' pressed -> dumping domain info (now=0x%X:%08X)\n", key,
            (u32)(now>>32), (u32)now); 
 
     read_lock(&domlist_lock);
@@ -111,9 +120,11 @@ static void do_task_queues(unsigned char key)
     for_each_domain ( d )
     {
         printk("General information for domain %u:\n", d->domain_id);
-        printk("    flags=%lx refcnt=%d nr_pages=%d xenheap_pages=%d\n",
+        cpuset_print(cpuset, sizeof(cpuset), d->domain_dirty_cpumask);
+        printk("    flags=%lx refcnt=%d nr_pages=%d xenheap_pages=%d "
+               "dirty_cpus=%s\n",
                d->domain_flags, atomic_read(&d->refcnt),
-               d->tot_pages, d->xenheap_pages);
+               d->tot_pages, d->xenheap_pages, cpuset);
         printk("    handle=%02x%02x%02x%02x-%02x%02x-%02x%02x-"
                "%02x%02x-%02x%02x%02x%02x%02x%02x\n",
                d->handle[ 0], d->handle[ 1], d->handle[ 2], d->handle[ 3],
@@ -129,12 +140,16 @@ static void do_task_queues(unsigned char key)
                d->domain_id);
         for_each_vcpu ( d, v ) {
             printk("    VCPU%d: CPU%d [has=%c] flags=%lx "
-                   "upcall_pend = %02x, upcall_mask = %02x\n",
+                   "upcall_pend = %02x, upcall_mask = %02x ",
                    v->vcpu_id, v->processor,
                    test_bit(_VCPUF_running, &v->vcpu_flags) ? 'T':'F',
                    v->vcpu_flags,
                    v->vcpu_info->evtchn_upcall_pending, 
                    v->vcpu_info->evtchn_upcall_mask);
+            cpuset_print(cpuset, sizeof(cpuset), v->vcpu_dirty_cpumask);
+            printk("dirty_cpus=%s ", cpuset);
+            cpuset_print(cpuset, sizeof(cpuset), v->cpu_affinity);
+            printk("cpu_affinity=%s\n", cpuset);
             printk("    Notifying guest (virq %d, port %d, stat %d/%d/%d)\n",
                    VIRQ_DEBUG, v->virq_to_evtchn[VIRQ_DEBUG],
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 
@@ -193,7 +208,7 @@ void initialize_keytable(void)
     register_keyhandler(
         'L', reset_sched_histo, "reset sched latency histogram");
     register_keyhandler(
-        'q', do_task_queues, "dump task queues + guest state");
+        'q', dump_domains, "dump domain (and guest debug) info");
     register_keyhandler(
         'r', dump_runq,      "dump run queues");
     register_irq_keyhandler(

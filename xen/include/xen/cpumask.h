@@ -8,8 +8,8 @@
  * See detailed comments in the file xen/bitmap.h describing the
  * data type on which these cpumasks are based.
  *
- * For details of cpumask_scnprintf() and cpumask_parse(),
- * see bitmap_scnprintf() and bitmap_parse() in lib/bitmap.c.
+ * For details of cpumask_scnprintf() and cpulist_scnprintf(),
+ * see bitmap_scnprintf() and bitmap_scnlistprintf() in lib/bitmap.c.
  *
  * The available cpumask operations are:
  *
@@ -36,8 +36,8 @@
  * void cpus_shift_right(dst, src, n)	Shift right
  * void cpus_shift_left(dst, src, n)	Shift left
  *
- * int first_cpu(mask)			Number lowest set bit, or >= NR_CPUS
- * int next_cpu(cpu, mask)		Next cpu past 'cpu', or >= NR_CPUS
+ * int first_cpu(mask)			Number lowest set bit, or NR_CPUS
+ * int next_cpu(cpu, mask)		Next cpu past 'cpu', or NR_CPUS
  *
  * cpumask_t cpumask_of_cpu(cpu)	Return cpumask with bit 'cpu' set
  * CPU_MASK_ALL				Initializer - all bits set
@@ -45,7 +45,7 @@
  * unsigned long *cpus_addr(mask)	Array of unsigned long's in mask
  *
  * int cpumask_scnprintf(buf, len, mask) Format cpumask for printing
- * int cpumask_parse(ubuf, ulen, mask)	Parse ascii string as cpumask
+ * int cpulist_scnprintf(buf, len, mask) Format cpumask as list for printing
  *
  * for_each_cpu_mask(cpu, mask)		for-loop cpu over mask
  *
@@ -207,13 +207,13 @@ static inline void __cpus_shift_left(cpumask_t *dstp,
 #define first_cpu(src) __first_cpu(&(src), NR_CPUS)
 static inline int __first_cpu(const cpumask_t *srcp, int nbits)
 {
-	return find_first_bit(srcp->bits, nbits);
+	return min_t(int, nbits, find_first_bit(srcp->bits, nbits));
 }
 
 #define next_cpu(n, src) __next_cpu((n), &(src), NR_CPUS)
 static inline int __next_cpu(int n, const cpumask_t *srcp, int nbits)
 {
-	return find_next_bit(srcp->bits, nbits, n+1);
+	return min_t(int, nbits, find_next_bit(srcp->bits, nbits, n+1));
 }
 
 #define cpumask_of_cpu(cpu)						\
@@ -259,7 +259,6 @@ static inline int __next_cpu(int n, const cpumask_t *srcp, int nbits)
 
 #define cpus_addr(src) ((src).bits)
 
-/*
 #define cpumask_scnprintf(buf, len, src) \
 			__cpumask_scnprintf((buf), (len), &(src), NR_CPUS)
 static inline int __cpumask_scnprintf(char *buf, int len,
@@ -268,14 +267,13 @@ static inline int __cpumask_scnprintf(char *buf, int len,
 	return bitmap_scnprintf(buf, len, srcp->bits, nbits);
 }
 
-#define cpumask_parse(ubuf, ulen, src) \
-			__cpumask_parse((ubuf), (ulen), &(src), NR_CPUS)
-static inline int __cpumask_parse(const char __user *buf, int len,
-					cpumask_t *dstp, int nbits)
+#define cpulist_scnprintf(buf, len, src) \
+			__cpulist_scnprintf((buf), (len), &(src), NR_CPUS)
+static inline int __cpulist_scnprintf(char *buf, int len,
+					const cpumask_t *srcp, int nbits)
 {
-	return bitmap_parse(buf, len, dstp->bits, nbits);
+	return bitmap_scnlistprintf(buf, len, srcp->bits, nbits);
 }
-*/
 
 #if NR_CPUS > 1
 #define for_each_cpu_mask(cpu, mask)		\
@@ -368,7 +366,7 @@ extern cpumask_t cpu_present_map;
 	for_each_cpu_mask(cpu, (mask))		\
 		if (cpu_online(cpu))		\
 			break;			\
-	min_t(int, NR_CPUS, cpu);		\
+	cpu;					\
 })
 
 #define for_each_cpu(cpu)	  for_each_cpu_mask((cpu), cpu_possible_map)
