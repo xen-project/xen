@@ -12,6 +12,7 @@ SUBDIRS += firmware
 SUBDIRS += security
 SUBDIRS += console
 SUBDIRS += xenmon
+SUBDIRS += guest-headers
 ifeq ($(VTPM_TOOLS),y)
 SUBDIRS += vtpm_manager
 SUBDIRS += vtpm
