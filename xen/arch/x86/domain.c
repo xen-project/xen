@@ -749,11 +749,21 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     unsigned int cpu = smp_processor_id();
 
+    ASSERT(local_irq_is_enabled());
+
     set_current(next);
 
     if ( (percpu_ctxt[cpu].curr_vcpu != next) &&
          !is_idle_domain(next->domain) )
     {
+        /* This may happen if next has been migrated by the scheduler. */
+        if ( unlikely(!cpus_empty(next->vcpu_dirty_cpumask)) )
+        {
+            ASSERT(!cpu_isset(cpu, next->vcpu_dirty_cpumask));
+            sync_vcpu_execstate(next);
+            ASSERT(cpus_empty(next->vcpu_dirty_cpumask));
+        }
+
         local_irq_disable();
         __context_switch();
         local_irq_enable();
