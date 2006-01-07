@@ -277,7 +277,7 @@ static void bvt_wake(struct vcpu *v)
 
 static void bvt_sleep(struct vcpu *v)
 {
-    if ( test_bit(_VCPUF_running, &v->vcpu_flags) )
+    if ( schedule_data[v->processor].curr == v )
         cpu_raise_softirq(v->processor, SCHEDULE_SOFTIRQ);
     else  if ( __task_on_runqueue(v) )
         __del_from_runqueue(v);
@@ -409,7 +409,7 @@ static struct task_slice bvt_do_schedule(s_time_t now)
         
         __del_from_runqueue(prev);
         
-        if ( domain_runnable(prev) )
+        if ( vcpu_runnable(prev) )
             __add_to_runqueue_tail(prev);
     }
 

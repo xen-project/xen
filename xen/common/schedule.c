@@ -168,7 +168,7 @@ void vcpu_sleep_nosync(struct vcpu *v)
     unsigned long flags;
 
     spin_lock_irqsave(&schedule_data[v->processor].schedule_lock, flags);
-    if ( likely(!domain_runnable(v)) )
+    if ( likely(!vcpu_runnable(v)) )
         SCHED_OP(sleep, v);
     spin_unlock_irqrestore(&schedule_data[v->processor].schedule_lock, flags);
 
@@ -184,7 +184,7 @@ void vcpu_sleep_sync(struct vcpu *v)
      * flag is cleared and the scheduler lock is released. We also check that
      * the domain continues to be unrunnable, in case someone else wakes it.
      */
-    while ( !domain_runnable(v) &&
+    while ( !vcpu_runnable(v) &&
             (test_bit(_VCPUF_running, &v->vcpu_flags) ||
              spin_is_locked(&schedule_data[v->processor].schedule_lock)) )
         cpu_relax();
@@ -197,7 +197,7 @@ void vcpu_wake(struct vcpu *v)
     unsigned long flags;
 
     spin_lock_irqsave(&schedule_data[v->processor].schedule_lock, flags);
-    if ( likely(domain_runnable(v)) )
+    if ( likely(vcpu_runnable(v)) )
     {
         SCHED_OP(wake, v);
         v->wokenup = NOW();
@@ -387,20 +387,18 @@ static void __enter_scheduler(void)
 {
     struct vcpu        *prev = current, *next = NULL;
     int                 cpu = smp_processor_id();
-    s_time_t            now;
+    s_time_t            now = NOW();
     struct task_slice   next_slice;
     s32                 r_time;     /* time for new dom to run */
 
-    perfc_incrc(sched_run);
-    
-    spin_lock_irq(&schedule_data[cpu].schedule_lock);
+    ASSERT(!in_irq());
 
-    now = NOW();
+    perfc_incrc(sched_run);
+
+    spin_lock_irq(&schedule_data[cpu].schedule_lock);
 
     rem_ac_timer(&schedule_data[cpu].s_timer);
     
-    ASSERT(!in_irq());
-
     prev->cpu_time += now - prev->lastschd;
 
     /* get policy-specific decision on scheduling... */
@@ -408,7 +406,7 @@ static void __enter_scheduler(void)
 
     r_time = next_slice.time;
     next = next_slice.task;
-    
+
     schedule_data[cpu].curr = next;
     
     next->lastschd = now;
@@ -426,11 +424,6 @@ static void __enter_scheduler(void)
     TRACE_3D(TRC_SCHED_SWITCH_INFNEXT,
              next->domain->domain_id, now - next->wokenup, r_time);
 
-    clear_bit(_VCPUF_running, &prev->vcpu_flags);
-    set_bit(_VCPUF_running, &next->vcpu_flags);
-
-    perfc_incrc(sched_ctx);
-
     /*
      * Logic of wokenup field in domain struct:
      * Used to calculate "waiting time", which is the time that a domain
@@ -439,7 +432,7 @@ static void __enter_scheduler(void)
      * also set here then a preempted runnable domain will get a screwed up
      * "waiting time" value next time it is scheduled.
      */
-    prev->wokenup = NOW();
+    prev->wokenup = now;
 
 #if defined(WAKE_HISTO)
     if ( !is_idle_domain(next->domain) && next->wokenup )
@@ -460,6 +453,12 @@ static void __enter_scheduler(void)
     }
 #endif
 
+    set_bit(_VCPUF_running, &next->vcpu_flags);
+
+    spin_unlock_irq(&schedule_data[cpu].schedule_lock);
+
+    perfc_incrc(sched_ctx);
+
     prev->sleep_tick = schedule_data[cpu].tick;
 
     /* Ensure that the domain has an up-to-date time base. */
@@ -474,25 +473,7 @@ static void __enter_scheduler(void)
              prev->domain->domain_id, prev->vcpu_id,
              next->domain->domain_id, next->vcpu_id);
 
-    schedule_data[cpu].context_switch_in_progress = 1;
     context_switch(prev, next);
-    if ( schedule_data[cpu].context_switch_in_progress )
-        context_switch_done();
-}
-
-void context_switch_done(void)
-{
-    unsigned int cpu = smp_processor_id();
-    ASSERT(schedule_data[cpu].context_switch_in_progress);
-    spin_unlock_irq(&schedule_data[cpu].schedule_lock);
-    schedule_data[cpu].context_switch_in_progress = 0;
-}
-
-/* No locking needed -- pointer comparison is safe :-) */
-int idle_cpu(int cpu)
-{
-    struct vcpu *p = schedule_data[cpu].curr;
-    return p == idle_domain[cpu];
 }
 
 

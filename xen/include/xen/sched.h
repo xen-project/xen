@@ -271,40 +271,27 @@ void vcpu_sleep_sync(struct vcpu *d);
 extern void sync_vcpu_execstate(struct vcpu *v);
 
 /*
- * Called by the scheduler to switch to another VCPU. On entry, although
- * VCPUF_running is no longer asserted for @prev, its context is still running
- * on the local CPU and is not committed to memory. The local scheduler lock
- * is therefore still held, and interrupts are disabled, because the local CPU
- * is in an inconsistent state.
- * 
- * The callee must ensure that the local CPU is no longer running in @prev's
- * context, and that the context is saved to memory, before returning.
- * Alternatively, if implementing lazy context switching, it suffices to ensure
- * that invoking sync_vcpu_execstate() will switch and commit @prev's state.
+ * Called by the scheduler to switch to another VCPU. This function must
+ * call context_saved(@prev) when the local CPU is no longer running in
+ * @prev's context, and that context is saved to memory. Alternatively, if
+ * implementing lazy context switching, it suffices to ensure that invoking
+ * sync_vcpu_execstate() will switch and commit @prev's state.
  */
 extern void context_switch(
     struct vcpu *prev, 
     struct vcpu *next);
 
 /*
- * If context_switch() does not return to the caller, or you need to perform
- * some aspects of state restoration with interrupts enabled, then you must
- * call context_switch_done() at a suitable safe point.
- * 
- * As when returning from context_switch(), the caller must ensure that the
- * local CPU is no longer running in the previous VCPU's context, and that the
- * context is saved to memory. Alternatively, if implementing lazy context
- * switching, ensure that invoking sync_vcpu_execstate() will switch and
- * commit the previous VCPU's state.
+ * As described above, context_switch() must call this function when the
+ * local CPU is no longer running in @prev's context, and @prev's context is
+ * saved to memory. Alternatively, if implementing lazy context switching,
+ * ensure that invoking sync_vcpu_execstate() will switch and commit @prev.
  */
-extern void context_switch_done(void);
+#define context_saved(prev) (clear_bit(_VCPUF_running, &(prev)->vcpu_flags))
 
 /* Called by the scheduler to continue running the current VCPU. */
 extern void continue_running(
     struct vcpu *same);
-
-/* Is CPU 'cpu' idle right now? */
-int idle_cpu(int cpu);
 
 void startup_cpu_idle_loop(void);
 
@@ -400,7 +387,7 @@ extern struct domain *domain_list;
 #define DOMF_debugging         (1UL<<_DOMF_debugging)
 
 
-static inline int domain_runnable(struct vcpu *v)
+static inline int vcpu_runnable(struct vcpu *v)
 {
     return ( (atomic_read(&v->pausecnt) == 0) &&
              !(v->vcpu_flags & (VCPUF_blocked|VCPUF_down)) &&

@@ -327,6 +327,8 @@ if (!i--) { printk("+",id); i = 1000000; }
     	}
 	    if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
     }
+
+    context_saved(prev);
 }
 
 void continue_running(struct vcpu *same)

@@ -739,7 +739,7 @@ static void __context_switch(void)
 
     if ( p->domain != n->domain )
         cpu_clear(cpu, p->domain->domain_dirty_cpumask);
-    cpu_clear(cpu, n->vcpu_dirty_cpumask);
+    cpu_clear(cpu, p->vcpu_dirty_cpumask);
 
     percpu_ctxt[cpu].curr_vcpu = n;
 }
@@ -749,17 +749,14 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     unsigned int cpu = smp_processor_id();
 
-    ASSERT(!local_irq_is_enabled());
-
     set_current(next);
 
     if ( (percpu_ctxt[cpu].curr_vcpu != next) &&
          !is_idle_domain(next->domain) )
     {
+        local_irq_disable();
         __context_switch();
-
-        context_switch_done();
-        ASSERT(local_irq_is_enabled());
+        local_irq_enable();
 
         if ( VMX_DOMAIN(next) )
         {
@@ -772,10 +769,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
             vmx_load_msrs(next);
         }
     }
-    else
-    {
-        context_switch_done();
-    }
+
+    context_saved(prev);
 
     schedule_tail(next);
     BUG();

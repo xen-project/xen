@@ -65,24 +65,16 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
 
 extern struct schedule_data schedule_data[NR_CPUS];
 
-void schedule_tail(struct vcpu *next)
+void schedule_tail(struct vcpu *prev)
 {
-	unsigned long rr7;
-	//printk("current=%lx,shared_info=%lx\n",current,current->vcpu_info);
-	//printk("next=%lx,shared_info=%lx\n",next,next->vcpu_info);
+	context_saved(prev);
 
-    // This is necessary because when a new domain is started, our
-    // implementation of context_switch() does not return (switch_to() has
-    // special and peculiar behaviour in this case).
-    context_switch_done();
-
-	/* rr7 will be postponed to last point when resuming back to guest */
-    if(VMX_DOMAIN(current)){
-    	vmx_load_all_rr(current);
-    }else{
-	    load_region_regs(current);
-            vcpu_load_kernel_regs(current);
-    }
+	if (VMX_DOMAIN(current)) {
+		vmx_load_all_rr(current);
+	} else {
+		load_region_regs(current);
+		vcpu_load_kernel_regs(current);
+	}
 }
 
 void tdpfoo(void) { }

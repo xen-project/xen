@@ -18,7 +18,6 @@ struct schedule_data {
     void               *sched_priv;
     struct ac_timer     s_timer;        /* scheduling timer                */
     unsigned long       tick;           /* current periodic 'tick'         */
-    int                 context_switch_in_progress;
 #ifdef BUCKETS
     u32                 hist[BUCKETS];  /* for scheduler latency histogram */
 #endif

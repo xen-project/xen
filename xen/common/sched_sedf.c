@@ -782,8 +782,8 @@ static struct task_slice sedf_do_schedule(s_time_t now)
  
     /* create local state of the status of the domain, in order to avoid
        inconsistent state during scheduling decisions, because data for
-       domain_runnable is not protected by the scheduling lock!*/
-    if ( !domain_runnable(current) )
+       vcpu_runnable is not protected by the scheduling lock!*/
+    if ( !vcpu_runnable(current) )
         inf->status |= SEDF_ASLEEP;
  
     if ( inf->status & SEDF_ASLEEP )
@@ -879,7 +879,7 @@ static void sedf_sleep(struct vcpu *d)
 
     EDOM_INFO(d)->status |= SEDF_ASLEEP;
  
-    if ( test_bit(_VCPUF_running, &d->vcpu_flags) )
+    if ( schedule_data[d->processor].curr == d )
     {
         cpu_raise_softirq(d->processor, SCHEDULE_SOFTIRQ);
     }
