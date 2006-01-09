@@ -380,10 +380,10 @@ void dump_ctx(int vcpu)
         exit(-1);
     }
 
-    ret = xc_domain_get_vcpu_context(xc_handle, domid, vcpu, &ctx);
+    ret = xc_vcpu_getcontext(xc_handle, domid, vcpu, &ctx);
     if (ret < 0) {
         xc_domain_unpause(xc_handle, domid);
-        perror("xc_domain_get_vcpu_context");
+        perror("xc_vcpu_getcontext");
         exit(-1);
     }
 

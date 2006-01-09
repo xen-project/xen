@@ -443,7 +443,7 @@ class XendDomain:
         cpumap = map(lambda x: int(x),
                      cpumap.replace("[", "").replace("]", "").split(","))
         try:
-            return xc.domain_pincpu(dominfo.getDomid(), vcpu, cpumap)
+            return xc.vcpu_setaffinity(dominfo.getDomid(), vcpu, cpumap)
         except Exception, ex:
             raise XendError(str(ex))
 

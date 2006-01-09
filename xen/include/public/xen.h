@@ -426,6 +426,15 @@ typedef uint64_t cpumap_t;
 
 typedef uint8_t xen_domain_handle_t[16];
 
+/* Turn a plain number into a C unsigned long constant. */
+#define __mk_unsigned_long(x) x ## UL
+#define mk_unsigned_long(x) __mk_unsigned_long(x)
+
+#else /* __ASSEMBLY__ */
+
+/* In assembly code we cannot use C numeric constant suffixes. */
+#define mk_unsigned_long(x) x
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __XEN_PUBLIC_XEN_H__ */

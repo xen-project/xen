@@ -435,7 +435,7 @@ void __init start_secondary(void *unused)
 
 	extern void percpu_traps_init(void);
 
-	set_current(idle_task[cpu]);
+	set_current(idle_domain[cpu]);
 	set_processor_id(cpu);
 
 	percpu_traps_init();
@@ -763,7 +763,6 @@ static int __init do_boot_cpu(int apicid)
 {
 	struct domain *idle;
 	struct vcpu *v;
-	void *stack;
 	unsigned long boot_error;
 	int timeout, cpu;
 	unsigned long start_eip;
@@ -774,7 +773,7 @@ static int __init do_boot_cpu(int apicid)
 	if ( (idle = do_createdomain(IDLE_DOMAIN_ID, cpu)) == NULL )
 		panic("failed 'createdomain' for CPU %d", cpu);
 
-	v = idle_task[cpu] = idle->vcpu[0];
+	v = idle_domain[cpu] = idle->vcpu[0];
 
 	set_bit(_DOMF_idle_domain, &idle->domain_flags);
 
@@ -786,16 +785,10 @@ static int __init do_boot_cpu(int apicid)
 	/* So we see what's up   */
 	printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
 
-	stack = alloc_xenheap_pages(STACK_ORDER);
-#if defined(__i386__)
-	stack_start.esp = (void *)__pa(stack);
-#elif defined(__x86_64__)
-	stack_start.esp = stack;
-#endif
-	stack_start.esp += STACK_SIZE - sizeof(struct cpu_info);
+	stack_start.esp = alloc_xenheap_pages(STACK_ORDER);
 
 	/* Debug build: detect stack overflow by setting up a guard page. */
-	memguard_guard_stack(stack);
+	memguard_guard_stack(stack_start.esp);
 
 	/*
 	 * This grunge runs the startup process for

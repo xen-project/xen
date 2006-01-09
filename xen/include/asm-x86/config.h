@@ -248,12 +248,10 @@ extern unsigned long _end; /* standard ELF symbol */
 
 #ifdef CONFIG_X86_PAE
 /* Hypervisor owns top 168MB of virtual address space. */
-# define __HYPERVISOR_VIRT_START  0xF5800000
-# define HYPERVISOR_VIRT_START   (0xF5800000UL)
+#define HYPERVISOR_VIRT_START   mk_unsigned_long(0xF5800000)
 #else
 /* Hypervisor owns top 64MB of virtual address space. */
-# define __HYPERVISOR_VIRT_START  0xFC000000
-# define HYPERVISOR_VIRT_START   (0xFC000000UL)
+#define HYPERVISOR_VIRT_START   mk_unsigned_long(0xFC000000)
 #endif
 
 #define L2_PAGETABLE_FIRST_XEN_SLOT \

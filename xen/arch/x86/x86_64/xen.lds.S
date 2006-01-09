@@ -1,5 +1,11 @@
 /* Excerpts written by Martin Mares <mj@atrey.karlin.mff.cuni.cz> */
 /* Modified for x86-64 Xen by Keir Fraser */
+
+#include <xen/config.h>
+#include <asm/page.h>
+#undef ENTRY
+#undef ALIGN
+
 OUTPUT_FORMAT("elf64-x86-64", "elf64-x86-64", "elf64-x86-64")
 OUTPUT_ARCH(i386:x86-64)
 ENTRY(start)
@@ -48,12 +54,12 @@ SECTIONS
   __initcall_start = .;
   .initcall.init : { *(.initcall.init) } :text
   __initcall_end = .;
-  . = ALIGN(8192);
+  . = ALIGN(STACK_SIZE);
   __init_end = .;
 
   __bss_start = .;		/* BSS */
   .bss : {
-	*(.bss.twopage_aligned)
+	*(.bss.stack_aligned)
 	*(.bss.page_aligned)
 	*(.bss)
 	} :text

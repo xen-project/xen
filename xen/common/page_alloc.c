@@ -615,7 +615,7 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
             shadow_drop_references(d, &pg[i]);
             ASSERT((pg[i].u.inuse.type_info & PGT_count_mask) == 0);
             pg[i].tlbflush_timestamp  = tlbflush_current_time();
-            pg[i].u.free.cpumask      = d->cpumask;
+            pg[i].u.free.cpumask      = d->domain_dirty_cpumask;
             list_del(&pg[i].list);
         }
 

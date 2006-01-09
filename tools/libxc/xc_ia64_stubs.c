@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <zlib.h>
 #include "xen/arch-ia64.h"
-#include <xen/io/ioreq.h>
+#include <xen/hvm/ioreq.h>
 
 /* this is a very ugly way of getting FPSR_DEFAULT.  struct ia64_fpreg is
  * mysteriously declared in two places: /usr/include/asm/fpu.h and
@@ -627,6 +627,7 @@ int xc_vmx_build(int xc_handle,
                  unsigned int control_evtchn,
                  unsigned int lapic,
                  unsigned int vcpus,
+                 unsigned int acpi,
                  unsigned int store_evtchn,
                  unsigned long *store_mfn)
 {
@@ -663,7 +664,7 @@ int xc_vmx_build(int xc_handle,
         goto error_out;
     }
 
-    if ( xc_domain_get_vcpu_context(xc_handle, domid, 0, ctxt) ){
+    if ( xc_vcpu_getcontext(xc_handle, domid, 0, ctxt) ){
         PERROR("Could not get vcpu context");
         goto error_out;
     }
@@ -687,11 +688,11 @@ int xc_vmx_build(int xc_handle,
 
     memset( &launch_op, 0, sizeof(launch_op) );
 
-    launch_op.u.setdomaininfo.domain = (domid_t)domid;
-    launch_op.u.setdomaininfo.vcpu   = 0;
-    launch_op.u.setdomaininfo.ctxt   = ctxt;
+    launch_op.u.setvcpucontext.domain = (domid_t)domid;
+    launch_op.u.setvcpucontext.vcpu   = 0;
+    launch_op.u.setvcpucontext.ctxt   = ctxt;
 
-    launch_op.cmd = DOM0_SETDOMAININFO;
+    launch_op.cmd = DOM0_SETVCPUCONTEXT;
     rc = do_dom0_op(xc_handle, &launch_op);
     return rc;
 

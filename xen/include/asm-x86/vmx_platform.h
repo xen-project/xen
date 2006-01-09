@@ -33,10 +33,10 @@
     (((size_reg) << 24) | ((index) << 16) | ((seg) << 8) | (flag))
 
 #define operand_size(operand)   \
-      ((operand >> 24) & 0xFF)
+    ((operand >> 24) & 0xFF)
 
 #define operand_index(operand)  \
-      ((operand >> 16) & 0xFF)
+    ((operand >> 16) & 0xFF)
 
 /* for instruction.operand[].size */
 #define BYTE    1
@@ -81,13 +81,13 @@ struct instruction {
 
 struct vmx_platform {
     unsigned long          shared_page_va;
-    unsigned int           nr_vcpu;
-    unsigned int           lapic_enable;
+    unsigned int           nr_vcpus;
+    unsigned int           apic_enabled;
 
     struct vmx_virpit      vmx_pit;
     struct vmx_io_handler  vmx_io_handler;
     struct vmx_virpic      vmx_pic;
-    struct vmx_vioapic      vmx_vioapic;
+    struct vmx_vioapic     vmx_vioapic;
     unsigned char          round_info[256];
     spinlock_t             round_robin_lock;
     int                    interrupt_request;

@@ -29,6 +29,7 @@ ifeq ($(TARGET_SUBARCH),x86_32)
 endif
 
 OBJS := $(subst $(TARGET_SUBARCH)/asm-offsets.o,,$(OBJS))
+OBJS := $(subst $(TARGET_SUBARCH)/xen.lds.o,,$(OBJS))
 
 ifneq ($(crash_debug),y)
 OBJS := $(patsubst cdb%.o,,$(OBJS))
@@ -43,21 +44,24 @@ $(TARGET): $(TARGET)-syms boot/mkelf32
 $(CURDIR)/arch.o: $(OBJS)
 	$(LD) $(LDFLAGS) -r -o $@ $(OBJS)
 
-$(TARGET)-syms: boot/$(TARGET_SUBARCH).o $(ALL_OBJS) $(TARGET_SUBARCH)/xen.lds
-	$(LD) $(LDFLAGS) -T $(TARGET_SUBARCH)/xen.lds -N \
+$(TARGET)-syms: boot/$(TARGET_SUBARCH).o $(ALL_OBJS) xen.lds
+	$(LD) $(LDFLAGS) -T xen.lds -N \
 	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) -o $@
 	$(NM) -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
 	$(MAKE) $(BASEDIR)/xen-syms.o
-	$(LD) $(LDFLAGS) -T $(TARGET_SUBARCH)/xen.lds -N \
+	$(LD) $(LDFLAGS) -T xen.lds -N \
 	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
 	$(NM) -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
 	$(MAKE) $(BASEDIR)/xen-syms.o
-	$(LD) $(LDFLAGS) -T $(TARGET_SUBARCH)/xen.lds -N \
+	$(LD) $(LDFLAGS) -T xen.lds -N \
 	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
 	rm -f $(BASEDIR)/xen-syms.S $(BASEDIR)/xen-syms.o
 
 asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c $(HDRS)
 	$(CC) $(CFLAGS) -S -o $@ $<
+
+xen.lds: $(TARGET_SUBARCH)/xen.lds.S $(HDRS)
+	$(CC) $(CFLAGS) -P -E -Ui386 -D__ASSEMBLY__ -o $@ $<
 
 boot/mkelf32: boot/mkelf32.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
@@ -73,5 +77,6 @@ clean:
 	rm -f dm/*.o dm/*~ dm/core
 	rm -f genapic/*.o genapic/*~ genapic/core
 	rm -f cpu/*.o cpu/*~ cpu/core
+	rm -f xen.lds
 
 .PHONY: default clean

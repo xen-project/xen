@@ -17,6 +17,7 @@
 #include <asm/msr.h>
 #include <xen/trace.h>
 #include <xen/console.h>
+#include <xen/iocap.h>
 #include <asm/shadow.h>
 #include <asm/irq.h>
 #include <asm/processor.h>
@@ -35,13 +36,13 @@ static unsigned long msr_hi;
 
 static void write_msr_for(void *unused)
 {
-    if ( ((1 << current->processor) & msr_cpu_mask) )
+    if ( ((1 << smp_processor_id()) & msr_cpu_mask) )
         (void)wrmsr_user(msr_addr, msr_lo, msr_hi);
 }
 
 static void read_msr_for(void *unused)
 {
-    if ( ((1 << current->processor) & msr_cpu_mask) )
+    if ( ((1 << smp_processor_id()) & msr_cpu_mask) )
         (void)rdmsr_user(msr_addr, msr_lo, msr_hi);
 }
 
@@ -102,12 +103,27 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             op->u.add_memtype.nr_pfns,
             op->u.add_memtype.type,
             1);
+        if (ret > 0)
+        {
+            (void)__put_user(0, &u_dom0_op->u.add_memtype.handle);
+            (void)__put_user(ret, &u_dom0_op->u.add_memtype.reg);
+            ret = 0;
+        }
     }
     break;
 
     case DOM0_DEL_MEMTYPE:
     {
-        ret = mtrr_del_page(op->u.del_memtype.reg, 0, 0);
+        if (op->u.del_memtype.handle == 0
+            /* mtrr/main.c otherwise does a lookup */
+            && (int)op->u.del_memtype.reg >= 0)
+        {
+            ret = mtrr_del_page(op->u.del_memtype.reg, 0, 0);
+            if (ret > 0)
+                ret = 0;
+        }
+        else
+            ret = -EINVAL;
     }
     break;
 
@@ -141,7 +157,6 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         struct domain *d;
         unsigned int fp = op->u.ioport_permission.first_port;
         unsigned int np = op->u.ioport_permission.nr_ports;
-        unsigned int p;
 
         ret = -EINVAL;
         if ( (fp + np) > 65536 )
@@ -152,26 +167,12 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             op->u.ioport_permission.domain)) == NULL) )
             break;
 
-        ret = -ENOMEM;
-        if ( d->arch.iobmp_mask != NULL )
-        {
-            if ( (d->arch.iobmp_mask = xmalloc_array(
-                u8, IOBMP_BYTES)) == NULL )
-            {
-                put_domain(d);
-                break;
-            }
-            memset(d->arch.iobmp_mask, 0xFF, IOBMP_BYTES);
-        }
-
-        ret = 0;
-        for ( p = fp; p < (fp + np); p++ )
-        {
-            if ( op->u.ioport_permission.allow_access )
-                clear_bit(p, d->arch.iobmp_mask);
-            else
-                set_bit(p, d->arch.iobmp_mask);
-        }
+        if ( np == 0 )
+            ret = 0;
+        else if ( op->u.ioport_permission.allow_access )
+            ret = ioports_permit_access(d, fp, fp + np - 1);
+        else
+            ret = ioports_deny_access(d, fp, fp + np - 1);
 
         put_domain(d);
     }
@@ -193,7 +194,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
         ret = 0;
         if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
-	    ret = -EFAULT;
+            ret = -EFAULT;
     }
     break;
     

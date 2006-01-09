@@ -29,7 +29,7 @@
 #include <asm/vmx_vcpu.h>
 #include <asm/privop.h>
 #include <asm/types.h>
-#include <public/io/ioreq.h>
+#include <public/hvm/ioreq.h>
 #include <asm/mm.h>
 #include <asm/vmx.h>
 

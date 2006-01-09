@@ -92,7 +92,7 @@ int main(int argc, char **argv)
     regs.ecx    = 0x12345678;
     cr2         = (unsigned long)&res;
     res         = 0x7FFFFFFF;
-    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);
+    rc = x86_emulate_memop(&regs, cr2, &emulops, X86EMUL_MODE_PROT32);
     if ( (rc != 0) || 
          (res != 0x92345677) || 
          (regs.eflags != 0xa94) ||
@@ -110,7 +110,7 @@ int main(int argc, char **argv)
     regs.ecx    = 0x12345678UL;
 #endif
     cr2         = (unsigned long)&res;
-    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);
+    rc = x86_emulate_memop(&regs, cr2, &emulops, X86EMUL_MODE_PROT32);
     if ( (rc != 0) || 
          (res != 0x92345677) || 
          (regs.ecx != 0x8000000FUL) ||
@@ -125,7 +125,7 @@ int main(int argc, char **argv)
     regs.eax    = 0x92345677UL;
     regs.ecx    = 0xAA;
     cr2         = (unsigned long)&res;
-    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);    
+    rc = x86_emulate_memop(&regs, cr2, &emulops, X86EMUL_MODE_PROT32);    
     if ( (rc != 0) || 
          (res != 0x923456AA) || 
          (regs.eflags != 0x244) ||
@@ -141,7 +141,7 @@ int main(int argc, char **argv)
     regs.eax    = 0xAABBCC77UL;
     regs.ecx    = 0xFF;
     cr2         = (unsigned long)&res;
-    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);    
+    rc = x86_emulate_memop(&regs, cr2, &emulops, X86EMUL_MODE_PROT32);    
     if ( (rc != 0) || 
          (res != 0x923456AA) || 
          ((regs.eflags&0x240) != 0x200) ||
@@ -157,7 +157,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.ecx    = 0x12345678;
     cr2         = (unsigned long)&res;
-    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);    
+    rc = x86_emulate_memop(&regs, cr2, &emulops, X86EMUL_MODE_PROT32);    
     if ( (rc != 0) || 
          (res != 0x12345678) || 
          (regs.eflags != 0x200) ||
@@ -174,7 +174,7 @@ int main(int argc, char **argv)
     regs.eax    = 0x923456AAUL;
     regs.ecx    = 0xDDEEFF00L;
     cr2         = (unsigned long)&res;
-    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);    
+    rc = x86_emulate_memop(&regs, cr2, &emulops, X86EMUL_MODE_PROT32);    
     if ( (rc != 0) || 
          (res != 0xDDEEFF00) || 
          (regs.eflags != 0x244) ||
@@ -193,7 +193,7 @@ int main(int argc, char **argv)
     regs.edi    = (unsigned long)&res + 2;
     regs.error_code = 0; /* read fault */
     cr2         = regs.esi;
-    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);    
+    rc = x86_emulate_memop(&regs, cr2, &emulops, X86EMUL_MODE_PROT32);    
     if ( (rc != 0) || 
          (res != 0x44554455) ||
          (regs.eflags != 0x200) ||
@@ -211,7 +211,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.edi    = (unsigned long)&res;
     cr2         = regs.edi;
-    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);    
+    rc = x86_emulate_memop(&regs, cr2, &emulops, X86EMUL_MODE_PROT32);    
     if ( (rc != 0) || 
          (res != 0x2233445D) ||
          ((regs.eflags&0x201) != 0x201) ||
@@ -229,7 +229,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.edi    = (unsigned long)cmpxchg8b_res;
     cr2         = regs.edi;
-    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);
+    rc = x86_emulate_memop(&regs, cr2, &emulops, X86EMUL_MODE_PROT32);
     if ( (rc != 0) || 
          (cmpxchg8b_res[0] != 0x9999AAAA) ||
          (cmpxchg8b_res[1] != 0xCCCCFFFF) ||
@@ -243,7 +243,7 @@ int main(int argc, char **argv)
     regs.eip    = (unsigned long)&instr[0];
     regs.edi    = (unsigned long)cmpxchg8b_res;
     cr2         = regs.edi;
-    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);
+    rc = x86_emulate_memop(&regs, cr2, &emulops, X86EMUL_MODE_PROT32);
     if ( (rc != 0) || 
          (cmpxchg8b_res[0] != 0x9999AAAA) ||
          (cmpxchg8b_res[1] != 0xCCCCFFFF) ||
@@ -260,7 +260,7 @@ int main(int argc, char **argv)
     regs.ecx    = 0x12345678;
     cr2         = (unsigned long)&res;
     res         = 0x82;
-    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);
+    rc = x86_emulate_memop(&regs, cr2, &emulops, X86EMUL_MODE_PROT32);
     if ( (rc != 0) ||
          (res != 0x82) ||
          (regs.ecx != 0xFFFFFF82) ||
@@ -275,7 +275,7 @@ int main(int argc, char **argv)
     regs.ecx    = 0x12345678;
     cr2         = (unsigned long)&res;
     res         = 0x1234aa82;
-    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);
+    rc = x86_emulate_memop(&regs, cr2, &emulops, X86EMUL_MODE_PROT32);
     if ( (rc != 0) ||
          (res != 0x1234aa82) ||
          (regs.ecx != 0xaa82) ||

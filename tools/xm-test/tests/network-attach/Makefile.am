@@ -6,7 +6,7 @@ TESTS = 01_network_attach_pos.test \
 	03_network_attach_detach_multiple_pos.test  \
 	04_network_attach_baddomain_neg.test
 
-XFAIL_TESTS = 03_network_attach_detach_multiple_pos.test
+XFAIL_TESTS = 
 
 EXTRA_DIST = $(TESTS) $(XFAIL_TESTS) network_utils.py
 

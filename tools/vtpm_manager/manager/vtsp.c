@@ -144,7 +144,10 @@ TPM_RESULT VerifyAuth( /*[IN]*/ const BYTE *outParamDigestText,
   if (memcmp (&hm, &(auth->HMAC), sizeof(TPM_DIGEST)) == 0)  // 0 indicates equality
     return (TPM_SUCCESS);
   else {
-    VTSP_OIAP( hContext, auth);
+    // If specified, reconnect the OIAP session.
+    // NOTE: This only works for TCS's that never have a 0 context. 
+    if (hContext) 
+      VTSP_OIAP( hContext, auth);
     return (TPM_AUTHFAIL);
   }
 }
@@ -157,6 +160,10 @@ TPM_RESULT VTSP_OIAP(const TCS_CONTEXT_HANDLE hContext,
   TPMTRYRETURN( TCSP_OIAP(hContext,
 			  &auth->AuthHandle,
 			  &auth->NonceEven) );
+
+  memset(&auth->HMAC, 0, sizeof(TPM_DIGEST));
+  auth->fContinueAuthSession = FALSE;
+
   goto egress;
   
  abort_egress:
@@ -195,6 +202,9 @@ TPM_RESULT VTSP_OSAP(const TCS_CONTEXT_HANDLE hContext,
 		 BSG_TPM_NONCE, &nonceOddOSAP);
   
   Crypto_HMAC(sharedSecretText, sizeof(sharedSecretText), (BYTE *) usageAuth, TPM_DIGEST_SIZE, (BYTE *) sharedSecret);       
+
+  memset(&auth->HMAC, 0, sizeof(TPM_DIGEST));
+  auth->fContinueAuthSession = FALSE;
     
   goto egress;
   
@@ -288,9 +298,6 @@ TPM_RESULT VTSP_TakeOwnership(   const TCS_CONTEXT_HANDLE hContext,
   
   struct pack_buf_t srkText;
   
-  // GenerateAuth new nonceOdd    
-  Crypto_GetRandom(&auth->NonceOdd, sizeof(TPM_NONCE) );
-  
   //These values are accurate for an enc(AuthData).
   struct pack_buf_t encOwnerAuth, encSrkAuth;
   
@@ -383,9 +390,6 @@ TPM_RESULT VTSP_DisablePubekRead( const TCS_CONTEXT_HANDLE    hContext,
   BYTE *paramText;        // Digest to make Auth.
   UINT32 paramTextSize;
     
-  // Generate HMAC   
-  Crypto_GetRandom(&auth->NonceOdd, sizeof(TPM_NONCE) );
-  
   paramText = (BYTE *) malloc(sizeof(BYTE) * TCPA_MAX_BUFFER_LENGTH);
   
   paramTextSize = BSG_PackList(paramText, 1,
@@ -504,9 +508,6 @@ TPM_RESULT VTSP_CreateWrapKey(  const TCS_CONTEXT_HANDLE hContext,
   newKeyText.data = flatKey;
   newKeyText.size = flatKeySize;
   
-  // GenerateAuth new nonceOdd    
-  Crypto_GetRandom(&auth->NonceOdd, sizeof(TPM_NONCE) );
-  
   // Generate HMAC
   paramText = (BYTE *) malloc(sizeof(BYTE) * TCPA_MAX_BUFFER_LENGTH);
   
@@ -563,63 +564,66 @@ TPM_RESULT VTSP_LoadKey(const TCS_CONTEXT_HANDLE    hContext,
                         const TPM_AUTHDATA          *parentAuth,
                         TPM_HANDLE                  *newKeyHandle,
                         TCS_AUTH                    *auth,
-                        CRYPTO_INFO                 *cryptoinfo /*= NULL*/) {
+                        CRYPTO_INFO                 *cryptoinfo,
+                        const BOOL                  skipTPMLoad) { 
   
   
-  vtpmloginfo(VTPM_LOG_VTSP, "Loading Key.\n%s","");
+  vtpmloginfo(VTPM_LOG_VTSP, "Loading Key %s.\n", (!skipTPMLoad ? "into TPM" : "only into memory"));
   
   TPM_RESULT status = TPM_SUCCESS;
   TPM_COMMAND_CODE command = TPM_ORD_LoadKey;
-  
-  BYTE *paramText;        // Digest to make Auth.
+
+  BYTE *paramText=NULL;        // Digest to make Auth.
   UINT32 paramTextSize;
+
+  // SkipTPMLoad stops key from being loaded into TPM, but still generates CRYPTO_INFO for it
+  if (! skipTPMLoad) { 
   
-  if ((rgbWrappedKeyBlob == NULL) || (parentAuth == NULL) || 
-      (newKeyHandle==NULL) || (auth==NULL)) {
-    status = TPM_BAD_PARAMETER;
-    goto abort_egress;
-  }
+    if ((rgbWrappedKeyBlob == NULL) || (parentAuth == NULL) || 
+        (newKeyHandle==NULL) || (auth==NULL)) {
+      status = TPM_BAD_PARAMETER;
+      goto abort_egress;
+    }
   
-  // Generate Extra TCS Parameters
-  TPM_HANDLE phKeyHMAC;
+    // Generate Extra TCS Parameters
+    TPM_HANDLE phKeyHMAC;
   
-  // Generate HMAC
-  Crypto_GetRandom(&auth->NonceOdd, sizeof(TPM_NONCE) );
+    paramText = (BYTE *) malloc(sizeof(BYTE) *  TCPA_MAX_BUFFER_LENGTH);
   
-  paramText = (BYTE *) malloc(sizeof(BYTE) *  TCPA_MAX_BUFFER_LENGTH);
+    paramTextSize = BSG_PackList(paramText, 1,
+  			         BSG_TPM_COMMAND_CODE, &command);
   
-  paramTextSize = BSG_PackList(paramText, 1,
-			       BSG_TPM_COMMAND_CODE, &command);
+    memcpy(paramText + paramTextSize, rgbWrappedKeyBlob->bytes, buffer_len(rgbWrappedKeyBlob));
+    paramTextSize += buffer_len(rgbWrappedKeyBlob);
   
-  memcpy(paramText + paramTextSize, rgbWrappedKeyBlob->bytes, buffer_len(rgbWrappedKeyBlob));
-  paramTextSize += buffer_len(rgbWrappedKeyBlob);
-  
-  TPMTRYRETURN( GenerateAuth( paramText, paramTextSize,
+    TPMTRYRETURN( GenerateAuth( paramText, paramTextSize,
 			      parentAuth, auth) );
   
-  // Call TCS
-  TPMTRYRETURN( TCSP_LoadKeyByBlob(  hContext,
-				     hUnwrappingKey,
-				     buffer_len(rgbWrappedKeyBlob),
-				     rgbWrappedKeyBlob->bytes,
-				     auth,
-				     newKeyHandle,
-				     &phKeyHMAC) );
+    // Call TCS
+    TPMTRYRETURN( TCSP_LoadKeyByBlob(  hContext,
+				       hUnwrappingKey,
+				       buffer_len(rgbWrappedKeyBlob),
+				       rgbWrappedKeyBlob->bytes,
+				       auth,
+				       newKeyHandle,
+				       &phKeyHMAC) );
   
-  // Verify Auth
-  paramTextSize = BSG_PackList(paramText, 3,
-			       BSG_TPM_RESULT, &status,
-			       BSG_TPM_COMMAND_CODE, &command,
-			       BSG_TPM_HANDLE, newKeyHandle);
+    // Verify Auth
+    paramTextSize = BSG_PackList(paramText, 3,
+			         BSG_TPM_RESULT, &status,
+			         BSG_TPM_COMMAND_CODE, &command,
+			         BSG_TPM_HANDLE, newKeyHandle);
   
-  TPMTRYRETURN( VerifyAuth( paramText, paramTextSize,
-			    parentAuth, auth, 
-			    hContext) );
+    TPMTRYRETURN( VerifyAuth( paramText, paramTextSize,
+			      parentAuth, auth, 
+			      hContext) );
+  } 
   
-  // Unpack/return key structure
+  // Build cryptoinfo structure for software crypto function. 
   if (cryptoinfo != NULL) {
     TPM_KEY newKey;
     
+    // Unpack/return key structure
     BSG_Unpack(BSG_TPM_KEY, rgbWrappedKeyBlob->bytes , &newKey);
     TPM_RSA_KEY_PARMS rsaKeyParms;
     
@@ -669,9 +673,6 @@ TPM_RESULT VTSP_Unbind( const TCS_CONTEXT_HANDLE    hContext,
   struct pack_buf_t clear_data32;
   BYTE *clear_data_text;
   UINT32 clear_data_size;
-  
-  // Generate HMAC   
-  Crypto_GetRandom(&auth->NonceOdd, sizeof(TPM_NONCE) );
   
   struct pack_buf_t bound_data32 = {bound_data->size, bound_data->bytes};
   
@@ -780,6 +781,196 @@ TPM_RESULT VTSP_Bind(   CRYPTO_INFO *cryptoInfo,
   
   return TPM_SUCCESS;
 }
+
+TPM_RESULT VTSP_Seal(const TCS_CONTEXT_HANDLE    hContext,
+                     const TPM_KEY_HANDLE        keyHandle,
+                     const TPM_AUTHDATA          *sealDataAuth,
+                     const TPM_PCR_COMPOSITE     *pcrComp,
+                     const buffer_t              *inData,
+                     TPM_STORED_DATA             *sealedData,                                   
+                     const TPM_SECRET            *osapSharedSecret,
+                     TCS_AUTH                    *auth) {
+
+  TPM_RESULT status = TPM_SUCCESS;
+  TPM_COMMAND_CODE command = TPM_ORD_Seal;
+
+  BYTE *paramText;        // Digest to make Auth.
+  UINT32 paramTextSize;
+
+  // Generate PCR_Info Struct from Comp
+  TPM_PCR_INFO pcrInfo;
+  UINT32 pcrInfoSize, flatpcrSize;
+  BYTE flatpcr[3 +                          // PCR_Select = 3 1 byte banks
+               sizeof(UINT16) +             //              2 byte UINT16
+               sizeof(UINT32) +             // PCR_Comp   = 4 byte UINT32
+               24 * sizeof(TPM_PCRVALUE) ]; //              up to 24 PCRs
+
+  if (pcrComp != NULL) {
+      //printf("\n\tBinding to PCRs: ");
+      //for(int i = 0 ; i < pcrComp->select.sizeOfSelect ; i++)
+      //printf("%2.2x", pcrComp->select.pcrSelect[i]);
+
+      memcpy(&pcrInfo.pcrSelection, &pcrComp->select, sizeof(TPM_PCR_SELECTION));
+
+      flatpcrSize = BSG_Pack(BSG_TPM_PCR_COMPOSITE, (BYTE *) pcrComp, flatpcr);
+      Crypto_SHA1Full((BYTE *) flatpcr, flatpcrSize, (BYTE *) &(pcrInfo.digestAtRelease));
+      memset(&(pcrInfo.digestAtCreation), 0, sizeof(TPM_DIGEST));
+      pcrInfoSize = BSG_Pack(BSG_TPM_PCR_INFO, (BYTE *) &pcrInfo, flatpcr);
+  } else {
+      //printf("\n\tBinding to no PCRS.");
+      pcrInfoSize = 0;
+  }
+
+  // Calculate encUsageAuth
+  BYTE XORbuffer[sizeof(TPM_SECRET) + sizeof(TPM_NONCE)];
+  UINT32 XORbufferSize = sizeof(XORbuffer);
+  TPM_DIGEST XORKey;
+  TPM_ENCAUTH encAuth;
+
+  BSG_PackList( XORbuffer, 2,
+                BSG_TPM_SECRET, osapSharedSecret,
+                BSG_TPM_NONCE, &auth->NonceEven );
+
+  Crypto_SHA1Full(XORbuffer, XORbufferSize, (BYTE *) &XORKey);
+
+  int i;
+  for (i=0; i < TPM_DIGEST_SIZE; i++)
+    ((BYTE *) &encAuth)[i] = ((BYTE *) &XORKey)[i] ^ ((BYTE *) sealDataAuth)[i];
+
+  // Generate Extra TCS Parameters
+  UINT32 inDataSize = buffer_len(inData);
+  struct pack_buf_t inData_pack = {inDataSize, inData->bytes};
+  struct pack_buf_t pcrInfo_pack = {pcrInfoSize, flatpcr};
+
+  UINT32 sealedDataSize;
+  BYTE *flatSealedData=NULL;
+
+  paramText = (BYTE *) malloc(sizeof(BYTE) *  TCPA_MAX_BUFFER_LENGTH);
+
+  paramTextSize = BSG_PackList(paramText, 4,
+                               BSG_TPM_COMMAND_CODE, &command,
+                               BSG_TPM_ENCAUTH, &encAuth,
+                               BSG_TPM_SIZE32_DATA, &pcrInfo_pack,
+                               BSG_TPM_SIZE32_DATA, &inData_pack);
+
+  TPMTRYRETURN( GenerateAuth( paramText, paramTextSize,
+                              osapSharedSecret, auth) );
+
+  // Call TCS
+  TPMTRYRETURN( TCSP_Seal( hContext,
+                           keyHandle,
+                           encAuth,
+                           pcrInfoSize,
+                           flatpcr,
+                           inDataSize,
+                           inData->bytes,
+                           auth,
+                           &sealedDataSize,
+                           &flatSealedData) );
+
+  // Unpack/return key structure
+  BSG_Unpack( BSG_TPM_STORED_DATA, flatSealedData, sealedData );
+
+  paramTextSize = BSG_PackList(paramText, 3,
+                               BSG_TPM_RESULT, &status,
+                               BSG_TPM_COMMAND_CODE, &command,
+                               BSG_TPM_STORED_DATA, sealedData);
+
+  TPMTRYRETURN( VerifyAuth( paramText, paramTextSize,
+                            osapSharedSecret, auth,
+                            0) );
+
+
+  goto egress;
+
+ abort_egress:
+ egress:
+
+  if (flatSealedData)
+    TCS_FreeMemory( hContext, flatSealedData);
+
+  free(paramText);
+  return status;
+}
+
+
+TPM_RESULT VTSP_Unseal(const TCS_CONTEXT_HANDLE    hContext,
+                       const TPM_KEY_HANDLE        keyHandle,
+                       const TPM_STORED_DATA       *sealedData,
+                       const TPM_AUTHDATA          *key_usage_auth,
+                       const TPM_AUTHDATA          *data_usage_auth,
+                       buffer_t                    *outData,
+                       TCS_AUTH                    *auth,
+                       TCS_AUTH                    *dataAuth) {
+
+  TPM_RESULT status = TPM_SUCCESS;
+  TPM_COMMAND_CODE command = TPM_ORD_Unseal;
+
+  BYTE *paramText;        // Digest to make Auth.
+  UINT32 paramTextSize;
+
+  // Generate Extra TCS Parameters
+  UINT32 sealDataSize, clearDataSize;
+  BYTE *flatSealedData= (BYTE *) malloc(sizeof(TPM_VERSION) +
+                                        2 * sizeof(UINT32) +
+                                        sealedData->sealInfoSize +
+                                        sealedData->encDataSize),
+       *clearData=NULL;
+
+  sealDataSize = BSG_Pack(BSG_TPM_STORED_DATA, sealedData, flatSealedData );
+
+  paramText = (BYTE *) malloc(sizeof(BYTE) *  TCPA_MAX_BUFFER_LENGTH);
+
+  paramTextSize = BSG_PackList(paramText, 2,
+                               BSG_TPM_COMMAND_CODE, &command,
+                               BSG_TPM_STORED_DATA, sealedData);
+
+  TPMTRYRETURN( GenerateAuth( paramText, paramTextSize,
+                              key_usage_auth, auth) );
+
+  TPMTRYRETURN( GenerateAuth( paramText, paramTextSize,
+                              data_usage_auth, dataAuth) );
+  // Call TCS
+  TPMTRYRETURN( TCSP_Unseal(  hContext,
+                              keyHandle,
+                              sealDataSize,
+                              flatSealedData,
+                              auth,
+                              dataAuth,
+                              &clearDataSize,
+                              &clearData) );
+
+  // Verify Auth
+  struct pack_buf_t clearData_pack = {clearDataSize, clearData};
+
+  paramTextSize = BSG_PackList(paramText, 3,
+                               BSG_TPM_RESULT, &status,
+                               BSG_TPM_COMMAND_CODE, &command,
+                               BSG_TPM_SIZE32_DATA, &clearData_pack);
+
+  TPMTRYRETURN( VerifyAuth( paramText, paramTextSize,
+                            key_usage_auth, auth,
+                            hContext) );
+
+  TPMTRYRETURN( VerifyAuth( paramText, paramTextSize,
+                            data_usage_auth, dataAuth,
+                            hContext) );
+
+  // Unpack/return key structure
+  TPMTRYRETURN( buffer_init(outData, clearDataSize, clearData) );
+
+  goto egress;
+
+ abort_egress:
+ egress:
+
+  if (flatSealedData)
+    TCS_FreeMemory( hContext, clearData);
+
+  free(paramText);
+  return status;
+}
+
 
 // Function Reaches into unsupported TCS command, beware.
 TPM_RESULT VTSP_RawTransmit(const TCS_CONTEXT_HANDLE    hContext,

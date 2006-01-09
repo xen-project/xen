@@ -74,7 +74,7 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
 #define pt_levels 4
 #endif
 
-    if (xc_domain_get_vcpu_context(xc_handle, dom, vcpu, &ctx) != 0) {
+    if (xc_vcpu_getcontext(xc_handle, dom, vcpu, &ctx) != 0) {
         fprintf(stderr, "failed to retreive vcpu context\n");
         goto out;
     }

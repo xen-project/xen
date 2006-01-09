@@ -24,8 +24,8 @@ struct arch_domain
     /* Writable pagetables. */
     struct ptwr_info ptwr[2];
 
-    /* I/O-port access bitmap mask. */
-    u8 *iobmp_mask;       /* Address of IO bitmap mask, or NULL.      */
+    /* I/O-port admin-specified access capabilities. */
+    struct rangeset *ioport_caps;
 
     /* Shadow mode status and controls. */
     struct shadow_ops *ops;

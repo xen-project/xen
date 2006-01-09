@@ -38,21 +38,21 @@
 /*
  * VMExit dispatcher should cooperate with instruction decoder to
  * prepare this structure and notify service OS and DM by sending
- * virq 
+ * virq
  */
 typedef struct {
-    uint64_t addr;   /*  physical address            */
-    uint64_t size;   /*  size in bytes               */
-    uint64_t count;  /*  for rep prefixes            */
+    uint64_t addr;          /*  physical address            */
+    uint64_t size;          /*  size in bytes               */
+    uint64_t count;         /*  for rep prefixes            */
     union {
-        uint64_t data;           /*  data                        */
-        void    *pdata;          /*  pointer to data             */
+        uint64_t data;      /*  data                        */
+        void    *pdata;     /*  pointer to data             */
     } u;
     uint8_t state:4;
-    uint8_t pdata_valid:1; /* if 1, use pdata above  */
-    uint8_t dir:1;   /*  1=read, 0=write             */
+    uint8_t pdata_valid:1;  /* if 1, use pdata above        */
+    uint8_t dir:1;          /*  1=read, 0=write             */
     uint8_t df:1;
-    uint8_t type;    /* I/O type                     */
+    uint8_t type;           /* I/O type                     */
 } ioreq_t;
 
 #define MAX_VECTOR      256
@@ -61,16 +61,15 @@ typedef struct {
 #define INTR_LEN_32     (MAX_VECTOR/(BITS_PER_BYTE * sizeof(uint32_t)))
 
 typedef struct {
-    uint16_t  pic_elcr;
-    uint16_t   pic_irr;
-    uint16_t   pic_last_irr;
-    uint16_t   pic_clear_irr;
-    int      eport; /* Event channel port */
+    uint16_t    pic_elcr;
+    uint16_t    pic_irr;
+    uint16_t    pic_last_irr;
+    uint16_t    pic_clear_irr;
+    int         eport; /* Event channel port */
 } global_iodata_t;
 
 typedef struct {
-    ioreq_t       vp_ioreq;
-    unsigned long vp_intr[INTR_LEN];
+    ioreq_t     vp_ioreq;
 } vcpu_iodata_t;
 
 typedef struct {

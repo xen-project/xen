@@ -636,7 +636,7 @@ TPM_RESULT TCSP_Seal(   TCS_CONTEXT_HANDLE hContext,  // in
   TDDL_UINT32  OutLength = TCPA_MAX_BUFFER_LENGTH;
   
   // check input params
-  if (inData == NULL || pubAuth == NULL || SealedDataSize == NULL || *SealedData == NULL)
+  if (inData == NULL || pubAuth == NULL || SealedDataSize == NULL || SealedData == NULL)
     return TPM_BAD_PARAMETER;
   
   // Convert Byte Input parameter in the input byte stream InBuf

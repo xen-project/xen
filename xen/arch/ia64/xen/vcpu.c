@@ -1085,7 +1085,7 @@ void vcpu_set_next_timer(VCPU *vcpu)
 	/* gloss over the wraparound problem for now... we know it exists
 	 * but it doesn't matter right now */
 
-	if (is_idle_task(vcpu->domain)) {
+	if (is_idle_domain(vcpu->domain)) {
 //		printf("****** vcpu_set_next_timer called during idle!!\n");
 		vcpu_safe_set_itm(s);
 		return;

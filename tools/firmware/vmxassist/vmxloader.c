@@ -24,12 +24,10 @@
 #include "machine.h"
 #include "roms.h"
 
-#ifdef _ACPI_
 #include "acpi.h"
 #include "../acpi/acpi2_0.h"  // for ACPI_PHYSICAL_ADDRESS
 int acpi_madt_update(unsigned char* acpi_start);
-#endif
-
+int get_acpi_enabled(void);
 
 /*
  * C runtime start off
@@ -120,18 +118,17 @@ main(void)
 		memcpy((void *)0xC0000,
 			vgabios_stdvga, sizeof(vgabios_stdvga));
 	}
-#ifdef _ACPI_
-	puts("Loading ACPI ...\n");
 
-	acpi_madt_update(acpi);
-
-	if (ACPI_PHYSICAL_ADDRESS+sizeof(acpi) <= 0xF0000) {
-		/* make sure acpi table does not overlap rombios
- 		 * currently acpi less than 8K will be OK.
-		 */
-		 memcpy((void *)ACPI_PHYSICAL_ADDRESS, acpi, sizeof(acpi));
+	if (get_acpi_enabled() != 0) {
+		puts("Loading ACPI ...\n");
+		acpi_madt_update((unsigned char*)acpi);
+		if (ACPI_PHYSICAL_ADDRESS+sizeof(acpi) <= 0xF0000) {
+			/* make sure acpi table does not overlap rombios
+			 * currently acpi less than 8K will be OK.
+			 */
+			memcpy((void *)ACPI_PHYSICAL_ADDRESS, acpi, sizeof(acpi));
+		}
 	}
-#endif
 
 	puts("Loading VMXAssist ...\n");
 	memcpy((void *)TEXTADDR, vmxassist, sizeof(vmxassist));

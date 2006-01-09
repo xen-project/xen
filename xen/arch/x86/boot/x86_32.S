@@ -1,5 +1,6 @@
 #include <xen/config.h>
 #include <public/xen.h>
+#include <asm/asm_defns.h>
 #include <asm/desc.h>
 #include <asm/page.h>
 #include <asm/msr.h>
@@ -53,6 +54,7 @@ __start:
         mov     %ecx,%gs
         ljmp    $(__HYPERVISOR_CS),$(1f)-__PAGE_OFFSET
 1:      lss     stack_start-__PAGE_OFFSET,%esp
+        add     $(STACK_SIZE-CPUINFO_sizeof-__PAGE_OFFSET),%esp
 
         /* Reset EFLAGS (subsumes CLI and CLD). */
 	pushl	$0
@@ -98,7 +100,7 @@ __start:
 1:      stosl   /* low mappings cover as much physmem as possible */
         add     $4,%edi
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
-        cmp     $__HYPERVISOR_VIRT_START+0xe3,%eax
+        cmp     $HYPERVISOR_VIRT_START+0xe3,%eax
         jne     1b
 #else
         /* Initialize low and high mappings of all memory with 4MB pages */
@@ -111,7 +113,7 @@ __start:
         jne     1b
 1:      stosl   /* low mappings cover as much physmem as possible */
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
-        cmp     $__HYPERVISOR_VIRT_START+0xe3,%eax
+        cmp     $HYPERVISOR_VIRT_START+0xe3,%eax
         jne     1b
 #endif
         
@@ -189,7 +191,7 @@ ignore_int:
 /*** STACK LOCATION ***/
         
 ENTRY(stack_start)
-        .long cpu0_stack + STACK_SIZE - 200 - __PAGE_OFFSET
+        .long cpu0_stack
         .long __HYPERVISOR_DS
         
 /*** DESCRIPTOR TABLES ***/
@@ -256,10 +258,6 @@ ENTRY(idle_pg_table_l2)
         .fill 1*PAGE_SIZE,1,0
 #endif
 
-#if (STACK_ORDER == 0)
-.section ".bss.page_aligned","w"
-#else
-.section ".bss.twopage_aligned","w"
-#endif
+.section ".bss.stack_aligned","w"
 ENTRY(cpu0_stack)
         .fill STACK_SIZE,1,0

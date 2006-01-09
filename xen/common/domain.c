@@ -16,6 +16,7 @@
 #include <xen/console.h>
 #include <xen/softirq.h>
 #include <xen/domain_page.h>
+#include <xen/rangeset.h>
 #include <asm/debugger.h>
 #include <public/dom0_ops.h>
 #include <public/sched.h>
@@ -50,25 +51,24 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     else
         set_bit(_DOMF_ctrl_pause, &d->domain_flags);
 
-    if ( !is_idle_task(d) &&
+    if ( !is_idle_domain(d) &&
          ((evtchn_init(d) != 0) || (grant_table_create(d) != 0)) )
-    {
-        evtchn_destroy(d);
-        free_domain(d);
-        return NULL;
-    }
+        goto fail1;
     
     if ( (v = alloc_vcpu(d, 0, cpu)) == NULL )
-    {
-        grant_table_destroy(d);
-        evtchn_destroy(d);
-        free_domain(d);
-        return NULL;
-    }
+        goto fail2;
 
-    arch_do_createdomain(v);
-    
-    if ( !is_idle_task(d) )
+    rangeset_domain_initialise(d);
+
+    d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
+    d->irq_caps   = rangeset_new(d, "Interrupts", 0);
+
+    if ( (d->iomem_caps == NULL) ||
+         (d->irq_caps == NULL) ||
+         (arch_do_createdomain(v) != 0) )
+        goto fail3;
+
+    if ( !is_idle_domain(d) )
     {
         write_lock(&domlist_lock);
         pd = &domain_list; /* NB. domain_list maintained in order of dom_id. */
@@ -83,6 +83,15 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     }
 
     return d;
+
+ fail3:
+    rangeset_domain_destroy(d);
+ fail2:
+    grant_table_destroy(d);
+ fail1:
+    evtchn_destroy(d);
+    free_domain(d);
+    return NULL;
 }
 
 
@@ -164,20 +173,23 @@ static void domain_shutdown_finalise(void)
 
     BUG_ON(d == NULL);
     BUG_ON(d == current->domain);
-    BUG_ON(!test_bit(_DOMF_shuttingdown, &d->domain_flags));
-    BUG_ON(test_bit(_DOMF_shutdown, &d->domain_flags));
+
+    LOCK_BIGLOCK(d);
 
     /* Make sure that every vcpu is descheduled before we finalise. */
     for_each_vcpu ( d, v )
         vcpu_sleep_sync(v);
-    BUG_ON(!cpus_empty(d->cpumask));
+    BUG_ON(!cpus_empty(d->domain_dirty_cpumask));
 
     sync_pagetable_state(d);
 
-    set_bit(_DOMF_shutdown, &d->domain_flags);
-    clear_bit(_DOMF_shuttingdown, &d->domain_flags);
+    /* Don't set DOMF_shutdown until execution contexts are sync'ed. */
+    if ( !test_and_set_bit(_DOMF_shutdown, &d->domain_flags) )
+        send_guest_virq(dom0->vcpu[0], VIRQ_DOM_EXC);
 
-    send_guest_virq(dom0->vcpu[0], VIRQ_DOM_EXC);
+    UNLOCK_BIGLOCK(d);
+
+    put_domain(d);
 }
 
 static __init int domain_shutdown_finaliser_init(void)
@@ -213,16 +225,17 @@ void domain_shutdown(struct domain *d, u8 reason)
 
     /* Mark the domain as shutting down. */
     d->shutdown_code = reason;
-    if ( !test_and_set_bit(_DOMF_shuttingdown, &d->domain_flags) )
-    {
-        /* This vcpu won the race to finalise the shutdown. */
-        domain_shuttingdown[smp_processor_id()] = d;
-        raise_softirq(DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ);
-    }
 
     /* Put every vcpu to sleep, but don't wait (avoids inter-vcpu deadlock). */
     for_each_vcpu ( d, v )
+    {
+        atomic_inc(&v->pausecnt);
         vcpu_sleep_nosync(v);
+    }
+
+    get_knownalive_domain(d);
+    domain_shuttingdown[smp_processor_id()] = d;
+    raise_softirq(DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ);
 }
 
 
@@ -270,6 +283,8 @@ void domain_destruct(struct domain *d)
         pd = &(*pd)->next_in_hashbucket;
     *pd = d->next_in_hashbucket;
     write_unlock(&domlist_lock);
+
+    rangeset_domain_destroy(d);
 
     evtchn_destroy(d);
     grant_table_destroy(d);
@@ -346,11 +361,11 @@ void domain_unpause_by_systemcontroller(struct domain *d)
  * of domains other than domain 0. ie. the domains that are being built by 
  * the userspace dom0 domain builder.
  */
-int set_info_guest(struct domain *d, dom0_setdomaininfo_t *setdomaininfo)
+int set_info_guest(struct domain *d, dom0_setvcpucontext_t *setvcpucontext)
 {
     int rc = 0;
     struct vcpu_guest_context *c = NULL;
-    unsigned long vcpu = setdomaininfo->vcpu;
+    unsigned long vcpu = setvcpucontext->vcpu;
     struct vcpu *v; 
 
     if ( (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
@@ -363,7 +378,7 @@ int set_info_guest(struct domain *d, dom0_setdomaininfo_t *setdomaininfo)
         return -ENOMEM;
 
     rc = -EFAULT;
-    if ( copy_from_user(c, setdomaininfo->ctxt, sizeof(*c)) == 0 )
+    if ( copy_from_user(c, setvcpucontext->ctxt, sizeof(*c)) == 0 )
         rc = arch_set_info_guest(v, c);
 
     xfree(c);

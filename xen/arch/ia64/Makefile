@@ -23,6 +23,13 @@ OBJS +=	bitop.o clear_page.o flush.o copy_page_mck.o			\
 	__divsi3.o __udivsi3.o __modsi3.o __umodsi3.o			\
 	__divdi3.o __udivdi3.o __moddi3.o __umoddi3.o
 
+# xen stack unwinder
+# unwind_decoder.c is included in unwind.c
+OBJS += unwind.o
+#unwind.o: CFLAGS += -DUNW_DEBUG=4
+
+OBJS += process-linux-xen.o
+
 # perfmon.o
 # unwind.o needed for kernel unwinding (rare)
 
@@ -31,11 +38,26 @@ OBJS := $(subst $(TARGET_ARCH)/asm-offsets.o,,$(OBJS))
 # remove following line if not privifying in memory
 # OBJS += privify.o
 
-default: $(OBJS) head.o xen.lds.s
-	$(LD) -r -o arch.o $(OBJS)
+default: $(TARGET)
+
+$(CURDIR)/arch.o: $(OBJS)
+	$(LD) -r -o $@ $(OBJS)
+
+$(TARGET)-syms: $(ALL_OBJS) head.o xen.lds.s
 	$(LD) $(LDFLAGS) -T $(BASEDIR)/arch/$(TARGET_ARCH)/xen.lds.s -N \
-		-Map map.out head.o $(ALL_OBJS) -o $(TARGET)-syms
-	$(OBJCOPY) -R .note -R .comment -S $(TARGET)-syms $(TARGET)
+		-Map map.out head.o $(ALL_OBJS) -o $@
+	$(NM) -n $@ | $(BASEDIR)/tools/symbols > $(BASEDIR)/xen-syms.S
+	$(MAKE) $(BASEDIR)/xen-syms.o
+	$(LD) $(LDFLAGS) -T $(BASEDIR)/arch/$(TARGET_ARCH)/xen.lds.s -N \
+		-Map map.out head.o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
+	$(NM) -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
+	$(MAKE) $(BASEDIR)/xen-syms.o
+	$(LD) $(LDFLAGS) -T $(BASEDIR)/arch/$(TARGET_ARCH)/xen.lds.s -N \
+		-Map map.out head.o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
+	rm -f $(BASEDIR)/xen-syms.S $(BASEDIR)/xen-syms.o
+
+$(TARGET): $(TARGET)-syms
+	$(OBJCOPY) -R .note -R .comment -S $(TARGET)-syms $@
 	$(NM) -n $(TARGET)-syms | grep -v '\( [aUw] \)\|\(__crc_\)\|\( \$[adt]\)'\
 		 > $(BASEDIR)/System.map
 

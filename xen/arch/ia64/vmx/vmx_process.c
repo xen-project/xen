@@ -53,6 +53,7 @@
 #define INITIAL_PSR_VALUE_AT_INTERRUPTION 0x0000001808028034
 
 
+extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 extern void rnat_consumption (VCPU *vcpu);
 #define DOMN_PAL_REQUEST    0x110000
 
@@ -185,8 +186,11 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 	}else if(iim == DOMN_PAL_REQUEST){
         pal_emul(current);
 		vmx_vcpu_increment_iip(current);
-    }  else
+    } else {
+		if (iim == 0) 
+			die_if_kernel("bug check", regs, iim);
 		vmx_reflect_interruption(ifa,isr,iim,11,regs);
+    }
 }
 
 
@@ -227,7 +231,7 @@ void leave_hypervisor_tail(struct pt_regs *regs)
 	struct domain *d = current->domain;
 	struct vcpu *v = current;
 	// FIXME: Will this work properly if doing an RFI???
-	if (!is_idle_task(d) ) {	// always comes from guest
+	if (!is_idle_domain(d) ) {	// always comes from guest
 	        extern void vmx_dorfirfi(void);
 		struct pt_regs *user_regs = vcpu_regs(current);
  		if (local_softirq_pending())

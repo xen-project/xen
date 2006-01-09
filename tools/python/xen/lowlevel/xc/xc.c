@@ -135,9 +135,9 @@ static PyObject *pyxc_domain_destroy(XcObject *self, PyObject *args)
 }
 
 
-static PyObject *pyxc_domain_pincpu(XcObject *self,
-                                    PyObject *args,
-                                    PyObject *kwds)
+static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
+                                       PyObject *args,
+                                       PyObject *kwds)
 {
     uint32_t dom;
     int vcpu = 0, i;
@@ -157,7 +157,7 @@ static PyObject *pyxc_domain_pincpu(XcObject *self,
             cpumap |= (cpumap_t)1 << PyInt_AsLong(PyList_GetItem(cpulist, i));
     }
   
-    if ( xc_domain_pincpu(self->xc_handle, dom, vcpu, cpumap) != 0 )
+    if ( xc_vcpu_setaffinity(self->xc_handle, dom, vcpu, cpumap) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
@@ -297,7 +297,7 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
                                       &dom, &vcpu) )
         return NULL;
 
-    rc = xc_domain_get_vcpu_info(self->xc_handle, dom, vcpu, &info);
+    rc = xc_vcpu_getinfo(self->xc_handle, dom, vcpu, &info);
     if ( rc < 0 )
         return PyErr_SetFromErrno(xc_error);
 
@@ -362,21 +362,23 @@ static PyObject *pyxc_vmx_build(XcObject *self,
     uint32_t dom;
     char *image;
     int control_evtchn, store_evtchn;
-    int vcpus = 1;
-    int lapic = 0;
     int memsize;
+    int vcpus = 1;
+    int acpi = 0;
+    int apic = 0;
     unsigned long store_mfn = 0;
 
     static char *kwd_list[] = { "dom", "control_evtchn", "store_evtchn",
-                                "memsize", "image", "lapic", "vcpus", NULL };
+                                "memsize", "image", "vcpus", "acpi", "apic",
+                                NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiisii", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiisiii", kwd_list,
                                       &dom, &control_evtchn, &store_evtchn,
-                                      &memsize, &image, &lapic, &vcpus) )
+                                      &memsize, &image, &vcpus, &acpi, &apic) )
         return NULL;
 
     if ( xc_vmx_build(self->xc_handle, dom, memsize, image, control_evtchn,
-                      lapic, vcpus, store_evtchn, &store_mfn) != 0 )
+                      vcpus, acpi, apic, store_evtchn, &store_mfn) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return Py_BuildValue("{s:i}", "store_mfn", store_mfn);
@@ -774,6 +776,52 @@ static PyObject *pyxc_domain_ioport_permission(XcObject *self,
     return zero;
 }
 
+static PyObject *pyxc_domain_irq_permission(PyObject *self,
+                                            PyObject *args,
+                                            PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    uint32_t dom;
+    int pirq, allow_access, ret;
+
+    static char *kwd_list[] = { "dom", "pirq", "allow_access", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iii", kwd_list, 
+                                      &dom, &pirq, &allow_access) )
+        return NULL;
+
+    ret = xc_domain_irq_permission(
+        xc->xc_handle, dom, pirq, allow_access);
+    if ( ret != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    Py_INCREF(zero);
+    return zero;
+}
+
+static PyObject *pyxc_domain_iomem_permission(PyObject *self,
+                                               PyObject *args,
+                                               PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    uint32_t dom;
+    unsigned long first_pfn, nr_pfns, allow_access, ret;
+
+    static char *kwd_list[] = { "dom", "first_pfn", "nr_pfns", "allow_access", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "illi", kwd_list, 
+                                      &dom, &first_pfn, &nr_pfns, &allow_access) )
+        return NULL;
+
+    ret = xc_domain_iomem_permission(
+        xc->xc_handle, dom, first_pfn, nr_pfns, allow_access);
+    if ( ret != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    Py_INCREF(zero);
+    return zero;
+}
+
 
 static PyObject *dom_op(XcObject *self, PyObject *args,
                         int (*fn)(int, uint32_t))
@@ -842,8 +890,8 @@ static PyMethodDef pyxc_methods[] = {
       " dom [int]:    Identifier of domain to be destroyed.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_pincpu", 
-      (PyCFunction)pyxc_domain_pincpu, 
+    { "vcpu_setaffinity", 
+      (PyCFunction)pyxc_vcpu_setaffinity, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Pin a VCPU to a specified set CPUs.\n"
       " dom [int]:     Identifier of domain to which VCPU belongs.\n"
@@ -1067,6 +1115,25 @@ static PyMethodDef pyxc_methods[] = {
       " dom          [int]: Identifier of domain to be allowed access.\n"
       " first_port   [int]: First IO port\n"
       " nr_ports     [int]: Number of IO ports\n"
+      " allow_access [int]: Non-zero means enable access; else disable access\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_irq_permission",
+      (PyCFunction)pyxc_domain_irq_permission,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Allow a domain access to a physical IRQ\n"
+      " dom          [int]: Identifier of domain to be allowed access.\n"
+      " pirq         [int]: The Physical IRQ\n"
+      " allow_access [int]: Non-zero means enable access; else disable access\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_iomem_permission",
+      (PyCFunction)pyxc_domain_iomem_permission,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Allow a domain access to a range of IO memory pages\n"
+      " dom          [int]: Identifier of domain to be allowed access.\n"
+      " first_pfn   [long]: First page of I/O Memory\n"
+      " nr_pfns     [long]: Number of pages of I/O Memory (>0)\n"
       " allow_access [int]: Non-zero means enable access; else disable access\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 

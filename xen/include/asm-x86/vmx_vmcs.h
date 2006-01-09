@@ -23,7 +23,7 @@
 #include <asm/vmx_cpu.h>
 #include <asm/vmx_platform.h>
 #include <asm/vmx_vlapic.h>
-#include <public/vmx_assist.h>
+#include <public/hvm/vmx_assist.h>
 
 extern int start_vmx(void);
 extern void stop_vmx(void);
@@ -86,7 +86,8 @@ struct mmio_op {
 #define PC_DEBUG_PORT   0x80
 
 struct arch_vmx_struct {
-    struct vmcs_struct      *vmcs;  /* VMCS pointer in virtual */
+    struct vmcs_struct      *vmcs;  /* VMCS pointer in virtual. */
+    unsigned int            launch_cpu; /* VMCS is valid on this CPU. */
     unsigned long           flags;  /* VMCS flags */
     unsigned long           cpu_cr0; /* copy of guest CR0 */
     unsigned long           cpu_shadow_cr0; /* copy of guest read shadow CR0 */

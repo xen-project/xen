@@ -20,6 +20,7 @@
 #include <xen/delay.h>
 #include <xen/softirq.h>
 #include <xen/grant_table.h>
+#include <xen/iocap.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
@@ -35,9 +36,7 @@
 #include <xen/console.h>
 #include <xen/elf.h>
 #include <asm/vmx.h>
-#include <asm/vmx_vmcs.h>
 #include <asm/msr.h>
-#include <asm/physdev.h>
 #include <xen/kernel.h>
 #include <xen/multicall.h>
 
@@ -47,17 +46,16 @@ boolean_param("noreboot", opt_noreboot);
 
 struct percpu_ctxt {
     struct vcpu *curr_vcpu;
-    unsigned int context_not_finalised;
     unsigned int dirty_segment_mask;
 } __cacheline_aligned;
 static struct percpu_ctxt percpu_ctxt[NR_CPUS];
 
-static void continue_idle_task(struct vcpu *v)
+static void continue_idle_domain(struct vcpu *v)
 {
     reset_stack_and_jump(idle_loop);
 }
 
-static void continue_nonidle_task(struct vcpu *v)
+static void continue_nonidle_domain(struct vcpu *v)
 {
     reset_stack_and_jump(ret_from_intr);
 }
@@ -93,12 +91,13 @@ void startup_cpu_idle_loop(void)
 {
     struct vcpu *v = current;
 
-    ASSERT(is_idle_task(v->domain));
+    ASSERT(is_idle_domain(v->domain));
     percpu_ctxt[smp_processor_id()].curr_vcpu = v;
-    cpu_set(smp_processor_id(), v->domain->cpumask);
-    v->arch.schedule_tail = continue_idle_task;
+    cpu_set(smp_processor_id(), v->domain->domain_dirty_cpumask);
+    cpu_set(smp_processor_id(), v->vcpu_dirty_cpumask);
+    v->arch.schedule_tail = continue_idle_domain;
 
-    idle_loop();
+    reset_stack_and_jump(idle_loop);
 }
 
 static long no_idt[2];
@@ -185,11 +184,17 @@ void dump_pageframe_info(struct domain *d)
 {
     struct pfn_info *page;
 
-    if ( d->tot_pages < 10 )
+    printk("Memory pages belonging to domain %u:\n", d->domain_id);
+
+    if ( d->tot_pages >= 10 )
+    {
+        printk("    DomPage list too long to display\n");
+    }
+    else
     {
         list_for_each_entry ( page, &d->page_list, list )
         {
-            printk("Page %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
+            printk("    DomPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
                    _p(page_to_phys(page)), _p(page_to_pfn(page)),
                    page->count_info, page->u.inuse.type_info);
         }
@@ -197,15 +202,10 @@ void dump_pageframe_info(struct domain *d)
 
     list_for_each_entry ( page, &d->xenpage_list, list )
     {
-        printk("XenPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
+        printk("    XenPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
                _p(page_to_phys(page)), _p(page_to_pfn(page)),
                page->count_info, page->u.inuse.type_info);
     }
-
-    page = virt_to_page(d->shared_info);
-    printk("Shared_info@%p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
-           _p(page_to_phys(page)), _p(page_to_pfn(page)), page->count_info,
-           page->u.inuse.type_info);
 }
 
 struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
@@ -250,24 +250,36 @@ void free_perdomain_pt(struct domain *d)
 #endif
 }
 
-void arch_do_createdomain(struct vcpu *v)
+int arch_do_createdomain(struct vcpu *v)
 {
     struct domain *d = v->domain;
     l1_pgentry_t gdt_l1e;
-    int vcpuid, pdpt_order;
+    int vcpuid, pdpt_order, rc;
 #ifdef __x86_64__
     int i;
 #endif
 
-    if ( is_idle_task(d) )
-        return;
+    if ( is_idle_domain(d) )
+        return 0;
 
-    v->arch.schedule_tail = continue_nonidle_task;
+    d->arch.ioport_caps = 
+        rangeset_new(d, "I/O Ports", RANGESETF_prettyprint_hex);
+    if ( d->arch.ioport_caps == NULL )
+        return -ENOMEM;
 
-    d->shared_info = alloc_xenheap_page();
+    if ( (d->shared_info = alloc_xenheap_page()) == NULL )
+        return -ENOMEM;
+
+    if ( (rc = ptwr_init(d)) != 0 )
+    {
+        free_xenheap_page(d->shared_info);
+        return rc;
+    }
+
+    v->arch.schedule_tail = continue_nonidle_domain;
+
     memset(d->shared_info, 0, PAGE_SIZE);
     v->vcpu_info = &d->shared_info->vcpu_info[v->vcpu_id];
-    v->cpumap = CPUMAP_RUNANYWHERE;
     SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
 
     pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
@@ -308,25 +320,10 @@ void arch_do_createdomain(struct vcpu *v)
                             __PAGE_HYPERVISOR);
 #endif
 
-    (void)ptwr_init(d);
-
     shadow_lock_init(d);
     INIT_LIST_HEAD(&d->arch.free_shadow_frames);
-}
 
-void vcpu_migrate_cpu(struct vcpu *v, int newcpu)
-{
-    if ( v->processor == newcpu )
-        return;
-
-    set_bit(_VCPUF_cpu_migrated, &v->vcpu_flags);
-    v->processor = newcpu;
-
-    if ( VMX_DOMAIN(v) )
-    {
-        __vmpclear(virt_to_phys(v->arch.arch_vmx.vmcs));
-        v->arch.schedule_tail = arch_vmx_do_relaunch;
-    }
+    return 0;
 }
 
 /* This is called by arch_final_setup_guest and do_boot_vcpu */
@@ -348,6 +345,8 @@ int arch_set_info_guest(
              ((c->user_regs.ss & 3) == 0) )
             return -EINVAL;
     }
+    else if ( !hvm_enabled )
+        return -EINVAL;
 
     clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
     if ( c->flags & VGCF_I387_VALID )
@@ -690,7 +689,7 @@ static void __context_switch(void)
     struct vcpu          *p = percpu_ctxt[cpu].curr_vcpu;
     struct vcpu          *n = current;
 
-    if ( !is_idle_task(p->domain) )
+    if ( !is_idle_domain(p->domain) )
     {
         memcpy(&p->arch.guest_context.user_regs,
                stack_regs,
@@ -699,7 +698,7 @@ static void __context_switch(void)
         save_segments(p);
     }
 
-    if ( !is_idle_task(n->domain) )
+    if ( !is_idle_domain(n->domain) )
     {
         memcpy(stack_regs,
                &n->arch.guest_context.user_regs,
@@ -725,7 +724,8 @@ static void __context_switch(void)
     }
 
     if ( p->domain != n->domain )
-        cpu_set(cpu, n->domain->cpumask);
+        cpu_set(cpu, n->domain->domain_dirty_cpumask);
+    cpu_set(cpu, n->vcpu_dirty_cpumask);
 
     write_ptbase(n);
 
@@ -738,7 +738,8 @@ static void __context_switch(void)
     }
 
     if ( p->domain != n->domain )
-        cpu_clear(cpu, p->domain->cpumask);
+        cpu_clear(cpu, p->domain->domain_dirty_cpumask);
+    cpu_clear(cpu, p->vcpu_dirty_cpumask);
 
     percpu_ctxt[cpu].curr_vcpu = n;
 }
@@ -748,28 +749,24 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     unsigned int cpu = smp_processor_id();
 
-    ASSERT(!local_irq_is_enabled());
+    ASSERT(local_irq_is_enabled());
 
     set_current(next);
 
-    if ( (percpu_ctxt[cpu].curr_vcpu != next) && !is_idle_task(next->domain) )
+    if ( (percpu_ctxt[cpu].curr_vcpu != next) &&
+         !is_idle_domain(next->domain) )
     {
+        /* This may happen if next has been migrated by the scheduler. */
+        if ( unlikely(!cpus_empty(next->vcpu_dirty_cpumask)) )
+        {
+            ASSERT(!cpu_isset(cpu, next->vcpu_dirty_cpumask));
+            sync_vcpu_execstate(next);
+            ASSERT(cpus_empty(next->vcpu_dirty_cpumask));
+        }
+
+        local_irq_disable();
         __context_switch();
-        percpu_ctxt[cpu].context_not_finalised = 1;
-    }
-}
-
-void context_switch_finalise(struct vcpu *next)
-{
-    unsigned int cpu = smp_processor_id();
-
-    ASSERT(local_irq_is_enabled());
-
-    if ( percpu_ctxt[cpu].context_not_finalised )
-    {
-        percpu_ctxt[cpu].context_not_finalised = 0;
-
-        BUG_ON(percpu_ctxt[cpu].curr_vcpu != next);
+        local_irq_enable();
 
         if ( VMX_DOMAIN(next) )
         {
@@ -782,6 +779,8 @@ void context_switch_finalise(struct vcpu *next)
             vmx_load_msrs(next);
         }
     }
+
+    context_saved(prev);
 
     schedule_tail(next);
     BUG();
@@ -812,20 +811,11 @@ int __sync_lazy_execstate(void)
 
 void sync_vcpu_execstate(struct vcpu *v)
 {
-    unsigned int cpu = v->processor;
-
-    if ( !cpu_isset(cpu, v->domain->cpumask) )
-        return;
-
-    if ( cpu == smp_processor_id() )
-    {
+    if ( cpu_isset(smp_processor_id(), v->vcpu_dirty_cpumask) )
         (void)__sync_lazy_execstate();
-    }
-    else
-    {
-        /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
-        flush_tlb_mask(cpumask_of_cpu(cpu));
-    }
+
+    /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
+    flush_tlb_mask(v->vcpu_dirty_cpumask);
 }
 
 unsigned long __hypercall_create_continuation(
@@ -951,9 +941,7 @@ void domain_relinquish_resources(struct domain *d)
     struct vcpu *v;
     unsigned long pfn;
 
-    BUG_ON(!cpus_empty(d->cpumask));
-
-    physdev_destroy_state(d);
+    BUG_ON(!cpus_empty(d->domain_dirty_cpumask));
 
     ptwr_destroy(d);
 

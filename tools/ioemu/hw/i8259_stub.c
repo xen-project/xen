@@ -22,7 +22,7 @@
  * THE SOFTWARE.
  */
 #include "xenctrl.h"
-#include <xen/io/ioreq.h>
+#include <xen/hvm/ioreq.h>
 #include <stdio.h>
 #include "cpu.h"
 #include "cpu-all.h"

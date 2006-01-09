@@ -17,30 +17,73 @@
  * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
+
 #include "../acpi/acpi2_0.h"
 #include "../acpi/acpi_madt.h"
+
+#include <xen/hvm/hvm_info_table.h>
 
 #define NULL ((void*)0)
 
 extern int puts(const char *s);
 
-#define VCPU_NR_PAGE        0x0009F000
-#define VCPU_NR_OFFSET      0x00000800
-#define VCPU_MAGIC          0x76637075  /* "vcpu" */
+static struct hvm_info_table *table = NULL;
 
-/* xc_vmx_builder wrote vcpu block at 0x9F800. Return it. */
-static int
-get_vcpu_nr(void)
+static int validate_hvm_info(struct hvm_info_table *t)
 {
-	unsigned int *vcpus;
+	char signature[] = "HVM INFO";
+	uint8_t *ptr = (uint8_t *)t;
+	uint8_t sum = 0;
+	int i;
 
-	vcpus = (unsigned int *)(VCPU_NR_PAGE + VCPU_NR_OFFSET);
-	if (vcpus[0] != VCPU_MAGIC) {
-		puts("Bad vcpus magic, set vcpu number to 1 by default.\n");
-		return 1;
+	/* strncmp(t->signature, "HVM INFO", 8) */
+	for (i = 0; i < 8; i++) {
+		if (signature[i] != t->signature[i]) {
+			puts("Bad hvm info signature\n");
+			return 0;
+		}
 	}
 
-	return vcpus[1];
+	for (i = 0; i < t->length; i++)
+		sum += ptr[i];
+
+	return (sum == 0);
+}
+
+/* xc_vmx_builder wrote hvm info at 0x9F800. Return it. */
+static struct hvm_info_table *
+get_hvm_info_table(void)
+{
+	struct hvm_info_table *t;
+	int i;
+
+	if (table != NULL)
+		return table;
+
+	t = (struct hvm_info_table *)HVM_INFO_PADDR;
+
+	if (!validate_hvm_info(t)) {
+		puts("Bad hvm info table\n");
+		return NULL;
+	}
+
+	table = t;
+
+	return table;
+}
+
+int
+get_vcpu_nr(void)
+{
+	struct hvm_info_table *t = get_hvm_info_table();
+	return (t ? t->nr_vcpus : 1); /* default 1 vcpu */
+}
+
+int
+get_acpi_enabled(void)
+{
+	struct hvm_info_table *t = get_hvm_info_table();
+	return (t ? t->acpi_enabled : 0); /* default no acpi */
 }
 
 static void *
@@ -74,10 +117,10 @@ acpi_madt_get_madt(unsigned char *acpi_start)
 	return madt;
 }
 
-static void 
+static void
 set_checksum(void *start, int checksum_offset, int len)
 {
-	unsigned char sum = 0;  
+	unsigned char sum = 0;
 	unsigned char *ptr;
 
 	ptr = start;
@@ -89,9 +132,9 @@ set_checksum(void *start, int checksum_offset, int len)
 	ptr[checksum_offset] = -sum;
 }
 
-static int 
+static int
 acpi_madt_set_local_apics(
-	int nr_vcpu, 
+	int nr_vcpu,
 	ACPI_MULTIPLE_APIC_DESCRIPTION_TABLE *madt)
 {
 	int i;
@@ -104,14 +147,14 @@ acpi_madt_set_local_apics(
 		madt->LocalApic[i].Length          = sizeof (ACPI_LOCAL_APIC_STRUCTURE);
 		madt->LocalApic[i].AcpiProcessorId = i;
 		madt->LocalApic[i].ApicId          = i;
-		madt->LocalApic[i].Flags           = 1; 
+		madt->LocalApic[i].Flags           = 1;
 	}
 
 	madt->Header.Header.Length =
-		sizeof(ACPI_MULTIPLE_APIC_DESCRIPTION_TABLE) - 
+		sizeof(ACPI_MULTIPLE_APIC_DESCRIPTION_TABLE) -
 		(MAX_VIRT_CPUS - nr_vcpu)* sizeof(ACPI_LOCAL_APIC_STRUCTURE);
 
-	return 0;                            
+	return 0;
 }
 
 #define FIELD_OFFSET(TYPE,Field) ((unsigned int)(&(((TYPE *) 0)->Field)))
@@ -133,7 +176,7 @@ int acpi_madt_update(unsigned char *acpi_start)
 		madt, FIELD_OFFSET(ACPI_TABLE_HEADER, Checksum),
 		madt->Header.Header.Length);
 
-	return 0;              
+	return 0;
 }
 
 /*

@@ -41,6 +41,8 @@
  * bitmap_weight(src, nbits)			Hamming Weight: number set bits
  * bitmap_shift_right(dst, src, n, nbits)	*dst = *src >> n
  * bitmap_shift_left(dst, src, n, nbits)	*dst = *src << n
+ * bitmap_scnprintf(buf, len, src, nbits)	Print bitmap src to buf
+ * bitmap_scnlistprintf(buf, len, src, nbits)	Print bitmap src as list to buf
  */
 
 /*
@@ -93,6 +95,10 @@ extern int __bitmap_subset(const unsigned long *bitmap1,
 			const unsigned long *bitmap2, int bits);
 extern int __bitmap_weight(const unsigned long *bitmap, int bits);
 
+extern int bitmap_scnprintf(char *buf, unsigned int len,
+			const unsigned long *src, int nbits);
+extern int bitmap_scnlistprintf(char *buf, unsigned int len,
+			const unsigned long *src, int nbits);
 extern int bitmap_find_free_region(unsigned long *bitmap, int bits, int order);
 extern void bitmap_release_region(unsigned long *bitmap, int pos, int order);
 extern int bitmap_allocate_region(unsigned long *bitmap, int pos, int order);

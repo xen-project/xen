@@ -14,6 +14,7 @@
 #include <asm-xen/balloon.h>
 #include <asm-xen/xen-public/memory.h>
 
+/*#define NETBE_DEBUG_INTERRUPT*/
 
 static void netif_idx_release(u16 pending_idx);
 static void netif_page_release(struct page *page);
@@ -727,6 +728,7 @@ static int make_rx_response(netif_t *netif,
 	return notify;
 }
 
+#ifdef NETBE_DEBUG_INTERRUPT
 static irqreturn_t netif_be_dbg(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct list_head *ent;
@@ -758,6 +760,7 @@ static irqreturn_t netif_be_dbg(int irq, void *dev_id, struct pt_regs *regs)
 
 	return IRQ_HANDLED;
 }
+#endif
 
 static int __init netback_init(void)
 {
@@ -794,6 +797,7 @@ static int __init netback_init(void)
 
 	netif_xenbus_init();
 
+#ifdef NETBE_DEBUG_INTERRUPT
 	(void)bind_virq_to_irqhandler(
 		VIRQ_DEBUG,
 		0,
@@ -801,6 +805,7 @@ static int __init netback_init(void)
 		SA_SHIRQ, 
 		"net-be-dbg",
 		&netif_be_dbg);
+#endif
 
 	return 0;
 }

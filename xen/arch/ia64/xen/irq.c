@@ -1378,9 +1378,6 @@ int pirq_guest_bind(struct vcpu *d, int irq, int will_share)
     unsigned long       flags;
     int                 rc = 0;
 
-    if ( !IS_CAPABLE_PHYSDEV(d->domain) )
-        return -EPERM;
-
     spin_lock_irqsave(&desc->lock, flags);
 
     action = (irq_guest_action_t *)desc->action;

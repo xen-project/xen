@@ -24,7 +24,7 @@
 #include <asm/vmx_vpit.h>
 #include <asm/vmx_intercept.h>
 #include <asm/vmx_vlapic.h>
-#include <public/io/ioreq.h>
+#include <public/hvm/ioreq.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <asm/current.h>

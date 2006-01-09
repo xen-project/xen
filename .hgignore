@@ -181,6 +181,7 @@
 ^xen/TAGS$
 ^xen/arch/x86/asm-offsets\.s$
 ^xen/arch/x86/boot/mkelf32$
+^xen/arch/x86/xen\.lds$
 ^xen/ddb/.*$
 ^xen/include/asm$
 ^xen/include/asm-.*/asm-offsets\.h$

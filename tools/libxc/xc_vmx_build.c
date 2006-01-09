@@ -9,7 +9,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <zlib.h>
-#include <xen/io/ioreq.h>
+#include <xen/hvm/hvm_info_table.h>
+#include <xen/hvm/ioreq.h>
 
 #define VMX_LOADER_ENTR_ADDR  0x00100000
 
@@ -32,9 +33,6 @@
 #define E820_MAP_PAGE       0x00090000
 #define E820_MAP_NR_OFFSET  0x000001E8
 #define E820_MAP_OFFSET     0x000002D0
-
-#define VCPU_NR_PAGE        0x0009F000
-#define VCPU_NR_OFFSET      0x00000800
 
 struct e820entry {
     uint64_t addr;
@@ -119,26 +117,50 @@ static unsigned char build_e820map(void *e820_page, unsigned long mem_size)
     return (*(((unsigned char *)e820_page) + E820_MAP_NR_OFFSET) = nr_map);
 }
 
-/*
- * Use E820 reserved memory 0x9F800 to pass number of vcpus to vmxloader
- * vmxloader will use it to config ACPI MADT table
- */
-#define VCPU_MAGIC      0x76637075  /* "vcpu" */
-static int set_vcpu_nr(int xc_handle, uint32_t dom,
-                        unsigned long *pfn_list, unsigned int vcpus)
+static void
+set_hvm_info_checksum(struct hvm_info_table *t)
 {
-    char         *va_map;
-    unsigned int *va_vcpus;
+    uint8_t *ptr = (uint8_t *)t, sum = 0;
+    unsigned int i;
 
-    va_map = xc_map_foreign_range(xc_handle, dom,
-                                  PAGE_SIZE, PROT_READ|PROT_WRITE,
-                                  pfn_list[VCPU_NR_PAGE >> PAGE_SHIFT]);
+    t->checksum = 0;
+
+    for (i = 0; i < t->length; i++)
+        sum += *ptr++;
+
+    t->checksum = -sum;
+}
+
+/*
+ * Use E820 reserved memory 0x9F800 to pass HVM info to vmxloader
+ * vmxloader will use this info to set BIOS accordingly
+ */
+static int set_hvm_info(int xc_handle, uint32_t dom,
+                        unsigned long *pfn_list, unsigned int vcpus,
+                        unsigned int acpi, unsigned int apic)
+{
+    char *va_map;
+    struct hvm_info_table *va_hvm;
+
+    va_map = xc_map_foreign_range(
+        xc_handle,
+        dom,
+        PAGE_SIZE,
+        PROT_READ|PROT_WRITE,
+        pfn_list[HVM_INFO_PFN]);
+    
     if ( va_map == NULL )
         return -1;
 
-    va_vcpus = (unsigned int *)(va_map + VCPU_NR_OFFSET);
-    va_vcpus[0] = VCPU_MAGIC;
-    va_vcpus[1] = vcpus;
+    va_hvm = (struct hvm_info_table *)(va_map + HVM_INFO_OFFSET);
+    memset(va_hvm, 0, sizeof(*va_hvm));
+    strncpy(va_hvm->signature, "HVM INFO", 8);
+    va_hvm->length       = sizeof(struct hvm_info_table);
+    va_hvm->acpi_enabled = acpi;
+    va_hvm->apic_enabled = apic;
+    va_hvm->nr_vcpus     = vcpus;
+
+    set_hvm_info_checksum(va_hvm);
 
     munmap(va_map, PAGE_SIZE);
 
@@ -279,8 +301,9 @@ static int setup_guest(int xc_handle,
                        vcpu_guest_context_t *ctxt,
                        unsigned long shared_info_frame,
                        unsigned int control_evtchn,
-                       unsigned int lapic,
                        unsigned int vcpus,
+                       unsigned int acpi,
+                       unsigned int apic,
                        unsigned int store_evtchn,
                        unsigned long *store_mfn)
 {
@@ -490,20 +513,14 @@ static int setup_guest(int xc_handle,
             goto error_out;
     }
 
-    if (set_vcpu_nr(xc_handle, dom, page_array, vcpus)) {
-        fprintf(stderr, "Couldn't set vcpu number for VMX guest.\n");
+    if ( set_hvm_info(xc_handle, dom, page_array, vcpus, acpi, apic) ) {
+        fprintf(stderr, "Couldn't set hvm info for VMX guest.\n");
         goto error_out;
     }
 
-    *store_mfn = page_array[(v_end-2) >> PAGE_SHIFT];
-    if ( xc_clear_domain_page(xc_handle, dom, *store_mfn) )
-        goto error_out;
-
-    shared_page_frame = (v_end - PAGE_SIZE) >> PAGE_SHIFT;
-
-    if ((e820_page = xc_map_foreign_range(
-        xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
-        page_array[E820_MAP_PAGE >> PAGE_SHIFT])) == 0)
+    if ( (e820_page = xc_map_foreign_range(
+         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
+         page_array[E820_MAP_PAGE >> PAGE_SHIFT])) == 0 )
         goto error_out;
     memset(e820_page, 0, PAGE_SIZE);
     e820_map_nr = build_e820map(e820_page, v_end);
@@ -518,25 +535,29 @@ static int setup_guest(int xc_handle,
     munmap(e820_page, PAGE_SIZE);
 
     /* shared_info page starts its life empty. */
-    if ((shared_info = xc_map_foreign_range(
-        xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
-        shared_info_frame)) == 0)
+    if ( (shared_info = xc_map_foreign_range(
+         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
+         shared_info_frame)) == 0 )
         goto error_out;
     memset(shared_info, 0, sizeof(shared_info_t));
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
-
     munmap(shared_info, PAGE_SIZE);
 
     /* Populate the event channel port in the shared page */
-    if ((sp = (shared_iopage_t *) xc_map_foreign_range(
-        xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
-        page_array[shared_page_frame])) == 0)
+    shared_page_frame = page_array[(v_end >> PAGE_SHIFT) - 1];
+    if ( (sp = (shared_iopage_t *) xc_map_foreign_range(
+         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
+         shared_page_frame)) == 0 )
         goto error_out;
     memset(sp, 0, PAGE_SIZE);
     sp->sp_global.eport = control_evtchn;
     munmap(sp, PAGE_SIZE);
+
+    *store_mfn = page_array[(v_end >> PAGE_SHIFT) - 2];
+    if ( xc_clear_domain_page(xc_handle, dom, *store_mfn) )
+        goto error_out;
 
     /* Send the page update requests down to the hypervisor. */
     if ( xc_finish_mmu_updates(xc_handle, mmu) )
@@ -559,7 +580,7 @@ static int setup_guest(int xc_handle,
     ctxt->user_regs.eax = 0;
     ctxt->user_regs.esp = 0;
     ctxt->user_regs.ebx = 0; /* startup_32 expects this to be 0 to signal boot cpu */
-    ctxt->user_regs.ecx = lapic;
+    ctxt->user_regs.ecx = 0;
     ctxt->user_regs.esi = 0;
     ctxt->user_regs.edi = 0;
     ctxt->user_regs.ebp = 0;
@@ -574,36 +595,14 @@ static int setup_guest(int xc_handle,
     return -1;
 }
 
-#define VMX_FEATURE_FLAG 0x20
-
-static int vmx_identify(void)
-{
-    int eax, ecx;
-
-    __asm__ __volatile__ (
-#if defined(__i386__)
-                          "push %%ebx; cpuid; pop %%ebx"
-#elif defined(__x86_64__)
-                          "push %%rbx; cpuid; pop %%rbx"
-#endif
-                          : "=a" (eax), "=c" (ecx)
-                          : "0" (1)
-                          : "dx");
-
-    if (!(ecx & VMX_FEATURE_FLAG)) {
-        return -1;
-    }
-
-    return 0;
-}
-
 int xc_vmx_build(int xc_handle,
                  uint32_t domid,
                  int memsize,
                  const char *image_name,
                  unsigned int control_evtchn,
-                 unsigned int lapic,
                  unsigned int vcpus,
+                 unsigned int acpi,
+                 unsigned int apic,
                  unsigned int store_evtchn,
                  unsigned long *store_mfn)
 {
@@ -613,10 +612,18 @@ int xc_vmx_build(int xc_handle,
     unsigned long nr_pages;
     char         *image = NULL;
     unsigned long image_size;
+    xen_capabilities_info_t xen_caps;
 
-    if ( vmx_identify() < 0 )
+    if ( (rc = xc_version(xc_handle, XENVER_capabilities, &xen_caps)) != 0 )
     {
-        PERROR("CPU doesn't support VMX Extensions");
+        PERROR("Failed to get xen version info");
+        goto error_out;
+    }
+
+    if ( !strstr(xen_caps, "hvm") )
+    {
+        PERROR("CPU doesn't support VMX Extensions or "
+               "CPU VMX Extensions are not turned on");
         goto error_out;
     }
 
@@ -644,7 +651,7 @@ int xc_vmx_build(int xc_handle,
         goto error_out;
     }
 
-    if ( xc_domain_get_vcpu_context(xc_handle, domid, 0, ctxt) )
+    if ( xc_vcpu_getcontext(xc_handle, domid, 0, ctxt) )
     {
         PERROR("Could not get vcpu context");
         goto error_out;
@@ -659,7 +666,7 @@ int xc_vmx_build(int xc_handle,
 
     if ( setup_guest(xc_handle, domid, memsize, image, image_size, nr_pages,
                      ctxt, op.u.getdomaininfo.shared_info_frame, control_evtchn,
-                     lapic, vcpus, store_evtchn, store_mfn) < 0)
+                     vcpus, acpi, apic, store_evtchn, store_mfn) < 0)
     {
         ERROR("Error constructing guest OS");
         goto error_out;
@@ -701,11 +708,11 @@ int xc_vmx_build(int xc_handle,
 
     memset( &launch_op, 0, sizeof(launch_op) );
 
-    launch_op.u.setdomaininfo.domain = (domid_t)domid;
-    launch_op.u.setdomaininfo.vcpu   = 0;
-    launch_op.u.setdomaininfo.ctxt   = ctxt;
+    launch_op.u.setvcpucontext.domain = (domid_t)domid;
+    launch_op.u.setvcpucontext.vcpu   = 0;
+    launch_op.u.setvcpucontext.ctxt   = ctxt;
 
-    launch_op.cmd = DOM0_SETDOMAININFO;
+    launch_op.cmd = DOM0_SETVCPUCONTEXT;
     rc = xc_dom0_op(xc_handle, &launch_op);
 
     return rc;

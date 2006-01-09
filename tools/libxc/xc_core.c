@@ -55,7 +55,7 @@ xc_domain_dumpcore(int xc_handle,
     }
  
     for (i = 0; i < info.max_vcpu_id; i++)
-        if (xc_domain_get_vcpu_context(xc_handle, domid,
+        if (xc_vcpu_getcontext(xc_handle, domid,
                                        i, &ctxt[nr_vcpus]) == 0)
             nr_vcpus++;
  

@@ -127,7 +127,7 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 			vcpu_wake(dom0->vcpu[0]);
 		}
 	}
-	if (!is_idle_task(current->domain))  {
+	if (!is_idle_domain(current->domain))  {
 		if (vcpu_timer_expired(current)) {
 			vcpu_pend_timer(current);
 			// ensure another timer interrupt happens even if domain doesn't

@@ -100,7 +100,9 @@ struct vcpu *alloc_vcpu(
     v->vcpu_id = vcpu_id;
     v->processor = cpu_id;
     atomic_set(&v->pausecnt, 0);
-    v->cpumap = CPUMAP_RUNANYWHERE;
+
+    v->cpu_affinity = is_idle_domain(d) ?
+        cpumask_of_cpu(cpu_id) : CPU_MASK_ALL;
 
     d->vcpu[vcpu_id] = v;
 
@@ -143,7 +145,7 @@ void sched_add_domain(struct vcpu *v)
     /* Initialise the per-domain timer. */
     init_ac_timer(&v->timer, dom_timer_fn, v, v->processor);
 
-    if ( is_idle_task(d) )
+    if ( is_idle_domain(d) )
     {
         schedule_data[v->processor].curr = v;
         schedule_data[v->processor].idle = v;
@@ -166,7 +168,7 @@ void vcpu_sleep_nosync(struct vcpu *v)
     unsigned long flags;
 
     spin_lock_irqsave(&schedule_data[v->processor].schedule_lock, flags);
-    if ( likely(!domain_runnable(v)) )
+    if ( likely(!vcpu_runnable(v)) )
         SCHED_OP(sleep, v);
     spin_unlock_irqrestore(&schedule_data[v->processor].schedule_lock, flags);
 
@@ -182,7 +184,7 @@ void vcpu_sleep_sync(struct vcpu *v)
      * flag is cleared and the scheduler lock is released. We also check that
      * the domain continues to be unrunnable, in case someone else wakes it.
      */
-    while ( !domain_runnable(v) &&
+    while ( !vcpu_runnable(v) &&
             (test_bit(_VCPUF_running, &v->vcpu_flags) ||
              spin_is_locked(&schedule_data[v->processor].schedule_lock)) )
         cpu_relax();
@@ -195,15 +197,22 @@ void vcpu_wake(struct vcpu *v)
     unsigned long flags;
 
     spin_lock_irqsave(&schedule_data[v->processor].schedule_lock, flags);
-    if ( likely(domain_runnable(v)) )
+    if ( likely(vcpu_runnable(v)) )
     {
         SCHED_OP(wake, v);
         v->wokenup = NOW();
     }
-    clear_bit(_VCPUF_cpu_migrated, &v->vcpu_flags);
     spin_unlock_irqrestore(&schedule_data[v->processor].schedule_lock, flags);
 
     TRACE_2D(TRC_SCHED_WAKE, v->domain->domain_id, v->vcpu_id);
+}
+
+int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
+{
+    if ( cpus_empty(*affinity) )
+        return -EINVAL;
+
+    return SCHED_OP(set_affinity, v, affinity);
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */
@@ -330,18 +339,23 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
     do {
         succ = 0;
         __clear_cpu_bits(have_lock);
-        for_each_vcpu(d, v) {
+        for_each_vcpu ( d, v )
+        {
             cpu = v->processor;
-            if (!__get_cpu_bit(cpu, have_lock)) {
+            if ( !__get_cpu_bit(cpu, have_lock) )
+            {
                 /* if we don't have a lock on this CPU: acquire it*/
-                if (spin_trylock(&schedule_data[cpu].schedule_lock)) {
+                if ( spin_trylock(&schedule_data[cpu].schedule_lock) )
+                {
                     /*we have this lock!*/
                     __set_cpu_bit(cpu, have_lock);
                     succ = 1;
-                } else {
+                }
+                else
+                {
                     /*we didn,t get this lock -> free all other locks too!*/
-                    for (cpu = 0; cpu < NR_CPUS; cpu++)
-                        if (__get_cpu_bit(cpu, have_lock))
+                    for ( cpu = 0; cpu < NR_CPUS; cpu++ )
+                        if ( __get_cpu_bit(cpu, have_lock) )
                             spin_unlock(&schedule_data[cpu].schedule_lock);
                     /* and start from the beginning! */
                     succ = 0;
@@ -354,8 +368,8 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
 
     SCHED_OP(adjdom, d, cmd);
 
-    for (cpu = 0; cpu < NR_CPUS; cpu++)
-        if (__get_cpu_bit(cpu, have_lock))
+    for ( cpu = 0; cpu < NR_CPUS; cpu++ )
+        if ( __get_cpu_bit(cpu, have_lock) )
             spin_unlock(&schedule_data[cpu].schedule_lock);
     __clear_cpu_bits(have_lock);
 
@@ -371,22 +385,20 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
  */
 static void __enter_scheduler(void)
 {
-    struct vcpu *prev = current, *next = NULL;
-    int                 cpu = prev->processor;
-    s_time_t            now;
+    struct vcpu        *prev = current, *next = NULL;
+    int                 cpu = smp_processor_id();
+    s_time_t            now = NOW();
     struct task_slice   next_slice;
     s32                 r_time;     /* time for new dom to run */
 
-    perfc_incrc(sched_run);
-    
-    spin_lock_irq(&schedule_data[cpu].schedule_lock);
+    ASSERT(!in_irq());
 
-    now = NOW();
+    perfc_incrc(sched_run);
+
+    spin_lock_irq(&schedule_data[cpu].schedule_lock);
 
     rem_ac_timer(&schedule_data[cpu].s_timer);
     
-    ASSERT(!in_irq());
-
     prev->cpu_time += now - prev->lastschd;
 
     /* get policy-specific decision on scheduling... */
@@ -394,7 +406,7 @@ static void __enter_scheduler(void)
 
     r_time = next_slice.time;
     next = next_slice.task;
-    
+
     schedule_data[cpu].curr = next;
     
     next->lastschd = now;
@@ -412,11 +424,6 @@ static void __enter_scheduler(void)
     TRACE_3D(TRC_SCHED_SWITCH_INFNEXT,
              next->domain->domain_id, now - next->wokenup, r_time);
 
-    clear_bit(_VCPUF_running, &prev->vcpu_flags);
-    set_bit(_VCPUF_running, &next->vcpu_flags);
-
-    perfc_incrc(sched_ctx);
-
     /*
      * Logic of wokenup field in domain struct:
      * Used to calculate "waiting time", which is the time that a domain
@@ -425,10 +432,10 @@ static void __enter_scheduler(void)
      * also set here then a preempted runnable domain will get a screwed up
      * "waiting time" value next time it is scheduled.
      */
-    prev->wokenup = NOW();
+    prev->wokenup = now;
 
 #if defined(WAKE_HISTO)
-    if ( !is_idle_task(next->domain) && next->wokenup )
+    if ( !is_idle_domain(next->domain) && next->wokenup )
     {
         ulong diff = (ulong)(now - next->wokenup);
         diff /= (ulong)MILLISECS(1);
@@ -438,7 +445,7 @@ static void __enter_scheduler(void)
     next->wokenup = (s_time_t)0;
 #elif defined(BLOCKTIME_HISTO)
     prev->lastdeschd = now;
-    if ( !is_idle_task(next->domain) )
+    if ( !is_idle_domain(next->domain) )
     {
         ulong diff = (ulong)((now - next->lastdeschd) / MILLISECS(10));
         if (diff <= BUCKETS-2)  schedule_data[cpu].hist[diff]++;
@@ -446,10 +453,16 @@ static void __enter_scheduler(void)
     }
 #endif
 
+    set_bit(_VCPUF_running, &next->vcpu_flags);
+
+    spin_unlock_irq(&schedule_data[cpu].schedule_lock);
+
+    perfc_incrc(sched_ctx);
+
     prev->sleep_tick = schedule_data[cpu].tick;
 
     /* Ensure that the domain has an up-to-date time base. */
-    if ( !is_idle_task(next->domain) )
+    if ( !is_idle_domain(next->domain) )
     {
         update_dom_time(next);
         if ( next->sleep_tick != schedule_data[cpu].tick )
@@ -461,17 +474,6 @@ static void __enter_scheduler(void)
              next->domain->domain_id, next->vcpu_id);
 
     context_switch(prev, next);
-
-    spin_unlock_irq(&schedule_data[cpu].schedule_lock);
-
-    context_switch_finalise(next);
-}
-
-/* No locking needed -- pointer comparison is safe :-) */
-int idle_cpu(int cpu)
-{
-    struct vcpu *p = schedule_data[cpu].curr;
-    return p == idle_task[cpu];
 }
 
 
@@ -493,11 +495,11 @@ static void s_timer_fn(void *unused)
 static void t_timer_fn(void *unused)
 {
     struct vcpu  *v  = current;
-    unsigned int  cpu = v->processor;
+    unsigned int  cpu = smp_processor_id();
 
     schedule_data[cpu].tick++;
 
-    if ( !is_idle_task(v->domain) )
+    if ( !is_idle_domain(v->domain) )
     {
         update_dom_time(v);
         send_guest_virq(v, VIRQ_TIMER);
@@ -531,8 +533,8 @@ void __init scheduler_init(void)
         init_ac_timer(&t_timer[i], t_timer_fn, NULL, i);
     }
 
-    schedule_data[0].curr = idle_task[0];
-    schedule_data[0].idle = idle_task[0];
+    schedule_data[0].curr = idle_domain[0];
+    schedule_data[0].idle = idle_domain[0];
 
     for ( i = 0; schedulers[i] != NULL; i++ )
     {
@@ -546,10 +548,10 @@ void __init scheduler_init(void)
 
     printk("Using scheduler: %s (%s)\n", ops.name, ops.opt_name);
 
-    rc = SCHED_OP(alloc_task, idle_task[0]);
+    rc = SCHED_OP(alloc_task, idle_domain[0]);
     BUG_ON(rc < 0);
 
-    sched_add_domain(idle_task[0]);
+    sched_add_domain(idle_domain[0]);
 }
 
 /*

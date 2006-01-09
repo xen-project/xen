@@ -393,10 +393,14 @@ static int setup_guest(int xc_handle,
     start_info->store_evtchn = store_evtchn;
     start_info->console_mfn   = nr_pages - 1;
     start_info->console_evtchn = console_evtchn;
+    start_info->nr_pages       = nr_pages;	// FIXME?: nr_pages - 2 ????
     if ( initrd_len != 0 )
     {
         ctxt->initrd.start    = vinitrd_start;
         ctxt->initrd.size     = initrd_len;
+    } else {
+        ctxt->initrd.start    = 0;
+        ctxt->initrd.size     = 0;
     }
     strncpy((char *)ctxt->cmdline, cmdline, IA64_COMMAND_LINE_SIZE);
     ctxt->cmdline[IA64_COMMAND_LINE_SIZE-1] = '\0';
@@ -790,7 +794,7 @@ int xc_linux_build(int xc_handle,
         goto error_out;
     }
 
-    if ( xc_domain_get_vcpu_context(xc_handle, domid, 0, ctxt) )
+    if ( xc_vcpu_getcontext(xc_handle, domid, 0, ctxt) )
     {
         PERROR("Could not get vcpu context");
         goto error_out;
@@ -893,11 +897,11 @@ int xc_linux_build(int xc_handle,
 
     memset( &launch_op, 0, sizeof(launch_op) );
 
-    launch_op.u.setdomaininfo.domain = (domid_t)domid;
-    launch_op.u.setdomaininfo.vcpu   = 0;
-    launch_op.u.setdomaininfo.ctxt   = ctxt;
+    launch_op.u.setvcpucontext.domain = (domid_t)domid;
+    launch_op.u.setvcpucontext.vcpu   = 0;
+    launch_op.u.setvcpucontext.ctxt   = ctxt;
 
-    launch_op.cmd = DOM0_SETDOMAININFO;
+    launch_op.cmd = DOM0_SETVCPUCONTEXT;
     rc = xc_dom0_op(xc_handle, &launch_op);
     
     return rc;

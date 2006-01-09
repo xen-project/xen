@@ -43,4 +43,13 @@
 #define __STR(...) #__VA_ARGS__
 #define STR(...) __STR(__VA_ARGS__)
 
+#ifndef __ASSEMBLY__
+/* Turn a plain number into a C unsigned long constant. */
+#define __mk_unsigned_long(x) x ## UL
+#define mk_unsigned_long(x) __mk_unsigned_long(x)
+#else /* __ASSEMBLY__ */
+/* In assembly code we cannot use C numeric constant suffixes. */
+#define mk_unsigned_long(x) x
+#endif /* !__ASSEMBLY__ */
+
 #endif /* __XEN_CONFIG_H__ */

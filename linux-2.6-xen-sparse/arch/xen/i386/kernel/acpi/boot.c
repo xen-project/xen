@@ -40,8 +40,6 @@
 #include <asm/fixmap.h>
 #endif
 
-void (*pm_power_off)(void) = NULL;
-
 #ifdef	CONFIG_X86_64
 
 static inline void  acpi_madt_oem_check(char *oem_id, char *oem_table_id) { }

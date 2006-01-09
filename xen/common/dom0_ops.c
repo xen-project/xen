@@ -16,6 +16,7 @@
 #include <xen/domain_page.h>
 #include <xen/trace.h>
 #include <xen/console.h>
+#include <xen/iocap.h>
 #include <asm/current.h>
 #include <public/dom0_ops.h>
 #include <public/sched_ctl.h>
@@ -109,13 +110,13 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     switch ( op->cmd )
     {
 
-    case DOM0_SETDOMAININFO:
+    case DOM0_SETVCPUCONTEXT:
     {
-        struct domain *d = find_domain_by_id(op->u.setdomaininfo.domain);
+        struct domain *d = find_domain_by_id(op->u.setvcpucontext.domain);
         ret = -ESRCH;
         if ( d != NULL )
         {
-            ret = set_info_guest(d, &op->u.setdomaininfo);
+            ret = set_info_guest(d, &op->u.setvcpucontext);
             put_domain(d);
         }
     }
@@ -283,11 +284,12 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
-    case DOM0_PINCPUDOMAIN:
+    case DOM0_SETVCPUAFFINITY:
     {
-        domid_t dom = op->u.pincpudomain.domain;
+        domid_t dom = op->u.setvcpuaffinity.domain;
         struct domain *d = find_domain_by_id(dom);
         struct vcpu *v;
+        cpumask_t new_affinity;
 
         if ( d == NULL )
         {
@@ -295,15 +297,15 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
         
-        if ( (op->u.pincpudomain.vcpu >= MAX_VIRT_CPUS) ||
-             !d->vcpu[op->u.pincpudomain.vcpu] )
+        if ( (op->u.setvcpuaffinity.vcpu >= MAX_VIRT_CPUS) ||
+             !d->vcpu[op->u.setvcpuaffinity.vcpu] )
         {
             ret = -EINVAL;
             put_domain(d);
             break;
         }
 
-        v = d->vcpu[op->u.pincpudomain.vcpu];
+        v = d->vcpu[op->u.setvcpuaffinity.vcpu];
         if ( v == NULL )
         {
             ret = -ESRCH;
@@ -318,22 +320,13 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
 
-        v->cpumap = op->u.pincpudomain.cpumap;
+        new_affinity = v->cpu_affinity;
+        memcpy(cpus_addr(new_affinity),
+               &op->u.setvcpuaffinity.cpumap,
+               min((int)BITS_TO_LONGS(NR_CPUS),
+                   (int)sizeof(op->u.setvcpuaffinity.cpumap)));
 
-        if ( v->cpumap == CPUMAP_RUNANYWHERE )
-        {
-            clear_bit(_VCPUF_cpu_pinned, &v->vcpu_flags);
-        }
-        else
-        {
-            /* pick a new cpu from the usable map */
-            int new_cpu;
-            new_cpu = (int)find_first_set_bit(v->cpumap) % num_online_cpus();
-            vcpu_pause(v);
-            vcpu_migrate_cpu(v, new_cpu);
-            set_bit(_VCPUF_cpu_pinned, &v->vcpu_flags);
-            vcpu_unpause(v);
-        }
+        ret = vcpu_set_affinity(v, &new_affinity);
 
         put_domain(d);
     }
@@ -505,7 +498,11 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         op->u.getvcpuinfo.running  = test_bit(_VCPUF_running, &v->vcpu_flags);
         op->u.getvcpuinfo.cpu_time = v->cpu_time;
         op->u.getvcpuinfo.cpu      = v->processor;
-        op->u.getvcpuinfo.cpumap   = v->cpumap;
+        op->u.getvcpuinfo.cpumap   = 0;
+        memcpy(&op->u.getvcpuinfo.cpumap,
+               cpus_addr(v->cpu_affinity),
+               min((int)BITS_TO_LONGS(NR_CPUS),
+                   (int)sizeof(op->u.getvcpuinfo.cpumap)));
         ret = 0;
 
         if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )     
@@ -582,6 +579,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         }
     }
     break;
+
     case DOM0_SETDEBUGGING:
     {
         struct domain *d; 
@@ -596,6 +594,53 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             put_domain(d);
             ret = 0;
         }
+    }
+    break;
+
+    case DOM0_IRQ_PERMISSION:
+    {
+        struct domain *d;
+        unsigned int pirq = op->u.irq_permission.pirq;
+
+        ret = -EINVAL;
+        if ( pirq >= NR_PIRQS )
+            break;
+
+        ret = -ESRCH;
+        d = find_domain_by_id(op->u.irq_permission.domain);
+        if ( d == NULL )
+            break;
+
+        if ( op->u.irq_permission.allow_access )
+            ret = irq_permit_access(d, pirq);
+        else
+            ret = irq_deny_access(d, pirq);
+
+        put_domain(d);
+    }
+    break;
+
+    case DOM0_IOMEM_PERMISSION:
+    {
+        struct domain *d;
+        unsigned long pfn = op->u.iomem_permission.first_pfn;
+        unsigned long nr_pfns = op->u.iomem_permission.nr_pfns;
+
+        ret = -EINVAL;
+        if ( (pfn + nr_pfns - 1) < pfn ) /* wrap? */
+            break;
+
+        ret = -ESRCH;
+        d = find_domain_by_id(op->u.iomem_permission.domain);
+        if ( d == NULL )
+            break;
+
+        if ( op->u.iomem_permission.allow_access )
+            ret = iomem_permit_access(d, pfn, pfn + nr_pfns - 1);
+        else
+            ret = iomem_deny_access(d, pfn, pfn + nr_pfns - 1);
+
+        put_domain(d);
     }
     break;
 

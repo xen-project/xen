@@ -94,14 +94,14 @@ typedef struct {
     xen_domain_handle_t handle;
 } dom0_getdomaininfo_t;
 
-#define DOM0_SETDOMAININFO      13
+#define DOM0_SETVCPUCONTEXT   13
 typedef struct {
     /* IN variables. */
     domid_t               domain;
     uint32_t              vcpu;
     /* IN/OUT parameters */
     vcpu_guest_context_t *ctxt;
-} dom0_setdomaininfo_t;
+} dom0_setvcpucontext_t;
 
 #define DOM0_MSR              15
 typedef struct {
@@ -163,13 +163,13 @@ typedef struct {
 /* 
  * Set which physical cpus a vcpu can execute on.
  */
-#define DOM0_PINCPUDOMAIN     20
+#define DOM0_SETVCPUAFFINITY  20
 typedef struct {
     /* IN variables. */
     domid_t   domain;
     uint32_t  vcpu;
     cpumap_t  cpumap;
-} dom0_pincpudomain_t;
+} dom0_setvcpuaffinity_t;
 
 /* Get trace buffers machine base address */
 #define DOM0_TBUFCONTROL       21
@@ -410,6 +410,21 @@ typedef struct {
     uint8_t enable;
 } dom0_setdebugging_t;
 
+#define DOM0_IRQ_PERMISSION 46
+typedef struct {
+    domid_t domain;          /* domain to be affected */
+    uint8_t pirq;
+    uint8_t allow_access;    /* flag to specify enable/disable of IRQ access */
+} dom0_irq_permission_t;
+
+#define DOM0_IOMEM_PERMISSION 47
+typedef struct {
+    domid_t  domain;          /* domain to be affected */
+    unsigned long first_pfn;  /* first page (physical page number) in range */
+    unsigned long nr_pfns;    /* number of pages in range (>0) */
+    uint8_t allow_access;     /* allow (!0) or deny (0) access to range? */
+} dom0_iomem_permission_t;
+ 
 typedef struct {
     uint32_t cmd;
     uint32_t interface_version; /* DOM0_INTERFACE_VERSION */
@@ -421,13 +436,13 @@ typedef struct {
         dom0_getmemlist_t        getmemlist;
         dom0_schedctl_t          schedctl;
         dom0_adjustdom_t         adjustdom;
-        dom0_setdomaininfo_t     setdomaininfo;
+        dom0_setvcpucontext_t    setvcpucontext;
         dom0_getdomaininfo_t     getdomaininfo;
         dom0_getpageframeinfo_t  getpageframeinfo;
         dom0_msr_t               msr;
         dom0_settime_t           settime;
         dom0_readconsole_t       readconsole;
-        dom0_pincpudomain_t      pincpudomain;
+        dom0_setvcpuaffinity_t   setvcpuaffinity;
         dom0_tbufcontrol_t       tbufcontrol;
         dom0_physinfo_t          physinfo;
         dom0_sched_id_t          sched_id;
@@ -448,6 +463,8 @@ typedef struct {
         dom0_max_vcpus_t         max_vcpus;
         dom0_setdomainhandle_t   setdomainhandle;        
         dom0_setdebugging_t      setdebugging;
+        dom0_irq_permission_t    irq_permission;
+        dom0_iomem_permission_t  iomem_permission;
         uint8_t                  pad[128];
     } u;
 } dom0_op_t;

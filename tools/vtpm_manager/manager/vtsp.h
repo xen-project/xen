@@ -86,7 +86,8 @@ TPM_RESULT VTSP_LoadKey(const TCS_CONTEXT_HANDLE    hContext,
                         const TPM_AUTHDATA          *parentAuth,
                         TPM_HANDLE                  *newKeyHandle,
                         TCS_AUTH                    *pAuth,
-                        CRYPTO_INFO                 *cryptoinfo);
+                        CRYPTO_INFO                 *cryptoinfo,
+                        const BOOL                  skipTPMLoad);
 
 TPM_RESULT VTSP_Unbind( const TCS_CONTEXT_HANDLE    hContext,
                         const TPM_KEY_HANDLE        key_handle,
@@ -99,4 +100,22 @@ TPM_RESULT VTSP_Bind(   CRYPTO_INFO *cryptoInfo,
             const buffer_t *inData, 
             buffer_t *outData);
                         
+TPM_RESULT VTSP_Seal(const TCS_CONTEXT_HANDLE    hContext,
+                     const TPM_KEY_HANDLE        keyHandle,
+                     const TPM_AUTHDATA          *sealDataAuth,
+                     const TPM_PCR_COMPOSITE     *pcrComp,
+                     const buffer_t              *inData,
+                     TPM_STORED_DATA             *sealedData,                                   
+                     const TPM_SECRET            *osapSharedSecret,
+                     TCS_AUTH                    *auth);
+
+TPM_RESULT VTSP_Unseal(const TCS_CONTEXT_HANDLE    hContext,
+                       const TPM_KEY_HANDLE        keyHandle,
+                       const TPM_STORED_DATA       *sealedData,
+                       const TPM_AUTHDATA          *key_usage_auth,
+                       const TPM_AUTHDATA          *data_usage_auth,
+                       buffer_t                    *outData,
+                       TCS_AUTH                    *auth,
+                       TCS_AUTH                    *dataAuth);
+
 #endif //_VTSP_H_

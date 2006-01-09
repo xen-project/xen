@@ -41,6 +41,7 @@
 #include <xen/softirq.h>
 #include <xen/domain_page.h>
 #include <xen/symbols.h>
+#include <xen/iocap.h>
 #include <asm/shadow.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -192,7 +193,8 @@ static void show_trace(struct cpu_user_regs *regs)
 
     /* Bounds for range of valid frame pointer. */
     low  = (unsigned long)(ESP_BEFORE_EXCEPTION(regs) - 2);
-    high = (low & ~(STACK_SIZE - 1)) + (STACK_SIZE - sizeof(struct cpu_info));
+    high = (low & ~(STACK_SIZE - 1)) + 
+        (STACK_SIZE - sizeof(struct cpu_info) - 2*sizeof(unsigned long));
 
     /* The initial frame pointer. */
     next = regs->ebp;
@@ -200,14 +202,14 @@ static void show_trace(struct cpu_user_regs *regs)
     for ( ; ; )
     {
         /* Valid frame pointer? */
-        if ( (next < low) || (next > high) )
+        if ( (next < low) || (next >= high) )
         {
             /*
              * Exception stack frames have a different layout, denoted by an
              * inverted frame pointer.
              */
             next = ~next;
-            if ( (next < low) || (next > high) )
+            if ( (next < low) || (next >= high) )
                 break;
             frame = (unsigned long *)next;
             next  = frame[0];
@@ -621,17 +623,7 @@ static inline int admin_io_okay(
     unsigned int port, unsigned int bytes,
     struct vcpu *v, struct cpu_user_regs *regs)
 {
-    struct domain *d = v->domain;
-    u16 x;
-
-    if ( d->arch.iobmp_mask != NULL )
-    {
-        x = *(u16 *)(d->arch.iobmp_mask + (port >> 3));
-        if ( (x & (((1<<bytes)-1) << (port&7))) == 0 )
-            return 1;
-    }
-
-    return 0;
+    return ioports_access_permitted(v->domain, port, port + bytes - 1);
 }
 
 /* Check admin limits. Silently fail the access if it is disallowed. */
@@ -871,7 +863,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0x09: /* WBINVD */
         /* Ignore the instruction if unprivileged. */
-        if ( !IS_CAPABLE_PHYSDEV(v->domain) )
+        if ( !cache_flush_permitted(v->domain) )
             DPRINTK("Non-physdev domain attempted WBINVD.\n");
         else
             wbinvd();
@@ -885,7 +877,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         switch ( modrm_reg )
         {
         case 0: /* Read CR0 */
-            *reg = v->arch.guest_context.ctrlreg[0];
+            *reg = (read_cr0() & ~X86_CR0_TS) |
+                v->arch.guest_context.ctrlreg[0];
             break;
 
         case 2: /* Read CR2 */
@@ -927,6 +920,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         switch ( modrm_reg )
         {
         case 0: /* Write CR0 */
+            if ( (*reg ^ read_cr0()) & ~X86_CR0_TS )
+            {
+                DPRINTK("Attempt to change unmodifiable CR0 flags.\n");
+                goto fail;
+            }
             (void)do_fpu_taskswitch(!!(*reg & X86_CR0_TS));
             break;
 
@@ -939,6 +937,14 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             LOCK_BIGLOCK(v->domain);
             (void)new_guest_cr3(*reg);
             UNLOCK_BIGLOCK(v->domain);
+            break;
+
+        case 4:
+            if ( *reg != (read_cr4() & ~(X86_CR4_PGE|X86_CR4_PSE)) )
+            {
+                DPRINTK("Attempt to change CR4 flags.\n");
+                goto fail;
+            }
             break;
 
         default:

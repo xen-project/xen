@@ -24,7 +24,7 @@
 #include <stdint.h>
 #endif
 
-#include <xen/vmx_assist.h>
+#include <xen/hvm/vmx_assist.h>
 
 #define	NR_EXCEPTION_HANDLER	32
 #define	NR_INTERRUPT_HANDLERS	16

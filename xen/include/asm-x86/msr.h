@@ -12,7 +12,7 @@
        __asm__ __volatile__("rdmsr" \
 			    : "=a" (a__), "=d" (b__) \
 			    : "c" (msr)); \
-       val = a__ | (b__<<32); \
+       val = a__ | ((u64)b__<<32); \
 } while(0); 
 
 #define wrmsr(msr,val1,val2) \

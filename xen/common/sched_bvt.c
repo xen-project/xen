@@ -31,7 +31,8 @@ struct bvt_vcpu_info
     struct list_head    run_list;         /* runqueue list pointers */
     u32                 avt;              /* actual virtual time */
     u32                 evt;              /* effective virtual time */
-    struct vcpu  *vcpu;
+    int                 migrated;         /* migrated to a new CPU */
+    struct vcpu         *vcpu;
     struct bvt_dom_info *inf;
 };
 
@@ -219,7 +220,7 @@ static void bvt_add_task(struct vcpu *v)
 
     einf->vcpu = v;
 
-    if ( is_idle_task(v->domain) )
+    if ( is_idle_domain(v->domain) )
     {
         einf->avt = einf->evt = ~0U;
         BUG_ON(__task_on_runqueue(v));
@@ -250,9 +251,11 @@ static void bvt_wake(struct vcpu *v)
 
     /* Set the BVT parameters. AVT should always be updated 
        if CPU migration ocurred.*/
-    if ( einf->avt < CPU_SVT(cpu) || 
-         unlikely(test_bit(_VCPUF_cpu_migrated, &v->vcpu_flags)) )
+    if ( (einf->avt < CPU_SVT(cpu)) || einf->migrated )
+    {
         einf->avt = CPU_SVT(cpu);
+        einf->migrated = 0;
+    }
 
     /* Deal with warping here. */
     einf->evt = calc_evt(v, einf->avt);
@@ -265,7 +268,7 @@ static void bvt_wake(struct vcpu *v)
         ((einf->evt - curr_evt) / BVT_INFO(curr->domain)->mcu_advance) +
         ctx_allow;
 
-    if ( is_idle_task(curr->domain) || (einf->evt <= curr_evt) )
+    if ( is_idle_domain(curr->domain) || (einf->evt <= curr_evt) )
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
     else if ( schedule_data[cpu].s_timer.expires > r_time )
         set_ac_timer(&schedule_data[cpu].s_timer, r_time);
@@ -274,11 +277,27 @@ static void bvt_wake(struct vcpu *v)
 
 static void bvt_sleep(struct vcpu *v)
 {
-    if ( test_bit(_VCPUF_running, &v->vcpu_flags) )
+    if ( schedule_data[v->processor].curr == v )
         cpu_raise_softirq(v->processor, SCHEDULE_SOFTIRQ);
     else  if ( __task_on_runqueue(v) )
         __del_from_runqueue(v);
 }
+
+
+static int bvt_set_affinity(struct vcpu *v, cpumask_t *affinity)
+{
+    if ( v == current )
+        return cpu_isset(v->processor, *affinity) ? 0 : -EBUSY;
+
+    vcpu_pause(v);
+    v->cpu_affinity = *affinity;
+    v->processor = first_cpu(v->cpu_affinity);
+    EBVT_INFO(v)->migrated = 1;
+    vcpu_unpause(v);
+
+    return 0;
+}
+
 
 /**
  * bvt_free_task - free BVT private structures for a task
@@ -380,7 +399,7 @@ static struct task_slice bvt_do_schedule(s_time_t now)
     ASSERT(prev_einf != NULL);
     ASSERT(__task_on_runqueue(prev));
 
-    if ( likely(!is_idle_task(prev->domain)) ) 
+    if ( likely(!is_idle_domain(prev->domain)) ) 
     {
         prev_einf->avt = calc_avt(prev, now);
         prev_einf->evt = calc_evt(prev, prev_einf->avt);
@@ -390,7 +409,7 @@ static struct task_slice bvt_do_schedule(s_time_t now)
         
         __del_from_runqueue(prev);
         
-        if ( domain_runnable(prev) )
+        if ( vcpu_runnable(prev) )
             __add_to_runqueue_tail(prev);
     }
 
@@ -471,13 +490,13 @@ static struct task_slice bvt_do_schedule(s_time_t now)
     }
 
     /* work out time for next run through scheduler */
-    if ( is_idle_task(next->domain) ) 
+    if ( is_idle_domain(next->domain) ) 
     {
         r_time = ctx_allow;
         goto sched_done;
     }
 
-    if ( (next_prime == NULL) || is_idle_task(next_prime->domain) )
+    if ( (next_prime == NULL) || is_idle_domain(next_prime->domain) )
     {
         /* We have only one runnable task besides the idle task. */
         r_time = 10 * ctx_allow;     /* RN: random constant */
@@ -557,6 +576,7 @@ struct scheduler sched_bvt_def = {
     .dump_cpu_state = bvt_dump_cpu_state,
     .sleep          = bvt_sleep,
     .wake           = bvt_wake,
+    .set_affinity   = bvt_set_affinity
 };
 
 /*

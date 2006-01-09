@@ -21,7 +21,7 @@
 #define VMX_VLAPIC_H
 
 #include <asm/msr.h>
-#include <public/io/ioreq.h>
+#include <public/hvm/ioreq.h>
 
 #if defined(__i386__) || defined(__x86_64__)
 static inline int __fls(uint32_t word)
