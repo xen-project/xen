@@ -109,7 +109,7 @@ static ssize_t xenbus_dev_write(struct file *filp,
 				size_t len, loff_t *ppos)
 {
 	struct xenbus_dev_data *u = filp->private_data;
-	struct xenbus_dev_transaction *trans;
+	struct xenbus_dev_transaction *trans = NULL;
 	void *reply;
 
 	if ((len + u->len) > sizeof(u->u.buffer))
@@ -134,14 +134,19 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	case XS_MKDIR:
 	case XS_RM:
 	case XS_SET_PERMS:
-		reply = xenbus_dev_request_and_reply(&u->u.msg);
-		if (IS_ERR(reply))
-			return PTR_ERR(reply);
-
 		if (u->u.msg.type == XS_TRANSACTION_START) {
 			trans = kmalloc(sizeof(*trans), GFP_KERNEL);
 			if (!trans)
 				return -ENOMEM;
+		}
+
+		reply = xenbus_dev_request_and_reply(&u->u.msg);
+		if (IS_ERR(reply)) {
+			kfree(trans);
+			return PTR_ERR(reply);
+		}
+
+		if (u->u.msg.type == XS_TRANSACTION_START) {
 			trans->handle = (struct xenbus_transaction *)
 				simple_strtoul(reply, NULL, 0);
 			list_add(&trans->list, &u->transactions);
