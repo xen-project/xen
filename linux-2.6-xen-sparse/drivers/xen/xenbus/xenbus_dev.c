@@ -134,14 +134,17 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	case XS_MKDIR:
 	case XS_RM:
 	case XS_SET_PERMS:
+		if (u->u.msg.type == XS_TRANSACTION_START) {
+			trans = kmalloc(sizeof(*trans), GFP_KERNEL);
+			if (!trans)
+				return -ENOMEM;
+		}
+
 		reply = xenbus_dev_request_and_reply(&u->u.msg);
 		if (IS_ERR(reply))
 			return PTR_ERR(reply);
 
 		if (u->u.msg.type == XS_TRANSACTION_START) {
-			trans = kmalloc(sizeof(*trans), GFP_KERNEL);
-			if (!trans)
-				return -ENOMEM;
 			trans->handle = (struct xenbus_transaction *)
 				simple_strtoul(reply, NULL, 0);
 			list_add(&trans->list, &u->transactions);
