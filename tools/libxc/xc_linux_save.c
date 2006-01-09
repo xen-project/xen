@@ -1164,6 +1164,9 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     if (live_shinfo)
         munmap(live_shinfo, PAGE_SIZE);
     
+    if (live_p2m_frame_list_list) 
+        munmap(live_p2m_frame_list_list, PAGE_SIZE); 
+
     if (live_p2m_frame_list) 
         munmap(live_p2m_frame_list, P2M_FLL_ENTRIES * PAGE_SIZE); 
 
