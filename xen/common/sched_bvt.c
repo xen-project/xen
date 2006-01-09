@@ -220,7 +220,7 @@ static void bvt_add_task(struct vcpu *v)
 
     einf->vcpu = v;
 
-    if ( is_idle_domain(v->domain) )
+    if ( is_idle_vcpu(v) )
     {
         einf->avt = einf->evt = ~0U;
         BUG_ON(__task_on_runqueue(v));
@@ -268,7 +268,7 @@ static void bvt_wake(struct vcpu *v)
         ((einf->evt - curr_evt) / BVT_INFO(curr->domain)->mcu_advance) +
         ctx_allow;
 
-    if ( is_idle_domain(curr->domain) || (einf->evt <= curr_evt) )
+    if ( is_idle_vcpu(curr) || (einf->evt <= curr_evt) )
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
     else if ( schedule_data[cpu].s_timer.expires > r_time )
         set_ac_timer(&schedule_data[cpu].s_timer, r_time);
@@ -399,7 +399,7 @@ static struct task_slice bvt_do_schedule(s_time_t now)
     ASSERT(prev_einf != NULL);
     ASSERT(__task_on_runqueue(prev));
 
-    if ( likely(!is_idle_domain(prev->domain)) ) 
+    if ( likely(!is_idle_vcpu(prev)) )
     {
         prev_einf->avt = calc_avt(prev, now);
         prev_einf->evt = calc_evt(prev, prev_einf->avt);
@@ -490,13 +490,13 @@ static struct task_slice bvt_do_schedule(s_time_t now)
     }
 
     /* work out time for next run through scheduler */
-    if ( is_idle_domain(next->domain) ) 
+    if ( is_idle_vcpu(next) )
     {
         r_time = ctx_allow;
         goto sched_done;
     }
 
-    if ( (next_prime == NULL) || is_idle_domain(next_prime->domain) )
+    if ( (next_prime == NULL) || is_idle_vcpu(next_prime) )
     {
         /* We have only one runnable task besides the idle task. */
         r_time = 10 * ctx_allow;     /* RN: random constant */

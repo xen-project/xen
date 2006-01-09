@@ -91,11 +91,9 @@ void startup_cpu_idle_loop(void)
 {
     struct vcpu *v = current;
 
-    ASSERT(is_idle_domain(v->domain));
-    percpu_ctxt[smp_processor_id()].curr_vcpu = v;
+    ASSERT(is_idle_vcpu(v));
     cpu_set(smp_processor_id(), v->domain->domain_dirty_cpumask);
     cpu_set(smp_processor_id(), v->vcpu_dirty_cpumask);
-    v->arch.schedule_tail = continue_idle_domain;
 
     reset_stack_and_jump(idle_loop);
 }
@@ -217,14 +215,20 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 
     memset(v, 0, sizeof(*v));
 
-    memcpy(&v->arch, &idle0_vcpu.arch, sizeof(v->arch));
+    memcpy(&v->arch, &idle_vcpu[0]->arch, sizeof(v->arch));
     v->arch.flags = TF_kernel_mode;
+
+    if ( is_idle_domain(d) )
+    {
+        percpu_ctxt[vcpu_id].curr_vcpu = v;
+        v->arch.schedule_tail = continue_idle_domain;
+    }
 
     if ( (v->vcpu_id = vcpu_id) != 0 )
     {
         v->arch.schedule_tail  = d->vcpu[0]->arch.schedule_tail;
         v->arch.perdomain_ptes =
-            d->arch.mm_perdomain_pt + (vcpu_id << PDPT_VCPU_SHIFT);
+            d->arch.mm_perdomain_pt + (vcpu_id << GDT_LDT_VCPU_SHIFT);
     }
 
     return v;
@@ -259,31 +263,11 @@ int arch_do_createdomain(struct vcpu *v)
     int i;
 #endif
 
-    if ( is_idle_domain(d) )
-        return 0;
-
-    d->arch.ioport_caps = 
-        rangeset_new(d, "I/O Ports", RANGESETF_prettyprint_hex);
-    if ( d->arch.ioport_caps == NULL )
-        return -ENOMEM;
-
-    if ( (d->shared_info = alloc_xenheap_page()) == NULL )
-        return -ENOMEM;
-
-    if ( (rc = ptwr_init(d)) != 0 )
-    {
-        free_xenheap_page(d->shared_info);
-        return rc;
-    }
-
-    v->arch.schedule_tail = continue_nonidle_domain;
-
-    memset(d->shared_info, 0, PAGE_SIZE);
-    v->vcpu_info = &d->shared_info->vcpu_info[v->vcpu_id];
-    SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
-
     pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
     d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order);
+    if ( d->arch.mm_perdomain_pt == NULL )
+        goto fail_nomem;
+
     memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE << pdpt_order);
     v->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
 
@@ -296,34 +280,75 @@ int arch_do_createdomain(struct vcpu *v)
      */
     gdt_l1e = l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
     for ( vcpuid = 0; vcpuid < MAX_VIRT_CPUS; vcpuid++ )
-        d->arch.mm_perdomain_pt[
-            (vcpuid << PDPT_VCPU_SHIFT) + FIRST_RESERVED_GDT_PAGE] = gdt_l1e;
+        d->arch.mm_perdomain_pt[((vcpuid << GDT_LDT_VCPU_SHIFT) +
+                                 FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
 
     v->arch.guest_vtable  = __linear_l2_table;
     v->arch.shadow_vtable = __shadow_linear_l2_table;
 
-#ifdef __x86_64__
+#if defined(__i386__)
+
+    d->arch.mapcache.l1tab = d->arch.mm_perdomain_pt +
+        (GDT_LDT_MBYTES << (20 - PAGE_SHIFT));
+    spin_lock_init(&d->arch.mapcache.lock);
+
+#else /* __x86_64__ */
+
     v->arch.guest_vl3table = __linear_l3_table;
     v->arch.guest_vl4table = __linear_l4_table;
 
     d->arch.mm_perdomain_l2 = alloc_xenheap_page();
+    d->arch.mm_perdomain_l3 = alloc_xenheap_page();
+    if ( (d->arch.mm_perdomain_l2 == NULL) ||
+         (d->arch.mm_perdomain_l3 == NULL) )
+        goto fail_nomem;
+
     memset(d->arch.mm_perdomain_l2, 0, PAGE_SIZE);
     for ( i = 0; i < (1 << pdpt_order); i++ )
         d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)+i] =
             l2e_from_page(virt_to_page(d->arch.mm_perdomain_pt)+i,
                           __PAGE_HYPERVISOR);
 
-    d->arch.mm_perdomain_l3 = alloc_xenheap_page();
     memset(d->arch.mm_perdomain_l3, 0, PAGE_SIZE);
     d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] =
         l3e_from_page(virt_to_page(d->arch.mm_perdomain_l2),
                             __PAGE_HYPERVISOR);
-#endif
+
+#endif /* __x86_64__ */
 
     shadow_lock_init(d);
     INIT_LIST_HEAD(&d->arch.free_shadow_frames);
 
+    if ( !is_idle_domain(d) )
+    {
+        d->arch.ioport_caps = 
+            rangeset_new(d, "I/O Ports", RANGESETF_prettyprint_hex);
+        if ( d->arch.ioport_caps == NULL )
+            goto fail_nomem;
+
+        if ( (d->shared_info = alloc_xenheap_page()) == NULL )
+            goto fail_nomem;
+
+        if ( (rc = ptwr_init(d)) != 0 )
+            goto fail_nomem;
+
+        memset(d->shared_info, 0, PAGE_SIZE);
+        v->vcpu_info = &d->shared_info->vcpu_info[v->vcpu_id];
+        SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
+
+        v->arch.schedule_tail = continue_nonidle_domain;
+    }
+
     return 0;
+
+ fail_nomem:
+    free_xenheap_page(d->shared_info);
+#ifdef __x86_64__
+    free_xenheap_page(d->arch.mm_perdomain_l2);
+    free_xenheap_page(d->arch.mm_perdomain_l3);
+#endif
+    free_xenheap_pages(d->arch.mm_perdomain_pt, pdpt_order);
+    return -ENOMEM;
 }
 
 /* This is called by arch_final_setup_guest and do_boot_vcpu */
@@ -692,7 +717,7 @@ static void __context_switch(void)
     ASSERT(p != n);
     ASSERT(cpus_empty(n->vcpu_dirty_cpumask));
 
-    if ( !is_idle_domain(p->domain) )
+    if ( !is_idle_vcpu(p) )
     {
         memcpy(&p->arch.guest_context.user_regs,
                stack_regs,
@@ -701,7 +726,7 @@ static void __context_switch(void)
         save_segments(p);
     }
 
-    if ( !is_idle_domain(n->domain) )
+    if ( !is_idle_vcpu(n) )
     {
         memcpy(stack_regs,
                &n->arch.guest_context.user_regs,
@@ -767,7 +792,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     set_current(next);
 
-    if ( (percpu_ctxt[cpu].curr_vcpu == next) || is_idle_domain(next->domain) )
+    if ( (percpu_ctxt[cpu].curr_vcpu == next) || is_idle_vcpu(next) )
     {
         local_irq_enable();
     }

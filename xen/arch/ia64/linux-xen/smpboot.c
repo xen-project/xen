@@ -484,7 +484,6 @@ do_rest:
 
 	if ( (idle = do_createdomain(IDLE_DOMAIN_ID, cpu)) == NULL )
 		panic("failed 'createdomain' for CPU %d", cpu);
-	set_bit(_DOMF_idle_domain, &idle->domain_flags);
 	v = idle->vcpu[0];
 
 	printf ("do_boot_cpu: cpu=%d, domain=%p, vcpu=%p\n", cpu, idle, v);

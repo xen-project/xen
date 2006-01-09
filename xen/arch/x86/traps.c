@@ -427,7 +427,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
         tb->flags |= TBF_INTERRUPT;
 }
 
-static int handle_perdomain_mapping_fault(
+static int handle_gdt_ldt_mapping_fault(
     unsigned long offset, struct cpu_user_regs *regs)
 {
     extern int map_ldt_shadow_page(unsigned int);
@@ -437,14 +437,14 @@ static int handle_perdomain_mapping_fault(
     int ret;
 
     /* Which vcpu's area did we fault in, and is it in the ldt sub-area? */
-    unsigned int is_ldt_area = (offset >> (PDPT_VCPU_VA_SHIFT-1)) & 1;
-    unsigned int vcpu_area   = (offset >> PDPT_VCPU_VA_SHIFT);
+    unsigned int is_ldt_area = (offset >> (GDT_LDT_VCPU_VA_SHIFT-1)) & 1;
+    unsigned int vcpu_area   = (offset >> GDT_LDT_VCPU_VA_SHIFT);
 
     /* Should never fault in another vcpu's area. */
     BUG_ON(vcpu_area != current->vcpu_id);
 
     /* Byte offset within the gdt/ldt sub-area. */
-    offset &= (1UL << (PDPT_VCPU_VA_SHIFT-1)) - 1UL;
+    offset &= (1UL << (GDT_LDT_VCPU_VA_SHIFT-1)) - 1UL;
 
     if ( likely(is_ldt_area) )
     {
@@ -490,9 +490,9 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     {
         if ( shadow_mode_external(d) && GUEST_CONTEXT(v, regs) )
             return shadow_fault(addr, regs);
-        if ( (addr >= PERDOMAIN_VIRT_START) && (addr < PERDOMAIN_VIRT_END) )
-            return handle_perdomain_mapping_fault(
-                addr - PERDOMAIN_VIRT_START, regs);
+        if ( (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
+            return handle_gdt_ldt_mapping_fault(
+                addr - GDT_LDT_VIRT_START, regs);
     }
     else if ( unlikely(shadow_mode_enabled(d)) )
     {
