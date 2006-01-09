@@ -100,7 +100,7 @@ __start:
 1:      stosl   /* low mappings cover as much physmem as possible */
         add     $4,%edi
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
-        cmp     $__HYPERVISOR_VIRT_START+0xe3,%eax
+        cmp     $HYPERVISOR_VIRT_START+0xe3,%eax
         jne     1b
 #else
         /* Initialize low and high mappings of all memory with 4MB pages */
@@ -113,7 +113,7 @@ __start:
         jne     1b
 1:      stosl   /* low mappings cover as much physmem as possible */
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
-        cmp     $__HYPERVISOR_VIRT_START+0xe3,%eax
+        cmp     $HYPERVISOR_VIRT_START+0xe3,%eax
         jne     1b
 #endif
         

@@ -49,10 +49,15 @@
  * machine->physical mapping table starts at this address, read-only.
  */
 #ifdef CONFIG_X86_PAE
-# define HYPERVISOR_VIRT_START (0xF5800000UL)
+#define __HYPERVISOR_VIRT_START 0xF5800000
 #else
-# define HYPERVISOR_VIRT_START (0xFC000000UL)
+#define __HYPERVISOR_VIRT_START 0xFC000000
 #endif
+
+#ifndef HYPERVISOR_VIRT_START
+#define HYPERVISOR_VIRT_START mk_unsigned_long(__HYPERVISOR_VIRT_START)
+#endif
+
 #ifndef machine_to_phys_mapping
 #define machine_to_phys_mapping ((unsigned long *)HYPERVISOR_VIRT_START)
 #endif
@@ -137,7 +142,7 @@ typedef struct {
     unsigned long pad[5]; /* sizeof(vcpu_info_t) == 64 */
 } arch_vcpu_info_t;
 
-#endif
+#endif /* !__ASSEMBLY__ */
 
 #endif
 

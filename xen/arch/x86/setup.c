@@ -343,6 +343,12 @@ void __init __start_xen(multiboot_info_t *mbi)
     BUG_ON(sizeof(shared_info_t) > PAGE_SIZE);
     BUG_ON(sizeof(vcpu_info_t) != 64);
 
+    /* __foo are defined in public headers. Check they match internal defs. */
+    BUG_ON(__HYPERVISOR_VIRT_START != HYPERVISOR_VIRT_START);
+#ifdef HYPERVISOR_VIRT_END
+    BUG_ON(__HYPERVISOR_VIRT_END   != HYPERVISOR_VIRT_END);
+#endif
+
     init_frametable();
 
     end_boot_allocator();

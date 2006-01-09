@@ -59,9 +59,12 @@
 /* And the trap vector is... */
 #define TRAP_INSTR "syscall"
 
+#define __HYPERVISOR_VIRT_START 0xFFFF800000000000
+#define __HYPERVISOR_VIRT_END   0xFFFF880000000000
+
 #ifndef HYPERVISOR_VIRT_START
-#define HYPERVISOR_VIRT_START (0xFFFF800000000000UL)
-#define HYPERVISOR_VIRT_END   (0xFFFF880000000000UL)
+#define HYPERVISOR_VIRT_START mk_unsigned_long(__HYPERVISOR_VIRT_START)
+#define HYPERVISOR_VIRT_END   mk_unsigned_long(__HYPERVISOR_VIRT_END)
 #endif
 
 /* Maximum number of virtual CPUs in multi-processor guests. */
