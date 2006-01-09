@@ -109,7 +109,7 @@ static ssize_t xenbus_dev_write(struct file *filp,
 				size_t len, loff_t *ppos)
 {
 	struct xenbus_dev_data *u = filp->private_data;
-	struct xenbus_dev_transaction *trans;
+	struct xenbus_dev_transaction *trans = NULL;
 	void *reply;
 
 	if ((len + u->len) > sizeof(u->u.buffer))
@@ -141,8 +141,10 @@ static ssize_t xenbus_dev_write(struct file *filp,
 		}
 
 		reply = xenbus_dev_request_and_reply(&u->u.msg);
-		if (IS_ERR(reply))
+		if (IS_ERR(reply)) {
+			kfree(trans);
 			return PTR_ERR(reply);
+		}
 
 		if (u->u.msg.type == XS_TRANSACTION_START) {
 			trans->handle = (struct xenbus_transaction *)
