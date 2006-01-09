@@ -689,6 +689,9 @@ static void __context_switch(void)
     struct vcpu          *p = percpu_ctxt[cpu].curr_vcpu;
     struct vcpu          *n = current;
 
+    ASSERT(p != n);
+    ASSERT(cpus_empty(n->vcpu_dirty_cpumask));
+
     if ( !is_idle_domain(p->domain) )
     {
         memcpy(&p->arch.guest_context.user_regs,
@@ -748,24 +751,31 @@ static void __context_switch(void)
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     unsigned int cpu = smp_processor_id();
+    cpumask_t dirty_mask = next->vcpu_dirty_cpumask;
 
     ASSERT(local_irq_is_enabled());
 
+    /* Allow at most one CPU at a time to be dirty. */
+    ASSERT(cpus_weight(dirty_mask) <= 1);
+    if ( unlikely(!cpu_isset(cpu, dirty_mask) && !cpus_empty(dirty_mask)) )
+    {
+        /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
+        flush_tlb_mask(dirty_mask);
+    }
+
+    local_irq_disable();
+
     set_current(next);
 
-    if ( (percpu_ctxt[cpu].curr_vcpu != next) &&
-         !is_idle_domain(next->domain) )
+    if ( (percpu_ctxt[cpu].curr_vcpu == next) || is_idle_domain(next->domain) )
     {
-        /* This may happen if next has been migrated by the scheduler. */
-        if ( unlikely(!cpus_empty(next->vcpu_dirty_cpumask)) )
-        {
-            ASSERT(!cpu_isset(cpu, next->vcpu_dirty_cpumask));
-            sync_vcpu_execstate(next);
-            ASSERT(cpus_empty(next->vcpu_dirty_cpumask));
-        }
-
-        local_irq_disable();
+        local_irq_enable();
+    }
+    else
+    {
         __context_switch();
+
+        /* Re-enable interrupts before restoring state which may fault. */
         local_irq_enable();
 
         if ( VMX_DOMAIN(next) )
