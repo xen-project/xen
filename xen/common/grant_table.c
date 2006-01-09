@@ -312,8 +312,6 @@ __gnttab_map_grant_ref(
     if ( !act->pin )
         clear_bit(_GTF_reading, &sha->flags);
 
-    spin_unlock(&rd->grant_table->lock);
-
  unlock_out:
     spin_unlock(&rd->grant_table->lock);
     (void)__put_user(rc, &uop->status);
