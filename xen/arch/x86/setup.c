@@ -165,9 +165,8 @@ void __init __start_xen(multiboot_info_t *mbi)
     if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
         cmdline_parse(__va(mbi->cmdline));
 
-    /* Must do this early -- e.g., spinlocks rely on get_current(). */
-    set_current(NULL/*idle_vcpu[0]*/);
-    set_processor_id(0);
+    set_current((struct vcpu *)0xfffff000); /* debug sanity */
+    set_processor_id(0); /* needed early, for smp_processor_id() */
 
     smp_prepare_boot_cpu();
 
