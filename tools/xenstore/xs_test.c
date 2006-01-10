@@ -43,7 +43,7 @@
 #define XSTEST
 
 static struct xs_handle *handles[10] = { NULL };
-static struct xs_transaction_handle *txh[10] = { XBT_NULL };
+static xs_transaction_handle txh[10] = { XBT_NULL };
 
 static unsigned int timeout_ms = 500;
 static bool timeout_suppressed = true;

@@ -302,7 +302,7 @@ static void maybe_connect(struct backend_info *be)
  */
 static void connect(struct backend_info *be)
 {
-	struct xenbus_transaction *xbt;
+	xenbus_transaction_t xbt;
 	int err;
 	struct xenbus_device *dev = be->dev;
 

@@ -271,7 +271,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 {
 	const char *message = NULL;
 	int err;
-	struct xenbus_transaction *xbt;
+	xenbus_transaction_t xbt;
 
 	err = setup_tpmring(dev, info);
 	if (err) {

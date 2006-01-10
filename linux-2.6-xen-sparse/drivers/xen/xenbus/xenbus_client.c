@@ -87,7 +87,7 @@ EXPORT_SYMBOL(xenbus_watch_path2);
 
 
 int xenbus_switch_state(struct xenbus_device *dev,
-			struct xenbus_transaction *xbt,
+			xenbus_transaction_t xbt,
 			XenbusState state)
 {
 	/* We check whether the state is currently set to the given value, and

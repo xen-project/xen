@@ -161,7 +161,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 			   struct blkfront_info *info)
 {
 	const char *message = NULL;
-	struct xenbus_transaction *xbt;
+	xenbus_transaction_t xbt;
 	int err;
 
 	/* Create shared ring, alloc event channel. */
