@@ -311,7 +311,7 @@ static void serial_rx(char c, struct cpu_user_regs *regs)
 
 long guest_console_write(char *buffer, int count)
 {
-    char kbuf[128];
+    char kbuf[128], *kptr;
     int kcount;
 
     while ( count > 0 )
@@ -333,6 +333,9 @@ long guest_console_write(char *buffer, int count)
         kbuf[kcount] = '\0';
 
         serial_puts(sercon_handle, kbuf);
+
+        for ( kptr = kbuf; *kptr != '\0'; kptr++ )
+            putchar_console(*kptr);
 
         buffer += kcount;
         count  -= kcount;
