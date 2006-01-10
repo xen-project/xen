@@ -17,21 +17,21 @@
 
 /*
  * Maps a given range of page frames, returning the mapped virtual address. The
- * pages are now accessible within the current domain until a corresponding
+ * pages are now accessible within the current VCPU until a corresponding
  * call to unmap_domain_page().
  */
 extern void *map_domain_pages(unsigned long pfn, unsigned int order);
 
 /*
  * Pass a VA within the first page of a range previously mapped in the context
- * of the currently-executing domain via a call to map_domain_pages(). Those
+ * of the currently-executing VCPU via a call to map_domain_pages(). Those
  * pages will then be removed from the mapping lists.
  */
 extern void unmap_domain_pages(void *va, unsigned int order);
 
 /*
  * Similar to the above calls, except the mapping is accessible in all
- * address spaces (not just within the domain that created the mapping). Global
+ * address spaces (not just within the VCPU that created the mapping). Global
  * mappings can also be unmapped from any context.
  */
 extern void *map_domain_page_global(unsigned long pfn);

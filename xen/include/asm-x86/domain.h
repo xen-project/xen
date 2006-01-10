@@ -17,6 +17,7 @@ struct mapcache {
     l1_pgentry_t *l1tab;
     unsigned int cursor;
     unsigned int epoch, shadow_epoch[MAX_VIRT_CPUS];
+    u32 tlbflush_timestamp;
     spinlock_t lock;
 };
 

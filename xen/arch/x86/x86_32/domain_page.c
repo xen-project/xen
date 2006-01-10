@@ -40,7 +40,8 @@ void *map_domain_pages(unsigned long pfn, unsigned int order)
 {
     unsigned long va;
     unsigned int idx, i, flags, vcpu = current->vcpu_id;
-    struct mapcache *cache = &current->domain->arch.mapcache;
+    struct domain *d;
+    struct mapcache *cache;
 #ifndef NDEBUG
     unsigned int flush_count = 0;
 #endif
@@ -49,17 +50,24 @@ void *map_domain_pages(unsigned long pfn, unsigned int order)
     perfc_incrc(map_domain_page_count);
 
     /* If we are the idle domain, ensure that we run on our own page tables. */
-    if ( unlikely(is_idle_vcpu(current)) )
+    d = current->domain;
+    if ( unlikely(is_idle_domain(d)) )
         __sync_lazy_execstate();
+
+    cache = &d->arch.mapcache;
 
     spin_lock(&cache->lock);
 
     /* Has some other CPU caused a wrap? We must flush if so. */
-    if ( cache->epoch != cache->shadow_epoch[vcpu] )
+    if ( unlikely(cache->epoch != cache->shadow_epoch[vcpu]) )
     {
-        perfc_incrc(domain_page_tlb_flush);
-        local_flush_tlb();
         cache->shadow_epoch[vcpu] = cache->epoch;
+        if ( NEED_FLUSH(tlbflush_time[smp_processor_id()],
+                        cache->tlbflush_timestamp) )
+        {
+            perfc_incrc(domain_page_tlb_flush);
+            local_flush_tlb();
+        }
     }
 
     do {
@@ -71,6 +79,7 @@ void *map_domain_pages(unsigned long pfn, unsigned int order)
             perfc_incrc(domain_page_tlb_flush);
             local_flush_tlb();
             cache->shadow_epoch[vcpu] = ++cache->epoch;
+            cache->tlbflush_timestamp = tlbflush_current_time();
         }
 
         flags = 0;
