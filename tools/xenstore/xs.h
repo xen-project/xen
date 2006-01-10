@@ -22,6 +22,8 @@
 
 #include <xs_lib.h>
 
+#define XBT_NULL NULL
+
 struct xs_handle;
 struct xs_transaction_handle;
 

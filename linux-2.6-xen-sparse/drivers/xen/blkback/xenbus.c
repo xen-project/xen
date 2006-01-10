@@ -145,7 +145,7 @@ static int blkback_probe(struct xenbus_device *dev,
 	if (err)
 		goto fail;
 
-	err = xenbus_switch_state(dev, NULL, XenbusStateInitWait);
+	err = xenbus_switch_state(dev, XBT_NULL, XenbusStateInitWait);
 	if (err)
 		goto fail;
 
@@ -175,7 +175,7 @@ static void backend_changed(struct xenbus_watch *watch,
 
 	DPRINTK("");
 
-	err = xenbus_scanf(NULL, dev->nodename, "physical-device", "%x:%x",
+	err = xenbus_scanf(XBT_NULL, dev->nodename, "physical-device", "%x:%x",
 			   &major, &minor);
 	if (XENBUS_EXIST_ERR(err)) {
 		/* Since this watch will fire once immediately after it is
@@ -197,7 +197,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		return;
 	}
 
-	be->mode = xenbus_read(NULL, dev->nodename, "mode", NULL);
+	be->mode = xenbus_read(XBT_NULL, dev->nodename, "mode", NULL);
 	if (IS_ERR(be->mode)) {
 		err = PTR_ERR(be->mode);
 		be->mode = NULL;
@@ -268,7 +268,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		xenbus_switch_state(dev, NULL, XenbusStateClosing);
+		xenbus_switch_state(dev, XBT_NULL, XenbusStateClosing);
 		break;
 
 	case XenbusStateClosed:
@@ -366,7 +366,7 @@ static int connect_ring(struct backend_info *be)
 
 	DPRINTK("%s", dev->otherend);
 
-	err = xenbus_gather(NULL, dev->otherend, "ring-ref", "%lu", &ring_ref,
+	err = xenbus_gather(XBT_NULL, dev->otherend, "ring-ref", "%lu", &ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {
 		xenbus_dev_fatal(dev, err,

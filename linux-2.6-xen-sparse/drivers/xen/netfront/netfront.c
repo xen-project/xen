@@ -212,7 +212,7 @@ static int netfront_probe(struct xenbus_device *dev,
 	struct netfront_info *info;
 	unsigned int handle;
 
-	err = xenbus_scanf(NULL, dev->nodename, "handle", "%u", &handle);
+	err = xenbus_scanf(XBT_NULL, dev->nodename, "handle", "%u", &handle);
 	if (err != 1) {
 		xenbus_dev_fatal(dev, err, "reading handle");
 		return err;
@@ -1199,7 +1199,7 @@ static void netfront_closing(struct xenbus_device *dev)
 
 	close_netdev(info);
 
-	xenbus_switch_state(dev, NULL, XenbusStateClosed);
+	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
 }
 
 

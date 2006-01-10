@@ -37,12 +37,13 @@
 #include <sys/time.h>
 #include "utils.h"
 #include "xs_lib.h"
+#include "xs.h"
 #include "list.h"
 
 #define XSTEST
 
 static struct xs_handle *handles[10] = { NULL };
-static struct xs_transaction_handle *txh[10] = { NULL };
+static struct xs_transaction_handle *txh[10] = { XBT_NULL };
 
 static unsigned int timeout_ms = 500;
 static bool timeout_suppressed = true;
@@ -492,7 +493,7 @@ static void do_unwatch(unsigned int handle, const char *node, const char *token)
 static void do_start(unsigned int handle)
 {
 	txh[handle] = xs_transaction_start(handles[handle]);
-	if (txh[handle] == NULL)
+	if (txh[handle] == XBT_NULL)
 		failed(handle);
 }
 
@@ -500,7 +501,7 @@ static void do_end(unsigned int handle, bool abort)
 {
 	if (!xs_transaction_end(handles[handle], txh[handle], abort))
 		failed(handle);
-	txh[handle] = NULL;
+	txh[handle] = XBT_NULL;
 }
 
 static void do_introduce(unsigned int handle,
@@ -718,7 +719,7 @@ static void do_command(unsigned int default_handle, char *line)
 	else if (streq(command, "close")) {
 		xs_daemon_close(handles[handle]);
 		handles[handle] = NULL;
-		txh[handle] = NULL;
+		txh[handle] = XBT_NULL;
 	} else if (streq(command, "start"))
 		do_start(handle);
 	else if (streq(command, "commit"))

@@ -37,6 +37,8 @@
 #include <asm-xen/xen-public/io/xenbus.h>
 #include <asm-xen/xen-public/io/xs_wire.h>
 
+#define XBT_NULL NULL
+
 /* Register callback to watch this node. */
 struct xenbus_watch
 {

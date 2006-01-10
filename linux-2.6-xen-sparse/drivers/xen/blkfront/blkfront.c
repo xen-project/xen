@@ -91,7 +91,7 @@ static int blkfront_probe(struct xenbus_device *dev,
 	struct blkfront_info *info;
 
 	/* FIXME: Use dynamic device id if this is not set. */
-	err = xenbus_scanf(NULL, dev->nodename,
+	err = xenbus_scanf(XBT_NULL, dev->nodename,
 			   "virtual-device", "%i", &vdevice);
 	if (err != 1) {
 		xenbus_dev_fatal(dev, err, "reading virtual-device");
@@ -319,7 +319,7 @@ static void connect(struct blkfront_info *info)
 
 	DPRINTK("blkfront.c:connect:%s.\n", info->xbdev->otherend);
 
-	err = xenbus_gather(NULL, info->xbdev->otherend,
+	err = xenbus_gather(XBT_NULL, info->xbdev->otherend,
 			    "sectors", "%lu", &sectors,
 			    "info", "%u", &binfo,
 			    "sector-size", "%lu", &sector_size,
@@ -338,7 +338,7 @@ static void connect(struct blkfront_info *info)
 		return;
 	}
 
-	(void)xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected); 
+	(void)xenbus_switch_state(info->xbdev, XBT_NULL, XenbusStateConnected); 
 
 	/* Kick pending requests. */
 	spin_lock_irq(&blkif_io_lock);
@@ -367,7 +367,7 @@ static void blkfront_closing(struct xenbus_device *dev)
 		info->mi = NULL;
 	}
 
-	xenbus_switch_state(dev, NULL, XenbusStateClosed);
+	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
 }
 
 
@@ -775,7 +775,7 @@ static void blkif_recover(struct blkfront_info *info)
 
 	kfree(copy);
 
-	(void)xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected); 
+	(void)xenbus_switch_state(info->xbdev, XBT_NULL, XenbusStateConnected); 
 	
 	/* Now safe for us to use the shared ring */
 	spin_lock_irq(&blkif_io_lock);

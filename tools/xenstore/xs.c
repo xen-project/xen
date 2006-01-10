@@ -560,7 +560,7 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 	iov[1].iov_base = (void *)token;
 	iov[1].iov_len = strlen(token) + 1;
 
-	return xs_bool(xs_talkv(h, NULL, XS_WATCH, iov,
+	return xs_bool(xs_talkv(h, XBT_NULL, XS_WATCH, iov,
 				ARRAY_SIZE(iov), NULL));
 }
 
@@ -627,7 +627,7 @@ bool xs_unwatch(struct xs_handle *h, const char *path, const char *token)
 	iov[1].iov_base = (char *)token;
 	iov[1].iov_len = strlen(token) + 1;
 
-	return xs_bool(xs_talkv(h, NULL, XS_UNWATCH, iov,
+	return xs_bool(xs_talkv(h, XBT_NULL, XS_UNWATCH, iov,
 				ARRAY_SIZE(iov), NULL));
 }
 
@@ -641,7 +641,7 @@ struct xs_transaction_handle *xs_transaction_start(struct xs_handle *h)
 	char *id_str;
 	unsigned long id;
 
-	id_str = xs_single(h, NULL, XS_TRANSACTION_START, "", NULL);
+	id_str = xs_single(h, XBT_NULL, XS_TRANSACTION_START, "", NULL);
 	if (id_str == NULL)
 		return NULL;
 
@@ -693,7 +693,7 @@ bool xs_introduce_domain(struct xs_handle *h,
 	iov[2].iov_base = eventchn_str;
 	iov[2].iov_len = strlen(eventchn_str) + 1;
 
-	return xs_bool(xs_talkv(h, NULL, XS_INTRODUCE, iov,
+	return xs_bool(xs_talkv(h, XBT_NULL, XS_INTRODUCE, iov,
 				ARRAY_SIZE(iov), NULL));
 }
 
@@ -705,7 +705,7 @@ static void * single_with_domid(struct xs_handle *h,
 
 	sprintf(domid_str, "%u", domid);
 
-	return xs_single(h, NULL, type, domid_str, NULL);
+	return xs_single(h, XBT_NULL, type, domid_str, NULL);
 }
 
 bool xs_release_domain(struct xs_handle *h, unsigned int domid)
@@ -719,7 +719,7 @@ char *xs_get_domain_path(struct xs_handle *h, unsigned int domid)
 
 	sprintf(domid_str, "%u", domid);
 
-	return xs_single(h, NULL, XS_GET_DOMAIN_PATH, domid_str, NULL);
+	return xs_single(h, XBT_NULL, XS_GET_DOMAIN_PATH, domid_str, NULL);
 }
 
 bool xs_is_domain_introduced(struct xs_handle *h, unsigned int domid)
@@ -739,7 +739,7 @@ char *xs_debug_command(struct xs_handle *h, const char *cmd,
 	iov[1].iov_base = data;
 	iov[1].iov_len = len;
 
-	return xs_talkv(h, NULL, XS_DEBUG, iov,
+	return xs_talkv(h, XBT_NULL, XS_DEBUG, iov,
 			ARRAY_SIZE(iov), NULL);
 }
 

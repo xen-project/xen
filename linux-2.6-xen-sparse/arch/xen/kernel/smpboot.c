@@ -298,7 +298,7 @@ static void vcpu_hotplug(unsigned int cpu)
 		return;
 
 	sprintf(dir, "cpu/%d", cpu);
-	err = xenbus_scanf(NULL, dir, "availability", "%s", state);
+	err = xenbus_scanf(XBT_NULL, dir, "availability", "%s", state);
 	if (err != 1) {
 		printk(KERN_ERR "XENBUS: Unable to read cpu state\n");
 		return;

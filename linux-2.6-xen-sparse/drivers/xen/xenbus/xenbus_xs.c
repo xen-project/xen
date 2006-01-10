@@ -431,7 +431,7 @@ struct xenbus_transaction *xenbus_transaction_start(void)
 
 	down_read(&xs_state.suspend_mutex);
 
-	id_str = xs_single(NULL, XS_TRANSACTION_START, "", NULL);
+	id_str = xs_single(XBT_NULL, XS_TRANSACTION_START, "", NULL);
 	if (IS_ERR(id_str)) {
 		up_read(&xs_state.suspend_mutex);
 		return (struct xenbus_transaction *)id_str;
@@ -553,7 +553,7 @@ static int xs_watch(const char *path, const char *token)
 	iov[1].iov_base = (void *)token;
 	iov[1].iov_len = strlen(token) + 1;
 
-	return xs_error(xs_talkv(NULL, XS_WATCH, iov,
+	return xs_error(xs_talkv(XBT_NULL, XS_WATCH, iov,
 				 ARRAY_SIZE(iov), NULL));
 }
 
@@ -566,7 +566,7 @@ static int xs_unwatch(const char *path, const char *token)
 	iov[1].iov_base = (char *)token;
 	iov[1].iov_len = strlen(token) + 1;
 
-	return xs_error(xs_talkv(NULL, XS_UNWATCH, iov,
+	return xs_error(xs_talkv(XBT_NULL, XS_UNWATCH, iov,
 				 ARRAY_SIZE(iov), NULL));
 }
 

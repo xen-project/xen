@@ -275,7 +275,7 @@ static int connect_ring(struct backend_info *be)
 	unsigned int evtchn;
 	int err;
 
-	err = xenbus_gather(NULL, dev->otherend,
+	err = xenbus_gather(XBT_NULL, dev->otherend,
 	                    "ring-ref", "%lu", &ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {

@@ -152,7 +152,7 @@ void _dev_error(struct xenbus_device *dev, int err, const char *fmt,
 		goto fail;
 	}
 
-	if (xenbus_write(NULL, path_buffer, "error", printf_buffer) != 0) {
+	if (xenbus_write(XBT_NULL, path_buffer, "error", printf_buffer) != 0) {
 		printk("xenbus: failed to write error node for %s (%s)\n",
 		       dev->nodename, printf_buffer);
 		goto fail;
@@ -187,7 +187,7 @@ void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
 	_dev_error(dev, err, fmt, ap);
 	va_end(ap);
 	
-	xenbus_switch_state(dev, NULL, XenbusStateClosing);
+	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosing);
 }
 EXPORT_SYMBOL(xenbus_dev_fatal);
 
@@ -223,7 +223,7 @@ XenbusState xenbus_read_driver_state(const char *path)
 {
 	XenbusState result;
 
-	int err = xenbus_gather(NULL, path, "state", "%d", &result, NULL);
+	int err = xenbus_gather(XBT_NULL, path, "state", "%d", &result, NULL);
 	if (err)
 		result = XenbusStateClosed;
 
