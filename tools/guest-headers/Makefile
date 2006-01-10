@@ -2,6 +2,8 @@
 XEN_ROOT=../..
 linuxsparsetree = $(XEN_ROOT)/linux-2.6-xen-sparse
 
+all:
+
 check:
 
 install:
