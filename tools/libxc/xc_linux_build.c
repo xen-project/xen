@@ -693,8 +693,11 @@ static int setup_guest(int xc_handle,
         start_info->mod_start    = vinitrd_start;
         start_info->mod_len      = initrd_len;
     }
-    strncpy((char *)start_info->cmd_line, cmdline, MAX_GUEST_CMDLINE);
-    start_info->cmd_line[MAX_GUEST_CMDLINE-1] = '\0';
+    if (cmdline != NULL) {
+        strncpy((char *)start_info->cmd_line, cmdline, MAX_GUEST_CMDLINE);
+        start_info->cmd_line[MAX_GUEST_CMDLINE-1] = '\0';
+    } else
+        start_info->cmd_line[0] = '\0';
     munmap(start_info, PAGE_SIZE);
 
     /* shared_info page starts its life empty. */
@@ -755,7 +758,8 @@ int xc_linux_build(int xc_handle,
         goto error_out;
     }
 
-    if ( (image = xc_read_kernel_image(image_name, &image_size)) == NULL )
+    if ( (image_name == NULL) ||
+         ((image = xc_read_kernel_image(image_name, &image_size)) == NULL) )
         goto error_out;
 
     if ( (ramdisk_name != NULL) && (strlen(ramdisk_name) != 0) )
