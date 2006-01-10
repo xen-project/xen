@@ -42,7 +42,7 @@ then
   {
     /sbin/ifup ${HWD_CONFIG_0} $1
   }
-elif ! which ifup >&/dev/null
+elif ! which ifup >/dev/null 2>/dev/null
 then
   if [ -e /etc/conf.d/net ]
   then
@@ -59,9 +59,18 @@ then
       /etc/init.d/net.$1 stop
     }
   else
-    logger -p "daemon.crit" -- \
-      "You don't have ifup and don't seem to be running Gentoo either!"
-    exit 1
+    preiftransfer()
+    {
+      true
+    }
+    ifup()
+    {
+      false
+    }
+    ifdown()
+    {
+      false
+    }
   fi
 else
   preiftransfer()
