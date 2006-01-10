@@ -648,12 +648,6 @@ fastcall void do_int3(struct pt_regs *regs, long error_code)
 }
 #endif
 
-static inline void conditional_sti(struct pt_regs *regs)
-{
-	if (regs->eflags & (X86_EFLAGS_IF|VM_MASK))
-		local_irq_enable();
-}
-
 /*
  * Our handling of the processor debug registers is non-trivial.
  * We do not clear them on entry and exit from the kernel. Therefore
@@ -686,9 +680,9 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 	if (notify_die(DIE_DEBUG, "debug", regs, condition, error_code,
 					SIGTRAP) == NOTIFY_STOP)
 		return;
-
 	/* It's safe to allow irq's after DR6 has been saved */
-	conditional_sti(regs);
+	if (regs->eflags & X86_EFLAGS_IF)
+		local_irq_enable();
 
 	/* Mask out spurious debug traps due to lazy DR7 setting */
 	if (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) {

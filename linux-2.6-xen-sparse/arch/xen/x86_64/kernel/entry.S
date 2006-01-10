@@ -57,7 +57,7 @@
 #ifndef CONFIG_PREEMPT
 #define retint_kernel retint_restore_args
 #endif	
-
+	
 /*
  * C code is not supposed to know about undefined top of stack. Every time 
  * a C function with an pt_regs argument is called from the SYSCALL based 
@@ -65,7 +65,7 @@
  * RESTORE_TOP_OF_STACK syncs the syscall state after any possible ptregs
  * manipulation.
  */        	
-
+		
 	/* %rsp:at FRAMEEND */ 
 	.macro FIXUP_TOP_OF_STACK tmp
 	movq    $__USER_CS,CS(%rsp)
@@ -417,7 +417,6 @@ ENTRY(stub_rt_sigreturn)
 	RESTORE_REST
 	jmp int_ret_from_sys_call
 	CFI_ENDPROC
-
 
 /* 
  * Interrupt entry/exit.

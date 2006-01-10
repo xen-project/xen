@@ -9,18 +9,15 @@
  * x86_64-specific irq controller code. (e.g. i8259.c and
  * io_apic.c.)
  */
-#include <asm/uaccess.h>
-#include <linux/module.h>
-#include <linux/seq_file.h>
-#include <linux/interrupt.h>
-#include <linux/kernel_stat.h>
 
-/*
- * Interrupt statistics:
- */
+#include <linux/kernel_stat.h>
+#include <linux/interrupt.h>
+#include <linux/seq_file.h>
+#include <linux/module.h>
+#include <asm/uaccess.h>
+#include <asm/io_apic.h>
 
 atomic_t irq_err_count;
-
 #ifdef CONFIG_X86_IO_APIC
 #ifdef APIC_MISMATCH_DEBUG
 atomic_t irq_mis_count;

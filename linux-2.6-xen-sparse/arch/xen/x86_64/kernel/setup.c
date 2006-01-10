@@ -304,7 +304,6 @@ static void __init probe_roms(void)
 }
 #endif
 
-
 static __init void parse_cmdline_early (char ** cmdline_p)
 {
 	char c = ' ', *to = command_line, *from = COMMAND_LINE;
@@ -379,6 +378,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 			acpi_skip_timer_override = 1;
 #endif
 #endif
+
 #ifndef CONFIG_XEN
 		if (!memcmp(from, "nolapic", 7) ||
 		    !memcmp(from, "disableapic", 11))
@@ -391,7 +391,8 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 			skip_ioapic_setup = 0;
 			ioapic_force = 1;
 		}
-#endif			
+#endif
+			
 		if (!memcmp(from, "mem=", 4))
 			parse_memopt(from+4, &from); 
 
@@ -588,7 +589,7 @@ void __init setup_arch(char **cmdline_p)
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_writable_pagetables);
 
-        ARCH_SETUP
+	ARCH_SETUP
 #else
  	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
  	drive_info = DRIVE_INFO;
@@ -612,7 +613,7 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.end_code = (unsigned long) &_etext;
 	init_mm.end_data = (unsigned long) &_edata;
 #ifdef CONFIG_XEN
-        init_mm.brk = start_pfn << PAGE_SHIFT;
+	init_mm.brk = start_pfn << PAGE_SHIFT;
 #else
 	init_mm.brk = (unsigned long) &_end;	
 
@@ -667,7 +668,6 @@ void __init setup_arch(char **cmdline_p)
 	/* reserve ebda region */
 	reserve_ebda_region();
 #endif
-
 
 #ifdef CONFIG_SMP
 	/*
@@ -790,8 +790,6 @@ void __init setup_arch(char **cmdline_p)
 
 	}
 
-
-
 	if ( ! (xen_start_info->flags & SIF_INITDOMAIN))
 	{
 		acpi_disabled = 1;
@@ -835,7 +833,7 @@ void __init setup_arch(char **cmdline_p)
 	 * and also for regions reported as reserved by the e820.
 	 */
 	probe_roms();
-	e820_reserve_resources();
+	e820_reserve_resources(); 
 #endif
 
 	request_resource(&iomem_resource, &video_ram_resource);

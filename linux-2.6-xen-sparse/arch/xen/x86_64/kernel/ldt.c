@@ -62,6 +62,7 @@ static int alloc_ldt(mm_context_t *pc, unsigned mincount, int reload)
 	if (reload) {
 #ifdef CONFIG_SMP
 		cpumask_t mask;
+
 		preempt_disable();
 #endif
 		make_pages_readonly(pc->ldt, (pc->size * LDT_ENTRY_SIZE) /
@@ -201,6 +202,7 @@ static int write_ldt(void __user * ptr, unsigned long bytecount, int oldmode)
 	struct user_desc ldt_info;
 
 	error = -EINVAL;
+
 	if (bytecount != sizeof(ldt_info))
 		goto out;
 	error = -EFAULT; 	

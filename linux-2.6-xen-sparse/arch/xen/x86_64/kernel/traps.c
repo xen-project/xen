@@ -890,7 +890,6 @@ asmlinkage void __attribute__((weak)) smp_thermal_interrupt(void)
 asmlinkage void math_state_restore(void)
 {
 	struct task_struct *me = current;
-        
         /* clts(); */ /* 'clts' is done for us by Xen during virtual trap. */
 
 	if (!used_math())
