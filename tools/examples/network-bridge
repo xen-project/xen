@@ -242,10 +242,10 @@ using loopback.nloopbacks=<N> on the domain 0 kernel command line.
 	ip addr flush ${pdev}
 	ip link set ${netdev} addr ${mac} arp on
 	add_to_bridge ${bridge} ${vif0}
-	add_to_bridge ${bridge} ${pdev}
 	ip link set ${bridge} up
 	ip link set ${vif0} up
 	ip link set ${pdev} up
+	add_to_bridge2 ${bridge} ${pdev}
 	do_ifup ${netdev}
     else
 	# old style without ${vdev}
@@ -291,6 +291,27 @@ op_stop () {
 	ip link set ${bridge} down
     fi
     brctl delbr ${bridge}
+}
+
+# adds $dev to $bridge but waits for $dev to be in running state first
+add_to_bridge2() {
+    local bridge=$1
+    local dev=$2
+    local maxtries=10
+
+    echo -n "Waiting for ${dev} to negotiate link."
+    for i in `seq ${maxtries}` ; do
+	if ifconfig ${dev} | grep -q RUNNING ; then
+	    break
+	else
+	    echo -n '.'
+	    sleep 1
+	fi
+    done
+
+    if [ ${i} -eq ${maxtries} ] ; then echo '(link isnt in running state)' ; fi
+
+    add_to_bridge ${bridge} ${dev}
 }
 
 case "$command" in
