@@ -98,7 +98,8 @@ void vmx_relinquish_resources(struct vcpu *v)
         /* unmap IO shared page */
         struct domain *d = v->domain;
         if ( d->arch.vmx_platform.shared_page_va )
-            unmap_domain_page((void *)d->arch.vmx_platform.shared_page_va);
+            unmap_domain_page_global(
+                (void *)d->arch.vmx_platform.shared_page_va);
     }
 
     destroy_vmcs(&v->arch.arch_vmx);

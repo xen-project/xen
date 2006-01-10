@@ -151,6 +151,8 @@ free_shadow_fl1_table(struct domain *d, unsigned long smfn)
 
     for (i = 0; i < L1_PAGETABLE_ENTRIES; i++)
         put_page_from_l1e(pl1e[i], d);
+
+    unmap_domain_page(pl1e);
 }
 
 /*
@@ -254,6 +256,7 @@ static pagetable_t page_table_convert(struct domain *d)
     pae_l3 = map_domain_page(pagetable_get_pfn(d->arch.phys_table));
     for (i = 0; i < PDP_ENTRIES; i++)
         l3[i] = l3e_from_pfn(l3e_get_pfn(pae_l3[i]), __PAGE_HYPERVISOR);
+    unmap_domain_page(pae_l3);
 
     unmap_domain_page(l4);
     unmap_domain_page(l3);
@@ -275,7 +278,7 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     ASSERT( mmfn_info );
 
     mmfn = page_to_pfn(mmfn_info);
-    mpl4e = (l4_pgentry_t *) map_domain_page(mmfn);
+    mpl4e = (l4_pgentry_t *) map_domain_page_global(mmfn);
     memcpy(mpl4e, &idle_pg_table[0], PAGE_SIZE);
     mpl4e[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_paddr(__pa(d->arch.mm_perdomain_l3), __PAGE_HYPERVISOR);
@@ -298,7 +301,7 @@ void free_monitor_pagetable(struct vcpu *v)
      * free monitor_table.
      */
     mfn = pagetable_get_pfn(v->arch.monitor_table);
-    unmap_domain_page(v->arch.monitor_vtable);
+    unmap_domain_page_global(v->arch.monitor_vtable);
     free_domheap_page(pfn_to_page(mfn));
 
     v->arch.monitor_table = mk_pagetable(0);
@@ -332,7 +335,7 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     ASSERT(mmfn_info != NULL);
 
     mmfn = page_to_pfn(mmfn_info);
-    mpl2e = (l2_pgentry_t *)map_domain_page(mmfn);
+    mpl2e = (l2_pgentry_t *)map_domain_page_global(mmfn);
     memset(mpl2e, 0, PAGE_SIZE);
 
     memcpy(&mpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
@@ -393,7 +396,7 @@ void free_monitor_pagetable(struct vcpu *v)
      * Then free monitor_table.
      */
     mfn = pagetable_get_pfn(v->arch.monitor_table);
-    unmap_domain_page(v->arch.monitor_vtable);
+    unmap_domain_page_global(v->arch.monitor_vtable);
     free_domheap_page(pfn_to_page(mfn));
 
     v->arch.monitor_table = mk_pagetable(0);
@@ -977,7 +980,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         if ( v->arch.guest_vtable &&
              (v->arch.guest_vtable != __linear_l2_table) )
         {
-            unmap_domain_page(v->arch.guest_vtable);
+            unmap_domain_page_global(v->arch.guest_vtable);
         }
         if ( (mode & (SHM_translate | SHM_external)) == SHM_translate )
             v->arch.guest_vtable = __linear_l2_table;
@@ -990,7 +993,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         if ( v->arch.shadow_vtable &&
              (v->arch.shadow_vtable != __shadow_linear_l2_table) )
         {
-            unmap_domain_page(v->arch.shadow_vtable);
+            unmap_domain_page_global(v->arch.shadow_vtable);
         }
         if ( !(mode & SHM_external) && d->arch.ops->guest_paging_levels == 2)
             v->arch.shadow_vtable = __shadow_linear_l2_table;
@@ -1004,7 +1007,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         if ( v->arch.hl2_vtable &&
              (v->arch.hl2_vtable != __linear_hl2_table) )
         {
-            unmap_domain_page(v->arch.hl2_vtable);
+            unmap_domain_page_global(v->arch.hl2_vtable);
         }
         if ( (mode & (SHM_translate | SHM_external)) == SHM_translate )
             v->arch.hl2_vtable = __linear_hl2_table;

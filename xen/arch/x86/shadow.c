@@ -2150,8 +2150,8 @@ static void shadow_update_pagetables(struct vcpu *v)
     if ( max_mode & (SHM_enable | SHM_external) )
     {
         if ( likely(v->arch.guest_vtable != NULL) )
-            unmap_domain_page(v->arch.guest_vtable);
-        v->arch.guest_vtable = map_domain_page(gmfn);
+            unmap_domain_page_global(v->arch.guest_vtable);
+        v->arch.guest_vtable = map_domain_page_global(gmfn);
     }
 
     /*
@@ -2187,8 +2187,8 @@ static void shadow_update_pagetables(struct vcpu *v)
         )
     {
         if ( v->arch.shadow_vtable )
-            unmap_domain_page(v->arch.shadow_vtable);
-        v->arch.shadow_vtable = map_domain_page(smfn);
+            unmap_domain_page_global(v->arch.shadow_vtable);
+        v->arch.shadow_vtable = map_domain_page_global(smfn);
     }
 
 #if CONFIG_PAGING_LEVELS == 2
@@ -2204,8 +2204,8 @@ static void shadow_update_pagetables(struct vcpu *v)
         if ( unlikely(!(hl2mfn = __shadow_status(d, gpfn, PGT_hl2_shadow))) )
             hl2mfn = shadow_hl2_table(d, gpfn, gmfn, smfn);
         if ( v->arch.hl2_vtable )
-            unmap_domain_page(v->arch.hl2_vtable);
-        v->arch.hl2_vtable = map_domain_page(hl2mfn);
+            unmap_domain_page_global(v->arch.hl2_vtable);
+        v->arch.hl2_vtable = map_domain_page_global(hl2mfn);
     }
 
     /*

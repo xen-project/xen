@@ -17,15 +17,25 @@
 
 /*
  * Maps a given range of page frames, returning the mapped virtual address. The
- * pages are now accessible until a corresponding call to unmap_domain_page().
+ * pages are now accessible within the current domain until a corresponding
+ * call to unmap_domain_page().
  */
 extern void *map_domain_pages(unsigned long pfn, unsigned int order);
 
 /*
- * Pass a VA within the first page of a range previously mapped with
- * map_omain_pages(). Those pages will then be removed from the mapping lists.
+ * Pass a VA within the first page of a range previously mapped in the context
+ * of the currently-executing domain via a call to map_domain_pages(). Those
+ * pages will then be removed from the mapping lists.
  */
 extern void unmap_domain_pages(void *va, unsigned int order);
+
+/*
+ * Similar to the above calls, except the mapping is accessible in all
+ * address spaces (not just within the domain that created the mapping). Global
+ * mappings can also be unmapped from any context.
+ */
+extern void *map_domain_page_global(unsigned long pfn);
+extern void unmap_domain_page_global(void *va);
 
 #define DMCACHE_ENTRY_VALID 1U
 #define DMCACHE_ENTRY_HELD  2U
@@ -89,6 +99,9 @@ domain_mmap_cache_destroy(struct domain_mmap_cache *cache)
 
 #define map_domain_pages(pfn,order)         phys_to_virt((pfn)<<PAGE_SHIFT)
 #define unmap_domain_pages(va,order)        ((void)((void)(va),(void)(order)))
+
+#define map_domain_page_global(pfn)         phys_to_virt((pfn)<<PAGE_SHIFT)
+#define unmap_domain_page_global(va)        ((void)(va))
 
 struct domain_mmap_cache { 
 };

@@ -193,7 +193,7 @@ static void vmx_map_io_shared_page(struct domain *d)
         domain_crash_synchronous();
     }
 
-    p = map_domain_page(mpfn);
+    p = map_domain_page_global(mpfn);
     if (p == NULL) {
         printk("Can not map io request shared page for VMX domain.\n");
         domain_crash_synchronous();

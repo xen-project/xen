@@ -733,7 +733,7 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     ASSERT(mmfn_info != NULL);
 
     mmfn = page_to_pfn(mmfn_info);
-    mpl2e = (l2_pgentry_t *)map_domain_page(mmfn);
+    mpl2e = (l2_pgentry_t *)map_domain_page_global(mmfn);
     memset(mpl2e, 0, PAGE_SIZE);
 
     memcpy(&mpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
@@ -794,7 +794,7 @@ void free_monitor_pagetable(struct vcpu *v)
      * Then free monitor_table.
      */
     mfn = pagetable_get_pfn(v->arch.monitor_table);
-    unmap_domain_page(v->arch.monitor_vtable);
+    unmap_domain_page_global(v->arch.monitor_vtable);
     free_domheap_page(pfn_to_page(mfn));
 
     v->arch.monitor_table = mk_pagetable(0);
@@ -929,7 +929,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         if ( v->arch.guest_vtable &&
              (v->arch.guest_vtable != __linear_l2_table) )
         {
-            unmap_domain_page(v->arch.guest_vtable);
+            unmap_domain_page_global(v->arch.guest_vtable);
         }
         if ( (mode & (SHM_translate | SHM_external)) == SHM_translate )
             v->arch.guest_vtable = __linear_l2_table;
@@ -942,7 +942,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         if ( v->arch.shadow_vtable &&
              (v->arch.shadow_vtable != __shadow_linear_l2_table) )
         {
-            unmap_domain_page(v->arch.shadow_vtable);
+            unmap_domain_page_global(v->arch.shadow_vtable);
         }
         if ( !(mode & SHM_external) )
             v->arch.shadow_vtable = __shadow_linear_l2_table;
@@ -955,7 +955,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         if ( v->arch.hl2_vtable &&
              (v->arch.hl2_vtable != __linear_hl2_table) )
         {
-            unmap_domain_page(v->arch.hl2_vtable);
+            unmap_domain_page_global(v->arch.hl2_vtable);
         }
         if ( (mode & (SHM_translate | SHM_external)) == SHM_translate )
             v->arch.hl2_vtable = __linear_hl2_table;
@@ -2906,8 +2906,8 @@ void __update_pagetables(struct vcpu *v)
     if ( max_mode & (SHM_enable | SHM_external) )
     {
         if ( likely(v->arch.guest_vtable != NULL) )
-            unmap_domain_page(v->arch.guest_vtable);
-        v->arch.guest_vtable = map_domain_page(gmfn);
+            unmap_domain_page_global(v->arch.guest_vtable);
+        v->arch.guest_vtable = map_domain_page_global(gmfn);
     }
 
     /*
@@ -2932,8 +2932,8 @@ void __update_pagetables(struct vcpu *v)
     if ( max_mode == SHM_external )
     {
         if ( v->arch.shadow_vtable )
-            unmap_domain_page(v->arch.shadow_vtable);
-        v->arch.shadow_vtable = map_domain_page(smfn);
+            unmap_domain_page_global(v->arch.shadow_vtable);
+        v->arch.shadow_vtable = map_domain_page_global(smfn);
     }
 
     /*
@@ -2948,8 +2948,8 @@ void __update_pagetables(struct vcpu *v)
         if ( unlikely(!(hl2mfn = __shadow_status(d, gpfn, PGT_hl2_shadow))) )
             hl2mfn = shadow_hl2_table(d, gpfn, gmfn, smfn);
         if ( v->arch.hl2_vtable )
-            unmap_domain_page(v->arch.hl2_vtable);
-        v->arch.hl2_vtable = map_domain_page(hl2mfn);
+            unmap_domain_page_global(v->arch.hl2_vtable);
+        v->arch.hl2_vtable = map_domain_page_global(hl2mfn);
     }
 
     /*

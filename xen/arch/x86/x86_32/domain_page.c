@@ -101,3 +101,71 @@ void unmap_domain_pages(void *va, unsigned int order)
     for ( i = 0; i < (1U << order); i++ )
         l1e_add_flags(cache->l1tab[idx+i], READY_FOR_TLB_FLUSH);
 }
+
+#define GLOBALMAP_BITS (IOREMAP_MBYTES << (20 - PAGE_SHIFT))
+static unsigned long inuse[BITS_TO_LONGS(GLOBALMAP_BITS)];
+static unsigned long garbage[BITS_TO_LONGS(GLOBALMAP_BITS)];
+static unsigned int inuse_cursor;
+static spinlock_t globalmap_lock = SPIN_LOCK_UNLOCKED;
+
+void *map_domain_page_global(unsigned long pfn)
+{
+    l2_pgentry_t *pl2e;
+    l1_pgentry_t *pl1e;
+    unsigned int idx, i;
+    unsigned long va;
+
+    ASSERT(!in_irq() && local_irq_is_enabled());
+
+    spin_lock(&globalmap_lock);
+
+    for ( ; ; )
+    {
+        idx = find_next_zero_bit(inuse, GLOBALMAP_BITS, inuse_cursor);
+        va = IOREMAP_VIRT_START + (idx << PAGE_SHIFT);
+
+        /* End of round? If not then we're done in this loop. */
+        if ( va < FIXADDR_START )
+            break;
+
+        /* /First/, clean the garbage map and update the inuse list. */
+        for ( i = 0; i < ARRAY_SIZE(garbage); i++ )
+        {
+            unsigned long x = xchg(&garbage[i], 0);
+            inuse[i] &= ~x;
+        }
+
+        /* /Second/, flush all TLBs to get rid of stale garbage mappings. */
+        flush_tlb_all();
+
+        inuse_cursor = 0;
+    }
+
+    set_bit(idx, inuse);
+    inuse_cursor = idx + 1;
+
+    spin_unlock(&globalmap_lock);
+
+    pl2e = virt_to_xen_l2e(va);
+    pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(va);
+    *pl1e = l1e_from_pfn(pfn, __PAGE_HYPERVISOR);
+
+    return (void *)va;
+}
+
+void unmap_domain_page_global(void *va)
+{
+    unsigned long __va = (unsigned long)va;
+    l2_pgentry_t *pl2e;
+    l1_pgentry_t *pl1e;
+    unsigned int idx;
+
+    /* /First/, we zap the PTE. */
+    pl2e = virt_to_xen_l2e(__va);
+    pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(__va);
+    *pl1e = l1e_empty();
+
+    /* /Second/, we add to the garbage map. */
+    idx = (__va - IOREMAP_VIRT_START) >> PAGE_SHIFT;
+    set_bit(idx, garbage);
+}
