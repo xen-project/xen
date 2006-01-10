@@ -26,7 +26,7 @@ unsigned long xenheap_phys_end;
 
 char saved_command_line[COMMAND_LINE_SIZE];
 
-struct vcpu *idle_domain[NR_CPUS] = { &idle0_vcpu };
+struct vcpu *idle_vcpu[NR_CPUS] = { &idle0_vcpu };
 
 cpumask_t cpu_present_map;
 

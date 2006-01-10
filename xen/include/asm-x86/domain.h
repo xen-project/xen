@@ -13,12 +13,24 @@ struct trap_bounce {
     unsigned long  eip;
 };
 
+struct mapcache {
+    l1_pgentry_t *l1tab;
+    unsigned int cursor;
+    unsigned int epoch, shadow_epoch[MAX_VIRT_CPUS];
+    spinlock_t lock;
+};
+
 struct arch_domain
 {
     l1_pgentry_t *mm_perdomain_pt;
 #ifdef CONFIG_X86_64
     l2_pgentry_t *mm_perdomain_l2;
     l3_pgentry_t *mm_perdomain_l3;
+#endif
+
+#ifdef CONFIG_X86_32
+    /* map_domain_page() mapping cache. */
+    struct mapcache mapcache;
 #endif
 
     /* Writable pagetables. */

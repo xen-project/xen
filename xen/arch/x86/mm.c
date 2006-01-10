@@ -841,10 +841,11 @@ static int alloc_l2_table(struct pfn_info *page, unsigned long type)
            L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
     pl2e[l2_table_offset(LINEAR_PT_VIRT_START)] =
         l2e_from_pfn(pfn, __PAGE_HYPERVISOR);
-    pl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
-        l2e_from_page(
-            virt_to_page(page_get_owner(page)->arch.mm_perdomain_pt),
-            __PAGE_HYPERVISOR);
+    for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
+        pl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
+            l2e_from_page(
+                virt_to_page(page_get_owner(page)->arch.mm_perdomain_pt) + i,
+                __PAGE_HYPERVISOR);
 #endif
 
     unmap_domain_page(pl2e);

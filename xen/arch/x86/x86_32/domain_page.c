@@ -23,28 +23,24 @@
 #define MAPCACHE_ORDER    10
 #define MAPCACHE_ENTRIES  (1 << MAPCACHE_ORDER)
 
-l1_pgentry_t *mapcache;
-static unsigned int map_idx, epoch, shadow_epoch[NR_CPUS];
-static spinlock_t map_lock = SPIN_LOCK_UNLOCKED;
-
 /* Use a spare PTE bit to mark entries ready for recycling. */
 #define READY_FOR_TLB_FLUSH (1<<10)
 
 static void flush_all_ready_maps(void)
 {
-    l1_pgentry_t *cache = mapcache;
+    struct mapcache *cache = &current->domain->arch.mapcache;
     unsigned int i;
 
     for ( i = 0; i < MAPCACHE_ENTRIES; i++ )
-        if ( (l1e_get_flags(cache[i]) & READY_FOR_TLB_FLUSH) )
-            cache[i] = l1e_empty();
+        if ( (l1e_get_flags(cache->l1tab[i]) & READY_FOR_TLB_FLUSH) )
+            cache->l1tab[i] = l1e_empty();
 }
 
 void *map_domain_pages(unsigned long pfn, unsigned int order)
 {
     unsigned long va;
-    unsigned int idx, i, flags, cpu = smp_processor_id();
-    l1_pgentry_t *cache = mapcache;
+    unsigned int idx, i, flags, vcpu = current->vcpu_id;
+    struct mapcache *cache = &current->domain->arch.mapcache;
 #ifndef NDEBUG
     unsigned int flush_count = 0;
 #endif
@@ -52,37 +48,41 @@ void *map_domain_pages(unsigned long pfn, unsigned int order)
     ASSERT(!in_irq());
     perfc_incrc(map_domain_page_count);
 
-    spin_lock(&map_lock);
+    /* If we are the idle domain, ensure that we run on our own page tables. */
+    if ( unlikely(is_idle_vcpu(current)) )
+        __sync_lazy_execstate();
+
+    spin_lock(&cache->lock);
 
     /* Has some other CPU caused a wrap? We must flush if so. */
-    if ( epoch != shadow_epoch[cpu] )
+    if ( cache->epoch != cache->shadow_epoch[vcpu] )
     {
         perfc_incrc(domain_page_tlb_flush);
         local_flush_tlb();
-        shadow_epoch[cpu] = epoch;
+        cache->shadow_epoch[vcpu] = cache->epoch;
     }
 
     do {
-        idx = map_idx = (map_idx + 1) & (MAPCACHE_ENTRIES - 1);
+        idx = cache->cursor = (cache->cursor + 1) & (MAPCACHE_ENTRIES - 1);
         if ( unlikely(idx == 0) )
         {
             ASSERT(flush_count++ == 0);
             flush_all_ready_maps();
             perfc_incrc(domain_page_tlb_flush);
             local_flush_tlb();
-            shadow_epoch[cpu] = ++epoch;
+            cache->shadow_epoch[vcpu] = ++cache->epoch;
         }
 
         flags = 0;
         for ( i = 0; i < (1U << order); i++ )
-            flags |= l1e_get_flags(cache[idx+i]);
+            flags |= l1e_get_flags(cache->l1tab[idx+i]);
     }
     while ( flags & _PAGE_PRESENT );
 
     for ( i = 0; i < (1U << order); i++ )
-        cache[idx+i] = l1e_from_pfn(pfn+i, __PAGE_HYPERVISOR);
+        cache->l1tab[idx+i] = l1e_from_pfn(pfn+i, __PAGE_HYPERVISOR);
 
-    spin_unlock(&map_lock);
+    spin_unlock(&cache->lock);
 
     va = MAPCACHE_VIRT_START + (idx << PAGE_SHIFT);
     return (void *)va;
@@ -91,9 +91,13 @@ void *map_domain_pages(unsigned long pfn, unsigned int order)
 void unmap_domain_pages(void *va, unsigned int order)
 {
     unsigned int idx, i;
+    struct mapcache *cache = &current->domain->arch.mapcache;
+
     ASSERT((void *)MAPCACHE_VIRT_START <= va);
     ASSERT(va < (void *)MAPCACHE_VIRT_END);
+
     idx = ((unsigned long)va - MAPCACHE_VIRT_START) >> PAGE_SHIFT;
+
     for ( i = 0; i < (1U << order); i++ )
-        l1e_add_flags(mapcache[idx+i], READY_FOR_TLB_FLUSH);
+        l1e_add_flags(cache->l1tab[idx+i], READY_FOR_TLB_FLUSH);
 }

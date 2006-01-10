@@ -46,9 +46,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     INIT_LIST_HEAD(&d->page_list);
     INIT_LIST_HEAD(&d->xenpage_list);
 
-    if ( d->domain_id == IDLE_DOMAIN_ID )
-        set_bit(_DOMF_idle_domain, &d->domain_flags);
-    else
+    if ( !is_idle_domain(d) )
         set_bit(_DOMF_ctrl_pause, &d->domain_flags);
 
     if ( !is_idle_domain(d) &&

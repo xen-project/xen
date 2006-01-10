@@ -366,26 +366,19 @@ int construct_dom0(struct domain *d,
         l2tab[(LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT)+i] =
             l2e_from_paddr((u32)l2tab + i*PAGE_SIZE, __PAGE_HYPERVISOR);
     }
-    {
-        unsigned long va;
-        for (va = PERDOMAIN_VIRT_START; va < PERDOMAIN_VIRT_END;
-             va += (1 << L2_PAGETABLE_SHIFT)) {
-            l2tab[va >> L2_PAGETABLE_SHIFT] =
-                l2e_from_paddr(__pa(d->arch.mm_perdomain_pt) +
-                               (va-PERDOMAIN_VIRT_START),
-                               __PAGE_HYPERVISOR);
-        }
-    }
     v->arch.guest_table = mk_pagetable((unsigned long)l3start);
 #else
     l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
     memcpy(l2tab, &idle_pg_table[0], PAGE_SIZE);
     l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         l2e_from_paddr((unsigned long)l2start, __PAGE_HYPERVISOR);
-    l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        l2e_from_paddr(__pa(d->arch.mm_perdomain_pt), __PAGE_HYPERVISOR);
     v->arch.guest_table = mk_pagetable((unsigned long)l2start);
 #endif
+
+    for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
+        l2tab[l2_linear_offset(PERDOMAIN_VIRT_START) + i] =
+            l2e_from_page(virt_to_page(d->arch.mm_perdomain_pt) + i,
+                          __PAGE_HYPERVISOR);
 
     l2tab += l2_linear_offset(dsi.v_start);
     mfn = alloc_spfn;

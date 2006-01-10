@@ -148,7 +148,8 @@ extern unsigned long _end; /* standard ELF symbol */
 #define SH_LINEAR_PT_VIRT_END   (SH_LINEAR_PT_VIRT_START + PML4_ENTRY_BYTES)
 /* Slot 260: per-domain mappings. */
 #define PERDOMAIN_VIRT_START    (PML4_ADDR(260))
-#define PERDOMAIN_VIRT_END      (PERDOMAIN_VIRT_START + PML4_ENTRY_BYTES)
+#define PERDOMAIN_VIRT_END      (PERDOMAIN_VIRT_START + (PERDOMAIN_MBYTES<<20))
+#define PERDOMAIN_MBYTES        ((unsigned long)GDT_LDT_MBYTES)
 /* Slot 261: machine-to-phys conversion table (16GB). */
 #define RDWR_MPT_VIRT_START     (PML4_ADDR(261))
 #define RDWR_MPT_VIRT_END       (RDWR_MPT_VIRT_START + (16UL<<30))
@@ -195,8 +196,7 @@ extern unsigned long _end; /* standard ELF symbol */
  *                                                       ------ ------
  *  I/O remapping area                                   ( 4MB)
  *  Direct-map (1:1) area [Xen code/data/heap]           (12MB)
- *  map_domain_page cache                                ( 4MB)
- *  Per-domain mappings                                  ( 4MB)
+ *  Per-domain mappings (inc. 4MB map_domain_page cache) ( 4MB)
  *  Shadow linear pagetable                              ( 4MB) ( 8MB)
  *  Guest linear pagetable                               ( 4MB) ( 8MB)
  *  Machine-to-physical translation table [writable]     ( 4MB) (16MB)
@@ -209,7 +209,7 @@ extern unsigned long _end; /* standard ELF symbol */
 #define IOREMAP_MBYTES           4
 #define DIRECTMAP_MBYTES        12
 #define MAPCACHE_MBYTES          4
-#define PERDOMAIN_MBYTES         4
+#define PERDOMAIN_MBYTES         8
 
 #ifdef CONFIG_X86_PAE
 # define LINEARPT_MBYTES         8
@@ -227,7 +227,7 @@ extern unsigned long _end; /* standard ELF symbol */
 #define DIRECTMAP_VIRT_START	(DIRECTMAP_VIRT_END - (DIRECTMAP_MBYTES<<20))
 #define MAPCACHE_VIRT_END	DIRECTMAP_VIRT_START
 #define MAPCACHE_VIRT_START	(MAPCACHE_VIRT_END - (MAPCACHE_MBYTES<<20))
-#define PERDOMAIN_VIRT_END	MAPCACHE_VIRT_START
+#define PERDOMAIN_VIRT_END	DIRECTMAP_VIRT_START
 #define PERDOMAIN_VIRT_START	(PERDOMAIN_VIRT_END - (PERDOMAIN_MBYTES<<20))
 #define SH_LINEAR_PT_VIRT_END	PERDOMAIN_VIRT_START
 #define SH_LINEAR_PT_VIRT_START	(SH_LINEAR_PT_VIRT_END - (LINEARPT_MBYTES<<20))
@@ -282,14 +282,21 @@ extern unsigned long _end; /* standard ELF symbol */
 extern unsigned long xenheap_phys_end; /* user-configurable */
 #endif
 
-#define GDT_VIRT_START(ed)    \
-    (PERDOMAIN_VIRT_START + ((ed)->vcpu_id << PDPT_VCPU_VA_SHIFT))
-#define LDT_VIRT_START(ed)    \
-    (GDT_VIRT_START(ed) + (64*1024))
+/* GDT/LDT shadow mapping area. The first per-domain-mapping sub-area. */
+#define GDT_LDT_VCPU_SHIFT       5
+#define GDT_LDT_VCPU_VA_SHIFT    (GDT_LDT_VCPU_SHIFT + PAGE_SHIFT)
+#define GDT_LDT_MBYTES           (MAX_VIRT_CPUS >> (20-GDT_LDT_VCPU_VA_SHIFT))
+#define GDT_LDT_VIRT_START       PERDOMAIN_VIRT_START
+#define GDT_LDT_VIRT_END         (GDT_LDT_VIRT_START + (GDT_LDT_MBYTES << 20))
 
-#define PDPT_VCPU_SHIFT       5
-#define PDPT_VCPU_VA_SHIFT    (PDPT_VCPU_SHIFT + PAGE_SHIFT)
-#define PDPT_L1_ENTRIES       (MAX_VIRT_CPUS << PDPT_VCPU_SHIFT)
+/* The address of a particular VCPU's GDT or LDT. */
+#define GDT_VIRT_START(v)    \
+    (PERDOMAIN_VIRT_START + ((v)->vcpu_id << GDT_LDT_VCPU_VA_SHIFT))
+#define LDT_VIRT_START(v)    \
+    (GDT_VIRT_START(v) + (64*1024))
+
+#define PDPT_L1_ENTRIES       \
+    ((PERDOMAIN_VIRT_END - PERDOMAIN_VIRT_START) >> PAGE_SHIFT)
 #define PDPT_L2_ENTRIES       \
     ((PDPT_L1_ENTRIES + (1 << PAGETABLE_ORDER) - 1) >> PAGETABLE_ORDER)
 

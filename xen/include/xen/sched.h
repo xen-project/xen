@@ -172,12 +172,10 @@ struct domain_setup_info
     char *xen_section_string;
 };
 
-extern struct domain idle0_domain;
-extern struct vcpu idle0_vcpu;
-
-extern struct vcpu *idle_domain[NR_CPUS];
+extern struct vcpu *idle_vcpu[NR_CPUS];
 #define IDLE_DOMAIN_ID   (0x7FFFU)
-#define is_idle_domain(_d) (test_bit(_DOMF_idle_domain, &(_d)->domain_flags))
+#define is_idle_domain(d) ((d)->domain_id == IDLE_DOMAIN_ID)
+#define is_idle_vcpu(v)   (is_idle_domain((v)->domain))
 
 struct vcpu *alloc_vcpu(
     struct domain *d, unsigned int vcpu_id, unsigned int cpu_id);
@@ -367,23 +365,20 @@ extern struct domain *domain_list;
 /*
  * Per-domain flags (domain_flags).
  */
- /* Is this one of the per-CPU idle domains? */
-#define _DOMF_idle_domain      0
-#define DOMF_idle_domain       (1UL<<_DOMF_idle_domain)
  /* Is this domain privileged? */
-#define _DOMF_privileged       1
+#define _DOMF_privileged       0
 #define DOMF_privileged        (1UL<<_DOMF_privileged)
  /* Guest shut itself down for some reason. */
-#define _DOMF_shutdown         2
+#define _DOMF_shutdown         1
 #define DOMF_shutdown          (1UL<<_DOMF_shutdown)
  /* Death rattle. */
-#define _DOMF_dying            3
+#define _DOMF_dying            2
 #define DOMF_dying             (1UL<<_DOMF_dying)
  /* Domain is paused by controller software. */
-#define _DOMF_ctrl_pause       4
+#define _DOMF_ctrl_pause       3
 #define DOMF_ctrl_pause        (1UL<<_DOMF_ctrl_pause)
  /* Domain is being debugged by controller software. */
-#define _DOMF_debugging        5
+#define _DOMF_debugging        4
 #define DOMF_debugging         (1UL<<_DOMF_debugging)
 
 

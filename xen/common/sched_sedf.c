@@ -396,7 +396,7 @@ static void sedf_add_task(struct vcpu *d)
     INIT_LIST_HEAD(&(inf->extralist[EXTRA_PEN_Q]));
     INIT_LIST_HEAD(&(inf->extralist[EXTRA_UTIL_Q]));
  
-    if ( !is_idle_domain(d->domain) )
+    if ( !is_idle_vcpu(d) )
     {
         extraq_check(d);
     }
@@ -777,7 +777,7 @@ static struct task_slice sedf_do_schedule(s_time_t now)
     struct task_slice      ret;
 
     /*idle tasks don't need any of the following stuf*/
-    if (is_idle_domain(current->domain))
+    if ( is_idle_vcpu(current) )
         goto check_waitq;
  
     /* create local state of the status of the domain, in order to avoid
@@ -874,7 +874,7 @@ static void sedf_sleep(struct vcpu *d)
     PRINT(2,"sedf_sleep was called, domain-id %i.%i\n",
           d->domain->domain_id, d->vcpu_id);
  
-    if ( is_idle_domain(d->domain) )
+    if ( is_idle_vcpu(d) )
         return;
 
     EDOM_INFO(d)->status |= SEDF_ASLEEP;
@@ -1194,7 +1194,7 @@ static void unblock_long_burst(struct sedf_vcpu_info* inf, s_time_t now)
 static inline int get_run_type(struct vcpu* d)
 {
     struct sedf_vcpu_info* inf = EDOM_INFO(d);
-    if (is_idle_domain(d->domain))
+    if (is_idle_vcpu(d))
         return DOMAIN_IDLE;
     if (inf->status & EXTRA_RUN_PEN)
         return DOMAIN_EXTRA_PEN;
@@ -1258,7 +1258,7 @@ void sedf_wake(struct vcpu *d)
     PRINT(3, "sedf_wake was called, domain-id %i.%i\n",d->domain->domain_id,
           d->vcpu_id);
 
-    if ( unlikely(is_idle_domain(d->domain)) )
+    if ( unlikely(is_idle_vcpu(d)) )
         return;
    
     if ( unlikely(__task_on_queue(d)) )

@@ -140,12 +140,10 @@ struct domain *alloc_domain(void)
  */
 void sched_add_domain(struct vcpu *v) 
 {
-    struct domain *d = v->domain;
-
     /* Initialise the per-domain timer. */
     init_ac_timer(&v->timer, dom_timer_fn, v, v->processor);
 
-    if ( is_idle_domain(d) )
+    if ( is_idle_vcpu(v) )
     {
         schedule_data[v->processor].curr = v;
         schedule_data[v->processor].idle = v;
@@ -153,7 +151,7 @@ void sched_add_domain(struct vcpu *v)
     }
 
     SCHED_OP(add_task, v);
-    TRACE_2D(TRC_SCHED_DOM_ADD, d->domain_id, v->vcpu_id);
+    TRACE_2D(TRC_SCHED_DOM_ADD, v->domain->domain_id, v->vcpu_id);
 }
 
 void sched_rem_domain(struct vcpu *v) 
@@ -435,7 +433,7 @@ static void __enter_scheduler(void)
     prev->wokenup = now;
 
 #if defined(WAKE_HISTO)
-    if ( !is_idle_domain(next->domain) && next->wokenup )
+    if ( !is_idle_vcpu(next) && next->wokenup )
     {
         ulong diff = (ulong)(now - next->wokenup);
         diff /= (ulong)MILLISECS(1);
@@ -445,7 +443,7 @@ static void __enter_scheduler(void)
     next->wokenup = (s_time_t)0;
 #elif defined(BLOCKTIME_HISTO)
     prev->lastdeschd = now;
-    if ( !is_idle_domain(next->domain) )
+    if ( !is_idle_vcpu(next) )
     {
         ulong diff = (ulong)((now - next->lastdeschd) / MILLISECS(10));
         if (diff <= BUCKETS-2)  schedule_data[cpu].hist[diff]++;
@@ -462,7 +460,7 @@ static void __enter_scheduler(void)
     prev->sleep_tick = schedule_data[cpu].tick;
 
     /* Ensure that the domain has an up-to-date time base. */
-    if ( !is_idle_domain(next->domain) )
+    if ( !is_idle_vcpu(next) )
     {
         update_dom_time(next);
         if ( next->sleep_tick != schedule_data[cpu].tick )
@@ -499,7 +497,7 @@ static void t_timer_fn(void *unused)
 
     schedule_data[cpu].tick++;
 
-    if ( !is_idle_domain(v->domain) )
+    if ( !is_idle_vcpu(v) )
     {
         update_dom_time(v);
         send_guest_virq(v, VIRQ_TIMER);
@@ -533,9 +531,6 @@ void __init scheduler_init(void)
         init_ac_timer(&t_timer[i], t_timer_fn, NULL, i);
     }
 
-    schedule_data[0].curr = idle_domain[0];
-    schedule_data[0].idle = idle_domain[0];
-
     for ( i = 0; schedulers[i] != NULL; i++ )
     {
         ops = *schedulers[i];
@@ -548,10 +543,16 @@ void __init scheduler_init(void)
 
     printk("Using scheduler: %s (%s)\n", ops.name, ops.opt_name);
 
-    rc = SCHED_OP(alloc_task, idle_domain[0]);
-    BUG_ON(rc < 0);
+    if ( idle_vcpu[0] != NULL )
+    {
+        schedule_data[0].curr = idle_vcpu[0];
+        schedule_data[0].idle = idle_vcpu[0];
 
-    sched_add_domain(idle_domain[0]);
+        rc = SCHED_OP(alloc_task, idle_vcpu[0]);
+        BUG_ON(rc < 0);
+
+        sched_add_domain(idle_vcpu[0]);
+    }
 }
 
 /*

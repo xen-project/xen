@@ -22,7 +22,6 @@
 #define IDLE0_DOMAIN(_t)             \
 {                                    \
     domain_id:   IDLE_DOMAIN_ID,     \
-    domain_flags:DOMF_idle_domain,   \
     refcnt:      ATOMIC_INIT(1)      \
 }
 
