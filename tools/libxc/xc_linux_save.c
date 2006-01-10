@@ -357,21 +357,14 @@ static int analysis_phase(int xc_handle, uint32_t domid, int max_pfn,
 }
 
 
-static int suspend_and_state(int xc_handle, int io_fd, int dom,       
-                             xc_dominfo_t *info,
+static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
+                             int dom, xc_dominfo_t *info,
                              vcpu_guest_context_t *ctxt)
 {
     int i = 0;
-    char ans[30];
 
-    printf("suspend\n");
-    fflush(stdout);
-    if (fgets(ans, sizeof(ans), stdin) == NULL) {
-        ERR("failed reading suspend reply");
-        return -1;
-    }
-    if (strncmp(ans, "done\n", 5)) {
-        ERR("suspend reply incorrect: %s", ans);
+    if (!(*suspend)(dom)) {
+        ERR("Suspend request failed");
         return -1;
     }
 
@@ -568,7 +561,7 @@ static unsigned long *xc_map_m2p(int xc_handle,
 
 
 int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters, 
-                  uint32_t max_factor, uint32_t flags)
+                  uint32_t max_factor, uint32_t flags, int (*suspend)(int))
 {
     xc_dominfo_t info;
 
@@ -748,7 +741,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         
         last_iter = 1;
         
-        if (suspend_and_state( xc_handle, io_fd, dom, &info, &ctxt)) {
+        if (suspend_and_state(suspend, xc_handle, io_fd, dom, &info, &ctxt)) {
             ERR("Domain appears not to have suspended");
             goto out;
         }
@@ -1054,7 +1047,8 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 DPRINTF("Start last iteration\n");
                 last_iter = 1;
                 
-                if (suspend_and_state(xc_handle, io_fd, dom, &info, &ctxt)) {
+                if (suspend_and_state(suspend, xc_handle, io_fd, dom, &info,
+                                      &ctxt)) {
                     ERR("Domain appears not to have suspended");
                     goto out;
                 }

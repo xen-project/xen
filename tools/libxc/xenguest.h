@@ -22,7 +22,9 @@
  * @return 0 on success, -1 on failure
  */
 int xc_linux_save(int xc_handle, int fd, uint32_t dom, uint32_t max_iters, 
-                  uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */);
+                  uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
+                  int (*suspend)(int));
+
 
 /**
  * This function will restore a saved domain running Linux.

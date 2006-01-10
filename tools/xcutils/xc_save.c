@@ -10,9 +10,27 @@
 #include <err.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <stdio.h>
 
 #include <xenguest.h>
+
+
+/**
+ * Issue a suspend request through stdout, and receive the acknowledgement
+ * from stdin.  This is handled by XendCheckpoint in the Python layer.
+ */
+static int suspend(int domid)
+{
+    char ans[30];
+
+    printf("suspend\n");
+    fflush(stdout);
+
+    return (fgets(ans, sizeof(ans), stdin) != NULL &&
+            !strncmp(ans, "done\n", 5));
+}
+
 
 int
 main(int argc, char **argv)
@@ -29,5 +47,5 @@ main(int argc, char **argv)
     max_f = atoi(argv[5]);
     flags = atoi(argv[6]);
 
-    return xc_linux_save(xc_fd, io_fd, domid, maxit, max_f, flags);
+    return xc_linux_save(xc_fd, io_fd, domid, maxit, max_f, flags, &suspend);
 }
