@@ -480,14 +480,6 @@ void new_thread(struct vcpu *d,
 
 #ifdef __x86_64__
 
-void toggle_guest_mode(struct vcpu *v)
-{
-    v->arch.flags ^= TF_kernel_mode;
-    __asm__ __volatile__ ( "swapgs" );
-    update_pagetables(v);
-    write_ptbase(v);
-}
-
 #define loadsegment(seg,value) ({               \
     int __r = 1;                                \
     __asm__ __volatile__ (                      \

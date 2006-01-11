@@ -157,38 +157,37 @@ asmlinkage void do_double_fault(void)
         __asm__ __volatile__ ( "hlt" );
 }
 
+static inline void pop_from_guest_stack(
+    void *dst, struct cpu_user_regs *regs, unsigned int bytes)
+{
+    if ( unlikely(copy_from_user(dst, (void __user *)regs->esp, bytes)) )
+        domain_crash_synchronous();
+    regs->esp += bytes;
+}
+
 asmlinkage unsigned long do_iret(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
 
-    /* Restore EAX (clobbered by hypercall). */
-    if ( copy_from_user(&regs->eax, (void __user *)regs->esp, 4) )
-        domain_crash_synchronous();
-    regs->esp += 4;
+    /* Pop and restore EAX (clobbered by hypercall). */
+    pop_from_guest_stack(&regs->eax, regs, 4);
 
-    /* Restore EFLAGS, CS and EIP. */
-    if ( copy_from_user(&regs->eip, (void __user *)regs->esp, 12) )
-        domain_crash_synchronous();
+    /* Pop and restore EFLAGS, CS and EIP. */
+    pop_from_guest_stack(&regs->eip, regs, 12);
 
     if ( VM86_MODE(regs) )
     {
-        /* Return to VM86 mode: restore ESP,SS,ES,DS,FS and GS. */
-        if(copy_from_user(&regs->esp, (void __user *)(regs->esp+12), 24))
-            domain_crash_synchronous();
+        /* Return to VM86 mode: pop and restore ESP,SS,ES,DS,FS and GS. */
+        pop_from_guest_stack(&regs->esp, regs, 24);
     }
     else if ( RING_0(regs) )
     {
         domain_crash_synchronous();
     }
-    else if ( RING_1(regs) ) {
-        /* Return to ring 1: pop EFLAGS,CS and EIP. */
-        regs->esp += 12;
-    }
-    else
+    else if ( !RING_1(regs) )
     {
-        /* Return to ring 2/3: restore ESP and SS. */
-        if ( copy_from_user(&regs->esp, (void __user *)(regs->esp+12), 8) )
-            domain_crash_synchronous();
+        /* Return to ring 2/3: pop and restore ESP and SS. */
+        pop_from_guest_stack(&regs->esp, regs, 8);
     }
 
     /* Fixup EFLAGS. */

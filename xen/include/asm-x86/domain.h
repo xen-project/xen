@@ -46,7 +46,10 @@ struct mapcache {
     struct vcpu_maphash vcpu_maphash[MAX_VIRT_CPUS];
 };
 
-extern void mapcache_init(struct domain *d);
+extern void mapcache_init(struct domain *);
+
+/* x86/64: toggle guest between kernel and user modes. */
+extern void toggle_guest_mode(struct vcpu *);
 
 struct arch_domain
 {

@@ -114,7 +114,13 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
         __asm__ __volatile__ ( "hlt" );
 }
 
-extern void toggle_guest_mode(struct vcpu *);
+void toggle_guest_mode(struct vcpu *v)
+{
+    v->arch.flags ^= TF_kernel_mode;
+    __asm__ __volatile__ ( "swapgs" );
+    update_pagetables(v);
+    write_ptbase(v);
+}
 
 long do_iret(void)
 {
@@ -122,13 +128,17 @@ long do_iret(void)
     struct iret_context iret_saved;
     struct vcpu *v = current;
 
-    if ( unlikely(copy_from_user(&iret_saved, (void *)regs->rsp, sizeof(iret_saved))) ||
-         unlikely(pagetable_get_paddr(v->arch.guest_table_user) == 0) )
-        return -EFAULT;
+    if ( unlikely(copy_from_user(&iret_saved, (void *)regs->rsp,
+                                 sizeof(iret_saved))) )
+        domain_crash_synchronous();
 
-    /* Returning to user mode. */
-    if ( (iret_saved.cs & 0x03) == 3 )
+    /* Returning to user mode? */
+    if ( (iret_saved.cs & 3) == 3 )
+    {
+        if ( unlikely(pagetable_get_paddr(v->arch.guest_table_user) == 0) )
+            return -EFAULT;
         toggle_guest_mode(v);
+    }
 
     regs->rip    = iret_saved.rip;
     regs->cs     = iret_saved.cs | 3; /* force guest privilege */

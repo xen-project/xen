@@ -297,7 +297,6 @@ int map_ldt_shadow_page(unsigned int off)
 
 #if defined(__x86_64__)
     /* If in user mode, switch to kernel mode just to read LDT mapping. */
-    extern void toggle_guest_mode(struct vcpu *);
     int user_mode = !(v->arch.flags & TF_kernel_mode);
 #define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
 #elif defined(__i386__)
@@ -2971,7 +2970,6 @@ void ptwr_flush(struct domain *d, const int which)
 
 #ifdef CONFIG_X86_64
     struct vcpu *v = current;
-    extern void toggle_guest_mode(struct vcpu *);
     int user_mode = !(v->arch.flags & TF_kernel_mode);
 #endif
 
