@@ -40,6 +40,7 @@ void *map_domain_page(unsigned long pfn)
     cache = &d->arch.mapcache;
 
     hashent = &cache->vcpu_maphash[vcpu].hash[MAPHASH_HASHFN(pfn)];
+#if 0
     if ( hashent->pfn == pfn )
     {
         idx = hashent->idx;
@@ -48,6 +49,7 @@ void *map_domain_page(unsigned long pfn)
         ASSERT(l1e_get_pfn(cache->l1tab[idx]) == pfn);
         goto out;
     }
+#endif
 
     spin_lock(&cache->lock);
 
@@ -90,7 +92,7 @@ void *map_domain_page(unsigned long pfn)
 
     cache->l1tab[idx] = l1e_from_pfn(pfn, __PAGE_HYPERVISOR);
 
- out:
+/*out:*/
     va = MAPCACHE_VIRT_START + (idx << PAGE_SHIFT);
     return (void *)va;
 }
