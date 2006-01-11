@@ -288,9 +288,7 @@ int arch_do_createdomain(struct vcpu *v)
 
 #if defined(__i386__)
 
-    d->arch.mapcache.l1tab = d->arch.mm_perdomain_pt +
-        (GDT_LDT_MBYTES << (20 - PAGE_SHIFT));
-    spin_lock_init(&d->arch.mapcache.lock);
+    mapcache_init(d);
 
 #else /* __x86_64__ */
 

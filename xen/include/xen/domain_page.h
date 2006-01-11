@@ -10,24 +10,19 @@
 #include <xen/config.h>
 #include <xen/mm.h>
 
-#define map_domain_page(pfn)   map_domain_pages(pfn,0)
-#define unmap_domain_page(va)  unmap_domain_pages(va,0)
-
 #ifdef CONFIG_DOMAIN_PAGE
 
 /*
- * Maps a given range of page frames, returning the mapped virtual address. The
- * pages are now accessible within the current VCPU until a corresponding
- * call to unmap_domain_page().
+ * Map a given page frame, returning the mapped virtual address. The page is
+ * then accessible within the current VCPU until a corresponding unmap call.
  */
-extern void *map_domain_pages(unsigned long pfn, unsigned int order);
+extern void *map_domain_page(unsigned long pfn);
 
 /*
- * Pass a VA within the first page of a range previously mapped in the context
- * of the currently-executing VCPU via a call to map_domain_pages(). Those
- * pages will then be removed from the mapping lists.
+ * Pass a VA within a page previously mapped in the context of the
+ * currently-executing VCPU via a call to map_domain_pages().
  */
-extern void unmap_domain_pages(void *va, unsigned int order);
+extern void unmap_domain_page(void *va);
 
 /*
  * Similar to the above calls, except the mapping is accessible in all
@@ -97,8 +92,8 @@ domain_mmap_cache_destroy(struct domain_mmap_cache *cache)
 
 #else /* !CONFIG_DOMAIN_PAGE */
 
-#define map_domain_pages(pfn,order)         phys_to_virt((pfn)<<PAGE_SHIFT)
-#define unmap_domain_pages(va,order)        ((void)((void)(va),(void)(order)))
+#define map_domain_page(pfn)                phys_to_virt((pfn)<<PAGE_SHIFT)
+#define unmap_domain_page(va)               ((void)(va))
 
 #define map_domain_page_global(pfn)         phys_to_virt((pfn)<<PAGE_SHIFT)
 #define unmap_domain_page_global(va)        ((void)(va))
