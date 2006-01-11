@@ -121,19 +121,19 @@
 	.endm
 
         /*
-         * Must be consistent with the definition in arch_x86_64.h:    
-         *     struct switch_to_user {
+         * Must be consistent with the definition in arch-x86_64.h:    
+         *     struct iret_context {
          *        u64 rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;
          *     };
          * #define VGCF_IN_SYSCALL (1<<8) 
          */
-        .macro SWITCH_TO_USER flag
+        .macro HYPERVISOR_IRET flag
         subq $8*4,%rsp                   # reuse rip, cs, rflags, rsp, ss in the stack
         movq %rax,(%rsp)
         movq %r11,1*8(%rsp)
         movq %rcx,2*8(%rsp)              # we saved %rcx upon exceptions
         movq $\flag,3*8(%rsp)
-        movq $__HYPERVISOR_switch_to_user,%rax
+        movq $__HYPERVISOR_iret,%rax
         syscall
         .endm
 
@@ -225,7 +225,7 @@ sysret_check:
 	jnz  sysret_careful 
         XEN_UNBLOCK_EVENTS(%rsi)                
 	RESTORE_ARGS 0,8,0
-        SWITCH_TO_USER VGCF_IN_SYSCALL
+        HYPERVISOR_IRET VGCF_IN_SYSCALL
 
 	/* Handle reschedules */
 	/* edx:	work, edi: workmask */	
@@ -478,7 +478,7 @@ kernel_mode:
         orb   $3,1*8(%rsp)
 	iretq
 user_mode:
-	SWITCH_TO_USER 0                        
+	HYPERVISOR_IRET 0
 	
 	/* edi: workmask, edx: work */	
 retint_careful:
@@ -719,6 +719,16 @@ ENTRY(do_hypervisor_callback)   # do_hyperviosr_callback(struct *pt_regs)
 	call evtchn_do_upcall
         jmp  error_exit
 
+ENTRY(nmi)
+	zeroentry do_nmi_callback
+ENTRY(do_nmi_callback)
+        addq $8, %rsp
+        call do_nmi
+        RESTORE_REST
+        XEN_BLOCK_EVENTS(%rsi)
+        GET_THREAD_INFO(%rcx)
+        jmp  retint_restore_args
+
         ALIGN
 restore_all_enable_events:  
 	XEN_UNBLOCK_EVENTS(%rsi)        # %rsi is already set up...
@@ -733,7 +743,7 @@ scrit:	/**** START OF CRITICAL REGION ****/
         orb   $3,1*8(%rsp)
         iretq
 crit_user_mode:
-        SWITCH_TO_USER 0
+        HYPERVISOR_IRET 0
         
 14:	XEN_LOCKED_BLOCK_EVENTS(%rsi)
 	XEN_PUT_VCPU_INFO(%rsi)

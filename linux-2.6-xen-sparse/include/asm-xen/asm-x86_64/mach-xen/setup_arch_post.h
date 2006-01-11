@@ -35,6 +35,7 @@ void __init machine_specific_modify_cpu_capabilities(struct cpuinfo_x86 *c)
 
 extern void hypervisor_callback(void);
 extern void failsafe_callback(void);
+extern void nmi(void);
 
 static void __init machine_specific_arch_setup(void)
 {
@@ -42,6 +43,8 @@ static void __init machine_specific_arch_setup(void)
                 (unsigned long) hypervisor_callback,
                 (unsigned long) failsafe_callback,
                 (unsigned long) system_call);
+
+	HYPERVISOR_nmi_op(XENNMI_register_callback, (unsigned long)&nmi);
 
 	machine_specific_modify_cpu_capabilities(&boot_cpu_data);
 }
