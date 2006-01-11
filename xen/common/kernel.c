@@ -151,19 +151,32 @@ long do_xen_version(int cmd, void *arg)
 
 long do_nmi_op(unsigned int cmd, void *arg)
 {
+    struct vcpu *v = current;
+    struct domain *d = current->domain;
     long rc = 0;
 
     switch ( cmd )
     {
     case XENNMI_register_callback:
-        if ( (current->domain->domain_id != 0) || (current->vcpu_id != 0) )
-            rc = -EINVAL;
+        if ( (d->domain_id != 0) || (v->vcpu_id != 0) )
+        { 
+           rc = -EINVAL;
+        }
         else
-            current->nmi_addr = (unsigned long)arg;
-        printk("***** NMI handler at 0x%lx\n", current->nmi_addr);
+        {
+            v->nmi_addr = (unsigned long)arg;
+#ifdef CONFIG_X86
+            /*
+             * If no handler was registered we can 'lose the NMI edge'.
+             * Re-assert it now.
+             */
+            if ( d->shared_info->arch.nmi_reason != 0 )
+                set_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
+#endif
+        }
         break;
     case XENNMI_unregister_callback:
-        current->nmi_addr = 0;
+        v->nmi_addr = 0;
         break;
     default:
         rc = -ENOSYS;
