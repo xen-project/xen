@@ -469,6 +469,7 @@ static unsigned long shadow_l2_table(
 {
     unsigned long smfn;
     l2_pgentry_t *spl2e;
+    int i;
 
     SH_VVLOG("shadow_l2_table(gpfn=%lx, gmfn=%lx)", gpfn, gmfn);
 
@@ -503,9 +504,11 @@ static unsigned long shadow_l2_table(
         spl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)] =
             l2e_from_pfn(smfn, __PAGE_HYPERVISOR);
 
-        spl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
-            l2e_from_paddr(__pa(page_get_owner(pfn_to_page(gmfn))->arch.mm_perdomain_pt),
-                            __PAGE_HYPERVISOR);
+        for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
+            spl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
+                l2e_from_page(virt_to_page(page_get_owner(pfn_to_page(gmfn))->
+                                           arch.mm_perdomain_pt) + i,
+                              __PAGE_HYPERVISOR);
 
         if ( shadow_mode_translate(d) ) // NB: not external
         {

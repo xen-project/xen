@@ -726,6 +726,7 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     l2_pgentry_t *mpl2e;
     struct pfn_info *mmfn_info;
     struct domain *d = v->domain;
+    int i;
 
     ASSERT(pagetable_get_paddr(v->arch.monitor_table) == 0);
 
@@ -740,9 +741,10 @@ static void alloc_monitor_pagetable(struct vcpu *v)
            &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
 
-    mpl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
-        l2e_from_paddr(__pa(d->arch.mm_perdomain_pt),
-                        __PAGE_HYPERVISOR);
+    for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
+        mpl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
+            l2e_from_page(virt_to_page(d->arch.mm_perdomain_pt) + i,
+                          __PAGE_HYPERVISOR);
 
     // map the phys_to_machine map into the Read-Only MPT space for this domain
     mpl2e[l2_table_offset(RO_MPT_VIRT_START)] =
@@ -1508,6 +1510,7 @@ static unsigned long shadow_l2_table(
 {
     unsigned long smfn;
     l2_pgentry_t *spl2e;
+    int i;
 
     SH_VVLOG("shadow_l2_table(gpfn=%lx, gmfn=%lx)", gpfn, gmfn);
 
@@ -1542,9 +1545,11 @@ static unsigned long shadow_l2_table(
         spl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)] =
             l2e_from_pfn(smfn, __PAGE_HYPERVISOR);
 
-        spl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
-            l2e_from_paddr(__pa(page_get_owner(pfn_to_page(gmfn))->arch.mm_perdomain_pt),
-                            __PAGE_HYPERVISOR);
+        for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
+            spl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
+            l2e_from_page(virt_to_page(page_get_owner(pfn_to_page(gmfn))->
+                                       arch.mm_perdomain_pt) + i,
+                          __PAGE_HYPERVISOR);
 
         if ( shadow_mode_translate(d) ) // NB: not external
         {
