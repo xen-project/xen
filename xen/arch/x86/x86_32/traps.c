@@ -157,6 +157,49 @@ asmlinkage void do_double_fault(void)
         __asm__ __volatile__ ( "hlt" );
 }
 
+asmlinkage unsigned long do_iret(void)
+{
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+
+    /* Restore EAX (clobbered by hypercall) */
+    if (copy_from_user(&regs->eax, (void __user *)regs->esp, 4))
+        domain_crash_synchronous();
+    regs->esp += 4;
+
+    /* Restore EFLAGS, CS and EIP */
+    if (copy_from_user(&regs->eip, (void __user *)regs->esp, 12))
+        domain_crash_synchronous();
+
+    if (VM86_MODE(regs)) {
+        /* return to VM86 mode: restore ESP,SS,ES,DS,FS and GS */
+        if(copy_from_user(&regs->esp, (void __user *)(regs->esp+12), 24))
+            domain_crash_synchronous();
+    } else if (RING_0(regs)) {
+        domain_crash_synchronous();
+    } else if (RING_1(regs)) {
+        /* return to ring 1: pop EFLAGS,CS and EIP */
+        regs->esp += 12;
+    } else {
+        /* return to ring 2/3: restore ESP and SS */
+        if(copy_from_user(&regs->esp, (void __user *)(regs->esp+12), 8))
+            domain_crash_synchronous();
+    }
+
+    /* Fixup EFLAGS */
+    regs->eflags &= ~X86_EFLAGS_IOPL;
+    regs->eflags |= X86_EFLAGS_IF;
+
+    /* No longer in NMI context */
+    clear_bit(_VCPUF_nmi_masked, &current->vcpu_flags);
+
+    /* Restore upcall mask from saved value */
+    current->vcpu_info->evtchn_upcall_mask = regs->saved_upcall_mask;
+
+    /* the hypercall exit path will overwrite eax
+     * with this return value */
+    return regs->eax;
+}
+
 BUILD_SMP_INTERRUPT(deferred_nmi, TRAP_deferred_nmi)
 asmlinkage void smp_deferred_nmi(struct cpu_user_regs regs)
 {
