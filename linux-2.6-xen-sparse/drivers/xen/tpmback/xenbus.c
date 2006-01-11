@@ -236,9 +236,8 @@ static void connect(struct backend_info *be)
 	unsigned long ready = 1;
 
 again:
-	xbt = xenbus_transaction_start();
-	if (IS_ERR(xbt)) {
-		err = PTR_ERR(xbt);
+	err = xenbus_transaction_start(&xbt);
+	if (err) {
 		xenbus_dev_fatal(be->dev, err, "starting transaction");
 		return;
 	}

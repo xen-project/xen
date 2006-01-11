@@ -37,7 +37,7 @@
 #include <asm-xen/xen-public/io/xenbus.h>
 #include <asm-xen/xen-public/io/xs_wire.h>
 
-#define XBT_NULL NULL
+#define XBT_NULL 0
 
 /* Register callback to watch this node. */
 struct xenbus_watch
@@ -102,8 +102,7 @@ int xenbus_register_frontend(struct xenbus_driver *drv);
 int xenbus_register_backend(struct xenbus_driver *drv);
 void xenbus_unregister_driver(struct xenbus_driver *drv);
 
-struct xenbus_transaction;
-typedef struct xenbus_transaction *xenbus_transaction_t;
+typedef u32 xenbus_transaction_t;
 
 char **xenbus_directory(xenbus_transaction_t t,
 			const char *dir, const char *node, unsigned int *num);
@@ -116,7 +115,7 @@ int xenbus_mkdir(xenbus_transaction_t t,
 int xenbus_exists(xenbus_transaction_t t,
 		  const char *dir, const char *node);
 int xenbus_rm(xenbus_transaction_t t, const char *dir, const char *node);
-xenbus_transaction_t xenbus_transaction_start(void);
+int xenbus_transaction_start(xenbus_transaction_t *t);
 int xenbus_transaction_end(xenbus_transaction_t t, int abort);
 
 /* Single read and scanf: returns -errno or num scanned if > 0. */

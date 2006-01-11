@@ -22,11 +22,10 @@
 
 #include <xs_lib.h>
 
-#define XBT_NULL NULL
+#define XBT_NULL 0
 
 struct xs_handle;
-struct xs_transaction_t;
-typedef struct xs_transaction_t * xs_transaction_t;
+typedef uint32_t xs_transaction_t;
 
 /* On failure, these routines set errno. */
 

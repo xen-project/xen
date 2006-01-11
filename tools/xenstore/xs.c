@@ -304,7 +304,7 @@ static void *xs_talkv(struct xs_handle *h, xs_transaction_t t,
 	unsigned int i;
 	struct sigaction ignorepipe, oldact;
 
-	msg.tx_id = (uint32_t)(unsigned long)t;
+	msg.tx_id = t;
 	msg.req_id = 0;
 	msg.type = type;
 	msg.len = 0;
@@ -634,21 +634,21 @@ bool xs_unwatch(struct xs_handle *h, const char *path, const char *token)
 /* Start a transaction: changes by others will not be seen during this
  * transaction, and changes will not be visible to others until end.
  * You can only have one transaction at any time.
- * Returns NULL on failure.
+ * Returns XBT_NULL on failure.
  */
 xs_transaction_t xs_transaction_start(struct xs_handle *h)
 {
 	char *id_str;
-	unsigned long id;
+	xs_transaction_t id;
 
 	id_str = xs_single(h, XBT_NULL, XS_TRANSACTION_START, "", NULL);
 	if (id_str == NULL)
-		return NULL;
+		return XBT_NULL;
 
 	id = strtoul(id_str, NULL, 0);
 	free(id_str);
 
-	return (xs_transaction_t)id;
+	return id;
 }
 
 /* End a transaction.

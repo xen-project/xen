@@ -310,10 +310,9 @@ static void connect(struct backend_info *be)
 
 	/* Supply the information about the device the frontend needs */
 again:
-	xbt = xenbus_transaction_start();
+	err = xenbus_transaction_start(&xbt);
 
-	if (IS_ERR(xbt)) {
-		err = PTR_ERR(xbt);
+	if (err) {
 		xenbus_dev_fatal(dev, err, "starting transaction");
 		return;
 	}

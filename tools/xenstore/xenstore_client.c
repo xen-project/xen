@@ -243,7 +243,7 @@ main(int argc, char **argv)
 
   again:
     xth = xs_transaction_start(xsh);
-    if (xth == NULL)
+    if (xth == XBT_NULL)
 	errx(1, "couldn't start transaction");
 
     ret = perform(optind, argc, argv, xsh, xth, prefix, tidy);

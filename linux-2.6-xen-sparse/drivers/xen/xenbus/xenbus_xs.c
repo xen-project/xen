@@ -201,7 +201,7 @@ static void *xs_talkv(xenbus_transaction_t t,
 	unsigned int i;
 	int err;
 
-	msg.tx_id = (u32)(unsigned long)t;
+	msg.tx_id = t;
 	msg.req_id = 0;
 	msg.type = type;
 	msg.len = 0;
@@ -424,23 +424,21 @@ EXPORT_SYMBOL(xenbus_rm);
 /* Start a transaction: changes by others will not be seen during this
  * transaction, and changes will not be visible to others until end.
  */
-xenbus_transaction_t xenbus_transaction_start(void)
+int xenbus_transaction_start(xenbus_transaction_t *t)
 {
 	char *id_str;
-	unsigned long id;
 
 	down_read(&xs_state.suspend_mutex);
 
 	id_str = xs_single(XBT_NULL, XS_TRANSACTION_START, "", NULL);
 	if (IS_ERR(id_str)) {
 		up_read(&xs_state.suspend_mutex);
-		return (xenbus_transaction_t )id_str;
+		return PTR_ERR(id_str);
 	}
 
-	id = simple_strtoul(id_str, NULL, 0);
+	*t = simple_strtoul(id_str, NULL, 0);
 	kfree(id_str);
-
-	return (xenbus_transaction_t) id;
+	return 0;
 }
 EXPORT_SYMBOL(xenbus_transaction_start);
 
