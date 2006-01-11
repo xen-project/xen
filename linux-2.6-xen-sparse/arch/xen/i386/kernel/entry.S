@@ -76,7 +76,7 @@ IF_MASK		= 0x00000200
 DF_MASK		= 0x00000400 
 NT_MASK		= 0x00004000
 VM_MASK		= 0x00020000
-/* pseudo-eflags */
+/* Pseudo-eflags. */
 NMI_MASK	= 0x80000000
 	
 /* Offsets into shared_info_t. */
