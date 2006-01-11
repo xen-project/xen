@@ -76,7 +76,9 @@ IF_MASK		= 0x00000200
 DF_MASK		= 0x00000400 
 NT_MASK		= 0x00004000
 VM_MASK		= 0x00020000
-
+/* pseudo-eflags */
+NMI_MASK	= 0x80000000
+	
 /* Offsets into shared_info_t. */
 #define evtchn_upcall_pending		/* 0 */
 #define evtchn_upcall_mask		1
@@ -305,8 +307,8 @@ restore_all:
 	je ldt_ss			# returning to user-space with LDT SS
 #endif /* XEN */
 restore_nocheck:
-	testl $VM_MASK, EFLAGS(%esp)
-	jnz resume_vm86
+	testl $(VM_MASK|NMI_MASK), EFLAGS(%esp)
+	jnz hypervisor_iret
 	movb EVENT_MASK(%esp), %al
 	notb %al			# %al == ~saved_mask
 	XEN_GET_VCPU_INFO(%esi)
@@ -328,11 +330,11 @@ iret_exc:
 	.long 1b,iret_exc
 .previous
 
-resume_vm86:
-	XEN_UNBLOCK_EVENTS(%esi)
+hypervisor_iret:
+	andl $~NMI_MASK, EFLAGS(%esp)
 	RESTORE_REGS
 	movl %eax,(%esp)
-	movl $__HYPERVISOR_switch_vm86,%eax
+	movl $__HYPERVISOR_iret,%eax
 	int $0x82
 	ud2
 
@@ -690,6 +692,15 @@ debug_stack_correct:
 	movl %esp,%eax			# pt_regs pointer
 	call do_debug
 	jmp ret_from_exception
+
+ENTRY(nmi)
+	pushl %eax
+	SAVE_ALL
+	xorl %edx,%edx		# zero error code
+	movl %esp,%eax		# pt_regs pointer
+	call do_nmi
+	orl  $NMI_MASK, EFLAGS(%esp)
+	jmp restore_all
 
 #if 0 /* XEN */
 /*
