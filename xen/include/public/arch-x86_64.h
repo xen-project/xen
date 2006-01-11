@@ -114,8 +114,10 @@ struct iret_context {
     uint64_t rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;
     /* Bottom of iret stack frame. */
 };
-/* For compatibility with HYPERVISOR_switch_to_user which is the old
- * name for HYPERVISOR_iret */
+/*
+ * For compatibility with HYPERVISOR_switch_to_user which is the old
+ * name for HYPERVISOR_iret.
+ */
 struct switch_to_user {
     /* Top of stack (%rsp at point of hypercall). */
     uint64_t rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;

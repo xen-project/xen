@@ -118,16 +118,16 @@ extern void toggle_guest_mode(struct vcpu *);
 
 long do_iret(void)
 {
-    struct cpu_user_regs  *regs = guest_cpu_user_regs();
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct iret_context iret_saved;
-    struct vcpu    *v = current;
+    struct vcpu *v = current;
 
     if ( unlikely(copy_from_user(&iret_saved, (void *)regs->rsp, sizeof(iret_saved))) ||
          unlikely(pagetable_get_paddr(v->arch.guest_table_user) == 0) )
         return -EFAULT;
 
-    /* returning to user mode */
-    if ((iret_saved.cs & 0x03) == 3)
+    /* Returning to user mode. */
+    if ( (iret_saved.cs & 0x03) == 3 )
         toggle_guest_mode(v);
 
     regs->rip    = iret_saved.rip;
@@ -143,7 +143,7 @@ long do_iret(void)
         regs->rcx = iret_saved.rcx;
     }
 
-    /* No longer in NMI context */
+    /* No longer in NMI context. */
     clear_bit(_VCPUF_nmi_masked, &current->vcpu_flags);
 
     /* Saved %rax gets written back to regs->rax in entry.S. */

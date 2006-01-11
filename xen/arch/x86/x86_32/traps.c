@@ -161,42 +161,50 @@ asmlinkage unsigned long do_iret(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
 
-    /* Restore EAX (clobbered by hypercall) */
-    if (copy_from_user(&regs->eax, (void __user *)regs->esp, 4))
+    /* Restore EAX (clobbered by hypercall). */
+    if ( copy_from_user(&regs->eax, (void __user *)regs->esp, 4) )
         domain_crash_synchronous();
     regs->esp += 4;
 
-    /* Restore EFLAGS, CS and EIP */
-    if (copy_from_user(&regs->eip, (void __user *)regs->esp, 12))
+    /* Restore EFLAGS, CS and EIP. */
+    if ( copy_from_user(&regs->eip, (void __user *)regs->esp, 12) )
         domain_crash_synchronous();
 
-    if (VM86_MODE(regs)) {
-        /* return to VM86 mode: restore ESP,SS,ES,DS,FS and GS */
+    if ( VM86_MODE(regs) )
+    {
+        /* Return to VM86 mode: restore ESP,SS,ES,DS,FS and GS. */
         if(copy_from_user(&regs->esp, (void __user *)(regs->esp+12), 24))
             domain_crash_synchronous();
-    } else if (RING_0(regs)) {
+    }
+    else if ( RING_0(regs) )
+    {
         domain_crash_synchronous();
-    } else if (RING_1(regs)) {
-        /* return to ring 1: pop EFLAGS,CS and EIP */
+    }
+    else if ( RING_1(regs) ) {
+        /* Return to ring 1: pop EFLAGS,CS and EIP. */
         regs->esp += 12;
-    } else {
-        /* return to ring 2/3: restore ESP and SS */
-        if(copy_from_user(&regs->esp, (void __user *)(regs->esp+12), 8))
+    }
+    else
+    {
+        /* Return to ring 2/3: restore ESP and SS. */
+        if ( copy_from_user(&regs->esp, (void __user *)(regs->esp+12), 8) )
             domain_crash_synchronous();
     }
 
-    /* Fixup EFLAGS */
+    /* Fixup EFLAGS. */
     regs->eflags &= ~X86_EFLAGS_IOPL;
     regs->eflags |= X86_EFLAGS_IF;
 
-    /* No longer in NMI context */
+    /* No longer in NMI context. */
     clear_bit(_VCPUF_nmi_masked, &current->vcpu_flags);
 
-    /* Restore upcall mask from saved value */
+    /* Restore upcall mask from saved value. */
     current->vcpu_info->evtchn_upcall_mask = regs->saved_upcall_mask;
 
-    /* the hypercall exit path will overwrite eax
-     * with this return value */
+    /*
+     * The hypercall exit path will overwrite EAX with this return
+     * value.
+     */
     return regs->eax;
 }
 
