@@ -87,7 +87,6 @@ static void continue_cpu_idle_loop(void)
 	int cpu = smp_processor_id();
 	for ( ; ; )
 	{
-	printf ("idle%dD\n", cpu);
 #ifdef IA64
 //        __IRQ_STAT(cpu, idle_timestamp) = jiffies
 #else
@@ -146,15 +145,26 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 {
 	struct vcpu *v;
 
+	/* Still keep idle vcpu0 static allocated at compilation, due
+	 * to some code from Linux still requires it in early phase.
+	 */
+	if (is_idle_domain(d) && !vcpu_id)
+		return idle_vcpu[0];
+
 	if ((v = alloc_xenheap_pages(KERNEL_STACK_SIZE_ORDER)) == NULL)
 		return NULL;
 
 	memset(v, 0, sizeof(*v)); 
-        memcpy(&v->arch, &idle0_vcpu.arch, sizeof(v->arch));
-	v->arch.privregs = 
+        memcpy(&v->arch, &idle_vcpu[0]->arch, sizeof(v->arch));
+
+	if (!is_idle_domain(d)) {
+	    v->arch.privregs = 
 		alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
+	    BUG_ON(v->arch.privregs == NULL);
+	    memset(v->arch.privregs, 0, PAGE_SIZE);
+	}
+
 	printf("arch_vcpu_info=%p\n", v->arch.privregs);
-	memset(v->arch.privregs, 0, PAGE_SIZE);
 
 	return v;
 }
@@ -191,6 +201,14 @@ int arch_do_createdomain(struct vcpu *v)
 	memset(ti, 0, sizeof(struct thread_info));
 	init_switch_stack(v);
 
+	// the following will eventually need to be negotiated dynamically
+	d->xen_vastart = XEN_START_ADDR;
+	d->xen_vaend = XEN_END_ADDR;
+	d->shared_info_va = SHAREDINFO_ADDR;
+
+	if (is_idle_vcpu(v))
+	    return 0;
+
 	d->shared_info = (void *)alloc_xenheap_page();
 	if (!d->shared_info) {
    		printk("ERROR/HALTING: CAN'T ALLOC PAGE\n");
@@ -200,12 +218,7 @@ int arch_do_createdomain(struct vcpu *v)
 	if (v == d->vcpu[0])
 	    memset(&d->shared_info->evtchn_mask[0], 0xff,
 		sizeof(d->shared_info->evtchn_mask));
-#if 0
-	d->vcpu[0].arch.privregs = 
-			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
-	printf("arch_vcpu_info=%p\n", d->vcpu[0].arch.privregs);
-	memset(d->vcpu.arch.privregs, 0, PAGE_SIZE);
-#endif
+
 	v->vcpu_info = &(d->shared_info->vcpu_info[0]);
 
 	d->max_pages = (128UL*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
@@ -227,28 +240,21 @@ int arch_do_createdomain(struct vcpu *v)
 		BUG();
 	v->arch.starting_rid = d->arch.starting_rid;
 	v->arch.ending_rid = d->arch.ending_rid;
-	// the following will eventually need to be negotiated dynamically
-	d->xen_vastart = XEN_START_ADDR;
-	d->xen_vaend = XEN_END_ADDR;
-	d->shared_info_va = SHAREDINFO_ADDR;
 	d->arch.breakimm = 0x1000;
 	v->arch.breakimm = d->arch.breakimm;
 
 	d->arch.sys_pgnr = 0;
-	if (d->domain_id != IDLE_DOMAIN_ID) {
-		d->arch.mm = xmalloc(struct mm_struct);
-		if (unlikely(!d->arch.mm)) {
-			printk("Can't allocate mm_struct for domain %d\n",d->domain_id);
-			return -ENOMEM;
-		}
-		memset(d->arch.mm, 0, sizeof(*d->arch.mm));
-		d->arch.mm->pgd = pgd_alloc(d->arch.mm);
-		if (unlikely(!d->arch.mm->pgd)) {
-			printk("Can't allocate pgd for domain %d\n",d->domain_id);
-			return -ENOMEM;
-		}
-	} else
- 		d->arch.mm = NULL;
+	d->arch.mm = xmalloc(struct mm_struct);
+	if (unlikely(!d->arch.mm)) {
+		printk("Can't allocate mm_struct for domain %d\n",d->domain_id);
+		return -ENOMEM;
+	}
+	memset(d->arch.mm, 0, sizeof(*d->arch.mm));
+	d->arch.mm->pgd = pgd_alloc(d->arch.mm);
+	if (unlikely(!d->arch.mm->pgd)) {
+		printk("Can't allocate pgd for domain %d\n",d->domain_id);
+		return -ENOMEM;
+	}
 	printf ("arch_do_create_domain: domain=%p\n", d);
 
 	return 0;

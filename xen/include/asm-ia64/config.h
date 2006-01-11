@@ -141,10 +141,6 @@ struct page;
 #undef alloc_task_struct
 #define get_thread_info(v) alloc_thread_info(v)
 
-// initial task has a different name in Xen
-//#define	idle0_task	init_task
-#define	idle0_vcpu	init_task
-
 // avoid redefining task_t in asm/thread_info.h
 #define task_t	struct domain
 

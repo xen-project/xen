@@ -482,9 +482,8 @@ do_rest:
 	struct vcpu *v;
 	void *stack;
 
-	if ( (idle = do_createdomain(IDLE_DOMAIN_ID, cpu)) == NULL )
-		panic("failed 'createdomain' for CPU %d", cpu);
-	v = idle->vcpu[0];
+	v = idle_vcpu[cpu] = alloc_vcpu(idle_vcpu[0]->domain, cpu, cpu);
+	BUG_ON(v == NULL);
 
 	printf ("do_boot_cpu: cpu=%d, domain=%p, vcpu=%p\n", cpu, idle, v);
 
