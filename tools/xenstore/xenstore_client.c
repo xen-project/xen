@@ -66,7 +66,7 @@ usage(const char *progname)
 
 #if defined(CLIENT_rm)
 static int
-do_rm(char *path, struct xs_handle *xsh, xs_transaction_handle xth)
+do_rm(char *path, struct xs_handle *xsh, xs_transaction_t xth)
 {
     if (xs_rm(xsh, xth, path)) {
         return 0;
@@ -81,7 +81,7 @@ do_rm(char *path, struct xs_handle *xsh, xs_transaction_handle xth)
 
 static int
 perform(int optind, int argc, char **argv, struct xs_handle *xsh,
-        xs_transaction_handle xth, int prefix, int tidy)
+        xs_transaction_t xth, int prefix, int tidy)
 {
     while (optind < argc) {
 #if defined(CLIENT_read)
@@ -179,7 +179,7 @@ int
 main(int argc, char **argv)
 {
     struct xs_handle *xsh;
-    xs_transaction_handle xth;
+    xs_transaction_t xth;
     int ret = 0, socket = 0;
     int prefix = 0;
     int tidy = 0;

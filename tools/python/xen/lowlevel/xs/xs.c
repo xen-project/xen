@@ -66,7 +66,7 @@ static PyObject *none(bool result);
 
 static int parse_transaction_path(XsHandle *self, PyObject *args,
                                   struct xs_handle **xh,
-                                  xs_transaction_handle *th,
+                                  xs_transaction_t *th,
                                   char **path);
 
 
@@ -83,7 +83,7 @@ static int parse_transaction_path(XsHandle *self, PyObject *args,
 static PyObject *xspy_read(XsHandle *self, PyObject *args)
 {
     struct xs_handle *xh;
-    xs_transaction_handle th;
+    xs_transaction_t th;
     char *path;
 
     char *xsval;
@@ -120,7 +120,7 @@ static PyObject *xspy_write(XsHandle *self, PyObject *args)
 {
     static char *arg_spec = "sss#";
     struct xs_handle *xh = xshandle(self);
-    xs_transaction_handle th;
+    xs_transaction_t th;
     char *thstr;
     char *path;
     char *data;
@@ -132,7 +132,7 @@ static PyObject *xspy_write(XsHandle *self, PyObject *args)
     if (!PyArg_ParseTuple(args, arg_spec, &thstr, &path, &data, &data_n))
         return NULL;
 
-    th = (xs_transaction_handle)strtoul(thstr, NULL, 16);
+    th = (xs_transaction_t)strtoul(thstr, NULL, 16);
 
     Py_BEGIN_ALLOW_THREADS
     result = xs_write(xh, th, path, data, data_n);
@@ -155,7 +155,7 @@ static PyObject *xspy_write(XsHandle *self, PyObject *args)
 static PyObject *xspy_ls(XsHandle *self, PyObject *args)
 {
     struct xs_handle *xh;
-    xs_transaction_handle th;
+    xs_transaction_t th;
     char *path;
 
     char **xsval;
@@ -193,7 +193,7 @@ static PyObject *xspy_ls(XsHandle *self, PyObject *args)
 static PyObject *xspy_mkdir(XsHandle *self, PyObject *args)
 {
     struct xs_handle *xh;
-    xs_transaction_handle th;
+    xs_transaction_t th;
     char *path;
 
     bool result;
@@ -221,7 +221,7 @@ static PyObject *xspy_mkdir(XsHandle *self, PyObject *args)
 static PyObject *xspy_rm(XsHandle *self, PyObject *args)
 {
     struct xs_handle *xh;
-    xs_transaction_handle th;
+    xs_transaction_t th;
     char *path;
 
     bool result;
@@ -256,7 +256,7 @@ static PyObject *xspy_get_permissions(XsHandle *self, PyObject *args)
     unsigned int perms_n = 0;
     int i;
 
-    xs_transaction_handle th;
+    xs_transaction_t th;
     char *thstr;
 
     if (!xh)
@@ -264,7 +264,7 @@ static PyObject *xspy_get_permissions(XsHandle *self, PyObject *args)
     if (!PyArg_ParseTuple(args, arg_spec, &thstr, &path))
         return NULL;
 
-    th = (xs_transaction_handle)strtoul(thstr, NULL, 16);
+    th = (xs_transaction_t)strtoul(thstr, NULL, 16);
 
     Py_BEGIN_ALLOW_THREADS
     perms = xs_get_permissions(xh, th, path, &perms_n);
@@ -312,7 +312,7 @@ static PyObject *xspy_set_permissions(XsHandle *self, PyObject *args)
     int xsperms_n;
     PyObject *tuple0 = NULL;
 
-    xs_transaction_handle th;
+    xs_transaction_t th;
     char *thstr;
 
     if (!xh)
@@ -320,7 +320,7 @@ static PyObject *xspy_set_permissions(XsHandle *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "ssO", &thstr, &path, &perms))
         goto exit;
 
-    th = (xs_transaction_handle)strtoul(thstr, NULL, 16);
+    th = (xs_transaction_t)strtoul(thstr, NULL, 16);
 
     if (!PyList_Check(perms)) {
         PyErr_SetString(PyExc_RuntimeError, "perms must be a list");
@@ -509,7 +509,7 @@ static PyObject *xspy_unwatch(XsHandle *self, PyObject *args)
 static PyObject *xspy_transaction_start(XsHandle *self)
 {
     struct xs_handle *xh = xshandle(self);
-    xs_transaction_handle th;
+    xs_transaction_t th;
     char thstr[MAX_STRLEN(unsigned long) + 1];
 
     if (!xh)
@@ -547,7 +547,7 @@ static PyObject *xspy_transaction_end(XsHandle *self, PyObject *args,
     struct xs_handle *xh = xshandle(self);
     bool result;
 
-    xs_transaction_handle th;
+    xs_transaction_t th;
     char *thstr;
 
     if (!xh)
@@ -556,7 +556,7 @@ static PyObject *xspy_transaction_end(XsHandle *self, PyObject *args,
                                      &thstr, &abort))
         return NULL;
 
-    th = (xs_transaction_handle)strtoul(thstr, NULL, 16);
+    th = (xs_transaction_t)strtoul(thstr, NULL, 16);
 
     Py_BEGIN_ALLOW_THREADS
     result = xs_transaction_end(xh, th, abort);
@@ -727,7 +727,7 @@ static void remove_watch(XsHandle *self, PyObject *token)
  */
 static int parse_transaction_path(XsHandle *self, PyObject *args,
                                   struct xs_handle **xh,
-                                  xs_transaction_handle *th,
+                                  xs_transaction_t *th,
                                   char **path)
 {
     char *thstr;
@@ -740,7 +740,7 @@ static int parse_transaction_path(XsHandle *self, PyObject *args,
     if (!PyArg_ParseTuple(args, "ss", &thstr, path))
         return 0;
 
-    *th = (xs_transaction_handle)strtoul(thstr, NULL, 16);
+    *th = (xs_transaction_t)strtoul(thstr, NULL, 16);
 
     return 1;
 }
