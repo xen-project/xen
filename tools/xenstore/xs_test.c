@@ -535,7 +535,7 @@ static void do_introduce(unsigned int handle,
 	*(uint16_t *)((void *)interface + 36) = atoi(eventchn);
 
 	if (!xs_introduce_domain(handles[handle], atoi(domid),
-				 atol(mfn), atoi(eventchn), path)) {
+				 atol(mfn), atoi(eventchn))) {
 		failed(handle);
 		munmap(interface, getpagesize());
 		return;
