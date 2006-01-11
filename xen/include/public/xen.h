@@ -53,9 +53,9 @@
 #define __HYPERVISOR_grant_table_op       20
 #define __HYPERVISOR_vm_assist            21
 #define __HYPERVISOR_update_va_mapping_otherdomain 22
-#define __HYPERVISOR_iret                 23 /* x86/32 only */
+#define __HYPERVISOR_iret                 23 /* x86 only */
 #define __HYPERVISOR_switch_vm86          23 /* x86/32 only (obsolete name) */
-#define __HYPERVISOR_switch_to_user       23 /* x86/64 only */
+#define __HYPERVISOR_switch_to_user       23 /* x86/64 only (obsolete name) */
 #define __HYPERVISOR_vcpu_op              24
 #define __HYPERVISOR_set_segment_base     25 /* x86/64 only */
 #define __HYPERVISOR_mmuext_op            26

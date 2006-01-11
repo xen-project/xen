@@ -12,6 +12,7 @@
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
+#include <asm/shadow.h>
 #include <asm/vmx.h>
 
 void show_registers(struct cpu_user_regs *regs)
@@ -111,6 +112,42 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
     /* Wait for manual reset. */
     for ( ; ; )
         __asm__ __volatile__ ( "hlt" );
+}
+
+extern void toggle_guest_mode(struct vcpu *);
+
+long do_iret(void)
+{
+    struct cpu_user_regs  *regs = guest_cpu_user_regs();
+    struct iret_context iret_saved;
+    struct vcpu    *v = current;
+
+    if ( unlikely(copy_from_user(&iret_saved, (void *)regs->rsp, sizeof(iret_saved))) ||
+         unlikely(pagetable_get_paddr(v->arch.guest_table_user) == 0) )
+        return -EFAULT;
+
+    /* returning to user mode */
+    if ((iret_saved.cs & 0x03) == 3)
+        toggle_guest_mode(v);
+
+    regs->rip    = iret_saved.rip;
+    regs->cs     = iret_saved.cs | 3; /* force guest privilege */
+    regs->rflags = (iret_saved.rflags & ~(EF_IOPL|EF_VM)) | EF_IE;
+    regs->rsp    = iret_saved.rsp;
+    regs->ss     = iret_saved.ss | 3; /* force guest privilege */
+
+    if ( !(iret_saved.flags & VGCF_IN_SYSCALL) )
+    {
+        regs->entry_vector = 0;
+        regs->r11 = iret_saved.r11;
+        regs->rcx = iret_saved.rcx;
+    }
+
+    /* No longer in NMI context */
+    clear_bit(_VCPUF_nmi_masked, &current->vcpu_flags);
+
+    /* Saved %rax gets written back to regs->rax in entry.S. */
+    return iret_saved.rax;
 }
 
 asmlinkage void syscall_enter(void);
