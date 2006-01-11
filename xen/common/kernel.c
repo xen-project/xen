@@ -160,7 +160,6 @@ long do_nmi_op(unsigned int cmd, void *arg)
             rc = -EINVAL;
         else
             current->nmi_addr = (unsigned long)arg;
-        printk("***** NMI handler at 0x%lx\n", current->nmi_addr);
         break;
     case XENNMI_unregister_callback:
         current->nmi_addr = 0;
