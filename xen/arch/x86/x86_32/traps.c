@@ -160,7 +160,7 @@ asmlinkage void do_double_fault(void)
 static inline void pop_from_guest_stack(
     void *dst, struct cpu_user_regs *regs, unsigned int bytes)
 {
-    if ( unlikely(copy_from_user(dst, (void __user *)regs->esp, bytes)) )
+    if ( unlikely(__copy_from_user(dst, (void __user *)regs->esp, bytes)) )
         domain_crash_synchronous();
     regs->esp += bytes;
 }
@@ -168,19 +168,31 @@ static inline void pop_from_guest_stack(
 asmlinkage unsigned long do_iret(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
+    u32 eflags;
+
+    /* Check worst-case stack frame for overlap with Xen protected area. */
+    if ( unlikely(!access_ok(regs->esp, 40)) )
+        domain_crash_synchronous();
 
     /* Pop and restore EAX (clobbered by hypercall). */
     pop_from_guest_stack(&regs->eax, regs, 4);
 
-    /* Pop and restore EFLAGS, CS and EIP. */
-    pop_from_guest_stack(&regs->eip, regs, 12);
+    /* Pop and restore CS and EIP. */
+    pop_from_guest_stack(&regs->eip, regs, 8);
+
+    /*
+     * Pop, fix up and restore EFLAGS. We fix up in a local staging area
+     * to avoid firing the BUG_ON(IOPL) check in arch_getdomaininfo_ctxt.
+     */
+    pop_from_guest_stack(&eflags, regs, 4);
+    regs->eflags = (eflags & ~X86_EFLAGS_IOPL) | X86_EFLAGS_IF;
 
     if ( VM86_MODE(regs) )
     {
         /* Return to VM86 mode: pop and restore ESP,SS,ES,DS,FS and GS. */
         pop_from_guest_stack(&regs->esp, regs, 24);
     }
-    else if ( RING_0(regs) )
+    else if ( unlikely(RING_0(regs)) )
     {
         domain_crash_synchronous();
     }
@@ -189,10 +201,6 @@ asmlinkage unsigned long do_iret(void)
         /* Return to ring 2/3: pop and restore ESP and SS. */
         pop_from_guest_stack(&regs->esp, regs, 8);
     }
-
-    /* Fixup EFLAGS. */
-    regs->eflags &= ~X86_EFLAGS_IOPL;
-    regs->eflags |= X86_EFLAGS_IF;
 
     /* No longer in NMI context. */
     clear_bit(_VCPUF_nmi_masked, &current->vcpu_flags);
