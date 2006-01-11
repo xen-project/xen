@@ -11,6 +11,7 @@
 #include <xen/compile.h>
 #include <xen/sched.h>
 #include <asm/current.h>
+#include <public/nmi.h>
 #include <public/version.h>
 
 void cmdline_parse(char *cmdline)
@@ -146,6 +147,30 @@ long do_xen_version(int cmd, void *arg)
     }
 
     return -ENOSYS;
+}
+
+long do_nmi_op(unsigned int cmd, void *arg)
+{
+    long rc = 0;
+
+    switch ( cmd )
+    {
+    case XENNMI_register_callback:
+        if ( (current->domain->domain_id != 0) || (current->vcpu_id != 0) )
+            rc = -EINVAL;
+        else
+            current->nmi_addr = (unsigned long)arg;
+        printk("***** NMI handler at 0x%lx\n", current->nmi_addr);
+        break;
+    case XENNMI_unregister_callback:
+        current->nmi_addr = 0;
+        break;
+    default:
+        rc = -ENOSYS;
+        break;
+    }
+
+    return rc;
 }
 
 long do_vm_assist(unsigned int cmd, unsigned int type)
