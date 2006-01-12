@@ -965,8 +965,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         if ( !IS_PRIV(v->domain) )
         {
             u32 l, h;
-            if ( (regs->ecx != MSR_EFER) ||
-                 (rdmsr_user(regs->ecx, l, h) != 0) ||
+            if ( (rdmsr_user(regs->ecx, l, h) != 0) ||
+                 (regs->ecx != MSR_EFER) ||
                  (regs->eax != l) || (regs->edx != h) )
                 DPRINTK("Non-priv domain attempted WRMSR %p from "
                         "%08x:%08x to %08lx:%08lx.\n",
