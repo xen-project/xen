@@ -21,9 +21,9 @@
  * @parm dom the id of the domain
  * @return 0 on success, -1 on failure
  */
-int xc_linux_save(int xc_handle, int fd, uint32_t dom, uint32_t max_iters, 
+int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters, 
                   uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
-                  int (*suspend)(int));
+                  int (*suspend)(int domid));
 
 
 /**

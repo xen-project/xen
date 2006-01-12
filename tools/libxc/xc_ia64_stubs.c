@@ -23,7 +23,8 @@ unsigned long xc_ia64_fpsr_default(void)
 }
 
 int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters, 
-                  uint32_t max_factor, uint32_t flags, int (*suspend)(void))
+                  uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
+                  int (*suspend)(int domid))
 {
     PERROR("xc_linux_save not implemented\n");
     return -1;
