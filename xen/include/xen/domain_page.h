@@ -2,6 +2,8 @@
  * domain_page.h
  * 
  * Allow temporary mapping of domain page frames into Xen space.
+ * 
+ * Copyright (c) 2003-2006, Keir Fraser <keir@xensource.com>
  */
 
 #ifndef __XEN_DOMAIN_PAGE_H__

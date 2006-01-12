@@ -1,14 +1,9 @@
 /******************************************************************************
  * domain_page.h
  * 
- * Allow temporary mapping of domain pages. Based on ideas from the
- * Linux PKMAP code -- the copyrights and credits are retained below.
- */
-
-/*
- * (C) 1999 Andrea Arcangeli, SuSE GmbH, andrea@suse.de
- *          Gerhard Wichert, Siemens AG, Gerhard.Wichert@pdb.siemens.de *
- * Copyright (C) 1999 Ingo Molnar <mingo@redhat.com>
+ * Allow temporary mapping of domain pages.
+ * 
+ * Copyright (c) 2003-2006, Keir Fraser <keir@xensource.com>
  */
 
 #include <xen/config.h>
