@@ -3017,7 +3017,7 @@ void ptwr_flush(struct domain *d, const int which)
     /* NB. INVLPG is a serialising instruction: flushes pending updates. */
     flush_tlb_one_mask(d->domain_dirty_cpumask, l1va);
     PTWR_PRINTK("[%c] disconnected_l1va at %p now %"PRIpte"\n",
-                PTWR_PRINT_WHICH, ptep, trawl l1e_get_intpte(pte));
+                PTWR_PRINT_WHICH, ptep, l1e_get_intpte(pte));
 
     /*
      * STEP 2. Validate any modified PTEs.

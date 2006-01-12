@@ -963,16 +963,26 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     case 0x30: /* WRMSR */
         /* Ignore the instruction if unprivileged. */
         if ( !IS_PRIV(v->domain) )
-            DPRINTK("Non-priv domain attempted WRMSR(%p,%08lx,%08lx).\n",
-                    _p(regs->ecx), (long)regs->eax, (long)regs->edx);
+        {
+            u32 l, h;
+            if ( (regs->ecx != MSR_EFER) ||
+                 (rdmsr_user(regs->ecx, l, h) != 0) ||
+                 (regs->eax != l) || (regs->edx != h) )
+                DPRINTK("Non-priv domain attempted WRMSR %p from "
+                        "%08x:%08x to %08lx:%08lx.\n",
+                        _p(regs->ecx), h, l, (long)regs->edx, (long)regs->eax);
+        }
         else if ( wrmsr_user(regs->ecx, regs->eax, regs->edx) )
             goto fail;
         break;
 
     case 0x32: /* RDMSR */
         if ( !IS_PRIV(v->domain) )
-            DPRINTK("Non-priv domain attempted RDMSR(%p,%08lx,%08lx).\n",
-                    _p(regs->ecx), (long)regs->eax, (long)regs->edx);
+        {
+            if ( regs->ecx != MSR_EFER )
+                DPRINTK("Non-priv domain attempted RDMSR %p.\n",
+                        _p(regs->ecx));
+        }
         /* Everyone can read the MSR space. */
         if ( rdmsr_user(regs->ecx, regs->eax, regs->edx) )
             goto fail;
