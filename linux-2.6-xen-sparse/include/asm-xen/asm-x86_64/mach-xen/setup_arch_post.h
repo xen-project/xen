@@ -44,7 +44,9 @@ static void __init machine_specific_arch_setup(void)
                 (unsigned long) failsafe_callback,
                 (unsigned long) system_call);
 
+#ifdef CONFIG_X86_LOCAL_APIC
 	HYPERVISOR_nmi_op(XENNMI_register_callback, (unsigned long)&nmi);
+#endif
 
 	machine_specific_modify_cpu_capabilities(&boot_cpu_data);
 }

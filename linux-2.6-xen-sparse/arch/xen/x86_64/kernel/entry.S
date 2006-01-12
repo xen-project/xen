@@ -719,6 +719,7 @@ ENTRY(do_hypervisor_callback)   # do_hyperviosr_callback(struct *pt_regs)
 	call evtchn_do_upcall
         jmp  error_exit
 
+#ifdef CONFIG_X86_LOCAL_APIC
 ENTRY(nmi)
 	zeroentry do_nmi_callback
 ENTRY(do_nmi_callback)
@@ -728,6 +729,7 @@ ENTRY(do_nmi_callback)
         XEN_BLOCK_EVENTS(%rsi)
         GET_THREAD_INFO(%rcx)
         jmp  retint_restore_args
+#endif
 
         ALIGN
 restore_all_enable_events:  
