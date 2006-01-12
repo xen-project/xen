@@ -89,7 +89,7 @@ static int tpmback_probe(struct xenbus_device *dev,
 		goto fail;
 	}
 
-	err = xenbus_switch_state(dev, NULL, XenbusStateInitWait);
+	err = xenbus_switch_state(dev, XBT_NULL, XenbusStateInitWait);
 	if (err) {
 		goto fail;
 	}
@@ -109,7 +109,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
 
-	err = xenbus_scanf(NULL, dev->nodename,
+	err = xenbus_scanf(XBT_NULL, dev->nodename,
 	                   "instance","%li", &instance);
 	if (XENBUS_EXIST_ERR(err)) {
 		return;
@@ -177,7 +177,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		xenbus_switch_state(dev, NULL, XenbusStateClosing);
+		xenbus_switch_state(dev, XBT_NULL, XenbusStateClosing);
 		break;
 
 	case XenbusStateClosed:
