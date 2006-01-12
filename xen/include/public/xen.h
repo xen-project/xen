@@ -53,12 +53,14 @@
 #define __HYPERVISOR_grant_table_op       20
 #define __HYPERVISOR_vm_assist            21
 #define __HYPERVISOR_update_va_mapping_otherdomain 22
-#define __HYPERVISOR_switch_vm86          23 /* x86/32 only */
-#define __HYPERVISOR_switch_to_user       23 /* x86/64 only */
+#define __HYPERVISOR_iret                 23 /* x86 only */
+#define __HYPERVISOR_switch_vm86          23 /* x86/32 only (obsolete name) */
+#define __HYPERVISOR_switch_to_user       23 /* x86/64 only (obsolete name) */
 #define __HYPERVISOR_vcpu_op              24
 #define __HYPERVISOR_set_segment_base     25 /* x86/64 only */
 #define __HYPERVISOR_mmuext_op            26
 #define __HYPERVISOR_acm_op               27
+#define __HYPERVISOR_nmi_op               28
 
 /* 
  * VIRTUAL INTERRUPTS
@@ -69,10 +71,7 @@
 #define VIRQ_DEBUG      1  /* Request guest to dump debug info.           */
 #define VIRQ_CONSOLE    2  /* (DOM0) Bytes received on emergency console. */
 #define VIRQ_DOM_EXC    3  /* (DOM0) Exceptional event for some domain.   */
-#define VIRQ_PARITY_ERR 4  /* (DOM0) NMI parity error (port 0x61, bit 7). */
-#define VIRQ_IO_ERR     5  /* (DOM0) NMI I/O error    (port 0x61, bit 6). */
 #define VIRQ_DEBUGGER   6  /* (DOM0) A domain has paused for debugging.   */
-#define VIRQ_NMI        7  /* (DOM0) Unknown NMI (not from ISA port 0x61).*/
 #define NR_VIRQS        8
 
 /*

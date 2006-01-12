@@ -288,9 +288,7 @@ int arch_do_createdomain(struct vcpu *v)
 
 #if defined(__i386__)
 
-    d->arch.mapcache.l1tab = d->arch.mm_perdomain_pt +
-        (GDT_LDT_MBYTES << (20 - PAGE_SHIFT));
-    spin_lock_init(&d->arch.mapcache.lock);
+    mapcache_init(d);
 
 #else /* __x86_64__ */
 
@@ -482,14 +480,6 @@ void new_thread(struct vcpu *d,
 
 #ifdef __x86_64__
 
-void toggle_guest_mode(struct vcpu *v)
-{
-    v->arch.flags ^= TF_kernel_mode;
-    __asm__ __volatile__ ( "swapgs" );
-    update_pagetables(v);
-    write_ptbase(v);
-}
-
 #define loadsegment(seg,value) ({               \
     int __r = 1;                                \
     __asm__ __volatile__ (                      \
@@ -657,35 +647,6 @@ static void save_segments(struct vcpu *v)
     }
 
     percpu_ctxt[smp_processor_id()].dirty_segment_mask = dirty_segment_mask;
-}
-
-long do_switch_to_user(void)
-{
-    struct cpu_user_regs  *regs = guest_cpu_user_regs();
-    struct switch_to_user  stu;
-    struct vcpu    *v = current;
-
-    if ( unlikely(copy_from_user(&stu, (void *)regs->rsp, sizeof(stu))) ||
-         unlikely(pagetable_get_paddr(v->arch.guest_table_user) == 0) )
-        return -EFAULT;
-
-    toggle_guest_mode(v);
-
-    regs->rip    = stu.rip;
-    regs->cs     = stu.cs | 3; /* force guest privilege */
-    regs->rflags = (stu.rflags & ~(EF_IOPL|EF_VM)) | EF_IE;
-    regs->rsp    = stu.rsp;
-    regs->ss     = stu.ss | 3; /* force guest privilege */
-
-    if ( !(stu.flags & VGCF_IN_SYSCALL) )
-    {
-        regs->entry_vector = 0;
-        regs->r11 = stu.r11;
-        regs->rcx = stu.rcx;
-    }
-
-    /* Saved %rax gets written back to regs->rax in entry.S. */
-    return stu.rax;
 }
 
 #define switch_kernel_stack(_n,_c) ((void)0)

@@ -287,9 +287,9 @@ HYPERVISOR_vcpu_op(
 }
 
 static inline int
-HYPERVISOR_switch_to_user(void)
+HYPERVISOR_iret(void)
 {
-	return _hypercall0(int, switch_to_user);
+	return _hypercall0(int, iret);
 }
 
 static inline int
@@ -305,6 +305,14 @@ HYPERVISOR_suspend(
 {
 	return _hypercall3(int, sched_op, SCHEDOP_shutdown,
 			   SHUTDOWN_suspend, srec);
+}
+
+static inline int
+HYPERVISOR_nmi_op(
+	unsigned long op,
+	unsigned long arg)
+{
+	return _hypercall2(int, nmi_op, op, arg);
 }
 
 #endif /* __HYPERCALL_H__ */

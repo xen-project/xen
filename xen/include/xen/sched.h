@@ -81,6 +81,8 @@ struct vcpu
     /* Bitmask of CPUs on which this VCPU may run. */
     cpumask_t        cpu_affinity;
 
+    unsigned long    nmi_addr;      /* NMI callback address. */
+
     /* Bitmask of CPUs which are holding onto this VCPU's state. */
     cpumask_t        vcpu_dirty_cpumask;
 
@@ -361,6 +363,12 @@ extern struct domain *domain_list;
  /* VCPU is not-runnable */
 #define _VCPUF_down            5
 #define VCPUF_down             (1UL<<_VCPUF_down)
+ /* NMI callback pending for this VCPU? */
+#define _VCPUF_nmi_pending     8
+#define VCPUF_nmi_pending      (1UL<<_VCPUF_nmi_pending)
+ /* Avoid NMI reentry by allowing NMIs to be masked for short periods. */
+#define _VCPUF_nmi_masked      9
+#define VCPUF_nmi_masked       (1UL<<_VCPUF_nmi_masked)
 
 /*
  * Per-domain flags (domain_flags).

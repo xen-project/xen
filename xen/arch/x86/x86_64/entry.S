@@ -171,7 +171,9 @@ test_all_events:
         leaq  irq_stat(%rip),%rcx
         testl $~0,(%rcx,%rax,1)
         jnz   process_softirqs
-/*test_guest_events:*/
+        btr   $_VCPUF_nmi_pending,VCPU_flags(%rbx)
+        jc    process_nmi
+test_guest_events:
         movq  VCPU_vcpu_info(%rbx),%rax
         testb $0xFF,VCPUINFO_upcall_mask(%rax)
         jnz   restore_all_guest
@@ -322,6 +324,23 @@ process_softirqs:
         call do_softirq
         jmp  test_all_events
 
+	ALIGN
+/* %rbx: struct vcpu */
+process_nmi:
+        movq VCPU_nmi_addr(%rbx),%rax
+        test %rax,%rax
+        jz   test_all_events
+        bts  $_VCPUF_nmi_masked,VCPU_flags(%rbx)
+        jc   1f
+        sti
+        leaq VCPU_trap_bounce(%rbx),%rdx
+        movq %rax,TRAPBOUNCE_eip(%rdx)
+        movw $(TBF_INTERRUPT|TBF_SLOW_IRET),TRAPBOUNCE_flags(%rdx)
+        call create_bounce_frame
+        jmp  test_all_events
+1:      bts  $_VCPUF_nmi_pending,VCPU_flags(%rbx)
+        jmp  test_guest_events
+	
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS STACK:                     */
 /*   { RCX, R11, [DS-GS,] [CR2,] [ERRCODE,] RIP, CS, RFLAGS, RSP, SS }   */
 /* %rdx: trap_bounce, %rbx: struct vcpu                           */
@@ -339,6 +358,9 @@ create_bounce_frame:
 1:      /* In kernel context already: push new frame at existing %rsp. */
         movq  UREGS_rsp+8(%rsp),%rsi
         andb  $0xfc,UREGS_cs+8(%rsp)    # Indicate kernel context to guest.
+	testw $(TBF_SLOW_IRET),TRAPBOUNCE_flags(%rdx)
+	jz    2f
+	orb   $0x01,UREGS_cs+8(%rsp)
 2:      andq  $~0xf,%rsi                # Stack frames are 16-byte aligned.
         movq  $HYPERVISOR_VIRT_START,%rax
         cmpq  %rax,%rsi
@@ -569,7 +591,7 @@ ENTRY(nmi)
         SAVE_ALL
         movq  %rsp,%rdi
         call  do_nmi
-	jmp   restore_all_xen
+        jmp   ret_from_intr
 
 do_arch_sched_op:
         # Ensure we return success even if we return via schedule_tail()
@@ -626,11 +648,12 @@ ENTRY(hypercall_table)
         .quad do_grant_table_op     /* 20 */
         .quad do_vm_assist
         .quad do_update_va_mapping_otherdomain
-        .quad do_switch_to_user
+        .quad do_iret
         .quad do_vcpu_op
         .quad do_set_segment_base   /* 25 */
         .quad do_mmuext_op
         .quad do_acm_op
+        .quad do_nmi_op
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .quad do_ni_hypercall
         .endr
@@ -659,11 +682,12 @@ ENTRY(hypercall_args_table)
         .byte 3 /* do_grant_table_op    */  /* 20 */
         .byte 2 /* do_vm_assist         */
         .byte 4 /* do_update_va_mapping_otherdomain */
-        .byte 0 /* do_switch_to_user    */
+        .byte 0 /* do_iret              */
         .byte 3 /* do_vcpu_op           */
         .byte 2 /* do_set_segment_base  */  /* 25 */
         .byte 4 /* do_mmuext_op         */
         .byte 1 /* do_acm_op            */
+        .byte 2 /* do_nmi_op            */
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr

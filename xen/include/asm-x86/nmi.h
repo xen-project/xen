@@ -2,6 +2,8 @@
 #ifndef ASM_NMI_H
 #define ASM_NMI_H
 
+#include <public/nmi.h>
+
 struct cpu_user_regs;
  
 typedef int (*nmi_callback_t)(struct cpu_user_regs *regs, int cpu);

@@ -323,7 +323,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         new_affinity = v->cpu_affinity;
         memcpy(cpus_addr(new_affinity),
                &op->u.setvcpuaffinity.cpumap,
-               min((int)BITS_TO_LONGS(NR_CPUS),
+               min((int)(BITS_TO_LONGS(NR_CPUS) * sizeof(long)),
                    (int)sizeof(op->u.setvcpuaffinity.cpumap)));
 
         ret = vcpu_set_affinity(v, &new_affinity);
@@ -501,7 +501,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         op->u.getvcpuinfo.cpumap   = 0;
         memcpy(&op->u.getvcpuinfo.cpumap,
                cpus_addr(v->cpu_affinity),
-               min((int)BITS_TO_LONGS(NR_CPUS),
+               min((int)(BITS_TO_LONGS(NR_CPUS) * sizeof(long)),
                    (int)sizeof(op->u.getvcpuinfo.cpumap)));
         ret = 0;
 

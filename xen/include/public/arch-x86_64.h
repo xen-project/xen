@@ -88,11 +88,20 @@
 #define SEGBASE_GS_USER_SEL 3 /* Set user %gs specified in base[15:0] */
 
 /*
- * int HYPERVISOR_switch_to_user(void)
+ * int HYPERVISOR_iret(void)
  * All arguments are on the kernel stack, in the following format.
  * Never returns if successful. Current kernel context is lost.
+ * The saved CS is mapped as follows:
+ *   RING0 -> RING3 kernel mode.
+ *   RING1 -> RING3 kernel mode.
+ *   RING2 -> RING3 kernel mode.
+ *   RING3 -> RING3 user mode.
+ * However RING0 indicates that the guest kernel should return to iteself
+ * directly with
+ *      orb   $3,1*8(%rsp)
+ *      iretq
  * If flags contains VGCF_IN_SYSCALL:
- *   Restore RAX, RIP, RFLAGS, RSP. 
+ *   Restore RAX, RIP, RFLAGS, RSP.
  *   Discard R11, RCX, CS, SS.
  * Otherwise:
  *   Restore RAX, R11, RCX, CS:RIP, RFLAGS, SS:RSP.
@@ -100,10 +109,19 @@
  */
 /* Guest exited in SYSCALL context? Return to guest with SYSRET? */
 #define VGCF_IN_SYSCALL (1<<8)
+struct iret_context {
+    /* Top of stack (%rsp at point of hypercall). */
+    uint64_t rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;
+    /* Bottom of iret stack frame. */
+};
+/*
+ * For compatibility with HYPERVISOR_switch_to_user which is the old
+ * name for HYPERVISOR_iret.
+ */
 struct switch_to_user {
     /* Top of stack (%rsp at point of hypercall). */
     uint64_t rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;
-    /* Bottom of switch_to_user stack frame. */
+    /* Bottom of iret stack frame. */
 };
 
 /*
@@ -202,6 +220,7 @@ typedef struct arch_shared_info {
     unsigned long max_pfn;                  /* max pfn that appears in table */
     /* Frame containing list of mfns containing list of mfns containing p2m. */
     unsigned long pfn_to_mfn_frame_list_list; 
+    unsigned long nmi_reason;
 } arch_shared_info_t;
 
 typedef struct {

@@ -207,7 +207,10 @@ void vcpu_wake(struct vcpu *v)
 
 int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
 {
-    if ( cpus_empty(*affinity) )
+    cpumask_t online_affinity;
+
+    cpus_and(online_affinity, *affinity, cpu_online_map);
+    if ( cpus_empty(online_affinity) )
         return -EINVAL;
 
     return SCHED_OP(set_affinity, v, affinity);
