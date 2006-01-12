@@ -171,20 +171,13 @@ void vcpu_sleep_nosync(struct vcpu *v)
     spin_unlock_irqrestore(&schedule_data[v->processor].schedule_lock, flags);
 
     TRACE_2D(TRC_SCHED_SLEEP, v->domain->domain_id, v->vcpu_id);
-} 
+}
 
 void vcpu_sleep_sync(struct vcpu *v)
 {
     vcpu_sleep_nosync(v);
 
-    /*
-     * We can be sure that the VCPU is finally descheduled after the running
-     * flag is cleared and the scheduler lock is released. We also check that
-     * the domain continues to be unrunnable, in case someone else wakes it.
-     */
-    while ( !vcpu_runnable(v) &&
-            (test_bit(_VCPUF_running, &v->vcpu_flags) ||
-             spin_is_locked(&schedule_data[v->processor].schedule_lock)) )
+    while ( !vcpu_runnable(v) && test_bit(_VCPUF_running, &v->vcpu_flags) )
         cpu_relax();
 
     sync_vcpu_execstate(v);
@@ -314,68 +307,42 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
 {
     struct domain *d;
     struct vcpu *v;
-    int cpu;
-#if NR_CPUS <=32
-    unsigned long have_lock;
- #else
-    unsigned long long have_lock;
-#endif
-    int succ;
-
-    #define __set_cpu_bit(cpu, data) data |= ((typeof(data))1)<<cpu
-    #define __get_cpu_bit(cpu, data) (data & ((typeof(data))1)<<cpu)
-    #define __clear_cpu_bits(data) data = ((typeof(data))0)
     
-    if ( cmd->sched_id != ops.sched_id )
-        return -EINVAL;
-    
-    if ( cmd->direction != SCHED_INFO_PUT && cmd->direction != SCHED_INFO_GET )
+    if ( (cmd->sched_id != ops.sched_id) ||
+         ((cmd->direction != SCHED_INFO_PUT) &&
+          (cmd->direction != SCHED_INFO_GET)) )
         return -EINVAL;
 
     d = find_domain_by_id(cmd->domain);
     if ( d == NULL )
         return -ESRCH;
 
-    /* acquire locks on all CPUs on which vcpus of this domain run */
-    do {
-        succ = 0;
-        __clear_cpu_bits(have_lock);
-        for_each_vcpu ( d, v )
-        {
-            cpu = v->processor;
-            if ( !__get_cpu_bit(cpu, have_lock) )
-            {
-                /* if we don't have a lock on this CPU: acquire it*/
-                if ( spin_trylock(&schedule_data[cpu].schedule_lock) )
-                {
-                    /*we have this lock!*/
-                    __set_cpu_bit(cpu, have_lock);
-                    succ = 1;
-                }
-                else
-                {
-                    /*we didn,t get this lock -> free all other locks too!*/
-                    for ( cpu = 0; cpu < NR_CPUS; cpu++ )
-                        if ( __get_cpu_bit(cpu, have_lock) )
-                            spin_unlock(&schedule_data[cpu].schedule_lock);
-                    /* and start from the beginning! */
-                    succ = 0;
-                    /* leave the "for_each_domain_loop" */
-                    break;
-                }
-            }
-        }
-    } while ( !succ );
+    /*
+     * Most VCPUs we can simply pause. If we are adjusting this VCPU then
+     * we acquire the local schedule_lock to guard against concurrent updates.
+     */
+    for_each_vcpu ( d, v )
+    {
+        if ( v == current )
+            spin_lock_irq(&schedule_data[smp_processor_id()].schedule_lock);
+        else
+            vcpu_pause(v);
+    }
 
     SCHED_OP(adjdom, d, cmd);
 
-    for ( cpu = 0; cpu < NR_CPUS; cpu++ )
-        if ( __get_cpu_bit(cpu, have_lock) )
-            spin_unlock(&schedule_data[cpu].schedule_lock);
-    __clear_cpu_bits(have_lock);
-
     TRACE_1D(TRC_SCHED_ADJDOM, d->domain_id);
+
+    for_each_vcpu ( d, v )
+    {
+        if ( v == current )
+            spin_unlock_irq(&schedule_data[smp_processor_id()].schedule_lock);
+        else
+            vcpu_unpause(v);
+    }
+
     put_domain(d);
+
     return 0;
 }
 
