@@ -391,7 +391,7 @@ static void vlapic_begin_timer(struct vlapic *vlapic)
       (262144 / get_apic_bus_scale()) * vlapic->timer_divide_counter;
     vlapic->vlapic_timer.expires = cur + offset;
 
-    set_ac_timer(&(vlapic->vlapic_timer), vlapic->vlapic_timer.expires );
+    set_timer(&(vlapic->vlapic_timer), vlapic->vlapic_timer.expires );
 
     VMX_DBG_LOG(DBG_LEVEL_VLAPIC, "vlapic_begin_timer: "
                 "bus_scale %x now %08x%08x expire %08x%08x "
@@ -739,7 +739,7 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
 
     case APIC_TMICT:
         if (vlapic_timer_active(vlapic))
-            rem_ac_timer(&(vlapic->vlapic_timer));
+            stop_timer(&(vlapic->vlapic_timer));
 
         vlapic->timer_initial = val;
         vlapic->timer_current = val;
@@ -846,7 +846,7 @@ void vlapic_timer_fn(void *data)
         vlapic->timer_current = vlapic->timer_initial;
         offset = vlapic->timer_current * (262144/get_apic_bus_scale()) * vlapic->timer_divide_counter;
         vlapic->vlapic_timer.expires = NOW() + offset;
-        set_ac_timer(&(vlapic->vlapic_timer), vlapic->vlapic_timer.expires);
+        set_timer(&(vlapic->vlapic_timer), vlapic->vlapic_timer.expires);
     }else {
         vlapic->timer_current = 0;
     }
@@ -986,7 +986,7 @@ static int vlapic_reset(struct vlapic *vlapic)
 
     vmx_vioapic_add_lapic(vlapic, v);
 
-    init_ac_timer(&vlapic->vlapic_timer,
+    init_timer(&vlapic->vlapic_timer,
                   vlapic_timer_fn, vlapic, v->processor);
 
 #ifdef VLAPIC_NO_BIOS

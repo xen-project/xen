@@ -75,7 +75,7 @@ struct pt_regs *guest_cpu_user_regs(void) { return vcpu_regs(current); }
 
 void raise_actimer_softirq(void)
 {
-	raise_softirq(AC_TIMER_SOFTIRQ);
+	raise_softirq(TIMER_SOFTIRQ);
 }
 
 unsigned long

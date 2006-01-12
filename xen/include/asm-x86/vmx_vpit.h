@@ -6,7 +6,7 @@
 #include <xen/lib.h>
 #include <xen/time.h>
 #include <xen/errno.h>
-#include <xen/ac_timer.h>
+#include <xen/timer.h>
 #include <asm/vmx_vmcs.h>
 #include <asm/vmx_vpic.h>
 
@@ -23,7 +23,7 @@ struct vmx_virpit {
     u64 inject_point; /* the time inject virt intr */
     u64 shift;  /* save the value of offset - drift */
     s_time_t scheduled;                 /* scheduled timer interrupt */
-    struct ac_timer pit_timer;  /* periodic timer for mode 2*/
+    struct timer pit_timer;  /* periodic timer for mode 2*/
     unsigned int channel;  /* the pit channel, counter 0~2 */
     unsigned int pending_intr_nr; /* the couner for pending timer interrupts */
     u32 period;		/* pit frequency in ns */

@@ -9,7 +9,7 @@
 #include <public/xen.h>
 #include <public/dom0_ops.h>
 #include <xen/time.h>
-#include <xen/ac_timer.h>
+#include <xen/timer.h>
 #include <xen/grant_table.h>
 #include <xen/rangeset.h>
 #include <asm/domain.h>
@@ -63,7 +63,7 @@ struct vcpu
 
     struct vcpu     *next_in_list;
 
-    struct ac_timer  timer;         /* one-shot timer for timeout values */
+    struct timer  timer;         /* one-shot timer for timeout values */
     unsigned long    sleep_tick;    /* tick at which this vcpu started sleep */
 
     s_time_t         lastschd;      /* time this domain was last scheduled */

@@ -291,8 +291,8 @@ printk("About to call scheduler_init()\n");
     init_IRQ ();
 printk("About to call init_xen_time()\n");
     init_xen_time(); /* initialise the time */
-printk("About to call ac_timer_init()\n");
-    ac_timer_init();
+printk("About to call timer_init()\n");
+    timer_init();
 
 #ifdef CONFIG_XEN_CONSOLE_INPUT	/* CONFIG_SERIAL_8250_CONSOLE=n in dom0! */
     initialize_keytable();

@@ -423,7 +423,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     trap_init();
 
-    ac_timer_init();
+    timer_init();
 
     early_time_init();
 

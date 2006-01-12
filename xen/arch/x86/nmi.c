@@ -34,7 +34,7 @@ unsigned int nmi_watchdog = NMI_NONE;
 static unsigned int nmi_hz = HZ;
 static unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
 static unsigned int nmi_p4_cccr_val;
-static struct ac_timer nmi_timer[NR_CPUS];
+static struct timer nmi_timer[NR_CPUS];
 static unsigned int nmi_timer_ticks[NR_CPUS];
 
 /*
@@ -132,7 +132,7 @@ static void nmi_timer_fn(void *unused)
 {
     int cpu = smp_processor_id();
     nmi_timer_ticks[cpu]++;
-    set_ac_timer(&nmi_timer[cpu], NOW() + MILLISECS(1000));
+    set_timer(&nmi_timer[cpu], NOW() + MILLISECS(1000));
 }
 
 static void disable_lapic_nmi_watchdog(void)
@@ -345,7 +345,7 @@ void __pminit setup_apic_nmi_watchdog(void)
     lapic_nmi_owner = LAPIC_NMI_WATCHDOG;
     nmi_active = 1;
 
-    init_ac_timer(&nmi_timer[cpu], nmi_timer_fn, NULL, cpu);
+    init_timer(&nmi_timer[cpu], nmi_timer_fn, NULL, cpu);
 }
 
 static unsigned int
@@ -383,7 +383,7 @@ void watchdog_enable(void)
          * during setup because the timer infrastructure is not available. 
          */
         for_each_online_cpu ( cpu )
-            set_ac_timer(&nmi_timer[cpu], NOW());
+            set_timer(&nmi_timer[cpu], NOW());
     }
 
     spin_unlock_irqrestore(&watchdog_lock, flags);

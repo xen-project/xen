@@ -356,19 +356,19 @@ static void pit_timer_fn(void *data)
     vpit->pending_intr_nr++;
     if ( test_bit(_VCPUF_running, &v->vcpu_flags) ) {
         vpit->scheduled += vpit->period;
-        set_ac_timer(&vpit->pit_timer, vpit->scheduled);
+        set_timer(&vpit->pit_timer, vpit->scheduled);
     }
 }
 
 void pickup_deactive_ticks(struct vmx_virpit *vpit)
 {
 
-    if ( !active_ac_timer(&(vpit->pit_timer)) ) {
+    if ( !active_timer(&(vpit->pit_timer)) ) {
         /* pick up missed timer tick */
         missed_ticks(vpit);
     
         vpit->scheduled += vpit->period;
-        set_ac_timer(&vpit->pit_timer, vpit->scheduled);
+        set_timer(&vpit->pit_timer, vpit->scheduled);
     }
 }
 
@@ -385,14 +385,14 @@ void vmx_hooks_assist(struct vcpu *v)
     /* load init count*/
     if (p->state == STATE_IORESP_HOOK) {
         /* set up actimer, handle re-init */
-        if ( active_ac_timer(&(vpit->pit_timer)) ) {
+        if ( active_timer(&(vpit->pit_timer)) ) {
             VMX_DBG_LOG(DBG_LEVEL_1, "VMX_PIT: guest reset PIT with channel %lx!\n", (unsigned long) ((p->u.data >> 24) & 0x3) );
-            rem_ac_timer(&(vpit->pit_timer));
+            stop_timer(&(vpit->pit_timer));
             reinit = 1;
  
         }
         else {
-            init_ac_timer(&vpit->pit_timer, pit_timer_fn, v, v->processor);
+            init_timer(&vpit->pit_timer, pit_timer_fn, v, v->processor);
         }
 
         /* init count for this channel */
@@ -431,7 +431,7 @@ void vmx_hooks_assist(struct vcpu *v)
         }
 
         vpit->scheduled = NOW() + vpit->period;
-        set_ac_timer(&vpit->pit_timer, vpit->scheduled);
+        set_timer(&vpit->pit_timer, vpit->scheduled);
 
         /*restore the state*/
         p->state = STATE_IORESP_READY;

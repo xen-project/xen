@@ -156,7 +156,7 @@ struct page;
 #define platform_outl	__ia64_outl
 
 // FIXME: This just overrides a use in a typedef (not allowed in ia64,
-//  or maybe just in older gcc's?) used in ac_timer.c but should be OK
+//  or maybe just in older gcc's?) used in timer.c but should be OK
 //  (and indeed is probably required!) elsewhere
 #undef __cacheline_aligned
 #undef ____cacheline_aligned

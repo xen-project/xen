@@ -119,7 +119,7 @@ void vtm_init(VCPU *vcpu)
     itc_freq = local_cpu_data->itc_freq;
     vtm->cfg_max_jump=itc_freq*MAX_JUMP_STEP/1000;
     vtm->cfg_min_grun=itc_freq*MIN_GUEST_RUNNING_TIME/1000;
-    init_ac_timer(&vtm->vtm_timer, vtm_timer_fn, vcpu, 0);
+    init_timer(&vtm->vtm_timer, vtm_timer_fn, vcpu, 0);
     vtm_reset(vcpu);
 }
 
@@ -163,20 +163,20 @@ void vtm_set_itv(VCPU *vcpu)
     local_irq_save(spsr);
     itv = VCPU(vcpu, itv);
     if ( ITV_IRQ_MASK(itv) )
-        rem_ac_timer(&vtm->vtm_timer);
+        stop_timer(&vtm->vtm_timer);
     vtm_interruption_update(vcpu, vtm);
     local_irq_restore(spsr);
 }
 
 
 /*
- * Update interrupt or hook the vtm ac_timer for fire 
+ * Update interrupt or hook the vtm timer for fire 
  * At this point vtm_timer should be removed if itv is masked.
  */
 /* Interrupt must be disabled at this point */
 
 extern u64 cycle_to_ns(u64 cyle);
-#define TIMER_SLOP (50*1000) /* ns */  /* copy from ac_timer.c */
+#define TIMER_SLOP (50*1000) /* ns */  /* copy from timer.c */
 void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
 {
     uint64_t    cur_itc,vitm,vitv;
@@ -198,7 +198,7 @@ void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
     
     if ( diff_last >= 0 ) {
         // interrupt already fired.
-        rem_ac_timer(&vtm->vtm_timer);
+        stop_timer(&vtm->vtm_timer);
     }
     else if ( diff_now >= 0 ) {
         // ITV is fired.
@@ -207,24 +207,24 @@ void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
     /* Both last_itc & cur_itc < itm, wait for fire condition */
     else {
         expires = NOW() + cycle_to_ns(0-diff_now) + TIMER_SLOP;
-        set_ac_timer(&vtm->vtm_timer, expires);
+        set_timer(&vtm->vtm_timer, expires);
     }
     local_irq_restore(spsr);
 }
 
 /*
  * Action for vtm when the domain is scheduled out.
- * Remove the ac_timer for vtm.
+ * Remove the timer for vtm.
  */
 void vtm_domain_out(VCPU *vcpu)
 {
     if(!is_idle_domain(vcpu->domain))
-	rem_ac_timer(&vcpu->arch.arch_vmx.vtm.vtm_timer);
+	stop_timer(&vcpu->arch.arch_vmx.vtm.vtm_timer);
 }
 
 /*
  * Action for vtm when the domain is scheduled in.
- * Fire vtm IRQ or add the ac_timer for vtm.
+ * Fire vtm IRQ or add the timer for vtm.
  */
 void vtm_domain_in(VCPU *vcpu)
 {

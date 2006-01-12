@@ -105,13 +105,13 @@ void vmx_relinquish_resources(struct vcpu *v)
     destroy_vmcs(&v->arch.arch_vmx);
     free_monitor_pagetable(v);
     vpit = &v->domain->arch.vmx_platform.vmx_pit;
-    if ( active_ac_timer(&(vpit->pit_timer)) )
-        rem_ac_timer(&vpit->pit_timer);
-    if ( active_ac_timer(&v->arch.arch_vmx.hlt_timer) )
-        rem_ac_timer(&v->arch.arch_vmx.hlt_timer);
+    if ( active_timer(&(vpit->pit_timer)) )
+        stop_timer(&vpit->pit_timer);
+    if ( active_timer(&v->arch.arch_vmx.hlt_timer) )
+        stop_timer(&v->arch.arch_vmx.hlt_timer);
     if ( vmx_apic_support(v->domain) && (VLAPIC(v) != NULL) )
     {
-        rem_ac_timer(&VLAPIC(v)->vlapic_timer);
+        stop_timer(&VLAPIC(v)->vlapic_timer);
         xfree(VLAPIC(v));
     }
 }
@@ -1600,7 +1600,7 @@ void vmx_vmexit_do_hlt(void)
         next_wakeup = next_pit;
     }
     if ( next_wakeup != - 1 ) 
-        set_ac_timer(&current->arch.arch_vmx.hlt_timer, next_wakeup);
+        set_timer(&current->arch.arch_vmx.hlt_timer, next_wakeup);
     do_block();
 }
 

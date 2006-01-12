@@ -341,7 +341,7 @@ static void vmx_do_launch(struct vcpu *v)
         vlapic_init(v);
 
     vmx_set_host_env(v);
-    init_ac_timer(&v->arch.arch_vmx.hlt_timer, hlt_timer_fn, v, v->processor);
+    init_timer(&v->arch.arch_vmx.hlt_timer, hlt_timer_fn, v, v->processor);
 
     error |= __vmwrite(GUEST_LDTR_SELECTOR, 0);
     error |= __vmwrite(GUEST_LDTR_BASE, 0);

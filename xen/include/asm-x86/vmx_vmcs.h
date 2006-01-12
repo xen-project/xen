@@ -100,7 +100,7 @@ struct arch_vmx_struct {
     void                    *io_bitmap_a, *io_bitmap_b;
     struct vlapic           *vlapic;
     u64                     tsc_offset;
-    struct ac_timer         hlt_timer;  /* hlt ins emulation wakeup timer */
+    struct timer         hlt_timer;  /* hlt ins emulation wakeup timer */
 };
 
 #define vmx_schedule_tail(next)         \

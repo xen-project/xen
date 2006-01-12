@@ -21,7 +21,7 @@
 #include <xen/delay.h>
 #include <xen/event.h>
 #include <xen/time.h>
-#include <xen/ac_timer.h>
+#include <xen/timer.h>
 #include <xen/perfc.h>
 #include <xen/sched-if.h>
 #include <xen/softirq.h>
@@ -71,7 +71,7 @@ static struct scheduler ops;
           : (typeof(ops.fn(__VA_ARGS__)))0 )
 
 /* Per-CPU periodic timer sends an event to the currently-executing domain. */
-static struct ac_timer t_timer[NR_CPUS]; 
+static struct timer t_timer[NR_CPUS]; 
 
 void free_domain(struct domain *d)
 {
@@ -141,7 +141,7 @@ struct domain *alloc_domain(void)
 void sched_add_domain(struct vcpu *v) 
 {
     /* Initialise the per-domain timer. */
-    init_ac_timer(&v->timer, dom_timer_fn, v, v->processor);
+    init_timer(&v->timer, dom_timer_fn, v, v->processor);
 
     if ( is_idle_vcpu(v) )
     {
@@ -156,7 +156,7 @@ void sched_add_domain(struct vcpu *v)
 
 void sched_rem_domain(struct vcpu *v) 
 {
-    rem_ac_timer(&v->timer);
+    stop_timer(&v->timer);
     SCHED_OP(rem_task, v);
     TRACE_2D(TRC_SCHED_DOM_REM, v->domain->domain_id, v->vcpu_id);
 }
@@ -278,9 +278,9 @@ long do_set_timer_op(s_time_t timeout)
     struct vcpu *v = current;
 
     if ( timeout == 0 )
-        rem_ac_timer(&v->timer);
+        stop_timer(&v->timer);
     else
-        set_ac_timer(&v->timer, timeout);
+        set_timer(&v->timer, timeout);
 
     return 0;
 }
@@ -365,7 +365,7 @@ static void __enter_scheduler(void)
 
     spin_lock_irq(&schedule_data[cpu].schedule_lock);
 
-    rem_ac_timer(&schedule_data[cpu].s_timer);
+    stop_timer(&schedule_data[cpu].s_timer);
     
     prev->cpu_time += now - prev->lastschd;
 
@@ -379,7 +379,7 @@ static void __enter_scheduler(void)
     
     next->lastschd = now;
 
-    set_ac_timer(&schedule_data[cpu].s_timer, now + r_time);
+    set_timer(&schedule_data[cpu].s_timer, now + r_time);
 
     if ( unlikely(prev == next) )
     {
@@ -475,7 +475,7 @@ static void t_timer_fn(void *unused)
 
     page_scrub_schedule_work();
 
-    set_ac_timer(&t_timer[cpu], NOW() + MILLISECS(10));
+    set_timer(&t_timer[cpu], NOW() + MILLISECS(10));
 }
 
 /* Domain timer function, sends a virtual timer interrupt to domain */
@@ -497,8 +497,8 @@ void __init scheduler_init(void)
     for ( i = 0; i < NR_CPUS; i++ )
     {
         spin_lock_init(&schedule_data[i].schedule_lock);
-        init_ac_timer(&schedule_data[i].s_timer, s_timer_fn, NULL, i);
-        init_ac_timer(&t_timer[i], t_timer_fn, NULL, i);
+        init_timer(&schedule_data[i].s_timer, s_timer_fn, NULL, i);
+        init_timer(&t_timer[i], t_timer_fn, NULL, i);
     }
 
     for ( i = 0; schedulers[i] != NULL; i++ )

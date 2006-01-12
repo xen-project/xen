@@ -819,7 +819,7 @@ interrupt_post_injection(struct vcpu * v, int vector, int type)
         if ( !vpit->first_injected ) {
             vpit->pending_intr_nr = 0;
             vpit->scheduled = NOW() + vpit->period;
-            set_ac_timer(&vpit->pit_timer, vpit->scheduled);
+            set_timer(&vpit->pit_timer, vpit->scheduled);
             vpit->first_injected = 1;
         } else {
             vpit->pending_intr_nr--;

@@ -20,7 +20,7 @@
 #include <xen/delay.h>
 #include <xen/event.h>
 #include <xen/time.h>
-#include <xen/ac_timer.h>
+#include <xen/timer.h>
 #include <xen/perfc.h>
 #include <xen/sched-if.h>
 #include <xen/softirq.h>
@@ -45,9 +45,9 @@ struct bvt_dom_info
                                              limits*/
     s32                 warp_value;       /* virtual time warp */
     s_time_t            warpl;            /* warp limit */
-    struct ac_timer     warp_timer;       /* deals with warpl */
+    struct timer     warp_timer;       /* deals with warpl */
     s_time_t            warpu;            /* unwarp time requirement */
-    struct ac_timer     unwarp_timer;     /* deals with warpu */
+    struct timer     unwarp_timer;     /* deals with warpu */
 
     struct bvt_vcpu_info vcpu_inf[MAX_VIRT_CPUS];
 };
@@ -111,7 +111,7 @@ static void warp_timer_fn(void *data)
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);   
     }
     
-    set_ac_timer(&inf->unwarp_timer, NOW() + inf->warpu);
+    set_timer(&inf->unwarp_timer, NOW() + inf->warpu);
 
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 }
@@ -214,8 +214,8 @@ static void bvt_add_task(struct vcpu *v)
         inf->warpl       = MILLISECS(2000);
         inf->warpu       = MILLISECS(1000);
         /* Initialise the warp timers. */
-        init_ac_timer(&inf->warp_timer, warp_timer_fn, inf, v->processor);
-        init_ac_timer(&inf->unwarp_timer, unwarp_timer_fn, inf, v->processor);
+        init_timer(&inf->warp_timer, warp_timer_fn, inf, v->processor);
+        init_timer(&inf->unwarp_timer, unwarp_timer_fn, inf, v->processor);
     }
 
     einf->vcpu = v;
@@ -271,7 +271,7 @@ static void bvt_wake(struct vcpu *v)
     if ( is_idle_vcpu(curr) || (einf->evt <= curr_evt) )
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
     else if ( schedule_data[cpu].s_timer.expires > r_time )
-        set_ac_timer(&schedule_data[cpu].s_timer, r_time);
+        set_timer(&schedule_data[cpu].s_timer, r_time);
 }
 
 
@@ -355,10 +355,10 @@ static int bvt_adjdom(
         inf->warpu = MILLISECS(warpu);
         
         /* If the unwarp timer set up it needs to be removed */
-        rem_ac_timer(&inf->unwarp_timer);
+        stop_timer(&inf->unwarp_timer);
         /* If we stop warping the warp timer needs to be removed */
         if ( !warpback )
-            rem_ac_timer(&inf->warp_timer);
+            stop_timer(&inf->warp_timer);
     }
     else if ( cmd->direction == SCHED_INFO_GET )
     {
@@ -405,7 +405,7 @@ static struct task_slice bvt_do_schedule(s_time_t now)
         prev_einf->evt = calc_evt(prev, prev_einf->avt);
        
         if(prev_inf->warpback && prev_inf->warpl > 0)
-            rem_ac_timer(&prev_inf->warp_timer);
+            stop_timer(&prev_inf->warp_timer);
         
         __del_from_runqueue(prev);
         
@@ -455,7 +455,7 @@ static struct task_slice bvt_do_schedule(s_time_t now)
     }
     
     if ( next_einf->inf->warp && next_einf->inf->warpl > 0 )
-        set_ac_timer(&next_einf->inf->warp_timer, now + next_einf->inf->warpl);
+        set_timer(&next_einf->inf->warp_timer, now + next_einf->inf->warpl);
    
     /* Extract the domain pointers from the dom infos */
     next        = next_einf->vcpu;

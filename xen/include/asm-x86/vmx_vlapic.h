@@ -187,7 +187,7 @@ struct vlapic
     uint32_t           timer_current;
     uint32_t           timer_divconf;
     uint32_t           timer_divide_counter;
-    struct ac_timer    vlapic_timer;
+    struct timer    vlapic_timer;
     int                intr_pending_count[MAX_VECTOR];
     s_time_t           timer_current_update;
     uint32_t           icr_high;
@@ -216,7 +216,7 @@ static inline int vlapic_set_irq(struct vlapic *t, uint8_t vec, uint8_t trig)
 
 static inline int  vlapic_timer_active(struct vlapic *vlapic)
 {
-    return  active_ac_timer(&(vlapic->vlapic_timer));
+    return  active_timer(&(vlapic->vlapic_timer));
 }
 
 int vlapic_find_highest_irr(struct vlapic *vlapic);
