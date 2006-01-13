@@ -21,7 +21,7 @@ builder='vmx'
 memory = 256
 
 # A name for your domain. All domains must have different names.
-name = "ExampleVMXDomain"
+name = "ExampleVTIDomain"
 
 # List of which CPUS this domain is allowed to use, default Xen picks
 #cpus = ""         # leave to Xen to pick
@@ -30,7 +30,11 @@ name = "ExampleVMXDomain"
 
 # Optionally define mac and/or bridge for the network interfaces.
 # Random MACs are assigned if not given.
-#vif = [ 'mac=00:16:3e:00:00:11, bridge=xen-br0' ]
+#vif = [ 'type=ioemu, mac=00:16:3e:00:00:11, bridge=xenbr0' ]
+# type=ioemu specify the NIC is an ioemu device not netfront
+vif = [ 'type=ioemu, bridge=xenbr0' ]
+# for multiple NICs in device model, 3 in this example
+#vif = [ 'type=ioemu, bridge=xenbr0', 'type=ioemu', 'type=ioemu']
 
 #----------------------------------------------------------------------------
 # Define the disk devices you want the domain to have access to, and
@@ -53,7 +57,7 @@ disk = [ 'file:/var/images/xenia64.img,ioemu:hda,w' ]
 #============================================================================
 
 # New stuff
-device_model = '/usr/' + arch_libdir + '/xen/bin/qemu-dm.debug'
+device_model = '/usr/' + arch_libdir + '/xen/bin/qemu-dm'
 
 # Advanced users only. Don't touch if you don't know what you're doing
 memmap = '/usr/lib/xen/boot/mem-map.sxp'
