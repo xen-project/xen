@@ -4,6 +4,7 @@
  * Copyright (c) 2005 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
+#include <xen/lib.h>
 #include <asm/acpi.h>
 #include <asm/sn/sn_sal.h>
 #include <xen/serial.h>

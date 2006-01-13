@@ -92,7 +92,7 @@ extern char _end[]; /* standard ELF symbol */
 //#define __acquire(x) (void)0
 //#define __release(x) (void)0
 //#define __cond_lock(x) (x)
-#define __must_check
+//#define __must_check
 #define __deprecated
 #ifndef RELOC_HIDE
 # define RELOC_HIDE(ptr, off)					\
@@ -187,7 +187,9 @@ void sort_extable(struct exception_table_entry *start,
 		  struct exception_table_entry *finish);
 void sort_main_extable(void);
 
+#if 0 /* Already defined in xen/lib.h */
 #define printk printf
+#endif
 
 #undef  __ARCH_IRQ_STAT
 
@@ -205,7 +207,6 @@ void sort_main_extable(void);
 #define	OPT_CONSOLE_STR "com2"
 #endif
 
-#define __attribute_used__	__attribute__ ((unused))
 #define __nocast
 
 // see include/asm-x86/atomic.h (different from standard linux)
@@ -255,9 +256,6 @@ struct screen_info { };
 #define seq_printf(a,b...) printf(b)
 #define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
 
-// needed for newer ACPI code
-#define asmlinkage
-
 #define FORCE_CRASH()	asm("break 0;;");
 
 void dummy_called(char *function);
@@ -306,13 +304,8 @@ extern int ht_per_core;
 #endif
 
 
-// FOLLOWING ADDED FOR XEN POST-NGIO and/or LINUX 2.6.7
-
-// following derived from linux/include/linux/compiler-gcc3.h
-// problem because xen (over?)simplifies include/xen/compiler.h
-#if __GNUC_MAJOR < 3 || __GNUC_MINOR__ >= 3
-# define __attribute_used__	__attribute__((__used__))
-#else
-# define __attribute_used__	__attribute__((__unused__))
+#ifndef __ASSEMBLY__
+#include <linux/linkage.h>
 #endif
+
 #endif	/* _IA64_CONFIG_H_ */

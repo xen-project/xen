@@ -16,6 +16,7 @@
 
 #ifdef XEN
 #include <linux/smp.h>
+#include <xen/lib.h>
 #endif
 #include <asm/page.h>
 #include <asm/sal.h>
