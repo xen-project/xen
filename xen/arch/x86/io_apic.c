@@ -1807,3 +1807,47 @@ int ioapic_guest_write(int apicid, int address, u32 val)
 
     return 0;
 }
+
+void dump_ioapic_irq_info(void)
+{
+    struct irq_pin_list *entry;
+    struct IO_APIC_route_entry rte;
+    unsigned int irq, pin, printed = 0;
+    unsigned long flags;
+
+    for ( irq = 0; irq < NR_IRQS; irq++ )
+    {
+        entry = &irq_2_pin[irq];
+        if ( entry->pin == -1 )
+            continue;
+
+        if ( !printed++ )
+            printk("IO-APIC interrupt information:\n");
+
+        printk("    IRQ%3d Vec%3d:\n", irq, irq_to_vector(irq));
+
+        for ( ; ; )
+        {
+            pin = entry->pin;
+
+            printk("      Apic 0x%02x, Pin %2d: ", entry->apic, pin);
+
+            spin_lock_irqsave(&ioapic_lock, flags);
+            *(((int *)&rte) + 0) = io_apic_read(entry->apic, 0x10 + 2 * pin);
+            *(((int *)&rte) + 1) = io_apic_read(entry->apic, 0x11 + 2 * pin);
+            spin_unlock_irqrestore(&ioapic_lock, flags);
+
+            printk("vector=%u, delivery_mode=%u, dest_mode=%s, "
+                   "delivery_status=%d, polarity=%d, irr=%d, "
+                   "trigger=%s, mask=%d\n",
+                   rte.vector, rte.delivery_mode,
+                   rte.dest_mode ? "logical" : "physical",
+                   rte.delivery_status, rte.polarity, rte.irr,
+                   rte.trigger ? "level" : "edge", rte.mask);
+
+            if ( entry->next == 0 )
+                break;
+            entry = &irq_2_pin[entry->next];
+        }
+    }
+}

@@ -9,7 +9,7 @@
 #include <public/xen.h>
 #include <public/dom0_ops.h>
 #include <xen/time.h>
-#include <xen/ac_timer.h>
+#include <xen/timer.h>
 #include <xen/grant_table.h>
 #include <xen/rangeset.h>
 #include <asm/domain.h>
@@ -51,8 +51,6 @@ struct evtchn
 int  evtchn_init(struct domain *d);
 void evtchn_destroy(struct domain *d);
 
-#define CPUMAP_RUNANYWHERE 0xFFFFFFFF
-
 struct vcpu 
 {
     int              vcpu_id;
@@ -65,7 +63,7 @@ struct vcpu
 
     struct vcpu     *next_in_list;
 
-    struct ac_timer  timer;         /* one-shot timer for timeout values */
+    struct timer  timer;         /* one-shot timer for timeout values */
     unsigned long    sleep_tick;    /* tick at which this vcpu started sleep */
 
     s_time_t         lastschd;      /* time this domain was last scheduled */
@@ -80,7 +78,13 @@ struct vcpu
 
     atomic_t         pausecnt;
 
-    cpumap_t         cpumap;        /* which cpus this domain can run on */
+    /* Bitmask of CPUs on which this VCPU may run. */
+    cpumask_t        cpu_affinity;
+
+    unsigned long    nmi_addr;      /* NMI callback address. */
+
+    /* Bitmask of CPUs which are holding onto this VCPU's state. */
+    cpumask_t        vcpu_dirty_cpumask;
 
     struct arch_vcpu arch;
 };
@@ -141,7 +145,7 @@ struct domain
     struct vcpu *vcpu[MAX_VIRT_CPUS];
 
     /* Bitmask of CPUs which are holding onto this domain's state. */
-    cpumask_t        cpumask;
+    cpumask_t        domain_dirty_cpumask;
 
     struct arch_domain arch;
 
@@ -170,12 +174,10 @@ struct domain_setup_info
     char *xen_section_string;
 };
 
-extern struct domain idle0_domain;
-extern struct vcpu idle0_vcpu;
-
-extern struct vcpu *idle_task[NR_CPUS];
+extern struct vcpu *idle_vcpu[NR_CPUS];
 #define IDLE_DOMAIN_ID   (0x7FFFU)
-#define is_idle_task(_d) (test_bit(_DOMF_idle_domain, &(_d)->domain_flags))
+#define is_idle_domain(d) ((d)->domain_id == IDLE_DOMAIN_ID)
+#define is_idle_vcpu(v)   (is_idle_domain((v)->domain))
 
 struct vcpu *alloc_vcpu(
     struct domain *d, unsigned int vcpu_id, unsigned int cpu_id);
@@ -223,7 +225,7 @@ extern int construct_dom0(
     unsigned long image_start, unsigned long image_len, 
     unsigned long initrd_start, unsigned long initrd_len,
     char *cmdline);
-extern int set_info_guest(struct domain *d, dom0_setdomaininfo_t *);
+extern int set_info_guest(struct domain *d, dom0_setvcpucontext_t *);
 
 struct domain *find_domain_by_id(domid_t dom);
 extern void domain_destruct(struct domain *d);
@@ -269,36 +271,27 @@ void vcpu_sleep_sync(struct vcpu *d);
 extern void sync_vcpu_execstate(struct vcpu *v);
 
 /*
- * Called by the scheduler to switch to another VCPU. On entry, although
- * VCPUF_running is no longer asserted for @prev, its context is still running
- * on the local CPU and is not committed to memory. The local scheduler lock
- * is therefore still held, and interrupts are disabled, because the local CPU
- * is in an inconsistent state.
- * 
- * The callee must ensure that the local CPU is no longer running in @prev's
- * context, and that the context is saved to memory, before returning.
- * Alternatively, if implementing lazy context switching, it suffices to ensure
- * that invoking sync_vcpu_execstate() will switch and commit @prev's state.
+ * Called by the scheduler to switch to another VCPU. This function must
+ * call context_saved(@prev) when the local CPU is no longer running in
+ * @prev's context, and that context is saved to memory. Alternatively, if
+ * implementing lazy context switching, it suffices to ensure that invoking
+ * sync_vcpu_execstate() will switch and commit @prev's state.
  */
 extern void context_switch(
     struct vcpu *prev, 
     struct vcpu *next);
 
 /*
- * On some architectures (notably x86) it is not possible to entirely load
- * @next's context with interrupts disabled. These may implement a function to
- * finalise loading the new context after interrupts are re-enabled. This
- * function is not given @prev and is not permitted to access it.
+ * As described above, context_switch() must call this function when the
+ * local CPU is no longer running in @prev's context, and @prev's context is
+ * saved to memory. Alternatively, if implementing lazy context switching,
+ * ensure that invoking sync_vcpu_execstate() will switch and commit @prev.
  */
-extern void context_switch_finalise(
-    struct vcpu *next);
+#define context_saved(prev) (clear_bit(_VCPUF_running, &(prev)->vcpu_flags))
 
 /* Called by the scheduler to continue running the current VCPU. */
 extern void continue_running(
     struct vcpu *same);
-
-/* Is CPU 'cpu' idle right now? */
-int idle_cpu(int cpu);
 
 void startup_cpu_idle_loop(void);
 
@@ -364,51 +357,44 @@ extern struct domain *domain_list;
  /* Currently running on a CPU? */
 #define _VCPUF_running         3
 #define VCPUF_running          (1UL<<_VCPUF_running)
- /* Disables auto-migration between CPUs. */
-#define _VCPUF_cpu_pinned      4
-#define VCPUF_cpu_pinned       (1UL<<_VCPUF_cpu_pinned)
- /* Domain migrated between CPUs. */
-#define _VCPUF_cpu_migrated    5
-#define VCPUF_cpu_migrated     (1UL<<_VCPUF_cpu_migrated)
  /* Initialization completed. */
-#define _VCPUF_initialised     6
+#define _VCPUF_initialised     4
 #define VCPUF_initialised      (1UL<<_VCPUF_initialised)
  /* VCPU is not-runnable */
-#define _VCPUF_down            7
+#define _VCPUF_down            5
 #define VCPUF_down             (1UL<<_VCPUF_down)
+ /* NMI callback pending for this VCPU? */
+#define _VCPUF_nmi_pending     8
+#define VCPUF_nmi_pending      (1UL<<_VCPUF_nmi_pending)
+ /* Avoid NMI reentry by allowing NMIs to be masked for short periods. */
+#define _VCPUF_nmi_masked      9
+#define VCPUF_nmi_masked       (1UL<<_VCPUF_nmi_masked)
 
 /*
  * Per-domain flags (domain_flags).
  */
- /* Is this one of the per-CPU idle domains? */
-#define _DOMF_idle_domain      0
-#define DOMF_idle_domain       (1UL<<_DOMF_idle_domain)
  /* Is this domain privileged? */
-#define _DOMF_privileged       1
+#define _DOMF_privileged       0
 #define DOMF_privileged        (1UL<<_DOMF_privileged)
  /* Guest shut itself down for some reason. */
-#define _DOMF_shutdown         2
+#define _DOMF_shutdown         1
 #define DOMF_shutdown          (1UL<<_DOMF_shutdown)
- /* Guest is in process of shutting itself down (becomes DOMF_shutdown). */
-#define _DOMF_shuttingdown     3
-#define DOMF_shuttingdown      (1UL<<_DOMF_shuttingdown)
  /* Death rattle. */
-#define _DOMF_dying            4
+#define _DOMF_dying            2
 #define DOMF_dying             (1UL<<_DOMF_dying)
  /* Domain is paused by controller software. */
-#define _DOMF_ctrl_pause       5
+#define _DOMF_ctrl_pause       3
 #define DOMF_ctrl_pause        (1UL<<_DOMF_ctrl_pause)
  /* Domain is being debugged by controller software. */
-#define _DOMF_debugging        6
+#define _DOMF_debugging        4
 #define DOMF_debugging         (1UL<<_DOMF_debugging)
 
 
-static inline int domain_runnable(struct vcpu *v)
+static inline int vcpu_runnable(struct vcpu *v)
 {
     return ( (atomic_read(&v->pausecnt) == 0) &&
              !(v->vcpu_flags & (VCPUF_blocked|VCPUF_down)) &&
-             !(v->domain->domain_flags &
-               (DOMF_shutdown|DOMF_shuttingdown|DOMF_ctrl_pause)) );
+             !(v->domain->domain_flags & (DOMF_shutdown|DOMF_ctrl_pause)) );
 }
 
 void vcpu_pause(struct vcpu *v);
@@ -418,6 +404,8 @@ void domain_unpause(struct domain *d);
 void domain_pause_by_systemcontroller(struct domain *d);
 void domain_unpause_by_systemcontroller(struct domain *d);
 void cpu_init(void);
+
+int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity);
 
 static inline void vcpu_unblock(struct vcpu *v)
 {

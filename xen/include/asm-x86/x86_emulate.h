@@ -18,10 +18,11 @@
  * special treatment or emulation (*_emulated).
  * 
  * The emulator assumes that an instruction accesses only one 'emulated memory'
- * location, and that this is one of its data operands. Instruction fetches and
+ * location, that this location is the given linear faulting address (cr2), and
+ * that this is one of the instruction's data operands. Instruction fetches and
  * stack operations are assumed never to access emulated memory. The emulator
  * automatically deduces which operand of a string-move operation is accessing
- * emulated memory, and requires that the other operand accesses normal memory.
+ * emulated memory, and assumes that the other operand accesses normal memory.
  * 
  * NOTES:
  *  1. The emulator isn't very smart about emulated vs. standard memory.
@@ -36,6 +37,7 @@
  *     then immediately bail.
  *  3. Valid access sizes are 1, 2, 4 and 8 bytes. On x86/32 systems only
  *     cmpxchg8b_emulated need support 8-byte accesses.
+ *  4. The emulator cannot handle 64-bit mode emulation on an x86/32 system.
  */
 /* Access completed successfully: continue emulation as normal. */
 #define X86EMUL_CONTINUE        0
@@ -141,22 +143,27 @@ x86_emulate_write_std(
 
 struct cpu_user_regs;
 
-/* Current execution mode, passed to the emulator. */
-#define X86EMUL_MODE_REAL     0
-#define X86EMUL_MODE_PROT16   2
-#define X86EMUL_MODE_PROT32   4
-#define X86EMUL_MODE_PROT64   8
+/* Execution mode, passed to the emulator. */
+#define X86EMUL_MODE_REAL     0 /* Real mode.             */
+#define X86EMUL_MODE_PROT16   2 /* 16-bit protected mode. */
+#define X86EMUL_MODE_PROT32   4 /* 32-bit protected mode. */
+#define X86EMUL_MODE_PROT64   8 /* 64-bit (long) mode.    */
+
+/* Host execution mode. */
+#if defined(__i386__)
+#define X86EMUL_MODE_HOST X86EMUL_MODE_PROT32
+#elif defined(__x86_64__)
+#define X86EMUL_MODE_HOST X86EMUL_MODE_PROT64
+#endif
 
 /*
  * x86_emulate_memop: Emulate an instruction that faulted attempting to
  *                    read/write a 'special' memory area.
  *  @regs: Register state at time of fault.
- *  @cr2:  Linear faulting address.
+ *  @cr2:  Linear faulting address within an emulated/special memory area.
  *  @ops:  Interface to access special memory.
- *  @mode: Current execution mode, represented by the default size of memory
- *         addresses, in bytes. Valid values are 2, 4 and 8 (x86/64 only).
- *         Alternatively use the appropriate X86EMUL_MODE value (which also
- *         includes a value for emulating real mode).
+ *  @mode: Emulated execution mode, represented by an X86EMUL_MODE value.
+ * Returns -1 on failure, 0 on success.
  */
 extern int
 x86_emulate_memop(

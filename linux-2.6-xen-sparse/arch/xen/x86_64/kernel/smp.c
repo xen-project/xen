@@ -30,8 +30,9 @@
 #include <asm/apicdef.h>
 #ifdef CONFIG_XEN
 #include <asm-xen/evtchn.h>
+#endif
 
-#else
+#ifndef CONFIG_XEN
 /*
  *	Smarter SMP flushing macros. 
  *		c/o Linus Torvalds.

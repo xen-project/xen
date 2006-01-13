@@ -17,6 +17,9 @@ char *xc_read_kernel_image(const char *filename, unsigned long *size)
     char *image = NULL;
     unsigned int bytes;
 
+    if ( filename == NULL )
+        goto out;
+
     if ( (kernel_fd = open(filename, O_RDONLY)) < 0 )
     {
         PERROR("Could not open kernel image");

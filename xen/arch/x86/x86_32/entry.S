@@ -326,7 +326,9 @@ test_all_events:
         shl  $IRQSTAT_shift,%eax
         test %ecx,irq_stat(%eax,1)
         jnz  process_softirqs
-/*test_guest_events:*/
+        btr  $_VCPUF_nmi_pending,VCPU_flags(%ebx)
+        jc   process_nmi
+test_guest_events:
         movl VCPU_vcpu_info(%ebx),%eax
         testb $0xFF,VCPUINFO_upcall_mask(%eax)
         jnz  restore_all_guest
@@ -348,7 +350,24 @@ process_softirqs:
         sti       
         call do_softirq
         jmp  test_all_events
-                
+	
+	ALIGN
+process_nmi:
+        movl VCPU_nmi_addr(%ebx),%eax
+        test %eax,%eax
+        jz   test_all_events
+        bts  $_VCPUF_nmi_masked,VCPU_flags(%ebx)
+        jc   1f
+        sti
+        leal VCPU_trap_bounce(%ebx),%edx
+        movl %eax,TRAPBOUNCE_eip(%edx)
+        movw $FLAT_KERNEL_CS,TRAPBOUNCE_cs(%edx)
+        movw $TBF_INTERRUPT,TRAPBOUNCE_flags(%edx)
+        call create_bounce_frame
+        jmp  test_all_events
+1:      bts  $_VCPUF_nmi_pending,VCPU_flags(%ebx)
+        jmp  test_guest_events
+
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:            */
 /*   {EIP, CS, EFLAGS, [ESP, SS]}                                        */
 /* %edx == trap_bounce, %ebx == struct vcpu                       */
@@ -620,9 +639,7 @@ ENTRY(nmi)
         jne   defer_nmi
 
 continue_nmi:
-        movl  $(__HYPERVISOR_DS),%edx
-        movl  %edx,%ds
-        movl  %edx,%es
+        SET_XEN_SEGMENTS(d)
         movl  %esp,%edx
         pushl %edx
         call  do_nmi
@@ -659,42 +676,6 @@ do_arch_sched_op:
         GET_GUEST_REGS(%ecx)
         movl %eax,UREGS_eax(%ecx)
         jmp  do_sched_op
-
-do_switch_vm86:
-        # Reset the stack pointer
-        GET_GUEST_REGS(%ecx)
-        movl %ecx,%esp
-
-        # GS:ESI == Ring-1 stack activation
-        movl UREGS_esp(%esp),%esi
-VFLT1:  mov  UREGS_ss(%esp),%gs
-
-        # ES:EDI == Ring-0 stack activation
-        leal UREGS_eip(%esp),%edi
-
-        # Restore the hypercall-number-clobbered EAX on our stack frame
-VFLT2:  movl %gs:(%esi),%eax
-        movl %eax,UREGS_eax(%esp)
-        addl $4,%esi
-        	
-      	# Copy the VM86 activation from the ring-1 stack to the ring-0 stack
-        movl $(UREGS_user_sizeof-UREGS_eip)/4,%ecx
-VFLT3:  movl %gs:(%esi),%eax
-        stosl
-        addl $4,%esi
-        loop VFLT3
-
-        # Fix up EFLAGS: IOPL=0, IF=1, VM=1
-        andl $~X86_EFLAGS_IOPL,UREGS_eflags(%esp)
-        orl  $X86_EFLAGS_IF|X86_EFLAGS_VM,UREGS_eflags(%esp)
-        
-        jmp test_all_events
-
-.section __ex_table,"a"
-        .long VFLT1,domain_crash_synchronous
-        .long VFLT2,domain_crash_synchronous
-        .long VFLT3,domain_crash_synchronous
-.previous
 
 .data
 
@@ -744,11 +725,12 @@ ENTRY(hypercall_table)
         .long do_grant_table_op     /* 20 */
         .long do_vm_assist
         .long do_update_va_mapping_otherdomain
-        .long do_switch_vm86
+        .long do_iret
         .long do_vcpu_op
         .long do_ni_hypercall       /* 25 */
         .long do_mmuext_op
-        .long do_acm_op             /* 27 */
+        .long do_acm_op
+        .long do_nmi_op
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .long do_ni_hypercall
         .endr
@@ -777,11 +759,12 @@ ENTRY(hypercall_args_table)
         .byte 3 /* do_grant_table_op    */  /* 20 */
         .byte 2 /* do_vm_assist         */
         .byte 5 /* do_update_va_mapping_otherdomain */
-        .byte 0 /* do_switch_vm86       */
+        .byte 0 /* do_iret              */
         .byte 3 /* do_vcpu_op           */
         .byte 0 /* do_ni_hypercall      */  /* 25 */
         .byte 4 /* do_mmuext_op         */
         .byte 1 /* do_acm_op            */
+        .byte 2 /* do_nmi_op            */
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr

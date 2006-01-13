@@ -33,7 +33,7 @@ fetch_regs(int xc_handle, int cpu, int *online)
     if (online)
         *online = 0;
     if ( !(regs_valid & (1 << cpu)) ) { 
-        retval = xc_domain_get_vcpu_context(xc_handle, current_domid, 
+        retval = xc_vcpu_getcontext(xc_handle, current_domid, 
 						cpu, &ctxt[cpu]);
         if ( retval ) 
             goto done;
@@ -43,8 +43,7 @@ fetch_regs(int xc_handle, int cpu, int *online)
 	if ( online == NULL )
 	    goto done;
 
-	retval = xc_domain_get_vcpu_info(xc_handle, current_domid,
-					 cpu, &info);
+	retval = xc_vcpu_getinfo(xc_handle, current_domid, cpu, &info);
 	*online = info.online;
     
  done:
@@ -395,7 +394,7 @@ xc_ptrace(
 
     case PTRACE_SETREGS:
         SET_XC_REGS(((struct gdb_regs *)data), ctxt[cpu].user_regs);
-        retval = xc_domain_setinfo(xc_handle, current_domid, cpu, &ctxt[cpu]);
+        retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu, &ctxt[cpu]);
         if (retval)
             goto error_out;
         break;
@@ -405,7 +404,7 @@ xc_ptrace(
          *  during single-stepping - but that just seems retarded
          */
         ctxt[cpu].user_regs.eflags |= PSL_T; 
-        retval = xc_domain_setinfo(xc_handle, current_domid, cpu, &ctxt[cpu]);
+        retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu, &ctxt[cpu]);
         if ( retval )
         {
             perror("dom0 op failed");
@@ -423,8 +422,8 @@ xc_ptrace(
                 /* Clear trace flag */
                 if ( ctxt[cpu].user_regs.eflags & PSL_T ) {
                     ctxt[cpu].user_regs.eflags &= ~PSL_T;
-                    retval = xc_domain_setinfo(xc_handle, current_domid, 
-                                               cpu, &ctxt[cpu]);
+                    retval = xc_vcpu_setcontext(xc_handle, current_domid, 
+                                                cpu, &ctxt[cpu]);
                     if ( retval ) {
                         perror("dom0 op failed");
                         goto error_out;

@@ -312,8 +312,6 @@ __gnttab_map_grant_ref(
     if ( !act->pin )
         clear_bit(_GTF_reading, &sha->flags);
 
-    spin_unlock(&rd->grant_table->lock);
-
  unlock_out:
     spin_unlock(&rd->grant_table->lock);
     (void)__put_user(rc, &uop->status);
@@ -471,7 +469,7 @@ gnttab_unmap_grant_ref(
     for ( i = 0; i < count; i++ )
         (void)__gnttab_unmap_grant_ref(&uop[i]);
 
-    flush_tlb_mask(current->domain->cpumask);
+    flush_tlb_mask(current->domain->domain_dirty_cpumask);
 
     return 0;
 }

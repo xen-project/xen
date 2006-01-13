@@ -81,6 +81,10 @@ extern void early_time_init(void);
 extern void initialize_keytable(void);
 extern void early_cpu_init(void);
 
+struct tss_struct init_tss[NR_CPUS];
+
+struct vcpu *idle_vcpu[NR_CPUS];
+
 extern unsigned long cpu0_stack[];
 
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
@@ -91,8 +95,6 @@ unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE;
 unsigned long mmu_cr4_features = X86_CR4_PSE;
 #endif
 EXPORT_SYMBOL(mmu_cr4_features);
-
-struct vcpu *idle_task[NR_CPUS] = { &idle0_vcpu };
 
 int acpi_disabled;
 
@@ -144,8 +146,8 @@ static struct e820entry e820_raw[E820MAX];
 
 void __init __start_xen(multiboot_info_t *mbi)
 {
-    unsigned long vgdt, gdt_pfn;
     char *cmdline;
+    struct domain *idle_domain;
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
@@ -163,9 +165,8 @@ void __init __start_xen(multiboot_info_t *mbi)
     if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
         cmdline_parse(__va(mbi->cmdline));
 
-    /* Must do this early -- e.g., spinlocks rely on get_current(). */
-    set_current(&idle0_vcpu);
-    set_processor_id(0);
+    set_current((struct vcpu *)0xfffff000); /* debug sanity */
+    set_processor_id(0); /* needed early, for smp_processor_id() */
 
     smp_prepare_boot_cpu();
 
@@ -343,6 +344,12 @@ void __init __start_xen(multiboot_info_t *mbi)
     BUG_ON(sizeof(shared_info_t) > PAGE_SIZE);
     BUG_ON(sizeof(vcpu_info_t) != 64);
 
+    /* __foo are defined in public headers. Check they match internal defs. */
+    BUG_ON(__HYPERVISOR_VIRT_START != HYPERVISOR_VIRT_START);
+#ifdef HYPERVISOR_VIRT_END
+    BUG_ON(__HYPERVISOR_VIRT_END   != HYPERVISOR_VIRT_END);
+#endif
+
     init_frametable();
 
     end_boot_allocator();
@@ -376,6 +383,14 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     early_cpu_init();
 
+    scheduler_init();
+
+    idle_domain = do_createdomain(IDLE_DOMAIN_ID, 0);
+    BUG_ON(idle_domain == NULL);
+
+    set_current(idle_domain->vcpu[0]);
+    idle_vcpu[0] = current;
+
     paging_init();
 
     /* Unmap the first page of CPU0's stack. */
@@ -387,21 +402,6 @@ void __init __start_xen(multiboot_info_t *mbi)
         nmi_watchdog = NMI_LOCAL_APIC;
 
     sort_exception_tables();
-
-    if ( arch_do_createdomain(current) != 0 )
-        BUG();
-
-    /*
-     * Map default GDT into its final positions in the idle page table. As
-     * noted in arch_do_createdomain(), we must map for every possible VCPU#.
-     */
-    vgdt = GDT_VIRT_START(current) + FIRST_RESERVED_GDT_BYTE;
-    gdt_pfn = virt_to_phys(gdt_table) >> PAGE_SHIFT;
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-    {
-        map_pages_to_xen(vgdt, gdt_pfn, 1, PAGE_HYPERVISOR);
-        vgdt += 1 << PDPT_VCPU_VA_SHIFT;
-    }
 
     find_smp_config();
 
@@ -423,13 +423,11 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     trap_init();
 
-    ac_timer_init();
+    timer_init();
 
     early_time_init();
 
     arch_init_memory();
-
-    scheduler_init();
 
     identify_cpu(&boot_cpu_data);
     if ( cpu_has_fxsr )
@@ -480,7 +478,8 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     schedulers_start();
 
-    watchdog_enable();
+    if ( opt_watchdog ) 
+        watchdog_enable();
 
     shadow_mode_init();
 

@@ -1179,7 +1179,7 @@ class XendDomainInfo:
                 for v in range(0, self.info['max_vcpu_id']+1):
                     # pincpu takes a list of ints
                     cpu = [ int( cpus[v % len(cpus)] ) ]
-                    xc.domain_pincpu(self.domid, v, cpu)
+                    xc.vcpu_setaffinity(self.domid, v, cpu)
 
             m = self.image.getDomainMemory(self.info['memory'] * 1024)
             balloon.free(m)

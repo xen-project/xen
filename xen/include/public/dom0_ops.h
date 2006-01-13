@@ -94,14 +94,14 @@ typedef struct {
     xen_domain_handle_t handle;
 } dom0_getdomaininfo_t;
 
-#define DOM0_SETDOMAININFO      13
+#define DOM0_SETVCPUCONTEXT   13
 typedef struct {
     /* IN variables. */
     domid_t               domain;
     uint32_t              vcpu;
     /* IN/OUT parameters */
     vcpu_guest_context_t *ctxt;
-} dom0_setdomaininfo_t;
+} dom0_setvcpucontext_t;
 
 #define DOM0_MSR              15
 typedef struct {
@@ -163,13 +163,13 @@ typedef struct {
 /* 
  * Set which physical cpus a vcpu can execute on.
  */
-#define DOM0_PINCPUDOMAIN     20
+#define DOM0_SETVCPUAFFINITY  20
 typedef struct {
     /* IN variables. */
     domid_t   domain;
     uint32_t  vcpu;
     cpumap_t  cpumap;
-} dom0_pincpudomain_t;
+} dom0_setvcpuaffinity_t;
 
 /* Get trace buffers machine base address */
 #define DOM0_TBUFCONTROL       21
@@ -436,13 +436,13 @@ typedef struct {
         dom0_getmemlist_t        getmemlist;
         dom0_schedctl_t          schedctl;
         dom0_adjustdom_t         adjustdom;
-        dom0_setdomaininfo_t     setdomaininfo;
+        dom0_setvcpucontext_t    setvcpucontext;
         dom0_getdomaininfo_t     getdomaininfo;
         dom0_getpageframeinfo_t  getpageframeinfo;
         dom0_msr_t               msr;
         dom0_settime_t           settime;
         dom0_readconsole_t       readconsole;
-        dom0_pincpudomain_t      pincpudomain;
+        dom0_setvcpuaffinity_t   setvcpuaffinity;
         dom0_tbufcontrol_t       tbufcontrol;
         dom0_physinfo_t          physinfo;
         dom0_sched_id_t          sched_id;

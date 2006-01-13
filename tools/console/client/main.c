@@ -220,7 +220,7 @@ int main(int argc, char **argv)
 	if (path == NULL)
 		err(ENOMEM, "realloc");
 	strcat(path, "/console/tty");
-	str_pty = xs_read(xs, NULL, path, &len);
+	str_pty = xs_read(xs, XBT_NULL, path, &len);
 
 	/* FIXME consoled currently does not assume domain-0 doesn't have a
 	   console which is good when we break domain-0 up.  To keep us
@@ -245,7 +245,7 @@ int main(int argc, char **argv)
 		struct timeval tv = { 0, 500 };
 		select(0, NULL, NULL, NULL, &tv); /* pause briefly */
 
-		str_pty = xs_read(xs, NULL, path, &len);
+		str_pty = xs_read(xs, XBT_NULL, path, &len);
 	}
 
 	if (str_pty == NULL) {

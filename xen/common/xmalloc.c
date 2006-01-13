@@ -30,7 +30,7 @@
 #include <xen/config.h>
 #include <xen/mm.h>
 #include <xen/spinlock.h>
-#include <xen/ac_timer.h>
+#include <xen/timer.h>
 #include <xen/cache.h>
 #include <xen/prefetch.h>
 

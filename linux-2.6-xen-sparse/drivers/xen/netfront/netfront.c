@@ -212,7 +212,7 @@ static int netfront_probe(struct xenbus_device *dev,
 	struct netfront_info *info;
 	unsigned int handle;
 
-	err = xenbus_scanf(NULL, dev->nodename, "handle", "%u", &handle);
+	err = xenbus_scanf(XBT_NULL, dev->nodename, "handle", "%u", &handle);
 	if (err != 1) {
 		xenbus_dev_fatal(dev, err, "reading handle");
 		return err;
@@ -260,7 +260,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 			   struct netfront_info *info)
 {
 	const char *message;
-	struct xenbus_transaction *xbt;
+	xenbus_transaction_t xbt;
 	int err;
 
 	err = xen_net_read_mac(dev, info->mac);
@@ -275,8 +275,8 @@ static int talk_to_backend(struct xenbus_device *dev,
 		goto out;
 
 again:
-	xbt = xenbus_transaction_start();
-	if (IS_ERR(xbt)) {
+	err = xenbus_transaction_start(&xbt);
+	if (err) {
 		xenbus_dev_fatal(dev, err, "starting transaction");
 		goto destroy_ring;
 	}
@@ -1199,7 +1199,7 @@ static void netfront_closing(struct xenbus_device *dev)
 
 	close_netdev(info);
 
-	xenbus_switch_state(dev, NULL, XenbusStateClosed);
+	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
 }
 
 
@@ -1218,21 +1218,13 @@ static int netfront_remove(struct xenbus_device *dev)
 
 static void close_netdev(struct netfront_info *info)
 {
-	/* Stop old i/f to prevent errors whilst we rebuild the state. */
-	spin_lock_irq(&info->tx_lock);
-	spin_lock(&info->rx_lock);
+	spin_lock_irq(&info->netdev->xmit_lock);
 	netif_stop_queue(info->netdev);
-	/* info->backend_state = BEST_DISCONNECTED; */
-	spin_unlock(&info->rx_lock);
-	spin_unlock_irq(&info->tx_lock);
+	spin_unlock_irq(&info->netdev->xmit_lock);
 
 #ifdef CONFIG_PROC_FS
 	xennet_proc_delif(info->netdev);
 #endif
-
-	if (info->irq)
-		unbind_from_irqhandler(info->irq, info->netdev);
-	info->evtchn = info->irq = 0;
 
 	del_timer_sync(&info->rx_refill_timer);
 
@@ -1242,6 +1234,17 @@ static void close_netdev(struct netfront_info *info)
 
 static void netif_disconnect_backend(struct netfront_info *info)
 {
+	/* Stop old i/f to prevent errors whilst we rebuild the state. */
+	spin_lock_irq(&info->tx_lock);
+	spin_lock(&info->rx_lock);
+	info->backend_state = BEST_DISCONNECTED;
+	spin_unlock(&info->rx_lock);
+	spin_unlock_irq(&info->tx_lock);
+
+	if (info->irq)
+		unbind_from_irqhandler(info->irq, info->netdev);
+	info->evtchn = info->irq = 0;
+
 	end_access(info->tx_ring_ref, info->tx.sring);
 	end_access(info->rx_ring_ref, info->rx.sring);
 	info->tx_ring_ref = GRANT_INVALID_REF;

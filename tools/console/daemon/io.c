@@ -174,7 +174,7 @@ static int domain_create_tty(struct domain *dom)
 		success = asprintf(&path, "%s/limit", dom->conspath) != -1;
 		if (!success)
 			goto out;
-		data = xs_read(xs, NULL, path, &len);
+		data = xs_read(xs, XBT_NULL, path, &len);
 		if (data) {
 			dom->buffer.max_capacity = strtoul(data, 0, 0);
 			free(data);
@@ -184,7 +184,7 @@ static int domain_create_tty(struct domain *dom)
 		success = asprintf(&path, "%s/tty", dom->conspath) != -1;
 		if (!success)
 			goto out;
-		success = xs_write(xs, NULL, path, slave, strlen(slave));
+		success = xs_write(xs, XBT_NULL, path, slave, strlen(slave));
 		free(path);
 		if (!success)
 			goto out;
@@ -214,7 +214,7 @@ int xs_gather(struct xs_handle *xs, const char *dir, ...)
 		char *p;
 
 		asprintf(&path, "%s/%s", dir, name);
-		p = xs_read(xs, NULL, path, NULL);
+		p = xs_read(xs, XBT_NULL, path, NULL);
 		free(path);
 		if (p == NULL) {
 			ret = ENOENT;

@@ -46,12 +46,10 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     INIT_LIST_HEAD(&d->page_list);
     INIT_LIST_HEAD(&d->xenpage_list);
 
-    if ( d->domain_id == IDLE_DOMAIN_ID )
-        set_bit(_DOMF_idle_domain, &d->domain_flags);
-    else
+    if ( !is_idle_domain(d) )
         set_bit(_DOMF_ctrl_pause, &d->domain_flags);
 
-    if ( !is_idle_task(d) &&
+    if ( !is_idle_domain(d) &&
          ((evtchn_init(d) != 0) || (grant_table_create(d) != 0)) )
         goto fail1;
     
@@ -68,7 +66,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
          (arch_do_createdomain(v) != 0) )
         goto fail3;
 
-    if ( !is_idle_task(d) )
+    if ( !is_idle_domain(d) )
     {
         write_lock(&domlist_lock);
         pd = &domain_list; /* NB. domain_list maintained in order of dom_id. */
@@ -173,20 +171,23 @@ static void domain_shutdown_finalise(void)
 
     BUG_ON(d == NULL);
     BUG_ON(d == current->domain);
-    BUG_ON(!test_bit(_DOMF_shuttingdown, &d->domain_flags));
-    BUG_ON(test_bit(_DOMF_shutdown, &d->domain_flags));
+
+    LOCK_BIGLOCK(d);
 
     /* Make sure that every vcpu is descheduled before we finalise. */
     for_each_vcpu ( d, v )
         vcpu_sleep_sync(v);
-    BUG_ON(!cpus_empty(d->cpumask));
+    BUG_ON(!cpus_empty(d->domain_dirty_cpumask));
 
     sync_pagetable_state(d);
 
-    set_bit(_DOMF_shutdown, &d->domain_flags);
-    clear_bit(_DOMF_shuttingdown, &d->domain_flags);
+    /* Don't set DOMF_shutdown until execution contexts are sync'ed. */
+    if ( !test_and_set_bit(_DOMF_shutdown, &d->domain_flags) )
+        send_guest_virq(dom0->vcpu[0], VIRQ_DOM_EXC);
 
-    send_guest_virq(dom0->vcpu[0], VIRQ_DOM_EXC);
+    UNLOCK_BIGLOCK(d);
+
+    put_domain(d);
 }
 
 static __init int domain_shutdown_finaliser_init(void)
@@ -222,16 +223,17 @@ void domain_shutdown(struct domain *d, u8 reason)
 
     /* Mark the domain as shutting down. */
     d->shutdown_code = reason;
-    if ( !test_and_set_bit(_DOMF_shuttingdown, &d->domain_flags) )
-    {
-        /* This vcpu won the race to finalise the shutdown. */
-        domain_shuttingdown[smp_processor_id()] = d;
-        raise_softirq(DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ);
-    }
 
     /* Put every vcpu to sleep, but don't wait (avoids inter-vcpu deadlock). */
     for_each_vcpu ( d, v )
+    {
+        atomic_inc(&v->pausecnt);
         vcpu_sleep_nosync(v);
+    }
+
+    get_knownalive_domain(d);
+    domain_shuttingdown[smp_processor_id()] = d;
+    raise_softirq(DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ);
 }
 
 
@@ -357,11 +359,11 @@ void domain_unpause_by_systemcontroller(struct domain *d)
  * of domains other than domain 0. ie. the domains that are being built by 
  * the userspace dom0 domain builder.
  */
-int set_info_guest(struct domain *d, dom0_setdomaininfo_t *setdomaininfo)
+int set_info_guest(struct domain *d, dom0_setvcpucontext_t *setvcpucontext)
 {
     int rc = 0;
     struct vcpu_guest_context *c = NULL;
-    unsigned long vcpu = setdomaininfo->vcpu;
+    unsigned long vcpu = setvcpucontext->vcpu;
     struct vcpu *v; 
 
     if ( (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
@@ -374,7 +376,7 @@ int set_info_guest(struct domain *d, dom0_setdomaininfo_t *setdomaininfo)
         return -ENOMEM;
 
     rc = -EFAULT;
-    if ( copy_from_user(c, setdomaininfo->ctxt, sizeof(*c)) == 0 )
+    if ( copy_from_user(c, setvcpucontext->ctxt, sizeof(*c)) == 0 )
         rc = arch_set_info_guest(v, c);
 
     xfree(c);

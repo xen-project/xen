@@ -119,8 +119,8 @@ xendebug_get_context (int xc_handle, uint32_t domid, uint32_t vcpu)
 
     if ( !ctxt->valid[vcpu] )
     {
-        if ( (rc = xc_domain_get_vcpu_context(xc_handle, domid, vcpu, 
-                                              &ctxt->context[vcpu])) )
+        if ( (rc = xc_vcpu_getcontext(xc_handle, domid, vcpu, 
+                                      &ctxt->context[vcpu])) )
             return NULL;
 
         ctxt->valid[vcpu] = true;
@@ -139,10 +139,10 @@ xendebug_set_context (int xc_handle, domain_context_p ctxt, uint32_t vcpu)
         return -EINVAL;
 
     op.interface_version = DOM0_INTERFACE_VERSION;
-    op.cmd = DOM0_SETDOMAININFO;
-    op.u.setdomaininfo.domain = ctxt->domid;
-    op.u.setdomaininfo.vcpu = vcpu;
-    op.u.setdomaininfo.ctxt = &ctxt->context[vcpu];
+    op.cmd = DOM0_SETVCPUCONTEXT;
+    op.u.setvcpucontext.domain = ctxt->domid;
+    op.u.setvcpucontext.vcpu = vcpu;
+    op.u.setvcpucontext.ctxt = &ctxt->context[vcpu];
 
     if ( (rc = mlock(&ctxt->context[vcpu], sizeof(vcpu_guest_context_t))) )
         return rc;

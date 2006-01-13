@@ -46,6 +46,8 @@ if not checkBlockList(domain):
 if not checkXmLongList(domain):
     FAIL("xm long list does not show that hda1 was attached")
 
+time.sleep(2)
+
 s, o = traceCommand("xm block-detach %s hda1" % domain.getName())
 if s != 0:
     FAIL("block-detach failed")

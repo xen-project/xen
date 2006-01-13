@@ -29,8 +29,6 @@
 #include <asm/fixmap.h>
 #include <public/memory.h>
 
-extern l1_pgentry_t *mapcache;
-
 unsigned int PAGE_HYPERVISOR         = __PAGE_HYPERVISOR;
 unsigned int PAGE_HYPERVISOR_NOCACHE = __PAGE_HYPERVISOR_NOCACHE;
 
@@ -68,7 +66,7 @@ void __init paging_init(void)
     void *ioremap_pt;
     unsigned long v;
     struct pfn_info *pg;
-    int i, mapcache_order;
+    int i;
 
 #ifdef CONFIG_X86_PAE
     printk("PAE enabled, limit: %d GB\n", MACHPHYS_MBYTES);
@@ -76,7 +74,7 @@ void __init paging_init(void)
     printk("PAE disabled.\n");
 #endif
 
-    idle0_vcpu.arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
+    idle_vcpu[0]->arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
 
     if ( cpu_has_pge )
     {
@@ -121,14 +119,12 @@ void __init paging_init(void)
             l2e_from_page(virt_to_page(ioremap_pt), __PAGE_HYPERVISOR);
     }
 
-    /* Set up mapping cache for domain pages. */
-    mapcache_order = get_order_from_bytes(
-        MAPCACHE_MBYTES << (20 - PAGETABLE_ORDER));
-    mapcache = alloc_xenheap_pages(mapcache_order);
-    memset(mapcache, 0, PAGE_SIZE << mapcache_order);
-    for ( i = 0; i < (MAPCACHE_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
-        idle_pg_table_l2[l2_linear_offset(MAPCACHE_VIRT_START) + i] =
-            l2e_from_page(virt_to_page(mapcache) + i, __PAGE_HYPERVISOR);
+    /* Install per-domain mappings for idle domain. */
+    for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
+        idle_pg_table_l2[l2_linear_offset(PERDOMAIN_VIRT_START) + i] =
+            l2e_from_page(virt_to_page(idle_vcpu[0]->domain->
+                                       arch.mm_perdomain_pt) + i,
+                          __PAGE_HYPERVISOR);
 }
 
 void __init zap_low_mappings(l2_pgentry_t *base)

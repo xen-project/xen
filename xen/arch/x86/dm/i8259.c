@@ -29,7 +29,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
-#include <public/io/ioreq.h>
+#include <public/hvm/ioreq.h>
 #include <asm/vmx.h>
 #include <asm/vmx_vpic.h>
 #include <asm/current.h>

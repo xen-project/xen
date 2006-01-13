@@ -35,6 +35,8 @@ mk-symlinks: LINUX_ROOT=$(XEN_ROOT)/linux-2.6-xen-sparse
 mk-symlinks:
 	mkdir -p xen
 	( cd xen && ln -sf ../$(XEN_ROOT)/xen/include/public/*.h . )
+	mkdir -p xen/hvm
+	( cd xen/hvm && ln -sf ../../$(XEN_ROOT)/xen/include/public/hvm/*.h . )
 	mkdir -p xen/io
 	( cd xen/io && ln -sf ../../$(XEN_ROOT)/xen/include/public/io/*.h . )
 	mkdir -p xen/linux

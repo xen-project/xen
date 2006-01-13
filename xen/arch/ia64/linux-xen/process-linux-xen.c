@@ -241,7 +241,7 @@ static inline void play_dead(void)
 
 	max_xtp();
 	local_irq_disable();
-	idle_task_exit();
+	idle_domain_exit();
 	ia64_jump_to_sal(&sal_boot_rendez_state[this_cpu]);
 	/*
 	 * The above is a point of no-return, the processor is

@@ -50,7 +50,7 @@ try:
     console.sendInput("bhs")
 
     # Bring up the "lo" interface.
-    console.runCmd("ifconfig lo up")
+    console.runCmd("ifconfig lo 127.0.0.1")
 
     console.runCmd("ifconfig eth0 inet "+ip+" netmask "+mask+" up")
 

@@ -181,10 +181,11 @@ int xc_domain_unpause(int xc_handle,
  */
 int xc_domain_destroy(int xc_handle, 
                       uint32_t domid);
-int xc_domain_pincpu(int xc_handle,
-                     uint32_t domid,
-                     int vcpu,
-                     cpumap_t cpumap);
+
+int xc_vcpu_setaffinity(int xc_handle,
+                        uint32_t domid,
+                        int vcpu,
+                        cpumap_t cpumap);
 
 /**
  * This function will return information about one or more domains. It is
@@ -208,7 +209,7 @@ int xc_domain_getinfo(int xc_handle,
 
 
 /**
- * This function will set the vcpu context for the specified domain.
+ * This function will set the execution context for the specified vcpu.
  *
  * @parm xc_handle a handle to an open hypervisor interface
  * @parm domid the domain to set the vcpu context for
@@ -216,10 +217,10 @@ int xc_domain_getinfo(int xc_handle,
  * @parm ctxt pointer to the the cpu context with the values to set
  * @return the number of domains enumerated or -1 on error
  */
-int xc_domain_setinfo(int xc_handle,
-                      uint32_t domid,
-                      uint32_t vcpu,
-                      vcpu_guest_context_t *ctxt);
+int xc_vcpu_setcontext(int xc_handle,
+                       uint32_t domid,
+                       uint32_t vcpu,
+                       vcpu_guest_context_t *ctxt);
 /**
  * This function will return information about one or more domains, using a
  * single hypercall.  The domain information will be stored into the supplied
@@ -249,17 +250,16 @@ int xc_domain_getinfolist(int xc_handle,
  *            domain
  * @return 0 on success, -1 on failure
  */
-int xc_domain_get_vcpu_context(int xc_handle,
+int xc_vcpu_getcontext(int xc_handle,
                                uint32_t domid,
                                uint32_t vcpu,
                                vcpu_guest_context_t *ctxt);
 
 typedef dom0_getvcpuinfo_t xc_vcpuinfo_t;
-int xc_domain_get_vcpu_info(int xc_handle,
-                            uint32_t domid,
-                            uint32_t vcpu,
-                            xc_vcpuinfo_t *info);
-
+int xc_vcpu_getinfo(int xc_handle,
+                    uint32_t domid,
+                    uint32_t vcpu,
+                    xc_vcpuinfo_t *info);
 
 int xc_domain_setcpuweight(int xc_handle,
                            uint32_t domid,

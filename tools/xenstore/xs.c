@@ -292,7 +292,7 @@ static void *read_reply(
 }
 
 /* Send message to xs, get malloc'ed reply.  NULL and set errno on error. */
-static void *xs_talkv(struct xs_handle *h, struct xs_transaction_handle *t,
+static void *xs_talkv(struct xs_handle *h, xs_transaction_t t,
 		      enum xsd_sockmsg_type type,
 		      const struct iovec *iovec,
 		      unsigned int num_vecs,
@@ -304,7 +304,7 @@ static void *xs_talkv(struct xs_handle *h, struct xs_transaction_handle *t,
 	unsigned int i;
 	struct sigaction ignorepipe, oldact;
 
-	msg.tx_id = (uint32_t)(unsigned long)t;
+	msg.tx_id = t;
 	msg.req_id = 0;
 	msg.type = type;
 	msg.len = 0;
@@ -368,7 +368,7 @@ static void free_no_errno(void *p)
 }
 
 /* Simplified version of xs_talkv: single message. */
-static void *xs_single(struct xs_handle *h, struct xs_transaction_handle *t,
+static void *xs_single(struct xs_handle *h, xs_transaction_t t,
 		       enum xsd_sockmsg_type type,
 		       const char *string,
 		       unsigned int *len)
@@ -388,7 +388,7 @@ static bool xs_bool(char *reply)
 	return true;
 }
 
-char **xs_directory(struct xs_handle *h, struct xs_transaction_handle *t,
+char **xs_directory(struct xs_handle *h, xs_transaction_t t,
 		    const char *path, unsigned int *num)
 {
 	char *strings, *p, **ret;
@@ -420,7 +420,7 @@ char **xs_directory(struct xs_handle *h, struct xs_transaction_handle *t,
  * Returns a malloced value: call free() on it after use.
  * len indicates length in bytes, not including the nul.
  */
-void *xs_read(struct xs_handle *h, struct xs_transaction_handle *t,
+void *xs_read(struct xs_handle *h, xs_transaction_t t,
 	      const char *path, unsigned int *len)
 {
 	return xs_single(h, t, XS_READ, path, len);
@@ -429,7 +429,7 @@ void *xs_read(struct xs_handle *h, struct xs_transaction_handle *t,
 /* Write the value of a single file.
  * Returns false on failure.
  */
-bool xs_write(struct xs_handle *h, struct xs_transaction_handle *t,
+bool xs_write(struct xs_handle *h, xs_transaction_t t,
 	      const char *path, const void *data, unsigned int len)
 {
 	struct iovec iovec[2];
@@ -446,7 +446,7 @@ bool xs_write(struct xs_handle *h, struct xs_transaction_handle *t,
 /* Create a new directory.
  * Returns false on failure, or success if it already exists.
  */
-bool xs_mkdir(struct xs_handle *h, struct xs_transaction_handle *t,
+bool xs_mkdir(struct xs_handle *h, xs_transaction_t t,
 	      const char *path)
 {
 	return xs_bool(xs_single(h, t, XS_MKDIR, path, NULL));
@@ -455,7 +455,7 @@ bool xs_mkdir(struct xs_handle *h, struct xs_transaction_handle *t,
 /* Destroy a file or directory (directories must be empty).
  * Returns false on failure, or success if it doesn't exist.
  */
-bool xs_rm(struct xs_handle *h, struct xs_transaction_handle *t,
+bool xs_rm(struct xs_handle *h, xs_transaction_t t,
 	   const char *path)
 {
 	return xs_bool(xs_single(h, t, XS_RM, path, NULL));
@@ -465,7 +465,7 @@ bool xs_rm(struct xs_handle *h, struct xs_transaction_handle *t,
  * Returns malloced array, or NULL: call free() after use.
  */
 struct xs_permissions *xs_get_permissions(struct xs_handle *h,
-					  struct xs_transaction_handle *t,
+					  xs_transaction_t t,
 					  const char *path, unsigned int *num)
 {
 	char *strings;
@@ -499,7 +499,7 @@ struct xs_permissions *xs_get_permissions(struct xs_handle *h,
  * Returns false on failure.
  */
 bool xs_set_permissions(struct xs_handle *h,
-			struct xs_transaction_handle *t,
+			xs_transaction_t t,
 			const char *path,
 			struct xs_permissions *perms,
 			unsigned int num_perms)
@@ -560,7 +560,7 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 	iov[1].iov_base = (void *)token;
 	iov[1].iov_len = strlen(token) + 1;
 
-	return xs_bool(xs_talkv(h, NULL, XS_WATCH, iov,
+	return xs_bool(xs_talkv(h, XBT_NULL, XS_WATCH, iov,
 				ARRAY_SIZE(iov), NULL));
 }
 
@@ -627,28 +627,28 @@ bool xs_unwatch(struct xs_handle *h, const char *path, const char *token)
 	iov[1].iov_base = (char *)token;
 	iov[1].iov_len = strlen(token) + 1;
 
-	return xs_bool(xs_talkv(h, NULL, XS_UNWATCH, iov,
+	return xs_bool(xs_talkv(h, XBT_NULL, XS_UNWATCH, iov,
 				ARRAY_SIZE(iov), NULL));
 }
 
 /* Start a transaction: changes by others will not be seen during this
  * transaction, and changes will not be visible to others until end.
  * You can only have one transaction at any time.
- * Returns NULL on failure.
+ * Returns XBT_NULL on failure.
  */
-struct xs_transaction_handle *xs_transaction_start(struct xs_handle *h)
+xs_transaction_t xs_transaction_start(struct xs_handle *h)
 {
 	char *id_str;
-	unsigned long id;
+	xs_transaction_t id;
 
-	id_str = xs_single(h, NULL, XS_TRANSACTION_START, "", NULL);
+	id_str = xs_single(h, XBT_NULL, XS_TRANSACTION_START, "", NULL);
 	if (id_str == NULL)
-		return NULL;
+		return XBT_NULL;
 
 	id = strtoul(id_str, NULL, 0);
 	free(id_str);
 
-	return (struct xs_transaction_handle *)id;
+	return id;
 }
 
 /* End a transaction.
@@ -656,7 +656,7 @@ struct xs_transaction_handle *xs_transaction_start(struct xs_handle *h)
  * Returns false on failure, which indicates an error: transactions will
  * not fail spuriously.
  */
-bool xs_transaction_end(struct xs_handle *h, struct xs_transaction_handle *t,
+bool xs_transaction_end(struct xs_handle *h, xs_transaction_t t,
 			bool abort)
 {
 	char abortstr[2];
@@ -693,7 +693,7 @@ bool xs_introduce_domain(struct xs_handle *h,
 	iov[2].iov_base = eventchn_str;
 	iov[2].iov_len = strlen(eventchn_str) + 1;
 
-	return xs_bool(xs_talkv(h, NULL, XS_INTRODUCE, iov,
+	return xs_bool(xs_talkv(h, XBT_NULL, XS_INTRODUCE, iov,
 				ARRAY_SIZE(iov), NULL));
 }
 
@@ -705,7 +705,7 @@ static void * single_with_domid(struct xs_handle *h,
 
 	sprintf(domid_str, "%u", domid);
 
-	return xs_single(h, NULL, type, domid_str, NULL);
+	return xs_single(h, XBT_NULL, type, domid_str, NULL);
 }
 
 bool xs_release_domain(struct xs_handle *h, unsigned int domid)
@@ -719,7 +719,7 @@ char *xs_get_domain_path(struct xs_handle *h, unsigned int domid)
 
 	sprintf(domid_str, "%u", domid);
 
-	return xs_single(h, NULL, XS_GET_DOMAIN_PATH, domid_str, NULL);
+	return xs_single(h, XBT_NULL, XS_GET_DOMAIN_PATH, domid_str, NULL);
 }
 
 bool xs_is_domain_introduced(struct xs_handle *h, unsigned int domid)
@@ -739,7 +739,7 @@ char *xs_debug_command(struct xs_handle *h, const char *cmd,
 	iov[1].iov_base = data;
 	iov[1].iov_len = len;
 
-	return xs_talkv(h, NULL, XS_DEBUG, iov,
+	return xs_talkv(h, XBT_NULL, XS_DEBUG, iov,
 			ARRAY_SIZE(iov), NULL);
 }
 

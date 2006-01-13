@@ -17,7 +17,7 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/time.h>
-#include <xen/ac_timer.h>
+#include <xen/timer.h>
 #include <xen/smp.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>
@@ -56,7 +56,7 @@ struct cpu_time {
     s_time_t stime_local_stamp;
     s_time_t stime_master_stamp;
     struct time_scale tsc_scale;
-    struct ac_timer calibration_timer;
+    struct timer calibration_timer;
 } __cacheline_aligned;
 
 static struct cpu_time cpu_time[NR_CPUS];
@@ -163,7 +163,7 @@ void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 
     /* Rough hack to allow accurate timers to sort-of-work with no APIC. */
     if ( !cpu_has_apic )
-        raise_softirq(AC_TIMER_SOFTIRQ);
+        raise_softirq(TIMER_SOFTIRQ);
 
     if ( using_pit )
         pit_overflow();
@@ -342,7 +342,7 @@ static void init_pit(void)
 /* Protected by platform_timer_lock. */
 static u64 hpet_counter64, hpet_overflow_period;
 static u32 hpet_stamp;
-static struct ac_timer hpet_overflow_timer;
+static struct timer hpet_overflow_timer;
 
 static void hpet_overflow(void *unused)
 {
@@ -354,7 +354,7 @@ static void hpet_overflow(void *unused)
     hpet_stamp = counter;
     spin_unlock_irq(&platform_timer_lock);
 
-    set_ac_timer(&hpet_overflow_timer, NOW() + hpet_overflow_period);
+    set_timer(&hpet_overflow_timer, NOW() + hpet_overflow_period);
 }
 
 static u64 read_hpet_count(void)
@@ -430,7 +430,7 @@ static int init_hpet(void)
         (void)do_div(hpet_overflow_period, (u32)hpet_rate);
     }
 
-    init_ac_timer(&hpet_overflow_timer, hpet_overflow, NULL, 0);
+    init_timer(&hpet_overflow_timer, hpet_overflow, NULL, 0);
     hpet_overflow(NULL);
     platform_timer_stamp = hpet_counter64;
 
@@ -459,7 +459,7 @@ int use_cyclone;
 /* Protected by platform_timer_lock. */
 static u64 cyclone_counter64;
 static u32 cyclone_stamp;
-static struct ac_timer cyclone_overflow_timer;
+static struct timer cyclone_overflow_timer;
 static volatile u32 *cyclone_timer; /* Cyclone MPMC0 register */
 
 static void cyclone_overflow(void *unused)
@@ -472,7 +472,7 @@ static void cyclone_overflow(void *unused)
     cyclone_stamp = counter;
     spin_unlock_irq(&platform_timer_lock);
 
-    set_ac_timer(&cyclone_overflow_timer, NOW() + MILLISECS(20000));
+    set_timer(&cyclone_overflow_timer, NOW() + MILLISECS(20000));
 }
 
 static u64 read_cyclone_count(void)
@@ -510,7 +510,7 @@ static int init_cyclone(void)
 
     read_platform_count = read_cyclone_count;
 
-    init_ac_timer(&cyclone_overflow_timer, cyclone_overflow, NULL, 0);
+    init_timer(&cyclone_overflow_timer, cyclone_overflow, NULL, 0);
     cyclone_overflow(NULL);
     platform_timer_stamp = cyclone_counter64;
     set_time_scale(&platform_timer_scale, CYCLONE_TIMER_FREQ);
@@ -876,7 +876,7 @@ static void local_time_calibration(void *unused)
     cpu_time[cpu].stime_master_stamp = curr_master_stime;
 
  out:
-    set_ac_timer(&cpu_time[cpu].calibration_timer, NOW() + EPOCH);
+    set_timer(&cpu_time[cpu].calibration_timer, NOW() + EPOCH);
 
     if ( cpu == 0 )
         platform_time_calibration();
@@ -896,9 +896,9 @@ void init_percpu_time(void)
     cpu_time[cpu].stime_master_stamp = now;
     cpu_time[cpu].stime_local_stamp  = now;
 
-    init_ac_timer(&cpu_time[cpu].calibration_timer,
+    init_timer(&cpu_time[cpu].calibration_timer,
                   local_time_calibration, NULL, cpu);
-    set_ac_timer(&cpu_time[cpu].calibration_timer, NOW() + EPOCH);
+    set_timer(&cpu_time[cpu].calibration_timer, NOW() + EPOCH);
 }
 
 /* Late init function (after all CPUs are booted). */

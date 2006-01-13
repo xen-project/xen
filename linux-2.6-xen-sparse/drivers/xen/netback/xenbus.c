@@ -93,7 +93,7 @@ static int netback_probe(struct xenbus_device *dev,
 	if (err)
 		goto fail;
 
-	err = xenbus_switch_state(dev, NULL, XenbusStateInitWait);
+	err = xenbus_switch_state(dev, XBT_NULL, XenbusStateInitWait);
 	if (err) {
 		goto fail;
 	}
@@ -122,7 +122,7 @@ static int netback_hotplug(struct xenbus_device *xdev, char **envp,
 
 	DPRINTK("netback_hotplug");
 
-	val = xenbus_read(NULL, xdev->nodename, "script", NULL);
+	val = xenbus_read(XBT_NULL, xdev->nodename, "script", NULL);
 	if (IS_ERR(val)) {
 		int err = PTR_ERR(val);
 		xenbus_dev_fatal(xdev, err, "reading script");
@@ -160,7 +160,7 @@ static void backend_changed(struct xenbus_watch *watch,
 
 	DPRINTK("");
 
-	err = xenbus_scanf(NULL, dev->nodename, "handle", "%li", &handle);
+	err = xenbus_scanf(XBT_NULL, dev->nodename, "handle", "%li", &handle);
 	if (XENBUS_EXIST_ERR(err)) {
 		/* Since this watch will fire once immediately after it is
 		   registered, we expect this.  Ignore it, and wait for the
@@ -212,7 +212,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		xenbus_switch_state(dev, NULL, XenbusStateClosing);
+		xenbus_switch_state(dev, XBT_NULL, XenbusStateClosing);
 		break;
 
 	case XenbusStateClosed:
@@ -256,7 +256,7 @@ static void connect(struct backend_info *be)
 		return;
 	}
 
-	xenbus_switch_state(dev, NULL, XenbusStateConnected);
+	xenbus_switch_state(dev, XBT_NULL, XenbusStateConnected);
 }
 
 
@@ -269,7 +269,7 @@ static int connect_rings(struct backend_info *be)
 
 	DPRINTK("");
 
-	err = xenbus_gather(NULL, dev->otherend,
+	err = xenbus_gather(XBT_NULL, dev->otherend,
 			    "tx-ring-ref", "%lu", &tx_ring_ref,
 			    "rx-ring-ref", "%lu", &rx_ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);

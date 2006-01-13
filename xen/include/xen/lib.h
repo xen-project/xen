@@ -53,10 +53,16 @@ extern long vm_assist(struct domain *, unsigned int, unsigned int);
 /* vsprintf.c */
 extern int sprintf(char * buf, const char * fmt, ...)
     __attribute__ ((format (printf, 2, 3)));
-extern int vsprintf(char *buf, const char *, va_list);
+extern int vsprintf(char *buf, const char *, va_list)
+    __attribute__ ((format (printf, 2, 0)));
 extern int snprintf(char * buf, size_t size, const char * fmt, ...)
     __attribute__ ((format (printf, 3, 4)));
-extern int vsnprintf(char *buf, size_t size, const char *fmt, va_list args);
+extern int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
+    __attribute__ ((format (printf, 3, 0)));
+extern int scnprintf(char * buf, size_t size, const char * fmt, ...)
+    __attribute__ ((format (printf, 3, 4)));
+extern int vscnprintf(char *buf, size_t size, const char *fmt, va_list args)
+    __attribute__ ((format (printf, 3, 0)));
 
 long simple_strtol(
     const char *cp,char **endp, unsigned int base);

@@ -13,12 +13,9 @@
 INSTALL         = install
 INSTALL_PROG    = $(INSTALL) -m0755
 INSTALL_DIR     = $(INSTALL) -d -m0755
-INSTALL_DATA    = $(INSTALL) -m064
+INSTALL_DATA    = $(INSTALL) -m0644
 
-prefix=/usr/local
-mandir=$(prefix)/share/man
-man1dir=$(mandir)/man1
-sbindir=$(prefix)/sbin
+sbindir=/usr/sbin
 
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk

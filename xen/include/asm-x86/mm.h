@@ -309,16 +309,13 @@ struct ptwr_info {
     unsigned long l1va;
     /* Copy of the p.t. page, taken before guest is given write access. */
     l1_pgentry_t *page;
-    /* A temporary Xen mapping of the actual p.t. page. */
-    l1_pgentry_t *pl1e;
     /* Index in L2 page table where this L1 p.t. is always hooked. */
     unsigned int l2_idx; /* NB. Only used for PTWR_PT_ACTIVE. */
     /* Info about last ptwr update batch. */
     unsigned int prev_nr_updates;
-    /* Exec domain which created writable mapping. */
+    /* VCPU which created writable mapping. */
     struct vcpu *vcpu;
-    /* EIP of the address which took the original write fault
-       used for stats collection only */
+    /* EIP of the original write fault (stats collection only). */
     unsigned long eip;
 };
 
@@ -336,11 +333,13 @@ int  ptwr_do_page_fault(struct domain *, unsigned long,
 int  revalidate_l1(struct domain *, l1_pgentry_t *, l1_pgentry_t *);
 
 void cleanup_writable_pagetable(struct domain *d);
-#define sync_pagetable_state(d)                 \
-    do {                                        \
-        LOCK_BIGLOCK(d);                        \
-        cleanup_writable_pagetable(d);          \
-        UNLOCK_BIGLOCK(d);                      \
+#define sync_pagetable_state(d)                                 \
+    do {                                                        \
+        LOCK_BIGLOCK(d);                                        \
+        /* Avoid racing with ptwr_destroy(). */                 \
+        if ( !test_bit(_DOMF_dying, &(d)->domain_flags) )       \
+            cleanup_writable_pagetable(d);                      \
+        UNLOCK_BIGLOCK(d);                                      \
     } while ( 0 )
 
 int audit_adjust_pgtables(struct domain *d, int dir, int noisy);

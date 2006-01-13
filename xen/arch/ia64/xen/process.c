@@ -65,26 +65,16 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
 
 extern struct schedule_data schedule_data[NR_CPUS];
 
-void schedule_tail(struct vcpu *next)
+void schedule_tail(struct vcpu *prev)
 {
-	unsigned long rr7;
-	//printk("current=%lx,shared_info=%lx\n",current,current->vcpu_info);
-	//printk("next=%lx,shared_info=%lx\n",next,next->vcpu_info);
+	context_saved(prev);
 
-    // TG: Real HACK FIXME.
-    // This is currently necessary because when a new domain is started, 
-    // the context_switch function of xen/common/schedule.c(__enter_scheduler)
-    // never returns.  Therefore, the lock must be released.
-    // schedule_tail is only called when a domain is started.
-    spin_unlock_irq(&schedule_data[current->processor].schedule_lock);
-
-	/* rr7 will be postponed to last point when resuming back to guest */
-    if(VMX_DOMAIN(current)){
-    	vmx_load_all_rr(current);
-    }else{
-	    load_region_regs(current);
-            vcpu_load_kernel_regs(current);
-    }
+	if (VMX_DOMAIN(current)) {
+		vmx_load_all_rr(current);
+	} else {
+		load_region_regs(current);
+		vcpu_load_kernel_regs(current);
+	}
 }
 
 void tdpfoo(void) { }
@@ -252,7 +242,7 @@ void deliver_pending_interrupt(struct pt_regs *regs)
 	struct domain *d = current->domain;
 	struct vcpu *v = current;
 	// FIXME: Will this work properly if doing an RFI???
-	if (!is_idle_task(d) && user_mode(regs)) {
+	if (!is_idle_domain(d) && user_mode(regs)) {
 		//vcpu_poke_timer(v);
 		if (vcpu_deliverable_interrupts(v))
 			reflect_extint(regs);

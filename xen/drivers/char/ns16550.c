@@ -33,7 +33,7 @@ static struct ns16550 {
     /* UART with IRQ line: interrupt-driven I/O. */
     struct irqaction irqaction;
     /* UART with no IRQ line: periodically-polled I/O. */
-    struct ac_timer timer;
+    struct timer timer;
     unsigned int timeout_ms;
 } ns16550_com[2] = { { 0 } };
 
@@ -138,7 +138,7 @@ static void ns16550_poll(void *data)
     if ( ns_read_reg(uart, LSR) & LSR_THRE )
         serial_tx_interrupt(port, regs);
 
-    set_ac_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
+    set_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
 }
 
 static int ns16550_tx_empty(struct serial_port *port)
@@ -214,8 +214,8 @@ static void ns16550_init_postirq(struct serial_port *port)
         bits = uart->data_bits + uart->stop_bits + !!uart->parity;
         uart->timeout_ms = max_t(
             unsigned int, 1, (bits * port->tx_fifo_size * 1000) / uart->baud);
-        init_ac_timer(&uart->timer, ns16550_poll, port, 0);
-        set_ac_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
+        init_timer(&uart->timer, ns16550_poll, port, 0);
+        set_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
     }
     else
     {

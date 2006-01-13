@@ -526,7 +526,7 @@ extern union xen_start_info_union xen_start_info_union;
 
 unsigned long __init e820_end_of_ram(void)
 {
-        unsigned long max_end_pfn;
+	unsigned long max_end_pfn;
 
 	if (xen_override_max_pfn == 0) {
 		max_end_pfn = xen_start_info->nr_pages;
@@ -612,7 +612,7 @@ void __init parse_memopt(char *p, char **from)
 { 
 	end_user_pfn = memparse(p, from);
 	end_user_pfn >>= PAGE_SHIFT;	
-        xen_override_max_pfn = (unsigned long) end_user_pfn;
+	xen_override_max_pfn = (unsigned long) end_user_pfn;
 } 
 
 /*

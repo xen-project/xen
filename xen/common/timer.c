@@ -1,5 +1,5 @@
 /******************************************************************************
- * ac_timer.c
+ * timer.c
  * 
  * Copyright (c) 2002-2003 Rolf Neugebauer
  * Copyright (c) 2002-2005 K A Fraser
@@ -15,7 +15,7 @@
 #include <xen/perfc.h>
 #include <xen/time.h>
 #include <xen/softirq.h>
-#include <xen/ac_timer.h>
+#include <xen/timer.h>
 #include <xen/keyhandler.h>
 #include <asm/system.h>
 #include <asm/desc.h>
@@ -26,15 +26,15 @@
  */
 #define TIMER_SLOP (50*1000) /* ns */
 
-struct ac_timers {
-    spinlock_t        lock;
-    struct ac_timer **heap;
-    unsigned int      softirqs;
+struct timers {
+    spinlock_t     lock;
+    struct timer **heap;
+    struct timer  *running;
 } __cacheline_aligned;
 
-struct ac_timers ac_timers[NR_CPUS];
+struct timers timers[NR_CPUS];
 
-extern int reprogram_ac_timer(s_time_t timeout);
+extern int reprogram_timer(s_time_t timeout);
 
 /****************************************************************************
  * HEAP OPERATIONS.
@@ -47,10 +47,10 @@ extern int reprogram_ac_timer(s_time_t timeout);
 #define SET_HEAP_LIMIT(_h,_v) (((u16 *)(_h))[1] = (u16)(_v))
 
 /* Sink down element @pos of @heap. */
-static void down_heap(struct ac_timer **heap, int pos)
+static void down_heap(struct timer **heap, int pos)
 {
     int sz = GET_HEAP_SIZE(heap), nxt;
-    struct ac_timer *t = heap[pos];
+    struct timer *t = heap[pos];
 
     while ( (nxt = (pos << 1)) <= sz )
     {
@@ -68,9 +68,9 @@ static void down_heap(struct ac_timer **heap, int pos)
 }
 
 /* Float element @pos up @heap. */
-static void up_heap(struct ac_timer **heap, int pos)
+static void up_heap(struct timer **heap, int pos)
 {
-    struct ac_timer *t = heap[pos];
+    struct timer *t = heap[pos];
 
     while ( (pos > 1) && (t->expires < heap[pos>>1]->expires) )
     {
@@ -85,7 +85,7 @@ static void up_heap(struct ac_timer **heap, int pos)
 
 
 /* Delete @t from @heap. Return TRUE if new top of heap. */
-static int remove_entry(struct ac_timer **heap, struct ac_timer *t)
+static int remove_entry(struct timer **heap, struct timer *t)
 {
     int sz = GET_HEAP_SIZE(heap);
     int pos = t->heap_offset;
@@ -114,9 +114,9 @@ static int remove_entry(struct ac_timer **heap, struct ac_timer *t)
 
 
 /* Add new entry @t to @heap. Return TRUE if new top of heap. */
-static int add_entry(struct ac_timer ***pheap, struct ac_timer *t)
+static int add_entry(struct timer ***pheap, struct timer *t)
 {
-    struct ac_timer **heap = *pheap;
+    struct timer **heap = *pheap;
     int sz = GET_HEAP_SIZE(heap);
 
     /* Copy the heap if it is full. */
@@ -125,7 +125,7 @@ static int add_entry(struct ac_timer ***pheap, struct ac_timer *t)
         /* old_limit == (2^n)-1; new_limit == (2^(n+4))-1 */
         int old_limit = GET_HEAP_LIMIT(heap);
         int new_limit = ((old_limit + 1) << 4) - 1;
-        heap = xmalloc_array(struct ac_timer *, new_limit + 1);
+        heap = xmalloc_array(struct timer *, new_limit + 1);
         BUG_ON(heap == NULL);
         memcpy(heap, *pheap, (old_limit + 1) * sizeof(*heap));
         SET_HEAP_LIMIT(heap, new_limit);
@@ -146,61 +146,80 @@ static int add_entry(struct ac_timer ***pheap, struct ac_timer *t)
  * TIMER OPERATIONS.
  */
 
-static inline void __add_ac_timer(struct ac_timer *timer)
+static inline void __add_timer(struct timer *timer)
 {
     int cpu = timer->cpu;
-    if ( add_entry(&ac_timers[cpu].heap, timer) )
-        cpu_raise_softirq(cpu, AC_TIMER_SOFTIRQ);
+    if ( add_entry(&timers[cpu].heap, timer) )
+        cpu_raise_softirq(cpu, TIMER_SOFTIRQ);
 }
 
 
-static inline void __rem_ac_timer(struct ac_timer *timer)
+static inline void __stop_timer(struct timer *timer)
 {
     int cpu = timer->cpu;
-    if ( remove_entry(ac_timers[cpu].heap, timer) )
-        cpu_raise_softirq(cpu, AC_TIMER_SOFTIRQ);
+    if ( remove_entry(timers[cpu].heap, timer) )
+        cpu_raise_softirq(cpu, TIMER_SOFTIRQ);
 }
 
 
-void set_ac_timer(struct ac_timer *timer, s_time_t expires)
+void set_timer(struct timer *timer, s_time_t expires)
 {
     int           cpu = timer->cpu;
     unsigned long flags;
 
-    spin_lock_irqsave(&ac_timers[cpu].lock, flags);
-    ASSERT(timer != NULL);
-    if ( active_ac_timer(timer) )
-        __rem_ac_timer(timer);
+    spin_lock_irqsave(&timers[cpu].lock, flags);
+    if ( active_timer(timer) )
+        __stop_timer(timer);
     timer->expires = expires;
-    __add_ac_timer(timer);
-    spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
+    if ( likely(!timer->killed) )
+        __add_timer(timer);
+    spin_unlock_irqrestore(&timers[cpu].lock, flags);
 }
 
 
-void rem_ac_timer(struct ac_timer *timer)
+void stop_timer(struct timer *timer)
 {
     int           cpu = timer->cpu;
     unsigned long flags;
 
-    spin_lock_irqsave(&ac_timers[cpu].lock, flags);
-    ASSERT(timer != NULL);
-    if ( active_ac_timer(timer) )
-        __rem_ac_timer(timer);
-    spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
+    spin_lock_irqsave(&timers[cpu].lock, flags);
+    if ( active_timer(timer) )
+        __stop_timer(timer);
+    spin_unlock_irqrestore(&timers[cpu].lock, flags);
 }
 
 
-static void ac_timer_softirq_action(void)
+void kill_timer(struct timer *timer)
 {
-    int              cpu = smp_processor_id();
-    struct ac_timer *t, **heap;
-    s_time_t         now;
-    void             (*fn)(void *);
+    int           cpu = timer->cpu;
+    unsigned long flags;
 
-    spin_lock_irq(&ac_timers[cpu].lock);
+    BUG_ON(timers[cpu].running == timer);
+
+    spin_lock_irqsave(&timers[cpu].lock, flags);
+    if ( active_timer(timer) )
+        __stop_timer(timer);
+    timer->killed = 1;
+    spin_unlock_irqrestore(&timers[cpu].lock, flags);
+
+    for_each_online_cpu ( cpu )
+        while ( timers[cpu].running == timer )
+            cpu_relax();
+}
+
+
+static void timer_softirq_action(void)
+{
+    int           cpu = smp_processor_id();
+    struct timer *t, **heap;
+    s_time_t      now;
+    void        (*fn)(void *);
+    void         *data;
+
+    spin_lock_irq(&timers[cpu].lock);
     
     do {
-        heap = ac_timers[cpu].heap;
+        heap = timers[cpu].heap;
         now  = NOW();
 
         while ( (GET_HEAP_SIZE(heap) != 0) &&
@@ -208,56 +227,59 @@ static void ac_timer_softirq_action(void)
         {
             remove_entry(heap, t);
 
-            if ( (fn = t->function) != NULL )
-            {
-                void *data = t->data;
-                spin_unlock_irq(&ac_timers[cpu].lock);
-                (*fn)(data);
-                spin_lock_irq(&ac_timers[cpu].lock);
-            }
+            timers[cpu].running = t;
+
+            fn   = t->function;
+            data = t->data;
+
+            spin_unlock_irq(&timers[cpu].lock);
+            (*fn)(data);
+            spin_lock_irq(&timers[cpu].lock);
 
             /* Heap may have grown while the lock was released. */
-            heap = ac_timers[cpu].heap;
+            heap = timers[cpu].heap;
         }
-    }
-    while ( !reprogram_ac_timer(GET_HEAP_SIZE(heap) ? heap[1]->expires : 0) );
 
-    spin_unlock_irq(&ac_timers[cpu].lock);
+        timers[cpu].running = NULL;
+    }
+    while ( !reprogram_timer(GET_HEAP_SIZE(heap) ? heap[1]->expires : 0) );
+
+    spin_unlock_irq(&timers[cpu].lock);
 }
 
 
 static void dump_timerq(unsigned char key)
 {
-    struct ac_timer *t;
-    unsigned long    flags; 
-    s_time_t         now = NOW();
-    int              i, j;
+    struct timer *t;
+    unsigned long flags; 
+    s_time_t      now = NOW();
+    int           i, j;
 
-    printk("Dumping ac_timer queues: NOW=0x%08X%08X\n",
+    printk("Dumping timer queues: NOW=0x%08X%08X\n",
            (u32)(now>>32), (u32)now); 
 
     for_each_online_cpu( i )
     {
         printk("CPU[%02d] ", i);
-        spin_lock_irqsave(&ac_timers[i].lock, flags);
-        for ( j = 1; j <= GET_HEAP_SIZE(ac_timers[i].heap); j++ )
+        spin_lock_irqsave(&timers[i].lock, flags);
+        for ( j = 1; j <= GET_HEAP_SIZE(timers[i].heap); j++ )
         {
-            t = ac_timers[i].heap[j];
+            t = timers[i].heap[j];
             printk ("  %d : %p ex=0x%08X%08X %p\n",
                     j, t, (u32)(t->expires>>32), (u32)t->expires, t->data);
         }
-        spin_unlock_irqrestore(&ac_timers[i].lock, flags);
+        spin_unlock_irqrestore(&timers[i].lock, flags);
         printk("\n");
     }
 }
 
 
-void __init ac_timer_init(void)
+void __init timer_init(void)
 {
-    static struct ac_timer *dummy_heap;
+    static struct timer *dummy_heap;
     int i;
 
-    open_softirq(AC_TIMER_SOFTIRQ, ac_timer_softirq_action);
+    open_softirq(TIMER_SOFTIRQ, timer_softirq_action);
 
     /*
      * All CPUs initially share an empty dummy heap. Only those CPUs that
@@ -268,11 +290,11 @@ void __init ac_timer_init(void)
 
     for ( i = 0; i < NR_CPUS; i++ )
     {
-        spin_lock_init(&ac_timers[i].lock);
-        ac_timers[i].heap = &dummy_heap;
+        spin_lock_init(&timers[i].lock);
+        timers[i].heap = &dummy_heap;
     }
 
-    register_keyhandler('a', dump_timerq, "dump ac_timer queues");
+    register_keyhandler('a', dump_timerq, "dump timer queues");
 }
 
 /*

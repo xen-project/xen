@@ -127,7 +127,7 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 			vcpu_wake(dom0->vcpu[0]);
 		}
 	}
-	if (!is_idle_task(current->domain))  {
+	if (!is_idle_domain(current->domain))  {
 		if (vcpu_timer_expired(current)) {
 			vcpu_pend_timer(current);
 			// ensure another timer interrupt happens even if domain doesn't
@@ -196,7 +196,7 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 //#endif
 		/* double check, in case we got hit by a (slow) PMI: */
 	} while (time_after_eq(ia64_get_itc(), new_itm));
-	raise_softirq(AC_TIMER_SOFTIRQ);
+	raise_softirq(TIMER_SOFTIRQ);
 
 	return IRQ_HANDLED;
 }
@@ -235,7 +235,7 @@ int __init init_xen_time()
     return 0;
 }
 
-int reprogram_ac_timer(s_time_t timeout)
+int reprogram_timer(s_time_t timeout)
 {
 	struct vcpu *v = current;
 	s_time_t expire;

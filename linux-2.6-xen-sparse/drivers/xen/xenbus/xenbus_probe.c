@@ -115,7 +115,7 @@ static int frontend_bus_id(char bus_id[BUS_ID_SIZE], const char *nodename)
 static int read_otherend_details(struct xenbus_device *xendev,
 				 char *id_node, char *path_node)
 {
-	int err = xenbus_gather(NULL, xendev->nodename,
+	int err = xenbus_gather(XBT_NULL, xendev->nodename,
 				id_node, "%i", &xendev->otherend_id,
 				path_node, NULL, &xendev->otherend,
 				NULL);
@@ -126,7 +126,7 @@ static int read_otherend_details(struct xenbus_device *xendev,
 		return err;
 	}
 	if (strlen(xendev->otherend) == 0 ||
-	    !xenbus_exists(NULL, xendev->otherend, "")) {
+	    !xenbus_exists(XBT_NULL, xendev->otherend, "")) {
 		xenbus_dev_fatal(xendev, -ENOENT, "missing other end from %s",
 				 xendev->nodename);
 		kfree(xendev->otherend);
@@ -200,14 +200,14 @@ static int backend_bus_id(char bus_id[BUS_ID_SIZE], const char *nodename)
 
 	devid = strrchr(nodename, '/') + 1;
 
-	err = xenbus_gather(NULL, nodename, "frontend-id", "%i", &domid,
+	err = xenbus_gather(XBT_NULL, nodename, "frontend-id", "%i", &domid,
 			    "frontend", NULL, &frontend,
 			    NULL);
 	if (err)
 		return err;
 	if (strlen(frontend) == 0)
 		err = -ERANGE;
-	if (!err && !xenbus_exists(NULL, frontend, ""))
+	if (!err && !xenbus_exists(XBT_NULL, frontend, ""))
 		err = -ENOENT;
 
 	kfree(frontend);
@@ -373,7 +373,7 @@ static int xenbus_dev_probe(struct device *_dev)
 	return 0;
 fail:
 	xenbus_dev_error(dev, err, "xenbus_dev_probe on %s", dev->nodename);
-	xenbus_switch_state(dev, NULL, XenbusStateClosed);
+	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
 	return -ENODEV;
 	
 }
@@ -391,7 +391,7 @@ static int xenbus_dev_remove(struct device *_dev)
 	if (drv->remove)
 		drv->remove(dev);
 
-	xenbus_switch_state(dev, NULL, XenbusStateClosed);
+	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
 	return 0;
 }
 
@@ -470,12 +470,17 @@ static int cleanup_dev(struct device *dev, void *data)
 
 	DPRINTK("%s", info->nodename);
 
-	if (!strncmp(xendev->nodename, info->nodename, len)) {
-		info->dev = xendev;
-		get_device(dev);
-		return 1;
-	}
-	return 0;
+	/* Match the info->nodename path, or any subdirectory of that path. */
+	if (strncmp(xendev->nodename, info->nodename, len))
+		return 0;
+
+	/* If the node name is longer, ensure it really is a subdirectory. */
+	if ((strlen(xendev->nodename) > len) && (xendev->nodename[len] != '/'))
+		return 0;
+
+	info->dev = xendev;
+	get_device(dev);
+	return 1;
 }
 
 static void xenbus_cleanup_devices(const char *path, struct bus_type *bus)
@@ -542,14 +547,6 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 			     const char *type,
 			     const char *nodename)
 {
-#define CHECK_FAIL				\
-	do {					\
-		if (err)			\
-			goto fail;		\
-	}					\
-	while (0)				\
-
-
 	int err;
 	struct xenbus_device *xendev;
 	size_t stringlen;
@@ -584,19 +581,18 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 	xendev->dev.release = xenbus_dev_release;
 
 	err = bus->get_bus_id(xendev->dev.bus_id, xendev->nodename);
-	CHECK_FAIL;
+	if (err)
+		goto fail;
 
 	/* Register with generic device framework. */
 	err = device_register(&xendev->dev);
-	CHECK_FAIL;
+	if (err)
+		goto fail;
 
 	device_create_file(&xendev->dev, &dev_attr_nodename);
 	device_create_file(&xendev->dev, &dev_attr_devtype);
 
 	return 0;
-
-#undef CHECK_FAIL
-
 fail:
 	xenbus_dev_free(xendev);
 	return err;
@@ -652,7 +648,7 @@ static int xenbus_probe_backend(const char *type, const char *domid)
 	if (!nodename)
 		return -ENOMEM;
 
-	dir = xenbus_directory(NULL, nodename, "", &dir_n);
+	dir = xenbus_directory(XBT_NULL, nodename, "", &dir_n);
 	if (IS_ERR(dir)) {
 		kfree(nodename);
 		return PTR_ERR(dir);
@@ -675,7 +671,7 @@ static int xenbus_probe_device_type(struct xen_bus_type *bus, const char *type)
 	unsigned int dir_n = 0;
 	int i;
 
-	dir = xenbus_directory(NULL, bus->root, type, &dir_n);
+	dir = xenbus_directory(XBT_NULL, bus->root, type, &dir_n);
 	if (IS_ERR(dir))
 		return PTR_ERR(dir);
 
@@ -694,7 +690,7 @@ static int xenbus_probe_devices(struct xen_bus_type *bus)
 	char **dir;
 	unsigned int i, dir_n;
 
-	dir = xenbus_directory(NULL, bus->root, "", &dir_n);
+	dir = xenbus_directory(XBT_NULL, bus->root, "", &dir_n);
 	if (IS_ERR(dir))
 		return PTR_ERR(dir);
 
@@ -740,7 +736,7 @@ static void dev_changed(const char *node, struct xen_bus_type *bus)
 	if (char_count(node, '/') < 2)
  		return;
 
-	exists = xenbus_exists(NULL, node, "");
+	exists = xenbus_exists(XBT_NULL, node, "");
 	if (!exists) {
 		xenbus_cleanup_devices(node, &bus->bus);
 		return;

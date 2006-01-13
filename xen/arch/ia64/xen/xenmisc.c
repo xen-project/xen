@@ -75,7 +75,7 @@ struct pt_regs *guest_cpu_user_regs(void) { return vcpu_regs(current); }
 
 void raise_actimer_softirq(void)
 {
-	raise_softirq(AC_TIMER_SOFTIRQ);
+	raise_softirq(TIMER_SOFTIRQ);
 }
 
 unsigned long
@@ -320,18 +320,15 @@ if (!i--) { printk("+",id); i = 1000000; }
 	ia64_set_iva(&ia64_ivt);
 	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
 		VHPT_ENABLED);
-    	if (!is_idle_task(current->domain)) {
+    	if (!is_idle_domain(current->domain)) {
 	    	load_region_regs(current);
 	    	vcpu_load_kernel_regs(current);
 		    if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
     	}
 	    if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
     }
-}
 
-void context_switch_finalise(struct vcpu *next)
-{
-	/* nothing to do */
+    context_saved(prev);
 }
 
 void continue_running(struct vcpu *same)

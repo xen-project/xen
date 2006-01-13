@@ -11,7 +11,7 @@ void print_dir(struct xs_handle *h, char *path, int cur_depth)
     int i;
     unsigned int num, len;
 
-    e = xs_directory(h, NULL, path, &num);
+    e = xs_directory(h, XBT_NULL, path, &num);
     if (e == NULL)
         err(1, "xs_directory (%s)", path);
 
@@ -22,7 +22,7 @@ void print_dir(struct xs_handle *h, char *path, int cur_depth)
         sprintf(newpath, "%s%s%s", path, 
                 path[strlen(path)-1] == '/' ? "" : "/", 
                 e[i]);
-        val = xs_read(h, NULL, newpath, &len);
+        val = xs_read(h, XBT_NULL, newpath, &len);
         if (val == NULL)
             printf(":\n");
         else if ((unsigned)len > (151 - strlen(e[i])))

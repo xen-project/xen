@@ -68,48 +68,19 @@ pdev="p${netdev}"
 vdev="veth${vifnum}"
 vif0="vif0.${vifnum}"
 
-legacy_mask_to_prefix() {
-    mask=$1
-    first=${mask%%.*}
-    second=${mask#*.}
-    third=${second#*.}
-    fourth=${third#*.}
-    second=${second%%.*}
-    third=${third%%.*}
-    declare -i INT FULLMASK BIT
-    INT=$((((($first*256)+$second)*256+$third)*256+$fourth))
-    FULLMASK=4294967295
-    BIT=1
-    for bit in `seq 32 -1 0`; do
-	if test $FULLMASK -eq $INT; then PREFIX=$bit; return; fi
-	FULLMASK=$(($FULLMASK-$BIT))
-	BIT=$((BIT*2))
-    done
-    echo "ERROR converting netmask $mask to prefix"
-    exit 1
+get_ip_info() {
+    addr_pfx=`ip addr show dev $1 | egrep '^ *inet' | sed -e 's/ *inet //' -e 's/ .*//'`
+    gateway=`ip route show dev $1 | fgrep default | sed 's/default via //'`
 }
-
-parse_kernel_ip() {
-    if egrep 'ip=[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:' /proc/cmdline; then
-	kip=`sed -e 's!.*ip=\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\):.*!\1!' /proc/cmdline`
-	kmask=`sed -e 's!.*ip=[^:]*:[^:]*:[^:]*:\([^:]*\):.*!\1!' /proc/cmdline` 
-	kgate=`sed -e 's!.*ip=[^:]*:[^:]*:\([^:]*\):.*!\1!' /proc/cmdline`
-    fi
-}
-
+    
 do_ifup() {
     if ! ifup $1 ; then
-        if [ ${kip} ] ; then
-            # use the addresses we grocked from /proc/cmdline
-            if [ -z "${kmask}" ]; then 
-                PREFIX=32
-            else 
-                legacy_mask_to_prefix ${kmask}
-            fi
+        if [ ${addr_pfx} ] ; then
+            # use the info from get_ip_info()
             ip addr flush $1
-            ip addr add ${kip}/${PREFIX} dev $1
+            ip addr add ${addr_pfx} dev $1
             ip link set dev $1 up
-            [ ${kgate} ] && ip route add default via ${kgate}
+            [ ${gateway} ] && ip route add default via ${gateway}
         fi
     fi
 }
@@ -171,7 +142,7 @@ transfer_routes () {
 #
 link_exists()
 {
-    if ip link show "$1" >&/dev/null
+    if ip link show "$1" >/dev/null 2>/dev/null
     then
         return 0
     else
@@ -231,7 +202,7 @@ show_status () {
 }
 
 op_start () {
-    if [ "${bridge}" == "null" ] ; then
+    if [ "${bridge}" = "null" ] ; then
 	return
     fi
 
@@ -259,9 +230,8 @@ using loopback.nloopbacks=<N> on the domain 0 kernel command line.
 	preiftransfer ${netdev}
 	transfer_addrs ${netdev} ${vdev}
 	if ! ifdown ${netdev}; then
-	    # If ifdown fails, take the IP details from the kernel command
-	    # line.
-	    parse_kernel_ip
+	    # If ifdown fails, remember the IP details.
+	    get_ip_info ${netdev}
 	    ip link set ${netdev} down
 	    ip addr flush ${netdev}
 	fi
@@ -283,13 +253,13 @@ using loopback.nloopbacks=<N> on the domain 0 kernel command line.
 	transfer_routes ${netdev} ${bridge}
     fi
 
-    if [ ${antispoof} == 'yes' ] ; then
+    if [ ${antispoof} = 'yes' ] ; then
 	antispoofing
     fi
 }
 
 op_stop () {
-    if [ "${bridge}" == "null" ]; then
+    if [ "${bridge}" = "null" ]; then
 	return
     fi
     if ! link_exists "$bridge"; then
@@ -301,7 +271,7 @@ op_stop () {
 	mac=`ip link show ${netdev} | grep 'link\/ether' | sed -e 's/.*ether \(..:..:..:..:..:..\).*/\1/'`
 	transfer_addrs ${netdev} ${pdev}
 	if ! ifdown ${netdev}; then
-	    parse_kernel_ip
+	    get_ip_info ${netdev}
 	fi
 	ip link set ${netdev} down arp off
 	ip link set ${netdev} addr fe:ff:ff:ff:ff:ff

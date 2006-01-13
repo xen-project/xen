@@ -21,8 +21,10 @@
  * @parm dom the id of the domain
  * @return 0 on success, -1 on failure
  */
-int xc_linux_save(int xc_handle, int fd, uint32_t dom, uint32_t max_iters, 
-                  uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */);
+int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters, 
+                  uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
+                  int (*suspend)(int domid));
+
 
 /**
  * This function will restore a saved domain running Linux.
@@ -56,9 +58,9 @@ int xc_vmx_build(int xc_handle,
                  int memsize,
                  const char *image_name,
                  unsigned int control_evtchn,
-                 unsigned int lapic,
                  unsigned int vcpus,
                  unsigned int acpi,
+                 unsigned int apic,
                  unsigned int store_evtchn,
                  unsigned long *store_mfn);
 

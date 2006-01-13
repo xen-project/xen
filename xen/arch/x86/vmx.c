@@ -42,7 +42,7 @@
 #include <asm/shadow_64.h>
 #endif
 #include <public/sched.h>
-#include <public/io/ioreq.h>
+#include <public/hvm/ioreq.h>
 #include <asm/vmx_vpic.h>
 #include <asm/vmx_vlapic.h>
 
@@ -53,7 +53,7 @@ unsigned int opt_vmx_debug_level = 0;
 integer_param("vmx_debug", opt_vmx_debug_level);
 
 static unsigned long trace_values[NR_CPUS][4];
-#define TRACE_VMEXIT(index,value) trace_values[current->processor][index]=value
+#define TRACE_VMEXIT(index,value) trace_values[smp_processor_id()][index]=value
 
 static int vmx_switch_on;
 
@@ -65,11 +65,6 @@ void vmx_final_setup_guest(struct vcpu *v)
     {
         struct domain *d = v->domain;
         struct vcpu *vc;
-
-        d->arch.vmx_platform.lapic_enable = v->arch.guest_context.user_regs.ecx;
-        v->arch.guest_context.user_regs.ecx = 0;
-        VMX_DBG_LOG(DBG_LEVEL_VLAPIC, "lapic enable is %d.\n",
-                    d->arch.vmx_platform.lapic_enable);
 
         /* Initialize monitor page table */
         for_each_vcpu(d, vc)
@@ -95,7 +90,7 @@ void vmx_final_setup_guest(struct vcpu *v)
 void vmx_relinquish_resources(struct vcpu *v)
 {
     struct vmx_virpit *vpit;
-    
+
     if ( !VMX_DOMAIN(v) )
         return;
 
@@ -103,19 +98,18 @@ void vmx_relinquish_resources(struct vcpu *v)
         /* unmap IO shared page */
         struct domain *d = v->domain;
         if ( d->arch.vmx_platform.shared_page_va )
-            unmap_domain_page((void *)d->arch.vmx_platform.shared_page_va);
+            unmap_domain_page_global(
+                (void *)d->arch.vmx_platform.shared_page_va);
     }
 
     destroy_vmcs(&v->arch.arch_vmx);
     free_monitor_pagetable(v);
     vpit = &v->domain->arch.vmx_platform.vmx_pit;
-    if ( active_ac_timer(&(vpit->pit_timer)) )
-        rem_ac_timer(&vpit->pit_timer);
-    if ( active_ac_timer(&v->arch.arch_vmx.hlt_timer) )
-        rem_ac_timer(&v->arch.arch_vmx.hlt_timer);
+    kill_timer(&vpit->pit_timer);
+    kill_timer(&v->arch.arch_vmx.hlt_timer);
     if ( vmx_apic_support(v->domain) && (VLAPIC(v) != NULL) )
     {
-        rem_ac_timer(&VLAPIC(v)->vlapic_timer);
+        kill_timer(&VLAPIC(v)->vlapic_timer);
         xfree(VLAPIC(v));
     }
 }
@@ -1604,7 +1598,7 @@ void vmx_vmexit_do_hlt(void)
         next_wakeup = next_pit;
     }
     if ( next_wakeup != - 1 ) 
-        set_ac_timer(&current->arch.arch_vmx.hlt_timer, next_wakeup);
+        set_timer(&current->arch.arch_vmx.hlt_timer, next_wakeup);
     do_block();
 }
 
@@ -1955,9 +1949,12 @@ asmlinkage void load_cr2(void)
 
 asmlinkage void trace_vmentry (void)
 {
-    TRACE_5D(TRC_VMENTRY,trace_values[current->processor][0],
-             trace_values[current->processor][1],trace_values[current->processor][2],
-             trace_values[current->processor][3],trace_values[current->processor][4]);
+    TRACE_5D(TRC_VMENTRY,
+             trace_values[smp_processor_id()][0],
+             trace_values[smp_processor_id()][1],
+             trace_values[smp_processor_id()][2],
+             trace_values[smp_processor_id()][3],
+             trace_values[smp_processor_id()][4]);
     TRACE_VMEXIT(0,9);
     TRACE_VMEXIT(1,9);
     TRACE_VMEXIT(2,9);

@@ -38,10 +38,7 @@ increase_reservation(
 
     if ( (extent_order != 0) &&
          !multipage_allocation_permitted(current->domain) )
-    {
-        DPRINTK("Only I/O-capable domains may allocate multi-page extents.\n");
         return 0;
-    }
 
     for ( i = 0; i < nr_extents; i++ )
     {

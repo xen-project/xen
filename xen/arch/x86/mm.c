@@ -297,7 +297,6 @@ int map_ldt_shadow_page(unsigned int off)
 
 #if defined(__x86_64__)
     /* If in user mode, switch to kernel mode just to read LDT mapping. */
-    extern void toggle_guest_mode(struct vcpu *);
     int user_mode = !(v->arch.flags & TF_kernel_mode);
 #define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
 #elif defined(__i386__)
@@ -841,10 +840,11 @@ static int alloc_l2_table(struct pfn_info *page, unsigned long type)
            L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
     pl2e[l2_table_offset(LINEAR_PT_VIRT_START)] =
         l2e_from_pfn(pfn, __PAGE_HYPERVISOR);
-    pl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
-        l2e_from_page(
-            virt_to_page(page_get_owner(page)->arch.mm_perdomain_pt),
-            __PAGE_HYPERVISOR);
+    for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
+        pl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
+            l2e_from_page(
+                virt_to_page(page_get_owner(page)->arch.mm_perdomain_pt) + i,
+                __PAGE_HYPERVISOR);
 #endif
 
     unmap_domain_page(pl2e);
@@ -1457,7 +1457,8 @@ int get_page_type(struct pfn_info *page, unsigned long type)
                      * was GDT/LDT) but those circumstances should be
                      * very rare.
                      */
-                    cpumask_t mask = page_get_owner(page)->cpumask;
+                    cpumask_t mask =
+                        page_get_owner(page)->domain_dirty_cpumask;
                     tlbflush_filter(mask, page->tlbflush_timestamp);
 
                     if ( unlikely(!cpus_empty(mask)) )
@@ -1619,7 +1620,7 @@ static void process_deferred_ops(unsigned int cpu)
         if ( shadow_mode_enabled(d) )
             shadow_sync_all(d);
         if ( deferred_ops & DOP_FLUSH_ALL_TLBS )
-            flush_tlb_mask(d->cpumask);
+            flush_tlb_mask(d->domain_dirty_cpumask);
         else
             local_flush_tlb();
     }
@@ -1691,7 +1692,7 @@ static inline cpumask_t vcpumask_to_pcpumask(
     struct domain *d, unsigned long vmask)
 {
     unsigned int vcpu_id;
-    cpumask_t    pmask;
+    cpumask_t    pmask = CPU_MASK_NONE;
     struct vcpu *v;
 
     while ( vmask != 0 )
@@ -1700,7 +1701,7 @@ static inline cpumask_t vcpumask_to_pcpumask(
         vmask &= ~(1UL << vcpu_id);
         if ( (vcpu_id < MAX_VIRT_CPUS) &&
              ((v = d->vcpu[vcpu_id]) != NULL) )
-            cpu_set(v->processor, pmask);
+            cpus_or(pmask, pmask, v->vcpu_dirty_cpumask);
     }
 
     return pmask;
@@ -1869,7 +1870,6 @@ int do_mmuext_op(
                 break;
             }
             pmask = vcpumask_to_pcpumask(d, vmask);
-            cpus_and(pmask, pmask, d->cpumask);
             if ( op.cmd == MMUEXT_TLB_FLUSH_MULTI )
                 flush_tlb_mask(pmask);
             else
@@ -1878,11 +1878,11 @@ int do_mmuext_op(
         }
 
         case MMUEXT_TLB_FLUSH_ALL:
-            flush_tlb_mask(d->cpumask);
+            flush_tlb_mask(d->domain_dirty_cpumask);
             break;
     
         case MMUEXT_INVLPG_ALL:
-            flush_tlb_one_mask(d->cpumask, op.arg1.linear_addr);
+            flush_tlb_one_mask(d->domain_dirty_cpumask, op.arg1.linear_addr);
             break;
 
         case MMUEXT_FLUSH_CACHE:
@@ -2497,7 +2497,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     l1_pgentry_t   val = l1e_from_intpte(val64);
     struct vcpu   *v   = current;
     struct domain *d   = v->domain;
-    unsigned int   cpu = v->processor;
+    unsigned int   cpu = smp_processor_id();
     unsigned long  vmask, bmap_ptr;
     cpumask_t      pmask;
     int            rc  = 0;
@@ -2548,13 +2548,12 @@ int do_update_va_mapping(unsigned long va, u64 val64,
             local_flush_tlb();
             break;
         case UVMF_ALL:
-            flush_tlb_mask(d->cpumask);
+            flush_tlb_mask(d->domain_dirty_cpumask);
             break;
         default:
             if ( unlikely(get_user(vmask, (unsigned long *)bmap_ptr)) )
                 rc = -EFAULT;
             pmask = vcpumask_to_pcpumask(d, vmask);
-            cpus_and(pmask, pmask, d->cpumask);
             flush_tlb_mask(pmask);
             break;
         }
@@ -2569,13 +2568,12 @@ int do_update_va_mapping(unsigned long va, u64 val64,
             local_flush_tlb_one(va);
             break;
         case UVMF_ALL:
-            flush_tlb_one_mask(d->cpumask, va);
+            flush_tlb_one_mask(d->domain_dirty_cpumask, va);
             break;
         default:
             if ( unlikely(get_user(vmask, (unsigned long *)bmap_ptr)) )
                 rc = -EFAULT;
             pmask = vcpumask_to_pcpumask(d, vmask);
-            cpus_and(pmask, pmask, d->cpumask);
             flush_tlb_one_mask(pmask, va);
             break;
         }
@@ -2972,7 +2970,6 @@ void ptwr_flush(struct domain *d, const int which)
 
 #ifdef CONFIG_X86_64
     struct vcpu *v = current;
-    extern void toggle_guest_mode(struct vcpu *);
     int user_mode = !(v->arch.flags & TF_kernel_mode);
 #endif
 
@@ -3002,7 +2999,7 @@ void ptwr_flush(struct domain *d, const int which)
         BUG();
     }
     PTWR_PRINTK("[%c] disconnected_l1va at %p is %"PRIpte"\n",
-                PTWR_PRINT_WHICH, ptep, pte.l1);
+                PTWR_PRINT_WHICH, ptep, l1e_get_intpte(pte));
     l1e_remove_flags(pte, _PAGE_RW);
 
     /* Write-protect the p.t. page in the guest page table. */
@@ -3018,20 +3015,33 @@ void ptwr_flush(struct domain *d, const int which)
 
     /* Ensure that there are no stale writable mappings in any TLB. */
     /* NB. INVLPG is a serialising instruction: flushes pending updates. */
-    flush_tlb_one_mask(d->cpumask, l1va);
+    flush_tlb_one_mask(d->domain_dirty_cpumask, l1va);
     PTWR_PRINTK("[%c] disconnected_l1va at %p now %"PRIpte"\n",
-                PTWR_PRINT_WHICH, ptep, pte.l1);
+                PTWR_PRINT_WHICH, ptep, l1e_get_intpte(pte));
 
     /*
      * STEP 2. Validate any modified PTEs.
      */
 
-    pl1e = d->arch.ptwr[which].pl1e;
-    modified = revalidate_l1(d, pl1e, d->arch.ptwr[which].page);
-    unmap_domain_page(pl1e);
-    perfc_incr_histo(wpt_updates, modified, PT_UPDATES);
-    ptwr_eip_stat_update(d->arch.ptwr[which].eip, d->domain_id, modified);
-    d->arch.ptwr[which].prev_nr_updates = modified;
+    if ( likely(d == current->domain) )
+    {
+        pl1e = map_domain_page(l1e_get_pfn(pte));
+        modified = revalidate_l1(d, pl1e, d->arch.ptwr[which].page);
+        unmap_domain_page(pl1e);
+        perfc_incr_histo(wpt_updates, modified, PT_UPDATES);
+        ptwr_eip_stat_update(d->arch.ptwr[which].eip, d->domain_id, modified);
+        d->arch.ptwr[which].prev_nr_updates = modified;
+    }
+    else
+    {
+        /*
+         * Must make a temporary global mapping, since we are running in the
+         * wrong address space, so no access to our own mapcache.
+         */
+        pl1e = map_domain_page_global(l1e_get_pfn(pte));
+        modified = revalidate_l1(d, pl1e, d->arch.ptwr[which].page);
+        unmap_domain_page_global(pl1e);
+    }
 
     /*
      * STEP 3. Reattach the L1 p.t. page into the current address space.
@@ -3209,7 +3219,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
 {
     unsigned long    pfn;
     struct pfn_info *page;
-    l1_pgentry_t     pte;
+    l1_pgentry_t    *pl1e, pte;
     l2_pgentry_t    *pl2e, l2e;
     int              which, flags;
     unsigned long    l2_idx;
@@ -3342,15 +3352,14 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     if ( which == PTWR_PT_ACTIVE )
     {
         l2e_remove_flags(*pl2e, _PAGE_PRESENT);
-        flush_tlb_mask(d->cpumask);
+        flush_tlb_mask(d->domain_dirty_cpumask);
     }
     
     /* Temporarily map the L1 page, and make a copy of it. */
-    d->arch.ptwr[which].pl1e = map_domain_page(pfn);
-    memcpy(d->arch.ptwr[which].page,
-           d->arch.ptwr[which].pl1e,
-           L1_PAGETABLE_ENTRIES * sizeof(l1_pgentry_t));
-    
+    pl1e = map_domain_page(pfn);
+    memcpy(d->arch.ptwr[which].page, pl1e, PAGE_SIZE);
+    unmap_domain_page(pl1e);
+
     /* Finally, make the p.t. page writable by the guest OS. */
     l1e_add_flags(pte, _PAGE_RW);
     if ( unlikely(__put_user(pte.l1,
@@ -3359,7 +3368,6 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
         MEM_LOG("ptwr: Could not update pte at %p", (unsigned long *)
                 &linear_pg_table[l1_linear_offset(addr)]);
         /* Toss the writable pagetable state and crash. */
-        unmap_domain_page(d->arch.ptwr[which].pl1e);
         d->arch.ptwr[which].l1va = 0;
         domain_crash(d);
         return 0;
@@ -3369,7 +3377,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
 
  emulate:
     if ( x86_emulate_memop(guest_cpu_user_regs(), addr,
-                           &ptwr_mem_emulator, BITS_PER_LONG/8) )
+                           &ptwr_mem_emulator, X86EMUL_MODE_HOST) )
         return 0;
     perfc_incrc(ptwr_emulations);
     return EXCRET_fault_fixed;

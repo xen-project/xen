@@ -65,6 +65,10 @@ void __dummy__(void)
            arch.guest_context.syscall_callback_eip);
     OFFSET(VCPU_kernel_sp, struct vcpu,
            arch.guest_context.kernel_sp);
+    OFFSET(VCPU_flags, struct vcpu, vcpu_flags);
+    OFFSET(VCPU_nmi_addr, struct vcpu, nmi_addr);
+    DEFINE(_VCPUF_nmi_pending, _VCPUF_nmi_pending);
+    DEFINE(_VCPUF_nmi_masked, _VCPUF_nmi_masked);
     BLANK();
 
     OFFSET(VCPUINFO_upcall_pending, vcpu_info_t, evtchn_upcall_pending);

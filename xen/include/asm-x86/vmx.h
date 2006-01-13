@@ -26,7 +26,7 @@
 #include <asm/vmx_vmcs.h>
 #include <asm/i387.h>
 
-#include <public/io/ioreq.h>
+#include <public/hvm/ioreq.h>
 
 extern int hvm_enabled;
 
@@ -38,7 +38,6 @@ extern void pic_irq_request(int *interrupt_request, int level);
 
 extern void arch_vmx_do_launch(struct vcpu *);
 extern void arch_vmx_do_resume(struct vcpu *);
-extern void arch_vmx_do_relaunch(struct vcpu *);
 
 extern unsigned int cpu_rev;
 
@@ -506,7 +505,7 @@ static inline int vmx_reflect_exception(struct vcpu *v)
 
 static inline unsigned int vmx_get_vcpu_nr(struct domain *d)
 {
-    return d->arch.vmx_platform.nr_vcpu;
+    return d->arch.vmx_platform.nr_vcpus;
 }
 
 static inline shared_iopage_t *get_sp(struct domain *d)

@@ -11,6 +11,7 @@
 #include <xen/compile.h>
 #include <xen/sched.h>
 #include <asm/current.h>
+#include <public/nmi.h>
 #include <public/version.h>
 
 void cmdline_parse(char *cmdline)
@@ -146,6 +147,43 @@ long do_xen_version(int cmd, void *arg)
     }
 
     return -ENOSYS;
+}
+
+long do_nmi_op(unsigned int cmd, void *arg)
+{
+    struct vcpu *v = current;
+    struct domain *d = current->domain;
+    long rc = 0;
+
+    switch ( cmd )
+    {
+    case XENNMI_register_callback:
+        if ( (d->domain_id != 0) || (v->vcpu_id != 0) )
+        { 
+           rc = -EINVAL;
+        }
+        else
+        {
+            v->nmi_addr = (unsigned long)arg;
+#ifdef CONFIG_X86
+            /*
+             * If no handler was registered we can 'lose the NMI edge'.
+             * Re-assert it now.
+             */
+            if ( d->shared_info->arch.nmi_reason != 0 )
+                set_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
+#endif
+        }
+        break;
+    case XENNMI_unregister_callback:
+        v->nmi_addr = 0;
+        break;
+    default:
+        rc = -ENOSYS;
+        break;
+    }
+
+    return rc;
 }
 
 long do_vm_assist(unsigned int cmd, unsigned int type)
