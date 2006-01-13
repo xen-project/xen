@@ -31,6 +31,10 @@
 #include <asm/div64.h>
 
 unsigned int nmi_watchdog = NMI_NONE;
+static spinlock_t   watchdog_lock = SPIN_LOCK_UNLOCKED;
+static unsigned int watchdog_disable_count = 1;
+static unsigned int watchdog_on;
+
 static unsigned int nmi_hz = HZ;
 static unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
 static unsigned int nmi_p4_cccr_val;
@@ -310,8 +314,16 @@ void __pminit setup_apic_nmi_watchdog(void)
 {
     int cpu = smp_processor_id();
 
-    if (!nmi_watchdog)
-        return;
+    if ( nmi_active < 0 )
+	return;
+
+    if ( !nmi_watchdog )
+    {
+	/* Force the watchdog to always be disabled. */
+	watchdog_disable_count++;
+	nmi_active = -1;
+	return;
+    }
 
     switch (boot_cpu_data.x86_vendor) {
     case X86_VENDOR_AMD:
@@ -351,10 +363,6 @@ void __pminit setup_apic_nmi_watchdog(void)
 static unsigned int
 last_irq_sums [NR_CPUS],
     alert_counter [NR_CPUS];
-
-static spinlock_t   watchdog_lock = SPIN_LOCK_UNLOCKED;
-static unsigned int watchdog_disable_count = 1;
-static unsigned int watchdog_on;
 
 void watchdog_disable(void)
 {
