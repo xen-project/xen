@@ -23,12 +23,14 @@
 #include <xen/sched.h>
 #include <xen/console.h>
 #include <xen/smp.h>
+#include <xen/keyhandler.h>
 #include <asm/current.h>
 #include <asm/mc146818rtc.h>
 #include <asm/msr.h>
 #include <asm/mpspec.h>
 #include <asm/debugger.h>
 #include <asm/div64.h>
+#include <asm/apic.h>
 
 unsigned int nmi_watchdog = NMI_NONE;
 static spinlock_t   watchdog_lock = SPIN_LOCK_UNLOCKED;
@@ -448,3 +450,26 @@ void nmi_watchdog_tick(struct cpu_user_regs * regs)
         write_watchdog_counter(NULL);
     }
 }
+
+/*
+ * For some reason the destination shorthand for self is not valid
+ * when used with the NMI delivery mode. This is documented in Tables
+ * 8-3 and 8-4 in IA32 Reference Manual Volume 3. We send the IPI to
+ * our own APIC ID explicitly which is valid.
+ */
+static void do_nmi_trigger(unsigned char key) {
+    u32 id = apic_read(APIC_ID);
+
+    printk("triggering NMI on APIC ID %x\n", id);
+
+    apic_wait_icr_idle();
+    apic_write_around(APIC_ICR2, SET_APIC_DEST_FIELD(id));
+    apic_write_around(APIC_ICR, APIC_DM_NMI | APIC_INT_ASSERT);
+}
+
+static __init int register_nmi_trigger(void)
+{
+    register_keyhandler('n', do_nmi_trigger, "trigger an NMI");
+    return 0;
+}
+__initcall(register_nmi_trigger);
