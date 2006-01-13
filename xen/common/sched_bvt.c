@@ -207,11 +207,7 @@ static int bvt_alloc_task(struct vcpu *v)
  */
 static void bvt_add_task(struct vcpu *v) 
 {
-    struct bvt_dom_info *inf = BVT_INFO(v->domain);
     struct bvt_vcpu_info *einf = EBVT_INFO(v);
-
-    ASSERT(inf != NULL);
-    ASSERT(v   != NULL);
 
     /* Allocate per-CPU context if this is the first domain to be added. */
     if ( CPU_INFO(v->processor) == NULL )
