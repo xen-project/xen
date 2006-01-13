@@ -502,6 +502,7 @@ find_largest_hole (u64 start, u64 end, void *arg)
 }
 #endif /* CONFIG_VIRTUAL_MEM_MAP */
 
+#ifndef XEN
 static int
 count_reserved_pages (u64 start, u64 end, void *arg)
 {
@@ -514,6 +515,7 @@ count_reserved_pages (u64 start, u64 end, void *arg)
 	*count += num_reserved;
 	return 0;
 }
+#endif
 
 /*
  * Boot command-line option "nolwsys" can be used to disable the use of any light-weight

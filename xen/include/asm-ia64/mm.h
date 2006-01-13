@@ -67,10 +67,12 @@ struct page
         } free;
 
     } u;
+#if 0
 // following added for Linux compiling
     page_flags_t flags;
     atomic_t _count;
     struct list_head lru;	// is this the same as above "list"?
+#endif
 };
 
 #define set_page_count(p,v) 	atomic_set(&(p)->_count, v - 1)
