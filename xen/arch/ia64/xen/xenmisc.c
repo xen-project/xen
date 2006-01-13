@@ -203,6 +203,8 @@ void dump_pageframe_info(struct domain *d)
 	printk("dump_pageframe_info not implemented\n");
 }
 
+int nmi_count(int x) { return x; }
+
 ///////////////////////////////
 // called from arch/ia64/head.S
 ///////////////////////////////
