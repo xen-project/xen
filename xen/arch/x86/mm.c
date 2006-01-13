@@ -3023,12 +3023,25 @@ void ptwr_flush(struct domain *d, const int which)
      * STEP 2. Validate any modified PTEs.
      */
 
-    pl1e = map_domain_page(l1e_get_pfn(pte));
-    modified = revalidate_l1(d, pl1e, d->arch.ptwr[which].page);
-    unmap_domain_page(pl1e);
-    perfc_incr_histo(wpt_updates, modified, PT_UPDATES);
-    ptwr_eip_stat_update(d->arch.ptwr[which].eip, d->domain_id, modified);
-    d->arch.ptwr[which].prev_nr_updates = modified;
+    if ( likely(d == current->domain) )
+    {
+        pl1e = map_domain_page(l1e_get_pfn(pte));
+        modified = revalidate_l1(d, pl1e, d->arch.ptwr[which].page);
+        unmap_domain_page(pl1e);
+        perfc_incr_histo(wpt_updates, modified, PT_UPDATES);
+        ptwr_eip_stat_update(d->arch.ptwr[which].eip, d->domain_id, modified);
+        d->arch.ptwr[which].prev_nr_updates = modified;
+    }
+    else
+    {
+        /*
+         * Must make a temporary global mapping, since we are running in the
+         * wrong address space, so no access to our own mapcache.
+         */
+        pl1e = map_domain_page_global(l1e_get_pfn(pte));
+        modified = revalidate_l1(d, pl1e, d->arch.ptwr[which].page);
+        unmap_domain_page_global(pl1e);
+    }
 
     /*
      * STEP 3. Reattach the L1 p.t. page into the current address space.
