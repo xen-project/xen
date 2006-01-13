@@ -185,27 +185,6 @@ void do_debug_key(unsigned char key, struct cpu_user_regs *regs)
                              bit. */
 }
 
-void do_nmi_stats(unsigned char key)
-{
-    int i;
-    struct domain *d;
-    struct vcpu *v;
-    printk("CPU\tNMI\n");
-    for_each_cpu(i)
-        printk("%3d\t%3d\n", i, nmi_count(i));
-
-    if ((d = dom0) == NULL)
-        return;
-    if ((v = d->vcpu[0]) == NULL)
-        return;
-    if (v->vcpu_flags & (VCPUF_nmi_pending|VCPUF_nmi_masked))
-        printk("dom0 vpu0: NMI %s%s\n",
-               v->vcpu_flags & VCPUF_nmi_pending ? "pending " : "",
-               v->vcpu_flags & VCPUF_nmi_masked ? "masked " : "");
-    else
-        printk("dom0 vcpu0: NMI neither pending nor masked\n");
-}
-
 #ifndef NDEBUG
 void debugtrace_key(unsigned char key)
 {
@@ -234,7 +213,6 @@ void initialize_keytable(void)
         'r', dump_runq,      "dump run queues");
     register_irq_keyhandler(
         'R', halt_machine,   "reboot machine"); 
-    register_keyhandler('N', do_nmi_stats,   "NMI statistics");
 
 #ifndef NDEBUG
     register_keyhandler(
