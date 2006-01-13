@@ -478,7 +478,8 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     schedulers_start();
 
-    watchdog_enable();
+    if ( opt_watchdog ) 
+        watchdog_enable();
 
     shadow_mode_init();
 
