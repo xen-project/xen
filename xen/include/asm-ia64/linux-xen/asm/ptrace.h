@@ -110,6 +110,7 @@ vcpu_regs (struct vcpu *v)
   return (struct cpu_user_regs *) ((unsigned long) v + IA64_STK_OFFSET) - 1;
 }
 
+struct pt_regs *guest_cpu_user_regs(void);
 
 #else
 struct pt_regs {
