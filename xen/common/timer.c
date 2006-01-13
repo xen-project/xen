@@ -29,6 +29,7 @@
 struct timers {
     spinlock_t     lock;
     struct timer **heap;
+    struct timer  *running;
 } __cacheline_aligned;
 
 struct timers timers[NR_CPUS];
@@ -167,11 +168,11 @@ void set_timer(struct timer *timer, s_time_t expires)
     unsigned long flags;
 
     spin_lock_irqsave(&timers[cpu].lock, flags);
-    ASSERT(timer != NULL);
     if ( active_timer(timer) )
         __stop_timer(timer);
     timer->expires = expires;
-    __add_timer(timer);
+    if ( likely(!timer->killed) )
+        __add_timer(timer);
     spin_unlock_irqrestore(&timers[cpu].lock, flags);
 }
 
@@ -182,10 +183,28 @@ void stop_timer(struct timer *timer)
     unsigned long flags;
 
     spin_lock_irqsave(&timers[cpu].lock, flags);
-    ASSERT(timer != NULL);
     if ( active_timer(timer) )
         __stop_timer(timer);
     spin_unlock_irqrestore(&timers[cpu].lock, flags);
+}
+
+
+void kill_timer(struct timer *timer)
+{
+    int           cpu = timer->cpu;
+    unsigned long flags;
+
+    BUG_ON(timers[cpu].running == timer);
+
+    spin_lock_irqsave(&timers[cpu].lock, flags);
+    if ( active_timer(timer) )
+        __stop_timer(timer);
+    timer->killed = 1;
+    spin_unlock_irqrestore(&timers[cpu].lock, flags);
+
+    for_each_online_cpu ( cpu )
+        while ( timers[cpu].running == timer )
+            cpu_relax();
 }
 
 
@@ -208,19 +227,20 @@ static void timer_softirq_action(void)
         {
             remove_entry(heap, t);
 
+            timers[cpu].running = t;
+
             fn   = t->function;
             data = t->data;
 
-            if ( fn != NULL )
-            {
-                spin_unlock_irq(&timers[cpu].lock);
-                (*fn)(data);
-                spin_lock_irq(&timers[cpu].lock);
-            }
+            spin_unlock_irq(&timers[cpu].lock);
+            (*fn)(data);
+            spin_lock_irq(&timers[cpu].lock);
 
             /* Heap may have grown while the lock was released. */
             heap = timers[cpu].heap;
         }
+
+        timers[cpu].running = NULL;
     }
     while ( !reprogram_timer(GET_HEAP_SIZE(heap) ? heap[1]->expires : 0) );
 

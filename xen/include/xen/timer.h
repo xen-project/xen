@@ -22,6 +22,8 @@ struct timer {
     void         *data;
     /* Timer-heap offset. */
     unsigned int  heap_offset;
+    /* Has this timer been killed (cannot be activated)? */
+    int           killed;
 };
 
 /*
@@ -62,6 +64,13 @@ extern void set_timer(struct timer *timer, s_time_t expires);
  * active.
  */
 extern void stop_timer(struct timer *timer);
+
+/*
+ * Deactivate a timer and prevent it from being re-set (future calls to
+ * set_timer will silently fail). When this function returns it is guaranteed
+ * that the timer callback handler is not running on any CPU.
+ */
+extern void kill_timer(struct timer *timer);
 
 /*
  * Initialisation. Must be called before any other timer function.

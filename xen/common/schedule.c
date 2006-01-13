@@ -156,7 +156,7 @@ void sched_add_domain(struct vcpu *v)
 
 void sched_rem_domain(struct vcpu *v) 
 {
-    stop_timer(&v->timer);
+    kill_timer(&v->timer);
     SCHED_OP(rem_task, v);
     TRACE_2D(TRC_SCHED_DOM_REM, v->domain->domain_id, v->vcpu_id);
 }
@@ -462,7 +462,7 @@ static void s_timer_fn(void *unused)
 /* Periodic tick timer: send timer event to current domain */
 static void t_timer_fn(void *unused)
 {
-    struct vcpu  *v  = current;
+    struct vcpu  *v   = current;
     unsigned int  cpu = smp_processor_id();
 
     schedule_data[cpu].tick++;

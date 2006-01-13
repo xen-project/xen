@@ -45,9 +45,9 @@ struct bvt_dom_info
                                              limits*/
     s32                 warp_value;       /* virtual time warp */
     s_time_t            warpl;            /* warp limit */
-    struct timer     warp_timer;       /* deals with warpl */
+    struct timer        warp_timer;       /* deals with warpl */
     s_time_t            warpu;            /* unwarp time requirement */
-    struct timer     unwarp_timer;     /* deals with warpu */
+    struct timer        unwarp_timer;     /* deals with warpu */
 
     struct bvt_vcpu_info vcpu_inf[MAX_VIRT_CPUS];
 };
@@ -168,6 +168,7 @@ static inline u32 calc_evt(struct vcpu *d, u32 avt)
 static int bvt_alloc_task(struct vcpu *v)
 {
     struct domain *d = v->domain;
+    struct bvt_dom_info *inf;
 
     if ( (d->sched_priv == NULL) )
     {
@@ -176,32 +177,12 @@ static int bvt_alloc_task(struct vcpu *v)
         memset(d->sched_priv, 0, sizeof(struct bvt_dom_info));
     }
 
-    v->sched_priv = &BVT_INFO(d)->vcpu_inf[v->vcpu_id];
+    inf = BVT_INFO(d);
 
-    BVT_INFO(d)->vcpu_inf[v->vcpu_id].inf = BVT_INFO(d);
-    BVT_INFO(d)->vcpu_inf[v->vcpu_id].vcpu = v;
+    v->sched_priv = &inf->vcpu_inf[v->vcpu_id];
 
-    return 0;
-}
-
-/*
- * Add and remove a domain
- */
-static void bvt_add_task(struct vcpu *v) 
-{
-    struct bvt_dom_info *inf = BVT_INFO(v->domain);
-    struct bvt_vcpu_info *einf = EBVT_INFO(v);
-    ASSERT(inf != NULL);
-    ASSERT(v   != NULL);
-
-    /* Allocate per-CPU context if this is the first domain to be added. */
-    if ( CPU_INFO(v->processor) == NULL )
-    {
-        schedule_data[v->processor].sched_priv = xmalloc(struct bvt_cpu_info);
-        BUG_ON(CPU_INFO(v->processor) == NULL);
-        INIT_LIST_HEAD(RUNQUEUE(v->processor));
-        CPU_SVT(v->processor) = 0;
-    }
+    inf->vcpu_inf[v->vcpu_id].inf  = BVT_INFO(d);
+    inf->vcpu_inf[v->vcpu_id].vcpu = v;
 
     if ( v->vcpu_id == 0 )
     {
@@ -218,7 +199,28 @@ static void bvt_add_task(struct vcpu *v)
         init_timer(&inf->unwarp_timer, unwarp_timer_fn, inf, v->processor);
     }
 
-    einf->vcpu = v;
+    return 0;
+}
+
+/*
+ * Add and remove a domain
+ */
+static void bvt_add_task(struct vcpu *v) 
+{
+    struct bvt_dom_info *inf = BVT_INFO(v->domain);
+    struct bvt_vcpu_info *einf = EBVT_INFO(v);
+
+    ASSERT(inf != NULL);
+    ASSERT(v   != NULL);
+
+    /* Allocate per-CPU context if this is the first domain to be added. */
+    if ( CPU_INFO(v->processor) == NULL )
+    {
+        schedule_data[v->processor].sched_priv = xmalloc(struct bvt_cpu_info);
+        BUG_ON(CPU_INFO(v->processor) == NULL);
+        INIT_LIST_HEAD(RUNQUEUE(v->processor));
+        CPU_SVT(v->processor) = 0;
+    }
 
     if ( is_idle_vcpu(v) )
     {
@@ -305,8 +307,14 @@ static int bvt_set_affinity(struct vcpu *v, cpumask_t *affinity)
  */
 static void bvt_free_task(struct domain *d)
 {
-    ASSERT(d->sched_priv != NULL);
-    xfree(d->sched_priv);
+    struct bvt_dom_info *inf = BVT_INFO(d);
+
+    ASSERT(inf != NULL);
+
+    kill_timer(&inf->warp_timer);
+    kill_timer(&inf->unwarp_timer);
+
+    xfree(inf);
 }
 
 /* Control the scheduler. */
