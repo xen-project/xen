@@ -121,7 +121,7 @@ extern char _end[]; /* standard ELF symbol */
 
 // from include/asm-ia64/smp.h
 #ifdef CONFIG_SMP
-#warning "Lots of things to fix to enable CONFIG_SMP!"
+//#warning "Lots of things to fix to enable CONFIG_SMP!"
 #endif
 #define	get_cpu()	smp_processor_id()
 #define put_cpu()	do {} while(0)
