@@ -130,9 +130,19 @@ unsigned long kernel_text_end(void)
 static void show_guest_stack(struct cpu_user_regs *regs)
 {
     int i;
-    unsigned long *stack = (unsigned long *)regs->esp, addr;
+    unsigned long *stack, addr;
 
-    printk("Guest stack trace from "__OP"sp=%p:\n   ", stack);
+    if ( VM86_MODE(regs) )
+    {
+        stack = (unsigned long *)((regs->ss << 4) + (regs->esp & 0xffff));
+        printk("Guest stack trace from ss:sp = %04x:%04x (VM86)\n   ",
+               regs->ss, (uint16_t)(regs->esp & 0xffff));
+    }
+    else
+    {
+        stack = (unsigned long *)regs->esp;
+        printk("Guest stack trace from "__OP"sp=%p:\n   ", stack);
+    }
 
     for ( i = 0; i < (debug_stack_lines*stack_words_per_line); i++ )
     {
