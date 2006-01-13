@@ -98,9 +98,9 @@ static inline int __task_on_runqueue(struct vcpu *d)
 static void warp_timer_fn(void *data)
 {
     struct bvt_dom_info *inf = data;
-    unsigned int cpu = inf->domain->vcpu[0]->processor;
-    
-    spin_lock_irq(&schedule_data[cpu].schedule_lock);
+    struct vcpu *v = inf->domain->vcpu[0];
+
+    vcpu_schedule_lock_irq(v);
 
     inf->warp = 0;
 
@@ -108,28 +108,28 @@ static void warp_timer_fn(void *data)
     if ( inf->warpu == 0 )
     {
         inf->warpback = 0;
-        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);   
+        cpu_raise_softirq(v->processor, SCHEDULE_SOFTIRQ);   
     }
     
     set_timer(&inf->unwarp_timer, NOW() + inf->warpu);
 
-    spin_unlock_irq(&schedule_data[cpu].schedule_lock);
+    vcpu_schedule_unlock_irq(v);
 }
 
 static void unwarp_timer_fn(void *data)
 {
     struct bvt_dom_info *inf = data;
-    unsigned int cpu = inf->domain->vcpu[0]->processor;
+    struct vcpu *v = inf->domain->vcpu[0];
 
-    spin_lock_irq(&schedule_data[cpu].schedule_lock);
+    vcpu_schedule_lock_irq(v);
 
     if ( inf->warpback )
     {
         inf->warp = 1;
-        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);   
+        cpu_raise_softirq(v->processor, SCHEDULE_SOFTIRQ);   
     }
      
-    spin_unlock_irq(&schedule_data[cpu].schedule_lock);
+    vcpu_schedule_unlock_irq(v);
 }
 
 static inline u32 calc_avt(struct vcpu *d, s_time_t now)

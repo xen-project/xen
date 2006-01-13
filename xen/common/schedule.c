@@ -165,10 +165,10 @@ void vcpu_sleep_nosync(struct vcpu *v)
 {
     unsigned long flags;
 
-    spin_lock_irqsave(&schedule_data[v->processor].schedule_lock, flags);
+    vcpu_schedule_lock_irqsave(v, flags);
     if ( likely(!vcpu_runnable(v)) )
         SCHED_OP(sleep, v);
-    spin_unlock_irqrestore(&schedule_data[v->processor].schedule_lock, flags);
+    vcpu_schedule_unlock_irqrestore(v, flags);
 
     TRACE_2D(TRC_SCHED_SLEEP, v->domain->domain_id, v->vcpu_id);
 }
@@ -187,13 +187,13 @@ void vcpu_wake(struct vcpu *v)
 {
     unsigned long flags;
 
-    spin_lock_irqsave(&schedule_data[v->processor].schedule_lock, flags);
+    vcpu_schedule_lock_irqsave(v, flags);
     if ( likely(vcpu_runnable(v)) )
     {
         SCHED_OP(wake, v);
         v->wokenup = NOW();
     }
-    spin_unlock_irqrestore(&schedule_data[v->processor].schedule_lock, flags);
+    vcpu_schedule_unlock_irqrestore(v, flags);
 
     TRACE_2D(TRC_SCHED_WAKE, v->domain->domain_id, v->vcpu_id);
 }
@@ -324,7 +324,7 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
     for_each_vcpu ( d, v )
     {
         if ( v == current )
-            spin_lock_irq(&schedule_data[smp_processor_id()].schedule_lock);
+            vcpu_schedule_lock_irq(v);
         else
             vcpu_pause(v);
     }
@@ -336,7 +336,7 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
     for_each_vcpu ( d, v )
     {
         if ( v == current )
-            spin_unlock_irq(&schedule_data[smp_processor_id()].schedule_lock);
+            vcpu_schedule_unlock_irq(v);
         else
             vcpu_unpause(v);
     }
