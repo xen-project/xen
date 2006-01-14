@@ -64,6 +64,10 @@
 #ifdef XEN
 #include <asm/hw_irq.h>
 int ht_per_core = 1;
+#ifndef CONFIG_SMP
+cpumask_t cpu_online_map = CPU_MASK_CPU0;
+EXPORT_SYMBOL(cpu_online_map);
+#endif
 #endif
 
 #ifdef CONFIG_SMP /* ifdef XEN */

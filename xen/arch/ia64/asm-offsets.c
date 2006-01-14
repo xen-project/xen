@@ -15,7 +15,7 @@
 #define task_struct vcpu
 
 #define DEFINE(sym, val) \
-        asm volatile("\n->" #sym " %0 " #val : : "i" (val))
+        asm volatile("\n->" #sym " (%0) " #val : : "i" (val))
 
 #define BLANK() asm volatile("\n->" : : )
 

@@ -21,6 +21,7 @@
 #include <asm/page.h>
 #include <asm/setup.h>
 #include <xen/string.h>
+#include <asm/vmx.h>
 
 unsigned long xenheap_phys_end;
 
@@ -436,9 +437,10 @@ void arch_get_xen_caps(xen_capabilities_info_t info)
 {
     char *p=info;
 
-    *p=0;
+    p += sprintf(p,"xen-%d.%d-ia64 ", XEN_VERSION, XEN_SUBVERSION);
 
-    p+=sprintf(p,"xen_%d.%d_ia64 ",XEN_VERSION,XEN_SUBVERSION);
+    if (vmx_enabled)
+        p += sprintf(p,"hvm-%d.%d-ia64 ", XEN_VERSION, XEN_SUBVERSION);
 
     *(p-1) = 0;
 
