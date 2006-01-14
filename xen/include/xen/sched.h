@@ -181,7 +181,6 @@ extern struct vcpu *idle_vcpu[NR_CPUS];
 
 struct vcpu *alloc_vcpu(
     struct domain *d, unsigned int vcpu_id, unsigned int cpu_id);
-void free_vcpu(struct vcpu *v);
 
 struct domain *alloc_domain(void);
 void free_domain(struct domain *d);

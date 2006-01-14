@@ -73,15 +73,29 @@ static struct scheduler ops;
 /* Per-CPU periodic timer sends an event to the currently-executing domain. */
 static struct timer t_timer[NR_CPUS]; 
 
+struct domain *alloc_domain(void)
+{
+    struct domain *d;
+
+    if ( (d = xmalloc(struct domain)) != NULL )
+        memset(d, 0, sizeof(*d));
+
+    return d;
+}
+
 void free_domain(struct domain *d)
 {
+    struct vcpu *v;
     int i;
+
+    for_each_vcpu ( d, v )
+        sched_rem_domain(v);
 
     SCHED_OP(free_task, d);
 
     for ( i = MAX_VIRT_CPUS-1; i >= 0; i-- )
-        if ( d->vcpu[i] != NULL )
-            free_vcpu_struct(d->vcpu[i]);
+        if ( (v = d->vcpu[i]) != NULL )
+            free_vcpu_struct(v);
 
     xfree(d);
 }
@@ -105,46 +119,24 @@ struct vcpu *alloc_vcpu(
     v->cpu_affinity = is_idle_domain(d) ?
         cpumask_of_cpu(cpu_id) : CPU_MASK_ALL;
 
-    d->vcpu[vcpu_id] = v;
+    if ( (vcpu_id != 0) && !is_idle_domain(d) )
+        set_bit(_VCPUF_down, &v->vcpu_flags);
 
     if ( SCHED_OP(alloc_task, v) < 0 )
     {
-        d->vcpu[vcpu_id] = NULL;
         free_vcpu_struct(v);
         return NULL;
     }
 
-    sched_add_domain(v);
-
+    d->vcpu[vcpu_id] = v;
     if ( vcpu_id != 0 )
-    {
         d->vcpu[v->vcpu_id-1]->next_in_list = v;
-        if ( !is_idle_domain(d) )
-            set_bit(_VCPUF_down, &v->vcpu_flags);
-    }
+
+    sched_add_domain(v);
 
     return v;
 }
 
-void free_vcpu(struct vcpu *v)
-{
-    /* NB. Rest of destruction is done in free_domain(). */
-    sched_rem_domain(v);
-}
-
-struct domain *alloc_domain(void)
-{
-    struct domain *d;
-
-    if ( (d = xmalloc(struct domain)) != NULL )
-        memset(d, 0, sizeof(*d));
-
-    return d;
-}
-
-/*
- * Add and remove a domain
- */
 void sched_add_domain(struct vcpu *v) 
 {
     /* Initialise the per-domain timer. */

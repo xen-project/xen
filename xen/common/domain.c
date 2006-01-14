@@ -66,7 +66,7 @@ struct domain *domain_create(domid_t dom_id, unsigned int cpu)
     d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
     d->irq_caps   = rangeset_new(d, "Interrupts", 0);
     if ( (d->iomem_caps == NULL) || (d->irq_caps == NULL) )
-        goto fail5;
+        goto fail4; /* NB. alloc_vcpu() is undone in free_domain() */
 
     if ( !is_idle_domain(d) )
     {
@@ -84,8 +84,6 @@ struct domain *domain_create(domid_t dom_id, unsigned int cpu)
 
     return d;
 
- fail5:
-    free_vcpu(v);
  fail4:
     arch_domain_destroy(d);
  fail3:
