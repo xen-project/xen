@@ -215,14 +215,10 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 
     memset(v, 0, sizeof(*v));
 
-    memcpy(&v->arch, &idle_vcpu[0]->arch, sizeof(v->arch));
     v->arch.flags = TF_kernel_mode;
 
     if ( is_idle_domain(d) )
-    {
         percpu_ctxt[vcpu_id].curr_vcpu = v;
-        v->arch.schedule_tail = continue_idle_domain;
-    }
 
     if ( (v->vcpu_id = vcpu_id) != 0 )
     {
@@ -333,9 +329,10 @@ int arch_do_createdomain(struct vcpu *v)
         memset(d->shared_info, 0, PAGE_SIZE);
         v->vcpu_info = &d->shared_info->vcpu_info[v->vcpu_id];
         SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
-
-        v->arch.schedule_tail = continue_nonidle_domain;
     }
+
+    v->arch.schedule_tail = is_idle_domain(d) ?
+        continue_idle_domain : continue_nonidle_domain;
 
     return 0;
 
