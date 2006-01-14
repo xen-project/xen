@@ -665,15 +665,7 @@ int xc_vmx_build(int xc_handle,
         goto error_out;
     }
 
-    if ( xc_vcpu_getcontext(xc_handle, domid, 0, ctxt) ){
-        PERROR("Could not get vcpu context");
-        goto error_out;
-    }
-
-    if ( !(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED) ) {
-        ERROR("Domain is already constructed");
-        goto error_out;
-    }
+    memset(ctxt, 0, sizeof(*ctxt));
 
     if ( setup_guest(xc_handle, domid, (unsigned long)memsize, image, image_size, 
                        control_evtchn, store_evtchn, store_mfn ) < 0 ){

@@ -369,15 +369,16 @@ int set_info_guest(struct domain *d, dom0_setvcpucontext_t *setvcpucontext)
     if ( (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
         return -EINVAL;
     
-    if ( !test_bit(_DOMF_ctrl_pause, &d->domain_flags) )
-        return -EINVAL;
-
     if ( (c = xmalloc(struct vcpu_guest_context)) == NULL )
         return -ENOMEM;
+
+    domain_pause(d);
 
     rc = -EFAULT;
     if ( copy_from_user(c, setvcpucontext->ctxt, sizeof(*c)) == 0 )
         rc = arch_set_info_guest(v, c);
+
+    domain_unpause(d);
 
     xfree(c);
     return rc;

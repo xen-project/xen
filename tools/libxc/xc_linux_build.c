@@ -33,10 +33,8 @@
 #endif
 
 #ifdef __ia64__
-#define already_built(ctxt) (0)
 #define get_tot_pages xc_get_max_pages
 #else
-#define already_built(ctxt) ((ctxt)->ctrlreg[3] != 0)
 #define get_tot_pages xc_get_tot_pages
 #endif
 
@@ -800,17 +798,7 @@ int xc_linux_build(int xc_handle,
         goto error_out;
     }
 
-    if ( xc_vcpu_getcontext(xc_handle, domid, 0, ctxt) )
-    {
-        PERROR("Could not get vcpu context");
-        goto error_out;
-    }
-
-    if ( !(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED) || already_built(ctxt) )
-    {
-        ERROR("Domain is already constructed");
-        goto error_out;
-    }
+    memset(ctxt, 0, sizeof(*ctxt));
 
     if ( setup_guest(xc_handle, domid, image, image_size, 
                      initrd_gfd, initrd_size, nr_pages, 
@@ -864,6 +852,8 @@ int xc_linux_build(int xc_handle,
     ctxt->user_regs.esp = vstack_start + PAGE_SIZE;
     ctxt->user_regs.esi = vstartinfo_start;
     ctxt->user_regs.eflags = 1 << 9; /* Interrupt Enable */
+
+    ctxt->flags = VGCF_IN_KERNEL;
 
     /* FPU is set up to default initial state. */
     memset(&ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));

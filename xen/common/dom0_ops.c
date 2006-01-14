@@ -450,6 +450,10 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         if ( (v = d->vcpu[op->u.getvcpucontext.vcpu]) == NULL )
             goto getvcpucontext_out;
 
+        ret = -ENODATA;
+        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+            goto getvcpucontext_out;
+
         ret = -ENOMEM;
         if ( (c = xmalloc(struct vcpu_guest_context)) == NULL )
             goto getvcpucontext_out;
