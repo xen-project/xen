@@ -2138,6 +2138,7 @@ static void shadow_update_pagetables(struct vcpu *v)
 #if CONFIG_PAGING_LEVELS == 2
     unsigned long hl2mfn;
 #endif
+    int need_sync = 0;
 
     int max_mode = ( shadow_mode_external(d) ? SHM_external
                      : shadow_mode_translate(d) ? SHM_translate
@@ -2169,8 +2170,17 @@ static void shadow_update_pagetables(struct vcpu *v)
 #elif CONFIG_PAGING_LEVELS == 4
         smfn = shadow_l4_table(d, gpfn, gmfn);
 #endif
-    }else
-        shadow_sync_all(d);
+    }
+    else
+    {
+        /*
+         *  move sync later in order to avoid this smfn been 
+         *  unshadowed occasionally
+         */
+        need_sync = 1;
+    }
+
+
     if ( !get_shadow_ref(smfn) )
         BUG();
     old_smfn = pagetable_get_pfn(v->arch.shadow_table);
@@ -2240,6 +2250,9 @@ static void shadow_update_pagetables(struct vcpu *v)
         local_flush_tlb();
     }
 #endif /* CONFIG_PAGING_LEVELS == 2 */
+
+    if(likely(need_sync))
+        shadow_sync_all(d);
 
 #if CONFIG_PAGING_LEVELS == 3
     /* FIXME: PAE code to be written */

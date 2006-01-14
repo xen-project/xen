@@ -2896,6 +2896,7 @@ void __update_pagetables(struct vcpu *v)
     unsigned long gmfn = pagetable_get_pfn(v->arch.guest_table);
     unsigned long gpfn = __mfn_to_gpfn(d, gmfn);
     unsigned long smfn, hl2mfn, old_smfn;
+    int need_sync = 0;
 
     int max_mode = ( shadow_mode_external(d) ? SHM_external
                      : shadow_mode_translate(d) ? SHM_translate
@@ -2921,7 +2922,13 @@ void __update_pagetables(struct vcpu *v)
     if ( unlikely(!(smfn = __shadow_status(d, gpfn, PGT_base_page_table))) )
         smfn = shadow_l2_table(d, gpfn, gmfn);
     else
-        shadow_sync_all(d);
+    {
+        /*
+         *  move sync later in order to avoid this smfn been 
+         *  unshadowed occasionally
+         */
+        need_sync = 1;
+    }
     if ( !get_shadow_ref(smfn) )
         BUG();
     old_smfn = pagetable_get_pfn(v->arch.shadow_table);
@@ -2985,6 +2992,9 @@ void __update_pagetables(struct vcpu *v)
         // XXX - maybe this can be optimized somewhat??
         local_flush_tlb();
     }
+
+    if(likely(need_sync))
+        shadow_sync_all(d);
 }
 
 void clear_all_shadow_status(struct domain *d)
