@@ -448,9 +448,31 @@ static void do_nmi_trigger(unsigned char key)
     local_irq_enable();
 }
 
+static void do_nmi_stats(unsigned char key)
+{
+    int i;
+    struct domain *d;
+    struct vcpu *v;
+    printk("CPU\tNMI\n");
+    for_each_cpu(i)
+        printk("%3d\t%3d\n", i, nmi_count(i));
+
+    if ((d = dom0) == NULL)
+        return;
+    if ((v = d->vcpu[0]) == NULL)
+        return;
+    if (v->vcpu_flags & (VCPUF_nmi_pending|VCPUF_nmi_masked))
+        printk("dom0 vpu0: NMI %s%s\n",
+               v->vcpu_flags & VCPUF_nmi_pending ? "pending " : "",
+               v->vcpu_flags & VCPUF_nmi_masked ? "masked " : "");
+    else
+        printk("dom0 vcpu0: NMI neither pending nor masked\n");
+}
+
 static __init int register_nmi_trigger(void)
 {
     register_keyhandler('n', do_nmi_trigger, "trigger an NMI");
+    register_keyhandler('N', do_nmi_stats,   "NMI statistics");
     return 0;
 }
 __initcall(register_nmi_trigger);
