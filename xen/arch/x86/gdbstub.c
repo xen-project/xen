@@ -86,12 +86,12 @@ gdb_arch_copy_from_user(void *dest, const void *src, unsigned len)
         "       jmp 2b\n"
         ".previous\n"
         ".section __pre_ex_table,\"a\"\n"
-        "   .align 4\n"
-        "   .long 1b,3b\n"
+        "   "__FIXUP_ALIGN"\n"
+        "   "__FIXUP_WORD" 1b,3b\n"
         ".previous\n"
         ".section __ex_table,\"a\"\n"
-        "   .align 4\n"
-        "   .long 1b,2b\n"
+        "   "__FIXUP_ALIGN"\n"
+        "   "__FIXUP_WORD" 1b,2b\n"
         ".previous\n"
         : "=c"(__d2), "=D" (__d0), "=S" (__d1)
         : "0"(len), "1"(dest), "2"(src)
