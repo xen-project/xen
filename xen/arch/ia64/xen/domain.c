@@ -67,10 +67,11 @@ unsigned long map_domain_page0(struct domain *);
 extern unsigned long dom_fw_setup(struct domain *, char *, int);
 
 /* this belongs in include/asm, but there doesn't seem to be a suitable place */
-void free_perdomain_pt(struct domain *d)
+void arch_domain_destroy(struct domain *d)
 {
-	printf("free_perdomain_pt: not implemented\n");
+	printf("arch_domain_destroy: not implemented\n");
 	//free_page((unsigned long)d->mm.perdomain_pt);
+	free_xenheap_page(d->shared_info);
 }
 
 static void default_idle(void)
@@ -192,9 +193,8 @@ static void init_switch_stack(struct vcpu *v)
 	memset(v->arch._thread.fph,0,sizeof(struct ia64_fpreg)*96);
 }
 
-int arch_do_createdomain(struct vcpu *v)
+int arch_domain_create(struct domain *d)
 {
-	struct domain *d = v->domain;
 	struct thread_info *ti = alloc_thread_info(v);
 
 	/* Clear thread_info to clear some important fields, like preempt_count */
@@ -255,7 +255,7 @@ int arch_do_createdomain(struct vcpu *v)
 		printk("Can't allocate pgd for domain %d\n",d->domain_id);
 		return -ENOMEM;
 	}
-	printf ("arch_do_create_domain: domain=%p\n", d);
+	printf ("arch_domain_create: domain=%p\n", d);
 
 	return 0;
 }

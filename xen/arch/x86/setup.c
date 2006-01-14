@@ -385,7 +385,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     scheduler_init();
 
-    idle_domain = do_createdomain(IDLE_DOMAIN_ID, 0);
+    idle_domain = domain_create(IDLE_DOMAIN_ID, 0);
     BUG_ON(idle_domain == NULL);
 
     set_current(idle_domain->vcpu[0]);
@@ -487,7 +487,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     acm_init(&initrdidx, mbi, initial_images_start);
 
     /* Create initial domain 0. */
-    dom0 = do_createdomain(0, 0);
+    dom0 = domain_create(0, 0);
     if ( dom0 == NULL )
         panic("Error creating domain 0\n");
 

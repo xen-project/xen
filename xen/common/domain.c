@@ -29,7 +29,7 @@ struct domain *domain_list;
 
 struct domain *dom0;
 
-struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
+struct domain *domain_create(domid_t dom_id, unsigned int cpu)
 {
     struct domain *d, **pd;
     struct vcpu *v;
@@ -46,25 +46,27 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     INIT_LIST_HEAD(&d->page_list);
     INIT_LIST_HEAD(&d->xenpage_list);
 
-    if ( !is_idle_domain(d) )
-        set_bit(_DOMF_ctrl_pause, &d->domain_flags);
-
-    if ( !is_idle_domain(d) &&
-         ((evtchn_init(d) != 0) || (grant_table_create(d) != 0)) )
-        goto fail1;
-    
-    if ( (v = alloc_vcpu(d, 0, cpu)) == NULL )
-        goto fail2;
-
     rangeset_domain_initialise(d);
+
+    if ( !is_idle_domain(d) )
+    {
+        set_bit(_DOMF_ctrl_pause, &d->domain_flags);
+        if ( evtchn_init(d) != 0 )
+            goto fail1;
+        if ( grant_table_create(d) != 0 )
+            goto fail2;
+    }
+
+    if ( arch_domain_create(d) != 0 )
+        goto fail3;
+
+    if ( (v = alloc_vcpu(d, 0, cpu)) == NULL )
+        goto fail4;
 
     d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
     d->irq_caps   = rangeset_new(d, "Interrupts", 0);
-
-    if ( (d->iomem_caps == NULL) ||
-         (d->irq_caps == NULL) ||
-         (arch_do_createdomain(v) != 0) )
-        goto fail3;
+    if ( (d->iomem_caps == NULL) || (d->irq_caps == NULL) )
+        goto fail5;
 
     if ( !is_idle_domain(d) )
     {
@@ -82,12 +84,18 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 
     return d;
 
+ fail5:
+    free_vcpu(v);
+ fail4:
+    arch_domain_destroy(d);
  fail3:
-    rangeset_domain_destroy(d);
+    if ( !is_idle_domain(d) )
+        grant_table_destroy(d);
  fail2:
-    grant_table_destroy(d);
+    if ( !is_idle_domain(d) )
+        evtchn_destroy(d);
  fail1:
-    evtchn_destroy(d);
+    rangeset_domain_destroy(d);
     free_domain(d);
     return NULL;
 }
@@ -256,16 +264,16 @@ void domain_pause_for_debugger(void)
 
 
 /* Release resources belonging to task @p. */
-void domain_destruct(struct domain *d)
+void domain_destroy(struct domain *d)
 {
     struct domain **pd;
     atomic_t      old, new;
 
     BUG_ON(!test_bit(_DOMF_dying, &d->domain_flags));
 
-    /* May be already destructed, or get_domain() can race us. */
+    /* May be already destroyed, or get_domain() can race us. */
     _atomic_set(old, 0);
-    _atomic_set(new, DOMAIN_DESTRUCTED);
+    _atomic_set(new, DOMAIN_DESTROYED);
     old = atomic_compareandswap(old, new, &d->refcnt);
     if ( _atomic_read(old) != 0 )
         return;
@@ -287,8 +295,7 @@ void domain_destruct(struct domain *d)
     evtchn_destroy(d);
     grant_table_destroy(d);
 
-    free_perdomain_pt(d);
-    free_xenheap_page(d->shared_info);
+    arch_domain_destroy(d);
 
     free_domain(d);
 

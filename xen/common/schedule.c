@@ -100,6 +100,7 @@ struct vcpu *alloc_vcpu(
     v->vcpu_id = vcpu_id;
     v->processor = cpu_id;
     atomic_set(&v->pausecnt, 0);
+    v->vcpu_info = &d->shared_info->vcpu_info[vcpu_id];
 
     v->cpu_affinity = is_idle_domain(d) ?
         cpumask_of_cpu(cpu_id) : CPU_MASK_ALL;
@@ -117,12 +118,18 @@ struct vcpu *alloc_vcpu(
 
     if ( vcpu_id != 0 )
     {
-        v->vcpu_info = &d->shared_info->vcpu_info[vcpu_id];
         d->vcpu[v->vcpu_id-1]->next_in_list = v;
-        set_bit(_VCPUF_down, &v->vcpu_flags);
+        if ( !is_idle_domain(d) )
+            set_bit(_VCPUF_down, &v->vcpu_flags);
     }
 
     return v;
+}
+
+void free_vcpu(struct vcpu *v)
+{
+    /* NB. Rest of destruction is done in free_domain(). */
+    sched_rem_domain(v);
 }
 
 struct domain *alloc_domain(void)

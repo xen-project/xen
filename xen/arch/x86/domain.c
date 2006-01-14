@@ -218,41 +218,35 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
     v->arch.flags = TF_kernel_mode;
 
     if ( is_idle_domain(d) )
-        percpu_ctxt[vcpu_id].curr_vcpu = v;
-
-    if ( (v->vcpu_id = vcpu_id) != 0 )
     {
-        v->arch.schedule_tail  = d->vcpu[0]->arch.schedule_tail;
-        v->arch.perdomain_ptes =
-            d->arch.mm_perdomain_pt + (vcpu_id << GDT_LDT_VCPU_SHIFT);
+        percpu_ctxt[vcpu_id].curr_vcpu = v;
+        v->arch.schedule_tail = continue_idle_domain;
     }
+    else
+    {
+        v->arch.schedule_tail = continue_nonidle_domain;
+    }
+
+    v->arch.perdomain_ptes =
+        d->arch.mm_perdomain_pt + (vcpu_id << GDT_LDT_VCPU_SHIFT);
+
+    v->arch.guest_vtable  = __linear_l2_table;
+    v->arch.shadow_vtable = __shadow_linear_l2_table;
+#if defined(__x86_64__)
+    v->arch.guest_vl3table = __linear_l3_table;
+    v->arch.guest_vl4table = __linear_l4_table;
+#endif
 
     return v;
 }
 
 void free_vcpu_struct(struct vcpu *v)
 {
-    BUG_ON(v->next_in_list != NULL);
-    if ( v->vcpu_id != 0 )
-        v->domain->vcpu[v->vcpu_id - 1]->next_in_list = NULL;
     xfree(v);
 }
 
-void free_perdomain_pt(struct domain *d)
+int arch_domain_create(struct domain *d)
 {
-    free_xenheap_pages(
-        d->arch.mm_perdomain_pt,
-        get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t)));
-
-#ifdef __x86_64__
-    free_xenheap_page(d->arch.mm_perdomain_l2);
-    free_xenheap_page(d->arch.mm_perdomain_l3);
-#endif
-}
-
-int arch_do_createdomain(struct vcpu *v)
-{
-    struct domain *d = v->domain;
     l1_pgentry_t gdt_l1e;
     int vcpuid, pdpt_order, rc;
 #ifdef __x86_64__
@@ -263,9 +257,7 @@ int arch_do_createdomain(struct vcpu *v)
     d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order);
     if ( d->arch.mm_perdomain_pt == NULL )
         goto fail_nomem;
-
     memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE << pdpt_order);
-    v->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
 
     /*
      * Map Xen segments into every VCPU's GDT, irrespective of whether every
@@ -279,17 +271,11 @@ int arch_do_createdomain(struct vcpu *v)
         d->arch.mm_perdomain_pt[((vcpuid << GDT_LDT_VCPU_SHIFT) +
                                  FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
 
-    v->arch.guest_vtable  = __linear_l2_table;
-    v->arch.shadow_vtable = __shadow_linear_l2_table;
-
 #if defined(__i386__)
 
     mapcache_init(d);
 
 #else /* __x86_64__ */
-
-    v->arch.guest_vl3table = __linear_l3_table;
-    v->arch.guest_vl4table = __linear_l4_table;
 
     d->arch.mm_perdomain_l2 = alloc_xenheap_page();
     d->arch.mm_perdomain_l3 = alloc_xenheap_page();
@@ -327,12 +313,8 @@ int arch_do_createdomain(struct vcpu *v)
             goto fail_nomem;
 
         memset(d->shared_info, 0, PAGE_SIZE);
-        v->vcpu_info = &d->shared_info->vcpu_info[v->vcpu_id];
         SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
     }
-
-    v->arch.schedule_tail = is_idle_domain(d) ?
-        continue_idle_domain : continue_nonidle_domain;
 
     return 0;
 
@@ -344,6 +326,20 @@ int arch_do_createdomain(struct vcpu *v)
 #endif
     free_xenheap_pages(d->arch.mm_perdomain_pt, pdpt_order);
     return -ENOMEM;
+}
+
+void arch_domain_destroy(struct domain *d)
+{
+    free_xenheap_pages(
+        d->arch.mm_perdomain_pt,
+        get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t)));
+
+#ifdef __x86_64__
+    free_xenheap_page(d->arch.mm_perdomain_l2);
+    free_xenheap_page(d->arch.mm_perdomain_l3);
+#endif
+
+    free_xenheap_page(d->shared_info);
 }
 
 /* This is called by arch_final_setup_guest and do_boot_vcpu */

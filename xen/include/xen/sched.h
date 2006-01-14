@@ -181,17 +181,18 @@ extern struct vcpu *idle_vcpu[NR_CPUS];
 
 struct vcpu *alloc_vcpu(
     struct domain *d, unsigned int vcpu_id, unsigned int cpu_id);
+void free_vcpu(struct vcpu *v);
 
 struct domain *alloc_domain(void);
 void free_domain(struct domain *d);
 
-#define DOMAIN_DESTRUCTED (1<<31) /* assumes atomic_t is >= 32 bits */
+#define DOMAIN_DESTROYED (1<<31) /* assumes atomic_t is >= 32 bits */
 #define put_domain(_d) \
-  if ( atomic_dec_and_test(&(_d)->refcnt) ) domain_destruct(_d)
+  if ( atomic_dec_and_test(&(_d)->refcnt) ) domain_destroy(_d)
 
 /*
  * Use this when you don't have an existing reference to @d. It returns
- * FALSE if @d is being destructed.
+ * FALSE if @d is being destroyed.
  */
 static always_inline int get_domain(struct domain *d)
 {
@@ -199,7 +200,7 @@ static always_inline int get_domain(struct domain *d)
     do
     {
         old = seen;
-        if ( unlikely(_atomic_read(old) & DOMAIN_DESTRUCTED) )
+        if ( unlikely(_atomic_read(old) & DOMAIN_DESTROYED) )
             return 0;
         _atomic_set(new, _atomic_read(old) + 1);
         seen = atomic_compareandswap(old, new, &d->refcnt);
@@ -210,15 +211,15 @@ static always_inline int get_domain(struct domain *d)
 
 /*
  * Use this when you already have, or are borrowing, a reference to @d.
- * In this case we know that @d cannot be destructed under our feet.
+ * In this case we know that @d cannot be destroyed under our feet.
  */
 static inline void get_knownalive_domain(struct domain *d)
 {
     atomic_inc(&d->refcnt);
-    ASSERT(!(atomic_read(&d->refcnt) & DOMAIN_DESTRUCTED));
+    ASSERT(!(atomic_read(&d->refcnt) & DOMAIN_DESTROYED));
 }
 
-extern struct domain *do_createdomain(
+extern struct domain *domain_create(
     domid_t dom_id, unsigned int cpu);
 extern int construct_dom0(
     struct domain *d,
@@ -228,7 +229,7 @@ extern int construct_dom0(
 extern int set_info_guest(struct domain *d, dom0_setvcpucontext_t *);
 
 struct domain *find_domain_by_id(domid_t dom);
-extern void domain_destruct(struct domain *d);
+extern void domain_destroy(struct domain *d);
 extern void domain_kill(struct domain *d);
 extern void domain_shutdown(struct domain *d, u8 reason);
 extern void domain_pause_for_debugger(void);

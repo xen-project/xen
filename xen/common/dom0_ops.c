@@ -208,7 +208,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 pro = i;
 
         ret = -ENOMEM;
-        if ( (d = do_createdomain(dom, pro)) == NULL )
+        if ( (d = domain_create(dom, pro)) == NULL )
             break;
 
         memcpy(d->handle, op->u.createdomain.handle,

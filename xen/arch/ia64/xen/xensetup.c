@@ -281,7 +281,7 @@ void start_kernel(void)
 printk("About to call scheduler_init()\n");
     scheduler_init();
     idle_vcpu[0] = (struct vcpu*) ia64_r13;
-    idle_domain = do_createdomain(IDLE_DOMAIN_ID, 0);
+    idle_domain = domain_create(IDLE_DOMAIN_ID, 0);
     BUG_ON(idle_domain == NULL);
 
     late_setup_arch(&cmdline);
@@ -339,14 +339,14 @@ printk("About to call sort_main_extable()\n");
 
 
     /* Create initial domain 0. */
-printk("About to call do_createdomain()\n");
-    dom0 = do_createdomain(0, 0);
+printk("About to call domain_create()\n");
+    dom0 = domain_create(0, 0);
 
 #ifdef CLONE_DOMAIN0
     {
     int i;
     for (i = 0; i < CLONE_DOMAIN0; i++) {
-	clones[i] = do_createdomain(i+1, 0);
+	clones[i] = domain_create(i+1, 0);
         if ( clones[i] == NULL )
             panic("Error creating domain0 clone %d\n",i);
     }
