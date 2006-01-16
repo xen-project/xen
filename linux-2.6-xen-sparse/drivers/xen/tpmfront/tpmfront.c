@@ -241,7 +241,7 @@ fail:
 
 static void destroy_tpmring(struct tpmfront_info *info, struct tpm_private *tp)
 {
-	tpmif_set_connected_state(tp, FALSE);
+	tpmif_set_connected_state(tp, 0);
 	if ( tp->tx != NULL ) {
 		gnttab_end_foreign_access(info->ring_ref, 0,
 					  (unsigned long)tp->tx);
@@ -329,15 +329,15 @@ static void backend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateConnected:
-		tpmif_set_connected_state(tp, TRUE);
+		tpmif_set_connected_state(tp, 1);
 		break;
 
 	case XenbusStateClosing:
-		tpmif_set_connected_state(tp, FALSE);
+		tpmif_set_connected_state(tp, 0);
 		break;
 
 	case XenbusStateClosed:
-        	if (tp->is_suspended == FALSE) {
+        	if (tp->is_suspended == 0) {
         	        device_unregister(&dev->dev);
         	}
 	        break;
@@ -401,7 +401,7 @@ tpmfront_suspend(struct xenbus_device *dev)
 
 	/* lock, so no app can send */
 	down(&suspend_lock);
-	tp->is_suspended = TRUE;
+	tp->is_suspended = 1;
 
 	while (atomic_read(&tp->tx_busy) && ctr <= 25) {
 		if ((ctr % 10) == 0)
@@ -571,7 +571,7 @@ tpm_xmit(struct tpm_private *tp,
 		return -EBUSY;
 	}
 
-	if (tp->is_connected != TRUE) {
+	if (tp->is_connected != 1) {
 		spin_unlock_irq(&tp->tx_lock);
 		return -EIO;
 	}
@@ -660,7 +660,7 @@ static void tpmif_set_connected_state(struct tpm_private *tp, u8 is_connected)
 	 * should disconnect - assumption is that we will resume
 	 * The semaphore keeps apps from sending.
 	 */
-	if (is_connected == FALSE && tp->is_suspended == TRUE) {
+	if (is_connected == 0 && tp->is_suspended == 1) {
 		return;
 	}
 
@@ -669,8 +669,8 @@ static void tpmif_set_connected_state(struct tpm_private *tp, u8 is_connected)
 	 * after being suspended - now resuming.
 	 * This also removes the suspend state.
 	 */
-	if (is_connected == TRUE && tp->is_suspended == TRUE) {
-		tp->is_suspended = FALSE;
+	if (is_connected == 1 && tp->is_suspended == 1) {
+		tp->is_suspended = 0;
 		/* unlock, so apps can resume sending */
 		up(&suspend_lock);
 	}

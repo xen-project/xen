@@ -78,7 +78,7 @@ static int tpmback_probe(struct xenbus_device *dev,
 
 	memset(be, 0, sizeof(*be));
 
-	be->is_instance_set = FALSE;
+	be->is_instance_set = 0;
 	be->dev = dev;
 	dev->data = be;
 
@@ -120,7 +120,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		return;
 	}
 
-	if (be->is_instance_set != FALSE && be->instance != instance) {
+	if (be->is_instance_set != 0 && be->instance != instance) {
 		printk(KERN_WARNING
 		       "tpmback: changing instance (from %ld to %ld) "
 		       "not allowed.\n",
@@ -128,7 +128,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		return;
 	}
 
-	if (be->is_instance_set == FALSE) {
+	if (be->is_instance_set == 0) {
 		be->tpmif = tpmif_find(dev->otherend_id,
 		                       instance);
 		if (IS_ERR(be->tpmif)) {
@@ -138,7 +138,7 @@ static void backend_changed(struct xenbus_watch *watch,
 			return;
 		}
 		be->instance = instance;
-		be->is_instance_set = TRUE;
+		be->is_instance_set = 1;
 
 		/*
 		 * There's an unfortunate problem:
