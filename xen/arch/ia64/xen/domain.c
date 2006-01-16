@@ -65,6 +65,7 @@ extern int readelfimage_base_and_size(char *, unsigned long,
 
 unsigned long map_domain_page0(struct domain *);
 extern unsigned long dom_fw_setup(struct domain *, char *, int);
+static void init_switch_stack(struct vcpu *v);
 
 /* this belongs in include/asm, but there doesn't seem to be a suitable place */
 void arch_domain_destroy(struct domain *d)
@@ -145,27 +146,45 @@ void startup_cpu_idle_loop(void)
 struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 {
 	struct vcpu *v;
+	struct thread_info *ti;
 
 	/* Still keep idle vcpu0 static allocated at compilation, due
 	 * to some code from Linux still requires it in early phase.
 	 */
 	if (is_idle_domain(d) && !vcpu_id)
-		return idle_vcpu[0];
-
-	if ((v = alloc_xenheap_pages(KERNEL_STACK_SIZE_ORDER)) == NULL)
+	    v = idle_vcpu[0];
+	else {
+	    if ((v = alloc_xenheap_pages(KERNEL_STACK_SIZE_ORDER)) == NULL)
 		return NULL;
+	    memset(v, 0, sizeof(*v)); 
+	}
 
-	memset(v, 0, sizeof(*v)); 
-        memcpy(&v->arch, &idle_vcpu[0]->arch, sizeof(v->arch));
+	ti = alloc_thread_info(v);
+	/* Clear thread_info to clear some important fields, like
+	 * preempt_count
+	 */
+	memset(ti, 0, sizeof(struct thread_info));
+	init_switch_stack(v);
 
 	if (!is_idle_domain(d)) {
 	    v->arch.privregs = 
 		alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
 	    BUG_ON(v->arch.privregs == NULL);
 	    memset(v->arch.privregs, 0, PAGE_SIZE);
-	}
 
-	printf("arch_vcpu_info=%p\n", v->arch.privregs);
+	    if (!vcpu_id)
+	    	memset(&d->shared_info->evtchn_mask[0], 0xff,
+		    sizeof(d->shared_info->evtchn_mask));
+
+	    v->vcpu_info = &(d->shared_info->vcpu_info[0]);
+	    v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
+	    v->arch.metaphysical_rr4 = d->arch.metaphysical_rr4;
+	    v->arch.metaphysical_saved_rr0 = d->arch.metaphysical_rr0;
+	    v->arch.metaphysical_saved_rr4 = d->arch.metaphysical_rr4;
+	    v->arch.starting_rid = d->arch.starting_rid;
+	    v->arch.ending_rid = d->arch.ending_rid;
+	    v->arch.breakimm = d->arch.breakimm;
+	}
 
 	return v;
 }
@@ -195,34 +214,19 @@ static void init_switch_stack(struct vcpu *v)
 
 int arch_domain_create(struct domain *d)
 {
-	struct thread_info *ti = alloc_thread_info(v);
-
-	/* Clear thread_info to clear some important fields, like preempt_count */
-	memset(ti, 0, sizeof(struct thread_info));
-	init_switch_stack(v);
-
 	// the following will eventually need to be negotiated dynamically
 	d->xen_vastart = XEN_START_ADDR;
 	d->xen_vaend = XEN_END_ADDR;
 	d->shared_info_va = SHAREDINFO_ADDR;
 
-	if (is_idle_vcpu(v))
+	if (is_idle_domain(d))
 	    return 0;
 
-	d->shared_info = (void *)alloc_xenheap_page();
-	if (!d->shared_info) {
-   		printk("ERROR/HALTING: CAN'T ALLOC PAGE\n");
-   		while (1);
-	}
+	if ((d->shared_info = (void *)alloc_xenheap_page()) == NULL)
+	    goto fail_nomem;
 	memset(d->shared_info, 0, PAGE_SIZE);
-	if (v == d->vcpu[0])
-	    memset(&d->shared_info->evtchn_mask[0], 0xff,
-		sizeof(d->shared_info->evtchn_mask));
-
-	v->vcpu_info = &(d->shared_info->vcpu_info[0]);
 
 	d->max_pages = (128UL*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
-
 	/* We may also need emulation rid for region4, though it's unlikely
 	 * to see guest issue uncacheable access in metaphysical mode. But
 	 * keep such info here may be more sane.
@@ -230,34 +234,27 @@ int arch_domain_create(struct domain *d)
 	if (((d->arch.metaphysical_rr0 = allocate_metaphysical_rr()) == -1UL)
 	 || ((d->arch.metaphysical_rr4 = allocate_metaphysical_rr()) == -1UL))
 		BUG();
-//	VCPU(v, metaphysical_mode) = 1;
-	v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
-	v->arch.metaphysical_rr4 = d->arch.metaphysical_rr4;
-	v->arch.metaphysical_saved_rr0 = d->arch.metaphysical_rr0;
-	v->arch.metaphysical_saved_rr4 = d->arch.metaphysical_rr4;
 #define DOMAIN_RID_BITS_DEFAULT 18
 	if (!allocate_rid_range(d,DOMAIN_RID_BITS_DEFAULT)) // FIXME
 		BUG();
-	v->arch.starting_rid = d->arch.starting_rid;
-	v->arch.ending_rid = d->arch.ending_rid;
 	d->arch.breakimm = 0x1000;
-	v->arch.breakimm = d->arch.breakimm;
-
 	d->arch.sys_pgnr = 0;
-	d->arch.mm = xmalloc(struct mm_struct);
-	if (unlikely(!d->arch.mm)) {
-		printk("Can't allocate mm_struct for domain %d\n",d->domain_id);
-		return -ENOMEM;
-	}
-	memset(d->arch.mm, 0, sizeof(*d->arch.mm));
-	d->arch.mm->pgd = pgd_alloc(d->arch.mm);
-	if (unlikely(!d->arch.mm->pgd)) {
-		printk("Can't allocate pgd for domain %d\n",d->domain_id);
-		return -ENOMEM;
-	}
-	printf ("arch_domain_create: domain=%p\n", d);
 
+	if ((d->arch.mm = xmalloc(struct mm_struct)) == NULL)
+	    goto fail_nomem;
+	memset(d->arch.mm, 0, sizeof(*d->arch.mm));
+
+	if ((d->arch.mm->pgd = pgd_alloc(d->arch.mm)) == NULL)
+	    goto fail_nomem;
+
+	printf ("arch_domain_create: domain=%p\n", d);
 	return 0;
+
+fail_nomem:
+	free_xenheap_page(d->shared_info);
+	xfree(d->arch.mm);
+	pgd_free(d->arch.mm->pgd);
+	return -ENOMEM;
 }
 
 void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
