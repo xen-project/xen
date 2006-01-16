@@ -90,11 +90,8 @@ tx_buffer_copy(struct tx_buffer *txb, const u8 * src, int len,
 		copied = txb->size;
 	}
 	if (isuserbuffer) {
-		if (copy_from_user(txb->data,
-		                   src,
-		                   copied)) {
+		if (copy_from_user(txb->data, src, copied))
 			return -EFAULT;
-		}
 	} else {
 		memcpy(txb->data, src, copied);
 	}
@@ -184,15 +181,12 @@ EXPORT_SYMBOL(tpm_fe_unregister_receiver);
 static int tpm_fe_send_upperlayer(const u8 * buf, size_t count,
                                   const void *ptr)
 {
-	int rc;
+	int rc = 0;
 
 	down(&upperlayer_lock);
 
-	if (upperlayer_tpmfe && upperlayer_tpmfe->receive) {
+	if (upperlayer_tpmfe && upperlayer_tpmfe->receive)
 		rc = upperlayer_tpmfe->receive(buf, count, ptr);
-	} else {
-		rc = 0;
-	}
 
 	up(&upperlayer_lock);
 	return rc;
@@ -242,7 +236,7 @@ fail:
 static void destroy_tpmring(struct tpmfront_info *info, struct tpm_private *tp)
 {
 	tpmif_set_connected_state(tp, 0);
-	if ( tp->tx != NULL ) {
+	if (tp->tx != NULL) {
 		gnttab_end_foreign_access(info->ring_ref, 0,
 					  (unsigned long)tp->tx);
 		tp->tx = NULL;
@@ -397,20 +391,19 @@ static int
 tpmfront_suspend(struct xenbus_device *dev)
 {
 	struct tpm_private *tp = &my_private;
-	u32 ctr = 0;
+	u32 ctr;
 
 	/* lock, so no app can send */
 	down(&suspend_lock);
 	tp->is_suspended = 1;
 
-	while (atomic_read(&tp->tx_busy) && ctr <= 25) {
+	for (ctr = 0; atomic_read(&tp->tx_busy) && ctr <= 25; ctr++) {
 		if ((ctr % 10) == 0)
 			printk("TPM-FE [INFO]: Waiting for outstanding request.\n");
 		/*
 		 * Wait for a request to be responded to.
 		 */
 		interruptible_sleep_on_timeout(&tp->wait_q, 100);
-		ctr++;
 	}
 
 	if (atomic_read(&tp->tx_busy)) {
@@ -428,16 +421,13 @@ static int
 tpmfront_resume(struct xenbus_device *dev)
 {
 	struct tpmfront_info *info = dev->data;
-	int err = talk_to_backend(dev, info);
-
-
-	return err;
+	return talk_to_backend(dev, info);
 }
 
 static void
 tpmif_connect(u16 evtchn, domid_t domid)
 {
-	int err = 0;
+	int err;
 	struct tpm_private *tp = &my_private;
 
 	tp->evtchn = evtchn;
@@ -481,12 +471,8 @@ tpm_allocate_buffers(struct tpm_private *tp)
 {
 	unsigned int i;
 
-	i = 0;
-	while (i < TPMIF_TX_RING_SIZE) {
+	for (i = 0; i < TPMIF_TX_RING_SIZE; i++)
 		tp->tx_buffers[i] = tx_buffer_alloc();
-		i++;
-	}
-
 	return 1;
 }
 
@@ -509,9 +495,7 @@ tpmif_rx_action(unsigned long unused)
 		goto exit;
 	}
 
-	i = 0;
-	while (i < TPMIF_TX_RING_SIZE &&
-	       offset < received) {
+	for (i = 0; i < TPMIF_TX_RING_SIZE && offset < received; i++) {
 		struct tx_buffer *txb = tp->tx_buffers[i];
 		tpmif_tx_request_t *tx;
 		unsigned int tocopy;
@@ -527,7 +511,6 @@ tpmif_rx_action(unsigned long unused)
 		gnttab_release_grant_reference(&gref_head, tx->ref);
 
 		offset += tocopy;
-		i++;
 	}
 
 	tpm_fe_send_upperlayer(buffer, received, tp->tx_remember);
@@ -576,14 +559,13 @@ tpm_xmit(struct tpm_private *tp,
 		return -EIO;
 	}
 
-	i = 0;
-	while (count > 0 && i < TPMIF_TX_RING_SIZE) {
+	for (i = 0; count > 0 && i < TPMIF_TX_RING_SIZE; i++) {
 		struct tx_buffer *txb = tp->tx_buffers[i];
 		int copied;
 
 		if (NULL == txb) {
-			DPRINTK("txb (i=%d) is NULL. buffers initilized?\n", i);
-			DPRINTK("Not transmitting anything!\n");
+			DPRINTK("txb (i=%d) is NULL. buffers initilized?\n"
+				"Not transmitting anything!\n", i);
 			spin_unlock_irq(&tp->tx_lock);
 			return -EFAULT;
 		}
@@ -591,6 +573,7 @@ tpm_xmit(struct tpm_private *tp,
 		                        isuserbuffer);
 		if (copied < 0) {
 			/* An error occurred */
+			spin_unlock_irq(&tp->tx_lock);
 			return copied;
 		}
 		count -= copied;
@@ -606,9 +589,10 @@ tpm_xmit(struct tpm_private *tp,
 		        txb->data[0],txb->data[1],txb->data[2],txb->data[3]);
 
 		/* get the granttable reference for this page */
-		tx->ref = gnttab_claim_grant_reference( &gref_head );
+		tx->ref = gnttab_claim_grant_reference(&gref_head);
 
-		if(-ENOSPC == tx->ref ) {
+		if (-ENOSPC == tx->ref) {
+			spin_unlock_irq(&tp->tx_lock);
 			DPRINTK(" Grant table claim reference failed in func:%s line:%d file:%s\n", __FUNCTION__, __LINE__, __FILE__);
 			return -ENOSPC;
 		}
@@ -616,7 +600,6 @@ tpm_xmit(struct tpm_private *tp,
 		                                 tp->backend_id,
 		                                 (tx->addr >> PAGE_SHIFT),
 		                                 0 /*RW*/);
-		i++;
 		wmb();
 	}
 
