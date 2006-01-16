@@ -154,13 +154,8 @@ static char *be_state_name[] = {
 };
 #endif
 
-#ifdef DEBUG
-#define DPRINTK(fmt, args...)						\
-	printk(KERN_ALERT "netfront (%s:%d) " fmt, __FUNCTION__,	\
-	       __LINE__, ##args)
-#else
-#define DPRINTK(fmt, args...) ((void)0)
-#endif
+#define DPRINTK(fmt, args...) pr_debug("netfront (%s:%d) " fmt, \
+                                       __FUNCTION__, __LINE__, ##args)
 #define IPRINTK(fmt, args...)				\
 	printk(KERN_INFO "netfront: " fmt, ##args)
 #define WPRINTK(fmt, args...)				\

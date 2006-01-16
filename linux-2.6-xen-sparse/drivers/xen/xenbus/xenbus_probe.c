@@ -27,12 +27,8 @@
  * IN THE SOFTWARE.
  */
 
-#if 0
 #define DPRINTK(fmt, args...) \
-    printk("xenbus_probe (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
-#else
-#define DPRINTK(fmt, args...) ((void)0)
-#endif
+    pr_debug("xenbus_probe (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 
 #include <linux/kernel.h>
 #include <linux/err.h>

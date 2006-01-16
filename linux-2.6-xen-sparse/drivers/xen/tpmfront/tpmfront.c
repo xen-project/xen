@@ -80,12 +80,8 @@ static int tpm_xmit(struct tpm_private *tp,
                     const u8 * buf, size_t count, int userbuffer,
                     void *remember);
 
-#if DEBUG
 #define DPRINTK(fmt, args...) \
-    printk(KERN_ALERT "xen_tpm_fr (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
-#else
-#define DPRINTK(fmt, args...) ((void)0)
-#endif
+    pr_debug("xen_tpm_fr (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
 #define IPRINTK(fmt, args...) \
     printk(KERN_INFO "xen_tpm_fr: " fmt, ##args)
 #define WPRINTK(fmt, args...) \
