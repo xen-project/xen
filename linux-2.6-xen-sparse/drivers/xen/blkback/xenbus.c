@@ -24,12 +24,9 @@
 #include <asm-xen/xenbus.h>
 #include "common.h"
 
-
-#if 0
 #undef DPRINTK
 #define DPRINTK(fmt, args...) \
-    printk("blkback/xenbus (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
-#endif
+    pr_debug("blkback/xenbus (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 
 
 struct backend_info
