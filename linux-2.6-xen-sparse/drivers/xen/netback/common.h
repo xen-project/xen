@@ -22,16 +22,8 @@
 #include <asm-xen/gnttab.h>
 #include <asm-xen/driver_util.h>
 
-#if 0
-#define ASSERT(_p) \
-    if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \
-    __LINE__, __FILE__); *(int*)0=0; }
-#define DPRINTK(_f, _a...) printk(KERN_ALERT "(file=%s, line=%d) " _f, \
-                           __FILE__ , __LINE__ , ## _a )
-#else
-#define ASSERT(_p) ((void)0)
-#define DPRINTK(_f, _a...) ((void)0)
-#endif
+#define DPRINTK(_f, _a...) pr_debug("(file=%s, line=%d) " _f, \
+                                    __FILE__ , __LINE__ , ## _a )
 #define IPRINTK(fmt, args...) \
     printk(KERN_INFO "xen_net: " fmt, ##args)
 #define WPRINTK(fmt, args...) \

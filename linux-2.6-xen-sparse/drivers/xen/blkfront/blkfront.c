@@ -35,14 +35,6 @@
  * IN THE SOFTWARE.
  */
 
-#if 1
-#define ASSERT(p)							   \
-	if (!(p)) { printk("Assertion '%s' failed, line %d, file %s", #p , \
-	__LINE__, __FILE__); *(int*)0=0; }
-#else
-#define ASSERT(_p)
-#endif
-
 #include <linux/version.h>
 #include "block.h"
 #include <linux/cdrom.h>

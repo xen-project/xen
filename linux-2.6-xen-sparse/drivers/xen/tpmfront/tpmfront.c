@@ -54,14 +54,6 @@
 
 #undef DEBUG
 
-#if 1
-#define ASSERT(_p) \
-    if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \
-        __LINE__, __FILE__); *(int*)0=0; }
-#else
-#define ASSERT(_p)
-#endif
-
 /* locally visible variables */
 static grant_ref_t gref_head;
 static struct tpm_private my_private;
