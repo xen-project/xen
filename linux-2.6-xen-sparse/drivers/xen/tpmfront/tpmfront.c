@@ -364,7 +364,7 @@ static int tpmfront_probe(struct xenbus_device *dev,
 	struct tpmfront_info *info;
 	int handle;
 
-	err = xenbus_scanf(NULL, dev->nodename,
+	err = xenbus_scanf(XBT_NULL, dev->nodename,
 	                   "handle", "%i", &handle);
 	if (XENBUS_EXIST_ERR(err))
 		return err;
