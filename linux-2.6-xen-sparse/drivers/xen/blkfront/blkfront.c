@@ -551,7 +551,7 @@ static int blkif_queue_request(struct request *req)
 			lsect = fsect + (bvec->bv_len >> 9) - 1;
 			/* install a grant reference. */
 			ref = gnttab_claim_grant_reference(&gref_head);
-			ASSERT(ref != -ENOSPC);
+			BUG_ON(ref == -ENOSPC);
 
 			gnttab_grant_foreign_access_ref(
 				ref,

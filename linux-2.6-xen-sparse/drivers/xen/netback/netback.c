@@ -120,7 +120,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
 
-	ASSERT(skb->dev == dev);
+	BUG_ON(skb->dev != dev);
 
 	/* Drop the packet if the target domain has no receive buffers. */
 	if (!netif->active || 
