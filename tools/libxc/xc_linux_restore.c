@@ -170,13 +170,6 @@ int xc_linux_restore(int xc_handle, int io_fd,
     }
 
 
-    /* Only have to worry about vcpu 0 even for SMP */
-    if (xc_vcpu_getcontext( xc_handle, dom, 0, &ctxt)) {
-        ERR("Could not get vcpu context");
-        goto out;
-    }
-
-    
     /* Read the saved P2M frame list */
     if(!(p2m_frame_list = malloc(P2M_FL_SIZE))) { 
         ERR("Couldn't allocate p2m_frame_list array");
