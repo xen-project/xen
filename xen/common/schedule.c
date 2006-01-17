@@ -420,6 +420,7 @@ static void __enter_scheduler(void)
     }
 #endif
 
+    ASSERT(!test_bit(_VCPUF_running, &next->vcpu_flags));
     set_bit(_VCPUF_running, &next->vcpu_flags);
 
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);

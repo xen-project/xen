@@ -738,9 +738,6 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     ASSERT(cpus_weight(dirty_mask) <= 1);
     if ( unlikely(!cpu_isset(cpu, dirty_mask) && !cpus_empty(dirty_mask)) )
     {
-        /* Make sure the next VCPU is not in a scheduling tail. */
-        while ( test_bit(_VCPUF_running, &next->vcpu_flags) )
-            cpu_relax();
         /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
         if ( !cpus_empty(next->vcpu_dirty_cpumask) )
             flush_tlb_mask(next->vcpu_dirty_cpumask);
