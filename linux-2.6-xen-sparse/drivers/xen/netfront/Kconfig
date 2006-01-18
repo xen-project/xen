@@ -1,6 +1,0 @@
-
-config XENNET
-	tristate "Xen network driver"
-	depends on NETDEVICES && ARCH_XEN
-	help
-	  Network driver for Xen
