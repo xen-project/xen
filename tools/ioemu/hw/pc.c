@@ -382,8 +382,6 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
 {
     char buf[1024];
     int ret, linux_boot, initrd_size, i, nb_nics1;
-    unsigned long bios_offset, vga_bios_offset;
-    int bios_size, isa_bios_size;
     PCIBus *pci_bus;
     extern void * shared_vram;
     

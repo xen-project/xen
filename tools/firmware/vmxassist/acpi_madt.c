@@ -55,7 +55,6 @@ static struct hvm_info_table *
 get_hvm_info_table(void)
 {
 	struct hvm_info_table *t;
-	int i;
 
 	if (table != NULL)
 		return table;

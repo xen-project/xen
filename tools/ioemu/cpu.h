@@ -63,6 +63,9 @@ int cpu_get_pic_interrupt(CPUX86State *s);
 /* MSDOS compatibility mode FPU exception support */
 void cpu_set_ferr(CPUX86State *s);
 
+/* helper2.c */
+void cpu_x86_set_a20(CPUX86State *env, int a20_state);
+
 #if defined(__i386__) || defined(__x86_64__)
 #define TARGET_PAGE_BITS 12
 #elif defined(__ia64__)
