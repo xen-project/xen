@@ -27,6 +27,7 @@
 #include <linux/inetdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/ethtool.h>
 #include <net/dst.h>
 
 static int nloopbacks = 8;
@@ -122,6 +123,12 @@ static void loopback_construct(struct net_device *dev, struct net_device *lo)
 	/*dev->mtu             = 16*1024;*/
 }
 
+static struct ethtool_ops network_ethtool_ops =
+{
+	.get_tx_csum = ethtool_op_get_tx_csum,
+	.set_tx_csum = ethtool_op_set_tx_csum,
+};
+
 static int __init make_loopback(int i)
 {
 	struct net_device *dev1, *dev2;
@@ -140,6 +147,8 @@ static int __init make_loopback(int i)
 
 	dev1->features |= NETIF_F_NO_CSUM;
 	dev2->features |= NETIF_F_IP_CSUM;
+
+	SET_ETHTOOL_OPS(dev2, &network_ethtool_ops);
 
 	/*
 	 * Initialise a dummy MAC address for the 'dummy backend' interface. We
