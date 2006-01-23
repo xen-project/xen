@@ -110,6 +110,20 @@ static inline void kb_wait(void)
             break;
 }
 
+void __attribute__((noreturn)) __machine_halt(void *unused)
+{
+    for ( ; ; )
+        safe_halt();
+}
+
+void machine_halt(void)
+{
+    watchdog_disable();
+    console_start_sync();
+    smp_call_function(__machine_halt, NULL, 1, 0);
+    __machine_halt(NULL);
+}
+
 void machine_restart(char * __unused)
 {
     int i;
@@ -117,8 +131,7 @@ void machine_restart(char * __unused)
     if ( opt_noreboot )
     {
         printk("Reboot disabled on cmdline: require manual reset\n");
-        for ( ; ; )
-            safe_halt();
+        machine_halt();
     }
 
     watchdog_disable();
@@ -163,20 +176,6 @@ void machine_restart(char * __unused)
     }
 }
 
-
-void __attribute__((noreturn)) __machine_halt(void *unused)
-{
-    for ( ; ; )
-        safe_halt();
-}
-
-void machine_halt(void)
-{
-    watchdog_disable();
-    console_start_sync();
-    smp_call_function(__machine_halt, NULL, 1, 0);
-    __machine_halt(NULL);
-}
 
 void dump_pageframe_info(struct domain *d)
 {
