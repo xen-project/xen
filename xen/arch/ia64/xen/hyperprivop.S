@@ -12,6 +12,7 @@
 #include <asm/offsets.h>
 #include <asm/processor.h>
 #include <asm/system.h>
+#include <asm/debugger.h>
 #include <public/arch-ia64.h>
 
 
@@ -549,7 +550,12 @@ GLOBAL_ENTRY(fast_break_reflect)
 (p7)    br.spnt.many 1f ;;
         cmp.eq p7,p0=r17,r0
 (p7)    br.spnt.few dispatch_break_fault ;;
-1:
+#ifdef CRASH_DEBUG
+	movl r21=CDB_BREAK_NUM ;;
+	cmp.eq p7,p0=r17,r21
+(p7)	br.spnt.few dispatch_break_fault ;;
+#endif	
+1:	
 #if 1 /* special handling in case running on simulator */
 	movl r20=first_break;;
 	ld4 r23=[r20];;

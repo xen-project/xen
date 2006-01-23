@@ -15,6 +15,7 @@
 #define sys_call_table 0
 #define sys_ni_syscall 0
 #include <asm/vhpt.h>
+#include <asm/debugger.h>
 #endif
 /*
  * arch/ia64/kernel/ivt.S
@@ -841,6 +842,13 @@ ENTRY(break_fault)
 	;;
 	cmp.eq p7,p0=r17,r0
 (p7)	br.spnt.few dispatch_break_fault ;;
+#ifdef CRASH_DEBUG
+        // panic can occur before domain0 is created.
+        // in such case referencing XSI_PSR_IC causes nested_dtlb_miss
+        movl r18=CDB_BREAK_NUM ;;
+        cmp.eq p7,p0=r17,r18 ;; 
+(p7)    br.spnt.few dispatch_break_fault ;;
+#endif
 	movl r18=XSI_PSR_IC
 	;;
 	ld8 r19=[r18]

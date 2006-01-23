@@ -18,6 +18,7 @@
 #include <xen/softirq.h>
 #include <public/sched.h>
 #include <asm/vhpt.h>
+#include <asm/debugger.h>
 
 efi_memory_desc_t ia64_efi_io_md;
 EXPORT_SYMBOL(ia64_efi_io_md);
@@ -356,6 +357,11 @@ loop:
 	va_end(args);
 	printf(buf);
 	if (regs) show_registers(regs);
+	if (regs) {
+		debugger_trap_fatal(0 /* don't care */, regs);
+	} else {
+		debugger_trap_immediate();
+	}
 	domain_pause_by_systemcontroller(current->domain);
 	v->domain->shutdown_code = SHUTDOWN_crash;
 	set_bit(_DOMF_shutdown, v->domain->domain_flags);
