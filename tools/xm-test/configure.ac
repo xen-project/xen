@@ -7,6 +7,7 @@ AM_INIT_AUTOMAKE([1.7 foreign])
 # Check for dependencies
 AC_PROG_CC
 #AC_PROG_INSTALL
+AC_CHECK_PROG([LILO],	lilo,	lilo,	"no",	[$PATH])
 
 # Right now, we can assume that the lib/ and ramdisk/ directories
 # are two levels above the tests
@@ -21,6 +22,18 @@ AC_ARG_ENABLE(vmx-support,
 	],[
 		ENABLE_VMX=False
 	])
+
+if test "x$ENABLE_VMX" = "xTrue"; then
+	if test "$LILO" = "no"; then 
+		AC_MSG_ERROR([lilo not found
+lilo version 22.7 or greater must be installed for testing with vmx enabled.])
+	else
+		pass=`$LILO -V | sed -e "s/LILO version //" | awk -F "." '{if ($1 >=22 && $2 >= 7) print "true"; else print "false"}'`
+		if test "$pass" != "true"; then
+			AC_MSG_ERROR(Lilo version must be equal or greater to 22.7+.)
+		fi
+	fi
+fi
 
 AM_CONDITIONAL(VMX, test x$ENABLE_VMX = xTrue)
 AC_SUBST(ENABLE_VMX)
