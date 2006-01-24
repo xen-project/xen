@@ -146,6 +146,8 @@ int construct_dom0(struct domain *d,
     struct pfn_info *page = NULL;
     start_info_t *si;
     struct vcpu *v = d->vcpu[0];
+    char *p;
+    unsigned long hypercall_page;
 #if defined(__i386__)
     char *image_start  = (char *)_image_start;  /* use lowmem mappings */
     char *initrd_start = (char *)_initrd_start; /* use lowmem mappings */
@@ -239,7 +241,8 @@ int construct_dom0(struct domain *d,
                xen_pae ? "yes" : "no", dom0_pae ? "yes" : "no");
         return -EINVAL;
     }
-    if (strstr(dsi.xen_section_string, "SHADOW=translate"))
+
+    if ( strstr(dsi.xen_section_string, "SHADOW=translate") )
         opt_dom0_translate = 1;
 
     /* Align load address to 4MB boundary. */
@@ -603,6 +606,23 @@ int construct_dom0(struct domain *d,
 
     /* Copy the OS image and free temporary buffer. */
     (void)loadelfimage(&dsi);
+
+    p = strstr(dsi.xen_section_string, "HYPERCALL_PAGE=");
+    if ( p != NULL )
+    {
+        p += strlen("HYPERCALL_PAGE=");
+        hypercall_page = simple_strtoul(p, NULL, 16);
+        hypercall_page = dsi.v_start + (hypercall_page << PAGE_SHIFT);
+        if ( (hypercall_page < dsi.v_start) || (hypercall_page >= v_end) )
+        {
+            write_ptbase(current);
+            local_irq_enable();
+            printk("Invalid HYPERCALL_PAGE field in guest header.\n");
+            return -1;
+        }
+
+        hypercall_page_initialise((void *)hypercall_page);
+    }
 
     init_domheap_pages(
         _image_start, (_image_start+image_len+PAGE_SIZE-1) & PAGE_MASK);

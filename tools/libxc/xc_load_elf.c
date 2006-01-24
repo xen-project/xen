@@ -120,6 +120,7 @@ static int parseelfimage(char *image,
 
         break;
     }
+
     if ( guestinfo == NULL )
     {
 #ifdef __ia64__
@@ -129,6 +130,8 @@ static int parseelfimage(char *image,
         return -EINVAL;
 #endif
     }
+
+    dsi->xen_guest_string = guestinfo;
 
     for ( h = 0; h < ehdr->e_phnum; h++ ) 
     {

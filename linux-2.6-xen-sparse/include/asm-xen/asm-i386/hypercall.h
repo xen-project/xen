@@ -34,13 +34,15 @@
 #include <asm-xen/xen-public/sched.h>
 #include <asm-xen/xen-public/nmi.h>
 
+#define __STR(x) #x
+#define STR(x) __STR(x)
+
 #define _hypercall0(type, name)			\
 ({						\
 	long __res;				\
 	asm volatile (				\
-		TRAP_INSTR			\
+		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res)			\
-		: "0" (__HYPERVISOR_##name)	\
 		: "memory" );			\
 	(type)__res;				\
 })
@@ -49,9 +51,9 @@
 ({								\
 	long __res, __ign1;					\
 	asm volatile (						\
-		TRAP_INSTR					\
+		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res), "=b" (__ign1)			\
-		: "0" (__HYPERVISOR_##name), "1" ((long)(a1))	\
+		: "1" ((long)(a1))				\
 		: "memory" );					\
 	(type)__res;						\
 })
@@ -60,10 +62,9 @@
 ({								\
 	long __res, __ign1, __ign2;				\
 	asm volatile (						\
-		TRAP_INSTR					\
+		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res), "=b" (__ign1), "=c" (__ign2)	\
-		: "0" (__HYPERVISOR_##name), "1" ((long)(a1)),	\
-		"2" ((long)(a2))				\
+		: "1" ((long)(a1)), "2" ((long)(a2))		\
 		: "memory" );					\
 	(type)__res;						\
 })
@@ -72,11 +73,11 @@
 ({								\
 	long __res, __ign1, __ign2, __ign3;			\
 	asm volatile (						\
-		TRAP_INSTR					\
+		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res), "=b" (__ign1), "=c" (__ign2), 	\
 		"=d" (__ign3)					\
-		: "0" (__HYPERVISOR_##name), "1" ((long)(a1)),	\
-		"2" ((long)(a2)), "3" ((long)(a3))		\
+		: "1" ((long)(a1)), "2" ((long)(a2)),		\
+		"3" ((long)(a3))				\
 		: "memory" );					\
 	(type)__res;						\
 })
@@ -85,12 +86,11 @@
 ({								\
 	long __res, __ign1, __ign2, __ign3, __ign4;		\
 	asm volatile (						\
-		TRAP_INSTR					\
+		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res), "=b" (__ign1), "=c" (__ign2),	\
 		"=d" (__ign3), "=S" (__ign4)			\
-		: "0" (__HYPERVISOR_##name), "1" ((long)(a1)),	\
-		"2" ((long)(a2)), "3" ((long)(a3)),		\
-		"4" ((long)(a4))				\
+		: "1" ((long)(a1)), "2" ((long)(a2)),		\
+		"3" ((long)(a3)), "4" ((long)(a4))		\
 		: "memory" );					\
 	(type)__res;						\
 })
@@ -99,12 +99,12 @@
 ({								\
 	long __res, __ign1, __ign2, __ign3, __ign4, __ign5;	\
 	asm volatile (						\
-		TRAP_INSTR					\
+		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res), "=b" (__ign1), "=c" (__ign2),	\
 		"=d" (__ign3), "=S" (__ign4), "=D" (__ign5)	\
-		: "0" (__HYPERVISOR_##name), "1" ((long)(a1)),	\
-		"2" ((long)(a2)), "3" ((long)(a3)),		\
-		"4" ((long)(a4)), "5" ((long)(a5))		\
+		: "1" ((long)(a1)), "2" ((long)(a2)),		\
+		"3" ((long)(a3)), "4" ((long)(a4)),		\
+		"5" ((long)(a5))				\
 		: "memory" );					\
 	(type)__res;						\
 })

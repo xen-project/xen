@@ -51,6 +51,12 @@ extern void mapcache_init(struct domain *);
 /* x86/64: toggle guest between kernel and user modes. */
 extern void toggle_guest_mode(struct vcpu *);
 
+/*
+ * Initialise a hypercall-transfer page. The given pointer must be mapped
+ * in Xen virtual address space (accesses are not validated or checked).
+ */
+extern void hypercall_page_initialise(void *);
+
 struct arch_domain
 {
     l1_pgentry_t *mm_perdomain_pt;

@@ -268,6 +268,39 @@ long do_set_callbacks(unsigned long event_address,
     return 0;
 }
 
+void hypercall_page_initialise(void *hypercall_page)
+{
+    char *p;
+    int i;
+
+    /* Fill in all the transfer points with template machine code. */
+    for ( i = 0; i < (PAGE_SIZE / 32); i++ )
+    {
+        p = (char *)(hypercall_page + (i * 32));
+        *(u8  *)(p+ 0) = 0x51;    /* push %rcx */
+        *(u16 *)(p+ 1) = 0x5341;  /* push %r11 */
+        *(u8  *)(p+ 3) = 0xb8;    /* mov  $<i>,%eax */
+        *(u32 *)(p+ 4) = i;
+        *(u16 *)(p+ 8) = 0x050f;  /* syscall */
+        *(u16 *)(p+10) = 0x5b41;  /* pop  %r11 */
+        *(u8  *)(p+12) = 0x59;    /* pop  %rcx */
+        *(u8  *)(p+13) = 0xc3;    /* ret */
+    }
+
+    /*
+     * HYPERVISOR_iret is special because it doesn't return and expects a 
+     * special stack frame. Guests jump at this transfer point instead of 
+     * calling it.
+     */
+    p = (char *)(hypercall_page + (__HYPERVISOR_iret * 32));
+    *(u8  *)(p+ 0) = 0x50;    /* push %rax */
+    *(u8  *)(p+ 1) = 0x51;    /* push %rcx */
+    *(u16 *)(p+ 2) = 0x5341;  /* push %r11 */
+    *(u8  *)(p+ 4) = 0xb8;    /* mov  $__HYPERVISOR_iret,%eax */
+    *(u32 *)(p+ 5) = __HYPERVISOR_iret;
+    *(u16 *)(p+ 9) = 0x050f;  /* syscall */
+}
+
 /*
  * Local variables:
  * mode: C

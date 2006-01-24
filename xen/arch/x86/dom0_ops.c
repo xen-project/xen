@@ -50,9 +50,6 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 {
     long ret = 0;
 
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
     switch ( op->cmd )
     {
 
@@ -406,6 +403,35 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 
         op->u.physical_memory_map.nr_map_entries = i;
         (void)copy_to_user(u_dom0_op, op, sizeof(*op));
+    }
+    break;
+
+    case DOM0_HYPERCALL_INIT:
+    {
+        struct domain *d; 
+        unsigned long mfn = op->u.hypercall_init.mfn;
+        void *hypercall_page;
+
+        ret = -ESRCH;
+        if ( unlikely((d = find_domain_by_id(
+            op->u.hypercall_init.domain)) == NULL) )
+            break;
+
+        ret = -EACCES;
+        if ( !pfn_valid(mfn) ||
+             !get_page_and_type(pfn_to_page(mfn), d, PGT_writable_page) )
+        {
+            put_domain(d);
+            break;
+        }
+
+        ret = 0;
+
+        hypercall_page = map_domain_page(mfn);
+        hypercall_page_initialise(hypercall_page);
+        unmap_domain_page(hypercall_page);
+
+        put_domain(d);
     }
     break;
 

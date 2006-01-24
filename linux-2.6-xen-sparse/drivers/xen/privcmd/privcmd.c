@@ -58,7 +58,9 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 			"movl 16(%%eax),%%esi ;"
 			"movl 20(%%eax),%%edi ;"
 			"movl   (%%eax),%%eax ;"
-			TRAP_INSTR "; "
+			"shll $5,%%eax ;"
+			"addl $hypercall_page,%%eax ;"
+			"call *%%eax ;"
 			"popl %%edi; popl %%esi; popl %%edx; "
 			"popl %%ecx; popl %%ebx"
 			: "=a" (ret) : "0" (&hypercall) : "memory" );
@@ -66,7 +68,10 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		{
 			long ign1, ign2, ign3;
 			__asm__ __volatile__ (
-				"movq %8,%%r10; movq %9,%%r8;" TRAP_INSTR
+				"movq %8,%%r10; movq %9,%%r8;"
+				"shlq $5,%%rax ;"
+				"addq $hypercall_page,%%rax ;"
+				"call *%%rax"
 				: "=a" (ret), "=D" (ign1),
 				  "=S" (ign2), "=d" (ign3)
 				: "0" ((unsigned long)hypercall.op), 
@@ -75,7 +80,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 				"3" ((unsigned long)hypercall.arg[2]), 
 				"g" ((unsigned long)hypercall.arg[3]),
 				"g" ((unsigned long)hypercall.arg[4])
-				: "r11","rcx","r8","r10","memory");
+				: "r8", "r10", "memory" );
 		}
 #elif defined (__ia64__)
 		__asm__ __volatile__ (

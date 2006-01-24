@@ -136,6 +136,9 @@ struct domain_setup_info
     unsigned int  pae_kernel;
     unsigned long symtab_addr;
     unsigned long symtab_len;
+
+    /* __xen_guest info string for convenient loader parsing. */
+    char *xen_guest_string;
 };
 
 typedef int (*parseimagefunc)(char *image, unsigned long image_size,

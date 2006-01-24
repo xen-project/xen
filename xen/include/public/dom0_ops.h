@@ -425,6 +425,12 @@ typedef struct {
     uint8_t allow_access;     /* allow (!0) or deny (0) access to range? */
 } dom0_iomem_permission_t;
  
+#define DOM0_HYPERCALL_INIT   48
+typedef struct {
+    domid_t  domain;          /* domain to be affected */
+    unsigned long mfn;        /* machine frame to be initialised */
+} dom0_hypercall_init_t;
+ 
 typedef struct {
     uint32_t cmd;
     uint32_t interface_version; /* DOM0_INTERFACE_VERSION */
@@ -465,6 +471,7 @@ typedef struct {
         dom0_setdebugging_t      setdebugging;
         dom0_irq_permission_t    irq_permission;
         dom0_iomem_permission_t  iomem_permission;
+        dom0_hypercall_init_t    hypercall_init;
         uint8_t                  pad[128];
     } u;
 } dom0_op_t;

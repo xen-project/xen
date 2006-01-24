@@ -429,10 +429,12 @@ static int setup_guest(int xc_handle,
                        unsigned int console_evtchn, unsigned long *console_mfn)
 {
     unsigned long *page_array = NULL;
-    unsigned long count, i;
+    unsigned long count, i, hypercall_pfn;
     start_info_t *start_info;
     shared_info_t *shared_info;
     xc_mmu_t *mmu = NULL;
+    char *p;
+    DECLARE_DOM0_OP;
     int rc;
 
     unsigned long nr_pt_pages;
@@ -714,6 +716,20 @@ static int setup_guest(int xc_handle,
     /* Send the page update requests down to the hypervisor. */
     if ( xc_finish_mmu_updates(xc_handle, mmu) )
         goto error_out;
+
+    p = strstr(dsi.xen_guest_string, "HYPERCALL_PAGE=");
+    if ( p != NULL )
+    {
+        p += strlen("HYPERCALL_PAGE=");
+        hypercall_pfn = strtoul(p, NULL, 16);
+        if ( hypercall_pfn >= nr_pages )
+            goto error_out;
+        op.u.hypercall_init.domain = (domid_t)dom;
+        op.u.hypercall_init.mfn    = page_array[hypercall_pfn];
+        op.cmd = DOM0_HYPERCALL_INIT;
+        if ( xc_dom0_op(xc_handle, &op) )
+            goto error_out;
+    }
 
     free(mmu);
     free(page_array);

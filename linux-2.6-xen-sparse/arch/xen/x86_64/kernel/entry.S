@@ -127,15 +127,10 @@
          *     };
          * #define VGCF_IN_SYSCALL (1<<8) 
          */
-        .macro HYPERVISOR_IRET flag
-        subq $8*4,%rsp                   # reuse rip, cs, rflags, rsp, ss in the stack
-        movq %rax,(%rsp)
-        movq %r11,1*8(%rsp)
-        movq %rcx,2*8(%rsp)              # we saved %rcx upon exceptions
-        movq $\flag,3*8(%rsp)
-        movq $__HYPERVISOR_iret,%rax
-        syscall
-        .endm
+	.macro HYPERVISOR_IRET flag
+	pushq $\flag
+	jmp  hypercall_page + (__HYPERVISOR_iret * 32)
+	.endm
 
         .macro SWITCH_TO_KERNEL ssoff,adjust=0
 	jc  1f

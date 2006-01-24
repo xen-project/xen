@@ -16,9 +16,11 @@
 #include <linux/linkage.h>
 
 .section __xen_guest
-	.ascii	"GUEST_OS=linux,GUEST_VER=2.6,XEN_VER=xen-3.0,VIRT_BASE=0xffffffff80000000"
+	.ascii	"GUEST_OS=linux,GUEST_VER=2.6"
+	.ascii	",XEN_VER=xen-3.0"
+	.ascii	",VIRT_BASE=0xffffffff80000000"
+	.ascii	",HYPERCALL_PAGE=0x10d" /* __pa(hypercall_page) >> 12 */
 	.ascii	",LOADER=generic"
-/*	.ascii	",PT_MODE_WRITABLE" */
 	.byte	0
                 
       
@@ -227,8 +229,10 @@ ENTRY(empty_bad_pmd_table)
 ENTRY(level3_physmem_pgt)
 	.quad	0x0000000000105007		/* -> level2_kernel_pgt (so that __va works even before pagetable_init) */
 
-	
-	.org 0xd000
+.org 0xd000
+ENTRY(hypercall_page)
+
+.org 0xe000
 #ifdef CONFIG_ACPI_SLEEP
 ENTRY(wakeup_level4_pgt)
 	.quad	0x0000000000102007		/* -> level3_ident_pgt */

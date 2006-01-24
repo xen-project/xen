@@ -333,10 +333,8 @@ iret_exc:
 hypervisor_iret:
 	andl $~NMI_MASK, EFLAGS(%esp)
 	RESTORE_REGS
-	movl %eax,(%esp)
-	movl $__HYPERVISOR_iret,%eax
-	int $0x82
-	ud2
+	addl $4, %esp
+	jmp  hypercall_page + (__HYPERVISOR_iret * 32)
 
 #if 0 /* XEN */
 ldt_ss:
