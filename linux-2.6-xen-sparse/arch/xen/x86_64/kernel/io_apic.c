@@ -255,10 +255,8 @@ static int __init enable_ioapic_setup(char *str)
 	return 1;
 }
 
-
 __setup("noapic", disable_ioapic_setup);
 __setup("apic", enable_ioapic_setup);
-
 
 #include <asm/pci-direct.h>
 #include <linux/pci_ids.h>
@@ -1146,6 +1144,7 @@ void __apicdebuginit print_PIC(void)
 	v = inb(0x4d1) << 8 | inb(0x4d0);
 	printk(KERN_DEBUG "... PIC ELCR: %04x\n", v);
 }
+
 #endif  /*  0  */
 
 #else
@@ -1191,6 +1190,7 @@ void disable_IO_APIC(void)
 	 * Clear the IO-APIC before rebooting:
 	 */
 	clear_IO_APIC();
+
 #ifndef CONFIG_XEN
 	disconnect_bsp_APIC();
 #endif
@@ -1202,6 +1202,7 @@ void disable_IO_APIC(void)
  *
  * by Matt Domsch <Matt_Domsch@dell.com>  Tue Dec 21 12:25:05 CST 1999
  */
+
 #ifndef CONFIG_XEN
 static void __init setup_ioapic_ids_from_mpc (void)
 {

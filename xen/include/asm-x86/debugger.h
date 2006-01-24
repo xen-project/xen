@@ -42,19 +42,19 @@
 
 #if defined(CRASH_DEBUG)
 
-extern int __trap_to_cdb(struct cpu_user_regs *r);
+#include <xen/gdbstub.h>
 
 #define __debugger_trap_entry(_v, _r) (0)
 
 static inline int __debugger_trap_fatal(
     unsigned int vector, struct cpu_user_regs *regs)
 {
-    (void)__trap_to_cdb(regs);
+    (void)__trap_to_gdb(regs, vector);
     return (vector == TRAP_int3); /* int3 is harmless */
 }
 
 /* Int3 is a trivial way to gather cpu_user_regs context. */
-#define __debugger_trap_immediate() __asm__ __volatile__ ( "int3" );
+#define debugger_trap_immediate() __asm__ __volatile__ ( "int3" );
 
 #elif 0
 
@@ -73,7 +73,7 @@ static inline int __debugger_trap_fatal(
 }
 
 /* Int3 is a trivial way to gather cpu_user_regs context. */
-#define __debugger_trap_immediate() __asm__ __volatile__ ( "int3" )
+#define debugger_trap_immediate() __asm__ __volatile__ ( "int3" )
 
 #else
 
@@ -100,6 +100,8 @@ static inline int debugger_trap_entry(
 }
 
 #define debugger_trap_fatal(v, r) (__debugger_trap_fatal(v, r))
+#ifndef debugger_trap_immediate
 #define debugger_trap_immediate() (__debugger_trap_immediate())
+#endif
 
 #endif /* __X86_DEBUGGER_H__ */

@@ -32,6 +32,7 @@
 
 #include <asm-xen/xen-public/xen.h>
 #include <asm-xen/xen-public/sched.h>
+#include <asm-xen/xen-public/nmi.h>
 
 #define _hypercall0(type, name)			\
 ({						\
@@ -298,6 +299,14 @@ HYPERVISOR_suspend(
 {
 	return _hypercall3(int, sched_op, SCHEDOP_shutdown,
 			   SHUTDOWN_suspend, srec);
+}
+
+static inline int
+HYPERVISOR_nmi_op(
+	unsigned long op,
+	unsigned long arg)
+{
+	return _hypercall2(int, nmi_op, op, arg);
 }
 
 #endif /* __HYPERCALL_H__ */

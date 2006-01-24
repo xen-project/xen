@@ -190,7 +190,7 @@ void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg)
 }
 
 /* Send message to xs, get kmalloc'ed reply.  ERR_PTR() on error. */
-static void *xs_talkv(struct xenbus_transaction *t,
+static void *xs_talkv(xenbus_transaction_t t,
 		      enum xsd_sockmsg_type type,
 		      const struct kvec *iovec,
 		      unsigned int num_vecs,
@@ -201,7 +201,7 @@ static void *xs_talkv(struct xenbus_transaction *t,
 	unsigned int i;
 	int err;
 
-	msg.tx_id = (u32)(unsigned long)t;
+	msg.tx_id = t;
 	msg.req_id = 0;
 	msg.type = type;
 	msg.len = 0;
@@ -242,7 +242,7 @@ static void *xs_talkv(struct xenbus_transaction *t,
 }
 
 /* Simplified version of xs_talkv: single message. */
-static void *xs_single(struct xenbus_transaction *t,
+static void *xs_single(xenbus_transaction_t t,
 		       enum xsd_sockmsg_type type,
 		       const char *string,
 		       unsigned int *len)
@@ -309,7 +309,7 @@ static char **split(char *strings, unsigned int len, unsigned int *num)
 	return ret;
 }
 
-char **xenbus_directory(struct xenbus_transaction *t,
+char **xenbus_directory(xenbus_transaction_t t,
 			const char *dir, const char *node, unsigned int *num)
 {
 	char *strings, *path;
@@ -329,7 +329,7 @@ char **xenbus_directory(struct xenbus_transaction *t,
 EXPORT_SYMBOL(xenbus_directory);
 
 /* Check if a path exists. Return 1 if it does. */
-int xenbus_exists(struct xenbus_transaction *t,
+int xenbus_exists(xenbus_transaction_t t,
 		  const char *dir, const char *node)
 {
 	char **d;
@@ -347,7 +347,7 @@ EXPORT_SYMBOL(xenbus_exists);
  * Returns a kmalloced value: call free() on it after use.
  * len indicates length in bytes.
  */
-void *xenbus_read(struct xenbus_transaction *t,
+void *xenbus_read(xenbus_transaction_t t,
 		  const char *dir, const char *node, unsigned int *len)
 {
 	char *path;
@@ -366,7 +366,7 @@ EXPORT_SYMBOL(xenbus_read);
 /* Write the value of a single file.
  * Returns -err on failure.
  */
-int xenbus_write(struct xenbus_transaction *t,
+int xenbus_write(xenbus_transaction_t t,
 		 const char *dir, const char *node, const char *string)
 {
 	const char *path;
@@ -389,7 +389,7 @@ int xenbus_write(struct xenbus_transaction *t,
 EXPORT_SYMBOL(xenbus_write);
 
 /* Create a new directory. */
-int xenbus_mkdir(struct xenbus_transaction *t,
+int xenbus_mkdir(xenbus_transaction_t t,
 		 const char *dir, const char *node)
 {
 	char *path;
@@ -406,7 +406,7 @@ int xenbus_mkdir(struct xenbus_transaction *t,
 EXPORT_SYMBOL(xenbus_mkdir);
 
 /* Destroy a file or directory (directories must be empty). */
-int xenbus_rm(struct xenbus_transaction *t, const char *dir, const char *node)
+int xenbus_rm(xenbus_transaction_t t, const char *dir, const char *node)
 {
 	char *path;
 	int ret;
@@ -424,30 +424,28 @@ EXPORT_SYMBOL(xenbus_rm);
 /* Start a transaction: changes by others will not be seen during this
  * transaction, and changes will not be visible to others until end.
  */
-struct xenbus_transaction *xenbus_transaction_start(void)
+int xenbus_transaction_start(xenbus_transaction_t *t)
 {
 	char *id_str;
-	unsigned long id;
 
 	down_read(&xs_state.suspend_mutex);
 
 	id_str = xs_single(XBT_NULL, XS_TRANSACTION_START, "", NULL);
 	if (IS_ERR(id_str)) {
 		up_read(&xs_state.suspend_mutex);
-		return (struct xenbus_transaction *)id_str;
+		return PTR_ERR(id_str);
 	}
 
-	id = simple_strtoul(id_str, NULL, 0);
+	*t = simple_strtoul(id_str, NULL, 0);
 	kfree(id_str);
-
-	return (struct xenbus_transaction *)id;
+	return 0;
 }
 EXPORT_SYMBOL(xenbus_transaction_start);
 
 /* End a transaction.
  * If abandon is true, transaction is discarded instead of committed.
  */
-int xenbus_transaction_end(struct xenbus_transaction *t, int abort)
+int xenbus_transaction_end(xenbus_transaction_t t, int abort)
 {
 	char abortstr[2];
 	int err;
@@ -466,7 +464,7 @@ int xenbus_transaction_end(struct xenbus_transaction *t, int abort)
 EXPORT_SYMBOL(xenbus_transaction_end);
 
 /* Single read and scanf: returns -errno or num scanned. */
-int xenbus_scanf(struct xenbus_transaction *t,
+int xenbus_scanf(xenbus_transaction_t t,
 		 const char *dir, const char *node, const char *fmt, ...)
 {
 	va_list ap;
@@ -489,7 +487,7 @@ int xenbus_scanf(struct xenbus_transaction *t,
 EXPORT_SYMBOL(xenbus_scanf);
 
 /* Single printf and write: returns -errno or 0. */
-int xenbus_printf(struct xenbus_transaction *t,
+int xenbus_printf(xenbus_transaction_t t,
 		  const char *dir, const char *node, const char *fmt, ...)
 {
 	va_list ap;
@@ -515,7 +513,7 @@ int xenbus_printf(struct xenbus_transaction *t,
 EXPORT_SYMBOL(xenbus_printf);
 
 /* Takes tuples of names, scanf-style args, and void **, NULL terminated. */
-int xenbus_gather(struct xenbus_transaction *t, const char *dir, ...)
+int xenbus_gather(xenbus_transaction_t t, const char *dir, ...)
 {
 	va_list ap;
 	const char *name;

@@ -290,15 +290,15 @@ static void shutdown_handler(struct xenbus_watch *watch,
 			     const char **vec, unsigned int len)
 {
 	char *str;
-	struct xenbus_transaction *xbt;
+	xenbus_transaction_t xbt;
 	int err;
 
 	if (shutting_down != SHUTDOWN_INVALID)
 		return;
 
  again:
-	xbt = xenbus_transaction_start();
-	if (IS_ERR(xbt))
+	err = xenbus_transaction_start(&xbt);
+	if (err)
 		return;
 	str = (char *)xenbus_read(xbt, "control", "shutdown", NULL);
 	/* Ignore read errors and empty reads. */
@@ -339,12 +339,12 @@ static void sysrq_handler(struct xenbus_watch *watch, const char **vec,
 			  unsigned int len)
 {
 	char sysrq_key = '\0';
-	struct xenbus_transaction *xbt;
+	xenbus_transaction_t xbt;
 	int err;
 
  again:
-	xbt  = xenbus_transaction_start();
-	if (IS_ERR(xbt))
+	err = xenbus_transaction_start(&xbt);
+	if (err)
 		return;
 	if (!xenbus_scanf(xbt, "control", "sysrq", "%c", &sysrq_key)) {
 		printk(KERN_ERR "Unable to read sysrq code in "

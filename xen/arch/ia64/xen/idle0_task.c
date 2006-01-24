@@ -11,29 +11,14 @@
 	.mmlist		= LIST_HEAD_INIT(name.mmlist),		\
 }
 
-#define IDLE0_EXEC_DOMAIN(_ed,_d)    \
+#define IDLE_VCPU(_v)    	     \
 {                                    \
     processor:   0,                  \
-    mm:          0,                  \
-    thread:      INIT_THREAD,        \
-    domain:      (_d)                \
-}
-
-#define IDLE0_DOMAIN(_t)             \
-{                                    \
-    domain_id:   IDLE_DOMAIN_ID,     \
-    refcnt:      ATOMIC_INIT(1)      \
+    domain:      0                   \
 }
 
 struct mm_struct init_mm = INIT_MM(init_mm);
 EXPORT_SYMBOL(init_mm);
-
-struct domain idle0_domain = IDLE0_DOMAIN(idle0_domain);
-#if 0
-struct vcpu idle0_vcpu = IDLE0_EXEC_DOMAIN(idle0_vcpu,
-                                                         &idle0_domain);
-#endif
-
 
 /*
  * Initial task structure.
@@ -43,15 +28,12 @@ struct vcpu idle0_vcpu = IDLE0_EXEC_DOMAIN(idle0_vcpu,
  */
 union {
 	struct {
-		struct domain task;
+		struct vcpu task;
 	} s;
 	unsigned long stack[KERNEL_STACK_SIZE/sizeof (unsigned long)];
-} init_task_mem asm ("init_task") __attribute__((section(".data.init_task")));
-// = {{
-	;
-//.task =		IDLE0_EXEC_DOMAIN(init_task_mem.s.task,&idle0_domain),
-//};
-//};
+} init_task_mem asm ("init_task") __attribute__((section(".data.init_task"))) = {{
+	.task = IDLE_VCPU(init_task_mem.s.task)
+}};
 
 EXPORT_SYMBOL(init_task);
 

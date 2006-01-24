@@ -870,7 +870,7 @@ void enable_APIC_timer(void)
  * returns 1 on success
  * returns 0 if the timeout value is too small or in the past.
  */
-int reprogram_ac_timer(s_time_t timeout)
+int reprogram_timer(s_time_t timeout)
 {
     s_time_t    now;
     s_time_t    expire;
@@ -931,7 +931,7 @@ void smp_apic_timer_interrupt(struct cpu_user_regs * regs)
 {
     ack_APIC_irq();
     perfc_incrc(apic_timer);
-    raise_softirq(AC_TIMER_SOFTIRQ);
+    raise_softirq(TIMER_SOFTIRQ);
 }
 
 /*

@@ -78,7 +78,7 @@ static int tpmback_probe(struct xenbus_device *dev,
 
 	memset(be, 0, sizeof(*be));
 
-	be->is_instance_set = FALSE;
+	be->is_instance_set = 0;
 	be->dev = dev;
 	dev->data = be;
 
@@ -89,7 +89,7 @@ static int tpmback_probe(struct xenbus_device *dev,
 		goto fail;
 	}
 
-	err = xenbus_switch_state(dev, NULL, XenbusStateInitWait);
+	err = xenbus_switch_state(dev, XBT_NULL, XenbusStateInitWait);
 	if (err) {
 		goto fail;
 	}
@@ -109,7 +109,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
 
-	err = xenbus_scanf(NULL, dev->nodename,
+	err = xenbus_scanf(XBT_NULL, dev->nodename,
 	                   "instance","%li", &instance);
 	if (XENBUS_EXIST_ERR(err)) {
 		return;
@@ -120,7 +120,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		return;
 	}
 
-	if (be->is_instance_set != FALSE && be->instance != instance) {
+	if (be->is_instance_set != 0 && be->instance != instance) {
 		printk(KERN_WARNING
 		       "tpmback: changing instance (from %ld to %ld) "
 		       "not allowed.\n",
@@ -128,7 +128,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		return;
 	}
 
-	if (be->is_instance_set == FALSE) {
+	if (be->is_instance_set == 0) {
 		be->tpmif = tpmif_find(dev->otherend_id,
 		                       instance);
 		if (IS_ERR(be->tpmif)) {
@@ -138,7 +138,7 @@ static void backend_changed(struct xenbus_watch *watch,
 			return;
 		}
 		be->instance = instance;
-		be->is_instance_set = TRUE;
+		be->is_instance_set = 1;
 
 		/*
 		 * There's an unfortunate problem:
@@ -177,7 +177,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		xenbus_switch_state(dev, NULL, XenbusStateClosing);
+		xenbus_switch_state(dev, XBT_NULL, XenbusStateClosing);
 		break;
 
 	case XenbusStateClosed:
@@ -230,15 +230,14 @@ static void maybe_connect(struct backend_info *be)
 
 static void connect(struct backend_info *be)
 {
-	struct xenbus_transaction *xbt;
+	xenbus_transaction_t xbt;
 	int err;
 	struct xenbus_device *dev = be->dev;
 	unsigned long ready = 1;
 
 again:
-	xbt = xenbus_transaction_start();
-	if (IS_ERR(xbt)) {
-		err = PTR_ERR(xbt);
+	err = xenbus_transaction_start(&xbt);
+	if (err) {
 		xenbus_dev_fatal(be->dev, err, "starting transaction");
 		return;
 	}

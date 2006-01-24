@@ -11,7 +11,6 @@
 
 #define vbd_sz(_v)   ((_v)->bdev->bd_part ?				\
 	(_v)->bdev->bd_part->nr_sects : (_v)->bdev->bd_disk->capacity)
-#define bdev_put(_b) blkdev_put(_b)
 
 unsigned long vbd_size(struct vbd *vbd)
 {
@@ -69,7 +68,7 @@ int vbd_create(blkif_t *blkif, blkif_vdev_t handle, unsigned major,
 void vbd_free(struct vbd *vbd)
 {
 	if (vbd->bdev)
-		bdev_put(vbd->bdev);
+		blkdev_put(vbd->bdev);
 	vbd->bdev = NULL;
 }
 

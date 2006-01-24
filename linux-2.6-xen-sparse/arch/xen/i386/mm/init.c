@@ -65,7 +65,7 @@ static pmd_t * __init one_md_table_init(pgd_t *pgd)
 {
 	pud_t *pud;
 	pmd_t *pmd_table;
-
+		
 #ifdef CONFIG_X86_PAE
 	pmd_table = (pmd_t *) alloc_bootmem_low_pages(PAGE_SIZE);
 	make_lowmem_page_readonly(pmd_table);

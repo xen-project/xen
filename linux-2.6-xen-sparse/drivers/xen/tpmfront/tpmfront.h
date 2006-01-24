@@ -1,11 +1,6 @@
 #ifndef TPM_FRONT_H
 #define TPM_FRONT_H
 
-#ifndef TRUE
-#define TRUE 1
-#define FALSE 0
-#endif
-
 struct tpm_private {
 	tpmif_tx_interface_t *tx;
 	unsigned int evtchn;

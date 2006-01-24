@@ -208,7 +208,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 pro = i;
 
         ret = -ENOMEM;
-        if ( (d = do_createdomain(dom, pro)) == NULL )
+        if ( (d = domain_create(dom, pro)) == NULL )
             break;
 
         memcpy(d->handle, op->u.createdomain.handle,
@@ -323,7 +323,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         new_affinity = v->cpu_affinity;
         memcpy(cpus_addr(new_affinity),
                &op->u.setvcpuaffinity.cpumap,
-               min((int)BITS_TO_LONGS(NR_CPUS),
+               min((int)(BITS_TO_LONGS(NR_CPUS) * sizeof(long)),
                    (int)sizeof(op->u.setvcpuaffinity.cpumap)));
 
         ret = vcpu_set_affinity(v, &new_affinity);
@@ -450,6 +450,10 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         if ( (v = d->vcpu[op->u.getvcpucontext.vcpu]) == NULL )
             goto getvcpucontext_out;
 
+        ret = -ENODATA;
+        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+            goto getvcpucontext_out;
+
         ret = -ENOMEM;
         if ( (c = xmalloc(struct vcpu_guest_context)) == NULL )
             goto getvcpucontext_out;
@@ -501,7 +505,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         op->u.getvcpuinfo.cpumap   = 0;
         memcpy(&op->u.getvcpuinfo.cpumap,
                cpus_addr(v->cpu_affinity),
-               min((int)BITS_TO_LONGS(NR_CPUS),
+               min((int)(BITS_TO_LONGS(NR_CPUS) * sizeof(long)),
                    (int)sizeof(op->u.getvcpuinfo.cpumap)));
         ret = 0;
 

@@ -35,14 +35,6 @@
  * IN THE SOFTWARE.
  */
 
-#if 1
-#define ASSERT(p)							   \
-	if (!(p)) { printk("Assertion '%s' failed, line %d, file %s", #p , \
-	__LINE__, __FILE__); *(int*)0=0; }
-#else
-#define ASSERT(_p)
-#endif
-
 #include <linux/version.h>
 #include "block.h"
 #include <linux/cdrom.h>
@@ -161,7 +153,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 			   struct blkfront_info *info)
 {
 	const char *message = NULL;
-	struct xenbus_transaction *xbt;
+	xenbus_transaction_t xbt;
 	int err;
 
 	/* Create shared ring, alloc event channel. */
@@ -170,8 +162,8 @@ static int talk_to_backend(struct xenbus_device *dev,
 		goto out;
 
 again:
-	xbt = xenbus_transaction_start();
-	if (IS_ERR(xbt)) {
+	err = xenbus_transaction_start(&xbt);
+	if (err) {
 		xenbus_dev_fatal(dev, err, "starting transaction");
 		goto destroy_blkring;
 	}
@@ -551,7 +543,7 @@ static int blkif_queue_request(struct request *req)
 			lsect = fsect + (bvec->bv_len >> 9) - 1;
 			/* install a grant reference. */
 			ref = gnttab_claim_grant_reference(&gref_head);
-			ASSERT(ref != -ENOSPC);
+			BUG_ON(ref == -ENOSPC);
 
 			gnttab_grant_foreign_access_ref(
 				ref,

@@ -11,6 +11,8 @@ VTPM_DIR = vtpm
 # Emulator tarball name
 TPM_EMULATOR_TARFILE = tpm_emulator-0.2b.tar.gz
 
+GMP_HEADER = /usr/include/gmp.h
+
 all: build
 
 build: $(TPM_EMULATOR_DIR) $(VTPM_DIR) build_sub
@@ -55,5 +57,12 @@ $(VTPM_DIR): $(TPM_EMULATOR_TARFILE)
 	patch -p1 <../vtpm.patch
 
 build_sub:
-	$(MAKE) -C $(TPM_EMULATOR_DIR)
-	$(MAKE) -C $(VTPM_DIR)
+	if [ -e $(GMP_HEADER) ]; then \
+		$(MAKE) -C $(VTPM_DIR); \
+		if [ "$(BUILD_EMULATOR)" = "y" ]; then \
+			$(MAKE) -C $(TPM_EMULATOR_DIR); \
+		fi \
+	else \
+		echo "*** Unable to build VTPMs. libgmp could not be found."; \
+	fi
+

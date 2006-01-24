@@ -27,12 +27,8 @@
  * IN THE SOFTWARE.
  */
 
-#if 0
 #define DPRINTK(fmt, args...) \
-    printk("xenbus_probe (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
-#else
-#define DPRINTK(fmt, args...) ((void)0)
-#endif
+    pr_debug("xenbus_probe (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 
 #include <linux/kernel.h>
 #include <linux/err.h>
@@ -470,12 +466,17 @@ static int cleanup_dev(struct device *dev, void *data)
 
 	DPRINTK("%s", info->nodename);
 
-	if (!strncmp(xendev->nodename, info->nodename, len)) {
-		info->dev = xendev;
-		get_device(dev);
-		return 1;
-	}
-	return 0;
+	/* Match the info->nodename path, or any subdirectory of that path. */
+	if (strncmp(xendev->nodename, info->nodename, len))
+		return 0;
+
+	/* If the node name is longer, ensure it really is a subdirectory. */
+	if ((strlen(xendev->nodename) > len) && (xendev->nodename[len] != '/'))
+		return 0;
+
+	info->dev = xendev;
+	get_device(dev);
+	return 1;
 }
 
 static void xenbus_cleanup_devices(const char *path, struct bus_type *bus)

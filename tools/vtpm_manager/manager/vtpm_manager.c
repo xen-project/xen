@@ -151,9 +151,6 @@ TPM_RESULT VTPM_Create_Service(){
 				    &osap) );
   
   // Generate boot key's auth
-  Crypto_GetRandom(  &vtpm_globals->storage_key_usage_auth, 
-		     sizeof(TPM_AUTHDATA) );
-  
   TPM_AUTHDATA bootKeyWrapAuth;
   memset(&bootKeyWrapAuth, 0, sizeof(bootKeyWrapAuth));
   

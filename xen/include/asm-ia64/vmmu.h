@@ -151,8 +151,8 @@ typedef union thash_cch_mem {
 typedef u64 *(THASH_FN)(PTA pta, u64 va);
 typedef u64 *(TTAG_FN)(PTA pta, u64 va);
 typedef u64 *(GET_MFN_FN)(domid_t d, u64 gpfn, u64 pages);
-typedef void *(REM_NOTIFIER_FN)(struct hash_cb *hcb, thash_data_t *entry);
-typedef void (RECYCLE_FN)(struct hash_cb *hc, u64 para);
+typedef void *(REM_NOTIFIER_FN)(struct thash_cb *hcb, thash_data_t *entry);
+typedef void (RECYCLE_FN)(struct thash_cb *hc, u64 para);
 typedef ia64_rr (GET_RR_FN)(struct vcpu *vcpu, u64 reg);
 typedef thash_data_t *(FIND_OVERLAP_FN)(struct thash_cb *hcb, 
         u64 va, u64 ps, int rid, char cl, search_section_t s_sect);

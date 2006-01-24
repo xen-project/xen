@@ -110,6 +110,20 @@ static inline void kb_wait(void)
             break;
 }
 
+void __attribute__((noreturn)) __machine_halt(void *unused)
+{
+    for ( ; ; )
+        safe_halt();
+}
+
+void machine_halt(void)
+{
+    watchdog_disable();
+    console_start_sync();
+    smp_call_function(__machine_halt, NULL, 1, 0);
+    __machine_halt(NULL);
+}
+
 void machine_restart(char * __unused)
 {
     int i;
@@ -117,8 +131,7 @@ void machine_restart(char * __unused)
     if ( opt_noreboot )
     {
         printk("Reboot disabled on cmdline: require manual reset\n");
-        for ( ; ; )
-            safe_halt();
+        machine_halt();
     }
 
     watchdog_disable();
@@ -164,20 +177,6 @@ void machine_restart(char * __unused)
 }
 
 
-void __attribute__((noreturn)) __machine_halt(void *unused)
-{
-    for ( ; ; )
-        safe_halt();
-}
-
-void machine_halt(void)
-{
-    watchdog_disable();
-    console_start_sync();
-    smp_call_function(__machine_halt, NULL, 1, 0);
-    __machine_halt(NULL);
-}
-
 void dump_pageframe_info(struct domain *d)
 {
     struct pfn_info *page;
@@ -215,7 +214,6 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 
     memset(v, 0, sizeof(*v));
 
-    memcpy(&v->arch, &idle_vcpu[0]->arch, sizeof(v->arch));
     v->arch.flags = TF_kernel_mode;
 
     if ( is_idle_domain(d) )
@@ -223,40 +221,31 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
         percpu_ctxt[vcpu_id].curr_vcpu = v;
         v->arch.schedule_tail = continue_idle_domain;
     }
-
-    if ( (v->vcpu_id = vcpu_id) != 0 )
+    else
     {
-        v->arch.schedule_tail  = d->vcpu[0]->arch.schedule_tail;
-        v->arch.perdomain_ptes =
-            d->arch.mm_perdomain_pt + (vcpu_id << GDT_LDT_VCPU_SHIFT);
+        v->arch.schedule_tail = continue_nonidle_domain;
     }
+
+    v->arch.perdomain_ptes =
+        d->arch.mm_perdomain_pt + (vcpu_id << GDT_LDT_VCPU_SHIFT);
+
+    v->arch.guest_vtable  = __linear_l2_table;
+    v->arch.shadow_vtable = __shadow_linear_l2_table;
+#if defined(__x86_64__)
+    v->arch.guest_vl3table = __linear_l3_table;
+    v->arch.guest_vl4table = __linear_l4_table;
+#endif
 
     return v;
 }
 
 void free_vcpu_struct(struct vcpu *v)
 {
-    BUG_ON(v->next_in_list != NULL);
-    if ( v->vcpu_id != 0 )
-        v->domain->vcpu[v->vcpu_id - 1]->next_in_list = NULL;
     xfree(v);
 }
 
-void free_perdomain_pt(struct domain *d)
+int arch_domain_create(struct domain *d)
 {
-    free_xenheap_pages(
-        d->arch.mm_perdomain_pt,
-        get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t)));
-
-#ifdef __x86_64__
-    free_xenheap_page(d->arch.mm_perdomain_l2);
-    free_xenheap_page(d->arch.mm_perdomain_l3);
-#endif
-}
-
-int arch_do_createdomain(struct vcpu *v)
-{
-    struct domain *d = v->domain;
     l1_pgentry_t gdt_l1e;
     int vcpuid, pdpt_order, rc;
 #ifdef __x86_64__
@@ -267,9 +256,7 @@ int arch_do_createdomain(struct vcpu *v)
     d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order);
     if ( d->arch.mm_perdomain_pt == NULL )
         goto fail_nomem;
-
     memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE << pdpt_order);
-    v->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
 
     /*
      * Map Xen segments into every VCPU's GDT, irrespective of whether every
@@ -283,19 +270,11 @@ int arch_do_createdomain(struct vcpu *v)
         d->arch.mm_perdomain_pt[((vcpuid << GDT_LDT_VCPU_SHIFT) +
                                  FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
 
-    v->arch.guest_vtable  = __linear_l2_table;
-    v->arch.shadow_vtable = __shadow_linear_l2_table;
-
 #if defined(__i386__)
 
-    d->arch.mapcache.l1tab = d->arch.mm_perdomain_pt +
-        (GDT_LDT_MBYTES << (20 - PAGE_SHIFT));
-    spin_lock_init(&d->arch.mapcache.lock);
+    mapcache_init(d);
 
 #else /* __x86_64__ */
-
-    v->arch.guest_vl3table = __linear_l3_table;
-    v->arch.guest_vl4table = __linear_l4_table;
 
     d->arch.mm_perdomain_l2 = alloc_xenheap_page();
     d->arch.mm_perdomain_l3 = alloc_xenheap_page();
@@ -333,10 +312,7 @@ int arch_do_createdomain(struct vcpu *v)
             goto fail_nomem;
 
         memset(d->shared_info, 0, PAGE_SIZE);
-        v->vcpu_info = &d->shared_info->vcpu_info[v->vcpu_id];
         SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
-
-        v->arch.schedule_tail = continue_nonidle_domain;
     }
 
     return 0;
@@ -349,6 +325,20 @@ int arch_do_createdomain(struct vcpu *v)
 #endif
     free_xenheap_pages(d->arch.mm_perdomain_pt, pdpt_order);
     return -ENOMEM;
+}
+
+void arch_domain_destroy(struct domain *d)
+{
+    free_xenheap_pages(
+        d->arch.mm_perdomain_pt,
+        get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t)));
+
+#ifdef __x86_64__
+    free_xenheap_page(d->arch.mm_perdomain_l2);
+    free_xenheap_page(d->arch.mm_perdomain_l3);
+#endif
+
+    free_xenheap_page(d->shared_info);
 }
 
 /* This is called by arch_final_setup_guest and do_boot_vcpu */
@@ -481,14 +471,6 @@ void new_thread(struct vcpu *d,
 
 
 #ifdef __x86_64__
-
-void toggle_guest_mode(struct vcpu *v)
-{
-    v->arch.flags ^= TF_kernel_mode;
-    __asm__ __volatile__ ( "swapgs" );
-    update_pagetables(v);
-    write_ptbase(v);
-}
 
 #define loadsegment(seg,value) ({               \
     int __r = 1;                                \
@@ -659,35 +641,6 @@ static void save_segments(struct vcpu *v)
     percpu_ctxt[smp_processor_id()].dirty_segment_mask = dirty_segment_mask;
 }
 
-long do_switch_to_user(void)
-{
-    struct cpu_user_regs  *regs = guest_cpu_user_regs();
-    struct switch_to_user  stu;
-    struct vcpu    *v = current;
-
-    if ( unlikely(copy_from_user(&stu, (void *)regs->rsp, sizeof(stu))) ||
-         unlikely(pagetable_get_paddr(v->arch.guest_table_user) == 0) )
-        return -EFAULT;
-
-    toggle_guest_mode(v);
-
-    regs->rip    = stu.rip;
-    regs->cs     = stu.cs | 3; /* force guest privilege */
-    regs->rflags = (stu.rflags & ~(EF_IOPL|EF_VM)) | EF_IE;
-    regs->rsp    = stu.rsp;
-    regs->ss     = stu.ss | 3; /* force guest privilege */
-
-    if ( !(stu.flags & VGCF_IN_SYSCALL) )
-    {
-        regs->entry_vector = 0;
-        regs->r11 = stu.r11;
-        regs->rcx = stu.rcx;
-    }
-
-    /* Saved %rax gets written back to regs->rax in entry.S. */
-    return stu.rax;
-}
-
 #define switch_kernel_stack(_n,_c) ((void)0)
 
 #elif defined(__i386__)
@@ -785,7 +738,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     if ( unlikely(!cpu_isset(cpu, dirty_mask) && !cpus_empty(dirty_mask)) )
     {
         /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
-        flush_tlb_mask(dirty_mask);
+        if ( !cpus_empty(next->vcpu_dirty_cpumask) )
+            flush_tlb_mask(next->vcpu_dirty_cpumask);
     }
 
     local_irq_disable();

@@ -1204,7 +1204,7 @@ int store_console_dev(int domid, char *pts)
         return -1;
     }
     strcat(path, "/console/tty");
-    if (!xs_write(xs, NULL, path, pts, strlen(pts))) {
+    if (!xs_write(xs, XBT_NULL, path, pts, strlen(pts))) {
         fprintf(logfile, "xs_write for console fail");
         return -1;
     }

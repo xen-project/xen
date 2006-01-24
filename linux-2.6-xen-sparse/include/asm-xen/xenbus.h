@@ -37,7 +37,7 @@
 #include <asm-xen/xen-public/io/xenbus.h>
 #include <asm-xen/xen-public/io/xs_wire.h>
 
-#define XBT_NULL NULL
+#define XBT_NULL 0
 
 /* Register callback to watch this node. */
 struct xenbus_watch
@@ -102,35 +102,35 @@ int xenbus_register_frontend(struct xenbus_driver *drv);
 int xenbus_register_backend(struct xenbus_driver *drv);
 void xenbus_unregister_driver(struct xenbus_driver *drv);
 
-struct xenbus_transaction;
+typedef u32 xenbus_transaction_t;
 
-char **xenbus_directory(struct xenbus_transaction *t,
+char **xenbus_directory(xenbus_transaction_t t,
 			const char *dir, const char *node, unsigned int *num);
-void *xenbus_read(struct xenbus_transaction *t,
+void *xenbus_read(xenbus_transaction_t t,
 		  const char *dir, const char *node, unsigned int *len);
-int xenbus_write(struct xenbus_transaction *t,
+int xenbus_write(xenbus_transaction_t t,
 		 const char *dir, const char *node, const char *string);
-int xenbus_mkdir(struct xenbus_transaction *t,
+int xenbus_mkdir(xenbus_transaction_t t,
 		 const char *dir, const char *node);
-int xenbus_exists(struct xenbus_transaction *t,
+int xenbus_exists(xenbus_transaction_t t,
 		  const char *dir, const char *node);
-int xenbus_rm(struct xenbus_transaction *t, const char *dir, const char *node);
-struct xenbus_transaction *xenbus_transaction_start(void);
-int xenbus_transaction_end(struct xenbus_transaction *t, int abort);
+int xenbus_rm(xenbus_transaction_t t, const char *dir, const char *node);
+int xenbus_transaction_start(xenbus_transaction_t *t);
+int xenbus_transaction_end(xenbus_transaction_t t, int abort);
 
 /* Single read and scanf: returns -errno or num scanned if > 0. */
-int xenbus_scanf(struct xenbus_transaction *t,
+int xenbus_scanf(xenbus_transaction_t t,
 		 const char *dir, const char *node, const char *fmt, ...)
 	__attribute__((format(scanf, 4, 5)));
 
 /* Single printf and write: returns -errno or 0. */
-int xenbus_printf(struct xenbus_transaction *t,
+int xenbus_printf(xenbus_transaction_t t,
 		  const char *dir, const char *node, const char *fmt, ...)
 	__attribute__((format(printf, 4, 5)));
 
 /* Generic read function: NULL-terminated triples of name,
  * sprintf-style type string, and pointer. Returns 0 or errno.*/
-int xenbus_gather(struct xenbus_transaction *t, const char *dir, ...);
+int xenbus_gather(xenbus_transaction_t t, const char *dir, ...);
 
 /* notifer routines for when the xenstore comes up */
 int register_xenstore_notifier(struct notifier_block *nb);
@@ -196,7 +196,7 @@ int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
  * XenbusStateClosing, and the error will be saved in the store.
  */
 int xenbus_switch_state(struct xenbus_device *dev,
-			struct xenbus_transaction *xbt,
+			xenbus_transaction_t xbt,
 			XenbusState new_state);
 
 

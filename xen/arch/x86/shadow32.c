@@ -726,6 +726,7 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     l2_pgentry_t *mpl2e;
     struct pfn_info *mmfn_info;
     struct domain *d = v->domain;
+    int i;
 
     ASSERT(pagetable_get_paddr(v->arch.monitor_table) == 0);
 
@@ -733,16 +734,17 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     ASSERT(mmfn_info != NULL);
 
     mmfn = page_to_pfn(mmfn_info);
-    mpl2e = (l2_pgentry_t *)map_domain_page(mmfn);
+    mpl2e = (l2_pgentry_t *)map_domain_page_global(mmfn);
     memset(mpl2e, 0, PAGE_SIZE);
 
     memcpy(&mpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
            &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
 
-    mpl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
-        l2e_from_paddr(__pa(d->arch.mm_perdomain_pt),
-                        __PAGE_HYPERVISOR);
+    for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
+        mpl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
+            l2e_from_page(virt_to_page(d->arch.mm_perdomain_pt) + i,
+                          __PAGE_HYPERVISOR);
 
     // map the phys_to_machine map into the Read-Only MPT space for this domain
     mpl2e[l2_table_offset(RO_MPT_VIRT_START)] =
@@ -794,7 +796,7 @@ void free_monitor_pagetable(struct vcpu *v)
      * Then free monitor_table.
      */
     mfn = pagetable_get_pfn(v->arch.monitor_table);
-    unmap_domain_page(v->arch.monitor_vtable);
+    unmap_domain_page_global(v->arch.monitor_vtable);
     free_domheap_page(pfn_to_page(mfn));
 
     v->arch.monitor_table = mk_pagetable(0);
@@ -929,7 +931,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         if ( v->arch.guest_vtable &&
              (v->arch.guest_vtable != __linear_l2_table) )
         {
-            unmap_domain_page(v->arch.guest_vtable);
+            unmap_domain_page_global(v->arch.guest_vtable);
         }
         if ( (mode & (SHM_translate | SHM_external)) == SHM_translate )
             v->arch.guest_vtable = __linear_l2_table;
@@ -942,7 +944,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         if ( v->arch.shadow_vtable &&
              (v->arch.shadow_vtable != __shadow_linear_l2_table) )
         {
-            unmap_domain_page(v->arch.shadow_vtable);
+            unmap_domain_page_global(v->arch.shadow_vtable);
         }
         if ( !(mode & SHM_external) )
             v->arch.shadow_vtable = __shadow_linear_l2_table;
@@ -955,7 +957,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         if ( v->arch.hl2_vtable &&
              (v->arch.hl2_vtable != __linear_hl2_table) )
         {
-            unmap_domain_page(v->arch.hl2_vtable);
+            unmap_domain_page_global(v->arch.hl2_vtable);
         }
         if ( (mode & (SHM_translate | SHM_external)) == SHM_translate )
             v->arch.hl2_vtable = __linear_hl2_table;
@@ -1508,6 +1510,7 @@ static unsigned long shadow_l2_table(
 {
     unsigned long smfn;
     l2_pgentry_t *spl2e;
+    int i;
 
     SH_VVLOG("shadow_l2_table(gpfn=%lx, gmfn=%lx)", gpfn, gmfn);
 
@@ -1542,9 +1545,11 @@ static unsigned long shadow_l2_table(
         spl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)] =
             l2e_from_pfn(smfn, __PAGE_HYPERVISOR);
 
-        spl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
-            l2e_from_paddr(__pa(page_get_owner(pfn_to_page(gmfn))->arch.mm_perdomain_pt),
-                            __PAGE_HYPERVISOR);
+        for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
+            spl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
+            l2e_from_page(virt_to_page(page_get_owner(pfn_to_page(gmfn))->
+                                       arch.mm_perdomain_pt) + i,
+                          __PAGE_HYPERVISOR);
 
         if ( shadow_mode_translate(d) ) // NB: not external
         {
@@ -2891,6 +2896,7 @@ void __update_pagetables(struct vcpu *v)
     unsigned long gmfn = pagetable_get_pfn(v->arch.guest_table);
     unsigned long gpfn = __mfn_to_gpfn(d, gmfn);
     unsigned long smfn, hl2mfn, old_smfn;
+    int need_sync = 0;
 
     int max_mode = ( shadow_mode_external(d) ? SHM_external
                      : shadow_mode_translate(d) ? SHM_translate
@@ -2906,8 +2912,8 @@ void __update_pagetables(struct vcpu *v)
     if ( max_mode & (SHM_enable | SHM_external) )
     {
         if ( likely(v->arch.guest_vtable != NULL) )
-            unmap_domain_page(v->arch.guest_vtable);
-        v->arch.guest_vtable = map_domain_page(gmfn);
+            unmap_domain_page_global(v->arch.guest_vtable);
+        v->arch.guest_vtable = map_domain_page_global(gmfn);
     }
 
     /*
@@ -2916,7 +2922,13 @@ void __update_pagetables(struct vcpu *v)
     if ( unlikely(!(smfn = __shadow_status(d, gpfn, PGT_base_page_table))) )
         smfn = shadow_l2_table(d, gpfn, gmfn);
     else
-        shadow_sync_all(d);
+    {
+        /*
+         *  move sync later in order to avoid this smfn been 
+         *  unshadowed occasionally
+         */
+        need_sync = 1;
+    }
     if ( !get_shadow_ref(smfn) )
         BUG();
     old_smfn = pagetable_get_pfn(v->arch.shadow_table);
@@ -2932,8 +2944,8 @@ void __update_pagetables(struct vcpu *v)
     if ( max_mode == SHM_external )
     {
         if ( v->arch.shadow_vtable )
-            unmap_domain_page(v->arch.shadow_vtable);
-        v->arch.shadow_vtable = map_domain_page(smfn);
+            unmap_domain_page_global(v->arch.shadow_vtable);
+        v->arch.shadow_vtable = map_domain_page_global(smfn);
     }
 
     /*
@@ -2948,8 +2960,8 @@ void __update_pagetables(struct vcpu *v)
         if ( unlikely(!(hl2mfn = __shadow_status(d, gpfn, PGT_hl2_shadow))) )
             hl2mfn = shadow_hl2_table(d, gpfn, gmfn, smfn);
         if ( v->arch.hl2_vtable )
-            unmap_domain_page(v->arch.hl2_vtable);
-        v->arch.hl2_vtable = map_domain_page(hl2mfn);
+            unmap_domain_page_global(v->arch.hl2_vtable);
+        v->arch.hl2_vtable = map_domain_page_global(hl2mfn);
     }
 
     /*
@@ -2980,6 +2992,9 @@ void __update_pagetables(struct vcpu *v)
         // XXX - maybe this can be optimized somewhat??
         local_flush_tlb();
     }
+
+    if(likely(need_sync))
+        shadow_sync_all(d);
 }
 
 void clear_all_shadow_status(struct domain *d)

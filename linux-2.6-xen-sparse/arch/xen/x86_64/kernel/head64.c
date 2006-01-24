@@ -68,13 +68,13 @@ static void __init copy_bootdata(char *real_mode_data)
 
 static void __init setup_boot_cpu_data(void)
 {
-	int dummy, eax;
+	unsigned int dummy, eax;
 
 	/* get vendor info */
-	cpuid(0, &boot_cpu_data.cpuid_level,
-	      (int *)&boot_cpu_data.x86_vendor_id[0],
-	      (int *)&boot_cpu_data.x86_vendor_id[8],
-	      (int *)&boot_cpu_data.x86_vendor_id[4]);
+	cpuid(0, (unsigned int *)&boot_cpu_data.cpuid_level,
+	      (unsigned int *)&boot_cpu_data.x86_vendor_id[0],
+	      (unsigned int *)&boot_cpu_data.x86_vendor_id[8],
+	      (unsigned int *)&boot_cpu_data.x86_vendor_id[4]);
 
 	/* get cpu type */
 	cpuid(1, &eax, &dummy, &dummy,
@@ -109,7 +109,6 @@ void __init x86_64_start_kernel(char * real_mode_data)
 	if (s != NULL)
 		setup_early_printk(s);
 #endif
-
 #ifdef CONFIG_DISCONTIGMEM
 	s = strstr(saved_command_line, "numa=");
 	if (s != NULL)

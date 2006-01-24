@@ -47,7 +47,7 @@
 
 struct xenbus_dev_transaction {
 	struct list_head list;
-	struct xenbus_transaction *handle;
+	xenbus_transaction_t handle;
 };
 
 struct xenbus_dev_data {
@@ -147,13 +147,11 @@ static ssize_t xenbus_dev_write(struct file *filp,
 		}
 
 		if (u->u.msg.type == XS_TRANSACTION_START) {
-			trans->handle = (struct xenbus_transaction *)
-				simple_strtoul(reply, NULL, 0);
+			trans->handle = simple_strtoul(reply, NULL, 0);
 			list_add(&trans->list, &u->transactions);
 		} else if (u->u.msg.type == XS_TRANSACTION_END) {
 			list_for_each_entry(trans, &u->transactions, list)
-				if ((unsigned long)trans->handle ==
-				    (unsigned long)u->u.msg.tx_id)
+				if (trans->handle == u->u.msg.tx_id)
 					break;
 			BUG_ON(&trans->list == &u->transactions);
 			list_del(&trans->list);

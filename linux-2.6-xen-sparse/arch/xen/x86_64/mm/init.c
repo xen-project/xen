@@ -40,14 +40,14 @@
 #include <asm/proto.h>
 #include <asm/smp.h>
 
+#ifndef Dprintk
+#define Dprintk(x...)
+#endif
+
 extern unsigned long *contiguous_bitmap;
 
 #if defined(CONFIG_SWIOTLB)
 extern void swiotlb_init(void);
-#endif
-
-#ifndef Dprintk
-#define Dprintk(x...)
 #endif
 
 extern char _stext[];
@@ -200,9 +200,9 @@ static void *spp_getpage(void)
 
 static inline pud_t *pud_offset_u(unsigned long address)
 {
-        pud_t *pud = level3_user_pgt;
+	pud_t *pud = level3_user_pgt;
 
-        return pud + pud_index(address);
+	return pud + pud_index(address);
 }
 
 static void set_pte_phys(unsigned long vaddr,
@@ -215,34 +215,27 @@ static void set_pte_phys(unsigned long vaddr,
 
 	Dprintk("set_pte_phys %lx to %lx\n", vaddr, phys);
 
-        pgd = (user_mode ? pgd_offset_u(vaddr) : pgd_offset_k(vaddr));
-
+	pgd = (user_mode ? pgd_offset_u(vaddr) : pgd_offset_k(vaddr));
 	if (pgd_none(*pgd)) {
 		printk("PGD FIXMAP MISSING, it should be setup in head.S!\n");
 		return;
 	}
-        
-        pud = (user_mode ? pud_offset_u(vaddr) : pud_offset(pgd, vaddr));
-
+	pud = (user_mode ? pud_offset_u(vaddr) : pud_offset(pgd, vaddr));
 	if (pud_none(*pud)) {
 		pmd = (pmd_t *) spp_getpage(); 
-
-                make_page_readonly(pmd);
-                xen_pmd_pin(__pa(pmd));
+		make_page_readonly(pmd);
+		xen_pmd_pin(__pa(pmd));
 		set_pud(pud, __pud(__pa(pmd) | _KERNPG_TABLE | _PAGE_USER));
 		if (pmd != pmd_offset(pud, 0)) {
 			printk("PAGETABLE BUG #01! %p <-> %p\n", pmd, pmd_offset(pud,0));
 			return;
 		}
 	}
-
 	pmd = pmd_offset(pud, vaddr);
-
 	if (pmd_none(*pmd)) {
 		pte = (pte_t *) spp_getpage();
-                make_page_readonly(pte);
-
-                xen_pte_pin(__pa(pte));
+		make_page_readonly(pte);
+		xen_pte_pin(__pa(pte));
 		set_pmd(pmd, __pmd(__pa(pte) | _KERNPG_TABLE | _PAGE_USER));
 		if (pte != pte_offset_kernel(pmd, 0)) {
 			printk("PAGETABLE BUG #02!\n");
@@ -252,11 +245,10 @@ static void set_pte_phys(unsigned long vaddr,
 	new_pte = pfn_pte(phys >> PAGE_SHIFT, prot);
 
 	pte = pte_offset_kernel(pmd, vaddr);
-
 	if (!pte_none(*pte) &&
 	    pte_val(*pte) != (pte_val(new_pte) & __supported_pte_mask))
 		pte_ERROR(*pte);
-        set_pte(pte, new_pte);
+	set_pte(pte, new_pte);
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -284,11 +276,11 @@ static void set_pte_phys_ma(unsigned long vaddr,
 	if (pud_none(*pud)) {
 
 		pmd = (pmd_t *) spp_getpage(); 
-                make_page_readonly(pmd);
-                xen_pmd_pin(__pa(pmd));
+		make_page_readonly(pmd);
+		xen_pmd_pin(__pa(pmd));
 
 		set_pud(pud, __pud(__pa(pmd) | _KERNPG_TABLE | _PAGE_USER));
-         
+
 		if (pmd != pmd_offset(pud, 0)) {
 			printk("PAGETABLE BUG #01! %p <-> %p\n", pmd, pmd_offset(pud,0));
 			return;
@@ -298,8 +290,8 @@ static void set_pte_phys_ma(unsigned long vaddr,
 
 	if (pmd_none(*pmd)) {
 		pte = (pte_t *) spp_getpage();
-                make_page_readonly(pte);  
-                xen_pte_pin(__pa(pte));
+		make_page_readonly(pte);  
+		xen_pte_pin(__pa(pte));
 
 		set_pmd(pmd, __pmd(__pa(pte) | _KERNPG_TABLE | _PAGE_USER));
 		if (pte != pte_offset_kernel(pmd, 0)) {
@@ -311,12 +303,12 @@ static void set_pte_phys_ma(unsigned long vaddr,
 	new_pte = pfn_pte_ma(phys >> PAGE_SHIFT, prot);
 	pte = pte_offset_kernel(pmd, vaddr);
 
-        /* 
-         * Note that the pte page is already RO, thus we want to use
-         * xen_l1_entry_update(), not set_pte().
-         */
-        xen_l1_entry_update(pte, 
-                            pfn_pte_ma(phys >> PAGE_SHIFT, prot));
+	/* 
+	 * Note that the pte page is already RO, thus we want to use
+	 * xen_l1_entry_update(), not set_pte().
+	 */
+	xen_l1_entry_update(pte, 
+			    pfn_pte_ma(phys >> PAGE_SHIFT, prot));
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -347,7 +339,6 @@ void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
 	}
 }
 
-
 /*
  * At this point it only supports vsyscall area.
  */
@@ -360,18 +351,18 @@ void __set_fixmap_user (enum fixed_addresses idx, unsigned long phys, pgprot_t p
 		return;
 	}
 
-        set_pte_phys(address, phys, prot, SET_FIXMAP_USER); 
+	set_pte_phys(address, phys, prot, SET_FIXMAP_USER); 
 }
 
 unsigned long __initdata table_start, tables_space; 
 
 unsigned long get_machine_pfn(unsigned long addr)
 {
-        pud_t* pud = pud_offset_k(addr);
-        pmd_t* pmd = pmd_offset(pud, addr);
-        pte_t *pte = pte_offset_kernel(pmd, addr);
-        
-        return pte_mfn(*pte);
+	pud_t* pud = pud_offset_k(addr);
+	pmd_t* pmd = pmd_offset(pud, addr);
+	pte_t *pte = pte_offset_kernel(pmd, addr);
+
+	return pte_mfn(*pte);
 } 
 
 static __init void *alloc_static_page(unsigned long *phys)
@@ -411,12 +402,11 @@ static inline int make_readonly(unsigned long paddr)
 
 static void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
 { 
-        long i, j, k; 
-        unsigned long paddr;
+	long i, j, k; 
+	unsigned long paddr;
 
 	i = pud_index(address);
 	pud = pud + i;
-
 	for (; i < PTRS_PER_PUD; pud++, i++) {
 		unsigned long pmd_phys;
 		pmd_t *pmd;
@@ -429,38 +419,37 @@ static void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned lon
 		} 
 
 		pmd = alloc_static_page(&pmd_phys);
-                early_make_page_readonly(pmd);
-                xen_pmd_pin(pmd_phys);
+		early_make_page_readonly(pmd);
+		xen_pmd_pin(pmd_phys);
 		set_pud(pud, __pud(pmd_phys | _KERNPG_TABLE));
-
       		for (j = 0; j < PTRS_PER_PMD; pmd++, j++) {
-                        unsigned long pte_phys;
-                        pte_t *pte, *pte_save;
+			unsigned long pte_phys;
+			pte_t *pte, *pte_save;
 
 			if (paddr >= end) { 
 				for (; j < PTRS_PER_PMD; j++, pmd++)
 					set_pmd(pmd,  __pmd(0)); 
 				break;
 			}
-                        pte = alloc_static_page(&pte_phys);
-                        pte_save = pte;
-                        for (k = 0; k < PTRS_PER_PTE; pte++, k++, paddr += PTE_SIZE) {
-                                if ((paddr >= end) ||
-                                    ((paddr >> PAGE_SHIFT) >=
-                                     xen_start_info->nr_pages)) { 
-                                        __set_pte(pte, __pte(0)); 
-                                        continue;
-                                }
-                                if (make_readonly(paddr)) {
-                                        __set_pte(pte, 
-                                                __pte(paddr | (_KERNPG_TABLE & ~_PAGE_RW)));
-                                        continue;
-                                }
-                                __set_pte(pte, __pte(paddr | _KERNPG_TABLE));
-                        }
-                        pte = pte_save;
-                        early_make_page_readonly(pte);  
-                        xen_pte_pin(pte_phys);
+			pte = alloc_static_page(&pte_phys);
+			pte_save = pte;
+			for (k = 0; k < PTRS_PER_PTE; pte++, k++, paddr += PTE_SIZE) {
+				if ((paddr >= end) ||
+				    ((paddr >> PAGE_SHIFT) >=
+				     xen_start_info->nr_pages)) { 
+					__set_pte(pte, __pte(0)); 
+					continue;
+				}
+				if (make_readonly(paddr)) {
+					__set_pte(pte, 
+						__pte(paddr | (_KERNPG_TABLE & ~_PAGE_RW)));
+					continue;
+				}
+				__set_pte(pte, __pte(paddr | _KERNPG_TABLE));
+			}
+			pte = pte_save;
+			early_make_page_readonly(pte);  
+			xen_pte_pin(pte_phys);
 			set_pmd(pmd, __pmd(pte_phys | _KERNPG_TABLE));
 		}
 	}
@@ -506,7 +495,7 @@ void __init xen_init_pt(void)
 	level3_kernel_pgt[pud_index(__START_KERNEL_map)] = 
 		__pud(__pa_symbol(level2_kernel_pgt) |
 		      _KERNPG_TABLE | _PAGE_USER);
-        memcpy((void *)level2_kernel_pgt, page, PAGE_SIZE);
+	memcpy((void *)level2_kernel_pgt, page, PAGE_SIZE);
 
 	early_make_page_readonly(init_level4_pgt);
 	early_make_page_readonly(init_level4_user_pgt);
@@ -618,7 +607,7 @@ extern struct x8664_pda cpu_pda[NR_CPUS];
 
 void zap_low_mappings(void)
 {
-        /* this is not required for Xen */
+	/* this is not required for Xen */
 #if 0
 	swap_low_mappings();
 #endif
@@ -629,11 +618,11 @@ void __init paging_init(void)
 {
 	{
 		unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
-                /*	unsigned int max_dma; */
-                /* max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT; */
-                /* if (end_pfn < max_dma) */
+		/*	unsigned int max_dma; */
+		/* max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT; */
+		/* if (end_pfn < max_dma) */
 			zones_size[ZONE_DMA] = end_pfn;
-#if 0                
+#if 0
 		else {
 			zones_size[ZONE_DMA] = max_dma;
 			zones_size[ZONE_NORMAL] = end_pfn - max_dma;
@@ -642,16 +631,16 @@ void __init paging_init(void)
 		free_area_init(zones_size);
 	}
 
-        set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
-        HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
+	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 
-        memset(empty_zero_page, 0, sizeof(empty_zero_page));
+	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 	init_mm.context.pinned = 1;
 
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
 	{
 		int i;
-        /* Setup mapping of lower 1st MB */
+		/* Setup mapping of lower 1st MB */
 		for (i = 0; i < NR_FIX_ISAMAPS; i++)
 			if (xen_start_info->flags & SIF_PRIVILEGED)
 				set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
@@ -701,7 +690,7 @@ void __init clear_kernel_mapping(unsigned long address, unsigned long size)
 
 static inline int page_is_ram (unsigned long pagenr)
 {
-        return 1;
+	return 1;
 }
 
 static struct kcore_list kcore_mem, kcore_vmalloc, kcore_kernel, kcore_modules,
@@ -790,10 +779,10 @@ extern char __initdata_begin[], __initdata_end[];
 void free_initmem(void)
 {
 #ifdef __DO_LATER__
-        /*
-         * Some pages can be pinned, but some are not. Unpinning such pages 
-         * triggers BUG(). 
-         */
+	/*
+	 * Some pages can be pinned, but some are not. Unpinning such pages 
+	 * triggers BUG(). 
+	 */
 	unsigned long addr;
 
 	addr = (unsigned long)(&__init_begin);
@@ -801,12 +790,12 @@ void free_initmem(void)
 		ClearPageReserved(virt_to_page(addr));
 		set_page_count(virt_to_page(addr), 1);
 		memset((void *)(addr & ~(PAGE_SIZE-1)), 0xcc, PAGE_SIZE); 
-                xen_pte_unpin(__pa(addr));
-                make_page_writable(__va(__pa(addr)));
-                /*
-                 * Make pages from __PAGE_OFFSET address as well
-                 */
-                make_page_writable((void *)addr);
+		xen_pte_unpin(__pa(addr));
+		make_page_writable(__va(__pa(addr)));
+		/*
+		 * Make pages from __PAGE_OFFSET address as well
+		 */
+		make_page_writable((void *)addr);
 		free_page(addr);
 		totalram_pages++;
 	}
@@ -856,7 +845,7 @@ int kern_addr_valid(unsigned long addr)
 	if (pgd_none(*pgd))
 		return 0;
 
-        pud = pud_offset_k(addr);
+	pud = pud_offset_k(addr);
 	if (pud_none(*pud))
 		return 0; 
 

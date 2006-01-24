@@ -9,7 +9,7 @@
 
 /* Maximum number of virtual CPUs in multi-processor guests. */
 /* WARNING: before changing this, check that shared_info fits on a page */
-#define MAX_VIRT_CPUS 1
+#define MAX_VIRT_CPUS 4
 
 #ifndef __ASSEMBLY__
 

@@ -34,13 +34,8 @@
 /* xenbus_probe.c */
 extern char *kasprintf(const char *fmt, ...);
 
-#if 0
 #define DPRINTK(fmt, args...) \
-    printk("xenbus_client (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
-#else
-#define DPRINTK(fmt, args...) ((void)0)
-#endif
-
+    pr_debug("xenbus_client (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 
 int xenbus_watch_path(struct xenbus_device *dev, const char *path,
 		      struct xenbus_watch *watch, 
@@ -87,7 +82,7 @@ EXPORT_SYMBOL(xenbus_watch_path2);
 
 
 int xenbus_switch_state(struct xenbus_device *dev,
-			struct xenbus_transaction *xbt,
+			xenbus_transaction_t xbt,
 			XenbusState state)
 {
 	/* We check whether the state is currently set to the given value, and

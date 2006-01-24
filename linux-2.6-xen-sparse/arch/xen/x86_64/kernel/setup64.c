@@ -33,6 +33,7 @@
 #ifdef CONFIG_XEN
 #include <asm/hypervisor.h>
 #endif
+
 char x86_boot_params[BOOT_PARAM_SIZE] __initdata = {0,};
 
 cpumask_t cpu_initialized __cpuinitdata = CPU_MASK_NONE;
@@ -165,7 +166,6 @@ void __init cpu_gdt_init(struct desc_ptr *gdt_descr)
 }
 #endif
 
-
 void pda_init(int cpu)
 { 
 	struct x8664_pda *pda = &cpu_pda[cpu];
@@ -175,9 +175,10 @@ void pda_init(int cpu)
 #ifndef CONFIG_XEN
 	wrmsrl(MSR_GS_BASE, cpu_pda + cpu);
 #else
-        HYPERVISOR_set_segment_base(SEGBASE_GS_KERNEL, 
-                                    (unsigned long)(cpu_pda + cpu));
+	HYPERVISOR_set_segment_base(SEGBASE_GS_KERNEL, 
+				    (unsigned long)(cpu_pda + cpu));
 #endif
+
 	pda->me = pda;
 	pda->cpunumber = cpu; 
 	pda->irqcount = -1;
@@ -201,6 +202,7 @@ void pda_init(int cpu)
 	}
 
 	switch_pt();
+
 	pda->irqstackptr += IRQSTACKSIZE-64;
 } 
 

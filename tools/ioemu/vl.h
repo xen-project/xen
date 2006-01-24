@@ -354,6 +354,9 @@ int register_savevm(const char *idstr,
 void qemu_get_timer(QEMUFile *f, QEMUTimer *ts);
 void qemu_put_timer(QEMUFile *f, QEMUTimer *ts);
 
+/* port-e9.c */
+void port_e9_init(void);
+
 /* block.c */
 typedef struct BlockDriverState BlockDriverState;
 typedef struct BlockDriver BlockDriver;

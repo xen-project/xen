@@ -10,8 +10,6 @@
 #include <asm/vmx_platform.h>
 #include <xen/list.h>
 
-extern int arch_do_createdomain(struct vcpu *);
-
 extern void domain_relinquish_resources(struct domain *);
 
 struct arch_domain {

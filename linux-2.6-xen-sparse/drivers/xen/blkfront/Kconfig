@@ -1,6 +1,0 @@
-
-config XENBLOCK
-	tristate "Block device driver"
-	depends on ARCH_XEN
-	help
-	  Block device driver for Xen

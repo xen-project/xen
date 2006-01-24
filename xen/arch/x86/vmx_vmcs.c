@@ -193,7 +193,7 @@ static void vmx_map_io_shared_page(struct domain *d)
         domain_crash_synchronous();
     }
 
-    p = map_domain_page(mpfn);
+    p = map_domain_page_global(mpfn);
     if (p == NULL) {
         printk("Can not map io request shared page for VMX domain.\n");
         domain_crash_synchronous();
@@ -341,7 +341,7 @@ static void vmx_do_launch(struct vcpu *v)
         vlapic_init(v);
 
     vmx_set_host_env(v);
-    init_ac_timer(&v->arch.arch_vmx.hlt_timer, hlt_timer_fn, v, v->processor);
+    init_timer(&v->arch.arch_vmx.hlt_timer, hlt_timer_fn, v, v->processor);
 
     error |= __vmwrite(GUEST_LDTR_SELECTOR, 0);
     error |= __vmwrite(GUEST_LDTR_BASE, 0);

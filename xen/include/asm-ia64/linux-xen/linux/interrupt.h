@@ -104,6 +104,7 @@ extern void local_bh_enable(void);
    al. should be converted to tasklets, not to softirqs.
  */
 
+#ifndef XEN
 enum
 {
 	HI_SOFTIRQ=0,
@@ -113,6 +114,7 @@ enum
 	SCSI_SOFTIRQ,
 	TASKLET_SOFTIRQ
 };
+#endif
 
 /* softirq mask and active fields moved to irq_cpustat_t in
  * asm/hardirq.h to get better cache usage.  KAO

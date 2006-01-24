@@ -23,7 +23,8 @@ unsigned long xc_ia64_fpsr_default(void)
 }
 
 int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters, 
-                  uint32_t max_factor, uint32_t flags, int (*suspend)(void))
+                  uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
+                  int (*suspend)(int domid))
 {
     PERROR("xc_linux_save not implemented\n");
     return -1;
@@ -664,15 +665,7 @@ int xc_vmx_build(int xc_handle,
         goto error_out;
     }
 
-    if ( xc_vcpu_getcontext(xc_handle, domid, 0, ctxt) ){
-        PERROR("Could not get vcpu context");
-        goto error_out;
-    }
-
-    if ( !(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED) ) {
-        ERROR("Domain is already constructed");
-        goto error_out;
-    }
+    memset(ctxt, 0, sizeof(*ctxt));
 
     if ( setup_guest(xc_handle, domid, (unsigned long)memsize, image, image_size, 
                        control_evtchn, store_evtchn, store_mfn ) < 0 ){

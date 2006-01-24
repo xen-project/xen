@@ -13,12 +13,43 @@ struct trap_bounce {
     unsigned long  eip;
 };
 
+#define MAPHASH_ENTRIES 8
+#define MAPHASH_HASHFN(pfn) ((pfn) & (MAPHASH_ENTRIES-1))
+#define MAPHASHENT_NOTINUSE ((u16)~0U)
+struct vcpu_maphash {
+    struct vcpu_maphash_entry {
+        unsigned long pfn;
+        uint16_t      idx;
+        uint16_t      refcnt;
+    } hash[MAPHASH_ENTRIES];
+} __cacheline_aligned;
+
+#define MAPCACHE_ORDER   10
+#define MAPCACHE_ENTRIES (1 << MAPCACHE_ORDER)
 struct mapcache {
+    /* The PTEs that provide the mappings, and a cursor into the array. */
     l1_pgentry_t *l1tab;
     unsigned int cursor;
-    unsigned int epoch, shadow_epoch[MAX_VIRT_CPUS];
+
+    /* Protects map_domain_page(). */
     spinlock_t lock;
+
+    /* Garbage mappings are flushed from TLBs in batches called 'epochs'. */
+    unsigned int epoch, shadow_epoch[MAX_VIRT_CPUS];
+    u32 tlbflush_timestamp;
+
+    /* Which mappings are in use, and which are garbage to reap next epoch? */
+    unsigned long inuse[BITS_TO_LONGS(MAPCACHE_ENTRIES)];
+    unsigned long garbage[BITS_TO_LONGS(MAPCACHE_ENTRIES)];
+
+    /* Lock-free per-VCPU hash of recently-used mappings. */
+    struct vcpu_maphash vcpu_maphash[MAX_VIRT_CPUS];
 };
+
+extern void mapcache_init(struct domain *);
+
+/* x86/64: toggle guest between kernel and user modes. */
+extern void toggle_guest_mode(struct vcpu *);
 
 struct arch_domain
 {

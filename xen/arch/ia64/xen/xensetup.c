@@ -21,12 +21,13 @@
 #include <asm/page.h>
 #include <asm/setup.h>
 #include <xen/string.h>
+#include <asm/vmx.h>
 
 unsigned long xenheap_phys_end;
 
 char saved_command_line[COMMAND_LINE_SIZE];
 
-struct vcpu *idle_vcpu[NR_CPUS] = { &idle0_vcpu };
+struct vcpu *idle_vcpu[NR_CPUS];
 
 cpumask_t cpu_present_map;
 
@@ -156,15 +157,11 @@ void start_kernel(void)
     unsigned long dom0_memory_start, dom0_memory_size;
     unsigned long dom0_initrd_start, dom0_initrd_size;
     unsigned long initial_images_start, initial_images_end;
+    struct domain *idle_domain;
 
     running_on_sim = is_platform_hp_ski();
     /* Kernel may be relocated by EFI loader */
     xen_pstart = ia64_tpa(KERNEL_START);
-
-    /* Must do this early -- e.g., spinlocks rely on get_current(). */
-    //set_current(&idle0_vcpu);
-    ia64_r13 = (void *)&idle0_vcpu;
-    idle0_vcpu.domain = &idle0_domain;
 
     early_setup_arch(&cmdline);
 
@@ -281,18 +278,22 @@ void start_kernel(void)
 	(xenheap_phys_end-__pa(heap_start)) >> 20,
 	(xenheap_phys_end-__pa(heap_start)) >> 10);
 
+printk("About to call scheduler_init()\n");
+    scheduler_init();
+    idle_vcpu[0] = (struct vcpu*) ia64_r13;
+    idle_domain = domain_create(IDLE_DOMAIN_ID, 0);
+    BUG_ON(idle_domain == NULL);
+
     late_setup_arch(&cmdline);
     setup_per_cpu_areas();
     mem_init();
 
-printk("About to call scheduler_init()\n");
-    scheduler_init();
     local_irq_disable();
     init_IRQ ();
 printk("About to call init_xen_time()\n");
     init_xen_time(); /* initialise the time */
-printk("About to call ac_timer_init()\n");
-    ac_timer_init();
+printk("About to call timer_init()\n");
+    timer_init();
 
 #ifdef CONFIG_XEN_CONSOLE_INPUT	/* CONFIG_SERIAL_8250_CONSOLE=n in dom0! */
     initialize_keytable();
@@ -308,13 +309,9 @@ printk("About to call ac_timer_init()\n");
     }
 
     smp_prepare_cpus(max_cpus);
-
     /* We aren't hotplug-capable yet. */
-    //BUG_ON(!cpus_empty(cpu_present_map));
     for_each_cpu ( i )
         cpu_set(i, cpu_present_map);
-
-    //BUG_ON(!local_irq_is_enabled());
 
     /*  Enable IRQ to receive IPI (needed for ITC sync).  */
     local_irq_enable();
@@ -342,19 +339,14 @@ printk("About to call sort_main_extable()\n");
 
 
     /* Create initial domain 0. */
-printk("About to call do_createdomain()\n");
-    dom0 = do_createdomain(0, 0);
-    init_task.domain = &idle0_domain;
-    init_task.processor = 0;
-//    init_task.mm = &init_mm;
-    init_task.domain->arch.mm = &init_mm;
-//    init_task.thread = INIT_THREAD;
-    //arch_do_createdomain(current);
+printk("About to call domain_create()\n");
+    dom0 = domain_create(0, 0);
+
 #ifdef CLONE_DOMAIN0
     {
     int i;
     for (i = 0; i < CLONE_DOMAIN0; i++) {
-	clones[i] = do_createdomain(i+1, 0);
+	clones[i] = domain_create(i+1, 0);
         if ( clones[i] == NULL )
             panic("Error creating domain0 clone %d\n",i);
     }
@@ -431,8 +423,8 @@ printk("About to call init_trace_bufs()\n");
 
     local_irq_enable();
 
-    printf("About to call schedulers_start dom0=%p, idle0_dom=%p\n",
-	   dom0, &idle0_domain);
+    printf("About to call schedulers_start dom0=%p, idle_dom=%p\n",
+	   dom0, &idle_domain);
     schedulers_start();
 
     domain_unpause_by_systemcontroller(dom0);
@@ -445,9 +437,10 @@ void arch_get_xen_caps(xen_capabilities_info_t info)
 {
     char *p=info;
 
-    *p=0;
+    p += sprintf(p,"xen-%d.%d-ia64 ", XEN_VERSION, XEN_SUBVERSION);
 
-    p+=sprintf(p,"xen_%d.%d_ia64 ",XEN_VERSION,XEN_SUBVERSION);
+    if (vmx_enabled)
+        p += sprintf(p,"hvm-%d.%d-ia64 ", XEN_VERSION, XEN_SUBVERSION);
 
     *(p-1) = 0;
 

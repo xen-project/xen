@@ -559,9 +559,11 @@ static void mem_parity_error(unsigned char reason, struct pt_regs * regs)
 	printk("Uhhuh. NMI received. Dazed and confused, but trying to continue\n");
 	printk("You probably have a hardware problem with your RAM chips\n");
 
+#if 0 /* XEN */
 	/* Clear and disable the memory parity error line. */
 	reason = (reason & 0xf) | 4;
 	outb(reason, 0x61);
+#endif /* XEN */
 }
 
 static void io_check_error(unsigned char reason, struct pt_regs * regs)
@@ -569,12 +571,14 @@ static void io_check_error(unsigned char reason, struct pt_regs * regs)
 	printk("NMI: IOCK error (debug interrupt?)\n");
 	show_registers(regs);
 
+#if 0 /* XEN */
 	/* Re-enable the IOCK line, wait for a few seconds */
 	reason = (reason & 0xf) | 8;
 	outb(reason, 0x61);
 	mdelay(2000);
 	reason &= ~8;
 	outb(reason, 0x61);
+#endif /* XEN */
 }
 
 static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
@@ -890,7 +894,6 @@ asmlinkage void __attribute__((weak)) smp_thermal_interrupt(void)
 asmlinkage void math_state_restore(void)
 {
 	struct task_struct *me = current;
-        
         /* clts(); */ /* 'clts' is done for us by Xen during virtual trap. */
 
 	if (!used_math())

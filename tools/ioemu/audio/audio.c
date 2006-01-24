@@ -257,11 +257,11 @@ void pcm_hw_clear (HWVoice *hw, void *buf, int len)
     switch (hw->fmt) {
     case AUD_FMT_S16:
     case AUD_FMT_S8:
-        memset (buf, len << hw->shift, 0x00);
+        memset (buf, 0x00, len << hw->shift);
         break;
 
     case AUD_FMT_U8:
-        memset (buf, len << hw->shift, 0x80);
+        memset (buf, 0x80, len << hw->shift);
         break;
 
     case AUD_FMT_U16:

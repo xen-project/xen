@@ -163,6 +163,7 @@
 ^tools/xenstore/xenstore-read$
 ^tools/xenstore/xenstore-rm$
 ^tools/xenstore/xenstore-write$
+^tools/xenstore/xenstore-ls$
 ^tools/xenstore/xenstored$
 ^tools/xenstore/xenstored_test$
 ^tools/xenstore/xs_crashme$
@@ -171,7 +172,6 @@
 ^tools/xenstore/xs_tdb_dump$
 ^tools/xenstore/xs_test$
 ^tools/xenstore/xs_watch_stress$
-^tools/xenstore/xsls$
 ^tools/xentrace/setsize$
 ^tools/xentrace/tbctl$
 ^tools/xentrace/xenctx$

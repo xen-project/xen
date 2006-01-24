@@ -98,19 +98,18 @@ void vmx_relinquish_resources(struct vcpu *v)
         /* unmap IO shared page */
         struct domain *d = v->domain;
         if ( d->arch.vmx_platform.shared_page_va )
-            unmap_domain_page((void *)d->arch.vmx_platform.shared_page_va);
+            unmap_domain_page_global(
+                (void *)d->arch.vmx_platform.shared_page_va);
     }
 
     destroy_vmcs(&v->arch.arch_vmx);
     free_monitor_pagetable(v);
     vpit = &v->domain->arch.vmx_platform.vmx_pit;
-    if ( active_ac_timer(&(vpit->pit_timer)) )
-        rem_ac_timer(&vpit->pit_timer);
-    if ( active_ac_timer(&v->arch.arch_vmx.hlt_timer) )
-        rem_ac_timer(&v->arch.arch_vmx.hlt_timer);
+    kill_timer(&vpit->pit_timer);
+    kill_timer(&v->arch.arch_vmx.hlt_timer);
     if ( vmx_apic_support(v->domain) && (VLAPIC(v) != NULL) )
     {
-        rem_ac_timer(&VLAPIC(v)->vlapic_timer);
+        kill_timer(&VLAPIC(v)->vlapic_timer);
         xfree(VLAPIC(v));
     }
 }
@@ -1599,7 +1598,7 @@ void vmx_vmexit_do_hlt(void)
         next_wakeup = next_pit;
     }
     if ( next_wakeup != - 1 ) 
-        set_ac_timer(&current->arch.arch_vmx.hlt_timer, next_wakeup);
+        set_timer(&current->arch.arch_vmx.hlt_timer, next_wakeup);
     do_block();
 }
 

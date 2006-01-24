@@ -17,16 +17,8 @@
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 
-#if 0
-#define ASSERT(_p) \
-    if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \
-    __LINE__, __FILE__); *(int*)0=0; }
-#define DPRINTK(_f, _a...) printk(KERN_ALERT "(file=%s, line=%d) " _f, \
-                           __FILE__ , __LINE__ , ## _a )
-#else
-#define ASSERT(_p) ((void)0)
-#define DPRINTK(_f, _a...) ((void)0)
-#endif
+#define DPRINTK(_f, _a...) pr_debug("(file=%s, line=%d) " _f, \
+                                    __FILE__ , __LINE__ , ## _a )
 
 typedef struct tpmif_st {
 	struct list_head tpmif_list;
@@ -83,11 +75,6 @@ int vtpm_release_packets(tpmif_t * tpmif, int send_msgs);
 extern int num_frontends;
 
 #define MMAP_VADDR(t,_req) ((t)->mmap_vstart + ((_req) * PAGE_SIZE))
-
-#ifndef TRUE
-#define TRUE 1
-#define FALSE 0
-#endif
 
 #endif /* __TPMIF__BACKEND__COMMON_H__ */
 

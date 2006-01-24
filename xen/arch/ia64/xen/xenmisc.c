@@ -18,6 +18,7 @@
 #include <xen/softirq.h>
 #include <public/sched.h>
 #include <asm/vhpt.h>
+#include <asm/debugger.h>
 
 efi_memory_desc_t ia64_efi_io_md;
 EXPORT_SYMBOL(ia64_efi_io_md);
@@ -75,7 +76,7 @@ struct pt_regs *guest_cpu_user_regs(void) { return vcpu_regs(current); }
 
 void raise_actimer_softirq(void)
 {
-	raise_softirq(AC_TIMER_SOFTIRQ);
+	raise_softirq(TIMER_SOFTIRQ);
 }
 
 unsigned long
@@ -202,6 +203,8 @@ void dump_pageframe_info(struct domain *d)
 {
 	printk("dump_pageframe_info not implemented\n");
 }
+
+int nmi_count(int x) { return x; }
 
 ///////////////////////////////
 // called from arch/ia64/head.S
@@ -354,6 +357,11 @@ loop:
 	va_end(args);
 	printf(buf);
 	if (regs) show_registers(regs);
+	if (regs) {
+		debugger_trap_fatal(0 /* don't care */, regs);
+	} else {
+		debugger_trap_immediate();
+	}
 	domain_pause_by_systemcontroller(current->domain);
 	v->domain->shutdown_code = SHUTDOWN_crash;
 	set_bit(_DOMF_shutdown, v->domain->domain_flags);

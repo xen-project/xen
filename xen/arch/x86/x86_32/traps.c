@@ -157,6 +157,64 @@ asmlinkage void do_double_fault(void)
         __asm__ __volatile__ ( "hlt" );
 }
 
+asmlinkage unsigned long do_iret(void)
+{
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+    u32 eflags;
+
+    /* Check worst-case stack frame for overlap with Xen protected area. */
+    if ( unlikely(!access_ok(regs->esp, 40)) )
+        domain_crash_synchronous();
+
+    /* Pop and restore EAX (clobbered by hypercall). */
+    if ( unlikely(__copy_from_user(&regs->eax, (void __user *)regs->esp, 4)) )
+        domain_crash_synchronous();
+    regs->esp += 4;
+
+    /* Pop and restore CS and EIP. */
+    if ( unlikely(__copy_from_user(&regs->eip, (void __user *)regs->esp, 8)) )
+        domain_crash_synchronous();
+    regs->esp += 8;
+
+    /*
+     * Pop, fix up and restore EFLAGS. We fix up in a local staging area
+     * to avoid firing the BUG_ON(IOPL) check in arch_getdomaininfo_ctxt.
+     */
+    if ( unlikely(__copy_from_user(&eflags, (void __user *)regs->esp, 4)) )
+        domain_crash_synchronous();
+    regs->esp += 4;
+    regs->eflags = (eflags & ~X86_EFLAGS_IOPL) | X86_EFLAGS_IF;
+
+    if ( VM86_MODE(regs) )
+    {
+        /* Return to VM86 mode: pop and restore ESP,SS,ES,DS,FS and GS. */
+        if ( __copy_from_user(&regs->esp, (void __user *)regs->esp, 24) )
+            domain_crash_synchronous();
+    }
+    else if ( unlikely(RING_0(regs)) )
+    {
+        domain_crash_synchronous();
+    }
+    else if ( !RING_1(regs) )
+    {
+        /* Return to ring 2/3: pop and restore ESP and SS. */
+        if ( __copy_from_user(&regs->esp, (void __user *)regs->esp, 8) )
+            domain_crash_synchronous();
+    }
+
+    /* No longer in NMI context. */
+    clear_bit(_VCPUF_nmi_masked, &current->vcpu_flags);
+
+    /* Restore upcall mask from saved value. */
+    current->vcpu_info->evtchn_upcall_mask = regs->saved_upcall_mask;
+
+    /*
+     * The hypercall exit path will overwrite EAX with this return
+     * value.
+     */
+    return regs->eax;
+}
+
 BUILD_SMP_INTERRUPT(deferred_nmi, TRAP_deferred_nmi)
 asmlinkage void smp_deferred_nmi(struct cpu_user_regs regs)
 {

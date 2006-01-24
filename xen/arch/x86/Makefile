@@ -32,7 +32,7 @@ OBJS := $(subst $(TARGET_SUBARCH)/asm-offsets.o,,$(OBJS))
 OBJS := $(subst $(TARGET_SUBARCH)/xen.lds.o,,$(OBJS))
 
 ifneq ($(crash_debug),y)
-OBJS := $(patsubst cdb%.o,,$(OBJS))
+OBJS := $(patsubst gdbstub%.o,,$(OBJS))
 endif
 
 default: $(TARGET)

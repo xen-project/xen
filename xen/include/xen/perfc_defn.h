@@ -32,7 +32,7 @@ PERFCOUNTER_CPU(ipis,                   "#IPIs")
 PERFCOUNTER_CPU(irq_time,               "cycles spent in irq handler")
 
 PERFCOUNTER_CPU(apic_timer,             "apic timer interrupts")
-PERFCOUNTER_CPU(ac_timer_max,           "ac_timer max error (ns)")
+PERFCOUNTER_CPU(timer_max,           "timer max error (ns)")
 PERFCOUNTER_CPU(sched_irq,              "sched: timer")
 PERFCOUNTER_CPU(sched_run,              "sched: runs through scheduler")
 PERFCOUNTER_CPU(sched_ctx,              "sched: context switches")

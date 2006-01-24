@@ -31,6 +31,7 @@
 #include <asm/dom_fw.h>
 #include "hpsim_ssc.h"
 #include <xen/multicall.h>
+#include <asm/debugger.h>
 
 extern unsigned long vcpu_get_itir_on_fault(struct vcpu *, UINT64);
 extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
@@ -652,7 +653,7 @@ void
 ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim)
 {
 	struct domain *d = (struct domain *) current->domain;
-	struct vcpu *v = (struct domain *) current;
+	struct vcpu *v = current;
 	extern unsigned long running_on_sim;
 
 	if (first_break) {
@@ -663,7 +664,14 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 	if (iim == 0x80001 || iim == 0x80002) {	//FIXME: don't hardcode constant
 		if (running_on_sim) do_ssc(vcpu_get_gr(current,36), regs);
 		else do_ssc(vcpu_get_gr(current,36), regs);
-	}
+	} 
+#ifdef CRASH_DEBUG
+	else if ((iim == 0 || iim == CDB_BREAK_NUM) && !user_mode(regs)) {
+		if (iim == 0)
+			show_registers(regs);
+		debugger_trap_fatal(0 /* don't care */, regs);
+	} 
+#endif
 	else if (iim == d->arch.breakimm) {
 		/* by default, do not continue */
 		v->arch.hypercall_continuation = 0;

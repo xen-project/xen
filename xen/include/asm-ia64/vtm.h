@@ -23,7 +23,7 @@
 #ifndef _VTM_H_
 #define _VTM_H_
 
-#include <xen/ac_timer.h>
+#include <xen/timer.h>
 #include <xen/types.h>
 
 #define MAX_JUMP_STEP       (5000)   /* 500ms, max jump step */
@@ -46,7 +46,7 @@ typedef struct vtime {
     	uint64_t    cfg_max_jump;   // max jump within one time suspendsion
     	uint64_t    cfg_min_grun;   // min guest running time since last jump
 //    	uint64_t    latest_read_itc;    // latest guest read ITC
-    	struct ac_timer	vtm_timer;
+    	struct timer	vtm_timer;
 //	int        triggered;
     	
 

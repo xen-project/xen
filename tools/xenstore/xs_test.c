@@ -43,7 +43,7 @@
 #define XSTEST
 
 static struct xs_handle *handles[10] = { NULL };
-static struct xs_transaction_handle *txh[10] = { XBT_NULL };
+static xs_transaction_t txh[10] = { XBT_NULL };
 
 static unsigned int timeout_ms = 500;
 static bool timeout_suppressed = true;
@@ -535,7 +535,7 @@ static void do_introduce(unsigned int handle,
 	*(uint16_t *)((void *)interface + 36) = atoi(eventchn);
 
 	if (!xs_introduce_domain(handles[handle], atoi(domid),
-				 atol(mfn), atoi(eventchn), path)) {
+				 atol(mfn), atoi(eventchn))) {
 		failed(handle);
 		munmap(interface, getpagesize());
 		return;

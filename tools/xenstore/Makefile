@@ -27,7 +27,7 @@ CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm
 CLIENTS += xenstore-write
 CLIENTS_OBJS := $(patsubst xenstore-%,xenstore_%.o,$(CLIENTS))
 
-all: libxenstore.so xenstored $(CLIENTS) xs_tdb_dump xsls
+all: libxenstore.so xenstored $(CLIENTS) xs_tdb_dump xenstore-ls
 
 testcode: xs_test xenstored_test xs_random
 
@@ -40,7 +40,7 @@ $(CLIENTS): xenstore-%: xenstore_%.o libxenstore.so
 $(CLIENTS_OBJS): xenstore_%.o: xenstore_client.c
 	$(COMPILE.c) -DCLIENT_$(*F) -o $@ $<
 
-xsls: xsls.o libxenstore.so
+xenstore-ls: xsls.o libxenstore.so
 	$(LINK.o) $< $(LOADLIBES) $(LDLIBS) -lxenctrl -L. -lxenstore -o $@
 
 xenstored_test: xenstored_core_test.o xenstored_watch_test.o xenstored_domain_test.o xenstored_transaction_test.o xs_lib.o talloc_test.o fake_libxc.o utils.o tdb.o
@@ -77,7 +77,7 @@ libxenstore.so: xs.opic xs_lib.opic
 clean: testsuite-clean
 	rm -f *.o *.opic *.so
 	rm -f xenstored xs_random xs_stress xs_crashme
-	rm -f xs_test xenstored_test xs_tdb_dump xsls $(CLIENTS)
+	rm -f xs_test xenstored_test xs_tdb_dump xenstore-ls $(CLIENTS)
 	$(RM) $(PROG_DEP)
 
 print-dir:
@@ -129,7 +129,7 @@ TAGS:
 tarball: clean
 	cd .. && tar -c -j -v -h -f xenstore.tar.bz2 xenstore/
 
-install: libxenstore.so xenstored xsls $(CLIENTS)
+install: libxenstore.so xenstored xenstore-ls $(CLIENTS)
 	$(INSTALL_DIR) -p $(DESTDIR)/var/run/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/var/lib/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/bin
@@ -137,7 +137,7 @@ install: libxenstore.so xenstored xsls $(CLIENTS)
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/include
 	$(INSTALL_PROG) xenstored $(DESTDIR)/usr/sbin
 	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)/usr/bin
-	$(INSTALL_PROG) xsls $(DESTDIR)/usr/bin
+	$(INSTALL_PROG) xenstore-ls $(DESTDIR)/usr/bin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) libxenstore.so $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) xs.h $(DESTDIR)/usr/include

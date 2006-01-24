@@ -278,12 +278,12 @@ static struct domain *new_domain(void *context, unsigned int domid,
 	talloc_set_destructor(domain, destroy_domain);
 
 	/* Tell kernel we're interested in this event. */
-        bind.remote_domain = domid;
-        bind.remote_port   = port;
-        rc = ioctl(eventchn_fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
-        if (rc == -1)
-            return NULL;
-        domain->port = rc;
+	bind.remote_domain = domid;
+	bind.remote_port   = port;
+	rc = ioctl(eventchn_fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
+	if (rc == -1)
+	    return NULL;
+	domain->port = rc;
 
 	domain->conn = new_connection(writechn, readchn);
 	domain->conn->domain = domain;
@@ -426,10 +426,10 @@ void do_is_domain_introduced(struct connection *conn, const char *domid_str)
 	int result;
 	unsigned int domid;
 
-        if (!domid_str) {
-                send_error(conn, EINVAL);
-                return;
-        }
+	if (!domid_str) {
+		send_error(conn, EINVAL);
+		return;
+	}
 
 	domid = atoi(domid_str);
 	if (domid == DOMID_SELF)
@@ -461,35 +461,45 @@ void restore_existing_connections(void)
 
 static int dom0_init(void) 
 { 
-        int rc, fd;
+	int rc, fd;
 	evtchn_port_t port; 
-        unsigned long mfn; 
-        char str[20]; 
-        struct domain *dom0; 
-        
-        fd = open(XENSTORED_PROC_MFN, O_RDONLY); 
-        
-        rc = read(fd, str, sizeof(str)); 
-        str[rc] = '\0'; 
-        mfn = strtoul(str, NULL, 0); 
-        
-        close(fd); 
-        
-        fd = open(XENSTORED_PROC_PORT, O_RDONLY); 
-        
-        rc = read(fd, str, sizeof(str)); 
-        str[rc] = '\0'; 
-        port = strtoul(str, NULL, 0); 
-        
-        close(fd); 
-        
-        
-        dom0 = new_domain(NULL, 0, mfn, port); 
-        talloc_steal(dom0->conn, dom0); 
+	unsigned long mfn; 
+	char str[20]; 
+	struct domain *dom0; 
 
-        evtchn_notify(dom0->port); 
+	fd = open(XENSTORED_PROC_MFN, O_RDONLY); 
+	if (fd == -1)
+		return -1;
 
-        return 0; 
+	rc = read(fd, str, sizeof(str)); 
+	if (rc == -1)
+		goto outfd;
+	str[rc] = '\0'; 
+	mfn = strtoul(str, NULL, 0); 
+
+	close(fd); 
+
+	fd = open(XENSTORED_PROC_PORT, O_RDONLY); 
+	if (fd == -1)
+		return -1;
+
+	rc = read(fd, str, sizeof(str)); 
+	if (rc == -1)
+		goto outfd;
+	str[rc] = '\0'; 
+	port = strtoul(str, NULL, 0); 
+
+	close(fd); 
+
+	dom0 = new_domain(NULL, 0, mfn, port); 
+	talloc_steal(dom0->conn, dom0); 
+
+	evtchn_notify(dom0->port); 
+
+	return 0; 
+outfd:
+	close(fd);
+	return -1;
 }
 
 
@@ -539,9 +549,9 @@ int domain_init(void)
 	if (eventchn_fd < 0)
 		barf_perror("Failed to open evtchn device");
 
-        if (dom0_init() != 0) 
-                barf_perror("Failed to initialize dom0 state"); 
-     
+	if (dom0_init() != 0) 
+		barf_perror("Failed to initialize dom0 state"); 
+
 	bind.virq = VIRQ_DOM_EXC;
 	rc = ioctl(eventchn_fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
 	if (rc == -1)

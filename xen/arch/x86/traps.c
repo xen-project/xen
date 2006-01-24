@@ -130,9 +130,19 @@ unsigned long kernel_text_end(void)
 static void show_guest_stack(struct cpu_user_regs *regs)
 {
     int i;
-    unsigned long *stack = (unsigned long *)regs->esp, addr;
+    unsigned long *stack, addr;
 
-    printk("Guest stack trace from "__OP"sp=%p:\n   ", stack);
+    if ( VM86_MODE(regs) )
+    {
+        stack = (unsigned long *)((regs->ss << 4) + (regs->esp & 0xffff));
+        printk("Guest stack trace from ss:sp = %04x:%04x (VM86)\n   ",
+               regs->ss, (uint16_t)(regs->esp & 0xffff));
+    }
+    else
+    {
+        stack = (unsigned long *)regs->esp;
+        printk("Guest stack trace from "__OP"sp=%p:\n   ", stack);
+    }
 
     for ( i = 0; i < (debug_stack_lines*stack_words_per_line); i++ )
     {
@@ -596,7 +606,6 @@ static inline int guest_io_okay(
     u16 x;
 #if defined(__x86_64__)
     /* If in user mode, switch to kernel mode just to read I/O bitmap. */
-    extern void toggle_guest_mode(struct vcpu *);
     int user_mode = !(v->arch.flags & TF_kernel_mode);
 #define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
 #elif defined(__i386__)
@@ -964,16 +973,26 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     case 0x30: /* WRMSR */
         /* Ignore the instruction if unprivileged. */
         if ( !IS_PRIV(v->domain) )
-            DPRINTK("Non-priv domain attempted WRMSR(%p,%08lx,%08lx).\n",
-                    _p(regs->ecx), (long)regs->eax, (long)regs->edx);
+        {
+            u32 l, h;
+            if ( (rdmsr_user(regs->ecx, l, h) != 0) ||
+                 (regs->ecx != MSR_EFER) ||
+                 (regs->eax != l) || (regs->edx != h) )
+                DPRINTK("Non-priv domain attempted WRMSR %p from "
+                        "%08x:%08x to %08lx:%08lx.\n",
+                        _p(regs->ecx), h, l, (long)regs->edx, (long)regs->eax);
+        }
         else if ( wrmsr_user(regs->ecx, regs->eax, regs->edx) )
             goto fail;
         break;
 
     case 0x32: /* RDMSR */
         if ( !IS_PRIV(v->domain) )
-            DPRINTK("Non-priv domain attempted RDMSR(%p,%08lx,%08lx).\n",
-                    _p(regs->ecx), (long)regs->eax, (long)regs->edx);
+        {
+            if ( regs->ecx != MSR_EFER )
+                DPRINTK("Non-priv domain attempted RDMSR %p.\n",
+                        _p(regs->ecx));
+        }
         /* Everyone can read the MSR space. */
         if ( rdmsr_user(regs->ecx, regs->eax, regs->edx) )
             goto fail;
@@ -1080,26 +1099,23 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
     return 0;
 }
 
-
-/* Defer dom0 notification to softirq context (unsafe in NMI context). */
-static unsigned long nmi_dom0_softirq_reason;
-#define NMI_DOM0_PARITY_ERR 0
-#define NMI_DOM0_IO_ERR     1
-#define NMI_DOM0_UNKNOWN    2
-
-static void nmi_dom0_softirq(void)
+static void nmi_softirq(void)
 {
-    if ( dom0 == NULL )
+    /* Only used to defer wakeup of dom0,vcpu0 to a safe (non-NMI) context. */
+    evtchn_notify(dom0->vcpu[0]);
+}
+
+static void nmi_dom0_report(unsigned int reason_idx)
+{
+    struct domain *d;
+
+    if ( (d = dom0) == NULL )
         return;
 
-    if ( test_and_clear_bit(NMI_DOM0_PARITY_ERR, &nmi_dom0_softirq_reason) )
-        send_guest_virq(dom0->vcpu[0], VIRQ_PARITY_ERR);
+    set_bit(reason_idx, &d->shared_info->arch.nmi_reason);
 
-    if ( test_and_clear_bit(NMI_DOM0_IO_ERR, &nmi_dom0_softirq_reason) )
-        send_guest_virq(dom0->vcpu[0], VIRQ_IO_ERR);
-
-    if ( test_and_clear_bit(NMI_DOM0_UNKNOWN, &nmi_dom0_softirq_reason) )
-        send_guest_virq(dom0->vcpu[0], VIRQ_NMI);
+    if ( test_and_set_bit(_VCPUF_nmi_pending, &d->vcpu[0]->vcpu_flags) )
+        raise_softirq(NMI_SOFTIRQ); /* not safe to wake up a vcpu here */
 }
 
 asmlinkage void mem_parity_error(struct cpu_user_regs *regs)
@@ -1107,8 +1123,7 @@ asmlinkage void mem_parity_error(struct cpu_user_regs *regs)
     switch ( opt_nmi[0] )
     {
     case 'd': /* 'dom0' */
-        set_bit(NMI_DOM0_PARITY_ERR, &nmi_dom0_softirq_reason);
-        raise_softirq(NMI_DOM0_SOFTIRQ);
+        nmi_dom0_report(_XEN_NMIREASON_parity_error);
     case 'i': /* 'ignore' */
         break;
     default:  /* 'fatal' */
@@ -1127,8 +1142,7 @@ asmlinkage void io_check_error(struct cpu_user_regs *regs)
     switch ( opt_nmi[0] )
     {
     case 'd': /* 'dom0' */
-        set_bit(NMI_DOM0_IO_ERR, &nmi_dom0_softirq_reason);
-        raise_softirq(NMI_DOM0_SOFTIRQ);
+        nmi_dom0_report(_XEN_NMIREASON_io_error);
     case 'i': /* 'ignore' */
         break;
     default:  /* 'fatal' */
@@ -1147,8 +1161,7 @@ static void unknown_nmi_error(unsigned char reason)
     switch ( opt_nmi[0] )
     {
     case 'd': /* 'dom0' */
-        set_bit(NMI_DOM0_UNKNOWN, &nmi_dom0_softirq_reason);
-        raise_softirq(NMI_DOM0_SOFTIRQ);
+        nmi_dom0_report(_XEN_NMIREASON_unknown);
     case 'i': /* 'ignore' */
         break;
     default:  /* 'fatal' */
@@ -1347,7 +1360,7 @@ void __init trap_init(void)
 
     cpu_init();
 
-    open_softirq(NMI_DOM0_SOFTIRQ, nmi_dom0_softirq);
+    open_softirq(NMI_SOFTIRQ, nmi_softirq);
 }
 
 

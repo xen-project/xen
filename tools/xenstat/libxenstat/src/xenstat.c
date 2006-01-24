@@ -705,7 +705,7 @@ static char *xenstat_get_domain_name(xenstat_handle *handle, unsigned int domain
 
 	snprintf(path, sizeof(path),"/local/domain/%i/name", domain_id);
 	
-	name = xs_read(handle->xshandle, NULL, path, NULL);
+	name = xs_read(handle->xshandle, XBT_NULL, path, NULL);
 	if (name == NULL)
 		name = strdup(" ");
 

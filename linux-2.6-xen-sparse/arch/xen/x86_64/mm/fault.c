@@ -153,7 +153,6 @@ void dump_pagetable(unsigned long address)
 	pgd = (pgd_t *)per_cpu(cur_pgd, smp_processor_id());
 	preempt_enable();
 	pgd += pgd_index(address);
-
 	printk("PGD %lx ", pgd_val(*pgd));
 	if (bad_address(pgd)) goto bad;
 	if (!pgd_present(*pgd)) goto ret; 
@@ -258,7 +257,6 @@ static int vmalloc_fault(unsigned long address)
 	pgd = (pgd_t *)per_cpu(cur_pgd, smp_processor_id());
 	preempt_enable();
 	pgd += pgd_index(address);
-
 	pgd_ref = pgd_offset_k(address);
 	if (pgd_none(*pgd_ref))
 		return -1;

@@ -16,16 +16,47 @@ struct schedule_data {
     struct vcpu        *curr;           /* current task                    */
     struct vcpu        *idle;           /* idle task for this cpu          */
     void               *sched_priv;
-    struct ac_timer     s_timer;        /* scheduling timer                */
+    struct timer        s_timer;        /* scheduling timer                */
     unsigned long       tick;           /* current periodic 'tick'         */
 #ifdef BUCKETS
     u32                 hist[BUCKETS];  /* for scheduler latency histogram */
 #endif
 } __cacheline_aligned;
 
+extern struct schedule_data schedule_data[];
+
+static inline void vcpu_schedule_lock(struct vcpu *v)
+{
+    unsigned int cpu;
+
+    for ( ; ; )
+    {
+        cpu = v->processor;
+        spin_lock(&schedule_data[cpu].schedule_lock);
+        if ( likely(v->processor == cpu) )
+            break;
+        spin_unlock(&schedule_data[cpu].schedule_lock);
+    }
+}
+
+#define vcpu_schedule_lock_irq(v) \
+    do { local_irq_disable(); vcpu_schedule_lock(v); } while ( 0 )
+#define vcpu_schedule_lock_irqsave(v, flags) \
+    do { local_irq_save(flags); vcpu_schedule_lock(v); } while ( 0 )
+
+static inline void vcpu_schedule_unlock(struct vcpu *v)
+{
+    spin_unlock(&schedule_data[v->processor].schedule_lock);
+}
+
+#define vcpu_schedule_unlock_irq(v) \
+    do { vcpu_schedule_unlock(v); local_irq_enable(); } while ( 0 )
+#define vcpu_schedule_unlock_irqrestore(v, flags) \
+    do { vcpu_schedule_unlock(v); local_irq_restore(flags); } while ( 0 )
+
 struct task_slice {
     struct vcpu *task;
-    s_time_t            time;
+    s_time_t     time;
 };
 
 struct scheduler {
@@ -47,7 +78,5 @@ struct scheduler {
     void         (*dump_settings)  (void);
     void         (*dump_cpu_state) (int);
 };
-
-extern struct schedule_data schedule_data[];
 
 #endif /* __XEN_SCHED_IF_H__ */

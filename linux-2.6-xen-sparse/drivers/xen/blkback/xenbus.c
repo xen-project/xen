@@ -24,12 +24,9 @@
 #include <asm-xen/xenbus.h>
 #include "common.h"
 
-
-#if 0
 #undef DPRINTK
 #define DPRINTK(fmt, args...) \
-    printk("blkback/xenbus (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
-#endif
+    pr_debug("blkback/xenbus (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 
 
 struct backend_info
@@ -302,7 +299,7 @@ static void maybe_connect(struct backend_info *be)
  */
 static void connect(struct backend_info *be)
 {
-	struct xenbus_transaction *xbt;
+	xenbus_transaction_t xbt;
 	int err;
 	struct xenbus_device *dev = be->dev;
 
@@ -310,10 +307,9 @@ static void connect(struct backend_info *be)
 
 	/* Supply the information about the device the frontend needs */
 again:
-	xbt = xenbus_transaction_start();
+	err = xenbus_transaction_start(&xbt);
 
-	if (IS_ERR(xbt)) {
-		err = PTR_ERR(xbt);
+	if (err) {
 		xenbus_dev_fatal(dev, err, "starting transaction");
 		return;
 	}

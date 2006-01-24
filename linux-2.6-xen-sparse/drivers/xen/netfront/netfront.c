@@ -154,13 +154,8 @@ static char *be_state_name[] = {
 };
 #endif
 
-#ifdef DEBUG
-#define DPRINTK(fmt, args...)						\
-	printk(KERN_ALERT "netfront (%s:%d) " fmt, __FUNCTION__,	\
-	       __LINE__, ##args)
-#else
-#define DPRINTK(fmt, args...) ((void)0)
-#endif
+#define DPRINTK(fmt, args...) pr_debug("netfront (%s:%d) " fmt, \
+                                       __FUNCTION__, __LINE__, ##args)
 #define IPRINTK(fmt, args...)				\
 	printk(KERN_INFO "netfront: " fmt, ##args)
 #define WPRINTK(fmt, args...)				\
@@ -260,7 +255,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 			   struct netfront_info *info)
 {
 	const char *message;
-	struct xenbus_transaction *xbt;
+	xenbus_transaction_t xbt;
 	int err;
 
 	err = xen_net_read_mac(dev, info->mac);
@@ -275,8 +270,8 @@ static int talk_to_backend(struct xenbus_device *dev,
 		goto out;
 
 again:
-	xbt = xenbus_transaction_start();
-	if (IS_ERR(xbt)) {
+	err = xenbus_transaction_start(&xbt);
+	if (err) {
 		xenbus_dev_fatal(dev, err, "starting transaction");
 		goto destroy_ring;
 	}

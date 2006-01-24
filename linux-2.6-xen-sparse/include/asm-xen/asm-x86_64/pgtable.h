@@ -417,12 +417,7 @@ static inline pud_t *__pud_offset_k(pud_t *pud, unsigned long address)
    Other CPUs get synced lazily via the page fault handler. */
 static inline pud_t *pud_offset_k(unsigned long address)
 {
-	unsigned long addr;
-
-	addr = pgd_val(init_level4_pgt[pud_index(address)]);
-	addr &= PHYSICAL_PAGE_MASK; /* machine physical */
-        addr = machine_to_phys(addr);
-	return __pud_offset_k((pud_t *)__va(addr), address);
+	return pud_offset(pgd_offset_k(address), address);
 }
 
 /* PMD  - Level 2 access */

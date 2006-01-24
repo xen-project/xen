@@ -22,10 +22,10 @@
 
 #include <xs_lib.h>
 
-#define XBT_NULL NULL
+#define XBT_NULL 0
 
 struct xs_handle;
-struct xs_transaction_handle;
+typedef uint32_t xs_transaction_t;
 
 /* On failure, these routines set errno. */
 
@@ -47,45 +47,45 @@ void xs_daemon_close(struct xs_handle *);
  * Returns a malloced array: call free() on it after use.
  * Num indicates size.
  */
-char **xs_directory(struct xs_handle *h, struct xs_transaction_handle *t,
+char **xs_directory(struct xs_handle *h, xs_transaction_t t,
 		    const char *path, unsigned int *num);
 
 /* Get the value of a single file, nul terminated.
  * Returns a malloced value: call free() on it after use.
  * len indicates length in bytes, not including terminator.
  */
-void *xs_read(struct xs_handle *h, struct xs_transaction_handle *t,
+void *xs_read(struct xs_handle *h, xs_transaction_t t,
 	      const char *path, unsigned int *len);
 
 /* Write the value of a single file.
  * Returns false on failure.
  */
-bool xs_write(struct xs_handle *h, struct xs_transaction_handle *t,
+bool xs_write(struct xs_handle *h, xs_transaction_t t,
 	      const char *path, const void *data, unsigned int len);
 
 /* Create a new directory.
  * Returns false on failure, or success if it already exists.
  */
-bool xs_mkdir(struct xs_handle *h, struct xs_transaction_handle *t,
+bool xs_mkdir(struct xs_handle *h, xs_transaction_t t,
 	      const char *path);
 
 /* Destroy a file or directory (and children).
  * Returns false on failure, or if it doesn't exist.
  */
-bool xs_rm(struct xs_handle *h, struct xs_transaction_handle *t,
+bool xs_rm(struct xs_handle *h, xs_transaction_t t,
 	   const char *path);
 
 /* Get permissions of node (first element is owner, first perms is "other").
  * Returns malloced array, or NULL: call free() after use.
  */
 struct xs_permissions *xs_get_permissions(struct xs_handle *h,
-					  struct xs_transaction_handle *t,
+					  xs_transaction_t t,
 					  const char *path, unsigned int *num);
 
 /* Set permissions of node (must be owner).
  * Returns false on failure.
  */
-bool xs_set_permissions(struct xs_handle *h, struct xs_transaction_handle *t,
+bool xs_set_permissions(struct xs_handle *h, xs_transaction_t t,
 			const char *path, struct xs_permissions *perms,
 			unsigned int num_perms);
 
@@ -115,14 +115,14 @@ bool xs_unwatch(struct xs_handle *h, const char *path, const char *token);
  * You can only have one transaction at any time.
  * Returns NULL on failure.
  */
-struct xs_transaction_handle *xs_transaction_start(struct xs_handle *h);
+xs_transaction_t xs_transaction_start(struct xs_handle *h);
 
 /* End a transaction.
  * If abandon is true, transaction is discarded instead of committed.
  * Returns false on failure: if errno == EAGAIN, you have to restart
  * transaction.
  */
-bool xs_transaction_end(struct xs_handle *h, struct xs_transaction_handle *t,
+bool xs_transaction_end(struct xs_handle *h, xs_transaction_t t,
 			bool abort);
 
 /* Introduce a new domain.

@@ -57,8 +57,21 @@
 void flush_tlb_mask(cpumask_t mask)
 {
 #ifdef CONFIG_SMP
-    printf("flush_tlb_mask called, not implemented for SMP\n");
-	dummy();
+    int cpu;
+
+    cpu = smp_processor_id();
+    if (cpu_isset (cpu, mask)) {
+        cpu_clear(cpu, mask);
+	local_flush_tlb_all ();
+    }
+
+    if (cpus_empty(mask))
+        return;
+
+    for (cpu = 0; cpu < NR_CPUS; ++cpu)
+        if (cpu_isset(cpu, mask))
+	   smp_call_function_single
+	     (cpu, (void (*)(void *))local_flush_tlb_all, NULL, 1, 1);
 #endif
 }
 //#if CONFIG_SMP || IA64

@@ -2,11 +2,11 @@
 #define __XEN_SOFTIRQ_H__
 
 /* Common softirqs come first in the following list. */
-#define AC_TIMER_SOFTIRQ                  0
+#define TIMER_SOFTIRQ                     0
 #define SCHEDULE_SOFTIRQ                  1
 #define NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ 2
 #define KEYPRESS_SOFTIRQ                  3
-#define NMI_DOM0_SOFTIRQ                  4
+#define NMI_SOFTIRQ                       4
 #define PAGE_SCRUB_SOFTIRQ                5
 #define DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ  6
 #define NR_SOFTIRQS                       7

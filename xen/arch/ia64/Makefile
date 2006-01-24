@@ -23,6 +23,10 @@ OBJS +=	bitop.o clear_page.o flush.o copy_page_mck.o			\
 	__divsi3.o __udivsi3.o __modsi3.o __umodsi3.o			\
 	__divdi3.o __udivdi3.o __moddi3.o __umoddi3.o
 
+ifeq ($(crash_debug),y)
+OBJS += gdbstub.o
+endif
+
 # xen stack unwinder
 # unwind_decoder.c is included in unwind.c
 OBJS += unwind.o

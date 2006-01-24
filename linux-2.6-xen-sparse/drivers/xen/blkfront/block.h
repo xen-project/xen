@@ -69,11 +69,7 @@
 #define WPRINTK(fmt, args...) ((void)0)
 #endif
  
-#if 0
-#define DPRINTK(_f, _a...) printk ( KERN_ALERT _f , ## _a )
-#else
-#define DPRINTK(_f, _a...) ((void)0)
-#endif
+#define DPRINTK(_f, _a...) pr_debug ( _f , ## _a )
 
 #if 0
 #define DPRINTK_IOCTL(_f, _a...) printk ( KERN_ALERT _f , ## _a )

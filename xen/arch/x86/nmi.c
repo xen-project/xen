@@ -23,18 +23,20 @@
 #include <xen/sched.h>
 #include <xen/console.h>
 #include <xen/smp.h>
+#include <xen/keyhandler.h>
 #include <asm/current.h>
 #include <asm/mc146818rtc.h>
 #include <asm/msr.h>
 #include <asm/mpspec.h>
 #include <asm/debugger.h>
 #include <asm/div64.h>
+#include <asm/apic.h>
 
 unsigned int nmi_watchdog = NMI_NONE;
 static unsigned int nmi_hz = HZ;
 static unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
 static unsigned int nmi_p4_cccr_val;
-static struct ac_timer nmi_timer[NR_CPUS];
+static struct timer nmi_timer[NR_CPUS];
 static unsigned int nmi_timer_ticks[NR_CPUS];
 
 /*
@@ -132,7 +134,7 @@ static void nmi_timer_fn(void *unused)
 {
     int cpu = smp_processor_id();
     nmi_timer_ticks[cpu]++;
-    set_ac_timer(&nmi_timer[cpu], NOW() + MILLISECS(1000));
+    set_timer(&nmi_timer[cpu], NOW() + MILLISECS(1000));
 }
 
 static void disable_lapic_nmi_watchdog(void)
@@ -308,8 +310,6 @@ static int __pminit setup_p4_watchdog(void)
 
 void __pminit setup_apic_nmi_watchdog(void)
 {
-    int cpu = smp_processor_id();
-
     if (!nmi_watchdog)
         return;
 
@@ -344,49 +344,37 @@ void __pminit setup_apic_nmi_watchdog(void)
 
     lapic_nmi_owner = LAPIC_NMI_WATCHDOG;
     nmi_active = 1;
-
-    init_ac_timer(&nmi_timer[cpu], nmi_timer_fn, NULL, cpu);
 }
 
 static unsigned int
 last_irq_sums [NR_CPUS],
     alert_counter [NR_CPUS];
 
-static spinlock_t   watchdog_lock = SPIN_LOCK_UNLOCKED;
-static unsigned int watchdog_disable_count = 1;
-static unsigned int watchdog_on;
+static atomic_t watchdog_disable_count = ATOMIC_INIT(1);
 
 void watchdog_disable(void)
 {
-    unsigned long flags;
-
-    spin_lock_irqsave(&watchdog_lock, flags);
-
-    if ( watchdog_disable_count++ == 0 )
-        watchdog_on = 0;
-
-    spin_unlock_irqrestore(&watchdog_lock, flags);
+    atomic_inc(&watchdog_disable_count);
 }
 
 void watchdog_enable(void)
 {
-    unsigned int  cpu;
-    unsigned long flags;
+    static unsigned long heartbeat_initialised;
+    unsigned int cpu;
 
-    spin_lock_irqsave(&watchdog_lock, flags);
+    if ( !atomic_dec_and_test(&watchdog_disable_count) ||
+         test_and_set_bit(0, &heartbeat_initialised) )
+        return;
 
-    if ( --watchdog_disable_count == 0 )
+    /*
+     * Activate periodic heartbeats. We cannot do this earlier during 
+     * setup because the timer infrastructure is not available.
+     */
+    for_each_online_cpu ( cpu )
     {
-        watchdog_on = 1;
-        /*
-         * Ensure periodic heartbeats are active. We cannot do this earlier
-         * during setup because the timer infrastructure is not available. 
-         */
-        for_each_online_cpu ( cpu )
-            set_ac_timer(&nmi_timer[cpu], NOW());
+        init_timer(&nmi_timer[cpu], nmi_timer_fn, NULL, cpu);
+        set_timer(&nmi_timer[cpu], NOW());
     }
-
-    spin_unlock_irqrestore(&watchdog_lock, flags);
 }
 
 void nmi_watchdog_tick(struct cpu_user_regs * regs)
@@ -395,7 +383,7 @@ void nmi_watchdog_tick(struct cpu_user_regs * regs)
 
     sum = nmi_timer_ticks[cpu];
 
-    if ( (last_irq_sums[cpu] == sum) && watchdog_on )
+    if ( (last_irq_sums[cpu] == sum) && !atomic_read(&watchdog_disable_count) )
     {
         /*
          * Ayiee, looks like this CPU is stuck ... wait a few IRQs (5 seconds) 
@@ -440,3 +428,51 @@ void nmi_watchdog_tick(struct cpu_user_regs * regs)
         write_watchdog_counter(NULL);
     }
 }
+
+/*
+ * For some reason the destination shorthand for self is not valid
+ * when used with the NMI delivery mode. This is documented in Tables
+ * 8-3 and 8-4 in IA32 Reference Manual Volume 3. We send the IPI to
+ * our own APIC ID explicitly which is valid.
+ */
+static void do_nmi_trigger(unsigned char key)
+{
+    u32 id = apic_read(APIC_ID);
+
+    printk("Triggering NMI on APIC ID %x\n", id);
+
+    local_irq_disable();
+    apic_wait_icr_idle();
+    apic_write_around(APIC_ICR2, SET_APIC_DEST_FIELD(id));
+    apic_write_around(APIC_ICR, APIC_DM_NMI | APIC_INT_ASSERT);
+    local_irq_enable();
+}
+
+static void do_nmi_stats(unsigned char key)
+{
+    int i;
+    struct domain *d;
+    struct vcpu *v;
+    printk("CPU\tNMI\n");
+    for_each_cpu(i)
+        printk("%3d\t%3d\n", i, nmi_count(i));
+
+    if ((d = dom0) == NULL)
+        return;
+    if ((v = d->vcpu[0]) == NULL)
+        return;
+    if (v->vcpu_flags & (VCPUF_nmi_pending|VCPUF_nmi_masked))
+        printk("dom0 vpu0: NMI %s%s\n",
+               v->vcpu_flags & VCPUF_nmi_pending ? "pending " : "",
+               v->vcpu_flags & VCPUF_nmi_masked ? "masked " : "");
+    else
+        printk("dom0 vcpu0: NMI neither pending nor masked\n");
+}
+
+static __init int register_nmi_trigger(void)
+{
+    register_keyhandler('n', do_nmi_trigger, "trigger an NMI");
+    register_keyhandler('N', do_nmi_stats,   "NMI statistics");
+    return 0;
+}
+__initcall(register_nmi_trigger);

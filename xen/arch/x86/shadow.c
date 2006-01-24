@@ -469,6 +469,7 @@ static unsigned long shadow_l2_table(
 {
     unsigned long smfn;
     l2_pgentry_t *spl2e;
+    int i;
 
     SH_VVLOG("shadow_l2_table(gpfn=%lx, gmfn=%lx)", gpfn, gmfn);
 
@@ -503,9 +504,11 @@ static unsigned long shadow_l2_table(
         spl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)] =
             l2e_from_pfn(smfn, __PAGE_HYPERVISOR);
 
-        spl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
-            l2e_from_paddr(__pa(page_get_owner(pfn_to_page(gmfn))->arch.mm_perdomain_pt),
-                            __PAGE_HYPERVISOR);
+        for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
+            spl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
+                l2e_from_page(virt_to_page(page_get_owner(pfn_to_page(gmfn))->
+                                           arch.mm_perdomain_pt) + i,
+                              __PAGE_HYPERVISOR);
 
         if ( shadow_mode_translate(d) ) // NB: not external
         {
@@ -2135,6 +2138,7 @@ static void shadow_update_pagetables(struct vcpu *v)
 #if CONFIG_PAGING_LEVELS == 2
     unsigned long hl2mfn;
 #endif
+    int need_sync = 0;
 
     int max_mode = ( shadow_mode_external(d) ? SHM_external
                      : shadow_mode_translate(d) ? SHM_translate
@@ -2150,8 +2154,8 @@ static void shadow_update_pagetables(struct vcpu *v)
     if ( max_mode & (SHM_enable | SHM_external) )
     {
         if ( likely(v->arch.guest_vtable != NULL) )
-            unmap_domain_page(v->arch.guest_vtable);
-        v->arch.guest_vtable = map_domain_page(gmfn);
+            unmap_domain_page_global(v->arch.guest_vtable);
+        v->arch.guest_vtable = map_domain_page_global(gmfn);
     }
 
     /*
@@ -2166,8 +2170,17 @@ static void shadow_update_pagetables(struct vcpu *v)
 #elif CONFIG_PAGING_LEVELS == 4
         smfn = shadow_l4_table(d, gpfn, gmfn);
 #endif
-    }else
-        shadow_sync_all(d);
+    }
+    else
+    {
+        /*
+         *  move sync later in order to avoid this smfn been 
+         *  unshadowed occasionally
+         */
+        need_sync = 1;
+    }
+
+
     if ( !get_shadow_ref(smfn) )
         BUG();
     old_smfn = pagetable_get_pfn(v->arch.shadow_table);
@@ -2187,8 +2200,8 @@ static void shadow_update_pagetables(struct vcpu *v)
         )
     {
         if ( v->arch.shadow_vtable )
-            unmap_domain_page(v->arch.shadow_vtable);
-        v->arch.shadow_vtable = map_domain_page(smfn);
+            unmap_domain_page_global(v->arch.shadow_vtable);
+        v->arch.shadow_vtable = map_domain_page_global(smfn);
     }
 
 #if CONFIG_PAGING_LEVELS == 2
@@ -2204,8 +2217,8 @@ static void shadow_update_pagetables(struct vcpu *v)
         if ( unlikely(!(hl2mfn = __shadow_status(d, gpfn, PGT_hl2_shadow))) )
             hl2mfn = shadow_hl2_table(d, gpfn, gmfn, smfn);
         if ( v->arch.hl2_vtable )
-            unmap_domain_page(v->arch.hl2_vtable);
-        v->arch.hl2_vtable = map_domain_page(hl2mfn);
+            unmap_domain_page_global(v->arch.hl2_vtable);
+        v->arch.hl2_vtable = map_domain_page_global(hl2mfn);
     }
 
     /*
@@ -2237,6 +2250,9 @@ static void shadow_update_pagetables(struct vcpu *v)
         local_flush_tlb();
     }
 #endif /* CONFIG_PAGING_LEVELS == 2 */
+
+    if(likely(need_sync))
+        shadow_sync_all(d);
 
 #if CONFIG_PAGING_LEVELS == 3
     /* FIXME: PAE code to be written */

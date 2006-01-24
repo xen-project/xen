@@ -544,7 +544,7 @@ static int __init blkif_init(void)
 		kfree(pending_grant_handles);
 		kfree(pending_vaddrs);
 		printk("%s: out of memory\n", __FUNCTION__);
-		return -1;
+		return -ENOMEM;
 	}
 
 	blkif_interface_init();

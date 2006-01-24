@@ -41,6 +41,7 @@
 #include <asm/regionreg.h>
 #include <asm/privop.h>
 #include <asm/ia64_int.h>
+#include <asm/debugger.h>
 //#include <asm/hpsim_ssc.h>
 #include <asm/dom_fw.h>
 #include <asm/vmx_vcpu.h>
@@ -107,6 +108,14 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 		if (running_on_sim) do_ssc(vcpu_get_gr_nat(current,36), regs);
 		else do_ssc(vcpu_get_gr_nat(current,36), regs);
 	}
+#endif
+#ifdef CRASH_DEBUG
+	if ((iim == 0 || iim == CDB_BREAK_NUM) && !user_mode(regs) &&
+        IS_VMM_ADDRESS(regs->cr_iip)) {
+		if (iim == 0)
+			show_registers(regs);
+		debugger_trap_fatal(0 /* don't care */, regs);
+	} else
 #endif
 	if (iim == d->arch.breakimm) {
 		struct ia64_pal_retval y;
