@@ -92,7 +92,7 @@ void *grab_file(const char *filename, unsigned long *size)
 	else
 		fd = open(filename, O_RDONLY, 0);
 
-	if (fd < 0)
+	if (fd == -1)
 		return NULL;
 
 	buffer = malloc(max+1);
