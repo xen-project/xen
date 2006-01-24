@@ -33,14 +33,14 @@ build: $(BIN) $(LIBBIN)
 
 install: build
 	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
-	[ -z "$(LIBBIN)"] || [ -d $(DESTDIR)/usr/$(LIBDIR)/xen/bin ] || \
+	[ -z "$(LIBBIN)" ] || [ -d $(DESTDIR)/usr/$(LIBDIR)/xen/bin ] || \
 		$(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)/xen/bin
 	[ -d $(DESTDIR)/usr/share/man/man1 ] || \
 		$(INSTALL_DIR) $(DESTDIR)/usr/share/man/man1
 	[ -d $(DESTDIR)/usr/share/man/man8 ] || \
 		$(INSTALL_DIR) $(DESTDIR)/usr/share/man/man8
 	$(INSTALL_PROG) $(BIN) $(SCRIPTS) $(DESTDIR)/usr/bin
-	[ -z "$(LIBBIN)"] || $(INSTALL_PROG) $(LIBBIN) $(DESTDIR)/usr/$(LIBDIR)/xen/bin
+	[ -z "$(LIBBIN)" ] || $(INSTALL_PROG) $(LIBBIN) $(DESTDIR)/usr/$(LIBDIR)/xen/bin
 	$(INSTALL_DATA) $(MAN1) $(DESTDIR)/usr/share/man/man1
 	$(INSTALL_DATA) $(MAN8) $(DESTDIR)/usr/share/man/man8
 
