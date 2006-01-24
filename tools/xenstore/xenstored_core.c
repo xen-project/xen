@@ -1301,11 +1301,10 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 {
 	struct connection *new;
 
-	new = talloc(talloc_autofree_context(), struct connection);
+	new = talloc_zero(talloc_autofree_context(), struct connection);
 	if (!new)
 		return NULL;
 
-	memset(new, 0, sizeof(*new));
 	new->fd = -1;
 	new->write = write;
 	new->read = read;
