@@ -96,21 +96,29 @@ void *grab_file(const char *filename, unsigned long *size)
 		return NULL;
 
 	buffer = malloc(max+1);
+	if (!buffer)
+		goto error;
 	*size = 0;
 	while ((ret = read(fd, buffer + *size, max - *size)) > 0) {
 		*size += ret;
 		if (*size == max) {
+			void *nbuffer;
 			max *= 2;
-			buffer = realloc(buffer, max + 1);
+			nbuffer = realloc(buffer, max + 1);
+			if (!nbuffer)
+				goto error;
+			buffer = nbuffer;
 		}
 	}
-	if (ret < 0) {
-		free(buffer);
-		buffer = NULL;
-	} else
-		((char *)buffer)[*size] = '\0';
+	if (ret < 0)
+		goto error;
+	((char *)buffer)[*size] = '\0';
 	close(fd);
 	return buffer;
+error:
+	free(buffer);
+	close(fd);
+	return NULL;
 }
 
 void release_file(void *data, unsigned long size __attribute__((unused)))
