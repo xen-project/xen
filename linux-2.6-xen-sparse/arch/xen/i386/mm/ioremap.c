@@ -52,8 +52,8 @@ static int __direct_remap_pfn_range(struct mm_struct *mm,
 				    pgprot_t prot,
 				    domid_t  domid)
 {
-	int i, rc;
-	unsigned long start_address;
+	int rc;
+	unsigned long i, start_address;
 	mmu_update_t *u, *v, *w;
 
 	u = v = w = (mmu_update_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
@@ -93,8 +93,10 @@ static int __direct_remap_pfn_range(struct mm_struct *mm,
 
 	if (v != u) {
 		/* get the ptep's filled in */
-		generic_page_range(mm, start_address, address - start_address,
+		rc = generic_page_range(mm, start_address, address - start_address,
 				   direct_remap_area_pte_fn, &w);
+		if (rc)
+			goto out;
 		rc = -EFAULT;
 		if (unlikely(HYPERVISOR_mmu_update(u, v - u, NULL, domid) < 0))
 			goto out;
