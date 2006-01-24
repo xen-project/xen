@@ -174,11 +174,38 @@ static char *sockmsg_string(enum xsd_sockmsg_type type)
 	}
 }
 
+void trace(const char *fmt, ...)
+{
+	va_list arglist;
+	char *str;
+	char sbuf[1024];
+	int ret;
+
+	if (tracefd < 0)
+		return;
+
+	/* try to use a static buffer */
+	va_start(arglist, fmt);
+	ret = vsnprintf(sbuf, 1024, fmt, arglist);
+	va_end(arglist);
+
+	if (ret <= 1024) {
+		write(tracefd, sbuf, ret);
+		return;
+	}
+
+	/* fail back to dynamic allocation */
+	va_start(arglist, fmt);
+	str = talloc_vasprintf(NULL, fmt, arglist);
+	va_end(arglist);
+	write(tracefd, str, strlen(str));
+	talloc_free(str);
+}
+
 static void trace_io(const struct connection *conn,
 		     const char *prefix,
 		     const struct buffered_data *data)
 {
-	char string[64];
 	unsigned int i;
 	time_t now;
 	struct tm *tm;
@@ -189,61 +216,24 @@ static void trace_io(const struct connection *conn,
 	now = time(NULL);
 	tm = localtime(&now);
 
-	write(tracefd, prefix, strlen(prefix));
-	sprintf(string, " %p %02d:%02d:%02d ", conn, tm->tm_hour, tm->tm_min,
-		tm->tm_sec);
-	write(tracefd, string, strlen(string));
-	write(tracefd, sockmsg_string(data->hdr.msg.type),
-	      strlen(sockmsg_string(data->hdr.msg.type)));
-	write(tracefd, " (", 2);
-	for (i = 0; i < data->hdr.msg.len; i++) {
-		if (data->buffer[i] == '\0')
-			write(tracefd, " ", 1);
-		else
-			write(tracefd, data->buffer + i, 1);
-	}
-	write(tracefd, ")\n", 2);
+	trace("%s %p %02d:%02d:%02d %s (", prefix, conn,
+	      tm->tm_hour, tm->tm_min, tm->tm_sec,
+	      sockmsg_string(data->hdr.msg.type));
+	
+	for (i = 0; i < data->hdr.msg.len; i++)
+		trace("%c", (data->buffer[i] != '\0') ? data->buffer[i] : ' ');
+	trace(")\n");
 }
 
 void trace_create(const void *data, const char *type)
 {
-	char string[64];
-	if (tracefd < 0)
-		return;
-
-	write(tracefd, "CREATE ", strlen("CREATE "));
-	write(tracefd, type, strlen(type));
-	sprintf(string, " %p\n", data);
-	write(tracefd, string, strlen(string));
+	trace("CREATE %s %p\n", type, data);
 }
 
 void trace_destroy(const void *data, const char *type)
 {
-	char string[64];
-	if (tracefd < 0)
-		return;
-
-	write(tracefd, "DESTROY ", strlen("DESTROY "));
-	write(tracefd, type, strlen(type));
-	sprintf(string, " %p\n", data);
-	write(tracefd, string, strlen(string));
+	trace("DESTROY %s %p\n", type, data);
 }
-
-void trace(const char *fmt, ...)
-{
-	va_list arglist;
-	char *str;
-
-	if (tracefd < 0)
-		return;
-
-	va_start(arglist, fmt);
-	str = talloc_vasprintf(NULL, fmt, arglist);
-	va_end(arglist);
-	write(tracefd, str, strlen(str));
-	talloc_free(str);
-}
-
 
 /**
  * Signal handler for SIGHUP, which requests that the trace log is reopened
@@ -268,7 +258,7 @@ static void reopen_log()
 		if (tracefd < 0)
 			perror("Could not open tracefile");
 		else
-			write(tracefd, "\n***\n", strlen("\n***\n"));
+			trace("\n***\n");
 	}
 }
 
