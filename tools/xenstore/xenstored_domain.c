@@ -468,21 +468,28 @@ static int dom0_init(void)
         struct domain *dom0; 
         
         fd = open(XENSTORED_PROC_MFN, O_RDONLY); 
+	if (fd == -1)
+		return -1;
         
         rc = read(fd, str, sizeof(str)); 
+	if (rc == -1)
+		goto outfd;
         str[rc] = '\0'; 
         mfn = strtoul(str, NULL, 0); 
         
         close(fd); 
         
         fd = open(XENSTORED_PROC_PORT, O_RDONLY); 
+	if (fd == -1)
+		return -1;
         
         rc = read(fd, str, sizeof(str)); 
+	if (rc == -1)
+		goto outfd;
         str[rc] = '\0'; 
         port = strtoul(str, NULL, 0); 
         
         close(fd); 
-        
         
         dom0 = new_domain(NULL, 0, mfn, port); 
         talloc_steal(dom0->conn, dom0); 
@@ -490,6 +497,9 @@ static int dom0_init(void)
         evtchn_notify(dom0->port); 
 
         return 0; 
+outfd:
+	close(fd);
+	return -1;
 }
 
 
