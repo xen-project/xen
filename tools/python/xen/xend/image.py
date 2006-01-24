@@ -25,6 +25,7 @@ from xen.xend import sxp
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
 from xen.xend.server.netif import randomMAC
+from xen.xend.xenstore.xswatch import xswatch
 
 
 xc = xen.lowlevel.xc.xc()
@@ -229,6 +230,8 @@ class VmxImageHandler(ImageHandler):
         log.debug("acpi           = %d", self.acpi)
         log.debug("apic           = %d", self.apic)
 
+        self.register_shutdown_watch()
+
         return xc.vmx_build(dom            = self.vm.getDomid(),
                             image          = self.kernel,
                             control_evtchn = self.device_channel,
@@ -365,6 +368,7 @@ class VmxImageHandler(ImageHandler):
         return vncconnect
 
     def destroy(self):
+        self.unregister_shutdown_watch();
         import signal
         if not self.pid:
             return
@@ -398,6 +402,41 @@ class VmxImageHandler(ImageHandler):
         else:
             return 1 + ((mem_mb + 3) >> 2)
 
+    def register_shutdown_watch(self):
+        """ add xen store watch on control/shutdown """
+        self.shutdownWatch = xswatch(self.vm.dompath + "/control/shutdown", \
+                                    self.vmx_shutdown)
+        log.debug("vmx shutdown watch registered")
+
+    def unregister_shutdown_watch(self):
+        """Remove the watch on the control/shutdown, if any. Nothrow
+        guarantee."""
+
+        try:
+            if self.shutdownWatch:
+                self.shutdownWatch.unwatch()
+        except:
+            log.exception("Unwatching vmx shutdown watch failed.")
+        self.shutdownWatch = None
+        log.debug("vmx shutdown watch unregistered")
+
+    def vmx_shutdown(self, _):
+        """ watch call back on node control/shutdown,
+            if node changed, this function will be called
+        """
+        from xen.xend.XendDomainInfo import shutdown_reasons
+        xd = xen.xend.XendDomain.instance()
+        vm = xd.domain_lookup( self.vm.getDomid() )
+
+        reason = vm.readDom('control/shutdown')
+        log.debug("vmx_shutdown fired, shutdown reason=%s", reason)
+        for x in shutdown_reasons.keys():
+            if shutdown_reasons[x] == reason:
+                vm.info['shutdown'] = 1
+                vm.info['shutdown_reason'] = x
+                vm.refreshShutdown(vm.info)
+
+        return 1 # Keep watching
 
 """Table of image handler classes for virtual machine images.  Indexed by
 image type.

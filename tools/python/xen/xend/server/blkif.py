@@ -42,10 +42,6 @@ class BlkifController(DevController):
         """@see DevController.getDeviceDetails"""
 
         dev = sxp.child_value(config, 'dev')
-        if 'ioemu:' in dev:
-            return (None,{},{})
-
-        devid = blkif.blkdev_name_to_number(dev)
 
         (typ, params) = string.split(sxp.child_value(config, 'uname'), ':', 1)
         back = { 'dev'    : dev,
@@ -54,7 +50,13 @@ class BlkifController(DevController):
                  'mode'   : sxp.child_value(config, 'mode', 'r')
                  }
 
-        front = { 'virtual-device' : "%i" % devid }
+        if 'ioemu:' in dev:
+            (dummy, dev1) = string.split(dev, ':', 1)
+            devid = blkif.blkdev_name_to_number(dev1)
+            front = {}
+        else:
+            devid = blkif.blkdev_name_to_number(dev)
+            front = { 'virtual-device' : "%i" % devid }
 
         return (devid, back, front)
 
