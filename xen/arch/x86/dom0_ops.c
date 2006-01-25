@@ -431,6 +431,8 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         hypercall_page_initialise(hypercall_page);
         unmap_domain_page(hypercall_page);
 
+        put_page_and_type(pfn_to_page(mfn));
+
         put_domain(d);
     }
     break;
