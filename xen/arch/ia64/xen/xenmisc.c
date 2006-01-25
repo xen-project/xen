@@ -290,13 +290,9 @@ unsigned long context_switch_count = 0;
 
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
-//printk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
-//printk("@@@@@@ context switch from domain %d (%x) to domain %d (%x)\n",
-//prev->domain->domain_id,(long)prev&0xffffff,next->domain->domain_id,(long)next&0xffffff);
-//if (prev->domain->domain_id == 1 && next->domain->domain_id == 0) cs10foo();
-//if (prev->domain->domain_id == 0 && next->domain->domain_id == 1) cs01foo();
-//printk("@@sw%d/%x %d->%d\n",smp_processor_id(), hard_smp_processor_id (),
-//       prev->domain->domain_id,next->domain->domain_id);
+    uint64_t spsr;
+
+    local_irq_save(spsr);
     if(VMX_DOMAIN(prev)){
     	vtm_domain_out(prev);
     }
@@ -331,6 +327,7 @@ if (!i--) { printk("+",id); i = 1000000; }
 	    if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
     }
 
+    local_irq_restore(spsr);
     context_saved(prev);
 }
 
