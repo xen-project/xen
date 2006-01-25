@@ -39,10 +39,9 @@ static struct timer_list net_timer;
 #define MAX_PENDING_REQS 256
 
 static struct sk_buff_head rx_queue;
-static multicall_entry_t rx_mcl[NET_RX_RING_SIZE*2+1];
+static multicall_entry_t rx_mcl[NET_RX_RING_SIZE+1];
 static mmu_update_t rx_mmu[NET_RX_RING_SIZE];
-
-static gnttab_transfer_t grant_rx_op[MAX_PENDING_REQS];
+static gnttab_transfer_t grant_rx_op[NET_RX_RING_SIZE];
 static unsigned char rx_notify[NR_IRQS];
 
 static unsigned long mmap_vstart;
@@ -245,7 +244,7 @@ static void net_rx_action(unsigned long unused)
 		__skb_queue_tail(&rxq, skb);
 
 		/* Filled the batch queue? */
-		if ((mcl - rx_mcl) == ARRAY_SIZE(rx_mcl))
+		if ((gop - grant_rx_op) == ARRAY_SIZE(grant_rx_op))
 			break;
 	}
 
