@@ -436,6 +436,14 @@ FLT13:  movq  %rax,(%rsi)               # RCX
         .quad FLT12,domain_crash_synchronous , FLT13,domain_crash_synchronous
 .previous
 
+domain_crash_synchronous_string:
+        .asciz "domain_crash_sync called from entry.S\n"
+
+domain_crash_synchronous:
+        leaq domain_crash_synchronous_string(%rip),%rdi
+        call printf
+        jmp  __domain_crash_synchronous
+
         ALIGN
 /* %rbx: struct vcpu */
 process_guest_exception_and_events:
