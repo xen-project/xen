@@ -139,7 +139,7 @@ void domain_kill(struct domain *d)
 }
 
 
-void domain_crash(struct domain *d)
+void __domain_crash(struct domain *d)
 {
     if ( d == current->domain )
     {
@@ -157,9 +157,9 @@ void domain_crash(struct domain *d)
 }
 
 
-void domain_crash_synchronous(void)
+void __domain_crash_synchronous(void)
 {
-    domain_crash(current->domain);
+    __domain_crash(current->domain);
     for ( ; ; )
         do_softirq();
 }

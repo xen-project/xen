@@ -477,6 +477,14 @@ nvm86_3:/* Rewrite our stack frame and return to ring 1. */
         .long FLT24,domain_crash_synchronous , FLT25,domain_crash_synchronous
 .previous
 
+domain_crash_synchronous_string:
+	.asciz "domain_crash_sync from entry.S %lx\n"
+	
+domain_crash_synchronous:
+	pushl $domain_crash_synchronous_string
+	call printf
+	jmp __domain_crash_synchronous
+	
         ALIGN
 process_guest_exception_and_events:
         leal VCPU_trap_bounce(%ebx),%edx

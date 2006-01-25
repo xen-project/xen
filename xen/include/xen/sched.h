@@ -238,13 +238,21 @@ extern void domain_pause_for_debugger(void);
  * caller is the specified domain. The domain is not synchronously descheduled
  * from any processor.
  */
-extern void domain_crash(struct domain *d);
+extern void __domain_crash(struct domain *d);
+#define domain_crash(d) do {                                              \
+    printf("domain_crash called from %s:%d\n", __FILE__, __LINE__);       \
+    __domain_crash(d);                                                    \
+} while (0)
 
 /*
  * Mark current domain as crashed and synchronously deschedule from the local
  * processor. This function never returns.
  */
-extern void domain_crash_synchronous(void) __attribute__((noreturn));
+extern void __domain_crash_synchronous(void) __attribute__((noreturn));
+#define domain_crash_synchronous() do {                                   \
+    printf("domain_crash_sync called from %s:%d\n", __FILE__, __LINE__);  \
+    __domain_crash_synchronous();                                         \
+} while (0)
 
 void new_thread(struct vcpu *d,
                 unsigned long start_pc,
