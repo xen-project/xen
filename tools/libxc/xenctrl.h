@@ -13,7 +13,6 @@
 #include <sys/ptrace.h>
 #include <xen/xen.h>
 #include <xen/dom0_ops.h>
-#include <xen/grant_table.h>
 #include <xen/version.h>
 #include <xen/event_channel.h>
 #include <xen/sched.h>
@@ -466,63 +465,6 @@ int xc_memory_op(int xc_handle, int cmd, void *arg);
 int xc_get_pfn_type_batch(int xc_handle, uint32_t dom,
                           int num, unsigned long *arr);
 
-
-/*\
- *  GRANT TABLE FUNCTIONS
-\*/ 
-
-/**
- * This function opens a handle to the more restricted grant table hypervisor
- * interface. This may be used where the standard interface is not
- * available because the domain is not privileged.
- * This function can  be called multiple times within a single process.
- * Multiple processes can have an open hypervisor interface at the same time.
- *
- * Each call to this function should have a corresponding call to
- * xc_grant_interface_close().
- *
- * This function can fail if a Xen-enabled kernel is not currently running.
- *
- * @return a handle to the hypervisor grant table interface or -1 on failure
- */
-int xc_grant_interface_open(void);
-
-/**
- * This function closes an open grant table hypervisor interface.
- *
- * This function can fail if the handle does not represent an open interface or
- * if there were problems closing the interface.
- *
- * @parm xc_handle a handle to an open grant table hypervisor interface
- * @return 0 on success, -1 otherwise.
- */
-int xc_grant_interface_close(int xc_handle);
-
-int xc_gnttab_map_grant_ref(int      xc_handle,
-                            uint64_t host_virt_addr,
-                            uint32_t dom,
-                            grant_ref_t ref,
-                            uint16_t flags,
-                            int16_t *status,
-                            grant_handle_t *handle,
-                            uint64_t *dev_bus_addr);
-
-int xc_gnttab_unmap_grant_ref(int  xc_handle,
-                              uint64_t  host_virt_addr,
-                              uint64_t  dev_bus_addr,
-                              grant_handle_t handle,
-                              int16_t *status);
-
-int xc_gnttab_setup_table(int        xc_handle,
-                          uint32_t   dom,
-                          uint16_t   nr_frames,
-                          int16_t   *status,
-                          unsigned long **frame_list);
-
-/* Grant debug builds only: */
-int xc_gnttab_dump_table(int        xc_handle,
-                         uint32_t   dom,
-                         int16_t   *status);
 
 /* Get current total pages allocated to a domain. */
 long xc_get_tot_pages(int xc_handle, uint32_t domid);
