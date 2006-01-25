@@ -1826,8 +1826,7 @@ int do_mmuext_op(
             break;
 
         case MMUEXT_NEW_BASEPTR:
-            if (shadow_mode_translate(current->domain))
-                mfn = __gpfn_to_mfn(current->domain, mfn);
+            mfn = __gpfn_to_mfn(current->domain, mfn);
             okay = new_guest_cr3(mfn);
             percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
             break;
@@ -2679,10 +2678,9 @@ long set_gdt(struct vcpu *v,
 
 long do_set_gdt(unsigned long *frame_list, unsigned int entries)
 {
-    int nr_pages = (entries + 511) / 512;
+    int i, nr_pages = (entries + 511) / 512;
     unsigned long frames[16];
     long ret;
-    int x;
 
     /* Rechecked in set_gdt, but ensures a sane limit for copy_from_user(). */
     if ( entries > FIRST_RESERVED_GDT_ENTRY )
@@ -2691,10 +2689,8 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
     if ( copy_from_user(frames, frame_list, nr_pages * sizeof(unsigned long)) )
         return -EFAULT;
 
-    if (shadow_mode_translate(current->domain)) {
-        for (x = 0; x < nr_pages; x++)
-            frames[x] = __gpfn_to_mfn(current->domain, frames[x]);
-    }
+    for ( i = 0; i < nr_pages; i++ )
+        frames[i] = __gpfn_to_mfn(current->domain, frames[i]);
 
     LOCK_BIGLOCK(current->domain);
 
