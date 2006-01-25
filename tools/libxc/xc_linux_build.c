@@ -3,6 +3,7 @@
  */
 
 #include "xg_private.h"
+#include "xc_private.h"
 #include <xenctrl.h>
 
 #if defined(__i386__)
@@ -31,6 +32,8 @@
 #define L3_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #endif
+
+#define NR_GRANT_FRAMES 4
 
 #ifdef __ia64__
 #define get_tot_pages xc_get_max_pages
@@ -504,6 +507,8 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
+    shadow_mode_enabled = !!strstr(dsi.xen_guest_string,
+                                   "SHADOW=translate");
     /*
      * Why do we need this? The number of page-table frames depends on the 
      * size of the bootstrap address space. But the size of the address space 
@@ -587,7 +592,7 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    if ( (page_array = malloc((nr_pages + 1) * sizeof(unsigned long))) == NULL )
+    if ( (page_array = malloc((nr_pages + 1 + NR_GRANT_FRAMES) * sizeof(unsigned long))) == NULL )
     {
         PERROR("Could not allocate memory");
         goto error_out;
@@ -622,19 +627,23 @@ static int setup_guest(int xc_handle,
     if ( (mmu = xc_init_mmu_updates(xc_handle, dom)) == NULL )
         goto error_out;
 
-    shadow_mode_enabled = !!strstr(dsi.xen_guest_string,
-                                   "SHADOW=translate");
-
     /* Write the phys->machine and machine->phys table entries. */
     physmap_pfn = (vphysmap_start - dsi.v_start) >> PAGE_SHIFT;
     physmap = physmap_e = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
         page_array[physmap_pfn++]);
 
-    if (shadow_mode_enabled)
-        page_array[nr_pages] = shared_info_frame;
+    page_array[nr_pages] = shared_info_frame;
 
-    for ( count = 0; count < nr_pages + shadow_mode_enabled; count++ )
+    if ( xc_get_gnttab_frames(xc_handle,
+                              dom,
+                              page_array + 1 + nr_pages,
+                              NR_GRANT_FRAMES) <= 0) {
+        fprintf(stderr, "cannot get grant table frames\n");
+        goto error_out;
+    }
+
+    for ( count = 0; count < nr_pages + 1 + NR_GRANT_FRAMES; count++ )
     {
         if ( xc_add_mmu_update(
             xc_handle, mmu,
