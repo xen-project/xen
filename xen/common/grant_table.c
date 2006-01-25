@@ -719,10 +719,18 @@ gnttab_transfer(
         }
 
         /* Check the passed page frame for basic validity. */
-        page = pfn_to_page(gop.mfn);
-        if ( unlikely(!pfn_valid(gop.mfn) || IS_XEN_HEAP_FRAME(page)) )
+        if ( unlikely(!pfn_valid(gop.mfn)) )
         { 
-            DPRINTK("gnttab_transfer: out-of-range or xen frame %lx\n",
+            DPRINTK("gnttab_transfer: out-of-range %lx\n",
+                    (unsigned long)gop.mfn);
+            (void)__put_user(GNTST_bad_page, &uop[i].status);
+            continue;
+        }
+
+        page = pfn_to_page(gop.mfn);
+        if ( unlikely(IS_XEN_HEAP_FRAME(page)) )
+        { 
+            DPRINTK("gnttab_transfer: xen frame %lx\n",
                     (unsigned long)gop.mfn);
             (void)__put_user(GNTST_bad_page, &uop[i].status);
             continue;
