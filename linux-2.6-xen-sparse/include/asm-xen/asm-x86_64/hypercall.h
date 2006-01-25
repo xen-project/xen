@@ -90,7 +90,7 @@
 ({								\
 	long __res, __ign1, __ign2, __ign3;			\
 	asm volatile (						\
-		"movq %8,%%r10; "				\
+		"movq %7,%%r10; "				\
 		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res), "=D" (__ign1), "=S" (__ign2),	\
 		"=d" (__ign3)					\
@@ -104,7 +104,7 @@
 ({								\
 	long __res, __ign1, __ign2, __ign3;			\
 	asm volatile (						\
-		"movq %8,%%r10; movq %9,%%r8; "			\
+		"movq %7,%%r10; movq %8,%%r8; "			\
 		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res), "=D" (__ign1), "=S" (__ign2),	\
 		"=d" (__ign3)					\

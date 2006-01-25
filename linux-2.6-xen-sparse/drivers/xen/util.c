@@ -31,6 +31,7 @@ struct vm_struct *alloc_vm_area(unsigned long size)
 
 	return area;
 }
+EXPORT_SYMBOL(alloc_vm_area);
 
 void free_vm_area(struct vm_struct *area)
 {
@@ -39,6 +40,7 @@ void free_vm_area(struct vm_struct *area)
 	BUG_ON(ret != area);
 	kfree(area);
 }
+EXPORT_SYMBOL(free_vm_area);
 
 void lock_vm_area(struct vm_struct *area)
 {
@@ -58,11 +60,13 @@ void lock_vm_area(struct vm_struct *area)
 	for (i = 0; i < area->size; i += PAGE_SIZE)
 		(void)__get_user(c, (char __user *)area->addr + i);
 }
+EXPORT_SYMBOL(lock_vm_area);
 
 void unlock_vm_area(struct vm_struct *area)
 {
 	preempt_enable();
 }
+EXPORT_SYMBOL(unlock_vm_area);
 
 /*
  * Local variables:
