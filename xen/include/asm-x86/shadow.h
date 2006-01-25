@@ -490,7 +490,7 @@ static inline void __mark_dirty(struct domain *d, unsigned long mfn)
 #ifndef NDEBUG
     else if ( mfn < max_page )
     {
-        SH_VLOG("mark_dirty OOR! mfn=%x pfn=%lx max=%x (dom %p)",
+        SH_VLOG("mark_dirty OOR! mfn=%lx pfn=%lx max=%x (dom %p)",
                mfn, pfn, d->arch.shadow_dirty_bitmap_size, d);
         SH_VLOG("dom=%p caf=%08x taf=%" PRtype_info, 
                 page_get_owner(pfn_to_page(mfn)),

@@ -60,16 +60,18 @@ static int probeimageformat(char *image,
     return 0;
 }
 
-#define alloc_pt(ltab, vltab)                                           \
+#define alloc_pt(ltab, vltab, pltab)                                    \
 do {                                                                    \
-    ltab = (uint64_t)page_array[ppt_alloc++] << PAGE_SHIFT;                  \
+    pltab = ppt_alloc++;                                                \
+    ltab = (uint64_t)page_array[pltab] << PAGE_SHIFT;                   \
+    pltab <<= PAGE_SHIFT;                                               \
     if ( vltab != NULL )                                                \
         munmap(vltab, PAGE_SIZE);                                       \
     if ( (vltab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,       \
                                        PROT_READ|PROT_WRITE,            \
                                        ltab >> PAGE_SHIFT)) == NULL )   \
         goto error_out;                                                 \
-    memset(vltab, 0, PAGE_SIZE);                                        \
+    memset(vltab, 0x0, PAGE_SIZE);                                      \
 } while ( 0 )
 
 #if defined(__i386__)
@@ -80,33 +82,42 @@ static int setup_pg_tables(int xc_handle, uint32_t dom,
                            unsigned long v_end,
                            unsigned long *page_array,
                            unsigned long vpt_start,
-                           unsigned long vpt_end)
+                           unsigned long vpt_end,
+                           unsigned shadow_mode_enabled)
 {
     l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
     l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
-    unsigned long l1tab = 0;
-    unsigned long l2tab = 0;
+    unsigned long l1tab = 0, pl1tab;
+    unsigned long l2tab = 0, pl2tab;
     unsigned long ppt_alloc;
     unsigned long count;
 
     ppt_alloc = (vpt_start - dsi_v_start) >> PAGE_SHIFT;
-    alloc_pt(l2tab, vl2tab);
+    alloc_pt(l2tab, vl2tab, pl2tab);
     vl2e = &vl2tab[l2_table_offset(dsi_v_start)];
     ctxt->ctrlreg[3] = l2tab;
 
     for ( count = 0; count < ((v_end - dsi_v_start) >> PAGE_SHIFT); count++ )
-    {    
+    {
         if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 )
         {
-            alloc_pt(l1tab, vl1tab);
+            alloc_pt(l1tab, vl1tab, pl1tab);
             vl1e = &vl1tab[l1_table_offset(dsi_v_start + (count<<PAGE_SHIFT))];
-            *vl2e++ = l1tab | L2_PROT;
+            if (shadow_mode_enabled)
+                *vl2e = pl1tab | L2_PROT;
+            else
+                *vl2e = l1tab | L2_PROT;
+            vl2e++;
         }
 
-        *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
-        if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) && 
-             (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) )
-            *vl1e &= ~_PAGE_RW;
+        if (shadow_mode_enabled) {
+            *vl1e = (count << PAGE_SHIFT) | L1_PROT;
+        } else {
+            *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
+            if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) && 
+                 (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) )
+                *vl1e &= ~_PAGE_RW;
+        }
         vl1e++;
     }
     munmap(vl1tab, PAGE_SIZE);
@@ -127,12 +138,13 @@ static int setup_pg_tables_pae(int xc_handle, uint32_t dom,
                                unsigned long v_end,
                                unsigned long *page_array,
                                unsigned long vpt_start,
-                               unsigned long vpt_end)
+                               unsigned long vpt_end,
+                               unsigned shadow_mode_enabled)
 {
     l1_pgentry_64_t *vl1tab = NULL, *vl1e = NULL;
     l2_pgentry_64_t *vl2tab = NULL, *vl2e = NULL;
     l3_pgentry_64_t *vl3tab = NULL, *vl3e = NULL;
-    uint64_t l1tab, l2tab, l3tab;
+    uint64_t l1tab, l2tab, l3tab, pl1tab, pl2tab, pl3tab;
     unsigned long ppt_alloc, count, nmfn;
 
     /* First allocate page for page dir. */
@@ -149,7 +161,7 @@ static int setup_pg_tables_pae(int xc_handle, uint32_t dom,
         page_array[ppt_alloc] = nmfn;
     }
 
-    alloc_pt(l3tab, vl3tab);
+    alloc_pt(l3tab, vl3tab, pl3tab);
     vl3e = &vl3tab[l3_table_offset_pae(dsi_v_start)];
     ctxt->ctrlreg[3] = l3tab;
 
@@ -159,22 +171,32 @@ static int setup_pg_tables_pae(int xc_handle, uint32_t dom,
         {
             if ( !((unsigned long)vl2e & (PAGE_SIZE-1)) )
             {
-                alloc_pt(l2tab, vl2tab);
+                alloc_pt(l2tab, vl2tab, pl2tab);
                 vl2e = &vl2tab[l2_table_offset_pae(
                     dsi_v_start + (count << PAGE_SHIFT))];
-                *vl3e++ = l2tab | L3_PROT;
+                if (shadow_mode_enabled)
+                    *vl3e = pl2tab | L3_PROT;
+                else
+                    *vl3e++ = l2tab | L3_PROT;
             }
 
-            alloc_pt(l1tab, vl1tab);
+            alloc_pt(l1tab, vl1tab, pl1tab);
             vl1e = &vl1tab[l1_table_offset_pae(
                 dsi_v_start + (count << PAGE_SHIFT))];
-            *vl2e++ = l1tab | L2_PROT;
+            if (shadow_mode_enabled)
+                *vl2e = pl1tab | L2_PROT;
+            else
+                *vl2e++ = l1tab | L2_PROT;
         }
         
-        *vl1e = ((uint64_t)page_array[count] << PAGE_SHIFT) | L1_PROT;
-        if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) &&
-             (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) ) 
-            *vl1e &= ~_PAGE_RW;
+        if (shadow_mode_enabled) {
+            *vl1e = (count << PAGE_SHIFT) | L1_PROT;
+        } else {
+            *vl1e = ((uint64_t)page_array[count] << PAGE_SHIFT) | L1_PROT;
+            if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) &&
+                 (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) ) 
+                *vl1e &= ~_PAGE_RW;
+        }
         vl1e++;
     }
      
@@ -203,7 +225,8 @@ static int setup_pg_tables_64(int xc_handle, uint32_t dom,
                               unsigned long v_end,
                               unsigned long *page_array,
                               unsigned long vpt_start,
-                              unsigned long vpt_end)
+                              unsigned long vpt_end,
+                              int shadow_mode_enabled)
 {
     l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
     l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
@@ -247,11 +270,15 @@ static int setup_pg_tables_64(int xc_handle, uint32_t dom,
             vl2e++;
         }
         
-        *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
-        if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) &&
-             (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) ) 
-        {
-            *vl1e &= ~_PAGE_RW;
+        if (shadow_mode_enable) {
+            *vl1e = (count << PAGE_SHIFT) | L1_PROT;
+        } else {
+            *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
+            if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) &&
+                 (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) ) 
+                {
+                    *vl1e &= ~_PAGE_RW;
+                }
         }
         vl1e++;
     }
@@ -458,6 +485,8 @@ static int setup_guest(int xc_handle,
     unsigned long vpt_start;
     unsigned long vpt_end;
     unsigned long v_end;
+    unsigned shadow_mode_enabled;
+    unsigned long guest_store_mfn, guest_console_mfn, guest_shared_info_mfn;
 
     rc = probeimageformat(image, image_size, &load_funcs);
     if ( rc != 0 )
@@ -558,7 +587,7 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
+    if ( (page_array = malloc((nr_pages + 1) * sizeof(unsigned long))) == NULL )
     {
         PERROR("Could not allocate memory");
         goto error_out;
@@ -593,24 +622,8 @@ static int setup_guest(int xc_handle,
     if ( (mmu = xc_init_mmu_updates(xc_handle, dom)) == NULL )
         goto error_out;
 
-    /* setup page tables */
-#if defined(__i386__)
-    if (dsi.pae_kernel)
-        rc = setup_pg_tables_pae(xc_handle, dom, ctxt,
-                                 dsi.v_start, v_end,
-                                 page_array, vpt_start, vpt_end);
-    else
-        rc = setup_pg_tables(xc_handle, dom, ctxt,
-                             dsi.v_start, v_end,
-                             page_array, vpt_start, vpt_end);
-#endif
-#if defined(__x86_64__)
-    rc = setup_pg_tables_64(xc_handle, dom, ctxt,
-                            dsi.v_start, v_end,
-                            page_array, vpt_start, vpt_end);
-#endif
-    if (0 != rc)
-        goto error_out;
+    shadow_mode_enabled = !!strstr(dsi.xen_guest_string,
+                                   "SHADOW=translate");
 
     /* Write the phys->machine and machine->phys table entries. */
     physmap_pfn = (vphysmap_start - dsi.v_start) >> PAGE_SHIFT;
@@ -618,7 +631,10 @@ static int setup_guest(int xc_handle,
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
         page_array[physmap_pfn++]);
 
-    for ( count = 0; count < nr_pages; count++ )
+    if (shadow_mode_enabled)
+        page_array[nr_pages] = shared_info_frame;
+
+    for ( count = 0; count < nr_pages + shadow_mode_enabled; count++ )
     {
         if ( xc_add_mmu_update(
             xc_handle, mmu,
@@ -640,20 +656,58 @@ static int setup_guest(int xc_handle,
         }
     }
     munmap(physmap, PAGE_SIZE);
-    
+
+    /* Send the page update requests down to the hypervisor. */
+    if ( xc_finish_mmu_updates(xc_handle, mmu) )
+        goto error_out;
+
+    if (shadow_mode_enabled) {
+        /* Enable shadow translate mode */
+        if (xc_shadow_control(xc_handle, dom,
+                              DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE,
+                              NULL, 0, NULL) < 0) {
+            PERROR("Could not enable translation mode");
+            goto error_out;
+        }
+    }
+
+    /* setup page tables */
+#if defined(__i386__)
+    if (dsi.pae_kernel)
+        rc = setup_pg_tables_pae(xc_handle, dom, ctxt,
+                                 dsi.v_start, v_end,
+                                 page_array, vpt_start, vpt_end,
+                                 shadow_mode_enabled);
+    else
+        rc = setup_pg_tables(xc_handle, dom, ctxt,
+                             dsi.v_start, v_end,
+                             page_array, vpt_start, vpt_end,
+                             shadow_mode_enabled);
+#endif
+#if defined(__x86_64__)
+    rc = setup_pg_tables_64(xc_handle, dom, ctxt,
+                            dsi.v_start, v_end,
+                            page_array, vpt_start, vpt_end,
+                            shadow_mode_enabled);
+#endif
+    if (0 != rc)
+        goto error_out;
+
 #if defined(__i386__)
     /*
      * Pin down l2tab addr as page dir page - causes hypervisor to provide
      * correct protection for the page
      */
-    if (dsi.pae_kernel) {
-        if ( pin_table(xc_handle, MMUEXT_PIN_L3_TABLE,
-                       ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
-            goto error_out;
-    } else {
-        if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE,
-                       ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
-            goto error_out;
+    if (!shadow_mode_enabled) {
+        if (dsi.pae_kernel) {
+            if ( pin_table(xc_handle, MMUEXT_PIN_L3_TABLE,
+                           ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
+                goto error_out;
+        } else {
+            if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE,
+                           ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
+                goto error_out;
+        }
     }
 #endif
 
@@ -672,24 +726,34 @@ static int setup_guest(int xc_handle,
     if ( xc_clear_domain_page(xc_handle, dom, *store_mfn) ||
          xc_clear_domain_page(xc_handle, dom, *console_mfn) )
         goto error_out;
+    if (shadow_mode_enabled) {
+        guest_store_mfn = (vstoreinfo_start-dsi.v_start) >> PAGE_SHIFT;
+        guest_console_mfn = (vconsole_start-dsi.v_start) >> PAGE_SHIFT;
+        guest_shared_info_mfn = nr_pages;
+    } else {
+        guest_store_mfn = *store_mfn;
+        guest_console_mfn = *console_mfn;
+        guest_shared_info_mfn = shared_info_frame;
+    }
 
     start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
         page_array[(vstartinfo_start-dsi.v_start)>>PAGE_SHIFT]);
+    /*shared_info, start_info */
     memset(start_info, 0, sizeof(*start_info));
     rc = xc_version(xc_handle, XENVER_version, NULL);
     sprintf(start_info->magic, "xen-%i.%i-x86_%d%s",
             rc >> 16, rc & (0xFFFF), (unsigned int)sizeof(long)*8,
             dsi.pae_kernel ? "p" : "");
     start_info->nr_pages     = nr_pages;
-    start_info->shared_info  = shared_info_frame << PAGE_SHIFT;
+    start_info->shared_info  = guest_shared_info_mfn << PAGE_SHIFT;
     start_info->flags        = flags;
     start_info->pt_base      = vpt_start;
     start_info->nr_pt_frames = nr_pt_pages;
     start_info->mfn_list     = vphysmap_start;
-    start_info->store_mfn    = *store_mfn;
+    start_info->store_mfn    = guest_store_mfn;
     start_info->store_evtchn = store_evtchn;
-    start_info->console_mfn   = *console_mfn;
+    start_info->console_mfn   = guest_console_mfn;
     start_info->console_evtchn = console_evtchn;
     if ( initrd_len != 0 )
     {

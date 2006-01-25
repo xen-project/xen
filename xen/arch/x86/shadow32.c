@@ -1391,7 +1391,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
     case DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE:
         free_shadow_pages(d);
         rc = __shadow_mode_enable(
-            d, d->arch.shadow_mode|SHM_enable|SHM_refcounts|SHM_translate);
+            d, d->arch.shadow_mode|SHM_enable|SHM_refcounts|SHM_translate|SHM_wr_pt_pte);
         break;
 
     default:
@@ -2643,7 +2643,8 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
     __guest_get_l2e(v, va, &gpde);
     if ( unlikely(!(l2e_get_flags(gpde) & _PAGE_PRESENT)) )
     {
-        SH_VVLOG("shadow_fault - EXIT: L1 not present");
+        SH_VVLOG("shadow_fault - EXIT: L2 not present (%x)",
+                 l2e_get_intpte(gpde));
         perfc_incrc(shadow_fault_bail_pde_not_present);
         goto fail;
     }
@@ -2655,8 +2656,9 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
     orig_gpte = gpte = linear_pg_table[l1_linear_offset(va)];
     if ( unlikely(!(l1e_get_flags(gpte) & _PAGE_PRESENT)) )
     {
-        SH_VVLOG("shadow_fault - EXIT: gpte not present (%" PRIpte ")",
-                 l1e_get_intpte(gpte));
+        SH_VVLOG("shadow_fault - EXIT: gpte not present (%" PRIpte ") (gpde %" PRIpte ")",
+                 l1e_get_intpte(gpte),
+                 l2e_get_intpte(gpde));
         perfc_incrc(shadow_fault_bail_pte_not_present);
         goto fail;
     }
