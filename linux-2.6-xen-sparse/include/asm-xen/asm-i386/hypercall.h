@@ -43,6 +43,7 @@
 	asm volatile (				\
 		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res)			\
+		:				\
 		: "memory" );			\
 	(type)__res;				\
 })

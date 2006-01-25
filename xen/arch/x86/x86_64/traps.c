@@ -293,9 +293,9 @@ void hypercall_page_initialise(void *hypercall_page)
      * calling it.
      */
     p = (char *)(hypercall_page + (__HYPERVISOR_iret * 32));
-    *(u8  *)(p+ 0) = 0x50;    /* push %rax */
-    *(u8  *)(p+ 1) = 0x51;    /* push %rcx */
-    *(u16 *)(p+ 2) = 0x5341;  /* push %r11 */
+    *(u8  *)(p+ 0) = 0x51;    /* push %rcx */
+    *(u16 *)(p+ 1) = 0x5341;  /* push %r11 */
+    *(u8  *)(p+ 3) = 0x50;    /* push %rax */
     *(u8  *)(p+ 4) = 0xb8;    /* mov  $__HYPERVISOR_iret,%eax */
     *(u32 *)(p+ 5) = __HYPERVISOR_iret;
     *(u16 *)(p+ 9) = 0x050f;  /* syscall */

@@ -46,6 +46,7 @@
 	asm volatile (				\
 		"call hypercall_page + ("STR(__HYPERVISOR_##name)" * 32)"\
 		: "=a" (__res)			\
+		:				\
 		: "memory" );			\
 	(type)__res;				\
 })
@@ -284,12 +285,6 @@ HYPERVISOR_vcpu_op(
 	int cmd, int vcpuid, void *extra_args)
 {
 	return _hypercall3(int, vcpu_op, cmd, vcpuid, extra_args);
-}
-
-static inline int
-HYPERVISOR_iret(void)
-{
-	return _hypercall0(int, iret);
 }
 
 static inline int
