@@ -348,6 +348,7 @@ int arch_set_info_guest(
     struct domain *d = v->domain;
     unsigned long phys_basetab;
     int i, rc;
+    unsigned got_basetab_type;
 
     /*
      * This is sufficient! If the descriptor DPL differs from CS RPL then we'll
@@ -401,23 +402,32 @@ int arch_set_info_guest(
         d->vm_assist = c->vm_assist;
 
     phys_basetab = c->ctrlreg[3];
+    phys_basetab =
+        (__gpfn_to_mfn(d, phys_basetab >> PAGE_SHIFT) << PAGE_SHIFT) |
+        (phys_basetab & ~PAGE_MASK);
+
     v->arch.guest_table = mk_pagetable(phys_basetab);
 
     if ( shadow_mode_refcounts(d) )
     {
         if ( !get_page(pfn_to_page(phys_basetab>>PAGE_SHIFT), d) )
             return -EINVAL;
+        got_basetab_type = 0;
     }
     else if ( !(c->flags & VGCF_VMX_GUEST) )
     {
         if ( !get_page_and_type(pfn_to_page(phys_basetab>>PAGE_SHIFT), d,
                                 PGT_base_page_table) )
             return -EINVAL;
+        got_basetab_type = 1;
     }
 
     if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
     {
-        put_page_and_type(pfn_to_page(phys_basetab>>PAGE_SHIFT));
+        if (got_basetab_type)
+            put_page_and_type(pfn_to_page(phys_basetab>>PAGE_SHIFT));
+        else
+            put_page(pfn_to_page(phys_basetab>>PAGE_SHIFT));
         return rc;
     }
 

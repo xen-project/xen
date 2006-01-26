@@ -98,7 +98,10 @@ static int setup_pg_tables(int xc_handle, uint32_t dom,
     ppt_alloc = (vpt_start - dsi_v_start) >> PAGE_SHIFT;
     alloc_pt(l2tab, vl2tab, pl2tab);
     vl2e = &vl2tab[l2_table_offset(dsi_v_start)];
-    ctxt->ctrlreg[3] = l2tab;
+    if (shadow_mode_enabled)
+        ctxt->ctrlreg[3] = pl2tab;
+    else
+        ctxt->ctrlreg[3] = l2tab;
 
     for ( count = 0; count < ((v_end - dsi_v_start) >> PAGE_SHIFT); count++ )
     {
@@ -166,7 +169,10 @@ static int setup_pg_tables_pae(int xc_handle, uint32_t dom,
 
     alloc_pt(l3tab, vl3tab, pl3tab);
     vl3e = &vl3tab[l3_table_offset_pae(dsi_v_start)];
-    ctxt->ctrlreg[3] = l3tab;
+    if (shadow_mode_enabled)
+        ctxt->ctrlreg[3] = pl3tab;
+    else
+        ctxt->ctrlreg[3] = l3tab;
 
     for ( count = 0; count < ((v_end - dsi_v_start) >> PAGE_SHIFT); count++)
     {
@@ -246,7 +252,10 @@ static int setup_pg_tables_64(int xc_handle, uint32_t dom,
     ppt_alloc = (vpt_start - dsi_v_start) >> PAGE_SHIFT;
     alloc_pt(l4tab, vl4tab);
     vl4e = &vl4tab[l4_table_offset(dsi_v_start)];
-    ctxt->ctrlreg[3] = l4tab;
+    if (shadow_mode_enabled)
+        ctxt->ctrlreg[3] = pl4tab;
+    else
+        ctxt->ctrlreg[3] = l4tab;
     
     for ( count = 0; count < ((v_end-dsi_v_start)>>PAGE_SHIFT); count++)
     {

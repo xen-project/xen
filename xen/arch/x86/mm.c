@@ -2153,9 +2153,7 @@ int do_mmu_update(
         case MMU_MACHPHYS_UPDATE:
 
             if (shadow_mode_translate(FOREIGNDOM)) {
-                /* We don't allow translate mode guests to have their
-                   M2P tables mutated while they're running. */
-                okay = 0;
+                MEM_LOG("can't mutate m2p table of translate mode guest");
                 break;
             }
 
@@ -2637,7 +2635,7 @@ long set_gdt(struct vcpu *v,
 
     /* Check the pages in the new GDT. */
     for ( i = 0; i < nr_pages; i++ ) {
-        pfn = frames[i];
+        pfn = frames[i] = __gpfn_to_mfn(d, frames[i]);
         if ((pfn >= max_page) ||
             !get_page_and_type(pfn_to_page(pfn), d, PGT_gdt_page) )
             goto fail;
@@ -2669,7 +2667,6 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
     int nr_pages = (entries + 511) / 512;
     unsigned long frames[16];
     long ret;
-    int x;
 
     /* Rechecked in set_gdt, but ensures a sane limit for copy_from_user(). */
     if ( entries > FIRST_RESERVED_GDT_ENTRY )
@@ -2677,11 +2674,6 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
     
     if ( copy_from_user(frames, frame_list, nr_pages * sizeof(unsigned long)) )
         return -EFAULT;
-
-    if (shadow_mode_translate(current->domain)) {
-        for (x = 0; x < nr_pages; x++)
-            frames[x] = __gpfn_to_mfn(current->domain, frames[x]);
-    }
 
     LOCK_BIGLOCK(current->domain);
 
