@@ -2152,32 +2152,19 @@ int do_mmu_update(
 
         case MMU_MACHPHYS_UPDATE:
 
-            mfn = req.ptr >> PAGE_SHIFT;
-            gpfn = req.val;
-
-            /* HACK ALERT...  Need to think about this some more... */
-            if ( unlikely(shadow_mode_translate(FOREIGNDOM) && IS_PRIV(d)) )
-            {
-                shadow_lock(FOREIGNDOM);
-                printk("privileged guest dom%d requests pfn=%lx to "
-                       "map mfn=%lx for dom%d\n",
-                       d->domain_id, gpfn, mfn, FOREIGNDOM->domain_id);
-                set_pfn_from_mfn(mfn, gpfn);
-                set_p2m_entry(FOREIGNDOM, gpfn, mfn, &sh_mapcache, &mapcache);
-                okay = 1;
-                shadow_unlock(FOREIGNDOM);
+            if (shadow_mode_translate(FOREIGNDOM)) {
+                /* We don't allow translate mode guests to have their
+                   M2P tables mutated while they're running. */
+                okay = 0;
                 break;
             }
+
+            mfn = req.ptr >> PAGE_SHIFT;
+            gpfn = req.val;
 
             if ( unlikely(!get_page_from_pagenr(mfn, FOREIGNDOM)) )
             {
                 MEM_LOG("Could not get page for mach->phys update");
-                break;
-            }
-
-            if ( unlikely(shadow_mode_translate(FOREIGNDOM) && !IS_PRIV(d)) )
-            {
-                MEM_LOG("can't mutate the m2p of translated guests");
                 break;
             }
 
