@@ -408,11 +408,11 @@ int arch_set_info_guest(
 
     v->arch.guest_table = mk_pagetable(phys_basetab);
 
+    got_basetab_type = 0;
     if ( shadow_mode_refcounts(d) )
     {
         if ( !get_page(pfn_to_page(phys_basetab>>PAGE_SHIFT), d) )
             return -EINVAL;
-        got_basetab_type = 0;
     }
     else if ( !(c->flags & VGCF_VMX_GUEST) )
     {
