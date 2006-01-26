@@ -45,7 +45,11 @@ initrd.img: $(XMTEST_VER_IMG)
 
 disk.img: $(XMTEST_VER_IMG)
 	chmod a+x $(VMX_SCRIPT)
-	$(VMX_SCRIPT) -r $(XMTEST_VER_IMG)
+	@if test "$(VMXKERNEL)" = "no" ; then \
+		$(VMX_SCRIPT) -r $(XMTEST_VER_IMG); \
+	else \
+		$(VMX_SCRIPT) -r $(XMTEST_VER_IMG) -k $(VMXKERNEL); \
+	fi
 
 existing:
 	@[ -f $(XMTEST_VER_IMG) ] && ln -sf $(XMTEST_VER_IMG) initrd.img || \

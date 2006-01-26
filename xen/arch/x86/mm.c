@@ -1826,8 +1826,7 @@ int do_mmuext_op(
             break;
 
         case MMUEXT_NEW_BASEPTR:
-            if (shadow_mode_translate(current->domain))
-                mfn = __gpfn_to_mfn(current->domain, mfn);
+            mfn = __gpfn_to_mfn(current->domain, mfn);
             okay = new_guest_cr3(mfn);
             percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
             break;
@@ -2664,7 +2663,7 @@ long set_gdt(struct vcpu *v,
 
 long do_set_gdt(unsigned long *frame_list, unsigned int entries)
 {
-    int nr_pages = (entries + 511) / 512;
+    int i, nr_pages = (entries + 511) / 512;
     unsigned long frames[16];
     long ret;
 

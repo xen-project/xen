@@ -396,6 +396,13 @@ gopts.var('xauthority', val='XAUTHORITY',
           fn=set_value, default=None,
           use="X11 Authority to use")
 
+gopts.var('uuid', val='',
+          fn=set_value, default=None,
+          use="""xenstore UUID (universally unique identifier) to use.  One 
+          will be randomly generated if this option is not set, just like MAC 
+          addresses for virtual network interfaces.  This must be a unique 
+          value across the entire cluster.""")
+
 
 def err(msg):
     """Print an error to stderr and exit.
@@ -566,6 +573,8 @@ def make_config(vals):
     map(add_conf, ['name', 'memory', 'ssidref', 'maxmem', 'restart',
                    'on_poweroff', 'on_reboot', 'on_crash', 'vcpus'])
     
+    if vals.uuid is not None:
+        config.append(['uuid', vals.uuid])
     if vals.cpu is not None:
         config.append(['cpu', vals.cpu])
     if vals.cpus is not None:

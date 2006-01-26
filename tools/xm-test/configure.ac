@@ -38,6 +38,14 @@ fi
 AM_CONDITIONAL(VMX, test x$ENABLE_VMX = xTrue)
 AC_SUBST(ENABLE_VMX)
 
+AC_ARG_WITH(vmx-kernel,
+	[[  --with-vmx-kernel=kernel       Use this kernel for vmx disk.img testing]],
+	VMXKERNEL=$withval,
+	VMXKERNEL="no")
+
+dnl substitute @VMXKERNEL@ in all Makefiles
+AC_SUBST(VMXKERNEL)
+
 AC_SUBST(TENV)
 AC_SUBST(PACKAGE_VERSION)
 

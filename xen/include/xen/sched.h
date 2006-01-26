@@ -240,7 +240,7 @@ extern void domain_pause_for_debugger(void);
  */
 extern void __domain_crash(struct domain *d);
 #define domain_crash(d) do {                                              \
-    printf("domain_crash called from %s:%d\n", __FILE__, __LINE__);       \
+    printk("domain_crash called from %s:%d\n", __FILE__, __LINE__);       \
     __domain_crash(d);                                                    \
 } while (0)
 
@@ -250,7 +250,7 @@ extern void __domain_crash(struct domain *d);
  */
 extern void __domain_crash_synchronous(void) __attribute__((noreturn));
 #define domain_crash_synchronous() do {                                   \
-    printf("domain_crash_sync called from %s:%d\n", __FILE__, __LINE__);  \
+    printk("domain_crash_sync called from %s:%d\n", __FILE__, __LINE__);  \
     __domain_crash_synchronous();                                         \
 } while (0)
 

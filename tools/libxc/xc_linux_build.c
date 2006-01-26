@@ -241,16 +241,16 @@ static int setup_pg_tables_64(int xc_handle, uint32_t dom,
     l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
     l3_pgentry_t *vl3tab=NULL, *vl3e=NULL;
     l4_pgentry_t *vl4tab=NULL, *vl4e=NULL;
-    unsigned long l2tab = 0;
-    unsigned long l1tab = 0;
-    unsigned long l3tab = 0;
-    unsigned long l4tab = 0;
+    unsigned long l2tab = 0, pl2tab;
+    unsigned long l1tab = 0, pl1tab;
+    unsigned long l3tab = 0, pl3tab;
+    unsigned long l4tab = 0, pl4tab;
     unsigned long ppt_alloc;
     unsigned long count;
 
     /* First allocate page for page dir. */
     ppt_alloc = (vpt_start - dsi_v_start) >> PAGE_SHIFT;
-    alloc_pt(l4tab, vl4tab);
+    alloc_pt(l4tab, vl4tab, pl4tab);
     vl4e = &vl4tab[l4_table_offset(dsi_v_start)];
     if (shadow_mode_enabled)
         ctxt->ctrlreg[3] = pl4tab;
@@ -261,28 +261,37 @@ static int setup_pg_tables_64(int xc_handle, uint32_t dom,
     {
         if ( !((unsigned long)vl1e & (PAGE_SIZE-1)) )
         {
-            alloc_pt(l1tab, vl1tab);
+            alloc_pt(l1tab, vl1tab, pl1tab);
             
             if ( !((unsigned long)vl2e & (PAGE_SIZE-1)) )
             {
-                alloc_pt(l2tab, vl2tab);
+                alloc_pt(l2tab, vl2tab, pl2tab);
                 if ( !((unsigned long)vl3e & (PAGE_SIZE-1)) )
                 {
-                    alloc_pt(l3tab, vl3tab);
+                    alloc_pt(l3tab, vl3tab, pl3tab);
                     vl3e = &vl3tab[l3_table_offset(dsi_v_start + (count<<PAGE_SHIFT))];
-                    *vl4e = l3tab | L4_PROT;
+                    if (shadow_mode_enabled)
+                        *vl4e = pl3tab | L4_PROT;
+                    else
+                        *vl4e = l3tab | L4_PROT;
                     vl4e++;
                 }
                 vl2e = &vl2tab[l2_table_offset(dsi_v_start + (count<<PAGE_SHIFT))];
-                *vl3e = l2tab | L3_PROT;
+                if (shadow_mode_enabled)
+                    *vl3e = pl2tab | L3_PROT;
+                else
+                    *vl3e = l2tab | L3_PROT;
                 vl3e++;
             }
             vl1e = &vl1tab[l1_table_offset(dsi_v_start + (count<<PAGE_SHIFT))];
-            *vl2e = l1tab | L2_PROT;
+            if (shadow_mode_enabled)
+                *vl2e = pl1tab | L2_PROT;
+            else
+                *vl2e = l1tab | L2_PROT;
             vl2e++;
         }
         
-        if (shadow_mode_enable) {
+        if (shadow_mode_enabled) {
             *vl1e = (count << PAGE_SHIFT) | L1_PROT;
         } else {
             *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;

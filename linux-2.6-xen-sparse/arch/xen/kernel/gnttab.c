@@ -14,7 +14,6 @@
 #include <asm-xen/xen-public/xen.h>
 #include <asm/fixmap.h>
 #include <asm/uaccess.h>
-#include <asm-xen/xen_proc.h>
 #include <asm-xen/linux-public/privcmd.h>
 #include <asm-xen/gnttab.h>
 #include <asm/synch_bitops.h>
@@ -339,81 +338,6 @@ gnttab_request_free_callback(struct gnttab_free_callback *callback,
  out:
 	spin_unlock_irqrestore(&gnttab_list_lock, flags);
 }
-
-/*
- * ProcFS operations
- */
-
-#ifdef CONFIG_PROC_FS
-
-static struct proc_dir_entry *grant_pde;
-static struct file_operations grant_file_ops;
-
-static int
-grant_read(char *page, char **start, off_t off, int count, int *eof,
-	   void *data)
-{
-	int             len;
-	unsigned int    i;
-	grant_entry_t  *gt;
-
-	gt = (grant_entry_t *)shared;
-	len = 0;
-
-	for (i = 0; i < NR_GRANT_ENTRIES; i++) {
-		if (len > (PAGE_SIZE - 200)) {
-			len += sprintf( page + len, "Truncated.\n");
-			break;
-		}
-	}
-
-	if (gt[i].flags) {
-		len += sprintf(page + len,
-			       "Grant: ref (0x%x) flags (0x%hx) "
-			       "dom (0x%hx) frame (0x%x)\n", 
-			       i,
-			       gt[i].flags,
-			       gt[i].domid,
-			       gt[i].frame );
-	}
-
-	*eof = 1;
-	return len;
-}
-
-static int
-grant_write(struct file *file, const char __user *buffer, unsigned long count,
-	    void *data)
-{
-	/* TODO: implement this */
-	return -ENOSYS;
-}
-
-static int __init
-gnttab_proc_init(void)
-{
-	/*
-	 *  /proc/xen/grant : used by libxc to access grant tables
-	 */
-	if ((grant_pde = create_xen_proc_entry("grant", 0600)) == NULL) {
-		WPRINTK("Unable to create grant xen proc entry\n");
-		return -1;
-	}
-
-	grant_file_ops.read   = grant_pde->proc_fops->read;
-	grant_file_ops.write  = grant_pde->proc_fops->write;
-
-	grant_pde->proc_fops  = &grant_file_ops;
-
-	grant_pde->read_proc  = &grant_read;
-	grant_pde->write_proc = &grant_write;
-
-	return 0;
-}
-
-device_initcall(gnttab_proc_init);
-
-#endif /* CONFIG_PROC_FS */
 
 int
 gnttab_resume(void)
