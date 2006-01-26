@@ -76,7 +76,7 @@ decrease_reservation(
     int           *preempted)
 {
     struct pfn_info *page;
-    unsigned long    i, j, mpfn;
+    unsigned long    i, j, mpfn, mfn;
 
     if ( !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
         return 0;
@@ -94,14 +94,15 @@ decrease_reservation(
 
         for ( j = 0; j < (1 << extent_order); j++ )
         {
-            if ( unlikely((mpfn + j) >= max_page) )
+            mfn = __gpfn_to_mfn(d, mpfn + j);
+            if ( unlikely(mfn >= max_page) )
             {
                 DPRINTK("Domain %u page number out of range (%lx >= %lx)\n", 
-                        d->domain_id, mpfn + j, max_page);
+                        d->domain_id, mfn, max_page);
                 return i;
             }
             
-            page = pfn_to_page(mpfn + j);
+            page = pfn_to_page(mfn);
             if ( unlikely(!get_page(page, d)) )
             {
                 DPRINTK("Bad page free for domain %u\n", d->domain_id);
