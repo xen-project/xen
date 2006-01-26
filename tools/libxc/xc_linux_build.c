@@ -610,7 +610,7 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    if ( (page_array = malloc((nr_pages + 1 + NR_GRANT_FRAMES) * sizeof(unsigned long))) == NULL )
+    if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
     {
         PERROR("Could not allocate memory");
         goto error_out;
@@ -651,17 +651,7 @@ static int setup_guest(int xc_handle,
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
         page_array[physmap_pfn++]);
 
-    page_array[nr_pages] = shared_info_frame;
-
-    if ( xc_get_gnttab_frames(xc_handle,
-                              dom,
-                              page_array + 1 + nr_pages,
-                              NR_GRANT_FRAMES) <= 0) {
-        fprintf(stderr, "cannot get grant table frames\n");
-        goto error_out;
-    }
-
-    for ( count = 0; count < nr_pages + 1 + NR_GRANT_FRAMES; count++ )
+    for ( count = 0; count < nr_pages; count++ )
     {
         if ( xc_add_mmu_update(
             xc_handle, mmu,
@@ -696,6 +686,16 @@ static int setup_guest(int xc_handle,
             PERROR("Could not enable translation mode");
             goto error_out;
         }
+
+        /* Find the shared info frame.  It's guaranteed to be at the
+           start of the PFN hole. */
+        guest_shared_info_mfn = xc_get_pfn_hole_start(xc_handle, dom);
+        if (guest_shared_info_mfn <= 0) {
+            PERROR("Cannot find shared info pfn");
+            goto error_out;
+        }
+    } else {
+        guest_shared_info_mfn = shared_info_frame;
     }
 
     /* setup page tables */
@@ -756,11 +756,9 @@ static int setup_guest(int xc_handle,
     if (shadow_mode_enabled) {
         guest_store_mfn = (vstoreinfo_start-dsi.v_start) >> PAGE_SHIFT;
         guest_console_mfn = (vconsole_start-dsi.v_start) >> PAGE_SHIFT;
-        guest_shared_info_mfn = nr_pages;
     } else {
         guest_store_mfn = *store_mfn;
         guest_console_mfn = *console_mfn;
-        guest_shared_info_mfn = shared_info_frame;
     }
 
     start_info = xc_map_foreign_range(

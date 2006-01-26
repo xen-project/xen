@@ -528,4 +528,6 @@ int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu,
                    unsigned long long ptr, unsigned long long val);
 int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu);
 
+int xc_get_pfn_hole_start(int xc_handle, domid_t dom);
+
 #endif

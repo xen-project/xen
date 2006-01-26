@@ -431,16 +431,6 @@ typedef struct {
     unsigned long mfn;        /* machine frame to be initialised */
 } dom0_hypercall_init_t;
 
-#define DOM0_GETGNTTABLIST    49
-typedef struct {
-    /* IN variables. */
-    domid_t       domain;
-    unsigned long max_pfns;
-    void         *buffer;
-    /* OUT variables. */
-    unsigned long num_pfns;
-} dom0_getgnttablist_t;
-
 typedef struct {
     uint32_t cmd;
     uint32_t interface_version; /* DOM0_INTERFACE_VERSION */
@@ -482,7 +472,6 @@ typedef struct {
         dom0_irq_permission_t    irq_permission;
         dom0_iomem_permission_t  iomem_permission;
         dom0_hypercall_init_t    hypercall_init;
-        dom0_getgnttablist_t     getgnttablist;
         uint8_t                  pad[128];
     } u;
 } dom0_op_t;

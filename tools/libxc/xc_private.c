@@ -314,35 +314,6 @@ int xc_get_pfn_list(int xc_handle,
     return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
 }
 
-int xc_get_gnttab_frames(int xc_handle,
-                         uint32_t domid,
-                         unsigned long *pfn_buf,
-                         unsigned long max_pfns)
-{
-    DECLARE_DOM0_OP;
-    int ret;
-    op.cmd = DOM0_GETGNTTABLIST;
-    op.u.getgnttablist.domain   = (domid_t)domid;
-    op.u.getgnttablist.max_pfns = max_pfns;
-    op.u.getgnttablist.buffer   = pfn_buf;
-
-#ifdef VALGRIND
-    memset(pfn_buf, 0, max_pfns * sizeof(unsigned long));
-#endif
-
-    if ( mlock(pfn_buf, max_pfns * sizeof(unsigned long)) != 0 )
-    {
-        PERROR("xc_get_pfn_list: pfn_buf mlock failed");
-        return -1;
-    }
-
-    ret = do_dom0_op(xc_handle, &op);
-
-    safe_munlock(pfn_buf, max_pfns * sizeof(unsigned long));
-
-    return (ret < 0) ? -1 : op.u.getgnttablist.num_pfns;
-}
-
 long xc_get_tot_pages(int xc_handle, uint32_t domid)
 {
     DECLARE_DOM0_OP;

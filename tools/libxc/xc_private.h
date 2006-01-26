@@ -111,9 +111,6 @@ static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
     return ret;
 }
 
-int xc_get_gnttab_frames(int xc_handle, uint32_t domid, unsigned long *pfn_buf,
-			 unsigned long max_pfns);
-
 
 /*
  * ioctl-based mfn mapping interface

@@ -330,38 +330,6 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
     }
     break;
 
-    case DOM0_GETGNTTABLIST:
-    {
-        int i;
-        struct domain *d = find_domain_by_id(op->u.getgnttablist.domain);
-        unsigned long max_pfns = op->u.getgnttablist.max_pfns;
-        unsigned long pfn;
-        unsigned long *buffer = op->u.getgnttablist.buffer;
-
-        ret = -EINVAL;
-        if ( d != NULL )
-        {
-            ret = 0;
-
-            for ( i = 0; i < max_pfns && i < NR_GRANT_FRAMES; i++ )
-            {
-		pfn = gnttab_shared_mfn(d, d->grant_table, i);
-                if ( put_user(pfn, buffer) )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-                buffer++;
-            }
-
-            op->u.getgnttablist.num_pfns = i;
-            copy_to_user(u_dom0_op, op, sizeof(*op));
-
-            put_domain(d);
-        }
-    }
-    break;
-
     case DOM0_GETMEMLIST:
     {
         int i;

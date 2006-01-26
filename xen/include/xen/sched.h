@@ -153,6 +153,9 @@ struct domain
 
     /* Control-plane tools handle for this domain. */
     xen_domain_handle_t handle;
+
+    /* Start of the PFN hole */
+    unsigned long start_pfn_hole;
 };
 
 struct domain_setup_info

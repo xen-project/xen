@@ -131,6 +131,14 @@ int xc_msr_write(int xc_handle, int cpu_mask, int msr, unsigned int low,
     return rc;
 }
 
+int xc_get_pfn_hole_start(int xc_handle, domid_t dom)
+{
+    struct mmuext_op op = {0};
+    op.cmd = MMUEXT_PFN_HOLE_BASE;
+    return xc_mmuext_op(xc_handle, &op, 1, dom);
+}
+
+
 /*
  * Local variables:
  * mode: C

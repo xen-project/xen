@@ -60,6 +60,9 @@
 #endif
 #endif
 
+/* How large is the PFN reserved area, when we have one? */
+#define PFN_HOLE_SIZE 32
+
 #ifndef STACK_ORDER
 #define STACK_ORDER 1
 #endif

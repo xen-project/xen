@@ -1929,7 +1929,57 @@ int do_mmuext_op(
             }
             break;
         }
-            
+
+        case MMUEXT_PFN_HOLE_BASE:
+        {
+            if (FOREIGNDOM->start_pfn_hole) {
+                rc = FOREIGNDOM->start_pfn_hole;
+                okay = 1;
+            } else {
+                rc = FOREIGNDOM->start_pfn_hole =
+                    FOREIGNDOM->max_pages;
+                okay = 1;
+                if (shadow_mode_translate(FOREIGNDOM)) {
+                    /* Fill in a few entries in the hole.  At the
+                       moment, this means the shared info page and the
+                       grant table pages. */
+                    struct domain_mmap_cache c1, c2;
+                    unsigned long pfn, mfn, x;
+                    domain_mmap_cache_init(&c1);
+                    domain_mmap_cache_init(&c2);
+                    shadow_lock(FOREIGNDOM);
+                    pfn = FOREIGNDOM->start_pfn_hole;
+                    mfn = virt_to_phys(FOREIGNDOM->shared_info) >> PAGE_SHIFT;
+                    set_p2m_entry(FOREIGNDOM, pfn, mfn, &c1, &c2);
+                    set_pfn_from_mfn(mfn, pfn);
+                    pfn++;
+                    for (x = 0; x < NR_GRANT_FRAMES; x++) {
+                        mfn = gnttab_shared_mfn(FOREIGNDOM,
+                                                FOREIGNDOM->grant_table,
+                                                x);
+                        set_p2m_entry(FOREIGNDOM, pfn, mfn, &c1, &c2);
+                        set_pfn_from_mfn(mfn, pfn);
+                        pfn++;
+                    }
+                    shadow_unlock(FOREIGNDOM);
+                    domain_mmap_cache_destroy(&c1);
+                    domain_mmap_cache_destroy(&c2);
+                }
+            }
+            break;
+        }
+
+        case MMUEXT_PFN_HOLE_SIZE:
+        {
+            if (shadow_mode_translate(FOREIGNDOM)) {
+                rc = PFN_HOLE_SIZE;
+            } else {
+                rc = 0;
+            }
+            okay = 1;
+            break;
+        }
+
         default:
             MEM_LOG("Invalid extended pt command 0x%x", op.cmd);
             okay = 0;
@@ -2663,7 +2713,7 @@ long set_gdt(struct vcpu *v,
 
 long do_set_gdt(unsigned long *frame_list, unsigned int entries)
 {
-    int i, nr_pages = (entries + 511) / 512;
+    int nr_pages = (entries + 511) / 512;
     unsigned long frames[16];
     long ret;
 
