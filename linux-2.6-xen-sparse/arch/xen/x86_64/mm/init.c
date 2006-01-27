@@ -40,6 +40,8 @@
 #include <asm/proto.h>
 #include <asm/smp.h>
 
+#include <asm-xen/features.h>
+
 #ifndef Dprintk
 #define Dprintk(x...)
 #endif
@@ -72,6 +74,9 @@ static void early_make_mmu_page_readonly(void *va)
 	pte_t pte, *ptep;
 	unsigned long *page = (unsigned long *) init_level4_pgt;
 
+	if (xen_feature(writable_mmu_structures))
+		return;
+
 	addr = (unsigned long) page[pgd_index(_va)];
 	addr_to_page(addr, page);
 
@@ -93,6 +98,9 @@ void make_mmu_page_readonly(void *va)
 	pgd_t *pgd; pud_t *pud; pmd_t *pmd; pte_t pte, *ptep;
 	unsigned long addr = (unsigned long) va;
 
+	if (xen_feature(writable_mmu_structures))
+		return;
+
 	pgd = pgd_offset_k(addr);
 	pud = pud_offset(pgd, addr);
 	pmd = pmd_offset(pud, addr);
@@ -111,6 +119,9 @@ void make_mmu_page_writable(void *va)
 	pgd_t *pgd; pud_t *pud; pmd_t *pmd; pte_t pte, *ptep;
 	unsigned long addr = (unsigned long) va;
 
+	if (xen_feature(writable_mmu_structures))
+		return;
+
 	pgd = pgd_offset_k(addr);
 	pud = pud_offset(pgd, addr);
 	pmd = pmd_offset(pud, addr);
@@ -126,6 +137,9 @@ void make_mmu_page_writable(void *va)
 
 void make_mmu_pages_readonly(void *va, unsigned nr)
 {
+	if (xen_feature(writable_mmu_structures))
+		return;
+
 	while (nr-- != 0) {
 		make_mmu_page_readonly(va);
 		va = (void*)((unsigned long)va + PAGE_SIZE);
@@ -134,6 +148,8 @@ void make_mmu_pages_readonly(void *va, unsigned nr)
 
 void make_mmu_pages_writable(void *va, unsigned nr)
 {
+	if (xen_feature(writable_mmu_structures))
+		return;
 	while (nr-- != 0) {
 		make_mmu_page_writable(va);
 		va = (void*)((unsigned long)va + PAGE_SIZE);
@@ -384,6 +400,9 @@ static inline void __set_pte(pte_t *dst, pte_t val)
 static inline int make_readonly(unsigned long paddr)
 {
 	int readonly = 0;
+
+	if (xen_feature(writable_mmu_structures))
+		return 0;
 
 	/* Make old and new page tables read-only. */
 	if ((paddr >= (xen_start_info->pt_base - __START_KERNEL_map))

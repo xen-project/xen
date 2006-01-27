@@ -24,6 +24,7 @@
 #include <asm/io.h>
 #include <asm/mmu_context.h>
 
+#include <asm-xen/features.h>
 #include <asm-xen/foreign_page.h>
 #include <asm/hypervisor.h>
 
@@ -391,24 +392,42 @@ void pgd_free(pgd_t *pgd)
 #ifndef CONFIG_XEN_SHADOW_MODE
 void make_lowmem_mmu_page_readonly(void *va)
 {
-	pte_t *pte = virt_to_ptep(va);
-	int rc = HYPERVISOR_update_va_mapping(
+	pte_t *pte;
+	int rc;
+
+	if (xen_feature(writable_mmu_structures))
+		return;
+
+	pte = virt_to_ptep(va);
+	rc = HYPERVISOR_update_va_mapping(
 		(unsigned long)va, pte_wrprotect(*pte), 0);
 	BUG_ON(rc);
 }
 
 void make_lowmem_mmu_page_writable(void *va)
 {
-	pte_t *pte = virt_to_ptep(va);
-	int rc = HYPERVISOR_update_va_mapping(
+	pte_t *pte;
+	int rc;
+
+	if (xen_feature(writable_mmu_structures))
+		return;
+
+	pte = virt_to_ptep(va);
+	rc = HYPERVISOR_update_va_mapping(
 		(unsigned long)va, pte_mkwrite(*pte), 0);
 	BUG_ON(rc);
 }
 
 void make_mmu_page_readonly(void *va)
 {
-	pte_t *pte = virt_to_ptep(va);
-	int rc = HYPERVISOR_update_va_mapping(
+	pte_t *pte;
+	int rc;
+
+	if (xen_feature(writable_mmu_structures))
+		return;
+
+	pte = virt_to_ptep(va);
+	rc = HYPERVISOR_update_va_mapping(
 		(unsigned long)va, pte_wrprotect(*pte), 0);
 	if (rc) /* fallback? */
 		xen_l1_entry_update(pte, pte_wrprotect(*pte));
@@ -426,8 +445,14 @@ void make_mmu_page_readonly(void *va)
 
 void make_mmu_page_writable(void *va)
 {
-	pte_t *pte = virt_to_ptep(va);
-	int rc = HYPERVISOR_update_va_mapping(
+	pte_t *pte;
+	int rc;
+
+	if (xen_feature(writable_mmu_structures))
+		return;
+
+	pte = virt_to_ptep(va);
+	rc = HYPERVISOR_update_va_mapping(
 		(unsigned long)va, pte_mkwrite(*pte), 0);
 	if (rc) /* fallback? */
 		xen_l1_entry_update(pte, pte_mkwrite(*pte));
@@ -443,6 +468,9 @@ void make_mmu_page_writable(void *va)
 
 void make_mmu_pages_readonly(void *va, unsigned int nr)
 {
+	if (xen_feature(writable_mmu_structures))
+		return;
+
 	while (nr-- != 0) {
 		make_mmu_page_readonly(va);
 		va = (void *)((unsigned long)va + PAGE_SIZE);
@@ -451,6 +479,8 @@ void make_mmu_pages_readonly(void *va, unsigned int nr)
 
 void make_mmu_pages_writable(void *va, unsigned int nr)
 {
+	if (xen_feature(writable_mmu_structures))
+		return;
 	while (nr-- != 0) {
 		make_mmu_page_writable(va);
 		va = (void *)((unsigned long)va + PAGE_SIZE);
