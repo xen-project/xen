@@ -39,6 +39,14 @@ typedef struct xen_platform_parameters {
     unsigned long virt_start;
 } xen_platform_parameters_t;
 
+#define XENVER_get_features 6
+typedef struct xen_feature_info {
+    unsigned int submap_idx;    /* IN: which 32-bit submap to return */
+    uint32_t     submap;        /* OUT: 32-bit submap */
+} xen_feature_info_t;
+
+#define XENFEAT_NR_SUBMAPS 1
+
 #endif /* __XEN_PUBLIC_VERSION_H__ */
 
 /*

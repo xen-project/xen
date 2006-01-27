@@ -63,6 +63,7 @@
 #include "setup_arch_pre.h"
 #include <asm/hypervisor.h>
 #include <asm-xen/xen-public/nmi.h>
+#include <asm-xen/features.h>
 #define PFN_UP(x)       (((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 #define PFN_PHYS(x)     ((x) << PAGE_SHIFT)
 #define end_pfn_map end_pfn
@@ -586,6 +587,8 @@ void __init setup_arch(char **cmdline_p)
 
 
 #endif
+
+	setup_xen_features();
 
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_writable_pagetables);

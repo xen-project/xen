@@ -144,6 +144,28 @@ long do_xen_version(int cmd, void *arg)
             return -EFAULT;
         return 0;
     }
+
+    case XENVER_get_features:
+    {
+        xen_feature_info_t fi;
+
+        if ( copy_from_user(&fi, arg, sizeof(fi)) )
+            return -EFAULT;
+
+        switch ( fi.submap_idx )
+        {
+        case 0:
+            fi.submap = 0;
+            break;
+        default:
+            return -EINVAL;
+        }
+
+        if ( copy_to_user(arg, &fi, sizeof(fi)) )
+            return -EFAULT;
+        return 0;
+    }
+
     }
 
     return -ENOSYS;
