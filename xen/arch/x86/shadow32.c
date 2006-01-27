@@ -1456,7 +1456,9 @@ shadow_hl2_table(struct domain *d, unsigned long gpfn, unsigned long gmfn,
 {
     unsigned long hl2mfn;
     l1_pgentry_t *hl2;
+    l2_pgentry_t *gpgd;
     int limit;
+    int x;
 
     ASSERT(PGT_base_page_table == PGT_l2_page_table);
 
@@ -1494,6 +1496,11 @@ shadow_hl2_table(struct domain *d, unsigned long gpfn, unsigned long gmfn,
         hl2[l2_table_offset(PERDOMAIN_VIRT_START)] =
             l1e_from_pfn(hl2mfn, __PAGE_HYPERVISOR);
     }
+
+    gpgd = map_domain_page(gmfn);
+    for (x = 0; x < DOMAIN_ENTRIES_PER_L2_PAGETABLE; x++)
+        validate_hl2e_change(d, gpgd[x], &hl2[x]);
+    unmap_domain_page(gpgd);
 
     unmap_domain_page(hl2);
 
@@ -2797,8 +2804,9 @@ void shadow_l2_normal_pt_update(
     unsigned long pa, l2_pgentry_t gpde,
     struct domain_mmap_cache *cache)
 {
-    unsigned long sl2mfn;
+    unsigned long sl2mfn, hl2mfn;
     l2_pgentry_t *spl2e;
+    l1_pgentry_t *hl2e;
 
     shadow_lock(d);
 
@@ -2811,6 +2819,15 @@ void shadow_l2_normal_pt_update(
         validate_pde_change(d, gpde,
                             &spl2e[(pa & ~PAGE_MASK) / sizeof(l2_pgentry_t)]);
         unmap_domain_page_with_cache(spl2e, cache);
+    }
+    hl2mfn = __shadow_status(current->domain, pa >> PAGE_SHIFT,
+                             PGT_hl2_shadow);
+    if ( hl2mfn )
+    {
+        hl2e = map_domain_page(hl2mfn);
+        validate_hl2e_change(d, gpde,
+                             &hl2e[(pa & ~PAGE_MASK) / sizeof(l1_pgentry_t)]);
+        unmap_domain_page(hl2e);
     }
 
     shadow_unlock(d);
