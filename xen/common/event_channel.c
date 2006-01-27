@@ -580,10 +580,10 @@ static long evtchn_unmask(evtchn_unmask_t *unmask)
     return 0;
 }
 
-long do_event_channel_op(evtchn_op_t *uop)
+long do_event_channel_op(struct evtchn_op *uop)
 {
     long rc;
-    evtchn_op_t op;
+    struct evtchn_op op;
 
     if ( copy_from_user(&op, uop, sizeof(op)) != 0 )
         return -EFAULT;

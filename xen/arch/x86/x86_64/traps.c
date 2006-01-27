@@ -122,7 +122,7 @@ void toggle_guest_mode(struct vcpu *v)
     write_ptbase(v);
 }
 
-long do_iret(void)
+unsigned long do_iret(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct iret_context iret_saved;

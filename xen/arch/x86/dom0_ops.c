@@ -46,7 +46,7 @@ static void read_msr_for(void *unused)
         (void)rdmsr_user(msr_addr, msr_lo, msr_hi);
 }
 
-long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
+long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
 {
     long ret = 0;
 

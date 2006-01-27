@@ -22,7 +22,8 @@
 #include <public/sched_ctl.h>
 #include <acm/acm_hooks.h>
 
-extern long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op);
+extern long arch_do_dom0_op(
+    struct dom0_op *op, struct dom0_op *u_dom0_op);
 extern void arch_getdomaininfo_ctxt(
     struct vcpu *, struct vcpu_guest_context *);
 
@@ -86,10 +87,10 @@ static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
     memcpy(info->handle, d->handle, sizeof(xen_domain_handle_t));
 }
 
-long do_dom0_op(dom0_op_t *u_dom0_op)
+long do_dom0_op(struct dom0_op *u_dom0_op)
 {
     long ret = 0;
-    dom0_op_t curop, *op = &curop;
+    struct dom0_op curop, *op = &curop;
     void *ssid = NULL; /* save security ptr between pre and post/fail hooks */
     static spinlock_t dom0_lock = SPIN_LOCK_UNLOCKED;
 

@@ -129,13 +129,13 @@ extern struct acm_operations *acm_secondary_ops;
 
 #ifndef ACM_SECURITY
 
-static inline int acm_pre_dom0_op(dom0_op_t *op, void **ssid) 
+static inline int acm_pre_dom0_op(struct dom0_op *op, void **ssid) 
 { return 0; }
-static inline void acm_post_dom0_op(dom0_op_t *op, void *ssid) 
+static inline void acm_post_dom0_op(struct dom0_op *op, void *ssid) 
 { return; }
-static inline void acm_fail_dom0_op(dom0_op_t *op, void *ssid) 
+static inline void acm_fail_dom0_op(struct dom0_op *op, void *ssid) 
 { return; }
-static inline int acm_pre_event_channel(evtchn_op_t *op) 
+static inline int acm_pre_event_channel(struct evtchn_op *op) 
 { return 0; }
 static inline int acm_pre_grant_map_ref(domid_t id) 
 { return 0; }
@@ -223,7 +223,7 @@ static inline int acm_pre_eventchannel_interdomain(domid_t id)
         return ACM_ACCESS_PERMITTED;
 }
 
-static inline int acm_pre_dom0_op(dom0_op_t *op, void **ssid) 
+static inline int acm_pre_dom0_op(struct dom0_op *op, void **ssid) 
 {
     int ret = -EACCES;
     struct domain *d;
@@ -260,7 +260,7 @@ static inline int acm_pre_dom0_op(dom0_op_t *op, void **ssid)
     return ret;
 }
 
-static inline void acm_post_dom0_op(dom0_op_t *op, void **ssid)
+static inline void acm_post_dom0_op(struct dom0_op *op, void **ssid)
 {
     switch(op->cmd) {
     case DOM0_CREATEDOMAIN:
@@ -279,7 +279,7 @@ static inline void acm_post_dom0_op(dom0_op_t *op, void **ssid)
     }
 }
 
-static inline void acm_fail_dom0_op(dom0_op_t *op, void *ssid) 
+static inline void acm_fail_dom0_op(struct dom0_op *op, void *ssid) 
 {
     switch(op->cmd) {
     case DOM0_CREATEDOMAIN:
@@ -289,7 +289,7 @@ static inline void acm_fail_dom0_op(dom0_op_t *op, void *ssid)
     }
 }
 
-static inline int acm_pre_event_channel(evtchn_op_t *op) 
+static inline int acm_pre_event_channel(struct evtchn_op *op) 
 {
     int ret = -EACCES;
 

@@ -250,8 +250,7 @@ typedef uint16_t domid_t;
  * Send an array of these to HYPERVISOR_mmu_update().
  * NB. The fields are natural pointer/address size for this architecture.
  */
-typedef struct
-{
+typedef struct mmu_update {
     uint64_t ptr;       /* Machine address of PTE. */
     uint64_t val;       /* New contents of PTE.    */
 } mmu_update_t;
@@ -260,8 +259,7 @@ typedef struct
  * Send an array of these to HYPERVISOR_multicall().
  * NB. The fields are natural register size for this architecture.
  */
-typedef struct
-{
+typedef struct multicall_entry {
     unsigned long op, result;
     unsigned long args[6];
 } multicall_entry_t;

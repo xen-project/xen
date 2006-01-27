@@ -2007,12 +2007,12 @@ int do_mmuext_op(
 }
 
 int do_mmu_update(
-    mmu_update_t *ureqs,
+    struct mmu_update *ureqs,
     unsigned int count,
     unsigned int *pdone,
     unsigned int foreigndom)
 {
-    mmu_update_t req;
+    struct mmu_update req;
     void *va;
     unsigned long gpfn, mfn;
     struct pfn_info *page;

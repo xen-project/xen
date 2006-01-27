@@ -12,8 +12,8 @@
 #define MCSF_in_multicall    (1<<_MCSF_in_multicall)
 #define MCSF_call_preempted  (1<<_MCSF_call_preempted)
 struct mc_state {
-    unsigned long     flags;
-    multicall_entry_t call;
+    unsigned long flags;
+    struct multicall_entry call;
 } __cacheline_aligned;
 
 extern struct mc_state mc_state[NR_CPUS];
