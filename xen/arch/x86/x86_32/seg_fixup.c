@@ -268,7 +268,7 @@ int fixup_seg(u16 seg, unsigned long offset)
 int gpf_emulate_4gb(struct cpu_user_regs *regs)
 {
     struct vcpu *d = current;
-    trap_info_t   *ti;
+    struct trap_info   *ti;
     struct trap_bounce *tb;
     u8            modrm, mod, reg, rm, decode;
     void         *memreg, *regreg;

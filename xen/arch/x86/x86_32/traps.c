@@ -157,7 +157,7 @@ asmlinkage void do_double_fault(void)
         __asm__ __volatile__ ( "hlt" );
 }
 
-asmlinkage unsigned long do_iret(void)
+unsigned long do_iret(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     u32 eflags;
@@ -263,7 +263,7 @@ void __init percpu_traps_init(void)
 
 void init_int80_direct_trap(struct vcpu *v)
 {
-    trap_info_t *ti = &v->arch.guest_context.trap_ctxt[0x80];
+    struct trap_info *ti = &v->arch.guest_context.trap_ctxt[0x80];
 
     /*
      * We can't virtualise interrupt gates, as there's no way to get

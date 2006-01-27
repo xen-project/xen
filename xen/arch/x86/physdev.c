@@ -17,11 +17,11 @@ extern int ioapic_guest_write(int apicid, int address, u32 pval);
 /*
  * Demuxing hypercall.
  */
-long do_physdev_op(physdev_op_t *uop)
+long do_physdev_op(struct physdev_op *uop)
 {
-    physdev_op_t op;
-    long         ret;
-    int          irq;
+    struct physdev_op op;
+    long ret;
+    int  irq;
 
     if ( unlikely(copy_from_user(&op, uop, sizeof(op)) != 0) )
         return -EFAULT;
@@ -39,7 +39,7 @@ long do_physdev_op(physdev_op_t *uop)
             break;
         op.u.irq_status_query.flags = 0;
         /* Edge-triggered interrupts don't need an explicit unmask downcall. */
-        if ( strstr(irq_desc[irq_to_vector(irq)].handler->typename, "edge") == NULL )
+        if ( !strstr(irq_desc[irq_to_vector(irq)].handler->typename, "edge") )
             op.u.irq_status_query.flags |= PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY;
         ret = 0;
         break;

@@ -15,7 +15,7 @@
 
 struct mc_state mc_state[NR_CPUS];
 
-long do_multicall(multicall_entry_t *call_list, unsigned int nr_calls)
+long do_multicall(struct multicall_entry *call_list, unsigned int nr_calls)
 {
     struct mc_state *mcs = &mc_state[smp_processor_id()];
     unsigned int     i;
@@ -51,7 +51,7 @@ long do_multicall(multicall_entry_t *call_list, unsigned int nr_calls)
              * Deliberately corrupt the contents of the multicall structure.
              * The caller must depend only on the 'result' field on return.
              */
-            multicall_entry_t corrupt;
+            struct multicall_entry corrupt;
             memset(&corrupt, 0xAA, sizeof(corrupt));
             (void)__copy_to_user(&call_list[i], &corrupt, sizeof(corrupt));
         }

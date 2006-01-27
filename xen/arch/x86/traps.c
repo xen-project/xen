@@ -325,7 +325,7 @@ static inline int do_trap(int trapnr, char *str,
 {
     struct vcpu *v = current;
     struct trap_bounce *tb = &v->arch.trap_bounce;
-    trap_info_t *ti;
+    struct trap_info *ti;
     unsigned long fixup;
 
     DEBUGGER_trap_entry(trapnr, regs);
@@ -392,7 +392,7 @@ asmlinkage int do_int3(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct trap_bounce *tb = &v->arch.trap_bounce;
-    trap_info_t *ti;
+    struct trap_info *ti;
 
     DEBUGGER_trap_entry(TRAP_int3, regs);
 
@@ -421,7 +421,7 @@ asmlinkage int do_machine_check(struct cpu_user_regs *regs)
 
 void propagate_page_fault(unsigned long addr, u16 error_code)
 {
-    trap_info_t *ti;
+    struct trap_info *ti;
     struct vcpu *v = current;
     struct trap_bounce *tb = &v->arch.trap_bounce;
 
@@ -1014,7 +1014,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct trap_bounce *tb = &v->arch.trap_bounce;
-    trap_info_t *ti;
+    struct trap_info *ti;
     unsigned long fixup;
 
     DEBUGGER_trap_entry(TRAP_gp_fault, regs);
@@ -1217,7 +1217,7 @@ void unset_nmi_callback(void)
 asmlinkage int math_state_restore(struct cpu_user_regs *regs)
 {
     struct trap_bounce *tb;
-    trap_info_t *ti;
+    struct trap_info *ti;
 
     /* Prevent recursion. */
     clts();
@@ -1246,7 +1246,7 @@ asmlinkage int do_debug(struct cpu_user_regs *regs)
     unsigned long condition;
     struct vcpu *v = current;
     struct trap_bounce *tb = &v->arch.trap_bounce;
-    trap_info_t *ti;
+    struct trap_info *ti;
 
     __asm__ __volatile__("mov %%db6,%0" : "=r" (condition));
 
@@ -1364,10 +1364,10 @@ void __init trap_init(void)
 }
 
 
-long do_set_trap_table(trap_info_t *traps)
+long do_set_trap_table(struct trap_info *traps)
 {
-    trap_info_t cur;
-    trap_info_t *dst = current->arch.guest_context.trap_ctxt;
+    struct trap_info cur;
+    struct trap_info *dst = current->arch.guest_context.trap_ctxt;
     long rc = 0;
 
     LOCK_BIGLOCK(current->domain);

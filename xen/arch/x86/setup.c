@@ -337,8 +337,9 @@ void __init __start_xen(multiboot_info_t *mbi)
            nr_pages << (PAGE_SHIFT - 10));
     total_pages = nr_pages;
 
-    /* Sanity check for unwanted bloat of dom0_op_t structure. */
-    BUG_ON(sizeof(((dom0_op_t *)0)->u) != sizeof(((dom0_op_t *)0)->u.pad));
+    /* Sanity check for unwanted bloat of dom0_op structure. */
+    BUG_ON(sizeof(((struct dom0_op *)0)->u) !=
+           sizeof(((struct dom0_op *)0)->u.pad));
 
     BUG_ON(sizeof(start_info_t) > PAGE_SIZE);
     BUG_ON(sizeof(shared_info_t) > PAGE_SIZE);
