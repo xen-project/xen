@@ -68,7 +68,7 @@ static pmd_t * __init one_md_table_init(pgd_t *pgd)
 		
 #ifdef CONFIG_X86_PAE
 	pmd_table = (pmd_t *) alloc_bootmem_low_pages(PAGE_SIZE);
-	make_lowmem_page_readonly(pmd_table);
+	make_lowmem_mmu_page_readonly(pmd_table);
 	set_pgd(pgd, __pgd(__pa(pmd_table) | _PAGE_PRESENT));
 	pud = pud_offset(pgd, 0);
 	if (pmd_table != pmd_offset(pud, 0)) 
@@ -89,7 +89,7 @@ static pte_t * __init one_page_table_init(pmd_t *pmd)
 {
 	if (pmd_none(*pmd)) {
 		pte_t *page_table = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
-		make_lowmem_page_readonly(page_table);
+		make_lowmem_mmu_page_readonly(page_table);
 		set_pmd(pmd, __pmd(__pa(page_table) | _PAGE_TABLE));
 		if (page_table != pte_offset_kernel(pmd, 0))
 			BUG();	
@@ -643,6 +643,17 @@ void __init mem_init(void)
 		set_page_count(&mem_map[pfn], 1);
 		totalram_pages++;
 	}
+
+        /* Make the Xen hole reserved. */
+        unsigned long hole_start, hole_size;
+        hole_size = xen_pfn_hole_size();
+        hole_start = xen_pfn_hole_start();
+        for (pfn = hole_start; pfn < hole_start + hole_size; pfn++) {
+                printk("<0>Reserve %lx for hole.\n",
+                       pfn);
+                SetPageReserved(pfn_to_page(pfn));
+                BUG_ON(!PageReserved(pfn_to_page(pfn)));
+        }
 
 	reservedpages = 0;
 	for (tmp = 0; tmp < max_low_pfn; tmp++)

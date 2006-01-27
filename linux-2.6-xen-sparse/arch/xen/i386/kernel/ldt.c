@@ -119,7 +119,7 @@ void destroy_context(struct mm_struct *mm)
 	if (mm->context.size) {
 		if (mm == current->active_mm)
 			clear_LDT();
-		make_pages_writable(mm->context.ldt, 
+		make_pages_writable(mm->context.ldt,
 				    (mm->context.size * LDT_ENTRY_SIZE) /
 				    PAGE_SIZE);
 		if (mm->context.size*LDT_ENTRY_SIZE > PAGE_SIZE)

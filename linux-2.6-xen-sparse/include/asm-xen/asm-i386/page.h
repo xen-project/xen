@@ -59,8 +59,18 @@
 #define clear_user_page(page, vaddr, pg)	clear_page(page)
 #define copy_user_page(to, from, vaddr, pg)	copy_page(to, from)
 
+/* Definitions for machine and pseudophysical addresses. */
+#ifdef CONFIG_X86_PAE
+typedef unsigned long long paddr_t;
+typedef unsigned long long maddr_t;
+#else
+typedef unsigned long paddr_t;
+typedef unsigned long maddr_t;
+#endif
+
 /**** MACHINE <-> PHYSICAL CONVERSION MACROS ****/
 #define INVALID_P2M_ENTRY	(~0UL)
+#ifndef CONFIG_XEN_SHADOW_MODE
 #define FOREIGN_FRAME(m)	((m) | (1UL<<31))
 extern unsigned long *phys_to_machine_mapping;
 #define pfn_to_mfn(pfn)	\
@@ -93,15 +103,6 @@ static inline void set_phys_to_machine(unsigned long pfn, unsigned long mfn)
 	phys_to_machine_mapping[pfn] = mfn;
 }
 
-/* Definitions for machine and pseudophysical addresses. */
-#ifdef CONFIG_X86_PAE
-typedef unsigned long long paddr_t;
-typedef unsigned long long maddr_t;
-#else
-typedef unsigned long paddr_t;
-typedef unsigned long maddr_t;
-#endif
-
 static inline maddr_t phys_to_machine(paddr_t phys)
 {
 	maddr_t machine = pfn_to_mfn(phys >> PAGE_SHIFT);
@@ -114,7 +115,16 @@ static inline paddr_t machine_to_phys(maddr_t machine)
 	phys = (phys << PAGE_SHIFT) | (machine & ~PAGE_MASK);
 	return phys;
 }
-
+#else
+#define pfn_to_mfn(p) (p)
+#define mfn_to_pfn(m) (m)
+#define phys_to_machine(p) (p)
+#define machine_to_phys(m) (m)
+static inline void set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+{
+       BUG_ON(pfn != mfn && mfn != INVALID_P2M_ENTRY);
+}
+#endif
 /*
  * These are used to make use of C type-checking..
  */

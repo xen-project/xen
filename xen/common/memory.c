@@ -30,7 +30,7 @@ increase_reservation(
     int           *preempted)
 {
     struct pfn_info *page;
-    unsigned int     i;
+    unsigned long    i;
 
     if ( (extent_list != NULL) &&
          !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
@@ -52,7 +52,7 @@ increase_reservation(
             d, extent_order, flags)) == NULL) )
         {
             DPRINTK("Could not allocate order=%d extent: "
-                    "id=%d flags=%x (%d of %d)\n",
+                    "id=%d flags=%x (%ld of %d)\n",
                     extent_order, d->domain_id, flags, i, nr_extents);
             return i;
         }
@@ -65,6 +65,79 @@ increase_reservation(
 
     return nr_extents;
 }
+
+static long
+populate_physmap(
+    struct domain *d, 
+    unsigned long *extent_list, 
+    unsigned int   nr_extents,
+    unsigned int   extent_order,
+    unsigned int   flags,
+    int           *preempted)
+{
+    struct pfn_info         *page;
+    unsigned long            i, j, pfn, mfn;
+    struct domain_mmap_cache cache1, cache2;
+
+    if ( !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
+        return 0;
+
+    if ( (extent_order != 0) &&
+         !multipage_allocation_permitted(current->domain) )
+        return 0;
+
+    if (shadow_mode_translate(d)) {
+        domain_mmap_cache_init(&cache1);
+        domain_mmap_cache_init(&cache2);
+        shadow_lock(d);
+    }
+
+    for ( i = 0; i < nr_extents; i++ )
+    {
+        if ( hypercall_preempt_check() )
+        {
+            *preempted = 1;
+            goto out;
+        }
+
+        if ( unlikely((page = alloc_domheap_pages(
+            d, extent_order, flags)) == NULL) )
+        {
+            DPRINTK("Could not allocate order=%d extent: "
+                    "id=%d flags=%x (%ld of %d)\n",
+                    extent_order, d->domain_id, flags, i, nr_extents);
+            goto out;
+        }
+
+        mfn = page_to_pfn(page);
+
+        if ( unlikely(__get_user(pfn, &extent_list[i]) != 0) )
+            goto out;
+
+        for ( j = 0; j < (1 << extent_order); j++ ) {
+            printf("Populating %lx with %lx.\n",
+                   pfn + j, mfn + j);
+            if (shadow_mode_translate(d))
+                set_p2m_entry(d, pfn + j, mfn + j, &cache1, &cache2);
+            set_pfn_from_mfn(mfn + j, pfn + j);
+        }
+
+        if (!shadow_mode_translate(d)) {
+            /* Inform the domain of the new page's machine address. */ 
+            if ( __put_user(mfn, &extent_list[i]) != 0 )
+                goto out;
+        }
+    }
+
+ out:
+    if (shadow_mode_translate(d)) {
+        shadow_unlock(d);
+        domain_mmap_cache_destroy(&cache1);
+        domain_mmap_cache_destroy(&cache2);
+    }
+
+    return i;
+}
     
 static long
 decrease_reservation(
@@ -76,7 +149,7 @@ decrease_reservation(
     int           *preempted)
 {
     struct pfn_info *page;
-    unsigned long    i, j, mpfn, mfn;
+    unsigned long    i, j, gpfn, mfn;
 
     if ( !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
         return 0;
@@ -89,16 +162,16 @@ decrease_reservation(
             return i;
         }
 
-        if ( unlikely(__get_user(mpfn, &extent_list[i]) != 0) )
+        if ( unlikely(__get_user(gpfn, &extent_list[i]) != 0) )
             return i;
 
         for ( j = 0; j < (1 << extent_order); j++ )
         {
-            mfn = __gpfn_to_mfn(d, mpfn + j);
+            mfn = __gpfn_to_mfn(d, gpfn + j);
             if ( unlikely(mfn >= max_page) )
             {
-                DPRINTK("Domain %u page number out of range (%lx >= %lx)\n", 
-                        d->domain_id, mfn, max_page);
+                DPRINTK("Domain %u page number out of range (%lx(%lx) >= %lx)\n", 
+                        d->domain_id, mfn, gpfn, max_page);
                 return i;
             }
             
@@ -115,8 +188,18 @@ decrease_reservation(
             if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
                 put_page(page);
 
-            shadow_sync_and_drop_references(d, page);
-
+            if (shadow_mode_translate(d)) {
+                struct domain_mmap_cache c1, c2;
+                domain_mmap_cache_init(&c1);
+                domain_mmap_cache_init(&c2);
+                shadow_lock(d);
+                shadow_sync_and_drop_references(d, page);
+                set_p2m_entry(d, gpfn + j, -1, &c1, &c2);
+                set_pfn_from_mfn(mfn + j, INVALID_M2P_ENTRY);
+                shadow_unlock(d);
+                domain_mmap_cache_destroy(&c1);
+                domain_mmap_cache_destroy(&c2);
+            }
             put_page(page);
         }
     }
@@ -144,6 +227,7 @@ long do_memory_op(int cmd, void *arg)
     {
     case XENMEM_increase_reservation:
     case XENMEM_decrease_reservation:
+    case XENMEM_populate_physmap:
         if ( copy_from_user(&reservation, arg, sizeof(reservation)) )
             return -EFAULT;
 
@@ -171,14 +255,37 @@ long do_memory_op(int cmd, void *arg)
         else if ( (d = find_domain_by_id(reservation.domid)) == NULL )
             return -ESRCH;
 
-        rc = ((op == XENMEM_increase_reservation) ?
-              increase_reservation : decrease_reservation)(
-                  d,
-                  reservation.extent_start,
-                  reservation.nr_extents,
-                  reservation.extent_order,
-                  flags,
-                  &preempted);
+        switch ( op )
+        {
+        case XENMEM_increase_reservation:
+            rc = increase_reservation(
+                d,
+                reservation.extent_start,
+                reservation.nr_extents,
+                reservation.extent_order,
+                flags,
+                &preempted);
+            break;
+        case XENMEM_decrease_reservation:
+            rc = decrease_reservation(
+                d,
+                reservation.extent_start,
+                reservation.nr_extents,
+                reservation.extent_order,
+                flags,
+                &preempted);
+            break;
+        case XENMEM_populate_physmap:
+        default:
+            rc = populate_physmap(
+                d,
+                reservation.extent_start,
+                reservation.nr_extents,
+                reservation.extent_order,
+                flags,
+                &preempted);
+            break;
+        }
 
         if ( unlikely(reservation.domid != DOMID_SELF) )
             put_domain(d);

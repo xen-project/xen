@@ -141,7 +141,7 @@ void __cpuinit cpu_gdt_init(struct desc_ptr *gdt_descr)
 	     va < gdt_descr->address + gdt_descr->size;
 	     va += PAGE_SIZE, f++) {
 		frames[f] = virt_to_mfn(va);
-		make_page_readonly((void *)va);
+		make_mmu_page_readonly((void *)va);
 	}
 	if (HYPERVISOR_set_gdt(frames, gdt_descr->size /
                                sizeof (struct desc_struct)))

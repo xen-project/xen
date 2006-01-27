@@ -113,6 +113,20 @@ void xen_pt_switch(unsigned long ptr)
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
+unsigned long xen_pfn_hole_start(void)
+{
+	struct mmuext_op op;
+	op.cmd = MMUEXT_PFN_HOLE_BASE;
+	return HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF);
+}
+
+unsigned long xen_pfn_hole_size(void)
+{
+	struct mmuext_op op;
+	op.cmd = MMUEXT_PFN_HOLE_SIZE;
+	return HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF);
+}
+
 void xen_new_user_pt(unsigned long ptr)
 {
 	struct mmuext_op op;
@@ -265,6 +279,7 @@ void xen_set_ldt(unsigned long ptr, unsigned long len)
  */
 unsigned long *contiguous_bitmap;
 
+#ifndef CONFIG_XEN_SHADOW_MODE
 static void contiguous_bitmap_set(
 	unsigned long first_page, unsigned long nr_pages)
 {
@@ -315,9 +330,9 @@ int xen_create_contiguous_region(
 	pud_t         *pud; 
 	pmd_t         *pmd;
 	pte_t         *pte;
-	unsigned long  mfn, i, flags;
+	unsigned long  frame, i, flags;
 	struct xen_memory_reservation reservation = {
-		.extent_start = &mfn,
+		.extent_start = &frame,
 		.nr_extents   = 1,
 		.extent_order = 0,
 		.domid        = DOMID_SELF
@@ -333,7 +348,7 @@ int xen_create_contiguous_region(
 		pud = pud_offset(pgd, (vstart + (i*PAGE_SIZE)));
 		pmd = pmd_offset(pud, (vstart + (i*PAGE_SIZE)));
 		pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE)));
-		mfn = pte_mfn(*pte);
+		frame = pte_mfn(*pte);
 		BUG_ON(HYPERVISOR_update_va_mapping(
 			vstart + (i*PAGE_SIZE), __pte_ma(0), 0));
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i,
@@ -345,7 +360,8 @@ int xen_create_contiguous_region(
 	/* 2. Get a new contiguous memory extent. */
 	reservation.extent_order = order;
 	reservation.address_bits = address_bits;
-	if (HYPERVISOR_memory_op(XENMEM_increase_reservation,
+	frame = __pa(vstart) >> PAGE_SHIFT;
+	if (HYPERVISOR_memory_op(XENMEM_populate_physmap,
 				 &reservation) != 1)
 		goto fail;
 
@@ -353,9 +369,8 @@ int xen_create_contiguous_region(
 	for (i = 0; i < (1<<order); i++) {
 		BUG_ON(HYPERVISOR_update_va_mapping(
 			vstart + (i*PAGE_SIZE),
-			pfn_pte_ma(mfn+i, PAGE_KERNEL), 0));
-		xen_machphys_update(mfn+i, (__pa(vstart)>>PAGE_SHIFT)+i);
-		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, mfn+i);
+			pfn_pte_ma(frame+i, PAGE_KERNEL), 0));
+		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, frame+i);
 	}
 
 	flush_tlb_all();
@@ -371,13 +386,13 @@ int xen_create_contiguous_region(
 	reservation.address_bits = 0;
 
 	for (i = 0; i < (1<<order); i++) {
+		frame = (__pa(vstart) >> PAGE_SHIFT) + i;
 		BUG_ON(HYPERVISOR_memory_op(
-			XENMEM_increase_reservation, &reservation) != 1);
+			XENMEM_populate_physmap, &reservation) != 1);
 		BUG_ON(HYPERVISOR_update_va_mapping(
 			vstart + (i*PAGE_SIZE),
-			pfn_pte_ma(mfn, PAGE_KERNEL), 0));
-		xen_machphys_update(mfn, (__pa(vstart)>>PAGE_SHIFT)+i);
-		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, mfn);
+			pfn_pte_ma(frame, PAGE_KERNEL), 0));
+		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, frame);
 	}
 
 	flush_tlb_all();
@@ -393,9 +408,9 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	pud_t         *pud; 
 	pmd_t         *pmd;
 	pte_t         *pte;
-	unsigned long  mfn, i, flags;
+	unsigned long  frame, i, flags;
 	struct xen_memory_reservation reservation = {
-		.extent_start = &mfn,
+		.extent_start = &frame,
 		.nr_extents   = 1,
 		.extent_order = 0,
 		.domid        = DOMID_SELF
@@ -413,7 +428,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 		pud = pud_offset(pgd, (vstart + (i*PAGE_SIZE)));
 		pmd = pmd_offset(pud, (vstart + (i*PAGE_SIZE)));
 		pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE)));
-		mfn = pte_mfn(*pte);
+		frame = pte_mfn(*pte);
 		BUG_ON(HYPERVISOR_update_va_mapping(
 			vstart + (i*PAGE_SIZE), __pte_ma(0), 0));
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i,
@@ -424,19 +439,32 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 
 	/* 2. Map new pages in place of old pages. */
 	for (i = 0; i < (1<<order); i++) {
+		frame = (__pa(vstart) >> PAGE_SHIFT) + i;
 		BUG_ON(HYPERVISOR_memory_op(
-			XENMEM_increase_reservation, &reservation) != 1);
+			XENMEM_populate_physmap, &reservation) != 1);
 		BUG_ON(HYPERVISOR_update_va_mapping(
 			vstart + (i*PAGE_SIZE),
-			pfn_pte_ma(mfn, PAGE_KERNEL), 0));
-		xen_machphys_update(mfn, (__pa(vstart)>>PAGE_SHIFT)+i);
-		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, mfn);
+			pfn_pte_ma(frame, PAGE_KERNEL), 0));
+		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, frame);
 	}
 
 	flush_tlb_all();
 
 	balloon_unlock(flags);
 }
+#else
+int xen_create_contiguous_region(
+       unsigned long vstat, unsigned int order, unsigned int address_bits)
+{
+       if (order >= 1)
+               BUG();
+       return 0;
+}
+
+void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
+{
+}
+#endif
 
 #ifdef __i386__
 int write_ldt_entry(void *ldt, int entry, __u32 entry_a, __u32 entry_b)

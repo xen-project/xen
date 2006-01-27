@@ -56,6 +56,7 @@
 #include <asm/hypervisor.h>
 #include <asm-xen/xen-public/physdev.h>
 #include <asm-xen/xen-public/memory.h>
+#include <asm-xen/features.h>
 #include "setup_arch_pre.h"
 #include <bios_ebda.h>
 
@@ -1591,6 +1592,9 @@ void __init setup_arch(char **cmdline_p)
 	rd_prompt = ((RAMDISK_FLAGS & RAMDISK_PROMPT_FLAG) != 0);
 	rd_doload = ((RAMDISK_FLAGS & RAMDISK_LOAD_FLAG) != 0);
 #endif
+
+	setup_xen_features();
+
 	ARCH_SETUP
 	if (efi_enabled)
 		efi_init();
@@ -1601,6 +1605,7 @@ void __init setup_arch(char **cmdline_p)
 
 	copy_edd();
 
+	/* Make the PFNs in the Xen hole reserved. */
 	if (!MOUNT_ROOT_RDONLY)
 		root_mountflags &= ~MS_RDONLY;
 	init_mm.start_code = (unsigned long) _text;
@@ -1763,6 +1768,8 @@ void __init setup_arch(char **cmdline_p)
 		console_use_vt = 0;
 #endif
 	}
+
+
 }
 
 static int

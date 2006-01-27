@@ -149,7 +149,7 @@ static inline int pte_none(pte_t pte)
 ({                                                                     \
        unsigned long mfn = pte_mfn(_pte);                              \
        unsigned long pfn = mfn_to_pfn(mfn);                            \
-       if ((pfn >= max_mapnr) || (phys_to_machine_mapping[pfn] != mfn))\
+       if ((pfn >= max_mapnr) || (pfn_to_mfn(pfn) != mfn))             \
                pfn = max_mapnr; /* special: force !pfn_valid() */      \
        pfn;                                                            \
 })

@@ -1041,7 +1041,7 @@ static inline int update_l1e(l1_pgentry_t *pl1e,
     if ( unlikely(cmpxchg_user(pl1e, o, n) != 0) ||
          unlikely(o != l1e_get_intpte(ol1e)) )
     {
-        MEM_LOG("Failed to update %" PRIpte " -> %" PRIpte
+        printf("Failed to update %" PRIpte " -> %" PRIpte
                 ": saw %" PRIpte,
                 l1e_get_intpte(ol1e),
                 l1e_get_intpte(nl1e),
@@ -1058,11 +1058,16 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
     l1_pgentry_t ol1e;
     struct domain *d = current->domain;
 
-    if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) )
+    shadow_sync_all(d);
+    if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) ) {
+        printf("copy_from_user1 failed %p, l2 %lx.\n", pl1e,
+               *(unsigned long *)&__linear_l2_table[l2_table_offset((unsigned long)pl1e)]);
         return 0;
+    }
 
-    if ( unlikely(shadow_mode_refcounts(d)) )
+    if ( unlikely(shadow_mode_refcounts(d)) ) {
         return update_l1e(pl1e, ol1e, nl1e);
+    }
 
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
@@ -2540,8 +2545,10 @@ int do_update_va_mapping(unsigned long va, u64 val64,
 
     perfc_incrc(calls_to_update_va);
 
-    if ( unlikely(!__addr_ok(va) && !shadow_mode_external(d)) )
+    if ( unlikely(!__addr_ok(va) && !shadow_mode_external(d)) ) {
+        printf("Bad update_va_mapping.\n");
         return -EINVAL;
+    }
 
     LOCK_BIGLOCK(d);
 
@@ -2550,9 +2557,13 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     if ( unlikely(shadow_mode_enabled(d)) )
         check_pagetable(v, "pre-va"); /* debug */
 
+    shadow_sync_all(d);
+
     if ( unlikely(!mod_l1_entry(&linear_pg_table[l1_linear_offset(va)],
-                                val)) )
+                                val)) ) {
+        printf("mod_l1_entry failed.\n");
         rc = -EINVAL;
+    }
 
     if ( likely(rc == 0) && unlikely(shadow_mode_enabled(d)) )
     {
@@ -2569,7 +2580,8 @@ int do_update_va_mapping(unsigned long va, u64 val64,
         }
     
         rc = shadow_do_update_va_mapping(va, val, v);
-
+        if (rc)
+            printf("shadow_do_update_va_mapping says %d.\n", rc);
         check_pagetable(v, "post-va"); /* debug */
     }
 

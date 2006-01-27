@@ -586,7 +586,8 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 		BUG_ON((signed short)ref < 0);
 		np->grant_rx_ref[id] = ref;
 		gnttab_grant_foreign_transfer_ref(ref,
-						  np->xbdev->otherend_id);
+						  np->xbdev->otherend_id,
+						  __pa(skb->head) >> PAGE_SHIFT);
 		RING_GET_REQUEST(&np->rx, req_prod + i)->gref = ref;
 		rx_pfn_array[i] = virt_to_mfn(skb->head);
 
@@ -613,7 +614,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	reservation.domid        = DOMID_SELF;
 
 	/* Tell the ballon driver what is going on. */
-	balloon_update_driver_allowance(i);
+//SOS22	balloon_update_driver_allowance(i);
 
 	/* Zap PTEs and give away pages in one big multicall. */
 	(void)HYPERVISOR_multicall(rx_mcl, i+1);
@@ -802,9 +803,11 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		np->stats.rx_bytes += rx->status;
 
 		/* Remap the page. */
+#ifndef CONFIG_XEN_SHADOW_MODE
 		mmu->ptr = ((maddr_t)mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
 		mmu->val  = __pa(skb->head) >> PAGE_SHIFT;
 		mmu++;
+#endif
 		MULTI_update_va_mapping(mcl, (unsigned long)skb->head,
 					pfn_pte_ma(mfn, PAGE_KERNEL), 0);
 		mcl++;
@@ -815,7 +818,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	}
 
 	/* Some pages are no longer absent... */
-	balloon_update_driver_allowance(-work_done);
+//SOS22	balloon_update_driver_allowance(-work_done);
 
 	/* Do all the remapping work, and M2P updates, in one big hypercall. */
 	if (likely((mcl - rx_mcl) != 0)) {
@@ -999,7 +1002,8 @@ static void network_connect(struct net_device *dev)
 		if ((unsigned long)np->rx_skbs[i] < __PAGE_OFFSET)
 			continue;
 		gnttab_grant_foreign_transfer_ref(
-			np->grant_rx_ref[i], np->xbdev->otherend_id);
+			np->grant_rx_ref[i], np->xbdev->otherend_id,
+			__pa(np->rx_skbs[i]->data) >> PAGE_SHIFT);
 		RING_GET_REQUEST(&np->rx, requeue_idx)->gref =
 			np->grant_rx_ref[i];
 		RING_GET_REQUEST(&np->rx, requeue_idx)->id = i;

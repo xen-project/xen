@@ -11,7 +11,7 @@ $(obj)/vmlinux.lds.S:
 
 extra-y += vmlinux.lds
 
-obj-y   := evtchn.o reboot.o gnttab.o
+obj-y   := evtchn.o reboot.o gnttab.o features.o
 
 obj-$(CONFIG_PROC_FS) += xen_proc.o
 obj-$(CONFIG_NET)     += skbuff.o

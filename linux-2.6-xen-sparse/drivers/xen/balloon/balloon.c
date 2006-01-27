@@ -107,9 +107,27 @@ static struct timer_list balloon_timer;
 #define WPRINTK(fmt, args...) \
 	printk(KERN_WARNING "xen_mem: " fmt, ##args)
 
+static int page_is_xen_hole(unsigned long pfn)
+{
+	static unsigned long hole_start, hole_len = -1;
+	if (hole_len == -1) {
+		hole_start = xen_pfn_hole_start();
+		hole_len = xen_pfn_hole_size();
+		printk("<0>Xen hole at [%lx,%lx).\n", hole_start,
+		       hole_start + hole_len);
+	}
+	return pfn >= hole_start && pfn < hole_start + hole_len;
+}
+
 /* balloon_append: add the given page to the balloon. */
 static void balloon_append(struct page *page)
 {
+	BUG_ON(PageReserved(page));
+	if (page_is_xen_hole(page_to_pfn(page))) {
+		printk("<0>Attempt to add reserved pfn %lx to balloon.\n",
+		       page_to_pfn(page));
+		BUG();
+	}
 	/* Lowmem is re-populated first, so highmem pages go at list tail. */
 	if (PageHighMem(page)) {
 		list_add_tail(PAGE_TO_LIST(page), &ballooned_pages);
@@ -139,6 +157,21 @@ static struct page *balloon_retrieve(void)
 	return page;
 }
 
+static struct page *balloon_first_page(void)
+{
+	if (list_empty(&ballooned_pages))
+		return NULL;
+	return LIST_TO_PAGE(ballooned_pages.next);
+}
+
+static struct page *balloon_next_page(struct page *page)
+{
+	struct list_head *next = PAGE_TO_LIST(page)->next;
+	if (next == &ballooned_pages)
+		return NULL;
+	return LIST_TO_PAGE(next);
+}
+
 static void balloon_alarm(unsigned long unused)
 {
 	schedule_work(&balloon_worker);
@@ -154,7 +187,7 @@ static unsigned long current_target(void)
 
 static int increase_reservation(unsigned long nr_pages)
 {
-	unsigned long *mfn_list, pfn, i, flags;
+	unsigned long *frame_list, pfn, i, flags;
 	struct page   *page;
 	long           rc;
 	struct xen_memory_reservation reservation = {
@@ -166,20 +199,28 @@ static int increase_reservation(unsigned long nr_pages)
 	if (nr_pages > (PAGE_SIZE / sizeof(unsigned long)))
 		nr_pages = PAGE_SIZE / sizeof(unsigned long);
 
-	mfn_list = (unsigned long *)__get_free_page(GFP_KERNEL);
-	if (mfn_list == NULL)
+	frame_list = (unsigned long *)__get_free_page(GFP_KERNEL);
+	if (frame_list == NULL)
 		return -ENOMEM;
 
 	balloon_lock(flags);
 
-	reservation.extent_start = mfn_list;
+	page = balloon_first_page();
+	for (i = 0; i < nr_pages; i++) {
+		BUG_ON(page == NULL);
+		frame_list[i] = page_to_pfn(page);;
+		BUG_ON(page_is_xen_hole(frame_list[i]));
+		page = balloon_next_page(page);
+	}
+
+	reservation.extent_start = frame_list;
 	reservation.nr_extents   = nr_pages;
 	rc = HYPERVISOR_memory_op(
-		XENMEM_increase_reservation, &reservation);
+		XENMEM_populate_physmap, &reservation);
 	if (rc < nr_pages) {
 		int ret;
 		/* We hit the Xen hard limit: reprobe. */
-		reservation.extent_start = mfn_list;
+		reservation.extent_start = frame_list;
 		reservation.nr_extents   = rc;
 		ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
 				&reservation);
@@ -193,20 +234,34 @@ static int increase_reservation(unsigned long nr_pages)
 		BUG_ON(page == NULL);
 
 		pfn = page_to_pfn(page);
+#ifndef CONFIG_XEN_SHADOW_MODE
+		/* In shadow mode, Xen handles this part for us. */
 		BUG_ON(phys_to_machine_mapping_valid(pfn));
 
 		/* Update P->M and M->P tables. */
-		set_phys_to_machine(pfn, mfn_list[i]);
-		xen_machphys_update(mfn_list[i], pfn);
-            
+		set_phys_to_machine(pfn, frame_list[i]);
+		xen_machphys_update(frame_list[i], pfn);
+#endif
+
+		printk("<0>Balloon allocated %lx.\n", pfn);
 		/* Link back into the page tables if not highmem. */
 		if (pfn < max_low_pfn) {
 			int ret;
+			pgd_t *pgd = pgd_offset_k((unsigned long)__va(pfn << PAGE_SHIFT));
+			printk("pgd is %lx.\n", *(unsigned long *)pgd);
+			(void)copy_from_user(&ret,
+					     (unsigned long *)__va(pfn << PAGE_SHIFT),
+					     4);
 			ret = HYPERVISOR_update_va_mapping(
 				(unsigned long)__va(pfn << PAGE_SHIFT),
-				pfn_pte_ma(mfn_list[i], PAGE_KERNEL),
+				pfn_pte_ma(frame_list[i], PAGE_KERNEL),
 				0);
 			BUG_ON(ret);
+			printk("<0>Rehooked va; pte now %lx.\n",
+			       *(unsigned long *)virt_to_ptep(__va(pfn << PAGE_SHIFT)));
+			*(unsigned long *)__va(pfn << PAGE_SHIFT) =
+				0xf001;
+			printk("<0>Touched va.\n");
 		}
 
 		/* Relinquish the page back to the allocator. */
@@ -221,14 +276,14 @@ static int increase_reservation(unsigned long nr_pages)
  out:
 	balloon_unlock(flags);
 
-	free_page((unsigned long)mfn_list);
+	free_page((unsigned long)frame_list);
 
 	return 0;
 }
 
 static int decrease_reservation(unsigned long nr_pages)
 {
-	unsigned long *mfn_list, pfn, i, flags;
+	unsigned long *frame_list, pfn, i, flags;
 	struct page   *page;
 	void          *v;
 	int            need_sleep = 0;
@@ -242,8 +297,8 @@ static int decrease_reservation(unsigned long nr_pages)
 	if (nr_pages > (PAGE_SIZE / sizeof(unsigned long)))
 		nr_pages = PAGE_SIZE / sizeof(unsigned long);
 
-	mfn_list = (unsigned long *)__get_free_page(GFP_KERNEL);
-	if (mfn_list == NULL)
+	frame_list = (unsigned long *)__get_free_page(GFP_KERNEL);
+	if (frame_list == NULL)
 		return -ENOMEM;
 
 	for (i = 0; i < nr_pages; i++) {
@@ -254,7 +309,7 @@ static int decrease_reservation(unsigned long nr_pages)
 		}
 
 		pfn = page_to_pfn(page);
-		mfn_list[i] = pfn_to_mfn(pfn);
+		frame_list[i] = pfn_to_mfn(pfn);
 
 		if (!PageHighMem(page)) {
 			v = phys_to_virt(pfn << PAGE_SHIFT);
@@ -280,12 +335,12 @@ static int decrease_reservation(unsigned long nr_pages)
 
 	/* No more mappings: invalidate P2M and add to balloon. */
 	for (i = 0; i < nr_pages; i++) {
-		pfn = mfn_to_pfn(mfn_list[i]);
+		pfn = mfn_to_pfn(frame_list[i]);
 		set_phys_to_machine(pfn, INVALID_P2M_ENTRY);
 		balloon_append(pfn_to_page(pfn));
 	}
 
-	reservation.extent_start = mfn_list;
+	reservation.extent_start = frame_list;
 	reservation.nr_extents   = nr_pages;
 	ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
 	BUG_ON(ret != nr_pages);
@@ -295,7 +350,7 @@ static int decrease_reservation(unsigned long nr_pages)
 
 	balloon_unlock(flags);
 
-	free_page((unsigned long)mfn_list);
+	free_page((unsigned long)frame_list);
 
 	return need_sleep;
 }

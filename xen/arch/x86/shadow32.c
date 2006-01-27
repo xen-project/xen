@@ -2494,7 +2494,9 @@ static int resync_all(struct domain *d, u32 stype)
             l2_pgentry_t *guest2 = guest;
             l2_pgentry_t *snapshot2 = snapshot;
             l1_pgentry_t *shadow2 = shadow;
-            
+
+            printf("Update hl2 shadow.\n");
+
             ASSERT(shadow_mode_write_all(d) || shadow_mode_wr_pt_pte(d));
             BUG_ON(!shadow_mode_refcounts(d)); // not yet implemented
 

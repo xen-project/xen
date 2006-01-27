@@ -326,7 +326,7 @@ struct out_of_sync_entry {
 #define SHADOW_SNAPSHOT_ELSEWHERE (-1L)
 
 /************************************************************************/
-#define SHADOW_DEBUG 0
+#define SHADOW_DEBUG 1
 #define SHADOW_VERBOSE_DEBUG 0
 #define SHADOW_VVERBOSE_DEBUG 0
 #define SHADOW_VVVERBOSE_DEBUG 0
