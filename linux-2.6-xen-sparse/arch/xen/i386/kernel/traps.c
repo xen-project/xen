@@ -995,7 +995,7 @@ void __init trap_init(void)
 	 * default LDT is a single-entry callgate to lcall7 for iBCS
 	 * and a callgate to lcall27 for Solaris/x86 binaries
 	 */
-	make_lowmem_page_readonly(&default_ldt[0]);
+	make_lowmem_mmu_page_readonly(&default_ldt[0]);
 
 	/*
 	 * Should be a barrier for any external CPU state.
