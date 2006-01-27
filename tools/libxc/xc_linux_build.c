@@ -33,8 +33,6 @@
 #define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #endif
 
-#define NR_GRANT_FRAMES 4
-
 #ifdef __ia64__
 #define get_tot_pages xc_get_max_pages
 #else

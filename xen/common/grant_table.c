@@ -522,9 +522,7 @@ gnttab_setup_table(
         ASSERT(d->grant_table != NULL);
         (void)put_user(GNTST_okay, &uop->status);
         for ( i = 0; i < op.nr_frames; i++ ) {
-            mfn = gnttab_shared_mfn(d, d->grant_table, i);
-            if (shadow_mode_translate(d))
-                mfn = __mfn_to_gpfn(d, mfn);
+            mfn = __mfn_to_gpfn(d, gnttab_shared_mfn(d, d->grant_table, i));
             (void)put_user(mfn, &op.frame_list[i]);
         }
     }

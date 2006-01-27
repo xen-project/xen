@@ -317,7 +317,6 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 
 	pgd_test_and_unpin(pgd);
 
-	memset(pgd, 0, 10);
 	if (PTRS_PER_PMD == 1 || !pgd)
 		return pgd;
 

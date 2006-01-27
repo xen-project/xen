@@ -113,8 +113,6 @@ static int page_is_xen_hole(unsigned long pfn)
 	if (hole_len == -1) {
 		hole_start = xen_pfn_hole_start();
 		hole_len = xen_pfn_hole_size();
-		printk("<0>Xen hole at [%lx,%lx).\n", hole_start,
-		       hole_start + hole_len);
 	}
 	return pfn >= hole_start && pfn < hole_start + hole_len;
 }
@@ -122,12 +120,9 @@ static int page_is_xen_hole(unsigned long pfn)
 /* balloon_append: add the given page to the balloon. */
 static void balloon_append(struct page *page)
 {
-	BUG_ON(PageReserved(page));
-	if (page_is_xen_hole(page_to_pfn(page))) {
-		printk("<0>Attempt to add reserved pfn %lx to balloon.\n",
+	if (page_is_xen_hole(page_to_pfn(page)))
+		panic("Attempt to add Xen-reserved pfn %lx to balloon.\n",
 		       page_to_pfn(page));
-		BUG();
-	}
 	/* Lowmem is re-populated first, so highmem pages go at list tail. */
 	if (PageHighMem(page)) {
 		list_add_tail(PAGE_TO_LIST(page), &ballooned_pages);
@@ -243,25 +238,14 @@ static int increase_reservation(unsigned long nr_pages)
 		xen_machphys_update(frame_list[i], pfn);
 #endif
 
-		printk("<0>Balloon allocated %lx.\n", pfn);
 		/* Link back into the page tables if not highmem. */
 		if (pfn < max_low_pfn) {
 			int ret;
-			pgd_t *pgd = pgd_offset_k((unsigned long)__va(pfn << PAGE_SHIFT));
-			printk("pgd is %lx.\n", *(unsigned long *)pgd);
-			(void)copy_from_user(&ret,
-					     (unsigned long *)__va(pfn << PAGE_SHIFT),
-					     4);
 			ret = HYPERVISOR_update_va_mapping(
 				(unsigned long)__va(pfn << PAGE_SHIFT),
 				pfn_pte_ma(frame_list[i], PAGE_KERNEL),
 				0);
 			BUG_ON(ret);
-			printk("<0>Rehooked va; pte now %lx.\n",
-			       *(unsigned long *)virt_to_ptep(__va(pfn << PAGE_SHIFT)));
-			*(unsigned long *)__va(pfn << PAGE_SHIFT) =
-				0xf001;
-			printk("<0>Touched va.\n");
 		}
 
 		/* Relinquish the page back to the allocator. */

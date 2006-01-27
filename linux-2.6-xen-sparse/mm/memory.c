@@ -291,7 +291,6 @@ pte_t fastcall *pte_alloc_map(struct mm_struct *mm, pmd_t *pmd,
 		spin_lock(&mm->page_table_lock);
 		if (!new)
 			return NULL;
-
 		/*
 		 * Because we dropped the lock, we should re-check the
 		 * entry, as somebody else could have populated it..

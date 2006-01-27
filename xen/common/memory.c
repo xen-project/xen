@@ -115,8 +115,6 @@ populate_physmap(
             goto out;
 
         for ( j = 0; j < (1 << extent_order); j++ ) {
-            printf("Populating %lx with %lx.\n",
-                   pfn + j, mfn + j);
             if (shadow_mode_translate(d))
                 set_p2m_entry(d, pfn + j, mfn + j, &cache1, &cache2);
             set_pfn_from_mfn(mfn + j, pfn + j);

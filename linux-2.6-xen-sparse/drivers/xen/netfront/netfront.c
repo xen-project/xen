@@ -614,7 +614,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	reservation.domid        = DOMID_SELF;
 
 	/* Tell the ballon driver what is going on. */
-//SOS22	balloon_update_driver_allowance(i);
+	balloon_update_driver_allowance(i);
 
 	/* Zap PTEs and give away pages in one big multicall. */
 	(void)HYPERVISOR_multicall(rx_mcl, i+1);
@@ -818,7 +818,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	}
 
 	/* Some pages are no longer absent... */
-//SOS22	balloon_update_driver_allowance(-work_done);
+	balloon_update_driver_allowance(-work_done);
 
 	/* Do all the remapping work, and M2P updates, in one big hypercall. */
 	if (likely((mcl - rx_mcl) != 0)) {

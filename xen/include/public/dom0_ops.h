@@ -430,7 +430,7 @@ typedef struct {
     domid_t  domain;          /* domain to be affected */
     unsigned long mfn;        /* machine frame to be initialised */
 } dom0_hypercall_init_t;
-
+ 
 typedef struct {
     uint32_t cmd;
     uint32_t interface_version; /* DOM0_INTERFACE_VERSION */
