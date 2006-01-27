@@ -413,19 +413,19 @@ do {				  					\
 } while (0)
 
 #ifndef CONFIG_XEN_SHADOW_MODE
-void make_lowmem_page_readonly(void *va);
-void make_lowmem_page_writable(void *va);
-void make_page_readonly(void *va);
-void make_page_writable(void *va);
-void make_pages_readonly(void *va, unsigned int nr);
-void make_pages_writable(void *va, unsigned int nr);
+void make_lowmem_mmu_page_readonly(void *va);
+void make_lowmem_mmu_page_writable(void *va);
+void make_mmu_page_readonly(void *va);
+void make_mmu_page_writable(void *va);
+void make_mmu_pages_readonly(void *va, unsigned int nr);
+void make_mmu_pages_writable(void *va, unsigned int nr);
 #else
-#define make_lowmem_page_readonly(_va) ((void)0)
-#define make_lowmem_page_writable(_va) ((void)0)
-#define make_page_readonly(_va)        ((void)0)
-#define make_page_writable(_va)        ((void)0)
-#define make_pages_readonly(_va, _nr)  ((void)0)
-#define make_pages_writable(_va, _nr)  ((void)0)
+#define make_lowmem_mmu_page_readonly(_va) ((void)0)
+#define make_lowmem_mmu_page_writable(_va)     ((void)0)
+#define make_mmu_page_readonly(_va)        ((void)0)
+#define make_mmu_page_writable(_va)            ((void)0)
+#define make_mmu_pages_readonly(_va, _nr)  ((void)0)
+#define make_mmu_pages_writable(_va, _nr)      ((void)0)
 #endif
 
 #define virt_to_ptep(__va)						\

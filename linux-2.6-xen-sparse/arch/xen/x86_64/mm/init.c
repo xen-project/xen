@@ -66,7 +66,7 @@ extern unsigned long start_pfn;
 	(((mfn_to_pfn((addr) >> PAGE_SHIFT)) << PAGE_SHIFT) +	\
 	__START_KERNEL_map)))
 
-static void early_make_page_readonly(void *va)
+static void early_make_mmu_page_readonly(void *va)
 {
 	unsigned long addr, _va = (unsigned long)va;
 	pte_t pte, *ptep;
@@ -88,7 +88,7 @@ static void early_make_page_readonly(void *va)
 		BUG();
 }
 
-void make_page_readonly(void *va)
+void make_mmu_page_readonly(void *va)
 {
 	pgd_t *pgd; pud_t *pud; pmd_t *pmd; pte_t pte, *ptep;
 	unsigned long addr = (unsigned long) va;
@@ -103,10 +103,10 @@ void make_page_readonly(void *va)
 		xen_l1_entry_update(ptep, pte); /* fallback */
 
 	if ((addr >= VMALLOC_START) && (addr < VMALLOC_END))
-		make_page_readonly(__va(pte_pfn(pte) << PAGE_SHIFT));
+		make_mmu_page_readonly(__va(pte_pfn(pte) << PAGE_SHIFT));
 }
 
-void make_page_writable(void *va)
+void make_mmu_page_writable(void *va)
 {
 	pgd_t *pgd; pud_t *pud; pmd_t *pmd; pte_t pte, *ptep;
 	unsigned long addr = (unsigned long) va;
@@ -121,21 +121,21 @@ void make_page_writable(void *va)
 		xen_l1_entry_update(ptep, pte); /* fallback */
 
 	if ((addr >= VMALLOC_START) && (addr < VMALLOC_END))
-		make_page_writable(__va(pte_pfn(pte) << PAGE_SHIFT));
+		make_mmu_page_writable(__va(pte_pfn(pte) << PAGE_SHIFT));
 }
 
-void make_pages_readonly(void *va, unsigned nr)
+void make_mmu_pages_readonly(void *va, unsigned nr)
 {
 	while (nr-- != 0) {
-		make_page_readonly(va);
+		make_mmu_page_readonly(va);
 		va = (void*)((unsigned long)va + PAGE_SIZE);
 	}
 }
 
-void make_pages_writable(void *va, unsigned nr)
+void make_mmu_pages_writable(void *va, unsigned nr)
 {
 	while (nr-- != 0) {
-		make_page_writable(va);
+		make_mmu_page_writable(va);
 		va = (void*)((unsigned long)va + PAGE_SIZE);
 	}
 }
@@ -223,7 +223,7 @@ static void set_pte_phys(unsigned long vaddr,
 	pud = (user_mode ? pud_offset_u(vaddr) : pud_offset(pgd, vaddr));
 	if (pud_none(*pud)) {
 		pmd = (pmd_t *) spp_getpage(); 
-		make_page_readonly(pmd);
+		make_mmu_page_readonly(pmd);
 		xen_pmd_pin(__pa(pmd));
 		set_pud(pud, __pud(__pa(pmd) | _KERNPG_TABLE | _PAGE_USER));
 		if (pmd != pmd_offset(pud, 0)) {
@@ -234,7 +234,7 @@ static void set_pte_phys(unsigned long vaddr,
 	pmd = pmd_offset(pud, vaddr);
 	if (pmd_none(*pmd)) {
 		pte = (pte_t *) spp_getpage();
-		make_page_readonly(pte);
+		make_mmu_page_readonly(pte);
 		xen_pte_pin(__pa(pte));
 		set_pmd(pmd, __pmd(__pa(pte) | _KERNPG_TABLE | _PAGE_USER));
 		if (pte != pte_offset_kernel(pmd, 0)) {
@@ -276,7 +276,7 @@ static void set_pte_phys_ma(unsigned long vaddr,
 	if (pud_none(*pud)) {
 
 		pmd = (pmd_t *) spp_getpage(); 
-		make_page_readonly(pmd);
+		make_mmu_page_readonly(pmd);
 		xen_pmd_pin(__pa(pmd));
 
 		set_pud(pud, __pud(__pa(pmd) | _KERNPG_TABLE | _PAGE_USER));
@@ -290,7 +290,7 @@ static void set_pte_phys_ma(unsigned long vaddr,
 
 	if (pmd_none(*pmd)) {
 		pte = (pte_t *) spp_getpage();
-		make_page_readonly(pte);  
+		make_mmu_page_readonly(pte);
 		xen_pte_pin(__pa(pte));
 
 		set_pmd(pmd, __pmd(__pa(pte) | _KERNPG_TABLE | _PAGE_USER));
@@ -419,7 +419,7 @@ static void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned lon
 		} 
 
 		pmd = alloc_static_page(&pmd_phys);
-		early_make_page_readonly(pmd);
+		early_make_mmu_page_readonly(pmd);
 		xen_pmd_pin(pmd_phys);
 		set_pud(pud, __pud(pmd_phys | _KERNPG_TABLE));
       		for (j = 0; j < PTRS_PER_PMD; pmd++, j++) {
@@ -448,7 +448,7 @@ static void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned lon
 				__set_pte(pte, __pte(paddr | _KERNPG_TABLE));
 			}
 			pte = pte_save;
-			early_make_page_readonly(pte);  
+			early_make_mmu_page_readonly(pte);
 			xen_pte_pin(pte_phys);
 			set_pmd(pmd, __pmd(pte_phys | _KERNPG_TABLE));
 		}
@@ -497,11 +497,11 @@ void __init xen_init_pt(void)
 		      _KERNPG_TABLE | _PAGE_USER);
 	memcpy((void *)level2_kernel_pgt, page, PAGE_SIZE);
 
-	early_make_page_readonly(init_level4_pgt);
-	early_make_page_readonly(init_level4_user_pgt);
-	early_make_page_readonly(level3_kernel_pgt);
-	early_make_page_readonly(level3_user_pgt);
-	early_make_page_readonly(level2_kernel_pgt);
+	early_make_mmu_page_readonly(init_level4_pgt);
+	early_make_mmu_page_readonly(init_level4_user_pgt);
+	early_make_mmu_page_readonly(level3_kernel_pgt);
+	early_make_mmu_page_readonly(level3_user_pgt);
+	early_make_mmu_page_readonly(level2_kernel_pgt);
 
 	xen_pgd_pin(__pa_symbol(init_level4_pgt));
 	xen_pgd_pin(__pa_symbol(init_level4_user_pgt));
@@ -539,7 +539,7 @@ void __init extend_init_mapping(void)
 		pmd = (pmd_t *)&page[pmd_index(va)];
 		if (pmd_none(*pmd)) {
 			pte_page = alloc_static_page(&phys);
-			early_make_page_readonly(pte_page);
+			early_make_mmu_page_readonly(pte_page);
 			xen_pte_pin(phys);
 			set_pmd(pmd, __pmd(phys | _KERNPG_TABLE | _PAGE_USER));
 		} else {
@@ -586,7 +586,7 @@ void __init init_memory_mapping(unsigned long start, unsigned long end)
 	for (; start < end; start = next) {
 		unsigned long pud_phys; 
 		pud_t *pud = alloc_static_page(&pud_phys);
-		early_make_page_readonly(pud);
+		early_make_mmu_page_readonly(pud);
 		xen_pud_pin(pud_phys);
 		next = start + PGDIR_SIZE;
 		if (next > end) 
@@ -791,11 +791,11 @@ void free_initmem(void)
 		set_page_count(virt_to_page(addr), 1);
 		memset((void *)(addr & ~(PAGE_SIZE-1)), 0xcc, PAGE_SIZE); 
 		xen_pte_unpin(__pa(addr));
-		make_page_writable(__va(__pa(addr)));
+		make_mmu_page_writable(__va(__pa(addr)));
 		/*
 		 * Make pages from __PAGE_OFFSET address as well
 		 */
-		make_page_writable((void *)addr);
+		make_mmu_page_writable((void *)addr);
 		free_page(addr);
 		totalram_pages++;
 	}

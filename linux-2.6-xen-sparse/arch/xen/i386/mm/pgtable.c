@@ -198,7 +198,7 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
 	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
 	if (pte)
-		make_lowmem_page_readonly(pte);
+		make_lowmem_mmu_page_readonly(pte);
 	return pte;
 }
 
@@ -344,7 +344,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 			pmd_t *kpmd = pmd_offset(kpud, v);
 			pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
 			memcpy(pmd, kpmd, PAGE_SIZE);
-			make_lowmem_page_readonly(pmd);
+			make_lowmem_mmu_page_readonly(pmd);
 		}
 		pgd_list_add(pgd);
 		spin_unlock_irqrestore(&pgd_lock, flags);
@@ -378,7 +378,7 @@ void pgd_free(pgd_t *pgd)
 			spin_unlock_irqrestore(&pgd_lock, flags);
 			for (i = USER_PTRS_PER_PGD; i < PTRS_PER_PGD; i++) {
 				pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
-				make_lowmem_page_writable(pmd);
+				make_lowmem_mmu_page_writable(pmd);
 				memset(pmd, 0, PTRS_PER_PMD*sizeof(pmd_t));
 				kmem_cache_free(pmd_cache, pmd);
 			}
@@ -389,7 +389,7 @@ void pgd_free(pgd_t *pgd)
 }
 
 #ifndef CONFIG_XEN_SHADOW_MODE
-void make_lowmem_page_readonly(void *va)
+void make_lowmem_mmu_page_readonly(void *va)
 {
 	pte_t *pte = virt_to_ptep(va);
 	int rc = HYPERVISOR_update_va_mapping(
@@ -397,7 +397,7 @@ void make_lowmem_page_readonly(void *va)
 	BUG_ON(rc);
 }
 
-void make_lowmem_page_writable(void *va)
+void make_lowmem_mmu_page_writable(void *va)
 {
 	pte_t *pte = virt_to_ptep(va);
 	int rc = HYPERVISOR_update_va_mapping(
@@ -405,7 +405,7 @@ void make_lowmem_page_writable(void *va)
 	BUG_ON(rc);
 }
 
-void make_page_readonly(void *va)
+void make_mmu_page_readonly(void *va)
 {
 	pte_t *pte = virt_to_ptep(va);
 	int rc = HYPERVISOR_update_va_mapping(
@@ -419,12 +419,12 @@ void make_page_readonly(void *va)
 			kmap_flush_unused(); /* flush stale writable kmaps */
 		else
 #endif
-			make_lowmem_page_readonly(
+			make_lowmem_mmu_page_readonly(
 				phys_to_virt(pfn << PAGE_SHIFT)); 
 	}
 }
 
-void make_page_writable(void *va)
+void make_mmu_page_writable(void *va)
 {
 	pte_t *pte = virt_to_ptep(va);
 	int rc = HYPERVISOR_update_va_mapping(
@@ -436,23 +436,23 @@ void make_page_writable(void *va)
 #ifdef CONFIG_HIGHMEM
 		if (pfn < highstart_pfn)
 #endif
-			make_lowmem_page_writable(
+			make_lowmem_mmu_page_writable(
 				phys_to_virt(pfn << PAGE_SHIFT)); 
 	}
 }
 
-void make_pages_readonly(void *va, unsigned int nr)
+void make_mmu_pages_readonly(void *va, unsigned int nr)
 {
 	while (nr-- != 0) {
-		make_page_readonly(va);
+		make_mmu_page_readonly(va);
 		va = (void *)((unsigned long)va + PAGE_SIZE);
 	}
 }
 
-void make_pages_writable(void *va, unsigned int nr)
+void make_mmu_pages_writable(void *va, unsigned int nr)
 {
 	while (nr-- != 0) {
-		make_page_writable(va);
+		make_mmu_page_writable(va);
 		va = (void *)((unsigned long)va + PAGE_SIZE);
 	}
 }

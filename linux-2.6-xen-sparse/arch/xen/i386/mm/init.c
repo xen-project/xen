@@ -68,7 +68,7 @@ static pmd_t * __init one_md_table_init(pgd_t *pgd)
 		
 #ifdef CONFIG_X86_PAE
 	pmd_table = (pmd_t *) alloc_bootmem_low_pages(PAGE_SIZE);
-	make_lowmem_page_readonly(pmd_table);
+	make_lowmem_mmu_page_readonly(pmd_table);
 	set_pgd(pgd, __pgd(__pa(pmd_table) | _PAGE_PRESENT));
 	pud = pud_offset(pgd, 0);
 	if (pmd_table != pmd_offset(pud, 0)) 
@@ -89,7 +89,7 @@ static pte_t * __init one_page_table_init(pmd_t *pmd)
 {
 	if (pmd_none(*pmd)) {
 		pte_t *page_table = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
-		make_lowmem_page_readonly(page_table);
+		make_lowmem_mmu_page_readonly(page_table);
 		set_pmd(pmd, __pmd(__pa(page_table) | _PAGE_TABLE));
 		if (page_table != pte_offset_kernel(pmd, 0))
 			BUG();	

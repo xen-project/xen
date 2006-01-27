@@ -65,8 +65,8 @@ static int alloc_ldt(mm_context_t *pc, unsigned mincount, int reload)
 
 		preempt_disable();
 #endif
-		make_pages_readonly(pc->ldt, (pc->size * LDT_ENTRY_SIZE) /
-				    PAGE_SIZE);
+		make_mmu_pages_readonly(pc->ldt, (pc->size * LDT_ENTRY_SIZE) /
+					PAGE_SIZE);
 		load_LDT(pc);
 #ifdef CONFIG_SMP
 		mask = cpumask_of_cpu(smp_processor_id());
@@ -76,7 +76,7 @@ static int alloc_ldt(mm_context_t *pc, unsigned mincount, int reload)
 #endif
 	}
 	if (oldsize) {
-		make_pages_writable(oldldt, (oldsize * LDT_ENTRY_SIZE) /
+		make_mmu_pages_writable(oldldt, (oldsize * LDT_ENTRY_SIZE) /
 			PAGE_SIZE);
 		if (oldsize*LDT_ENTRY_SIZE > PAGE_SIZE)
 			vfree(oldldt);
@@ -92,8 +92,8 @@ static inline int copy_ldt(mm_context_t *new, mm_context_t *old)
 	if (err < 0)
 		return err;
 	memcpy(new->ldt, old->ldt, old->size*LDT_ENTRY_SIZE);
-	make_pages_readonly(new->ldt, (new->size * LDT_ENTRY_SIZE) /
-			    PAGE_SIZE);
+	make_mmu_pages_readonly(new->ldt, (new->size * LDT_ENTRY_SIZE) /
+				PAGE_SIZE);
 	return 0;
 }
 
@@ -131,9 +131,9 @@ void destroy_context(struct mm_struct *mm)
 	if (mm->context.size) {
 		if (mm == current->active_mm)
 			clear_LDT();
-		make_pages_writable(mm->context.ldt, 
-				    (mm->context.size * LDT_ENTRY_SIZE) /
-				    PAGE_SIZE);
+		make_mmu_pages_writable(mm->context.ldt,
+					(mm->context.size * LDT_ENTRY_SIZE) /
+					PAGE_SIZE);
 		if (mm->context.size*LDT_ENTRY_SIZE > PAGE_SIZE)
 			vfree(mm->context.ldt);
 		else
