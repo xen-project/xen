@@ -75,9 +75,8 @@ populate_physmap(
     unsigned int   flags,
     int           *preempted)
 {
-    struct pfn_info         *page;
-    unsigned long            i, j, pfn, mfn;
-    struct domain_mmap_cache cache1, cache2;
+    struct pfn_info *page;
+    unsigned long    i, j, pfn, mfn;
 
     if ( !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
         return 0;
@@ -85,12 +84,6 @@ populate_physmap(
     if ( (extent_order != 0) &&
          !multipage_allocation_permitted(current->domain) )
         return 0;
-
-    if (shadow_mode_translate(d)) {
-        domain_mmap_cache_init(&cache1);
-        domain_mmap_cache_init(&cache2);
-        shadow_lock(d);
-    }
 
     for ( i = 0; i < nr_extents; i++ )
     {
@@ -114,13 +107,16 @@ populate_physmap(
         if ( unlikely(__get_user(pfn, &extent_list[i]) != 0) )
             goto out;
 
-        for ( j = 0; j < (1 << extent_order); j++ ) {
-            if (shadow_mode_translate(d))
-                set_p2m_entry(d, pfn + j, mfn + j, &cache1, &cache2);
-            set_pfn_from_mfn(mfn + j, pfn + j);
+        if ( unlikely(shadow_mode_translate(d)) )
+        {
+            for ( j = 0; j < (1 << extent_order); j++ )
+                guest_physmap_add_page(d, pfn + j, mfn + j);
         }
+        else
+        {
+            for ( j = 0; j < (1 << extent_order); j++ )
+                set_pfn_from_mfn(mfn + j, pfn + j);
 
-        if (!shadow_mode_translate(d)) {
             /* Inform the domain of the new page's machine address. */ 
             if ( __put_user(mfn, &extent_list[i]) != 0 )
                 goto out;
@@ -128,12 +124,6 @@ populate_physmap(
     }
 
  out:
-    if (shadow_mode_translate(d)) {
-        shadow_unlock(d);
-        domain_mmap_cache_destroy(&cache1);
-        domain_mmap_cache_destroy(&cache2);
-    }
-
     return i;
 }
     
@@ -168,8 +158,8 @@ decrease_reservation(
             mfn = __gpfn_to_mfn(d, gpfn + j);
             if ( unlikely(mfn >= max_page) )
             {
-                DPRINTK("Domain %u page number out of range (%lx(%lx) >= %lx)\n", 
-                        d->domain_id, mfn, gpfn, max_page);
+                DPRINTK("Domain %u page number out of range (%lx >= %lx)\n",
+                        d->domain_id, mfn, max_page);
                 return i;
             }
             
@@ -186,18 +176,8 @@ decrease_reservation(
             if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
                 put_page(page);
 
-            if (shadow_mode_translate(d)) {
-                struct domain_mmap_cache c1, c2;
-                domain_mmap_cache_init(&c1);
-                domain_mmap_cache_init(&c2);
-                shadow_lock(d);
-                shadow_sync_and_drop_references(d, page);
-                set_p2m_entry(d, gpfn + j, -1, &c1, &c2);
-                set_pfn_from_mfn(mfn + j, INVALID_M2P_ENTRY);
-                shadow_unlock(d);
-                domain_mmap_cache_destroy(&c1);
-                domain_mmap_cache_destroy(&c2);
-            }
+            guest_physmap_remove_page(d, gpfn + j, mfn);
+
             put_page(page);
         }
     }

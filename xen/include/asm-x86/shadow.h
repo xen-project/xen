@@ -636,6 +636,44 @@ static inline void shadow_sync_and_drop_references(
 }
 #endif
 
+static inline void guest_physmap_add_page(
+    struct domain *d, unsigned long gpfn, unsigned long mfn)
+{
+    struct domain_mmap_cache c1, c2;
+
+    if ( likely(!shadow_mode_translate(d)) )
+        return;
+
+    domain_mmap_cache_init(&c1);
+    domain_mmap_cache_init(&c2);
+    shadow_lock(d);
+    shadow_sync_and_drop_references(d, pfn_to_page(mfn));
+    set_p2m_entry(d, gpfn, mfn, &c1, &c2);
+    set_pfn_from_mfn(mfn, gpfn);
+    shadow_unlock(d);
+    domain_mmap_cache_destroy(&c1);
+    domain_mmap_cache_destroy(&c2);
+}
+
+static inline void guest_physmap_remove_page(
+    struct domain *d, unsigned long gpfn, unsigned long mfn)
+{
+    struct domain_mmap_cache c1, c2;
+
+    if ( likely(!shadow_mode_translate(d)) )
+        return;
+
+    domain_mmap_cache_init(&c1);
+    domain_mmap_cache_init(&c2);
+    shadow_lock(d);
+    shadow_sync_and_drop_references(d, pfn_to_page(mfn));
+    set_p2m_entry(d, gpfn, -1, &c1, &c2);
+    set_pfn_from_mfn(mfn, INVALID_M2P_ENTRY);
+    shadow_unlock(d);
+    domain_mmap_cache_destroy(&c1);
+    domain_mmap_cache_destroy(&c2);
+}
+
 /************************************************************************/
 
 /*
