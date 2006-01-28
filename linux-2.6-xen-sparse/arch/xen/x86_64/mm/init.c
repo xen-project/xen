@@ -93,13 +93,10 @@ static void early_make_mmu_page_readonly(void *va)
 		BUG();
 }
 
-void make_mmu_page_readonly(void *va)
+void make_page_readonly(void *va)
 {
 	pgd_t *pgd; pud_t *pud; pmd_t *pmd; pte_t pte, *ptep;
 	unsigned long addr = (unsigned long) va;
-
-	if (xen_feature(writable_mmu_structures))
-		return;
 
 	pgd = pgd_offset_k(addr);
 	pud = pud_offset(pgd, addr);
@@ -111,16 +108,20 @@ void make_mmu_page_readonly(void *va)
 		xen_l1_entry_update(ptep, pte); /* fallback */
 
 	if ((addr >= VMALLOC_START) && (addr < VMALLOC_END))
-		make_mmu_page_readonly(__va(pte_pfn(pte) << PAGE_SHIFT));
+		make_page_readonly(__va(pte_pfn(pte) << PAGE_SHIFT));
 }
 
-void make_mmu_page_writable(void *va)
+void make_mmu_page_readonly(void *va)
+{
+	if (xen_feature(writable_mmu_structures))
+		return;
+	make_page_readonly(va);
+}
+
+void make_page_writable(void *va)
 {
 	pgd_t *pgd; pud_t *pud; pmd_t *pmd; pte_t pte, *ptep;
 	unsigned long addr = (unsigned long) va;
-
-	if (xen_feature(writable_mmu_structures))
-		return;
 
 	pgd = pgd_offset_k(addr);
 	pud = pud_offset(pgd, addr);
@@ -132,16 +133,35 @@ void make_mmu_page_writable(void *va)
 		xen_l1_entry_update(ptep, pte); /* fallback */
 
 	if ((addr >= VMALLOC_START) && (addr < VMALLOC_END))
-		make_mmu_page_writable(__va(pte_pfn(pte) << PAGE_SHIFT));
+		make_page_writable(__va(pte_pfn(pte) << PAGE_SHIFT));
+}
+
+void make_mmu_page_writable(void *va)
+{
+	if (xen_feature(writable_mmu_structures))
+		return;
+	make_page_writable(va);
+}
+
+void make_pages_readonly(void *va, unsigned nr)
+{
+	while (nr-- != 0) {
+		make_page_readonly(va);
+		va = (void*)((unsigned long)va + PAGE_SIZE);
+	}
 }
 
 void make_mmu_pages_readonly(void *va, unsigned nr)
 {
 	if (xen_feature(writable_mmu_structures))
 		return;
+	make_pages_readonly(va, nr);
+}
 
+void make_pages_writable(void *va, unsigned nr)
+{
 	while (nr-- != 0) {
-		make_mmu_page_readonly(va);
+		make_page_writable(va);
 		va = (void*)((unsigned long)va + PAGE_SIZE);
 	}
 }
@@ -150,10 +170,7 @@ void make_mmu_pages_writable(void *va, unsigned nr)
 {
 	if (xen_feature(writable_mmu_structures))
 		return;
-	while (nr-- != 0) {
-		make_mmu_page_writable(va);
-		va = (void*)((unsigned long)va + PAGE_SIZE);
-	}
+	make_pages_writable(va, nr);
 }
 
 /*
