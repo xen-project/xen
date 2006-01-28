@@ -201,6 +201,7 @@ int xc_memory_op(int xc_handle,
     {
     case XENMEM_increase_reservation:
     case XENMEM_decrease_reservation:
+    case XENMEM_populate_physmap:
         if ( mlock(reservation, sizeof(*reservation)) != 0 )
         {
             PERROR("Could not mlock");
@@ -229,6 +230,13 @@ int xc_memory_op(int xc_handle,
             goto out1;
         }
         break;
+    case XENMEM_reserved_phys_area:
+        if ( mlock(arg, sizeof(struct xen_reserved_phys_area)) )
+        {
+            PERROR("Could not mlock");
+            goto out1;
+        }
+        break;
     }
 
     ret = do_xen_hypercall(xc_handle, &hypercall);
@@ -237,6 +245,7 @@ int xc_memory_op(int xc_handle,
     {
     case XENMEM_increase_reservation:
     case XENMEM_decrease_reservation:
+    case XENMEM_populate_physmap:
         safe_munlock(reservation, sizeof(*reservation));
         if ( reservation->extent_start != NULL )
             safe_munlock(reservation->extent_start,
@@ -246,6 +255,9 @@ int xc_memory_op(int xc_handle,
         safe_munlock(xmml, sizeof(*xmml));
         safe_munlock(xmml->extent_start,
                      xmml->max_extents * sizeof(unsigned long));
+        break;
+    case XENMEM_reserved_phys_area:
+        safe_munlock(arg, sizeof(struct xen_reserved_phys_area));
         break;
     }
 

@@ -144,15 +144,6 @@
  * cmd: MMUEXT_SET_LDT
  * linear_addr: Linear address of LDT base (NB. must be page-aligned).
  * nr_ents: Number of entries in LDT.
- *
- * cmd: MMUEXT_PFN_HOLE_BASE
- * No additional arguments.  Returns the first pfn in the Xen-reserved
- * pfn hole.  Note that we delay allocating the hole until the first
- * time this is called.
- *
- * cmd: MMUEXT_PFN_HOLE_SIZE
- * No additional arguments.  Returns the number of pfns in the
- * Xen-reserved pfn hole.
  */
 #define MMUEXT_PIN_L1_TABLE      0
 #define MMUEXT_PIN_L2_TABLE      1
@@ -169,8 +160,6 @@
 #define MMUEXT_FLUSH_CACHE      12
 #define MMUEXT_SET_LDT          13
 #define MMUEXT_NEW_USER_BASEPTR 15
-#define MMUEXT_PFN_HOLE_BASE    16
-#define MMUEXT_PFN_HOLE_SIZE    17
 
 #ifndef __ASSEMBLY__
 struct mmuext_op {

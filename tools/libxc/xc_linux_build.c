@@ -114,9 +114,12 @@ static int setup_pg_tables(int xc_handle, uint32_t dom,
             vl2e++;
         }
 
-        if (shadow_mode_enabled) {
+        if ( shadow_mode_enabled )
+        {
             *vl1e = (count << PAGE_SHIFT) | L1_PROT;
-        } else {
+        }
+        else
+        {
             *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
             if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) && 
                  (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) )
@@ -196,9 +199,12 @@ static int setup_pg_tables_pae(int xc_handle, uint32_t dom,
                 *vl2e++ = l1tab | L2_PROT;
         }
         
-        if (shadow_mode_enabled) {
+        if ( shadow_mode_enabled )
+        {
             *vl1e = (count << PAGE_SHIFT) | L1_PROT;
-        } else {
+        }
+        else
+        {
             *vl1e = ((uint64_t)page_array[count] << PAGE_SHIFT) | L1_PROT;
             if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) &&
                  (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) ) 
@@ -289,9 +295,12 @@ static int setup_pg_tables_64(int xc_handle, uint32_t dom,
             vl2e++;
         }
         
-        if (shadow_mode_enabled) {
+        if ( shadow_mode_enabled )
+        {
             *vl1e = (count << PAGE_SHIFT) | L1_PROT;
-        } else {
+        }
+        else
+        {
             *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
             if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) &&
                  (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) ) 
@@ -442,7 +451,9 @@ static int setup_guest(int xc_handle,
     {
         ctxt->initrd.start    = vinitrd_start;
         ctxt->initrd.size     = initrd_len;
-    } else {
+    }
+    else
+    {
         ctxt->initrd.start    = 0;
         ctxt->initrd.size     = 0;
     }
@@ -553,12 +564,15 @@ static int setup_guest(int xc_handle,
         if ( (v_end - vstack_end) < (512UL << 10) )
             v_end += 1UL << 22; /* Add extra 4MB to get >= 512kB padding. */
 #if defined(__i386__)
-        if (dsi.pae_kernel) {
+        if ( dsi.pae_kernel )
+        {
             /* FIXME: assumes one L2 pgtable @ 0xc0000000 */
             if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT_PAE)-1)) >> 
                    L2_PAGETABLE_SHIFT_PAE) + 2) <= nr_pt_pages )
                 break;
-        } else {
+        }
+        else
+        {
             if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT)-1)) >> 
                    L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
                 break;
@@ -676,23 +690,33 @@ static int setup_guest(int xc_handle,
     if ( xc_finish_mmu_updates(xc_handle, mmu) )
         goto error_out;
 
-    if (shadow_mode_enabled) {
+    if ( shadow_mode_enabled )
+    {
+        struct xen_reserved_phys_area xrpa;
+
         /* Enable shadow translate mode */
-        if (xc_shadow_control(xc_handle, dom,
-                              DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE,
-                              NULL, 0, NULL) < 0) {
+        if ( xc_shadow_control(xc_handle, dom,
+                               DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE,
+                               NULL, 0, NULL) < 0 )
+        {
             PERROR("Could not enable translation mode");
             goto error_out;
         }
 
         /* Find the shared info frame.  It's guaranteed to be at the
            start of the PFN hole. */
-        guest_shared_info_mfn = xc_get_pfn_hole_start(xc_handle, dom);
-        if (guest_shared_info_mfn <= 0) {
+        xrpa.domid = dom;
+        xrpa.idx   = 0;
+        rc = xc_memory_op(xc_handle, XENMEM_reserved_phys_area, &xrpa);
+        if ( rc != 0 )
+        {
             PERROR("Cannot find shared info pfn");
             goto error_out;
         }
-    } else {
+        guest_shared_info_mfn = xrpa.first_pfn;
+    }
+    else
+    {
         guest_shared_info_mfn = shared_info_frame;
     }
 
@@ -723,12 +747,16 @@ static int setup_guest(int xc_handle,
      * Pin down l2tab addr as page dir page - causes hypervisor to provide
      * correct protection for the page
      */
-    if (!shadow_mode_enabled) {
-        if (dsi.pae_kernel) {
+    if ( !shadow_mode_enabled )
+    {
+        if ( dsi.pae_kernel )
+        {
             if ( pin_table(xc_handle, MMUEXT_PIN_L3_TABLE,
                            ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
                 goto error_out;
-        } else {
+        }
+        else
+        {
             if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE,
                            ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
                 goto error_out;
@@ -751,10 +779,13 @@ static int setup_guest(int xc_handle,
     if ( xc_clear_domain_page(xc_handle, dom, *store_mfn) ||
          xc_clear_domain_page(xc_handle, dom, *console_mfn) )
         goto error_out;
-    if (shadow_mode_enabled) {
+    if ( shadow_mode_enabled )
+    {
         guest_store_mfn = (vstoreinfo_start-dsi.v_start) >> PAGE_SHIFT;
         guest_console_mfn = (vconsole_start-dsi.v_start) >> PAGE_SHIFT;
-    } else {
+    }
+    else
+    {
         guest_store_mfn = *store_mfn;
         guest_console_mfn = *console_mfn;
     }

@@ -94,6 +94,26 @@ typedef struct xen_machphys_mfn_list {
     unsigned int nr_extents;
 } xen_machphys_mfn_list_t;
 
+/*
+ * Returns the base and size of the specified reserved 'RAM hole' in the
+ * specified guest's pseudophysical address space.
+ * arg == addr of xen_reserved_phys_area_t.
+ */
+#define XENMEM_reserved_phys_area   7
+typedef struct xen_reserved_phys_area {
+    /* Which request to report about? */
+    domid_t domid;
+
+    /*
+     * Which reserved area to report? Out-of-range request reports
+     * -ESRCH. Currently no architecture will have more than one reserved area.
+     */
+    unsigned int idx;
+
+    /* Base and size of the specified reserved area. */
+    unsigned long first_pfn, nr_pfns;
+} xen_reserved_phys_area_t;
+
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 
 /*

@@ -182,7 +182,7 @@ void subarch_init_memory(struct domain *dom_xen)
     }
 }
 
-long arch_memory_op(int op, void *arg)
+long subarch_memory_op(int op, void *arg)
 {
     struct xen_machphys_mfn_list xmml;
     l3_pgentry_t l3e;

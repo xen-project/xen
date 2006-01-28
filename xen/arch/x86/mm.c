@@ -104,6 +104,7 @@
 #include <asm/uaccess.h>
 #include <asm/ldt.h>
 #include <asm/x86_emulate.h>
+#include <public/memory.h>
 
 #ifdef VERBOSE
 #define MEM_LOG(_f, _a...)                           \
@@ -1930,56 +1931,6 @@ int do_mmuext_op(
             break;
         }
 
-        case MMUEXT_PFN_HOLE_BASE:
-        {
-            if (FOREIGNDOM->start_pfn_hole) {
-                rc = FOREIGNDOM->start_pfn_hole;
-                okay = 1;
-            } else {
-                rc = FOREIGNDOM->start_pfn_hole =
-                    FOREIGNDOM->max_pages;
-                okay = 1;
-                if (shadow_mode_translate(FOREIGNDOM)) {
-                    /* Fill in a few entries in the hole.  At the
-                       moment, this means the shared info page and the
-                       grant table pages. */
-                    struct domain_mmap_cache c1, c2;
-                    unsigned long pfn, mfn, x;
-                    domain_mmap_cache_init(&c1);
-                    domain_mmap_cache_init(&c2);
-                    shadow_lock(FOREIGNDOM);
-                    pfn = FOREIGNDOM->start_pfn_hole;
-                    mfn = virt_to_phys(FOREIGNDOM->shared_info) >> PAGE_SHIFT;
-                    set_p2m_entry(FOREIGNDOM, pfn, mfn, &c1, &c2);
-                    set_pfn_from_mfn(mfn, pfn);
-                    pfn++;
-                    for (x = 0; x < NR_GRANT_FRAMES; x++) {
-                        mfn = gnttab_shared_mfn(FOREIGNDOM,
-                                                FOREIGNDOM->grant_table,
-                                                x);
-                        set_p2m_entry(FOREIGNDOM, pfn, mfn, &c1, &c2);
-                        set_pfn_from_mfn(mfn, pfn);
-                        pfn++;
-                    }
-                    shadow_unlock(FOREIGNDOM);
-                    domain_mmap_cache_destroy(&c1);
-                    domain_mmap_cache_destroy(&c2);
-                }
-            }
-            break;
-        }
-
-        case MMUEXT_PFN_HOLE_SIZE:
-        {
-            if (shadow_mode_translate(FOREIGNDOM)) {
-                rc = PFN_HOLE_SIZE;
-            } else {
-                rc = 0;
-            }
-            okay = 1;
-            break;
-        }
-
         default:
             MEM_LOG("Invalid extended pt command 0x%x", op.cmd);
             okay = 0;
@@ -2814,6 +2765,62 @@ long do_update_descriptor(u64 pa, u64 desc)
     return ret;
 }
 
+
+long arch_memory_op(int op, void *arg)
+{
+    struct xen_reserved_phys_area xrpa;
+    unsigned long pfn;
+    struct domain *d;
+    unsigned int i;
+
+    switch ( op )
+    {
+    case XENMEM_reserved_phys_area:
+        if ( copy_from_user(&xrpa, arg, sizeof(xrpa)) )
+            return -EFAULT;
+
+        /* No guest has more than one reserved area. */
+        if ( xrpa.idx != 0 )
+            return -ESRCH;
+
+        if ( (d = find_domain_by_id(xrpa.domid)) == NULL )
+            return -ESRCH;
+
+        /* Only initialised translated guests have a reserved area. */
+        if ( !shadow_mode_translate(d) || (d->max_pages == 0) )
+        {
+            put_domain(d);
+            return -ESRCH;
+        }
+
+        LOCK_BIGLOCK(d);
+        if ( d->arch.first_reserved_pfn == 0 )
+        {
+            d->arch.first_reserved_pfn = pfn = d->max_pages;
+            guest_physmap_add_page(
+                d, pfn + 0, virt_to_phys(d->shared_info) >> PAGE_SHIFT);
+            for ( i = 0; i < NR_GRANT_FRAMES; i++ )
+                guest_physmap_add_page(
+                    d, pfn + 1 + i, gnttab_shared_mfn(d, d->grant_table, i));
+        }
+        UNLOCK_BIGLOCK(d);
+
+        xrpa.first_pfn = d->arch.first_reserved_pfn;
+        xrpa.nr_pfns   = 32;
+
+        put_domain(d);
+
+        if ( copy_to_user(arg, &xrpa, sizeof(xrpa)) )
+            return -EFAULT;
+
+        break;
+
+    default:
+        return subarch_memory_op(op, arg);
+    }
+
+    return 0;
+}
 
 
 /*************************
