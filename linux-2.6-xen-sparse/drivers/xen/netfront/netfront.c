@@ -586,8 +586,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 		BUG_ON((signed short)ref < 0);
 		np->grant_rx_ref[id] = ref;
 		gnttab_grant_foreign_transfer_ref(ref,
-						  np->xbdev->otherend_id,
-						  __pa(skb->head) >> PAGE_SHIFT);
+						  np->xbdev->otherend_id);
 		RING_GET_REQUEST(&np->rx, req_prod + i)->gref = ref;
 		rx_pfn_array[i] = virt_to_mfn(skb->head);
 
@@ -803,11 +802,9 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		np->stats.rx_bytes += rx->status;
 
 		/* Remap the page. */
-#ifndef CONFIG_XEN_SHADOW_MODE
 		mmu->ptr = ((maddr_t)mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
 		mmu->val  = __pa(skb->head) >> PAGE_SHIFT;
 		mmu++;
-#endif
 		MULTI_update_va_mapping(mcl, (unsigned long)skb->head,
 					pfn_pte_ma(mfn, PAGE_KERNEL), 0);
 		mcl++;
@@ -1002,8 +999,7 @@ static void network_connect(struct net_device *dev)
 		if ((unsigned long)np->rx_skbs[i] < __PAGE_OFFSET)
 			continue;
 		gnttab_grant_foreign_transfer_ref(
-			np->grant_rx_ref[i], np->xbdev->otherend_id,
-			__pa(np->rx_skbs[i]->data) >> PAGE_SHIFT);
+			np->grant_rx_ref[i], np->xbdev->otherend_id);
 		RING_GET_REQUEST(&np->rx, requeue_idx)->gref =
 			np->grant_rx_ref[i];
 		RING_GET_REQUEST(&np->rx, requeue_idx)->id = i;

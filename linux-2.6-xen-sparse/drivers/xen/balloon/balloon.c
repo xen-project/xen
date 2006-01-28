@@ -107,22 +107,9 @@ static struct timer_list balloon_timer;
 #define WPRINTK(fmt, args...) \
 	printk(KERN_WARNING "xen_mem: " fmt, ##args)
 
-static int page_is_xen_hole(unsigned long pfn)
-{
-	static unsigned long hole_start, hole_len = -1;
-	if (hole_len == -1) {
-		hole_start = xen_pfn_hole_start();
-		hole_len = xen_pfn_hole_size();
-	}
-	return pfn >= hole_start && pfn < hole_start + hole_len;
-}
-
 /* balloon_append: add the given page to the balloon. */
 static void balloon_append(struct page *page)
 {
-	if (page_is_xen_hole(page_to_pfn(page)))
-		panic("Attempt to add Xen-reserved pfn %lx to balloon.\n",
-		       page_to_pfn(page));
 	/* Lowmem is re-populated first, so highmem pages go at list tail. */
 	if (PageHighMem(page)) {
 		list_add_tail(PAGE_TO_LIST(page), &ballooned_pages);
@@ -204,7 +191,6 @@ static int increase_reservation(unsigned long nr_pages)
 	for (i = 0; i < nr_pages; i++) {
 		BUG_ON(page == NULL);
 		frame_list[i] = page_to_pfn(page);;
-		BUG_ON(page_is_xen_hole(frame_list[i]));
 		page = balloon_next_page(page);
 	}
 
@@ -229,15 +215,12 @@ static int increase_reservation(unsigned long nr_pages)
 		BUG_ON(page == NULL);
 
 		pfn = page_to_pfn(page);
-#ifndef CONFIG_XEN_SHADOW_MODE
-		/* In shadow mode, Xen handles this part for us. */
 		BUG_ON(phys_to_machine_mapping_valid(pfn));
 
 		/* Update P->M and M->P tables. */
 		set_phys_to_machine(pfn, frame_list[i]);
 		xen_machphys_update(frame_list[i], pfn);
-#endif
-
+            
 		/* Link back into the page tables if not highmem. */
 		if (pfn < max_low_pfn) {
 			int ret;

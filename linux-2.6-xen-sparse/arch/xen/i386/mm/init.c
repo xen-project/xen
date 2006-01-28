@@ -597,7 +597,6 @@ void __init mem_init(void)
 	int tmp;
 	int bad_ppro;
 	unsigned long pfn;
-        unsigned long hole_start, hole_size;
 
 	contiguous_bitmap = alloc_bootmem_low_pages(
 		(max_low_pfn + 2*BITS_PER_LONG) >> 3);
@@ -644,12 +643,6 @@ void __init mem_init(void)
 		set_page_count(&mem_map[pfn], 1);
 		totalram_pages++;
 	}
-
-        /* Make the Xen hole reserved. */
-        hole_size = xen_pfn_hole_size();
-        hole_start = xen_pfn_hole_start();
-        for (pfn = hole_start; pfn < hole_start + hole_size; pfn++)
-                SetPageReserved(pfn_to_page(pfn));
 
 	reservedpages = 0;
 	for (tmp = 0; tmp < max_low_pfn; tmp++)

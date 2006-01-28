@@ -412,12 +412,6 @@ do {				  					\
 	ptep_set_access_flags(__vma, __address, __ptep, __entry, 1);	\
 } while (0)
 
-void make_lowmem_page_readonly(void *va);
-void make_lowmem_page_writable(void *va);
-void make_page_readonly(void *va);
-void make_page_writable(void *va);
-void make_pages_readonly(void *va, unsigned int nr);
-void make_pages_writable(void *va, unsigned int nr);
 #ifndef CONFIG_XEN_SHADOW_MODE
 void make_lowmem_mmu_page_readonly(void *va);
 void make_lowmem_mmu_page_writable(void *va);

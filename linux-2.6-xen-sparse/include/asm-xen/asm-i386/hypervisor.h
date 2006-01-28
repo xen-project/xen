@@ -101,9 +101,6 @@ void xen_pte_unpin(unsigned long ptr);
 void xen_set_ldt(unsigned long ptr, unsigned long bytes);
 void xen_machphys_update(unsigned long mfn, unsigned long pfn);
 
-unsigned long xen_pfn_hole_start(void);
-unsigned long xen_pfn_hole_size(void);
-
 #ifdef CONFIG_SMP
 #include <linux/cpumask.h>
 void xen_tlb_flush_all(void);

@@ -74,7 +74,6 @@ static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
 #endif
 
 
-#ifndef CONFIG_XEN_SHADOW_MODE
 static int __do_suspend(void *ignore)
 {
 	int i, j, k, fpp;
@@ -217,13 +216,6 @@ static int __do_suspend(void *ignore)
 
 	return err;
 }
-#else
-static int __do_suspend(void *ignore)
-{
-	printk(KERN_WARNING "Don't do suspend in shadow mode\n");
-	return -EOPNOTSUPP;
-}
-#endif
 
 static int shutdown_process(void *__unused)
 {

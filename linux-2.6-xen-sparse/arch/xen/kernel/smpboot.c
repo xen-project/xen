@@ -239,7 +239,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		memcpy((void *)cpu_gdt_descr[cpu].address,
 		       (void *)cpu_gdt_descr[0].address,
 		       cpu_gdt_descr[0].size);
-		make_page_readonly((void *)cpu_gdt_descr[cpu].address);
+		make_mmu_page_readonly((void *)cpu_gdt_descr[cpu].address);
 
 		cpu_set(cpu, cpu_possible_map);
 #ifdef CONFIG_HOTPLUG_CPU

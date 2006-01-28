@@ -113,20 +113,6 @@ void xen_pt_switch(unsigned long ptr)
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
-unsigned long xen_pfn_hole_start(void)
-{
-	struct mmuext_op op;
-	op.cmd = MMUEXT_PFN_HOLE_BASE;
-	return HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF);
-}
-
-unsigned long xen_pfn_hole_size(void)
-{
-	struct mmuext_op op;
-	op.cmd = MMUEXT_PFN_HOLE_SIZE;
-	return HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF);
-}
-
 void xen_new_user_pt(unsigned long ptr)
 {
 	struct mmuext_op op;
@@ -279,7 +265,6 @@ void xen_set_ldt(unsigned long ptr, unsigned long len)
  */
 unsigned long *contiguous_bitmap;
 
-#ifndef CONFIG_XEN_SHADOW_MODE
 static void contiguous_bitmap_set(
 	unsigned long first_page, unsigned long nr_pages)
 {
@@ -452,19 +437,6 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 
 	balloon_unlock(flags);
 }
-#else
-int xen_create_contiguous_region(
-       unsigned long vstat, unsigned int order, unsigned int address_bits)
-{
-       if (order >= 1)
-               BUG();
-       return 0;
-}
-
-void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
-{
-}
-#endif
 
 #ifdef __i386__
 int write_ldt_entry(void *ldt, int entry, __u32 entry_a, __u32 entry_b)

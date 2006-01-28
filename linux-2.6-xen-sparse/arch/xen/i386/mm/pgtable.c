@@ -389,11 +389,14 @@ void pgd_free(pgd_t *pgd)
 	kmem_cache_free(pgd_cache, pgd);
 }
 
-
-void make_lowmem_page_readonly(void *va)
+#ifndef CONFIG_XEN_SHADOW_MODE
+void make_lowmem_mmu_page_readonly(void *va)
 {
 	pte_t *pte;
 	int rc;
+
+	if (xen_feature(writable_mmu_structures))
+		return;
 
 	pte = virt_to_ptep(va);
 	rc = HYPERVISOR_update_va_mapping(
@@ -401,10 +404,13 @@ void make_lowmem_page_readonly(void *va)
 	BUG_ON(rc);
 }
 
-void make_lowmem_page_writable(void *va)
+void make_lowmem_mmu_page_writable(void *va)
 {
 	pte_t *pte;
 	int rc;
+
+	if (xen_feature(writable_mmu_structures))
+		return;
 
 	pte = virt_to_ptep(va);
 	rc = HYPERVISOR_update_va_mapping(
@@ -412,11 +418,13 @@ void make_lowmem_page_writable(void *va)
 	BUG_ON(rc);
 }
 
-
-void make_page_readonly(void *va)
+void make_mmu_page_readonly(void *va)
 {
 	pte_t *pte;
 	int rc;
+
+	if (xen_feature(writable_mmu_structures))
+		return;
 
 	pte = virt_to_ptep(va);
 	rc = HYPERVISOR_update_va_mapping(
@@ -430,15 +438,18 @@ void make_page_readonly(void *va)
 			kmap_flush_unused(); /* flush stale writable kmaps */
 		else
 #endif
-			make_lowmem_page_readonly(
+			make_lowmem_mmu_page_readonly(
 				phys_to_virt(pfn << PAGE_SHIFT)); 
 	}
 }
 
-void make_page_writable(void *va)
+void make_mmu_page_writable(void *va)
 {
 	pte_t *pte;
 	int rc;
+
+	if (xen_feature(writable_mmu_structures))
+		return;
 
 	pte = virt_to_ptep(va);
 	rc = HYPERVISOR_update_va_mapping(
@@ -450,70 +461,32 @@ void make_page_writable(void *va)
 #ifdef CONFIG_HIGHMEM
 		if (pfn < highstart_pfn)
 #endif
-			make_lowmem_page_writable(
+			make_lowmem_mmu_page_writable(
 				phys_to_virt(pfn << PAGE_SHIFT)); 
 	}
-}
-
-void make_pages_readonly(void *va, unsigned nr)
-{
-	while (nr-- != 0) {
-		make_page_readonly(va);
-		va = (void *)((unsigned long)va + PAGE_SIZE);
-	}
-}
-
-void make_pages_writable(void *va, unsigned nr)
-{
-	while (nr-- != 0) {
-		make_page_writable(va);
-		va = (void *)((unsigned long)va + PAGE_SIZE);
-	}
-}
-
-#ifndef CONFIG_XEN_SHADOW_MODE
-void make_lowmem_mmu_page_readonly(void *va)
-{
-	if (xen_feature(writable_mmu_structures))
-		return;
-	make_lowmem_page_readonly(va);
-}
-
-void make_lowmem_mmu_page_writable(void *va)
-{
-	if (xen_feature(writable_mmu_structures))
-		return;
-	make_lowmem_page_writable(va);
-}
-
-void make_mmu_page_readonly(void *va)
-{
-	if (xen_feature(writable_mmu_structures))
-		return;
-	make_page_readonly(va);
-}
-
-void make_mmu_page_writable(void *va)
-{
-	if (xen_feature(writable_mmu_structures))
-		return;
-	make_page_writable(va);
 }
 
 void make_mmu_pages_readonly(void *va, unsigned int nr)
 {
 	if (xen_feature(writable_mmu_structures))
 		return;
-	make_pages_readonly(va, nr);
+
+	while (nr-- != 0) {
+		make_mmu_page_readonly(va);
+		va = (void *)((unsigned long)va + PAGE_SIZE);
+	}
 }
 
 void make_mmu_pages_writable(void *va, unsigned int nr)
 {
 	if (xen_feature(writable_mmu_structures))
 		return;
-	make_pages_writable(va, nr);
+	while (nr-- != 0) {
+		make_mmu_page_writable(va);
+		va = (void *)((unsigned long)va + PAGE_SIZE);
+	}
 }
-#endif
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
 static inline void pgd_walk_set_prot(void *pt, pgprot_t flags)
 {
@@ -564,8 +537,7 @@ static void pgd_walk(pgd_t *pgd_base, pgprot_t flags)
 
 static void __pgd_pin(pgd_t *pgd)
 {
-	if (!xen_feature(writable_mmu_structures))
-		pgd_walk(pgd, PAGE_KERNEL_RO);
+	pgd_walk(pgd, PAGE_KERNEL_RO);
 	xen_pgd_pin(__pa(pgd));
 	set_bit(PG_pinned, &virt_to_page(pgd)->flags);
 }
@@ -573,8 +545,7 @@ static void __pgd_pin(pgd_t *pgd)
 static void __pgd_unpin(pgd_t *pgd)
 {
 	xen_pgd_unpin(__pa(pgd));
-	if (!xen_feature(writable_mmu_structures))
-		pgd_walk(pgd, PAGE_KERNEL);
+	pgd_walk(pgd, PAGE_KERNEL);
 	clear_bit(PG_pinned, &virt_to_page(pgd)->flags);
 }
 
