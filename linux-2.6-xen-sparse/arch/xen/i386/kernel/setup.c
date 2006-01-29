@@ -68,6 +68,9 @@ static struct notifier_block xen_panic_block = {
 	xen_panic_event, NULL, 0 /* try to go last */
 };
 
+extern char hypercall_page[PAGE_SIZE];
+EXPORT_SYMBOL(hypercall_page);
+
 int disable_pse __initdata = 0;
 
 /*

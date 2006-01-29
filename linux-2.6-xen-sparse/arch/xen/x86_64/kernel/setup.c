@@ -75,6 +75,9 @@ extern struct edid_info edid_info;
 shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 EXPORT_SYMBOL(HYPERVISOR_shared_info);
 
+extern char hypercall_page[PAGE_SIZE];
+EXPORT_SYMBOL(hypercall_page);
+
 /* Allows setting of maximum possible memory size  */
 unsigned long xen_override_max_pfn;
 
