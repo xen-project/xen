@@ -20,6 +20,8 @@
 ###############################################################################
 function cleanup()
 {
+	umount "$MNT"
+	rm -Rf "$MNT";
 	if [ "$LOOPD" ]; then
 		losetup -d $LOOPD
 	fi
@@ -49,9 +51,21 @@ Command creates a vmx guest disk image for xm-test.
 Usage: $0 [OPTIONS]
 
 OPTIONS:
+    -d|--dvrdir <name>       Directory where to fine network driver 
+                             to use for disk image. 
     -i|--image <name>        Image name to create.
     -k|--kernel <name>       Kernel name to use for disk image.
     -r|--rootfs <image>      Rootfs image to use for disk image.
+
+This script currently only supports the pcnet32 driver for network
+tests. If a dvrdir isn't added on the command-line, it will look
+in /lib/modules/ directory relating to the supplied kernel. If the
+network driver is built into the kernel, you can specify the key word
+"builtin" with the -d option and the script will continue.
+
+Note: The pcnet32 driver relies upon mii.ko. This script will look
+for that module in the same location as the pcnet32 driver, either
+for the kernel or the location used with the -d option.
 
 EOU
 }
@@ -79,6 +93,7 @@ function initialize_globals()
 	PROGNAME="create_disk_image"
 	IMAGE="disk.img"
 	KERNEL=""
+	DRVDIR=""
 	LCONF="lilo.conf"
 	LOOPD=""    # Loop device for entire disk image
 	LOOPP=""    # Loop device for ext partition
@@ -96,6 +111,11 @@ function get_options()
 {
 	while [ $# -gt 0 ]; do
 		case $1 in
+			-d|--drvdir)
+				shift
+				DRVDIR=${1}
+				shift
+				;;
 			-i|--image)
 				shift
 				IMAGE=${1}
@@ -221,6 +241,36 @@ function copy_kernel_to_image()
 	cp "$KERNEL" "$MNT/boot"
 }
 
+function copy_netdriver_to_image()
+{
+	local kernel=`basename $KERNEL`
+	local kversion=$( echo $kernel | sed 's/^vmlinuz-//' )
+	local fdir="/lib/modules/$kversion/kernel/drivers/net"
+                                                                                
+	mkdir "$MNT/lib/modules"
+	if [ -e "$DRVDIR" ]; then
+		if [ -e "$DRVDIR/pcnet32.ko" ]; then
+			cp $DRVDIR/mii.ko $MNT/lib/modules
+			cp $DRVDIR/pcnet32.ko $MNT/lib/modules
+		else
+			die "Failed to find pcnet32.ko at $DRVDIR."
+		fi
+	elif [ -e "$fdir/pcnet32.ko" ]; then
+		cp $fdir/mii.ko $MNT/lib/modules
+		cp $fdir/pcnet32.ko $MNT/lib/modules
+	else
+		die "Xm-test requires the pcnet32 driver to run."
+	fi
+
+	# Make sure that modules will be installed
+	if [ -e "$MNT/etc/init.d/rcS" ]; then
+		echo "insmod /lib/modules/mii.ko" >> $MNT/etc/init.d/rcS
+		echo "insmod /lib/modules/pcnet32.ko" >> $MNT/etc/init.d/rcS
+	else
+		die "Failed to add insmod command to rcS file on image."
+	fi
+}
+
 function lilo_image()
 {
 	local kernel=`basename $KERNEL`
@@ -303,6 +353,9 @@ if [ $? -ne 0 ]; then
 fi
 
 copy_kernel_to_image
+if [ ! "$DRVDIR" = "builtin" ]; then
+	copy_netdriver_to_image
+fi
 #add_getty_to_inittab
 
 lilo_image

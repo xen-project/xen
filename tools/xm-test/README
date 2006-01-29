@@ -55,6 +55,10 @@ you should not attempt to use a ramdisk from a previous minor version
 of xm-test (i.e., don't use a ramdisk from 0.4.0 with 0.5.0.  0.5.0
 should work for 0.5.3 though)
 
+
+BUILDING with HVM Support
+=========================
+
 If you'd like to build and run this with hardware virtual machine assist
 (HVM) support to test fully virtualized disk images on VMX hardware, 
 please add the --enable-vmx-support option to configure:
@@ -80,6 +84,20 @@ with the "--with-vmx-kernel=KERNEL" option:
 
 Otherwise, you can always rerun the create script using the -k option
 to use a specific kernel. 
+
+The disk.img created for HVM testing must contain a pcnet32 driver for
+network tests. The ramdisk/bin/create_disk_image script will, by default,
+look in the /lib/modules directory associated with the kernel being
+used. If you'd like to specify a different location for the driver or
+want to tell the script that the driver is built into the kernel, please
+use the "--with-driver-dir=DRVDIR" configure option. If built into
+the kernel, please use the key word "builtin" with the option:
+
+# ./autogen
+# ./configure --enable-vmx-support --with-driver-dir=builtin
+- or -
+# ./configure --enable-vmx-support --with-driver-dir=/driver/directory
+# make
 
 Xm-test will look for disk.img in the ramdisk directory when run by 
 default.

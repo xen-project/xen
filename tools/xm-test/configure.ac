@@ -46,6 +46,14 @@ AC_ARG_WITH(vmx-kernel,
 dnl substitute @VMXKERNEL@ in all Makefiles
 AC_SUBST(VMXKERNEL)
 
+AC_ARG_WITH(driver-dir,
+	[[  --with-driver-dir=drvdir       Look in this directory for the pcnet32 driver for the vmx disk.img. drvdir can equal key word "builtin" if driver is built into the kernel]],
+	DRVDIR=$withval,
+	DRVDIR="no")
+
+dnl substitute @DRVDIR@ in all Makefiles
+AC_SUBST(DRVDIR)
+
 AC_SUBST(TENV)
 AC_SUBST(PACKAGE_VERSION)
 

@@ -45,10 +45,15 @@ initrd.img: $(XMTEST_VER_IMG)
 
 disk.img: $(XMTEST_VER_IMG)
 	chmod a+x $(VMX_SCRIPT)
-	@if test "$(VMXKERNEL)" = "no" ; then \
-		$(VMX_SCRIPT) -r $(XMTEST_VER_IMG); \
-	else \
+	@if test ! "$(VMXKERNEL)" = "no" -a ! "$(DRVDIR)" = "no"; then \
+		$(VMX_SCRIPT) -r $(XMTEST_VER_IMG) -k $(VMXKERNEL) \
+			-d $(DRVDIR); \
+	elif test "$(VMXKERNEL)" = "no" -a ! "$(DRVDIR)" = "no"; then \
+		$(VMX_SCRIPT) -r $(XMTEST_VER_IMG) -d $(DRVDIR); \
+	elif test ! "$(VMXKERNEL)" = "no" -a "$(DRVDIR)" = "no"; then \
 		$(VMX_SCRIPT) -r $(XMTEST_VER_IMG) -k $(VMXKERNEL); \
+	else \
+		$(VMX_SCRIPT) -r $(XMTEST_VER_IMG); \
 	fi
 
 existing:
