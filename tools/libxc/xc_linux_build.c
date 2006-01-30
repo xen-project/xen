@@ -654,6 +654,60 @@ static int setup_guest(int xc_handle,
         }
     }
 
+    /* setup page tables */
+#if defined(__i386__)
+    if (dsi.pae_kernel)
+        rc = setup_pg_tables_pae(xc_handle, dom, ctxt,
+                                 dsi.v_start, v_end,
+                                 page_array, vpt_start, vpt_end,
+                                 shadow_mode_enabled);
+    else
+        rc = setup_pg_tables(xc_handle, dom, ctxt,
+                             dsi.v_start, v_end,
+                             page_array, vpt_start, vpt_end,
+                             shadow_mode_enabled);
+#endif
+#if defined(__x86_64__)
+    rc = setup_pg_tables_64(xc_handle, dom, ctxt,
+                            dsi.v_start, v_end,
+                            page_array, vpt_start, vpt_end,
+                            shadow_mode_enabled);
+#endif
+    if (0 != rc)
+        goto error_out;
+
+#if defined(__i386__)
+    /*
+     * Pin down l2tab addr as page dir page - causes hypervisor to provide
+     * correct protection for the page
+     */
+    if ( !shadow_mode_enabled )
+    {
+        if ( dsi.pae_kernel )
+        {
+            if ( pin_table(xc_handle, MMUEXT_PIN_L3_TABLE,
+                           ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
+                goto error_out;
+        }
+        else
+        {
+            if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE,
+                           ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
+                goto error_out;
+        }
+    }
+#endif
+
+#if defined(__x86_64__)
+    /*
+     * Pin down l4tab addr as page dir page - causes hypervisor to  provide
+     * correct protection for the page
+     */
+    if ( pin_table(xc_handle, MMUEXT_PIN_L4_TABLE,
+                   ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
+        goto error_out;
+#endif
+
     if ( (mmu = xc_init_mmu_updates(xc_handle, dom)) == NULL )
         goto error_out;
 
@@ -719,60 +773,6 @@ static int setup_guest(int xc_handle,
     {
         guest_shared_info_mfn = shared_info_frame;
     }
-
-    /* setup page tables */
-#if defined(__i386__)
-    if (dsi.pae_kernel)
-        rc = setup_pg_tables_pae(xc_handle, dom, ctxt,
-                                 dsi.v_start, v_end,
-                                 page_array, vpt_start, vpt_end,
-                                 shadow_mode_enabled);
-    else
-        rc = setup_pg_tables(xc_handle, dom, ctxt,
-                             dsi.v_start, v_end,
-                             page_array, vpt_start, vpt_end,
-                             shadow_mode_enabled);
-#endif
-#if defined(__x86_64__)
-    rc = setup_pg_tables_64(xc_handle, dom, ctxt,
-                            dsi.v_start, v_end,
-                            page_array, vpt_start, vpt_end,
-                            shadow_mode_enabled);
-#endif
-    if (0 != rc)
-        goto error_out;
-
-#if defined(__i386__)
-    /*
-     * Pin down l2tab addr as page dir page - causes hypervisor to provide
-     * correct protection for the page
-     */
-    if ( !shadow_mode_enabled )
-    {
-        if ( dsi.pae_kernel )
-        {
-            if ( pin_table(xc_handle, MMUEXT_PIN_L3_TABLE,
-                           ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
-                goto error_out;
-        }
-        else
-        {
-            if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE,
-                           ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
-                goto error_out;
-        }
-    }
-#endif
-
-#if defined(__x86_64__)
-    /*
-     * Pin down l4tab addr as page dir page - causes hypervisor to  provide
-     * correct protection for the page
-     */
-    if ( pin_table(xc_handle, MMUEXT_PIN_L4_TABLE,
-                   ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
-        goto error_out;
-#endif
 
     *store_mfn = page_array[(vstoreinfo_start-dsi.v_start) >> PAGE_SHIFT];
     *console_mfn = page_array[(vconsole_start-dsi.v_start) >> PAGE_SHIFT];
