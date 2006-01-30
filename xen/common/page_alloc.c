@@ -215,8 +215,6 @@ unsigned long alloc_boot_pages(unsigned long nr_pfns, unsigned long pfn_align)
 #define MEMZONE_DMADOM 2
 #define NR_ZONES    3
 
-
-#define MAX_DMADOM_PFN 0x7FFFFUL /* 31 addressable bits */
 #define pfn_dom_zone_type(_pfn)                                 \
     (((_pfn) <= MAX_DMADOM_PFN) ? MEMZONE_DMADOM : MEMZONE_DOM)
 
