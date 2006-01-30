@@ -21,13 +21,15 @@
  */
 #include <xen/config.h>
 #include <xen/sched.h>
+#include <xen/hypercall.h>
+#include <public/sched.h>
 #include <public/hvm/ioreq.h>
 #include <asm/vmx.h>
 #include <asm/vmx_vcpu.h>
 
 /*
  * I/O emulation should be atomic from domain point of view. However,
- * when emulation code is waiting for I/O completion by do_block,
+ * when emulation code is waiting for I/O completion by blocking,
  * other events like DM interrupt, VBD, etc. may come and unblock
  * current exection flow. So we have to prepare for re-block if unblocked
  * by non I/O completion event.
@@ -36,13 +38,12 @@ void vmx_wait_io(void)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
-    extern void do_block();
     int port = iopacket_port(d);
 
     do {
 	if (!test_bit(port,
 		&d->shared_info->evtchn_pending[0]))
-	    do_block();
+            do_sched_op(SCHEDOP_block, 0);
 
 	/* Unblocked when some event is coming. Clear pending indication
 	 * immediately if deciding to go for io assist
@@ -100,7 +101,7 @@ void vmx_io_assist(struct vcpu *v)
 
     if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags)) {
 	if (p->state != STATE_IORESP_READY) {
-	    /* Can't do_block here, for the same reason as other places to
+	    /* Can't block here, for the same reason as other places to
 	     * use vmx_wait_io. Simple return is safe since vmx_wait_io will
 	     * try to block again
 	     */

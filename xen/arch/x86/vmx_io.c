@@ -24,7 +24,7 @@
 #include <xen/errno.h>
 #include <xen/trace.h>
 #include <xen/event.h>
-
+#include <xen/hypercall.h>
 #include <asm/current.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -37,6 +37,7 @@
 #include <asm/shadow.h>
 #include <asm/vmx_vpic.h>
 #include <asm/vmx_vlapic.h>
+#include <public/sched.h>
 #include <public/hvm/ioreq.h>
 
 #ifdef CONFIG_VMX
@@ -756,12 +757,11 @@ void vmx_check_events(struct vcpu *v)
    the device model */
 void vmx_wait_io()
 {
-    extern void do_block();
     int port = iopacket_port(current->domain);
 
     do {
         if (!test_bit(port, &current->domain->shared_info->evtchn_pending[0]))
-            do_block();
+            do_sched_op(SCHEDOP_block, 0);
 
         vmx_check_events(current);
         if (!test_bit(ARCH_VMX_IO_WAIT, &current->arch.arch_vmx.flags))

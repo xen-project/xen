@@ -8,6 +8,7 @@
 
 #include <xen/config.h>
 #include <xen/sched.h>
+#include <xen/hypercall.h>
 
 #include <linux/efi.h>	/* FOR EFI_UNIMPLEMENTED */
 #include <asm/sal.h>	/* FOR struct ia64_sal_retval */
@@ -57,7 +58,7 @@ ia64_hypercall (struct pt_regs *regs)
 			}
 			else {
 				pal_halt_light_count++;
-				do_sched_op(SCHEDOP_yield);
+				do_sched_op(SCHEDOP_yield, 0);
 			}
 			regs->r8 = 0;
 			regs->r9 = 0;

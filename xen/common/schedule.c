@@ -209,7 +209,7 @@ int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */
-long do_block(void)
+static long do_block(void)
 {
     struct vcpu *v = current;
 

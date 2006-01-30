@@ -30,6 +30,7 @@
 #include <asm/page.h>
 #include <xen/mm.h>
 #include <xen/multicall.h>
+#include <xen/hypercall.h>
 
 
 void hyper_not_support(void)
@@ -118,9 +119,10 @@ void hyper_dom_mem_op(void)
 void hyper_sched_op(void)
 {
     VCPU *vcpu=current;
-    u64 r32,ret;
+    u64 r32,r33,ret;
     vcpu_get_gr_nat(vcpu,16,&r32);
-    ret=do_sched_op(r32);
+    vcpu_get_gr_nat(vcpu,17,&r33);
+    ret=do_sched_op(r32,r33);
     vcpu_set_gr(vcpu, 8, ret, 0);
 
     vmx_vcpu_increment_iip(vcpu);
@@ -150,9 +152,10 @@ void hyper_event_channel_op(void)
 void hyper_xen_version(void)
 {
     VCPU *vcpu=current;
-    u64 r32,ret;
+    u64 r32,r33,ret;
     vcpu_get_gr_nat(vcpu,16,&r32);
-    ret=do_xen_version((int )r32);
+    vcpu_get_gr_nat(vcpu,17,&r33);
+    ret=do_xen_version((int )r32,r33);
     vcpu_set_gr(vcpu, 8, ret, 0);
     vmx_vcpu_increment_iip(vcpu);
 }

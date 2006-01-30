@@ -25,6 +25,7 @@
 #include <xen/irq.h>
 #include <xen/softirq.h>
 #include <xen/domain_page.h>
+#include <xen/hypercall.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
@@ -328,7 +329,6 @@ static inline int  long_mode_do_msr_write(struct cpu_user_regs *regs){
 #endif
 
 extern long evtchn_send(int lport);
-extern long do_block(void);
 void do_nmi(struct cpu_user_regs *);
 
 static int check_vmx_controls(ctrls, msr)
@@ -1599,7 +1599,7 @@ void vmx_vmexit_do_hlt(void)
     }
     if ( next_wakeup != - 1 ) 
         set_timer(&current->arch.arch_vmx.hlt_timer, next_wakeup);
-    do_block();
+    do_sched_op(SCHEDOP_block, 0);
 }
 
 static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
@@ -1801,14 +1801,12 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         case TRAP_debug:
         {
             void store_cpu_user_regs(struct cpu_user_regs *regs);
-            long do_sched_op(unsigned long op);
-
 
             store_cpu_user_regs(&regs);
             __vm_clear_bit(GUEST_PENDING_DBG_EXCEPTIONS, PENDING_DEBUG_EXC_BS);
 
             domain_pause_for_debugger();
-            do_sched_op(SCHEDOP_yield);
+            do_sched_op(SCHEDOP_yield, 0);
 
             break;
         }
