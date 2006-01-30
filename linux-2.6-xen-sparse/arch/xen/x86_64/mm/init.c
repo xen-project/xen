@@ -519,13 +519,13 @@ void __init xen_init_pt(void)
 	early_make_page_readonly(init_level4_pgt,
 				 XENFEAT_writable_page_tables);
 	early_make_page_readonly(init_level4_user_pgt,
-				 XENFEAT_writable_page_tables));
+				 XENFEAT_writable_page_tables);
 	early_make_page_readonly(level3_kernel_pgt,
-				 XENFEAT_writable_page_tables));
+				 XENFEAT_writable_page_tables);
 	early_make_page_readonly(level3_user_pgt,
-				 XENFEAT_writable_page_tables));
+				 XENFEAT_writable_page_tables);
 	early_make_page_readonly(level2_kernel_pgt,
-				 XENFEAT_writable_page_tables));
+				 XENFEAT_writable_page_tables);
 
 	xen_pgd_pin(__pa_symbol(init_level4_pgt));
 	xen_pgd_pin(__pa_symbol(init_level4_user_pgt));
