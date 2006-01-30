@@ -7,7 +7,7 @@
  */
 
 #include "common.h"
-#include <asm-xen/xenbus.h>
+#include <xen/xenbus.h>
 
 #define vbd_sz(_v)   ((_v)->bdev->bd_part ?				\
 	(_v)->bdev->bd_part->nr_sects : (_v)->bdev->bd_disk->capacity)

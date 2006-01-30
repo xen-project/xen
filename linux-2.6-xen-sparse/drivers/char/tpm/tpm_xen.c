@@ -22,7 +22,7 @@
 
 #include <asm/uaccess.h>
 #include <linux/list.h>
-#include <asm-xen/tpmfe.h>
+#include <xen/tpmfe.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include "tpm.h"

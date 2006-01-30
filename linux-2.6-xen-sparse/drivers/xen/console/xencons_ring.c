@@ -14,13 +14,13 @@
 #include <linux/slab.h>
 
 #include <asm/hypervisor.h>
-#include <asm-xen/evtchn.h>
-#include <asm-xen/xencons.h>
+#include <xen/evtchn.h>
+#include <xen/xencons.h>
 #include <linux/wait.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/err.h>
-#include <asm-xen/xen-public/io/console.h>
+#include <xen/interface/io/console.h>
 
 static int xencons_irq;
 

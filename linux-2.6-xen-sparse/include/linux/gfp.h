@@ -77,12 +77,12 @@ struct vm_area_struct;
  * optimized to &contig_page_data at compile-time.
  */
 
+#ifndef HAVE_ARCH_FREE_PAGE
 /*
  * If arch_free_page returns non-zero then the generic free_page code can
  * immediately bail: the arch-specific function has done all the work.
  */
-#ifndef HAVE_ARCH_FREE_PAGE
-#define arch_free_page(page, order) 0
+static inline int arch_free_page(struct page *page, int order) { return 0; }
 #endif
 
 extern struct page *

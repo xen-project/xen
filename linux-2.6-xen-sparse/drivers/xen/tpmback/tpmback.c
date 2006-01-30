@@ -12,15 +12,15 @@
  */
 
 #include "common.h"
-#include <asm-xen/evtchn.h>
+#include <xen/evtchn.h>
 
 #include <linux/types.h>
 #include <linux/list.h>
 #include <linux/miscdevice.h>
 #include <linux/poll.h>
 #include <asm/uaccess.h>
-#include <asm-xen/xenbus.h>
-#include <asm-xen/xen-public/grant_table.h>
+#include <xen/xenbus.h>
+#include <xen/interface/grant_table.h>
 
 
 /* local data structures */

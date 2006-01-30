@@ -8,7 +8,7 @@
 
 #include <linux/kernel.h>
 #include <linux/spinlock.h>
-#include <asm-xen/balloon.h>
+#include <xen/balloon.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/mm.h>

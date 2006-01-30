@@ -38,7 +38,7 @@
 #include <linux/slab.h>
 #include <linux/fcntl.h>
 #include <linux/kthread.h>
-#include <asm-xen/xenbus.h>
+#include <xen/xenbus.h>
 #include "xenbus_comms.h"
 
 /* xenbus_probe.c */

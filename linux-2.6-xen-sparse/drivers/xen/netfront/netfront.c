@@ -51,16 +51,16 @@
 #include <net/route.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <asm-xen/evtchn.h>
-#include <asm-xen/xenbus.h>
-#include <asm-xen/xen-public/io/netif.h>
-#include <asm-xen/xen-public/memory.h>
-#include <asm-xen/balloon.h>
+#include <xen/evtchn.h>
+#include <xen/xenbus.h>
+#include <xen/interface/io/netif.h>
+#include <xen/interface/memory.h>
+#include <xen/balloon.h>
 #include <asm/page.h>
 #include <asm/uaccess.h>
-#include <asm-xen/xen-public/grant_table.h>
-#include <asm-xen/gnttab.h>
-#include <asm-xen/net_driver_util.h>
+#include <xen/interface/grant_table.h>
+#include <xen/gnttab.h>
+#include <xen/net_driver_util.h>
 
 #define GRANT_INVALID_REF	0
 

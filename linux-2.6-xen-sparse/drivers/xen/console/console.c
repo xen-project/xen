@@ -49,11 +49,11 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
-#include <asm-xen/xen-public/xen.h>
-#include <asm-xen/xen-public/event_channel.h>
+#include <xen/interface/xen.h>
+#include <xen/interface/event_channel.h>
 #include <asm/hypervisor.h>
-#include <asm-xen/evtchn.h>
-#include <asm-xen/xencons.h>
+#include <xen/evtchn.h>
+#include <xen/xencons.h>
 
 /*
  * Modes:

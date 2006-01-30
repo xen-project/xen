@@ -8,6 +8,6 @@ check:
 
 install:
 	mkdir -p $(DESTDIR)/usr/include/xen/linux
-	install -m0644 $(linuxsparsetree)/include/asm-xen/linux-public/*.h $(DESTDIR)/usr/include/xen/linux
+	install -m0644 $(linuxsparsetree)/include/xen/public/*.h $(DESTDIR)/usr/include/xen/linux
 
 clean:

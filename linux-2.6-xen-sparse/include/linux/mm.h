@@ -161,7 +161,9 @@ extern unsigned int kobjsize(const void *objp);
 #define VM_HUGETLB	0x00400000	/* Huge TLB Page VM */
 #define VM_NONLINEAR	0x00800000	/* Is non-linear (remap_file_pages) */
 #define VM_MAPPED_COPY	0x01000000	/* T if mapped copy of data (nommu mmap) */
+#ifdef CONFIG_XEN
 #define VM_FOREIGN	0x02000000	/* Has pages belonging to another VM */
+#endif
 
 #ifndef VM_STACK_DEFAULT_FLAGS		/* arch can override this */
 #define VM_STACK_DEFAULT_FLAGS VM_DATA_DEFAULT_FLAGS
@@ -817,12 +819,13 @@ extern int check_user_page_readable(struct mm_struct *mm, unsigned long address)
 int remap_pfn_range(struct vm_area_struct *, unsigned long,
 		unsigned long, unsigned long, pgprot_t);
 
+#ifdef CONFIG_XEN
 typedef int (*pte_fn_t)(pte_t *pte, struct page *pte_page, unsigned long addr, 
                         void *data);
 extern int generic_page_range(struct mm_struct *mm, unsigned long address, 
                               unsigned long size, pte_fn_t fn, void *data);
 
-
+#endif
 #ifdef CONFIG_PROC_FS
 void __vm_stat_account(struct mm_struct *, unsigned long, struct file *, long);
 #else

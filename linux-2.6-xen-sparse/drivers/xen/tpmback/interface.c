@@ -12,7 +12,7 @@
  */
 
 #include "common.h"
-#include <asm-xen/balloon.h>
+#include <xen/balloon.h>
 
 #define TPMIF_HASHSZ (2 << 5)
 #define TPMIF_HASH(_d,_h) (((int)(_d)^(int)(_h))&(TPMIF_HASHSZ-1))

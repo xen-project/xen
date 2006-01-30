@@ -27,9 +27,9 @@
  * IN THE SOFTWARE.
  */
 
-#include <asm-xen/evtchn.h>
-#include <asm-xen/gnttab.h>
-#include <asm-xen/xenbus.h>
+#include <xen/evtchn.h>
+#include <xen/gnttab.h>
+#include <xen/xenbus.h>
 
 /* xenbus_probe.c */
 extern char *kasprintf(const char *fmt, ...);

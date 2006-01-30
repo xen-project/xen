@@ -74,7 +74,9 @@ extern irq_desc_t irq_desc [NR_IRQS];
 #include <asm/hw_irq.h> /* the arch dependent stuff */
 
 extern int setup_irq(unsigned int irq, struct irqaction * new);
+#ifdef CONFIG_XEN
 extern int teardown_irq(unsigned int irq, struct irqaction * old);
+#endif
 
 #ifdef CONFIG_GENERIC_HARDIRQS
 extern cpumask_t irq_affinity[NR_IRQS];

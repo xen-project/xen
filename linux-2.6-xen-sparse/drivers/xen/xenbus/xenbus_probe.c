@@ -43,11 +43,11 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/hypervisor.h>
-#include <asm-xen/xenbus.h>
-#include <asm-xen/xen_proc.h>
-#include <asm-xen/balloon.h>
-#include <asm-xen/evtchn.h>
-#include <asm-xen/linux-public/evtchn.h>
+#include <xen/xenbus.h>
+#include <xen/xen_proc.h>
+#include <xen/balloon.h>
+#include <xen/evtchn.h>
+#include <xen/public/evtchn.h>
 
 #include "xenbus_comms.h"
 

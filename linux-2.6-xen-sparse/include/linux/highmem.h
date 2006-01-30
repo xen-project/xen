@@ -13,12 +13,16 @@
 
 /* declarations for linux/mm/highmem.c */
 unsigned int nr_free_highpages(void);
+#ifdef CONFIG_XEN
 void kmap_flush_unused(void);
+#endif
 
 #else /* CONFIG_HIGHMEM */
 
 static inline unsigned int nr_free_highpages(void) { return 0; }
+#ifdef CONFIG_XEN
 static inline void kmap_flush_unused(void) { }
+#endif
 
 static inline void *kmap(struct page *page)
 {

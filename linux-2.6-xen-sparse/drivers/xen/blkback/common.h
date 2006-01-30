@@ -12,12 +12,12 @@
 #include <asm/io.h>
 #include <asm/setup.h>
 #include <asm/pgalloc.h>
-#include <asm-xen/evtchn.h>
+#include <xen/evtchn.h>
 #include <asm/hypervisor.h>
-#include <asm-xen/xen-public/io/blkif.h>
-#include <asm-xen/xen-public/io/ring.h>
-#include <asm-xen/gnttab.h>
-#include <asm-xen/driver_util.h>
+#include <xen/interface/io/blkif.h>
+#include <xen/interface/io/ring.h>
+#include <xen/gnttab.h>
+#include <xen/driver_util.h>
 
 #define DPRINTK(_f, _a...) pr_debug("(file=%s, line=%d) " _f, \
                                     __FILE__ , __LINE__ , ## _a )

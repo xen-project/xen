@@ -45,8 +45,8 @@
 #include <linux/irq.h>
 #include <linux/init.h>
 #include <linux/gfp.h>
-#include <asm-xen/evtchn.h>
-#include <asm-xen/linux-public/evtchn.h>
+#include <xen/evtchn.h>
+#include <xen/public/evtchn.h>
 
 struct per_user_data {
 	/* Notification ring, accessed via /dev/xen/evtchn. */

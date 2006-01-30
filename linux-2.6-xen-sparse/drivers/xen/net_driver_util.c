@@ -30,7 +30,7 @@
 
 #include <linux/if_ether.h>
 #include <linux/err.h>
-#include <asm-xen/net_driver_util.h>
+#include <xen/net_driver_util.h>
 
 
 int xen_net_read_mac(struct xenbus_device *dev, u8 mac[])

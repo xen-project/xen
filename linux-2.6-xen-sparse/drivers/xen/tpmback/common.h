@@ -10,10 +10,10 @@
 #include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
-#include <asm-xen/evtchn.h>
-#include <asm-xen/driver_util.h>
-#include <asm-xen/xen-public/grant_table.h>
-#include <asm-xen/xen-public/io/tpmif.h>
+#include <xen/evtchn.h>
+#include <xen/driver_util.h>
+#include <xen/interface/grant_table.h>
+#include <xen/interface/io/tpmif.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 

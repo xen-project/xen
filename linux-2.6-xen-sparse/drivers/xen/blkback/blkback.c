@@ -14,7 +14,7 @@
 #include <linux/spinlock.h>
 #include <linux/kthread.h>
 #include <linux/list.h>
-#include <asm-xen/balloon.h>
+#include <xen/balloon.h>
 #include <asm/hypervisor.h>
 #include "common.h"
 

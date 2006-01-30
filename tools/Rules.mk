@@ -41,4 +41,4 @@ mk-symlinks:
 	( cd xen/io && ln -sf ../../$(XEN_ROOT)/xen/include/public/io/*.h . )
 	mkdir -p xen/linux
 	( cd xen/linux && \
-	  ln -sf ../../$(LINUX_ROOT)/include/asm-xen/linux-public/*.h . )
+	  ln -sf ../../$(LINUX_ROOT)/include/xen/public/*.h . )

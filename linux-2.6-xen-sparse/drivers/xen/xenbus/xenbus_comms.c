@@ -28,12 +28,12 @@
  */
 
 #include <asm/hypervisor.h>
-#include <asm-xen/evtchn.h>
+#include <xen/evtchn.h>
 #include <linux/wait.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/err.h>
-#include <asm-xen/xenbus.h>
+#include <xen/xenbus.h>
 #include "xenbus_comms.h"
 
 static int xenbus_irq;

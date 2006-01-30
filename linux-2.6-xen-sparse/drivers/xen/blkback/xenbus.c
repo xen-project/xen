@@ -21,7 +21,7 @@
 #include <stdarg.h>
 #include <linux/module.h>
 #include <linux/kthread.h>
-#include <asm-xen/xenbus.h>
+#include <xen/xenbus.h>
 #include "common.h"
 
 #undef DPRINTK

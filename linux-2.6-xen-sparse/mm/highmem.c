@@ -148,6 +148,7 @@ start:
 	return vaddr;
 }
 
+#ifdef CONFIG_XEN
 void kmap_flush_unused(void)
 {
 	spin_lock(&kmap_lock);
@@ -156,6 +157,7 @@ void kmap_flush_unused(void)
 }
 
 EXPORT_SYMBOL(kmap_flush_unused);
+#endif
 
 void fastcall *kmap_high(struct page *page)
 {

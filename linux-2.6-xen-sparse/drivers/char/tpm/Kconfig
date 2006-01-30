@@ -6,7 +6,7 @@ menu "TPM devices"
 
 config TCG_TPM
 	tristate "TPM Hardware Support"
-	depends on EXPERIMENTAL && PCI
+	depends on EXPERIMENTAL && (PCI || XEN)
 	---help---
 	  If you have a TPM security chip in your system, which
 	  implements the Trusted Computing Group's specification,
@@ -20,7 +20,7 @@ config TCG_TPM
 
 config TCG_NSC
 	tristate "National Semiconductor TPM Interface"
-	depends on TCG_TPM
+	depends on TCG_TPM && !XEN_UNPRIVILEGED_GUEST
 	---help---
 	  If you have a TPM security chip from National Semicondutor 
 	  say Yes and it will be accessible from within Linux.  To 
@@ -29,7 +29,7 @@ config TCG_NSC
 
 config TCG_ATMEL
 	tristate "Atmel TPM Interface"
-	depends on TCG_TPM
+	depends on TCG_TPM && !XEN_UNPRIVILEGED_GUEST
 	---help---
 	  If you have a TPM security chip from Atmel say Yes and it 
 	  will be accessible from within Linux.  To compile this driver 
@@ -37,7 +37,7 @@ config TCG_ATMEL
 
 config TCG_XEN
 	tristate "XEN TPM Interface"
-	depends on TCG_TPM && ARCH_XEN && XEN_TPMDEV_FRONTEND
+	depends on TCG_TPM && XEN && XEN_TPMDEV_FRONTEND
 	---help---
 	  If you want to make TPM support available to a Xen
 	  user domain, say Yes and it will

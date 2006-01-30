@@ -7,7 +7,7 @@
  */
 
 #include "common.h"
-#include <asm-xen/evtchn.h>
+#include <xen/evtchn.h>
 
 static kmem_cache_t *blkif_cachep;
 

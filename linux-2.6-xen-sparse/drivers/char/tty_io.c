@@ -2968,19 +2968,17 @@ static int __init tty_init(void)
 #endif
 
 #ifdef CONFIG_VT
-	if (console_use_vt) {
-		cdev_init(&vc0_cdev, &console_fops);
-		if (cdev_add(&vc0_cdev, MKDEV(TTY_MAJOR, 0), 1) ||
-		    register_chrdev_region(MKDEV(TTY_MAJOR, 0), 1,
-					   "/dev/vc/0") < 0)
-			panic("Couldn't register /dev/tty0 driver\n");
-		devfs_mk_cdev(MKDEV(TTY_MAJOR, 0), S_IFCHR|S_IRUSR|S_IWUSR,
-			      "vc/0");
-		class_simple_device_add(tty_class, MKDEV(TTY_MAJOR, 0), NULL,
-					"tty0");
+	if (!console_use_vt)
+		goto out_vt;
+	cdev_init(&vc0_cdev, &console_fops);
+	if (cdev_add(&vc0_cdev, MKDEV(TTY_MAJOR, 0), 1) ||
+	    register_chrdev_region(MKDEV(TTY_MAJOR, 0), 1, "/dev/vc/0") < 0)
+		panic("Couldn't register /dev/tty0 driver\n");
+	devfs_mk_cdev(MKDEV(TTY_MAJOR, 0), S_IFCHR|S_IRUSR|S_IWUSR, "vc/0");
+	class_simple_device_add(tty_class, MKDEV(TTY_MAJOR, 0), NULL, "tty0");
 
-		vty_init();
-	}
+	vty_init();
+ out_vt:
 #endif
 	return 0;
 }

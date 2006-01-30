@@ -27,10 +27,10 @@
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
 #include <asm/hypervisor.h>
-#include <asm-xen/linux-public/privcmd.h>
-#include <asm-xen/xen-public/xen.h>
-#include <asm-xen/xen-public/dom0_ops.h>
-#include <asm-xen/xen_proc.h>
+#include <xen/public/privcmd.h>
+#include <xen/interface/xen.h>
+#include <xen/interface/dom0_ops.h>
+#include <xen/xen_proc.h>
 
 static struct proc_dir_entry *privcmd_intf;
 static struct proc_dir_entry *capabilities_intf;

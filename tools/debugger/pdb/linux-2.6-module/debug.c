@@ -7,10 +7,10 @@
 #include <linux/mm.h>
 #include <linux/sched.h>
 #include <asm-i386/kdebug.h>
-#include <asm-xen/asm-i386/processor.h>
-#include <asm-xen/asm-i386/ptrace.h>
-#include <asm-xen/asm-i386/tlbflush.h>
-#include <asm-xen/xen-public/xen.h>
+#include <asm-i386/mach-xen/asm/processor.h>
+#include <asm-i386/mach-xen/asm/ptrace.h>
+#include <asm-i386/mach-xen/asm/tlbflush.h>
+#include <xen/interface/xen.h>
 #include "pdb_module.h"
 #include "pdb_debug.h"
 

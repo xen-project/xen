@@ -254,8 +254,10 @@ struct sk_buff {
 	unsigned char		local_df,
 				cloned:1,
 				nohdr:1,
+#ifdef CONFIG_XEN
 				proto_csum_valid:1,
 				proto_csum_blank:1,
+#endif
 				pkt_type,
 				ip_summed;
 	__u32			priority;

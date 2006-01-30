@@ -38,17 +38,17 @@
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
-#include <asm-xen/tpmfe.h>
+#include <xen/tpmfe.h>
 #include <linux/err.h>
 
 #include <asm/semaphore.h>
 #include <asm/io.h>
-#include <asm-xen/evtchn.h>
-#include <asm-xen/xen-public/grant_table.h>
-#include <asm-xen/xen-public/io/tpmif.h>
+#include <xen/evtchn.h>
+#include <xen/interface/grant_table.h>
+#include <xen/interface/io/tpmif.h>
 #include <asm/uaccess.h>
-#include <asm-xen/xenbus.h>
-#include <asm-xen/xen-public/grant_table.h>
+#include <xen/xenbus.h>
+#include <xen/interface/grant_table.h>
 
 #include "tpmfront.h"
 

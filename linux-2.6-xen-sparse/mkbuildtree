@@ -108,9 +108,9 @@ relative_lndir ${RS}
 rm -f mkbuildtree
 
 # Create links to the shared definitions of the Xen interfaces.
-rm -rf ${AD}/include/asm-xen/xen-public
-mkdir  ${AD}/include/asm-xen/xen-public
-cd     ${AD}/include/asm-xen/xen-public
+rm -rf ${AD}/include/xen/interface
+mkdir  ${AD}/include/xen/interface
+cd     ${AD}/include/xen/interface
 relative_lndir ../../../${RS}/../xen/include/public
 
 # Arch-specific post-processing

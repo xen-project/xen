@@ -41,17 +41,17 @@
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
 #include <linux/vmalloc.h>
-#include <asm-xen/xen_proc.h>
+#include <xen/xen_proc.h>
 #include <asm/hypervisor.h>
-#include <asm-xen/balloon.h>
-#include <asm-xen/xen-public/memory.h>
+#include <xen/balloon.h>
+#include <xen/interface/memory.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
 #include <linux/list.h>
 
-#include<asm-xen/xenbus.h>
+#include <xen/xenbus.h>
 
 #define PAGES2KB(_p) ((_p)<<(PAGE_SHIFT-10))
 

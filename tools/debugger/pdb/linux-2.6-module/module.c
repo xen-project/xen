@@ -13,13 +13,13 @@
 
 #include <asm-i386/kdebug.h>
 
-#include <asm-xen/evtchn.h>
-#include <asm-xen/ctrl_if.h>
-#include <asm-xen/hypervisor.h>
-#include <asm-xen/xen-public/io/domain_controller.h>
-#include <asm-xen/xen-public/xen.h>
+#include <xen/evtchn.h>
+#include <xen/ctrl_if.h>
+#include <xen/hypervisor.h>
+#include <xen/interface/io/domain_controller.h>
+#include <xen/interface/xen.h>
 
-#include <asm-xen/xen-public/io/ring.h>
+#include <xen/interface/io/ring.h>
 
 #include "pdb_module.h"
 #include "pdb_debug.h"

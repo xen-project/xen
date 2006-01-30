@@ -20,8 +20,8 @@
 
 #include <stdarg.h>
 #include <linux/module.h>
-#include <asm-xen/xenbus.h>
-#include <asm-xen/net_driver_util.h>
+#include <xen/xenbus.h>
+#include <xen/net_driver_util.h>
 #include "common.h"
 
 

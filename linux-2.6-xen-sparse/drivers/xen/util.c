@@ -4,7 +4,7 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <asm/uaccess.h>
-#include <asm-xen/driver_util.h>
+#include <xen/driver_util.h>
 
 static int f(pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
 {

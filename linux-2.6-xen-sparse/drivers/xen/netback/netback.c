@@ -11,8 +11,8 @@
  */
 
 #include "common.h"
-#include <asm-xen/balloon.h>
-#include <asm-xen/xen-public/memory.h>
+#include <xen/balloon.h>
+#include <xen/interface/memory.h>
 
 /*#define NETBE_DEBUG_INTERRUPT*/
 

@@ -14,13 +14,13 @@
 #include <linux/in.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
-#include <asm-xen/evtchn.h>
-#include <asm-xen/xen-public/io/netif.h>
+#include <xen/evtchn.h>
+#include <xen/interface/io/netif.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
-#include <asm-xen/xen-public/grant_table.h>
-#include <asm-xen/gnttab.h>
-#include <asm-xen/driver_util.h>
+#include <xen/interface/grant_table.h>
+#include <xen/gnttab.h>
+#include <xen/driver_util.h>
 
 #define DPRINTK(_f, _a...) pr_debug("(file=%s, line=%d) " _f, \
                                     __FILE__ , __LINE__ , ## _a )

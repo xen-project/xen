@@ -115,10 +115,11 @@
 #endif	/* CONFIG_NET_RADIO */
 #include <asm/current.h>
 
+#ifdef CONFIG_XEN
 #include <net/ip.h>
 #include <linux/tcp.h>
 #include <linux/udp.h>
-
+#endif
 
 /* This define, if set, will randomly drop a packet when congestion
  * is more than moderate.  It helps fairness in the multi-interface
@@ -1266,6 +1267,7 @@ int dev_queue_xmit(struct sk_buff *skb)
 	    __skb_linearize(skb, GFP_ATOMIC))
 		goto out_kfree_skb;
 
+#ifdef CONFIG_XEN
 	/* If a checksum-deferred packet is forwarded to a device that needs a
 	 * checksum, correct the pointers and force checksumming.
 	 */
@@ -1294,6 +1296,7 @@ int dev_queue_xmit(struct sk_buff *skb)
 			goto out_kfree_skb;
 		skb->ip_summed = CHECKSUM_HW;
 	}
+#endif
 
 	/* If packet is not checksummed and device does not support
 	 * checksumming for this protocol, complete checksumming here.
@@ -1714,6 +1717,7 @@ int netif_receive_skb(struct sk_buff *skb)
 	}
 #endif
 
+#ifdef CONFIG_XEN
 	switch (skb->ip_summed) {
 	case CHECKSUM_UNNECESSARY:
 		skb->proto_csum_valid = 1;
@@ -1724,6 +1728,7 @@ int netif_receive_skb(struct sk_buff *skb)
 		skb->proto_csum_valid = 0;
 		break;
 	}
+#endif
 
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
 		if (!ptype->dev || ptype->dev == skb->dev) {

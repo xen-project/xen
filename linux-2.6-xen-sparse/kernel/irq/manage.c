@@ -146,14 +146,9 @@ int can_request_irq(unsigned int irq, unsigned long irqflags)
 	return !action;
 }
 
-/**
- *	setup_irq - register an irqaction structure
- *	@irq: Interrupt to register
- *	@irqaction: The irqaction structure to be registered
- *
- *	Normally called by request_irq, this function can be used
- *	directly to allocate special interrupts that are part of the
- *	architecture.
+/*
+ * Internal function to register an irqaction - typically used to
+ * allocate special interrupts that are part of the architecture.
  */
 int setup_irq(unsigned int irq, struct irqaction * new)
 {
@@ -222,6 +217,7 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 	return 0;
 }
 
+#ifdef CONFIG_XEN
 /*
  *	teardown_irq - unregister an irqaction
  *	@irq: Interrupt line being freed
@@ -318,6 +314,67 @@ void free_irq(unsigned int irq, void *dev_id)
 	spin_unlock_irqrestore(&desc->lock,flags);
 	return;
 }
+
+#else
+/**
+ *	free_irq - free an interrupt
+ *	@irq: Interrupt line to free
+ *	@dev_id: Device identity to free
+ *
+ *	Remove an interrupt handler. The handler is removed and if the
+ *	interrupt line is no longer in use by any driver it is disabled.
+ *	On a shared IRQ the caller must ensure the interrupt is disabled
+ *	on the card it drives before calling this function. The function
+ *	does not return until any executing interrupts for this IRQ
+ *	have completed.
+ *
+ *	This function must not be called from interrupt context.
+ */
+void free_irq(unsigned int irq, void *dev_id)
+{
+	struct irq_desc *desc;
+	struct irqaction **p;
+	unsigned long flags;
+
+	if (irq >= NR_IRQS)
+		return;
+
+	desc = irq_desc + irq;
+	spin_lock_irqsave(&desc->lock,flags);
+	p = &desc->action;
+	for (;;) {
+		struct irqaction * action = *p;
+
+		if (action) {
+			struct irqaction **pp = p;
+
+			p = &action->next;
+			if (action->dev_id != dev_id)
+				continue;
+
+			/* Found it - now remove it from the list of entries */
+			*pp = action->next;
+			if (!desc->action) {
+				desc->status |= IRQ_DISABLED;
+				if (desc->handler->shutdown)
+					desc->handler->shutdown(irq);
+				else
+					desc->handler->disable(irq);
+			}
+			spin_unlock_irqrestore(&desc->lock,flags);
+			unregister_handler_proc(irq, action);
+
+			/* Make sure it's not being used on another CPU */
+			synchronize_irq(irq);
+			kfree(action);
+			return;
+		}
+		printk(KERN_ERR "Trying to free free IRQ%d\n",irq);
+		spin_unlock_irqrestore(&desc->lock,flags);
+		return;
+	}
+}
+#endif
 
 EXPORT_SYMBOL(free_irq);
 

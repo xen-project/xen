@@ -1907,7 +1907,6 @@ void exit_mmap(struct mm_struct *mm)
 #ifdef arch_exit_mmap
 	arch_exit_mmap(mm);
 #endif
-
 	lru_add_drain();
 
 	spin_lock(&mm->page_table_lock);

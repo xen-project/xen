@@ -41,10 +41,10 @@
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <scsi/scsi.h>
-#include <asm-xen/evtchn.h>
-#include <asm-xen/xenbus.h>
-#include <asm-xen/xen-public/grant_table.h>
-#include <asm-xen/gnttab.h>
+#include <xen/evtchn.h>
+#include <xen/xenbus.h>
+#include <xen/interface/grant_table.h>
+#include <xen/gnttab.h>
 #include <asm/hypervisor.h>
 
 #define BLKIF_STATE_DISCONNECTED 0

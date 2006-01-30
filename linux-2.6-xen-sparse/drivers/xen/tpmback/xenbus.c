@@ -18,7 +18,7 @@
 */
 #include <stdarg.h>
 #include <linux/module.h>
-#include <asm-xen/xenbus.h>
+#include <xen/xenbus.h>
 #include "common.h"
 
 struct backend_info

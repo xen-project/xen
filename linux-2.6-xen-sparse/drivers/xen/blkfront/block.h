@@ -46,11 +46,11 @@
 #include <linux/major.h>
 #include <linux/devfs_fs_kernel.h>
 #include <asm/hypervisor.h>
-#include <asm-xen/xenbus.h>
-#include <asm-xen/gnttab.h>
-#include <asm-xen/xen-public/xen.h>
-#include <asm-xen/xen-public/io/blkif.h>
-#include <asm-xen/xen-public/io/ring.h>
+#include <xen/xenbus.h>
+#include <xen/gnttab.h>
+#include <xen/interface/xen.h>
+#include <xen/interface/io/blkif.h>
+#include <xen/interface/io/ring.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>

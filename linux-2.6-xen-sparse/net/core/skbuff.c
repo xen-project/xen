@@ -355,8 +355,10 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 	C(local_df);
 	n->cloned = 1;
 	n->nohdr = 0;
+#ifdef CONFIG_XEN
 	C(proto_csum_valid);
 	C(proto_csum_blank);
+#endif
 	C(pkt_type);
 	C(ip_summed);
 	C(priority);
