@@ -40,7 +40,7 @@
 //leave SMP for a later time
 //#undef CONFIG_SMP
 
-#define MAX_DMADOM_PFN 0x7FFFFUL /* 31 addressable bits */
+#define MAX_DMADOM_PFN (0x7FFFFFFFUL >> PAGE_SHIFT) /* 31 addressable bits */
 
 #ifndef __ASSEMBLY__
 
