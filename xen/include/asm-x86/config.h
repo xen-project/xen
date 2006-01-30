@@ -65,6 +65,8 @@
 #endif
 #define STACK_SIZE  (PAGE_SIZE << STACK_ORDER)
 
+#define MAX_DMADOM_PFN 0x7FFFFUL /* 31 addressable bits */
+
 #ifndef __ASSEMBLY__
 extern unsigned long _end; /* standard ELF symbol */
 #endif /* __ASSEMBLY__ */

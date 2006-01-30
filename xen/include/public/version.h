@@ -45,8 +45,8 @@ typedef struct xen_feature_info {
     uint32_t     submap;        /* OUT: 32-bit submap */
 } xen_feature_info_t;
 
-#define _XENFEAT_writable_mmu_structures 0
-#define XENFEAT_writable_mmu_structures (1UL<<_XENFEAT_writable_mmu_structures)
+#define XENFEAT_writable_page_tables       0
+#define XENFEAT_writable_descriptor_tables 1
 
 #define XENFEAT_NR_SUBMAPS 1
 

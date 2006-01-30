@@ -572,7 +572,8 @@ void __cpuinit cpu_gdt_init(struct Xgt_desc_struct *gdt_descr)
 	     va < gdt_descr->address + gdt_descr->size;
 	     va += PAGE_SIZE, f++) {
 		frames[f] = virt_to_mfn(va);
-		make_lowmem_mmu_page_readonly((void *)va);
+		make_lowmem_page_readonly(
+			(void *)va, XENFEAT_writable_descriptor_tables);
 	}
 	if (HYPERVISOR_set_gdt(frames, gdt_descr->size / 8))
 		BUG();

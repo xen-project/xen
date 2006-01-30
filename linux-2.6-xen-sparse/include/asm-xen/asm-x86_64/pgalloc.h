@@ -7,10 +7,11 @@
 #include <linux/mm.h>
 #include <asm/io.h>		/* for phys_to_virt and page_to_pseudophys */
 
-void make_mmu_page_readonly(void *va);
-void make_mmu_page_writable(void *va);
-void make_mmu_pages_readonly(void *va, unsigned int nr);
-void make_mmu_pages_writable(void *va, unsigned int nr);
+#include <asm-xen/features.h>
+void make_page_readonly(void *va, unsigned int feature);
+void make_page_writable(void *va, unsigned int feature);
+void make_pages_readonly(void *va, unsigned int nr, unsigned int feature);
+void make_pages_writable(void *va, unsigned int nr, unsigned int feature);
 
 #define __user_pgd(pgd) ((pgd) + PTRS_PER_PGD)
 
@@ -161,7 +162,7 @@ static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long ad
 {
         pte_t *pte = (pte_t *)get_zeroed_page(GFP_KERNEL|__GFP_REPEAT);
         if (pte)
-		make_mmu_page_readonly(pte);
+		make_page_readonly(pte, XENFEAT_writable_page_tables);
 
 	return pte;
 }
@@ -181,7 +182,7 @@ extern __inline__ void pte_free_kernel(pte_t *pte)
 {
 	BUG_ON((unsigned long)pte & (PAGE_SIZE-1));
         xen_pte_unpin(__pa(pte));
-        make_mmu_page_writable(pte);
+        make_page_writable(pte, XENFEAT_writable_page_tables);
 	free_page((unsigned long)pte); 
 }
 
