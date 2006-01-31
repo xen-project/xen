@@ -13,7 +13,6 @@
 .*\.flc$
 .*\.orig$
 .*\.rej$
-.*\.patch$
 ^TAGS$
 ^dist/.*$
 ^docs/.*\.aux$
