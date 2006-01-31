@@ -353,8 +353,13 @@ gnttab_resume(void)
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1));
 	BUG_ON(setup.status != 0);
 
+#ifdef __ia64__
+	shared = __va(frames[0] << PAGE_SHIFT);
+	printk("grant table at %p\n", shared);
+#else
 	for (i = 0; i < NR_GRANT_FRAMES; i++)
 		set_fixmap(FIX_GNTTAB_END - i, frames[i] << PAGE_SHIFT);
+#endif
 
 	return 0;
 }
@@ -380,7 +385,9 @@ gnttab_init(void)
 
 	BUG_ON(gnttab_resume());
 
+#ifndef __ia64__
 	shared = (grant_entry_t *)fix_to_virt(FIX_GNTTAB_END);
+#endif
 
 	for (i = NR_RESERVED_ENTRIES; i < NR_GRANT_ENTRIES; i++)
 		gnttab_list[i] = i + 1;
