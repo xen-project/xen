@@ -157,14 +157,14 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 	    if ((v = alloc_xenheap_pages(KERNEL_STACK_SIZE_ORDER)) == NULL)
 		return NULL;
 	    memset(v, 0, sizeof(*v)); 
-	}
 
-	ti = alloc_thread_info(v);
-	/* Clear thread_info to clear some important fields, like
-	 * preempt_count
-	 */
-	memset(ti, 0, sizeof(struct thread_info));
-	init_switch_stack(v);
+	    ti = alloc_thread_info(v);
+	    /* Clear thread_info to clear some important fields, like
+	     * preempt_count
+	     */
+	    memset(ti, 0, sizeof(struct thread_info));
+	    init_switch_stack(v);
+	}
 
 	if (!is_idle_domain(d)) {
 	    v->arch.privregs = 
