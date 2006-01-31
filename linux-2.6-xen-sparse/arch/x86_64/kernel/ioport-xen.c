@@ -25,24 +25,24 @@
  *
  */
 
-asmlinkage long sys_iopl(unsigned int new_io_pl, struct pt_regs *regs)
+asmlinkage long sys_iopl(unsigned int new_iopl, struct pt_regs *regs)
 {
-        unsigned int old_io_pl = current->thread.io_pl;
+        unsigned int old_iopl = current->thread.iopl;
         physdev_op_t op;
 
-	if (new_io_pl > 3)
+	if (new_iopl > 3)
 		return -EINVAL;
 
 	/* Need "raw I/O" privileges for direct port access. */
-	if ((new_io_pl > old_io_pl) && !capable(CAP_SYS_RAWIO))
+	if ((new_iopl > old_iopl) && !capable(CAP_SYS_RAWIO))
 		return -EPERM;
 
 	/* Change our version of the privilege levels. */
-	current->thread.io_pl = new_io_pl;
+	current->thread.iopl = new_iopl;
 
 	/* Force the change at ring 0. */
 	op.cmd             = PHYSDEVOP_SET_IOPL;
-	op.u.set_iopl.iopl = (new_io_pl == 0) ? 1 : new_io_pl;
+	op.u.set_iopl.iopl = (new_iopl == 0) ? 1 : new_iopl;
 	HYPERVISOR_physdev_op(&op);
 
 	return 0;

@@ -64,7 +64,7 @@ static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
 	}
 }
 
-extern __inline__ void pmd_free(pmd_t *pmd)
+static inline void pmd_free(pmd_t *pmd)
 {
 	pte_t *ptep = virt_to_ptep(pmd);
 
@@ -178,7 +178,7 @@ static inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long add
 /* Should really implement gc for free page table pages. This could be
    done with a reference count in struct page. */
 
-extern __inline__ void pte_free_kernel(pte_t *pte)
+static inline void pte_free_kernel(pte_t *pte)
 {
 	BUG_ON((unsigned long)pte & (PAGE_SIZE-1));
         xen_pte_unpin(__pa(pte));

@@ -27,9 +27,9 @@ DEFINE_PER_CPU(unsigned char, cpu_16bit_stack[CPU_16BIT_STACK_SIZE]);
 EXPORT_PER_CPU_SYMBOL(cpu_16bit_stack);
 #endif
 
-static int cachesize_override __initdata = -1;
-static int disable_x86_fxsr __initdata = 0;
-static int disable_x86_serial_nr __initdata = 1;
+static int cachesize_override __devinitdata = -1;
+static int disable_x86_fxsr __devinitdata = 0;
+static int disable_x86_serial_nr __devinitdata = 1;
 
 struct cpu_dev * cpu_devs[X86_VENDOR_NUM] = {};
 
@@ -64,7 +64,7 @@ static int __init cachesize_setup(char *str)
 }
 __setup("cachesize=", cachesize_setup);
 
-int __init get_model_name(struct cpuinfo_x86 *c)
+int __devinit get_model_name(struct cpuinfo_x86 *c)
 {
 	unsigned int *v;
 	char *p, *q;
@@ -94,7 +94,7 @@ int __init get_model_name(struct cpuinfo_x86 *c)
 }
 
 
-void __init display_cacheinfo(struct cpuinfo_x86 *c)
+void __devinit display_cacheinfo(struct cpuinfo_x86 *c)
 {
 	unsigned int n, dummy, ecx, edx, l2size;
 
@@ -135,7 +135,7 @@ void __init display_cacheinfo(struct cpuinfo_x86 *c)
 /* in particular, if CPUID levels 0x80000002..4 are supported, this isn't used */
 
 /* Look up CPU names by table lookup. */
-static char __init *table_lookup_model(struct cpuinfo_x86 *c)
+static char __devinit *table_lookup_model(struct cpuinfo_x86 *c)
 {
 	struct cpu_model_info *info;
 
@@ -156,7 +156,7 @@ static char __init *table_lookup_model(struct cpuinfo_x86 *c)
 }
 
 
-void __init get_cpu_vendor(struct cpuinfo_x86 *c, int early)
+static void __devinit get_cpu_vendor(struct cpuinfo_x86 *c, int early)
 {
 	char *v = c->x86_vendor_id;
 	int i;
@@ -207,7 +207,7 @@ static inline int flag_is_changeable_p(u32 flag)
 
 
 /* Probe for the CPUID instruction */
-static int __init have_cpuid_p(void)
+static int __devinit have_cpuid_p(void)
 {
 	return flag_is_changeable_p(X86_EFLAGS_ID);
 }
@@ -254,7 +254,7 @@ static void __init early_cpu_detect(void)
 #endif
 }
 
-void __init generic_identify(struct cpuinfo_x86 * c)
+void __devinit generic_identify(struct cpuinfo_x86 * c)
 {
 	u32 tfms, xlvl;
 	int junk;
@@ -301,7 +301,7 @@ void __init generic_identify(struct cpuinfo_x86 * c)
 	}
 }
 
-static void __init squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
+static void __devinit squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 {
 	if (cpu_has(c, X86_FEATURE_PN) && disable_x86_serial_nr ) {
 		/* Disable processor serial number */
@@ -329,7 +329,7 @@ __setup("serialnumber", x86_serial_nr_setup);
 /*
  * This does the hard work of actually picking apart the CPU stuff...
  */
-void __init identify_cpu(struct cpuinfo_x86 *c)
+void __devinit identify_cpu(struct cpuinfo_x86 *c)
 {
 	int i;
 
@@ -439,10 +439,18 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 #ifdef CONFIG_X86_MCE
 	mcheck_init(c);
 #endif
+	if (c == &boot_cpu_data)
+		sysenter_setup();
+	enable_sep_cpu();
+
+	if (c == &boot_cpu_data)
+		mtrr_bp_init();
+	else
+		mtrr_ap_init();
 }
 
 #ifdef CONFIG_X86_HT
-void __init detect_ht(struct cpuinfo_x86 *c)
+void __devinit detect_ht(struct cpuinfo_x86 *c)
 {
 	u32 	eax, ebx, ecx, edx;
 	int 	index_msb, tmp;
@@ -497,7 +505,7 @@ void __init detect_ht(struct cpuinfo_x86 *c)
 }
 #endif
 
-void __init print_cpu_info(struct cpuinfo_x86 *c)
+void __devinit print_cpu_info(struct cpuinfo_x86 *c)
 {
 	char *vendor = NULL;
 
@@ -586,7 +594,7 @@ void __cpuinit cpu_gdt_init(struct Xgt_desc_struct *gdt_descr)
  * and IDT. We reload them nevertheless, this function acts as a
  * 'CPU state barrier', nothing should get across.
  */
-void __cpuinit cpu_init (void)
+void __cpuinit cpu_init(void)
 {
 	int cpu = smp_processor_id();
 	struct tss_struct * t = &per_cpu(init_tss, cpu);
@@ -637,12 +645,12 @@ void __cpuinit cpu_init (void)
 	asm volatile ("xorl %eax, %eax; movl %eax, %fs; movl %eax, %gs");
 
 	/* Clear all 6 debug registers: */
-
-#define CD(register) HYPERVISOR_set_debugreg(register, 0)
-
-	CD(0); CD(1); CD(2); CD(3); /* no db4 and db5 */; CD(6); CD(7);
-
-#undef CD
+	set_debugreg(0, 0);
+	set_debugreg(0, 1);
+	set_debugreg(0, 2);
+	set_debugreg(0, 3);
+	set_debugreg(0, 6);
+	set_debugreg(0, 7);
 
 	/*
 	 * Force FPU initialization:
@@ -651,3 +659,15 @@ void __cpuinit cpu_init (void)
 	clear_used_math();
 	mxcsr_feature_mask_init();
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
+void __devinit cpu_uninit(void)
+{
+	int cpu = raw_smp_processor_id();
+	cpu_clear(cpu, cpu_initialized);
+
+	/* lazy TLB state */
+	per_cpu(cpu_tlbstate, cpu).state = 0;
+	per_cpu(cpu_tlbstate, cpu).active_mm = &init_mm;
+}
+#endif

@@ -8,6 +8,8 @@
 #ifndef __ASSEMBLY__
 
 #include <linux/string.h>
+#include <linux/smp.h>
+
 #include <asm/segment.h>
 #include <asm/mmu.h>
 
@@ -91,6 +93,7 @@ static inline void clear_LDT(void)
  */
 extern struct desc_struct default_ldt[];
 extern struct gate_struct idt_table[]; 
+extern struct desc_ptr cpu_gdt_descr[];
 
 static inline void _set_gate(void *adr, unsigned type, unsigned long func, unsigned dpl, unsigned ist)  
 {
@@ -215,7 +218,7 @@ static inline void load_TLS(struct thread_struct *t, unsigned int cpu)
 /*
  * load one particular LDT into the current CPU
  */
-extern inline void load_LDT_nolock (mm_context_t *pc, int cpu)
+static inline void load_LDT_nolock (mm_context_t *pc, int cpu)
 {
         void *segments = pc->ldt;
         int count = pc->size;

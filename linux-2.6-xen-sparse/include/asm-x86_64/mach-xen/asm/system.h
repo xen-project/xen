@@ -120,12 +120,12 @@ struct alt_instr {
 /*
  * Alternative inline assembly with input.
  * 
- * Pecularities:
+ * Peculiarities:
  * No memory clobber here. 
  * Argument numbers start with 1.
  * Best is to use constraints that are fixed size (like (%1) ... "r")
  * If you use variable sized constraints like "m" or "g" in the 
- * replacement maake sure to pad to the worst case length.
+ * replacement make sure to pad to the worst case length.
  */
 #define alternative_input(oldinstr, newinstr, feature, input...)	\
 	asm volatile ("661:\n\t" oldinstr "\n662:\n"			\
@@ -192,7 +192,7 @@ static inline void write_cr4(unsigned long val)
 
 #define __xg(x) ((volatile long *)(x))
 
-extern inline void set_64bit(volatile unsigned long *ptr, unsigned long val)
+static inline void set_64bit(volatile unsigned long *ptr, unsigned long val)
 {
 	*ptr = val;
 }
@@ -257,19 +257,19 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 	case 2:
 		__asm__ __volatile__(LOCK_PREFIX "cmpxchgw %w1,%2"
 				     : "=a"(prev)
-				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
+				     : "r"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 4:
 		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %k1,%2"
 				     : "=a"(prev)
-				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
+				     : "r"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 8:
 		__asm__ __volatile__(LOCK_PREFIX "cmpxchgq %1,%2"
 				     : "=a"(prev)
-				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
+				     : "r"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	}
@@ -405,9 +405,6 @@ void cpu_idle_wait(void);
 #define HAVE_DISABLE_HLT
 void disable_hlt(void);
 void enable_hlt(void);
-
-#define HAVE_EAT_KEY
-void eat_key(void);
 
 extern unsigned long arch_align_stack(unsigned long sp);
 

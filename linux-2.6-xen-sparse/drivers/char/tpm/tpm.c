@@ -66,9 +66,6 @@ static ssize_t tpm_transmit(struct tpm_chip * chip, const char *buf,
 	if (!chip)
 		return -ENODEV;
 
-	if ( !chip )
-		return -ENODEV;
-
 	count = be32_to_cpu(*((__be32 *) (buf + 2)));
 
 	if (count == 0)
@@ -140,13 +137,8 @@ static const u8 pcrread[] = {
 	0, 0, 0, 0		/* PCR index */
 };
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
 ssize_t tpm_show_pcrs(struct device *dev, struct device_attribute *attr,
 		      char *buf)
-#else
-ssize_t tpm_show_pcrs(struct device *dev,
-		      char *buf)
-#endif
 {
 	u8 data[READ_PCR_RESULT_SIZE];
 	ssize_t len;
@@ -154,7 +146,8 @@ ssize_t tpm_show_pcrs(struct device *dev,
 	__be32 index;
 	char *str = buf;
 
-	struct tpm_chip *chip = dev_get_drvdata(dev);
+	struct tpm_chip *chip =
+	    pci_get_drvdata(to_pci_dev(dev));
 	if (chip == NULL)
 		return -ENODEV;
 
@@ -197,20 +190,16 @@ static const u8 readpubek[] = {
 	0, 0, 0, 124,		/* TPM_ORD_ReadPubek */
 };
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
 ssize_t tpm_show_pubek(struct device *dev, struct device_attribute *attr,
 		       char *buf)
-#else
-ssize_t tpm_show_pubek(struct device *dev,
-		       char *buf)
-#endif
 {
 	u8 *data;
 	ssize_t len;
 	int i, rc;
 	char *str = buf;
 
-	struct tpm_chip *chip = dev_get_drvdata(dev);
+	struct tpm_chip *chip =
+	    pci_get_drvdata(to_pci_dev(dev));
 	if (chip == NULL)
 		return -ENODEV;
 
@@ -285,19 +274,15 @@ static const u8 cap_manufacturer[] = {
 	0, 0, 1, 3
 };
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
 ssize_t tpm_show_caps(struct device *dev, struct device_attribute *attr,
 		      char *buf)
-#else
-ssize_t tpm_show_caps(struct device *dev,
-		      char *buf)
-#endif
 {
 	u8 data[sizeof(cap_manufacturer)];
 	ssize_t len;
 	char *str = buf;
 
-	struct tpm_chip *chip = dev_get_drvdata(dev);
+	struct tpm_chip *chip =
+	    pci_get_drvdata(to_pci_dev(dev));
 	if (chip == NULL)
 		return -ENODEV;
 
@@ -325,13 +310,8 @@ ssize_t tpm_show_caps(struct device *dev,
 }
 EXPORT_SYMBOL_GPL(tpm_show_caps);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
 ssize_t tpm_store_cancel(struct device *dev, struct device_attribute *attr,
 			const char *buf, size_t count)
-#else
-ssize_t tpm_store_cancel(struct device *dev,
-			const char *buf, size_t count)
-#endif
 {
 	struct tpm_chip *chip = dev_get_drvdata(dev);
 	if (chip == NULL)

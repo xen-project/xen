@@ -38,6 +38,7 @@
 #include <linux/kallsyms.h>
 #include <linux/ptrace.h>
 #include <linux/random.h>
+#include <linux/kprobes.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -46,7 +47,6 @@
 #include <asm/ldt.h>
 #include <asm/processor.h>
 #include <asm/i387.h>
-#include <asm/irq.h>
 #include <asm/desc.h>
 #include <xen/interface/physdev.h>
 #include <xen/interface/vcpu.h>
@@ -54,8 +54,10 @@
 #include <asm/math_emu.h>
 #endif
 
-#include <linux/irq.h>
 #include <linux/err.h>
+
+#include <asm/tlbflush.h>
+#include <asm/cpu.h>
 
 #include <asm/tlbflush.h>
 #include <asm/cpu.h>
@@ -79,6 +81,7 @@ unsigned long thread_saved_pc(struct task_struct *tsk)
  * Powermanagement idle function, if any..
  */
 void (*pm_idle)(void);
+EXPORT_SYMBOL(pm_idle);
 static DEFINE_PER_CPU(unsigned int, cpu_idle_state);
 
 void disable_hlt(void)
@@ -111,6 +114,9 @@ void xen_idle(void)
 		start_hz_timer();
 	}
 }
+#ifdef CONFIG_APM_MODULE
+EXPORT_SYMBOL(default_idle);
+#endif
 
 /*
  * The idle thread. There's no useful work to be
@@ -118,10 +124,10 @@ void xen_idle(void)
  * low exit latency (ie sit in a loop waiting for
  * somebody to say that they'd like to reschedule)
  */
-void cpu_idle (void)
+void cpu_idle(void)
 {
 #if defined(CONFIG_HOTPLUG_CPU)
-	int cpu = _smp_processor_id();
+	int cpu = raw_smp_processor_id();
 #endif
 
 	/* endless idle loop with no priority at all */
@@ -130,6 +136,7 @@ void cpu_idle (void)
 
 			if (__get_cpu_var(cpu_idle_state))
 				__get_cpu_var(cpu_idle_state) = 0;
+
 			rmb();
 
 #if defined(CONFIG_HOTPLUG_CPU)
@@ -176,7 +183,7 @@ EXPORT_SYMBOL_GPL(cpu_idle_wait);
 
 /* XXX XEN doesn't use mwait_idle(), select_idle_routine(), idle_setup(). */
 /* Always use xen_idle() instead. */
-void __init select_idle_routine(const struct cpuinfo_x86 *c) {}
+void __devinit select_idle_routine(const struct cpuinfo_x86 *c) {}
 
 void show_regs(struct pt_regs * regs)
 {
@@ -185,7 +192,7 @@ void show_regs(struct pt_regs * regs)
 	printk("EIP: %04x:[<%08lx>] CPU: %d\n",0xffff & regs->xcs,regs->eip, smp_processor_id());
 	print_symbol("EIP is at %s\n", regs->eip);
 
-	if (regs->xcs & 2)
+	if (user_mode(regs))
 		printk(" ESP: %04x:%08lx",0xffff & regs->xss,regs->esp);
 	printk(" EFLAGS: %08lx    %s  (%s)\n",
 	       regs->eflags, print_tainted(), system_utsname.release);
@@ -237,6 +244,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	/* Ok, create the new process.. */
 	return do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
 }
+EXPORT_SYMBOL(kernel_thread);
 
 /*
  * Free current thread data structures etc..
@@ -245,6 +253,13 @@ void exit_thread(void)
 {
 	struct task_struct *tsk = current;
 	struct thread_struct *t = &tsk->thread;
+
+	/*
+	 * Remove function-return probe instances associated with this task
+	 * and put them back on the free list. Do not insert an exit probe for
+	 * this function, it will be disabled by kprobe_flush_task if you do.
+	 */
+	kprobe_flush_task(tsk);
 
 	/* The process may have allocated an io port bitmap... nuke it. */
 	if (unlikely(NULL != t->io_bitmap_ptr)) {
@@ -259,6 +274,13 @@ void exit_thread(void)
 void flush_thread(void)
 {
 	struct task_struct *tsk = current;
+
+	/*
+	 * Remove function-return probe instances associated with this task
+	 * and put them back on the free list. Do not insert an exit probe for
+	 * this function, it will be disabled by kprobe_flush_task if you do.
+	 */
+	kprobe_flush_task(tsk);
 
 	memset(tsk->thread.debugreg, 0, sizeof(unsigned long)*8);
 	memset(tsk->thread.tls_array, 0, sizeof(tsk->thread.tls_array));	
@@ -361,7 +383,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 		desc->b = LDT_entry_b(&info);
 	}
 
-	p->thread.io_pl = current->thread.io_pl;
+	p->thread.iopl = current->thread.iopl;
 
 	err = 0;
  out:
@@ -413,6 +435,7 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 
 	dump->u_fpvalid = dump_fpu (regs, &dump->i387);
 }
+EXPORT_SYMBOL(dump_thread);
 
 /* 
  * Capture the user space registers if the task is not running (in user space)
@@ -432,6 +455,33 @@ int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
 
 	boot_option_idle_override = 1;
 	return 1;
+}
+
+/*
+ * This function selects if the context switch from prev to next
+ * has to tweak the TSC disable bit in the cr4.
+ */
+static inline void disable_tsc(struct task_struct *prev_p,
+			       struct task_struct *next_p)
+{
+	struct thread_info *prev, *next;
+
+	/*
+	 * gcc should eliminate the ->thread_info dereference if
+	 * has_secure_computing returns 0 at compile time (SECCOMP=n).
+	 */
+	prev = prev_p->thread_info;
+	next = next_p->thread_info;
+
+	if (has_secure_computing(prev) || has_secure_computing(next)) {
+		/* slow path here */
+		if (has_secure_computing(prev) &&
+		    !has_secure_computing(next)) {
+			write_cr4(read_cr4() & ~X86_CR4_TSD);
+		} else if (!has_secure_computing(prev) &&
+			   has_secure_computing(next))
+			write_cr4(read_cr4() | X86_CR4_TSD);
+	}
 }
 
 /*
@@ -488,7 +538,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 #endif
 
 	/*
-	 * Reload esp0, LDT and the page table pointer:
+	 * Reload esp0.
 	 * This is load_esp0(tss, next) with a multicall.
 	 */
 	tss->esp0 = next->esp0;
@@ -514,9 +564,10 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	C(0); C(1); C(2);
 #undef C
 
-	if (unlikely(prev->io_pl != next->io_pl)) {
+	if (unlikely(prev->iopl != next->iopl)) {
 		iopl_op.cmd             = PHYSDEVOP_SET_IOPL;
-		iopl_op.u.set_iopl.iopl = (next->io_pl == 0) ? 1 : next->io_pl;
+		iopl_op.u.set_iopl.iopl = (next->iopl == 0) ? 1 :
+			(next->iopl >> 12) & 3;
 		mcl->op      = __HYPERVISOR_physdev_op;
 		mcl->args[0] = (unsigned long)&iopl_op;
 		mcl++;
@@ -538,24 +589,30 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 
 	/*
 	 * Restore %fs and %gs if needed.
+	 *
+	 * Glibc normally makes %fs be zero, and %gs is one of
+	 * the TLS segments.
 	 */
-	if (unlikely(next->fs | next->gs)) {
+	if (unlikely(next->fs))
 		loadsegment(fs, next->fs);
+
+	if (next->gs)
 		loadsegment(gs, next->gs);
-	}
 
 	/*
 	 * Now maybe reload the debug registers
 	 */
 	if (unlikely(next->debugreg[7])) {
-		loaddebug(next, 0);
-		loaddebug(next, 1);
-		loaddebug(next, 2);
-		loaddebug(next, 3);
+		set_debugreg(next->debugreg[0], 0);
+		set_debugreg(next->debugreg[1], 1);
+		set_debugreg(next->debugreg[2], 2);
+		set_debugreg(next->debugreg[3], 3);
 		/* no 4 and 5 */
-		loaddebug(next, 6);
-		loaddebug(next, 7);
+		set_debugreg(next->debugreg[6], 6);
+		set_debugreg(next->debugreg[7], 7);
 	}
+
+	disable_tsc(prev_p, next_p);
 
 	return prev_p;
 }
@@ -649,6 +706,7 @@ unsigned long get_wchan(struct task_struct *p)
 	} while (count++ < 16);
 	return 0;
 }
+EXPORT_SYMBOL(get_wchan);
 
 /*
  * sys_alloc_thread_area: get a yet unused TLS descriptor index.
@@ -744,6 +802,8 @@ asmlinkage int sys_get_thread_area(struct user_desc __user *u_info)
 		return -EFAULT;
 	if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
 		return -EINVAL;
+
+	memset(&info, 0, sizeof(info));
 
 	desc = current->thread.tls_array + idx - GDT_ENTRY_TLS_MIN;
 

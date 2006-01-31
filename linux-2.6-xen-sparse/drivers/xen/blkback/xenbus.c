@@ -58,7 +58,8 @@ void update_blkif_status(blkif_t *blkif)
 }
 
 
-static ssize_t show_physical_device(struct device *_dev, char *buf)
+static ssize_t show_physical_device(struct device *_dev,
+				    struct device_attribute *attr, char *buf)
 {
 	struct xenbus_device *dev = to_xenbus_device(_dev);
 	struct backend_info *be = dev->data;
@@ -68,7 +69,8 @@ DEVICE_ATTR(physical_device, S_IRUSR | S_IRGRP | S_IROTH,
 	    show_physical_device, NULL);
 
 
-static ssize_t show_mode(struct device *_dev, char *buf)
+static ssize_t show_mode(struct device *_dev, struct device_attribute *attr,
+			 char *buf)
 {
 	struct xenbus_device *dev = to_xenbus_device(_dev);
 	struct backend_info *be = dev->data;

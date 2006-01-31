@@ -35,7 +35,6 @@ enum tpm_addr {
 	TPM_ADDR = 0x4E,
 };
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
 extern ssize_t tpm_show_pubek(struct device *, struct device_attribute *attr,
 				char *);
 extern ssize_t tpm_show_pcrs(struct device *, struct device_attribute *attr,
@@ -44,16 +43,6 @@ extern ssize_t tpm_show_caps(struct device *, struct device_attribute *attr,
 				char *);
 extern ssize_t tpm_store_cancel(struct device *, struct device_attribute *attr,
 				const char *, size_t);
-#else
-extern ssize_t tpm_show_pubek(struct device *,
-				char *);
-extern ssize_t tpm_show_pcrs(struct device *,
-				char *);
-extern ssize_t tpm_show_caps(struct device *,
-				char *);
-extern ssize_t tpm_store_cancel(struct device *,
-				const char *, size_t);
-#endif
 
 struct tpm_chip;
 

@@ -25,7 +25,8 @@ static struct {
 	kmem_cache_t *cachep;
 } skbuff_small[] = { { 512, NULL }, { 2048, NULL } };
 
-struct sk_buff *alloc_skb(unsigned int length, int gfp_mask)
+struct sk_buff *__alloc_skb(unsigned int length, gfp_t gfp_mask,
+			    int fclone)
 {
 	int order, i;
 	kmem_cache_t *cachep;
@@ -48,10 +49,10 @@ struct sk_buff *alloc_skb(unsigned int length, int gfp_mask)
 
 	length -= sizeof(struct skb_shared_info);
 
-	return alloc_skb_from_cache(cachep, length, gfp_mask);
+	return alloc_skb_from_cache(cachep, length, gfp_mask, fclone);
 }
 
-struct sk_buff *__dev_alloc_skb(unsigned int length, int gfp_mask)
+struct sk_buff *__dev_alloc_skb(unsigned int length, gfp_t gfp_mask)
 {
 	struct sk_buff *skb;
 	int order;
@@ -65,7 +66,7 @@ struct sk_buff *__dev_alloc_skb(unsigned int length, int gfp_mask)
 	}
 
 	skb = alloc_skb_from_cache(
-		skbuff_order_cachep[order], length, gfp_mask);
+		skbuff_order_cachep[order], length, gfp_mask, 0);
 	if (skb != NULL)
 		skb_reserve(skb, 16);
 

@@ -27,6 +27,7 @@
 #include <linux/highmem.h>
 #include <linux/poll.h>
 #include <linux/net.h>
+#include <linux/textsearch.h>
 #include <net/checksum.h>
 
 #define HAVE_ALLOC_SKB		/* For the drivers to know */
@@ -154,16 +155,27 @@ struct skb_shared_info {
 #define SKB_DATAREF_SHIFT 16
 #define SKB_DATAREF_MASK ((1 << SKB_DATAREF_SHIFT) - 1)
 
+struct skb_timeval {
+	u32	off_sec;
+	u32	off_usec;
+};
+
+
+enum {
+	SKB_FCLONE_UNAVAILABLE,
+	SKB_FCLONE_ORIG,
+	SKB_FCLONE_CLONE,
+};
+
 /** 
  *	struct sk_buff - socket buffer
  *	@next: Next buffer in list
  *	@prev: Previous buffer in list
  *	@list: List we are on
  *	@sk: Socket we are owned by
- *	@stamp: Time we arrived
+ *	@tstamp: Time we arrived
  *	@dev: Device we arrived on/are leaving by
  *	@input_dev: Device we arrived on
- *      @real_dev: The real device we are using
  *	@h: Transport layer header
  *	@nh: Network layer header
  *	@mac: Link layer header
@@ -184,7 +196,6 @@ struct skb_shared_info {
  *	@priority: Packet queueing priority
  *	@users: User count - see {datagram,tcp}.c
  *	@protocol: Packet protocol from driver
- *	@security: Security level of packet
  *	@truesize: Buffer size 
  *	@head: Head of buffer
  *	@data: Data head pointer
@@ -192,15 +203,11 @@ struct skb_shared_info {
  *	@end: End pointer
  *	@destructor: Destruct function
  *	@nfmark: Can be used for communication between hooks
- *	@nfcache: Cache info
  *	@nfct: Associated connection, if any
  *	@nfctinfo: Relationship of this skb to the connection
- *	@nf_debug: Netfilter debugging
  *	@nf_bridge: Saved data about a bridged frame - see br_netfilter.c
- *      @private: Data which is private to the HIPPI implementation
  *	@tc_index: Traffic control index
  *	@tc_verd: traffic control verdict
- *	@tc_classid: traffic control classid
  */
 
 struct sk_buff {
@@ -208,12 +215,10 @@ struct sk_buff {
 	struct sk_buff		*next;
 	struct sk_buff		*prev;
 
-	struct sk_buff_head	*list;
 	struct sock		*sk;
-	struct timeval		stamp;
+	struct skb_timeval	tstamp;
 	struct net_device	*dev;
 	struct net_device	*input_dev;
-	struct net_device	*real_dev;
 
 	union {
 		struct tcphdr	*th;
@@ -251,44 +256,39 @@ struct sk_buff {
 				data_len,
 				mac_len,
 				csum;
-	unsigned char		local_df,
-				cloned:1,
-				nohdr:1,
-#ifdef CONFIG_XEN
-				proto_csum_valid:1,
-				proto_csum_blank:1,
-#endif
-				pkt_type,
-				ip_summed;
 	__u32			priority;
-	unsigned short		protocol,
-				security;
+	__u8			local_df:1,
+				cloned:1,
+				ip_summed:2,
+				nohdr:1,
+				nfctinfo:3;
+	__u8			pkt_type:3,
+#ifndef CONFIG_XEN
+				fclone:2;
+#else
+				fclone:2,
+				proto_csum_valid:1,
+				proto_csum_blank:1;
+				/* 1 bit spare */
+#endif
+	__be16			protocol;
 
 	void			(*destructor)(struct sk_buff *skb);
 #ifdef CONFIG_NETFILTER
-        unsigned long		nfmark;
-	__u32			nfcache;
-	__u32			nfctinfo;
+	__u32			nfmark;
 	struct nf_conntrack	*nfct;
-#ifdef CONFIG_NETFILTER_DEBUG
-        unsigned int		nf_debug;
+#if defined(CONFIG_IP_VS) || defined(CONFIG_IP_VS_MODULE)
+	__u8			ipvs_property:1;
 #endif
 #ifdef CONFIG_BRIDGE_NETFILTER
 	struct nf_bridge_info	*nf_bridge;
 #endif
 #endif /* CONFIG_NETFILTER */
-#if defined(CONFIG_HIPPI)
-	union {
-		__u32		ifield;
-	} private;
-#endif
 #ifdef CONFIG_NET_SCHED
-       __u32			tc_index;        /* traffic control index */
+	__u16			tc_index;	/* traffic control index */
 #ifdef CONFIG_NET_CLS_ACT
-	__u32           tc_verd;               /* traffic control verdict */
-	__u32           tc_classid;            /* traffic control classid */
+	__u16			tc_verd;	/* traffic control verdict */
 #endif
-
 #endif
 
 
@@ -310,26 +310,67 @@ struct sk_buff {
 #include <asm/system.h>
 
 extern void	       __kfree_skb(struct sk_buff *skb);
-extern struct sk_buff *alloc_skb(unsigned int size, int priority);
+extern struct sk_buff *__alloc_skb(unsigned int size,
+				   gfp_t priority, int fclone);
+static inline struct sk_buff *alloc_skb(unsigned int size,
+					gfp_t priority)
+{
+	return __alloc_skb(size, priority, 0);
+}
+
+static inline struct sk_buff *alloc_skb_fclone(unsigned int size,
+					       gfp_t priority)
+{
+	return __alloc_skb(size, priority, 1);
+}
+
 extern struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
-					    unsigned int size, int priority);
+					    unsigned int size,
+					    gfp_t priority,
+					    int fclone);
 extern void	       kfree_skbmem(struct sk_buff *skb);
-extern struct sk_buff *skb_clone(struct sk_buff *skb, int priority);
-extern struct sk_buff *skb_copy(const struct sk_buff *skb, int priority);
-extern struct sk_buff *pskb_copy(struct sk_buff *skb, int gfp_mask);
+extern struct sk_buff *skb_clone(struct sk_buff *skb,
+				 gfp_t priority);
+extern struct sk_buff *skb_copy(const struct sk_buff *skb,
+				gfp_t priority);
+extern struct sk_buff *pskb_copy(struct sk_buff *skb,
+				 gfp_t gfp_mask);
 extern int	       pskb_expand_head(struct sk_buff *skb,
-					int nhead, int ntail, int gfp_mask);
+					int nhead, int ntail,
+					gfp_t gfp_mask);
 extern struct sk_buff *skb_realloc_headroom(struct sk_buff *skb,
 					    unsigned int headroom);
 extern struct sk_buff *skb_copy_expand(const struct sk_buff *skb,
 				       int newheadroom, int newtailroom,
-				       int priority);
+				       gfp_t priority);
 extern struct sk_buff *		skb_pad(struct sk_buff *skb, int pad);
 #define dev_kfree_skb(a)	kfree_skb(a)
 extern void	      skb_over_panic(struct sk_buff *skb, int len,
 				     void *here);
 extern void	      skb_under_panic(struct sk_buff *skb, int len,
 				      void *here);
+
+struct skb_seq_state
+{
+	__u32		lower_offset;
+	__u32		upper_offset;
+	__u32		frag_idx;
+	__u32		stepped_offset;
+	struct sk_buff	*root_skb;
+	struct sk_buff	*cur_skb;
+	__u8		*frag_data;
+};
+
+extern void	      skb_prepare_seq_read(struct sk_buff *skb,
+					   unsigned int from, unsigned int to,
+					   struct skb_seq_state *st);
+extern unsigned int   skb_seq_read(unsigned int consumed, const u8 **data,
+				   struct skb_seq_state *st);
+extern void	      skb_abort_seq_read(struct skb_seq_state *st);
+
+extern unsigned int   skb_find_text(struct sk_buff *skb, unsigned int from,
+				    unsigned int to, struct ts_config *config,
+				    struct ts_state *state);
 
 /* Internal */
 #define skb_shinfo(SKB)		((struct skb_shared_info *)((SKB)->end))
@@ -452,7 +493,8 @@ static inline int skb_shared(const struct sk_buff *skb)
  *
  *	NULL is returned on a memory allocation failure.
  */
-static inline struct sk_buff *skb_share_check(struct sk_buff *skb, int pri)
+static inline struct sk_buff *skb_share_check(struct sk_buff *skb,
+					      gfp_t pri)
 {
 	might_sleep_if(pri & __GFP_WAIT);
 	if (skb_shared(skb)) {
@@ -483,7 +525,8 @@ static inline struct sk_buff *skb_share_check(struct sk_buff *skb, int pri)
  *
  *	%NULL is returned on a memory allocation failure.
  */
-static inline struct sk_buff *skb_unshare(struct sk_buff *skb, int pri)
+static inline struct sk_buff *skb_unshare(struct sk_buff *skb,
+					  gfp_t pri)
 {
 	might_sleep_if(pri & __GFP_WAIT);
 	if (skb_cloned(skb)) {
@@ -577,7 +620,6 @@ static inline void __skb_queue_head(struct sk_buff_head *list,
 {
 	struct sk_buff *prev, *next;
 
-	newsk->list = list;
 	list->qlen++;
 	prev = (struct sk_buff *)list;
 	next = prev->next;
@@ -602,7 +644,6 @@ static inline void __skb_queue_tail(struct sk_buff_head *list,
 {
 	struct sk_buff *prev, *next;
 
-	newsk->list = list;
 	list->qlen++;
 	next = (struct sk_buff *)list;
 	prev = next->prev;
@@ -635,7 +676,6 @@ static inline struct sk_buff *__skb_dequeue(struct sk_buff_head *list)
 		next->prev   = prev;
 		prev->next   = next;
 		result->next = result->prev = NULL;
-		result->list = NULL;
 	}
 	return result;
 }
@@ -644,7 +684,7 @@ static inline struct sk_buff *__skb_dequeue(struct sk_buff_head *list)
 /*
  *	Insert a packet on a list.
  */
-extern void        skb_insert(struct sk_buff *old, struct sk_buff *newsk);
+extern void        skb_insert(struct sk_buff *old, struct sk_buff *newsk, struct sk_buff_head *list);
 static inline void __skb_insert(struct sk_buff *newsk,
 				struct sk_buff *prev, struct sk_buff *next,
 				struct sk_buff_head *list)
@@ -652,24 +692,23 @@ static inline void __skb_insert(struct sk_buff *newsk,
 	newsk->next = next;
 	newsk->prev = prev;
 	next->prev  = prev->next = newsk;
-	newsk->list = list;
 	list->qlen++;
 }
 
 /*
  *	Place a packet after a given packet in a list.
  */
-extern void	   skb_append(struct sk_buff *old, struct sk_buff *newsk);
-static inline void __skb_append(struct sk_buff *old, struct sk_buff *newsk)
+extern void	   skb_append(struct sk_buff *old, struct sk_buff *newsk, struct sk_buff_head *list);
+static inline void __skb_append(struct sk_buff *old, struct sk_buff *newsk, struct sk_buff_head *list)
 {
-	__skb_insert(newsk, old, old->next, old->list);
+	__skb_insert(newsk, old, old->next, list);
 }
 
 /*
  * remove sk_buff from list. _Must_ be called atomically, and with
  * the list known..
  */
-extern void	   skb_unlink(struct sk_buff *skb);
+extern void	   skb_unlink(struct sk_buff *skb, struct sk_buff_head *list);
 static inline void __skb_unlink(struct sk_buff *skb, struct sk_buff_head *list)
 {
 	struct sk_buff *next, *prev;
@@ -678,7 +717,6 @@ static inline void __skb_unlink(struct sk_buff *skb, struct sk_buff_head *list)
 	next	   = skb->next;
 	prev	   = skb->prev;
 	skb->next  = skb->prev = NULL;
-	skb->list  = NULL;
 	next->prev = prev;
 	prev->next = next;
 }
@@ -989,7 +1027,7 @@ static inline void __skb_queue_purge(struct sk_buff_head *list)
  *	%NULL is returned in there is no free memory.
  */
 static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
-					      int gfp_mask)
+					      gfp_t gfp_mask)
 {
 	struct sk_buff *skb = alloc_skb(length + 16, gfp_mask);
 	if (likely(skb))
@@ -997,7 +1035,7 @@ static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 	return skb;
 }
 #else
-extern struct sk_buff *__dev_alloc_skb(unsigned int length, int gfp_mask);
+extern struct sk_buff *__dev_alloc_skb(unsigned int length, gfp_t gfp_mask);
 #endif
 
 /**
@@ -1102,8 +1140,8 @@ static inline int skb_can_coalesce(struct sk_buff *skb, int i,
  *	If there is no free memory -ENOMEM is returned, otherwise zero
  *	is returned and the old skb data released.
  */
-extern int __skb_linearize(struct sk_buff *skb, int gfp);
-static inline int skb_linearize(struct sk_buff *skb, int gfp)
+extern int __skb_linearize(struct sk_buff *skb, gfp_t gfp);
+static inline int skb_linearize(struct sk_buff *skb, gfp_t gfp)
 {
 	return __skb_linearize(skb, gfp);
 }
@@ -1137,7 +1175,7 @@ static inline void skb_postpull_rcsum(struct sk_buff *skb,
 
 static inline int pskb_trim_rcsum(struct sk_buff *skb, unsigned int len)
 {
-	if (len >= skb->len)
+	if (likely(len >= skb->len))
 		return 0;
 	if (skb->ip_summed == CHECKSUM_HW)
 		skb->ip_summed = CHECKSUM_NONE;
@@ -1193,12 +1231,14 @@ extern void	       skb_copy_and_csum_dev(const struct sk_buff *skb, u8 *to);
 extern void	       skb_split(struct sk_buff *skb,
 				 struct sk_buff *skb1, const u32 len);
 
+extern void	       skb_release_data(struct sk_buff *skb);
+
 static inline void *skb_header_pointer(const struct sk_buff *skb, int offset,
 				       int len, void *buffer)
 {
 	int hlen = skb_headlen(skb);
 
-	if (offset + len <= hlen)
+	if (hlen - offset >= len)
 		return skb->data + offset;
 
 	if (skb_copy_bits(skb, offset, buffer, len) < 0)
@@ -1209,6 +1249,38 @@ static inline void *skb_header_pointer(const struct sk_buff *skb, int offset,
 
 extern void skb_init(void);
 extern void skb_add_mtu(int mtu);
+
+/**
+ *	skb_get_timestamp - get timestamp from a skb
+ *	@skb: skb to get stamp from
+ *	@stamp: pointer to struct timeval to store stamp in
+ *
+ *	Timestamps are stored in the skb as offsets to a base timestamp.
+ *	This function converts the offset back to a struct timeval and stores
+ *	it in stamp.
+ */
+static inline void skb_get_timestamp(const struct sk_buff *skb, struct timeval *stamp)
+{
+	stamp->tv_sec  = skb->tstamp.off_sec;
+	stamp->tv_usec = skb->tstamp.off_usec;
+}
+
+/**
+ * 	skb_set_timestamp - set timestamp of a skb
+ *	@skb: skb to set stamp of
+ *	@stamp: pointer to struct timeval to get stamp from
+ *
+ *	Timestamps are stored in the skb as offsets to a base timestamp.
+ *	This function converts a struct timeval to an offset and stores
+ *	it in the skb.
+ */
+static inline void skb_set_timestamp(struct sk_buff *skb, const struct timeval *stamp)
+{
+	skb->tstamp.off_sec  = stamp->tv_sec;
+	skb->tstamp.off_usec = stamp->tv_usec;
+}
+
+extern void __net_timestamp(struct sk_buff *skb);
 
 #ifdef CONFIG_NETFILTER
 static inline void nf_conntrack_put(struct nf_conntrack *nfct)
@@ -1225,15 +1297,6 @@ static inline void nf_reset(struct sk_buff *skb)
 {
 	nf_conntrack_put(skb->nfct);
 	skb->nfct = NULL;
-#ifdef CONFIG_NETFILTER_DEBUG
-	skb->nf_debug = 0;
-#endif
-}
-static inline void nf_reset_debug(struct sk_buff *skb)
-{
-#ifdef CONFIG_NETFILTER_DEBUG
-	skb->nf_debug = 0;
-#endif
 }
 
 #ifdef CONFIG_BRIDGE_NETFILTER

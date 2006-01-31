@@ -5,6 +5,9 @@ menu "Device Drivers"
 source "drivers/base/Kconfig"
 
 if !XEN || XEN_PHYSDEV_ACCESS
+
+source "drivers/connector/Kconfig"
+
 source "drivers/mtd/Kconfig"
 
 source "drivers/parport/Kconfig"
@@ -36,7 +39,7 @@ source "drivers/message/i2o/Kconfig"
 source "drivers/macintosh/Kconfig"
 endif
 
-source "net/Kconfig"
+source "drivers/net/Kconfig"
 
 if !XEN || XEN_PHYSDEV_ACCESS
 source "drivers/isdn/Kconfig"
@@ -53,7 +56,11 @@ source "drivers/i2c/Kconfig"
 
 source "drivers/w1/Kconfig"
 
+source "drivers/hwmon/Kconfig"
+
 source "drivers/misc/Kconfig"
+
+source "drivers/mfd/Kconfig"
 
 source "drivers/media/Kconfig"
 
@@ -67,5 +74,7 @@ source "drivers/mmc/Kconfig"
 
 source "drivers/infiniband/Kconfig"
 endif
+
+source "drivers/sn/Kconfig"
 
 endmenu

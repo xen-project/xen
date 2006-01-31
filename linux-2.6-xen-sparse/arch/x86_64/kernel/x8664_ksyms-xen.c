@@ -59,7 +59,9 @@ EXPORT_SYMBOL(disable_irq_nosync);
 EXPORT_SYMBOL(probe_irq_mask);
 EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(pm_idle);
+#ifdef CONFIG_ACPI_BOOT
 EXPORT_SYMBOL(pm_power_off);
+#endif
 EXPORT_SYMBOL(get_cmos_time);
 
 EXPORT_SYMBOL(__down_failed);
@@ -176,10 +178,6 @@ EXPORT_SYMBOL(rwsem_down_write_failed_thunk);
 #endif
 
 EXPORT_SYMBOL(empty_zero_page);
-
-#ifdef CONFIG_HAVE_DEC_LOCK
-EXPORT_SYMBOL(_atomic_dec_and_lock);
-#endif
 
 EXPORT_SYMBOL(die_chain);
 EXPORT_SYMBOL(register_die_notifier);

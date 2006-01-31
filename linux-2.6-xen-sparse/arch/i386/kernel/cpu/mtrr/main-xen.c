@@ -79,15 +79,25 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 	return op.u.add_memtype.reg;
 }
 
+static int mtrr_check(unsigned long base, unsigned long size)
+{
+	if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
+		printk(KERN_WARNING
+			"mtrr: size and base must be multiples of 4 kiB\n");
+		printk(KERN_DEBUG
+			"mtrr: size: 0x%lx  base: 0x%lx\n", size, base);
+		dump_stack();
+		return -1;
+	}
+	return 0;
+}
+
 int
 mtrr_add(unsigned long base, unsigned long size, unsigned int type,
 	 char increment)
 {
-	if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
-		printk(KERN_WARNING "mtrr: size and base must be multiples of 4 kiB\n");
-		printk(KERN_DEBUG "mtrr: size: 0x%lx  base: 0x%lx\n", size, base);
+	if (mtrr_check(base, size))
 		return -EINVAL;
-	}
 	return mtrr_add_page(base >> PAGE_SHIFT, size >> PAGE_SHIFT, type,
 			     increment);
 }
@@ -139,16 +149,21 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 int
 mtrr_del(int reg, unsigned long base, unsigned long size)
 {
-	if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
-		printk(KERN_INFO "mtrr: size and base must be multiples of 4 kiB\n");
-		printk(KERN_DEBUG "mtrr: size: 0x%lx  base: 0x%lx\n", size, base);
+	if (mtrr_check(base, size))
 		return -EINVAL;
-	}
 	return mtrr_del_page(reg, base >> PAGE_SHIFT, size >> PAGE_SHIFT);
 }
 
 EXPORT_SYMBOL(mtrr_add);
 EXPORT_SYMBOL(mtrr_del);
+
+void __init mtrr_bp_init(void)
+{
+}
+
+void mtrr_ap_init(void)
+{
+}
 
 static int __init mtrr_init(void)
 {

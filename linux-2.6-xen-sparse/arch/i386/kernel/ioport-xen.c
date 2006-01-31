@@ -101,25 +101,21 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
  * code.
  */
 
-asmlinkage long sys_iopl(unsigned int new_io_pl)
+asmlinkage long sys_iopl(unsigned long unused)
 {
-	unsigned int old_io_pl = current->thread.io_pl;
-	physdev_op_t op;
+	volatile struct pt_regs * regs = (struct pt_regs *) &unused;
+	unsigned int level = regs->ebx;
+	struct thread_struct *t = &current->thread;
+	unsigned int old = (t->iopl >> 12) & 3;
 
-	if (new_io_pl > 3)
+	if (level > 3)
 		return -EINVAL;
-
-	/* Need "raw I/O" privileges for direct port access. */
-	if ((new_io_pl > old_io_pl) && !capable(CAP_SYS_RAWIO))
-		return -EPERM;
-
-	/* Change our version of the privilege levels. */
-	current->thread.io_pl = new_io_pl;
-
-	/* Force the change at ring 0. */
-	op.cmd             = PHYSDEVOP_SET_IOPL;
-	op.u.set_iopl.iopl = (new_io_pl == 0) ? 1 : new_io_pl;
-	HYPERVISOR_physdev_op(&op);
-
+	/* Trying to gain more privileges? */
+	if (level > old) {
+		if (!capable(CAP_SYS_RAWIO))
+			return -EPERM;
+	}
+	t->iopl = level << 12;
+	set_iopl_mask(t->iopl);
 	return 0;
 }

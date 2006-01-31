@@ -8,7 +8,8 @@
  * 
  *  X86-64 port
  *	Andi Kleen.
- * 
+ *
+ *	CPU hotplug support - ashok.raj@intel.com
  *  $Id: process.c,v 1.38 2002/01/15 10:08:03 ak Exp $
  * 
  *  Jun Nakajima <jun.nakajima@intel.com> 
@@ -34,10 +35,10 @@
 #include <linux/a.out.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
-#include <linux/irq.h>
 #include <linux/ptrace.h>
 #include <linux/utsname.h>
 #include <linux/random.h>
+#include <linux/kprobes.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -103,10 +104,15 @@ void xen_idle(void)
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
+DECLARE_PER_CPU(int, cpu_state);
+
 #include <asm/nmi.h>
 /* We don't actually take CPU down, just spin without interrupts. */
 static inline void play_dead(void)
 {
+	idle_task_exit();
+	wbinvd();
+	mb();
 	/* Ack it */
 	__get_cpu_var(cpu_state) = CPU_DEAD;
 
@@ -137,8 +143,6 @@ static inline void play_dead(void)
  */
 void cpu_idle (void)
 {
-	int cpu = smp_processor_id();
-
 	/* endless idle loop with no priority at all */
 	while (1) {
 		while (!need_resched()) {
@@ -146,7 +150,7 @@ void cpu_idle (void)
 				__get_cpu_var(cpu_idle_state) = 0;
 			rmb();
 			
-			if (cpu_is_offline(cpu))
+			if (cpu_is_offline(smp_processor_id()))
 				play_dead();
 
 			xen_idle();
@@ -186,7 +190,7 @@ EXPORT_SYMBOL_GPL(cpu_idle_wait);
 
 /* XXX XEN doesn't use mwait_idle(), select_idle_routine(), idle_setup(). */
 /* Always use xen_idle() instead. */
-void __init select_idle_routine(const struct cpuinfo_x86 *c) {}
+void __cpuinit select_idle_routine(const struct cpuinfo_x86 *c) {}
 
 /* Prints also some state that isn't saved in the pt_regs */ 
 void __show_regs(struct pt_regs * regs)
@@ -197,8 +201,11 @@ void __show_regs(struct pt_regs * regs)
 
 	printk("\n");
 	print_modules();
-	printk("Pid: %d, comm: %.20s %s %s\n", 
-	       current->pid, current->comm, print_tainted(), system_utsname.release);
+	printk("Pid: %d, comm: %.20s %s %s %.*s\n",
+		current->pid, current->comm, print_tainted(),
+		system_utsname.release,
+		(int)strcspn(system_utsname.version, " "),
+		system_utsname.version);
 	printk("RIP: %04lx:[<%016lx>] ", regs->cs & 0xffff, regs->rip);
 	printk_address(regs->rip); 
 	printk("\nRSP: %04lx:%016lx  EFLAGS: %08lx\n", regs->ss, regs->rsp, regs->eflags);
@@ -231,6 +238,7 @@ void __show_regs(struct pt_regs * regs)
 
 void show_regs(struct pt_regs *regs)
 {
+	printk("CPU %d:", smp_processor_id());
 	__show_regs(regs);
 	show_trace(&regs->rsp);
 }
@@ -242,6 +250,14 @@ void exit_thread(void)
 {
 	struct task_struct *me = current;
 	struct thread_struct *t = &me->thread;
+
+	/*
+	 * Remove function-return probe instances associated with this task
+	 * and put them back on the free list. Do not insert an exit probe for
+	 * this function, it will be disabled by kprobe_flush_task if you do.
+	 */
+	kprobe_flush_task(me);
+
 	if (me->thread.io_bitmap_ptr) { 
 		struct tss_struct *tss = &per_cpu(init_tss, get_cpu());
 
@@ -265,6 +281,13 @@ void flush_thread(void)
 {
 	struct task_struct *tsk = current;
 	struct thread_info *t = current_thread_info();
+
+	/*
+	 * Remove function-return probe instances associated with this task
+	 * and put them back on the free list. Do not insert an exit probe for
+	 * this function, it will be disabled by kprobe_flush_task if you do.
+	 */
+	kprobe_flush_task(tsk);
 
 	if (t->flags & _TIF_ABI_PENDING)
 		t->flags ^= (_TIF_ABI_PENDING | _TIF_IA32);
@@ -384,7 +407,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 		if (err) 
 			goto out;
 	}
-        p->thread.io_pl = current->thread.io_pl;
+        p->thread.iopl = current->thread.iopl;
 
 	err = 0;
 out:
@@ -394,14 +417,6 @@ out:
 	}
 	return err;
 }
-
-/*
- * This special macro can be used to load a debugging register
- */
-#define loaddebug(thread,register) \
-		HYPERVISOR_set_debugreg((register),	\
-			(thread->debugreg ## register))
-
 
 static inline void __save_init_fpu( struct task_struct *tsk )
 {
@@ -463,9 +478,9 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 	C(0); C(1); C(2);
 #undef C
 
-	if (unlikely(prev->io_pl != next->io_pl)) {
+	if (unlikely(prev->iopl != next->iopl)) {
 		iopl_op.cmd             = PHYSDEVOP_SET_IOPL;
-		iopl_op.u.set_iopl.iopl = (next->io_pl == 0) ? 1 : next->io_pl;
+		iopl_op.u.set_iopl.iopl = (next->iopl == 0) ? 1 : next->iopl;
 		mcl->op      = __HYPERVISOR_physdev_op;
 		mcl->args[0] = (unsigned long)&iopl_op;
 		mcl++;
@@ -521,13 +536,13 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 	 * Now maybe reload the debug registers
 	 */
 	if (unlikely(next->debugreg7)) {
-		loaddebug(next, 0);
-		loaddebug(next, 1);
-		loaddebug(next, 2);
-		loaddebug(next, 3);
+		set_debugreg(next->debugreg0, 0);
+		set_debugreg(next->debugreg1, 1);
+		set_debugreg(next->debugreg2, 2);
+		set_debugreg(next->debugreg3, 3);
 		/* no 4 and 5 */
-		loaddebug(next, 6);
-		loaddebug(next, 7);
+		set_debugreg(next->debugreg6, 6);
+		set_debugreg(next->debugreg7, 7);
 	}
 
 	return prev_p;
@@ -630,7 +645,7 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 
 	switch (code) { 
 	case ARCH_SET_GS:
-		if (addr >= TASK_SIZE) 
+		if (addr >= TASK_SIZE_OF(task))
 			return -EPERM; 
 		cpu = get_cpu();
 		/* handle small bases via the GDT because that's faster to 
@@ -656,7 +671,7 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 	case ARCH_SET_FS:
 		/* Not strictly needed for fs, but do it for symmetry
 		   with gs */
-		if (addr >= TASK_SIZE)
+		if (addr >= TASK_SIZE_OF(task))
 			return -EPERM; 
 		cpu = get_cpu();
 		/* handle small bases via the GDT because that's faster to 

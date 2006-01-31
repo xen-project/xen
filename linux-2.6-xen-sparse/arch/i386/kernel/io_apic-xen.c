@@ -21,7 +21,6 @@
  */
 
 #include <linux/mm.h>
-#include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/delay.h>
@@ -31,12 +30,14 @@
 #include <linux/mc146818rtc.h>
 #include <linux/compiler.h>
 #include <linux/acpi.h>
-
+#include <linux/module.h>
 #include <linux/sysdev.h>
+
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/desc.h>
 #include <asm/timer.h>
+#include <asm/i8259.h>
 
 #include <mach_apic.h>
 
@@ -100,6 +101,8 @@ int sis_apic_bug = -1;
  */
 int nr_ioapic_registers[MAX_IO_APICS];
 
+int disable_timer_pin_1 __initdata;
+
 /*
  * Rough estimation of how many shared IRQs there are, can
  * be changed anytime.
@@ -118,7 +121,7 @@ static struct irq_pin_list {
 	int apic, pin, next;
 } irq_2_pin[PIN_MAP_SIZE];
 
-int vector_irq[NR_VECTORS] = { [0 ... NR_VECTORS - 1] = -1};
+int vector_irq[NR_VECTORS] __read_mostly = { [0 ... NR_VECTORS - 1] = -1};
 #ifdef CONFIG_PCI_MSI
 #define vector_to_irq(vector) 	\
 	(platform_legacy_irq(vector) ? vector : vector_irq[vector])
@@ -149,7 +152,9 @@ static void add_pin_to_irq(unsigned int irq, int apic, int pin)
 	entry->pin = pin;
 }
 
-#ifndef CONFIG_XEN
+#ifdef CONFIG_XEN
+#define clear_IO_APIC() ((void)0)
+#else
 /*
  * Reroute an IRQ to a different pin.
  */
@@ -264,13 +269,21 @@ static void clear_IO_APIC (void)
 			clear_IO_APIC_pin(apic, pin);
 }
 
+#ifdef CONFIG_SMP
 static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t cpumask)
 {
 	unsigned long flags;
 	int pin;
 	struct irq_pin_list *entry = irq_2_pin + irq;
 	unsigned int apicid_value;
+	cpumask_t tmp;
 	
+	cpus_and(tmp, cpumask, cpu_online_map);
+	if (cpus_empty(tmp))
+		tmp = TARGET_CPUS;
+
+	cpus_and(cpumask, tmp, CPU_MASK_ALL);
+
 	apicid_value = cpu_mask_to_apicid(cpumask);
 	/* Prepare to do the io_apic_write */
 	apicid_value = apicid_value << 24;
@@ -284,11 +297,9 @@ static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t cpumask)
 			break;
 		entry = irq_2_pin + entry->next;
 	}
+	set_irq_info(irq, cpumask);
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 }
-#else
-#define clear_IO_APIC() ((void)0)
-#endif
 
 #if defined(CONFIG_IRQBALANCE)
 # include <asm/processor.h>	/* kernel_thread() */
@@ -304,7 +315,6 @@ static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t cpumask)
 #  define Dprintk(x...) 
 # endif
 
-cpumask_t __cacheline_aligned pending_irq_balance_cpumask[NR_IRQS];
 
 #define IRQBALANCE_CHECK_ARCH -999
 static int irqbalance_disabled = IRQBALANCE_CHECK_ARCH;
@@ -373,12 +383,7 @@ static inline void balance_irq(int cpu, int irq)
 	cpus_and(allowed_mask, cpu_online_map, irq_affinity[irq]);
 	new_cpu = move(cpu, allowed_mask, now, 1);
 	if (cpu != new_cpu) {
-		irq_desc_t *desc = irq_desc + irq;
-		unsigned long flags;
-
-		spin_lock_irqsave(&desc->lock, flags);
-		pending_irq_balance_cpumask[irq] = cpumask_of_cpu(new_cpu);
-		spin_unlock_irqrestore(&desc->lock, flags);
+		set_pending_irq(irq, cpumask_of_cpu(new_cpu));
 	}
 }
 
@@ -573,16 +578,12 @@ tryanotherirq:
 	cpus_and(tmp, target_cpu_mask, allowed_mask);
 
 	if (!cpus_empty(tmp)) {
-		irq_desc_t *desc = irq_desc + selected_irq;
-		unsigned long flags;
 
 		Dprintk("irq = %d moved to cpu = %d\n",
 				selected_irq, min_loaded);
 		/* mark for change destination */
-		spin_lock_irqsave(&desc->lock, flags);
-		pending_irq_balance_cpumask[selected_irq] =
-					cpumask_of_cpu(min_loaded);
-		spin_unlock_irqrestore(&desc->lock, flags);
+		set_pending_irq(selected_irq, cpumask_of_cpu(min_loaded));
+
 		/* Since we made a change, come back sooner to 
 		 * check for more variation.
 		 */
@@ -613,13 +614,13 @@ static int balanced_irq(void *unused)
 	
 	/* push everything to CPU 0 to give us a starting point.  */
 	for (i = 0 ; i < NR_IRQS ; i++) {
-		pending_irq_balance_cpumask[i] = cpumask_of_cpu(0);
+		pending_irq_cpumask[i] = cpumask_of_cpu(0);
+		set_pending_irq(i, cpumask_of_cpu(0));
 	}
 
 	for ( ; ; ) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		time_remaining = schedule_timeout(time_remaining);
-		try_to_freeze(PF_FREEZE);
+		time_remaining = schedule_timeout_interruptible(time_remaining);
+		try_to_freeze();
 		if (time_after(jiffies,
 				prev_balance_time+balanced_irq_interval)) {
 			preempt_disable();
@@ -678,10 +679,8 @@ static int __init balanced_irq_init(void)
 		printk(KERN_ERR "balanced_irq_init: failed to spawn balanced_irq");
 failed:
 	for (i = 0; i < NR_CPUS; i++) {
-		if(irq_cpu_data[i].irq_delta)
-			kfree(irq_cpu_data[i].irq_delta);
-		if(irq_cpu_data[i].last_irq)
-			kfree(irq_cpu_data[i].last_irq);
+		kfree(irq_cpu_data[i].irq_delta);
+		kfree(irq_cpu_data[i].last_irq);
 	}
 	return 0;
 }
@@ -694,20 +693,10 @@ int __init irqbalance_disable(char *str)
 
 __setup("noirqbalance", irqbalance_disable);
 
-static inline void move_irq(int irq)
-{
-	/* note - we hold the desc->lock */
-	if (unlikely(!cpus_empty(pending_irq_balance_cpumask[irq]))) {
-		set_ioapic_affinity_irq(irq, pending_irq_balance_cpumask[irq]);
-		cpus_clear(pending_irq_balance_cpumask[irq]);
-	}
-}
-
 late_initcall(balanced_irq_init);
-
-#else /* !CONFIG_IRQBALANCE */
-static inline void move_irq(int irq) { }
 #endif /* CONFIG_IRQBALANCE */
+#endif /* CONFIG_SMP */
+#endif
 
 #ifndef CONFIG_SMP
 void fastcall send_IPI_self(int vector)
@@ -864,13 +853,15 @@ int IO_APIC_get_PCI_irq_vector(int bus, int slot, int pin)
 	}
 	return best_guess;
 }
+EXPORT_SYMBOL(IO_APIC_get_PCI_irq_vector);
 
-#ifndef CONFIG_XEN
 /*
  * This function currently is only a helper for the i386 smp boot process where 
  * we need to reprogram the ioredtbls to cater for the cpus which have come online
  * so mask in all cases should simply be TARGET_CPUS
  */
+#ifdef CONFIG_SMP
+#ifndef CONFIG_XEN
 void __init setup_ioapic_dest(void)
 {
 	int pin, ioapic, irq, irq_entry;
@@ -890,6 +881,7 @@ void __init setup_ioapic_dest(void)
 	}
 }
 #endif /* !CONFIG_XEN */
+#endif
 
 /*
  * EISA Edge/Level control register, ELCR
@@ -1179,7 +1171,7 @@ static inline int IO_APIC_irq_trigger(int irq)
 }
 
 /* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
-u8 irq_vector[NR_IRQ_VECTORS]; /* = { FIRST_DEVICE_VECTOR , 0 }; */
+u8 irq_vector[NR_IRQ_VECTORS] __read_mostly; /* = { FIRST_DEVICE_VECTOR , 0 }; */
 
 int assign_irq_vector(int irq)
 {
@@ -1301,6 +1293,7 @@ static void __init setup_IO_APIC_irqs(void)
 		spin_lock_irqsave(&ioapic_lock, flags);
 		io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));
 		io_apic_write(apic, 0x10+2*pin, *(((int *)&entry)+0));
+		set_native_irq_info(irq, TARGET_CPUS);
 		spin_unlock_irqrestore(&ioapic_lock, flags);
 	}
 	}
@@ -1618,7 +1611,6 @@ void print_all_local_APICs (void)
 
 void /*__init*/ print_PIC(void)
 {
-	extern spinlock_t i8259A_lock;
 	unsigned int v;
 	unsigned long flags;
 
@@ -1687,13 +1679,46 @@ static void __init enable_IO_APIC(void)
  */
 void disable_IO_APIC(void)
 {
+#ifndef CONFIG_XEN
+	int pin;
+#endif
 	/*
 	 * Clear the IO-APIC before rebooting:
 	 */
 	clear_IO_APIC();
 
 #ifndef CONFIG_XEN
-	disconnect_bsp_APIC();
+	/*
+	 * If the i8259 is routed through an IOAPIC
+	 * Put that IOAPIC in virtual wire mode
+	 * so legacy interrupts can be delivered.
+	 */
+	pin = find_isa_irq_pin(0, mp_ExtINT);
+	if (pin != -1) {
+		struct IO_APIC_route_entry entry;
+		unsigned long flags;
+
+		memset(&entry, 0, sizeof(entry));
+		entry.mask            = 0; /* Enabled */
+		entry.trigger         = 0; /* Edge */
+		entry.irr             = 0;
+		entry.polarity        = 0; /* High */
+		entry.delivery_status = 0;
+		entry.dest_mode       = 0; /* Physical */
+		entry.delivery_mode   = 7; /* ExtInt */
+		entry.vector          = 0;
+		entry.dest.physical.physical_dest = 0;
+
+
+		/*
+		 * Add it to the IO-APIC irq-routing table:
+		 */
+		spin_lock_irqsave(&ioapic_lock, flags);
+		io_apic_write(0, 0x11+2*pin, *(((int *)&entry)+1));
+		io_apic_write(0, 0x10+2*pin, *(((int *)&entry)+0));
+		spin_unlock_irqrestore(&ioapic_lock, flags);
+	}
+	disconnect_bsp_APIC(pin != -1);
 #endif
 }
 
@@ -1714,6 +1739,12 @@ static void __init setup_ioapic_ids_from_mpc(void)
 	unsigned char old_id;
 	unsigned long flags;
 
+	/*
+	 * Don't check I/O APIC IDs for xAPIC systems.  They have
+	 * no meaning without the serial APIC bus.
+	 */
+	if (!(boot_cpu_data.x86_vendor == X86_VENDOR_INTEL && boot_cpu_data.x86 < 15))
+		return;
 	/*
 	 * This is broken; anything with a real cpu count has to
 	 * circumvent this idiocy regardless.
@@ -1740,10 +1771,6 @@ static void __init setup_ioapic_ids_from_mpc(void)
 			mp_ioapics[apic].mpc_apicid = reg_00.bits.ID;
 		}
 
-		/* Don't check I/O APIC IDs for some xAPIC systems.  They have
-		 * no meaning without the serial APIC bus. */
-		if (NO_IOAPIC_CHECK)
-			continue;
 		/*
 		 * Sanity check, is the ID really free? Every APIC in a
 		 * system must have a unique ID or we get lots of nice
@@ -1967,6 +1994,7 @@ static void ack_edge_ioapic_vector(unsigned int vector)
 {
 	int irq = vector_to_irq(vector);
 
+	move_irq(vector);
 	ack_edge_ioapic_irq(irq);
 }
 
@@ -1981,6 +2009,7 @@ static void end_level_ioapic_vector (unsigned int vector)
 {
 	int irq = vector_to_irq(vector);
 
+	move_irq(vector);
 	end_level_ioapic_irq(irq);
 }
 
@@ -1998,13 +2027,16 @@ static void unmask_IO_APIC_vector (unsigned int vector)
 	unmask_IO_APIC_irq(irq);
 }
 
+#ifdef CONFIG_SMP
 static void set_ioapic_affinity_vector (unsigned int vector,
 					cpumask_t cpu_mask)
 {
 	int irq = vector_to_irq(vector);
 
+	set_native_irq_info(vector, cpu_mask);
 	set_ioapic_affinity_irq(irq, cpu_mask);
 }
+#endif
 #endif
 
 /*
@@ -2015,7 +2047,7 @@ static void set_ioapic_affinity_vector (unsigned int vector,
  * edge-triggered handler, without risking IRQ storms and other ugly
  * races.
  */
-static struct hw_interrupt_type ioapic_edge_type = {
+static struct hw_interrupt_type ioapic_edge_type __read_mostly = {
 	.typename 	= "IO-APIC-edge",
 	.startup 	= startup_edge_ioapic,
 	.shutdown 	= shutdown_edge_ioapic,
@@ -2023,10 +2055,12 @@ static struct hw_interrupt_type ioapic_edge_type = {
 	.disable 	= disable_edge_ioapic,
 	.ack 		= ack_edge_ioapic,
 	.end 		= end_edge_ioapic,
+#ifdef CONFIG_SMP
 	.set_affinity 	= set_ioapic_affinity,
+#endif
 };
 
-static struct hw_interrupt_type ioapic_level_type = {
+static struct hw_interrupt_type ioapic_level_type __read_mostly = {
 	.typename 	= "IO-APIC-level",
 	.startup 	= startup_level_ioapic,
 	.shutdown 	= shutdown_level_ioapic,
@@ -2034,7 +2068,9 @@ static struct hw_interrupt_type ioapic_level_type = {
 	.disable 	= disable_level_ioapic,
 	.ack 		= mask_and_ack_level_ioapic,
 	.end 		= end_level_ioapic,
+#ifdef CONFIG_SMP
 	.set_affinity 	= set_ioapic_affinity,
+#endif
 };
 #endif /* !CONFIG_XEN */
 
@@ -2101,7 +2137,7 @@ static void ack_lapic_irq (unsigned int irq)
 
 static void end_lapic_irq (unsigned int i) { /* nothing */ }
 
-static struct hw_interrupt_type lapic_irq_type = {
+static struct hw_interrupt_type lapic_irq_type __read_mostly = {
 	.typename 	= "local-APIC-edge",
 	.startup 	= NULL, /* startup_irq() not used for IRQ0 */
 	.shutdown 	= NULL, /* shutdown_irq() not used for IRQ0 */
@@ -2237,6 +2273,8 @@ static inline void check_timer(void)
 				setup_nmi();
 				enable_8259A_irq(0);
 			}
+			if (disable_timer_pin_1 > 0)
+				clear_IO_APIC_pin(0, pin1);
 			return;
 		}
 		clear_IO_APIC_pin(0, pin1);
@@ -2453,7 +2491,7 @@ device_initcall(ioapic_init_sysfs);
                           ACPI-based IOAPIC Configuration
    -------------------------------------------------------------------------- */
 
-#ifdef CONFIG_ACPI_BOOT
+#ifdef CONFIG_ACPI
 
 int __init io_apic_get_unique_id (int ioapic, int apic_id)
 {
@@ -2603,9 +2641,10 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 	spin_lock_irqsave(&ioapic_lock, flags);
 	io_apic_write(ioapic, 0x11+2*pin, *(((int *)&entry)+1));
 	io_apic_write(ioapic, 0x10+2*pin, *(((int *)&entry)+0));
+	set_native_irq_info(use_pci_vector() ? entry.vector : irq, TARGET_CPUS);
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 
 	return 0;
 }
 
-#endif /*CONFIG_ACPI_BOOT*/
+#endif /* CONFIG_ACPI */

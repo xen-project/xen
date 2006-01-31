@@ -11,7 +11,6 @@
 #include <linux/init.h>
 
 #include <linux/mm.h>
-#include <linux/irq.h>
 #include <linux/delay.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
@@ -20,6 +19,7 @@
 #include <linux/cache.h>
 #include <linux/interrupt.h>
 #include <linux/cpu.h>
+#include <linux/module.h>
 
 #include <asm/mtrr.h>
 #include <asm/tlbflush.h>
@@ -415,6 +415,7 @@ void flush_tlb_page(struct vm_area_struct * vma, unsigned long va)
 
 	preempt_enable();
 }
+EXPORT_SYMBOL(flush_tlb_page);
 
 static void do_flush_tlb_all(void* info)
 {
@@ -471,6 +472,16 @@ struct call_data_struct {
 	int wait;
 };
 
+void lock_ipi_call_lock(void)
+{
+	spin_lock_irq(&call_lock);
+}
+
+void unlock_ipi_call_lock(void)
+{
+	spin_unlock_irq(&call_lock);
+}
+
 static struct call_data_struct * call_data;
 
 /*
@@ -498,8 +509,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 
 	/* Holding any lock stops cpus from going down. */
 	spin_lock(&call_lock);
-	cpus = num_online_cpus()-1;
-
+	cpus = num_online_cpus() - 1;
 	if (!cpus) {
 		spin_unlock(&call_lock);
 		return 0;
@@ -532,6 +542,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 
 	return 0;
 }
+EXPORT_SYMBOL(smp_call_function);
 
 static void stop_this_cpu (void * dummy)
 {
@@ -544,7 +555,7 @@ static void stop_this_cpu (void * dummy)
 	disable_local_APIC();
 #endif
 	if (cpu_data[smp_processor_id()].hlt_works_ok)
-		for(;;) __asm__("hlt");
+		for(;;) halt();
 	for (;;);
 }
 

@@ -87,9 +87,7 @@ void paging_init(void);
 #endif
 
 /*
- * The 4MB page is guessing..  Detailed in the infamous "Chapter H"
- * of the Pentium details, but assuming intel did the straightforward
- * thing, this bit set in the page directory entry just means that
+ * _PAGE_PSE set in the page directory entry just means that
  * the page directory entry points directly to a 4MB-aligned block of
  * memory. 
  */
@@ -120,8 +118,10 @@ void paging_init(void);
 #define _PAGE_UNUSED2	0x400
 #define _PAGE_UNUSED3	0x800
 
-#define _PAGE_FILE	0x040	/* set:pagecache unset:swap */
-#define _PAGE_PROTNONE	0x080	/* If not present */
+/* If _PAGE_PRESENT is clear, we use these: */
+#define _PAGE_FILE	0x040	/* nonlinear file mapping, saved PTE; unset:swap */
+#define _PAGE_PROTNONE	0x080	/* if the user mapped it with PROT_NONE;
+				   pte_present gives true */
 #ifdef CONFIG_X86_PAE
 #define _PAGE_NX	(1ULL<<_PAGE_BIT_NX)
 #else
@@ -218,11 +218,13 @@ extern unsigned long pg0[];
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
+#define __LARGE_PTE (_PAGE_PSE | _PAGE_PRESENT)
 static inline int pte_user(pte_t pte)		{ return (pte).pte_low & _PAGE_USER; }
 static inline int pte_read(pte_t pte)		{ return (pte).pte_low & _PAGE_USER; }
 static inline int pte_dirty(pte_t pte)		{ return (pte).pte_low & _PAGE_DIRTY; }
 static inline int pte_young(pte_t pte)		{ return (pte).pte_low & _PAGE_ACCESSED; }
 static inline int pte_write(pte_t pte)		{ return (pte).pte_low & _PAGE_RW; }
+static inline int pte_huge(pte_t pte)		{ return ((pte).pte_low & __LARGE_PTE) == __LARGE_PTE; }
 
 /*
  * The following only works if pte_present() is not true.
@@ -239,6 +241,7 @@ static inline pte_t pte_mkexec(pte_t pte)	{ (pte).pte_low |= _PAGE_USER; return 
 static inline pte_t pte_mkdirty(pte_t pte)	{ (pte).pte_low |= _PAGE_DIRTY; return pte; }
 static inline pte_t pte_mkyoung(pte_t pte)	{ (pte).pte_low |= _PAGE_ACCESSED; return pte; }
 static inline pte_t pte_mkwrite(pte_t pte)	{ (pte).pte_low |= _PAGE_RW; return pte; }
+static inline pte_t pte_mkhuge(pte_t pte)	{ (pte).pte_low |= __LARGE_PTE; return pte; }
 
 #ifdef CONFIG_X86_PAE
 # include <asm/pgtable-3level.h>
@@ -260,10 +263,37 @@ static inline int ptep_test_and_clear_young(struct vm_area_struct *vma, unsigned
 	return test_and_clear_bit(_PAGE_BIT_ACCESSED, &ptep->pte_low);
 }
 
+static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm, unsigned long addr, pte_t *ptep, int full)
+{
+	pte_t pte;
+	if (full) {
+		pte = *ptep;
+		*ptep = __pte(0);
+	} else {
+		pte = ptep_get_and_clear(mm, addr, ptep);
+	}
+	return pte;
+}
+
 static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	if (pte_write(*ptep))
 		clear_bit(_PAGE_BIT_RW, &ptep->pte_low);
+}
+
+/*
+ * clone_pgd_range(pgd_t *dst, pgd_t *src, int count);
+ *
+ *  dst - pointer to pgd range anwhere on a pgd page
+ *  src - ""
+ *  count - the number of pgds to copy.
+ *
+ * dst and src can be on the same page, but the range must not overlap,
+ * and must not cross a page boundary.
+ */
+static inline void clone_pgd_range(pgd_t *dst, pgd_t *src, int count)
+{
+       memcpy(dst, src, count * sizeof(pgd_t));
 }
 
 /*
@@ -279,7 +309,6 @@ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, 
  */
 
 #define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
-#define mk_pte_huge(entry) ((entry).pte_low |= _PAGE_PRESENT | _PAGE_PSE)
 
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
@@ -436,9 +465,9 @@ void make_pages_writable(void *va, unsigned int nr, unsigned int feature);
 
 #endif /* !__ASSEMBLY__ */
 
-#ifndef CONFIG_DISCONTIGMEM
+#ifdef CONFIG_FLATMEM
 #define kern_addr_valid(addr)	(1)
-#endif /* !CONFIG_DISCONTIGMEM */
+#endif /* CONFIG_FLATMEM */
 
 int direct_remap_pfn_range(struct vm_area_struct *vma,
                            unsigned long address, 
@@ -458,9 +487,6 @@ int touch_pte_range(struct mm_struct *mm,
                     unsigned long address,
                     unsigned long size);
 
-#define io_remap_page_range(vma,from,phys,size,prot) \
-direct_remap_pfn_range(vma,from,(phys)>>PAGE_SHIFT,size,prot,DOMID_IO)
-
 #define io_remap_pfn_range(vma,from,pfn,size,prot) \
 direct_remap_pfn_range(vma,from,pfn,size,prot,DOMID_IO)
 
@@ -471,6 +497,7 @@ direct_remap_pfn_range(vma,from,pfn,size,prot,DOMID_IO)
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR
+#define __HAVE_ARCH_PTEP_GET_AND_CLEAR_FULL
 #define __HAVE_ARCH_PTEP_SET_WRPROTECT
 #define __HAVE_ARCH_PTE_SAME
 #include <asm-generic/pgtable.h>

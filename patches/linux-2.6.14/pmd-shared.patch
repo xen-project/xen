@@ -1,7 +1,7 @@
-diff -urNpP linux-2.6.12/arch/i386/mm/pageattr.c linux-2.6.12.new/arch/i386/mm/pageattr.c
---- linux-2.6.12/arch/i386/mm/pageattr.c	2005-06-17 20:48:29.000000000 +0100
-+++ linux-2.6.12.new/arch/i386/mm/pageattr.c	2005-07-11 16:28:09.775165494 +0100
-@@ -75,7 +75,7 @@ static void set_pmd_pte(pte_t *kpte, uns
+diff -pru ../pristine-linux-2.6.14/arch/i386/mm/pageattr.c ./arch/i386/mm/pageattr.c
+--- ../pristine-linux-2.6.14/arch/i386/mm/pageattr.c	2005-10-28 01:02:08.000000000 +0100
++++ ./arch/i386/mm/pageattr.c	2006-01-31 15:49:38.000000000 +0000
+@@ -76,7 +76,7 @@ static void set_pmd_pte(pte_t *kpte, uns
  	unsigned long flags;
  
  	set_pte_atomic(kpte, pte); 	/* change init_mm */
@@ -10,43 +10,24 @@ diff -urNpP linux-2.6.12/arch/i386/mm/pageattr.c linux-2.6.12.new/arch/i386/mm/p
  		return;
  
  	spin_lock_irqsave(&pgd_lock, flags);
-diff -urNpP linux-2.6.12/arch/i386/mm/pgtable.c linux-2.6.12.new/arch/i386/mm/pgtable.c
---- linux-2.6.12/arch/i386/mm/pgtable.c	2005-11-26 09:55:10.000000000 +0000
-+++ linux-2.6.12.new/arch/i386/mm/pgtable.c	2005-11-26 10:20:36.000000000 +0000
-@@ -199,19 +199,20 @@ void pgd_ctor(void *pgd, kmem_cache_t *c
- {
- 	unsigned long flags;
- 
--	if (PTRS_PER_PMD == 1)
-+	if (PTRS_PER_PMD > 1) {
-+		if (HAVE_SHARED_KERNEL_PMD)
-+			memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
-+			       swapper_pg_dir + USER_PTRS_PER_PGD,
-+			       (PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
-+	} else {
+diff -pru ../pristine-linux-2.6.14/arch/i386/mm/pgtable.c ./arch/i386/mm/pgtable.c
+--- ../pristine-linux-2.6.14/arch/i386/mm/pgtable.c	2005-10-28 01:02:08.000000000 +0100
++++ ./arch/i386/mm/pgtable.c	2006-01-31 15:56:50.000000000 +0000
+@@ -212,9 +212,10 @@ void pgd_ctor(void *pgd, kmem_cache_t *c
  		spin_lock_irqsave(&pgd_lock, flags);
--
--	memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
--			swapper_pg_dir + USER_PTRS_PER_PGD,
--			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
--
--	if (PTRS_PER_PMD > 1)
--		return;
--
--	pgd_list_add(pgd);
--	spin_unlock_irqrestore(&pgd_lock, flags);
--	memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
-+		memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
-+		       swapper_pg_dir + USER_PTRS_PER_PGD,
-+		       (PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
-+		memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
-+		pgd_list_add(pgd);
-+		spin_unlock_irqrestore(&pgd_lock, flags);
-+	}
- }
+ 	}
  
- /* never called when PTRS_PER_PMD > 1 */
-@@ -238,6 +239,30 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
+-	clone_pgd_range((pgd_t *)pgd + USER_PTRS_PER_PGD,
+-			swapper_pg_dir + USER_PTRS_PER_PGD,
+-			KERNEL_PGD_PTRS);
++	if (PTRS_PER_PMD == 1 || HAVE_SHARED_KERNEL_PMD)
++		clone_pgd_range((pgd_t *)pgd + USER_PTRS_PER_PGD,
++				swapper_pg_dir + USER_PTRS_PER_PGD,
++				KERNEL_PGD_PTRS);
+ 	if (PTRS_PER_PMD > 1)
+ 		return;
+ 
+@@ -246,6 +247,30 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
  			goto out_oom;
  		set_pgd(&pgd[i], __pgd(1 + __pa(pmd)));
  	}
@@ -77,7 +58,7 @@ diff -urNpP linux-2.6.12/arch/i386/mm/pgtable.c linux-2.6.12.new/arch/i386/mm/pg
  	return pgd;
  
  out_oom:
-@@ -252,9 +277,23 @@ void pgd_free(pgd_t *pgd)
+@@ -260,9 +285,23 @@ void pgd_free(pgd_t *pgd)
  	int i;
  
  	/* in the PAE case user pgd entries are overwritten before usage */
@@ -104,9 +85,9 @@ diff -urNpP linux-2.6.12/arch/i386/mm/pgtable.c linux-2.6.12.new/arch/i386/mm/pg
  	/* in the non-PAE case, free_pgtables() clears user pgd entries */
  	kmem_cache_free(pgd_cache, pgd);
  }
-diff -urNpP linux-2.6.12/include/asm-i386/pgtable-2level-defs.h linux-2.6.12.new/include/asm-i386/pgtable-2level-defs.h
---- linux-2.6.12/include/asm-i386/pgtable-2level-defs.h	2005-06-17 20:48:29.000000000 +0100
-+++ linux-2.6.12.new/include/asm-i386/pgtable-2level-defs.h	2005-07-11 16:28:09.733164251 +0100
+diff -pru ../pristine-linux-2.6.14/include/asm-i386/pgtable-2level-defs.h ./include/asm-i386/pgtable-2level-defs.h
+--- ../pristine-linux-2.6.14/include/asm-i386/pgtable-2level-defs.h	2005-10-28 01:02:08.000000000 +0100
++++ ./include/asm-i386/pgtable-2level-defs.h	2006-01-31 15:49:38.000000000 +0000
 @@ -1,6 +1,8 @@
  #ifndef _I386_PGTABLE_2LEVEL_DEFS_H
  #define _I386_PGTABLE_2LEVEL_DEFS_H
@@ -116,9 +97,9 @@ diff -urNpP linux-2.6.12/include/asm-i386/pgtable-2level-defs.h linux-2.6.12.new
  /*
   * traditional i386 two-level paging structure:
   */
-diff -urNpP linux-2.6.12/include/asm-i386/pgtable-3level-defs.h linux-2.6.12.new/include/asm-i386/pgtable-3level-defs.h
---- linux-2.6.12/include/asm-i386/pgtable-3level-defs.h	2005-06-17 20:48:29.000000000 +0100
-+++ linux-2.6.12.new/include/asm-i386/pgtable-3level-defs.h	2005-07-11 16:28:09.755164902 +0100
+diff -pru ../pristine-linux-2.6.14/include/asm-i386/pgtable-3level-defs.h ./include/asm-i386/pgtable-3level-defs.h
+--- ../pristine-linux-2.6.14/include/asm-i386/pgtable-3level-defs.h	2005-10-28 01:02:08.000000000 +0100
++++ ./include/asm-i386/pgtable-3level-defs.h	2006-01-31 15:49:38.000000000 +0000
 @@ -1,6 +1,8 @@
  #ifndef _I386_PGTABLE_3LEVEL_DEFS_H
  #define _I386_PGTABLE_3LEVEL_DEFS_H

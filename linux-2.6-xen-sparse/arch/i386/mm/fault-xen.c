@@ -21,6 +21,7 @@
 #include <linux/vt_kern.h>		/* For unblank_screen() */
 #include <linux/highmem.h>
 #include <linux/module.h>
+#include <linux/kprobes.h>
 #include <linux/percpu.h>
 
 #include <asm/system.h>
@@ -149,7 +150,7 @@ static int __is_prefetch(struct pt_regs *regs, unsigned long addr)
 
 		if (instr > limit)
 			break;
-		if (__get_user(opcode, (unsigned char *) instr))
+		if (__get_user(opcode, (unsigned char __user *) instr))
 			break; 
 
 		instr_hi = opcode & 0xf0; 
@@ -176,7 +177,7 @@ static int __is_prefetch(struct pt_regs *regs, unsigned long addr)
 			scan_more = 0;
 			if (instr > limit)
 				break;
-			if (__get_user(opcode, (unsigned char *) instr)) 
+			if (__get_user(opcode, (unsigned char __user *) instr))
 				break;
 			prefetch = (instr_lo == 0xF) &&
 				(opcode == 0x0D || opcode == 0x18);
@@ -201,6 +202,18 @@ static inline int is_prefetch(struct pt_regs *regs, unsigned long addr,
 	}
 	return 0;
 } 
+
+static noinline void force_sig_info_fault(int si_signo, int si_code,
+	unsigned long address, struct task_struct *tsk)
+{
+	siginfo_t info;
+
+	info.si_signo = si_signo;
+	info.si_errno = 0;
+	info.si_code = si_code;
+	info.si_addr = (void __user *)address;
+	force_sig_info(si_signo, &info, tsk);
+}
 
 fastcall void do_invalid_op(struct pt_regs *, unsigned long);
 
@@ -282,14 +295,14 @@ static void dump_fault_path(unsigned long address)
  *	bit 1 == 0 means read, 1 means write
  *	bit 2 == 0 means kernel, 1 means user-mode
  */
-fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code)
+fastcall void __kprobes do_page_fault(struct pt_regs *regs,
+				      unsigned long error_code)
 {
 	struct task_struct *tsk;
 	struct mm_struct *mm;
 	struct vm_area_struct * vma;
 	unsigned long address;
-	int write;
-	siginfo_t info;
+	int write, si_code;
 
 	address = HYPERVISOR_shared_info->vcpu_info[
 		smp_processor_id()].arch.cr2;
@@ -309,7 +322,7 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 
 	tsk = current;
 
-	info.si_code = SEGV_MAPERR;
+	si_code = SEGV_MAPERR;
 
 	/*
 	 * We fault-in kernel-space virtual memory on-demand. The
@@ -389,7 +402,7 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code)
  * we can handle it..
  */
 good_area:
-	info.si_code = SEGV_ACCERR;
+	si_code = SEGV_ACCERR;
 	write = 0;
 	switch (error_code & 3) {
 		default:	/* 3: write, present */
@@ -463,11 +476,7 @@ bad_area_nosemaphore:
 		/* Kernel addresses are always protection faults */
 		tsk->thread.error_code = error_code | (address >= TASK_SIZE);
 		tsk->thread.trap_no = 14;
-		info.si_signo = SIGSEGV;
-		info.si_errno = 0;
-		/* info.si_code has been set above */
-		info.si_addr = (void __user *)address;
-		force_sig_info(SIGSEGV, &info, tsk);
+		force_sig_info_fault(SIGSEGV, si_code, address, tsk);
 		return;
 	}
 
@@ -523,6 +532,9 @@ no_context:
 	printk(KERN_ALERT " printing eip:\n");
 	printk("%08lx\n", regs->eip);
 	dump_fault_path(address);
+	tsk->thread.cr2 = address;
+	tsk->thread.trap_no = 14;
+	tsk->thread.error_code = error_code;
 	die("Oops", regs, error_code);
 	bust_spinlocks(0);
 	do_exit(SIGKILL);
@@ -557,11 +569,7 @@ do_sigbus:
 	tsk->thread.cr2 = address;
 	tsk->thread.error_code = error_code;
 	tsk->thread.trap_no = 14;
-	info.si_signo = SIGBUS;
-	info.si_errno = 0;
-	info.si_code = BUS_ADRERR;
-	info.si_addr = (void __user *)address;
-	force_sig_info(SIGBUS, &info, tsk);
+	force_sig_info_fault(SIGBUS, BUS_ADRERR, address, tsk);
 	return;
 
 vmalloc_fault:

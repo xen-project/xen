@@ -23,8 +23,10 @@
  * This file handles the architecture-dependent parts of initialization
  */
 
+#include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
+#include <linux/mmzone.h>
 #include <linux/tty.h>
 #include <linux/ioport.h>
 #include <linux/acpi.h>
@@ -44,7 +46,12 @@
 #include <linux/kernel.h>
 #include <linux/percpu.h>
 #include <linux/notifier.h>
+#include <linux/kexec.h>
+#include <linux/crash_dump.h>
+
 #include <video/edid.h>
+
+#include <asm/apic.h>
 #include <asm/e820.h>
 #include <asm/mpspec.h>
 #include <asm/setup.h>
@@ -60,6 +67,9 @@
 #include "setup_arch_pre.h"
 #include <bios_ebda.h>
 
+/* Forward Declaration. */
+void __init find_max_pfn(void);
+
 /* Allows setting of maximum possible memory size  */
 static unsigned long xen_override_max_pfn;
 
@@ -71,7 +81,7 @@ static struct notifier_block xen_panic_block = {
 extern char hypercall_page[PAGE_SIZE];
 EXPORT_SYMBOL(hypercall_page);
 
-int disable_pse __initdata = 0;
+int disable_pse __devinitdata = 0;
 
 /*
  * Machine setup..
@@ -85,30 +95,37 @@ EXPORT_SYMBOL(efi_enabled);
 /* cpu data as detected by the assembly code in head.S */
 struct cpuinfo_x86 new_cpu_data __initdata = { 0, 0, 0, 0, -1, 0, 1, 0, -1 };
 /* common cpu data for all cpus */
-struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 0, 1, 0, -1 };
+struct cpuinfo_x86 boot_cpu_data __read_mostly = { 0, 0, 0, 0, -1, 0, 1, 0, -1 };
+EXPORT_SYMBOL(boot_cpu_data);
 
 unsigned long mmu_cr4_features;
 
-#ifdef	CONFIG_ACPI_INTERPRETER
+#ifdef	CONFIG_ACPI
 	int acpi_disabled = 0;
 #else
 	int acpi_disabled = 1;
 #endif
 EXPORT_SYMBOL(acpi_disabled);
 
-#ifdef	CONFIG_ACPI_BOOT
+#ifdef	CONFIG_ACPI
 int __initdata acpi_force = 0;
 extern acpi_interrupt_flags	acpi_sci_flags;
 #endif
 
 /* for MCA, but anyone else can use it if they want */
 unsigned int machine_id;
+#ifdef CONFIG_MCA
+EXPORT_SYMBOL(machine_id);
+#endif
 unsigned int machine_submodel_id;
 unsigned int BIOS_revision;
 unsigned int mca_pentium_flag;
 
 /* For PCI or other memory-mapped resources */
 unsigned long pci_mem_start = 0x10000000;
+#ifdef CONFIG_PCI
+EXPORT_SYMBOL(pci_mem_start);
+#endif
 
 /* Boot loader ID as an integer, for the benefit of proc_dointvec */
 int bootloader_type;
@@ -120,14 +137,27 @@ static unsigned int highmem_pages = -1;
  * Setup options
  */
 struct drive_info_struct { char dummy[32]; } drive_info;
+#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_HD) || \
+    defined(CONFIG_BLK_DEV_IDE_MODULE) || defined(CONFIG_BLK_DEV_HD_MODULE)
+EXPORT_SYMBOL(drive_info);
+#endif
 struct screen_info screen_info;
+#ifdef CONFIG_VT
+EXPORT_SYMBOL(screen_info);
+#endif
 struct apm_info apm_info;
+EXPORT_SYMBOL(apm_info);
 struct sys_desc_table_struct {
 	unsigned short length;
 	unsigned char table[0];
 };
 struct edid_info edid_info;
+EXPORT_SYMBOL_GPL(edid_info);
 struct ist_info ist_info;
+#if defined(CONFIG_X86_SPEEDSTEP_SMI) || \
+	defined(CONFIG_X86_SPEEDSTEP_SMI_MODULE)
+EXPORT_SYMBOL(ist_info);
+#endif
 struct e820map e820;
 
 extern void early_cpu_init(void);
@@ -377,12 +407,16 @@ static void __init limit_regions(unsigned long long size)
 	int i;
 
 	if (efi_enabled) {
-		for (i = 0; i < memmap.nr_map; i++) {
-			current_addr = memmap.map[i].phys_addr +
-				       (memmap.map[i].num_pages << 12);
-			if (memmap.map[i].type == EFI_CONVENTIONAL_MEMORY) {
+		efi_memory_desc_t *md;
+		void *p;
+
+		for (p = memmap.map, i = 0; p < memmap.map_end;
+			p += memmap.desc_size, i++) {
+			md = p;
+			current_addr = md->phys_addr + (md->num_pages << 12);
+			if (md->type == EFI_CONVENTIONAL_MEMORY) {
 				if (current_addr >= size) {
-					memmap.map[i].num_pages -=
+					md->num_pages -=
 						(((current_addr-size) + PAGE_SIZE-1) >> PAGE_SHIFT);
 					memmap.nr_map = i + 1;
 					return;
@@ -757,6 +791,15 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			if (to != command_line)
 				to--;
 			if (!memcmp(from+7, "exactmap", 8)) {
+#ifdef CONFIG_CRASH_DUMP
+				/* If we are doing a crash dump, we
+				 * still need to know the real mem
+				 * size before original memory map is
+				 * reset.
+				 */
+				find_max_pfn();
+				saved_max_pfn = max_pfn;
+#endif
 				from += 8+7;
 				e820.nr_map = 0;
 				userdef = 1;
@@ -802,7 +845,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		}
 #endif
 
-#ifdef CONFIG_ACPI_BOOT
+#ifdef CONFIG_ACPI
 		/* "acpi=off" disables both ACPI table parsing and interpreter */
 		else if (!memcmp(from, "acpi=off", 8)) {
 			disable_acpi();
@@ -851,14 +894,55 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 #ifdef CONFIG_X86_IO_APIC
 		else if (!memcmp(from, "acpi_skip_timer_override", 24))
 			acpi_skip_timer_override = 1;
-#endif
 
-#ifdef CONFIG_X86_LOCAL_APIC
+		if (!memcmp(from, "disable_timer_pin_1", 19))
+			disable_timer_pin_1 = 1;
+		if (!memcmp(from, "enable_timer_pin_1", 18))
+			disable_timer_pin_1 = -1;
+
 		/* disable IO-APIC */
 		else if (!memcmp(from, "noapic", 6))
 			disable_ioapic_setup();
+#endif /* CONFIG_X86_IO_APIC */
+#endif /* CONFIG_ACPI */
+
+#ifdef CONFIG_X86_LOCAL_APIC
+		/* enable local APIC */
+		else if (!memcmp(from, "lapic", 5))
+			lapic_enable();
+
+		/* disable local APIC */
+		else if (!memcmp(from, "nolapic", 6))
+			lapic_disable();
 #endif /* CONFIG_X86_LOCAL_APIC */
-#endif /* CONFIG_ACPI_BOOT */
+
+#ifdef CONFIG_KEXEC
+		/* crashkernel=size@addr specifies the location to reserve for
+		 * a crash kernel.  By reserving this memory we guarantee
+		 * that linux never set's it up as a DMA target.
+		 * Useful for holding code to do something appropriate
+		 * after a kernel panic.
+		 */
+		else if (!memcmp(from, "crashkernel=", 12)) {
+			unsigned long size, base;
+			size = memparse(from+12, &from);
+			if (*from == '@') {
+				base = memparse(from+1, &from);
+				/* FIXME: Do I want a sanity check
+				 * to validate the memory range?
+				 */
+				crashk_res.start = base;
+				crashk_res.end   = base + size - 1;
+			}
+		}
+#endif
+#ifdef CONFIG_CRASH_DUMP
+		/* elfcorehdr= specifies the location of elf core header
+		 * stored by the crashed kernel.
+		 */
+		else if (!memcmp(from, "elfcorehdr=", 11))
+			elfcorehdr_addr = memparse(from+11, &from);
+#endif
 
 		/*
 		 * highmem=size forces highmem to be exactly 'size' bytes.
@@ -1086,7 +1170,7 @@ static void __init reserve_ebda_region(void)
 }
 #endif
 
-#ifndef CONFIG_DISCONTIGMEM
+#ifndef CONFIG_NEED_MULTIPLE_NODES
 void __init setup_bootmem_allocator(void);
 static unsigned long __init setup_memory(void)
 {
@@ -1144,9 +1228,9 @@ void __init zone_sizes_init(void)
 	free_area_init(zones_size);
 }
 #else
-extern unsigned long setup_memory(void);
+extern unsigned long __init setup_memory(void);
 extern void zone_sizes_init(void);
-#endif /* !CONFIG_DISCONTIGMEM */
+#endif /* !CONFIG_NEED_MULTIPLE_NODES */
 
 void __init setup_bootmem_allocator(void)
 {
@@ -1164,8 +1248,8 @@ void __init setup_bootmem_allocator(void)
 	 * the (very unlikely) case of us accidentally initializing the
 	 * bootmem allocator with an invalid RAM area.
 	 */
-	reserve_bootmem(HIGH_MEMORY, (PFN_PHYS(min_low_pfn) +
-			 bootmap_size + PAGE_SIZE-1) - (HIGH_MEMORY));
+	reserve_bootmem(__PHYSICAL_START, (PFN_PHYS(min_low_pfn) +
+			 bootmap_size + PAGE_SIZE-1) - (__PHYSICAL_START));
 
 #ifndef CONFIG_XEN
 	/*
@@ -1328,8 +1412,16 @@ legacy_init_iomem_resources(struct resource *code_resource, struct resource *dat
 			 */
 			request_resource(res, code_resource);
 			request_resource(res, data_resource);
+#ifdef CONFIG_KEXEC
+			request_resource(res, &crashk_res);
+#endif
 		}
 	}
+#endif
+#ifdef CONFIG_KEXEC
+	if (crashk_res.start != crashk_res.end)
+		reserve_bootmem(crashk_res.start,
+			crashk_res.end - crashk_res.start + 1);
 #endif
 }
 
@@ -1339,7 +1431,7 @@ legacy_init_iomem_resources(struct resource *code_resource, struct resource *dat
 static void __init register_memory(void)
 {
 #ifndef CONFIG_XEN
-	unsigned long gapstart, gapsize;
+	unsigned long gapstart, gapsize, round;
 	unsigned long long last;
 #endif
 	int	      i;
@@ -1390,14 +1482,14 @@ static void __init register_memory(void)
 	}
 
 	/*
-	 * Start allocating dynamic PCI memory a bit into the gap,
-	 * aligned up to the nearest megabyte.
-	 *
-	 * Question: should we try to pad it up a bit (do something
-	 * like " + (gapsize >> 3)" in there too?). We now have the
-	 * technology.
+	 * See how much we want to round up: start off with
+	 * rounding to the next 1MB area.
 	 */
-	pci_mem_start = (gapstart + 0xfffff) & ~0xfffff;
+	round = 0x100000;
+	while ((gapsize >> 4) > round)
+		round += round;
+	/* Fun with two's complement */
+	pci_mem_start = (gapstart + round) & -round;
 
 	printk("Allocating PCI resources starting at %08lx (gap: %08lx:%08lx)\n",
 		pci_mem_start, gapstart, gapsize);
@@ -1465,7 +1557,7 @@ static struct nop {
    This runs before SMP is initialized to avoid SMP problems with
    self modifying code. This implies that assymetric systems where
    APs have less capabilities than the boot processor are not handled. 
-   In this case boot with "noreplacement". */ 
+   Tough. Make sure you disable such features by hand. */ 
 void apply_alternatives(void *start, void *end) 
 { 
 	struct alt_instr *a; 
@@ -1493,23 +1585,11 @@ void apply_alternatives(void *start, void *end)
 	}
 } 
 
-static int no_replacement __initdata = 0; 
- 
 void __init alternative_instructions(void)
 {
 	extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
-	if (no_replacement) 
-		return;
 	apply_alternatives(__alt_instructions, __alt_instructions_end);
 }
-
-static int __init noreplacement_setup(char *s)
-{ 
-     no_replacement = 1; 
-     return 0; 
-} 
-
-__setup("noreplacement", noreplacement_setup); 
 
 static char * __init machine_specific_memory_setup(void);
 
@@ -1581,13 +1661,19 @@ void __init setup_arch(char **cmdline_p)
 	bootloader_type = LOADER_TYPE;
 
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
-	/* This is drawn from a dump from vgacon:startup in standard Linux. */
-	screen_info.orig_video_mode = 3; 
-	screen_info.orig_video_isVGA = 1;
-	screen_info.orig_video_lines = 25;
-	screen_info.orig_video_cols = 80;
-	screen_info.orig_video_ega_bx = 3;
-	screen_info.orig_video_points = 16;
+	if (xen_start_info->flags & SIF_INITDOMAIN) {
+		/* This is drawn from a dump from vgacon:startup in
+		 * standard Linux. */
+		screen_info.orig_video_mode = 3; 
+		screen_info.orig_video_isVGA = 1;
+		screen_info.orig_video_lines = 25;
+		screen_info.orig_video_cols = 80;
+		screen_info.orig_video_ega_bx = 3;
+		screen_info.orig_video_points = 16;
+	} else
+		screen_info.orig_video_isVGA = 0;
+#else
+	screen_info.orig_video_isVGA = 0;
 #endif
 
 #ifdef CONFIG_BLK_DEV_RAM
@@ -1641,6 +1727,7 @@ void __init setup_arch(char **cmdline_p)
 #endif
 	paging_init();
 	remapped_pgdat_init();
+	sparse_init();
 	zone_sizes_init();
 
 #ifdef CONFIG_X86_FIND_SMP_CONFIG
@@ -1717,22 +1804,26 @@ void __init setup_arch(char **cmdline_p)
 	op.u.set_iopl.iopl = 1;
 	HYPERVISOR_physdev_op(&op);
 
-#ifdef CONFIG_ACPI_BOOT
+#ifdef CONFIG_ACPI
 	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
 		printk(KERN_INFO "ACPI in unprivileged domain disabled\n");
 		acpi_disabled = 1;
 		acpi_ht = 0;
 	}
-#endif
 
-#ifdef CONFIG_ACPI_BOOT
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
 	acpi_boot_table_init();
 	acpi_boot_init();
-#endif
 
+#if defined(CONFIG_SMP) && defined(CONFIG_X86_PC)
+	if (def_to_bigsmp)
+		printk(KERN_WARNING "More than 8 CPUs detected and "
+			"CONFIG_X86_PC cannot handle it.\nUse "
+			"CONFIG_X86_GENERICARCH or CONFIG_X86_BIGSMP.\n");
+#endif
+#endif
 #ifdef CONFIG_X86_LOCAL_APIC
 	if (smp_found_config)
 		get_smp_config();

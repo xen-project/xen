@@ -1,6 +1,10 @@
-obj-$(CONFIG_ACPI_BOOT)		:= boot.o
+obj-y				:= boot.o
 obj-$(CONFIG_X86_IO_APIC)	+= earlyquirk.o
 obj-$(CONFIG_ACPI_SLEEP)	+= sleep.o wakeup.o
+
+ifneq ($(CONFIG_ACPI_PROCESSOR),)
+obj-y				+= cstate.o
+endif
 
 ifdef CONFIG_XEN
 include $(srctree)/scripts/Makefile.xen

@@ -22,7 +22,7 @@
 #include <linux/linkage.h>
 #include <asm/segment.h>
 #include <asm/thread_info.h>
-#include <asm/asm_offsets.h>
+#include <asm/asm-offsets.h>
 #include <xen/interface/arch-x86_32.h>
 
 /*
@@ -72,16 +72,15 @@ checkCPUtype:
 	movb %cl,X86_MASK
 	movl %edx,X86_CAPABILITY
 
-	incb ready
-
 	xorl %eax,%eax			# Clear FS/GS and LDT
 	movl %eax,%fs
 	movl %eax,%gs
 	cld			# gcc2 wants the direction flag cleared at all times
 
 #if 0
-	movb ready, %cl	
-	cmpb $1,%cl
+	movb ready, %cl
+	movb $1, ready
+	cmpb $0,%cl
 	je 1f			# the first CPU calls start_kernel
 				# all other CPUs call initialize_secondary
 	call initialize_secondary

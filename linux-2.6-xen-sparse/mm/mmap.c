@@ -61,7 +61,7 @@ pgprot_t protection_map[16] = {
 
 int sysctl_overcommit_memory = OVERCOMMIT_GUESS;  /* heuristic overcommit */
 int sysctl_overcommit_ratio = 50;	/* default is 50% */
-int sysctl_max_map_count = DEFAULT_MAX_MAP_COUNT;
+int sysctl_max_map_count __read_mostly = DEFAULT_MAX_MAP_COUNT;
 atomic_t vm_committed_space = ATOMIC_INIT(0);
 
 /*
@@ -143,7 +143,11 @@ int __vm_enough_memory(long pages, int cap_sys_admin)
 	   leave 3% of the size of this process for other processes */
 	allowed -= current->mm->total_vm / 32;
 
-	if (atomic_read(&vm_committed_space) < allowed)
+	/*
+	 * cast `allowed' as a signed long because vm_committed_space
+	 * sometimes has a negative value
+	 */
+	if (atomic_read(&vm_committed_space) < (long)allowed)
 		return 0;
 
 	vm_unacct_memory(pages);
@@ -199,13 +203,6 @@ static void remove_vm_struct(struct vm_area_struct *vma)
 	kmem_cache_free(vm_area_cachep, vma);
 }
 
-/*
- *  sys_brk() for the most part doesn't need the global kernel
- *  lock, except when an application is doing something nasty
- *  like trying to un-brk an area that has already been mapped
- *  to a regular file.  in this case, the unmapping will need
- *  to invoke file system routines that need the global lock.
- */
 asmlinkage unsigned long sys_brk(unsigned long brk)
 {
 	unsigned long rlim, retval;
@@ -1175,7 +1172,12 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 		    (!vma || addr + len <= vma->vm_start))
 			return addr;
 	}
-	start_addr = addr = mm->free_area_cache;
+	if (len > mm->cached_hole_size) {
+	        start_addr = addr = mm->free_area_cache;
+	} else {
+	        start_addr = addr = TASK_UNMAPPED_BASE;
+	        mm->cached_hole_size = 0;
+	}
 
 full_search:
 	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
@@ -1186,7 +1188,9 @@ full_search:
 			 * some holes.
 			 */
 			if (start_addr != TASK_UNMAPPED_BASE) {
-				start_addr = addr = TASK_UNMAPPED_BASE;
+				addr = TASK_UNMAPPED_BASE;
+			        start_addr = addr;
+				mm->cached_hole_size = 0;
 				goto full_search;
 			}
 			return -ENOMEM;
@@ -1198,19 +1202,22 @@ full_search:
 			mm->free_area_cache = addr + len;
 			return addr;
 		}
+		if (addr + mm->cached_hole_size < vma->vm_start)
+		        mm->cached_hole_size = vma->vm_start - addr;
 		addr = vma->vm_end;
 	}
 }
 #endif	
 
-void arch_unmap_area(struct vm_area_struct *area)
+void arch_unmap_area(struct mm_struct *mm, unsigned long addr)
 {
 	/*
 	 * Is this a new hole at the lowest possible address?
 	 */
-	if (area->vm_start >= TASK_UNMAPPED_BASE &&
-			area->vm_start < area->vm_mm->free_area_cache)
-		area->vm_mm->free_area_cache = area->vm_start;
+	if (addr >= TASK_UNMAPPED_BASE && addr < mm->free_area_cache) {
+		mm->free_area_cache = addr;
+		mm->cached_hole_size = ~0UL;
+	}
 }
 
 /*
@@ -1240,6 +1247,12 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 			return addr;
 	}
 
+	/* check if free_area_cache is useful for us */
+	if (len <= mm->cached_hole_size) {
+ 	        mm->cached_hole_size = 0;
+ 		mm->free_area_cache = mm->mmap_base;
+ 	}
+
 	/* either no address requested or can't fit in requested address hole */
 	addr = mm->free_area_cache;
 
@@ -1250,6 +1263,9 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 			/* remember the address as a hint for next time */
 			return (mm->free_area_cache = addr-len);
 	}
+
+	if (mm->mmap_base < len)
+		goto bottomup;
 
 	addr = mm->mmap_base-len;
 
@@ -1264,38 +1280,45 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 			/* remember the address as a hint for next time */
 			return (mm->free_area_cache = addr);
 
+ 		/* remember the largest hole we saw so far */
+ 		if (addr + mm->cached_hole_size < vma->vm_start)
+ 		        mm->cached_hole_size = vma->vm_start - addr;
+
 		/* try just below the current vma->vm_start */
 		addr = vma->vm_start-len;
 	} while (len < vma->vm_start);
 
+bottomup:
 	/*
 	 * A failed mmap() very likely causes application failure,
 	 * so fall back to the bottom-up function here. This scenario
 	 * can happen with large stack limits and large mmap()
 	 * allocations.
 	 */
-	mm->free_area_cache = TASK_UNMAPPED_BASE;
+	mm->cached_hole_size = ~0UL;
+  	mm->free_area_cache = TASK_UNMAPPED_BASE;
 	addr = arch_get_unmapped_area(filp, addr0, len, pgoff, flags);
 	/*
 	 * Restore the topdown base:
 	 */
 	mm->free_area_cache = mm->mmap_base;
+	mm->cached_hole_size = ~0UL;
 
 	return addr;
 }
 #endif
 
-void arch_unmap_area_topdown(struct vm_area_struct *area)
+void arch_unmap_area_topdown(struct mm_struct *mm, unsigned long addr)
 {
 	/*
 	 * Is this a new hole at the highest possible address?
 	 */
-	if (area->vm_end > area->vm_mm->free_area_cache)
-		area->vm_mm->free_area_cache = area->vm_end;
+	if (addr > mm->free_area_cache)
+		mm->free_area_cache = addr;
 
 	/* dont allow allocations above current base */
-	if (area->vm_mm->free_area_cache > area->vm_mm->mmap_base)
-		area->vm_mm->free_area_cache = area->vm_mm->mmap_base;
+	if (mm->free_area_cache > mm->mmap_base)
+		mm->free_area_cache = mm->mmap_base;
 }
 
 unsigned long
@@ -1595,7 +1618,6 @@ static void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
 	if (area->vm_flags & VM_LOCKED)
 		area->vm_mm->locked_vm -= len >> PAGE_SHIFT;
 	vm_stat_unaccount(area);
-	area->vm_mm->unmap_area(area);
 	remove_vm_struct(area);
 }
 
@@ -1618,7 +1640,7 @@ static void unmap_vma_list(struct mm_struct *mm, struct vm_area_struct *vma)
 /*
  * Get rid of page table information in the indicated region.
  *
- * Called with the page table lock held.
+ * Called with the mm semaphore held.
  */
 static void unmap_region(struct mm_struct *mm,
 		struct vm_area_struct *vma, struct vm_area_struct *prev,
@@ -1649,6 +1671,7 @@ detach_vmas_to_be_unmapped(struct mm_struct *mm, struct vm_area_struct *vma,
 {
 	struct vm_area_struct **insertion_point;
 	struct vm_area_struct *tail_vma = NULL;
+	unsigned long addr;
 
 	insertion_point = (prev ? &prev->vm_next : &mm->mmap);
 	do {
@@ -1659,6 +1682,11 @@ detach_vmas_to_be_unmapped(struct mm_struct *mm, struct vm_area_struct *vma,
 	} while (vma && vma->vm_start < end);
 	*insertion_point = vma;
 	tail_vma->vm_next = NULL;
+	if (mm->unmap_area == arch_unmap_area)
+		addr = prev ? prev->vm_end : mm->mmap_base;
+	else
+		addr = vma ?  vma->vm_start : mm->mmap_base;
+	mm->unmap_area(mm, addr);
 	mm->mmap_cache = NULL;		/* Kill the cache. */
 }
 
@@ -1907,6 +1935,7 @@ void exit_mmap(struct mm_struct *mm)
 #ifdef arch_exit_mmap
 	arch_exit_mmap(mm);
 #endif
+
 	lru_add_drain();
 
 	spin_lock(&mm->page_table_lock);
@@ -1967,6 +1996,9 @@ int insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 	}
 	__vma = find_vma_prepare(mm,vma->vm_start,&prev,&rb_link,&rb_parent);
 	if (__vma && __vma->vm_start < vma->vm_end)
+		return -ENOMEM;
+	if ((vma->vm_flags & VM_ACCOUNT) &&
+	     security_vm_enough_memory(vma_pages(vma)))
 		return -ENOMEM;
 	vma_link(mm, vma, prev, rb_link, rb_parent);
 	return 0;

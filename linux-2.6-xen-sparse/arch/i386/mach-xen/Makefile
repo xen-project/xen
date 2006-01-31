@@ -2,6 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-obj-y				:= topology.o
+obj-y				:= setup.o topology.o
 
 topology-y			:= ../mach-default/topology.o

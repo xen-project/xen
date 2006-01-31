@@ -231,16 +231,17 @@ static inline int page_kills_ppro(unsigned long pagenr)
 
 extern int is_available_memory(efi_memory_desc_t *);
 
-static inline int page_is_ram(unsigned long pagenr)
+int page_is_ram(unsigned long pagenr)
 {
 	int i;
 	unsigned long addr, end;
 
 	if (efi_enabled) {
 		efi_memory_desc_t *md;
+		void *p;
 
-		for (i = 0; i < memmap.nr_map; i++) {
-			md = &memmap.map[i];
+		for (p = memmap.map; p < memmap.map_end; p += memmap.desc_size) {
+			md = p;
 			if (!is_available_memory(md))
 				continue;
 			addr = (md->phys_addr+PAGE_SIZE-1) >> PAGE_SHIFT;
@@ -316,7 +317,6 @@ void __init one_highpage_init(struct page *page, int pfn, int bad_ppro)
 {
 	if (page_is_ram(pfn) && !(bad_ppro && page_kills_ppro(pfn))) {
 		ClearPageReserved(page);
-		set_bit(PG_highmem, &page->flags);
 		set_page_count(page, 1);
 		if (pfn < xen_start_info->nr_pages)
 			__free_page(page);
@@ -325,7 +325,9 @@ void __init one_highpage_init(struct page *page, int pfn, int bad_ppro)
 		SetPageReserved(page);
 }
 
-#ifndef CONFIG_DISCONTIGMEM
+#ifdef CONFIG_NUMA
+extern void set_highmem_pages_init(int);
+#else
 static void __init set_highmem_pages_init(int bad_ppro)
 {
 	int pfn;
@@ -333,9 +335,7 @@ static void __init set_highmem_pages_init(int bad_ppro)
 		one_highpage_init(pfn_to_page(pfn), pfn, bad_ppro);
 	totalram_pages += totalhigh_pages;
 }
-#else
-extern void set_highmem_pages_init(int);
-#endif /* !CONFIG_DISCONTIGMEM */
+#endif /* CONFIG_FLATMEM */
 
 #else
 #define kmap_init() do { } while (0)
@@ -344,12 +344,13 @@ extern void set_highmem_pages_init(int);
 #endif /* CONFIG_HIGHMEM */
 
 unsigned long long __PAGE_KERNEL = _PAGE_KERNEL;
+EXPORT_SYMBOL(__PAGE_KERNEL);
 unsigned long long __PAGE_KERNEL_EXEC = _PAGE_KERNEL_EXEC;
 
-#ifndef CONFIG_DISCONTIGMEM
-#define remap_numa_kva() do {} while (0)
-#else
+#ifdef CONFIG_NUMA
 extern void __init remap_numa_kva(void);
+#else
+#define remap_numa_kva() do {} while (0)
 #endif
 
 pgd_t *swapper_pg_dir;
@@ -390,7 +391,7 @@ static void __init pagetable_init (void)
 	permanent_kmaps_init(pgd_base);
 }
 
-#if defined(CONFIG_PM_DISK) || defined(CONFIG_SOFTWARE_SUSPEND)
+#ifdef CONFIG_SOFTWARE_SUSPEND
 /*
  * Swap suspend & friends need this for resume because things like the intel-agp
  * driver might have split up a kernel 4MB mapping.
@@ -430,7 +431,7 @@ void zap_low_mappings (void)
 }
 
 static int disable_nx __initdata = 0;
-u64 __supported_pte_mask = ~_PAGE_NX;
+u64 __supported_pte_mask __read_mostly = ~_PAGE_NX;
 
 /*
  * noexec = on|off
@@ -584,7 +585,7 @@ static void __init set_max_mapnr_init(void)
 #else
 	num_physpages = max_low_pfn;
 #endif
-#ifndef CONFIG_DISCONTIGMEM
+#ifdef CONFIG_FLATMEM
 	max_mapnr = num_physpages;
 #endif
 }
@@ -608,7 +609,7 @@ void __init mem_init(void)
 	swiotlb_init();	
 #endif
 
-#ifndef CONFIG_DISCONTIGMEM
+#ifdef CONFIG_FLATMEM
 	if (!mem_map)
 		BUG();
 #endif

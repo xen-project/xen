@@ -221,29 +221,23 @@ static inline unsigned long pgd_val(pgd_t x)
  */
 extern unsigned int __VMALLOC_RESERVE;
 
-/* Pure 2^n version of get_order */
-static __inline__ int get_order(unsigned long size)
-{
-	int order;
-
-	size = (size-1) >> (PAGE_SHIFT-1);
-	order = -1;
-	do {
-		size >>= 1;
-		order++;
-	} while (size);
-	return order;
-}
-
 extern int sysctl_legacy_va_layout;
+
+extern int page_is_ram(unsigned long pagenr);
 
 #endif /* __ASSEMBLY__ */
 
 #ifdef __ASSEMBLY__
 #define __PAGE_OFFSET		(0xC0000000)
+#define __PHYSICAL_START	CONFIG_PHYSICAL_START
 #else
 #define __PAGE_OFFSET		(0xC0000000UL)
+#define __PHYSICAL_START	((unsigned long)CONFIG_PHYSICAL_START)
 #endif
+#define __KERNEL_START		(__PAGE_OFFSET + __PHYSICAL_START)
+
+#undef LOAD_OFFSET
+#define LOAD_OFFSET		0
 
 
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
@@ -252,11 +246,11 @@ extern int sysctl_legacy_va_layout;
 #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
 #define pfn_to_kaddr(pfn)      __va((pfn) << PAGE_SHIFT)
-#ifndef CONFIG_DISCONTIGMEM
+#ifdef CONFIG_FLATMEM
 #define pfn_to_page(pfn)	(mem_map + (pfn))
 #define page_to_pfn(page)	((unsigned long)((page) - mem_map))
 #define pfn_valid(pfn)		((pfn) < max_mapnr)
-#endif /* !CONFIG_DISCONTIGMEM */
+#endif /* CONFIG_FLATMEM */
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
 
 #define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
@@ -272,5 +266,7 @@ extern int sysctl_legacy_va_layout;
 #define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
 
 #endif /* __KERNEL__ */
+
+#include <asm-generic/page.h>
 
 #endif /* _I386_PAGE_H */

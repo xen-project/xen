@@ -12,13 +12,18 @@
 
 #ifdef __KERNEL__
 
+#ifdef CONFIG_SMP
+#define __vcpu_id smp_processor_id()
+#else
+#define __vcpu_id 0
+#endif
+
 struct task_struct;	/* one of the stranger aspects of C forward declarations.. */
 extern struct task_struct * FASTCALL(__switch_to(struct task_struct *prev, struct task_struct *next));
 
 #define switch_to(prev,next,last) do {					\
 	unsigned long esi,edi;						\
-	asm volatile("pushfl\n\t"					\
-		     "pushl %%ebp\n\t"					\
+	asm volatile("pushl %%ebp\n\t"					\
 		     "movl %%esp,%0\n\t"	/* save ESP */		\
 		     "movl %5,%%esp\n\t"	/* restore ESP */	\
 		     "movl $1f,%1\n\t"		/* save EIP */		\
@@ -26,7 +31,6 @@ extern struct task_struct * FASTCALL(__switch_to(struct task_struct *prev, struc
 		     "jmp __switch_to\n"				\
 		     "1:\t"						\
 		     "popl %%ebp\n\t"					\
-		     "popfl"						\
 		     :"=m" (prev->thread.esp),"=m" (prev->thread.eip),	\
 		      "=a" (last),"=S" (esi),"=D" (edi)			\
 		     :"m" (next->thread.esp),"m" (next->thread.eip),	\
@@ -96,13 +100,13 @@ static inline unsigned long _get_base(char * addr)
 		".align 4\n\t"			\
 		".long 1b,3b\n"			\
 		".previous"			\
-		: :"m" (value))
+		: :"rm" (value))
 
 /*
  * Save a segment register away
  */
 #define savesegment(seg, value) \
-	asm volatile("mov %%" #seg ",%0":"=m" (value))
+	asm volatile("mov %%" #seg ",%0":"=rm" (value))
 
 /*
  * Clear and set 'TS' bit respectively
@@ -110,13 +114,29 @@ static inline unsigned long _get_base(char * addr)
 #define clts() (HYPERVISOR_fpu_taskswitch(0))
 #define read_cr0() ({ \
 	unsigned int __dummy; \
-	__asm__( \
+	__asm__ __volatile__( \
 		"movl %%cr0,%0\n\t" \
 		:"=r" (__dummy)); \
 	__dummy; \
 })
 #define write_cr0(x) \
-	__asm__("movl %0,%%cr0": :"r" (x));
+	__asm__ __volatile__("movl %0,%%cr0": :"r" (x));
+
+#define read_cr2() ({ \
+	unsigned int __dummy; \
+	__asm__ __volatile__( \
+		"movl %%cr2,%0\n\t" \
+		:"=r" (__dummy)); \
+	__dummy; \
+})
+#define write_cr2(x) \
+	__asm__ __volatile__("movl %0,%%cr2": :"r" (x));
+
+#define read_cr3() per_cpu(cur_pgd, smp_processor_id())
+#define write_cr3(x) do {				\
+	xen_pt_switch((x));				\
+	per_cpu(cur_pgd, smp_processor_id()) = (x);	\
+} while (/* CONSTCOND */0)
 
 #define read_cr4() ({ \
 	unsigned int __dummy; \
@@ -126,7 +146,8 @@ static inline unsigned long _get_base(char * addr)
 	__dummy; \
 })
 #define write_cr4(x) \
-	__asm__("movl %0,%%cr4": :"r" (x));
+	__asm__ __volatile__("movl %0,%%cr4": :"r" (x));
+
 #define stts() (HYPERVISOR_fpu_taskswitch(1))
 
 #endif	/* __KERNEL__ */
@@ -501,7 +522,7 @@ __asm__ __volatile__("6667:movl %1, %0\n6668:\n"                    \
 do {									\
 	vcpu_info_t *_vcpu;						\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	_vcpu->evtchn_upcall_mask = 1;					\
 	preempt_enable_no_resched();					\
 	barrier();							\
@@ -512,7 +533,7 @@ do {									\
 	vcpu_info_t *_vcpu;						\
 	barrier();							\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	_vcpu->evtchn_upcall_mask = 0;					\
 	barrier(); /* unmask then check (avoid races) */		\
 	if ( unlikely(_vcpu->evtchn_upcall_pending) )			\
@@ -524,7 +545,7 @@ do {									\
 do {									\
 	vcpu_info_t *_vcpu;						\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	(x) = _vcpu->evtchn_upcall_mask;				\
 	preempt_enable();						\
 } while (0)
@@ -534,7 +555,7 @@ do {									\
 	vcpu_info_t *_vcpu;						\
 	barrier();							\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	if ((_vcpu->evtchn_upcall_mask = (x)) == 0) {			\
 		barrier(); /* unmask then check (avoid races) */	\
 		if ( unlikely(_vcpu->evtchn_upcall_pending) )		\
@@ -545,12 +566,13 @@ do {									\
 } while (0)
 
 #define safe_halt()		((void)0)
+#define halt()			((void)0)
 
 #define __save_and_cli(x)						\
 do {									\
 	vcpu_info_t *_vcpu;						\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	(x) = _vcpu->evtchn_upcall_mask;				\
 	_vcpu->evtchn_upcall_mask = 1;					\
 	preempt_enable_no_resched();					\
@@ -568,7 +590,7 @@ do {									\
 ({	int ___x;							\
 	vcpu_info_t *_vcpu;						\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	___x = (_vcpu->evtchn_upcall_mask != 0);			\
 	preempt_enable_no_resched();					\
 	___x; })

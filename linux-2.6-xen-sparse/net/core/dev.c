@@ -121,18 +121,6 @@
 #include <linux/udp.h>
 #endif
 
-/* This define, if set, will randomly drop a packet when congestion
- * is more than moderate.  It helps fairness in the multi-interface
- * case when one of them is a hog, but it kills performance for the
- * single interface case so it is off now by default.
- */
-#undef RAND_LIE
-
-/* Setting this will sample the queue lengths and thus congestion
- * via a timer instead of as each packet is received.
- */
-#undef OFFLINE_SAMPLE
-
 /*
  *	The list of packet types we will receive (as opposed to discard)
  *	and the routines to invoke.
@@ -164,11 +152,6 @@
 static DEFINE_SPINLOCK(ptype_lock);
 static struct list_head ptype_base[16];	/* 16 way hashed list */
 static struct list_head ptype_all;		/* Taps */
-
-#ifdef OFFLINE_SAMPLE
-static void sample_queue(unsigned long dummy);
-static struct timer_list samp_timer = TIMER_INITIALIZER(sample_queue, 0, 0);
-#endif
 
 /*
  * The @dev_base list is protected by @dev_base_lock and the rtln
@@ -221,7 +204,7 @@ static struct notifier_block *netdev_chain;
  *	Device drivers call our routines to queue packets here. We empty the
  *	queue in the local softnet handler.
  */
-DEFINE_PER_CPU(struct softnet_data, softnet_data) = { 0, };
+DEFINE_PER_CPU(struct softnet_data, softnet_data) = { NULL };
 
 #ifdef CONFIG_SYSFS
 extern int netdev_sysfs_init(void);
@@ -289,10 +272,6 @@ void dev_add_pack(struct packet_type *pt)
 	}
 	spin_unlock_bh(&ptype_lock);
 }
-
-extern void linkwatch_run_queue(void);
-
-
 
 /**
  *	__dev_remove_pack	 - remove packet handler
@@ -600,6 +579,8 @@ struct net_device *dev_getbyhwaddr(unsigned short type, char *ha)
 			break;
 	return dev;
 }
+
+EXPORT_SYMBOL(dev_getbyhwaddr);
 
 struct net_device *dev_getfirstbyhwtype(unsigned short type)
 {
@@ -924,8 +905,7 @@ int dev_close(struct net_device *dev)
 	smp_mb__after_clear_bit(); /* Commit netif_running(). */
 	while (test_bit(__LINK_STATE_RX_SCHED, &dev->state)) {
 		/* No hurry. */
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(1);
+		msleep(1);
 	}
 
 	/*
@@ -1033,13 +1013,22 @@ void net_disable_timestamp(void)
 	atomic_dec(&netstamp_needed);
 }
 
-static inline void net_timestamp(struct timeval *stamp)
+void __net_timestamp(struct sk_buff *skb)
+{
+	struct timeval tv;
+
+	do_gettimeofday(&tv);
+	skb_set_timestamp(skb, &tv);
+}
+EXPORT_SYMBOL(__net_timestamp);
+
+static inline void net_timestamp(struct sk_buff *skb)
 {
 	if (atomic_read(&netstamp_needed))
-		do_gettimeofday(stamp);
+		__net_timestamp(skb);
 	else {
-		stamp->tv_sec = 0;
-		stamp->tv_usec = 0;
+		skb->tstamp.off_sec = 0;
+		skb->tstamp.off_usec = 0;
 	}
 }
 
@@ -1051,7 +1040,8 @@ static inline void net_timestamp(struct timeval *stamp)
 void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct packet_type *ptype;
-	net_timestamp(&skb->stamp);
+
+	net_timestamp(skb);
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
@@ -1082,7 +1072,7 @@ void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 
 			skb2->h.raw = skb2->nh.raw;
 			skb2->pkt_type = PACKET_OUTGOING;
-			ptype->func(skb2, skb->dev, ptype);
+			ptype->func(skb2, skb->dev, ptype, skb->dev);
 		}
 	}
 	rcu_read_unlock();
@@ -1147,10 +1137,8 @@ static inline int illegal_highdma(struct net_device *dev, struct sk_buff *skb)
 #define illegal_highdma(dev, skb)	(0)
 #endif
 
-extern void skb_release_data(struct sk_buff *);
-
 /* Keep head the same: replace data */
-int __skb_linearize(struct sk_buff *skb, int gfp_mask)
+int __skb_linearize(struct sk_buff *skb, gfp_t gfp_mask)
 {
 	unsigned int size;
 	u8 *data;
@@ -1308,6 +1296,8 @@ int dev_queue_xmit(struct sk_buff *skb)
 	      	if (skb_checksum_help(skb, 0))
 	      		goto out_kfree_skb;
 
+	spin_lock_prefetch(&dev->queue_lock);
+
 	/* Disable soft irqs for various locks below. Also 
 	 * stops preemption for RCU. 
 	 */
@@ -1400,69 +1390,11 @@ out:
 			Receiver routines
   =======================================================================*/
 
-int netdev_max_backlog = 300;
+int netdev_max_backlog = 1000;
+int netdev_budget = 300;
 int weight_p = 64;            /* old backlog weight */
-/* These numbers are selected based on intuition and some
- * experimentatiom, if you have more scientific way of doing this
- * please go ahead and fix things.
- */
-int no_cong_thresh = 10;
-int no_cong = 20;
-int lo_cong = 100;
-int mod_cong = 290;
 
 DEFINE_PER_CPU(struct netif_rx_stats, netdev_rx_stat) = { 0, };
-
-
-static void get_sample_stats(int cpu)
-{
-#ifdef RAND_LIE
-	unsigned long rd;
-	int rq;
-#endif
-	struct softnet_data *sd = &per_cpu(softnet_data, cpu);
-	int blog = sd->input_pkt_queue.qlen;
-	int avg_blog = sd->avg_blog;
-
-	avg_blog = (avg_blog >> 1) + (blog >> 1);
-
-	if (avg_blog > mod_cong) {
-		/* Above moderate congestion levels. */
-		sd->cng_level = NET_RX_CN_HIGH;
-#ifdef RAND_LIE
-		rd = net_random();
-		rq = rd % netdev_max_backlog;
-		if (rq < avg_blog) /* unlucky bastard */
-			sd->cng_level = NET_RX_DROP;
-#endif
-	} else if (avg_blog > lo_cong) {
-		sd->cng_level = NET_RX_CN_MOD;
-#ifdef RAND_LIE
-		rd = net_random();
-		rq = rd % netdev_max_backlog;
-			if (rq < avg_blog) /* unlucky bastard */
-				sd->cng_level = NET_RX_CN_HIGH;
-#endif
-	} else if (avg_blog > no_cong)
-		sd->cng_level = NET_RX_CN_LOW;
-	else  /* no congestion */
-		sd->cng_level = NET_RX_SUCCESS;
-
-	sd->avg_blog = avg_blog;
-}
-
-#ifdef OFFLINE_SAMPLE
-static void sample_queue(unsigned long dummy)
-{
-/* 10 ms 0r 1ms -- i don't care -- JHS */
-	int next_tick = 1;
-	int cpu = smp_processor_id();
-
-	get_sample_stats(cpu);
-	next_tick += jiffies;
-	mod_timer(&samp_timer, next_tick);
-}
-#endif
 
 
 /**
@@ -1485,7 +1417,6 @@ static void sample_queue(unsigned long dummy)
 
 int netif_rx(struct sk_buff *skb)
 {
-	int this_cpu;
 	struct softnet_data *queue;
 	unsigned long flags;
 
@@ -1493,46 +1424,30 @@ int netif_rx(struct sk_buff *skb)
 	if (netpoll_rx(skb))
 		return NET_RX_DROP;
 
-	if (!skb->stamp.tv_sec)
-		net_timestamp(&skb->stamp);
+	if (!skb->tstamp.off_sec)
+		net_timestamp(skb);
 
 	/*
 	 * The code is rearranged so that the path is the most
 	 * short when CPU is congested, but is still operating.
 	 */
 	local_irq_save(flags);
-	this_cpu = smp_processor_id();
 	queue = &__get_cpu_var(softnet_data);
 
 	__get_cpu_var(netdev_rx_stat).total++;
 	if (queue->input_pkt_queue.qlen <= netdev_max_backlog) {
 		if (queue->input_pkt_queue.qlen) {
-			if (queue->throttle)
-				goto drop;
-
 enqueue:
 			dev_hold(skb->dev);
 			__skb_queue_tail(&queue->input_pkt_queue, skb);
-#ifndef OFFLINE_SAMPLE
-			get_sample_stats(this_cpu);
-#endif
 			local_irq_restore(flags);
-			return queue->cng_level;
+			return NET_RX_SUCCESS;
 		}
-
-		if (queue->throttle)
-			queue->throttle = 0;
 
 		netif_rx_schedule(&queue->backlog_dev);
 		goto enqueue;
 	}
 
-	if (!queue->throttle) {
-		queue->throttle = 1;
-		__get_cpu_var(netdev_rx_stat).throttled++;
-	}
-
-drop:
 	__get_cpu_var(netdev_rx_stat).dropped++;
 	local_irq_restore(flags);
 
@@ -1555,14 +1470,14 @@ int netif_rx_ni(struct sk_buff *skb)
 
 EXPORT_SYMBOL(netif_rx_ni);
 
-static __inline__ void skb_bond(struct sk_buff *skb)
+static inline struct net_device *skb_bond(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
 
-	if (dev->master) {
-		skb->real_dev = skb->dev;
+	if (dev->master)
 		skb->dev = dev->master;
-	}
+
+	return dev;
 }
 
 static void net_tx_action(struct softirq_action *h)
@@ -1612,10 +1527,11 @@ static void net_tx_action(struct softirq_action *h)
 }
 
 static __inline__ int deliver_skb(struct sk_buff *skb,
-				  struct packet_type *pt_prev)
+				  struct packet_type *pt_prev,
+				  struct net_device *orig_dev)
 {
 	atomic_inc(&skb->users);
-	return pt_prev->func(skb, skb->dev, pt_prev);
+	return pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
 }
 
 #if defined(CONFIG_BRIDGE) || defined (CONFIG_BRIDGE_MODULE)
@@ -1626,7 +1542,8 @@ struct net_bridge_fdb_entry *(*br_fdb_get_hook)(struct net_bridge *br,
 void (*br_fdb_put_hook)(struct net_bridge_fdb_entry *ent);
 
 static __inline__ int handle_bridge(struct sk_buff **pskb,
-				    struct packet_type **pt_prev, int *ret)
+				    struct packet_type **pt_prev, int *ret,
+				    struct net_device *orig_dev)
 {
 	struct net_bridge_port *port;
 
@@ -1635,14 +1552,14 @@ static __inline__ int handle_bridge(struct sk_buff **pskb,
 		return 0;
 
 	if (*pt_prev) {
-		*ret = deliver_skb(*pskb, *pt_prev);
+		*ret = deliver_skb(*pskb, *pt_prev, orig_dev);
 		*pt_prev = NULL;
 	} 
 	
 	return br_handle_frame_hook(port, pskb);
 }
 #else
-#define handle_bridge(skb, pt_prev, ret)	(0)
+#define handle_bridge(skb, pt_prev, ret, orig_dev)	(0)
 #endif
 
 #ifdef CONFIG_NET_CLS_ACT
@@ -1664,17 +1581,14 @@ static int ing_filter(struct sk_buff *skb)
 		__u32 ttl = (__u32) G_TC_RTTL(skb->tc_verd);
 		if (MAX_RED_LOOP < ttl++) {
 			printk("Redir loop detected Dropping packet (%s->%s)\n",
-				skb->input_dev?skb->input_dev->name:"??",skb->dev->name);
+				skb->input_dev->name, skb->dev->name);
 			return TC_ACT_SHOT;
 		}
 
 		skb->tc_verd = SET_TC_RTTL(skb->tc_verd,ttl);
 
 		skb->tc_verd = SET_TC_AT(skb->tc_verd,AT_INGRESS);
-		if (NULL == skb->input_dev) {
-			skb->input_dev = skb->dev;
-			printk("ing_filter:  fixed  %s out %s\n",skb->input_dev->name,skb->dev->name);
-		}
+
 		spin_lock(&dev->ingress_lock);
 		if ((q = dev->qdisc_ingress) != NULL)
 			result = q->enqueue(skb, q);
@@ -1689,6 +1603,7 @@ static int ing_filter(struct sk_buff *skb)
 int netif_receive_skb(struct sk_buff *skb)
 {
 	struct packet_type *ptype, *pt_prev;
+	struct net_device *orig_dev;
 	int ret = NET_RX_DROP;
 	unsigned short type;
 
@@ -1696,10 +1611,13 @@ int netif_receive_skb(struct sk_buff *skb)
 	if (skb->dev->poll && netpoll_rx(skb))
 		return NET_RX_DROP;
 
-	if (!skb->stamp.tv_sec)
-		net_timestamp(&skb->stamp);
+	if (!skb->tstamp.off_sec)
+		net_timestamp(skb);
 
-	skb_bond(skb);
+	if (!skb->input_dev)
+		skb->input_dev = skb->dev;
+
+	orig_dev = skb_bond(skb);
 
 	__get_cpu_var(netdev_rx_stat).total++;
 
@@ -1733,14 +1651,14 @@ int netif_receive_skb(struct sk_buff *skb)
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
 		if (!ptype->dev || ptype->dev == skb->dev) {
 			if (pt_prev) 
-				ret = deliver_skb(skb, pt_prev);
+				ret = deliver_skb(skb, pt_prev, orig_dev);
 			pt_prev = ptype;
 		}
 	}
 
 #ifdef CONFIG_NET_CLS_ACT
 	if (pt_prev) {
-		ret = deliver_skb(skb, pt_prev);
+		ret = deliver_skb(skb, pt_prev, orig_dev);
 		pt_prev = NULL; /* noone else should process this after*/
 	} else {
 		skb->tc_verd = SET_TC_OK2MUNGE(skb->tc_verd);
@@ -1759,7 +1677,7 @@ ncls:
 
 	handle_diverter(skb);
 
-	if (handle_bridge(&skb, &pt_prev, &ret))
+	if (handle_bridge(&skb, &pt_prev, &ret, orig_dev))
 		goto out;
 
 	type = skb->protocol;
@@ -1767,13 +1685,13 @@ ncls:
 		if (ptype->type == type &&
 		    (!ptype->dev || ptype->dev == skb->dev)) {
 			if (pt_prev) 
-				ret = deliver_skb(skb, pt_prev);
+				ret = deliver_skb(skb, pt_prev, orig_dev);
 			pt_prev = ptype;
 		}
 	}
 
 	if (pt_prev) {
-		ret = pt_prev->func(skb, skb->dev, pt_prev);
+		ret = pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
 	} else {
 		kfree_skb(skb);
 		/* Jamal, now you will not able to escape explaining
@@ -1830,8 +1748,6 @@ job_done:
 	smp_mb__before_clear_bit();
 	netif_poll_enable(backlog_dev);
 
-	if (queue->throttle)
-		queue->throttle = 0;
 	local_irq_enable();
 	return 0;
 }
@@ -1840,9 +1756,9 @@ static void net_rx_action(struct softirq_action *h)
 {
 	struct softnet_data *queue = &__get_cpu_var(softnet_data);
 	unsigned long start_time = jiffies;
-	int budget = netdev_max_backlog;
+	int budget = netdev_budget;
+	void *have;
 
-	
 	local_irq_disable();
 
 	while (!list_empty(&queue->poll_list)) {
@@ -1855,10 +1771,10 @@ static void net_rx_action(struct softirq_action *h)
 
 		dev = list_entry(queue->poll_list.next,
 				 struct net_device, poll_list);
-		netpoll_poll_lock(dev);
+		have = netpoll_poll_lock(dev);
 
 		if (dev->quota <= 0 || dev->poll(dev, &budget)) {
-			netpoll_poll_unlock(dev);
+			netpoll_poll_unlock(have);
 			local_irq_disable();
 			list_del(&dev->poll_list);
 			list_add_tail(&dev->poll_list, &queue->poll_list);
@@ -1867,7 +1783,7 @@ static void net_rx_action(struct softirq_action *h)
 			else
 				dev->quota = dev->weight;
 		} else {
-			netpoll_poll_unlock(dev);
+			netpoll_poll_unlock(have);
 			dev_put(dev);
 			local_irq_disable();
 		}
@@ -2105,15 +2021,9 @@ static int softnet_seq_show(struct seq_file *seq, void *v)
 	struct netif_rx_stats *s = v;
 
 	seq_printf(seq, "%08x %08x %08x %08x %08x %08x %08x %08x %08x\n",
-		   s->total, s->dropped, s->time_squeeze, s->throttled,
-		   s->fastroute_hit, s->fastroute_success, s->fastroute_defer,
-		   s->fastroute_deferred_out,
-#if 0
-		   s->fastroute_latency_reduction
-#else
-		   s->cpu_collision
-#endif
-		  );
+		   s->total, s->dropped, s->time_squeeze, 0,
+		   0, 0, 0, 0, /* was fastroute */
+		   s->cpu_collision );
 	return 0;
 }
 
@@ -2240,10 +2150,11 @@ void dev_set_promiscuity(struct net_device *dev, int inc)
 {
 	unsigned short old_flags = dev->flags;
 
-	dev->flags |= IFF_PROMISC;
 	if ((dev->promiscuity += inc) == 0)
 		dev->flags &= ~IFF_PROMISC;
-	if (dev->flags ^ old_flags) {
+	else
+		dev->flags |= IFF_PROMISC;
+	if (dev->flags != old_flags) {
 		dev_mc_upload(dev);
 		printk(KERN_INFO "device %s %s promiscuous mode\n",
 		       dev->name, (dev->flags & IFF_PROMISC) ? "entered" :
@@ -3355,9 +3266,6 @@ static int __init net_dev_init(void)
 
 		queue = &per_cpu(softnet_data, i);
 		skb_queue_head_init(&queue->input_pkt_queue);
-		queue->throttle = 0;
-		queue->cng_level = 0;
-		queue->avg_blog = 10; /* arbitrary non-zero */
 		queue->completion_queue = NULL;
 		INIT_LIST_HEAD(&queue->poll_list);
 		set_bit(__LINK_STATE_START, &queue->backlog_dev.state);
@@ -3365,11 +3273,6 @@ static int __init net_dev_init(void)
 		queue->backlog_dev.poll = process_backlog;
 		atomic_set(&queue->backlog_dev.refcnt, 1);
 	}
-
-#ifdef OFFLINE_SAMPLE
-	samp_timer.expires = jiffies + (10 * HZ);
-	add_timer(&samp_timer);
-#endif
 
 	dev_boot_phase = 0;
 

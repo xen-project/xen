@@ -1,6 +1,7 @@
---- ref-linux-2.6.12/arch/i386/kernel/traps.c	2005-12-19 09:23:44.000000000 +0000
-+++ linux-2.6.12-xen0/arch/i386/kernel/traps.c	2006-01-05 15:51:52.000000000 +0000
-@@ -521,18 +521,11 @@
+diff -pruN ../pristine-linux-2.6.14/arch/i386/kernel/traps.c ./arch/i386/kernel/traps.c
+--- ../pristine-linux-2.6.14/arch/i386/kernel/traps.c	2005-10-28 01:02:08.000000000 +0100
++++ ./arch/i386/kernel/traps.c	2006-01-31 16:15:06.000000000 +0000
+@@ -532,18 +532,11 @@ static void mem_parity_error(unsigned ch
  
  static void io_check_error(unsigned char reason, struct pt_regs * regs)
  {
@@ -20,9 +21,10 @@
  }
  
  static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
---- ref-linux-2.6.12/include/asm-i386/mach-default/mach_traps.h	2005-06-17 20:48:29.000000000 +0100
-+++ linux-2.6.12-xen0/include/asm-i386/mach-default/mach_traps.h	2006-01-05 15:52:33.000000000 +0000
-@@ -15,6 +15,18 @@
+diff -pruN ../pristine-linux-2.6.14/include/asm-i386/mach-default/mach_traps.h ./include/asm-i386/mach-default/mach_traps.h
+--- ../pristine-linux-2.6.14/include/asm-i386/mach-default/mach_traps.h	2005-10-28 01:02:08.000000000 +0100
++++ ./include/asm-i386/mach-default/mach_traps.h	2006-01-31 16:15:06.000000000 +0000
+@@ -15,6 +15,18 @@ static inline void clear_mem_error(unsig
  	outb(reason, 0x61);
  }
  

@@ -72,7 +72,10 @@
 
 #include <xen/evtchn.h>
 
-extern spinlock_t i8259A_lock;
+#if defined (__i386__)
+#include <asm/i8259.h>
+#endif
+
 int pit_latch_buggy;              /* extern */
 
 u64 jiffies_64 = INITIAL_JIFFIES;
@@ -88,22 +91,25 @@ struct timespec __xtime __section_xtime;
 struct timezone __sys_tz __section_sys_tz;
 #endif
 
-#if defined(__x86_64__)
 unsigned int cpu_khz;	/* Detected as we calibrate the TSC */
-#else
-unsigned long cpu_khz;	/* Detected as we calibrate the TSC */
-#endif
+EXPORT_SYMBOL(cpu_khz);
 
 extern unsigned long wall_jiffies;
 
 DEFINE_SPINLOCK(rtc_lock);
+EXPORT_SYMBOL(rtc_lock);
+
+#if defined (__i386__)
+#include <asm/i8253.h>
+#endif
 
 DEFINE_SPINLOCK(i8253_lock);
 EXPORT_SYMBOL(i8253_lock);
 
 extern struct init_timer_opts timer_tsc_init;
 extern struct timer_opts timer_tsc;
-struct timer_opts *cur_timer = &timer_tsc;
+#define timer_none timer_tsc
+struct timer_opts *cur_timer __read_mostly = &timer_tsc;
 
 /* These are peridically updated in shared_info, and then copied here. */
 struct shadow_time_info {
@@ -201,6 +207,14 @@ static inline u64 scale_delta(u64 delta, u32 mul_frac, int shift)
 	return product;
 }
 
+#if defined (__i386__)
+int read_current_timer(unsigned long *timer_val)
+{
+	rdtscl(*timer_val);
+	return 0;
+}
+#endif
+
 void init_cpu_khz(void)
 {
 	u64 __cpu_khz = 1000000ULL << 32;
@@ -252,10 +266,7 @@ static void __update_wallclock(time_t sec, long nsec)
 	set_normalized_timespec(&xtime, xtime_sec, xtime_nsec);
 	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
 
-	time_adjust = 0;		/* stop active adjtime() */
-	time_status |= STA_UNSYNC;
-	time_maxerror = NTP_PHASE_LIMIT;
-	time_esterror = NTP_PHASE_LIMIT;
+	ntp_clear();
 }
 
 static void update_wallclock(void)
@@ -619,10 +630,11 @@ unsigned long get_cmos_time(void)
 
 	return retval;
 }
+EXPORT_SYMBOL(get_cmos_time);
+
 static void sync_cmos_clock(unsigned long dummy);
 
-static struct timer_list sync_cmos_timer =
-                                      TIMER_INITIALIZER(sync_cmos_clock, 0, 0);
+static DEFINE_TIMER(sync_cmos_timer, sync_cmos_clock, 0, 0);
 
 static void sync_cmos_clock(unsigned long dummy)
 {
@@ -636,7 +648,7 @@ static void sync_cmos_clock(unsigned long dummy)
 	 * This code is run on a timer.  If the clock is set, that timer
 	 * may not expire at the correct time.  Thus, we adjust...
 	 */
-	if ((time_status & STA_UNSYNC) != 0)
+	if (!ntp_synced())
 		/*
 		 * Not synced, exit, do not restart a timer (if one is
 		 * running, let it run out).
@@ -671,6 +683,7 @@ void notify_arch_cmos_timer(void)
 
 static long clock_cmos_diff, sleep_start;
 
+static struct timer_opts *last_timer;
 static int timer_suspend(struct sys_device *dev, pm_message_t state)
 {
 	/*
@@ -679,6 +692,10 @@ static int timer_suspend(struct sys_device *dev, pm_message_t state)
 	clock_cmos_diff = -get_cmos_time();
 	clock_cmos_diff += get_seconds();
 	sleep_start = get_cmos_time();
+	last_timer = cur_timer;
+	cur_timer = &timer_none;
+	if (last_timer->suspend)
+		last_timer->suspend(state);
 	return 0;
 }
 
@@ -700,6 +717,11 @@ static int timer_resume(struct sys_device *dev)
 	write_sequnlock_irqrestore(&xtime_lock, flags);
 	jiffies += sleep_length;
 	wall_jiffies += sleep_length;
+	if (last_timer->resume)
+		last_timer->resume();
+	cur_timer = last_timer;
+	last_timer = NULL;
+	touch_softlockup_watchdog();
 	return 0;
 }
 
@@ -784,14 +806,13 @@ void __init time_init(void)
 	update_wallclock();
 
 	init_cpu_khz();
-	printk(KERN_INFO "Xen reported: %lu.%03lu MHz processor.\n",
+	printk(KERN_INFO "Xen reported: %u.%03u MHz processor.\n",
 	       cpu_khz / 1000, cpu_khz % 1000);
 
 #if defined(__x86_64__)
 	vxtime.mode = VXTIME_TSC;
 	vxtime.quot = (1000000L << 32) / vxtime_hz;
 	vxtime.tsc_quot = (1000L << 32) / cpu_khz;
-	vxtime.hz = vxtime_hz;
 	sync_core();
 	rdtscll(vxtime.last_tsc);
 #endif

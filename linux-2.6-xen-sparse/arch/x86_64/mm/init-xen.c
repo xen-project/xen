@@ -165,31 +165,31 @@ void make_pages_writable(void *va, unsigned nr, unsigned int feature)
 
 void show_mem(void)
 {
-	int i, total = 0, reserved = 0;
-	int shared = 0, cached = 0;
+	long i, total = 0, reserved = 0;
+	long shared = 0, cached = 0;
 	pg_data_t *pgdat;
 	struct page *page;
 
-	printk("Mem-info:\n");
+	printk(KERN_INFO "Mem-info:\n");
 	show_free_areas();
-	printk("Free swap:       %6ldkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
+	printk(KERN_INFO "Free swap:       %6ldkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
 
 	for_each_pgdat(pgdat) {
                for (i = 0; i < pgdat->node_spanned_pages; ++i) {
 			page = pfn_to_page(pgdat->node_start_pfn + i);
 			total++;
-                       if (PageReserved(page))
-			reserved++;
-                       else if (PageSwapCache(page))
-			cached++;
-                       else if (page_count(page))
-                               shared += page_count(page) - 1;
+			if (PageReserved(page))
+				reserved++;
+			else if (PageSwapCache(page))
+				cached++;
+			else if (page_count(page))
+				shared += page_count(page) - 1;
                }
 	}
-	printk("%d pages of RAM\n", total);
-	printk("%d reserved pages\n",reserved);
-	printk("%d pages shared\n",shared);
-	printk("%d pages swap cached\n",cached);
+	printk(KERN_INFO "%lu pages of RAM\n", total);
+	printk(KERN_INFO "%lu reserved pages\n",reserved);
+	printk(KERN_INFO "%lu pages shared\n",shared);
+	printk(KERN_INFO "%lu pages swap cached\n",cached);
 }
 
 /* References to section boundaries */
@@ -638,22 +638,31 @@ void zap_low_mappings(void)
 #endif
 }
 
-#ifndef CONFIG_DISCONTIGMEM
+#ifndef CONFIG_NUMA
 void __init paging_init(void)
 {
 	{
-		unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
+		unsigned long zones_size[MAX_NR_ZONES];
+		unsigned long holes[MAX_NR_ZONES];
 		/*	unsigned int max_dma; */
+
+		memset(zones_size, 0, sizeof(zones_size));
+		memset(holes, 0, sizeof(holes));
+
 		/* max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT; */
-		/* if (end_pfn < max_dma) */
+		/* if (end_pfn < max_dma) { */
 			zones_size[ZONE_DMA] = end_pfn;
 #if 0
-		else {
+			holes[ZONE_DMA] = e820_hole_size(0, end_pfn);
+		} else {
 			zones_size[ZONE_DMA] = max_dma;
+			holes[ZONE_DMA] = e820_hole_size(0, max_dma);
 			zones_size[ZONE_NORMAL] = end_pfn - max_dma;
+			holes[ZONE_NORMAL] = e820_hole_size(max_dma, end_pfn);
 		}
 #endif
-		free_area_init(zones_size);
+		free_area_init_node(0, NODE_DATA(0), zones_size,
+				    __pa(PAGE_OFFSET) >> PAGE_SHIFT, holes);
 	}
 
 	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
@@ -713,18 +722,12 @@ void __init clear_kernel_mapping(unsigned long address, unsigned long size)
 	__flush_tlb_all();
 } 
 
-static inline int page_is_ram (unsigned long pagenr)
-{
-	return 1;
-}
-
 static struct kcore_list kcore_mem, kcore_vmalloc, kcore_kernel, kcore_modules,
 			 kcore_vsyscall;
 
 void __init mem_init(void)
 {
-	int codesize, reservedpages, datasize, initsize;
-	int tmp;
+	long codesize, reservedpages, datasize, initsize;
 
 	contiguous_bitmap = alloc_bootmem_low_pages(
 		(end_pfn + 2*BITS_PER_LONG) >> 3);
@@ -747,23 +750,12 @@ void __init mem_init(void)
 	reservedpages = 0;
 
 	/* this will put all low memory onto the freelists */
-#ifdef CONFIG_DISCONTIGMEM
-	totalram_pages += numa_free_all_bootmem();
-	tmp = 0;
-	/* should count reserved pages here for all nodes */ 
+#ifdef CONFIG_NUMA
+	totalram_pages = numa_free_all_bootmem();
 #else
-	max_mapnr = end_pfn;
-	if (!mem_map) BUG();
-
-	totalram_pages += free_all_bootmem();
-
-	for (tmp = 0; tmp < end_pfn; tmp++)
-		/*
-		 * Only count reserved RAM pages
-		 */
-		if (page_is_ram(tmp) && PageReserved(pfn_to_page(tmp)))
-			reservedpages++;
+	totalram_pages = free_all_bootmem();
 #endif
+	reservedpages = end_pfn - totalram_pages - e820_hole_size(0, end_pfn);
 
 	after_bootmem = 1;
 
@@ -780,7 +772,7 @@ void __init mem_init(void)
 	kclist_add(&kcore_vsyscall, (void *)VSYSCALL_START, 
 				 VSYSCALL_END - VSYSCALL_START);
 
-	printk("Memory: %luk/%luk available (%dk kernel code, %dk reserved, %dk data, %dk init)\n",
+	printk("Memory: %luk/%luk available (%ldk kernel code, %ldk reserved, %ldk data, %ldk init)\n",
 		(unsigned long) nr_free_pages() << (PAGE_SHIFT-10),
 		end_pfn << (PAGE_SHIFT-10),
 		codesize >> 10,
@@ -849,7 +841,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 void __init reserve_bootmem_generic(unsigned long phys, unsigned len) 
 { 
 	/* Should check here against the e820 map to avoid double free */ 
-#ifdef CONFIG_DISCONTIGMEM
+#ifdef CONFIG_NUMA
 	int nid = phys_to_nid(phys);
   	reserve_bootmem_node(NODE_DATA(nid), phys, len);
 #else       		

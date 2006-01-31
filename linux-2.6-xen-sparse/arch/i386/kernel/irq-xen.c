@@ -156,6 +156,11 @@ void irq_ctx_init(int cpu)
 		cpu,hardirq_ctx[cpu],softirq_ctx[cpu]);
 }
 
+void irq_ctx_exit(int cpu)
+{
+	hardirq_ctx[cpu] = NULL;
+}
+
 extern asmlinkage void __do_softirq(void);
 
 asmlinkage void do_softirq(void)
@@ -242,12 +247,13 @@ skip:
 	} else if (i == NR_IRQS) {
 		seq_printf(p, "NMI: ");
 		for_each_cpu(j)
- 			seq_printf(p, "%10u ", nmi_count(j));
+			seq_printf(p, "%10u ", nmi_count(j));
 		seq_putc(p, '\n');
 #ifdef CONFIG_X86_LOCAL_APIC
 		seq_printf(p, "LOC: ");
 		for_each_cpu(j)
-			seq_printf(p, "%10u ", per_cpu(irq_stat,j).apic_timer_irqs);
+			seq_printf(p, "%10u ",
+				per_cpu(irq_stat,j).apic_timer_irqs);
 		seq_putc(p, '\n');
 #endif
 		seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));

@@ -27,6 +27,7 @@
 #include <linux/ptrace.h>
 #include <linux/utsname.h>
 #include <linux/kprobes.h>
+#include <linux/kexec.h>
 
 #ifdef CONFIG_EISA
 #include <linux/ioport.h>
@@ -51,7 +52,6 @@
 #include <asm/arch_hooks.h>
 #include <asm/kdebug.h>
 
-#include <linux/irq.h>
 #include <linux/module.h>
 
 #include "mach_traps.h"
@@ -104,6 +104,7 @@ int register_die_notifier(struct notifier_block *nb)
 	spin_unlock_irqrestore(&die_notifier_lock, flags);
 	return err;
 }
+EXPORT_SYMBOL(register_die_notifier);
 
 static inline int valid_stack_ptr(struct thread_info *tinfo, void *p)
 {
@@ -208,8 +209,8 @@ void show_registers(struct pt_regs *regs)
 	unsigned short ss;
 
 	esp = (unsigned long) (&regs->esp);
-	ss = __KERNEL_DS;
-	if (regs->xcs & 3) {
+	savesegment(ss, ss);
+	if (user_mode(regs)) {
 		in_kernel = 0;
 		esp = regs->esp;
 		ss = regs->xss & 0xffff;
@@ -233,22 +234,22 @@ void show_registers(struct pt_regs *regs)
 	 * time of the fault..
 	 */
 	if (in_kernel) {
-		u8 *eip;
+		u8 __user *eip;
 
 		printk("\nStack: ");
 		show_stack(NULL, (unsigned long*)esp);
 
 		printk("Code: ");
 
-		eip = (u8 *)regs->eip - 43;
+		eip = (u8 __user *)regs->eip - 43;
 		for (i = 0; i < 64; i++, eip++) {
 			unsigned char c;
 
-			if (eip < (u8 *)PAGE_OFFSET || __get_user(c, eip)) {
+			if (eip < (u8 __user *)PAGE_OFFSET || __get_user(c, eip)) {
 				printk(" Bad EIP value.");
 				break;
 			}
-			if (eip == (u8 *)regs->eip)
+			if (eip == (u8 __user *)regs->eip)
 				printk("<%02x> ", c);
 			else
 				printk("%02x ", c);
@@ -265,20 +266,17 @@ static void handle_BUG(struct pt_regs *regs)
 	char c;
 	unsigned long eip;
 
-	if (regs->xcs & 3)
-		goto no_bug;		/* Not in kernel */
-
 	eip = regs->eip;
 
 	if (eip < PAGE_OFFSET)
 		goto no_bug;
-	if (__get_user(ud2, (unsigned short *)eip))
+	if (__get_user(ud2, (unsigned short __user *)eip))
 		goto no_bug;
 	if (ud2 != 0x0b0f)
 		goto no_bug;
-	if (__get_user(line, (unsigned short *)(eip + 2)))
+	if (__get_user(line, (unsigned short __user *)(eip + 2)))
 		goto bug;
-	if (__get_user(file, (char **)(eip + 4)) ||
+	if (__get_user(file, (char * __user *)(eip + 4)) ||
 		(unsigned long)file < PAGE_OFFSET || __get_user(c, file))
 		file = "<bad filename>";
 
@@ -293,6 +291,9 @@ bug:
 	printk("Kernel BUG\n");
 }
 
+/* This is gone through when something in the kernel
+ * has done something bad and is about to be terminated.
+*/
 void die(const char * str, struct pt_regs * regs, long err)
 {
 	static struct {
@@ -306,7 +307,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 	};
 	static int die_counter;
 
-	if (die.lock_owner != _smp_processor_id()) {
+	if (die.lock_owner != raw_smp_processor_id()) {
 		console_verbose();
 		spin_lock_irq(&die.lock);
 		die.lock_owner = smp_processor_id();
@@ -340,6 +341,10 @@ void die(const char * str, struct pt_regs * regs, long err)
 	bust_spinlocks(0);
 	die.lock_owner = -1;
 	spin_unlock_irq(&die.lock);
+
+	if (kexec_should_crash(current))
+		crash_kexec(regs);
+
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 
@@ -353,26 +358,28 @@ void die(const char * str, struct pt_regs * regs, long err)
 
 static inline void die_if_kernel(const char * str, struct pt_regs * regs, long err)
 {
-	if (!(regs->eflags & VM_MASK) && !(3 & regs->xcs))
+	if (!user_mode_vm(regs))
 		die(str, regs, err);
 }
 
-static void do_trap(int trapnr, int signr, char *str, int vm86,
-			   struct pt_regs * regs, long error_code, siginfo_t *info)
+static void __kprobes do_trap(int trapnr, int signr, char *str, int vm86,
+			      struct pt_regs * regs, long error_code,
+			      siginfo_t *info)
 {
+	struct task_struct *tsk = current;
+	tsk->thread.error_code = error_code;
+	tsk->thread.trap_no = trapnr;
+
 	if (regs->eflags & VM_MASK) {
 		if (vm86)
 			goto vm86_trap;
 		goto trap_signal;
 	}
 
-	if (!(regs->xcs & 3))
+	if (!user_mode(regs))
 		goto kernel_trap;
 
 	trap_signal: {
-		struct task_struct *tsk = current;
-		tsk->thread.error_code = error_code;
-		tsk->thread.trap_no = trapnr;
 		if (info)
 			force_sig_info(signr, info, tsk);
 		else
@@ -453,7 +460,8 @@ DO_ERROR(12, SIGBUS,  "stack segment", stack_segment)
 DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, 0)
 DO_ERROR_INFO(32, SIGSEGV, "iret exception", iret_error, ILL_BADSTK, 0)
 
-fastcall void do_general_protection(struct pt_regs * regs, long error_code)
+fastcall void __kprobes do_general_protection(struct pt_regs * regs,
+					      long error_code)
 {
 	int cpu = get_cpu();
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
@@ -485,10 +493,13 @@ fastcall void do_general_protection(struct pt_regs * regs, long error_code)
 	}
 	put_cpu();
 
+	current->thread.error_code = error_code;
+	current->thread.trap_no = 13;
+
 	if (regs->eflags & VM_MASK)
 		goto gp_in_vm86;
 
-	if (!(regs->xcs & 3))
+	if (!user_mode(regs))
 		goto gp_in_kernel;
 
 	current->thread.error_code = error_code;
@@ -548,6 +559,10 @@ static DEFINE_SPINLOCK(nmi_print_lock);
 
 void die_nmi (struct pt_regs *regs, const char *msg)
 {
+	if (notify_die(DIE_NMIWATCHDOG, msg, regs, 0, 0, SIGINT) ==
+	    NOTIFY_STOP)
+		return;
+
 	spin_lock(&nmi_print_lock);
 	/*
 	* We are in trouble anyway, lets at least try
@@ -562,6 +577,15 @@ void die_nmi (struct pt_regs *regs, const char *msg)
 	console_silent();
 	spin_unlock(&nmi_print_lock);
 	bust_spinlocks(0);
+
+	/* If we are in kernel we are probably nested up pretty bad
+	 * and might aswell get out now while we still can.
+	*/
+	if (!user_mode(regs)) {
+		current->thread.trap_no = 2;
+		crash_kexec(regs);
+	}
+
 	do_exit(SIGSEGV);
 }
 
@@ -617,9 +641,17 @@ fastcall void do_nmi(struct pt_regs * regs, long error_code)
 	nmi_enter();
 
 	cpu = smp_processor_id();
+
+#ifdef CONFIG_HOTPLUG_CPU
+	if (!cpu_online(cpu)) {
+		nmi_exit();
+		return;
+	}
+#endif
+
 	++nmi_count(cpu);
 
-	if (!nmi_callback(regs, cpu))
+	if (!rcu_dereference(nmi_callback)(regs, cpu))
 		default_do_nmi(regs);
 
 	nmi_exit();
@@ -627,16 +659,18 @@ fastcall void do_nmi(struct pt_regs * regs, long error_code)
 
 void set_nmi_callback(nmi_callback_t callback)
 {
-	nmi_callback = callback;
+	rcu_assign_pointer(nmi_callback, callback);
 }
+EXPORT_SYMBOL_GPL(set_nmi_callback);
 
 void unset_nmi_callback(void)
 {
 	nmi_callback = dummy_nmi_callback;
 }
+EXPORT_SYMBOL_GPL(unset_nmi_callback);
 
 #ifdef CONFIG_KPROBES
-fastcall void do_int3(struct pt_regs *regs, long error_code)
+fastcall void __kprobes do_int3(struct pt_regs *regs, long error_code)
 {
 	if (notify_die(DIE_INT3, "int3", regs, error_code, 3, SIGTRAP)
 			== NOTIFY_STOP)
@@ -670,12 +704,12 @@ fastcall void do_int3(struct pt_regs *regs, long error_code)
  * find every occurrence of the TF bit that could be saved away even
  * by user code)
  */
-fastcall void do_debug(struct pt_regs * regs, long error_code)
+fastcall void __kprobes do_debug(struct pt_regs * regs, long error_code)
 {
 	unsigned int condition;
 	struct task_struct *tsk = current;
 
-	__asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
+	get_debugreg(condition, 6);
 
 	if (notify_die(DIE_DEBUG, "debug", regs, condition, error_code,
 					SIGTRAP) == NOTIFY_STOP)
@@ -706,7 +740,7 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 		 * check for kernel mode by just checking the CPL
 		 * of CS.
 		 */
-		if ((regs->xcs & 3) == 0)
+		if (!user_mode(regs))
 			goto clear_TF_reenable;
 	}
 
@@ -717,9 +751,7 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 	 * the signal is delivered.
 	 */
 clear_dr7:
-	__asm__("movl %0,%%db7"
-		: /* no output */
-		: "r" (0));
+	set_debugreg(0, 7);
 	return;
 
 debug_vm86:
@@ -766,15 +798,18 @@ void math_error(void __user *eip)
 	 */
 	cwd = get_fpu_cwd(task);
 	swd = get_fpu_swd(task);
-	switch (((~cwd) & swd & 0x3f) | (swd & 0x240)) {
-		case 0x000:
-		default:
+	switch (swd & ~cwd & 0x3f) {
+		case 0x000: /* No unmasked exception */
+			return;
+		default:    /* Multiple exceptions */
 			break;
 		case 0x001: /* Invalid Op */
-		case 0x041: /* Stack Fault */
-		case 0x241: /* Stack Fault | Direction */
+			/*
+			 * swd & 0x240 == 0x040: Stack Underflow
+			 * swd & 0x240 == 0x240: Stack Overflow
+			 * User must clear the SF bit (0x40) if set
+			 */
 			info.si_code = FPE_FLTINV;
-			/* Should we clear the SF or let user space do it ???? */
 			break;
 		case 0x002: /* Denormalize */
 		case 0x010: /* Underflow */
@@ -864,9 +899,9 @@ fastcall void do_simd_coprocessor_error(struct pt_regs * regs,
 					  error_code);
 			return;
 		}
-		die_if_kernel("cache flush denied", regs, error_code);
 		current->thread.trap_no = 19;
 		current->thread.error_code = error_code;
+		die_if_kernel("cache flush denied", regs, error_code);
 		force_sig(SIGSEGV, current);
 	}
 }
@@ -969,7 +1004,7 @@ void __init trap_init_f00f_bug(void)
 	 * it uses the read-only mapped virtual address.
 	 */
 	idt_descr.address = fix_to_virt(FIX_F00F_IDT);
-	__asm__ __volatile__("lidt %0" : : "m" (idt_descr));
+	load_idt(&idt_descr);
 }
 #endif
 

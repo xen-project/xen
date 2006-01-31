@@ -1,7 +1,7 @@
-diff -ur linux-2.6.11/kernel/rcupdate.c linux-2.6.11-rcu/kernel/rcupdate.c
---- linux-2.6.11/kernel/rcupdate.c	2005-05-30 10:51:41 +01:00
-+++ linux-2.6.11-rcu/kernel/rcupdate.c	2005-05-30 10:53:53 +01:00
-@@ -202,8 +202,11 @@
+diff -pru ../pristine-linux-2.6.14/kernel/rcupdate.c ./kernel/rcupdate.c
+--- ../pristine-linux-2.6.14/kernel/rcupdate.c	2005-10-28 01:02:08.000000000 +0100
++++ ./kernel/rcupdate.c	2006-01-31 16:04:36.000000000 +0000
+@@ -227,8 +227,11 @@ static void rcu_start_batch(struct rcu_c
   */
  static void cpu_quiet(int cpu, struct rcu_ctrlblk *rcp, struct rcu_state *rsp)
  {
