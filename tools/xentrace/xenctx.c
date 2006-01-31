@@ -53,7 +53,7 @@ struct symbol {
     struct symbol *next;
 } *symbol_table = NULL;
 
-size_t kernel_stext, kernel_etext, kernel_sinittext, kernel_einittext;
+size_t kernel_stext, kernel_etext, kernel_sinittext, kernel_einittext, kernel_hypercallpage;
 
 int is_kernel_text(size_t addr)
 {
@@ -67,6 +67,9 @@ int is_kernel_text(size_t addr)
 
     if (addr >= kernel_stext &&
         addr <= kernel_etext)
+        return 1;
+    if (addr >= kernel_hypercallpage &&
+        addr <= kernel_hypercallpage + 4096)
         return 1;
     if (addr >= kernel_sinittext &&
         addr <= kernel_einittext)
@@ -184,6 +187,8 @@ void read_symbol_table(const char *symtab)
             kernel_sinittext = symbol->address;
         else if (strcmp(symbol->name, "_einittext") == 0)
             kernel_einittext = symbol->address;
+        else if (strcmp(symbol->name, "hypercall_page") == 0)
+            kernel_hypercallpage = symbol->address;
     }
 
     fclose(f);
