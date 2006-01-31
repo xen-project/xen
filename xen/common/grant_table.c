@@ -481,7 +481,7 @@ gnttab_setup_table(
     gnttab_setup_table_t  op;
     struct domain        *d;
     int                   i;
-    unsigned long         mfn;
+    unsigned long         gpfn;
 
     if ( count != 1 )
         return -EINVAL;
@@ -523,8 +523,8 @@ gnttab_setup_table(
         (void)put_user(GNTST_okay, &uop->status);
         for ( i = 0; i < op.nr_frames; i++ )
         {
-            mfn = __mfn_to_gpfn(d, gnttab_shared_mfn(d, d->grant_table, i));
-            (void)put_user(mfn, &op.frame_list[i]);
+            gpfn = gnttab_shared_gpfn(d, d->grant_table, i);
+            (void)put_user(gpfn, &op.frame_list[i]);
         }
     }
 
