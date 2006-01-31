@@ -850,8 +850,9 @@ void stop_hz_timer(void)
 	unsigned int cpu = smp_processor_id();
 	unsigned long j;
 	
-	/* s390 does this /before/ checking rcu_pending(). We copy them. */
+	/* We must do this /before/ checking rcu_pending(). */
 	cpu_set(cpu, nohz_cpu_mask);
+	smp_mb();
 
 	/* Leave ourselves in 'tick mode' if rcu or softirq pending. */
 	if (rcu_pending(cpu) || local_softirq_pending()) {
