@@ -15,8 +15,6 @@
 
 #define shadow_mode_translate(d)              (0)
 
-#define __gpfn_to_mfn(d, p)                   (p)
-#define __mfn_to_gpfn(d, p)                   (p)
 #define guest_physmap_add_page(d, p, m)       ((void)0)
 #define guest_physmap_remove_page(d, p, m)    ((void)0)
 
