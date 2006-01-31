@@ -427,9 +427,9 @@ done:
     return length;
 
 cannot_emulate:
-    DPRINTF("Cannot emulate %02x at address %x (eip %x, mode %d)\n",
-        b, _regs.eip, regs->eip, mode);
-        svm_dump_inst(_regs.eip);
+    DPRINTF("Cannot emulate %02x at address %lx (eip %lx, mode %d)\n",
+            b, (unsigned long)_regs.eip, (unsigned long)regs->eip, mode);
+    svm_dump_inst(_regs.eip);
     return (unsigned long)-1;
 }
 #endif /* CONFIG_SVM */
