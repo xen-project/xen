@@ -305,7 +305,7 @@ long sched_ctl(struct sched_ctl_cmd *cmd)
 long sched_adjdom(struct sched_adjdom_cmd *cmd)
 {
     struct domain *d;
-    struct vcpu *v;
+    struct vcpu *v, *vme;
     
     if ( (cmd->sched_id != ops.sched_id) ||
          ((cmd->direction != SCHED_INFO_PUT) &&
@@ -319,24 +319,37 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
     /*
      * Most VCPUs we can simply pause. If we are adjusting this VCPU then
      * we acquire the local schedule_lock to guard against concurrent updates.
+     *
+     * We only acquire the local schedule lock after we have paused all other
+     * VCPUs in this domain. There are two reasons for this:
+     * 1- We don't want to hold up interrupts as pausing a VCPU can
+     *    trigger a tlb shootdown.
+     * 2- Pausing other VCPUs involves briefly locking the schedule
+     *    lock of the CPU they are running on. This CPU could be the
+     *    same as ours.
      */
+    vme = NULL;
+
     for_each_vcpu ( d, v )
     {
         if ( v == current )
-            vcpu_schedule_lock_irq(v);
+            vme = current;
         else
             vcpu_pause(v);
     }
 
-    SCHED_OP(adjdom, d, cmd);
+    if (vme)
+            vcpu_schedule_lock_irq(vme);
 
+    SCHED_OP(adjdom, d, cmd);
     TRACE_1D(TRC_SCHED_ADJDOM, d->domain_id);
+
+    if (vme)
+            vcpu_schedule_unlock_irq(vme);
 
     for_each_vcpu ( d, v )
     {
-        if ( v == current )
-            vcpu_schedule_unlock_irq(v);
-        else
+        if ( v != vme )
             vcpu_unpause(v);
     }
 
