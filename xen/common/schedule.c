@@ -305,7 +305,7 @@ long sched_ctl(struct sched_ctl_cmd *cmd)
 long sched_adjdom(struct sched_adjdom_cmd *cmd)
 {
     struct domain *d;
-    struct vcpu *v, *vme;
+    struct vcpu *v;
     
     if ( (cmd->sched_id != ops.sched_id) ||
          ((cmd->direction != SCHED_INFO_PUT) &&
@@ -328,28 +328,25 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
      *    lock of the CPU they are running on. This CPU could be the
      *    same as ours.
      */
-    vme = NULL;
 
     for_each_vcpu ( d, v )
     {
-        if ( v == current )
-            vme = current;
-        else
+        if ( v != current )
             vcpu_pause(v);
     }
 
-    if (vme)
-            vcpu_schedule_lock_irq(vme);
+    if ( d == current->domain )
+        vcpu_schedule_lock_irq(current);
 
     SCHED_OP(adjdom, d, cmd);
     TRACE_1D(TRC_SCHED_ADJDOM, d->domain_id);
 
-    if (vme)
-            vcpu_schedule_unlock_irq(vme);
+    if ( d == current->domain )
+        vcpu_schedule_unlock_irq(current);
 
     for_each_vcpu ( d, v )
     {
-        if ( v != vme )
+        if ( v != current )
             vcpu_unpause(v);
     }
 
