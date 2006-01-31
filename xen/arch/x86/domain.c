@@ -35,7 +35,8 @@
 #include <asm/shadow.h>
 #include <xen/console.h>
 #include <xen/elf.h>
-#include <asm/vmx.h>
+#include <asm/hvm/hvm.h>
+#include <asm/hvm/support.h>
 #include <asm/msr.h>
 #include <xen/kernel.h>
 #include <xen/multicall.h>
@@ -153,8 +154,7 @@ void machine_restart(char * __unused)
      */
     smp_send_stop();
     disable_IO_APIC();
-
-    stop_vmx();
+    hvm_disable();
 
     /* Rebooting needs to touch the page at absolute address 0. */
     *((unsigned short *)__va(0x472)) = reboot_mode;
@@ -354,26 +354,26 @@ int arch_set_info_guest(
      * #GP. If DS, ES, FS, GS are DPL 0 then they'll be cleared automatically.
      * If SS RPL or DPL differs from CS RPL then we'll #GP.
      */
-    if ( !(c->flags & VGCF_VMX_GUEST) )
+    if ( !(c->flags & VGCF_HVM_GUEST) )
     {
         if ( ((c->user_regs.cs & 3) == 0) ||
              ((c->user_regs.ss & 3) == 0) )
             return -EINVAL;
     }
     else if ( !hvm_enabled )
-        return -EINVAL;
+      return -EINVAL;
 
     clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
     if ( c->flags & VGCF_I387_VALID )
         set_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
 
     v->arch.flags &= ~TF_kernel_mode;
-    if ( (c->flags & VGCF_IN_KERNEL) || (c->flags & VGCF_VMX_GUEST) )
+    if ( (c->flags & VGCF_IN_KERNEL) || (c->flags & VGCF_HVM_GUEST) )
         v->arch.flags |= TF_kernel_mode;
 
     memcpy(&v->arch.guest_context, c, sizeof(*c));
 
-    if ( !(c->flags & VGCF_VMX_GUEST) )
+    if ( !(c->flags & VGCF_HVM_GUEST) )
     {
         /* IOPL privileges are virtualised. */
         v->arch.iopl = (v->arch.guest_context.user_regs.eflags >> 12) & 3;
@@ -384,9 +384,7 @@ int arch_set_info_guest(
     }
     else if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
     {
-        return modify_vmcs(
-            &v->arch.arch_vmx,
-            &v->arch.guest_context.user_regs);
+	hvm_modify_guest_state(v);
     }
 
     if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
@@ -418,7 +416,7 @@ int arch_set_info_guest(
             return -EINVAL;
         }
     }
-    else if ( !(c->flags & VGCF_VMX_GUEST) )
+    else if ( !(c->flags & VGCF_HVM_GUEST) )
     {
         if ( !get_page_and_type(pfn_to_page(phys_basetab>>PAGE_SHIFT), d,
                                 PGT_base_page_table) )
@@ -428,14 +426,17 @@ int arch_set_info_guest(
         }
     }
 
-    if ( c->flags & VGCF_VMX_GUEST )
+    if ( c->flags & VGCF_HVM_GUEST )
     {
-        /* VMX uses the initially provided page tables as the P2M map. */
+        /* HVM uses the initially provided page tables as the P2M map. */
         if ( !pagetable_get_paddr(d->arch.phys_table) )
             d->arch.phys_table = v->arch.guest_table;
         v->arch.guest_table = mk_pagetable(0);
 
-        vmx_final_setup_guest(v);
+	if (!hvm_initialize_guest_resources(v))
+            return -EINVAL;
+	   
+	hvm_switch_on = 1;
     }
 
     update_pagetables(v);
@@ -611,8 +612,8 @@ static void save_segments(struct vcpu *v)
     struct cpu_user_regs      *regs = &ctxt->user_regs;
     unsigned int dirty_segment_mask = 0;
 
-    if ( VMX_DOMAIN(v) )
-        rdmsrl(MSR_SHADOW_GS_BASE, v->arch.arch_vmx.msr_content.shadow_gs);
+    if ( HVM_DOMAIN(v) )
+	hvm_save_segments(v);
 
     __asm__ __volatile__ ( "mov %%ds,%0" : "=m" (regs->ds) );
     __asm__ __volatile__ ( "mov %%es,%0" : "=m" (regs->es) );
@@ -704,7 +705,7 @@ static void __context_switch(void)
             loaddebug(&n->arch.guest_context, 7);
         }
 
-        if ( !VMX_DOMAIN(n) )
+        if ( !HVM_DOMAIN(n) )
         {
             set_int80_direct_trap(n);
             switch_kernel_stack(n, cpu);
@@ -764,15 +765,16 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         /* Re-enable interrupts before restoring state which may fault. */
         local_irq_enable();
 
-        if ( VMX_DOMAIN(next) )
+        if ( HVM_DOMAIN(next) )
         {
-            vmx_restore_msrs(next);
+            hvm_restore_msrs(next);
         }
         else
         {
             load_LDT(next);
             load_segments(next);
-            vmx_load_msrs(next);
+	    if ( HVM_DOMAIN(next) )
+                hvm_load_msrs(next);
         }
     }
 
@@ -962,7 +964,8 @@ void domain_relinquish_resources(struct domain *d)
             v->arch.guest_table_user = mk_pagetable(0);
         }
 
-        vmx_relinquish_resources(v);
+	if ( HVM_DOMAIN(v) )
+            hvm_relinquish_guest_resources(v);
     }
 
     shadow_mode_disable(d);

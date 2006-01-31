@@ -31,7 +31,7 @@
 //#define DEBUG_IRQ_LATENCY
 //#define DEBUG_IRQ_COUNT
 
-extern void pit_reset_vmx_vectors();
+extern void pit_reset_hvm_vectors();
 
 typedef struct PicState {
     uint8_t last_irr; /* edge detection */
@@ -368,7 +368,7 @@ static void pic_ioport_write(void *opaque, uint32_t addr, uint32_t val)
         case 1:
             s->irq_base = val & 0xf8;
             s->init_state = 2;
-            pit_reset_vmx_vectors();
+            pit_reset_hvm_vectors();
             break;
         case 2:
             if (s->init4) {

@@ -20,7 +20,9 @@
 
 /*
  * Main cpu loop for handling I/O requests coming from a virtual machine
+ *
  * Copyright © 2004, Intel Corporation.
+ * Copyright © 2005, International Business Machines Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU Lesser General Public License,
@@ -394,7 +396,7 @@ void cpu_handle_ioreq(CPUState *env)
 int xc_handle;
 
 void
-destroy_vmx_domain(void)
+destroy_hvm_domain(void)
 {
     extern FILE* logfile;
     char destroy_cmd[32];
@@ -467,11 +469,11 @@ int main_loop(void)
             (void)ioctl(evtchn_fd, IOCTL_EVTCHN_NOTIFY, &notify);
         }
     }
-    destroy_vmx_domain();
+    destroy_hvm_domain();
     return 0;
 }
 
-static void qemu_vmx_reset(void *unused)
+static void qemu_hvm_reset(void *unused)
 {
     char cmd[64];
 
@@ -489,7 +491,7 @@ CPUState * cpu_init()
     int rc;
 
     cpu_exec_init();
-    qemu_register_reset(qemu_vmx_reset, NULL);
+    qemu_register_reset(qemu_hvm_reset, NULL);
     env = malloc(sizeof(CPUX86State));
     if (!env)
         return NULL;

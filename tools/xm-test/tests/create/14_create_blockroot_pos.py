@@ -17,7 +17,7 @@ rdpath = getRdPath()
 # if verbose:
 #     print "Using %s" % output
 
-if ENABLE_VMX_SUPPORT:
+if ENABLE_HVM_SUPPORT:
     domain = XmTestDomain(name="14_create_blockroot")
 else:
     config = {"memory" : "64",

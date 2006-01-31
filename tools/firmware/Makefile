@@ -1,9 +1,9 @@
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-# vmxloader is a 32-bit protected mode binary.
+# hvmloader is a 32-bit protected mode binary.
 # It belongs in /usr/lib, not /usr/lib64.
-TARGET      := vmxassist/vmxloader
+TARGET      := hvmloader/hvmloader
 INSTALL_DIR := $(DESTDIR)/usr/lib/xen/boot
 
 SUBDIRS :=
@@ -11,6 +11,7 @@ SUBDIRS += rombios
 SUBDIRS += vgabios
 SUBDIRS += acpi
 SUBDIRS += vmxassist
+SUBDIRS += hvmloader
 
 .PHONY: all install clean
 

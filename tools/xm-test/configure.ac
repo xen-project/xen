@@ -15,18 +15,18 @@ TESTLIB=../../lib
 RD_PATH=../../ramdisk
 TENV="PYTHONPATH=$PYTHONPATH:$TESTLIB:/usr/lib/python RD_PATH=$RD_PATH"
 
-AC_ARG_ENABLE(vmx-support,
-	[[  --enable-vmx-support           enable hardware virtual machine assist]],
+AC_ARG_ENABLE(hvm-support,
+	[[  --enable-hvm-support           enable hardware virtual machine assist]],
 	[
-		ENABLE_VMX=True
+		ENABLE_HVM=True
 	],[
-		ENABLE_VMX=False
+		ENABLE_HVM=False
 	])
 
-if test "x$ENABLE_VMX" = "xTrue"; then
+if test "x$ENABLE_HVM" = "xTrue"; then
 	if test "$LILO" = "no"; then 
 		AC_MSG_ERROR([lilo not found
-lilo version 22.7 or greater must be installed for testing with vmx enabled.])
+lilo version 22.7 or greater must be installed for testing with hvm enabled.])
 	else
 		pass=`$LILO -V | sed -e "s/LILO version //" | awk -F "." '{if ($1 >=22 && $2 >= 7) print "true"; else print "false"}'`
 		if test "$pass" != "true"; then
@@ -35,16 +35,16 @@ lilo version 22.7 or greater must be installed for testing with vmx enabled.])
 	fi
 fi
 
-AM_CONDITIONAL(VMX, test x$ENABLE_VMX = xTrue)
-AC_SUBST(ENABLE_VMX)
+AM_CONDITIONAL(HVM, test x$ENABLE_HVM = xTrue)
+AC_SUBST(ENABLE_HVM)
 
-AC_ARG_WITH(vmx-kernel,
-	[[  --with-vmx-kernel=kernel       Use this kernel for vmx disk.img testing]],
-	VMXKERNEL=$withval,
-	VMXKERNEL="no")
+AC_ARG_WITH(hvm-kernel,
+      [[  --with-hvm-kernel=kernel       Use this kernel for hvm disk.img testing]],
+      HVMKERNEL=$withval,
+      HVMKERNEL="no")
 
-dnl substitute @VMXKERNEL@ in all Makefiles
-AC_SUBST(VMXKERNEL)
+dnl substitute @HVMKERNEL@ in all Makefiles
+AC_SUBST(HVMKERNEL)
 
 AC_ARG_WITH(driver-dir,
 	[[  --with-driver-dir=drvdir       Look in this directory for the pcnet32 driver for the vmx disk.img. drvdir can equal key word "builtin" if driver is built into the kernel]],

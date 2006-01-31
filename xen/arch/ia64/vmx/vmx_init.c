@@ -48,7 +48,7 @@
 #include <asm/vmx.h>
 #include <xen/mm.h>
 #include <public/arch-ia64.h>
-#include <asm/vmx_vioapic.h>
+#include <asm/hvm/vioapic.h>
 
 /* Global flag to identify whether Intel vmx feature is on */
 u32 vmx_enabled = 0;
@@ -394,7 +394,7 @@ void vmx_setup_platform(struct domain *d, struct vcpu_guest_context *c)
 	vmx_virq_line_init(d);
 
 	/* Initialize iosapic model within hypervisor */
-	vmx_vioapic_init(d);
+	hvm_vioapic_init(d);
 }
 
 

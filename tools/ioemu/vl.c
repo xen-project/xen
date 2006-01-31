@@ -125,7 +125,7 @@ static char network_script[1024];
 int pit_min_timer_count = 0;
 int nb_nics;
 char bridge[16];
-char domain_name[1024] = { 'V', 'T', 'X', 'E', 'N', '-'};
+char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
 NetDriverState nd_table[MAX_NICS];
 QEMUTimer *gui_timer;
 QEMUTimer *polling_timer;
@@ -826,8 +826,8 @@ static void init_timers(void)
     {
         /* get times() syscall frequency */
         timer_freq = sysconf(_SC_CLK_TCK);
-
-#ifndef TARGET_VMX
+      
+#ifndef TARGET_HVM
         /* timer signal */
         sigfillset(&act.sa_mask);
         act.sa_flags = 0;
@@ -869,7 +869,7 @@ static void init_timers(void)
             pit_min_timer_count = ((uint64_t)itv.it_interval.tv_usec *
                                    PIT_FREQ) / 1000000;
         }
-#endif /* TARGET_VMX */
+#endif /* TARGET_HVM */
     }
 #endif
 }

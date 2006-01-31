@@ -26,8 +26,8 @@
 
 // ROM BIOS for use with Bochs/Plex x86 emulation environment
 
-#define VMXASSIST
-#undef VMXTEST
+#define HVMASSIST
+#undef HVMTEST
 
 // Xen full virtualization does not handle unaligned IO with page crossing.
 // Disable 32-bit PIO as a workaround.
@@ -177,8 +177,8 @@
 #define BASE_MEM_IN_K   (640 - EBDA_SIZE)
 
   // Define the application NAME
-#ifdef VMXASSIST
-#  define BX_APPNAME "VMXAssist"
+#ifdef HVMASSIST
+#  define BX_APPNAME "HVMAssist"
 #elif PLEX86
 #  define BX_APPNAME "Plex86"
 #else
@@ -1430,7 +1430,7 @@ ASM_START
 ASM_END
 }
 
-#ifdef VMXASSIST
+#ifdef HVMASSIST
 void
 copy_e820_table()
 {
@@ -1440,7 +1440,7 @@ copy_e820_table()
   write_word(0xe000, 0x8, nr_entries);
   memcpyb(0xe000, 0x10, 0x9000, 0x2d0, nr_entries * 0x14);
 }
-#endif /* VMXASSIST */
+#endif /* HVMASSIST */
 
 #if BX_DEBUG_SERIAL
 /* serial debug port*/
@@ -1520,7 +1520,7 @@ send(action, c)
   if (c == '\n') uart_tx_byte(BX_DEBUG_PORT, '\r');
   uart_tx_byte(BX_DEBUG_PORT, c);
 #endif
-#ifdef VMXASSIST
+#ifdef HVMASSIST
   outb(0xE9, c);
 #endif
 #if BX_VIRTUAL_PORTS
@@ -4089,7 +4089,7 @@ ASM_END
          case 0x20: // coded by osmaker aka K.J.
             if(regs.u.r32.edx == 0x534D4150) /* SMAP */
             {
-#ifdef VMXASSIST
+#ifdef HVMASSIST
 		if ((regs.u.r16.bx / 0x14) * 0x14 == regs.u.r16.bx) {
 		    Bit16u e820_table_size = read_word(0xe000, 0x8) * 0x14;
 
@@ -9595,7 +9595,7 @@ post_default_ints:
   ;; int 1C already points at dummy_iret_handler (above)
   mov al, #0x34 ; timer0: binary count, 16bit count, mode 2
   out 0x43, al
-#ifdef VMXASSIST
+#ifdef HVMASSIST
   mov al, #0x0b ; #0xe90b = 20 Hz (temporary, until we fix xen/vmx support)
   out 0x40, al ; lsb
   mov al, #0xe9
@@ -9702,22 +9702,10 @@ post_default_ints:
   mov al, #0x11 ; send initialisation commands
   out 0x20, al
   out 0xa0, al
-#ifdef VMXASSIST
-  ;; The vm86 emulator expects interrupts to be mapped beyond the reserved
-  ;; vectors (0 through 31). Since rombios fully controls the hardware, we
-  ;; map it the way the emulator needs it and expect that it will do the
-  ;; proper 8086 interrupt translation (that is, master pic base is at 0x8
-  ;; and slave pic base is at 0x70).
-  mov al, #0x20
-  out 0x21, al
-  mov al, #0x28
-  out 0xa1, al
-#else
   mov al, #0x08
   out 0x21, al
   mov al, #0x70
   out 0xa1, al
-#endif
   mov al, #0x04
   out 0x21, al
   mov al, #0x02
@@ -9734,7 +9722,7 @@ post_default_ints:
 #endif
   out  0xa1, AL ;slave  pic: unmask IRQ 12, 13, 14
 
-#ifdef VMXASSIST
+#ifdef HVMASSIST
   call _copy_e820_table
 #endif
 
@@ -10368,13 +10356,13 @@ dummy_iret_handler:
   HALT(__LINE__)
   iret
 
-#ifdef VMXTEST
+#ifdef HVMTEST
 .org 0xffe0
   jmp 0xf000:post;
 #endif
 
 .org 0xfff0 ; Power-up Entry Point
-#ifdef VMXTEST
+#ifdef HVMTEST
   jmp 0xd000:0x0003;
 #else
   jmp 0xf000:post

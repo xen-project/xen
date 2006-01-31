@@ -1,11 +1,11 @@
-Domain FirmWare support
+Domain firmware support
 -----------------------
 
 One of the key advantages of full virtualization hardware support (such
-as Intel's VT or AMD's Pacifica) is the ability to run unmodified guest
-operating systems.  However, since most OSes rely on BIOS support during
-their early bringup, we need to provide a surrogate ROMBIOS and VGABIOS
-firmware layer.
+as Intel's VT or AMD's SVM extensions) is the ability to run unmodified
+guest operating systems.  However, since most OSes rely on BIOS support
+during their early bringup, we need to provide a surrogate ROMBIOS and
+VGABIOS firmware layer.
 
 What's more, we need to support real-mode which is required by
 the firmware and bootstrap loaders. Real-mode support is especially

@@ -9,12 +9,12 @@ BR_IMG = $(BR_SRC)/rootfs.i386.ext2
 
 BR_ROOT = build_i386/root
 
-VMX_SCRIPT = bin/create_disk_image
+HVM_SCRIPT = bin/create_disk_image
 
 XMTEST_MAJ_VER = $(shell echo @PACKAGE_VERSION@ | perl -pe 's/(\d+)\.(\d+)\.\d+/\1.\2/')
 XMTEST_VER_IMG = initrd-$(XMTEST_MAJ_VER).img
 
-if VMX
+if HVM
 all: initrd.img disk.img
 else
 all: initrd.img
@@ -44,16 +44,16 @@ initrd.img: $(XMTEST_VER_IMG)
 	ln -sf $(XMTEST_VER_IMG) initrd.img
 
 disk.img: $(XMTEST_VER_IMG)
-	chmod a+x $(VMX_SCRIPT)
-	@if test ! "$(VMXKERNEL)" = "no" -a ! "$(DRVDIR)" = "no"; then \
-		$(VMX_SCRIPT) -r $(XMTEST_VER_IMG) -k $(VMXKERNEL) \
+	chmod a+x $(HVM_SCRIPT)
+	@if test ! "$(HVMKERNEL)" = "no" -a ! "$(DRVDIR)" = "no"; then \
+		$(HVM_SCRIPT) -r $(XMTEST_VER_IMG) -k $(HVMKERNEL) \
 			-d $(DRVDIR); \
-	elif test "$(VMXKERNEL)" = "no" -a ! "$(DRVDIR)" = "no"; then \
-		$(VMX_SCRIPT) -r $(XMTEST_VER_IMG) -d $(DRVDIR); \
-	elif test ! "$(VMXKERNEL)" = "no" -a "$(DRVDIR)" = "no"; then \
-		$(VMX_SCRIPT) -r $(XMTEST_VER_IMG) -k $(VMXKERNEL); \
+	elif test "$(HVMKERNEL)" = "no" -a ! "$(DRVDIR)" = "no"; then \
+		$(HVM_SCRIPT) -r $(XMTEST_VER_IMG) -d $(DRVDIR); \
+	elif test ! "$(HVMKERNEL)" = "no" -a "$(DRVDIR)" = "no"; then \
+		$(HVM_SCRIPT) -r $(XMTEST_VER_IMG) -k $(HVMKERNEL); \
 	else \
-		$(VMX_SCRIPT) -r $(XMTEST_VER_IMG); \
+		$(HVM_SCRIPT) -r $(XMTEST_VER_IMG); \
 	fi
 
 existing:

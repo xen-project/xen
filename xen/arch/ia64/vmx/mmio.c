@@ -207,7 +207,7 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 extern struct vmx_mmio_handler vioapic_mmio_handler;
 static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int dir)
 {
-    struct virutal_platform_def *v_plat;
+    struct virtual_platform_def *v_plat;
     //mmio_type_t iot;
     unsigned long iot;
     struct vmx_mmio_handler *vioapic_handler = &vioapic_mmio_handler;

@@ -8,8 +8,8 @@ import sys
 from XmTestLib import *
 from network_utils import *
 
-if ENABLE_VMX_SUPPORT:
-    SKIP("Network-attach not supported for VMX domains")
+if ENABLE_HVM_SUPPORT:
+    SKIP("Network-attach not supported for HVM domains")
 
 # Create a domain (default XmTestDomain, with our ramdisk)
 domain = XmTestDomain()

@@ -225,10 +225,10 @@ static void do_info_history (void)
     }
 }
 
-extern void destroy_vmx_domain(void);
+extern void destroy_hvm_domain(void);
 static void do_quit(void)
 {
-    destroy_vmx_domain();
+    destroy_hvm_domain();
     exit(0);
 }
 
@@ -506,8 +506,8 @@ static term_cmd_t info_cmds[] = {
       "", "show i8259 (PIC) state", },
     { "pci", "", pci_info,
       "", "show PCI info", },
-    { "vmxiopage", "", sp_info,
-      "", "show VMX device model shared page info", },
+    { "hvmiopage", "", sp_info,
+      "", "show HVM device model shared page info", },
     { NULL, NULL, },
 };
 
@@ -700,7 +700,7 @@ static void monitor_handle_command(const char *cmdline)
                 args[nb_args++] = (void *)has_option;
             }
             break;
-        /* TODO: add more commands we need here to support vmx device model */
+        /* TODO: add more commands we need here to support hvm device model */
         case '/':
         case 'i':
         default:
@@ -772,14 +772,14 @@ static void monitor_handle_command1(void *opaque, const char *cmdline)
 
 static void monitor_start_input(void)
 {
-    readline_start("(VTXen) ", 0, monitor_handle_command1, NULL);
+    readline_start("(HVMXen) ", 0, monitor_handle_command1, NULL);
 }
 
 void monitor_init(CharDriverState *hd, int show_banner)
 {
     monitor_hd = hd;
     if (show_banner) {
-        term_printf("VMX device model. type 'q' to exit\n");
+        term_printf("HVM device model. type 'q' to exit\n");
     }
     qemu_chr_add_read_handler(hd, term_can_read, term_read, NULL);
     monitor_start_input();

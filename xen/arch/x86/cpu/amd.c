@@ -3,11 +3,19 @@
 #include <xen/bitops.h>
 #include <xen/mm.h>
 #include <xen/smp.h>
+#include <xen/sched.h>
 #include <asm/io.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
+#include <asm/hvm/vcpu.h>
+#include <asm/hvm/support.h>
+
 
 #include "cpu.h"
+
+
+#define		AMD_C1_CLOCK_RAMP			0x80000084
+#define		AMD_ADVPM_TSC_INVARIANT		0x80000007
 
 /*
  * amd_flush_filter={on,off}. Forcibly Enable or disable the TLB flush
@@ -40,6 +48,99 @@ custom_param("amd_flush_filter", flush_filter);
  
 extern void vide(void);
 __asm__(".text\n.align 4\nvide: ret");
+
+
+/*
+ *	Check if C1-Clock ramping enabled in  PMM7.CpuLowPwrEnh
+ *	On 8th-Generation cores only. Assume BIOS has setup
+ *	all Northbridges equivalently.
+ */
+
+static int c1_ramp_8gen(void) 
+{
+	u32 l;
+
+	/*	Read dev=0x18, function = 3, offset=0x87  */
+	l = AMD_C1_CLOCK_RAMP;
+	/*	fill in dev (18) + function (3) */
+	/*	direct cfc/cf8 should be safe here */
+	l += (((0x18) << 3) + 0x3) << 8; 
+	outl(l, 0xcf8);
+	return (1 & (inl(0xcfc) >> 24));
+}
+
+/*
+ * returns TRUE if ok to use TSC
+ */
+
+static int use_amd_tsc(struct cpuinfo_x86 *c) 
+{ 
+	if (c->x86 < 0xf) {
+		/*
+		 *	TSC drift doesn't exist on 7th Gen or less
+		 *	However, OS still needs to consider effects
+		 *	of P-state changes on TSC
+		*/
+		return 1;
+	} else if ( cpuid_edx(AMD_ADVPM_TSC_INVARIANT) & 0x100 ) {
+		/*
+		 *	CPUID.AdvPowerMgmtInfo.TscInvariant
+		 *	EDX bit 8, 8000_0007
+		 *	Invariant TSC on 8th Gen or newer, use it
+		 *	(assume all cores have invariant TSC)
+		*/
+		return 1;
+	} else if ((mp_get_num_processors() == 1) && (c->x86_num_cores == 1)) {
+		/*
+		 *	OK to use TSC on uni-processor-uni-core
+		 *	However, OS still needs to consider effects
+		 *	of P-state changes on TSC
+		*/
+		return 1;
+	} else if ( (mp_get_num_processors() == 1) && (c->x86 == 0x0f) 
+				&& !c1_ramp_8gen()) {
+		/*
+		 *	Use TSC on 8th Gen uni-proc with C1_ramp off 
+		 *	However, OS still needs to consider effects
+		 *	of P-state changes on TSC
+		*/
+		return 1;
+	} else { 
+		return 0;
+	}
+}
+
+/*
+ *	Disable C1-Clock ramping if enabled in PMM7.CpuLowPwrEnh
+ *	On 8th-Generation cores only. Assume BIOS has setup
+ *	all Northbridges equivalently.
+ */
+
+static void amd_disable_c1_ramping(void) 
+{
+	u32 l, h;
+	int i;
+
+	for (i=0; i < NR_CPUS;i++) {
+		/* Read from the Northbridge for Node x. until we get invalid data */
+		/* fill in dev (18 + cpu#) + function (3) */
+		l = AMD_C1_CLOCK_RAMP + ((((0x18 + i) << 3) + 0x3) << 8);
+		/*	direct cfc/cf8 should be safe here */
+		outl(l, 0xcf8);
+		h = inl(0xcfc);
+		if (h != 0xFFFFFFFF) {
+			h &= 0xFCFFFFFF; /* clears pmm7[1:0]  */
+			outl(l, 0xcf8);
+			outl(h, 0xcfc);
+			printk ("AMD: Disabling C1 Clock Ramping Node #%x\n",i);
+		}
+		else {
+			i = NR_CPUS;
+		}
+			
+	}
+	return;
+}
 
 static void __init init_amd(struct cpuinfo_x86 *c)
 {
@@ -245,6 +346,18 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 		printk(KERN_INFO "CPU %d(%d) -> Core %d\n",
 		       cpu, c->x86_num_cores, cpu_core_id[cpu]);
 	}
+#endif
+	/*
+	 * Prevent TSC drift in non single-processor, single-core platforms
+	 */
+	if ( !use_amd_tsc(c) && (c->x86 == 0x0f) && c1_ramp_8gen() && 
+			(smp_processor_id() == 0)) {
+		/* Disable c1 Clock Ramping on all cores */
+		amd_disable_c1_ramping();
+	}
+
+#ifdef CONFIG_SVM
+	start_svm();
 #endif
 }
 

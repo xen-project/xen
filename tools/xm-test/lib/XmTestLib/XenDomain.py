@@ -70,14 +70,14 @@ ParavirtDefaults = {"memory"       : 64,
                     "root"         : "/dev/ram0",
                     "ramdisk"      : getRdPath() + "/initrd.img"
                     }
-VmxDefaults =      {"memory"       : 64,
+HVMDefaults =      {"memory"       : 64,
                     "vcpus"        : 1,
                     "acpi"         : 0,
                     "apic"         : 0,
                     "disk"         : ["file:%s/disk.img,ioemu:%s,w" %
                                    (getRdPath(), BLOCK_ROOT_DEV)],
-                    "kernel"       : "/usr/lib/xen/boot/vmxloader",
-                    "builder"      : "vmx",
+                    "kernel"       : "/usr/lib/xen/boot/hvmloader",
+                    "builder"      : "hvm",
                     "sdl"          : 0,
                     "vnc"          : 0,
                     "vncviewer"    : 0,
@@ -86,8 +86,8 @@ VmxDefaults =      {"memory"       : 64,
                     "device_model" : getDeviceModel()
                     }
 
-if ENABLE_VMX_SUPPORT:
-    configDefaults = VmxDefaults
+if ENABLE_HVM_SUPPORT:
+    configDefaults = HVMDefaults
 else:
     configDefaults = ParavirtDefaults
 
@@ -247,7 +247,7 @@ class XmTestDomain(XenDomain):
 
     def start(self):
         XenDomain.start(self)
-        if ENABLE_VMX_SUPPORT:
+        if ENABLE_HVM_SUPPORT:
             waitForBoot()
 
     def startNow(self):
@@ -271,7 +271,7 @@ if __name__ == "__main__":
 
     print str(c)
 
-    
+
 
 #    c.write("/tmp/foo.conf")
 

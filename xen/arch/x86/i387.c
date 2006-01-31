@@ -12,6 +12,7 @@
 #include <xen/sched.h>
 #include <asm/current.h>
 #include <asm/processor.h>
+#include <asm/hvm/support.h>
 #include <asm/i387.h>
 
 void init_fpu(void)
@@ -29,7 +30,7 @@ void save_init_fpu(struct vcpu *tsk)
      * This causes us to set the real flag, so we'll need
      * to temporarily clear it while saving f-p state.
      */
-    if ( VMX_DOMAIN(tsk) || (tsk->arch.guest_context.ctrlreg[0] & X86_CR0_TS) )
+    if ( HVM_DOMAIN(tsk) || (tsk->arch.guest_context.ctrlreg[0] & X86_CR0_TS) )
         clts();
 
     if ( cpu_has_fxsr )

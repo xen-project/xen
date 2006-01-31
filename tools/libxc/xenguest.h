@@ -53,7 +53,7 @@ int xc_linux_build(int xc_handle,
                    unsigned int console_evtchn,
                    unsigned long *console_mfn);
 
-int xc_vmx_build(int xc_handle,
+int xc_hvm_build(int xc_handle,
                  uint32_t domid,
                  int memsize,
                  const char *image_name,

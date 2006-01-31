@@ -1,10 +1,10 @@
-
 #ifndef __ASM_DOMAIN_H__
 #define __ASM_DOMAIN_H__
 
 #include <xen/config.h>
 #include <xen/mm.h>
-#include <asm/vmx_vmcs.h>
+#include <asm/hvm/vcpu.h>
+#include <asm/hvm/domain.h>
 
 struct trap_bounce {
     unsigned long  error_code;
@@ -108,7 +108,7 @@ struct arch_domain
     struct list_head free_shadow_frames;
 
     pagetable_t         phys_table;         /* guest 1:1 pagetable */
-    struct vmx_platform vmx_platform;
+    struct hvm_domain   hvm_domain;
 
     /* Shadow-translated guest: Pseudophys base address of reserved area. */
     unsigned long first_reserved_pfn;
@@ -137,7 +137,7 @@ struct arch_vcpu
 #endif
 
     /* Virtual Machine Extensions */
-    struct arch_vmx_struct arch_vmx;
+    struct hvm_vcpu hvm_vcpu;
 
     /*
      * Every domain has a L1 pagetable of its own. Per-domain mappings
@@ -165,6 +165,10 @@ struct arch_vcpu
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;
 } __cacheline_aligned;
+
+/* shorthands to improve code legibility */
+#define hvm_vmx         hvm_vcpu.u.vmx
+#define hvm_svm         hvm_vcpu.u.svm
 
 #endif /* __ASM_DOMAIN_H__ */
 

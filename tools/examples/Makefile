@@ -16,7 +16,7 @@ XEN_CONFIG_DIR = /etc/xen
 XEN_CONFIGS = xend-config.sxp
 XEN_CONFIGS += xmexample1 
 XEN_CONFIGS += xmexample2
-XEN_CONFIGS += xmexample.vmx
+XEN_CONFIGS += xmexample.hvm
 XEN_CONFIGS += xmexample.vti
 
 # Xen script dir and scripts to go there.

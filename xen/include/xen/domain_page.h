@@ -48,6 +48,8 @@ domain_mmap_cache_init(struct domain_mmap_cache *cache)
 {
     ASSERT(cache != NULL);
     cache->flags = 0;
+    cache->pfn = 0;
+    cache->va = NULL;
 }
 
 static inline void *

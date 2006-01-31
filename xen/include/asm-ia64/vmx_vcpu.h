@@ -113,7 +113,7 @@ extern void guest_write_eoi(VCPU *vcpu);
 extern uint64_t guest_read_vivr(VCPU *vcpu);
 extern void vmx_inject_vhpi(VCPU *vcpu, u8 vec);
 extern int vmx_vcpu_pend_interrupt(VCPU *vcpu, uint8_t vector);
-extern struct virutal_platform_def *vmx_vcpu_get_plat(VCPU *vcpu);
+extern struct virtual_platform_def *vmx_vcpu_get_plat(VCPU *vcpu);
 extern void memread_p(VCPU *vcpu, u64 *src, u64 *dest, size_t s);
 extern void memread_v(VCPU *vcpu, thash_data_t *vtlb, u64 *src, u64 *dest, size_t s);
 extern void memwrite_v(VCPU *vcpu, thash_data_t *vtlb, u64 *src, u64 *dest, size_t s);

@@ -20,6 +20,8 @@
 #include <xen/iocap.h>
 #include <asm/shadow.h>
 #include <asm/irq.h>
+#include <asm/hvm/hvm.h>
+#include <asm/hvm/support.h>
 #include <asm/processor.h>
 #include <public/sched_ctl.h>
 
@@ -448,15 +450,12 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
 void arch_getdomaininfo_ctxt(
     struct vcpu *v, struct vcpu_guest_context *c)
 {
-    extern void save_vmx_cpu_user_regs(struct cpu_user_regs *);
-
     memcpy(c, &v->arch.guest_context, sizeof(*c));
 
-    if ( VMX_DOMAIN(v) )
+    if ( HVM_DOMAIN(v) )
     {
-        save_vmx_cpu_user_regs(&c->user_regs);
-        __vmread(CR0_READ_SHADOW, &c->ctrlreg[0]);
-        __vmread(CR4_READ_SHADOW, &c->ctrlreg[4]);
+	hvm_store_cpu_guest_regs(v, &c->user_regs);
+	hvm_store_cpu_guest_ctrl_regs(v, c->ctrlreg);
     }
     else
     {
@@ -470,8 +469,8 @@ void arch_getdomaininfo_ctxt(
         c->flags |= VGCF_I387_VALID;
     if ( KERNEL_MODE(v, &v->arch.guest_context.user_regs) )
         c->flags |= VGCF_IN_KERNEL;
-    if (VMX_DOMAIN(v))
-        c->flags |= VGCF_VMX_GUEST;
+    if ( HVM_DOMAIN(v) )
+        c->flags |= VGCF_HVM_GUEST;
 
     c->ctrlreg[3] = pagetable_get_paddr(v->arch.guest_table);
 

@@ -26,7 +26,8 @@ struct arch_domain {
     /* System pages out of guest memory, like for xenstore/console */
     unsigned long sys_pgnr;
     unsigned long max_pfn; /* Max pfn including I/O holes */
-    struct virutal_platform_def     vmx_platform;
+    struct virtual_platform_def     vmx_platform;
+#define	hvm_domain vmx_platform /* platform defs are not vmx specific */
 
     u64 xen_vastart;
     u64 xen_vaend;

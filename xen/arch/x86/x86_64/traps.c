@@ -13,51 +13,57 @@
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
 #include <asm/shadow.h>
-#include <asm/vmx.h>
+#include <asm/hvm/hvm.h>
+#include <asm/hvm/support.h>
 
 void show_registers(struct cpu_user_regs *regs)
 {
-    unsigned long rip, rsp, rflags, cs, cr0, cr3;
+    struct cpu_user_regs faultregs;
+    unsigned long faultcrs[8];
     const char *context;
 
-    if ( VMX_DOMAIN(current) && (regs->eflags == 0) )
+    if ( HVM_DOMAIN(current) && regs->eflags == 0 )
     {
-        __vmread(GUEST_RIP, &rip);
-        __vmread(GUEST_RSP, &rsp);
-        __vmread(GUEST_RFLAGS, &rflags);
-        __vmread(GUEST_CS_SELECTOR, &cs);
-        __vmread(CR0_READ_SHADOW, &cr0);
-        __vmread(GUEST_CR3, &cr3);
-        context = "vmx guest";
+	context = "hvm";
+	hvm_load_cpu_guest_regs(current, &faultregs);
+	hvm_store_cpu_guest_ctrl_regs(current, faultcrs);
     }
     else
     {
-        rip     = regs->rip;
-        rflags  = regs->rflags;
-        cr0     = read_cr0();
-        cr3     = read_cr3();
-        rsp     = regs->rsp;
-        cs      = regs->cs & 0xffff;
-        context = GUEST_MODE(regs) ? "guest" : "hypervisor";
+    	faultregs = *regs;
+
+        if ( GUEST_MODE(regs) )
+        {
+            context = "guest";
+	}
+	else 
+	{
+            context = "hypervisor";
+            faultregs.esp = (unsigned long)&regs->esp;
+	}
+
+	faultcrs[0] = read_cr0();
+	faultcrs[3] = read_cr3();
     }
 
-    printk("CPU:    %d\nRIP:    %04lx:[<%016lx>]",
-           smp_processor_id(), cs, rip);
-    if ( !GUEST_MODE(regs) )
-        print_symbol(" %s", rip);
-    printk("\nRFLAGS: %016lx   CONTEXT: %s\n", rflags, context);
+    printk("CPU:    %d\nRIP:    %04x:[<%016lx>]",
+           smp_processor_id(), faultregs.cs, faultregs.rip);
+    if ( !HVM_DOMAIN(current) && !GUEST_MODE(regs) )
+        print_symbol(" %s", faultregs.rip);
+
+    printk("\nRFLAGS: %016lx   CONTEXT: %s\n", faultregs.rflags, context);
     printk("rax: %016lx   rbx: %016lx   rcx: %016lx\n",
            regs->rax, regs->rbx, regs->rcx);
     printk("rdx: %016lx   rsi: %016lx   rdi: %016lx\n",
            regs->rdx, regs->rsi, regs->rdi);
     printk("rbp: %016lx   rsp: %016lx   r8:  %016lx\n",
-           regs->rbp, rsp, regs->r8);
+           regs->rbp, faultregs.rsp, regs->r8);
     printk("r9:  %016lx   r10: %016lx   r11: %016lx\n",
            regs->r9,  regs->r10, regs->r11);
     printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
            regs->r12, regs->r13, regs->r14);
     printk("r15: %016lx   cr0: %016lx   cr3: %016lx\n",
-           regs->r15, cr0, cr3);
+           regs->r15, faultcrs[0], faultcrs[3]);
 
     show_stack(regs);
 }

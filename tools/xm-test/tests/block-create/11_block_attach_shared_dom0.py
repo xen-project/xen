@@ -5,8 +5,8 @@
 
 from XmTestLib import *
 
-if ENABLE_VMX_SUPPORT:
-    SKIP("Block-attach not supported for VMX domains")
+if ENABLE_HVM_SUPPORT:
+    SKIP("Block-attach not supported for HVM domains")
 
 # Mount /dev/ram0
 

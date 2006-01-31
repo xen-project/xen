@@ -32,6 +32,6 @@ xmexample2          - a more complex configuration script for 'xm create'
 xmexample3          - an advanced configuration script for 'xm create' 
                       that utilizes the vmid
 xmexample.nbd       - configuration script that uses NBD filesystems
-xmexample.vmx       - a configuration script for creating a vmx domain with
+xmexample.hvm       - a configuration script for creating a hvm domain with
                       'xm create'
 xmexample.vti       - a configuration script for creating a domain on vti

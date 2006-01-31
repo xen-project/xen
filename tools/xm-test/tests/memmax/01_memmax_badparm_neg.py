@@ -8,8 +8,8 @@ import re
 
 from XmTestLib import *
 
-if ENABLE_VMX_SUPPORT:
-    SKIP("Mem-max not supported for VMX domains")
+if ENABLE_HVM_SUPPORT:
+    SKIP("Mem-max not supported for HVM domains")
 
 status, output = traceCommand("xm mem-max")
 eyecatcher = "Error:"

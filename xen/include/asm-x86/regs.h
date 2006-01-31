@@ -33,10 +33,6 @@ enum EFLAGS {
 
 #define GUEST_MODE(_r) (likely(VM86_MODE(_r) || !RING_0(_r)))
 
-#ifdef CONFIG_VMX
-#define GUEST_CONTEXT(_ed, _r) ( (VMX_DOMAIN(_ed) && ((_r)->eflags == 0)) || GUEST_MODE(_r) )
-#else
-#define GUEST_CONTEXT(_ed, _r) GUEST_MODE(_r)
-#endif
+#define GUEST_CONTEXT(_ed, _r) ((HVM_DOMAIN(_ed) && ((_r)->eflags == 0)) || GUEST_MODE(_r))
 
 #endif /* __X86_REGS_H__ */

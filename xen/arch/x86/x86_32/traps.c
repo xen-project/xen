@@ -10,74 +10,65 @@
 #include <xen/symbols.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
-#include <asm/vmx.h>
+#include <asm/hvm/hvm.h>
+#include <asm/hvm/support.h>
 
 /* All CPUs have their own IDT to allow int80 direct trap. */
 idt_entry_t *idt_tables[NR_CPUS] = { 0 };
 
 void show_registers(struct cpu_user_regs *regs)
 {
-    unsigned long ss, ds, es, fs, gs, cs;
-    unsigned long eip, esp, eflags, cr0, cr3;
+    struct cpu_user_regs faultregs;
+    unsigned long faultcrs[8];
     const char *context;
 
-    if ( VMX_DOMAIN(current) && (regs->eflags == 0) )
+    if ( HVM_DOMAIN(current) && regs->eflags == 0 )
     {
-        __vmread(GUEST_RIP, &eip);
-        __vmread(GUEST_RSP, &esp);
-        __vmread(GUEST_RFLAGS, &eflags);
-        __vmread(GUEST_SS_SELECTOR, &ss);
-        __vmread(GUEST_DS_SELECTOR, &ds);
-        __vmread(GUEST_ES_SELECTOR, &es);
-        __vmread(GUEST_FS_SELECTOR, &fs);
-        __vmread(GUEST_GS_SELECTOR, &gs);
-        __vmread(GUEST_CS_SELECTOR, &cs);
-        __vmread(CR0_READ_SHADOW, &cr0);
-        __vmread(GUEST_CR3, &cr3);
-        context = "vmx guest";
+	context = "hvm";
+	hvm_load_cpu_guest_regs(current, &faultregs);
+	hvm_store_cpu_guest_ctrl_regs(current, faultcrs);
     }
     else
     {
-        eip    = regs->eip;
-        eflags = regs->eflags;
-        cr0    = read_cr0();
-        cr3    = read_cr3();
-
-        __asm__ ( "movl %%fs,%0 ; movl %%gs,%1" : "=r" (fs), "=r" (gs) );
-
+    	faultregs = *regs;
         if ( GUEST_MODE(regs) )
         {
-            esp = regs->esp;
-            ss  = regs->ss & 0xffff;
-            ds  = regs->ds & 0xffff;
-            es  = regs->es & 0xffff;
-            cs  = regs->cs & 0xffff;
             context = "guest";
-        }
-        else
-        {
-            esp = (unsigned long)&regs->esp;
-            ss  = __HYPERVISOR_DS;
-            ds  = __HYPERVISOR_DS;
-            es  = __HYPERVISOR_DS;
-            cs  = __HYPERVISOR_CS;
+            faultregs.ss &= 0xFFFF;
+            faultregs.ds &= 0xFFFF;
+            faultregs.es &= 0xFFFF;
+            faultregs.cs &= 0xFFFF;
+	}
+	else 
+	{
             context = "hypervisor";
-        }
+            faultregs.esp = (unsigned long)&regs->esp;
+            faultregs.ss = __HYPERVISOR_DS;
+            faultregs.ds = __HYPERVISOR_DS;
+            faultregs.es = __HYPERVISOR_DS;
+            faultregs.cs = __HYPERVISOR_CS;
+	}
+        __asm__ ("movw %%fs,%0 ; movw %%gs,%1"
+	         : "=r" (faultregs.fs), "=r" (faultregs.gs) );
+
+	faultcrs[0] = read_cr0();
+	faultcrs[3] = read_cr3();
     }
 
-    printk("CPU:    %d\nEIP:    %04lx:[<%08lx>]",
-           smp_processor_id(), (unsigned long)0xffff & regs->cs, eip);
-    if ( !GUEST_MODE(regs) )
-        print_symbol(" %s", eip);
-    printk("\nEFLAGS: %08lx   CONTEXT: %s\n", eflags, context);
+    printk("CPU:    %d\nEIP:    %04x:[<%08x>]",
+           smp_processor_id(), faultregs.cs, faultregs.eip);
+    if ( !HVM_DOMAIN(current) && !GUEST_MODE(regs) )
+        print_symbol(" %s", faultregs.eip);
+    printk("\nEFLAGS: %08x   CONTEXT: %s\n", faultregs.eflags, context);
     printk("eax: %08x   ebx: %08x   ecx: %08x   edx: %08x\n",
            regs->eax, regs->ebx, regs->ecx, regs->edx);
-    printk("esi: %08x   edi: %08x   ebp: %08x   esp: %08lx\n",
-           regs->esi, regs->edi, regs->ebp, esp);
-    printk("cr0: %08lx   cr3: %08lx\n", cr0, cr3);
-    printk("ds: %04lx   es: %04lx   fs: %04lx   gs: %04lx   "
-           "ss: %04lx   cs: %04lx\n",
-           ds, es, fs, gs, ss, cs);
+    printk("esi: %08x   edi: %08x   ebp: %08x   esp: %08x\n",
+           regs->esi, regs->edi, regs->ebp, faultregs.esp);
+    printk("cr0: %08lx   cr3: %08lx\n", faultcrs[0], faultcrs[3]);
+    printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   "
+           "ss: %04x   cs: %04x\n",
+           faultregs.ds, faultregs.es, faultregs.fs,
+	   faultregs.gs, faultregs.ss, faultregs.cs);
 
     show_stack(regs);
 }

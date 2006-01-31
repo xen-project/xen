@@ -50,7 +50,7 @@ typedef struct PITChannelState {
     int64_t next_transition_time;
     QEMUTimer *irq_timer;
     int irq;
-    int vmx_channel; /* Is this accelerated by VMX ? */
+    int hvm_channel; /* Is this accelerated by HVM ? */
 } PITChannelState;
 
 struct PITState {
@@ -61,8 +61,8 @@ static PITState pit_state;
 
 static void pit_irq_timer_update(PITChannelState *s, int64_t current_time);
 
-/* currently operate which channel for vmx use */
-int vmx_channel = -1;
+/* currently operate which channel for hvm use */
+int hvm_channel = -1;
 extern FILE *logfile;
 static int pit_get_count(PITChannelState *s)
 {
@@ -215,7 +215,7 @@ int pit_get_gate(PITState *pit, int channel)
     return s->gate;
 }
 
-void pit_reset_vmx_vectors()
+void pit_reset_hvm_vectors()
 {
     extern shared_iopage_t *shared_page;
     ioreq_t *req; 
@@ -225,18 +225,18 @@ void pit_reset_vmx_vectors()
     irq = 0;
 
     for(i = 0; i < 3; i++) {
-        if (pit_state.channels[i].vmx_channel)
+        if (pit_state.channels[i].hvm_channel)
              break;
     }
     
     if (i == 3)
         return;
 
-    /* Assumes just one VMX accelerated channel */
-    vmx_channel = i;
-    s = &pit_state.channels[vmx_channel];
+    /* Assumes just one HVM accelerated channel */
+    hvm_channel = i;
+    s = &pit_state.channels[hvm_channel];
     fprintf(logfile,
-    	"VMX_PIT:guest init pit channel %d!\n", vmx_channel);
+    	"HVM_PIT:guest init pit channel %d!\n", hvm_channel);
     req = &shared_page->vcpu_iodata[0].vp_ioreq;
 
     req->state = STATE_IORESP_HOOK;
@@ -247,9 +247,9 @@ void pit_reset_vmx_vectors()
      */
     req->u.data = s->count;
     req->u.data |= (irq << 16);
-    req->u.data |= (vmx_channel << 24);
+    req->u.data |= (hvm_channel << 24);
     req->u.data |= ((s->rw_mode) << 26);
-    fprintf(logfile, "VMX_PIT:pass info 0x%llx to HV!\n", req->u.data);
+    fprintf(logfile, "HVM_PIT:pass info 0x%llx to HV!\n", req->u.data);
 }
 
 static inline void pit_load_count(PITChannelState *s, int val)
@@ -261,9 +261,9 @@ static inline void pit_load_count(PITChannelState *s, int val)
 
     /* guest init this pit channel for periodic mode. we do not update related
      * timer so the channel never send intr from device model*/
-    if (vmx_channel != -1 && s->mode == 2) {
-        pit_reset_vmx_vectors();
-        vmx_channel = -1;
+    if (hvm_channel != -1 && s->mode == 2) {
+        pit_reset_hvm_vectors();
+        hvm_channel = -1;
     }
 
 /*    pit_irq_timer_update(s, s->count_load_time);*/
@@ -323,8 +323,8 @@ static void pit_ioport_write(void *opaque, uint32_t addr, uint32_t val)
         }
     } else {
         s = &pit->channels[addr];
-        s->vmx_channel = 1;
-        vmx_channel = addr;
+        s->hvm_channel = 1;
+        hvm_channel = addr;
         switch(s->write_state) {
         default:
         case RW_STATE_LSB:

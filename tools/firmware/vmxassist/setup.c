@@ -194,6 +194,12 @@ setup_pic(void)
 }
 
 void
+setiomap(int port)
+{
+	tss.iomap[port >> 3] |= 1 << (port & 7);
+}
+
+void
 enter_real_mode(struct regs *regs)
 {
 	/* mask off TSS busy bit */
@@ -217,6 +223,13 @@ enter_real_mode(struct regs *regs)
 		}
 		regs->uesp = 0;
 		regs->uss = 0;
+
+		/* intercept accesses to the PIC */
+		setiomap(PIC_MASTER+PIC_CMD);
+		setiomap(PIC_MASTER+PIC_IMR);
+		setiomap(PIC_SLAVE+PIC_CMD);
+		setiomap(PIC_SLAVE+PIC_IMR);
+
 		printf("Starting emulated 16-bit real-mode: ip=%04x:%04x\n",
 			regs->cs, regs->eip);
 

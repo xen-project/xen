@@ -37,13 +37,7 @@ LDFLAGS  = -m elf_i386
 
 OBJECTS = head.o trap.o vm86.o setup.o util.o
 
-all: vmxloader
-
-vmxloader: roms.h vmxloader.c acpi.h acpi_madt.c
-	$(CC) $(CFLAGS) $(DEFINES) -c vmxloader.c -c acpi_madt.c
-	$(CC) -o vmxloader.tmp -m32 -nostdlib -Wl,-N -Wl,-Ttext -Wl,0x100000 vmxloader.o acpi_madt.o
-	objcopy vmxloader.tmp vmxloader
-	rm -f vmxloader.tmp
+all: vmxassist.bin
 
 vmxassist.bin: vmxassist.ld $(OBJECTS)
 	$(CPP) $(DEFINES) vmxassist.ld > vmxassist.tmp
@@ -68,15 +62,6 @@ setup.o: machine.h setup.c
 util.o: machine.h util.c
 	$(CC) $(CFLAGS) -c util.c
 
-roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabios/VGABIOS-lgpl-latest.cirrus.bin vmxassist.bin
-	./mkhex rombios ../rombios/BIOS-bochs-latest > roms.h
-	./mkhex vgabios_stdvga ../vgabios/VGABIOS-lgpl-latest.bin >> roms.h
-	./mkhex vgabios_cirrusvga ../vgabios/VGABIOS-lgpl-latest.cirrus.bin >> roms.h
-	./mkhex vmxassist vmxassist.bin >> roms.h
-
-acpi.h: ../acpi/acpi.bin
-	./mkhex acpi ../acpi/acpi.bin > acpi.h
-
 offsets.h: gen
 	./gen > offsets.h
 
@@ -84,7 +69,7 @@ gen:	gen.c
 	$(HOSTCC) $(HOSTCFLAGS) -I. $(XENINC) -o gen gen.c
 
 clean:
-	rm -f vmxassist vmxassist.tmp vmxassist.bin vmxassist.run vmxassist.sym head.s roms.h acpi.h
-	rm -f vmxloader vmxloader.tmp vmxloader.o $(OBJECTS)
+	rm -f vmxassist vmxassist.tmp vmxassist.bin vmxassist.run vmxassist.sym head.s
+	rm -f $(OBJECTS)
 	rm -f gen gen.o offsets.h
 

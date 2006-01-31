@@ -141,15 +141,15 @@ cpu_weight = 0.75
                  })
             
 
-    def testVMXConfigFile(self):
+    def testHVMConfigFile(self):
         (fd, fname) = tempfile.mkstemp()
         try:
             os.write(fd,
                      '''
-kernel = "/usr/lib/xen/boot/vmxloader"
-builder='vmx'
+kernel = "/usr/lib/xen/boot/hvmloader"
+builder='hvm'
 memory = 128
-name = "ExampleVMXDomain"
+name = "ExampleHVMDomain"
 vcpus=1
 vif = [ 'type=ioemu, bridge=xenbr0' ]
 disk = [ 'file:/var/images/min-el3-i386.img,ioemu:hda,w' ]
@@ -163,10 +163,10 @@ ne2000=0
             os.close(fd)
 
         self.t('-f %s display=fakedisplay' % fname,
-               { 'kernel'      : '/usr/lib/xen/boot/vmxloader',
-                 'builder'     : 'vmx',
+               { 'kernel'      : '/usr/lib/xen/boot/hvmloader',
+                 'builder'     : 'hvm',
                  'memory'      : 128,
-                 'name'        : 'ExampleVMXDomain',
+                 'name'        : 'ExampleHVMDomain',
                  'vcpus'       : 1,
                  'nics'        : -1,
                  'vif'         : ['type=ioemu, bridge=xenbr0'],

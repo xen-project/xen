@@ -198,7 +198,7 @@ vmx_vcpu_get_vtlb(VCPU *vcpu)
 }
 
 
-struct virutal_platform_def *
+struct virtual_platform_def *
 vmx_vcpu_get_plat(VCPU *vcpu)
 {
     return &(vcpu->domain->arch.vmx_platform);

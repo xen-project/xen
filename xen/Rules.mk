@@ -53,6 +53,9 @@ else
 CFLAGS += -g -DVERBOSE
 endif
 
+# There is no real reason to compile without it
+CFLAGS += -g
+
 ifeq ($(crash_debug),y)
 CFLAGS += -g -DCRASH_DEBUG
 endif

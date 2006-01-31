@@ -621,7 +621,7 @@ static int setup_guest(  int xc_handle,
     return -1;
 }
 
-int xc_vmx_build(int xc_handle,
+int xc_hvm_build(int xc_handle,
                  uint32_t domid,
                  int memsize,
                  const char *image_name,

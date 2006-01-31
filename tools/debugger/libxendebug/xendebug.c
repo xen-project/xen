@@ -355,7 +355,7 @@ xendebug_memory_page (domain_context_p ctxt, int xc_handle, uint32_t vcpu,
 
     if ( (pde = ctxt->cr3_virt[vcpu][vtopdi(va)]) == 0) /* logical address */
         return 0;
-    if (ctxt->context[vcpu].flags & VGCF_VMX_GUEST)
+    if (ctxt->context[vcpu].flags & VGCF_HVM_GUEST)
         pde = ctxt->page_array[pde >> PAGE_SHIFT] << PAGE_SHIFT;
     if (pde != ctxt->pde_phys[vcpu]) 
     {
@@ -370,7 +370,7 @@ xendebug_memory_page (domain_context_p ctxt, int xc_handle, uint32_t vcpu,
 
     if ((page = ctxt->pde_virt[vcpu][vtopti(va)]) == 0) /* logical address */
         return 0;
-    if (ctxt->context[vcpu].flags & VGCF_VMX_GUEST)
+    if (ctxt->context[vcpu].flags & VGCF_HVM_GUEST)
         page = ctxt->page_array[page >> PAGE_SHIFT] << PAGE_SHIFT;
     if (page != ctxt->page_phys[vcpu] || protection != ctxt->page_perm[vcpu]) 
     {

@@ -88,7 +88,7 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 /* Intel defined MSRs. */
 #define MSR_IA32_P5_MC_ADDR		0
 #define MSR_IA32_P5_MC_TYPE		1
-#define MSR_IA32_TIME_STAMP_COUNTER	0x10
+#define MSR_IA32_TIME_STAMP_COUNTER     0x10
 #define MSR_IA32_PLATFORM_ID		0x17
 #define MSR_IA32_EBL_CR_POWERON		0x2a
 
@@ -128,11 +128,13 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 #define _EFER_LME 8  /* Long mode enable */
 #define _EFER_LMA 10 /* Long mode active (read-only) */
 #define _EFER_NX 11  /* No execute enable */
+#define _EFER_SVME 12
 
 #define EFER_SCE (1<<_EFER_SCE)
 #define EFER_LME (1<<_EFER_LME)
 #define EFER_LMA (1<<_EFER_LMA)
 #define EFER_NX (1<<_EFER_NX)
+#define EFER_SVME (1<<_EFER_SVME)
 
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PLATFORM_ID	0x17
@@ -271,7 +273,6 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 #define MSR_P4_U2L_ESCR0 		0x3b0
 #define MSR_P4_U2L_ESCR1 		0x3b1
 
-/* AMD Defined MSRs */
 #define MSR_K6_EFER			0xC0000080
 #define MSR_K6_STAR			0xC0000081
 #define MSR_K6_WHCR			0xC0000082
@@ -292,6 +293,11 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 #define MSR_K7_CLK_CTL			0xC001001b
 #define MSR_K7_FID_VID_CTL		0xC0010041
 #define MSR_K7_FID_VID_STATUS		0xC0010042
+
+#define MSR_K8_TOP_MEM1			0xC001001A
+#define MSR_K8_TOP_MEM2			0xC001001D
+#define MSR_K8_VM_HSAVE_PA		0xC0010117
+#define MSR_K8_SYSCFG			0xC0000010	
 
 /* Centaur-Hauls/IDT defined MSRs. */
 #define MSR_IDT_FCR1			0x107

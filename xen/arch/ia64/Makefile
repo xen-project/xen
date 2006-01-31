@@ -15,7 +15,7 @@ OBJS = xensetup.o setup.o time.o irq.o process.o smp.o \
 OBJS += vmx_init.o vmx_virt.o vmx_vcpu.o vmx_process.o vmx_vsa.o vmx_ivt.o\
 	vmx_phy_mode.o vmx_utility.o vmx_interrupt.o vmx_entry.o vmmu.o \
 	vtlb.o mmio.o vlsapic.o vmx_hypercall.o mm.o vmx_support.o \
-	pal_emul.o vmx_irq_ia64.o vmx_vioapic.o
+	pal_emul.o vmx_irq_ia64.o hvm_vioapic.o
 
 # lib files from xen/arch/ia64/linux/ (linux/arch/ia64/lib)
 OBJS +=	bitop.o clear_page.o flush.o copy_page_mck.o			\
@@ -94,13 +94,19 @@ $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 	 || ln -s $(BASEDIR)/include/xen $(BASEDIR)/include/linux
 	[ -e $(BASEDIR)/include/asm-ia64/xen ] \
 	 || ln -s $(BASEDIR)/include/asm-ia64/linux $(BASEDIR)/include/asm-ia64/xen
-# Link to DM file in Xen for ia64/vti
-	[ -e $(BASEDIR)/include/asm-ia64/vmx_vpic.h ] \
-	 || ln -s ../../include/asm-x86/vmx_vpic.h $(BASEDIR)/include/asm-ia64/vmx_vpic.h
-	[ -e $(BASEDIR)/include/asm-ia64/vmx_vioapic.h ] \
-	 || ln -s ../../include/asm-x86/vmx_vioapic.h $(BASEDIR)/include/asm-ia64/vmx_vioapic.h
-	[ -e $(BASEDIR)/arch/ia64/vmx/vmx_vioapic.c ] \
-	 || ln -s ../../../arch/x86/dm/vmx_vioapic.c $(BASEDIR)/arch/ia64/vmx/vmx_vioapic.c
+# Link to HVM files in Xen for ia64/vti
+	[ -e $(BASEDIR)/include/asm-ia64/hvm ] \
+	 || mkdir $(BASEDIR)/include/asm-ia64/hvm
+	[ -e $(BASEDIR)/include/asm-ia64/hvm/support.h ] \
+	 || ln -s ../../../include/asm-x86/hvm/support.h $(BASEDIR)/include/asm-ia64/hvm/support.h
+	[ -e $(BASEDIR)/include/asm-ia64/hvm/io.h ] \
+	 || ln -s ../../../include/asm-x86/hvm/io.h $(BASEDIR)/include/asm-ia64/hvm/io.h
+	[ -e $(BASEDIR)/include/asm-ia64/hvm/vpic.h ] \
+	 || ln -s ../../../include/asm-x86/hvm/vpic.h $(BASEDIR)/include/asm-ia64/hvm/vpic.h
+	[ -e $(BASEDIR)/include/asm-ia64/hvm/vioapic.h ] \
+	 || ln -s ../../../include/asm-x86/hvm/vioapic.h $(BASEDIR)/include/asm-ia64/hvm/vioapic.h
+	[ -e $(BASEDIR)/arch/ia64/vmx/hvm_vioapic.c ] \
+	 || ln -s ../../../arch/x86/hvm/vioapic.c $(BASEDIR)/arch/ia64/vmx/hvm_vioapic.c
 # Solve circular reference on asm-offsets.h
 	[ -f $(BASEDIR)/include/asm-ia64/asm-offsets.h ] \
 	 || echo "#define IA64_TASK_SIZE 0" > $(BASEDIR)/include/asm-ia64/asm-offsets.h
@@ -136,6 +142,8 @@ __umodsi3.o: idiv32.S
 clean:
 	rm -f *.o *~ core  xen.lds.s $(BASEDIR)/include/asm-ia64/.offsets.h.stamp asm-offsets.s map.out
 	rm -f asm-xsi-offsets.s $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
+	rm -f $(BASEDIR)/arch/ia64/vmx/hvm_*.c
+	rm -rf $(BASEDIR)/include/asm-ia64/hvm
 	rm -f linux/lib/*.o
 
 .PHONY: default clean

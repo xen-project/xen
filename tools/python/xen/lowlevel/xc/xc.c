@@ -355,7 +355,7 @@ static PyObject *pyxc_linux_build(XcObject *self,
 			 "console_mfn", console_mfn);
 }
 
-static PyObject *pyxc_vmx_build(XcObject *self,
+static PyObject *pyxc_hvm_build(XcObject *self,
                                 PyObject *args,
                                 PyObject *kwds)
 {
@@ -369,16 +369,15 @@ static PyObject *pyxc_vmx_build(XcObject *self,
     unsigned long store_mfn = 0;
 
     static char *kwd_list[] = { "dom", "control_evtchn", "store_evtchn",
-                                "memsize", "image", "vcpus", "acpi", "apic",
-                                NULL };
-
+				"memsize", "image", "vcpus", "acpi", "apic",
+				NULL };
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiisiii", kwd_list,
                                       &dom, &control_evtchn, &store_evtchn,
-                                      &memsize, &image, &vcpus, &acpi, &apic) )
+				      &memsize, &image, &vcpus, &acpi, &apic) )
         return NULL;
 
-    if ( xc_vmx_build(self->xc_handle, dom, memsize, image, control_evtchn,
-                      vcpus, acpi, apic, store_evtchn, &store_mfn) != 0 )
+    if ( xc_hvm_build(self->xc_handle, dom, memsize, image, control_evtchn,
+		      vcpus, acpi, apic, store_evtchn, &store_mfn) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return Py_BuildValue("{s:i}", "store_mfn", store_mfn);
@@ -965,12 +964,12 @@ static PyMethodDef pyxc_methods[] = {
       " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "vmx_build", 
-      (PyCFunction)pyxc_vmx_build, 
+    { "hvm_build", 
+      (PyCFunction)pyxc_hvm_build, 
       METH_VARARGS | METH_KEYWORDS, "\n"
-      "Build a new VMX guest OS.\n"
+      "Build a new HVM guest OS.\n"
       " dom     [int]:      Identifier of domain to build into.\n"
-      " image   [str]:      Name of VMX loader image file.\n"
+      " image   [str]:      Name of HVM loader image file.\n"
       " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 

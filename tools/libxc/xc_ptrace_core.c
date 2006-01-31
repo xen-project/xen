@@ -126,7 +126,7 @@ map_domain_va(unsigned long domfd, int cpu, void * guest_va)
     } 
     if ((pde = cr3_virt[cpu][vtopdi(va)]) == 0) /* logical address */
         goto error_out;
-    if (ctxt[cpu].flags & VGCF_VMX_GUEST)
+    if (ctxt[cpu].flags & VGCF_HVM_GUEST)
         pde = p2m_array[pde >> PAGE_SHIFT] << PAGE_SHIFT;
     if (pde != pde_phys[cpu]) 
     {
@@ -142,7 +142,7 @@ map_domain_va(unsigned long domfd, int cpu, void * guest_va)
     }
     if ((page = pde_virt[cpu][vtopti(va)]) == 0) /* logical address */
         goto error_out;
-    if (ctxt[cpu].flags & VGCF_VMX_GUEST)
+    if (ctxt[cpu].flags & VGCF_HVM_GUEST)
         page = p2m_array[page >> PAGE_SHIFT] << PAGE_SHIFT;
     if (page != page_phys[cpu]) 
     {

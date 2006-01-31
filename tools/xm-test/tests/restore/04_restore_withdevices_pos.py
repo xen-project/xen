@@ -7,8 +7,8 @@ from XmTestLib import *
 
 import re
 
-if ENABLE_VMX_SUPPORT:
-    SKIP("Restore currently not supported for VMX domains")
+if ENABLE_HVM_SUPPORT:
+    SKIP("Restore currently not supported for HVM domains")
 
 config = {"disk": ["phy:/dev/ram0,hda1,w", "phy:/dev/ram1,hdb2,w"],
           "vif":  ['', '']}

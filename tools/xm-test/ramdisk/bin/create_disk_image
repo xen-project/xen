@@ -46,7 +46,7 @@ function die()
 function usage()
 {
 	cat << EOU
-Command creates a vmx guest disk image for xm-test. 
+Command creates a hvm guest disk image for xm-test. 
 
 Usage: $0 [OPTIONS]
 

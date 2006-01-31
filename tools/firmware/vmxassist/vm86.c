@@ -738,6 +738,83 @@ interrupt(struct regs *regs, int n)
 	regs->cs = read16(address(regs, 0, n * 4 + 2));
 }
 
+/*
+ * Most port I/O operations are passed unmodified. We do have to be
+ * careful and make sure the emulated program isn't remapping the
+ * interrupt vectors. The following simple state machine catches
+ * these attempts and rewrites them.
+ */
+int
+outbyte(struct regs *regs, unsigned prefix, unsigned opc)
+{
+	static char icw2[2] = { 0 };
+	int al, port;
+
+	switch (opc) {
+	case 0xE6: /* outb port, al */
+		port = fetch8(regs);
+		break;
+	case 0xEE: /* outb (%dx), al */
+		port = MASK16(regs->edx);
+		break;
+	default:
+		return 0;
+	}
+
+	al = regs->eax & 0xFF;
+
+	switch (port) {
+	case PIC_MASTER + PIC_CMD:
+		if (al & (1 << 4)) /* A0=0,D4=1 -> ICW1 */
+			icw2[0] = 1;
+		break;
+	case PIC_MASTER + PIC_IMR:
+		if (icw2[0]) {
+			icw2[0] = 0;
+			printf("Remapping master: ICW2 0x%x -> 0x%x\n",
+				al, NR_EXCEPTION_HANDLER);
+			al = NR_EXCEPTION_HANDLER;
+		}
+		break;
+
+	case PIC_SLAVE  + PIC_CMD:
+		if (al & (1 << 4)) /* A0=0,D4=1 -> ICW1 */
+			icw2[1] = 1;
+		break;
+	case PIC_SLAVE  + PIC_IMR:
+		if (icw2[1]) {
+			icw2[1] = 0;
+			printf("Remapping slave: ICW2 0x%x -> 0x%x\n",
+				al, NR_EXCEPTION_HANDLER+8);
+			al = NR_EXCEPTION_HANDLER+8;
+		}
+		break;
+	}
+
+	outb(port, al);
+	return 1;
+}
+
+int
+inbyte(struct regs *regs, unsigned prefix, unsigned opc)
+{
+	int port;
+
+	switch (opc) {
+	case 0xE4: /* inb al, port */
+		port = fetch8(regs);
+		break;
+	case 0xEC: /* inb al, (%dx) */
+		port = MASK16(regs->edx);
+		break;
+	default:
+		return 0;
+	}
+
+	regs->eax = (regs->eax & ~0xFF) | inb(port);
+	return 1;
+}
+
 enum { OPC_INVALID, OPC_EMULATED };
 
 /*
@@ -885,6 +962,16 @@ opcode(struct regs *regs)
 			}
 			return OPC_EMULATED;
 
+		case 0xE4:	/* inb al, port */
+			if (!inbyte(regs, prefix, opc))
+				goto invalid;
+			return OPC_EMULATED;
+
+		case 0xE6:	/* outb port, al */
+			if (!outbyte(regs, prefix, opc))
+				goto invalid;
+			return OPC_EMULATED;
+
 		case 0xEA: 	/* jmpl */
 			if ((mode == VM86_REAL_TO_PROTECTED) ||
 			    (mode == VM86_PROTECTED_TO_REAL)) {
@@ -902,6 +989,16 @@ opcode(struct regs *regs)
 				return OPC_EMULATED;
 			}
 			goto invalid;
+
+		case 0xEC:	/* inb al, (%dx) */
+			if (!inbyte(regs, prefix, opc))
+				goto invalid;
+			return OPC_EMULATED;
+
+		case 0xEE:	/* outb (%dx), al */
+			if (!outbyte(regs, prefix, opc))
+				goto invalid;
+			return OPC_EMULATED;
 
 		case 0xF0:	/* lock */
 			TRACE((regs, regs->eip - eip, "lock"));

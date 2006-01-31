@@ -8,8 +8,8 @@
 
 from XmTestLib import *
 
-if ENABLE_VMX_SUPPORT:
-    SKIP("Block-list not supported for VMX domains")
+if ENABLE_HVM_SUPPORT:
+    SKIP("Block-list not supported for HVM domains")
 
 config = {"disk":"phy:/dev/ram0,hda1,w"}
 domain = XmTestDomain(extraConfig=config)

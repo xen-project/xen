@@ -226,7 +226,7 @@ alloc_shadow_page(struct domain *d,
             if (d->arch.ops->guest_paging_levels == PAGING_L2)
             {
 #if CONFIG_PAGING_LEVELS >= 3
-                /* For 32-bit VMX guest, 2 shadow L1s to simulate 1 guest L1
+                /* For 32-bit HVM guest, 2 shadow L1s to simulate 1 guest L1
                  * So need allocate 2 continues shadow L1 each time.
                  */
                 page = alloc_domheap_pages(NULL, SL1_ORDER, 0);
@@ -602,7 +602,7 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
 #if CONFIG_PAGING_LEVELS >=3
     if (d->arch.ops->guest_paging_levels == PAGING_L2)
     {
-        /* for 32-bit VMX guest on 64-bit or PAE host,
+        /* for 32-bit HVM guest on 64-bit or PAE host,
          * need update two L2 entries each time
          */
         if ( !get_shadow_ref(sl1mfn))
@@ -2838,7 +2838,7 @@ static unsigned long gva_to_gpa_pae(unsigned long gva)
 /* 64-bit shadow-mode code testing */
 /****************************************************************************/
 /*
- * init_bl2() is for 32-bit VMX guest on 64-bit host
+ * init_bl2() is for 32-bit HVM guest on 64-bit host
  * Using 1 shadow L4(l3) and 4 shadow L2s to simulate guest L2
  */
 static inline unsigned long init_bl2(l4_pgentry_t *spl4e, unsigned long smfn)
@@ -2938,7 +2938,7 @@ static unsigned long shadow_l4_table(
 #if CONFIG_PAGING_LEVELS >= 3
 /*
  * validate_bl2e_change()
- * The code is for 32-bit VMX gues on 64-bit host.
+ * The code is for 32-bit HVM guest on 64-bit host.
  * To sync guest L2.
  */
 
@@ -3078,7 +3078,7 @@ static void shadow_set_l2e_64(unsigned long va, l2_pgentry_t sl2e,
             shadow_map_into_current(v, va, PAGING_L3, PAGING_L4);
             __shadow_get_l4e(v, va, &sl4e);
         } else {
-            printk("For non VMX shadow, create_l1_shadow:%d\n", create_l2_shadow);
+            printk("For non HVM shadow, create_l1_shadow:%d\n", create_l2_shadow);
         }
     }
 
@@ -3089,7 +3089,7 @@ static void shadow_set_l2e_64(unsigned long va, l2_pgentry_t sl2e,
             shadow_map_into_current(v, va, PAGING_L2, PAGING_L3);
             __shadow_get_l3e(v, va, &sl3e);
         } else {
-            printk("For non VMX shadow, create_l1_shadow:%d\n", create_l2_shadow);
+            printk("For non HVM shadow, create_l1_shadow:%d\n", create_l2_shadow);
         }
          shadow_update_min_max(l4e_get_pfn(sl4e), l3_table_offset(va));
 

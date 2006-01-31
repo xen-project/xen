@@ -111,6 +111,9 @@ _start:
 	cli
 
 	/* save register parameters to C land */
+#ifdef TEST
+	xorl	%edx, %edx
+#endif
 	movl	%edx, booting_cpu
 	movl	%ebx, booting_vector
 

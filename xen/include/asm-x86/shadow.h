@@ -31,7 +31,9 @@
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/processor.h>
-#include <asm/vmx.h>
+#include <asm/hvm/hvm.h>
+#include <asm/hvm/support.h>
+#include <asm/regs.h>
 #include <public/dom0_ops.h>
 #include <asm/shadow_public.h>
 #include <asm/page-guest32.h>
@@ -167,8 +169,6 @@ static inline unsigned long __shadow_status(
 #if CONFIG_PAGING_LEVELS <= 2
 static inline void update_hl2e(struct vcpu *v, unsigned long va);
 #endif
-
-extern void vmx_shadow_clear_state(struct domain *);
 
 static inline int page_is_page_table(struct pfn_info *page)
 {
@@ -1707,21 +1707,18 @@ static inline void update_pagetables(struct vcpu *v)
     struct domain *d = v->domain;
     int paging_enabled;
 
-#ifdef CONFIG_VMX
-    if ( VMX_DOMAIN(v) )
-        paging_enabled = vmx_paging_enabled(v);
-
+    if ( HVM_DOMAIN(v) )
+        paging_enabled = hvm_paging_enabled(v);
     else
-#endif
         // HACK ALERT: there's currently no easy way to figure out if a domU
         // has set its arch.guest_table to zero, vs not yet initialized it.
         //
         paging_enabled = !!pagetable_get_paddr(v->arch.guest_table);
 
     /*
-     * We don't call __update_pagetables() when vmx guest paging is
+     * We don't call __update_pagetables() when hvm guest paging is
      * disabled as we want the linear_pg_table to be inaccessible so that
-     * we bail out early of shadow_fault() if the vmx guest tries illegal
+     * we bail out early of shadow_fault() if the hvm guest tries illegal
      * accesses while it thinks paging is turned off.
      */
     if ( unlikely(shadow_mode_enabled(d)) && paging_enabled )

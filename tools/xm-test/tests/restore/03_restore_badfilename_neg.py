@@ -12,8 +12,8 @@ import re
 
 from XmTestLib import *
 
-if ENABLE_VMX_SUPPORT:
-    SKIP("Restore currently not supported for VMX domains")
+if ENABLE_HVM_SUPPORT:
+    SKIP("Restore currently not supported for HVM domains")
 
 status, output = traceCommand("xm restore /tmp/NON_EXIST")
 eyecatcher1 = "Error:"

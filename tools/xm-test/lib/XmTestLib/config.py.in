@@ -1,4 +1,4 @@
 #!/usr/bin/python
 
-ENABLE_VMX_SUPPORT = @ENABLE_VMX@
+ENABLE_HVM_SUPPORT = @ENABLE_HVM@
 

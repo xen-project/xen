@@ -240,7 +240,7 @@ map_domain_va(
     }
     if ( (pde = cr3_virt[cpu][vtopdi(va)]) == 0 )
         goto error_out;
-    if ( (ctxt[cpu].flags & VGCF_VMX_GUEST) && paging_enabled(&ctxt[cpu]) )
+    if ( (ctxt[cpu].flags & VGCF_HVM_GUEST) && paging_enabled(&ctxt[cpu]) )
         pde = page_array[pde >> PAGE_SHIFT] << PAGE_SHIFT;
     if ( pde != pde_phys[cpu] )
     {
@@ -255,7 +255,7 @@ map_domain_va(
     }
     if ( (page = pde_virt[cpu][vtopti(va)]) == 0 )
         goto error_out;
-    if ( (ctxt[cpu].flags & VGCF_VMX_GUEST) && paging_enabled(&ctxt[cpu]) )
+    if ( (ctxt[cpu].flags & VGCF_HVM_GUEST) && paging_enabled(&ctxt[cpu]) )
         page = page_array[page >> PAGE_SHIFT] << PAGE_SHIFT;
     if ( (page != page_phys[cpu]) || (perm != prev_perm[cpu]) )
     {

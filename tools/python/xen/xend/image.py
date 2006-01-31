@@ -143,7 +143,7 @@ class ImageHandler:
 
     def getDomainMemory(self, mem):
         """@return The memory required, in KiB, by the domain to store the
-        given amount, also in KiB.  This is normally just mem, but VMX domains
+        given amount, also in KiB.  This is normally just mem, but HVM domains
         have overheads to account for."""
         return mem
 
@@ -183,21 +183,21 @@ class LinuxImageHandler(ImageHandler):
                               cmdline        = self.cmdline,
                               ramdisk        = self.ramdisk)
 
-class VmxImageHandler(ImageHandler):
+class HVMImageHandler(ImageHandler):
 
-    ostype = "vmx"
+    ostype = "hvm"
 
     def configure(self, imageConfig, deviceConfig):
         ImageHandler.configure(self, imageConfig, deviceConfig)
 
         info = xc.xeninfo()
-        if not 'hvm' in info['xen_caps']:
-            raise VmError("vmx: not an Intel VT platform, we stop creating!")
+	if not 'hvm' in info['xen_caps']:
+	    raise VmError("Not an HVM capable platform, we stop creating!")
 
         self.dmargs = self.parseDeviceModelArgs(imageConfig, deviceConfig)
         self.device_model = sxp.child_value(imageConfig, 'device_model')
         if not self.device_model:
-            raise VmError("vmx: missing device model")
+            raise VmError("hvm: missing device model")
         self.display = sxp.child_value(imageConfig, 'display')
         self.xauthority = sxp.child_value(imageConfig, 'xauthority')
 
@@ -217,7 +217,7 @@ class VmxImageHandler(ImageHandler):
         # Create an event channel
         self.device_channel = xc.evtchn_alloc_unbound(dom=self.vm.getDomid(),
                                                       remote_dom=0)
-        log.info("VMX device model port: %d", self.device_channel)
+        log.info("HVM device model port: %d", self.device_channel)
 
         store_evtchn = self.vm.getStorePort()
 
@@ -232,7 +232,7 @@ class VmxImageHandler(ImageHandler):
 
         self.register_shutdown_watch()
 
-        return xc.vmx_build(dom            = self.vm.getDomid(),
+        return xc.hvm_build(dom            = self.vm.getDomid(),
                             image          = self.kernel,
                             control_evtchn = self.device_channel,
                             store_evtchn   = store_evtchn,
@@ -283,7 +283,7 @@ class VmxImageHandler(ImageHandler):
                     continue;
                 vbddev_list = ['hda', 'hdb', 'hdc', 'hdd']
                 if vbddev not in vbddev_list:
-                    raise VmError("vmx: for qemu vbd type=file&dev=hda~hdd")
+                    raise VmError("hvm: for qemu vbd type=file&dev=hda~hdd")
                 ret.append("-%s" % vbddev)
                 ret.append("%s" % vbdparam)
             if name == 'vif':
@@ -405,8 +405,8 @@ class VmxImageHandler(ImageHandler):
     def register_shutdown_watch(self):
         """ add xen store watch on control/shutdown """
         self.shutdownWatch = xswatch(self.vm.dompath + "/control/shutdown", \
-                                    self.vmx_shutdown)
-        log.debug("vmx shutdown watch registered")
+                                    self.hvm_shutdown)
+        log.debug("hvm shutdown watch registered")
 
     def unregister_shutdown_watch(self):
         """Remove the watch on the control/shutdown, if any. Nothrow
@@ -416,11 +416,11 @@ class VmxImageHandler(ImageHandler):
             if self.shutdownWatch:
                 self.shutdownWatch.unwatch()
         except:
-            log.exception("Unwatching vmx shutdown watch failed.")
+            log.exception("Unwatching hvm shutdown watch failed.")
         self.shutdownWatch = None
-        log.debug("vmx shutdown watch unregistered")
+        log.debug("hvm shutdown watch unregistered")
 
-    def vmx_shutdown(self, _):
+    def hvm_shutdown(self, _):
         """ watch call back on node control/shutdown,
             if node changed, this function will be called
         """
@@ -429,7 +429,7 @@ class VmxImageHandler(ImageHandler):
         vm = xd.domain_lookup( self.vm.getDomid() )
 
         reason = vm.readDom('control/shutdown')
-        log.debug("vmx_shutdown fired, shutdown reason=%s", reason)
+        log.debug("hvm_shutdown fired, shutdown reason=%s", reason)
         for x in shutdown_reasons.keys():
             if shutdown_reasons[x] == reason:
                 vm.info['shutdown'] = 1
@@ -444,7 +444,7 @@ image type.
 imageHandlerClasses = {}
 
 
-for h in LinuxImageHandler, VmxImageHandler:
+for h in LinuxImageHandler, HVMImageHandler:
     imageHandlerClasses[h.ostype] = h
 
 

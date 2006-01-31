@@ -38,7 +38,7 @@
 #include <asm/vmx_pal_vsa.h>
 #include <asm/kregs.h>
 #include <asm/vmx_platform.h>
-#include <asm/vmx_vioapic.h>
+#include <asm/hvm/vioapic.h>
 
 //u64  fire_itc;
 //u64  fire_itc2;
@@ -278,7 +278,7 @@ void vmx_virq_line_assist(struct vcpu *v)
 	do {
 	    irqs = *(volatile uint16_t*)virq_line;
 	} while ((uint16_t)cmpxchg(virq_line, irqs, 0) != irqs);
-	vmx_vioapic_do_irqs(v->domain, irqs);
+	hvm_vioapic_do_irqs(v->domain, irqs);
     }
 
     virq_line = &spg->pic_clear_irr;
@@ -286,7 +286,7 @@ void vmx_virq_line_assist(struct vcpu *v)
 	do {
 	    irqs = *(volatile uint16_t*)virq_line;
 	} while ((uint16_t)cmpxchg(virq_line, irqs, 0) != irqs);
-	vmx_vioapic_do_irqs_clear(v->domain, irqs);
+	hvm_vioapic_do_irqs_clear(v->domain, irqs);
     }
 }
 
@@ -300,7 +300,7 @@ void vmx_virq_line_init(struct domain *d)
     spg->pic_clear_irr = 0;
 }
 
-int ioapic_match_logical_addr(vmx_vioapic_t *s, int number, uint16_t dest)
+int ioapic_match_logical_addr(hvm_vioapic_t *s, int number, uint16_t dest)
 {
     return (VLAPIC_ID(s->lapic_info[number]) == dest);
 }
@@ -311,14 +311,14 @@ struct vlapic* apic_round_robin(struct domain *d,
 				uint32_t bitmap)
 {
     uint8_t bit;
-    vmx_vioapic_t *s;
+    hvm_vioapic_t *s;
     
     if (!bitmap) {
 	printk("<apic_round_robin> no bit on bitmap\n");
 	return NULL;
     }
 
-    s = &d->arch.vmx_platform.vmx_vioapic;
+    s = &d->arch.vmx_platform.vioapic;
     for (bit = 0; bit < s->lapic_count; bit++) {
 	if (bitmap & (1 << bit))
 	    return s->lapic_info[bit];
@@ -351,7 +351,7 @@ void vlsapic_reset(VCPU *vcpu)
 
 #ifdef V_IOSAPIC_READY
     vcpu->arch.arch_vmx.vlapic.vcpu = vcpu;
-    vmx_vioapic_add_lapic(&vcpu->arch.arch_vmx.vlapic, vcpu);
+    hvm_vioapic_add_lapic(&vcpu->arch.arch_vmx.vlapic, vcpu);
 #endif
     DPRINTK("VLSAPIC inservice base=%lp\n", &VLSAPIC_INSVC(vcpu,0) );
 }

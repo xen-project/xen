@@ -21,16 +21,16 @@
 
 #include <public/xen.h>
 #include <public/arch-ia64.h>
-#include <asm/vmx_vioapic.h>
+#include <asm/hvm/vioapic.h>
 
 struct mmio_list;
-typedef struct virutal_platform_def {
+typedef struct virtual_platform_def {
     unsigned long       shared_page_va;
     unsigned long       pib_base;
     unsigned char       xtp;
     struct mmio_list    *mmio;
     /* One IOSAPIC now... */
-    struct vmx_vioapic   vmx_vioapic;
+    struct hvm_vioapic  vioapic;
 } vir_plat_t;
 
 static inline int __fls(uint32_t word)
@@ -63,7 +63,7 @@ static inline int vlapic_set_irq(struct vlapic *t, uint8_t vec, uint8_t trig)
 
 /* As long as we register vlsapic to ioapic controller, it's said enabled */
 #define vlapic_enabled(l) 1
-#define vmx_apic_support(d) 1
+#define hvm_apic_support(d) 1
 
 #define VLAPIC_DELIV_MODE_FIXED		0x0
 #define VLAPIC_DELIV_MODE_REDIR		0x1

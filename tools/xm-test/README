@@ -60,26 +60,26 @@ BUILDING with HVM Support
 =========================
 
 If you'd like to build and run this with hardware virtual machine assist
-(HVM) support to test fully virtualized disk images on VMX hardware, 
-please add the --enable-vmx-support option to configure:
+(HVM) support to test fully virtualized disk images on VMX/SVM hardware, 
+please add the --enable-hvm-support option to configure:
 
   # ./autogen
-  # ./configure --enable-vmx-support
+  # ./configure --enable-hvm-support
   # make
 
 The ramdisk/bin/create_disk_image script, which builds the full virt
 disk.img, requires Lilo 22.7+ to be installed on the system. Lilo is 
 used to install the bootloader on the disk.img.
 
-If HVM / VMX support is enabled, the ramdisk/bin/create_disk_image script
+If HVM support is enabled, the ramdisk/bin/create_disk_image script
 will be run to create a full virt disk.img in the ramdisk directory. The
 script, by default, will look in /boot for the first non-Xen kernel it
 runs across. If you'd like to set xm-test to use a specific kernel,
 rather than the first one it finds in /boot, you can configure it in
-with the "--with-vmx-kernel=KERNEL" option:
-
+with the "--with-hvm-kernel=KERNEL" option:
+ 
 # ./autogen
-# ./configure --enable-vmx-support --with-vmx-kernel=KERNEL
+# ./configure --enable-hvm-support --with-hvm-kernel=KERNEL
 # make
 
 Otherwise, you can always rerun the create script using the -k option
@@ -92,14 +92,14 @@ used. If you'd like to specify a different location for the driver or
 want to tell the script that the driver is built into the kernel, please
 use the "--with-driver-dir=DRVDIR" configure option. If built into
 the kernel, please use the key word "builtin" with the option:
-
+ 
 # ./autogen
-# ./configure --enable-vmx-support --with-driver-dir=builtin
+# ./configure --enable-hvm-support --with-driver-dir=builtin
 - or -
-# ./configure --enable-vmx-support --with-driver-dir=/driver/directory
+# ./configure --enable-hvm-support --with-driver-dir=/driver/directory
 # make
-
-Xm-test will look for disk.img in the ramdisk directory when run by 
+ 
+Xm-test will look for disk.img in the ramdisk directory when run by
 default.
 
 

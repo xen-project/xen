@@ -4,10 +4,14 @@ include $(BASEDIR)/Rules.mk
 OBJS += $(patsubst %.S,%.o,$(wildcard $(TARGET_SUBARCH)/*.S))
 OBJS += $(patsubst %.c,%.o,$(wildcard $(TARGET_SUBARCH)/*.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard acpi/*.c))
-OBJS += $(patsubst %.c,%.o,$(wildcard dm/*.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard mtrr/*.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard genapic/*.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard cpu/*.c))
+OBJS += $(patsubst %.c,%.o,$(wildcard hvm/*.c))
+OBJS += $(patsubst %.c,%.o,$(wildcard hvm/vmx/*.c))
+OBJS += $(patsubst %.S,%.o,$(wildcard hvm/vmx/$(TARGET_SUBARCH)/*.S))
+OBJS += $(patsubst %.c,%.o,$(wildcard hvm/svm/*.c))
+OBJS += $(patsubst %.S,%.o,$(wildcard hvm/svm/$(TARGET_SUBARCH)/*.S))
 
 ifeq ($(TARGET_SUBARCH),x86_64) 
 OBJS := $(subst cpu/centaur.o,,$(OBJS))
@@ -74,9 +78,15 @@ clean:
 	rm -f x86_64/*.o x86_64/*~ x86_64/core
 	rm -f mtrr/*.o mtrr/*~ mtrr/core
 	rm -f acpi/*.o acpi/*~ acpi/core
-	rm -f dm/*.o dm/*~ dm/core
 	rm -f genapic/*.o genapic/*~ genapic/core
 	rm -f cpu/*.o cpu/*~ cpu/core
+	rm -f hvm/*.o hvm/*~ hvm/core
+	rm -f hvm/vmx/*.o hvm/vmx/*~ hvm/vmx/core
+	rm -f hvm/vmx/x86_32/*.o hvm/vmx/x86_32/*~ hvm/vmx/x86_32/core
+	rm -f hvm/vmx/x86_64/*.o hvm/vmx/x86_64/*~ hvm/vmx/x86_64/core
+	rm -f hvm/svm/*.o hvm/svm/*~ hvm/svm/core
+	rm -f hvm/svm/x86_32/*.o hvm/svm/x86_32/*~ hvm/svm/x86_32/core
+	rm -f hvm/svm/x86_64/*.o hvm/svm/x86_64/*~ hvm/svm/x86_64/core
 	rm -f xen.lds
 
 .PHONY: default clean

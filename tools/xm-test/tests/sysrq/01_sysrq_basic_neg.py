@@ -9,8 +9,8 @@ import re
 
 from XmTestLib import *
 
-if ENABLE_VMX_SUPPORT:
-    SKIP("Sysrq not supported for VMX domains")
+if ENABLE_HVM_SUPPORT:
+    SKIP("Sysrq not supported for HVM domains")
 
 status, output = traceCommand("xm sysrq does_not_exist s");
 

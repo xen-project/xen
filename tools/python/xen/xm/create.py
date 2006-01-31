@@ -162,11 +162,11 @@ gopts.var('cpus', val='CPUS',
 
 gopts.var('acpi', val='ACPI',
           fn=set_int, default=0,
-          use="Disable or enable ACPI of VMX domain.")
+          use="Disable or enable ACPI of HVM domain.")
 
 gopts.var('apic', val='APIC',
           fn=set_int, default=0,
-          use="Disable or enable APIC of VMX domain.")
+          use="Disable or enable APIC of HVM domain.")
 
 gopts.var('vcpus', val='VCPUS',
           fn=set_int, default=1,
@@ -441,8 +441,8 @@ def configure_image(vals):
     if vals.extra:
         config_image.append(['args', vals.extra])
 
-    if vals.builder == 'vmx':
-        configure_vmx(config_image, vals)
+    if vals.builder == 'hvm':
+        configure_hvm(config_image, vals)
         
     return config_image
     
@@ -536,8 +536,8 @@ def configure_vifs(config_devs, vals):
         config_devs.append(['device', config_vif])
 
 
-def configure_vmx(config_image, vals):
-    """Create the config for VMX devices.
+def configure_hvm(config_image, vals):
+    """Create the config for HVM devices.
     """
     args = [ 'device_model', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'audio',

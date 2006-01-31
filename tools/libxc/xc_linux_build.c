@@ -815,7 +815,7 @@ static int setup_guest(int xc_handle,
         start_info->mod_len      = initrd_len;
     }
     if ( cmdline != NULL )
-    {
+    { 
         strncpy((char *)start_info->cmd_line, cmdline, MAX_GUEST_CMDLINE);
         start_info->cmd_line[MAX_GUEST_CMDLINE-1] = '\0';
     }
