@@ -48,7 +48,7 @@ show_mem (void)
 	printk("Free swap:       %6ldkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
 	i = max_mapnr;
 	while (i-- > 0) {
-		if (!pfn_valid(i))
+		if (!mfn_valid(i))
 			continue;
 		total++;
 		if (PageReserved(mem_map+i))
@@ -253,7 +253,7 @@ paging_init (void)
 	num_physpages = 0;
 	efi_memmap_walk(count_pages, &num_physpages);
 
-	max_dma = virt_to_phys((void *) MAX_DMA_ADDRESS) >> PAGE_SHIFT;
+	max_dma = virt_to_maddr((void *) MAX_DMA_ADDRESS) >> PAGE_SHIFT;
 
 #ifdef CONFIG_VIRTUAL_MEM_MAP
 	memset(zholes_size, 0, sizeof(zholes_size));

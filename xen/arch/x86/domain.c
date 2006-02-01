@@ -179,7 +179,7 @@ void machine_restart(char * __unused)
 
 void dump_pageframe_info(struct domain *d)
 {
-    struct pfn_info *page;
+    struct page_info *page;
 
     printk("Memory pages belonging to domain %u:\n", d->domain_id);
 
@@ -192,7 +192,7 @@ void dump_pageframe_info(struct domain *d)
         list_for_each_entry ( page, &d->page_list, list )
         {
             printk("    DomPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
-                   _p(page_to_phys(page)), _p(page_to_pfn(page)),
+                   _p(page_to_maddr(page)), _p(page_to_mfn(page)),
                    page->count_info, page->u.inuse.type_info);
         }
     }
@@ -200,7 +200,7 @@ void dump_pageframe_info(struct domain *d)
     list_for_each_entry ( page, &d->xenpage_list, list )
     {
         printk("    XenPage %p: mfn=%p, caf=%08x, taf=%" PRtype_info "\n",
-               _p(page_to_phys(page)), _p(page_to_pfn(page)),
+               _p(page_to_maddr(page)), _p(page_to_mfn(page)),
                page->count_info, page->u.inuse.type_info);
     }
 }
@@ -400,7 +400,7 @@ int arch_set_info_guest(
 
     phys_basetab = c->ctrlreg[3];
     phys_basetab =
-        (__gpfn_to_mfn(d, phys_basetab >> PAGE_SHIFT) << PAGE_SHIFT) |
+        (gmfn_to_mfn(d, phys_basetab >> PAGE_SHIFT) << PAGE_SHIFT) |
         (phys_basetab & ~PAGE_MASK);
 
     v->arch.guest_table = mk_pagetable(phys_basetab);
@@ -410,7 +410,7 @@ int arch_set_info_guest(
 
     if ( shadow_mode_refcounts(d) )
     {
-        if ( !get_page(pfn_to_page(phys_basetab>>PAGE_SHIFT), d) )
+        if ( !get_page(mfn_to_page(phys_basetab>>PAGE_SHIFT), d) )
         {
             destroy_gdt(v);
             return -EINVAL;
@@ -418,7 +418,7 @@ int arch_set_info_guest(
     }
     else if ( !(c->flags & VGCF_HVM_GUEST) )
     {
-        if ( !get_page_and_type(pfn_to_page(phys_basetab>>PAGE_SHIFT), d,
+        if ( !get_page_and_type(mfn_to_page(phys_basetab>>PAGE_SHIFT), d,
                                 PGT_base_page_table) )
         {
             destroy_gdt(v);
@@ -879,7 +879,7 @@ unsigned long __hypercall_create_continuation(
 static void relinquish_memory(struct domain *d, struct list_head *list)
 {
     struct list_head *ent;
-    struct pfn_info  *page;
+    struct page_info  *page;
     unsigned long     x, y;
 
     /* Use a recursive lock, as we may enter 'free_domheap_page'. */
@@ -888,7 +888,7 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
     ent = list->next;
     while ( ent != list )
     {
-        page = list_entry(ent, struct pfn_info, list);
+        page = list_entry(ent, struct page_info, list);
 
         /* Grab a reference to the page so it won't disappear from under us. */
         if ( unlikely(!get_page(page, d)) )
@@ -949,8 +949,8 @@ void domain_relinquish_resources(struct domain *d)
         if ( (pfn = pagetable_get_pfn(v->arch.guest_table)) != 0 )
         {
             if ( !shadow_mode_refcounts(d) )
-                put_page_type(pfn_to_page(pfn));
-            put_page(pfn_to_page(pfn));
+                put_page_type(mfn_to_page(pfn));
+            put_page(mfn_to_page(pfn));
 
             v->arch.guest_table = mk_pagetable(0);
         }
@@ -958,8 +958,8 @@ void domain_relinquish_resources(struct domain *d)
         if ( (pfn = pagetable_get_pfn(v->arch.guest_table_user)) != 0 )
         {
             if ( !shadow_mode_refcounts(d) )
-                put_page_type(pfn_to_page(pfn));
-            put_page(pfn_to_page(pfn));
+                put_page_type(mfn_to_page(pfn));
+            put_page(mfn_to_page(pfn));
 
             v->arch.guest_table_user = mk_pagetable(0);
         }

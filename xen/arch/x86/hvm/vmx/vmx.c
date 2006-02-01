@@ -495,7 +495,7 @@ int start_vmx(void)
         return 0;
     }
 
-    phys_vmcs = (u64) virt_to_phys(vmcs);
+    phys_vmcs = (u64) virt_to_maddr(vmcs);
 
     if (!(__vmxon(phys_vmcs))) {
         printk("VMXON is done\n");
@@ -987,12 +987,12 @@ vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
             return 0;
         }
         mfn = get_mfn_from_pfn(c->cr3 >> PAGE_SHIFT);
-        if(!get_page(pfn_to_page(mfn), v->domain))
+        if(!get_page(mfn_to_page(mfn), v->domain))
                 return 0;
         old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
         v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
         if (old_base_mfn)
-             put_page(pfn_to_page(old_base_mfn));
+             put_page(mfn_to_page(old_base_mfn));
         update_pagetables(v);
         /*
          * arch.shadow_table should now hold the next CR3 for shadow
@@ -1159,7 +1159,7 @@ static int vmx_set_cr0(unsigned long value)
          */
         if ( !VALID_MFN(mfn = get_mfn_from_pfn(
             v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT)) ||
-             !get_page(pfn_to_page(mfn), v->domain) )
+             !get_page(mfn_to_page(mfn), v->domain) )
         {
             printk("Invalid CR3 value = %lx", v->arch.hvm_vmx.cpu_cr3);
             domain_crash_synchronous(); /* need to take a clean path */
@@ -1232,7 +1232,7 @@ static int vmx_set_cr0(unsigned long value)
 
     if(!((value & X86_CR0_PE) && (value & X86_CR0_PG)) && paging_enabled)
         if(v->arch.hvm_vmx.cpu_cr3) {
-            put_page(pfn_to_page(get_mfn_from_pfn(
+            put_page(mfn_to_page(get_mfn_from_pfn(
                       v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT)));
             v->arch.guest_table = mk_pagetable(0);
         }
@@ -1378,7 +1378,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
             if ( ((value >> PAGE_SHIFT) > v->domain->max_pages ) ||
                  !VALID_MFN(mfn = get_mfn_from_pfn(value >> PAGE_SHIFT)) ||
-                 !get_page(pfn_to_page(mfn), v->domain) )
+                 !get_page(mfn_to_page(mfn), v->domain) )
             {
                 printk("Invalid CR3 value=%lx", value);
                 domain_crash_synchronous(); /* need to take a clean path */
@@ -1386,7 +1386,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
             v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
             if (old_base_mfn)
-                put_page(pfn_to_page(old_base_mfn));
+                put_page(mfn_to_page(old_base_mfn));
             update_pagetables(v);
             /*
              * arch.shadow_table should now hold the next CR3 for shadow

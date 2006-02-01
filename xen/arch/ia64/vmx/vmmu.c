@@ -64,10 +64,10 @@ u64 get_mfn(domid_t domid, u64 gpfn, u64 pages)
         d = find_domain_by_id(domid);
     }
     xen_gppn = arch_ppn_to_xen_ppn(gpfn);
-    xen_mppn = __gpfn_to_mfn(d, xen_gppn);
+    xen_mppn = gmfn_to_mfn(d, xen_gppn);
 /*
     for (i=0; i<pages; i++) {
-        if ( __gpfn_to_mfn(d, gpfn+i) == INVALID_MFN ) {
+        if ( gmfn_to_mfn(d, gpfn+i) == INVALID_MFN ) {
             return INVALID_MFN;
         }
     }
@@ -143,7 +143,7 @@ purge_machine_tc_by_domid(domid_t domid)
 
 static thash_cb_t *init_domain_vhpt(struct vcpu *d)
 {
-    struct pfn_info *page;
+    struct page_info *page;
     void   *vbase,*vcur;
     vhpt_special *vs;
     thash_cb_t  *vhpt;
@@ -188,7 +188,7 @@ static thash_cb_t *init_domain_vhpt(struct vcpu *d)
 
 thash_cb_t *init_domain_tlb(struct vcpu *d)
 {
-    struct pfn_info *page;
+    struct page_info *page;
     void    *vbase,*vcur;
     tlb_special_t  *ts;
     thash_cb_t  *tlb;
@@ -228,7 +228,7 @@ thash_cb_t *init_domain_tlb(struct vcpu *d)
 void
 alloc_pmt(struct domain *d)
 {
-    struct pfn_info *page;
+    struct page_info *page;
 
     /* Only called once */
     ASSERT(d->arch.pmt);
@@ -392,7 +392,7 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code)
         if ( tlb == NULL ) panic("No entry found in ITLB and DTLB\n");
         gpip = (tlb->ppn << 12) | ( gip & (PSIZE(tlb->ps)-1) );
     }
-    mfn = __gpfn_to_mfn(vcpu->domain, gpip >>PAGE_SHIFT);
+    mfn = gmfn_to_mfn(vcpu->domain, gpip >>PAGE_SHIFT);
     if ( mfn == INVALID_MFN ) return 0;
  
     mpa = (gpip & (PAGE_SIZE-1)) | (mfn<<PAGE_SHIFT);
@@ -789,7 +789,7 @@ __domain_va_to_ma(unsigned long va, unsigned long* ma, unsigned long *len)
     gpfn =PAGEALIGN(gpfn,(entry->ps-PAGE_SHIFT));
     gpfn = gpfn | POFFSET(va>>PAGE_SHIFT,(entry->ps-PAGE_SHIFT)); 
 
-    mpfn = __gpfn_to_mfn(v->domain, gpfn);
+    mpfn = gmfn_to_mfn(v->domain, gpfn);
     m = (mpfn<<PAGE_SHIFT) | (va & (PAGE_SIZE - 1));
     /* machine address may be not continuous */
     end = PAGEALIGN(m, PAGE_SHIFT) + PAGE_SIZE;

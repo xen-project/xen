@@ -80,14 +80,14 @@ void raise_actimer_softirq(void)
 }
 
 unsigned long
-__gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
+gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 {
 	if (d == dom0)
 		return(gpfn);
 	else {
 		unsigned long pte = lookup_domain_mpa(d,gpfn << PAGE_SHIFT);
 		if (!pte) {
-printk("__gpfn_to_mfn_foreign: bad gpfn. spinning...\n");
+printk("gmfn_to_mfn_foreign: bad gpfn. spinning...\n");
 while(1);
 			return 0;
 		}
@@ -96,11 +96,11 @@ while(1);
 }
 #if 0
 u32
-__mfn_to_gpfn(struct domain *d, unsigned long frame)
+mfn_to_gmfn(struct domain *d, unsigned long frame)
 {
 	// FIXME: is this right?
 if ((frame << PAGE_SHIFT) & _PAGE_PPN_MASK) {
-printk("__mfn_to_gpfn: bad frame. spinning...\n");
+printk("mfn_to_gmfn: bad frame. spinning...\n");
 while(1);
 }
 	return frame;
@@ -142,7 +142,7 @@ void init_percpu_info(void)
 }
 
 #if 0
-void free_page_type(struct pfn_info *page, unsigned int type)
+void free_page_type(struct page_info *page, unsigned int type)
 {
 	dummy();
 }

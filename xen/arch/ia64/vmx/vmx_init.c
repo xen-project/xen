@@ -307,7 +307,7 @@ int vmx_alloc_contig_pages(struct domain *d)
 {
 	unsigned int order;
 	unsigned long i, j, start, end, pgnr, conf_nr;
-	struct pfn_info *page;
+	struct page_info *page;
 	struct vcpu *v = d->vcpu[0];
 
 	ASSERT(!test_bit(ARCH_VMX_CONTIG_MEM, &v->arch.arch_vmx.flags));
@@ -329,7 +329,7 @@ int vmx_alloc_contig_pages(struct domain *d)
 	}
 
 	/* Map normal memory below 3G */
-	pgnr = page_to_pfn(page);
+	pgnr = page_to_mfn(page);
 	end = conf_nr << PAGE_SHIFT;
 	for (i = 0;
 	     i < (end < MMIO_START ? end : MMIO_START);
@@ -354,7 +354,7 @@ int vmx_alloc_contig_pages(struct domain *d)
 	}
 
 	/* Map guest firmware */
-	pgnr = page_to_pfn(page);
+	pgnr = page_to_mfn(page);
 	for (i = GFW_START; i < GFW_START + GFW_SIZE; i += PAGE_SIZE, pgnr++)
 	    map_domain_page(d, i, pgnr << PAGE_SHIFT);
 
@@ -364,7 +364,7 @@ int vmx_alloc_contig_pages(struct domain *d)
 	}
 
 	/* Map for shared I/O page and xenstore */
-	pgnr = page_to_pfn(page);
+	pgnr = page_to_mfn(page);
 	map_domain_page(d, IO_PAGE_START, pgnr << PAGE_SHIFT);
 	pgnr++;
 	map_domain_page(d, STORE_PAGE_START, pgnr << PAGE_SHIFT);

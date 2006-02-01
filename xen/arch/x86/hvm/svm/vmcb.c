@@ -155,8 +155,8 @@ static int construct_vmcb_controls(struct arch_svm_struct *arch_svm)
     arch_svm->iopm = iopm;
     arch_svm->msrpm = msrpm;
 
-    vmcb->iopm_base_pa = (u64) virt_to_phys(iopm);
-    vmcb->msrpm_base_pa = (u64) virt_to_phys(msrpm);
+    vmcb->iopm_base_pa = (u64) virt_to_maddr(iopm);
+    vmcb->msrpm_base_pa = (u64) virt_to_maddr(msrpm);
 
     return 0;
 }
@@ -361,11 +361,11 @@ int construct_vmcb(struct arch_svm_struct *arch_svm, struct cpu_user_regs *regs)
         goto err_out;
     }
 
-    phys_hsa = (u64) virt_to_phys(hsa);
+    phys_hsa = (u64) virt_to_maddr(hsa);
     arch_svm->host_save_area = hsa;
     arch_svm->host_save_pa   = phys_hsa;
 
-    arch_svm->vmcb_pa  = (u64) virt_to_phys(arch_svm->vmcb);
+    arch_svm->vmcb_pa  = (u64) virt_to_maddr(arch_svm->vmcb);
 
     if ((error = load_vmcb(arch_svm, arch_svm->host_save_pa))) 
     {

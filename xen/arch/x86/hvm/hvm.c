@@ -59,18 +59,18 @@ static void hvm_map_io_shared_page(struct domain *d)
     unsigned char e820_map_nr;
     struct e820entry *e820entry;
     unsigned char *p;
-    unsigned long mpfn;
+    unsigned long mfn;
     unsigned long gpfn = 0;
 
     local_flush_tlb_pge();
 
-    mpfn = get_mfn_from_pfn(E820_MAP_PAGE >> PAGE_SHIFT);
-    if (mpfn == INVALID_MFN) {
+    mfn = get_mfn_from_pfn(E820_MAP_PAGE >> PAGE_SHIFT);
+    if (mfn == INVALID_MFN) {
         printk("Can not find E820 memory map page for HVM domain.\n");
         domain_crash_synchronous();
     }
 
-    p = map_domain_page(mpfn);
+    p = map_domain_page(mfn);
     if (p == NULL) {
         printk("Can not map E820 memory map page for HVM domain.\n");
         domain_crash_synchronous();
@@ -97,13 +97,13 @@ static void hvm_map_io_shared_page(struct domain *d)
     unmap_domain_page(p);
 
     /* Initialise shared page */
-    mpfn = get_mfn_from_pfn(gpfn);
-    if (mpfn == INVALID_MFN) {
+    mfn = get_mfn_from_pfn(gpfn);
+    if (mfn == INVALID_MFN) {
         printk("Can not find io request shared page for HVM domain.\n");
         domain_crash_synchronous();
     }
 
-    p = map_domain_page_global(mpfn);
+    p = map_domain_page_global(mfn);
     if (p == NULL) {
         printk("Can not map io request shared page for HVM domain.\n");
         domain_crash_synchronous();
@@ -140,16 +140,16 @@ static int validate_hvm_info(struct hvm_info_table *t)
 static void hvm_get_info(struct domain *d)
 {
     unsigned char *p;
-    unsigned long mpfn;
+    unsigned long mfn;
     struct hvm_info_table *t;
 
-    mpfn = get_mfn_from_pfn(HVM_INFO_PFN);
-    if ( mpfn == INVALID_MFN ) {
+    mfn = get_mfn_from_pfn(HVM_INFO_PFN);
+    if ( mfn == INVALID_MFN ) {
         printk("Can not get info page mfn for HVM domain.\n");
         domain_crash_synchronous();
     }
 
-    p = map_domain_page(mpfn);
+    p = map_domain_page(mfn);
     if ( p == NULL ) {
         printk("Can not map info page for HVM domain.\n");
         domain_crash_synchronous();

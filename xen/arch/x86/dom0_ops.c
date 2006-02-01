@@ -199,7 +199,7 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
     
     case DOM0_GETPAGEFRAMEINFO:
     {
-        struct pfn_info *page;
+        struct page_info *page;
         unsigned long pfn = op->u.getpageframeinfo.pfn;
         domid_t dom = op->u.getpageframeinfo.domain;
         struct domain *d;
@@ -210,7 +210,7 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
              unlikely((d = find_domain_by_id(dom)) == NULL) )
             break;
 
-        page = pfn_to_page(pfn);
+        page = mfn_to_page(pfn);
 
         if ( likely(get_page(page, d)) )
         {
@@ -282,12 +282,12 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
      
             for( j = 0; j < k; j++ )
             {      
-                struct pfn_info *page;
+                struct page_info *page;
                 unsigned long mfn = l_arr[j];
 
-                page = pfn_to_page(mfn);
+                page = mfn_to_page(mfn);
 
-                if ( likely(pfn_valid(mfn) && get_page(page, d)) ) 
+                if ( likely(mfn_valid(mfn) && get_page(page, d)) ) 
                 {
                     unsigned long type = 0;
 
@@ -350,14 +350,14 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
             list_ent = d->page_list.next;
             for ( i = 0; (i < max_pfns) && (list_ent != &d->page_list); i++ )
             {
-                pfn = page_to_pfn(list_entry(list_ent, struct pfn_info, list));
+                pfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
                 if ( put_user(pfn, buffer) )
                 {
                     ret = -EFAULT;
                     break;
                 }
                 buffer++;
-                list_ent = pfn_to_page(pfn)->list.next;
+                list_ent = mfn_to_page(pfn)->list.next;
             }
             spin_unlock(&d->page_alloc_lock);
 
@@ -420,8 +420,8 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
             break;
 
         ret = -EACCES;
-        if ( !pfn_valid(mfn) ||
-             !get_page_and_type(pfn_to_page(mfn), d, PGT_writable_page) )
+        if ( !mfn_valid(mfn) ||
+             !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
         {
             put_domain(d);
             break;
@@ -433,7 +433,7 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
         hypercall_page_initialise(hypercall_page);
         unmap_domain_page(hypercall_page);
 
-        put_page_and_type(pfn_to_page(mfn));
+        put_page_and_type(mfn_to_page(mfn));
 
         put_domain(d);
     }

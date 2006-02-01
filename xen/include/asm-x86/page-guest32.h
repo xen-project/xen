@@ -34,9 +34,9 @@ typedef l2_pgentry_t root_pgentry_32_t;
 #define l2e_get_flags_32(x)           (get_pte_flags_32((x).l2))
 
 #define l1e_get_paddr_32(x)           \
-    ((physaddr_t)(((x).l1 & (PADDR_MASK&PAGE_MASK))))
+    ((paddr_t)(((x).l1 & (PADDR_MASK&PAGE_MASK))))
 #define l2e_get_paddr_32(x)           \
-    ((physaddr_t)(((x).l2 & (PADDR_MASK&PAGE_MASK))))
+    ((paddr_t)(((x).l2 & (PADDR_MASK&PAGE_MASK))))
 
 /* Construct an empty pte. */
 #define l1e_empty_32()                ((l1_pgentry_32_t) { 0 })
@@ -50,12 +50,12 @@ typedef l2_pgentry_t root_pgentry_32_t;
 
 /* Construct a pte from a physical address and access flags. */
 #ifndef __ASSEMBLY__
-static inline l1_pgentry_32_t l1e_from_paddr_32(physaddr_t pa, unsigned int flags)
+static inline l1_pgentry_32_t l1e_from_paddr_32(paddr_t pa, unsigned int flags)
 {
     ASSERT((pa & ~(PADDR_MASK & PAGE_MASK)) == 0);
     return (l1_pgentry_32_t) { pa | put_pte_flags_32(flags) };
 }
-static inline l2_pgentry_32_t l2e_from_paddr_32(physaddr_t pa, unsigned int flags)
+static inline l2_pgentry_32_t l2e_from_paddr_32(paddr_t pa, unsigned int flags)
 {
     ASSERT((pa & ~(PADDR_MASK & PAGE_MASK)) == 0);
     return (l2_pgentry_32_t) { pa | put_pte_flags_32(flags) };
@@ -64,8 +64,8 @@ static inline l2_pgentry_32_t l2e_from_paddr_32(physaddr_t pa, unsigned int flag
 
 
 /* Construct a pte from a page pointer and access flags. */
-#define l1e_from_page_32(page, flags) (l1e_from_pfn_32(page_to_pfn(page),(flags)))
-#define l2e_from_page_32(page, flags) (l2e_from_pfn_32(page_to_pfn(page),(flags)))
+#define l1e_from_page_32(page, flags) (l1e_from_pfn_32(page_to_mfn(page),(flags)))
+#define l2e_from_page_32(page, flags) (l2e_from_pfn_32(page_to_mfn(page),(flags)))
 
 /* Add extra flags to an existing pte. */
 #define l1e_add_flags_32(x, flags)    ((x).l1 |= put_pte_flags_32(flags))

@@ -96,10 +96,10 @@ domain_mmap_cache_destroy(struct domain_mmap_cache *cache)
 
 #else /* !CONFIG_DOMAIN_PAGE */
 
-#define map_domain_page(pfn)                phys_to_virt((pfn)<<PAGE_SHIFT)
+#define map_domain_page(pfn)                maddr_to_virt((pfn)<<PAGE_SHIFT)
 #define unmap_domain_page(va)               ((void)(va))
 
-#define map_domain_page_global(pfn)         phys_to_virt((pfn)<<PAGE_SHIFT)
+#define map_domain_page_global(pfn)         maddr_to_virt((pfn)<<PAGE_SHIFT)
 #define unmap_domain_page_global(va)        ((void)(va))
 
 struct domain_mmap_cache { 

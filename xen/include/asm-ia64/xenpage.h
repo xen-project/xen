@@ -5,20 +5,20 @@
 #error "xenpage.h: page macros need to be defined for CONFIG_DISCONTIGMEM"
 #endif
 
-#undef pfn_valid
-#undef page_to_pfn
-#undef pfn_to_page
-# define pfn_valid(_pfn)	((_pfn) < max_page)
-# define page_to_pfn(_page)	((unsigned long) ((_page) - frame_table))
-# define pfn_to_page(_pfn)	(frame_table + (_pfn))
+#undef mfn_valid
+#undef page_to_mfn
+#undef mfn_to_page
+# define mfn_valid(_pfn)	((_pfn) < max_page)
+# define page_to_mfn(_page)	((unsigned long) ((_page) - frame_table))
+# define mfn_to_page(_pfn)	(frame_table + (_pfn))
 
-#undef page_to_phys
+#undef page_to_maddr
 #undef virt_to_page
-#define page_to_phys(page)	(page_to_pfn(page) << PAGE_SHIFT)
-#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+#define page_to_maddr(page)	(page_to_mfn(page) << PAGE_SHIFT)
+#define virt_to_page(kaddr)	mfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
 
-#define page_to_virt(_page)	phys_to_virt(page_to_phys(_page))
-#define phys_to_page(kaddr)	pfn_to_page(((kaddr) >> PAGE_SHIFT))
+#define page_to_virt(_page)	maddr_to_virt(page_to_maddr(_page))
+#define maddr_to_page(kaddr)	mfn_to_page(((kaddr) >> PAGE_SHIFT))
 
 #ifndef __ASSEMBLY__
 typedef union xen_va {
@@ -30,7 +30,7 @@ typedef union xen_va {
 	void *p;
 } xen_va;
 
-static inline int get_order_from_bytes(physaddr_t size)
+static inline int get_order_from_bytes(paddr_t size)
 {
     int order;
     size = (size-1) >> PAGE_SHIFT;

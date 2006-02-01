@@ -61,7 +61,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 #ifdef __i386__
 #ifdef CONFIG_X86_PAE
         /* 32b PAE */
-        if ( (( pfn_to_page(mfn)->u.inuse.type_info & PGT_va_mask ) 
+        if ( (( mfn_to_page(mfn)->u.inuse.type_info & PGT_va_mask ) 
 	    >> PGT_va_shift) == 3 )
             return l2_table_offset(HYPERVISOR_VIRT_START); 
         else
@@ -76,7 +76,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 #endif
     }
 
-    void _adjust(struct pfn_info *page, int adjtype ADJUST_EXTRA_ARGS)
+    void _adjust(struct page_info *page, int adjtype ADJUST_EXTRA_ARGS)
     {
         int count;
 
@@ -90,7 +90,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             if ( page_get_owner(page) == NULL )
             {
                 APRINTK("adjust(mfn=%lx, dir=%d, adjtype=%d) owner=NULL",
-                        page_to_pfn(page), dir, adjtype);
+                        page_to_mfn(page), dir, adjtype);
                 errors++;
             }
 
@@ -98,7 +98,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             {
                 APRINTK("Audit %d: type count went below zero "
                         "mfn=%lx t=%" PRtype_info " ot=%x",
-                        d->domain_id, page_to_pfn(page),
+                        d->domain_id, page_to_mfn(page),
                         page->u.inuse.type_info,
                         page->tlbflush_timestamp);
                 errors++;
@@ -107,7 +107,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             {
                 APRINTK("Audit %d: type count overflowed "
                         "mfn=%lx t=%" PRtype_info " ot=%x",
-                        d->domain_id, page_to_pfn(page),
+                        d->domain_id, page_to_mfn(page),
                         page->u.inuse.type_info,
                         page->tlbflush_timestamp);
                 errors++;
@@ -124,7 +124,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         {
             APRINTK("Audit %d: general count went below zero "
                     "mfn=%lx t=%" PRtype_info " ot=%x",
-                    d->domain_id, page_to_pfn(page),
+                    d->domain_id, page_to_mfn(page),
                     page->u.inuse.type_info,
                     page->tlbflush_timestamp);
             errors++;
@@ -133,7 +133,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         {
             APRINTK("Audit %d: general count overflowed "
                     "mfn=%lx t=%" PRtype_info " ot=%x",
-                    d->domain_id, page_to_pfn(page),
+                    d->domain_id, page_to_mfn(page),
                     page->u.inuse.type_info,
                     page->tlbflush_timestamp);
             errors++;
@@ -153,7 +153,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             if ( l2e_get_flags(pt[i]) & _PAGE_PRESENT )
             {
 	        unsigned long l1mfn = l2e_get_pfn(pt[i]);
-                struct pfn_info *l1page = pfn_to_page(l1mfn);
+                struct page_info *l1page = mfn_to_page(l1mfn);
 
                 if ( noisy )
                 {
@@ -223,7 +223,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         {
             unsigned long hl2mfn =
                 l2e_get_pfn(pt[l2_table_offset(LINEAR_PT_VIRT_START)]);
-            struct pfn_info *hl2page = pfn_to_page(hl2mfn);
+            struct page_info *hl2page = mfn_to_page(hl2mfn);
             adjust(hl2page, 0);
         }
 
@@ -240,7 +240,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             if ( l2e_get_flags(pt[i]) & _PAGE_PRESENT )
             {
                 unsigned long gmfn = l2e_get_pfn(pt[i]);
-                struct pfn_info *gpage = pfn_to_page(gmfn);
+                struct page_info *gpage = mfn_to_page(gmfn);
 
                 if ( gmfn < 0x100 )
                 {
@@ -287,7 +287,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             if ( l1e_get_flags(pt[i]) & _PAGE_PRESENT )
             {
                 unsigned long gmfn = l1e_get_pfn(pt[i]);
-                struct pfn_info *gpage = pfn_to_page(gmfn);
+                struct page_info *gpage = mfn_to_page(gmfn);
 
                 if ( gmfn < 0x100 )
                 {
@@ -354,7 +354,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
     {
         struct shadow_status *a;
         unsigned long smfn, gmfn;
-        struct pfn_info *page;
+        struct page_info *page;
         int i;
 
         for ( i = 0; i < shadow_ht_buckets; i++ )
@@ -362,32 +362,32 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             a = &d->arch.shadow_ht[i];
             while ( a && a->gpfn_and_flags )
             {
-                gmfn = __gpfn_to_mfn(d, a->gpfn_and_flags & PGT_mfn_mask);
+                gmfn = gmfn_to_mfn(d, a->gpfn_and_flags & PGT_mfn_mask);
                 smfn = a->smfn;
-                page = pfn_to_page(smfn);
+                page = mfn_to_page(smfn);
 
                 switch ( a->gpfn_and_flags & PGT_type_mask ) {
                 case PGT_writable_pred:
                     break;
                 case PGT_snapshot:
-                    adjust(pfn_to_page(gmfn), 0);
+                    adjust(mfn_to_page(gmfn), 0);
                     break;
                 case PGT_l1_shadow:
-                    adjust(pfn_to_page(gmfn), 0);
+                    adjust(mfn_to_page(gmfn), 0);
                     if ( shadow_refcounts )
                         adjust_l1_page(smfn);
                     if ( page->u.inuse.type_info & PGT_pinned )
                         adjust(page, 0);
                     break;
                 case PGT_hl2_shadow:
-                    adjust(pfn_to_page(gmfn), 0);
+                    adjust(mfn_to_page(gmfn), 0);
                     if ( shadow_refcounts )
                         adjust_hl2_page(smfn);
                     if ( page->u.inuse.type_info & PGT_pinned )
                         adjust(page, 0);
                     break;
                 case PGT_l2_shadow:
-                    adjust(pfn_to_page(gmfn), 0);
+                    adjust(mfn_to_page(gmfn), 0);
                     adjust_l2_page(smfn, 1);
                     if ( page->u.inuse.type_info & PGT_pinned )
                         adjust(page, 0);
@@ -411,15 +411,15 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
         while ( oos )
         {
-            adjust(pfn_to_page(oos->gmfn), 0);
+            adjust(mfn_to_page(oos->gmfn), 0);
 
             // Only use entries that have low bits clear...
             //
             if ( !(oos->writable_pl1e & (sizeof(l1_pgentry_t)-1)) )
-                adjust(pfn_to_page(oos->writable_pl1e >> PAGE_SHIFT), 0);
+                adjust(mfn_to_page(oos->writable_pl1e >> PAGE_SHIFT), 0);
 
             if ( oos->snapshot_mfn != SHADOW_SNAPSHOT_ELSEWHERE )
-                adjust(pfn_to_page(oos->snapshot_mfn), 0);
+                adjust(mfn_to_page(oos->snapshot_mfn), 0);
 
             oos = oos->next;
             oos_count++;
@@ -433,28 +433,28 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         for_each_vcpu(d, v)
         {
             if ( pagetable_get_paddr(v->arch.guest_table) )
-                adjust(pfn_to_page(pagetable_get_pfn(v->arch.guest_table)),
+                adjust(mfn_to_page(pagetable_get_pfn(v->arch.guest_table)),
                        !shadow_mode_refcounts(d));
             if ( pagetable_get_paddr(v->arch.shadow_table) )
-                adjust(pfn_to_page(pagetable_get_pfn(v->arch.shadow_table)),
+                adjust(mfn_to_page(pagetable_get_pfn(v->arch.shadow_table)),
                        0);
             if ( v->arch.monitor_shadow_ref )
-                adjust(pfn_to_page(v->arch.monitor_shadow_ref), 0);
+                adjust(mfn_to_page(v->arch.monitor_shadow_ref), 0);
         }
     }
 
     void adjust_guest_pages()
     {
         struct list_head *list_ent = d->page_list.next;
-        struct pfn_info *page;
+        struct page_info *page;
         unsigned long mfn, snapshot_mfn;
 
         while ( list_ent != &d->page_list )
         {
             u32 page_type;
 
-            page = list_entry(list_ent, struct pfn_info, list);
-            snapshot_mfn = mfn = page_to_pfn(page);
+            page = list_entry(list_ent, struct page_info, list);
+            snapshot_mfn = mfn = page_to_mfn(page);
             page_type = page->u.inuse.type_info & PGT_type_mask;
 
             BUG_ON(page_get_owner(page) != d);
@@ -464,7 +464,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             if ( shadow_enabled && !shadow_refcounts &&
                  page_out_of_sync(page) )
             {
-                unsigned long gpfn = __mfn_to_gpfn(d, mfn);
+                unsigned long gpfn = mfn_to_gmfn(d, mfn);
                 ASSERT( VALID_M2P(gpfn) );
                 snapshot_mfn = __shadow_status(d, gpfn, PGT_snapshot);
                 ASSERT( snapshot_mfn );
@@ -619,7 +619,7 @@ void _audit_domain(struct domain *d, int flags)
     void scan_for_pfn_in_mfn(struct domain *d, unsigned long xmfn,
                              unsigned long mfn)
     {
-        struct pfn_info *page = pfn_to_page(mfn);
+        struct page_info *page = mfn_to_page(mfn);
         l1_pgentry_t *pt = map_domain_page(mfn);
         int i;
 
@@ -662,17 +662,17 @@ void _audit_domain(struct domain *d, int flags)
         if ( !shadow_mode_enabled(d) )
         {
             struct list_head *list_ent = d->page_list.next;
-            struct pfn_info *page;
+            struct page_info *page;
 
             while ( list_ent != &d->page_list )
             {
-                page = list_entry(list_ent, struct pfn_info, list);
+                page = list_entry(list_ent, struct page_info, list);
 
                 switch ( page->u.inuse.type_info & PGT_type_mask )
                 {
                 case PGT_l1_page_table:
                 case PGT_l2_page_table:
-                    scan_for_pfn_in_mfn(d, xmfn, page_to_pfn(page));
+                    scan_for_pfn_in_mfn(d, xmfn, page_to_mfn(page));
                     break;
                 default:
                     break;
@@ -720,7 +720,7 @@ void _audit_domain(struct domain *d, int flags)
 
     unsigned long mfn;
     struct list_head *list_ent;
-    struct pfn_info *page;
+    struct page_info *page;
     int errors = 0;
 
     if ( (d != current->domain) && shadow_mode_translate(d) )
@@ -751,8 +751,8 @@ void _audit_domain(struct domain *d, int flags)
         u32 page_type;
         unsigned long pfn;
 
-        page = list_entry(list_ent, struct pfn_info, list);
-        mfn = page_to_pfn(page);
+        page = list_entry(list_ent, struct page_info, list);
+        mfn = page_to_mfn(page);
         page_type = page->u.inuse.type_info & PGT_type_mask;
 
         BUG_ON(page_get_owner(page) != d);
@@ -806,7 +806,7 @@ void _audit_domain(struct domain *d, int flags)
                 printk("out of sync page mfn=%lx is not a page table\n", mfn);
                 errors++;
             }
-            pfn = __mfn_to_gpfn(d, mfn);
+            pfn = mfn_to_gmfn(d, mfn);
             if ( !__shadow_status(d, pfn, PGT_snapshot) )
             {
                 printk("out of sync page mfn=%lx doesn't have a snapshot\n",
@@ -845,8 +845,8 @@ void _audit_domain(struct domain *d, int flags)
     list_ent = d->page_list.next;
     while ( list_ent != &d->page_list )
     {
-        page = list_entry(list_ent, struct pfn_info, list);
-        mfn = page_to_pfn(page);
+        page = list_entry(list_ent, struct page_info, list);
+        mfn = page_to_mfn(page);
 
         switch ( page->u.inuse.type_info & PGT_type_mask)
         {
@@ -898,7 +898,7 @@ void _audit_domain(struct domain *d, int flags)
     if ( shadow_mode_enabled(d) )
     {
         struct shadow_status *a;
-        struct pfn_info *page;
+        struct page_info *page;
         u32 page_type;
         int i;
 
@@ -907,7 +907,7 @@ void _audit_domain(struct domain *d, int flags)
             a = &d->arch.shadow_ht[i];
             while ( a && a->gpfn_and_flags )
             {
-                page = pfn_to_page(a->smfn);
+                page = mfn_to_page(a->smfn);
                 page_type = a->gpfn_and_flags & PGT_type_mask;
 
                 switch ( page_type ) {
@@ -920,7 +920,7 @@ void _audit_domain(struct domain *d, int flags)
                     {
                         printk("Audit %d: shadow page counts wrong "
                                "mfn=%lx t=%" PRtype_info " c=%08x\n",
-                               d->domain_id, page_to_pfn(page),
+                               d->domain_id, page_to_mfn(page),
                                page->u.inuse.type_info,
                                page->count_info);
                         printk("a->gpfn_and_flags=%p\n",

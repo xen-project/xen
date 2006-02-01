@@ -29,7 +29,7 @@ typedef unsigned long page_flags_t;
  * Per-page-frame information.
  * 
  * Every architecture must ensure the following:
- *  1. 'struct pfn_info' contains a 'struct list_head list'.
+ *  1. 'struct page_info' contains a 'struct list_head list'.
  *  2. Provide a PFN_ORDER() macro for accessing the order of a free page.
  */
 #define PFN_ORDER(_pfn)	((_pfn)->u.free.order)
@@ -106,8 +106,8 @@ struct page
 /* 30-bit count of references to this frame. */
 #define PGC_count_mask      ((1U<<30)-1)
 
-#define IS_XEN_HEAP_FRAME(_pfn) ((page_to_phys(_pfn) < xenheap_phys_end) \
-				 && (page_to_phys(_pfn) >= xen_pstart))
+#define IS_XEN_HEAP_FRAME(_pfn) ((page_to_maddr(_pfn) < xenheap_phys_end) \
+				 && (page_to_maddr(_pfn) >= xen_pstart))
 
 static inline struct domain *unpickle_domptr(u32 _d)
 { return (_d == 0) ? NULL : __va(_d); }
@@ -120,7 +120,7 @@ static inline u32 pickle_domptr(struct domain *_d)
 /* Dummy now */
 #define SHARE_PFN_WITH_DOMAIN(_pfn, _dom) do { } while (0)
 
-extern struct pfn_info *frame_table;
+extern struct page_info *frame_table;
 extern unsigned long frame_table_size;
 extern struct list_head free_list;
 extern spinlock_t free_list_lock;
@@ -134,7 +134,7 @@ extern void __init init_frametable(void);
 #endif
 void add_to_domain_alloc_list(unsigned long ps, unsigned long pe);
 
-static inline void put_page(struct pfn_info *page)
+static inline void put_page(struct page_info *page)
 {
 #ifdef VALIDATE_VT	// doesn't work with non-VTI in grant tables yet
     u32 nx, x, y = page->count_info;
@@ -151,7 +151,7 @@ static inline void put_page(struct pfn_info *page)
 }
 
 /* count_info and ownership are checked atomically. */
-static inline int get_page(struct pfn_info *page,
+static inline int get_page(struct page_info *page,
                            struct domain *domain)
 {
 #ifdef VALIDATE_VT
@@ -165,7 +165,7 @@ static inline int get_page(struct pfn_info *page,
 	    unlikely((nx & PGC_count_mask) == 0) ||	/* Count overflow? */
 	    unlikely((x >> 32) != _domain)) {		/* Wrong owner? */
 	    DPRINTK("Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%08x\n",
-		page_to_pfn(page), domain, unpickle_domptr(domain),
+		page_to_mfn(page), domain, unpickle_domptr(domain),
 		x, page->u.inuse.type_info);
 	    return 0;
 	}
@@ -178,14 +178,14 @@ static inline int get_page(struct pfn_info *page,
 /* No type info now */
 #define put_page_type(page)
 #define get_page_type(page, type) 1
-static inline void put_page_and_type(struct pfn_info *page)
+static inline void put_page_and_type(struct page_info *page)
 {
     put_page_type(page);
     put_page(page);
 }
 
 
-static inline int get_page_and_type(struct pfn_info *page,
+static inline int get_page_and_type(struct page_info *page,
                                     struct domain *domain,
                                     u32 type)
 {
@@ -366,7 +366,7 @@ extern unsigned long max_mapnr;
 
 static inline void *lowmem_page_address(struct page *page)
 {
-	return __va(page_to_pfn(page) << PAGE_SHIFT);
+	return __va(page_to_mfn(page) << PAGE_SHIFT);
 }
 
 #if defined(CONFIG_HIGHMEM) && !defined(WANT_PAGE_VIRTUAL)
@@ -422,29 +422,29 @@ extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
 * here. However if it's allocated by HV, we should access it directly
 */
 
-#define __mfn_to_gpfn(_d, mfn)			\
+#define mfn_to_gmfn(_d, mfn)			\
     machine_to_phys_mapping[(mfn)]
 
-#define __gpfn_to_mfn(_d, gpfn)			\
-    __gpfn_to_mfn_foreign((_d), (gpfn))
+#define gmfn_to_mfn(_d, gpfn)			\
+    gmfn_to_mfn_foreign((_d), (gpfn))
 
 #define __gpfn_invalid(_d, gpfn)			\
 	(lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT)) & GPFN_INV_MASK)
 
-#define __gpfn_valid(_d, gpfn)	!__gpfn_invalid(_d, gpfn)
+#define __gmfn_valid(_d, gpfn)	!__gpfn_invalid(_d, gpfn)
 
 /* Return I/O type if trye */
 #define __gpfn_is_io(_d, gpfn)				\
-	(__gpfn_valid(_d, gpfn) ? 			\
+	(__gmfn_valid(_d, gpfn) ? 			\
 	(lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT)) & GPFN_IO_MASK) : 0)
 
 #define __gpfn_is_mem(_d, gpfn)				\
-	(__gpfn_valid(_d, gpfn) ?			\
+	(__gmfn_valid(_d, gpfn) ?			\
 	((lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT)) & GPFN_IO_MASK) == GPFN_MEM) : 0)
 
 
 #define __gpa_to_mpa(_d, gpa)   \
-    ((__gpfn_to_mfn((_d),(gpa)>>PAGE_SHIFT)<<PAGE_SHIFT)|((gpa)&~PAGE_MASK))
+    ((gmfn_to_mfn((_d),(gpa)>>PAGE_SHIFT)<<PAGE_SHIFT)|((gpa)&~PAGE_MASK))
 
 /* Arch-specific portion of memory_op hypercall. */
 #define arch_memory_op(op, arg) (-ENOSYS)

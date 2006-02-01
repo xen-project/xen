@@ -384,7 +384,7 @@ xlate_dev_mem_ptr (unsigned long p)
 	struct page *page;
 	char * ptr;
 
-	page = pfn_to_page(p >> PAGE_SHIFT);
+	page = mfn_to_page(p >> PAGE_SHIFT);
 	if (PageUncached(page))
 		ptr = (char *)p + __IA64_UNCACHED_OFFSET;
 	else

@@ -12,12 +12,12 @@
 
 #define steal_page_for_grant_transfer(d, p)  0
 
-#define gnttab_create_shared_mfn(d, t, i) ((void)0)
+#define gnttab_create_shared_page(d, t, i) ((void)0)
 
-#define gnttab_shared_gpfn(d, t, i)                                     \
+#define gnttab_shared_gmfn(d, t, i)                                     \
     ( ((d) == dom0) ?                                                   \
-      ((virt_to_phys((t)->shared) >> PAGE_SHIFT) + (i)) :               \
-      (map_domain_page((d), 1UL<<40, virt_to_phys((t)->shared)),        \
+      ((virt_to_maddr((t)->shared) >> PAGE_SHIFT) + (i)) :              \
+      (map_domain_page((d), 1UL<<40, virt_to_maddr((t)->shared)),       \
        1UL << (40 - PAGE_SHIFT))                                        \
     )
 

@@ -98,7 +98,7 @@ static int trampoline_exec;
 static unsigned long __init setup_trampoline(void)
 {
 	memcpy(trampoline_base, trampoline_data, trampoline_end - trampoline_data);
-	return virt_to_phys(trampoline_base);
+	return virt_to_maddr(trampoline_base);
 }
 
 /*
@@ -1038,7 +1038,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 */
 	CMOS_WRITE(0, 0xf);
 
-	*((volatile long *) phys_to_virt(0x467)) = 0;
+	*((volatile long *) maddr_to_virt(0x467)) = 0;
 
 #ifdef BOGOMIPS
 	/*

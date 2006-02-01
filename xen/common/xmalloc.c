@@ -21,8 +21,8 @@
 
 /*
  * TODO (Keir, 17/2/05):
- *  1. Use space in pfn_info to avoid xmalloc_hdr in allocated blocks.
- *  2. pfn_info points into free list to make xfree() O(1) complexity.
+ *  1. Use space in page_info to avoid xmalloc_hdr in allocated blocks.
+ *  2. page_info points into free list to make xfree() O(1) complexity.
  *  3. Perhaps make this a sub-page buddy allocator? xmalloc() == O(1).
  *     (Disadvantage is potentially greater internal fragmentation).
  */

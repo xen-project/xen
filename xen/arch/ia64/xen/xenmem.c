@@ -14,7 +14,7 @@
 #include <xen/mm.h>
 
 extern struct page *zero_page_memmap_ptr;
-struct pfn_info *frame_table;
+struct page_info *frame_table;
 unsigned long frame_table_size;
 unsigned long max_page;
 
@@ -34,7 +34,7 @@ unsigned long mpt_table_size;
 void
 paging_init (void)
 {
-	struct pfn_info *pg;
+	struct page_info *pg;
 	unsigned int mpt_order;
 	/* Create machine to physical mapping table
 	 * NOTE: similar to frame table, later we may need virtually
@@ -62,7 +62,7 @@ paging_init (void)
 void __init init_frametable(void)
 {
 	unsigned long i, pfn;
-	frame_table_size = max_page * sizeof(struct pfn_info);
+	frame_table_size = max_page * sizeof(struct page_info);
 	frame_table_size = (frame_table_size + PAGE_SIZE - 1) & PAGE_MASK;
 
 	/* Request continuous trunk from boot allocator, since HV

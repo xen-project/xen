@@ -29,7 +29,7 @@ increase_reservation(
     unsigned int   flags,
     int           *preempted)
 {
-    struct pfn_info *page;
+    struct page_info *page;
     unsigned long    i;
 
     if ( (extent_list != NULL) &&
@@ -59,7 +59,7 @@ increase_reservation(
 
         /* Inform the domain of the new page's machine address. */ 
         if ( (extent_list != NULL) &&
-             (__put_user(page_to_pfn(page), &extent_list[i]) != 0) )
+             (__put_user(page_to_mfn(page), &extent_list[i]) != 0) )
             return i;
     }
 
@@ -75,7 +75,7 @@ populate_physmap(
     unsigned int   flags,
     int           *preempted)
 {
-    struct pfn_info *page;
+    struct page_info *page;
     unsigned long    i, j, pfn, mfn;
 
     if ( !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
@@ -102,7 +102,7 @@ populate_physmap(
             goto out;
         }
 
-        mfn = page_to_pfn(page);
+        mfn = page_to_mfn(page);
 
         if ( unlikely(__get_user(pfn, &extent_list[i]) != 0) )
             goto out;
@@ -136,8 +136,8 @@ decrease_reservation(
     unsigned int   flags,
     int           *preempted)
 {
-    struct pfn_info *page;
-    unsigned long    i, j, gpfn, mfn;
+    struct page_info *page;
+    unsigned long    i, j, gmfn, mfn;
 
     if ( !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
         return 0;
@@ -150,12 +150,12 @@ decrease_reservation(
             return i;
         }
 
-        if ( unlikely(__get_user(gpfn, &extent_list[i]) != 0) )
+        if ( unlikely(__get_user(gmfn, &extent_list[i]) != 0) )
             return i;
 
         for ( j = 0; j < (1 << extent_order); j++ )
         {
-            mfn = __gpfn_to_mfn(d, gpfn + j);
+            mfn = gmfn_to_mfn(d, gmfn + j);
             if ( unlikely(mfn >= max_page) )
             {
                 DPRINTK("Domain %u page number out of range (%lx >= %lx)\n",
@@ -163,7 +163,7 @@ decrease_reservation(
                 return i;
             }
             
-            page = pfn_to_page(mfn);
+            page = mfn_to_page(mfn);
             if ( unlikely(!get_page(page, d)) )
             {
                 DPRINTK("Bad page free for domain %u\n", d->domain_id);
@@ -176,7 +176,7 @@ decrease_reservation(
             if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
                 put_page(page);
 
-            guest_physmap_remove_page(d, gpfn + j, mfn);
+            guest_physmap_remove_page(d, gmfn + j, mfn);
 
             put_page(page);
         }

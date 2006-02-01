@@ -988,7 +988,7 @@ u64 vtlb_chain_sanity(thash_cb_t *vtlb, thash_cb_t *vhpt, thash_data_t *hash)
 
 void check_vtlb_sanity(thash_cb_t *vtlb)
 {
-//    struct pfn_info *page;
+//    struct page_info *page;
     u64  hash_num, i, psr;
     static u64 check_ok_num, check_fail_num,check_invalid;
 //  void *vb1, *vb2;

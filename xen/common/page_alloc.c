@@ -132,7 +132,7 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
  */
 
 /* Initialise allocator to handle up to @max_page pages. */
-physaddr_t init_boot_allocator(physaddr_t bitmap_start)
+paddr_t init_boot_allocator(paddr_t bitmap_start)
 {
     unsigned long bitmap_size;
 
@@ -145,7 +145,7 @@ physaddr_t init_boot_allocator(physaddr_t bitmap_start)
     bitmap_size  = max_page / 8;
     bitmap_size += sizeof(unsigned long);
     bitmap_size  = round_pgup(bitmap_size);
-    alloc_bitmap = (unsigned long *)phys_to_virt(bitmap_start);
+    alloc_bitmap = (unsigned long *)maddr_to_virt(bitmap_start);
 
     /* All allocated by default. */
     memset(alloc_bitmap, ~0, bitmap_size);
@@ -153,7 +153,7 @@ physaddr_t init_boot_allocator(physaddr_t bitmap_start)
     return bitmap_start + bitmap_size;
 }
 
-void init_boot_pages(physaddr_t ps, physaddr_t pe)
+void init_boot_pages(paddr_t ps, paddr_t pe)
 {
     unsigned long bad_pfn;
     char *p;
@@ -245,13 +245,13 @@ void end_boot_allocator(void)
         if ( next_free )
             map_alloc(i+1, 1); /* prevent merging in free_heap_pages() */
         if ( curr_free )
-            free_heap_pages(pfn_dom_zone_type(i), pfn_to_page(i), 0);
+            free_heap_pages(pfn_dom_zone_type(i), mfn_to_page(i), 0);
     }
 }
 
 /* Hand the specified arbitrary page range to the specified heap zone. */
 void init_heap_pages(
-    unsigned int zone, struct pfn_info *pg, unsigned long nr_pages)
+    unsigned int zone, struct page_info *pg, unsigned long nr_pages)
 {
     unsigned long i;
 
@@ -263,10 +263,10 @@ void init_heap_pages(
 
 
 /* Allocate 2^@order contiguous pages. */
-struct pfn_info *alloc_heap_pages(unsigned int zone, unsigned int order)
+struct page_info *alloc_heap_pages(unsigned int zone, unsigned int order)
 {
     int i;
-    struct pfn_info *pg;
+    struct page_info *pg;
 
     ASSERT(zone < NR_ZONES);
 
@@ -285,7 +285,7 @@ struct pfn_info *alloc_heap_pages(unsigned int zone, unsigned int order)
     return NULL;
 
  found: 
-    pg = list_entry(heap[zone][i].next, struct pfn_info, list);
+    pg = list_entry(heap[zone][i].next, struct page_info, list);
     list_del(&pg->list);
 
     /* We may have to halve the chunk a number of times. */
@@ -296,7 +296,7 @@ struct pfn_info *alloc_heap_pages(unsigned int zone, unsigned int order)
         pg += 1 << i;
     }
     
-    map_alloc(page_to_pfn(pg), 1 << order);
+    map_alloc(page_to_mfn(pg), 1 << order);
     avail[zone] -= 1 << order;
 
     spin_unlock(&heap_lock);
@@ -307,7 +307,7 @@ struct pfn_info *alloc_heap_pages(unsigned int zone, unsigned int order)
 
 /* Free 2^@order set of pages. */
 void free_heap_pages(
-    unsigned int zone, struct pfn_info *pg, unsigned int order)
+    unsigned int zone, struct page_info *pg, unsigned int order)
 {
     unsigned long mask;
 
@@ -316,7 +316,7 @@ void free_heap_pages(
 
     spin_lock(&heap_lock);
 
-    map_free(page_to_pfn(pg), 1 << order);
+    map_free(page_to_mfn(pg), 1 << order);
     avail[zone] += 1 << order;
     
     /* Merge chunks as far as possible. */
@@ -324,10 +324,10 @@ void free_heap_pages(
     {
         mask = 1 << order;
 
-        if ( (page_to_pfn(pg) & mask) )
+        if ( (page_to_mfn(pg) & mask) )
         {
             /* Merge with predecessor block? */
-            if ( allocated_in_map(page_to_pfn(pg)-mask) ||
+            if ( allocated_in_map(page_to_mfn(pg)-mask) ||
                  (PFN_ORDER(pg-mask) != order) )
                 break;
             list_del(&(pg-mask)->list);
@@ -336,7 +336,7 @@ void free_heap_pages(
         else
         {
             /* Merge with successor block? */
-            if ( allocated_in_map(page_to_pfn(pg)+mask) ||
+            if ( allocated_in_map(page_to_mfn(pg)+mask) ||
                  (PFN_ORDER(pg+mask) != order) )
                 break;
             list_del(&(pg+mask)->list);
@@ -383,9 +383,9 @@ void scrub_heap_pages(void)
         /* Re-check page status with lock held. */
         if ( !allocated_in_map(pfn) )
         {
-            if ( IS_XEN_HEAP_FRAME(pfn_to_page(pfn)) )
+            if ( IS_XEN_HEAP_FRAME(mfn_to_page(pfn)) )
             {
-                p = page_to_virt(pfn_to_page(pfn));
+                p = page_to_virt(mfn_to_page(pfn));
                 memguard_unguard_range(p, PAGE_SIZE);
                 clear_page(p);
                 memguard_guard_range(p, PAGE_SIZE);
@@ -410,7 +410,7 @@ void scrub_heap_pages(void)
  * XEN-HEAP SUB-ALLOCATOR
  */
 
-void init_xenheap_pages(physaddr_t ps, physaddr_t pe)
+void init_xenheap_pages(paddr_t ps, paddr_t pe)
 {
     unsigned long flags;
 
@@ -419,17 +419,17 @@ void init_xenheap_pages(physaddr_t ps, physaddr_t pe)
     if ( pe <= ps )
         return;
 
-    memguard_guard_range(phys_to_virt(ps), pe - ps);
+    memguard_guard_range(maddr_to_virt(ps), pe - ps);
 
     /*
      * Yuk! Ensure there is a one-page buffer between Xen and Dom zones, to
      * prevent merging of power-of-two blocks across the zone boundary.
      */
-    if ( !IS_XEN_HEAP_FRAME(phys_to_page(pe)) )
+    if ( !IS_XEN_HEAP_FRAME(maddr_to_page(pe)) )
         pe -= PAGE_SIZE;
 
     local_irq_save(flags);
-    init_heap_pages(MEMZONE_XEN, phys_to_page(ps), (pe - ps) >> PAGE_SHIFT);
+    init_heap_pages(MEMZONE_XEN, maddr_to_page(ps), (pe - ps) >> PAGE_SHIFT);
     local_irq_restore(flags);
 }
 
@@ -437,7 +437,7 @@ void init_xenheap_pages(physaddr_t ps, physaddr_t pe)
 void *alloc_xenheap_pages(unsigned int order)
 {
     unsigned long flags;
-    struct pfn_info *pg;
+    struct page_info *pg;
     int i;
 
     local_irq_save(flags);
@@ -484,7 +484,7 @@ void free_xenheap_pages(void *v, unsigned int order)
  * DOMAIN-HEAP SUB-ALLOCATOR
  */
 
-void init_domheap_pages(physaddr_t ps, physaddr_t pe)
+void init_domheap_pages(paddr_t ps, paddr_t pe)
 {
     unsigned long s_tot, e_tot, s_dma, e_dma, s_nrm, e_nrm;
 
@@ -496,19 +496,19 @@ void init_domheap_pages(physaddr_t ps, physaddr_t pe)
     s_dma = min(s_tot, MAX_DMADOM_PFN + 1);
     e_dma = min(e_tot, MAX_DMADOM_PFN + 1);
     if ( s_dma < e_dma )
-        init_heap_pages(MEMZONE_DMADOM, pfn_to_page(s_dma), e_dma - s_dma);
+        init_heap_pages(MEMZONE_DMADOM, mfn_to_page(s_dma), e_dma - s_dma);
 
     s_nrm = max(s_tot, MAX_DMADOM_PFN + 1);
     e_nrm = max(e_tot, MAX_DMADOM_PFN + 1);
     if ( s_nrm < e_nrm )
-        init_heap_pages(MEMZONE_DOM, pfn_to_page(s_nrm), e_nrm - s_nrm);
+        init_heap_pages(MEMZONE_DOM, mfn_to_page(s_nrm), e_nrm - s_nrm);
 }
 
 
-struct pfn_info *alloc_domheap_pages(
+struct page_info *alloc_domheap_pages(
     struct domain *d, unsigned int order, unsigned int flags)
 {
-    struct pfn_info *pg = NULL;
+    struct page_info *pg = NULL;
     cpumask_t mask;
     int i;
 
@@ -560,7 +560,7 @@ struct pfn_info *alloc_domheap_pages(
         DPRINTK("...or the domain is dying (%d)\n", 
                 !!test_bit(_DOMF_dying, &d->domain_flags));
         spin_unlock(&d->page_alloc_lock);
-        free_heap_pages(pfn_dom_zone_type(page_to_pfn(pg)), pg, order);
+        free_heap_pages(pfn_dom_zone_type(page_to_mfn(pg)), pg, order);
         return NULL;
     }
 
@@ -583,7 +583,7 @@ struct pfn_info *alloc_domheap_pages(
 }
 
 
-void free_domheap_pages(struct pfn_info *pg, unsigned int order)
+void free_domheap_pages(struct page_info *pg, unsigned int order)
 {
     int            i, drop_dom_ref;
     struct domain *d = page_get_owner(pg);
@@ -624,7 +624,7 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
 
         if ( likely(!test_bit(_DOMF_dying, &d->domain_flags)) )
         {
-            free_heap_pages(pfn_dom_zone_type(page_to_pfn(pg)), pg, order);
+            free_heap_pages(pfn_dom_zone_type(page_to_mfn(pg)), pg, order);
         }
         else
         {
@@ -646,7 +646,7 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
         /* Freeing anonymous domain-heap pages. */
         for ( i = 0; i < (1 << order); i++ )
             pg[i].u.free.cpumask = CPU_MASK_NONE;
-        free_heap_pages(pfn_dom_zone_type(page_to_pfn(pg)), pg, order);
+        free_heap_pages(pfn_dom_zone_type(page_to_mfn(pg)), pg, order);
         drop_dom_ref = 0;
     }
 
@@ -669,7 +669,7 @@ unsigned long avail_domheap_pages(void)
 static void page_scrub_softirq(void)
 {
     struct list_head *ent;
-    struct pfn_info  *pg;
+    struct page_info  *pg;
     void             *p;
     int               i;
     s_time_t          start = NOW();
@@ -701,12 +701,12 @@ static void page_scrub_softirq(void)
         /* Working backwards, scrub each page in turn. */
         while ( ent != &page_scrub_list )
         {
-            pg = list_entry(ent, struct pfn_info, list);
+            pg = list_entry(ent, struct page_info, list);
             ent = ent->prev;
-            p = map_domain_page(page_to_pfn(pg));
+            p = map_domain_page(page_to_mfn(pg));
             clear_page(p);
             unmap_domain_page(p);
-            free_heap_pages(pfn_dom_zone_type(page_to_pfn(pg)), pg, 0);
+            free_heap_pages(pfn_dom_zone_type(page_to_mfn(pg)), pg, 0);
         }
     } while ( (NOW() - start) < MILLISECS(1) );
 }

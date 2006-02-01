@@ -12,12 +12,12 @@
  * Per-page-frame information.
  * 
  * Every architecture must ensure the following:
- *  1. 'struct pfn_info' contains a 'struct list_head list'.
+ *  1. 'struct page_info' contains a 'struct list_head list'.
  *  2. Provide a PFN_ORDER() macro for accessing the order of a free page.
  */
 #define PFN_ORDER(_pfn) ((_pfn)->u.free.order)
 
-struct pfn_info
+struct page_info
 {
     /* Each frame can be threaded onto a doubly-linked list. */
     struct list_head list;
@@ -121,7 +121,7 @@ struct pfn_info
 #define PageSetSlab(page)   ((void)0)
 #define PageClearSlab(page) ((void)0)
 
-#define IS_XEN_HEAP_FRAME(_pfn) (page_to_phys(_pfn) < xenheap_phys_end)
+#define IS_XEN_HEAP_FRAME(_pfn) (page_to_maddr(_pfn) < xenheap_phys_end)
 
 #if defined(__i386__)
 #define pickle_domptr(_d)   ((u32)(unsigned long)(_d))
@@ -154,20 +154,20 @@ static inline u32 pickle_domptr(struct domain *domain)
         spin_unlock(&(_dom)->page_alloc_lock);                              \
     } while ( 0 )
 
-extern struct pfn_info *frame_table;
+extern struct page_info *frame_table;
 extern unsigned long max_page;
 extern unsigned long total_pages;
 void init_frametable(void);
 
-int alloc_page_type(struct pfn_info *page, unsigned long type);
-void free_page_type(struct pfn_info *page, unsigned long type);
+int alloc_page_type(struct page_info *page, unsigned long type);
+void free_page_type(struct page_info *page, unsigned long type);
 extern void invalidate_shadow_ldt(struct vcpu *d);
 extern int shadow_remove_all_write_access(
-    struct domain *d, unsigned long gpfn, unsigned long gmfn);
+    struct domain *d, unsigned long gmfn, unsigned long mfn);
 extern u32 shadow_remove_all_access( struct domain *d, unsigned long gmfn);
 extern int _shadow_mode_refcounts(struct domain *d);
 
-static inline void put_page(struct pfn_info *page)
+static inline void put_page(struct page_info *page)
 {
     u32 nx, x, y = page->count_info;
 
@@ -182,7 +182,7 @@ static inline void put_page(struct pfn_info *page)
 }
 
 
-static inline int get_page(struct pfn_info *page,
+static inline int get_page(struct page_info *page,
                            struct domain *domain)
 {
     u32 x, nx, y = page->count_info;
@@ -199,7 +199,7 @@ static inline int get_page(struct pfn_info *page,
         {
             if ( !_shadow_mode_refcounts(domain) )
                 DPRINTK("Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%" PRtype_info "\n",
-                        page_to_pfn(page), domain, unpickle_domptr(d),
+                        page_to_mfn(page), domain, unpickle_domptr(d),
                         x, page->u.inuse.type_info);
             return 0;
         }
@@ -214,19 +214,19 @@ static inline int get_page(struct pfn_info *page,
     return 1;
 }
 
-void put_page_type(struct pfn_info *page);
-int  get_page_type(struct pfn_info *page, unsigned long type);
+void put_page_type(struct page_info *page);
+int  get_page_type(struct page_info *page, unsigned long type);
 int  get_page_from_l1e(l1_pgentry_t l1e, struct domain *d);
 void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d);
 
-static inline void put_page_and_type(struct pfn_info *page)
+static inline void put_page_and_type(struct page_info *page)
 {
     put_page_type(page);
     put_page(page);
 }
 
 
-static inline int get_page_and_type(struct pfn_info *page,
+static inline int get_page_and_type(struct page_info *page,
                                     struct domain *domain,
                                     unsigned long type)
 {

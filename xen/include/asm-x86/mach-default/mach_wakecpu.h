@@ -8,8 +8,8 @@
 
 #define WAKE_SECONDARY_VIA_INIT
 
-#define TRAMPOLINE_LOW phys_to_virt(0x467)
-#define TRAMPOLINE_HIGH phys_to_virt(0x469)
+#define TRAMPOLINE_LOW maddr_to_virt(0x467)
+#define TRAMPOLINE_HIGH maddr_to_virt(0x469)
 
 #define boot_cpu_apicid boot_cpu_physical_apicid
 

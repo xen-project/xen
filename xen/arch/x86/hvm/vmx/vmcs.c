@@ -107,8 +107,8 @@ static inline int construct_vmcs_controls(struct arch_vmx_struct *arch_vmx)
     clear_bit(PC_DEBUG_PORT, io_bitmap_a);
     memset(io_bitmap_b, 0xff, 0x1000);
 
-    error |= __vmwrite(IO_BITMAP_A, (u64) virt_to_phys(io_bitmap_a));
-    error |= __vmwrite(IO_BITMAP_B, (u64) virt_to_phys(io_bitmap_b));
+    error |= __vmwrite(IO_BITMAP_A, (u64) virt_to_maddr(io_bitmap_a));
+    error |= __vmwrite(IO_BITMAP_B, (u64) virt_to_maddr(io_bitmap_b));
 
     arch_vmx->io_bitmap_a = io_bitmap_a;
     arch_vmx->io_bitmap_b = io_bitmap_b;
@@ -405,7 +405,7 @@ static int construct_vmcs(struct arch_vmx_struct *arch_vmx,
         rc = -ENOMEM;
         goto err_out;
     }
-    vmcs_phys_ptr = (u64) virt_to_phys(arch_vmx->vmcs);
+    vmcs_phys_ptr = (u64) virt_to_maddr(arch_vmx->vmcs);
 
     if ((error = __vmpclear(vmcs_phys_ptr))) {
         printk("construct_vmcs: VMCLEAR failed\n");
@@ -474,9 +474,9 @@ int modify_vmcs(struct arch_vmx_struct *arch_vmx,
 {
     int error;
     u64 vmcs_phys_ptr, old, old_phys_ptr;
-    vmcs_phys_ptr = (u64) virt_to_phys(arch_vmx->vmcs);
+    vmcs_phys_ptr = (u64) virt_to_maddr(arch_vmx->vmcs);
 
-    old_phys_ptr = virt_to_phys(&old);
+    old_phys_ptr = virt_to_maddr(&old);
     __vmptrst(old_phys_ptr);
     if ((error = load_vmcs(arch_vmx, vmcs_phys_ptr))) {
         printk("modify_vmcs: load_vmcs failed: VMCS = %lx\n",
@@ -512,14 +512,14 @@ void arch_vmx_do_resume(struct vcpu *v)
 {
     if ( v->arch.hvm_vmx.launch_cpu == smp_processor_id() )
     {
-        load_vmcs(&v->arch.hvm_vmx, virt_to_phys(v->arch.hvm_vmx.vmcs));
+        load_vmcs(&v->arch.hvm_vmx, virt_to_maddr(v->arch.hvm_vmx.vmcs));
         vmx_do_resume(v);
         reset_stack_and_jump(vmx_asm_do_resume);
     }
     else
     {
-        __vmpclear(virt_to_phys(v->arch.hvm_vmx.vmcs));
-        load_vmcs(&v->arch.hvm_vmx, virt_to_phys(v->arch.hvm_vmx.vmcs));
+        __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+        load_vmcs(&v->arch.hvm_vmx, virt_to_maddr(v->arch.hvm_vmx.vmcs));
         vmx_do_resume(v);
         vmx_set_host_env(v);
         v->arch.hvm_vmx.launch_cpu = smp_processor_id();

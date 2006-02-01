@@ -109,7 +109,7 @@ static inline void pmd_free(pmd_t * pmd)
 static inline void
 pmd_populate(struct mm_struct *mm, pmd_t * pmd_entry, struct page *pte)
 {
-	pmd_val(*pmd_entry) = page_to_phys(pte);
+	pmd_val(*pmd_entry) = page_to_maddr(pte);
 }
 
 static inline void

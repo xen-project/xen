@@ -29,7 +29,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
     {
     case DOM0_GETPAGEFRAMEINFO:
     {
-        struct pfn_info *page;
+        struct page_info *page;
         unsigned long pfn = op->u.getpageframeinfo.pfn;
         domid_t dom = op->u.getpageframeinfo.domain;
         struct domain *d;
@@ -102,7 +102,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
      
             for( j = 0; j < k; j++ )
             {      
-                struct pfn_info *page;
+                struct page_info *page;
                 unsigned long mfn = l_arr[j];
 
                 if ( unlikely(mfn >= max_page) )
@@ -177,7 +177,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 
             for ( i = start_page; i < (start_page + nr_pages); i++ )
             {
-		pfn = __gpfn_to_mfn_foreign(d, i);
+		pfn = gmfn_to_mfn_foreign(d, i);
 
                 if ( put_user(pfn, buffer) )
                 {

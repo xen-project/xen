@@ -7,7 +7,7 @@
  */
 static inline unsigned int get_bios_ebda(void)
 {
-	unsigned int address = *(unsigned short *)phys_to_virt(0x40E);
+	unsigned int address = *(unsigned short *)maddr_to_virt(0x40E);
 	address <<= 4;
 	return address;	/* 0 means none */
 }

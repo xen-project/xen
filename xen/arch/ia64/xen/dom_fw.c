@@ -807,7 +807,7 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 		/*
 		 * This is a bad hack.  Dom0 may share other domains' memory
 		 * through a dom0 physical address.  Unfortunately, this
-		 * address may be used in phys_to_page (e.g. in the loopback
+		 * address may be used in maddr_to_page (e.g. in the loopback
 		 * driver) but when Linux initializes memory it only creates
 		 * page structs for the physical memory it knows about.  And
 		 * on ia64, only for full writeback granules.  So, we reserve

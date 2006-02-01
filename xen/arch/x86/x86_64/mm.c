@@ -30,7 +30,7 @@
 #include <asm/msr.h>
 #include <public/memory.h>
 
-struct pfn_info *alloc_xen_pagetable(void)
+struct page_info *alloc_xen_pagetable(void)
 {
     extern int early_boot;
     unsigned long pfn;
@@ -39,10 +39,10 @@ struct pfn_info *alloc_xen_pagetable(void)
         return alloc_domheap_page(NULL);
 
     pfn = alloc_boot_pages(1, 1);
-    return ((pfn == 0) ? NULL : pfn_to_page(pfn));
+    return ((pfn == 0) ? NULL : mfn_to_page(pfn));
 }
 
-void free_xen_pagetable(struct pfn_info *pg)
+void free_xen_pagetable(struct page_info *pg)
 {
     free_domheap_page(pg);
 }
@@ -78,7 +78,7 @@ void __init paging_init(void)
     unsigned long i, mpt_size;
     l3_pgentry_t *l3_ro_mpt;
     l2_pgentry_t *l2_ro_mpt;
-    struct pfn_info *pg;
+    struct page_info *pg;
 
     idle_vcpu[0]->arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
 
@@ -106,7 +106,7 @@ void __init paging_init(void)
         if ( (pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0)) == NULL )
             panic("Not enough memory for m2p table\n");
         map_pages_to_xen(
-            RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT), page_to_pfn(pg), 
+            RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT), page_to_mfn(pg), 
             1UL << PAGETABLE_ORDER,
             PAGE_HYPERVISOR);
         memset((void *)(RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)), 0x55,
@@ -140,19 +140,19 @@ void subarch_init_memory(struct domain *dom_xen)
     l2_pgentry_t l2e;
 
     /*
-     * We are rather picky about the layout of 'struct pfn_info'. The
+     * We are rather picky about the layout of 'struct page_info'. The
      * count_info and domain fields must be adjacent, as we perform atomic
      * 64-bit operations on them.
      */
-    if ( ((offsetof(struct pfn_info, u.inuse._domain) != 
-           (offsetof(struct pfn_info, count_info) + sizeof(u32)))) ||
-         ((offsetof(struct pfn_info, count_info) & 7) != 0) ||
-         (sizeof(struct pfn_info) != 40) )
+    if ( ((offsetof(struct page_info, u.inuse._domain) != 
+           (offsetof(struct page_info, count_info) + sizeof(u32)))) ||
+         ((offsetof(struct page_info, count_info) & 7) != 0) ||
+         (sizeof(struct page_info) != 40) )
     {
-        printk("Weird pfn_info layout (%ld,%ld,%ld)\n",
-               offsetof(struct pfn_info, count_info),
-               offsetof(struct pfn_info, u.inuse._domain),
-               sizeof(struct pfn_info));
+        printk("Weird page_info layout (%ld,%ld,%ld)\n",
+               offsetof(struct page_info, count_info),
+               offsetof(struct page_info, u.inuse._domain),
+               sizeof(struct page_info));
         for ( ; ; ) ;
     }
 
@@ -172,7 +172,7 @@ void subarch_init_memory(struct domain *dom_xen)
 
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         {
-            struct pfn_info *page = pfn_to_page(m2p_start_mfn + i);
+            struct page_info *page = mfn_to_page(m2p_start_mfn + i);
             page->count_info = PGC_allocated | 1;
             /* gdt to make sure it's only mapped read-only by non-privileged
                domains. */

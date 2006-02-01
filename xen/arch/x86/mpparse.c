@@ -737,7 +737,7 @@ int __init mp_get_num_processors(void)
 
 static int __init smp_scan_config (unsigned long base, unsigned long length)
 {
-	unsigned int *bp = phys_to_virt(base);
+	unsigned int *bp = maddr_to_virt(base);
 	struct intel_mp_floating *mpf;
 
 	Dprintk("Scan SMP from %p for %ld bytes.\n", bp,length);
@@ -754,9 +754,9 @@ static int __init smp_scan_config (unsigned long base, unsigned long length)
 
 			smp_found_config = 1;
 			printk(KERN_INFO "found SMP MP-table at %08lx\n",
-						virt_to_phys(mpf));
+						virt_to_maddr(mpf));
 #if 0
-			reserve_bootmem(virt_to_phys(mpf), PAGE_SIZE);
+			reserve_bootmem(virt_to_maddr(mpf), PAGE_SIZE);
 			if (mpf->mpf_physptr) {
 				/*
 				 * We cannot access to MPC table to compute

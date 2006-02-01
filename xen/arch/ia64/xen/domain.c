@@ -385,7 +385,7 @@ static struct page * map_new_domain0_page(unsigned long mpaddr)
 printk("map_new_domain0_page: start=%p,end=%p!\n",dom0_start,dom0_start+dom0_size);
 		while(1);
 	}
-	return pfn_to_page((mpaddr >> PAGE_SHIFT));
+	return mfn_to_page((mpaddr >> PAGE_SHIFT));
 }
 
 /* allocate new page for domain and map it to the specified metaphysical addr */
@@ -425,16 +425,16 @@ extern unsigned long vhpt_paddr, vhpt_pend;
 		{
 			p = alloc_domheap_page(d);
 			// zero out pages for security reasons
-			if (p) memset(__va(page_to_phys(p)),0,PAGE_SIZE);
+			if (p) memset(__va(page_to_maddr(p)),0,PAGE_SIZE);
 		}
 		if (unlikely(!p)) {
 printf("map_new_domain_page: Can't alloc!!!! Aaaargh!\n");
 			return(p);
 		}
-if (unlikely(page_to_phys(p) > vhpt_paddr && page_to_phys(p) < vhpt_pend)) {
-  printf("map_new_domain_page: reassigned vhpt page %p!!\n",page_to_phys(p));
+if (unlikely(page_to_maddr(p) > vhpt_paddr && page_to_maddr(p) < vhpt_pend)) {
+  printf("map_new_domain_page: reassigned vhpt page %p!!\n",page_to_maddr(p));
 }
-		set_pte(pte, pfn_pte(page_to_phys(p) >> PAGE_SHIFT,
+		set_pte(pte, pfn_pte(page_to_maddr(p) >> PAGE_SHIFT,
 			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
 	}
 	else printk("map_new_domain_page: mpaddr %lx already mapped!\n",mpaddr);
@@ -662,7 +662,7 @@ void loaddomainelfimage(struct domain *d, unsigned long image_start)
 #else
 		p = map_new_domain_page(d,dom_mpaddr);
 		if (unlikely(!p)) BUG();
-		dom_imva = __va(page_to_phys(p));
+		dom_imva = __va(page_to_maddr(p));
 #endif
 		if (filesz > 0) {
 			if (filesz >= PAGE_SIZE)
@@ -778,7 +778,7 @@ int construct_dom0(struct domain *d,
 	unsigned long nr_pt_pages;
 	unsigned long count;
 	unsigned long alloc_start, alloc_end;
-	struct pfn_info *page = NULL;
+	struct page_info *page = NULL;
 	start_info_t *si;
 	struct vcpu *v = d->vcpu[0];
 
@@ -915,7 +915,7 @@ int construct_dom0(struct domain *d,
 	si->nr_pages     = d->tot_pages;
 
 #if 0
-	si->shared_info  = virt_to_phys(d->shared_info);
+	si->shared_info  = virt_to_maddr(d->shared_info);
 	si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
 	//si->pt_base      = vpt_start;
 	//si->nr_pt_frames = nr_pt_pages;

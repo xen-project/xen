@@ -29,7 +29,7 @@ extern void generic_apic_probe(void);
 
 /*
  * opt_xenheap_megabytes: Size of Xen heap in megabytes, excluding the
- * pfn_info table and allocation bitmap.
+ * page_info table and allocation bitmap.
  */
 static unsigned int opt_xenheap_megabytes = XENHEAP_DEFAULT_MB;
 #if defined(CONFIG_X86_64)
@@ -153,7 +153,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, modules_length;
     unsigned long initial_images_start, initial_images_end;
-    physaddr_t s, e;
+    paddr_t s, e;
     int i, e820_warn = 0, e820_raw_nr = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,

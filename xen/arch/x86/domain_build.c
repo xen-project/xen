@@ -75,9 +75,9 @@ string_param("dom0_ioports_disable", opt_dom0_ioports_disable);
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 
-static struct pfn_info *alloc_chunk(struct domain *d, unsigned long max_pages)
+static struct page_info *alloc_chunk(struct domain *d, unsigned long max_pages)
 {
-    struct pfn_info *page;
+    struct page_info *page;
     unsigned int order;
     /*
      * Allocate up to 2MB at a time: It prevents allocating very large chunks
@@ -143,7 +143,7 @@ int construct_dom0(struct domain *d,
     unsigned long alloc_spfn;
     unsigned long alloc_epfn;
     unsigned long count;
-    struct pfn_info *page = NULL;
+    struct page_info *page = NULL;
     start_info_t *si;
     struct vcpu *v = d->vcpu[0];
     char *p;
@@ -299,12 +299,12 @@ int construct_dom0(struct domain *d,
     /* Allocate from DMA pool: PAE L3 table must be below 4GB boundary. */
     if ( (page = alloc_domheap_pages(d, order, ALLOC_DOM_DMA)) == NULL )
         panic("Not enough RAM for domain 0 allocation.\n");
-    alloc_spfn = page_to_pfn(page);
+    alloc_spfn = page_to_mfn(page);
     alloc_epfn = alloc_spfn + d->tot_pages;
 
     printk("PHYSICAL MEMORY ARRANGEMENT:\n"
-           " Dom0 alloc.:   %"PRIphysaddr"->%"PRIphysaddr,
-           pfn_to_phys(alloc_spfn), pfn_to_phys(alloc_epfn));
+           " Dom0 alloc.:   %"PRIpaddr"->%"PRIpaddr,
+           pfn_to_paddr(alloc_spfn), pfn_to_paddr(alloc_epfn));
     if ( d->tot_pages < nr_pages )
         printk(" (%lu pages to be allocated)",
                nr_pages - d->tot_pages);
@@ -334,7 +334,7 @@ int construct_dom0(struct domain *d,
     }
 
     mpt_alloc = (vpt_start - dsi.v_start) + 
-        (unsigned long)pfn_to_phys(alloc_spfn);
+        (unsigned long)pfn_to_paddr(alloc_spfn);
 
     /*
      * We're basically forcing default RPLs to 1, so that our "what privilege
@@ -400,7 +400,7 @@ int construct_dom0(struct domain *d,
         *l1tab = l1e_from_pfn(mfn, L1_PROT);
         l1tab++;
         
-        page = pfn_to_page(mfn);
+        page = mfn_to_page(mfn);
         if ( !get_page_and_type(page, d, PGT_writable_page) )
             BUG();
 
@@ -413,7 +413,7 @@ int construct_dom0(struct domain *d,
     l1tab += l1_table_offset(vpt_start);
     for ( count = 0; count < nr_pt_pages; count++ ) 
     {
-        page = pfn_to_page(l1e_get_pfn(*l1tab));
+        page = mfn_to_page(l1e_get_pfn(*l1tab));
         if ( !opt_dom0_shadow )
             l1e_remove_flags(*l1tab, _PAGE_RW);
         else
@@ -496,7 +496,7 @@ int construct_dom0(struct domain *d,
     }
 
     /* WARNING: The new domain must have its 'processor' field filled in! */
-    phys_to_page(mpt_alloc)->u.inuse.type_info = PGT_l4_page_table;
+    maddr_to_page(mpt_alloc)->u.inuse.type_info = PGT_l4_page_table;
     l4start = l4tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
     memcpy(l4tab, &idle_pg_table[0], PAGE_SIZE);
     l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
@@ -511,21 +511,21 @@ int construct_dom0(struct domain *d,
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
         {
-            phys_to_page(mpt_alloc)->u.inuse.type_info = PGT_l1_page_table;
+            maddr_to_page(mpt_alloc)->u.inuse.type_info = PGT_l1_page_table;
             l1start = l1tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
             clear_page(l1tab);
             if ( count == 0 )
                 l1tab += l1_table_offset(dsi.v_start);
             if ( !((unsigned long)l2tab & (PAGE_SIZE-1)) )
             {
-                phys_to_page(mpt_alloc)->u.inuse.type_info = PGT_l2_page_table;
+                maddr_to_page(mpt_alloc)->u.inuse.type_info = PGT_l2_page_table;
                 l2start = l2tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
                 clear_page(l2tab);
                 if ( count == 0 )
                     l2tab += l2_table_offset(dsi.v_start);
                 if ( !((unsigned long)l3tab & (PAGE_SIZE-1)) )
                 {
-                    phys_to_page(mpt_alloc)->u.inuse.type_info =
+                    maddr_to_page(mpt_alloc)->u.inuse.type_info =
                         PGT_l3_page_table;
                     l3start = l3tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
                     clear_page(l3tab);
@@ -543,7 +543,7 @@ int construct_dom0(struct domain *d,
         *l1tab = l1e_from_pfn(mfn, L1_PROT);
         l1tab++;
 
-        page = pfn_to_page(mfn);
+        page = mfn_to_page(mfn);
         if ( (page->u.inuse.type_info == 0) &&
              !get_page_and_type(page, d, PGT_writable_page) )
             BUG();
@@ -562,7 +562,7 @@ int construct_dom0(struct domain *d,
     for ( count = 0; count < nr_pt_pages; count++ ) 
     {
         l1e_remove_flags(*l1tab, _PAGE_RW);
-        page = pfn_to_page(l1e_get_pfn(*l1tab));
+        page = mfn_to_page(l1e_get_pfn(*l1tab));
 
         /* Read-only mapping + PGC_allocated + page-table page. */
         page->count_info         = PGC_allocated | 3;
@@ -640,11 +640,11 @@ int construct_dom0(struct domain *d,
     memset(si, 0, PAGE_SIZE);
     si->nr_pages = nr_pages;
 
-    si->shared_info = virt_to_phys(d->shared_info);
+    si->shared_info = virt_to_maddr(d->shared_info);
     if ( opt_dom0_translate )
     {
         si->shared_info  = max_page << PAGE_SHIFT;
-        set_pfn_from_mfn(virt_to_phys(d->shared_info) >> PAGE_SHIFT, max_page);
+        set_pfn_from_mfn(virt_to_maddr(d->shared_info) >> PAGE_SHIFT, max_page);
     }
 
     si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
@@ -672,7 +672,7 @@ int construct_dom0(struct domain *d,
             panic("Not enough RAM for DOM0 reservation.\n");
         while ( pfn < d->tot_pages )
         {
-            mfn = page_to_pfn(page);
+            mfn = page_to_mfn(page);
 #ifndef NDEBUG
 #define pfn (nr_pages - 1 - (pfn - (alloc_epfn - alloc_spfn)))
 #endif

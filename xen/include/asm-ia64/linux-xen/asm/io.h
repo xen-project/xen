@@ -80,13 +80,13 @@ extern unsigned int num_io_spaces;
  * Change virtual addresses to physical addresses and vv.
  */
 static inline unsigned long
-virt_to_phys (volatile void *address)
+virt_to_maddr (volatile void *address)
 {
 	return (unsigned long) address - PAGE_OFFSET;
 }
 
 static inline void*
-phys_to_virt (unsigned long address)
+maddr_to_virt (unsigned long address)
 {
 	return (void *) (address + PAGE_OFFSET);
 }
@@ -98,9 +98,9 @@ extern int valid_phys_addr_range (unsigned long addr, size_t *count); /* efi.c *
  * The following two macros are deprecated and scheduled for removal.
  * Please use the PCI-DMA interface defined in <asm/pci.h> instead.
  */
-#define bus_to_virt	phys_to_virt
-#define virt_to_bus	virt_to_phys
-#define page_to_bus	page_to_phys
+#define bus_to_virt	maddr_to_virt
+#define virt_to_bus	virt_to_maddr
+#define page_to_bus	page_to_maddr
 
 # endif /* KERNEL */
 

@@ -49,7 +49,7 @@
 typedef int pid_t;
 
 // now needed for xen/include/mm.h
-typedef unsigned long physaddr_t;
+typedef unsigned long paddr_t;
 // from include/linux/kernel.h
 #define ALIGN(x,a) (((x)+(a)-1)&~((a)-1))
 
@@ -212,8 +212,8 @@ void sort_main_extable(void);
 #define _atomic_read(v) ((v).counter)
 #define atomic_compareandswap(old, new, v) ((atomic_t){ cmpxchg(v, _atomic_read(old), _atomic_read(new)) })
 
-// see include/asm-ia64/mm.h, handle remaining pfn_info uses until gone
-#define pfn_info page
+// see include/asm-ia64/mm.h, handle remaining page_info uses until gone
+#define page_info page
 
 // see common/memory.c
 #define set_pfn_from_mfn(x,y)	do { } while (0)

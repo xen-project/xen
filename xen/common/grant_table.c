@@ -237,7 +237,7 @@ __gnttab_map_grant_ref(
         if ( !act->pin )
         {
             act->domid = sdom;
-            act->frame = __gpfn_to_mfn(rd, sha->frame);
+            act->frame = gmfn_to_mfn(rd, sha->frame);
         }
     }
     else if ( (act->pin & 0x80808080U) != 0 )
@@ -254,10 +254,10 @@ __gnttab_map_grant_ref(
     spin_unlock(&rd->grant_table->lock);
 
     frame = act->frame;
-    if ( unlikely(!pfn_valid(frame)) ||
+    if ( unlikely(!mfn_valid(frame)) ||
          unlikely(!((dev_hst_ro_flags & GNTMAP_readonly) ?
-                    get_page(pfn_to_page(frame), rd) :
-                    get_page_and_type(pfn_to_page(frame), rd,
+                    get_page(mfn_to_page(frame), rd) :
+                    get_page_and_type(mfn_to_page(frame), rd,
                                       PGT_writable_page))) )
         PIN_FAIL(undo_out, GNTST_general_error,
                  "Could not pin the granted frame (%lx)!\n", frame);
@@ -268,16 +268,16 @@ __gnttab_map_grant_ref(
         if ( rc != GNTST_okay )
         {
             if ( !(dev_hst_ro_flags & GNTMAP_readonly) )
-                put_page_type(pfn_to_page(frame));
-            put_page(pfn_to_page(frame));
+                put_page_type(mfn_to_page(frame));
+            put_page(mfn_to_page(frame));
             goto undo_out;
         }
 
         if ( dev_hst_ro_flags & GNTMAP_device_map )
         {
-            (void)get_page(pfn_to_page(frame), rd);
+            (void)get_page(mfn_to_page(frame), rd);
             if ( !(dev_hst_ro_flags & GNTMAP_readonly) )
-                get_page_type(pfn_to_page(frame), PGT_writable_page);
+                get_page_type(mfn_to_page(frame), PGT_writable_page);
         }
     }
 
@@ -407,12 +407,12 @@ __gnttab_unmap_grant_ref(
             if ( flags & GNTMAP_readonly )
             {
                 act->pin -= GNTPIN_devr_inc;
-                put_page(pfn_to_page(frame));
+                put_page(mfn_to_page(frame));
             }
             else
             {
                 act->pin -= GNTPIN_devw_inc;
-                put_page_and_type(pfn_to_page(frame));
+                put_page_and_type(mfn_to_page(frame));
             }
         }
     }
@@ -427,12 +427,12 @@ __gnttab_unmap_grant_ref(
         if ( flags & GNTMAP_readonly )
         {
             act->pin -= GNTPIN_hstr_inc;
-            put_page(pfn_to_page(frame));
+            put_page(mfn_to_page(frame));
         }
         else
         {
             act->pin -= GNTPIN_hstw_inc;
-            put_page_and_type(pfn_to_page(frame));
+            put_page_and_type(mfn_to_page(frame));
         }
     }
 
@@ -481,7 +481,7 @@ gnttab_setup_table(
     gnttab_setup_table_t  op;
     struct domain        *d;
     int                   i;
-    unsigned long         gpfn;
+    unsigned long         gmfn;
 
     if ( count != 1 )
         return -EINVAL;
@@ -523,8 +523,8 @@ gnttab_setup_table(
         (void)put_user(GNTST_okay, &uop->status);
         for ( i = 0; i < op.nr_frames; i++ )
         {
-            gpfn = gnttab_shared_gpfn(d, d->grant_table, i);
-            (void)put_user(gpfn, &op.frame_list[i]);
+            gmfn = gnttab_shared_gmfn(d, d->grant_table, i);
+            (void)put_user(gmfn, &op.frame_list[i]);
         }
     }
 
@@ -568,7 +568,7 @@ gnttab_dump_table(
     gt = d->grant_table;
     (void)put_user(GNTST_okay, &uop->status);
 
-    shared_mfn = virt_to_phys(d->grant_table->shared);
+    shared_mfn = virt_to_maddr(d->grant_table->shared);
 
     DPRINTK("Grant table for dom (%hu) MFN (%x)\n",
             op.dom, shared_mfn);
@@ -706,7 +706,7 @@ gnttab_transfer(
 {
     struct domain *d = current->domain;
     struct domain *e;
-    struct pfn_info *page;
+    struct page_info *page;
     int i;
     grant_entry_t *sha;
     gnttab_transfer_t gop;
@@ -723,7 +723,7 @@ gnttab_transfer(
         }
 
         /* Check the passed page frame for basic validity. */
-        if ( unlikely(!pfn_valid(gop.mfn)) )
+        if ( unlikely(!mfn_valid(gop.mfn)) )
         { 
             DPRINTK("gnttab_transfer: out-of-range %lx\n",
                     (unsigned long)gop.mfn);
@@ -731,8 +731,8 @@ gnttab_transfer(
             continue;
         }
 
-        mfn = __gpfn_to_mfn(d, gop.mfn);
-        page = pfn_to_page(mfn);
+        mfn = gmfn_to_mfn(d, gop.mfn);
+        page = mfn_to_page(mfn);
         if ( unlikely(IS_XEN_HEAP_FRAME(page)) )
         { 
             DPRINTK("gnttab_transfer: xen frame %lx\n",
@@ -895,7 +895,7 @@ grant_table_create(
     memset(t->shared, 0, NR_GRANT_FRAMES * PAGE_SIZE);
 
     for ( i = 0; i < NR_GRANT_FRAMES; i++ )
-        gnttab_create_shared_mfn(d, t, i);
+        gnttab_create_shared_page(d, t, i);
 
     /* Okay, install the structure. */
     wmb(); /* avoid races with lock-free access to d->grant_table */
@@ -952,7 +952,7 @@ gnttab_release_mappings(
             {
                 BUG_ON(!(act->pin & GNTPIN_devr_mask));
                 act->pin -= GNTPIN_devr_inc;
-                put_page(pfn_to_page(act->frame));
+                put_page(mfn_to_page(act->frame));
             }
 
             if ( map->ref_and_flags & GNTMAP_host_map )
@@ -960,7 +960,7 @@ gnttab_release_mappings(
                 BUG_ON(!(act->pin & GNTPIN_hstr_mask));
                 act->pin -= GNTPIN_hstr_inc;
                 /* Done implicitly when page tables are destroyed. */
-                /* put_page(pfn_to_page(act->frame)); */
+                /* put_page(mfn_to_page(act->frame)); */
             }
         }
         else
@@ -969,7 +969,7 @@ gnttab_release_mappings(
             {
                 BUG_ON(!(act->pin & GNTPIN_devw_mask));
                 act->pin -= GNTPIN_devw_inc;
-                put_page_and_type(pfn_to_page(act->frame));
+                put_page_and_type(mfn_to_page(act->frame));
             }
 
             if ( map->ref_and_flags & GNTMAP_host_map )
@@ -977,7 +977,7 @@ gnttab_release_mappings(
                 BUG_ON(!(act->pin & GNTPIN_hstw_mask));
                 act->pin -= GNTPIN_hstw_inc;
                 /* Done implicitly when page tables are destroyed. */
-                /* put_page_and_type(pfn_to_page(act->frame)); */
+                /* put_page_and_type(mfn_to_page(act->frame)); */
             }
 
             if ( (act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0 )

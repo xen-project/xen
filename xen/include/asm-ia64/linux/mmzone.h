@@ -289,7 +289,7 @@ typedef struct pglist_data {
 #ifdef CONFIG_FLAT_NODE_MEM_MAP
 #define pgdat_page_nr(pgdat, pagenr)	((pgdat)->node_mem_map + (pagenr))
 #else
-#define pgdat_page_nr(pgdat, pagenr)	pfn_to_page((pgdat)->node_start_pfn + (pagenr))
+#define pgdat_page_nr(pgdat, pagenr)	mfn_to_page((pgdat)->node_start_pfn + (pagenr))
 #endif
 #define nid_page_nr(nid, pagenr) 	pgdat_page_nr(NODE_DATA(nid),(pagenr))
 
@@ -536,18 +536,18 @@ static inline struct mem_section *__pfn_to_section(unsigned long pfn)
 	return __nr_to_section(pfn_to_section_nr(pfn));
 }
 
-#define pfn_to_page(pfn) 						\
+#define mfn_to_page(pfn) 						\
 ({ 									\
 	unsigned long __pfn = (pfn);					\
 	__section_mem_map_addr(__pfn_to_section(__pfn)) + __pfn;	\
 })
-#define page_to_pfn(page)						\
+#define page_to_mfn(page)						\
 ({									\
 	page - __section_mem_map_addr(__nr_to_section(			\
 		page_to_section(page)));				\
 })
 
-static inline int pfn_valid(unsigned long pfn)
+static inline int mfn_valid(unsigned long pfn)
 {
 	if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
 		return 0;
@@ -568,7 +568,7 @@ static inline int pfn_valid(unsigned long pfn)
 	NODE_DATA(pfn_to_nid(pfn));					\
 })
 
-#define early_pfn_valid(pfn)	pfn_valid(pfn)
+#define early_mfn_valid(pfn)	mfn_valid(pfn)
 void sparse_init(void);
 #else
 #define sparse_init()	do {} while (0)
@@ -580,8 +580,8 @@ void sparse_init(void);
 #define early_pfn_in_nid(pfn, nid)	(1)
 #endif
 
-#ifndef early_pfn_valid
-#define early_pfn_valid(pfn)	(1)
+#ifndef early_mfn_valid
+#define early_mfn_valid(pfn)	(1)
 #endif
 
 void memory_present(int nid, unsigned long start, unsigned long end);

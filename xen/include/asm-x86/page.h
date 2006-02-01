@@ -41,21 +41,21 @@
 #define l4e_get_pfn(x)             \
     ((unsigned long)(((x).l4 & (PADDR_MASK&PAGE_MASK)) >> PAGE_SHIFT))
 
-/* Get physical address of page mapped by pte (physaddr_t). */
+/* Get physical address of page mapped by pte (paddr_t). */
 #define l1e_get_paddr(x)           \
-    ((physaddr_t)(((x).l1 & (PADDR_MASK&PAGE_MASK))))
+    ((paddr_t)(((x).l1 & (PADDR_MASK&PAGE_MASK))))
 #define l2e_get_paddr(x)           \
-    ((physaddr_t)(((x).l2 & (PADDR_MASK&PAGE_MASK))))
+    ((paddr_t)(((x).l2 & (PADDR_MASK&PAGE_MASK))))
 #define l3e_get_paddr(x)           \
-    ((physaddr_t)(((x).l3 & (PADDR_MASK&PAGE_MASK))))
+    ((paddr_t)(((x).l3 & (PADDR_MASK&PAGE_MASK))))
 #define l4e_get_paddr(x)           \
-    ((physaddr_t)(((x).l4 & (PADDR_MASK&PAGE_MASK))))
+    ((paddr_t)(((x).l4 & (PADDR_MASK&PAGE_MASK))))
 
-/* Get pointer to info structure of page mapped by pte (struct pfn_info *). */
-#define l1e_get_page(x)           (pfn_to_page(l1e_get_pfn(x)))
-#define l2e_get_page(x)           (pfn_to_page(l2e_get_pfn(x)))
-#define l3e_get_page(x)           (pfn_to_page(l3e_get_pfn(x)))
-#define l4e_get_page(x)           (pfn_to_page(l4e_get_pfn(x)))
+/* Get pointer to info structure of page mapped by pte (struct page_info *). */
+#define l1e_get_page(x)           (mfn_to_page(l1e_get_pfn(x)))
+#define l2e_get_page(x)           (mfn_to_page(l2e_get_pfn(x)))
+#define l3e_get_page(x)           (mfn_to_page(l3e_get_pfn(x)))
+#define l4e_get_page(x)           (mfn_to_page(l4e_get_pfn(x)))
 
 /* Get pte access flags (unsigned int). */
 #define l1e_get_flags(x)           (get_pte_flags((x).l1))
@@ -81,25 +81,25 @@
 
 /* Construct a pte from a physical address and access flags. */
 #ifndef __ASSEMBLY__
-static inline l1_pgentry_t l1e_from_paddr(physaddr_t pa, unsigned int flags)
+static inline l1_pgentry_t l1e_from_paddr(paddr_t pa, unsigned int flags)
 {
     ASSERT((pa & ~(PADDR_MASK & PAGE_MASK)) == 0);
     return (l1_pgentry_t) { pa | put_pte_flags(flags) };
 }
-static inline l2_pgentry_t l2e_from_paddr(physaddr_t pa, unsigned int flags)
+static inline l2_pgentry_t l2e_from_paddr(paddr_t pa, unsigned int flags)
 {
     ASSERT((pa & ~(PADDR_MASK & PAGE_MASK)) == 0);
     return (l2_pgentry_t) { pa | put_pte_flags(flags) };
 }
 #if CONFIG_PAGING_LEVELS >= 3
-static inline l3_pgentry_t l3e_from_paddr(physaddr_t pa, unsigned int flags)
+static inline l3_pgentry_t l3e_from_paddr(paddr_t pa, unsigned int flags)
 {
     ASSERT((pa & ~(PADDR_MASK & PAGE_MASK)) == 0);
     return (l3_pgentry_t) { pa | put_pte_flags(flags) };
 }
 #endif
 #if CONFIG_PAGING_LEVELS >= 4
-static inline l4_pgentry_t l4e_from_paddr(physaddr_t pa, unsigned int flags)
+static inline l4_pgentry_t l4e_from_paddr(paddr_t pa, unsigned int flags)
 {
     ASSERT((pa & ~(PADDR_MASK & PAGE_MASK)) == 0);
     return (l4_pgentry_t) { pa | put_pte_flags(flags) };
@@ -114,10 +114,10 @@ static inline l4_pgentry_t l4e_from_paddr(physaddr_t pa, unsigned int flags)
 #define l4e_from_intpte(intpte)    ((l4_pgentry_t) { (intpte_t)(intpte) })
 
 /* Construct a pte from a page pointer and access flags. */
-#define l1e_from_page(page, flags) (l1e_from_pfn(page_to_pfn(page),(flags)))
-#define l2e_from_page(page, flags) (l2e_from_pfn(page_to_pfn(page),(flags)))
-#define l3e_from_page(page, flags) (l3e_from_pfn(page_to_pfn(page),(flags)))
-#define l4e_from_page(page, flags) (l4e_from_pfn(page_to_pfn(page),(flags)))
+#define l1e_from_page(page, flags) (l1e_from_pfn(page_to_mfn(page),(flags)))
+#define l2e_from_page(page, flags) (l2e_from_pfn(page_to_mfn(page),(flags)))
+#define l3e_from_page(page, flags) (l3e_from_pfn(page_to_mfn(page),(flags)))
+#define l4e_from_page(page, flags) (l4e_from_pfn(page_to_mfn(page),(flags)))
 
 /* Add extra flags to an existing pte. */
 #define l1e_add_flags(x, flags)    ((x).l1 |= put_pte_flags(flags))
@@ -172,7 +172,7 @@ typedef struct { u32 pfn; } pagetable_t;
 /* x86_64 */
 typedef struct { u64 pfn; } pagetable_t;
 #endif
-#define pagetable_get_paddr(x) ((physaddr_t)(x).pfn << PAGE_SHIFT)
+#define pagetable_get_paddr(x) ((paddr_t)(x).pfn << PAGE_SHIFT)
 #define pagetable_get_pfn(x)   ((x).pfn)
 #define mk_pagetable(pa)       \
     ({ pagetable_t __p; __p.pfn = (pa) >> PAGE_SHIFT; __p; })
@@ -181,16 +181,31 @@ typedef struct { u64 pfn; } pagetable_t;
 #define clear_page(_p)      memset((void *)(_p), 0, PAGE_SIZE)
 #define copy_page(_t,_f)    memcpy((void *)(_t), (void *)(_f), PAGE_SIZE)
 
-#define PAGE_OFFSET         ((unsigned long)__PAGE_OFFSET)
-#define __pa(x)             ((unsigned long)(x)-PAGE_OFFSET)
-#define __va(x)             ((void *)((unsigned long)(x)+PAGE_OFFSET))
-#define pfn_to_page(_pfn)   (frame_table + (_pfn))
-#define phys_to_page(kaddr) (frame_table + ((kaddr) >> PAGE_SHIFT))
-#define virt_to_page(kaddr) (frame_table + (__pa(kaddr) >> PAGE_SHIFT))
-#define pfn_valid(_pfn)     ((_pfn) < max_page)
+#define mfn_valid(mfn)      ((mfn) < max_page)
 
-#define pfn_to_phys(pfn)    ((physaddr_t)(pfn) << PAGE_SHIFT)
-#define phys_to_pfn(pa)     ((unsigned long)((pa) >> PAGE_SHIFT))
+/* Convert between Xen-heap virtual addresses and machine addresses. */
+#define PAGE_OFFSET         ((unsigned long)__PAGE_OFFSET)
+#define virt_to_maddr(va)   ((unsigned long)(va)-PAGE_OFFSET)
+#define maddr_to_virt(ma)   ((void *)((unsigned long)(ma)+PAGE_OFFSET))
+/* Shorthand versions of the above functions. */
+#define __pa(x)             (virt_to_maddr(x))
+#define __va(x)             (maddr_to_virt(x))
+
+/* Convert between machine frame numbers and page-info structures. */
+#define mfn_to_page(mfn)    (frame_table + (mfn))
+#define page_to_mfn(pg)     ((unsigned long)((pg) - frame_table))
+
+/* Convert between machine addresses and page-info structures. */
+#define maddr_to_page(ma)   (frame_table + ((ma) >> PAGE_SHIFT))
+#define page_to_maddr(pg)   ((paddr_t)((pg) - frame_table) << PAGE_SHIFT)
+
+/* Convert between Xen-heap virtual addresses and page-info structures. */
+#define virt_to_page(va)    (frame_table + (__pa(va) >> PAGE_SHIFT))
+#define page_to_virt(pg)    (maddr_to_virt(page_to_maddr(pg)))
+
+/* Convert between frame number and address formats.  */
+#define pfn_to_paddr(pfn)   ((paddr_t)(pfn) << PAGE_SHIFT)
+#define paddr_to_pfn(pa)    ((unsigned long)((pa) >> PAGE_SHIFT))
 
 /* High table entries are reserved by the hypervisor. */
 #if defined(CONFIG_X86_32) && !defined(CONFIG_X86_PAE)
@@ -228,9 +243,9 @@ typedef struct { u64 pfn; } pagetable_t;
                      (LINEAR_PT_OFFSET >> (PAGETABLE_ORDER<<2))))
 
 #define linear_pg_table linear_l1_table
-#define linear_l2_table(_ed) ((_ed)->arch.guest_vtable)
-#define linear_l3_table(_ed) ((_ed)->arch.guest_vl3table)
-#define linear_l4_table(_ed) ((_ed)->arch.guest_vl4table)
+#define linear_l2_table(v) ((v)->arch.guest_vtable)
+#define linear_l3_table(v) ((v)->arch.guest_vl3table)
+#define linear_l4_table(v) ((v)->arch.guest_vl4table)
 
 #ifndef __ASSEMBLY__
 #if CONFIG_PAGING_LEVELS == 3
@@ -298,7 +313,7 @@ extern void paging_init(void);
 
 #ifndef __ASSEMBLY__
 
-static inline int get_order_from_bytes(physaddr_t size)
+static inline int get_order_from_bytes(paddr_t size)
 {
     int order;
     size = (size-1) >> PAGE_SHIFT;
@@ -317,17 +332,17 @@ static inline int get_order_from_pages(unsigned long nr_pages)
 }
 
 /* Allocator functions for Xen pagetables. */
-struct pfn_info *alloc_xen_pagetable(void);
-void free_xen_pagetable(struct pfn_info *pg);
+struct page_info *alloc_xen_pagetable(void);
+void free_xen_pagetable(struct page_info *pg);
 l2_pgentry_t *virt_to_xen_l2e(unsigned long v);
 
-/* Map physical page range in Xen virtual address space. */
+/* Map machine page range in Xen virtual address space. */
 #define MAP_SMALL_PAGES (1UL<<16) /* don't use superpages for the mapping */
 int
 map_pages_to_xen(
     unsigned long virt,
-    unsigned long pfn,
-    unsigned long nr_pfns,
+    unsigned long mfn,
+    unsigned long nr_mfns,
     unsigned long flags);
 
 #endif /* !__ASSEMBLY__ */

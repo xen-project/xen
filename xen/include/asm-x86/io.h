@@ -5,52 +5,6 @@
 #include <xen/types.h>
 #include <asm/page.h>
 
-#define IO_SPACE_LIMIT 0xffff
-
-/**
- *  virt_to_phys    -   map virtual addresses to physical
- *  @address: address to remap
- *
- *  The returned physical address is the physical (CPU) mapping for
- *  the memory address given. It is only valid to use this function on
- *  addresses directly mapped or allocated via xmalloc.
- *
- *  This function does not give bus mappings for DMA transfers. In
- *  almost all conceivable cases a device driver should not be using
- *  this function
- */
-
-static inline unsigned long virt_to_phys(volatile void * address)
-{
-    return __pa(address);
-}
-
-/**
- *  phys_to_virt    -   map physical address to virtual
- *  @address: address to remap
- *
- *  The returned virtual address is a current CPU mapping for
- *  the memory address given. It is only valid to use this function on
- *  addresses that have a kernel mapping
- *
- *  This function does not handle bus mappings for DMA transfers. In
- *  almost all conceivable cases a device driver should not be using
- *  this function
- */
-
-static inline void * phys_to_virt(unsigned long address)
-{
-    return __va(address);
-}
-
-/*
- * Change "struct pfn_info" to physical address.
- */
-#define page_to_phys(page)  ((physaddr_t)(page - frame_table) << PAGE_SHIFT)
-
-#define page_to_pfn(_page)  ((unsigned long)((_page) - frame_table))
-#define page_to_virt(_page) phys_to_virt(page_to_phys(_page))
-
 /* We don't need real ioremap() on Xen/x86. */
 #define ioremap(x,l) (__va(x))
 
@@ -60,13 +14,6 @@ static inline void * phys_to_virt(unsigned long address)
 #define writeb(d,x) (*(volatile char *)(x) = (d))
 #define writew(d,x) (*(volatile short *)(x) = (d))
 #define writel(d,x) (*(volatile int *)(x) = (d))
-
-/*
- * IO bus memory addresses are also 1:1 with the physical address
- */
-#define virt_to_bus virt_to_phys
-#define bus_to_virt phys_to_virt
-#define page_to_bus page_to_phys
 
 #define __OUT1(s,x) \
 static inline void out##s(unsigned x value, unsigned short port) {

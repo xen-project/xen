@@ -34,11 +34,11 @@ unsigned int PAGE_HYPERVISOR_NOCACHE = __PAGE_HYPERVISOR_NOCACHE;
 
 static unsigned long mpt_size;
 
-struct pfn_info *alloc_xen_pagetable(void)
+struct page_info *alloc_xen_pagetable(void)
 {
     extern int early_boot;
     extern unsigned long xenheap_phys_start;
-    struct pfn_info *pg;
+    struct page_info *pg;
 
     if ( !early_boot )
     {
@@ -46,12 +46,12 @@ struct pfn_info *alloc_xen_pagetable(void)
         return ((v == NULL) ? NULL : virt_to_page(v));
     }
 
-    pg = phys_to_page(xenheap_phys_start);
+    pg = maddr_to_page(xenheap_phys_start);
     xenheap_phys_start += PAGE_SIZE;
     return pg;
 }
 
-void free_xen_pagetable(struct pfn_info *pg)
+void free_xen_pagetable(struct page_info *pg)
 {
     free_xenheap_page(page_to_virt(pg));
 }
@@ -65,7 +65,7 @@ void __init paging_init(void)
 {
     void *ioremap_pt;
     unsigned long v;
-    struct pfn_info *pg;
+    struct page_info *pg;
     int i;
 
 #ifdef CONFIG_X86_PAE
@@ -149,20 +149,20 @@ void subarch_init_memory(struct domain *dom_xen)
     unsigned int i, j;
 
     /*
-     * We are rather picky about the layout of 'struct pfn_info'. The
+     * We are rather picky about the layout of 'struct page_info'. The
      * count_info and domain fields must be adjacent, as we perform atomic
      * 64-bit operations on them. Also, just for sanity, we assert the size
      * of the structure here.
      */
-    if ( (offsetof(struct pfn_info, u.inuse._domain) != 
-          (offsetof(struct pfn_info, count_info) + sizeof(u32))) ||
-         ((offsetof(struct pfn_info, count_info) & 7) != 0) ||
-         (sizeof(struct pfn_info) != 24) )
+    if ( (offsetof(struct page_info, u.inuse._domain) != 
+          (offsetof(struct page_info, count_info) + sizeof(u32))) ||
+         ((offsetof(struct page_info, count_info) & 7) != 0) ||
+         (sizeof(struct page_info) != 24) )
     {
-        printk("Weird pfn_info layout (%ld,%ld,%d)\n",
-               offsetof(struct pfn_info, count_info),
-               offsetof(struct pfn_info, u.inuse._domain),
-               sizeof(struct pfn_info));
+        printk("Weird page_info layout (%ld,%ld,%d)\n",
+               offsetof(struct page_info, count_info),
+               offsetof(struct page_info, u.inuse._domain),
+               sizeof(struct page_info));
         BUG();
     }
 
@@ -173,7 +173,7 @@ void subarch_init_memory(struct domain *dom_xen)
             idle_pg_table_l2[l2_linear_offset(RDWR_MPT_VIRT_START) + i]);
         for ( j = 0; j < L2_PAGETABLE_ENTRIES; j++ )
         {
-            struct pfn_info *page = pfn_to_page(m2p_start_mfn + j);
+            struct page_info *page = mfn_to_page(m2p_start_mfn + j);
             page->count_info = PGC_allocated | 1;
             /* Ensure it's only mapped read-only by domains. */
             page->u.inuse.type_info = PGT_gdt_page | 1;

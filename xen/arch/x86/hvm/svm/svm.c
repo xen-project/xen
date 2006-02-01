@@ -1365,7 +1365,7 @@ static int svm_set_cr0(unsigned long value)
         /* The guest CR3 must be pointing to the guest physical. */
         if (!VALID_MFN(mfn = 
                     get_mfn_from_pfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT))
-                || !get_page(pfn_to_page(mfn), v->domain))
+                || !get_page(mfn_to_page(mfn), v->domain))
         {
             printk("Invalid CR3 value = %lx\n", v->arch.hvm_svm.cpu_cr3);
             domain_crash_synchronous(); /* need to take a clean path */
@@ -1435,7 +1435,7 @@ static int svm_set_cr0(unsigned long value)
             unsigned long old_base_mfn;
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
             if (old_base_mfn)
-                put_page(pfn_to_page(old_base_mfn));
+                put_page(mfn_to_page(old_base_mfn));
 	}
 #endif
         /* Now arch.guest_table points to machine physical. */
@@ -1571,7 +1571,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
             if (((value >> PAGE_SHIFT) > v->domain->max_pages) 
                     || !VALID_MFN(mfn = get_mfn_from_pfn(value >> PAGE_SHIFT))
-                    || !get_page(pfn_to_page(mfn), v->domain))
+                    || !get_page(mfn_to_page(mfn), v->domain))
             {
                 printk("Invalid CR3 value=%lx\n", value);
                 domain_crash_synchronous(); /* need to take a clean path */
@@ -1581,7 +1581,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
 
             if (old_base_mfn)
-                put_page(pfn_to_page(old_base_mfn));
+                put_page(mfn_to_page(old_base_mfn));
 
             update_pagetables(v);
             

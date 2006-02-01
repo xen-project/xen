@@ -446,7 +446,7 @@ virtual_memmap_init (u64 start, u64 end, void *arg)
 
 	if (map_start < map_end)
 		memmap_init_zone(map_start, (unsigned long) (map_end - map_start),
-				 args->nid, args->zone, page_to_pfn(map_start));
+				 args->nid, args->zone, page_to_mfn(map_start));
 	return 0;
 }
 
@@ -469,16 +469,16 @@ memmap_init (struct page *start, unsigned long size, int nid,
 }
 
 int
-ia64_pfn_valid (unsigned long pfn)
+ia64_mfn_valid (unsigned long pfn)
 {
 	char byte;
-	struct page *pg = pfn_to_page(pfn);
+	struct page *pg = mfn_to_page(pfn);
 
 	return     (__get_user(byte, (char *) pg) == 0)
 		&& ((((u64)pg & PAGE_MASK) == (((u64)(pg + 1) - 1) & PAGE_MASK))
 			|| (__get_user(byte, (char *) (pg + 1) - 1) == 0));
 }
-EXPORT_SYMBOL(ia64_pfn_valid);
+EXPORT_SYMBOL(ia64_mfn_valid);
 
 int
 find_largest_hole (u64 start, u64 end, void *arg)
