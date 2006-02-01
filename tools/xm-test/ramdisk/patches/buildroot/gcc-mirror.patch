@@ -1,0 +1,13 @@
+--- buildroot/toolchain/gcc/gcc-uclibc-3.x.mk~	2006-01-15 17:41:18.000000000 -0500
++++ buildroot/toolchain/gcc/gcc-uclibc-3.x.mk	2006-01-15 17:43:07.000000000 -0500
+@@ -20,8 +20,8 @@
+ GCC_VERSION:=$(strip $(GCC_VERSION))
+ 
+ #GCC_SITE:=ftp://ftp.gnu.org/gnu/gcc/releases/gcc-$(GCC_VERSION)
+-GCC_SITE:=http://mirrors.rcn.net/pub/sourceware/gcc/releases/gcc-$(GCC_VERSION)
+-
++#GCC_SITE:=http://mirrors.rcn.net/pub/sourceware/gcc/releases/gcc-$(GCC_VERSION)
++GCC_SITE:=http://mirrors.usc.edu/pub/gnu/gcc/gcc-$(GCC_VERSION)
+ #
+ # snapshots....
+ #GCC_VERSION:=3.3-20031013
