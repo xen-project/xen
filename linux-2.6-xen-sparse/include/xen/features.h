@@ -13,8 +13,8 @@
 
 extern void setup_xen_features(void);
 
-extern unsigned long xen_features[XENFEAT_NR_SUBMAPS];
+extern u8 xen_features[XENFEAT_NR_SUBMAPS * 32];
 
-#define xen_feature(flag)	(test_bit(flag, xen_features))
+#define xen_feature(flag)	(xen_features[flag])
 
 #endif /* __ASM_XEN_FEATURES_H__ */
