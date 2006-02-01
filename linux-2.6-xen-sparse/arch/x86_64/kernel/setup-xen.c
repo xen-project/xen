@@ -784,27 +784,6 @@ void __init setup_arch(char **cmdline_p)
 		int i, j, k, fpp;
 		unsigned long va;
 
-		/* Make sure we have a large enough P->M table. */
-		phys_to_machine_mapping = alloc_bootmem(
-			end_pfn * sizeof(unsigned long));
-		memset(phys_to_machine_mapping, ~0,
-		       end_pfn * sizeof(unsigned long));
-		memcpy(phys_to_machine_mapping,
-		       (unsigned long *)xen_start_info->mfn_list,
-		       xen_start_info->nr_pages * sizeof(unsigned long));
-		free_bootmem(
-			__pa(xen_start_info->mfn_list), 
-			PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
-					sizeof(unsigned long))));
-
-		/* 'Initial mapping' of old p2m table must be destroyed. */
-		for (va = xen_start_info->mfn_list;
-		     va < (xen_start_info->mfn_list +
-			   (xen_start_info->nr_pages*sizeof(unsigned long)));
-		     va += PAGE_SIZE) {
-			HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0);
-		}
-
 		/* 'Initial mapping' of initrd must be destroyed. */
 		for (va = xen_start_info->mod_start;
 		     va < (xen_start_info->mod_start+xen_start_info->mod_len);
@@ -812,30 +791,53 @@ void __init setup_arch(char **cmdline_p)
 			HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0);
 		}
 
-		/* 
-		 * Initialise the list of the frames that specify the list of 
-		 * frames that make up the p2m table. Used by save/restore
-		 */
-		pfn_to_mfn_frame_list_list = alloc_bootmem(PAGE_SIZE);
-		HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
-		  virt_to_mfn(pfn_to_mfn_frame_list_list);
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			/* Make sure we have a large enough P->M table. */
+			phys_to_machine_mapping = alloc_bootmem(
+				end_pfn * sizeof(unsigned long));
+			memset(phys_to_machine_mapping, ~0,
+			       end_pfn * sizeof(unsigned long));
+			memcpy(phys_to_machine_mapping,
+			       (unsigned long *)xen_start_info->mfn_list,
+			       xen_start_info->nr_pages * sizeof(unsigned long));
+			free_bootmem(
+				__pa(xen_start_info->mfn_list),
+				PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
+						sizeof(unsigned long))));
 
-		fpp = PAGE_SIZE/sizeof(unsigned long);
-		for ( i=0, j=0, k=-1; i< end_pfn; i+=fpp, j++ )
-		{
-			if ( (j % fpp) == 0 )
-			{
-				k++;
-				BUG_ON(k>=fpp);
-				pfn_to_mfn_frame_list[k] = alloc_bootmem(PAGE_SIZE);
-				pfn_to_mfn_frame_list_list[k] = 
-					virt_to_mfn(pfn_to_mfn_frame_list[k]);
-				j=0;
+			/* Destroyed 'initial mapping' of old p2m table. */
+			for (va = xen_start_info->mfn_list;
+			     va < (xen_start_info->mfn_list +
+				   (xen_start_info->nr_pages*sizeof(unsigned long)));
+			     va += PAGE_SIZE) {
+				HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0);
 			}
-			pfn_to_mfn_frame_list[k][j] = 
-				virt_to_mfn(&phys_to_machine_mapping[i]);
+
+			/*
+			 * Initialise the list of the frames that specify the
+			 * list of frames that make up the p2m table. Used by
+                         * save/restore.
+			 */
+			pfn_to_mfn_frame_list_list = alloc_bootmem(PAGE_SIZE);
+			HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
+				virt_to_mfn(pfn_to_mfn_frame_list_list);
+
+			fpp = PAGE_SIZE/sizeof(unsigned long);
+			for (i=0, j=0, k=-1; i< end_pfn; i+=fpp, j++) {
+				if ((j % fpp) == 0) {
+					k++;
+					BUG_ON(k>=fpp);
+					pfn_to_mfn_frame_list[k] =
+						alloc_bootmem(PAGE_SIZE);
+					pfn_to_mfn_frame_list_list[k] =
+						virt_to_mfn(pfn_to_mfn_frame_list[k]);
+					j=0;
+				}
+				pfn_to_mfn_frame_list[k][j] =
+					virt_to_mfn(&phys_to_machine_mapping[i]);
+			}
+			HYPERVISOR_shared_info->arch.max_pfn = end_pfn;
 		}
-		HYPERVISOR_shared_info->arch.max_pfn = end_pfn;
 
 	}
 

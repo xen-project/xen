@@ -35,6 +35,7 @@
 #include <asm/pgtable.h>
 #include <asm/hypervisor.h>
 #include <xen/balloon.h>
+#include <xen/features.h>
 #include <xen/interface/memory.h>
 #include <linux/module.h>
 #include <linux/percpu.h>
@@ -100,6 +101,10 @@ void xen_l4_entry_update(pgd_t *ptr, pgd_t val)
 void xen_machphys_update(unsigned long mfn, unsigned long pfn)
 {
 	mmu_update_t u;
+	if (xen_feature(XENFEAT_auto_translated_physmap)) {
+		BUG_ON(pfn != mfn);
+		return;
+	}
 	u.ptr = ((unsigned long long)mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
 	u.val = pfn;
 	BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
@@ -323,6 +328,11 @@ int xen_create_contiguous_region(
 		.domid        = DOMID_SELF
 	};
 
+	if (xen_feature(XENFEAT_auto_translated_physmap)) {
+		BUG_ON(order >= 1);
+		return 0;
+	}
+
 	scrub_pages(vstart, 1 << order);
 
 	balloon_lock(flags);
@@ -400,6 +410,9 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 		.extent_order = 0,
 		.domid        = DOMID_SELF
 	};
+
+	if (xen_feature(XENFEAT_auto_translated_physmap))
+		return;
 
 	scrub_pages(vstart, 1 << order);
 

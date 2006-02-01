@@ -89,9 +89,12 @@ void __init x86_64_start_kernel(char * real_mode_data)
 {
 	int i;
 
-        phys_to_machine_mapping = (unsigned long *)xen_start_info->mfn_list;
-        start_pfn = (__pa(xen_start_info->pt_base) >> PAGE_SHIFT) + 
-		xen_start_info->nr_pt_frames;
+	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+		phys_to_machine_mapping =
+			(unsigned long *)xen_start_info->mfn_list;
+		start_pfn = (__pa(xen_start_info->pt_base) >> PAGE_SHIFT) +
+			xen_start_info->nr_pt_frames;
+	}
 
 	for (i = 0; i < 256; i++)
 		set_intr_gate(i, early_idt_handler);

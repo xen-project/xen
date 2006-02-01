@@ -522,6 +522,9 @@ static void pgd_walk(pgd_t *pgd_base, pgprot_t flags)
 	pte_t *pte;
 	int    g, u, m;
 
+	if (xen_feature(XENFEAT_auto_translated_physmap))
+		return;
+
 	for (g = 0; g < USER_PTRS_PER_PGD; g++, pgd++) {
 		if (pgd_none(*pgd))
 			continue;

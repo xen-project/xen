@@ -295,35 +295,8 @@ static inline unsigned long pud_bad(pud_t pud)
 
 #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
 
-/*
- * We detect special mappings in one of two ways:
- *  1. If the MFN is an I/O page then Xen will set the m2p entry
- *     to be outside our maximum possible pseudophys range.
- *  2. If the MFN belongs to a different domain then we will certainly
- *     not have MFN in our p2m table. Conversely, if the page is ours,
- *     then we'll have p2m(m2p(MFN))==MFN.
- * If we detect a special mapping then it doesn't have a 'struct page'.
- * We force !pfn_valid() by returning an out-of-range pointer.
- *
- * NB. These checks require that, for any MFN that is not in our reservation,
- * there is no PFN such that p2m(PFN) == MFN. Otherwise we can get confused if
- * we are foreign-mapping the MFN, and the other domain as m2p(MFN) == PFN.
- * Yikes! Various places must poke in INVALID_P2M_ENTRY for safety.
- * 
- * NB2. When deliberately mapping foreign pages into the p2m table, you *must*
- *      use FOREIGN_FRAME(). This will cause pte_pfn() to choke on it, as we
- *      require. In all the cases we care about, the FOREIGN_FRAME bit is
- *      masked (e.g., pfn_to_mfn()) so behaviour there is correct.
- */
 #define pte_mfn(_pte) (((_pte).pte & PTE_MASK) >> PAGE_SHIFT)
-#define pte_pfn(_pte)							\
-({									\
-	unsigned long mfn = pte_mfn(_pte);                              \
-	unsigned long pfn = mfn_to_pfn(mfn);                            \
-	if ((pfn >= end_pfn) || (phys_to_machine_mapping[pfn] != mfn))\
-		pfn = end_pfn; /* special: force !pfn_valid() */	\
-	pfn;								\
-})
+#define pte_pfn(_pte) mfn_to_local_pfn(pte_mfn(_pte))
 
 #define pte_page(x)	pfn_to_page(pte_pfn(x))
 

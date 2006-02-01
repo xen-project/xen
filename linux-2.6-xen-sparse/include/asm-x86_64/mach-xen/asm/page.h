@@ -4,7 +4,10 @@
 #include <linux/config.h>
 /* #include <linux/string.h> */
 #ifndef __ASSEMBLY__
+#include <linux/kernel.h>
 #include <linux/types.h>
+#include <asm/bug.h>
+#include <xen/features.h>
 #endif
 #include <xen/interface/xen.h> 
 #include <xen/foreign_page.h>
@@ -65,15 +68,31 @@ void copy_page(void *, void *);
 
 /**** MACHINE <-> PHYSICAL CONVERSION MACROS ****/
 #define INVALID_P2M_ENTRY	(~0UL)
-#define FOREIGN_FRAME(m)	((m) | (1UL<<63))
+#define FOREIGN_FRAME_BIT	(1UL<<63)
+#define FOREIGN_FRAME(m)	((m) | FOREIGN_FRAME_BIT)
+
 extern unsigned long *phys_to_machine_mapping;
-#define pfn_to_mfn(pfn)	\
-(phys_to_machine_mapping[(unsigned int)(pfn)] & ~(1UL << 63))
-#define	phys_to_machine_mapping_valid(pfn) \
-	(phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY)
+
+static inline unsigned long pfn_to_mfn(unsigned long pfn)
+{
+	if (xen_feature(XENFEAT_auto_translated_physmap))
+		return pfn;
+	return phys_to_machine_mapping[(unsigned int)(pfn)] & ~FOREIGN_FRAME_BIT;
+}
+
+static inline int phys_to_machine_mapping_valid(unsigned long pfn)
+{
+	if (xen_feature(XENFEAT_auto_translated_physmap))
+		return 1;
+	return (phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY);
+}
+
 static inline unsigned long mfn_to_pfn(unsigned long mfn)
 {
 	unsigned long pfn;
+
+	if (xen_feature(XENFEAT_auto_translated_physmap))
+		return mfn;
 
 	/*
 	 * The array access can fail (e.g., device space beyond end of RAM).
@@ -92,8 +111,43 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
 	return pfn;
 }
 
+/*
+ * We detect special mappings in one of two ways:
+ *  1. If the MFN is an I/O page then Xen will set the m2p entry
+ *     to be outside our maximum possible pseudophys range.
+ *  2. If the MFN belongs to a different domain then we will certainly
+ *     not have MFN in our p2m table. Conversely, if the page is ours,
+ *     then we'll have p2m(m2p(MFN))==MFN.
+ * If we detect a special mapping then it doesn't have a 'struct page'.
+ * We force !pfn_valid() by returning an out-of-range pointer.
+ *
+ * NB. These checks require that, for any MFN that is not in our reservation,
+ * there is no PFN such that p2m(PFN) == MFN. Otherwise we can get confused if
+ * we are foreign-mapping the MFN, and the other domain as m2p(MFN) == PFN.
+ * Yikes! Various places must poke in INVALID_P2M_ENTRY for safety.
+ *
+ * NB2. When deliberately mapping foreign pages into the p2m table, you *must*
+ *      use FOREIGN_FRAME(). This will cause pte_pfn() to choke on it, as we
+ *      require. In all the cases we care about, the FOREIGN_FRAME bit is
+ *      masked (e.g., pfn_to_mfn()) so behaviour there is correct.
+ */
+static inline unsigned long mfn_to_local_pfn(unsigned long mfn)
+{
+	unsigned long pfn = mfn_to_pfn(mfn);
+	if ((pfn < end_pfn)
+	    && !xen_feature(XENFEAT_auto_translated_physmap)
+	    && (phys_to_machine_mapping[pfn] != mfn))
+		return end_pfn; /* force !pfn_valid() */
+	return pfn;
+}
+
+
 static inline void set_phys_to_machine(unsigned long pfn, unsigned long mfn)
 {
+	if (xen_feature(XENFEAT_auto_translated_physmap)) {
+		BUG_ON(pfn != mfn && mfn != INVALID_P2M_ENTRY);
+		return;
+	}
 	phys_to_machine_mapping[pfn] = mfn;
 }
 
@@ -207,12 +261,6 @@ static inline pgd_t __pgd(unsigned long x)
 
 #define KERNEL_TEXT_SIZE  (40UL*1024*1024)
 #define KERNEL_TEXT_START 0xffffffff80000000UL 
-
-#ifndef __ASSEMBLY__
-
-#include <asm/bug.h>
-
-#endif /* __ASSEMBLY__ */
 
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
 

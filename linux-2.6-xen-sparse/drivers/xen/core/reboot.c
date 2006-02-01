@@ -102,6 +102,12 @@ static int __do_suspend(void *ignore)
 	BUG_ON(smp_processor_id() != 0);
 	BUG_ON(in_interrupt());
 
+	if (xen_feature(XENFEAT_auto_translated_physmap)) {
+		printk(KERN_WARNING "Cannot suspend in "
+		       "auto_translated_physmap mode.\n");
+		return -EOPNOTSUPP;
+	}
+
 #if defined(CONFIG_SMP) && !defined(CONFIG_HOTPLUG_CPU)
 	if (num_online_cpus() > 1) {
 		printk(KERN_WARNING "Can't suspend SMP guests "

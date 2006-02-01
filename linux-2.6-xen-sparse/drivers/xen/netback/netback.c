@@ -236,10 +236,12 @@ static void net_rx_action(unsigned long unused)
 		netif->rx.req_cons++;
 		gop++;
 
-		mmu->ptr = ((maddr_t)new_mfn << PAGE_SHIFT) |
-			MMU_MACHPHYS_UPDATE;
-		mmu->val = __pa(vdata) >> PAGE_SHIFT;  
-		mmu++;
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			mmu->ptr = ((maddr_t)new_mfn << PAGE_SHIFT) |
+				MMU_MACHPHYS_UPDATE;
+			mmu->val = __pa(vdata) >> PAGE_SHIFT;
+			mmu++;
+		}
 
 		__skb_queue_tail(&rxq, skb);
 
@@ -251,14 +253,17 @@ static void net_rx_action(unsigned long unused)
 	if (mcl == rx_mcl)
 		return;
 
-	mcl->op = __HYPERVISOR_mmu_update;
-	mcl->args[0] = (unsigned long)rx_mmu;
-	mcl->args[1] = mmu - rx_mmu;
-	mcl->args[2] = 0;
-	mcl->args[3] = DOMID_SELF;
-	mcl++;
+	mcl[-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
 
-	mcl[-2].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
+	if (mmu - rx_mmu) {
+		mcl->op = __HYPERVISOR_mmu_update;
+		mcl->args[0] = (unsigned long)rx_mmu;
+		mcl->args[1] = mmu - rx_mmu;
+		mcl->args[2] = 0;
+		mcl->args[3] = DOMID_SELF;
+		mcl++;
+	}
+
 	ret = HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
 	BUG_ON(ret != 0);
 

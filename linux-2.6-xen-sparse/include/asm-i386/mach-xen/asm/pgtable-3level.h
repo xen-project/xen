@@ -140,14 +140,7 @@ static inline int pte_none(pte_t pte)
 
 #define pte_mfn(_pte) ( ((_pte).pte_low >> PAGE_SHIFT) |\
 		        (((_pte).pte_high & 0xfff) << (32-PAGE_SHIFT)) )
-#define pte_pfn(_pte)                                                  \
-({                                                                     \
-       unsigned long mfn = pte_mfn(_pte);                              \
-       unsigned long pfn = mfn_to_pfn(mfn);                            \
-       if ((pfn >= max_mapnr) || (phys_to_machine_mapping[pfn] != mfn))\
-               pfn = max_mapnr; /* special: force !pfn_valid() */      \
-       pfn;                                                            \
-})
+#define pte_pfn(_pte) mfn_to_local_pfn(pte_mfn(_pte))
 
 extern unsigned long long __supported_pte_mask;
 

@@ -802,14 +802,17 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		np->stats.rx_bytes += rx->status;
 
 		/* Remap the page. */
-		mmu->ptr = ((maddr_t)mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
-		mmu->val  = __pa(skb->head) >> PAGE_SHIFT;
-		mmu++;
 		MULTI_update_va_mapping(mcl, (unsigned long)skb->head,
 					pfn_pte_ma(mfn, PAGE_KERNEL), 0);
 		mcl++;
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			mmu->ptr = ((maddr_t)mfn << PAGE_SHIFT)
+				| MMU_MACHPHYS_UPDATE;
+			mmu->val = __pa(skb->head) >> PAGE_SHIFT;
+			mmu++;
 
-		set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT, mfn);
+			set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT, mfn);
+		}
 
 		__skb_queue_tail(&rxq, skb);
 	}

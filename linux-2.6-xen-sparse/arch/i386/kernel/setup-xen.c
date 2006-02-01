@@ -1310,7 +1310,9 @@ void __init setup_bootmem_allocator(void)
 	}
 #endif
 
-	phys_to_machine_mapping = (unsigned long *)xen_start_info->mfn_list;
+	if (!xen_feature(XENFEAT_auto_translated_physmap))
+		phys_to_machine_mapping =
+			(unsigned long *)xen_start_info->mfn_list;
 }
 
 /*
@@ -1746,42 +1748,43 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 	/* Make sure we have a correctly sized P->M table. */
-	phys_to_machine_mapping = alloc_bootmem_low_pages(
-		max_pfn * sizeof(unsigned long));
-	memset(phys_to_machine_mapping, ~0,
-		max_pfn * sizeof(unsigned long));
-	memcpy(phys_to_machine_mapping,
-		(unsigned long *)xen_start_info->mfn_list,
-		xen_start_info->nr_pages * sizeof(unsigned long));
-	free_bootmem(
-		__pa(xen_start_info->mfn_list), 
-		PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
-		sizeof(unsigned long))));
+	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+		phys_to_machine_mapping = alloc_bootmem_low_pages(
+		     max_pfn * sizeof(unsigned long));
+		memset(phys_to_machine_mapping, ~0,
+		       max_pfn * sizeof(unsigned long));
+		memcpy(phys_to_machine_mapping,
+		       (unsigned long *)xen_start_info->mfn_list,
+		       xen_start_info->nr_pages * sizeof(unsigned long));
+		free_bootmem(
+		     __pa(xen_start_info->mfn_list),
+		     PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
+				     sizeof(unsigned long))));
 
-	/* 
-	 * Initialise the list of the frames that specify the list of 
-	 * frames that make up the p2m table. Used by save/restore
-	 */
-	pfn_to_mfn_frame_list_list = alloc_bootmem_low_pages(PAGE_SIZE);
-	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
-	  virt_to_mfn(pfn_to_mfn_frame_list_list);
-	       
-	fpp = PAGE_SIZE/sizeof(unsigned long);
-	for ( i=0, j=0, k=-1; i< max_pfn; i+=fpp, j++ )
-	{
-	    if ( (j % fpp) == 0 )
-	    {
-	        k++;
-		BUG_ON(k>=16);
-		pfn_to_mfn_frame_list[k] = alloc_bootmem_low_pages(PAGE_SIZE);
-		pfn_to_mfn_frame_list_list[k] = 
-		    virt_to_mfn(pfn_to_mfn_frame_list[k]);
-		j=0;
-	    }
-	    pfn_to_mfn_frame_list[k][j] = 
-	        virt_to_mfn(&phys_to_machine_mapping[i]);
+		/*
+		 * Initialise the list of the frames that specify the list of
+		 * frames that make up the p2m table. Used by save/restore
+		 */
+		pfn_to_mfn_frame_list_list = alloc_bootmem_low_pages(PAGE_SIZE);
+		HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
+		     virt_to_mfn(pfn_to_mfn_frame_list_list);
+
+		fpp = PAGE_SIZE/sizeof(unsigned long);
+		for (i=0, j=0, k=-1; i< max_pfn; i+=fpp, j++) {
+			if ((j % fpp) == 0) {
+				k++;
+				BUG_ON(k>=16);
+				pfn_to_mfn_frame_list[k] =
+					alloc_bootmem_low_pages(PAGE_SIZE);
+				pfn_to_mfn_frame_list_list[k] =
+					virt_to_mfn(pfn_to_mfn_frame_list[k]);
+				j=0;
+			}
+			pfn_to_mfn_frame_list[k][j] =
+				virt_to_mfn(&phys_to_machine_mapping[i]);
+		}
+		HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
 	}
-	HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
 
 	/*
 	 * NOTE: at this point the bootmem allocator is fully available.
