@@ -31,7 +31,7 @@ $(BR_IMG): $(BR_SRC)
 	cp configs/busybox $(BR_SRC)/package/busybox/busybox.config
 	cp configs/uClibc $(BR_SRC)/toolchain/uClibc/uClibc.config
 	(for i in patches/buildroot/*.patch; do \
-	  cd $(BR_SRC) && patch -p1 <../$$i; done )
+	  cd $(BR_SRC) && patch -p1 <../$$i && cd ..; done )
 	cd $(BR_SRC) && make oldconfig && make
 
 $(XMTEST_VER_IMG): $(BR_IMG)
@@ -67,5 +67,4 @@ am_config_clean-local:
 	rm -f *~
 	rm -f initrd.img
 	rm -f $(BR_TAR)
-	rm -Rf patches make.d
 	rm -f disk.img
