@@ -58,6 +58,7 @@
 #include <asm/uaccess.h>
 #include <asm/processor.h>
 #include <asm/timer.h>
+#include <asm/sections.h>
 
 #include "mach_time.h"
 
@@ -541,22 +542,33 @@ unsigned long long sched_clock(void)
 }
 
 #if defined(CONFIG_SMP) && defined(CONFIG_FRAME_POINTER)
-#ifdef __x86_64__
-#define REG_BP rbp
-#else
-#define REG_BP ebp
-#endif
 unsigned long profile_pc(struct pt_regs *regs)
 {
 	unsigned long pc = instruction_pointer(regs);
 
+#ifdef __x86_64__
+	/* Assume the lock function has either no stack frame or only a single word.
+	   This checks if the address on the stack looks like a kernel text address.
+	   There is a small window for false hits, but in that case the tick
+	   is just accounted to the spinlock function.
+	   Better would be to write these functions in assembler again
+	   and check exactly. */
+	if (in_lock_functions(pc)) {
+		char *v = *(char **)regs->rsp;
+		if ((v >= _stext && v <= _etext) ||
+			(v >= _sinittext && v <= _einittext) ||
+			(v >= (char *)MODULES_VADDR  && v <= (char *)MODULES_END))
+			return (unsigned long)v;
+		return ((unsigned long *)regs->rsp)[1];
+	}
+#else
 	if (in_lock_functions(pc))
 		return *(unsigned long *)(regs->REG_BP + 4);
+#endif
 
 	return pc;
 }
 EXPORT_SYMBOL(profile_pc);
-#undef REG_BP
 #endif
 
 irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
