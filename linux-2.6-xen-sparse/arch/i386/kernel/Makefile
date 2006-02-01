@@ -86,6 +86,7 @@ ifdef CONFIG_XEN
 include $(srctree)/scripts/Makefile.xen
 
 obj-y += fixup.o
+microcode-$(subst m,y,$(CONFIG_MICROCODE)) := microcode-xen.o
 n-obj-xen := i8259.o doublefault.o timers/ reboot.o smpboot.o trampoline.o
 
 obj-y := $(call filterxen, $(obj-y), $(n-obj-xen))

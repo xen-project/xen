@@ -488,6 +488,7 @@ fastcall void __kprobes do_general_protection(struct pt_regs * regs,
 				tss->io_bitmap_max - thread->io_bitmap_max);
 		tss->io_bitmap_max = thread->io_bitmap_max;
 		tss->io_bitmap_base = IO_BITMAP_OFFSET;
+		tss->io_bitmap_owner = thread;
 		put_cpu();
 		return;
 	}
@@ -641,13 +642,6 @@ fastcall void do_nmi(struct pt_regs * regs, long error_code)
 	nmi_enter();
 
 	cpu = smp_processor_id();
-
-#ifdef CONFIG_HOTPLUG_CPU
-	if (!cpu_online(cpu)) {
-		nmi_exit();
-		return;
-	}
-#endif
 
 	++nmi_count(cpu);
 

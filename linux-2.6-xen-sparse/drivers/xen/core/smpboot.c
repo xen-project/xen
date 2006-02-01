@@ -126,8 +126,10 @@ static void xen_smp_intr_exit(unsigned int cpu)
 
 static void cpu_bringup(void)
 {
-	if (!cpu_isset(smp_processor_id(), cpu_initialized))
+	if (!cpu_isset(smp_processor_id(), cpu_initialized)) {
 		cpu_init();
+		preempt_disable();
+	}
 	local_irq_enable();
 	cpu_idle();
 }

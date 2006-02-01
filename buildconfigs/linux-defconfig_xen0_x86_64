@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.14-xen0
-# Tue Jan 31 16:21:00 2006
+# Linux kernel version: 2.6.15-xen0
+# Wed Feb  1 15:50:08 2006
 #
 CONFIG_X86_64=y
 CONFIG_64BIT=y
@@ -40,6 +40,7 @@ CONFIG_HOTPLUG=y
 CONFIG_KOBJECT_UEVENT=y
 # CONFIG_IKCONFIG is not set
 CONFIG_INITRAMFS_SOURCE=""
+# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
 # CONFIG_EMBEDDED is not set
 CONFIG_KALLSYMS=y
 # CONFIG_KALLSYMS_ALL is not set
@@ -69,6 +70,24 @@ CONFIG_OBSOLETE_MODPARM=y
 CONFIG_KMOD=y
 
 #
+# Block layer
+#
+# CONFIG_LBD is not set
+
+#
+# IO Schedulers
+#
+CONFIG_IOSCHED_NOOP=y
+CONFIG_IOSCHED_AS=y
+CONFIG_IOSCHED_DEADLINE=y
+CONFIG_IOSCHED_CFQ=y
+CONFIG_DEFAULT_AS=y
+# CONFIG_DEFAULT_DEADLINE is not set
+# CONFIG_DEFAULT_CFQ is not set
+# CONFIG_DEFAULT_NOOP is not set
+CONFIG_DEFAULT_IOSCHED="anticipatory"
+
+#
 # Processor type and features
 #
 # CONFIG_MK8 is not set
@@ -88,7 +107,6 @@ CONFIG_X86_LOCAL_APIC=y
 CONFIG_PREEMPT_NONE=y
 # CONFIG_PREEMPT_VOLUNTARY is not set
 # CONFIG_PREEMPT is not set
-# CONFIG_NUMA is not set
 CONFIG_ARCH_FLATMEM_ENABLE=y
 CONFIG_SELECT_MEMORY_MODEL=y
 CONFIG_FLATMEM_MANUAL=y
@@ -97,6 +115,7 @@ CONFIG_FLATMEM_MANUAL=y
 CONFIG_FLATMEM=y
 CONFIG_FLAT_NODE_MEM_MAP=y
 # CONFIG_SPARSEMEM_STATIC is not set
+CONFIG_SPLIT_PTLOCK_CPUS=4096
 CONFIG_HAVE_ARCH_EARLY_PFN_TO_NID=y
 CONFIG_SWIOTLB=y
 CONFIG_DUMMY_IOMMU=y
@@ -196,6 +215,10 @@ CONFIG_TCP_CONG_BIC=y
 CONFIG_NETFILTER=y
 # CONFIG_NETFILTER_DEBUG is not set
 CONFIG_BRIDGE_NETFILTER=y
+
+#
+# Core Netfilter Configuration
+#
 # CONFIG_NETFILTER_NETLINK is not set
 
 #
@@ -285,8 +308,11 @@ CONFIG_BRIDGE=y
 # CONFIG_NET_DIVERT is not set
 # CONFIG_ECONET is not set
 # CONFIG_WAN_ROUTER is not set
+
+#
+# QoS and/or fair queueing
+#
 # CONFIG_NET_SCHED is not set
-# CONFIG_NET_CLS_ROUTE is not set
 
 #
 # Network testing
@@ -348,16 +374,7 @@ CONFIG_BLK_DEV_RAM=y
 CONFIG_BLK_DEV_RAM_COUNT=16
 CONFIG_BLK_DEV_RAM_SIZE=16384
 CONFIG_BLK_DEV_INITRD=y
-# CONFIG_LBD is not set
 # CONFIG_CDROM_PKTCDVD is not set
-
-#
-# IO Schedulers
-#
-CONFIG_IOSCHED_NOOP=y
-CONFIG_IOSCHED_AS=y
-CONFIG_IOSCHED_DEADLINE=y
-CONFIG_IOSCHED_CFQ=y
 # CONFIG_ATA_OVER_ETH is not set
 
 #
@@ -458,6 +475,7 @@ CONFIG_SCSI_SPI_ATTRS=y
 #
 # SCSI low-level drivers
 #
+# CONFIG_ISCSI_TCP is not set
 CONFIG_BLK_DEV_3W_XXXX_RAID=y
 # CONFIG_SCSI_3W_9XXX is not set
 # CONFIG_SCSI_ACARD is not set
@@ -488,10 +506,12 @@ CONFIG_SCSI_SATA=y
 CONFIG_SCSI_ATA_PIIX=y
 # CONFIG_SCSI_SATA_MV is not set
 # CONFIG_SCSI_SATA_NV is not set
-CONFIG_SCSI_SATA_PROMISE=y
+# CONFIG_SCSI_PDC_ADMA is not set
 # CONFIG_SCSI_SATA_QSTOR is not set
+CONFIG_SCSI_SATA_PROMISE=y
 CONFIG_SCSI_SATA_SX4=y
 CONFIG_SCSI_SATA_SIL=y
+CONFIG_SCSI_SATA_SIL24=y
 # CONFIG_SCSI_SATA_SIS is not set
 # CONFIG_SCSI_SATA_ULI is not set
 # CONFIG_SCSI_SATA_VIA is not set
@@ -499,7 +519,6 @@ CONFIG_SCSI_SATA_SIL=y
 CONFIG_SCSI_SATA_INTEL_COMBINED=y
 CONFIG_SCSI_BUSLOGIC=y
 # CONFIG_SCSI_OMIT_FLASHPOINT is not set
-# CONFIG_SCSI_CPQFCTS is not set
 # CONFIG_SCSI_DMX3191D is not set
 # CONFIG_SCSI_EATA is not set
 # CONFIG_SCSI_EATA_PIO is not set
@@ -510,7 +529,6 @@ CONFIG_SCSI_BUSLOGIC=y
 # CONFIG_SCSI_INIA100 is not set
 # CONFIG_SCSI_SYM53C8XX_2 is not set
 # CONFIG_SCSI_IPR is not set
-# CONFIG_SCSI_QLOGIC_ISP is not set
 # CONFIG_SCSI_QLOGIC_FC is not set
 # CONFIG_SCSI_QLOGIC_1280 is not set
 CONFIG_SCSI_QLA2XXX=y
@@ -750,7 +768,6 @@ CONFIG_HW_CONSOLE=y
 #
 # Serial drivers
 #
-# CONFIG_SERIAL_8250 is not set
 
 #
 # Non-8250 serial port support
@@ -800,6 +817,7 @@ CONFIG_DRM_SIS=m
 # TPM devices
 #
 # CONFIG_TCG_TPM is not set
+# CONFIG_TELCLOCK is not set
 
 #
 # I2C support
@@ -884,12 +902,15 @@ CONFIG_USB_UHCI_HCD=y
 #
 # USB Device Class drivers
 #
-# CONFIG_USB_BLUETOOTH_TTY is not set
 # CONFIG_USB_ACM is not set
 # CONFIG_USB_PRINTER is not set
 
 #
-# NOTE: USB_STORAGE enables SCSI, and 'SCSI disk support' may also be needed; see USB_STORAGE Help for more information
+# NOTE: USB_STORAGE enables SCSI, and 'SCSI disk support'
+#
+
+#
+# may also be needed; see USB_STORAGE Help for more information
 #
 # CONFIG_USB_STORAGE is not set
 
@@ -989,6 +1010,7 @@ CONFIG_INFINIBAND_MTHCA_DEBUG=y
 CONFIG_INFINIBAND_IPOIB=y
 CONFIG_INFINIBAND_IPOIB_DEBUG=y
 CONFIG_INFINIBAND_IPOIB_DEBUG_DATA=y
+CONFIG_INFINIBAND_SRP=y
 
 #
 # SN Devices
@@ -1155,9 +1177,10 @@ CONFIG_NLS_ISO8859_1=y
 # CONFIG_NLS_UTF8 is not set
 
 #
-# Profiling support
+# Instrumentation Support
 #
 # CONFIG_PROFILING is not set
+# CONFIG_KPROBES is not set
 
 #
 # Kernel hacking
@@ -1173,10 +1196,10 @@ CONFIG_DETECT_SOFTLOCKUP=y
 # CONFIG_DEBUG_SPINLOCK_SLEEP is not set
 # CONFIG_DEBUG_KOBJECT is not set
 # CONFIG_DEBUG_FS is not set
+# CONFIG_DEBUG_VM is not set
 CONFIG_FRAME_POINTER=y
-# CONFIG_CHECKING is not set
+# CONFIG_RCU_TORTURE_TEST is not set
 # CONFIG_INIT_DEBUG is not set
-# CONFIG_KPROBES is not set
 
 #
 # Security options

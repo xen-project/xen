@@ -22,6 +22,8 @@
 #include <asm/bootsetup.h>
 #include <asm/setup.h>
 #include <asm/desc.h>
+#include <asm/pgtable.h>
+#include <asm/sections.h>
 
 unsigned long start_pfn;
 
@@ -30,9 +32,8 @@ unsigned long start_pfn;
 #if 0
 static void __init clear_bss(void)
 {
-	extern char __bss_start[], __bss_end[];
 	memset(__bss_start, 0,
-	       (unsigned long) __bss_end - (unsigned long) __bss_start);
+	       (unsigned long) __bss_stop - (unsigned long) __bss_start);
 }
 #endif
 
@@ -83,8 +84,6 @@ static void __init setup_boot_cpu_data(void)
 	boot_cpu_data.x86_model = (eax >> 4) & 0xf;
 	boot_cpu_data.x86_mask = eax & 0xf;
 }
-
-extern char _end[];
 
 void __init x86_64_start_kernel(char * real_mode_data)
 {

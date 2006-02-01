@@ -25,6 +25,7 @@
                 
       
 #include <linux/threads.h>
+#include <linux/init.h>
 #include <asm/desc.h>
 #include <asm/segment.h>
 #include <asm/page.h>
@@ -235,6 +236,26 @@ ENTRY(hypercall_page)
 .org 0xe000
 #ifdef CONFIG_ACPI_SLEEP
 ENTRY(wakeup_level4_pgt)
+	.quad	0x0000000000002007 + __PHYSICAL_START	/* -> level3_ident_pgt */
+	.fill	255,8,0
+	.quad	0x000000000000a007 + __PHYSICAL_START
+	.fill	254,8,0
+	/* (2^48-(2*1024*1024*1024))/(2^39) = 511 */
+	.quad	0x0000000000003007 + __PHYSICAL_START	/* -> level3_kernel_pgt */
+#endif
+
+#ifndef CONFIG_XEN
+#ifndef CONFIG_HOTPLUG_CPU
+	__INITDATA
+#endif
+	/*
+	 * This default setting generates an ident mapping at address 0x100000
+	 * and a mapping for the kernel that precisely maps virtual address
+	 * 0xffffffff80000000 to physical address 0x000000. (always using
+	 * 2Mbyte large pages provided by PAE mode)
+	 */
+	.align PAGE_SIZE
+ENTRY(boot_level4_pgt)
 	.quad	0x0000000000002007 + __PHYSICAL_START	/* -> level3_ident_pgt */
 	.fill	255,8,0
 	.quad	0x000000000000a007 + __PHYSICAL_START

@@ -2,7 +2,7 @@
 OS           = linux
 
 LINUX_SERIES = 2.6
-LINUX_VER    = 2.6.14
+LINUX_VER    = 2.6.15
 
 EXTRAVERSION ?= xen
 

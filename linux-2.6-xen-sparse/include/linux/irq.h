@@ -10,6 +10,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/smp.h>
 
 #if !defined(CONFIG_ARCH_S390)
 

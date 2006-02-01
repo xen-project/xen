@@ -10,7 +10,8 @@ menu "Serial drivers"
 # The new 8250/16550 serial drivers
 config SERIAL_8250
 	tristate "8250/16550 and compatible serial support"
-	depends on (BROKEN || !(SPARC64 || SPARC32 || XEN_DISABLE_SERIAL))
+	depends on (BROKEN || !SPARC)
+	depends on !XEN_DISABLE_SERIAL
 	select SERIAL_CORE
 	---help---
 	  This selects whether you want to include the driver for the standard
@@ -206,6 +207,14 @@ config SERIAL_8250_ACORN
 	  If you have an Atomwide Serial card or Serial Port card for an Acorn
 	  system, say Y to this option.  The driver can handle 1, 2, or 3 port
 	  cards.  If unsure, say N.
+
+config SERIAL_8250_AU1X00
+	bool "AU1X00 serial port support"
+	depends on SERIAL_8250 != n && SOC_AU1X00
+	help
+	  If you have an Au1x00 board and want to use the serial port, say Y
+	  to this option.  The driver can handle 1 or 2 serial ports.
+	  If unsure, say N.
 
 comment "Non-8250 serial port support"
 
@@ -461,14 +470,14 @@ config SERIAL_IMX_CONSOLE
 
 config SERIAL_SUNCORE
 	bool
-	depends on SPARC32 || SPARC64
+	depends on SPARC
 	select SERIAL_CORE
 	select SERIAL_CORE_CONSOLE
 	default y
 
 config SERIAL_SUNZILOG
 	tristate "Sun Zilog8530 serial support"
-	depends on SPARC32 || SPARC64
+	depends on SPARC
 	help
 	  This driver supports the Zilog8530 serial ports found on many Sparc
 	  systems.  Say Y or M if you want to be able to these serial ports.
@@ -483,7 +492,7 @@ config SERIAL_SUNZILOG_CONSOLE
 
 config SERIAL_SUNSU
 	tristate "Sun SU serial support"
-	depends on (SPARC32 || SPARC64) && PCI
+	depends on SPARC && PCI
 	help
 	  This driver supports the 8250 serial ports that run the keyboard and
 	  mouse on (PCI) UltraSPARC systems.  Say Y or M if you want to be able
@@ -499,7 +508,7 @@ config SERIAL_SUNSU_CONSOLE
 
 config SERIAL_MUX
 	tristate "Serial MUX support"
-	depends on PARISC
+	depends on GSC
 	select SERIAL_CORE
 	default y
 	---help---
@@ -539,7 +548,7 @@ config PDC_CONSOLE
 
 config SERIAL_SUNSAB
 	tristate "Sun Siemens SAB82532 serial support"
-	depends on (SPARC32 || SPARC64) && PCI
+	depends on SPARC && PCI
 	help
 	  This driver supports the Siemens SAB82532 DUSCC serial ports on newer
 	  (PCI) UltraSPARC systems.  Say Y or M if you want to be able to these

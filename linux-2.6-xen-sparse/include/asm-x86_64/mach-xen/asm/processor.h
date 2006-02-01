@@ -61,10 +61,12 @@ struct cpuinfo_x86 {
 	int	x86_cache_alignment;
 	int	x86_tlbsize;	/* number of 4K pages in DTLB/ITLB combined(in pages)*/
         __u8    x86_virt_bits, x86_phys_bits;
-	__u8	x86_num_cores;
+	__u8	x86_max_cores;	/* cpuid returned max cores value */
         __u32   x86_power; 	
 	__u32   extended_cpuid_level;	/* Max extended CPUID function supported */
 	unsigned long loops_per_jiffy;
+	__u8	apicid;
+	__u8	booted_cores;	/* number of cores as seen by OS */
 } ____cacheline_aligned;
 
 #define X86_VENDOR_INTEL 0
@@ -168,11 +170,6 @@ static inline void clear_in_cr4 (unsigned long mask)
 }
 
 
-#define load_cr3(pgdir) do {				\
-	xen_pt_switch(__pa(pgdir));			\
-	per_cpu(cur_pgd, smp_processor_id()) = pgdir;	\
-} while (/* CONSTCOND */0)
-
 /*
  * Bus types
  */
@@ -247,7 +244,6 @@ struct tss_struct {
 
 extern struct cpuinfo_x86 boot_cpu_data;
 DECLARE_PER_CPU(struct tss_struct,init_tss);
-DECLARE_PER_CPU(pgd_t *, cur_pgd);
 
 #define ARCH_MIN_TASKALIGN	16
 

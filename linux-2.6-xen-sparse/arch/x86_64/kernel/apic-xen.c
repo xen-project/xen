@@ -34,8 +34,6 @@
 #include <asm/arch_hooks.h>
 #include <asm/hpet.h>
 
-#include "io_ports.h"
-
 /*
  * Debug level
  */

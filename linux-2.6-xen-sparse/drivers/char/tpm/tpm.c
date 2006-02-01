@@ -47,6 +47,13 @@ static void user_reader_timeout(unsigned long ptr)
 {
 	struct tpm_chip *chip = (struct tpm_chip *) ptr;
 
+	schedule_work(&chip->work);
+}
+
+static void timeout_work(void * ptr)
+{
+	struct tpm_chip *chip = ptr;
+
 	down(&chip->buffer_mutex);
 	atomic_set(&chip->data_pending, 0);
 	memset(chip->data_buffer, 0, chip->vendor->buffersize);
@@ -146,8 +153,7 @@ ssize_t tpm_show_pcrs(struct device *dev, struct device_attribute *attr,
 	__be32 index;
 	char *str = buf;
 
-	struct tpm_chip *chip =
-	    pci_get_drvdata(to_pci_dev(dev));
+	struct tpm_chip *chip = dev_get_drvdata(dev);
 	if (chip == NULL)
 		return -ENODEV;
 
@@ -170,7 +176,8 @@ ssize_t tpm_show_pcrs(struct device *dev, struct device_attribute *attr,
 		    < READ_PCR_RESULT_SIZE){
 			dev_dbg(chip->dev, "A TPM error (%d) occurred"
 				" attempting to read PCR %d of %d\n",
-				be32_to_cpu(*((__be32 *) (data + 6))), i, num_pcrs);
+				be32_to_cpu(*((__be32 *) (data + 6))),
+				i, num_pcrs);
 			goto out;
 		}
 		str += sprintf(str, "PCR-%02d: ", i);
@@ -198,17 +205,15 @@ ssize_t tpm_show_pubek(struct device *dev, struct device_attribute *attr,
 	int i, rc;
 	char *str = buf;
 
-	struct tpm_chip *chip =
-	    pci_get_drvdata(to_pci_dev(dev));
+	struct tpm_chip *chip = dev_get_drvdata(dev);
 	if (chip == NULL)
 		return -ENODEV;
 
-	data = kmalloc(READ_PUBEK_RESULT_SIZE, GFP_KERNEL);
+	data = kzalloc(READ_PUBEK_RESULT_SIZE, GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
 
 	memcpy(data, readpubek, sizeof(readpubek));
-	memset(data + sizeof(readpubek), 0, 20);	/* zero nonce */
 
 	if ((len = tpm_transmit(chip, data, READ_PUBEK_RESULT_SIZE)) <
 	    READ_PUBEK_RESULT_SIZE) {
@@ -252,7 +257,6 @@ out:
 	kfree(data);
 	return rc;
 }
-
 EXPORT_SYMBOL_GPL(tpm_show_pubek);
 
 #define CAP_VER_RESULT_SIZE 18
@@ -281,8 +285,7 @@ ssize_t tpm_show_caps(struct device *dev, struct device_attribute *attr,
 	ssize_t len;
 	char *str = buf;
 
-	struct tpm_chip *chip =
-	    pci_get_drvdata(to_pci_dev(dev));
+	struct tpm_chip *chip = dev_get_drvdata(dev);
 	if (chip == NULL)
 		return -ENODEV;
 
@@ -322,7 +325,6 @@ ssize_t tpm_store_cancel(struct device *dev, struct device_attribute *attr,
 }
 EXPORT_SYMBOL_GPL(tpm_store_cancel);
 
-
 /*
  * Device file system interface to the TPM
  */
@@ -346,8 +348,7 @@ int tpm_open(struct inode *inode, struct file *file)
 	}
 
 	if (chip->num_opens) {
-		dev_dbg(chip->dev,
-			"Another process owns this TPM\n");
+		dev_dbg(chip->dev, "Another process owns this TPM\n");
 		rc = -EBUSY;
 		goto err_out;
 	}
@@ -373,7 +374,6 @@ err_out:
 	spin_unlock(&driver_lock);
 	return rc;
 }
-
 EXPORT_SYMBOL_GPL(tpm_open);
 
 int tpm_release(struct inode *inode, struct file *file)
@@ -384,16 +384,16 @@ int tpm_release(struct inode *inode, struct file *file)
 	file->private_data = NULL;
 	chip->num_opens--;
 	del_singleshot_timer_sync(&chip->user_read_timer);
+	flush_scheduled_work();
 	atomic_set(&chip->data_pending, 0);
 	put_device(chip->dev);
 	kfree(chip->data_buffer);
 	spin_unlock(&driver_lock);
 	return 0;
 }
-
 EXPORT_SYMBOL_GPL(tpm_release);
 
-ssize_t tpm_write(struct file * file, const char __user * buf,
+ssize_t tpm_write(struct file *file, const char __user *buf,
 		  size_t size, loff_t * off)
 {
 	struct tpm_chip *chip = file->private_data;
@@ -431,13 +431,14 @@ ssize_t tpm_write(struct file * file, const char __user * buf,
 
 EXPORT_SYMBOL_GPL(tpm_write);
 
-ssize_t tpm_read(struct file * file, char __user * buf,
+ssize_t tpm_read(struct file * file, char __user *buf,
 		 size_t size, loff_t * off)
 {
 	struct tpm_chip *chip = file->private_data;
 	int ret_size;
 	int pos, pending = 0;
 
+	flush_scheduled_work();
 	ret_size = atomic_read(&chip->data_pending);
 	if (ret_size > 0) {	/* relay data */
 		if (size < ret_size)
@@ -446,8 +447,7 @@ ssize_t tpm_read(struct file * file, char __user * buf,
 		pos = atomic_read(&chip->data_position);
 
 		down(&chip->buffer_mutex);
-		if (copy_to_user
-		    ((void __user *) buf, &chip->data_buffer[pos], ret_size)) {
+		if (copy_to_user(buf, &chip->data_buffer[pos], ret_size)) {
 			ret_size = -EFAULT;
 		} else {
 			pending = atomic_read(&chip->data_pending) - ret_size;
@@ -466,7 +466,6 @@ ssize_t tpm_read(struct file * file, char __user * buf,
 
 	return ret_size;
 }
-
 EXPORT_SYMBOL_GPL(tpm_read);
 
 void tpm_remove_hardware(struct device *dev)
@@ -490,13 +489,13 @@ void tpm_remove_hardware(struct device *dev)
 
 	sysfs_remove_group(&dev->kobj, chip->vendor->attr_group);
 
-	dev_mask[chip->dev_num / TPM_NUM_MASK_ENTRIES ] &= !(1 << (chip->dev_num % TPM_NUM_MASK_ENTRIES));
+	dev_mask[chip->dev_num / TPM_NUM_MASK_ENTRIES ] &=
+		~(1 << (chip->dev_num % TPM_NUM_MASK_ENTRIES));
 
 	kfree(chip);
 
 	put_device(dev);
 }
-
 EXPORT_SYMBOL_GPL(tpm_remove_hardware);
 
 static u8 savestate[] = {
@@ -509,32 +508,30 @@ static u8 savestate[] = {
  * We are about to suspend. Save the TPM state
  * so that it can be restored.
  */
-int tpm_pm_suspend(struct pci_dev *pci_dev, pm_message_t pm_state)
+int tpm_pm_suspend(struct device *dev, pm_message_t pm_state)
 {
-	struct tpm_chip *chip = pci_get_drvdata(pci_dev);
+	struct tpm_chip *chip = dev_get_drvdata(dev);
 	if (chip == NULL)
 		return -ENODEV;
 
 	tpm_transmit(chip, savestate, sizeof(savestate));
 	return 0;
 }
-
 EXPORT_SYMBOL_GPL(tpm_pm_suspend);
 
 /*
  * Resume from a power safe. The BIOS already restored
  * the TPM state.
  */
-int tpm_pm_resume(struct pci_dev *pci_dev)
+int tpm_pm_resume(struct device *dev)
 {
-	struct tpm_chip *chip = pci_get_drvdata(pci_dev);
+	struct tpm_chip *chip = dev_get_drvdata(dev);
 
 	if (chip == NULL)
 		return -ENODEV;
 
 	return 0;
 }
-
 EXPORT_SYMBOL_GPL(tpm_pm_resume);
 
 /*
@@ -544,8 +541,7 @@ EXPORT_SYMBOL_GPL(tpm_pm_resume);
  * upon errant exit from this function specific probe function should call
  * pci_disable_device
  */
-int tpm_register_hardware(struct device *dev,
-			  struct tpm_vendor_specific *entry)
+int tpm_register_hardware(struct device *dev, struct tpm_vendor_specific *entry)
 {
 #define DEVNAME_SIZE 7
 
@@ -554,15 +550,15 @@ int tpm_register_hardware(struct device *dev,
 	int i, j;
 
 	/* Driver specific per-device data */
-	chip = kmalloc(sizeof(*chip), GFP_KERNEL);
+	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
-
-	memset(chip, 0, sizeof(struct tpm_chip));
 
 	init_MUTEX(&chip->buffer_mutex);
 	init_MUTEX(&chip->tpm_mutex);
 	INIT_LIST_HEAD(&chip->list);
+
+	INIT_WORK(&chip->work, timeout_work, chip);
 
 	init_timer(&chip->user_read_timer);
 	chip->user_read_timer.function = user_reader_timeout;
@@ -589,8 +585,7 @@ int tpm_register_hardware(struct device *dev,
 
 dev_num_search_complete:
 	if (chip->dev_num < 0) {
-		dev_err(dev,
-			"No available tpm device numbers\n");
+		dev_err(dev, "No available tpm device numbers\n");
 		kfree(chip);
 		return -ENODEV;
 	} else if (chip->dev_num == 0)
@@ -628,7 +623,6 @@ dev_num_search_complete:
 
 	return 0;
 }
-
 EXPORT_SYMBOL_GPL(tpm_register_hardware);
 
 MODULE_AUTHOR("Leendert van Doorn (leendert@watson.ibm.com)");

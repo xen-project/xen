@@ -19,11 +19,11 @@
  * 
  */
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
+#include <linux/platform_device.h>
 
 enum tpm_timeout {
 	TPM_TIMEOUT = 5,	/* msecs */
@@ -76,6 +76,7 @@ struct tpm_chip {
 	struct semaphore buffer_mutex;
 
 	struct timer_list user_read_timer;	/* user needs to claim result */
+	struct work_struct work;
 	struct semaphore tpm_mutex;	/* tpm is processing */
 
 	struct tpm_vendor_specific *vendor;

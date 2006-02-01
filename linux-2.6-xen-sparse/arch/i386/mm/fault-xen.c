@@ -22,7 +22,6 @@
 #include <linux/highmem.h>
 #include <linux/module.h>
 #include <linux/kprobes.h>
-#include <linux/percpu.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -30,8 +29,6 @@
 #include <asm/kdebug.h>
 
 extern void die(const char *,struct pt_regs *,long);
-
-DEFINE_PER_CPU(pgd_t *, cur_pgd);
 
 /*
  * Unlock any spinlocks which will prevent us from getting the
@@ -111,7 +108,7 @@ static inline unsigned long get_segment_eip(struct pt_regs *regs,
 		desc = (void *)desc + (seg & ~7);
 	} else {
 		/* Must disable preemption while reading the GDT. */
-		desc = (u32 *)get_cpu_gdt_table(get_cpu());
+ 		desc = (u32 *)get_cpu_gdt_table(get_cpu());
 		desc = (void *)desc + (seg & ~7);
 	}
 
@@ -223,10 +220,7 @@ static void dump_fault_path(unsigned long address)
 	unsigned long *p, page;
 	unsigned long mfn; 
 
-	preempt_disable();
-	page = __pa(per_cpu(cur_pgd, smp_processor_id()));
-	preempt_enable();
-
+	page = read_cr3();
 	p  = (unsigned long *)__va(page);
 	p += (address >> 30) * 2;
 	printk(KERN_ALERT "%08lx -> *pde = %08lx:%08lx\n", page, p[1], p[0]);
@@ -256,13 +250,8 @@ static void dump_fault_path(unsigned long address)
 {
 	unsigned long page;
 
-	preempt_disable();
-	page = ((unsigned long *) per_cpu(cur_pgd, smp_processor_id()))
-	    [address >> 22];
-	preempt_enable();
-
-	page = ((unsigned long *) per_cpu(cur_pgd, get_cpu()))
-	    [address >> 22];
+	page = read_cr3();
+	page = ((unsigned long *) __va(page))[address >> 22];
 	printk(KERN_ALERT "*pde = ma %08lx pa %08lx\n", page,
 	       machine_to_phys(page));
 	/*
@@ -304,8 +293,8 @@ fastcall void __kprobes do_page_fault(struct pt_regs *regs,
 	unsigned long address;
 	int write, si_code;
 
-	address = HYPERVISOR_shared_info->vcpu_info[
-		smp_processor_id()].arch.cr2;
+	/* get the address */
+        address = read_cr2();
 
 	/* Set the "privileged fault" bit to something sane. */
 	error_code &= ~4;
@@ -582,14 +571,14 @@ vmalloc_fault:
 		 * an interrupt in the middle of a task switch..
 		 */
 		int index = pgd_index(address);
+		unsigned long pgd_paddr;
 		pgd_t *pgd, *pgd_k;
 		pud_t *pud, *pud_k;
 		pmd_t *pmd, *pmd_k;
 		pte_t *pte_k;
 
-		preempt_disable();
-		pgd = index + per_cpu(cur_pgd, smp_processor_id());
-		preempt_enable();
+		pgd_paddr = read_cr3();
+		pgd = index + (pgd_t *)__va(pgd_paddr);
 		pgd_k = init_mm.pgd + index;
 
 		if (!pgd_present(*pgd_k))

@@ -24,7 +24,6 @@
 #include <linux/compiler.h>
 #include <linux/module.h>
 #include <linux/kprobes.h>
-#include <linux/percpu.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -35,8 +34,6 @@
 #include <asm/kdebug.h>
 #include <asm-generic/sections.h>
 #include <asm/kdebug.h>
-
-DEFINE_PER_CPU(pgd_t *, cur_pgd);
 
 void bust_spinlocks(int yes)
 {
@@ -149,9 +146,10 @@ void dump_pagetable(unsigned long address)
 	pmd_t *pmd;
 	pte_t *pte;
 
-	preempt_disable();
-	pgd = (pgd_t *)per_cpu(cur_pgd, smp_processor_id());
-	preempt_enable();
+	asm("movq %%cr3,%0" : "=r" (pgd));
+	pgd = (pgd_t *)machine_to_phys((maddr_t)pgd);
+
+	pgd = __va((unsigned long)pgd & PHYSICAL_PAGE_MASK); 
 	pgd += pgd_index(address);
 	printk("PGD %lx ", pgd_val(*pgd));
 	if (bad_address(pgd)) goto bad;
@@ -252,9 +250,9 @@ static int vmalloc_fault(unsigned long address)
 
 	/* On Xen the line below does not always work. Needs investigating! */
 	/*pgd = pgd_offset(current->mm ?: &init_mm, address);*/
-	preempt_disable();
-	pgd = (pgd_t *)per_cpu(cur_pgd, smp_processor_id());
-	preempt_enable();
+	asm("movq %%cr3,%0" : "=r" (pgd));
+	pgd = (pgd_t *)machine_to_phys((maddr_t)pgd);
+	pgd = __va((unsigned long)pgd & PHYSICAL_PAGE_MASK);
 	pgd += pgd_index(address);
 	pgd_ref = pgd_offset_k(address);
 	if (pgd_none(*pgd_ref))
@@ -330,22 +328,9 @@ asmlinkage void __kprobes do_page_fault(struct pt_regs *regs,
 	if (!user_mode(regs))
 		error_code &= ~4; /* means kernel */
 
-#ifdef CONFIG_CHECKING
-	{ 
-		unsigned long gs; 
-		struct x8664_pda *pda = cpu_pda + stack_smp_processor_id(); 
-		rdmsrl(MSR_GS_BASE, gs); 
-		if (gs != (unsigned long)pda) { 
-			wrmsrl(MSR_GS_BASE, pda); 
-			printk("page_fault: wrong gs %lx expected %p\n", gs, pda);
-		}
-	}
-#endif
-
 	/* get the address */
 	address = HYPERVISOR_shared_info->vcpu_info[
 		smp_processor_id()].arch.cr2;
-
 	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
 					SIGSEGV) == NOTIFY_STOP)
 		return;
@@ -595,3 +580,10 @@ do_sigbus:
 	force_sig_info(SIGBUS, &info, tsk);
 	return;
 }
+
+static int __init enable_pagefaulttrace(char *str)
+{
+	page_fault_trace = 1;
+	return 0;
+}
+__setup("pagefaulttrace", enable_pagefaulttrace);

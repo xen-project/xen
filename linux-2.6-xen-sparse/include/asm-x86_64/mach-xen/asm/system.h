@@ -11,6 +11,12 @@
 #ifdef __KERNEL__
 
 #ifdef CONFIG_SMP
+#define __vcpu_id smp_processor_id()
+#else
+#define __vcpu_id 0
+#endif
+
+#ifdef CONFIG_SMP
 #define LOCK_PREFIX "lock ; "
 #else
 #define LOCK_PREFIX ""
@@ -325,7 +331,7 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 do {									\
 	vcpu_info_t *_vcpu;						\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	_vcpu->evtchn_upcall_mask = 1;					\
 	preempt_enable_no_resched();					\
 	barrier();							\
@@ -336,7 +342,7 @@ do {									\
 	vcpu_info_t *_vcpu;						\
 	barrier();							\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	_vcpu->evtchn_upcall_mask = 0;					\
 	barrier(); /* unmask then check (avoid races) */		\
 	if ( unlikely(_vcpu->evtchn_upcall_pending) )			\
@@ -348,7 +354,7 @@ do {									\
 do {									\
 	vcpu_info_t *_vcpu;						\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	(x) = _vcpu->evtchn_upcall_mask;				\
 	preempt_enable();						\
 } while (0)
@@ -358,7 +364,7 @@ do {									\
 	vcpu_info_t *_vcpu;						\
 	barrier();							\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	if ((_vcpu->evtchn_upcall_mask = (x)) == 0) {			\
 		barrier(); /* unmask then check (avoid races) */	\
 		if ( unlikely(_vcpu->evtchn_upcall_pending) )		\
@@ -374,7 +380,7 @@ do {									\
 do {									\
 	vcpu_info_t *_vcpu;						\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	(x) = _vcpu->evtchn_upcall_mask;				\
 	_vcpu->evtchn_upcall_mask = 1;					\
 	preempt_enable_no_resched();					\
@@ -394,7 +400,7 @@ void cpu_idle_wait(void);
 ({	int ___x;							\
 	vcpu_info_t *_vcpu;						\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	___x = (_vcpu->evtchn_upcall_mask != 0);			\
 	preempt_enable_no_resched();					\
 	___x; })

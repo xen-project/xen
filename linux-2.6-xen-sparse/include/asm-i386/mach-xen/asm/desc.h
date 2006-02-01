@@ -15,6 +15,8 @@
 
 extern struct desc_struct cpu_gdt_table[NR_CPUS][GDT_ENTRIES];
 
+#define get_cpu_gdt_table(_cpu) ((struct desc_struct *)cpu_gdt_descr[(_cpu)].address)
+
 DECLARE_PER_CPU(unsigned char, cpu_16bit_stack[CPU_16BIT_STACK_SIZE]);
 
 struct Xgt_desc_struct {
@@ -37,8 +39,6 @@ extern struct Xgt_desc_struct idt_descr, cpu_gdt_descr[NR_CPUS];
 #define store_idt(dtr) __asm__ ("sidt %0":"=m" (*dtr))
 #define store_tr(tr) __asm__ ("str %0":"=mr" (tr))
 #define store_ldt(ldt) __asm__ ("sldt %0":"=mr" (ldt))
-
-#define get_cpu_gdt_table(_cpu) ((struct desc_struct *)cpu_gdt_descr[(_cpu)].address)
 
 /*
  * This is the ldt that every process will get unless we need
@@ -68,8 +68,7 @@ static inline void __set_tss_desc(unsigned int cpu, unsigned int entry, void *ad
 
 static inline void set_ldt_desc(unsigned int cpu, void *addr, unsigned int size)
 {
-	_set_tssldt_desc(&get_cpu_gdt_table(cpu)[GDT_ENTRY_LDT],
-	    (int)addr, ((size << 3)-1), 0x82);
+	_set_tssldt_desc(&get_cpu_gdt_table(cpu)[GDT_ENTRY_LDT], (int)addr, ((size << 3)-1), 0x82);
 }
 
 #define LDT_entry_a(info) \

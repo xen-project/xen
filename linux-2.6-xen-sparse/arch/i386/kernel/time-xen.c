@@ -69,8 +69,6 @@
 
 #include <asm/arch_hooks.h>
 
-#include "io_ports.h"
-
 #include <xen/evtchn.h>
 
 #if defined (__i386__)
@@ -78,10 +76,6 @@
 #endif
 
 int pit_latch_buggy;              /* extern */
-
-u64 jiffies_64 = INITIAL_JIFFIES;
-
-EXPORT_SYMBOL(jiffies_64);
 
 #if defined(__x86_64__)
 unsigned long vxtime_hz = PIT_TICK_RATE;

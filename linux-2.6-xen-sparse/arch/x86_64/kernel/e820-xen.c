@@ -23,6 +23,7 @@
 #include <asm/e820.h>
 #include <asm/proto.h>
 #include <asm/bootsetup.h>
+#include <asm/sections.h>
 #include <xen/interface/memory.h>
 
 unsigned long pci_mem_start = 0xaeedbabe;
@@ -54,7 +55,6 @@ void __init add_memory_region(unsigned long start, unsigned long size, int type)
 }
 
 #ifndef CONFIG_XEN
-extern char _end[];
 
 /* 
  * end_pfn only includes RAM, while end_pfn_map includes all e820 entries.

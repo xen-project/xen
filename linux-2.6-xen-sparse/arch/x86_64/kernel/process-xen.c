@@ -96,10 +96,13 @@ void xen_idle(void)
 	if (need_resched()) {
 		local_irq_enable();
 	} else {
+		clear_thread_flag(TIF_POLLING_NRFLAG);
+		smp_mb__after_clear_bit();
 		stop_hz_timer();
 		/* Blocking includes an implicit local_irq_enable(). */
 		HYPERVISOR_sched_op(SCHEDOP_block, 0);
 		start_hz_timer();
+		set_thread_flag(TIF_POLLING_NRFLAG);
 	}
 }
 
@@ -143,6 +146,8 @@ static inline void play_dead(void)
  */
 void cpu_idle (void)
 {
+	set_thread_flag(TIF_POLLING_NRFLAG);
+
 	/* endless idle loop with no priority at all */
 	while (1) {
 		while (!need_resched()) {
@@ -156,7 +161,9 @@ void cpu_idle (void)
 			xen_idle();
 		}
 
+		preempt_enable_no_resched();
 		schedule();
+		preempt_disable();
 	}
 }
 
@@ -180,7 +187,8 @@ void cpu_idle_wait(void)
 	do {
 		ssleep(1);
 		for_each_online_cpu(cpu) {
-			if (cpu_isset(cpu, map) && !per_cpu(cpu_idle_state, cpu))
+			if (cpu_isset(cpu, map) &&
+					!per_cpu(cpu_idle_state, cpu))
 				cpu_clear(cpu, map);
 		}
 		cpus_and(map, map, cpu_online_map);
@@ -208,7 +216,8 @@ void __show_regs(struct pt_regs * regs)
 		system_utsname.version);
 	printk("RIP: %04lx:[<%016lx>] ", regs->cs & 0xffff, regs->rip);
 	printk_address(regs->rip); 
-	printk("\nRSP: %04lx:%016lx  EFLAGS: %08lx\n", regs->ss, regs->rsp, regs->eflags);
+	printk("\nRSP: %04lx:%016lx  EFLAGS: %08lx\n", regs->ss, regs->rsp,
+		regs->eflags);
 	printk("RAX: %016lx RBX: %016lx RCX: %016lx\n",
 	       regs->rax, regs->rbx, regs->rcx);
 	printk("RDX: %016lx RSI: %016lx RDI: %016lx\n",
@@ -282,13 +291,6 @@ void flush_thread(void)
 	struct task_struct *tsk = current;
 	struct thread_info *t = current_thread_info();
 
-	/*
-	 * Remove function-return probe instances associated with this task
-	 * and put them back on the free list. Do not insert an exit probe for
-	 * this function, it will be disabled by kprobe_flush_task if you do.
-	 */
-	kprobe_flush_task(tsk);
-
 	if (t->flags & _TIF_ABI_PENDING)
 		t->flags ^= (_TIF_ABI_PENDING | _TIF_IA32);
 
@@ -361,15 +363,14 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 	struct pt_regs * childregs;
 	struct task_struct *me = current;
 
-	childregs = ((struct pt_regs *) (THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
-
+	childregs = ((struct pt_regs *)
+			(THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
 	*childregs = *regs;
 
 	childregs->rax = 0;
 	childregs->rsp = rsp;
-	if (rsp == ~0UL) {
+	if (rsp == ~0UL)
 		childregs->rsp = (unsigned long)childregs;
-	}
 
 	p->thread.rsp = (unsigned long) childregs;
 	p->thread.rsp0 = (unsigned long) (childregs+1);
@@ -391,7 +392,8 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 			p->thread.io_bitmap_max = 0;
 			return -ENOMEM;
 		}
-		memcpy(p->thread.io_bitmap_ptr, me->thread.io_bitmap_ptr, IO_BITMAP_BYTES);
+		memcpy(p->thread.io_bitmap_ptr, me->thread.io_bitmap_ptr,
+				IO_BITMAP_BYTES);
 	} 
 
 	/*
@@ -432,7 +434,8 @@ static inline void __save_init_fpu( struct task_struct *tsk )
  * - fold all the options into a flag word and test it with a single test.
  * - could test fs/gs bitsliced
  */
-struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *next_p)
+struct task_struct *
+__switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
 	struct thread_struct *prev = &prev_p->thread,
 				 *next = &next_p->thread;
@@ -530,7 +533,8 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 	prev->userrsp = read_pda(oldrsp); 
 	write_pda(oldrsp, next->userrsp); 
 	write_pda(pcurrent, next_p); 
-	write_pda(kernelstack, (unsigned long)next_p->thread_info + THREAD_SIZE - PDA_STACKOFFSET);
+	write_pda(kernelstack,
+	    (unsigned long)next_p->thread_info + THREAD_SIZE - PDA_STACKOFFSET);
 
 	/*
 	 * Now maybe reload the debug registers
@@ -591,7 +595,9 @@ asmlinkage long sys_fork(struct pt_regs *regs)
 	return do_fork(SIGCHLD, regs->rsp, regs, 0, NULL, NULL);
 }
 
-asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, void __user *parent_tid, void __user *child_tid, struct pt_regs *regs)
+asmlinkage long
+sys_clone(unsigned long clone_flags, unsigned long newsp,
+	  void __user *parent_tid, void __user *child_tid, struct pt_regs *regs)
 {
 	if (!newsp)
 		newsp = regs->rsp;
@@ -627,7 +633,8 @@ unsigned long get_wchan(struct task_struct *p)
 		return 0;
 	fp = *(u64 *)(p->thread.rsp);
 	do { 
-		if (fp < (unsigned long)stack || fp > (unsigned long)stack+THREAD_SIZE)
+		if (fp < (unsigned long)stack ||
+		    fp > (unsigned long)stack+THREAD_SIZE)
 			return 0; 
 		rip = *(u64 *)(fp+8); 
 		if (!in_sched_functions(rip))
@@ -662,8 +669,9 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 			task->thread.gsindex = 0;
 			task->thread.gs = addr;
 			if (doit) {
-		load_gs_index(0);
-                ret = HYPERVISOR_set_segment_base(SEGBASE_GS_USER, addr);
+				load_gs_index(0);
+				ret = HYPERVISOR_set_segment_base(
+					SEGBASE_GS_USER, addr);
 			} 
 		}
 		put_cpu();
@@ -680,7 +688,7 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 			set_32bit_tls(task, FS_TLS, addr);
 			if (doit) { 
 				load_TLS(&task->thread, cpu); 
-				asm volatile("mov %0,%%fs" :: "r" (FS_TLS_SEL));
+				asm volatile("movl %0,%%fs" :: "r"(FS_TLS_SEL));
 			}
 			task->thread.fsindex = FS_TLS_SEL;
 			task->thread.fs = 0;
@@ -690,9 +698,9 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 			if (doit) {
 				/* set the selector to 0 to not confuse
 				   __switch_to */
-		asm volatile("mov %0,%%fs" :: "r" (0));
-                                ret = HYPERVISOR_set_segment_base(SEGBASE_FS, addr);
-
+				asm volatile("movl %0,%%fs" :: "r" (0));
+                                ret = HYPERVISOR_set_segment_base(SEGBASE_FS,
+								  addr);
 			}
 		}
 		put_cpu();
@@ -701,9 +709,9 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 		unsigned long base; 
 		if (task->thread.fsindex == FS_TLS_SEL)
 			base = read_32bit_tls(task, FS_TLS);
-		else if (doit) {
+		else if (doit)
 			rdmsrl(MSR_FS_BASE, base);
-		} else
+		else
 			base = task->thread.fs;
 		ret = put_user(base, (unsigned long __user *)addr); 
 		break; 
@@ -712,9 +720,9 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 		unsigned long base;
 		if (task->thread.gsindex == GS_TLS_SEL)
 			base = read_32bit_tls(task, GS_TLS);
-		else if (doit) {
+		else if (doit)
 			rdmsrl(MSR_KERNEL_GS_BASE, base);
-		} else
+		else
 			base = task->thread.gs;
 		ret = put_user(base, (unsigned long __user *)addr); 
 		break;

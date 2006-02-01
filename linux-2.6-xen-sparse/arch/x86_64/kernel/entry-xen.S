@@ -609,7 +609,14 @@ retint_kernel:
 	CFI_ENDPROC
 	.endm
 
-#if 0
+#ifndef CONFIG_XEN
+ENTRY(thermal_interrupt)
+	apicinterrupt THERMAL_APIC_VECTOR,smp_thermal_interrupt
+
+ENTRY(threshold_interrupt)
+	apicinterrupt THRESHOLD_APIC_VECTOR,mce_threshold_interrupt
+
+#ifdef CONFIG_SMP	
 ENTRY(reschedule_interrupt)
 	apicinterrupt RESCHEDULE_VECTOR,smp_reschedule_interrupt
 
@@ -630,6 +637,7 @@ ENTRY(invalidate_interrupt\num)
 ENTRY(call_function_interrupt)
 	apicinterrupt CALL_FUNCTION_VECTOR,smp_call_function_interrupt
 #endif
+#endif /* !CONFIG_XEN */
 
 #ifdef CONFIG_X86_LOCAL_APIC	
 ENTRY(apic_timer_interrupt)

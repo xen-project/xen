@@ -1114,6 +1114,19 @@ out:
 	return ret;
 }
 
+/* Take action when hardware reception checksum errors are detected. */
+#ifdef CONFIG_BUG
+void netdev_rx_csum_fault(struct net_device *dev)
+{
+	if (net_ratelimit()) {
+		printk(KERN_ERR "%s: hw csum failure.\n", 
+			dev ? dev->name : "<unknown>");
+		dump_stack();
+	}
+}
+EXPORT_SYMBOL(netdev_rx_csum_fault);
+#endif
+
 #ifdef CONFIG_HIGHMEM
 /* Actually, we should eliminate this check as soon as we know, that:
  * 1. IOMMU is present and allows to map all the memory.
@@ -2766,6 +2779,20 @@ int register_netdevice(struct net_device *dev)
 		printk("%s: Dropping NETIF_F_TSO since no SG feature.\n",
 		       dev->name);
 		dev->features &= ~NETIF_F_TSO;
+	}
+	if (dev->features & NETIF_F_UFO) {
+		if (!(dev->features & NETIF_F_HW_CSUM)) {
+			printk(KERN_ERR "%s: Dropping NETIF_F_UFO since no "
+					"NETIF_F_HW_CSUM feature.\n",
+							dev->name);
+			dev->features &= ~NETIF_F_UFO;
+		}
+		if (!(dev->features & NETIF_F_SG)) {
+			printk(KERN_ERR "%s: Dropping NETIF_F_UFO since no "
+					"NETIF_F_SG feature.\n",
+					dev->name);
+			dev->features &= ~NETIF_F_UFO;
+		}
 	}
 
 	/*

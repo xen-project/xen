@@ -60,6 +60,12 @@ extern void mm_pin(struct mm_struct *mm);
 extern void mm_unpin(struct mm_struct *mm);
 void mm_pin_all(void);
 
+static inline void load_cr3(pgd_t *pgd)
+{
+	asm volatile("movq %0,%%cr3" :: "r" (phys_to_machine(__pa(pgd))) :
+		     "memory");
+}
+
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, 
 			     struct task_struct *tsk)
 {
@@ -79,7 +85,6 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		set_bit(cpu, &next->cpu_vm_mask);
 
 		/* load_cr3(next->pgd) */
-		per_cpu(cur_pgd, smp_processor_id()) = next->pgd;
 		op->cmd = MMUEXT_NEW_BASEPTR;
 		op->arg1.mfn = pfn_to_mfn(__pa(next->pgd) >> PAGE_SHIFT);
 		op++;

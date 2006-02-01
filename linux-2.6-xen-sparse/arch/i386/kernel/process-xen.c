@@ -108,15 +108,31 @@ void xen_idle(void)
 	if (need_resched()) {
 		local_irq_enable();
 	} else {
+		clear_thread_flag(TIF_POLLING_NRFLAG);
+		smp_mb__after_clear_bit();
 		stop_hz_timer();
 		/* Blocking includes an implicit local_irq_enable(). */
 		HYPERVISOR_sched_op(SCHEDOP_block, 0);
 		start_hz_timer();
+		set_thread_flag(TIF_POLLING_NRFLAG);
 	}
 }
 #ifdef CONFIG_APM_MODULE
 EXPORT_SYMBOL(default_idle);
 #endif
+
+#ifdef CONFIG_HOTPLUG_CPU
+static inline void play_dead(void)
+{
+	HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL);
+	local_irq_enable();
+}
+#else
+static inline void play_dead(void)
+{
+	BUG();
+}
+#endif /* CONFIG_HOTPLUG_CPU */
 
 /*
  * The idle thread. There's no useful work to be
@@ -126,9 +142,9 @@ EXPORT_SYMBOL(default_idle);
  */
 void cpu_idle(void)
 {
-#if defined(CONFIG_HOTPLUG_CPU)
-	int cpu = raw_smp_processor_id();
-#endif
+	int cpu = smp_processor_id();
+
+	set_thread_flag(TIF_POLLING_NRFLAG);
 
 	/* endless idle loop with no priority at all */
 	while (1) {
@@ -139,17 +155,15 @@ void cpu_idle(void)
 
 			rmb();
 
-#if defined(CONFIG_HOTPLUG_CPU)
-			if (cpu_is_offline(cpu)) {
-				HYPERVISOR_vcpu_op(VCPUOP_down, cpu, NULL);
-				local_irq_enable();
-			}
-#endif
+			if (cpu_is_offline(cpu))
+				play_dead();
 
 			__get_cpu_var(irq_stat).idle_timestamp = jiffies;
 			xen_idle();
 		}
+		preempt_enable_no_resched();
 		schedule();
+		preempt_disable();
 	}
 }
 
@@ -187,6 +201,8 @@ void __devinit select_idle_routine(const struct cpuinfo_x86 *c) {}
 
 void show_regs(struct pt_regs * regs)
 {
+	unsigned long cr0 = 0L, cr2 = 0L, cr3 = 0L, cr4 = 0L;
+
 	printk("\n");
 	printk("Pid: %d, comm: %20s\n", current->pid, current->comm);
 	printk("EIP: %04x:[<%08lx>] CPU: %d\n",0xffff & regs->xcs,regs->eip, smp_processor_id());
@@ -203,6 +219,13 @@ void show_regs(struct pt_regs * regs)
 	printk(" DS: %04x ES: %04x\n",
 		0xffff & regs->xds,0xffff & regs->xes);
 
+	cr0 = read_cr0();
+	cr2 = read_cr2();
+	cr3 = read_cr3();
+	if (current_cpu_data.x86 > 4) {
+		cr4 = read_cr4();
+	}
+	printk("CR0: %08lx CR2: %08lx CR3: %08lx CR4: %08lx\n", cr0, cr2, cr3, cr4);
 	show_trace(NULL, &regs->esp);
 }
 
@@ -274,13 +297,6 @@ void exit_thread(void)
 void flush_thread(void)
 {
 	struct task_struct *tsk = current;
-
-	/*
-	 * Remove function-return probe instances associated with this task
-	 * and put them back on the free list. Do not insert an exit probe for
-	 * this function, it will be disabled by kprobe_flush_task if you do.
-	 */
-	kprobe_flush_task(tsk);
 
 	memset(tsk->thread.debugreg, 0, sizeof(unsigned long)*8);
 	memset(tsk->thread.tls_array, 0, sizeof(tsk->thread.tls_array));	
@@ -445,7 +461,9 @@ int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
 	struct pt_regs ptregs;
 	
 	ptregs = *(struct pt_regs *)
-		((unsigned long)tsk->thread_info+THREAD_SIZE - sizeof(ptregs));
+		((unsigned long)tsk->thread_info +
+		/* see comments in copy_thread() about -8 */
+		THREAD_SIZE - sizeof(ptregs) - 8);
 	ptregs.xcs &= 0xffff;
 	ptregs.xds &= 0xffff;
 	ptregs.xes &= 0xffff;
@@ -453,7 +471,6 @@ int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
 
 	elf_core_copy_regs(regs, &ptregs);
 
-	boot_option_idle_override = 1;
 	return 1;
 }
 

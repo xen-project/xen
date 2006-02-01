@@ -204,3 +204,6 @@ EXPORT_SYMBOL(flush_tlb_page);
 #endif
 
 EXPORT_SYMBOL(cpu_khz);
+
+EXPORT_SYMBOL(load_gs_index);
+

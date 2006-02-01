@@ -323,9 +323,15 @@ void __iomem *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 }
 EXPORT_SYMBOL(ioremap_nocache);
 
+/**
+ * iounmap - Free a IO remapping
+ * @addr: virtual address from ioremap_*
+ *
+ * Caller must ensure there is only one unmapping for the same pointer.
+ */
 void iounmap(volatile void __iomem *addr)
 {
-	struct vm_struct *p;
+	struct vm_struct *p, *o;
 
 	if ((void __force *)addr <= high_memory)
 		return;
@@ -338,14 +344,27 @@ void iounmap(volatile void __iomem *addr)
 	if ((unsigned long) addr >= fix_to_virt(FIX_ISAMAP_BEGIN))
 		return;
 
-	write_lock(&vmlist_lock);
-	p = __remove_vm_area((void *)(PAGE_MASK & (unsigned long __force)addr));
-	if (!p) { 
-		printk(KERN_WARNING "iounmap: bad address %p\n", addr);
+	addr = (volatile void __iomem *)(PAGE_MASK & (unsigned long __force)addr);
+
+	/* Use the vm area unlocked, assuming the caller
+	   ensures there isn't another iounmap for the same address
+	   in parallel. Reuse of the virtual address is prevented by
+	   leaving it in the global lists until we're done with it.
+	   cpa takes care of the direct mappings. */
+	read_lock(&vmlist_lock);
+	for (p = vmlist; p; p = p->next) {
+		if (p->addr == addr)
+			break;
+	}
+	read_unlock(&vmlist_lock);
+
+	if (!p) {
+		printk("iounmap: bad address %p\n", addr);
 		dump_stack();
-		goto out_unlock;
+		return;
 	}
 
+	/* Reset the direct mapping. Can block */
 	if ((p->flags >> 20) && is_local_lowmem(p->phys_addr)) {
 		/* p->size includes the guard page, but cpa doesn't like that */
 		change_page_attr(virt_to_page(bus_to_virt(p->phys_addr)),
@@ -353,8 +372,10 @@ void iounmap(volatile void __iomem *addr)
 				 PAGE_KERNEL);
 		global_flush_tlb();
 	} 
-out_unlock:
-	write_unlock(&vmlist_lock);
+
+	/* Finally remove it */
+	o = remove_vm_area((void *)addr);
+	BUG_ON(p != o || o == NULL);
 	kfree(p); 
 }
 EXPORT_SYMBOL(iounmap);

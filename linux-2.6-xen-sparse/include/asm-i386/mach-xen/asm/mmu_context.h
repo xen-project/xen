@@ -63,7 +63,6 @@ static inline void switch_mm(struct mm_struct *prev,
 		cpu_set(cpu, next->cpu_vm_mask);
 
 		/* Re-load page tables: load_cr3(next->pgd) */
-		per_cpu(cur_pgd, cpu) = next->pgd;
 		op->cmd = MMUEXT_NEW_BASEPTR;
 		op->arg1.mfn = pfn_to_mfn(__pa(next->pgd) >> PAGE_SHIFT);
 		op++;

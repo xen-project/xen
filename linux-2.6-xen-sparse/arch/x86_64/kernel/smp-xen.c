@@ -71,8 +71,6 @@ union smp_flush_state {
 static DEFINE_PER_CPU(union smp_flush_state, flush_state);
 #endif
 
-#define __cpuinit __init
-
 /*
  * We cannot call mmdrop() because we are in interrupt context, 
  * instead update mm->cpu_vm_mask.
@@ -478,15 +476,16 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 
 void smp_stop_cpu(void)
 {
+	unsigned long flags;
 	/*
 	 * Remove this CPU:
 	 */
 	cpu_clear(smp_processor_id(), cpu_online_map);
-	local_irq_disable();
+	local_irq_save(flags);
 #ifndef CONFIG_XEN
 	disable_local_APIC();
 #endif
-	local_irq_enable(); 
+	local_irq_restore(flags); 
 }
 
 static void smp_really_stop_cpu(void *dummy)

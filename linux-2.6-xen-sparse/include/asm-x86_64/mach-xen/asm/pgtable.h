@@ -39,6 +39,7 @@ extern pud_t level3_physmem_pgt[512];
 extern pud_t level3_ident_pgt[512];
 extern pmd_t level2_kernel_pgt[512];
 extern pgd_t init_level4_pgt[];
+extern pgd_t boot_level4_pgt[];
 extern unsigned long __supported_pte_mask;
 
 #define swapper_pg_dir init_level4_pgt
@@ -142,6 +143,8 @@ static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
         return pte;
 }
 #endif
+
+struct mm_struct;
 
 static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm, unsigned long addr, pte_t *ptep, int full)
 {
@@ -405,8 +408,6 @@ static inline int pmd_large(pmd_t pte) {
  * and a page entry and page directory to the page they refer to.
  */
 
-#define page_pte(page) page_pte_prot(page, __pgprot(0))
-
 /*
  * Level 4 access.
  * Never use these in the common code.
@@ -450,7 +451,7 @@ static inline pud_t *pud_offset_k(unsigned long address)
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
 #define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
 #define pfn_pmd(nr,prot) (__pmd(((nr) << PAGE_SHIFT) | pgprot_val(prot)))
-#define pmd_pfn(x)  ((pmd_val(x) >> PAGE_SHIFT) & __PHYSICAL_MASK)
+#define pmd_pfn(x)  ((pmd_val(x) & __PHYSICAL_MASK) >> PAGE_SHIFT)
 
 #define pte_to_pgoff(pte) ((pte_val(pte) & PHYSICAL_PAGE_MASK) >> PAGE_SHIFT)
 #define pgoff_to_pte(off) ((pte_t) { ((off) << PAGE_SHIFT) | _PAGE_FILE })
