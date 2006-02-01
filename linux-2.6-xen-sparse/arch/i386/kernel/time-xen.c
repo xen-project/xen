@@ -541,16 +541,22 @@ unsigned long long sched_clock(void)
 }
 
 #if defined(CONFIG_SMP) && defined(CONFIG_FRAME_POINTER)
+#ifdef __x86_64__
+#define REG_BP rbp
+#else
+#define REG_BP ebp
+#endif
 unsigned long profile_pc(struct pt_regs *regs)
 {
 	unsigned long pc = instruction_pointer(regs);
 
 	if (in_lock_functions(pc))
-		return *(unsigned long *)(regs->ebp + 4);
+		return *(unsigned long *)(regs->REG_BP + 4);
 
 	return pc;
 }
 EXPORT_SYMBOL(profile_pc);
+#undef REG_BP
 #endif
 
 irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
