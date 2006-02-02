@@ -957,19 +957,34 @@ static CharDriverState *stdio_clients[STDIO_MAX_CLIENTS];
 
 static int unix_write(int fd, const uint8_t *buf, int len1)
 {
-    int ret, len;
+    int ret,sel_ret,len;
+    int max_fd;
+    fd_set writefds;
+    struct timeval timeout;
+
+    max_fd = fd;  
 
     len = len1;
     while (len > 0) {
-        ret = write(fd, buf, len);
-        if (ret < 0) {
-            if (errno != EINTR && errno != EAGAIN)
-                return -1;
-        } else if (ret == 0) {
-            break;
-        } else {
-            buf += ret;
-            len -= ret;
+        FD_ZERO(&writefds);
+        FD_SET(fd, &writefds);
+	timeout.tv_sec = 0;
+	timeout.tv_usec = 0;
+	sel_ret = select(max_fd + 1, NULL, &writefds, 0, &timeout);
+	if (sel_ret <= 0) {
+		/* Timeout or select error */
+            return -1;
+	} else {
+            ret = write(fd, buf, len);
+            if (ret < 0) {
+                if (errno != EINTR && errno != EAGAIN)
+                    return -1;
+            } else if (ret == 0) {
+            	    break;
+            } else {
+            	    buf += ret;
+                    len -= ret;
+            }
         }
     }
     return len1 - len;

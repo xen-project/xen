@@ -130,7 +130,7 @@ vncviewer=1
 #-----------------------------------------------------------------------------
 #   serial port re-direct to pty deivce, /dev/pts/n 
 #   then xm console or minicom can connect
-#serial='pty'
+serial='pty'
 
 #----------------------------------------------------------------------------
 # enable ne2000, default = 0(use pcnet)
