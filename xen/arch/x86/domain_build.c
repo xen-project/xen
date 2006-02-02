@@ -755,28 +755,45 @@ int construct_dom0(struct domain *d,
         printk("dom0: shadow setup done\n");
     }
 
-    i = 0;
+    rc = 0;
 
     /* DOM0 is permitted full I/O capabilities. */
-    i |= ioports_permit_access(dom0, 0, 0xFFFF);
-    i |= iomem_permit_access(dom0, 0UL, ~0UL);
-    i |= irqs_permit_access(dom0, 0, NR_PIRQS-1);
+    rc |= ioports_permit_access(dom0, 0, 0xFFFF);
+    rc |= iomem_permit_access(dom0, 0UL, ~0UL);
+    rc |= irqs_permit_access(dom0, 0, NR_PIRQS-1);
 
     /*
      * Modify I/O port access permissions.
      */
     /* Master Interrupt Controller (PIC). */
-    i |= ioports_deny_access(dom0, 0x20, 0x21);
+    rc |= ioports_deny_access(dom0, 0x20, 0x21);
     /* Slave Interrupt Controller (PIC). */
-    i |= ioports_deny_access(dom0, 0xA0, 0xA1);
+    rc |= ioports_deny_access(dom0, 0xA0, 0xA1);
     /* Interval Timer (PIT). */
-    i |= ioports_deny_access(dom0, 0x40, 0x43);
+    rc |= ioports_deny_access(dom0, 0x40, 0x43);
     /* PIT Channel 2 / PC Speaker Control. */
-    i |= ioports_deny_access(dom0, 0x61, 0x61);
+    rc |= ioports_deny_access(dom0, 0x61, 0x61);
     /* Command-line I/O ranges. */
     process_dom0_ioports_disable();
 
-    BUG_ON(i != 0);
+    /*
+     * Modify I/O memory access permissions.
+     */
+    /* Local APIC. */
+    if ( mp_lapic_addr != 0 )
+    {
+        mfn = paddr_to_pfn(mp_lapic_addr);
+        rc |= iomem_deny_access(dom0, mfn, mfn);
+    }
+    /* I/O APICs. */
+    for ( i = 0; i < nr_ioapics; i++ )
+    {
+        mfn = paddr_to_pfn(mp_ioapics[i].mpc_apicaddr);
+        if ( smp_found_config )
+            rc |= iomem_deny_access(dom0, mfn, mfn);
+    }
+
+    BUG_ON(rc != 0);
 
     return 0;
 }
