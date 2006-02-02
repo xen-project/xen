@@ -51,8 +51,6 @@ msr-$(subst m,y,$(CONFIG_X86_MSR))  += ../../i386/kernel/msr.o
 
 ifdef CONFIG_XEN
 time-y				+= ../../i386/kernel/time-xen.o
-obj-$(CONFIG_SWIOTLB)		+= swiotlb.o
-swiotlb-$(CONFIG_SWIOTLB)	:= ../../i386/kernel/swiotlb.o
 pci-dma-y			+= ../../i386/kernel/pci-dma-xen.o
 microcode-$(subst m,y,$(CONFIG_MICROCODE))  := ../../i386/kernel/microcode-xen.o
 quirks-y			:= ../../i386/kernel/quirks-xen.o

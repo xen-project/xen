@@ -35,7 +35,6 @@ obj-$(CONFIG_HPET_TIMER) 	+= time_hpet.o
 obj-$(CONFIG_EFI) 		+= efi.o efi_stub.o
 obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
 obj-$(CONFIG_SMP_ALTERNATIVES)	+= smpalts.o
-obj-$(CONFIG_SWIOTLB)		+= swiotlb.o
 
 EXTRA_AFLAGS   := -traditional
 
