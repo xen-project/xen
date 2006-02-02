@@ -13,6 +13,7 @@
 .*\.flc$
 .*\.orig$
 .*\.rej$
+^.valid-srcs$
 ^TAGS$
 ^dist/.*$
 ^docs/.*\.aux$

@@ -3,6 +3,8 @@ OS           = linux
 
 LINUX_SERIES = 2.6
 LINUX_VER    = 2.6.16-rc1-git4
+LINUX_SRCS = linux-2.6.15.tar.bz2 patch-2.6.16-rc1.bz2 patch-2.6.16-rc1-git4.bz2
+LINUX_PDIR = linux-$(LINUX_VER)
 
 EXTRAVERSION ?= xen
 
@@ -20,15 +22,17 @@ build: $(LINUX_DIR)/include/linux/autoconf.h
 	fi
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(DESTDIR) install
 
-pristine-linux-%/.valid-pristine: override _LINUX_PDIR = linux-$*.16-rc1-git4
-pristine-linux-%.16-rc1-git4/.valid-pristine: linux-%.15.tar.bz2 patch-%.16-rc1.bz2 patch-%.16-rc1-git4.bz2
-	rm -rf tmp-pristine-$(_LINUX_PDIR) $(@D)
-	mkdir -p tmp-pristine-$(_LINUX_PDIR)
-	tar -C tmp-pristine-$(_LINUX_PDIR) -jxf $<
-	-@rm tmp-pristine-$(_LINUX_PDIR)/pax_global_header
-	mv tmp-pristine-$(_LINUX_PDIR)/* $(@D)
-	@rm -rf tmp-pristine-$(_LINUX_PDIR)
-	bzcat $(wordlist 2,$(words $^),$^) | patch -d $(@D) -p1
+.valid-srcs: $(LINUX_SRCS)
+	touch $@
+
+pristine-linux-%.16-rc1-git4/.valid-pristine: .valid-srcs
+	rm -rf tmp-pristine-$(LINUX_PDIR) $(@D)
+	mkdir -p tmp-pristine-$(LINUX_PDIR)
+	tar -C tmp-pristine-$(LINUX_PDIR) -jxf $(word 1,$(LINUX_SRCS))
+	-@rm tmp-pristine-$(LINUX_PDIR)/pax_global_header
+	mv tmp-pristine-$(LINUX_PDIR)/* $(@D)
+	@rm -rf tmp-pristine-$(LINUX_PDIR)
+	bzcat $(wordlist 2,$(words $(LINUX_SRCS)),$(LINUX_SRCS)) | patch -d $(@D) -p1
 	touch $(@D)/.hgskip
 	touch $@ # update timestamp to avoid rebuild
 
