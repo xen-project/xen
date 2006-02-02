@@ -21,9 +21,6 @@
 #include <asm/ustack.h>
 #include <asm/privop.h>
 
-/* Our arch specific arch_init_sched_domain is in arch/ia64/kernel/domain.c */
-#define ARCH_HAS_SCHED_DOMAIN
-
 #define IA64_NUM_DBG_REGS	8
 /*
  * Limits for PMC and PMD are set to less than maximum architected values
