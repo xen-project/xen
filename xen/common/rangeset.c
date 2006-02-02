@@ -95,6 +95,8 @@ int rangeset_add_range(
     struct range *x, *y;
     int rc = 0;
 
+    ASSERT(s <= e);
+
     spin_lock(&r->lock);
 
     x = find_range(r, s);
@@ -161,6 +163,8 @@ int rangeset_remove_range(
     struct range *x, *y, *t;
     int rc = 0;
 
+    ASSERT(s <= e);
+
     spin_lock(&r->lock);
 
     x = find_range(r, s);
@@ -226,6 +230,8 @@ int rangeset_contains_range(
 {
     struct range *x;
     int contains;
+
+    ASSERT(s <= e);
 
     spin_lock(&r->lock);
     x = find_range(r, s);
