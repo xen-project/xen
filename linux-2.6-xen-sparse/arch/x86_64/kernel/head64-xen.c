@@ -45,9 +45,9 @@ static void __init clear_bss(void)
 
 extern char saved_command_line[];
 
-#if 0
 static void __init copy_bootdata(char *real_mode_data)
 {
+#if 0
 	int new_data;
 	char * command_line;
 
@@ -63,9 +63,17 @@ static void __init copy_bootdata(char *real_mode_data)
 	}
 	command_line = (char *) ((u64)(new_data));
 	memcpy(saved_command_line, command_line, COMMAND_LINE_SIZE);
-	printk("Bootdata ok (command line is %s)\n", saved_command_line);	
-}
+	printk("Bootdata ok (command line is %s)\n", saved_command_line);
+#else
+	int max_cmdline;
+	
+	if ((max_cmdline = MAX_GUEST_CMDLINE) > COMMAND_LINE_SIZE)
+		max_cmdline = COMMAND_LINE_SIZE;
+	memcpy(saved_command_line, xen_start_info->cmd_line, max_cmdline);
+	saved_command_line[max_cmdline-1] = '\0';
+	printk("Bootdata ok (command line is %s)\n", saved_command_line);
 #endif
+}
 
 static void __init setup_boot_cpu_data(void)
 {
@@ -87,6 +95,7 @@ static void __init setup_boot_cpu_data(void)
 
 void __init x86_64_start_kernel(char * real_mode_data)
 {
+	char *s;
 	int i;
 
 	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
@@ -101,16 +110,18 @@ void __init x86_64_start_kernel(char * real_mode_data)
 #if 0
 	asm volatile("lidt %0" :: "m" (idt_descr));
 #endif
+
+ 	for (i = 0; i < NR_CPUS; i++)
+ 		cpu_pda(i) = &boot_cpu_pda[i];
+
 	pda_init(0);
-        /*	copy_bootdata(real_mode_data); */
+	copy_bootdata(real_mode_data);
 #ifdef CONFIG_SMP
 	cpu_set(0, cpu_online_map);
 #endif
-#if 0
 	s = strstr(saved_command_line, "earlyprintk=");
 	if (s != NULL)
-		setup_early_printk(s);
-#endif
+		setup_early_printk(strchr(s, '=') + 1);
 #ifdef CONFIG_NUMA
 	s = strstr(saved_command_line, "numa=");
 	if (s != NULL)

@@ -664,7 +664,8 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 				req, (bret->status == BLKIF_RSP_OKAY),
 				req->hard_nr_sectors);
 			BUG_ON(ret);
-			end_that_request_last(req);
+			end_that_request_last(
+				req, (bret->status == BLKIF_RSP_OKAY));
 			break;
 		default:
 			BUG();

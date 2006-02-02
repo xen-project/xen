@@ -26,6 +26,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/sysdev.h>
 #include <linux/cpu.h>
+#include <linux/module.h>
 
 #include <asm/atomic.h>
 #include <asm/smp.h>
@@ -37,8 +38,17 @@
 #include <asm/i8253.h>
 
 #include <mach_apic.h>
+#include <mach_ipi.h>
 
 #include "io_ports.h"
+
+#ifndef CONFIG_XEN
+/*
+ * cpu_mask that denotes the CPUs that needs timer interrupt coming in as
+ * IPIs in place of local APIC timers
+ */
+static cpumask_t timer_bcast_ipi;
+#endif
 
 /*
  * Knob to control our willingness to enable the local APIC.
@@ -72,6 +82,50 @@ void ack_bad_irq(unsigned int irq)
 	 */
 	ack_APIC_irq();
 }
+
+#ifdef CONFIG_XEN
+void switch_APIC_timer_to_ipi(void *cpumask) { }
+EXPORT_SYMBOL(switch_APIC_timer_to_ipi);
+void switch_ipi_to_APIC_timer(void *cpumask) { }
+EXPORT_SYMBOL(switch_ipi_to_APIC_timer);
+#else
+#ifndef CONFIG_SMP
+static void up_apic_timer_interrupt_call(struct pt_regs *regs)
+{
+	int cpu = smp_processor_id();
+
+	/*
+	 * the NMI deadlock-detector uses this.
+	 */
+	per_cpu(irq_stat, cpu).apic_timer_irqs++;
+
+	smp_local_timer_interrupt(regs);
+}
+#endif
+
+void smp_send_timer_broadcast_ipi(struct pt_regs *regs)
+{
+	cpumask_t mask;
+
+	cpus_and(mask, cpu_online_map, timer_bcast_ipi);
+	if (!cpus_empty(mask)) {
+#ifdef CONFIG_SMP
+		send_IPI_mask(mask, LOCAL_TIMER_VECTOR);
+#else
+		/*
+		 * We can directly call the apic timer interrupt handler
+		 * in UP case. Minus all irq related functions
+		 */
+		up_apic_timer_interrupt_call(regs);
+#endif
+	}
+}
+
+int setup_profiling_timer(unsigned int multiplier)
+{
+	return -EINVAL;
+}
+#endif
 
 /*
  * This initializes the IO-APIC and APIC hardware if this is

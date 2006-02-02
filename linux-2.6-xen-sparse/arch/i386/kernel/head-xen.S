@@ -161,15 +161,20 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0x80 TSS descriptor */
 	.quad 0x0000000000000000	/* 0x88 LDT descriptor */
 
-	/* Segments used for calling PnP BIOS */
+	/*
+	 * Segments used for calling PnP BIOS have byte granularity.
+	 * They code segments and data segments have fixed 64k limits,
+	 * the transfer segment sizes are set at run time.
+	 */
 	.quad 0x0000000000000000	/* 0x90 32-bit code */
 	.quad 0x0000000000000000	/* 0x98 16-bit code */
 	.quad 0x0000000000000000	/* 0xa0 16-bit data */
 	.quad 0x0000000000000000	/* 0xa8 16-bit data */
 	.quad 0x0000000000000000	/* 0xb0 16-bit data */
+
 	/*
 	 * The APM segments have byte granularity and their bases
-	 * and limits are set at run time.
+	 * are set at run time.  All have 64k limits.
 	 */
 	.quad 0x0000000000000000	/* 0xb8 APM CS    code */
 	.quad 0x0000000000000000	/* 0xc0 APM CS 16 code (16 bit) */
@@ -181,7 +186,9 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0xe8 - unused */
 	.quad 0x0000000000000000	/* 0xf0 - unused */
 	.quad 0x0000000000000000	/* 0xf8 - GDT entry 31: double-fault TSS */
-	.fill GDT_ENTRIES-32,8,0
+
+	/* Be sure this is zeroed to avoid false validations in Xen */
+	.fill PAGE_SIZE_asm / 8 - GDT_ENTRIES,8,0
 
 .org 0x3000
 ENTRY(default_ldt)

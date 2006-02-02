@@ -26,12 +26,19 @@ LINUX_VER	?= $(shell grep "^LINUX_VER" buildconfigs/mk.linux-2.6-xen | sed -e 's
 # Setup Linux search path
 LINUX_SRC_PATH	?= .:..
 vpath linux-%.tar.bz2 $(LINUX_SRC_PATH)
+vpath patch-%.bz2 $(LINUX_SRC_PATH)
 
 # download a pristine Linux kernel tarball if there isn't one in LINUX_SRC_PATH
 linux-%.tar.bz2: override _LINUX_VDIR = $(word 1,$(subst ., ,$*)).$(word 2,$(subst ., ,$*))
 linux-%.tar.bz2:
 	@echo "Cannot find $@ in path $(LINUX_SRC_PATH)"
 	wget $(KERNEL_REPO)/pub/linux/kernel/v$(_LINUX_VDIR)/$@ -O./$@
+
+patch-%.bz2: override _LINUX_VDIR = $(word 1,$(subst ., ,$(*F))).$(word 2,$(subst ., ,$(*F)))
+patch-%.bz2: override _LINUX_XDIR = $(if $(word 3,$(subst -, ,$(*F))),snapshots,testing)
+patch-%.bz2:
+	@echo "Cannot find $(@F) in path $(LINUX_SRC_PATH)"
+	wget $(KERNEL_REPO)/pub/linux/kernel/v$(_LINUX_VDIR)/$(_LINUX_XDIR)/$(@F) -O./$@
 
 # Expand NetBSD release to NetBSD version
 NETBSD_RELEASE  ?= 2.0

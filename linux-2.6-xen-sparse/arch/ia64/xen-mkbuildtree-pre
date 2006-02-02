@@ -13,10 +13,10 @@ then
 	mv net net.xen-x86
 	mv kernel kernel.xen-x86
 	mv drivers/acpi/tables.c drivers/acpi/tables.c.xen-x86
-#	mv arch/xen/kernel drivers/xen/core
-#	mv arch/xen arch/xen.xen-x86
-#	mkdir arch/xen
-#	mv arch/xen.xen-x86/configs arch/xen
+	mv arch/xen/kernel drivers/xen/core
+	mv arch/xen arch/xen.xen-x86
+	mkdir arch/xen
+	mv arch/xen.xen-x86/configs arch/xen
 #	mv include/asm-generic include/asm-generic.xen-x86
 	mv include/linux include/linux.xen-x86
 	mkdir include/linux

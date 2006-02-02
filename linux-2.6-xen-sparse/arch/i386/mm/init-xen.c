@@ -45,12 +45,6 @@
 
 extern unsigned long *contiguous_bitmap;
 
-#if defined(CONFIG_SWIOTLB)
-extern void swiotlb_init(void);
-int swiotlb;
-EXPORT_SYMBOL(swiotlb);
-#endif
-
 unsigned int __VMALLOC_RESERVE = 128 << 20;
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
@@ -315,7 +309,7 @@ static void __init permanent_kmaps_init(pgd_t *pgd_base)
 	pkmap_page_table = pte;	
 }
 
-static void __devinit free_new_highpage(struct page *page, int pfn)
+static void __meminit free_new_highpage(struct page *page, int pfn)
 {
 	set_page_count(page, 1);
 	if (pfn < xen_start_info->nr_pages)
@@ -815,6 +809,30 @@ void free_initmem(void)
 	}
 	printk (KERN_INFO "Freeing unused kernel memory: %dk freed\n", (__init_end - __init_begin) >> 10);
 }
+
+#ifdef CONFIG_DEBUG_RODATA
+
+extern char __start_rodata, __end_rodata;
+void mark_rodata_ro(void)
+{
+	unsigned long addr = (unsigned long)&__start_rodata;
+
+	for (; addr < (unsigned long)&__end_rodata; addr += PAGE_SIZE)
+		change_page_attr(virt_to_page(addr), 1, PAGE_KERNEL_RO);
+
+	printk ("Write protecting the kernel read-only data: %luk\n",
+			(unsigned long)(&__end_rodata - &__start_rodata) >> 10);
+
+	/*
+	 * change_page_attr() requires a global_flush_tlb() call after it.
+	 * We do this after the printk so that if something went wrong in the
+	 * change, the printk gets out at least to give a better debug hint
+	 * of who is the culprit.
+	 */
+	global_flush_tlb();
+}
+#endif
+
 
 #ifdef CONFIG_BLK_DEV_INITRD
 void free_initrd_mem(unsigned long start, unsigned long end)

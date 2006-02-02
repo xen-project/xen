@@ -27,6 +27,12 @@
 #include <asm/uaccess.h>
 #include <xen/interface/memory.h>
 
+#if defined(CONFIG_SWIOTLB)
+extern void swiotlb_init(void);
+int swiotlb;
+EXPORT_SYMBOL(swiotlb);
+#endif
+
 #define OFFSET(val,align) ((unsigned long)((val) & ( (align) - 1)))
 
 #define SG_ENT_PHYS_ADDRESS(sg)	(page_to_phys((sg)->page) + (sg)->offset)

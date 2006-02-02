@@ -30,8 +30,8 @@
 #ifndef __HYPERCALL_H__
 #define __HYPERCALL_H__
 
-#include <xen/interface/xen.h>
-#include <xen/interface/sched.h>
+#include <asm-xen/xen-public/xen.h>
+#include <asm-xen/xen-public/sched.h>
 
 /* FIXME: temp place to hold these page related macros */
 #include <asm/page.h>

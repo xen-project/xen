@@ -17,6 +17,25 @@
 #include <xen/balloon.h>
 #include <asm/tlbflush.h>
 #include <asm/swiotlb.h>
+#include <asm/bug.h>
+
+#ifdef __x86_64__
+int iommu_merge __read_mostly = 0;
+EXPORT_SYMBOL(iommu_merge);
+
+dma_addr_t bad_dma_address __read_mostly;
+EXPORT_SYMBOL(bad_dma_address);
+
+/* This tells the BIO block layer to assume merging. Default to off
+   because we cannot guarantee merging later. */
+int iommu_bio_merge __read_mostly = 0;
+EXPORT_SYMBOL(iommu_bio_merge);
+
+__init int iommu_setup(char *p)
+{
+    return 1;
+}
+#endif
 
 struct dma_coherent_mem {
 	void		*virt_base;
@@ -41,7 +60,9 @@ dma_map_sg(struct device *hwdev, struct scatterlist *sg, int nents,
 {
 	int i, rc;
 
-	BUG_ON(direction == DMA_NONE);
+	if (direction == DMA_NONE)
+		BUG();
+	WARN_ON(nents == 0 || sg[0].length == 0);
 
 	if (swiotlb) {
 		rc = swiotlb_map_sg(hwdev, sg, nents, direction);
@@ -266,7 +287,9 @@ dma_map_single(struct device *dev, void *ptr, size_t size,
 {
 	dma_addr_t dma;
 
-	BUG_ON(direction == DMA_NONE);
+	if (direction == DMA_NONE)
+		BUG();
+	WARN_ON(size == 0);
 
 	if (swiotlb) {
 		dma = swiotlb_map_single(dev, ptr, size, direction);
@@ -285,7 +308,8 @@ void
 dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
 		 enum dma_data_direction direction)
 {
-	BUG_ON(direction == DMA_NONE);
+	if (direction == DMA_NONE)
+		BUG();
 	if (swiotlb)
 		swiotlb_unmap_single(dev, dma_addr, size, direction);
 }

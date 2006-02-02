@@ -45,6 +45,7 @@
 #include <linux/bitops.h>
 #include <linux/proc_fs.h>
 #include <linux/ethtool.h>
+#include <linux/in.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 #include <net/arp.h>

@@ -1,13 +1,13 @@
-diff -pruN ../pristine-linux-2.6.15/arch/i386/kernel/traps.c ./arch/i386/kernel/traps.c
---- ../pristine-linux-2.6.15/arch/i386/kernel/traps.c	2006-01-03 03:21:10.000000000 +0000
-+++ ./arch/i386/kernel/traps.c	2006-02-02 17:14:26.000000000 +0000
-@@ -533,18 +533,11 @@ static void mem_parity_error(unsigned ch
+diff -pruN ../pristine-linux-2.6.16-rc1-git4/arch/i386/kernel/traps.c ./arch/i386/kernel/traps.c
+--- ../pristine-linux-2.6.16-rc1-git4/arch/i386/kernel/traps.c	2006-02-02 17:39:29.000000000 +0000
++++ ./arch/i386/kernel/traps.c	2006-02-02 17:43:01.000000000 +0000
+@@ -564,18 +564,11 @@ static void mem_parity_error(unsigned ch
  
  static void io_check_error(unsigned char reason, struct pt_regs * regs)
  {
 -	unsigned long i;
 -
- 	printk("NMI: IOCK error (debug interrupt?)\n");
+ 	printk(KERN_EMERG "NMI: IOCK error (debug interrupt?)\n");
  	show_registers(regs);
  
  	/* Re-enable the IOCK line, wait for a few seconds */
@@ -21,9 +21,9 @@ diff -pruN ../pristine-linux-2.6.15/arch/i386/kernel/traps.c ./arch/i386/kernel/
  }
  
  static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
-diff -pruN ../pristine-linux-2.6.15/include/asm-i386/mach-default/mach_traps.h ./include/asm-i386/mach-default/mach_traps.h
---- ../pristine-linux-2.6.15/include/asm-i386/mach-default/mach_traps.h	2006-01-03 03:21:10.000000000 +0000
-+++ ./include/asm-i386/mach-default/mach_traps.h	2006-02-02 17:14:26.000000000 +0000
+diff -pruN ../pristine-linux-2.6.16-rc1-git4/include/asm-i386/mach-default/mach_traps.h ./include/asm-i386/mach-default/mach_traps.h
+--- ../pristine-linux-2.6.16-rc1-git4/include/asm-i386/mach-default/mach_traps.h	2006-01-03 03:21:10.000000000 +0000
++++ ./include/asm-i386/mach-default/mach_traps.h	2006-02-02 17:41:55.000000000 +0000
 @@ -15,6 +15,18 @@ static inline void clear_mem_error(unsig
  	outb(reason, 0x61);
  }

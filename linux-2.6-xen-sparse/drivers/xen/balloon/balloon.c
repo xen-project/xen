@@ -91,15 +91,13 @@ static void balloon_process(void *unused);
 static DECLARE_WORK(balloon_worker, balloon_process, NULL);
 static struct timer_list balloon_timer;
 
-/* Use the private and mapping fields of struct page as a list. */
-#define PAGE_TO_LIST(p) ((struct list_head *)&p->u.private)
-#define LIST_TO_PAGE(l)				\
-	(list_entry(((unsigned long *)l), struct page, u.private))
+#define PAGE_TO_LIST(p) (&(p)->ballooned)
+#define LIST_TO_PAGE(l) list_entry((l), struct page, ballooned)
 #define UNLIST_PAGE(p)				\
 	do {					\
 		list_del(PAGE_TO_LIST(p));	\
-		p->mapping = NULL;		\
-		p->u.private = 0;		\
+		PAGE_TO_LIST(p)->next = NULL;	\
+		PAGE_TO_LIST(p)->prev = NULL;	\
 	} while(0)
 
 #define IPRINTK(fmt, args...) \

@@ -188,7 +188,7 @@ void vcpu_prepare(int vcpu)
 
 	ctxt.ctrlreg[3] = virt_to_mfn(init_level4_pgt) << PAGE_SHIFT;
 
-	ctxt.gs_base_kernel = (unsigned long)(cpu_pda + vcpu);
+	ctxt.gs_base_kernel = (unsigned long)(cpu_pda(vcpu));
 #endif
 
 	BUG_ON(HYPERVISOR_vcpu_op(VCPUOP_initialise, vcpu, &ctxt));
@@ -226,8 +226,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 			panic("failed fork for CPU %d", cpu);
 
 #ifdef __x86_64__
-		cpu_pda[cpu].pcurrent = idle;
-		cpu_pda[cpu].cpunumber = cpu;
+		cpu_pda(cpu)->pcurrent = idle;
+		cpu_pda(cpu)->cpunumber = cpu;
 		per_cpu(init_tss,cpu).rsp0 = idle->thread.rsp;
 		clear_ti_thread_flag(idle->thread_info, TIF_FORK);
 #endif

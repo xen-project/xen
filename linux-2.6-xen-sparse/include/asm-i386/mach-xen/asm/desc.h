@@ -15,8 +15,6 @@
 
 extern struct desc_struct cpu_gdt_table[NR_CPUS][GDT_ENTRIES];
 
-#define get_cpu_gdt_table(_cpu) ((struct desc_struct *)cpu_gdt_descr[(_cpu)].address)
-
 DECLARE_PER_CPU(unsigned char, cpu_16bit_stack[CPU_16BIT_STACK_SIZE]);
 
 struct Xgt_desc_struct {
@@ -26,6 +24,11 @@ struct Xgt_desc_struct {
 } __attribute__ ((packed));
 
 extern struct Xgt_desc_struct idt_descr, cpu_gdt_descr[NR_CPUS];
+
+static inline struct desc_struct *get_cpu_gdt_table(unsigned int cpu)
+{
+	return ((struct desc_struct *)cpu_gdt_descr[cpu].address);
+}
 
 #define load_TR_desc() __asm__ __volatile__("ltr %w0"::"q" (GDT_ENTRY_TSS*8))
 #define load_LDT_desc() __asm__ __volatile__("lldt %w0"::"q" (GDT_ENTRY_LDT*8))

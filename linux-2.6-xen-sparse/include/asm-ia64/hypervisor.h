@@ -34,8 +34,8 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/version.h>
-#include <xen/interface/xen.h>
-#include <xen/interface/dom0_ops.h>
+#include <asm-xen/xen-public/xen.h>
+#include <asm-xen/xen-public/dom0_ops.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
 

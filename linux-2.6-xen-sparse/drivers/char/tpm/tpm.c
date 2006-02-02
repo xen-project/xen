@@ -438,6 +438,7 @@ ssize_t tpm_read(struct file * file, char __user *buf,
 	int ret_size;
 	int pos, pending = 0;
 
+	del_singleshot_timer_sync(&chip->user_read_timer);
 	flush_scheduled_work();
 	ret_size = atomic_read(&chip->data_pending);
 	if (ret_size > 0) {	/* relay data */
@@ -488,6 +489,7 @@ void tpm_remove_hardware(struct device *dev)
 	kfree(chip->vendor->miscdev.name);
 
 	sysfs_remove_group(&dev->kobj, chip->vendor->attr_group);
+	tpm_bios_log_teardown(chip->bios_dir);
 
 	dev_mask[chip->dev_num / TPM_NUM_MASK_ENTRIES ] &=
 		~(1 << (chip->dev_num % TPM_NUM_MASK_ENTRIES));
@@ -620,6 +622,8 @@ dev_num_search_complete:
 	spin_unlock(&driver_lock);
 
 	sysfs_create_group(&dev->kobj, chip->vendor->attr_group);
+
+	chip->bios_dir = tpm_bios_log_setup(devname);
 
 	return 0;
 }

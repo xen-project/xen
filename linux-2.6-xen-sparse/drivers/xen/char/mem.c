@@ -91,11 +91,13 @@ out:
 
 static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 {
+	size_t size = vma->vm_end - vma->vm_start;
+
 	if (uncached_access(file))
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
 	if (direct_remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
-				   vma->vm_end - vma->vm_start,
+				   size,
 				   vma->vm_page_prot, DOMID_IO))
 		return -EAGAIN;
 
@@ -114,7 +116,7 @@ static loff_t memory_lseek(struct file * file, loff_t offset, int orig)
 {
 	loff_t ret;
 
-	down(&file->f_dentry->d_inode->i_sem);
+	mutex_lock(&file->f_dentry->d_inode->i_mutex);
 	switch (orig) {
 		case 0:
 			file->f_pos = offset;
@@ -129,7 +131,7 @@ static loff_t memory_lseek(struct file * file, loff_t offset, int orig)
 		default:
 			ret = -EINVAL;
 	}
-	up(&file->f_dentry->d_inode->i_sem);
+	mutex_unlock(&file->f_dentry->d_inode->i_mutex);
 	return ret;
 }
 

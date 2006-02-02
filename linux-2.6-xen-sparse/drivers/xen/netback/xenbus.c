@@ -112,15 +112,15 @@ fail:
  * and vif variables to the environment, for the benefit of the vif-* hotplug
  * scripts.
  */
-static int netback_hotplug(struct xenbus_device *xdev, char **envp,
-			   int num_envp, char *buffer, int buffer_size)
+static int netback_uevent(struct xenbus_device *xdev, char **envp,
+			  int num_envp, char *buffer, int buffer_size)
 {
 	struct backend_info *be = xdev->data;
 	netif_t *netif = be->netif;
 	int i = 0, length = 0;
 	char *val;
 
-	DPRINTK("netback_hotplug");
+	DPRINTK("netback_uevent");
 
 	val = xenbus_read(XBT_NULL, xdev->nodename, "script", NULL);
 	if (IS_ERR(val)) {
@@ -129,15 +129,13 @@ static int netback_hotplug(struct xenbus_device *xdev, char **envp,
 		return err;
 	}
 	else {
-		add_hotplug_env_var(envp, num_envp, &i,
-				    buffer, buffer_size, &length,
-				    "script=%s", val);
+		add_uevent_var(envp, num_envp, &i, buffer, buffer_size,
+			       &length, "script=%s", val);
 		kfree(val);
 	}
 
-	add_hotplug_env_var(envp, num_envp, &i,
-			    buffer, buffer_size, &length,
-			    "vif=%s", netif->dev->name);
+	add_uevent_var(envp, num_envp, &i, buffer, buffer_size, &length,
+		       "vif=%s", netif->dev->name);
 
 	envp[i] = NULL;
 
@@ -183,7 +181,7 @@ static void backend_changed(struct xenbus_watch *watch,
 			return;
 		}
 
-		kobject_hotplug(&dev->dev.kobj, KOBJ_ONLINE);
+		kobject_uevent(&dev->dev.kobj, KOBJ_ONLINE);
 
 		maybe_connect(be);
 	}
@@ -216,7 +214,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosed:
-		kobject_hotplug(&dev->dev.kobj, KOBJ_OFFLINE);
+		kobject_uevent(&dev->dev.kobj, KOBJ_OFFLINE);
 		device_unregister(&dev->dev);
 		break;
 
@@ -307,7 +305,7 @@ static struct xenbus_driver netback = {
 	.ids = netback_ids,
 	.probe = netback_probe,
 	.remove = netback_remove,
-	.hotplug = netback_hotplug,
+	.uevent = netback_uevent,
 	.otherend_changed = frontend_changed,
 };
 

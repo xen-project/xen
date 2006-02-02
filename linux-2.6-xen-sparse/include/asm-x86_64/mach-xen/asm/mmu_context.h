@@ -18,7 +18,7 @@ void destroy_context(struct mm_struct *mm);
 
 static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
-#if 0 /*  XEN: no lazy tlb */
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 	if (read_pda(mmu_state) == TLBSTATE_OK) 
 		write_pda(mmu_state, TLBSTATE_LAZY);
 #endif
@@ -78,7 +78,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 
 		/* stop flush ipis for the previous mm */
 		clear_bit(cpu, &prev->cpu_vm_mask);
-#if 0  /* XEN: no lazy tlb */
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 		write_pda(mmu_state, TLBSTATE_OK);
 		write_pda(active_mm, next);
 #endif
@@ -104,8 +104,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 
 		BUG_ON(HYPERVISOR_mmuext_op(_op, op-_op, NULL, DOMID_SELF));
 	}
-
-#if 0 /* XEN: no lazy tlb */
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 	else {
 		write_pda(mmu_state, TLBSTATE_OK);
 		if (read_pda(active_mm) != next)

@@ -20,9 +20,6 @@
 #include "cpu.h"
 
 #ifndef CONFIG_XEN
-DEFINE_PER_CPU(struct desc_struct, cpu_gdt_table[GDT_ENTRIES]);
-EXPORT_PER_CPU_SYMBOL(cpu_gdt_table);
-
 DEFINE_PER_CPU(unsigned char, cpu_16bit_stack[CPU_16BIT_STACK_SIZE]);
 EXPORT_PER_CPU_SYMBOL(cpu_16bit_stack);
 #endif
@@ -212,7 +209,10 @@ static int __devinit have_cpuid_p(void)
 
 /* Do minimum CPU detection early.
    Fields really needed: vendor, cpuid_level, family, model, mask, cache alignment.
-   The others are not touched to avoid unwanted side effects. */
+   The others are not touched to avoid unwanted side effects.
+
+   WARNING: this function is only called on the BP.  Don't add code here
+   that is supposed to run on all CPUs. */
 static void __init early_cpu_detect(void)
 {
 	struct cpuinfo_x86 *c = &boot_cpu_data;
@@ -244,12 +244,6 @@ static void __init early_cpu_detect(void)
 		if (cap0 & (1<<19))
 			c->x86_cache_alignment = ((misc >> 8) & 0xff) * 8;
 	}
-
-	early_intel_workaround(c);
-
-#ifdef CONFIG_X86_HT
-	phys_proc_id[smp_processor_id()] = (cpuid_ebx(1) >> 24) & 0xff;
-#endif
 }
 
 void __devinit generic_identify(struct cpuinfo_x86 * c)
@@ -297,6 +291,12 @@ void __devinit generic_identify(struct cpuinfo_x86 * c)
 				get_model_name(c); /* Default name */
 		}
 	}
+
+	early_intel_workaround(c);
+
+#ifdef CONFIG_X86_HT
+	phys_proc_id[smp_processor_id()] = (cpuid_ebx(1) >> 24) & 0xff;
+#endif
 }
 
 static void __devinit squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
@@ -607,11 +607,6 @@ void __cpuinit cpu_init(void)
 	cpu_gdt_init(&cpu_gdt_descr[cpu]);
 
 	/*
-	 * Delete NT
-	 */
-	__asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");
-
-	/*
 	 * Set up and load the per-CPU TSS and LDT
 	 */
 	atomic_inc(&init_mm.mm_count);
@@ -623,6 +618,11 @@ void __cpuinit cpu_init(void)
 	load_esp0(t, thread);
 
 	load_LDT(&init_mm.context);
+
+#ifdef CONFIG_DOUBLEFAULT
+	/* Set up doublefault TSS pointer in the GDT */
+	__set_tss_desc(cpu, GDT_ENTRY_DOUBLEFAULT_TSS, &doublefault_tss);
+#endif
 
 	/* Clear %fs and %gs. */
 	asm volatile ("xorl %eax, %eax; movl %eax, %fs; movl %eax, %gs");

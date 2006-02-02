@@ -25,6 +25,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/kernel_stat.h>
 #include <linux/sysdev.h>
+#include <linux/module.h>
 
 #include <asm/atomic.h>
 #include <asm/smp.h>
@@ -33,6 +34,7 @@
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
 #include <asm/hpet.h>
+#include <asm/idle.h>
 
 /*
  * Debug level
@@ -42,35 +44,12 @@ int disable_apic;
 
 void smp_local_timer_interrupt(struct pt_regs *regs)
 {
-
 	profile_tick(CPU_PROFILING, regs);
 #ifndef CONFIG_XEN
-	int cpu = smp_processor_id();
-
-	if (--per_cpu(prof_counter, cpu) <= 0) {
-		/*
-		 * The multiplier may have changed since the last time we got
-		 * to this point as a result of the user writing to
-		 * /proc/profile. In this case we need to adjust the APIC
-		 * timer accordingly.
-		 *
-		 * Interrupts are already masked off at this point.
-		 */
-		per_cpu(prof_counter, cpu) = per_cpu(prof_multiplier, cpu);
-		if (per_cpu(prof_counter, cpu) != 
-		    per_cpu(prof_old_multiplier, cpu)) {
-			__setup_APIC_LVTT(calibration_result/
-					per_cpu(prof_counter, cpu));
-			per_cpu(prof_old_multiplier, cpu) =
-				per_cpu(prof_counter, cpu);
-		}
-
 #ifdef CONFIG_SMP
 		update_process_times(user_mode(regs));
 #endif
-	}
 #endif
-
 	/*
 	 * We take the 'long' return path, and there every subsystem
 	 * grabs the appropriate locks (kernel lock/ irq lock).
@@ -108,6 +87,7 @@ void smp_apic_timer_interrupt(struct pt_regs *regs)
 	 * Besides, if we don't timer interrupts ignore the global
 	 * interrupt lock, which is the WrongThing (tm) to do.
 	 */
+	exit_idle();
 	irq_enter();
 	smp_local_timer_interrupt(regs);
 	irq_exit();
@@ -119,6 +99,7 @@ void smp_apic_timer_interrupt(struct pt_regs *regs)
 asmlinkage void smp_spurious_interrupt(void)
 {
 	unsigned int v;
+	exit_idle();
 	irq_enter();
 	/*
 	 * Check if this really is a spurious interrupt and ACK it
@@ -154,6 +135,7 @@ asmlinkage void smp_error_interrupt(void)
 {
 	unsigned int v, v1;
 
+	exit_idle();
 	irq_enter();
 	/* First tickle the hardware, only then report what went on. -- REW */
 	v = apic_read(APIC_ESR);
@@ -181,6 +163,13 @@ int get_physical_broadcast(void)
 {
         return 0xff;
 }
+
+#ifdef CONFIG_XEN
+void switch_APIC_timer_to_ipi(void *cpumask) { }
+EXPORT_SYMBOL(switch_APIC_timer_to_ipi);
+void switch_ipi_to_APIC_timer(void *cpumask) { }
+EXPORT_SYMBOL(switch_ipi_to_APIC_timer);
+#endif
 
 /*
  * This initializes the IO-APIC and APIC hardware if this is

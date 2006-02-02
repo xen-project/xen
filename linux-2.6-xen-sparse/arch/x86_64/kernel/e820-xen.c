@@ -276,6 +276,7 @@ void __init e820_reserve_resources(void)
 		}
 	}
 }
+#endif /* CONFIG_XEN */
 
 void __init e820_print_map(char *who)
 {
@@ -303,6 +304,7 @@ void __init e820_print_map(char *who)
 	}
 }
 
+#ifndef CONFIG_XEN
 /*
  * Sanitize the BIOS e820 map.
  *
@@ -659,6 +661,27 @@ void __init parse_memopt(char *p, char **from)
 	end_user_pfn >>= PAGE_SHIFT;	
 	xen_override_max_pfn = (unsigned long) end_user_pfn;
 } 
+
+void __init parse_memmapopt(char *p, char **from)
+{
+	unsigned long long start_at, mem_size;
+
+	mem_size = memparse(p, from);
+	p = *from;
+	if (*p == '@') {
+		start_at = memparse(p+1, from);
+		add_memory_region(start_at, mem_size, E820_RAM);
+	} else if (*p == '#') {
+		start_at = memparse(p+1, from);
+		add_memory_region(start_at, mem_size, E820_ACPI);
+	} else if (*p == '$') {
+		start_at = memparse(p+1, from);
+		add_memory_region(start_at, mem_size, E820_RESERVED);
+	} else {
+		end_user_pfn = (mem_size >> PAGE_SHIFT);
+	}
+	p = *from;
+}
 
 /*
  * Search for the biggest gap in the low 32 bits of the e820

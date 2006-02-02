@@ -15,21 +15,21 @@ static __inline__ void synch_set_bit(int nr, volatile void * addr)
 {
     __asm__ __volatile__ ( 
         "lock btsl %1,%0"
-        : "=m" (ADDR) : "Ir" (nr) : "memory" );
+        : "+m" (ADDR) : "Ir" (nr) : "memory" );
 }
 
 static __inline__ void synch_clear_bit(int nr, volatile void * addr)
 {
     __asm__ __volatile__ (
         "lock btrl %1,%0"
-        : "=m" (ADDR) : "Ir" (nr) : "memory" );
+        : "+m" (ADDR) : "Ir" (nr) : "memory" );
 }
 
 static __inline__ void synch_change_bit(int nr, volatile void * addr)
 {
     __asm__ __volatile__ (
         "lock btcl %1,%0"
-        : "=m" (ADDR) : "Ir" (nr) : "memory" );
+        : "+m" (ADDR) : "Ir" (nr) : "memory" );
 }
 
 static __inline__ int synch_test_and_set_bit(int nr, volatile void * addr)
@@ -37,7 +37,7 @@ static __inline__ int synch_test_and_set_bit(int nr, volatile void * addr)
     int oldbit;
     __asm__ __volatile__ (
         "lock btsl %2,%1\n\tsbbl %0,%0"
-        : "=r" (oldbit), "=m" (ADDR) : "Ir" (nr) : "memory");
+        : "=r" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory");
     return oldbit;
 }
 
@@ -46,7 +46,7 @@ static __inline__ int synch_test_and_clear_bit(int nr, volatile void * addr)
     int oldbit;
     __asm__ __volatile__ (
         "lock btrl %2,%1\n\tsbbl %0,%0"
-        : "=r" (oldbit), "=m" (ADDR) : "Ir" (nr) : "memory");
+        : "=r" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory");
     return oldbit;
 }
 
@@ -56,7 +56,7 @@ static __inline__ int synch_test_and_change_bit(int nr, volatile void * addr)
 
     __asm__ __volatile__ (
         "lock btcl %2,%1\n\tsbbl %0,%0"
-        : "=r" (oldbit), "=m" (ADDR) : "Ir" (nr) : "memory");
+        : "=r" (oldbit), "+m" (ADDR) : "Ir" (nr) : "memory");
     return oldbit;
 }
 
@@ -85,7 +85,7 @@ static inline unsigned long __synch_cmpxchg(volatile void *ptr,
 	case 2:
 		__asm__ __volatile__("lock; cmpxchgw %w1,%2"
 				     : "=a"(prev)
-				     : "q"(new), "m"(*__synch_xg(ptr)),
+				     : "r"(new), "m"(*__synch_xg(ptr)),
 				       "0"(old)
 				     : "memory");
 		return prev;
@@ -93,14 +93,14 @@ static inline unsigned long __synch_cmpxchg(volatile void *ptr,
 	case 4:
 		__asm__ __volatile__("lock; cmpxchgl %k1,%2"
 				     : "=a"(prev)
-				     : "q"(new), "m"(*__synch_xg(ptr)),
+				     : "r"(new), "m"(*__synch_xg(ptr)),
 				       "0"(old)
 				     : "memory");
 		return prev;
 	case 8:
 		__asm__ __volatile__("lock; cmpxchgq %1,%2"
 				     : "=a"(prev)
-				     : "q"(new), "m"(*__synch_xg(ptr)),
+				     : "r"(new), "m"(*__synch_xg(ptr)),
 				       "0"(old)
 				     : "memory");
 		return prev;
@@ -108,7 +108,7 @@ static inline unsigned long __synch_cmpxchg(volatile void *ptr,
 	case 4:
 		__asm__ __volatile__("lock; cmpxchgl %1,%2"
 				     : "=a"(prev)
-				     : "q"(new), "m"(*__synch_xg(ptr)),
+				     : "r"(new), "m"(*__synch_xg(ptr)),
 				       "0"(old)
 				     : "memory");
 		return prev;
@@ -117,7 +117,8 @@ static inline unsigned long __synch_cmpxchg(volatile void *ptr,
 	return old;
 }
 
-static __inline__ int synch_const_test_bit(int nr, const volatile void * addr)
+static __always_inline int synch_const_test_bit(int nr,
+						const volatile void * addr)
 {
     return ((1UL << (nr & 31)) & 
             (((const volatile unsigned int *) addr)[nr >> 5])) != 0;

@@ -29,8 +29,8 @@
 #define __RESTORE(reg,offset) "movq (14-" #offset ")*8(%%rsp),%%" #reg "\n\t"
 
 /* frame pointer must be last for get_wchan */
-#define SAVE_CONTEXT    "pushfq ; pushq %%rbp ; movq %%rsi,%%rbp\n\t"
-#define RESTORE_CONTEXT "movq %%rbp,%%rsi ; popq %%rbp ; popfq\n\t" 
+#define SAVE_CONTEXT    "pushq %%rbp ; movq %%rsi,%%rbp\n\t"
+#define RESTORE_CONTEXT "movq %%rbp,%%rsi ; popq %%rbp\n\t"
 
 #define __EXTRA_CLOBBER  \
 	,"rcx","rbx","rdx","r8","r9","r10","r11","r12","r13","r14","r15"
@@ -147,6 +147,21 @@ struct alt_instr {
 		      "663:\n\t" newinstr "\n664:\n"   /* replacement */ \
 		      ".previous" :: "i" (feature), ##input)
 
+/* Like alternative_input, but with a single output argument */
+#define alternative_io(oldinstr, newinstr, feature, output, input...) \
+	asm volatile ("661:\n\t" oldinstr "\n662:\n"			\
+		      ".section .altinstructions,\"a\"\n"		\
+		      "  .align 8\n"					\
+		      "  .quad 661b\n"            /* label */		\
+		      "  .quad 663f\n"		  /* new instruction */	\
+		      "  .byte %c[feat]\n"        /* feature bit */	\
+		      "  .byte 662b-661b\n"       /* sourcelen */	\
+		      "  .byte 664f-663f\n"       /* replacementlen */	\
+		      ".previous\n"					\
+		      ".section .altinstr_replacement,\"ax\"\n"		\
+		      "663:\n\t" newinstr "\n664:\n"   /* replacement */ \
+		      ".previous" : output : [feat] "i" (feature), ##input)
+
 /*
  * Clear and set 'TS' bit respectively
  */
@@ -187,6 +202,15 @@ static inline void write_cr4(unsigned long val)
 
 #define wbinvd() \
 	__asm__ __volatile__ ("wbinvd": : :"memory");
+
+/*
+ * On SMP systems, when the scheduler does migration-cost autodetection,
+ * it needs a way to flush as much of the CPU's caches as possible.
+ */
+static inline void sched_cacheflush(void)
+{
+	wbinvd();
+}
 
 #endif	/* __KERNEL__ */
 
@@ -374,8 +398,6 @@ do {									\
 		preempt_enable_no_resched();				\
 } while (0)
 
-#define safe_halt()		((void)0)
-
 #define __save_and_cli(x)						\
 do {									\
 	vcpu_info_t *_vcpu;						\
@@ -386,8 +408,6 @@ do {									\
 	preempt_enable_no_resched();					\
 	barrier();							\
 } while (0)
-
-void cpu_idle_wait(void);
 
 #define local_irq_save(x)	__save_and_cli(x)
 #define local_irq_restore(x)	__restore_flags(x)
@@ -405,12 +425,10 @@ void cpu_idle_wait(void);
 	preempt_enable_no_resched();					\
 	___x; })
 
-/*
- * disable hlt during certain critical i/o operations
- */
-#define HAVE_DISABLE_HLT
-void disable_hlt(void);
-void enable_hlt(void);
+#define safe_halt()		((void)0)
+#define halt()			((void)0)
+
+void cpu_idle_wait(void);
 
 extern unsigned long arch_align_stack(unsigned long sp);
 

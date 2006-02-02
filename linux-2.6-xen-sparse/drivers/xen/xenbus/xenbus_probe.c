@@ -217,8 +217,8 @@ static int backend_bus_id(char bus_id[BUS_ID_SIZE], const char *nodename)
 	return 0;
 }
 
-static int xenbus_hotplug_backend(struct device *dev, char **envp,
-				  int num_envp, char *buffer, int buffer_size);
+static int xenbus_uevent_backend(struct device *dev, char **envp,
+				 int num_envp, char *buffer, int buffer_size);
 static int xenbus_probe_backend(const char *type, const char *domid);
 static struct xen_bus_type xenbus_backend = {
 	.root = "backend",
@@ -228,15 +228,15 @@ static struct xen_bus_type xenbus_backend = {
 	.bus = {
 		.name  = "xen-backend",
 		.match = xenbus_match,
-		.hotplug = xenbus_hotplug_backend,
+		.uevent = xenbus_uevent_backend,
 	},
 	.dev = {
 		.bus_id = "xen-backend",
 	},
 };
 
-static int xenbus_hotplug_backend(struct device *dev, char **envp,
-				  int num_envp, char *buffer, int buffer_size)
+static int xenbus_uevent_backend(struct device *dev, char **envp,
+				 int num_envp, char *buffer, int buffer_size)
 {
 	struct xenbus_device *xdev;
 	struct xenbus_driver *drv;
@@ -253,17 +253,14 @@ static int xenbus_hotplug_backend(struct device *dev, char **envp,
 		return -ENODEV;
 
 	/* stuff we want to pass to /sbin/hotplug */
-	add_hotplug_env_var(envp, num_envp, &i,
-			    buffer, buffer_size, &length,
-			    "XENBUS_TYPE=%s", xdev->devicetype);
+	add_uevent_var(envp, num_envp, &i, buffer, buffer_size, &length,
+		       "XENBUS_TYPE=%s", xdev->devicetype);
 
-	add_hotplug_env_var(envp, num_envp, &i,
-			    buffer, buffer_size, &length,
-			    "XENBUS_PATH=%s", xdev->nodename);
+	add_uevent_var(envp, num_envp, &i, buffer, buffer_size, &length,
+		       "XENBUS_PATH=%s", xdev->nodename);
 
-	add_hotplug_env_var(envp, num_envp, &i,
-			    buffer, buffer_size, &length,
-			    "XENBUS_BASE_PATH=%s", xenbus_backend.root);
+	add_uevent_var(envp, num_envp, &i, buffer, buffer_size, &length,
+		       "XENBUS_BASE_PATH=%s", xenbus_backend.root);
 
 	/* terminate, set to next free slot, shrink available space */
 	envp[i] = NULL;
@@ -274,9 +271,9 @@ static int xenbus_hotplug_backend(struct device *dev, char **envp,
 
 	if (dev->driver) {
 		drv = to_xenbus_driver(dev->driver);
-		if (drv && drv->hotplug)
-			return drv->hotplug(xdev, envp, num_envp, buffer,
-					    buffer_size);
+		if (drv && drv->uevent)
+			return drv->uevent(xdev, envp, num_envp, buffer,
+					   buffer_size);
 	}
 
 	return 0;
