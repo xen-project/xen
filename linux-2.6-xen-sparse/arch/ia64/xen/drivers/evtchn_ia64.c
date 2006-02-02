@@ -4,7 +4,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <asm/hw_irq.h>
-#include <asm-xen/evtchn.h>
+#include <xen/evtchn.h>
 
 #define MAX_EVTCHN 1024
 
