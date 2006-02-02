@@ -1364,7 +1364,7 @@ static int svm_set_cr0(unsigned long value)
     {
         /* The guest CR3 must be pointing to the guest physical. */
         if (!VALID_MFN(mfn = 
-                    get_mfn_from_pfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT))
+                    get_mfn_from_gpfn(v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT))
                 || !get_page(mfn_to_page(mfn), v->domain))
         {
             printk("Invalid CR3 value = %lx\n", v->arch.hvm_svm.cpu_cr3);
@@ -1557,7 +1557,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
              * removed some translation or changed page attributes.
              * We simply invalidate the shadow.
              */
-            mfn = get_mfn_from_pfn(value >> PAGE_SHIFT);
+            mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
             if (mfn != pagetable_get_pfn(v->arch.guest_table))
                 __hvm_bug(regs);
             shadow_sync_all(v->domain);
@@ -1570,7 +1570,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
              */
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
             if (((value >> PAGE_SHIFT) > v->domain->max_pages) 
-                    || !VALID_MFN(mfn = get_mfn_from_pfn(value >> PAGE_SHIFT))
+                    || !VALID_MFN(mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT))
                     || !get_page(mfn_to_page(mfn), v->domain))
             {
                 printk("Invalid CR3 value=%lx\n", value);

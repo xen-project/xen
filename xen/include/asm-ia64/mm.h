@@ -415,8 +415,8 @@ extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
 #define VALID_M2P(_e)            (!((_e) & (1U<<63)))
 #define IS_INVALID_M2P_ENTRY(_e) (!VALID_M2P(_e))
 
-#define set_pfn_from_mfn(mfn, pfn) (machine_to_phys_mapping[(mfn)] = (pfn))
-#define get_pfn_from_mfn(mfn)      (machine_to_phys_mapping[(mfn)])
+#define set_gpfn_from_mfn(mfn, pfn) (machine_to_phys_mapping[(mfn)] = (pfn))
+#define get_gpfn_from_mfn(mfn)      (machine_to_phys_mapping[(mfn)])
 
 /* If pmt table is provided by control pannel later, we need __get_user
 * here. However if it's allocated by HV, we should access it directly

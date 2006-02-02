@@ -968,7 +968,7 @@ vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
          * removed some translation or changed page attributes.
          * We simply invalidate the shadow.
          */
-        mfn = get_mfn_from_pfn(c->cr3 >> PAGE_SHIFT);
+        mfn = get_mfn_from_gpfn(c->cr3 >> PAGE_SHIFT);
         if (mfn != pagetable_get_pfn(v->arch.guest_table)) {
             printk("Invalid CR3 value=%x", c->cr3);
             domain_crash_synchronous();
@@ -986,7 +986,7 @@ vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
             domain_crash_synchronous();
             return 0;
         }
-        mfn = get_mfn_from_pfn(c->cr3 >> PAGE_SHIFT);
+        mfn = get_mfn_from_gpfn(c->cr3 >> PAGE_SHIFT);
         if(!get_page(mfn_to_page(mfn), v->domain))
                 return 0;
         old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
@@ -1157,7 +1157,7 @@ static int vmx_set_cr0(unsigned long value)
         /*
          * The guest CR3 must be pointing to the guest physical.
          */
-        if ( !VALID_MFN(mfn = get_mfn_from_pfn(
+        if ( !VALID_MFN(mfn = get_mfn_from_gpfn(
             v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT)) ||
              !get_page(mfn_to_page(mfn), v->domain) )
         {
@@ -1232,7 +1232,7 @@ static int vmx_set_cr0(unsigned long value)
 
     if(!((value & X86_CR0_PE) && (value & X86_CR0_PG)) && paging_enabled)
         if(v->arch.hvm_vmx.cpu_cr3) {
-            put_page(mfn_to_page(get_mfn_from_pfn(
+            put_page(mfn_to_page(get_mfn_from_gpfn(
                       v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT)));
             v->arch.guest_table = mk_pagetable(0);
         }
@@ -1366,7 +1366,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
              * removed some translation or changed page attributes.
              * We simply invalidate the shadow.
              */
-            mfn = get_mfn_from_pfn(value >> PAGE_SHIFT);
+            mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT);
             if (mfn != pagetable_get_pfn(v->arch.guest_table))
                 __hvm_bug(regs);
             shadow_sync_all(v->domain);
@@ -1377,7 +1377,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
              */
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
             if ( ((value >> PAGE_SHIFT) > v->domain->max_pages ) ||
-                 !VALID_MFN(mfn = get_mfn_from_pfn(value >> PAGE_SHIFT)) ||
+                 !VALID_MFN(mfn = get_mfn_from_gpfn(value >> PAGE_SHIFT)) ||
                  !get_page(mfn_to_page(mfn), v->domain) )
             {
                 printk("Invalid CR3 value=%lx", value);

@@ -870,7 +870,7 @@ alloc_p2m_table(struct domain *d)
     {
         page = list_entry(list_ent, struct page_info, list);
         mfn = page_to_mfn(page);
-        pfn = get_pfn_from_mfn(mfn);
+        pfn = get_gpfn_from_mfn(mfn);
         ASSERT(pfn != INVALID_M2P_ENTRY);
         ASSERT(pfn < (1u<<20));
 
@@ -884,7 +884,7 @@ alloc_p2m_table(struct domain *d)
     {
         page = list_entry(list_ent, struct page_info, list);
         mfn = page_to_mfn(page);
-        pfn = get_pfn_from_mfn(mfn);
+        pfn = get_gpfn_from_mfn(mfn);
         if ( (pfn != INVALID_M2P_ENTRY) &&
              (pfn < (1u<<20)) )
         {
@@ -1410,7 +1410,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 }
 
 unsigned long
-get_mfn_from_pfn_foreign(struct domain *d, unsigned long gpfn)
+get_mfn_from_gpfn_foreign(struct domain *d, unsigned long gpfn)
 {
     unsigned long va, tabpfn;
     l1_pgentry_t *l1, l1e;
@@ -1418,7 +1418,7 @@ get_mfn_from_pfn_foreign(struct domain *d, unsigned long gpfn)
 
     ASSERT(shadow_mode_translate(d));
 
-    perfc_incrc(get_mfn_from_pfn_foreign);
+    perfc_incrc(get_mfn_from_gpfn_foreign);
 
     va = gpfn << PAGE_SHIFT;
     tabpfn = pagetable_get_pfn(d->arch.phys_table);

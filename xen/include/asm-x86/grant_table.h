@@ -25,7 +25,7 @@ int steal_page_for_grant_transfer(
     do {                                                                 \
         SHARE_PFN_WITH_DOMAIN(                                           \
             virt_to_page((char *)(t)->shared + ((i) * PAGE_SIZE)), (d)); \
-        set_pfn_from_mfn(                                                \
+        set_gpfn_from_mfn(                                               \
             (virt_to_maddr((t)->shared) >> PAGE_SHIFT) + (i),            \
             INVALID_M2P_ENTRY);                                          \
     } while ( 0 )

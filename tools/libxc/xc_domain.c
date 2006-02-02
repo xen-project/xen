@@ -421,16 +421,16 @@ int xc_domain_irq_permission(int xc_handle,
 
 int xc_domain_iomem_permission(int xc_handle,
                                uint32_t domid,
-                               unsigned long first_pfn,
-                               unsigned long nr_pfns,
+                               unsigned long first_mfn,
+                               unsigned long nr_mfns,
                                uint8_t allow_access)
 {
     dom0_op_t op;
 
     op.cmd = DOM0_IOMEM_PERMISSION;
     op.u.iomem_permission.domain = domid;
-    op.u.iomem_permission.first_pfn = first_pfn;
-	op.u.iomem_permission.nr_pfns = nr_pfns;
+    op.u.iomem_permission.first_mfn = first_mfn;
+	op.u.iomem_permission.nr_mfns = nr_mfns;
     op.u.iomem_permission.allow_access = allow_access;
 
     return do_dom0_op(xc_handle, &op);

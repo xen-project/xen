@@ -108,7 +108,7 @@ void __init paging_init(void)
 
     /* Fill with an obvious debug pattern. */
     for ( i = 0; i < (mpt_size / BYTES_PER_LONG); i++)
-        set_pfn_from_mfn(i, 0x55555555);
+        set_gpfn_from_mfn(i, 0x55555555);
 
     /* Create page tables for ioremap(). */
     for ( i = 0; i < (IOREMAP_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )

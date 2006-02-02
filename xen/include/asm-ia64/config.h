@@ -216,7 +216,7 @@ void sort_main_extable(void);
 #define page_info page
 
 // see common/memory.c
-#define set_pfn_from_mfn(x,y)	do { } while (0)
+#define set_gpfn_from_mfn(x,y)	do { } while (0)
 
 // see common/keyhandler.c
 #define	nop()	asm volatile ("nop 0")

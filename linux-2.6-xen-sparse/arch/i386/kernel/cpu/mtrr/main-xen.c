@@ -17,8 +17,8 @@ void generic_get_mtrr(unsigned int reg, unsigned long *base,
 	op.u.read_memtype.reg = reg;
 	(void)HYPERVISOR_dom0_op(&op);
 
-	*size = op.u.read_memtype.nr_pfns;
-	*base = op.u.read_memtype.pfn;
+	*size = op.u.read_memtype.nr_mfns;
+	*base = op.u.read_memtype.mfn;
 	*type = op.u.read_memtype.type;
 }
 
@@ -64,8 +64,8 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 	dom0_op_t op;
 
 	op.cmd = DOM0_ADD_MEMTYPE;
-	op.u.add_memtype.pfn     = base;
-	op.u.add_memtype.nr_pfns = size;
+	op.u.add_memtype.mfn     = base;
+	op.u.add_memtype.nr_mfns = size;
 	op.u.add_memtype.type    = type;
 	error = HYPERVISOR_dom0_op(&op);
 	if (error) {

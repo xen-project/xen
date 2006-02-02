@@ -176,7 +176,7 @@ static inline int __entry(
         }
         mfn = entry_get_pfn(*le_e);
         if ( (flag & GUEST_ENTRY) && shadow_mode_translate(d) )
-            mfn = get_mfn_from_pfn(mfn);
+            mfn = get_mfn_from_gpfn(mfn);
         if ( le_p )
             unmap_domain_page(le_p);
         le_p = (pgentry_64_t *)map_domain_page(mfn);
@@ -301,7 +301,7 @@ static inline int  __guest_set_l1e(
                 if (unlikely(!(l2e_get_flags_32(gl2e) & _PAGE_PRESENT)))
                     return 0;
 
-                l1mfn = get_mfn_from_pfn(
+                l1mfn = get_mfn_from_gpfn(
                   l2e_get_pfn(gl2e));
 
                 l1va = (l1_pgentry_32_t *)map_domain_page(l1mfn);
@@ -343,7 +343,7 @@ static inline int  __guest_get_l1e(
                     return 0;
 
 
-                l1mfn = get_mfn_from_pfn(
+                l1mfn = get_mfn_from_gpfn(
                   l2e_get_pfn(gl2e));
                 l1va = (l1_pgentry_32_t *) map_domain_page(l1mfn);
                 if (gl1e)

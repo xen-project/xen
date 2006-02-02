@@ -154,7 +154,7 @@ extern void hvm_pic_assist(struct vcpu *v);
 extern int cpu_get_interrupt(struct vcpu *v, int *type);
 
 // XXX - think about this, maybe use bit 30 of the mfn to signify an MMIO frame.
-#define mmio_space(gpa) (!VALID_MFN(get_mfn_from_pfn((gpa) >> PAGE_SHIFT)))
+#define mmio_space(gpa) (!VALID_MFN(get_mfn_from_gpfn((gpa) >> PAGE_SHIFT)))
 
 #endif /* __ASM_X86_HVM_IO_H__ */
 

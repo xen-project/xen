@@ -64,7 +64,7 @@ static void hvm_map_io_shared_page(struct domain *d)
 
     local_flush_tlb_pge();
 
-    mfn = get_mfn_from_pfn(E820_MAP_PAGE >> PAGE_SHIFT);
+    mfn = get_mfn_from_gpfn(E820_MAP_PAGE >> PAGE_SHIFT);
     if (mfn == INVALID_MFN) {
         printk("Can not find E820 memory map page for HVM domain.\n");
         domain_crash_synchronous();
@@ -97,7 +97,7 @@ static void hvm_map_io_shared_page(struct domain *d)
     unmap_domain_page(p);
 
     /* Initialise shared page */
-    mfn = get_mfn_from_pfn(gpfn);
+    mfn = get_mfn_from_gpfn(gpfn);
     if (mfn == INVALID_MFN) {
         printk("Can not find io request shared page for HVM domain.\n");
         domain_crash_synchronous();
@@ -143,7 +143,7 @@ static void hvm_get_info(struct domain *d)
     unsigned long mfn;
     struct hvm_info_table *t;
 
-    mfn = get_mfn_from_pfn(HVM_INFO_PFN);
+    mfn = get_mfn_from_gpfn(HVM_INFO_PFN);
     if ( mfn == INVALID_MFN ) {
         printk("Can not get info page mfn for HVM domain.\n");
         domain_crash_synchronous();
@@ -255,9 +255,9 @@ hvm_copy(void *buf, unsigned long vaddr, int size, int dir)
 
         if (hvm_paging_enabled(current)) {
             gpa = gva_to_gpa(vaddr);
-            mfn = get_mfn_from_pfn(gpa >> PAGE_SHIFT);
+            mfn = get_mfn_from_gpfn(gpa >> PAGE_SHIFT);
         } else
-            mfn = get_mfn_from_pfn(vaddr >> PAGE_SHIFT);
+            mfn = get_mfn_from_gpfn(vaddr >> PAGE_SHIFT);
         if (mfn == INVALID_MFN)
             return 0;
 

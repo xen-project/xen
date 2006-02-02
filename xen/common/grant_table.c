@@ -629,7 +629,6 @@ gnttab_prepare_for_transfer(
     u16            sflags;
     u32            scombo, prev_scombo;
     int            retries = 0;
-    unsigned long  target_pfn;
 
     if ( unlikely((rgt = rd->grant_table) == NULL) ||
          unlikely(ref >= NR_GRANT_ENTRIES) )
@@ -648,14 +647,6 @@ gnttab_prepare_for_transfer(
 
     for ( ; ; )
     {
-        target_pfn = sha->frame;
-
-        if ( unlikely(target_pfn >= max_page ) )
-        {
-            DPRINTK("Bad pfn (%lx)\n", target_pfn);
-            goto fail;
-        }
-
         if ( unlikely(sflags != GTF_accept_transfer) ||
              unlikely(sdom != ld->domain_id) )
         {

@@ -628,11 +628,11 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
     case DOM0_IOMEM_PERMISSION:
     {
         struct domain *d;
-        unsigned long pfn = op->u.iomem_permission.first_pfn;
-        unsigned long nr_pfns = op->u.iomem_permission.nr_pfns;
+        unsigned long mfn = op->u.iomem_permission.first_mfn;
+        unsigned long nr_mfns = op->u.iomem_permission.nr_mfns;
 
         ret = -EINVAL;
-        if ( (pfn + nr_pfns - 1) < pfn ) /* wrap? */
+        if ( (mfn + nr_mfns - 1) < mfn ) /* wrap? */
             break;
 
         ret = -ESRCH;
@@ -641,9 +641,9 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
             break;
 
         if ( op->u.iomem_permission.allow_access )
-            ret = iomem_permit_access(d, pfn, pfn + nr_pfns - 1);
+            ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
         else
-            ret = iomem_deny_access(d, pfn, pfn + nr_pfns - 1);
+            ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
 
         put_domain(d);
     }

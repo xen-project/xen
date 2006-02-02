@@ -83,7 +83,7 @@ unsigned int get_pfn_type(int xc_handle,
 {
     DECLARE_DOM0_OP;
     op.cmd = DOM0_GETPAGEFRAMEINFO;
-    op.u.getpageframeinfo.pfn    = mfn;
+    op.u.getpageframeinfo.mfn    = mfn;
     op.u.getpageframeinfo.domain = (domid_t)dom;
     if ( do_dom0_op(xc_handle, &op) < 0 )
     {

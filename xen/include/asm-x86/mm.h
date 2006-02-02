@@ -262,8 +262,8 @@ int check_descriptor(struct desc_struct *d);
 #define VALID_M2P(_e)            (!((_e) & (1UL<<(BITS_PER_LONG-1))))
 #define IS_INVALID_M2P_ENTRY(_e) (!VALID_M2P(_e))
 
-#define set_pfn_from_mfn(mfn, pfn) (machine_to_phys_mapping[(mfn)] = (pfn))
-#define get_pfn_from_mfn(mfn)      (machine_to_phys_mapping[(mfn)])
+#define set_gpfn_from_mfn(mfn, pfn) (machine_to_phys_mapping[(mfn)] = (pfn))
+#define get_gpfn_from_mfn(mfn)      (machine_to_phys_mapping[(mfn)])
 
 /*
  * The phys_to_machine_mapping is the reversed mapping of MPT for full
@@ -275,8 +275,8 @@ int check_descriptor(struct desc_struct *d);
 #define INVALID_MFN             (~0UL)
 #define VALID_MFN(_mfn)         (!((_mfn) & (1U<<31)))
 
-#define set_mfn_from_pfn(pfn, mfn) (phys_to_machine_mapping[(pfn)] = (mfn))
-static inline unsigned long get_mfn_from_pfn(unsigned long pfn)
+#define set_mfn_from_gpfn(pfn, mfn) (phys_to_machine_mapping[(pfn)] = (mfn))
+static inline unsigned long get_mfn_from_gpfn(unsigned long pfn)
 {
     unsigned long mfn;
     l1_pgentry_t pte;

@@ -285,19 +285,19 @@ static inline void shadow_mode_disable(struct domain *d)
 
 #define mfn_to_gmfn(_d, mfn)                         \
     ( (shadow_mode_translate(_d))                      \
-      ? get_pfn_from_mfn(mfn)                          \
+      ? get_gpfn_from_mfn(mfn)                          \
       : (mfn) )
 
 #define gmfn_to_mfn(_d, gpfn)                        \
     ({                                                 \
         unlikely(shadow_mode_translate(_d))            \
         ? (likely(current->domain == (_d))             \
-           ? get_mfn_from_pfn(gpfn)                    \
-           : get_mfn_from_pfn_foreign(_d, gpfn))       \
+           ? get_mfn_from_gpfn(gpfn)                    \
+           : get_mfn_from_gpfn_foreign(_d, gpfn))       \
         : (gpfn);                                      \
     })
 
-extern unsigned long get_mfn_from_pfn_foreign(
+extern unsigned long get_mfn_from_gpfn_foreign(
     struct domain *d, unsigned long gpfn);
 
 /************************************************************************/
@@ -471,7 +471,7 @@ static inline void __mark_dirty(struct domain *d, unsigned long mfn)
     ASSERT(d->arch.shadow_dirty_bitmap != NULL);
 
     /* We /really/ mean PFN here, even for non-translated guests. */
-    pfn = get_pfn_from_mfn(mfn);
+    pfn = get_gpfn_from_mfn(mfn);
 
     /*
      * Values with the MSB set denote MFNs that aren't really part of the 
@@ -488,7 +488,7 @@ static inline void __mark_dirty(struct domain *d, unsigned long mfn)
         d->arch.shadow_dirty_count++;
     }
 #ifndef NDEBUG
-    else if ( mfn < max_page )
+    else if ( mfn_valid(mfn) )
     {
         SH_VLOG("mark_dirty OOR! mfn=%lx pfn=%lx max=%x (dom %p)",
                mfn, pfn, d->arch.shadow_dirty_bitmap_size, d);
@@ -567,7 +567,7 @@ update_hl2e(struct vcpu *v, unsigned long va)
     old_hl2e = v->arch.hl2_vtable[index];
 
     if ( (l2e_get_flags(gl2e) & _PAGE_PRESENT) &&
-         VALID_MFN(mfn = get_mfn_from_pfn(l2e_get_pfn(gl2e))) )
+         VALID_MFN(mfn = get_mfn_from_gpfn(l2e_get_pfn(gl2e))) )
         new_hl2e = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
     else
         new_hl2e = l1e_empty();
@@ -649,7 +649,7 @@ static inline void guest_physmap_add_page(
     shadow_lock(d);
     shadow_sync_and_drop_references(d, mfn_to_page(mfn));
     set_p2m_entry(d, gpfn, mfn, &c1, &c2);
-    set_pfn_from_mfn(mfn, gpfn);
+    set_gpfn_from_mfn(mfn, gpfn);
     shadow_unlock(d);
     domain_mmap_cache_destroy(&c1);
     domain_mmap_cache_destroy(&c2);
@@ -668,7 +668,7 @@ static inline void guest_physmap_remove_page(
     shadow_lock(d);
     shadow_sync_and_drop_references(d, mfn_to_page(mfn));
     set_p2m_entry(d, gpfn, -1, &c1, &c2);
-    set_pfn_from_mfn(mfn, INVALID_M2P_ENTRY);
+    set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
     shadow_unlock(d);
     domain_mmap_cache_destroy(&c1);
     domain_mmap_cache_destroy(&c2);
@@ -894,7 +894,7 @@ static inline void hl2e_propagate_from_guest(
     if ( l2e_get_flags(gpde) & _PAGE_PRESENT )
     {
         mfn = gmfn_to_mfn(d, pfn);
-        if ( VALID_MFN(mfn) && (mfn < max_page) )
+        if ( VALID_MFN(mfn) && mfn_valid(mfn) )
             hl2e = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
     }
 
@@ -1233,7 +1233,7 @@ static inline unsigned long ___shadow_status(
 static inline unsigned long __shadow_status(
     struct domain *d, unsigned long gpfn, unsigned long stype)
 {
-    unsigned long gmfn = ((current->domain == d)
+    unsigned long mfn = ((current->domain == d)
                           ? gmfn_to_mfn(d, gpfn)
                           : INVALID_MFN);
 
@@ -1241,22 +1241,22 @@ static inline unsigned long __shadow_status(
     ASSERT(gpfn == (gpfn & PGT_mfn_mask));
     ASSERT(stype && !(stype & ~PGT_type_mask));
 
-    if ( VALID_MFN(gmfn) && (gmfn < max_page) &&
+    if ( VALID_MFN(mfn) && mfn_valid(mfn) &&
          (stype != PGT_writable_pred) &&
          ((stype == PGT_snapshot)
-          ? !mfn_out_of_sync(gmfn)
-          : !mfn_is_page_table(gmfn)) )
+          ? !mfn_out_of_sync(mfn)
+          : !mfn_is_page_table(mfn)) )
     {
         perfc_incrc(shadow_status_shortcut);
 #ifndef NDEBUG
         if ( ___shadow_status(d, gpfn, stype) != 0 )
         {
-            printk("d->id=%d gpfn=%lx gmfn=%lx stype=%lx c=%x t=%" PRtype_info " "
-                   "mfn_out_of_sync(gmfn)=%d mfn_is_page_table(gmfn)=%d\n",
-                   d->domain_id, gpfn, gmfn, stype,
-                   mfn_to_page(gmfn)->count_info,
-                   mfn_to_page(gmfn)->u.inuse.type_info,
-                   mfn_out_of_sync(gmfn), mfn_is_page_table(gmfn));
+            printk("d->id=%d gpfn=%lx mfn=%lx stype=%lx c=%x t=%" PRtype_info " "
+                   "mfn_out_of_sync(mfn)=%d mfn_is_page_table(mfn)=%d\n",
+                   d->domain_id, gpfn, mfn, stype,
+                   mfn_to_page(mfn)->count_info,
+                   mfn_to_page(mfn)->u.inuse.type_info,
+                   mfn_out_of_sync(mfn), mfn_is_page_table(mfn));
             BUG();
         }
 

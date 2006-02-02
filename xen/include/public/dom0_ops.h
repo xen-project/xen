@@ -141,11 +141,11 @@ typedef struct dom0_settime {
 
 typedef struct dom0_getpageframeinfo {
     /* IN variables. */
-    unsigned long pfn;     /* Machine page frame number to query.       */
+    unsigned long mfn;     /* Machine page frame number to query.       */
     domid_t domain;        /* To which domain does the frame belong?    */
     /* OUT variables. */
     /* Is the page PINNED to a type? */
-    uint32_t type;              /* see above type defs */
+    uint32_t type;         /* see above type defs */
 } dom0_getpageframeinfo_t;
 
 /*
@@ -263,7 +263,7 @@ typedef struct dom0_getpageframeinfo2 {
 } dom0_getpageframeinfo2_t;
 
 /*
- * Request memory range (@pfn, @pfn+@nr_pfns-1) to have type @type.
+ * Request memory range (@mfn, @mfn+@nr_mfns-1) to have type @type.
  * On x86, @type is an architecture-defined MTRR memory type.
  * On success, returns the MTRR that was used (@reg) and a handle that can
  * be passed to DOM0_DEL_MEMTYPE to accurately tear down the new setting.
@@ -272,8 +272,8 @@ typedef struct dom0_getpageframeinfo2 {
 #define DOM0_ADD_MEMTYPE         31
 typedef struct dom0_add_memtype {
     /* IN variables. */
-    unsigned long pfn;
-    unsigned long nr_pfns;
+    unsigned long mfn;
+    unsigned long nr_mfns;
     uint32_t      type;
     /* OUT variables. */
     uint32_t      handle;
@@ -300,8 +300,8 @@ typedef struct dom0_read_memtype {
     /* IN variables. */
     uint32_t reg;
     /* OUT variables. */
-    unsigned long pfn;
-    unsigned long nr_pfns;
+    unsigned long mfn;
+    unsigned long nr_mfns;
     uint32_t type;
 } dom0_read_memtype_t;
 
@@ -419,8 +419,8 @@ typedef struct dom0_irq_permission {
 #define DOM0_IOMEM_PERMISSION 47
 typedef struct dom0_iomem_permission {
     domid_t  domain;          /* domain to be affected */
-    unsigned long first_pfn;  /* first page (physical page number) in range */
-    unsigned long nr_pfns;    /* number of pages in range (>0) */
+    unsigned long first_mfn;  /* first page (physical page number) in range */
+    unsigned long nr_mfns;    /* number of pages in range (>0) */
     uint8_t allow_access;     /* allow (!0) or deny (0) access to range? */
 } dom0_iomem_permission_t;
  

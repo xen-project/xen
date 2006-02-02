@@ -76,7 +76,7 @@ populate_physmap(
     int           *preempted)
 {
     struct page_info *page;
-    unsigned long    i, j, pfn, mfn;
+    unsigned long    i, j, gpfn, mfn;
 
     if ( !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
         return 0;
@@ -104,18 +104,18 @@ populate_physmap(
 
         mfn = page_to_mfn(page);
 
-        if ( unlikely(__get_user(pfn, &extent_list[i]) != 0) )
+        if ( unlikely(__get_user(gpfn, &extent_list[i]) != 0) )
             goto out;
 
         if ( unlikely(shadow_mode_translate(d)) )
         {
             for ( j = 0; j < (1 << extent_order); j++ )
-                guest_physmap_add_page(d, pfn + j, mfn + j);
+                guest_physmap_add_page(d, gpfn + j, mfn + j);
         }
         else
         {
             for ( j = 0; j < (1 << extent_order); j++ )
-                set_pfn_from_mfn(mfn + j, pfn + j);
+                set_gpfn_from_mfn(mfn + j, gpfn + j);
 
             /* Inform the domain of the new page's machine address. */ 
             if ( __put_user(mfn, &extent_list[i]) != 0 )
@@ -156,10 +156,10 @@ decrease_reservation(
         for ( j = 0; j < (1 << extent_order); j++ )
         {
             mfn = gmfn_to_mfn(d, gmfn + j);
-            if ( unlikely(mfn >= max_page) )
+            if ( unlikely(!mfn_valid(mfn)) )
             {
-                DPRINTK("Domain %u page number out of range (%lx >= %lx)\n",
-                        d->domain_id, mfn, max_page);
+                DPRINTK("Domain %u page number %lx invalid\n",
+                        d->domain_id, mfn);
                 return i;
             }
             

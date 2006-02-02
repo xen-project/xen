@@ -21,12 +21,12 @@ typedef struct xen_memory_reservation {
 
     /*
      * XENMEM_increase_reservation:
-     *   OUT: MFN bases of extents that were allocated
+     *   OUT: MFN (*not* GMFN) bases of extents that were allocated
      * XENMEM_decrease_reservation:
-     *   IN:  MFN bases of extents to free
+     *   IN:  GMFN bases of extents to free
      * XENMEM_populate_physmap:
-     *   IN:  PFN bases of extents to populate with memory
-     *   OUT: MFN bases of extents that were allocated
+     *   IN:  GPFN bases of extents to populate with memory
+     *   OUT: GMFN bases of extents that were allocated
      *   (NB. This command also updates the mach_to_phys translation table)
      */
     unsigned long *extent_start;
@@ -36,7 +36,7 @@ typedef struct xen_memory_reservation {
     unsigned int   extent_order;
 
     /*
-     * Mmaximum # bits addressable by the user of the allocated region (e.g., 
+     * Maximum # bits addressable by the user of the allocated region (e.g., 
      * I/O devices often have a 32-bit limitation even in 64-bit systems). If 
      * zero then the user has no addressing restriction.
      * This field is not used by XENMEM_decrease_reservation.
@@ -111,7 +111,7 @@ typedef struct xen_reserved_phys_area {
     unsigned int idx;
 
     /* Base and size of the specified reserved area. */
-    unsigned long first_pfn, nr_pfns;
+    unsigned long first_gpfn, nr_gpfns;
 } xen_reserved_phys_area_t;
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */

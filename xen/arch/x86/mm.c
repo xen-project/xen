@@ -475,7 +475,7 @@ get_page_from_l1e(
     {
         MEM_LOG("Error getting mfn %lx (pfn %lx) from L1 entry %" PRIpte
                 " for dom%d",
-                mfn, get_pfn_from_mfn(mfn), l1e_get_intpte(l1e), d->domain_id);
+                mfn, get_gpfn_from_mfn(mfn), l1e_get_intpte(l1e), d->domain_id);
     }
 
     return okay;
@@ -1507,7 +1507,7 @@ int get_page_type(struct page_info *page, unsigned long type)
                                 " != exp %" PRtype_info ") "
                                 "for mfn %lx (pfn %lx)",
                                 x, type, page_to_mfn(page),
-                                get_pfn_from_mfn(page_to_mfn(page)));
+                                get_gpfn_from_mfn(page_to_mfn(page)));
                     return 0;
                 }
                 else if ( (x & PGT_va_mask) == PGT_va_mutable )
@@ -1547,7 +1547,7 @@ int get_page_type(struct page_info *page, unsigned long type)
         {
             MEM_LOG("Error while validating mfn %lx (pfn %lx) for type %"
                     PRtype_info ": caf=%08x taf=%" PRtype_info,
-                    page_to_mfn(page), get_pfn_from_mfn(page_to_mfn(page)),
+                    page_to_mfn(page), get_gpfn_from_mfn(page_to_mfn(page)),
                     type, page->count_info, page->u.inuse.type_info);
             /* Noone else can get a reference. We hold the only ref. */
             page->u.inuse.type_info = 0;
@@ -2152,7 +2152,8 @@ int do_mmu_update(
 
         case MMU_MACHPHYS_UPDATE:
 
-            if (shadow_mode_translate(FOREIGNDOM)) {
+            if ( shadow_mode_translate(FOREIGNDOM) )
+            {
                 MEM_LOG("can't mutate m2p table of translate mode guest");
                 break;
             }
@@ -2166,7 +2167,7 @@ int do_mmu_update(
                 break;
             }
 
-            set_pfn_from_mfn(mfn, gpfn);
+            set_gpfn_from_mfn(mfn, gpfn);
             okay = 1;
 
             mark_dirty(FOREIGNDOM, mfn);
@@ -2626,7 +2627,7 @@ long set_gdt(struct vcpu *v,
     struct domain *d = v->domain;
     /* NB. There are 512 8-byte entries per GDT page. */
     int i, nr_pages = (entries + 511) / 512;
-    unsigned long pfn;
+    unsigned long mfn;
 
     if ( entries > FIRST_RESERVED_GDT_ENTRY )
         return -EINVAL;
@@ -2635,9 +2636,9 @@ long set_gdt(struct vcpu *v,
 
     /* Check the pages in the new GDT. */
     for ( i = 0; i < nr_pages; i++ ) {
-        pfn = frames[i] = gmfn_to_mfn(d, frames[i]);
-        if ((pfn >= max_page) ||
-            !get_page_and_type(mfn_to_page(pfn), d, PGT_gdt_page) )
+        mfn = frames[i] = gmfn_to_mfn(d, frames[i]);
+        if ( !mfn_valid(mfn) ||
+             !get_page_and_type(mfn_to_page(mfn), d, PGT_gdt_page) )
             goto fail;
     }
 
@@ -2704,7 +2705,7 @@ long do_update_descriptor(u64 pa, u64 desc)
 
     if ( !VALID_MFN(mfn = gmfn_to_mfn(dom, gmfn)) ||
          (((unsigned int)pa % sizeof(struct desc_struct)) != 0) ||
-         (mfn >= max_page) ||
+         !mfn_valid(mfn) ||
          !check_descriptor(&d) )
     {
         UNLOCK_BIGLOCK(dom);
@@ -2805,8 +2806,8 @@ long arch_memory_op(int op, void *arg)
         }
         UNLOCK_BIGLOCK(d);
 
-        xrpa.first_pfn = d->arch.first_reserved_pfn;
-        xrpa.nr_pfns   = 32;
+        xrpa.first_gpfn = d->arch.first_reserved_pfn;
+        xrpa.nr_gpfns   = 32;
 
         put_domain(d);
 

@@ -767,7 +767,7 @@ static int setup_guest(int xc_handle,
             PERROR("Cannot find shared info pfn");
             goto error_out;
         }
-        guest_shared_info_mfn = xrpa.first_pfn;
+        guest_shared_info_mfn = xrpa.first_gpfn;
     }
     else
     {

@@ -239,16 +239,16 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         {
             if ( l2e_get_flags(pt[i]) & _PAGE_PRESENT )
             {
-                unsigned long gmfn = l2e_get_pfn(pt[i]);
-                struct page_info *gpage = mfn_to_page(gmfn);
+                unsigned long mfn = l2e_get_pfn(pt[i]);
+                struct page_info *gpage = mfn_to_page(mfn);
 
-                if ( gmfn < 0x100 )
+                if ( mfn < 0x100 )
                 {
                     lowmem_mappings++;
                     continue;
                 }
 
-                if ( gmfn > max_page )
+                if ( !mfn_valid(mfn) )
                 {
                     io_mappings++;
                     continue;
@@ -264,7 +264,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                                d->domain_id, hl2mfn, i,
                                page_get_owner(gpage),
                                page_get_owner(gpage)->domain_id,
-                               gmfn,
+                               mfn,
                                gpage->count_info,
                                gpage->u.inuse.type_info);
                         continue;
@@ -286,16 +286,16 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         {
             if ( l1e_get_flags(pt[i]) & _PAGE_PRESENT )
             {
-                unsigned long gmfn = l1e_get_pfn(pt[i]);
-                struct page_info *gpage = mfn_to_page(gmfn);
+                unsigned long mfn = l1e_get_pfn(pt[i]);
+                struct page_info *gpage = mfn_to_page(mfn);
 
-                if ( gmfn < 0x100 )
+                if ( mfn < 0x100 )
                 {
                     lowmem_mappings++;
                     continue;
                 }
 
-                if ( gmfn > max_page )
+                if ( !mfn_valid(mfn) )
                 {
                     io_mappings++;
                     continue;
@@ -313,7 +313,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                             printk("Audit %d: [l1mfn=%lx, i=%x] Illegal RW "
                                    "t=%" PRtype_info " mfn=%lx\n",
                                    d->domain_id, l1mfn, i,
-                                   gpage->u.inuse.type_info, gmfn);
+                                   gpage->u.inuse.type_info, mfn);
                             errors++;
                         }
 
@@ -322,8 +322,8 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                              ! page_out_of_sync(gpage) )
                         {
                             printk("Audit %d: [l1mfn=%lx, i=%x] Illegal RW of "
-                                   "page table gmfn=%lx\n",
-                                   d->domain_id, l1mfn, i, gmfn);
+                                   "page table mfn=%lx\n",
+                                   d->domain_id, l1mfn, i, mfn);
                             errors++;
                         }
                     }		   
@@ -336,7 +336,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                                d->domain_id, l1mfn, i,
                                page_get_owner(gpage),
                                page_get_owner(gpage)->domain_id,
-                               gmfn,
+                               mfn,
                                gpage->count_info,
                                gpage->u.inuse.type_info);
                         continue;

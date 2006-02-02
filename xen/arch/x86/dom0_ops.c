@@ -98,8 +98,8 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
     case DOM0_ADD_MEMTYPE:
     {
         ret = mtrr_add_page(
-            op->u.add_memtype.pfn,
-            op->u.add_memtype.nr_pfns,
+            op->u.add_memtype.mfn,
+            op->u.add_memtype.nr_mfns,
             op->u.add_memtype.type,
             1);
         if (ret > 0)
@@ -128,16 +128,16 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
 
     case DOM0_READ_MEMTYPE:
     {
-        unsigned long pfn;
-        unsigned int  nr_pfns;
+        unsigned long mfn;
+        unsigned int  nr_mfns;
         mtrr_type     type;
 
         ret = -EINVAL;
         if ( op->u.read_memtype.reg < num_var_ranges )
         {
-            mtrr_if->get(op->u.read_memtype.reg, &pfn, &nr_pfns, &type);
-            (void)__put_user(pfn, &u_dom0_op->u.read_memtype.pfn);
-            (void)__put_user(nr_pfns, &u_dom0_op->u.read_memtype.nr_pfns);
+            mtrr_if->get(op->u.read_memtype.reg, &mfn, &nr_mfns, &type);
+            (void)__put_user(mfn, &u_dom0_op->u.read_memtype.mfn);
+            (void)__put_user(nr_mfns, &u_dom0_op->u.read_memtype.nr_mfns);
             (void)__put_user(type, &u_dom0_op->u.read_memtype.type);
             ret = 0;
         }
@@ -200,17 +200,17 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
     case DOM0_GETPAGEFRAMEINFO:
     {
         struct page_info *page;
-        unsigned long pfn = op->u.getpageframeinfo.pfn;
+        unsigned long mfn = op->u.getpageframeinfo.mfn;
         domid_t dom = op->u.getpageframeinfo.domain;
         struct domain *d;
 
         ret = -EINVAL;
 
-        if ( unlikely(pfn >= max_page) || 
+        if ( unlikely(!mfn_valid(mfn)) ||
              unlikely((d = find_domain_by_id(dom)) == NULL) )
             break;
 
-        page = mfn_to_page(pfn);
+        page = mfn_to_page(mfn);
 
         if ( likely(get_page(page, d)) )
         {
@@ -337,7 +337,7 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
         int i;
         struct domain *d = find_domain_by_id(op->u.getmemlist.domain);
         unsigned long max_pfns = op->u.getmemlist.max_pfns;
-        unsigned long pfn;
+        unsigned long mfn;
         unsigned long *buffer = op->u.getmemlist.buffer;
         struct list_head *list_ent;
 
@@ -350,14 +350,14 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
             list_ent = d->page_list.next;
             for ( i = 0; (i < max_pfns) && (list_ent != &d->page_list); i++ )
             {
-                pfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
-                if ( put_user(pfn, buffer) )
+                mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
+                if ( put_user(mfn, buffer) )
                 {
                     ret = -EFAULT;
                     break;
                 }
                 buffer++;
-                list_ent = mfn_to_page(pfn)->list.next;
+                list_ent = mfn_to_page(mfn)->list.next;
             }
             spin_unlock(&d->page_alloc_lock);
 
