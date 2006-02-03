@@ -19,7 +19,7 @@
 	.ascii	"GUEST_OS=linux,GUEST_VER=2.6"
 	.ascii	",XEN_VER=xen-3.0"
 	.ascii	",VIRT_BASE=0xffffffff80000000"
-	.ascii	",HYPERCALL_PAGE=0x10d" /* __pa(hypercall_page) >> 12 */
+	.ascii	",HYPERCALL_PAGE=0x10a" /* __pa(hypercall_page) >> 12 */
 	.ascii	",LOADER=generic"
 	.byte	0
       
