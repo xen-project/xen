@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.16-rc1-git4-xenU
-# Thu Feb  2 18:28:58 2006
+# Linux kernel version: 2.6.16-rc2-xenU
+# Fri Feb  3 16:57:27 2006
 #
 CONFIG_X86_32=y
 CONFIG_SEMAPHORE_SLEEPERS=y
@@ -159,6 +159,11 @@ CONFIG_X86_CPUID=y
 # CONFIG_NOHIGHMEM is not set
 CONFIG_HIGHMEM4G=y
 # CONFIG_HIGHMEM64G is not set
+CONFIG_VMSPLIT_3G=y
+# CONFIG_VMSPLIT_3G_OPT is not set
+# CONFIG_VMSPLIT_2G is not set
+# CONFIG_VMSPLIT_1G is not set
+CONFIG_PAGE_OFFSET=0xC0000000
 CONFIG_HIGHMEM=y
 CONFIG_SELECT_MEMORY_MODEL=y
 CONFIG_FLATMEM_MANUAL=y

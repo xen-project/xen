@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.16-rc1-git4
-# Thu Feb  2 17:54:57 2006
+# Linux kernel version: 2.6.16-rc2-xen
+# Fri Feb  3 16:30:34 2006
 #
 CONFIG_X86_64=y
 CONFIG_64BIT=y
@@ -2195,6 +2195,7 @@ CONFIG_USB_MICROTEK=m
 CONFIG_USB_DABUSB=m
 CONFIG_USB_VICAM=m
 CONFIG_USB_DSBR=m
+CONFIG_USB_ET61X251=m
 CONFIG_USB_IBMCAM=m
 CONFIG_USB_KONICAWC=m
 CONFIG_USB_OV511=m

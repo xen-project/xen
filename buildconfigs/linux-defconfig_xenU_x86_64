@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.16-rc1-git4
-# Thu Feb  2 17:50:11 2006
+# Linux kernel version: 2.6.16-rc2-xenU
+# Fri Feb  3 16:30:13 2006
 #
 CONFIG_X86_64=y
 CONFIG_64BIT=y
@@ -735,7 +735,6 @@ CONFIG_VXFS_FS=m
 CONFIG_QNX4FS_FS=m
 CONFIG_SYSV_FS=m
 CONFIG_UFS_FS=m
-# CONFIG_UFS_FS_WRITE is not set
 
 #
 # Network File Systems

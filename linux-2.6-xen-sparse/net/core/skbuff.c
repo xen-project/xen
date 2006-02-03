@@ -136,13 +136,15 @@ void skb_under_panic(struct sk_buff *skb, int sz, void *here)
 struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 			    int fclone)
 {
+	kmem_cache_t *cache;
 	struct skb_shared_info *shinfo;
 	struct sk_buff *skb;
 	u8 *data;
 
+	cache = fclone ? skbuff_fclone_cache : skbuff_head_cache;
+
 	/* Get the HEAD */
-	skb = kmem_cache_alloc(fclone ? skbuff_fclone_cache : skbuff_head_cache,
-				gfp_mask & ~__GFP_DMA);
+	skb = kmem_cache_alloc(cache, gfp_mask & ~__GFP_DMA);
 	if (!skb)
 		goto out;
 
@@ -181,7 +183,7 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 out:
 	return skb;
 nodata:
-	kmem_cache_free(fclone ? skbuff_fclone_cache : skbuff_head_cache, skb);
+	kmem_cache_free(cache, skb);
 	skb = NULL;
 	goto out;
 }
@@ -206,13 +208,15 @@ struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
 				     gfp_t gfp_mask,
 				     int fclone)
 {
+	kmem_cache_t *cache;
 	struct skb_shared_info *shinfo;
 	struct sk_buff *skb;
 	u8 *data;
 
+	cache = fclone ? skbuff_fclone_cache : skbuff_head_cache;
+
 	/* Get the HEAD */
-	skb = kmem_cache_alloc(fclone ? skbuff_fclone_cache : skbuff_head_cache,
-				gfp_mask & ~__GFP_DMA);
+	skb = kmem_cache_alloc(cache, gfp_mask & ~__GFP_DMA);
 	if (!skb)
 		goto out;
 
@@ -251,7 +255,7 @@ struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
 out:
 	return skb;
 nodata:
-	kmem_cache_free(fclone ? skbuff_fclone_cache : skbuff_head_cache, skb);
+	kmem_cache_free(cache, skb);
 	skb = NULL;
 	goto out;
 }

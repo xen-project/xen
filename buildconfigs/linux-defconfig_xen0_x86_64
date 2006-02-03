@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.16-rc1-git4
-# Thu Feb  2 17:51:17 2006
+# Linux kernel version: 2.6.16-rc2-xen0
+# Fri Feb  3 16:53:41 2006
 #
 CONFIG_X86_64=y
 CONFIG_64BIT=y
@@ -529,10 +529,12 @@ CONFIG_DM_MULTIPATH_EMC=y
 #
 # Fusion MPT device support
 #
-# CONFIG_FUSION is not set
-# CONFIG_FUSION_SPI is not set
+CONFIG_FUSION=y
+CONFIG_FUSION_SPI=y
 # CONFIG_FUSION_FC is not set
 # CONFIG_FUSION_SAS is not set
+CONFIG_FUSION_MAX_SGE=128
+# CONFIG_FUSION_CTL is not set
 
 #
 # IEEE 1394 (FireWire) support
