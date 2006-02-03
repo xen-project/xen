@@ -13,7 +13,8 @@
 .*\.flc$
 .*\.orig$
 .*\.rej$
-^.valid-srcs$
+^[^/]*\.bz2$
+^\.valid-srcs$
 ^TAGS$
 ^dist/.*$
 ^docs/.*\.aux$
