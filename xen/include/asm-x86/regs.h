@@ -31,8 +31,17 @@ enum EFLAGS {
     EF_ID   = 0x00200000,   /* id */
 };
 
-#define GUEST_MODE(_r) (likely(VM86_MODE(_r) || !RING_0(_r)))
-
-#define GUEST_CONTEXT(_ed, _r) ((HVM_DOMAIN(_ed) && ((_r)->eflags == 0)) || GUEST_MODE(_r))
+#define GUEST_MODE(r)                                                         \
+({                                                                            \
+    unsigned long diff = (char *)guest_cpu_user_regs() - (char *)(r);         \
+    /* Frame pointer must point into current CPU stack. */                    \
+    ASSERT(diff < STACK_SIZE);                                                \
+    /* If a guest frame, it must not be a ring 0 frame (unless HVM guest). */ \
+    ASSERT((diff != 0) || VM86_MODE(r) || !RING_0(r) || HVM_DOMAIN(current)); \
+    /* If not a guest frame, it must be a ring 0 frame. */                    \
+    ASSERT((diff == 0) || (!VM86_MODE(r) && RING_0(r)));                      \
+    /* Return TRUE if it's a guest frame. */                                  \
+    (diff == 0);                                                              \
+})
 
 #endif /* __X86_REGS_H__ */

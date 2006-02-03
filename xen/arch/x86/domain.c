@@ -384,7 +384,7 @@ int arch_set_info_guest(
     }
     else if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
     {
-	hvm_modify_guest_state(v);
+        hvm_modify_guest_state(v);
     }
 
     if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
@@ -433,10 +433,10 @@ int arch_set_info_guest(
             d->arch.phys_table = v->arch.guest_table;
         v->arch.guest_table = mk_pagetable(0);
 
-	if (!hvm_initialize_guest_resources(v))
+        if ( !hvm_initialize_guest_resources(v) )
             return -EINVAL;
-	   
-	hvm_switch_on = 1;
+
+        hvm_switch_on = 1;
     }
 
     update_pagetables(v);
@@ -613,7 +613,7 @@ static void save_segments(struct vcpu *v)
     unsigned int dirty_segment_mask = 0;
 
     if ( HVM_DOMAIN(v) )
-	hvm_save_segments(v);
+        hvm_save_segments(v);
 
     __asm__ __volatile__ ( "mov %%ds,%0" : "=m" (regs->ds) );
     __asm__ __volatile__ ( "mov %%es,%0" : "=m" (regs->es) );
@@ -773,7 +773,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         {
             load_LDT(next);
             load_segments(next);
-	    if ( HVM_DOMAIN(next) )
+            if ( HVM_DOMAIN(next) )
                 hvm_load_msrs(next);
         }
     }
@@ -964,7 +964,7 @@ void domain_relinquish_resources(struct domain *d)
             v->arch.guest_table_user = mk_pagetable(0);
         }
 
-	if ( HVM_DOMAIN(v) )
+        if ( HVM_DOMAIN(v) )
             hvm_relinquish_guest_resources(v);
     }
 

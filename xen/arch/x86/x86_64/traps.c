@@ -18,52 +18,40 @@
 
 void show_registers(struct cpu_user_regs *regs)
 {
-    struct cpu_user_regs faultregs;
-    unsigned long faultcrs[8];
+    struct cpu_user_regs fault_regs = *regs;
+    unsigned long fault_crs[8];
     const char *context;
 
-    if ( HVM_DOMAIN(current) && regs->eflags == 0 )
+    if ( HVM_DOMAIN(current) && GUEST_MODE(regs) )
     {
-	context = "hvm";
-	hvm_load_cpu_guest_regs(current, &faultregs);
-	hvm_store_cpu_guest_ctrl_regs(current, faultcrs);
+        context = "hvm";
+        hvm_store_cpu_guest_regs(current, &fault_regs);
+        hvm_store_cpu_guest_ctrl_regs(current, fault_crs);
     }
     else
     {
-    	faultregs = *regs;
-
-        if ( GUEST_MODE(regs) )
-        {
-            context = "guest";
-	}
-	else 
-	{
-            context = "hypervisor";
-            faultregs.esp = (unsigned long)&regs->esp;
-	}
-
-	faultcrs[0] = read_cr0();
-	faultcrs[3] = read_cr3();
+        context = GUEST_MODE(regs) ? "guest" : "hypervisor";
+        fault_crs[0] = read_cr0();
+        fault_crs[3] = read_cr3();
     }
 
     printk("CPU:    %d\nRIP:    %04x:[<%016lx>]",
-           smp_processor_id(), faultregs.cs, faultregs.rip);
-    if ( !HVM_DOMAIN(current) && !GUEST_MODE(regs) )
-        print_symbol(" %s", faultregs.rip);
-
-    printk("\nRFLAGS: %016lx   CONTEXT: %s\n", faultregs.rflags, context);
+           smp_processor_id(), fault_regs.cs, fault_regs.rip);
+    if ( !GUEST_MODE(regs) )
+        print_symbol(" %s", fault_regs.rip);
+    printk("\nRFLAGS: %016lx   CONTEXT: %s\n", fault_regs.rflags, context);
     printk("rax: %016lx   rbx: %016lx   rcx: %016lx\n",
-           regs->rax, regs->rbx, regs->rcx);
+           fault_regs.rax, fault_regs.rbx, fault_regs.rcx);
     printk("rdx: %016lx   rsi: %016lx   rdi: %016lx\n",
-           regs->rdx, regs->rsi, regs->rdi);
+           fault_regs.rdx, fault_regs.rsi, fault_regs.rdi);
     printk("rbp: %016lx   rsp: %016lx   r8:  %016lx\n",
-           regs->rbp, faultregs.rsp, regs->r8);
+           fault_regs.rbp, fault_regs.rsp, fault_regs.r8);
     printk("r9:  %016lx   r10: %016lx   r11: %016lx\n",
-           regs->r9,  regs->r10, regs->r11);
+           fault_regs.r9,  fault_regs.r10, fault_regs.r11);
     printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
-           regs->r12, regs->r13, regs->r14);
+           fault_regs.r12, fault_regs.r13, fault_regs.r14);
     printk("r15: %016lx   cr0: %016lx   cr3: %016lx\n",
-           regs->r15, faultcrs[0], faultcrs[3]);
+           fault_regs.r15, fault_crs[0], fault_crs[3]);
 
     show_stack(regs);
 }

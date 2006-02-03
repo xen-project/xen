@@ -311,8 +311,15 @@ domain_crash_synchronous_string:
         .asciz "domain_crash_sync called from entry.S\n"
 
 domain_crash_synchronous:
-        leaq domain_crash_synchronous_string(%rip),%rdi
-        call printf
+        # Get out of the guest-save area of the stack.
+        GET_GUEST_REGS(%rax)
+        movq  %rax,%rsp
+        # create_bounce_frame() temporarily clobbers CS.RPL. Fix up.
+        orb   $3,UREGS_cs(%rsp)
+        # printk(domain_crash_synchronous_string)
+        leaq  domain_crash_synchronous_string(%rip),%rdi
+        xorl  %eax,%eax
+        call  printf
         jmp  __domain_crash_synchronous
 
         ALIGN
@@ -468,6 +475,18 @@ ENTRY(double_fault)
 ENTRY(nmi)
         pushq $0
         SAVE_ALL
+        testb $3,UREGS_cs(%rsp)
+        jz    nmi_in_hypervisor_mode
+        /* Interrupted guest context. Copy the context to stack bottom. */
+        GET_GUEST_REGS(%rbx)
+        addq  $UREGS_kernel_sizeof,%rbx
+        movl  $UREGS_kernel_sizeof/8,%ecx
+1:      popq  %rax
+        subq  $8,%rbx
+        movq  %rax,(%rbx)
+        loop  1b
+        movq  %rbx,%rsp
+nmi_in_hypervisor_mode:
         movq  %rsp,%rdi
         call  do_nmi
         jmp   ret_from_intr

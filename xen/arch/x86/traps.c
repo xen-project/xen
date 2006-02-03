@@ -132,6 +132,9 @@ static void show_guest_stack(struct cpu_user_regs *regs)
     int i;
     unsigned long *stack, addr;
 
+    if ( HVM_DOMAIN(current) )
+        return;
+
     if ( VM86_MODE(regs) )
     {
         stack = (unsigned long *)((regs->ss << 4) + (regs->esp & 0xffff));
@@ -251,7 +254,7 @@ void show_stack(struct cpu_user_regs *regs)
     unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), addr;
     int i;
 
-    if ( GUEST_CONTEXT(current, regs) )
+    if ( GUEST_MODE(regs) )
         return show_guest_stack(regs);
 
     printk("Xen stack trace from "__OP"sp=%p:\n   ", stack);
@@ -498,7 +501,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
 
     if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
     {
-        if ( shadow_mode_external(d) && GUEST_CONTEXT(v, regs) )
+        if ( shadow_mode_external(d) && GUEST_MODE(regs) )
             return shadow_fault(addr, regs);
         if ( (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
             return handle_gdt_ldt_mapping_fault(

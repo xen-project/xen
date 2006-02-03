@@ -62,7 +62,6 @@
         pushl $HVM_MONITOR_EFLAGS; \
         popf; \
         subl $(NR_SKIPPED_REGS*4), %esp; \
-        movl $0, 0xc(%esp); /* eflags==0 identifies cpu_user_regs as HVM guest */ \
         pushl %eax; \
         pushl %ebp; \
         pushl %edi; \

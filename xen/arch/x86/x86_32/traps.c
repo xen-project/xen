@@ -18,57 +18,51 @@ idt_entry_t *idt_tables[NR_CPUS] = { 0 };
 
 void show_registers(struct cpu_user_regs *regs)
 {
-    struct cpu_user_regs faultregs;
-    unsigned long faultcrs[8];
+    struct cpu_user_regs fault_regs = *regs;
+    unsigned long fault_crs[8];
     const char *context;
 
-    if ( HVM_DOMAIN(current) && regs->eflags == 0 )
+    if ( HVM_DOMAIN(current) && GUEST_MODE(regs) )
     {
-	context = "hvm";
-	hvm_load_cpu_guest_regs(current, &faultregs);
-	hvm_store_cpu_guest_ctrl_regs(current, faultcrs);
+        context = "hvm";
+        hvm_store_cpu_guest_regs(current, &fault_regs);
+        hvm_store_cpu_guest_ctrl_regs(current, fault_crs);
     }
     else
     {
-    	faultregs = *regs;
-        if ( GUEST_MODE(regs) )
-        {
-            context = "guest";
-            faultregs.ss &= 0xFFFF;
-            faultregs.ds &= 0xFFFF;
-            faultregs.es &= 0xFFFF;
-            faultregs.cs &= 0xFFFF;
-	}
-	else 
-	{
-            context = "hypervisor";
-            faultregs.esp = (unsigned long)&regs->esp;
-            faultregs.ss = __HYPERVISOR_DS;
-            faultregs.ds = __HYPERVISOR_DS;
-            faultregs.es = __HYPERVISOR_DS;
-            faultregs.cs = __HYPERVISOR_CS;
-	}
-        __asm__ ("movw %%fs,%0 ; movw %%gs,%1"
-	         : "=r" (faultregs.fs), "=r" (faultregs.gs) );
+        context = GUEST_MODE(regs) ? "guest" : "hypervisor";
 
-	faultcrs[0] = read_cr0();
-	faultcrs[3] = read_cr3();
+        if ( !GUEST_MODE(regs) )
+        {
+            fault_regs.esp = (unsigned long)&regs->esp;
+            fault_regs.ss = __HYPERVISOR_DS;
+            fault_regs.ds = __HYPERVISOR_DS;
+            fault_regs.es = __HYPERVISOR_DS;
+            fault_regs.cs = __HYPERVISOR_CS;
+        }
+
+        __asm__ (
+            "movw %%fs,%0 ; movw %%gs,%1"
+            : "=r" (fault_regs.fs), "=r" (fault_regs.gs) );
+        
+        fault_crs[0] = read_cr0();
+        fault_crs[3] = read_cr3();
     }
 
     printk("CPU:    %d\nEIP:    %04x:[<%08x>]",
-           smp_processor_id(), faultregs.cs, faultregs.eip);
-    if ( !HVM_DOMAIN(current) && !GUEST_MODE(regs) )
-        print_symbol(" %s", faultregs.eip);
-    printk("\nEFLAGS: %08x   CONTEXT: %s\n", faultregs.eflags, context);
+           smp_processor_id(), fault_regs.cs, fault_regs.eip);
+    if ( !GUEST_MODE(regs) )
+        print_symbol(" %s", fault_regs.eip);
+    printk("\nEFLAGS: %08x   CONTEXT: %s\n", fault_regs.eflags, context);
     printk("eax: %08x   ebx: %08x   ecx: %08x   edx: %08x\n",
-           regs->eax, regs->ebx, regs->ecx, regs->edx);
+           fault_regs.eax, fault_regs.ebx, fault_regs.ecx, fault_regs.edx);
     printk("esi: %08x   edi: %08x   ebp: %08x   esp: %08x\n",
-           regs->esi, regs->edi, regs->ebp, faultregs.esp);
-    printk("cr0: %08lx   cr3: %08lx\n", faultcrs[0], faultcrs[3]);
+           fault_regs.esi, fault_regs.edi, fault_regs.ebp, fault_regs.esp);
+    printk("cr0: %08lx   cr3: %08lx\n", fault_crs[0], fault_crs[3]);
     printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   "
            "ss: %04x   cs: %04x\n",
-           faultregs.ds, faultregs.es, faultregs.fs,
-	   faultregs.gs, faultregs.ss, faultregs.cs);
+           fault_regs.ds, fault_regs.es, fault_regs.fs,
+           fault_regs.gs, fault_regs.ss, fault_regs.cs);
 
     show_stack(regs);
 }
