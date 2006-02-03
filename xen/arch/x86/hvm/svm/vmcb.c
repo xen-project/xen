@@ -417,9 +417,8 @@ void svm_do_launch(struct vcpu *v)
     /* current core is the one we will perform the vmrun on */
     v->arch.hvm_svm.core = core;
     clear_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
-    if(!asidpool_assign_next(vmcb, 0, core, core)) {
+    if ( !asidpool_assign_next(vmcb, 0, core, core) )
         BUG();
-    }
 
     if (v->vcpu_id == 0)
         hvm_setup_platform(v->domain);
@@ -446,15 +445,13 @@ void svm_do_launch(struct vcpu *v)
         pt = pagetable_get_paddr(v->domain->arch.phys_table);
         printk("%s: phys_table   = %lx\n", __func__, pt);
     }
-    
-    if (svm_paging_enabled(v))
-    {
+
+    shadow_direct_map_init(v);
+
+    if ( svm_paging_enabled(v) )
         vmcb->cr3 = pagetable_get_paddr(v->arch.guest_table);
-    }
     else
-    {
         vmcb->cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
-    }
 
     if (svm_dbg_on) 
     {

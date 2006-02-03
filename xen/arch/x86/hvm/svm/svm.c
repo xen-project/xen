@@ -833,8 +833,11 @@ static int svm_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
             va, eip, (unsigned long)regs->error_code);
 //#endif
 
-    if (!svm_paging_enabled(v)) 
+    if ( !svm_paging_enabled(v) )
     {
+        if ( shadow_direct_map_fault(va, regs) ) 
+            return 1;
+
         handle_mmio(va, va);
         TRACE_VMEXIT(2,2);
         return 1;
@@ -1437,6 +1440,9 @@ static int svm_set_cr0(unsigned long value)
             if (old_base_mfn)
                 put_page(mfn_to_page(old_base_mfn));
 	}
+#endif
+#if CONFIG_PAGING_LEVELS == 2
+        shadow_direct_map_clean(v);
 #endif
         /* Now arch.guest_table points to machine physical. */
         v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
@@ -2272,10 +2278,8 @@ void walk_shadow_and_guest_pt(unsigned long gva)
 
     gpa = gva_to_gpa( gva );
     printk( "gva = %lx, gpa=%lx, gCR3=%x\n", gva, gpa, (u32)vmcb->cr3 );
-    if( !svm_paging_enabled(v) || mmio_space( gpa ) )
-    {
+    if( !svm_paging_enabled(v) || mmio_space(gpa) )
        return;
-    }
 
     /* let's dump the guest and shadow page info */
 
