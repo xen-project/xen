@@ -168,133 +168,6 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
     return 0;
 }
 
-#ifdef __i386__
-static int zap_mmio_range(int xc_handle, uint32_t dom,
-                          l2_pgentry_32_t *vl2tab,
-                          unsigned long mmio_range_start,
-                          unsigned long mmio_range_size)
-{
-    unsigned long mmio_addr;
-    unsigned long mmio_range_end = mmio_range_start + mmio_range_size;
-    unsigned long vl2e;
-    l1_pgentry_32_t *vl1tab;
-
-    mmio_addr = mmio_range_start & PAGE_MASK;
-    for (; mmio_addr < mmio_range_end; mmio_addr += PAGE_SIZE) {
-        vl2e = vl2tab[l2_table_offset(mmio_addr)];
-        if (vl2e == 0)
-            continue;
-        vl1tab = xc_map_foreign_range(
-            xc_handle, dom, PAGE_SIZE,
-            PROT_READ|PROT_WRITE, vl2e >> PAGE_SHIFT);
-        if ( vl1tab == 0 )
-        {
-            PERROR("Failed zap MMIO range");
-            return -1;
-        }
-        vl1tab[l1_table_offset(mmio_addr)] = 0;
-        munmap(vl1tab, PAGE_SIZE);
-    }
-    return 0;
-}
-
-static int zap_mmio_ranges(int xc_handle, uint32_t dom, unsigned long l2tab,
-                           unsigned char e820_map_nr, unsigned char *e820map)
-{
-    unsigned int i;
-    struct e820entry *e820entry = (struct e820entry *)e820map;
-
-    l2_pgentry_32_t *vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                                   PROT_READ|PROT_WRITE,
-                                                   l2tab >> PAGE_SHIFT);
-    if ( vl2tab == 0 )
-        return -1;
-
-    for ( i = 0; i < e820_map_nr; i++ )
-    {
-        if ( (e820entry[i].type == E820_IO) &&
-             (zap_mmio_range(xc_handle, dom, vl2tab,
-                             e820entry[i].addr, e820entry[i].size) == -1))
-            return -1;
-    }
-
-    munmap(vl2tab, PAGE_SIZE);
-    return 0;
-}
-#else
-static int zap_mmio_range(int xc_handle, uint32_t dom,
-                          l3_pgentry_t *vl3tab,
-                          unsigned long mmio_range_start,
-                          unsigned long mmio_range_size)
-{
-    unsigned long mmio_addr;
-    unsigned long mmio_range_end = mmio_range_start + mmio_range_size;
-    unsigned long vl2e = 0;
-    unsigned long vl3e;
-    l1_pgentry_t *vl1tab;
-    l2_pgentry_t *vl2tab;
-
-    mmio_addr = mmio_range_start & PAGE_MASK;
-    for ( ; mmio_addr < mmio_range_end; mmio_addr += PAGE_SIZE )
-    {
-        vl3e = vl3tab[l3_table_offset(mmio_addr)];
-        if ( vl3e == 0 )
-            continue;
-
-        vl2tab = xc_map_foreign_range(
-            xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, vl3e>>PAGE_SHIFT);
-        if ( vl2tab == NULL )
-        {
-            PERROR("Failed zap MMIO range");
-            return -1;
-        }
-
-        vl2e = vl2tab[l2_table_offset(mmio_addr)];
-        if ( vl2e == 0 )
-        {
-            munmap(vl2tab, PAGE_SIZE);
-            continue;
-        }
-
-        vl1tab = xc_map_foreign_range(
-            xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, vl2e>>PAGE_SHIFT);
-        if ( vl1tab == NULL )
-        {
-            PERROR("Failed zap MMIO range");
-            munmap(vl2tab, PAGE_SIZE);
-            return -1;
-        }
-
-        vl1tab[l1_table_offset(mmio_addr)] = 0;
-        munmap(vl2tab, PAGE_SIZE);
-        munmap(vl1tab, PAGE_SIZE);
-    }
-    return 0;
-}
-
-static int zap_mmio_ranges(int xc_handle, uint32_t dom, unsigned long l3tab,
-                           unsigned char e820_map_nr, unsigned char *e820map)
-{
-    unsigned int i;
-    struct e820entry *e820entry = (struct e820entry *)e820map;
-
-    l3_pgentry_t *vl3tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                                PROT_READ|PROT_WRITE,
-                                                l3tab >> PAGE_SHIFT);
-    if (vl3tab == 0)
-        return -1;
-    for ( i = 0; i < e820_map_nr; i++ ) {
-        if ( (e820entry[i].type == E820_IO) &&
-             (zap_mmio_range(xc_handle, dom, vl3tab,
-                             e820entry[i].addr, e820entry[i].size) == -1) )
-            return -1;
-    }
-    munmap(vl3tab, PAGE_SIZE);
-    return 0;
-}
-
-#endif
-
 static int setup_guest(int xc_handle,
                        uint32_t dom, int memsize,
                        char *image, unsigned long image_size,
@@ -308,15 +181,8 @@ static int setup_guest(int xc_handle,
                        unsigned int store_evtchn,
                        unsigned long *store_mfn)
 {
-    l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
-    l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
     unsigned long *page_array = NULL;
-#ifdef __x86_64__
-    l3_pgentry_t *vl3tab=NULL;
-    unsigned long l3tab;
-#endif
-    unsigned long l2tab = 0;
-    unsigned long l1tab = 0;
+
     unsigned long count, i;
     shared_info_t *shared_info;
     void *e820_page;
@@ -325,7 +191,6 @@ static int setup_guest(int xc_handle,
     int rc;
 
     unsigned long nr_pt_pages;
-    unsigned long ppt_alloc;
 
     struct domain_setup_info dsi;
     unsigned long vpt_start;
@@ -391,120 +256,6 @@ static int setup_guest(int xc_handle,
     if ( (mmu = xc_init_mmu_updates(xc_handle, dom)) == NULL )
         goto error_out;
 
-    /* First allocate page for page dir or pdpt */
-    ppt_alloc = vpt_start >> PAGE_SHIFT;
-    if ( page_array[ppt_alloc] > 0xfffff )
-    {
-        unsigned long nmfn;
-        nmfn = xc_make_page_below_4G( xc_handle, dom, page_array[ppt_alloc] );
-        if ( nmfn == 0 )
-        {
-            fprintf(stderr, "Couldn't get a page below 4GB :-(\n");
-            goto error_out;
-        }
-        page_array[ppt_alloc] = nmfn;
-    }
-
-#ifdef __i386__
-    l2tab = page_array[ppt_alloc++] << PAGE_SHIFT;
-    ctxt->ctrlreg[3] = l2tab;
-
-    if ( (vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                        PROT_READ|PROT_WRITE,
-                                        l2tab >> PAGE_SHIFT)) == NULL )
-        goto error_out;
-    memset(vl2tab, 0, PAGE_SIZE);
-    vl2e = &vl2tab[l2_table_offset(0)];
-    for ( count = 0; count < (v_end >> PAGE_SHIFT); count++ )
-    {
-        if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 )
-        {
-            l1tab = page_array[ppt_alloc++] << PAGE_SHIFT;
-            if ( vl1tab != NULL )
-                munmap(vl1tab, PAGE_SIZE);
-            if ( (vl1tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                                PROT_READ|PROT_WRITE,
-                                                l1tab >> PAGE_SHIFT)) == NULL )
-            {
-                munmap(vl2tab, PAGE_SIZE);
-                goto error_out;
-            }
-            memset(vl1tab, 0, PAGE_SIZE);
-            vl1e = &vl1tab[l1_table_offset(count << PAGE_SHIFT)];
-            *vl2e++ = l1tab | L2_PROT;
-        }
-
-        *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
-        vl1e++;
-    }
-    munmap(vl1tab, PAGE_SIZE);
-    munmap(vl2tab, PAGE_SIZE);
-#else
-    l3tab = page_array[ppt_alloc++] << PAGE_SHIFT;
-    ctxt->ctrlreg[3] = l3tab;
-
-    if ( (vl3tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                        PROT_READ|PROT_WRITE,
-                                        l3tab >> PAGE_SHIFT)) == NULL )
-        goto error_out;
-    memset(vl3tab, 0, PAGE_SIZE);
-
-    /* Fill in every PDPT entry. */
-    for ( i = 0; i < L3_PAGETABLE_ENTRIES_PAE; i++ )
-    {
-        l2tab = page_array[ppt_alloc++] << PAGE_SHIFT;
-        if ( (vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                            PROT_READ|PROT_WRITE,
-                                            l2tab >> PAGE_SHIFT)) == NULL )
-            goto error_out;
-        memset(vl2tab, 0, PAGE_SIZE);
-        munmap(vl2tab, PAGE_SIZE);
-        vl2tab = NULL;
-        vl3tab[i] = l2tab | L3_PROT;
-    }
-
-    for ( count = 0; count < (v_end >> PAGE_SHIFT); count++ )
-    {
-        if ( !(count & ((1 << (L3_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)) - 1)) )
-        {
-            l2tab = vl3tab[count >> (L3_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)]
-                    & PAGE_MASK;
-
-            if (vl2tab != NULL)
-                munmap(vl2tab, PAGE_SIZE);
-
-            if ( (vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                                PROT_READ|PROT_WRITE,
-                                                l2tab >> PAGE_SHIFT)) == NULL )
-                goto error_out;
-
-            vl2e = &vl2tab[l2_table_offset(count << PAGE_SHIFT)];
-        }
-        if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 )
-        {
-            l1tab = page_array[ppt_alloc++] << PAGE_SHIFT;
-            if ( vl1tab != NULL )
-                munmap(vl1tab, PAGE_SIZE);
-            if ( (vl1tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                                PROT_READ|PROT_WRITE,
-                                                l1tab >> PAGE_SHIFT)) == NULL )
-            {
-                munmap(vl2tab, PAGE_SIZE);
-                goto error_out;
-            }
-            memset(vl1tab, 0, PAGE_SIZE);
-            vl1e = &vl1tab[l1_table_offset(count << PAGE_SHIFT)];
-            *vl2e++ = l1tab | L2_PROT;
-        }
-
-        *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
-        vl1e++;
-    }
-
-    munmap(vl1tab, PAGE_SIZE);
-    munmap(vl2tab, PAGE_SIZE);
-    munmap(vl3tab, PAGE_SIZE);
-#endif
     /* Write the machine->phys table entries. */
     for ( count = 0; count < nr_pages; count++ )
     {
@@ -525,14 +276,6 @@ static int setup_guest(int xc_handle,
         goto error_out;
     memset(e820_page, 0, PAGE_SIZE);
     e820_map_nr = build_e820map(e820_page, v_end);
-#if defined (__i386__)
-    if (zap_mmio_ranges(xc_handle, dom, l2tab, e820_map_nr,
-                        ((unsigned char *)e820_page) + E820_MAP_OFFSET) == -1)
-#else
-    if (zap_mmio_ranges(xc_handle, dom, l3tab, e820_map_nr,
-                        ((unsigned char *)e820_page) + E820_MAP_OFFSET) == -1)
-#endif
-        goto error_out;
     munmap(e820_page, PAGE_SIZE);
 
     /* shared_info page starts its life empty. */

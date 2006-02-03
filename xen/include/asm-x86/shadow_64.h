@@ -92,7 +92,7 @@ typedef struct { intpte_t lo; } pgentry_64_t;
         ( !!(((x).lo ^ (y).lo) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )
 
 #define PAE_SHADOW_SELF_ENTRY   259
-#define PDP_ENTRIES   4
+#define PAE_L3_PAGETABLE_ENTRIES   4
 
 static inline int  table_offset_64(unsigned long va, int level)
 {

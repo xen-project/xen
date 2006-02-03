@@ -563,7 +563,12 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
     }
 #endif
 
-    if (!vmx_paging_enabled(current)){
+    if ( !vmx_paging_enabled(current) )
+    {
+        /* construct 1-to-1 direct mapping */
+        if ( shadow_direct_map_fault(va, regs) ) 
+            return 1;
+
         handle_mmio(va, va);
         TRACE_VMEXIT (2,2);
         return 1;
@@ -1212,6 +1217,9 @@ static int vmx_set_cr0(unsigned long value)
                 __vmwrite(GUEST_CR4, crn | X86_CR4_PAE);
             }
         }
+#endif
+#if CONFIG_PAGING_LEVELS == 2
+        shadow_direct_map_clean(v);
 #endif
         /*
          * Now arch.guest_table points to machine physical.

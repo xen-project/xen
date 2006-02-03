@@ -34,7 +34,8 @@
 #include <asm/flushtlb.h>
 #include <xen/event.h>
 #include <xen/kernel.h>
-#if CONFIG_PAGING_LEVELS >= 4
+#include <asm/shadow.h>
+#if CONFIG_PAGING_LEVELS >= 3
 #include <asm/shadow_64.h>
 #endif
 
@@ -218,6 +219,7 @@ static void vmx_do_launch(struct vcpu *v)
     error |= __vmwrite(GUEST_TR_BASE, 0);
     error |= __vmwrite(GUEST_TR_LIMIT, 0xff);
 
+    shadow_direct_map_init(v);
     __vmwrite(GUEST_CR3, pagetable_get_paddr(v->domain->arch.phys_table));
     __vmwrite(HOST_CR3, pagetable_get_paddr(v->arch.monitor_table));
     __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());

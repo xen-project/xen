@@ -53,6 +53,20 @@ integer_param("hvm_debug", opt_hvm_debug_level);
 
 struct hvm_function_table hvm_funcs;
 
+static void vmx_zap_mmio_range(
+    struct domain *d, unsigned long pfn, unsigned long nr_pfn)
+{
+    unsigned long i, val = INVALID_MFN;
+
+    for ( i = 0; i < nr_pfn; i++ )
+    {
+        if ( pfn + i >= 0xfffff ) 
+            break;
+        
+        __copy_to_user(&phys_to_machine_mapping[pfn + i], &val, sizeof (val));
+    }
+}
+
 static void hvm_map_io_shared_page(struct domain *d)
 {
     int i;
@@ -84,8 +98,12 @@ static void hvm_map_io_shared_page(struct domain *d)
         if (e820entry[i].type == E820_SHARED_PAGE)
         {
             gpfn = (e820entry[i].addr >> PAGE_SHIFT);
-            break;
         }
+        if ( e820entry[i].type == E820_IO )
+            vmx_zap_mmio_range(
+                d, 
+                e820entry[i].addr >> PAGE_SHIFT,
+                e820entry[i].size >> PAGE_SHIFT);
     }
 
     if ( gpfn == 0 ) {

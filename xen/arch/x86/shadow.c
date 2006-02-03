@@ -2858,7 +2858,7 @@ static inline unsigned long init_bl2(l4_pgentry_t *spl4e, unsigned long smfn)
     if (!page)
         domain_crash_synchronous();
 
-    for (count = 0; count < PDP_ENTRIES; count++)
+    for ( count = 0; count < PAE_L3_PAGETABLE_ENTRIES; count++ )
     {
         sl2mfn = page_to_mfn(page+count);
         l2 = map_domain_page(sl2mfn);
@@ -3568,6 +3568,7 @@ static void shadow_invlpg_64(struct vcpu *v, unsigned long va)
     shadow_unlock(d);
 }
 
+
 #if CONFIG_PAGING_LEVELS == 4
 static unsigned long gva_to_gpa_64(unsigned long gva)
 {
@@ -3637,6 +3638,79 @@ struct shadow_ops MODE_B_HANDLER = {
 
 #endif
 
+#if CONFIG_PAGING_LEVELS == 3 ||                                \
+    ( CONFIG_PAGING_LEVELS == 4 && defined (GUEST_PGENTRY_32) )
+
+/* 
+ * Use GUEST_PGENTRY_32 to force PAE_SHADOW_SELF_ENTRY for L4.
+ *
+ * Very simple shadow code to handle 1:1 direct mapping for guest 
+ * non-paging code, which actually is running in PAE/vm86 mode with 
+ * paging-enabled.
+ *
+ * We expect that the top level (L3) page has been allocated and initialized.
+ */
+int shadow_direct_map_fault(unsigned long vpa, struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
+    l3_pgentry_t sl3e;
+    l2_pgentry_t sl2e;
+    l1_pgentry_t sl1e;
+    unsigned long mfn, smfn;
+    struct page_info *page;
+
+    /*
+     * If the faulting address is within the MMIO range, we continue
+     * on handling the #PF as such.
+     */
+    if ( (mfn = get_mfn_from_gpfn(vpa >> PAGE_SHIFT)) == INVALID_MFN )
+    {
+         goto fail;
+    }
+
+    shadow_lock(d);
+
+    __shadow_get_l3e(v, vpa, &sl3e);
+
+    if ( !(l3e_get_flags(sl3e) & _PAGE_PRESENT) ) 
+    {
+        page = alloc_domheap_page(NULL);
+        if ( !page )
+            goto fail; 
+        smfn = page_to_mfn(page);
+        sl3e = l3e_from_pfn(smfn, _PAGE_PRESENT);
+        __shadow_set_l3e(v, vpa, &sl3e);
+    }
+
+    __shadow_get_l2e(v, vpa, &sl2e);
+
+    if ( !(l2e_get_flags(sl2e) & _PAGE_PRESENT) ) 
+    {
+        page = alloc_domheap_page(NULL);
+        if ( !page )
+            goto fail; 
+        smfn = page_to_mfn(page);
+
+        sl2e = l2e_from_pfn(smfn, __PAGE_HYPERVISOR | _PAGE_USER);
+        __shadow_set_l2e(v, vpa, &sl2e);
+    }
+
+    __shadow_get_l1e(v, vpa, &sl1e);
+        
+    if ( !(l1e_get_flags(sl1e) & _PAGE_PRESENT) ) 
+    {
+        sl1e = l1e_from_pfn(mfn, __PAGE_HYPERVISOR | _PAGE_USER);
+        __shadow_set_l1e(v, vpa, &sl1e);
+    } 
+
+    shadow_unlock(d);
+    return EXCRET_fault_fixed;
+
+fail:
+    return 0;
+}
+#endif
 
 /*
  * Local variables:

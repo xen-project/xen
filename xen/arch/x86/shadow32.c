@@ -43,6 +43,8 @@ static void free_writable_pte_predictions(struct domain *d);
 static void mark_shadows_as_reflecting_snapshot(struct domain *d, unsigned long gpfn);
 #endif
 
+static void free_p2m_table(struct vcpu *v);
+
 /********
 
 There's a per-domain shadow table spin lock which works fine for SMP
@@ -746,19 +748,18 @@ static void alloc_monitor_pagetable(struct vcpu *v)
             l2e_from_page(virt_to_page(d->arch.mm_perdomain_pt) + i,
                           __PAGE_HYPERVISOR);
 
-    // map the phys_to_machine map into the Read-Only MPT space for this domain
-    mpl2e[l2_table_offset(RO_MPT_VIRT_START)] =
-        l2e_from_paddr(pagetable_get_paddr(d->arch.phys_table),
-                        __PAGE_HYPERVISOR);
-
     // Don't (yet) have mappings for these...
     // Don't want to accidentally see the idle_pg_table's linear mapping.
     //
     mpl2e[l2_table_offset(LINEAR_PT_VIRT_START)] = l2e_empty();
     mpl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)] = l2e_empty();
+    mpl2e[l2_table_offset(RO_MPT_VIRT_START)] = l2e_empty();
 
     v->arch.monitor_table = mk_pagetable(mmfn << PAGE_SHIFT);
     v->arch.monitor_vtable = mpl2e;
+
+    if ( v->vcpu_id == 0 )
+        alloc_p2m_table(d);
 }
 
 /*
@@ -791,6 +792,9 @@ void free_monitor_pagetable(struct vcpu *v)
         ASSERT(mfn);
         put_shadow_ref(mfn);
     }
+
+    if ( v->vcpu_id == 0 )
+        free_p2m_table(v);
 
     /*
      * Then free monitor_table.
@@ -844,67 +848,209 @@ set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn,
     return 1;
 }
 
-static int
+int
 alloc_p2m_table(struct domain *d)
 {
     struct list_head *list_ent;
-    struct page_info *page, *l2page;
-    l2_pgentry_t *l2;
-    unsigned long mfn, pfn;
-    struct domain_mmap_cache l1cache, l2cache;
+    unsigned long va = RO_MPT_VIRT_START;   /* phys_to_machine_mapping */
 
-    l2page = alloc_domheap_page(NULL);
-    if ( l2page == NULL )
-        return 0;
+    l2_pgentry_t *l2tab = NULL;
+    l1_pgentry_t *l1tab = NULL;
+    unsigned long *l0tab = NULL;
+    l2_pgentry_t l2e = { 0 };
+    l1_pgentry_t l1e = { 0 };
 
-    domain_mmap_cache_init(&l1cache);
-    domain_mmap_cache_init(&l2cache);
+    unsigned long pfn;
+    int i;
 
-    d->arch.phys_table = mk_pagetable(page_to_maddr(l2page));
-    l2 = map_domain_page_with_cache(page_to_mfn(l2page), &l2cache);
-    memset(l2, 0, PAGE_SIZE);
-    unmap_domain_page_with_cache(l2, &l2cache);
+    ASSERT ( pagetable_get_pfn(d->vcpu[0]->arch.monitor_table));
+
+    l2tab = map_domain_page(
+        pagetable_get_pfn(d->vcpu[0]->arch.monitor_table));
 
     list_ent = d->page_list.next;
-    while ( list_ent != &d->page_list )
+
+    for ( i = 0; list_ent != &d->page_list; i++ )
     {
+        struct page_info *page;
         page = list_entry(list_ent, struct page_info, list);
-        mfn = page_to_mfn(page);
-        pfn = get_gpfn_from_mfn(mfn);
-        ASSERT(pfn != INVALID_M2P_ENTRY);
-        ASSERT(pfn < (1u<<20));
+        pfn = page_to_mfn(page);
 
-        set_p2m_entry(d, pfn, mfn, &l2cache, &l1cache);
-
-        list_ent = page->list.next;
-    }
-
-    list_ent = d->xenpage_list.next;
-    while ( list_ent != &d->xenpage_list )
-    {
-        page = list_entry(list_ent, struct page_info, list);
-        mfn = page_to_mfn(page);
-        pfn = get_gpfn_from_mfn(mfn);
-        if ( (pfn != INVALID_M2P_ENTRY) &&
-             (pfn < (1u<<20)) )
+        l2e = l2tab[l2_table_offset(va)];
+        if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
         {
-            set_p2m_entry(d, pfn, mfn, &l2cache, &l1cache);
-        }
+            page = alloc_domheap_page(NULL);
 
-        list_ent = page->list.next;
+            if ( !l1tab )
+                unmap_domain_page(l1tab);
+            l1tab = map_domain_page(page_to_mfn(page));
+            memset(l1tab, 0, PAGE_SIZE);
+            l2e = l2tab[l2_table_offset(va)] =
+                l2e_from_page(page, __PAGE_HYPERVISOR);
+        }
+        else if ( l1tab == NULL)
+            l1tab = map_domain_page(l2e_get_pfn(l2e));
+
+        l1e = l1tab[l1_table_offset(va)];
+        if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
+        {
+            page = alloc_domheap_page(NULL);
+            if ( !l0tab  )
+                unmap_domain_page(l0tab);
+            l0tab = map_domain_page(page_to_mfn(page));
+            memset(l0tab, 0, PAGE_SIZE );
+            l1e = l1tab[l1_table_offset(va)] =
+                l1e_from_page(page, __PAGE_HYPERVISOR);
+        }
+        else if ( l0tab == NULL)
+            l0tab = map_domain_page(l1e_get_pfn(l1e));
+
+        l0tab[i & ((1 << PAGETABLE_ORDER) - 1) ] = pfn;
+        list_ent = frame_table[pfn].list.next;
+        va += sizeof(pfn);
     }
 
-    domain_mmap_cache_destroy(&l2cache);
-    domain_mmap_cache_destroy(&l1cache);
+    unmap_domain_page(l2tab);
+    unmap_domain_page(l1tab);
+    unmap_domain_page(l0tab);
 
     return 1;
 }
 
-static void
-free_p2m_table(struct domain *d)
+static void 
+free_p2m_table(struct vcpu *v)
 {
-    // uh, this needs some work...  :)
-    BUG();
+    unsigned long va;
+    l2_pgentry_t *l2tab;
+    l1_pgentry_t *l1tab;
+    l2_pgentry_t l2e;
+    l1_pgentry_t l1e;
+
+    ASSERT ( pagetable_get_pfn(v->arch.monitor_table) );
+
+    l2tab = map_domain_page(
+        pagetable_get_pfn(v->arch.monitor_table));
+
+    for ( va = RO_MPT_VIRT_START; va < RO_MPT_VIRT_END; )
+    {
+        int i;
+
+        l2e = l2tab[l2_table_offset(va)];
+        if ( l2e_get_flags(l2e) & _PAGE_PRESENT )
+        {
+            l1tab = map_domain_page(l2e_get_pfn(l2e));
+            for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++)
+            {
+                l1e = l1tab[l1_table_offset(va)];
+
+                if ( l1e_get_flags(l1e) & _PAGE_PRESENT )
+                    free_domheap_page(mfn_to_page(l1e_get_pfn(l1e)));
+                va += PAGE_SIZE; 
+            }
+            unmap_domain_page(l1tab);
+            free_domheap_page(mfn_to_page(l2e_get_pfn(l2e)));
+        }
+    }
+    unmap_domain_page(l2tab);
+}
+
+int shadow_direct_map_fault(unsigned long vpa, struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
+    l2_pgentry_t sl2e;
+    l1_pgentry_t sl1e;
+    l1_pgentry_t *sple = NULL;
+    unsigned long mfn, smfn;
+    struct page_info *page;
+
+    /*
+     * If the faulting address is within the MMIO range, we continue
+     * on handling the #PF as such.
+     */
+    if ( (mfn = get_mfn_from_gpfn(vpa >> PAGE_SHIFT)) == INVALID_MFN )
+    {
+         goto fail;
+    }
+
+    shadow_lock(d);
+
+    __shadow_get_l2e(v, vpa, &sl2e);
+
+   if ( !(l2e_get_flags(sl2e) & _PAGE_PRESENT) )
+    {
+        page = alloc_domheap_page(NULL);
+        if ( !page )
+            goto fail;
+
+        smfn = page_to_mfn(page);
+        sl2e = l2e_from_pfn(smfn, __PAGE_HYPERVISOR | _PAGE_USER);
+        __shadow_set_l2e(v, vpa, sl2e);
+    }
+
+    sple = (l1_pgentry_t *)map_domain_page(l2e_get_pfn(sl2e));
+    sl1e = sple[l1_table_offset(vpa)];
+
+    if ( !(l1e_get_flags(sl1e) & _PAGE_PRESENT) )
+    {
+        sl1e = l1e_from_pfn(mfn, __PAGE_HYPERVISOR | _PAGE_USER);
+        sple[l1_table_offset(vpa)] = sl1e;
+    }
+    unmap_domain_page(sple);
+    shadow_unlock(d);
+
+    return EXCRET_fault_fixed;
+
+fail:
+    return 0;
+}
+
+
+int shadow_direct_map_init(struct vcpu *v)
+{
+    struct page_info *page;
+    l2_pgentry_t *root;
+
+    if ( !(page = alloc_domheap_page(NULL)) )
+        goto fail;
+
+    root = map_domain_page_global(page_to_mfn(page));
+    memset(root, 0, PAGE_SIZE);
+
+    v->domain->arch.phys_table = mk_pagetable(page_to_maddr(page));
+    /* 
+     * We need to set shadow_vtable to get __shadow_set/get_xxx
+     * working
+     */
+    v->arch.shadow_vtable = (l2_pgentry_t *) root;
+    v->arch.shadow_table = mk_pagetable(0);
+    return 1;
+
+fail:
+    return 0;
+}
+
+void shadow_direct_map_clean(struct vcpu *v)
+{
+    int i;
+    l2_pgentry_t *l2e;
+
+    ASSERT ( v->arch.shadow_vtable );
+
+    l2e = v->arch.shadow_vtable;
+
+    for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
+    {
+        if ( l2e_get_flags(l2e[i]) & _PAGE_PRESENT )
+            free_domheap_page(mfn_to_page(l2e_get_pfn(l2e[i])));
+    }
+
+    free_domheap_page(
+            mfn_to_page(pagetable_get_pfn(v->domain->arch.phys_table)));
+
+    unmap_domain_page_global(v->arch.shadow_vtable);
+    v->arch.shadow_vtable = 0;
+    v->domain->arch.phys_table = mk_pagetable(0);
 }
 
 int __shadow_mode_enable(struct domain *d, unsigned int mode)
@@ -1092,11 +1238,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         xfree(d->arch.shadow_dirty_bitmap);
         d->arch.shadow_dirty_bitmap = NULL;
     }
-    if ( (new_modes & SHM_translate) && !(new_modes & SHM_external) &&
-         pagetable_get_paddr(d->arch.phys_table) )
-    {
-        free_p2m_table(d);
-    }
+
     return -ENOMEM;
 }
 

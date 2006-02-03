@@ -279,14 +279,9 @@ int check_descriptor(struct desc_struct *d);
 static inline unsigned long get_mfn_from_gpfn(unsigned long pfn)
 {
     unsigned long mfn;
-    l1_pgentry_t pte;
 
-    if ( (__copy_from_user(&pte, &phys_to_machine_mapping[pfn],
-                           sizeof(pte)) == 0) &&
-         (l1e_get_flags(pte) & _PAGE_PRESENT) )
-        mfn = l1e_get_pfn(pte);
-    else
-        mfn = INVALID_MFN;
+    if ( __copy_from_user(&mfn, &phys_to_machine_mapping[pfn], sizeof(mfn)) )
+	mfn = INVALID_MFN;
 
     return mfn;
 }
