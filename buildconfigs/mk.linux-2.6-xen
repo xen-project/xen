@@ -25,11 +25,11 @@ build: $(LINUX_DIR)/include/linux/autoconf.h
 pristine-$(LINUX_PDIR)/.valid-srcs: $(LINUX_SRCS)
 	rm -rf tmp-pristine-$(LINUX_PDIR) $(@D)
 	mkdir -p tmp-pristine-$(LINUX_PDIR)
-	tar -C tmp-pristine-$(LINUX_PDIR) -jxf $(word 1,$<)
+	tar -C tmp-pristine-$(LINUX_PDIR) -jxf $<
 	-@rm tmp-pristine-$(LINUX_PDIR)/pax_global_header
 	mv tmp-pristine-$(LINUX_PDIR)/* $(@D)
 	@rm -rf tmp-pristine-$(LINUX_PDIR)
-	bzcat $(wordlist 2,$(words $<),$<) | patch -d $(@D) -p1
+	bzcat $(wordlist 2,$(words $^),$^) | patch -d $(@D) -p1
 	touch $(@D)/.hgskip
 	touch $@
 
