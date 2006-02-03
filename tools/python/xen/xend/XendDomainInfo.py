@@ -251,13 +251,14 @@ def restore(config):
 
     log.debug("XendDomainInfo.restore(%s)", config)
 
-    vm = XendDomainInfo(parseConfig(config))
+    vm = XendDomainInfo(parseConfig(config), None, None, False, False, True)
     try:
         vm.construct()
         vm.storeVmDetails()
         vm.createDevices()
         vm.createChannels()
         vm.storeDomDetails()
+        vm.endRestore()
         return vm
     except:
         vm.destroy()
@@ -410,7 +411,7 @@ def dom_get(dom):
 class XendDomainInfo:
 
     def __init__(self, info, domid = None, dompath = None, augment = False,
-                 priv = False):
+                 priv = False, resume = False):
 
         self.info = info
 
@@ -445,6 +446,7 @@ class XendDomainInfo:
         self.state_updated = threading.Condition()
         self.refresh_shutdown_lock = threading.Condition()
 
+        self.setResume(resume)
 
     ## private:
 
@@ -758,6 +760,14 @@ class XendDomainInfo:
         """Get this domain's target memory size, in KB."""
         return self.info['memory'] * 1024
 
+    def getResume(self):
+        return "%s" % self.info['resume']
+
+    def endRestore(self):
+        self.setResume(False)
+
+    def setResume(self, state):
+        self.info['resume'] = state
 
     def refreshShutdown(self, xeninfo = None):
         # If set at the end of this method, a restart is required, with the

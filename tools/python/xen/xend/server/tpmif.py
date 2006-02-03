@@ -45,7 +45,8 @@ class TPMifController(DevController):
 
         log.info("The domain has a TPM with instance %d and devid %d.",
                  inst, devid)
-        back  = { 'pref_instance' : "%i" % inst }
+        back  = { 'pref_instance' : "%i" % inst,
+                  'resume'        : "%s" % (self.vm.getResume()) }
         front = { 'handle' : "%i" % devid }
 
         return (devid, back, front)
