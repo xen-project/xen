@@ -86,11 +86,7 @@ static void __exit cleanup_xen(void);
 static inline struct transmission *
 transmission_alloc(void)
 {
-	struct transmission *t = kmalloc(sizeof(*t), GFP_KERNEL);
-	if (t) {
-		memset(t, 0x0, sizeof(*t));
-	}
-	return t;
+	return kzalloc(sizeof(struct transmission), GFP_KERNEL);
 }
 
 static inline unsigned char *

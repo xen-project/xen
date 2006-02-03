@@ -28,9 +28,6 @@
 #include <linux/spinlock.h>
 #include "tpm.h"
 
-#define TPM_CHIP_NUM_MASK	0x0000ffff
-#define TPM_CHIP_TYPE_SHIFT	16	
-
 enum tpm_const {
 	TPM_MINOR = 224,	/* officially assigned */
 	TPM_MIN_BUFSIZE = 2048,
