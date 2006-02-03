@@ -30,17 +30,17 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
     case DOM0_GETPAGEFRAMEINFO:
     {
         struct page_info *page;
-        unsigned long pfn = op->u.getpageframeinfo.pfn;
+        unsigned long mfn = op->u.getpageframeinfo.mfn;
         domid_t dom = op->u.getpageframeinfo.domain;
         struct domain *d;
 
         ret = -EINVAL;
 
-        if ( unlikely(pfn >= max_page) || 
+        if ( unlikely(!mfn_valid(mfn)) || 
              unlikely((d = find_domain_by_id(dom)) == NULL) )
             break;
 
-        page = &frame_table[pfn];
+        page = &frame_table[mfn];
 
         if ( likely(get_page(page, d)) )
         {
@@ -52,8 +52,8 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             {
                 switch ( page->u.inuse.type_info & PGT_type_mask )
                 {
-		default:
-		    panic("No such page type\n");
+                default:
+                    panic("No such page type\n");
                     break;
                 }
             }
@@ -116,9 +116,9 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 
                     switch( page->u.inuse.type_info & PGT_type_mask )
                     {
-		    default:
-			panic("No such page type\n");
-			break;
+                    default:
+                        panic("No such page type\n");
+                        break;
                     }
 
                     if ( page->u.inuse.type_info & PGT_pinned )
@@ -158,7 +158,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         struct domain *d = find_domain_by_id(op->u.getmemlist.domain);
         unsigned long start_page = op->u.getmemlist.max_pfns >> 32;
         unsigned long nr_pages = op->u.getmemlist.max_pfns & 0xffffffff;
-        unsigned long pfn;
+        unsigned long mfn;
         unsigned long *buffer = op->u.getmemlist.buffer;
         struct page *page;
 
@@ -167,19 +167,20 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         {
             ret = 0;
 
-	    /* A temp trick here. When max_pfns == -1, we assume
-	     * the request is for  machine contiguous pages, so request
-	     * all pages at first query
-	     */
-	    if ((op->u.getmemlist.max_pfns == -1UL) &&
-		!test_bit(ARCH_VMX_CONTIG_MEM,&d->vcpu[0]->arch.arch_vmx.flags))
-		return vmx_alloc_contig_pages(d) ? (-ENOMEM) : 0;
+            /* A temp trick here. When max_pfns == -1, we assume
+             * the request is for  machine contiguous pages, so request
+             * all pages at first query
+             */
+            if ( (op->u.getmemlist.max_pfns == -1UL) &&
+                 !test_bit(ARCH_VMX_CONTIG_MEM,
+                           &d->vcpu[0]->arch.arch_vmx.flags) )
+                return vmx_alloc_contig_pages(d) ? (-ENOMEM) : 0;
 
             for ( i = start_page; i < (start_page + nr_pages); i++ )
             {
-		pfn = gmfn_to_mfn_foreign(d, i);
+                mfn = gmfn_to_mfn_foreign(d, i);
 
-                if ( put_user(pfn, buffer) )
+                if ( put_user(mfn, buffer) )
                 {
                     ret = -EFAULT;
                     break;
@@ -211,15 +212,25 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         //memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
         ret = 0;
         if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
-	    ret = -EFAULT;
+            ret = -EFAULT;
     }
     break;
 
     default:
-printf("arch_do_dom0_op: unrecognized dom0 op: %d!!!\n",op->cmd);
+        printf("arch_do_dom0_op: unrecognized dom0 op: %d!!!\n",op->cmd);
         ret = -ENOSYS;
 
     }
 
     return ret;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
