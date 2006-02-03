@@ -43,7 +43,7 @@ $(XMTEST_VER_IMG): $(BR_IMG)
 initrd.img: $(XMTEST_VER_IMG)
 	ln -sf $(XMTEST_VER_IMG) initrd.img
 
-disk.img: $(XMTEST_VER_IMG)
+disk.img: existing
 	chmod a+x $(HVM_SCRIPT)
 	@if test ! "$(HVMKERNEL)" = "no" -a ! "$(DRVDIR)" = "no"; then \
 		$(HVM_SCRIPT) -r $(XMTEST_VER_IMG) -k $(HVMKERNEL) \
@@ -57,8 +57,12 @@ disk.img: $(XMTEST_VER_IMG)
 	fi
 
 existing:
-	@[ -f $(XMTEST_VER_IMG) ] && ln -sf $(XMTEST_VER_IMG) initrd.img || \
-	echo Error, $(XMTEST_VER_IMG) not found
+	@if [ -f $(XMTEST_VER_IMG) ] ; then \
+		ln -sf $(XMTEST_VER_IMG) initrd.img; \
+	else \
+		echo Error, $(XMTEST_VER_IMG) not found;  \
+		false; \
+	fi
 
 clean-local: am_config_clean-local
 
