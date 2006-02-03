@@ -14,7 +14,6 @@
 .*\.orig$
 .*\.rej$
 ^[^/]*\.bz2$
-^\.valid-srcs$
 ^TAGS$
 ^dist/.*$
 ^docs/.*\.aux$
@@ -68,6 +67,7 @@
 ^patches/tmp/.*$
 ^pristine-.*$
 ^ref-.*$
+^tmp-.*$
 ^tools/.*/TAGS$
 ^tools/.*/build/lib.*/.*\.py$
 ^tools/blktap/Makefile\.smh$

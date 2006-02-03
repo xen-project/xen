@@ -22,18 +22,18 @@ build: $(LINUX_DIR)/include/linux/autoconf.h
 	fi
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(DESTDIR) install
 
-.valid-srcs: $(LINUX_SRCS)
-	touch $@
-
-pristine-linux-%.16-rc1-git4/.valid-pristine: .valid-srcs
+pristine-$(LINUX_PDIR)/.valid-srcs: $(LINUX_SRCS)
 	rm -rf tmp-pristine-$(LINUX_PDIR) $(@D)
 	mkdir -p tmp-pristine-$(LINUX_PDIR)
-	tar -C tmp-pristine-$(LINUX_PDIR) -jxf $(word 1,$(LINUX_SRCS))
+	tar -C tmp-pristine-$(LINUX_PDIR) -jxf $(word 1,$<)
 	-@rm tmp-pristine-$(LINUX_PDIR)/pax_global_header
 	mv tmp-pristine-$(LINUX_PDIR)/* $(@D)
 	@rm -rf tmp-pristine-$(LINUX_PDIR)
-	bzcat $(wordlist 2,$(words $(LINUX_SRCS)),$(LINUX_SRCS)) | patch -d $(@D) -p1
+	bzcat $(wordlist 2,$(words $<),$<) | patch -d $(@D) -p1
 	touch $(@D)/.hgskip
+	touch $@
+
+pristine-linux-%.16-rc1-git4/.valid-pristine: pristine-$(LINUX_PDIR)/.valid-srcs
 	touch $@ # update timestamp to avoid rebuild
 
 $(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
