@@ -219,6 +219,17 @@ function remove_entry () {
 }
 
 
+# Find the reason for the creation of this device:
+# Set global REASON variable to 'resume' or 'create'
+function get_create_reason () {
+	local resume=$(xenstore-read $XENBUS_PATH/resume)
+	if [ "$resume" == "True" ]; then
+		REASON="resume"
+	else
+		REASON="create"
+	fi
+}
+
 #Create a vTPM instance
 # If no entry in the TPM database is found, the instance is
 # created and an entry added to the database.
@@ -226,6 +237,7 @@ function vtpm_create_instance () {
 	local domname=$(xenstore_read "$XENBUS_PATH"/domain)
 	local res
 	set +e
+	get_create_reason
 	find_instance $domname
 	res=$?
 	if [ $res -eq 0 ]; then
@@ -243,7 +255,7 @@ function vtpm_create_instance () {
 		add_instance $domname $instance
 		if [ "$REASON" == "create" ]; then
 			vtpm_create $instance
-		elif [ "$REASON" == "hibernate" ]; then
+		elif [ "$REASON" == "resume" ]; then
 			vtpm_resume $instance $domname
 		else
 			#default case for 'now'
@@ -252,11 +264,12 @@ function vtpm_create_instance () {
 	fi
 	if [ "$REASON" == "create" ]; then
 		vtpm_reset $instance
-	elif [ "$REASON" == "hibernate" ]; then
+	elif [ "$REASON" == "resume" ]; then
 		vtpm_setup $instance
 	else
 		#default case for 'now'
-		vtpm_reset $instance
+		#vtpm_reset $instance
+		true
 	fi
 	xenstore_write $XENBUS_PATH/instance $instance
 	set -e
@@ -273,7 +286,7 @@ function vtpm_remove_instance () {
 		#Something is really wrong with the DB
 		log err "vTPM DB file $VTPMDB has no entry for '$domname'"
 	else
-		if [ "$REASON" == "hibernate" ]; then
+		if [ "$REASON" == "suspend" ]; then
 			vtpm_suspend $instance
 		fi
 	fi
