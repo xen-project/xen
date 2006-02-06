@@ -479,12 +479,12 @@ ENTRY(nmi)
         jz    nmi_in_hypervisor_mode
         /* Interrupted guest context. Copy the context to stack bottom. */
         GET_GUEST_REGS(%rbx)
-        addq  $UREGS_kernel_sizeof,%rbx
         movl  $UREGS_kernel_sizeof/8,%ecx
 1:      popq  %rax
-        subq  $8,%rbx
         movq  %rax,(%rbx)
+        addq  $8,%rbx
         loop  1b
+        subq  $UREGS_kernel_sizeof,%rbx
         movq  %rbx,%rsp
 nmi_in_hypervisor_mode:
         movq  %rsp,%rdi
