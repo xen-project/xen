@@ -552,7 +552,7 @@ ENTRY(hypercall_table)
         .quad do_mmuext_op
         .quad do_acm_op
         .quad do_nmi_op
-        .rept NR_hypercalls-((.-hypercall_table)/4)
+        .rept NR_hypercalls-((.-hypercall_table)/8)
         .quad do_ni_hypercall
         .endr
 
