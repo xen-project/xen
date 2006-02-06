@@ -23,7 +23,6 @@
 #define DPRINTF DPRINTK
 #include <asm-x86/x86_emulate.h>
 
-#ifdef CONFIG_SVM
 /*
  * Opcode effective-address decode tables.
  * Note that we only emulate instructions that have at least one memory
@@ -432,4 +431,3 @@ cannot_emulate:
     svm_dump_inst(_regs.eip);
     return (unsigned long)-1;
 }
-#endif /* CONFIG_SVM */

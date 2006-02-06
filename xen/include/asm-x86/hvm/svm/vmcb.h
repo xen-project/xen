@@ -23,8 +23,6 @@
 #include <asm/config.h>
 #include <asm/hvm/hvm.h>
 
-#ifdef CONFIG_SVM
-
 extern int start_svm(void);
 
 /* general 1 intercepts */
@@ -487,8 +485,6 @@ enum {
 
 #define VMCB_EFLAGS_RESERVED_0          0xffc08028 /* bitmap for 0 */
 #define VMCB_EFLAGS_RESERVED_1          0x00000002 /* bitmap for 1 */
-
-#endif /* CONFIG_SVM */
 
 #endif /* ASM_X86_HVM_SVM_VMCS_H__ */
 

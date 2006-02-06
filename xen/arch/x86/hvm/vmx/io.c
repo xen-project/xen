@@ -38,8 +38,6 @@
 #include <asm/hvm/vlapic.h>
 #include <public/hvm/ioreq.h>
 
-#ifdef CONFIG_VMX
-
 #define BSP_CPU(v)    (!(v->vcpu_id))
 
 void vmx_set_tsc_shift(struct vcpu *v, struct hvm_virpit *vpit)
@@ -194,7 +192,6 @@ void vmx_do_resume(struct vcpu *v)
     /* We can't resume the guest if we're waiting on I/O */
     ASSERT(!test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags));
 }
-#endif /* CONFIG_VMX */
 
 /*
  * Local variables:

@@ -24,8 +24,6 @@
 #include <asm/hvm/vmx/cpu.h>
 #include <public/hvm/vmx_assist.h>
 
-#ifdef CONFIG_VMX
-
 extern int start_vmx(void);
 extern void stop_vmx(void);
 
@@ -247,8 +245,6 @@ enum vmcs_field {
     HOST_RSP                        = 0x00006c14,
     HOST_RIP                        = 0x00006c16,
 };
-
-#endif /* CONFIG_VMX */
 
 #endif /* ASM_X86_HVM_VMX_VMCS_H__ */
 

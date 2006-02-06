@@ -92,7 +92,6 @@
         popq %rdi; \
         addq $(NR_SKIPPED_REGS*8), %rsp; \
 
-#ifdef CONFIG_SVM
 #define VMRUN  .byte 0x0F,0x01,0xD8
 #define VMLOAD .byte 0x0F,0x01,0xDA
 #define VMSAVE .byte 0x0F,0x01,0xDB
@@ -175,5 +174,3 @@ svm_process_softirqs:
         sti
         call do_softirq
         jmp  svm_test_all_events
-#endif /* CONFIG_SVM */
-

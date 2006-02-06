@@ -27,8 +27,6 @@
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/hvm/svm/emulate.h>
 
-#ifdef CONFIG_SVM
-
 extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
         int inst_len);
 
@@ -504,7 +502,6 @@ unsigned int __get_instruction_length_from_list(struct vmcb_struct *vmcb,
             "eip = %lx\n",  __func__, (unsigned long)vmcb->rip);
     return 0;
 }
-#endif /* CONFIG_SVM */
 
 /*
  * Local variables:

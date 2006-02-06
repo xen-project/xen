@@ -248,9 +248,7 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 	}
 #endif
 
-#ifdef CONFIG_SVM
 	start_svm();
-#endif
 }
 
 static unsigned int amd_size_cache(struct cpuinfo_x86 * c, unsigned int size)

@@ -39,8 +39,6 @@
 #include <asm/shadow_64.h>
 #endif
 
-#ifdef CONFIG_VMX
-
 int vmcs_size;
 
 struct vmcs_struct *alloc_vmcs(void)
@@ -539,7 +537,6 @@ void arch_vmx_do_launch(struct vcpu *v)
     vmx_do_launch(v);
     reset_stack_and_jump(vmx_asm_do_launch);
 }
-#endif /* CONFIG_VMX */
 
 /*
  * Local variables:

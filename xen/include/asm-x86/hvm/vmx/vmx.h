@@ -26,8 +26,6 @@
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/i387.h>
 
-#ifdef CONFIG_VMX
-
 extern void vmx_asm_vmexit_handler(struct cpu_user_regs);
 extern void vmx_asm_do_resume(void);
 extern void vmx_asm_do_launch(void);
@@ -457,7 +455,5 @@ static inline int vmx_reflect_exception(struct vcpu *v)
     vmx_inject_exception(v, vector, error_code);
     return 0;
 }
-
-#endif /* CONFIG_VMX */
 
 #endif /* __ASM_X86_HVM_VMX_VMX_H__ */

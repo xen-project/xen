@@ -50,8 +50,6 @@
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
 
-#ifdef CONFIG_SVM
-
 #define SVM_EXTRA_DEBUG
 
 #ifdef TRACE_BUFFER
@@ -2698,7 +2696,6 @@ asmlinkage void svm_asid(void)
     }
     clear_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
 }
-#endif /* CONFIG_SVM */
 
 /*
  * Local variables:

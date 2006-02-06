@@ -36,8 +36,6 @@
 #include <xen/kernel.h>
 #include <xen/domain_page.h>
 
-#ifdef CONFIG_SVM
-
 extern int svm_dbg_on;
 extern int asidpool_assign_next( struct vmcb_struct *vmcb, int retire_current,
                                   int oldcore, int newcore);
@@ -589,7 +587,6 @@ void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb)
     svm_dump_sel("IDTR", &vmcb->idtr);
     svm_dump_sel("TR", &vmcb->tr);
 }
-#endif /* CONFIG_SVM */
 
 /*
  * Local variables:

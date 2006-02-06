@@ -22,8 +22,6 @@
 #ifndef __ASM_X86_HVM_SVM_VMMCALL_H__
 #define __ASM_X86_HVM_SVM_VMMCALL_H__
 
-#ifdef CONFIG_SVM
-
 /* VMMCALL command fields */
 #define VMMCALL_CODE_CPL_MASK     0xC0000000
 #define VMMCALL_CODE_MBZ_MASK     0x3FFF0000
@@ -42,7 +40,5 @@ static inline int get_vmmcall_cpl(int cmd)
 {
     return (cmd & VMMCALL_CODE_CPL_MASK) >> 30;
 }
-
-#endif /* CONFIG_SVM */
 
 #endif /* __ASM_X86_HVM_SVM_VMMCALL_H__ */

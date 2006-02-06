@@ -187,9 +187,7 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 	if (c->x86 == 6) 
 		set_bit(X86_FEATURE_P3, c->x86_capability);
 
-#ifdef CONFIG_VMX
 	start_vmx();
-#endif
 }
 
 

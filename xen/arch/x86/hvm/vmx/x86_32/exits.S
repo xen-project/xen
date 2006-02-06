@@ -81,8 +81,6 @@
 
         ALIGN
 
-#ifdef CONFIG_VMX
-
 ENTRY(vmx_asm_vmexit_handler)
         /* selectors are restored/saved by VMX */
         HVM_SAVE_ALL_NOSEGREGS
@@ -148,5 +146,3 @@ ENTRY(vmx_asm_do_resume)
 
 ENTRY(vmx_asm_do_relaunch)
     vmx_asm_common 1 1
-
-#endif /* CONFIG_VMX */

@@ -22,13 +22,8 @@
 
 #include <asm/hvm/io.h>
 #include <asm/hvm/vlapic.h>
-
-#ifdef CONFIG_VMX
 #include <asm/hvm/vmx/vmcs.h>
-#endif
-#ifdef CONFIG_SVM
 #include <asm/hvm/svm/vmcb.h>
-#endif
 
 struct hvm_vcpu {
     unsigned long       ioflags;
@@ -36,12 +31,8 @@ struct hvm_vcpu {
     struct vlapic       *vlapic;
 
     union {
-#ifdef CONFIG_VMX
         struct arch_vmx_struct vmx;
-#endif
-#ifdef CONFIG_SVM
         struct arch_svm_struct svm;
-#endif
     } u;
 };
 

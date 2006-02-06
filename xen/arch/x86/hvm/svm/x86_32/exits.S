@@ -80,8 +80,6 @@
         popl %eax;  \
         addl $(NR_SKIPPED_REGS*4), %esp
 
-#ifdef CONFIG_SVM
-
         ALIGN
 
 #define VMRUN  .byte 0x0F,0x01,0xD8
@@ -216,5 +214,3 @@ svm_process_softirqs:
         sti       
         call do_softirq
         jmp  svm_test_all_events
-#endif /* CONFIG_SVM */
-

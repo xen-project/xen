@@ -38,8 +38,6 @@
 #include <public/hvm/ioreq.h>
 #include <xen/domain_page.h>
 
-#ifdef CONFIG_SVM
-
 /*
  * Most of this code is copied from vmx_io.c and modified 
  * to be suitable for SVM.
@@ -205,8 +203,6 @@ asmlinkage void svm_intr_assist(void)
         }
     }
 }
-
-#endif /* CONFIG_SVM */
 
 /*
  * Local variables:

@@ -21,8 +21,6 @@
 #ifndef __ASM_X86_HVM_SVM_EMULATE_H__
 #define __ASM_X86_HVM_SVM_EMULATE_H__
 
-#ifdef CONFIG_SVM
-
 typedef enum OPERATING_MODE_ {
     INVALID_OPERATING_MODE = -1,
     LEGACY_MODE,
@@ -145,8 +143,6 @@ static void inline __update_guest_eip(struct vmcb_struct *vmcb,
 {
     vmcb->rip += inst_len;
 }
-
-#endif /* CONFIG_SVM */
 
 #endif /* __ASM_X86_HVM_SVM_EMULATE_H__ */
 

@@ -72,7 +72,6 @@ void __dummy__(void)
     DEFINE(_VCPUF_nmi_masked, _VCPUF_nmi_masked);
     BLANK();
 
-#ifdef CONFIG_SVM
     OFFSET(VCPU_svm_vmcb_pa, struct vcpu, arch.hvm_svm.vmcb_pa);
     OFFSET(VCPU_svm_hsa_pa,  struct vcpu, arch.hvm_svm.host_save_pa);
     OFFSET(VCPU_svm_vmcb, struct vcpu, arch.hvm_svm.vmcb);
@@ -82,7 +81,6 @@ void __dummy__(void)
     OFFSET(VMCB_rax, struct vmcb_struct, rax);
     OFFSET(VMCB_tsc_offset, struct vmcb_struct, tsc_offset);
     BLANK();
-#endif
 
     OFFSET(VCPUINFO_upcall_pending, vcpu_info_t, evtchn_upcall_pending);
     OFFSET(VCPUINFO_upcall_mask, vcpu_info_t, evtchn_upcall_mask);

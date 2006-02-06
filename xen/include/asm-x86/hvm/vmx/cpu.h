@@ -19,8 +19,6 @@
 #ifndef __ASM_X86_HVM_VMX_CPU_H__
 #define __ASM_X86_HVM_VMX_CPU_H__
 
-#ifdef CONFIG_VMX
-
 /*
  * Virtual CPU
  */
@@ -33,7 +31,5 @@ struct arch_state_struct {
 #define VMX_MF_VM86     0
 #define VMX_MF_32       1
 #define VMX_MF_64       2
-
-#endif /* CONFIG_VMX */
 
 #endif /* __ASM_X86_HVM_VMX_CPU_H__ */

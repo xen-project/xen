@@ -28,7 +28,6 @@
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/i387.h>
 
-#ifdef CONFIG_SVM
 extern void asidpool_retire( struct vmcb_struct *vmcb, int core );
 
 extern void svm_asm_vmexit_handler(struct cpu_user_regs);
@@ -85,7 +84,5 @@ struct asid_pool {
 #define SVM_REG_R13 (13)
 #define SVM_REG_R14 (14)
 #define SVM_REG_R15 (15)
-
-#endif /* CONFIG_SVM */
 
 #endif /* __ASM_X86_HVM_SVM_H__ */

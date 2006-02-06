@@ -48,9 +48,6 @@
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
 
-
-#ifdef CONFIG_VMX
-
 static unsigned long trace_values[NR_CPUS][4];
 #define TRACE_VMEXIT(index,value) trace_values[smp_processor_id()][index]=value
 
@@ -2001,7 +1998,6 @@ asmlinkage void vmx_trace_vmexit (void)
     TRACE_3D(TRC_VMEXIT,0,0,0);
     return;
 }
-#endif /* CONFIG_VMX */
 
 /*
  * Local variables:
