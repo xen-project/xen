@@ -730,11 +730,6 @@ void __init get_smp_config (void)
 	 */
 }
 
-int __init mp_get_num_processors(void)
-{
-    return num_processors;
-}
-
 static int __init smp_scan_config (unsigned long base, unsigned long length)
 {
 	unsigned int *bp = maddr_to_virt(base);
