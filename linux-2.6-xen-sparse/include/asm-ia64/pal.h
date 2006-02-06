@@ -75,6 +75,8 @@
 #define PAL_CACHE_READ		259	/* read tag & data of cacheline for diagnostic testing */
 #define PAL_CACHE_WRITE		260	/* write tag & data of cacheline for diagnostic testing */
 #define PAL_VM_TR_READ		261	/* read contents of translation register */
+#define PAL_GET_PSTATE		262	/* get the current P-state */
+#define PAL_SET_PSTATE		263	/* set the P-state */
 
 #ifndef __ASSEMBLY__
 
@@ -926,7 +928,7 @@ static inline s64
 ia64_pal_cache_flush (u64 cache_type, u64 invalidate, u64 *progress, u64 *vector)
 {
 	struct ia64_pal_retval iprv;
-	PAL_CALL_IC_OFF(iprv, PAL_CACHE_FLUSH, cache_type, invalidate, *progress);
+	PAL_CALL(iprv, PAL_CACHE_FLUSH, cache_type, invalidate, *progress);
 	if (vector)
 		*vector = iprv.v0;
 	*progress = iprv.v1;
@@ -1109,6 +1111,25 @@ ia64_pal_halt_info (pal_power_mgmt_info_u_t *power_buf)
 {
 	struct ia64_pal_retval iprv;
 	PAL_CALL_STK(iprv, PAL_HALT_INFO, (unsigned long) power_buf, 0, 0);
+	return iprv.status;
+}
+
+/* Get the current P-state information */
+static inline s64
+ia64_pal_get_pstate (u64 *pstate_index)
+{
+	struct ia64_pal_retval iprv;
+	PAL_CALL_STK(iprv, PAL_GET_PSTATE, 0, 0, 0);
+	*pstate_index = iprv.v0;
+	return iprv.status;
+}
+
+/* Set the P-state */
+static inline s64
+ia64_pal_set_pstate (u64 pstate_index)
+{
+	struct ia64_pal_retval iprv;
+	PAL_CALL_STK(iprv, PAL_SET_PSTATE, pstate_index, 0, 0);
 	return iprv.status;
 }
 

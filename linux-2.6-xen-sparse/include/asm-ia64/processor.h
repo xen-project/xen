@@ -21,16 +21,13 @@
 #include <asm/ustack.h>
 #include <asm/privop.h>
 
-/* Our arch specific arch_init_sched_domain is in arch/ia64/kernel/domain.c */
-#define ARCH_HAS_SCHED_DOMAIN
-
 #define IA64_NUM_DBG_REGS	8
 /*
  * Limits for PMC and PMD are set to less than maximum architected values
  * but should be sufficient for a while
  */
-#define IA64_NUM_PMC_REGS	32
-#define IA64_NUM_PMD_REGS	32
+#define IA64_NUM_PMC_REGS	64
+#define IA64_NUM_PMD_REGS	64
 
 #define DEFAULT_MAP_BASE	__IA64_UL_CONST(0x2000000000000000)
 #define DEFAULT_TASK_SIZE	__IA64_UL_CONST(0xa000000000000000)
@@ -356,7 +353,7 @@ extern unsigned long get_wchan (struct task_struct *p);
 /* Return instruction pointer of blocked task TSK.  */
 #define KSTK_EIP(tsk)					\
   ({							\
-	struct pt_regs *_regs = ia64_task_regs(tsk);	\
+	struct pt_regs *_regs = task_pt_regs(tsk);	\
 	_regs->cr_iip + ia64_psr(_regs)->ri;		\
   })
 
