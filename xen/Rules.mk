@@ -1,3 +1,4 @@
+
 #
 # If you change any of these configuration options then you must
 # 'make clean' before rebuilding.
@@ -44,20 +45,19 @@ ALL_OBJS += $(BASEDIR)/arch/$(TARGET_ARCH)/arch.o
 
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
+CFLAGS += -g
+
 ifneq ($(debug),y)
 CFLAGS += -DNDEBUG
 ifeq ($(verbose),y)
 CFLAGS += -DVERBOSE
 endif
 else
-CFLAGS += -g -DVERBOSE
+CFLAGS += -DVERBOSE
 endif
 
-# There is no real reason to compile without it
-CFLAGS += -g
-
 ifeq ($(crash_debug),y)
-CFLAGS += -g -DCRASH_DEBUG
+CFLAGS += -DCRASH_DEBUG
 endif
 
 ifeq ($(perfc),y)
