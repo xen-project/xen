@@ -10,8 +10,6 @@
 #include <asm/mpspec.h>
 #include <asm/apic.h>
 #include <mach_apic.h>
-#include <asm/hvm/vpit.h>
-#include <asm/hvm/vcpu.h>
 #include <asm/hvm/support.h>
 
 #include "cpu.h"

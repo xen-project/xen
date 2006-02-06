@@ -188,7 +188,7 @@ long subarch_memory_op(int op, void *arg)
     l3_pgentry_t l3e;
     l2_pgentry_t l2e;
     unsigned long mfn, v;
-    unsigned int i = 0;
+    unsigned int i;
     long rc = 0;
 
     switch ( op )

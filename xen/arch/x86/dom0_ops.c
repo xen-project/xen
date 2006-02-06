@@ -454,8 +454,8 @@ void arch_getdomaininfo_ctxt(
 
     if ( HVM_DOMAIN(v) )
     {
-	hvm_store_cpu_guest_regs(v, &c->user_regs);
-	hvm_store_cpu_guest_ctrl_regs(v, c->ctrlreg);
+        hvm_store_cpu_guest_regs(v, &c->user_regs);
+        hvm_store_cpu_guest_ctrl_regs(v, c->ctrlreg);
     }
     else
     {
@@ -476,3 +476,13 @@ void arch_getdomaininfo_ctxt(
 
     c->vm_assist = v->domain->vm_assist;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
