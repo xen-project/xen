@@ -191,17 +191,9 @@ static void vmx_do_launch(struct vcpu *v)
 
     __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (cr4) : );
 
-#ifdef __x86_64__
     error |= __vmwrite(GUEST_CR4, cr4 & ~X86_CR4_PSE);
-#else
-    error |= __vmwrite(GUEST_CR4, cr4);
-#endif
-
-#ifdef __x86_64__
     cr4 &= ~(X86_CR4_PGE | X86_CR4_VMXE | X86_CR4_PAE);
-#else
-    cr4 &= ~(X86_CR4_PGE | X86_CR4_VMXE);
-#endif
+
     error |= __vmwrite(CR4_READ_SHADOW, cr4);
 
     vmx_stts();

@@ -29,7 +29,15 @@
 #include <asm/shadow.h>
 #include <asm/shadow_ops.h>
 
-extern struct shadow_ops MODE_B_HANDLER;
+/*
+ * The naming convention of the shadow_ops:
+ * MODE_<pgentry size>_<guest paging levels>_HANDLER
+ */
+extern struct shadow_ops MODE_64_2_HANDLER;
+extern struct shadow_ops MODE_64_3_HANDLER;
+#if CONFIG_PAGING_LEVELS == 4
+extern struct shadow_ops MODE_64_4_HANDLER;
+#endif
 
 #if CONFIG_PAGING_LEVELS == 3
 #define L4_PAGETABLE_SHIFT      39
@@ -118,7 +126,6 @@ static inline int  table_offset_64(unsigned long va, int level)
 #endif
 #endif
         default:
-            //printk("<table_offset_64> level %d is too big\n", level);
             return -1;
     }
 }
@@ -142,7 +149,7 @@ static inline void free_out_of_sync_state(struct domain *d)
 }
 
 static inline int __entry(
-    struct vcpu *v, u64 va, pgentry_64_t *e_p, u32 flag)
+    struct vcpu *v, unsigned long va, pgentry_64_t *e_p, u32 flag)
 {
     int i;
     pgentry_64_t *le_e;
@@ -197,7 +204,7 @@ static inline int __entry(
 }
 
 static inline int __rw_entry(
-    struct vcpu *v, u64 va, void *e_p, u32 flag)
+    struct vcpu *v, unsigned long va, void *e_p, u32 flag)
 {
     pgentry_64_t *e = (pgentry_64_t *)e_p;
 
@@ -235,7 +242,7 @@ static inline int __rw_entry(
   __rw_entry(v, va, gl3e, GUEST_ENTRY | GET_ENTRY | PAGING_L3)
 
 static inline int  __guest_set_l2e(
-    struct vcpu *v, u64 va, void *value, int size)
+    struct vcpu *v, unsigned long va, void *value, int size)
 {
     switch(size) {
         case 4:
@@ -258,10 +265,10 @@ static inline int  __guest_set_l2e(
 }
 
 #define __guest_set_l2e(v, va, value) \
-    __guest_set_l2e(v, (u64)va, value, sizeof(*value))
+    __guest_set_l2e(v, (unsigned long)va, value, sizeof(*value))
 
 static inline int  __guest_get_l2e(
-  struct vcpu *v, u64 va, void *gl2e, int size)
+  struct vcpu *v, unsigned long va, void *gl2e, int size)
 {
     switch(size) {
         case 4:
@@ -283,10 +290,10 @@ static inline int  __guest_get_l2e(
 }
 
 #define __guest_get_l2e(v, va, gl2e) \
-    __guest_get_l2e(v, (u64)va, gl2e, sizeof(*gl2e))
+    __guest_get_l2e(v, (unsigned long)va, gl2e, sizeof(*gl2e))
 
 static inline int  __guest_set_l1e(
-  struct vcpu *v, u64 va, void *value, int size)
+  struct vcpu *v, unsigned long va, void *value, int size)
 {
     switch(size) {
         case 4:
@@ -322,10 +329,10 @@ static inline int  __guest_set_l1e(
 }
 
 #define __guest_set_l1e(v, va, value) \
-     __guest_set_l1e(v, (u64)va, value, sizeof(*value))
+     __guest_set_l1e(v, (unsigned long)va, value, sizeof(*value))
 
 static inline int  __guest_get_l1e(
-  struct vcpu *v, u64 va, void *gl1e, int size)
+  struct vcpu *v, unsigned long va, void *gl1e, int size)
 {
     switch(size) {
         case 4:
@@ -362,7 +369,7 @@ static inline int  __guest_get_l1e(
 }
 
 #define __guest_get_l1e(v, va, gl1e) \
-    __guest_get_l1e(v, (u64)va, gl1e, sizeof(*gl1e))
+    __guest_get_l1e(v, (unsigned long)va, gl1e, sizeof(*gl1e))
 
 static inline void entry_general(
   struct domain *d,

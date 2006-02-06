@@ -26,7 +26,7 @@ ifeq ($(TARGET_SUBARCH),x86_64)
 endif
 ifeq ($(TARGET_SUBARCH),x86_32) 
  ifneq ($(pae),n)
-  OBJS += shadow.o shadow_public.o	# x86_32p: new code
+  OBJS += shadow.o shadow_public.o shadow_guest32.o	# x86_32p: new code
  else
   OBJS += shadow32.o			# x86_32: old code
  endif

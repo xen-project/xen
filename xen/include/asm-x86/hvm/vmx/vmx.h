@@ -174,10 +174,10 @@ extern unsigned int cpu_rev;
 #define DEBUG_REG_ACCESS_REG            0xf00   /* 11:8, general purpose register */
  
 /* These bits in the CR4 are owned by the host */
-#ifdef __i386__
-#define VMX_CR4_HOST_MASK (X86_CR4_VMXE)
-#else
+#if CONFIG_PAGING_LEVELS >= 3
 #define VMX_CR4_HOST_MASK (X86_CR4_VMXE | X86_CR4_PAE)
+#else
+#define VMX_CR4_HOST_MASK (X86_CR4_VMXE)
 #endif
 
 #define VMCALL_OPCODE   ".byte 0x0f,0x01,0xc1\n"

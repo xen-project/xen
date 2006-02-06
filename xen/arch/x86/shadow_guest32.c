@@ -1,9 +1,8 @@
 #define GUEST_PGENTRY_32
-#if defined (__x86_64__)
 
 #include "shadow.c"
-struct shadow_ops MODE_D_HANDLER = {
-    .guest_paging_levels              = 2,
+struct shadow_ops MODE_64_2_HANDLER = {
+    .guest_paging_levels        = 2,
     .invlpg                     = shadow_invlpg_64,
     .fault                      = shadow_fault_64,
     .update_pagetables          = shadow_update_pagetables,
@@ -15,4 +14,3 @@ struct shadow_ops MODE_D_HANDLER = {
     .gva_to_gpa                 = gva_to_gpa_64,
 };
 
-#endif

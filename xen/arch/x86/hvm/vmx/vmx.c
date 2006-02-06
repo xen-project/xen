@@ -645,7 +645,7 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
                 !vlapic_global_enabled((VLAPIC(v))) )
             clear_bit(X86_FEATURE_APIC, &edx);
 
-#ifdef __x86_64__
+#if CONFIG_PAGING_LEVELS >= 3
         if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
 #endif
         {
@@ -995,7 +995,7 @@ vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
         if(!get_page(mfn_to_page(mfn), v->domain))
                 return 0;
         old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-        v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+        v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
         if (old_base_mfn)
              put_page(mfn_to_page(old_base_mfn));
         update_pagetables(v);
@@ -1196,8 +1196,9 @@ static int vmx_set_cr0(unsigned long value)
 #endif
         }
         else
+#endif  /* __x86_64__ */
         {
-#if CONFIG_PAGING_LEVELS >= 4
+#if CONFIG_PAGING_LEVELS >= 3
             if(!shadow_set_guest_paging_levels(v->domain, 2)) {
                 printk("Unsupported guest paging levels\n");
                 domain_crash_synchronous(); /* need to take a clean path */
@@ -1217,14 +1218,13 @@ static int vmx_set_cr0(unsigned long value)
                 __vmwrite(GUEST_CR4, crn | X86_CR4_PAE);
             }
         }
-#endif
 #if CONFIG_PAGING_LEVELS == 2
         shadow_direct_map_clean(v);
 #endif
         /*
          * Now arch.guest_table points to machine physical.
          */
-        v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+        v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
         update_pagetables(v);
 
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
@@ -1392,7 +1392,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
                 domain_crash_synchronous(); /* need to take a clean path */
             }
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-            v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+            v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
             if (old_base_mfn)
                 put_page(mfn_to_page(old_base_mfn));
             update_pagetables(v);
