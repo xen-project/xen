@@ -629,7 +629,7 @@ static void __init find_early_table_space(unsigned long end)
 	table_start = start_pfn;
 
 	early_printk("kernel direct mapping tables up to %lx @ %lx-%lx\n",
-		__pa(end), table_start << PAGE_SHIFT, start_pfn << PAGE_SHIFT);
+		end, table_start << PAGE_SHIFT, start_pfn << PAGE_SHIFT);
 }
 
 /* Setup the direct mapping of the physical memory at PAGE_OFFSET.
