@@ -189,6 +189,7 @@ NEXT_PAGE(hypercall_page)
 	 * different address than expected. */
 	.quad	__adjust_hypercall_page_in_header
 .endif
+	.fill	512,8,0
 
 #undef NEXT_PAGE
 
