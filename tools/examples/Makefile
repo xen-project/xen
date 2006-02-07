@@ -42,7 +42,7 @@ DE = $(shell readlink -f $(DESTDIR))
 ifeq ($(findstring $(DI),$(DE)),$(DI))
 HOTPLUGS=install-hotplug install-udev
 else
-ifeq ($(shell [ -x /sbin/udev ] && [ ! -z `/sbin/udev -V` ] && [ `/sbin/udev -V` -ge 059 ] && echo 1),1)
+ifeq ($(shell [ -x /usr/bin/udevinfo ] && [ `/usr/bin/udevinfo -V | sed -e 's/^[^0-9]* \([0-9]\{1,\}\)[^0-9]\{0,\}/\1/'` -ge 059 ] && echo 1),1)
 HOTPLUGS=install-udev
 else
 HOTPLUGS=install-hotplug
