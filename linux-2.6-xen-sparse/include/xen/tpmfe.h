@@ -1,6 +1,8 @@
 #ifndef TPM_FE_H
 #define TPM_FE_H
 
+struct tpm_private;
+
 struct tpmfe_device {
 	/*
 	 * Let upper layer receive data from front-end
@@ -19,6 +21,11 @@ struct tpmfe_device {
 	 * for allocation of buffers.
 	 */
 	unsigned int max_tx_size;
+	/*
+	 * The following is a private structure of the underlying
+	 * driver. It's expected as first parameter in the send function.
+	 */
+	struct tpm_private *tpm_private;
 };
 
 enum {
@@ -26,7 +33,7 @@ enum {
 	TPMFE_STATUS_CONNECTED = 0x1
 };
 
-int tpm_fe_send(const u8 * buf, size_t count, void *ptr);
+int tpm_fe_send(struct tpm_private * tp, const u8 * buf, size_t count, void *ptr);
 int tpm_fe_register_receiver(struct tpmfe_device *);
 void tpm_fe_unregister_receiver(void);
 

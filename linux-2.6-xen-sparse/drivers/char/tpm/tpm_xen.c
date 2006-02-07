@@ -42,7 +42,6 @@ struct transmission {
 	unsigned int request_len;
 	unsigned char *rcv_buffer;
 	unsigned int  buffersize;
-	struct tpm_chip     *chip;
 	unsigned int flags;
 };
 
@@ -74,6 +73,8 @@ enum {
 static struct data_exchange dataex;
 
 static unsigned long disconnect_time;
+
+static struct tpmfe_device tpmfe;
 
 /* local function prototypes */
 static void __exit cleanup_xen(void);
@@ -119,7 +120,7 @@ transmission_free(struct transmission *t)
 static int tpm_recv(const u8 *buffer, size_t count, const void *ptr)
 {
 	int ret_size = 0;
-	struct transmission *t, *temp;
+	struct transmission *t;
 
 	/*
 	 * The list with requests must contain one request
@@ -127,8 +128,9 @@ static int tpm_recv(const u8 *buffer, size_t count, const void *ptr)
 	 * was passed to me from the front-end.
 	 */
 	if (dataex.current_request != ptr) {
-		printk("WARNING: The request pointer is different than the pointer "
-		       "the shared memory driver returned to me. %p != %p\n",
+		printk("WARNING: The request pointer is different than the "
+		       "pointer the shared memory driver returned to me. "
+		       "%p != %p\n",
 		       dataex.current_request, ptr);
 	}
 
@@ -144,16 +146,16 @@ static int tpm_recv(const u8 *buffer, size_t count, const void *ptr)
 		return 0;
 	}
 
-	if (NULL != (temp = dataex.current_request)) {
-		transmission_free(temp);
+	if (NULL != (t = dataex.current_request)) {
+		transmission_free(t);
 		dataex.current_request = NULL;
 	}
 
 	t = transmission_alloc();
-	if (NULL != t) {
+	if (t) {
 		unsigned long flags;
 		t->rcv_buffer = kmalloc(count, GFP_KERNEL);
-		if (NULL == t->rcv_buffer) {
+		if (! t->rcv_buffer) {
 			transmission_free(t);
 			return -ENOMEM;
 		}
@@ -258,10 +260,6 @@ static int tpm_xen_send(struct tpm_chip *chip, u8 * buf, size_t count)
 
 	if (t != NULL) {
 		unsigned int error = 0;
-		t->rcv_buffer = NULL;
-		t->buffersize = 0;
-		t->chip = chip;
-
 		/*
 		 * Queue the packet if the driver below is not
 		 * ready, yet, or there is any packet already
@@ -304,9 +302,11 @@ static int tpm_xen_send(struct tpm_chip *chip, u8 * buf, size_t count)
 				struct transmission *qt = (struct transmission *) dataex.queued_requests.next;
 				list_del(&qt->next);
 				dataex.current_request = qt;
-				spin_unlock_irqrestore(&dataex.req_list_lock, flags);
+				spin_unlock_irqrestore(&dataex.req_list_lock,
+				                       flags);
 
-				rc = tpm_fe_send(qt->request,
+				rc = tpm_fe_send(tpmfe.tpm_private,
+				                 qt->request,
 				                 qt->request_len,
 				                 qt);
 
@@ -351,7 +351,8 @@ static int tpm_xen_send(struct tpm_chip *chip, u8 * buf, size_t count)
 				 * amount of bytes in the request and
 				 * a void * pointer (here: transmission structure)
 				 */
-				rc = tpm_fe_send(buf, count, t);
+				rc = tpm_fe_send(tpmfe.tpm_private,
+				                 buf, count, t);
 				/*
 				 * The generic TPM driver will call
 				 * the function to receive the response.
@@ -373,7 +374,8 @@ queue_it:
 				 * queue it.
 				 */
 				dataex.flags |= DATAEX_FLAG_QUEUED_ONLY;
-				list_add_tail(&t->next, &dataex.queued_requests);
+				list_add_tail(&t->next,
+				              &dataex.queued_requests);
 				rc = 0;
 			}
 		}
@@ -512,7 +514,7 @@ static void __exit cleanup_xen(void)
 	tpm_fe_unregister_receiver();
 }
 
-fs_initcall(init_xen);
+module_init(init_xen);
 module_exit(cleanup_xen);
 
 MODULE_AUTHOR("Stefan Berger (stefanb@us.ibm.com)");

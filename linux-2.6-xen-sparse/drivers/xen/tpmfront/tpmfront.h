@@ -17,9 +17,6 @@ struct tpm_private {
 	domid_t backend_id;
 	wait_queue_head_t wait_q;
 
-};
-
-struct tpmfront_info {
 	struct xenbus_device *dev;
 	int ring_ref;
 };
