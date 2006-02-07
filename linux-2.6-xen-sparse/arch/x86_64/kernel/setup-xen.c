@@ -951,22 +951,20 @@ void __init setup_arch(char **cmdline_p)
 		       
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
-	       conswitchp = &vga_con;
+		       conswitchp = &vga_con;
 #elif defined(CONFIG_DUMMY_CONSOLE)
-	       conswitchp = &dummy_con;
+		       conswitchp = &dummy_con;
 #endif
 #endif
 	       } else {
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 		       extern const struct consw xennull_con;
 		       extern int console_use_vt;
 #if defined(CONFIG_VGA_CONSOLE)
-		/* disable VGA driver */
+		       /* disable VGA driver */
 		       ORIG_VIDEO_ISVGA = VIDEO_TYPE_VLFB;
 #endif
 		       conswitchp = &xennull_con;
 		       console_use_vt = 0;
-#endif
 	       }
        }
 #else	/* CONFIG_XEN */
