@@ -62,7 +62,7 @@ config X86_XEN
 	bool "Xen-compatible"
 	select X86_UP_APIC if !SMP && XEN_PRIVILEGED_GUEST
 	select X86_UP_IOAPIC if !SMP && XEN_PRIVILEGED_GUEST
-	select SWIOTLB if XEN_PHYSDEV_ACCESS
+	select SWIOTLB
 	help
 	  Choose this option is you plan to run this kernel on top of Xen
 	  Hypervisor.
@@ -951,7 +951,6 @@ source "arch/i386/kernel/cpu/cpufreq/Kconfig"
 endmenu
 
 menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
-	depends on !XEN_UNPRIVILEGED_GUEST
 
 config PCI
 	bool "PCI support" if !X86_VISWS

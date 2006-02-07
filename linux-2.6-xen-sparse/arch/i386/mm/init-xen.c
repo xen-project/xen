@@ -531,9 +531,7 @@ out:
  */
 void __init paging_init(void)
 {
-#ifdef CONFIG_XEN_PHYSDEV_ACCESS
 	int i;
-#endif
 
 #ifdef CONFIG_X86_PAE
 	set_nx();
@@ -562,7 +560,6 @@ void __init paging_init(void)
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
-#ifdef CONFIG_XEN_PHYSDEV_ACCESS
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
 		if (xen_start_info->flags & SIF_PRIVILEGED)
@@ -571,7 +568,6 @@ void __init paging_init(void)
 			__set_fixmap(FIX_ISAMAP_BEGIN - i,
 				     virt_to_machine(empty_zero_page),
 				     PAGE_KERNEL_RO);
-#endif
 }
 
 /*

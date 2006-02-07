@@ -562,7 +562,6 @@ static struct tty_operations xencons_ops = {
 	.wait_until_sent = xencons_wait_until_sent,
 };
 
-#ifdef CONFIG_XEN_PHYSDEV_ACCESS
 static const char *xennullcon_startup(void)
 {
 	return NULL;
@@ -601,7 +600,6 @@ const struct consw xennull_con = {
 	.con_set_palette =	DUMMY,
 	.con_scrolldelta =	DUMMY,
 };
-#endif
 
 static int __init xencons_init(void)
 {

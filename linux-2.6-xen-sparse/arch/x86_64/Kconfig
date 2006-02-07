@@ -121,7 +121,7 @@ endchoice
 
 config X86_64_XEN
 	bool "Enable Xen compatible kernel"
-	select SWIOTLB if XEN_PHYSDEV_ACCESS
+	select SWIOTLB
 	help
 	  This option will compile a kernel compatible with Xen hypervisor
 

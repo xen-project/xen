@@ -630,7 +630,6 @@ void __init setup_arch(char **cmdline_p)
  	ROOT_DEV = MKDEV(RAMDISK_MAJOR,0); 
  	drive_info = DRIVE_INFO;
 	kernel_end = 0;		/* dummy */
-#ifdef CONFIG_XEN_PHYSDEV_ACCESS
  	screen_info = SCREEN_INFO;
 
 	if (xen_start_info->flags & SIF_INITDOMAIN) {
@@ -644,9 +643,7 @@ void __init setup_arch(char **cmdline_p)
 		screen_info.orig_video_points = 16;
 	} else
 		screen_info.orig_video_isVGA = 0;
-#else
-	screen_info.orig_video_isVGA = 0;
-#endif
+
 	edid_info = EDID_INFO;
 	saved_video_mode = SAVED_VIDEO_MODE;
 	bootloader_type = LOADER_TYPE;

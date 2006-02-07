@@ -172,8 +172,6 @@ int touch_pte_range(struct mm_struct *mm,
 
 EXPORT_SYMBOL(touch_pte_range);
 
-#ifdef CONFIG_XEN_PHYSDEV_ACCESS
-
 /*
  * Does @address reside within a non-highmem page that is local to this virtual
  * machine (i.e., not an I/O page, nor a memory page belonging to another VM).
@@ -449,38 +447,6 @@ void __init bt_iounmap(void *addr, unsigned long size)
 }
 
 #endif /* __i386__ */
-
-#else /* CONFIG_XEN_PHYSDEV_ACCESS */
-
-void __iomem * __ioremap(unsigned long phys_addr, unsigned long size,
-			 unsigned long flags)
-{
-	return NULL;
-}
-
-void __iomem *ioremap_nocache (unsigned long phys_addr, unsigned long size)
-{
-	return NULL;
-}
-
-void iounmap(volatile void __iomem *addr)
-{
-}
-
-#ifdef __i386__
-
-void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
-{
-	return NULL;
-}
-
-void __init bt_iounmap(void *addr, unsigned long size)
-{
-}
-
-#endif /* __i386__ */
-
-#endif /* CONFIG_XEN_PHYSDEV_ACCESS */
 
 /*
  * Local variables:

@@ -22,7 +22,6 @@ config XEN_PRIVILEGED_GUEST
 	bool "Privileged Guest (domain 0)"
 	depends XEN
 	default n
-	select XEN_PHYSDEV_ACCESS
 	help
 	  Support for privileged operation (domain 0)
 
@@ -30,19 +29,8 @@ config XEN_UNPRIVILEGED_GUEST
 	bool
 	default !XEN_PRIVILEGED_GUEST
 
-config XEN_PHYSDEV_ACCESS
-	bool "Physical device access"
-	depends XEN_PRIVILEGED_GUEST
-	default XEN_PRIVILEGED_GUEST
-	help
-	  Assume access is available to physical hardware devices
-	  (e.g., hard drives, network cards). This allows you to configure
-	  such devices and also includes some low-level support that is
-	  otherwise not compiled into the kernel.
-
 config XEN_BLKDEV_BACKEND
 	bool "Block-device backend driver"
-	depends on XEN_PHYSDEV_ACCESS
 	default y
 	help
 	  The block-device backend driver allows the kernel to export its
@@ -64,7 +52,6 @@ config XEN_BLKDEV_TAP_BE
 
 config XEN_NETDEV_BACKEND
 	bool "Network-device backend driver"
-	depends on XEN_PHYSDEV_ACCESS
 	default y
 	help
 	  The network-device backend driver allows the kernel to export its
@@ -86,7 +73,6 @@ config XEN_NETDEV_PIPELINED_TRANSMITTER
 
 config XEN_TPMDEV_BACKEND
 	bool "TPM-device backend driver"
-	depends on XEN_PHYSDEV_ACCESS
 	default n
 	help
 	  The TPM-device backend driver

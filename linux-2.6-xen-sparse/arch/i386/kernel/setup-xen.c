@@ -1678,7 +1678,6 @@ void __init setup_arch(char **cmdline_p)
 	}
 	bootloader_type = LOADER_TYPE;
 
-#ifdef CONFIG_XEN_PHYSDEV_ACCESS
 	if (xen_start_info->flags & SIF_INITDOMAIN) {
 		/* This is drawn from a dump from vgacon:startup in
 		 * standard Linux. */
@@ -1690,9 +1689,6 @@ void __init setup_arch(char **cmdline_p)
 		screen_info.orig_video_points = 16;
 	} else
 		screen_info.orig_video_isVGA = 0;
-#else
-	screen_info.orig_video_isVGA = 0;
-#endif
 
 #ifdef CONFIG_BLK_DEV_RAM
 	rd_image_start = RAMDISK_FLAGS & RAMDISK_IMAGE_START_MASK;
@@ -1869,7 +1865,6 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif
 	} else {
-#ifdef CONFIG_XEN_PHYSDEV_ACCESS
 		extern const struct consw xennull_con;
 		extern int console_use_vt;
 #if defined(CONFIG_VGA_CONSOLE)
@@ -1878,7 +1873,6 @@ void __init setup_arch(char **cmdline_p)
 #endif
 		conswitchp = &xennull_con;
 		console_use_vt = 0;
-#endif
 	}
 }
 

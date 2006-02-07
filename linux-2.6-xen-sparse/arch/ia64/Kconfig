@@ -69,11 +69,6 @@ config XEN_PRIVILEGED_GUEST
 	help
 	  Used in drivers/xen/privcmd.c.  Should go away?
 
-config XEN_PHYSDEV_ACCESS
-	depends on XEN
-	bool
-	default y
-
 config XEN_BLKDEV_GRANT
 	depends on XEN
 	bool

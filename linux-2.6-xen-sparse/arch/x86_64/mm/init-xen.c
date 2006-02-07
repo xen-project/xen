@@ -753,6 +753,7 @@ size_zones(unsigned long *z, unsigned long *h,
 void __init paging_init(void)
 {
 	unsigned long zones[MAX_NR_ZONES], holes[MAX_NR_ZONES];
+	int i;
 
 	memory_present(0, 0, end_pfn);
 	sparse_init();
@@ -766,20 +767,14 @@ void __init paging_init(void)
 	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 	init_mm.context.pinned = 1;
 
-#ifdef CONFIG_XEN_PHYSDEV_ACCESS
-	{
-		int i;
-		/* Setup mapping of lower 1st MB */
-		for (i = 0; i < NR_FIX_ISAMAPS; i++)
-			if (xen_start_info->flags & SIF_PRIVILEGED)
-				set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
-			else
-				__set_fixmap(FIX_ISAMAP_BEGIN - i,
-					     virt_to_mfn(empty_zero_page) << PAGE_SHIFT,
-					     PAGE_KERNEL_RO);
-	}
-#endif
-
+	/* Setup mapping of lower 1st MB */
+	for (i = 0; i < NR_FIX_ISAMAPS; i++)
+		if (xen_start_info->flags & SIF_PRIVILEGED)
+			set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
+		else
+			__set_fixmap(FIX_ISAMAP_BEGIN - i,
+				     virt_to_mfn(empty_zero_page) << PAGE_SHIFT,
+				     PAGE_KERNEL_RO);
 }
 #endif
 

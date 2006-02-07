@@ -153,11 +153,7 @@ extern void bt_iounmap(void *addr, unsigned long size);
  */
 #define isa_virt_to_bus(_x) isa_virt_to_bus_is_UNSUPPORTED->x
 #define isa_page_to_bus(_x) isa_page_to_bus_is_UNSUPPORTED->x
-#ifdef CONFIG_XEN_PHYSDEV_ACCESS
 #define isa_bus_to_virt(_x) (void *)(__fix_to_virt(FIX_ISAMAP_BEGIN) + (_x))
-#else
-#define isa_bus_to_virt(_x) isa_bus_to_virt_needs_PRIVILEGED_BUILD
-#endif
 
 /*
  * However PCI ones are not necessarily 1:1 and therefore these interfaces
