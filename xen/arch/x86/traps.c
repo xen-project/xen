@@ -670,6 +670,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     unsigned long *reg, eip = regs->eip, res;
     u8 opcode, modrm_reg = 0, modrm_rm = 0, rep_prefix = 0;
     unsigned int port, i, op_bytes = 4, data;
+    u32 l, h;
 
     /* Legacy prefixes. */
     for ( i = 0; i < 8; i++ )
@@ -974,31 +975,67 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         break;
 
     case 0x30: /* WRMSR */
-        /* Ignore the instruction if unprivileged. */
-        if ( !IS_PRIV(v->domain) )
+        switch ( regs->ecx )
         {
-            u32 l, h;
+#ifdef CONFIG_X86_64
+        case MSR_FS_BASE:
+            if ( wrmsr_user(MSR_FS_BASE, regs->eax, regs->edx) )
+                goto fail;
+            v->arch.guest_context.fs_base =
+                ((u64)regs->edx << 32) | regs->eax;
+            break;
+        case MSR_GS_BASE:
+            if ( wrmsr_user(MSR_GS_BASE, regs->eax, regs->edx) )
+                goto fail;
+            v->arch.guest_context.gs_base_kernel =
+                ((u64)regs->edx << 32) | regs->eax;
+            break;
+        case MSR_SHADOW_GS_BASE:
+            if ( wrmsr_user(MSR_SHADOW_GS_BASE, regs->eax, regs->edx) )
+                goto fail;
+            v->arch.guest_context.gs_base_user =
+                ((u64)regs->edx << 32) | regs->eax;
+            break;
+#endif
+        default:
             if ( (rdmsr_user(regs->ecx, l, h) != 0) ||
                  (regs->ecx != MSR_EFER) ||
                  (regs->eax != l) || (regs->edx != h) )
-                DPRINTK("Non-priv domain attempted WRMSR %p from "
+                DPRINTK("Domain attempted WRMSR %p from "
                         "%08x:%08x to %08lx:%08lx.\n",
                         _p(regs->ecx), h, l, (long)regs->edx, (long)regs->eax);
+            break;
         }
-        else if ( wrmsr_user(regs->ecx, regs->eax, regs->edx) )
-            goto fail;
         break;
 
     case 0x32: /* RDMSR */
-        if ( !IS_PRIV(v->domain) )
+        switch ( regs->ecx )
         {
-            if ( regs->ecx != MSR_EFER )
-                DPRINTK("Non-priv domain attempted RDMSR %p.\n",
-                        _p(regs->ecx));
+#ifdef CONFIG_X86_64
+        case MSR_FS_BASE:
+            regs->eax = v->arch.guest_context.fs_base & 0xFFFFFFFFUL;
+            regs->edx = v->arch.guest_context.fs_base >> 32;
+            break;
+        case MSR_GS_BASE:
+            regs->eax = v->arch.guest_context.gs_base_kernel & 0xFFFFFFFFUL;
+            regs->edx = v->arch.guest_context.gs_base_kernel >> 32;
+            break;
+        case MSR_SHADOW_GS_BASE:
+            regs->eax = v->arch.guest_context.gs_base_user & 0xFFFFFFFFUL;
+            regs->edx = v->arch.guest_context.gs_base_user >> 32;
+            break;
+#endif
+        case MSR_EFER:
+            if ( rdmsr_user(regs->ecx, regs->eax, regs->edx) )
+                goto fail;
+            break;
+        default:
+            DPRINTK("Domain attempted RDMSR %p.\n", _p(regs->ecx));
+            /* Everyone can read the MSR space. */
+            if ( rdmsr_user(regs->ecx, regs->eax, regs->edx) )
+                goto fail;
+            break;
         }
-        /* Everyone can read the MSR space. */
-        if ( rdmsr_user(regs->ecx, regs->eax, regs->edx) )
-            goto fail;
         break;
 
     default:
