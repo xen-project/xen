@@ -272,8 +272,10 @@ void __cpuinit cpu_init (void)
 	 * Initialize the per-CPU GDT with the boot GDT,
 	 * and set up the GDT descriptor:
 	 */
+#ifndef CONFIG_XEN 
 	if (cpu)
  		memcpy(cpu_gdt(cpu), cpu_gdt_table, GDT_SIZE);
+#endif
 
 	cpu_gdt_descr[cpu].size = GDT_SIZE;
 #ifndef CONFIG_XEN 

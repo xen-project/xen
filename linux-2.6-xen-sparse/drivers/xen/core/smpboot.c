@@ -81,6 +81,18 @@ EXPORT_SYMBOL(x86_cpu_to_apicid);
 unsigned int maxcpus = NR_CPUS;
 #endif
 
+void __init prefill_possible_map(void)
+{
+	int i, rc;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		rc = HYPERVISOR_vcpu_op(VCPUOP_is_up, i, NULL);
+		if (rc == -ENOENT)
+			break;
+		cpu_set(i, cpu_possible_map);
+	}
+}
+
 void __init smp_alloc_memory(void)
 {
 }

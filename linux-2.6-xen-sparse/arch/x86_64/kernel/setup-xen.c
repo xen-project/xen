@@ -911,6 +911,9 @@ void __init setup_arch(char **cmdline_p)
 	init_apic_mappings();
 #endif
 #endif
+#if defined(CONFIG_XEN) && defined(CONFIG_SMP) && !defined(CONFIG_HOTPLUG_CPU)
+	prefill_possible_map();
+#endif
 
 #if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 	/*
