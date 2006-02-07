@@ -29,7 +29,8 @@ PYGRUB_VER = 0.3
 
 def draw_window():
     stdscr = curses.initscr()
-    curses.use_default_colors()
+    if hasattr(curses, 'use_default_colors'):
+        curses.use_default_colors()
     try:
         curses.curs_set(0)
     except _curses.error:
@@ -152,15 +153,16 @@ def get_entry_idx(cf, entry):
 
 def main(cf = None):
     mytime = 0
+    timeout = int(cf.timeout)
 
     (stdscr, win) = draw_window()
     stdscr.timeout(1000)
     selected = cf.default
     
-    while (mytime < int(cf.timeout)):
-        if cf.timeout != -1 and mytime != -1: 
+    while (timeout == -1 or mytime < int(timeout)):
+        if timeout != -1 and mytime != -1: 
             stdscr.addstr(20, 5, "Will boot selected entry in %2d seconds"
-                          %(int(cf.timeout) - mytime))
+                          %(int(timeout) - mytime))
         else:
             stdscr.addstr(20, 5, " " * 80)
             
