@@ -40,7 +40,14 @@ static void mm_walk(struct mm_struct *mm, pgprot_t flags)
 	int          g,u,m;
 
 	pgd = mm->pgd;
-	for (g = 0; g <= USER_PTRS_PER_PGD; g++, pgd++) {
+	/*
+	 * Cannot iterate up to USER_PTRS_PER_PGD as these pagetables may not
+	 * be the 'current' task's pagetables (e.g., current may be 32-bit,
+	 * but the pagetables may be for a 64-bit task).
+	 * Subtracting 1 from TASK_SIZE64 means the loop limit is correct
+	 * regardless of whether TASK_SIZE64 is a multiple of PGDIR_SIZE.
+	 */
+	for (g = 0; g <= ((TASK_SIZE64-1) / PGDIR_SIZE); g++, pgd++) {
 		if (pgd_none(*pgd))
 			continue;
 		pud = pud_offset(pgd, 0);
