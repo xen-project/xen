@@ -826,10 +826,16 @@ ENTRY(hypervisor_callback)
 ENTRY(do_hypervisor_callback)   # do_hyperviosr_callback(struct *pt_regs)
 # Since we don't modify %rdi, evtchn_do_upall(struct *pt_regs) will
 # see the correct pointer to the pt_regs
-        addq $8, %rsp            # we don't return, adjust the stack frame
-11:	movb $0, EVENT_MASK(%rsp)         
+	movq %rdi, %rsp            # we don't return, adjust the stack frame
+11:	movb $0, EVENT_MASK(%rdi)
+	movq %gs:pda_irqstackptr,%rax
+	incl %gs:pda_irqcount
+	cmovzq %rax,%rsp
+	pushq %rdi
 	call evtchn_do_upcall
-        jmp  error_exit
+	popq %rsp
+	decl %gs:pda_irqcount
+	jmp  error_exit
 
 #ifdef CONFIG_X86_LOCAL_APIC
 ENTRY(nmi)
