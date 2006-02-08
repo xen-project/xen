@@ -126,6 +126,7 @@ EXPORT_SYMBOL(default_idle);
 #ifdef CONFIG_HOTPLUG_CPU
 static inline void play_dead(void)
 {
+	idle_task_exit();
 	HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL);
 	local_irq_enable();
 }

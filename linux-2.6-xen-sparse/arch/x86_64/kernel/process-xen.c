@@ -53,6 +53,7 @@
 #include <asm/kdebug.h>
 #include <xen/interface/dom0_ops.h>
 #include <xen/interface/physdev.h>
+#include <xen/interface/vcpu.h>
 #include <asm/desc.h>
 #include <asm/proto.h>
 #include <asm/hardirq.h>
@@ -144,21 +145,7 @@ DECLARE_PER_CPU(int, cpu_state);
 static inline void play_dead(void)
 {
 	idle_task_exit();
-	wbinvd();
-	mb();
-	/* Ack it */
-	__get_cpu_var(cpu_state) = CPU_DEAD;
-
-	/* We shouldn't have to disable interrupts while dead, but
-	 * some interrupts just don't seem to go away, and this makes
-	 * it "work" for testing purposes. */
-	/* Death loop */
-	while (__get_cpu_var(cpu_state) != CPU_UP_PREPARE)
-		HYPERVISOR_sched_op(SCHEDOP_yield, 0);
-
-	local_irq_disable();
-	__flush_tlb_all();
-	cpu_set(smp_processor_id(), cpu_online_map);
+	HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL);
 	local_irq_enable();
 }
 #else
