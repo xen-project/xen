@@ -179,12 +179,11 @@ static inline void write_cr0(unsigned long val)
 	asm volatile("movq %0,%%cr0" :: "r" (val));
 } 
 
-static inline unsigned long read_cr3(void)
-{ 
-	unsigned long cr3;
-	asm("movq %%cr3,%0" : "=r" (cr3));
-	return cr3;
-} 
+#define read_cr3() ({ \
+	unsigned long __dummy; \
+	asm("movq %%cr3,%0" : "=r" (__dummy)); \
+	return machine_to_phys(__dummy); \
+})
 
 static inline unsigned long read_cr4(void)
 { 
