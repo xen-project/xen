@@ -1,16 +1,14 @@
 diff -pruN ../pristine-linux-2.6.16-rc1-git4/net/ipv4/netfilter/ip_nat_proto_tcp.c ./net/ipv4/netfilter/ip_nat_proto_tcp.c
 --- ../pristine-linux-2.6.16-rc1-git4/net/ipv4/netfilter/ip_nat_proto_tcp.c	2006-02-02 17:39:51.000000000 +0000
 +++ ./net/ipv4/netfilter/ip_nat_proto_tcp.c	2006-02-02 17:44:18.000000000 +0000
-@@ -129,10 +129,16 @@ tcp_manip_pkt(struct sk_buff **pskb,
+@@ -129,10 +129,14 @@ tcp_manip_pkt(struct sk_buff **pskb,
  	if (hdrsize < sizeof(*hdr))
  		return 1;
  
 -	hdr->check = ip_nat_cheat_check(~oldip, newip,
 +	if ((*pskb)->proto_csum_blank) {
-+		hdr->check = ip_nat_cheat_check(oldip, ~newip,
-+				ip_nat_cheat_check(oldport ^ 0xFFFF,
-+					newport, hdr->check));
-+	} else { 
++		hdr->check = ip_nat_cheat_check(oldip, ~newip, hdr->check);
++	} else {
 +		hdr->check = ip_nat_cheat_check(~oldip, newip,
  					ip_nat_cheat_check(oldport ^ 0xFFFF,
  							   newport,
@@ -18,22 +16,19 @@ diff -pruN ../pristine-linux-2.6.16-rc1-git4/net/ipv4/netfilter/ip_nat_proto_tcp
 +	}
  	return 1;
  }
- 
+
 diff -pruN ../pristine-linux-2.6.16-rc1-git4/net/ipv4/netfilter/ip_nat_proto_udp.c ./net/ipv4/netfilter/ip_nat_proto_udp.c
 --- ../pristine-linux-2.6.16-rc1-git4/net/ipv4/netfilter/ip_nat_proto_udp.c	2006-02-02 17:39:51.000000000 +0000
 +++ ./net/ipv4/netfilter/ip_nat_proto_udp.c	2006-02-02 17:44:18.000000000 +0000
-@@ -113,11 +113,19 @@ udp_manip_pkt(struct sk_buff **pskb,
+@@ -113,11 +113,16 @@ udp_manip_pkt(struct sk_buff **pskb,
  		newport = tuple->dst.u.udp.port;
  		portptr = &hdr->dest;
  	}
 -	if (hdr->check) /* 0 is a special case meaning no checksum */
 -		hdr->check = ip_nat_cheat_check(~oldip, newip,
-+	
 +	if (hdr->check) { /* 0 is a special case meaning no checksum */
 +		if ((*pskb)->proto_csum_blank) {
-+			hdr->check = ip_nat_cheat_check(oldip, ~newip, 
-+					ip_nat_cheat_check(*portptr ^ 0xFFFF, 
-+						newport, hdr->check));
++			hdr->check = ip_nat_cheat_check(oldip, ~newip, hdr->check);
 +		} else {
 +			hdr->check = ip_nat_cheat_check(~oldip, newip,
  					ip_nat_cheat_check(*portptr ^ 0xFFFF,
