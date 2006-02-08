@@ -123,8 +123,10 @@ static void init_evtchn_cpu_bindings(void)
 #ifdef CONFIG_X86
 extern fastcall unsigned int do_IRQ(struct pt_regs *regs);
 #if defined (__i386__)
+static inline void exit_idle(void) {}
 #define IRQ_REG orig_eax
 #elif defined (__x86_64__)
+#include <asm/idle.h>
 #define IRQ_REG orig_rax
 #endif
 #define do_IRQ(irq, regs) do {			\
@@ -170,8 +172,10 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 			port = (l1i * BITS_PER_LONG) + l2i;
 			if ((irq = evtchn_to_irq[port]) != -1)
 				do_IRQ(irq, regs);
-			else
+			else {
+				exit_idle();
 				evtchn_device_upcall(port);
+			}
 		}
 	}
 }
