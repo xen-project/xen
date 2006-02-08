@@ -179,7 +179,6 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 		}
 	}
 }
-EXPORT_SYMBOL(evtchn_do_upcall);
 
 static int find_unbound_irq(void)
 {
