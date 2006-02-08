@@ -52,9 +52,7 @@ EXPORT_SYMBOL(ioremap_nocache);
 EXPORT_SYMBOL(iounmap);
 EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(pm_idle);
-#ifdef CONFIG_ACPI_BOOT
 EXPORT_SYMBOL(pm_power_off);
-#endif
 
 EXPORT_SYMBOL(__down_failed);
 EXPORT_SYMBOL(__down_failed_interruptible);
