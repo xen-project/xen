@@ -66,6 +66,12 @@ extern void set_timer(struct timer *timer, s_time_t expires);
 extern void stop_timer(struct timer *timer);
 
 /*
+ * Migrate a timer to a different CPU. The timer must have been previously
+ * initialised by init_timer(). The timer may be active.
+ */
+extern void migrate_timer(struct timer *timer, unsigned int new_cpu);
+
+/*
  * Deactivate a timer and prevent it from being re-set (future calls to
  * set_timer will silently fail). When this function returns it is guaranteed
  * that the timer callback handler is not running on any CPU.

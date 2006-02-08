@@ -161,46 +161,122 @@ static inline void __stop_timer(struct timer *timer)
         cpu_raise_softirq(cpu, TIMER_SOFTIRQ);
 }
 
+static inline void timer_lock(struct timer *timer)
+{
+    unsigned int cpu;
+
+    for ( ; ; )
+    {
+        cpu = timer->cpu;
+        spin_lock(&timers[cpu].lock);
+        if ( likely(timer->cpu == cpu) )
+            break;
+        spin_unlock(&timers[cpu].lock);
+    }
+}
+
+#define timer_lock_irq(t) \
+    do { local_irq_disable(); timer_lock(t); } while ( 0 )
+#define timer_lock_irqsave(t, flags) \
+    do { local_irq_save(flags); timer_lock(t); } while ( 0 )
+
+static inline void timer_unlock(struct timer *timer)
+{
+        spin_unlock(&timers[timer->cpu].lock);
+}
+
+#define timer_unlock_irq(t) \
+    do { timer_unlock(t); local_irq_enable(); } while ( 0 )
+#define timer_unlock_irqrestore(t, flags) \
+    do { timer_unlock(t); local_irq_restore(flags); } while ( 0 )
+
 
 void set_timer(struct timer *timer, s_time_t expires)
 {
-    int           cpu = timer->cpu;
     unsigned long flags;
 
-    spin_lock_irqsave(&timers[cpu].lock, flags);
+    timer_lock_irqsave(timer, flags);
+
     if ( active_timer(timer) )
         __stop_timer(timer);
+
     timer->expires = expires;
+
     if ( likely(!timer->killed) )
         __add_timer(timer);
-    spin_unlock_irqrestore(&timers[cpu].lock, flags);
+
+    timer_unlock_irqrestore(timer, flags);
 }
 
 
 void stop_timer(struct timer *timer)
 {
-    int           cpu = timer->cpu;
     unsigned long flags;
 
-    spin_lock_irqsave(&timers[cpu].lock, flags);
+    timer_lock_irqsave(timer, flags);
+
     if ( active_timer(timer) )
         __stop_timer(timer);
-    spin_unlock_irqrestore(&timers[cpu].lock, flags);
+
+    timer_unlock_irqrestore(timer, flags);
+}
+
+
+void migrate_timer(struct timer *timer, unsigned int new_cpu)
+{
+    int           old_cpu;
+    unsigned long flags;
+
+    for ( ; ; )
+    {
+        if ( (old_cpu = timer->cpu) == new_cpu )
+            return;
+
+        if ( old_cpu < new_cpu )
+        {
+            spin_lock_irqsave(&timers[old_cpu].lock, flags);
+            spin_lock(&timers[new_cpu].lock);
+        }
+        else
+        {
+            spin_lock_irqsave(&timers[new_cpu].lock, flags);
+            spin_lock(&timers[old_cpu].lock);
+        }
+
+        if ( likely(timer->cpu == old_cpu) )
+             break;
+
+        spin_unlock(&timers[old_cpu].lock);
+        spin_unlock_irqrestore(&timers[new_cpu].lock, flags);
+    }
+
+    if ( active_timer(timer) )
+        __stop_timer(timer);
+
+    timer->cpu = new_cpu;
+
+    if ( likely(!timer->killed) )
+        __add_timer(timer);
+
+    spin_unlock(&timers[old_cpu].lock);
+    spin_unlock_irqrestore(&timers[new_cpu].lock, flags);
 }
 
 
 void kill_timer(struct timer *timer)
 {
-    int           cpu = timer->cpu;
+    int           cpu;
     unsigned long flags;
 
-    BUG_ON(timers[cpu].running == timer);
+    BUG_ON(timers[smp_processor_id()].running == timer);
 
-    spin_lock_irqsave(&timers[cpu].lock, flags);
+    timer_lock_irqsave(timer, flags);
+
     if ( active_timer(timer) )
         __stop_timer(timer);
     timer->killed = 1;
-    spin_unlock_irqrestore(&timers[cpu].lock, flags);
+
+    timer_unlock_irqrestore(timer, flags);
 
     for_each_online_cpu ( cpu )
         while ( timers[cpu].running == timer )
