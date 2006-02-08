@@ -1641,14 +1641,18 @@ static int set_foreigndom(unsigned int cpu, domid_t domid)
     struct domain *e, *d = current->domain;
     int okay = 1;
 
-    if ( (e = percpu_info[cpu].foreign) != NULL )
-        put_domain(e);
-    percpu_info[cpu].foreign = NULL;
-    
-    if ( domid == DOMID_SELF )
+    ASSERT(percpu_info[cpu].foreign == NULL);
+
+    if ( likely(domid == DOMID_SELF) )
         goto out;
 
-    if ( !IS_PRIV(d) )
+    if ( domid == d->domain_id )
+    {
+        MEM_LOG("Dom %u tried to specify itself as foreign domain",
+                d->domain_id);
+        okay = 0;
+    }
+    else if ( !IS_PRIV(d) )
     {
         switch ( domid )
         {
@@ -1734,7 +1738,7 @@ int do_mmuext_op(
 
     if ( !set_foreigndom(cpu, foreigndom) )
     {
-        rc = -EINVAL;
+        rc = -ESRCH;
         goto out;
     }
 
@@ -1993,7 +1997,7 @@ int do_mmu_update(
 
     if ( !set_foreigndom(cpu, foreigndom) )
     {
-        rc = -EINVAL;
+        rc = -ESRCH;
         goto out;
     }
 
@@ -2580,18 +2584,13 @@ int do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
                                      domid_t domid)
 {
     unsigned int cpu = smp_processor_id();
-    struct domain *d;
     int rc;
 
     if ( unlikely(!IS_PRIV(current->domain)) )
         return -EPERM;
 
-    percpu_info[cpu].foreign = d = find_domain_by_id(domid);
-    if ( unlikely(d == NULL) )
-    {
-        MEM_LOG("Unknown domain '%u'", domid);
+    if ( !set_foreigndom(cpu, domid) )
         return -ESRCH;
-    }
 
     rc = do_update_va_mapping(va, val64, flags);
 
