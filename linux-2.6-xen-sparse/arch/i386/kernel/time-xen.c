@@ -147,7 +147,7 @@ static int __init __independent_wallclock(char *str)
 }
 __setup("independent_wallclock", __independent_wallclock);
 
-int tsc_disable __initdata = 0;
+int tsc_disable __devinitdata = 0;
 
 static void delay_tsc(unsigned long loops)
 {

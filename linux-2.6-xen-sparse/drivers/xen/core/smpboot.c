@@ -223,8 +223,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	cpu_sibling_map[0] = cpumask_of_cpu(0);
 	cpu_core_map[0]    = cpumask_of_cpu(0);
 
-	if (max_cpus != 0)
-		xen_smp_intr_init(0);
+	xen_smp_intr_init(0);
 
 	for_each_cpu_mask (cpu, cpu_possible_map) {
 		if (cpu == 0)
