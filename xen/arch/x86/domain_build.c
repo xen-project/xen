@@ -50,10 +50,13 @@ static void parse_dom0_mem(char *s)
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
-static unsigned int opt_dom0_shadow = 0;
+static unsigned int opt_dom0_max_vcpus;
+integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
+
+static unsigned int opt_dom0_shadow;
 boolean_param("dom0_shadow", opt_dom0_shadow);
 
-static unsigned int opt_dom0_translate = 0;
+static unsigned int opt_dom0_translate;
 boolean_param("dom0_translate", opt_dom0_translate);
 
 static char opt_dom0_ioports_disable[200] = "";
@@ -594,7 +597,13 @@ int construct_dom0(struct domain *d,
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
 
-    for ( i = 1; i < num_online_cpus(); i++ )
+    if ( opt_dom0_max_vcpus == 0 )
+        opt_dom0_max_vcpus = num_online_cpus();
+    if ( opt_dom0_max_vcpus > MAX_VIRT_CPUS )
+        opt_dom0_max_vcpus = MAX_VIRT_CPUS;
+    printk("Dom0 has maximum %u VCPUs\n", opt_dom0_max_vcpus);
+
+    for ( i = 1; i < opt_dom0_max_vcpus; i++ )
         (void)alloc_vcpu(d, i, i);
 
     /* Set up monitor table */
