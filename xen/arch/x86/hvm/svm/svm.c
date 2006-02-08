@@ -2317,7 +2317,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
     save_svm_cpu_user_regs(v, &regs);
     v->arch.hvm_svm.injecting_event = 0;
 
-    vmcb->tlb_control = 0;
+    vmcb->tlb_control = 1;
 
 #ifdef SVM_EXTRA_DEBUG
 {
