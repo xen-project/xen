@@ -863,16 +863,16 @@ EXPORT_SYMBOL(xenbus_resume);
 
 
 /* A flag to determine if xenstored is 'ready' (i.e. has started) */
-int xenstored_ready = 0; 
+int xenstored_ready = 0;
 
 
 int register_xenstore_notifier(struct notifier_block *nb)
 {
 	int ret = 0;
 
-	if (xenstored_ready > 0) 
+	if (xenstored_ready > 0)
 		ret = nb->notifier_call(nb, 0, NULL);
-	else 
+	else
 		notifier_chain_register(&xenstore_chain, nb);
 
 	return ret;
@@ -889,7 +889,7 @@ EXPORT_SYMBOL(unregister_xenstore_notifier);
 
 void xenbus_probe(void *unused)
 {
-	BUG_ON((xenstored_ready <= 0)); 
+	BUG_ON((xenstored_ready <= 0));
 
 	/* Enumerate devices in xenstore. */
 	xenbus_probe_devices(&xenbus_frontend);
@@ -904,27 +904,27 @@ void xenbus_probe(void *unused)
 }
 
 
-static struct proc_dir_entry *xsd_mfn_intf;
+static struct proc_dir_entry *xsd_kva_intf;
 static struct proc_dir_entry *xsd_port_intf;
 
 
-static int xsd_mfn_read(char *page, char **start, off_t off,
+static int xsd_kva_read(char *page, char **start, off_t off,
                         int count, int *eof, void *data)
 {
-	int len; 
-	len  = sprintf(page, "%ld", xen_start_info->store_mfn); 
-	*eof = 1; 
-	return len; 
+	int len;
+	len  = sprintf(page, "0x%p", mfn_to_virt(xen_start_info->store_mfn));
+	*eof = 1;
+	return len;
 }
 
 static int xsd_port_read(char *page, char **start, off_t off,
 			 int count, int *eof, void *data)
 {
-	int len; 
+	int len;
 
-	len  = sprintf(page, "%d", xen_start_info->store_evtchn); 
-	*eof = 1; 
-	return len; 
+	len  = sprintf(page, "%d", xen_start_info->store_evtchn);
+	*eof = 1;
+	return len;
 }
 
 
@@ -959,8 +959,8 @@ static int __init xenbus_probe_init(void)
 
 		/* Allocate page. */
 		page = get_zeroed_page(GFP_KERNEL);
-		if (!page) 
-			return -ENOMEM; 
+		if (!page)
+			return -ENOMEM;
 
 		/* We don't refcnt properly, so set reserved on page.
 		 * (this allocation is permanent) */
@@ -973,25 +973,25 @@ static int __init xenbus_probe_init(void)
 		/* Next allocate a local port which xenstored can bind to */
 		op.cmd = EVTCHNOP_alloc_unbound;
 		op.u.alloc_unbound.dom        = DOMID_SELF;
-		op.u.alloc_unbound.remote_dom = 0; 
+		op.u.alloc_unbound.remote_dom = 0;
 
 		ret = HYPERVISOR_event_channel_op(&op);
-		BUG_ON(ret); 
+		BUG_ON(ret);
 		xen_start_info->store_evtchn = op.u.alloc_unbound.port;
 
 		/* And finally publish the above info in /proc/xen */
-		if((xsd_mfn_intf = create_xen_proc_entry("xsd_mfn", 0400)))
-			xsd_mfn_intf->read_proc = xsd_mfn_read; 
+		if((xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0400)))
+			xsd_kva_intf->read_proc = xsd_kva_read;
 		if((xsd_port_intf = create_xen_proc_entry("xsd_port", 0400)))
 			xsd_port_intf->read_proc = xsd_port_read;
 	}
 
 	/* Initialize the interface to xenstore. */
-	err = xs_init(); 
+	err = xs_init();
 	if (err) {
 		printk(KERN_WARNING
 		       "XENBUS: Error initializing xenstore comms: %i\n", err);
-		return err; 
+		return err;
 	}
 
 	if (!dom0) {

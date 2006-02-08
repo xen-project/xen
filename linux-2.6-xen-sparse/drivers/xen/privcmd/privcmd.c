@@ -163,7 +163,12 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 			goto batch_err;
 		}
 
-		vma = find_vma( current->mm, m.addr );
+		if (m.dom == DOMID_SELF) {
+			ret = -EINVAL;
+			goto batch_err;
+		}
+
+		vma = find_vma(current->mm, m.addr);
 		if (!vma) {
 			ret = -EINVAL;
 			goto batch_err;

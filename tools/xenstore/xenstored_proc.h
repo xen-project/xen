@@ -20,7 +20,7 @@
 #ifndef _XENSTORED_PROC_H
 #define _XENSTORED_PROC_H
 
-#define XENSTORED_PROC_MFN  "/proc/xen/xsd_mfn"
+#define XENSTORED_PROC_KVA  "/proc/xen/xsd_kva"
 #define XENSTORED_PROC_PORT "/proc/xen/xsd_port"
 
 

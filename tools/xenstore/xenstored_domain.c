@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <paths.h>
 
 //#define DEBUG
 #include "utils.h"
@@ -256,7 +257,7 @@ static char *talloc_domain_path(void *context, unsigned int domid)
 }
 
 static struct domain *new_domain(void *context, unsigned int domid,
-				 unsigned long mfn, int port)
+				 int port)
 {
 	struct domain *domain;
 	struct ioctl_evtchn_bind_interdomain bind;
@@ -268,11 +269,6 @@ static struct domain *new_domain(void *context, unsigned int domid,
 	domain->shutdown = 0;
 	domain->domid = domid;
 	domain->path = talloc_domain_path(domain, domid);
-	domain->interface = xc_map_foreign_range(
-		*xc_handle, domain->domid,
-		getpagesize(), PROT_READ|PROT_WRITE, mfn);
-	if (!domain->interface)
-		return NULL;
 
 	list_add(&domain->list, &domains);
 	talloc_set_destructor(domain, destroy_domain);
@@ -290,7 +286,6 @@ static struct domain *new_domain(void *context, unsigned int domid,
 	domain->conn->id = domid;
 
 	domain->remote_port = port;
-	domain->mfn = mfn;
 
 	return domain;
 }
@@ -341,11 +336,19 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 
 	if (domain == NULL) {
 		/* Hang domain off "in" until we're finished. */
-		domain = new_domain(in, domid, mfn, port);
+		domain = new_domain(in, domid, port);
 		if (!domain) {
 			send_error(conn, errno);
 			return;
 		}
+		domain->interface = xc_map_foreign_range(
+			*xc_handle, domid,
+			getpagesize(), PROT_READ|PROT_WRITE, mfn);
+		if (!domain->interface) {
+			send_error(conn, errno);
+			return;
+		}
+		domain->mfn = mfn;
 
 		/* Now domain belongs to its connection. */
 		talloc_steal(domain->conn, domain);
@@ -463,11 +466,11 @@ static int dom0_init(void)
 { 
 	int rc, fd;
 	evtchn_port_t port; 
-	unsigned long mfn; 
+	unsigned long kva; 
 	char str[20]; 
 	struct domain *dom0; 
 
-	fd = open(XENSTORED_PROC_MFN, O_RDONLY); 
+	fd = open(XENSTORED_PROC_KVA, O_RDONLY); 
 	if (fd == -1)
 		return -1;
 
@@ -475,7 +478,7 @@ static int dom0_init(void)
 	if (rc == -1)
 		goto outfd;
 	str[rc] = '\0'; 
-	mfn = strtoul(str, NULL, 0); 
+	kva = strtoul(str, NULL, 0); 
 
 	close(fd); 
 
@@ -491,7 +494,19 @@ static int dom0_init(void)
 
 	close(fd); 
 
-	dom0 = new_domain(NULL, 0, mfn, port); 
+	dom0 = new_domain(NULL, 0, port); 
+
+	fd = open(_PATH_KMEM, O_RDWR);
+	if (fd == -1)
+		return -1;
+
+	dom0->interface = mmap(NULL, getpagesize(), PROT_READ|PROT_WRITE,
+			       MAP_SHARED, fd, kva);
+	if (dom0->interface == MAP_FAILED)
+		goto outfd;
+
+	close(fd);
+
 	talloc_steal(dom0->conn, dom0); 
 
 	evtchn_notify(dom0->port); 
