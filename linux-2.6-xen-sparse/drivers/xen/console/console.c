@@ -562,45 +562,6 @@ static struct tty_operations xencons_ops = {
 	.wait_until_sent = xencons_wait_until_sent,
 };
 
-static const char *xennullcon_startup(void)
-{
-	return NULL;
-}
-
-static int xennullcon_dummy(void)
-{
-	return 0;
-}
-
-#define DUMMY (void *)xennullcon_dummy
-
-/*
- *  The console `switch' structure for the dummy console
- *
- *  Most of the operations are dummies.
- */
-
-const struct consw xennull_con = {
-	.owner =		THIS_MODULE,
-	.con_startup =	xennullcon_startup,
-	.con_init =		DUMMY,
-	.con_deinit =	DUMMY,
-	.con_clear =	DUMMY,
-	.con_putc =		DUMMY,
-	.con_putcs =	DUMMY,
-	.con_cursor =	DUMMY,
-	.con_scroll =	DUMMY,
-	.con_bmove =	DUMMY,
-	.con_switch =	DUMMY,
-	.con_blank =	DUMMY,
-	.con_font_set =	DUMMY,
-	.con_font_get =	DUMMY,
-	.con_font_default =	DUMMY,
-	.con_font_copy =	DUMMY,
-	.con_set_palette =	DUMMY,
-	.con_scrolldelta =	DUMMY,
-};
-
 static int __init xencons_init(void)
 {
 	int rc;

@@ -940,36 +940,37 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 #ifdef CONFIG_XEN
-       {
-	       physdev_op_t op;
+	{
+		physdev_op_t op;
 
-	       op.cmd             = PHYSDEVOP_SET_IOPL;
-	       op.u.set_iopl.iopl = 1;
-	       HYPERVISOR_physdev_op(&op);
+		op.cmd             = PHYSDEVOP_SET_IOPL;
+		op.u.set_iopl.iopl = 1;
+		HYPERVISOR_physdev_op(&op);
 
-	       if (xen_start_info->flags & SIF_INITDOMAIN) {
-		       if (!(xen_start_info->flags & SIF_PRIVILEGED))
-			       panic("Xen granted us console access "
-				     "but not privileged status");
+		if (xen_start_info->flags & SIF_INITDOMAIN) {
+			if (!(xen_start_info->flags & SIF_PRIVILEGED))
+				panic("Xen granted us console access "
+				      "but not privileged status");
 		       
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
-		       conswitchp = &vga_con;
+			conswitchp = &vga_con;
 #elif defined(CONFIG_DUMMY_CONSOLE)
-		       conswitchp = &dummy_con;
+			conswitchp = &dummy_con;
 #endif
 #endif
-	       } else {
-		       extern const struct consw xennull_con;
-		       extern int console_use_vt;
+		} else {
+			extern int console_use_vt;
 #if defined(CONFIG_VGA_CONSOLE)
-		       /* disable VGA driver */
-		       ORIG_VIDEO_ISVGA = VIDEO_TYPE_VLFB;
+			/* disable VGA driver */
+			ORIG_VIDEO_ISVGA = VIDEO_TYPE_VLFB;
 #endif
-		       conswitchp = &xennull_con;
-		       console_use_vt = 0;
-	       }
-       }
+#if defined(CONFIG_DUMMY_CONSOLE)
+			conswitchp = &dummy_con;
+#endif
+			console_use_vt = 0;
+		}
+	}
 #else	/* CONFIG_XEN */
 
 #ifdef CONFIG_VT

@@ -1865,13 +1865,14 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif
 	} else {
-		extern const struct consw xennull_con;
 		extern int console_use_vt;
 #if defined(CONFIG_VGA_CONSOLE)
 		/* disable VGA driver */
 		ORIG_VIDEO_ISVGA = VIDEO_TYPE_VLFB;
 #endif
-		conswitchp = &xennull_con;
+#if defined(CONFIG_DUMMY_CONSOLE)
+		conswitchp = &dummy_con;
+#endif
 		console_use_vt = 0;
 	}
 }
