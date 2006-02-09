@@ -877,7 +877,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     case 0x09: /* WBINVD */
         /* Ignore the instruction if unprivileged. */
         if ( !cache_flush_permitted(v->domain) )
-            DPRINTK("Non-physdev domain attempted WBINVD.\n");
+            /* Non-physdev domain attempted WBINVD; ignore for now since
+               newer linux uses this in some start-of-day timing loops */
+            ;
         else
             wbinvd();
         break;
