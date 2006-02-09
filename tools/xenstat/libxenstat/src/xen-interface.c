@@ -61,43 +61,40 @@ static int xi_make_xen_version_hypercall(xi_handle *handle, long *vnum,
 					 xen_extraversion_t *ver)
 {
 	privcmd_hypercall_t privcmd;
-	multicall_entry_t multicall[2];
 	int ret = 0;
 
-	/* set up for doing hypercall */
-	privcmd.op = __HYPERVISOR_multicall;
-	privcmd.arg[0] = (unsigned long)multicall;
-	privcmd.arg[1] = 2;
-
-	/* first one to get xen version number */
-	multicall[0].op = __HYPERVISOR_xen_version;
-	multicall[0].args[0] = (unsigned long)XENVER_version;
-
-	/* second to get xen version flag */
-	multicall[1].op = __HYPERVISOR_xen_version;
-	multicall[1].args[0] = (unsigned long)XENVER_extraversion;
-	multicall[1].args[1] = (unsigned long)ver;
-
-	if (mlock( &privcmd, sizeof(privcmd_hypercall_t)) < 0) {
+	if (mlock(&privcmd, sizeof(privcmd)) < 0) {
 		perror("Failed to mlock privcmd structure");
 		return -1;
 	}
 
-	if (mlock( multicall, sizeof(multicall_entry_t)) < 0) {
-		perror("Failed to mlock multicall_entry structure");
-		munlock( &multicall, sizeof(multicall_entry_t));
+	if (mlock(ver, sizeof(*ver)) < 0) {
+		perror("Failed to mlock extraversion structure");
+		munlock(&privcmd, sizeof(privcmd));
 		return -1;
 	}
 
-	if (ioctl( handle->fd, IOCTL_PRIVCMD_HYPERCALL, &privcmd) < 0) {
+	privcmd.op = __HYPERVISOR_xen_version;
+	privcmd.arg[0] = (unsigned long)XENVER_version;
+	privcmd.arg[1] = 0;
+
+	*vnum = ioctl(handle->fd, IOCTL_PRIVCMD_HYPERCALL, &privcmd);
+	if (*vnum < 0) {
 		perror("Hypercall failed");
 		ret = -1;
 	}
 
-	*vnum = multicall[0].result;
+	privcmd.op = __HYPERVISOR_xen_version;
+	privcmd.arg[0] = (unsigned long)XENVER_extraversion;
+	privcmd.arg[1] = (unsigned long)ver;
 
-	munlock( &privcmd, sizeof(privcmd_hypercall_t));
-	munlock( &multicall, sizeof(multicall_entry_t));
+	if (ioctl(handle->fd, IOCTL_PRIVCMD_HYPERCALL, &privcmd) < 0) {
+		perror("Hypercall failed");
+		ret = -1;
+	}
+
+	munlock(&privcmd, sizeof(privcmd));
+	munlock(ver, sizeof(*ver));
 
 	return ret;
 }

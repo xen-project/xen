@@ -35,6 +35,9 @@
 static struct proc_dir_entry *privcmd_intf;
 static struct proc_dir_entry *capabilities_intf;
 
+#define NR_HYPERCALLS 32
+static DECLARE_BITMAP(hypercall_permission_map, NR_HYPERCALLS);
+
 static int privcmd_ioctl(struct inode *inode, struct file *file,
                          unsigned int cmd, unsigned long data)
 {
@@ -47,6 +50,12 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
   
 		if (copy_from_user(&hypercall, udata, sizeof(hypercall)))
 			return -EFAULT;
+
+		/* Check hypercall number for validity. */
+		if (hypercall.op >= NR_HYPERCALLS)
+			return -EINVAL;
+		if (!test_bit(hypercall.op, hypercall_permission_map))
+			return -EINVAL;
 
 #if defined(__i386__)
 		__asm__ __volatile__ (
@@ -260,6 +269,15 @@ static int capabilities_read(char *page, char **start, off_t off,
 
 static int __init privcmd_init(void)
 {
+	/* Set of hypercalls that privileged applications may execute. */
+	set_bit(__HYPERVISOR_acm_op,           hypercall_permission_map);
+	set_bit(__HYPERVISOR_dom0_op,          hypercall_permission_map);
+	set_bit(__HYPERVISOR_event_channel_op, hypercall_permission_map);
+	set_bit(__HYPERVISOR_memory_op,        hypercall_permission_map);
+	set_bit(__HYPERVISOR_mmu_update,       hypercall_permission_map);
+	set_bit(__HYPERVISOR_mmuext_op,        hypercall_permission_map);
+	set_bit(__HYPERVISOR_xen_version,      hypercall_permission_map);
+
 	privcmd_intf = create_xen_proc_entry("privcmd", 0400);
 	if (privcmd_intf != NULL)
 		privcmd_intf->proc_fops = &privcmd_file_ops;
