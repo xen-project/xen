@@ -61,16 +61,20 @@ xen_do_IRQ(ia64_vector vector)
  */
 void xen_irq_exit(struct pt_regs *regs)
 {
-	//account_system_vtime(current);
 	sub_preempt_count(IRQ_EXIT_OFFSET);
-    if((((char *)regs) -(char *) current) != (IA64_STK_OFFSET-IA64_PT_REGS_SIZE))
-        return;
+}
 
-	if (!in_interrupt()&&local_softirq_pending()) {
+/*
+ * ONLY gets called from ia64_leave_kernel
+ * ONLY call with interrupts enabled
+ */
+void process_soft_irq()
+{
+	if (!in_interrupt() && local_softirq_pending()) {
 		add_preempt_count(SOFTIRQ_OFFSET);
 		do_softirq();
 		sub_preempt_count(SOFTIRQ_OFFSET);
 	}
-	//preempt_enable_no_resched();
 }
+
 /* end from linux/kernel/softirq.c */
