@@ -782,6 +782,7 @@ int construct_dom0(struct domain *d,
 	unsigned long pkern_entry;
 	unsigned long pkern_end;
 	unsigned long pinitrd_start = 0;
+	unsigned long pstart_info;
 	unsigned long ret, progress = 0;
 
 //printf("construct_dom0: starting\n");
@@ -839,13 +840,18 @@ int construct_dom0(struct domain *d,
                           (PAGE_ALIGN(initrd_len) + 4*1024*1024);
 
              memcpy(__va(pinitrd_start),initrd_start,initrd_len);
+             pstart_info = PAGE_ALIGN(pinitrd_start + initrd_len);
+        } else {
+             pstart_info = PAGE_ALIGN(pkern_end);
         }
 
 	printk("METAPHYSICAL MEMORY ARRANGEMENT:\n"
 	       " Kernel image:  %lx->%lx\n"
 	       " Entry address: %lx\n"
-               " Init. ramdisk: %lx len %lx\n",
-               pkern_start, pkern_end, pkern_entry, pinitrd_start, initrd_len);
+	       " Init. ramdisk: %lx len %lx\n"
+	       " Start info.:   %lx->%lx\n",
+	       pkern_start, pkern_end, pkern_entry, pinitrd_start, initrd_len,
+	       pstart_info, pstart_info + PAGE_SIZE);
 
 	if ( (pkern_end - pkern_start) > (d->max_pages * PAGE_SIZE) )
 	{
@@ -900,9 +906,9 @@ int construct_dom0(struct domain *d,
 
 
 	/* Set up start info area. */
-	si = (start_info_t *)alloc_xenheap_page();
+	d->shared_info->arch.start_info_pfn = pstart_info >> PAGE_SHIFT;
+	si = __va(pstart_info);
 	memset(si, 0, PAGE_SIZE);
-	d->shared_info->arch.start_info_pfn = __pa(si) >> PAGE_SHIFT;
 	sprintf(si->magic, "xen-%i.%i-ia64", XEN_VERSION, XEN_SUBVERSION);
 	si->nr_pages     = d->tot_pages;
 
