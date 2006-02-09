@@ -294,7 +294,9 @@ def parseConfig(config):
     try:
         if result['image']:
             v = sxp.child_value(result['image'], 'vcpus')
-            if v is not None and int(v) != result['vcpus']:
+            if result['vcpus'] is None and v is not None:
+                result['vcpus'] = int(v)
+            elif v is not None and int(v) != result['vcpus']:
                 log.warn(('Image VCPUs setting overrides vcpus=%d elsewhere.'
                           '  Using %s VCPUs for VM %s.') %
                          (result['vcpus'], v, result['uuid']))
