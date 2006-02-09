@@ -9,6 +9,7 @@
 #include <xen/config.h>
 #include <xen/sched.h>
 #include <xen/hypercall.h>
+#include <xen/multicall.h>
 
 #include <linux/efi.h>	/* FOR EFI_UNIMPLEMENTED */
 #include <asm/sal.h>	/* FOR struct ia64_sal_retval */
@@ -22,6 +23,42 @@ extern unsigned long translate_domain_mpaddr(unsigned long);
 
 unsigned long idle_when_pending = 0;
 unsigned long pal_halt_light_count = 0;
+
+hypercall_t ia64_hypercall_table[] =
+	{
+	(hypercall_t)do_ni_hypercall,		/* do_set_trap_table */		/*  0 */
+	(hypercall_t)do_ni_hypercall,		/* do_mmu_update */
+	(hypercall_t)do_ni_hypercall,		/* do_set_gdt */
+	(hypercall_t)do_ni_hypercall,		/* do_stack_switch */
+	(hypercall_t)do_ni_hypercall,		/* do_set_callbacks */
+	(hypercall_t)do_ni_hypercall,		/* do_fpu_taskswitch */		/*  5 */
+	(hypercall_t)do_ni_hypercall,		/* do_sched_op */
+	(hypercall_t)do_dom0_op,
+	(hypercall_t)do_ni_hypercall,		/* do_set_debugreg */
+	(hypercall_t)do_ni_hypercall,		/* do_get_debugreg */
+	(hypercall_t)do_ni_hypercall,		/* do_update_descriptor */	/* 10 */
+	(hypercall_t)do_ni_hypercall,		/* do_ni_hypercall */
+	(hypercall_t)do_memory_op,
+	(hypercall_t)do_multicall,
+	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping */
+	(hypercall_t)do_ni_hypercall,		/* do_set_timer_op */		/* 15 */
+	(hypercall_t)do_event_channel_op,
+	(hypercall_t)do_xen_version,
+	(hypercall_t)do_console_io,
+	(hypercall_t)do_ni_hypercall,           /* do_physdev_op */
+	(hypercall_t)do_grant_table_op,						/* 20 */
+	(hypercall_t)do_ni_hypercall,		/* do_vm_assist */
+	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping_otherdomain */
+	(hypercall_t)do_ni_hypercall,		/* (x86 only) */
+	(hypercall_t)do_ni_hypercall,		/* do_vcpu_op */
+	(hypercall_t)do_ni_hypercall,		/* (x86_64 only) */		/* 25 */
+	(hypercall_t)do_ni_hypercall,		/* do_mmuext_op */
+	(hypercall_t)do_ni_hypercall,		/* do_acm_op */
+	(hypercall_t)do_ni_hypercall,		/* do_nmi_op */
+	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_ni_hypercall,		/*  */				/* 30 */
+	(hypercall_t)do_ni_hypercall		/*  */
+	};
 
 int
 ia64_hypercall (struct pt_regs *regs)
@@ -181,9 +218,13 @@ ia64_hypercall (struct pt_regs *regs)
 		regs->r8 = do_xen_version(regs->r14, regs->r15);
 		break;
 
+	    case __HYPERVISOR_multicall:
+		regs->r8 = do_multicall(regs->r14, regs->r15);
+		break;
+
 	    default:
 		printf("unknown hypercall %x\n", regs->r2);
-		regs->r8 = (unsigned long)-1;
+		regs->r8 = do_ni_hypercall();
 	}
 	return 1;
 }
