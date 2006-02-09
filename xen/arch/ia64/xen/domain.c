@@ -389,7 +389,7 @@ printk("map_new_domain0_page: start=%p,end=%p!\n",dom0_start,dom0_start+dom0_siz
 }
 
 /* allocate new page for domain and map it to the specified metaphysical addr */
-struct page * map_new_domain_page(struct domain *d, unsigned long mpaddr)
+struct page * assign_new_domain_page(struct domain *d, unsigned long mpaddr)
 {
 	struct mm_struct *mm = d->arch.mm;
 	struct page *p = (struct page *)0;
@@ -400,7 +400,7 @@ struct page * map_new_domain_page(struct domain *d, unsigned long mpaddr)
 extern unsigned long vhpt_paddr, vhpt_pend;
 
 	if (!mm->pgd) {
-		printk("map_new_domain_page: domain pgd must exist!\n");
+		printk("assign_new_domain_page: domain pgd must exist!\n");
 		return(p);
 	}
 	pgd = pgd_offset(mm,mpaddr);
@@ -428,21 +428,21 @@ extern unsigned long vhpt_paddr, vhpt_pend;
 			if (p) memset(__va(page_to_maddr(p)),0,PAGE_SIZE);
 		}
 		if (unlikely(!p)) {
-printf("map_new_domain_page: Can't alloc!!!! Aaaargh!\n");
+printf("assign_new_domain_page: Can't alloc!!!! Aaaargh!\n");
 			return(p);
 		}
 if (unlikely(page_to_maddr(p) > vhpt_paddr && page_to_maddr(p) < vhpt_pend)) {
-  printf("map_new_domain_page: reassigned vhpt page %p!!\n",page_to_maddr(p));
+  printf("assign_new_domain_page: reassigned vhpt page %p!!\n",page_to_maddr(p));
 }
 		set_pte(pte, pfn_pte(page_to_maddr(p) >> PAGE_SHIFT,
 			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
 	}
-	else printk("map_new_domain_page: mpaddr %lx already mapped!\n",mpaddr);
+	else printk("assign_new_domain_page: mpaddr %lx already mapped!\n",mpaddr);
 	return p;
 }
 
 /* map a physical address to the specified metaphysical addr */
-void map_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr)
+void assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr)
 {
 	struct mm_struct *mm = d->arch.mm;
 	pgd_t *pgd;
@@ -451,7 +451,7 @@ void map_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physa
 	pte_t *pte;
 
 	if (!mm->pgd) {
-		printk("map_domain_page: domain pgd must exist!\n");
+		printk("assign_domain_page: domain pgd must exist!\n");
 		return;
 	}
 	pgd = pgd_offset(mm,mpaddr);
@@ -472,11 +472,11 @@ void map_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physa
 		set_pte(pte, pfn_pte(physaddr >> PAGE_SHIFT,
 			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
 	}
-	else printk("map_domain_page: mpaddr %lx already mapped!\n",mpaddr);
+	else printk("assign_domain_page: mpaddr %lx already mapped!\n",mpaddr);
 }
 #if 0
 /* map a physical address with specified I/O flag */
-void map_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long flags)
+void assign_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long flags)
 {
 	struct mm_struct *mm = d->arch.mm;
 	pgd_t *pgd;
@@ -486,7 +486,7 @@ void map_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long fl
 	pte_t io_pte;
 
 	if (!mm->pgd) {
-		printk("map_domain_page: domain pgd must exist!\n");
+		printk("assign_domain_page: domain pgd must exist!\n");
 		return;
 	}
 	ASSERT(flags & GPFN_IO_MASK);
@@ -509,7 +509,7 @@ void map_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long fl
 		pte_val(io_pte) = flags;
 		set_pte(pte, io_pte);
 	}
-	else printk("map_domain_page: mpaddr %lx already mapped!\n",mpaddr);
+	else printk("assign_domain_page: mpaddr %lx already mapped!\n",mpaddr);
 }
 #endif
 void mpafoo(unsigned long mpaddr)
@@ -557,7 +557,7 @@ tryagain:
 	}
 	/* if lookup fails and mpaddr is "legal", "create" the page */
 	if ((mpaddr >> PAGE_SHIFT) < d->max_pages) {
-		if (map_new_domain_page(d,mpaddr)) goto tryagain;
+		if (assign_new_domain_page(d,mpaddr)) goto tryagain;
 	}
 	printk("lookup_domain_mpa: bad mpa %p (> %p\n",
 		mpaddr,d->max_pages<<PAGE_SHIFT);
@@ -655,7 +655,7 @@ void loaddomainelfimage(struct domain *d, unsigned long image_start)
 	else
 #endif
 	while (memsz > 0) {
-		p = map_new_domain_page(d,dom_mpaddr);
+		p = assign_new_domain_page(d,dom_mpaddr);
 		if (unlikely(!p)) BUG();
 		dom_imva = __va(page_to_maddr(p));
 		if (filesz > 0) {
