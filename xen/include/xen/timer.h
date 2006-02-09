@@ -30,15 +30,21 @@ struct timer {
  * All functions below can be called for any CPU from any CPU in any context.
  */
 
-/* Returns TRUE if the given timer is on a timer list. */
+/*
+ * Returns TRUE if the given timer is on a timer list.
+ * The timer must *previously* have been initialised by init_timer(), or its
+ * structure initialised to all-zeroes.
+ */
 static __inline__ int active_timer(struct timer *timer)
 {
     return (timer->heap_offset != 0);
 }
 
 /*
- * It initialises the static fields of the timer structure.
- * It can be called multiple times to reinitialise a single (inactive) timer.
+ * Initialise a timer structure with an initial callback CPU, callback
+ * function and callback data pointer. This function may be called at any
+ * time (and multiple times) on an inactive timer. It must *never* execute
+ * concurrently with any other operation on the same timer.
  */
 static __inline__ void init_timer(
     struct timer *timer,
@@ -53,21 +59,23 @@ static __inline__ void init_timer(
 }
 
 /*
- * Set the expiry time and activate a timer (which must previously have been
- * initialised by init_timer).
+ * Set the expiry time and activate a timer. The timer must *previously* have
+ * been initialised by init_timer() (so that callback details are known).
  */
 extern void set_timer(struct timer *timer, s_time_t expires);
 
 /*
- * Deactivate a timer (which must previously have been initialised by
- * init_timer). This function has no effect if the timer is not currently
+ * Deactivate a timer This function has no effect if the timer is not currently
  * active.
+ * The timer must *previously* have been initialised by init_timer(), or its
+ * structure initialised to all zeroes.
  */
 extern void stop_timer(struct timer *timer);
 
 /*
- * Migrate a timer to a different CPU. The timer must have been previously
- * initialised by init_timer(). The timer may be active.
+ * Migrate a timer to a different CPU. The timer may be currently active.
+ * The timer must *previously* have been initialised by init_timer(), or its
+ * structure initialised to all zeroes.
  */
 extern void migrate_timer(struct timer *timer, unsigned int new_cpu);
 
@@ -75,11 +83,13 @@ extern void migrate_timer(struct timer *timer, unsigned int new_cpu);
  * Deactivate a timer and prevent it from being re-set (future calls to
  * set_timer will silently fail). When this function returns it is guaranteed
  * that the timer callback handler is not running on any CPU.
+ * The timer must *previously* have been initialised by init_timer(), or its
+ * structure initialised to all zeroes.
  */
 extern void kill_timer(struct timer *timer);
 
 /*
- * Initialisation. Must be called before any other timer function.
+ * Bootstrap initialisation. Must be called before any other timer function.
  */
 extern void timer_init(void);
 
