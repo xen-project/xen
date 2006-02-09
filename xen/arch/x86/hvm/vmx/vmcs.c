@@ -75,6 +75,26 @@ static int load_vmcs(struct arch_vmx_struct *arch_vmx, u64 phys_ptr)
     return 0;
 }
 
+static void vmx_smp_clear_vmcs(void *info)
+{
+    struct vcpu *v = (struct vcpu *)info;
+
+    ASSERT(HVM_DOMAIN(v));
+
+    if (v->arch.hvm_vmx.launch_cpu == smp_processor_id())
+        __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+}
+
+void vmx_request_clear_vmcs(struct vcpu *v)
+{
+    ASSERT(HVM_DOMAIN(v));
+
+    if (v->arch.hvm_vmx.launch_cpu == smp_processor_id())
+        __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+    else
+        smp_call_function(vmx_smp_clear_vmcs, v, 1, 1);
+}
+
 #if 0
 static int store_vmcs(struct arch_vmx_struct *arch_vmx, u64 phys_ptr)
 {
@@ -167,6 +187,7 @@ static void vmx_set_host_env(struct vcpu *v)
     host_env.tr_base = (unsigned long) &init_tss[cpu];
     error |= __vmwrite(HOST_TR_SELECTOR, host_env.tr_selector);
     error |= __vmwrite(HOST_TR_BASE, host_env.tr_base);
+    error |= __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());
 }
 
 static void vmx_do_launch(struct vcpu *v)
@@ -212,7 +233,6 @@ static void vmx_do_launch(struct vcpu *v)
     shadow_direct_map_init(v);
     __vmwrite(GUEST_CR3, pagetable_get_paddr(v->domain->arch.phys_table));
     __vmwrite(HOST_CR3, pagetable_get_paddr(v->arch.monitor_table));
-    __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());
 
     v->arch.schedule_tail = arch_vmx_do_resume;
     v->arch.hvm_vmx.launch_cpu = smp_processor_id();
@@ -510,10 +530,11 @@ void arch_vmx_do_resume(struct vcpu *v)
     }
     else
     {
-        __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+        vmx_request_clear_vmcs(v);
         load_vmcs(&v->arch.hvm_vmx, virt_to_maddr(v->arch.hvm_vmx.vmcs));
-        vmx_do_resume(v);
+        vmx_migrate_timers(v);
         vmx_set_host_env(v);
+        vmx_do_resume(v);
         v->arch.hvm_vmx.launch_cpu = smp_processor_id();
         reset_stack_and_jump(vmx_asm_do_relaunch);
     }

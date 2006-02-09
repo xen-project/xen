@@ -91,6 +91,7 @@ void vmx_relinquish_resources(struct vcpu *v)
 	        (void *)d->arch.hvm_domain.shared_page_va);
     }
 
+    vmx_request_clear_vmcs(v);
     destroy_vmcs(&v->arch.hvm_vmx);
     free_monitor_pagetable(v);
     vpit = &v->domain->arch.hvm_domain.vpit;
@@ -336,6 +337,16 @@ int vmx_relinquish_guest_resources(struct vcpu *v)
 {
     vmx_relinquish_resources(v);
     return 1;
+}
+
+void vmx_migrate_timers(struct vcpu *v)
+{
+    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
+
+    migrate_timer(&vpit->pit_timer, v->processor);
+    migrate_timer(&v->arch.hvm_vmx.hlt_timer, v->processor);
+    if ( hvm_apic_support(v->domain) && VLAPIC(v))
+        migrate_timer(&(VLAPIC(v)->vlapic_timer), v->processor);
 }
 
 void vmx_store_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)

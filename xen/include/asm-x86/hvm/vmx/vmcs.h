@@ -95,6 +95,8 @@ int modify_vmcs(struct arch_vmx_struct *arch_vmx,
                 struct cpu_user_regs *regs);
 void destroy_vmcs(struct arch_vmx_struct *arch_vmx);
 
+extern void vmx_request_clear_vmcs(struct vcpu *v);
+
 #define VMCS_USE_HOST_ENV       1
 #define VMCS_USE_SEPARATE_ENV   0
 
