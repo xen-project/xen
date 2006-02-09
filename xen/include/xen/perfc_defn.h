@@ -86,7 +86,7 @@ PERFCOUNTER_CPU(shadow_invlpg_faults,   "shadow_invlpg's get_user faulted")
 PERFCOUNTER_CPU(unshadow_l2_count,      "unpinned L2 count")
 
 PERFCOUNTER_CPU(shadow_status_shortcut, "fastpath miss on shadow cache")
-PERFCOUNTER_CPU(shadow_status_calls,    "calls to ___shadow_status")
+PERFCOUNTER_CPU(shadow_status_calls,    "calls to shadow_status")
 PERFCOUNTER_CPU(shadow_status_miss,     "missed shadow cache")
 PERFCOUNTER_CPU(shadow_status_hit_head, "hits on head of bucket")
 PERFCOUNTER_CPU(shadow_max_type,        "calls to shadow_max_type")

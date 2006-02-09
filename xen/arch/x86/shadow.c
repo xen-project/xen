@@ -3256,7 +3256,7 @@ static inline int l2e_rw_fault(
     if ( !__shadow_get_l2e(v, va, &sl2e) )
         sl2e = l2e_empty();
 
-    l1_mfn = ___shadow_status(d, start_gpfn | nx, PGT_fl1_shadow);
+    l1_mfn = __shadow_status(d, start_gpfn | nx, PGT_fl1_shadow);
 
     /* Check the corresponding l2e */
     if (l1_mfn) {

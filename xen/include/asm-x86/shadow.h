@@ -1179,19 +1179,21 @@ static inline struct shadow_status *hash_bucket(
  *      its mfn).
  *      It returns the shadow's mfn, or zero if it doesn't exist.
  */
-
-static inline unsigned long ___shadow_status(
+static inline unsigned long __shadow_status(
     struct domain *d, unsigned long gpfn, unsigned long stype)
 {
     struct shadow_status *p, *x, *head;
     unsigned long key = gpfn | stype;
+
+    ASSERT(shadow_lock_is_acquired(d));
+    ASSERT(gpfn == (gpfn & PGT_mfn_mask));
+    ASSERT(stype && !(stype & ~PGT_type_mask));
 
     perfc_incrc(shadow_status_calls);
 
     x = head = hash_bucket(d, gpfn);
     p = NULL;
 
-    //SH_VVLOG("lookup gpfn=%08x type=%08x bucket=%p", gpfn, stype, x);
     shadow_audit(d, 0);
 
     do
@@ -1221,7 +1223,6 @@ static inline unsigned long ___shadow_status(
                 perfc_incrc(shadow_status_hit_head);
             }
 
-            //SH_VVLOG("lookup gpfn=%p => status=%p", key, head->smfn);
             return head->smfn;
         }
 
@@ -1230,51 +1231,8 @@ static inline unsigned long ___shadow_status(
     }
     while ( x != NULL );
 
-    //SH_VVLOG("lookup gpfn=%p => status=0", key);
     perfc_incrc(shadow_status_miss);
     return 0;
-}
-
-static inline unsigned long __shadow_status(
-    struct domain *d, unsigned long gpfn, unsigned long stype)
-{
-    unsigned long mfn = ((current->domain == d)
-                          ? gmfn_to_mfn(d, gpfn)
-                          : INVALID_MFN);
-
-    ASSERT(shadow_lock_is_acquired(d));
-    ASSERT(gpfn == (gpfn & PGT_mfn_mask));
-    ASSERT(stype && !(stype & ~PGT_type_mask));
-
-    if ( VALID_MFN(mfn) && mfn_valid(mfn) &&
-         (stype != PGT_writable_pred) &&
-         ((stype == PGT_snapshot)
-          ? !mfn_out_of_sync(mfn)
-          : !mfn_is_page_table(mfn)) )
-    {
-        perfc_incrc(shadow_status_shortcut);
-#ifndef NDEBUG
-        if ( ___shadow_status(d, gpfn, stype) != 0 )
-        {
-            printk("d->id=%d gpfn=%lx mfn=%lx stype=%lx c=%x t=%" PRtype_info " "
-                   "mfn_out_of_sync(mfn)=%d mfn_is_page_table(mfn)=%d\n",
-                   d->domain_id, gpfn, mfn, stype,
-                   mfn_to_page(mfn)->count_info,
-                   mfn_to_page(mfn)->u.inuse.type_info,
-                   mfn_out_of_sync(mfn), mfn_is_page_table(mfn));
-            BUG();
-        }
-
-        // Undo the affects of the above call to ___shadow_status()'s perf
-        // counters, since that call is really just part of an assertion.
-        //
-        perfc_decrc(shadow_status_calls);
-        perfc_decrc(shadow_status_miss);
-#endif
-        return 0;
-    }
-
-    return ___shadow_status(d, gpfn, stype);
 }
 
 /*
