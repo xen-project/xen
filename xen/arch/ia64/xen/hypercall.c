@@ -131,15 +131,8 @@ ia64_hypercall (struct pt_regs *regs)
 			printf("(by dom0)\n ");
 			(*efi.reset_system)(EFI_RESET_WARM,0,0,NULL);
 		}
-#ifdef DOMU_AUTO_RESTART
-		else {
-			reconstruct_domU(current);
-			return 0;  // don't increment ip!
-		}
-#else	
 		printf("(not supported for non-0 domain)\n");
 		regs->r8 = EFI_UNSUPPORTED;
-#endif
 		break;
 	    case FW_HYPERCALL_EFI_GET_TIME:
 		tv = vcpu_get_gr(v,32);

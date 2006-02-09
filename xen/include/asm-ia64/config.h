@@ -3,11 +3,8 @@
 
 #undef USE_PAL_EMULATOR
 // control flags for turning on/off features under test
-#undef CLONE_DOMAIN0
-//#define CLONE_DOMAIN0 1
 #undef DOMU_BUILD_STAGING
 #define VHPT_GLOBAL
-#define DOMU_AUTO_RESTART
 
 #undef DEBUG_PFMON
 

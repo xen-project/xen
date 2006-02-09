@@ -655,15 +655,9 @@ void loaddomainelfimage(struct domain *d, unsigned long image_start)
 	else
 #endif
 	while (memsz > 0) {
-#ifdef DOMU_AUTO_RESTART
-		pteval = lookup_domain_mpa(d,dom_mpaddr);
-		if (pteval) dom_imva = __va(pteval & _PFN_MASK);
-		else { printf("loaddomainelfimage: BAD!\n"); while(1); }
-#else
 		p = map_new_domain_page(d,dom_mpaddr);
 		if (unlikely(!p)) BUG();
 		dom_imva = __va(page_to_maddr(p));
-#endif
 		if (filesz > 0) {
 			if (filesz >= PAGE_SIZE)
 				copy_memory(dom_imva,elfaddr,PAGE_SIZE);
@@ -792,12 +786,10 @@ int construct_dom0(struct domain *d,
 
 //printf("construct_dom0: starting\n");
 
-#ifndef CLONE_DOMAIN0
 	/* Sanity! */
 	BUG_ON(d != dom0);
 	BUG_ON(d->vcpu[0] == NULL);
 	BUG_ON(test_bit(_VCPUF_initialised, &v->vcpu_flags));
-#endif
 
 	memset(&dsi, 0, sizeof(struct domain_setup_info));
 
@@ -962,9 +954,6 @@ int construct_dom0(struct domain *d,
 	sync_split_caches();
 
 	// FIXME: Hack for keyboard input
-#ifdef CLONE_DOMAIN0
-if (d == dom0)
-#endif
 	serial_input_init();
 	if (d == dom0) {
 		VCPU(v, delivery_mask[0]) = -1L;
@@ -976,65 +965,6 @@ if (d == dom0)
 
 	return 0;
 }
-
-// FIXME: When dom0 can construct domains, this goes away (or is rewritten)
-int construct_domU(struct domain *d,
-		   unsigned long image_start, unsigned long image_len,
-	           unsigned long initrd_start, unsigned long initrd_len,
-	           char *cmdline)
-{
-	int i, rc;
-	struct vcpu *v = d->vcpu[0];
-	unsigned long pkern_entry;
-
-#ifndef DOMU_AUTO_RESTART
-	BUG_ON(test_bit(_VCPUF_initialised, &v->vcpu_flags));
-#endif
-
-	printk("*** LOADING DOMAIN %d ***\n",d->domain_id);
-
-	d->max_pages = dom0_size/PAGE_SIZE;	// FIXME: use dom0 size
-	// FIXME: use domain0 command line
-	rc = parsedomainelfimage(image_start, image_len, &pkern_entry);
-	printk("parsedomainelfimage returns %d\n",rc);
-	if ( rc != 0 ) return rc;
-
-	/* Mask all upcalls... */
-	for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-		d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
-
-	/* Copy the OS image. */
-	printk("calling loaddomainelfimage(%p,%p)\n",d,image_start);
-	loaddomainelfimage(d,image_start);
-	printk("loaddomainelfimage returns\n");
-
-	set_bit(_VCPUF_initialised, &v->vcpu_flags);
-
-	printk("calling new_thread, entry=%p\n",pkern_entry);
-#ifdef DOMU_AUTO_RESTART
-	v->domain->arch.image_start = image_start;
-	v->domain->arch.image_len = image_len;
-	v->domain->arch.entry = pkern_entry;
-#endif
-	new_thread(v, pkern_entry, 0, 0);
-	printk("new_thread returns\n");
-	sync_split_caches();
-	__set_bit(0x30, VCPU(v, delivery_mask));
-
-	return 0;
-}
-
-#ifdef DOMU_AUTO_RESTART
-void reconstruct_domU(struct vcpu *v)
-{
-	/* re-copy the OS image to reset data values to original */
-	printk("reconstruct_domU: restarting domain %d...\n",
-		v->domain->domain_id);
-	loaddomainelfimage(v->domain,v->domain->arch.image_start);
-	new_thread(v, v->domain->arch.entry, 0, 0);
-	sync_split_caches();
-}
-#endif
 
 void machine_restart(char * __unused)
 {
