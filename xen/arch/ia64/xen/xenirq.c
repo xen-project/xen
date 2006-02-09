@@ -10,7 +10,6 @@
 #include <asm/hw_irq.h>
 #include <asm/delay.h>
 
-
 void
 xen_debug_irq(ia64_vector vector, struct pt_regs *regs)
 {
@@ -60,11 +59,14 @@ xen_do_IRQ(ia64_vector vector)
 /*
  * Exit an interrupt context. Process softirqs if needed and possible:
  */
-void irq_exit(void)
+void xen_irq_exit(struct pt_regs *regs)
 {
 	//account_system_vtime(current);
 	sub_preempt_count(IRQ_EXIT_OFFSET);
-	if (!in_interrupt() && local_softirq_pending()) {
+    if((((char *)regs) -(char *) current) != (IA64_STK_OFFSET-IA64_PT_REGS_SIZE))
+        return;
+
+	if (!in_interrupt()&&local_softirq_pending()) {
 		add_preempt_count(SOFTIRQ_OFFSET);
 		do_softirq();
 		sub_preempt_count(SOFTIRQ_OFFSET);

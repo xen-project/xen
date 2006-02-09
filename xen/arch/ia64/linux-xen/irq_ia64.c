@@ -169,7 +169,7 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 	 * handler needs to be able to wait for further keyboard interrupts, which can't
 	 * come through until ia64_eoi() has been done.
 	 */
-	irq_exit();
+	xen_irq_exit(regs);
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
