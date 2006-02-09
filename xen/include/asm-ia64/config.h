@@ -215,9 +215,6 @@ void sort_main_extable(void);
 // see include/asm-ia64/mm.h, handle remaining page_info uses until gone
 #define page_info page
 
-// see common/memory.c
-#define set_gpfn_from_mfn(x,y)	do { } while (0)
-
 // see common/keyhandler.c
 #define	nop()	asm volatile ("nop 0")
 
