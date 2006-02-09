@@ -310,6 +310,7 @@ int ParserState_new(ParserStateFn *fn, char *name,
 void Parser_pop(Parser *p){
     ParserState *s = p->state;
     if(!s) return;
+    dprintf("Parser_pop> %s\n", s->name);
     p->state = s->parent;
     if (p->start_state == s) {
         p->start_state = NULL;
@@ -336,6 +337,7 @@ void Parser_free(Parser *z){
 }
 
 int Parser_push(Parser *p, ParserStateFn *fn, char *name){
+    dprintf("Parser_push> %s\n", name);
     return ParserState_new(fn, name, p->state, &p->state);
 }
         
@@ -522,7 +524,7 @@ int Parser_ready(Parser *p){
 }
 
 Sxpr Parser_get_val(Parser *p){
-    Sxpr v = ONONE;
+    Sxpr v = ONONE, w = ONONE;
     if(CONSP(p->val)){
     } else if (p->start_state && CONSP(p->start_state->val)){
         p->val = p->start_state->val;
@@ -531,7 +533,7 @@ Sxpr Parser_get_val(Parser *p){
     }  else {
         goto exit;
     }
-    Sxpr w = p->val;
+    w = p->val;
     v = CAR(w);
     p->val = CDR(w);
     hfree(w);
@@ -940,11 +942,13 @@ int Parser_input_eof(Parser *p){
 int Parser_input(Parser *p, char *buf, int buf_n){
     int err = 0;
     int i = 0;
-    dprintf("> |%s|\n", buf);
+    dprintf("> buf_n=%d\n", buf_n);
     if(buf_n <= 0){
+        buf_n = 0;
         err = Parser_input_eof(p);
         goto exit;
     }
+    dprintf("> buf=|%*s|\n", buf_n, buf);
     for(i = 0; i < buf_n; i++){
         err = Parser_input_char(p, buf[i]);
         if(err) goto exit;

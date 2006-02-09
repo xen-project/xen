@@ -24,9 +24,37 @@ typedef struct SelectSet {
     fd_set rd, wr, er;
 } SelectSet;
 
+enum {
+    SELECT_READ  = 1,
+    SELECT_WRITE = 2,
+    SELECT_ERROR = 4,
+};
+
 extern void SelectSet_zero(SelectSet *set);
+extern void SelectSet_add(SelectSet *set, int fd, int mode);
 extern void SelectSet_add_read(SelectSet *set, int fd);
 extern void SelectSet_add_write(SelectSet *set, int fd);
+extern void SelectSet_add_error(SelectSet *set, int fd);
 extern int SelectSet_select(SelectSet *set, struct timeval *timeout);
+
+static inline int SelectSet_in(SelectSet *set, int fd){
+    return ((fd >= 0)
+            ? ((FD_ISSET(fd, &set->rd) ? SELECT_READ : 0) |
+               (FD_ISSET(fd, &set->wr) ? SELECT_WRITE : 0) |
+               (FD_ISSET(fd, &set->er) ? SELECT_ERROR : 0))
+            : 0);
+}
+
+static inline int SelectSet_in_read(SelectSet *set, int fd){
+    return (fd >= 0) && FD_ISSET(fd, &set->rd);
+}
+
+static inline int SelectSet_in_write(SelectSet *set, int fd){
+    return (fd >= 0) && FD_ISSET(fd, &set->wr);
+}
+
+static inline int SelectSet_in_err(SelectSet *set, int fd){
+    return (fd >= 0) && FD_ISSET(fd, &set->er);
+}
 
 #endif /* ! _VFC_SELECT_H_ */

@@ -182,7 +182,7 @@ int get_host_address(const char *name, unsigned long *address){
 #else
     struct hostent *host = gethostbyname(name);
     if(!host){
-        return -EINVAL;
+        return -ENOENT;
     }
     *address = ((struct in_addr *)(host->h_addr))->s_addr;
     return 0;

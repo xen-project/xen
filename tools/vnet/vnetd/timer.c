@@ -49,7 +49,7 @@ double time_now(void){
  * @param expiry time (in seconds)
  * @return 0 on success, error code otherwise
  */
-static int timer_set(double expiry){
+static int itimer_set(double expiry){
     struct itimerval val = {};
     struct itimerval old = {};
     double now, delay;
@@ -69,7 +69,7 @@ static int timer_set(double expiry){
     return err;
 }
 
-static void Timer_free(Timer *z){
+void Timer_free(Timer *z){
 #ifndef USE_GC
     if(!z) return;
     deallocate(z);
@@ -93,26 +93,16 @@ int process_timers(void){
     for(curr = timers; curr; curr = next){
         next = curr->next;
         if(curr->expiry > now) break;
-        if(curr->fn) curr->fn(curr);
-        Timer_free(curr);
+        if(curr->fn) curr->fn(curr->data);
     }
     timers = curr;
-    timer_set((curr ? curr->expiry : 0));
+    itimer_set((curr ? curr->expiry : 0));
     return 0;
 }
 
-Timer * Timer_set(double delay, TimerFn *fn, void *data){
-    // Get 'now'.
-    double now = time_now();
-    Timer *timer = NULL, *prev, *curr, *next;
-    timer = ALLOCATE(Timer);
-    if(!timer) goto exit;
-    // Add delay to now to get expiry time.
-    timer->expiry = now + delay;
-    timer->fn = fn;
-    timer->data = data;
-
+void Timer_add(Timer *timer){
     // Insert timer in list ordered by (increasing) expiry time.
+    Timer *prev, *curr, *next;
     prev = NULL;
     for(curr = timers; curr; prev = curr, curr = next){
         next = curr->next;
@@ -126,7 +116,21 @@ Timer * Timer_set(double delay, TimerFn *fn, void *data){
     timer->next = curr;
 
     // Set interval timer to go off for earliest expiry time.
-    timer_set(timer->expiry);
+    itimer_set(timer->expiry);
+}
+
+Timer * Timer_set(double delay, TimerFn *fn, unsigned long data){
+    // Get 'now'.
+    double now = time_now();
+    Timer *timer = NULL;
+    timer = ALLOCATE(Timer);
+    if(!timer) goto exit;
+    // Add delay to now to get expiry time.
+    timer->expiry = now + delay;
+    timer->fn = fn;
+    timer->data = data;
+
+    Timer_add(timer);
   exit:
     return timer;
 }
@@ -145,7 +149,6 @@ int Timer_cancel(Timer *timer){
                 timers = curr->next;
             }
             curr->next = NULL;
-            Timer_free(curr);
             break;
         }
     }

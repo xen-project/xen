@@ -1,2 +1,2 @@
 # Vnet configuration for a vnet with id 99 and message confidentiality.
-(vnet (id 99) (bridge vnet99) (vnetif vnetif99) (security conf))
+(vnet (id 99) (bridge vnet99) (vnif vnetif99) (security conf))

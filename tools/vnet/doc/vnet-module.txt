@@ -1,11 +1,14 @@
-Vnet Module Command Interface
+Vnet Low-level Command Interface
 Mike Wray <mike.wray@hp.com>
-2005/08/25
+2006/10/12
 
-When insmod the vnet-module creates /proc/vnet/policy which
-can be used to control the module by writing commands into it.
-The return code from the command should be returned by close.
-Xend uses these commands to implement its vnet interface.
+The vnet kernel module and user-space daemon vnetd support a low-level
+command interface to control vnets. The kernel module creates /proc/vnet/policy,
+which is used by writing commands into it. Vnetd listens on the unix-domain
+socket /tmp/vnetd.
+
+The vn utility in ../scripts provides a higher-level interface to
+the vnet commands (using the kernel module or vnetd).
 
 The commands are:
 
@@ -37,33 +40,33 @@ Delete the vnet with id <id>.
 
 Add the vif with MAC address <macaddr> to the vnet with id <vnetid>.
 This makes the vnet module respond to VARP requests for <macaddr>
-on vnet <vnetid>.
+on vnet <vnetid>. The vnet implementation learns MAC addresses
+so doing this should not be necessary.
 
 (vif.del (vnet <vnetid>) (vmac <macaddr>))
 
 Remove the vif with MAC address <macaddr> from the vnet with id <vnetid>.
 The vnet module will stop responding to VARP for the vif.
 
-(vif.print)
+(peer.add (addr <addr>))
 
-Print the known vnets, vifs and varp cache on the console.
+Add a peer at IP address <addr> to forward multicasts to,
+and accept forwarded multicasts from.
 
-Examples:
+(peer.del (addr <addr>))
 
-To create vnet 10 with no security:
+Delete a peer.
 
-echo '(vnet.add (id 10))' > /proc/vnet/policy
+(vif.list)  - get list of vifs.
+(vnet.list) - get list of vnets.
+(varp.list) - get vnet/varp info.
+(peer.list) - get list of peers.
 
-This creates a device vnif0010.
+The kernel module produces output on the console, and vnetd
+returns output on the unix socket. The kernel module also provides
+the following files which can be read to get information:
 
-To create vnet 11 with message authentication:
-
-echo '(vnet.add (id 11) (security auth))' > /proc/vnet/policy
-
-To add the vif with vmac "aa:00:00:bc:34:ae" to vnet 10:
-
-echo '(vif.add (vnet 10) (vmac aa:00:00:bc:34:ae))' > /proc/vnet/policy
-
-To remove the vif from the vnet:
-
-echo '(vif.del (vnet 10) (vmac aa:00:00:bc:34:ae))' > /proc/vnet/policy
+/proc/vnet/vifs  - get list of vifs.
+/proc/vnet/vnets - get list of vnets.
+/proc/vnet/varp  - get vnet/varp info.
+/proc/vnet/peers - get list of peers.

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -21,7 +21,18 @@
 
 #include "if_etherip.h"
 
+#ifdef __KERNEL__
 extern int etherip_module_init(void);
 extern void etherip_module_exit(void);
+#endif
 
+extern int etherip_protocol_recv(struct sk_buff *skb);
+extern int etherip_in_udp;
+
+struct VnetId;
+struct VarpAddr;
+struct Tunnel;
+
+extern int etherip_tunnel_create(struct VnetId *vnet, struct VarpAddr *addr,
+                                 struct Tunnel *base, struct Tunnel **tunnel);
 #endif

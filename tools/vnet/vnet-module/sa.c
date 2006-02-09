@@ -19,17 +19,11 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 
-#include <net/ip.h>
-#include <net/protocol.h>
-#include <net/route.h>
-#include <linux/skbuff.h>
-
-#include <linux/in.h>
-#include <linux/inet.h>
-#include <linux/netdevice.h>
-
+#include <tunnel.h>
+#include <vnet.h>
 #include <sa.h>
 #include <sa_algorithm.h>
+
 #include "hash_table.h"
 #include "allocate.h"
 
@@ -120,58 +114,46 @@ static int sa_key_check(SAKey *key, enum sa_alg_type type){
 
 static unsigned long sa_spi_counter = 0;
 
+/** Mangle some input to generate output.
+ * This is used to derive spis and keying material from secrets,
+ * so it probably ought to be cryptographically strong.
+ * Probably ought to use a good hash (sha1) or cipher (aes).
+ *
+ * @param input input bytes
+ * @param n number of bytes
+ * @return mangled value
+ */
+static u32 mangle(void *input, int n){
+    return hash_hvoid(0, input, n);
+}
+
 /** Generate a random spi.
  * Uses a hashed counter.
  *
  * @return spi
  */
 static u32 random_spi(void){
-    unsigned long left, right = 0;
     u32 spi;
     do{
-        left = sa_spi_counter++;
-        pseudo_des(&left, &right);
-        spi = right;
+        spi = sa_spi_counter++;
+        spi = mangle(&spi, sizeof(spi));
     } while(!spi);
     return spi;
 }
 
-/** Mangle some input to generate output.
- * This is used to derive spis and keying material from secrets,
- * so it probably ought to be cryptographically strong.
- * Probably ought to use a good hash (sha1) or cipher (aes).
- *
- * @param input input values
- * @param n number of values
- * @return mangled value
- */
-static u32 mangle(u32 input[], int n){
-    unsigned long left = 0, right = 0;
-    int i;
-    for(i=0; i<n; i++){
-        left ^= input[i];
-        pseudo_des(&left, &right);
-    }
-    return (u32)right;
-}
-
-/** Generate a spi for a given protocol and address, using a secret key.
- * The offset is used when it is necessary to generate more than one spi
- * for the same protocol and address.
- *
- * @param key key
- * @param offset offset
- * @param protocol protocol
- * @param addr IP address
- * @return spi
- */
+ /** Generate a spi for a given protocol and address, using a secret key.
+  * The offset is used when it is necessary to generate more than one spi
+  * for the same protocol and address.
+  *
+  * @param key key
+  * @param offset offset
+  * @param protocol protocol
+  * @param addr IP address
+  * @return spi
+  */
 static u32 generate_spi(u32 key, u32 offset, u32 protocol, u32 addr){
     u32 input[] = { key, offset, protocol, addr };
-    u32 spi;
-    dprintf(">\n");
-    spi = mangle(input, 4);
-    dprintf("< spi=%x\n", spi);
-    return spi;
+    return mangle(input, sizeof(input));
 }
 
 /** Generate keying material for a given spi, based on a
@@ -184,7 +166,7 @@ static u32 generate_spi(u32 key, u32 offset, u32 protocol, u32 addr){
  */
 static u32 generate_key(u32 key, u32 offset, u32 spi){
     u32 input[] = { key, offset, spi };
-    return mangle(input, 3);
+    return mangle(input, sizeof(input));
 }    
 
 /** Allocate a spi.
@@ -238,7 +220,7 @@ static u32 sa_id = 1;
  * @return hashcode
  */
 static inline Hashcode sa_table_hash_id(u32 id){
-    return hash_ul(id);
+    return hash_hvoid(0, &id, sizeof(id));
 }
 
 /** Hash SA spi/protocol/addr.
@@ -249,10 +231,8 @@ static inline Hashcode sa_table_hash_id(u32 id){
  * @return hashcode
  */
 static inline Hashcode sa_table_hash_spi(u32 spi, u32 protocol, u32 addr){
-    Hashcode h = 0;
-    h = hash_2ul(spi, protocol);
-    h = hash_hul(h, addr);
-    return h;
+    u32 a[] = { spi, protocol, addr };
+    return hash_hvoid(0, a, sizeof(a));
 }
 
 /** Test if an SA entry has a given value.
@@ -299,7 +279,7 @@ static int sa_table_spi_fn(TableArg arg, HashTable *table, HTEntry *entry){
  * @param table containing table
  * @param entry to free
  */
-void sa_table_free_fn(HashTable *table, HTEntry *entry){
+static void sa_table_free_fn(HashTable *table, HTEntry *entry){
     if(!entry) return;
     if(entry->value){
         SAState *state = entry->value;
@@ -665,6 +645,113 @@ int sa_delete(int id){
     }
     sa_table_delete(state);
     SAState_decref(state);
+  exit:
+    return err;
+}
+/** Determine ESP security mode for a new SA.
+ *
+ * @param spi incoming spi
+ * @param protocol incoming protocol
+ * @param addr source address
+ * @return security level or negative error code
+ *
+ * @todo Need to check spi, and do some lookup for security params.
+ */
+int vnet_sa_security(u32 spi, int protocol, u32 addr){
+    extern int vnet_security_default;
+    int security = vnet_security_default;
+    dprintf("< security=%x\n", security);
+    return security;
+}
+
+/** Create a new SA for incoming traffic.
+ *
+ * @param spi incoming spi
+ * @param protocol incoming protocol
+ * @param addr source address
+ * @param sa return parameter for SA
+ * @return 0 on success, error code otherwise
+ */
+int vnet_sa_create(u32 spi, int protocol, u32 addr, SAState **sa){
+    int err = 0;
+    int security = vnet_sa_security(spi, protocol, addr);
+    if(security < 0){
+        err = security;
+        goto exit;
+    }
+    err = sa_create(security, spi, protocol, addr, sa);
+  exit:
+    return err;
+}
+/** Open function for SA tunnels.
+ *
+ * @param tunnel to open
+ * @return 0 on success, error code otherwise
+ */
+static int sa_tunnel_open(Tunnel *tunnel){
+    int err = 0;
+    //dprintf(">\n");
+    //dprintf("< err=%d\n", err);
+    return err;
+}
+
+/** Close function for SA tunnels.
+ *
+ * @param tunnel to close (OK if null)
+ */
+static void sa_tunnel_close(Tunnel *tunnel){
+    SAState *sa;
+    if(!tunnel) return;
+    sa = tunnel->data;
+    if(!sa) return;
+    SAState_decref(sa);
+    tunnel->data = NULL;
+}
+
+/** Packet send function for SA tunnels.
+ *
+ * @param tunnel to send on
+ * @param skb packet to send
+ * @return 0 on success, negative error code on error
+ */
+static int sa_tunnel_send(Tunnel *tunnel, struct sk_buff *skb){
+    int err = -EINVAL;
+    SAState *sa;
+    if(!tunnel){
+        wprintf("> Null tunnel!\n");
+        goto exit;
+    }
+    sa = tunnel->data;
+    if(!sa){
+        wprintf("> Null SA!\n");
+        goto exit;
+    }
+    err = SAState_send(sa, skb, tunnel->base);
+  exit:
+    return err;
+}
+
+/** Functions used by SA tunnels. */
+static TunnelType _sa_tunnel_type = {
+    .name	= "SA",
+    .open	= sa_tunnel_open,
+    .close	= sa_tunnel_close,
+    .send 	= sa_tunnel_send
+};
+
+/** Functions used by SA tunnels. */
+TunnelType *sa_tunnel_type = &_sa_tunnel_type;
+
+int sa_tunnel_create(Vnet *info, VarpAddr *addr, Tunnel *base, Tunnel **tunnel){
+    int err = 0;
+    SAState *sa = NULL;
+    //FIXME: Assuming IPv4 for now.
+    u32 ipaddr = addr->u.ip4.s_addr;
+    err = Tunnel_create(sa_tunnel_type, &info->vnet, addr, base, tunnel);
+    if(err) goto exit;
+    err = sa_create(info->security, 0, IPPROTO_ESP, ipaddr, &sa);
+    if(err) goto exit;
+    (*tunnel)->data = sa;
   exit:
     return err;
 }

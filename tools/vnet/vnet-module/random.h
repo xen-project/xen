@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -19,9 +19,7 @@
 #ifndef __VNET_RANDOM_H__
 #define __VNET_RANDOM_H__
 
-extern int get_random_byte(void);
 extern void get_random_bytes(void *dst, int dst_n);
-extern void add_random_byte(int b);
 extern void add_random_bytes(const void *src, int src_n);
 
 extern int random_module_init(void);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -42,6 +42,7 @@
 #include <varp.h>
 #include <vif.h>
 #include <vnet_dev.h>
+#include <random.h>
 
 #define MODULE_NAME "VNET"
 #define DEBUG 1
@@ -49,51 +50,31 @@
 #include "debug.h"
 
 #ifndef CONFIG_BRIDGE
-#error Must configure ethernet bridging in Network Options
+#warning Should configure ethernet bridging in kernel Network Options
 #endif
 
 static void vnet_dev_destructor(struct net_device *dev){
-    dprintf(">\n");
-    dev->open                 = NULL;
-    dev->stop                 = NULL;
-    dev->uninit               = NULL;
-    dev->destructor           = NULL;
-    dev->hard_start_xmit      = NULL;
-    dev->get_stats            = NULL;
-    dev->do_ioctl             = NULL;
-    dev->change_mtu           = NULL;
-
-    dev->tx_timeout           = NULL;
-    dev->set_multicast_list   = NULL;
-    dev->flags                = 0;
-
-    dev->priv                 = NULL;
-}
-
-static void vnet_dev_uninit(struct net_device *dev){
-    //Vnet *vnet = dev->priv;
-    dprintf(">\n");
-    //dev_put(dev);
-    dprintf("<\n");
+    Vnet *vnet = dev->priv;
+    if(vnet){
+        if(vnet->dev == dev){
+            vnet->dev = NULL;
+        }
+        dev->priv = NULL;
+        Vnet_decref(vnet);
+    }
+    free_netdev(dev);
 }
 
 static struct net_device_stats *vnet_dev_get_stats(struct net_device *dev){
+    static struct net_device_stats stats = {};
     Vnet *vnet = dev->priv;
-    //dprintf(">\n");
-    return &vnet->stats;
-}
-
-static int vnet_dev_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd){
-    int err = 0;
-    
-    dprintf(">\n");
-    return err;
+    return (vnet ? &vnet->stats : &stats);
 }
 
 static int vnet_dev_change_mtu(struct net_device *dev, int mtu){
     int err = 0;
     Vnet *vnet = dev->priv;
-    if (mtu < 68 || mtu > 1500 - vnet->header_n){
+    if (mtu < 68 || mtu > (vnet ? vnet->mtu : 1500)){
         err = -EINVAL;
         goto exit;
     }
@@ -102,64 +83,29 @@ static int vnet_dev_change_mtu(struct net_device *dev, int mtu){
     return err;
 }
 
-static int vnet_dev_set_name(struct net_device *dev){
-    int err = 0;
-    Vnet *vnet = (void*)dev->priv;
-
-    dprintf(">\n");
-    if(__dev_get_by_name(vnet->device)){
-        err = -ENOMEM;
-        wprintf("> vnet device name in use: %s\n", vnet->device);
-    }
-    strcpy(dev->name, vnet->device);
-    dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Create the virtual interface for a vnet.
- *
- * @param info vnet
- * @return 0 on success, error code otherwise
- */
-int Vnet_create(Vnet *info){
-    int err = 0;
-
-    err = vnet_dev_add(info);
-    if(err) goto exit;
-    err = Vnet_add(info);
-  exit:
-    return err;
-}
-    
 /** Remove the net device for a vnet.
- * Clears the dev field of the vnet.
  * Safe to call if the vnet or its dev are null.
  *
  * @param vnet vnet
  */
 void vnet_dev_remove(Vnet *vnet){
-    if(!vnet) return;
-    if(vnet->dev){
-        //dev_put(vnet->dev);
-        dprintf("> unregister_netdev(%s)\n", vnet->dev->name);
+    if(vnet && vnet->dev){
+        iprintf("> Removing vnet device %s\n", vnet->dev->name);
         unregister_netdev(vnet->dev);
-        vnet->dev = NULL;
     }
 }
 
 static int vnet_dev_open(struct net_device *dev){
     int err = 0;
-    dprintf(">\n");
+
     netif_start_queue(dev);
-    dprintf("<\n");
     return err;
 }
 
 static int vnet_dev_stop(struct net_device *dev){
     int err = 0;
-    dprintf(">\n");
+
     netif_stop_queue(dev);
-    dprintf("<\n");
     return err;
 }
 
@@ -168,25 +114,28 @@ static int vnet_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
     Vnet *vnet = dev->priv;
     int len = 0;
 
-    dprintf("> skb=%p\n", skb);
+    if(!skb){
+        wprintf("> skb NULL!\n");
+        return -EINVAL;
+    }
+    if(!vnet){
+        return -ENOTCONN;
+    }
     if(vnet->recursion++) {
+        extern void print_skb(const char *msg, int count, struct sk_buff *skb);
+        char vnetbuf[VNET_ID_BUF];
+        
         vnet->stats.collisions++;
 	vnet->stats.tx_errors++;
-        wprintf("> recursion!\n");
-	dev_kfree_skb(skb);
+        wprintf("> recursion! vnet=%s\n", VnetId_ntoa(&vnet->vnet, vnetbuf));
+        print_skb("RECURSION", 0, skb);
+        varp_print(iostdout);
+	kfree_skb(skb);
         goto exit;
     }
-    if(!skb){
-        err = -EINVAL;
-        wprintf("> skb NULL!\n");
-        goto exit;
-    }
-    dprintf("> skb->data=%p skb->mac.raw=%p\n", skb->data, skb->mac.raw);
-    if(skb->mac.raw < skb->data || skb->mac.raw > skb->nh.raw){
-        wprintf("> skb mac duff!\n");
+    if(!skb->mac.raw){
         skb->mac.raw = skb->data;
-    }
-    //dev->trans_start = jiffies;
+    }        
     len = skb->len;
     // Must not use skb pointer after vnet_skb_send().
     err = vnet_skb_send(skb, &vnet->vnet);
@@ -198,18 +147,22 @@ static int vnet_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
     }
   exit:
     vnet->recursion--;
-    dprintf("<\n");
     return 0;
 }
 
-void vnet_dev_tx_timeout(struct net_device *dev){
-    dprintf(">\n");
-    //dev->trans_start = jiffies;
-    //netif_wake_queue(dev);
+void vnet_dev_set_multicast_list(struct net_device *dev){
 }
 
-void vnet_dev_set_multicast_list(struct net_device *dev){
-    dprintf(">\n");
+#if 0
+static int vnet_dev_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd){
+    int err = 0;
+    
+    return err;
+}
+
+void vnet_dev_tx_timeout(struct net_device *dev){
+    //dev->trans_start = jiffies;
+    //netif_wake_queue(dev);
 }
 
 static int (*eth_hard_header)(struct sk_buff *skb,
@@ -227,18 +180,7 @@ static int vnet_dev_hard_header(struct sk_buff *skb,
   exit:
     return err;
 }
-
-void vnet_default_mac(unsigned char *mac)
-{
-    static unsigned val = 1;
-    mac[0] = 0xAA;
-    mac[1] = 0xFF;
-    mac[2] = (unsigned char)((val >> 24) & 0xff);
-    mac[3] = (unsigned char)((val >> 16) & 0xff);
-    mac[4] = (unsigned char)((val >>  8) & 0xff);
-    mac[5] = (unsigned char)((val      ) & 0xff);
-    val++;
-}
+#endif
 
 int vnet_device_mac(const char *device, unsigned char *mac){
     int err;
@@ -253,97 +195,98 @@ int vnet_device_mac(const char *device, unsigned char *mac){
 }
 
 void vnet_dev_mac(unsigned char *mac){
-    const char *devices[] = { "eth0", "eth1", "eth2", NULL };
-    const char **pdev;
-    int err = -ENODEV;
-
-    for(pdev = devices; err && *pdev; pdev++){
-        err = vnet_device_mac(*pdev, mac);
-    }
-    if(err){
-        vnet_default_mac(mac);
-    }
+    mac[0] = 0xAA;
+    mac[1] = 0xFF;
+    get_random_bytes(mac + 2, 4);
 }
 
-static int vnet_dev_init(struct net_device *dev){
-    int err = 0;
-    Vnet *vnet = (void*)dev->priv;
- 
-    dprintf(">\n");
+/** Initial setup of the device for a vnet.
+ */
+static void vnet_dev_init(struct net_device *dev){
     ether_setup(dev);
 
+#if 0
     if(!eth_hard_header){
         eth_hard_header = dev->hard_header;
     }
     dev->hard_header          = vnet_dev_hard_header;
+    //dev->do_ioctl             = vnet_dev_do_ioctl;
+    //dev->tx_timeout           = vnet_dev_tx_timeout;
+    //dev->watchdog_timeo       = TX_TIMEOUT;
+    
+#endif
 
     dev->open                 = vnet_dev_open;
     dev->stop                 = vnet_dev_stop;
-    dev->uninit               = vnet_dev_uninit;
     dev->destructor           = vnet_dev_destructor;
     dev->hard_start_xmit      = vnet_dev_hard_start_xmit;
     dev->get_stats            = vnet_dev_get_stats;
-    dev->do_ioctl             = vnet_dev_do_ioctl;
     dev->change_mtu           = vnet_dev_change_mtu;
-
-    dev->tx_timeout           = vnet_dev_tx_timeout;
-    dev->watchdog_timeo       = TX_TIMEOUT;
     dev->set_multicast_list   = vnet_dev_set_multicast_list;
-    
-    dev->hard_header_len      += vnet->header_n;
-    dev->mtu                  -= vnet->header_n;
-
-    vnet_dev_mac(dev->dev_addr);
 
     dev->flags |= IFF_DEBUG;
     dev->flags |= IFF_PROMISC;
     dev->flags |= IFF_ALLMULTI;
 
-    dprintf("<\n");
+    vnet_dev_mac(dev->dev_addr);
+}
+
+/** Complete the setup of the device for a vnet.
+ * Associate the device and the vnet and set mtu etc.
+ */
+static int vnet_dev_setup(Vnet *vnet, struct net_device *dev){
+    int err;
+
+    Vnet_incref(vnet);
+    dev->priv = vnet;
+    vnet->dev = dev;
+    dev->hard_header_len += vnet->header_n;
+    if(!etherip_in_udp){
+        dev->mtu -= vnet->header_n;
+    }
+    vnet->mtu = dev->mtu;
+    iprintf("> Adding vnet device %s\n", dev->name);
+    err = register_netdev(dev);
+    if(err){
+        eprintf("> register_netdev(%s) = %d\n", dev->name, err);
+        vnet_dev_destructor(dev);
+    }
     return err;
+}
+
+static inline int roundup(int n, int k){
+    return k * ((n + k - 1) / k);
 }
 
 /** Add the interface (net device) for a vnet.
  * Sets the dev field of the vnet on success.
- * Does nothing if the vif already has an interface.
+ * Does nothing if the vnet already has an interface.
  *
- * @param vif vif
+ * @param vnet vnet
  * @return 0 on success, error code otherwise
  */
 int vnet_dev_add(Vnet *vnet){
     int err = 0;
     struct net_device *dev = NULL;
 
-    dprintf("> vnet=%p\n", vnet);
     if(vnet->dev) goto exit;
-    vnet->header_n = sizeof(struct iphdr) + sizeof(struct etheriphdr);
-    dev = kmalloc(sizeof(struct net_device), GFP_ATOMIC);
+    vnet->header_n = ETH_HLEN + sizeof(struct iphdr) + sizeof(struct etheriphdr);
+    if(etherip_in_udp){
+        vnet->header_n += sizeof(struct VnetMsgHdr);
+        vnet->header_n += sizeof(struct udphdr);
+    }
+    vnet->header_n = roundup(vnet->header_n, 4);
+    dev = alloc_netdev(0, vnet->device, vnet_dev_init);
     if(!dev){
         err = -ENOMEM;
         goto exit;
     }
-    *dev = (struct net_device){};
-    dev->priv = vnet;
-    vnet->dev = dev;
-
-    err = vnet_dev_set_name(dev);
-    if(err) goto exit;
-    vnet_dev_init(dev);
-    err = register_netdev(dev);
-    if(err){
-        wprintf("> register_netdev(%s) = %d\n", dev->name, err);
-    }
+    err = vnet_dev_setup(vnet, dev);
     if(err) goto exit;
     rtnl_lock();
     dev_open(dev);
     rtnl_unlock();
 
-    //dev_hold(dev);
   exit:
-    if(err){
-        if(dev) kfree(dev);
-        vnet->dev = NULL;
-    }
-    dprintf("< err=%d\n", err);
     return err;
 }

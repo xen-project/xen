@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -19,9 +19,18 @@
 #ifndef __VNET_TUNNEL_H__
 #define __VNET_TUNNEL_H__
 
+#ifdef __KERNEL__
 #include <linux/types.h>
-#include <linux/slab.h>
 #include <asm/atomic.h>
+
+#else
+
+//#include <linux/types.h>
+#include "sys_kernel.h"
+#include "spinlock.h"
+
+#endif
+
 #include <if_varp.h>
 
 struct sk_buff;
@@ -42,8 +51,8 @@ typedef struct TunnelStats {
 } TunnelStats;
 
 typedef struct TunnelKey {
-    VnetId vnet;
-    VarpAddr addr;
+    struct VnetId vnet;
+    struct VarpAddr addr;
 } TunnelKey;
 
 typedef struct Tunnel {
@@ -61,17 +70,13 @@ typedef struct Tunnel {
     struct Tunnel *base;
 } Tunnel;
 
-extern void Tunnel_print(Tunnel *tunnel);
-
 /** Decrement the reference count, freeing if zero.
  *
  * @param tunnel tunnel (may be null)
  */
-static inline void Tunnel_decref(Tunnel *tunnel){
+static inline void Tunnel_decref(struct Tunnel *tunnel){
     if(!tunnel) return;
     if(atomic_dec_and_test(&tunnel->refcount)){
-        printk("%s> Closing tunnel:\n", __FUNCTION__);
-        Tunnel_print(tunnel);
         tunnel->type->close(tunnel);
         Tunnel_decref(tunnel->base);
         kfree(tunnel);
@@ -88,15 +93,19 @@ static inline void Tunnel_incref(Tunnel *tunnel){
 }
 
 extern int Tunnel_init(void);
-extern Tunnel * Tunnel_lookup(struct VnetId *vnet, struct VarpAddr *addr);
-extern int Tunnel_add(Tunnel *tunnel);
-extern int Tunnel_del(Tunnel *tunnel);
-extern int Tunnel_send(Tunnel *tunnel, struct sk_buff *skb);
+extern int Tunnel_lookup(struct VnetId *vnet, struct VarpAddr *addr, struct Tunnel **tunnel);
+extern int Tunnel_open(struct VnetId *vnet, struct VarpAddr *addr,
+                       int (*ctor)(struct VnetId *vnet,
+                                   struct VarpAddr *addr,
+                                   struct Tunnel **ptunnel),
+                       struct Tunnel **ptunnel);
+extern int Tunnel_add(struct Tunnel *tunnel);
+extern int Tunnel_del(struct Tunnel *tunnel);
+extern void Tunnel_print(struct Tunnel *tunnel);
+extern int Tunnel_send(struct Tunnel *tunnel, struct sk_buff *skb);
 
-extern int Tunnel_create(TunnelType *type, struct VnetId *vnet, struct VarpAddr *addr,
-                         Tunnel *base, Tunnel **tunnelp);
-extern int Tunnel_open(TunnelType *type, struct VnetId *vnet, struct VarpAddr *addr,
-                       Tunnel *base, Tunnel **tunnelp);
+extern int Tunnel_create(struct TunnelType *type, struct VnetId *vnet, struct VarpAddr *addr,
+                         struct Tunnel *base, struct Tunnel **tunnelp);
 
 extern int tunnel_module_init(void);
 extern void tunnel_module_exit(void);

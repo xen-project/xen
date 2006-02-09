@@ -21,6 +21,11 @@
 
 #include "select.h"
 
+#define MODULE_NAME  "select"
+#define DEBUG
+#undef DEBUG
+#include "debug.h"
+
 /** Zero all the file descriptor sets.
  *
  * @param set select set
@@ -34,6 +39,26 @@ void SelectSet_zero(SelectSet *set){
     FD_ZERO(&set->er);
 }
 
+/** Add a file descriptor to the set.
+ *
+ * @param set select set
+ * @param fd file descriptor
+ * @param mode mask of sets to add to
+ * @return 0 on success, -1 otherwise
+ */
+void SelectSet_add(SelectSet *set, int fd, int mode){
+    if(fd < 0) return;
+    if(mode & SELECT_READ){
+        SelectSet_add_read(set, fd);
+    }
+    if(mode & SELECT_WRITE){
+        SelectSet_add_write(set, fd);
+    }
+    if(mode & SELECT_ERROR){
+        SelectSet_add_error(set, fd);
+    }
+}
+
 /** Add a file descriptor to the write set.
  *
  * @param set select set
@@ -41,6 +66,8 @@ void SelectSet_zero(SelectSet *set){
  * @return 0 on success, -1 otherwise
  */
 void SelectSet_add_read(SelectSet *set, int fd){
+    dprintf("> fd=%d\n", fd);
+    if(fd < 0) return;
     FD_SET(fd, &set->rd);
     if(fd > set->n) set->n = fd;
 }
@@ -52,7 +79,22 @@ void SelectSet_add_read(SelectSet *set, int fd){
  * @return 0 on success, -1 otherwise
  */
 void SelectSet_add_write(SelectSet *set, int fd){
+    dprintf("> fd=%d\n", fd);
+    if(fd < 0) return;
     FD_SET(fd, &set->wr);
+    if(fd > set->n) set->n = fd;
+}
+
+/** Add a file descriptor to the error set.
+ *
+ * @param set select set
+ * @param fd file descriptor
+ * @return 0 on success, -1 otherwise
+ */
+void SelectSet_add_error(SelectSet *set, int fd){
+    dprintf("> fd=%d\n", fd);
+    if(fd < 0) return;
+    FD_SET(fd, &set->er);
     if(fd > set->n) set->n = fd;
 }
 

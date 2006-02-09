@@ -20,10 +20,24 @@
 #ifndef __VNET_SKB_CONTEXT_H__
 #define __VNET_SKB_CONTEXT_H__
 
+#ifdef __KERNEL__
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <asm/atomic.h>
 #include <linux/types.h>
+
+//todo: fixme
+#define SKB_CONTEXT(_skb) ((SkbContext *)(&(_skb)->cb[0]))
+
+#else
+
+#include "sys_kernel.h"
+#include "spinlock.h"
+
+//todo: fixme
+#define SKB_CONTEXT(_skb) ((SkbContext *)NULL)
+
+#endif
 
 /** Structure used to record inbound processing path for skbs.
  * For example, the ETHERIP protocol handler can use this to
@@ -69,8 +83,5 @@ extern int SkbContext_push(SkbContext **val, u32 vnet, u32 addr, int protocol,
 struct sk_buff;
 extern int skb_push_context(struct sk_buff *skb, u32 vnet, u32 addr, int protocol,
                             void *data, void (*free_fn)(SkbContext *));
-
-//todo: fixme
-#define SKB_CONTEXT(_skb) ((SkbContext *)(&(_skb)->cb[0]))
 
 #endif /* !__VNET_SKB_CONTEXT_H__ */ 

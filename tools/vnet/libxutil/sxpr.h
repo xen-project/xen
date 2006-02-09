@@ -149,7 +149,7 @@ static inline int eq(Sxpr x, Sxpr y){
 
 typedef struct ObjString {
     int len;
-    char data[];
+    char data[0];
 } ObjString;
 
 /** An atom. */
@@ -317,7 +317,6 @@ typedef struct SxprType {
     ObjFreeFn *free;
     ObjCopyFn *copy;
 } SxprType;
-
 
 extern int def_sxpr_type(SxprType *tydef);
 extern SxprType *get_sxpr_type(int ty);

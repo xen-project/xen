@@ -19,14 +19,27 @@
 #ifndef __VNET_SA_H__
 #define __VNET_SA_H__
 
+#ifdef __KERNEL__
 #include <linux/types.h>
 #include <linux/crypto.h>
 
-#include <tunnel.h>
+#else
+
+#include "sys_kernel.h"
+
+#endif
+
+struct Vnet;
+struct VarpAddr;
+struct Tunnel;
 
 #ifndef CRYPTO_MAX_KEY_BYTES
 #define CRYPTO_MAX_KEY_BYTES            64
 #define CRYPTO_MAX_KEY_BITS             (CRYPTO_MAX_KEY_BYTES * 8)
+#endif
+
+#ifndef CRYPTO_MAX_ALG_NAME
+#define CRYPTO_MAX_ALG_NAME		64
 #endif
 
 typedef struct SALimits {
@@ -104,7 +117,7 @@ typedef struct SAType {
     int (*init)(SAState *state, void *args);
     void (*fini)(SAState *state);
     int (*recv)(SAState *state, struct sk_buff *skb);
-    int (*send)(SAState *state, struct sk_buff *skb, Tunnel *tunnel);
+    int (*send)(SAState *state, struct sk_buff *skb, struct Tunnel *tunnel);
     u32 (*size)(SAState *state, int size);
 } SAType;
 
@@ -170,7 +183,7 @@ extern SAState *SAState_alloc(void);
 extern int SAState_init(SAIdent *id, SAState **statep);
 extern int SAState_create(SAInfo *info, SAState **statep);
 
-static inline int SAState_send(SAState *sa, struct sk_buff *skb, Tunnel *tunnel){
+static inline int SAState_send(SAState *sa, struct sk_buff *skb, struct Tunnel *tunnel){
     return sa->type->send(sa, skb, tunnel);
 }
 
@@ -195,5 +208,8 @@ enum {
     SA_STATE_ACQUIRE = 1,
     SA_STATE_VALID   = 2,
 };
+
+extern int sa_tunnel_create(struct Vnet *info, struct VarpAddr *addr,
+                            struct Tunnel *base, struct Tunnel **tunnel);
 
 #endif /* !__VNET_SA_H__ */

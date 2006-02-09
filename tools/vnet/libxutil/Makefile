@@ -14,7 +14,7 @@ LIB_SRCS :=
 LIB_SRCS += allocate.c
 LIB_SRCS += enum.c
 LIB_SRCS += file_stream.c
-LIB_SRCS += gzip_stream.c
+#LIB_SRCS += gzip_stream.c
 LIB_SRCS += hash_table.c
 LIB_SRCS += iostream.c
 LIB_SRCS += lexis.c
@@ -45,8 +45,10 @@ LIB      += libxutil.a
 
 all: build
 
-build: check-for-zlib
+build: #check-for-zlib
 	$(MAKE) $(LIB)
+
+gzip_stream.o: check-for-zlib
 
 libxutil.so: libxutil.so.$(MAJOR)
 	ln -sf $^ $@

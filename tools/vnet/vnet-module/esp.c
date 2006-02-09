@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -51,6 +51,7 @@
 #include <tunnel.h>
 #include <vnet.h>
 #include <skb_util.h>
+#include <skb_context.h>
 
 static const int DEBUG_ICV = 0;
 
@@ -58,6 +59,18 @@ static const int DEBUG_ICV = 0;
 #define DEBUG 1
 #undef DEBUG
 #include "debug.h"
+
+#ifndef CONFIG_CRYPTO_HMAC
+#warning No esp transform - CONFIG_CRYPTO_HMAC not defined
+
+int __init esp_module_init(void){
+    return 0;
+}
+
+void __exit esp_module_exit(void){
+}
+
+#else
 
 /* Outgoing packet:                            [ eth | ip | data ]
  * After etherip:        [ eth2 | ip2 |  ethip | eth | ip | data ]
@@ -221,7 +234,7 @@ static int esp_sa_digest(ESPState *esp, struct sk_buff *skb, int digest_n, int i
     
     if(DEBUG_ICV){
         dprintf("> skb digest_n=%d icv_n=%d\n", digest_n, icv_n);
-        skb_print_bits(skb, 0, digest_n);
+        skb_print_bits("esp", skb, 0, digest_n);
     }
     memset(icv, 0, icv_n);
     esp->digest.icv(esp, skb, 0, digest_n, icv);
@@ -248,7 +261,7 @@ static int esp_check_icv(SAState *sa, ESPState *esp, ESPHdr *esph, struct sk_buf
     if(DEBUG_ICV){
         dprintf("> skb len=%d digest_n=%d icv_n=%d\n",
                 skb->len, digest_n, icv_n);
-        skb_print_bits(skb, 0, skb->len);
+        skb_print_bits("esp", skb, 0, skb->len);
     }
     if(skb_copy_bits(skb, digest_n, icv_skb, icv_n)){
         wprintf("> Error getting icv from skb\n");
@@ -309,7 +322,7 @@ static int esp_sa_send(SAState *sa, struct sk_buff *skb, Tunnel *tunnel){
     dprintf("> len=%d plaintext=%d ciphertext=%d extra=%d\n",
             skb->len, plaintext_n, ciphertext_n, extra_n);
     dprintf("> iv=%d icv=%d\n", iv_n, icv_n);
-    skb_print_bits(skb, 0, skb->len);
+    skb_print_bits("iv", skb, 0, skb->len);
 
     // Add headroom for esp header and iv, tailroom for the ciphertext
     // and icv.
@@ -393,9 +406,12 @@ static void esp_context_free_fn(SkbContext *context){
  * Does ESP receive processing (check icv, decrypt), strips
  * ESP header and re-receives.
  *
+ * If return 1 the packet has been freed.
+ * If return <= 0 the caller must free.
+ *
  * @param sa SA
  * @param skb packet
- * @return 0 on success, negative error code otherwise
+ * @return >= 0 on success, negative protocol otherwise
  */
 static int esp_sa_recv(SAState *sa, struct sk_buff *skb){
     int err = -EINVAL;
@@ -458,10 +474,19 @@ static int esp_sa_recv(SAState *sa, struct sk_buff *skb){
                            sa, esp_context_free_fn);
     if(err) goto exit;
     // Increase sa refcount now the skb context refers to it.
+    // Refcount is decreased by esp_context_free_fn.
     SAState_incref(sa);
-    err = netif_rx(skb);
+    // Deliver skb to be received by network code.
+    // Not safe to refer to the skb after this.
+    // todo: return -skb->nh.iph->protocol instead?
+    netif_rx(skb);
   exit:
-    if(mine) err = 1;
+    if(mine){
+        if(err < 0){
+            kfree_skb(skb);
+        }
+        err = 1;
+    }
     dprintf("< skb=%p err=%d\n", skb, err);
     return err;
 }
@@ -717,9 +742,15 @@ static int esp_skb_header(struct sk_buff *skb, ESPHdr **esph){
  * Lookup spi, if state found hand to the state.
  * If no state, check spi, if ok, create state and pass to it.
  * If spi not ok, drop.
+ *
+ * Return value convention for protocols:
+ * >= 0 Protocol took the packet
+ * < 0  A -ve protocol id the packet should be re-received as.
+ *
+ * So always return >=0 if we took the packet, even if we dropped it.
  * 
  * @param skb packet
- * @return 0 on sucess, negative error code otherwise
+ * @return 0 on sucess, negative protocol number otherwise
  */
 static int esp_protocol_recv(struct sk_buff *skb){
     int err = 0;
@@ -730,7 +761,10 @@ static int esp_protocol_recv(struct sk_buff *skb){
     u32 addr;
     
     dprintf(">\n");
-    dprintf("> recv skb=\n"); skb_print_bits(skb, 0, skb->len);
+#ifdef DEBUG
+    dprintf("> recv skb=\n"); 
+    skb_print_bits(skb, 0, skb->len);
+#endif
     ip_n = (skb->nh.iph->ihl << 2);
     if(skb->data == skb->mac.raw){
         // skb->data points at ethernet header.
@@ -751,9 +785,14 @@ static int esp_protocol_recv(struct sk_buff *skb){
         err = vnet_sa_create(esph->spi, IPPROTO_ESP, addr, &sa);
         if(err) goto exit;
     }
+    //todo: Return a -ve protocol instead? See esp_sa_recv.
     err = SAState_recv(sa, skb);
   exit:
     if(sa) SAState_decref(sa);
+    if(err <= 0){
+        kfree_skb(skb);
+        err = 0;
+    }
     dprintf("< err=%d\n", err);
     return err;
 }
@@ -861,3 +900,4 @@ void __exit esp_module_exit(void){
     }
 }
 
+#endif // CONFIG_CRYPTO_HMAC

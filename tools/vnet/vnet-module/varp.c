@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -17,6 +17,7 @@
  *
  */
 
+#ifdef __KERNEL__
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -28,6 +29,7 @@
 #include <linux/in.h>
 #include <linux/inet.h>
 #include <linux/netdevice.h>
+#include <linux/inetdevice.h>
 #include <linux/udp.h>
 
 #include <net/ip.h>
@@ -37,18 +39,35 @@
 #include <linux/spinlock.h>
 #include <asm/semaphore.h>
 
+#else
+
+#include "sys_kernel.h"
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <linux/ip.h>
+#include <linux/udp.h>
+#include "spinlock.h"
+#include "skbuff.h"
+
+#endif
+
 #include <tunnel.h>
 #include <vnet.h>
 #include <vif.h>
 #include <if_varp.h>
 #include <varp.h>
+#include <varp_util.h>
 #include <vnet.h>
+#include <etherip.h>
+#include <vnet_forward.h>
 
 #include "allocate.h"
+#include "iostream.h"
 #include "hash_table.h"
 #include "sys_net.h"
 #include "sys_string.h"
 #include "skb_util.h"
+#include "timer_util.h"
 
 #define MODULE_NAME "VARP"
 #define DEBUG 1
@@ -104,7 +123,7 @@ on probe timer:
 enum {
     VARP_STATE_INCOMPLETE = 1,
     VARP_STATE_REACHABLE = 2,
-    VARP_STATE_FAILED = 3
+    VARP_STATE_FAILED = 3,
 };
 
 /** Varp entry flags. */
@@ -137,6 +156,8 @@ typedef struct VarpEntry {
     atomic_t refcount;
     /** Lock. */
     rwlock_t lock;
+    unsigned long lflags;
+
     /** How many probes have been made. */
     atomic_t probes;
     /** Probe timer. */
@@ -146,6 +167,7 @@ typedef struct VarpEntry {
     struct sk_buff_head queue;
     /** Maximum size of the queue. */
     int queue_max;
+    atomic_t deleted;
 } VarpEntry;
 
 /** The varp cache. Varp entries indexed by VarpKey. */
@@ -156,11 +178,13 @@ typedef struct VarpTable {
     /** Sweep timer. */
     struct timer_list timer;
 
-    /** Lock. Need to use a semaphore instead of a spinlock because
-     * some operations under the varp table lock can schedule - and
-     * you mustn't hold a spinlock when scheduling.
-     */
-    struct semaphore lock;
+    rwlock_t lock;
+    struct semaphore mutex;
+
+    int entry_ttl;
+    int probe_max;
+    int probe_interval;
+    int queue_max;
 
 } VarpTable;
 
@@ -176,19 +200,30 @@ u32 varp_mcast_addr = 0;
 /** UDP port (network order). */
 u16 varp_port = 0;
 
-char *varp_device = "xenbr0";
+char *varp_device = "xen-br0";
 
-#define VarpTable_read_lock(z, flags)    do{ (flags) = 0; down(&(z)->lock); } while(0)
-#define VarpTable_read_unlock(z, flags)  do{ (flags) = 0; up(&(z)->lock); } while(0)
-#define VarpTable_write_lock(z, flags)   do{ (flags) = 0; down(&(z)->lock); } while(0)
-#define VarpTable_write_unlock(z, flags) do{ (flags) = 0; up(&(z)->lock); } while(0)
+#define VarpTable_read_lock(vtable, flags)    \
+  do{ read_lock_irqsave(&(vtable)->lock, (flags)); } while(0)
 
-#define VarpEntry_lock(ventry, flags)    write_lock_irqsave(&(ventry)->lock, (flags))
-#define VarpEntry_unlock(ventry, flags)  write_unlock_irqrestore(&(ventry)->lock, (flags))
+#define VarpTable_read_unlock(vtable, flags)  \
+  do{ read_unlock_irqrestore(&(vtable)->lock, (flags)); } while(0)
 
-void VarpTable_sweep(VarpTable *z, int all);
-void VarpTable_flush(VarpTable *z);
-void VarpTable_print(VarpTable *z);
+#define VarpTable_write_lock(vtable, flags)    \
+  do{ write_lock_irqsave(&(vtable)->lock, (flags)); } while(0)
+
+#define VarpTable_write_unlock(vtable, flags)  \
+  do{ write_unlock_irqrestore(&(vtable)->lock, (flags)); } while(0)
+
+#define VarpEntry_lock(ventry, flags)    \
+  do{ write_lock_irqsave(&(ventry)->lock, (flags)); (ventry)->lflags = (flags); } while(0)
+
+#define VarpEntry_unlock(ventry, flags)  \
+  do{ (flags) = (ventry)->lflags; write_unlock_irqrestore(&(ventry)->lock, (flags)); } while(0)
+
+void VarpTable_sweep(VarpTable *vtable);
+void VarpTable_flush(VarpTable *vtable);
+void VarpTable_print(VarpTable *vtable, IOStream *io);
+int VarpEntry_output(VarpEntry *ventry, struct sk_buff *skb);
 
 #include "./varp_util.c"
 
@@ -196,7 +231,7 @@ void VarpTable_print(VarpTable *z);
  */
 void varp_dprint(void){
 #ifdef DEBUG
-    VarpTable_print(varp_table);
+    VarpTable_print(varp_table, iostdout);
 #endif
 } 
 
@@ -206,6 +241,7 @@ void varp_flush(void){
     VarpTable_flush(varp_table);
 }
 
+#ifdef __KERNEL__
 static int device_ucast_addr(const char *device, uint32_t *addr)
 {
     int err;
@@ -232,23 +268,6 @@ int varp_ucast_addr(uint32_t *addr)
         err = device_ucast_addr(*p, addr);
     }
     return err;
-}
-
-/** Print varp info and the varp cache.
- */
-void varp_print(void){
-    uint32_t addr = 0;
-    varp_ucast_addr(&addr);
-
-    printk(KERN_INFO "=== VARP ===============================================================\n");
-    printk(KERN_INFO "varp_device     %s\n", varp_device);
-    printk(KERN_INFO "varp_mcast_addr " IPFMT "\n", NIPQUAD(varp_mcast_addr));
-    printk(KERN_INFO "varp_ucast_addr " IPFMT "\n", NIPQUAD(addr));
-    printk(KERN_INFO "varp_port       %d\n", ntohs(varp_port));
-    vnet_print();
-    vif_print();
-    VarpTable_print(varp_table);
-    printk(KERN_INFO "========================================================================\n");
 }
 
 /** Lookup a network device by name.
@@ -287,6 +306,35 @@ int vnet_get_device_address(struct net_device *dev, u32 *addr){
     return err;
 }
 
+#else
+
+int varp_ucast_addr(uint32_t *addr)
+{
+    return 0;
+}
+
+#endif
+
+/** Print varp info and the varp cache.
+ */
+void varp_print(IOStream *io){
+    uint32_t addr = 0;
+    varp_ucast_addr(&addr);
+
+    IOStream_print(io, "(varp \n");
+    IOStream_print(io, " (device %s)\n", varp_device);
+    IOStream_print(io, " (mcast_addr " IPFMT ")\n", NIPQUAD(varp_mcast_addr));
+    IOStream_print(io, " (ucast_addr " IPFMT ")\n", NIPQUAD(addr));
+    IOStream_print(io, " (port %d)\n", ntohs(varp_port));
+    IOStream_print(io, " (encapsulation %s)\n",
+                   (etherip_in_udp ? "etherip_in_udp" : "etherip"));
+    IOStream_print(io, " (entry_ttl %lu)\n", varp_table->entry_ttl);
+    IOStream_print(io, ")\n");
+    VarpTable_print(varp_table, io);
+}
+
+#ifdef __KERNEL__
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 
 static inline int addr_route(u32 daddr, struct rtable **prt){
@@ -312,13 +360,20 @@ static inline int addr_route(u32 daddr, struct rtable **prt){
     return err;
 }
 
-#endif
+#endif // LINUX_VERSION_CODE
 
 #ifndef LL_RESERVED_SPACE
 #define HH_DATA_MOD	16
 #define LL_RESERVED_SPACE(dev) \
         ((dev->hard_header_len & ~(HH_DATA_MOD - 1)) + HH_DATA_MOD)
-#endif
+
+#endif // LL_RESERVED_SPACE
+
+#else // __KERNEL__
+
+#define ip_eth_mc_map(daddr, dmac) do{ }while(0)
+
+#endif // __KERNEL__
 
 /** Send a varp protocol message.
  *
@@ -337,12 +392,11 @@ int varp_send(u16 opcode, struct net_device *dev, struct sk_buff *skbin,
     int udp_n = sizeof(struct udphdr);
     int varp_n = sizeof(VarpHdr);
     struct sk_buff *skbout = NULL;
-    struct in_device *in_dev = NULL;
     VarpHdr *varph = NULL;
-    u8 macbuf[6] = {};
-    u8 *smac, *dmac = macbuf;
-    u32 saddr, daddr;
-    u16 sport, dport;
+    u8 smacbuf[6] = {}, dmacbuf[6] = {};
+    u8 *smac = smacbuf, *dmac = dmacbuf;
+    u32 saddr = 0, daddr = 0;
+    u16 sport = 0, dport = 0;
 #if defined(DEBUG)
     char vnetbuf[VNET_ID_BUF];
 #endif
@@ -365,28 +419,38 @@ int varp_send(u16 opcode, struct net_device *dev, struct sk_buff *skbin,
         sport = varp_port;
     }
 
-    if(!dev){
-        struct rtable *rt = NULL;
-        err = addr_route(daddr, &rt);
-        if(err) goto exit;
-        dev = rt->u.dst.dev;
+#ifdef __KERNEL__
+    {
+        struct in_device *in_dev = NULL;
+        if(!dev){
+            struct rtable *rt = NULL;
+            err = addr_route(daddr, &rt);
+            if(err) goto exit;
+            dev = rt->u.dst.dev;
+        }
+        
+        in_dev = in_dev_get(dev);
+        if(!in_dev){
+            err = -ENODEV;
+            goto exit;
+        }
+        link_n = LL_RESERVED_SPACE(dev);
+        saddr = in_dev->ifa_list->ifa_address;
+        smac = dev->dev_addr;
+        if(daddr == INADDR_BROADCAST){
+            daddr = in_dev->ifa_list->ifa_broadcast;
+            dmac = dev->broadcast;
+        }
+        in_dev_put(in_dev);
     }
+#else
+    {
+        extern uint32_t vnetd_addr(void); 
+        saddr = vnetd_addr();
+    }
+#endif // __KERNEL__
 
-    in_dev = in_dev_get(dev);
-    if(!in_dev){
-        err = -ENODEV;
-        goto exit;
-    }
-    link_n = LL_RESERVED_SPACE(dev);
-    saddr = in_dev->ifa_list->ifa_address;
-    smac = dev->dev_addr;
-    if(daddr == INADDR_BROADCAST){
-        daddr = in_dev->ifa_list->ifa_broadcast;
-        dmac = dev->broadcast;
-    }
-    in_dev_put(in_dev);
-
-    dprintf("> dev=%s\n", dev->name);
+    dprintf("> dev=%s\n", (dev ? dev->name : "<none>"));
     dprintf("> smac=" MACFMT " dmac=" MACFMT "\n", MAC6TUPLE(smac), MAC6TUPLE(dmac));
     dprintf("> saddr=" IPFMT " daddr=" IPFMT "\n", NIPQUAD(saddr), NIPQUAD(daddr));
     dprintf("> sport=%u dport=%u\n", ntohs(sport), ntohs(dport));
@@ -400,12 +464,16 @@ int varp_send(u16 opcode, struct net_device *dev, struct sk_buff *skbin,
     skb_reserve(skbout, link_n);
     skbout->protocol = htons(ETH_P_IP);
 
+#ifdef __KERNEL__
     // Device header. Pushes device header on front of skb.
     if (dev->hard_header){
         err = dev->hard_header(skbout, dev, ETH_P_IP, dmac, smac, skbout->len);
         if(err < 0) goto exit;
         skbout->mac.raw = skbout->data;
     }
+#else
+    smac = smac; // Defeat unused variable warning.
+#endif // __KERNEL__
 
     // IP header.
     skbout->nh.raw = skb_put(skbout, ip_n);
@@ -446,104 +514,102 @@ int varp_send(u16 opcode, struct net_device *dev, struct sk_buff *skbin,
     return err;
 }
 
+
 /** Send a varp request for the vnet and destination mac of a packet.
+ * Assumes the ventry is locked.
  *
  * @param skb packet
  * @param vnet vnet (in network order)
  * @return 0 on success, error code otherwise
  */
-int varp_solicit(struct sk_buff *skb, VnetId *vnet){
-    int err = 0;
-    err = varp_send(VARP_OP_REQUEST, NULL, NULL,
-                    vnet, (Vmac*)eth_hdr(skb)->h_dest);
-    return err;
+int varp_solicit(VnetId *vnet, Vmac *vmac){
+    return varp_send(VARP_OP_REQUEST, NULL, NULL, vnet, vmac);
 }
 
 /* Test some flags.
  *
- * @param z varp entry
+ * @param ventry varp entry
  * @param flags to test
  * @return nonzero if flags set
  */
-int VarpEntry_get_flags(VarpEntry *z, int flags){
-    return z->flags & flags;
+int VarpEntry_get_flags(VarpEntry *ventry, int flags){
+    return ventry->flags & flags;
 }
 
 /** Set some flags.
  *
- * @param z varp entry
+ * @param ventry varp entry
  * @param flags to set
  * @param set set flags on if nonzero, off if zero
  * @return new flags value
  */
-int VarpEntry_set_flags(VarpEntry *z, int flags, int set){
+int VarpEntry_set_flags(VarpEntry *ventry, int flags, int set){
     if(set){
-        z->flags |= flags;
+        ventry->flags |= flags;
     } else {
-        z->flags &= ~flags;
+        ventry->flags &= ~flags;
     }
-    return z->flags;
+    return ventry->flags;
 }
 
 /** Print a varp entry.
  *
  * @param ventry varp entry
  */
-void VarpEntry_print(VarpEntry *ventry){
+void VarpEntry_print(VarpEntry *ventry, IOStream *io){
+    IOStream_print(io, "(ventry \n");
     if(ventry){
+        unsigned long now = jiffies;
         char *state, *flags;
         char vnetbuf[VNET_ID_BUF];
         char addrbuf[VARP_ADDR_BUF];
 
         switch(ventry->state){
-        case VARP_STATE_INCOMPLETE: state = "INC"; break;
-        case VARP_STATE_REACHABLE:  state = "RCH"; break;
-        case VARP_STATE_FAILED:     state = "FLD"; break;
-        default:                    state = "UNK"; break;
+        case VARP_STATE_INCOMPLETE: state = "incomplete"; break;
+        case VARP_STATE_REACHABLE:  state = "reachable"; break;
+        case VARP_STATE_FAILED:     state = "failed"; break;
+        default:                    state = "unknown"; break;
         }
-        flags = (VarpEntry_get_flags(ventry, VARP_FLAG_PROBING) ? "P" : " ");
+        flags = (VarpEntry_get_flags(ventry, VARP_FLAG_PROBING) ? "P" : "-");
 
-        printk(KERN_INFO "VENTRY(%p ref=%1d %s %s vnet=%s vmac=" MACFMT
-               " addr=%s q=%3d t=%lu)\n",
-               ventry,
-               atomic_read(&ventry->refcount),
-               state, flags,
-               VnetId_ntoa(&ventry->key.vnet, vnetbuf),
-               MAC6TUPLE(ventry->key.vmac.mac),
-               VarpAddr_ntoa(&ventry->addr, addrbuf),
-               skb_queue_len(&ventry->queue),
-               ventry->timestamp);
-    } else {
-        printk("VENTRY: Null!\n");
+        IOStream_print(io, " (ref %d)\n", atomic_read(&ventry->refcount));
+        IOStream_print(io, " (state %s)\n", state);
+        IOStream_print(io, " (flags %s)\n", flags);
+        IOStream_print(io, " (addr %s)\n", VarpAddr_ntoa(&ventry->addr, addrbuf));
+        IOStream_print(io, " (queue %d)\n", skb_queue_len(&ventry->queue));
+        IOStream_print(io, " (age %lu)\n", now - ventry->timestamp);
+        IOStream_print(io, " (vmac " MACFMT ")\n", MAC6TUPLE(ventry->key.vmac.mac));
+        IOStream_print(io, " (vnet %s)\n", VnetId_ntoa(&ventry->key.vnet, vnetbuf));
     }
+    IOStream_print(io, ")\n");
 }
 
 /** Free a varp entry.
  *
- * @param z varp entry
+ * @param ventry varp entry
  */
-void VarpEntry_free(VarpEntry *z){
-    if(!z) return;
-    deallocate(z);
+static void VarpEntry_free(VarpEntry *ventry){
+    if(!ventry) return;
+    deallocate(ventry);
 }
 
 /** Increment reference count.
  *
- * @param z varp entry (may be null)
+ * @param ventry varp entry (may be null)
  */
-void VarpEntry_incref(VarpEntry *z){
-    if(!z) return;
-    atomic_inc(&z->refcount);
+void VarpEntry_incref(VarpEntry *ventry){
+    if(!ventry) return;
+    atomic_inc(&ventry->refcount);
 }
 
 /** Decrement reference count, freeing if zero.
  *
- * @param z varp entry (may be null)
+ * @param ventry varp entry (may be null)
  */
-void VarpEntry_decref(VarpEntry *z){
-    if(!z) return;
-    if(atomic_dec_and_test(&z->refcount)){
-        VarpEntry_free(z);
+void VarpEntry_decref(VarpEntry *ventry){
+    if(!ventry) return;
+    if(atomic_dec_and_test(&ventry->refcount)){
+        VarpEntry_free(ventry);
     }
 }
 
@@ -567,9 +633,7 @@ void VarpEntry_error(VarpEntry *ventry){
  * @param ventry varp entry
  */
 void VarpEntry_schedule(VarpEntry *ventry){
-    unsigned long now = jiffies;
-    ventry->timer.expires = now + VARP_PROBE_INTERVAL;
-    add_timer(&ventry->timer);
+    timer_set(&ventry->timer, VARP_PROBE_INTERVAL);
 }
 
 /** Function called when a varp entry timer goes off.
@@ -582,36 +646,49 @@ static void varp_timer_fn(unsigned long arg){
     unsigned long flags;
     VarpEntry *ventry = (VarpEntry *)arg;
     struct sk_buff *skb = NULL;
-    int locked = 0, probing = 0;
+    int probing = 0;
 
-    dprintf(">\n"); //VarpEntry_print(ventry);
+    dprintf(">\n");
     VarpEntry_lock(ventry, flags);
-    locked = 1;
-    if(ventry->state == VARP_STATE_REACHABLE){
-        // Do nothing.
-    } else {
-        // Probe if haven't run out of tries, otherwise fail.
-        if(atomic_read(&ventry->probes) < VARP_PROBE_MAX){
-            probing = 1;
-            VarpEntry_schedule(ventry);
-            skb = skb_peek(&ventry->queue);
-            if(skb){
-                dprintf("> skbs in queue - solicit\n");
-                atomic_inc(&ventry->probes);
-                VarpEntry_unlock(ventry, flags);
-                locked = 0;
-                varp_solicit(skb, &ventry->key.vnet);
+    if(!atomic_read(&ventry->deleted)){
+        switch(ventry->state){
+        case VARP_STATE_REACHABLE:
+        case VARP_STATE_FAILED:
+            break;
+        case VARP_STATE_INCOMPLETE:
+            // Probe if haven't run out of tries, otherwise fail.
+            if(atomic_read(&ventry->probes) < VARP_PROBE_MAX){
+                unsigned long qflags;
+                VnetId vnet;
+                Vmac vmac;
+
+                probing = 1;
+                spin_lock_irqsave(&ventry->queue.lock, qflags);
+                skb = skb_peek(&ventry->queue);
+                if(skb){
+                    vmac = *(Vmac*)eth_hdr(skb)->h_dest;
+                }
+                spin_unlock_irqrestore(&ventry->queue.lock, qflags);
+                if(skb){
+                    dprintf("> skbs in queue - solicit\n");
+                    vnet = ventry->key.vnet;
+                    atomic_inc(&ventry->probes);
+                    VarpEntry_unlock(ventry, flags);
+                    varp_solicit(&vnet, &vmac);
+                    VarpEntry_lock(ventry, flags);        
+                } else {
+                    dprintf("> empty queue.\n");
+                }
+                VarpEntry_schedule(ventry);
             } else {
-                dprintf("> empty queue.\n");
+                VarpEntry_error(ventry);
+                ventry->state = VARP_STATE_FAILED;
             }
-        } else {
-            dprintf("> Out of probes: FAILED\n");
-            VarpEntry_error(ventry);
-            ventry->state = VARP_STATE_FAILED;
+            break;
         }
     }
     VarpEntry_set_flags(ventry, VARP_FLAG_PROBING, probing);
-    if(locked) VarpEntry_unlock(ventry, flags);
+    VarpEntry_unlock(ventry, flags);
     if(!probing) VarpEntry_decref(ventry);
     dprintf("<\n");
 }
@@ -631,25 +708,25 @@ static void varp_error_fn(VarpEntry *ventry, struct sk_buff *skb){
  * @return ventry or null
  */
 VarpEntry * VarpEntry_new(VnetId *vnet, Vmac *vmac){
-    VarpEntry *z = ALLOCATE(VarpEntry);
-    if(z){
+    VarpEntry *ventry = ALLOCATE(VarpEntry);
+    if(ventry){
         unsigned long now = jiffies;
 
-        atomic_set(&z->refcount, 1);
-        z->lock = RW_LOCK_UNLOCKED;
-        z->state = VARP_STATE_INCOMPLETE;
-        z->queue_max = VARP_QUEUE_MAX;
-        skb_queue_head_init(&z->queue);
-        init_timer(&z->timer);
-        z->timer.data = (unsigned long)z;
-        z->timer.function = varp_timer_fn;
-        z->timestamp = now;
-        z->error = varp_error_fn;
+        atomic_set(&ventry->refcount, 1);
+        atomic_set(&ventry->probes, 0);
+        atomic_set(&ventry->deleted, 0);
+        ventry->lock = RW_LOCK_UNLOCKED;
+        ventry->state = VARP_STATE_INCOMPLETE;
+        ventry->queue_max = VARP_QUEUE_MAX;
+        skb_queue_head_init(&ventry->queue);
+        timer_init(&ventry->timer, varp_timer_fn, ventry);
+        ventry->timestamp = now;
+        ventry->error = varp_error_fn;
 
-        z->key.vnet = *vnet;
-        z->key.vmac = *vmac;
+        ventry->key.vnet = *vnet;
+        ventry->key.vmac = *vmac;
     }
-    return z;
+    return ventry;
 }
 
 /** Hash function for keys in the varp cache.
@@ -658,12 +735,8 @@ VarpEntry * VarpEntry_new(VnetId *vnet, Vmac *vmac){
  * @param k key (VarpKey)
  * @return hashcode
  */
-Hashcode varp_key_hash_fn(void *k){
-    VarpKey *key = k;
-    Hashcode h = 0;
-    h = VnetId_hash(h, &key->vnet);
-    h = Vmac_hash(h, &key->vmac);
-    return h;
+static Hashcode varp_key_hash_fn(void *k){
+    return hash_hvoid(0, k, sizeof(VarpKey));
 }
 
 /** Test equality for keys in the varp cache.
@@ -673,11 +746,8 @@ Hashcode varp_key_hash_fn(void *k){
  * @param k2 key to compare (VarpKey)
  * @return 1 if equal, 0 otherwise
  */
-int varp_key_equal_fn(void *k1, void *k2){
-    VarpKey *key1 = k1;
-    VarpKey *key2 = k2;
-    return (VnetId_eq(&key1->vnet, &key2->vnet) &&
-            Vmac_eq(&key1->vmac, &key2->vmac));
+static int varp_key_equal_fn(void *k1, void *k2){
+    return memcmp(k1, k2, sizeof(VarpKey)) == 0;
 }
 
 /** Free an entry in the varp cache.
@@ -696,27 +766,43 @@ static void varp_entry_free_fn(HashTable *table, HTEntry *entry){
 /** Free the whole varp cache.
  * Dangerous.
  *
- * @param z varp cache
+ * @param vtable varp cache
  */
-void VarpTable_free(VarpTable *z){
-    unsigned long flags;
-    if(!z) return;
-    VarpTable_write_lock(z, flags);
-    del_timer(&z->timer);
-    z->timer.data = 0;
-    if(z->table) HashTable_free(z->table); 
-    VarpTable_write_unlock(z, flags);
-    deallocate(z);
+void VarpTable_free(VarpTable *vtable){
+    unsigned long vtflags;
+    if(!vtable) return;
+    VarpTable_write_lock(vtable, vtflags);
+    timer_cancel(&vtable->timer);
+    vtable->timer.data = 0;
+    if(vtable->table){
+        HashTable *table = vtable->table;
+        HashTable_for_decl(entry);
+
+        vtable->table = NULL;
+        HashTable_for_each(entry, table){
+            VarpEntry *ventry = entry->value;
+            unsigned long flags;
+            VarpEntry_lock(ventry, flags);
+            atomic_set(&ventry->deleted, 1);
+            if(VarpEntry_get_flags(ventry, VARP_FLAG_PROBING)){
+                timer_cancel(&ventry->timer);
+                ventry->timer.data = 0;
+                VarpEntry_decref(ventry);
+            }
+            VarpEntry_unlock(ventry, flags);
+        }
+        HashTable_free(table); 
+    }
+    VarpTable_write_unlock(vtable, vtflags);
+    deallocate(vtable);
 }
 
 /** Schedule the varp table timer.
  *
- * @param z varp table
+ * @param vtable varp table
  */
-void VarpTable_schedule(VarpTable *z){
-    unsigned long now = jiffies;
-    z->timer.expires = now + VARP_ENTRY_TTL;
-    add_timer(&z->timer);
+void VarpTable_schedule(VarpTable *vtable){
+    timer_set(&vtable->timer, vtable->entry_ttl);
 }
 
 /** Function called when the varp table timer goes off.
@@ -725,30 +811,30 @@ void VarpTable_schedule(VarpTable *z){
  * @param arg varp table
  */
 static void varp_table_timer_fn(unsigned long arg){
-    VarpTable *z = (VarpTable *)arg;
-    if(z){
-        VarpTable_sweep(z, 0);
-        VarpTable_schedule(z);
+    VarpTable *vtable = (VarpTable *)arg;
+    if(vtable){
+        VarpTable_sweep(vtable);
+        VarpTable_schedule(vtable);
     }
 }
 
 /** Print a varp table.
  *
- * @param z table
+ * @param vtable table
  */
-void VarpTable_print(VarpTable *z){
+void VarpTable_print(VarpTable *vtable, IOStream *io){
     HashTable_for_decl(entry);
     VarpEntry *ventry;
-    unsigned long flags, vflags;
+    unsigned long vtflags, flags;
 
-    VarpTable_read_lock(z, flags);
-    HashTable_for_each(entry, varp_table->table){
+    VarpTable_read_lock(vtable, vtflags);
+    HashTable_for_each(entry, vtable->table){
         ventry = entry->value;
-        VarpEntry_lock(ventry, vflags);
-        VarpEntry_print(ventry);
-        VarpEntry_unlock(ventry, vflags);
+        VarpEntry_lock(ventry, flags);
+        VarpEntry_print(ventry, io);
+        VarpEntry_unlock(ventry, flags);
     }
-    VarpTable_read_unlock(z, flags);
+    VarpTable_read_unlock(vtable, vtflags);
 }
 
 /** Create a varp table.
@@ -757,83 +843,140 @@ void VarpTable_print(VarpTable *z){
  */
 VarpTable * VarpTable_new(void){
     int err = -ENOMEM;
-    VarpTable *z = NULL;
+    VarpTable *vtable = NULL;
 
-    z = ALLOCATE(VarpTable);
-    if(!z) goto exit;
-    z->table = HashTable_new(VARP_TABLE_BUCKETS);
-    if(!z->table) goto exit;
-    z->table->key_equal_fn = varp_key_equal_fn;
-    z->table->key_hash_fn = varp_key_hash_fn;
-    z->table->entry_free_fn = varp_entry_free_fn;
-    init_MUTEX(&z->lock);
-    init_timer(&z->timer);
-    z->timer.data = (unsigned long)z;
-    z->timer.function = varp_table_timer_fn;
-    VarpTable_schedule(z);
+    vtable = ALLOCATE(VarpTable);
+    if(!vtable) goto exit;
+    vtable->table = HashTable_new(VARP_TABLE_BUCKETS);
+    if(!vtable->table) goto exit;
+    vtable->table->key_equal_fn = varp_key_equal_fn;
+    vtable->table->key_hash_fn = varp_key_hash_fn;
+    vtable->table->entry_free_fn = varp_entry_free_fn;
+
+    vtable->entry_ttl = VARP_ENTRY_TTL;
+    vtable->probe_max = VARP_PROBE_MAX;
+    vtable->probe_interval = VARP_PROBE_INTERVAL;
+    vtable->queue_max = VARP_QUEUE_MAX;
+
+    init_MUTEX(&vtable->mutex);
+    vtable->lock = RW_LOCK_UNLOCKED;
+    timer_init(&vtable->timer, varp_table_timer_fn, vtable);
     err = 0;
   exit:
     if(err){
-        VarpTable_free(z);
-        z = NULL;
+        VarpTable_free(vtable);
+        vtable = NULL;
     }
-    return z;
+    return vtable;
 }
 
 /** Add a new entry to the varp table.
  *
- * @param z table
+ * @param vtable table
  * @param vnet vnet id
  * @param vmac virtual MAC address (copied)
  * @return new entry or null
  */
-VarpEntry * VarpTable_add(VarpTable *z, VnetId *vnet, Vmac *vmac){
-    int err = -ENOMEM;
-    VarpEntry *ventry;
-    HTEntry *entry;
-    unsigned long flags;
+VarpEntry * VarpTable_add(VarpTable *vtable, VnetId *vnet, Vmac *vmac){
+    int err = 0;
+    VarpKey key = { .vnet = *vnet, .vmac = *vmac};
+    VarpEntry *ventry = NULL;
+    HTEntry *entry = NULL;
+    unsigned long vtflags;
 
+    VarpTable_write_lock(vtable, vtflags);
+    ventry = HashTable_get(vtable->table, &key);
+    if(ventry){
+        VarpEntry_incref(ventry);
+        goto exit;
+    }
+    err = -ENOMEM;
     ventry = VarpEntry_new(vnet, vmac);
     if(!ventry) goto exit;
-    VarpTable_write_lock(z, flags);
-    entry = HashTable_add(z->table, ventry, ventry);
-    VarpTable_write_unlock(z, flags);
-    if(!entry) goto exit;
-    VarpEntry_incref(ventry);
-    err = 0;
-  exit:
-    if(err){
-        VarpEntry_free(ventry);
+    entry = HashTable_add(vtable->table, ventry, ventry);
+    if(!entry){
+        VarpEntry_decref(ventry);
         ventry = NULL;
+        goto exit;
     }
+    err = 0;
+    VarpEntry_incref(ventry);
+  exit:
+    VarpTable_write_unlock(vtable, vtflags);
     return ventry;
 }
 
 /** Remove an entry from the varp table.
  *
- * @param z table
+ * @param vtable table
  * @param ventry entry to remove
  * @return removed count
  */
-int VarpTable_remove(VarpTable *z, VarpEntry *ventry){
-    return HashTable_remove(z->table, ventry);
+int VarpTable_remove(VarpTable *vtable, VarpEntry *ventry){
+    //TODO: Could send a varp announce with null addr for the entry
+    // vnet and vmac to notify others, so they will resolve the addr
+    // instead of sending traffic to us.
+    atomic_set(&ventry->deleted, 1);
+    skb_queue_purge(&ventry->queue);
+    return HashTable_remove(vtable->table, ventry);
+}
+
+/** Remove all entries using a vnet.
+ * Caller must hold the table lock.
+ *
+ * @param vtable table
+ * @param vnet vnet
+ * @return removed count
+ */
+int VarpTable_remove_vnet(VarpTable *vtable, VnetId *vnet){
+    int count = 0;
+    HashTable_for_decl(entry);
+
+    HashTable_for_each(entry, vtable->table){
+        VarpEntry *ventry = entry->value;
+        if(VnetId_eq(&ventry->key.vnet, vnet)){
+            count += VarpTable_remove(vtable, ventry);
+        }
+    }
+    return count;
+}
+
+/** Remove all entries using a vnet from the varp table.
+ *
+ * @param vnet vnet
+ * @return removed count
+ */
+int varp_remove_vnet(VnetId *vnet){
+    int count = 0;
+    unsigned long vtflags;
+
+    VarpTable_write_lock(varp_table, vtflags);
+    count = VarpTable_remove_vnet(varp_table, vnet);
+    VarpTable_write_unlock(varp_table, vtflags);
+    return count;
 }
 
 /** Lookup an entry in the varp table.
  *
- * @param z table
+ * @param vtable table
  * @param vnet vnet id
- * @param vmac virtual MAC addres
+ * @param vmac virtual MAC address
+ * @param create create a new entry if needed if true
  * @return entry found or null
  */
-VarpEntry * VarpTable_lookup(VarpTable *z, VnetId *vnet, Vmac *vmac){
-    unsigned long flags;
+VarpEntry * VarpTable_lookup(VarpTable *vtable, VnetId *vnet, Vmac *vmac, int create){
     VarpKey key = { .vnet = *vnet, .vmac = *vmac };
-    VarpEntry *ventry;
-    VarpTable_read_lock(z, flags);
-    ventry = HashTable_get(z->table, &key);
+    VarpEntry *ventry = NULL;
+    unsigned long vtflags;
+
+    VarpTable_read_lock(vtable, vtflags);
+    ventry = HashTable_get(vtable->table, &key);
     if(ventry) VarpEntry_incref(ventry);
-    VarpTable_read_unlock(z, flags);
+    VarpTable_read_unlock(vtable, vtflags);
+
+    if(!ventry && create){
+        ventry = VarpTable_add(vtable, vnet, vmac);
+    }
     return ventry;
 }
 
@@ -849,11 +992,13 @@ int VarpEntry_send(VarpEntry *ventry, struct sk_buff *skb){
     int err = 0;
     unsigned long flags = 0;
     VarpAddr addr;
+    VnetId vnet;
 
     dprintf("> skb=%p\n", skb);
+    vnet = ventry->key.vnet;
     addr = ventry->addr;
     VarpEntry_unlock(ventry, flags);
-    err = vnet_tunnel_send(&ventry->key.vnet, &addr, skb);
+    err = vnet_tunnel_send(&vnet, &addr, skb);
     VarpEntry_lock(ventry, flags);
     dprintf("< err=%d\n", err);
     return err;
@@ -872,6 +1017,8 @@ int VarpEntry_send(VarpEntry *ventry, struct sk_buff *skb){
 int VarpEntry_resolve(VarpEntry *ventry, struct sk_buff *skb){
     int err = 0;
     unsigned long flags = 0;
+    VnetId vnet;
+    Vmac vmac;
 
     dprintf("> skb=%p\n", skb);
     ventry->state = VARP_STATE_INCOMPLETE;
@@ -881,44 +1028,27 @@ int VarpEntry_resolve(VarpEntry *ventry, struct sk_buff *skb){
         VarpEntry_incref(ventry);
         VarpEntry_schedule(ventry);
     }
+    vnet = ventry->key.vnet;
+    vmac = *(Vmac*)eth_hdr(skb)->h_dest;
     VarpEntry_unlock(ventry, flags);
-    varp_solicit(skb, &ventry->key.vnet);
+    varp_solicit(&vnet, &vmac);
     VarpEntry_lock(ventry, flags);
 
     if(ventry->state == VARP_STATE_INCOMPLETE){
-        if(skb_queue_len(&ventry->queue) >= ventry->queue_max){
+        while(skb_queue_len(&ventry->queue) >= ventry->queue_max){
             struct sk_buff *oldskb;
-            oldskb = ventry->queue.next;
-            __skb_unlink(oldskb, &ventry->queue);
+            oldskb = skb_dequeue(&ventry->queue);
+            //oldskb = ventry->queue.next;
+            //__skb_unlink(oldskb, &ventry->queue);
+            if(!oldskb) break;
             dprintf("> dropping skb=%p\n", oldskb);
             kfree_skb(oldskb);
         }
-        __skb_queue_tail(&ventry->queue, skb);
+        skb_queue_tail(&ventry->queue, skb);
     } else {
         err = VarpEntry_send(ventry, skb);
     }
     dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Handle output for a ventry. Resolves the ventry
- * if necessary.
- *
- * @param ventry varp entry
- * @param skb skb to send
- * @return 0 on success, error code otherwise
- */
-int VarpEntry_output(VarpEntry *ventry, struct sk_buff *skb){
-    int err = 0;
-
-    switch(ventry->state){
-    case VARP_STATE_REACHABLE:
-        err = VarpEntry_send(ventry, skb);
-        break;
-    default:
-        err = VarpEntry_resolve(ventry, skb);
-        break;
-    }
     return err;
 }
 
@@ -931,11 +1061,58 @@ void VarpEntry_process_queue(VarpEntry *ventry){
     struct sk_buff *skb;
     for( ; ; ){
         if(ventry->state != VARP_STATE_REACHABLE) break;
-        skb = __skb_dequeue(&ventry->queue);
+        skb = skb_dequeue(&ventry->queue);
         if(!skb) break;
-        VarpEntry_output(ventry, skb);
+        VarpEntry_send(ventry, skb);
     }
     skb_queue_purge(&ventry->queue);
+}
+
+/** Multicast an skb on a vnet.
+ *
+ * @param vnet vnet id
+ * @param skb skb to send
+ * @return 0 on success, error code otherwise
+ */
+static int varp_multicast(VnetId *vnet, struct sk_buff *skb){
+    VarpAddr addr = { .family = AF_INET };
+    addr.u.ip4.s_addr = varp_mcast_addr;
+    return vnet_tunnel_send(vnet, &addr, skb);
+}
+
+/** Handle output for a ventry. Resolves the ventry
+ * if necessary.
+ *
+ * @param ventry varp entry
+ * @param skb skb to send
+ * @return 0 on success, error code otherwise
+ */
+int VarpEntry_output(VarpEntry *ventry, struct sk_buff *skb){
+    int err = 0;
+    unsigned long flags;
+
+    VarpEntry_lock(ventry, flags);
+    switch(ventry->state){
+    case VARP_STATE_REACHABLE:
+        if(skb_queue_len(&ventry->queue) > 0){
+            VarpEntry_process_queue(ventry);
+        }
+        err = VarpEntry_send(ventry, skb);
+        break;
+    default: 
+        if(0){
+            err = VarpEntry_resolve(ventry, skb);
+        } else {     
+            // Multicast the skb if the entry is not reachable.
+            VnetId vnet = ventry->key.vnet;
+            VarpEntry_unlock(ventry, flags);
+            err = varp_multicast(&vnet, skb);
+            VarpEntry_lock(ventry, flags);
+        }
+        break;
+    }
+    VarpEntry_unlock(ventry, flags);
+    return err;
 }
 
 /** Update a ventry. Sets the address and state to those given
@@ -946,132 +1123,155 @@ void VarpEntry_process_queue(VarpEntry *ventry){
  * @param state state
  * @return 0 on success, error code otherwise
  */
-int VarpEntry_update(VarpEntry *ventry, VarpAddr *addr, int state){
+int VarpEntry_update(VarpEntry *ventry, VarpAddr *addr, int state, int vflags){
     int err = 0;
     unsigned long now = jiffies;
     unsigned long flags;
 
-    dprintf("> addr=" IPFMT " state=%d\n", NIPQUAD(addr), state);
     VarpEntry_lock(ventry, flags);
+    //if(atomic_read(&ventry->deleted)) goto exit;
     if(VarpEntry_get_flags(ventry, VARP_FLAG_PERMANENT)) goto exit;
     ventry->addr = *addr;
     ventry->timestamp = now;
     ventry->state = state;
-    VarpEntry_process_queue(ventry);
+    // Can't process the queue while atomic as it calls schedule(),
+    // and that's bad.
+    //if(0 && (vflags & VARP_UPDATE_QUEUE) && !in_atomic()){
+    //    VarpEntry_process_queue(ventry);
+    //}
   exit:
     VarpEntry_unlock(ventry, flags);
     dprintf("< err=%d\n", err);
     return err;
 }
     
-int VarpTable_update(VarpTable *z, VnetId *vnet, Vmac *vmac, VarpAddr *addr,
-                     int state, int force){
+/** Update the entry for a vnet.
+ *
+ * @param vtable varp table
+ * @param vnet vnet id
+ * @param vmac mac address
+ * @param addr care-of-address
+ * @param state state
+ * @param flags update flags
+ * @return 0 on success, error code otherwise
+ */
+int VarpTable_update(VarpTable *vtable, VnetId *vnet, Vmac *vmac, VarpAddr *addr,
+                     int state, int flags){
     int err = 0;
     VarpEntry *ventry;
 #ifdef DEBUG
     char vnetbuf[VNET_ID_BUF];
     char addrbuf[VARP_ADDR_BUF];
-#endif
     
-    dprintf("> vnet=%s mac=" MACFMT " addr=%s state=%d force=%d\n",
+    dprintf("> vnet=%s mac=" MACFMT " addr=%s state=%d flags=%x\n",
             VnetId_ntoa(vnet, vnetbuf),
             MAC6TUPLE(vmac->mac),
             VarpAddr_ntoa(addr, addrbuf),
             state,
-            force);
-    ventry = VarpTable_lookup(z, vnet, vmac);
-    if(force && !ventry){
-        dprintf("> No entry, adding\n");
-        ventry = VarpTable_add(z, vnet, vmac);
-    }
-    if(ventry){
-        dprintf("> Updating\n");
-        err = VarpEntry_update(ventry, addr, state);
-        VarpEntry_decref(ventry);
-    } else {
-        dprintf("> No entry found\n");
+            flags);
+#endif
+    ventry = VarpTable_lookup(vtable, vnet, vmac, (flags & VARP_UPDATE_CREATE));
+    if(!ventry){
         err = -ENOENT;
+        goto exit;
     }
+    err = VarpEntry_update(ventry, addr, state, flags);
+    VarpEntry_decref(ventry);
+  exit:
     dprintf("< err=%d\n", err);
     return err;
 }
 
-/** Update the ventry corresponding to the given varp header.
+/** Update the entry for a vnet: make it reachable and create an entry
+ * if needed.
  *
- * @param z table
- * @param varph varp header
- * @param state state
- * @return 0 on success, -ENOENT if no entry found
+ * @param vnet vnet id
+ * @param vmac mac address
+ * @param addr care-of-address
+ * @return 0 on success, error code otherwise
  */
-int VarpTable_update_entry(VarpTable *z, VarpHdr *varph, int state){
-    return VarpTable_update(z, &varph->vnet, &varph->vmac, &varph->addr, state, 0);
-}
-
 int varp_update(VnetId *vnet, unsigned char *vmac, VarpAddr *addr){
+    int err = 0;
     if(!varp_table){
-        return -ENOSYS;
+        err = -ENOSYS;
+    } else {
+        err = VarpTable_update(varp_table, vnet, (Vmac*)vmac, addr,
+                               VARP_STATE_REACHABLE, VARP_UPDATE_CREATE);
     }
-    return VarpTable_update(varp_table, vnet, (Vmac*)vmac, addr,
-                            VARP_STATE_REACHABLE, 1);
+    return err;
 }
 
-/** Put old varp entries into the incomplete state.
- * Permanent entries are not changed.
- * If 'all' is non-zero, all non-permanent entries
- * are put into the incomplete state, regardless of age.
+static inline int VarpEntry_sweepable(VarpEntry *ventry){
+    return !VarpEntry_get_flags(ventry, (VARP_FLAG_PERMANENT | VARP_FLAG_PROBING));
+}
+
+static inline int VarpTable_old(VarpTable *vtable, VarpEntry *ventry, unsigned long now){
+    return now - ventry->timestamp > vtable->entry_ttl;
+}
+
+/** Sweep old varp entries.
+ * Doesn't affect entries that are probing or permanent.
  *
- * @param z table
- * @param all reset all entries if non-zero
+ * @param vtable table
  */
-void VarpTable_sweep(VarpTable *z, int all){
+void VarpTable_sweep(VarpTable *vtable){
     HashTable_for_decl(entry);
     VarpEntry *ventry;
     unsigned long now = jiffies;
-    unsigned long old = now - VARP_ENTRY_TTL;
-    unsigned long flags, vflags;
+    unsigned long vtflags, flags;
+    int sweep, swept = 0;
 
-    VarpTable_read_lock(z, flags);
-    HashTable_for_each(entry, varp_table->table){
+    if(!vtable) return;
+    VarpTable_write_lock(vtable, vtflags);
+    HashTable_for_each(entry, vtable->table){
         ventry = entry->value;
-        VarpEntry_lock(ventry, vflags);
-        if(!VarpEntry_get_flags(ventry, VARP_FLAG_PERMANENT) &&
-           (all || (ventry->timestamp < old))){
-            VarpEntry_process_queue(ventry);
+        VarpEntry_lock(ventry, flags);
+        sweep = VarpEntry_sweepable(ventry) && VarpTable_old(vtable, ventry, now);
+        if(sweep){
+            swept++;
+            iprintf("> Sweeping:\n");
+            VarpEntry_print(ventry, iostdout);
+            //VarpEntry_process_queue(ventry);
             ventry->state = VARP_STATE_INCOMPLETE;
         }
-        VarpEntry_unlock(ventry, vflags);
+        VarpEntry_unlock(ventry, flags);
+        if(sweep){
+            VarpTable_remove(vtable, ventry);
+        }
     }
-    VarpTable_read_unlock(z, flags);
+    VarpTable_write_unlock(vtable, vtflags);
+    if(swept){
+        iprintf(">\n");
+        varp_print(iostdout);
+    }
 }
 
 /** Flush the varp table.
- * Remove old unreachable varp entries with empty queues.
- * Permanent entries are not removed.
  *
- * @param z table
+ * @param vtable table
  */
-void VarpTable_flush(VarpTable *z){
+void VarpTable_flush(VarpTable *vtable){
     HashTable_for_decl(entry);
     VarpEntry *ventry;
-    unsigned long now = jiffies;
-    unsigned long old = now - VARP_ENTRY_TTL;
-    unsigned long flags, vflags;
+    unsigned long vtflags, flags;
     int flush;
 
-    VarpTable_write_lock(z, flags);
-    HashTable_for_each(entry, varp_table->table){
+    VarpTable_write_lock(vtable, vtflags);
+    HashTable_for_each(entry, vtable->table){
         ventry = entry->value;
-        VarpEntry_lock(ventry, vflags);
+        VarpEntry_lock(ventry, flags);
         flush = (!VarpEntry_get_flags(ventry, VARP_FLAG_PERMANENT) &&
-                 (ventry->timestamp < old) &&
-                 (ventry->state != VARP_STATE_REACHABLE) &&
-                 (skb_queue_len(&ventry->queue) == 0));
-        VarpEntry_unlock(ventry, vflags);
+                 !VarpEntry_get_flags(ventry, VARP_FLAG_PROBING));                
         if(flush){
-            VarpTable_remove(z, ventry);
+            iprintf("> Flushing:\n");
+            VarpEntry_print(ventry, iostdout);
+        }
+        VarpEntry_unlock(ventry, flags);
+        if(flush){
+            VarpTable_remove(vtable, ventry);
         }
     }
-    VarpTable_write_unlock(z, flags);
+    VarpTable_write_unlock(vtable, vtflags);
 }
 
 /** Handle a varp request. Look for a vif with the requested 
@@ -1129,7 +1329,10 @@ int varp_handle_announce(struct sk_buff *skb, VarpHdr *varph){
     int err = 0;
 
     dprintf(">\n");
-    err = VarpTable_update_entry(varp_table, varph, VARP_STATE_REACHABLE);
+    err = VarpTable_update(varp_table,
+                           &varph->vnet, &varph->vmac, &varph->addr,
+                           VARP_STATE_REACHABLE, 
+                           (VARP_UPDATE_CREATE | VARP_UPDATE_QUEUE));
     dprintf("< err=%d\n", err);
     return err;
 }
@@ -1140,33 +1343,51 @@ int varp_handle_announce(struct sk_buff *skb, VarpHdr *varph){
  * @return 0 if OK, error code otherwise
  */
 int varp_handle_message(struct sk_buff *skb){
-    // Assume h. nh set, skb->data point after udp hdr (at varphdr).
-    int err = -EINVAL, mine = 0;
-    VarpHdr *varph = (void*)(skb->h.uh + 1);
+    // Assume nh, h set, skb->data points at udp hdr (h).
+    int err = -EINVAL;
+    VarpHdr *varph; // = (void*)(skb->h.uh + 1);
 
-    dprintf(">\n");
+    dprintf("> skb=%p saddr=" IPFMT " daddr=" IPFMT "\n",
+            skb,
+            NIPQUAD(skb->nh.iph->saddr),
+            NIPQUAD(skb->nh.iph->daddr));
     if(!varp_table){
         err = -ENOSYS;
+        return err;
+    }
+    if(MULTICAST(skb->nh.iph->daddr)){
+        if(skb->nh.iph->daddr != varp_mcast_addr){
+            // Ignore multicast packets not addressed to us.
+            err = 0;
+            dprintf("> Ignoring daddr=" IPFMT " mcaddr=" IPFMT "\n",
+                    NIPQUAD(skb->nh.iph->daddr), NIPQUAD(varp_mcast_addr));
+            goto exit;
+        }
+    }
+    varph = (void*)skb_pull(skb, sizeof(struct udphdr));
+    if(skb->len < sizeof(struct VnetMsgHdr)){
+        wprintf("> Varp msg too short: %d < %d\n", skb->len, sizeof(struct VnetMsgHdr));
         goto exit;
     }
-    if(MULTICAST(skb->nh.iph->daddr) &&
-       (skb->nh.iph->daddr != varp_mcast_addr)){
-        // Ignore multicast packets not addressed to us.
-        err = 0;
-        dprintf("> Ignoring daddr=" IPFMT " mcaddr=" IPFMT "\n",
-                NIPQUAD(skb->nh.iph->daddr), NIPQUAD(varp_mcast_addr));
+    switch(ntohs(varph->hdr.id)){
+    case VARP_ID: // Varp message. Handled below.
+        if(skb->len < sizeof(*varph)){
+            wprintf("> Varp msg too short: %d < %d\n", skb->len, sizeof(*varph));
+            goto exit;
+        }
+        break;
+    case VUDP_ID: // Etherip-in-udp packet.
+        skb_pull(skb, sizeof(struct VnetMsgHdr));
+        err = etherip_protocol_recv(skb);
         goto exit;
-    }
-    if(skb->len < sizeof(*varph)){
-        wprintf("> Varp msg too short: %d < %d\n", skb->len, sizeof(*varph));
+    case VFWD_ID: // Forwarded.
+        skb_pull(skb, sizeof(struct VnetMsgHdr));
+        err = vnet_forward_recv(skb);
         goto exit;
-    }
-    mine = 1;
-    if(varph->hdr.id != htons(VARP_ID)){
+    default:
         // It's not varp at all - ignore it.
-        wprintf("> Invalid varp id: %d, expected %d \n",
-                ntohs(varph->hdr.id),
-                VARP_ID);
+        wprintf("> Invalid varp id: %d\n", ntohs(varph->hdr.id));
+        print_skb("INVALID", 0, skb);
         goto exit;
     }
 #ifdef DEBUG
@@ -1196,7 +1417,6 @@ int varp_handle_message(struct sk_buff *skb){
         break;
     }
   exit:
-    if(mine) err = 1;
     dprintf("< err=%d\n", err);
     return err;
 }
@@ -1212,8 +1432,11 @@ int varp_output(struct sk_buff *skb, VnetId *vnet){
     unsigned char *mac = NULL;
     Vmac *vmac = NULL;
     VarpEntry *ventry = NULL;
+#if defined(DEBUG)
+    char vnetbuf[VNET_ID_BUF];
+#endif
 
-    dprintf(">\n");
+    dprintf("> vnet=%s\n", VnetId_ntoa(vnet, vnetbuf));
     if(!varp_table){
         err = -ENOSYS;
         goto exit;
@@ -1226,20 +1449,11 @@ int varp_output(struct sk_buff *skb, VnetId *vnet){
     mac = eth_hdr(skb)->h_dest;
     vmac = (Vmac*)mac;
     if(mac_is_multicast(mac)){
-        VarpAddr addr = {};
-        addr.family = AF_INET;
-        addr.u.ip4.s_addr = varp_mcast_addr;
-        err = vnet_tunnel_send(vnet, &addr, skb);
+        err = varp_multicast(vnet, skb);
     } else {
-        ventry = VarpTable_lookup(varp_table, vnet, vmac);
-        if(!ventry){
-            ventry = VarpTable_add(varp_table, vnet, vmac);
-        }
+        ventry = VarpTable_lookup(varp_table, vnet, vmac, 1);
         if(ventry){
-            unsigned long flags;
-            VarpEntry_lock(ventry, flags);
             err = VarpEntry_output(ventry, skb);
-            VarpEntry_unlock(ventry, flags);
             VarpEntry_decref(ventry);
         } else {
             err = -ENOMEM;
@@ -1292,6 +1506,7 @@ int varp_init(void){
         err = -ENOMEM;
         goto exit;
     }
+    VarpTable_schedule(varp_table);
     varp_init_mcast_addr(varp_mcaddr);
     varp_port = htons(VARP_PORT);
 
@@ -1307,9 +1522,9 @@ void varp_exit(void){
     dprintf(">\n");
     varp_close();
     if(varp_table){
-        VarpTable *z = varp_table;
+        VarpTable *vtable = varp_table;
         varp_table = NULL;
-        VarpTable_free(z);
+        VarpTable_free(vtable);
     }
     dprintf("<\n");
 }

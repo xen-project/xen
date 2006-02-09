@@ -1,3 +1,5 @@
+This directory contains the implementation of vnets:
+virtual private networks for virtual machines.
 
 make
         - compile in local dirs. The module is in vnet-module/vnet_module.ko.
@@ -8,6 +10,12 @@ make dist
 
 make install
         - compile and install into system.
+
+By default the makefiles expect this code to have been installed
+in tools/vnet in a xen source tree. If compiling outside the xen
+source tree, set XEN_ROOT to the location of the xen source.
+You can do this in the environment or in a Make.local file
+in the current directory (see Make.env for details).
 
 The xen0 kernel must have been compiled before building the vnet module.
 The vnet module installs to

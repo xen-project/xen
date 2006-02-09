@@ -30,11 +30,15 @@ KERNEL_MODULE = vnet_module.ko
 #export KBUILD_VERBOSE=1
 
 .PHONY: all
-all: module
+all: module module_version
 
 .PHONY: module
 module modules:
 	$(MAKE) -C $(KERNEL_SRC) M=`pwd` modules
+
+.PHONY: module_version
+module_version:
+	$(warning Module version $(shell strings $(KERNEL_MODULE) | grep vermagic))
 
 .PHONY: install install-module modules_install
 install install-module modules_install: module
@@ -47,6 +51,7 @@ clean:
 	-@$(RM) *.a *.o *.ko *~ .*.d .*.cmd *.mod.?
 	-@$(RM) -r .tmp_versions
 
+.PHONY: TAGS
 TAGS:
 	etags *.c *.h
 

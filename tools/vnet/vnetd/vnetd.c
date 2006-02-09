@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>.
+ * Copyright (C) 2005, 2006 Mike Wray <mike.wray@hp.com>.
  *
  * This library is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -14,96 +14,19 @@
  * along with this library; if not, write to the Free Software Foundation,
  * Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
-/** @file
- *
- * Vnetd tcp messages:
- *
- * - varp request: request care-of-addr for a vif.
- *       If know answer, reply. If not broadcast locally.
- *
- * - varp announce: reply to a varp request.
- *       If a (local) request is pending, remember and broadcast locally.
- *
- * - vnet subscribe: indicate there are local vifs in a vnet (use varp announce?).
- *
- * - vnet forward: tunneled broadcast packet to rebroadcast.
- *       Broadcast locally (if there are vifs in the vnet).
- *
- *
- * Vnetd udp messages (varp):
- *
- * - local varp request:
- *       If know and vif is non-local, reply.
- *       If know and vif is local, do nothing (but announce will reset).
- *       If have entry saying is local and no-one answers - remove (? or rely on entry timeout).
- *       If don't know and there is no (quick) local reply, forward to peers.
- *
- * - remote varp request:
- *       If know, reply.
- *       If don't know, query locally (and queue request).
- *
- * - varp announce: remember and adjust vnet subscriptions.
- *       Forward to peers if a request is pending.
- *
- * Vnetd broadcast messages (tunneling):
- *
- * - etherip: forward to peers (on the right vnets)
- *
- * - esp: forward to peers (on the right vnets)
- *
- *
- * For etherip can tell the vnet from the header (in clear).
- * But for esp can't. So should use mcast to define? Or always some clear header?
- *
- * Make ssl on tcp connections optional.
- *
- * So far have been assuming esp for security.
- * But could use vnetd to forward and use ssl on the connection.
- * But has usual probs with efficiency.
- * However, should 'just work' if the coa for the vif has been set
- * to the vnetd. How? Vnetd configured to act as gateway for 
- * some peers? Then would rewrite varp announce to itself and forward
- * traffic to peer.
- *
- * Simplify - make each vnetd have one peer?
- * If need to link more subnets, add vnetds?
- *
- * Need requests table for each tcp conn (incoming).
- * - entries we want to resolve (and fwd the answer).
- *
- * Need requests table for the udp socket.
- * - entries we want to resolve (and return the answer).
- *
- * Need table of entries we know.
- * - from caching local announce
- * - from caching announce reply to forwarded request
- *
- * Problem with replying to requests from the cache - if the cache
- * is out of date we reply with incorrect data. So if a VM migrates
- * we will advertise the old location until it times out.
- *
- * So should probably not reply out of the cache at all - but always
- * query for the answer. Could query direct to old location if
- * entry is valid the first time, and broadcast if no reply in timeout.
- * Causes delay if migrated - may as well broadcast.
- *
- * Need to watch out for query loops. If have 3 vnetds A,B,C and
- * A gets a query, forwards to B and C. B forwards to C, which
- * forwards to A, and on forever. So if have an entry that has been
- * probed, do not forward it when get another query for it.
- *
- * @author Mike Wray <mike.wray@hpl.hp.com>
- */
-
-
 #include <stdlib.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <getopt.h>
 #include <errno.h>
-#include <sys/types.h>
 #include <time.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string.h>
@@ -112,15 +35,21 @@
 #include <sys/wait.h>
 #include <sys/select.h>
 
-#include <linux/ip.h> // For struct iphdr;
+#include <asm/types.h> // For __u32 etc.
 
+#include <linux/ip.h>  // For struct iphdr.
+#include <linux/udp.h> // For struct udphdr.
+
+#include <linux/if.h>
 #include <linux/if_ether.h>
-#include "if_etherip.h"
-#include "if_varp.h"
+#include <linux/if_tun.h> 
+
+#include "sys_kernel.h"
+#include "skbuff.h"
+#include "spinlock.h"
 
 #include "allocate.h"
 
-#include "vnetd.h"
 #include "file_stream.h"
 #include "string_stream.h"
 #include "socket_stream.h"
@@ -128,59 +57,621 @@
 
 #include "enum.h"
 #include "sxpr.h"
+#include "sxpr_parser.h"
 
-#include "marshal.h"
 #include "connection.h"
 #include "select.h"
 #include "timer.h"
-#include "vcache.h"
 
-int create_socket(int socktype, uint32_t saddr, uint32_t port, int flags, Conn **val);
+#include "if_etherip.h"
+#include "if_varp.h"
+#include "varp.h"
+#include "vnet.h"
+#include "vnet_dev.h"
+#include "vnet_eval.h"
+#include "vnet_forward.h"
+#include "tunnel.h"
+#include "etherip.h"
+#include "sxpr_util.h"
 
-#ifndef TRUE
-#define TRUE 1
-#endif
-
-#ifndef FALSE
-#define FALSE 0
-#endif
-
-/** Socket flags. */
-enum {
-    VSOCK_REUSE=1,
-    VSOCK_BIND=2,
-    VSOCK_CONNECT=4,
-    VSOCK_BROADCAST=8,
-    VSOCK_MULTICAST=16,
- };
-
-#define PROGRAM      "vnetd"
-#define VERSION      "0.1"
-
-#define MODULE_NAME  PROGRAM
-#define DEBUG
+#define MODULE_NAME "VNETD"
+#define DEBUG 1
 #undef DEBUG
 #include "debug.h"
 
-#define OPT_PORT     'p'
-#define KEY_PORT     "port"
-#define DOC_PORT     "<port>\n\t" PROGRAM " UDP port (as a number or service name)"
+#define PROGRAM "vnetd"
+#define VERSION "1.0"
 
-#define OPT_ADDR     'm'
-#define KEY_ADDR     "mcaddr"
-#define DOC_ADDR     "<address>\n\t" PROGRAM " multicast address"
+typedef struct Vnetd {
+    unsigned long port;
+    int ttl;
+    int verbose;
+    int etherip;
 
-#define OPT_PEER     'r'
-#define KEY_PEER     "peer"
-#define DOC_PEER     "<peer>\n\t Peer " PROGRAM " to connect to (IP address or hostname)"
+    int udp_sock;
+    struct sockaddr_in udp_sock_addr;
+    int mcast_sock;
+    struct sockaddr_in mcast_sock_addr;
+    int etherip_sock;
+    struct sockaddr_in etherip_sock_addr;
+    int unix_sock;
+    char *unix_path;
+
+    int raw_sock;
+
+    struct sockaddr_in ucast_addr;
+    struct sockaddr_in mcast_addr;
+
+    HashTable *vnet_table;
+
+    ConnList *conns;
+
+} Vnetd;
+
+Vnetd _vnetd = {}, *vnetd = &_vnetd;
+
+uint32_t vnetd_intf_addr(Vnetd *vnetd){
+    return vnetd->ucast_addr.sin_addr.s_addr;
+}
+
+uint32_t vnetd_mcast_addr(Vnetd *vnetd){
+    return vnetd->mcast_addr.sin_addr.s_addr;
+}
+
+void vnetd_set_mcast_addr(Vnetd *vnetd, uint32_t addr){
+    varp_mcast_addr = addr;
+    vnetd->mcast_addr.sin_addr.s_addr = addr;
+}
+
+uint16_t vnetd_mcast_port(Vnetd *vnetd){
+    return vnetd->mcast_addr.sin_port;
+}
+
+uint32_t vnetd_addr(void){
+    return vnetd_intf_addr(vnetd);
+}
+
+/** Open tap device.
+ */
+int tap_open(struct net_device *dev){
+    int err;
+    /* IFF_TAP      : Ethernet tap device.
+     * IFF_NO_PI    : Don't add packet info struct when reading.
+     * IFF_ONE_QUEUE: Drop packets when the dev queue is full. The driver uses
+     *                the queue size from the device, which defaults to 1000 for etherdev.
+     *                If not set the driver stops the device queue when it goes over
+     *                TUN_READQ_SIZE, which is 10. Broken - makes the device stall
+     *                under load.
+     */
+    struct ifreq ifr = { };
+    ifr.ifr_flags = (IFF_TAP | IFF_NO_PI | IFF_ONE_QUEUE);
+
+    dprintf(">\n");
+    dev->tapfd = open("/dev/net/tun", O_RDWR);
+    if(dev->tapfd < 0){
+        err = -errno;
+        perror("open");
+        goto exit;
+    }
+    strcpy(ifr.ifr_name, dev->name);
+    err = ioctl(dev->tapfd, TUNSETIFF, (void *)&ifr);
+    if(err < 0){
+        err = -errno;
+        perror("ioctl");
+        goto exit;
+    }
+    strcpy(dev->name, ifr.ifr_name);
+    dprintf("> dev=%s\n", dev->name);
+    // Make it non-blocking.
+    fcntl(dev->tapfd, F_SETFL, O_NONBLOCK);
+
+  exit:
+    if(err && (dev->tapfd >= 0)){
+        close(dev->tapfd);
+        dev->tapfd = -1;
+    }
+    dprintf("< err=%d\n", err);
+    return err;
+}
+
+/** Close tap device.
+ */
+int tap_close(struct net_device *dev){
+    int err = 0;
+
+    if(dev->tapfd >= 0){
+        err = close(dev->tapfd);
+        dev->tapfd = -1;
+    }
+    return err;
+}
+
+/** Open vnif tap device for a vnet.
+ */
+int vnet_dev_add(struct Vnet *vnet){
+    int err = 0;
+    struct net_device *dev = ALLOCATE(struct net_device);
+    strcpy(dev->name, vnet->device);
+    err = tap_open(dev);
+    if(err){
+        wprintf("> Unable to open tap device.\n"
+                "The tun module must be loaded and\n"
+                "the vnet kernel module must not be loaded.");
+        deallocate(dev);
+        goto exit;
+    }
+    vnet->dev = dev;
+  exit:
+    return err;
+}
+
+/** Close vnif tap device for a vnet.
+ */
+void vnet_dev_remove(struct Vnet *vnet){
+    if(vnet->dev){
+        tap_close(vnet->dev);
+        deallocate(vnet->dev);
+        vnet->dev = NULL;
+    }
+}
+
+/** Receive decapsulated ethernet packet on skb->dev.
+ * Always succeeds. The skb must not be referred to after
+ * this is called.
+ */
+int netif_rx(struct sk_buff *skb){
+    int err = 0, n, k;
+    struct net_device *dev = skb->dev;
+    if(!dev){
+        err = -ENODEV;
+        goto exit;
+    }
+    n = skb->tail - skb->mac.raw;
+    k = write(dev->tapfd, skb->mac.raw, n);
+    if(k < 0){
+        err = -errno;
+        perror("write");
+    } else if(k < n){
+        //todo: What?
+    }
+  exit:
+    kfree_skb(skb);
+    return err;
+}
+
+static const int SKB_SIZE = 1700;
+
+struct sk_buff *skb_new(void){
+    return alloc_skb(SKB_SIZE, GFP_ATOMIC);
+}
+
+/** Receive a packet and fill-in source and destination addresses.
+ * Just like recvfrom() but adds the destination address.
+ * The socket must have the IP_PKTINFO option set so that the
+ * destination address information is available.
+ *
+ * @param sock socket
+ * @param buf receive buffer
+ * @param len size of buffer
+ * @param flags receive flags
+ * @param from source address
+ * @param fromlen size of source address
+ * @param dest destination address
+ * @param destlen size of destination address
+ * @return number of bytes read on success, negative otherwise
+ */
+int recvfromdest(int sock, void *buf, size_t len, int flags,
+                 struct sockaddr *from, socklen_t *fromlen,
+                 struct sockaddr *dest, socklen_t *destlen){
+    int ret = 0;
+    struct iovec iov;
+    struct msghdr msg;
+    struct cmsghdr *cmsg;
+    char cbuf[1024];
+    struct in_pktinfo *info;
+    struct sockaddr_in *dest_in = (struct sockaddr_in *)dest;
+
+    //dest_in->sin_family = AF_INET;
+    //dest_in->sin_port   = 0;
+    getsockname(sock, dest, destlen);
+
+    iov.iov_base       = buf;
+    iov.iov_len        = len;
+    msg.msg_name       = from;
+    msg.msg_namelen    = *fromlen;
+    msg.msg_iov        = &iov;
+    msg.msg_iovlen     = 1;
+    msg.msg_control    = cbuf;
+    msg.msg_controllen = sizeof(cbuf);
+    
+    ret = recvmsg(sock, &msg, flags);
+    if(ret < 0) goto exit;
+    *fromlen = msg.msg_namelen;
+    
+    for(cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)){
+        if((cmsg->cmsg_level == SOL_IP) && (cmsg->cmsg_type == IP_PKTINFO)){
+            info = (void*)CMSG_DATA(cmsg);
+            dest_in->sin_addr = info->ipi_addr;
+            break;
+        }
+    }
+
+  exit:
+    return ret;
+}
+
+/** Read an skb from a udp socket and fill in its headers.
+ */
+int skb_recv_udp(int sock, int flags,
+                 struct sockaddr_in *peer, socklen_t *peer_n,
+                 struct sockaddr_in *dest, socklen_t *dest_n,
+                 struct sk_buff **pskb){
+    int err = 0, n;
+    struct sk_buff *skb = skb_new();
+
+    skb->mac.raw = skb->data;
+    skb_reserve(skb, ETH_HLEN);
+    skb->nh.raw = skb->data;
+    skb_reserve(skb, sizeof(struct iphdr));
+    // Rcvr wants skb->data pointing at the udphdr.
+    skb->h.raw = skb_put(skb, sizeof(struct udphdr));
+    n = recvfromdest(sock, skb->tail, skb_tailroom(skb), flags,
+                     (struct sockaddr *)peer, peer_n,
+                     (struct sockaddr *)dest, dest_n);
+    if(n < 0){
+        err = -errno;
+        //perror("recvfrom");
+        goto exit;
+    }
+    dprintf("> peer=%s:%d\n", inet_ntoa(peer->sin_addr), ntohs(peer->sin_port));
+    dprintf("> dest=%s:%d\n", inet_ntoa(dest->sin_addr), ntohs(dest->sin_port));
+    skb_put(skb, n);
+    skb->protocol = skb->nh.iph->protocol = IPPROTO_UDP;
+    skb->nh.iph->saddr = peer->sin_addr.s_addr;
+    skb->h.uh->source  = peer->sin_port;
+    skb->nh.iph->daddr = dest->sin_addr.s_addr;
+    skb->h.uh->dest    = dest->sin_port;
+  exit:
+    if(err < 0){
+        kfree_skb(skb);
+        *pskb = NULL;
+    } else {
+        *pskb = skb;
+    }
+    return (err < 0 ? err : n);
+}
+
+/** Read an skb fom a raw socket and fill in its headers.
+ */
+int skb_recv_raw(int sock, int flags,
+                 struct sockaddr_in *peer, socklen_t *peer_n,
+                 struct sockaddr_in *dest, socklen_t *dest_n,
+                 struct sk_buff **pskb){
+    int err = 0, n;
+    struct sk_buff *skb = skb_new();
+
+    skb->mac.raw = skb->data;
+    skb_reserve(skb, ETH_HLEN);
+    skb->nh.raw = skb->data;
+    skb_reserve(skb, sizeof(struct iphdr));
+    // Rcvr wants skb->data pointing after ip hdr, at raw protocol hdr.
+    n = recvfromdest(sock, skb->tail, skb_tailroom(skb), flags,
+                     (struct sockaddr *)peer, peer_n,
+                     (struct sockaddr *)dest, dest_n);
+    if(n < 0){
+        err = -errno;
+        //perror("recvfrom");
+        goto exit;
+    }
+    skb_put(skb, n);
+    // On a raw socket the port in the address is the protocol.
+    skb->protocol = skb->nh.iph->protocol = peer->sin_port;
+    skb->nh.iph->saddr = peer->sin_addr.s_addr;
+    skb->nh.iph->daddr = dest->sin_addr.s_addr;
+  exit:
+    if(err < 0){
+        kfree_skb(skb);
+        *pskb = NULL;
+    } else {
+        *pskb = skb;
+    }
+    return (err < 0 ? err : n);
+}
+
+/** Read an skb from a file descriptor.
+ * Used for skbs coming to us from the tap device.
+ * The skb content is an ethernet frame.
+ */
+int skb_read(int fd, struct sk_buff **pskb){
+    int err = 0, n;
+    struct sk_buff *skb = skb_new();
+
+    // Reserve space for the headers we will add.
+    skb_reserve(skb, 100);
+    // Rcvr will want ethhdr on the skb.
+    skb->mac.raw = skb->tail;
+    n = read(fd, skb->tail, skb_tailroom(skb));
+    if(n < 0){
+        err = -errno;
+        //perror("read");
+        goto exit;
+    }
+    skb_put(skb, n);
+  exit:
+    if(err < 0){
+        kfree_skb(skb);
+        *pskb = NULL;
+    } else {
+        *pskb = skb;
+    }
+    return (err < 0 ? err : n);
+}
+
+/** Read an skb from the tap device for a vnet and send it.
+ */
+int vnet_read(Vnet *vnet){
+    int err;
+    struct sk_buff *skb = NULL;
+
+    err = skb_read(vnet->dev->tapfd, &skb);
+    if(err < 0) goto exit;
+    err = vnet_skb_send(skb, &vnet->vnet);
+  exit:
+    if(skb) kfree_skb(skb);
+    return (err < 0 ? err : 0);
+}
+
+/** Transmit an skb to the network.
+ */
+int _skb_xmit(struct sk_buff *skb, uint32_t saddr){
+    int err = 0;
+    int sock;
+    unsigned char *data;
+    struct sockaddr_in addr = { .sin_family = AF_INET };
+    int flags = 0;
+
+    if(saddr){
+        dprintf("> Raw IP send\n");
+        sock = vnetd->raw_sock;
+        skb->nh.iph->saddr = saddr;
+        addr.sin_addr.s_addr = skb->nh.iph->daddr;
+        // Should be the protocol, but is ignored. See raw(7) man page.
+        addr.sin_port        = 0;
+        // Data includes the ip header.
+        data = (void*)(skb->nh.iph);
+    } else {        
+        switch(skb->nh.iph->protocol){
+        case IPPROTO_UDP:
+            dprintf("> protocol=UDP\n");
+            sock = vnetd->udp_sock;
+            // Data comes after the udp header.
+            data = (void*)(skb->h.uh + 1);
+            addr.sin_addr.s_addr = skb->nh.iph->daddr;
+            addr.sin_port        = skb->h.uh->dest;
+            break;
+        case IPPROTO_ETHERIP:
+            dprintf("> protocol=ETHERIP\n");
+            if(vnetd->etherip_sock < 0){
+                err = -ENOSYS;
+                goto exit;
+            }
+            sock = vnetd->etherip_sock;
+            // Data comes after the ip header.
+            data = (void*)(skb->nh.iph + 1);
+            addr.sin_addr.s_addr = skb->nh.iph->daddr;
+            // Should be the protocol, but is ignored. See raw(7) man page.
+            addr.sin_port        = 0;
+            break;
+        default:
+            err = -ENOSYS;
+            wprintf("> protocol=%d, %d\n", skb->nh.iph->protocol, skb->protocol);
+            goto exit;
+        }
+    }
+
+    dprintf("> sending %d bytes to %s:%d protocol=%d\n",
+            skb->tail - data,
+            inet_ntoa(addr.sin_addr),
+            ntohs(addr.sin_port),
+            skb->nh.iph->protocol);
+
+    err = sendto(sock, data, skb->tail - data, flags,
+                 (struct sockaddr *)&addr, sizeof(addr));
+    if(err < 0){
+        err = -errno;
+        perror("sendto");
+    }
+  exit:    
+    if(err >= 0){
+        // Caller will assume skb freed if no error.
+        kfree_skb(skb);
+        err = 0;
+    }
+    dprintf("< err=%d\n", err);
+    return err;
+}
+
+int varp_open(uint32_t mcaddr, uint16_t port){
+    return 0;
+}
+
+void varp_close(void){
+}
+
+/** Create a raw socket.
+ *
+ * @param protocol protocol
+ * @param flags flags (VSOCK_*)
+ * @param mcaddr multicast addr used with flag VSOCK_MULTICAST
+ * @param sock return value for the socket
+ */
+int vnetd_raw_socket(Vnetd *vnetd, int protocol, int flags,
+                     uint32_t mcaddr, int *sock){
+    int err;
+    int bcast = (flags & VSOCK_BROADCAST);
+
+    err = *sock = socket(AF_INET, SOCK_RAW, protocol);
+    if(err < 0){
+        err = -errno;
+        perror("socket");
+        goto exit;
+    }
+    if(bcast){
+        err = setsock_broadcast(*sock, bcast);
+        if(err < 0) goto exit;
+    }
+    if(flags & VSOCK_MULTICAST){
+        err = setsock_multicast(*sock, INADDR_ANY, mcaddr);
+        if(err < 0) goto exit;
+    }
+    //todo ?? fcntl(*sock, F_SETFL, O_NONBLOCK);
+  exit:
+    return err;
+}
+
+int get_dev_address(char *dev, unsigned long *addr){
+    int err = 0;
+    int sock = -1;
+    struct ifreq ifreq = {};
+    struct sockaddr_in *in_addr;
+
+    sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if(sock < 0){
+        err = -errno;
+        goto exit;
+    }
+    strncpy(ifreq.ifr_name, dev, IFNAMSIZ);
+    err = ioctl(sock, SIOCGIFADDR, &ifreq);
+    if(err){
+        err = -errno;
+        goto exit;
+    }
+    in_addr = (struct sockaddr_in *) &ifreq.ifr_addr;
+    *addr = in_addr->sin_addr.s_addr;
+    //iprintf("> dev=%s addr=%s\n", dev, inet_ntoa(in_addr->sin_addr));
+  exit:
+    if(sock >= 0) close(sock);
+    return err;
+}
+
+int get_intf_address(unsigned long *addr){
+    int err = 0;
+    char *devs[] = { "xen-br0", "eth0", "eth1", "eth2", NULL };
+    char **dev;
+
+    for(dev = devs; *dev; dev++){
+        err = get_dev_address(*dev, addr);
+        if(err == 0) goto exit;
+    }
+    err = -ENOSYS;
+  exit:
+    return err;
+}
+
+/** Get our own address. So we can ignore broadcast traffic
+ * we sent ourselves.
+ *
+ * @param addr
+ * @return 0 on success, error code otherwise
+ */
+int get_self_addr(struct sockaddr_in *addr){
+    int err = 0;
+    char hostname[1024] = {};
+    unsigned long saddr;
+ 
+    err = gethostname(hostname, sizeof(hostname) - 1);
+    if(err){
+        err = -errno;
+        perror("gethostname");
+        goto exit;
+    }
+    err = get_host_address(hostname, &saddr);
+    if(err) goto exit;
+    addr->sin_addr.s_addr = saddr;
+    if(saddr == htonl(INADDR_LOOPBACK)){
+        err = get_intf_address(&saddr);
+        if(err) goto exit;
+    }
+    addr->sin_addr.s_addr = saddr;
+    err = 0;
+  exit:
+    return err;
+}
+
+static int eval_vnetd_mcaddr(Sxpr exp, IOStream *out, void *data){
+    int err = 0;
+    Vnetd *vnetd = data;
+    Sxpr oaddr = intern("addr");
+    Sxpr ottl = intern("ttl");
+    uint32_t addr;
+    int ttl;
+
+    err = child_addr(exp, oaddr, &addr);
+    if(err < 0) goto exit;
+    vnetd_set_mcast_addr(vnetd, addr);
+    if(child_int(exp, ottl, &ttl) == 0){
+        vnetd->ttl = ttl;
+    }
+  exit:
+    return err;
+}
+
+static int vnetd_eval_io(Vnetd *vnetd, Parser *parser, SxprEval *defs,
+                         IOStream *in, IOStream *out){
+    int err = 0;
+    char buf[1024];
+    int k, n = sizeof(buf) - 1;
+
+    for( ; ; ){
+        k = IOStream_read(in, buf, n);
+        if(k < 0){
+            err = k;
+            goto exit;
+        }
+        err = Parser_input(parser, buf, k);
+        if(err < 0) goto exit;
+        while(Parser_ready(parser)){
+            Sxpr exp = Parser_get_val(parser);
+            if(NONEP(exp)) break;
+            err = vnet_eval_defs(defs, exp, out, vnetd);
+            if(err) goto exit;
+        }
+        if(Parser_at_eof(parser)) break;
+    }
+  exit:
+    return err;
+}
+
+static int vnetd_configure(Vnetd *vnetd, char *file){
+    int err = 0;
+    Parser *parser = NULL;    
+    IOStream *io = NULL;
+    SxprEval defs[] = {
+        { .name = intern("peer.add"),     .fn = eval_peer_add     },
+        { .name = intern("varp.mcaddr"),  .fn = eval_vnetd_mcaddr },
+        { .name = intern("vnet.add"),     .fn = eval_vnet_add     },
+        { .name = ONONE, .fn = NULL } };
+
+    parser = Parser_new(); 
+    io = file_stream_fopen(file, "rb");
+    if(!io){
+        err = -errno;
+        goto exit;
+    }
+    vnetd_eval_io(vnetd, parser, defs, io, iostdout);
+  exit:
+    if(io) IOStream_close(io);
+    Parser_free(parser);
+    return err;
+}
+
+#define OPT_MCADDR   'a'
+#define KEY_MCADDR   "varp_mcaddr"
+#define DOC_MCADDR   "<addr>\n\t VARP multicast address"
 
 #define OPT_FILE     'f'
 #define KEY_FILE     "file"
 #define DOC_FILE     "<file>\n\t Configuration file to load"
-
-#define OPT_CTRL     'c'
-#define KEY_CTRL     "control"
-#define DOC_CTRL     "<port>\n\t " PROGRAM " control port (as a number or service name)"
 
 #define OPT_HELP     'h'
 #define KEY_HELP     "help"
@@ -204,9 +695,8 @@ static void usage(int err){
     FILE *out = (err ? stderr : stdout);
 
     fprintf(out, "Usage: %s [options]\n", PROGRAM);
-    fprintf(out, "-%c, --%s %s\n", OPT_ADDR,     KEY_ADDR,     DOC_ADDR);
-    fprintf(out, "-%c, --%s %s\n", OPT_PORT,     KEY_PORT,     DOC_PORT);
-    fprintf(out, "-%c, --%s %s\n", OPT_PEER,     KEY_PEER,     DOC_PEER);
+    fprintf(out, "-%c, --%s %s\n", OPT_MCADDR,   KEY_MCADDR,   DOC_MCADDR);
+    fprintf(out, "-%c, --%s %s\n", OPT_FILE,     KEY_FILE,     DOC_FILE);
     fprintf(out, "-%c, --%s %s\n", OPT_VERBOSE,  KEY_VERBOSE,  DOC_VERBOSE);
     fprintf(out, "-%c, --%s %s\n", OPT_VERSION,  KEY_VERSION,  DOC_VERSION);
     fprintf(out, "-%c, --%s %s\n", OPT_HELP,     KEY_HELP,     DOC_HELP);
@@ -215,9 +705,8 @@ static void usage(int err){
 
 /** Short options. Options followed by ':' take an argument. */
 static char *short_opts = (char[]){
-    OPT_ADDR,     ':',
-    OPT_PORT,     ':',
-    OPT_PEER,     ':',
+    OPT_MCADDR,   ':',
+    OPT_FILE,     ':',
     OPT_HELP,
     OPT_VERSION,
     OPT_VERBOSE,
@@ -225,819 +714,422 @@ static char *short_opts = (char[]){
 
 /** Long options. */
 static struct option const long_opts[] = {
-    { KEY_ADDR,     required_argument, NULL, OPT_ADDR     },
-    { KEY_PORT,     required_argument, NULL, OPT_PORT     },
-    { KEY_PEER,     required_argument, NULL, OPT_PEER     },
+    { KEY_MCADDR,   required_argument, NULL, OPT_MCADDR   },
+    { KEY_FILE,     required_argument, NULL, OPT_FILE     },
     { KEY_HELP,     no_argument,       NULL, OPT_HELP     },
     { KEY_VERSION,  no_argument,       NULL, OPT_VERSION  },
     { KEY_VERBOSE,  no_argument,       NULL, OPT_VERBOSE  },
     { NULL,         0,                 NULL, 0            }
 };
 
-/** Get address of vnetd. So we can ignore broadcast traffic
- * we sent ourselves.
- *
- * @param addr
- * @return 0 on success, error code otherwise
- */
-int get_self_addr(struct sockaddr_in *addr){
+static int vnetd_getopts(Vnetd *vnetd, int argc, char *argv[]){
     int err = 0;
-    char hostname[1024] = {};
-    unsigned long saddr;
- 
-    //dprintf(">\n");
-    err = gethostname(hostname, sizeof(hostname) -1);
-    if(err) goto exit;
-    err = get_host_address(hostname, &saddr);
-    if(err == 0){ err = -ENOENT;  goto exit; }
-    err = 0;
-    addr->sin_addr.s_addr = saddr;
-  exit:
-    //dprintf("< err=%d\n", err);
-    return err;
-}
+    int key = 0;
+    int long_index = 0;
 
-/** Marshal a message.
- *
- * @param io destination
- * @param msg message
- * @return number of bytes written, or negative error code
- */
-int VnetMsg_marshal(IOStream *io, VnetMsg *msg){
-    int err = 0;
-    int hdr_n = sizeof(VnetMsgHdr);
-
-    err = marshal_uint16(io, msg->hdr.id);
-    if(err < 0) goto exit;
-    err = marshal_uint16(io, msg->hdr.opcode);
-    if(err < 0) goto exit;
-    switch(msg->hdr.id){
-    case VNET_VARP_ID:
-        err = marshal_bytes(io, ((char*)msg) + hdr_n, sizeof(VarpHdr) - hdr_n);
-        break;
-    case VNET_FWD_ID:
-        err = marshal_uint16(io, msg->fwd.protocol);
-        if(err < 0) goto exit;
-        err = marshal_uint16(io, msg->fwd.len);
-        if(err < 0) goto exit;
-        err = marshal_bytes(io, msg->fwd.data, msg->fwd.len);
-        break;
-    default:
-        err = -EINVAL;
-        break;
+    while(1){
+	key = getopt_long(argc, argv, short_opts, long_opts, &long_index);
+	if(key == -1) break;
+	switch(key){
+        case OPT_MCADDR: {
+            unsigned long addr;
+            err = get_inet_addr(optarg, &addr);
+            if(err) goto exit;
+            vnetd_set_mcast_addr(vnetd, addr);
+            break; }
+        case OPT_FILE:
+            err = vnetd_configure(vnetd, optarg);
+            if(err) goto exit;
+            break;
+	case OPT_HELP:
+	    usage(0);
+	    break;
+	case OPT_VERBOSE:
+	    vnetd->verbose = true;
+	    break;
+	case OPT_VERSION:
+            iprintf("> %s %s\n", PROGRAM, VERSION);
+            exit(0);
+	    break;
+	default:
+	    usage(EINVAL);
+	    break;
+	}
     }
   exit:
     return err;
 }
 
-/** Unmarshal a message.
- *
- * @param io source
- * @param msg message to unmarshal into
- * @return number of bytes read, or negative error code
- */
-int VnetMsg_unmarshal(IOStream *io, VnetMsg *msg){
-    int err = 0;
-    int hdr_n = sizeof(VnetMsgHdr);
-
-    dprintf("> id\n");
-    err = unmarshal_uint16(io, &msg->hdr.id);
-    if(err < 0) goto exit;
-    dprintf("> opcode\n");
-    err = unmarshal_uint16(io, &msg->hdr.opcode);
-    if(err < 0) goto exit;
-    switch(msg->hdr.id){
-    case VNET_VARP_ID:
-        msg->hdr.opcode = htons(msg->hdr.opcode);
-        dprintf("> varp hdr_n=%d varphdr=%d\n", hdr_n, sizeof(VarpHdr));
-        err = unmarshal_bytes(io, ((char*)msg) + hdr_n, sizeof(VarpHdr) - hdr_n);
-        break;
-    case VNET_FWD_ID:
-        dprintf("> forward\n");
-        err = unmarshal_uint16(io, &msg->fwd.protocol);
-        if(err < 0) goto exit;
-        dprintf("> forward len\n");
-        err = unmarshal_uint16(io, &msg->fwd.len);
-        if(err < 0) goto exit;
-        dprintf("> forward bytes\n");
-        err = unmarshal_bytes(io, msg->fwd.data, msg->fwd.len);
-        break;
-    default:
-        wprintf("> Invalid id %d\n", msg->hdr.id);
-        err = -EINVAL;
-        break;
-    }
-  exit:
-    dprintf("< err=%d \n", err);
-    return err;
-}
-
-Vnetd _vnetd = {};
-Vnetd *vnetd = &_vnetd;
-
-/** Counter for timer alarms.
- */
-static unsigned timer_alarms = 0;
-
-/** Set vnetd defaults.
+/** Initialise vnetd params.
  *
  * @param vnetd vnetd
  */
-void vnetd_set_defaults(Vnetd *vnetd){
+int vnetd_init(Vnetd *vnetd, int argc, char *argv[]){
+    int err = 0;
+
+    // Use etherip-in-udp encapsulation.
+    etherip_in_udp = true;
+
     *vnetd = (Vnetd){};
-    vnetd->port = htons(VNETD_PORT);
-    vnetd->peer_port = vnetd->port; //htons(VNETD_PEER_PORT);
-    vnetd->verbose = FALSE;
-    vnetd->peers = ONULL;
-    vnetd->mcast_addr.sin_addr.s_addr = VARP_MCAST_ADDR;
+    vnetd->port = htons(VARP_PORT);
+    vnetd->verbose = false;
+    vnetd->ttl = 1; // Default multicast ttl.
+    vnetd->etherip = true;
+    vnetd->udp_sock = -1;
+    vnetd->mcast_sock = -1;
+    vnetd->etherip_sock = -1;
+    vnetd_set_mcast_addr(vnetd, htonl(VARP_MCAST_ADDR));
     vnetd->mcast_addr.sin_port = vnetd->port;
-}
+    vnetd->unix_path = "/tmp/vnetd";
 
-uint32_t vnetd_mcast_addr(Vnetd *vnetd){
-    return vnetd->mcast_addr.sin_addr.s_addr;
-}
-
-uint16_t vnetd_mcast_port(Vnetd *vnetd){
-    return vnetd->mcast_addr.sin_port;
-}
-
-/** Add a connection to a peer.
- *
- * @param vnetd vnetd
- * @param conn connection
- */
-void connections_add(Vnetd *vnetd, Conn *conn){
-    vnetd->connections = ConnList_add(conn, vnetd->connections);
-}
-
-/** Delete a connection to a peer.
- *
- * @param vnetd vnetd
- * @param conn connection
- */
-void connections_del(Vnetd *vnetd, Conn *conn){
-    ConnList *prev, *curr, *next;
-    for(prev = NULL, curr = vnetd->connections; curr; prev = curr, curr = next){
-        next = curr->next;
-        if(curr->conn == conn){
-            if(prev){
-                prev->next = curr->next;
-            } else {
-                vnetd->connections = curr->next;
-            }
-        }
-    }
-}
-
-/** Close all connections to peers.
- *
- * @param vnetd vnetd
- */
-void connections_close_all(Vnetd *vnetd){
-    ConnList *l;
-    for(l = vnetd->connections; l; l = l->next){
-        Conn_close(l->conn);
-    }
-    vnetd->connections = NULL;
-}
-
-/** Add peer connections to a select set.
- *
- * @param vnetd vnetd
- * @param set select set
- */
-void connections_select(Vnetd *vnetd, SelectSet *set){
-    ConnList *l;
-    for(l = vnetd->connections; l; l = l->next){
-        SelectSet_add_read(set, l->conn->sock);
-    }
-}
-
-/** Handle peer connections according to a select set.
- *
- * @param vnetd vnetd
- * @param set indicates ready connections
- */
-void connections_handle(Vnetd *vnetd, SelectSet *set){
-    ConnList *prev, *curr, *next;
-    Conn *conn;
-    for(prev = NULL, curr = vnetd->connections; curr; prev = curr, curr = next){
-        next = curr->next;
-        conn = curr->conn;
-        if(FD_ISSET(conn->sock, &set->rd)){
-            int conn_err;
-            conn_err = Conn_handle(conn);
-            if(conn_err){
-                if(prev){
-                    prev->next = curr->next;
-                } else {
-                    vnetd->connections = curr->next;
-                }
-            }
-        }
-    }
-}
-
-/** Forward a message from a peer onto the local subnet.
- *
- * @param vnetd vnetd
- * @param vmsg message
- * @return 0 on success, error code otherwise
- */
-int vnetd_forward_local(Vnetd *vnetd, VnetMsg *vmsg){
-    int err = 0;
-    int sock = 0;
-    struct sockaddr_in addr_in;
-    struct sockaddr *addr = (struct sockaddr *)&addr_in;
-    socklen_t addr_n = sizeof(addr_in);
-
-    dprintf(">\n");
-    switch(vmsg->fwd.protocol){
-    case IPPROTO_ESP:
-        dprintf("> ESP\n");
-        sock = vnetd->esp_sock; break;
-    case IPPROTO_ETHERIP:
-        dprintf("> Etherip\n");
-        sock = vnetd->etherip_sock; break;
-    default:
-        err = -EINVAL;
-        goto exit;
-    }
-    addr_in.sin_family = AF_INET;
-    addr_in.sin_addr = vnetd->mcast_addr.sin_addr;
-    addr_in.sin_port = htons(vmsg->fwd.protocol);
-    dprintf("> send dst=%s protocol=%d len=%d\n",
-            inet_ntoa(addr_in.sin_addr), vmsg->fwd.protocol, vmsg->fwd.len);
-    err = sendto(sock, vmsg->fwd.data, vmsg->fwd.len, 0, addr, addr_n);
-  exit:
-    dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Forward a message to a peer.
- *
- * @param conn peer connection
- * @param protocol message protocol
- * @param data message data
- * @param data_n message size
- * @return 0 on success, error code otherwise
- */
-int vnetd_forward_peer(Conn *conn, int protocol, void *data, int data_n){
-    int err = 0;
-    IOStream _io, *io = &_io;
-    StringData sdata;
-    char buf[1600];
-
-    dprintf("> addr=%s protocol=%d n=%d\n",
-            inet_ntoa(conn->addr.sin_addr), protocol, data_n);
-    string_stream_init(io, &sdata, buf, sizeof(buf));
-    err = marshal_uint16(io, VNET_FWD_ID);
-    if(err < 0) goto exit;
-    err = marshal_uint16(io, 0);
-    if(err < 0) goto exit;
-    err = marshal_uint16(io, protocol);
-    if(err < 0) goto exit;
-    err = marshal_uint16(io, data_n);
-    if(err < 0) goto exit;
-    err = marshal_bytes(io, data, data_n);
-    if(err < 0) goto exit;
-    err = IOStream_write(conn->out, buf, IOStream_get_written(io));
-    IOStream_flush(conn->out);
-  exit:
-    if(err < 0) perror(__FUNCTION__);
-    dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Forward a message to all peers.
- *
- * @param vnetd vnetd
- * @param protocol message protocol
- * @param data message data
- * @param data_n message size
- * @return 0 on success, error code otherwise
- */
-int vnetd_forward_peers(Vnetd *vnetd, int protocol, void *data, int data_n){
-    int err = 0;
-    ConnList *curr, *next;
-
-    dprintf(">\n");
-    for(curr = vnetd->connections; curr; curr = next){
-        next = curr->next;
-        vnetd_forward_peer(curr->conn, protocol, data, data_n);
-    }
-    dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Handler for a peer connection.
- * Reads a VnetMsg from the connection and handles it.
- *
- * @param conn peer connection
- * @return 0 on success, error code otherwise
- */
-int conn_handle_fn(Conn *conn){
-    int err = 0;
-    VnetMsg *vmsg = ALLOCATE(VnetMsg);
-    IPMessage *msg = NULL;
-
-    dprintf("> addr=%s port=%u\n",
-            inet_ntoa(conn->addr.sin_addr),
-            ntohs(conn->addr.sin_port));
-    err = VnetMsg_unmarshal(conn->in, vmsg);
-    if(err < 0){
-        wprintf("> Unmarshal error %d\n", err);
-        goto exit;
-    }
-    switch(vmsg->hdr.id){
-    case VNET_VARP_ID:
-        dprintf("> Got varp message\n");
-        msg = ALLOCATE(IPMessage);
-        msg->conn = conn;
-        msg->saddr = conn->addr;
-        msg->data = vmsg;
-        err = vcache_handle_message(msg, 0);
-        err = 0;
-        break;
-    case VNET_FWD_ID:
-        dprintf("> Got forward message\n");
-        err = vnetd_forward_local(vnetd, vmsg);
-        err = 0;
-        break;
-    default:
-        wprintf("> Invalid id=%d\n", vmsg->hdr.id);
-        err = -EINVAL;
-        break;
-    }
-  exit:
-    dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Accept an incoming tcp connection from a peer vnetd.
- *
- * @param sock tcp socket
- * @return 0 on success, error code otherwise
- */
-int vnetd_accept(Vnetd *vnetd, Conn *conn){
-    Conn *new_conn = NULL;
-    struct sockaddr_in peer_in;
-    struct sockaddr *peer = (struct sockaddr *)&peer_in;
-    socklen_t peer_n = sizeof(peer_in);
-    int peersock;
-    int err = 0;
+    vnetd_getopts(vnetd, argc, argv);
     
-    //dprintf(">\n");
-    new_conn = Conn_new(conn_handle_fn, vnetd);
-    //dprintf("> accept...\n");
-    peersock = accept(conn->sock, peer, &peer_n);
-    //dprintf("> accept=%d\n", peersock);
+    err = get_self_addr(&vnetd->ucast_addr);
+    vnetd->ucast_addr.sin_port = vnetd->port;
+    dprintf("> mcaddr=%s\n", inet_ntoa(vnetd->mcast_addr.sin_addr));
+    dprintf("> addr  =%s\n", inet_ntoa(vnetd->ucast_addr.sin_addr));
+    return err;
+}
+
+void vnet_select(Vnetd *vnetd, SelectSet *set){
+    HashTable_for_decl(entry);
+
+    HashTable_for_each(entry, vnetd->vnet_table){
+        Vnet *vnet = entry->value;
+        struct net_device *dev = vnet->dev;
+        if(!dev) continue;
+        if(dev->tapfd < 0) continue;
+        SelectSet_add(set, dev->tapfd, SELECT_READ);
+    }
+}
+
+void vnet_handle(Vnetd *vnetd, SelectSet *set){
+    HashTable_for_decl(entry);
+
+    HashTable_for_each(entry, vnetd->vnet_table){
+        Vnet *vnet = entry->value;
+        struct net_device *dev = vnet->dev;
+        if(!dev) continue;
+        if(dev->tapfd < 0) continue;
+        if(SelectSet_in_read(set, dev->tapfd)){
+            int n;
+            for(n = 64; n > 0; --n){
+                if(vnet_read(vnet) < 0) break;
+            }
+        }
+    }
+}
+
+int vnetd_handle_udp(Vnetd *vnetd, struct sockaddr_in *addr, int sock){
+    int err = 0, n = 0;
+    struct sockaddr_in peer, dest;
+    socklen_t peer_n = sizeof(peer), dest_n = sizeof(dest);
+    int flags = MSG_DONTWAIT;
+    struct sk_buff *skb = NULL;
+
+    dest = *addr;
+    n = skb_recv_udp(sock, flags, &peer, &peer_n, &dest, &dest_n, &skb);
+    if(n < 0){
+        err = n;
+        goto exit;
+    }
+    dprintf("> Received %d bytes from=%s:%d dest=%s:%d\n",
+            n,
+            inet_ntoa(peer.sin_addr), htons(peer.sin_port),
+            inet_ntoa(dest.sin_addr), htons(dest.sin_port));
+    if(peer.sin_addr.s_addr == vnetd_intf_addr(vnetd)){
+        dprintf("> Ignoring message from self.\n");
+        goto exit;
+    }
+    if(dest.sin_addr.s_addr == vnetd_mcast_addr(vnetd)){
+        vnet_forward_send(skb);
+    }
+    err = varp_handle_message(skb);
+
+  exit:
+    if(skb) kfree_skb(skb);
+    return err;
+}
+
+int vnetd_handle_etherip(Vnetd *vnetd, struct sockaddr_in *addr, int sock){
+    int err = 0, n = 0;
+    struct sockaddr_in peer, dest;
+    socklen_t peer_n = sizeof(peer), dest_n = sizeof(dest);
+    int flags = 0;
+    struct sk_buff *skb = NULL;
+
+    dest = *addr;
+    n = skb_recv_raw(sock, flags, &peer, &peer_n, &dest, &dest_n, &skb);
+    if(n < 0){
+        err = n;
+        goto exit;
+    }
+    dprintf("> Received %d bytes from=%s:%d dest=%s:%d\n",
+            n,
+            inet_ntoa(peer.sin_addr), htons(peer.sin_port),
+            inet_ntoa(dest.sin_addr), htons(dest.sin_port));
+    if(peer.sin_addr.s_addr == vnetd_intf_addr(vnetd)){
+        dprintf("> Ignoring message from self.\n");
+        goto exit;
+    }
+    err = etherip_protocol_recv(skb);
+  exit:
+    if(skb) kfree_skb(skb);
+    return err;
+}
+
+typedef struct ConnClient {
+    Vnetd *vnetd;
+    Parser *parser;
+} ConnClient;
+
+int conn_handle_fn(Conn *conn, int mode){
+    int err;
+    ConnClient *client = conn->data;
+    char data[1024] = {};
+    int k;
+    int done = false;
+
+    k = IOStream_read(conn->in, data, sizeof(data));
+    if(k < 0){
+        err = k;
+        goto exit;
+    }
+    if(!client->parser){
+        err = -ENOSYS;
+        goto exit;
+    }
+    if((k == 0) && Parser_at_eof(client->parser)){
+        err = -EINVAL;
+        goto exit;
+    }
+    err = Parser_input(client->parser, data, k);
+    if(err < 0) goto exit;
+    while(Parser_ready(client->parser)){
+        Sxpr sxpr = Parser_get_val(client->parser);
+        err = vnet_eval(sxpr, conn->out, NULL);
+        if(err) goto exit;
+        done = true;
+    }
+    if(done || Parser_at_eof(client->parser)){
+        // Close at EOF.
+        err = -EIO;
+    }
+  exit:
+    if(err < 0){
+        Parser_free(client->parser);
+        client->parser = NULL;
+    }
+    return (err < 0 ? err : 0);
+}
+
+int vnetd_handle_unix(Vnetd *vnetd, int sock){
+    int err;
+    ConnClient *client = NULL;
+    Conn *conn = NULL;
+    struct sockaddr_un peer = {};
+    int peer_n = sizeof(peer);
+    int peersock;
+
+    peersock = accept(sock, (struct sockaddr *)&peer, &peer_n);
     if(peersock < 0){
         perror("accept");
         err = -errno;
         goto exit;
     }
-    iprintf("> Accepted connection from %s:%d\n",
-            inet_ntoa(peer_in.sin_addr), htons(peer_in.sin_port));
-    err = Conn_init(new_conn, peersock, SOCK_STREAM, peer_in);
+    // We want non-blocking i/o.
+    fcntl(peersock, F_SETFL, O_NONBLOCK);
+    client = ALLOCATE(ConnClient);
+    client->vnetd = vnetd;
+    client->parser = Parser_new();
+    conn = Conn_new(conn_handle_fn, client);
+    err = Conn_init(conn, peersock, SOCK_STREAM, SELECT_READ,
+                    (struct sockaddr_in){});
     if(err) goto exit;
-    connections_add(vnetd, new_conn);
+    vnetd->conns = ConnList_add(vnetd->conns, conn);
   exit:
     if(err){
-        Conn_close(new_conn);
+        Conn_close(conn);
+        close(peersock);
     }
     if(err < 0) wprintf("< err=%d\n", err);
     return err;
 }
 
-/** Connect to a peer vnetd.
- *
- * @param vnetd vnetd
- * @param addr address
- * @param port port
- * @return 0 on success, error code otherwise
+void vnetd_select(Vnetd *vnetd, SelectSet *set){
+    SelectSet_add(set, vnetd->unix_sock, SELECT_READ);
+    SelectSet_add(set, vnetd->udp_sock, SELECT_READ);
+    SelectSet_add(set, vnetd->mcast_sock, SELECT_READ);
+    if(vnetd->etherip_sock >= 0){
+        SelectSet_add(set, vnetd->etherip_sock, SELECT_READ);
+    }
+    vnet_select(vnetd, set);
+    ConnList_select(vnetd->conns, set);
+}
+
+void vnetd_handle(Vnetd *vnetd, SelectSet *set){
+    if(SelectSet_in_read(set, vnetd->unix_sock)){
+        vnetd_handle_unix(vnetd, vnetd->unix_sock);
+    }
+    if(SelectSet_in_read(set, vnetd->udp_sock)){
+        int n;
+
+        for(n = 256; n > 0; --n){
+            if(vnetd_handle_udp(vnetd, &vnetd->udp_sock_addr, vnetd->udp_sock) < 0){
+                break;
+            }
+        }
+    }
+    if(SelectSet_in_read(set, vnetd->mcast_sock)){
+        vnetd_handle_udp(vnetd, &vnetd->mcast_sock_addr, vnetd->mcast_sock);
+    }
+    if((vnetd->etherip_sock >= 0) &&
+       SelectSet_in_read(set, vnetd->etherip_sock)){
+        vnetd_handle_etherip(vnetd, &vnetd->etherip_sock_addr, vnetd->etherip_sock);
+    }
+    vnet_handle(vnetd, set);
+    vnetd->conns = ConnList_handle(vnetd->conns, set);
+}
+
+/** Counter for timer alarms.
  */
-int vnetd_connect(Vnetd *vnetd, struct in_addr addr, uint16_t port){
-    Conn *conn = NULL;
+static unsigned timer_alarms = 0;
+
+int vnetd_main(Vnetd *vnetd){
     int err = 0;
+    SelectSet _set = {}, *set = &_set;
+    struct timeval _timeout = {}, *timeout = &_timeout;
 
-    //dprintf(">\n");
-    conn = Conn_new(conn_handle_fn, vnetd);
-    err = Conn_connect(conn, SOCK_STREAM, addr, port);
-    if(err) goto exit;
-    connections_add(vnetd, conn);
-  exit:
-    if(err){
-        Conn_close(conn);
-    }
-    //dprintf(" < err=%d\n", err);
-    return err;
-}
+    vnetd->vnet_table = vnet_table;
 
-/** Handle a message on the udp socket.
- * Expecting to see VARP messages only.
- *
- * @param sock udp socket
- * @return 0 on success, error code otherwise
- */
-int vnetd_handle_udp(Vnetd *vnetd, Conn *conn){
-    int err = 0, rcv = 0;
-    struct sockaddr_in self_in;
-    struct sockaddr_in peer_in;
-    struct sockaddr *peer = (struct sockaddr *)&peer_in;
-    socklen_t peer_n = sizeof(peer_in);
-    VnetMsg *vmsg = NULL;
-    void *data;
-    int data_n;
-    int flags = 0;
-    IPMessage *msg = NULL;
-
-    //dprintf(">\n");
-    self_in = vnetd->addr;
-    vmsg = ALLOCATE(VnetMsg);
-    data = &vmsg->varp.varph;
-    data_n = sizeof(VarpHdr);
-    rcv = recvfrom(conn->sock, data, data_n, flags, peer, &peer_n);
-    if(rcv < 0){
-        err = rcv;
-        goto exit;
-    }
-    dprintf("> Received %d bytes from %s:%d\n",
-            rcv, inet_ntoa(peer_in.sin_addr), htons(peer_in.sin_port));
-    if(rcv != data_n){
-        err = -EINVAL;
-        goto exit;
-    }
-    if(peer_in.sin_addr.s_addr == self_in.sin_addr.s_addr){
-        //dprintf("> Ignoring message from self.\n");
-        goto exit;
-    }
-    msg = ALLOCATE(IPMessage);
-    msg->conn = conn;
-    msg->saddr = peer_in;
-    msg->data = vmsg;
-
-    err = vcache_handle_message(msg, 1);
-  exit:
-    //dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Handle a message on a raw socket.
- * Only deals with etherip and esp.
- * Forwards messages to peers.
- *
- * @param vnetd vnetd
- * @param sock socket
- * @param protocol protocol
- * @return 0 on success, error code otherwise
- */
-int vnetd_handle_protocol(Vnetd *vnetd, int sock, int protocol){
-    int err = 0, rcv = 0;
-    struct sockaddr_in self_in;
-    struct sockaddr_in peer_in;
-    struct sockaddr *peer = (struct sockaddr *)&peer_in;
-    socklen_t peer_n = sizeof(peer_in);
-    uint8_t buf[VNET_FWD_MAX];
-    int buf_n = sizeof(buf);
-    char *data, *end;
-    int flags = 0;
-    struct iphdr *iph = NULL;
-
-    //dprintf(">\n");
-    self_in = vnetd->addr;
-    rcv = recvfrom(sock, buf, buf_n, flags, peer, &peer_n);
-    if(rcv < 0){
-        err = rcv;
-        goto exit;
-    }
-    dprintf("> Received %d bytes from %s protocol=%d\n",
-            rcv, inet_ntoa(peer_in.sin_addr), protocol);
-    if(rcv < sizeof(struct iphdr)){
-        wprintf("> Message too short for IP header\n");
-        err = -EINVAL;
-        goto exit;
-    }
-    if(peer_in.sin_addr.s_addr == self_in.sin_addr.s_addr){
-        dprintf("> Ignoring message from self.\n");
-        goto exit;
-    }
-    data = buf;
-    end = buf + rcv;
-    iph = (void*)data;
-    data += (iph->ihl << 2);
-    vnetd_forward_peers(vnetd, protocol, data, end - data);
-  exit:
-    //dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Socket select loop.
- * Accepts connections on the tcp socket and handles
- * messages on the other sockets.
- *
- * @return 0 on success, error code otherwise
- */
-int vnetd_select(Vnetd *vnetd){
-    int err = 0;
-    SelectSet set = {};
-    while(1){
-        SelectSet_zero(&set);
-        SelectSet_add_read(&set, vnetd->udp_conn->sock);
-        SelectSet_add_read(&set, vnetd->bcast_conn->sock);
-        SelectSet_add_read(&set, vnetd->etherip_sock);
-        SelectSet_add_read(&set, vnetd->esp_sock);
-        SelectSet_add_read(&set, vnetd->listen_conn->sock);
-        connections_select(vnetd, &set);
-        err = SelectSet_select(&set, NULL);
+    for( ; ; ){
+        timeout->tv_sec = 0;
+        timeout->tv_usec = 500000;
+        SelectSet_zero(set);
+        vnetd_select(vnetd, set);
+        err = SelectSet_select(set, timeout);
         if(err == 0) continue;
         if(err < 0){
-            if(errno == EINTR){
+            switch(errno){
+            case EINTR:
                 if(timer_alarms){
                     timer_alarms = 0;
                     process_timers();
                 }
                 continue;
+            case EBADF:
+                continue;
+            default:
+                perror("select");
+                goto exit;
             }
-            perror("select");
-            goto exit;
         }
-        if(FD_ISSET(vnetd->udp_conn->sock, &set.rd)){
-            vnetd_handle_udp(vnetd, vnetd->udp_conn);
-        }
-        if(FD_ISSET(vnetd->bcast_conn->sock, &set.rd)){
-            vnetd_handle_udp(vnetd, vnetd->bcast_conn);
-        }
-        if(FD_ISSET(vnetd->etherip_sock, &set.rd)){
-            vnetd_handle_protocol(vnetd, vnetd->etherip_sock, IPPROTO_ETHERIP);
-        }
-        if(FD_ISSET(vnetd->esp_sock, &set.rd)){
-            vnetd_handle_protocol(vnetd, vnetd->esp_sock, IPPROTO_ESP);
-        }
-        connections_handle(vnetd, &set);
-        if(FD_ISSET(vnetd->listen_conn->sock, &set.rd)){
-            vnetd_accept(vnetd, vnetd->listen_conn);
-        }
+        vnetd_handle(vnetd, set);
     }
   exit:
     return err;
 }
 
-/** Set socket option to reuse address.
- */
-int setsock_reuse(int sock, int reuse){
-    int err = 0;
-    err = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
-    if(err < 0){
-        err = -errno;
-        perror("setsockopt SO_REUSEADDR");
-    }
-    return err;
+int getsockaddr(int sock, struct sockaddr_in *addr){
+    socklen_t addr_n = sizeof(struct sockaddr_in);
+    return getsockname(sock, (struct sockaddr*)addr, &addr_n);
 }
 
-/** Set socket broadcast option.
- */
-int setsock_broadcast(int sock, int bcast){
+int vnetd_etherip_sock(Vnetd *vnetd){
     int err = 0;
-    err = setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &bcast, sizeof(bcast));
-    if(err < 0){
-        err = -errno;
-        perror("setsockopt SO_BROADCAST");
-    }
-    return err;
-}
 
-/** Join a socket to a multicast group.
- */
-int setsock_multicast(int sock, uint32_t saddr){
-    int err = 0;
-    struct ip_mreqn mreq = {};
-    int mloop = 0;
-    // See 'man 7 ip' for these options.
-    mreq.imr_multiaddr.s_addr = saddr;       // IP multicast address.
-    mreq.imr_address = vnetd->addr.sin_addr; // Interface IP address.
-    mreq.imr_ifindex = 0;                    // Interface index (0 means any).
-    err = setsockopt(sock, SOL_IP, IP_MULTICAST_LOOP, &mloop, sizeof(mloop));
-    if(err < 0){
-        err = -errno;
-        perror("setsockopt IP_MULTICAST_LOOP");
-        goto exit;
-    }
-    err = setsockopt(sock, SOL_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
-    if(err < 0){
-        err = -errno;
-        perror("setsockopt IP_ADD_MEMBERSHIP");
-        goto exit;
-    }
-  exit:
-    return err;
-}
-
-/** Set a socket's multicast ttl (default is 1).
- */
-int setsock_multicast_ttl(int sock, uint8_t ttl){
-    int err = 0;
-    err = setsockopt(sock, SOL_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
-    if(err < 0){
-        err = -errno;
-        perror("setsockopt IP_MULTICAST_TTL");
-    }
-    return err;
-}
-
-
-char * socket_flags(int flags){
-    static char s[6];
-    int i = 0;
-    s[i++] = (flags & VSOCK_CONNECT   ? 'c' : '-');
-    s[i++] = (flags & VSOCK_BIND      ? 'b' : '-');
-    s[i++] = (flags & VSOCK_REUSE     ? 'r' : '-');
-    s[i++] = (flags & VSOCK_BROADCAST ? 'B' : '-');
-    s[i++] = (flags & VSOCK_MULTICAST ? 'M' : '-');
-    s[i++] = '\0';
-    return s;
-}
-
-/** Create a socket.
- * The flags can include VSOCK_REUSE, VSOCK_BROADCAST, VSOCK_CONNECT.
- *
- * @param socktype socket type
- * @param saddr address
- * @param port port
- * @param flags flags
- * @param val return value for the socket connection
- * @return 0 on success, error code otherwise
- */
-int create_socket(int socktype, uint32_t saddr, uint32_t port, int flags, Conn **val){
-    int err = 0;
-    int sock = 0;
-    struct sockaddr_in addr_in;
-    struct sockaddr *addr = (struct sockaddr *)&addr_in;
-    socklen_t addr_n = sizeof(addr_in);
-    Conn *conn = NULL;
-    int reuse, bcast;
-
-    //dprintf(">\n");
-    reuse = (flags & VSOCK_REUSE);
-    bcast = (flags & VSOCK_BROADCAST);
-    addr_in.sin_family      = AF_INET;
-    addr_in.sin_addr.s_addr = saddr;
-    addr_in.sin_port        = port;
-    dprintf("> flags=%s addr=%s port=%d\n", socket_flags(flags),
-            inet_ntoa(addr_in.sin_addr), ntohs(addr_in.sin_port));
-
-    sock = socket(AF_INET, socktype, 0);
-    if(sock < 0){
-        err = -errno;
-        goto exit;
-    }
-    if(reuse){
-        err = setsock_reuse(sock, reuse);
-        if(err < 0) goto exit;
-    }
-    if(bcast){
-        err = setsock_broadcast(sock, bcast);
-        if(err < 0) goto exit;
-    }
-    if(flags & VSOCK_MULTICAST){
-        err = setsock_multicast(sock, saddr);
-        if(err < 0) goto exit;
-    }
-    if(flags & VSOCK_CONNECT){
-        err = connect(sock, addr, addr_n);
-        if(err < 0){
-            err = -errno;
-            perror("connect");
-            goto exit;
-        }
-    }
-    if(flags & VSOCK_BIND){
-        err = bind(sock, addr, addr_n);
-        if(err < 0){
-            err = -errno;
-            perror("bind");
-            goto exit;
-        }
-    }
-    conn = Conn_new(NULL, NULL);
-    Conn_init(conn, sock, socktype, addr_in);
-    {
-        struct sockaddr_in self = {};
-        socklen_t self_n;
-        getsockname(conn->sock, (struct sockaddr *)&self, &self_n);
-        dprintf("> sockname sock=%d addr=%s port=%d\n",
-                conn->sock, inet_ntoa(self.sin_addr), ntohs(self.sin_port));
-    }
-  exit:
-    *val = (err ? NULL : conn);
-    //dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Create the tcp listen socket.
- *
- * @param vnetd program arguments
- * @param val return value for the socket
- * @return 0 on success, error code otherwise
- */
-int vnetd_listen_conn(Vnetd *vnetd, Conn **val){
-    int err = 0;
-    int flags = VSOCK_BIND | VSOCK_REUSE;
-    //dprintf(">\n");
-    err = create_socket(SOCK_STREAM, INADDR_ANY, vnetd->peer_port, flags, val);
-    if(err) goto exit;
-    err = listen((*val)->sock, 5);
-    if(err < 0){
-        err = -errno;
-        perror("listen");
-        goto exit;
-    }
-  exit:
-    if(err && *val){
-        Conn_close(*val);
-        *val = NULL;
-    }
-    //dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Create the udp socket.
- *
- * @param vnetd program arguments
- * @param val return value for the socket
- * @return 0 on success, error code otherwise
- */
-int vnetd_udp_conn(Vnetd *vnetd, Conn **val){
-    int err = 0;
-    uint32_t addr = INADDR_ANY;
-    uint16_t port = vnetd->port;
-    int flags = (VSOCK_BIND | VSOCK_REUSE);
-    err = create_socket(SOCK_DGRAM, addr, port, flags, val);
-    return err;
-}
-
-/** Create the broadcast socket.
- *
- * @param vnetd program arguments
- * @param val return value for the socket
- * @return 0 on success, error code otherwise
- */
-int vnetd_broadcast_conn(Vnetd *vnetd, Conn **val){
-    int err = 0;
-    uint32_t addr = vnetd_mcast_addr(vnetd);
-    uint16_t port = vnetd_mcast_port(vnetd);
-    int flags = VSOCK_REUSE;
-    int multicast = IN_MULTICAST(ntohl(addr));
-    
-    flags |= VSOCK_MULTICAST;
-    flags |= VSOCK_BROADCAST;
-
-    err = create_socket(SOCK_DGRAM, addr, port, flags, val);
+    if(!vnetd->etherip) goto exit;
+    err = vnetd_raw_socket(vnetd, IPPROTO_ETHERIP,
+                           (VSOCK_BROADCAST | VSOCK_MULTICAST),
+                           vnetd_mcast_addr(vnetd),
+                           &vnetd->etherip_sock);
     if(err < 0) goto exit;
-    if(multicast){
-        err = setsock_multicast_ttl((*val)->sock, 1);
-        if(err < 0) goto exit;
-    }
-    if(0){
-        struct sockaddr * addr = (struct sockaddr *)&vnetd->addr;
-        socklen_t addr_n = sizeof(vnetd->addr);
-        dprintf("> sock=%d bind addr=%s:%d\n",
-                (*val)->sock, inet_ntoa(vnetd->addr.sin_addr), ntohs(vnetd->addr.sin_port));
-        err = bind((*val)->sock, addr, addr_n);
-        if(err < 0){
-            err = -errno;
-            perror("bind");
-            goto exit;
-        }
-    }
-    if(0){
-        struct sockaddr_in self = {};
-        socklen_t self_n;
-        getsockname((*val)->sock, (struct sockaddr *)&self, &self_n);
-        dprintf("> sockname sock=%d addr=%s port=%d\n",
-                (*val)->sock, inet_ntoa(self.sin_addr), ntohs(self.sin_port));
-    }
+    err = setsock_pktinfo(vnetd->etherip_sock, true);
+    if(err < 0) goto exit;
+    getsockaddr(vnetd->etherip_sock, &vnetd->etherip_sock_addr);
   exit:
     return err;
 }
 
-/** Type for signal handling functions. */
-typedef void SignalAction(int code, siginfo_t *info, void *data);
+int vnetd_udp_sock(Vnetd *vnetd){
+    int err;
+    uint32_t mcaddr = vnetd_mcast_addr(vnetd);
 
-/** Handle SIGCHLD by getting child exit status.
- * This prevents child processes being defunct.
- *
- * @param code signal code
- * @param info signal info
- * @param data
- */
-static void sigaction_SIGCHLD(int code, siginfo_t *info, void *data){
-    int status;
-    pid_t pid;
-    pid = wait(&status);
-    dprintf("> child pid=%d status=%d\n", pid, status);
+    err = create_socket(SOCK_DGRAM, INADDR_ANY, vnetd->port,
+                        (VSOCK_BIND | VSOCK_REUSE),
+                        &vnetd->udp_sock);
+    if(err < 0) goto exit;
+    err = setsock_pktinfo(vnetd->udp_sock, true);
+    if(err < 0) goto exit;
+    getsockaddr(vnetd->udp_sock, &vnetd->udp_sock_addr);
+    vnetd->mcast_sock_addr.sin_addr.s_addr = vnetd_intf_addr(vnetd);
+
+    err = create_socket(SOCK_DGRAM, mcaddr, vnetd_mcast_port(vnetd),
+                        (VSOCK_REUSE | VSOCK_BROADCAST | VSOCK_MULTICAST),
+                        &vnetd->mcast_sock);
+    if(err < 0) goto exit;
+    err = setsock_pktinfo(vnetd->udp_sock, true);
+    if(err < 0) goto exit;
+    err = setsock_multicast(vnetd->mcast_sock, INADDR_ANY, mcaddr);
+    if(err < 0) goto exit;
+    err = setsock_multicast_ttl(vnetd->mcast_sock, vnetd->ttl);
+    if(err < 0) goto exit;
+    getsockaddr(vnetd->mcast_sock, &vnetd->mcast_sock_addr);
+    vnetd->mcast_sock_addr.sin_addr.s_addr = mcaddr;
+
+  exit:
+    if(err < 0){
+        close(vnetd->udp_sock);
+        close(vnetd->mcast_sock);
+        vnetd->udp_sock = -1;
+        vnetd->mcast_sock = -1;
+    }
+    return err;
 }
 
+int vnetd_raw_sock(Vnetd *vnetd){
+    int err;
+
+    err = vnetd_raw_socket(vnetd, IPPROTO_RAW,
+                           (VSOCK_BROADCAST),
+                           vnetd_mcast_addr(vnetd),
+                           &vnetd->raw_sock);
+    if(err){
+        close(vnetd->raw_sock);
+        vnetd->raw_sock = -1;
+    }
+    return err;
+}
+
+int vnetd_unix_sock(Vnetd *vnetd){
+    int err = 0;
+    struct sockaddr_un addr = { .sun_family = AF_UNIX };
+    socklen_t addr_n;
+    
+    vnetd->unix_sock = socket(addr.sun_family, SOCK_STREAM, 0);
+    if(vnetd->unix_sock < 0){
+        err = -errno;
+        perror("unix socket");
+        goto exit;
+    }
+    unlink(vnetd->unix_path);
+    strcpy(addr.sun_path, vnetd->unix_path);
+    addr_n = sizeof(addr) - sizeof(addr.sun_path) + strlen(vnetd->unix_path) + 1;
+    err = bind(vnetd->unix_sock, (struct sockaddr *)&addr, addr_n);
+    if(err < 0){
+        err = -errno;
+        perror("unix bind");
+        goto exit;
+    }
+    err = listen(vnetd->unix_sock, 5);
+    if(err < 0){
+        err = -errno;
+        perror("unix listen");
+    }
+  exit:
+    return err;
+}
+   
 /** Handle SIGPIPE.
  *
  * @param code signal code
@@ -1055,9 +1147,11 @@ static void sigaction_SIGPIPE(int code, siginfo_t *info, void *data){
  * @param data
  */
 static void sigaction_SIGALRM(int code, siginfo_t *info, void *data){
-    //dprintf("> SIGALRM\n");
     timer_alarms++;
 }
+
+/** Type for signal handling functions. */
+typedef void SignalAction(int code, siginfo_t *info, void *data);
 
 /** Install a handler for a signal.
  *
@@ -1068,165 +1162,39 @@ static void sigaction_SIGALRM(int code, siginfo_t *info, void *data){
 static int catch_signal(int signum, SignalAction *action){
     int err = 0;
     struct sigaction sig = {};
+    dprintf(">\n");
     sig.sa_sigaction = action;
     sig.sa_flags = SA_SIGINFO;
     err = sigaction(signum, &sig, NULL);
     if(err){
+        err = -errno;
         perror("sigaction");
     }
     return err;
 }    
 
-/** Create a raw socket.
- *
- * @param protocol protocol
- * @param flags flags
- * @param sock return value for the socket
- */
-int vnetd_raw_socket(int protocol, int flags, uint32_t mcaddr, int *sock){
-    int err;
-    int bcast = (flags & VSOCK_BROADCAST);
-    //dprintf("> protocol=%d\n", protocol);
-    err = *sock = socket(AF_INET, SOCK_RAW, protocol);
-    if(err < 0){
-        err = -errno;
-        perror("socket");
-        goto exit;
-    }
-    if(bcast){
-        err = setsock_broadcast(*sock, bcast);
-        if(err < 0) goto exit;
-    }
-    if(flags & VSOCK_MULTICAST){
-        err = setsock_multicast(*sock, mcaddr);
-        if(err < 0) goto exit;
-    }
-  exit:
-    //dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Connect to peer vnetds.
- *
- * @param vnetd vnetd
- * @return 0 on success, error code otherwise
- */
-int vnetd_peers(Vnetd *vnetd){
-    int err =0;
-    Sxpr x, l;
-    struct in_addr addr = {};
-    for(l = vnetd->peers; CONSP(l); l = CDR(l)){
-        x = CAR(l);
-        addr.s_addr = OBJ_INT(x);
-        vnetd_connect(vnetd, addr, vnetd->peer_port);
-    }
-    return err;
-}
-
-/** Vnet daemon main program.
- *
- * @param vnetd program arguments
- * @return 0 on success, error code otherwise
- */
-int vnetd_main(Vnetd *vnetd){
+int main(int argc, char *argv[]){
     int err = 0;
 
-    //dprintf(">\n");
-    err = get_self_addr(&vnetd->addr);
-    vnetd->addr.sin_port = vnetd->port;
-    iprintf("> VNETD\n");
-    iprintf("> addr=%s port=%u\n",
-            inet_ntoa(vnetd->addr.sin_addr), htons(vnetd->port));
-    iprintf("> mcaddr=%s port=%u\n",
-            inet_ntoa(vnetd->mcast_addr.sin_addr), htons(vnetd->port));
-    iprintf("> peers port=%u ", htons(vnetd->peer_port));
-    objprint(iostdout, vnetd->peers, 0); printf("\n");
-    
-    err = vcache_init();
-    err = vnetd_peers(vnetd);
-
-    catch_signal(SIGCHLD,sigaction_SIGCHLD);
-    catch_signal(SIGPIPE,sigaction_SIGPIPE);
-    catch_signal(SIGALRM,sigaction_SIGALRM); 
-    err  = vnetd_listen_conn(vnetd, &vnetd->listen_conn);
+    err = tunnel_module_init();
     if(err < 0) goto exit;
-    err = vnetd_udp_conn(vnetd, &vnetd->udp_conn);
+    err = vnet_init();
     if(err < 0) goto exit;
-    err = vnetd_broadcast_conn(vnetd, &vnetd->bcast_conn);
+    err = vnetd_init(vnetd, argc, argv);
     if(err < 0) goto exit;
-    { 
-        int flags = (VSOCK_BROADCAST | VSOCK_MULTICAST);
-        uint32_t mcaddr = vnetd->mcast_addr.sin_addr.s_addr;
-
-        err = vnetd_raw_socket(IPPROTO_ETHERIP, flags, mcaddr, &vnetd->etherip_sock);
-        if(err < 0) goto exit;
-        err = vnetd_raw_socket(IPPROTO_ESP, flags, mcaddr, &vnetd->esp_sock);
-        if(err < 0) goto exit;
-    }
-    err = vnetd_select(vnetd);
-  exit:
-    Conn_close(vnetd->listen_conn);
-    Conn_close(vnetd->udp_conn);
-    Conn_close(vnetd->bcast_conn);
-    connections_close_all(vnetd);
-    close(vnetd->etherip_sock);
-    close(vnetd->esp_sock);
-    //dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Parse command-line arguments and call the vnetd main program.
- *
- * @param arg argument count
- * @param argv arguments
- * @return 0 on success, 1 otherwise
- */
-extern int main(int argc, char *argv[]){
-    int err = 0;
-    int key = 0;
-    int long_index = 0;
-
-    vnetd_set_defaults(vnetd);
-    while(1){
-	key = getopt_long(argc, argv, short_opts, long_opts, &long_index);
-	if(key == -1) break;
-	switch(key){
-        case OPT_ADDR:{
-            unsigned long addr;
-            err = get_host_address(optarg, &addr);
-            if(err) goto exit;
-            vnetd->mcast_addr.sin_addr.s_addr = addr;
-            break; }
-        case OPT_PORT:
-            err = convert_service_to_port(optarg, &vnetd->port);
-            if(err) goto exit;
-            break;
-        case OPT_PEER:{
-            unsigned long addr;
-            err = get_host_address(optarg, &addr);
-            if(err) goto exit;
-            //cons_push(&vnetd->peers, mkaddress(addr));
-            cons_push(&vnetd->peers, mkint(addr));
-            break; }
-	case OPT_HELP:
-	    usage(0);
-	    break;
-	case OPT_VERBOSE:
-	    vnetd->verbose = TRUE;
-	    break;
-	case OPT_VERSION:
-            iprintf("> %s %s\n", PROGRAM, VERSION);
-            exit(0);
-	    break;
-	default:
-	    usage(EINVAL);
-	    break;
-	}
-    }
+    err = catch_signal(SIGPIPE, sigaction_SIGPIPE);
+    if(err < 0) goto exit;
+    err = catch_signal(SIGALRM, sigaction_SIGALRM); 
+    if(err < 0) goto exit;
+    err = vnetd_etherip_sock(vnetd);
+    if(err < 0) goto exit;
+    err = vnetd_udp_sock(vnetd);
+    if(err < 0) goto exit;
+    err = vnetd_raw_sock(vnetd);
+    if(err < 0) goto exit;
+    err = vnetd_unix_sock(vnetd);
+    if(err < 0) goto exit;
     err = vnetd_main(vnetd);
-  exit:
-    if(err && key > 0){
-        eprintf("> Error in arg %c\n", key);
-    }
+exit:
     return (err ? 1 : 0);
 }

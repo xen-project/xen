@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -40,95 +40,25 @@
 #include "vnet.h"
 #include "varp.h"
 #include "vnet_dev.h"
+#include "vnet_eval.h"
+#include "vnet_forward.h"
 
-#include "sxpr_parser.h"
 #include "iostream.h"
 #include "kernel_stream.h"
+#include "mem_stream.h"
 #include "sys_string.h"
 #include "sys_net.h"
+#include "sxpr_parser.h"
 
 #define MODULE_NAME "VNET"
 #define DEBUG 1
 #undef DEBUG
 #include "debug.h"
 
-// Functions to manage vnets.
-/*
-
-Have to rely on ethernet bridging being configured - but we can't rely
-on the kernel interface being available to us (it's not exported @!$"%!).
-
-Create a vnet N:
-- create the vnet device vnifN: using commands to /proc, kernel api
-- create the vnet bridge vnetN: using brctl in user-space
-- for best results something should keep track of the mapping vnet id <-> bridge name
-
-Add vif device vifD.N to vnet N.
-- domain is configured with vifD.N on bridge vnetN
-- vif script adds vif to bridge using brctl
-- vif script detects that the bridge is a vnet bridge and
-  uses /proc commands to configure the mac on the vnet
-
-Wouldn't be hard to add support for specifying vnet keys(s) in
-the control interface.
-
-*/
-
-    // id         vnet id
-    // security   security level
-    // ciphersuite: digest, cipher, keys??
-/* Security policy.
-   vnet
-   src: mac
-   dst: mac
-   coa: ip
-   Map vnet x coa -> security (none, auth, conf)
-
-   Policy, e.g.
-   - same subnet x vnet
-   - diff subnet x vnet
-   - some subnet x vnet
-   - some host addr x vnet
-
-   (security (net local) (vnet *) (mode none))
-   (security (net (not local))
-
-   (security (addr, vnet) (local-subnet addr)       none)
-   (security (addr, vnet) (not (local-subnet addr)) conf)
-   (security (addr, vnet) (host 15.144.27.80)
-   (security (addr, vnet) (subnet addr 15.144.24.0/24) auth)
-   (security (addr, vnet) t auth)
-
-   (security (addr local)         (mode none))
-   (security (addr local/16)      (mode none))
-   (security (addr 15.144.0.0/16) (mode auth))
-   (security (addr 15.0.0.0/8)    (mode conf))
-   (security (addr *)             (mode drop))
-
-   ?Varp security
-   Use esp too - none, auth, conf,
-   Varp sends broadcasts (requests) and unicasts (replies).
-   Uses UDP. Could send over ESP if needed.
-   For bcast don't know where it goes, so security has to be by vnet.
-   For ucast know where it goes, so could do by vnet and addr.
-
-   Similar issue for vnets: know where unicast goes but don't know where
-   bcast goes.
-
-   Simplify: 2 levels
-   local ucast
-   nonlocal ucast, mcast
-
-   (security (local none) (nonlocal conf))
-   (security (local auth) (nonlocal conf))
-
-   VARP security matches vnet security.
-
- */
-
 /** @file
  *
  * Kernel interface to files in /proc.
+ * todo: Add a sysfs interface using kobject.
  */
 
 #define PROC_ROOT "/proc/"
@@ -137,6 +67,10 @@ the control interface.
 
 enum {
     VNET_POLICY = 1,
+    VNET_VNETS,
+    VNET_VIFS,
+    VNET_VARP,
+    VNET_PEERS,
 };
 
 typedef struct proc_dir_entry ProcEntry;
@@ -144,14 +78,12 @@ typedef struct inode Inode;
 typedef struct file File;
 
 static int proc_open_fn(struct inode *inode, File *file);
-static ssize_t proc_read_fn(File *file, char *buffer, size_t count, loff_t *offset);
-static ssize_t proc_write_fn(File *file, const char *buffer, size_t count, loff_t *offset) ;
+//static ssize_t proc_read_fn(File *file, char *buffer, size_t count, loff_t *offset);
+//static ssize_t proc_write_fn(File *file, const char *buffer, size_t count, loff_t *offset) ;
 //static int proc_flush_fn(File *file);
 static loff_t proc_lseek_fn(File * file, loff_t offset, int orig);
 static int proc_ioctl_fn(struct inode *inode, File *file, unsigned opcode, unsigned long arg);
-static int proc_release_fn(struct inode *inode, File *file);
-
-static int eval(Sxpr exp);
+//static int proc_release_fn(struct inode *inode, File *file);
 
 static int ProcEntry_has_name(ProcEntry *entry, const char *name, int namelen){
     dprintf("> name=%.*s entry=%.*s\n", namelen, name, entry->namelen, entry->name);
@@ -164,17 +96,6 @@ static int ProcEntry_has_name(ProcEntry *entry, const char *name, int namelen){
 // Does interface stop r/w on first error?
 // Is release called after an error?
 //
-
-static struct file_operations proc_file_ops = {
-    //owner:   THIS_MODULE,
-    open:    proc_open_fn,
-    read:    proc_read_fn,
-    write:   proc_write_fn,
-    //flush:   proc_flush_fn,
-    llseek:  proc_lseek_fn,
-    ioctl:   proc_ioctl_fn,
-    release: proc_release_fn,
-};
 
 static int proc_get_parser(File *file, Parser **val){
     int err = 0;
@@ -200,6 +121,7 @@ static int proc_open_fn(Inode *inode, File *file){
     // Get entry from
     //ProcEntry *entry = (ProcEntry *)inode->u.generic_ip;
     //file->private_data = NULL;
+    //file->f_dentry->d_ino is inode.
     // Check for user privilege - deny otherwise.
     // -EACCESS
     int err = 0;
@@ -221,33 +143,13 @@ static ssize_t proc_read_fn(File *file, char *buffer,
     return count;
 }
 
+#if 0
 static ssize_t proc_write_fn(File *file, const char *buffer,
                              size_t count, loff_t *offset) {
-    // User write.
-    // Copy data into kernel space from buffer.
-    // Increment offset by count, return count (or code).
-    int err = 0;
-    char *data = NULL;
-    Parser *parser = NULL;
-
-    //dprintf("> count=%d\n", count);
-    err = proc_get_parser(file, &parser);
-    if(err) goto exit;
-    data = allocate(count);
-    if(!data){
-        err = -ENOMEM;
-        goto exit;
-    }
-    err = copy_from_user(data, buffer, count);
-    if(err) goto exit;
-    *offset += count;
-    err = Parser_input(parser, data, count);
-  exit:
-    deallocate(data);
-    err = (err < 0 ? err : count);
-    //dprintf("< err = %d\n", err);
-    return err;
+    return -EINVAL;
 }
+#endif
+
 
 #if 0
 static int proc_flush_fn(File *file){
@@ -299,7 +201,33 @@ static int proc_ioctl_fn(Inode *inode, File *file,
     return 0;
 }
 
-static int proc_release_fn(Inode *inode, File *file){
+static ssize_t proc_policy_write_fn(File *file, const char *buffer,
+                             size_t count, loff_t *offset) {
+    // User write.
+    // Copy data into kernel space from buffer.
+    // Increment offset by count, return count (or code).
+    int err = 0;
+    char *data = NULL;
+    Parser *parser = NULL;
+
+    err = proc_get_parser(file, &parser);
+    if(err) goto exit;
+    data = allocate(count);
+    if(!data){
+        err = -ENOMEM;
+        goto exit;
+    }
+    err = copy_from_user(data, buffer, count);
+    if(err) goto exit;
+    *offset += count;
+    err = Parser_input(parser, data, count);
+  exit:
+    deallocate(data);
+    err = (err < 0 ? err : count);
+    return err;
+}
+
+static int proc_policy_release_fn(Inode *inode, File *file){
     // User close.
     // Cleanup file->private_data, return errcode.
     int err = 0;
@@ -313,7 +241,7 @@ static int proc_release_fn(Inode *inode, File *file){
     if(err) goto exit;
     obj = parser->val;
     for(l = obj; CONSP(l); l = CDR(l)){
-        err = eval(CAR(l));
+        err = vnet_eval(CAR(l), iostdout, NULL);
         if(err) break;
     }
   exit:
@@ -322,6 +250,130 @@ static int proc_release_fn(Inode *inode, File *file){
     dprintf("< err=%d\n", err);
     return err;
 }
+
+static int proc_io_open(Inode *inode, File *file, IOStream **val){
+    int err = 0;
+    IOStream *io = mem_stream_new();
+    if(!io){
+        err = -ENOMEM;
+        goto exit;
+    }
+    file->private_data = io;
+  exit:
+    *val = (err ? NULL: io);
+    return err;
+}
+
+static ssize_t proc_io_read_fn(File *file, char *buffer,
+                               size_t count, loff_t *offset){
+    // User read.
+    // Copy data to user buffer, increment offset by count, return count.
+    int err = 0;
+    char kbuf[1024] = {};
+    int kbuf_n = sizeof(kbuf);
+    int k, n = 0;
+    char *ubuf = buffer;
+    IOStream *io = file->private_data;
+
+    dprintf(">\n");
+    if(!io) goto exit;
+    while(n < count){
+        k = count - n;
+        if(k > kbuf_n){
+            k = kbuf_n;
+        }
+        k = IOStream_read(io, kbuf, k);
+        if(k <= 0) break;
+        if(copy_to_user(ubuf, kbuf, k)){
+            err = -EFAULT;
+            goto exit;
+        }
+        n += k;
+        ubuf += k;
+    }
+    *offset += n;
+  exit:
+    return (err ? err : n);
+}
+
+static int proc_io_release_fn(Inode *inode, File *file){
+    // User close.
+    int err = 0;
+    IOStream *io = file->private_data;
+    if(io) IOStream_close(io);
+    dprintf("< err=%d\n", err);
+    return err;
+}
+
+static int proc_vnets_open_fn(Inode *inode, File *file){
+    int err = 0;
+    IOStream *io;
+    if(proc_io_open(inode, file, &io)) goto exit;
+    vnet_print(io);
+  exit:
+    return err;
+}
+
+static int proc_vifs_open_fn(Inode *inode, File *file){
+    int err = 0;
+    IOStream *io;
+    if(proc_io_open(inode, file, &io)) goto exit;
+    vif_print(io);
+  exit:
+    return err;
+}
+
+static int proc_peers_open_fn(Inode *inode, File *file){
+    int err = 0;
+    IOStream *io;
+    if(proc_io_open(inode, file, &io)) goto exit;
+    vnet_peer_print(io);
+  exit:
+    return err;
+}
+
+static int proc_varp_open_fn(Inode *inode, File *file){
+    int err = 0;
+    IOStream *io;
+    if(proc_io_open(inode, file, &io)) goto exit;
+    varp_print(io);
+  exit:
+    return err;
+}
+
+static struct file_operations proc_policy_ops = {
+    open:    proc_open_fn,
+    read:    proc_read_fn,
+    write:   proc_policy_write_fn,
+    //flush:   proc_flush_fn,
+    llseek:  proc_lseek_fn,
+    ioctl:   proc_ioctl_fn,
+    release: proc_policy_release_fn,
+};
+
+static struct file_operations proc_vnets_ops = {
+    open:    proc_vnets_open_fn,
+    read:    proc_io_read_fn,
+    release: proc_io_release_fn,
+};
+
+static struct file_operations proc_vifs_ops = {
+    open:    proc_vifs_open_fn,
+    read:    proc_io_read_fn,
+    release: proc_io_release_fn,
+};
+
+static struct file_operations proc_peers_ops = {
+    open:    proc_peers_open_fn,
+    read:    proc_io_read_fn,
+    release: proc_io_release_fn,
+};
+
+static struct file_operations proc_varp_ops = {
+    open:    proc_varp_open_fn,
+    read:    proc_io_read_fn,
+    release: proc_io_release_fn,
+};
 
 static ProcEntry *proc_fs_root = &proc_root;
 
@@ -343,7 +395,6 @@ static int proc_path_init(const char *path, const char **rest){
     *rest = path;
     return err;
 }
-
 
 /** Parse a path relative to `dir'. If dir is null or the proc root
  * the path is relative to "/proc/", and the leading "/proc/" may be
@@ -379,13 +430,14 @@ static ProcEntry * ProcFS_lookup(const char *path, ProcEntry *dir){
     return result;
 }
 
-static ProcEntry *ProcFS_register(const char *name, ProcEntry *dir, int val){
+static ProcEntry *ProcFS_register(const char *name, ProcEntry *dir,
+                                  int val, struct file_operations *ops){
     mode_t mode = 0;
     ProcEntry *entry;
 
     entry = create_proc_entry(name, mode, dir);
     if(entry){
-        entry->proc_fops = &proc_file_ops;
+        entry->proc_fops = ops;
         entry->data = (void*)val; // Whatever data we need.
     }
     return entry;
@@ -430,366 +482,22 @@ static void ProcFS_rmrec(const char *name, ProcEntry *parent){
     dprintf("<\n");
 }
 
-static int stringof(Sxpr exp, char **s){
-    int err = 0;
-    if(ATOMP(exp)){
-        *s = atom_name(exp);
-    } else if(STRINGP(exp)){
-        *s = string_string(exp);
-    } else {
-        err = -EINVAL;
-        *s = NULL;
-    }
-    return err;
-}
-
-static int child_string(Sxpr exp, Sxpr key, char **s){
-    int err = 0;
-    Sxpr val = sxpr_child_value(exp, key, ONONE);
-    err = stringof(val, s);
-    return err;
-}
-
-#if 0
-static int intof(Sxpr exp, int *v){
-    int err = 0;
-    char *s;
-    unsigned long l;
-    if(INTP(exp)){
-        *v = OBJ_INT(exp);
-    } else {
-        err = stringof(exp, &s);
-        if(err) goto exit;
-        err = convert_atoul(s, &l);
-        *v = (int)l;
-    }
- exit:
-    return err;
-}
-
-static int child_int(Sxpr exp, Sxpr key, int *v){
-    int err = 0;
-    Sxpr val = sxpr_child_value(exp, key, ONONE);
-    err = intof(val, v);
-    return err;
-}
-#endif
-
-static int vnetof(Sxpr exp, VnetId *v){
-    int err = 0;
-    char *s;
-    err = stringof(exp, &s);
-    if(err) goto exit;
-    err = VnetId_aton(s, v);
-  exit:
-    return err;
-}
-
-static int child_vnet(Sxpr exp, Sxpr key, VnetId *v){
-    int err = 0;
-    Sxpr val = sxpr_child_value(exp, key, ONONE);
-    err = vnetof(val, v);
-    return err;
-}
-
-static int macof(Sxpr exp, unsigned char *v){
-    int err = 0;
-    char *s;
-    err = stringof(exp, &s);
-    if(err) goto exit;
-    err = mac_aton(s, v);
-  exit:
-    return err;
-}
-
-static int child_mac(Sxpr exp, Sxpr key, unsigned char *v){
-    int err = 0;
-    Sxpr val = sxpr_child_value(exp, key, ONONE);
-    err = macof(val, v);
-    return err;
-}
-
-static int addrof(Sxpr exp, uint32_t *v){
-    int err = 0;
-    char *s;
-    unsigned long w;
-    err = stringof(exp, &s);
-    if(err) goto exit;
-    err = get_inet_addr(s, &w);
-    if(err) goto exit;
-    *v = (uint32_t)w;
-  exit:
-    return err;
-}
-
-static int child_addr(Sxpr exp, Sxpr key, uint32_t *v){
-    int err = 0;
-    Sxpr val = sxpr_child_value(exp, key, ONONE);
-    err = addrof(val, v);
-    return err;
-}
-
-/** Create a vnet.
- * It is an error if a vnet with the same id exists.
- *
- * @param vnet vnet id
- * @param device vnet device name
- * @param security security level
- * @return 0 on success, error code otherwise
- */
-static int ctrl_vnet_add(VnetId *vnet, char *device, int security){
-    int err = 0;
-    Vnet *vnetinfo = NULL;
-
-    if(strlen(device) >= IFNAMSIZ){
-        err = -EINVAL;
-        goto exit;
-    }
-    if(Vnet_lookup(vnet, &vnetinfo) == 0){
-        err = -EEXIST;
-        goto exit;
-    }
-    err = Vnet_alloc(&vnetinfo);
-    if(err) goto exit;
-    vnetinfo->vnet = *vnet;
-    vnetinfo->security = security;
-    strcpy(vnetinfo->device, device);
-    err = Vnet_create(vnetinfo);
-  exit:
-    if(vnetinfo) Vnet_decref(vnetinfo);
-    return err;
-}
-
-/** Delete a vnet.
- *
- * @param vnet vnet id
- * @return 0 on success, error code otherwise
- */
-static int ctrl_vnet_del(VnetId *vnet){
-    int err = -ENOSYS;
-    // Can't delete if there are any vifs on the vnet.
-
-    // Need to flush vif entries for the deleted vnet.
-    // Need to flush varp entries for the deleted vnet.
-    // Note that (un)register_netdev() hold rtnl_lock() around
-    // (un)register_netdevice().
-
-    //Vnet_del(vnet);
-    return err;
-}
-
-/** Create an entry for a vif with the given vnet and vmac.
- *
- * @param vnet vnet id
- * @param vmac mac address
- * @return 0 on success, error code otherwise
- */
-static int ctrl_vif_add(VnetId *vnet, Vmac *vmac){
-    int err = 0;
-    Vnet *vnetinfo = NULL;
-    Vif *vif = NULL;
-
-    dprintf(">\n");
-    err = Vnet_lookup(vnet, &vnetinfo);
-    if(err) goto exit;
-    err = vif_create(vnet, vmac, &vif);
-  exit:
-    if(vnetinfo) Vnet_decref(vnetinfo);
-    if(vif) vif_decref(vif);
-    dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Delete a vif.
- *
- * @param vnet vnet id
- * @param vmac mac address
- * @return 0 on success, error code otherwise
- */
-static int ctrl_vif_del(VnetId *vnet, Vmac *vmac){
-    int err = 0;
-    Vnet *vnetinfo = NULL;
-    Vif *vif = NULL;
-
-    dprintf(">\n");
-    err = Vnet_lookup(vnet, &vnetinfo);
-    if(err) goto exit;
-    err = vif_lookup(vnet, vmac, &vif);
-    if(err) goto exit;
-    vif_remove(vnet, vmac);
-  exit:
-    if(vnetinfo) Vnet_decref(vnetinfo);
-    if(vif) vif_decref(vif);
-    dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** (varp.print)
- */
-static int eval_varp_print(Sxpr exp){
-    int err = 0;
-    varp_print();
-    return err;
-}
-
-/** (varp.mcaddr (addr <addr>))
- */
-static int eval_varp_mcaddr(Sxpr exp){
-    int err =0;
-    Sxpr oaddr = intern("addr");
-    uint32_t addr;
-
-    err = child_addr(exp, oaddr, &addr);
-    if(err < 0) goto exit;
-    varp_set_mcast_addr(addr);
-  exit:
-    return err;
-}
-
-/** (varp.flush)
- */
-static int eval_varp_flush(Sxpr exp){
-    int err = 0;
-    varp_flush();
-    return err;
-}
-
-/** (vnet.add (id <id>)
- *            [(vnetif <name>)]
- *            [(security { none | auth | conf } )]
- *  )
- */
-static int eval_vnet_add(Sxpr exp){
-    int err = 0;
-    Sxpr oid = intern("id");
-    Sxpr osecurity = intern("security");
-    Sxpr ovnetif = intern("vnetif");
-    Sxpr csecurity;
-    VnetId vnet = {};
-    char *device = NULL;
-    char dev[IFNAMSIZ] = {};
-    char *security = NULL;
-    int sec;
-
-    err = child_vnet(exp, oid, &vnet);
-    if(err) goto exit;
-    child_string(exp, ovnetif, &device);
-    if(!device){
-        snprintf(dev, IFNAMSIZ-1, "vnif%04x", ntohs(vnet.u.vnet16[7]));
-        device = dev;
-    }
-    csecurity = sxpr_child_value(exp, osecurity, intern("none"));
-    err = stringof(csecurity, &security);
-    if(err) goto exit;
-    if(strcmp(security, "none")==0){
-        sec = 0;
-    } else if(strcmp(security, "auth")==0){
-        sec = SA_AUTH;
-    } else if(strcmp(security, "conf")==0){
-        sec = SA_CONF;
-    } else {
-        err = -EINVAL;
-        goto exit;
-    }
-    err = ctrl_vnet_add(&vnet, device, sec);
- exit:
-    dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Delete a vnet.
- *
- * (vnet.del (id <id>))
- *
- * @param vnet vnet id
- * @return 0 on success, error code otherwise
- */
-static int eval_vnet_del(Sxpr exp){
-    int err = 0;
-    Sxpr oid = intern("id");
-    VnetId vnet = {};
-
-    err = child_vnet(exp, oid, &vnet);
-    if(err) goto exit;
-    err = ctrl_vnet_del(&vnet);
-  exit:
-    return err;
-}
-
-/** (vif.add (vnet <vnet>) (vmac <macaddr>))
- */
-static int eval_vif_add(Sxpr exp){
-    int err = 0;
-    Sxpr ovnet = intern("vnet");
-    Sxpr ovmac = intern("vmac");
-    VnetId vnet = {};
-    Vmac vmac = {};
-
-    err = child_vnet(exp, ovnet, &vnet);
-    if(err) goto exit;
-    err = child_mac(exp, ovmac, vmac.mac);
-    if(err) goto exit;
-    err = ctrl_vif_add(&vnet, &vmac);
-  exit:
-    return err;
-}
-
-/** (vif.del (vnet <vnet>) (vmac <macaddr>))
- */
-static int eval_vif_del(Sxpr exp){
-    int err = 0;
-    Sxpr ovnet = intern("vnet");
-    Sxpr ovmac = intern("vmac");
-    VnetId vnet = {};
-    Vmac vmac = {};
-
-    err = child_vnet(exp, ovnet, &vnet);
-    if(err) goto exit;
-    err = child_mac(exp, ovmac, vmac.mac);
-    if(err) goto exit;
-    err = ctrl_vif_del(&vnet, &vmac);
-  exit:
-    return err;
-}
-
-typedef struct SxprEval {
-    Sxpr elt;
-    int (*fn)(Sxpr);
-} SxprEval;
-
-static int eval(Sxpr exp){
-    int err = 0;
-    SxprEval defs[] = {
-        { intern("varp.print"),   eval_varp_print   },
-        { intern("varp.mcaddr"),  eval_varp_mcaddr  },
-        { intern("varp.flush"),   eval_varp_flush   },
-        { intern("vif.add"),      eval_vif_add      },
-        { intern("vif.del"),      eval_vif_del      },
-        { intern("vnet.add"),     eval_vnet_add     },
-        { intern("vnet.del"),     eval_vnet_del     },
-        { ONONE, NULL } };
-    SxprEval *def;
-
-    iprintf("> "); objprint(iostdout, exp, 0); IOStream_print(iostdout, "\n");
-    err = -ENOSYS;
-    for(def = defs; !NONEP(def->elt); def++){
-        if(sxpr_elementp(exp, def->elt)){
-            err = def->fn(exp);
-            break;
-        }
-    }
-    iprintf("< err=%d\n", err);
-    return err;
-}
-
 void __init ProcFS_init(void){
     ProcEntry *root_entry;
     ProcEntry *policy_entry;
+    ProcEntry *vnets_entry;
+    ProcEntry *vifs_entry;
+    ProcEntry *peers_entry;
+    ProcEntry *varp_entry;
 
     dprintf(">\n");
     root_entry = ProcFS_mkdir(MODULE_ROOT, NULL);
     if(!root_entry) goto exit;
-    policy_entry = ProcFS_register("policy", root_entry, VNET_POLICY);
+    policy_entry = ProcFS_register("policy", root_entry, VNET_POLICY, &proc_policy_ops);
+    vnets_entry = ProcFS_register("vnets", root_entry, VNET_VNETS, &proc_vnets_ops);
+    vifs_entry = ProcFS_register("vifs", root_entry, VNET_VIFS, &proc_vifs_ops);
+    peers_entry = ProcFS_register("peers", root_entry, VNET_PEERS, &proc_peers_ops);
+    varp_entry = ProcFS_register("varp", root_entry, VNET_VARP, &proc_varp_ops);
   exit:
     dprintf("<\n");
 }

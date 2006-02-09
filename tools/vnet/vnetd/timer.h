@@ -21,19 +21,20 @@
 
 struct Timer;
 
-typedef void TimerFn(struct Timer *);
+typedef void TimerFn(unsigned long);
 
 typedef struct Timer {
-    TimerFn *fn;
-    void *data;
-    double expiry;
     struct Timer *next;
+    TimerFn *fn;
+    unsigned long data;
+    double expiry;
 } Timer;
 
 extern void timer_alarm(void);
 extern double time_now(void);
 extern int process_timers(void);
-extern Timer * Timer_set(double delay, TimerFn *fn, void *data);
+extern Timer * Timer_set(double delay, TimerFn *fn, unsigned long data);
+extern void Timer_add(Timer *timer);
 extern int Timer_cancel(Timer *timer);
 
 #endif /* ! _VNET_TIMER_H_ */

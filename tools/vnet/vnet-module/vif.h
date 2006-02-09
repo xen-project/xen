@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -19,37 +19,44 @@
 #ifndef _VNET_VIF_H_
 #define _VNET_VIF_H_
 
+#ifdef __KERNEL__
+#include <asm/atomic.h>
+#else
+#include "spinlock.h"
+#endif
+
 #include <if_varp.h>
-struct net_device;
+struct IOStream;
 
 /** Key for entries in the vif table. */
 typedef struct VifKey {
-    VnetId vnet;
-    Vmac vmac;
+    struct VnetId vnet;
+    struct Vmac vmac;
 } VifKey;
 
 typedef struct Vif {
-    VnetId vnet;
-    Vmac vmac;
-    struct net_device *dev;
+    struct VnetId vnet;
+    struct Vmac vmac;
     atomic_t refcount;
+    unsigned long timestamp;
+    int flags;
 } Vif;
 
-struct HashTable;
-extern struct HashTable *vif_table;
+enum {
+    VIF_FLAG_PERSISTENT = 1,
+};
 
-extern void vif_print(void);
+extern void vif_print(struct IOStream *io);
 
-extern void vif_decref(Vif *vif);
-extern void vif_incref(Vif *vif);
+extern void vif_decref(struct Vif *vif);
+extern void vif_incref(struct Vif *vif);
 
-extern int vif_create(struct VnetId *vnet, Vmac *vmac, Vif **vif);
-
-extern int vif_create(VnetId *vnet, Vmac *vmac, Vif **vif);
-extern int vif_add(struct VnetId *vnet, Vmac *vmac, Vif **vif);
-extern int vif_lookup(struct VnetId *vnet, Vmac *vmac, Vif **vif);
-extern int vif_remove(struct VnetId *vnet, Vmac *vmac);
+extern int vif_create(struct VnetId *vnet, struct Vmac *vmac, int flags, struct Vif **vif);
+extern int vif_lookup(struct VnetId *vnet, struct Vmac *vmac, struct Vif **vif);
+extern int vif_update(struct VnetId *vnet, struct Vmac *vmac);
+extern int vif_remove(struct VnetId *vnet, struct Vmac *vmac);
 extern void vif_purge(void);
+extern int vif_remove_vnet(struct VnetId *vnet);
 
 extern int vif_init(void);
 extern void vif_exit(void);

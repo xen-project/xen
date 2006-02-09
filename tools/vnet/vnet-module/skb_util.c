@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -16,6 +16,7 @@
  * 59 Temple Place, suite 330, Boston, MA 02111-1307 USA
  *
  */
+#ifdef __KERNEL__
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -39,6 +40,44 @@
 #include <net/route.h>
 #include <linux/skbuff.h>
 
+#else
+
+#include <stdlib.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <errno.h>
+
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+
+#include <linux/if_ether.h>
+#include <linux/if_arp.h>
+#include <linux/ip.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
+
+#include "sys_kernel.h"
+#include "skbuff.h"
+
+#if defined(__LITTLE_ENDIAN)
+#define HIPQUAD(addr) \
+	((unsigned char *)&addr)[3], \
+	((unsigned char *)&addr)[2], \
+	((unsigned char *)&addr)[1], \
+	((unsigned char *)&addr)[0]
+#elif defined(__BIG_ENDIAN)
+#define HIPQUAD	NIPQUAD
+#else
+#error "Please fix asm/byteorder.h"
+#endif /* __LITTLE_ENDIAN */
+
+#endif
+
 #include <varp.h>
 #include <skb_util.h>
 
@@ -47,16 +86,7 @@
 #undef DEBUG
 #include "debug.h"
 
-static const int DEBUG_SCATTERLIST = 0;
-static const int DEBUG_SKB = 0;
-
 //============================================================================
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-#define SET_SCATTER_ADDR(sg, addr) do{} while(0)
-#else
-#define SET_SCATTER_ADDR(sg, addr) (sg).address = (addr)
-#endif
-
 /** Make enough room in an skb for extra header and trailer.
  *
  * @param pskb return parameter for expanded skb
@@ -85,7 +115,7 @@ int skb_make_room(struct sk_buff **pskb, struct sk_buff *skb, int head_n, int ta
             err = -ENOMEM;
             goto exit;
         }
-        dev_kfree_skb(skb);
+        kfree_skb(skb);
         *pskb = new_skb;
     } else {
         // No room. Expand. There may be more efficient ways to do
@@ -95,7 +125,7 @@ int skb_make_room(struct sk_buff **pskb, struct sk_buff *skb, int head_n, int ta
             err = -ENOMEM;
             goto exit;
         }
-        dev_kfree_skb(skb);
+        kfree_skb(skb);
         *pskb = new_skb;
     }
     dprintf("> skb=%p headroom=%d head_n=%d tailroom=%d tail_n=%d\n",
@@ -129,6 +159,7 @@ int skb_put_bits(const struct sk_buff *skb, int offset, void *src, int len)
         src += copy;
     }
 
+#ifdef __KERNEL__
     for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
         int end;
 
@@ -177,6 +208,10 @@ int skb_put_bits(const struct sk_buff *skb, int offset, void *src, int len)
             start = end;
         }
     }
+#else
+    i=0;
+#endif
+
     if (len == 0)
         return 0;
 
@@ -184,45 +219,11 @@ int skb_put_bits(const struct sk_buff *skb, int offset, void *src, int len)
     return -EFAULT;
 }
 
-/** Add some space to the end of a (possibly fragmented) skb.
- *
- * Only works with Xen output skbs.  Output skbs have 1 frag, and we
- * add another frag for the extra space.
- *
- * @param skb skb
- * @param n number of bytes to add
- * @return 0 on success, error code otherwise 
- *
- * @todo fixme
- */
-int pskb_put(struct sk_buff *skb, int n){
-    int err = 0;
-    if(1 || skb_is_nonlinear(skb)){
-        struct skb_shared_info *info = skb_shinfo(skb);
-        char *ptr = NULL;
-
-        if(info->nr_frags >= MAX_SKB_FRAGS){
-            err = -ENOMEM;
-            goto exit;
-        }
-        ptr = kmalloc(n, GFP_ATOMIC);
-        if(!ptr){
-            err = -ENOMEM;
-            goto exit;
-        }
-        info->nr_frags++;
-        info->frags[info->nr_frags - 1].page = virt_to_page(ptr);
-        info->frags[info->nr_frags - 1].page_offset = ((unsigned long)ptr & ~PAGE_MASK);
-        info->frags[info->nr_frags - 1].size = n;
-
-        skb->data_len += n;
-        skb->len += n;
-    } else {
-        __skb_put(skb, n);
+int skboffset(struct sk_buff *skb, unsigned char *ptr){
+    if(!ptr || ptr < skb->head || ptr > skb->tail){
+        return -1;
     }
-  exit:
-    if(err) dprintf("< err=%d\n", err);
-    return err;
+    return (ptr - skb->head);
 }
 
 /** Print some bits of an skb.
@@ -231,11 +232,23 @@ int pskb_put(struct sk_buff *skb, int n){
  * @param offset byte offset to start printing at
  * @param n number of bytes to print
  */
-void skb_print_bits(struct sk_buff *skb, int offset, int n){
+void skb_print_bits(const char *msg, struct sk_buff *skb, int offset, int n){
     int chunk = 16;
     int i, k;
     u8 buff[chunk];
-    if(!DEBUG_SKB) return;
+    if(!skb) return;
+    printk("%s> tot=%d len=%d data=%d mac=%d nh=%d h=%d\n",
+           msg,
+           skb->tail - skb->head,
+           skb->len,
+           skboffset(skb, skb->data),
+           skboffset(skb, skb->mac.raw),
+           skboffset(skb, skb->nh.raw),
+           skboffset(skb, skb->h.raw));
+    printk("%s> head=%p data=%p mac=%p nh=%p h=%p tail=%p\n",
+           msg, skb->head, skb->data,
+           skb->mac.raw, skb->nh.raw, skb->h.raw,
+           skb->tail);
     while(n){
         k = (n > chunk ? chunk : n);
         skb_copy_bits(skb, offset, buff, k);
@@ -275,8 +288,15 @@ void *skb_trim_tail(struct sk_buff *skb, int n){
     return skb->tail;
 }
 
-// #define BUG_TRAP(x)
-// if(!(x)){ printk("KERNEL: assertion (" #x ") failed at " __FILE__ "(%d)\n", __LINE__); }
+#ifdef __KERNEL__
+
+static const int DEBUG_SCATTERLIST = 0;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#define SET_SCATTER_ADDR(sg, addr) do{} while(0)
+#else
+#define SET_SCATTER_ADDR(sg, addr) (sg).address = (addr)
+#endif
 
 /** Convert a (possibly fragmented) skb into a scatter list.
  *
@@ -360,27 +380,9 @@ int skb_scatterlist(struct sk_buff *skb, struct scatterlist *sg, int *sg_n,
     return err;
 }
 
-struct arpheader
-{
-	unsigned short	ar_hrd;		/* format of hardware address	*/
-	unsigned short	ar_pro;		/* format of protocol address	*/
-	unsigned char	ar_hln;		/* length of hardware address	*/
-	unsigned char	ar_pln;		/* length of protocol address	*/
-	unsigned short	ar_op;		/* ARP opcode (command)		*/
-
-#if 1
-	 /*
-	  *	 Ethernet looks like this : This bit is variable sized however...
-	  */
-	unsigned char		ar_sha[ETH_ALEN];	/* sender hardware address	*/
-	unsigned char		ar_sip[4];		/* sender IP address		*/
-	unsigned char		ar_tha[ETH_ALEN];	/* target hardware address	*/
-	unsigned char		ar_tip[4];		/* target IP address		*/
 #endif
 
-};
-
-void print_skb_data(char *msg, int count, struct sk_buff *skb, u8 *data, int len)
+void print_skb_data(const char *msg, int count, struct sk_buff *skb, u8 *data, int len)
 {
     static int skb_count = 1000000;
     u8 *ptr, *end;
@@ -460,7 +462,7 @@ void print_skb_data(char *msg, int count, struct sk_buff *skb, u8 *data, int len
                    msg, count, nh.iph->protocol,
                    HIPQUAD(src_addr), HIPQUAD(dst_addr));
             printk("%s.%d> IP tot_len=%u len=%d\n",
-                   msg, count, nh.iph->tot_len & 0xffff, len - ETH_HLEN);
+                   msg, count, ntohs(nh.iph->tot_len), len - ETH_HLEN);
         }
         ptr += (nh.iph->ihl * 4);
         if(ptr > end){ printk ("***IP: len"); goto exit; }
@@ -506,10 +508,49 @@ void print_skb_data(char *msg, int count, struct sk_buff *skb, u8 *data, int len
     return;
   exit:
     printk("%s.%d> %s: skb problem\n", msg, count, __FUNCTION__);
-    printk("%s.%d> %s: data=%p end=%p(%d) ptr=%p(%d) eth=%d arp=%d ip=%d\n",
+    printk("%s.%d> %s: data=%p end=%p(%d) ptr=%p(%d) eth=%d ip=%d\n",
            msg, count, __FUNCTION__,
            data, end, end - data, ptr, ptr - data,
-           sizeof(struct ethhdr), sizeof(struct arphdr), sizeof(struct iphdr));
+           sizeof(struct ethhdr),
+           sizeof(struct iphdr));
     return;
 }
 
+void print_skb(const char *msg, int count, struct sk_buff *skb){
+    print_skb_data(msg, count, skb, skb->mac.raw, skb->tail - skb->mac.raw);
+}
+
+void print_ethhdr(const char *msg, struct sk_buff *skb){
+    struct ethhdr *eth;
+
+    if(!skb || skboffset(skb, skb->mac.raw) < 0) return;
+    eth = eth_hdr(skb);
+    printk("%s> ETH proto=%d src=" MACFMT " dst=" MACFMT "\n",
+           msg,
+           ntohs(eth->h_proto),
+           MAC6TUPLE(eth->h_source),
+           MAC6TUPLE(eth->h_dest));
+}
+
+void print_iphdr(const char *msg, struct sk_buff *skb){
+    u32 src_addr, dst_addr;
+    
+    if(!skb || skboffset(skb, skb->nh.raw) < 0) return;
+    src_addr = ntohl(skb->nh.iph->saddr);
+    dst_addr = ntohl(skb->nh.iph->daddr);
+    printk("%s> IP proto=%d src=" IPFMT " dst=" IPFMT " tot_len=%u\n",
+           msg,
+           skb->nh.iph->protocol,
+           HIPQUAD(src_addr),
+           HIPQUAD(dst_addr),
+           ntohs(skb->nh.iph->tot_len));
+}
+
+void print_udphdr(const char *msg, struct sk_buff *skb){
+    if(!skb || skboffset(skb, skb->h.raw) < 0) return;
+    printk("%s> UDP src=%u dst=%u len=%u\n",
+           msg,
+           ntohs(skb->h.uh->source),
+           ntohs(skb->h.uh->dest),
+           ntohs(skb->h.uh->len));
+}

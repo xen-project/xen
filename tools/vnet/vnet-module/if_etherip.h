@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -19,9 +19,25 @@
 #ifndef _VNET_IF_ETHERIP_H_
 #define _VNET_IF_ETHERIP_H_
 
+#ifdef __KERNEL__
+#include <asm/byteorder.h>
+#else
+#define __KERNEL__
+/* This include may cause a compile warning, which can be ignored.
+ * Can't use <endian.h> because it doesn't define 
+ *__LITTLE_ENDIAN_BITFIELD or __BIG_ENDIAN_BITFIELD.
+ */
+#include <asm/byteorder.h>
+#undef __KERNEL__
+#endif
+
+#include <if_varp.h>
+
 #define CONFIG_ETHERIP_EXT
 
 #ifdef CONFIG_ETHERIP_EXT
+
+/* Extended header with room for a longer vnet id. */
 
 #define ETHERIP_VERSION 4
 
@@ -33,12 +49,14 @@ struct etheriphdr {
     __u16    version:4,
             reserved:12;
 #else
-#error  "Please fix <asm/byteorder.h>"
+#error  "Adjust your <asm/byteorder.h> defines"
 #endif
-    __u8 vnet[16];
+    __u8 vnet[VNETID_SIZE8];
 } __attribute__ ((packed));
 
 #else
+
+/* Original header as in Etherip RFC. */
 
 #define ETHERIP_VERSION 3
 
@@ -51,7 +69,7 @@ struct etheriphdr
     __u16    version:4,
             reserved:12;
 #else
-#error  "Please fix <asm/byteorder.h>"
+#error  "Adjust your <asm/byteorder.h> defines"
 #endif
 
 };

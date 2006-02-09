@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001 - 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2001 - 2005 Mike Wray <mike.wray@hp.com>
  *
  * This library is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -20,6 +20,7 @@
 #define _XUTIL_HASH_TABLE_H_
 
 #include "iostream.h"
+#include "sys_string.h"
 
 typedef unsigned long Hashcode;
 
@@ -33,8 +34,6 @@ typedef union TableArg {
 typedef struct HTEntry {
     /** Hashcode of the entry's key. */
     Hashcode hashcode;
-    /** Identifier for this entry in the table. */
-    int index;
     /** The key for this entry. */
     void *key;
     /** The value in this entry. */
@@ -53,8 +52,8 @@ typedef struct HTBucket {
 
 /** Default number of buckets in a hash table.
  * You want enough buckets so the lists in the buckets will typically be short.
- * It's a good idea if this is prime, since that will help to spread hashcodes
- * around the table.
+ * If the hash function is good it doesn't matter whether the number of
+ * buckets is prime or not.
  */
 //#define HT_BUCKETS_N 1
 //#define HT_BUCKETS_N 3
@@ -91,14 +90,10 @@ typedef int TableOrderFn(HTEntry *e1, HTEntry *e2);
  * These all default to 0, when default behaviour treating keys as integers is used.
  */
 struct HashTable {
-    /** Flag indicating whether the table has been initialised. */
-    int init_done;
-    /** Next value for the id field in inserted rules. */
-    unsigned long next_id;
-    /** Number of buckets in the bucket array. */
-    int buckets_n;
     /** Array of buckets, each with its own list. */
     HTBucket *buckets;
+    /** Number of buckets in the bucket array. */
+    int buckets_n;
     /** Number of entries in the table. */
     int entry_count;
     /** Function to free keys and values in entries. */
@@ -126,85 +121,35 @@ extern HTEntry * HashTable_find_entry(HashTable *table, Hashcode hashcode,
                                       TableTestFn *test_fn, TableArg arg);
 extern int HashTable_remove_entry(HashTable *table, Hashcode hashcode,
                                    TableTestFn *test_fn, TableArg arg);
-//extern int HashTable_map(HashTable *table, TableMapFn *map_fn, TableArg arg);
 extern void HashTable_print(HashTable *table, IOStream *out);
 extern int HashTable_set_buckets_n(HashTable *table, int buckets_n);
 extern int HashTable_adjust(HashTable *table, int buckets_min);
-extern void pseudo_des(unsigned long *pleft, unsigned long *pright);
-extern Hashcode hash_string(char *s);
 
 extern int HashTable_order_bucket(HashTable *table, Hashcode hashcode, TableOrderFn *order);
 
-/** Control whether to use hashing based on DES or simple
- * hashing. DES hashing is `more random' but much more expensive.
- */
-#define HASH_PSEUDO_DES 0
+typedef unsigned long ub4;
+typedef unsigned char ub1;
 
-/** Hash a long using a quick and dirty linear congruential random number generator.
- *  See `Numerical Recipes in C', Chapter 7, "An Even Quicker Generator".
- *
- * @param a value to hash
- * @return hashed input
- */
-static inline unsigned long lcrng_hash(unsigned long a){
-    return (1664525L * a + 1013904223L);
-}
+extern ub4 hash(const ub1 *k, ub4 length, ub4 initval);
 
-/** Hash an unsigned long.
+/** Hash some bytes starting with a given hashcode.
  *
- * @param a input to hash
+ * @param h initial hashcode - use 0, a previous hash, or an arbitrary value
+ * @param b bytes to hash
+ * @param b_n number of bytes to hash
  * @return hashcode
  */
-static inline Hashcode hash_ul(unsigned long a){
-#if HASH_PSEUDO_DES
-    unsigned long left = a;
-    unsigned long right = 0L;
-    pseudo_des(&left, &right);
-    return right;
-#else
-    a = lcrng_hash(a);
-    a = lcrng_hash(a);
-    return a;
-#endif
+static inline Hashcode hash_hvoid(Hashcode h, const void *b, unsigned b_n){
+    return hash(b, b_n, h);
 }
 
-/** Hash two unsigned longs together.
+/** Hash a string (null-terminated).
  *
- * @param a input to hash
- * @param b input to hash
+ * @param s input to hash
  * @return hashcode
  */
-static inline Hashcode hash_2ul(unsigned long a, unsigned long b){
-#if HASH_PSEUDO_DES
-    unsigned long left = a;
-    unsigned long right = b;
-    pseudo_des(&left, &right);
-    return right;
-#else
-    a = lcrng_hash(a);
-    a ^= b;
-    a = lcrng_hash(a);
-    return a;
-#endif
-}
-
-/** Hash a hashcode and an unsigned long together.
- *
- * @param a input hashcode
- * @param b input to hash
- * @return hashcode
- */
-static inline Hashcode hash_hul(Hashcode a, unsigned long b){
-#if HASH_PSEUDO_DES
-    unsigned long left = a;
-    unsigned long right = b;
-    pseudo_des(&left, &right);
-    return right;
-#else
-    a ^= b;
-    a = lcrng_hash(a);
-    return a;
-#endif
+static inline Hashcode hash_string(char *s){
+    return (s ? hash_hvoid(0, s, strlen(s)) : 0);
 }
 
 /** Macro to declare variables for HashTable_for_each() to use.

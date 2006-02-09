@@ -7,9 +7,11 @@ endif
 
 .PHONY: all compile install dist clean pristine
 .PHONY: gc-all gc-install gc-clean
+.PHONY: help
 
 SUBDIRS:=
 SUBDIRS+= examples
+SUBDIRS+= scripts
 SUBDIRS+= gc
 SUBDIRS+= libxutil
 SUBDIRS+= vnetd
@@ -60,3 +62,21 @@ clean: $(call subtgt,clean)
 
 pristine: clean
 	-@$(RM) gc.tar.gz
+
+help:
+	@echo 'Cleaning targets:'
+	@echo '  clean     - clean subdirs and remove the build dir'
+	@echo '  pristine  - clean, then remove the gc tarball'
+	@echo ''
+	@echo 'Installation targets:'
+	@echo '  install   - build and install relative to /'
+	@echo '  dist      - build and install relative to DESTDIR (default XEN_ROOT/dist/install)'
+	@echo ''
+	@echo 'Compilation targets:'
+	@echo '  all       - same as compile'
+	@echo '  compile   - build everything'
+	@echo ''
+	@echo 'To build everything locally use "make" or "make all"'.
+	@echo 'To build and install into XEN_ROOT/dist/install use "make dist".'
+	@echo 'To build and install into the system use "make dist".'
+	@echo 'See ./00README and ./00INSTALL for more information.'

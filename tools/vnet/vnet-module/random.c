@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -38,20 +38,28 @@
 static unsigned long seed = 0;
 static unsigned long count = 0;
 
-static unsigned long stir(unsigned long *a, unsigned long b){
-    pseudo_des(a, &b);
-    return b;
-}    
+/** Contribute some random bytes.
+ *
+ * @param src bytes to contribute
+ * @param src_n number of bytes
+ */
+void add_random_bytes(const void *src, int src_n){
+    ++count;
+    seed = hash_hvoid(seed, &count, sizeof(count));
+    seed = hash_hvoid(seed, src, src_n);
+}
 
 /** Get one random byte.
  *
  * @return random byte
  */
 int get_random_byte(void){
-    return stir(&seed, ++count);
+    int tmp = jiffies;
+    add_random_bytes(&tmp, sizeof(tmp));
+    return seed;
 }
 
-#if 0
+#ifndef __KERNEL__
 /* Get some random bytes.
  *
  * @param dst destination for the bytes
@@ -66,33 +74,11 @@ void get_random_bytes(void *dst, int dst_n){
 }
 #endif
 
-/** Contribute a random byte.
- *
- * @param b byte to contribute
- */
-void add_random_byte(int b){
-    stir(&seed, ++count);
-    stir(&seed, b);
-}
-
-/** Contribute some random bytes.
- *
- * @param src bytes to contribute
- * @param src_n number of bytes
- */
-void add_random_bytes(const void *src, int src_n){
-    int i;
-    char *p = (char *)src;
-    for(i = 0; i < src_n; i++){
-        add_random_byte(*p++);
-    }
-}
-
 int __init random_module_init(void){
     int dummy;
     int tmp = jiffies;
     seed = (unsigned long)&dummy;
-    add_random_byte(tmp);
+    add_random_bytes(&tmp, sizeof(tmp));
     return 0;
 }
 

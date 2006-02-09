@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -16,19 +16,21 @@
  * 59 Temple Place, suite 330, Boston, MA 02111-1307 USA
  *
  */
+#ifdef __KERNEL__
+
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
-
-#include <linux/net.h>
-#include <linux/in.h>
-#include <linux/inet.h>
-#include <linux/netdevice.h>
-
-#include <net/ip.h>
-#include <net/protocol.h>
-#include <net/route.h>
 #include <linux/skbuff.h>
+#include <linux/spinlock.h>
+
+#else
+
+#include "sys_kernel.h"
+#include "spinlock.h"
+#include "skbuff.h"
+
+#endif
 
 #include <tunnel.h>
 #include <vnet.h>
@@ -40,9 +42,18 @@
 #undef DEBUG
 #include "debug.h"
 
+/** Table of tunnels, indexed by vnet and addr. */
+HashTable *tunnel_table = NULL;
+rwlock_t tunnel_table_lock = RW_LOCK_UNLOCKED;
+
+#define tunnel_read_lock(flags)    read_lock_irqsave(&tunnel_table_lock, (flags))
+#define tunnel_read_unlock(flags)  read_unlock_irqrestore(&tunnel_table_lock, (flags))
+#define tunnel_write_lock(flags)   write_lock_irqsave(&tunnel_table_lock, (flags))
+#define tunnel_write_unlock(flags) write_unlock_irqrestore(&tunnel_table_lock, (flags))
+
 void Tunnel_print(Tunnel *tunnel){
     if(tunnel){
-        printk("Tunnel<%p base=%p ref=%02d type=%s>\n",
+        iprintf("Tunnel<%p base=%p ref=%02d type=%s>\n",
                tunnel,
                tunnel->base,
                atomic_read(&tunnel->refcount),
@@ -51,12 +62,13 @@ void Tunnel_print(Tunnel *tunnel){
             Tunnel_print(tunnel->base);
         }
     } else {
-        printk("Tunnel<%p base=%p ref=%02d type=%s>\n",
+        iprintf("Tunnel<%p base=%p ref=%02d type=%s>\n",
                NULL, NULL, 0, "ip");
     }
 }
 
-int Tunnel_create(TunnelType *type, VnetId *vnet, VarpAddr *addr, Tunnel *base, Tunnel **val){
+int Tunnel_create(TunnelType *type, VnetId *vnet, VarpAddr *addr,
+                  Tunnel *base, Tunnel **val){
     int err = 0;
     Tunnel *tunnel = NULL;
     if(!type || !type->open || !type->send || !type->close){
@@ -87,22 +99,6 @@ int Tunnel_create(TunnelType *type, VnetId *vnet, VarpAddr *addr, Tunnel *base, 
     return err;
 }
 
-int Tunnel_open(TunnelType *type, VnetId *vnet, VarpAddr *addr, Tunnel *base, Tunnel **tunnel){
-    int err = 0;
-
-    dprintf(">\n");
-    err = Tunnel_create(type, vnet, addr, base, tunnel);
-    if(err) goto exit;
-    err = Tunnel_add(*tunnel);
-  exit:
-    if(err){
-        Tunnel_decref(*tunnel);
-        *tunnel = NULL;
-    }
-    dprintf("< err=%d\n", err);
-    return err;
-}
-
 void TunnelStats_update(TunnelStats *stats, int len, int err){
     dprintf(">len=%d  err=%d\n", len, err);
     if(err){
@@ -115,29 +111,18 @@ void TunnelStats_update(TunnelStats *stats, int len, int err){
     dprintf("<\n");
 }
 
-/** Table of tunnels, indexed by vnet and addr. */
-HashTable *tunnel_table = NULL;
-
 static inline Hashcode tunnel_table_key_hash_fn(void *k){
-    TunnelKey *key = k;
-    Hashcode h = 0;
-    h = VnetId_hash(h, &key->vnet);
-    h = VarpAddr_hash(h, &key->addr);
-    return h;
+    return hash_hvoid(0, k, sizeof(TunnelKey));
 }
 
 static int tunnel_table_key_equal_fn(void *k1, void *k2){
-    TunnelKey *key1 = k1;
-    TunnelKey *key2 = k2;
-    return VnetId_eq(&key1->vnet, &key2->vnet) &&
-           VarpAddr_eq(&key1->addr, &key2->addr);
+    return memcmp(k1, k2, sizeof(TunnelKey)) == 0;
 }
 
 static void tunnel_table_entry_free_fn(HashTable *table, HTEntry *entry){
     Tunnel *tunnel;
     if(!entry) return;
     tunnel = entry->value;
-    //dprintf(">\n"); Tunnel_print(tunnel);
     Tunnel_decref(tunnel);
     HTEntry_free(entry);
 }
@@ -159,35 +144,86 @@ int Tunnel_init(void){
 }
     
 /** Lookup tunnel state by vnet and destination.
+ * The caller must drop the tunnel reference when done.
  *
  * @param vnet vnet
  * @param addr destination address
- * @return tunnel state or NULL
+ * @return 0 on success
  */
-Tunnel * Tunnel_lookup(VnetId *vnet, VarpAddr *addr){
-    Tunnel *tunnel = NULL;
-    TunnelKey key = {.vnet = *vnet, .addr = *addr };
+int Tunnel_lookup(VnetId *vnet, VarpAddr *addr, Tunnel **tunnel){
+    unsigned long flags;
+    TunnelKey key = { .vnet = *vnet, .addr = *addr };
     dprintf(">\n");
+    tunnel_read_lock(flags);
+    *tunnel = HashTable_get(tunnel_table, &key);
+    tunnel_read_unlock(flags);
+    Tunnel_incref(*tunnel);
+    dprintf("< tunnel=%p\n", *tunnel);
+    return (*tunnel ? 0 : -ENOENT);
+}
+
+/** Get a tunnel to a given vnet and destination, creating
+ * a tunnel if necessary.
+ * The caller must drop the tunnel reference when done.
+ *
+ * @param vnet vnet
+ * @param addr destination address
+ * @param ctor tunnel constructor
+ * @parma ptunnel return parameter for the tunnel
+ * @return 0 on success
+ */
+int Tunnel_open(VnetId *vnet, VarpAddr *addr,
+                int (*ctor)(VnetId *vnet, VarpAddr *addr, Tunnel **ptunnel),
+                Tunnel **ptunnel){
+    int err = 0;
+    Tunnel *tunnel = NULL;
+    unsigned long flags;
+    TunnelKey key = { .vnet = *vnet, .addr = *addr };
+
+    tunnel_write_lock(flags);
     tunnel = HashTable_get(tunnel_table, &key);
-    Tunnel_incref(tunnel);
-    dprintf("< tunnel=%p\n", tunnel);
-    return tunnel;
+    if(!tunnel){
+        err = ctor(vnet, addr, &tunnel);
+        if(err) goto exit;
+        if(!HashTable_add(tunnel_table, tunnel, tunnel)){
+            err = -ENOMEM;
+            goto exit;
+        }
+    }
+  exit:
+    tunnel_write_unlock(flags);
+    if(err){
+        Tunnel_decref(tunnel);
+        *ptunnel = NULL;
+    } else {
+        Tunnel_incref(tunnel);
+        *ptunnel = tunnel;
+    }
+    return err;
 }
 
 int Tunnel_add(Tunnel *tunnel){
     int err = 0;
+    unsigned long flags;
     dprintf(">\n");
+    tunnel_write_lock(flags);
     if(HashTable_add(tunnel_table, tunnel, tunnel)){
         Tunnel_incref(tunnel);   
     } else {
         err = -ENOMEM;
     }
+    tunnel_write_unlock(flags);
     dprintf("< err=%d\n", err);
     return err;
 }
 
 int Tunnel_del(Tunnel *tunnel){
-    return HashTable_remove(tunnel_table, tunnel);
+    int err;
+    unsigned long flags;
+    tunnel_write_lock(flags);
+    err = HashTable_remove(tunnel_table, tunnel);
+    tunnel_write_unlock(flags);
+    return err;
 }
 
 /** Do tunnel send processing on a packet.
@@ -217,8 +253,11 @@ int __init tunnel_module_init(void){
 }
 
 void __exit tunnel_module_exit(void){
+    unsigned long flags;
+    tunnel_write_lock(flags);
     if(tunnel_table){
         HashTable_free(tunnel_table);
         tunnel_table = NULL;
     }
+    tunnel_write_unlock(flags);
 }

@@ -3,7 +3,7 @@ Vnets: Virtual Networks for Virtual Machines
 
 Mike Wray <mike.wray@hp.com>
 
-2005/08/25
+2005/12/13
 
 0) Introduction
 ---------------
@@ -15,7 +15,7 @@ see the real network, and the real network cannot see it either.
 
 Virtual interfaces on the same vnet can be on the same machine
 or on different machines, they can still talk. The hosting machines
-can even be on different subnets if you run vnetd to forward,
+can even be on different subnets if you configure vnet forwarding,
 or have multicast routing enabled.
 
 
@@ -34,7 +34,7 @@ Configure the network script:
 
 Restart xend.
 
-Alternatively insert the vnet module using vnet-insert,
+Alternatively insert the vnet module using 'vn insmod',
 preferably before xend starts.
 
 2) Creating vnets
@@ -47,14 +47,14 @@ xm vnet-create <vnet config file>
 
 For example, if vnet97.sxp contains:
 
-(vnet (id 97) (bridge vnet97) (vnetif vnetif97) (security none))
+(vnet (id 97) (bridge vnet97) (vnetif vnif97) (security none))
 
 do
 
 xm vnet-create vnet97.sxp
 
 This will define a vnet with id 97 and no security. The bridge for the
-vnet is called vnet97 and the virtual interface for it is vnetif97.
+vnet is called vnet97 and the virtual interface for it is vnif97.
 To add an interface on a vm to this vnet simply set its bridge to vnet97
 in its configuration.
 
@@ -66,6 +66,22 @@ In sxp:
 
 (dev (vif (mac aa:00:00:01:02:03) (bridge vnet97)))
 
+By default vnets use udp encapsulation, but if you use etherip encapsulation
+you will also have to reduce the MTU of the corresponding
+device in the domain (because of the tunneling). Reducing the MTU may improve
+performance for udp encapsulation, but is not necessary.
+
+For example, for eth0 (in the domain, not dom0) use
+
+ifconfig eth0 mtu 1400
+
+or, better, put
+
+MTU=1400
+
+in /etc/sysconfig/network-scripts/ifcfg-eth0. You may also have to change or remove
+cached config files for eth0 under /etc/sysconfig/networking.
+
 Once configured, vnets are persistent in the xend database.
 To remove a vnet use
 
@@ -75,9 +91,13 @@ To list vnets use
 
 xm vnet-list
 
-To get information on a vnet id use
+To get information on one or more vnet ids use
 
-xm vnet-list <vnet id>
+xm vnet-list <vnet id>...
+
+You can also manage vnets using the vn utility which talks
+directly to the vnet implementation. The source is in ../scripts/vn
+and is installed in /usr/sbin/vn.
 
 3) Troubleshooting
 ------------------
@@ -87,20 +107,18 @@ If a vnet has been configured it should appear in the output of 'xm vnet-list'.
 Its bridge and interface should appear in 'ifconfig'.
 It should also show in 'brctl show', with its attached interfaces.
 
-You can 'see into' a vnet from dom0 if you put an IP address on the bridge
-and configure its MAC address as a vif.
-For example, if you have vnet97 with a vm with ip addr 10.0.0.12 on it,
-and <mac> is the MAC address of vnet97 (use ifconfig), then
+You can 'see into' a vnet from dom0 if you put an IP address on the bridge.
+For example, if you have vnet97 and a vm with ip addr 10.0.0.12 connected to it,
+then
 
-echo '(vif.add (vnet 97) (vmac <mac>))' >/proc/vnet/policy
 ifconfig vnet97 10.0.0.20 up
 
 should let you ping 10.0.0.12 via the vnet97 bridge.
-This works even if the vm with vif 10.0.0.12 is on another
-machine (it only works locally if you don't use vif.add).
 
 4) Examples
 -----------
+
+These assume a vnet with a bridge 'vnet97' has been created.
 
 Here's the full config for a vm on vnet 97, using ip addr 10.0.0.12:
 
@@ -143,7 +161,7 @@ If you run another vm on the same vnet:
 the vms should be able to talk over the vnet. Check with ping.
 If they are both on the same machine the connection will simply
 be the vnet97 bridge, if they are on separate machines their
-packets will be tunneled in etherip. They should be able to
+packets will be tunneled in udp (or etherip). They should be able to
 see each other, but not the real network.
 
 

@@ -29,6 +29,7 @@ VNETD_INSTALL_DIR = /usr/sbin
 
 INCLUDES += -I$(LIBXUTIL_DIR)
 INCLUDES += -I$(VNET_MODULE_DIR)
+INCLUDES += -I$(shell pwd)
 
 #----------------------------------------------------------------------------
 # GC.
@@ -37,8 +38,12 @@ INCLUDES += -I$(GC_INCLUDE)
 #LIBS += -L$(GC_LIB_DIR)
 CPPFLAGS += -D USE_GC
 
+# Sometimes linux/atomic.h is not #ifdef __KERNEL__.
+CPPFLAGS += -D __ARCH_I386_ATOMIC__
+
 #----------------------------------------------------------------------------
 CFLAGS += -g
+CFLAGS += -O2
 CFLAGS += -Wall
 CFLAGS += $(INCLUDES) $(LIBS)
 
@@ -49,6 +54,7 @@ CFLAGS += -Wp,-MD,.$(@F).d
 PROG_DEP = .*.d
 
 vpath %.c $(LIBXUTIL_DIR)
+vpath %.c $(VNET_MODULE_DIR)
 
 IPATHS:=$(INCLUDES:-I=)
 vpath %.h $(IPATHS)
@@ -56,12 +62,25 @@ vpath %.h $(IPATHS)
 #----------------------------------------------------------------------------
 VNETD_SRC:=
 VNETD_SRC+= connection.c
-VNETD_SRC+= marshal.c
 VNETD_SRC+= select.c
 VNETD_SRC+= timer.c
-VNETD_SRC+= vcache.c
+VNETD_SRC+= spinlock.c
+VNETD_SRC+= skbuff.c
 VNETD_SRC+= vnetd.c
 
+VNETD_SRC+= skb_util.c
+VNETD_SRC+= sxpr_util.c
+VNETD_SRC+= timer_util.c
+VNETD_SRC+= etherip.c
+VNETD_SRC+= vnet.c
+VNETD_SRC+= vnet_eval.c
+VNETD_SRC+= vnet_forward.c
+VNETD_SRC+= vif.c
+VNETD_SRC+= tunnel.c
+VNETD_SRC+= sa.c
+VNETD_SRC+= varp.c
+
+#----------------------------------------------------------------------------
 LIB_SRC:=
 LIB_SRC+= allocate.c
 LIB_SRC+= enum.c
@@ -72,6 +91,7 @@ LIB_SRC+= lexis.c
 LIB_SRC+= socket_stream.c
 LIB_SRC+= string_stream.c
 LIB_SRC+= sxpr.c
+LIB_SRC+= sxpr_parser.c
 LIB_SRC+= sys_net.c
 LIB_SRC+= sys_string.c
 LIB_SRC+= util.c

@@ -47,7 +47,7 @@ int VnetId_aton(const char *s, VnetId *vnet){
     char buf[5];
     int buf_n = sizeof(buf) - 1;
     int i, n;
-    const int elts_n = 8;
+    const int elts_n = VNETID_SIZE16;
 
     q = s;
     p = strchr(q, ':');

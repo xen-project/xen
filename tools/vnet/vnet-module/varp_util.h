@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -84,59 +84,12 @@ extern int VnetId_aton(const char *s, VnetId *vnet);
  */
 static inline struct VnetId toVnetId(uint32_t vnetid){
     struct VnetId vnet = {};
-    vnet.u.vnet32[3] = htonl(vnetid);
+    vnet.u.vnet32[VNETID_SIZE32 - 1] = htonl(vnetid);
     return vnet;
 }
 
-static inline uint32_t VnetId_hash(uint32_t h, VnetId *vnet)
-{
-    h = hash_hul(h, vnet->u.vnet32[0]);
-    h = hash_hul(h, vnet->u.vnet32[1]);
-    h = hash_hul(h, vnet->u.vnet32[2]);
-    h = hash_hul(h, vnet->u.vnet32[3]);
-    return h;
-}
-
-static inline int VnetId_eq(VnetId *vnet1, VnetId *vnet2)
-{
-    return memcmp(vnet1, vnet2, sizeof(VnetId)) == 0;
-}
-
-static inline uint32_t VarpAddr_hash(uint32_t h, VarpAddr *addr)
-{
-    h = hash_hul(h, addr->family);
-    if(addr->family == AF_INET6){
-        h = hash_hul(h, addr->u.ip6.s6_addr32[0]);
-        h = hash_hul(h, addr->u.ip6.s6_addr32[1]);
-        h = hash_hul(h, addr->u.ip6.s6_addr32[2]);
-        h = hash_hul(h, addr->u.ip6.s6_addr32[3]);
-    } else {
-        h = hash_hul(h, addr->u.ip4.s_addr);
-    }
-    return h;
-}
-
-static inline int VarpAddr_eq(VarpAddr *addr1, VarpAddr*addr2)
-{
-    return memcmp(addr1, addr2, sizeof(VarpAddr)) == 0;
-}
-
-static inline uint32_t Vmac_hash(uint32_t h, Vmac *vmac)
-{
-    h = hash_hul(h,
-                 (vmac->mac[0] << 24) |
-                 (vmac->mac[1] << 16) |
-                 (vmac->mac[2] <<  8) |
-                 (vmac->mac[3]      ));
-    h = hash_hul(h, 
-                 (vmac->mac[4] <<   8) |
-                 (vmac->mac[5]       ));
-    return h;
-}
-
-static inline int Vmac_eq(Vmac *vmac1, Vmac *vmac2)
-{
-    return memcmp(vmac1, vmac2, sizeof(Vmac)) == 0;
+static inline int VnetId_eq(VnetId *id1, VnetId *id2){
+    return memcmp(id1, id2, sizeof(VnetId)) == 0;
 }
 
 #endif /* _VNET_VARP_UTIL_H */

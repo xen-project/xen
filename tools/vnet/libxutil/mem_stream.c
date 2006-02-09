@@ -183,6 +183,8 @@ static void mem_put(MemData *data, const char *buf, size_t n){
 static int mem_expand(MemData *data, size_t extra){
     int err = -ENOMEM;
     int delta = (extra < delta_min ? delta_min : extra);
+    int buf_n;
+    char *buf;
     if(data->buf_max > 0){
         int delta_max = data->buf_max - data->buf_n;
         if(delta > delta_max){
@@ -190,8 +192,8 @@ static int mem_expand(MemData *data, size_t extra){
             if(delta > delta_max) goto exit;
         }
     }
-    int buf_n = data->buf_n + delta;
-    char *buf = allocate(buf_n);
+    buf_n = data->buf_n + delta;
+    buf = allocate(buf_n);
     if(!buf) goto exit;
     mem_get(data, buf, mem_len(data));
     data->hi = mem_len(data);
@@ -218,9 +220,10 @@ static int mem_expand(MemData *data, size_t extra){
  * @return number of bytes written on success, negative error code otherwise
  */
 static int mem_write(IOStream *io, const void *msg, size_t n){
+    int room;
     MemData *data = get_mem_data(io);
     if(data->err) return -data->err;
-    int room = mem_room(data);
+    room = mem_room(data);
     if(n > room){
         int err = mem_expand(data, n - room);
         if(err) return err;
@@ -238,9 +241,10 @@ static int mem_write(IOStream *io, const void *msg, size_t n){
  * @return number of bytes read on success, negative error code otherwise
  */
 static int mem_read(IOStream *io, void *buf, size_t n){
+    int k;
     MemData *data = get_mem_data(io);
     if(data->err) return -data->err;
-    int k = mem_len(data);
+    k = mem_len(data);
     if(n > k){
         n = k;
     }
@@ -292,8 +296,9 @@ static void mem_free(IOStream *io){
 IOStream *mem_stream_new_size(size_t buf_n, size_t buf_max){
     int err = -ENOMEM;
     MemData *data = ALLOCATE(MemData);
+    IOStream *io = NULL;
     if(!data) goto exit;
-    IOStream *io = ALLOCATE(IOStream);
+    io = ALLOCATE(IOStream);
     if(!io) goto exit;
     if(buf_n <= delta_min){
         buf_n = delta_min;

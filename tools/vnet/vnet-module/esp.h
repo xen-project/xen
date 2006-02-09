@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -19,9 +19,18 @@
 #ifndef __VNET_ESP_H__
 #define __VNET_ESP_H__
 
+#ifdef __KERNEL__
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/crypto.h>
+
+#else
+
+#include "sys_kernel.h"
+
+struct crypto_tfm;
+
+#endif
 
 /** Header used by IPSEC ESP (Encapsulated Security Payload). */
 typedef struct ESPHdr {

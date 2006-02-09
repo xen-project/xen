@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ * Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by the 
@@ -23,6 +23,5 @@ struct Vnet;
 
 extern int vnet_dev_add(struct Vnet *vnet);
 extern void vnet_dev_remove(struct Vnet *vnet);
-extern int Vnet_create(struct Vnet *info);
 
 #endif
