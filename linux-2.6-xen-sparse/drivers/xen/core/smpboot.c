@@ -40,8 +40,6 @@ extern void failsafe_callback(void);
 extern void system_call(void);
 extern void smp_trap_init(trap_info_t *);
 
-extern cpumask_t cpu_initialized;
-
 /* Number of siblings per CPU package */
 int smp_num_siblings = 1;
 int phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
@@ -141,10 +139,9 @@ static void xen_smp_intr_exit(unsigned int cpu)
 
 static void cpu_bringup(void)
 {
-	if (!cpu_isset(smp_processor_id(), cpu_initialized)) {
-		cpu_init();
-		preempt_disable();
-	}
+	cpu_init();
+	touch_softlockup_watchdog();
+	preempt_disable();
 	local_irq_enable();
 	cpu_idle();
 }

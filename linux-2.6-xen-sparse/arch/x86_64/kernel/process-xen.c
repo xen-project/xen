@@ -138,14 +138,17 @@ void xen_idle(void)
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
-DECLARE_PER_CPU(int, cpu_state);
-
-#include <asm/nmi.h>
-/* We halt the CPU with physical CPU hotplug */
 static inline void play_dead(void)
 {
 	idle_task_exit();
+	local_irq_disable();
+	cpu_clear(smp_processor_id(), cpu_initialized);
+	preempt_enable_no_resched();
 	HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL);
+	/* Same as drivers/xen/core/smpboot.c:cpu_bringup(). */
+	cpu_init();
+	touch_softlockup_watchdog();
+	preempt_disable();
 	local_irq_enable();
 }
 #else

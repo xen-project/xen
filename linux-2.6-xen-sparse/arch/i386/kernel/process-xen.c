@@ -124,10 +124,18 @@ EXPORT_SYMBOL(default_idle);
 #endif
 
 #ifdef CONFIG_HOTPLUG_CPU
+extern cpumask_t cpu_initialized;
 static inline void play_dead(void)
 {
 	idle_task_exit();
+	local_irq_disable();
+	cpu_clear(smp_processor_id(), cpu_initialized);
+	preempt_enable_no_resched();
 	HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL);
+	/* Same as drivers/xen/core/smpboot.c:cpu_bringup(). */
+	cpu_init();
+	touch_softlockup_watchdog();
+	preempt_disable();
 	local_irq_enable();
 }
 #else
