@@ -64,8 +64,8 @@ config X86_XEN
 	select X86_UP_IOAPIC if !SMP && XEN_PRIVILEGED_GUEST
 	select SWIOTLB
 	help
-	  Choose this option is you plan to run this kernel on top of Xen
-	  Hypervisor.
+	  Choose this option if you plan to run this kernel on top of the
+	  Xen Hypervisor.
 
 config X86_ELAN
 	bool "AMD Elan"

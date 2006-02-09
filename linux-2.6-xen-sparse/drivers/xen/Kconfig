@@ -127,7 +127,7 @@ config XEN_SHADOW_MODE
 	bool "Fake shadow mode"
 	default n
 	help
-	  fakes out a shadow mode kernel
+	  Fakes out a shadow mode kernel
 
 
 config XEN_SCRUB_PAGES
