@@ -76,7 +76,6 @@ void xen_load_gs(unsigned int selector); /* x86_64 only */
 void xen_tlb_flush(void);
 void xen_invlpg(unsigned long ptr);
 
-#ifndef CONFIG_XEN_SHADOW_MODE
 void xen_l1_entry_update(pte_t *ptr, pte_t val);
 void xen_l2_entry_update(pmd_t *ptr, pmd_t val);
 void xen_l3_entry_update(pud_t *ptr, pud_t val); /* x86_64/PAE */
@@ -89,14 +88,6 @@ void xen_pmd_pin(unsigned long ptr); /* x86_64 only */
 void xen_pmd_unpin(unsigned long ptr); /* x86_64 only */
 void xen_pte_pin(unsigned long ptr);
 void xen_pte_unpin(unsigned long ptr);
-#else
-#define xen_l1_entry_update(_p, _v) set_pte((_p), (_v))
-#define xen_l2_entry_update(_p, _v) set_pgd((_p), (_v))
-#define xen_pgd_pin(_p)   ((void)0)
-#define xen_pgd_unpin(_p) ((void)0)
-#define xen_pte_pin(_p)   ((void)0)
-#define xen_pte_unpin(_p) ((void)0)
-#endif
 
 void xen_set_ldt(unsigned long ptr, unsigned long bytes);
 void xen_machphys_update(unsigned long mfn, unsigned long pfn);

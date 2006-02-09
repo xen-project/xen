@@ -402,7 +402,6 @@ void pgd_free(pgd_t *pgd)
 	kmem_cache_free(pgd_cache, pgd);
 }
 
-#ifndef CONFIG_XEN_SHADOW_MODE
 void make_lowmem_page_readonly(void *va, unsigned int feature)
 {
 	pte_t *pte;
@@ -500,7 +499,6 @@ void make_pages_writable(void *va, unsigned int nr, unsigned int feature)
 		va = (void *)((unsigned long)va + PAGE_SIZE);
 	}
 }
-#endif /* CONFIG_XEN_SHADOW_MODE */
 
 static inline void pgd_walk_set_prot(void *pt, pgprot_t flags)
 {

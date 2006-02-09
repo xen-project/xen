@@ -31,11 +31,7 @@
 
 #define set_pte_atomic(pteptr, pteval) set_pte(pteptr,pteval)
 
-#ifndef CONFIG_XEN_SHADOW_MODE
 #define set_pmd(pmdptr, pmdval) xen_l2_entry_update((pmdptr), (pmdval))
-#else
-#define set_pmd(pmdptr, pmdval) (*(pmdptr) = (pmdval))
-#endif
 
 #define ptep_get_and_clear(mm,addr,xp)	__pte_ma(xchg(&(xp)->pte_low, 0))
 #define pte_same(a, b)		((a).pte_low == (b).pte_low)

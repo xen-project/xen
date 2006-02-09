@@ -83,17 +83,10 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
 	}								\
 } while (0)
 
-#ifdef CONFIG_XEN_SHADOW_MODE
-# define set_pmd(pmdptr,pmdval) \
-		set_64bit((unsigned long long *)(pmdptr),pmd_val(pmdval))
-# define set_pud(pudptr,pudval) \
-		(*(pudptr) = (pudval))
-#else
-# define set_pmd(pmdptr,pmdval)				\
+#define set_pmd(pmdptr,pmdval)				\
 		xen_l2_entry_update((pmdptr), (pmdval))
-# define set_pud(pudptr,pudval) \
+#define set_pud(pudptr,pudval) \
 		xen_l3_entry_update((pudptr), (pudval))
-#endif
 
 /*
  * Pentium-II erratum A13: in PAE mode we explicitly have to flush

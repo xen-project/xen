@@ -52,7 +52,6 @@
 #endif
 #endif
 
-#ifndef CONFIG_XEN_SHADOW_MODE
 void xen_l1_entry_update(pte_t *ptr, pte_t val)
 {
 	mmu_update_t u;
@@ -96,7 +95,6 @@ void xen_l4_entry_update(pgd_t *ptr, pgd_t val)
 	BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
 }
 #endif /* CONFIG_X86_64 */
-#endif /* CONFIG_XEN_SHADOW_MODE */
 
 void xen_machphys_update(unsigned long mfn, unsigned long pfn)
 {
@@ -181,7 +179,6 @@ void xen_invlpg_mask(cpumask_t *mask, unsigned long ptr)
 
 #endif /* CONFIG_SMP */
 
-#ifndef CONFIG_XEN_SHADOW_MODE
 void xen_pgd_pin(unsigned long ptr)
 {
 	struct mmuext_op op;
@@ -253,7 +250,6 @@ void xen_pmd_unpin(unsigned long ptr)
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 #endif /* CONFIG_X86_64 */
-#endif /* CONFIG_XEN_SHADOW_MODE */
 
 void xen_set_ldt(unsigned long ptr, unsigned long len)
 {
