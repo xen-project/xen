@@ -176,7 +176,7 @@ void vcpu_prepare(int vcpu)
 
 #ifdef __i386__
 	ctxt.user_regs.cs = __KERNEL_CS;
-	ctxt.user_regs.esp = idle->thread.esp;
+	ctxt.user_regs.esp = idle->thread.esp0 - sizeof(struct pt_regs);
 
 	ctxt.kernel_ss = __KERNEL_DS;
 	ctxt.kernel_sp = idle->thread.esp0;
@@ -187,9 +187,9 @@ void vcpu_prepare(int vcpu)
 	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
 
 	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
-#else
+#else /* __x86_64__ */
 	ctxt.user_regs.cs = __KERNEL_CS | 3;
-	ctxt.user_regs.esp = idle->thread.rsp;
+	ctxt.user_regs.esp = idle->thread.rsp0 - sizeof(struct pt_regs);
 
 	ctxt.kernel_ss = __KERNEL_DS;
 	ctxt.kernel_sp = idle->thread.rsp0;
