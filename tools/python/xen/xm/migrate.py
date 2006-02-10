@@ -38,7 +38,7 @@ gopts.opt('live', short='l',
           fn=set_true, default=0,
           use="Use live migration.")
 
-gopts.opt('port', short='p',
+gopts.opt('port', short='p', val='portnum',
           fn=set_int, default=0,
           use="Use specified port for migration.")
 
