@@ -32,11 +32,6 @@ struct arch_domain {
     u64 xen_vastart;
     u64 xen_vaend;
     u64 shared_info_va;
-#ifdef DOMU_AUTO_RESTART
-    u64 image_start;
-    u64 image_len;
-    u64 entry;
-#endif
     unsigned long initrd_start;
     unsigned long initrd_len;
     char *cmdline;

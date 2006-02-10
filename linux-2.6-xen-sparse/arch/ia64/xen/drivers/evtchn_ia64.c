@@ -106,8 +106,10 @@ int bind_virq_to_irqhandler(
     BUG_ON(HYPERVISOR_event_channel_op(&op) != 0 );
     evtchn = op.u.bind_virq.port;
 
-    if (!unbound_irq(evtchn))
-	return -EINVAL;
+    if (!unbound_irq(evtchn)) {
+        evtchn = -EINVAL;
+        goto out;
+    }
 
     evtchns[evtchn].handler = handler;
     evtchns[evtchn].dev_id = dev_id;
@@ -115,6 +117,7 @@ int bind_virq_to_irqhandler(
     irq_info[evtchn] = mk_irq_info(IRQT_VIRQ, virq, evtchn);
 
     unmask_evtchn(evtchn);
+out:
     spin_unlock(&irq_mapping_update_lock);
     return evtchn;
 }
@@ -125,8 +128,10 @@ int bind_evtchn_to_irqhandler(unsigned int evtchn,
 {
     spin_lock(&irq_mapping_update_lock);
 
-    if (!unbound_irq(evtchn))
-	return -EINVAL;
+    if (!unbound_irq(evtchn)) {
+	evtchn = -EINVAL;
+	goto out;
+    }
 
     evtchns[evtchn].handler = handler;
     evtchns[evtchn].dev_id = dev_id;
@@ -134,6 +139,7 @@ int bind_evtchn_to_irqhandler(unsigned int evtchn,
     irq_info[evtchn] = mk_irq_info(IRQT_EVTCHN, 0, evtchn);
 
     unmask_evtchn(evtchn);
+out:
     spin_unlock(&irq_mapping_update_lock);
     return evtchn;
 }
@@ -158,7 +164,7 @@ void unbind_from_irqhandler(unsigned int irq, void *dev_id)
     spin_lock(&irq_mapping_update_lock);
 
     if (unbound_irq(irq))
-        return;
+        goto out;
 
     op.cmd = EVTCHNOP_close;
     op.u.close.port = evtchn;
@@ -179,6 +185,7 @@ void unbind_from_irqhandler(unsigned int irq, void *dev_id)
     evtchns[evtchn].handler = NULL;
     evtchns[evtchn].opened = 0;
 
+out:
     spin_unlock(&irq_mapping_update_lock);
 }
 

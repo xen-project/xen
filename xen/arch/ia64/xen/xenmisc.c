@@ -168,7 +168,11 @@ void __free_pages(struct page *page, unsigned int order)
 
 void *pgtable_quicklist_alloc(void)
 {
-	return alloc_xenheap_pages(0);
+    void *p;
+    p = alloc_xenheap_pages(0);
+    if (p) 
+        clear_page(p);
+    return p;
 }
 
 void pgtable_quicklist_free(void *pgtable_entry)
