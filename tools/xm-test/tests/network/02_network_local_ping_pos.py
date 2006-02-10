@@ -28,7 +28,11 @@ ip   = Net.ip("dom1", "eth0")
 mask = Net.mask("dom1", "eth0")
 
 # Fire up a guest domain w/1 nic
-config = {"vif" : ['ip=%s' % ip]}
+if ENABLE_HVM_SUPPORT:
+    config = {"vif" : ['type=ioemu']}
+else:
+    config = {"vif" : ['ip=%s' % ip ]}
+
 domain = XmTestDomain(extraConfig=config)
 try:
     domain.start()

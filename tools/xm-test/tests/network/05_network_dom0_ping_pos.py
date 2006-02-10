@@ -31,7 +31,13 @@ except NetworkError, e:
         FAIL(str(e))
 
 # Fire up a guest domain w/1 nic
-config = {"vif"  : ["ip=%s" % ip]}
+if ENABLE_HVM_SUPPORT:
+    brg = "xenbr0"
+    config = {"vif" : ['type=ioemu, bridge=%s' % brg]}
+else:
+    config = {"vif" : ['ip=%s' % ip ]}
+    brg = None
+
 domain = XmTestDomain(extraConfig=config)
 try:
     domain.start()
@@ -52,7 +58,7 @@ except ConsoleError, e:
 
 try:
     # Add a suitable dom0 IP address 
-    dom0ip = Net.ip("dom0", "eth0", todomname=domain.getName(), toeth="eth0")
+    dom0ip = Net.ip("dom0", "eth0", todomname=domain.getName(), toeth="eth0", bridge=brg)
 except NetworkError, e:
         FAIL(str(e))
 

@@ -25,6 +25,7 @@ import atexit;
 
 from Test import *
 from Xm import *
+from config import *
 
 class NetworkError(Exception):
     def __init__(self, msg):
@@ -36,6 +37,9 @@ class NetworkError(Exception):
 def undo_dom0_alias(eth, ip):
     traceCommand("ip addr del " + ip + " dev " + eth)
 
+def net_from_ip(ip):
+    return ip[:ip.rfind(".")] + ".0/24"
+    
 class XmNetwork:
 
     def __init__(self):
@@ -56,14 +60,21 @@ class XmNetwork:
         domnum = int(dom[len("dom"):])
         return "169.254."+ str(ethnum+153) + "." + str(domnum+10)
 
-    def ip(self, dom, interface, todomname=None, toeth=None):
+    def ip(self, dom, interface, todomname=None, toeth=None, bridge=None):
         newip = self.calc_ip_address(dom, interface)
 
         # If the testcase is going to talk to dom0, we need to add an 
         # IP address in the proper subnet
         if dom == "dom0":
-            # The domain's vif is a convenient place to add to
-            vifname = "vif" + str(domid(todomname)) + "." + toeth[3:]
+	    if ENABLE_HVM_SUPPORT:
+	        # HVM uses ioemu which uses a bridge
+		if not bridge:
+		    SKIP("no bridge supplied")
+		else:
+		    vifname = bridge
+	    else:
+                # The domain's vif is a convenient place to add to
+                vifname = "vif" + str(domid(todomname)) + "." + toeth[3:]
 
             # register the exit handler FIRST, just in case
             atexit.register(undo_dom0_alias, vifname, newip)
@@ -73,6 +84,15 @@ class XmNetwork:
                                               " dev " + vifname)
             if status:
                 SKIP("\"ip addr add\" failed")
+
+	    if ENABLE_HVM_SUPPORT:
+	        # We need to add a route to the bridge device
+		network = net_from_ip(newip)
+		status, output = traceCommand("ip route add " + network + " dev " + vifname + " scope link")
+
+                if status:
+		    SKIP("\"ip route add\" failed")
+
         return newip
 
     def mask(self, dom, interface):
