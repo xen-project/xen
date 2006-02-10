@@ -869,7 +869,7 @@ void __init mem_init(void)
 	memset(contiguous_bitmap, 0, (end_pfn + 2*BITS_PER_LONG) >> 3);
 
 #if defined(CONFIG_SWIOTLB)
-	swiotlb_init();	
+	pci_swiotlb_init();	
 #endif
 	no_iommu_init();
 
