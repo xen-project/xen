@@ -61,6 +61,7 @@ evalVariables "$@"
 
 vifnum=${vifnum:-0}
 bridge=${bridge:-xenbr${vifnum}}
+netdev=${netdev:-$(ip route list default scope global| awk '{ print $NF }')}
 netdev=${netdev:-eth${vifnum}}
 antispoof=${antispoof:-no}
 

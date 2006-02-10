@@ -70,8 +70,8 @@
 #
 # (network-script network-bridge)
 #
-# Your eth0 is used as the outgoing interface, by default.  To use a different
-# one (e.g. eth1) use
+# Your default ethernet device is used as the outgoing interface, by default. 
+# To use a different one (e.g. eth1) use
 #
 # (network-script 'network-bridge netdev=eth1')
 #
