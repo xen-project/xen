@@ -339,6 +339,8 @@ static int destroy_conn(void *_conn)
 
 static void set_fd(int fd, fd_set *set, int *max)
 {
+	if (fd < 0)
+		return;
 	FD_SET(fd, set);
 	if (fd > *max)
 		*max = fd;
@@ -1670,7 +1672,7 @@ int main(int argc, char *argv[])
 		if (FD_ISSET(*ro_sock, &inset))
 			accept_connection(*ro_sock, false);
 
-		if (FD_ISSET(eventchn_fd, &inset))
+		if (eventchn_fd > 0 && FD_ISSET(eventchn_fd, &inset))
 			handle_event();
 
 		list_for_each_entry(i, &connections, list) {
