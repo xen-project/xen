@@ -101,7 +101,7 @@ network_list_help = "network-list <DomId>             List virtual network inter
 vnet_list_help = "vnet-list [-l|--long]            list vnets"
 vnet_create_help = "vnet-create <config>             create a vnet from a config file"
 vnet_delete_help = "vnet-delete <vnetid>             delete a vnet"
-
+vtpm_list_help = "vtpm-list <DomId>                list virtual TPM devices"
 
 short_command_list = [
     "console",
@@ -165,6 +165,7 @@ device_commands = [
     "network-attach",
     "network-detach",
     "network-list",
+    "vtpm-list",
     ]
 
 vnet_commands = [
@@ -699,6 +700,14 @@ def xm_block_list(args):
         sxp.show(x)
         print
 
+def xm_vtpm_list(args):
+    arg_check(args, "vtpm-list", 1)
+    dom = args[0]
+    from xen.xend.XendClient import server
+    for x in server.xend_domain_devices(dom, 'vtpm'):
+        sxp.show(x)
+        print
+
 def xm_block_attach(args):
     arg_check(args, 'block-attach', 4, 5)
 
@@ -834,6 +843,8 @@ commands = {
     "vnet-list": xm_vnet_list,
     "vnet-create": xm_vnet_create,
     "vnet-delete": xm_vnet_delete,
+    # vtpm
+    "vtpm-list": xm_vtpm_list,
     }
 
 ## The commands supported by a separate argument parser in xend.xm.
