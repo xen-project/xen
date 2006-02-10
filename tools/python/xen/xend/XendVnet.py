@@ -63,7 +63,7 @@ class XendVnetInfo:
         to_store = {
             'id' : self.id,
             'dbid' : self.dbid,
-            'config' : sxp.to_string
+            'config' : sxp.to_string(self.config)
             }
         xstransact.Write(self.dbpath, to_store)
 
