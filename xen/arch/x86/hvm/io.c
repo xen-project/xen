@@ -690,62 +690,41 @@ void hvm_io_assist(struct vcpu *v)
     }
 }
 
-int hvm_clear_pending_io_event(struct vcpu *v)
-{
-    struct domain *d = v->domain;
-    int port = iopacket_port(d);
-
-    /* evtchn_pending_sel bit is shared by other event channels. */
-    if (!d->shared_info->evtchn_pending[port/BITS_PER_LONG])
-        clear_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
-
-    /* Note: HVM domains may need upcalls as well. */
-    if (!v->vcpu_info->evtchn_pending_sel)
-        clear_bit(0, &v->vcpu_info->evtchn_upcall_pending);
-
-    /* Clear the pending bit for port. */
-    return test_and_clear_bit(port, &d->shared_info->evtchn_pending[0]);
-}
-
 /*
- * Because we've cleared the pending events first, we need to guarantee that
- * all events to be handled by xen for HVM domains are taken care of here.
- *
- * interrupts are guaranteed to be checked before resuming guest.
- * HVM upcalls have been already arranged for if necessary.
- */
-void hvm_check_events(struct vcpu *v)
-{
-    /*
-     * Clear the event *before* checking for work. This should
-     * avoid the set-and-check races
-     */
-    if (hvm_clear_pending_io_event(current))
-        hvm_io_assist(v);
-}
-
-/*
- * On exit from hvm_wait_io, we're guaranteed to have a I/O response
- * from the device model.
+ * On exit from hvm_wait_io, we're guaranteed not to be waiting on
+ * I/O response from the device model.
  */
 void hvm_wait_io(void)
 {
-    int port = iopacket_port(current->domain);
+    struct vcpu *v = current;
+    struct domain *d = v->domain;    
+    int port = iopacket_port(d);
 
-    do {
-        if (!test_bit(port, &current->domain->shared_info->evtchn_pending[0]))
-	    do_sched_op(SCHEDOP_block, 0);
+    for ( ; ; )
+    {
+        /* Clear master flag, selector flag, event flag each in turn. */
+        v->vcpu_info->evtchn_upcall_pending = 0;
+        smp_mb__before_clear_bit();
+        clear_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
+        smp_mb__after_clear_bit();
+        if ( test_and_clear_bit(port, &d->shared_info->evtchn_pending[0]) )
+            hvm_io_assist(v);
 
-        hvm_check_events(current);
-        if (!test_bit(ARCH_HVM_IO_WAIT, &current->arch.hvm_vcpu.ioflags))
+        /* Need to wait for I/O responses? */
+        if ( !test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags) )
             break;
-        /*
-	 * Events other than IOPACKET_PORT might have woken us up.
-	 * In that case, safely go back to sleep.
-	 */
-        clear_bit(port/BITS_PER_LONG, &current->vcpu_info->evtchn_pending_sel);
-        clear_bit(0, &current->vcpu_info->evtchn_upcall_pending);
-    } while(1);
+
+        do_sched_op(SCHEDOP_block, 0);
+    }
+
+    /*
+     * Re-set the selector and master flags in case any other notifications
+     * are pending.
+     */
+    if ( d->shared_info->evtchn_pending[port/BITS_PER_LONG] )
+        set_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
+    if ( v->vcpu_info->evtchn_pending_sel )
+        v->vcpu_info->evtchn_upcall_pending = 1;
 }
 
 /*

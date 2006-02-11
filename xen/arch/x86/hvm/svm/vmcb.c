@@ -489,13 +489,8 @@ void svm_do_resume(struct vcpu *v)
 {
     struct hvm_virpit *vpit = &v->domain->arch.hvm_domain.vpit;
     
-    if (event_pending(v)) 
-    {
-        hvm_check_events(v);
-
-        if (test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags))
-            hvm_wait_io();
-    }
+    if ( event_pending(v) )
+        hvm_wait_io();
 
     /* pick up the elapsed PIT ticks and re-enable pit_timer */
     if ( vpit->first_injected ) {

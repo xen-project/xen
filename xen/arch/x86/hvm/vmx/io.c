@@ -177,17 +177,13 @@ void vmx_do_resume(struct vcpu *v)
 
     vmx_stts();
 
-    if (event_pending(v)) {
-        hvm_check_events(v);
+    if ( event_pending(v) )
+        hvm_wait_io();
 
-        if (test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags))
-            hvm_wait_io();
-    }
     /* pick up the elapsed PIT ticks and re-enable pit_timer */
-    if ( vpit->first_injected ) {
+    if ( vpit->first_injected )
         pickup_deactive_ticks(vpit);
-    }
-    vmx_set_tsc_shift(v,vpit);
+    vmx_set_tsc_shift(v, vpit);
 
     /* We can't resume the guest if we're waiting on I/O */
     ASSERT(!test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags));
