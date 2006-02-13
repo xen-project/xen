@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.16-rc2-xen0
-# Fri Feb  3 16:57:06 2006
+# Linux kernel version: 2.6.16-rc2-xenU
+# Mon Feb 13 15:10:22 2006
 #
 CONFIG_X86_32=y
 CONFIG_SEMAPHORE_SLEEPERS=y
@@ -555,9 +555,12 @@ CONFIG_SCSI_SATA_SIL24=y
 # CONFIG_SCSI_SATA_VIA is not set
 # CONFIG_SCSI_SATA_VITESSE is not set
 CONFIG_SCSI_SATA_INTEL_COMBINED=y
+# CONFIG_SCSI_BUSLOGIC is not set
 # CONFIG_SCSI_DMX3191D is not set
+# CONFIG_SCSI_EATA is not set
 # CONFIG_SCSI_EATA_PIO is not set
 # CONFIG_SCSI_FUTURE_DOMAIN is not set
+# CONFIG_SCSI_GDTH is not set
 # CONFIG_SCSI_IPS is not set
 # CONFIG_SCSI_INITIO is not set
 # CONFIG_SCSI_INIA100 is not set
