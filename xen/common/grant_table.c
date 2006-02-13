@@ -316,6 +316,7 @@ __gnttab_map_grant_ref(
     spin_unlock(&rd->grant_table->lock);
     (void)__put_user(rc, &uop->status);
     put_maptrack_handle(ld->grant_table, handle);
+    put_domain(rd);
     return rc;
 }
 
