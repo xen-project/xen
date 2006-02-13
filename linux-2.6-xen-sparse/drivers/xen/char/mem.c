@@ -96,12 +96,9 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 	if (uncached_access(file))
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-	if (direct_remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
-				   size,
-				   vma->vm_page_prot, DOMID_IO))
-		return -EAGAIN;
-
-	return 0;
+	/* We want to return the real error code, not EAGAIN. */
+	return direct_remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+				      size, vma->vm_page_prot, DOMID_IO);
 }
 
 /*
