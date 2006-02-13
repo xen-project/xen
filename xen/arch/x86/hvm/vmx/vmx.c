@@ -25,7 +25,6 @@
 #include <xen/irq.h>
 #include <xen/softirq.h>
 #include <xen/domain_page.h>
-#include <xen/hypercall.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
@@ -1643,16 +1642,14 @@ void vmx_vmexit_do_hlt(void)
     struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
     s_time_t   next_pit=-1,next_wakeup;
 
-    if ( !v->vcpu_id ) {
+    if ( !v->vcpu_id )
         next_pit = get_pit_scheduled(v,vpit);
-    }
     next_wakeup = get_apictime_scheduled(v);
-    if ( (next_pit != -1 && next_pit < next_wakeup) || next_wakeup == -1 ) {
+    if ( (next_pit != -1 && next_pit < next_wakeup) || next_wakeup == -1 )
         next_wakeup = next_pit;
-    }
     if ( next_wakeup != - 1 ) 
         set_timer(&current->arch.hvm_vmx.hlt_timer, next_wakeup);
-    do_sched_op(SCHEDOP_block, 0);
+    hvm_safe_block();
 }
 
 static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
@@ -1849,7 +1846,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
             __vm_clear_bit(GUEST_PENDING_DBG_EXCEPTIONS, PENDING_DEBUG_EXC_BS);
 
             domain_pause_for_debugger();
-            do_sched_op(SCHEDOP_yield, 0);
 
             break;
         }

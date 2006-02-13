@@ -173,11 +173,12 @@ asmlinkage void vmx_intr_assist(void)
 
 void vmx_do_resume(struct vcpu *v)
 {
-    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
+    struct domain *d = v->domain;
+    struct hvm_virpit *vpit = &v->domain->arch.hvm_domain.vpit;
 
     vmx_stts();
 
-    if ( event_pending(v) ||
+    if ( test_bit(iopacket_port(d), &d->shared_info->evtchn_pending[0]) ||
          test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags) )
         hvm_wait_io();
 

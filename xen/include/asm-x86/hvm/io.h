@@ -148,6 +148,7 @@ static inline int irq_masked(unsigned long eflags)
 
 extern void handle_mmio(unsigned long, unsigned long);
 extern void hvm_wait_io(void);
+extern void hvm_safe_block(void);
 extern void hvm_io_assist(struct vcpu *v);
 extern void pic_irq_request(int *interrupt_request, int level);
 extern void hvm_pic_assist(struct vcpu *v);

@@ -25,7 +25,6 @@
 #include <xen/sched.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>
-#include <xen/hypercall.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
@@ -1812,16 +1811,14 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
     inst_len = __get_instruction_length(vmcb, INSTR_HLT, NULL);
     __update_guest_eip(vmcb, inst_len);
 
-    if ( !v->vcpu_id ) {
+    if ( !v->vcpu_id )
         next_pit = get_pit_scheduled(v, vpit);
-    }
     next_wakeup = get_apictime_scheduled(v);
-    if ( (next_pit != -1 && next_pit < next_wakeup) || next_wakeup == -1 ) {
+    if ( (next_pit != -1 && next_pit < next_wakeup) || next_wakeup == -1 )
         next_wakeup = next_pit;
-    }
     if ( next_wakeup != - 1 )
         set_timer(&current->arch.hvm_svm.hlt_timer, next_wakeup);
-    do_sched_op(SCHEDOP_block, 0);
+    hvm_safe_block();
 }
 
 
@@ -2434,7 +2431,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 #else
         svm_store_cpu_user_regs(&regs, v);
         domain_pause_for_debugger();  
-        do_sched_op(SCHEDOP_yield, 0);
 #endif
     }
     break;

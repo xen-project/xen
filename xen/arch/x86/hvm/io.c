@@ -704,7 +704,6 @@ void hvm_wait_io(void)
     {
         /* Clear master flag, selector flag, event flag each in turn. */
         v->vcpu_info->evtchn_upcall_pending = 0;
-        smp_mb__before_clear_bit();
         clear_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
         smp_mb__after_clear_bit();
         if ( test_and_clear_bit(port, &d->shared_info->evtchn_pending[0]) )
@@ -725,6 +724,31 @@ void hvm_wait_io(void)
         set_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
     if ( v->vcpu_info->evtchn_pending_sel )
         v->vcpu_info->evtchn_upcall_pending = 1;
+}
+
+void hvm_safe_block(void)
+{
+    struct vcpu *v = current;
+    struct domain *d = v->domain;    
+    int port = iopacket_port(d);
+
+    for ( ; ; )
+    {
+        /* Clear master flag & selector flag so we will wake from block. */
+        v->vcpu_info->evtchn_upcall_pending = 0;
+        clear_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
+        smp_mb__after_clear_bit();
+
+        /* Event pending already? */
+        if ( test_bit(port, &d->shared_info->evtchn_pending[0]) )
+            break;
+
+        do_sched_op(SCHEDOP_block, 0);
+    }
+
+    /* Reflect pending event in selector and master flags. */
+    set_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
+    v->vcpu_info->evtchn_upcall_pending = 1;
 }
 
 /*
