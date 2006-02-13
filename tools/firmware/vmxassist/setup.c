@@ -353,8 +353,6 @@ setup_ctx(void)
 void
 start_bios(void)
 {
-	unsigned long cr0;
-
 	if (booting_cpu == 0)
 		printf("Start BIOS ...\n");
 	else
@@ -362,11 +360,7 @@ start_bios(void)
 		       booting_cpu, booting_vector << 12);
 
 	initialize_real_mode = 1;
-	cr0 = get_cr0();
-#ifndef TEST
-	set_cr0(cr0 | CR0_PE);
-#endif
-	set_cr0(cr0 & ~CR0_PE);
+	set_cr0(get_cr0() & ~CR0_PE);
 	panic("vmxassist returned"); /* "cannot happen" */
 }
 
