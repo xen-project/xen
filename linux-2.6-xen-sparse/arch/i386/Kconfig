@@ -1022,7 +1022,6 @@ source "drivers/pci/Kconfig"
 
 config ISA_DMA_API
 	bool
-	depends on !X86_XEN
 	default y
 
 config ISA
