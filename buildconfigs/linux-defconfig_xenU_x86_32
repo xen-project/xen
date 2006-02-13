@@ -187,6 +187,7 @@ CONFIG_HOTPLUG_CPU=y
 # Bus options (PCI, PCMCIA, EISA, MCA, ISA)
 #
 # CONFIG_PCI is not set
+CONFIG_ISA_DMA_API=y
 # CONFIG_SCx200 is not set
 
 #
