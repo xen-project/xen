@@ -23,30 +23,28 @@ void init_fpu(void)
     set_bit(_VCPUF_fpu_initialised, &current->vcpu_flags);
 }
 
-void save_init_fpu(struct vcpu *tsk)
+void save_init_fpu(struct vcpu *v)
 {
-    /*
-     * The guest OS may have set the 'virtual STTS' flag.
-     * This causes us to set the real flag, so we'll need
-     * to temporarily clear it while saving f-p state.
-     */
-    if ( HVM_DOMAIN(tsk) || (tsk->arch.guest_context.ctrlreg[0] & X86_CR0_TS) )
+    unsigned long cr0 = read_cr0();
+
+    /* This can happen, if a paravirtualised guest OS has set its CR0.TS. */
+    if ( cr0 & X86_CR0_TS )
         clts();
 
     if ( cpu_has_fxsr )
         __asm__ __volatile__ (
             "fxsave %0 ; fnclex"
-            : "=m" (tsk->arch.guest_context.fpu_ctxt) );
+            : "=m" (v->arch.guest_context.fpu_ctxt) );
     else
         __asm__ __volatile__ (
             "fnsave %0 ; fwait"
-            : "=m" (tsk->arch.guest_context.fpu_ctxt) );
+            : "=m" (v->arch.guest_context.fpu_ctxt) );
 
-    clear_bit(_VCPUF_fpu_dirtied, &tsk->vcpu_flags);
-    stts();
+    clear_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags);
+    write_cr0(cr0|X86_CR0_TS);
 }
 
-void restore_fpu(struct vcpu *tsk)
+void restore_fpu(struct vcpu *v)
 {
     /*
      * FXRSTOR can fault if passed a corrupted data block. We handle this
@@ -74,12 +72,12 @@ void restore_fpu(struct vcpu *tsk)
             "   "__FIXUP_WORD" 1b,2b  \n"
             ".previous                \n"
             : 
-            : "m" (tsk->arch.guest_context.fpu_ctxt),
-              "i" (sizeof(tsk->arch.guest_context.fpu_ctxt)/4) );
+            : "m" (v->arch.guest_context.fpu_ctxt),
+              "i" (sizeof(v->arch.guest_context.fpu_ctxt)/4) );
     else
         __asm__ __volatile__ (
             "frstor %0"
-            : : "m" (tsk->arch.guest_context.fpu_ctxt) );
+            : : "m" (v->arch.guest_context.fpu_ctxt) );
 }
 
 /*
