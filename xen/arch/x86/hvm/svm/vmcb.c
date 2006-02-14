@@ -489,7 +489,9 @@ void svm_do_resume(struct vcpu *v)
 {
     struct domain *d = v->domain;
     struct hvm_virpit *vpit = &d->arch.hvm_domain.vpit;
-    
+
+    svm_stts(v);
+
     if ( test_bit(iopacket_port(d), &d->shared_info->evtchn_pending[0]) ||
          test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags) )
         hvm_wait_io();
@@ -498,7 +500,7 @@ void svm_do_resume(struct vcpu *v)
     if ( vpit->first_injected )
         pickup_deactive_ticks(vpit);
     svm_set_tsc_shift(v, vpit);
-    
+
     /* We can't resume the guest if we're waiting on I/O */
     ASSERT(!test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags));
 }

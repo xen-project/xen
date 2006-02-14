@@ -701,12 +701,21 @@ void svm_stts(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    ASSERT(vmcb);    
+    /* FPU state already dirty? Then no need to setup_fpu() lazily. */
+    if ( test_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
+        return;
 
-    vmcb->cr0 |= X86_CR0_TS;
-
-    if (!(v->arch.hvm_svm.cpu_shadow_cr0 & X86_CR0_TS))
+    /*
+     * If the guest does not have TS enabled then we must cause and handle an 
+     * exception on first use of the FPU. If the guest *does* have TS enabled 
+     * then this is not necessary: no FPU activity can occur until the guest 
+     * clears CR0.TS, and we will initialise the FPU when that happens.
+     */
+    if ( !(v->arch.hvm_svm.cpu_shadow_cr0 & X86_CR0_TS) )
+    {
         v->arch.hvm_svm.vmcb->exception_intercepts |= EXCEPTION_BITMAP_NM;
+        vmcb->cr0 |= X86_CR0_TS;
+    }
 }
 
 static void arch_svm_do_launch(struct vcpu *v) 
@@ -884,14 +893,11 @@ static void svm_do_no_device_fault(struct vmcb_struct *vmcb)
 {
     struct vcpu *v = current;
 
-    clts();
-
     setup_fpu(v);    
-
-    if (!(v->arch.hvm_svm.cpu_shadow_cr0 & X86_CR0_TS))
-        vmcb->cr0 &= ~X86_CR0_TS;
-    
     vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_NM;
+
+    if ( !(v->arch.hvm_svm.cpu_shadow_cr0 & X86_CR0_TS) )
+        vmcb->cr0 &= ~X86_CR0_TS;
 }
 
 
@@ -1350,10 +1356,11 @@ static int svm_set_cr0(unsigned long value)
     vmcb->cr0 = value | X86_CR0_PG;
     v->arch.hvm_svm.cpu_shadow_cr0 = value;
 
-    /* Check if FP Unit Trap need to be on */
-    if (value & X86_CR0_TS)
-    { 
-       vmcb->exception_intercepts |= EXCEPTION_BITMAP_NM;
+    /* TS cleared? Then initialise FPU now. */
+    if ( !(value & X86_CR0_TS) )
+    {
+        setup_fpu(v);
+        vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_NM;
     }
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx\n", value);
@@ -1669,11 +1676,11 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
         break;
 
     case INSTR_CLTS:
-        clts();
+        /* TS being cleared means that it's time to restore fpu state. */
         setup_fpu(current);
+        vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_NM;
         vmcb->cr0 &= ~X86_CR0_TS; /* clear TS */
         v->arch.hvm_svm.cpu_shadow_cr0 &= ~X86_CR0_TS; /* clear TS */
-        vmcb->exception_intercepts &= ~EXCEPTION_BITMAP_NM;
         break;
 
     case INSTR_LMSW:
@@ -1803,11 +1810,8 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
     struct vcpu *v = current;
     struct hvm_virpit *vpit = &v->domain->arch.hvm_domain.vpit;
     s_time_t  next_pit = -1, next_wakeup;
-    unsigned int inst_len;
 
-    svm_stts(v);
-    inst_len = __get_instruction_length(vmcb, INSTR_HLT, NULL);
-    __update_guest_eip(vmcb, inst_len);
+    __update_guest_eip(vmcb, 1);
 
     if ( !v->vcpu_id )
         next_pit = get_pit_scheduled(v, vpit);
@@ -1822,7 +1826,6 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
 
 static inline void svm_vmexit_do_mwait(void)
 {
-    return;
 }
 
 
@@ -2494,7 +2497,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
         break;
 
     case VMEXIT_INTR:
-        svm_stts(v);
         raise_softirq(SCHEDULE_SOFTIRQ);
         break;
 

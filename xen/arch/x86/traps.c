@@ -1261,9 +1261,6 @@ asmlinkage int math_state_restore(struct cpu_user_regs *regs)
     struct trap_bounce *tb;
     struct trap_info *ti;
 
-    /* Prevent recursion. */
-    clts();
-
     setup_fpu(current);
 
     if ( current->arch.guest_context.ctrlreg[0] & X86_CR0_TS )

@@ -615,8 +615,8 @@ static void vmx_do_no_device_fault(void)
     unsigned long cr0;
     struct vcpu *v = current;
 
-    clts();
     setup_fpu(current);
+    __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
 
     /* Disable TS in guest CR0 unless the guest wants the exception too. */
     __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
@@ -626,9 +626,6 @@ static void vmx_do_no_device_fault(void)
         cr0 &= ~X86_CR0_TS;
         __vmwrite(GUEST_CR0, cr0);
     }
-
-    /* Xen itself doesn't need another exception. */
-    __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
 }
 
 /* Reserved bits: [31:15], [12:11], [9], [6], [2:1] */
@@ -1158,14 +1155,11 @@ static int vmx_set_cr0(unsigned long value)
     __vmread_vcpu(v, CR0_READ_SHADOW, &old_cr0);
     paging_enabled = (old_cr0 & X86_CR0_PE) && (old_cr0 & X86_CR0_PG);
 
-    /*
-     * Disable TS? Then we do so at the same time, and initialise FPU.
-     * This avoids needing another vmexit.
-     */
-    if ( (old_cr0 & ~value & X86_CR0_TS) != 0 )
+    /* TS cleared? Then initialise FPU now. */
+    if ( !(value & X86_CR0_TS) )
     {
-        clts();
         setup_fpu(v);
+        __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
     }
 
     __vmwrite(GUEST_CR0, value | X86_CR0_PE | X86_CR0_PG | X86_CR0_NE);
@@ -1520,8 +1514,8 @@ static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs 
         TRACE_VMEXIT(1,TYPE_CLTS);
 
         /* We initialise the FPU now, to avoid needing another vmexit. */
-        clts();
-        setup_fpu(current);
+        setup_fpu(v);
+        __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
 
         __vmread_vcpu(v, GUEST_CR0, &value);
         value &= ~X86_CR0_TS; /* clear TS */

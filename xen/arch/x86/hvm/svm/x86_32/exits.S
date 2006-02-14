@@ -89,7 +89,7 @@
 #define CLGI   .byte 0x0F,0x01,0xDD
 
 #define DO_TSC_OFFSET 0
-#define DO_FPUSAVE    1
+#define DO_FPUSAVE    0
         
 ENTRY(svm_asm_do_launch)
         sti

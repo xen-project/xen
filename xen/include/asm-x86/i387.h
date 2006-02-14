@@ -33,6 +33,7 @@ static inline void setup_fpu(struct vcpu *v)
 {
     if ( !test_and_set_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
     {
+        clts();
         if ( test_bit(_VCPUF_fpu_initialised, &v->vcpu_flags) )
             restore_fpu(v);
         else
