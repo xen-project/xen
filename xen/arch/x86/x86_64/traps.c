@@ -35,6 +35,10 @@ void show_registers(struct cpu_user_regs *regs)
         context = GUEST_MODE(regs) ? "guest" : "hypervisor";
         fault_crs[0] = read_cr0();
         fault_crs[3] = read_cr3();
+        fault_regs.ds = read_segment_register(ds);
+        fault_regs.es = read_segment_register(es);
+        fault_regs.fs = read_segment_register(fs);
+        fault_regs.gs = read_segment_register(gs);
     }
 
     printk("----[ Xen-%d.%d%s    %s ]----\n",
@@ -57,6 +61,10 @@ void show_registers(struct cpu_user_regs *regs)
            fault_regs.r12, fault_regs.r13, fault_regs.r14);
     printk("r15: %016lx   cr0: %016lx   cr3: %016lx\n",
            fault_regs.r15, fault_crs[0], fault_crs[3]);
+    printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   "
+           "ss: %04x   cs: %04x\n",
+           fault_regs.ds, fault_regs.es, fault_regs.fs,
+           fault_regs.gs, fault_regs.ss, fault_regs.cs);
 
     show_stack(regs);
 }

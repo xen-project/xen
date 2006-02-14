@@ -5,6 +5,12 @@
 #include <xen/types.h>
 #include <asm/bitops.h>
 
+#define read_segment_register(name)                                     \
+({  u16 __sel;                                                          \
+    __asm__ __volatile__ ( "movw %%" STR(name) ",%0" : "=r" (__sel) );  \
+    __sel;                                                              \
+})
+
 /* Clear and set 'TS' bit respectively */
 #define clts() __asm__ __volatile__ ("clts")
 #define stts() write_cr0(X86_CR0_TS|read_cr0())

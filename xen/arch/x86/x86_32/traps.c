@@ -37,16 +37,13 @@ void show_registers(struct cpu_user_regs *regs)
         if ( !GUEST_MODE(regs) )
         {
             fault_regs.esp = (unsigned long)&regs->esp;
-            fault_regs.ss = __HYPERVISOR_DS;
-            fault_regs.ds = __HYPERVISOR_DS;
-            fault_regs.es = __HYPERVISOR_DS;
-            fault_regs.cs = __HYPERVISOR_CS;
+            fault_regs.ss = read_segment_register(ss);
+            fault_regs.ds = read_segment_register(ds);
+            fault_regs.es = read_segment_register(es);
+            fault_regs.fs = read_segment_register(fs);
+            fault_regs.gs = read_segment_register(gs);
         }
 
-        __asm__ (
-            "movw %%fs,%0 ; movw %%gs,%1"
-            : "=r" (fault_regs.fs), "=r" (fault_regs.gs) );
-        
         fault_crs[0] = read_cr0();
         fault_crs[3] = read_cr3();
     }
