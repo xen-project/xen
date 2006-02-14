@@ -31,8 +31,7 @@ static unsigned int startup_none(unsigned int vector) { return 0; }
 static void disable_none(unsigned int vector) { }
 static void ack_none(unsigned int vector)
 {
-    printk("Unexpected IRQ trap at vector %02x.\n", vector);
-    ack_APIC_irq();
+    ack_bad_irq(vector);
 }
 
 #define shutdown_none   disable_none
@@ -84,11 +83,11 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
     while ( desc->status & IRQ_PENDING )
     {
         desc->status &= ~IRQ_PENDING;
-        irq_enter(smp_processor_id());
+        irq_enter();
         spin_unlock_irq(&desc->lock);
         action->handler(vector_to_irq(vector), action->dev_id, regs);
         spin_lock_irq(&desc->lock);
-        irq_exit(smp_processor_id());
+        irq_exit();
     }
 
     desc->status &= ~IRQ_INPROGRESS;

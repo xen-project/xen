@@ -71,9 +71,9 @@ static void (*vendor_thermal_interrupt)(struct cpu_user_regs *regs) = unexpected
 
 fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs)
 {
-	irq_enter(smp_processor_id());
+	irq_enter();
 	vendor_thermal_interrupt(regs);
-	irq_exit(smp_processor_id());
+	irq_exit();
 }
 
 /* P4/Xeon Thermal regulation detect and init */

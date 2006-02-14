@@ -35,10 +35,17 @@
 #include <mach_apic.h>
 #include <io_ports.h>
 
+#define set_irq_info(irq, mask) ((void)0)
+#define set_native_irq_info(irq, mask) ((void)0)
+
+/* Different to Linux: our implementation can be simpler. */
 #define make_8259A_irq(irq) (io_apic_irqs &= ~(1<<(irq)))
 
 int (*ioapic_renumber_irq)(int ioapic, int irq);
 atomic_t irq_mis_count;
+
+/* Where if anywhere is the i8259 connect in external int mode */
+static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 
 static DEFINE_SPINLOCK(ioapic_lock);
 
@@ -48,6 +55,8 @@ int skip_ioapic_setup;
  * # of IRQ routing registers
  */
 int nr_ioapic_registers[MAX_IO_APICS];
+
+int disable_timer_pin_1 __initdata;
 
 /*
  * Rough estimation of how many shared IRQs there are, can
@@ -67,7 +76,7 @@ static struct irq_pin_list {
     int apic, pin, next;
 } irq_2_pin[PIN_MAP_SIZE];
 
-int vector_irq[NR_VECTORS] = { [0 ... NR_VECTORS - 1] = -1};
+int vector_irq[NR_VECTORS] __read_mostly = { [0 ... NR_VECTORS - 1] = -1};
 
 /*
  * The common case is 1:1 IRQ<->pin mappings. Sometimes there are
@@ -173,7 +182,7 @@ static void unmask_IO_APIC_irq (unsigned int irq)
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
-void clear_IO_APIC_pin(unsigned int apic, unsigned int pin)
+static void clear_IO_APIC_pin(unsigned int apic, unsigned int pin)
 {
     struct IO_APIC_route_entry entry;
     unsigned long flags;
@@ -206,13 +215,21 @@ static void clear_IO_APIC (void)
             clear_IO_APIC_pin(apic, pin);
 }
 
+#ifdef CONFIG_SMP
 static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t cpumask)
 {
     unsigned long flags;
     int pin;
     struct irq_pin_list *entry = irq_2_pin + irq;
     unsigned int apicid_value;
+    cpumask_t tmp;
 	
+    cpus_and(tmp, cpumask, cpu_online_map);
+    if (cpus_empty(tmp))
+        tmp = TARGET_CPUS;
+
+    cpus_and(cpumask, tmp, CPU_MASK_ALL);
+
     apicid_value = cpu_mask_to_apicid(cpumask);
     /* Prepare to do the io_apic_write */
     apicid_value = apicid_value << 24;
@@ -226,8 +243,10 @@ static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t cpumask)
             break;
         entry = irq_2_pin + entry->next;
     }
+    set_irq_info(irq, cpumask);
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
+#endif /* CONFIG_SMP */
 
 /*
  * Find the IRQ entry number of a certain pin.
@@ -249,7 +268,7 @@ static int find_irq_entry(int apic, int pin, int type)
 /*
  * Find the pin to which IRQ[irq] (ISA) is connected
  */
-static int find_isa_irq_pin(int irq, int type)
+static int __init find_isa_irq_pin(int irq, int type)
 {
     int i;
 
@@ -269,6 +288,33 @@ static int find_isa_irq_pin(int irq, int type)
     return -1;
 }
 
+static int __init find_isa_irq_apic(int irq, int type)
+{
+    int i;
+
+    for (i = 0; i < mp_irq_entries; i++) {
+        int lbus = mp_irqs[i].mpc_srcbus;
+
+        if ((mp_bus_id_to_type[lbus] == MP_BUS_ISA ||
+             mp_bus_id_to_type[lbus] == MP_BUS_EISA ||
+             mp_bus_id_to_type[lbus] == MP_BUS_MCA ||
+             mp_bus_id_to_type[lbus] == MP_BUS_NEC98
+            ) &&
+            (mp_irqs[i].mpc_irqtype == type) &&
+            (mp_irqs[i].mpc_srcbusirq == irq))
+            break;
+    }
+    if (i < mp_irq_entries) {
+        int apic;
+        for(apic = 0; apic < nr_ioapics; apic++) {
+            if (mp_ioapics[apic].mpc_apicid == mp_irqs[i].mpc_dstapic)
+                return apic;
+        }
+    }
+
+    return -1;
+}
+
 /*
  * Find a specific PCI IRQ entry.
  * Not an __init, possibly needed by modules
@@ -276,10 +322,11 @@ static int find_isa_irq_pin(int irq, int type)
 static int pin_2_irq(int idx, int apic, int pin);
 
 /*
- * This function currently is only a helper for the i386 smp boot process where
- * we need to reprogram the ioredtbls to cater for the cpus which have come
- * online so mask in all cases should simply be TARGET_CPUS
+ * This function currently is only a helper for the i386 smp boot process where 
+ * we need to reprogram the ioredtbls to cater for the cpus which have come online
+ * so mask in all cases should simply be TARGET_CPUS
  */
+#ifdef CONFIG_SMP
 void __init setup_ioapic_dest(void)
 {
     int pin, ioapic, irq, irq_entry;
@@ -298,6 +345,7 @@ void __init setup_ioapic_dest(void)
 
     }
 }
+#endif
 
 /*
  * EISA Edge/Level control register, ELCR
@@ -571,7 +619,7 @@ static inline int IO_APIC_irq_trigger(int irq)
 }
 
 /* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
-u8 irq_vector[NR_IRQ_VECTORS];
+u8 irq_vector[NR_IRQ_VECTORS] __read_mostly = { FIRST_DEVICE_VECTOR , 0 };
 
 int assign_irq_vector(int irq)
 {
@@ -580,7 +628,7 @@ int assign_irq_vector(int irq)
     BUG_ON(irq >= NR_IRQ_VECTORS);
     if (irq != AUTO_ASSIGN && IO_APIC_VECTOR(irq) > 0)
         return IO_APIC_VECTOR(irq);
- next:
+next:
     current_vector += 8;
 
     /* Skip the hypercall vector. */
@@ -621,7 +669,7 @@ static inline void ioapic_register_intr(int irq, int vector, unsigned long trigg
         irq_desc[vector].handler = &ioapic_edge_type;
 }
 
-void __init setup_IO_APIC_irqs(void)
+static void __init setup_IO_APIC_irqs(void)
 {
     struct IO_APIC_route_entry entry;
     int apic, pin, idx, irq, first_notcon = 1, vector;
@@ -689,6 +737,7 @@ void __init setup_IO_APIC_irqs(void)
             spin_lock_irqsave(&ioapic_lock, flags);
             io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));
             io_apic_write(apic, 0x10+2*pin, *(((int *)&entry)+0));
+            set_native_irq_info(entry.vector, TARGET_CPUS);
             spin_unlock_irqrestore(&ioapic_lock, flags);
 	}
     }
@@ -700,7 +749,7 @@ void __init setup_IO_APIC_irqs(void)
 /*
  * Set up the 8259A-master output pin:
  */
-void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
+static void __init setup_ExtINT_IRQ0_pin(unsigned int apic, unsigned int pin, int vector)
 {
     struct IO_APIC_route_entry entry;
     unsigned long flags;
@@ -734,8 +783,8 @@ void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
      * Add it to the IO-APIC irq-routing table:
      */
     spin_lock_irqsave(&ioapic_lock, flags);
-    io_apic_write(0, 0x11+2*pin, *(((int *)&entry)+1));
-    io_apic_write(0, 0x10+2*pin, *(((int *)&entry)+0));
+    io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));
+    io_apic_write(apic, 0x10+2*pin, *(((int *)&entry)+0));
     spin_unlock_irqrestore(&ioapic_lock, flags);
 
     enable_8259A_irq(0);
@@ -901,7 +950,8 @@ void print_IO_APIC_keyhandler(unsigned char key)
 static void __init enable_IO_APIC(void)
 {
     union IO_APIC_reg_01 reg_01;
-    int i;
+    int i8259_apic, i8259_pin;
+    int i, apic;
     unsigned long flags;
 
     for (i = 0; i < PIN_MAP_SIZE; i++) {
@@ -912,11 +962,52 @@ static void __init enable_IO_APIC(void)
     /*
      * The number of IO-APIC IRQ registers (== #pins):
      */
-    for (i = 0; i < nr_ioapics; i++) {
+    for (apic = 0; apic < nr_ioapics; apic++) {
         spin_lock_irqsave(&ioapic_lock, flags);
-        reg_01.raw = io_apic_read(i, 1);
+        reg_01.raw = io_apic_read(apic, 1);
         spin_unlock_irqrestore(&ioapic_lock, flags);
-        nr_ioapic_registers[i] = reg_01.bits.entries+1;
+        nr_ioapic_registers[apic] = reg_01.bits.entries+1;
+    }
+    for(apic = 0; apic < nr_ioapics; apic++) {
+        int pin;
+        /* See if any of the pins is in ExtINT mode */
+        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
+            struct IO_APIC_route_entry entry;
+            spin_lock_irqsave(&ioapic_lock, flags);
+            *(((int *)&entry) + 0) = io_apic_read(apic, 0x10 + 2 * pin);
+            *(((int *)&entry) + 1) = io_apic_read(apic, 0x11 + 2 * pin);
+            spin_unlock_irqrestore(&ioapic_lock, flags);
+
+
+            /* If the interrupt line is enabled and in ExtInt mode
+             * I have found the pin where the i8259 is connected.
+             */
+            if ((entry.mask == 0) && (entry.delivery_mode == dest_ExtINT)) {
+                ioapic_i8259.apic = apic;
+                ioapic_i8259.pin  = pin;
+                goto found_i8259;
+            }
+        }
+    }
+ found_i8259:
+    /* Look to see what if the MP table has reported the ExtINT */
+    /* If we could not find the appropriate pin by looking at the ioapic
+     * the i8259 probably is not connected the ioapic but give the
+     * mptable a chance anyway.
+     */
+    i8259_pin  = find_isa_irq_pin(0, mp_ExtINT);
+    i8259_apic = find_isa_irq_apic(0, mp_ExtINT);
+    /* Trust the MP table if nothing is setup in the hardware */
+    if ((ioapic_i8259.pin == -1) && (i8259_pin >= 0)) {
+        printk(KERN_WARNING "ExtINT not setup in hardware but reported by MP table\n");
+        ioapic_i8259.pin  = i8259_pin;
+        ioapic_i8259.apic = i8259_apic;
+    }
+    /* Complain if the MP table and the hardware disagree */
+    if (((ioapic_i8259.apic != i8259_apic) || (ioapic_i8259.pin != i8259_pin)) &&
+        (i8259_pin >= 0) && (ioapic_i8259.pin >= 0))
+    {
+        printk(KERN_WARNING "ExtINT in hardware and MP table differ\n");
     }
 
     /*
@@ -932,10 +1023,41 @@ void disable_IO_APIC(void)
 {
     /*
      * Clear the IO-APIC before rebooting:
-	 */
+     */
     clear_IO_APIC();
 
-    disconnect_bsp_APIC();
+    /*
+     * If the i8259 is routed through an IOAPIC
+     * Put that IOAPIC in virtual wire mode
+     * so legacy interrupts can be delivered.
+     */
+    if (ioapic_i8259.pin != -1) {
+        struct IO_APIC_route_entry entry;
+        unsigned long flags;
+
+        memset(&entry, 0, sizeof(entry));
+        entry.mask            = 0; /* Enabled */
+        entry.trigger         = 0; /* Edge */
+        entry.irr             = 0;
+        entry.polarity        = 0; /* High */
+        entry.delivery_status = 0;
+        entry.dest_mode       = 0; /* Physical */
+        entry.delivery_mode   = dest_ExtINT; /* ExtInt */
+        entry.vector          = 0;
+        entry.dest.physical.physical_dest =
+            GET_APIC_ID(apic_read(APIC_ID));
+
+        /*
+         * Add it to the IO-APIC irq-routing table:
+         */
+        spin_lock_irqsave(&ioapic_lock, flags);
+        io_apic_write(ioapic_i8259.apic, 0x11+2*ioapic_i8259.pin,
+                      *(((int *)&entry)+1));
+        io_apic_write(ioapic_i8259.apic, 0x10+2*ioapic_i8259.pin,
+                      *(((int *)&entry)+0));
+        spin_unlock_irqrestore(&ioapic_lock, flags);
+    }
+    disconnect_bsp_APIC(ioapic_i8259.pin != -1);
 }
 
 /*
@@ -1248,6 +1370,8 @@ static void set_ioapic_affinity_vector(
     unsigned int vector, cpumask_t cpu_mask)
 {
     int irq = vector_to_irq(vector);
+
+    set_native_irq_info(vector, cpu_mask);
     set_ioapic_affinity_irq(irq, cpu_mask);
 }
 
@@ -1292,6 +1416,7 @@ static struct hw_interrupt_type ioapic_level_type = {
 static inline void init_IO_APIC_traps(void)
 {
     int irq;
+    /* Xen: This is way simpler than the Linux implementation. */
     for (irq = 0; irq < 16 ; irq++)
         if (IO_APIC_IRQ(irq) && !IO_APIC_VECTOR(irq))
             make_8259A_irq(irq);
@@ -1339,20 +1464,21 @@ static struct hw_interrupt_type lapic_irq_type = {
  */
 static inline void unlock_ExtINT_logic(void)
 {
-    int pin, i;
+    int apic, pin, i;
     struct IO_APIC_route_entry entry0, entry1;
     unsigned char save_control, save_freq_select;
     unsigned long flags;
 
     pin = find_isa_irq_pin(8, mp_INT);
+    apic = find_isa_irq_apic(8, mp_INT);
     if (pin == -1)
         return;
 
     spin_lock_irqsave(&ioapic_lock, flags);
-    *(((int *)&entry0) + 1) = io_apic_read(0, 0x11 + 2 * pin);
-    *(((int *)&entry0) + 0) = io_apic_read(0, 0x10 + 2 * pin);
+    *(((int *)&entry0) + 1) = io_apic_read(apic, 0x11 + 2 * pin);
+    *(((int *)&entry0) + 0) = io_apic_read(apic, 0x10 + 2 * pin);
     spin_unlock_irqrestore(&ioapic_lock, flags);
-    clear_IO_APIC_pin(0, pin);
+    clear_IO_APIC_pin(apic, pin);
 
     memset(&entry1, 0, sizeof(entry1));
 
@@ -1365,8 +1491,8 @@ static inline void unlock_ExtINT_logic(void)
     entry1.vector = 0;
 
     spin_lock_irqsave(&ioapic_lock, flags);
-    io_apic_write(0, 0x11 + 2 * pin, *(((int *)&entry1) + 1));
-    io_apic_write(0, 0x10 + 2 * pin, *(((int *)&entry1) + 0));
+    io_apic_write(apic, 0x11 + 2 * pin, *(((int *)&entry1) + 1));
+    io_apic_write(apic, 0x10 + 2 * pin, *(((int *)&entry1) + 0));
     spin_unlock_irqrestore(&ioapic_lock, flags);
 
     save_control = CMOS_READ(RTC_CONTROL);
@@ -1384,11 +1510,11 @@ static inline void unlock_ExtINT_logic(void)
 
     CMOS_WRITE(save_control, RTC_CONTROL);
     CMOS_WRITE(save_freq_select, RTC_FREQ_SELECT);
-    clear_IO_APIC_pin(0, pin);
+    clear_IO_APIC_pin(apic, pin);
 
     spin_lock_irqsave(&ioapic_lock, flags);
-    io_apic_write(0, 0x11 + 2 * pin, *(((int *)&entry0) + 1));
-    io_apic_write(0, 0x10 + 2 * pin, *(((int *)&entry0) + 0));
+    io_apic_write(apic, 0x11 + 2 * pin, *(((int *)&entry0) + 1));
+    io_apic_write(apic, 0x10 + 2 * pin, *(((int *)&entry0) + 0));
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
@@ -1400,7 +1526,7 @@ static inline void unlock_ExtINT_logic(void)
  */
 static inline void check_timer(void)
 {
-    int pin1, pin2;
+    int apic1, pin1, apic2, pin2;
     int vector;
 
     /*
@@ -1425,10 +1551,13 @@ static inline void check_timer(void)
     timer_ack = 1;
     enable_8259A_irq(0);
 
-    pin1 = find_isa_irq_pin(0, mp_INT);
-    pin2 = find_isa_irq_pin(0, mp_ExtINT);
+    pin1  = find_isa_irq_pin(0, mp_INT);
+    apic1 = find_isa_irq_apic(0, mp_INT);
+    pin2  = ioapic_i8259.pin;
+    apic2 = ioapic_i8259.apic;
 
-    printk(KERN_INFO "..TIMER: vector=0x%02X pin1=%d pin2=%d\n", vector, pin1, pin2);
+    printk(KERN_INFO "..TIMER: vector=0x%02X apic1=%d pin1=%d apic2=%d pin2=%d\n",
+           vector, apic1, pin1, apic2, pin2);
 
     if (pin1 != -1) {
         /*
@@ -1436,10 +1565,13 @@ static inline void check_timer(void)
          */
         unmask_IO_APIC_irq(0);
         if (timer_irq_works()) {
+            if (disable_timer_pin_1 > 0)
+                clear_IO_APIC_pin(apic1, pin1);
             return;
         }
-        clear_IO_APIC_pin(0, pin1);
-        printk(KERN_ERR "..MP-BIOS bug: 8254 timer not connected to IO-APIC\n");
+        clear_IO_APIC_pin(apic1, pin1);
+        printk(KERN_ERR "..MP-BIOS bug: 8254 timer not connected to "
+               "IO-APIC\n");
     }
 
     printk(KERN_INFO "...trying to set up timer (IRQ0) through the 8259A ... ");
@@ -1448,19 +1580,19 @@ static inline void check_timer(void)
         /*
          * legacy devices should be connected to IO APIC #0
          */
-        setup_ExtINT_IRQ0_pin(pin2, vector);
+        setup_ExtINT_IRQ0_pin(apic2, pin2, vector);
         if (timer_irq_works()) {
             printk("works.\n");
             if (pin1 != -1)
-                replace_pin_at_irq(0, 0, pin1, 0, pin2);
+                replace_pin_at_irq(0, apic1, pin1, apic2, pin2);
             else
-                add_pin_to_irq(0, 0, pin2);
+                add_pin_to_irq(0, apic2, pin2);
             return;
         }
         /*
          * Cleanup, just in case ...
          */
-        clear_IO_APIC_pin(0, pin2);
+        clear_IO_APIC_pin(apic2, pin2);
     }
     printk(" failed.\n");
 
@@ -1699,6 +1831,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
     spin_lock_irqsave(&ioapic_lock, flags);
     io_apic_write(ioapic, 0x11+2*pin, *(((int *)&entry)+1));
     io_apic_write(ioapic, 0x10+2*pin, *(((int *)&entry)+0));
+    set_native_irq_info(entry.vector, TARGET_CPUS);
     spin_unlock_irqrestore(&ioapic_lock, flags);
 
     return 0;

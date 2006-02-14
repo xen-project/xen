@@ -38,9 +38,53 @@
 #include <io_ports.h>
 
 /*
+ * Knob to control our willingness to enable the local APIC.
+ */
+int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enable */
+
+/*
  * Debug level
  */
 int apic_verbosity;
+
+
+static void apic_pm_activate(void);
+
+/*
+ * 'what should we do if we get a hw irq event on an illegal vector'.
+ * each architecture has to answer this themselves.
+ */
+void ack_bad_irq(unsigned int irq)
+{
+    printk("unexpected IRQ trap at vector %02x\n", irq);
+    /*
+     * Currently unexpected vectors happen only on SMP and APIC.
+     * We _must_ ack these because every local APIC has only N
+     * irq slots per priority level, and a 'hanging, unacked' IRQ
+     * holds up an irq slot - in excessive cases (when multiple
+     * unexpected vectors occur) that might lock up the APIC
+     * completely.
+     */
+    ack_APIC_irq();
+}
+
+void __init apic_intr_init(void)
+{
+#ifdef CONFIG_SMP
+    smp_intr_init();
+#endif
+    /* self generated IPI for local APIC timer */
+    set_intr_gate(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
+
+    /* IPI vectors for APIC spurious and error interrupts */
+    set_intr_gate(SPURIOUS_APIC_VECTOR, spurious_interrupt);
+    set_intr_gate(ERROR_APIC_VECTOR, error_interrupt);
+
+    /* thermal monitor LVT interrupt */
+#ifdef CONFIG_X86_MCE_P4THERMAL
+    set_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
+#endif
+}
 
 /* Using APIC to generate smp_local_timer_interrupt? */
 int using_apic_timer = 0;
@@ -148,7 +192,7 @@ void __init connect_bsp_APIC(void)
     enable_apic_mode();
 }
 
-void disconnect_bsp_APIC(void)
+void disconnect_bsp_APIC(int virt_wire_setup)
 {
     if (pic_mode) {
         /*
@@ -161,6 +205,42 @@ void disconnect_bsp_APIC(void)
                     "entering PIC mode.\n");
         outb(0x70, 0x22);
         outb(0x00, 0x23);
+    }
+    else {
+        /* Go back to Virtual Wire compatibility mode */
+        unsigned long value;
+
+        /* For the spurious interrupt use vector F, and enable it */
+        value = apic_read(APIC_SPIV);
+        value &= ~APIC_VECTOR_MASK;
+        value |= APIC_SPIV_APIC_ENABLED;
+        value |= 0xf;
+        apic_write_around(APIC_SPIV, value);
+
+        if (!virt_wire_setup) {
+            /* For LVT0 make it edge triggered, active high, external and enabled */
+            value = apic_read(APIC_LVT0);
+            value &= ~(APIC_MODE_MASK | APIC_SEND_PENDING |
+                       APIC_INPUT_POLARITY | APIC_LVT_REMOTE_IRR |
+                       APIC_LVT_LEVEL_TRIGGER | APIC_LVT_MASKED );
+            value |= APIC_LVT_REMOTE_IRR | APIC_SEND_PENDING;
+            value = SET_APIC_DELIVERY_MODE(value, APIC_MODE_EXTINT);
+            apic_write_around(APIC_LVT0, value);
+        }
+        else {
+            /* Disable LVT0 */
+            apic_write_around(APIC_LVT0, APIC_LVT_MASKED);
+        }
+
+        /* For LVT1 make it edge triggered, active high, nmi and enabled */
+        value = apic_read(APIC_LVT1);
+        value &= ~(
+            APIC_MODE_MASK | APIC_SEND_PENDING |
+            APIC_INPUT_POLARITY | APIC_LVT_REMOTE_IRR |
+            APIC_LVT_LEVEL_TRIGGER | APIC_LVT_MASKED);
+        value |= APIC_LVT_REMOTE_IRR | APIC_SEND_PENDING;
+        value = SET_APIC_DELIVERY_MODE(value, APIC_MODE_NMI);
+        apic_write_around(APIC_LVT1, value);
     }
 }
 
@@ -306,7 +386,7 @@ void __init init_bsp_APIC(void)
     apic_write_around(APIC_LVT1, value);
 }
 
-void __init setup_local_APIC (void)
+void __devinit setup_local_APIC(void)
 {
     unsigned long oldvalue, value, ver, maxlvt;
 
@@ -453,17 +533,15 @@ void __init setup_local_APIC (void)
 
     if (nmi_watchdog == NMI_LOCAL_APIC)
         setup_apic_nmi_watchdog();
+    apic_pm_activate();
 }
+
+static void apic_pm_activate(void) { }
 
 /*
  * Detect and enable local APICs on non-SMP boards.
  * Original code written by Keir Fraser.
  */
-
-/*
- * Knob to control our willingness to enable the local APIC.
- */
-int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enable */
 
 static void __init lapic_disable(char *str)
 {
@@ -497,9 +575,6 @@ static int __init detect_init_APIC (void)
     /* Disabled by kernel option? */
     if (enable_local_apic < 0)
         return -1;
-
-    /* Workaround for us being called before identify_cpu(). */
-    /*get_cpu_vendor(&boot_cpu_data); Not for Xen */
 
     switch (boot_cpu_data.x86_vendor) {
     case X86_VENDOR_AMD:
@@ -563,6 +638,8 @@ static int __init detect_init_APIC (void)
         nmi_watchdog = NMI_LOCAL_APIC;
 
     printk("Found and enabled local APIC!\n");
+
+    apic_pm_activate();
 
     return 0;
 
@@ -824,26 +901,27 @@ static unsigned int calibration_result;
 
 void __init setup_boot_APIC_clock(void)
 {
+    unsigned long flags;
     apic_printk(APIC_VERBOSE, "Using local APIC timer interrupts.\n");
     using_apic_timer = 1;
 
-    local_irq_disable();
-    
+    local_irq_save(flags);
+
     calibration_result = calibrate_APIC_clock();
     /*
      * Now set up the timer for real.
      */
     setup_APIC_timer(calibration_result);
     
-    local_irq_enable();
+    local_irq_restore(flags);
 }
 
-void __init setup_secondary_APIC_clock(void)
+void __devinit setup_secondary_APIC_clock(void)
 {
     setup_APIC_timer(calibration_result);
 }
 
-void __init disable_APIC_timer(void)
+void disable_APIC_timer(void)
 {
     if (using_apic_timer) {
         unsigned long v;
@@ -941,6 +1019,7 @@ fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs)
 {
     unsigned long v;
 
+    irq_enter();
     /*
      * Check if this really is a spurious interrupt and ACK it
      * if it is a vectored one.  Just in case...
@@ -953,6 +1032,7 @@ fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs)
     /* see sw-dev-man vol 3, chapter 7.4.13.5 */
     printk(KERN_INFO "spurious APIC interrupt on CPU#%d, should never happen.\n",
            smp_processor_id());
+    irq_exit();
 }
 
 /*
@@ -963,6 +1043,7 @@ fastcall void smp_error_interrupt(struct cpu_user_regs *regs)
 {
     unsigned long v, v1;
 
+    irq_enter();
     /* First tickle the hardware, only then report what went on. -- REW */
     v = apic_read(APIC_ESR);
     apic_write(APIC_ESR, 0);
@@ -982,6 +1063,7 @@ fastcall void smp_error_interrupt(struct cpu_user_regs *regs)
     */
     printk (KERN_DEBUG "APIC error on CPU%d: %02lx(%02lx)\n",
             smp_processor_id(), v , v1);
+    irq_exit();
 }
 
 /*

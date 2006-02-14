@@ -58,6 +58,7 @@
 asmlinkage void x(void);                        \
 __asm__(                                        \
     "\n"__ALIGN_STR"\n"                         \
+    ".globl " STR(x) "\n\t"                     \
     STR(x) ":\n\t"                              \
     "pushl $"#v"<<16\n\t"                       \
     STR(SAVE_ALL(a))                            \
@@ -66,8 +67,6 @@ __asm__(                                        \
     "call "STR(smp_##x)"\n\t"                   \
     "addl $4,%esp\n\t"                          \
     "jmp ret_from_intr\n");
-
-#define BUILD_SMP_TIMER_INTERRUPT(x,v) BUILD_SMP_INTERRUPT(x,v)
 
 #define BUILD_COMMON_IRQ()                      \
 __asm__(                                        \

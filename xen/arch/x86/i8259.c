@@ -374,25 +374,7 @@ void __init init_IRQ(void)
         irq_desc[LEGACY_VECTOR(i)].handler = &i8259A_irq_type;
     }
 
-    /*
-     * IRQ0 must be given a fixed assignment and initialized,
-     * because it's used before the IO-APIC is set up.
-     */
-    irq_vector[0] = FIRST_DEVICE_VECTOR;
-    vector_irq[FIRST_DEVICE_VECTOR] = 0;
-
-    /* Various IPI functions. */
-    set_intr_gate(EVENT_CHECK_VECTOR, event_check_interrupt);
-    set_intr_gate(INVALIDATE_TLB_VECTOR, invalidate_interrupt);
-    set_intr_gate(CALL_FUNCTION_VECTOR, call_function_interrupt);
-
-    /* Self-generated IPI for local APIC timer. */
-    set_intr_gate(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
-
-    /* IPI vectors for APIC spurious and error interrupts. */
-    set_intr_gate(SPURIOUS_APIC_VECTOR, spurious_interrupt);
-    set_intr_gate(ERROR_APIC_VECTOR, error_interrupt);
-    set_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
+    apic_intr_init();
 
     /* Set the clock to HZ Hz */
 #define CLOCK_TICK_RATE 1193180 /* crystal freq (Hz) */

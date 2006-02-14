@@ -24,6 +24,14 @@ extern u8 irq_vector[NR_IRQ_VECTORS];
 
 #define platform_legacy_irq(irq)	((irq) < 16)
 
+fastcall void event_check_interrupt(void);
+fastcall void invalidate_interrupt(void);
+fastcall void call_function_interrupt(void);
+fastcall void apic_timer_interrupt(void);
+fastcall void error_interrupt(void);
+fastcall void spurious_interrupt(void);
+fastcall void thermal_interrupt(void);
+
 void disable_8259A_irq(unsigned int irq);
 void enable_8259A_irq(unsigned int irq);
 int i8259A_irq_pending(unsigned int irq);

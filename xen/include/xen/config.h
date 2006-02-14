@@ -52,4 +52,7 @@
 #define mk_unsigned_long(x) x
 #endif /* !__ASSEMBLY__ */
 
+#define fastcall
+#define __read_mostly
+
 #endif /* __XEN_CONFIG_H__ */

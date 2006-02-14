@@ -15,7 +15,12 @@ typedef struct {
 
 #define in_irq() (local_irq_count(smp_processor_id()) != 0)
 
-#define irq_enter(cpu)	(local_irq_count(cpu)++)
-#define irq_exit(cpu)	(local_irq_count(cpu)--)
+#define irq_enter()	(local_irq_count(smp_processor_id())++)
+#define irq_exit()	(local_irq_count(smp_processor_id())--)
+
+void ack_bad_irq(unsigned int irq);
+
+extern void apic_intr_init(void);
+extern void smp_intr_init(void);
 
 #endif /* __ASM_HARDIRQ_H */
