@@ -1,5 +1,6 @@
 
 #include <xen/config.h>
+#include <xen/compile.h>
 #include <xen/init.h>
 #include <xen/sched.h>
 #include <xen/lib.h>
@@ -20,6 +21,7 @@ void show_registers(struct cpu_user_regs *regs)
 {
     struct cpu_user_regs fault_regs = *regs;
     unsigned long fault_crs[8];
+    char taint_str[TAINT_STRING_MAX_LEN];
     const char *context;
 
     if ( HVM_DOMAIN(current) && GUEST_MODE(regs) )
@@ -35,6 +37,9 @@ void show_registers(struct cpu_user_regs *regs)
         fault_crs[3] = read_cr3();
     }
 
+    printk("----[ Xen-%d.%d%s    %s ]----\n",
+           XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
+           print_tainted(taint_str));
     printk("CPU:    %d\nRIP:    %04x:[<%016lx>]",
            smp_processor_id(), fault_regs.cs, fault_regs.rip);
     if ( !GUEST_MODE(regs) )

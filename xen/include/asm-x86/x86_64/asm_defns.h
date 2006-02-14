@@ -69,21 +69,11 @@ __asm__(                                        \
     "pushq $0\n\t"                              \
     "movl $"#v",4(%rsp)\n\t"                    \
     STR(SAVE_ALL)                               \
-    "callq "STR(smp_##x)"\n\t"                  \
-    "jmp ret_from_intr\n");
-
-#define BUILD_SMP_TIMER_INTERRUPT(x,v) XBUILD_SMP_TIMER_INTERRUPT(x,v)
-#define XBUILD_SMP_TIMER_INTERRUPT(x,v)         \
-asmlinkage void x(struct cpu_user_regs * regs); \
-__asm__(                                        \
-"\n"__ALIGN_STR"\n"                             \
-STR(x) ":\n\t"                                  \
-    "pushq $0\n\t"                              \
-    "movl $"#v",4(%rsp)\n\t"                    \
-    STR(SAVE_ALL)                               \
     "movq %rsp,%rdi\n\t"                        \
     "callq "STR(smp_##x)"\n\t"                  \
     "jmp ret_from_intr\n");
+
+#define BUILD_SMP_TIMER_INTERRUPT(x,v) BUILD_SMP_INTERRUPT(x,v)
 
 #define BUILD_COMMON_IRQ()                      \
 __asm__(                                        \

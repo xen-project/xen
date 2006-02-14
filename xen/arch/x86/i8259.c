@@ -68,9 +68,10 @@ BUILD_SMP_INTERRUPT(call_function_interrupt,CALL_FUNCTION_VECTOR)
  * overflow. Linux uses the local APIC timer interrupt to get
  * a much simpler SMP time architecture:
  */
-BUILD_SMP_TIMER_INTERRUPT(apic_timer_interrupt,LOCAL_TIMER_VECTOR)
+BUILD_SMP_INTERRUPT(apic_timer_interrupt,LOCAL_TIMER_VECTOR)
 BUILD_SMP_INTERRUPT(error_interrupt,ERROR_APIC_VECTOR)
 BUILD_SMP_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
+BUILD_SMP_INTERRUPT(thermal_interrupt,THERMAL_APIC_VECTOR)
 
 #define IRQ(x,y) \
     IRQ##x##y##_interrupt
@@ -391,6 +392,7 @@ void __init init_IRQ(void)
     /* IPI vectors for APIC spurious and error interrupts. */
     set_intr_gate(SPURIOUS_APIC_VECTOR, spurious_interrupt);
     set_intr_gate(ERROR_APIC_VECTOR, error_interrupt);
+    set_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
 
     /* Set the clock to HZ Hz */
 #define CLOCK_TICK_RATE 1193180 /* crystal freq (Hz) */

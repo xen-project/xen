@@ -218,12 +218,12 @@ typedef struct {
 	mtrr_type type;
 } arr_state_t;
 
-arr_state_t arr_state[8] __initdata = {
+static arr_state_t arr_state[8] __devinitdata = {
 	{0UL, 0UL, 0UL}, {0UL, 0UL, 0UL}, {0UL, 0UL, 0UL}, {0UL, 0UL, 0UL},
 	{0UL, 0UL, 0UL}, {0UL, 0UL, 0UL}, {0UL, 0UL, 0UL}, {0UL, 0UL, 0UL}
 };
 
-unsigned char ccr_state[7] __initdata = { 0, 0, 0, 0, 0, 0, 0 };
+static unsigned char ccr_state[7] __devinitdata = { 0, 0, 0, 0, 0, 0, 0 };
 
 static void cyrix_set_all(void)
 {
@@ -243,6 +243,7 @@ static void cyrix_set_all(void)
 	post_set();
 }
 
+#if 0
 /*
  * On Cyrix 6x86(MX) and M II the ARR3 is special: it has connection
  * with the SMM (System Management Mode) mode. So we need the following:
@@ -341,10 +342,11 @@ cyrix_arr_init(void)
 	if (ccrc[6])
 		printk(KERN_INFO "mtrr: ARR3 was write protected, unprotected\n");
 }
+#endif
 
 static struct mtrr_ops cyrix_mtrr_ops = {
 	.vendor            = X86_VENDOR_CYRIX,
-	.init              = cyrix_arr_init,
+//	.init              = cyrix_arr_init,
 	.set_all	   = cyrix_set_all,
 	.set               = cyrix_set_arr,
 	.get               = cyrix_get_arr,

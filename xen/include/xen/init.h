@@ -100,4 +100,6 @@ extern struct kernel_param __setup_start, __setup_end;
 #define __devexitdata __exitdata
 #endif
 
+#define fastcall
+
 #endif /* _LINUX_INIT_H */

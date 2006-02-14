@@ -42,27 +42,24 @@
 #include <asm/msr.h>
 #include "mtrr.h"
 
-#define MTRR_VERSION            "2.0 (20020519)"
-
 /* No blocking mutexes in Xen. Spin instead. */
 #define DECLARE_MUTEX(_m) spinlock_t _m = SPIN_LOCK_UNLOCKED
 #define down(_m) spin_lock(_m)
 #define up(_m) spin_unlock(_m)
+#define lock_cpu_hotplug() ((void)0)
+#define unlock_cpu_hotplug() ((void)0)
+#define dump_stack() ((void)0)
 
 u32 num_var_ranges = 0;
 
 unsigned int *usage_table;
-static DECLARE_MUTEX(main_lock);
+static DECLARE_MUTEX(mtrr_sem);
 
 u32 size_or_mask, size_and_mask;
 
 static struct mtrr_ops * mtrr_ops[X86_VENDOR_NUM] = {};
 
 struct mtrr_ops * mtrr_if = NULL;
-
-__initdata char *mtrr_if_name[] = {
-    "none", "Intel", "AMD K6", "Cyrix ARR", "Centaur MCR"
-};
 
 static void set_mtrr(unsigned int reg, unsigned long base,
 		     unsigned long size, mtrr_type type);
@@ -98,7 +95,7 @@ static int have_wrcomb(void)
 }
 
 /*  This function returns the number of variable MTRRs  */
-void __init set_num_var_ranges(void)
+static void __init set_num_var_ranges(void)
 {
 	unsigned long config = 0, dummy;
 
@@ -329,8 +326,10 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 
 	error = -EINVAL;
 
+	/* No CPU hotplug when we change MTRR entries */
+	lock_cpu_hotplug();
 	/*  Search for existing MTRR  */
-	down(&main_lock);
+	down(&mtrr_sem);
 	for (i = 0; i < num_var_ranges; ++i) {
 		mtrr_if->get(i, &lbase, &lsize, &ltype);
 		if (base >= lbase + lsize)
@@ -368,8 +367,22 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 		printk(KERN_INFO "mtrr: no more MTRRs available\n");
 	error = i;
  out:
-	up(&main_lock);
+	up(&mtrr_sem);
+	unlock_cpu_hotplug();
 	return error;
+}
+
+static int mtrr_check(unsigned long base, unsigned long size)
+{
+	if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
+		printk(KERN_WARNING
+			"mtrr: size and base must be multiples of 4 kiB\n");
+		printk(KERN_DEBUG
+			"mtrr: size: 0x%lx  base: 0x%lx\n", size, base);
+		dump_stack();
+		return -1;
+	}
+	return 0;
 }
 
 /**
@@ -412,11 +425,8 @@ int
 mtrr_add(unsigned long base, unsigned long size, unsigned int type,
 	 char increment)
 {
-	if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
-		printk(KERN_WARNING "mtrr: size and base must be multiples of 4 kiB\n");
-		printk(KERN_DEBUG "mtrr: size: 0x%lx  base: 0x%lx\n", size, base);
+	if (mtrr_check(base, size))
 		return -EINVAL;
-	}
 	return mtrr_add_page(base >> PAGE_SHIFT, size >> PAGE_SHIFT, type,
 			     increment);
 }
@@ -448,7 +458,9 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 		return -ENXIO;
 
 	max = num_var_ranges;
-	down(&main_lock);
+	/* No CPU hotplug when we change MTRR entries */
+	lock_cpu_hotplug();
+	down(&mtrr_sem);
 	if (reg < 0) {
 		/*  Search for existing MTRR  */
 		for (i = 0; i < max; ++i) {
@@ -487,7 +499,8 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 		set_mtrr(reg, 0, 0, 0);
 	error = reg;
  out:
-	up(&main_lock);
+	up(&mtrr_sem);
+	unlock_cpu_hotplug();
 	return error;
 }
 /**
@@ -508,11 +521,8 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 int
 mtrr_del(int reg, unsigned long base, unsigned long size)
 {
-	if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
-		printk(KERN_INFO "mtrr: size and base must be multiples of 4 kiB\n");
-		printk(KERN_DEBUG "mtrr: size: 0x%lx  base: 0x%lx\n", size, base);
+	if (mtrr_check(base, size))
 		return -EINVAL;
-	}
 	return mtrr_del_page(reg, base >> PAGE_SHIFT, size >> PAGE_SHIFT);
 }
 
@@ -534,21 +544,9 @@ static void __init init_ifs(void)
 	centaur_init_mtrr();
 }
 
-static void __init init_other_cpus(void)
-{
-	if (use_intel())
-		get_mtrr_state();
-
-	/* bring up the other processors */
-	set_mtrr(~0U,0,0,0);
-
-	if (use_intel()) {
-		finalize_mtrr_state();
-		mtrr_state_warn();
-	}
-}
-
-
+/* The suspend/resume methods are only for CPU without MTRR. CPU using generic
+ * MTRR driver doesn't require this
+ */
 struct mtrr_value {
 	mtrr_type	ltype;
 	unsigned long	lbase;
@@ -556,13 +554,13 @@ struct mtrr_value {
 };
 
 /**
- * mtrr_init - initialize mtrrs on the boot CPU
+ * mtrr_bp_init - initialize mtrrs on the boot CPU
  *
  * This needs to be called early; before any of the other CPUs are 
  * initialized (i.e. before smp_init()).
  * 
  */
-static int __init mtrr_init(void)
+void __init mtrr_bp_init(void)
 {
 	init_ifs();
 
@@ -570,40 +568,29 @@ static int __init mtrr_init(void)
 		mtrr_if = &generic_mtrr_ops;
 		size_or_mask = 0xff000000;	/* 36 bits */
 		size_and_mask = 0x00f00000;
-			
-		switch (boot_cpu_data.x86_vendor) {
-		case X86_VENDOR_AMD:
-			/* The original Athlon docs said that
-			   total addressable memory is 44 bits wide.
-			   It was not really clear whether its MTRRs
-			   follow this or not. (Read: 44 or 36 bits).
-			   However, "x86-64_overview.pdf" explicitly
-			   states that "previous implementations support
-			   36 bit MTRRs" and also provides a way to
-			   query the width (in bits) of the physical
-			   addressable memory on the Hammer family.
-			 */
-			if (boot_cpu_data.x86 == 15
-			    && (cpuid_eax(0x80000000) >= 0x80000008)) {
-				u32 phys_addr;
-				phys_addr = cpuid_eax(0x80000008) & 0xff;
-				size_or_mask =
-				    ~((1 << (phys_addr - PAGE_SHIFT)) - 1);
-				size_and_mask = ~size_or_mask & 0xfff00000;
-			}
-			/* Athlon MTRRs use an Intel-compatible interface for 
-			 * getting and setting */
-			break;
-		case X86_VENDOR_CENTAUR:
-			if (boot_cpu_data.x86 == 6) {
-				/* VIA Cyrix family have Intel style MTRRs, but don't support PAE */
-				size_or_mask = 0xfff00000;	/* 32 bits */
-				size_and_mask = 0;
-			}
-			break;
-		
-		default:
-			break;
+
+		/* This is an AMD specific MSR, but we assume(hope?) that
+		   Intel will implement it to when they extend the address
+		   bus of the Xeon. */
+		if (cpuid_eax(0x80000000) >= 0x80000008) {
+			u32 phys_addr;
+			phys_addr = cpuid_eax(0x80000008) & 0xff;
+			/* CPUID workaround for Intel 0F33/0F34 CPU */
+			if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
+			    boot_cpu_data.x86 == 0xF &&
+			    boot_cpu_data.x86_model == 0x3 &&
+			    (boot_cpu_data.x86_mask == 0x3 ||
+			     boot_cpu_data.x86_mask == 0x4))
+				phys_addr = 36;
+
+			size_or_mask = ~((1 << (phys_addr - PAGE_SHIFT)) - 1);
+			size_and_mask = ~size_or_mask & 0xfff00000;
+		} else if (boot_cpu_data.x86_vendor == X86_VENDOR_CENTAUR &&
+			   boot_cpu_data.x86 == 6) {
+			/* VIA C* family have Intel style MTRRs, but
+			   don't support PAE */
+			size_or_mask = 0xfff00000;	/* 32 bits */
+			size_and_mask = 0;
 		}
 	} else {
 		switch (boot_cpu_data.x86_vendor) {
@@ -633,15 +620,42 @@ static int __init mtrr_init(void)
 			break;
 		}
 	}
-	printk(KERN_INFO "mtrr: v%s\n",MTRR_VERSION);
 
 	if (mtrr_if) {
 		set_num_var_ranges();
 		init_table();
-		init_other_cpus();
-		return 0;
+		if (use_intel())
+			get_mtrr_state();
 	}
-	return -ENXIO;
 }
 
-__initcall(mtrr_init);
+void mtrr_ap_init(void)
+{
+	unsigned long flags;
+
+	if (!mtrr_if || !use_intel())
+		return;
+	/*
+	 * Ideally we should hold mtrr_sem here to avoid mtrr entries changed,
+	 * but this routine will be called in cpu boot time, holding the lock
+	 * breaks it. This routine is called in two cases: 1.very earily time
+	 * of software resume, when there absolutely isn't mtrr entry changes;
+	 * 2.cpu hotadd time. We let mtrr_add/del_page hold cpuhotplug lock to
+	 * prevent mtrr entry changes
+	 */
+	local_irq_save(flags);
+
+	mtrr_if->set_all();
+
+	local_irq_restore(flags);
+}
+
+static int __init mtrr_init_finialize(void)
+{
+	if (!mtrr_if)
+		return 0;
+	if (use_intel())
+		mtrr_state_warn();
+	return 0;
+}
+__initcall(mtrr_init_finialize);

@@ -188,7 +188,7 @@ static spinlock_t flush_lock = SPIN_LOCK_UNLOCKED;
 static cpumask_t flush_cpumask;
 static unsigned long flush_va;
 
-asmlinkage void smp_invalidate_interrupt(void)
+fastcall void smp_invalidate_interrupt(void)
 {
     ack_APIC_irq();
     perfc_incrc(ipis);
@@ -339,13 +339,13 @@ void smp_send_stop(void)
     local_irq_enable();
 }
 
-asmlinkage void smp_event_check_interrupt(void)
+fastcall void smp_event_check_interrupt(struct cpu_user_regs *regs)
 {
     ack_APIC_irq();
     perfc_incrc(ipis);
 }
 
-asmlinkage void smp_call_function_interrupt(void)
+fastcall void smp_call_function_interrupt(struct cpu_user_regs *regs)
 {
     void (*func)(void *info) = call_data->func;
     void *info = call_data->info;

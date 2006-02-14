@@ -61,22 +61,13 @@ __asm__(                                        \
     STR(x) ":\n\t"                              \
     "pushl $"#v"<<16\n\t"                       \
     STR(SAVE_ALL(a))                            \
-    "call "STR(smp_##x)"\n\t"                   \
-    "jmp ret_from_intr\n");
-
-#define BUILD_SMP_TIMER_INTERRUPT(x,v) XBUILD_SMP_TIMER_INTERRUPT(x,v)
-#define XBUILD_SMP_TIMER_INTERRUPT(x,v)         \
-asmlinkage void x(struct cpu_user_regs * regs); \
-__asm__(                                        \
-"\n"__ALIGN_STR"\n"                             \
-STR(x) ":\n\t"                                  \
-    "pushl $"#v"<<16\n\t"                       \
-    STR(SAVE_ALL(a))                            \
     "movl %esp,%eax\n\t"                        \
     "pushl %eax\n\t"                            \
     "call "STR(smp_##x)"\n\t"                   \
     "addl $4,%esp\n\t"                          \
     "jmp ret_from_intr\n");
+
+#define BUILD_SMP_TIMER_INTERRUPT(x,v) BUILD_SMP_INTERRUPT(x,v)
 
 #define BUILD_COMMON_IRQ()                      \
 __asm__(                                        \

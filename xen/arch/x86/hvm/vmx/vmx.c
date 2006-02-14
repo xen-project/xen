@@ -1568,7 +1568,7 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
     default:
         if(long_mode_do_msr_read(regs))
             return;
-        rdmsr_user(regs->ecx, regs->eax, regs->edx);
+        rdmsr_safe(regs->ecx, regs->eax, regs->edx);
         break;
     }
 
@@ -1658,13 +1658,12 @@ static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
     int error;
 
     asmlinkage void do_IRQ(struct cpu_user_regs *);
-    void smp_apic_timer_interrupt(struct cpu_user_regs *);
-    void timer_interrupt(int, void *, struct cpu_user_regs *);
-    void smp_event_check_interrupt(void);
-    void smp_invalidate_interrupt(void);
-    void smp_call_function_interrupt(void);
-    void smp_spurious_interrupt(struct cpu_user_regs *regs);
-    void smp_error_interrupt(struct cpu_user_regs *regs);
+    fastcall void smp_apic_timer_interrupt(struct cpu_user_regs *);
+    fastcall void smp_event_check_interrupt(void);
+    fastcall void smp_invalidate_interrupt(void);
+    fastcall void smp_call_function_interrupt(void);
+    fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs);
+    fastcall void smp_error_interrupt(struct cpu_user_regs *regs);
 
     if ((error = __vmread(VM_EXIT_INTR_INFO, &vector))
         && !(vector & INTR_INFO_VALID_MASK))

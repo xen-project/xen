@@ -1,5 +1,6 @@
 
 #include <xen/config.h>
+#include <xen/compile.h>
 #include <xen/domain_page.h>
 #include <xen/init.h>
 #include <xen/sched.h>
@@ -20,6 +21,7 @@ void show_registers(struct cpu_user_regs *regs)
 {
     struct cpu_user_regs fault_regs = *regs;
     unsigned long fault_crs[8];
+    char taint_str[TAINT_STRING_MAX_LEN];
     const char *context;
 
     if ( HVM_DOMAIN(current) && GUEST_MODE(regs) )
@@ -49,6 +51,9 @@ void show_registers(struct cpu_user_regs *regs)
         fault_crs[3] = read_cr3();
     }
 
+    printk("----[ Xen-%d.%d%s    %s ]----\n",
+           XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
+           print_tainted(taint_str));
     printk("CPU:    %d\nEIP:    %04x:[<%08x>]",
            smp_processor_id(), fault_regs.cs, fault_regs.eip);
     if ( !GUEST_MODE(regs) )
@@ -201,11 +206,11 @@ unsigned long do_iret(void)
 }
 
 BUILD_SMP_INTERRUPT(deferred_nmi, TRAP_deferred_nmi)
-asmlinkage void smp_deferred_nmi(struct cpu_user_regs regs)
+fastcall void smp_deferred_nmi(struct cpu_user_regs *regs)
 {
     asmlinkage void do_nmi(struct cpu_user_regs *);
     ack_APIC_irq();
-    do_nmi(&regs);
+    do_nmi(regs);
 }
 
 void __init percpu_traps_init(void)

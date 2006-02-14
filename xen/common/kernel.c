@@ -14,6 +14,8 @@
 #include <public/nmi.h>
 #include <public/version.h>
 
+int tainted;
+
 void cmdline_parse(char *cmdline)
 {
     char opt[100], *optval, *p = cmdline, *q;
@@ -76,6 +78,37 @@ void cmdline_parse(char *cmdline)
             }
         }
     }
+}
+
+/**
+ *      print_tainted - return a string to represent the kernel taint state.
+ *
+ *  'S' - SMP with CPUs not designed for SMP.
+ *  'M' - Machine had a machine check experience.
+ *  'B' - System has hit bad_page.
+ *
+ *      The string is overwritten by the next call to print_taint().
+ */
+char *print_tainted(char *str)
+{
+    if ( tainted )
+    {
+        snprintf(str, TAINT_STRING_MAX_LEN, "Tainted: %c%c%c",
+                 tainted & TAINT_UNSAFE_SMP ? 'S' : ' ',
+                 tainted & TAINT_MACHINE_CHECK ? 'M' : ' ',
+                 tainted & TAINT_BAD_PAGE ? 'B' : ' ');
+    }
+    else
+    {
+        snprintf(str, TAINT_STRING_MAX_LEN, "Not tainted");
+    }
+
+    return str;
+}
+
+void add_taint(unsigned flag)
+{
+    tainted |= flag;
 }
 
 /*

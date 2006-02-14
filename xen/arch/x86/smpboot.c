@@ -53,8 +53,6 @@
 static int _foo;
 #define set_kernel_exec(x,y) (_foo=0)
 #define alloc_bootmem_low_pages(x) __va(0x90000) /* trampoline address */
-int tainted;
-#define TAINT_UNSAFE_SMP 0
 
 /* Set if we find a B stepping CPU */
 static int __initdata smp_b_stepping;
@@ -1110,7 +1108,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 			smp_num_siblings = siblings;
 		}
 
-		if (c->x86_num_cores > 1) {
+		if (c->x86_max_cores > 1) {
 			for (i = 0; i < NR_CPUS; i++) {
 				if (!cpu_isset(i, cpu_callout_map))
 					continue;

@@ -243,21 +243,21 @@ long do_set_segment_base(unsigned int which, unsigned long base)
     switch ( which )
     {
     case SEGBASE_FS:
-        if ( wrmsr_user(MSR_FS_BASE, base, base>>32) )
+        if ( wrmsr_safe(MSR_FS_BASE, base, base>>32) )
             ret = -EFAULT;
         else
             v->arch.guest_context.fs_base = base;
         break;
 
     case SEGBASE_GS_USER:
-        if ( wrmsr_user(MSR_SHADOW_GS_BASE, base, base>>32) )
+        if ( wrmsr_safe(MSR_SHADOW_GS_BASE, base, base>>32) )
             ret = -EFAULT;
         else
             v->arch.guest_context.gs_base_user = base;
         break;
 
     case SEGBASE_GS_KERNEL:
-        if ( wrmsr_user(MSR_GS_BASE, base, base>>32) )
+        if ( wrmsr_safe(MSR_GS_BASE, base, base>>32) )
             ret = -EFAULT;
         else
             v->arch.guest_context.gs_base_kernel = base;

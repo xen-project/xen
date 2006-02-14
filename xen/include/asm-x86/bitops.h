@@ -322,6 +322,58 @@ static __inline__ unsigned int find_first_set_bit(unsigned long word)
 }
 
 /**
+ * ffz - find first zero in word.
+ * @word: The word to search
+ *
+ * Undefined if no zero exists, so code should check against ~0UL first.
+ */
+static inline unsigned long ffz(unsigned long word)
+{
+	__asm__("bsf %1,%0"
+		:"=r" (word)
+		:"r" (~word));
+	return word;
+}
+
+#define fls64(x)   generic_fls64(x)
+
+/**
+ * ffs - find first bit set
+ * @x: the word to search
+ *
+ * This is defined the same way as
+ * the libc and compiler builtin ffs routines, therefore
+ * differs in spirit from the above ffz (man ffs).
+ */
+static inline int ffs(int x)
+{
+	int r;
+
+	__asm__("bsfl %1,%0\n\t"
+		"jnz 1f\n\t"
+		"movl $-1,%0\n"
+		"1:" : "=r" (r) : "rm" (x));
+	return r+1;
+}
+
+/**
+ * fls - find last bit set
+ * @x: the word to search
+ *
+ * This is defined the same way as ffs.
+ */
+static inline int fls(int x)
+{
+	int r;
+
+	__asm__("bsrl %1,%0\n\t"
+		"jnz 1f\n\t"
+		"movl $-1,%0\n"
+		"1:" : "=r" (r) : "rm" (x));
+	return r+1;
+}
+
+/**
  * hweightN - returns the hamming weight of a N-bit word
  * @x: the word to weigh
  *

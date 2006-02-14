@@ -69,8 +69,6 @@ extern void do_nmi(struct cpu_user_regs *, unsigned long);
 extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
                                 int inst_len);
 extern asmlinkage void do_IRQ(struct cpu_user_regs *);
-extern void smp_apic_timer_interrupt(struct cpu_user_regs *);
-extern void timer_interrupt(int, void *, struct cpu_user_regs *);
 extern void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
        unsigned long count, int size, long value, int dir, int pvalid);
 extern int svm_instrlen(struct cpu_user_regs *regs, int mode);
@@ -1761,7 +1759,7 @@ static inline void svm_do_msr_access(struct vcpu *v, struct cpu_user_regs *regs)
         default:
             if (long_mode_do_msr_read(regs))
                 goto done;
-            rdmsr_user(regs->ecx, regs->eax, regs->edx);
+            rdmsr_safe(regs->ecx, regs->eax, regs->edx);
             break;
         }
     }

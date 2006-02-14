@@ -76,6 +76,33 @@ static __inline__ int generic_fls(int x)
  */
 #include <asm/bitops.h>
 
+
+static inline int generic_fls64(__u64 x)
+{
+    __u32 h = x >> 32;
+    if (h)
+        return fls(x) + 32;
+    return fls(x);
+}
+
+static __inline__ int get_bitmask_order(unsigned int count)
+{
+    int order;
+    
+    order = fls(count);
+    return order;   /* We could be slightly more clever with -1 here... */
+}
+
+static __inline__ int get_count_order(unsigned int count)
+{
+    int order;
+
+    order = fls(count) - 1;
+    if (count & (count - 1))
+        order++;
+    return order;
+}
+
 /*
  * hweightN: returns the hamming weight (i.e. the number
  * of bits set) of a N-bit word
@@ -124,6 +151,28 @@ static inline unsigned long generic_hweight64(__u64 w)
 static inline unsigned long hweight_long(unsigned long w)
 {
     return sizeof(w) == 4 ? generic_hweight32(w) : generic_hweight64(w);
+}
+
+/*
+ * rol32 - rotate a 32-bit value left
+ *
+ * @word: value to rotate
+ * @shift: bits to roll
+ */
+static inline __u32 rol32(__u32 word, unsigned int shift)
+{
+    return (word << shift) | (word >> (32 - shift));
+}
+
+/*
+ * ror32 - rotate a 32-bit value right
+ *
+ * @word: value to rotate
+ * @shift: bits to roll
+ */
+static inline __u32 ror32(__u32 word, unsigned int shift)
+{
+    return (word >> shift) | (word << (32 - shift));
 }
 
 #endif

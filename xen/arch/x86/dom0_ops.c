@@ -26,7 +26,7 @@
 #include <public/sched_ctl.h>
 
 #include <asm/mtrr.h>
-#include "mtrr/mtrr.h"
+#include "cpu/mtrr/mtrr.h"
 
 #define TRC_DOM0OP_ENTER_BASE  0x00020000
 #define TRC_DOM0OP_LEAVE_BASE  0x00030000
@@ -39,13 +39,13 @@ static unsigned long msr_hi;
 static void write_msr_for(void *unused)
 {
     if ( ((1 << smp_processor_id()) & msr_cpu_mask) )
-        (void)wrmsr_user(msr_addr, msr_lo, msr_hi);
+        (void)wrmsr_safe(msr_addr, msr_lo, msr_hi);
 }
 
 static void read_msr_for(void *unused)
 {
     if ( ((1 << smp_processor_id()) & msr_cpu_mask) )
-        (void)rdmsr_user(msr_addr, msr_lo, msr_hi);
+        (void)rdmsr_safe(msr_addr, msr_lo, msr_hi);
 }
 
 long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
@@ -182,7 +182,7 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
         dom0_physinfo_t *pi = &op->u.physinfo;
 
         pi->threads_per_core = smp_num_siblings;
-        pi->cores_per_socket = boot_cpu_data.x86_num_cores;
+        pi->cores_per_socket = boot_cpu_data.x86_max_cores;
         pi->sockets_per_node = 
             num_online_cpus() / (pi->threads_per_core * pi->cores_per_socket);
         pi->nr_nodes         = 1;

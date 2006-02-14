@@ -86,6 +86,8 @@ static void centaur_set_mcr(unsigned int reg, unsigned long base,
 	centaur_mcr[reg].low = low;
 	wrmsr(MSR_IDT_MCR0 + reg, low, high);
 }
+
+#if 0
 /*
  *	Initialise the later (saner) Winchip MCR variant. In this version
  *	the BIOS can pass us the registers it has used (but not their values)
@@ -183,6 +185,7 @@ centaur_mcr_init(void)
 
 	set_mtrr_done(&ctxt);
 }
+#endif
 
 static int centaur_validate_add_page(unsigned long base, 
 				     unsigned long size, unsigned int type)
@@ -203,7 +206,7 @@ static int centaur_validate_add_page(unsigned long base,
 
 static struct mtrr_ops centaur_mtrr_ops = {
 	.vendor            = X86_VENDOR_CENTAUR,
-	.init              = centaur_mcr_init,
+//	.init              = centaur_mcr_init,
 	.set               = centaur_set_mcr,
 	.get               = centaur_get_mcr,
 	.get_free_region   = centaur_get_free_region,

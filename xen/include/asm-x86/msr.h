@@ -28,34 +28,36 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
         wrmsr(msr, lo, hi);
 }
 
-#define rdmsr_user(msr,val1,val2) ({\
+/* rdmsr with exception handling */
+#define rdmsr_safe(msr,val1,val2) ({\
     int _rc; \
     __asm__ __volatile__( \
         "1: rdmsr\n2:\n" \
         ".section .fixup,\"ax\"\n" \
-        "3: movl $1,%2\n; jmp 2b\n" \
+        "3: movl %5,%2\n; jmp 2b\n" \
         ".previous\n" \
         ".section __ex_table,\"a\"\n" \
         "   "__FIXUP_ALIGN"\n" \
         "   "__FIXUP_WORD" 1b,3b\n" \
         ".previous\n" \
         : "=a" (val1), "=d" (val2), "=&r" (_rc) \
-        : "c" (msr), "2" (0)); \
+        : "c" (msr), "2" (0), "i" (-EFAULT)); \
     _rc; })
 
-#define wrmsr_user(msr,val1,val2) ({\
+/* wrmsr with exception handling */
+#define wrmsr_safe(msr,val1,val2) ({\
     int _rc; \
     __asm__ __volatile__( \
         "1: wrmsr\n2:\n" \
         ".section .fixup,\"ax\"\n" \
-        "3: movl $1,%0\n; jmp 2b\n" \
+        "3: movl %5,%0\n; jmp 2b\n" \
         ".previous\n" \
         ".section __ex_table,\"a\"\n" \
         "   "__FIXUP_ALIGN"\n" \
         "   "__FIXUP_WORD" 1b,3b\n" \
         ".previous\n" \
         : "=&r" (_rc) \
-        : "c" (msr), "a" (val1), "d" (val2), "0" (0)); \
+        : "c" (msr), "a" (val1), "d" (val2), "0" (0), "i" (-EFAULT)); \
     _rc; })
 
 #define rdtsc(low,high) \

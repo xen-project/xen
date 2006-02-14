@@ -147,24 +147,28 @@ struct vcpu;
 #endif
 
 struct cpuinfo_x86 {
-	__u8 x86;		/* CPU family */
-	__u8 x86_vendor;	/* CPU vendor */
-	__u8 x86_model;
-	__u8 x86_mask;
-	char wp_works_ok;	/* It doesn't on 386's */
-	char hlt_works_ok;	/* Problems on some 486Dx4's and old 386's */
-	char hard_math;
-	char rfu;
+    __u8 x86;		/* CPU family */
+    __u8 x86_vendor;	/* CPU vendor */
+    __u8 x86_model;
+    __u8 x86_mask;
+    char wp_works_ok;	/* It doesn't on 386's */
+    char hlt_works_ok;	/* Problems on some 486Dx4's and old 386's */
+    char hard_math;
+    char rfu;
     int  cpuid_level;	/* Maximum supported CPUID level, -1=no CPUID */
-	unsigned int x86_capability[NCAPINTS];
-	char x86_vendor_id[16];
-	char x86_model_id[64];
-	int  x86_cache_size;  /* in KB - valid for CPUS which support this call  */
-	int  x86_cache_alignment;	/* In bytes */
-	int	 fdiv_bug;
-	int	 f00f_bug;
-	int	 coma_bug;
-	unsigned char x86_num_cores;
+    unsigned int x86_capability[NCAPINTS];
+    char x86_vendor_id[16];
+    char x86_model_id[64];
+    int  x86_cache_size;  /* in KB - valid for CPUS which support this call  */
+    int  x86_cache_alignment;	/* In bytes */
+    char fdiv_bug;
+    char f00f_bug;
+    char coma_bug;
+    char pad0;
+    int  x86_power;
+    unsigned char x86_max_cores; /* cpuid returned max cores value */
+    unsigned char booted_cores; /* number of cores as seen by OS */
+    unsigned char apicid;
 } __cacheline_aligned;
 
 /*
@@ -207,6 +211,18 @@ static always_inline void detect_ht(struct cpuinfo_x86 *c) {}
               "=c" (*(int *)(_ecx)),            \
               "=d" (*(int *)(_edx))             \
             : "0" (_op), "2" (0))
+
+/* Some CPUID calls want 'count' to be placed in ecx */
+static inline void cpuid_count(int op, int count, int *eax, int *ebx, int *ecx,
+	       	int *edx)
+{
+	__asm__("cpuid"
+		: "=a" (*eax),
+		  "=b" (*ebx),
+		  "=c" (*ecx),
+		  "=d" (*edx)
+		: "0" (op), "c" (count));
+}
 
 /*
  * CPUID functions returning a single datum
@@ -501,6 +517,11 @@ void show_stack(struct cpu_user_regs *regs);
 void show_registers(struct cpu_user_regs *regs);
 void show_page_walk(unsigned long addr);
 asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs);
+
+extern void mtrr_ap_init(void);
+extern void mtrr_bp_init(void);
+
+extern void mcheck_init(struct cpuinfo_x86 *c);
 
 #endif /* !__ASSEMBLY__ */
 

@@ -37,7 +37,7 @@ typedef u8 mtrr_type;
 struct mtrr_ops {
 	u32	vendor;
 	u32	use_intel_if;
-	void	(*init)(void);
+//	void	(*init)(void);
 	void	(*set)(unsigned int reg, unsigned long base,
 		       unsigned long size, mtrr_type type);
 	void	(*set_all)(void);
@@ -57,7 +57,6 @@ extern int generic_validate_add_page(unsigned long base, unsigned long size,
 
 extern struct mtrr_ops generic_mtrr_ops;
 
-extern int generic_have_wrcomb(void);
 extern int positive_have_wrcomb(void);
 
 /* library functions for processor-specific routines */
@@ -92,8 +91,7 @@ extern struct mtrr_ops * mtrr_if;
 
 extern unsigned int num_var_ranges;
 
-void finalize_mtrr_state(void);
 void mtrr_state_warn(void);
 char *mtrr_attrib_to_str(int x);
+void mtrr_wrmsr(unsigned, unsigned, unsigned);
 
-extern char * mtrr_if_name[];

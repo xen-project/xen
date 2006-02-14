@@ -981,26 +981,26 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         {
 #ifdef CONFIG_X86_64
         case MSR_FS_BASE:
-            if ( wrmsr_user(MSR_FS_BASE, regs->eax, regs->edx) )
+            if ( wrmsr_safe(MSR_FS_BASE, regs->eax, regs->edx) )
                 goto fail;
             v->arch.guest_context.fs_base =
                 ((u64)regs->edx << 32) | regs->eax;
             break;
         case MSR_GS_BASE:
-            if ( wrmsr_user(MSR_GS_BASE, regs->eax, regs->edx) )
+            if ( wrmsr_safe(MSR_GS_BASE, regs->eax, regs->edx) )
                 goto fail;
             v->arch.guest_context.gs_base_kernel =
                 ((u64)regs->edx << 32) | regs->eax;
             break;
         case MSR_SHADOW_GS_BASE:
-            if ( wrmsr_user(MSR_SHADOW_GS_BASE, regs->eax, regs->edx) )
+            if ( wrmsr_safe(MSR_SHADOW_GS_BASE, regs->eax, regs->edx) )
                 goto fail;
             v->arch.guest_context.gs_base_user =
                 ((u64)regs->edx << 32) | regs->eax;
             break;
 #endif
         default:
-            if ( (rdmsr_user(regs->ecx, l, h) != 0) ||
+            if ( (rdmsr_safe(regs->ecx, l, h) != 0) ||
                  (regs->ecx != MSR_EFER) ||
                  (regs->eax != l) || (regs->edx != h) )
                 DPRINTK("Domain attempted WRMSR %p from "
@@ -1028,13 +1028,13 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 #endif
         case MSR_EFER:
-            if ( rdmsr_user(regs->ecx, regs->eax, regs->edx) )
+            if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
                 goto fail;
             break;
         default:
             DPRINTK("Domain attempted RDMSR %p.\n", _p(regs->ecx));
             /* Everyone can read the MSR space. */
-            if ( rdmsr_user(regs->ecx, regs->eax, regs->edx) )
+            if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
                 goto fail;
             break;
         }

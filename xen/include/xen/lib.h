@@ -75,4 +75,12 @@ unsigned long long simple_strtoull(
 
 unsigned long long parse_size_and_unit(char *s);
 
+#define TAINT_UNSAFE_SMP                (1<<0)
+#define TAINT_MACHINE_CHECK             (1<<1)
+#define TAINT_BAD_PAGE                  (1<<2)
+extern int tainted;
+#define TAINT_STRING_MAX_LEN            20
+extern char *print_tainted(char *str);
+extern void add_taint(unsigned);
+
 #endif /* __LIB_H__ */
