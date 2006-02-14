@@ -15,25 +15,26 @@
 #include <asm/processor.h>
 
 extern void init_fpu(void);
-extern void save_init_fpu(struct vcpu *tsk);
-extern void restore_fpu(struct vcpu *tsk);
+extern void save_init_fpu(struct vcpu *v);
+extern void restore_fpu(struct vcpu *v);
 
-#define unlazy_fpu(_tsk) do { \
-    if ( test_bit(_VCPUF_fpu_dirtied, &(_tsk)->vcpu_flags) ) \
-        save_init_fpu(_tsk); \
+#define unlazy_fpu(v) do {                                      \
+    if ( test_bit(_VCPUF_fpu_dirtied, &(v)->vcpu_flags) )       \
+        save_init_fpu(v);                                       \
 } while ( 0 )
 
-#define load_mxcsr( val ) do { \
-    unsigned long __mxcsr = ((unsigned long)(val) & 0xffbf); \
-    __asm__ __volatile__ ( "ldmxcsr %0" : : "m" (__mxcsr) ); \
+#define load_mxcsr(val) do {                                    \
+    unsigned long __mxcsr = ((unsigned long)(val) & 0xffbf);    \
+    __asm__ __volatile__ ( "ldmxcsr %0" : : "m" (__mxcsr) );    \
 } while ( 0 )
 
-/* Make domain the FPU owner */
 static inline void setup_fpu(struct vcpu *v)
 {
+    /* Avoid recursion. */
+    clts();
+
     if ( !test_and_set_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
     {
-        clts();
         if ( test_bit(_VCPUF_fpu_initialised, &v->vcpu_flags) )
             restore_fpu(v);
         else
