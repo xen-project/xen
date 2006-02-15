@@ -856,6 +856,8 @@ void __init mp_register_lapic_address (
 #ifndef CONFIG_XEN
 	mp_lapic_addr = (unsigned long) address;
 
+	set_fixmap_nocache(FIX_APIC_BASE, mp_lapic_addr);
+
 	if (boot_cpu_physical_apicid == -1U)
 		boot_cpu_physical_apicid = GET_APIC_ID(apic_read(APIC_ID));
 
@@ -951,6 +953,9 @@ void __init mp_register_ioapic (
 	mp_ioapics[idx].mpc_flags = MPC_APIC_USABLE;
 	mp_ioapics[idx].mpc_apicaddr = address;
 
+#ifndef CONFIG_XEN
+	set_fixmap_nocache(FIX_IO_APIC_BASE_0 + idx, address);
+#endif
 	if ((boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) && (boot_cpu_data.x86 < 15))
 		mp_ioapics[idx].mpc_apicid = io_apic_get_unique_id(idx, id);
 	else

@@ -503,7 +503,6 @@ struct alt_instr {
 #endif
 
 #ifdef CONFIG_SMP
-#define smp_wmb()	wmb()
 #if defined(CONFIG_SMP_ALTERNATIVES) && !defined(MODULE)
 #define smp_alt_mb(instr)                                           \
 __asm__ __volatile__("6667:\nnop\nnop\nnop\nnop\nnop\nnop\n6668:\n" \
@@ -524,8 +523,8 @@ __asm__ __volatile__("6667:\nnop\nnop\nnop\nnop\nnop\nnop\n6668:\n" \
 		     :                                              \
 		     : "i" (X86_FEATURE_XMM2)                       \
 		     : "memory")
-#define smp_rmb() smp_alt_mb("lfence")
 #define smp_mb()  smp_alt_mb("mfence")
+#define smp_rmb() smp_alt_mb("lfence")
 #define set_mb(var, value) do {                                     \
 unsigned long __set_mb_temp;                                        \
 __asm__ __volatile__("6667:movl %1, %0\n6668:\n"                    \
@@ -547,10 +546,11 @@ __asm__ __volatile__("6667:movl %1, %0\n6668:\n"                    \
 		     : "1" (value)                                  \
 		     : "memory"); } while (0)
 #else
-#define smp_rmb()	rmb()
 #define smp_mb()	mb()
-#define set_mb(var, value) do { xchg(&var, value); } while (0)
+#define smp_rmb()	rmb()
+#define set_mb(var, value) do { (void) xchg(&var, value); } while (0)
 #endif
+#define smp_wmb()	wmb()
 #define smp_read_barrier_depends()	read_barrier_depends()
 #else
 #define smp_mb()	barrier()

@@ -3,6 +3,7 @@
 
 #include <linux/config.h>
 #include <asm/fixmap.h>
+
 /*
  * This file contains the definitions for the x86 IO instructions
  * inb/inw/inl/outb/outw/outl and the "string versions" of the same
@@ -119,7 +120,6 @@ static inline void * phys_to_virt(unsigned long address)
 {
 	return __va(address);
 }
-
 
 #define virt_to_bus(_x) phys_to_machine(__pa(_x))
 #define bus_to_virt(_x) __va(machine_to_phys(_x))

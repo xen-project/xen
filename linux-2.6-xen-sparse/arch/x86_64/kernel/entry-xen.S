@@ -996,7 +996,7 @@ KPROBE_ENTRY(debug)
 
 #if 0
 	/* runs on exception stack */	
-ENTRY(nmi)
+KPROBE_ENTRY(nmi)
 	INTR_FRAME
 	pushq $-1
 	CFI_ADJUST_CFA_OFFSET 8
@@ -1043,6 +1043,7 @@ paranoid_schedule:
 	cli
 	jmp paranoid_userspace
 	CFI_ENDPROC
+	.previous .text
 #endif        
 
 KPROBE_ENTRY(int3)

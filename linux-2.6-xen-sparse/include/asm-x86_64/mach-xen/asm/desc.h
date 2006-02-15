@@ -69,8 +69,6 @@ extern struct desc_ptr idt_descr, cpu_gdt_descr[NR_CPUS];
 
 extern struct desc_struct cpu_gdt_table[GDT_ENTRIES];
 
-#define get_cpu_gdt_table(_cpu) ((struct desc_struct *)(cpu_gdt_descr[(_cpu)].address))
-
 #define load_TR_desc() asm volatile("ltr %w0"::"r" (GDT_ENTRY_TSS*8))
 #define load_LDT_desc() asm volatile("lldt %w0"::"r" (GDT_ENTRY_LDT*8))
 
@@ -163,7 +161,7 @@ static inline void set_tss_desc(unsigned cpu, void *addr)
 	 * -1? seg base+limit should be pointing to the address of the
 	 * last valid byte
 	 */
-        set_tssldt_descriptor(&cpu_gdt(cpu)[GDT_ENTRY_TSS], 
+	set_tssldt_descriptor(&cpu_gdt(cpu)[GDT_ENTRY_TSS], 
 		(unsigned long)addr, DESC_TSS,
 		IO_BITMAP_OFFSET + IO_BITMAP_BYTES + sizeof(unsigned long) - 1);
 } 
@@ -225,7 +223,7 @@ static inline void load_TLS(struct thread_struct *t, unsigned int cpu)
 	gdt[2] = t->tls_array[2];
 #endif
 #define C(i) \
-	HYPERVISOR_update_descriptor(virt_to_machine(&get_cpu_gdt_table(cpu)[GDT_ENTRY_TLS_MIN + i]), t->tls_array[i])
+	HYPERVISOR_update_descriptor(virt_to_machine(&cpu_gdt(cpu)[GDT_ENTRY_TLS_MIN + i]), t->tls_array[i])
 
 	C(0); C(1); C(2);
 #undef C
@@ -236,13 +234,13 @@ static inline void load_TLS(struct thread_struct *t, unsigned int cpu)
  */
 static inline void load_LDT_nolock (mm_context_t *pc, int cpu)
 {
-        void *segments = pc->ldt;
-        int count = pc->size;
+	void *segments = pc->ldt;
+	int count = pc->size;
 
-        if (likely(!count))
-                segments = NULL;
+	if (likely(!count))
+		segments = NULL;
 
-        xen_set_ldt((unsigned long)segments, count);
+	xen_set_ldt((unsigned long)segments, count);
 }
 
 static inline void load_LDT(mm_context_t *pc)

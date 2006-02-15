@@ -82,7 +82,7 @@ all: vmlinuz
 vmlinuz: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@
 
-install: vmlinux
+install:
 	$(Q)$(MAKE) $(build)=$(boot) XENGUEST=$(XENGUEST) $@
 else
 #Default target when executing "make"

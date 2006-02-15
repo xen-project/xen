@@ -74,8 +74,10 @@ void ack_bad_irq(unsigned int irq)
 	 * holds up an irq slot - in excessive cases (when multiple
 	 * unexpected vectors occur) that might lock up the APIC
 	 * completely.
+	 * But only ack when the APIC is enabled -AK
 	 */
-	ack_APIC_irq();
+	if (cpu_has_apic)
+		ack_APIC_irq();
 }
 
 int get_physical_broadcast(void)

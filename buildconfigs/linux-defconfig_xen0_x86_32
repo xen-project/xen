@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.16-rc2-xenU
-# Mon Feb 13 15:10:22 2006
+# Linux kernel version: 2.6.16-rc3-xen0
+# Wed Feb 15 20:55:18 2006
 #
 CONFIG_X86_32=y
 CONFIG_SEMAPHORE_SLEEPERS=y
@@ -16,8 +16,6 @@ CONFIG_DMI=y
 # Code maturity level options
 #
 CONFIG_EXPERIMENTAL=y
-# CONFIG_CLEAN_COMPILE is not set
-CONFIG_BROKEN=y
 CONFIG_BROKEN_ON_SMP=y
 CONFIG_INIT_ENV_ARG_LIMIT=32
 
@@ -259,6 +257,7 @@ CONFIG_NET=y
 #
 # Networking options
 #
+# CONFIG_NETDEBUG is not set
 CONFIG_PACKET=y
 # CONFIG_PACKET_MMAP is not set
 CONFIG_UNIX=y
@@ -533,7 +532,6 @@ CONFIG_AIC79XX_DEBUG_ENABLE=y
 CONFIG_AIC79XX_DEBUG_MASK=0
 CONFIG_AIC79XX_REG_PRETTY_PRINT=y
 # CONFIG_SCSI_DPT_I2O is not set
-# CONFIG_SCSI_ADVANSYS is not set
 CONFIG_MEGARAID_NEWGEN=y
 # CONFIG_MEGARAID_MM is not set
 # CONFIG_MEGARAID_LEGACY is not set
@@ -558,7 +556,6 @@ CONFIG_SCSI_SATA_INTEL_COMBINED=y
 # CONFIG_SCSI_BUSLOGIC is not set
 # CONFIG_SCSI_DMX3191D is not set
 # CONFIG_SCSI_EATA is not set
-# CONFIG_SCSI_EATA_PIO is not set
 # CONFIG_SCSI_FUTURE_DOMAIN is not set
 # CONFIG_SCSI_GDTH is not set
 # CONFIG_SCSI_IPS is not set

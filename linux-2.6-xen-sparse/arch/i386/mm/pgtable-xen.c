@@ -227,7 +227,6 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 		set_page_count(pte, 1);
 	}
 #endif
-
 	return pte;
 }
 

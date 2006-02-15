@@ -156,7 +156,6 @@ static inline void set_in_cr4 (unsigned long mask)
 	}
 }
 
-
 static inline void clear_in_cr4 (unsigned long mask)
 {
 #ifndef CONFIG_XEN
@@ -175,7 +174,6 @@ static inline void clear_in_cr4 (unsigned long mask)
  */
 #define MCA_bus 0
 #define MCA_bus__is_a_macro
-
 
 /*
  * User space process size. 47bits minus one guard page.
@@ -278,7 +276,7 @@ struct thread_struct {
 	unsigned io_bitmap_max;
 /* cached TLS descriptors. */
 	u64 tls_array[GDT_ENTRY_TLS_ENTRIES];
-       	unsigned int	iopl;
+	unsigned int	iopl;
 } __attribute__((aligned(16)));
 
 #define INIT_THREAD  { \

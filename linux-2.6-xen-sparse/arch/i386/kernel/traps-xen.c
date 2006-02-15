@@ -85,7 +85,11 @@ asmlinkage void page_fault(void);
 asmlinkage void coprocessor_error(void);
 asmlinkage void simd_coprocessor_error(void);
 asmlinkage void alignment_check(void);
+#ifndef CONFIG_XEN
+asmlinkage void spurious_interrupt_bug(void);
+#else
 asmlinkage void fixup_4gb_segment(void);
+#endif
 asmlinkage void machine_check(void);
 
 static int kstack_depth_to_print = 24;
@@ -163,7 +167,8 @@ static void show_trace_log_lvl(struct task_struct *task,
 		stack = (unsigned long*)context->previous_esp;
 		if (!stack)
 			break;
-		printk(KERN_EMERG " =======================\n");
+		printk(log_lvl);
+		printk(" =======================\n");
 	}
 }
 
@@ -236,9 +241,11 @@ void show_registers(struct pt_regs *regs)
 	}
 	print_modules();
 	printk(KERN_EMERG "CPU:    %d\nEIP:    %04x:[<%08lx>]    %s VLI\n"
-			"EFLAGS: %08lx   (%s) \n",
+			"EFLAGS: %08lx   (%s %.*s) \n",
 		smp_processor_id(), 0xffff & regs->xcs, regs->eip,
-		print_tainted(), regs->eflags, system_utsname.release);
+		print_tainted(), regs->eflags, system_utsname.release,
+		(int)strcspn(system_utsname.version, " "),
+		system_utsname.version);
 	print_symbol(KERN_EMERG "EIP is at %s\n", regs->eip);
 	printk(KERN_EMERG "eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
 		regs->eax, regs->ebx, regs->ecx, regs->edx);
@@ -384,7 +391,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 
 static inline void die_if_kernel(const char * str, struct pt_regs * regs, long err)
 {
-  if (!user_mode_vm(regs))
+	if (!user_mode_vm(regs))
 		die(str, regs, err);
 }
 
@@ -479,15 +486,11 @@ DO_VM86_ERROR( 3, SIGTRAP, "int3", int3)
 DO_VM86_ERROR( 4, SIGSEGV, "overflow", overflow)
 DO_VM86_ERROR( 5, SIGSEGV, "bounds", bounds)
 DO_ERROR_INFO( 6, SIGILL,  "invalid opcode", invalid_op, ILL_ILLOPN, regs->eip)
-DO_VM86_ERROR( 7, SIGSEGV, "device not available", device_not_available)
 DO_ERROR( 9, SIGFPE,  "coprocessor segment overrun", coprocessor_segment_overrun)
 DO_ERROR(10, SIGSEGV, "invalid TSS", invalid_TSS)
 DO_ERROR(11, SIGBUS,  "segment not present", segment_not_present)
 DO_ERROR(12, SIGBUS,  "stack segment", stack_segment)
 DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, 0)
-#ifdef CONFIG_X86_MCE
-DO_ERROR(18, SIGBUS, "machine check", machine_check)
-#endif
 DO_ERROR_INFO(32, SIGSEGV, "iret exception", iret_error, ILL_BADSTK, 0)
 
 fastcall void __kprobes do_general_protection(struct pt_regs * regs,
@@ -749,7 +752,7 @@ fastcall void __kprobes do_debug(struct pt_regs * regs, long error_code)
 		 * check for kernel mode by just checking the CPL
 		 * of CS.
 		 */
-	  if (!user_mode(regs))
+		if (!user_mode(regs))
 			goto clear_TF_reenable;
 	}
 
@@ -916,6 +919,15 @@ fastcall void do_simd_coprocessor_error(struct pt_regs * regs,
 }
 
 #ifndef CONFIG_XEN
+fastcall void do_spurious_interrupt_bug(struct pt_regs * regs,
+					  long error_code)
+{
+#if 0
+	/* No need to warn about this any longer. */
+	printk("Ignoring P6 Local APIC Spurious Interrupt Bug...\n");
+#endif
+}
+
 fastcall void setup_x86_bogus_stack(unsigned char * stk)
 {
 	unsigned long *switch16_ptr, *switch32_ptr;

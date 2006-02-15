@@ -33,7 +33,6 @@
 #include <asm/proto.h>
 #include <asm/kdebug.h>
 #include <asm-generic/sections.h>
-#include <asm/kdebug.h>
 
 /* Page fault error code bits */
 #define PF_PROT	(1<<0)		/* or no page found */
@@ -158,8 +157,8 @@ void dump_pagetable(unsigned long address)
 
 	pgd = __va((unsigned long)pgd & PHYSICAL_PAGE_MASK); 
 	pgd += pgd_index(address);
-	printk("PGD %lx ", pgd_val(*pgd));
 	if (bad_address(pgd)) goto bad;
+	printk("PGD %lx ", pgd_val(*pgd));
 	if (!pgd_present(*pgd)) goto ret; 
 
 	pud = __pud_offset_k((pud_t *)pgd_page(*pgd), address);
@@ -331,7 +330,7 @@ asmlinkage void __kprobes do_page_fault(struct pt_regs *regs,
 	siginfo_t info;
 
 	if (!user_mode(regs))
-		error_code &= ~4; /* means kernel */
+		error_code &= ~PF_USER; /* means kernel */
 
 	/* get the address */
 	address = HYPERVISOR_shared_info->vcpu_info[

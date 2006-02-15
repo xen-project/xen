@@ -155,3 +155,14 @@ asmlinkage void do_softirq(void)
  	local_irq_restore(flags);
 }
 EXPORT_SYMBOL(do_softirq);
+
+#ifndef CONFIG_X86_LOCAL_APIC
+/*
+ * 'what should we do if we get a hw irq event on an illegal vector'.
+ * each architecture has to answer this themselves.
+ */
+void ack_bad_irq(unsigned int irq)
+{
+        printk("unexpected IRQ trap at vector %02x\n", irq);
+}
+#endif

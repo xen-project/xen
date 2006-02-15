@@ -454,8 +454,10 @@ static inline void __save_init_fpu( struct task_struct *tsk )
  * This could still be optimized: 
  * - fold all the options into a flag word and test it with a single test.
  * - could test fs/gs bitsliced
+ *
+ * Kprobes not supported here. Set the probe on schedule instead.
  */
-struct task_struct *
+__kprobes struct task_struct *
 __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
 	struct thread_struct *prev = &prev_p->thread,
@@ -494,7 +496,7 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	if (unlikely(next->tls_array[i] != prev->tls_array[i])) {	\
 		mcl->op      = __HYPERVISOR_update_descriptor;		\
 		mcl->args[0] = virt_to_machine(				\
-			&get_cpu_gdt_table(cpu)[GDT_ENTRY_TLS_MIN + i]);\
+			&cpu_gdt(cpu)[GDT_ENTRY_TLS_MIN + i]);		\
 		mcl->args[1] = next->tls_array[i];			\
 		mcl++;							\
 	}								\

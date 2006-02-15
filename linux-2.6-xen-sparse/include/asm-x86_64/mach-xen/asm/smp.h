@@ -100,6 +100,7 @@ extern unsigned disabled_cpus;
 extern u8 x86_cpu_to_apicid[NR_CPUS];	/* physical ID */
 extern u8 x86_cpu_to_log_apicid[NR_CPUS];
 extern u8 bios_cpu_apicid[];
+
 #ifdef CONFIG_X86_LOCAL_APIC
 static inline unsigned int cpu_mask_to_apicid(cpumask_t cpumask)
 {

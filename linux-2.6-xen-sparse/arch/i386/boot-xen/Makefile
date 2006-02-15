@@ -10,7 +10,7 @@ vmlinux-stripped: vmlinux FORCE
 INSTALL_ROOT := $(patsubst %/boot,%,$(INSTALL_PATH))
 
 XINSTALL_NAME ?= $(KERNELRELEASE)
-install: vmlinuz
+install:
 	mkdir -p $(INSTALL_ROOT)/boot
 	ln -f -s vmlinuz-$(XINSTALL_NAME)$(INSTALL_SUFFIX) $(INSTALL_ROOT)/boot/vmlinuz-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(XENGUEST)$(INSTALL_SUFFIX)
 	rm -f $(INSTALL_ROOT)/boot/vmlinuz-$(XINSTALL_NAME)$(INSTALL_SUFFIX)

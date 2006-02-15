@@ -38,6 +38,26 @@
 
 int apic_verbosity;
 
+/*
+ * 'what should we do if we get a hw irq event on an illegal vector'.
+ * each architecture has to answer this themselves.
+ */
+void ack_bad_irq(unsigned int irq)
+{
+	printk("unexpected IRQ trap at vector %02x\n", irq);
+	/*
+	 * Currently unexpected vectors happen only on SMP and APIC.
+	 * We _must_ ack these because every local APIC has only N
+	 * irq slots per priority level, and a 'hanging, unacked' IRQ
+	 * holds up an irq slot - in excessive cases (when multiple
+	 * unexpected vectors occur) that might lock up the APIC
+	 * completely.
+  	 * But don't ack when the APIC is disabled. -AK
+	 */
+	if (!disable_apic)
+		ack_APIC_irq();
+}
+
 #ifdef CONFIG_XEN
 void switch_APIC_timer_to_ipi(void *cpumask) { }
 EXPORT_SYMBOL(switch_APIC_timer_to_ipi);
