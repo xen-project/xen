@@ -10,8 +10,8 @@
 #include <xen/errno.h>
 #include <xen/compile.h>
 #include <xen/sched.h>
+#include <xen/shadow.h>
 #include <asm/current.h>
-#include <asm/shadow.h>
 #include <public/nmi.h>
 #include <public/version.h>
 
@@ -190,10 +190,10 @@ long do_xen_version(int cmd, void *arg)
         {
         case 0:
             fi.submap = 0;
-            if (shadow_mode_translate(current->domain))
-                fi.submap |= 1 << XENFEAT_writable_page_tables |
-                    1 << XENFEAT_writable_descriptor_tables |
-                    1 << XENFEAT_auto_translated_physmap;
+            if ( shadow_mode_translate(current->domain) )
+                fi.submap |= 
+                    (1U << XENFEAT_writable_page_tables) |
+                    (1U << XENFEAT_auto_translated_physmap);
             break;
         default:
             return -EINVAL;
