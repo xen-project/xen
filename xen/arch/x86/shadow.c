@@ -821,7 +821,7 @@ static void shadow_set_l1e_64(
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
-    pgentry_64_t sle;
+    pgentry_64_t sle = { 0 };
     pgentry_64_t sle_up = {0};
     l1_pgentry_t old_spte;
     l1_pgentry_t sl1e = *(l1_pgentry_t *)sl1e_p;
@@ -1606,7 +1606,7 @@ static int resync_all(struct domain *d, u32 stype)
             perfc_incr_histo(l1_entries_checked, max_shadow - min_shadow + 1, PT_UPDATES);
             if ( d->arch.ops->guest_paging_levels >= PAGING_L3 &&
                  unshadow_l1 ) {
-                pgentry_64_t l2e;
+                pgentry_64_t l2e = { 0 };
 
                 __shadow_get_l2e(entry->v, entry->va, &l2e);
 
@@ -3407,7 +3407,7 @@ static inline int guest_page_fault(
     guest_l2_pgentry_t *gpl2e, guest_l1_pgentry_t *gpl1e)
 {
     struct domain *d = v->domain;
-    pgentry_64_t gle;
+    pgentry_64_t gle = { 0 };
     unsigned long gpfn = 0, mfn;
     int i;
 
