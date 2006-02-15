@@ -842,7 +842,7 @@ set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn,
     unmap_domain_page_with_cache(l2, l2cache);
 
     l1 = map_domain_page_with_cache(l2e_get_pfn(l2e), l1cache);
-    l1[l1_table_offset(va)] = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
+    l1[l1_table_offset(va)] = (l1_pgentry_t) { mfn };
     unmap_domain_page_with_cache(l1, l1cache);
 
     return 1;
@@ -860,42 +860,48 @@ alloc_p2m_table(struct domain *d)
     l2_pgentry_t l2e = { 0 };
     l1_pgentry_t l1e = { 0 };
 
+    struct page_info *page;
     unsigned long pfn;
     int i;
 
-    ASSERT ( pagetable_get_pfn(d->vcpu[0]->arch.monitor_table));
-
-    l2tab = map_domain_page(
-        pagetable_get_pfn(d->vcpu[0]->arch.monitor_table));
-
-    list_ent = d->page_list.next;
-
-    for ( i = 0; list_ent != &d->page_list; i++ )
+    if ( pagetable_get_pfn(d->vcpu[0]->arch.monitor_table) )
     {
-        struct page_info *page;
-        page = list_entry(list_ent, struct page_info, list);
-        pfn = page_to_mfn(page);
-
+        l2tab = map_domain_page(
+            pagetable_get_pfn(d->vcpu[0]->arch.monitor_table));
         l2e = l2tab[l2_table_offset(va)];
         if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
         {
             page = alloc_domheap_page(NULL);
 
-            if ( !l1tab )
-                unmap_domain_page(l1tab);
             l1tab = map_domain_page(page_to_mfn(page));
             memset(l1tab, 0, PAGE_SIZE);
             l2e = l2tab[l2_table_offset(va)] =
                 l2e_from_page(page, __PAGE_HYPERVISOR);
         }
-        else if ( l1tab == NULL)
+        else
             l1tab = map_domain_page(l2e_get_pfn(l2e));
+    }
+    else
+    {
+        page = alloc_domheap_page(NULL);
+
+        l1tab = map_domain_page(page_to_mfn(page));
+        memset(l1tab, 0, PAGE_SIZE);
+        d->arch.phys_table = mk_pagetable(page_to_maddr(page));
+    }
+
+    list_ent = d->page_list.next;
+
+    for ( i = 0; list_ent != &d->page_list; i++ )
+    {
+        page = list_entry(list_ent, struct page_info, list);
+        pfn = page_to_mfn(page);
 
         l1e = l1tab[l1_table_offset(va)];
         if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
         {
             page = alloc_domheap_page(NULL);
-            if ( !l0tab  )
+            if ( l0tab  )
                 unmap_domain_page(l0tab);
             l0tab = map_domain_page(page_to_mfn(page));
             memset(l0tab, 0, PAGE_SIZE );
@@ -910,7 +916,8 @@ alloc_p2m_table(struct domain *d)
         va += sizeof(pfn);
     }
 
-    unmap_domain_page(l2tab);
+    if (l2tab)
+        unmap_domain_page(l2tab);
     unmap_domain_page(l1tab);
     unmap_domain_page(l0tab);
 
@@ -1582,14 +1589,7 @@ get_mfn_from_gpfn_foreign(struct domain *d, unsigned long gpfn)
            __func__, d->domain_id, gpfn, l1_pgentry_val(l1e) >> PAGE_SHIFT, tabpfn, l2e, l1tab, l1e);
 #endif
 
-    if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
-    {
-        printk("%s(d->id=%d, gpfn=%lx) => 0 l1e=%" PRIpte "\n",
-               __func__, d->domain_id, gpfn, l1e_get_intpte(l1e));
-        return INVALID_MFN;
-    }
-
-    return l1e_get_pfn(l1e);
+    return l1e_get_intpte(l1e);
 }
 
 static unsigned long
@@ -1704,6 +1704,7 @@ static unsigned long shadow_l2_table(
         {
             unsigned long hl2mfn;
 
+            ASSERT(pagetable_get_paddr(d->arch.phys_table));
             spl2e[l2_table_offset(RO_MPT_VIRT_START)] =
                 l2e_from_paddr(pagetable_get_paddr(d->arch.phys_table),
                                 __PAGE_HYPERVISOR);
