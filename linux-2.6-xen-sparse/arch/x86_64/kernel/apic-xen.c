@@ -36,11 +36,19 @@
 #include <asm/hpet.h>
 #include <asm/idle.h>
 
-/*
- * Debug level
- */
 int apic_verbosity;
-int disable_apic;
+
+#ifdef CONFIG_XEN
+void switch_APIC_timer_to_ipi(void *cpumask) { }
+EXPORT_SYMBOL(switch_APIC_timer_to_ipi);
+void switch_ipi_to_APIC_timer(void *cpumask) { }
+EXPORT_SYMBOL(switch_ipi_to_APIC_timer);
+#endif
+
+int setup_profiling_timer(unsigned int multiplier)
+{
+	return -EINVAL;
+}
 
 void smp_local_timer_interrupt(struct pt_regs *regs)
 {
@@ -159,17 +167,7 @@ asmlinkage void smp_error_interrupt(void)
 	irq_exit();
 }
 
-int get_physical_broadcast(void)
-{
-        return 0xff;
-}
-
-#ifdef CONFIG_XEN
-void switch_APIC_timer_to_ipi(void *cpumask) { }
-EXPORT_SYMBOL(switch_APIC_timer_to_ipi);
-void switch_ipi_to_APIC_timer(void *cpumask) { }
-EXPORT_SYMBOL(switch_ipi_to_APIC_timer);
-#endif
+int disable_apic;
 
 /*
  * This initializes the IO-APIC and APIC hardware if this is

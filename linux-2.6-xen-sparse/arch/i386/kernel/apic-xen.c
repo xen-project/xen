@@ -60,11 +60,6 @@ int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enable */
  */
 int apic_verbosity;
 
-int get_physical_broadcast(void)
-{
-        return 0xff;
-}
-
 /*
  * 'what should we do if we get a hw irq event on an illegal vector'.
  * each architecture has to answer this themselves.
@@ -83,12 +78,19 @@ void ack_bad_irq(unsigned int irq)
 	ack_APIC_irq();
 }
 
+int get_physical_broadcast(void)
+{
+        return 0xff;
+}
+
 #ifdef CONFIG_XEN
 void switch_APIC_timer_to_ipi(void *cpumask) { }
 EXPORT_SYMBOL(switch_APIC_timer_to_ipi);
 void switch_ipi_to_APIC_timer(void *cpumask) { }
 EXPORT_SYMBOL(switch_ipi_to_APIC_timer);
-#else
+#endif
+
+#ifndef CONFIG_XEN
 #ifndef CONFIG_SMP
 static void up_apic_timer_interrupt_call(struct pt_regs *regs)
 {
@@ -120,12 +122,12 @@ void smp_send_timer_broadcast_ipi(struct pt_regs *regs)
 #endif
 	}
 }
+#endif
 
 int setup_profiling_timer(unsigned int multiplier)
 {
 	return -EINVAL;
 }
-#endif
 
 /*
  * This initializes the IO-APIC and APIC hardware if this is

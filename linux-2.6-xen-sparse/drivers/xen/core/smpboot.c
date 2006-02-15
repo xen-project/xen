@@ -432,11 +432,12 @@ void __init smp_cpus_done(unsigned int max_cpus)
 {
 }
 
+#ifndef CONFIG_X86_LOCAL_APIC
 int setup_profiling_timer(unsigned int multiplier)
 {
-	/* Dummy function. */
-	return 0;
+	return -EINVAL;
 }
+#endif
 
 /*
  * Local variables:
