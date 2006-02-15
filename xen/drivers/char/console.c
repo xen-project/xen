@@ -224,14 +224,26 @@ static void putchar_console_ring(int c)
 long read_console_ring(char **pstr, u32 *pcount, int clear)
 {
     char *str = *pstr;
-    u32 count = *pcount;
-    unsigned int p, q;
+    unsigned int idx, len, max, sofar, c;
     unsigned long flags;
 
-    /* Start of buffer may get overwritten during copy. So copy backwards. */
-    for ( p = conringp, q = count; (p > conringc) && (q > 0); p--, q-- )
-        if ( put_user(conring[CONRING_IDX_MASK(p-1)], (char *)str+q-1) )
+    max   = *pcount;
+    sofar = 0;
+
+    c = conringc;
+    while ( c != conringp )
+    {
+        idx = CONRING_IDX_MASK(c);
+        len = conringp - c;
+        if ( (idx + len) > CONRING_SIZE )
+            len = CONRING_SIZE - idx;
+        if ( (sofar + len) > max )
+            len = max - sofar;
+        if ( copy_to_user(str + sofar, &conring[idx], len) )
             return -EFAULT;
+        sofar += len;
+        c += len;
+    }
 
     if ( clear )
     {
@@ -240,8 +252,7 @@ long read_console_ring(char **pstr, u32 *pcount, int clear)
         spin_unlock_irqrestore(&console_lock, flags);
     }
 
-    *pstr   = str + q;
-    *pcount = count - q;
+    *pcount = sofar;
     return 0;
 }
 
@@ -347,6 +358,7 @@ long guest_console_write(char *buffer, int count)
 long do_console_io(int cmd, int count, char *buffer)
 {
     long rc;
+    unsigned int idx, len;
 
 #ifndef VERBOSE
     /* Only domain 0 may access the emergency console. */
@@ -363,14 +375,19 @@ long do_console_io(int cmd, int count, char *buffer)
         rc = 0;
         while ( (serial_rx_cons != serial_rx_prod) && (rc < count) )
         {
-            if ( put_user(serial_rx_ring[SERIAL_RX_MASK(serial_rx_cons)],
-                          &buffer[rc]) )
+            idx = SERIAL_RX_MASK(serial_rx_cons);
+            len = serial_rx_prod - serial_rx_cons;
+            if ( (idx + len) > SERIAL_RX_SIZE )
+                len = SERIAL_RX_SIZE - idx;
+            if ( (rc + len) > count )
+                len = count - rc;
+            if ( copy_to_user(&buffer[rc], &serial_rx_ring[idx], len) )
             {
                 rc = -EFAULT;
                 break;
             }
-            rc++;
-            serial_rx_cons++;
+            rc += len;
+            serial_rx_cons += len;
         }
         break;
     default:

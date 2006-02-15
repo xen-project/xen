@@ -30,7 +30,7 @@ increase_reservation(
     int           *preempted)
 {
     struct page_info *page;
-    unsigned long    i;
+    unsigned long     i, mfn;
 
     if ( (extent_list != NULL) &&
          !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
@@ -58,9 +58,12 @@ increase_reservation(
         }
 
         /* Inform the domain of the new page's machine address. */ 
-        if ( (extent_list != NULL) &&
-             (__put_user(page_to_mfn(page), &extent_list[i]) != 0) )
-            return i;
+        if ( extent_list != NULL )
+        {
+            mfn = page_to_mfn(page);
+            if ( unlikely(__copy_to_user(&extent_list[i], &mfn, sizeof(mfn))) )
+                return i;
+        }
     }
 
     return nr_extents;
@@ -93,6 +96,9 @@ populate_physmap(
             goto out;
         }
 
+        if ( unlikely(__copy_from_user(&gpfn, &extent_list[i], sizeof(gpfn))) )
+            goto out;
+
         if ( unlikely((page = alloc_domheap_pages(
             d, extent_order, flags)) == NULL) )
         {
@@ -103,9 +109,6 @@ populate_physmap(
         }
 
         mfn = page_to_mfn(page);
-
-        if ( unlikely(__get_user(gpfn, &extent_list[i]) != 0) )
-            goto out;
 
         if ( unlikely(shadow_mode_translate(d)) )
         {
@@ -118,7 +121,7 @@ populate_physmap(
                 set_gpfn_from_mfn(mfn + j, gpfn + j);
 
             /* Inform the domain of the new page's machine address. */ 
-            if ( __put_user(mfn, &extent_list[i]) != 0 )
+            if ( unlikely(__copy_to_user(&extent_list[i], &mfn, sizeof(mfn))) )
                 goto out;
         }
     }
@@ -150,7 +153,7 @@ decrease_reservation(
             return i;
         }
 
-        if ( unlikely(__get_user(gmfn, &extent_list[i]) != 0) )
+        if ( unlikely(__copy_from_user(&gmfn, &extent_list[i], sizeof(gmfn))) )
             return i;
 
         for ( j = 0; j < (1 << extent_order); j++ )
@@ -282,7 +285,7 @@ long do_memory_op(int cmd, void *arg)
 
     case XENMEM_current_reservation:
     case XENMEM_maximum_reservation:
-        if ( get_user(domid, (domid_t *)arg) )
+        if ( copy_from_user(&domid, (domid_t *)arg, sizeof(domid)) )
             return -EFAULT;
 
         if ( likely((domid = (unsigned long)arg) == DOMID_SELF) )

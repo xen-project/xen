@@ -229,7 +229,7 @@ typedef struct gnttab_dump_table {
  * to the calling domain *unless* the error is GNTST_bad_page.
  */
 #define GNTTABOP_transfer                4
-typedef struct {
+typedef struct gnttab_transfer {
     /* IN parameters. */
     unsigned long mfn;
     domid_t       domid;

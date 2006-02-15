@@ -57,7 +57,9 @@ long do_multicall(struct multicall_entry *call_list, unsigned int nr_calls)
         }
 #endif
 
-        if ( unlikely(__put_user(mcs->call.result, &call_list[i].result)) )
+        if ( unlikely(__copy_to_user(&call_list[i].result,
+                                     &mcs->call.result,
+                                     sizeof(mcs->call.result))) )
         {
             DPRINTK("Error writing result back to multicall block.\n");
             goto fault;
