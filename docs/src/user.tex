@@ -1191,6 +1191,65 @@ For more complex network setups (e.g.\ where routing is required or
 integrate with existing bridges) these scripts may be replaced with
 customized variants for your site's preferred configuration.
 
+\section{Driver Domain Configuration}
+\label{s:ddconf}
+
+\subsection{PCI}
+\label{ss:pcidd}
+
+Individual PCI devices can be assigned to a given domain to allow that
+domain direct access to the PCI hardware. To use this functionality, ensure
+that the PCI Backend is compiled in to a privileged domain (e.g. domain 0)
+and that the domains which will be assigned PCI devices have the PCI Frontend
+compiled in. In XenLinux, the PCI Backend is available under the Xen
+configuration section while the PCI Frontend is under the
+architecture-specific "Bus Options" section. You may compile both the backend
+and the frontend into the same kernel; they will not affect each other.
+
+The PCI devices you wish to assign to unprivileged domains must be "hidden"
+from your backend domain (usually domain 0) so that it does not load a driver
+for them. Use the \path{pciback.hide} kernel parameter which is specified on
+the kernel command-line and is configurable through GRUB (see
+Section~\ref{s:configure}). Note that devices are not really hidden from the
+backend domain. The PCI Backend ensures that no other device driver loads
+for those devices. PCI devices are identified by hexadecimal
+slot/funciton numbers (on Linux, use \path{lspci} to determine slot/funciton
+numbers of your devices) and can be specified with or without the PCI domain: \\
+\centerline{  {\tt ({\em bus}:{\em slot}.{\em func})} example {\tt (02:1d.3)}} \\
+\centerline{  {\tt ({\em domain}:{\em bus}:{\em slot}.{\em func})} example {\tt (0000:02:1d.3)}} \\
+
+An example kernel command-line which hides two PCI devices might be: \\
+\centerline{ {\tt root=/dev/sda4 ro console=tty0 pciback.hide=(02:01.f)(0000:04:1d.0) } } \\
+
+To configure a domU to receive a PCI device:
+
+\begin{description}
+\item[Command-line:]
+  Use the {\em pci} command-line flag. For multiple devices, use the option
+  multiple times. \\
+\centerline{  {\tt xm create netcard-dd pci=01:00.0 pci=02:03.0 }} \\
+
+\item[Flat Format configuration file:]
+  Specify all of your PCI devices in a python list named {\em pci}. \\
+\centerline{  {\tt pci=['01:00.0','02:03.0'] }} \\
+
+\item[SXP Format configuration file:]
+  Use a single PCI device section for all of your devices (specify the numbers
+  in hexadecimal with the preceding '0x'). Note that {\em domain} here refers
+  to the PCI domain, not a virtual machine within Xen.
+{\small
+\begin{verbatim}
+(device (pci
+    (dev (domain 0x0)(bus 0x3)(slot 0x1a)(func 0x1)
+    (dev (domain 0x0)(bus 0x1)(slot 0x5)(func 0x0)
+)
+\end{verbatim}
+}
+\end{description}
+
+There are a number of security concerns associated with PCI Driver Domains
+that you can read about in Section~\ref{s:ddsecurity}.
+
 %% There are two possible types of privileges: IO privileges and
 %% administration privileges.
 
@@ -1595,6 +1654,63 @@ set of best practices for Domain-0:
   users to access Domain-0 (even as unprivileged users) you run the risk
   of a kernel exploit making all of your domains vulnerable.
 \end{enumerate}
+
+\section{Driver Domain Security Considerations}
+\label{s:ddsecurity}
+
+Driver domains address a range of security problems that exist regarding
+the use of device drivers and hardware. On many operating systems in common
+use today, device drivers run within the kernel with the same privileges as
+the kernel. Few or no mechanisms exist to protect the integrity of the kernel
+from a misbehaving (read "buggy") or malicious device driver. Driver
+domains exist to aid in isolating a device driver within its own virtual
+machine where it cannot affect the stability and integrity of other
+domains. If a driver crashes, the driver domain can be restarted rather than
+have the entire machine crash (and restart) with it. Drivers written by
+unknown or untrusted third-parties can be confined to an isolated space.
+Driver domains thus address a number of security and stability issues with
+device drivers.
+
+However, due to limitations in current hardware, a number of security
+concerns remain that need to be considered when setting up driver domains (it
+should be noted that the following list is not intended to be exhaustive).
+
+\begin{enumerate}
+\item \textbf{Without an IOMMU, a hardware device can DMA to memory regions
+  outside of its controlling domain.} Architectures which do not have an
+  IOMMU (e.g. most x86-based platforms) to restrict DMA usage by hardware
+  are vulnerable. A hardware device which can perform arbitrary memory reads
+  and writes can read/write outside of the memory of its controlling domain.
+  A malicious or misbehaving domain could use a hardware device it controls
+  to send data overwriting memory in another domain or to read arbitrary
+  regions of memory in another domain.
+\item \textbf{Shared buses are vulnerable to sniffing.} Devices that share
+  a data bus can sniff (and possible spoof) each others' data. Device A that
+  is assigned to Domain A could eavesdrop on data being transmitted by
+  Domain B to Device B and then relay that data back to Domain A.
+\item \textbf{Devices which share interrupt lines can either prevent the
+  reception of that interrupt by the driver domain or can trigger the
+  interrupt service routine of that guest needlessly.} A devices which shares
+  a level-triggered interrupt (e.g. PCI devices) with another device can
+  raise an interrupt and never clear it. This effectively blocks other devices
+  which share that interrupt line from notifying their controlling driver
+  domains that they need to be serviced. A device which shares an
+  any type of interrupt line can trigger its interrupt continually which
+  forces execution time to be spent (in multiple guests) in the interrupt
+  service routine (potentially denying time to other processes within that
+  guest). System architectures which allow each device to have its own
+  interrupt line (e.g. PCI's Message Signaled Interrupts) are less
+  vulnerable to this denial-of-service problem.
+\item \textbf{Devices may share the use of I/O memory address space.} Xen can
+  only restrict access to a device's physical I/O resources at a certain
+  granularity. For interrupt lines and I/O port address space, that
+  granularity is very fine (per interrupt line and per I/O port). However,
+  Xen can only restrict access to I/O memory address space on a page size
+  basis. If more than one device shares use of a page in I/O memory address
+  space, the domains to which those devices are assigned will be able to
+  access the I/O memory address space of each other's devices.
+\end{enumerate}
+
 
 \section{Security Scenarios}
 
