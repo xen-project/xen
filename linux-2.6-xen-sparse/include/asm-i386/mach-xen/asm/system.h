@@ -555,7 +555,7 @@ __asm__ __volatile__("6667:movl %1, %0\n6668:\n"                    \
 #else
 #define smp_rmb()	rmb()
 #define smp_mb()	mb()
-#define set_mb(var, value) do { xchg(&var, value); } while (0)
+#define set_mb(var, value) do { (void) xchg(&var, value); } while (0)
 #endif
 #define smp_read_barrier_depends()	read_barrier_depends()
 #else
