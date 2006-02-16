@@ -311,7 +311,7 @@ typedef struct dom0_read_memtype {
 #define DOM0_PERFCCONTROL_OP_RESET 1   /* Reset all counters to zero. */
 #define DOM0_PERFCCONTROL_OP_QUERY 2   /* Get perfctr information. */
 typedef struct dom0_perfc_desc {
-    uint8_t      name[80];             /* name of perf counter */
+    char         name[80];             /* name of perf counter */
     uint32_t     nr_vals;              /* number of values for this counter */
     uint32_t     vals[64];             /* array of values */
 } dom0_perfc_desc_t;

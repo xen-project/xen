@@ -672,7 +672,7 @@ void free_shadow_page(unsigned long smfn)
         break;
 #endif
     case PGT_snapshot:
-        perfc_decr(apshot_pages);
+        perfc_decr(snapshot_pages);
         break;
 
     default:

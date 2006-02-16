@@ -14,6 +14,12 @@ PERFCOUNTER_ARRAY(shm_l2_updates,       "shadow mode L2 pt updates",
                   PERFC_MAX_PT_UPDATES)
 PERFCOUNTER_ARRAY(shm_hl2_updates,      "shadow mode HL2 pt updates",
                   PERFC_MAX_PT_UPDATES)
+#if defined(CONFIG_X86_64) || defined(CONFIG_X86_PAE)
+PERFCOUNTER_ARRAY(shm_l3_updates,       "shadow mode L3 pt updates",
+                  PERFC_MAX_PT_UPDATES)
+PERFCOUNTER_ARRAY(shm_l4_updates,       "shadow mode L4 pt updates",
+                  PERFC_MAX_PT_UPDATES)
+#endif
 PERFCOUNTER_ARRAY(snapshot_copies,      "entries copied per snapshot",
                   PERFC_MAX_PT_UPDATES)
 
@@ -60,6 +66,10 @@ PERFCOUNTER_CPU(read_fault_bail,        "sf bailed due to read_fault")
 PERFCOUNTER_CPU(map_domain_page_count,  "map_domain_page count")
 PERFCOUNTER_CPU(ptwr_emulations,        "writable pt emulations")
 
+#if defined(CONFIG_X86_64) || defined(CONFIG_X86_PAE)
+PERFCOUNTER_CPU(shadow_l4_table_count,  "shadow_l4_table count")
+PERFCOUNTER_CPU(shadow_l3_table_count,  "shadow_l3_table count")
+#endif
 PERFCOUNTER_CPU(shadow_l2_table_count,  "shadow_l2_table count")
 PERFCOUNTER_CPU(shadow_l1_table_count,  "shadow_l1_table count")
 PERFCOUNTER_CPU(unshadow_table_count,   "unshadow_table count")
@@ -68,6 +78,10 @@ PERFCOUNTER_CPU(shadow_update_va_fail1, "shadow_update_va_fail1")
 PERFCOUNTER_CPU(shadow_update_va_fail2, "shadow_update_va_fail2")
 
 /* STATUS counters do not reset when 'P' is hit */
+#if defined(CONFIG_X86_64) || defined(CONFIG_X86_PAE)
+PERFSTATUS(shadow_l4_pages,             "current # shadow L4 pages")
+PERFSTATUS(shadow_l3_pages,             "current # shadow L3 pages")
+#endif
 PERFSTATUS(shadow_l2_pages,             "current # shadow L2 pages")
 PERFSTATUS(shadow_l1_pages,             "current # shadow L1 pages")
 PERFSTATUS(hl2_table_pages,             "current # hl2 pages")
@@ -82,6 +96,10 @@ PERFCOUNTER_CPU(shadow_hl2_table_count, "shadow_hl2_table count")
 PERFCOUNTER_CPU(shadow_set_l1e_force_map, "shadow_set_l1e forced to map l1")
 PERFCOUNTER_CPU(shadow_set_l1e_unlinked, "shadow_set_l1e found unlinked l1")
 PERFCOUNTER_CPU(shadow_set_l1e_fail,    "shadow_set_l1e failed (no sl1)")
+#if defined(CONFIG_X86_64) || defined(CONFIG_X86_PAE)
+PERFCOUNTER_CPU(shadow_set_l2e_force_map, "shadow_set_l2e forced to map l2")
+PERFCOUNTER_CPU(shadow_set_l3e_force_map, "shadow_set_l3e forced to map l3")
+#endif
 PERFCOUNTER_CPU(shadow_invlpg_faults,   "shadow_invlpg's get_user faulted")
 PERFCOUNTER_CPU(unshadow_l2_count,      "unpinned L2 count")
 
@@ -95,6 +113,10 @@ PERFCOUNTER_CPU(shadow_sync_all,        "calls to shadow_sync_all")
 PERFCOUNTER_CPU(shadow_sync_va,         "calls to shadow_sync_va")
 PERFCOUNTER_CPU(resync_l1,              "resync L1 page")
 PERFCOUNTER_CPU(resync_l2,              "resync L2 page")
+#if defined(CONFIG_X86_64) || defined(CONFIG_X86_PAE)
+PERFCOUNTER_CPU(resync_l3,              "resync L3 page")
+PERFCOUNTER_CPU(resync_l4,              "resync L4 page")
+#endif
 PERFCOUNTER_CPU(resync_hl2,             "resync HL2 page")
 PERFCOUNTER_CPU(shadow_make_snapshot,   "snapshots created")
 PERFCOUNTER_CPU(shadow_mark_mfn_out_of_sync_calls,
@@ -113,6 +135,9 @@ PERFCOUNTER_CPU(validate_pde_changes,   "validate_pde makes changes")
 PERFCOUNTER_CPU(shadow_get_page_fail,   "shadow_get_page_from_l1e fails")
 PERFCOUNTER_CPU(validate_hl2e_calls,    "calls to validate_hl2e_change")
 PERFCOUNTER_CPU(validate_hl2e_changes,  "validate_hl2e makes changes")
+#if defined(CONFIG_X86_64) || defined(CONFIG_X86_PAE)
+PERFCOUNTER_CPU(validate_entry_changes,  "validate_entry changes")
+#endif
 PERFCOUNTER_CPU(exception_fixed,        "pre-exception fixed")
 PERFCOUNTER_CPU(get_mfn_from_gpfn_foreign, "calls to get_mfn_from_gpfn_foreign")
 PERFCOUNTER_CPU(remove_all_access,      "calls to remove_all_access")
