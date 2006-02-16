@@ -469,6 +469,9 @@ static int __init init_xen(void)
 {
 	int rc;
 
+	if ((xen_start_info->flags & SIF_INITDOMAIN)) {
+		return -EPERM;
+	}
 	/*
 	 * Register device with the low lever front-end
 	 * driver

@@ -47,7 +47,7 @@
 
 #define STATE_FILE    "/var/vtpm/VTPM"
 #define DMI_NVM_FILE  "/var/vtpm/vtpm_dm_%d.data"
-#define VTPM_BE_DEV   "/dev/vtpm0"
+#define VTPM_BE_DEV   "/dev/vtpm"
 #define VTPM_CTL_DM   0
 
 #ifndef VTPM_MUTLI_VM

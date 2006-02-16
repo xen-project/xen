@@ -129,17 +129,18 @@ static inline void tpm_private_init(struct tpm_private *tp)
 static struct tpm_private *tpm_private_get(void)
 {
 	if (!my_priv) {
-	        my_priv = kzalloc(sizeof(struct tpm_private), GFP_KERNEL);
-	        if (my_priv) {
-                	tpm_private_init(my_priv);
-	        }
-        }
-        return my_priv;
+		my_priv = kzalloc(sizeof(struct tpm_private), GFP_KERNEL);
+		if (my_priv) {
+			tpm_private_init(my_priv);
+		}
+	}
+	return my_priv;
 }
 
-static inline void tpm_private_free(struct tpm_private *tp)
+static inline void tpm_private_free(void)
 {
-	kfree(tp);
+	kfree(my_priv);
+	my_priv = NULL;
 }
 
 /**************************************************************
@@ -158,7 +159,7 @@ static struct tpmfe_device *upperlayer_tpmfe;
  */
 int tpm_fe_send(struct tpm_private *tp, const u8 * buf, size_t count, void *ptr)
 {
-	int sent = 0;
+	int sent;
 
 	down(&suspend_lock);
 	sent = tpm_xmit(tp, buf, count, 0, ptr);
@@ -180,6 +181,9 @@ int tpm_fe_register_receiver(struct tpmfe_device *tpmfe_dev)
 		upperlayer_tpmfe = tpmfe_dev;
 		tpmfe_dev->max_tx_size = TPMIF_TX_RING_SIZE * PAGE_SIZE;
 		tpmfe_dev->tpm_private = tpm_private_get();
+		if (!tpmfe_dev->tpm_private) {
+			rc = -ENOMEM;
+		}
 	} else {
 		rc = -EBUSY;
 	}
@@ -355,10 +359,10 @@ static void backend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosed:
-        	if (tp->is_suspended == 0) {
-        	        device_unregister(&dev->dev);
-        	}
-	        break;
+		if (tp->is_suspended == 0) {
+			device_unregister(&dev->dev);
+		}
+		break;
 	}
 }
 
@@ -380,12 +384,12 @@ static int tpmfront_probe(struct xenbus_device *dev,
 		return err;
 	}
 
-        tp->dev = dev;
-        dev->data = tp;
+	tp->dev = dev;
+	dev->data = tp;
 
 	err = talk_to_backend(dev, tp);
 	if (err) {
-                tpm_private_free(tp);
+		tpm_private_free();
 		dev->data = NULL;
 		return err;
 	}
@@ -395,7 +399,7 @@ static int tpmfront_probe(struct xenbus_device *dev,
 
 static int tpmfront_remove(struct xenbus_device *dev)
 {
-        struct tpm_private *tp = dev->data;
+	struct tpm_private *tp = dev->data;
 	destroy_tpmring(tp);
 	return 0;
 }
@@ -433,7 +437,7 @@ tpmfront_suspend(struct xenbus_device *dev)
 static int
 tpmfront_resume(struct xenbus_device *dev)
 {
-        struct tpm_private *tp = dev->data;
+	struct tpm_private *tp = dev->data;
 	return talk_to_backend(dev, tp);
 }
 

@@ -37,7 +37,7 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/linux_module.h tpm_emulator/linux_module
 diff -uprN orig/tpm_emulator-0.2-x86_64/Makefile tpm_emulator/Makefile
 --- orig/tpm_emulator-0.2-x86_64/Makefile	2005-09-15 19:21:14.845078568 -0700
 +++ tpm_emulator/Makefile	2005-09-14 20:27:22.000000000 -0700
-@@ -1,16 +1,20 @@
+@@ -1,16 +1,22 @@
  # Software-Based Trusted Platform Module (TPM) Emulator for Linux
  # Copyright (C) 2004 Mario Strasser <mast@gmx.net>
 +# Copyright (C) 2005 INTEL Corp.
@@ -50,7 +50,9 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/Makefile tpm_emulator/Makefile
  # kernel settings
  KERNEL_RELEASE := $(shell uname -r)
 -KERNEL_BUILD   := /lib/modules/$(KERNEL_RELEASE)/build
-+KERNEL_BUILD   := $(XEN_ROOT)/linux-2.6.12-xen0
++CUR_DIR        := $(shell pwd)
++LINUX_VERSION  := $(shell cat $(CUR_DIR)/$(XEN_ROOT)/buildconfigs/mk.linux-2.6-xen | grep "LINUX_VER" | grep "2.6" | gawk '{ print $$3 }' )
++KERNEL_BUILD   := $(XEN_ROOT)/linux-$(LINUX_VERSION)-xen0
  MOD_SUBDIR     := misc
  COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
  
