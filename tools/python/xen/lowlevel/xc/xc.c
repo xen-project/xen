@@ -347,9 +347,11 @@ static PyObject *pyxc_linux_build(XcObject *self,
     if ( xc_linux_build(self->xc_handle, dom, image,
                         ramdisk, cmdline, flags,
                         store_evtchn, &store_mfn, 
-			console_evtchn, &console_mfn) != 0 )
+			console_evtchn, &console_mfn) != 0 ) {
+        if (!errno)
+             errno = EINVAL;
         return PyErr_SetFromErrno(xc_error);
-    
+    }
     return Py_BuildValue("{s:i,s:i}", 
 			 "store_mfn", store_mfn,
 			 "console_mfn", console_mfn);
