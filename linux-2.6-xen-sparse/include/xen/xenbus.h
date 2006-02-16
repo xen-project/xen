@@ -34,6 +34,7 @@
 #include <linux/device.h>
 #include <linux/notifier.h>
 #include <asm/semaphore.h>
+#include <xen/interface/grant_table.h>
 #include <xen/interface/io/xenbus.h>
 #include <xen/interface/io/xs_wire.h>
 
@@ -209,12 +210,54 @@ int xenbus_grant_ring(struct xenbus_device *dev, unsigned long ring_mfn);
 
 
 /**
+ * Map a page of memory into this domain from another domain's grant table.
+ * xenbus_map_ring_valloc allocates a page of virtual address space, maps the
+ * page to that address, and sets *vaddr to that address.
+ * xenbus_map_ring does not allocate the virtual address space (you must do
+ * this yourself!). It only maps in the page to the specified address.
+ * Returns 0 on success, and GNTST_* (see xen/include/public/grant_table.h) or
+ * -ENOMEM on error. If an error is returned, device will switch to
+ * XenbusStateClosing and the error message will be saved in XenStore.
+ */
+int xenbus_map_ring_valloc(struct xenbus_device *dev,
+			   int gnt_ref, void **vaddr);
+int xenbus_map_ring(struct xenbus_device *dev, int gnt_ref,
+			   grant_handle_t *handle, void *vaddr);
+
+
+/**
+ * Unmap a page of memory in this domain that was imported from another domain.
+ * Use xenbus_unmap_ring_vfree if you mapped in your memory with
+ * xenbus_map_ring_valloc (it will free the virtual address space).
+ * Returns 0 on success and returns GNTST_* on error
+ * (see xen/include/public/grant_table.h).
+ */
+int xenbus_unmap_ring_vfree(struct xenbus_device *dev, void *vaddr);
+int xenbus_unmap_ring(struct xenbus_device *dev,
+		      grant_handle_t handle, void *vaddr);
+
+
+/**
  * Allocate an event channel for the given xenbus_device, assigning the newly
  * created local port to *port.  Return 0 on success, or -errno on error.  On
  * error, the device will switch to XenbusStateClosing, and the error will be
  * saved in the store.
  */
 int xenbus_alloc_evtchn(struct xenbus_device *dev, int *port);
+
+
+/**
+ * Bind to an existing interdomain event channel in another domain. Returns 0
+ * on success and stores the local port in *port. On error, returns -errno,
+ * switches the device to XenbusStateClosing, and saves the error in XenStore.
+ */
+int xenbus_bind_evtchn(struct xenbus_device *dev, int remote_port, int *port);
+
+
+/**
+ * Free an existing event channel. Returns 0 on success or -errno on error.
+ */
+int xenbus_free_evtchn(struct xenbus_device *dev, int port);
 
 
 /**

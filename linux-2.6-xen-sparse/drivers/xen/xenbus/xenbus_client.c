@@ -30,6 +30,7 @@
 #include <xen/evtchn.h>
 #include <xen/gnttab.h>
 #include <xen/xenbus.h>
+#include <xen/driver_util.h>
 
 /* xenbus_probe.c */
 extern char *kasprintf(const char *fmt, ...);
@@ -139,6 +140,8 @@ void _dev_error(struct xenbus_device *dev, int err, const char *fmt,
 	BUG_ON(len + ret > PRINTF_BUFFER_SIZE-1);
 	dev->has_error = 1;
 
+	dev_err(&dev->dev, "%s\n", printf_buffer);
+
 	path_buffer = error_path(dev);
 
 	if (path_buffer == NULL) {
@@ -202,7 +205,8 @@ int xenbus_alloc_evtchn(struct xenbus_device *dev, int *port)
 	evtchn_op_t op = {
 		.cmd = EVTCHNOP_alloc_unbound,
 		.u.alloc_unbound.dom = DOMID_SELF,
-		.u.alloc_unbound.remote_dom = dev->otherend_id };
+		.u.alloc_unbound.remote_dom = dev->otherend_id
+	};
 
 	int err = HYPERVISOR_event_channel_op(&op);
 	if (err)
@@ -212,6 +216,167 @@ int xenbus_alloc_evtchn(struct xenbus_device *dev, int *port)
 	return err;
 }
 EXPORT_SYMBOL(xenbus_alloc_evtchn);
+
+
+int xenbus_bind_evtchn(struct xenbus_device *dev, int remote_port, int *port)
+{
+	evtchn_op_t op = {
+		.cmd = EVTCHNOP_bind_interdomain,
+		.u.bind_interdomain.remote_dom = dev->otherend_id,
+		.u.bind_interdomain.remote_port = remote_port,
+	};
+
+	int err = HYPERVISOR_event_channel_op(&op);
+	if (err)
+		xenbus_dev_fatal(dev, err,
+				 "binding to event channel %d from domain %d",
+				 remote_port, dev->otherend_id);
+	else
+		*port = op.u.bind_interdomain.local_port;
+	return err;
+}
+EXPORT_SYMBOL(xenbus_bind_evtchn);
+
+
+int xenbus_free_evtchn(struct xenbus_device *dev, int port)
+{
+	evtchn_op_t op = {
+		.cmd = EVTCHNOP_close,
+		.u.close.port = port,
+	};
+	int err = HYPERVISOR_event_channel_op(&op);
+	if (err)
+		xenbus_dev_error(dev, err, "freeing event channel %d", port);
+	return err;
+}
+
+
+/* Based on Rusty Russell's skeleton driver's map_page */
+int xenbus_map_ring_valloc(struct xenbus_device *dev, int gnt_ref, void **vaddr)
+{
+	struct gnttab_map_grant_ref op = {
+		.flags = GNTMAP_host_map,
+		.ref   = gnt_ref,
+		.dom   = dev->otherend_id,
+	};
+	struct vm_struct *area;
+
+	*vaddr = NULL;
+
+	area = alloc_vm_area(PAGE_SIZE);
+	if (!area)
+		return -ENOMEM;
+
+	op.host_addr = (unsigned long)area->addr;
+
+	lock_vm_area(area);
+	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1));
+	unlock_vm_area(area);
+
+	if (op.status != GNTST_okay) {
+		free_vm_area(area);
+		xenbus_dev_fatal(dev, op.status,
+				 "mapping in shared page %d from domain %d",
+				 gnt_ref, dev->otherend_id);
+		return op.status;
+	}
+
+	/* Stuff the handle in an unused field */
+	area->phys_addr = (unsigned long)op.handle;
+
+	*vaddr = area->addr;
+	return 0;
+}
+EXPORT_SYMBOL(xenbus_map_ring_valloc);
+
+
+int xenbus_map_ring(struct xenbus_device *dev, int gnt_ref,
+		   grant_handle_t *handle, void *vaddr)
+{
+	struct gnttab_map_grant_ref op = {
+		.host_addr = (unsigned long)vaddr,
+		.flags     = GNTMAP_host_map,
+		.ref       = gnt_ref,
+		.dom       = dev->otherend_id,
+	};
+
+	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1));
+
+	if (op.status != GNTST_okay) {
+		xenbus_dev_fatal(dev, op.status,
+				 "mapping in shared page %d from domain %d",
+				 gnt_ref, dev->otherend_id);
+	} else
+		*handle = op.handle;
+
+	return op.status;
+}
+EXPORT_SYMBOL(xenbus_map_ring);
+
+
+/* Based on Rusty Russell's skeleton driver's unmap_page */
+int xenbus_unmap_ring_vfree(struct xenbus_device *dev, void *vaddr)
+{
+	struct vm_struct *area;
+	struct gnttab_unmap_grant_ref op = {
+		.host_addr = (unsigned long)vaddr,
+	};
+
+	/* It'd be nice if linux/vmalloc.h provided a find_vm_area(void *addr)
+	 * method so that we don't have to muck with vmalloc internals here.
+	 * We could force the user to hang on to their struct vm_struct from
+	 * xenbus_map_ring_valloc, but these 6 lines considerably simplify
+	 * this API.
+	 */
+	read_lock(&vmlist_lock);
+	for (area = vmlist; area != NULL; area = area->next) {
+		if (area->addr == vaddr)
+			break;
+	}
+	read_unlock(&vmlist_lock);
+
+	if (!area) {
+		xenbus_dev_error(dev, -ENOENT,
+				 "can't find mapped virtual address %p", vaddr);
+		return GNTST_bad_virt_addr;
+	}
+
+	op.handle = (grant_handle_t)area->phys_addr;
+
+	lock_vm_area(area);
+	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
+	unlock_vm_area(area);
+
+	if (op.status == GNTST_okay)
+		free_vm_area(area);
+	else
+		xenbus_dev_error(dev, op.status,
+				 "unmapping page at handle %d error %d",
+				 (int16_t)area->phys_addr, op.status);
+
+	return op.status;
+}
+EXPORT_SYMBOL(xenbus_unmap_ring_vfree);
+
+
+int xenbus_unmap_ring(struct xenbus_device *dev,
+		     grant_handle_t handle, void *vaddr)
+{
+	struct gnttab_unmap_grant_ref op = {
+		.host_addr = (unsigned long)vaddr,
+		.handle    = handle,
+	};
+
+	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
+
+	if (op.status != GNTST_okay)
+		xenbus_dev_error(dev, op.status,
+				 "unmapping page at handle %d error %d",
+				 handle, op.status);
+
+	return op.status;
+}
+EXPORT_SYMBOL(xenbus_unmap_ring);
 
 
 XenbusState xenbus_read_driver_state(const char *path)
