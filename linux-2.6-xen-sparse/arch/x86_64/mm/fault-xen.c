@@ -366,12 +366,12 @@ asmlinkage void __kprobes do_page_fault(struct pt_regs *regs,
 	 */
 	if (unlikely(address >= TASK_SIZE64)) {
 		/*
-		 * Don't check for the module range here: its PML4
-		 * is always initialized because it's shared with the main
-		 * kernel text. Only vmalloc may need PML4 syncups.
+		 * Must check for the entire kernel range here: with writable
+		 * page tables the hypervisor may temporarily clear PMD
+		 * entries.
 		 */
 		if (!(error_code & (PF_RSVD|PF_USER|PF_PROT)) &&
-		      ((address >= VMALLOC_START && address < VMALLOC_END))) {
+		    address >= PAGE_OFFSET) {
 			if (vmalloc_fault(address) < 0)
 				goto bad_area_nosemaphore;
 			return;
