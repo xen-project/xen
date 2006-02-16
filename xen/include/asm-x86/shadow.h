@@ -115,9 +115,7 @@ do {                                            \
 #define SHADOW_ENCODE_MIN_MAX(_min, _max) ((((GUEST_L1_PAGETABLE_ENTRIES - 1) - (_max)) << 16) | (_min))
 #define SHADOW_MIN(_encoded) ((_encoded) & ((1u<<16) - 1))
 #define SHADOW_MAX(_encoded) ((GUEST_L1_PAGETABLE_ENTRIES - 1) - ((_encoded) >> 16))
-#if CONFIG_PAGING_LEVELS == 2
 extern void shadow_direct_map_clean(struct vcpu *v);
-#endif
 extern int shadow_direct_map_init(struct vcpu *v);
 extern int shadow_direct_map_fault(
     unsigned long vpa, struct cpu_user_regs *regs);
@@ -556,6 +554,38 @@ __guest_set_l2e(
         update_hl2e(v, va);
 
     __mark_dirty(d, pagetable_get_pfn(v->arch.guest_table));
+}
+
+static inline void
+__direct_get_l2e(
+    struct vcpu *v, unsigned long va, l2_pgentry_t *psl2e)
+{
+    l2_pgentry_t *phys_vtable;
+
+    ASSERT(shadow_mode_enabled(v->domain));
+
+    phys_vtable = map_domain_page(
+        pagetable_get_pfn(v->domain->arch.phys_table));
+
+    *psl2e = phys_vtable[l2_table_offset(va)];
+
+    unmap_domain_page(phys_vtable);
+}
+
+static inline void
+__direct_set_l2e(
+    struct vcpu *v, unsigned long va, l2_pgentry_t value)
+{
+    l2_pgentry_t *phys_vtable;
+
+    ASSERT(shadow_mode_enabled(v->domain));
+
+    phys_vtable = map_domain_page(
+        pagetable_get_pfn(v->domain->arch.phys_table));
+
+    phys_vtable[l2_table_offset(va)] = value;
+
+    unmap_domain_page(phys_vtable);
 }
 
 static inline void

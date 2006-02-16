@@ -799,6 +799,7 @@ void svm_relinquish_resources(struct vcpu *v)
         struct domain *d = v->domain;
         if (d->arch.hvm_domain.shared_page_va)
             unmap_domain_page((void *)d->arch.hvm_domain.shared_page_va);
+        shadow_direct_map_clean(v);
     }
 
     destroy_vmcb(&v->arch.hvm_svm);
@@ -1443,9 +1444,7 @@ static int svm_set_cr0(unsigned long value)
                 put_page(mfn_to_page(old_base_mfn));
 	}
 #endif
-#if CONFIG_PAGING_LEVELS == 2
-        shadow_direct_map_clean(v);
-#endif
+
         /* Now arch.guest_table points to machine physical. */
         v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
         update_pagetables(v);

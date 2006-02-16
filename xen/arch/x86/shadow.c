@@ -3743,6 +3743,7 @@ struct shadow_ops MODE_32_2_HANDLER = {
 #if ( CONFIG_PAGING_LEVELS == 3 && !defined (GUEST_PGENTRY_32) ) ||  \
     ( CONFIG_PAGING_LEVELS == 4 && defined (GUEST_PGENTRY_32) )
 
+
 /* 
  * Use GUEST_PGENTRY_32 to force PAE_SHADOW_SELF_ENTRY for L4.
  *
@@ -3756,8 +3757,8 @@ int shadow_direct_map_fault(unsigned long vpa, struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
-    l3_pgentry_t sl3e;
-    l2_pgentry_t sl2e;
+    l3_pgentry_t sl3e, *sl3e_p;
+    l2_pgentry_t sl2e, *sl2e_p;
     l1_pgentry_t sl1e;
     unsigned long mfn, smfn;
     struct page_info *page;
@@ -3773,37 +3774,47 @@ int shadow_direct_map_fault(unsigned long vpa, struct cpu_user_regs *regs)
 
     shadow_lock(d);
 
-    __shadow_get_l3e(v, vpa, &sl3e);
+    __direct_get_l3e(v, vpa, &sl3e);
 
     if ( !(l3e_get_flags(sl3e) & _PAGE_PRESENT) ) 
     {
         page = alloc_domheap_page(NULL);
         if ( !page )
-            goto fail; 
+            goto nomem; 
+
         smfn = page_to_mfn(page);
         sl3e = l3e_from_pfn(smfn, _PAGE_PRESENT);
-        __shadow_set_l3e(v, vpa, &sl3e);
+
+        sl3e_p = (l3_pgentry_t *)map_domain_page(smfn);
+        memset(sl3e_p, 0, PAGE_SIZE);
+        unmap_domain_page(sl3e_p);
+
+        __direct_set_l3e(v, vpa, &sl3e);
     }
 
-    __shadow_get_l2e(v, vpa, &sl2e);
+    __direct_get_l2e(v, vpa, &sl2e);
 
     if ( !(l2e_get_flags(sl2e) & _PAGE_PRESENT) ) 
     {
         page = alloc_domheap_page(NULL);
         if ( !page )
-            goto fail; 
-        smfn = page_to_mfn(page);
+            goto nomem; 
 
+        smfn = page_to_mfn(page);
         sl2e = l2e_from_pfn(smfn, __PAGE_HYPERVISOR | _PAGE_USER);
-        __shadow_set_l2e(v, vpa, &sl2e);
+        sl2e_p = (l2_pgentry_t *)map_domain_page(smfn);
+        memset(sl2e_p, 0, PAGE_SIZE);
+        unmap_domain_page(sl2e_p);
+
+        __direct_set_l2e(v, vpa, &sl2e);
     }
 
-    __shadow_get_l1e(v, vpa, &sl1e);
+    __direct_get_l1e(v, vpa, &sl1e);
 
     if ( !(l1e_get_flags(sl1e) & _PAGE_PRESENT) ) 
     {
         sl1e = l1e_from_pfn(mfn, __PAGE_HYPERVISOR | _PAGE_USER);
-        __shadow_set_l1e(v, vpa, &sl1e);
+        __direct_set_l1e(v, vpa, &sl1e);
     } 
 
     shadow_unlock(d);
@@ -3811,6 +3822,10 @@ int shadow_direct_map_fault(unsigned long vpa, struct cpu_user_regs *regs)
 
 fail:
     return 0;
+
+nomem:
+    shadow_direct_map_clean(v);
+    domain_crash_synchronous();
 }
 #endif
 

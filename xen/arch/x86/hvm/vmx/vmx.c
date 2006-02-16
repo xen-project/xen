@@ -88,6 +88,7 @@ void vmx_relinquish_resources(struct vcpu *v)
         if ( d->arch.hvm_domain.shared_page_va )
             unmap_domain_page_global(
 	        (void *)d->arch.hvm_domain.shared_page_va);
+        shadow_direct_map_clean(v);
     }
 
     vmx_request_clear_vmcs(v);
@@ -1227,9 +1228,7 @@ static int vmx_set_cr0(unsigned long value)
                 __vmwrite(GUEST_CR4, crn | X86_CR4_PAE);
             }
         }
-#if CONFIG_PAGING_LEVELS == 2
-        shadow_direct_map_clean(v);
-#endif
+
         /*
          * Now arch.guest_table points to machine physical.
          */

@@ -44,33 +44,28 @@ int shadow_direct_map_init(struct vcpu *v)
     if ( !(page = alloc_domheap_pages(NULL, 0, ALLOC_DOM_DMA)) )
         goto fail;
 
-    root = map_domain_page_global(page_to_mfn(page));
+    root = map_domain_page(page_to_mfn(page));
     memset(root, 0, PAGE_SIZE);
     root[PAE_SHADOW_SELF_ENTRY] = l3e_from_page(page, __PAGE_HYPERVISOR);
 
     v->domain->arch.phys_table = mk_pagetable(page_to_maddr(page));
-    /* 
-     * We need to set shadow_vtable to get __shadow_set/get_xxx
-     * working
-     */
-    v->arch.shadow_vtable = (l2_pgentry_t *) root;
 
+    unmap_domain_page(root);
     return 1;
-    
+
 fail:
     return 0;
 }
 
-static void shadow_direct_map_clean(struct vcpu *v)
+void shadow_direct_map_clean(struct vcpu *v)
 {
     l2_pgentry_t *l2e;
     l3_pgentry_t *l3e;
     int i, j;
 
-    ASSERT ( v->arch.shadow_vtable );
+    l3e = (l3_pgentry_t *)map_domain_page(
+        pagetable_get_pfn(v->domain->arch.phys_table));
 
-    l3e = (l3_pgentry_t *) v->arch.shadow_vtable;
-    
     for ( i = 0; i < PAE_L3_PAGETABLE_ENTRIES; i++ )
     {
         if ( l3e_get_flags(l3e[i]) & _PAGE_PRESENT )
@@ -90,8 +85,7 @@ static void shadow_direct_map_clean(struct vcpu *v)
     free_domheap_page(
         mfn_to_page(pagetable_get_pfn(v->domain->arch.phys_table)));
 
-    unmap_domain_page_global(v->arch.shadow_vtable);
-    v->arch.shadow_vtable = 0;
+    unmap_domain_page(l3e);
     v->domain->arch.phys_table = mk_pagetable(0);
 }
 
@@ -102,12 +96,7 @@ static void shadow_direct_map_clean(struct vcpu *v)
 
 int shadow_set_guest_paging_levels(struct domain *d, int levels)
 {
-    struct vcpu *v = current;
     shadow_lock(d);
-
-    if ( shadow_mode_translate(d) && 
-         !(pagetable_get_paddr(v->domain->arch.phys_table)) )
-         shadow_direct_map_clean(v);
 
     switch(levels) {
 #if CONFIG_PAGING_LEVELS == 4
@@ -1330,43 +1319,133 @@ int _shadow_mode_refcounts(struct domain *d)
     return shadow_mode_refcounts(d);
 }
 
+static int
+map_p2m_entry(
+    pgentry_64_t *top_tab, unsigned long va, unsigned long gpa, unsigned long mfn)
+{
+#if CONFIG_PAGING_LEVELS >= 4
+    pgentry_64_t l4e = { 0 };
+#endif
+#if CONFIG_PAGING_LEVELS >= 3
+    pgentry_64_t *l3tab = NULL;
+    pgentry_64_t l3e = { 0 };
+#endif
+    l2_pgentry_t *l2tab = NULL;
+    l1_pgentry_t *l1tab = NULL;
+    unsigned long *l0tab = NULL;
+    l2_pgentry_t l2e = { 0 };
+    l1_pgentry_t l1e = { 0 };
+    struct page_info *page;
+
+#if CONFIG_PAGING_LEVELS >= 4
+    l4e = top_tab[l4_table_offset(va)];
+    if ( !(entry_get_flags(l4e) & _PAGE_PRESENT) ) 
+    {
+        page = alloc_domheap_page(NULL);
+        if ( !page )
+            goto nomem;
+
+        l3tab = map_domain_page(page_to_mfn(page));
+        memset(l3tab, 0, PAGE_SIZE);
+        l4e = top_tab[l4_table_offset(va)] = 
+            entry_from_page(page, __PAGE_HYPERVISOR);
+    } 
+    else if ( l3tab == NULL)
+        l3tab = map_domain_page(entry_get_pfn(l4e));
+
+    l3e = l3tab[l3_table_offset(va)];
+#else
+    l3e = top_tab[l3_table_offset(va)];
+#endif
+    if ( !(entry_get_flags(l3e) & _PAGE_PRESENT) ) 
+    {
+        page = alloc_domheap_page(NULL);
+        if ( !page )
+            goto nomem;
+
+        l2tab = map_domain_page(page_to_mfn(page));
+        memset(l2tab, 0, PAGE_SIZE);
+        l3e = l3tab[l3_table_offset(va)] = 
+            entry_from_page(page, __PAGE_HYPERVISOR);
+    } 
+    else if ( l2tab == NULL) 
+        l2tab = map_domain_page(entry_get_pfn(l3e));
+
+    l2e = l2tab[l2_table_offset(va)];
+    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) ) 
+    {
+        page = alloc_domheap_page(NULL);
+        if ( !page )
+            goto nomem;
+
+        l1tab = map_domain_page(page_to_mfn(page));
+        memset(l1tab, 0, PAGE_SIZE);
+        l2e = l2tab[l2_table_offset(va)] = 
+            l2e_from_page(page, __PAGE_HYPERVISOR);
+    } 
+    else if ( l1tab == NULL) 
+        l1tab = map_domain_page(l2e_get_pfn(l2e));
+
+    l1e = l1tab[l1_table_offset(va)];
+    if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) ) 
+    {
+        page = alloc_domheap_page(NULL);
+        if ( !page )
+            goto nomem;
+
+        l0tab = map_domain_page(page_to_mfn(page));
+        memset(l0tab, 0, PAGE_SIZE);
+        l1e = l1tab[l1_table_offset(va)] = 
+            l1e_from_page(page, __PAGE_HYPERVISOR);
+    }
+    else if ( l0tab == NULL) 
+        l0tab = map_domain_page(l1e_get_pfn(l1e));
+
+    l0tab[gpa & ((PAGE_SIZE / sizeof (mfn)) - 1) ] = mfn;
+
+    if ( l2tab )
+    {
+        unmap_domain_page(l2tab);
+        l2tab = NULL;
+    }
+    if ( l1tab )
+    {
+        unmap_domain_page(l1tab);
+        l1tab = NULL;
+    }
+    if ( l0tab )
+    {
+        unmap_domain_page(l0tab);
+        l0tab = NULL;
+    }
+
+    return 1;
+
+nomem:
+
+    return 0;
+}
+
 int
 set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn,
               struct domain_mmap_cache *l2cache,
               struct domain_mmap_cache *l1cache)
 {
-    unsigned long tabpfn = pagetable_get_pfn(d->arch.phys_table);
-    l2_pgentry_t *l2, l2e;
-    l1_pgentry_t *l1;
-    struct page_info *l1page;
-    unsigned long va = pfn << PAGE_SHIFT;
+    unsigned long tabpfn = pagetable_get_pfn(d->vcpu[0]->arch.monitor_table);
+    pgentry_64_t *top;
+    unsigned long va = RO_MPT_VIRT_START + (pfn * sizeof (unsigned long));
+    int error;
 
     ASSERT(tabpfn != 0);
+    ASSERT(shadow_lock_is_acquired(d));
 
-    l2 = map_domain_page_with_cache(tabpfn, l2cache);
-    l2e = l2[l2_table_offset(va)];
-    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
-    {
-        l1page = alloc_domheap_page(NULL);
-        if ( !l1page )
-        {
-            unmap_domain_page_with_cache(l2, l2cache);
-            return 0;
-        }
+    top = map_domain_page_with_cache(tabpfn, l2cache);
+    error = map_p2m_entry(top, va, pfn, mfn);
+    unmap_domain_page_with_cache(top, l2cache);
 
-        l1 = map_domain_page_with_cache(page_to_mfn(l1page), l1cache);
-        memset(l1, 0, PAGE_SIZE);
-        unmap_domain_page_with_cache(l1, l1cache);
-
-        l2e = l2e_from_page(l1page, __PAGE_HYPERVISOR);
-        l2[l2_table_offset(va)] = l2e;
-    }
-    unmap_domain_page_with_cache(l2, l2cache);
-
-    l1 = map_domain_page_with_cache(l2e_get_pfn(l2e), l1cache);
-    l1[l1_table_offset(va)] = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
-    unmap_domain_page_with_cache(l1, l1cache);
-
+    if ( !error )
+         domain_crash_synchronous();
+        
     return 1;
 }
 
@@ -1375,119 +1454,31 @@ alloc_p2m_table(struct domain *d)
 {
     struct list_head *list_ent;
     unsigned long va = RO_MPT_VIRT_START; /*  phys_to_machine_mapping */
-
-#if CONFIG_PAGING_LEVELS >= 4
-    l4_pgentry_t *l4tab = NULL;
-    l4_pgentry_t l4e = { 0 };
-#endif
-#if CONFIG_PAGING_LEVELS >= 3
-    l3_pgentry_t *l3tab = NULL;
-    l3_pgentry_t l3e = { 0 };
-#endif
-    l2_pgentry_t *l2tab = NULL;
-    l1_pgentry_t *l1tab = NULL;
-    unsigned long *l0tab = NULL;
-    l2_pgentry_t l2e = { 0 };
-    l1_pgentry_t l1e = { 0 };
-
-    unsigned long pfn;
-    int i;
+    pgentry_64_t *top_tab = NULL;
+    unsigned long mfn;
+    int gpa;
 
     ASSERT ( pagetable_get_pfn(d->vcpu[0]->arch.monitor_table) );
 
-#if CONFIG_PAGING_LEVELS >= 4
-    l4tab = map_domain_page(
+    top_tab = map_domain_page(
         pagetable_get_pfn(d->vcpu[0]->arch.monitor_table));
-#endif
-#if CONFIG_PAGING_LEVELS >= 3
-    l3tab = map_domain_page(
-        pagetable_get_pfn(d->vcpu[0]->arch.monitor_table));
-#endif
+
 
     list_ent = d->page_list.next;
 
-    for ( i = 0; list_ent != &d->page_list; i++ ) 
+    for ( gpa = 0; list_ent != &d->page_list; gpa++ ) 
     {
         struct page_info *page;
-
         page = list_entry(list_ent, struct page_info, list);
-        pfn = page_to_mfn(page);
+        mfn = page_to_mfn(page);
 
-#if CONFIG_PAGING_LEVELS >= 4
-        l4e = l4tab[l4_table_offset(va)];
-        if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) ) 
-        {
-            page = alloc_domheap_page(NULL);
-            l3tab = map_domain_page(page_to_mfn(page));
-            memset(l3tab, 0, PAGE_SIZE);
-            l4e = l4tab[l4_table_offset(va)] = 
-                l4e_from_page(page, __PAGE_HYPERVISOR);
-        } 
-        else if ( l3tab == NULL)
-            l3tab = map_domain_page(l4e_get_pfn(l4e));
-#endif
-        l3e = l3tab[l3_table_offset(va)];
-        if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) ) 
-        {
-            page = alloc_domheap_page(NULL);
-            l2tab = map_domain_page(page_to_mfn(page));
-            memset(l2tab, 0, PAGE_SIZE);
-            l3e = l3tab[l3_table_offset(va)] = 
-                l3e_from_page(page, __PAGE_HYPERVISOR);
-        } 
-        else if ( l2tab == NULL) 
-            l2tab = map_domain_page(l3e_get_pfn(l3e));
-
-        l2e = l2tab[l2_table_offset(va)];
-        if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) ) 
-        {
-            page = alloc_domheap_page(NULL);
-            l1tab = map_domain_page(page_to_mfn(page));
-            memset(l1tab, 0, PAGE_SIZE);
-            l2e = l2tab[l2_table_offset(va)] = 
-                l2e_from_page(page, __PAGE_HYPERVISOR);
-        } 
-        else if ( l1tab == NULL) 
-            l1tab = map_domain_page(l2e_get_pfn(l2e));
-
-        l1e = l1tab[l1_table_offset(va)];
-        if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) ) 
-        {
-            page = alloc_domheap_page(NULL);
-            l0tab = map_domain_page(page_to_mfn(page));
-            memset(l0tab, 0, PAGE_SIZE);
-            l1e = l1tab[l1_table_offset(va)] = 
-                l1e_from_page(page, __PAGE_HYPERVISOR);
-        }
-        else if ( l0tab == NULL) 
-            l0tab = map_domain_page(l1e_get_pfn(l1e));
-
-        l0tab[i & ((PAGE_SIZE / sizeof (pfn)) - 1) ] = pfn;
-        list_ent = frame_table[pfn].list.next;
-        va += sizeof (pfn);
-
-        if ( l2tab )
-        {
-            unmap_domain_page(l2tab);
-            l2tab = NULL;
-        }
-        if ( l1tab )
-        {
-            unmap_domain_page(l1tab);
-            l1tab = NULL;
-        }
-        if ( l0tab )
-        {
-            unmap_domain_page(l0tab);
-            l0tab = NULL;
-        }
+        map_p2m_entry(top_tab, va, gpa, mfn);
+        list_ent = frame_table[mfn].list.next;
+        va += sizeof(mfn);
     }
-#if CONFIG_PAGING_LEVELS >= 4
-    unmap_domain_page(l4tab);
-#endif
-#if CONFIG_PAGING_LEVELS >= 3
-    unmap_domain_page(l3tab);
-#endif
+
+    unmap_domain_page(top_tab);
+
     return 1;
 }
 

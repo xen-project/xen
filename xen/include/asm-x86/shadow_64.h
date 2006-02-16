@@ -66,9 +66,12 @@ typedef struct { intpte_t l4; } l4_pgentry_t;
 #define PAGING_L1      1UL
 #define L_MASK  0xff
 
+#define PAE_PAGING_LEVELS   3
+
 #define ROOT_LEVEL_64   PAGING_L4
 #define ROOT_LEVEL_32   PAGING_L2
 
+#define DIRECT_ENTRY    (4UL << 16)
 #define SHADOW_ENTRY    (2UL << 16)
 #define GUEST_ENTRY     (1UL << 16)
 
@@ -94,6 +97,7 @@ typedef struct { intpte_t lo; } pgentry_64_t;
 #define entry_empty()           ((pgentry_64_t) { 0 })
 #define entry_from_pfn(pfn, flags)  \
     ((pgentry_64_t) { ((intpte_t)(pfn) << PAGE_SHIFT) | put_pte_flags(flags) })
+#define entry_from_page(page, flags) (entry_from_pfn(page_to_mfn(page),(flags)))
 #define entry_add_flags(x, flags)    ((x).lo |= put_pte_flags(flags))
 #define entry_remove_flags(x, flags) ((x).lo &= ~put_pte_flags(flags))
 #define entry_has_changed(x,y,flags) \
@@ -162,16 +166,24 @@ static inline int __entry(
 
     if ( flag & SHADOW_ENTRY )
     {
-	root_level =  ROOT_LEVEL_64;
-	index = table_offset_64(va, root_level);
+        root_level =  ROOT_LEVEL_64;
+        index = table_offset_64(va, root_level);
         le_e = (pgentry_64_t *)&v->arch.shadow_vtable[index];
     }
-    else /* guest entry */  
+    else if ( flag & GUEST_ENTRY )
     {
         root_level = v->domain->arch.ops->guest_paging_levels;
-	index = table_offset_64(va, root_level);
+        index = table_offset_64(va, root_level);
         le_e = (pgentry_64_t *)&v->arch.guest_vtable[index];
     }
+    else /* direct mode */
+    {
+        root_level = PAE_PAGING_LEVELS;
+        index = table_offset_64(va, root_level);
+        le_e = (pgentry_64_t *)map_domain_page(
+            pagetable_get_pfn(v->domain->arch.phys_table));
+    }
+
     /*
      * If it's not external mode, then mfn should be machine physical.
      */
@@ -240,6 +252,20 @@ static inline int __rw_entry(
   __rw_entry(v, va, value, GUEST_ENTRY | SET_ENTRY | PAGING_L3)
 #define __guest_get_l3e(v, va, sl3e) \
   __rw_entry(v, va, gl3e, GUEST_ENTRY | GET_ENTRY | PAGING_L3)
+
+#define __direct_set_l3e(v, va, value) \
+  __rw_entry(v, va, value, DIRECT_ENTRY | SET_ENTRY | PAGING_L3)
+#define __direct_get_l3e(v, va, sl3e) \
+  __rw_entry(v, va, sl3e, DIRECT_ENTRY | GET_ENTRY | PAGING_L3)
+#define __direct_set_l2e(v, va, value) \
+  __rw_entry(v, va, value, DIRECT_ENTRY | SET_ENTRY | PAGING_L2)
+#define __direct_get_l2e(v, va, sl2e) \
+  __rw_entry(v, va, sl2e, DIRECT_ENTRY | GET_ENTRY | PAGING_L2)
+#define __direct_set_l1e(v, va, value) \
+  __rw_entry(v, va, value, DIRECT_ENTRY | SET_ENTRY | PAGING_L1)
+#define __direct_get_l1e(v, va, sl1e) \
+  __rw_entry(v, va, sl1e, DIRECT_ENTRY | GET_ENTRY | PAGING_L1)
+
 
 static inline int  __guest_set_l2e(
     struct vcpu *v, unsigned long va, void *value, int size)
