@@ -26,6 +26,7 @@ import sys
 import socket
 import commands
 import time
+import re
 
 import xen.lowlevel.xc
 
@@ -240,10 +241,10 @@ gopts.var('disk', val='phy:DEV,VDEV,MODE[,DOM]',
           backend driver domain to use for the disk.
           The option may be repeated to add more than one disk.""")
 
-gopts.var('pci', val='BUS,DEV,FUNC',
+gopts.var('pci', val='BUS:DEV.FUNC',
           fn=append_value, default=[],
           use="""Add a PCI device to a domain, using given params (in hex).
-         For example '-pci c0,02,1a'.
+         For example '-pci c0:02.1a'.
          The option may be repeated to add more than one pci device.""")
 
 gopts.var('ioports', val='FROM[-TO]',
@@ -461,8 +462,13 @@ def configure_disks(config_devs, vals):
 def configure_pci(config_devs, vals):
     """Create the config for pci devices.
     """
-    for (bus, dev, func) in vals.pci:
-        config_pci = ['pci', ['bus', bus], ['dev', dev], ['func', func]]
+    config_pci = []
+    for (domain, bus, slot, func) in vals.pci:
+        config_pci.append(['dev', ['domain', domain], ['bus', bus], \
+                        ['slot', slot], ['func', func]])
+
+    if len(config_pci)>0:
+        config_pci.insert(0, 'pci')
         config_devs.append(['device', config_pci])
 
 def configure_ioports(config_devs, vals):
@@ -624,13 +630,20 @@ def preprocess_disk(vals):
 def preprocess_pci(vals):
     if not vals.pci: return
     pci = []
-    for v in vals.pci:
-        d = v.split(',')
-        if len(d) != 3:
-            err('Invalid pci specifier: ' + v)
-        # Components are in hex: add hex specifier.
-        hexd = map(lambda v: '0x'+v, d)
-        pci.append(hexd)
+    for pci_dev_str in vals.pci:
+        pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
+                r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
+                r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
+                r"(?P<func>[0-9a-fA-F])", pci_dev_str)
+        if pci_match!=None:
+            pci_dev_info = pci_match.groupdict('0')
+            try:
+                pci.append( ('0x'+pci_dev_info['domain'], \
+                        '0x'+pci_dev_info['bus'], \
+                        '0x'+pci_dev_info['slot'], \
+                        '0x'+pci_dev_info['func']))
+            except IndexError:
+                err('Error in PCI slot syntax "%s"'%(pci_dev_str))
     vals.pci = pci
 
 def preprocess_ioports(vals):
