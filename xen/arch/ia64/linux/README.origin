@@ -5,14 +5,15 @@ needs to be changed, move it to ../linux-xen and follow
 the instructions in the README there.
 
 cmdline.c		-> linux/lib/cmdline.c
-efi_stub.S		-> linux/arch/ia64/efi_stub.S
+efi_stub.S		-> linux/arch/ia64/kernel/efi_stub.S
 extable.c		-> linux/arch/ia64/mm/extable.c
 hpsim.S			-> linux/arch/ia64/hp/sim/hpsim.S
 ia64_ksyms.c		-> linux/arch/ia64/kernel/ia64_ksyms.c
+irq_lsapic.c		-> linux/arch/ia64/kernel/irq_lsapic.c
 linuxextable.c		-> linux/kernel/extable.c
 machvec.c		-> linux/arch/ia64/kernel/machvec.c
 patch.c			-> linux/arch/ia64/kernel/patch.c
-pcdp.h			-> drivers/firmware/pcdp.h
+pcdp.h			-> linux/drivers/firmware/pcdp.h
 
 bitop.c			-> linux/arch/ia64/lib/bitop.c
 clear_page.S		-> linux/arch/ia64/lib/clear_page.S

@@ -4,6 +4,6 @@
 # needs to be changed, move it to ../linux-xen and follow
 # the instructions in the README there.
 
-generic.h		-> linux/include/byteorder/generic.h
-little_endian.h		-> linux/include/byteorder/little_endian.h
-swab.h			-> linux/include/byteorder/swab.h
+generic.h		-> linux/include/linux/byteorder/generic.h
+little_endian.h		-> linux/include/linux/byteorder/little_endian.h
+swab.h			-> linux/include/linux/byteorder/swab.h

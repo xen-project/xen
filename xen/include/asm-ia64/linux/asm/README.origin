@@ -4,6 +4,7 @@
 # needs to be changed, move it to ../linux-xen and follow
 # the instructions in the README there.
 
+acpi.h			-> linux/include/asm-ia64/acpi.h
 asmmacro.h		-> linux/include/asm-ia64/asmmacro.h
 atomic.h		-> linux/include/asm-ia64/atomic.h
 bitops.h		-> linux/include/asm-ia64/bitops.h
@@ -11,7 +12,6 @@ break.h			-> linux/include/asm-ia64/break.h
 bug.h			-> linux/include/asm-ia64/bug.h
 byteorder.h		-> linux/include/asm-ia64/byteorder.h
 cacheflush.h		-> linux/include/asm-ia64/cacheflush.h
-cache.h			-> linux/include/asm-ia64/cache.h
 checksum.h		-> linux/include/asm-ia64/checksum.h
 current.h		-> linux/include/asm-ia64/current.h
 delay.h			-> linux/include/asm-ia64/delay.h

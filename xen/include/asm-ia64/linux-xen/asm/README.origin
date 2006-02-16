@@ -5,6 +5,7 @@
 # (e.g. with #ifdef XEN or XEN in a comment) so that they can be
 # easily updated to future versions of the corresponding Linux files.
 
+cache.h		-> linux/include/asm-ia64/cache.h
 gcc_intrin.h		-> linux/include/asm-ia64/gcc_intrin.h
 ia64regs.h		-> linux/include/asm-ia64/ia64regs.h
 io.h			-> linux/include/asm-ia64/io.h
