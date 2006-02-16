@@ -61,6 +61,7 @@
         pushl $HVM_MONITOR_EFLAGS; \
         popf; \
         subl $(NR_SKIPPED_REGS*4), %esp; \
+        movl $0, 0xc(%esp);  /* XXX why do we need to force eflags==0 ?? */ \
         pushl %eax; \
         pushl %ebp; \
         pushl %edi; \
