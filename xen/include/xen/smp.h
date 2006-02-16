@@ -86,9 +86,7 @@ void smp_prepare_boot_cpu(void);
 
 #define smp_send_event_check_mask(m)            ((void)0)
 #define smp_send_event_check_cpu(p)             ((void)0) 
-#ifndef __smp_processor_id
-#define smp_processor_id()			0
-#endif
+#define raw_smp_processor_id()			0
 #define hard_smp_processor_id()			0
 #define smp_call_function(func,info,retry,wait)	({ do {} while (0); 0; })
 #define on_each_cpu(func,info,retry,wait)	({ func(info); 0; })
@@ -97,10 +95,6 @@ void smp_prepare_boot_cpu(void);
 
 #endif
 
-#ifdef __smp_processor_id
-#define smp_processor_id() __smp_processor_id()
-#else
-extern unsigned int smp_processor_id(void);
-#endif
+#define smp_processor_id() raw_smp_processor_id()
 
 #endif

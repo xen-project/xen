@@ -299,9 +299,9 @@ extern int ht_per_core;
 
 // needed for include/xen/smp.h
 #ifdef CONFIG_SMP
-#define __smp_processor_id()	current->processor
+#define raw_smp_processor_id()	current->processor
 #else
-#define __smp_processor_id()	0
+#define raw_smp_processor_id()	0
 #endif
 
 

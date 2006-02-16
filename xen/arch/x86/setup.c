@@ -445,11 +445,6 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     smp_prepare_cpus(max_cpus);
 
-    /* We aren't hotplug-capable yet. */
-    BUG_ON(!cpus_empty(cpu_present_map));
-    for_each_cpu ( i )
-        cpu_set(i, cpu_present_map);
-
     /*
      * Initialise higher-level timer functions. We do this fairly late
      * (post-SMP) because the time bases and scale factors need to be updated 
