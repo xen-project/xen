@@ -134,6 +134,10 @@ static inline void pci_dma_burst_advice(struct pci_dev *pdev,
 
 #endif /* __KERNEL__ */
 
+#ifdef CONFIG_XEN_PCIDEV_FRONTEND
+#include <xen/pcifront.h>
+#endif /* CONFIG_XEN_PCIDEV_FRONTEND */
+
 /* implement the pci_ DMA API in terms of the generic device dma_ one */
 #include <asm-generic/pci-dma-compat.h>
 

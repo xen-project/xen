@@ -15,8 +15,13 @@ obj-$(CONFIG_PCI_MMCONFIG) += mmconfig.o direct.o
 
 obj-$(CONFIG_NUMA)	+= k8-bus.o
 
+# pcifront should be after mmconfig.o and direct.o as it should only
+# take over if direct access to the PCI bus is unavailable
+obj-$(CONFIG_XEN_PCIDEV_FRONTEND)	+= pcifront.o
+
 direct-y += ../../i386/pci/direct.o
 acpi-y   += ../../i386/pci/acpi.o
+pcifront-y += ../../i386/pci/pcifront.o
 legacy-y += ../../i386/pci/legacy.o
 irq-y    += ../../i386/pci/irq.o
 common-y += ../../i386/pci/common.o
@@ -25,7 +30,6 @@ i386-y  += ../../i386/pci/i386.o
 
 ifdef CONFIG_XEN
 irq-y		:= ../../i386/pci/irq-xen.o
-i386-y		:= ../../i386/pci/i386.o
 include $(srctree)/scripts/Makefile.xen
 
 obj-y := $(call cherrypickxen, $(obj-y))

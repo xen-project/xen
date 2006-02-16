@@ -29,6 +29,44 @@ config XEN_UNPRIVILEGED_GUEST
 	bool
 	default !XEN_PRIVILEGED_GUEST
 
+config XEN_PCIDEV_BACKEND
+	bool "PCI device backend driver"
+	select PCI
+	default y if XEN_PRIVILEGED_GUEST
+	help
+	  The PCI device backend driver allows the kernel to export arbitrary
+	  PCI devices to other guests.
+
+choice
+	prompt "PCI Backend Mode"
+	depends on XEN_PCIDEV_BACKEND
+	default XEN_PCIDEV_BACKEND_VPCI
+
+config XEN_PCIDEV_BACKEND_VPCI
+	bool "Virtual PCI"
+	---help---
+	  This PCI Backend hides the true PCI topology and makes the frontend
+	  think there is a single PCI bus with only the exported devices on it.
+	  For example, a device at 03:05.0 will be re-assigned to 00:00.0. A
+	  second device at 02:1a.0 will be re-assigned to 00:01.0.
+
+config XEN_PCIDEV_BACKEND_PASS
+	bool "Passthrough"
+	---help---
+	  This PCI Backend provides a real view of the PCI topology to the
+	  frontend (for example, a device at 06:01.b will still appear at
+	  06:01.b to the frontend). This is similar to how Xen 2.0.x exposed
+	  PCI devices to its driver domains. This may be required for drivers
+	  which depend on finding their hardward in certain bus/slot
+	  locations.
+
+endchoice
+
+config XEN_PCIDEV_BE_DEBUG
+	bool "PCI Backend Debugging"
+	depends on XEN_PCIDEV_BACKEND
+	default n
+
 config XEN_BLKDEV_BACKEND
 	bool "Block-device backend driver"
 	default y

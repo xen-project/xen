@@ -550,6 +550,21 @@ config PCI_MMCONFIG
 	bool "Support mmconfig PCI config space access"
 	depends on PCI && ACPI
 
+config XEN_PCIDEV_FRONTEND
+	bool "Xen PCI Frontend"
+	depends on PCI && X86_64_XEN
+	default y
+	help
+	  The PCI device frontend driver allows the kernel to import arbitrary
+	  PCI devices from a PCI backend to support PCI driver domains.
+
+config XEN_PCIDEV_FE_DEBUG
+	bool "Xen PCI Frontend Debugging"
+	depends on XEN_PCIDEV_FRONTEND
+	default n
+	help
+	  Enables some debug statements within the PCI Frontend.
+
 config UNORDERED_IO
        bool "Unordered IO mapping access"
        depends on EXPERIMENTAL
