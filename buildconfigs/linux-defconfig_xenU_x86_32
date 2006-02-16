@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.16-rc3-xenU
-# Wed Feb 15 20:56:26 2006
+# Linux kernel version: 2.6.16-rc3-xen0
+# Thu Feb 16 22:53:43 2006
 #
 CONFIG_X86_32=y
 CONFIG_SEMAPHORE_SLEEPERS=y
@@ -858,6 +858,7 @@ CONFIG_NO_IDLE_HZ=y
 #
 # CONFIG_XEN_PRIVILEGED_GUEST is not set
 CONFIG_XEN_UNPRIVILEGED_GUEST=y
+# CONFIG_XEN_PCIDEV_BACKEND is not set
 # CONFIG_XEN_BLKDEV_BACKEND is not set
 # CONFIG_XEN_NETDEV_BACKEND is not set
 # CONFIG_XEN_TPMDEV_BACKEND is not set
