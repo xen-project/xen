@@ -269,6 +269,7 @@ typedef struct CirrusVGAState {
     int last_hw_cursor_y_end;
     int real_vram_size; /* XXX: suppress that */
     CPUWriteMemoryFunc **cirrus_linear_write;
+    int set_mapping;
 } CirrusVGAState;
 
 typedef struct PCICirrusVGAState {
@@ -2431,7 +2432,6 @@ static void cirrus_linear_bitblt_writel(void *opaque, target_phys_addr_t addr,
 #endif
 }
 
-
 static CPUReadMemoryFunc *cirrus_linear_bitblt_read[3] = {
     cirrus_linear_bitblt_readb,
     cirrus_linear_bitblt_readw,
@@ -2448,9 +2448,9 @@ static CPUWriteMemoryFunc *cirrus_linear_bitblt_write[3] = {
 static void cirrus_update_memory_access(CirrusVGAState *s)
 {
     unsigned mode;
+    extern void * set_vram_mapping(unsigned long addr, unsigned long end);
 
-    extern void unset_vram_mapping(unsigned long addr, unsigned long end);
-    extern void set_vram_mapping(unsigned long addr, unsigned long end);
+    extern int unset_vram_mapping(unsigned long addr, unsigned long end);
     extern int vga_accelerate;
 
     if ((s->sr[0x17] & 0x44) == 0x44) {
@@ -2466,15 +2466,36 @@ static void cirrus_update_memory_access(CirrusVGAState *s)
 
     mode = s->gr[0x05] & 0x7;
     if (mode < 4 || mode > 5 || ((s->gr[0x0B] & 0x4) == 0)) {
-            if (vga_accelerate && s->cirrus_lfb_addr && s->cirrus_lfb_end)
-                set_vram_mapping(s->cirrus_lfb_addr, s->cirrus_lfb_end);
+            if (vga_accelerate && s->cirrus_lfb_addr && s->cirrus_lfb_end) {
+                if (!s->set_mapping) {
+                    void * vram_pointer;
+                    s->set_mapping = 1;
+                    vram_pointer = set_vram_mapping(s->cirrus_lfb_addr ,s->cirrus_lfb_end);
+                    if (!vram_pointer){
+                        fprintf(stderr, "NULL vram_pointer\n");
+                    } else
+                    {
+                        vga_update_vram((VGAState *)s, vram_pointer,
+                                        VGA_RAM_SIZE);
+                    }
+                }
+            }
             s->cirrus_linear_write[0] = cirrus_linear_mem_writeb;
             s->cirrus_linear_write[1] = cirrus_linear_mem_writew;
             s->cirrus_linear_write[2] = cirrus_linear_mem_writel;
         } else {
         generic_io:
-            if (vga_accelerate && s->cirrus_lfb_addr && s->cirrus_lfb_end)
-                 unset_vram_mapping(s->cirrus_lfb_addr, s->cirrus_lfb_end);
+            if (vga_accelerate && s->cirrus_lfb_addr && s->cirrus_lfb_end) {
+                if(s->set_mapping) {
+                    int error;
+                    s->set_mapping = 0;
+                    error = unset_vram_mapping(s->cirrus_lfb_addr,
+                                           s->cirrus_lfb_end);
+                    if (!error)
+                        vga_update_vram((VGAState *)s, NULL, VGA_RAM_SIZE);
+                }
+            }
+
             s->cirrus_linear_write[0] = cirrus_linear_writeb;
             s->cirrus_linear_write[1] = cirrus_linear_writew;
             s->cirrus_linear_write[2] = cirrus_linear_writel;

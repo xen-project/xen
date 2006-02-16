@@ -2485,158 +2485,165 @@ get_vl2_table(unsigned long count, unsigned long start)
 #endif
 }
 
-int
-setup_mapping(int xc_handle, uint32_t dom, unsigned long toptab,
-              unsigned long  *mem_page_array, unsigned long *page_table_array,
-              unsigned long v_start, unsigned long v_end)
+/* FIXME Flush the shadow page */
+static int unset_mm_mapping(int xc_handle,
+                     uint32_t domid,
+                     unsigned long nr_pages,
+                     unsigned int address_bits,
+                     unsigned long *extent_start)
 {
-    l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
-    l2_pgentry_t *vl2tab[4] = {NULL, NULL, NULL, NULL};
-    l2_pgentry_t *vl2e=NULL, *vl2_table = NULL;
-    unsigned long l1tab;
-    unsigned long ppt_alloc = 0;
-    unsigned long count;
-    int i = 0;
-#if _LEVEL_3_
-    l3_pgentry_t *vl3tab = NULL;
-    unsigned long l2tab;
+    int err = 0;
+    xc_dominfo_t info;
 
-    if ( (vl3tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                        PROT_READ|PROT_WRITE,
-                                        toptab >> PAGE_SHIFT)) == NULL )
-        goto error_out;
-    for (i = 0; i < 4 ; i++) {
-        l2tab = vl3tab[i] & PAGE_MASK;
-        vl2tab[i] = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                         PROT_READ|PROT_WRITE,
-                                         l2tab >> PAGE_SHIFT);
-        if(vl2tab[i] == NULL)
-            goto error_out;
-    }
-    munmap(vl3tab, PAGE_SIZE);
-    vl3tab = NULL;
-#else
-    if ( (vl2tab[0] = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                           PROT_READ|PROT_WRITE,
-                                           toptab >> PAGE_SHIFT)) == NULL )
-        goto error_out;
-#endif
+    err = xc_domain_memory_decrease_reservation(xc_handle, domid,
+      nr_pages, 0, extent_start);
 
-    for ( count = 0; count < ((v_end-v_start)>>PAGE_SHIFT); count++ )
+    if ( err )
+        fprintf(stderr, "Failed to decrease physmap\n");
+
+    xc_domain_getinfo(xc_handle, domid, 1, &info);
+
+    if ( (info.nr_pages - nr_pages) <= 0 )
     {
-        if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 )
-        {
-            vl2_table = vl2tab[get_vl2_table(count, v_start)];
-            vl2e = &vl2_table[l2_table_offset(v_start +
-                                              (count << PAGE_SHIFT))];
-
-            l1tab = page_table_array[ppt_alloc++] << PAGE_SHIFT;
-            if ( vl1tab != NULL )
-                munmap(vl1tab, PAGE_SIZE);
-
-            if ( (vl1tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                                PROT_READ|PROT_WRITE,
-                                                l1tab >> PAGE_SHIFT)) == NULL )
-            {
-                goto error_out;
-            }
-            memset(vl1tab, 0, PAGE_SIZE);
-            vl1e = &vl1tab[l1_table_offset(v_start + (count<<PAGE_SHIFT))];
-            *vl2e = l1tab | L2_PROT;
-        }
-
-        *vl1e = (mem_page_array[count] << PAGE_SHIFT) | L1_PROT;
-        vl1e++;
-    }
-error_out:
-    if (vl1tab)
-        munmap(vl1tab, PAGE_SIZE);
-    for(i = 0; i < 4; i++)
-        if(vl2tab[i]) munmap(vl2tab[i], PAGE_SIZE);
-    return ppt_alloc;
-}
-
-void
-unsetup_mapping(int xc_handle, uint32_t dom, unsigned long toptab,
-                unsigned long v_start, unsigned long v_end)
-{
-    l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
-    l2_pgentry_t *vl2tab[4], *vl2e=NULL, *vl2_table = NULL;
-    unsigned long l1tab;
-    unsigned long count;
-    int i = 0;
-#if _LEVEL_3_
-    l3_pgentry_t *vl3tab = NULL;
-    unsigned long l2tab;
-
-    if ( (vl3tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                        PROT_READ|PROT_WRITE,
-                                        toptab >> PAGE_SHIFT)) == NULL )
-        goto error_out;
-    for (i = 0; i < 4 ; i ++) {
-        l2tab = vl3tab[i] & PAGE_MASK;
-        vl2tab[i] = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                         PROT_READ|PROT_WRITE,
-                                         l2tab >> PAGE_SHIFT);
-        if (vl2tab[i] == NULL)
-            goto error_out;
-    }
-    munmap(vl3tab, PAGE_SIZE);
-    vl3tab = NULL;
-#else
-    if ( (vl2tab[0] = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                           PROT_READ|PROT_WRITE,
-                                           toptab >> PAGE_SHIFT)) == NULL )
-        goto error_out;
-#endif
-
-    for ( count = 0; count < ((v_end-v_start)>>PAGE_SHIFT); count++ ) {
-        if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 )
-        {
-            vl2_table = vl2tab[get_vl2_table(count, v_start)];
-            vl2e = &vl2_table[l2_table_offset(v_start + (count << PAGE_SHIFT))];
-            l1tab = *vl2e & PAGE_MASK;
-
-            if(l1tab == 0)
-                continue;
-            if ( vl1tab != NULL )
-                munmap(vl1tab, PAGE_SIZE);
-
-            if ( (vl1tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                                PROT_READ|PROT_WRITE,
-                                                l1tab >> PAGE_SHIFT)) == NULL )
-            {
-                goto error_out;
-            }
-            vl1e = &vl1tab[l1_table_offset(v_start + (count<<PAGE_SHIFT))];
-            *vl2e = 0;
-        }
-
-        *vl1e = 0;
-        vl1e++;
+        fprintf(stderr, "unset_mm_mapping: error nr_pages\n");
+        err = -1;
     }
 
-error_out:
-    if (vl1tab)
-        munmap(vl1tab, PAGE_SIZE);
-    for(i = 0; i < 4; i++)
-        if (vl2tab[i])
-            munmap(vl2tab[i], PAGE_SIZE);
+    if ( xc_domain_setmaxmem(xc_handle, domid,
+                             (info.nr_pages - nr_pages) * PAGE_SIZE/1024) != 0)
+    {
+        fprintf(logfile, "set maxmem returned error %d\n", errno);
+        err = -1;
+    }
+
+    return err;
 }
 
-void set_vram_mapping(unsigned long addr, unsigned long end)
+static int set_mm_mapping(int xc_handle,
+                    uint32_t domid,
+                    unsigned long nr_pages,
+                    unsigned int address_bits,
+                    unsigned long *extent_start)
 {
-    end = addr + VGA_RAM_SIZE;
-    setup_mapping(xc_handle, domid, toptab,
-                  vgapage_array, freepage_array, addr, end);
+    int i;
+    xc_dominfo_t info;
+    int err = 0;
+
+    xc_domain_getinfo(xc_handle, domid, 1, &info);
+
+    if ( xc_domain_setmaxmem(xc_handle, domid,
+                             (info.nr_pages + nr_pages) * PAGE_SIZE/1024) != 0)
+    {
+        fprintf(logfile, "set maxmem returned error %d\n", errno);
+        return -1;
+    }
+
+    err = xc_domain_memory_populate_physmap(xc_handle, domid,
+                                            nr_pages, 0,
+                                            address_bits, extent_start);
+
+    if ( err )
+    {
+        fprintf(stderr, "Failed to populate physmap\n");
+        return -1;
+    }
+
+    err = xc_domain_translate_gpfn_list(xc_handle, domid,
+                                        nr_pages,
+                                        extent_start, extent_start);
+
+    if ( err )
+    {
+        fprintf(stderr, "Failed to translate gpfn list\n");
+        return -1;
+    }
+
+    for (i = 0; i < nr_pages; i++)
+        fprintf(stderr, "set_map result i %x result %lx\n", i, extent_start[i]);
+
+    return 0;
 }
 
-void unset_vram_mapping(unsigned long addr, unsigned long end)
+
+void * set_vram_mapping(unsigned long begin, unsigned long end)
 {
-    end = addr + VGA_RAM_SIZE;
-    /* FIXME Flush the shadow page */
-    unsetup_mapping(xc_handle, domid, toptab, addr, end);
+    unsigned long * extent_start = NULL;
+    unsigned long nr_extents;
+    void *vram_pointer = NULL;
+    int i;
+
+    /* align begin and end address */
+    begin = begin & PAGE_MASK;
+    end = begin + VGA_RAM_SIZE;
+    end = (end + PAGE_SIZE -1 )& PAGE_MASK;
+    nr_extents = (end - begin) >> PAGE_SHIFT;
+
+    extent_start = malloc(sizeof(unsigned long) * nr_extents );
+    if (extent_start == NULL)
+    {
+        fprintf(stderr, "Failed malloc on set_vram_mapping\n");
+        return NULL;
+    }
+
+    memset(extent_start, 0, sizeof(unsigned long) * nr_extents);
+
+    for (i = 0; i < nr_extents; i++)
+    {
+        extent_start[i] = (begin + i * PAGE_SIZE) >> PAGE_SHIFT;
+    }
+
+    set_mm_mapping(xc_handle, domid, nr_extents, 0, extent_start);
+
+    if ( (vram_pointer =  xc_map_foreign_batch(xc_handle, domid,
+                                               PROT_READ|PROT_WRITE,
+                                               extent_start,
+                                               nr_extents)) == NULL)
+    {
+        fprintf(logfile,
+          "xc_map_foreign_batch vgaram returned error %d\n", errno);
+        return NULL;
+    }
+
+    memset(vram_pointer, 0, nr_extents * PAGE_SIZE);
+
+    free(extent_start);
+
+    return vram_pointer;
 }
+
+int unset_vram_mapping(unsigned long begin, unsigned long end)
+{
+    unsigned long * extent_start = NULL;
+    unsigned long nr_extents;
+    int i;
+
+    /* align begin and end address */
+
+    end = begin + VGA_RAM_SIZE;
+    begin = begin & PAGE_MASK;
+    end = (end + PAGE_SIZE -1 ) & PAGE_MASK;
+    nr_extents = (end - begin) >> PAGE_SHIFT;
+
+    extent_start = malloc(sizeof(unsigned long) * nr_extents );
+
+    if (extent_start == NULL)
+    {
+        fprintf(stderr, "Failed malloc on set_mm_mapping\n");
+        return -1;
+    }
+
+    memset(extent_start, 0, sizeof(unsigned long) * nr_extents);
+
+    for (i = 0; i < nr_extents; i++)
+        extent_start[i] = (begin + (i * PAGE_SIZE)) >> PAGE_SHIFT;
+
+    unset_mm_mapping(xc_handle, domid, nr_extents, 0, extent_start);
+
+    free(extent_start);
+
+    return 0;
+}
+
 #elif defined(__ia64__)
 void set_vram_mapping(unsigned long addr, unsigned long end) {}
 void unset_vram_mapping(unsigned long addr, unsigned long end) {}

@@ -164,5 +164,6 @@ void vga_draw_cursor_line_32(uint8_t *d1, const uint8_t *src1,
                              unsigned int color0, unsigned int color1,
                              unsigned int color_xor);
 
+int vga_update_vram(VGAState *s, void *vga_ram_base, int vga_ram_size);
 extern const uint8_t sr_mask[8];
 extern const uint8_t gr_mask[16];

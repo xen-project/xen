@@ -1974,6 +1974,31 @@ int vga_initialize(PCIBus *bus, DisplayState *ds, uint8_t *vga_ram_base,
     return 0;
 }
 
+int vga_update_vram(VGAState *s, void *vga_ram_base, int vga_ram_size)
+{
+    if (s->vram_size != vga_ram_size)
+    {
+        fprintf(stderr, "No support to change vga_ram_size\n");
+        return -1;
+    }
+
+    if ( !vga_ram_base )
+    {
+        vga_ram_base = qemu_malloc(vga_ram_size);
+        if (!vga_ram_base)
+        {
+            fprintf(stderr, "reallocate error\n");
+            return -1;
+        }
+    }
+
+    /* XXX lock needed? */
+    memcpy(vga_ram_base, s->vram_ptr, vga_ram_size);
+    s->vram_ptr = vga_ram_base;
+
+    return 0;
+}
+
 /********************************************************/
 /* vga screen dump */
 
