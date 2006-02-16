@@ -1,16 +1,13 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.16-rc2-xenU
-# Mon Feb  6 03:35:30 2006
+# Linux kernel version: 2.6.16-rc3-xenU
+# Thu Feb 16 13:47:59 2006
 #
 
 #
 # Code maturity level options
 #
 CONFIG_EXPERIMENTAL=y
-# CONFIG_CLEAN_COMPILE is not set
-CONFIG_BROKEN=y
-CONFIG_BROKEN_ON_SMP=y
 CONFIG_LOCK_KERNEL=y
 CONFIG_INIT_ENV_ARG_LIMIT=32
 
@@ -211,6 +208,7 @@ CONFIG_NET=y
 #
 # Networking options
 #
+# CONFIG_NETDEBUG is not set
 CONFIG_PACKET=y
 # CONFIG_PACKET_MMAP is not set
 CONFIG_UNIX=y
@@ -397,13 +395,11 @@ CONFIG_SCSI_SAS_ATTRS=y
 # CONFIG_SCSI_AIC7XXX is not set
 # CONFIG_SCSI_AIC7XXX_OLD is not set
 # CONFIG_SCSI_AIC79XX is not set
-# CONFIG_SCSI_ADVANSYS is not set
 # CONFIG_MEGARAID_NEWGEN is not set
 # CONFIG_MEGARAID_LEGACY is not set
 # CONFIG_MEGARAID_SAS is not set
 # CONFIG_SCSI_SATA is not set
 # CONFIG_SCSI_DMX3191D is not set
-# CONFIG_SCSI_EATA_PIO is not set
 # CONFIG_SCSI_FUTURE_DOMAIN is not set
 # CONFIG_SCSI_IPS is not set
 # CONFIG_SCSI_INITIO is not set
@@ -752,6 +748,7 @@ CONFIG_HWMON=y
 # CONFIG_SENSORS_ASB100 is not set
 # CONFIG_SENSORS_ATXP1 is not set
 # CONFIG_SENSORS_DS1621 is not set
+# CONFIG_SENSORS_F71805F is not set
 # CONFIG_SENSORS_FSCHER is not set
 # CONFIG_SENSORS_FSCPOS is not set
 # CONFIG_SENSORS_GL518SM is not set
@@ -809,7 +806,6 @@ CONFIG_VIDEO_DEV=y
 # CONFIG_TUNER_3036 is not set
 # CONFIG_VIDEO_STRADIS is not set
 # CONFIG_VIDEO_ZORAN is not set
-# CONFIG_VIDEO_ZR36120 is not set
 # CONFIG_VIDEO_SAA7134 is not set
 # CONFIG_VIDEO_MXB is not set
 # CONFIG_VIDEO_DPC is not set
@@ -865,7 +861,6 @@ CONFIG_FB_RADEON_DEBUG=y
 # CONFIG_FB_3DFX is not set
 # CONFIG_FB_VOODOO1 is not set
 # CONFIG_FB_TRIDENT is not set
-# CONFIG_FB_PM3 is not set
 # CONFIG_FB_VIRTUAL is not set
 
 #

@@ -74,6 +74,8 @@ all: compressed unwcheck
 
 compressed: vmlinux.gz
 
+vmlinuz: vmlinux.gz
+
 vmlinux.gz: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@
 
@@ -88,7 +90,7 @@ CLEAN_FILES += vmlinux.gz bootloader
 boot:	lib/lib.a vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@
 
-install: vmlinux.gz
+install:
 	sh $(srctree)/arch/ia64/install.sh $(KERNELRELEASE) $< System.map "$(INSTALL_PATH)"
 
 define archhelp

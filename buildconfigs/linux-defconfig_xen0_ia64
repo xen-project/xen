@@ -1,14 +1,13 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.16-rc2-xen0
-# Mon Feb  6 02:48:43 2006
+# Linux kernel version: 2.6.16-rc3-xen0
+# Thu Feb 16 13:20:46 2006
 #
 
 #
 # Code maturity level options
 #
 CONFIG_EXPERIMENTAL=y
-CONFIG_CLEAN_COMPILE=y
 CONFIG_LOCK_KERNEL=y
 CONFIG_INIT_ENV_ARG_LIMIT=32
 
@@ -212,6 +211,7 @@ CONFIG_NET=y
 #
 # Networking options
 #
+# CONFIG_NETDEBUG is not set
 CONFIG_PACKET=y
 # CONFIG_PACKET_MMAP is not set
 CONFIG_UNIX=y
@@ -359,6 +359,7 @@ CONFIG_BLK_DEV_INITRD=y
 # ATA/ATAPI/MFM/RLL support
 #
 CONFIG_IDE=y
+CONFIG_IDE_MAX_HWIFS=4
 CONFIG_BLK_DEV_IDE=y
 
 #
@@ -739,6 +740,7 @@ CONFIG_SERIAL_8250_SHARE_IRQ=y
 #
 CONFIG_SERIAL_CORE=y
 CONFIG_SERIAL_CORE_CONSOLE=y
+# CONFIG_SERIAL_JSM is not set
 CONFIG_UNIX98_PTYS=y
 CONFIG_LEGACY_PTYS=y
 CONFIG_LEGACY_PTY_COUNT=256
@@ -860,6 +862,7 @@ CONFIG_HWMON=y
 # CONFIG_SENSORS_ASB100 is not set
 # CONFIG_SENSORS_ATXP1 is not set
 # CONFIG_SENSORS_DS1621 is not set
+# CONFIG_SENSORS_F71805F is not set
 # CONFIG_SENSORS_FSCHER is not set
 # CONFIG_SENSORS_FSCPOS is not set
 # CONFIG_SENSORS_GL518SM is not set
