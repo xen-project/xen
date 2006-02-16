@@ -37,6 +37,12 @@
 int smp_found_config;
 unsigned int __initdata maxcpus = NR_CPUS;
 
+#ifdef CONFIG_HOTPLUG_CPU
+#define CPU_HOTPLUG_ENABLED	(1)
+#else
+#define CPU_HOTPLUG_ENABLED	(0)
+#endif
+
 /*
  * Various Linux-internal data structures created from the
  * MP-table.
@@ -47,7 +53,7 @@ int mp_bus_id_to_node [MAX_MP_BUSSES];
 int mp_bus_id_to_local [MAX_MP_BUSSES];
 int quad_local_to_mp_bus_id [NR_CPUS/4][4];
 int mp_bus_id_to_pci_bus [MAX_MP_BUSSES] = { [0 ... MAX_MP_BUSSES-1] = -1 };
-int mp_current_pci_id;
+static int mp_current_pci_id;
 
 /* I/O APIC entries */
 struct mpc_config_ioapic mp_ioapics[MAX_IO_APICS];
@@ -63,7 +69,7 @@ int nr_ioapics;
 int pic_mode;
 unsigned long mp_lapic_addr;
 
-unsigned int def_to_bigsmp;
+unsigned int def_to_bigsmp = 0;
 
 /* Processor that is doing the boot up */
 unsigned int boot_cpu_physical_apicid = -1U;
@@ -119,10 +125,10 @@ static int MP_valid_apicid(int apicid, int version)
 }
 #endif
 
-void __init MP_processor_info (struct mpc_config_processor *m)
+static void __devinit MP_processor_info (struct mpc_config_processor *m)
 {
  	int ver, apicid;
-	physid_mask_t tmp;
+	physid_mask_t phys_cpu;
  	
 	if (!(m->mpc_cpuflag & CPU_ENABLED))
 		return;
@@ -180,48 +186,57 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 	if (m->mpc_cpuflag & CPU_BOOTPROCESSOR) {
 		Dprintk("    Bootup CPU\n");
 		boot_cpu_physical_apicid = m->mpc_apicid;
-		boot_cpu_logical_apicid = apicid;
 	}
 
-	if (num_processors >= NR_CPUS) {
-		printk(KERN_WARNING "WARNING: NR_CPUS limit of %i reached."
-			"  Processor ignored.\n", NR_CPUS); 
-		return;
-	}
-
-	if (num_processors >= maxcpus) {
-		printk(KERN_WARNING "WARNING: maxcpus limit of %i reached."
-			" Processor ignored.\n", maxcpus); 
-		return;
-	}
-	num_processors++;
 	ver = m->mpc_apicver;
 
 	if (!MP_valid_apicid(apicid, ver)) {
 		printk(KERN_WARNING "Processor #%d INVALID. (Max ID: %d).\n",
 			m->mpc_apicid, MAX_APICS);
-		--num_processors;
 		return;
 	}
 
-	tmp = apicid_to_cpu_present(apicid);
-	physids_or(phys_cpu_present_map, phys_cpu_present_map, tmp);
-	
 	/*
 	 * Validate version
 	 */
 	if (ver == 0x0) {
-		printk(KERN_WARNING "BIOS bug, APIC version is 0 for CPU#%d! fixing up to 0x10. (tell your hw vendor)\n", m->mpc_apicid);
+		printk(KERN_WARNING "BIOS bug, APIC version is 0 for CPU#%d! "
+				"fixing up to 0x10. (tell your hw vendor)\n",
+				m->mpc_apicid);
 		ver = 0x10;
 	}
 	apic_version[m->mpc_apicid] = ver;
-	if ((num_processors > 8) &&
-	    APIC_XAPIC(ver) &&
-	    (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL))
-		def_to_bigsmp = 1;
-	else
-		def_to_bigsmp = 0;
 
+	phys_cpu = apicid_to_cpu_present(apicid);
+	physids_or(phys_cpu_present_map, phys_cpu_present_map, phys_cpu);
+
+	if (num_processors >= NR_CPUS) {
+		printk(KERN_WARNING "WARNING: NR_CPUS limit of %i reached."
+			"  Processor ignored.\n", NR_CPUS);
+		return;
+	}
+
+	if (num_processors >= maxcpus) {
+		printk(KERN_WARNING "WARNING: maxcpus limit of %i reached."
+			" Processor ignored.\n", maxcpus);
+		return;
+	}
+
+	cpu_set(num_processors, cpu_possible_map);
+	num_processors++;
+
+	if (CPU_HOTPLUG_ENABLED || (num_processors > 8)) {
+		switch (boot_cpu_data.x86_vendor) {
+		case X86_VENDOR_INTEL:
+			if (!APIC_XAPIC(ver)) {
+				def_to_bigsmp = 0;
+				break;
+			}
+			/* If P4 and above fall through */
+		case X86_VENDOR_AMD:
+			def_to_bigsmp = 1;
+		}
+	}
 	bios_cpu_apicid[num_processors - 1] = m->mpc_apicid;
 }
 
@@ -662,8 +677,6 @@ void __init get_smp_config (void)
 	struct intel_mp_floating *mpf = mpf_found;
 
 	/*
-	 * ACPI may be used to obtain the entire SMP configuration or just to 
-	 * enumerate/configure processors (CONFIG_ACPI_BOOT).  Note that 
 	 * ACPI supports both logical (e.g. Hyper-Threading) and physical 
 	 * processors, where MPS only supports physical.
 	 */
@@ -820,7 +833,7 @@ void __init find_smp_config (void)
                             ACPI-based MP Configuration
    -------------------------------------------------------------------------- */
 
-#ifdef CONFIG_ACPI_BOOT
+#ifdef CONFIG_ACPI
 
 void __init mp_register_lapic_address (
 	u64			address)
@@ -836,7 +849,7 @@ void __init mp_register_lapic_address (
 }
 
 
-void __init mp_register_lapic (
+void __devinit mp_register_lapic (
 	u8			id, 
 	u8			enabled)
 {
@@ -866,12 +879,12 @@ void __init mp_register_lapic (
 	MP_processor_info(&processor);
 }
 
-#if defined(CONFIG_X86_IO_APIC) && (defined(CONFIG_ACPI_INTERPRETER) || defined(CONFIG_ACPI_BOOT))
+#ifdef	CONFIG_X86_IO_APIC
 
 #define MP_ISA_BUS		0
 #define MP_MAX_IOAPIC_PIN	127
 
-struct mp_ioapic_routing {
+static struct mp_ioapic_routing {
 	int			apic_id;
 	int			gsi_base;
 	int			gsi_end;
@@ -1067,7 +1080,7 @@ void __init mp_config_acpi_legacy_irqs (void)
 
 #define MAX_GSI_NUM	4096
 
-int mp_register_gsi (u32 gsi, int edge_level, int active_high_low)
+int mp_register_gsi (u32 gsi, int triggering, int polarity)
 {
 	int			ioapic = -1;
 	int			ioapic_pin = 0;
@@ -1078,7 +1091,7 @@ int mp_register_gsi (u32 gsi, int edge_level, int active_high_low)
 	 * represent all possible interrupts, and IRQs
 	 * assigned to actual devices.
 	 */
-	static int              gsi_to_irq[MAX_GSI_NUM];
+	static int		gsi_to_irq[MAX_GSI_NUM];
 
 #ifdef CONFIG_ACPI_BUS
 	/* Don't set up the ACPI SCI because it's already set up */
@@ -1118,14 +1131,22 @@ int mp_register_gsi (u32 gsi, int edge_level, int active_high_low)
 
 	mp_ioapic_routing[ioapic].pin_programmed[idx] |= (1<<bit);
 
-	if (edge_level) {
+	if (triggering == ACPI_LEVEL_SENSITIVE) {
 		/*
 		 * For PCI devices assign IRQs in order, avoiding gaps
 		 * due to unused I/O APIC pins.
 		 */
 		int irq = gsi;
 		if (gsi < MAX_GSI_NUM) {
-			gsi = pci_irq++;
+			if (gsi > 15)
+				gsi = pci_irq++;
+#ifdef CONFIG_ACPI_BUS
+			/*
+			 * Don't assign IRQ used by ACPI SCI
+			 */
+			if (gsi == acpi_fadt.sci_int)
+				gsi = pci_irq++;
+#endif
 			gsi_to_irq[irq] = gsi;
 		} else {
 			printk(KERN_ERR "GSI %u is too high\n", gsi);
@@ -1134,10 +1155,10 @@ int mp_register_gsi (u32 gsi, int edge_level, int active_high_low)
 	}
 
 	io_apic_set_pci_routing(ioapic, ioapic_pin, gsi,
-		    edge_level == ACPI_EDGE_SENSITIVE ? 0 : 1,
-		    active_high_low == ACPI_ACTIVE_HIGH ? 0 : 1);
+		    triggering == ACPI_EDGE_SENSITIVE ? 0 : 1,
+		    polarity == ACPI_ACTIVE_HIGH ? 0 : 1);
 	return gsi;
 }
 
-#endif /*CONFIG_X86_IO_APIC && (CONFIG_ACPI_INTERPRETER || CONFIG_ACPI_BOOT)*/
-#endif /*CONFIG_ACPI_BOOT*/
+#endif /* CONFIG_X86_IO_APIC */
+#endif /* CONFIG_ACPI */
