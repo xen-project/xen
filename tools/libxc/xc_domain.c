@@ -326,6 +326,53 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
     return err;
 }
 
+int xc_domain_memory_populate_physmap(int xc_handle,
+                                          uint32_t domid,
+                                          unsigned long nr_extents,
+                                          unsigned int extent_order,
+                                          unsigned int address_bits,
+                                          unsigned long *extent_start)
+{
+    int err;
+    struct xen_memory_reservation reservation = {
+        .extent_start = extent_start,
+        .nr_extents   = nr_extents,
+        .extent_order = extent_order,
+        .address_bits = address_bits,
+        .domid        = domid
+    };
+
+    err = xc_memory_op(xc_handle, XENMEM_populate_physmap, &reservation);
+    if ( err == nr_extents )
+        return 0;
+
+    if ( err > 0 )
+    {
+        fprintf(stderr,"Failed deallocation for dom %d: %ld pages order %d\n",
+                domid, nr_extents, extent_order);
+        errno = EBUSY;
+        err = -1;
+    }
+
+    return err;
+}
+
+int xc_domain_translate_gpfn_list(int xc_handle,
+                                  uint32_t domid,
+                                  unsigned long nr_gpfns,
+                                  unsigned long *gpfn_list,
+                                  unsigned long *mfn_list)
+{
+    struct xen_translate_gpfn_list op = {
+        .domid        = domid,
+        .nr_gpfns     = nr_gpfns,
+        .gpfn_list    = gpfn_list,
+        .mfn_list     = mfn_list
+    };
+
+    return xc_memory_op(xc_handle, XENMEM_translate_gpfn_list, &op);
+}
+
 int xc_domain_max_vcpus(int xc_handle, uint32_t domid, unsigned int max)
 {
     DECLARE_DOM0_OP;

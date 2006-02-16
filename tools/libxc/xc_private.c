@@ -191,6 +191,7 @@ int xc_memory_op(int xc_handle,
     DECLARE_HYPERCALL;
     struct xen_memory_reservation *reservation = arg;
     struct xen_machphys_mfn_list *xmml = arg;
+    struct xen_translate_gpfn_list *trans = arg;
     long ret = -EINVAL;
 
     hypercall.op     = __HYPERVISOR_memory_op;
@@ -237,6 +238,26 @@ int xc_memory_op(int xc_handle,
             goto out1;
         }
         break;
+    case XENMEM_translate_gpfn_list:
+        if ( mlock(trans, sizeof(*trans)) != 0 )
+        {
+            PERROR("Could not mlock");
+            goto out1;
+        }
+        if ( mlock(trans->gpfn_list, trans->nr_gpfns * sizeof(long)) != 0 )
+        {
+            PERROR("Could not mlock");
+            safe_munlock(trans, sizeof(*trans));
+            goto out1;
+        }
+        if ( mlock(trans->mfn_list, trans->nr_gpfns * sizeof(long)) != 0 )
+        {
+            PERROR("Could not mlock");
+            safe_munlock(trans->gpfn_list, trans->nr_gpfns * sizeof(long));
+            safe_munlock(trans, sizeof(*trans));
+            goto out1;
+        }
+        break;
     }
 
     ret = do_xen_hypercall(xc_handle, &hypercall);
@@ -258,6 +279,11 @@ int xc_memory_op(int xc_handle,
         break;
     case XENMEM_reserved_phys_area:
         safe_munlock(arg, sizeof(struct xen_reserved_phys_area));
+        break;
+    case XENMEM_translate_gpfn_list:
+            safe_munlock(trans->mfn_list, trans->nr_gpfns * sizeof(long));
+            safe_munlock(trans->gpfn_list, trans->nr_gpfns * sizeof(long));
+            safe_munlock(trans, sizeof(*trans));
         break;
     }
 

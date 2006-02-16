@@ -373,6 +373,19 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
                                           unsigned int extent_order,
 					  unsigned long *extent_start);
 
+int xc_domain_memory_populate_physmap(int xc_handle,
+                                      uint32_t domid,
+                                      unsigned long nr_extents,
+                                      unsigned int extent_order,
+                                      unsigned int address_bits,
+                                      unsigned long *extent_start);
+
+int xc_domain_translate_gpfn_list(int xc_handle,
+                                  uint32_t domid,
+                                  unsigned long nr_gpfns,
+                                  unsigned long *gpfn_list,
+                                  unsigned long *mfn_list);
+
 int xc_domain_ioport_permission(int xc_handle,
                                 uint32_t domid,
                                 uint32_t first_port,

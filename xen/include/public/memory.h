@@ -101,7 +101,7 @@ typedef struct xen_machphys_mfn_list {
  */
 #define XENMEM_reserved_phys_area   7
 typedef struct xen_reserved_phys_area {
-    /* Which request to report about? */
+    /* Which domain to report about? */
     domid_t domid;
 
     /*
@@ -113,6 +113,28 @@ typedef struct xen_reserved_phys_area {
     /* Base and size of the specified reserved area. */
     unsigned long first_gpfn, nr_gpfns;
 } xen_reserved_phys_area_t;
+
+/*
+ * Translates a list of domain-specific GPFNs into MFNs. Returns a -ve error
+ * code on failure. This call only works for auto-translated guests.
+ */
+#define XENMEM_translate_gpfn_list  8
+typedef struct xen_translate_gpfn_list {
+    /* Which domain to translate for? */
+    domid_t domid;
+
+    /* Length of list. */
+    unsigned long nr_gpfns;
+
+    /* List of GPFNs to translate. */
+    unsigned long *gpfn_list;
+
+    /*
+     * Output list to contain MFN translations. May be the same as the input
+     * list (in which case each input GPFN is overwritten with the output MFN).
+     */
+    unsigned long *mfn_list;
+} xen_translate_gpfn_list_t;
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 
