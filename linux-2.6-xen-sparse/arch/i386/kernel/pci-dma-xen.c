@@ -16,7 +16,7 @@
 #include <asm/io.h>
 #include <xen/balloon.h>
 #include <asm/tlbflush.h>
-#include <asm/swiotlb.h>
+#include <asm-i386/mach-xen/asm/swiotlb.h>
 #include <asm/bug.h>
 
 #ifdef __x86_64__
