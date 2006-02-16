@@ -54,21 +54,15 @@ void signal_handler(int reason) {
 #ifndef VTPM_MULTI_VM
 
   if (pthread_equal(pthread_self(), vtpm_globals->master_pid)) {
-    if (reason >= 0) { // Reason is a signal
-      vtpmloginfo(VTPM_LOG_VTPM, "VTPM Manager shutting down for signal %d.\n", reason);
-    } else  {// Reason is a TPM_RESULT * -1
-      vtpmloginfo(VTPM_LOG_VTPM,"VTPM Manager shuting down for: %s\n", tpm_get_error_name(-1 * reason) );
-    }
-    
-    return;
+    vtpmloginfo(VTPM_LOG_VTPM, "VTPM Manager shutting down for signal %d.\n", reason);
   } else {
+    // For old Linux Thread machines, signals are delivered to each thread. Deal with them.
     vtpmloginfo(VTPM_LOG_VTPM, "Child shutting down\n");
     pthread_exit(NULL);
   }
-#else
+#endif
   VTPM_Stop_Service();
   exit(-1);
-#endif
 }
 
 struct sigaction ctl_c_handler;
@@ -127,8 +121,10 @@ int main(int argc, char **argv) {
   //Join the other threads until exit time.
   pthread_join(be_thread, NULL);
   pthread_join(dmi_thread, NULL);
-  
+#endif
+ 
+  vtpmlogerror(VTPM_LOG_VTPM, "VTPM Manager shut down unexpectedly.\n");
+ 
   VTPM_Stop_Service();
   return 0;
-#endif
 }

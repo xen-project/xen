@@ -22,10 +22,10 @@ install: build
 	$(MAKE) -C $(VTPM_DIR) $@
 
 clean:
-	if [ -d $(TPM_EMULATOR_DIR) ]; \
+	@if [ -d $(TPM_EMULATOR_DIR) ]; \
 		then $(MAKE) -C $(TPM_EMULATOR_DIR) clean; \
 	fi
-	if [ -d $(VTPM_DIR) ]; \
+	@if [ -d $(VTPM_DIR) ]; \
 		then $(MAKE) -C $(VTPM_DIR) clean; \
 	fi
 
@@ -57,7 +57,7 @@ $(VTPM_DIR): $(TPM_EMULATOR_TARFILE)
 	patch -p1 <../vtpm.patch
 
 build_sub:
-	if [ -e $(GMP_HEADER) ]; then \
+	@if [ -e $(GMP_HEADER) ]; then \
 		$(MAKE) -C $(VTPM_DIR); \
 		if [ "$(BUILD_EMULATOR)" = "y" ]; then \
 			$(MAKE) -C $(TPM_EMULATOR_DIR); \

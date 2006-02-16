@@ -9,7 +9,7 @@ OPENSSL_HEADER	= /usr/include/openssl/crypto.h
 all: build
 
 build:
-	if [ -e $(OPENSSL_HEADER) ]; then \
+	@if [ -e $(OPENSSL_HEADER) ]; then \
 		@set -e; for subdir in $(SUBDIRS); do \
 			$(MAKE) -C $$subdir $@; \
 		done; \

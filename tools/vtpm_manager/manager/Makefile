@@ -24,4 +24,4 @@ $(BIN): $(OBJS)
 
 # libraries
 LIBS += ../tcs/libTCS.a ../util/libTCGUtils.a ../crypto/libtcpaCrypto.a
-LIBS += -lcrypto -lpthread -lrt -lm
+LIBS += -lcrypto -lpthread -lm
