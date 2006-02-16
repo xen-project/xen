@@ -58,10 +58,6 @@ EXPORT_SYMBOL(dma_ops);
 
 extern unsigned long *contiguous_bitmap;
 
-#if defined(CONFIG_SWIOTLB)
-extern void swiotlb_init(void);
-#endif
-
 static unsigned long dma_reserve __initdata;
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);

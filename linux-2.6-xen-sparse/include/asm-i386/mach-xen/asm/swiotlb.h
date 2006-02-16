@@ -32,6 +32,7 @@ extern dma_addr_t swiotlb_map_page(struct device *hwdev, struct page *page,
 extern void swiotlb_unmap_page(struct device *hwdev, dma_addr_t dma_address,
                                size_t size, enum dma_data_direction direction);
 extern int swiotlb_dma_supported(struct device *hwdev, u64 mask);
+extern void swiotlb_init(void);
 
 #ifdef CONFIG_SWIOTLB
 extern int swiotlb;
