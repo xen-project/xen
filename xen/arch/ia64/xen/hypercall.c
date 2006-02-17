@@ -63,7 +63,7 @@ hypercall_t ia64_hypercall_table[] =
 int
 ia64_hypercall (struct pt_regs *regs)
 {
-	struct vcpu *v = (struct domain *) current;
+	struct vcpu *v = current;
 	struct sal_ret_values x;
 	unsigned long *tv, *tc;
 	int pi;
