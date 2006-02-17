@@ -683,10 +683,10 @@ block-list> to determine that number.
 FIXME: this is currently B<broken>.  Even though a block device is
 removed from domU, it appears to still be allocated in the domain 0.
 
-=item B<block-list> I<domain-id>
+=item B<block-list> I<[-l|--long]> I<domain-id>
 
 List virtual block devices for a domain.  The returned output is
-sexpression formatted.
+formatted as a list or as an S-Expression if the '--long' option was given.
 
 =head2 NETWORK DEVICES
 
@@ -738,10 +738,17 @@ I<devid> is the virtual interface device number within the domain
 FIXME: this is currently B<broken>.  Network devices aren't completely
 removed from domain 0.
 
-=item B<network-list> I<domain-id>
+=item B<network-list> I<[-l|--long]> I<domain-id>
 
 List virtual network interfaces for a domain.  The returned output is
-sexpression formatted.
+formatted as a list or as an S-Expression if the '--long' option was given.
+
+=head2 VIRTUAL TPM DEVICES
+
+=item B<vtpm-list> I<[-l|--long]> I<domain-id>
+
+Show the virtual TPM device for a domain.  The returned output is
+formatted as a list or as an S-Expression if the '--long' option was given.
 
 =back
 
