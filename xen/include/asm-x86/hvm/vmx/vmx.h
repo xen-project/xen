@@ -395,6 +395,7 @@ static inline void vmx_stts(void)
     __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
     if ( !(cr0 & X86_CR0_TS) )
     {
+        __vmread_vcpu(v, GUEST_CR0, &cr0);
         __vmwrite(GUEST_CR0, cr0 | X86_CR0_TS);
         __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
     }
