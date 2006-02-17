@@ -251,9 +251,12 @@ int arch_domain_create(struct domain *d)
 	return 0;
 
 fail_nomem:
-	free_xenheap_page(d->shared_info);
-	xfree(d->arch.mm);
-	pgd_free(d->arch.mm->pgd);
+	if (d->arch.mm->pgd != NULL)
+	    pgd_free(d->arch.mm->pgd);
+	if (d->arch.mm != NULL)
+	    xfree(d->arch.mm);
+	if (d->shared_info != NULL)
+	    free_xenheap_page(d->shared_info);
 	return -ENOMEM;
 }
 
