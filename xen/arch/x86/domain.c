@@ -712,7 +712,7 @@ static void __context_switch(void)
         }
         else
         {
-            hvm_restore_msrs(next);
+            hvm_restore_msrs(n);
         }
     }
 
