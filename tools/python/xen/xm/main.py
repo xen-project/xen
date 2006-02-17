@@ -90,18 +90,18 @@ block_detach_help = """block-detach  <DomId> <DevId>    Destroy a domain's virtu
                                     where <DevId> may either be the device ID
                                     or the device name as mounted in the guest"""
 
-block_list_help = "block-list <DomId>               List virtual block devices for a domain"
+block_list_help = "block-list <DomId> [--long]      List virtual block devices for a domain"
 network_attach_help = """network-attach  <DomID> [script=<script>] [ip=<ip>] [mac=<mac>]
                            [bridge=<bridge>] [backend=<backDomID>]
                                     Create a new virtual network device """
 network_detach_help = """network-detach  <DomId> <DevId>  Destroy a domain's virtual network
                                     device, where <DevId> is the device ID."""
 
-network_list_help = "network-list <DomId>             List virtual network interfaces for a domain"
+network_list_help = "network-list <DomId> [--long]    List virtual network interfaces for a domain"
 vnet_list_help = "vnet-list [-l|--long]            list vnets"
 vnet_create_help = "vnet-create <config>             create a vnet from a config file"
 vnet_delete_help = "vnet-delete <vnetid>             delete a vnet"
-vtpm_list_help = "vtpm-list <DomId>                list virtual TPM devices"
+vtpm_list_help = "vtpm-list <DomId> [--long]       list virtual TPM devices"
 
 short_command_list = [
     "console",
@@ -684,29 +684,133 @@ def xm_log(args):
     from xen.xend.XendClient import server
     print server.xend_node_log()
 
+def parse_dev_info(info):
+    def get_info(n, t, d):
+        i = 0
+        while i < len(info):
+            if (info[i][0] == n):
+                return t(info[i][1])
+            i = i + 1
+        return t(d)
+    return {
+        #common
+        'backend-id' : get_info('backend-id',   int,   -1),
+        'handle'     : get_info('handle',       int,    0),
+        'state'      : get_info('state',        int,   -1),
+        'be-path'    : get_info('backend',      str,   '??'),
+        'event-ch'   : get_info('event-channel',int,   -1),
+        #network specific
+        'virtual-device' : get_info('virtual-device', str, '??'),
+        'tx-ring-ref': get_info('tx-ring-ref',  int,   -1),
+        'rx-ring-ref': get_info('rx-ring-ref',  int,   -1),
+        'mac'        : get_info('mac',          str,   '??'),
+        #block-device specific
+        'ring-ref'   : get_info('ring-ref',     int,   -1),
+        }
+
+def has_long_option(args):
+    use_long = 0
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'l', ['long'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
+
+    for (k, v) in options:
+        if k in ['-l', '--long']:
+            use_long = 1
+    return (use_long, params)
+
 def xm_network_list(args):
-    arg_check(args, "network-list", 1)
-    dom = args[0]
+    arg_check(args, "network-list", 1, 2)
+
+    (use_long, params) = has_long_option(args)
+
+    if len(params) == 0:
+        print 'No domain parameter given'
+        sys.exit(1)
+    dom = params[0]
     from xen.xend.XendClient import server
-    for x in server.xend_domain_devices(dom, 'vif'):
-        sxp.show(x)
-        print
+    if use_long:
+        devs = server.xend_domain_devices(dom, 'vif')
+        map(PrettyPrint.prettyprint, devs)
+    else:
+        hdr = 0
+        for x in server.xend_domain_devices(dom, 'vif'):
+            if hdr == 0:
+                print 'Idx BE     MAC Addr.     handle state evt-ch tx-/rx-ring-ref BE-path'
+                hdr = 1
+            ni = parse_dev_info(x[1])
+            ni['idx'] = int(x[0])
+            print ("%(idx)-3d "
+                   "%(backend-id)-3d"
+                   "%(mac)-17s    "
+                   "%(handle)-3d   "
+                   "%(state)-3d    "
+                   "%(event-ch)-3d   "
+                   "%(tx-ring-ref)-5d/%(rx-ring-ref)-5d   "
+                   "%(be-path)-30s  "
+                   % ni)
 
 def xm_block_list(args):
-    arg_check(args, "block-list", 1)
-    dom = args[0]
+    arg_check(args, "block-list", 1, 2)
+
+    (use_long, params) = has_long_option(args)
+
+    if len(params) == 0:
+        print 'No domain parameter given'
+        sys.exit(1)
+    dom = params[0]
     from xen.xend.XendClient import server
-    for x in server.xend_domain_devices(dom, 'vbd'):
-        sxp.show(x)
-        print
+    if use_long:
+        devs = server.xend_domain_devices(dom, 'vbd')
+        map(PrettyPrint.prettyprint, devs)
+    else:
+        hdr = 0
+        for x in server.xend_domain_devices(dom, 'vbd'):
+            if hdr == 0:
+                print 'Vdev  BE handle state evt-ch ring-ref BE-path'
+                hdr = 1
+            ni = parse_dev_info(x[1])
+            ni['idx'] = int(x[0])
+            print ("%(idx)-3d    "
+                   "%(backend-id)-3d  "
+                   "%(handle)-3d   "
+                   "%(state)-3d    "
+                   "%(event-ch)-3d    "
+                   "%(ring-ref)-5d "
+                   "%(be-path)-30s  "
+                   % ni)
 
 def xm_vtpm_list(args):
-    arg_check(args, "vtpm-list", 1)
-    dom = args[0]
+    arg_check(args, "vtpm-list", 1, 2)
+
+    (use_long, params) = has_long_option(args)
+
+    if len(params) == 0:
+        print 'No domain parameter given'
+        sys.exit(1)
+    dom = params[0]
     from xen.xend.XendClient import server
-    for x in server.xend_domain_devices(dom, 'vtpm'):
-        sxp.show(x)
-        print
+    if use_long:
+        devs = server.xend_domain_devices(dom, 'vtpm')
+        map(PrettyPrint.prettyprint, devs)
+    else:
+        hdr = 0
+        for x in server.xend_domain_devices(dom, 'vtpm'):
+            if hdr == 0:
+                print 'Idx  BE handle state evt-ch ring-ref BE-path'
+                hdr = 1
+            ni = parse_dev_info(x[1])
+            ni['idx'] = int(x[0])
+            print ("%(idx)-3d   "
+                   "%(backend-id)-3d  "
+                   "%(handle)-3d   "
+                   "%(state)-3d    "
+                   "%(event-ch)-3d    "
+                   "%(ring-ref)-5d "
+                   "%(be-path)-30s  "
+                   % ni)
 
 def xm_block_attach(args):
     arg_check(args, 'block-attach', 4, 5)
