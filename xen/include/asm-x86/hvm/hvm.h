@@ -50,7 +50,7 @@ struct hvm_function_table {
     void (*load_cpu_guest_regs)(struct vcpu *v, struct cpu_user_regs *r);
 #ifdef __x86_64__
     void (*save_segments)(struct vcpu *v);
-    void (*load_msrs)(struct vcpu *v);
+    void (*load_msrs)(void);
     void (*restore_msrs)(struct vcpu *v);
 #endif
     void (*store_cpu_guest_ctrl_regs)(struct vcpu *v, unsigned long crs[8]);
@@ -116,10 +116,10 @@ hvm_save_segments(struct vcpu *v)
 }
 
 static inline void
-hvm_load_msrs(struct vcpu *v)
+hvm_load_msrs(void)
 {
     if (hvm_funcs.load_msrs)
-        hvm_funcs.load_msrs(v);
+        hvm_funcs.load_msrs();
 }
 
 static inline void

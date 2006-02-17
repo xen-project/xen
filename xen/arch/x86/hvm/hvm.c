@@ -46,7 +46,6 @@
 #include <public/hvm/hvm_info_table.h>
 
 int hvm_enabled = 0;
-int hvm_switch_on = 0;
 
 unsigned int opt_hvm_debug_level = 0;
 integer_param("hvm_debug", opt_hvm_debug_level);

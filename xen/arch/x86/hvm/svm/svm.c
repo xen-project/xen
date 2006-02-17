@@ -251,13 +251,10 @@ void svm_save_segments(struct vcpu *v)
  * are not modified once set for generic domains, we don't save them,
  * but simply reset them to the values set at percpu_traps_init().
  */
-void svm_load_msrs(struct vcpu *n)
+void svm_load_msrs(void)
 {
     struct svm_msr_state *host_state = &percpu_msr[smp_processor_id()];
     int i;
-
-    if ( !hvm_switch_on )
-        return;
 
     while ( host_state->flags )
     {

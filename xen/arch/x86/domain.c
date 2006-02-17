@@ -435,8 +435,6 @@ int arch_set_info_guest(
 
         if ( !hvm_initialize_guest_resources(v) )
             return -EINVAL;
-
-        hvm_switch_on = 1;
     }
 
     update_pagetables(v);
@@ -685,6 +683,8 @@ static void __context_switch(void)
                CTXT_SWITCH_STACK_BYTES);
         unlazy_fpu(p);
         save_segments(p);
+        if ( HVM_DOMAIN(p) )
+            hvm_load_msrs();
     }
 
     if ( !is_idle_vcpu(n) )
@@ -709,6 +709,10 @@ static void __context_switch(void)
         {
             set_int80_direct_trap(n);
             switch_kernel_stack(n, cpu);
+        }
+        else
+        {
+            hvm_restore_msrs(next);
         }
     }
 
@@ -765,16 +769,10 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         /* Re-enable interrupts before restoring state which may fault. */
         local_irq_enable();
 
-        if ( HVM_DOMAIN(next) )
-        {
-            hvm_restore_msrs(next);
-        }
-        else
+        if ( !HVM_DOMAIN(next) )
         {
             load_LDT(next);
             load_segments(next);
-            if ( HVM_DOMAIN(next) )
-                hvm_load_msrs(next);
         }
     }
 

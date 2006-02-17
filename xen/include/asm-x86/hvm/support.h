@@ -133,7 +133,6 @@ extern unsigned int opt_hvm_debug_level;
     } while (0)
 
 extern int hvm_enabled;
-extern int hvm_switch_on;
 
 enum { HVM_COPY_IN = 0, HVM_COPY_OUT };
 extern int hvm_copy(void *buf, unsigned long vaddr, int size, int dir);
