@@ -901,7 +901,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
             
         case 3: /* Read CR3 */
-            *reg = pagetable_get_paddr(v->arch.guest_table);
+            *reg = pfn_to_paddr(mfn_to_gmfn(v->domain,
+                                    pagetable_get_pfn(v->arch.guest_table)));
             break;
 
         case 4: /* Read CR4 */
@@ -950,7 +951,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             
         case 3: /* Write CR3 */
             LOCK_BIGLOCK(v->domain);
-            (void)new_guest_cr3(*reg);
+            (void)new_guest_cr3(gmfn_to_mfn(v->domain, paddr_to_pfn(*reg)));
             UNLOCK_BIGLOCK(v->domain);
             break;
 
