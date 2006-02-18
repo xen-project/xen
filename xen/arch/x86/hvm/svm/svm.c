@@ -176,7 +176,7 @@ static inline void svm_inject_exception(struct vmcb_struct *vmcb,
     event.fields.ev = 1;
     event.fields.errorcode = error_code;
 
-    ASSERT(vmcb->eventinj.v == 0);
+    ASSERT(vmcb->eventinj.fields.v == 0);
     
     vmcb->eventinj = event;
 }
