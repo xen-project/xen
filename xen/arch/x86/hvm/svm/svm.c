@@ -2666,18 +2666,22 @@ asmlinkage void svm_asid(void)
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int core = smp_processor_id();
+    int oldcore = v->arch.hvm_svm.core; 
     /* 
      * if need to assign new asid or if switching cores, 
      * then retire asid for old core, and assign new for new core.
      */
-    if( svm_dbg_on)
-        printk("old core %d new core %d\n",(int)v->arch.hvm_svm.core,(int)core);
-
+    if( v->arch.hvm_svm.core != core ) {
+        if (svm_dbg_on)
+            printk("old core %d new core %d\n",(int)v->arch.hvm_svm.core,(int)core);
+        v->arch.hvm_svm.core = core;
+    }
     if( test_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags) ||
-          (v->arch.hvm_svm.core != core)) {
+          (oldcore != core)) {
         if(!asidpool_assign_next(vmcb, 1, 
-	            v->arch.hvm_svm.core, core)) {
-           BUG();        	
+	            oldcore, core)) {
+            /* If we get here, we have a major problem */
+            domain_crash_synchronous();
         }
     }
     clear_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
