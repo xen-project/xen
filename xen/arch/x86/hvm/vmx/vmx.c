@@ -244,7 +244,6 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
                        host_state->msr_items[VMX_INDEX_MSR_EFER]);
                 set_bit(VMX_INDEX_MSR_EFER, &host_state->flags);
                 set_bit(VMX_INDEX_MSR_EFER, &msr->flags);
-                wrmsrl(MSR_EFER, msr_content);
             }
         }
         break;
@@ -433,6 +432,22 @@ int vmx_instruction_length(struct vcpu *v)
     return inst_len;
 }
 
+unsigned long vmx_get_ctrl_reg(struct vcpu *v, unsigned int num)
+{
+    switch ( num )
+    {
+    case 0:
+        return v->arch.hvm_vmx.cpu_cr0;
+    case 2:
+        return v->arch.hvm_vmx.cpu_cr2;
+    case 3:
+        return v->arch.hvm_vmx.cpu_cr3;
+    default:
+        BUG();
+    }
+    return 0;                   /* dummy */
+}
+
 extern long evtchn_send(int lport);
 void do_nmi(struct cpu_user_regs *);
 
@@ -529,6 +544,7 @@ int start_vmx(void)
     hvm_funcs.realmode = vmx_realmode;
     hvm_funcs.paging_enabled = vmx_paging_enabled;
     hvm_funcs.instruction_length = vmx_instruction_length;
+    hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
 
     hvm_enabled = 1;
 
@@ -652,14 +668,17 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
                 !vlapic_global_enabled((VLAPIC(v))) )
             clear_bit(X86_FEATURE_APIC, &edx);
 
-#if CONFIG_PAGING_LEVELS >= 3
+#if CONFIG_PAGING_LEVELS < 3
+        clear_bit(X86_FEATURE_PSE, &edx);
+        clear_bit(X86_FEATURE_PAE, &edx);
+        clear_bit(X86_FEATURE_PSE36, &edx);
+#else
         if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
-#endif
         {
             clear_bit(X86_FEATURE_PSE, &edx);
-            clear_bit(X86_FEATURE_PAE, &edx);
             clear_bit(X86_FEATURE_PSE36, &edx);
         }
+#endif
 
         /* Unsupportable for virtualised CPUs. */
         ecx &= ~VMX_VCPU_CPUID_L1_RESERVED; /* mask off reserved bits */
@@ -1005,11 +1024,11 @@ vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
         v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
         if (old_base_mfn)
              put_page(mfn_to_page(old_base_mfn));
-        update_pagetables(v);
         /*
          * arch.shadow_table should now hold the next CR3 for shadow
          */
         v->arch.hvm_vmx.cpu_cr3 = c->cr3;
+        update_pagetables(v);
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %x", c->cr3);
         __vmwrite(GUEST_CR3, pagetable_get_paddr(v->arch.shadow_table));
     }
@@ -1400,11 +1419,16 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
             if (old_base_mfn)
                 put_page(mfn_to_page(old_base_mfn));
-            update_pagetables(v);
             /*
              * arch.shadow_table should now hold the next CR3 for shadow
              */
+#if CONFIG_PAGING_LEVELS >= 3
+            if ( v->domain->arch.ops->guest_paging_levels == PAGING_L3 )
+                shadow_sync_all(v->domain);
+#endif
+
             v->arch.hvm_vmx.cpu_cr3 = value;
+            update_pagetables(v);
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx",
                         value);
             __vmwrite(GUEST_CR3, pagetable_get_paddr(v->arch.shadow_table));
@@ -1413,18 +1437,81 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     }
     case 4: /* CR4 */
     {
-        if (value & X86_CR4_PAE){
+        unsigned long old_cr4;
+
+        __vmread(CR4_READ_SHADOW, &old_cr4);
+
+        if ( value & X86_CR4_PAE && !(old_cr4 & X86_CR4_PAE) )
+        {
             set_bit(VMX_CPU_STATE_PAE_ENABLED, &v->arch.hvm_vmx.cpu_state);
-        } else {
-            if (test_bit(VMX_CPU_STATE_LMA_ENABLED,
-                         &v->arch.hvm_vmx.cpu_state)){
-                vmx_inject_exception(v, TRAP_gp_fault, 0);
+
+            if ( vmx_pgbit_test(v) ) 
+            {
+                /* The guest is 32 bit. */
+#if CONFIG_PAGING_LEVELS >= 4
+                unsigned long mfn, old_base_mfn;
+
+                if( !shadow_set_guest_paging_levels(v->domain, 3) )
+                {
+                    printk("Unsupported guest paging levels\n");
+                    domain_crash_synchronous(); /* need to take a clean path */
+                }
+
+                if ( !VALID_MFN(mfn = get_mfn_from_gpfn(
+                                    v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT)) ||
+                     !get_page(mfn_to_page(mfn), v->domain) ) 
+                {
+                    printk("Invalid CR3 value = %lx", v->arch.hvm_vmx.cpu_cr3);
+                    domain_crash_synchronous(); /* need to take a clean path */
+                }
+
+                old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+                if ( old_base_mfn )
+                    put_page(mfn_to_page(old_base_mfn));
+
+                /*
+                 * Now arch.guest_table points to machine physical.
+                 */
+
+                v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
+                update_pagetables(v);
+
+                HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
+                            (unsigned long) (mfn << PAGE_SHIFT));
+
+                __vmwrite(GUEST_CR3, pagetable_get_paddr(v->arch.shadow_table));
+
+                /*
+                 * arch->shadow_table should hold the next CR3 for shadow
+                 */
+
+                HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx",
+                            v->arch.hvm_vmx.cpu_cr3, mfn);
+#endif
+            } 
+            else
+            {
+                /*  The guest is 64 bit. */
+#if CONFIG_PAGING_LEVELS >= 4
+                if ( !shadow_set_guest_paging_levels(v->domain, 4) ) 
+                {
+                    printk("Unsupported guest paging levels\n");
+                    domain_crash_synchronous(); /* need to take a clean path */
+                }
+#endif
             }
+        }
+        else if ( value & X86_CR4_PAE )
+            set_bit(VMX_CPU_STATE_PAE_ENABLED, &v->arch.hvm_vmx.cpu_state);
+        else
+        {
+            if ( test_bit(VMX_CPU_STATE_LMA_ENABLED, &v->arch.hvm_vmx.cpu_state) )
+                vmx_inject_exception(v, TRAP_gp_fault, 0);
+
             clear_bit(VMX_CPU_STATE_PAE_ENABLED, &v->arch.hvm_vmx.cpu_state);
         }
 
         __vmread(CR4_READ_SHADOW, &old_cr);
-
         __vmwrite(GUEST_CR4, value| VMX_CR4_HOST_MASK);
         __vmwrite(CR4_READ_SHADOW, value);
 
@@ -1432,9 +1519,9 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
          * Writing to CR4 to modify the PSE, PGE, or PAE flag invalidates
          * all TLB entries except global entries.
          */
-        if ((old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE)) {
+        if ( (old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE) )
             shadow_sync_all(v->domain);
-        }
+
         break;
     }
     default:

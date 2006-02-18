@@ -92,7 +92,7 @@ void shadow_direct_map_clean(struct vcpu *v)
 /****************************************************************************/
 /************* export interface functions ***********************************/
 /****************************************************************************/
-
+void free_shadow_pages(struct domain *d);
 
 int shadow_set_guest_paging_levels(struct domain *d, int levels)
 {
@@ -106,10 +106,19 @@ int shadow_set_guest_paging_levels(struct domain *d, int levels)
         shadow_unlock(d);
         return 1;
 #endif
-#if CONFIG_PAGING_LEVELS >= 3
+#if CONFIG_PAGING_LEVELS == 3
     case 3:
         if ( d->arch.ops != &MODE_64_3_HANDLER )
             d->arch.ops = &MODE_64_3_HANDLER;
+        shadow_unlock(d);
+        return 1;
+#endif
+#if CONFIG_PAGING_LEVELS == 4
+    case 3:
+        if ( d->arch.ops == &MODE_64_2_HANDLER )
+            free_shadow_pages(d);
+        if ( d->arch.ops != &MODE_64_PAE_HANDLER )
+            d->arch.ops = &MODE_64_PAE_HANDLER;
         shadow_unlock(d);
         return 1;
 #endif
@@ -239,9 +248,19 @@ free_shadow_tables(struct domain *d, unsigned long smfn, u32 level)
          */
         if ( external )
         {
-            for ( i = 0; i < PAGETABLE_ENTRIES; i++ )
+            for ( i = 0; i < PAGETABLE_ENTRIES; i++ ) {
                 if ( entry_get_flags(ple[i]) & _PAGE_PRESENT )
                     put_shadow_ref(entry_get_pfn(ple[i]));
+                if (d->arch.ops->guest_paging_levels == PAGING_L3)
+                {
+#if CONFIG_PAGING_LEVELS == 4
+                    if ( i == PAE_L3_PAGETABLE_ENTRIES && level == PAGING_L4 )
+#elif CONFIG_PAGING_LEVELS == 3
+                    if ( i == PAE_L3_PAGETABLE_ENTRIES && level == PAGING_L3 )
+#endif
+                        break;
+                }
+            }
         } 
         else
         {
@@ -622,7 +641,7 @@ void free_shadow_page(unsigned long smfn)
     SH_VVLOG("%s: free'ing smfn=%lx", __func__, smfn);
 
     ASSERT( ! IS_INVALID_M2P_ENTRY(gpfn) );
-#if CONFIG_PAGING_LEVELS >=4
+#if CONFIG_PAGING_LEVELS >= 4
     if ( type == PGT_fl1_shadow ) 
     {
         unsigned long mfn;
@@ -630,6 +649,10 @@ void free_shadow_page(unsigned long smfn)
         if ( !mfn )
             gpfn |= (1UL << 63);
     }
+    if (d->arch.ops->guest_paging_levels == PAGING_L3)
+        if (type == PGT_l4_shadow ) {
+            gpfn = ((unsigned long)page->tlbflush_timestamp << PGT_score_shift) | gpfn;
+        }
 #endif
 
     delete_shadow_status(d, gpfn, gmfn, type);
@@ -661,6 +684,7 @@ void free_shadow_page(unsigned long smfn)
     case PGT_l2_shadow:
     case PGT_l3_shadow:
     case PGT_l4_shadow:
+        gpfn = gpfn & PGT_mfn_mask;
         shadow_demote(d, gpfn, gmfn);
         free_shadow_tables(d, smfn, shadow_type_to_level(type));
         d->arch.shadow_page_count--;

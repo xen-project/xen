@@ -410,6 +410,14 @@ static inline int vmx_paging_enabled(struct vcpu *v)
     return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
 }
 
+static inline int vmx_pgbit_test(struct vcpu *v)
+{
+    unsigned long cr0;
+
+    __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
+    return (cr0 & X86_CR0_PG);
+}
+
 static inline int __vmx_inject_exception(struct vcpu *v, int trap, int type, 
                                          int error_code)
 {

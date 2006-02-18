@@ -539,6 +539,7 @@ struct page_info *alloc_domheap_pages(
         pg[i].count_info        = 0;
         pg[i].u.inuse._domain   = 0;
         pg[i].u.inuse.type_info = 0;
+        page_set_owner(&pg[i], NULL);
     }
 
     if ( unlikely(!cpus_empty(mask)) )

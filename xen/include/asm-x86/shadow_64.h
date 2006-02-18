@@ -28,6 +28,7 @@
 #define _XEN_SHADOW_64_H
 #include <asm/shadow.h>
 #include <asm/shadow_ops.h>
+#include <asm/hvm/hvm.h>
 
 /*
  * The naming convention of the shadow_ops:
@@ -37,6 +38,7 @@ extern struct shadow_ops MODE_64_2_HANDLER;
 extern struct shadow_ops MODE_64_3_HANDLER;
 #if CONFIG_PAGING_LEVELS == 4
 extern struct shadow_ops MODE_64_4_HANDLER;
+extern struct shadow_ops MODE_64_PAE_HANDLER;
 #endif
 
 #if CONFIG_PAGING_LEVELS == 3
@@ -106,6 +108,15 @@ typedef struct { intpte_t lo; } pgentry_64_t;
 #define PAE_SHADOW_SELF_ENTRY   259
 #define PAE_L3_PAGETABLE_ENTRIES   4
 
+/******************************************************************************/
+/*
+ * The macro and inlines are for 32-bit PAE guest on 64-bit host
+ */
+#define PAE_CR3_ALIGN       5
+#define PAE_CR3_IDX_MASK    0x7f
+#define PAE_CR3_IDX_NO      128
+
+/******************************************************************************/
 static inline int  table_offset_64(unsigned long va, int level)
 {
     switch(level) {
@@ -122,8 +133,13 @@ static inline int  table_offset_64(unsigned long va, int level)
 
 #if CONFIG_PAGING_LEVELS >= 4
 #ifndef GUEST_PGENTRY_32
+#ifndef GUEST_32PAE
         case 4:
             return  (((va) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1));
+#else
+        case 4:
+            return PAE_SHADOW_SELF_ENTRY;
+#endif
 #else
         case 4:
             return PAE_SHADOW_SELF_ENTRY; 
@@ -133,6 +149,55 @@ static inline int  table_offset_64(unsigned long va, int level)
             return -1;
     }
 }
+
+/*****************************************************************************/
+
+#if defined( GUEST_32PAE )
+static inline int guest_table_offset_64(unsigned long va, int level, unsigned int index)
+{
+    switch(level) {
+        case 1:
+            return  (((va) >> L1_PAGETABLE_SHIFT) & (L1_PAGETABLE_ENTRIES - 1));
+        case 2:
+            return  (((va) >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES - 1));
+        case 3:
+            return  (index * 4 + ((va) >> L3_PAGETABLE_SHIFT));
+#if CONFIG_PAGING_LEVELS == 3
+        case 4:
+            return PAE_SHADOW_SELF_ENTRY;
+#endif
+
+#if CONFIG_PAGING_LEVELS >= 4
+#ifndef GUEST_PGENTRY_32
+        case 4:
+            return  (((va) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1));
+#else
+        case 4:
+            return PAE_SHADOW_SELF_ENTRY;
+#endif
+#endif
+        default:
+            return -1;
+    }
+}
+
+static inline unsigned long get_cr3_idxval(struct vcpu *v)
+{
+    unsigned long pae_cr3 = hvm_get_guest_ctrl_reg(v, 3); /* get CR3 */
+
+    return (pae_cr3 >> PAE_CR3_ALIGN) & PAE_CR3_IDX_MASK;
+}
+
+
+#define SH_GUEST_32PAE 1
+#else 
+#define guest_table_offset_64(va, level, index) \
+            table_offset_64((va),(level))
+#define get_cr3_idxval(v) 0
+#define SH_GUEST_32PAE 0
+#endif
+
+/********************************************************************************/
 
 static inline void free_out_of_sync_state(struct domain *d)
 {
@@ -163,6 +228,9 @@ static inline int __entry(
     u32 level = flag & L_MASK;
     struct domain *d = v->domain;
     int root_level;
+    unsigned int base_idx;
+
+    base_idx = get_cr3_idxval(v);
 
     if ( flag & SHADOW_ENTRY )
     {
@@ -173,7 +241,10 @@ static inline int __entry(
     else if ( flag & GUEST_ENTRY )
     {
         root_level = v->domain->arch.ops->guest_paging_levels;
-        index = table_offset_64(va, root_level);
+        if ( root_level == PAGING_L3 )
+            index = guest_table_offset_64(va, PAGING_L3, base_idx);
+        else
+            index = guest_table_offset_64(va, root_level, base_idx);
         le_e = (pgentry_64_t *)&v->arch.guest_vtable[index];
     }
     else /* direct mode */
@@ -199,7 +270,10 @@ static inline int __entry(
         if ( le_p )
             unmap_domain_page(le_p);
         le_p = (pgentry_64_t *)map_domain_page(mfn);
-        index = table_offset_64(va, (level + i - 1));
+        if ( flag & SHADOW_ENTRY )
+            index = table_offset_64(va, (level + i - 1));
+        else
+            index = guest_table_offset_64(va, (level + i - 1), base_idx);
         le_e = &le_p[index];
     }
 
