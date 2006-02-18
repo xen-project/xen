@@ -851,7 +851,6 @@ static int svm_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
         return 1;
     }
 
-    update_pagetables(v);
 
     gpa = gva_to_gpa(va);
 
@@ -2548,6 +2547,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 
     case VMEXIT_CR3_WRITE:
         svm_cr_access(v, 3, TYPE_MOV_TO_CR, &regs);
+        local_flush_tlb();
         break;
 
     case VMEXIT_CR4_WRITE:
