@@ -251,9 +251,12 @@ int arch_domain_create(struct domain *d)
 	return 0;
 
 fail_nomem:
-	free_xenheap_page(d->shared_info);
-	xfree(d->arch.mm);
-	pgd_free(d->arch.mm->pgd);
+	if (d->arch.mm->pgd != NULL)
+	    pgd_free(d->arch.mm->pgd);
+	if (d->arch.mm != NULL)
+	    xfree(d->arch.mm);
+	if (d->shared_info != NULL)
+	    free_xenheap_page(d->shared_info);
 	return -ENOMEM;
 }
 
@@ -389,7 +392,7 @@ printk("map_new_domain0_page: start=%p,end=%p!\n",dom0_start,dom0_start+dom0_siz
 }
 
 /* allocate new page for domain and map it to the specified metaphysical addr */
-struct page * map_new_domain_page(struct domain *d, unsigned long mpaddr)
+struct page * assign_new_domain_page(struct domain *d, unsigned long mpaddr)
 {
 	struct mm_struct *mm = d->arch.mm;
 	struct page *p = (struct page *)0;
@@ -400,7 +403,7 @@ struct page * map_new_domain_page(struct domain *d, unsigned long mpaddr)
 extern unsigned long vhpt_paddr, vhpt_pend;
 
 	if (!mm->pgd) {
-		printk("map_new_domain_page: domain pgd must exist!\n");
+		printk("assign_new_domain_page: domain pgd must exist!\n");
 		return(p);
 	}
 	pgd = pgd_offset(mm,mpaddr);
@@ -428,21 +431,21 @@ extern unsigned long vhpt_paddr, vhpt_pend;
 			if (p) memset(__va(page_to_maddr(p)),0,PAGE_SIZE);
 		}
 		if (unlikely(!p)) {
-printf("map_new_domain_page: Can't alloc!!!! Aaaargh!\n");
+printf("assign_new_domain_page: Can't alloc!!!! Aaaargh!\n");
 			return(p);
 		}
 if (unlikely(page_to_maddr(p) > vhpt_paddr && page_to_maddr(p) < vhpt_pend)) {
-  printf("map_new_domain_page: reassigned vhpt page %p!!\n",page_to_maddr(p));
+  printf("assign_new_domain_page: reassigned vhpt page %p!!\n",page_to_maddr(p));
 }
 		set_pte(pte, pfn_pte(page_to_maddr(p) >> PAGE_SHIFT,
 			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
 	}
-	else printk("map_new_domain_page: mpaddr %lx already mapped!\n",mpaddr);
+	else printk("assign_new_domain_page: mpaddr %lx already mapped!\n",mpaddr);
 	return p;
 }
 
 /* map a physical address to the specified metaphysical addr */
-void map_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr)
+void assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr)
 {
 	struct mm_struct *mm = d->arch.mm;
 	pgd_t *pgd;
@@ -451,7 +454,7 @@ void map_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physa
 	pte_t *pte;
 
 	if (!mm->pgd) {
-		printk("map_domain_page: domain pgd must exist!\n");
+		printk("assign_domain_page: domain pgd must exist!\n");
 		return;
 	}
 	pgd = pgd_offset(mm,mpaddr);
@@ -472,11 +475,11 @@ void map_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physa
 		set_pte(pte, pfn_pte(physaddr >> PAGE_SHIFT,
 			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
 	}
-	else printk("map_domain_page: mpaddr %lx already mapped!\n",mpaddr);
+	else printk("assign_domain_page: mpaddr %lx already mapped!\n",mpaddr);
 }
 #if 0
 /* map a physical address with specified I/O flag */
-void map_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long flags)
+void assign_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long flags)
 {
 	struct mm_struct *mm = d->arch.mm;
 	pgd_t *pgd;
@@ -486,7 +489,7 @@ void map_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long fl
 	pte_t io_pte;
 
 	if (!mm->pgd) {
-		printk("map_domain_page: domain pgd must exist!\n");
+		printk("assign_domain_page: domain pgd must exist!\n");
 		return;
 	}
 	ASSERT(flags & GPFN_IO_MASK);
@@ -509,7 +512,7 @@ void map_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long fl
 		pte_val(io_pte) = flags;
 		set_pte(pte, io_pte);
 	}
-	else printk("map_domain_page: mpaddr %lx already mapped!\n",mpaddr);
+	else printk("assign_domain_page: mpaddr %lx already mapped!\n",mpaddr);
 }
 #endif
 void mpafoo(unsigned long mpaddr)
@@ -557,7 +560,7 @@ tryagain:
 	}
 	/* if lookup fails and mpaddr is "legal", "create" the page */
 	if ((mpaddr >> PAGE_SHIFT) < d->max_pages) {
-		if (map_new_domain_page(d,mpaddr)) goto tryagain;
+		if (assign_new_domain_page(d,mpaddr)) goto tryagain;
 	}
 	printk("lookup_domain_mpa: bad mpa %p (> %p\n",
 		mpaddr,d->max_pages<<PAGE_SHIFT);
@@ -655,15 +658,9 @@ void loaddomainelfimage(struct domain *d, unsigned long image_start)
 	else
 #endif
 	while (memsz > 0) {
-#ifdef DOMU_AUTO_RESTART
-		pteval = lookup_domain_mpa(d,dom_mpaddr);
-		if (pteval) dom_imva = __va(pteval & _PFN_MASK);
-		else { printf("loaddomainelfimage: BAD!\n"); while(1); }
-#else
-		p = map_new_domain_page(d,dom_mpaddr);
+		p = assign_new_domain_page(d,dom_mpaddr);
 		if (unlikely(!p)) BUG();
 		dom_imva = __va(page_to_maddr(p));
-#endif
 		if (filesz > 0) {
 			if (filesz >= PAGE_SIZE)
 				copy_memory(dom_imva,elfaddr,PAGE_SIZE);
@@ -788,16 +785,15 @@ int construct_dom0(struct domain *d,
 	unsigned long pkern_entry;
 	unsigned long pkern_end;
 	unsigned long pinitrd_start = 0;
+	unsigned long pstart_info;
 	unsigned long ret, progress = 0;
 
 //printf("construct_dom0: starting\n");
 
-#ifndef CLONE_DOMAIN0
 	/* Sanity! */
 	BUG_ON(d != dom0);
 	BUG_ON(d->vcpu[0] == NULL);
 	BUG_ON(test_bit(_VCPUF_initialised, &v->vcpu_flags));
-#endif
 
 	memset(&dsi, 0, sizeof(struct domain_setup_info));
 
@@ -847,13 +843,18 @@ int construct_dom0(struct domain *d,
                           (PAGE_ALIGN(initrd_len) + 4*1024*1024);
 
              memcpy(__va(pinitrd_start),initrd_start,initrd_len);
+             pstart_info = PAGE_ALIGN(pinitrd_start + initrd_len);
+        } else {
+             pstart_info = PAGE_ALIGN(pkern_end);
         }
 
 	printk("METAPHYSICAL MEMORY ARRANGEMENT:\n"
 	       " Kernel image:  %lx->%lx\n"
 	       " Entry address: %lx\n"
-               " Init. ramdisk: %lx len %lx\n",
-               pkern_start, pkern_end, pkern_entry, pinitrd_start, initrd_len);
+	       " Init. ramdisk: %lx len %lx\n"
+	       " Start info.:   %lx->%lx\n",
+	       pkern_start, pkern_end, pkern_entry, pinitrd_start, initrd_len,
+	       pstart_info, pstart_info + PAGE_SIZE);
 
 	if ( (pkern_end - pkern_start) > (d->max_pages * PAGE_SIZE) )
 	{
@@ -908,9 +909,9 @@ int construct_dom0(struct domain *d,
 
 
 	/* Set up start info area. */
-	si = (start_info_t *)alloc_xenheap_page();
+	d->shared_info->arch.start_info_pfn = pstart_info >> PAGE_SHIFT;
+	si = __va(pstart_info);
 	memset(si, 0, PAGE_SIZE);
-	d->shared_info->arch.start_info_pfn = __pa(si) >> PAGE_SHIFT;
 	sprintf(si->magic, "xen-%i.%i-ia64", XEN_VERSION, XEN_SUBVERSION);
 	si->nr_pages     = d->tot_pages;
 
@@ -962,9 +963,6 @@ int construct_dom0(struct domain *d,
 	sync_split_caches();
 
 	// FIXME: Hack for keyboard input
-#ifdef CLONE_DOMAIN0
-if (d == dom0)
-#endif
 	serial_input_init();
 	if (d == dom0) {
 		VCPU(v, delivery_mask[0]) = -1L;
@@ -976,65 +974,6 @@ if (d == dom0)
 
 	return 0;
 }
-
-// FIXME: When dom0 can construct domains, this goes away (or is rewritten)
-int construct_domU(struct domain *d,
-		   unsigned long image_start, unsigned long image_len,
-	           unsigned long initrd_start, unsigned long initrd_len,
-	           char *cmdline)
-{
-	int i, rc;
-	struct vcpu *v = d->vcpu[0];
-	unsigned long pkern_entry;
-
-#ifndef DOMU_AUTO_RESTART
-	BUG_ON(test_bit(_VCPUF_initialised, &v->vcpu_flags));
-#endif
-
-	printk("*** LOADING DOMAIN %d ***\n",d->domain_id);
-
-	d->max_pages = dom0_size/PAGE_SIZE;	// FIXME: use dom0 size
-	// FIXME: use domain0 command line
-	rc = parsedomainelfimage(image_start, image_len, &pkern_entry);
-	printk("parsedomainelfimage returns %d\n",rc);
-	if ( rc != 0 ) return rc;
-
-	/* Mask all upcalls... */
-	for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-		d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
-
-	/* Copy the OS image. */
-	printk("calling loaddomainelfimage(%p,%p)\n",d,image_start);
-	loaddomainelfimage(d,image_start);
-	printk("loaddomainelfimage returns\n");
-
-	set_bit(_VCPUF_initialised, &v->vcpu_flags);
-
-	printk("calling new_thread, entry=%p\n",pkern_entry);
-#ifdef DOMU_AUTO_RESTART
-	v->domain->arch.image_start = image_start;
-	v->domain->arch.image_len = image_len;
-	v->domain->arch.entry = pkern_entry;
-#endif
-	new_thread(v, pkern_entry, 0, 0);
-	printk("new_thread returns\n");
-	sync_split_caches();
-	__set_bit(0x30, VCPU(v, delivery_mask));
-
-	return 0;
-}
-
-#ifdef DOMU_AUTO_RESTART
-void reconstruct_domU(struct vcpu *v)
-{
-	/* re-copy the OS image to reset data values to original */
-	printk("reconstruct_domU: restarting domain %d...\n",
-		v->domain->domain_id);
-	loaddomainelfimage(v->domain,v->domain->arch.image_start);
-	new_thread(v, v->domain->arch.entry, 0, 0);
-	sync_split_caches();
-}
-#endif
 
 void machine_restart(char * __unused)
 {

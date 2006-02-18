@@ -59,7 +59,7 @@ xen_do_IRQ(ia64_vector vector)
 /*
  * Exit an interrupt context. Process softirqs if needed and possible:
  */
-void xen_irq_exit(struct pt_regs *regs)
+void irq_exit(void)
 {
 	sub_preempt_count(IRQ_EXIT_OFFSET);
 }

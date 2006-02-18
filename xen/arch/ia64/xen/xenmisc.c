@@ -168,7 +168,11 @@ void __free_pages(struct page *page, unsigned int order)
 
 void *pgtable_quicklist_alloc(void)
 {
-	return alloc_xenheap_pages(0);
+    void *p;
+    p = alloc_xenheap_pages(0);
+    if (p) 
+        clear_page(p);
+    return p;
 }
 
 void pgtable_quicklist_free(void *pgtable_entry)
@@ -291,6 +295,7 @@ unsigned long context_switch_count = 0;
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     uint64_t spsr;
+    uint64_t pta;
 
     local_irq_save(spsr);
     if(VMX_DOMAIN(prev)){
@@ -298,9 +303,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     }
 	context_switch_count++;
 	switch_to(prev,next,prev);
-    if(VMX_DOMAIN(current)){
-        vtm_domain_in(current);
-    }
+//    if(VMX_DOMAIN(current)){
+//        vtm_domain_in(current);
+//    }
 
 // leave this debug for now: it acts as a heartbeat when more than
 // one domain is active
@@ -313,18 +318,26 @@ if (!i--) { printk("+",id); i = 1000000; }
 }
 
     if (VMX_DOMAIN(current)){
+        vtm_domain_in(current);
 		vmx_load_all_rr(current);
     }else{
-	extern char ia64_ivt;
-	ia64_set_iva(&ia64_ivt);
-	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
-		VHPT_ENABLED);
+    	extern char ia64_ivt;
+    	ia64_set_iva(&ia64_ivt);
     	if (!is_idle_domain(current->domain)) {
+        	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
+		        VHPT_ENABLED);
 	    	load_region_regs(current);
 	    	vcpu_load_kernel_regs(current);
-		    if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
-    	}
-	    if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
+		    if (vcpu_timer_expired(current))
+                vcpu_pend_timer(current);
+    	}else {
+        /* When switching to idle domain, only need to disable vhpt
+        * walker. Then all accesses happen within idle context will
+        * be handled by TR mapping and identity mapping.
+        */
+           pta = ia64_get_pta();
+           ia64_set_pta(pta & ~VHPT_ENABLED);
+        }
     }
 
     local_irq_restore(spsr);

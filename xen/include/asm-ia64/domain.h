@@ -15,8 +15,8 @@ extern void domain_relinquish_resources(struct domain *);
 struct arch_domain {
     struct mm_struct *active_mm;
     struct mm_struct *mm;
-    int metaphysical_rr0;
-    int metaphysical_rr4;
+    unsigned long metaphysical_rr0;
+    unsigned long metaphysical_rr4;
     int starting_rid;		/* first RID assigned to domain */
     int ending_rid;		/* one beyond highest RID assigned to domain */
     int rid_bits;		/* number of virtual rid bits (default: 18) */
@@ -32,11 +32,6 @@ struct arch_domain {
     u64 xen_vastart;
     u64 xen_vaend;
     u64 shared_info_va;
-#ifdef DOMU_AUTO_RESTART
-    u64 image_start;
-    u64 image_len;
-    u64 entry;
-#endif
     unsigned long initrd_start;
     unsigned long initrd_len;
     char *cmdline;
@@ -66,10 +61,10 @@ struct arch_vcpu {
 	unsigned long xen_timer_interval;
 #endif
     mapped_regs_t *privregs; /* save the state of vcpu */
-    int metaphysical_rr0;		// from arch_domain (so is pinned)
-    int metaphysical_rr4;		// from arch_domain (so is pinned)
-    int metaphysical_saved_rr0;		// from arch_domain (so is pinned)
-    int metaphysical_saved_rr4;		// from arch_domain (so is pinned)
+    unsigned long metaphysical_rr0;		// from arch_domain (so is pinned)
+    unsigned long metaphysical_rr4;		// from arch_domain (so is pinned)
+    unsigned long metaphysical_saved_rr0;	// from arch_domain (so is pinned)
+    unsigned long metaphysical_saved_rr4;	// from arch_domain (so is pinned)
     int breakimm;			// from arch_domain (so is pinned)
     int starting_rid;		/* first RID assigned to domain */
     int ending_rid;		/* one beyond highest RID assigned to domain */

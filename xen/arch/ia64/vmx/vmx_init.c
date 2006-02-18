@@ -317,7 +317,7 @@ int vmx_alloc_contig_pages(struct domain *d)
 	    for (j = io_ranges[i].start;
 		 j < io_ranges[i].start + io_ranges[i].size;
 		 j += PAGE_SIZE)
-		map_domain_page(d, j, io_ranges[i].type);
+		assign_domain_page(d, j, io_ranges[i].type);
 	}
 
 	conf_nr = VMX_CONFIG_PAGES(d);
@@ -334,14 +334,14 @@ int vmx_alloc_contig_pages(struct domain *d)
 	for (i = 0;
 	     i < (end < MMIO_START ? end : MMIO_START);
 	     i += PAGE_SIZE, pgnr++)
-	    map_domain_page(d, i, pgnr << PAGE_SHIFT);
+	    assign_domain_page(d, i, pgnr << PAGE_SHIFT);
 
 	/* Map normal memory beyond 4G */
 	if (unlikely(end > MMIO_START)) {
 	    start = 4 * MEM_G;
 	    end = start + (end - 3 * MEM_G);
 	    for (i = start; i < end; i += PAGE_SIZE, pgnr++)
-		map_domain_page(d, i, pgnr << PAGE_SHIFT);
+		assign_domain_page(d, i, pgnr << PAGE_SHIFT);
 	}
 
 	d->arch.max_pfn = end >> PAGE_SHIFT;
@@ -356,7 +356,7 @@ int vmx_alloc_contig_pages(struct domain *d)
 	/* Map guest firmware */
 	pgnr = page_to_mfn(page);
 	for (i = GFW_START; i < GFW_START + GFW_SIZE; i += PAGE_SIZE, pgnr++)
-	    map_domain_page(d, i, pgnr << PAGE_SHIFT);
+	    assign_domain_page(d, i, pgnr << PAGE_SHIFT);
 
 	if (unlikely((page = alloc_domheap_pages(d, 1, 0)) == NULL)) {
 	    printk("Could not allocate order=1 pages for vmx contig alloc\n");
@@ -365,9 +365,9 @@ int vmx_alloc_contig_pages(struct domain *d)
 
 	/* Map for shared I/O page and xenstore */
 	pgnr = page_to_mfn(page);
-	map_domain_page(d, IO_PAGE_START, pgnr << PAGE_SHIFT);
+	assign_domain_page(d, IO_PAGE_START, pgnr << PAGE_SHIFT);
 	pgnr++;
-	map_domain_page(d, STORE_PAGE_START, pgnr << PAGE_SHIFT);
+	assign_domain_page(d, STORE_PAGE_START, pgnr << PAGE_SHIFT);
 
 	set_bit(ARCH_VMX_CONTIG_MEM, &v->arch.arch_vmx.flags);
 	return 0;

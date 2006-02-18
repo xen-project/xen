@@ -34,9 +34,9 @@ struct privop_addr_count {
 #endif
 
 /* general registers */
-extern UINT64 vcpu_get_gr(VCPU *vcpu, unsigned reg);
-extern IA64FAULT vcpu_get_gr_nat(VCPU *vcpu, unsigned reg, UINT64 *val);
-extern IA64FAULT vcpu_set_gr(VCPU *vcpu, unsigned reg, UINT64 value, int nat);
+extern UINT64 vcpu_get_gr(VCPU *vcpu, unsigned long reg);
+extern IA64FAULT vcpu_get_gr_nat(VCPU *vcpu, unsigned long reg, UINT64 *val);
+extern IA64FAULT vcpu_set_gr(VCPU *vcpu, unsigned long reg, UINT64 value, int nat);
 /* application registers */
 extern IA64FAULT vcpu_set_ar(VCPU *vcpu, UINT64 reg, UINT64 val);
 /* psr */

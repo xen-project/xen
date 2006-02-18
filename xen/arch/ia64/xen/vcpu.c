@@ -81,7 +81,7 @@ unsigned long vcpu_verbose = 0;
 **************************************************************************/
 #ifdef XEN
 UINT64
-vcpu_get_gr(VCPU *vcpu, unsigned reg)
+vcpu_get_gr(VCPU *vcpu, unsigned long reg)
 {
 	REGS *regs = vcpu_regs(vcpu);
 	UINT64 val;
@@ -90,7 +90,7 @@ vcpu_get_gr(VCPU *vcpu, unsigned reg)
 	return val;
 }
 IA64FAULT
-vcpu_get_gr_nat(VCPU *vcpu, unsigned reg, UINT64 *val)
+vcpu_get_gr_nat(VCPU *vcpu, unsigned long reg, UINT64 *val)
 {
 	REGS *regs = vcpu_regs(vcpu);
     int nat;
@@ -104,7 +104,7 @@ vcpu_get_gr_nat(VCPU *vcpu, unsigned reg, UINT64 *val)
 //   IA64_ILLOP_FAULT if the register would cause an Illegal Operation fault
 //   IA64_NO_FAULT otherwise
 IA64FAULT
-vcpu_set_gr(VCPU *vcpu, unsigned reg, UINT64 value, int nat)
+vcpu_set_gr(VCPU *vcpu, unsigned long reg, UINT64 value, int nat)
 {
 	REGS *regs = vcpu_regs(vcpu);
 	if (!reg) return IA64_ILLOP_FAULT;
@@ -118,7 +118,7 @@ vcpu_set_gr(VCPU *vcpu, unsigned reg, UINT64 value, int nat)
 //   IA64_ILLOP_FAULT if the register would cause an Illegal Operation fault
 //   IA64_NO_FAULT otherwise
 IA64FAULT
-vcpu_set_gr(VCPU *vcpu, unsigned reg, UINT64 value)
+vcpu_set_gr(VCPU *vcpu, unsigned long reg, UINT64 value)
 {
 	REGS *regs = vcpu_regs(vcpu);
 	long sof = (regs->cr_ifs) & 0x7f;

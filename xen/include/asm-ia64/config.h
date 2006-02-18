@@ -3,11 +3,8 @@
 
 #undef USE_PAL_EMULATOR
 // control flags for turning on/off features under test
-#undef CLONE_DOMAIN0
-//#define CLONE_DOMAIN0 1
 #undef DOMU_BUILD_STAGING
 #define VHPT_GLOBAL
-#define DOMU_AUTO_RESTART
 
 #undef DEBUG_PFMON
 
@@ -214,9 +211,6 @@ void sort_main_extable(void);
 
 // see include/asm-ia64/mm.h, handle remaining page_info uses until gone
 #define page_info page
-
-// see common/memory.c
-#define set_gpfn_from_mfn(x,y)	do { } while (0)
 
 // see common/keyhandler.c
 #define	nop()	asm volatile ("nop 0")

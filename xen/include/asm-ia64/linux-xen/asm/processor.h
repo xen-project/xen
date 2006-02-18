@@ -639,6 +639,19 @@ ia64_get_ivr (void)
 	return r;
 }
 
+#ifdef XEN
+/* Get the page table address and control bits.  */
+static inline __u64
+ia64_get_pta (void)
+{
+   __u64 r;
+   ia64_srlz_d();
+   r = ia64_getreg(_IA64_REG_CR_PTA);
+   ia64_srlz_d();
+   return r;
+}
+#endif
+
 static inline void
 ia64_set_dbr (__u64 regnum, __u64 value)
 {

@@ -5,19 +5,24 @@
 # (e.g. with #ifdef XEN or XEN in a comment) so that they can be
 # easily updated to future versions of the corresponding Linux files.
 
-efi.c		-> linux/arch/ia64/kernel/efi.c
-entry.h		-> linux/arch/ia64/kernel/entry.h
-entry.S		-> linux/arch/ia64/kernel/entry.S
-hpsim_ssc.h	-> linux/arch/ia64/hp/sim/hpsim_ssc.h
-irq_ia64.c	-> linux/arch/ia64/kernel/irq_ia64.c
-minstate.h	-> linux/arch/ia64/kernel/minstate.h
-mm_contig.c	-> linux/arch/ia64/mm/contig.c
-pal.S		-> linux/arch/ia64/kernel/pal.S
-sal.c		-> linux/arch/ia64/kernel/sal.c
-setup.c		-> linux/arch/ia64/kernel/setup.c
-smp.c		-> linux/arch/ia64/kernel/smp.c
-smpboot.c	-> linux/arch/ia64/kernel/smpboot.c
-sort.c		-> linux/lib/sort.c
-time.c		-> linux/arch/ia64/kernel/time.c
-tlb.c		-> linux/arch/ia64/mm/tlb.c
-unaligned.c	-> linux/arch/ia64/kernel/unaligned.c
+efi.c			-> linux/arch/ia64/kernel/efi.c
+entry.h			-> linux/arch/ia64/kernel/entry.h
+entry.S			-> linux/arch/ia64/kernel/entry.S
+head.S			-> linux/arch/ia64/kernel/head.S
+hpsim_ssc.h		-> linux/arch/ia64/hp/sim/hpsim_ssc.h
+irq_ia64.c		-> linux/arch/ia64/kernel/irq_ia64.c
+minstate.h		-> linux/arch/ia64/kernel/minstate.h
+mm_contig.c		-> linux/arch/ia64/mm/contig.c
+pal.S			-> linux/arch/ia64/kernel/pal.S
+process-linux-xen.c	-> linux/arch/ia64/kernel/process.c
+sal.c			-> linux/arch/ia64/kernel/sal.c
+setup.c			-> linux/arch/ia64/kernel/setup.c
+smp.c			-> linux/arch/ia64/kernel/smp.c
+smpboot.c		-> linux/arch/ia64/kernel/smpboot.c
+sort.c			-> linux/lib/sort.c
+time.c			-> linux/arch/ia64/kernel/time.c
+tlb.c			-> linux/arch/ia64/mm/tlb.c
+unaligned.c		-> linux/arch/ia64/kernel/unaligned.c
+unwind.c		-> linux/arch/ia64/kernel/unwind.c
+unwind_decoder.c	-> linux/arch/ia64/kernel/unwind_decoder.c
+unwind_i.h		-> linux/arch/ia64/kernel/unwind_i.h

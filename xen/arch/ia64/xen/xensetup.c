@@ -31,9 +31,6 @@ struct vcpu *idle_vcpu[NR_CPUS];
 
 cpumask_t cpu_present_map;
 
-#ifdef CLONE_DOMAIN0
-struct domain *clones[CLONE_DOMAIN0];
-#endif
 extern unsigned long domain0_ready;
 
 int find_max_pfn (unsigned long, unsigned long, void *);
@@ -342,16 +339,6 @@ printk("About to call sort_main_extable()\n");
 printk("About to call domain_create()\n");
     dom0 = domain_create(0, 0);
 
-#ifdef CLONE_DOMAIN0
-    {
-    int i;
-    for (i = 0; i < CLONE_DOMAIN0; i++) {
-	clones[i] = domain_create(i+1, 0);
-        if ( clones[i] == NULL )
-            panic("Error creating domain0 clone %d\n",i);
-    }
-    }
-#endif
     if ( dom0 == NULL )
         panic("Error creating domain 0\n");
 
@@ -376,22 +363,6 @@ printk("About to call domain_create()\n");
     /* PIN domain0 on CPU 0.  */
     dom0->vcpu[0]->cpu_affinity = cpumask_of_cpu(0);
 
-#ifdef CLONE_DOMAIN0
-    {
-    int i;
-    dom0_memory_start = __va(ia64_boot_param->domain_start);
-    dom0_memory_size = ia64_boot_param->domain_size;
-
-    for (i = 0; i < CLONE_DOMAIN0; i++) {
-      printk("CONSTRUCTING DOMAIN0 CLONE #%d\n",i+1);
-      if ( construct_domU(clones[i], dom0_memory_start, dom0_memory_size,
-			  dom0_initrd_start,dom0_initrd_size,
-			  0) != 0)
-            panic("Could not set up DOM0 clone %d\n",i);
-    }
-    }
-#endif
-
     /* The stash space for the initial kernel image can now be freed up. */
     init_domheap_pages(ia64_boot_param->domain_start,
                        ia64_boot_param->domain_size);
@@ -412,13 +383,6 @@ printk("About to call init_trace_bufs()\n");
     console_endboot(cmdline && strstr(cmdline, "tty0"));
 #endif
 
-#ifdef CLONE_DOMAIN0
-    {
-    int i;
-    for (i = 0; i < CLONE_DOMAIN0; i++)
-	domain_unpause_by_systemcontroller(clones[i]);
-    }
-#endif
     domain0_ready = 1;
 
     local_irq_enable();
