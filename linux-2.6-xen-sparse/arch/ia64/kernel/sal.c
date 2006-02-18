@@ -336,8 +336,10 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 		p += SAL_DESC_SIZE(*p);
 	}
 
+#ifdef CONFIG_XEN
 	if (!running_on_xen)
-		check_sal_cache_flush();
+#endif
+	check_sal_cache_flush();
 }
 
 int
