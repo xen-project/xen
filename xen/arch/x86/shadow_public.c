@@ -1790,39 +1790,56 @@ get_mfn_from_gpfn_foreign(struct domain *d, unsigned long gpfn)
     unsigned long va, tabpfn;
     l1_pgentry_t *l1, l1e;
     l2_pgentry_t *l2, l2e;
+#if CONFIG_PAGING_LEVELS >= 4
+    pgentry_64_t *l4 = NULL;
+    pgentry_64_t l4e = { 0 };
+#endif
+    pgentry_64_t *l3 = NULL;
+    pgentry_64_t l3e = { 0 };
+    unsigned long *l0tab = NULL;
+    unsigned long mfn;
 
     ASSERT(shadow_mode_translate(d));
 
     perfc_incrc(get_mfn_from_gpfn_foreign);
 
-    va = gpfn << PAGE_SHIFT;
-    tabpfn = pagetable_get_pfn(d->arch.phys_table);
-    l2 = map_domain_page(tabpfn);
+    va = RO_MPT_VIRT_START + (gpfn * sizeof(mfn));
+
+    tabpfn = pagetable_get_pfn(d->vcpu[0]->arch.monitor_table);
+    if ( !tabpfn )
+        return INVALID_MFN;
+
+#if CONFIG_PAGING_LEVELS >= 4
+    l4 = map_domain_page(tabpfn);
+    l4e = l4[l4_table_offset(va)];
+    unmap_domain_page(l4);
+    if ( !(entry_get_flags(l4e) & _PAGE_PRESENT) )
+        return INVALID_MFN;
+
+    l3 = map_domain_page(entry_get_pfn(l4e));
+#else
+    l3 = map_domain_page(tabpfn);
+#endif
+    l3e = l3[l3_table_offset(va)];
+    unmap_domain_page(l3);
+    if ( !(entry_get_flags(l3e) & _PAGE_PRESENT) )
+        return INVALID_MFN;
+    l2 = map_domain_page(entry_get_pfn(l3e));
     l2e = l2[l2_table_offset(va)];
     unmap_domain_page(l2);
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
-    {
-        printk("%s(d->id=%d, gpfn=%lx) => 0 l2e=%" PRIpte "\n",
-               __func__, d->domain_id, gpfn, l2e_get_intpte(l2e));
         return INVALID_MFN;
-    }
+
     l1 = map_domain_page(l2e_get_pfn(l2e));
     l1e = l1[l1_table_offset(va)];
     unmap_domain_page(l1);
-
-#if 0
-    printk("%s(d->id=%d, gpfn=%lx) => %lx tabpfn=%lx l2e=%lx l1tab=%lx, l1e=%lx\n",
-           __func__, d->domain_id, gpfn, l1_pgentry_val(l1e) >> PAGE_SHIFT, tabpfn, l2e, l1tab, l1e);
-#endif
-
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
-    {
-        printk("%s(d->id=%d, gpfn=%lx) => 0 l1e=%" PRIpte "\n",
-               __func__, d->domain_id, gpfn, l1e_get_intpte(l1e));
         return INVALID_MFN;
-    }
 
-    return l1e_get_pfn(l1e);
+    l0tab = map_domain_page(l1e_get_pfn(l1e));
+    mfn = l0tab[gpfn & ((PAGE_SIZE / sizeof (mfn)) - 1)];
+    unmap_domain_page(l0tab);
+    return mfn;
 }
 
 static u32 remove_all_access_in_page(
