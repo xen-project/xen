@@ -47,7 +47,9 @@
 #include <asm/proto.h>
 #include <asm/nmi.h>
 
+#ifndef CONFIG_X86_NO_IDT
 extern struct gate_struct idt_table[256]; 
+#endif
 
 asmlinkage void divide_error(void);
 asmlinkage void debug(void);
@@ -986,10 +988,6 @@ void __init trap_init(void)
                 printk("HYPERVISOR_set_trap_table faild: error %d\n",
                        ret);
 
-#ifdef CONFIG_IA32_EMULATION
-	set_system_gate(IA32_SYSCALL_VECTOR, ia32_syscall);
-#endif
-       
 	/*
 	 * Should be a barrier for any external CPU state.
 	 */

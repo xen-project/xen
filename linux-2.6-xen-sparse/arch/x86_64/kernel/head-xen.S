@@ -129,14 +129,6 @@ gdt_end:
 	/* zero the remaining page */
 	.fill PAGE_SIZE / 8 - GDT_ENTRIES,8,0
 
-	.section .bss, "aw", @nobits
-	.align L1_CACHE_BYTES
-ENTRY(idt_table)	
-	.rept   256
-	.quad   0
-	.quad 	0
-	.endr
-
 /*
  * __xen_guest information
  */

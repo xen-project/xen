@@ -130,6 +130,11 @@ config X86_NO_TSS
 	depends on X86_64_XEN
 	default y
 
+config X86_NO_IDT
+	bool
+	depends on X86_64_XEN
+	default y
+
 #
 # Define implied options from the CPU selection here
 #

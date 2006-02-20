@@ -40,7 +40,9 @@ cpumask_t cpu_initialized __cpuinitdata = CPU_MASK_NONE;
 struct x8664_pda *_cpu_pda[NR_CPUS] __read_mostly;
 struct x8664_pda boot_cpu_pda[NR_CPUS] __cacheline_aligned;
 
+#ifndef CONFIG_X86_NO_IDT
 struct desc_ptr idt_descr = { 256 * 16, (unsigned long) idt_table }; 
+#endif
 
 char boot_cpu_stack[IRQSTACKSIZE] __attribute__((section(".bss.page_aligned")));
 
@@ -155,13 +157,7 @@ static void switch_pt(void)
 
 void __init cpu_gdt_init(struct desc_ptr *gdt_descr)
 {
-#ifdef CONFIG_SMP
-	int cpu = stack_smp_processor_id();
-#else
-	int cpu = smp_processor_id();
-#endif
-
-	asm volatile("lgdt %0" :: "m" (cpu_gdt_descr[cpu]));
+	asm volatile("lgdt %0" :: "m" (*gdt_descr));
 	asm volatile("lidt %0" :: "m" (idt_descr));
 }
 #endif
@@ -285,12 +281,7 @@ void __cpuinit cpu_init (void)
 #endif
 
 	cpu_gdt_descr[cpu].size = GDT_SIZE;
-#ifndef CONFIG_XEN 
- 	asm volatile("lgdt %0" :: "m" (cpu_gdt_descr[cpu]));
- 	asm volatile("lidt %0" :: "m" (idt_descr));
-#else
 	cpu_gdt_init(&cpu_gdt_descr[cpu]);
-#endif
 
 	memset(me->thread.tls_array, 0, GDT_ENTRY_TLS_ENTRIES * 8);
 	syscall_init();
