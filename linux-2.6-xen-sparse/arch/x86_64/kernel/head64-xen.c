@@ -47,7 +47,7 @@ extern char saved_command_line[];
 
 static void __init copy_bootdata(char *real_mode_data)
 {
-#if 0
+#ifndef CONFIG_XEN
 	int new_data;
 	char * command_line;
 
@@ -63,7 +63,6 @@ static void __init copy_bootdata(char *real_mode_data)
 	}
 	command_line = (char *) ((u64)(new_data));
 	memcpy(saved_command_line, command_line, COMMAND_LINE_SIZE);
-	printk("Bootdata ok (command line is %s)\n", saved_command_line);
 #else
 	int max_cmdline;
 	
@@ -71,8 +70,8 @@ static void __init copy_bootdata(char *real_mode_data)
 		max_cmdline = COMMAND_LINE_SIZE;
 	memcpy(saved_command_line, xen_start_info->cmd_line, max_cmdline);
 	saved_command_line[max_cmdline-1] = '\0';
-	printk("Bootdata ok (command line is %s)\n", saved_command_line);
 #endif
+	printk("Bootdata ok (command line is %s)\n", saved_command_line);
 }
 
 static void __init setup_boot_cpu_data(void)
@@ -98,6 +97,7 @@ void __init x86_64_start_kernel(char * real_mode_data)
 	char *s;
 	int i;
 
+	xen_start_info = (struct start_info *)real_mode_data;
 	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 		phys_to_machine_mapping =
 			(unsigned long *)xen_start_info->mfn_list;
@@ -105,9 +105,9 @@ void __init x86_64_start_kernel(char * real_mode_data)
 			xen_start_info->nr_pt_frames;
 	}
 
+#if 0
 	for (i = 0; i < 256; i++)
 		set_intr_gate(i, early_idt_handler);
-#if 0
 	asm volatile("lidt %0" :: "m" (idt_descr));
 #endif
 
