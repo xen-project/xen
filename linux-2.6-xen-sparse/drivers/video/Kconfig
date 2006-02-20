@@ -495,7 +495,7 @@ config FB_HGA_ACCEL
 
 config VIDEO_SELECT
 	bool
-	depends on (FB = y) && X86
+	depends on (FB = y) && X86 && !XEN
 	default y
 
 config FB_SGIVW
