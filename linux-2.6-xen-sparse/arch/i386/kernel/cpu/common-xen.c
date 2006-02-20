@@ -595,7 +595,9 @@ void __cpuinit cpu_gdt_init(struct Xgt_desc_struct *gdt_descr)
 void __cpuinit cpu_init(void)
 {
 	int cpu = smp_processor_id();
+#ifdef CONFIG_DOUBLEFAULT
 	struct tss_struct * t = &per_cpu(init_tss, cpu);
+#endif
 	struct thread_struct *thread = &current->thread;
 
 	if (cpu_test_and_set(cpu, cpu_initialized)) {

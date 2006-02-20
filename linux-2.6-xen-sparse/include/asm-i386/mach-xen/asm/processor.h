@@ -91,8 +91,10 @@ struct cpuinfo_x86 {
 
 extern struct cpuinfo_x86 boot_cpu_data;
 extern struct cpuinfo_x86 new_cpu_data;
+#ifndef CONFIG_X86_NO_TSS
 extern struct tss_struct doublefault_tss;
 DECLARE_PER_CPU(struct tss_struct, init_tss);
+#endif
 
 #ifdef CONFIG_SMP
 extern struct cpuinfo_x86 cpu_data[];
@@ -343,7 +345,9 @@ extern int bootloader_type;
 #define IO_BITMAP_BITS  65536
 #define IO_BITMAP_BYTES (IO_BITMAP_BITS/8)
 #define IO_BITMAP_LONGS (IO_BITMAP_BYTES/sizeof(long))
+#ifndef CONFIG_X86_NO_TSS
 #define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
+#endif
 #define INVALID_IO_BITMAP_OFFSET 0x8000
 #define INVALID_IO_BITMAP_OFFSET_LAZY 0x9000
 
@@ -401,6 +405,7 @@ typedef struct {
 
 struct thread_struct;
 
+#ifndef CONFIG_X86_NO_TSS
 struct tss_struct {
 	unsigned short	back_link,__blh;
 	unsigned long	esp0;
@@ -446,6 +451,7 @@ struct tss_struct {
 	 */
 	unsigned long stack[64];
 } __attribute__((packed));
+#endif
 
 #define ARCH_MIN_TASKALIGN	16
 
@@ -482,6 +488,7 @@ struct thread_struct {
 	.io_bitmap_ptr = NULL,						\
 }
 
+#ifndef CONFIG_X86_NO_TSS
 /*
  * Note that the .io_bitmap member must be extra-big. This is because
  * the CPU will access an additional byte beyond the end of the IO
@@ -504,8 +511,11 @@ static inline void load_esp0(struct tss_struct *tss, struct thread_struct *threa
 		tss->ss1 = thread->sysenter_cs;
 		wrmsr(MSR_IA32_SYSENTER_CS, thread->sysenter_cs, 0);
 	}
-	HYPERVISOR_stack_switch(tss->ss0, tss->esp0);
 }
+#else
+#define load_esp0(tss, thread) \
+	HYPERVISOR_stack_switch(__KERNEL_DS, (thread)->esp0)
+#endif
 
 #define start_thread(regs, new_eip, new_esp) do {		\
 	__asm__("movl %0,%%fs ; movl %0,%%gs": :"r" (0));	\

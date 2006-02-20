@@ -518,7 +518,9 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	struct thread_struct *prev = &prev_p->thread,
 				 *next = &next_p->thread;
 	int cpu = smp_processor_id();
+#ifndef CONFIG_X86_NO_TSS
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
+#endif
 	physdev_op_t iopl_op, iobmp_op;
 	multicall_entry_t _mcl[8], *mcl = _mcl;
 
@@ -543,10 +545,9 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	 * Reload esp0.
 	 * This is load_esp0(tss, next) with a multicall.
 	 */
-	tss->esp0 = next->esp0;
 	mcl->op      = __HYPERVISOR_stack_switch;
-	mcl->args[0] = tss->ss0;
-	mcl->args[1] = tss->esp0;
+	mcl->args[0] = __KERNEL_DS;
+	mcl->args[1] = next->esp0;
 	mcl++;
 
 	/*

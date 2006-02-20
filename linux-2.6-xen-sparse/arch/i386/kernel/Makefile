@@ -49,11 +49,13 @@ else
 vsyscall_note := vsyscall-note.o
 endif
 
+VSYSCALL_TYPES-y			:= int80
+VSYSCALL_TYPES-$(CONFIG_X86_SYSENTER)	+= sysenter
 # vsyscall.o contains the vsyscall DSO images as __initdata.
 # We must build both images before we can assemble it.
 # Note: kbuild does not track this dependency due to usage of .incbin
-$(obj)/vsyscall.o: $(obj)/vsyscall-int80.so $(obj)/vsyscall-sysenter.so
-targets += $(foreach F,int80 sysenter,vsyscall-$F.o vsyscall-$F.so)
+$(obj)/vsyscall.o: $(foreach F,$(VSYSCALL_TYPES-y),$(obj)/vsyscall-$F.so)
+targets += $(foreach F,$(VSYSCALL_TYPES-y),vsyscall-$F.o vsyscall-$F.so)
 targets += $(vsyscall_note) vsyscall.lds
 
 # The DSO images are built using a special linker script.
@@ -81,7 +83,8 @@ $(obj)/built-in.o: ld_flags += -R $(obj)/vsyscall-syms.o
 
 SYSCFLAGS_vsyscall-syms.o = -r
 $(obj)/vsyscall-syms.o: $(src)/vsyscall.lds \
-			$(obj)/vsyscall-sysenter.o $(obj)/$(vsyscall_note) FORCE
+			$(foreach F,$(VSYSCALL_TYPES-y),$(obj)/vsyscall-$F.o) \
+			$(obj)/$(vsyscall_note) FORCE
 	$(call if_changed,syscall)
 
 ifdef CONFIG_XEN
