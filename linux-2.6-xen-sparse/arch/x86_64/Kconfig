@@ -529,9 +529,7 @@ endif
 
 source "drivers/acpi/Kconfig"
 
-if !X86_64_XEN
 source "arch/x86_64/kernel/cpufreq/Kconfig"
-endif
 
 endmenu
 

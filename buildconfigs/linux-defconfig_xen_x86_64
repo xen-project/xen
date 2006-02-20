@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.16-rc3-xen0
-# Thu Feb 16 22:56:25 2006
+# Linux kernel version: 2.6.16-rc3-xen
+# Mon Feb 20 11:37:11 2006
 #
 CONFIG_X86_64=y
 CONFIG_64BIT=y
@@ -168,6 +168,11 @@ CONFIG_ACPI_EC=y
 CONFIG_ACPI_POWER=y
 CONFIG_ACPI_SYSTEM=y
 CONFIG_ACPI_CONTAINER=m
+
+#
+# CPU Frequency scaling
+#
+# CONFIG_CPU_FREQ is not set
 
 #
 # Bus options (PCI etc.)
