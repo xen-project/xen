@@ -152,10 +152,7 @@ void dump_pagetable(unsigned long address)
 	pmd_t *pmd;
 	pte_t *pte;
 
-	asm("movq %%cr3,%0" : "=r" (pgd));
-	pgd = (pgd_t *)machine_to_phys((maddr_t)pgd);
-
-	pgd = __va((unsigned long)pgd & PHYSICAL_PAGE_MASK); 
+	pgd = __va(read_cr3() & PHYSICAL_PAGE_MASK);
 	pgd += pgd_index(address);
 	if (bad_address(pgd)) goto bad;
 	printk("PGD %lx ", pgd_val(*pgd));
@@ -261,9 +258,7 @@ static int vmalloc_fault(unsigned long address)
 
 	/* On Xen the line below does not always work. Needs investigating! */
 	/*pgd = pgd_offset(current->mm ?: &init_mm, address);*/
-	asm("movq %%cr3,%0" : "=r" (pgd));
-	pgd = (pgd_t *)machine_to_phys((maddr_t)pgd);
-	pgd = __va((unsigned long)pgd & PHYSICAL_PAGE_MASK);
+	pgd = __va(read_cr3() & PHYSICAL_PAGE_MASK);
 	pgd += pgd_index(address);
 	pgd_ref = pgd_offset_k(address);
 	if (pgd_none(*pgd_ref))
