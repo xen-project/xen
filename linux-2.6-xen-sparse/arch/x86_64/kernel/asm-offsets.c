@@ -66,7 +66,9 @@ int main(void)
 	DEFINE(pbe_address, offsetof(struct pbe, address));
 	DEFINE(pbe_orig_address, offsetof(struct pbe, orig_address));
 	DEFINE(pbe_next, offsetof(struct pbe, next));
+#ifndef CONFIG_X86_NO_TSS
 	BLANK();
 	DEFINE(TSS_ist, offsetof(struct tss_struct, ist));
+#endif
 	return 0;
 }

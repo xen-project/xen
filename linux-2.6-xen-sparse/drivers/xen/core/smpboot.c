@@ -237,7 +237,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 #ifdef __x86_64__
 		cpu_pda(cpu)->pcurrent = idle;
 		cpu_pda(cpu)->cpunumber = cpu;
-		per_cpu(init_tss,cpu).rsp0 = idle->thread.rsp;
 		clear_ti_thread_flag(idle->thread_info, TIF_FORK);
 #endif
 

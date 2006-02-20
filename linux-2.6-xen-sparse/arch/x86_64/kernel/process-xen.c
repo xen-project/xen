@@ -289,16 +289,28 @@ void exit_thread(void)
 	kprobe_flush_task(me);
 
 	if (me->thread.io_bitmap_ptr) { 
+#ifndef CONFIG_X86_NO_TSS
 		struct tss_struct *tss = &per_cpu(init_tss, get_cpu());
+#endif
+#ifdef CONFIG_XEN
+		static physdev_op_t iobmp_op = {
+			.cmd = PHYSDEVOP_SET_IOBITMAP
+		};
+#endif
 
 		kfree(t->io_bitmap_ptr);
 		t->io_bitmap_ptr = NULL;
 		/*
 		 * Careful, clear this in the TSS too:
 		 */
+#ifndef CONFIG_X86_NO_TSS
 		memset(tss->io_bitmap, 0xff, t->io_bitmap_max);
-		t->io_bitmap_max = 0;
 		put_cpu();
+#endif
+#ifdef CONFIG_XEN
+		HYPERVISOR_physdev_op(&iobmp_op);
+#endif
+		t->io_bitmap_max = 0;
 	}
 }
 
@@ -463,7 +475,9 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	struct thread_struct *prev = &prev_p->thread,
 				 *next = &next_p->thread;
 	int cpu = smp_processor_id();  
+#ifndef CONFIG_X86_NO_TSS
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
+#endif
 	physdev_op_t iopl_op, iobmp_op;
 	multicall_entry_t _mcl[8], *mcl = _mcl;
 
@@ -482,10 +496,9 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	/*
 	 * Reload esp0, LDT and the page table pointer:
 	 */
-	tss->rsp0 = next->rsp0;
 	mcl->op      = __HYPERVISOR_stack_switch;
 	mcl->args[0] = __KERNEL_DS;
-	mcl->args[1] = tss->rsp0;
+	mcl->args[1] = next->rsp0;
 	mcl++;
 
 	/*

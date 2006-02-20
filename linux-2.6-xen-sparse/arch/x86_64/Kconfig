@@ -125,6 +125,11 @@ config X86_64_XEN
 	help
 	  This option will compile a kernel compatible with Xen hypervisor
 
+config X86_NO_TSS
+	bool
+	depends on X86_64_XEN
+	default y
+
 #
 # Define implied options from the CPU selection here
 #

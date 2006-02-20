@@ -152,6 +152,7 @@ static inline void set_tssldt_descriptor(void *ptr, unsigned long tss, unsigned 
 	memcpy(ptr, &d, 16); 
 }
 
+#ifndef CONFIG_X86_NO_TSS
 static inline void set_tss_desc(unsigned cpu, void *addr)
 { 
 	/*
@@ -165,6 +166,7 @@ static inline void set_tss_desc(unsigned cpu, void *addr)
 		(unsigned long)addr, DESC_TSS,
 		IO_BITMAP_OFFSET + IO_BITMAP_BYTES + sizeof(unsigned long) - 1);
 } 
+#endif
 
 static inline void set_ldt_desc(unsigned cpu, void *addr, int size)
 { 
