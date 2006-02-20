@@ -58,13 +58,6 @@ void ack_bad_irq(unsigned int irq)
 		ack_APIC_irq();
 }
 
-#ifdef CONFIG_XEN
-void switch_APIC_timer_to_ipi(void *cpumask) { }
-EXPORT_SYMBOL(switch_APIC_timer_to_ipi);
-void switch_ipi_to_APIC_timer(void *cpumask) { }
-EXPORT_SYMBOL(switch_ipi_to_APIC_timer);
-#endif
-
 int setup_profiling_timer(unsigned int multiplier)
 {
 	return -EINVAL;
