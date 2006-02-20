@@ -1,23 +1,11 @@
 
-#include <linux/config.h>
-
-.section __xen_guest
-	.ascii	"GUEST_OS=linux,GUEST_VER=2.6"
-	.ascii	",XEN_VER=xen-3.0"
-	.ascii	",VIRT_BASE=0xC0000000"
-	.ascii	",HYPERCALL_PAGE=0x104" /* __pa(hypercall_page) >> 12 */
-#ifdef CONFIG_X86_PAE
-	.ascii	",PAE=yes"
-#else
-	.ascii	",PAE=no"
-#endif
-	.ascii	",LOADER=generic"
-	.byte	0
 
 .text
+#include <linux/config.h>
 #include <linux/threads.h>
 #include <linux/linkage.h>
 #include <asm/segment.h>
+#include <asm/page.h>
 #include <asm/thread_info.h>
 #include <asm/asm-offsets.h>
 #include <xen/interface/arch-x86_32.h>
@@ -190,12 +178,47 @@ ENTRY(cpu_gdt_table)
 .org 0x3000
 ENTRY(default_ldt)
 
-.org 0x4000
+#define HYPERCALL_PAGE_OFFSET 0x4000
+.org HYPERCALL_PAGE_OFFSET
 ENTRY(hypercall_page)
+.skip 0x1000
 
-.org 0x5000
 /*
  * Real beginning of normal "text" segment
  */
 ENTRY(stext)
 ENTRY(_stext)
+
+
+/*
+ * __xen_guest information
+ */
+.macro bigutoa value
+	utoa (\value) >> 12
+	.ascii "000"
+.endm
+.macro utoa value
+ .if (\value) >= 16
+	utoa (\value) >> 4
+ .endif
+ .if (\value) % 16 < 10
+  .byte '0' + (\value) % 16
+ .else
+  .byte 'A' + (\value) % 16 - 10
+ .endif
+.endm
+
+.section __xen_guest
+	.ascii	"GUEST_OS=linux,GUEST_VER=2.6"
+	.ascii	",XEN_VER=xen-3.0"
+	.ascii	",VIRT_BASE=0x"
+		 bigutoa __PAGE_OFFSET
+	.ascii	",HYPERCALL_PAGE=0x"
+		utoa ((__PHYSICAL_START+HYPERCALL_PAGE_OFFSET)>>PAGE_SHIFT)
+#ifdef CONFIG_X86_PAE
+	.ascii	",PAE=yes"
+#else
+	.ascii	",PAE=no"
+#endif
+	.ascii	",LOADER=generic"
+	.byte	0
