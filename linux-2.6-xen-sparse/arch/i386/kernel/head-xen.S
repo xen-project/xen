@@ -94,19 +94,11 @@ ENTRY(stack_start)
 	.long init_thread_union+THREAD_SIZE
 	.long __BOOT_DS
 
-ready:	.byte 0
-
-.globl idt_descr
-.globl cpu_gdt_descr
-
 	ALIGN
-	.word 0				# 32-bit align idt_desc.address
-idt_descr:
-	.word IDT_ENTRIES*8-1		# idt contains 256 entries
-	.long idt_table
 
 # boot GDT descriptor (later on used by CPU#0):
 	.word 0				# 32 bit align gdt_desc.address
+	.globl cpu_gdt_descr
 cpu_gdt_descr:
 	.word GDT_SIZE
 	.long cpu_gdt_table

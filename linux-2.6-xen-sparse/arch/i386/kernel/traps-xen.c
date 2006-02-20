@@ -61,12 +61,14 @@ asmlinkage int system_call(void);
 /* Do we ignore FPU interrupts ? */
 char ignore_fpu_irq = 0;
 
+#ifndef CONFIG_X86_NO_IDT
 /*
  * The IDT has to be page-aligned to simplify the Pentium
  * F0 0F bug workaround.. We have a special link segment
  * for this.
  */
 struct desc_struct idt_table[256] __attribute__((__section__(".data.idt"))) = { {0, 0}, };
+#endif
 
 asmlinkage void divide_error(void);
 asmlinkage void debug(void);

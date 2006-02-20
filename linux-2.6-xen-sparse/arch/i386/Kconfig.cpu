@@ -251,7 +251,7 @@ config X86_PPRO_FENCE
 
 config X86_F00F_BUG
 	bool
-	depends on M586MMX || M586TSC || M586 || M486 || M386
+	depends on (M586MMX || M586TSC || M586 || M486 || M386) && !X86_NO_IDT
 	default y
 
 config X86_WP_WORKS_OK

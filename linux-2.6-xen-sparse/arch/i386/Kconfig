@@ -1186,6 +1186,11 @@ config X86_SYSENTER
 	depends on !X86_NO_TSS
 	default y
 
+config X86_NO_IDT
+	bool
+	depends on X86_XEN
+	default y
+
 config KTIME_SCALAR
 	bool
 	default y
