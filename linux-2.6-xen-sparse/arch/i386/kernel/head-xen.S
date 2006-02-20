@@ -33,7 +33,7 @@ ENTRY(startup_32_smp)
 	cld
 
 	/* Set up the stack pointer */
-	lss stack_start,%esp
+	movl $(init_thread_union+THREAD_SIZE),%esp
 
 checkCPUtype:
 
@@ -89,10 +89,6 @@ ENTRY(lgdt_finish)
 	pushl $(__KERNEL_CS)
 	pushl %eax
 	lret
-
-ENTRY(stack_start)
-	.long init_thread_union+THREAD_SIZE
-	.long __BOOT_DS
 
 	ALIGN
 
