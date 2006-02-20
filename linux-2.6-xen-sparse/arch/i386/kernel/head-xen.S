@@ -193,18 +193,14 @@ ENTRY(_stext)
 /*
  * __xen_guest information
  */
-.macro bigutoa value
-	utoa (\value) >> 12
-	.ascii "000"
-.endm
 .macro utoa value
- .if (\value) >= 16
-	utoa (\value) >> 4
+ .if (\value) < 0 || (\value) >= 0x10
+	utoa (((\value)>>4)&0x0fffffff)
  .endif
- .if (\value) % 16 < 10
-  .byte '0' + (\value) % 16
+ .if ((\value) & 0xf) < 10
+  .byte '0' + ((\value) & 0xf)
  .else
-  .byte 'A' + (\value) % 16 - 10
+  .byte 'A' + ((\value) & 0xf) - 10
  .endif
 .endm
 
@@ -212,7 +208,7 @@ ENTRY(_stext)
 	.ascii	"GUEST_OS=linux,GUEST_VER=2.6"
 	.ascii	",XEN_VER=xen-3.0"
 	.ascii	",VIRT_BASE=0x"
-		 bigutoa __PAGE_OFFSET
+		utoa __PAGE_OFFSET
 	.ascii	",HYPERCALL_PAGE=0x"
 		utoa ((__PHYSICAL_START+HYPERCALL_PAGE_OFFSET)>>PAGE_SHIFT)
 #ifdef CONFIG_X86_PAE
