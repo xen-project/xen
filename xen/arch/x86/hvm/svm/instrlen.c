@@ -2,17 +2,19 @@
  * instrlen.c - calculates the instruction length for all operating modes
  * 
  * Travis Betak, travis.betak@amd.com
- * Copyright (c) 2005 AMD
+ * Copyright (c) 2005,2006 AMD
+ * Copyright (c) 2005 Keir Fraser
  *
- * Essentially a very, very stripped version of Keir Fraser's work in 
- * x86_emulate.c.  Used primarily for MMIO.
+ * Essentially a very, very stripped version of Keir Fraser's work in
+ * x86_emulate.c.  Used for MMIO.
  */
 
 /*
- * TODO: the way in which we use svm_instrlen is very inefficient as is now 
- * stands.  it will be worth while to return the actual instruction buffer
- * along with the instruction length since we are getting the instruction length
- * so we know how much of the buffer we need to fetch.
+ * TODO: the way in which we use svm_instrlen is very inefficient as is now
+ * stands.  It will be worth while to return the actual instruction buffer
+ * along with the instruction length since one of the reasons we are getting
+ * the instruction length is to know how many instruction bytes we need to
+ * fetch.
  */
 
 #include <xen/config.h>
@@ -22,6 +24,11 @@
 #include <asm/regs.h>
 #define DPRINTF DPRINTK
 #include <asm-x86/x86_emulate.h>
+
+/* read from guest memory */
+extern int inst_copy_from_guest(unsigned char *buf, unsigned long eip,
+        int length);
+extern void svm_dump_inst(unsigned long eip);
 
 /*
  * Opcode effective-address decode tables.
@@ -33,98 +40,101 @@
  */
 
 /* Operand sizes: 8-bit operands or specified/overridden size. */
-#define BYTE_OP      (1<<0)  /* 8-bit operands. */
+#define ByteOp      (1<<0) /* 8-bit operands. */
 /* Destination operand type. */
-#define IMPLICIT_OPS (1<<1)  /* Implicit in opcode. No generic decode. */
-#define DST_REG      (2<<1)  /* Register operand. */
-#define DST_MEM      (3<<1)  /* Memory operand. */
-#define DST_MASK     (3<<1)
+#define ImplicitOps (1<<1) /* Implicit in opcode. No generic decode. */
+#define DstReg      (2<<1) /* Register operand. */
+#define DstMem      (3<<1) /* Memory operand. */
+#define DstMask     (3<<1)
 /* Source operand type. */
-#define SRC_NONE     (0<<3)  /* No source operand. */
-#define SRC_IMPLICIT (0<<3)  /* Source operand is implicit in the opcode. */
-#define SRC_REG      (1<<3)  /* Register operand. */
-#define SRC_MEM      (2<<3)  /* Memory operand. */
-#define SRC_IMM      (3<<3)  /* Immediate operand. */
-#define SRC_IMMBYTE  (4<<3)  /* 8-bit sign-extended immediate operand. */
-#define SRC_MASK     (7<<3)
-/* Generic MODRM decode. */
-#define MODRM       (1<<6)
+#define SrcNone     (0<<3) /* No source operand. */
+#define SrcImplicit (0<<3) /* Source operand is implicit in the opcode. */
+#define SrcReg      (1<<3) /* Register operand. */
+#define SrcMem      (2<<3) /* Memory operand. */
+#define SrcMem16    (3<<3) /* Memory operand (16-bit). */
+#define SrcMem32    (4<<3) /* Memory operand (32-bit). */
+#define SrcImm      (5<<3) /* Immediate operand. */
+#define SrcImmByte  (6<<3) /* 8-bit sign-extended immediate operand. */
+#define SrcMask     (7<<3)
+/* Generic ModRM decode. */
+#define ModRM       (1<<6)
 /* Destination is only written; never read. */
 #define Mov         (1<<7)
 
-static u8 opcode_table[256] = {
+static uint8_t opcode_table[256] = {
     /* 0x00 - 0x07 */
-    BYTE_OP | DST_MEM | SRC_REG | MODRM, DST_MEM | SRC_REG | MODRM,
-    BYTE_OP | DST_REG | SRC_MEM | MODRM, DST_REG | SRC_MEM | MODRM,
+    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
+    ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
     0, 0, 0, 0,
     /* 0x08 - 0x0F */
-    BYTE_OP | DST_MEM | SRC_REG | MODRM, DST_MEM | SRC_REG | MODRM,
-    BYTE_OP | DST_REG | SRC_MEM | MODRM, DST_REG | SRC_MEM | MODRM,
+    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
+    ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
     0, 0, 0, 0,
     /* 0x10 - 0x17 */
-    BYTE_OP | DST_MEM | SRC_REG | MODRM, DST_MEM | SRC_REG | MODRM,
-    BYTE_OP | DST_REG | SRC_MEM | MODRM, DST_REG | SRC_MEM | MODRM,
+    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
+    ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
     0, 0, 0, 0,
     /* 0x18 - 0x1F */
-    BYTE_OP | DST_MEM | SRC_REG | MODRM, DST_MEM | SRC_REG | MODRM,
-    BYTE_OP | DST_REG | SRC_MEM | MODRM, DST_REG | SRC_MEM | MODRM,
+    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
+    ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
     0, 0, 0, 0,
     /* 0x20 - 0x27 */
-    BYTE_OP | DST_MEM | SRC_REG | MODRM, DST_MEM | SRC_REG | MODRM,
-    BYTE_OP | DST_REG | SRC_MEM | MODRM, DST_REG | SRC_MEM | MODRM,
+    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
+    ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
     0, 0, 0, 0,
     /* 0x28 - 0x2F */
-    BYTE_OP | DST_MEM | SRC_REG | MODRM, DST_MEM | SRC_REG | MODRM,
-    BYTE_OP | DST_REG | SRC_MEM | MODRM, DST_REG | SRC_MEM | MODRM,
+    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
+    ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
     0, 0, 0, 0,
     /* 0x30 - 0x37 */
-    BYTE_OP | DST_MEM | SRC_REG | MODRM, DST_MEM | SRC_REG | MODRM,
-    BYTE_OP | DST_REG | SRC_MEM | MODRM, DST_REG | SRC_MEM | MODRM,
+    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
+    ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
     0, 0, 0, 0,
     /* 0x38 - 0x3F */
-    BYTE_OP | DST_MEM | SRC_REG | MODRM, DST_MEM | SRC_REG | MODRM,
-    BYTE_OP | DST_REG | SRC_MEM | MODRM, DST_REG | SRC_MEM | MODRM,
+    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
+    ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
     0, 0, 0, 0,
     /* 0x40 - 0x4F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x50 - 0x5F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x60 - 0x6F */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, DstReg|SrcMem32|ModRM|Mov /* movsxd (x86/64) */,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x70 - 0x7F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x80 - 0x87 */
-    BYTE_OP | DST_MEM | SRC_IMM | MODRM, DST_MEM | SRC_IMM | MODRM,
-    BYTE_OP | DST_MEM | SRC_IMM | MODRM, DST_MEM | SRC_IMMBYTE | MODRM,
-    BYTE_OP | DST_MEM | SRC_REG | MODRM, DST_MEM | SRC_REG | MODRM,
-    BYTE_OP | DST_MEM | SRC_REG | MODRM, DST_MEM | SRC_REG | MODRM,
+    ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImm|ModRM,
+    ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImmByte|ModRM,
+    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
+    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     /* 0x88 - 0x8F */
-    BYTE_OP | DST_MEM | SRC_REG | MODRM, DST_MEM | SRC_REG | MODRM,
-    BYTE_OP | DST_REG | SRC_MEM | MODRM, DST_REG | SRC_MEM | MODRM,
-    0, 0, 0, DST_MEM | SRC_NONE | MODRM | Mov,
+    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
+    ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
+    0, 0, 0, DstMem|SrcNone|ModRM|Mov,
     /* 0x90 - 0x9F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xA0 - 0xA7 */
-    BYTE_OP | DST_REG | SRC_MEM | Mov, DST_REG | SRC_MEM | Mov,
-    BYTE_OP | DST_MEM | SRC_REG | Mov, DST_MEM | SRC_REG | Mov,
-    BYTE_OP | IMPLICIT_OPS | Mov, IMPLICIT_OPS | Mov,
-    BYTE_OP | IMPLICIT_OPS, IMPLICIT_OPS,
+    ByteOp|DstReg|SrcMem|Mov, DstReg|SrcMem|Mov,
+    ByteOp|DstMem|SrcReg|Mov, DstMem|SrcReg|Mov,
+    ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
+    ByteOp|ImplicitOps, ImplicitOps,
     /* 0xA8 - 0xAF */
-    0, 0, BYTE_OP | IMPLICIT_OPS | Mov, IMPLICIT_OPS | Mov,
-    BYTE_OP | IMPLICIT_OPS | Mov, IMPLICIT_OPS | Mov,
-    BYTE_OP | IMPLICIT_OPS, IMPLICIT_OPS,
+    0, 0, ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
+    ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
+    ByteOp|ImplicitOps, ImplicitOps,
     /* 0xB0 - 0xBF */
-    SRC_IMMBYTE, SRC_IMMBYTE, SRC_IMMBYTE, SRC_IMMBYTE, 
-    SRC_IMMBYTE, SRC_IMMBYTE, SRC_IMMBYTE, SRC_IMMBYTE,
+    SrcImmByte, SrcImmByte, SrcImmByte, SrcImmByte, 
+    SrcImmByte, SrcImmByte, SrcImmByte, SrcImmByte, 
     0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xC0 - 0xC7 */
-    BYTE_OP | DST_MEM | SRC_IMM | MODRM, DST_MEM | SRC_IMMBYTE | MODRM, 0, 0,
-    0, 0, BYTE_OP | DST_MEM | SRC_IMM | MODRM, DST_MEM | SRC_IMM | MODRM,
+    ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImmByte|ModRM, 0, 0,
+    0, 0, ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImm|ModRM,
     /* 0xC8 - 0xCF */
     0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xD0 - 0xD7 */
-    BYTE_OP | DST_MEM | SRC_IMPLICIT | MODRM, DST_MEM | SRC_IMPLICIT | MODRM,
-    BYTE_OP | DST_MEM | SRC_IMPLICIT | MODRM, DST_MEM | SRC_IMPLICIT | MODRM,
+    ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM, 
+    ByteOp|DstMem|SrcImplicit|ModRM, DstMem|SrcImplicit|ModRM, 
     0, 0, 0, 0,
     /* 0xD8 - 0xDF */
     0, 0, 0, 0, 0, 0, 0, 0,
@@ -132,31 +142,31 @@ static u8 opcode_table[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xF0 - 0xF7 */
     0, 0, 0, 0,
-    0, 0, BYTE_OP | DST_MEM | SRC_NONE | MODRM, DST_MEM | SRC_NONE | MODRM,
+    0, 0, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM,
     /* 0xF8 - 0xFF */
     0, 0, 0, 0,
-    0, 0, BYTE_OP | DST_MEM | SRC_NONE | MODRM, DST_MEM | SRC_NONE | MODRM
+    0, 0, ByteOp|DstMem|SrcNone|ModRM, DstMem|SrcNone|ModRM
 };
 
-static u8 twobyte_table[256] = {
+static uint8_t twobyte_table[256] = {
     /* 0x00 - 0x0F */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, IMPLICIT_OPS | MODRM, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM, 0, 0,
     /* 0x10 - 0x1F */
-    0, 0, 0, 0, 0, 0, 0, 0, IMPLICIT_OPS | MODRM, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM, 0, 0, 0, 0, 0, 0, 0,
     /* 0x20 - 0x2F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x30 - 0x3F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x40 - 0x47 */
-    DST_REG | SRC_MEM | MODRM | Mov, DST_REG | SRC_MEM | MODRM | Mov,
-    DST_REG | SRC_MEM | MODRM | Mov, DST_REG | SRC_MEM | MODRM | Mov,
-    DST_REG | SRC_MEM | MODRM | Mov, DST_REG | SRC_MEM | MODRM | Mov,
-    DST_REG | SRC_MEM | MODRM | Mov, DST_REG | SRC_MEM | MODRM | Mov,
+    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
+    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
+    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
+    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
     /* 0x48 - 0x4F */
-    DST_REG | SRC_MEM | MODRM | Mov, DST_REG | SRC_MEM | MODRM | Mov,
-    DST_REG | SRC_MEM | MODRM | Mov, DST_REG | SRC_MEM | MODRM | Mov,
-    DST_REG | SRC_MEM | MODRM | Mov, DST_REG | SRC_MEM | MODRM | Mov,
-    DST_REG | SRC_MEM | MODRM | Mov, DST_REG | SRC_MEM | MODRM | Mov,
+    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
+    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
+    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
+    DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
     /* 0x50 - 0x5F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x60 - 0x6F */
@@ -168,20 +178,17 @@ static u8 twobyte_table[256] = {
     /* 0x90 - 0x9F */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xA0 - 0xA7 */
-    0, 0, 0, DST_MEM | SRC_REG | MODRM, 0, 0, 0, 0,
+    0, 0, 0, DstMem|SrcReg|ModRM, 0, 0, 0, 0, 
     /* 0xA8 - 0xAF */
-    0, 0, 0, DST_MEM | SRC_REG | MODRM, 0, 0, 0, 0,
+    0, 0, 0, DstMem|SrcReg|ModRM, 0, 0, 0, 0,
     /* 0xB0 - 0xB7 */
-    BYTE_OP | DST_MEM | SRC_REG | MODRM, DST_MEM | SRC_REG | MODRM, 0,
-    DST_MEM | SRC_REG | MODRM,
-    0, 0,
-    DST_REG | SRC_MEM | MODRM,
-    DST_REG | SRC_REG | MODRM,
-
+    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM, 0, DstMem|SrcReg|ModRM,
+    0, 0, ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
     /* 0xB8 - 0xBF */
-    0, 0, DST_MEM | SRC_IMMBYTE | MODRM, DST_MEM | SRC_REG | MODRM, 0, 0, 0, 0,
+    0, 0, DstMem|SrcImmByte|ModRM, DstMem|SrcReg|ModRM,
+    0, 0, ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
     /* 0xC0 - 0xCF */
-    0, 0, 0, 0, 0, 0, 0, IMPLICIT_OPS | MODRM, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xD0 - 0xDF */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xE0 - 0xEF */
@@ -189,11 +196,6 @@ static u8 twobyte_table[256] = {
     /* 0xF0 - 0xFF */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
-
-/* read from guest memory */
-extern int inst_copy_from_guest(unsigned char *buf, unsigned long eip,
-        int length);
-extern void svm_dump_inst(unsigned long eip);
 
 /* 
  * insn_fetch - fetch the next 1 to 4 bytes from instruction stream 
@@ -219,206 +221,250 @@ extern void svm_dump_inst(unsigned long eip);
     (_type)_x; \
 })
 
+
 /**
- * get_instruction_length - returns the current instructions length
+ * svn_instrlen - returns the current instructions length
  *
  * @regs: guest register state
- * @cr2:  target address
- * @ops:  guest memory operations
  * @mode: guest operating mode
  *
  * EXTERNAL this routine calculates the length of the current instruction
  * pointed to by eip.  The guest state is _not_ changed by this routine.
  */
-unsigned long svm_instrlen(struct cpu_user_regs *regs, int mode)
+int svm_instrlen(struct cpu_user_regs *regs, int mode)
 {
-    u8 b, d, twobyte = 0;
-    u8 modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
-    unsigned int op_bytes = (mode == 8) ? 4 : mode, ad_bytes = mode;
-    unsigned int i;
+    uint8_t b, d, twobyte = 0, rex_prefix = 0;
+    uint8_t modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
+    unsigned int op_bytes, ad_bytes, lock_prefix = 0, rep_prefix = 0, i;
     int rc = 0;
-    u32 length = 0;
-    u8 tmp;
+    int length = 0;
+    unsigned int tmp;
 
-    /* Copy the registers so we don't alter the guest's present state */
-    volatile struct cpu_user_regs _regs = *regs;
+    /* Shadow copy of register state. Committed on successful emulation. */
+    struct cpu_user_regs _regs = *regs;
 
-        /* Check for Real Mode */
-    if (mode == 2)
-        _regs.eip += (_regs.cs << 4); 
+    /* include CS for 16-bit modes */
+    if (mode == X86EMUL_MODE_REAL || mode == X86EMUL_MODE_PROT16)
+        _regs.eip += (_regs.cs << 4);
 
-    /* Legacy prefix check */
-    for (i = 0; i < 8; i++) {
-        switch (b = insn_fetch(u8, 1, _regs.eip, length)) {
-        case 0x66:  /* operand-size override */
-            op_bytes ^= 6;  /* switch between 2/4 bytes */
+    switch ( mode )
+    {
+    case X86EMUL_MODE_REAL:
+    case X86EMUL_MODE_PROT16:
+        op_bytes = ad_bytes = 2;
+        break;
+    case X86EMUL_MODE_PROT32:
+        op_bytes = ad_bytes = 4;
+        break;
+#ifdef __x86_64__
+    case X86EMUL_MODE_PROT64:
+        op_bytes = 4;
+        ad_bytes = 8;
+        break;
+#endif
+    default:
+        return -1;
+    }
+
+    /* Legacy prefixes. */
+    for ( i = 0; i < 8; i++ )
+    {
+        switch ( b = insn_fetch(uint8_t, 1, _regs.eip, length) )
+        {
+        case 0x66: /* operand-size override */
+            op_bytes ^= 6;      /* switch between 2/4 bytes */
             break;
-        case 0x67:  /* address-size override */
-            ad_bytes ^= (mode == 8) ? 12 : 6; /* 2/4/8 bytes */
+        case 0x67: /* address-size override */
+            if ( mode == X86EMUL_MODE_PROT64 )
+                ad_bytes ^= 12; /* switch between 4/8 bytes */
+            else
+                ad_bytes ^= 6;  /* switch between 2/4 bytes */
             break;
-        case 0x2e:  /* CS override */
-        case 0x3e:  /* DS override */
-        case 0x26:  /* ES override */
-        case 0x64:  /* FS override */
-        case 0x65:  /* GS override */
-        case 0x36:  /* SS override */
-        case 0xf0:  /* LOCK */
-        case 0xf3:  /* REP/REPE/REPZ */
-        case 0xf2:  /* REPNE/REPNZ */
+        case 0x2e: /* CS override */
+        case 0x3e: /* DS override */
+        case 0x26: /* ES override */
+        case 0x64: /* FS override */
+        case 0x65: /* GS override */
+        case 0x36: /* SS override */
+            break;
+        case 0xf0: /* LOCK */
+            lock_prefix = 1;
+            break;
+        case 0xf3: /* REP/REPE/REPZ */
+            rep_prefix = 1;
+            break;
+        case 0xf2: /* REPNE/REPNZ */
             break;
         default:
             goto done_prefixes;
         }
     }
-
 done_prefixes:
 
-    /* REX prefix check */
-    if ((mode == 8) && ((b & 0xf0) == 0x40))
+    /* Note quite the same as 80386 real mode, but hopefully good enough. */
+    if ( (mode == X86EMUL_MODE_REAL) && (ad_bytes != 2) ) {
+        printf("sonofabitch!! we don't support 32-bit addresses in realmode\n");
+        goto cannot_emulate;
+    }
+
+    /* REX prefix. */
+    if ( (mode == X86EMUL_MODE_PROT64) && ((b & 0xf0) == 0x40) )
     {
-        if (b & 8)
-            op_bytes = 8;   /* REX.W */
-        modrm_reg = (b & 4) << 1;   /* REX.R */
+        rex_prefix = b;
+        if ( b & 8 )
+            op_bytes = 8;          /* REX.W */
+        modrm_reg = (b & 4) << 1;  /* REX.R */
         /* REX.B and REX.X do not need to be decoded. */
-        b = insn_fetch(u8, 1, _regs.eip, length);
+        b = insn_fetch(uint8_t, 1, _regs.eip, length);
     }
 
     /* Opcode byte(s). */
     d = opcode_table[b];
-    if (d == 0) 
+    if ( d == 0 )
     {
         /* Two-byte opcode? */
-        if (b == 0x0f) {
+        if ( b == 0x0f )
+        {
             twobyte = 1;
-            b = insn_fetch(u8, 1, _regs.eip, length);
+            b = insn_fetch(uint8_t, 1, _regs.eip, length);
             d = twobyte_table[b];
         }
 
         /* Unrecognised? */
-        if (d == 0)
+        if ( d == 0 )
             goto cannot_emulate;
     }
 
-    /* MODRM and SIB bytes. */
-    if (d & MODRM) 
+    /* ModRM and SIB bytes. */
+    if ( d & ModRM )
     {
-        modrm = insn_fetch(u8, 1, _regs.eip, length);
+        modrm = insn_fetch(uint8_t, 1, _regs.eip, length);
         modrm_mod |= (modrm & 0xc0) >> 6;
         modrm_reg |= (modrm & 0x38) >> 3;
-        modrm_rm |= (modrm & 0x07);
-        switch (modrm_mod) 
+        modrm_rm  |= (modrm & 0x07);
+
+        if ( modrm_mod == 3 )
         {
-        case 0:
-            if ((modrm_rm == 4) &&
-                (((insn_fetch(u8, 1, _regs.eip,
-                      length)) & 7) == 5)) 
-            {
-                length += 4;
-                _regs.eip += 4; /* skip SIB.base disp32 */
-            } 
-            else if (modrm_rm == 5) 
-            {
-                length += 4;
-                _regs.eip += 4; /* skip disp32 */
-            }
-            break;
-        case 1:
-            if (modrm_rm == 4) 
-            {
-                insn_fetch(u8, 1, _regs.eip, length);
-            }
-            length += 1;
-            _regs.eip += 1; /* skip disp8 */
-            break;
-        case 2:
-            if (modrm_rm == 4)
-            {
-                insn_fetch(u8, 1, _regs.eip, length);
-            }
-            length += 4;
-            _regs.eip += 4; /* skip disp32 */
-            break;
-        case 3:
             DPRINTF("Cannot parse ModRM.mod == 3.\n");
             goto cannot_emulate;
+        }
+
+        if ( ad_bytes == 2 )
+        {
+            /* 16-bit ModR/M decode. */
+            switch ( modrm_mod )
+            {
+            case 0:
+                if ( modrm_rm == 6 ) 
+                {
+                    length += 2;
+                    _regs.eip += 2; /* skip disp16 */
+                }
+                break;
+            case 1:
+                length += 1;
+                _regs.eip += 1; /* skip disp8 */
+                break;
+            case 2:
+                length += 2;
+                _regs.eip += 2; /* skip disp16 */
+                break;
+            }
+        }
+        else
+        {
+            /* 32/64-bit ModR/M decode. */
+            switch ( modrm_mod )
+            {
+            case 0:
+                if ( (modrm_rm == 4) && 
+                     (((insn_fetch(uint8_t, 1, _regs.eip, length)) & 7) 
+                        == 5) )
+                {
+                    length += 4;
+                    _regs.eip += 4; /* skip disp32 specified by SIB.base */
+                }
+                else if ( modrm_rm == 5 )
+                {
+                    length += 4;
+                    _regs.eip += 4; /* skip disp32 */
+                }
+                break;
+            case 1:
+                if ( modrm_rm == 4 )
+                {
+                    insn_fetch(uint8_t, 1, _regs.eip, length);
+                }
+                length += 1;
+                _regs.eip += 1; /* skip disp8 */
+                break;
+            case 2:
+                if ( modrm_rm == 4 )
+                {
+                    insn_fetch(uint8_t, 1, _regs.eip, length);
+                }
+                length += 4;
+                _regs.eip += 4; /* skip disp32 */
+                break;
+            }
         }
     }
 
     /* Decode and fetch the destination operand: register or memory. */
-    switch (d & DST_MASK) 
+    switch ( d & DstMask )
     {
-    case IMPLICIT_OPS:
+    case ImplicitOps:
         /* Special instructions do their own operand decoding. */
         goto done;
     }
 
-    /* Decode and fetch the source operand: register, memory or immediate */
-    switch (d & SRC_MASK) 
+    /* Decode and fetch the source operand: register, memory or immediate. */
+    switch ( d & SrcMask )
     {
-    case SRC_IMM:
-        tmp = (d & BYTE_OP) ? 1 : op_bytes;
-        if (tmp == 8)
-            tmp = 4;
+    case SrcImm:
+        tmp = (d & ByteOp) ? 1 : op_bytes;
+        if ( tmp == 8 ) tmp = 4;
         /* NB. Immediates are sign-extended as necessary. */
-        switch (tmp) {
-        case 1:
-            insn_fetch(s8, 1, _regs.eip, length);
-            break;
-        case 2:
-            insn_fetch(s16, 2, _regs.eip, length);
-            break;
-        case 4:
-            insn_fetch(s32, 4, _regs.eip, length);
-            break;
+        switch ( tmp )
+        {
+        case 1: insn_fetch(int8_t,  1, _regs.eip, length); break;
+        case 2: insn_fetch(int16_t, 2, _regs.eip, length); break;
+        case 4: insn_fetch(int32_t, 4, _regs.eip, length); break;
         }
         break;
-    case SRC_IMMBYTE:
-        insn_fetch(s8, 1, _regs.eip, length);
+    case SrcImmByte:
+        insn_fetch(int8_t,  1, _regs.eip, length);
         break;
     }
 
-    if (twobyte)
+    if ( twobyte )
         goto done;
 
-    switch (b) 
+    switch ( b )
     {
-    case 0xa0:
-    case 0xa1:      /* mov */
+    case 0xa0 ... 0xa1: /* mov */
         length += ad_bytes;
-        _regs.eip += ad_bytes;  /* skip src displacement */
+        _regs.eip += ad_bytes; /* skip src displacement */
         break;
-    case 0xa2:
-    case 0xa3:      /* mov */
+    case 0xa2 ... 0xa3: /* mov */
         length += ad_bytes;
-        _regs.eip += ad_bytes;  /* skip dst displacement */
+        _regs.eip += ad_bytes; /* skip dst displacement */
         break;
-    case 0xf6:
-    case 0xf7:      /* Grp3 */
-        switch (modrm_reg) 
+    case 0xf6 ... 0xf7: /* Grp3 */
+        switch ( modrm_reg )
         {
-        case 0:
-        case 1: /* test */
-            /* 
-             * Special case in Grp3: test has an 
-             * immediate source operand. 
-             */
-            tmp = (d & BYTE_OP) ? 1 : op_bytes;
-            if (tmp == 8)
-                tmp = 4;
-            switch (tmp) 
+        case 0 ... 1: /* test */
+            /* Special case in Grp3: test has an immediate source operand. */
+            tmp = (d & ByteOp) ? 1 : op_bytes;
+            if ( tmp == 8 ) tmp = 4;
+            switch ( tmp )
             {
-            case 1:
-                insn_fetch(s8, 1, _regs.eip, length);
-                break;
-            case 2:
-                insn_fetch(s16, 2, _regs.eip, length);
-                break;
-            case 4:
-                insn_fetch(s32, 4, _regs.eip, length);
-                break;
+            case 1: insn_fetch(int8_t,  1, _regs.eip, length); break;
+            case 2: insn_fetch(int16_t, 2, _regs.eip, length); break;
+            case 4: insn_fetch(int32_t, 4, _regs.eip, length); break;
             }
             goto done;
-        }
+	}
         break;
     }
 
@@ -429,5 +475,5 @@ cannot_emulate:
     DPRINTF("Cannot emulate %02x at address %lx (eip %lx, mode %d)\n",
             b, (unsigned long)_regs.eip, (unsigned long)regs->eip, mode);
     svm_dump_inst(_regs.eip);
-    return (unsigned long)-1;
+    return -1;
 }
