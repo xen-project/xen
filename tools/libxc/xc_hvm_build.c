@@ -192,11 +192,7 @@ static int setup_guest(int xc_handle,
     xc_mmu_t *mmu = NULL;
     int rc;
 
-    unsigned long nr_pt_pages;
-
     struct domain_setup_info dsi;
-    unsigned long vpt_start;
-    unsigned long vpt_end;
     unsigned long v_end;
 
     unsigned long shared_page_frame = 0;
@@ -216,20 +212,10 @@ static int setup_guest(int xc_handle,
     /* memsize is in megabytes */
     v_end              = (unsigned long)memsize << 20;
 
-#ifdef __i386__
-    nr_pt_pages = 1 + ((memsize + 3) >> 2);
-#else
-    nr_pt_pages = 5 + ((memsize + 1) >> 1);
-#endif
-    vpt_start   = v_end;
-    vpt_end     = vpt_start + (nr_pt_pages * PAGE_SIZE);
-
     printf("VIRTUAL MEMORY ARRANGEMENT:\n"
            " Loaded HVM loader: %08lx->%08lx\n"
-           " Page tables:   %08lx->%08lx\n"
            " TOTAL:         %08lx->%08lx\n",
            dsi.v_kernstart, dsi.v_kernend,
-           vpt_start, vpt_end,
            dsi.v_start, v_end);
     printf(" ENTRY ADDRESS: %08lx\n", dsi.v_kernentry);
 

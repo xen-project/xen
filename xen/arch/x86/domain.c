@@ -398,12 +398,15 @@ int arch_set_info_guest(
     if ( v->vcpu_id == 0 )
         d->vm_assist = c->vm_assist;
 
-    phys_basetab = c->ctrlreg[3];
-    phys_basetab =
-        (gmfn_to_mfn(d, phys_basetab >> PAGE_SHIFT) << PAGE_SHIFT) |
-        (phys_basetab & ~PAGE_MASK);
+    if ( !(c->flags & VGCF_HVM_GUEST) )
+    {
+        phys_basetab = c->ctrlreg[3];
+        phys_basetab =
+            (gmfn_to_mfn(d, phys_basetab >> PAGE_SHIFT) << PAGE_SHIFT) |
+            (phys_basetab & ~PAGE_MASK);
 
-    v->arch.guest_table = mk_pagetable(phys_basetab);
+        v->arch.guest_table = mk_pagetable(phys_basetab);
+    }
 
     if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
         return rc;
@@ -428,9 +431,6 @@ int arch_set_info_guest(
 
     if ( c->flags & VGCF_HVM_GUEST )
     {
-        /* HVM uses the initially provided page tables as the P2M map. */
-        if ( !pagetable_get_paddr(d->arch.phys_table) )
-            d->arch.phys_table = v->arch.guest_table;
         v->arch.guest_table = mk_pagetable(0);
 
         if ( !hvm_initialize_guest_resources(v) )
