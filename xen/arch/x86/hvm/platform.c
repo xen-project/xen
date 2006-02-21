@@ -760,12 +760,12 @@ static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,
 
 void handle_mmio(unsigned long va, unsigned long gpa)
 {
-    unsigned long inst_len, inst_addr;
+    unsigned long inst_addr;
     struct mmio_op *mmio_opp;
     struct cpu_user_regs *regs;
     struct instruction mmio_inst;
     unsigned char inst[MAX_INST_LEN];
-    int i, realmode, ret;
+    int i, realmode, ret, inst_len;
     struct vcpu *v = current;
 
     mmio_opp = &v->arch.hvm_vcpu.mmio_op;
@@ -795,7 +795,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
 
     if (hvm_decode(realmode, inst, &mmio_inst) == DECODE_failure) {
         printf("handle_mmio: failed to decode instruction\n");
-        printf("mmio opcode: va 0x%lx, gpa 0x%lx, len %ld:",
+        printf("mmio opcode: va 0x%lx, gpa 0x%lx, len %d:",
                va, gpa, inst_len);
         for (i = 0; i < inst_len; i++)
             printf(" %02x", inst[i] & 0xFF);
