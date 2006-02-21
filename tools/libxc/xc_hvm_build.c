@@ -137,7 +137,7 @@ set_hvm_info_checksum(struct hvm_info_table *t)
  */
 static int set_hvm_info(int xc_handle, uint32_t dom,
                         unsigned long *pfn_list, unsigned int vcpus,
-                        unsigned int acpi, unsigned int apic)
+                        unsigned int pae, unsigned int acpi, unsigned int apic)
 {
     char *va_map;
     struct hvm_info_table *va_hvm;
@@ -159,6 +159,7 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
     va_hvm->length       = sizeof(struct hvm_info_table);
     va_hvm->acpi_enabled = acpi;
     va_hvm->apic_enabled = apic;
+    va_hvm->pae_enabled  = pae;
     va_hvm->nr_vcpus     = vcpus;
 
     set_hvm_info_checksum(va_hvm);
@@ -176,7 +177,8 @@ static int setup_guest(int xc_handle,
                        unsigned long shared_info_frame,
                        unsigned int control_evtchn,
                        unsigned int vcpus,
-		       unsigned int acpi,
+                       unsigned int pae,
+                       unsigned int acpi,
                        unsigned int apic,
                        unsigned int store_evtchn,
                        unsigned long *store_mfn)
@@ -265,7 +267,7 @@ static int setup_guest(int xc_handle,
             goto error_out;
     }
 
-    if ( set_hvm_info(xc_handle, dom, page_array, vcpus, acpi, apic) ) {
+    if ( set_hvm_info(xc_handle, dom, page_array, vcpus, pae, acpi, apic) ) {
         fprintf(stderr, "Couldn't set hvm info for HVM guest.\n");
         goto error_out;
     }
@@ -345,7 +347,8 @@ int xc_hvm_build(int xc_handle,
                  const char *image_name,
                  unsigned int control_evtchn,
                  unsigned int vcpus,
-		 unsigned int acpi,
+                 unsigned int pae,
+                 unsigned int acpi,
                  unsigned int apic,
                  unsigned int store_evtchn,
                  unsigned long *store_mfn)
@@ -400,7 +403,7 @@ int xc_hvm_build(int xc_handle,
     ctxt->flags = VGCF_HVM_GUEST;
     if ( setup_guest(xc_handle, domid, memsize, image, image_size, nr_pages,
                      ctxt, op.u.getdomaininfo.shared_info_frame, control_evtchn,
-                     vcpus, acpi, apic, store_evtchn, store_mfn) < 0)
+                     vcpus, pae, acpi, apic, store_evtchn, store_mfn) < 0)
     {
         ERROR("Error constructing guest OS");
         goto error_out;

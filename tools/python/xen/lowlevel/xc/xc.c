@@ -366,20 +366,21 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     int control_evtchn, store_evtchn;
     int memsize;
     int vcpus = 1;
+    int pae  = 0;
     int acpi = 0;
     int apic = 0;
     unsigned long store_mfn = 0;
 
     static char *kwd_list[] = { "dom", "control_evtchn", "store_evtchn",
-				"memsize", "image", "vcpus", "acpi", "apic",
+				"memsize", "image", "vcpus", "pae", "acpi", "apic",
 				NULL };
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiisiii", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiisiiii", kwd_list,
                                       &dom, &control_evtchn, &store_evtchn,
-				      &memsize, &image, &vcpus, &acpi, &apic) )
+				      &memsize, &image, &vcpus, &pae, &acpi, &apic) )
         return NULL;
 
     if ( xc_hvm_build(self->xc_handle, dom, memsize, image, control_evtchn,
-		      vcpus, acpi, apic, store_evtchn, &store_mfn) != 0 )
+		      vcpus, pae, acpi, apic, store_evtchn, &store_mfn) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return Py_BuildValue("{s:i}", "store_mfn", store_mfn);

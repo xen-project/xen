@@ -30,6 +30,9 @@ name = "ExampleHVMDomain"
 # the number of cpus guest platform has, default=1
 #vcpus=1
 
+# enable/disable HVM guest PAE, default=0 (disabled)
+#pae=0
+
 # enable/disable HVM guest ACPI, default=0 (disabled)
 #acpi=0
 

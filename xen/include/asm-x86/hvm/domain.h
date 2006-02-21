@@ -34,6 +34,7 @@ struct hvm_domain {
     unsigned long          shared_page_va;
     unsigned int           nr_vcpus;
     unsigned int           apic_enabled;
+    unsigned int           pae_enabled;
 
     struct hvm_virpit      vpit;
     struct hvm_virpic      vpic;

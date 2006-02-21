@@ -40,7 +40,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, 
                      unsigned long nr_pfns, unsigned int store_evtchn, 
                      unsigned long *store_mfn, unsigned int console_evtchn,
-		     unsigned long *console_mfn);
+                     unsigned long *console_mfn);
 
 int xc_linux_build(int xc_handle,
                    uint32_t domid,
@@ -59,6 +59,7 @@ int xc_hvm_build(int xc_handle,
                  const char *image_name,
                  unsigned int control_evtchn,
                  unsigned int vcpus,
+                 unsigned int pae,
                  unsigned int acpi,
                  unsigned int apic,
                  unsigned int store_evtchn,

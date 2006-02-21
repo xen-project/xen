@@ -161,6 +161,10 @@ gopts.var('cpus', val='CPUS',
           fn=set_int, default=None,
           use="CPUS to run the domain on.")
 
+gopts.var('pae', val='PAE',
+          fn=set_int, default=0,
+          use="Disable or enable PAE of HVM domain.")
+
 gopts.var('acpi', val='ACPI',
           fn=set_int, default=0,
           use="Disable or enable ACPI of HVM domain.")
@@ -545,7 +549,7 @@ def configure_vifs(config_devs, vals):
 def configure_hvm(config_image, vals):
     """Create the config for HVM devices.
     """
-    args = [ 'device_model', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
+    args = [ 'device_model', 'pae', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'audio',
              'vnc', 'vncviewer', 'sdl', 'display', 'ne2000', 'acpi', 'apic',
              'xauthority' ]

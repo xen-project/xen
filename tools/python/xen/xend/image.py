@@ -191,8 +191,8 @@ class HVMImageHandler(ImageHandler):
         ImageHandler.configure(self, imageConfig, deviceConfig)
 
         info = xc.xeninfo()
-	if not 'hvm' in info['xen_caps']:
-	    raise VmError("Not an HVM capable platform, we stop creating!")
+        if not 'hvm' in info['xen_caps']:
+            raise VmError("Not an HVM capable platform, we stop creating!")
 
         self.dmargs = self.parseDeviceModelArgs(imageConfig, deviceConfig)
         self.device_model = sxp.child_value(imageConfig, 'device_model')
@@ -209,6 +209,8 @@ class HVMImageHandler(ImageHandler):
         self.pid = 0
 
         self.dmargs += self.configVNC(imageConfig)
+
+        self.pae  = int(sxp.child_value(imageConfig, 'pae', 0))
 
         self.acpi = int(sxp.child_value(imageConfig, 'acpi', 0))
         self.apic = int(sxp.child_value(imageConfig, 'apic', 0))
@@ -227,6 +229,7 @@ class HVMImageHandler(ImageHandler):
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
+        log.debug("pae            = %d", self.pae)
         log.debug("acpi           = %d", self.acpi)
         log.debug("apic           = %d", self.apic)
 
@@ -238,6 +241,7 @@ class HVMImageHandler(ImageHandler):
                             store_evtchn   = store_evtchn,
                             memsize        = self.vm.getMemoryTarget() / 1024,
                             vcpus          = self.vm.getVCpuCount(),
+                            pae            = self.pae,
                             acpi           = self.acpi,
                             apic           = self.apic)
 

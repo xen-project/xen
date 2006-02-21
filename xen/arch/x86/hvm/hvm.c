@@ -175,10 +175,12 @@ static void hvm_get_info(struct domain *d)
     if ( validate_hvm_info(t) ) {
         d->arch.hvm_domain.nr_vcpus = t->nr_vcpus;
         d->arch.hvm_domain.apic_enabled = t->apic_enabled;
+        d->arch.hvm_domain.pae_enabled = t->pae_enabled;
     } else {
         printk("Bad hvm info table\n");
         d->arch.hvm_domain.nr_vcpus = 1;
         d->arch.hvm_domain.apic_enabled = 0;
+        d->arch.hvm_domain.pae_enabled = 0;
     }
 
     unmap_domain_page(p);
