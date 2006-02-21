@@ -25,6 +25,7 @@
 #include <xen/tpmfe.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
+#include <linux/platform_device.h>
 #include "tpm.h"
 
 /* read status bits */
@@ -455,9 +456,7 @@ static struct tpm_vendor_specific tpm_xen = {
 	.buffersize = 64 * 1024,
 };
 
-static struct device tpm_device = {
-	.bus_id = "vtpm",
-};
+static struct platform_device *pdev;
 
 static struct tpmfe_device tpmfe = {
 	.receive = tpm_recv,
@@ -477,23 +476,22 @@ static int __init init_xen(void)
 	 * driver
 	 */
 	if ((rc = tpm_fe_register_receiver(&tpmfe)) < 0) {
-		return rc;
+		goto err_exit;
 	}
 
 	/*
 	 * Register our device with the system.
 	 */
-	if ((rc = device_register(&tpm_device)) < 0) {
-		tpm_fe_unregister_receiver();
-		return rc;
+	pdev = platform_device_register_simple("tpm_vtpm", -1, NULL, 0);
+	if (IS_ERR(pdev)) {
+		rc = PTR_ERR(pdev);
+		goto err_unreg_fe;
 	}
 
 	tpm_xen.buffersize = tpmfe.max_tx_size;
 
-	if ((rc = tpm_register_hardware(&tpm_device, &tpm_xen)) < 0) {
-		device_unregister(&tpm_device);
-		tpm_fe_unregister_receiver();
-		return rc;
+	if ((rc = tpm_register_hardware(&pdev->dev, &tpm_xen)) < 0) {
+		goto err_unreg_pdev;
 	}
 
 	dataex.current_request = NULL;
@@ -508,13 +506,25 @@ static int __init init_xen(void)
 	disconnect_time = jiffies;
 
 	return 0;
+
+
+err_unreg_pdev:
+	platform_device_unregister(pdev);
+err_unreg_fe:
+	tpm_fe_unregister_receiver();
+
+err_exit:
+	return rc;
 }
 
 static void __exit cleanup_xen(void)
 {
-	tpm_remove_hardware(&tpm_device);
-	device_unregister(&tpm_device);
-	tpm_fe_unregister_receiver();
+	struct tpm_chip *chip = dev_get_drvdata(&pdev->dev);
+	if (chip) {
+		tpm_remove_hardware(chip->dev);
+		platform_device_unregister(pdev);
+		tpm_fe_unregister_receiver();
+	}
 }
 
 module_init(init_xen);

@@ -173,6 +173,7 @@ function validate_entry () {
 	local vmname=$1
 	local inst=$2
 	local res
+
 	res=`cat $VTPMDB |             \
 	     gawk -vvmname=$vmname     \
 	          -vinst=$inst         \
@@ -238,6 +239,9 @@ function vtpm_create_instance () {
 	local res
 	set +e
 	get_create_reason
+
+	claim_lock vtpmdb
+
 	find_instance $domname
 	res=$?
 	if [ $res -eq 0 ]; then
@@ -262,6 +266,9 @@ function vtpm_create_instance () {
 			vtpm_create $instance
 		fi
 	fi
+
+	release_lock vtpmdb
+
 	if [ "$REASON" == "create" ]; then
 		vtpm_reset $instance
 	elif [ "$REASON" == "resume" ]; then
@@ -292,3 +299,5 @@ function vtpm_remove_instance () {
 	fi
 	set -e
 }
+
+

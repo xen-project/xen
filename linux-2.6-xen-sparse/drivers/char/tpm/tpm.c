@@ -53,7 +53,7 @@ static void timeout_work(void * ptr)
 
 	down(&chip->buffer_mutex);
 	atomic_set(&chip->data_pending, 0);
-	memset(chip->data_buffer, 0, chip->vendor->buffersize);
+	memset(chip->data_buffer, 0, get_chip_buffersize(chip));
 	up(&chip->buffer_mutex);
 }
 
@@ -352,7 +352,7 @@ int tpm_open(struct inode *inode, struct file *file)
 
 	spin_unlock(&driver_lock);
 
-	chip->data_buffer = kmalloc(chip->vendor->buffersize * sizeof(u8), GFP_KERNEL);
+	chip->data_buffer = kmalloc(get_chip_buffersize(chip) * sizeof(u8), GFP_KERNEL);
 	if (chip->data_buffer == NULL) {
 		chip->num_opens--;
 		put_device(chip->dev);
@@ -400,8 +400,8 @@ ssize_t tpm_write(struct file *file, const char __user *buf,
 
 	down(&chip->buffer_mutex);
 
-	if (in_size > chip->vendor->buffersize)
-		in_size = chip->vendor->buffersize;
+	if (in_size > get_chip_buffersize(chip))
+		in_size = get_chip_buffersize(chip);
 
 	if (copy_from_user
 	    (chip->data_buffer, (void __user *) buf, in_size)) {
@@ -411,7 +411,7 @@ ssize_t tpm_write(struct file *file, const char __user *buf,
 
 	/* atomic tpm command send and result receive */
 	out_size = tpm_transmit(chip, chip->data_buffer, 
-	                        chip->vendor->buffersize);
+	                        get_chip_buffersize(chip));
 
 	atomic_set(&chip->data_pending, out_size);
 	atomic_set(&chip->data_position, 0);
@@ -432,8 +432,6 @@ ssize_t tpm_read(struct file * file, char __user *buf,
 	int ret_size;
 	int pos, pending = 0;
 
-	del_singleshot_timer_sync(&chip->user_read_timer);
-	flush_scheduled_work();
 	ret_size = atomic_read(&chip->data_pending);
 	if (ret_size > 0) {	/* relay data */
 		if (size < ret_size)
@@ -457,6 +455,7 @@ ssize_t tpm_read(struct file * file, char __user *buf,
 	if ( ret_size <= 0 || pending == 0 ) {
 		atomic_set( &chip->data_pending, 0 );
 		del_singleshot_timer_sync(&chip->user_read_timer);
+		flush_scheduled_work();
 	}
 
 	return ret_size;

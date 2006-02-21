@@ -66,8 +66,6 @@ static int  packet_read_shmem(struct packet *pak,
                               u32 left);
 
 
-#define MAX_PENDING_REQS TPMIF_TX_RING_SIZE
-
 #define MIN(x,y)  (x) < (y) ? (x) : (y)
 
 
@@ -972,8 +970,6 @@ static void processing_timeout(unsigned long ptr)
 
 static void tpm_tx_action(unsigned long unused);
 static DECLARE_TASKLET(tpm_tx_tasklet, tpm_tx_action, 0);
-
-#define MAX_PENDING_REQS TPMIF_TX_RING_SIZE
 
 static struct list_head tpm_schedule_list;
 static spinlock_t tpm_schedule_list_lock;

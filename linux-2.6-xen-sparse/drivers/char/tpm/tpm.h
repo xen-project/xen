@@ -101,6 +101,11 @@ static inline void tpm_write_index(int base, int index, int value)
 	outb(value & 0xFF, base+1);
 }
 
+static inline u32 get_chip_buffersize(struct tpm_chip *chip)
+{
+	return chip->vendor->buffersize;
+}
+
 extern int tpm_register_hardware(struct device *,
 				 struct tpm_vendor_specific *);
 extern int tpm_open(struct inode *, struct file *);
