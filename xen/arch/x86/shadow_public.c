@@ -59,12 +59,21 @@ fail:
 
 void shadow_direct_map_clean(struct vcpu *v)
 {
+    unsigned long mfn;
+    struct domain *d = v->domain;
     l2_pgentry_t *l2e;
     l3_pgentry_t *l3e;
     int i, j;
 
-    l3e = (l3_pgentry_t *)map_domain_page(
-        pagetable_get_pfn(v->domain->arch.phys_table));
+    mfn = pagetable_get_pfn(d->arch.phys_table);
+
+    /*
+     * We may fail very early before direct map is built.
+     */
+    if ( !mfn )
+        return;
+
+    l3e = (l3_pgentry_t *)map_domain_page(mfn);
 
     for ( i = 0; i < PAE_L3_PAGETABLE_ENTRIES; i++ )
     {
@@ -81,12 +90,11 @@ void shadow_direct_map_clean(struct vcpu *v)
             free_domheap_page(mfn_to_page(l3e_get_pfn(l3e[i])));
         }
     }
-
-    free_domheap_page(
-        mfn_to_page(pagetable_get_pfn(v->domain->arch.phys_table)));
+    free_domheap_page(mfn_to_page(mfn));
 
     unmap_domain_page(l3e);
-    v->domain->arch.phys_table = mk_pagetable(0);
+
+    d->arch.phys_table = mk_pagetable(0);
 }
 
 /****************************************************************************/

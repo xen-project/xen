@@ -1110,22 +1110,30 @@ fail:
 void shadow_direct_map_clean(struct vcpu *v)
 {
     int i;
+    unsigned long mfn;
+    struct domain *d = v->domain;
     l2_pgentry_t *l2e;
 
-    l2e = map_domain_page(
-      pagetable_get_pfn(v->domain->arch.phys_table));
+    mfn =  pagetable_get_pfn(d->arch.phys_table);
+
+    /*
+     * We may fail very early before direct map is built.
+     */
+    if ( !mfn )
+        return;
+
+    l2e = map_domain_page(mfn);
 
     for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
     {
         if ( l2e_get_flags(l2e[i]) & _PAGE_PRESENT )
             free_domheap_page(mfn_to_page(l2e_get_pfn(l2e[i])));
     }
-
-    free_domheap_page(
-            mfn_to_page(pagetable_get_pfn(v->domain->arch.phys_table)));
+    free_domheap_page(mfn_to_page(mfn));
 
     unmap_domain_page(l2e);
-    v->domain->arch.phys_table = mk_pagetable(0);
+
+    d->arch.phys_table = mk_pagetable(0);
 }
 
 int __shadow_mode_enable(struct domain *d, unsigned int mode)
