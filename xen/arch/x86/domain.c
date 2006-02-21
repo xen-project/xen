@@ -610,9 +610,6 @@ static void save_segments(struct vcpu *v)
     struct cpu_user_regs      *regs = &ctxt->user_regs;
     unsigned int dirty_segment_mask = 0;
 
-    if ( HVM_DOMAIN(v) )
-        hvm_save_segments(v);
-
     regs->ds = read_segment_register(ds);
     regs->es = read_segment_register(es);
     regs->fs = read_segment_register(fs);
@@ -682,9 +679,15 @@ static void __context_switch(void)
                stack_regs,
                CTXT_SWITCH_STACK_BYTES);
         unlazy_fpu(p);
-        save_segments(p);
-        if ( HVM_DOMAIN(p) )
+        if ( !HVM_DOMAIN(p) )
+        {
+            save_segments(p);
+        }
+        else
+        {
+            hvm_save_segments(v);
             hvm_load_msrs();
+        }
     }
 
     if ( !is_idle_vcpu(n) )
