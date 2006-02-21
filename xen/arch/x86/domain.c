@@ -685,7 +685,7 @@ static void __context_switch(void)
         }
         else
         {
-            hvm_save_segments(v);
+            hvm_save_segments(p);
             hvm_load_msrs();
         }
     }
