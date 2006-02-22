@@ -36,31 +36,27 @@ static void free_p2m_table(struct vcpu *v);
 #define SHADOW_MAX_GUEST32(_encoded) ((L1_PAGETABLE_ENTRIES_32 - 1) - ((_encoded) >> 16))
 
 
-int shadow_direct_map_init(struct vcpu *v)
+int shadow_direct_map_init(struct domain *d)
 {
     struct page_info *page;
     l3_pgentry_t *root;
 
     if ( !(page = alloc_domheap_pages(NULL, 0, ALLOC_DOM_DMA)) )
-        goto fail;
+        return 0;
 
     root = map_domain_page(page_to_mfn(page));
     memset(root, 0, PAGE_SIZE);
     root[PAE_SHADOW_SELF_ENTRY] = l3e_from_page(page, __PAGE_HYPERVISOR);
 
-    v->domain->arch.phys_table = mk_pagetable(page_to_maddr(page));
+    d->arch.phys_table = mk_pagetable(page_to_maddr(page));
 
     unmap_domain_page(root);
     return 1;
-
-fail:
-    return 0;
 }
 
-void shadow_direct_map_clean(struct vcpu *v)
+void shadow_direct_map_clean(struct domain *d)
 {
     unsigned long mfn;
-    struct domain *d = v->domain;
     l2_pgentry_t *l2e;
     l3_pgentry_t *l3e;
     int i, j;

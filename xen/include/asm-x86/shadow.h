@@ -115,8 +115,8 @@ do {                                            \
 #define SHADOW_ENCODE_MIN_MAX(_min, _max) ((((GUEST_L1_PAGETABLE_ENTRIES - 1) - (_max)) << 16) | (_min))
 #define SHADOW_MIN(_encoded) ((_encoded) & ((1u<<16) - 1))
 #define SHADOW_MAX(_encoded) ((GUEST_L1_PAGETABLE_ENTRIES - 1) - ((_encoded) >> 16))
-extern void shadow_direct_map_clean(struct vcpu *v);
-extern int shadow_direct_map_init(struct vcpu *v);
+extern void shadow_direct_map_clean(struct domain *d);
+extern int shadow_direct_map_init(struct domain *d);
 extern int shadow_direct_map_fault(
     unsigned long vpa, struct cpu_user_regs *regs);
 extern void shadow_mode_init(void);

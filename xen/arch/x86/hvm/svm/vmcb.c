@@ -444,8 +444,6 @@ void svm_do_launch(struct vcpu *v)
         printk("%s: phys_table   = %lx\n", __func__, pt);
     }
 
-    shadow_direct_map_init(v);
-
     if ( svm_paging_enabled(v) )
         vmcb->cr3 = pagetable_get_paddr(v->arch.guest_table);
     else

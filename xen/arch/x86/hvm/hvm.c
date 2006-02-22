@@ -190,8 +190,10 @@ void hvm_setup_platform(struct domain* d)
 {
     struct hvm_domain *platform;
 
-    if (!(HVM_DOMAIN(current) && (current->vcpu_id == 0)))
+    if ( !HVM_DOMAIN(current) || (current->vcpu_id != 0) )
         return;
+
+    shadow_direct_map_init(d);
 
     hvm_map_io_shared_page(d);
     hvm_get_info(d);
@@ -200,7 +202,8 @@ void hvm_setup_platform(struct domain* d)
     pic_init(&platform->vpic, pic_irq_request, &platform->interrupt_request);
     register_pic_io_hook();
 
-    if ( hvm_apic_support(d) ) {
+    if ( hvm_apic_support(d) )
+    {
         spin_lock_init(&d->arch.hvm_domain.round_robin_lock);
         hvm_vioapic_init(d);
     }

@@ -1044,7 +1044,7 @@ int shadow_direct_map_fault(unsigned long vpa, struct cpu_user_regs *regs)
     }
 
     shadow_lock(d);
-  
+
    __direct_get_l2e(v, vpa, &sl2e);
 
     if ( !(l2e_get_flags(sl2e) & _PAGE_PRESENT) )
@@ -1059,7 +1059,7 @@ int shadow_direct_map_fault(unsigned long vpa, struct cpu_user_regs *regs)
         sple = (l1_pgentry_t *)map_domain_page(smfn);
         memset(sple, 0, PAGE_SIZE);
         __direct_set_l2e(v, vpa, sl2e);
-    } 
+    }
 
     if ( !sple )
         sple = (l1_pgentry_t *)map_domain_page(l2e_get_pfn(sl2e));
@@ -1082,36 +1082,32 @@ fail:
     return 0;
 
 nomem:
-    shadow_direct_map_clean(v);
+    shadow_direct_map_clean(d);
     domain_crash_synchronous();
 }
 
 
-int shadow_direct_map_init(struct vcpu *v)
+int shadow_direct_map_init(struct domain *d)
 {
     struct page_info *page;
     l2_pgentry_t *root;
 
     if ( !(page = alloc_domheap_page(NULL)) )
-        goto fail;
+        return 0;
 
     root = map_domain_page(page_to_mfn(page));
     memset(root, 0, PAGE_SIZE);
     unmap_domain_page(root);
 
-    v->domain->arch.phys_table = mk_pagetable(page_to_maddr(page));
+    d->arch.phys_table = mk_pagetable(page_to_maddr(page));
 
     return 1;
-
-fail:
-    return 0;
 }
 
-void shadow_direct_map_clean(struct vcpu *v)
+void shadow_direct_map_clean(struct domain *d)
 {
     int i;
     unsigned long mfn;
-    struct domain *d = v->domain;
     l2_pgentry_t *l2e;
 
     mfn =  pagetable_get_pfn(d->arch.phys_table);
@@ -1143,7 +1139,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
 
     if(!new_modes) /* Nothing to do - return success */
         return 0; 
-        
+
     // can't take anything away by calling this function.
     ASSERT(!(d->arch.shadow_mode & ~mode));
 
