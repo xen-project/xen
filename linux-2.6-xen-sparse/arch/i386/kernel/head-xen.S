@@ -77,19 +77,6 @@ L6:
 	jmp L6			# main should never return here, but
 				# just in case, we know what happens.
 
-ENTRY(lgdt_finish)
-	movl $(__KERNEL_DS),%eax	# reload all the segment registers
-	movw %ax,%ss			# after changing gdt.
-
-	movl $(__USER_DS),%eax		# DS/ES contains default USER segment
-	movw %ax,%ds
-	movw %ax,%es
-
-	popl %eax			# reload CS by intersegment return
-	pushl $(__KERNEL_CS)
-	pushl %eax
-	lret
-
 	ALIGN
 
 # boot GDT descriptor (later on used by CPU#0):

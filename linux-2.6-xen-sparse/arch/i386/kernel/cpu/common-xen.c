@@ -583,7 +583,19 @@ void __cpuinit cpu_gdt_init(struct Xgt_desc_struct *gdt_descr)
 	}
 	if (HYPERVISOR_set_gdt(frames, gdt_descr->size / 8))
 		BUG();
-	lgdt_finish();
+
+	/* Reload all the segment registers after changing gdt. */
+	asm volatile("movl %0,%%ss\n\t"
+		     "movl %1,%%ds\n\t"
+		     "movl %1,%%es\n\t"
+		     "pushl %2\n\t"		/* Reload CS by intersegment return. */
+		     "pushl $1f\n\t"
+		     "lret\n\t"
+		     "1:\n\t"
+		     : /* no outputs */
+		     : "r"(__KERNEL_DS),
+		       "r"(__USER_DS),
+		       "r"(__KERNEL_CS));
 }
 
 /*
