@@ -346,7 +346,7 @@ int arch_set_info_guest(
     struct vcpu *v, struct vcpu_guest_context *c)
 {
     struct domain *d = v->domain;
-    unsigned long phys_basetab;
+    unsigned long phys_basetab = INVALID_MFN;
     int i, rc;
 
     /*
@@ -421,7 +421,14 @@ int arch_set_info_guest(
     if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
         return rc;
 
-    if ( shadow_mode_refcounts(d) )
+    if ( c->flags & VGCF_HVM_GUEST )
+    {
+        v->arch.guest_table = mk_pagetable(0);
+
+        if ( !hvm_initialize_guest_resources(v) )
+            return -EINVAL;
+    }
+    else if ( shadow_mode_refcounts(d) )
     {
         if ( !get_page(mfn_to_page(phys_basetab>>PAGE_SHIFT), d) )
         {
@@ -429,7 +436,7 @@ int arch_set_info_guest(
             return -EINVAL;
         }
     }
-    else if ( !(c->flags & VGCF_HVM_GUEST) )
+    else
     {
         if ( !get_page_and_type(mfn_to_page(phys_basetab>>PAGE_SHIFT), d,
                                 PGT_base_page_table) )
@@ -437,14 +444,6 @@ int arch_set_info_guest(
             destroy_gdt(v);
             return -EINVAL;
         }
-    }
-
-    if ( c->flags & VGCF_HVM_GUEST )
-    {
-        v->arch.guest_table = mk_pagetable(0);
-
-        if ( !hvm_initialize_guest_resources(v) )
-            return -EINVAL;
     }
 
     update_pagetables(v);
