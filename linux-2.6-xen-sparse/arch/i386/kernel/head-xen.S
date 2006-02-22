@@ -192,6 +192,9 @@ ENTRY(_stext)
 		utoa __PAGE_OFFSET
 	.ascii	",HYPERCALL_PAGE=0x"
 		utoa ((__PHYSICAL_START+HYPERCALL_PAGE_OFFSET)>>PAGE_SHIFT)
+	.ascii  ",FEATURES=writable_page_tables"
+	.ascii	         "|writable_descriptor_tables"
+	.ascii	         "|auto_translated_physmap"
 #ifdef CONFIG_X86_PAE
 	.ascii	",PAE=yes"
 #else

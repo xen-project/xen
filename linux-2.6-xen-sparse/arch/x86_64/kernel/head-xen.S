@@ -148,5 +148,8 @@ gdt_end:
 	.ascii	",XEN_VER=xen-3.0"
 	.ascii	",VIRT_BASE=0x"; utoh __START_KERNEL_map
 	.ascii	",HYPERCALL_PAGE=0x"; utoh (phys_hypercall_page >> PAGE_SHIFT)
+	.ascii  ",FEATURES=writable_page_tables"
+	.ascii		 "|writable_descriptor_tables"
+	.ascii		 "|auto_translated_physmap"
 	.ascii	",LOADER=generic"
 	.byte	0
