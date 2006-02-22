@@ -106,8 +106,8 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0x53 reserved */
 	.quad 0x0000000000000000	/* 0x5b reserved */
 
-	.quad 0x00cfbb000000ffff	/* 0x60 kernel 4GB code at 0x00000000 */
-	.quad 0x00cfb3000000ffff	/* 0x68 kernel 4GB data at 0x00000000 */
+	.quad 0x00cf9b000000ffff	/* 0x60 kernel 4GB code at 0x00000000 */
+	.quad 0x00cf93000000ffff	/* 0x68 kernel 4GB data at 0x00000000 */
 	.quad 0x00cffb000000ffff	/* 0x73 user 4GB code at 0x00000000 */
 	.quad 0x00cff3000000ffff	/* 0x7b user 4GB data at 0x00000000 */
 
@@ -182,6 +182,7 @@ ENTRY(_stext)
 	.ascii  ",FEATURES=writable_page_tables"
 	.ascii	         "|writable_descriptor_tables"
 	.ascii	         "|auto_translated_physmap"
+	.ascii	         "|ring0_kernel"
 #ifdef CONFIG_X86_PAE
 	.ascii	",PAE=yes"
 #else

@@ -356,7 +356,8 @@ int arch_set_info_guest(
      */
     if ( !(c->flags & VGCF_HVM_GUEST) )
     {
-        if ( ((c->user_regs.ss & 3) == 0) ||
+        if ( !VALID_STACKSEL(c->user_regs.ss) ||
+             !VALID_STACKSEL(c->kernel_ss) ||
              !VALID_CODESEL(c->user_regs.cs) )
             return -EINVAL;
 

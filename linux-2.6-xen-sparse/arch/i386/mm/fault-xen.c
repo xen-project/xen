@@ -85,7 +85,7 @@ static inline unsigned long get_segment_eip(struct pt_regs *regs,
 		return eip + (seg << 4);
 	
 	/* By far the most common cases. */
-	if (likely(seg == __USER_CS || seg == __KERNEL_CS))
+	if (likely(seg == __USER_CS || seg == GET_KERNEL_CS()))
 		return eip;
 
 	/* Check the segment exists, is within the current LDT/GDT size,
@@ -396,7 +396,7 @@ good_area:
 	switch (error_code & 3) {
 		default:	/* 3: write, present */
 #ifdef TEST_VERIFY_AREA
-			if (regs->cs == KERNEL_CS)
+			if (regs->cs == GET_KERNEL_CS())
 				printk("WP fault at %08lx\n", regs->eip);
 #endif
 			/* fall through */

@@ -51,6 +51,7 @@ typedef struct xen_feature_info {
 #define XENFEAT_writable_page_tables       0
 #define XENFEAT_writable_descriptor_tables 1
 #define XENFEAT_auto_translated_physmap    2
+#define XENFEAT_ring0_kernel               3
 
 #define XENFEAT_NR_SUBMAPS 1
 

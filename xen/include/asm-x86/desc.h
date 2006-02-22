@@ -35,7 +35,14 @@
 #define VALID_SEL(_s)                                                      \
     (((((_s)>>3) < FIRST_RESERVED_GDT_ENTRY) || ((_s)&4)) &&               \
      (((_s)&3) == GUEST_KERNEL_RPL))
-#define VALID_CODESEL(_s) ((_s) == FLAT_KERNEL_CS || VALID_SEL(_s))
+#define VALID_CODESEL(_s) ({                                               \
+    if ( ((_s) & 3) == 0 )                                                 \
+        (_s) |= GUEST_KERNEL_RPL;                                          \
+    (_s) == FLAT_KERNEL_CS || VALID_SEL(_s); })
+#define VALID_STACKSEL(_s) ({                                              \
+    if ( ((_s) & 3) == 0 )                                                 \
+        (_s) |= GUEST_KERNEL_RPL;                                          \
+    (_s) == FLAT_KERNEL_SS || VALID_SEL(_s); })
 
 /* These are bitmasks for the high 32 bits of a descriptor table entry. */
 #define _SEGMENT_TYPE    (15<< 8)

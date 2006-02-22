@@ -292,6 +292,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
 int check_descriptor(struct desc_struct *d)
 {
     u32 a = d->a, b = d->b;
+    u16 cs = a>>16;
 
     /* A not-present descriptor will always fault, so is safe. */
     if ( !(b & _SEGMENT_P) ) 
@@ -314,8 +315,16 @@ int check_descriptor(struct desc_struct *d)
         goto bad;
 
     /* Can't allow far jump to a Xen-private segment. */
-    if ( !VALID_CODESEL(a>>16) )
+    if ( !VALID_CODESEL(cs) )
         goto bad;
+
+    /*
+     * VALID_CODESEL might have fixed up the RPL for us. So be sure to
+     * update the descriptor.
+     *
+     */
+    d->a &= 0x0000ffff;
+    d->a |= cs<<16;
 
     /* Reserved bits must be zero. */
     if ( (b & 0xe0) != 0 )

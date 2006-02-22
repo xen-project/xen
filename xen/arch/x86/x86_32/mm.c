@@ -223,7 +223,7 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
     int nr = smp_processor_id();
     struct tss_struct *t = &init_tss[nr];
 
-    if ( (ss & 3) != 1 )
+    if ( !VALID_STACKSEL(ss) )
         return -EPERM;
 
     current->arch.guest_context.kernel_ss = ss;
@@ -239,6 +239,7 @@ int check_descriptor(struct desc_struct *d)
 {
     unsigned long base, limit;
     u32 a = d->a, b = d->b;
+    u16 cs = a>>16;
 
     /* A not-present descriptor will always fault, so is safe. */
     if ( !(b & _SEGMENT_P) ) 
@@ -251,7 +252,7 @@ int check_descriptor(struct desc_struct *d)
      * DPL 0 -- this would get the OS ring-0 privileges).
      */
     if ( (b & _SEGMENT_DPL) == 0 )
-        goto bad;
+        d->b = b = b | (0x01<<13); /* Force DPL == 1 */
 
     if ( !(b & _SEGMENT_S) )
     {
@@ -272,8 +273,16 @@ int check_descriptor(struct desc_struct *d)
             goto bad;
 
         /* Can't allow far jump to a Xen-private segment. */
-        if ( !VALID_CODESEL(a>>16) )
+        if ( !VALID_CODESEL(cs) )
             goto bad;
+
+        /*
+         * VALID_CODESEL might have fixed up the RPL for us. So be sure to
+         * update the descriptor.
+         *
+         */
+        d->a &= 0x0000ffff;
+        d->a |= cs<<16;
 
         /* Reserved bits must be zero. */
         if ( (b & 0xe0) != 0 )
