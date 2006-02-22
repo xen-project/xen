@@ -356,9 +356,15 @@ int arch_set_info_guest(
      */
     if ( !(c->flags & VGCF_HVM_GUEST) )
     {
-        if ( ((c->user_regs.cs & 3) == 0) ||
-             ((c->user_regs.ss & 3) == 0) )
+        if ( ((c->user_regs.ss & 3) == 0) ||
+             !VALID_CODESEL(c->user_regs.cs) ||
+             !VALID_CODESEL(c->event_callback_cs) ||
+             !VALID_CODESEL(c->failsafe_callback_cs) )
             return -EINVAL;
+
+        for ( i = 0; i < 256; i++ )
+            if ( !VALID_CODESEL(c->trap_ctxt[i].cs) )
+                return -EINVAL;
     }
     else if ( !hvm_enabled )
       return -EINVAL;
