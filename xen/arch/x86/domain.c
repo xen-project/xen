@@ -357,10 +357,14 @@ int arch_set_info_guest(
     if ( !(c->flags & VGCF_HVM_GUEST) )
     {
         if ( ((c->user_regs.ss & 3) == 0) ||
-             !VALID_CODESEL(c->user_regs.cs) ||
-             !VALID_CODESEL(c->event_callback_cs) ||
+             !VALID_CODESEL(c->user_regs.cs) )
+            return -EINVAL;
+
+#ifdef __i386__
+        if ( !VALID_CODESEL(c->event_callback_cs) ||
              !VALID_CODESEL(c->failsafe_callback_cs) )
             return -EINVAL;
+#endif
 
         for ( i = 0; i < 256; i++ )
             if ( !VALID_CODESEL(c->trap_ctxt[i].cs) )
