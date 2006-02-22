@@ -1753,6 +1753,9 @@ static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
     fastcall void smp_call_function_interrupt(void);
     fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs);
     fastcall void smp_error_interrupt(struct cpu_user_regs *regs);
+#ifdef CONFIG_X86_MCE_P4THERMAL
+    fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs);
+#endif
 
     if ((error = __vmread(VM_EXIT_INTR_INFO, &vector))
         && !(vector & INTR_INFO_VALID_MASK))
@@ -1780,6 +1783,11 @@ static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
     case ERROR_APIC_VECTOR:
         smp_error_interrupt(regs);
         break;
+#ifdef CONFIG_X86_MCE_P4THERMAL
+    case THERMAL_APIC_VECTOR:
+        smp_thermal_interrupt(regs);
+        break;
+#endif
     default:
         regs->entry_vector = vector;
         do_IRQ(regs);
