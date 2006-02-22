@@ -57,6 +57,9 @@ disk.img: existing
 	fi
 
 existing:
+	@if test -n "$(INITRD)"; then \
+		wget $(INITRD)/$(XMTEST_VER_IMG); \
+	fi
 	@if [ -f $(XMTEST_VER_IMG) ] ; then \
 		ln -sf $(XMTEST_VER_IMG) initrd.img; \
 	else \
