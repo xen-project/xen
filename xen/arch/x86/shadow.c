@@ -3609,7 +3609,7 @@ static inline int guest_page_fault(
     if ( d->arch.ops->guest_paging_levels == PAGING_L3 ) 
     {
         if ( SH_GUEST_32PAE )
-            gpfn = hvm_get_guest_ctrl_reg(v, 3);
+            gpfn = (hvm_get_guest_ctrl_reg(v, 3)) >> PAGE_SHIFT;
         else
             gpfn = pagetable_get_pfn(v->arch.guest_table);
     }
