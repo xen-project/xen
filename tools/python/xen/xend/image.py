@@ -386,8 +386,8 @@ class HVMImageHandler(ImageHandler):
         extra_pages = 0
         if os.uname()[4] == 'ia64':
             page_kb = 16
-            # ROM size for guest firmware
-            extra_pages = 1024
+            # ROM size for guest firmware, ioreq page and xenstore page
+            extra_pages = 1024 + 2
         return mem + extra_pages * page_kb
 
     def register_shutdown_watch(self):
