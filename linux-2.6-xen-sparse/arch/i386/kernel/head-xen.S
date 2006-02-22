@@ -119,17 +119,10 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0x53 reserved */
 	.quad 0x0000000000000000	/* 0x5b reserved */
 
-#ifdef CONFIG_X86_PAE
-	.quad 0x00cfbb00000067ff	/* 0x60 kernel 4GB code at 0x00000000 */
-	.quad 0x00cfb300000067ff	/* 0x68 kernel 4GB data at 0x00000000 */
-	.quad 0x00cffb00000067ff	/* 0x73 user 4GB code at 0x00000000 */
-	.quad 0x00cff300000067ff	/* 0x7b user 4GB data at 0x00000000 */
-#else
-	.quad 0x00cfbb000000c3ff	/* 0x60 kernel 4GB code at 0x00000000 */
-	.quad 0x00cfb3000000c3ff	/* 0x68 kernel 4GB data at 0x00000000 */
-	.quad 0x00cffb000000c3ff	/* 0x73 user 4GB code at 0x00000000 */
-	.quad 0x00cff3000000c3ff	/* 0x7b user 4GB data at 0x00000000 */
-#endif
+	.quad 0x00cfbb000000ffff	/* 0x60 kernel 4GB code at 0x00000000 */
+	.quad 0x00cfb3000000ffff	/* 0x68 kernel 4GB data at 0x00000000 */
+	.quad 0x00cffb000000ffff	/* 0x73 user 4GB code at 0x00000000 */
+	.quad 0x00cff3000000ffff	/* 0x7b user 4GB data at 0x00000000 */
 
 	.quad 0x0000000000000000	/* 0x80 TSS descriptor */
 	.quad 0x0000000000000000	/* 0x88 LDT descriptor */
