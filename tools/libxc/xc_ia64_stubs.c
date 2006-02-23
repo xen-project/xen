@@ -16,7 +16,7 @@
 #undef __IA64_UL
 #define __IA64_UL(x)           ((unsigned long)(x))
 #undef __ASSEMBLY__
-                                                                                
+
 unsigned long xc_ia64_fpsr_default(void)
 {
         return FPSR_DEFAULT;

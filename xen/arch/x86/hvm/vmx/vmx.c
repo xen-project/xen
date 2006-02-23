@@ -642,7 +642,7 @@ static void vmx_do_no_device_fault(void)
 }
 
 /* Reserved bits: [31:15], [12:11], [9], [6], [2:1] */
-#define VMX_VCPU_CPUID_L1_RESERVED 0xffff9a46 
+#define VMX_VCPU_CPUID_L1_RESERVED 0xffff9a46
 
 static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
 {
@@ -1185,8 +1185,12 @@ static int vmx_set_cr0(unsigned long value)
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx\n", value);
 
-    if ((value & X86_CR0_PE) && (value & X86_CR0_PG) && !paging_enabled) {
+    if ( (value & X86_CR0_PE) && (value & X86_CR0_PG) && !paging_enabled )
+    {
+        unsigned long cr4;
+
         /*
+         * Trying to enable guest paging.
          * The guest CR3 must be pointing to the guest physical.
          */
         if ( !VALID_MFN(mfn = get_mfn_from_gpfn(
@@ -1198,52 +1202,51 @@ static int vmx_set_cr0(unsigned long value)
         }
 
 #if defined(__x86_64__)
-        if (test_bit(VMX_CPU_STATE_LME_ENABLED,
-                     &v->arch.hvm_vmx.cpu_state) &&
-            !test_bit(VMX_CPU_STATE_PAE_ENABLED,
-                      &v->arch.hvm_vmx.cpu_state)){
-            HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enable\n");
+        if ( test_bit(VMX_CPU_STATE_LME_ENABLED,
+                      &v->arch.hvm_vmx.cpu_state) &&
+             !test_bit(VMX_CPU_STATE_PAE_ENABLED,
+                       &v->arch.hvm_vmx.cpu_state) )
+        {
+            HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enabled\n");
             vmx_inject_exception(v, TRAP_gp_fault, 0);
         }
-        if (test_bit(VMX_CPU_STATE_LME_ENABLED,
-                     &v->arch.hvm_vmx.cpu_state)){
-            /* Here the PAE is should to be opened */
-            HVM_DBG_LOG(DBG_LEVEL_1, "Enable the Long mode\n");
+
+        if ( test_bit(VMX_CPU_STATE_LME_ENABLED,
+                     &v->arch.hvm_vmx.cpu_state) )
+        {
+            /* Here the PAE is should be opened */
+            HVM_DBG_LOG(DBG_LEVEL_1, "Enable long mode\n");
             set_bit(VMX_CPU_STATE_LMA_ENABLED,
                     &v->arch.hvm_vmx.cpu_state);
+
             __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
             vm_entry_value |= VM_ENTRY_CONTROLS_IA32E_MODE;
             __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
 
-#if CONFIG_PAGING_LEVELS >= 4
-            if(!shadow_set_guest_paging_levels(v->domain, 4)) {
+            if ( !shadow_set_guest_paging_levels(v->domain, 4) ) {
                 printk("Unsupported guest paging levels\n");
                 domain_crash_synchronous(); /* need to take a clean path */
             }
-#endif
         }
         else
 #endif  /* __x86_64__ */
         {
 #if CONFIG_PAGING_LEVELS >= 3
-            if(!shadow_set_guest_paging_levels(v->domain, 2)) {
+            if ( !shadow_set_guest_paging_levels(v->domain, 2) ) {
                 printk("Unsupported guest paging levels\n");
                 domain_crash_synchronous(); /* need to take a clean path */
             }
 #endif
         }
 
+        /* update CR4's PAE if needed */
+        __vmread(GUEST_CR4, &cr4);
+        if ( (!(cr4 & X86_CR4_PAE)) &&
+             test_bit(VMX_CPU_STATE_PAE_ENABLED,
+                      &v->arch.hvm_vmx.cpu_state) )
         {
-            unsigned long crn;
-            /* update CR4's PAE if needed */
-            __vmread(GUEST_CR4, &crn);
-            if ( (!(crn & X86_CR4_PAE)) &&
-                 test_bit(VMX_CPU_STATE_PAE_ENABLED,
-                          &v->arch.hvm_vmx.cpu_state) )
-            {
-                HVM_DBG_LOG(DBG_LEVEL_1, "enable PAE on cr4\n");
-                __vmwrite(GUEST_CR4, crn | X86_CR4_PAE);
-            }
+            HVM_DBG_LOG(DBG_LEVEL_1, "enable PAE in cr4\n");
+            __vmwrite(GUEST_CR4, cr4 | X86_CR4_PAE);
         }
 
         /*
@@ -1263,8 +1266,8 @@ static int vmx_set_cr0(unsigned long value)
                     v->arch.hvm_vmx.cpu_cr3, mfn);
     }
 
-    if(!((value & X86_CR0_PE) && (value & X86_CR0_PG)) && paging_enabled)
-        if(v->arch.hvm_vmx.cpu_cr3) {
+    if ( !((value & X86_CR0_PE) && (value & X86_CR0_PG)) && paging_enabled )
+        if ( v->arch.hvm_vmx.cpu_cr3 ) {
             put_page(mfn_to_page(get_mfn_from_gpfn(
                       v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT)));
             v->arch.guest_table = mk_pagetable(0);
@@ -1275,7 +1278,8 @@ static int vmx_set_cr0(unsigned long value)
      * real-mode by performing a world switch to VMXAssist whenever
      * a partition disables the CR0.PE bit.
      */
-    if ((value & X86_CR0_PE) == 0) {
+    if ( (value & X86_CR0_PE) == 0 )
+    {
         if ( value & X86_CR0_PG ) {
             /* inject GP here */
             vmx_inject_exception(v, TRAP_gp_fault, 0);
@@ -1285,8 +1289,9 @@ static int vmx_set_cr0(unsigned long value)
              * Disable paging here.
              * Same to PE == 1 && PG == 0
              */
-            if (test_bit(VMX_CPU_STATE_LMA_ENABLED,
-                         &v->arch.hvm_vmx.cpu_state)){
+            if ( test_bit(VMX_CPU_STATE_LMA_ENABLED,
+                          &v->arch.hvm_vmx.cpu_state) )
+            {
                 clear_bit(VMX_CPU_STATE_LMA_ENABLED,
                           &v->arch.hvm_vmx.cpu_state);
                 __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
@@ -1296,19 +1301,21 @@ static int vmx_set_cr0(unsigned long value)
         }
 
         clear_all_shadow_status(v->domain);
-        if (vmx_assist(v, VMX_ASSIST_INVOKE)) {
+        if ( vmx_assist(v, VMX_ASSIST_INVOKE) ) {
             set_bit(VMX_CPU_STATE_ASSIST_ENABLED, &v->arch.hvm_vmx.cpu_state);
             __vmread(GUEST_RIP, &eip);
             HVM_DBG_LOG(DBG_LEVEL_1,
                         "Transfering control to vmxassist %%eip 0x%lx\n", eip);
             return 0; /* do not update eip! */
         }
-    } else if (test_bit(VMX_CPU_STATE_ASSIST_ENABLED,
-                        &v->arch.hvm_vmx.cpu_state)) {
+    } else if ( test_bit(VMX_CPU_STATE_ASSIST_ENABLED,
+                         &v->arch.hvm_vmx.cpu_state) )
+    {
         __vmread(GUEST_RIP, &eip);
         HVM_DBG_LOG(DBG_LEVEL_1,
                     "Enabling CR0.PE at %%eip 0x%lx\n", eip);
-        if (vmx_assist(v, VMX_ASSIST_RESTORE)) {
+        if ( vmx_assist(v, VMX_ASSIST_RESTORE) )
+        {
             clear_bit(VMX_CPU_STATE_ASSIST_ENABLED,
                       &v->arch.hvm_vmx.cpu_state);
             __vmread(GUEST_RIP, &eip);
@@ -1438,15 +1445,13 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     }
     case 4: /* CR4 */
     {
-        unsigned long old_cr4;
+        __vmread(CR4_READ_SHADOW, &old_cr);
 
-        __vmread(CR4_READ_SHADOW, &old_cr4);
-
-        if ( value & X86_CR4_PAE && !(old_cr4 & X86_CR4_PAE) )
+        if ( value & X86_CR4_PAE && !(old_cr & X86_CR4_PAE) )
         {
             set_bit(VMX_CPU_STATE_PAE_ENABLED, &v->arch.hvm_vmx.cpu_state);
 
-            if ( vmx_pgbit_test(v) ) 
+            if ( vmx_pgbit_test(v) )
             {
                 /* The guest is 32 bit. */
 #if CONFIG_PAGING_LEVELS >= 4
@@ -1460,7 +1465,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
 
                 if ( !VALID_MFN(mfn = get_mfn_from_gpfn(
                                     v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT)) ||
-                     !get_page(mfn_to_page(mfn), v->domain) ) 
+                     !get_page(mfn_to_page(mfn), v->domain) )
                 {
                     printk("Invalid CR3 value = %lx", v->arch.hvm_vmx.cpu_cr3);
                     domain_crash_synchronous(); /* need to take a clean path */
@@ -1489,12 +1494,12 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx",
                             v->arch.hvm_vmx.cpu_cr3, mfn);
 #endif
-            } 
+            }
             else
             {
                 /*  The guest is 64 bit. */
 #if CONFIG_PAGING_LEVELS >= 4
-                if ( !shadow_set_guest_paging_levels(v->domain, 4) ) 
+                if ( !shadow_set_guest_paging_levels(v->domain, 4) )
                 {
                     printk("Unsupported guest paging levels\n");
                     domain_crash_synchronous(); /* need to take a clean path */
@@ -1512,7 +1517,6 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             clear_bit(VMX_CPU_STATE_PAE_ENABLED, &v->arch.hvm_vmx.cpu_state);
         }
 
-        __vmread(CR4_READ_SHADOW, &old_cr);
         __vmwrite(GUEST_CR4, value| VMX_CR4_HOST_MASK);
         __vmwrite(CR4_READ_SHADOW, value);
 

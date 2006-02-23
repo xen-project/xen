@@ -3942,9 +3942,7 @@ int shadow_direct_map_fault(unsigned long vpa, struct cpu_user_regs *regs)
      * on handling the #PF as such.
      */
     if ( (mfn = get_mfn_from_gpfn(vpa >> PAGE_SHIFT)) == INVALID_MFN )
-    {
-         goto fail;
-    }
+        return 0;
 
     shadow_lock(d);
 
@@ -3993,9 +3991,6 @@ int shadow_direct_map_fault(unsigned long vpa, struct cpu_user_regs *regs)
 
     shadow_unlock(d);
     return EXCRET_fault_fixed;
-
-fail:
-    return 0;
 
 nomem:
     shadow_direct_map_clean(d);

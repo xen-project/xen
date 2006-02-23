@@ -20,7 +20,7 @@
 #define L3_PROT (_PAGE_PRESENT)
 #endif
 
-#define E820MAX	128
+#define E820MAX     128
 
 #define E820_RAM          1
 #define E820_RESERVED     2
@@ -149,7 +149,7 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
         PAGE_SIZE,
         PROT_READ|PROT_WRITE,
         pfn_list[HVM_INFO_PFN]);
-    
+
     if ( va_map == NULL )
         return -1;
 
@@ -365,8 +365,8 @@ int xc_hvm_build(int xc_handle,
 
     if ( !strstr(xen_caps, "hvm") )
     {
-	PERROR("CPU doesn't support HVM extensions or "
-	       "the extensions are not enabled");
+        PERROR("CPU doesn't support HVM extensions or "
+               "the extensions are not enabled");
         goto error_out;
     }
 
