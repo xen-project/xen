@@ -129,10 +129,15 @@ extern int dump_task_extended_fpu (struct task_struct *, struct user_fxsr_struct
 #define ELF_CORE_COPY_FPREGS(tsk, elf_fpregs) dump_task_fpu(tsk, elf_fpregs)
 #define ELF_CORE_COPY_XFPREGS(tsk, elf_xfpregs) dump_task_extended_fpu(tsk, elf_xfpregs)
 
-#define VSYSCALL_BASE	(__fix_to_virt(FIX_VSYSCALL))
+#define VSYSCALL_BASE	(PAGE_OFFSET - 2*PAGE_SIZE)
 #define VSYSCALL_EHDR	((const struct elfhdr *) VSYSCALL_BASE)
 #define VSYSCALL_ENTRY	((unsigned long) &__kernel_vsyscall)
 extern void __kernel_vsyscall;
+
+#define ARCH_HAS_SETUP_ADDITIONAL_PAGES
+struct linux_binprm;
+extern int arch_setup_additional_pages(struct linux_binprm *bprm,
+                                       int executable_stack);
 
 #define ARCH_DLINFO						\
 do {								\

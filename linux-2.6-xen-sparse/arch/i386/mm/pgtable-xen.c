@@ -194,7 +194,6 @@ void __set_fixmap (enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
 	}
 	switch (idx) {
 	case FIX_WP_TEST:
-	case FIX_VSYSCALL:
 #ifdef CONFIG_X86_F00F_BUG
 	case FIX_F00F_IDT:
 #endif

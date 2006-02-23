@@ -317,6 +317,8 @@ extern int page_is_ram(unsigned long pagenr);
 #define virt_to_mfn(v)		(pfn_to_mfn(__pa(v) >> PAGE_SHIFT))
 #define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
 
+#define __HAVE_ARCH_GATE_AREA 1
+
 #endif /* __KERNEL__ */
 
 #include <asm-generic/page.h>
