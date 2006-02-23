@@ -1430,11 +1430,7 @@ long do_set_trap_table(struct trap_info *traps)
         if ( cur.address == 0 )
             break;
 
-        if ( !VALID_CODESEL(cur.cs) )
-        {
-            rc = -EPERM;
-            break;
-        }
+        fixup_guest_selector(cur.cs);
 
         memcpy(&dst[cur.vector], &cur, sizeof(cur));
 

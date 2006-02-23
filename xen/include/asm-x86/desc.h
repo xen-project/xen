@@ -26,23 +26,28 @@
 #define GUEST_KERNEL_RPL 1
 #endif
 
+/* Fix up the RPL of a guest segment selector. */
+#define fixup_guest_selector(sel)                               \
+    ((sel) = (((sel) & 3) >= GUEST_KERNEL_RPL) ? (sel) :        \
+     (((sel) & ~3) | GUEST_KERNEL_RPL))
+
 /*
- * Guest OS must provide its own code selectors, or use the one we provide. Any
- * LDT selector value is okay. Note that checking only the RPL is insufficient:
- * if the selector is poked into an interrupt, trap or call gate then the RPL
- * is ignored when the gate is accessed.
+ * We need this function because enforcing the correct guest kernel RPL is
+ * unsufficient if the selector is poked into an interrupt, trap or call gate.
+ * The selector RPL is ignored when a gate is accessed. We must therefore make
+ * sure that the selector does not reference a Xen-private segment.
+ * 
+ * Note that selectors used only by IRET do not need to be checked. If the
+ * descriptor DPL fiffers from CS RPL then we'll #GP.
+ * 
+ * Stack and data selectors do not need to be checked. If DS, ES, FS, GS are
+ * DPL < CPL then they'll be cleared automatically. If SS RPL or DPL differs
+ * from CS RPL then we'll #GP.
  */
-#define VALID_SEL(_s)                                                      \
-    (((((_s)>>3) < FIRST_RESERVED_GDT_ENTRY) || ((_s)&4)) &&               \
-     (((_s)&3) == GUEST_KERNEL_RPL))
-#define VALID_CODESEL(_s) ({                                               \
-    if ( ((_s) & 3) == 0 )                                                 \
-        (_s) |= GUEST_KERNEL_RPL;                                          \
-    (_s) == FLAT_KERNEL_CS || VALID_SEL(_s); })
-#define VALID_STACKSEL(_s) ({                                              \
-    if ( ((_s) & 3) == 0 )                                                 \
-        (_s) |= GUEST_KERNEL_RPL;                                          \
-    (_s) == FLAT_KERNEL_SS || VALID_SEL(_s); })
+#define guest_gate_selector_okay(sel)                                   \
+    ((((sel)>>3) < FIRST_RESERVED_GDT_ENTRY) || /* Guest seg? */        \
+     ((sel) == FLAT_KERNEL_CS) ||               /* Xen default seg? */  \
+     ((sel) & 4))                               /* LDT seg? */
 
 /* These are bitmasks for the high 32 bits of a descriptor table entry. */
 #define _SEGMENT_TYPE    (15<< 8)

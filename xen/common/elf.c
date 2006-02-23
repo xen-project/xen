@@ -61,7 +61,6 @@ int parseelfimage(struct domain_setup_info *dsi)
             continue;
 
         guestinfo = elfbase + shdr->sh_offset;
-        printk("Xen-ELF header found: '%s'\n", guestinfo);
 
         if ( (strstr(guestinfo, "LOADER=generic") == NULL) &&
              (strstr(guestinfo, "GUEST_OS=linux") == NULL) )

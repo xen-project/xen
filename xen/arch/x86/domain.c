@@ -349,27 +349,19 @@ int arch_set_info_guest(
     unsigned long phys_basetab = INVALID_MFN;
     int i, rc;
 
-    /*
-     * This is sufficient! If the descriptor DPL differs from CS RPL then we'll
-     * #GP. If DS, ES, FS, GS are DPL 0 then they'll be cleared automatically.
-     * If SS RPL or DPL differs from CS RPL then we'll #GP.
-     */
     if ( !(c->flags & VGCF_HVM_GUEST) )
     {
-        if ( !VALID_STACKSEL(c->user_regs.ss) ||
-             !VALID_STACKSEL(c->kernel_ss) ||
-             !VALID_CODESEL(c->user_regs.cs) )
-            return -EINVAL;
+        fixup_guest_selector(c->user_regs.ss);
+        fixup_guest_selector(c->kernel_ss);
+        fixup_guest_selector(c->user_regs.cs);
 
 #ifdef __i386__
-        if ( !VALID_CODESEL(c->event_callback_cs) ||
-             !VALID_CODESEL(c->failsafe_callback_cs) )
-            return -EINVAL;
+        fixup_guest_selector(c->event_callback_cs);
+        fixup_guest_selector(c->failsafe_callback_cs);
 #endif
 
         for ( i = 0; i < 256; i++ )
-            if ( !VALID_CODESEL(c->trap_ctxt[i].cs) )
-                return -EINVAL;
+            fixup_guest_selector(c->trap_ctxt[i].cs);
     }
     else if ( !hvm_enabled )
       return -EINVAL;
@@ -383,6 +375,7 @@ int arch_set_info_guest(
         v->arch.flags |= TF_kernel_mode;
 
     memcpy(&v->arch.guest_context, c, sizeof(*c));
+    init_int80_direct_trap(v);
 
     if ( !(c->flags & VGCF_HVM_GUEST) )
     {
