@@ -324,10 +324,13 @@ int xen_create_contiguous_region(
 		.domid        = DOMID_SELF
 	};
 
-	if (xen_feature(XENFEAT_auto_translated_physmap)) {
-		BUG_ON(order >= 1);
+	/*
+	 * Currently an auto-translated guest will not perform I/O, nor will
+	 * it require PAE page directories below 4GB. Therefore any calls to
+	 * this function are redundant and can be ignored.
+	 */
+	if (xen_feature(XENFEAT_auto_translated_physmap))
 		return 0;
-	}
 
 	scrub_pages(vstart, 1 << order);
 
