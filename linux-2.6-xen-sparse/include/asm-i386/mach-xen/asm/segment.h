@@ -87,9 +87,11 @@
 
 /* Simple and small GDT entries for booting only */
 
-#define __BOOT_CS	FLAT_KERNEL_CS
+#define GDT_ENTRY_BOOT_CS		2
+#define __BOOT_CS	(GDT_ENTRY_BOOT_CS * 8)
 
-#define __BOOT_DS	FLAT_KERNEL_DS
+#define GDT_ENTRY_BOOT_DS		(GDT_ENTRY_BOOT_CS + 1)
+#define __BOOT_DS	(GDT_ENTRY_BOOT_DS * 8)
 
 /* The PnP BIOS entries in the GDT */
 #define GDT_ENTRY_PNPBIOS_CS32		(GDT_ENTRY_PNPBIOS_BASE + 0)

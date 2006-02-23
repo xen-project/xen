@@ -1096,12 +1096,6 @@ void __init trap_init(void)
 void smp_trap_init(trap_info_t *trap_ctxt)
 {
 	trap_info_t *t = trap_table;
-	int i;
-
-	for (i = 0; i < 256; i++) {
-		trap_ctxt[i].vector = i;
-		trap_ctxt[i].cs     = FLAT_KERNEL_CS;
-	}
 
 	for (t = trap_table; t->address; t++) {
 		trap_ctxt[t->vector].flags = t->flags;
