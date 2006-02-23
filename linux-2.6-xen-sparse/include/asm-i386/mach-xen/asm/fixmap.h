@@ -20,7 +20,7 @@
  * Leave one empty page between vmalloc'ed areas and
  * the start of the fixmap.
  */
-#define __FIXADDR_TOP	(HYPERVISOR_VIRT_START - 2 * PAGE_SIZE)
+extern unsigned long __FIXADDR_TOP;
 
 #ifndef __ASSEMBLY__
 #include <linux/kernel.h>
@@ -98,8 +98,10 @@ enum fixed_addresses {
 	__end_of_fixed_addresses
 };
 
-extern void __set_fixmap(
-	enum fixed_addresses idx, maddr_t phys, pgprot_t flags);
+extern void __set_fixmap(enum fixed_addresses idx,
+					maddr_t phys, pgprot_t flags);
+
+extern void set_fixaddr_top(unsigned long top);
 
 #define set_fixmap(idx, phys) \
 		__set_fixmap(idx, phys, PAGE_KERNEL)

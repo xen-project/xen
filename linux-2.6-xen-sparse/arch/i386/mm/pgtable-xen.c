@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/pagemap.h>
 #include <linux/spinlock.h>
+#include <linux/module.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -184,6 +185,10 @@ void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 	__flush_tlb_one(vaddr);
 }
 
+static int nr_fixmaps = 0;
+unsigned long __FIXADDR_TOP = (HYPERVISOR_VIRT_START - 2 * PAGE_SIZE);
+EXPORT_SYMBOL(__FIXADDR_TOP);
+
 void __set_fixmap (enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
 {
 	unsigned long address = __fix_to_virt(idx);
@@ -203,6 +208,13 @@ void __set_fixmap (enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
 		set_pte_pfn_ma(address, phys >> PAGE_SHIFT, flags);
 		break;
 	}
+	nr_fixmaps++;
+}
+
+void set_fixaddr_top(unsigned long top)
+{
+	BUG_ON(nr_fixmaps > 0);
+	__FIXADDR_TOP = top - PAGE_SIZE;
 }
 
 pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
