@@ -1609,15 +1609,19 @@ static int sedf_adjdom(struct domain *p, struct sched_adjdom_cmd *cmd)
         else {
             /*time driven domains*/
             for_each_vcpu(p, v) {
-                /* sanity checking! */
-                if(cmd->u.sedf.slice > cmd->u.sedf.period )
+                /*
+                 * Sanity checking: note that disabling extra weight requires
+                 * that we set a non-zero slice.
+                 */
+                if ( (cmd->u.sedf.slice == 0) ||
+                     (cmd->u.sedf.slice > cmd->u.sedf.period) )
                     return -EINVAL;
                 EDOM_INFO(v)->weight = 0;
                 EDOM_INFO(v)->extraweight = 0;
                 EDOM_INFO(v)->period_orig = 
-                    EDOM_INFO(v)->period   = cmd->u.sedf.period;
+                    EDOM_INFO(v)->period  = cmd->u.sedf.period;
                 EDOM_INFO(v)->slice_orig  = 
-                    EDOM_INFO(v)->slice    = cmd->u.sedf.slice;
+                    EDOM_INFO(v)->slice   = cmd->u.sedf.slice;
             }
         }
         if (sedf_adjust_weights(cmd))
