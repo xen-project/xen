@@ -206,7 +206,7 @@ process_nmi:
         sti
         leaq VCPU_trap_bounce(%rbx),%rdx
         movq %rax,TRAPBOUNCE_eip(%rdx)
-        movw $(TBF_INTERRUPT|TBF_SLOW_IRET),TRAPBOUNCE_flags(%rdx)
+        movw $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         call create_bounce_frame
         jmp  test_all_events
 1:      bts  $_VCPUF_nmi_pending,VCPU_flags(%rbx)
@@ -229,9 +229,6 @@ create_bounce_frame:
 1:      /* In kernel context already: push new frame at existing %rsp. */
         movq  UREGS_rsp+8(%rsp),%rsi
         andb  $0xfc,UREGS_cs+8(%rsp)    # Indicate kernel context to guest.
-	testw $(TBF_SLOW_IRET),TRAPBOUNCE_flags(%rdx)
-	jz    2f
-	orb   $0x01,UREGS_cs+8(%rsp)
 2:      andq  $~0xf,%rsi                # Stack frames are 16-byte aligned.
         movq  $HYPERVISOR_VIRT_START,%rax
         cmpq  %rax,%rsi
