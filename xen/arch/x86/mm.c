@@ -1776,7 +1776,7 @@ int do_mmuext_op(
 
         pin_page:
             if ( shadow_mode_refcounts(FOREIGNDOM) )
-                type = PGT_writable_page;
+                break;
 
             okay = get_page_and_type_from_pagenr(mfn, type, FOREIGNDOM);
             if ( unlikely(!okay) )
@@ -1811,6 +1811,9 @@ int do_mmuext_op(
             goto pin_page;
 
         case MMUEXT_UNPIN_TABLE:
+            if ( shadow_mode_refcounts(d) )
+                break;
+
             if ( unlikely(!(okay = get_page_from_pagenr(mfn, d))) )
             {
                 MEM_LOG("Mfn %lx bad domain (dom=%p)",
