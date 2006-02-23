@@ -49,6 +49,7 @@
 #include <xen/mm.h>
 #include <public/arch-ia64.h>
 #include <asm/hvm/vioapic.h>
+#include <public/event_channel.h>
 
 /* Global flag to identify whether Intel vmx feature is on */
 u32 vmx_enabled = 0;
@@ -254,9 +255,6 @@ vmx_final_setup_guest(struct vcpu *v)
 {
 	vpd_t *vpd;
 
-	/* Allocate resources for vcpu 0 */
-	//memset(&v->arch.arch_vmx, 0, sizeof(struct arch_vmx_struct));
-
 	vpd = alloc_vpd();
 	ASSERT(vpd);
 
@@ -375,20 +373,15 @@ int vmx_alloc_contig_pages(struct domain *d)
 
 void vmx_setup_platform(struct domain *d, struct vcpu_guest_context *c)
 {
-	shared_iopage_t *sp;
-
 	ASSERT(d != dom0); /* only for non-privileged vti domain */
 	d->arch.vmx_platform.shared_page_va =
 		__va(__gpa_to_mpa(d, IO_PAGE_START));
-	sp = get_sp(d);
-	//memset((char *)sp,0,PAGE_SIZE);
 	/* TEMP */
 	d->arch.vmx_platform.pib_base = 0xfee00000UL;
 
 	/* Only open one port for I/O and interrupt emulation */
 	memset(&d->shared_info->evtchn_mask[0], 0xff,
 	    sizeof(d->shared_info->evtchn_mask));
-	clear_bit(iopacket_port(d), &d->shared_info->evtchn_mask[0]);
 
 	/* Initialize the virtual interrupt lines */
 	vmx_virq_line_init(d);
@@ -397,4 +390,16 @@ void vmx_setup_platform(struct domain *d, struct vcpu_guest_context *c)
 	hvm_vioapic_init(d);
 }
 
+void vmx_do_launch(struct vcpu *v)
+{
+	if (evtchn_bind_vcpu(iopacket_port(v), v->vcpu_id) < 0) {
+	    printk("VMX domain bind port %d to vcpu %d failed!\n",
+		iopacket_port(v), v->vcpu_id);
+	    domain_crash_synchronous();
+	}
 
+	clear_bit(iopacket_port(v),
+		&v->domain->shared_info->evtchn_mask[0]);
+
+	vmx_load_all_rr(v);
+}

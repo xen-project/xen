@@ -40,9 +40,9 @@ static inline vcpu_iodata_t *get_vio(struct domain *d, unsigned long cpu)
     return &((shared_iopage_t *)d->arch.vmx_platform.shared_page_va)->vcpu_iodata[cpu];
 }
 
-static inline int iopacket_port(struct domain *d)
+static inline int iopacket_port(struct vcpu *v)
 {
-    return ((shared_iopage_t *)d->arch.vmx_platform.shared_page_va)->sp_global.eport;
+    return get_vio(v->domain, v->vcpu_id)->vp_eport;
 }
 
 static inline shared_iopage_t *get_sp(struct domain *d)
