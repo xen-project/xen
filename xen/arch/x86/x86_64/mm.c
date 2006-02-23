@@ -228,8 +228,7 @@ long subarch_memory_op(int op, void *arg)
 
 long do_stack_switch(unsigned long ss, unsigned long esp)
 {
-    if ( (ss & 3) != 3 )
-        return -EPERM;
+    fixup_guest_selector(ss);
     current->arch.guest_context.kernel_ss = ss;
     current->arch.guest_context.kernel_sp = esp;
     return 0;
@@ -298,9 +297,9 @@ int check_descriptor(struct desc_struct *d)
     if ( !(b & _SEGMENT_P) ) 
         goto good;
 
-    /* The guest can only safely be executed in ring 3. */
-    if ( (b & _SEGMENT_DPL) != _SEGMENT_DPL )
-        goto bad;
+    /* Check and fix up the DPL. */
+    if ( (b & _SEGMENT_DPL) < (GUEST_KERNEL_RPL << 13) )
+        d->b = b = (b & ~_SEGMENT_DPL) | (GUEST_KERNEL_RPL << 13);
 
     /* All code and data segments are okay. No base/limit checking. */
     if ( (b & _SEGMENT_S) )

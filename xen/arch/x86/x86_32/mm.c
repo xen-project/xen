@@ -250,8 +250,8 @@ int check_descriptor(struct desc_struct *d)
      * gates (consider a call gate pointing at another kernel descriptor with 
      * DPL 0 -- this would get the OS ring-0 privileges).
      */
-    if ( (b & _SEGMENT_DPL) == 0 )
-        d->b = b = b | (0x01<<13); /* Force DPL == 1 */
+    if ( (b & _SEGMENT_DPL) < (GUEST_KERNEL_RPL << 13) )
+        d->b = b = (b & ~_SEGMENT_DPL) | (GUEST_KERNEL_RPL << 13);
 
     if ( !(b & _SEGMENT_S) )
     {

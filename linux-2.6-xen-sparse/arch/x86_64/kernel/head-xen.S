@@ -111,12 +111,12 @@ gdt:
 ENTRY(cpu_gdt_table)
 	.quad	0x0000000000000000	/* NULL descriptor */
 	.quad	0x0			/* unused */
-	.quad	0x00affa000000ffff	/* __KERNEL_CS */
-	.quad	0x00cff2000000ffff	/* __KERNEL_DS */
+	.quad	0x00af9a000000ffff	/* __KERNEL_CS */
+	.quad	0x00cf92000000ffff	/* __KERNEL_DS */
 	.quad	0x00cffa000000ffff	/* __USER32_CS */
 	.quad	0x00cff2000000ffff	/* __USER_DS, __USER32_DS  */
 	.quad	0x00affa000000ffff	/* __USER_CS */
-	.quad	0x00cffa000000ffff	/* __KERNEL32_CS */
+	.quad	0x00cf9a000000ffff	/* __KERNEL32_CS */
 	.quad	0,0			/* TSS */
 	.quad	0,0			/* LDT */
 	.quad   0,0,0			/* three TLS descriptors */
@@ -151,5 +151,6 @@ gdt_end:
 	.ascii  ",FEATURES=writable_page_tables"
 	.ascii		 "|writable_descriptor_tables"
 	.ascii		 "|auto_translated_physmap"
+	.ascii	         "|supervisor_mode_kernel"
 	.ascii	",LOADER=generic"
 	.byte	0

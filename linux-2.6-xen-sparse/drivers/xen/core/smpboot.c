@@ -188,7 +188,7 @@ void vcpu_prepare(int vcpu)
 
 	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
 #else /* __x86_64__ */
-	ctxt.user_regs.cs = __KERNEL_CS | 3;
+	ctxt.user_regs.cs = __KERNEL_CS;
 	ctxt.user_regs.esp = idle->thread.rsp0 - sizeof(struct pt_regs);
 
 	ctxt.kernel_ss = __KERNEL_DS;

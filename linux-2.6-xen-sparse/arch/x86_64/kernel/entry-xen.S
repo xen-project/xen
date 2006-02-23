@@ -325,7 +325,7 @@ ENTRY(int_ret_from_sys_call)
 	testb $3,CS-ARGOFFSET(%rsp)
         jnz 1f
         /* Need to set the proper %ss (not NULL) for ring 3 iretq */
-        movl $__KERNEL_DS,SS-ARGOFFSET(%rsp)
+        movl $__KERNEL_DS|3,SS-ARGOFFSET(%rsp)
         jmp retint_restore_args   # retrun from ring3 kernel
 1:              
 	movl $_TIF_ALLWORK_MASK,%edi
