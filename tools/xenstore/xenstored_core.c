@@ -573,14 +573,11 @@ static struct buffered_data *new_buffer(void *ctx)
 {
 	struct buffered_data *data;
 
-	data = talloc(ctx, struct buffered_data);
+	data = talloc_zero(ctx, struct buffered_data);
 	if (data == NULL)
 		return NULL;
 	
 	data->inhdr = true;
-	data->used = 0;
-	data->buffer = NULL;
-
 	return data;
 }
 
@@ -1394,17 +1391,13 @@ static void manual_node(const char *name, const char *child)
 	struct node *node;
 	struct xs_permissions perms = { .id = 0, .perms = XS_PERM_NONE };
 
-	node = talloc(NULL, struct node);
+	node = talloc_zero(NULL, struct node);
 	node->name = name;
 	node->perms = &perms;
 	node->num_perms = 1;
-	node->data = NULL;
-	node->datalen = 0;
 	node->children = (char *)child;
 	if (child)
 		node->childlen = strlen(child) + 1;
-	else
-		node->childlen = 0;
 
 	if (!write_node(NULL, node))
 		barf_perror("Could not create initial node %s", name);
