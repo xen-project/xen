@@ -61,11 +61,11 @@
 
 #define GDT_ENTRY_KERNEL_CS		(GDT_ENTRY_KERNEL_BASE + 0)
 #define __KERNEL_CS (GDT_ENTRY_KERNEL_CS * 8)
-#define GET_KERNEL_CS() (__KERNEL_CS | (xen_feature(XENFEAT_ring0_kernel)?0:1) )
+#define GET_KERNEL_CS() (__KERNEL_CS | (xen_feature(XENFEAT_supervisor_mode_kernel)?0:1) )
 
 #define GDT_ENTRY_KERNEL_DS		(GDT_ENTRY_KERNEL_BASE + 1)
 #define __KERNEL_DS (GDT_ENTRY_KERNEL_DS * 8)
-#define GET_KERNEL_DS() (__KERNEL_DS | (xen_feature(XENFEAT_ring0_kernel)?0:1) )
+#define GET_KERNEL_DS() (__KERNEL_DS | (xen_feature(XENFEAT_supervisor_mode_kernel)?0:1) )
 
 #define GDT_ENTRY_TSS			(GDT_ENTRY_KERNEL_BASE + 4)
 #define GDT_ENTRY_LDT			(GDT_ENTRY_KERNEL_BASE + 5)

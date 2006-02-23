@@ -193,7 +193,8 @@ long do_xen_version(int cmd, void *arg)
             if ( shadow_mode_translate(current->domain) )
                 fi.submap |= 
                     (1U << XENFEAT_writable_page_tables) |
-                    (1U << XENFEAT_auto_translated_physmap);
+                    (1U << XENFEAT_auto_translated_physmap) |
+                    (1U << XENFEAT_pae_pgdir_above_4gb);
             break;
         default:
             return -EINVAL;

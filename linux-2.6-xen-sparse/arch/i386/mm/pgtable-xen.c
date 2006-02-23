@@ -289,10 +289,11 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	unsigned long flags;
 
 	if (PTRS_PER_PMD > 1) {
-		/* Ensure pgd resides below 4GB. */
-		int rc = xen_create_contiguous_region(
-			(unsigned long)pgd, 0, 32);
-		BUG_ON(rc);
+		if (!xen_feature(XENFEAT_pae_pgdir_above_4gb)) {
+			int rc = xen_create_contiguous_region(
+				(unsigned long)pgd, 0, 32);
+			BUG_ON(rc);
+		}
 		if (HAVE_SHARED_KERNEL_PMD)
 			memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
 			       swapper_pg_dir + USER_PTRS_PER_PGD,

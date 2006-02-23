@@ -182,7 +182,7 @@ ENTRY(_stext)
 	.ascii  ",FEATURES=writable_page_tables"
 	.ascii	         "|writable_descriptor_tables"
 	.ascii	         "|auto_translated_physmap"
-	.ascii	         "|ring0_kernel"
+	.ascii	         "|supervisor_mode_kernel"
 #ifdef CONFIG_X86_PAE
 	.ascii	",PAE=yes"
 #else
