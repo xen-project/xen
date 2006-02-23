@@ -71,7 +71,7 @@ int gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly);
 void gnttab_end_foreign_access(grant_ref_t ref, int readonly,
 			       unsigned long page);
 
-int gnttab_grant_foreign_transfer(domid_t domid);
+int gnttab_grant_foreign_transfer(domid_t domid, unsigned long pfn);
 
 unsigned long gnttab_end_foreign_transfer_ref(grant_ref_t ref);
 unsigned long gnttab_end_foreign_transfer(grant_ref_t ref);
@@ -98,7 +98,8 @@ void gnttab_request_free_callback(struct gnttab_free_callback *callback,
 void gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
 				     unsigned long frame, int readonly);
 
-void gnttab_grant_foreign_transfer_ref(grant_ref_t, domid_t domid);
+void gnttab_grant_foreign_transfer_ref(grant_ref_t, domid_t domid,
+				       unsigned long pfn);
 
 #ifdef __ia64__
 #define gnttab_map_vaddr(map) __va(map.dev_bus_addr)
