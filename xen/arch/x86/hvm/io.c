@@ -697,8 +697,8 @@ void hvm_io_assist(struct vcpu *v)
 void hvm_wait_io(void)
 {
     struct vcpu *v = current;
-    struct domain *d = v->domain;    
-    int port = iopacket_port(d);
+    struct domain *d = v->domain;
+    int port = iopacket_port(v);
 
     for ( ; ; )
     {
@@ -729,8 +729,8 @@ void hvm_wait_io(void)
 void hvm_safe_block(void)
 {
     struct vcpu *v = current;
-    struct domain *d = v->domain;    
-    int port = iopacket_port(d);
+    struct domain *d = v->domain;
+    int port = iopacket_port(v);
 
     for ( ; ; )
     {

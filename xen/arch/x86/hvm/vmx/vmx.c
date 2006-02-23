@@ -448,7 +448,6 @@ unsigned long vmx_get_ctrl_reg(struct vcpu *v, unsigned int num)
     return 0;                   /* dummy */
 }
 
-extern long evtchn_send(int lport);
 void do_nmi(struct cpu_user_regs *);
 
 static int check_vmx_controls(ctrls, msr)

@@ -399,7 +399,7 @@ static long evtchn_close(evtchn_close_t *close)
 }
 
 
-long evtchn_send(int lport)
+long evtchn_send(unsigned int lport)
 {
     struct evtchn *lchn, *rchn;
     struct domain *ld = current->domain, *rd;
@@ -508,15 +508,13 @@ static long evtchn_status(evtchn_status_t *status)
     return rc;
 }
 
-static long evtchn_bind_vcpu(evtchn_bind_vcpu_t *bind) 
+long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
 {
-    struct domain *d    = current->domain;
-    int            port = bind->port;
-    int            vcpu = bind->vcpu;
+    struct domain *d = current->domain;
     struct evtchn *chn;
     long           rc = 0;
 
-    if ( (vcpu >= ARRAY_SIZE(d->vcpu)) || (d->vcpu[vcpu] == NULL) )
+    if ( (vcpu_id >= ARRAY_SIZE(d->vcpu)) || (d->vcpu[vcpu_id] == NULL) )
         return -ENOENT;
 
     spin_lock(&d->evtchn_lock);
@@ -533,7 +531,7 @@ static long evtchn_bind_vcpu(evtchn_bind_vcpu_t *bind)
     case ECS_UNBOUND:
     case ECS_INTERDOMAIN:
     case ECS_PIRQ:
-        chn->notify_vcpu_id = vcpu;
+        chn->notify_vcpu_id = vcpu_id;
         break;
     default:
         rc = -EINVAL;
@@ -638,7 +636,7 @@ long do_event_channel_op(struct evtchn_op *uop)
         break;
 
     case EVTCHNOP_bind_vcpu:
-        rc = evtchn_bind_vcpu(&op.u.bind_vcpu);
+        rc = evtchn_bind_vcpu(op.u.bind_vcpu.port, op.u.bind_vcpu.vcpu);
         break;
 
     case EVTCHNOP_unmask:

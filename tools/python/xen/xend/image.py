@@ -205,7 +205,6 @@ class HVMImageHandler(ImageHandler):
                         ("image/device-model", self.device_model),
                         ("image/display", self.display))
 
-        self.device_channel = None
         self.pid = 0
 
         self.dmargs += self.configVNC(imageConfig)
@@ -216,16 +215,10 @@ class HVMImageHandler(ImageHandler):
         self.apic = int(sxp.child_value(imageConfig, 'apic', 0))
 
     def buildDomain(self):
-        # Create an event channel
-        self.device_channel = xc.evtchn_alloc_unbound(dom=self.vm.getDomid(),
-                                                      remote_dom=0)
-        log.info("HVM device model port: %d", self.device_channel)
-
         store_evtchn = self.vm.getStorePort()
 
         log.debug("dom            = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
-        log.debug("control_evtchn = %d", self.device_channel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
@@ -237,7 +230,6 @@ class HVMImageHandler(ImageHandler):
 
         return xc.hvm_build(dom            = self.vm.getDomid(),
                             image          = self.kernel,
-                            control_evtchn = self.device_channel,
                             store_evtchn   = store_evtchn,
                             memsize        = self.vm.getMemoryTarget() / 1024,
                             vcpus          = self.vm.getVCpuCount(),
@@ -345,7 +337,6 @@ class HVMImageHandler(ImageHandler):
         if len(vnc):
             args = args + vnc
         args = args + ([ "-d",  "%d" % self.vm.getDomid(),
-                  "-p", "%d" % self.device_channel,
                   "-m", "%s" % (self.vm.getMemoryTarget() / 1024)])
         args = args + self.dmargs
         env = dict(os.environ)

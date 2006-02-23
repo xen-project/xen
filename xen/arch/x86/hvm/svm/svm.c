@@ -64,7 +64,6 @@ static unsigned long trace_values[NR_CPUS][4];
 /* 
  * External functions, etc. We should move these to some suitable header file(s) */
 
-extern long evtchn_send(int lport);
 extern void do_nmi(struct cpu_user_regs *, unsigned long);
 extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
                                 int inst_len);

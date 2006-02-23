@@ -200,6 +200,18 @@ static void vmx_do_launch(struct vcpu *v)
     if (v->vcpu_id == 0)
         hvm_setup_platform(v->domain);
 
+    if ( evtchn_bind_vcpu(iopacket_port(v), v->vcpu_id) < 0 )
+    {
+        printk("VMX domain bind port %d to vcpu %d failed!\n",
+               iopacket_port(v), v->vcpu_id);
+        domain_crash_synchronous();
+    }
+
+    HVM_DBG_LOG(DBG_LEVEL_1, "eport: %x", iopacket_port(v));
+
+    clear_bit(iopacket_port(v),
+              &v->domain->shared_info->evtchn_mask[0]);
+
     __asm__ __volatile__ ("mov %%cr0,%0" : "=r" (cr0) : );
 
     error |= __vmwrite(GUEST_CR0, cr0);

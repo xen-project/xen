@@ -124,11 +124,6 @@ static void hvm_map_io_shared_page(struct domain *d)
         domain_crash_synchronous();
     }
     d->arch.hvm_domain.shared_page_va = (unsigned long)p;
-
-    HVM_DBG_LOG(DBG_LEVEL_1, "eport: %x\n", iopacket_port(d));
-
-    clear_bit(iopacket_port(d),
-              &d->shared_info->evtchn_mask[0]);
 }
 
 static int validate_hvm_info(struct hvm_info_table *t)

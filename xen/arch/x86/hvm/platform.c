@@ -42,8 +42,6 @@
 #define DECODE_success  1
 #define DECODE_failure  0
 
-extern long evtchn_send(int lport);
-
 #if defined (__x86_64__)
 static inline long __get_reg_value(unsigned long reg, int size)
 {
@@ -648,6 +646,8 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
     p->count = count;
     p->df = regs->eflags & EF_DF ? 1 : 0;
 
+    p->io_count++;
+
     if (pvalid) {
         if (hvm_paging_enabled(current))
             p->u.pdata = (void *) gva_to_gpa(value);
@@ -664,18 +664,18 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
 
     p->state = STATE_IOREQ_READY;
 
-    evtchn_send(iopacket_port(v->domain));
+    evtchn_send(iopacket_port(v));
     hvm_wait_io();
 }
 
-void send_mmio_req(unsigned char type, unsigned long gpa,
-                   unsigned long count, int size, long value, int dir, int pvalid)
+void send_mmio_req(
+    unsigned char type, unsigned long gpa,
+    unsigned long count, int size, long value, int dir, int pvalid)
 {
     struct vcpu *v = current;
     vcpu_iodata_t *vio;
     ioreq_t *p;
     struct cpu_user_regs *regs;
-    extern long evtchn_send(int lport);
 
     regs = current->arch.hvm_vcpu.mmio_op.inst_decoder_regs;
 
@@ -702,6 +702,8 @@ void send_mmio_req(unsigned char type, unsigned long gpa,
     p->count = count;
     p->df = regs->eflags & EF_DF ? 1 : 0;
 
+    p->io_count++;
+
     if (pvalid) {
         if (hvm_paging_enabled(v))
             p->u.pdata = (void *) gva_to_gpa(value);
@@ -718,7 +720,7 @@ void send_mmio_req(unsigned char type, unsigned long gpa,
 
     p->state = STATE_IOREQ_READY;
 
-    evtchn_send(iopacket_port(v->domain));
+    evtchn_send(iopacket_port(v));
     hvm_wait_io();
 }
 

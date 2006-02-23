@@ -125,9 +125,8 @@ target_ulong cpu_get_phys_page_debug(CPUState *env, target_ulong addr)
 //the evtchn fd for polling
 int evtchn_fd = -1;
 
-//the evtchn port for polling the notification,
-//should be inputed as bochs's parameter
-evtchn_port_t ioreq_remote_port, ioreq_local_port;
+//which vcpu we are serving
+int send_vcpu = 0;
 
 //some functions to handle the io req packet
 void sp_info()
@@ -135,52 +134,62 @@ void sp_info()
     ioreq_t *req;
     int i;
 
-    term_printf("event port: %d\n", shared_page->sp_global.eport);
     for ( i = 0; i < vcpus; i++ ) {
         req = &(shared_page->vcpu_iodata[i].vp_ioreq);
-        term_printf("vcpu %d:\n", i);
+        term_printf("vcpu %d: event port %d\n",
+                    i, shared_page->vcpu_iodata[i].vp_eport);
         term_printf("  req state: %x, pvalid: %x, addr: %llx, "
                     "data: %llx, count: %llx, size: %llx\n",
                     req->state, req->pdata_valid, req->addr,
                     req->u.data, req->count, req->size);
+        term_printf("  IO totally occurred on this vcpu: %llx\n",
+                    req->io_count);
     }
 }
 
 //get the ioreq packets from share mem
-ioreq_t* __cpu_get_ioreq(void)
+static ioreq_t* __cpu_get_ioreq(int vcpu)
 {
     ioreq_t *req;
 
-    req = &(shared_page->vcpu_iodata[0].vp_ioreq);
-    if (req->state == STATE_IOREQ_READY) {
-        req->state = STATE_IOREQ_INPROCESS;
-    } else {
-        fprintf(logfile, "False I/O request ... in-service already: "
-                         "%x, pvalid: %x, port: %llx, "
-                         "data: %llx, count: %llx, size: %llx\n",
-                         req->state, req->pdata_valid, req->addr,
-                         req->u.data, req->count, req->size);
-        req = NULL;
-    }
+    req = &(shared_page->vcpu_iodata[vcpu].vp_ioreq);
 
-    return req;
+    if ( req->state == STATE_IOREQ_READY )
+        return req;
+
+    fprintf(logfile, "False I/O request ... in-service already: "
+                     "%x, pvalid: %x, port: %llx, "
+                     "data: %llx, count: %llx, size: %llx\n",
+                     req->state, req->pdata_valid, req->addr,
+                     req->u.data, req->count, req->size);
+    return NULL;
 }
 
 //use poll to get the port notification
 //ioreq_vec--out,the
 //retval--the number of ioreq packet
-ioreq_t* cpu_get_ioreq(void)
+static ioreq_t* cpu_get_ioreq(void)
 {
-    int rc;
+    int i, rc;
     evtchn_port_t port;
 
     rc = read(evtchn_fd, &port, sizeof(port));
-    if ((rc == sizeof(port)) && (port == ioreq_local_port)) {
+    if ( rc == sizeof(port) ) {
+        for ( i = 0; i < vcpus; i++ )
+            if ( shared_page->vcpu_iodata[i].dm_eport == port )
+                break;
+
+        if ( i == vcpus ) {
+            fprintf(logfile, "Fatal error while trying to get io event!\n");
+            exit(1);
+        }
+
         // unmask the wanted port again
-        write(evtchn_fd, &ioreq_local_port, sizeof(port));
+        write(evtchn_fd, &port, sizeof(port));
 
         //get the io packet from shared memory
-        return __cpu_get_ioreq();
+        send_vcpu = i;
+        return __cpu_get_ioreq(i);
     }
 
     //read error or read nothing
@@ -361,6 +370,8 @@ void cpu_handle_ioreq(CPUState *env)
     ioreq_t *req = cpu_get_ioreq();
 
     if (req) {
+        req->state = STATE_IOREQ_INPROCESS;
+
         if ((!req->pdata_valid) && (req->dir == IOREQ_WRITE)) {
             if (req->size != 4)
                 req->u.data &= (1UL << (8 * req->size))-1;
@@ -465,7 +476,7 @@ int main_loop(void)
             struct ioctl_evtchn_notify notify;
 
             env->send_event = 0;
-            notify.port = ioreq_local_port;
+            notify.port = shared_page->vcpu_iodata[send_vcpu].dm_eport;
             (void)ioctl(evtchn_fd, IOCTL_EVTCHN_NOTIFY, &notify);
         }
     }
@@ -488,7 +499,7 @@ CPUState * cpu_init()
 {
     CPUX86State *env;
     struct ioctl_evtchn_bind_interdomain bind;
-    int rc;
+    int i, rc;
 
     cpu_exec_init();
     qemu_register_reset(qemu_hvm_reset, NULL);
@@ -509,14 +520,17 @@ CPUState * cpu_init()
         return NULL;
     }
 
+    /* FIXME: how about if we overflow the page here? */
     bind.remote_domain = domid;
-    bind.remote_port   = ioreq_remote_port;
-    rc = ioctl(evtchn_fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
-    if (rc == -1) {
-        fprintf(logfile, "bind interdomain ioctl error %d\n", errno);
-        return NULL;
+    for ( i = 0; i < vcpus; i++ ) {
+        bind.remote_port = shared_page->vcpu_iodata[i].vp_eport;
+        rc = ioctl(evtchn_fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
+        if ( rc == -1 ) {
+            fprintf(logfile, "bind interdomain ioctl error %d\n", errno);
+            return NULL;
+        }
+        shared_page->vcpu_iodata[i].dm_eport = rc;
     }
-    ioreq_local_port = rc;
 
     return env;
 }

@@ -53,6 +53,7 @@ typedef struct {
     uint8_t dir:1;          /*  1=read, 0=write             */
     uint8_t df:1;
     uint8_t type;           /* I/O type                     */
+    uint64_t io_count;      /* How many IO done on a vcpu   */
 } ioreq_t;
 
 #define MAX_VECTOR      256
@@ -65,11 +66,13 @@ typedef struct {
     uint16_t    pic_irr;
     uint16_t    pic_last_irr;
     uint16_t    pic_clear_irr;
-    int         eport; /* Event channel port */
 } global_iodata_t;
 
 typedef struct {
-    ioreq_t     vp_ioreq;
+    ioreq_t         vp_ioreq;
+    /* Event channel port */
+    unsigned long   vp_eport;   /* VMX vcpu uses this to notify DM */
+    unsigned long   dm_eport;   /* DM uses this to notify VMX vcpu */
 } vcpu_iodata_t;
 
 typedef struct {

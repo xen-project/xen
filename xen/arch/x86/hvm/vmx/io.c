@@ -178,7 +178,7 @@ void vmx_do_resume(struct vcpu *v)
 
     vmx_stts();
 
-    if ( test_bit(iopacket_port(d), &d->shared_info->evtchn_pending[0]) ||
+    if ( test_bit(iopacket_port(v), &d->shared_info->evtchn_pending[0]) ||
          test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags) )
         hvm_wait_io();
 

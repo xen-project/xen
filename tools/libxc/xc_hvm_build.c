@@ -175,7 +175,6 @@ static int setup_guest(int xc_handle,
                        unsigned long nr_pages,
                        vcpu_guest_context_t *ctxt,
                        unsigned long shared_info_frame,
-                       unsigned int control_evtchn,
                        unsigned int vcpus,
                        unsigned int pae,
                        unsigned int acpi,
@@ -284,7 +283,19 @@ static int setup_guest(int xc_handle,
          shared_page_frame)) == 0 )
         goto error_out;
     memset(sp, 0, PAGE_SIZE);
-    sp->sp_global.eport = control_evtchn;
+
+    /* FIXME: how about if we overflow the page here? */
+    for ( i = 0; i < vcpus; i++ ) {
+        unsigned int vp_eport;
+
+        vp_eport = xc_evtchn_alloc_unbound(xc_handle, dom, 0);
+        if ( vp_eport < 0 ) {
+            fprintf(stderr, "Couldn't get unbound port from VMX guest.\n");
+            goto error_out;
+        }
+        sp->vcpu_iodata[i].vp_eport = vp_eport;
+    }
+
     munmap(sp, PAGE_SIZE);
 
     *store_mfn = page_array[(v_end >> PAGE_SHIFT) - 2];
@@ -331,7 +342,6 @@ int xc_hvm_build(int xc_handle,
                  uint32_t domid,
                  int memsize,
                  const char *image_name,
-                 unsigned int control_evtchn,
                  unsigned int vcpus,
                  unsigned int pae,
                  unsigned int acpi,
@@ -388,7 +398,7 @@ int xc_hvm_build(int xc_handle,
 
     ctxt->flags = VGCF_HVM_GUEST;
     if ( setup_guest(xc_handle, domid, memsize, image, image_size, nr_pages,
-                     ctxt, op.u.getdomaininfo.shared_info_frame, control_evtchn,
+                     ctxt, op.u.getdomaininfo.shared_info_frame,
                      vcpus, pae, acpi, apic, store_evtchn, store_mfn) < 0)
     {
         ERROR("Error constructing guest OS");
