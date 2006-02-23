@@ -1,11 +1,16 @@
 #include <os.h>
 
 .section __xen_guest
-        .asciz  "XEN_VER=3.0,LOADER=generic,PT_MODE_WRITABLE"
+	.ascii	"GUEST_OS=Mini-OS"
+	.ascii	",XEN_VER=xen-3.0"
+	.ascii	",HYPERCALL_PAGE=0x2"
+	.ascii	",LOADER=generic"
+	.ascii	",PT_MODE_WRITABLE"
+	.byte	0
 .text
 
 #define ENTRY(X) .globl X ; X :
-.globl _start, shared_info
+.globl _start, shared_info, hypercall_page
 
 #define SAVE_ALL \
         cld; \
@@ -56,6 +61,9 @@ stack_start:
         .org 0x1000
 shared_info:
         .org 0x2000
+
+hypercall_page:
+        .org 0x3000
 
 ENTRY(hypervisor_callback)
         popq  %rcx
