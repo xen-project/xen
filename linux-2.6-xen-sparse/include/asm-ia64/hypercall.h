@@ -46,6 +46,74 @@
  * Assembler stubs for hyper-calls.
  */
 
+#define _hypercall0(type, name)					\
+({								\
+	long __res;						\
+	__asm__ __volatile__ (";;\n"				\
+			      "mov r2=%1\n"			\
+			      "break 0x1000 ;;\n"		\
+			      "mov %0=r8 ;;\n"			\
+			      : "=r" (__res)			\
+			      : "i" (__HYPERVISOR_##name)	\
+			      : "r2","r8"			\
+				"memory" );			\
+	(type)__res;						\
+})
+
+#define _hypercall1(type, name, a1)				\
+({								\
+	long __res;						\
+	__asm__ __volatile__ (";;\n"				\
+			      "mov r14=%2\n"			\
+			      "mov r2=%1\n"			\
+			      "break 0x1000 ;;\n"		\
+			      "mov %0=r8 ;;\n"			\
+			      : "=r" (__res)			\
+			      : "i" (__HYPERVISOR_##name),	\
+				"r" ((unsigned long)(a1))	\
+			      : "r14","r2","r8",		\
+				"memory" );			\
+	(type)__res;						\
+})
+
+#define _hypercall2(type, name, a1, a2)				\
+({								\
+	long __res;						\
+	__asm__ __volatile__ (";;\n"				\
+			      "mov r14=%2\n"			\
+			      "mov r15=%3\n"			\
+			      "mov r2=%1\n"			\
+			      "break 0x1000 ;;\n"		\
+			      "mov %0=r8 ;;\n"			\
+			      : "=r" (__res)			\
+			      : "i" (__HYPERVISOR_##name),	\
+				"r" ((unsigned long)(a1)),	\
+				"r" ((unsigned long)(a2))	\
+			      : "r14","r15","r2","r8",		\
+				"memory" );			\
+	(type)__res;						\
+})
+
+#define _hypercall3(type, name, a1, a2, a3)			\
+({								\
+	long __res;						\
+	__asm__ __volatile__ (";;\n"                            \
+			      "mov r14=%2\n"                    \
+			      "mov r15=%3\n"                    \
+			      "mov r16=%4\n"                    \
+			      "mov r2=%1\n"                     \
+			      "break 0x1000 ;;\n"               \
+			      "mov %0=r8 ;;\n"                  \
+			      : "=r" (__res)                    \
+			      : "i" (__HYPERVISOR_##name),      \
+				"r" ((unsigned long)(a1)),	\
+				"r" ((unsigned long)(a2)),	\
+				"r" ((unsigned long)(a3))	\
+			      : "r14","r15","r16","r2","r8",    \
+				"memory" );                     \
+	(type)__res;                                            \
+})
+
 #if 0
 static inline int
 HYPERVISOR_set_trap_table(
@@ -369,24 +437,14 @@ static inline int
 HYPERVISOR_memory_op(
     unsigned int cmd, void *arg)
 {
-    int ret;
-    __asm__ __volatile__ ( ";; mov r14=%2 ; mov r15=%3 ; mov r2=%1 ; break 0x1000 ;; mov %0=r8 ;;"
-        : "=r" (ret)
-        : "i" (__HYPERVISOR_memory_op), "r"(cmd), "r"(arg)
-        : "r14","r15","r2","r8","memory" );
-    return ret;
+    return _hypercall2(int, memory_op, cmd, arg);
 }
 
 static inline int
 HYPERVISOR_event_channel_op(
     void *op)
 {
-    int ret;
-    __asm__ __volatile__ ( ";; mov r14=%2 ; mov r2=%1 ; break 0x1000 ;; mov %0=r8 ;;"
-        : "=r" (ret)
-        : "i" (__HYPERVISOR_event_channel_op), "r"(op)
-        : "r14","r2","r8","memory" );
-    return ret;
+    return _hypercall1(int, event_channel_op, op);
 }
 
 #if 0
@@ -414,12 +472,7 @@ static inline int
 HYPERVISOR_console_io(
     int cmd, int count, char *str)
 {
-    int ret;
-    __asm__ __volatile__ ( ";; mov r14=%2 ; mov r15=%3 ; mov r16=%4 ; mov r2=%1 ; break 0x1000 ;; mov %0=r8 ;;"
-        : "=r" (ret)
-        : "i" (__HYPERVISOR_console_io), "r"(cmd), "r"(count), "r"(str)
-        : "r14","r15","r16","r2","r8","memory" );
-    return ret;
+    return _hypercall3(int, console_io, cmd, count, str);
 }
 
 #if 0
@@ -447,12 +500,7 @@ static inline int
 HYPERVISOR_grant_table_op(
     unsigned int cmd, void *uop, unsigned int count)
 {
-    int ret;
-    __asm__ __volatile__ ( ";; mov r14=%2 ; mov r15=%3 ; mov r16=%4 ; mov r2=%1 ; break 0x1000 ;; mov %0=r8 ;;"
-        : "=r" (ret)
-        : "i" (__HYPERVISOR_grant_table_op), "r"(cmd), "r"(uop), "r"(count)
-        : "r14","r15","r16","r2","r8","memory" );
-    return ret;
+    return _hypercall3(int, grant_table_op, cmd, uop, count);
 }
 
 #if 0
