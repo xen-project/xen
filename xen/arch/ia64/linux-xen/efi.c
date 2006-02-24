@@ -534,32 +534,9 @@ efi_map_pal_code (void)
 {
 #ifdef XEN
 	u64 psr;
-	static unsigned long last_rr7 = 0;
-	unsigned long current_rr7 = ia64_get_rr(7L<<61);
-
-	// this routine is called only once in Linux but may be called
-	// multiple times in Xen.  However, we only need to flush and
-	// reset itr[IA64_TR_PALCODE] if rr7 changes
 	if (!pal_vaddr) {
 		pal_vaddr = efi_get_pal_addr ();
-		last_rr7 = current_rr7;
 	}
-	else if (last_rr7 == current_rr7) return;
-	else {
-		last_rr7 = current_rr7;
-		printk("efi_map_pal_code,remapping pal w/rr7=%lx\n",last_rr7);
-	}
-
-	printf("efi_map_pal_code: about to ia64_ptr(%d,%p,%p)\n",
-		0x1, GRANULEROUNDDOWN((unsigned long) pal_vaddr),
-		 IA64_GRANULE_SHIFT);
-	ia64_ptr(0x1, GRANULEROUNDDOWN((unsigned long) pal_vaddr),
-		 IA64_GRANULE_SHIFT);
-	ia64_srlz_i();
-	printf("efi_map_pal_code: about to ia64_itr(%p,%p,%p,%p,%p)\n",
-		0x1, IA64_TR_PALCODE, GRANULEROUNDDOWN((unsigned long) pal_vaddr),
-		 pte_val(pfn_pte(__pa(pal_vaddr) >> PAGE_SHIFT, PAGE_KERNEL)),
-		 IA64_GRANULE_SHIFT);
 #else
 	void *pal_vaddr = efi_get_pal_addr ();
 	u64 psr;
