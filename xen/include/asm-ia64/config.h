@@ -293,11 +293,11 @@ extern int ht_per_core;
 #endif /* __XEN_IA64_CONFIG_H__ */
 
 // needed for include/xen/smp.h
-#ifdef CONFIG_SMP
-#define raw_smp_processor_id()	current->processor
-#else
-#define raw_smp_processor_id()	0
-#endif
+//#ifdef CONFIG_SMP
+//#define raw_smp_processor_id()	current->processor
+//#else
+//#define raw_smp_processor_id()	0
+//#endif
 
 
 #ifndef __ASSEMBLY__

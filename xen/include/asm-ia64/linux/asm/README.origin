@@ -46,7 +46,6 @@ scatterlist.h		-> linux/include/asm-ia64/scatterlist.h
 sections.h		-> linux/include/asm-ia64/sections.h
 semaphore.h		-> linux/include/asm-ia64/semaphore.h
 setup.h			-> linux/include/asm-ia64/setup.h
-smp.h			-> linux/include/asm-ia64/smp.h
 string.h		-> linux/include/asm-ia64/string.h
 thread_info.h		-> linux/include/asm-ia64/thread_info.h
 timex.h			-> linux/include/asm-ia64/timex.h

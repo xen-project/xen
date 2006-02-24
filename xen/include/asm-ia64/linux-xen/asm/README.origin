@@ -17,6 +17,7 @@ pgalloc.h		-> linux/include/asm-ia64/pgalloc.h
 pgtable.h		-> linux/include/asm-ia64/pgtable.h
 processor.h		-> linux/include/asm-ia64/processor.h
 ptrace.h		-> linux/include/asm-ia64/ptrace.h
+smp.h			-> linux/include/asm-ia64/smp.h
 spinlock.h		-> linux/include/asm-ia64/spinlock.h
 system.h		-> linux/include/asm-ia64/system.h
 tlbflush.h		-> linux/include/asm-ia64/tlbflush.h
