@@ -17,10 +17,15 @@
  * 	- command line string
  * 	- kernel code & data
  * 	- Kernel memory map built from EFI memory map
+ *	- xen start info
  *
  * More could be added if necessary
  */
+#ifndef CONFIG_XEN
 #define IA64_MAX_RSVD_REGIONS 6
+#else
+#define IA64_MAX_RSVD_REGIONS 7
+#endif
 
 struct rsvd_region {
 	unsigned long start;	/* virtual address of beginning of element */

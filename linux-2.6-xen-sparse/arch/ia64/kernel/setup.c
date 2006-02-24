@@ -247,9 +247,11 @@ reserve_memory (void)
 	n++;
 
 #ifdef CONFIG_XEN
-	rsvd_region[n].start = (unsigned long) (HYPERVISOR_shared_info->arch.start_info_pfn << PAGE_SHIFT);
-	rsvd_region[n].end   = rsvd_region[n].start + PAGE_SIZE;
-	n++;
+	if (running_on_xen) {
+		rsvd_region[n].start = (unsigned long)__va((HYPERVISOR_shared_info->arch.start_info_pfn << PAGE_SHIFT));
+		rsvd_region[n].end   = rsvd_region[n].start + PAGE_SIZE;
+		n++;
+ 	}
 #endif
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -269,6 +271,7 @@ reserve_memory (void)
 	n++;
 
 	num_rsvd_regions = n;
+	BUG_ON(IA64_MAX_RSVD_REGIONS + 1 < n);
 
 	sort_regions(rsvd_region, num_rsvd_regions);
 }
