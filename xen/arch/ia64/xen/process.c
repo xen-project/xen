@@ -94,7 +94,7 @@ unsigned long translate_domain_pte(unsigned long pteval,
 	extern unsigned long dom0_start, dom0_size;
 
 	// FIXME address had better be pre-validated on insert
-	mask = itir_mask(itir);
+	mask = ~itir_mask(itir);
 	mpaddr = ((pteval & _PAGE_PPN_MASK) & ~mask) | (address & mask);
 	if (d == dom0) {
 		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
