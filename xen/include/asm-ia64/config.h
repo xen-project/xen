@@ -211,6 +211,9 @@ void sort_main_extable(void);
 
 // see include/asm-ia64/mm.h, handle remaining page_info uses until gone
 #define page_info page
+// Deprivated linux inf and put here for short time compatibility
+#define kmalloc(s, t) xmalloc_bytes((s))
+#define kfree(s) xfree((s))
 
 // see common/keyhandler.c
 #define	nop()	asm volatile ("nop 0")

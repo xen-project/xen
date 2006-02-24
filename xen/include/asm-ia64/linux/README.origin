@@ -23,7 +23,6 @@ preempt.h		-> linux/include/linux/preempt.h
 rbtree.h		-> linux/include/linux/rbtree.h
 rwsem.h			-> linux/include/linux/rwsem.h
 seqlock.h		-> linux/include/linux/seqlock.h
-slab.h			-> linux/include/linux/slab.h
 sort.h			-> linux/include/linux/sort.h
 stddef.h		-> linux/include/linux/stddef.h
 thread_info.h		-> linux/include/linux/thread_info.h

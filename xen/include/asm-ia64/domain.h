@@ -9,6 +9,7 @@
 #include <public/arch-ia64.h>
 #include <asm/vmx_platform.h>
 #include <xen/list.h>
+#include <xen/cpumask.h>
 
 extern void domain_relinquish_resources(struct domain *);
 
