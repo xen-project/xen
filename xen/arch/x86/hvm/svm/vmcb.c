@@ -421,6 +421,18 @@ void svm_do_launch(struct vcpu *v)
     if (v->vcpu_id == 0)
         hvm_setup_platform(v->domain);
 
+    if ( evtchn_bind_vcpu(iopacket_port(v), v->vcpu_id) < 0 )
+    {
+        printk("HVM domain bind port %d to vcpu %d failed!\n",
+               iopacket_port(v), v->vcpu_id);
+        domain_crash_synchronous();
+    }
+
+    HVM_DBG_LOG(DBG_LEVEL_1, "eport: %x", iopacket_port(v));
+
+    clear_bit(iopacket_port(v),
+              &v->domain->shared_info->evtchn_mask[0]);
+
     if (hvm_apic_support(v->domain))
         vlapic_init(v);
     init_timer(&v->arch.hvm_svm.hlt_timer,
@@ -443,8 +455,6 @@ void svm_do_launch(struct vcpu *v)
         pt = pagetable_get_paddr(v->domain->arch.phys_table);
         printk("%s: phys_table   = %lx\n", __func__, pt);
     }
-
-    shadow_direct_map_init(v);
 
     if ( svm_paging_enabled(v) )
         vmcb->cr3 = pagetable_get_paddr(v->arch.guest_table);
@@ -492,7 +502,7 @@ void svm_do_resume(struct vcpu *v)
 
     svm_stts(v);
 
-    if ( test_bit(iopacket_port(d), &d->shared_info->evtchn_pending[0]) ||
+    if ( test_bit(iopacket_port(v), &d->shared_info->evtchn_pending[0]) ||
          test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags) )
         hvm_wait_io();
 

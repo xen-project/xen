@@ -14,7 +14,6 @@
 
 #include <linux/vmalloc.h>
 
-
 /*
  * The DMA channel used by the floppy controller cannot access data at
  * addresses >= 16MB
@@ -25,8 +24,6 @@
  */
 #define _CROSS_64KB(a,s,vdma) \
 (!(vdma) && ((unsigned long)(a)/K_64 != ((unsigned long)(a) + (s) - 1) / K_64))
-
-#include <linux/vmalloc.h>
 
 /* XEN: Hit DMA paths on the head. This trick from asm-m68k/floppy.h. */
 #include <asm/dma.h>
@@ -43,8 +40,12 @@
 #define fd_disable_irq()        disable_irq(FLOPPY_IRQ)
 #define fd_free_irq()		free_irq(FLOPPY_IRQ, NULL)
 #define fd_get_dma_residue()    vdma_get_dma_residue(FLOPPY_DMA)
-#define fd_dma_mem_alloc(size)	vdma_mem_alloc(size)
-#define fd_dma_mem_free(addr, size) vdma_mem_free(addr, size) 
+/*
+ * Do not use vmalloc/vfree: floppy_release_irq_and_dma() gets called from
+ * softirq context via motor_off_callback. A generic bug we happen to trigger.
+ */
+#define fd_dma_mem_alloc(size)	__get_free_pages(GFP_KERNEL, get_order(size))
+#define fd_dma_mem_free(addr, size) free_pages(addr, get_order(size))
 #define fd_dma_setup(addr, size, mode, io) vdma_dma_setup(addr, size, mode, io)
 
 static int virtual_dma_count;
@@ -137,7 +138,7 @@ static int fd_request_irq(void)
 					   "floppy", NULL);
 }
 
-
+#if 0
 static unsigned long vdma_mem_alloc(unsigned long size)
 {
 	return (unsigned long) vmalloc(size);
@@ -148,6 +149,7 @@ static void vdma_mem_free(unsigned long addr, unsigned long size)
 {
 	vfree((void *)addr);
 }
+#endif
 
 static int vdma_dma_setup(char *addr, unsigned long size, int mode, int io)
 {
@@ -168,7 +170,7 @@ static int xen_floppy_init(void)
 {
 	use_virtual_dma = 1;
 	can_use_virtual_dma = 1;
-	return 0x340;
+	return 0x3f0;
 }
 
 /*

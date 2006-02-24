@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.16-rc3-xen0
-# Thu Feb 16 22:55:30 2006
+# Mon Feb 20 11:37:43 2006
 #
 CONFIG_X86_64=y
 CONFIG_64BIT=y
@@ -126,10 +126,10 @@ CONFIG_SWIOTLB=y
 # CONFIG_CRASH_DUMP is not set
 CONFIG_PHYSICAL_START=0x100000
 CONFIG_SECCOMP=y
-# CONFIG_HZ_100 is not set
-CONFIG_HZ_250=y
+CONFIG_HZ_100=y
+# CONFIG_HZ_250 is not set
 # CONFIG_HZ_1000 is not set
-CONFIG_HZ=250
+CONFIG_HZ=100
 CONFIG_GENERIC_HARDIRQS=y
 CONFIG_GENERIC_IRQ_PROBE=y
 CONFIG_ISA_DMA_API=y
@@ -160,6 +160,11 @@ CONFIG_ACPI_EC=y
 CONFIG_ACPI_POWER=y
 CONFIG_ACPI_SYSTEM=y
 # CONFIG_ACPI_CONTAINER is not set
+
+#
+# CPU Frequency scaling
+#
+# CONFIG_CPU_FREQ is not set
 
 #
 # Bus options (PCI etc.)

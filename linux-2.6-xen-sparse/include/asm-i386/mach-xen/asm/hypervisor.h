@@ -61,9 +61,6 @@ void xen_cpu_idle (void);
 /* arch/xen/i386/kernel/hypervisor.c */
 void do_hypervisor_callback(struct pt_regs *regs);
 
-/* arch/xen/i386/kernel/head.S */
-void lgdt_finish(void);
-
 /* arch/xen/i386/mm/hypervisor.c */
 /*
  * NB. ptr values should be PHYSICAL, not MACHINE. 'vals' should be already

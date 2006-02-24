@@ -63,4 +63,10 @@ extern void send_guest_pirq(struct domain *d, int pirq);
     (!!(v)->vcpu_info->evtchn_upcall_pending &  \
       !(v)->vcpu_info->evtchn_upcall_mask)
 
+/* Send a notification from a local event-channel port. */
+extern long evtchn_send(unsigned int lport);
+
+/* Bind a local event-channel port to the specified VCPU. */
+extern long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id);
+
 #endif /* __XEN_EVENT_H__ */

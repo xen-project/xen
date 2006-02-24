@@ -124,11 +124,6 @@ static void hvm_map_io_shared_page(struct domain *d)
         domain_crash_synchronous();
     }
     d->arch.hvm_domain.shared_page_va = (unsigned long)p;
-
-    HVM_DBG_LOG(DBG_LEVEL_1, "eport: %x\n", iopacket_port(d));
-
-    clear_bit(iopacket_port(d),
-              &d->shared_info->evtchn_mask[0]);
 }
 
 static int validate_hvm_info(struct hvm_info_table *t)
@@ -175,10 +170,12 @@ static void hvm_get_info(struct domain *d)
     if ( validate_hvm_info(t) ) {
         d->arch.hvm_domain.nr_vcpus = t->nr_vcpus;
         d->arch.hvm_domain.apic_enabled = t->apic_enabled;
+        d->arch.hvm_domain.pae_enabled = t->pae_enabled;
     } else {
         printk("Bad hvm info table\n");
         d->arch.hvm_domain.nr_vcpus = 1;
         d->arch.hvm_domain.apic_enabled = 0;
+        d->arch.hvm_domain.pae_enabled = 0;
     }
 
     unmap_domain_page(p);
@@ -188,8 +185,10 @@ void hvm_setup_platform(struct domain* d)
 {
     struct hvm_domain *platform;
 
-    if (!(HVM_DOMAIN(current) && (current->vcpu_id == 0)))
+    if ( !HVM_DOMAIN(current) || (current->vcpu_id != 0) )
         return;
+
+    shadow_direct_map_init(d);
 
     hvm_map_io_shared_page(d);
     hvm_get_info(d);
@@ -198,7 +197,8 @@ void hvm_setup_platform(struct domain* d)
     pic_init(&platform->vpic, pic_irq_request, &platform->interrupt_request);
     register_pic_io_hook();
 
-    if ( hvm_apic_support(d) ) {
+    if ( hvm_apic_support(d) )
+    {
         spin_lock_init(&d->arch.hvm_domain.round_robin_lock);
         hvm_vioapic_init(d);
     }

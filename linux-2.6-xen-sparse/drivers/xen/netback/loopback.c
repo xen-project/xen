@@ -137,10 +137,13 @@ static int __init make_loopback(int i)
 
 	sprintf(dev_name, "vif0.%d", i);
 	dev1 = alloc_netdev(sizeof(struct net_private), dev_name, ether_setup);
+	if (!dev1)
+		return err;
+
 	sprintf(dev_name, "veth%d", i);
 	dev2 = alloc_netdev(sizeof(struct net_private), dev_name, ether_setup);
-	if ((dev1 == NULL) || (dev2 == NULL))
-		goto fail;
+	if (!dev2)
+		goto fail_netdev2;
 
 	loopback_construct(dev1, dev2);
 	loopback_construct(dev2, dev1);
@@ -169,8 +172,9 @@ static int __init make_loopback(int i)
 	return 0;
 
  fail:
-	kfree(dev1);
-	kfree(dev2);
+	free_netdev(dev2);
+ fail_netdev2:
+	free_netdev(dev1);
 	return err;
 }
 

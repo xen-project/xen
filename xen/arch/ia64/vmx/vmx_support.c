@@ -38,7 +38,7 @@ void vmx_wait_io(void)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
-    int port = iopacket_port(d);
+    int port = iopacket_port(v);
 
     do {
 	if (!test_bit(port,
@@ -129,7 +129,7 @@ void vmx_intr_assist(struct vcpu *v)
     struct domain *d = v->domain;
     extern void vmx_vcpu_pend_batch_interrupt(VCPU *vcpu,
 					unsigned long *pend_irr);
-    int port = iopacket_port(d);
+    int port = iopacket_port(v);
 
     /* I/O emulation is atomic, so it's impossible to see execution flow
      * out of vmx_wait_io, when guest is still waiting for response.

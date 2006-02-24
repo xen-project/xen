@@ -61,6 +61,7 @@ __asm__ __volatile__ ("movw %w3,0(%2)\n\t" \
 	"rorl $16,%1" \
 	: "=m"(*(n)) : "q" (addr), "r"(n), "ir"(limit), "i"(type))
 
+#ifndef CONFIG_X86_NO_TSS
 static inline void __set_tss_desc(unsigned int cpu, unsigned int entry, void *addr)
 {
 	_set_tssldt_desc(&get_cpu_gdt_table(cpu)[entry], (int)addr,
@@ -68,6 +69,7 @@ static inline void __set_tss_desc(unsigned int cpu, unsigned int entry, void *ad
 }
 
 #define set_tss_desc(cpu,addr) __set_tss_desc(cpu, GDT_ENTRY_TSS, addr)
+#endif
 
 static inline void set_ldt_desc(unsigned int cpu, void *addr, unsigned int size)
 {

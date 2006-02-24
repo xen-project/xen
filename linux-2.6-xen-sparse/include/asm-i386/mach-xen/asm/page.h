@@ -294,7 +294,7 @@ extern int page_is_ram(unsigned long pagenr);
 
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
 #define VMALLOC_RESERVE		((unsigned long)__VMALLOC_RESERVE)
-#define MAXMEM			(HYPERVISOR_VIRT_START-__PAGE_OFFSET-__VMALLOC_RESERVE)
+#define MAXMEM			(__FIXADDR_TOP-__PAGE_OFFSET-__VMALLOC_RESERVE)
 #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
 #define pfn_to_kaddr(pfn)      __va((pfn) << PAGE_SHIFT)
@@ -316,6 +316,8 @@ extern int page_is_ram(unsigned long pagenr);
 #define virt_to_machine(v)	(phys_to_machine(__pa(v)))
 #define virt_to_mfn(v)		(pfn_to_mfn(__pa(v) >> PAGE_SHIFT))
 #define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
+
+#define __HAVE_ARCH_GATE_AREA 1
 
 #endif /* __KERNEL__ */
 

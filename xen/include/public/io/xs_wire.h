@@ -54,7 +54,7 @@ static struct xsd_errors xsd_errors[] __attribute__((unused)) = {
     XSD_ERROR(EROFS),
     XSD_ERROR(EBUSY),
     XSD_ERROR(EAGAIN),
-    XSD_ERROR(EISCONN),
+    XSD_ERROR(EISCONN)
 };
 
 struct xsd_sockmsg
@@ -70,7 +70,7 @@ struct xsd_sockmsg
 enum xs_watch_type
 {
     XS_WATCH_PATH = 0,
-    XS_WATCH_TOKEN,
+    XS_WATCH_TOKEN
 };
 
 /* Inter-domain shared memory communications. */

@@ -3,6 +3,7 @@
 dir=$(dirname "$0")
 . "$dir/vtpm-common.sh"
 
+vtpm_fatal_error=0
 
 case "$command" in
   add)
@@ -19,5 +20,8 @@ case "$command" in
   ;;
 esac
 
-log debug "Successful vTPM operation '$command'."
-success
+if [ $vtpm_fatal_error -eq 0 ]; then
+	log debug "Successful vTPM operation '$command'."
+	success
+fi
+

@@ -3609,7 +3609,7 @@ static inline int guest_page_fault(
     if ( d->arch.ops->guest_paging_levels == PAGING_L3 ) 
     {
         if ( SH_GUEST_32PAE )
-            gpfn = hvm_get_guest_ctrl_reg(v, 3);
+            gpfn = (hvm_get_guest_ctrl_reg(v, 3)) >> PAGE_SHIFT;
         else
             gpfn = pagetable_get_pfn(v->arch.guest_table);
     }
@@ -3942,19 +3942,17 @@ int shadow_direct_map_fault(unsigned long vpa, struct cpu_user_regs *regs)
      * on handling the #PF as such.
      */
     if ( (mfn = get_mfn_from_gpfn(vpa >> PAGE_SHIFT)) == INVALID_MFN )
-    {
-         goto fail;
-    }
+        return 0;
 
     shadow_lock(d);
 
     __direct_get_l3e(v, vpa, &sl3e);
 
-    if ( !(l3e_get_flags(sl3e) & _PAGE_PRESENT) ) 
+    if ( !(l3e_get_flags(sl3e) & _PAGE_PRESENT) )
     {
         page = alloc_domheap_page(NULL);
         if ( !page )
-            goto nomem; 
+            goto nomem;
 
         smfn = page_to_mfn(page);
         sl3e = l3e_from_pfn(smfn, _PAGE_PRESENT);
@@ -3968,11 +3966,11 @@ int shadow_direct_map_fault(unsigned long vpa, struct cpu_user_regs *regs)
 
     __direct_get_l2e(v, vpa, &sl2e);
 
-    if ( !(l2e_get_flags(sl2e) & _PAGE_PRESENT) ) 
+    if ( !(l2e_get_flags(sl2e) & _PAGE_PRESENT) )
     {
         page = alloc_domheap_page(NULL);
         if ( !page )
-            goto nomem; 
+            goto nomem;
 
         smfn = page_to_mfn(page);
         sl2e = l2e_from_pfn(smfn, __PAGE_HYPERVISOR | _PAGE_USER);
@@ -3985,20 +3983,17 @@ int shadow_direct_map_fault(unsigned long vpa, struct cpu_user_regs *regs)
 
     __direct_get_l1e(v, vpa, &sl1e);
 
-    if ( !(l1e_get_flags(sl1e) & _PAGE_PRESENT) ) 
+    if ( !(l1e_get_flags(sl1e) & _PAGE_PRESENT) )
     {
         sl1e = l1e_from_pfn(mfn, __PAGE_HYPERVISOR | _PAGE_USER);
         __direct_set_l1e(v, vpa, &sl1e);
-    } 
+    }
 
     shadow_unlock(d);
     return EXCRET_fault_fixed;
 
-fail:
-    return 0;
-
 nomem:
-    shadow_direct_map_clean(v);
+    shadow_direct_map_clean(d);
     domain_crash_synchronous();
 }
 #endif

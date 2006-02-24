@@ -40,7 +40,9 @@ cpumask_t cpu_initialized __cpuinitdata = CPU_MASK_NONE;
 struct x8664_pda *_cpu_pda[NR_CPUS] __read_mostly;
 struct x8664_pda boot_cpu_pda[NR_CPUS] __cacheline_aligned;
 
+#ifndef CONFIG_X86_NO_IDT
 struct desc_ptr idt_descr = { 256 * 16, (unsigned long) idt_table }; 
+#endif
 
 char boot_cpu_stack[IRQSTACKSIZE] __attribute__((section(".bss.page_aligned")));
 
@@ -155,13 +157,7 @@ static void switch_pt(void)
 
 void __init cpu_gdt_init(struct desc_ptr *gdt_descr)
 {
-#ifdef CONFIG_SMP
-	int cpu = stack_smp_processor_id();
-#else
-	int cpu = smp_processor_id();
-#endif
-
-	asm volatile("lgdt %0" :: "m" (cpu_gdt_descr[cpu]));
+	asm volatile("lgdt %0" :: "m" (*gdt_descr));
 	asm volatile("lidt %0" :: "m" (idt_descr));
 }
 #endif
@@ -203,8 +199,10 @@ void pda_init(int cpu)
 	pda->irqstackptr += IRQSTACKSIZE-64;
 } 
 
+#ifndef CONFIG_X86_NO_TSS
 char boot_exception_stacks[(N_EXCEPTION_STACKS - 1) * EXCEPTION_STKSZ + DEBUG_STKSZ]
 __attribute__((section(".bss.page_aligned")));
+#endif
 
 /* May not be marked __init: used by software suspend */
 void syscall_init(void)
@@ -246,18 +244,23 @@ void __cpuinit check_efer(void)
 void __cpuinit cpu_init (void)
 {
 	int cpu = stack_smp_processor_id();
+#ifndef CONFIG_X86_NO_TSS
 	struct tss_struct *t = &per_cpu(init_tss, cpu);
 	unsigned long v; 
 	char *estacks = NULL; 
+	unsigned i;
+#endif
 	struct task_struct *me;
-	int i;
 
 	/* CPU 0 is initialised in head64.c */
 	if (cpu != 0) {
 		pda_init(cpu);
 		zap_low_mappings(cpu);
-	} else 
+	}
+#ifndef CONFIG_X86_NO_TSS
+	else
 		estacks = boot_exception_stacks; 
+#endif
 
 	me = current;
 
@@ -278,12 +281,7 @@ void __cpuinit cpu_init (void)
 #endif
 
 	cpu_gdt_descr[cpu].size = GDT_SIZE;
-#ifndef CONFIG_XEN 
- 	asm volatile("lgdt %0" :: "m" (cpu_gdt_descr[cpu]));
- 	asm volatile("lidt %0" :: "m" (idt_descr));
-#else
 	cpu_gdt_init(&cpu_gdt_descr[cpu]);
-#endif
 
 	memset(me->thread.tls_array, 0, GDT_ENTRY_TLS_ENTRIES * 8);
 	syscall_init();
@@ -294,6 +292,7 @@ void __cpuinit cpu_init (void)
 
 	check_efer();
 
+#ifndef CONFIG_X86_NO_TSS
 	/*
 	 * set up and load the per-CPU TSS
 	 */
@@ -330,6 +329,7 @@ void __cpuinit cpu_init (void)
 	 */
 	for (i = 0; i <= IO_BITMAP_LONGS; i++)
 		t->io_bitmap[i] = ~0UL;
+#endif
 
 	atomic_inc(&init_mm.mm_count);
 	me->active_mm = &init_mm;
@@ -337,8 +337,10 @@ void __cpuinit cpu_init (void)
 		BUG();
 	enter_lazy_tlb(&init_mm, me);
 
-#ifndef CONFIG_XEN
+#ifndef CONFIG_X86_NO_TSS
 	set_tss_desc(cpu, t);
+#endif
+#ifndef CONFIG_XEN
 	load_TR_desc();
 #endif
 	load_LDT(&init_mm.context);

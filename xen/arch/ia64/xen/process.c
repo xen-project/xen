@@ -71,7 +71,7 @@ void schedule_tail(struct vcpu *prev)
 	context_saved(prev);
 
 	if (VMX_DOMAIN(current)) {
-		vmx_load_all_rr(current);
+		vmx_do_launch(current);
 	} else {
 		load_region_regs(current);
 		vcpu_load_kernel_regs(current);

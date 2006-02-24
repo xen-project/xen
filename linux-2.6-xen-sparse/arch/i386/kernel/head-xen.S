@@ -1,23 +1,11 @@
 
-#include <linux/config.h>
-
-.section __xen_guest
-	.ascii	"GUEST_OS=linux,GUEST_VER=2.6"
-	.ascii	",XEN_VER=xen-3.0"
-	.ascii	",VIRT_BASE=0xC0000000"
-	.ascii	",HYPERCALL_PAGE=0x104" /* __pa(hypercall_page) >> 12 */
-#ifdef CONFIG_X86_PAE
-	.ascii	",PAE=yes"
-#else
-	.ascii	",PAE=no"
-#endif
-	.ascii	",LOADER=generic"
-	.byte	0
 
 .text
+#include <linux/config.h>
 #include <linux/threads.h>
 #include <linux/linkage.h>
 #include <asm/segment.h>
+#include <asm/page.h>
 #include <asm/thread_info.h>
 #include <asm/asm-offsets.h>
 #include <xen/interface/arch-x86_32.h>
@@ -37,15 +25,10 @@
 
 ENTRY(startup_32)
 	movl %esi,xen_start_info
-
-#if 0
-ENTRY(startup_32_smp)
-#endif /* CONFIG_SMP */
-
 	cld
 
 	/* Set up the stack pointer */
-	lss stack_start,%esp
+	movl $(init_thread_union+THREAD_SIZE),%esp
 
 checkCPUtype:
 
@@ -69,66 +52,54 @@ checkCPUtype:
 	movb %cl,X86_MASK
 	movl %edx,X86_CAPABILITY
 
+	movb $1,X86_HARD_MATH
+
 	xorl %eax,%eax			# Clear FS/GS and LDT
 	movl %eax,%fs
 	movl %eax,%gs
 	cld			# gcc2 wants the direction flag cleared at all times
 
-#if 0
-	movb ready, %cl
-	movb $1, ready
-	cmpb $0,%cl
-	je 1f			# the first CPU calls start_kernel
-				# all other CPUs call initialize_secondary
-	call initialize_secondary
-	jmp L6
-1:
-#endif /* CONFIG_SMP */
 	call start_kernel
 L6:
 	jmp L6			# main should never return here, but
 				# just in case, we know what happens.
 
-ENTRY(lgdt_finish)
-	movl $(__KERNEL_DS),%eax	# reload all the segment registers
-	movw %ax,%ss			# after changing gdt.
+#define HYPERCALL_PAGE_OFFSET 0x1000
+.org HYPERCALL_PAGE_OFFSET
+ENTRY(hypercall_page)
+.skip 0x1000
 
-	movl $(__USER_DS),%eax		# DS/ES contains default USER segment
-	movw %ax,%ds
-	movw %ax,%es
+/*
+ * Real beginning of normal "text" segment
+ */
+ENTRY(stext)
+ENTRY(_stext)
 
-	popl %eax			# reload CS by intersegment return
-	pushl $(__KERNEL_CS)
-	pushl %eax
-	lret
+/*
+ * BSS section
+ */
+.section ".bss.page_aligned","w"
+ENTRY(empty_zero_page)
+	.fill 4096,1,0
 
-ENTRY(stack_start)
-	.long init_thread_union+THREAD_SIZE
-	.long __BOOT_DS
-
-ready:	.byte 0
-
-.globl idt_descr
-.globl cpu_gdt_descr
+/*
+ * This starts the data section.
+ */
+.data
 
 	ALIGN
-	.word 0				# 32-bit align idt_desc.address
-idt_descr:
-	.word IDT_ENTRIES*8-1		# idt contains 256 entries
-	.long idt_table
-
-# boot GDT descriptor (later on used by CPU#0):
 	.word 0				# 32 bit align gdt_desc.address
+	.globl cpu_gdt_descr
 cpu_gdt_descr:
 	.word GDT_SIZE
 	.long cpu_gdt_table
 
 	.fill NR_CPUS-1,8,0		# space for the other GDT descriptors
 
-.org 0x1000
-ENTRY(empty_zero_page)
-
-.org 0x2000
+/*
+ * The Global Descriptor Table contains 28 quadwords, per-CPU.
+ */
+	.align PAGE_SIZE_asm
 ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x0000000000000000	/* 0x0b reserved */
@@ -143,17 +114,10 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0x53 reserved */
 	.quad 0x0000000000000000	/* 0x5b reserved */
 
-#ifdef CONFIG_X86_PAE
-	.quad 0x00cfbb00000067ff	/* 0x60 kernel 4GB code at 0x00000000 */
-	.quad 0x00cfb300000067ff	/* 0x68 kernel 4GB data at 0x00000000 */
-	.quad 0x00cffb00000067ff	/* 0x73 user 4GB code at 0x00000000 */
-	.quad 0x00cff300000067ff	/* 0x7b user 4GB data at 0x00000000 */
-#else
-	.quad 0x00cfbb000000c3ff	/* 0x60 kernel 4GB code at 0x00000000 */
-	.quad 0x00cfb3000000c3ff	/* 0x68 kernel 4GB data at 0x00000000 */
-	.quad 0x00cffb000000c3ff	/* 0x73 user 4GB code at 0x00000000 */
-	.quad 0x00cff3000000c3ff	/* 0x7b user 4GB data at 0x00000000 */
-#endif
+	.quad 0x00cf9a000000ffff	/* 0x60 kernel 4GB code at 0x00000000 */
+	.quad 0x00cf92000000ffff	/* 0x68 kernel 4GB data at 0x00000000 */
+	.quad 0x00cffa000000ffff	/* 0x73 user 4GB code at 0x00000000 */
+	.quad 0x00cff2000000ffff	/* 0x7b user 4GB data at 0x00000000 */
 
 	.quad 0x0000000000000000	/* 0x80 TSS descriptor */
 	.quad 0x0000000000000000	/* 0x88 LDT descriptor */
@@ -187,15 +151,36 @@ ENTRY(cpu_gdt_table)
 	/* Be sure this is zeroed to avoid false validations in Xen */
 	.fill PAGE_SIZE_asm / 8 - GDT_ENTRIES,8,0
 
-.org 0x3000
-ENTRY(default_ldt)
 
-.org 0x4000
-ENTRY(hypercall_page)
-
-.org 0x5000
 /*
- * Real beginning of normal "text" segment
+ * __xen_guest information
  */
-ENTRY(stext)
-ENTRY(_stext)
+.macro utoa value
+ .if (\value) < 0 || (\value) >= 0x10
+	utoa (((\value)>>4)&0x0fffffff)
+ .endif
+ .if ((\value) & 0xf) < 10
+  .byte '0' + ((\value) & 0xf)
+ .else
+  .byte 'A' + ((\value) & 0xf) - 10
+ .endif
+.endm
+
+.section __xen_guest
+	.ascii	"GUEST_OS=linux,GUEST_VER=2.6"
+	.ascii	",XEN_VER=xen-3.0"
+	.ascii	",VIRT_BASE=0x"
+		utoa __PAGE_OFFSET
+	.ascii	",HYPERCALL_PAGE=0x"
+		utoa ((__PHYSICAL_START+HYPERCALL_PAGE_OFFSET)>>PAGE_SHIFT)
+	.ascii  ",FEATURES=writable_page_tables"
+	.ascii	         "|writable_descriptor_tables"
+	.ascii	         "|auto_translated_physmap"
+	.ascii	         "|supervisor_mode_kernel"
+#ifdef CONFIG_X86_PAE
+	.ascii	",PAE=yes"
+#else
+	.ascii	",PAE=no"
+#endif
+	.ascii	",LOADER=generic"
+	.byte	0

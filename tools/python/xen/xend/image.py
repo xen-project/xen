@@ -191,8 +191,8 @@ class HVMImageHandler(ImageHandler):
         ImageHandler.configure(self, imageConfig, deviceConfig)
 
         info = xc.xeninfo()
-	if not 'hvm' in info['xen_caps']:
-	    raise VmError("Not an HVM capable platform, we stop creating!")
+        if not 'hvm' in info['xen_caps']:
+            raise VmError("Not an HVM capable platform, we stop creating!")
 
         self.dmargs = self.parseDeviceModelArgs(imageConfig, deviceConfig)
         self.device_model = sxp.child_value(imageConfig, 'device_model')
@@ -205,28 +205,24 @@ class HVMImageHandler(ImageHandler):
                         ("image/device-model", self.device_model),
                         ("image/display", self.display))
 
-        self.device_channel = None
         self.pid = 0
 
         self.dmargs += self.configVNC(imageConfig)
+
+        self.pae  = int(sxp.child_value(imageConfig, 'pae', 0))
 
         self.acpi = int(sxp.child_value(imageConfig, 'acpi', 0))
         self.apic = int(sxp.child_value(imageConfig, 'apic', 0))
 
     def buildDomain(self):
-        # Create an event channel
-        self.device_channel = xc.evtchn_alloc_unbound(dom=self.vm.getDomid(),
-                                                      remote_dom=0)
-        log.info("HVM device model port: %d", self.device_channel)
-
         store_evtchn = self.vm.getStorePort()
 
         log.debug("dom            = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
-        log.debug("control_evtchn = %d", self.device_channel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
+        log.debug("pae            = %d", self.pae)
         log.debug("acpi           = %d", self.acpi)
         log.debug("apic           = %d", self.apic)
 
@@ -234,10 +230,10 @@ class HVMImageHandler(ImageHandler):
 
         return xc.hvm_build(dom            = self.vm.getDomid(),
                             image          = self.kernel,
-                            control_evtchn = self.device_channel,
                             store_evtchn   = store_evtchn,
                             memsize        = self.vm.getMemoryTarget() / 1024,
                             vcpus          = self.vm.getVCpuCount(),
+                            pae            = self.pae,
                             acpi           = self.acpi,
                             apic           = self.apic)
 
@@ -341,7 +337,6 @@ class HVMImageHandler(ImageHandler):
         if len(vnc):
             args = args + vnc
         args = args + ([ "-d",  "%d" % self.vm.getDomid(),
-                  "-p", "%d" % self.device_channel,
                   "-m", "%s" % (self.vm.getMemoryTarget() / 1024)])
         args = args + self.dmargs
         env = dict(os.environ)
@@ -379,28 +374,12 @@ class HVMImageHandler(ImageHandler):
     def getDomainMemory(self, mem):
         """@see ImageHandler.getDomainMemory"""
         page_kb = 4
+        extra_pages = 0
         if os.uname()[4] == 'ia64':
             page_kb = 16
-        # for ioreq_t and xenstore
-        static_pages = 2
-        return mem + (self.getPageTableSize(mem / 1024) + static_pages) * page_kb
-
-    def getPageTableSize(self, mem_mb):
-        """Return the pages of memory needed for 1:1 page tables for physical
-           mode.
-
-        @param mem_mb: size in MB
-        @return size in KB
-        """
-        # 1 page for the PGD + 1 pte page for 4MB of memory (rounded)
-        if os.uname()[4] == 'x86_64':
-            return 5 + ((mem_mb + 1) >> 1)
-        elif os.uname()[4] == 'ia64':
-            # 1:1 pgtable is allocated on demand ia64, so just return rom size
-	    # for guest firmware
-            return 1024
-        else:
-            return 1 + ((mem_mb + 3) >> 2)
+            # ROM size for guest firmware, ioreq page and xenstore page
+            extra_pages = 1024 + 2
+        return mem + extra_pages * page_kb
 
     def register_shutdown_watch(self):
         """ add xen store watch on control/shutdown """

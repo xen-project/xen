@@ -254,10 +254,14 @@ void init_int80_direct_trap(struct vcpu *v)
 
     /*
      * We can't virtualise interrupt gates, as there's no way to get
-     * the CPU to automatically clear the events_mask variable.
+     * the CPU to automatically clear the events_mask variable. Also we
+     * must ensure that the CS is safe to poke into an interrupt gate.
      */
-    if ( TI_GET_IF(ti) )
+    if ( TI_GET_IF(ti) || !guest_gate_selector_okay(ti->cs) )
+    {
+        v->arch.int80_desc.a = v->arch.int80_desc.b = 0;
         return;
+    }
 
     v->arch.int80_desc.a = (ti->cs << 16) | (ti->address & 0xffff);
     v->arch.int80_desc.b =
@@ -274,8 +278,8 @@ long do_set_callbacks(unsigned long event_selector,
 {
     struct vcpu *d = current;
 
-    if ( !VALID_CODESEL(event_selector) || !VALID_CODESEL(failsafe_selector) )
-        return -EPERM;
+    fixup_guest_selector(event_selector);
+    fixup_guest_selector(failsafe_selector);
 
     d->arch.guest_context.event_callback_cs     = event_selector;
     d->arch.guest_context.event_callback_eip    = event_address;

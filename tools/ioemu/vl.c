@@ -2337,7 +2337,6 @@ enum {
 
     QEMU_OPTION_S,
     QEMU_OPTION_s,
-    QEMU_OPTION_p,
     QEMU_OPTION_d,
     QEMU_OPTION_l,
     QEMU_OPTION_hdachs,
@@ -2414,7 +2413,6 @@ const QEMUOption qemu_options[] = {
 
     { "S", 0, QEMU_OPTION_S },
     { "s", 0, QEMU_OPTION_s },
-    { "p", HAS_ARG, QEMU_OPTION_p },
     { "d", HAS_ARG, QEMU_OPTION_d },
     { "l", HAS_ARG, QEMU_OPTION_l },
     { "hdachs", HAS_ARG, QEMU_OPTION_hdachs },
@@ -2936,13 +2934,6 @@ int main(int argc, char **argv)
                 {
                     domid = atoi(optarg);
                     fprintf(logfile, "domid: %d\n", domid);
-                }
-                break;
-            case QEMU_OPTION_p:
-                {
-                    extern evtchn_port_t ioreq_remote_port;
-                    ioreq_remote_port = atoi(optarg);
-                    fprintf(logfile, "eport: %d\n", ioreq_remote_port);
                 }
                 break;
             case QEMU_OPTION_l:

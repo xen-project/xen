@@ -85,13 +85,6 @@ int get_physical_broadcast(void)
         return 0xff;
 }
 
-#ifdef CONFIG_XEN
-void switch_APIC_timer_to_ipi(void *cpumask) { }
-EXPORT_SYMBOL(switch_APIC_timer_to_ipi);
-void switch_ipi_to_APIC_timer(void *cpumask) { }
-EXPORT_SYMBOL(switch_ipi_to_APIC_timer);
-#endif
-
 #ifndef CONFIG_XEN
 #ifndef CONFIG_SMP
 static void up_apic_timer_interrupt_call(struct pt_regs *regs)

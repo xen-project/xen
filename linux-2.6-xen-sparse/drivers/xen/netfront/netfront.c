@@ -587,25 +587,23 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 		BUG_ON((signed short)ref < 0);
 		np->grant_rx_ref[id] = ref;
 		gnttab_grant_foreign_transfer_ref(ref,
-						  np->xbdev->otherend_id);
+						  np->xbdev->otherend_id,
+						  __pa(skb->head) >> PAGE_SHIFT);
 		RING_GET_REQUEST(&np->rx, req_prod + i)->gref = ref;
 		rx_pfn_array[i] = virt_to_mfn(skb->head);
 
-		/* Remove this page from map before passing back to Xen. */
-		set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT,
-				    INVALID_P2M_ENTRY);
-
-		MULTI_update_va_mapping(rx_mcl+i, (unsigned long)skb->head,
-					__pte(0), 0);
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			/* Remove this page before passing back to Xen. */
+			set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT,
+					    INVALID_P2M_ENTRY);
+			MULTI_update_va_mapping(rx_mcl+i,
+						(unsigned long)skb->head,
+						__pte(0), 0);
+		}
 	}
 
-	/* After all PTEs have been zapped we blow away stale TLB entries. */
-	rx_mcl[i-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
-
-	/* Give away a batch of pages. */
-	rx_mcl[i].op = __HYPERVISOR_memory_op;
-	rx_mcl[i].args[0] = XENMEM_decrease_reservation;
-	rx_mcl[i].args[1] = (unsigned long)&reservation;
+	/* Tell the ballon driver what is going on. */
+	balloon_update_driver_allowance(i);
 
 	reservation.extent_start = rx_pfn_array;
 	reservation.nr_extents   = i;
@@ -613,15 +611,27 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	reservation.address_bits = 0;
 	reservation.domid        = DOMID_SELF;
 
-	/* Tell the ballon driver what is going on. */
-	balloon_update_driver_allowance(i);
+	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+		/* After all PTEs have been zapped, flush the TLB. */
+		rx_mcl[i-1].args[MULTI_UVMFLAGS_INDEX] =
+			UVMF_TLB_FLUSH|UVMF_ALL;
 
-	/* Zap PTEs and give away pages in one big multicall. */
-	(void)HYPERVISOR_multicall(rx_mcl, i+1);
+		/* Give away a batch of pages. */
+		rx_mcl[i].op = __HYPERVISOR_memory_op;
+		rx_mcl[i].args[0] = XENMEM_decrease_reservation;
+		rx_mcl[i].args[1] = (unsigned long)&reservation;
 
-	/* Check return status of HYPERVISOR_memory_op(). */
-	if (unlikely(rx_mcl[i].result != i))
-		panic("Unable to reduce memory reservation\n");
+		/* Zap PTEs and give away pages in one big multicall. */
+		(void)HYPERVISOR_multicall(rx_mcl, i+1);
+
+		/* Check return status of HYPERVISOR_memory_op(). */
+		if (unlikely(rx_mcl[i].result != i))
+			panic("Unable to reduce memory reservation\n");
+	} else {
+		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
+					 &reservation) != i)
+			panic("Unable to reduce memory reservation\n");
+	}
 
 	/* Above is a suitable barrier to ensure backend will see requests. */
 	np->rx.req_prod_pvt = req_prod + i;
@@ -802,17 +812,19 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		np->stats.rx_packets++;
 		np->stats.rx_bytes += rx->status;
 
-		/* Remap the page. */
-		MULTI_update_va_mapping(mcl, (unsigned long)skb->head,
-					pfn_pte_ma(mfn, PAGE_KERNEL), 0);
-		mcl++;
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			/* Remap the page. */
+			MULTI_update_va_mapping(mcl, (unsigned long)skb->head,
+						pfn_pte_ma(mfn, PAGE_KERNEL),
+						0);
+			mcl++;
 			mmu->ptr = ((maddr_t)mfn << PAGE_SHIFT)
 				| MMU_MACHPHYS_UPDATE;
 			mmu->val = __pa(skb->head) >> PAGE_SHIFT;
 			mmu++;
 
-			set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT, mfn);
+			set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT,
+					    mfn);
 		}
 
 		__skb_queue_tail(&rxq, skb);
@@ -1003,7 +1015,8 @@ static void network_connect(struct net_device *dev)
 		if ((unsigned long)np->rx_skbs[i] < __PAGE_OFFSET)
 			continue;
 		gnttab_grant_foreign_transfer_ref(
-			np->grant_rx_ref[i], np->xbdev->otherend_id);
+			np->grant_rx_ref[i], np->xbdev->otherend_id,
+			__pa(np->rx_skbs[i]->data) >> PAGE_SHIFT);
 		RING_GET_REQUEST(&np->rx, requeue_idx)->gref =
 			np->grant_rx_ref[i];
 		RING_GET_REQUEST(&np->rx, requeue_idx)->id = i;

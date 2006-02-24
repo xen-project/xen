@@ -41,9 +41,11 @@ struct task_struct init_task = INIT_TASK(init_task);
 
 EXPORT_SYMBOL(init_task);
 
+#ifndef CONFIG_X86_NO_TSS
 /*
  * per-CPU TSS segments. Threads are completely 'soft' on Linux,
  * no more per-task TSS's.
  */ 
 DEFINE_PER_CPU(struct tss_struct, init_tss) ____cacheline_internodealigned_in_smp = INIT_TSS;
+#endif
 

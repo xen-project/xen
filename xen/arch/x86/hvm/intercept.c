@@ -332,8 +332,8 @@ int intercept_pit_io(ioreq_t *p)
 void hlt_timer_fn(void *data)
 {
     struct vcpu *v = data;
-    
-    evtchn_set_pending(v, iopacket_port(v->domain));
+
+    evtchn_set_pending(v, iopacket_port(v));
 }
 
 static __inline__ void missed_ticks(struct hvm_virpit*vpit)

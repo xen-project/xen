@@ -20,7 +20,7 @@
 #define L3_PROT (_PAGE_PRESENT)
 #endif
 
-#define E820MAX	128
+#define E820MAX     128
 
 #define E820_RAM          1
 #define E820_RESERVED     2
@@ -137,7 +137,7 @@ set_hvm_info_checksum(struct hvm_info_table *t)
  */
 static int set_hvm_info(int xc_handle, uint32_t dom,
                         unsigned long *pfn_list, unsigned int vcpus,
-                        unsigned int acpi, unsigned int apic)
+                        unsigned int pae, unsigned int acpi, unsigned int apic)
 {
     char *va_map;
     struct hvm_info_table *va_hvm;
@@ -149,7 +149,7 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
         PAGE_SIZE,
         PROT_READ|PROT_WRITE,
         pfn_list[HVM_INFO_PFN]);
-    
+
     if ( va_map == NULL )
         return -1;
 
@@ -159,6 +159,7 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
     va_hvm->length       = sizeof(struct hvm_info_table);
     va_hvm->acpi_enabled = acpi;
     va_hvm->apic_enabled = apic;
+    va_hvm->pae_enabled  = pae;
     va_hvm->nr_vcpus     = vcpus;
 
     set_hvm_info_checksum(va_hvm);
@@ -174,9 +175,9 @@ static int setup_guest(int xc_handle,
                        unsigned long nr_pages,
                        vcpu_guest_context_t *ctxt,
                        unsigned long shared_info_frame,
-                       unsigned int control_evtchn,
                        unsigned int vcpus,
-		       unsigned int acpi,
+                       unsigned int pae,
+                       unsigned int acpi,
                        unsigned int apic,
                        unsigned int store_evtchn,
                        unsigned long *store_mfn)
@@ -190,11 +191,7 @@ static int setup_guest(int xc_handle,
     xc_mmu_t *mmu = NULL;
     int rc;
 
-    unsigned long nr_pt_pages;
-
     struct domain_setup_info dsi;
-    unsigned long vpt_start;
-    unsigned long vpt_end;
     unsigned long v_end;
 
     unsigned long shared_page_frame = 0;
@@ -214,20 +211,10 @@ static int setup_guest(int xc_handle,
     /* memsize is in megabytes */
     v_end              = (unsigned long)memsize << 20;
 
-#ifdef __i386__
-    nr_pt_pages = 1 + ((memsize + 3) >> 2);
-#else
-    nr_pt_pages = 5 + ((memsize + 1) >> 1);
-#endif
-    vpt_start   = v_end;
-    vpt_end     = vpt_start + (nr_pt_pages * PAGE_SIZE);
-
     printf("VIRTUAL MEMORY ARRANGEMENT:\n"
            " Loaded HVM loader: %08lx->%08lx\n"
-           " Page tables:   %08lx->%08lx\n"
            " TOTAL:         %08lx->%08lx\n",
            dsi.v_kernstart, dsi.v_kernend,
-           vpt_start, vpt_end,
            dsi.v_start, v_end);
     printf(" ENTRY ADDRESS: %08lx\n", dsi.v_kernentry);
 
@@ -265,7 +252,7 @@ static int setup_guest(int xc_handle,
             goto error_out;
     }
 
-    if ( set_hvm_info(xc_handle, dom, page_array, vcpus, acpi, apic) ) {
+    if ( set_hvm_info(xc_handle, dom, page_array, vcpus, pae, acpi, apic) ) {
         fprintf(stderr, "Couldn't set hvm info for HVM guest.\n");
         goto error_out;
     }
@@ -296,7 +283,19 @@ static int setup_guest(int xc_handle,
          shared_page_frame)) == 0 )
         goto error_out;
     memset(sp, 0, PAGE_SIZE);
-    sp->sp_global.eport = control_evtchn;
+
+    /* FIXME: how about if we overflow the page here? */
+    for ( i = 0; i < vcpus; i++ ) {
+        unsigned int vp_eport;
+
+        vp_eport = xc_evtchn_alloc_unbound(xc_handle, dom, 0);
+        if ( vp_eport < 0 ) {
+            fprintf(stderr, "Couldn't get unbound port from VMX guest.\n");
+            goto error_out;
+        }
+        sp->vcpu_iodata[i].vp_eport = vp_eport;
+    }
+
     munmap(sp, PAGE_SIZE);
 
     *store_mfn = page_array[(v_end >> PAGE_SHIFT) - 2];
@@ -343,9 +342,9 @@ int xc_hvm_build(int xc_handle,
                  uint32_t domid,
                  int memsize,
                  const char *image_name,
-                 unsigned int control_evtchn,
                  unsigned int vcpus,
-		 unsigned int acpi,
+                 unsigned int pae,
+                 unsigned int acpi,
                  unsigned int apic,
                  unsigned int store_evtchn,
                  unsigned long *store_mfn)
@@ -366,8 +365,8 @@ int xc_hvm_build(int xc_handle,
 
     if ( !strstr(xen_caps, "hvm") )
     {
-	PERROR("CPU doesn't support HVM extensions or "
-	       "the extensions are not enabled");
+        PERROR("CPU doesn't support HVM extensions or "
+               "the extensions are not enabled");
         goto error_out;
     }
 
@@ -399,8 +398,8 @@ int xc_hvm_build(int xc_handle,
 
     ctxt->flags = VGCF_HVM_GUEST;
     if ( setup_guest(xc_handle, domid, memsize, image, image_size, nr_pages,
-                     ctxt, op.u.getdomaininfo.shared_info_frame, control_evtchn,
-                     vcpus, acpi, apic, store_evtchn, store_mfn) < 0)
+                     ctxt, op.u.getdomaininfo.shared_info_frame,
+                     vcpus, pae, acpi, apic, store_evtchn, store_mfn) < 0)
     {
         ERROR("Error constructing guest OS");
         goto error_out;

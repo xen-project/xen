@@ -23,6 +23,7 @@
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vioapic.h>
 #include <public/hvm/ioreq.h>
+#include <public/event_channel.h>
 
 #define MAX_OPERAND_NUM 2
 

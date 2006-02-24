@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/pagemap.h>
 #include <linux/spinlock.h>
+#include <linux/module.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -184,6 +185,10 @@ void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 	__flush_tlb_one(vaddr);
 }
 
+static int nr_fixmaps = 0;
+unsigned long __FIXADDR_TOP = (HYPERVISOR_VIRT_START - 2 * PAGE_SIZE);
+EXPORT_SYMBOL(__FIXADDR_TOP);
+
 void __set_fixmap (enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
 {
 	unsigned long address = __fix_to_virt(idx);
@@ -194,7 +199,6 @@ void __set_fixmap (enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
 	}
 	switch (idx) {
 	case FIX_WP_TEST:
-	case FIX_VSYSCALL:
 #ifdef CONFIG_X86_F00F_BUG
 	case FIX_F00F_IDT:
 #endif
@@ -204,6 +208,13 @@ void __set_fixmap (enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
 		set_pte_pfn_ma(address, phys >> PAGE_SHIFT, flags);
 		break;
 	}
+	nr_fixmaps++;
+}
+
+void set_fixaddr_top(unsigned long top)
+{
+	BUG_ON(nr_fixmaps > 0);
+	__FIXADDR_TOP = top - PAGE_SIZE;
 }
 
 pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
@@ -289,10 +300,11 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	unsigned long flags;
 
 	if (PTRS_PER_PMD > 1) {
-		/* Ensure pgd resides below 4GB. */
-		int rc = xen_create_contiguous_region(
-			(unsigned long)pgd, 0, 32);
-		BUG_ON(rc);
+		if (!xen_feature(XENFEAT_pae_pgdir_above_4gb)) {
+			int rc = xen_create_contiguous_region(
+				(unsigned long)pgd, 0, 32);
+			BUG_ON(rc);
+		}
 		if (HAVE_SHARED_KERNEL_PMD)
 			memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
 			       swapper_pg_dir + USER_PTRS_PER_PGD,
@@ -308,16 +320,20 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	}
 }
 
-/* never called when PTRS_PER_PMD > 1 */
 void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 {
 	unsigned long flags; /* can be called from interrupt context */
 
-	spin_lock_irqsave(&pgd_lock, flags);
-	pgd_list_del(pgd);
-	spin_unlock_irqrestore(&pgd_lock, flags);
+	if (PTRS_PER_PMD > 1) {
+		if (!xen_feature(XENFEAT_pae_pgdir_above_4gb))
+			xen_destroy_contiguous_region((unsigned long)pgd, 0);
+	} else {
+		spin_lock_irqsave(&pgd_lock, flags);
+		pgd_list_del(pgd);
+		spin_unlock_irqrestore(&pgd_lock, flags);
 
-	pgd_test_and_unpin(pgd);
+		pgd_test_and_unpin(pgd);
+	}
 }
 
 pgd_t *pgd_alloc(struct mm_struct *mm)

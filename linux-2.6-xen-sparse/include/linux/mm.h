@@ -1064,5 +1064,7 @@ int shrink_slab(unsigned long scanned, gfp_t gfp_mask,
 void drop_pagecache(void);
 void drop_slab(void);
 
+extern int randomize_va_space;
+
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */

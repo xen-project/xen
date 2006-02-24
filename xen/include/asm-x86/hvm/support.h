@@ -40,9 +40,9 @@ static inline vcpu_iodata_t *get_vio(struct domain *d, unsigned long cpu)
     return &get_sp(d)->vcpu_iodata[cpu];
 }
 
-static inline int iopacket_port(struct domain *d)
+static inline int iopacket_port(struct vcpu *v)
 {
-    return get_sp(d)->sp_global.eport;
+    return get_vio(v->domain, v->vcpu_id)->vp_eport;
 }
 
 /* XXX these are really VMX specific */

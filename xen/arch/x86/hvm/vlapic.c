@@ -210,7 +210,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
                 set_bit(vector, &vlapic->tmr[0]);
             }
         }
-        evtchn_set_pending(vlapic->vcpu, iopacket_port(vlapic->domain));
+        evtchn_set_pending(vlapic->vcpu, iopacket_port(vlapic->vcpu));
         result = 1;
         break;
 
@@ -834,7 +834,7 @@ void vlapic_timer_fn(void *data)
         }
         else
             vlapic->intr_pending_count[vlapic_lvt_vector(vlapic, VLAPIC_LVT_TIMER)]++;
-        evtchn_set_pending(vlapic->vcpu, iopacket_port(vlapic->domain));
+        evtchn_set_pending(vlapic->vcpu, iopacket_port(vlapic->vcpu));
     }
 
     vlapic->timer_current_update = NOW();

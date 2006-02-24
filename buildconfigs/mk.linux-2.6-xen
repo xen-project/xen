@@ -2,8 +2,8 @@
 OS           = linux
 
 LINUX_SERIES = 2.6
-LINUX_VER    = 2.6.16-rc3
-LINUX_SRCS = linux-2.6.15.tar.bz2 patch-2.6.16-rc3.bz2
+LINUX_VER    = 2.6.16-rc4
+LINUX_SRCS = linux-2.6.15.tar.bz2 patch-2.6.16-rc4.bz2
 LINUX_PDIR = linux-$(LINUX_VER)
 
 EXTRAVERSION ?= xen
@@ -34,7 +34,7 @@ pristine-$(LINUX_PDIR)/.valid-srcs: $(LINUX_SRCS)
 	touch $(@D)/.hgskip
 	touch $@
 
-pristine-linux-%.16-rc3/.valid-pristine: pristine-$(LINUX_PDIR)/.valid-srcs
+pristine-linux-%.16-rc4/.valid-pristine: pristine-$(LINUX_PDIR)/.valid-srcs
 	touch $@ # update timestamp to avoid rebuild
 
 $(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref

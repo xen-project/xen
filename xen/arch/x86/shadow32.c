@@ -1039,12 +1039,10 @@ int shadow_direct_map_fault(unsigned long vpa, struct cpu_user_regs *regs)
      * on handling the #PF as such.
      */
     if ( (mfn = get_mfn_from_gpfn(vpa >> PAGE_SHIFT)) == INVALID_MFN )
-    {
-         goto fail;
-    }
+        return 0;
 
     shadow_lock(d);
-  
+
    __direct_get_l2e(v, vpa, &sl2e);
 
     if ( !(l2e_get_flags(sl2e) & _PAGE_PRESENT) )
@@ -1059,7 +1057,7 @@ int shadow_direct_map_fault(unsigned long vpa, struct cpu_user_regs *regs)
         sple = (l1_pgentry_t *)map_domain_page(smfn);
         memset(sple, 0, PAGE_SIZE);
         __direct_set_l2e(v, vpa, sl2e);
-    } 
+    }
 
     if ( !sple )
         sple = (l1_pgentry_t *)map_domain_page(l2e_get_pfn(sl2e));
@@ -1078,54 +1076,55 @@ int shadow_direct_map_fault(unsigned long vpa, struct cpu_user_regs *regs)
     shadow_unlock(d);
     return EXCRET_fault_fixed;
 
-fail:
-    return 0;
-
 nomem:
-    shadow_direct_map_clean(v);
+    shadow_direct_map_clean(d);
     domain_crash_synchronous();
 }
 
 
-int shadow_direct_map_init(struct vcpu *v)
+int shadow_direct_map_init(struct domain *d)
 {
     struct page_info *page;
     l2_pgentry_t *root;
 
     if ( !(page = alloc_domheap_page(NULL)) )
-        goto fail;
+        return 0;
 
     root = map_domain_page(page_to_mfn(page));
     memset(root, 0, PAGE_SIZE);
     unmap_domain_page(root);
 
-    v->domain->arch.phys_table = mk_pagetable(page_to_maddr(page));
+    d->arch.phys_table = mk_pagetable(page_to_maddr(page));
 
     return 1;
-
-fail:
-    return 0;
 }
 
-void shadow_direct_map_clean(struct vcpu *v)
+void shadow_direct_map_clean(struct domain *d)
 {
     int i;
+    unsigned long mfn;
     l2_pgentry_t *l2e;
 
-    l2e = map_domain_page(
-      pagetable_get_pfn(v->domain->arch.phys_table));
+    mfn =  pagetable_get_pfn(d->arch.phys_table);
+
+    /*
+     * We may fail very early before direct map is built.
+     */
+    if ( !mfn )
+        return;
+
+    l2e = map_domain_page(mfn);
 
     for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
     {
         if ( l2e_get_flags(l2e[i]) & _PAGE_PRESENT )
             free_domheap_page(mfn_to_page(l2e_get_pfn(l2e[i])));
     }
-
-    free_domheap_page(
-            mfn_to_page(pagetable_get_pfn(v->domain->arch.phys_table)));
+    free_domheap_page(mfn_to_page(mfn));
 
     unmap_domain_page(l2e);
-    v->domain->arch.phys_table = mk_pagetable(0);
+
+    d->arch.phys_table = mk_pagetable(0);
 }
 
 int __shadow_mode_enable(struct domain *d, unsigned int mode)
@@ -1135,7 +1134,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
 
     if(!new_modes) /* Nothing to do - return success */
         return 0; 
-        
+
     // can't take anything away by calling this function.
     ASSERT(!(d->arch.shadow_mode & ~mode));
 
@@ -1630,27 +1629,58 @@ get_mfn_from_gpfn_foreign(struct domain *d, unsigned long gpfn)
 
     perfc_incrc(get_mfn_from_gpfn_foreign);
 
-    va = gpfn << PAGE_SHIFT;
-    tabpfn = pagetable_get_pfn(d->arch.phys_table);
-    l2 = map_domain_page(tabpfn);
-    l2e = l2[l2_table_offset(va)];
-    unmap_domain_page(l2);
-    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+    if ( shadow_mode_external(d) )
     {
-        printk("%s(d->id=%d, gpfn=%lx) => 0 l2e=%" PRIpte "\n",
-               __func__, d->domain_id, gpfn, l2e_get_intpte(l2e));
-        return INVALID_MFN;
-    }
-    l1 = map_domain_page(l2e_get_pfn(l2e));
-    l1e = l1[l1_table_offset(va)];
-    unmap_domain_page(l1);
+        unsigned long mfn;
+        unsigned long *l0;
 
+        va = RO_MPT_VIRT_START + (gpfn * sizeof(mfn));
+
+        tabpfn = pagetable_get_pfn(d->vcpu[0]->arch.monitor_table);
+        if ( !tabpfn )
+            return INVALID_MFN;
+
+        l2 = map_domain_page(tabpfn);
+        l2e = l2[l2_table_offset(va)];
+        unmap_domain_page(l2);
+        if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+            return INVALID_MFN;
+
+        l1 = map_domain_page(l2e_get_pfn(l2e));
+        l1e = l1[l1_table_offset(va)];
+        unmap_domain_page(l1);
+        if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
+            return INVALID_MFN;
+
+        l0 = map_domain_page(l1e_get_pfn(l1e));
+        mfn = l0[gpfn & ((PAGE_SIZE / sizeof(mfn)) - 1)];
+        unmap_domain_page(l0);
+        return mfn;
+    }
+    else
+    {
+        va = gpfn << PAGE_SHIFT;
+        tabpfn = pagetable_get_pfn(d->arch.phys_table);
+        l2 = map_domain_page(tabpfn);
+        l2e = l2[l2_table_offset(va)];
+        unmap_domain_page(l2);
+        if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+        {
+            printk("%s(d->id=%d, gpfn=%lx) => 0 l2e=%" PRIpte "\n",
+                   __func__, d->domain_id, gpfn, l2e_get_intpte(l2e));
+            return INVALID_MFN;
+        }
+        l1 = map_domain_page(l2e_get_pfn(l2e));
+        l1e = l1[l1_table_offset(va)];
+        unmap_domain_page(l1);
 #if 0
-    printk("%s(d->id=%d, gpfn=%lx) => %lx tabpfn=%lx l2e=%lx l1tab=%lx, l1e=%lx\n",
-           __func__, d->domain_id, gpfn, l1_pgentry_val(l1e) >> PAGE_SHIFT, tabpfn, l2e, l1tab, l1e);
+        printk("%s(d->id=%d, gpfn=%lx) => %lx tabpfn=%lx l2e=%lx l1tab=%lx, l1e=%lx\n",
+               __func__, d->domain_id, gpfn, l1_pgentry_val(l1e) >> PAGE_SHIFT, tabpfn, l2e, l1tab, l1e);
 #endif
 
-    return l1e_get_intpte(l1e);
+        return l1e_get_intpte(l1e);
+    }
+
 }
 
 static unsigned long

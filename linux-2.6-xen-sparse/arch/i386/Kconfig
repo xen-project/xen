@@ -780,7 +780,7 @@ config HOTPLUG_CPU
 config DOUBLEFAULT
 	default y
 	bool "Enable doublefault exception handler" if EMBEDDED
-	depends on !XEN
+	depends on !X86_NO_TSS
 	help
           This option allows trapping of rare doublefault exceptions that
           would otherwise cause a system to silently reboot. Disabling this
@@ -1174,6 +1174,21 @@ config X86_BIOS_REBOOT
 config X86_TRAMPOLINE
 	bool
 	depends on X86_SMP || (X86_VOYAGER && SMP)
+	default y
+
+config X86_NO_TSS
+	bool
+	depends on X86_XEN
+	default y
+
+config X86_SYSENTER
+	bool
+	depends on !X86_NO_TSS
+	default y
+
+config X86_NO_IDT
+	bool
+	depends on X86_XEN
 	default y
 
 config KTIME_SCALAR

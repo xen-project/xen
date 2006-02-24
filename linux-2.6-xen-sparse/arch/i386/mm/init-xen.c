@@ -759,7 +759,7 @@ void __init pgtable_cache_init(void)
 #endif
 				0,
 				pgd_ctor,
-				PTRS_PER_PMD == 1 ? pgd_dtor : NULL);
+				pgd_dtor);
 	if (!pgd_cache)
 		panic("pgtable_cache_init(): Cannot create pgd cache");
 }

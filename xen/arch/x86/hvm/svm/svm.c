@@ -64,7 +64,6 @@ static unsigned long trace_values[NR_CPUS][4];
 /* 
  * External functions, etc. We should move these to some suitable header file(s) */
 
-extern long evtchn_send(int lport);
 extern void do_nmi(struct cpu_user_regs *, unsigned long);
 extern int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip,
                                 int inst_len);
@@ -797,12 +796,13 @@ void svm_relinquish_resources(struct vcpu *v)
     free_host_save_area(v->arch.hvm_svm.host_save_area);
 #endif
 
-    if (v->vcpu_id == 0) {
+    if ( v->vcpu_id == 0 )
+    {
         /* unmap IO shared page */
         struct domain *d = v->domain;
-        if (d->arch.hvm_domain.shared_page_va)
+        if ( d->arch.hvm_domain.shared_page_va )
             unmap_domain_page((void *)d->arch.hvm_domain.shared_page_va);
-        shadow_direct_map_clean(v);
+        shadow_direct_map_clean(d);
     }
 
     destroy_vmcb(&v->arch.hvm_svm);

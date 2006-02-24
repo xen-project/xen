@@ -49,6 +49,15 @@ Simply copy the initrd-X.Y.img file into ramdisk/ and then run:
 
    # make existing
 
+Or, you can run:
+   # INITRD="http://url.of.initrd.repo/" make existing
+
+You do not need to include the name of the image itself in the url, 
+however, an initrd with the right name (initrd.X.Y.img) and version 
+number must exist at that location.  The script will determine which 
+version of the initrd it needs and try to download the right file from 
+that location.
+
 This will set up the link so that xm-test will use the existing
 ramdisk.  Next, just run "runtest.sh" normally.  Note that in general,
 you should not attempt to use a ramdisk from a previous minor version

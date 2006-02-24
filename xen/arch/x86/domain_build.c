@@ -17,6 +17,7 @@
 #include <xen/domain.h>
 #include <xen/compile.h>
 #include <xen/iocap.h>
+#include <xen/bitops.h>
 #include <asm/regs.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -24,6 +25,8 @@
 #include <asm/desc.h>
 #include <asm/i387.h>
 #include <asm/shadow.h>
+
+#include <public/version.h>
 
 static long dom0_nrpages;
 
@@ -55,9 +58,6 @@ integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
 
 static unsigned int opt_dom0_shadow;
 boolean_param("dom0_shadow", opt_dom0_shadow);
-
-static unsigned int opt_dom0_translate;
-boolean_param("dom0_translate", opt_dom0_translate);
 
 static char opt_dom0_ioports_disable[200] = "";
 string_param("dom0_ioports_disable", opt_dom0_ioports_disable);
@@ -134,6 +134,62 @@ static void process_dom0_ioports_disable(void)
     }
 }
 
+static const char *feature_names[XENFEAT_NR_SUBMAPS*32] = {
+    [XENFEAT_writable_page_tables]       = "writable_page_tables",
+    [XENFEAT_writable_descriptor_tables] = "writable_descriptor_tables",
+    [XENFEAT_auto_translated_physmap]    = "auto_translated_physmap",
+    [XENFEAT_supervisor_mode_kernel]     = "supervisor_mode_kernel",
+    [XENFEAT_pae_pgdir_above_4gb]        = "pae_pgdir_above_4gb"
+};
+
+static void parse_features(
+    const char *feats,
+    uint32_t supported[XENFEAT_NR_SUBMAPS],
+    uint32_t required[XENFEAT_NR_SUBMAPS])
+{
+    const char *end, *p;
+    int i, req;
+
+    if ( (end = strchr(feats, ',')) == NULL )
+        end = feats + strlen(feats);
+
+    while ( feats < end )
+    {
+        p = strchr(feats, '|');
+        if ( (p == NULL) || (p > end) )
+            p = end;
+
+        req = (*feats == '!');
+        if ( req )
+            feats++;
+
+        for ( i = 0; i < XENFEAT_NR_SUBMAPS*32; i++ )
+        {
+            if ( feature_names[i] == NULL )
+                continue;
+
+            if ( strncmp(feature_names[i], feats, p-feats) == 0 )
+            {
+                set_bit(i, supported);
+                if ( req )
+                    set_bit(i, required);
+                break;
+            }
+        }
+
+        if ( i == XENFEAT_NR_SUBMAPS*32 )
+        {
+            printk("Unknown kernel feature \"%.*s\".\n",
+                   (int)(p-feats), feats);
+            panic("Domain 0 requires an unknown hypervisor feature.\n");
+        }
+
+        feats = p;
+        if ( *feats == '|' )
+            feats++;
+    }
+}
+
 int construct_dom0(struct domain *d,
                    unsigned long _image_start, unsigned long image_len, 
                    unsigned long _initrd_start, unsigned long initrd_len,
@@ -187,6 +243,10 @@ int construct_dom0(struct domain *d,
 
     /* Machine address of next candidate page-table page. */
     unsigned long mpt_alloc;
+
+    /* Features supported. */
+    uint32_t dom0_features_supported[XENFEAT_NR_SUBMAPS] = { 0 };
+    uint32_t dom0_features_required[XENFEAT_NR_SUBMAPS] = { 0 };
 
     extern void translate_l2pgtable(
         struct domain *d, l1_pgentry_t *p2m, unsigned long l2mfn);
@@ -245,8 +305,19 @@ int construct_dom0(struct domain *d,
         return -EINVAL;
     }
 
-    if ( strstr(dsi.xen_section_string, "SHADOW=translate") )
-        opt_dom0_translate = 1;
+    if ( (p = strstr(dsi.xen_section_string, "FEATURES=")) != NULL )
+    {
+        parse_features(
+            p + strlen("FEATURES="),
+            dom0_features_supported,
+            dom0_features_required);
+        printk("Domain 0 kernel supports features = { %08x }.\n",
+               dom0_features_supported[0]);
+        printk("Domain 0 kernel requires features = { %08x }.\n",
+               dom0_features_required[0]);
+        if ( dom0_features_required[0] )
+            panic("Domain 0 requires an unsupported hypervisor feature.\n");
+    }
 
     /* Align load address to 4MB boundary. */
     dsi.v_start &= ~((1UL<<22)-1);
@@ -650,11 +721,6 @@ int construct_dom0(struct domain *d,
     si->nr_pages = nr_pages;
 
     si->shared_info = virt_to_maddr(d->shared_info);
-    if ( opt_dom0_translate )
-    {
-        si->shared_info  = max_page << PAGE_SHIFT;
-        set_gpfn_from_mfn(virt_to_maddr(d->shared_info) >> PAGE_SHIFT, max_page);
-    }
 
     si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
     si->pt_base      = vpt_start;
@@ -669,7 +735,7 @@ int construct_dom0(struct domain *d,
         mfn = pfn + alloc_spfn;
 #ifndef NDEBUG
 #define REVERSE_START ((v_end - dsi.v_start) >> PAGE_SHIFT)
-        if ( !opt_dom0_translate && (pfn > REVERSE_START) )
+        if ( pfn > REVERSE_START )
             mfn = alloc_epfn - (pfn - REVERSE_START);
 #endif
         ((unsigned long *)vphysmap_start)[pfn] = mfn;
@@ -720,48 +786,10 @@ int construct_dom0(struct domain *d,
 
     new_thread(v, dsi.v_kernentry, vstack_end, vstartinfo_start);
 
-    if ( opt_dom0_shadow || opt_dom0_translate )
+    if ( opt_dom0_shadow )
     {
-        printk("dom0: shadow enable\n");
-        shadow_mode_enable(d, (opt_dom0_translate
-                               ? SHM_enable | SHM_refcounts | SHM_translate
-                               : SHM_enable));
-        if ( opt_dom0_translate )
-        {
-            printk("dom0: shadow translate\n");
-#if defined(__i386__) && defined(CONFIG_X86_PAE)
-            printk("FIXME: PAE code needed here: %s:%d (%s)\n",
-                   __FILE__, __LINE__, __FUNCTION__);
-            for ( ; ; )
-                __asm__ __volatile__ ( "hlt" );
-#else
-            /* Hmm, what does this?
-               Looks like isn't portable across 32/64 bit and pae/non-pae ...
-               -- kraxel */
-
-            /* mafetter: This code is mostly a hack in order to be able to
-             * test with dom0's which are running with shadow translate.
-             * I expect we'll rip this out once we have a stable set of
-             * domU clients which use the various shadow modes, but it's
-             * useful to leave this here for now...
-             */
-
-            // map this domain's p2m table into current page table,
-            // so that we can easily access it.
-            //
-            ASSERT( root_get_intpte(idle_pg_table[1]) == 0 );
-            ASSERT( pagetable_get_paddr(d->arch.phys_table) );
-            idle_pg_table[1] = root_from_paddr(
-                pagetable_get_paddr(d->arch.phys_table), __PAGE_HYPERVISOR);
-            translate_l2pgtable(d, (l1_pgentry_t *)(1u << L2_PAGETABLE_SHIFT),
-                                pagetable_get_pfn(v->arch.guest_table));
-            idle_pg_table[1] = root_empty();
-            local_flush_tlb();
-#endif
-        }
-
-        update_pagetables(v); /* XXX SMP */
-        printk("dom0: shadow setup done\n");
+        shadow_mode_enable(d, SHM_enable);
+        update_pagetables(v);
     }
 
     rc = 0;

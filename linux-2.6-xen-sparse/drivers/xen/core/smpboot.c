@@ -188,7 +188,7 @@ void vcpu_prepare(int vcpu)
 
 	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
 #else /* __x86_64__ */
-	ctxt.user_regs.cs = __KERNEL_CS | 3;
+	ctxt.user_regs.cs = __KERNEL_CS;
 	ctxt.user_regs.esp = idle->thread.rsp0 - sizeof(struct pt_regs);
 
 	ctxt.kernel_ss = __KERNEL_DS;
@@ -237,7 +237,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 #ifdef __x86_64__
 		cpu_pda(cpu)->pcurrent = idle;
 		cpu_pda(cpu)->cpunumber = cpu;
-		per_cpu(init_tss,cpu).rsp0 = idle->thread.rsp;
 		clear_ti_thread_flag(idle->thread_info, TIF_FORK);
 #endif
 

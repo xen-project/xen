@@ -346,19 +346,22 @@ int arch_set_info_guest(
     struct vcpu *v, struct vcpu_guest_context *c)
 {
     struct domain *d = v->domain;
-    unsigned long phys_basetab;
+    unsigned long phys_basetab = INVALID_MFN;
     int i, rc;
 
-    /*
-     * This is sufficient! If the descriptor DPL differs from CS RPL then we'll
-     * #GP. If DS, ES, FS, GS are DPL 0 then they'll be cleared automatically.
-     * If SS RPL or DPL differs from CS RPL then we'll #GP.
-     */
     if ( !(c->flags & VGCF_HVM_GUEST) )
     {
-        if ( ((c->user_regs.cs & 3) == 0) ||
-             ((c->user_regs.ss & 3) == 0) )
-            return -EINVAL;
+        fixup_guest_selector(c->user_regs.ss);
+        fixup_guest_selector(c->kernel_ss);
+        fixup_guest_selector(c->user_regs.cs);
+
+#ifdef __i386__
+        fixup_guest_selector(c->event_callback_cs);
+        fixup_guest_selector(c->failsafe_callback_cs);
+#endif
+
+        for ( i = 0; i < 256; i++ )
+            fixup_guest_selector(c->trap_ctxt[i].cs);
     }
     else if ( !hvm_enabled )
       return -EINVAL;
@@ -372,6 +375,7 @@ int arch_set_info_guest(
         v->arch.flags |= TF_kernel_mode;
 
     memcpy(&v->arch.guest_context, c, sizeof(*c));
+    init_int80_direct_trap(v);
 
     if ( !(c->flags & VGCF_HVM_GUEST) )
     {
@@ -398,17 +402,27 @@ int arch_set_info_guest(
     if ( v->vcpu_id == 0 )
         d->vm_assist = c->vm_assist;
 
-    phys_basetab = c->ctrlreg[3];
-    phys_basetab =
-        (gmfn_to_mfn(d, phys_basetab >> PAGE_SHIFT) << PAGE_SHIFT) |
-        (phys_basetab & ~PAGE_MASK);
+    if ( !(c->flags & VGCF_HVM_GUEST) )
+    {
+        phys_basetab = c->ctrlreg[3];
+        phys_basetab =
+            (gmfn_to_mfn(d, phys_basetab >> PAGE_SHIFT) << PAGE_SHIFT) |
+            (phys_basetab & ~PAGE_MASK);
 
-    v->arch.guest_table = mk_pagetable(phys_basetab);
+        v->arch.guest_table = mk_pagetable(phys_basetab);
+    }
 
     if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
         return rc;
 
-    if ( shadow_mode_refcounts(d) )
+    if ( c->flags & VGCF_HVM_GUEST )
+    {
+        v->arch.guest_table = mk_pagetable(0);
+
+        if ( !hvm_initialize_guest_resources(v) )
+            return -EINVAL;
+    }
+    else if ( shadow_mode_refcounts(d) )
     {
         if ( !get_page(mfn_to_page(phys_basetab>>PAGE_SHIFT), d) )
         {
@@ -416,7 +430,7 @@ int arch_set_info_guest(
             return -EINVAL;
         }
     }
-    else if ( !(c->flags & VGCF_HVM_GUEST) )
+    else
     {
         if ( !get_page_and_type(mfn_to_page(phys_basetab>>PAGE_SHIFT), d,
                                 PGT_base_page_table) )
@@ -424,17 +438,6 @@ int arch_set_info_guest(
             destroy_gdt(v);
             return -EINVAL;
         }
-    }
-
-    if ( c->flags & VGCF_HVM_GUEST )
-    {
-        /* HVM uses the initially provided page tables as the P2M map. */
-        if ( !pagetable_get_paddr(d->arch.phys_table) )
-            d->arch.phys_table = v->arch.guest_table;
-        v->arch.guest_table = mk_pagetable(0);
-
-        if ( !hvm_initialize_guest_resources(v) )
-            return -EINVAL;
     }
 
     update_pagetables(v);
@@ -610,9 +613,6 @@ static void save_segments(struct vcpu *v)
     struct cpu_user_regs      *regs = &ctxt->user_regs;
     unsigned int dirty_segment_mask = 0;
 
-    if ( HVM_DOMAIN(v) )
-        hvm_save_segments(v);
-
     regs->ds = read_segment_register(ds);
     regs->es = read_segment_register(es);
     regs->fs = read_segment_register(fs);
@@ -682,9 +682,15 @@ static void __context_switch(void)
                stack_regs,
                CTXT_SWITCH_STACK_BYTES);
         unlazy_fpu(p);
-        save_segments(p);
-        if ( HVM_DOMAIN(p) )
+        if ( !HVM_DOMAIN(p) )
+        {
+            save_segments(p);
+        }
+        else
+        {
+            hvm_save_segments(p);
             hvm_load_msrs();
+        }
     }
 
     if ( !is_idle_vcpu(n) )
@@ -980,6 +986,26 @@ void domain_relinquish_resources(struct domain *d)
     relinquish_memory(d, &d->page_list);
 }
 
+void arch_dump_domain_info(struct domain *d)
+{
+    if ( shadow_mode_enabled(d) )
+    {
+        printk("    shadow mode: ");
+        if ( shadow_mode_refcounts(d) )
+            printk("refcounts ");
+        if ( shadow_mode_write_all(d) )
+            printk("write_all ");
+        if ( shadow_mode_log_dirty(d) )
+            printk("log_dirty ");
+        if ( shadow_mode_translate(d) )
+            printk("translate ");
+        if ( shadow_mode_external(d) )
+            printk("external ");
+        if ( shadow_mode_wr_pt_pte(d) )
+            printk("wr_pt_pte ");
+        printk("\n");
+    }
+}
 
 /*
  * Local variables:

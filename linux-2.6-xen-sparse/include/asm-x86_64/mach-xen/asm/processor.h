@@ -196,7 +196,9 @@ static inline void clear_in_cr4 (unsigned long mask)
 #define IO_BITMAP_BITS  65536
 #define IO_BITMAP_BYTES (IO_BITMAP_BITS/8)
 #define IO_BITMAP_LONGS (IO_BITMAP_BYTES/sizeof(long))
+#ifndef CONFIG_X86_NO_TSS
 #define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
+#endif
 #define INVALID_IO_BITMAP_OFFSET 0x8000
 
 struct i387_fxsave_struct {
@@ -217,6 +219,7 @@ union i387_union {
 	struct i387_fxsave_struct	fxsave;
 };
 
+#ifndef CONFIG_X86_NO_TSS
 struct tss_struct {
 	u32 reserved1;
 	u64 rsp0;	
@@ -240,8 +243,10 @@ struct tss_struct {
 	unsigned long io_bitmap[IO_BITMAP_LONGS + 1];
 } __attribute__((packed)) ____cacheline_aligned;
 
-extern struct cpuinfo_x86 boot_cpu_data;
 DECLARE_PER_CPU(struct tss_struct,init_tss);
+#endif
+
+extern struct cpuinfo_x86 boot_cpu_data;
 
 #ifdef CONFIG_X86_VSMP
 #define ARCH_MIN_TASKALIGN	(1 << INTERNODE_CACHE_SHIFT)
@@ -283,9 +288,11 @@ struct thread_struct {
 	.rsp0 = (unsigned long)&init_stack + sizeof(init_stack) \
 }
 
+#ifndef CONFIG_X86_NO_TSS
 #define INIT_TSS  { \
 	.rsp0 = (unsigned long)&init_stack + sizeof(init_stack) \
 }
+#endif
 
 #define INIT_MMAP \
 { &init_mm, 0, 0, NULL, PAGE_SHARED, VM_READ | VM_WRITE | VM_EXEC, 1, NULL, NULL }

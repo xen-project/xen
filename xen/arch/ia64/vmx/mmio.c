@@ -154,7 +154,7 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 
     set_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
     p->state = STATE_IOREQ_READY;
-    evtchn_send(iopacket_port(v->domain));
+    evtchn_send(iopacket_port(v));
     vmx_wait_io();
     if(dir==IOREQ_READ){ //read
         *val=p->u.data;
@@ -186,7 +186,7 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 
     set_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
     p->state = STATE_IOREQ_READY;
-    evtchn_send(iopacket_port(v->domain));
+    evtchn_send(iopacket_port(v));
 
     vmx_wait_io();
     if(dir==IOREQ_READ){ //read

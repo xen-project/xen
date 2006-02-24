@@ -231,6 +231,7 @@ static int parsebinimage(char *image,
     dsi->v_kernstart = dsi->v_start;
     dsi->v_kernend = dsi->v_end;
     dsi->v_kernentry = image_info->entry_addr;
+    dsi->xen_guest_string = "";
 
     return 0;
 }

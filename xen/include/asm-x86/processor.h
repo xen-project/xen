@@ -124,7 +124,6 @@
 #define TBF_EXCEPTION_ERRCODE  2
 #define TBF_INTERRUPT          8
 #define TBF_FAILSAFE          16
-#define TBF_SLOW_IRET         32
 
 /* 'arch_vcpu' flags values */
 #define _TF_kernel_mode        0
