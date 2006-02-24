@@ -43,7 +43,8 @@ static void free_writable_pte_predictions(struct domain *d);
 static void mark_shadows_as_reflecting_snapshot(struct domain *d, unsigned long gpfn);
 #endif
 
-static void free_p2m_table(struct vcpu *v);
+static int alloc_p2m_table(struct domain *d);
+static void free_p2m_table(struct domain *d);
 
 /********
 
@@ -739,7 +740,7 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     mpl2e = (l2_pgentry_t *)map_domain_page_global(mmfn);
     memset(mpl2e, 0, PAGE_SIZE);
 
-    memcpy(&mpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
+    memcpy(&mpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
            &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
 
@@ -760,6 +761,23 @@ static void alloc_monitor_pagetable(struct vcpu *v)
 
     if ( v->vcpu_id == 0 )
         alloc_p2m_table(d);
+    else
+    {
+        unsigned long mfn;
+
+        mfn = pagetable_get_pfn(d->vcpu[0]->arch.monitor_table);
+        if ( mfn )
+        {
+            l2_pgentry_t *l2tab;
+
+            l2tab = map_domain_page(mfn);
+
+            mpl2e[l2_table_offset(RO_MPT_VIRT_START)] =
+                l2tab[l2_table_offset(RO_MPT_VIRT_START)];
+
+            unmap_domain_page(l2tab);
+        }
+    }
 }
 
 /*
@@ -771,7 +789,7 @@ void free_monitor_pagetable(struct vcpu *v)
     unsigned long mfn;
 
     ASSERT( pagetable_get_paddr(v->arch.monitor_table) );
-    
+
     mpl2e = v->arch.monitor_vtable;
 
     /*
@@ -794,7 +812,7 @@ void free_monitor_pagetable(struct vcpu *v)
     }
 
     if ( v->vcpu_id == 0 )
-        free_p2m_table(v);
+        free_p2m_table(v->domain);
 
     /*
      * Then free monitor_table.
@@ -808,8 +826,8 @@ void free_monitor_pagetable(struct vcpu *v)
 }
 
 static int
-map_p2m_entry(
-    l1_pgentry_t *l1tab, unsigned long va, unsigned long gpa, unsigned long mfn)
+map_p2m_entry(l1_pgentry_t *l1tab, unsigned long va,
+              unsigned long gpa, unsigned long mfn)
 {
     unsigned long *l0tab = NULL;
     l1_pgentry_t l1e = { 0 };
@@ -820,27 +838,22 @@ map_p2m_entry(
     {
         page = alloc_domheap_page(NULL);
         if ( !page )
-            goto fail;
+            return 0;
 
-        if ( l0tab  )
-            unmap_domain_page(l0tab);
         l0tab = map_domain_page(page_to_mfn(page));
-        memset(l0tab, 0, PAGE_SIZE );
+        memset(l0tab, 0, PAGE_SIZE);
+
         l1e = l1tab[l1_table_offset(va)] =
             l1e_from_page(page, __PAGE_HYPERVISOR);
     }
-    else if ( l0tab == NULL)
+    else
         l0tab = map_domain_page(l1e_get_pfn(l1e));
 
-    l0tab[gpa & ((PAGE_SIZE / sizeof (mfn)) - 1) ] = mfn;
+    l0tab[gpa & ((PAGE_SIZE / sizeof(mfn)) - 1)] = mfn;
 
-    if ( l0tab )
-        unmap_domain_page(l0tab);
+    unmap_domain_page(l0tab);
 
     return 1;
-
-fail:
-    return 0;
 }
 
 int
@@ -853,7 +866,6 @@ set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn,
     l1_pgentry_t *l1;
     struct page_info *l1page;
     unsigned long va = pfn << PAGE_SHIFT;
-    int error;
 
     if ( shadow_mode_external(d) )
     {
@@ -877,6 +889,7 @@ set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn,
 
     if ( shadow_mode_external(d) )
     {
+        int error;
         l1_pgentry_t *l1tab = NULL;
         l2_pgentry_t l2e;
 
@@ -885,14 +898,13 @@ set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn,
         ASSERT( l2e_get_flags(l2e) & _PAGE_PRESENT );
 
         l1tab = map_domain_page(l2e_get_pfn(l2e));
-        error = map_p2m_entry(l1tab, va, pfn, mfn);
-        if ( !error )
-            domain_crash_synchronous(); 
+        if ( !(error = map_p2m_entry(l1tab, va, pfn, mfn)) )
+            domain_crash(d);
 
         unmap_domain_page(l1tab);
         unmap_domain_page_with_cache(l2, l2cache);
 
-        return 1;
+        return error;
     }
 
     /*
@@ -926,7 +938,7 @@ set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn,
     return 1;
 }
 
-int
+static int
 alloc_p2m_table(struct domain *d)
 {
     struct list_head *list_ent;
@@ -937,7 +949,7 @@ alloc_p2m_table(struct domain *d)
     l2_pgentry_t l2e = { 0 };
     struct page_info *page;
     unsigned long gpfn, mfn;
-    int error;
+    int error = 0;
 
     if ( pagetable_get_pfn(d->vcpu[0]->arch.monitor_table) )
     {
@@ -955,6 +967,9 @@ alloc_p2m_table(struct domain *d)
         }
         else
             l1tab = map_domain_page(l2e_get_pfn(l2e));
+
+        if ( l2tab )
+            unmap_domain_page(l2tab);
     }
     else
     {
@@ -972,23 +987,23 @@ alloc_p2m_table(struct domain *d)
         page = list_entry(list_ent, struct page_info, list);
         mfn = page_to_mfn(page);
 
-        error = map_p2m_entry(l1tab, va, gpfn, mfn);
-        if ( !error )
-            domain_crash_synchronous(); 
+        if ( !(error = map_p2m_entry(l1tab, va, gpfn, mfn)) )
+        {
+            domain_crash(d);
+            break;
+        }
 
         list_ent = frame_table[mfn].list.next;
         va += sizeof(mfn);
     }
 
-    if (l2tab)
-        unmap_domain_page(l2tab);
     unmap_domain_page(l1tab);
 
-    return 1;
+    return error;
 }
 
-static void 
-free_p2m_table(struct vcpu *v)
+static void
+free_p2m_table(struct domain *d)
 {
     unsigned long va;
     l2_pgentry_t *l2tab;
@@ -996,10 +1011,10 @@ free_p2m_table(struct vcpu *v)
     l2_pgentry_t l2e;
     l1_pgentry_t l1e;
 
-    ASSERT ( pagetable_get_pfn(v->arch.monitor_table) );
+    ASSERT( pagetable_get_pfn(d->vcpu[0]->arch.monitor_table) );
 
     l2tab = map_domain_page(
-        pagetable_get_pfn(v->arch.monitor_table));
+        pagetable_get_pfn(d->vcpu[0]->arch.monitor_table));
 
     for ( va = RO_MPT_VIRT_START; va < RO_MPT_VIRT_END; )
     {
@@ -1015,11 +1030,13 @@ free_p2m_table(struct vcpu *v)
 
                 if ( l1e_get_flags(l1e) & _PAGE_PRESENT )
                     free_domheap_page(mfn_to_page(l1e_get_pfn(l1e)));
-                va += PAGE_SIZE; 
+                va += PAGE_SIZE;
             }
             unmap_domain_page(l1tab);
             free_domheap_page(mfn_to_page(l2e_get_pfn(l2e)));
         }
+        else
+            va += PAGE_SIZE * L1_PAGETABLE_ENTRIES;
     }
     unmap_domain_page(l2tab);
 }
@@ -1246,7 +1263,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
 
     if ( shadow_mode_refcounts(d) )
     {
-        struct list_head *list_ent; 
+        struct list_head *list_ent;
         struct page_info *page;
 
         /*
