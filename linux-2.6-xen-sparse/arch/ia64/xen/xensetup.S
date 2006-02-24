@@ -24,7 +24,7 @@ GLOBAL_ENTRY(early_xen_setup)
 (p7)	movl r10=xen_ivt;;
 (p7)	mov cr.iva=r10
 	br.ret.sptk.many rp;;
-END(xen_init)
+END(early_xen_setup)
 
 GLOBAL_ENTRY(is_running_on_xen)
 	movl r9=running_on_xen;;
