@@ -569,12 +569,14 @@ static int add_pal_hob(void* hob_buf){
 static int setup_guest(  int xc_handle,
                          uint32_t dom, unsigned long memsize,
                          char *image, unsigned long image_size,
-                         unsigned int control_evtchn,
+                         uint32_t vcpus,
                          unsigned int store_evtchn,
                          unsigned long *store_mfn)
 {
     unsigned long page_array[2];
     shared_iopage_t *sp;
+    int i;
+
     // FIXME: initialize pfn list for a temp hack
     if (xc_ia64_get_pfn_list(xc_handle, dom, NULL, -1, -1) == -1) {
 	PERROR("Could not allocate continuous memory");
@@ -612,7 +614,18 @@ static int setup_guest(  int xc_handle,
 		page_array[0])) == 0)
 	goto error_out;
     memset(sp, 0, PAGE_SIZE);
-    sp->sp_global.eport = control_evtchn;
+
+    for (i = 0; i < vcpus; i++) {
+        uint32_t vp_eport;
+
+        vp_eport = xc_evtchn_alloc_unbound(xc_handle, dom, 0);
+        if (vp_eport < 0) {
+            fprintf(stderr, "Couldn't get unbound port from VMX guest.\n");
+            goto error_out;
+        }
+        sp->vcpu_iodata[i].vp_eport = vp_eport;
+    }
+
     munmap(sp, PAGE_SIZE);
 
     return 0;
@@ -625,7 +638,6 @@ int xc_hvm_build(int xc_handle,
                  uint32_t domid,
                  int memsize,
                  const char *image_name,
-                 unsigned int control_evtchn,
                  unsigned int vcpus,
                  unsigned int pae,
                  unsigned int acpi,
@@ -668,8 +680,8 @@ int xc_hvm_build(int xc_handle,
 
     memset(ctxt, 0, sizeof(*ctxt));
 
-    if ( setup_guest(xc_handle, domid, (unsigned long)memsize, image, image_size, 
-                       control_evtchn, store_evtchn, store_mfn ) < 0 ){
+    if ( setup_guest(xc_handle, domid, (unsigned long)memsize, image,
+                     image_size, vcpus, store_evtchn, store_mfn ) < 0 ){
         ERROR("Error constructing guest OS");
         goto error_out;
     }
