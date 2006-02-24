@@ -61,6 +61,8 @@
 #ifndef CONFIG_PREEMPT
 #define retint_kernel retint_restore_args
 #endif	
+
+NMI_MASK = 0x80000000
 	
 /*
  * C code is not supposed to know about undefined top of stack. Every time 
@@ -143,6 +145,18 @@
          * #define VGCF_IN_SYSCALL (1<<8) 
          */
 	.macro HYPERVISOR_IRET flag
+	testb $3,1*8(%rsp)
+	jnz   1f
+	testl $NMI_MASK,2*8(%rsp)
+	jnz   1f
+
+	/* Direct iret to kernel space. Correct CS and SS. */
+	orb   $3,1*8(%rsp)
+	orb   $3,4*8(%rsp)
+	iretq
+
+1:	/* Slow iret via hypervisor. */
+	andl  $~NMI_MASK, 16(%rsp)
 	pushq $\flag
 	jmp  hypercall_page + (__HYPERVISOR_iret * 32)
 	.endm
@@ -805,6 +819,7 @@ ENTRY(nmi)
 ENTRY(do_nmi_callback)
         addq $8, %rsp
         call do_nmi
+        orl  $NMI_MASK,EFLAGS(%rsp)
         RESTORE_REST
         XEN_BLOCK_EVENTS(%rsi)
         GET_THREAD_INFO(%rcx)
