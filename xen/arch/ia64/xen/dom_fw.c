@@ -730,7 +730,7 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 		if (efi.mps) {
 			efi_tables[i].guid = MPS_TABLE_GUID;
 			efi_tables[i].table = __pa(efi.mps);
-			printf(" MPS=%0xlx",efi_tables[i].table);
+			printf(" MPS=0x%lx",efi_tables[i].table);
 			i++;
 		}
 
@@ -739,25 +739,25 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 		if (efi.acpi20) {
 			efi_tables[i].guid = ACPI_20_TABLE_GUID;
 			efi_tables[i].table = __pa(efi.acpi20);
-			printf(" ACPI 2.0=%0xlx",efi_tables[i].table);
+			printf(" ACPI 2.0=0x%lx",efi_tables[i].table);
 			i++;
 		}
 		if (efi.acpi) {
 			efi_tables[i].guid = ACPI_TABLE_GUID;
 			efi_tables[i].table = __pa(efi.acpi);
-			printf(" ACPI=%0xlx",efi_tables[i].table);
+			printf(" ACPI=0x%lx",efi_tables[i].table);
 			i++;
 		}
 		if (efi.smbios) {
 			efi_tables[i].guid = SMBIOS_TABLE_GUID;
 			efi_tables[i].table = __pa(efi.smbios);
-			printf(" SMBIOS=%0xlx",efi_tables[i].table);
+			printf(" SMBIOS=0x%lx",efi_tables[i].table);
 			i++;
 		}
 		if (efi.hcdp) {
 			efi_tables[i].guid = HCDP_TABLE_GUID;
 			efi_tables[i].table = __pa(efi.hcdp);
-			printf(" HCDP=%0xlx",efi_tables[i].table);
+			printf(" HCDP=0x%lx",efi_tables[i].table);
 			i++;
 		}
 		printf("\n");
@@ -774,7 +774,7 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 
 			efi_tables[i].guid = ACPI_20_TABLE_GUID;
 			efi_tables[i].table = dom_pa(acpi_tables);
-			printf(" ACPI 2.0=%0xlx",efi_tables[i].table);
+			printf(" ACPI 2.0=0x%lx",efi_tables[i].table);
 			i++;
 		}
 	}
@@ -870,7 +870,7 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 		bp->initrd_start = d->arch.initrd_start;
 		bp->initrd_size  = d->arch.initrd_len;
 	}
-	printf(" initrd start %0xlx", bp->initrd_start);
-	printf(" initrd size %0xlx", bp->initrd_size);
+	printf(" initrd start 0x%lx", bp->initrd_start);
+	printf(" initrd size 0x%lx\n", bp->initrd_size);
 	return bp;
 }
