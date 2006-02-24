@@ -27,8 +27,6 @@
 //#define VHPT_SIZE   (1 << VHPT_SIZE_PS)
 #define ARCH_PAGE_SHIFT   12
 #define ARCH_PAGE_SIZE    PSIZE(ARCH_PAGE_SHIFT)
-#define INVALID_MFN	(-1)
-
 #define MAX_PHYS_ADDR_BITS  50
 #define PMASK(size)         (~((size) - 1))
 #define PSIZE(size)         (1UL<<(size))
@@ -87,9 +85,6 @@
 #define STLB_TC         0
 #define STLB_TR         1
 
-#define VMM_RR_MASK     0xfffff
-#define VMM_RR_SHIFT        20
-
 #define IA64_RR_SHIFT       61
 
 #define PHYS_PAGE_SHIFT     PPN_SHIFT
@@ -109,7 +104,6 @@
 
 #define VRN_MASK        0xe000000000000000L
 #define PTA_BASE_MASK       0x3fffffffffffL
-#define PTA_BASE_SHIFT      15
 #define VHPT_OFFSET_MASK    0x7fff
 
 #define BITS_SHIFT_256MB    28
@@ -145,6 +139,7 @@ bits_v(uint64_t v, uint32_t bs, uint32_t be)
     uint64_t    result;
     __asm __volatile("shl %0=%1, %2;; shr.u %0=%0, %3;;"
         : "=r" (result): "r"(v), "r"(63-be), "r" (bs+63-be) );
+    return result;
 }
 
 #define bits(val, bs, be)                                         \
