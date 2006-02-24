@@ -149,4 +149,16 @@ extern void vcpu_itc_no_srlz(VCPU *vcpu, UINT64, UINT64, UINT64, UINT64, UINT64)
 extern UINT64 vcpu_get_tmp(VCPU *, UINT64);
 extern void vcpu_set_tmp(VCPU *, UINT64, UINT64);
 
+static inline UINT64
+itir_ps(UINT64 itir)
+{
+    return ((itir >> 2) & 0x3f);
+}
+
+static inline UINT64
+itir_mask(UINT64 itir)
+{
+    return (~((1UL << itir_ps(itir)) - 1));
+}
+
 #endif

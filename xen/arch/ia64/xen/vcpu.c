@@ -1293,9 +1293,6 @@ IA64FAULT vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 	return (IA64_ILLOP_FAULT);
 }
 
-#define itir_ps(itir)	((itir >> 2) & 0x3f)
-#define itir_mask(itir) (~((1UL << itir_ps(itir)) - 1))
-
 unsigned long vhpt_translate_count = 0;
 unsigned long fast_vhpt_translate_count = 0;
 unsigned long recover_to_page_fault_count = 0;
@@ -1798,7 +1795,7 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 
 IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 {
-	unsigned long pteval, logps = (itir >> 2) & 0x3f;
+	unsigned long pteval, logps = itir_ps(itir);
 	unsigned long translate_domain_pte(UINT64,UINT64,UINT64);
 	BOOLEAN swap_rr0 = (!(ifa>>61) && PSCB(vcpu,metaphysical_mode));
 
@@ -1818,7 +1815,7 @@ IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 
 IA64FAULT vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 {
-	unsigned long pteval, logps = (itir >> 2) & 0x3f;
+	unsigned long pteval, logps = itir_ps(itir);
 	unsigned long translate_domain_pte(UINT64,UINT64,UINT64);
 	BOOLEAN swap_rr0 = (!(ifa>>61) && PSCB(vcpu,metaphysical_mode));
 
