@@ -575,7 +575,8 @@ void guest_write_eoi(VCPU *vcpu)
     VLSAPIC_INSVC(vcpu,vec>>6) &= ~(1UL <<(vec&63));
     local_irq_restore(spsr);
     VCPU(vcpu, eoi)=0;    // overwrite the data
-    vmx_check_pending_irq(vcpu);
+    vcpu->arch.irq_new_pending=1;
+//    vmx_check_pending_irq(vcpu);
 }
 
 uint64_t guest_read_vivr(VCPU *vcpu)

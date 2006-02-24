@@ -262,10 +262,10 @@ void leave_hypervisor_tail(struct pt_regs *regs)
  		 *
  		 * Now hardcode the vector as 0x10 temporarily
  		 */
- 		if (event_pending(v)&&(!(VLSAPIC_INSVC(v,0)&(1UL<<0x10)))) {
- 			VCPU(v, irr[0]) |= 1UL << 0x10;
- 			v->arch.irq_new_pending = 1;
- 		}
+// 		if (event_pending(v)&&(!(VLSAPIC_INSVC(v,0)&(1UL<<0x10)))) {
+// 			VCPU(v, irr[0]) |= 1UL << 0x10;
+// 			v->arch.irq_new_pending = 1;
+// 		}
 
  		if ( v->arch.irq_new_pending ) {
  			v->arch.irq_new_pending = 0;
