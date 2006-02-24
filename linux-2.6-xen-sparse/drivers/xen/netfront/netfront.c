@@ -114,6 +114,7 @@ struct netfront_info
 
 	/* Receive-ring batched refills. */
 #define RX_MIN_TARGET 8
+#define RX_DFL_MIN_TARGET 64
 #define RX_MAX_TARGET NET_RX_RING_SIZE
 	int rx_min_target, rx_max_target, rx_target;
 	struct sk_buff_head rx_batch;
@@ -1102,8 +1103,8 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 	spin_lock_init(&np->rx_lock);
 
 	skb_queue_head_init(&np->rx_batch);
-	np->rx_target     = RX_MIN_TARGET;
-	np->rx_min_target = RX_MIN_TARGET;
+	np->rx_target     = RX_DFL_MIN_TARGET;
+	np->rx_min_target = RX_DFL_MIN_TARGET;
 	np->rx_max_target = RX_MAX_TARGET;
 
 	init_timer(&np->rx_refill_timer);
