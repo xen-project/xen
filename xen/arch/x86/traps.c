@@ -1002,7 +1002,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 #endif
         default:
             if ( (rdmsr_safe(regs->ecx, l, h) != 0) ||
-                 (regs->ecx != MSR_EFER) ||
                  (regs->eax != l) || (regs->edx != h) )
                 DPRINTK("Domain attempted WRMSR %p from "
                         "%08x:%08x to %08lx:%08lx.\n",
@@ -1033,8 +1032,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             break;
         default:
-            DPRINTK("Domain attempted RDMSR %p.\n", _p(regs->ecx));
             /* Everyone can read the MSR space. */
+            /*DPRINTK("Domain attempted RDMSR %p.\n", _p(regs->ecx));*/
             if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
                 goto fail;
             break;
