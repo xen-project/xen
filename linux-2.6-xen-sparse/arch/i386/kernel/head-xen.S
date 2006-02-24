@@ -25,11 +25,6 @@
 
 ENTRY(startup_32)
 	movl %esi,xen_start_info
-
-#if 0
-ENTRY(startup_32_smp)
-#endif /* CONFIG_SMP */
-
 	cld
 
 	/* Set up the stack pointer */
@@ -57,29 +52,42 @@ checkCPUtype:
 	movb %cl,X86_MASK
 	movl %edx,X86_CAPABILITY
 
+	movb $1,X86_HARD_MATH
+
 	xorl %eax,%eax			# Clear FS/GS and LDT
 	movl %eax,%fs
 	movl %eax,%gs
 	cld			# gcc2 wants the direction flag cleared at all times
 
-#if 0
-	movb ready, %cl
-	movb $1, ready
-	cmpb $0,%cl
-	je 1f			# the first CPU calls start_kernel
-				# all other CPUs call initialize_secondary
-	call initialize_secondary
-	jmp L6
-1:
-#endif /* CONFIG_SMP */
 	call start_kernel
 L6:
 	jmp L6			# main should never return here, but
 				# just in case, we know what happens.
 
-	ALIGN
+#define HYPERCALL_PAGE_OFFSET 0x1000
+.org HYPERCALL_PAGE_OFFSET
+ENTRY(hypercall_page)
+.skip 0x1000
 
-# boot GDT descriptor (later on used by CPU#0):
+/*
+ * Real beginning of normal "text" segment
+ */
+ENTRY(stext)
+ENTRY(_stext)
+
+/*
+ * BSS section
+ */
+.section ".bss.page_aligned","w"
+ENTRY(empty_zero_page)
+	.fill 4096,1,0
+
+/*
+ * This starts the data section.
+ */
+.data
+
+	ALIGN
 	.word 0				# 32 bit align gdt_desc.address
 	.globl cpu_gdt_descr
 cpu_gdt_descr:
@@ -88,10 +96,10 @@ cpu_gdt_descr:
 
 	.fill NR_CPUS-1,8,0		# space for the other GDT descriptors
 
-.org 0x1000
-ENTRY(empty_zero_page)
-
-.org 0x2000
+/*
+ * The Global Descriptor Table contains 28 quadwords, per-CPU.
+ */
+	.align PAGE_SIZE_asm
 ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x0000000000000000	/* 0x0b reserved */
@@ -106,10 +114,10 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0x53 reserved */
 	.quad 0x0000000000000000	/* 0x5b reserved */
 
-	.quad 0x00cf9b000000ffff	/* 0x60 kernel 4GB code at 0x00000000 */
-	.quad 0x00cf93000000ffff	/* 0x68 kernel 4GB data at 0x00000000 */
-	.quad 0x00cffb000000ffff	/* 0x73 user 4GB code at 0x00000000 */
-	.quad 0x00cff3000000ffff	/* 0x7b user 4GB data at 0x00000000 */
+	.quad 0x00cf9a000000ffff	/* 0x60 kernel 4GB code at 0x00000000 */
+	.quad 0x00cf92000000ffff	/* 0x68 kernel 4GB data at 0x00000000 */
+	.quad 0x00cffa000000ffff	/* 0x73 user 4GB code at 0x00000000 */
+	.quad 0x00cff2000000ffff	/* 0x7b user 4GB data at 0x00000000 */
 
 	.quad 0x0000000000000000	/* 0x80 TSS descriptor */
 	.quad 0x0000000000000000	/* 0x88 LDT descriptor */
@@ -142,20 +150,6 @@ ENTRY(cpu_gdt_table)
 
 	/* Be sure this is zeroed to avoid false validations in Xen */
 	.fill PAGE_SIZE_asm / 8 - GDT_ENTRIES,8,0
-
-.org 0x3000
-ENTRY(default_ldt)
-
-#define HYPERCALL_PAGE_OFFSET 0x4000
-.org HYPERCALL_PAGE_OFFSET
-ENTRY(hypercall_page)
-.skip 0x1000
-
-/*
- * Real beginning of normal "text" segment
- */
-ENTRY(stext)
-ENTRY(_stext)
 
 
 /*

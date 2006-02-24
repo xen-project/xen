@@ -25,6 +25,7 @@ void __init machine_specific_modify_cpu_capabilities(struct cpuinfo_x86 *c)
 	clear_bit(X86_FEATURE_SEP, c->x86_capability);
 	if (!(xen_start_info->flags & SIF_PRIVILEGED))
 		clear_bit(X86_FEATURE_MTRR, c->x86_capability);
+	c->hlt_works_ok = 0;
 }
 
 extern void hypervisor_callback(void);

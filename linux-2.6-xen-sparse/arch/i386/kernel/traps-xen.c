@@ -58,6 +58,9 @@
 
 asmlinkage int system_call(void);
 
+struct desc_struct default_ldt[] = { { 0, 0 }, { 0, 0 }, { 0, 0 },
+		{ 0, 0 }, { 0, 0 } };
+
 /* Do we ignore FPU interrupts ? */
 char ignore_fpu_irq = 0;
 
@@ -498,20 +501,6 @@ DO_ERROR_INFO(32, SIGSEGV, "iret exception", iret_error, ILL_BADSTK, 0)
 fastcall void __kprobes do_general_protection(struct pt_regs * regs,
 					      long error_code)
 {
-	/*
-	 * If we trapped on an LDT access then ensure that the default_ldt is
-	 * loaded, if nothing else. We load default_ldt lazily because LDT
-	 * switching costs time and many applications don't need it.
-	 */
-	if (unlikely((error_code & 6) == 4)) {
-		unsigned long ldt;
-		__asm__ __volatile__ ("sldt %0" : "=r" (ldt));
-		if (ldt == 0) {
-			xen_set_ldt((unsigned long)&default_ldt[0], 5);
-			return;
-		}
-	}
-
 	current->thread.error_code = error_code;
 	current->thread.trap_no = 13;
 
@@ -1079,13 +1068,6 @@ void __init trap_init(void)
 		set_in_cr4(X86_CR4_OSXMMEXCPT);
 		printk("done.\n");
 	}
-
-	/*
-	 * default LDT is a single-entry callgate to lcall7 for iBCS
-	 * and a callgate to lcall27 for Solaris/x86 binaries
-	 */
-	make_lowmem_page_readonly(
-		&default_ldt[0], XENFEAT_writable_descriptor_tables);
 
 	/*
 	 * Should be a barrier for any external CPU state.
