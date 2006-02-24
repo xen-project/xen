@@ -132,22 +132,8 @@ static void dump_domains(unsigned char key)
                d->handle[ 4], d->handle[ 5], d->handle[ 6], d->handle[ 7],
                d->handle[ 8], d->handle[ 9], d->handle[10], d->handle[11],
                d->handle[12], d->handle[13], d->handle[14], d->handle[15]);
-        if ( shadow_mode_enabled(d) ) {
-            printk("    shadow mode: ");
-            if ( shadow_mode_refcounts(d) )
-                printk("refcounts ");
-            if ( shadow_mode_write_all(d) )
-                printk("write_all ");
-            if ( shadow_mode_log_dirty(d) )
-                printk("log_dirty ");
-            if ( shadow_mode_translate(d) )
-                printk("translate ");
-            if ( shadow_mode_external(d) )
-                printk("external ");
-            if ( shadow_mode_wr_pt_pte(d) )
-                printk("wr_pt_pte ");
-            printk("\n");
-        }
+
+        arch_dump_domain_info(d);
 
         rangeset_domain_printk(d);
 

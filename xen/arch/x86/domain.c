@@ -986,6 +986,26 @@ void domain_relinquish_resources(struct domain *d)
     relinquish_memory(d, &d->page_list);
 }
 
+void arch_dump_domain_info(struct domain *d)
+{
+    if ( shadow_mode_enabled(d) )
+    {
+        printk("    shadow mode: ");
+        if ( shadow_mode_refcounts(d) )
+            printk("refcounts ");
+        if ( shadow_mode_write_all(d) )
+            printk("write_all ");
+        if ( shadow_mode_log_dirty(d) )
+            printk("log_dirty ");
+        if ( shadow_mode_translate(d) )
+            printk("translate ");
+        if ( shadow_mode_external(d) )
+            printk("external ");
+        if ( shadow_mode_wr_pt_pte(d) )
+            printk("wr_pt_pte ");
+        printk("\n");
+    }
+}
 
 /*
  * Local variables:
