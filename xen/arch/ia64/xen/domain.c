@@ -63,7 +63,6 @@ extern unsigned long running_on_sim;
 extern int readelfimage_base_and_size(char *, unsigned long,
 	              unsigned long *, unsigned long *, unsigned long *);
 
-unsigned long map_domain_page0(struct domain *);
 extern unsigned long dom_fw_setup(struct domain *, char *, int);
 static void init_switch_stack(struct vcpu *v);
 
@@ -381,11 +380,11 @@ void new_thread(struct vcpu *v,
 	}
 }
 
-static struct page * map_new_domain0_page(unsigned long mpaddr)
+static struct page * assign_new_domain0_page(unsigned long mpaddr)
 {
 	if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
-		printk("map_new_domain0_page: bad domain0 mpaddr %p!\n",mpaddr);
-printk("map_new_domain0_page: start=%p,end=%p!\n",dom0_start,dom0_start+dom0_size);
+		printk("assign_new_domain0_page: bad domain0 mpaddr %p!\n",mpaddr);
+printk("assign_new_domain0_page: start=%p,end=%p!\n",dom0_start,dom0_start+dom0_size);
 		while(1);
 	}
 	return mfn_to_page((mpaddr >> PAGE_SHIFT));
@@ -422,7 +421,7 @@ extern unsigned long vhpt_paddr, vhpt_pend;
 	pte = pte_offset_map(pmd, mpaddr);
 	if (pte_none(*pte)) {
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
-		if (d == dom0) p = map_new_domain0_page(mpaddr);
+		if (d == dom0) p = assign_new_domain0_page(mpaddr);
 		else
 #endif
 		{
