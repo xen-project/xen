@@ -54,7 +54,7 @@ static struct xsd_errors xsd_errors[] __attribute__((unused)) = {
     XSD_ERROR(EROFS),
     XSD_ERROR(EBUSY),
     XSD_ERROR(EAGAIN),
-    XSD_ERROR(EISCONN),
+    XSD_ERROR(EISCONN)
 };
 
 struct xsd_sockmsg
