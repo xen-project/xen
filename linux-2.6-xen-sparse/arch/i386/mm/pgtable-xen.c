@@ -320,16 +320,20 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	}
 }
 
-/* never called when PTRS_PER_PMD > 1 */
 void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 {
 	unsigned long flags; /* can be called from interrupt context */
 
-	spin_lock_irqsave(&pgd_lock, flags);
-	pgd_list_del(pgd);
-	spin_unlock_irqrestore(&pgd_lock, flags);
+	if (PTRS_PER_PMD > 1) {
+		if (!xen_feature(XENFEAT_pae_pgdir_above_4gb))
+			xen_destroy_contiguous_region((unsigned long)pgd, 0);
+	} else {
+		spin_lock_irqsave(&pgd_lock, flags);
+		pgd_list_del(pgd);
+		spin_unlock_irqrestore(&pgd_lock, flags);
 
-	pgd_test_and_unpin(pgd);
+		pgd_test_and_unpin(pgd);
+	}
 }
 
 pgd_t *pgd_alloc(struct mm_struct *mm)
