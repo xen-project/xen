@@ -25,6 +25,7 @@
 #include <xen/sched.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>
+#include <xen/domain.h>
 #include <xen/domain_page.h>
 #include <asm/current.h>
 #include <asm/io.h>
@@ -59,9 +60,9 @@ static void hvm_zap_mmio_range(
 
     for ( i = 0; i < nr_pfn; i++ )
     {
-        if ( pfn + i >= 0xfffff ) 
+        if ( pfn + i >= 0xfffff )
             break;
-        
+
         __copy_to_user(&phys_to_machine_mapping[pfn + i], &val, sizeof (val));
     }
 }
@@ -217,7 +218,7 @@ void hvm_pic_assist(struct vcpu *v)
     global_iodata_t *spg;
     u16   *virq_line, irqs;
     struct hvm_virpic *pic = &v->domain->arch.hvm_domain.vpic;
-    
+
     spg = &get_sp(v->domain)->sp_global;
     virq_line  = &spg->pic_clear_irr;
     if ( *virq_line ) {
@@ -309,6 +310,52 @@ void hvm_print_line(struct vcpu *v, const char c)
 	*index = 0;
     } else
 	pbuf[(*index)++] = c;
+}
+
+/*
+ * only called in HVM domain BSP context
+ * when booting, vcpuid is always equal to apic_id
+ */
+int hvm_bringup_ap(int vcpuid, int trampoline_vector)
+{
+    struct vcpu *bsp = current, *v;
+    struct domain *d = bsp->domain;
+    struct vcpu_guest_context *ctxt;
+    int rc = 0;
+
+    /* current must be HVM domain BSP */
+    if ( !(HVM_DOMAIN(bsp) && bsp->vcpu_id == 0) ) {
+        printk("Not calling hvm_bringup_ap from BSP context.\n");
+        domain_crash_synchronous();
+    }
+
+    if ( (v = d->vcpu[vcpuid]) == NULL )
+        return -ENOENT;
+
+    if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL ) {
+        printk("Failed to allocate memory in hvm_bringup_ap.\n");
+        return -ENOMEM;
+    }
+
+    hvm_init_ap_context(ctxt, vcpuid, trampoline_vector);
+
+    LOCK_BIGLOCK(d);
+    rc = -EEXIST;
+    if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+        rc = boot_vcpu(d, vcpuid, ctxt);
+    UNLOCK_BIGLOCK(d);
+
+    if ( rc != 0 )
+        printk("AP %d bringup failed in boot_vcpu %x.\n", vcpuid, rc);
+    else {
+        if ( test_and_clear_bit(_VCPUF_down, &d->vcpu[vcpuid]->vcpu_flags) )
+            vcpu_wake(d->vcpu[vcpuid]);
+        printk("AP %d bringup suceeded.\n", vcpuid);
+    }
+
+    xfree(ctxt);
+
+    return rc;
 }
 
 /*

@@ -159,9 +159,6 @@ typedef struct direct_intr_info {
     int source[6];
 } direct_intr_info_t;
 
-#define VLAPIC_INIT_SIPI_SIPI_STATE_NORM          0
-#define VLAPIC_INIT_SIPI_SIPI_STATE_WAIT_SIPI     1
-
 struct vlapic
 {
     //FIXME check what would be 64 bit on EM64T
@@ -197,7 +194,6 @@ struct vlapic
     unsigned long      init_ticks;
     uint32_t           err_write_count;
     uint64_t           apic_base_msr;
-    uint32_t           init_sipi_sipi_state;
     struct vcpu        *vcpu;
     struct domain      *domain;
 };
