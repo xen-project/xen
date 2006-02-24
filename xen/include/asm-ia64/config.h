@@ -251,8 +251,6 @@ struct screen_info { };
 #define seq_printf(a,b...) printf(b)
 #define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
 
-#define FORCE_CRASH()	asm("break 0;;");
-
 void dummy_called(char *function);
 #define dummy()	dummy_called(__FUNCTION__)
 
@@ -301,6 +299,9 @@ extern int ht_per_core;
 
 #ifndef __ASSEMBLY__
 #include <linux/linkage.h>
+#define FORCE_CRASH()	asm("break.m 0;;");
+#else
+#define FORCE_CRASH	break.m 0;;
 #endif
 
 #endif	/* _IA64_CONFIG_H_ */

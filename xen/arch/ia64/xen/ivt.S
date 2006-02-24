@@ -298,12 +298,83 @@ ENTRY(dtlb_miss)
 	DBG_FAULT(2)
 #ifdef XEN
 	VHPT_CCHAIN_LOOKUP(dtlb_miss,d)
+#if VHPT_ENABLED
+	// XXX TODO optimization
+	mov r31=pr				// save predicates
+	mov r30=cr.ipsr
+	mov r28=cr.iip			
+	mov r16=cr.ifa				// get virtual address
+	mov r17=cr.isr				// save predicates
+	;;
+
+	extr.u r18 = r30, IA64_PSR_CPL0_BIT, 2	// extract psr.cpl
+	;; 
+	cmp.ne p6, p0 = r0, r18			// cpl == 0?
+(p6)	br.cond.sptk 2f
+
+	// is speculation bit on?
+	tbit.nz p7,p0=r17,IA64_ISR_SP_BIT	
+	;; 
+(p7)	br.cond.spnt 2f
+
+	// is non-access bit on?
+	tbit.nz p8,p0=r17,IA64_ISR_NA_BIT	
+	;;
+(p8)	br.cond.spnt 2f
+
+	// cr.isr.code == IA64_ISR_CODE_LFETCH?
+	and r18=IA64_ISR_CODE_MASK,r17		// get the isr.code field
+	;; 
+	cmp.eq p9,p0=IA64_ISR_CODE_LFETCH,r18	// check isr.code field
+(p9)	br.cond.spnt 2f
+
+	// Is the faulted iip in vmm area?
+	// check [59:58] bit
+	// 00, 11: guest
+	// 01, 10: vmm
+	extr.u r19 = r28, 58, 2
+	;; 
+	cmp.eq p10, p0 = 0x0, r19
+(p10)	br.cond.sptk 2f
+	cmp.eq p11, p0 = 0x3, r19
+(p11)	br.cond.sptk 2f
+
+	// Is the faulted address is in the identity mapping area?
+	// 0xf000... or 0xe8000...
+	extr.u r20 = r16, 59, 5
+	;; 
+	cmp.eq p12, p0 = 0x1e, r20 // (0xf0 >> 3) = 0x1e
+(p12)	br.cond.spnt 1f
+	cmp.eq p0, p13 = 0x1d, r20 // (0xe8 >> 3) = 0x1d
+(p13)	br.cond.sptk 2f
+
+1:
+	// xen identity mappin area.
+	movl r24=PAGE_KERNEL
+	movl r25=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
+	;;
+	shr.u r26=r16,55	// move address bit 59 to bit 4
+	and r25=r25,r16		// clear ed, reserved bits, and PTE control bits
+	;;
+	and r26=0x10,r26	// bit 4=address-bit(59)
+	;; 
+	or r25=r25,r24		// insert PTE control bits into r25
+	;;
+	or r25=r25,r26		// set bit 4 (uncached) if the access was to region 6
+	;;
+	itc.d r25		// insert the TLB entry
+	mov pr=r31,-1
+	rfi
+
+2:
+#endif	
 #ifdef VHPT_GLOBAL
 //	br.cond.sptk page_fault
 	br.cond.sptk fast_tlb_miss_reflect
 	;;
 #endif
-#endif
+	mov r29=b0				// save b0
+#else	
 	/*
 	 * The DTLB handler accesses the L3 PTE via the virtually mapped linear
 	 * page table.  If a nested TLB miss occurs, we switch into physical
@@ -313,6 +384,7 @@ ENTRY(dtlb_miss)
 	mov r16=cr.ifa				// get virtual address
 	mov r29=b0				// save b0
 	mov r31=pr				// save predicates
+#endif
 dtlb_fault:
 	mov r17=cr.iha				// get virtual address of L3 PTE
 	movl r30=1f				// load nested fault continuation point
@@ -399,6 +471,9 @@ late_alt_itlb_miss:
 	;;
 	or r19=r19,r18		// set bit 4 (uncached) if the access was to region 6
 (p8)	br.cond.spnt page_fault
+#ifdef XEN
+	FORCE_CRASH
+#endif	
 	;;
 	itc.i r19		// insert the TLB entry
 	mov pr=r31,-1
