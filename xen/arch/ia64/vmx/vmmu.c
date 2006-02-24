@@ -31,6 +31,7 @@
 #include <asm/hw_irq.h>
 #include <asm/vmx_pal_vsa.h>
 #include <asm/kregs.h>
+#include <xen/irq.h>
 
 /*
  * Architecture ppn is in 4KB unit while XEN
@@ -55,7 +56,7 @@ static inline u64 xen_ppn_to_arch_ppn(u64 xppn)
 u64 get_mfn(domid_t domid, u64 gpfn, u64 pages)
 {
     struct domain *d;
-    u64    i, xen_gppn, xen_mppn, mpfn;
+    u64    xen_gppn, xen_mppn, mpfn;
     
     if ( domid == DOMID_SELF ) {
         d = current->domain;
@@ -178,7 +179,7 @@ static thash_cb_t *init_domain_vhpt(struct vcpu *d)
     vhpt->vs->tag_func = machine_ttag;
     vhpt->hash = vbase;
     vhpt->hash_sz = VCPU_TLB_SIZE/2;
-    vhpt->cch_buf = (u64)vbase + vhpt->hash_sz;
+    vhpt->cch_buf = (void *)(vbase + vhpt->hash_sz);
     vhpt->cch_sz = (u64)vcur - (u64)vhpt->cch_buf;
     vhpt->recycle_notifier = recycle_message;
     thash_init(vhpt,VCPU_TLB_SHIFT-1);
@@ -212,7 +213,7 @@ thash_cb_t *init_domain_tlb(struct vcpu *d)
     tlb->hash_func = machine_thash;
     tlb->hash = vbase;
     tlb->hash_sz = VCPU_TLB_SIZE/2;
-    tlb->cch_buf = (u64)vbase + tlb->hash_sz;
+    tlb->cch_buf = (void *)((u64)vbase + tlb->hash_sz);
     tlb->cch_sz = (u64)vcur - (u64)tlb->cch_buf;
     tlb->recycle_notifier = recycle_message;
     thash_init(tlb,VCPU_TLB_SHIFT-1);
@@ -249,13 +250,14 @@ void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb)
     u64     psr;
     thash_data_t    mtlb;
     unsigned int    cl = tlb->cl;
-
+    unsigned long mtlb_ppn; 
     mtlb.ifa = tlb->vadr;
     mtlb.itir = tlb->itir & ~ITIR_RV_MASK;
     //vmx_vcpu_get_rr(d, mtlb.ifa, &vrr.value);
     mtlb.page_flags = tlb->page_flags & ~PAGE_FLAGS_RV_MASK;
-    mtlb.ppn = get_mfn(DOMID_SELF,tlb->ppn, 1);
-    if (mtlb.ppn == INVALID_MFN)
+    mtlb.ppn = (unsigned long)get_mfn(DOMID_SELF,tlb->ppn, 1);
+    mtlb_ppn=mtlb.ppn;
+    if (mtlb_ppn == INVALID_MFN)
     panic("Machine tlb insert with invalid mfn number.\n");
 
     psr = ia64_clear_ic();
@@ -291,10 +293,8 @@ void machine_tlb_purge(u64 va, u64 ps)
 u64 machine_thash(PTA pta, u64 va)
 {
     u64     saved_pta;
-    u64     hash_addr, tag;
+    u64     hash_addr;
     unsigned long psr;
-    struct vcpu *v = current;
-    ia64_rr vrr;
 
     saved_pta = ia64_getreg(_IA64_REG_CR_PTA);
     psr = ia64_clear_ic();
@@ -414,7 +414,7 @@ IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
     data.vadr=PAGEALIGN(ifa,data.ps);
     data.tc = 1;
     data.cl=ISIDE_TLB;
-    vmx_vcpu_get_rr(vcpu, ifa, &vrr);
+    vmx_vcpu_get_rr(vcpu, ifa, (UINT64 *)&vrr);
     data.rid = vrr.rid;
     
     sections.tr = 1;
@@ -424,7 +424,7 @@ IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
     while (ovl) {
         // generate MCA.
         panic("Tlb conflict!!");
-        return;
+        return IA64_FAULT;
     }
     thash_purge_and_insert(hcb, &data);
     return IA64_NO_FAULT;
@@ -447,7 +447,7 @@ IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
     data.vadr=PAGEALIGN(ifa,data.ps);
     data.tc = 1;
     data.cl=DSIDE_TLB;
-    vmx_vcpu_get_rr(vcpu, ifa, &vrr);
+    vmx_vcpu_get_rr(vcpu, ifa, (UINT64 *)&vrr);
     data.rid = vrr.rid;
     sections.tr = 1;
     sections.tc = 0;
@@ -456,7 +456,7 @@ IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
     if (ovl) {
           // generate MCA.
         panic("Tlb conflict!!");
-        return;
+        return IA64_FAULT;
     }
     thash_purge_and_insert(hcb, &data);
     return IA64_NO_FAULT;
@@ -472,7 +472,7 @@ int vmx_lock_guest_dtc (VCPU *vcpu, UINT64 va, int lock)
     ia64_rr vrr;
     u64	  preferred_size;
 
-    vmx_vcpu_get_rr(vcpu, va, &vrr);
+    vmx_vcpu_get_rr(vcpu, va, (UINT64 *)&vrr);
     hcb = vmx_vcpu_get_vtlb(vcpu);
     va = PAGEALIGN(va,vrr.ps);
     preferred_size = PSIZE(vrr.ps);
@@ -493,7 +493,7 @@ IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64
     data.vadr=PAGEALIGN(ifa,data.ps);
     data.tc = 0;
     data.cl=ISIDE_TLB;
-    vmx_vcpu_get_rr(vcpu, ifa, &vrr);
+    vmx_vcpu_get_rr(vcpu, ifa, (UINT64 *)&vrr);
     data.rid = vrr.rid;
     sections.tr = 1;
     sections.tc = 0;
@@ -502,7 +502,7 @@ IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64
     if (ovl) {
         // generate MCA.
         panic("Tlb conflict!!");
-        return;
+        return IA64_FAULT;
     }
     sections.tr = 0;
     sections.tc = 1;
@@ -526,7 +526,7 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64
     data.vadr=PAGEALIGN(ifa,data.ps);
     data.tc = 0;
     data.cl=DSIDE_TLB;
-    vmx_vcpu_get_rr(vcpu, ifa, &vrr);
+    vmx_vcpu_get_rr(vcpu, ifa, (UINT64 *)&vrr);
     data.rid = vrr.rid;
     sections.tr = 1;
     sections.tc = 0;
@@ -535,7 +535,7 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64
     while (ovl) {
         // generate MCA.
         panic("Tlb conflict!!");
-        return;
+        return IA64_FAULT;
     }
     sections.tr = 0;
     sections.tc = 1;
@@ -578,7 +578,6 @@ IA64FAULT vmx_vcpu_ptc_l(VCPU *vcpu, UINT64 vadr, UINT64 ps)
     thash_cb_t  *hcb;
     ia64_rr vrr;
     search_section_t sections;
-    thash_data_t data, *ovl;
     hcb = vmx_vcpu_get_vtlb(vcpu);
     vrr=vmx_vcpu_rr(vcpu,vadr);
     sections.tr = 0;
@@ -616,7 +615,7 @@ IA64FAULT vmx_vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
 {
     PTA vpta;
     ia64_rr vrr;
-    u64 vhpt_offset,tmp;
+    u64 vhpt_offset;
     vmx_vcpu_get_pta(vcpu, &vpta.val);
     vrr=vmx_vcpu_rr(vcpu, vadr);
     if(vpta.vf){

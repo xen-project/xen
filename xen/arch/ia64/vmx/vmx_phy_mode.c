@@ -61,9 +61,9 @@ int mm_switch_table[8][8] = {
      *  data access can be satisfied though itlb entry for physical
      *  emulation is hit.
          */
-    SW_SELF,0,  0,  SW_NOP, 0,  0,  0,  SW_P2V,
-    0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,
+    {SW_SELF,0,  0,  SW_NOP, 0,  0,  0,  SW_P2V},
+    {0,  0,  0,  0,  0,  0,  0,  0},
+    {0,  0,  0,  0,  0,  0,  0,  0},
     /*
      *  (it,dt,rt): (0,1,1) -> (1,1,1)
      *  This kind of transition is found in OSYa.
@@ -71,17 +71,17 @@ int mm_switch_table[8][8] = {
      *  (it,dt,rt): (0,1,1) -> (0,0,0)
      *  This kind of transition is found in OSYa
      */
-    SW_NOP, 0,  0,  SW_SELF,0,  0,  0,  SW_P2V,
+    {SW_NOP, 0,  0,  SW_SELF,0,  0,  0,  SW_P2V},
     /* (1,0,0)->(1,1,1) */
-    0,  0,  0,  0,  0,  0,  0,  SW_P2V,
+    {0,  0,  0,  0,  0,  0,  0,  SW_P2V},
     /*
          *  (it,dt,rt): (1,0,1) -> (1,1,1)
          *  This kind of transition usually occurs when Linux returns
      *  from the low level TLB miss handlers.
          *  (see "arch/ia64/kernel/ivt.S")
          */
-    0,  0,  0,  0,  0,  SW_SELF,0,  SW_P2V,
-    0,  0,  0,  0,  0,  0,  0,  0,
+    {0,  0,  0,  0,  0,  SW_SELF,0,  SW_P2V},
+    {0,  0,  0,  0,  0,  0,  0,  0},
     /*
          *  (it,dt,rt): (1,1,1) -> (1,0,1)
          *  This kind of transition usually occurs in Linux low level
@@ -94,67 +94,18 @@ int mm_switch_table[8][8] = {
      *  (1,1,1)->(1,0,0)
      */
 
-    SW_V2P, 0,  0,  0,  SW_V2P, SW_V2P, 0,  SW_SELF,
+    {SW_V2P, 0,  0,  0,  SW_V2P, SW_V2P, 0,  SW_SELF}
 };
 
 void
 physical_mode_init(VCPU *vcpu)
 {
-    UINT64 psr;
-    struct domain * d = vcpu->domain;
-
     vcpu->arch.old_rsc = 0;
     vcpu->arch.mode_flags = GUEST_IN_PHY;
 }
 
 extern u64 get_mfn(domid_t domid, u64 gpfn, u64 pages);
-#if 0
-void
-physical_itlb_miss_domn(VCPU *vcpu, u64 vadr)
-{
-    u64 psr;
-    IA64_PSR vpsr;
-    u64 mppn,gppn,mpp1,gpp1;
-    struct domain *d;
-    static u64 test=0;
-    d=vcpu->domain;
-    if(test)
-        panic("domn physical itlb miss happen\n");
-    else
-        test=1;
-    vpsr.val=vmx_vcpu_get_psr(vcpu);
-    gppn=(vadr<<1)>>13;
-    mppn = get_mfn(DOMID_SELF,gppn,1);
-    mppn=(mppn<<12)|(vpsr.cpl<<7);
-    gpp1=0;
-    mpp1 = get_mfn(DOMID_SELF,gpp1,1);
-    mpp1=(mpp1<<12)|(vpsr.cpl<<7);
-//    if(vadr>>63)
-//        mppn |= PHY_PAGE_UC;
-//    else
-//        mppn |= PHY_PAGE_WB;
-    mpp1 |= PHY_PAGE_WB;
-    psr=ia64_clear_ic();
-    ia64_itr(0x1, IA64_TEMP_PHYSICAL, vadr&(~0xfff), (mppn|PHY_PAGE_WB), 24);
-    ia64_srlz_i();
-    ia64_itr(0x2, IA64_TEMP_PHYSICAL, vadr&(~0xfff), (mppn|PHY_PAGE_WB), 24);
-    ia64_stop();
-    ia64_srlz_i();
-    ia64_itr(0x1, IA64_TEMP_PHYSICAL+1, vadr&(~0x8000000000000fffUL), (mppn|PHY_PAGE_WB), 24);
-    ia64_srlz_i();
-    ia64_itr(0x2, IA64_TEMP_PHYSICAL+1, vadr&(~0x8000000000000fffUL), (mppn|PHY_PAGE_WB), 24);
-    ia64_stop();
-    ia64_srlz_i();
-    ia64_itr(0x1, IA64_TEMP_PHYSICAL+2, gpp1&(~0xfff), mpp1, 28);
-    ia64_srlz_i();
-    ia64_itr(0x2, IA64_TEMP_PHYSICAL+2, gpp1&(~0xfff), mpp1, 28);
-    ia64_stop();
-    ia64_srlz_i();
-    ia64_set_psr(psr);
-    ia64_srlz_i();
-    return;
-}
-#endif
+extern void vmx_switch_rr7(unsigned long ,shared_info_t*,void *,void *,void *);
 
 void
 physical_itlb_miss_dom0(VCPU *vcpu, u64 vadr)
@@ -404,7 +355,7 @@ check_mm_mode_switch (VCPU *vcpu,  IA64_PSR old_psr, IA64_PSR new_psr)
         switch_mm_mode (vcpu, old_psr, new_psr);
     }
 
-    return 0;
+    return;
 }
 
 

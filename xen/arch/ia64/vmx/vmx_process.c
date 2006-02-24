@@ -50,6 +50,7 @@
 #include <asm/vmx_mm_def.h>
 #include <asm/vmx_phy_mode.h>
 #include <xen/mm.h>
+#include <asm/vmx_pal.h>
 /* reset all PSR field to 0, except up,mfl,mfh,pk,dt,rt,mc,it */
 #define INITIAL_PSR_VALUE_AT_INTERRUPTION 0x0000001808028034
 
@@ -65,7 +66,7 @@ static UINT64 vec2off[68] = {0x0,0x400,0x800,0xc00,0x1000, 0x1400,0x1800,
     0x6100,0x6200,0x6300,0x6400,0x6500,0x6600,0x6700,0x6800,0x6900,0x6a00,
     0x6b00,0x6c00,0x6d00,0x6e00,0x6f00,0x7000,0x7100,0x7200,0x7300,0x7400,
     0x7500,0x7600,0x7700,0x7800,0x7900,0x7a00,0x7b00,0x7c00,0x7d00,0x7e00,
-    0x7f00,
+    0x7f00
 };
 
 
@@ -74,7 +75,7 @@ void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
      UINT64 vector,REGS *regs)
 {
     VCPU *vcpu = current;
-    UINT64 viha,vpsr = vmx_vcpu_get_psr(vcpu);
+    UINT64 vpsr = vmx_vcpu_get_psr(vcpu);
     if(!(vpsr&IA64_PSR_IC)&&(vector!=5)){
         panic("Guest nested fault!");
     }
@@ -92,10 +93,8 @@ void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
 IA64FAULT
 vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim)
 {
-	static int first_time = 1;
 	struct domain *d = (struct domain *) current->domain;
-	struct vcpu *v = (struct domain *) current;
-	extern unsigned long running_on_sim;
+	struct vcpu *v = (struct vcpu *) current;
 	unsigned long i, sal_param[8];
 
 #if 0
@@ -160,12 +159,12 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 		    case FW_HYPERCALL_EFI_GET_TIME:
 			{
 			unsigned long *tv, *tc;
-			vcpu_get_gr_nat(v, 32, &tv);
-			vcpu_get_gr_nat(v, 33, &tc);
+			vcpu_get_gr_nat(v, 32, (u64 *)&tv);
+			vcpu_get_gr_nat(v, 33, (u64 *)&tc);
 			printf("efi_get_time(%p,%p) called...",tv,tc);
-			tv = __va(translate_domain_mpaddr(tv));
-			if (tc) tc = __va(translate_domain_mpaddr(tc));
-			regs->r8 = (*efi.get_time)(tv,tc);
+			tv = __va(translate_domain_mpaddr((unsigned long)tv));
+			if (tc) tc = __va(translate_domain_mpaddr((unsigned long)tc));
+			regs->r8 = (*efi.get_time)((efi_time_t *)tv,(efi_time_cap_t *)tc);
 			printf("and returns %lx\n",regs->r8);
 			}
 			break;
@@ -200,12 +199,13 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 			die_if_kernel("bug check", regs, iim);
 		vmx_reflect_interruption(ifa,isr,iim,11,regs);
     }
+    return IA64_NO_FAULT;
 }
 
 
 void save_banked_regs_to_vpd(VCPU *v, REGS *regs)
 {
-    unsigned long i, * src,* dst, *sunat, *dunat;
+    unsigned long i=0UL, * src,* dst, *sunat, *dunat;
     IA64_PSR vpsr;
     src=&regs->r16;
     sunat=&regs->eml_unat;
@@ -287,16 +287,17 @@ static int vmx_handle_lds(REGS* regs)
 }
 
 /* We came here because the H/W VHPT walker failed to find an entry */
-void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
+IA64FAULT
+vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
 {
     IA64_PSR vpsr;
-    CACHE_LINE_TYPE type;
+    CACHE_LINE_TYPE type=ISIDE_TLB;
     u64 vhpt_adr, gppa;
     ISR misr;
     ia64_rr vrr;
 //    REGS *regs;
-    thash_cb_t *vtlb, *vhpt;
-    thash_data_t *data, me;
+    thash_cb_t *vtlb;
+    thash_data_t *data;
     VCPU *v = current;
     vtlb=vmx_vcpu_get_vtlb(v);
 #ifdef  VTLB_DEBUG
@@ -316,7 +317,7 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
     if(is_physical_mode(v)&&(!(vadr<<1>>62))){
         if(vec==1){
             physical_itlb_miss(v, vadr);
-            return;
+            return IA64_FAULT;
         }
         if(vec==2){
             if(v->domain!=dom0&&__gpfn_is_io(v->domain,(vadr<<1)>>(PAGE_SHIFT+1))){
@@ -324,7 +325,7 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
             }else{
                 physical_dtlb_miss(v, vadr);
             }
-            return;
+            return IA64_FAULT;
         }
     }
     vrr = vmx_vcpu_rr(v, vadr);
@@ -334,7 +335,7 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
 
 //    prepare_if_physical_mode(v);
 
-    if(data=vtlb_lookup_ex(vtlb, vrr.rid, vadr,type)){
+    if((data=vtlb_lookup_ex(vtlb, vrr.rid, vadr,type))!=0){
 	gppa = (vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
         if(v->domain!=dom0&&type==DSIDE_TLB && __gpfn_is_io(v->domain,gppa>>PAGE_SHIFT)){
             emulate_io_inst(v, gppa, data->ma);
@@ -428,6 +429,5 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
             }
         }
     }
+    return IA64_NO_FAULT;
 }
-
-

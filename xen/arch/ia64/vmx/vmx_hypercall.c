@@ -31,6 +31,11 @@
 #include <xen/mm.h>
 #include <xen/multicall.h>
 #include <xen/hypercall.h>
+#include <public/version.h>
+#include <asm/dom_fw.h>
+#include <xen/domain.h>
+
+extern long do_sched_op(int cmd, unsigned long arg);
 
 
 void hyper_not_support(void)
@@ -48,7 +53,7 @@ void hyper_mmu_update(void)
     vcpu_get_gr_nat(vcpu,17,&r33);
     vcpu_get_gr_nat(vcpu,18,&r34);
     vcpu_get_gr_nat(vcpu,19,&r35);
-    ret=vmx_do_mmu_update((mmu_update_t*)r32,r33,r34,r35);
+    ret=vmx_do_mmu_update((mmu_update_t*)r32,r33,(u64 *)r34,r35);
     vcpu_set_gr(vcpu, 8, ret, 0);
     vmx_vcpu_increment_iip(vcpu);
 }
@@ -162,7 +167,6 @@ void hyper_xen_version(void)
 
 static int do_lock_page(VCPU *vcpu, u64 va, u64 lock)
 {
-    int i;
     ia64_rr rr;
     thash_cb_t *hcb;
     hcb = vmx_vcpu_get_vtlb(vcpu);
@@ -207,7 +211,7 @@ static int do_set_shared_page(VCPU *vcpu, u64 gpa)
     	 * to xen heap. Or else, leave to domain itself to decide.
     	 */
     	if (likely(IS_XEN_HEAP_FRAME(virt_to_page(o_info))))
-	    	free_xenheap_page(o_info);
+	    	free_xenheap_page((void *)o_info);
     } else
         memset(d->shared_info, 0, PAGE_SIZE);
     return 0;

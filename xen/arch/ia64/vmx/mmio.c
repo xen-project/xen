@@ -32,6 +32,7 @@
 #include <public/hvm/ioreq.h>
 #include <asm/mm.h>
 #include <asm/vmx.h>
+#include <public/event_channel.h>
 
 /*
 struct mmio_list *lookup_mmio(u64 gpa, struct mmio_list *mio_base)
@@ -135,7 +136,6 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     struct vcpu *v = current;
     vcpu_iodata_t *vio;
     ioreq_t *p;
-    unsigned long addr;
 
     vio = get_vio(v->domain, v->vcpu_id);
     if (vio == 0) {
@@ -168,7 +168,6 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     struct vcpu *v = current;
     vcpu_iodata_t *vio;
     ioreq_t *p;
-    unsigned long addr;
 
     vio = get_vio(v->domain, v->vcpu_id);
     if (vio == 0) {
@@ -406,7 +405,7 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
 {
     REGS *regs;
     IA64_BUNDLE bundle;
-    int slot, dir, inst_type;
+    int slot, dir=0, inst_type;
     size_t size;
     u64 data, value,post_update, slot1a, slot1b, temp;
     INST64 inst;

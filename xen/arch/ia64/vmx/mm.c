@@ -133,7 +133,7 @@ int vmx_do_mmu_update(mmu_update_t *ureqs,u64 count,u64 *pdone,u64 foreigndom)
             if (ovl) {
                   // generate MCA.
                 panic("Tlb conflict!!");
-                return;
+                return -1;
             }
             thash_purge_and_insert(hcb, &entry);
         }else if(cmd == MMU_MACHPHYS_UPDATE){

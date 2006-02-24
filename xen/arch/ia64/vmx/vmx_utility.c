@@ -307,9 +307,8 @@ check_cr_rsv_fields (int index, u64 value)
             }
             return 0;
     }
-
-
     panic ("Unsupported CR");
+    return 0;
 }
 
 
@@ -600,7 +599,6 @@ void set_isr_reg_nat_consumption(VCPU *vcpu, u64 flag, u64 non_access)
 
 void set_isr_for_priv_fault(VCPU *vcpu, u64 non_access)
 {
-    u64 value;
     ISR isr;
 
     isr.val = set_isr_ei_ni(vcpu);

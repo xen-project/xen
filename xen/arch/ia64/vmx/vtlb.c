@@ -86,7 +86,7 @@ static int __is_translated(thash_data_t *tlb, u64 rid, u64 va, CACHE_LINE_TYPE c
 static int
 __is_tlb_overlap(thash_cb_t *hcb,thash_data_t *entry,int rid, char cl, u64 sva, u64 eva)
 {
-    uint64_t size1,size2,sa1,ea1,ea2;
+    uint64_t size1,sa1,ea1;
 
     if ( entry->invalid || entry->rid != rid || (!entry->tc && entry->cl != cl ) ) {
         return 0;
@@ -287,11 +287,11 @@ int __tlb_to_vhpt(thash_cb_t *hcb,
     ASSERT ( hcb->ht == THASH_VHPT );
     vrr = (hcb->get_rr_fn)(hcb->vcpu,va);
     pages = PSIZE(vrr.ps) >> PAGE_SHIFT;
-    mfn = (hcb->vs->get_mfn)(DOMID_SELF,tlb->ppn, pages);
+    mfn = (unsigned long)(hcb->vs->get_mfn)(DOMID_SELF,tlb->ppn, pages);
     if ( mfn == INVALID_MFN ) return 0;
 
     // TODO with machine discontinuous address space issue.
-    vhpt->etag = (hcb->vs->tag_func)( hcb->pta, tlb->vadr);
+    vhpt->etag =(unsigned long) (hcb->vs->tag_func)( hcb->pta, tlb->vadr);
     //vhpt->ti = 0;
     vhpt->itir = tlb->itir & ~ITIR_RV_MASK;
     vhpt->page_flags = tlb->page_flags & ~PAGE_FLAGS_RV_MASK;
@@ -374,7 +374,7 @@ void vtlb_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
     u64 gppn;
     u64 ppns, ppne;
 
-    hash_table = (hcb->hash_func)(hcb->pta, va);
+    hash_table = (thash_data_t *)(hcb->hash_func)(hcb->pta, va);
     if( INVALID_ENTRY(hcb, hash_table) ) {
         *hash_table = *entry;
         hash_table->next = 0;
@@ -419,11 +419,11 @@ void vtlb_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
 static void vhpt_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
 {
     thash_data_t   vhpt_entry, *hash_table, *cch;
-    ia64_rr vrr;
+
     if ( !__tlb_to_vhpt(hcb, entry, va, &vhpt_entry) ) {
         panic("Can't convert to machine VHPT entry\n");
     }
-    hash_table = (hcb->hash_func)(hcb->pta, va);
+    hash_table = (thash_data_t *)(hcb->hash_func)(hcb->pta, va);
     if( INVALID_ENTRY(hcb, hash_table) ) {
         *hash_table = vhpt_entry;
         hash_table->next = 0;
@@ -449,7 +449,7 @@ static void vhpt_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
 
 void thash_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
 {
-    thash_data_t    *hash_table;
+    //thash_data_t    *hash_table;
     ia64_rr vrr;
     
     vrr = (hcb->get_rr_fn)(hcb->vcpu,entry->vadr);
@@ -466,7 +466,6 @@ static void rem_thash(thash_cb_t *hcb, thash_data_t *entry)
 {
     thash_data_t    *hash_table, *p, *q;
     thash_internal_t *priv = &hcb->priv;
-    int idx;
 
     hash_table = priv->hash_base;
     if ( hash_table == entry ) {
@@ -492,9 +491,6 @@ static void rem_thash(thash_cb_t *hcb, thash_data_t *entry)
 
 static void rem_vtlb(thash_cb_t *hcb, thash_data_t *entry)
 {
-    thash_data_t    *hash_table, *p, *q;
-    thash_internal_t *priv = &hcb->priv;
-    int idx;
     
     if ( !entry->tc ) {
         return rem_tr(hcb, entry->cl, entry->tr_idx);
@@ -554,7 +550,6 @@ static void thash_rem_line(thash_cb_t *hcb, thash_data_t *hash)
     }
 }
 
-
 /*
  * Find an overlap entry in hash table and its collision chain.
  * Refer to SDM2 4.1.1.4 for overlap definition.
@@ -580,7 +575,6 @@ static thash_data_t *vtlb_find_overlap(thash_cb_t *hcb,
 {
     thash_data_t    *hash_table;
     thash_internal_t *priv = &hcb->priv;
-    u64     tag;
     ia64_rr vrr;
 
     priv->_curva = va & ~(size-1);
@@ -588,7 +582,7 @@ static thash_data_t *vtlb_find_overlap(thash_cb_t *hcb,
     priv->rid = rid;
     vrr = (hcb->get_rr_fn)(hcb->vcpu,va);
     priv->ps = vrr.ps;
-    hash_table = (hcb->hash_func)(hcb->pta, priv->_curva);
+    hash_table =(thash_data_t *)(hcb->hash_func)(hcb->pta, priv->_curva);
     priv->s_sect = s_sect;
     priv->cl = cl;
     priv->_tr_idx = 0;
@@ -610,8 +604,8 @@ static thash_data_t *vhpt_find_overlap(thash_cb_t *hcb,
     priv->rid = rid;
     vrr = (hcb->get_rr_fn)(hcb->vcpu,va);
     priv->ps = vrr.ps;
-    hash_table = (hcb->hash_func)( hcb->pta, priv->_curva);
-    tag = (hcb->vs->tag_func)( hcb->pta, priv->_curva);
+    hash_table = (thash_data_t *)(hcb->hash_func)( hcb->pta, priv->_curva);
+    tag = (unsigned long)(hcb->vs->tag_func)( hcb->pta, priv->_curva);
     priv->tag = tag;
     priv->hash_base = hash_table;
     priv->cur_cch = hash_table;
@@ -634,10 +628,10 @@ static thash_data_t *vtr_find_next_overlap(thash_cb_t *hcb)
         tr = &DTR(hcb,0);
     }
     for (; priv->_tr_idx < num; priv->_tr_idx ++ ) {
-        if ( __is_tlb_overlap(hcb, &tr[priv->_tr_idx],
+        if ( __is_tlb_overlap(hcb, &tr[(unsigned)priv->_tr_idx],
                 priv->rid, priv->cl,
                 priv->_curva, priv->_eva) ) {
-            return &tr[priv->_tr_idx++];
+            return &tr[(unsigned)priv->_tr_idx++];
         }
     }
     return NULL;
@@ -652,7 +646,7 @@ static thash_data_t *vtlb_next_overlap(thash_cb_t *hcb)
 {
     thash_data_t    *ovl;
     thash_internal_t *priv = &hcb->priv;
-    u64 addr,rr_psize;
+    u64 rr_psize;
     ia64_rr vrr;
 
     if ( priv->s_sect.tr ) {
@@ -673,7 +667,7 @@ static thash_data_t *vtlb_next_overlap(thash_cb_t *hcb)
             }
         }
         priv->_curva += rr_psize;
-        priv->hash_base = (hcb->hash_func)( hcb->pta, priv->_curva);
+        priv->hash_base = (thash_data_t *)(hcb->hash_func)( hcb->pta, priv->_curva);
         priv->cur_cch = priv->hash_base;
     }
     return NULL;
@@ -683,7 +677,7 @@ static thash_data_t *vhpt_next_overlap(thash_cb_t *hcb)
 {
     thash_data_t    *ovl;
     thash_internal_t *priv = &hcb->priv;
-    u64 addr,rr_psize;
+    u64 rr_psize;
     ia64_rr vrr;
 
     vrr = (hcb->get_rr_fn)(hcb->vcpu,priv->_curva);
@@ -698,8 +692,8 @@ static thash_data_t *vhpt_next_overlap(thash_cb_t *hcb)
             }
         }
         priv->_curva += rr_psize;
-        priv->hash_base = (hcb->hash_func)( hcb->pta, priv->_curva);
-        priv->tag = (hcb->vs->tag_func)( hcb->pta, priv->_curva);
+        priv->hash_base =(thash_data_t *)(hcb->hash_func)( hcb->pta, priv->_curva);
+        priv->tag = (unsigned long)(hcb->vs->tag_func)( hcb->pta, priv->_curva);
         priv->cur_cch = priv->hash_base;
     }
     return NULL;
@@ -842,7 +836,6 @@ thash_data_t *vtlb_lookup_ex(thash_cb_t *hcb,
             CACHE_LINE_TYPE cl)
 {
     thash_data_t    *hash_table, *cch;
-    u64     tag;
     ia64_rr vrr;
    
     ASSERT ( hcb->ht == THASH_VTLB );
@@ -851,7 +844,7 @@ thash_data_t *vtlb_lookup_ex(thash_cb_t *hcb,
     if ( cch ) return cch;
 
     vrr = (hcb->get_rr_fn)(hcb->vcpu,va);
-    hash_table = (hcb->hash_func)( hcb->pta, va);
+    hash_table = (thash_data_t *)(hcb->hash_func)( hcb->pta, va);
 
     if ( INVALID_ENTRY(hcb, hash_table ) )
         return NULL;
@@ -913,12 +906,13 @@ int thash_lock_tc(thash_cb_t *hcb, u64 va, u64 size, int rid, char cl, int lock)
  */
 void tlb_remove_notifier(thash_cb_t *hcb, thash_data_t *entry)
 {
-    thash_cb_t  *vhpt;
+//    thash_cb_t  *vhpt;
     search_section_t    s_sect;
     
     s_sect.v = 0;
     thash_purge_entries(hcb->ts->vhpt, entry, s_sect);
     machine_tlb_purge(entry->vadr, entry->ps);
+    return;
 }
 
 /*
@@ -930,7 +924,7 @@ void thash_init(thash_cb_t *hcb, u64 sz)
 
     cch_mem_init (hcb);
     hcb->magic = THASH_CB_MAGIC;
-    hcb->pta.val = hcb->hash;
+    hcb->pta.val = (unsigned long)hcb->hash;
     hcb->pta.vf = 1;
     hcb->pta.ve = 1;
     hcb->pta.size = sz;
@@ -1010,7 +1004,7 @@ void check_vtlb_sanity(thash_cb_t *vtlb)
 //    vb2 = vb1 + vtlb->hash_sz;
     hash_num = vhpt->hash_sz / sizeof(thash_data_t);
 //    printf("vb2=%lp, size=%lx hash_num=%lx\n", vb2, vhpt->hash_sz, hash_num);
-    printf("vtlb=%lp, hash=%lp size=0x%lx; vhpt=%lp, hash=%lp size=0x%lx\n", 
+    printf("vtlb=%p, hash=%p size=0x%lx; vhpt=%p, hash=%p size=0x%lx\n", 
                 vtlb, vtlb->hash,vtlb->hash_sz,
                 vhpt, vhpt->hash, vhpt->hash_sz);
     //memcpy(vb1, vtlb->hash, vtlb->hash_sz);
@@ -1043,7 +1037,7 @@ void check_vtlb_sanity(thash_cb_t *vtlb)
         }
         hash ++;
     }
-    printf("Done vtlb entry check, hash=%lp\n", hash);
+    printf("Done vtlb entry check, hash=%p\n", hash);
     printf("check_ok_num = 0x%lx check_invalid=0x%lx\n", check_ok_num,check_invalid);
     invalid_ratio = 1000*check_invalid / hash_num;
     printf("%02ld.%01ld%% entries are invalid\n", 
@@ -1072,7 +1066,7 @@ void check_vtlb_sanity(thash_cb_t *vtlb)
         if ( !INVALID_ENTRY(vhpt, hash) ) {
             for ( cch= hash; cch; cch=cch->next) {
                 if ( !cch->checked ) {
-                    printf ("!!!Hash=%lp cch=%lp not within vtlb\n", hash, cch);
+                    printf ("!!!Hash=%p cch=%p not within vtlb\n", hash, cch);
                     check_fail_num ++;
                 }
                 else {
@@ -1112,9 +1106,9 @@ void dump_vtlb(thash_cb_t *vtlb)
     printf("Dump vTC\n");
     for ( i = 0; i < hash_num; i++ ) {
         if ( !INVALID_ENTRY(vtlb, hash) ) {
-            printf("VTLB at hash=%lp\n", hash);
+            printf("VTLB at hash=%p\n", hash);
             for (cch=hash; cch; cch=cch->next) {
-                printf("Entry %lp va=%lx ps=%lx rid=%lx\n",
+                printf("Entry %p va=%lx ps=%d rid=%d\n",
                     cch, cch->vadr, cch->ps, cch->rid);
             }
         }
@@ -1123,13 +1117,13 @@ void dump_vtlb(thash_cb_t *vtlb)
     printf("Dump vDTR\n");
     for (i=0; i<NDTRS; i++) {
         tr = &DTR(vtlb,i);
-        printf("Entry %lp va=%lx ps=%lx rid=%lx\n",
+        printf("Entry %p va=%lx ps=%d rid=%d\n",
                     tr, tr->vadr, tr->ps, tr->rid);
     }
     printf("Dump vITR\n");
     for (i=0; i<NITRS; i++) {
         tr = &ITR(vtlb,i);
-        printf("Entry %lp va=%lx ps=%lx rid=%lx\n",
+        printf("Entry %p va=%lx ps=%d rid=%d\n",
                     tr, tr->vadr, tr->ps, tr->rid);
     }
     printf("End of vTLB dump\n");

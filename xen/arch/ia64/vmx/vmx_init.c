@@ -95,7 +95,7 @@ identify_vmx_feature(void)
 	if (!(vp_env_info & VP_OPCODE))
 		printk("WARNING: no opcode provided from hardware(%lx)!!!\n", vp_env_info);
 	vm_order = get_order(buffer_size);
-	printk("vm buffer size: %d, order: %d\n", buffer_size, vm_order);
+	printk("vm buffer size: %ld, order: %ld\n", buffer_size, vm_order);
 
 	vmx_enabled = 1;
 no_vti:
@@ -113,7 +113,7 @@ vmx_init_env(void)
 	u64 status, tmp_base;
 
 	if (!vm_buffer) {
-		vm_buffer = alloc_xenheap_pages(vm_order);
+		vm_buffer = (unsigned long)alloc_xenheap_pages(vm_order);
 		ASSERT(vm_buffer);
 		printk("vm_buffer: 0x%lx\n", vm_buffer);
 	}
@@ -125,7 +125,7 @@ vmx_init_env(void)
 
 	if (status != PAL_STATUS_SUCCESS) {
 		printk("ia64_pal_vp_init_env failed.\n");
-		return -1;
+		return ;
 	}
 
 	if (!__vsa_base)
@@ -189,7 +189,7 @@ vmx_create_vp(struct vcpu *v)
 	/* ia64_ivt is function pointer, so need this tranlation */
 	ivt_base = (u64) &vmx_ia64_ivt;
 	printk("ivt_base: 0x%lx\n", ivt_base);
-	ret = ia64_pal_vp_create(vpd, ivt_base, 0);
+	ret = ia64_pal_vp_create((u64 *)vpd, (u64 *)ivt_base, 0);
 	if (ret != PAL_STATUS_SUCCESS)
 		panic("ia64_pal_vp_create failed. \n");
 }
@@ -198,11 +198,10 @@ vmx_create_vp(struct vcpu *v)
 void
 vmx_save_state(struct vcpu *v)
 {
-	u64 status, psr;
-	u64 old_rr0, dom_rr7, rr0_xen_start, rr0_vhpt;
+	u64 status;
 
 	/* FIXME: about setting of pal_proc_vector... time consuming */
-	status = ia64_pal_vp_save(v->arch.privregs, 0);
+	status = ia64_pal_vp_save((u64 *)v->arch.privregs, 0);
 	if (status != PAL_STATUS_SUCCESS)
 		panic("Save vp status failed\n");
 
@@ -224,10 +223,7 @@ vmx_save_state(struct vcpu *v)
 void
 vmx_load_state(struct vcpu *v)
 {
-	u64 status, psr;
-	u64 old_rr0, dom_rr7, rr0_xen_start, rr0_vhpt;
-	u64 pte_xen, pte_vhpt;
-	int i;
+	u64 status;
 
 	status = ia64_pal_vp_restore(v->arch.privregs, 0);
 	if (status != PAL_STATUS_SUCCESS)
@@ -379,7 +375,7 @@ void vmx_setup_platform(struct domain *d, struct vcpu_guest_context *c)
 
 	ASSERT(d != dom0); /* only for non-privileged vti domain */
 	d->arch.vmx_platform.shared_page_va =
-		__va(__gpa_to_mpa(d, IO_PAGE_START));
+		(unsigned long)__va(__gpa_to_mpa(d, IO_PAGE_START));
 	sp = get_sp(d);
 	//memset((char *)sp,0,PAGE_SIZE);
 	/* TEMP */

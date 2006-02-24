@@ -30,8 +30,9 @@
 #include <asm/vmmu.h>
 #include <asm/vmx_mm_def.h>
 #include <asm/smp.h>
-
+#include <asm/vmx.h>
 #include <asm/virt_event.h>
+#include <asm/vmx_phy_mode.h>
 extern UINT64 privop_trace;
 
 void
@@ -137,6 +138,11 @@ ia64_priv_decoder(IA64_SLOT_TYPE slot_type, INST64 inst, UINT64  * cause)
                 *cause=EVENT_BSW_1;
             }
         }
+        case I:
+        case F:
+        case L:
+        case ILLEGAL:
+        break;
     }
 }
 
@@ -157,7 +163,6 @@ IA64FAULT vmx_emul_mov_from_psr(VCPU *vcpu, INST64 inst)
 {
     UINT64 tgt = inst.M33.r1;
     UINT64 val;
-    IA64FAULT fault;
 
 /*
     if ((fault = vmx_vcpu_get_psr(vcpu,&val)) == IA64_NO_FAULT)
@@ -176,7 +181,6 @@ IA64FAULT vmx_emul_mov_from_psr(VCPU *vcpu, INST64 inst)
 IA64FAULT vmx_emul_mov_to_psr(VCPU *vcpu, INST64 inst)
 {
     UINT64 val;
-    IA64FAULT fault;
     if(vcpu_get_gr_nat(vcpu, inst.M35.r2, &val) != IA64_NO_FAULT)
 	panic(" get_psr nat bit fault\n");
 
@@ -255,7 +259,6 @@ IA64FAULT vmx_emul_cover(VCPU *vcpu, INST64 inst)
 IA64FAULT vmx_emul_ptc_l(VCPU *vcpu, INST64 inst)
 {
     u64 r2,r3;
-    ISR isr;
     IA64_PSR  vpsr;
 
     vpsr.val=vmx_vcpu_get_psr(vcpu);
@@ -267,6 +270,7 @@ IA64FAULT vmx_emul_ptc_l(VCPU *vcpu, INST64 inst)
     }
     if(vcpu_get_gr_nat(vcpu,inst.M45.r3,&r3)||vcpu_get_gr_nat(vcpu,inst.M45.r2,&r2)){
 #ifdef  VMAL_NO_FAULT_CHECK
+        ISR isr;
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
         return IA64_FAULT;
@@ -287,11 +291,11 @@ IA64FAULT vmx_emul_ptc_l(VCPU *vcpu, INST64 inst)
 IA64FAULT vmx_emul_ptc_e(VCPU *vcpu, INST64 inst)
 {
     u64 r3;
-    ISR isr;
     IA64_PSR  vpsr;
 
     vpsr.val=vmx_vcpu_get_psr(vcpu);
 #ifdef  VMAL_NO_FAULT_CHECK
+    ISR isr;
     if ( vpsr.cpl != 0) {
         /* Inject Privileged Operation fault into guest */
         set_privileged_operation_isr (vcpu, 0);
@@ -321,10 +325,10 @@ IA64FAULT vmx_emul_ptc_ga(VCPU *vcpu, INST64 inst)
 
 IA64FAULT ptr_fault_check(VCPU *vcpu, INST64 inst, u64 *pr2, u64 *pr3)
 {
-    ISR isr;
     IA64FAULT	ret1, ret2;
 
 #ifdef  VMAL_NO_FAULT_CHECK
+    ISR isr;
     IA64_PSR  vpsr;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
     if ( vpsr.cpl != 0) {
@@ -373,9 +377,9 @@ IA64FAULT vmx_emul_ptr_i(VCPU *vcpu, INST64 inst)
 IA64FAULT vmx_emul_thash(VCPU *vcpu, INST64 inst)
 {
     u64 r1,r3;
+#ifdef  CHECK_FAULT
     ISR visr;
     IA64_PSR vpsr;
-#ifdef  CHECK_FAULT
     if(check_target_register(vcpu, inst.M46.r1)){
         set_illegal_op_isr(vcpu);
         illegal_op(vcpu);
@@ -403,9 +407,11 @@ IA64FAULT vmx_emul_thash(VCPU *vcpu, INST64 inst)
 IA64FAULT vmx_emul_ttag(VCPU *vcpu, INST64 inst)
 {
     u64 r1,r3;
+#ifdef  CHECK_FAULT
     ISR visr;
     IA64_PSR vpsr;
- #ifdef  CHECK_FAULT
+#endif
+#ifdef  CHECK_FAULT
     if(check_target_register(vcpu, inst.M46.r1)){
         set_illegal_op_isr(vcpu);
         illegal_op(vcpu);
@@ -433,8 +439,8 @@ IA64FAULT vmx_emul_ttag(VCPU *vcpu, INST64 inst)
 IA64FAULT vmx_emul_tpa(VCPU *vcpu, INST64 inst)
 {
     u64 r1,r3;
-    ISR visr;
 #ifdef  CHECK_FAULT
+    ISR visr;
     if(check_target_register(vcpu, inst.M46.r1)){
         set_illegal_op_isr(vcpu);
         illegal_op(vcpu);
@@ -477,10 +483,10 @@ IA64FAULT vmx_emul_tpa(VCPU *vcpu, INST64 inst)
 IA64FAULT vmx_emul_tak(VCPU *vcpu, INST64 inst)
 {
     u64 r1,r3;
+#ifdef  CHECK_FAULT
     ISR visr;
     IA64_PSR vpsr;
     int fault=IA64_NO_FAULT;
-#ifdef  CHECK_FAULT
     visr.val=0;
     if(check_target_register(vcpu, inst.M46.r1)){
         set_illegal_op_isr(vcpu);
@@ -514,8 +520,7 @@ IA64FAULT vmx_emul_tak(VCPU *vcpu, INST64 inst)
 
 IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
 {
-    UINT64 fault, itir, ifa, pte, slot;
-    ISR isr;
+    UINT64 itir, ifa, pte, slot;
     IA64_PSR  vpsr;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
     if ( vpsr.ic ) {
@@ -524,6 +529,7 @@ IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #ifdef  VMAL_NO_FAULT_CHECK
+    ISR isr;
     if ( vpsr.cpl != 0) {
         /* Inject Privileged Operation fault into guest */
         set_privileged_operation_isr (vcpu, 0);
@@ -571,8 +577,10 @@ IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
 
 IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
 {
-    UINT64 fault, itir, ifa, pte, slot;
+    UINT64 itir, ifa, pte, slot;
+#ifdef  VMAL_NO_FAULT_CHECK
     ISR isr;
+#endif
     IA64_PSR  vpsr;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
     if ( vpsr.ic ) {
@@ -628,8 +636,6 @@ IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
 
 IA64FAULT itc_fault_check(VCPU *vcpu, INST64 inst, u64 *itir, u64 *ifa,u64 *pte)
 {
-    UINT64 fault;
-    ISR isr;
     IA64_PSR  vpsr;
     IA64FAULT	ret1;
 
@@ -641,6 +647,8 @@ IA64FAULT itc_fault_check(VCPU *vcpu, INST64 inst, u64 *itir, u64 *ifa,u64 *pte)
     }
 
 #ifdef  VMAL_NO_FAULT_CHECK
+    UINT64 fault;
+    ISR isr;
     if ( vpsr.cpl != 0) {
         /* Inject Privileged Operation fault into guest */
         set_privileged_operation_isr (vcpu, 0);
@@ -1146,7 +1154,7 @@ IA64FAULT vmx_emul_mov_from_cpuid(VCPU *vcpu, INST64 inst)
 
 IA64FAULT vmx_emul_mov_to_cr(VCPU *vcpu, INST64 inst)
 {
-    u64 r2,cr3;
+    u64 r2;
 #ifdef  CHECK_FAULT
     IA64_PSR  vpsr;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
@@ -1309,14 +1317,10 @@ IA64_BUNDLE __vmx_get_domain_bundle(u64 iip)
 void
 vmx_emulate(VCPU *vcpu, REGS *regs)
 {
-    IA64_BUNDLE bundle;
-    int slot;
-    IA64_SLOT_TYPE slot_type;
     IA64FAULT status;
     INST64 inst;
     UINT64 iip, cause, opcode;
     iip = regs->cr_iip;
-    IA64_PSR vpsr;
     cause = VMX(vcpu,cause);
     opcode = VMX(vcpu,opcode);
 
@@ -1342,6 +1346,10 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
 #endif
 #ifdef BYPASS_VMAL_OPCODE
     // make a local copy of the bundle containing the privop
+    IA64_BUNDLE bundle;
+    int slot;
+    IA64_SLOT_TYPE slot_type;
+    IA64_PSR vpsr;
     bundle = __vmx_get_domain_bundle(iip);
     slot = ((struct ia64_psr *)&(regs->cr_ipsr))->ri;
     if (!slot) inst.inst = bundle.slot0;
@@ -1483,11 +1491,11 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
         status=vmx_emul_mov_from_cpuid(vcpu, inst);
         break;
     case EVENT_VMSW:
-        printf ("Unimplemented instruction %d\n", cause);
+        printf ("Unimplemented instruction %ld\n", cause);
 	status=IA64_FAULT;
         break;
     default:
-        printf("unknown cause %d, iip: %lx, ipsr: %lx\n", cause,regs->cr_iip,regs->cr_ipsr);
+        printf("unknown cause %ld, iip: %lx, ipsr: %lx\n", cause,regs->cr_iip,regs->cr_ipsr);
         while(1);
 	/* For unknown cause, let hardware to re-execute */
 	status=IA64_RETRY;

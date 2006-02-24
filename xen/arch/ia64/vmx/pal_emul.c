@@ -238,7 +238,6 @@ pal_vm_info(VCPU *vcpu){
 static struct ia64_pal_retval
 pal_vm_page_size(VCPU *vcpu){
 }
-
 void
 pal_emul( VCPU *vcpu) {
 	UINT64 gr28;

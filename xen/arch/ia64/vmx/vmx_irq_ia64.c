@@ -24,6 +24,8 @@
 #include <asm/pgtable.h>
 #include <asm/system.h>
 
+#include <asm/vcpu.h>
+#include <xen/irq.h>
 #ifdef CONFIG_SMP
 #   define IS_RESCHEDULE(vec)   (vec == IA64_IPI_RESCHEDULE)
 #else
@@ -126,6 +128,6 @@ vmx_ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 	 * come through until ia64_eoi() has been done.
 	 */
 	vmx_irq_exit();
-	if ( wake_dom0 && current != dom0 ) 
+	if (current && wake_dom0 != dom0 ) 
 		vcpu_wake(dom0->vcpu[0]);
 }
