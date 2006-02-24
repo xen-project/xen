@@ -70,7 +70,7 @@ struct xsd_sockmsg
 enum xs_watch_type
 {
     XS_WATCH_PATH = 0,
-    XS_WATCH_TOKEN,
+    XS_WATCH_TOKEN
 };
 
 /* Inter-domain shared memory communications. */
