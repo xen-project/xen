@@ -437,11 +437,7 @@ void __init __start_xen(multiboot_info_t *mbi)
         set_in_cr4(X86_CR4_OSXMMEXCPT);
 
     if ( opt_nosmp )
-    {
         max_cpus = 0;
-        smp_num_siblings = 1;
-        boot_cpu_data.x86_max_cores = 1;
-    }
 
     smp_prepare_cpus(max_cpus);
 

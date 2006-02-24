@@ -181,10 +181,13 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
     {
         dom0_physinfo_t *pi = &op->u.physinfo;
 
-        pi->threads_per_core = smp_num_siblings;
-        pi->cores_per_socket = boot_cpu_data.x86_max_cores;
+        pi->threads_per_core =
+            cpus_weight(cpu_sibling_map[0]);
+        pi->cores_per_socket =
+            cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
         pi->sockets_per_node = 
-            num_online_cpus() / (pi->threads_per_core * pi->cores_per_socket);
+            num_online_cpus() / cpus_weight(cpu_core_map[0]);
+
         pi->nr_nodes         = 1;
         pi->total_pages      = total_pages;
         pi->free_pages       = avail_domheap_pages();

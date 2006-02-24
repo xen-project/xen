@@ -165,6 +165,7 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
         domid_t        dom;
         struct vcpu   *v;
         unsigned int   i, cnt[NR_CPUS] = { 0 };
+        cpumask_t      cpu_exclude_map;
         static domid_t rover = 0;
 
         dom = op->u.createdomain.domain;
@@ -195,18 +196,29 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
         read_lock(&domlist_lock);
         for_each_domain ( d )
             for_each_vcpu ( d, v )
-                cnt[v->processor]++;
+                if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
+                    cnt[v->processor]++;
         read_unlock(&domlist_lock);
         
         /*
-         * If we're on a HT system, we only use the first HT for dom0, other 
-         * domains will all share the second HT of each CPU. Since dom0 is on 
-         * CPU 0, we favour high numbered CPUs in the event of a tie.
+         * If we're on a HT system, we only auto-allocate to a non-primary HT.
+         * We favour high numbered CPUs in the event of a tie.
          */
-        pro = smp_num_siblings - 1;
-        for ( i = pro; i < num_online_cpus(); i += smp_num_siblings )
+        pro = first_cpu(cpu_sibling_map[0]);
+        if ( cpus_weight(cpu_sibling_map[0]) > 1 )
+            pro = next_cpu(pro, cpu_sibling_map[0]);
+        cpu_exclude_map = cpu_sibling_map[0];
+        for_each_online_cpu ( i )
+        {
+            if ( cpu_isset(i, cpu_exclude_map) )
+                continue;
+            if ( (i == first_cpu(cpu_sibling_map[i])) &&
+                 (cpus_weight(cpu_sibling_map[i]) > 1) )
+                continue;
+            cpus_or(cpu_exclude_map, cpu_exclude_map, cpu_sibling_map[i]);
             if ( cnt[i] <= cnt[pro] )
                 pro = i;
+        }
 
         ret = -ENOMEM;
         if ( (d = domain_create(dom, pro)) == NULL )
