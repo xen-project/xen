@@ -8,9 +8,6 @@
 #ifndef __XEN_SCHED_IF_H__
 #define __XEN_SCHED_IF_H__
 
-#define BUCKETS  10
-/*300*/
-
 struct schedule_data {
     spinlock_t          schedule_lock;  /* spinlock protecting curr        */
     struct vcpu        *curr;           /* current task                    */
@@ -18,9 +15,6 @@ struct schedule_data {
     void               *sched_priv;
     struct timer        s_timer;        /* scheduling timer                */
     unsigned long       tick;           /* current periodic 'tick'         */
-#ifdef BUCKETS
-    u32                 hist[BUCKETS];  /* for scheduler latency histogram */
-#endif
 } __cacheline_aligned;
 
 extern struct schedule_data schedule_data[];

@@ -51,6 +51,40 @@
 /* Returns 1 if the given VCPU is up. */
 #define VCPUOP_is_up                3
 
+/*
+ * Return information about the state and running time of a VCPU.
+ * @extra_arg == pointer to xen_vcpu_info structure.
+ */
+#define VCPUOP_get_runstate_info    4
+typedef struct vcpu_runstate_info {
+    /* VCPU's current state (RUNSTATE_*). */
+    int      state;
+    /* When was current state entered (system time, ns)? */
+    uint64_t state_entry_time;
+    /*
+     * Time spent in each RUNSTATE_* (ns). The sum of these times is
+     * guaranteed not to drift from system time.
+     */
+    uint64_t time[4];
+} vcpu_runstate_info_t;
+
+/* VCPU is currently running on a physical CPU. */
+#define RUNSTATE_running  0
+
+/* VCPU is runnable, but not currently scheduled on any physical CPU. */
+#define RUNSTATE_runnable 1
+
+/* VCPU is blocked (a.k.a. idle). It is therefore not runnable. */
+#define RUNSTATE_blocked  2
+
+/*
+ * VCPU is not runnable, but it is not blocked.
+ * This is a 'catch all' state for things like hotplug and pauses by the
+ * system administrator (or for critical sections in the hypervisor).
+ * RUNSTATE_blocked dominates this state (it is the preferred state).
+ */
+#define RUNSTATE_offline  3
+
 #endif /* __XEN_PUBLIC_VCPU_H__ */
 
 /*

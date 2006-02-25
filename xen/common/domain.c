@@ -451,6 +451,19 @@ long do_vcpu_op(int cmd, int vcpuid, void *arg)
     case VCPUOP_is_up:
         rc = !test_bit(_VCPUF_down, &v->vcpu_flags);
         break;
+
+    case VCPUOP_get_runstate_info:
+    {
+        struct vcpu_runstate_info runstate;
+        vcpu_runstate_get(v, &runstate);
+        if ( copy_to_user(arg, &runstate, sizeof(runstate)) )
+            rc = -EFAULT;
+        break;
+    }
+
+    default:
+        rc = -ENOSYS;
+        break;
     }
 
     return rc;

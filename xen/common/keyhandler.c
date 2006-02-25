@@ -169,8 +169,6 @@ static void dump_domains(unsigned char key)
 }
 
 extern void dump_runq(unsigned char key);
-extern void print_sched_histo(unsigned char key);
-extern void reset_sched_histo(unsigned char key);
 #ifndef NDEBUG
 extern void audit_domains_key(unsigned char key);
 #endif
@@ -206,10 +204,6 @@ void initialize_keytable(void)
         'd', dump_registers, "dump registers"); 
     register_keyhandler(
         'h', show_handlers, "show this message");
-    register_keyhandler(
-        'l', print_sched_histo, "print sched latency histogram");
-    register_keyhandler(
-        'L', reset_sched_histo, "reset sched latency histogram");
     register_keyhandler(
         'q', dump_domains, "dump domain (and guest debug) info");
     register_keyhandler(

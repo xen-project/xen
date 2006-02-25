@@ -36,14 +36,6 @@ extern void arch_getdomaininfo_ctxt(struct vcpu *,
 static char opt_sched[10] = "sedf";
 string_param("sched", opt_sched);
 
-/*#define WAKE_HISTO*/
-/*#define BLOCKTIME_HISTO*/
-#if defined(WAKE_HISTO)
-#define BUCKETS 31
-#elif defined(BLOCKTIME_HISTO)
-#define BUCKETS 200
-#endif
-
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 
 /* Various timer handlers. */
@@ -72,6 +64,36 @@ static struct scheduler ops;
 
 /* Per-CPU periodic timer sends an event to the currently-executing domain. */
 static struct timer t_timer[NR_CPUS]; 
+
+static inline void vcpu_runstate_change(
+    struct vcpu *v, int new_state, s_time_t new_entry_time)
+{
+    ASSERT(v->runstate.state != new_state);
+    ASSERT(spin_is_locked(&schedule_data[v->processor].schedule_lock));
+
+    v->runstate.time[v->runstate.state] +=
+        new_entry_time - v->runstate.state_entry_time;
+    v->runstate.state_entry_time = new_entry_time;
+    v->runstate.state = new_state;
+}
+
+void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate)
+{
+    if ( likely(v == current) )
+    {
+        /* Fast lock-free path. */
+        memcpy(runstate, &v->runstate, sizeof(*runstate));
+        ASSERT(runstate->state = RUNSTATE_running);
+        runstate->time[RUNSTATE_running] += NOW() - runstate->state_entry_time;
+    }
+    else
+    {
+        vcpu_schedule_lock_irq(v);
+        memcpy(runstate, &v->runstate, sizeof(*runstate));
+        runstate->time[runstate->state] += NOW() - runstate->state_entry_time;
+        vcpu_schedule_unlock_irq(v);
+    }
+}
 
 struct domain *alloc_domain(void)
 {
@@ -119,6 +141,9 @@ struct vcpu *alloc_vcpu(
     v->cpu_affinity = is_idle_domain(d) ?
         cpumask_of_cpu(cpu_id) : CPU_MASK_ALL;
 
+    v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
+    v->runstate.state_entry_time = NOW();
+
     if ( (vcpu_id != 0) && !is_idle_domain(d) )
         set_bit(_VCPUF_down, &v->vcpu_flags);
 
@@ -165,8 +190,15 @@ void vcpu_sleep_nosync(struct vcpu *v)
     unsigned long flags;
 
     vcpu_schedule_lock_irqsave(v, flags);
+
     if ( likely(!vcpu_runnable(v)) )
+    {
+        if ( v->runstate.state == RUNSTATE_runnable )
+            vcpu_runstate_change(v, RUNSTATE_offline, NOW());
+
         SCHED_OP(sleep, v);
+    }
+
     vcpu_schedule_unlock_irqrestore(v, flags);
 
     TRACE_2D(TRC_SCHED_SLEEP, v->domain->domain_id, v->vcpu_id);
@@ -187,11 +219,19 @@ void vcpu_wake(struct vcpu *v)
     unsigned long flags;
 
     vcpu_schedule_lock_irqsave(v, flags);
+
     if ( likely(vcpu_runnable(v)) )
     {
+        if ( v->runstate.state >= RUNSTATE_blocked )
+            vcpu_runstate_change(v, RUNSTATE_runnable, NOW());
         SCHED_OP(wake, v);
-        v->wokenup = NOW();
     }
+    else if ( !test_bit(_VCPUF_blocked, &v->vcpu_flags) )
+    {
+        if ( v->runstate.state == RUNSTATE_blocked )
+            vcpu_runstate_change(v, RUNSTATE_offline, NOW());
+    }
+
     vcpu_schedule_unlock_irqrestore(v, flags);
 
     TRACE_2D(TRC_SCHED_WAKE, v->domain->domain_id, v->vcpu_id);
@@ -376,8 +416,6 @@ static void __enter_scheduler(void)
 
     stop_timer(&schedule_data[cpu].s_timer);
     
-    prev->cpu_time += now - prev->lastschd;
-
     /* get policy-specific decision on scheduling... */
     next_slice = ops.do_schedule(now);
 
@@ -386,8 +424,6 @@ static void __enter_scheduler(void)
 
     schedule_data[cpu].curr = next;
     
-    next->lastschd = now;
-
     set_timer(&schedule_data[cpu].s_timer, now + r_time);
 
     if ( unlikely(prev == next) )
@@ -397,38 +433,23 @@ static void __enter_scheduler(void)
     }
 
     TRACE_2D(TRC_SCHED_SWITCH_INFPREV,
-             prev->domain->domain_id, now - prev->lastschd);
+             prev->domain->domain_id,
+             now - prev->runstate.state_entry_time);
     TRACE_3D(TRC_SCHED_SWITCH_INFNEXT,
-             next->domain->domain_id, now - next->wokenup, r_time);
+             next->domain->domain_id,
+             (next->runstate.state == RUNSTATE_runnable) ?
+             (now - next->runstate.state_entry_time) : 0,
+             r_time);
 
-    /*
-     * Logic of wokenup field in domain struct:
-     * Used to calculate "waiting time", which is the time that a domain
-     * spends being "runnable", but not actually running. wokenup is set
-     * set whenever a domain wakes from sleeping. However, if wokenup is not
-     * also set here then a preempted runnable domain will get a screwed up
-     * "waiting time" value next time it is scheduled.
-     */
-    prev->wokenup = now;
+    ASSERT(prev->runstate.state == RUNSTATE_running);
+    vcpu_runstate_change(
+        prev,
+        (test_bit(_VCPUF_blocked, &prev->vcpu_flags) ? RUNSTATE_blocked :
+         (vcpu_runnable(prev) ? RUNSTATE_runnable : RUNSTATE_offline)),
+        now);
 
-#if defined(WAKE_HISTO)
-    if ( !is_idle_vcpu(next) && next->wokenup )
-    {
-        ulong diff = (ulong)(now - next->wokenup);
-        diff /= (ulong)MILLISECS(1);
-        if (diff <= BUCKETS-2)  schedule_data[cpu].hist[diff]++;
-        else                    schedule_data[cpu].hist[BUCKETS-1]++;
-    }
-    next->wokenup = (s_time_t)0;
-#elif defined(BLOCKTIME_HISTO)
-    prev->lastdeschd = now;
-    if ( !is_idle_vcpu(next) )
-    {
-        ulong diff = (ulong)((now - next->lastdeschd) / MILLISECS(10));
-        if (diff <= BUCKETS-2)  schedule_data[cpu].hist[diff]++;
-        else                    schedule_data[cpu].hist[BUCKETS-1]++;
-    }
-#endif
+    ASSERT(next->runstate.state != RUNSTATE_running);
+    vcpu_runstate_change(next, RUNSTATE_running, now);
 
     ASSERT(!test_bit(_VCPUF_running, &next->vcpu_flags));
     set_bit(_VCPUF_running, &next->vcpu_flags);
@@ -567,47 +588,6 @@ void dump_runq(unsigned char key)
 
     local_irq_restore(flags);
 }
-
-#if defined(WAKE_HISTO) || defined(BLOCKTIME_HISTO)
-
-void print_sched_histo(unsigned char key)
-{
-    int i, j, k;
-    for_each_online_cpu ( k )
-    {
-        j = 0;
-        printf ("CPU[%02d]: scheduler latency histogram (ms:[count])\n", k);
-        for ( i = 0; i < BUCKETS; i++ )
-        {
-            if ( schedule_data[k].hist[i] != 0 )
-            {
-                if ( i < BUCKETS-1 )
-                    printk("%2d:[%7u]    ", i, schedule_data[k].hist[i]);
-                else
-                    printk(" >:[%7u]    ", schedule_data[k].hist[i]);
-                if ( !(++j % 5) )
-                    printk("\n");
-            }
-        }
-        printk("\n");
-    }
-      
-}
-
-void reset_sched_histo(unsigned char key)
-{
-    int i, j;
-    for ( j = 0; j < NR_CPUS; j++ )
-        for ( i=0; i < BUCKETS; i++ ) 
-            schedule_data[j].hist[i] = 0;
-}
-
-#else
-
-void print_sched_histo(unsigned char key) { }
-void reset_sched_histo(unsigned char key) { }
-
-#endif
 
 /*
  * Local variables:

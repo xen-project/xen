@@ -46,6 +46,7 @@ static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
     struct vcpu   *v;
     u64 cpu_time = 0;
     int flags = DOMFLAGS_BLOCKED;
+    struct vcpu_runstate_info runstate;
     
     info->domain = d->domain_id;
     info->nr_online_vcpus = 0;
@@ -55,7 +56,8 @@ static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
      * - domain is marked as running if any of its vcpus is running
      */
     for_each_vcpu ( d, v ) {
-        cpu_time += v->cpu_time;
+        vcpu_runstate_get(v, &runstate);
+        cpu_time += runstate.time[RUNSTATE_running];
         info->max_vcpu_id = v->vcpu_id;
         if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
         {
@@ -497,6 +499,7 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
     { 
         struct domain *d;
         struct vcpu   *v;
+        struct vcpu_runstate_info runstate;
 
         ret = -ESRCH;
         if ( (d = find_domain_by_id(op->u.getvcpuinfo.domain)) == NULL )
@@ -510,10 +513,12 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
         if ( (v = d->vcpu[op->u.getvcpuinfo.vcpu]) == NULL )
             goto getvcpuinfo_out;
 
+        vcpu_runstate_get(v, &runstate);
+
         op->u.getvcpuinfo.online   = !test_bit(_VCPUF_down, &v->vcpu_flags);
         op->u.getvcpuinfo.blocked  = test_bit(_VCPUF_blocked, &v->vcpu_flags);
         op->u.getvcpuinfo.running  = test_bit(_VCPUF_running, &v->vcpu_flags);
-        op->u.getvcpuinfo.cpu_time = v->cpu_time;
+        op->u.getvcpuinfo.cpu_time = runstate.time[RUNSTATE_running];
         op->u.getvcpuinfo.cpu      = v->processor;
         op->u.getvcpuinfo.cpumap   = 0;
         memcpy(&op->u.getvcpuinfo.cpumap,

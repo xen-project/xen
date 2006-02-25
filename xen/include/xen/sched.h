@@ -8,6 +8,7 @@
 #include <xen/smp.h>
 #include <public/xen.h>
 #include <public/dom0_ops.h>
+#include <public/vcpu.h>
 #include <xen/time.h>
 #include <xen/timer.h>
 #include <xen/grant_table.h>
@@ -63,14 +64,12 @@ struct vcpu
 
     struct vcpu     *next_in_list;
 
-    struct timer  timer;         /* one-shot timer for timeout values */
+    struct timer     timer;         /* one-shot timer for timeout values */
     unsigned long    sleep_tick;    /* tick at which this vcpu started sleep */
 
-    s_time_t         lastschd;      /* time this domain was last scheduled */
-    s_time_t         lastdeschd;    /* time this domain was last descheduled */
-    s_time_t         cpu_time;      /* total CPU time received till now */
-    s_time_t         wokenup;       /* time domain got woken up */
     void            *sched_priv;    /* scheduler-specific data */
+
+    struct vcpu_runstate_info runstate;
 
     unsigned long    vcpu_flags;
 
@@ -397,7 +396,6 @@ extern struct domain *domain_list;
 #define _DOMF_debugging        4
 #define DOMF_debugging         (1UL<<_DOMF_debugging)
 
-
 static inline int vcpu_runnable(struct vcpu *v)
 {
     return ( (atomic_read(&v->pausecnt) == 0) &&
@@ -414,6 +412,8 @@ void domain_unpause_by_systemcontroller(struct domain *d);
 void cpu_init(void);
 
 int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity);
+
+void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
 
 static inline void vcpu_unblock(struct vcpu *v)
 {
