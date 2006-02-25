@@ -83,7 +83,7 @@ void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate)
     {
         /* Fast lock-free path. */
         memcpy(runstate, &v->runstate, sizeof(*runstate));
-        ASSERT(runstate->state = RUNSTATE_running);
+        ASSERT(runstate->state == RUNSTATE_running);
         runstate->time[RUNSTATE_running] += NOW() - runstate->state_entry_time;
     }
     else
