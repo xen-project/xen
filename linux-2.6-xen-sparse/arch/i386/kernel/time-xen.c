@@ -48,6 +48,8 @@
 #include <linux/mca.h>
 #include <linux/sysctl.h>
 #include <linux/percpu.h>
+#include <linux/kernel_stat.h>
+#include <linux/posix-timers.h>
 
 #include <asm/io.h>
 #include <asm/smp.h>
@@ -70,6 +72,7 @@
 #include <asm/arch_hooks.h>
 
 #include <xen/evtchn.h>
+#include <xen/interface/vcpu.h>
 
 #if defined (__i386__)
 #include <asm/i8259.h>
@@ -122,6 +125,10 @@ static u32 shadow_tv_version;
 /* Keep track of last time we did processing/updating of jiffies and xtime. */
 static u64 processed_system_time;   /* System time (ns) at last processing. */
 static DEFINE_PER_CPU(u64, processed_system_time);
+
+/* How much CPU time was spent blocked and how much was 'stolen'? */
+static DEFINE_PER_CPU(u64, processed_stolen_time);
+static DEFINE_PER_CPU(u64, processed_blocked_time);
 
 /* Must be signed, as it's compared with s64 quantities which can be -ve. */
 #define NS_PER_TICK (1000000000LL/HZ)
@@ -567,9 +574,10 @@ EXPORT_SYMBOL(profile_pc);
 
 irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	s64 delta, delta_cpu;
+	s64 delta, delta_cpu, stolen, blocked;
 	int i, cpu = smp_processor_id();
 	struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
+	struct vcpu_runstate_info runstate;
 
 	write_seqlock(&xtime_lock);
 
@@ -611,19 +619,79 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	write_sequnlock(&xtime_lock);
 
-	/*
-         * Local CPU jiffy work. No need to hold xtime_lock, and I'm not sure
-         * if there is risk of deadlock if we do (since update_process_times
-         * may do scheduler rebalancing work and thus acquire runqueue locks).
-         */
-	while (delta_cpu >= NS_PER_TICK) {
-		delta_cpu -= NS_PER_TICK;
-		per_cpu(processed_system_time, cpu) += NS_PER_TICK;
-		update_process_times(user_mode(regs));
-		profile_tick(CPU_PROFILING, regs);
+	/* Obtain stolen/blocked cycles, if the hypervisor supports it. */
+	if (HYPERVISOR_vcpu_op(VCPUOP_get_runstate_info,
+			       cpu, &runstate) == 0) {
+		/*
+		 * Account stolen ticks.
+		 * HACK: Passing NULL to account_steal_time()
+		 * ensures that the ticks are accounted as stolen.
+		 */
+		stolen = runstate.time[RUNSTATE_runnable] +
+			runstate.time[RUNSTATE_offline] -
+			per_cpu(processed_stolen_time, cpu);
+		if (unlikely(stolen < 0)) /* clock jitter */
+			stolen = 0;
+		delta_cpu -= stolen;
+		if (unlikely(delta_cpu < 0)) {
+			stolen += delta_cpu;
+			delta_cpu = 0;
+		}
+		do_div(stolen, NS_PER_TICK);
+		per_cpu(processed_stolen_time, cpu) += stolen * NS_PER_TICK;
+		account_steal_time(NULL, (cputime_t)stolen);
+
+		/*
+		 * Account blocked ticks.
+		 * HACK: Passing idle_task to account_steal_time()
+		 * ensures that the ticks are accounted as idle/wait.
+		 */
+		blocked = runstate.time[RUNSTATE_blocked] -
+			per_cpu(processed_blocked_time, cpu);
+		if (unlikely(blocked < 0)) /* clock jitter */
+			blocked = 0;
+		delta_cpu -= blocked;
+		if (unlikely(delta_cpu < 0)) {
+			blocked += delta_cpu;
+			delta_cpu = 0;
+		}
+		do_div(blocked, NS_PER_TICK);
+		per_cpu(processed_blocked_time, cpu) += blocked * NS_PER_TICK;
+		account_steal_time(idle_task(cpu), (cputime_t)blocked);
+
+		per_cpu(processed_system_time, cpu) +=
+			(stolen + blocked) * NS_PER_TICK;
 	}
 
+	if (delta_cpu > 0) {
+		do_div(delta_cpu, NS_PER_TICK);
+		if (user_mode(regs))
+			account_user_time(current, (cputime_t)delta_cpu);
+		else
+			account_system_time(current, HARDIRQ_OFFSET,
+					    (cputime_t)delta_cpu);
+		per_cpu(processed_system_time, cpu) += delta_cpu * NS_PER_TICK;
+	}
+
+	run_local_timers();
+	if (rcu_pending(cpu))
+		rcu_check_callbacks(cpu, user_mode(regs));
+	scheduler_tick();
+	run_posix_cpu_timers(current);
+
 	return IRQ_HANDLED;
+}
+
+static void init_missing_ticks_accounting(int cpu)
+{
+	struct vcpu_runstate_info runstate = { 0 };
+
+	HYPERVISOR_vcpu_op(VCPUOP_get_runstate_info, cpu, &runstate);
+
+	per_cpu(processed_blocked_time, cpu) = runstate.time[RUNSTATE_blocked];
+	per_cpu(processed_stolen_time, cpu) =
+		runstate.time[RUNSTATE_runnable] +
+		runstate.time[RUNSTATE_offline];
 }
 
 /* not static: needed by APM */
@@ -814,6 +882,7 @@ void __init time_init(void)
 
 	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
 	per_cpu(processed_system_time, 0) = processed_system_time;
+	init_missing_ticks_accounting(0);
 
 	update_wallclock();
 
@@ -891,6 +960,7 @@ void time_resume(void)
 
 	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
 	per_cpu(processed_system_time, 0) = processed_system_time;
+	init_missing_ticks_accounting(0);
 
 	update_wallclock();
 }
@@ -909,6 +979,7 @@ void local_setup_timer(unsigned int cpu)
 		/* Use cpu0 timestamp: cpu's shadow is not initialised yet. */
 		per_cpu(processed_system_time, cpu) = 
 			per_cpu(shadow_time, 0).system_timestamp;
+		init_missing_ticks_accounting(cpu);
 	} while (read_seqretry(&xtime_lock, seq));
 
 	sprintf(timer_name[cpu], "timer%d", cpu);
