@@ -130,6 +130,9 @@ static DEFINE_PER_CPU(u64, processed_system_time);
 static DEFINE_PER_CPU(u64, processed_stolen_time);
 static DEFINE_PER_CPU(u64, processed_blocked_time);
 
+/* Current runstate of each CPU (updated automatically by the hypervisor). */
+static DEFINE_PER_CPU(struct vcpu_runstate_info, runstate);
+
 /* Must be signed, as it's compared with s64 quantities which can be -ve. */
 #define NS_PER_TICK (1000000000LL/HZ)
 
@@ -575,19 +578,36 @@ EXPORT_SYMBOL(profile_pc);
 irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	s64 delta, delta_cpu, stolen, blocked;
+	u64 sched_time;
 	int i, cpu = smp_processor_id();
 	struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
-	struct vcpu_runstate_info runstate;
+	struct vcpu_runstate_info *runstate = &per_cpu(runstate, cpu);
 
 	write_seqlock(&xtime_lock);
 
 	do {
 		get_time_values_from_xen();
 
+		/* Obtain a consistent snapshot of elapsed wallclock cycles. */
 		delta = delta_cpu = 
 			shadow->system_timestamp + get_nsec_offset(shadow);
 		delta     -= processed_system_time;
 		delta_cpu -= per_cpu(processed_system_time, cpu);
+
+		/*
+		 * Obtain a consistent snapshot of stolen/blocked cycles. We
+		 * can use state_entry_time to detect if we get preempted here.
+		 */
+		do {
+			sched_time = runstate->state_entry_time;
+			barrier();
+			stolen = runstate->time[RUNSTATE_runnable] +
+				runstate->time[RUNSTATE_offline] -
+				per_cpu(processed_stolen_time, cpu);
+			blocked = runstate->time[RUNSTATE_blocked] -
+				per_cpu(processed_blocked_time, cpu);
+			barrier();
+		} while (sched_time != runstate->state_entry_time);
 	}
 	while (!time_values_up_to_date(cpu));
 
@@ -619,60 +639,44 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	write_sequnlock(&xtime_lock);
 
-	/* Obtain stolen/blocked cycles, if the hypervisor supports it. */
-	if (HYPERVISOR_vcpu_op(VCPUOP_get_runstate_info,
-			       cpu, &runstate) == 0) {
-		/*
-		 * Account stolen ticks.
-		 * HACK: Passing NULL to account_steal_time()
-		 * ensures that the ticks are accounted as stolen.
-		 */
-		stolen = runstate.time[RUNSTATE_runnable] +
-			runstate.time[RUNSTATE_offline] -
-			per_cpu(processed_stolen_time, cpu);
-		if (unlikely(stolen < 0)) /* clock jitter */
-			stolen = 0;
+	/*
+	 * Account stolen ticks.
+	 * HACK: Passing NULL to account_steal_time()
+	 * ensures that the ticks are accounted as stolen.
+	 */
+	if (stolen > 0) {
 		delta_cpu -= stolen;
-		if (unlikely(delta_cpu < 0)) {
-			stolen += delta_cpu;
-			delta_cpu = 0;
-		}
 		do_div(stolen, NS_PER_TICK);
 		per_cpu(processed_stolen_time, cpu) += stolen * NS_PER_TICK;
+		per_cpu(processed_system_time, cpu) += stolen * NS_PER_TICK;
 		account_steal_time(NULL, (cputime_t)stolen);
-
-		/*
-		 * Account blocked ticks.
-		 * HACK: Passing idle_task to account_steal_time()
-		 * ensures that the ticks are accounted as idle/wait.
-		 */
-		blocked = runstate.time[RUNSTATE_blocked] -
-			per_cpu(processed_blocked_time, cpu);
-		if (unlikely(blocked < 0)) /* clock jitter */
-			blocked = 0;
-		delta_cpu -= blocked;
-		if (unlikely(delta_cpu < 0)) {
-			blocked += delta_cpu;
-			delta_cpu = 0;
-		}
-		do_div(blocked, NS_PER_TICK);
-		per_cpu(processed_blocked_time, cpu) += blocked * NS_PER_TICK;
-		account_steal_time(idle_task(cpu), (cputime_t)blocked);
-
-		per_cpu(processed_system_time, cpu) +=
-			(stolen + blocked) * NS_PER_TICK;
 	}
 
+	/*
+	 * Account blocked ticks.
+	 * HACK: Passing idle_task to account_steal_time()
+	 * ensures that the ticks are accounted as idle/wait.
+	 */
+	if (blocked > 0) {
+		delta_cpu -= blocked;
+		do_div(blocked, NS_PER_TICK);
+		per_cpu(processed_blocked_time, cpu) += blocked * NS_PER_TICK;
+		per_cpu(processed_system_time, cpu)  += blocked * NS_PER_TICK;
+		account_steal_time(idle_task(cpu), (cputime_t)blocked);
+	}
+
+	/* Account user/system ticks. */
 	if (delta_cpu > 0) {
 		do_div(delta_cpu, NS_PER_TICK);
+		per_cpu(processed_system_time, cpu) += delta_cpu * NS_PER_TICK;
 		if (user_mode(regs))
 			account_user_time(current, (cputime_t)delta_cpu);
 		else
 			account_system_time(current, HARDIRQ_OFFSET,
 					    (cputime_t)delta_cpu);
-		per_cpu(processed_system_time, cpu) += delta_cpu * NS_PER_TICK;
 	}
 
+	/* Local timer processing (see update_process_times()). */
 	run_local_timers();
 	if (rcu_pending(cpu))
 		rcu_check_callbacks(cpu, user_mode(regs));
@@ -684,14 +688,19 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static void init_missing_ticks_accounting(int cpu)
 {
-	struct vcpu_runstate_info runstate = { 0 };
+	struct vcpu_register_runstate_memory_area area;
+	struct vcpu_runstate_info *runstate = &per_cpu(runstate, cpu);
 
-	HYPERVISOR_vcpu_op(VCPUOP_get_runstate_info, cpu, &runstate);
+	memset(runstate, 0, sizeof(*runstate));
 
-	per_cpu(processed_blocked_time, cpu) = runstate.time[RUNSTATE_blocked];
+	area.addr.v = runstate;
+	HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area, cpu, &area);
+
+	per_cpu(processed_blocked_time, cpu) =
+		runstate->time[RUNSTATE_blocked];
 	per_cpu(processed_stolen_time, cpu) =
-		runstate.time[RUNSTATE_runnable] +
-		runstate.time[RUNSTATE_offline];
+		runstate->time[RUNSTATE_runnable] +
+		runstate->time[RUNSTATE_offline];
 }
 
 /* not static: needed by APM */

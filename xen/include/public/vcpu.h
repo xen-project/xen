@@ -53,7 +53,7 @@
 
 /*
  * Return information about the state and running time of a VCPU.
- * @extra_arg == pointer to xen_vcpu_info structure.
+ * @extra_arg == pointer to vcpu_runstate_info structure.
  */
 #define VCPUOP_get_runstate_info    4
 typedef struct vcpu_runstate_info {
@@ -84,6 +84,27 @@ typedef struct vcpu_runstate_info {
  * RUNSTATE_blocked dominates this state (it is the preferred state).
  */
 #define RUNSTATE_offline  3
+
+/*
+ * Register a shared memory area from which the guest may obtain its own
+ * runstate information without needing to execute a hypercall.
+ * Notes:
+ *  1. The registered address may be virtual or physical, depending on the
+ *     platform. The virtual address should be registered on x86 systems.
+ *  2. Only one shared area may be registered per VCPU. The shared area is
+ *     updated by the hypervisor each time the VCPU is scheduled. Thus
+ *     runstate.state will always be RUNSTATE_running and
+ *     runstate.state_entry_time will indicate the system time at which the
+ *     VCPU was last scheduled to run.
+ * @extra_arg == pointer to vcpu_register_runstate_memory_area structure.
+ */
+#define VCPUOP_register_runstate_memory_area 5
+typedef struct vcpu_register_runstate_memory_area {
+    union {
+        struct vcpu_runstate_info *v;
+        uint64_t p;
+    } addr;
+} vcpu_register_runstate_memory_area_t;
 
 #endif /* __XEN_PUBLIC_VCPU_H__ */
 

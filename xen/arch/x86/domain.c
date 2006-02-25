@@ -784,6 +784,11 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     context_saved(prev);
 
+    /* Update per-VCPU guest runstate shared memory area (if registered). */
+    if ( next->runstate_guest != NULL )
+        __copy_to_user(next->runstate_guest, &next->runstate,
+                       sizeof(next->runstate));
+
     schedule_tail(next);
     BUG();
 }

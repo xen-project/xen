@@ -70,6 +70,7 @@ struct vcpu
     void            *sched_priv;    /* scheduler-specific data */
 
     struct vcpu_runstate_info runstate;
+    struct vcpu_runstate_info *runstate_guest; /* guest address */
 
     unsigned long    vcpu_flags;
 

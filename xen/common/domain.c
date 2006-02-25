@@ -461,6 +461,28 @@ long do_vcpu_op(int cmd, int vcpuid, void *arg)
         break;
     }
 
+    case VCPUOP_register_runstate_memory_area:
+    {
+        struct vcpu_register_runstate_memory_area area;
+
+        rc = -EINVAL;
+        if ( v != current )
+            break;
+
+        rc = -EFAULT;
+        if ( copy_from_user(&area, arg, sizeof(area)) )
+            break;
+
+        if ( !access_ok(area.addr.v, sizeof(*area.addr.v)) )
+            break;
+
+        rc = 0;
+        v->runstate_guest = area.addr.v;
+        __copy_to_user(v->runstate_guest, &v->runstate, sizeof(v->runstate));
+
+        break;
+    }
+
     default:
         rc = -ENOSYS;
         break;
