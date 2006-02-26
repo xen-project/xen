@@ -94,11 +94,17 @@ def get_active_offset(file):
             return struct.unpack("<L", buf[poff+8:poff+12])[0] * SECTOR_SIZE
     return -1
 
-def get_config(fn):
+def get_config(fn, isconfig = False):
     if not os.access(fn, os.R_OK):
         raise RuntimeError, "Unable to access %s" %(fn,)
 
     cf = grub.GrubConf.GrubConfigFile()
+
+    if isconfig:
+        # set the config file and parse it
+        cf.filename = fn
+        cf.parse()
+        return cf
 
     offset = 0
     if is_disk_image(fn):
@@ -130,9 +136,7 @@ def get_config(fn):
         # then parse the grub config
         cf.parse(buf)
     else:
-        # set the config file and parse it
-        cf.filename = fn
-        cf.parse()
+        raise RuntimeError, "Unable to read filesystem" 
     
     return cf
 
@@ -214,7 +218,8 @@ if __name__ == "__main__":
 
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'qh::',
-                                   ["quiet", "help", "output=", "entry="])
+                                   ["quiet", "help", "output=", "entry=",
+                                    "isconfig"])
     except getopt.GetoptError:
         usage()
         sys.exit(1)
@@ -227,6 +232,7 @@ if __name__ == "__main__":
     output = None
     entry = None
     interactive = True
+    isconfig = False
     for o, a in opts:
         if o in ("-q", "--quiet"):
             interactive = False
@@ -239,13 +245,15 @@ if __name__ == "__main__":
             entry = a
             # specifying the entry to boot implies non-interactive
             interactive = False
+        elif o in ("--isconfig",):
+            isconfig = True
 
     if output is None or output == "-":
         fd = sys.stdout.fileno()
     else:
         fd = os.open(output, os.O_WRONLY)
 
-    cf = get_config(file)
+    cf = get_config(file, isconfig)
     if interactive:
         curses.wrapper(run_main)
     else:
