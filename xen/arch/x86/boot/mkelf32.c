@@ -244,7 +244,7 @@ int main(int argc, char **argv)
 
     inimage  = argv[1];
     outimage = argv[2];
-    loadbase = strtoul(argv[3], NULL, 16);
+    loadbase = strtoull(argv[3], NULL, 16);
     final_exec_addr = strtoul(argv[4], NULL, 16);
 
     infd = open(inimage, O_RDONLY);
