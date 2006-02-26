@@ -1502,15 +1502,14 @@ class XendDomainInfo:
         if not self.info['bootloader']:
             return
         # if we're restarting with a bootloader, we need to run it
-        # FIXME: this assumes the disk is the first device and
-        # that we're booting from the first disk
         blcfg = None
         config = self.sxpr()
         # FIXME: this assumes that we want to use the first disk
-        dev = sxp.child_value(config, "device")
-        if dev:
-            disk = sxp.child_value(dev, "uname")
-            fn = blkdev_uname_to_file(disk)
+        for dev in sxp.children(config, "device"):
+            disk = sxp.child(dev, "vbd")
+            if disk is None:
+                continue
+            fn = blkdev_uname_to_file(sxp.child_value(disk, "uname"))
             blcfg = bootloader(self.info['bootloader'], fn, 1,
                                self.info['vcpus'])
         if blcfg is None:
