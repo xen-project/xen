@@ -487,14 +487,45 @@ int do_settimeofday(struct timespec *tv)
 
 EXPORT_SYMBOL(do_settimeofday);
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+static void sync_xen_wallclock(unsigned long dummy);
+static DEFINE_TIMER(sync_xen_wallclock_timer, sync_xen_wallclock, 0, 0);
+static void sync_xen_wallclock(unsigned long dummy)
+{
+	time_t sec;
+	s64 nsec;
+	dom0_op_t op;
+
+	if (!ntp_synced() || independent_wallclock ||
+	    !(xen_start_info->flags & SIF_INITDOMAIN))
+		return;
+
+	write_seqlock_irq(&xtime_lock);
+
+	sec  = xtime.tv_sec;
+	nsec = xtime.tv_nsec + ((jiffies - wall_jiffies) * (u64)NS_PER_TICK);
+	__normalize_time(&sec, &nsec);
+
+	op.cmd = DOM0_SETTIME;
+	op.u.settime.secs        = sec;
+	op.u.settime.nsecs       = nsec;
+	op.u.settime.system_time = processed_system_time;
+	HYPERVISOR_dom0_op(&op);
+
+	update_wallclock();
+
+	write_sequnlock_irq(&xtime_lock);
+
+	/* Once per minute. */
+	mod_timer(&sync_xen_wallclock_timer, jiffies + 60*HZ);
+}
+
 static int set_rtc_mmss(unsigned long nowtime)
 {
 	int retval;
 
 	WARN_ON(irqs_disabled());
 
-	if (!(xen_start_info->flags & SIF_INITDOMAIN))
+	if (independent_wallclock || !(xen_start_info->flags & SIF_INITDOMAIN))
 		return 0;
 
 	/* gets recalled with irq locally disabled */
@@ -507,12 +538,6 @@ static int set_rtc_mmss(unsigned long nowtime)
 
 	return retval;
 }
-#else
-static int set_rtc_mmss(unsigned long nowtime)
-{
-	return 0;
-}
-#endif
 
 /* monotonic_clock(): returns # of nanoseconds passed since time_init()
  *		Note: This function is required to return accurate
@@ -768,6 +793,7 @@ static void sync_cmos_clock(unsigned long dummy)
 void notify_arch_cmos_timer(void)
 {
 	mod_timer(&sync_cmos_timer, jiffies + 1);
+	mod_timer(&sync_xen_wallclock_timer, jiffies + 1);
 }
 
 static long clock_cmos_diff, sleep_start;
