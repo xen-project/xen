@@ -626,7 +626,7 @@ kernel output or logging in to Linux over serial port.  It does however
 allow you to monitor and log the Xen boot process via serial console and
 can be very useful in debugging.
 
-%% kernel /boot/xen-2.0.gz dom0_mem=131072 com1=115200,8n1
+%% kernel /boot/xen-2.0.gz dom0_mem=131072 console=com1,vga com1=115200,8n1
 %% module /boot/vmlinuz-2.6-xen0 root=/dev/sda4 ro
 
 In order to configure Xen serial console output, it is necessary to
@@ -637,8 +637,9 @@ example kernel line with:
 \end{verbatim}}
 \end{quote}
 
-This configures Xen to output on COM1 at 115,200 baud, 8 data bits, 1
-stop bit and no parity. Modify these parameters for your environment.
+This configures Xen to output on COM1 at 115,200 baud, 8 data bits, no
+parity and 1 stop bit. Modify these parameters for your environment.
+See Section~\ref{s:xboot} for an explanation of all boot parameters.
 
 One can also configure XenLinux to share the serial console; to achieve
 this append ``\path{console=ttyS0}'' to your module line.
