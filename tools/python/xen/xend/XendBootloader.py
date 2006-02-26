@@ -1,7 +1,7 @@
 #
 # XendBootloader.py - Framework to run a boot loader for picking the kernel
 #
-# Copyright 2005 Red Hat, Inc.
+# Copyright 2005-2006 Red Hat, Inc.
 # Jeremy Katz <katzj@redhat.com>
 #
 # This software may be freely redistributed under the terms of the GNU
@@ -13,12 +13,11 @@
 #
 
 import os, select, errno
+import random
 import sxp
 
 from XendLogging import log
 from XendError import VmError
-
-BL_FIFO = "/var/lib/xen/xenbl"
 
 def bootloader(blexec, disk, quiet = 0, vcpus = None, entry = None):
     """Run the boot loader executable on the given disk and return a
@@ -38,14 +37,18 @@ def bootloader(blexec, disk, quiet = 0, vcpus = None, entry = None):
         log.error(msg)
         raise VmError(msg)
 
-    os.mkfifo(BL_FIFO, 0600)
+    while True:
+        fifo = "/var/lib/xen/xenbl.%s" %(random.randint(0, 32000),)
+        if not os.path.exists(fifo):
+            break
+    os.mkfifo(fifo, 0600)
 
     child = os.fork()
     if (not child):
         args = [ blexec ]
         if quiet:
             args.append("-q")
-        args.append("--output=%s" %(BL_FIFO,))
+        args.append("--output=%s" %(fifo,))
         if entry is not None:
             args.append("--entry=%s" %(entry,))
         args.append(disk)
@@ -59,7 +62,7 @@ def bootloader(blexec, disk, quiet = 0, vcpus = None, entry = None):
 
     while 1:
         try:
-            r = os.open(BL_FIFO, os.O_RDONLY)
+            r = os.open(fifo, os.O_RDONLY)
         except OSError, e:
             if e.errno == errno.EINTR:
                 continue
@@ -74,7 +77,7 @@ def bootloader(blexec, disk, quiet = 0, vcpus = None, entry = None):
         
     os.waitpid(child, 0)
     os.close(r)
-    os.unlink(BL_FIFO)
+    os.unlink(fifo)
 
     if len(ret) == 0:
         msg = "Boot loader didn't return any data!"
