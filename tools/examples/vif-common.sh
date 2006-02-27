@@ -125,7 +125,7 @@ function handle_iptable()
 #
 function ip_of()
 {
-  ip addr show "$1" | awk "/^.*inet.*$1\$/{print \$2}" | sed 's,/.*,,' | head -1
+  ip addr show "$1" | awk "/^.*inet.*$1\$/{print \$2}" | sed -n '1 s,/.*,,p'
 }
 
 
