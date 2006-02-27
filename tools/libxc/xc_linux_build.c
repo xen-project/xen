@@ -46,6 +46,77 @@
 #define probe_aout9(image,image_size,load_funcs) 1
 #endif
 
+static const char *feature_names[XENFEAT_NR_SUBMAPS*32] = {
+    [XENFEAT_writable_page_tables]       = "writable_page_tables",
+    [XENFEAT_writable_descriptor_tables] = "writable_descriptor_tables",
+    [XENFEAT_auto_translated_physmap]    = "auto_translated_physmap",
+    [XENFEAT_supervisor_mode_kernel]     = "supervisor_mode_kernel",
+    [XENFEAT_pae_pgdir_above_4gb]        = "pae_pgdir_above_4gb"
+};
+
+static inline void set_feature_bit (int nr, uint32_t *addr)
+{
+    addr[nr>>5] |= (1<<(nr&31));
+}
+
+static inline int test_feature_bit(int nr, uint32_t *addr)
+{
+    return !!(addr[nr>>5] & (1<<(nr&31)));
+}
+
+static int parse_features(
+    const char *feats,
+    uint32_t supported[XENFEAT_NR_SUBMAPS],
+    uint32_t required[XENFEAT_NR_SUBMAPS])
+{
+    const char *end, *p;
+    int i, req;
+
+    if ( (end = strchr(feats, ',')) == NULL )
+        end = feats + strlen(feats);
+
+    while ( feats < end )
+    {
+        p = strchr(feats, '|');
+        if ( (p == NULL) || (p > end) )
+            p = end;
+
+        req = (*feats == '!');
+        if ( req )
+            feats++;
+
+        for ( i = 0; i < XENFEAT_NR_SUBMAPS*32; i++ )
+        {
+            if ( feature_names[i] == NULL )
+                continue;
+
+            if ( strncmp(feature_names[i], feats, p-feats) == 0 )
+            {
+                set_feature_bit(i, supported);
+                if ( required && req )
+                    set_feature_bit(i, required);
+                break;
+            }
+        }
+
+        if ( i == XENFEAT_NR_SUBMAPS*32 )
+        {
+            ERROR("Unknown feature \"%.*s\".\n", (int)(p-feats), feats);
+            if ( req )
+            {
+                ERROR("Kernel requires an unknown hypervisor feature.\n");
+                return -EINVAL;
+            }
+        }
+
+        feats = p;
+        if ( *feats == '|' )
+            feats++;
+    }
+
+    return -EINVAL;
+}
+
 static int probeimageformat(char *image,
                             unsigned long image_size,
                             struct load_funcs *load_funcs)
@@ -344,7 +415,8 @@ static int setup_guest(int xc_handle,
                        unsigned long shared_info_frame,
                        unsigned long flags,
                        unsigned int store_evtchn, unsigned long *store_mfn,
-                       unsigned int console_evtchn, unsigned long *console_mfn)
+                       unsigned int console_evtchn, unsigned long *console_mfn,
+                       uint32_t required_features[XENFEAT_NR_SUBMAPS])
 {
     unsigned long *page_array = NULL;
     struct load_funcs load_funcs;
@@ -483,7 +555,8 @@ static int setup_guest(int xc_handle,
                        unsigned long shared_info_frame,
                        unsigned long flags,
                        unsigned int store_evtchn, unsigned long *store_mfn,
-                       unsigned int console_evtchn, unsigned long *console_mfn)
+                       unsigned int console_evtchn, unsigned long *console_mfn,
+                       uint32_t required_features[XENFEAT_NR_SUBMAPS])
 {
     unsigned long *page_array = NULL;
     unsigned long count, i, hypercall_pfn;
@@ -515,8 +588,9 @@ static int setup_guest(int xc_handle,
     unsigned long vpt_start;
     unsigned long vpt_end;
     unsigned long v_end;
-    unsigned shadow_mode_enabled;
     unsigned long guest_store_mfn, guest_console_mfn, guest_shared_info_mfn;
+    unsigned long shadow_mode_enabled;
+    uint32_t supported_features[XENFEAT_NR_SUBMAPS] = { 0, };
 
     rc = probeimageformat(image, image_size, &load_funcs);
     if ( rc != 0 )
@@ -534,8 +608,6 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    shadow_mode_enabled = !!strstr(dsi.xen_guest_string,
-                                   "SHADOW=translate");
     /*
      * Why do we need this? The number of page-table frames depends on the 
      * size of the bootstrap address space. But the size of the address space 
@@ -636,6 +708,35 @@ static int setup_guest(int xc_handle,
 
     (load_funcs.loadimage)(image, image_size, xc_handle, dom, page_array,
                            &dsi);
+
+    /* Parse and validate kernel features. */
+    p = strstr(dsi.xen_guest_string, "FEATURES=");
+    if ( p != NULL )
+    {
+        if ( !parse_features(p + strlen("FEATURES="),
+                             supported_features,
+                             required_features) )
+        {
+            ERROR("Failed to parse guest kernel features.\n");
+            goto error_out;
+        }
+
+        fprintf(stderr, "Supported features  = { %08x }.\n",
+                supported_features[0]);
+        fprintf(stderr, "Required features   = { %08x }.\n",
+                required_features[0]);
+    }
+
+    for ( i = 0; i < XENFEAT_NR_SUBMAPS; i++ )
+    {
+        if ( (supported_features[i]&required_features[i]) != required_features[i] )
+        {
+            ERROR("Guest kernel does not support a required feature.\n");
+            goto error_out;
+        }
+    }
+
+    shadow_mode_enabled = test_feature_bit(XENFEAT_auto_translated_physmap, required_features);
 
     /* Load the initial ramdisk image. */
     if ( initrd_len != 0 )
@@ -870,6 +971,7 @@ int xc_linux_build(int xc_handle,
                    const char *image_name,
                    const char *ramdisk_name,
                    const char *cmdline,
+                   const char *features,
                    unsigned long flags,
                    unsigned int store_evtchn,
                    unsigned long *store_mfn,
@@ -886,6 +988,16 @@ int xc_linux_build(int xc_handle,
     char         *image = NULL;
     unsigned long image_size, initrd_size=0;
     unsigned long vstartinfo_start, vkern_entry, vstack_start;
+    uint32_t      features_bitmap[XENFEAT_NR_SUBMAPS] = { 0, };
+
+    if ( features != NULL )
+    {
+        if ( !parse_features(features, features_bitmap, NULL) )
+        {
+            PERROR("Failed to parse configured features\n");
+            goto error_out;
+        }
+    }
 
     if ( (nr_pages = get_tot_pages(xc_handle, domid)) < 0 )
     {
@@ -940,7 +1052,8 @@ int xc_linux_build(int xc_handle,
                      &vstack_start, ctxt, cmdline,
                      op.u.getdomaininfo.shared_info_frame,
                      flags, store_evtchn, store_mfn,
-                     console_evtchn, console_mfn) < 0 )
+                     console_evtchn, console_mfn,
+                     features_bitmap) < 0 )
     {
         ERROR("Error constructing guest OS");
         goto error_out;

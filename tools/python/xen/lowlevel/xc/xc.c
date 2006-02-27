@@ -326,27 +326,29 @@ static PyObject *pyxc_linux_build(XcObject *self,
                                   PyObject *kwds)
 {
     uint32_t dom;
-    char *image, *ramdisk = NULL, *cmdline = "";
+    char *image, *ramdisk = NULL, *cmdline = "", *features = NULL;
     int flags = 0;
     int store_evtchn, console_evtchn;
     unsigned long store_mfn = 0;
     unsigned long console_mfn = 0;
 
-    static char *kwd_list[] = { "dom", "store_evtchn", 
-                                "console_evtchn", "image", 
+    static char *kwd_list[] = { "dom", "store_evtchn",
+                                "console_evtchn", "image",
 				/* optional */
-				"ramdisk", "cmdline", "flags", NULL };
+				"ramdisk", "cmdline", "flags",
+				"features", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|ssi", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|ssis", kwd_list,
                                       &dom, &store_evtchn,
-				      &console_evtchn, &image, 
+				      &console_evtchn, &image,
 				      /* optional */
-				      &ramdisk, &cmdline, &flags) )
+				      &ramdisk, &cmdline, &flags,
+				      &features) )
         return NULL;
 
     if ( xc_linux_build(self->xc_handle, dom, image,
-                        ramdisk, cmdline, flags,
-                        store_evtchn, &store_mfn, 
+                        ramdisk, cmdline, features, flags,
+                        store_evtchn, &store_mfn,
 			console_evtchn, &console_mfn) != 0 ) {
         if (!errno)
              errno = EINVAL;
