@@ -802,6 +802,14 @@ int construct_dom0(struct domain *d,
         v->arch.guest_context.user_regs.fs &= ~3;
         v->arch.guest_context.user_regs.gs &= ~3;
         printk("Dom0 runs in ring 0 (supervisor mode)\n");
+        if ( !test_bit(XENFEAT_supervisor_mode_kernel,
+                       dom0_features_supported) )
+            panic("Dom0 does not support supervisor-mode execution\n");
+    }
+    else
+    {
+        if ( test_bit(XENFEAT_supervisor_mode_kernel, dom0_features_required) )
+            panic("Dom0 requires supervisor-mode execution\n");
     }
 
     rc = 0;
