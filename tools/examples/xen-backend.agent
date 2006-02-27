@@ -18,7 +18,7 @@ case "$ACTION" in
   add)
     ;;
   remove)
-    /etc/xen/scripts/xen-hotplug-cleanup.sh
+    /etc/xen/scripts/xen-hotplug-cleanup
     ;;
   online)
     ;;
