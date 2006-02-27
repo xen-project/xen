@@ -20,4 +20,3 @@ spinlock.h		-> linux/include/asm-ia64/spinlock.h
 system.h		-> linux/include/asm-ia64/system.h
 tlbflush.h		-> linux/include/asm-ia64/tlbflush.h
 types.h			-> linux/include/asm-ia64/types.h
-uaccess.h		-> linux/include/asm-ia64/uaccess.h

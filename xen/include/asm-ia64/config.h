@@ -195,11 +195,6 @@ void sort_main_extable(void);
 
 #define find_first_set_bit(x)	(ffs(x)-1)	// FIXME: Is this right???
 
-// from include/asm-x86/*/uaccess.h
-#define array_access_ok(addr,count,size)			\
-    (likely(sizeof(count) <= 4) /* disallow 64-bit counts */ &&  \
-     access_ok(type,addr,count*size))
-
 // see drivers/char/console.c
 #ifndef VALIDATE_VT
 #define	OPT_CONSOLE_STR "com1"
@@ -305,7 +300,6 @@ extern int ht_per_core;
 #else
 #define raw_smp_processor_id()	0
 #endif
-
 
 #ifndef __ASSEMBLY__
 #include <linux/linkage.h>

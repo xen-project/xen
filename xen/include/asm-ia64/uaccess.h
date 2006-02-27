@@ -42,47 +42,10 @@
 #include <asm/pgtable.h>
 #include <asm/io.h>
 
-/*
- * For historical reasons, the following macros are grossly misnamed:
- */
-#define KERNEL_DS	((mm_segment_t) { ~0UL })		/* cf. access_ok() */
-#define USER_DS		((mm_segment_t) { TASK_SIZE-1 })	/* cf. access_ok() */
-
-#define VERIFY_READ	0
-#define VERIFY_WRITE	1
-
-#define get_ds()  (KERNEL_DS)
-#define get_fs()  (current_thread_info()->addr_limit)
-#define set_fs(x) (current_thread_info()->addr_limit = (x))
-
-#define segment_eq(a, b)	((a).seg == (b).seg)
-
-/*
- * When accessing user memory, we need to make sure the entire area really is in
- * user-level space.  In order to do this efficiently, we make sure that the page at
- * address TASK_SIZE is never valid.  We also need to make sure that the address doesn't
- * point inside the virtually mapped linear page table.
- */
-#ifdef XEN
 #define IS_VMM_ADDRESS(addr) ((((addr) >> 60) ^ ((addr) >> 59)) & 1)
-#define __access_ok(addr, size, segment) (!IS_VMM_ADDRESS((unsigned long)(addr)))
-#else
-#define __access_ok(addr, size, segment)						\
-({											\
-	__chk_user_ptr(addr);								\
-	(likely((unsigned long) (addr) <= (segment).seg)				\
-	 && ((segment).seg == KERNEL_DS.seg						\
-	     || likely(REGION_OFFSET((unsigned long) (addr)) < RGN_MAP_LIMIT)));	\
-})
-#endif
-#define access_ok(type, addr, size)	__access_ok((addr), (size), get_fs())
-
-/* this function will go away soon - use access_ok() instead */
-static inline int __deprecated
-verify_area (int type, const void __user *addr, unsigned long size)
-{
-	return access_ok(type, addr, size) ? 0 : -EFAULT;
-}
+#define __access_ok(addr) (!IS_VMM_ADDRESS((unsigned long)(addr)))
+#define access_ok(addr, size) (__access_ok(addr))
+#define array_access_ok(addr,count,size)( __access_ok(addr))
 
 /*
  * These are the main single-value transfer routines.  They automatically
@@ -201,7 +164,7 @@ extern void __get_user_unknown (void);
 	__typeof__ (size) __gu_size = (size);						\
 	long __gu_err = -EFAULT, __gu_val = 0;						\
 											\
-	if (!check || __access_ok(__gu_ptr, size, segment))				\
+	if (!check || __access_ok(__gu_ptr))						\
 		switch (__gu_size) {							\
 		      case 1: __get_user_size(__gu_val, __gu_ptr, 1, __gu_err); break;	\
 		      case 2: __get_user_size(__gu_val, __gu_ptr, 2, __gu_err); break;	\
@@ -229,7 +192,7 @@ extern void __put_user_unknown (void);
 	__typeof__ (size) __pu_size = (size);						\
 	long __pu_err = -EFAULT;							\
 											\
-	if (!check || __access_ok(__pu_ptr, __pu_size, segment))			\
+	if (!check || __access_ok(__pu_ptr))						\
 		switch (__pu_size) {							\
 		      case 1: __put_user_size(__pu_x, __pu_ptr, 1, __pu_err); break;	\
 		      case 2: __put_user_size(__pu_x, __pu_ptr, 2, __pu_err); break;	\
@@ -269,7 +232,7 @@ __copy_from_user (void *to, const void __user *from, unsigned long count)
 	const void *__cu_from = (from);							\
 	long __cu_len = (n);								\
 											\
-	if (__access_ok(__cu_to, __cu_len, get_fs()))					\
+	if (__access_ok(__cu_to))							\
 		__cu_len = __copy_user(__cu_to, (void __user *) __cu_from, __cu_len);	\
 	__cu_len;									\
 })
@@ -281,7 +244,7 @@ __copy_from_user (void *to, const void __user *from, unsigned long count)
 	long __cu_len = (n);								\
 											\
 	__chk_user_ptr(__cu_from);							\
-	if (__access_ok(__cu_from, __cu_len, get_fs()))					\
+	if (__access_ok(__cu_from))							\
 		__cu_len = __copy_user((void __user *) __cu_to, __cu_from, __cu_len);	\
 	__cu_len;									\
 })
@@ -291,68 +254,11 @@ __copy_from_user (void *to, const void __user *from, unsigned long count)
 static inline unsigned long
 copy_in_user (void __user *to, const void __user *from, unsigned long n)
 {
-	if (likely(access_ok(VERIFY_READ, from, n) && access_ok(VERIFY_WRITE, to, n)))
+	if (likely(access_ok(from, n) && access_ok(to, n)))
 		n = __copy_user(to, from, n);
 	return n;
 }
 
-extern unsigned long __do_clear_user (void __user *, unsigned long);
-
-#define __clear_user(to, n)		__do_clear_user(to, n)
-
-#define clear_user(to, n)					\
-({								\
-	unsigned long __cu_len = (n);				\
-	if (__access_ok(to, __cu_len, get_fs()))		\
-		__cu_len = __do_clear_user(to, __cu_len);	\
-	__cu_len;						\
-})
-
-
-/*
- * Returns: -EFAULT if exception before terminator, N if the entire buffer filled, else
- * strlen.
- */
-extern long __must_check __strncpy_from_user (char *to, const char __user *from, long to_len);
-
-#define strncpy_from_user(to, from, n)					\
-({									\
-	const char __user * __sfu_from = (from);			\
-	long __sfu_ret = -EFAULT;					\
-	if (__access_ok(__sfu_from, 0, get_fs()))			\
-		__sfu_ret = __strncpy_from_user((to), __sfu_from, (n));	\
-	__sfu_ret;							\
-})
-
-/* Returns: 0 if bad, string length+1 (memory size) of string if ok */
-extern unsigned long __strlen_user (const char __user *);
-
-#define strlen_user(str)				\
-({							\
-	const char __user *__su_str = (str);		\
-	unsigned long __su_ret = 0;			\
-	if (__access_ok(__su_str, 0, get_fs()))		\
-		__su_ret = __strlen_user(__su_str);	\
-	__su_ret;					\
-})
-
-/*
- * Returns: 0 if exception before NUL or reaching the supplied limit
- * (N), a value greater than N if the limit would be exceeded, else
- * strlen.
- */
-extern unsigned long __strnlen_user (const char __user *, long);
-
-#define strnlen_user(str, len)					\
-({								\
-	const char __user *__su_str = (str);			\
-	unsigned long __su_ret = 0;				\
-	if (__access_ok(__su_str, 0, get_fs()))			\
-		__su_ret = __strnlen_user(__su_str, len);	\
-	__su_ret;						\
-})
-
-/* Generic code can't deal with the location-relative format that we use for compactness.  */
 #define ARCH_HAS_SORT_EXTABLE
 #define ARCH_HAS_SEARCH_EXTABLE
 
@@ -375,41 +281,5 @@ ia64_done_with_exception (struct pt_regs *regs)
 	}
 	return 0;
 }
-
-#ifndef XEN
-#define ARCH_HAS_TRANSLATE_MEM_PTR	1
-static __inline__ char *
-xlate_dev_mem_ptr (unsigned long p)
-{
-	struct page *page;
-	char * ptr;
-
-	page = mfn_to_page(p >> PAGE_SHIFT);
-	if (PageUncached(page))
-		ptr = (char *)p + __IA64_UNCACHED_OFFSET;
-	else
-		ptr = __va(p);
-
-	return ptr;
-}
-
-/*
- * Convert a virtual cached kernel memory pointer to an uncached pointer
- */
-static __inline__ char *
-xlate_dev_kmem_ptr (char * p)
-{
-	struct page *page;
-	char * ptr;
-
-	page = virt_to_page((unsigned long)p >> PAGE_SHIFT);
-	if (PageUncached(page))
-		ptr = (char *)__pa(p) + __IA64_UNCACHED_OFFSET;
-	else
-		ptr = p;
-
-	return ptr;
-}
-#endif
 
 #endif /* _ASM_IA64_UACCESS_H */
