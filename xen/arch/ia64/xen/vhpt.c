@@ -121,7 +121,8 @@ void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte, unsigned long 
 
 void vhpt_init(void)
 {
-	unsigned long vhpt_total_size, vhpt_alignment, vhpt_imva;
+	unsigned long vhpt_total_size, vhpt_alignment;
+	struct page_info *page;
 #if !VHPT_ENABLED
 	return;
 #endif
@@ -134,12 +135,13 @@ void vhpt_init(void)
 	 * from domain heap when each domain is created. Assume xen buddy
 	 * allocator can provide natural aligned page by order?
 	 */
-	vhpt_imva = alloc_xenheap_pages(VHPT_SIZE_LOG2 - PAGE_SHIFT);
-	if (!vhpt_imva) {
+//	vhpt_imva = alloc_xenheap_pages(VHPT_SIZE_LOG2 - PAGE_SHIFT);
+	page = alloc_domheap_pages(NULL, VHPT_SIZE_LOG2 - PAGE_SHIFT, 0);
+	if (!page) {
 		printf("vhpt_init: can't allocate VHPT!\n");
 		while(1);
 	}
-	vhpt_paddr = __pa(vhpt_imva);
+	vhpt_paddr = page_to_maddr(page);
 	vhpt_pend = vhpt_paddr + vhpt_total_size - 1;
 	printf("vhpt_init: vhpt paddr=%p, end=%p\n",vhpt_paddr,vhpt_pend);
 	vhpt_pte = pte_val(pfn_pte(vhpt_paddr >> PAGE_SHIFT, PAGE_KERNEL));
