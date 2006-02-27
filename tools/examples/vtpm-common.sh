@@ -17,21 +17,8 @@
 #
 
 dir=$(dirname "$0")
-. "$dir/xen-hotplug-common.sh"
-
-findCommand "$@"
-if [ "$command" != "online" ]  &&
-   [ "$command" != "offline" ] &&
-   [ "$command" != "add" ]     &&
-   [ "$command" != "remove" ]
-then
-	log err "Invalid command: $command"
-	exit 1
-fi
-
-
-XENBUS_PATH="${XENBUS_PATH:?}"
-
+. "$dir/logging.sh"
+. "$dir/locking.sh"
 
 VTPMDB="/etc/xen/vtpm.db"
 
@@ -58,7 +45,11 @@ if [ -z "$VTPM_IMPL_DEFINED" ]; then
 	function vtpm_resume() {
 		true
 	}
+	function vtpm_delete() {
+		true
+	}
 fi
+
 
 #Find the instance number for the vtpm given the name of the domain
 # Parameters
@@ -66,7 +57,7 @@ fi
 # Return value
 #  Returns '0' if instance number could not be found, otherwise
 #  it returns the instance number in the variable 'instance'
-function find_instance () {
+function vtpmdb_find_instance () {
 	local vmname=$1
 	local ret=0
 	instance=`cat $VTPMDB |                    \
@@ -80,18 +71,17 @@ function find_instance () {
 	             }                             \
 	           }'`
 	if [ "$instance" != "" ]; then
-		ret=1
+		ret=$instance
 	fi
-	return $ret
+	echo "$ret"
 }
 
 
 # Check whether a particular instance number is still available
-# returns '1' if it is available
-function is_free_instancenum () {
+# returns "0" if it is not available, "1" otherwise.
+function vtpmdb_is_free_instancenum () {
 	local instance=$1
 	local avail=1
-
 	#Allowed instance number range: 1-255
 	if [ $instance -eq 0 -o $instance -gt 255 ]; then
 		avail=0
@@ -110,13 +100,13 @@ function is_free_instancenum () {
 			fi
 		done
 	fi
-	return $avail
+	echo "$avail"
 }
 
 
 # Get an available instance number given the database
 # Returns an unused instance number
-function get_free_instancenum () {
+function vtpmdb_get_free_instancenum () {
 	local ctr
 	local instances
 	local don
@@ -145,12 +135,12 @@ function get_free_instancenum () {
 		fi
 		let ctr=ctr+1
 	done
-	let instance=$ctr
+	echo "$ctr"
 }
 
 
 # Add a domain name and instance number to the DB file
-function add_instance () {
+function vtpmdb_add_instance () {
 	local vmname=$1
 	local inst=$2
 
@@ -159,8 +149,8 @@ function add_instance () {
 		echo "#1st column: domain name" >> $VTPMDB
 		echo "#2nd column: TPM instance number" >> $VTPMDB
 	fi
-	validate_entry $vmname $inst
-	if [ $? -eq 0 ]; then
+	res=$(vtpmdb_validate_entry $vmname $inst)
+	if [ $res -eq 0 ]; then
 		echo "$vmname $inst" >> $VTPMDB
 	fi
 }
@@ -168,11 +158,10 @@ function add_instance () {
 
 #Validate whether an entry is the same as passed to this
 #function
-function validate_entry () {
+function vtpmdb_validate_entry () {
 	local rc=0
 	local vmname=$1
 	local inst=$2
-	local res
 
 	res=`cat $VTPMDB |             \
 	     gawk -vvmname=$vmname     \
@@ -197,13 +186,15 @@ function validate_entry () {
 	elif [ "$res" == "2" ]; then
 		let rc=2
 	fi
-	return $rc
+	echo "$rc"
 }
 
 
 #Remove an entry from the vTPM database given its domain name
-function remove_entry () {
+#and instance number
+function vtpmdb_remove_entry () {
 	local vmname=$1
+	local instance=$2
 	local VTPMDB_TMP="$VTPMDB".tmp
 	`cat $VTPMDB |             \
 	 gawk -vvmname=$vmname     \
@@ -214,6 +205,7 @@ function remove_entry () {
 	 '} > $VTPMDB_TMP`
 	if [ -e $VTPMDB_TMP ]; then
 		mv -f $VTPMDB_TMP $VTPMDB
+		vtpm_delete $instance
 	else
 		log err "Error creating temporary file '$VTPMDB_TMP'."
 	fi
@@ -222,7 +214,7 @@ function remove_entry () {
 
 # Find the reason for the creation of this device:
 # Set global REASON variable to 'resume' or 'create'
-function get_create_reason () {
+function vtpm_get_create_reason () {
 	local resume=$(xenstore-read $XENBUS_PATH/resume)
 	if [ "$resume" == "True" ]; then
 		REASON="resume"
@@ -231,32 +223,30 @@ function get_create_reason () {
 	fi
 }
 
+
 #Create a vTPM instance
 # If no entry in the TPM database is found, the instance is
 # created and an entry added to the database.
 function vtpm_create_instance () {
 	local domname=$(xenstore_read "$XENBUS_PATH"/domain)
 	local res
-	set +e
-	get_create_reason
+	local instance
+	vtpm_get_create_reason
 
 	claim_lock vtpmdb
-
-	find_instance $domname
-	res=$?
-	if [ $res -eq 0 ]; then
+	instance=$(vtpmdb_find_instance $domname)
+	if [ "$instance" == "0" ]; then
 		#Try to give the preferred instance to the domain
 		instance=$(xenstore_read "$XENBUS_PATH"/pref_instance)
 		if [ "$instance" != "" ]; then
-			is_free_instancenum $instance
-			res=$?
+			res=$(vtpmdb_is_free_instancenum $instance)
 			if [ $res -eq 0 ]; then
-				get_free_instancenum
+				instance=$(vtpmdb_get_free_instancenum)
 			fi
 		else
-			get_free_instancenum
+			instance=$(vtpmdb_get_free_instancenum)
 		fi
-		add_instance $domname $instance
+		vtpmdb_add_instance $domname $instance
 		if [ "$REASON" == "create" ]; then
 			vtpm_create $instance
 		elif [ "$REASON" == "resume" ]; then
@@ -279,25 +269,40 @@ function vtpm_create_instance () {
 		true
 	fi
 	xenstore_write $XENBUS_PATH/instance $instance
-	set -e
 }
 
 
-#Remove an instance
+#Remove an instance when a VM is terminating or suspending.
+#Since it is assumed that the VM will appear again, the
+#entry is kept in the VTPMDB file.
 function vtpm_remove_instance () {
 	local domname=$(xenstore_read "$XENBUS_PATH"/domain)
-	set +e
-	find_instance $domname
-	res=$?
-	if [ $res -eq 0 ]; then
-		#Something is really wrong with the DB
-		log err "vTPM DB file $VTPMDB has no entry for '$domname'"
-	else
+
+	claim_lock vtpmdb
+
+	instance=$(vtpmdb_find_instance $domname)
+
+	if [ "$instance" != "0" ]; then
 		if [ "$REASON" == "suspend" ]; then
 			vtpm_suspend $instance
 		fi
 	fi
-	set -e
+
+	release_lock vtpmdb
 }
 
 
+#Remove an entry in the VTPMDB file given the domain's name
+#1st parameter: The name of the domain
+function vtpm_delete_instance () {
+	local rc
+
+	claim_lock vtpmdb
+
+	instance=$(vtpmdb_find_instance $1)
+	if [ "$instance" != "0" ]; then
+		vtpmdb_remove_entry $1 $instance
+	fi
+
+	release_lock vtpmdb
+}
