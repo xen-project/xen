@@ -139,6 +139,8 @@ extern int page_is_ram(unsigned long pagenr);
 	((current->personality & READ_IMPLIES_EXEC) ? VM_EXEC : 0 ) | \
 		 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
 
+#define __HAVE_ARCH_GATE_AREA 1
+
 #endif /* __KERNEL__ */
 
 #include <asm-generic/page.h>
