@@ -1570,42 +1570,68 @@ int new_guest_cr3(unsigned long mfn)
     unsigned long old_base_mfn;
 
     if ( shadow_mode_refcounts(d) )
-        okay = get_page_from_pagenr(mfn, d);
-    else
-        okay = get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d);
-
-    if ( likely(okay) )
     {
-        invalidate_shadow_ldt(v);
-
-        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-        v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
-        update_pagetables(v); /* update shadow_table and monitor_table */
-
-        write_ptbase(v);
-
-        if ( shadow_mode_refcounts(d) )
-            put_page(mfn_to_page(old_base_mfn));
-        else
-            put_page_and_type(mfn_to_page(old_base_mfn));
-
-        /* CR3 also holds a ref to its shadow... */
-        if ( shadow_mode_enabled(d) )
+        okay = get_page_from_pagenr(mfn, d);
+        if ( unlikely(!okay) )
         {
-            if ( v->arch.monitor_shadow_ref )
-                put_shadow_ref(v->arch.monitor_shadow_ref);
-            v->arch.monitor_shadow_ref =
-                pagetable_get_pfn(v->arch.monitor_table);
-            ASSERT(!page_get_owner(mfn_to_page(v->arch.monitor_shadow_ref)));
-            get_shadow_ref(v->arch.monitor_shadow_ref);
+            MEM_LOG("Error while installing new baseptr %lx", mfn);
+            return 0;
         }
     }
     else
     {
-        MEM_LOG("Error while installing new baseptr %lx", mfn);
+        okay = get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d);
+        if ( unlikely(!okay) )
+        {
+            /* Switch to idle pagetable: this VCPU has no active p.t. now. */
+            old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+            v->arch.guest_table = mk_pagetable(0);
+            update_pagetables(v);
+            write_cr3(__pa(idle_pg_table));
+            if ( old_base_mfn != 0 )
+                put_page_and_type(mfn_to_page(old_base_mfn));
+
+            /* Retry the validation with no active p.t. for this VCPU. */
+            okay = get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d);
+            if ( !okay )
+            {
+                /* Failure here is unrecoverable: the VCPU has no pagetable! */
+                MEM_LOG("Fatal error while installing new baseptr %lx", mfn);
+                domain_crash(d);
+                percpu_info[v->processor].deferred_ops = 0;
+                return 0;
+            }
+        }
     }
 
-    return okay;
+    invalidate_shadow_ldt(v);
+
+    old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+    v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+    update_pagetables(v); /* update shadow_table and monitor_table */
+
+    write_ptbase(v);
+
+    if ( likely(old_base_mfn != 0) )
+    {
+        if ( shadow_mode_refcounts(d) )
+            put_page(mfn_to_page(old_base_mfn));
+        else
+            put_page_and_type(mfn_to_page(old_base_mfn));
+    }
+
+    /* CR3 also holds a ref to its shadow... */
+    if ( shadow_mode_enabled(d) )
+    {
+        if ( v->arch.monitor_shadow_ref )
+            put_shadow_ref(v->arch.monitor_shadow_ref);
+        v->arch.monitor_shadow_ref =
+            pagetable_get_pfn(v->arch.monitor_table);
+        ASSERT(!page_get_owner(mfn_to_page(v->arch.monitor_shadow_ref)));
+        get_shadow_ref(v->arch.monitor_shadow_ref);
+    }
+
+    return 1;
 }
 
 static void process_deferred_ops(unsigned int cpu)
@@ -1625,7 +1651,7 @@ static void process_deferred_ops(unsigned int cpu)
         else
             local_flush_tlb();
     }
-        
+
     if ( deferred_ops & DOP_RELOAD_LDT )
         (void)map_ldt_shadow_page(0);
 
