@@ -22,6 +22,7 @@
 import sys;
 import os;
 import atexit;
+import random;
 
 from Test import *
 from Xm import *
@@ -53,12 +54,22 @@ class XmNetwork:
         if rc == 0:
             SKIP("Zeroconf address found: " + out)
 
+        # Randomize one octet of the IP addresses we choose, so that
+        # multiple machines running network tests don't interfere 
+        # with each other. 
+        self.subnet = random.randint(1,254)
+
     def calc_ip_address(self, dom, interface):
         # Generate an IP address from the dom# and eth#:
-        #      169.254.(eth#+153).(dom#+10)
+        #      169.254.(self.subnet).(eth#)*16 + (dom# + 1)
         ethnum = int(interface[len("eth"):])
+        if (ethnum > 15):
+            raise NetworkError("ethnum > 15 : " + interface)
         domnum = int(dom[len("dom"):])
-        return "169.254."+ str(ethnum+153) + "." + str(domnum+10)
+        if (domnum > 14):
+            raise NetworkError("domnum > 14 : " + dom)
+
+        return "169.254."+ str(self.subnet) + "." + str(ethnum*16+domnum+1)
 
     def ip(self, dom, interface, todomname=None, toeth=None, bridge=None):
         newip = self.calc_ip_address(dom, interface)
@@ -96,4 +107,4 @@ class XmNetwork:
         return newip
 
     def mask(self, dom, interface):
-        return "255.255.255.0"
+        return "255.255.255.240"
