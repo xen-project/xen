@@ -793,6 +793,17 @@ int construct_dom0(struct domain *d,
         update_pagetables(v);
     }
 
+    if ( supervisor_mode_kernel )
+    {
+        v->arch.guest_context.kernel_ss &= ~3;
+        v->arch.guest_context.user_regs.ss &= ~3;
+        v->arch.guest_context.user_regs.es &= ~3;
+        v->arch.guest_context.user_regs.ds &= ~3;
+        v->arch.guest_context.user_regs.fs &= ~3;
+        v->arch.guest_context.user_regs.gs &= ~3;
+        printk("Dom0 runs in ring 0 (supervisor mode)\n");
+    }
+
     rc = 0;
 
     /* DOM0 is permitted full I/O capabilities. */

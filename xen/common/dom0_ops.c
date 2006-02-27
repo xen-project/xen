@@ -170,6 +170,13 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
         cpumask_t      cpu_exclude_map;
         static domid_t rover = 0;
 
+        /*
+         * Running the domain 0 kernel in ring 0 is not compatible
+         * with multiple guests.
+         */
+        if ( supervisor_mode_kernel )
+            return -EINVAL;
+
         dom = op->u.createdomain.domain;
         if ( (dom > 0) && (dom < DOMID_FIRST_RESERVED) )
         {

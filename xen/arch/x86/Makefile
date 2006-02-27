@@ -33,6 +33,10 @@ ifeq ($(TARGET_SUBARCH),x86_32)
  endif
 endif
 
+ifneq ($(supervisor_mode_kernel),y)
+OBJS := $(subst x86_32/supervisor_mode_kernel.o,,$(OBJS))
+endif
+
 OBJS := $(subst $(TARGET_SUBARCH)/asm-offsets.o,,$(OBJS))
 OBJS := $(subst $(TARGET_SUBARCH)/xen.lds.o,,$(OBJS))
 

@@ -72,6 +72,13 @@ void __dummy__(void)
     DEFINE(_VCPUF_nmi_masked, _VCPUF_nmi_masked);
     BLANK();
 
+    OFFSET(TSS_ss0, struct tss_struct, ss0);
+    OFFSET(TSS_esp0, struct tss_struct, esp0);
+    OFFSET(TSS_ss1, struct tss_struct, ss1);
+    OFFSET(TSS_esp1, struct tss_struct, esp1);
+    DEFINE(TSS_sizeof, sizeof(struct tss_struct));
+    BLANK();
+
     OFFSET(VCPU_svm_vmcb_pa, struct vcpu, arch.hvm_svm.vmcb_pa);
     OFFSET(VCPU_svm_hsa_pa,  struct vcpu, arch.hvm_svm.host_save_pa);
     OFFSET(VCPU_svm_vmcb, struct vcpu, arch.hvm_svm.vmcb);

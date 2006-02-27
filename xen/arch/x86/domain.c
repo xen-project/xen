@@ -351,17 +351,17 @@ int arch_set_info_guest(
 
     if ( !(c->flags & VGCF_HVM_GUEST) )
     {
-        fixup_guest_selector(c->user_regs.ss);
-        fixup_guest_selector(c->kernel_ss);
-        fixup_guest_selector(c->user_regs.cs);
+        fixup_guest_stack_selector(c->user_regs.ss);
+        fixup_guest_stack_selector(c->kernel_ss);
+        fixup_guest_code_selector(c->user_regs.cs);
 
 #ifdef __i386__
-        fixup_guest_selector(c->event_callback_cs);
-        fixup_guest_selector(c->failsafe_callback_cs);
+        fixup_guest_code_selector(c->event_callback_cs);
+        fixup_guest_code_selector(c->failsafe_callback_cs);
 #endif
 
         for ( i = 0; i < 256; i++ )
-            fixup_guest_selector(c->trap_ctxt[i].cs);
+            fixup_guest_code_selector(c->trap_ctxt[i].cs);
     }
     else if ( !hvm_enabled )
       return -EINVAL;
@@ -847,7 +847,11 @@ unsigned long __hypercall_create_continuation(
         regs       = guest_cpu_user_regs();
 #if defined(__i386__)
         regs->eax  = op;
-        regs->eip -= 2;  /* re-execute 'int 0x82' */
+
+        if ( supervisor_mode_kernel )
+            regs->eip &= ~31; /* re-execute entire hypercall entry stub */
+        else
+            regs->eip -= 2;   /* re-execute 'int 0x82' */
 
         for ( i = 0; i < nr_args; i++ )
         {

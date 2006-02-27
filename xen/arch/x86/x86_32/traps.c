@@ -256,8 +256,14 @@ void init_int80_direct_trap(struct vcpu *v)
      * We can't virtualise interrupt gates, as there's no way to get
      * the CPU to automatically clear the events_mask variable. Also we
      * must ensure that the CS is safe to poke into an interrupt gate.
+     *
+     * When running with supervisor_mode_kernel enabled a direct trap
+     * to the guest OS cannot be used because the INT instruction will
+     * switch to the Xen stack and we need to swap back to the guest
+     * kernel stack before passing control to the system call entry point.
      */
-    if ( TI_GET_IF(ti) || !guest_gate_selector_okay(ti->cs) )
+    if ( TI_GET_IF(ti) || !guest_gate_selector_okay(ti->cs) ||
+         supervisor_mode_kernel )
     {
         v->arch.int80_desc.a = v->arch.int80_desc.b = 0;
         return;
@@ -278,8 +284,8 @@ long do_set_callbacks(unsigned long event_selector,
 {
     struct vcpu *d = current;
 
-    fixup_guest_selector(event_selector);
-    fixup_guest_selector(failsafe_selector);
+    fixup_guest_code_selector(event_selector);
+    fixup_guest_code_selector(failsafe_selector);
 
     d->arch.guest_context.event_callback_cs     = event_selector;
     d->arch.guest_context.event_callback_eip    = event_address;
@@ -289,12 +295,51 @@ long do_set_callbacks(unsigned long event_selector,
     return 0;
 }
 
-void hypercall_page_initialise(void *hypercall_page)
+static void hypercall_page_initialise_ring0_kernel(void *hypercall_page)
+{
+    extern asmlinkage int hypercall(void);
+    char *p;
+    int i;
+
+    /* Fill in all the transfer points with template machine code. */
+
+    for ( i = 0; i < NR_hypercalls; i++ )
+    {
+        p = (char *)(hypercall_page + (i * 32));
+
+        *(u8  *)(p+ 0) = 0x9c;      /* pushf */
+        *(u8  *)(p+ 1) = 0xfa;      /* cli */
+        *(u8  *)(p+ 2) = 0xb8;      /* mov $<i>,%eax */
+        *(u32 *)(p+ 3) = i;
+        *(u8  *)(p+ 7) = 0x9a;      /* lcall $__HYPERVISOR_CS,&hypercall */
+        *(u32 *)(p+ 8) = (u32)&hypercall;
+        *(u16 *)(p+12) = (u16)__HYPERVISOR_CS;
+        *(u8  *)(p+14) = 0xc3;      /* ret */
+    }
+
+    /*
+     * HYPERVISOR_iret is special because it doesn't return and expects a
+     * special stack frame. Guests jump at this transfer point instead of
+     * calling it.
+     */
+    p = (char *)(hypercall_page + (__HYPERVISOR_iret * 32));
+    *(u8  *)(p+ 0) = 0x50;      /* push %eax */
+    *(u8  *)(p+ 1) = 0x9c;      /* pushf */
+    *(u8  *)(p+ 2) = 0xfa;      /* cli */
+    *(u8  *)(p+ 3) = 0xb8;      /* mov $<i>,%eax */
+    *(u32 *)(p+ 4) = __HYPERVISOR_iret;
+    *(u8  *)(p+ 8) = 0x9a;      /* lcall $__HYPERVISOR_CS,&hypercall */
+    *(u32 *)(p+ 9) = (u32)&hypercall;
+    *(u16 *)(p+13) = (u16)__HYPERVISOR_CS;
+}
+
+static void hypercall_page_initialise_ring1_kernel(void *hypercall_page)
 {
     char *p;
     int i;
 
     /* Fill in all the transfer points with template machine code. */
+
     for ( i = 0; i < (PAGE_SIZE / 32); i++ )
     {
         p = (char *)(hypercall_page + (i * 32));
@@ -314,6 +359,14 @@ void hypercall_page_initialise(void *hypercall_page)
     *(u8  *)(p+ 1) = 0xb8;    /* mov  $__HYPERVISOR_iret,%eax */
     *(u32 *)(p+ 2) = __HYPERVISOR_iret;
     *(u16 *)(p+ 6) = 0x82cd;  /* int  $0x82 */
+}
+
+void hypercall_page_initialise(void *hypercall_page)
+{
+    if ( supervisor_mode_kernel )
+        hypercall_page_initialise_ring0_kernel(hypercall_page);
+    else
+        hypercall_page_initialise_ring1_kernel(hypercall_page);
 }
 
 /*

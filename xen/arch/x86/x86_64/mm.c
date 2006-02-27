@@ -228,7 +228,7 @@ long subarch_memory_op(int op, void *arg)
 
 long do_stack_switch(unsigned long ss, unsigned long esp)
 {
-    fixup_guest_selector(ss);
+    fixup_guest_stack_selector(ss);
     current->arch.guest_context.kernel_ss = ss;
     current->arch.guest_context.kernel_sp = esp;
     return 0;
@@ -315,7 +315,7 @@ int check_descriptor(struct desc_struct *d)
 
     /* Validate and fix up the target code selector. */
     cs = a >> 16;
-    fixup_guest_selector(cs);
+    fixup_guest_code_selector(cs);
     if ( !guest_gate_selector_okay(cs) )
         goto bad;
     a = d->a = (d->a & 0xffffU) | (cs << 16);

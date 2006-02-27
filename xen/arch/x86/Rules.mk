@@ -6,6 +6,7 @@
 # 'make clean' before rebuilding.
 #
 pae ?= n
+supervisor_mode_kernel ?= n
 
 CFLAGS  += -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
 CFLAGS  += -iwithprefix include -Wall -Werror -Wno-pointer-arith -pipe
@@ -31,6 +32,9 @@ LDFLAGS += -m elf_i386
 ifeq ($(pae),y)
 CFLAGS  += -DCONFIG_X86_PAE=1
 endif
+endif
+ifeq ($(supervisor_mode_kernel),y)
+CFLAGS  += -DCONFIG_X86_SUPERVISOR_MODE_KERNEL=1
 endif
 
 ifeq ($(TARGET_SUBARCH),x86_64)

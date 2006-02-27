@@ -27,9 +27,22 @@
 #endif
 
 /* Fix up the RPL of a guest segment selector. */
-#define fixup_guest_selector(sel)                               \
+#define __fixup_guest_selector(sel)                             \
     ((sel) = (((sel) & 3) >= GUEST_KERNEL_RPL) ? (sel) :        \
      (((sel) & ~3) | GUEST_KERNEL_RPL))
+
+/* Stack selectors don't need fixing up if the kernel runs in ring 0. */
+#ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
+#define fixup_guest_stack_selector(ss) ((void)0)
+#else
+#define fixup_guest_stack_selector(ss) __fixup_guest_selector(ss)
+#endif
+
+/*
+ * Code selectors are always fixed up. It allows the Xen exit stub to detect
+ * return to guest context, even when the guest kernel runs in ring 0.
+ */
+#define fixup_guest_code_selector(cs)  __fixup_guest_selector(cs)
 
 /*
  * We need this function because enforcing the correct guest kernel RPL is

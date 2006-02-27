@@ -180,6 +180,15 @@ void subarch_init_memory(struct domain *dom_xen)
             page_set_owner(page, dom_xen);
         }
     }
+
+    if ( supervisor_mode_kernel )
+    {
+        /* Guest kernel runs in ring 0, not ring 1. */
+        struct desc_struct *d;
+        d = &gdt_table[(FLAT_RING1_CS >> 3) - FIRST_RESERVED_GDT_ENTRY];
+        d[0].b &= ~_SEGMENT_DPL;
+        d[1].b &= ~_SEGMENT_DPL;
+    }
 }
 
 long subarch_memory_op(int op, void *arg)
@@ -223,7 +232,7 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
     int nr = smp_processor_id();
     struct tss_struct *t = &init_tss[nr];
 
-    fixup_guest_selector(ss);
+    fixup_guest_stack_selector(ss);
 
     current->arch.guest_context.kernel_ss = ss;
     current->arch.guest_context.kernel_sp = esp;
@@ -239,6 +248,10 @@ int check_descriptor(struct desc_struct *d)
     unsigned long base, limit;
     u32 a = d->a, b = d->b;
     u16 cs;
+
+    /* Let a ring0 guest kernel set any descriptor it wants to. */
+    if ( supervisor_mode_kernel )
+        return 1;
 
     /* A not-present descriptor will always fault, so is safe. */
     if ( !(b & _SEGMENT_P) ) 
@@ -273,7 +286,7 @@ int check_descriptor(struct desc_struct *d)
 
         /* Validate and fix up the target code selector. */
         cs = a >> 16;
-        fixup_guest_selector(cs);
+        fixup_guest_code_selector(cs);
         if ( !guest_gate_selector_okay(cs) )
             goto bad;
         a = d->a = (d->a & 0xffffU) | (cs << 16);
