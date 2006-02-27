@@ -46,6 +46,7 @@
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx_vpd.h>
 #include <asm/pal.h>
+#include <asm/vhpt.h>
 #include <public/hvm/ioreq.h>
 
 #define CONFIG_DOMAIN0_CONTIGUOUS
@@ -399,7 +400,6 @@ struct page * assign_new_domain_page(struct domain *d, unsigned long mpaddr)
 	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
-extern unsigned long vhpt_paddr, vhpt_pend;
 
 	if (!mm->pgd) {
 		printk("assign_new_domain_page: domain pgd must exist!\n");
@@ -433,9 +433,11 @@ extern unsigned long vhpt_paddr, vhpt_pend;
 printf("assign_new_domain_page: Can't alloc!!!! Aaaargh!\n");
 			return(p);
 		}
-if (unlikely(page_to_maddr(p) > vhpt_paddr && page_to_maddr(p) < vhpt_pend)) {
-  printf("assign_new_domain_page: reassigned vhpt page %p!!\n",page_to_maddr(p));
-}
+		if (unlikely(page_to_maddr(p) > __get_cpu_var(vhpt_paddr)
+			     && page_to_maddr(p) < __get_cpu_var(vhpt_pend))) {
+		  printf("assign_new_domain_page: reassigned vhpt page %p!!\n",
+			 page_to_maddr(p));
+		}
 		set_pte(pte, pfn_pte(page_to_maddr(p) >> PAGE_SHIFT,
 			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
 	}

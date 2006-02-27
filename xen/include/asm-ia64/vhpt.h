@@ -121,6 +121,11 @@ extern void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte,
 extern void vhpt_insert (unsigned long vadr, unsigned long ptr,
 			 unsigned logps);
 extern void vhpt_flush(void);
+
+/* Currently the VHPT is allocated per CPU.  */
+DECLARE_PER_CPU (unsigned long, vhpt_paddr);
+DECLARE_PER_CPU (unsigned long, vhpt_pend);
+
 #endif /* !__ASSEMBLY */
 
 #if !VHPT_ENABLED

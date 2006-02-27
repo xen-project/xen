@@ -15,7 +15,8 @@
 #include <asm/dma.h>
 #include <asm/vhpt.h>
 
-unsigned long vhpt_paddr, vhpt_pend, vhpt_pte;
+DEFINE_PER_CPU (unsigned long, vhpt_paddr);
+DEFINE_PER_CPU (unsigned long, vhpt_pend);
 
 void vhpt_flush(void)
 {
@@ -77,12 +78,12 @@ void vhpt_flush_address(unsigned long vadr, unsigned long addr_range)
 }
 #endif
 
-void vhpt_map(void)
+static void vhpt_map(unsigned long pte)
 {
 	unsigned long psr;
 
 	psr = ia64_clear_ic();
-	ia64_itr(0x2, IA64_TR_VHPT, VHPT_ADDR, vhpt_pte, VHPT_SIZE_LOG2);
+	ia64_itr(0x2, IA64_TR_VHPT, VHPT_ADDR, pte, VHPT_SIZE_LOG2);
 	ia64_set_psr(psr);
 	ia64_srlz_i();
 }
@@ -122,6 +123,7 @@ void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte, unsigned long 
 void vhpt_init(void)
 {
 	unsigned long vhpt_total_size, vhpt_alignment;
+	unsigned long paddr, pte;
 	struct page_info *page;
 #if !VHPT_ENABLED
 	return;
@@ -141,11 +143,13 @@ void vhpt_init(void)
 		printf("vhpt_init: can't allocate VHPT!\n");
 		while(1);
 	}
-	vhpt_paddr = page_to_maddr(page);
-	vhpt_pend = vhpt_paddr + vhpt_total_size - 1;
-	printf("vhpt_init: vhpt paddr=%p, end=%p\n",vhpt_paddr,vhpt_pend);
-	vhpt_pte = pte_val(pfn_pte(vhpt_paddr >> PAGE_SHIFT, PAGE_KERNEL));
-	vhpt_map();
+	paddr = page_to_maddr(page);
+	__get_cpu_var(vhpt_paddr) = paddr;
+	__get_cpu_var(vhpt_pend) = paddr + vhpt_total_size - 1;
+	printf("vhpt_init: vhpt paddr=%p, end=%p\n",
+	       paddr, __get_cpu_var(vhpt_pend));
+	pte = pte_val(pfn_pte(paddr >> PAGE_SHIFT, PAGE_KERNEL));
+	vhpt_map(pte);
 	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
 		VHPT_ENABLED);
 	vhpt_flush();
