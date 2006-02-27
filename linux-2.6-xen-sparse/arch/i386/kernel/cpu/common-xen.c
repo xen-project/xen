@@ -4,6 +4,7 @@
 #include <linux/smp.h>
 #include <linux/module.h>
 #include <linux/percpu.h>
+#include <linux/bootmem.h>
 #include <asm/semaphore.h>
 #include <asm/processor.h>
 #include <asm/i387.h>
@@ -18,6 +19,9 @@
 #include <asm/hypervisor.h>
 
 #include "cpu.h"
+
+DEFINE_PER_CPU(struct Xgt_desc_struct, cpu_gdt_descr);
+EXPORT_PER_CPU_SYMBOL(cpu_gdt_descr);
 
 #ifndef CONFIG_XEN
 DEFINE_PER_CPU(unsigned char, cpu_16bit_stack[CPU_16BIT_STACK_SIZE]);
@@ -598,6 +602,8 @@ void __cpuinit cpu_init(void)
 	struct tss_struct * t = &per_cpu(init_tss, cpu);
 #endif
 	struct thread_struct *thread = &current->thread;
+	struct desc_struct *gdt;
+	struct Xgt_desc_struct *cpu_gdt_descr = &per_cpu(cpu_gdt_descr, cpu);
 
 	if (cpu_test_and_set(cpu, cpu_initialized)) {
 		printk(KERN_WARNING "CPU#%d already initialized!\n", cpu);
@@ -614,7 +620,54 @@ void __cpuinit cpu_init(void)
 		set_in_cr4(X86_CR4_TSD);
 	}
 
-	cpu_gdt_init(&cpu_gdt_descr[cpu]);
+#ifndef CONFIG_XEN
+	/*
+	 * This is a horrible hack to allocate the GDT.  The problem
+	 * is that cpu_init() is called really early for the boot CPU
+	 * (and hence needs bootmem) but much later for the secondary
+	 * CPUs, when bootmem will have gone away
+	 */
+	if (NODE_DATA(0)->bdata->node_bootmem_map) {
+		gdt = (struct desc_struct *)alloc_bootmem_pages(PAGE_SIZE);
+		/* alloc_bootmem_pages panics on failure, so no check */
+		memset(gdt, 0, PAGE_SIZE);
+	} else {
+		gdt = (struct desc_struct *)get_zeroed_page(GFP_KERNEL);
+		if (unlikely(!gdt)) {
+			printk(KERN_CRIT "CPU%d failed to allocate GDT\n", cpu);
+			for (;;)
+				local_irq_enable();
+		}
+	}
+
+	/*
+	 * Initialize the per-CPU GDT with the boot GDT,
+	 * and set up the GDT descriptor:
+	 */
+ 	memcpy(gdt, cpu_gdt_table, GDT_SIZE);
+
+	/* Set up GDT entry for 16bit stack */
+ 	*(__u64 *)(&gdt[GDT_ENTRY_ESPFIX_SS]) |=
+		((((__u64)stk16_off) << 16) & 0x000000ffffff0000ULL) |
+		((((__u64)stk16_off) << 32) & 0xff00000000000000ULL) |
+		(CPU_16BIT_STACK_SIZE - 1);
+
+	cpu_gdt_descr->size = GDT_SIZE - 1;
+ 	cpu_gdt_descr->address = (unsigned long)gdt;
+#else
+	if (cpu == 0 && cpu_gdt_descr->address == 0) {
+		gdt = (struct desc_struct *)alloc_bootmem_pages(PAGE_SIZE);
+		/* alloc_bootmem_pages panics on failure, so no check */
+		memset(gdt, 0, PAGE_SIZE);
+
+		memcpy(gdt, cpu_gdt_table, GDT_SIZE);
+		
+		cpu_gdt_descr->size = GDT_SIZE;
+		cpu_gdt_descr->address = (unsigned long)gdt;
+	}
+#endif
+
+	cpu_gdt_init(cpu_gdt_descr);
 
 	/*
 	 * Set up and load the per-CPU TSS and LDT
