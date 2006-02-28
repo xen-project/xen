@@ -505,14 +505,12 @@ static void net_tx_action(unsigned long unused)
 			/* Still too big to send right now? Set a callback. */
 			if (txreq.size > netif->remaining_credit) {
 				netif->remaining_credit = 0;
-				netif->credit_timeout.expires  = 
-					next_credit;
 				netif->credit_timeout.data     =
 					(unsigned long)netif;
 				netif->credit_timeout.function =
 					tx_credit_callback;
-				add_timer_on(&netif->credit_timeout,
-					     smp_processor_id());
+				__mod_timer(&netif->credit_timeout,
+					    next_credit);
 				break;
 			}
 		}
