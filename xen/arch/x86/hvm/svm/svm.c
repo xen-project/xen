@@ -982,17 +982,23 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
                 !vlapic_global_enabled((VLAPIC(v))) )
             clear_bit(X86_FEATURE_APIC, &edx);
 	    
-#ifdef __x86_64__
+#if CONFIG_PAGING_LEVELS < 3
+        clear_bit(X86_FEATURE_PAE, &edx);
+        clear_bit(X86_FEATURE_PSE, &edx);
+        clear_bit(X86_FEATURE_PSE36, &edx);
+#else
         if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
-#endif
         {
+            if ( !v->domain->arch.hvm_domain.pae_enabled )
+                clear_bit(X86_FEATURE_PAE, &edx);
             clear_bit(X86_FEATURE_PSE, &edx);
-            clear_bit(X86_FEATURE_PAE, &edx);
             clear_bit(X86_FEATURE_PSE36, &edx);
         }
+#endif
 	
         /* Clear out reserved bits. */
         ecx &= ~SVM_VCPU_CPUID_L1_RESERVED; /* mask off reserved bits */
+        clear_bit(X86_FEATURE_MWAIT & 31, &ecx);
     }
 #ifdef __i386__
     else if ( input == 0x80000001 )
@@ -1462,7 +1468,7 @@ static int svm_set_cr0(unsigned long value)
 #endif
 
         /* Now arch.guest_table points to machine physical. */
-        v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+        v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
         update_pagetables(v);
 
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
@@ -1601,7 +1607,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             }
 
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-            v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+            v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
 
             if (old_base_mfn)
                 put_page(mfn_to_page(old_base_mfn));
