@@ -32,6 +32,7 @@
 #include <xen/softirq.h>
 #include <xen/shadow.h>
 #include <xen/domain_page.h>
+#include <xen/keyhandler.h>
 #include <asm/page.h>
 
 /*
@@ -660,6 +661,26 @@ unsigned long avail_domheap_pages(void)
 {
     return avail[MEMZONE_DOM] + avail[MEMZONE_DMADOM];
 }
+
+
+static void pagealloc_keyhandler(unsigned char key)
+{
+    printk("Physical memory information:\n");
+    printk("    Xen heap: %lukB free\n"
+           "    DMA heap: %lukB free\n"
+           "    Dom heap: %lukB free\n",
+           avail[MEMZONE_XEN]<<(PAGE_SHIFT-10),
+           avail[MEMZONE_DMADOM]<<(PAGE_SHIFT-10),
+           avail[MEMZONE_DOM]<<(PAGE_SHIFT-10));
+}
+
+
+static __init int pagealloc_keyhandler_init(void)
+{
+    register_keyhandler('m', pagealloc_keyhandler, "memory info");
+    return 0;
+}
+__initcall(pagealloc_keyhandler_init);
 
 
 
