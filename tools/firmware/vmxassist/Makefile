@@ -19,7 +19,7 @@
 #
 
 XEN_ROOT = ../../..
-include $(XEN_ROOT)/tools/Rules.mk
+include $(XEN_ROOT)/Config.mk
 
 # The emulator code lives in ROM space
 TEXTADDR=0x000D0000
@@ -27,11 +27,14 @@ TEXTADDR=0x000D0000
 DEFINES=-DDEBUG -DTEXTADDR=$(TEXTADDR)
 XENINC=-I$(XEN_ROOT)/tools/libxc
 
-LD       = ld
-CC       = gcc
+# Disable PIE/SSP if GCC supports them. They can break us.
+CFLAGS  += $(call test-gcc-flag,$(CC),-nopie)
+CFLAGS  += $(call test-gcc-flag,$(CC),-fno-stack-protector)
+CFLAGS  += $(call test-gcc-flag,$(CC),-fno-stack-protector-all)
+
 CPP      = cpp -P
 OBJCOPY  = objcopy -p -O binary -R .note -R .comment -R .bss -S --gap-fill=0
-CFLAGS   = $(DEFINES) -I. $(XENINC) -Wall -fno-builtin -O2 -msoft-float
+CFLAGS  += $(DEFINES) -I. $(XENINC) -Wall -fno-builtin -O2 -msoft-float
 CFLAGS  += -m32 -march=i686
 LDFLAGS  = -m elf_i386
 

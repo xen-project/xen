@@ -1,7 +1,8 @@
-XEN_ROOT=../../..
-include $(XEN_ROOT)/tools/Rules.mk
 include config.mak
 override TARGET_ARCH=i386
+
+XEN_ROOT=../../..
+include $(XEN_ROOT)/tools/Rules.mk
 
 INSTALL_DIR := $(DESTDIR)/usr/$(LIBDIR)/xen/bin
 TARGET_PATH=$(SRC_PATH)/target-$(TARGET_ARCH)
@@ -12,7 +13,7 @@ ifdef CONFIG_USER_ONLY
 VPATH+=:$(SRC_PATH)/linux-user
 DEFINES+=-I$(SRC_PATH)/linux-user -I$(SRC_PATH)/linux-user/$(TARGET_ARCH)
 endif
-CFLAGS=-Wall -O2 -g -fno-strict-aliasing
+CFLAGS+=-Wall -O2 -g -fno-strict-aliasing
 LDFLAGS=-g
 LIBS=
 HELPER_CFLAGS=$(CFLAGS)
