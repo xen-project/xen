@@ -68,7 +68,7 @@ config XEN_PCIDEV_BE_DEBUG
 	default n
 
 config XEN_BLKDEV_BACKEND
-	bool "Block-device backend driver"
+	tristate "Block-device backend driver"
 	default y
 	help
 	  The block-device backend driver allows the kernel to export its
@@ -76,7 +76,7 @@ config XEN_BLKDEV_BACKEND
 	  interface.
 
 config XEN_BLKDEV_TAP_BE
-        bool "Block Tap support for backend driver (DANGEROUS)"
+        tristate "Block Tap support for backend driver (DANGEROUS)"
         depends on XEN_BLKDEV_BACKEND
         default n
         help
@@ -145,7 +145,7 @@ config XEN_NETDEV_FRONTEND
 	  (domain 0), then you almost certainly want to say Y here.
 
 config XEN_BLKDEV_TAP
-	bool "Block device tap driver"
+	tristate "Block device tap driver"
 	default n
 	help
 	  This driver allows a VM to interact on block device channels

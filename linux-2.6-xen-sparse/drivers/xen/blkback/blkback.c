@@ -29,14 +29,10 @@
  * 64 should be enough to keep us competitive with Linux.
  */
 static int blkif_reqs = 64;
-static int mmap_pages;
+module_param_named(reqs, blkif_reqs, int, 0);
+MODULE_PARM_DESC(reqs, "Number of blkback requests to allocate");
 
-static int __init set_blkif_reqs(char *str)
-{
-	get_option(&str, &blkif_reqs);
-	return 1;
-}
-__setup("blkif_reqs=", set_blkif_reqs);
+static int mmap_pages;
 
 /* Run-time switchable: /sys/module/blkback/parameters/ */
 static unsigned int log_stats = 0;
@@ -574,10 +570,20 @@ static int __init blkif_init(void)
 		list_add_tail(&pending_reqs[i].free_list, &pending_free);
     
 	blkif_xenbus_init();
+	__unsafe(THIS_MODULE);
 	return 0;
 }
 
-__initcall(blkif_init);
+module_init(blkif_init);
+
+static void blkif_exit(void)
+{
+	BUG();
+}
+
+module_exit(blkif_exit);
+
+MODULE_LICENSE("Dual BSD/GPL");
 
 /*
  * Local variables:
