@@ -34,7 +34,6 @@ unsigned long mpt_table_size;
 void
 paging_init (void)
 {
-	struct page_info *pg;
 	unsigned int mpt_order;
 	/* Create machine to physical mapping table
 	 * NOTE: similar to frame table, later we may need virtually
@@ -61,7 +60,7 @@ paging_init (void)
 #define FT_ALIGN_SIZE	(16UL << 20)
 void __init init_frametable(void)
 {
-	unsigned long i, pfn;
+	unsigned long pfn;
 	frame_table_size = max_page * sizeof(struct page_info);
 	frame_table_size = (frame_table_size + PAGE_SIZE - 1) & PAGE_MASK;
 

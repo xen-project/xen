@@ -33,8 +33,14 @@
 #include <xen/multicall.h>
 #include <asm/debugger.h>
 
-extern unsigned long vcpu_get_itir_on_fault(struct vcpu *, UINT64);
 extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
+/* FIXME: where these declarations shold be there ? */
+extern void load_region_regs(struct vcpu *);
+extern void panic_domain(struct pt_regs *, const char *, ...);
+extern long platform_is_hp_ski(void);
+extern int ia64_hyperprivop(unsigned long, REGS *);
+extern int ia64_hypercall(struct pt_regs *regs);
+extern void vmx_do_launch(struct vcpu *);
 
 extern unsigned long dom0_start, dom0_size;
 
@@ -98,14 +104,17 @@ unsigned long translate_domain_pte(unsigned long pteval,
 	mpaddr = ((pteval & _PAGE_PPN_MASK) & ~mask) | (address & mask);
 	if (d == dom0) {
 		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
-			//printk("translate_domain_pte: out-of-bounds dom0 mpaddr %p! itc=%lx...\n",mpaddr,ia64_get_itc());
+			/*
+			printk("translate_domain_pte: out-of-bounds dom0 mpaddr 0x%lx! itc=%lx...\n",
+				mpaddr, ia64_get_itc());
+			*/
 			tdpfoo();
 		}
 	}
 	else if ((mpaddr >> PAGE_SHIFT) > d->max_pages) {
 		if ((mpaddr & ~0x1fffL ) != (1L << 40))
-		printf("translate_domain_pte: bad mpa=%p (> %p),vadr=%p,pteval=%p,itir=%p\n",
-			mpaddr,d->max_pages<<PAGE_SHIFT,address,pteval,itir);
+		printf("translate_domain_pte: bad mpa=0x%lx (> 0x%lx),vadr=0x%lx,pteval=0x%lx,itir=0x%lx\n",
+			mpaddr, (unsigned long) d->max_pages<<PAGE_SHIFT, address, pteval, itir);
 		tdpfoo();
 	}
 	pteval2 = lookup_domain_mpa(d,mpaddr);
@@ -123,7 +132,8 @@ unsigned long translate_domain_mpaddr(unsigned long mpaddr)
 
 	if (current->domain == dom0) {
 		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
-			printk("translate_domain_mpaddr: out-of-bounds dom0 mpaddr %p! continuing...\n",mpaddr);
+			printk("translate_domain_mpaddr: out-of-bounds dom0 mpaddr 0x%lx! continuing...\n",
+				mpaddr);
 			tdpfoo();
 		}
 	}
@@ -150,7 +160,7 @@ int dump_reflect_counts(char *buf)
 
 	s += sprintf(s,"Slow reflections by vector:\n");
 	for (i = 0, j = 0; i < 0x80; i++) {
-		if (cnt = slow_reflect_count[i]) {
+		if ( (cnt = slow_reflect_count[i]) != 0 ) {
 			s += sprintf(s,"0x%02x00:%10d, ",i,cnt);
 			if ((j++ & 3) == 3) s += sprintf(s,"\n");
 		}
@@ -158,7 +168,7 @@ int dump_reflect_counts(char *buf)
 	if (j & 3) s += sprintf(s,"\n");
 	s += sprintf(s,"Fast reflections by vector:\n");
 	for (i = 0, j = 0; i < 0x80; i++) {
-		if (cnt = fast_reflect_count[i]) {
+		if ( (cnt = fast_reflect_count[i]) != 0 ) {
 			s += sprintf(s,"0x%02x00:%10d, ",i,cnt);
 			if ((j++ & 3) == 3) s += sprintf(s,"\n");
 		}
@@ -186,7 +196,6 @@ panic_domain(regs,"psr.ic off, delivering fault=%lx,ipsr=%p,iip=%p,ifa=%p,isr=%p
 
 void reflect_interruption(unsigned long isr, struct pt_regs *regs, unsigned long vector)
 {
-	unsigned long vcpu_get_ipsr_int_state(struct vcpu *,unsigned long);
 	struct vcpu *v = current;
 
 	if (!PSCB(v,interrupt_collection_enabled))
@@ -205,7 +214,7 @@ void reflect_interruption(unsigned long isr, struct pt_regs *regs, unsigned long
 #ifdef CONFIG_SMP
 #warning "SMP FIXME: sharedinfo doesn't handle smp yet, need page per vcpu"
 #endif
-	regs->r31 = &(((mapped_regs_t *)SHARED_ARCHINFO_ADDR)->ipsr);
+	regs->r31 = (unsigned long) &(((mapped_regs_t *)SHARED_ARCHINFO_ADDR)->ipsr);
 
 	PSCB(v,interrupt_delivery_enabled) = 0;
 	PSCB(v,interrupt_collection_enabled) = 0;
@@ -219,13 +228,13 @@ unsigned long pending_false_positive = 0;
 
 void reflect_extint(struct pt_regs *regs)
 {
-	extern unsigned long vcpu_verbose, privop_trace;
+//	extern unsigned long vcpu_verbose, privop_trace;
 	unsigned long isr = regs->cr_ipsr & IA64_PSR_RI;
 	struct vcpu *v = current;
-	static first_extint = 1;
+	static int first_extint = 1;
 
 	if (first_extint) {
-		printf("Delivering first extint to domain: isr=%p, iip=%p\n",isr,regs->cr_iip);
+		printf("Delivering first extint to domain: isr=0x%lx, iip=0x%lx\n", isr, regs->cr_iip);
 		//privop_trace = 1; vcpu_verbose = 1;
 		first_extint = 0;
 	}
@@ -297,11 +306,11 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 			// should never happen.  If it does, region 0 addr may
 			// indicate a bad xen pointer
 			printk("*** xen_handle_domain_access: exception table"
-			       " lookup failed, iip=%p, addr=%p, spinning...\n",
-				iip,address);
+			       " lookup failed, iip=0x%lx, addr=0x%lx, spinning...\n",
+				iip, address);
 			panic_domain(regs,"*** xen_handle_domain_access: exception table"
-			       " lookup failed, iip=%p, addr=%p, spinning...\n",
-				iip,address);
+			       " lookup failed, iip=0x%lx, addr=0x%lx, spinning...\n",
+				iip, address);
 		}
 		return;
 	}
@@ -329,9 +338,12 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 	    unsigned long arg6, unsigned long arg7, unsigned long stack)
 {
 	struct pt_regs *regs = (struct pt_regs *) &stack;
-	unsigned long code, error = isr;
-	char buf[128];
+	unsigned long code;
+#if 0
+	unsigned long error = isr;
 	int result, sig;
+#endif
+	char buf[128];
 	static const char *reason[] = {
 		"IA-64 Illegal Operation fault",
 		"IA-64 Privileged Operation fault",
@@ -543,7 +555,6 @@ do_ssc(unsigned long ssc, struct pt_regs *regs)
 /**/	static int last_fd, last_count;	// FIXME FIXME FIXME
 /**/					// BROKEN FOR MULTIPLE DOMAINS & SMP
 /**/	struct ssc_disk_stat { int fd; unsigned count;} *stat, last_stat;
-	extern unsigned long vcpu_verbose, privop_trace;
 
 	arg0 = vcpu_get_gr(current,32);
 	switch(ssc) {
@@ -588,11 +599,11 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 		arg3 = vcpu_get_gr(current,35);
 		if (arg2) {	// metaphysical address of descriptor
 			struct ssc_disk_req *req;
-			unsigned long mpaddr, paddr;
+			unsigned long mpaddr;
 			long len;
 
 			arg2 = translate_domain_mpaddr(arg2);
-			req = (struct disk_req *)__va(arg2);
+			req = (struct ssc_disk_req *) __va(arg2);
 			req->len &= 0xffffffffL;	// avoid strange bug
 			len = req->len;
 /**/			last_fd = arg1;
@@ -640,7 +651,8 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 		vcpu_set_gr(current,8,-1L,0);
 		break;
 	    default:
-		printf("ia64_handle_break: bad ssc code %lx, iip=%p, b0=%p... spinning\n",ssc,regs->cr_iip,regs->b0);
+		printf("ia64_handle_break: bad ssc code %lx, iip=0x%lx, b0=0x%lx... spinning\n",
+			ssc, regs->cr_iip, regs->b0);
 		while(1);
 		break;
 	}
@@ -696,9 +708,9 @@ void
 ia64_handle_privop (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long itir)
 {
 	IA64FAULT vector;
-	struct domain *d = current->domain;
 	struct vcpu *v = current;
-	vector = priv_emulate(current,regs,isr);
+
+	vector = priv_emulate(v,regs,isr);
 	if (vector != IA64_NO_FAULT && vector != IA64_RFI_IN_PROGRESS) {
 		// Note: if a path results in a vector to reflect that requires
 		// iha/itir (e.g. vcpu_force_data_miss), they must be set there
@@ -712,8 +724,7 @@ UINT64 int_counts[INTR_TYPE_MAX];
 void
 ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim, unsigned long vector)
 {
-	struct domain *d = (struct domain *) current->domain;
-	struct vcpu *v = (struct domain *) current;
+	struct vcpu *v = current;
 	unsigned long check_lazy_cover = 0;
 	unsigned long psr = regs->cr_ipsr;
 
@@ -753,7 +764,7 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		}
 #endif
 printf("*** NaT fault... attempting to handle as privop\n");
-printf("isr=%p, ifa=%p,iip=%p,ipsr=%p\n",isr,ifa,regs->cr_iip,psr);
+printf("isr=0x%lx, ifa=0x%lx, iip=0x%lx, ipsr=0x%lx\n", isr, ifa, regs->cr_iip, psr);
 		//regs->eml_unat = 0;  FIXME: DO WE NEED THIS???
 		// certain NaT faults are higher priority than privop faults
 		vector = priv_emulate(v,regs,isr);
@@ -800,8 +811,7 @@ unsigned long __hypercall_create_continuation(
 	unsigned int op, unsigned int nr_args, ...)
 {
     struct mc_state *mcs = &mc_state[smp_processor_id()];
-    VCPU *vcpu = current;
-    struct cpu_user_regs *regs = vcpu_regs(vcpu);
+    struct vcpu *v = current;
     unsigned int i;
     va_list args;
 
@@ -809,25 +819,25 @@ unsigned long __hypercall_create_continuation(
     if ( test_bit(_MCSF_in_multicall, &mcs->flags) ) {
 	panic("PREEMPT happen in multicall\n");	// Not support yet
     } else {
-	vcpu_set_gr(vcpu, 2, op, 0);
+	vcpu_set_gr(v, 2, op, 0);
 	for ( i = 0; i < nr_args; i++) {
 	    switch (i) {
-	    case 0: vcpu_set_gr(vcpu, 14, va_arg(args, unsigned long), 0);
+	    case 0: vcpu_set_gr(v, 14, va_arg(args, unsigned long), 0);
 		    break;
-	    case 1: vcpu_set_gr(vcpu, 15, va_arg(args, unsigned long), 0);
+	    case 1: vcpu_set_gr(v, 15, va_arg(args, unsigned long), 0);
 		    break;
-	    case 2: vcpu_set_gr(vcpu, 16, va_arg(args, unsigned long), 0);
+	    case 2: vcpu_set_gr(v, 16, va_arg(args, unsigned long), 0);
 		    break;
-	    case 3: vcpu_set_gr(vcpu, 17, va_arg(args, unsigned long), 0);
+	    case 3: vcpu_set_gr(v, 17, va_arg(args, unsigned long), 0);
 		    break;
-	    case 4: vcpu_set_gr(vcpu, 18, va_arg(args, unsigned long), 0);
+	    case 4: vcpu_set_gr(v, 18, va_arg(args, unsigned long), 0);
 		    break;
 	    default: panic("Too many args for hypercall continuation\n");
 		    break;
 	    }
 	}
     }
-    vcpu->arch.hypercall_continuation = 1;
+    v->arch.hypercall_continuation = 1;
     va_end(args);
     return op;
 }

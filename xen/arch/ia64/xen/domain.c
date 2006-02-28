@@ -45,6 +45,7 @@
 #include <asm/vmx.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx_vpd.h>
+#include <asm/vmx_phy_mode.h>
 #include <asm/pal.h>
 #include <asm/vhpt.h>
 #include <public/hvm/ioreq.h>
@@ -65,6 +66,15 @@ extern int readelfimage_base_and_size(char *, unsigned long,
 	              unsigned long *, unsigned long *, unsigned long *);
 
 extern unsigned long dom_fw_setup(struct domain *, char *, int);
+/* FIXME: where these declarations should be there ? */
+extern void domain_pend_keyboard_interrupt(int);
+extern long platform_is_hp_ski(void);
+extern unsigned long allocate_metaphysical_rr(void);
+extern int allocate_rid_range(struct domain *, unsigned long);
+extern void sync_split_caches(void);
+extern void init_all_rr(struct vcpu *);
+extern void serial_input_init(void);
+
 static void init_switch_stack(struct vcpu *v);
 
 /* this belongs in include/asm, but there doesn't seem to be a suitable place */
@@ -275,8 +285,6 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 {
 	struct pt_regs *regs = vcpu_regs (v);
 	struct domain *d = v->domain;
-	int i, rc, ret;
-	unsigned long progress = 0;
 
 	printf("arch_set_info_guest\n");
 	if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
@@ -304,7 +312,7 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
  	v->vcpu_info->arch.evtchn_vector = c->vcpu.evtchn_vector;
 	if ( c->vcpu.privregs && copy_from_user(v->arch.privregs,
 			   c->vcpu.privregs, sizeof(mapped_regs_t))) {
-	    printk("Bad ctxt address in arch_set_info_guest: 0x%lx\n", c->vcpu.privregs);
+	    printk("Bad ctxt address in arch_set_info_guest: %p\n", c->vcpu.privregs);
 	    return -EFAULT;
 	}
 
@@ -331,9 +339,7 @@ void new_thread(struct vcpu *v,
 {
 	struct domain *d = v->domain;
 	struct pt_regs *regs;
-	struct ia64_boot_param *bp;
 	extern char saved_command_line[];
-
 
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
 	if (d == dom0) start_pc += dom0_start;
@@ -384,8 +390,9 @@ void new_thread(struct vcpu *v,
 static struct page * assign_new_domain0_page(unsigned long mpaddr)
 {
 	if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
-		printk("assign_new_domain0_page: bad domain0 mpaddr %p!\n",mpaddr);
-printk("assign_new_domain0_page: start=%p,end=%p!\n",dom0_start,dom0_start+dom0_size);
+		printk("assign_new_domain0_page: bad domain0 mpaddr 0x%lx!\n",mpaddr);
+		printk("assign_new_domain0_page: start=0x%lx,end=0x%lx!\n",
+			dom0_start, dom0_start+dom0_size);
 		while(1);
 	}
 	return mfn_to_page((mpaddr >> PAGE_SHIFT));
@@ -430,13 +437,13 @@ struct page * assign_new_domain_page(struct domain *d, unsigned long mpaddr)
 			if (p) memset(__va(page_to_maddr(p)),0,PAGE_SIZE);
 		}
 		if (unlikely(!p)) {
-printf("assign_new_domain_page: Can't alloc!!!! Aaaargh!\n");
+			printf("assign_new_domain_page: Can't alloc!!!! Aaaargh!\n");
 			return(p);
 		}
 		if (unlikely(page_to_maddr(p) > __get_cpu_var(vhpt_paddr)
 			     && page_to_maddr(p) < __get_cpu_var(vhpt_pend))) {
-		  printf("assign_new_domain_page: reassigned vhpt page %p!!\n",
-			 page_to_maddr(p));
+			printf("assign_new_domain_page: reassigned vhpt page %lx!!\n",
+				page_to_maddr(p));
 		}
 		set_pte(pte, pfn_pte(page_to_maddr(p) >> PAGE_SHIFT,
 			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
@@ -534,8 +541,8 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
 	if (d == dom0) {
 		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
-			//printk("lookup_domain_mpa: bad dom0 mpaddr %p!\n",mpaddr);
-//printk("lookup_domain_mpa: start=%p,end=%p!\n",dom0_start,dom0_start+dom0_size);
+			//printk("lookup_domain_mpa: bad dom0 mpaddr 0x%lx!\n",mpaddr);
+			//printk("lookup_domain_mpa: start=0x%lx,end=0x%lx!\n",dom0_start,dom0_start+dom0_size);
 			mpafoo(mpaddr);
 		}
 		pte_t pteval = pfn_pte(mpaddr >> PAGE_SHIFT,
@@ -563,8 +570,8 @@ tryagain:
 	if ((mpaddr >> PAGE_SHIFT) < d->max_pages) {
 		if (assign_new_domain_page(d,mpaddr)) goto tryagain;
 	}
-	printk("lookup_domain_mpa: bad mpa %p (> %p\n",
-		mpaddr,d->max_pages<<PAGE_SHIFT);
+	printk("lookup_domain_mpa: bad mpa 0x%lx (> 0x%lx)\n",
+		mpaddr, (unsigned long) d->max_pages<<PAGE_SHIFT);
 	mpafoo(mpaddr);
 	return 0;
 }
@@ -577,7 +584,7 @@ unsigned long domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
 	unsigned long imva;
 
 	pte &= _PAGE_PPN_MASK;
-	imva = __va(pte);
+	imva = (unsigned long) __va(pte);
 	imva |= mpaddr & ~PAGE_MASK;
 	return(imva);
 }
@@ -606,13 +613,13 @@ static void copy_memory(void *dst, void *src, int size)
 {
 	int remain;
 
-	if (IS_XEN_ADDRESS(dom0,src)) {
+	if (IS_XEN_ADDRESS(dom0,(unsigned long) src)) {
 		memcpy(dst,src,size);
 	}
 	else {
 		printf("About to call __copy_from_user(%p,%p,%d)\n",
 			dst,src,size);
-		while (remain = __copy_from_user(dst,src,size)) {
+		while ((remain = __copy_from_user(dst,src,size)) != 0) {
 			printf("incomplete user copy, %d remain of %d\n",
 				remain,size);
 			dst += size - remain; src += size - remain;
@@ -623,16 +630,15 @@ static void copy_memory(void *dst, void *src, int size)
 
 void loaddomainelfimage(struct domain *d, unsigned long image_start)
 {
-	char *elfbase = image_start;
+	char *elfbase = (char *) image_start;
 	//Elf_Ehdr *ehdr = (Elf_Ehdr *)image_start;
 	Elf_Ehdr ehdr;
 	Elf_Phdr phdr;
-	int h, filesz, memsz, paddr;
+	int h, filesz, memsz;
 	unsigned long elfaddr, dom_mpaddr, dom_imva;
 	struct page *p;
-	unsigned long pteval;
   
-	copy_memory(&ehdr,image_start,sizeof(Elf_Ehdr));
+	copy_memory(&ehdr, (void *) image_start, sizeof(Elf_Ehdr));
 	for ( h = 0; h < ehdr.e_phnum; h++ ) {
 		copy_memory(&phdr,elfbase + ehdr.e_phoff + (h*ehdr.e_phentsize),
 		sizeof(Elf_Phdr));
@@ -641,7 +647,7 @@ void loaddomainelfimage(struct domain *d, unsigned long image_start)
 	        continue;
 	}
 	filesz = phdr.p_filesz; memsz = phdr.p_memsz;
-	elfaddr = elfbase + phdr.p_offset;
+	elfaddr = (unsigned long) elfbase + phdr.p_offset;
 	dom_mpaddr = phdr.p_paddr;
 //printf("p_offset: %x, size=%x\n",elfaddr,filesz);
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
@@ -650,9 +656,9 @@ void loaddomainelfimage(struct domain *d, unsigned long image_start)
 			printf("Domain0 doesn't fit in allocated space!\n");
 			while(1);
 		}
-		dom_imva = __va(dom_mpaddr + dom0_start);
-		copy_memory(dom_imva,elfaddr,filesz);
-		if (memsz > filesz) memset(dom_imva+filesz,0,memsz-filesz);
+		dom_imva = (unsigned long) __va(dom_mpaddr + dom0_start);
+		copy_memory((void *) dom_imva, (void *) elfaddr, filesz);
+		if (memsz > filesz) memset((void *) dom_imva+filesz, 0, memsz-filesz);
 //FIXME: This test for code seems to find a lot more than objdump -x does
 		if (phdr.p_flags & PF_X) privify_memory(dom_imva,filesz);
 	}
@@ -661,20 +667,20 @@ void loaddomainelfimage(struct domain *d, unsigned long image_start)
 	while (memsz > 0) {
 		p = assign_new_domain_page(d,dom_mpaddr);
 		if (unlikely(!p)) BUG();
-		dom_imva = __va(page_to_maddr(p));
+		dom_imva = (unsigned long) __va(page_to_maddr(p));
 		if (filesz > 0) {
 			if (filesz >= PAGE_SIZE)
-				copy_memory(dom_imva,elfaddr,PAGE_SIZE);
+				copy_memory((void *) dom_imva, (void *) elfaddr, PAGE_SIZE);
 			else { // copy partial page, zero the rest of page
-				copy_memory(dom_imva,elfaddr,filesz);
-				memset(dom_imva+filesz,0,PAGE_SIZE-filesz);
+				copy_memory((void *) dom_imva, (void *) elfaddr, filesz);
+				memset((void *) dom_imva+filesz, 0, PAGE_SIZE-filesz);
 			}
 //FIXME: This test for code seems to find a lot more than objdump -x does
 			if (phdr.p_flags & PF_X)
 				privify_memory(dom_imva,PAGE_SIZE);
 		}
 		else if (memsz > 0) // always zero out entire page
-			memset(dom_imva,0,PAGE_SIZE);
+			memset((void *) dom_imva, 0, PAGE_SIZE);
 		memsz -= PAGE_SIZE; filesz -= PAGE_SIZE;
 		elfaddr += PAGE_SIZE; dom_mpaddr += PAGE_SIZE;
 	}
@@ -689,33 +695,33 @@ parsedomainelfimage(char *elfbase, unsigned long elfsize, unsigned long *entry)
 	copy_memory(&ehdr,elfbase,sizeof(Elf_Ehdr));
 
 	if ( !elf_sanity_check(&ehdr) ) {
-	    printk("ELF sanity check failed.\n");
-	    return -EINVAL;
+		printk("ELF sanity check failed.\n");
+		return -EINVAL;
 	}
 
 	if ( (ehdr.e_phoff + (ehdr.e_phnum * ehdr.e_phentsize)) > elfsize )
 	{
-	    printk("ELF program headers extend beyond end of image.\n");
-	    return -EINVAL;
+		printk("ELF program headers extend beyond end of image.\n");
+		return -EINVAL;
 	}
 
 	if ( (ehdr.e_shoff + (ehdr.e_shnum * ehdr.e_shentsize)) > elfsize )
 	{
-	    printk("ELF section headers extend beyond end of image.\n");
-	    return -EINVAL;
+		printk("ELF section headers extend beyond end of image.\n");
+		return -EINVAL;
 	}
 
 #if 0
 	/* Find the section-header strings table. */
 	if ( ehdr.e_shstrndx == SHN_UNDEF )
 	{
-	    printk("ELF image has no section-header strings table (shstrtab).\n");
-	    return -EINVAL;
+		printk("ELF image has no section-header strings table (shstrtab).\n");
+		return -EINVAL;
 	}
 #endif
 
 	*entry = ehdr.e_entry;
-printf("parsedomainelfimage: entry point = %p\n",*entry);
+	printf("parsedomainelfimage: entry point = 0x%lx\n", *entry);
 
 	return 0;
 }
@@ -727,22 +733,21 @@ void alloc_dom0(void)
 	if (platform_is_hp_ski()) {
 	dom0_size = 128*1024*1024; //FIXME: Should be configurable
 	}
-	printf("alloc_dom0: starting (initializing %d MB...)\n",dom0_size/(1024*1024));
+	printf("alloc_dom0: starting (initializing %lu MB...)\n",dom0_size/(1024*1024));
  
-     /* FIXME: The first trunk (say 256M) should always be assigned to
-      * Dom0, since Dom0's physical == machine address for DMA purpose.
-      * Some old version linux, like 2.4, assumes physical memory existing
-      * in 2nd 64M space.
-      */
-     dom0_start = alloc_boot_pages(
-         dom0_size >> PAGE_SHIFT, dom0_align >> PAGE_SHIFT);
-     dom0_start <<= PAGE_SHIFT;
+	/* FIXME: The first trunk (say 256M) should always be assigned to
+	 * Dom0, since Dom0's physical == machine address for DMA purpose.
+	 * Some old version linux, like 2.4, assumes physical memory existing
+	 * in 2nd 64M space.
+	 */
+	dom0_start = alloc_boot_pages(dom0_size >> PAGE_SHIFT, dom0_align >> PAGE_SHIFT);
+	dom0_start <<= PAGE_SHIFT;
 	if (!dom0_start) {
-	printf("construct_dom0: can't allocate contiguous memory size=%p\n",
+	printf("alloc_dom0: can't allocate contiguous memory size=%lu\n",
 		dom0_size);
 	while(1);
 	}
-	printf("alloc_dom0: dom0_start=%p\n",dom0_start);
+	printf("alloc_dom0: dom0_start=0x%lx\n", dom0_start);
 #else
 	dom0_start = 0;
 #endif
@@ -770,13 +775,8 @@ int construct_dom0(struct domain *d,
 	               unsigned long initrd_start, unsigned long initrd_len,
 	               char *cmdline)
 {
-	char *dst;
 	int i, rc;
-	unsigned long pfn, mfn;
-	unsigned long nr_pt_pages;
-	unsigned long count;
 	unsigned long alloc_start, alloc_end;
-	struct page_info *page = NULL;
 	start_info_t *si;
 	struct vcpu *v = d->vcpu[0];
 
@@ -787,7 +787,15 @@ int construct_dom0(struct domain *d,
 	unsigned long pkern_end;
 	unsigned long pinitrd_start = 0;
 	unsigned long pstart_info;
-	unsigned long ret, progress = 0;
+#if 0
+	char *dst;
+	unsigned long nr_pt_pages;
+	unsigned long count;
+#endif
+#ifdef VALIDATE_VT
+	unsigned long mfn;
+	struct page_info *page = NULL;
+#endif
 
 //printf("construct_dom0: starting\n");
 
@@ -843,7 +851,7 @@ int construct_dom0(struct domain *d,
              pinitrd_start=(dom0_start+dom0_size) -
                           (PAGE_ALIGN(initrd_len) + 4*1024*1024);
 
-             memcpy(__va(pinitrd_start),initrd_start,initrd_len);
+             memcpy(__va(pinitrd_start), (void *) initrd_start, initrd_len);
              pstart_info = PAGE_ALIGN(pinitrd_start + initrd_len);
         } else {
              pstart_info = PAGE_ALIGN(pkern_end);
@@ -861,7 +869,8 @@ int construct_dom0(struct domain *d,
 	{
 	    printk("Initial guest OS requires too much space\n"
 	           "(%luMB is greater than %luMB limit)\n",
-	           (pkern_end-pkern_start)>>20, (d->max_pages<<PAGE_SHIFT)>>20);
+	           (pkern_end-pkern_start)>>20,
+	           (unsigned long) (d->max_pages<<PAGE_SHIFT)>>20);
 	    return -ENOMEM;
 	}
 

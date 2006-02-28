@@ -21,7 +21,7 @@ DEFINE_PER_CPU (unsigned long, vhpt_pend);
 void vhpt_flush(void)
 {
 	struct vhpt_lf_entry *v = (void *)VHPT_ADDR;
-	int i, cnt = 0;
+	int i;
 #if 0
 static int firsttime = 2;
 
@@ -48,7 +48,6 @@ printf("vhpt_flush: *********************************************\n");
 #ifdef VHPT_GLOBAL
 void vhpt_flush_address(unsigned long vadr, unsigned long addr_range)
 {
-	unsigned long ps;
 	struct vhpt_lf_entry *vlfe;
 
 	if ((vadr >> 61) == 7) {
@@ -131,7 +130,8 @@ void vhpt_init(void)
 	// allocate a huge chunk of physical memory.... how???
 	vhpt_total_size = 1 << VHPT_SIZE_LOG2;	// 4MB, 16MB, 64MB, or 256MB
 	vhpt_alignment = 1 << VHPT_SIZE_LOG2;	// 4MB, 16MB, 64MB, or 256MB
-	printf("vhpt_init: vhpt size=%p, align=%p\n",vhpt_total_size,vhpt_alignment);
+	printf("vhpt_init: vhpt size=0x%lx, align=0x%lx\n",
+		vhpt_total_size, vhpt_alignment);
 	/* This allocation only holds true if vhpt table is unique for
 	 * all domains. Or else later new vhpt table should be allocated
 	 * from domain heap when each domain is created. Assume xen buddy
@@ -146,8 +146,8 @@ void vhpt_init(void)
 	paddr = page_to_maddr(page);
 	__get_cpu_var(vhpt_paddr) = paddr;
 	__get_cpu_var(vhpt_pend) = paddr + vhpt_total_size - 1;
-	printf("vhpt_init: vhpt paddr=%p, end=%p\n",
-	       paddr, __get_cpu_var(vhpt_pend));
+	printf("vhpt_init: vhpt paddr=0x%lx, end=0x%lx\n",
+		paddr, __get_cpu_var(vhpt_pend));
 	pte = pte_val(pfn_pte(paddr >> PAGE_SHIFT, PAGE_KERNEL));
 	vhpt_map(pte);
 	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
@@ -173,6 +173,6 @@ int dump_vhpt_stats(char *buf)
 		if (v->CChain) vhpt_chains++;
 	}
 	s += sprintf(s,"VHPT usage: %ld/%ld (%ld collision chains)\n",
-		vhpt_valid,VHPT_NUM_ENTRIES,vhpt_chains);
+		vhpt_valid, (unsigned long) VHPT_NUM_ENTRIES, vhpt_chains);
 	return s - buf;
 }

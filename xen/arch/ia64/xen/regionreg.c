@@ -18,6 +18,8 @@
 extern void ia64_new_rr7(unsigned long rid,void *shared_info, void *shared_arch_info, unsigned long p_vhpt, unsigned long v_pal);
 extern void *pal_vaddr;
 
+/* FIXME: where these declarations should be there ? */
+extern void panic_domain(struct pt_regs *, const char *, ...);
 
 #define	IA64_MIN_IMPL_RID_BITS	(IA64_MIN_IMPL_RID_MSB+1)
 #define	IA64_MAX_IMPL_RID_BITS	24
@@ -142,7 +144,7 @@ int allocate_rid_range(struct domain *d, unsigned long ridbits)
 	// setup domain struct
 	d->arch.rid_bits = ridbits;
 	d->arch.starting_rid = i << IA64_MIN_IMPL_RID_BITS; d->arch.ending_rid = (i+n_rid_blocks) << IA64_MIN_IMPL_RID_BITS;
-printf("###allocating rid_range, domain %p: starting_rid=%lx, ending_rid=%lx\n",
+printf("###allocating rid_range, domain %p: starting_rid=%x, ending_rid=%x\n",
 d,d->arch.starting_rid, d->arch.ending_rid);
 	
 	return 1;
@@ -219,8 +221,8 @@ int set_one_rr(unsigned long rr, unsigned long val)
 	newrid = v->arch.starting_rid + rrv.rid;
 
 	if (newrid > v->arch.ending_rid) {
-		printk("can't set rr%d to %lx, starting_rid=%lx,"
-			"ending_rid=%lx, val=%lx\n", rreg, newrid,
+		printk("can't set rr%d to %lx, starting_rid=%x,"
+			"ending_rid=%x, val=%lx\n", (int) rreg, newrid,
 			v->arch.starting_rid,v->arch.ending_rid,val);
 		return 0;
 	}
@@ -253,7 +255,7 @@ int set_one_rr(unsigned long rr, unsigned long val)
 	else if (rreg == 7)
 		ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info,
 			     v->arch.privregs, __get_cpu_var(vhpt_paddr),
-			     pal_vaddr);
+			     (unsigned long) pal_vaddr);
 	else set_rr(rr,newrrv.rrval);
 #endif
 	return 1;
@@ -263,11 +265,12 @@ int set_one_rr(unsigned long rr, unsigned long val)
 int set_metaphysical_rr0(void)
 {
 	struct vcpu *v = current;
-	ia64_rr rrv;
+//	ia64_rr rrv;
 	
 //	rrv.ve = 1; 	FIXME: TURN ME BACK ON WHEN VHPT IS WORKING
 	ia64_set_rr(0,v->arch.metaphysical_rr0);
 	ia64_srlz_d();
+	return 1;
 }
 
 // validates/changes region registers 0-6 in the currently executing domain

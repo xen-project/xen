@@ -286,7 +286,9 @@ EXPORT_SYMBOL(synchronize_irq);
 int handle_IRQ_event(unsigned int irq,
 		struct pt_regs *regs, struct irqaction *action)
 {
+#ifndef XEN
 	int status = 1;	/* Force the "do bottom halves" bit */
+#endif
 	int retval = 0;
 
 #ifndef XEN
@@ -657,8 +659,10 @@ int request_irq(unsigned int irq,
 	if (!action)
 		return -ENOMEM;
 
+#ifdef XEN
+	action->handler = (void *) handler;
+#else
 	action->handler = handler;
-#ifndef XEN
 	action->flags = irqflags;
 	action->mask = 0;
 #endif
@@ -698,7 +702,9 @@ void free_irq(unsigned int irq, void *dev_id)
 #endif
 {
 	irq_desc_t *desc;
+#ifndef XEN
 	struct irqaction **p;
+#endif
 	unsigned long flags;
 
 	if (irq >= NR_IRQS)
@@ -755,7 +761,8 @@ EXPORT_SYMBOL(free_irq);
  * disabled.
  */
 
-static DECLARE_MUTEX(probe_sem);
+#ifndef XEN
+static int DECLARE_MUTEX(probe_sem);
 
 /**
  *	probe_irq_on	- begin an interrupt autodetect
@@ -765,7 +772,6 @@ static DECLARE_MUTEX(probe_sem);
  *
  */
 
-#ifndef XEN
 unsigned long probe_irq_on(void)
 {
 	unsigned int i;
@@ -936,7 +942,9 @@ EXPORT_SYMBOL(probe_irq_off);
 
 int setup_irq(unsigned int irq, struct irqaction * new)
 {
+#ifndef XEN
 	int shared = 0;
+#endif
 	unsigned long flags;
 	struct irqaction *old, **p;
 	irq_desc_t *desc = irq_descp(irq);
@@ -1371,7 +1379,7 @@ int pirq_guest_unmask(struct domain *d)
     return 0;
 }
 
-int pirq_guest_bind(struct vcpu *d, int irq, int will_share)
+int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action;
@@ -1431,7 +1439,7 @@ int pirq_guest_bind(struct vcpu *d, int irq, int will_share)
         goto out;
     }
 
-    action->guest[action->nr_guests++] = d;
+    action->guest[action->nr_guests++] = v->domain;
 
  out:
     spin_unlock_irqrestore(&desc->lock, flags);
@@ -1480,6 +1488,7 @@ int pirq_guest_unbind(struct domain *d, int irq)
 #ifdef XEN
 #ifdef IA64
 // this is a temporary hack until real console input is implemented
+extern void domain_pend_keyboard_interrupt(int irq);
 irqreturn_t guest_forward_keyboard_input(int irq, void *nada, struct pt_regs *regs)
 {
 	domain_pend_keyboard_interrupt(irq);

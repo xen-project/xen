@@ -21,7 +21,15 @@ int in_tpa = 0;
 #include <asm/processor.h>
 #include <asm/delay.h>
 #include <asm/vmx_vcpu.h>
+#include <asm/vhpt.h>
+#include <asm/tlbflush.h>
 #include <xen/event.h>
+
+/* FIXME: where these declarations should be there ? */
+extern void getreg(unsigned long regnum, unsigned long *val, int *nat, struct pt_regs *regs);
+extern void setreg(unsigned long regnum, unsigned long val, int nat, struct pt_regs *regs);
+extern void panic_domain(struct pt_regs *, const char *, ...);
+extern int set_metaphysical_rr0(void);
 
 typedef	union {
 	struct ia64_psr ia64_psr;
@@ -47,10 +55,10 @@ typedef	union {
 #define STATIC
 
 #ifdef PRIVOP_ADDR_COUNT
-struct privop_addr_count privop_addr_counter[PRIVOP_COUNT_NINSTS] = {
-	{ "=ifa", { 0 }, { 0 }, 0 },
+struct privop_addr_count privop_addr_counter[PRIVOP_COUNT_NINSTS+1] = {
+	{ "=ifa",  { 0 }, { 0 }, 0 },
 	{ "thash", { 0 }, { 0 }, 0 },
-	0
+	{ 0,       { 0 }, { 0 }, 0 }
 };
 extern void privop_count_addr(unsigned long addr, int inst);
 #define	PRIVOP_COUNT_ADDR(regs,inst) privop_count_addr(regs->cr_iip,inst)
@@ -375,7 +383,7 @@ BOOLEAN vcpu_get_psr_i(VCPU *vcpu)
 UINT64 vcpu_get_ipsr_int_state(VCPU *vcpu,UINT64 prevpsr)
 {
 	UINT64 dcr = PSCBX(vcpu,dcr);
-	PSR psr = {0};
+	PSR psr;
 
 	//printf("*** vcpu_get_ipsr_int_state (0x%016lx)...",prevpsr);
 	psr.i64 = prevpsr;
@@ -397,7 +405,7 @@ UINT64 vcpu_get_ipsr_int_state(VCPU *vcpu,UINT64 prevpsr)
 
 IA64FAULT vcpu_get_dcr(VCPU *vcpu, UINT64 *pval)
 {
-extern unsigned long privop_trace;
+//extern unsigned long privop_trace;
 //privop_trace=0;
 //verbose("vcpu_get_dcr: called @%p\n",PSCB(vcpu,iip));
 	// Reads of cr.dcr on Xen always have the sign bit set, so
@@ -525,7 +533,7 @@ IA64FAULT vcpu_get_iha(VCPU *vcpu, UINT64 *pval)
 
 IA64FAULT vcpu_set_dcr(VCPU *vcpu, UINT64 val)
 {
-extern unsigned long privop_trace;
+//extern unsigned long privop_trace;
 //privop_trace=1;
 	// Reads of cr.dcr on SP always have the sign bit set, so
 	// a domain can differentiate whether it is running on SP or not
@@ -747,7 +755,7 @@ UINT64 vcpu_deliverable_timer(VCPU *vcpu)
 
 IA64FAULT vcpu_get_lid(VCPU *vcpu, UINT64 *pval)
 {
-extern unsigned long privop_trace;
+//extern unsigned long privop_trace;
 //privop_trace=1;
 	//TODO: Implement this
 	printf("vcpu_get_lid: WARNING: Getting cr.lid always returns zero\n");
@@ -764,9 +772,10 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 #define HEARTBEAT_FREQ 16	// period in seconds
 #ifdef HEARTBEAT_FREQ
 #define N_DOMS 16	// period in seconds
+#if 0
 	static long count[N_DOMS] = { 0 };
+#endif
 	static long nonclockcount[N_DOMS] = { 0 };
-	REGS *regs = vcpu_regs(vcpu);
 	unsigned domid = vcpu->domain->domain_id;
 #endif
 #ifdef IRQ_DEBUG
@@ -803,7 +812,7 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 	// getting ivr has "side effects"
 #ifdef IRQ_DEBUG
 	if (firsttime[vector]) {
-		printf("*** First get_ivr on vector=%d,itc=%lx\n",
+		printf("*** First get_ivr on vector=%lu,itc=%lx\n",
 			vector,ia64_get_itc());
 		firsttime[vector]=0;
 	}
@@ -817,7 +826,7 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 
 	i = vector >> 6;
 	mask = 1L << (vector & 0x3f);
-//printf("ZZZZZZ vcpu_get_ivr: setting insvc mask for vector %ld\n",vector);
+//printf("ZZZZZZ vcpu_get_ivr: setting insvc mask for vector %lu\n",vector);
 	PSCBX(vcpu,insvc[i]) |= mask;
 	PSCBX(vcpu,irr[i]) &= ~mask;
 	//PSCB(vcpu,pending_interruption)--;
@@ -983,19 +992,19 @@ void vcpu_enable_timer(VCPU *vcpu,UINT64 cycles)
 {
     PSCBX(vcpu,xen_timer_interval) = cycles;
     vcpu_set_next_timer(vcpu);
-    printf("vcpu_enable_timer(%d): interval set to %d cycles\n",
+    printf("vcpu_enable_timer: interval set to %lu cycles\n",
              PSCBX(vcpu,xen_timer_interval));
     __set_bit(PSCB(vcpu,itv), PSCB(vcpu,delivery_mask));
 }
 
 IA64FAULT vcpu_set_itv(VCPU *vcpu, UINT64 val)
 {
-extern unsigned long privop_trace;
+//extern unsigned long privop_trace;
 //privop_trace=1;
 	if (val & 0xef00) return (IA64_ILLOP_FAULT);
 	PSCB(vcpu,itv) = val;
 	if (val & 0x10000) {
-printf("**** vcpu_set_itv(%d): vitm=%lx, setting to 0\n",val,PSCBX(vcpu,domain_itm));
+printf("**** vcpu_set_itv(%lu): vitm=%lx, setting to 0\n",val,PSCBX(vcpu,domain_itm));
 		PSCBX(vcpu,domain_itm) = 0;
 	}
 	else vcpu_enable_timer(vcpu,1000000L);
@@ -1103,7 +1112,7 @@ void vcpu_set_next_timer(VCPU *vcpu)
 
 IA64FAULT vcpu_set_itm(VCPU *vcpu, UINT64 val)
 {
-	UINT now = ia64_get_itc();
+	//UINT now = ia64_get_itc();
 
 	//if (val < now) val = now + 1000;
 //printf("*** vcpu_set_itm: called with %lx\n",val);
@@ -1114,7 +1123,10 @@ IA64FAULT vcpu_set_itm(VCPU *vcpu, UINT64 val)
 
 IA64FAULT vcpu_set_itc(VCPU *vcpu, UINT64 val)
 {
-
+#define DISALLOW_SETTING_ITC_FOR_NOW
+#ifdef DISALLOW_SETTING_ITC_FOR_NOW
+printf("vcpu_set_itc: Setting ar.itc is currently disabled\n");
+#else
 	UINT64 oldnow = ia64_get_itc();
 	UINT64 olditm = PSCBX(vcpu,domain_itm);
 	unsigned long d = olditm - oldnow;
@@ -1122,10 +1134,6 @@ IA64FAULT vcpu_set_itc(VCPU *vcpu, UINT64 val)
 
 	UINT64 newnow = val, min_delta;
 
-#define DISALLOW_SETTING_ITC_FOR_NOW
-#ifdef DISALLOW_SETTING_ITC_FOR_NOW
-printf("vcpu_set_itc: Setting ar.itc is currently disabled\n");
-#else
 	local_irq_disable();
 	if (olditm) {
 printf("**** vcpu_set_itc(%lx): vitm changed to %lx\n",val,newnow+d);
@@ -1314,7 +1322,7 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 // this down, but since it has been apparently harmless, just flag it for now
 //			panic_domain(vcpu_regs(vcpu),
 			printk(
-			 "vcpu_translate: bad physical address: %p\n",address);
+			 "vcpu_translate: bad physical address: 0x%lx\n",address);
 		}
 		*pteval = (address & _PAGE_PPN_MASK) | __DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX;
 		*itir = PAGE_SHIFT << 2;
@@ -1327,7 +1335,8 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 		unsigned long vipsr = PSCB(vcpu,ipsr);
 		unsigned long iip = regs->cr_iip;
 		unsigned long ipsr = regs->cr_ipsr;
-		printk("vcpu_translate: bad address %p, viip=%p, vipsr=%p, iip=%p, ipsr=%p continuing\n", address, viip, vipsr, iip, ipsr);
+		printk("vcpu_translate: bad address 0x%lx, viip=0x%lx, vipsr=0x%lx, iip=0x%lx, ipsr=0x%lx continuing\n",
+			address, viip, vipsr, iip, ipsr);
 	}
 
 	rr = PSCB(vcpu,rrs)[region];
@@ -1888,7 +1897,7 @@ IA64FAULT vcpu_ptc_g(VCPU *vcpu, UINT64 vadr, UINT64 addr_range)
 
 IA64FAULT vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 {
-	extern ia64_global_tlb_purge(UINT64 start, UINT64 end, UINT64 nbits);
+	extern void ia64_global_tlb_purge(UINT64 start, UINT64 end, UINT64 nbits);
 	// FIXME: validate not flushing Xen addresses
 	// if (Xen address) return(IA64_ILLOP_FAULT);
 	// FIXME: ??breaks if domain PAGE_SIZE < Xen PAGE_SIZE

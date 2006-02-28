@@ -47,6 +47,7 @@
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
 #include <asm/mca.h>
+#include <asm/vhpt.h>
 
 #ifndef XEN
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
@@ -63,7 +64,7 @@ struct page *vmem_map;
 EXPORT_SYMBOL(vmem_map);
 #endif
 
-static int pgt_cache_water[2] = { 25, 50 };
+// static int pgt_cache_water[2] = { 25, 50 };
 
 struct page *zero_page_memmap_ptr;		/* map entry for zero page */
 EXPORT_SYMBOL(zero_page_memmap_ptr);
@@ -222,7 +223,7 @@ inline void
 ia64_set_rbs_bot (void)
 {
 #ifdef XEN
-	unsigned stack_size = MAX_USER_STACK_SIZE;
+	unsigned long stack_size = MAX_USER_STACK_SIZE;
 #else
 	unsigned long stack_size = current->rlim[RLIMIT_STACK].rlim_max & -16;
 #endif
@@ -279,7 +280,7 @@ printf("ia64_init_addr_space: called, not implemented\n");
 #endif
 }
 
-setup_gate (void)
+void setup_gate (void)
 {
 	printk("setup_gate not-implemented.\n");
 }
@@ -287,7 +288,10 @@ setup_gate (void)
 void __devinit
 ia64_mmu_init (void *my_cpu_data)
 {
-	unsigned long psr, pta, impl_va_bits;
+	unsigned long psr, impl_va_bits;
+#if 0
+	unsigned long pta;
+#endif
 	extern void __devinit tlb_init (void);
 	int cpu;
 

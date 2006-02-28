@@ -14,7 +14,7 @@
 #include <public/version.h>
 //#include <xen/delay.h>
 #include <xen/compile.h>
-//#include <xen/console.h>
+#include <xen/console.h>
 #include <xen/serial.h>
 #include <xen/trace.h>
 #include <asm/meminit.h>
@@ -22,6 +22,7 @@
 #include <asm/setup.h>
 #include <xen/string.h>
 #include <asm/vmx.h>
+#include <linux/efi.h>
 
 unsigned long xenheap_phys_end;
 
@@ -35,6 +36,16 @@ extern unsigned long domain0_ready;
 
 int find_max_pfn (unsigned long, unsigned long, void *);
 void start_of_day(void);
+
+/* FIXME: which header these declarations should be there ? */
+extern long is_platform_hp_ski(void);
+extern void early_setup_arch(char **);
+extern void late_setup_arch(char **);
+extern void hpsim_serial_init(void);
+extern void alloc_dom0(void);
+extern void setup_per_cpu_areas(void);
+extern void mem_init(void);
+extern void init_IRQ(void);
 
 /* opt_nosmp: If true, secondary processors are ignored. */
 static int opt_nosmp = 0;
@@ -149,8 +160,7 @@ void start_kernel(void)
 {
     unsigned char *cmdline;
     void *heap_start;
-    int i;
-    unsigned long max_mem, nr_pages, firsthole_start;
+    unsigned long nr_pages, firsthole_start;
     unsigned long dom0_memory_start, dom0_memory_size;
     unsigned long dom0_initrd_start, dom0_initrd_size;
     unsigned long initial_images_start, initial_images_end;
@@ -160,7 +170,7 @@ void start_kernel(void)
     /* Kernel may be relocated by EFI loader */
     xen_pstart = ia64_tpa(KERNEL_START);
 
-    early_setup_arch(&cmdline);
+    early_setup_arch((char **) &cmdline);
 
     /* We initialise the serial devices very early so we can get debugging. */
     if (running_on_sim) hpsim_serial_init();
@@ -248,9 +258,9 @@ void start_kernel(void)
 	max_page);
 
     heap_start = memguard_init(ia64_imva(&_end));
-    printf("Before heap_start: 0x%lx\n", heap_start);
+    printf("Before heap_start: %p\n", heap_start);
     heap_start = __va(init_boot_allocator(__pa(heap_start)));
-    printf("After heap_start: 0x%lx\n", heap_start);
+    printf("After heap_start: %p\n", heap_start);
 
     reserve_memory();
 
@@ -281,7 +291,7 @@ printk("About to call scheduler_init()\n");
     idle_domain = domain_create(IDLE_DOMAIN_ID, 0);
     BUG_ON(idle_domain == NULL);
 
-    late_setup_arch(&cmdline);
+    late_setup_arch((char **) &cmdline);
     setup_per_cpu_areas();
     mem_init();
 
@@ -298,6 +308,8 @@ printk("About to call timer_init()\n");
 #endif
 
 #ifdef CONFIG_SMP
+    int i;
+
     if ( opt_nosmp )
     {
         max_cpus = 0;
@@ -349,9 +361,9 @@ printk("About to call domain_create()\n");
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
     printk("About to call construct_dom0()\n");
-    dom0_memory_start = __va(initial_images_start);
+    dom0_memory_start = (unsigned long) __va(initial_images_start);
     dom0_memory_size = ia64_boot_param->domain_size;
-    dom0_initrd_start = __va(initial_images_start +
+    dom0_initrd_start = (unsigned long) __va(initial_images_start +
 			     PAGE_ALIGN(ia64_boot_param->domain_size));
     dom0_initrd_size = ia64_boot_param->initrd_size;
  

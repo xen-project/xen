@@ -19,12 +19,18 @@
 #include <public/sched.h>
 #include <asm/vhpt.h>
 #include <asm/debugger.h>
+#include <asm/vmx.h>
+#include <asm/vmx_vcpu.h>
 
 efi_memory_desc_t ia64_efi_io_md;
 EXPORT_SYMBOL(ia64_efi_io_md);
 unsigned long wait_init_idle;
 int phys_proc_id[NR_CPUS];
 unsigned long loops_per_jiffy = (1<<12);	// from linux/init/main.c
+
+/* FIXME: where these declarations should be there ? */
+extern void load_region_regs(struct vcpu *);
+extern void show_registers(struct pt_regs *regs);
 
 void ia64_mca_init(void) { printf("ia64_mca_init() skipped (Machine check abort handling)\n"); }
 void ia64_mca_cpu_init(void *x) { }
@@ -251,6 +257,7 @@ ia64_peek (struct task_struct *child, struct switch_stack *child_stack,
 	   unsigned long user_rbs_end, unsigned long addr, long *val)
 {
 	printk("ia64_peek: called, not implemented\n");
+	return 1;
 }
 
 long
@@ -258,6 +265,7 @@ ia64_poke (struct task_struct *child, struct switch_stack *child_stack,
 	   unsigned long user_rbs_end, unsigned long addr, long val)
 {
 	printk("ia64_poke: called, not implemented\n");
+	return 1;
 }
 
 void
@@ -314,7 +322,7 @@ static long cnt[16] = { 50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50};
 static int i = 100;
 int id = ((struct vcpu *)current)->domain->domain_id & 0xf;
 if (!cnt[id]--) { printk("%x",id); cnt[id] = 500000; }
-if (!i--) { printk("+",id); i = 1000000; }
+if (!i--) { printk("+"); i = 1000000; }
 }
 
     if (VMX_DOMAIN(current)){
@@ -358,12 +366,12 @@ void panic_domain(struct pt_regs *regs, const char *fmt, ...)
 	va_list args;
 	char buf[128];
 	struct vcpu *v = current;
-	static volatile int test = 1;	// so can continue easily in debug
-	extern spinlock_t console_lock;
-	unsigned long flags;
+//	static volatile int test = 1;	// so can continue easily in debug
+//	extern spinlock_t console_lock;
+//	unsigned long flags;
     
 loop:
-	printf("$$$$$ PANIC in domain %d (k6=%p): ",
+	printf("$$$$$ PANIC in domain %d (k6=0x%lx): ",
 		v->domain->domain_id, 
 		__get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT]);
 	va_start(args, fmt);
@@ -378,7 +386,7 @@ loop:
 	}
 	domain_pause_by_systemcontroller(current->domain);
 	v->domain->shutdown_code = SHUTDOWN_crash;
-	set_bit(_DOMF_shutdown, v->domain->domain_flags);
+	set_bit(_DOMF_shutdown, &v->domain->domain_flags);
 	if (v->domain->domain_id == 0) {
 		int i = 1000000000L;
 		// if domain0 crashes, just periodically print out panic
