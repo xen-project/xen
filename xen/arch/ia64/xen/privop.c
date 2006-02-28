@@ -529,7 +529,7 @@ IA64FAULT priv_mov_from_psr(VCPU *vcpu, INST64 inst)
 Privileged operation decode and dispatch routines
 **************************************************************************/
 
-IA64_SLOT_TYPE slot_types[0x20][3] = {
+static const IA64_SLOT_TYPE slot_types[0x20][3] = {
 	{M, I, I}, {M, I, I}, {M, I, I}, {M, I, I},
 	{M, I, ILLEGAL}, {M, I, ILLEGAL},
 	{ILLEGAL, ILLEGAL, ILLEGAL}, {ILLEGAL, ILLEGAL, ILLEGAL},
@@ -549,7 +549,7 @@ IA64_SLOT_TYPE slot_types[0x20][3] = {
 // pointer to privileged emulation function
 typedef IA64FAULT (*PPEFCN)(VCPU *vcpu, INST64 inst);
 
-PPEFCN Mpriv_funcs[64] = {
+static const PPEFCN Mpriv_funcs[64] = {
   priv_mov_to_rr, priv_mov_to_dbr, priv_mov_to_ibr, priv_mov_to_pkr,
   priv_mov_to_pmc, priv_mov_to_pmd, 0, 0,
   0, priv_ptc_l, priv_ptc_g, priv_ptc_ga,
@@ -799,7 +799,7 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 #define HYPERPRIVOP_SET_KR		0x12
 #define HYPERPRIVOP_MAX			0x12
 
-char *hyperpriv_str[HYPERPRIVOP_MAX+1] = {
+static const char * const hyperpriv_str[HYPERPRIVOP_MAX+1] = {
 	0, "rfi", "rsm.dt", "ssm.dt", "cover", "itc.d", "itc.i", "ssm.i",
 	"=ivr", "=tpr", "tpr=", "eoi", "itm=", "thash", "ptc.ga", "itr.d",
 	"=rr", "rr=", "kr="
@@ -898,7 +898,7 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 Privileged operation instrumentation routines
 **************************************************************************/
 
-char *Mpriv_str[64] = {
+static const char * const Mpriv_str[64] = {
   "mov_to_rr", "mov_to_dbr", "mov_to_ibr", "mov_to_pkr",
   "mov_to_pmc", "mov_to_pmd", "<0x06>", "<0x07>",
   "<0x08>", "ptc_l", "ptc_g", "ptc_ga",
@@ -918,7 +918,7 @@ char *Mpriv_str[64] = {
 };
 
 #define RS "Rsvd"
-char *cr_str[128] = {
+static const char * const cr_str[128] = {
   "dcr","itm","iva",RS,RS,RS,RS,RS,
   "pta",RS,RS,RS,RS,RS,RS,RS,
   "ipsr","isr",RS,"iip","ifa","itir","iipa","ifs",

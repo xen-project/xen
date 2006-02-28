@@ -129,7 +129,9 @@ unsigned int __ia64_local_vector_to_irq (ia64_vector vec)
 }
 #endif
 
+#ifndef XEN
 static void register_irq_proc (unsigned int irq);
+#endif
 
 /*
  * Special irq handlers.
@@ -1492,6 +1494,7 @@ extern void domain_pend_keyboard_interrupt(int irq);
 irqreturn_t guest_forward_keyboard_input(int irq, void *nada, struct pt_regs *regs)
 {
 	domain_pend_keyboard_interrupt(irq);
+	return 0;
 }
 
 void serial_input_init(void)

@@ -228,14 +228,12 @@ unsigned long pending_false_positive = 0;
 
 void reflect_extint(struct pt_regs *regs)
 {
-//	extern unsigned long vcpu_verbose, privop_trace;
 	unsigned long isr = regs->cr_ipsr & IA64_PSR_RI;
 	struct vcpu *v = current;
 	static int first_extint = 1;
 
 	if (first_extint) {
 		printf("Delivering first extint to domain: isr=0x%lx, iip=0x%lx\n", isr, regs->cr_iip);
-		//privop_trace = 1; vcpu_verbose = 1;
 		first_extint = 0;
 	}
 	if (vcpu_timer_pending_early(v))
@@ -339,12 +337,8 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 {
 	struct pt_regs *regs = (struct pt_regs *) &stack;
 	unsigned long code;
-#if 0
-	unsigned long error = isr;
-	int result, sig;
-#endif
 	char buf[128];
-	static const char *reason[] = {
+	static const char * const reason[] = {
 		"IA-64 Illegal Operation fault",
 		"IA-64 Privileged Operation fault",
 		"IA-64 Privileged Register fault",
@@ -708,9 +702,8 @@ void
 ia64_handle_privop (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long itir)
 {
 	IA64FAULT vector;
-	struct vcpu *v = current;
 
-	vector = priv_emulate(v,regs,isr);
+	vector = priv_emulate(current,regs,isr);
 	if (vector != IA64_NO_FAULT && vector != IA64_RFI_IN_PROGRESS) {
 		// Note: if a path results in a vector to reflect that requires
 		// iha/itir (e.g. vcpu_force_data_miss), they must be set there
@@ -764,7 +757,8 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		}
 #endif
 printf("*** NaT fault... attempting to handle as privop\n");
-printf("isr=0x%lx, ifa=0x%lx, iip=0x%lx, ipsr=0x%lx\n", isr, ifa, regs->cr_iip, psr);
+printf("isr=%016lx, ifa=%016lx, iip=%016lx, ipsr=%016lx\n",
+       isr, ifa, regs->cr_iip, psr);
 		//regs->eml_unat = 0;  FIXME: DO WE NEED THIS???
 		// certain NaT faults are higher priority than privop faults
 		vector = priv_emulate(v,regs,isr);

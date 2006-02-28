@@ -209,4 +209,6 @@ typedef union U_INST64 {
 
 extern void privify_memory(void *start, UINT64 len);
 
+extern int ia64_hyperprivop(unsigned long iim, REGS *regs);
+
 #endif
