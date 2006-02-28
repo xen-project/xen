@@ -155,6 +155,24 @@ struct ns16550_defaults ns16550_com2 = {
     .parity    = 'n',
     .stop_bits = 1
 };
+/*  This is a wrapper function of init_domheap_pages,
+ *  memory exceeds (max_page<<PAGE_SHIFT) will not be reclaimed.
+ *  This function will go away when the virtual memmap/discontig
+ *  memory issues are solved
+ */
+void init_domheap_pages_wrapper(unsigned long ps, unsigned long pe)
+{
+    unsigned long s_nrm, e_nrm, max_mem;
+    max_mem = (max_page+1)<<PAGE_SHIFT;
+    s_nrm = (ps+PAGE_SIZE-1)&PAGE_MASK;
+    e_nrm = pe&PAGE_MASK;
+    s_nrm = min(s_nrm, max_mem);
+    e_nrm = min(e_nrm, max_mem);
+    if(s_nrm < e_nrm)
+         init_domheap_pages(s_nrm, e_nrm);
+}
+
+
 
 void start_kernel(void)
 {
@@ -376,12 +394,14 @@ printk("About to call domain_create()\n");
     dom0->vcpu[0]->cpu_affinity = cpumask_of_cpu(0);
 
     /* The stash space for the initial kernel image can now be freed up. */
-    init_domheap_pages(ia64_boot_param->domain_start,
-                       ia64_boot_param->domain_size);
+    /* init_domheap_pages_wrapper is temporary solution, please refer to the
+     * descriptor of this function */
+    init_domheap_pages_wrapper(ia64_boot_param->domain_start,
+           ia64_boot_param->domain_start+ia64_boot_param->domain_size);
     /* throw away initrd area passed from elilo */
     if (ia64_boot_param->initrd_size) {
-        init_domheap_pages(ia64_boot_param->initrd_start,
-                          ia64_boot_param->initrd_size);
+        init_domheap_pages_wrapper(ia64_boot_param->initrd_start,
+           ia64_boot_param->initrd_start+ia64_boot_param->initrd_size);
     }
 
     if (!running_on_sim)  // slow on ski and pages are pre-initialized to zero
