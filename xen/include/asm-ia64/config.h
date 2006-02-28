@@ -255,7 +255,7 @@ struct screen_info { };
 #define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
 
 void dummy_called(char *function);
-#define dummy()	dummy_called(__FUNCTION__)
+#define dummy()	dummy_called((char *) __FUNCTION__)
 
 // these declarations got moved at some point, find a better place for them
 extern int ht_per_core;

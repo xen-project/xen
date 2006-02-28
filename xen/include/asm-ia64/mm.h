@@ -407,6 +407,7 @@ extern unsigned long totalram_pages;
 extern int nr_swap_pages;
 
 extern unsigned long *mpt_table;
+extern unsigned long gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
 extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
 #undef machine_to_phys_mapping
 #define machine_to_phys_mapping	mpt_table
