@@ -480,6 +480,11 @@ static void __init init_tpm_xenbus(void)
 	xenbus_register_frontend(&tpmfront);
 }
 
+static void __exit exit_tpm_xenbus(void)
+{
+	xenbus_unregister_driver(&tpmfront);
+}
+
 
 static int
 tpm_allocate_buffers(struct tpm_private *tp)
@@ -700,7 +705,18 @@ tpmif_init(void)
 	return 0;
 }
 
-__initcall(tpmif_init);
+module_init(tpmif_init);
+
+static void __exit
+tpmif_exit(void)
+{
+	exit_tpm_xenbus();
+	gnttab_free_grant_references(gref_head);
+}
+
+module_exit(tpmif_exit);
+
+MODULE_LICENSE("Dual BSD/GPL");
 
 /*
  * Local variables:

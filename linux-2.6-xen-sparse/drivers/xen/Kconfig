@@ -118,7 +118,7 @@ config XEN_NETDEV_LOOPBACK
 	  connection.
 
 config XEN_TPMDEV_BACKEND
-	bool "TPM-device backend driver"
+	tristate "TPM-device backend driver"
 	default n
 	help
 	  The TPM-device backend driver
@@ -162,7 +162,7 @@ config XEN_BLKDEV_TAP
 	  space.  Odds are that you want to say N here.
 
 config XEN_TPMDEV_FRONTEND
-	bool "TPM-device frontend driver"
+	tristate "TPM-device frontend driver"
 	default n
 	select TCG_TPM
 	select TCG_XEN
