@@ -810,7 +810,8 @@ void svm_relinquish_resources(struct vcpu *v)
     vpit = &v->domain->arch.hvm_domain.vpit;
     kill_timer(&vpit->pit_timer);
     kill_timer(&v->arch.hvm_svm.hlt_timer);
-    if ( hvm_apic_support(v->domain) ) {
+    if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) ) 
+    {
         kill_timer( &(VLAPIC(v)->vlapic_timer) );
         xfree( VLAPIC(v) );
     }
