@@ -796,31 +796,49 @@ printf("*** Handled privop masquerading as NaT fault\n");
 	reflect_interruption(isr,regs,vector);
 }
 
-unsigned long __hypercall_create_continuation(
-	unsigned int op, unsigned int nr_args, ...)
+unsigned long hypercall_create_continuation(
+	unsigned int op, const char *format, ...)
 {
     struct mc_state *mcs = &mc_state[smp_processor_id()];
     VCPU *vcpu = current;
     struct cpu_user_regs *regs = vcpu_regs(vcpu);
+    const char *p = format;
+    unsigned long arg;
     unsigned int i;
     va_list args;
 
-    va_start(args, nr_args);
+    va_start(args, format);
     if ( test_bit(_MCSF_in_multicall, &mcs->flags) ) {
 	panic("PREEMPT happen in multicall\n");	// Not support yet
     } else {
 	vcpu_set_gr(vcpu, 2, op, 0);
-	for ( i = 0; i < nr_args; i++) {
+	for ( i = 0; *p != '\0'; i++) {
+            switch ( *p++ )
+            {
+            case 'i':
+                arg = (unsigned long)va_arg(args, unsigned int);
+                break;
+            case 'l':
+                arg = (unsigned long)va_arg(args, unsigned long);
+                break;
+            case 'p':
+            case 'h':
+                arg = (unsigned long)va_arg(args, void *);
+                break;
+            default:
+                arg = 0;
+                BUG();
+            }
 	    switch (i) {
-	    case 0: vcpu_set_gr(vcpu, 14, va_arg(args, unsigned long), 0);
+	    case 0: vcpu_set_gr(vcpu, 14, arg, 0);
 		    break;
-	    case 1: vcpu_set_gr(vcpu, 15, va_arg(args, unsigned long), 0);
+	    case 1: vcpu_set_gr(vcpu, 15, arg, 0);
 		    break;
-	    case 2: vcpu_set_gr(vcpu, 16, va_arg(args, unsigned long), 0);
+	    case 2: vcpu_set_gr(vcpu, 16, arg, 0);
 		    break;
-	    case 3: vcpu_set_gr(vcpu, 17, va_arg(args, unsigned long), 0);
+	    case 3: vcpu_set_gr(vcpu, 17, arg, 0);
 		    break;
-	    case 4: vcpu_set_gr(vcpu, 18, va_arg(args, unsigned long), 0);
+	    case 4: vcpu_set_gr(vcpu, 18, arg, 0);
 		    break;
 	    default: panic("Too many args for hypercall continuation\n");
 		    break;

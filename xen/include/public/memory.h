@@ -29,7 +29,7 @@ typedef struct xen_memory_reservation {
      *   OUT: GMFN bases of extents that were allocated
      *   (NB. This command also updates the mach_to_phys translation table)
      */
-    unsigned long *extent_start;
+    GUEST_HANDLE(xen_ulong) extent_start;
 
     /* Number of extents, and size/alignment of each (2^extent_order pages). */
     unsigned long  nr_extents;
@@ -50,6 +50,7 @@ typedef struct xen_memory_reservation {
     domid_t        domid;
 
 } xen_memory_reservation_t;
+DEFINE_GUEST_HANDLE(xen_memory_reservation_t);
 
 /*
  * Returns the maximum machine frame number of mapped RAM in this system.
@@ -85,7 +86,7 @@ typedef struct xen_machphys_mfn_list {
      * any large discontiguities in the machine address space, 2MB gaps in
      * the machphys table will be represented by an MFN base of zero.
      */
-    unsigned long *extent_start;
+    GUEST_HANDLE(xen_ulong) extent_start;
 
     /*
      * Number of extents written to the above array. This will be smaller
@@ -93,6 +94,7 @@ typedef struct xen_machphys_mfn_list {
      */
     unsigned int nr_extents;
 } xen_machphys_mfn_list_t;
+DEFINE_GUEST_HANDLE(xen_machphys_mfn_list_t);
 
 /*
  * Returns the base and size of the specified reserved 'RAM hole' in the
@@ -113,6 +115,7 @@ typedef struct xen_reserved_phys_area {
     /* Base and size of the specified reserved area. */
     unsigned long first_gpfn, nr_gpfns;
 } xen_reserved_phys_area_t;
+DEFINE_GUEST_HANDLE(xen_reserved_phys_area_t);
 
 /*
  * Translates a list of domain-specific GPFNs into MFNs. Returns a -ve error
@@ -127,14 +130,15 @@ typedef struct xen_translate_gpfn_list {
     unsigned long nr_gpfns;
 
     /* List of GPFNs to translate. */
-    unsigned long *gpfn_list;
+    GUEST_HANDLE(xen_ulong) gpfn_list;
 
     /*
      * Output list to contain MFN translations. May be the same as the input
      * list (in which case each input GPFN is overwritten with the output MFN).
      */
-    unsigned long *mfn_list;
+    GUEST_HANDLE(xen_ulong) mfn_list;
 } xen_translate_gpfn_list_t;
+DEFINE_GUEST_HANDLE(xen_translate_gpfn_list_t);
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 

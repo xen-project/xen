@@ -23,6 +23,7 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
+#include <xen/guest_access.h>
 #include <asm/current.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
@@ -191,7 +192,7 @@ void subarch_init_memory(struct domain *dom_xen)
     }
 }
 
-long subarch_memory_op(int op, void *arg)
+long subarch_memory_op(int op, GUEST_HANDLE(void) arg)
 {
     struct xen_machphys_mfn_list xmml;
     unsigned long mfn;
@@ -201,7 +202,7 @@ long subarch_memory_op(int op, void *arg)
     switch ( op )
     {
     case XENMEM_machphys_mfn_list:
-        if ( copy_from_user(&xmml, arg, sizeof(xmml)) )
+        if ( copy_from_guest(&xmml, arg, 1) )
             return -EFAULT;
 
         max = min_t(unsigned int, xmml.max_extents, mpt_size >> 21);
@@ -210,11 +211,12 @@ long subarch_memory_op(int op, void *arg)
         {
             mfn = l2e_get_pfn(idle_pg_table_l2[l2_linear_offset(
                 RDWR_MPT_VIRT_START + (i << 21))]) + l1_table_offset(i << 21);
-            if ( put_user(mfn, &xmml.extent_start[i]) )
+            if ( copy_to_guest_offset(xmml.extent_start, i, &mfn, 1) )
                 return -EFAULT;
         }
 
-        if ( put_user(i, &((struct xen_machphys_mfn_list *)arg)->nr_extents) )
+        xmml.nr_extents = i;
+        if ( copy_to_guest(arg, &xmml, 1) )
             return -EFAULT;
 
         break;

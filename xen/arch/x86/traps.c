@@ -1415,8 +1415,8 @@ long do_set_trap_table(struct trap_info *traps)
     {
         if ( hypercall_preempt_check() )
         {
-            rc = hypercall1_create_continuation(
-                __HYPERVISOR_set_trap_table, traps);
+            rc = hypercall_create_continuation(
+                __HYPERVISOR_set_trap_table, "p", traps);
             break;
         }
 

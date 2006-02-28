@@ -825,22 +825,37 @@ void sync_vcpu_execstate(struct vcpu *v)
     flush_tlb_mask(v->vcpu_dirty_cpumask);
 }
 
-unsigned long __hypercall_create_continuation(
-    unsigned int op, unsigned int nr_args, ...)
+#define next_arg(fmt, args) ({                                              \
+    unsigned long __arg;                                                    \
+    switch ( *(fmt)++ )                                                     \
+    {                                                                       \
+    case 'i': __arg = (unsigned long)va_arg(args, unsigned int);  break;    \
+    case 'l': __arg = (unsigned long)va_arg(args, unsigned long); break;    \
+    case 'p': __arg = (unsigned long)va_arg(args, void *);        break;    \
+    case 'h': __arg = (unsigned long)va_arg(args, void *);        break;    \
+    default:  __arg = 0; BUG();                                             \
+    }                                                                       \
+    __arg;                                                                  \
+})
+
+unsigned long hypercall_create_continuation(
+    unsigned int op, const char *format, ...)
 {
     struct mc_state *mcs = &mc_state[smp_processor_id()];
     struct cpu_user_regs *regs;
+    const char *p = format;
+    unsigned long arg;
     unsigned int i;
     va_list args;
 
-    va_start(args, nr_args);
+    va_start(args, format);
 
     if ( test_bit(_MCSF_in_multicall, &mcs->flags) )
     {
         __set_bit(_MCSF_call_preempted, &mcs->flags);
 
-        for ( i = 0; i < nr_args; i++ )
-            mcs->call.args[i] = va_arg(args, unsigned long);
+        for ( i = 0; *p != '\0'; i++ )
+            mcs->call.args[i] = next_arg(p, args);
     }
     else
     {
@@ -853,32 +868,34 @@ unsigned long __hypercall_create_continuation(
         else
             regs->eip -= 2;   /* re-execute 'int 0x82' */
 
-        for ( i = 0; i < nr_args; i++ )
+        for ( i = 0; *p != '\0'; i++ )
         {
+            arg = next_arg(p, args);
             switch ( i )
             {
-            case 0: regs->ebx = va_arg(args, unsigned long); break;
-            case 1: regs->ecx = va_arg(args, unsigned long); break;
-            case 2: regs->edx = va_arg(args, unsigned long); break;
-            case 3: regs->esi = va_arg(args, unsigned long); break;
-            case 4: regs->edi = va_arg(args, unsigned long); break;
-            case 5: regs->ebp = va_arg(args, unsigned long); break;
+            case 0: regs->ebx = arg; break;
+            case 1: regs->ecx = arg; break;
+            case 2: regs->edx = arg; break;
+            case 3: regs->esi = arg; break;
+            case 4: regs->edi = arg; break;
+            case 5: regs->ebp = arg; break;
             }
         }
 #elif defined(__x86_64__)
         regs->rax  = op;
         regs->rip -= 2;  /* re-execute 'syscall' */
 
-        for ( i = 0; i < nr_args; i++ )
+        for ( i = 0; *p != '\0'; i++ )
         {
+            arg = next_arg(p, args);
             switch ( i )
             {
-            case 0: regs->rdi = va_arg(args, unsigned long); break;
-            case 1: regs->rsi = va_arg(args, unsigned long); break;
-            case 2: regs->rdx = va_arg(args, unsigned long); break;
-            case 3: regs->r10 = va_arg(args, unsigned long); break;
-            case 4: regs->r8  = va_arg(args, unsigned long); break;
-            case 5: regs->r9  = va_arg(args, unsigned long); break;
+            case 0: regs->rdi = arg; break;
+            case 1: regs->rsi = arg; break;
+            case 2: regs->rdx = arg; break;
+            case 3: regs->r10 = arg; break;
+            case 4: regs->r8  = arg; break;
+            case 5: regs->r9  = arg; break;
             }
         }
 #endif

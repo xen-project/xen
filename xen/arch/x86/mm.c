@@ -97,11 +97,11 @@
 #include <xen/domain_page.h>
 #include <xen/event.h>
 #include <xen/iocap.h>
+#include <xen/guest_access.h>
 #include <asm/shadow.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/io.h>
-#include <asm/uaccess.h>
 #include <asm/ldt.h>
 #include <asm/x86_emulate.h>
 #include <public/memory.h>
@@ -1778,9 +1778,9 @@ int do_mmuext_op(
     {
         if ( hypercall_preempt_check() )
         {
-            rc = hypercall4_create_continuation(
-                __HYPERVISOR_mmuext_op, uops,
-                (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
+            rc = hypercall_create_continuation(
+                __HYPERVISOR_mmuext_op, "pipi",
+                uops, (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
             break;
         }
 
@@ -2044,9 +2044,9 @@ int do_mmu_update(
     {
         if ( hypercall_preempt_check() )
         {
-            rc = hypercall4_create_continuation(
-                __HYPERVISOR_mmu_update, ureqs, 
-                (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
+            rc = hypercall_create_continuation(
+                __HYPERVISOR_mmu_update, "pipi",
+                ureqs, (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
             break;
         }
 
@@ -2795,7 +2795,7 @@ long do_update_descriptor(u64 pa, u64 desc)
 }
 
 
-long arch_memory_op(int op, void *arg)
+long arch_memory_op(int op, GUEST_HANDLE(void) arg)
 {
     struct xen_reserved_phys_area xrpa;
     unsigned long pfn;
@@ -2805,7 +2805,7 @@ long arch_memory_op(int op, void *arg)
     switch ( op )
     {
     case XENMEM_reserved_phys_area:
-        if ( copy_from_user(&xrpa, arg, sizeof(xrpa)) )
+        if ( copy_from_guest(&xrpa, arg, 1) )
             return -EFAULT;
 
         /* No guest has more than one reserved area. */
@@ -2839,7 +2839,7 @@ long arch_memory_op(int op, void *arg)
 
         put_domain(d);
 
-        if ( copy_to_user(arg, &xrpa, sizeof(xrpa)) )
+        if ( copy_to_guest(arg, &xrpa, 1) )
             return -EFAULT;
 
         break;
