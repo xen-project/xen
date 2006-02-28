@@ -59,7 +59,6 @@ struct arch_vcpu {
 	unsigned long domain_itm;
 	unsigned long domain_itm_last;
 	unsigned long xen_itm;
-	unsigned long xen_timer_interval;
 #endif
     mapped_regs_t *privregs; /* save the state of vcpu */
     unsigned long metaphysical_rr0;		// from arch_domain (so is pinned)

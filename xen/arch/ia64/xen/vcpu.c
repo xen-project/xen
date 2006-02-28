@@ -985,15 +985,6 @@ IA64FAULT vcpu_set_lrr1(VCPU *vcpu, UINT64 val)
 	return (IA64_NO_FAULT);
 }
 
-// parameter is a time interval specified in cycles
-void vcpu_enable_timer(VCPU *vcpu,UINT64 cycles)
-{
-    PSCBX(vcpu,xen_timer_interval) = cycles;
-    vcpu_set_next_timer(vcpu);
-    printf("vcpu_enable_timer: interval set to %lu cycles\n",
-             PSCBX(vcpu,xen_timer_interval));
-}
-
 IA64FAULT vcpu_set_itv(VCPU *vcpu, UINT64 val)
 {
 //extern unsigned long privop_trace;
@@ -1001,10 +992,11 @@ IA64FAULT vcpu_set_itv(VCPU *vcpu, UINT64 val)
 	if (val & 0xef00) return (IA64_ILLOP_FAULT);
 	PSCB(vcpu,itv) = val;
 	if (val & 0x10000) {
-printf("**** vcpu_set_itv(%lu): vitm=%lx, setting to 0\n",val,PSCBX(vcpu,domain_itm));
+		printf("**** vcpu_set_itv(%lu): vitm=%lx, setting to 0\n",
+		       val,PSCBX(vcpu,domain_itm));
 		PSCBX(vcpu,domain_itm) = 0;
 	}
-	else vcpu_enable_timer(vcpu,1000000L);
+	else vcpu_set_next_timer(vcpu);
 	return (IA64_NO_FAULT);
 }
 
@@ -1086,7 +1078,6 @@ void vcpu_set_next_timer(VCPU *vcpu)
 	//UINT64 s = PSCBX(vcpu,xen_itm);
 	UINT64 s = local_cpu_data->itm_next;
 	UINT64 now = ia64_get_itc();
-	//UINT64 interval = PSCBX(vcpu,xen_timer_interval);
 
 	/* gloss over the wraparound problem for now... we know it exists
 	 * but it doesn't matter right now */
