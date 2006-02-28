@@ -974,13 +974,6 @@ int construct_dom0(struct domain *d,
 
 	// FIXME: Hack for keyboard input
 	serial_input_init();
-	if (d == dom0) {
-		VCPU(v, delivery_mask[0]) = -1L;
-		VCPU(v, delivery_mask[1]) = -1L;
-		VCPU(v, delivery_mask[2]) = -1L;
-		VCPU(v, delivery_mask[3]) = -1L;
-	}
-	else __set_bit(0x30, VCPU(v, delivery_mask));
 
 	return 0;
 }

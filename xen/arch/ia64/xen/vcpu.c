@@ -651,7 +651,6 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 	    set_bit(vector,VCPU(vcpu,irr));
     } else
     {
-	/* if (!test_bit(vector,PSCB(vcpu,delivery_mask))) return; */
 	if (test_bit(vector,PSCBX(vcpu,irr))) {
 //printf("vcpu_pend_interrupt: overrun\n");
 	}
@@ -691,7 +690,6 @@ check_start:
 		vcpu_pend_interrupt(vcpu, vcpu->vcpu_info->arch.evtchn_vector);
 
 	p = &PSCBX(vcpu,irr[3]);
-	/* q = &PSCB(vcpu,delivery_mask[3]); */
 	r = &PSCBX(vcpu,insvc[3]);
 	for (i = 3; ; p--, q--, r--, i--) {
 		bits = *p /* & *q */;
@@ -994,7 +992,6 @@ void vcpu_enable_timer(VCPU *vcpu,UINT64 cycles)
     vcpu_set_next_timer(vcpu);
     printf("vcpu_enable_timer: interval set to %lu cycles\n",
              PSCBX(vcpu,xen_timer_interval));
-    __set_bit(PSCB(vcpu,itv), PSCB(vcpu,delivery_mask));
 }
 
 IA64FAULT vcpu_set_itv(VCPU *vcpu, UINT64 val)
