@@ -175,7 +175,7 @@
 	;;											\
 .mem.offset 0,0; st8.spill [r16]=r13,16;							\
 .mem.offset 8,0; st8.spill [r17]=r21,16;	/* save ar.fpsr */				\
-	/* XEN mov r13=IA64_KR(CURRENT);	/* establish `current' */				\
+	/* XEN mov r13=IA64_KR(CURRENT);*/	/* establish `current' */				\
 	MINSTATE_GET_CURRENT(r13);		/* XEN establish `current' */				\
 	;;											\
 .mem.offset 0,0; st8.spill [r16]=r15,16;							\

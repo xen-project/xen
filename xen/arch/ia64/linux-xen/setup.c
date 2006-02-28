@@ -94,6 +94,10 @@ struct io_space io_space[MAX_IO_SPACES];
 EXPORT_SYMBOL(io_space);
 unsigned int num_io_spaces;
 
+#ifdef XEN
+extern void early_cmdline_parse(char **);
+#endif
+
 /*
  * "flush_icache_range()" needs to know what processor dependent stride size to use
  * when it makes i-cache(s) coherent with d-caches.
@@ -500,6 +504,7 @@ late_setup_arch (char **cmdline_p)
 	paging_init();
 }
 
+#ifndef XEN
 /*
  * Display cpu info for all cpu's.
  */
@@ -611,14 +616,13 @@ c_stop (struct seq_file *m, void *v)
 {
 }
 
-#ifndef XEN
 struct seq_operations cpuinfo_op = {
 	.start =	c_start,
 	.next =		c_next,
 	.stop =		c_stop,
 	.show =		show_cpuinfo
 };
-#endif
+#endif /* XEN */
 
 void
 identify_cpu (struct cpuinfo_ia64 *c)

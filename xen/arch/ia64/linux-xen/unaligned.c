@@ -216,6 +216,7 @@ static u16 gr_info[32]={
 	RPT(r28), RPT(r29), RPT(r30), RPT(r31)
 };
 
+#ifndef XEN
 static u16 fr_info[32]={
 	0,			/* constant : WE SHOULD NEVER GET THIS */
 	0,			/* constant : WE SHOULD NEVER GET THIS */
@@ -285,6 +286,7 @@ invala_fr (int regno)
 	}
 #	undef F
 }
+#endif /* XEN */
 
 static inline unsigned long
 rotate_reg (unsigned long sor, unsigned long rrb, unsigned long reg)
@@ -299,12 +301,11 @@ rotate_reg (unsigned long sor, unsigned long rrb, unsigned long reg)
 void
 set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, unsigned long nat)
 {
-	struct switch_stack *sw = (struct switch_stack *) regs - 1;
-	unsigned long *bsp, *bspstore, *addr, *rnat_addr, *ubs_end;
+	unsigned long *bsp, *bspstore, *addr, *rnat_addr;
 	unsigned long *kbs = (void *) current + IA64_RBS_OFFSET;
-	unsigned long rnats, nat_mask;
+	unsigned long nat_mask;
     unsigned long old_rsc,new_rsc;
-	unsigned long on_kbs,rnat;
+	unsigned long rnat;
 	long sof = (regs->cr_ifs) & 0x7f;
 	long sor = 8 * ((regs->cr_ifs >> 14) & 0xf);
 	long rrb_gr = (regs->cr_ifs >> 18) & 0x7f;
@@ -323,7 +324,7 @@ set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, unsigned
     new_rsc=old_rsc&(~0x3);
     ia64_set_rsc(new_rsc);
 
-    bspstore = ia64_get_bspstore();
+    bspstore = (unsigned long*)ia64_get_bspstore();
     bsp =kbs + (regs->loadrs >> 19);//16+3
 
 	addr = ia64_rse_skip_regs(bsp, -sof + ridx);
@@ -335,7 +336,7 @@ set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, unsigned
         ia64_flushrs ();
         ia64_mf ();
 		*addr = val;
-        bspstore = ia64_get_bspstore();
+        bspstore = (unsigned long*)ia64_get_bspstore();
     	rnat = ia64_get_rnat ();
         if(bspstore < rnat_addr){
             rnat=rnat&(~nat_mask);
@@ -362,13 +363,11 @@ set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, unsigned
 
 
 static void
-get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, unsigned long *nat)
+get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, int*nat)
 {
-    struct switch_stack *sw = (struct switch_stack *) regs - 1;
-    unsigned long *bsp, *addr, *rnat_addr, *ubs_end, *bspstore;
+    unsigned long *bsp, *addr, *rnat_addr, *bspstore;
     unsigned long *kbs = (void *) current + IA64_RBS_OFFSET;
-    unsigned long rnats, nat_mask;
-    unsigned long on_kbs;
+    unsigned long nat_mask;
     unsigned long old_rsc, new_rsc;
     long sof = (regs->cr_ifs) & 0x7f;
     long sor = 8 * ((regs->cr_ifs >> 14) & 0xf);
@@ -388,7 +387,7 @@ get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, unsigne
     new_rsc=old_rsc&(~(0x3));
     ia64_set_rsc(new_rsc);
 
-    bspstore = ia64_get_bspstore();
+    bspstore = (unsigned long*)ia64_get_bspstore();
     bsp =kbs + (regs->loadrs >> 19); //16+3;
 
     addr = ia64_rse_skip_regs(bsp, -sof + ridx);
@@ -399,14 +398,14 @@ get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, unsigne
 
         ia64_flushrs ();
         ia64_mf ();
-        bspstore = ia64_get_bspstore();
+        bspstore = (unsigned long*)ia64_get_bspstore();
     }
     *val=*addr;
     if(nat){
         if(bspstore < rnat_addr){
-            *nat=!!(ia64_get_rnat()&nat_mask);
+            *nat=(int)!!(ia64_get_rnat()&nat_mask);
         }else{
-            *nat = !!((*rnat_addr)&nat_mask);
+            *nat = (int)!!((*rnat_addr)&nat_mask);
         }
         ia64_set_rsc(old_rsc);
     }
@@ -634,6 +633,7 @@ fph_index (struct pt_regs *regs, long regnum)
 	return rotate_reg(96, rrb_fr, (regnum - IA64_FIRST_ROTATING_FR));
 }
 
+#ifndef XEN
 static void
 setfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_regs *regs)
 {
@@ -682,6 +682,7 @@ setfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_regs *regs)
 		regs->cr_ipsr |= IA64_PSR_MFL;
 	}
 }
+#endif /* XEN */
 
 /*
  * Those 2 inline functions generate the spilled versions of the constant floating point
@@ -699,6 +700,7 @@ float_spill_f1 (struct ia64_fpreg *final)
 	ia64_stf_spill(final, 1);
 }
 
+#ifndef XEN
 static void
 getfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_regs *regs)
 {
@@ -748,6 +750,7 @@ getfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_regs *regs)
 		}
 	}
 }
+#endif /* XEN */
 
 
 #ifdef XEN
@@ -803,6 +806,7 @@ getreg (unsigned long regnum, unsigned long *val, int *nat, struct pt_regs *regs
 		*nat  = (*unat >> (addr >> 3 & 0x3f)) & 0x1UL;
 }
 
+#ifndef XEN
 static void
 emulate_load_updates (update_t type, load_store_t ld, struct pt_regs *regs, unsigned long ifa)
 {
@@ -1078,6 +1082,7 @@ emulate_store_int (unsigned long ifa, load_store_t ld, struct pt_regs *regs)
 
 	return 0;
 }
+#endif /* XEN */
 
 /*
  * floating point operations sizes in bytes
@@ -1153,6 +1158,7 @@ float2mem_double (struct ia64_fpreg *init, struct ia64_fpreg *final)
 	ia64_stfd(final, 6);
 }
 
+#ifndef XEN
 static int
 emulate_load_floatpair (unsigned long ifa, load_store_t ld, struct pt_regs *regs)
 {
@@ -1437,6 +1443,7 @@ within_logging_rate_limit (void)
 	return 0;
 
 }
+#endif /* XEN */
 
 void
 ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
