@@ -107,6 +107,7 @@ struct mm_struct {
 						 * by mmlist_lock
 						 */
 
+#ifndef XEN
 	unsigned long start_code, end_code, start_data, end_data;
 	unsigned long start_brk, brk, start_stack;
 	unsigned long arg_start, arg_end, env_start, env_end;
@@ -116,6 +117,7 @@ struct mm_struct {
 	unsigned long saved_auxv[40]; /* for /proc/PID/auxv */
 
 	unsigned dumpable:1;
+#endif
 #ifdef CONFIG_HUGETLB_PAGE
 	int used_hugetlb;
 #endif
