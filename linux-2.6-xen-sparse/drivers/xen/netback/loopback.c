@@ -178,6 +178,23 @@ static int __init make_loopback(int i)
 	return err;
 }
 
+static void __init clean_loopback(int i)
+{
+	struct net_device *dev1, *dev2;
+	char dev_name[IFNAMSIZ];
+
+	sprintf(dev_name, "vif0.%d", i);
+	dev1 = dev_get_by_name(dev_name);
+	sprintf(dev_name, "veth%d", i);
+	dev2 = dev_get_by_name(dev_name);
+	if (dev1 && dev2) {
+		unregister_netdev(dev2);
+		unregister_netdev(dev1);
+		free_netdev(dev2);
+		free_netdev(dev1);
+	}
+}
+
 static int __init loopback_init(void)
 {
 	int i, err = 0;
@@ -190,6 +207,18 @@ static int __init loopback_init(void)
 }
 
 module_init(loopback_init);
+
+static void __exit loopback_exit(void)
+{
+	int i;
+
+	for (i = nloopbacks; i-- > 0; )
+		clean_loopback(i);
+}
+
+module_exit(loopback_exit);
+
+MODULE_LICENSE("Dual BSD/GPL");
 
 /*
  * Local variables:

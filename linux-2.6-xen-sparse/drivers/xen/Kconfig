@@ -89,7 +89,7 @@ config XEN_BLKDEV_TAP_BE
           modified to use grant tables.
 
 config XEN_NETDEV_BACKEND
-	bool "Network-device backend driver"
+	tristate "Network-device backend driver"
 	default y
 	help
 	  The network-device backend driver allows the kernel to export its
@@ -108,6 +108,14 @@ config XEN_NETDEV_PIPELINED_TRANSMITTER
 	  like reassembling packets to perform firewall filtering; or if you
 	  are unsure; or if you experience network hangs when this option is
 	  enabled; then you must say N here.
+
+config XEN_NETDEV_LOOPBACK
+	tristate "Network-device loopback driver"
+	depends on XEN_NETDEV_BACKEND
+	default y
+	help
+	  A two-interface loopback device to emulate a local netfront-netback
+	  connection.
 
 config XEN_TPMDEV_BACKEND
 	bool "TPM-device backend driver"

@@ -809,6 +809,8 @@ static int __init netback_init(void)
 		&netif_be_dbg);
 #endif
 
+	__unsafe(THIS_MODULE);
+
 	return 0;
 }
 
@@ -819,6 +821,8 @@ static void netback_cleanup(void)
 
 module_init(netback_init);
 module_exit(netback_cleanup);
+
+MODULE_LICENSE("Dual BSD/GPL");
 
 /*
  * Local variables:
