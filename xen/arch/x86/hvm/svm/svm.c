@@ -1813,7 +1813,9 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
         next_wakeup = next_pit;
     if ( next_wakeup != - 1 )
         set_timer(&current->arch.hvm_svm.hlt_timer, next_wakeup);
+/* temporary workaround for 8828/8822 evtchn patches causing SVM failure.
     hvm_safe_block();
+*/
 }
 
 
