@@ -1363,13 +1363,13 @@ static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs)
     }
 }
 
-
 static int svm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
     unsigned long mfn;
     int paging_enabled;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    unsigned long crn;
 
     ASSERT(vmcb);
 
@@ -1414,14 +1414,7 @@ static int svm_set_cr0(unsigned long value)
             HVM_DBG_LOG(DBG_LEVEL_1, "Enable the Long mode\n");
             set_bit(SVM_CPU_STATE_LMA_ENABLED,
                     &v->arch.hvm_svm.cpu_state);
-#if 0
-            __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
-            vm_entry_value |= VM_ENTRY_CONTROLS_IA32E_MODE;
-            __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
-#else
-	    printk("Cannot yet set SVM_CPU_STATE_LMA_ENABLED\n");
-	    domain_crash_synchronous();
-#endif
+            vmcb->efer |= (EFER_LMA | EFER_LME);
 
 #if CONFIG_PAGING_LEVELS >= 4 
             if (!shadow_set_guest_paging_levels(v->domain, 4)) 
@@ -1432,8 +1425,9 @@ static int svm_set_cr0(unsigned long value)
 #endif
         }
         else
+#endif  /* __x86_64__ */
         {
-#if CONFIG_PAGING_LEVELS >= 4
+#if CONFIG_PAGING_LEVELS >= 3
             if (!shadow_set_guest_paging_levels(v->domain, 2))
             {
                 printk("Unsupported guest paging levels\n");
@@ -1442,30 +1436,15 @@ static int svm_set_cr0(unsigned long value)
 #endif
         }
 
-#if 0
-        unsigned long crn;
-
         /* update CR4's PAE if needed */
-        __vmread(GUEST_CR4, &crn);
+        crn = vmcb->cr4;
         if ((!(crn & X86_CR4_PAE)) 
                 && test_bit(SVM_CPU_STATE_PAE_ENABLED, 
                     &v->arch.hvm_svm.cpu_state))
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "enable PAE on cr4\n");
-            __vmwrite(GUEST_CR4, crn | X86_CR4_PAE);
+            vmcb->cr4 |= X86_CR4_PAE;
         }
-#else
-	printk("Cannot yet set SVM_CPU_STATE_PAE_ENABLED\n");
-	domain_crash_synchronous(); 
-#endif
-#elif defined(__i386__)
-	{
-            unsigned long old_base_mfn;
-            old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-            if (old_base_mfn)
-                put_page(mfn_to_page(old_base_mfn));
-	}
-#endif
 
         /* Now arch.guest_table points to machine physical. */
         v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
@@ -1499,7 +1478,6 @@ static int svm_set_cr0(unsigned long value)
 
     return 1;
 }
-
 
 /*
  * Read from control registers. CR0 and CR4 are read from the shadow.
