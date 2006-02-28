@@ -190,7 +190,6 @@ static int construct_init_vmcb_guest(struct arch_svm_struct *arch_svm,
     unsigned long eflags;
     unsigned long shadow_cr;
     struct vmcb_struct *vmcb = arch_svm->vmcb;
-    struct Xgt_desc_struct desc;
 
     /* Allows IRQs to be shares */
     vmcb->vintr.fields.intr_masking = 1;
@@ -224,9 +223,9 @@ static int construct_init_vmcb_guest(struct arch_svm_struct *arch_svm,
     vmcb->fs.base = 0;
     vmcb->gs.base = 0;
 
-    __asm__ __volatile__ ("sidt  (%0) \n" :: "a"(&desc) : "memory");
-    vmcb->idtr.base = desc.address;
-    vmcb->idtr.limit = desc.size;
+    /* Guest Interrupt descriptor table */
+    vmcb->idtr.base = 0;
+    vmcb->idtr.limit = 0;
 
     /* Set up segment attributes */
     attrib.bytes = 0;
@@ -248,15 +247,11 @@ static int construct_init_vmcb_guest(struct arch_svm_struct *arch_svm,
     attrib.fields.type = 0xb;   /* type=0xb -> executable/readable, accessed */
     vmcb->cs.attributes = attrib;
 
-    /* Global descriptor table */
-    //NMERGE7500 - can probably remove access to gdtr
-    vmcb->gdtr.base = regs->edx;
-    regs->edx = 0;
-    ASSERT(regs->eax <= 0xFFFF); /* Make sure we're in the limit */
-    vmcb->gdtr.limit = regs->eax;
-    regs->eax = 0;
+    /* Guest Global descriptor table */
+    vmcb->gdtr.base = 0;
+    vmcb->gdtr.limit = 0;
 
-    /* Local Descriptor Table */
+    /* Guest Local Descriptor Table */
     attrib.fields.s = 0; /* not code or data segement */
     attrib.fields.type = 0x2; /* LDT */
     attrib.fields.db = 0; /* 16-bit */
@@ -279,11 +274,10 @@ static int construct_init_vmcb_guest(struct arch_svm_struct *arch_svm,
     /* CR3 is set in svm_final_setup_guest */
 
     __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (crn) :); 
-    shadow_cr = crn;
-    vmcb->cr4 = shadow_cr;
+    arch_svm->cpu_shadow_cr4 = crn & ~(X86_CR4_PGE | X86_CR4_PSE);
+    vmcb->cr4 = crn | SVM_CR4_HOST_MASK;
 
-//MERGE7500 - should write a 0 instead to rsp?
-    vmcb->rsp = regs->esp;
+    vmcb->rsp = 0;
     vmcb->rip = regs->eip;
 
     eflags = regs->eflags & ~HVM_EFLAGS_RESERVED_0; /* clear 0s */

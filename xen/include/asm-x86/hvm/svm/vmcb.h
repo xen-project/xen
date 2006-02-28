@@ -269,21 +269,6 @@ enum {
 #define SVM_LONG_GUEST(ed)    \
   (test_bit(SVM_CPU_STATE_LMA_ENABLED, &ed->arch.hvm_svm.cpu_state))
 
-enum {
-    SVM_INDEX_MSR_LSTAR = 0,
-    SVM_INDEX_MSR_STAR,
-    SVM_INDEX_MSR_CSTAR,
-    SVM_INDEX_MSR_SYSCALL_MASK,
-    SVM_INDEX_MSR_EFER,
-
-    SVM_MSR_COUNT,
-};
-
-struct svm_msr_state {
-    unsigned long flags;
-    unsigned long msr_items[SVM_MSR_COUNT];
-    unsigned long shadow_gs;
-};
 
 /* 
  * Attribute for segment selector. This is a copy of bit 40:47 & 52:55 of the
@@ -449,7 +434,7 @@ struct vmcb_struct {
 
 struct arch_svm_struct {
     struct vmcb_struct	*vmcb;
-    void		*host_save_area;
+    void		        *host_save_area;
     u64                 host_save_pa;
     u64                 vmcb_pa;
     u32                 *iopm;
@@ -461,11 +446,11 @@ struct arch_svm_struct {
     u32                 asid_core;
     
     unsigned long       flags;      /* VMCB flags */
-    unsigned long       cpu_shadow_cr0; /* copy of guest read shadow CR0 */
+    unsigned long       cpu_shadow_cr0; /* Guest value for CR0 */
+    unsigned long       cpu_shadow_cr4; /* Guest value for CR4 */
     unsigned long       cpu_cr2;
     unsigned long       cpu_cr3;
     unsigned long       cpu_state;
-    struct svm_msr_state msr_content;
     struct timer        hlt_timer;  /* hlt ins emulation wakeup timer */
 };
 
@@ -486,6 +471,14 @@ enum {
 
 #define VMCB_EFLAGS_RESERVED_0          0xffc08028 /* bitmap for 0 */
 #define VMCB_EFLAGS_RESERVED_1          0x00000002 /* bitmap for 1 */
+
+/* These bits in the CR4 are owned by the host */
+#ifdef __i386__
+#define SVM_CR4_HOST_MASK (0)
+#else
+#define SVM_CR4_HOST_MASK (X86_CR4_PAE)
+#endif
+
 
 #endif /* ASM_X86_HVM_SVM_VMCS_H__ */
 

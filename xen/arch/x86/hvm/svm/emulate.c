@@ -86,7 +86,7 @@ static inline unsigned long DECODE_GPR_VALUE(struct vmcb_struct *vmcb,
     case 0x7:
         value = regs->edi;
         break;
-#if X86_64
+#if __x86_64__
     case 0x8:
         value = regs->r8;
         break;
@@ -318,20 +318,14 @@ unsigned long get_effective_addr_sib(struct vmcb_struct *vmcb,
 
 
 /* Get the register/mode number of src register in ModRM register. */
-unsigned int decode_dest_reg(u8 m)
+unsigned int decode_dest_reg(u8 prefix, u8 m)
 {
-#if __x86_64__
-    ASSERT(0); /* Need to adjust for REX prefix if applicable */
-#endif
-    return (m >> 3) & 7;
+    return DECODE_MODRM_REG(prefix, m);
 }
 
-unsigned int decode_src_reg(u8 m)
+unsigned int decode_src_reg(u8 prefix, u8 m)
 {
-#if __x86_64__
-    ASSERT(0); /* Need to adjust for REX prefix if applicable */
-#endif
-    return m & 7;
+    return DECODE_MODRM_RM(prefix, m);
 }
 
 
@@ -431,7 +425,7 @@ static const u8 *opc_bytes[INSTR_MAX_COUNT] =
  * The caller can either pass a NULL pointer to the guest_eip_buf, or a pointer
  * to enough bytes to satisfy the instruction including prefix bytes.
  */
-unsigned int __get_instruction_length_from_list(struct vmcb_struct *vmcb,
+int __get_instruction_length_from_list(struct vmcb_struct *vmcb,
         enum instruction_index *list, unsigned int list_count, 
         u8 *guest_eip_buf, enum instruction_index *match)
 {

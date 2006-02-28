@@ -107,8 +107,6 @@ ENTRY(svm_asm_do_launch)
         movq %rax, VMCB_rax(%rcx)
         movq VCPU_svm_hsa_pa(%rbx), %rax
         VMSAVE
-	/* XXX FPU SAVE */
-	/* XXX DO TSC OFFSET */
 
         movq VCPU_svm_vmcb_pa(%rbx), %rax
         popq %r15
@@ -137,9 +135,7 @@ ENTRY(svm_asm_do_launch)
         VMSAVE
         /* rax is the only register we're allowed to touch here... */
 
-	/* XXX FPU SAVE */
         GET_CURRENT(%rax)
-	/* XXX DO TSC OFFSET */
         movq VCPU_svm_hsa_pa(%rax), %rax
         VMLOAD
 
