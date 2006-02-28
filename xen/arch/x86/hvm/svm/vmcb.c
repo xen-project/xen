@@ -306,7 +306,7 @@ void destroy_vmcb(struct arch_svm_struct *arch_svm)
 {
     if(arch_svm->vmcb != NULL)
     {
-        asidpool_retire(arch_svm->vmcb, arch_svm->core);
+        asidpool_retire(arch_svm->vmcb, arch_svm->asid_core);
          free_vmcb(arch_svm->vmcb);
     }
     if(arch_svm->iopm != NULL) {
@@ -404,18 +404,17 @@ err_out:
 
 void svm_do_launch(struct vcpu *v)
 {
-    /* Update CR3, GDT, LDT, TR */
-    struct vmcb_struct *vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int core = smp_processor_id();
-    vmcb = v->arch.hvm_svm.vmcb;
     ASSERT(vmcb);
 
+    /* Update CR3, GDT, LDT, TR */
     svm_stts(v);
 
-    /* current core is the one we will perform the vmrun on */
-    v->arch.hvm_svm.core = core;
+    /* current core is the one we intend to perform the VMRUN on */
+    v->arch.hvm_svm.launch_core = v->arch.hvm_svm.asid_core = core;
     clear_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
-    if ( !asidpool_assign_next(vmcb, 0, core, core) )
+    if ( !asidpool_assign_next( vmcb, 0, core, core ))
         BUG();
 
     if (v->vcpu_id == 0)

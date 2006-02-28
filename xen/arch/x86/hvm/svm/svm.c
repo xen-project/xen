@@ -820,8 +820,29 @@ void svm_relinquish_resources(struct vcpu *v)
 
 void arch_svm_do_resume(struct vcpu *v) 
 {
-    svm_do_resume(v);
-    reset_stack_and_jump(svm_asm_do_resume);
+    /* pinning VCPU to a different core? */
+    if ( v->arch.hvm_svm.launch_core == smp_processor_id()) {
+        svm_do_resume( v );
+        reset_stack_and_jump( svm_asm_do_resume );
+    }
+    else {
+        printk("VCPU core pinned: %d to %d\n", v->arch.hvm_svm.launch_core, smp_processor_id() );
+        v->arch.hvm_svm.launch_core = smp_processor_id();
+        svm_migrate_timers( v );
+        svm_do_resume( v );
+        reset_stack_and_jump( svm_asm_do_resume );
+    }
+}
+
+
+void svm_migrate_timers(struct vcpu *v)
+{
+    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
+
+    migrate_timer( &vpit->pit_timer, v->processor );
+    migrate_timer( &v->arch.hvm_svm.hlt_timer, v->processor );
+    if ( hvm_apic_support(v->domain) && VLAPIC( v ))
+        migrate_timer( &(VLAPIC(v)->vlapic_timer ), v->processor );
 }
 
 
@@ -2668,26 +2689,23 @@ asmlinkage void svm_asid(void)
 {
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    int core = smp_processor_id();
-    int oldcore = v->arch.hvm_svm.core; 
-    /* 
-     * if need to assign new asid or if switching cores, 
-     * then retire asid for old core, and assign new for new core.
-     */
-    if( v->arch.hvm_svm.core != core ) {
-        if (svm_dbg_on)
-            printk("old core %d new core %d\n",(int)v->arch.hvm_svm.core,(int)core);
-        v->arch.hvm_svm.core = core;
-    }
-    if( test_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags) ||
-          (oldcore != core)) {
-        if(!asidpool_assign_next(vmcb, 1, 
-	            oldcore, core)) {
+
+   /*
+    * if need to assign new asid, or if switching cores,
+    * retire asid for the old core, and assign a new asid to the current core.
+    */
+    if ( test_bit( ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags ) ||
+       ( v->arch.hvm_svm.asid_core != v->arch.hvm_svm.launch_core )) {
+        /* recycle asid */
+        if ( !asidpool_assign_next( vmcb, 1,
+	     v->arch.hvm_svm.asid_core, v->arch.hvm_svm.launch_core )) {
             /* If we get here, we have a major problem */
             domain_crash_synchronous();
         }
+
+        v->arch.hvm_svm.asid_core = v->arch.hvm_svm.launch_core;
+        clear_bit( ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags );
     }
-    clear_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
 }
 
 /*

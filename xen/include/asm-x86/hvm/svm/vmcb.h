@@ -457,7 +457,8 @@ struct arch_svm_struct {
     u64                 vmexit_tsc; /* tsc read at #VMEXIT. for TSC_OFFSET */
     int                 injecting_event;
     int                 saved_irq_vector;
-    u32                 core;        /* cpu of last vmexit */
+    u32                 launch_core;
+    u32                 asid_core;
     
     unsigned long       flags;      /* VMCB flags */
     unsigned long       cpu_shadow_cr0; /* copy of guest read shadow CR0 */
