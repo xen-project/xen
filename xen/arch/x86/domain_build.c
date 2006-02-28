@@ -28,6 +28,9 @@
 
 #include <public/version.h>
 
+extern unsigned long initial_images_nrpages(void);
+extern void discard_initial_images(void);
+
 static long dom0_nrpages;
 
 /*
@@ -249,9 +252,6 @@ int construct_dom0(struct domain *d,
     uint32_t dom0_features_supported[XENFEAT_NR_SUBMAPS] = { 0 };
     uint32_t dom0_features_required[XENFEAT_NR_SUBMAPS] = { 0 };
 
-    extern void translate_l2pgtable(
-        struct domain *d, l1_pgentry_t *p2m, unsigned long l2mfn);
-
     /* Sanity! */
     BUG_ON(d->domain_id != 0);
     BUG_ON(d->vcpu[0] == NULL);
@@ -272,18 +272,14 @@ int construct_dom0(struct domain *d,
      */
     if ( dom0_nrpages == 0 )
     {
-        dom0_nrpages = avail_domheap_pages() +
-            ((initrd_len + PAGE_SIZE - 1) >> PAGE_SHIFT) +
-            ((image_len  + PAGE_SIZE - 1) >> PAGE_SHIFT);
+        dom0_nrpages = avail_domheap_pages() + initial_images_nrpages();
         dom0_nrpages = min(dom0_nrpages / 16, 128L << (20 - PAGE_SHIFT));
         dom0_nrpages = -dom0_nrpages;
     }
 
     /* Negative memory specification means "all memory - specified amount". */
     if ( dom0_nrpages < 0 )
-        nr_pages = avail_domheap_pages() +
-            ((initrd_len + PAGE_SIZE - 1) >> PAGE_SHIFT) +
-            ((image_len  + PAGE_SIZE - 1) >> PAGE_SHIFT) +
+        nr_pages = avail_domheap_pages() + initial_images_nrpages() +
             dom0_nrpages;
     else
         nr_pages = dom0_nrpages;
@@ -705,16 +701,12 @@ int construct_dom0(struct domain *d,
         hypercall_page_initialise((void *)hypercall_page);
     }
 
-    init_domheap_pages(
-        _image_start, (_image_start+image_len+PAGE_SIZE-1) & PAGE_MASK);
-
-    /* Copy the initial ramdisk and free temporary buffer. */
+    /* Copy the initial ramdisk. */
     if ( initrd_len != 0 )
-    {
         memcpy((void *)vinitrd_start, initrd_start, initrd_len);
-        init_domheap_pages(
-            _initrd_start, (_initrd_start+initrd_len+PAGE_SIZE-1) & PAGE_MASK);
-    }
+
+    /* Free temporary buffers. */
+    discard_initial_images();
 
     /* Set up start info area. */
     si = (start_info_t *)vstartinfo_start;

@@ -144,6 +144,20 @@ static void __init do_initcalls(void)
 
 static struct e820entry e820_raw[E820MAX];
 
+static unsigned long initial_images_start, initial_images_end;
+
+unsigned long initial_images_nrpages(void)
+{
+    unsigned long s = initial_images_start + PAGE_SIZE - 1;
+    unsigned long e = initial_images_end;
+    return ((e >> PAGE_SHIFT) - (s >> PAGE_SHIFT));
+}
+
+void discard_initial_images(void)
+{
+    init_domheap_pages(initial_images_start, initial_images_end);
+}
+
 void __init __start_xen(multiboot_info_t *mbi)
 {
     char *cmdline;
@@ -152,7 +166,6 @@ void __init __start_xen(multiboot_info_t *mbi)
     unsigned int initrdidx = 1;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, modules_length;
-    unsigned long initial_images_start, initial_images_end;
     paddr_t s, e;
     int i, e820_warn = 0, e820_raw_nr = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
