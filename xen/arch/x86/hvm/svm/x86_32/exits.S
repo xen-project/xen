@@ -88,9 +88,6 @@
 #define STGI   .byte 0x0F,0x01,0xDC
 #define CLGI   .byte 0x0F,0x01,0xDD
 
-#define DO_TSC_OFFSET 0
-#define DO_FPUSAVE    0
-        
 ENTRY(svm_asm_do_launch)
         sti
         CLGI                
@@ -100,36 +97,6 @@ ENTRY(svm_asm_do_launch)
         movl %eax, VMCB_rax(%ecx)
         movl VCPU_svm_hsa_pa(%ebx), %eax
         VMSAVE
-
-#if DO_FPUSAVE
-        mov      %cr0, %eax     
-        push %eax
-        clts
-        lea     VCPU_arch_guest_fpu_ctxt(%ebx), %eax
-        fxrstor (%eax)
-        pop      %eax
-        mov      %eax, %cr0
-#endif
-
-#if (DO_TSC_OFFSET)
-        pushl %edx /* eax and edx get trashed by rdtsc */
-        pushl %eax
-        rdtsc
-        subl VCPU_svm_vmexit_tsc(%ebx),%eax   /* tsc's from    */
-        sbbl VCPU_svm_vmexit_tsc+4(%ebx),%edx /* last #VMEXIT? */
-        subl %eax,VMCB_tsc_offset(%ecx)  /* subtract from running TSC_OFFSET */
-        sbbl %edx,VMCB_tsc_offset+4(%ecx)
-        subl $20000,VMCB_tsc_offset(%ecx)  /* fudge factor for VMXXX calls  */
-        sbbl $0,VMCB_tsc_offset+4(%ecx)
-
-        /* 
-         * TODO: may need to add a kludge factor to account for all the cycles 
-         * burned in VMLOAD, VMSAVE, VMRUN...
-         */
-
-        popl %eax
-        popl %edx
-        #endif
 
         movl VCPU_svm_vmcb_pa(%ebx), %eax
         popl %ebx
@@ -150,31 +117,7 @@ ENTRY(svm_asm_do_launch)
         VMSAVE
         /* eax is the only register we're allowed to touch here... */
 
-#if DO_FPUSAVE
-        mov  %cr0, %eax
-        push %eax
-        clts
         GET_CURRENT(%eax)
-        lea     VCPU_arch_guest_fpu_ctxt(%eax), %eax
-        fxsave (%eax)
-        fnclex
-        pop  %eax
-        mov  %eax, %cr0
-#endif
-        
-        GET_CURRENT(%eax)
-
-#if (DO_TSC_OFFSET)
-        pushl %edx
-        pushl %ebx
-        movl %eax,%ebx
-        rdtsc
-        movl %eax,VCPU_svm_vmexit_tsc(%ebx)
-        movl %edx,VCPU_svm_vmexit_tsc+4(%ebx)
-        movl %ebx,%eax
-        popl %ebx
-        popl %edx
-#endif
 
         movl VCPU_svm_hsa_pa(%eax), %eax
         VMLOAD
