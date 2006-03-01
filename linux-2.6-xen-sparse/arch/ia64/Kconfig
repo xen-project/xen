@@ -79,6 +79,11 @@ config XEN_BLKDEV_FRONTEND
 	bool
 	default y
 
+config XEN_BLKDEV_BACKEND
+	depends on XEN
+	bool
+	default y
+
 config XEN_VT
 	bool "Override for turning on CONFIG_VT for domU"
 	default y
