@@ -120,6 +120,14 @@ extern void memwrite_p(VCPU *vcpu, u64 *src, u64 *dest, size_t s);
 extern void vcpu_load_kernel_regs(VCPU *vcpu);
 extern IA64FAULT vmx_vcpu_increment_iip(VCPU *vcpu);
 extern void vmx_switch_rr7(unsigned long ,shared_info_t*,void *,void *,void *);
+
+extern void dtlb_fault (VCPU *vcpu, u64 vadr);
+extern void nested_dtlb (VCPU *vcpu);
+extern void alt_dtlb (VCPU *vcpu, u64 vadr);
+extern void dvhpt_fault (VCPU *vcpu, u64 vadr);
+extern void dnat_page_consumption (VCPU *vcpu, uint64_t vadr);
+extern void page_not_present(VCPU *vcpu, u64 vadr);
+
 /**************************************************************************
  VCPU control register access routines
 **************************************************************************/

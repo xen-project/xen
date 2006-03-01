@@ -29,6 +29,7 @@
 #include <linux/interrupt.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/vmmu.h>
+#include <asm/tlbflush.h>
 #define  MAX_CCH_LENGTH     40
 
 thash_data_t *__alloc_chain(thash_cb_t *, thash_data_t *);
@@ -52,7 +53,7 @@ static thash_data_t *cch_alloc(thash_cb_t *hcb)
 
     if ( (p = hcb->cch_freelist) != NULL ) {
         hcb->cch_freelist = p->next;
-        return p;
+        return (thash_data_t *)p;
     }else{
         return NULL;
     }
@@ -295,7 +296,7 @@ int __tlb_to_vhpt(thash_cb_t *hcb,
             thash_data_t *tlb, u64 va,
             thash_data_t *vhpt)
 {
-    u64 pages,mfn,padr,pte;
+    u64 padr,pte;
 //    ia64_rr vrr;
     ASSERT ( hcb->ht == THASH_VHPT );
 //    vrr = (hcb->get_rr_fn)(hcb->vcpu,va);
@@ -340,7 +341,7 @@ void thash_vhpt_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
     //panic("Can't convert to machine VHPT entry\n");
     }
 
-    hash_table = ia64_thash(va);
+    hash_table = (thash_data_t *)ia64_thash(va);
     if( INVALID_VHPT(hash_table) ) {
         *hash_table = vhpt_entry;
         hash_table->next = 0;
@@ -393,7 +394,7 @@ thash_data_t * vhpt_lookup(u64 va)
 {
     thash_data_t *hash;
     u64 tag;
-    hash = ia64_thash(va);
+    hash = (thash_data_t *)ia64_thash(va);
     tag = ia64_ttag(va);
     while(hash){
     	if(hash->etag == tag)
@@ -456,7 +457,7 @@ static void vhpt_purge(thash_cb_t *hcb, u64 va, u64 ps)
     start = va & (-size);
     end = start + size;
     while(start < end){
-    	hash_table = ia64_thash(start);
+    	hash_table = (thash_data_t *)ia64_thash(start);
 	    tag = ia64_ttag(start);
     	if(hash_table->etag == tag ){
             __rem_hash_head(hcb, hash_table);
@@ -566,10 +567,10 @@ thash_data_t *__alloc_chain(thash_cb_t *hcb,thash_data_t *entry)
 void vtlb_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
 {
     thash_data_t    *hash_table, *cch;
-    int flag;
+    /* int flag; */
     ia64_rr vrr;
-    u64 gppn;
-    u64 ppns, ppne, tag;
+    /* u64 gppn, ppns, ppne; */
+    u64 tag;
     vrr=vmx_vcpu_rr(current, va);
     if (vrr.ps != entry->ps) {
 //        machine_tlb_insert(hcb->vcpu, entry);
@@ -716,6 +717,7 @@ static thash_data_t *thash_rem_cch(thash_cb_t *hcb, thash_data_t *cch)
         return cch;
     }
 }
+ */
 
 /*
  * Purge one hash line (include the entry in hash table).
@@ -950,9 +952,10 @@ void thash_purge_entries_ex(thash_cb_t *hcb,
             search_section_t p_sect,
             CACHE_LINE_TYPE cl)
 {
+/*
     thash_data_t    *ovl;
 
-/*    ovl = (hcb->find_overlap)(hcb, va, PSIZE(ps), rid, cl, p_sect);
+    ovl = (hcb->find_overlap)(hcb, va, PSIZE(ps), rid, cl, p_sect);
     while ( ovl != NULL ) {
         (hcb->rem_hash)(hcb, ovl);
         ovl = (hcb->next_overlap)(hcb);
@@ -968,7 +971,7 @@ void thash_purge_entries_ex(thash_cb_t *hcb,
  */
 void thash_purge_and_insert(thash_cb_t *hcb, thash_data_t *in, u64 va)
 {
-    thash_data_t    *ovl;
+    /* thash_data_t    *ovl; */
     search_section_t sections;
 
 #ifdef   XEN_DEBUGGER
@@ -1040,9 +1043,10 @@ static void thash_purge_line(thash_cb_t *hcb, thash_data_t *hash)
 // TODO: add sections.
 void thash_purge_all(thash_cb_t *hcb)
 {
-    thash_data_t    *hash_table, *entry;
+    thash_data_t    *hash_table;
+    /* thash_data_t    *entry; */
     thash_cb_t  *vhpt;
-    u64 i, start, end;
+    /* u64 i, start, end; */
 
 #ifdef  VTLB_DEBUG
 	extern u64  sanity_check;

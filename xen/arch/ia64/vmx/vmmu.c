@@ -477,7 +477,7 @@ IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64
     thash_cb_t  *hcb;
     search_section_t sections;
     ia64_rr vrr;
-    u64 mfn,psr;
+    /* u64 mfn,psr; */
 
     hcb = vmx_vcpu_get_vtlb(vcpu);
     data.page_flags=pte & ~PAGE_FLAGS_RV_MASK;
@@ -527,7 +527,7 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64
     thash_cb_t  *hcb;
     search_section_t sections;
     ia64_rr    vrr;
-    u64 mfn,psr;
+    /* u64 mfn,psr; */
 
     hcb = vmx_vcpu_get_vtlb(vcpu);
     data.page_flags=pte & ~PAGE_FLAGS_RV_MASK;

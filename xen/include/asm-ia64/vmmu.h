@@ -31,10 +31,6 @@
 #define         VCPU_VHPT_SIZE           (1UL<<VCPU_VHPT_SHIFT)
 #define         VCPU_VHPT_ORDER          (VCPU_VHPT_SHIFT - PAGE_SHIFT)
 
-#define         PTA_BASE_SHIFT          (15)
-
-
-
 #ifndef __ASSEMBLY__
 
 #include <xen/config.h>
@@ -384,6 +380,7 @@ extern ia64_rr vmmu_get_rr(struct vcpu *vcpu, u64 va);
 extern thash_cb_t *init_domain_tlb(struct vcpu *d);
 extern thash_data_t * vsa_thash(PTA vpta, u64 va, u64 vrr, u64 *tag);
 extern thash_data_t * vhpt_lookup(u64 va);
+extern void machine_tlb_purge(u64 va, u64 ps);
 
 //#define   VTLB_DEBUG
 #ifdef   VTLB_DEBUG
