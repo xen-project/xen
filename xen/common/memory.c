@@ -16,6 +16,7 @@
 #include <xen/event.h>
 #include <xen/shadow.h>
 #include <xen/iocap.h>
+#include <xen/guest_access.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
 #include <public/memory.h>
@@ -30,7 +31,7 @@
 static long
 increase_reservation(
     struct domain *d, 
-    unsigned long *extent_list, 
+    GUEST_HANDLE(xen_ulong) extent_list,
     unsigned int   nr_extents,
     unsigned int   extent_order,
     unsigned int   flags,
@@ -39,8 +40,8 @@ increase_reservation(
     struct page_info *page;
     unsigned long     i, mfn;
 
-    if ( (extent_list != NULL) &&
-         !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
+    if ( !guest_handle_is_null(extent_list) &&
+         !guest_handle_okay(extent_list, nr_extents) )
         return 0;
 
     if ( (extent_order != 0) &&
@@ -65,10 +66,10 @@ increase_reservation(
         }
 
         /* Inform the domain of the new page's machine address. */ 
-        if ( extent_list != NULL )
+        if ( !guest_handle_is_null(extent_list) )
         {
             mfn = page_to_mfn(page);
-            if ( unlikely(__copy_to_user(&extent_list[i], &mfn, sizeof(mfn))) )
+            if ( unlikely(__copy_to_guest_offset(extent_list, i, &mfn, 1)) )
                 return i;
         }
     }
@@ -79,16 +80,16 @@ increase_reservation(
 static long
 populate_physmap(
     struct domain *d, 
-    unsigned long *extent_list, 
-    unsigned int   nr_extents,
-    unsigned int   extent_order,
-    unsigned int   flags,
-    int           *preempted)
+    GUEST_HANDLE(xen_ulong) extent_list,
+    unsigned int  nr_extents,
+    unsigned int  extent_order,
+    unsigned int  flags,
+    int          *preempted)
 {
     struct page_info *page;
     unsigned long    i, j, gpfn, mfn;
 
-    if ( !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
+    if ( !guest_handle_okay(extent_list, nr_extents) )
         return 0;
 
     if ( (extent_order != 0) &&
@@ -103,7 +104,7 @@ populate_physmap(
             goto out;
         }
 
-        if ( unlikely(__copy_from_user(&gpfn, &extent_list[i], sizeof(gpfn))) )
+        if ( unlikely(__copy_from_guest_offset(&gpfn, extent_list, i, 1)) )
             goto out;
 
         if ( unlikely((page = alloc_domheap_pages(
@@ -128,7 +129,7 @@ populate_physmap(
                 set_gpfn_from_mfn(mfn + j, gpfn + j);
 
             /* Inform the domain of the new page's machine address. */ 
-            if ( unlikely(__copy_to_user(&extent_list[i], &mfn, sizeof(mfn))) )
+            if ( unlikely(__copy_to_guest_offset(extent_list, i, &mfn, 1)) )
                 goto out;
         }
     }
@@ -139,8 +140,8 @@ populate_physmap(
     
 static long
 decrease_reservation(
-    struct domain *d, 
-    unsigned long *extent_list, 
+    struct domain *d,
+    GUEST_HANDLE(xen_ulong) extent_list,
     unsigned int   nr_extents,
     unsigned int   extent_order,
     unsigned int   flags,
@@ -149,7 +150,7 @@ decrease_reservation(
     struct page_info *page;
     unsigned long    i, j, gmfn, mfn;
 
-    if ( !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
+    if ( !guest_handle_okay(extent_list, nr_extents) )
         return 0;
 
     for ( i = 0; i < nr_extents; i++ )
@@ -160,7 +161,7 @@ decrease_reservation(
             return i;
         }
 
-        if ( unlikely(__copy_from_user(&gmfn, &extent_list[i], sizeof(gmfn))) )
+        if ( unlikely(__copy_from_guest_offset(&gmfn, extent_list, i, 1)) )
             return i;
 
         for ( j = 0; j < (1 << extent_order); j++ )
@@ -197,21 +198,21 @@ decrease_reservation(
 
 static long
 translate_gpfn_list(
-    struct xen_translate_gpfn_list *uop, unsigned long *progress)
+    GUEST_HANDLE(xen_translate_gpfn_list_t) uop, unsigned long *progress)
 {
     struct xen_translate_gpfn_list op;
     unsigned long i, gpfn, mfn;
     struct domain *d;
 
-    if ( copy_from_user(&op, uop, sizeof(op)) )
+    if ( copy_from_guest(&op, uop, 1) )
         return -EFAULT;
 
     /* Is size too large for us to encode a continuation? */
     if ( op.nr_gpfns > (ULONG_MAX >> START_EXTENT_SHIFT) )
         return -EINVAL;
 
-    if ( !array_access_ok(op.gpfn_list, op.nr_gpfns, sizeof(*op.gpfn_list)) ||
-         !array_access_ok(op.mfn_list, op.nr_gpfns, sizeof(*op.mfn_list)) )
+    if ( !guest_handle_okay(op.gpfn_list, op.nr_gpfns) ||
+         !guest_handle_okay(op.mfn_list,  op.nr_gpfns) )
         return -EFAULT;
 
     if ( op.domid == DOMID_SELF )
@@ -237,8 +238,7 @@ translate_gpfn_list(
             return -EAGAIN;
         }
 
-        if ( unlikely(__copy_from_user(&gpfn, &op.gpfn_list[i],
-                                       sizeof(gpfn))) )
+        if ( unlikely(__copy_from_guest_offset(&gpfn, op.gpfn_list, i, 1)) )
         {
             put_domain(d);
             return -EFAULT;
@@ -246,8 +246,7 @@ translate_gpfn_list(
 
         mfn = gmfn_to_mfn(d, gpfn);
 
-        if ( unlikely(__copy_to_user(&op.mfn_list[i], &mfn,
-                                     sizeof(mfn))) )
+        if ( unlikely(__copy_to_guest_offset(op.mfn_list, i, &mfn, 1)) )
         {
             put_domain(d);
             return -EFAULT;
@@ -258,7 +257,7 @@ translate_gpfn_list(
     return 0;
 }
 
-long do_memory_op(unsigned long cmd, void *arg)
+long do_memory_op(unsigned long cmd, GUEST_HANDLE(void) arg)
 {
     struct domain *d;
     int rc, op, flags = 0, preempted = 0;
@@ -273,7 +272,7 @@ long do_memory_op(unsigned long cmd, void *arg)
     case XENMEM_increase_reservation:
     case XENMEM_decrease_reservation:
     case XENMEM_populate_physmap:
-        if ( copy_from_user(&reservation, arg, sizeof(reservation)) )
+        if ( copy_from_guest(&reservation, arg, 1) )
             return -EFAULT;
 
         /* Is size too large for us to encode a continuation? */
@@ -283,9 +282,9 @@ long do_memory_op(unsigned long cmd, void *arg)
         start_extent = cmd >> START_EXTENT_SHIFT;
         if ( unlikely(start_extent > reservation.nr_extents) )
             return -EINVAL;
-        
-        if ( reservation.extent_start != NULL )
-            reservation.extent_start += start_extent;
+
+        if ( !guest_handle_is_null(reservation.extent_start) )
+            guest_handle_add_offset(reservation.extent_start, start_extent);
         reservation.nr_extents -= start_extent;
 
         if ( (reservation.address_bits != 0) &&
@@ -342,8 +341,9 @@ long do_memory_op(unsigned long cmd, void *arg)
         rc += start_extent;
 
         if ( preempted )
-            return hypercall2_create_continuation(
-                __HYPERVISOR_memory_op, op | (rc << START_EXTENT_SHIFT), arg);
+            return hypercall_create_continuation(
+                __HYPERVISOR_memory_op, "lh",
+                op | (rc << START_EXTENT_SHIFT), arg);
 
         break;
 
@@ -353,10 +353,10 @@ long do_memory_op(unsigned long cmd, void *arg)
 
     case XENMEM_current_reservation:
     case XENMEM_maximum_reservation:
-        if ( copy_from_user(&domid, (domid_t *)arg, sizeof(domid)) )
+        if ( copy_from_guest(&domid, arg, 1) )
             return -EFAULT;
 
-        if ( likely((domid = (unsigned long)arg) == DOMID_SELF) )
+        if ( likely(domid == DOMID_SELF) )
             d = current->domain;
         else if ( !IS_PRIV(current->domain) )
             return -EPERM;
@@ -372,12 +372,13 @@ long do_memory_op(unsigned long cmd, void *arg)
 
     case XENMEM_translate_gpfn_list:
         progress = cmd >> START_EXTENT_SHIFT;
-        rc = translate_gpfn_list(arg, &progress);
+        rc = translate_gpfn_list(
+            guest_handle_cast(arg, xen_translate_gpfn_list_t),
+            &progress);
         if ( rc == -EAGAIN )
-            return hypercall2_create_continuation(
-                __HYPERVISOR_memory_op,
-                op | (progress << START_EXTENT_SHIFT),
-                arg);
+            return hypercall_create_continuation(
+                __HYPERVISOR_memory_op, "lh",
+                op | (progress << START_EXTENT_SHIFT), arg);
         break;
 
     default:

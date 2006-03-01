@@ -83,15 +83,15 @@ extern unsigned long get_effective_addr_sib(struct vmcb_struct *vmcb,
         struct cpu_user_regs *regs, const u8 prefix, const u8 *operand, 
         u8 *size);
 extern OPERATING_MODE get_operating_mode (struct vmcb_struct *vmcb);
-extern unsigned int decode_dest_reg(u8 modrm);
-extern unsigned int decode_src_reg(u8 modrm);
+extern unsigned int decode_dest_reg(u8 prefix, u8 modrm);
+extern unsigned int decode_src_reg(u8 prefix, u8 modrm);
 extern unsigned long svm_rip2pointer(struct vmcb_struct *vmcb);
-extern unsigned int __get_instruction_length_from_list(struct vmcb_struct *vmcb,
+extern int __get_instruction_length_from_list(struct vmcb_struct *vmcb,
         enum instruction_index *list, unsigned int list_count, 
         u8 *guest_eip_buf, enum instruction_index *match);
 
 
-static inline unsigned int __get_instruction_length(struct vmcb_struct *vmcb, 
+static inline int __get_instruction_length(struct vmcb_struct *vmcb, 
         enum instruction_index instr, u8 *guest_eip_buf)
 {
     return __get_instruction_length_from_list(vmcb, &instr, 1, guest_eip_buf, 
@@ -138,9 +138,20 @@ static inline unsigned int is_prefix(u8 opc)
 }
 
 
-static void inline __update_guest_eip(struct vmcb_struct *vmcb, 
-        unsigned long inst_len) 
+static inline int skip_prefix_bytes(u8 *buf, size_t size)
 {
+    int index;
+    for (index = 0; index < size && is_prefix(buf[index]); index ++)  
+        /* do nothing */ ;
+    return index;
+}
+
+
+
+static void inline __update_guest_eip(struct vmcb_struct *vmcb, 
+        int inst_len) 
+{
+    ASSERT(inst_len > 0);
     vmcb->rip += inst_len;
 }
 

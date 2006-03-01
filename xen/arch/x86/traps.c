@@ -951,6 +951,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             
         case 3: /* Write CR3 */
             LOCK_BIGLOCK(v->domain);
+            cleanup_writable_pagetable(v->domain);
             (void)new_guest_cr3(gmfn_to_mfn(v->domain, paddr_to_pfn(*reg)));
             UNLOCK_BIGLOCK(v->domain);
             break;
@@ -1002,7 +1003,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 #endif
         default:
             if ( (rdmsr_safe(regs->ecx, l, h) != 0) ||
-                 (regs->ecx != MSR_EFER) ||
                  (regs->eax != l) || (regs->edx != h) )
                 DPRINTK("Domain attempted WRMSR %p from "
                         "%08x:%08x to %08lx:%08lx.\n",
@@ -1033,8 +1033,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             break;
         default:
-            DPRINTK("Domain attempted RDMSR %p.\n", _p(regs->ecx));
             /* Everyone can read the MSR space. */
+            /*DPRINTK("Domain attempted RDMSR %p.\n", _p(regs->ecx));*/
             if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
                 goto fail;
             break;
@@ -1416,8 +1416,8 @@ long do_set_trap_table(struct trap_info *traps)
     {
         if ( hypercall_preempt_check() )
         {
-            rc = hypercall1_create_continuation(
-                __HYPERVISOR_set_trap_table, traps);
+            rc = hypercall_create_continuation(
+                __HYPERVISOR_set_trap_table, "p", traps);
             break;
         }
 
@@ -1430,7 +1430,7 @@ long do_set_trap_table(struct trap_info *traps)
         if ( cur.address == 0 )
             break;
 
-        fixup_guest_selector(cur.cs);
+        fixup_guest_code_selector(cur.cs);
 
         memcpy(&dst[cur.vector], &cur, sizeof(cur));
 

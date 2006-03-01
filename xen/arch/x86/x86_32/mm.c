@@ -23,6 +23,7 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
+#include <xen/guest_access.h>
 #include <asm/current.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
@@ -180,9 +181,18 @@ void subarch_init_memory(struct domain *dom_xen)
             page_set_owner(page, dom_xen);
         }
     }
+
+    if ( supervisor_mode_kernel )
+    {
+        /* Guest kernel runs in ring 0, not ring 1. */
+        struct desc_struct *d;
+        d = &gdt_table[(FLAT_RING1_CS >> 3) - FIRST_RESERVED_GDT_ENTRY];
+        d[0].b &= ~_SEGMENT_DPL;
+        d[1].b &= ~_SEGMENT_DPL;
+    }
 }
 
-long subarch_memory_op(int op, void *arg)
+long subarch_memory_op(int op, GUEST_HANDLE(void) arg)
 {
     struct xen_machphys_mfn_list xmml;
     unsigned long mfn;
@@ -192,7 +202,7 @@ long subarch_memory_op(int op, void *arg)
     switch ( op )
     {
     case XENMEM_machphys_mfn_list:
-        if ( copy_from_user(&xmml, arg, sizeof(xmml)) )
+        if ( copy_from_guest(&xmml, arg, 1) )
             return -EFAULT;
 
         max = min_t(unsigned int, xmml.max_extents, mpt_size >> 21);
@@ -201,11 +211,12 @@ long subarch_memory_op(int op, void *arg)
         {
             mfn = l2e_get_pfn(idle_pg_table_l2[l2_linear_offset(
                 RDWR_MPT_VIRT_START + (i << 21))]) + l1_table_offset(i << 21);
-            if ( put_user(mfn, &xmml.extent_start[i]) )
+            if ( copy_to_guest_offset(xmml.extent_start, i, &mfn, 1) )
                 return -EFAULT;
         }
 
-        if ( put_user(i, &((struct xen_machphys_mfn_list *)arg)->nr_extents) )
+        xmml.nr_extents = i;
+        if ( copy_to_guest(arg, &xmml, 1) )
             return -EFAULT;
 
         break;
@@ -223,7 +234,7 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
     int nr = smp_processor_id();
     struct tss_struct *t = &init_tss[nr];
 
-    fixup_guest_selector(ss);
+    fixup_guest_stack_selector(ss);
 
     current->arch.guest_context.kernel_ss = ss;
     current->arch.guest_context.kernel_sp = esp;
@@ -239,6 +250,10 @@ int check_descriptor(struct desc_struct *d)
     unsigned long base, limit;
     u32 a = d->a, b = d->b;
     u16 cs;
+
+    /* Let a ring0 guest kernel set any descriptor it wants to. */
+    if ( supervisor_mode_kernel )
+        return 1;
 
     /* A not-present descriptor will always fault, so is safe. */
     if ( !(b & _SEGMENT_P) ) 
@@ -273,7 +288,7 @@ int check_descriptor(struct desc_struct *d)
 
         /* Validate and fix up the target code selector. */
         cs = a >> 16;
-        fixup_guest_selector(cs);
+        fixup_guest_code_selector(cs);
         if ( !guest_gate_selector_okay(cs) )
             goto bad;
         a = d->a = (d->a & 0xffffU) | (cs << 16);

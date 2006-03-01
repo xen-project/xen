@@ -46,6 +46,7 @@ static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
     struct vcpu   *v;
     u64 cpu_time = 0;
     int flags = DOMFLAGS_BLOCKED;
+    struct vcpu_runstate_info runstate;
     
     info->domain = d->domain_id;
     info->nr_online_vcpus = 0;
@@ -55,7 +56,8 @@ static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
      * - domain is marked as running if any of its vcpus is running
      */
     for_each_vcpu ( d, v ) {
-        cpu_time += v->cpu_time;
+        vcpu_runstate_get(v, &runstate);
+        cpu_time += runstate.time[RUNSTATE_running];
         info->max_vcpu_id = v->vcpu_id;
         if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
         {
@@ -165,7 +167,15 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
         domid_t        dom;
         struct vcpu   *v;
         unsigned int   i, cnt[NR_CPUS] = { 0 };
+        cpumask_t      cpu_exclude_map;
         static domid_t rover = 0;
+
+        /*
+         * Running the domain 0 kernel in ring 0 is not compatible
+         * with multiple guests.
+         */
+        if ( supervisor_mode_kernel )
+            return -EINVAL;
 
         dom = op->u.createdomain.domain;
         if ( (dom > 0) && (dom < DOMID_FIRST_RESERVED) )
@@ -195,18 +205,29 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
         read_lock(&domlist_lock);
         for_each_domain ( d )
             for_each_vcpu ( d, v )
-                cnt[v->processor]++;
+                if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
+                    cnt[v->processor]++;
         read_unlock(&domlist_lock);
         
         /*
-         * If we're on a HT system, we only use the first HT for dom0, other 
-         * domains will all share the second HT of each CPU. Since dom0 is on 
-         * CPU 0, we favour high numbered CPUs in the event of a tie.
+         * If we're on a HT system, we only auto-allocate to a non-primary HT.
+         * We favour high numbered CPUs in the event of a tie.
          */
-        pro = smp_num_siblings - 1;
-        for ( i = pro; i < num_online_cpus(); i += smp_num_siblings )
+        pro = first_cpu(cpu_sibling_map[0]);
+        if ( cpus_weight(cpu_sibling_map[0]) > 1 )
+            pro = next_cpu(pro, cpu_sibling_map[0]);
+        cpu_exclude_map = cpu_sibling_map[0];
+        for_each_online_cpu ( i )
+        {
+            if ( cpu_isset(i, cpu_exclude_map) )
+                continue;
+            if ( (i == first_cpu(cpu_sibling_map[i])) &&
+                 (cpus_weight(cpu_sibling_map[i]) > 1) )
+                continue;
+            cpus_or(cpu_exclude_map, cpu_exclude_map, cpu_sibling_map[i]);
             if ( cnt[i] <= cnt[pro] )
                 pro = i;
+        }
 
         ret = -ENOMEM;
         if ( (d = domain_create(dom, pro)) == NULL )
@@ -485,6 +506,7 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
     { 
         struct domain *d;
         struct vcpu   *v;
+        struct vcpu_runstate_info runstate;
 
         ret = -ESRCH;
         if ( (d = find_domain_by_id(op->u.getvcpuinfo.domain)) == NULL )
@@ -498,10 +520,12 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
         if ( (v = d->vcpu[op->u.getvcpuinfo.vcpu]) == NULL )
             goto getvcpuinfo_out;
 
+        vcpu_runstate_get(v, &runstate);
+
         op->u.getvcpuinfo.online   = !test_bit(_VCPUF_down, &v->vcpu_flags);
         op->u.getvcpuinfo.blocked  = test_bit(_VCPUF_blocked, &v->vcpu_flags);
         op->u.getvcpuinfo.running  = test_bit(_VCPUF_running, &v->vcpu_flags);
-        op->u.getvcpuinfo.cpu_time = v->cpu_time;
+        op->u.getvcpuinfo.cpu_time = runstate.time[RUNSTATE_running];
         op->u.getvcpuinfo.cpu      = v->processor;
         op->u.getvcpuinfo.cpumap   = 0;
         memcpy(&op->u.getvcpuinfo.cpumap,

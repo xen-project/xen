@@ -45,7 +45,7 @@ ALL_OBJS += $(BASEDIR)/arch/$(TARGET_ARCH)/arch.o
 
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
-CFLAGS += -g
+CFLAGS += -g -D__XEN__
 
 ifneq ($(debug),y)
 CFLAGS += -DNDEBUG

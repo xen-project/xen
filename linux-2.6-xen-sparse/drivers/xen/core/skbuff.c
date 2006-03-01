@@ -16,6 +16,7 @@
 
 /* Referenced in netback.c. */
 /*static*/ kmem_cache_t *skbuff_cachep;
+EXPORT_SYMBOL(skbuff_cachep);
 
 #define MAX_SKBUFF_ORDER 4
 static kmem_cache_t *skbuff_order_cachep[MAX_SKBUFF_ORDER + 1];

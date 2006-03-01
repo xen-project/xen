@@ -67,6 +67,9 @@ struct hvm_function_table {
     int (*paging_enabled)(struct vcpu *v);
     int (*instruction_length)(struct vcpu *v);
     unsigned long (*get_guest_ctrl_reg)(struct vcpu *v, unsigned int num);
+
+    void (*init_ap_context)(struct vcpu_guest_context *ctxt,
+                            int vcpuid, int trampoline_vector);
 };
 
 extern struct hvm_function_table hvm_funcs;
@@ -173,4 +176,14 @@ hvm_get_guest_ctrl_reg(struct vcpu *v, unsigned int num)
         return hvm_funcs.get_guest_ctrl_reg(v, num);
     return 0;                   /* force to fail */
 }
+
+static inline void
+hvm_init_ap_context(struct vcpu_guest_context *ctxt,
+                    int vcpuid, int trampoline_vector)
+{
+    return hvm_funcs.init_ap_context(ctxt, vcpuid, trampoline_vector);
+}
+
+extern int hvm_bringup_ap(int vcpuid, int trampoline_vector);
+
 #endif /* __ASM_X86_HVM_HVM_H__ */

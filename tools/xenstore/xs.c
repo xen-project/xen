@@ -31,7 +31,6 @@
 #include <signal.h>
 #include <stdint.h>
 #include <errno.h>
-#include <sys/ioctl.h>
 #include <pthread.h>
 #include "xs.h"
 #include "list.h"
@@ -343,7 +342,6 @@ static void *xs_talkv(struct xs_handle *h, xs_transaction_t t,
 		free(ret);
 		saved_errno = EBADF;
 		goto close_fd;
-		
 	}
 	return ret;
 

@@ -225,27 +225,35 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         break;
 
     case VLAPIC_DELIV_MODE_INIT:
-        if (!level && trig_mode == 1) {        //Deassert
+        if ( !level && trig_mode == 1 ) {        //Deassert
             printk("This hvm_vlapic is for P4, no work for De-assert init\n");
         } else {
             /* FIXME How to check the situation after vcpu reset? */
-            vlapic->init_sipi_sipi_state = VLAPIC_INIT_SIPI_SIPI_STATE_WAIT_SIPI;
-            if (vlapic->vcpu) {
-                vcpu_pause(vlapic->vcpu);
+            if ( test_and_clear_bit(_VCPUF_initialised, &v->vcpu_flags) ) {
+                printk("Reset hvm vcpu not supported yet\n");
+                domain_crash_synchronous();
             }
+            v->arch.hvm_vcpu.init_sipi_sipi_state =
+                HVM_VCPU_INIT_SIPI_SIPI_STATE_WAIT_SIPI;
+            result = 1;
         }
         break;
 
     case VLAPIC_DELIV_MODE_STARTUP:
-        if (vlapic->init_sipi_sipi_state != VLAPIC_INIT_SIPI_SIPI_STATE_WAIT_SIPI)
+        if ( v->arch.hvm_vcpu.init_sipi_sipi_state ==
+                HVM_VCPU_INIT_SIPI_SIPI_STATE_NORM )
             break;
-        vlapic->init_sipi_sipi_state = VLAPIC_INIT_SIPI_SIPI_STATE_NORM;
-        if (!vlapic->vcpu) {
-            /* XXX Call hvm_bringup_ap here */
-             result = 0;
-        }else{
-            //hvm_vcpu_reset(vlapic->vcpu);
+
+        v->arch.hvm_vcpu.init_sipi_sipi_state =
+                HVM_VCPU_INIT_SIPI_SIPI_STATE_NORM;
+
+        if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) ) {
+            printk("SIPI for initialized vcpu vcpuid %x\n", v->vcpu_id);
+            domain_crash_synchronous();
         }
+
+        if ( hvm_bringup_ap(v->vcpu_id, vector) != 0 )
+            result = 0;
         break;
 
     default:

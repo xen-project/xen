@@ -77,6 +77,13 @@
 restore_all_guest:
         testl $X86_EFLAGS_VM,UREGS_eflags(%esp)
         jnz  restore_all_vm86
+#ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
+        testl $2,UREGS_cs(%esp)
+        jnz   1f
+        call  restore_ring0_guest
+        jmp   restore_all_vm86
+1:
+#endif
 FLT1:   mov  UREGS_ds(%esp),%ds
 FLT2:   mov  UREGS_es(%esp),%es
 FLT3:   mov  UREGS_fs(%esp),%fs
@@ -157,6 +164,7 @@ restore_all_xen:
         ALIGN
 ENTRY(hypercall)
         subl $4,%esp
+        FIXUP_RING0_GUEST_STACK
 	SAVE_ALL(b)
         sti
         GET_CURRENT(%ebx)
@@ -294,6 +302,11 @@ FLT14:  movl %eax,%gs:(%esi)
         popl %eax
         shll $16,%eax                    # Bits 16-23: saved_upcall_mask
         movw UREGS_cs+4(%esp),%ax        # Bits  0-15: CS
+#ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
+        testw $2,%ax
+        jnz  FLT15
+        and  $~3,%ax                     # RPL 1 -> RPL 0
+#endif
 FLT15:  movl %eax,%gs:4(%esi) 
         test $0x00FF0000,%eax            # Bits 16-23: saved_upcall_mask
         setz %ch                         # %ch == !saved_upcall_mask
@@ -388,6 +401,7 @@ ENTRY(divide_error)
 	pushl $TRAP_divide_error<<16
 	ALIGN
 error_code:
+        FIXUP_RING0_GUEST_STACK
         SAVE_ALL_NOSEGREGS(a)
         SET_XEN_SEGMENTS(a)
         testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%esp)
@@ -505,6 +519,10 @@ ENTRY(spurious_interrupt_bug)
 	jmp error_code
 
 ENTRY(nmi)
+#ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
+        # NMI entry protocol is incompatible with guest kernel in ring 0.
+        iret
+#else
         # Save state but do not trash the segment registers!
         # We may otherwise be unable to reload them or copy them to ring 1. 
 	pushl %eax
@@ -546,6 +564,7 @@ defer_nmi:
         movl  $(APIC_DM_FIXED | APIC_DEST_SELF | APIC_DEST_LOGICAL | \
                 TRAP_deferred_nmi),%ss:APIC_ICR(%eax)
         jmp   restore_all_xen
+#endif /* !CONFIG_X86_SUPERVISOR_MODE_KERNEL */
 
 ENTRY(setup_vm86_frame)
         # Copies the entire stack frame forwards by 16 bytes.

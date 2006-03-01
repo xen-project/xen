@@ -54,6 +54,8 @@ extern int load_vmcb(struct arch_svm_struct *arch_svm, u64 phys_hsa);
 /* For debugging. Remove when no longer needed. */
 extern void svm_dump_host_regs(const char *from);
 
+extern void svm_migrate_timers(struct vcpu *v);
+
 /* ASID API */
 enum {
     ASID_AVAILABLE = 0,

@@ -51,6 +51,7 @@
 #include <asm/page.h>
 #include <asm/errno.h>
 #include <xen/interface/arch-x86_64.h>
+#include <xen/interface/features.h>
 
 #include "irq_vectors.h"
 
@@ -146,16 +147,19 @@ NMI_MASK = 0x80000000
          */
 	.macro HYPERVISOR_IRET flag
 	testb $3,1*8(%rsp)
-	jnz   1f
+	jnz   2f
 	testl $NMI_MASK,2*8(%rsp)
+	jnz   2f
+
+	testb $1,(xen_features+XENFEAT_supervisor_mode_kernel)
 	jnz   1f
 
 	/* Direct iret to kernel space. Correct CS and SS. */
 	orb   $3,1*8(%rsp)
 	orb   $3,4*8(%rsp)
-	iretq
+1:	iretq
 
-1:	/* Slow iret via hypervisor. */
+2:	/* Slow iret via hypervisor. */
 	andl  $~NMI_MASK, 16(%rsp)
 	pushq $\flag
 	jmp  hypercall_page + (__HYPERVISOR_iret * 32)

@@ -132,13 +132,13 @@ static void unwarp_timer_fn(void *data)
     vcpu_schedule_unlock_irq(v);
 }
 
-static inline u32 calc_avt(struct vcpu *d, s_time_t now)
+static inline u32 calc_avt(struct vcpu *v, s_time_t now)
 {
     u32 ranfor, mcus;
-    struct bvt_dom_info *inf = BVT_INFO(d->domain);
-    struct bvt_vcpu_info *einf = EBVT_INFO(d);
+    struct bvt_dom_info *inf = BVT_INFO(v->domain);
+    struct bvt_vcpu_info *einf = EBVT_INFO(v);
     
-    ranfor = (u32)(now - d->lastschd);
+    ranfor = (u32)(now - v->runstate.state_entry_time);
     mcus = (ranfor + MCU - 1)/MCU;
 
     return einf->avt + mcus * inf->mcu_advance;
@@ -262,7 +262,7 @@ static void bvt_wake(struct vcpu *v)
     curr_evt = calc_evt(curr, calc_avt(curr, now));
     /* Calculate the time the current domain would run assuming
        the second smallest evt is of the newly woken domain */
-    r_time = curr->lastschd +
+    r_time = curr->runstate.state_entry_time +
         ((einf->evt - curr_evt) / BVT_INFO(curr->domain)->mcu_advance) +
         ctx_allow;
 
@@ -558,7 +558,6 @@ static void bvt_dump_cpu_state(int i)
         printk("%3d: %u has=%c ", loop++, v->domain->domain_id,
                test_bit(_VCPUF_running, &v->vcpu_flags) ? 'T':'F');
         bvt_dump_runq_el(v);
-        printk("c=0x%X%08X\n", (u32)(v->cpu_time>>32), (u32)v->cpu_time);
         printk("         l: %p n: %p  p: %p\n",
                &vcpu_inf->run_list, vcpu_inf->run_list.next,
                vcpu_inf->run_list.prev);

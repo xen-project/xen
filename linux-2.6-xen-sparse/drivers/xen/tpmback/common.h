@@ -54,9 +54,11 @@ typedef struct tpmif_st {
 void tpmif_disconnect_complete(tpmif_t * tpmif);
 tpmif_t *tpmif_find(domid_t domid, long int instance);
 void tpmif_interface_init(void);
+void tpmif_interface_exit(void);
 void tpmif_schedule_work(tpmif_t * tpmif);
 void tpmif_deschedule_work(tpmif_t * tpmif);
 void tpmif_xenbus_init(void);
+void tpmif_xenbus_exit(void);
 int tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn);
 irqreturn_t tpmif_be_int(int irq, void *dev_id, struct pt_regs *regs);
 int tpmif_vtpm_open(tpmif_t *tpmif, domid_t domain, u32 instance);

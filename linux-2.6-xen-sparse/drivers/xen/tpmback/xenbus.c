@@ -317,6 +317,11 @@ void tpmif_xenbus_init(void)
 	xenbus_register_backend(&tpmback);
 }
 
+void tpmif_xenbus_exit(void)
+{
+	xenbus_unregister_driver(&tpmback);
+}
+
 /*
  * Local variables:
  *  c-file-style: "linux"

@@ -150,6 +150,11 @@ void vcpu_prepare(int vcpu)
 {
 	vcpu_guest_context_t ctxt;
 	struct task_struct *idle = idle_task(vcpu);
+#ifdef __x86_64__
+	struct desc_ptr *gdt_descr = &cpu_gdt_descr[vcpu];
+#else
+	struct Xgt_desc_struct *gdt_descr = &per_cpu(cpu_gdt_descr, vcpu);
+#endif
 
 	if (vcpu == 0)
 		return;
@@ -171,8 +176,8 @@ void vcpu_prepare(int vcpu)
 
 	ctxt.ldt_ents = 0;
 
-	ctxt.gdt_frames[0] = virt_to_mfn(cpu_gdt_descr[vcpu].address);
-	ctxt.gdt_ents      = cpu_gdt_descr[vcpu].size / 8;
+	ctxt.gdt_frames[0] = virt_to_mfn(gdt_descr->address);
+	ctxt.gdt_ents      = gdt_descr->size / 8;
 
 #ifdef __i386__
 	ctxt.user_regs.cs = __KERNEL_CS;
@@ -210,6 +215,11 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 {
 	int cpu;
 	struct task_struct *idle;
+#ifdef __x86_64__
+	struct desc_ptr *gdt_descr;
+#else
+	struct Xgt_desc_struct *gdt_descr;
+#endif
 
 	cpu_data[0] = boot_cpu_data;
 
@@ -226,6 +236,22 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		if (cpu == 0)
 			continue;
 
+#ifdef __x86_64__
+		gdt_descr = &cpu_gdt_descr[cpu];
+#else
+		gdt_descr = &per_cpu(cpu_gdt_descr, cpu);
+#endif
+		gdt_descr->address = get_zeroed_page(GFP_KERNEL);
+		if (unlikely(!gdt_descr->address)) {
+			printk(KERN_CRIT "CPU%d failed to allocate GDT\n", cpu);
+			continue;
+		}
+		gdt_descr->size = GDT_SIZE;
+		memcpy((void *)gdt_descr->address, cpu_gdt_table, GDT_SIZE);
+		make_page_readonly(
+			(void *)gdt_descr->address,
+			XENFEAT_writable_descriptor_tables);
+
 		cpu_data[cpu] = boot_cpu_data;
 		cpu_2_logical_apicid[cpu] = cpu;
 		x86_cpu_to_apicid[cpu] = cpu;
@@ -241,17 +267,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 #endif
 
 		irq_ctx_init(cpu);
-
-		cpu_gdt_descr[cpu].address =
-			__get_free_page(GFP_KERNEL|__GFP_ZERO);
-		BUG_ON(cpu_gdt_descr[0].size > PAGE_SIZE);
-		cpu_gdt_descr[cpu].size = cpu_gdt_descr[0].size;
-		memcpy((void *)cpu_gdt_descr[cpu].address,
-		       (void *)cpu_gdt_descr[0].address,
-		       cpu_gdt_descr[0].size);
-		make_page_readonly(
-			(void *)cpu_gdt_descr[cpu].address,
-			XENFEAT_writable_descriptor_tables);
 
 #ifdef CONFIG_HOTPLUG_CPU
 		if (xen_start_info->flags & SIF_INITDOMAIN)

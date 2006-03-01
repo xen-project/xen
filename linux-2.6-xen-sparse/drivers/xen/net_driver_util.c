@@ -30,6 +30,7 @@
 
 #include <linux/if_ether.h>
 #include <linux/err.h>
+#include <linux/module.h>
 #include <xen/net_driver_util.h>
 
 
@@ -54,7 +55,7 @@ int xen_net_read_mac(struct xenbus_device *dev, u8 mac[])
 	kfree(macstr);
 	return 0;
 }
-
+EXPORT_SYMBOL(xen_net_read_mac);
 
 /*
  * Local variables:

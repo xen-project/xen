@@ -376,6 +376,10 @@ static int pcnet_can_receive(void *opaque)
     if (s->recv_pos > 0)
         return 0;
 
+    pcnet_rdte_poll(s);
+    if (!(CSR_CRST(s) & 0x8000)) {
+        return 0;
+    }
     return sizeof(s->buffer)-16;
 }
 

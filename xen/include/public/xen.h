@@ -9,6 +9,22 @@
 #ifndef __XEN_PUBLIC_XEN_H__
 #define __XEN_PUBLIC_XEN_H__
 
+#ifdef __XEN__
+#define DEFINE_GUEST_HANDLE(type) struct __guest_handle_ ## type { type *p; }
+#define GUEST_HANDLE(type)        struct __guest_handle_ ## type
+#else
+#define DEFINE_GUEST_HANDLE(type)
+#define GUEST_HANDLE(type)        type *
+#endif
+
+#ifndef __ASSEMBLY__
+/* Guest handle for unsigned long pointer. Define a name with no whitespace. */
+typedef unsigned long xen_ulong;
+DEFINE_GUEST_HANDLE(xen_ulong);
+/* Guest handle for arbitrary-type pointer (void *). */
+DEFINE_GUEST_HANDLE(void);
+#endif
+
 #if defined(__i386__)
 #include "arch-x86_32.h"
 #elif defined(__x86_64__)

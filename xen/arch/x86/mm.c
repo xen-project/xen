@@ -97,11 +97,11 @@
 #include <xen/domain_page.h>
 #include <xen/event.h>
 #include <xen/iocap.h>
+#include <xen/guest_access.h>
 #include <asm/shadow.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/io.h>
-#include <asm/uaccess.h>
 #include <asm/ldt.h>
 #include <asm/x86_emulate.h>
 #include <public/memory.h>
@@ -475,7 +475,8 @@ get_page_from_l1e(
     {
         MEM_LOG("Error getting mfn %lx (pfn %lx) from L1 entry %" PRIpte
                 " for dom%d",
-                mfn, get_gpfn_from_mfn(mfn), l1e_get_intpte(l1e), d->domain_id);
+                mfn, get_gpfn_from_mfn(mfn),
+                l1e_get_intpte(l1e), d->domain_id);
     }
 
     return okay;
@@ -515,7 +516,6 @@ get_page_from_l2e(
 
 
 #if CONFIG_PAGING_LEVELS >= 3
-
 static int 
 get_page_from_l3e(
     l3_pgentry_t l3e, unsigned long pfn,
@@ -545,11 +545,9 @@ get_page_from_l3e(
 #endif
     return rc;
 }
-
 #endif /* 3 level */
 
 #if CONFIG_PAGING_LEVELS >= 4
-
 static int 
 get_page_from_l4e(
     l4_pgentry_t l4e, unsigned long pfn, 
@@ -579,7 +577,6 @@ get_page_from_l4e(
 
     return rc;
 }
-
 #endif /* 4 level */
 
 
@@ -649,27 +646,22 @@ static void put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
 
 
 #if CONFIG_PAGING_LEVELS >= 3
-
 static void put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn)
 {
     if ( (l3e_get_flags(l3e) & _PAGE_PRESENT) && 
          (l3e_get_pfn(l3e) != pfn) )
         put_page_and_type(mfn_to_page(l3e_get_pfn(l3e)));
 }
-
 #endif
 
 #if CONFIG_PAGING_LEVELS >= 4
-
 static void put_page_from_l4e(l4_pgentry_t l4e, unsigned long pfn)
 {
     if ( (l4e_get_flags(l4e) & _PAGE_PRESENT) && 
          (l4e_get_pfn(l4e) != pfn) )
         put_page_and_type(mfn_to_page(l4e_get_pfn(l4e)));
 }
-
 #endif
-
 
 static int alloc_l1_table(struct page_info *page)
 {
@@ -1569,43 +1561,71 @@ int new_guest_cr3(unsigned long mfn)
     int okay;
     unsigned long old_base_mfn;
 
+    ASSERT(writable_pagetable_in_sync(d));
+
     if ( shadow_mode_refcounts(d) )
-        okay = get_page_from_pagenr(mfn, d);
-    else
-        okay = get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d);
-
-    if ( likely(okay) )
     {
-        invalidate_shadow_ldt(v);
-
-        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-        v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
-        update_pagetables(v); /* update shadow_table and monitor_table */
-
-        write_ptbase(v);
-
-        if ( shadow_mode_refcounts(d) )
-            put_page(mfn_to_page(old_base_mfn));
-        else
-            put_page_and_type(mfn_to_page(old_base_mfn));
-
-        /* CR3 also holds a ref to its shadow... */
-        if ( shadow_mode_enabled(d) )
+        okay = get_page_from_pagenr(mfn, d);
+        if ( unlikely(!okay) )
         {
-            if ( v->arch.monitor_shadow_ref )
-                put_shadow_ref(v->arch.monitor_shadow_ref);
-            v->arch.monitor_shadow_ref =
-                pagetable_get_pfn(v->arch.monitor_table);
-            ASSERT(!page_get_owner(mfn_to_page(v->arch.monitor_shadow_ref)));
-            get_shadow_ref(v->arch.monitor_shadow_ref);
+            MEM_LOG("Error while installing new baseptr %lx", mfn);
+            return 0;
         }
     }
     else
     {
-        MEM_LOG("Error while installing new baseptr %lx", mfn);
+        okay = get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d);
+        if ( unlikely(!okay) )
+        {
+            /* Switch to idle pagetable: this VCPU has no active p.t. now. */
+            old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+            v->arch.guest_table = mk_pagetable(0);
+            update_pagetables(v);
+            write_cr3(__pa(idle_pg_table));
+            if ( old_base_mfn != 0 )
+                put_page_and_type(mfn_to_page(old_base_mfn));
+
+            /* Retry the validation with no active p.t. for this VCPU. */
+            okay = get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d);
+            if ( !okay )
+            {
+                /* Failure here is unrecoverable: the VCPU has no pagetable! */
+                MEM_LOG("Fatal error while installing new baseptr %lx", mfn);
+                domain_crash(d);
+                percpu_info[v->processor].deferred_ops = 0;
+                return 0;
+            }
+        }
     }
 
-    return okay;
+    invalidate_shadow_ldt(v);
+
+    old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+    v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+    update_pagetables(v); /* update shadow_table and monitor_table */
+
+    write_ptbase(v);
+
+    if ( likely(old_base_mfn != 0) )
+    {
+        if ( shadow_mode_refcounts(d) )
+            put_page(mfn_to_page(old_base_mfn));
+        else
+            put_page_and_type(mfn_to_page(old_base_mfn));
+    }
+
+    /* CR3 also holds a ref to its shadow... */
+    if ( shadow_mode_enabled(d) )
+    {
+        if ( v->arch.monitor_shadow_ref )
+            put_shadow_ref(v->arch.monitor_shadow_ref);
+        v->arch.monitor_shadow_ref =
+            pagetable_get_pfn(v->arch.monitor_table);
+        ASSERT(!page_get_owner(mfn_to_page(v->arch.monitor_shadow_ref)));
+        get_shadow_ref(v->arch.monitor_shadow_ref);
+    }
+
+    return 1;
 }
 
 static void process_deferred_ops(unsigned int cpu)
@@ -1625,7 +1645,7 @@ static void process_deferred_ops(unsigned int cpu)
         else
             local_flush_tlb();
     }
-        
+
     if ( deferred_ops & DOP_RELOAD_LDT )
         (void)map_ldt_shadow_page(0);
 
@@ -1752,9 +1772,9 @@ int do_mmuext_op(
     {
         if ( hypercall_preempt_check() )
         {
-            rc = hypercall4_create_continuation(
-                __HYPERVISOR_mmuext_op, uops,
-                (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
+            rc = hypercall_create_continuation(
+                __HYPERVISOR_mmuext_op, "pipi",
+                uops, (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
             break;
         }
 
@@ -2018,9 +2038,9 @@ int do_mmu_update(
     {
         if ( hypercall_preempt_check() )
         {
-            rc = hypercall4_create_continuation(
-                __HYPERVISOR_mmu_update, ureqs, 
-                (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
+            rc = hypercall_create_continuation(
+                __HYPERVISOR_mmu_update, "pipi",
+                ureqs, (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
             break;
         }
 
@@ -2769,7 +2789,7 @@ long do_update_descriptor(u64 pa, u64 desc)
 }
 
 
-long arch_memory_op(int op, void *arg)
+long arch_memory_op(int op, GUEST_HANDLE(void) arg)
 {
     struct xen_reserved_phys_area xrpa;
     unsigned long pfn;
@@ -2779,7 +2799,7 @@ long arch_memory_op(int op, void *arg)
     switch ( op )
     {
     case XENMEM_reserved_phys_area:
-        if ( copy_from_user(&xrpa, arg, sizeof(xrpa)) )
+        if ( copy_from_guest(&xrpa, arg, 1) )
             return -EFAULT;
 
         /* No guest has more than one reserved area. */
@@ -2813,7 +2833,7 @@ long arch_memory_op(int op, void *arg)
 
         put_domain(d);
 
-        if ( copy_to_user(arg, &xrpa, sizeof(xrpa)) )
+        if ( copy_to_guest(arg, &xrpa, 1) )
             return -EFAULT;
 
         break;

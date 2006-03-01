@@ -33,6 +33,10 @@ ifeq ($(TARGET_SUBARCH),x86_32)
  endif
 endif
 
+ifneq ($(supervisor_mode_kernel),y)
+OBJS := $(subst x86_32/supervisor_mode_kernel.o,,$(OBJS))
+endif
+
 OBJS := $(subst $(TARGET_SUBARCH)/asm-offsets.o,,$(OBJS))
 OBJS := $(subst $(TARGET_SUBARCH)/xen.lds.o,,$(OBJS))
 
@@ -44,7 +48,7 @@ default: $(TARGET)
 
 $(TARGET): $(TARGET)-syms boot/mkelf32
 	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
-	`nm $(TARGET)-syms | sort | tail -n 1 | sed -e 's/^\([^ ]*\).*/0x\1/'`
+	`$(NM) $(TARGET)-syms | sort | tail -n 1 | sed -e 's/^\([^ ]*\).*/0x\1/'`
 
 $(CURDIR)/arch.o: $(OBJS)
 	$(LD) $(LDFLAGS) -r -o $@ $(OBJS)

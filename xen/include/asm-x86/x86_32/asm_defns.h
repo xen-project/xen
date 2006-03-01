@@ -48,9 +48,24 @@
 
 #ifdef PERF_COUNTERS
 #define PERFC_INCR(_name,_idx)                          \
-    lock incl perfcounters+_name(,_idx,4)
+        lock incl perfcounters+_name(,_idx,4)
 #else
 #define PERFC_INCR(_name,_idx)
+#endif
+
+#ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
+#define FIXUP_RING0_GUEST_STACK                         \
+        testl $2,8(%esp);                               \
+        jnz 1f; /* rings 2 & 3 permitted */             \
+        testl $1,8(%esp);                               \
+        jz 2f;                                          \
+        ud2; /* ring 1 should not be used */            \
+        2:cmpl $(__HYPERVISOR_VIRT_START),%esp;         \
+        jge 1f;                                         \
+        call fixup_ring0_guest_stack;                   \
+        1:
+#else
+#define FIXUP_RING0_GUEST_STACK
 #endif
 
 #define BUILD_SMP_INTERRUPT(x,v) XBUILD_SMP_INTERRUPT(x,v)
@@ -61,6 +76,7 @@ __asm__(                                        \
     ".globl " STR(x) "\n\t"                     \
     STR(x) ":\n\t"                              \
     "pushl $"#v"<<16\n\t"                       \
+    STR(FIXUP_RING0_GUEST_STACK)                \
     STR(SAVE_ALL(a))                            \
     "movl %esp,%eax\n\t"                        \
     "pushl %eax\n\t"                            \
@@ -72,6 +88,7 @@ __asm__(                                        \
 __asm__(                                        \
     "\n" __ALIGN_STR"\n"                        \
     "common_interrupt:\n\t"                     \
+    STR(FIXUP_RING0_GUEST_STACK)                \
     STR(SAVE_ALL(a))                            \
     "movl %esp,%eax\n\t"                        \
     "pushl %eax\n\t"                            \

@@ -1,2 +1,3 @@
+obj-$(CONFIG_XEN_BLKDEV_BACKEND) := blkbk.o
 
-obj-y	:= blkback.o xenbus.o interface.o vbd.o
+blkbk-y	:= blkback.o xenbus.o interface.o vbd.o

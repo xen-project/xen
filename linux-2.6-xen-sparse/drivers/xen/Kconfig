@@ -68,7 +68,7 @@ config XEN_PCIDEV_BE_DEBUG
 	default n
 
 config XEN_BLKDEV_BACKEND
-	bool "Block-device backend driver"
+	tristate "Block-device backend driver"
 	default y
 	help
 	  The block-device backend driver allows the kernel to export its
@@ -76,7 +76,7 @@ config XEN_BLKDEV_BACKEND
 	  interface.
 
 config XEN_BLKDEV_TAP_BE
-        bool "Block Tap support for backend driver (DANGEROUS)"
+        tristate "Block Tap support for backend driver (DANGEROUS)"
         depends on XEN_BLKDEV_BACKEND
         default n
         help
@@ -89,7 +89,7 @@ config XEN_BLKDEV_TAP_BE
           modified to use grant tables.
 
 config XEN_NETDEV_BACKEND
-	bool "Network-device backend driver"
+	tristate "Network-device backend driver"
 	default y
 	help
 	  The network-device backend driver allows the kernel to export its
@@ -109,8 +109,16 @@ config XEN_NETDEV_PIPELINED_TRANSMITTER
 	  are unsure; or if you experience network hangs when this option is
 	  enabled; then you must say N here.
 
+config XEN_NETDEV_LOOPBACK
+	tristate "Network-device loopback driver"
+	depends on XEN_NETDEV_BACKEND
+	default y
+	help
+	  A two-interface loopback device to emulate a local netfront-netback
+	  connection.
+
 config XEN_TPMDEV_BACKEND
-	bool "TPM-device backend driver"
+	tristate "TPM-device backend driver"
 	default n
 	help
 	  The TPM-device backend driver
@@ -145,7 +153,7 @@ config XEN_NETDEV_FRONTEND
 	  (domain 0), then you almost certainly want to say Y here.
 
 config XEN_BLKDEV_TAP
-	bool "Block device tap driver"
+	tristate "Block device tap driver"
 	default n
 	help
 	  This driver allows a VM to interact on block device channels
@@ -154,7 +162,7 @@ config XEN_BLKDEV_TAP
 	  space.  Odds are that you want to say N here.
 
 config XEN_TPMDEV_FRONTEND
-	bool "TPM-device frontend driver"
+	tristate "TPM-device frontend driver"
 	default n
 	select TCG_TPM
 	select TCG_XEN

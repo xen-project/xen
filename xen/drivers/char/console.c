@@ -335,8 +335,9 @@ long guest_console_write(char *buffer, int count)
         }
 
         if ( hypercall_preempt_check() )
-            return hypercall3_create_continuation(
-                __HYPERVISOR_console_io, CONSOLEIO_write, count, buffer);
+            return hypercall_create_continuation(
+                __HYPERVISOR_console_io, "iip",
+                CONSOLEIO_write, count, buffer);
 
         kcount = min_t(int, count, sizeof(kbuf)-1);
         if ( copy_from_user(kbuf, buffer, kcount) )

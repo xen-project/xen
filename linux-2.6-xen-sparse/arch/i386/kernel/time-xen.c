@@ -48,6 +48,8 @@
 #include <linux/mca.h>
 #include <linux/sysctl.h>
 #include <linux/percpu.h>
+#include <linux/kernel_stat.h>
+#include <linux/posix-timers.h>
 
 #include <asm/io.h>
 #include <asm/smp.h>
@@ -70,6 +72,7 @@
 #include <asm/arch_hooks.h>
 
 #include <xen/evtchn.h>
+#include <xen/interface/vcpu.h>
 
 #if defined (__i386__)
 #include <asm/i8259.h>
@@ -122,6 +125,13 @@ static u32 shadow_tv_version;
 /* Keep track of last time we did processing/updating of jiffies and xtime. */
 static u64 processed_system_time;   /* System time (ns) at last processing. */
 static DEFINE_PER_CPU(u64, processed_system_time);
+
+/* How much CPU time was spent blocked and how much was 'stolen'? */
+static DEFINE_PER_CPU(u64, processed_stolen_time);
+static DEFINE_PER_CPU(u64, processed_blocked_time);
+
+/* Current runstate of each CPU (updated automatically by the hypervisor). */
+static DEFINE_PER_CPU(struct vcpu_runstate_info, runstate);
 
 /* Must be signed, as it's compared with s64 quantities which can be -ve. */
 #define NS_PER_TICK (1000000000LL/HZ)
@@ -477,14 +487,45 @@ int do_settimeofday(struct timespec *tv)
 
 EXPORT_SYMBOL(do_settimeofday);
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+static void sync_xen_wallclock(unsigned long dummy);
+static DEFINE_TIMER(sync_xen_wallclock_timer, sync_xen_wallclock, 0, 0);
+static void sync_xen_wallclock(unsigned long dummy)
+{
+	time_t sec;
+	s64 nsec;
+	dom0_op_t op;
+
+	if (!ntp_synced() || independent_wallclock ||
+	    !(xen_start_info->flags & SIF_INITDOMAIN))
+		return;
+
+	write_seqlock_irq(&xtime_lock);
+
+	sec  = xtime.tv_sec;
+	nsec = xtime.tv_nsec + ((jiffies - wall_jiffies) * (u64)NS_PER_TICK);
+	__normalize_time(&sec, &nsec);
+
+	op.cmd = DOM0_SETTIME;
+	op.u.settime.secs        = sec;
+	op.u.settime.nsecs       = nsec;
+	op.u.settime.system_time = processed_system_time;
+	HYPERVISOR_dom0_op(&op);
+
+	update_wallclock();
+
+	write_sequnlock_irq(&xtime_lock);
+
+	/* Once per minute. */
+	mod_timer(&sync_xen_wallclock_timer, jiffies + 60*HZ);
+}
+
 static int set_rtc_mmss(unsigned long nowtime)
 {
 	int retval;
 
 	WARN_ON(irqs_disabled());
 
-	if (!(xen_start_info->flags & SIF_INITDOMAIN))
+	if (independent_wallclock || !(xen_start_info->flags & SIF_INITDOMAIN))
 		return 0;
 
 	/* gets recalled with irq locally disabled */
@@ -497,12 +538,6 @@ static int set_rtc_mmss(unsigned long nowtime)
 
 	return retval;
 }
-#else
-static int set_rtc_mmss(unsigned long nowtime)
-{
-	return 0;
-}
-#endif
 
 /* monotonic_clock(): returns # of nanoseconds passed since time_init()
  *		Note: This function is required to return accurate
@@ -567,19 +602,37 @@ EXPORT_SYMBOL(profile_pc);
 
 irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	s64 delta, delta_cpu;
+	s64 delta, delta_cpu, stolen, blocked;
+	u64 sched_time;
 	int i, cpu = smp_processor_id();
 	struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
+	struct vcpu_runstate_info *runstate = &per_cpu(runstate, cpu);
 
 	write_seqlock(&xtime_lock);
 
 	do {
 		get_time_values_from_xen();
 
+		/* Obtain a consistent snapshot of elapsed wallclock cycles. */
 		delta = delta_cpu = 
 			shadow->system_timestamp + get_nsec_offset(shadow);
 		delta     -= processed_system_time;
 		delta_cpu -= per_cpu(processed_system_time, cpu);
+
+		/*
+		 * Obtain a consistent snapshot of stolen/blocked cycles. We
+		 * can use state_entry_time to detect if we get preempted here.
+		 */
+		do {
+			sched_time = runstate->state_entry_time;
+			barrier();
+			stolen = runstate->time[RUNSTATE_runnable] +
+				runstate->time[RUNSTATE_offline] -
+				per_cpu(processed_stolen_time, cpu);
+			blocked = runstate->time[RUNSTATE_blocked] -
+				per_cpu(processed_blocked_time, cpu);
+			barrier();
+		} while (sched_time != runstate->state_entry_time);
 	}
 	while (!time_values_up_to_date(cpu));
 
@@ -612,18 +665,67 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	write_sequnlock(&xtime_lock);
 
 	/*
-         * Local CPU jiffy work. No need to hold xtime_lock, and I'm not sure
-         * if there is risk of deadlock if we do (since update_process_times
-         * may do scheduler rebalancing work and thus acquire runqueue locks).
-         */
-	while (delta_cpu >= NS_PER_TICK) {
-		delta_cpu -= NS_PER_TICK;
-		per_cpu(processed_system_time, cpu) += NS_PER_TICK;
-		update_process_times(user_mode(regs));
-		profile_tick(CPU_PROFILING, regs);
+	 * Account stolen ticks.
+	 * HACK: Passing NULL to account_steal_time()
+	 * ensures that the ticks are accounted as stolen.
+	 */
+	if (stolen > 0) {
+		delta_cpu -= stolen;
+		do_div(stolen, NS_PER_TICK);
+		per_cpu(processed_stolen_time, cpu) += stolen * NS_PER_TICK;
+		per_cpu(processed_system_time, cpu) += stolen * NS_PER_TICK;
+		account_steal_time(NULL, (cputime_t)stolen);
 	}
 
+	/*
+	 * Account blocked ticks.
+	 * HACK: Passing idle_task to account_steal_time()
+	 * ensures that the ticks are accounted as idle/wait.
+	 */
+	if (blocked > 0) {
+		delta_cpu -= blocked;
+		do_div(blocked, NS_PER_TICK);
+		per_cpu(processed_blocked_time, cpu) += blocked * NS_PER_TICK;
+		per_cpu(processed_system_time, cpu)  += blocked * NS_PER_TICK;
+		account_steal_time(idle_task(cpu), (cputime_t)blocked);
+	}
+
+	/* Account user/system ticks. */
+	if (delta_cpu > 0) {
+		do_div(delta_cpu, NS_PER_TICK);
+		per_cpu(processed_system_time, cpu) += delta_cpu * NS_PER_TICK;
+		if (user_mode(regs))
+			account_user_time(current, (cputime_t)delta_cpu);
+		else
+			account_system_time(current, HARDIRQ_OFFSET,
+					    (cputime_t)delta_cpu);
+	}
+
+	/* Local timer processing (see update_process_times()). */
+	run_local_timers();
+	if (rcu_pending(cpu))
+		rcu_check_callbacks(cpu, user_mode(regs));
+	scheduler_tick();
+	run_posix_cpu_timers(current);
+
 	return IRQ_HANDLED;
+}
+
+static void init_missing_ticks_accounting(int cpu)
+{
+	struct vcpu_register_runstate_memory_area area;
+	struct vcpu_runstate_info *runstate = &per_cpu(runstate, cpu);
+
+	memset(runstate, 0, sizeof(*runstate));
+
+	area.addr.v = runstate;
+	HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area, cpu, &area);
+
+	per_cpu(processed_blocked_time, cpu) =
+		runstate->time[RUNSTATE_blocked];
+	per_cpu(processed_stolen_time, cpu) =
+		runstate->time[RUNSTATE_runnable] +
+		runstate->time[RUNSTATE_offline];
 }
 
 /* not static: needed by APM */
@@ -691,6 +793,7 @@ static void sync_cmos_clock(unsigned long dummy)
 void notify_arch_cmos_timer(void)
 {
 	mod_timer(&sync_cmos_timer, jiffies + 1);
+	mod_timer(&sync_xen_wallclock_timer, jiffies + 1);
 }
 
 static long clock_cmos_diff, sleep_start;
@@ -814,6 +917,7 @@ void __init time_init(void)
 
 	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
 	per_cpu(processed_system_time, 0) = processed_system_time;
+	init_missing_ticks_accounting(0);
 
 	update_wallclock();
 
@@ -891,6 +995,7 @@ void time_resume(void)
 
 	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
 	per_cpu(processed_system_time, 0) = processed_system_time;
+	init_missing_ticks_accounting(0);
 
 	update_wallclock();
 }
@@ -909,6 +1014,7 @@ void local_setup_timer(unsigned int cpu)
 		/* Use cpu0 timestamp: cpu's shadow is not initialised yet. */
 		per_cpu(processed_system_time, cpu) = 
 			per_cpu(shadow_time, 0).system_timestamp;
+		init_missing_ticks_accounting(cpu);
 	} while (read_seqretry(&xtime_lock, seq));
 
 	sprintf(timer_name[cpu], "timer%d", cpu);

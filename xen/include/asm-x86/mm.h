@@ -337,6 +337,10 @@ void cleanup_writable_pagetable(struct domain *d);
         UNLOCK_BIGLOCK(d);                                      \
     } while ( 0 )
 
+#define writable_pagetable_in_sync(d)           \
+    (!((d)->arch.ptwr[PTWR_PT_ACTIVE].l1va |    \
+       (d)->arch.ptwr[PTWR_PT_INACTIVE].l1va))
+
 int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
 
 #ifndef NDEBUG
@@ -376,7 +380,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code);
 int __sync_lazy_execstate(void);
 
 /* Arch-specific portion of memory_op hypercall. */
-long arch_memory_op(int op, void *arg);
-long subarch_memory_op(int op, void *arg);
+long arch_memory_op(int op, GUEST_HANDLE(void) arg);
+long subarch_memory_op(int op, GUEST_HANDLE(void) arg);
 
 #endif /* __ASM_X86_MM_H__ */

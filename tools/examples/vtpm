@@ -1,7 +1,7 @@
 #!/bin/sh
 
 dir=$(dirname "$0")
-. "$dir/vtpm-common.sh"
+. "$dir/vtpm-hotplug-common.sh"
 
 vtpm_fatal_error=0
 

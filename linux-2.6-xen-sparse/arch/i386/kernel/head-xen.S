@@ -87,19 +87,9 @@ ENTRY(empty_zero_page)
  */
 .data
 
-	ALIGN
-	.word 0				# 32 bit align gdt_desc.address
-	.globl cpu_gdt_descr
-cpu_gdt_descr:
-	.word GDT_SIZE
-	.long cpu_gdt_table
-
-	.fill NR_CPUS-1,8,0		# space for the other GDT descriptors
-
 /*
  * The Global Descriptor Table contains 28 quadwords, per-CPU.
  */
-	.align PAGE_SIZE_asm
 ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x0000000000000000	/* 0x0b reserved */
@@ -148,10 +138,6 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0xf0 - unused */
 	.quad 0x0000000000000000	/* 0xf8 - GDT entry 31: double-fault TSS */
 
-	/* Be sure this is zeroed to avoid false validations in Xen */
-	.fill PAGE_SIZE_asm / 8 - GDT_ENTRIES,8,0
-
-
 /*
  * __xen_guest information
  */
@@ -176,6 +162,7 @@ ENTRY(cpu_gdt_table)
 	.ascii  ",FEATURES=writable_page_tables"
 	.ascii	         "|writable_descriptor_tables"
 	.ascii	         "|auto_translated_physmap"
+	.ascii	         "|pae_pgdir_above_4gb"
 	.ascii	         "|supervisor_mode_kernel"
 #ifdef CONFIG_X86_PAE
 	.ascii	",PAE=yes"

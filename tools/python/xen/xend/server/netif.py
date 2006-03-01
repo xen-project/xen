@@ -113,7 +113,8 @@ class NetifController(DevController):
                            script.replace(xroot.network_script_dir + os.sep,
                                           "")])
         if ip:
-            result.append(['ip', ip.split(" ")])
+            for i in ip.split(" "):
+                result.append(['ip', i])
         if bridge:
             result.append(['bridge', bridge])
         if mac:

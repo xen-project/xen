@@ -223,6 +223,7 @@ static inline int __entry(
     int i;
     pgentry_64_t *le_e;
     pgentry_64_t *le_p = NULL;
+    pgentry_64_t *phys_vtable = NULL;
     unsigned long mfn;
     int index;
     u32 level = flag & L_MASK;
@@ -251,25 +252,35 @@ static inline int __entry(
     {
         root_level = PAE_PAGING_LEVELS;
         index = table_offset_64(va, root_level);
-        le_e = (pgentry_64_t *)map_domain_page(
+        phys_vtable = (pgentry_64_t *)map_domain_page(
             pagetable_get_pfn(v->domain->arch.phys_table));
+        le_e = &phys_vtable[index];
     }
 
     /*
      * If it's not external mode, then mfn should be machine physical.
      */
-    for (i = root_level - level; i > 0; i--) {
-        if ( unlikely(!(entry_get_flags(*le_e) & _PAGE_PRESENT)) ) {
+    for ( i = root_level - level; i > 0; i-- )
+    {
+        if ( unlikely(!(entry_get_flags(*le_e) & _PAGE_PRESENT)) )
+        {
             if ( le_p )
                 unmap_domain_page(le_p);
+
+            if ( phys_vtable )
+                unmap_domain_page(phys_vtable);
+
             return 0;
         }
+
         mfn = entry_get_pfn(*le_e);
         if ( (flag & GUEST_ENTRY) && shadow_mode_translate(d) )
             mfn = get_mfn_from_gpfn(mfn);
+
         if ( le_p )
             unmap_domain_page(le_p);
         le_p = (pgentry_64_t *)map_domain_page(mfn);
+
         if ( flag & SHADOW_ENTRY )
             index = table_offset_64(va, (level + i - 1));
         else
@@ -285,8 +296,10 @@ static inline int __entry(
     if ( le_p )
         unmap_domain_page(le_p);
 
-    return 1;
+    if ( phys_vtable )
+        unmap_domain_page(phys_vtable);
 
+    return 1;
 }
 
 static inline int __rw_entry(

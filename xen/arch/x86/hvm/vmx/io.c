@@ -113,13 +113,15 @@ asmlinkage void vmx_intr_assist(void)
     struct hvm_virpit *vpit = &plat->vpit;
     struct hvm_virpic *pic= &plat->vpic;
 
-    hvm_pic_assist(v);
-    __vmread_vcpu(v, CPU_BASED_VM_EXEC_CONTROL, &cpu_exec_control);
-    if ( vpit->pending_intr_nr ) {
+    if ( v->vcpu_id == 0 )
+        hvm_pic_assist(v);
+
+    if ( (v->vcpu_id == 0) && vpit->pending_intr_nr ) {
         pic_set_irq(pic, 0, 0);
         pic_set_irq(pic, 0, 1);
     }
 
+    __vmread_vcpu(v, CPU_BASED_VM_EXEC_CONTROL, &cpu_exec_control);
     __vmread(VM_ENTRY_INTR_INFO_FIELD, &intr_fields);
 
     if (intr_fields & INTR_INFO_VALID_MASK) {

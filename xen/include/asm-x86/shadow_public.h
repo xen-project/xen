@@ -22,8 +22,6 @@
 #ifndef _XEN_SHADOW_PUBLIC_H
 #define _XEN_SHADOW_PUBLIC_H
 
-extern int alloc_p2m_table(struct domain *d);
-
 #if CONFIG_PAGING_LEVELS >= 3
 #define MFN_PINNED(_x) (mfn_to_page(_x)->u.inuse.type_info & PGT_pinned)
 

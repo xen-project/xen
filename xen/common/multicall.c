@@ -81,8 +81,8 @@ long do_multicall(struct multicall_entry *call_list, unsigned int nr_calls)
             if ( i < nr_calls )
             {
                 mcs->flags = 0;
-                return hypercall2_create_continuation(
-                    __HYPERVISOR_multicall, &call_list[i], nr_calls-i);
+                return hypercall_create_continuation(
+                    __HYPERVISOR_multicall, "pi", &call_list[i], nr_calls-i);
             }
         }
     }

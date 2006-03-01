@@ -448,6 +448,37 @@ unsigned long vmx_get_ctrl_reg(struct vcpu *v, unsigned int num)
     return 0;                   /* dummy */
 }
 
+/* SMP VMX guest support */
+void vmx_init_ap_context(struct vcpu_guest_context *ctxt,
+                         int vcpuid, int trampoline_vector)
+{
+    int i;
+
+    memset(ctxt, 0, sizeof(*ctxt));
+
+    /*
+     * Initial register values:
+     */
+    ctxt->user_regs.eip = VMXASSIST_BASE;
+    ctxt->user_regs.edx = vcpuid;
+    ctxt->user_regs.ebx = trampoline_vector;
+
+    ctxt->flags = VGCF_HVM_GUEST;
+
+    /* Virtual IDT is empty at start-of-day. */
+    for ( i = 0; i < 256; i++ )
+    {
+        ctxt->trap_ctxt[i].vector = i;
+        ctxt->trap_ctxt[i].cs     = FLAT_KERNEL_CS;
+    }
+
+    /* No callback handlers. */
+#if defined(__i386__)
+    ctxt->event_callback_cs     = FLAT_KERNEL_CS;
+    ctxt->failsafe_callback_cs  = FLAT_KERNEL_CS;
+#endif
+}
+
 void do_nmi(struct cpu_user_regs *);
 
 static int check_vmx_controls(ctrls, msr)
@@ -544,6 +575,8 @@ int start_vmx(void)
     hvm_funcs.paging_enabled = vmx_paging_enabled;
     hvm_funcs.instruction_length = vmx_instruction_length;
     hvm_funcs.get_guest_ctrl_reg = vmx_get_ctrl_reg;
+
+    hvm_funcs.init_ap_context = vmx_init_ap_context;
 
     hvm_enabled = 1;
 

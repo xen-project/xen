@@ -1092,7 +1092,20 @@ tpmback_init(void)
 	return 0;
 }
 
-__initcall(tpmback_init);
+module_init(tpmback_init);
+
+static void __exit
+tpmback_exit(void)
+{
+
+	tpmif_xenbus_exit();
+	tpmif_interface_exit();
+	misc_deregister(&ibmvtpms_miscdevice);
+}
+
+module_exit(tpmback_exit);
+
+MODULE_LICENSE("Dual BSD/GPL");
 
 /*
  * Local variables:

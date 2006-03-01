@@ -25,10 +25,15 @@
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/svm/vmcb.h>
 
+#define HVM_VCPU_INIT_SIPI_SIPI_STATE_NORM          0
+#define HVM_VCPU_INIT_SIPI_SIPI_STATE_WAIT_SIPI     1
+
 struct hvm_vcpu {
-    unsigned long       ioflags;
-    struct mmio_op      mmio_op;
-    struct vlapic       *vlapic;
+    unsigned long   ioflags;
+    struct mmio_op  mmio_op;
+    struct vlapic   *vlapic;
+    /* For AP startup */
+    unsigned long   init_sipi_sipi_state;
 
     union {
         struct arch_vmx_struct vmx;

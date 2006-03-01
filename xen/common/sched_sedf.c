@@ -1408,18 +1408,14 @@ static void sedf_dump_domain(struct vcpu *d)
 {
     printk("%i.%i has=%c ", d->domain->domain_id, d->vcpu_id,
            test_bit(_VCPUF_running, &d->vcpu_flags) ? 'T':'F');
-    printk("p=%"PRIu64" sl=%"PRIu64" ddl=%"PRIu64" w=%hu c=%"PRIu64
+    printk("p=%"PRIu64" sl=%"PRIu64" ddl=%"PRIu64" w=%hu"
            " sc=%i xtr(%s)=%"PRIu64" ew=%hu",
            EDOM_INFO(d)->period, EDOM_INFO(d)->slice, EDOM_INFO(d)->deadl_abs,
-           EDOM_INFO(d)->weight, d->cpu_time,
+           EDOM_INFO(d)->weight,
            EDOM_INFO(d)->score[EXTRA_UTIL_Q],
            (EDOM_INFO(d)->status & EXTRA_AWARE) ? "yes" : "no",
            EDOM_INFO(d)->extra_time_tot, EDOM_INFO(d)->extraweight);
     
-    if ( d->cpu_time != 0 )
-        printf(" (%"PRIu64"%%)", (EDOM_INFO(d)->extra_time_tot * 100)
-               / d->cpu_time);
-
 #ifdef SEDF_STATS
     if ( EDOM_INFO(d)->block_time_tot != 0 )
         printf(" pen=%"PRIu64"%%", (EDOM_INFO(d)->penalty_time_tot * 100) /

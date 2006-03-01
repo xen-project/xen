@@ -80,12 +80,7 @@ interrupt_post_injection(struct vcpu * v, int vector, int type)
 {
     struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
 
-    switch(type)
-    {
-    case VLAPIC_DELIV_MODE_EXT:
-    case VLAPIC_DELIV_MODE_FIXED:
-    case VLAPIC_DELIV_MODE_LPRI:
-        if ( is_pit_irq(v, vector, type) ) {
+    if ( is_pit_irq(v, vector, type) ) {
             if ( !vpit->first_injected ) {
                 vpit->first_injected = 1;
                 vpit->pending_intr_nr = 0;
@@ -95,12 +90,15 @@ interrupt_post_injection(struct vcpu * v, int vector, int type)
             }
             vpit->inject_point = NOW();
             svm_set_tsc_shift (v, vpit);
-        }
+    }
+
+    switch(type)
+    {
+    case VLAPIC_DELIV_MODE_EXT:
         break;
 
     default:
-        printk("Not support interrupt type: %d\n", type);
-        break;
+        vlapic_post_injection(v, vector, type);
     }
 }
 

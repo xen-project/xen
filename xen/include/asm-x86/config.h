@@ -37,6 +37,12 @@
 
 #define NR_CPUS 32
 
+#ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
+# define supervisor_mode_kernel (1)
+#else
+# define supervisor_mode_kernel (0)
+#endif
+
 /* Linkage for x86 */
 #define __ALIGN .align 16,0x90
 #define __ALIGN_STR ".align 16,0x90"

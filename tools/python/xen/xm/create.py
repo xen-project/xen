@@ -137,6 +137,10 @@ gopts.var('ramdisk', val='FILE',
           fn=set_value, default='',
           use="Path to ramdisk.")
 
+gopts.var('features', val='FEATURES',
+          fn=set_value, default='',
+          use="Features to enable in guest kernel")
+
 gopts.var('builder', val='FUNCTION',
           fn=set_value, default='linux',
           use="Function to use to build the domain.")
@@ -445,6 +449,8 @@ def configure_image(vals):
         config_image.append(['root', cmdline_root])
     if vals.extra:
         config_image.append(['args', vals.extra])
+    if vals.features:
+        config_image.append(['features', vals.features])
 
     if vals.builder == 'hvm':
         configure_hvm(config_image, vals)

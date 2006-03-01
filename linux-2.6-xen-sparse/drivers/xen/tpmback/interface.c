@@ -186,6 +186,12 @@ tpmif_interface_init(void)
 					 0, 0, NULL, NULL);
 }
 
+void __init
+tpmif_interface_exit(void)
+{
+	kmem_cache_destroy(tpmif_cachep);
+}
+
 /*
  * Local variables:
  *  c-file-style: "linux"
