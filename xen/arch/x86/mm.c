@@ -506,10 +506,10 @@ get_page_from_l2e(
     vaddr <<= PGT_va_shift;
     rc = get_page_and_type_from_pagenr(
         l2e_get_pfn(l2e), PGT_l1_page_table | vaddr, d);
-
-    if ( (CONFIG_PAGING_LEVELS == 2) && unlikely(!rc) )
+#if CONFIG_PAGING_LEVELS == 2
+    if ( unlikely(!rc) )
         rc = get_linear_pagetable(l2e, pfn, d);
-
+#endif
     return rc;
 }
 
@@ -538,10 +538,10 @@ get_page_from_l3e(
     rc = get_page_and_type_from_pagenr(
         l3e_get_pfn(l3e),
         PGT_l2_page_table | vaddr, d);
-
-    if ( (CONFIG_PAGING_LEVELS == 3) && unlikely(!rc) )
+#if CONFIG_PAGING_LEVELS == 3
+    if ( unlikely(!rc) )
         rc = get_linear_pagetable(l3e, pfn, d);
-
+#endif
     return rc;
 }
 #endif /* 3 level */
