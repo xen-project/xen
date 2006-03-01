@@ -11,15 +11,40 @@
 #include <xen/mm.h>
 #include <xen/perfc.h>
 #include <xen/domain_page.h>
+#include <xen/shadow.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/hardirq.h>
 
+static inline struct vcpu *mapcache_current_vcpu(void)
+{
+    struct vcpu *v;
+
+    /* In the common case we use the mapcache of the running VCPU. */
+    v = current;
+
+    /*
+     * If guest_table is NULL, and we are running a paravirtualised guest,
+     * then it means we are running on the idle domain's page table and must
+     * therefore use its mapcache.
+     */
+    if ( unlikely(!pagetable_get_pfn(v->arch.guest_table)) && !HVM_DOMAIN(v) )
+    {
+        /* If we really are idling, perform lazy context switch now. */
+        if ( (v = idle_vcpu[smp_processor_id()]) == current )
+            __sync_lazy_execstate();
+        /* We must now be running on the idle page table. */
+        ASSERT(read_cr3() == __pa(idle_pg_table));
+    }
+
+    return v;
+}
+
 void *map_domain_page(unsigned long pfn)
 {
     unsigned long va;
-    unsigned int idx, i, vcpu = current->vcpu_id;
-    struct domain *d;
+    unsigned int idx, i, vcpu;
+    struct vcpu *v;
     struct mapcache *cache;
     struct vcpu_maphash_entry *hashent;
 
@@ -27,12 +52,10 @@ void *map_domain_page(unsigned long pfn)
 
     perfc_incrc(map_domain_page_count);
 
-    /* If we are the idle domain, ensure that we run on our own page tables. */
-    d = current->domain;
-    if ( unlikely(is_idle_domain(d)) )
-        __sync_lazy_execstate();
+    v = mapcache_current_vcpu();
 
-    cache = &d->arch.mapcache;
+    vcpu  = v->vcpu_id;
+    cache = &v->domain->arch.mapcache;
 
     hashent = &cache->vcpu_maphash[vcpu].hash[MAPHASH_HASHFN(pfn)];
     if ( hashent->pfn == pfn )
@@ -93,7 +116,8 @@ void *map_domain_page(unsigned long pfn)
 void unmap_domain_page(void *va)
 {
     unsigned int idx;
-    struct mapcache *cache = &current->domain->arch.mapcache;
+    struct vcpu *v;
+    struct mapcache *cache;
     unsigned long pfn;
     struct vcpu_maphash_entry *hashent;
 
@@ -102,9 +126,13 @@ void unmap_domain_page(void *va)
     ASSERT((void *)MAPCACHE_VIRT_START <= va);
     ASSERT(va < (void *)MAPCACHE_VIRT_END);
 
+    v = mapcache_current_vcpu();
+
+    cache = &v->domain->arch.mapcache;
+
     idx = ((unsigned long)va - MAPCACHE_VIRT_START) >> PAGE_SHIFT;
     pfn = l1e_get_pfn(cache->l1tab[idx]);
-    hashent = &cache->vcpu_maphash[current->vcpu_id].hash[MAPHASH_HASHFN(pfn)];
+    hashent = &cache->vcpu_maphash[v->vcpu_id].hash[MAPHASH_HASHFN(pfn)];
 
     if ( hashent->idx == idx )
     {
