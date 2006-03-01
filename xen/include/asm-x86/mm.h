@@ -337,6 +337,10 @@ void cleanup_writable_pagetable(struct domain *d);
         UNLOCK_BIGLOCK(d);                                      \
     } while ( 0 )
 
+#define writable_pagetable_in_sync(d)           \
+    (!((d)->arch.ptwr[PTWR_PT_ACTIVE].l1va |    \
+       (d)->arch.ptwr[PTWR_PT_INACTIVE].l1va))
+
 int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
 
 #ifndef NDEBUG

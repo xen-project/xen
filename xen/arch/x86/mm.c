@@ -475,7 +475,8 @@ get_page_from_l1e(
     {
         MEM_LOG("Error getting mfn %lx (pfn %lx) from L1 entry %" PRIpte
                 " for dom%d",
-                mfn, get_gpfn_from_mfn(mfn), l1e_get_intpte(l1e), d->domain_id);
+                mfn, get_gpfn_from_mfn(mfn),
+                l1e_get_intpte(l1e), d->domain_id);
     }
 
     return okay;
@@ -515,7 +516,6 @@ get_page_from_l2e(
 
 
 #if CONFIG_PAGING_LEVELS >= 3
-
 static int 
 get_page_from_l3e(
     l3_pgentry_t l3e, unsigned long pfn,
@@ -545,11 +545,9 @@ get_page_from_l3e(
 #endif
     return rc;
 }
-
 #endif /* 3 level */
 
 #if CONFIG_PAGING_LEVELS >= 4
-
 static int 
 get_page_from_l4e(
     l4_pgentry_t l4e, unsigned long pfn, 
@@ -579,7 +577,6 @@ get_page_from_l4e(
 
     return rc;
 }
-
 #endif /* 4 level */
 
 
@@ -649,27 +646,22 @@ static void put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
 
 
 #if CONFIG_PAGING_LEVELS >= 3
-
 static void put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn)
 {
     if ( (l3e_get_flags(l3e) & _PAGE_PRESENT) && 
          (l3e_get_pfn(l3e) != pfn) )
         put_page_and_type(mfn_to_page(l3e_get_pfn(l3e)));
 }
-
 #endif
 
 #if CONFIG_PAGING_LEVELS >= 4
-
 static void put_page_from_l4e(l4_pgentry_t l4e, unsigned long pfn)
 {
     if ( (l4e_get_flags(l4e) & _PAGE_PRESENT) && 
          (l4e_get_pfn(l4e) != pfn) )
         put_page_and_type(mfn_to_page(l4e_get_pfn(l4e)));
 }
-
 #endif
-
 
 static int alloc_l1_table(struct page_info *page)
 {
@@ -1568,6 +1560,8 @@ int new_guest_cr3(unsigned long mfn)
     struct domain *d = v->domain;
     int okay;
     unsigned long old_base_mfn;
+
+    ASSERT(writable_pagetable_in_sync(d));
 
     if ( shadow_mode_refcounts(d) )
     {

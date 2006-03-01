@@ -951,6 +951,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             
         case 3: /* Write CR3 */
             LOCK_BIGLOCK(v->domain);
+            cleanup_writable_pagetable(v->domain);
             (void)new_guest_cr3(gmfn_to_mfn(v->domain, paddr_to_pfn(*reg)));
             UNLOCK_BIGLOCK(v->domain);
             break;
