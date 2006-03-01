@@ -34,7 +34,7 @@
 #define POFFSET(vaddr, ps)  ((vaddr) & (PSIZE(ps) - 1))
 #define PPN_2_PA(ppn)       ((ppn)<<12)
 #define CLEARLSB(ppn, nbits)    ((((uint64_t)ppn) >> (nbits)) << (nbits))
-#define PAGEALIGN(va, ps)	(va & ~(PSIZE(ps)-1))
+#define PAGEALIGN(va, ps)	CLEARLSB(va, ps)
 
 #define TLB_AR_R        0
 #define TLB_AR_RX       1
@@ -104,6 +104,7 @@
 
 #define VRN_MASK        0xe000000000000000L
 #define PTA_BASE_MASK       0x3fffffffffffL
+#define PTA_BASE_SHIFT      15
 #define VHPT_OFFSET_MASK    0x7fff
 
 #define BITS_SHIFT_256MB    28

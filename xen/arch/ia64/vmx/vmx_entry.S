@@ -34,6 +34,7 @@
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
 #include <asm/vhpt.h>
+#include <asm/vmmu.h>
 #include "vmx_minstate.h"
 
 /*
@@ -696,7 +697,7 @@ GLOBAL_ENTRY(vmx_switch_rr7)
    movl r25=PAGE_KERNEL
    ;;
    or loc5 = r25,loc5          // construct PA | page properties
-   mov r23 = IA64_GRANULE_SHIFT <<2
+   mov r23 = VCPU_VHPT_SHIFT <<2
    ;;
    ptr.d   in3,r23
    ;;

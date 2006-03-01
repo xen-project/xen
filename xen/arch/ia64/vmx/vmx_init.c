@@ -172,7 +172,15 @@ static vpd_t *alloc_vpd(void)
 	cpuid3.number = 4;	/* 5 - 1 */
 	vpd->vcpuid[3] = cpuid3.value;
 
+    vpd->vac.a_from_int_cr = 1;
+    vpd->vac.a_to_int_cr = 1;
+    vpd->vac.a_from_psr = 1;
+    vpd->vac.a_from_cpuid = 1;
+    vpd->vac.a_cover = 1;
+    vpd->vac.a_bsw = 1;
+
 	vpd->vdc.d_vmsw = 1;
+
 	return vpd;
 }
 
@@ -300,7 +308,7 @@ io_range_t io_ranges[] = {
 int vmx_alloc_contig_pages(struct domain *d)
 {
 	unsigned int order;
-	unsigned long i, j, start, end, pgnr, conf_nr;
+	unsigned long i, j, start,tmp, end, pgnr, conf_nr;
 	struct page_info *page;
 	struct vcpu *v = d->vcpu[0];
 
@@ -315,52 +323,100 @@ int vmx_alloc_contig_pages(struct domain *d)
 	}
 
 	conf_nr = VMX_CONFIG_PAGES(d);
+    if((conf_nr<<PAGE_SHIFT)<(1UL<<(_PAGE_SIZE_64M+1)))
+        panic("vti domain needs 128M memory at least\n");
+/*
 	order = get_order_from_pages(conf_nr);
 	if (unlikely((page = alloc_domheap_pages(d, order, 0)) == NULL)) {
 	    printk("Could not allocate order=%d pages for vmx contig alloc\n",
 			order);
 	    return -1;
 	}
+*/
+ 
+/* reserve contiguous 64M for linux kernel */
+
+    if (unlikely((page = alloc_domheap_pages(d,(KERNEL_TR_PAGE_SHIFT-PAGE_SHIFT), 0)) == NULL)) {
+        printk("No enough memory for vti domain!!!\n");
+        return -1;
+    }
+    pgnr = page_to_mfn(page);
+	for (i=(1UL<<KERNEL_TR_PAGE_SHIFT);i<(1UL<<(KERNEL_TR_PAGE_SHIFT+1));i+=PAGE_SIZE,pgnr++){
+	    assign_domain_page(d, i, pgnr << PAGE_SHIFT);
+    }
+
+	for (i = 0; i < (1UL<<KERNEL_TR_PAGE_SHIFT) ; i += PAGE_SIZE){
+        if (unlikely((page = alloc_domheap_pages(d, 0, 0)) == NULL)) {
+            printk("No enough memory for vti domain!!!\n");
+            return -1;
+        }
+	    pgnr = page_to_mfn(page);
+	    assign_domain_page(d, i, pgnr << PAGE_SHIFT);
+    }
 
 	/* Map normal memory below 3G */
-	pgnr = page_to_mfn(page);
 	end = conf_nr << PAGE_SHIFT;
-	for (i = 0;
-	     i < (end < MMIO_START ? end : MMIO_START);
-	     i += PAGE_SIZE, pgnr++)
+    tmp = end < MMIO_START ? end : MMIO_START;
+	for (i = (1UL<<(KERNEL_TR_PAGE_SHIFT+1)); i < tmp; i += PAGE_SIZE){
+        if (unlikely((page = alloc_domheap_pages(d, 0, 0)) == NULL)) {
+            printk("No enough memory for vti domain!!!\n");
+            return -1;
+        }
+	    pgnr = page_to_mfn(page);
 	    assign_domain_page(d, i, pgnr << PAGE_SHIFT);
-
+    }
 	/* Map normal memory beyond 4G */
 	if (unlikely(end > MMIO_START)) {
 	    start = 4 * MEM_G;
 	    end = start + (end - 3 * MEM_G);
-	    for (i = start; i < end; i += PAGE_SIZE, pgnr++)
-		assign_domain_page(d, i, pgnr << PAGE_SHIFT);
+	    for (i = start; i < end; i += PAGE_SIZE){
+            if (unlikely((page = alloc_domheap_pages(d, 0, 0)) == NULL)) {
+                printk("No enough memory for vti domain!!!\n");
+                return -1;
+            }
+            pgnr = page_to_mfn(page);
+            assign_domain_page(d, i, pgnr << PAGE_SHIFT);
+        }
 	}
 
 	d->arch.max_pfn = end >> PAGE_SHIFT;
-
+/*
 	order = get_order_from_pages(GFW_SIZE >> PAGE_SHIFT);
 	if (unlikely((page = alloc_domheap_pages(d, order, 0)) == NULL)) {
 	    printk("Could not allocate order=%d pages for vmx contig alloc\n",
-			order);
+			order);`
 	    return -1;
 	}
-
+*/
 	/* Map guest firmware */
-	pgnr = page_to_mfn(page);
-	for (i = GFW_START; i < GFW_START + GFW_SIZE; i += PAGE_SIZE, pgnr++)
+	for (i = GFW_START; i < GFW_START + GFW_SIZE; i += PAGE_SIZE, pgnr++){
+        if (unlikely((page = alloc_domheap_pages(d, 0, 0)) == NULL)) {
+            printk("No enough memory for vti domain!!!\n");
+            return -1;
+        }
+	    pgnr = page_to_mfn(page);
 	    assign_domain_page(d, i, pgnr << PAGE_SHIFT);
+    }
 
+/*
 	if (unlikely((page = alloc_domheap_pages(d, 1, 0)) == NULL)) {
 	    printk("Could not allocate order=1 pages for vmx contig alloc\n");
 	    return -1;
 	}
-
+*/
 	/* Map for shared I/O page and xenstore */
+    if (unlikely((page = alloc_domheap_pages(d, 0, 0)) == NULL)) {
+        printk("No enough memory for vti domain!!!\n");
+        return -1;
+    }
 	pgnr = page_to_mfn(page);
 	assign_domain_page(d, IO_PAGE_START, pgnr << PAGE_SHIFT);
-	pgnr++;
+
+    if (unlikely((page = alloc_domheap_pages(d, 0, 0)) == NULL)) {
+        printk("No enough memory for vti domain!!!\n");
+        return -1;
+    }
+	pgnr = page_to_mfn(page);
 	assign_domain_page(d, STORE_PAGE_START, pgnr << PAGE_SHIFT);
 
 	set_bit(ARCH_VMX_CONTIG_MEM, &v->arch.arch_vmx.flags);

@@ -8,7 +8,8 @@
 #define	IA64_TR_VHPT		4	/* dtr4: vhpt */
 #define IA64_TR_ARCH_INFO	5
 #define IA64_TR_PERVP_VHPT	6
-
+#define IA64_DTR_GUEST_KERNEL   7
+#define IA64_ITR_GUEST_KERNEL   2
 /* Processor status register bits: */
 #define IA64_PSR_VM_BIT		46
 #define IA64_PSR_VM	(__IA64_UL(1) << IA64_PSR_VM_BIT)

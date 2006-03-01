@@ -27,7 +27,7 @@
 #include <asm/vmx_phy_mode.h>
 #include <xen/sched.h>
 #include <asm/pgtable.h>
-
+#include <asm/vmmu.h>
 int valid_mm_mode[8] = {
     GUEST_PHYS, /* (it, dt, rt) -> (0, 0, 0) */
     INV_MODE,
@@ -94,7 +94,7 @@ int mm_switch_table[8][8] = {
      *  (1,1,1)->(1,0,0)
      */
 
-    {SW_V2P, 0,  0,  0,  SW_V2P, SW_V2P, 0,  SW_SELF}
+    {SW_V2P, 0,  0,  0,  SW_V2P, SW_V2P, 0,  SW_SELF},
 };
 
 void
@@ -104,9 +104,8 @@ physical_mode_init(VCPU *vcpu)
     vcpu->arch.mode_flags = GUEST_IN_PHY;
 }
 
-extern u64 get_mfn(domid_t domid, u64 gpfn, u64 pages);
+extern u64 get_mfn(struct domain *d, u64 gpfn);
 extern void vmx_switch_rr7(unsigned long ,shared_info_t*,void *,void *,void *);
-
 void
 physical_itlb_miss_dom0(VCPU *vcpu, u64 vadr)
 {
@@ -115,7 +114,7 @@ physical_itlb_miss_dom0(VCPU *vcpu, u64 vadr)
     u64 mppn,gppn;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
     gppn=(vadr<<1)>>13;
-    mppn = get_mfn(DOMID_SELF,gppn,1);
+    mppn = get_mfn(vcpu->domain,gppn);
     mppn=(mppn<<12)|(vpsr.cpl<<7); 
 //    if(vadr>>63)
 //       mppn |= PHY_PAGE_UC;
@@ -147,7 +146,7 @@ physical_dtlb_miss(VCPU *vcpu, u64 vadr)
 //        panic("dom n physical dtlb miss happen\n");
     vpsr.val=vmx_vcpu_get_psr(vcpu);
     gppn=(vadr<<1)>>13;
-    mppn = get_mfn(DOMID_SELF,gppn,1);
+    mppn = get_mfn(vcpu->domain, gppn);
     mppn=(mppn<<12)|(vpsr.cpl<<7);
     if(vadr>>63)
         mppn |= PHY_PAGE_UC;

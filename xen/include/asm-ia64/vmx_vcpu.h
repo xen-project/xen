@@ -464,6 +464,7 @@ vmx_vrrtomrr(VCPU *v, unsigned long val)
 
     rr.rrval=val;
     rr.rid = rr.rid + v->arch.starting_rid;
+    rr.ps = PAGE_SHIFT;
     rr.ve = 1;
     return  vmMangleRID(rr.rrval);
 /* Disable this rid allocation algorithm for now */

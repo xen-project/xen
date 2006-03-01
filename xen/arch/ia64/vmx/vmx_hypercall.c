@@ -178,6 +178,8 @@ static int do_lock_page(VCPU *vcpu, u64 va, u64 lock)
  * Lock guest page in vTLB, so that it's not relinquished by recycle
  * session when HV is servicing that hypercall.
  */
+
+/*
 void hyper_lock_page(void)
 {
 //TODO:
@@ -190,6 +192,7 @@ void hyper_lock_page(void)
 
     vmx_vcpu_increment_iip(vcpu);
 }
+ */
 
 static int do_set_shared_page(VCPU *vcpu, u64 gpa)
 {

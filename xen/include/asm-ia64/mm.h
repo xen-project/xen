@@ -134,6 +134,8 @@ extern void __init init_frametable(void);
 #endif
 void add_to_domain_alloc_list(unsigned long ps, unsigned long pe);
 
+extern unsigned long gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
+
 static inline void put_page(struct page_info *page)
 {
 #ifdef VALIDATE_VT	// doesn't work with non-VTI in grant tables yet
@@ -215,8 +217,8 @@ void memguard_unguard_range(void *p, unsigned long l);
 #endif
 
 // prototype of misc memory stuff
-unsigned long __get_free_pages(unsigned int mask, unsigned int order);
-void __free_pages(struct page *page, unsigned int order);
+//unsigned long __get_free_pages(unsigned int mask, unsigned int order);
+//void __free_pages(struct page *page, unsigned int order);
 void *pgtable_quicklist_alloc(void);
 void pgtable_quicklist_free(void *pgtable_entry);
 
@@ -436,12 +438,22 @@ extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
 
 /* Return I/O type if trye */
 #define __gpfn_is_io(_d, gpfn)				\
-	(__gmfn_valid(_d, gpfn) ? 			\
-	(lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT)) & GPFN_IO_MASK) : 0)
+({                                          \
+    u64 pte, ret=0;                                \
+    pte=lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT));      \
+    if(!(pte&GPFN_INV_MASK))        \
+        ret = pte & GPFN_IO_MASK;        \
+    ret;                \
+})
 
 #define __gpfn_is_mem(_d, gpfn)				\
-	(__gmfn_valid(_d, gpfn) ?			\
-	((lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT)) & GPFN_IO_MASK) == GPFN_MEM) : 0)
+({                                          \
+    u64 pte, ret=0;                                \
+    pte=lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT));      \
+    if((!(pte&GPFN_INV_MASK))&&((pte & GPFN_IO_MASK)==GPFN_MEM))   \
+        ret = 1;             \
+    ret;                \
+})
 
 
 #define __gpa_to_mpa(_d, gpa)   \

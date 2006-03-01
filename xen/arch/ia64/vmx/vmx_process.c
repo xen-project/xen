@@ -47,6 +47,7 @@
 #include <asm/vmx_vcpu.h>
 #include <asm/kregs.h>
 #include <asm/vmx.h>
+#include <asm/vmmu.h>
 #include <asm/vmx_mm_def.h>
 #include <asm/vmx_phy_mode.h>
 #include <xen/mm.h>
@@ -314,6 +315,10 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
         return;
     }
 */
+    if(vadr == 0x1ea18c00 ){
+        ia64_clear_ic();
+        while(1);
+    }
     if(is_physical_mode(v)&&(!(vadr<<1>>62))){
         if(vec==1){
             physical_itlb_miss(v, vadr);
@@ -342,12 +347,18 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
             return IA64_FAULT;
         }
 
-    	if ( data->ps != vrr.ps ) {
+//    	if ( data->ps != vrr.ps ) {
+//    		machine_tlb_insert(v, data);
+//    	}
+//    	else {
+/*        if ( data->contiguous&&(!data->tc)){
     		machine_tlb_insert(v, data);
-    	}
-    	else {
-	        thash_insert(vtlb->ts->vhpt,data,vadr);
-	    }
+        }
+        else{
+ */
+            thash_vhpt_insert(vtlb->ts->vhpt,data,vadr);
+//        }
+//	    }
     }else if(type == DSIDE_TLB){
         if(!vhpt_enabled(v, vadr, misr.rs?RSE_REF:DATA_REF)){
             if(vpsr.ic){
@@ -367,8 +378,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
         } else{
             vmx_vcpu_thash(v, vadr, &vhpt_adr);
             vrr=vmx_vcpu_rr(v,vhpt_adr);
-            data = vtlb_lookup_ex(vtlb, vrr.rid, vhpt_adr, DSIDE_TLB);
-            if(data){
+            if(vhpt_lookup(vhpt_adr) ||  vtlb_lookup_ex(vtlb, vrr.rid, vhpt_adr, DSIDE_TLB)){
                 if(vpsr.ic){
                     vcpu_set_isr(v, misr.val);
                     dtlb_fault(v, vadr);
@@ -411,8 +421,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
         } else{
             vmx_vcpu_thash(v, vadr, &vhpt_adr);
             vrr=vmx_vcpu_rr(v,vhpt_adr);
-            data = vtlb_lookup_ex(vtlb, vrr.rid, vhpt_adr, DSIDE_TLB);
-            if(data){
+            if(vhpt_lookup(vhpt_adr) || vtlb_lookup_ex(vtlb, vrr.rid, vhpt_adr, DSIDE_TLB)){
                 if(!vpsr.ic){
                     misr.ni=1;
                 }

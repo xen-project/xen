@@ -104,7 +104,6 @@ extern IA64FAULT vcpu_set_itv(VCPU *vcpu, UINT64 val);
 extern IA64FAULT vcpu_set_pmv(VCPU *vcpu, UINT64 val);
 extern IA64FAULT vcpu_set_cmcv(VCPU *vcpu, UINT64 val);
 /* interval timer registers */
-extern IA64FAULT vcpu_set_itm(VCPU *vcpu,UINT64 val);
 extern IA64FAULT vcpu_set_itc(VCPU *vcpu,UINT64 val);
 extern UINT64 vcpu_timer_pending_early(VCPU *vcpu);
 /* debug breakpoint registers */

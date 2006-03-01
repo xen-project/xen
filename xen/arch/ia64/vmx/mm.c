@@ -117,6 +117,7 @@ int vmx_do_mmu_update(mmu_update_t *ureqs,u64 count,u64 *pdone,u64 foreigndom)
         copy_from_user(&req, ureqs, sizeof(req));
         cmd = req.ptr&3;
         req.ptr &= ~3;
+/*
         if(cmd ==MMU_NORMAL_PT_UPDATE){
             entry.page_flags = req.val;
             entry.locked = 1;
@@ -135,8 +136,10 @@ int vmx_do_mmu_update(mmu_update_t *ureqs,u64 count,u64 *pdone,u64 foreigndom)
                 panic("Tlb conflict!!");
                 return -1;
             }
-            thash_purge_and_insert(hcb, &entry);
-        }else if(cmd == MMU_MACHPHYS_UPDATE){
+            thash_purge_and_insert(hcb, &entry, req.ptr);
+        }else
+ */
+        if(cmd == MMU_MACHPHYS_UPDATE){
             mfn = req.ptr >>PAGE_SHIFT;
             gpfn = req.val;
             set_machinetophys(mfn,gpfn);

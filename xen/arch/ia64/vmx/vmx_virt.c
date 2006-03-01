@@ -1300,9 +1300,7 @@ extern IA64_SLOT_TYPE  slot_types[0x20][3];
 IA64_BUNDLE __vmx_get_domain_bundle(u64 iip)
 {
 	IA64_BUNDLE bundle;
-
-	fetch_code( current,iip, &bundle.i64[0]);
-	fetch_code( current,iip+8, &bundle.i64[1]);
+	fetch_code( current, iip, &bundle.i64[0], &bundle.i64[1]);
 	return bundle;
 }
 

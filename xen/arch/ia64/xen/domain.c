@@ -484,6 +484,9 @@ void assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long ph
 			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
 	}
 	else printk("assign_domain_page: mpaddr %lx already mapped!\n",mpaddr);
+    if((physaddr>>PAGE_SHIFT)<max_page){
+        *(mpt_table + (physaddr>>PAGE_SHIFT))=(mpaddr>>PAGE_SHIFT);
+    }
 }
 #if 0
 /* map a physical address with specified I/O flag */
