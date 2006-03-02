@@ -26,7 +26,11 @@
 #include <asm/regs.h>
 #include <asm/processor.h>
 
+#ifndef NDEBUG
 #define HVM_DEBUG 1
+#else
+#define HVM_DEBUG 0
+#endif
 
 #define	HVM_DOMAIN(v)	((v)->arch.guest_context.flags & VGCF_HVM_GUEST)
 

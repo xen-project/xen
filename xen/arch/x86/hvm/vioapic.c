@@ -56,8 +56,8 @@ static void ioapic_dump_redir(hvm_vioapic_t *s, uint8_t entry)
 {
     RedirStatus redir = s->redirtbl[entry];
 
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_dump_redir "
-      "entry %x vector %x deliver_mod %x destmode %x delivestatus %x "
+    printk("ioapic_dump_redir entry %x vector %x "
+      "deliver_mod %x destmode %x delivestatus %x "
       "polarity %x remote_irr %x trigmod %x mask %x dest_id %x\n",
       entry, redir.RedirForm.vector, redir.RedirForm.deliver_mode,
       redir.RedirForm.destmode, redir.RedirForm.delivestatus,
