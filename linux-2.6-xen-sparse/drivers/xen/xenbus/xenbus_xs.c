@@ -123,8 +123,9 @@ static void *read_reply(enum xsd_sockmsg_type *type, unsigned int *len)
 
 	while (list_empty(&xs_state.reply_list)) {
 		spin_unlock(&xs_state.reply_lock);
-		wait_event_interruptible(xs_state.reply_waitq,
-					 !list_empty(&xs_state.reply_list));
+		/* XXX FIXME: Avoid synchronous wait for response here. */
+		wait_event(xs_state.reply_waitq,
+			   !list_empty(&xs_state.reply_list));
 		spin_lock(&xs_state.reply_lock);
 	}
 
@@ -685,6 +686,9 @@ static int xenwatch_thread(void *unused)
 		wait_event_interruptible(watch_events_waitq,
 					 !list_empty(&watch_events));
 
+		if (kthread_should_stop())
+			break;
+
 		down(&xenwatch_mutex);
 
 		spin_lock(&watch_events_lock);
@@ -705,6 +709,8 @@ static int xenwatch_thread(void *unused)
 
 		up(&xenwatch_mutex);
 	}
+
+	return 0;
 }
 
 static int process_msg(void)
@@ -778,7 +784,11 @@ static int xenbus_thread(void *unused)
 		if (err)
 			printk(KERN_WARNING "XENBUS error %d while reading "
 			       "message\n", err);
+		if (kthread_should_stop())
+			break;
 	}
+
+	return 0;
 }
 
 int xs_init(void)
