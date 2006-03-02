@@ -884,7 +884,7 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
     __vmread(GUEST_RFLAGS, &eflags);
     vm86 = eflags & X86_EFLAGS_VM ? 1 : 0;
 
-    HVM_DBG_LOG(DBG_LEVEL_1,
+    HVM_DBG_LOG(DBG_LEVEL_IO,
                 "vmx_io_instruction: vm86 %d, eip=%lx:%lx, "
                 "exit_qualification = %lx",
                 vm86, cs, eip, exit_qualification);
