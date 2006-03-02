@@ -10,19 +10,25 @@
 #define __XEN_PUBLIC_XEN_H__
 
 #ifdef __XEN__
-#define DEFINE_GUEST_HANDLE(type) struct __guest_handle_ ## type { type *p; }
-#define GUEST_HANDLE(type)        struct __guest_handle_ ## type
+#define __define_guest_handle(name, type) \
+    typedef struct { type *p; } __guest_handle_ ## name
 #else
-#define DEFINE_GUEST_HANDLE(type)
-#define GUEST_HANDLE(type)        type *
+#define __define_guest_handle(name, type) \
+    typedef type * __guest_handle_ ## name
 #endif
 
+#define define_guest_handle(name) __define_guest_handle(name, name)
+#define guest_handle(name)        __guest_handle_ ## name
+
 #ifndef __ASSEMBLY__
-/* Guest handle for unsigned long pointer. Define a name with no whitespace. */
-typedef unsigned long xen_ulong;
-DEFINE_GUEST_HANDLE(xen_ulong);
-/* Guest handle for arbitrary-type pointer (void *). */
-DEFINE_GUEST_HANDLE(void);
+/* Guest handles for primitive C types. */
+__define_guest_handle(uchar, unsigned char);
+__define_guest_handle(uint,  unsigned int);
+__define_guest_handle(ulong, unsigned long);
+define_guest_handle(char);
+define_guest_handle(int);
+define_guest_handle(long);
+define_guest_handle(void);
 #endif
 
 #if defined(__i386__)

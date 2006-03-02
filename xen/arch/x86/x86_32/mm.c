@@ -192,7 +192,7 @@ void subarch_init_memory(struct domain *dom_xen)
     }
 }
 
-long subarch_memory_op(int op, GUEST_HANDLE(void) arg)
+long subarch_memory_op(int op, guest_handle(void) arg)
 {
     struct xen_machphys_mfn_list xmml;
     unsigned long mfn;

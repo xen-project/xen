@@ -18,7 +18,7 @@
 /* Cast a guest handle to the specified type of handle. */
 #define guest_handle_cast(hnd, type) ({         \
     type *_x = (hnd).p;                         \
-    (GUEST_HANDLE(type)) { _x };                \
+    (guest_handle(type)) { _x };                \
 })
 
 /*
