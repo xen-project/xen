@@ -298,13 +298,8 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
         return 0;
     }
 
-#ifdef __x86_64__
-    HVM_DBG_LOG(DBG_LEVEL_2, "mode_do_msr_read: msr_content: %lx\n", 
+    HVM_DBG_LOG(DBG_LEVEL_2, "mode_do_msr_read: msr_content: %"PRIx64"\n", 
             msr_content);
-#else
-    HVM_DBG_LOG(DBG_LEVEL_2, "mode_do_msr_read: msr_content: %llx\n", 
-            msr_content);
-#endif
 
     regs->eax = msr_content & 0xffffffff;
     regs->edx = msr_content >> 32;
@@ -317,13 +312,9 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     struct vcpu *vc = current;
     struct vmcb_struct *vmcb = vc->arch.hvm_svm.vmcb;
 
-#ifdef __x86_64__
-    HVM_DBG_LOG(DBG_LEVEL_1, "mode_do_msr_write msr %lx msr_content %lx\n", 
-                regs->ecx, msr_content);
-#else
-    HVM_DBG_LOG(DBG_LEVEL_1, "mode_do_msr_write msr %x msr_content %llx\n", 
-                regs->ecx, msr_content);
-#endif
+    HVM_DBG_LOG(DBG_LEVEL_1, "mode_do_msr_write msr %lx "
+                "msr_content %"PRIx64"\n", 
+                (unsigned long)regs->ecx, msr_content);
 
     switch (regs->ecx)
     {
