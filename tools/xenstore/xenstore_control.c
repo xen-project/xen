@@ -7,6 +7,8 @@
 
 int main(int argc, char **argv)
 {
+  struct xs_handle * xsh;
+
   if (argc < 2 ||
       strcmp(argv[1], "check"))
   {
@@ -18,7 +20,7 @@ int main(int argc, char **argv)
     return 2;
   }
 
-  struct xs_handle * xsh = xs_daemon_open();
+  xsh = xs_daemon_open();
 
   xs_debug_command(xsh, argv[1], NULL, 0);
 
