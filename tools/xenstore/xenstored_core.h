@@ -148,10 +148,6 @@ int destroy_tdb(void *_tdb);
 /* Replace the tdb: required for transaction code */
 bool replace_tdb(const char *newname, TDB_CONTEXT *newtdb);
 
-/* Fail due to excessive corruption, capitalist pigdogs! */
-void __attribute__((noreturn)) corrupt(struct connection *conn,
-				       const char *fmt, ...);
-
 struct connection *new_connection(connwritefn_t *write, connreadfn_t *read);
 
 

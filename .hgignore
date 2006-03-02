@@ -166,6 +166,7 @@
 ^tools/xenstore/xenstore-read$
 ^tools/xenstore/xenstore-rm$
 ^tools/xenstore/xenstore-write$
+^tools/xenstore/xenstore-control$
 ^tools/xenstore/xenstore-ls$
 ^tools/xenstore/xenstored$
 ^tools/xenstore/xenstored_test$

@@ -129,7 +129,14 @@ check_sharing()
 same_vm()
 {
   local otherdom="$1"
-  local othervm=$(xenstore-read "/local/domain/$otherdom/vm")
+  # Note that othervm can be MISSING here, because Xend will be racing with
+  # the hotplug scripts -- the entries in /local/domain can be removed by
+  # Xend before the hotplug scripts have removed the entry in
+  # /local/domain/0/backend/.  In this case, we want to pretend that the
+  # VM is the same as FRONTEND_UUID, because that way the 'sharing' will be
+  # allowed.
+  local othervm=$(xenstore_read_default "/local/domain/$otherdom/vm"         \
+                  "$FRONTEND_UUID")
 
   [ "$FRONTEND_UUID" == "$othervm" ]
 }
