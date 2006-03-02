@@ -202,8 +202,8 @@ static void trace_io(const struct connection *conn,
 	tm = localtime(&now);
 
 	trace("%s %p %p %04d%02d%02d %02d:%02d:%02d %s (", prefix, conn,
-	      conn->transaction, tm->year + 1900, tm->mon + 1, tm->mday,
-	      tm->tm_hour, tm->tm_min, tm->tm_sec,
+	      conn->transaction, tm->tm_year + 1900, tm->tm_mon + 1,
+	      tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
 	      sockmsg_string(data->hdr.msg.type));
 	
 	for (i = 0; i < data->hdr.msg.len; i++)
