@@ -32,8 +32,6 @@
 #include <asm/tlbflush.h>
 #include <asm/kdebug.h>
 
-extern spinlock_t rtc_lock;
-
 #ifdef CONFIG_SMP
 extern void __write_lock_failed(rwlock_t *rw);
 extern void __read_lock_failed(rwlock_t *rw);
@@ -42,9 +40,6 @@ extern void __read_lock_failed(rwlock_t *rw);
 /* platform dependent support */
 EXPORT_SYMBOL(boot_cpu_data);
 //EXPORT_SYMBOL(dump_fpu);
-EXPORT_SYMBOL(__ioremap);
-EXPORT_SYMBOL(ioremap_nocache);
-EXPORT_SYMBOL(iounmap);
 EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(pm_idle);
 EXPORT_SYMBOL(pm_power_off);
@@ -101,8 +96,6 @@ EXPORT_SYMBOL(screen_info);
 #endif
 
 EXPORT_SYMBOL(get_wchan);
-
-EXPORT_SYMBOL(rtc_lock);
 
 #ifdef CONFIG_X86_LOCAL_APIC
 EXPORT_SYMBOL_GPL(set_nmi_callback);
@@ -165,8 +158,6 @@ EXPORT_SYMBOL(__supported_pte_mask);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(flush_tlb_page);
 #endif
-
-EXPORT_SYMBOL(cpu_khz);
 
 EXPORT_SYMBOL(load_gs_index);
 
