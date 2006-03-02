@@ -60,6 +60,18 @@ static int reopen_log_pipe[2];
 static char *tracefile = NULL;
 static TDB_CONTEXT *tdb_ctx;
 
+static void corrupt(struct connection *conn, const char *fmt, ...);
+static void check_store();
+
+#define log(...)							\
+	do {								\
+		char *s = talloc_asprintf(NULL, __VA_ARGS__);		\
+		trace("%s\n", s);					\
+		syslog(LOG_ERR, "%s",  s);				\
+		talloc_free(s);						\
+	} while (0)
+
+
 #ifdef TESTING
 static bool failtest = false;
 
@@ -103,33 +115,6 @@ int test_mkdir(const char *dir, int perms)
 #endif /* TESTING */
 
 #include "xenstored_test.h"
-
-/* FIXME: Ideally, this should never be called.  Some can be eliminated. */
-/* Something is horribly wrong: shutdown immediately. */
-void __attribute__((noreturn)) corrupt(struct connection *conn,
-				       const char *fmt, ...)
-{
-	va_list arglist;
-	char *str;
-	int saved_errno = errno;
-
-	va_start(arglist, fmt);
-	str = talloc_vasprintf(NULL, fmt, arglist);
-	va_end(arglist);
-
-	trace("xenstored corruption: connection id %i: err %s: %s",
-		conn ? (int)conn->id : -1, strerror(saved_errno), str);
-	eprintf("xenstored corruption: connection id %i: err %s: %s",
-		conn ? (int)conn->id : -1, strerror(saved_errno), str);
-#ifdef TESTING
-	/* Allow them to attach debugger. */
-	sleep(30);
-#endif
-	syslog(LOG_DAEMON,
-	       "xenstored corruption: connection id %i: err %s: %s",
-	       conn ? (int)conn->id : -1, strerror(saved_errno), str);
-	_exit(2);
-}
 
 TDB_CONTEXT *tdb_context(struct connection *conn)
 {
@@ -216,7 +201,8 @@ static void trace_io(const struct connection *conn,
 	now = time(NULL);
 	tm = localtime(&now);
 
-	trace("%s %p %02d:%02d:%02d %s (", prefix, conn,
+	trace("%s %p %p %04d%02d%02d %02d:%02d:%02d %s (", prefix, conn,
+	      conn->transaction, tm->year + 1900, tm->mon + 1, tm->mday,
 	      tm->tm_hour, tm->tm_min, tm->tm_sec,
 	      sockmsg_string(data->hdr.msg.type));
 	
@@ -837,8 +823,6 @@ static int destroy_node(void *_node)
 	return 0;
 }
 
-/* Be careful: create heirarchy, put entry in existing parent *last*.
- * This helps fsck if we die during this. */
 static struct node *create_node(struct connection *conn, 
 				const char *name,
 				void *data, unsigned int datalen)
@@ -939,8 +923,9 @@ static void delete_node(struct connection *conn, struct node *node)
 {
 	unsigned int i;
 
-	/* Delete self, then delete children.  If something goes wrong,
-	 * consistency check will clean up this way. */
+	/* Delete self, then delete children.  If we crash, then the worst
+	   that can happen is the children will continue to take up space, but
+	   will otherwise be unreachable. */
 	delete_node_single(conn, node);
 
 	/* Delete children, too. */
@@ -950,9 +935,14 @@ static void delete_node(struct connection *conn, struct node *node)
 		child = read_node(conn, 
 				  talloc_asprintf(node, "%s/%s", node->name,
 						  node->children + i));
-		if (!child)
-			corrupt(conn, "No child '%s' found", child);
-		delete_node(conn, child);
+		if (child) {
+			delete_node(conn, child);
+		}
+		else {
+			trace("delete_node: No child '%s/%s' found!\n",
+			      node->name, node->children + i);
+			/* Skip it, we've already deleted the parent. */
+		}
 	}
 }
 
@@ -976,12 +966,15 @@ static bool delete_child(struct connection *conn,
 		}
 	}
 	corrupt(conn, "Can't find child '%s' in %s", childname, node->name);
+	return false;
 }
 
 
 static int _rm(struct connection *conn, struct node *node, const char *name)
 {
-	/* Delete from parent first, then if something explodes fsck cleans. */
+	/* Delete from parent first, then if we crash, the worst that can
+	   happen is the child will continue to take up space, but will
+	   otherwise be unreachable. */
 	struct node *parent = read_node(conn, get_parent(name));
 	if (!parent) {
 		send_error(conn, EINVAL);
@@ -1000,10 +993,11 @@ static int _rm(struct connection *conn, struct node *node, const char *name)
 
 static void internal_rm(const char *name)
 {
-	char *tname = talloc_strdup(talloc_autofree_context(), name);
+	char *tname = talloc_strdup(NULL, name);
 	struct node *node = read_node(NULL, tname);
 	if (node)
 		_rm(NULL, node, tname);
+	talloc_free(tname);
 }
 
 
@@ -1149,18 +1143,19 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 	case XS_DEBUG:
 		if (streq(in->buffer, "print"))
 			xprintf("debug: %s", in->buffer + get_string(in, 0));
+		if (streq(in->buffer, "check"))
+			check_store();
 #ifdef TESTING
 		/* For testing, we allow them to set id. */
 		if (streq(in->buffer, "setid")) {
 			conn->id = atoi(in->buffer + get_string(in, 0));
-			send_ack(conn, XS_DEBUG);
 		} else if (streq(in->buffer, "failtest")) {
 			if (get_string(in, 0) < in->used)
 				srandom(atoi(in->buffer + get_string(in, 0)));
-			send_ack(conn, XS_DEBUG);
 			failtest = true;
 		}
 #endif /* TESTING */
+		send_ack(conn, XS_DEBUG);
 		break;
 
 	case XS_WATCH:
@@ -1258,7 +1253,7 @@ static void handle_input(struct connection *conn)
 
 		if (in->hdr.msg.len > PATH_MAX) {
 #ifndef TESTING
-			syslog(LOG_DAEMON, "Client tried to feed us %i",
+			syslog(LOG_ERR, "Client tried to feed us %i",
 			       in->hdr.msg.len);
 #endif
 			goto bad_client;
@@ -1425,10 +1420,16 @@ static void setup_structure(void)
 		   balloon driver will pick up stale entries.  In the case of
 		   the balloon driver, this can be fatal.
 		*/
-		char *tlocal = talloc_strdup(talloc_autofree_context(),
-					     "/local");
+		char *tlocal = talloc_strdup(NULL, "/local");
+
+		check_store();
+
 		internal_rm("/local");
 		create_node(NULL, tlocal, NULL, 0);
+
+		talloc_free(tlocal);
+
+		check_store();
 	}
 	else {
 		tdb_ctx = tdb_open(tdbname, 7919, TDB_FLAGS, O_RDWR|O_CREAT,
@@ -1439,10 +1440,92 @@ static void setup_structure(void)
 		manual_node("/", "tool");
 		manual_node("/tool", "xenstored");
 		manual_node("/tool/xenstored", NULL);
-	}
 
-	/* FIXME: Fsck */
+		check_store();
+	}
 }
+
+static char *child_name(const char *s1, const char *s2)
+{
+	if (strcmp(s1, "/")) {
+		return talloc_asprintf(NULL, "%s/%s", s1, s2);
+	}
+	else {
+		return talloc_asprintf(NULL, "/%s", s2);
+	}
+}
+
+static void check_store_(const char *name)
+{
+	struct node *node = read_node(NULL, name);
+
+	if (node) {
+		size_t i = 0;
+
+		while (i < node->childlen) {
+			size_t childlen = strlen(node->children + i);
+			char * childname = child_name(node->name,
+						      node->children + i);
+			struct node *childnode = read_node(NULL, childname);
+			
+			if (childnode) {
+				check_store_(childname);
+				i += childlen + 1;
+			}
+			else {
+				log("check_store: No child '%s' found!\n",
+				    childname);
+
+				memdel(node->children, i, childlen + 1,
+				       node->childlen);
+				node->childlen -= childlen + 1;
+				write_node(NULL, node);
+			}
+
+			talloc_free(childname);
+		}
+	}
+	else {
+		/* Impossible, because no database should ever be without the
+		   root, and otherwise, we've just checked in our caller
+		   (which made a recursive call to get here). */
+		   
+		log("check_store: No child '%s' found: impossible!", name);
+	}
+}
+
+
+static void check_store()
+{
+	char * root = talloc_strdup(NULL, "/");
+	log("Checking store ...");
+	check_store_(root);
+	log("Checking store complete.");
+	talloc_free(root);
+}
+
+
+/* Something is horribly wrong: check the store. */
+static void corrupt(struct connection *conn, const char *fmt, ...)
+{
+	va_list arglist;
+	char *str;
+	int saved_errno = errno;
+
+	va_start(arglist, fmt);
+	str = talloc_vasprintf(NULL, fmt, arglist);
+	va_end(arglist);
+
+	log("corruption detected by connection %i: err %s: %s",
+	    conn ? (int)conn->id : -1, strerror(saved_errno), str);
+
+#ifdef TESTING
+	/* Allow them to attach debugger. */
+	sleep(30);
+#endif
+	check_store();
+}
+
 
 static void write_pidfile(const char *pidfile)
 {
