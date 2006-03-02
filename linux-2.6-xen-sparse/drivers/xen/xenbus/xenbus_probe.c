@@ -45,9 +45,7 @@
 #include <asm/hypervisor.h>
 #include <xen/xenbus.h>
 #include <xen/xen_proc.h>
-#include <xen/balloon.h>
 #include <xen/evtchn.h>
-#include <xen/public/evtchn.h>
 
 #include "xenbus_comms.h"
 

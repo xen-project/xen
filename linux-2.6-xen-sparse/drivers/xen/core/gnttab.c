@@ -35,7 +35,6 @@
 #include <xen/interface/xen.h>
 #include <asm/fixmap.h>
 #include <asm/uaccess.h>
-#include <xen/public/privcmd.h>
 #include <xen/gnttab.h>
 #include <asm/synch_bitops.h>
 
