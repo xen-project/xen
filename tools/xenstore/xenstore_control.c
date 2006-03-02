@@ -22,6 +22,11 @@ int main(int argc, char **argv)
 
   xsh = xs_daemon_open();
 
+  if (xsh == NULL) {
+    fprintf(stderr, "Failed to contact Xenstored.\n");
+    return 1;
+  }
+
   xs_debug_command(xsh, argv[1], NULL, 0);
 
   xs_daemon_close(xsh);
