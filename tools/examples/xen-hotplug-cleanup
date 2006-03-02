@@ -12,10 +12,11 @@ dir=$(dirname "$0")
 claim_lock "block"
 
 # remove device frontend store entries
-xenstore-rm -t $(xenstore-read "$XENBUS_PATH/frontend") || true
+xenstore-rm -t \
+  $(xenstore-read "$XENBUS_PATH/frontend" 2>/dev/null) 2>/dev/null || true
 
 # remove device backend store entries
-xenstore-rm -t "$XENBUS_PATH"       || true
-xenstore-rm -t "error/$XENBUS_PATH" || true
+xenstore-rm -t "$XENBUS_PATH"        2>/dev/null || true
+xenstore-rm -t "error/$XENBUS_PATH"  2>/dev/null || true
 
 release_lock "block"
