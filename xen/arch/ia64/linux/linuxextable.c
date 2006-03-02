@@ -20,6 +20,10 @@
 #include <asm/uaccess.h>
 #include <asm/sections.h>
 
+extern void *search_module_extables(unsigned long addr);
+extern void *__module_text_address(unsigned long addr);
+extern void *module_text_address(unsigned long addr);
+
 extern struct exception_table_entry __start___ex_table[];
 extern struct exception_table_entry __stop___ex_table[];
 

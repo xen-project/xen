@@ -35,7 +35,7 @@
 #include <asm/gcc_intrin.h>
 #include <asm/vmx_mm_def.h>
 #include <asm/vmx.h>
-
+#include <asm/vmx_phy_mode.h>
 //u64  fire_itc;
 //u64  fire_itc2;
 //u64  fire_itm;
@@ -66,7 +66,6 @@
 #include <asm/hw_irq.h>
 #include <asm/vmx_pal_vsa.h>
 #include <asm/kregs.h>
-
 //unsigned long last_guest_rsm = 0x0;
 struct guest_psr_bundle{
     unsigned long ip;
@@ -138,7 +137,7 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
     regs->cr_ipsr = (regs->cr_ipsr & mask ) | ( value & (~mask) );
 
     check_mm_mode_switch(vcpu, old_psr, new_psr);
-    return IA64_NO_FAULT;
+    return ;
 }
 
 /* Adjust slot both in pt_regs and vpd, upon vpsr.ri which

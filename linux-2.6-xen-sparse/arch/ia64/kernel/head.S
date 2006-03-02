@@ -363,6 +363,12 @@ start_ap:
 	;;
 (isBP)	st8 [r2]=r28		// save the address of the boot param area passed by the bootloader
 
+#ifdef CONFIG_XEN
+	//  Note: isBP is used by the subprogram.
+	br.call.sptk.many rp=early_xen_setup
+	;;
+#endif
+
 #ifdef CONFIG_SMP
 (isAP)	br.call.sptk.many rp=start_secondary
 .ret0:
@@ -371,10 +377,6 @@ start_ap:
 
 	// This is executed by the bootstrap processor (bsp) only:
 
-#ifdef CONFIG_XEN
-	br.call.sptk.many rp=early_xen_setup
-	;;
-#endif
 #ifdef CONFIG_IA64_FW_EMU
 	// initialize PAL & SAL emulator:
 	br.call.sptk.many rp=sys_fw_init

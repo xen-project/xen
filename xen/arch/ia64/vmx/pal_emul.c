@@ -19,6 +19,7 @@
  */
 
 #include <asm/vmx_vcpu.h>
+#include <asm/pal.h>
 
 static void
 get_pal_parameters (VCPU *vcpu, UINT64 *gr29,
@@ -180,10 +181,18 @@ pal_fixed_addr(VCPU *vcpu){
 
 static struct ia64_pal_retval
 pal_freq_base(VCPU *vcpu){
+    struct ia64_pal_retval result;
+
+    PAL_CALL(result,PAL_FREQ_BASE, 0, 0, 0);
+    return result;
 }
 
 static struct ia64_pal_retval
 pal_freq_ratios(VCPU *vcpu){
+    struct ia64_pal_retval result;
+
+    PAL_CALL(result,PAL_FREQ_RATIOS, 0, 0, 0);
+    return result;
 }
 
 static struct ia64_pal_retval
@@ -229,7 +238,6 @@ pal_vm_info(VCPU *vcpu){
 static struct ia64_pal_retval
 pal_vm_page_size(VCPU *vcpu){
 }
-
 void
 pal_emul( VCPU *vcpu) {
 	UINT64 gr28;
@@ -266,9 +274,17 @@ pal_emul( VCPU *vcpu) {
 		case PAL_CACHE_WRITE:
 			result = pal_cache_write (vcpu);
 			break;
-			
+
 		case PAL_PLATFORM_ADDR:
 			result = pal_platform_addr (vcpu);
+			break;
+
+		case PAL_FREQ_RATIOS:
+			result = pal_freq_ratios (vcpu);
+			break;
+
+		case PAL_FREQ_BASE:
+			result = pal_freq_base (vcpu);
 			break;
 
 		default:

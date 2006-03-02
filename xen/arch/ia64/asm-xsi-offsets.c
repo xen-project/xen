@@ -84,8 +84,6 @@ void foo(void)
 	DEFINE(XSI_PEND, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, pending_interruption)));
 	DEFINE(XSI_INCOMPL_REGFR_OFS, offsetof(mapped_regs_t, incomplete_regframe));
 	DEFINE(XSI_INCOMPL_REGFR, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, incomplete_regframe)));
-	DEFINE(XSI_DELIV_MASK0_OFS, offsetof(mapped_regs_t, delivery_mask[0]));
-	DEFINE(XSI_DELIV_MASK0, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, delivery_mask[0])));
 	DEFINE(XSI_METAPHYS_OFS, offsetof(mapped_regs_t, metaphysical_mode));
 	DEFINE(XSI_METAPHYS, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, metaphysical_mode)));
 

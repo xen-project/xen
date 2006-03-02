@@ -34,7 +34,24 @@ extern void vmx_load_state(struct vcpu *v);
 extern void vmx_setup_platform(struct domain *d, struct vcpu_guest_context *c);
 extern void vmx_wait_io(void);
 extern void vmx_io_assist(struct vcpu *v);
-
+extern void vmx_load_all_rr(struct vcpu *vcpu);
+extern void panic_domain(struct pt_regs *regs, const char *fmt, ...);
+extern int ia64_hypercall (struct pt_regs *regs);
+extern void vmx_save_state(struct vcpu *v);
+extern void vmx_load_state(struct vcpu *v);
+extern void show_registers(struct pt_regs *regs);
+extern int vmx_alloc_contig_pages(struct domain *d);
+extern unsigned long __gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
+extern void sync_split_caches(void);
+extern void vmx_virq_line_assist(struct vcpu *v);
+extern void set_privileged_operation_isr (struct vcpu *vcpu,int inst);
+extern void privilege_op (struct vcpu *vcpu);
+extern void set_ifa_itir_iha (struct vcpu *vcpu, u64 vadr,
+          int set_ifa, int set_itir, int set_iha);
+extern void inject_guest_interruption(struct vcpu *vcpu, u64 vec);
+extern void vmx_intr_assist(struct vcpu *v);
+extern void set_illegal_op_isr (struct vcpu *vcpu);
+extern  void illegal_op (struct vcpu *vcpu);
 static inline vcpu_iodata_t *get_vio(struct domain *d, unsigned long cpu)
 {
     return &((shared_iopage_t *)d->arch.vmx_platform.shared_page_va)->vcpu_iodata[cpu];

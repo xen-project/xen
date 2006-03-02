@@ -79,6 +79,11 @@ config XEN_BLKDEV_FRONTEND
 	bool
 	default y
 
+config XEN_BLKDEV_BACKEND
+	depends on XEN
+	bool
+	default y
+
 config XEN_VT
 	bool "Override for turning on CONFIG_VT for domU"
 	default y
@@ -495,6 +500,7 @@ source "arch/ia64/oprofile/Kconfig"
 
 config KPROBES
 	bool "Kprobes (EXPERIMENTAL)"
+	depends on EXPERIMENTAL && MODULES
 	help
 	  Kprobes allows you to trap at almost any kernel address and
 	  execute a callback function.  register_kprobe() establishes

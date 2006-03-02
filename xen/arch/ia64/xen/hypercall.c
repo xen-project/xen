@@ -9,24 +9,66 @@
 #include <xen/config.h>
 #include <xen/sched.h>
 #include <xen/hypercall.h>
+#include <xen/multicall.h>
 
 #include <linux/efi.h>	/* FOR EFI_UNIMPLEMENTED */
 #include <asm/sal.h>	/* FOR struct ia64_sal_retval */
 
 #include <asm/vcpu.h>
 #include <asm/dom_fw.h>
+#include <public/dom0_ops.h>
+#include <public/event_channel.h>
 #include <public/memory.h>
 #include <public/sched.h>
 
 extern unsigned long translate_domain_mpaddr(unsigned long);
+/* FIXME: where these declarations should be there ? */
+extern int dump_privop_counts_to_user(char *, int);
+extern int zero_privop_counts_to_user(char *, int);
 
 unsigned long idle_when_pending = 0;
 unsigned long pal_halt_light_count = 0;
 
+hypercall_t ia64_hypercall_table[] =
+	{
+	(hypercall_t)do_ni_hypercall,		/* do_set_trap_table */		/*  0 */
+	(hypercall_t)do_ni_hypercall,		/* do_mmu_update */
+	(hypercall_t)do_ni_hypercall,		/* do_set_gdt */
+	(hypercall_t)do_ni_hypercall,		/* do_stack_switch */
+	(hypercall_t)do_ni_hypercall,		/* do_set_callbacks */
+	(hypercall_t)do_ni_hypercall,		/* do_fpu_taskswitch */		/*  5 */
+	(hypercall_t)do_ni_hypercall,		/* do_sched_op */
+	(hypercall_t)do_dom0_op,
+	(hypercall_t)do_ni_hypercall,		/* do_set_debugreg */
+	(hypercall_t)do_ni_hypercall,		/* do_get_debugreg */
+	(hypercall_t)do_ni_hypercall,		/* do_update_descriptor */	/* 10 */
+	(hypercall_t)do_ni_hypercall,		/* do_ni_hypercall */
+	(hypercall_t)do_memory_op,
+	(hypercall_t)do_multicall,
+	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping */
+	(hypercall_t)do_ni_hypercall,		/* do_set_timer_op */		/* 15 */
+	(hypercall_t)do_event_channel_op,
+	(hypercall_t)do_xen_version,
+	(hypercall_t)do_console_io,
+	(hypercall_t)do_ni_hypercall,           /* do_physdev_op */
+	(hypercall_t)do_grant_table_op,						/* 20 */
+	(hypercall_t)do_ni_hypercall,		/* do_vm_assist */
+	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping_otherdomain */
+	(hypercall_t)do_ni_hypercall,		/* (x86 only) */
+	(hypercall_t)do_ni_hypercall,		/* do_vcpu_op */
+	(hypercall_t)do_ni_hypercall,		/* (x86_64 only) */		/* 25 */
+	(hypercall_t)do_ni_hypercall,		/* do_mmuext_op */
+	(hypercall_t)do_ni_hypercall,		/* do_acm_op */
+	(hypercall_t)do_ni_hypercall,		/* do_nmi_op */
+	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_ni_hypercall,		/*  */				/* 30 */
+	(hypercall_t)do_ni_hypercall		/*  */
+	};
+
 int
 ia64_hypercall (struct pt_regs *regs)
 {
-	struct vcpu *v = (struct domain *) current;
+	struct vcpu *v = current;
 	struct sal_ret_values x;
 	unsigned long *tv, *tc;
 	int pi;
@@ -94,23 +136,16 @@ ia64_hypercall (struct pt_regs *regs)
 			printf("(by dom0)\n ");
 			(*efi.reset_system)(EFI_RESET_WARM,0,0,NULL);
 		}
-#ifdef DOMU_AUTO_RESTART
-		else {
-			reconstruct_domU(current);
-			return 0;  // don't increment ip!
-		}
-#else	
 		printf("(not supported for non-0 domain)\n");
 		regs->r8 = EFI_UNSUPPORTED;
-#endif
 		break;
 	    case FW_HYPERCALL_EFI_GET_TIME:
-		tv = vcpu_get_gr(v,32);
-		tc = vcpu_get_gr(v,33);
+		tv = (unsigned long *) vcpu_get_gr(v,32);
+		tc = (unsigned long *) vcpu_get_gr(v,33);
 		//printf("efi_get_time(%p,%p) called...",tv,tc);
-		tv = __va(translate_domain_mpaddr(tv));
-		if (tc) tc = __va(translate_domain_mpaddr(tc));
-		regs->r8 = (*efi.get_time)(tv,tc);
+		tv = (unsigned long *) __va(translate_domain_mpaddr((unsigned long) tv));
+		if (tc) tc = (unsigned long *) __va(translate_domain_mpaddr((unsigned long) tc));
+		regs->r8 = (*efi.get_time)((efi_time_t *) tv, (efi_time_cap_t *) tc);
 		//printf("and returns %lx\n",regs->r8);
 		break;
 	    case FW_HYPERCALL_EFI_SET_TIME:
@@ -131,23 +166,23 @@ ia64_hypercall (struct pt_regs *regs)
 		break;
 	    case 0xffff:
 		regs->r8 = dump_privop_counts_to_user(
-			vcpu_get_gr(v,32),
-			vcpu_get_gr(v,33));
+			(char *) vcpu_get_gr(v,32),
+			(int) vcpu_get_gr(v,33));
 		break;
 	    case 0xfffe:
 		regs->r8 = zero_privop_counts_to_user(
-			vcpu_get_gr(v,32),
-			vcpu_get_gr(v,33));
+			(char *) vcpu_get_gr(v,32),
+			(int) vcpu_get_gr(v,33));
 		break;
 	    case __HYPERVISOR_dom0_op:
-		regs->r8 = do_dom0_op(regs->r14);
+		regs->r8 = do_dom0_op((struct dom0_op *) regs->r14);
 		break;
 
 	    case __HYPERVISOR_memory_op:
 		/* we don't handle reservations; just return success */
 		{
 		    struct xen_memory_reservation reservation;
-		    void *arg = regs->r15;
+		    void *arg = (void *) regs->r15;
 
 		    switch(regs->r14) {
 		    case XENMEM_increase_reservation:
@@ -159,31 +194,35 @@ ia64_hypercall (struct pt_regs *regs)
 			    regs->r8 = reservation.nr_extents;
 			break;
 		    default:
-			regs->r8 = do_memory_op(regs->r14, regs->r15);
+			regs->r8 = do_memory_op((int) regs->r14, (void *)regs->r15);
 			break;
 		    }
 		}
 		break;
 
 	    case __HYPERVISOR_event_channel_op:
-		regs->r8 = do_event_channel_op(regs->r14);
+		regs->r8 = do_event_channel_op((struct evtchn_op *) regs->r14);
 		break;
 
 	    case __HYPERVISOR_grant_table_op:
-		regs->r8 = do_grant_table_op(regs->r14, regs->r15, regs->r16);
+		regs->r8 = do_grant_table_op((unsigned int) regs->r14, (void *) regs->r15, (unsigned int) regs->r16);
 		break;
 
 	    case __HYPERVISOR_console_io:
-		regs->r8 = do_console_io(regs->r14, regs->r15, regs->r16);
+		regs->r8 = do_console_io((int) regs->r14, (int) regs->r15, (char *) regs->r16);
 		break;
 
 	    case __HYPERVISOR_xen_version:
-		regs->r8 = do_xen_version(regs->r14, regs->r15);
+		regs->r8 = do_xen_version((int) regs->r14, (void *) regs->r15);
+		break;
+
+	    case __HYPERVISOR_multicall:
+		regs->r8 = do_multicall((struct multicall_entry *) regs->r14, (unsigned int) regs->r15);
 		break;
 
 	    default:
-		printf("unknown hypercall %x\n", regs->r2);
-		regs->r8 = (unsigned long)-1;
+		printf("unknown hypercall %lx\n", regs->r2);
+		regs->r8 = do_ni_hypercall();
 	}
 	return 1;
 }

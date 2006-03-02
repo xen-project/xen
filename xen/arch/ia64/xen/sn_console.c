@@ -9,7 +9,13 @@
 #include <asm/sn/sn_sal.h>
 #include <xen/serial.h>
 
-void sn_putc(struct serial_port *, char);
+/*
+ * sn_putc - Send a character to the console, polled or interrupt mode
+ */
+static void sn_putc(struct serial_port *port, char c)
+{
+	ia64_sn_console_putc(c);
+}
 
 static struct uart_driver sn_sal_console = {
 	.putc = sn_putc,
@@ -74,12 +80,4 @@ int __init sn_serial_console_early_setup(void)
 	serial_register_uart(0, &sn_sal_console, NULL);
 
 	return 0;
-}
-
-/*
- * sn_putc - Send a character to the console, polled or interrupt mode
- */
-void sn_putc(struct serial_port *port, char c)
-{
-	return ia64_sn_console_putc(c);
 }

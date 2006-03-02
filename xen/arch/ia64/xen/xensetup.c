@@ -14,7 +14,7 @@
 #include <public/version.h>
 //#include <xen/delay.h>
 #include <xen/compile.h>
-//#include <xen/console.h>
+#include <xen/console.h>
 #include <xen/serial.h>
 #include <xen/trace.h>
 #include <asm/meminit.h>
@@ -22,6 +22,7 @@
 #include <asm/setup.h>
 #include <xen/string.h>
 #include <asm/vmx.h>
+#include <linux/efi.h>
 
 unsigned long xenheap_phys_end;
 
@@ -31,13 +32,20 @@ struct vcpu *idle_vcpu[NR_CPUS];
 
 cpumask_t cpu_present_map;
 
-#ifdef CLONE_DOMAIN0
-struct domain *clones[CLONE_DOMAIN0];
-#endif
 extern unsigned long domain0_ready;
 
 int find_max_pfn (unsigned long, unsigned long, void *);
 void start_of_day(void);
+
+/* FIXME: which header these declarations should be there ? */
+extern long is_platform_hp_ski(void);
+extern void early_setup_arch(char **);
+extern void late_setup_arch(char **);
+extern void hpsim_serial_init(void);
+extern void alloc_dom0(void);
+extern void setup_per_cpu_areas(void);
+extern void mem_init(void);
+extern void init_IRQ(void);
 
 /* opt_nosmp: If true, secondary processors are ignored. */
 static int opt_nosmp = 0;
@@ -147,13 +155,30 @@ struct ns16550_defaults ns16550_com2 = {
     .parity    = 'n',
     .stop_bits = 1
 };
+/*  This is a wrapper function of init_domheap_pages,
+ *  memory exceeds (max_page<<PAGE_SHIFT) will not be reclaimed.
+ *  This function will go away when the virtual memmap/discontig
+ *  memory issues are solved
+ */
+void init_domheap_pages_wrapper(unsigned long ps, unsigned long pe)
+{
+    unsigned long s_nrm, e_nrm, max_mem;
+    max_mem = (max_page+1)<<PAGE_SHIFT;
+    s_nrm = (ps+PAGE_SIZE-1)&PAGE_MASK;
+    e_nrm = pe&PAGE_MASK;
+    s_nrm = min(s_nrm, max_mem);
+    e_nrm = min(e_nrm, max_mem);
+    if(s_nrm < e_nrm)
+         init_domheap_pages(s_nrm, e_nrm);
+}
+
+
 
 void start_kernel(void)
 {
     unsigned char *cmdline;
     void *heap_start;
-    int i;
-    unsigned long max_mem, nr_pages, firsthole_start;
+    unsigned long nr_pages, firsthole_start;
     unsigned long dom0_memory_start, dom0_memory_size;
     unsigned long dom0_initrd_start, dom0_initrd_size;
     unsigned long initial_images_start, initial_images_end;
@@ -163,7 +188,7 @@ void start_kernel(void)
     /* Kernel may be relocated by EFI loader */
     xen_pstart = ia64_tpa(KERNEL_START);
 
-    early_setup_arch(&cmdline);
+    early_setup_arch((char **) &cmdline);
 
     /* We initialise the serial devices very early so we can get debugging. */
     if (running_on_sim) hpsim_serial_init();
@@ -251,9 +276,9 @@ void start_kernel(void)
 	max_page);
 
     heap_start = memguard_init(ia64_imva(&_end));
-    printf("Before heap_start: 0x%lx\n", heap_start);
+    printf("Before heap_start: %p\n", heap_start);
     heap_start = __va(init_boot_allocator(__pa(heap_start)));
-    printf("After heap_start: 0x%lx\n", heap_start);
+    printf("After heap_start: %p\n", heap_start);
 
     reserve_memory();
 
@@ -284,7 +309,7 @@ printk("About to call scheduler_init()\n");
     idle_domain = domain_create(IDLE_DOMAIN_ID, 0);
     BUG_ON(idle_domain == NULL);
 
-    late_setup_arch(&cmdline);
+    late_setup_arch((char **) &cmdline);
     setup_per_cpu_areas();
     mem_init();
 
@@ -301,6 +326,8 @@ printk("About to call timer_init()\n");
 #endif
 
 #ifdef CONFIG_SMP
+    int i;
+
     if ( opt_nosmp )
     {
         max_cpus = 0;
@@ -342,16 +369,6 @@ printk("About to call sort_main_extable()\n");
 printk("About to call domain_create()\n");
     dom0 = domain_create(0, 0);
 
-#ifdef CLONE_DOMAIN0
-    {
-    int i;
-    for (i = 0; i < CLONE_DOMAIN0; i++) {
-	clones[i] = domain_create(i+1, 0);
-        if ( clones[i] == NULL )
-            panic("Error creating domain0 clone %d\n",i);
-    }
-    }
-#endif
     if ( dom0 == NULL )
         panic("Error creating domain 0\n");
 
@@ -362,9 +379,9 @@ printk("About to call domain_create()\n");
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
     printk("About to call construct_dom0()\n");
-    dom0_memory_start = __va(initial_images_start);
+    dom0_memory_start = (unsigned long) __va(initial_images_start);
     dom0_memory_size = ia64_boot_param->domain_size;
-    dom0_initrd_start = __va(initial_images_start +
+    dom0_initrd_start = (unsigned long) __va(initial_images_start +
 			     PAGE_ALIGN(ia64_boot_param->domain_size));
     dom0_initrd_size = ia64_boot_param->initrd_size;
  
@@ -376,29 +393,15 @@ printk("About to call domain_create()\n");
     /* PIN domain0 on CPU 0.  */
     dom0->vcpu[0]->cpu_affinity = cpumask_of_cpu(0);
 
-#ifdef CLONE_DOMAIN0
-    {
-    int i;
-    dom0_memory_start = __va(ia64_boot_param->domain_start);
-    dom0_memory_size = ia64_boot_param->domain_size;
-
-    for (i = 0; i < CLONE_DOMAIN0; i++) {
-      printk("CONSTRUCTING DOMAIN0 CLONE #%d\n",i+1);
-      if ( construct_domU(clones[i], dom0_memory_start, dom0_memory_size,
-			  dom0_initrd_start,dom0_initrd_size,
-			  0) != 0)
-            panic("Could not set up DOM0 clone %d\n",i);
-    }
-    }
-#endif
-
     /* The stash space for the initial kernel image can now be freed up. */
-    init_domheap_pages(ia64_boot_param->domain_start,
-                       ia64_boot_param->domain_size);
+    /* init_domheap_pages_wrapper is temporary solution, please refer to the
+     * descriptor of this function */
+    init_domheap_pages_wrapper(ia64_boot_param->domain_start,
+           ia64_boot_param->domain_start+ia64_boot_param->domain_size);
     /* throw away initrd area passed from elilo */
     if (ia64_boot_param->initrd_size) {
-        init_domheap_pages(ia64_boot_param->initrd_start,
-                          ia64_boot_param->initrd_size);
+        init_domheap_pages_wrapper(ia64_boot_param->initrd_start,
+           ia64_boot_param->initrd_start+ia64_boot_param->initrd_size);
     }
 
     if (!running_on_sim)  // slow on ski and pages are pre-initialized to zero
@@ -412,13 +415,6 @@ printk("About to call init_trace_bufs()\n");
     console_endboot(cmdline && strstr(cmdline, "tty0"));
 #endif
 
-#ifdef CLONE_DOMAIN0
-    {
-    int i;
-    for (i = 0; i < CLONE_DOMAIN0; i++)
-	domain_unpause_by_systemcontroller(clones[i]);
-    }
-#endif
     domain0_ready = 1;
 
     local_irq_enable();

@@ -34,11 +34,13 @@ struct privop_addr_count {
 #endif
 
 /* general registers */
-extern UINT64 vcpu_get_gr(VCPU *vcpu, unsigned reg);
-extern IA64FAULT vcpu_get_gr_nat(VCPU *vcpu, unsigned reg, UINT64 *val);
-extern IA64FAULT vcpu_set_gr(VCPU *vcpu, unsigned reg, UINT64 value, int nat);
+extern UINT64 vcpu_get_gr(VCPU *vcpu, unsigned long reg);
+extern IA64FAULT vcpu_get_gr_nat(VCPU *vcpu, unsigned long reg, UINT64 *val);
+extern IA64FAULT vcpu_set_gr(VCPU *vcpu, unsigned long reg, UINT64 value, int nat);
 /* application registers */
+extern void vcpu_load_kernel_regs(VCPU *vcpu);
 extern IA64FAULT vcpu_set_ar(VCPU *vcpu, UINT64 reg, UINT64 val);
+extern IA64FAULT vcpu_get_ar(VCPU *vcpu, UINT64 reg, UINT64 *val);
 /* psr */
 extern BOOLEAN vcpu_get_psr_ic(VCPU *vcpu);
 extern UINT64 vcpu_get_ipsr_int_state(VCPU *vcpu,UINT64 prevpsr);
@@ -46,6 +48,9 @@ extern IA64FAULT vcpu_get_psr(VCPU *vcpu, UINT64 *pval);
 extern IA64FAULT vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm);
 extern IA64FAULT vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm);
 extern IA64FAULT vcpu_set_psr_l(VCPU *vcpu, UINT64 val);
+extern IA64FAULT vcpu_set_psr_i(VCPU *vcpu);
+extern IA64FAULT vcpu_reset_psr_dt(VCPU *vcpu);
+extern IA64FAULT vcpu_set_psr_dt(VCPU *vcpu);
 /* control registers */
 extern IA64FAULT vcpu_set_dcr(VCPU *vcpu, UINT64 val);
 extern IA64FAULT vcpu_set_itm(VCPU *vcpu, UINT64 val);
@@ -89,6 +94,8 @@ extern IA64FAULT vcpu_get_irr3(VCPU *vcpu, UINT64 *pval);
 extern IA64FAULT vcpu_get_lrr0(VCPU *vcpu, UINT64 *pval);
 extern IA64FAULT vcpu_get_lrr1(VCPU *vcpu, UINT64 *pval);
 /* interrupt registers */
+extern void vcpu_pend_unspecified_interrupt(VCPU *vcpu);
+extern UINT64 vcpu_check_pending_interrupts(VCPU *vcpu);
 extern IA64FAULT vcpu_get_itv(VCPU *vcpu,UINT64 *pval);
 extern IA64FAULT vcpu_get_pmv(VCPU *vcpu,UINT64 *pval);
 extern IA64FAULT vcpu_get_cmcv(VCPU *vcpu,UINT64 *pval);
@@ -97,8 +104,8 @@ extern IA64FAULT vcpu_set_itv(VCPU *vcpu, UINT64 val);
 extern IA64FAULT vcpu_set_pmv(VCPU *vcpu, UINT64 val);
 extern IA64FAULT vcpu_set_cmcv(VCPU *vcpu, UINT64 val);
 /* interval timer registers */
-extern IA64FAULT vcpu_set_itm(VCPU *vcpu,UINT64 val);
 extern IA64FAULT vcpu_set_itc(VCPU *vcpu,UINT64 val);
+extern UINT64 vcpu_timer_pending_early(VCPU *vcpu);
 /* debug breakpoint registers */
 extern IA64FAULT vcpu_set_ibr(VCPU *vcpu,UINT64 reg,UINT64 val);
 extern IA64FAULT vcpu_set_dbr(VCPU *vcpu,UINT64 reg,UINT64 val);
@@ -135,9 +142,14 @@ extern IA64FAULT vcpu_ptr_d(VCPU *vcpu,UINT64 vadr, UINT64 addr_range);
 extern IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr, UINT64 addr_range);
 extern IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir, UINT64 *iha);
 extern IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr);
+extern IA64FAULT vcpu_force_data_miss(VCPU *vcpu, UINT64 ifa);
+extern IA64FAULT vcpu_fc(VCPU *vcpu, UINT64 vadr);
 /* misc */
 extern IA64FAULT vcpu_rfi(VCPU *vcpu);
 extern IA64FAULT vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval);
+extern IA64FAULT vcpu_cover(VCPU *vcpu);
+extern IA64FAULT vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *padr);
+extern IA64FAULT vcpu_get_cpuid(VCPU *vcpu, UINT64 reg, UINT64 *pval);
 
 extern void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector);
 extern void vcpu_pend_timer(VCPU *vcpu);
@@ -148,5 +160,17 @@ extern UINT64 vcpu_deliverable_interrupts(VCPU *vcpu);
 extern void vcpu_itc_no_srlz(VCPU *vcpu, UINT64, UINT64, UINT64, UINT64, UINT64);
 extern UINT64 vcpu_get_tmp(VCPU *, UINT64);
 extern void vcpu_set_tmp(VCPU *, UINT64, UINT64);
+
+static inline UINT64
+itir_ps(UINT64 itir)
+{
+    return ((itir >> 2) & 0x3f);
+}
+
+static inline UINT64
+itir_mask(UINT64 itir)
+{
+    return (~((1UL << itir_ps(itir)) - 1));
+}
 
 #endif

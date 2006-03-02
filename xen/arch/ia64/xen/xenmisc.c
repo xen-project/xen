@@ -19,12 +19,18 @@
 #include <public/sched.h>
 #include <asm/vhpt.h>
 #include <asm/debugger.h>
+#include <asm/vmx.h>
+#include <asm/vmx_vcpu.h>
 
 efi_memory_desc_t ia64_efi_io_md;
 EXPORT_SYMBOL(ia64_efi_io_md);
 unsigned long wait_init_idle;
 int phys_proc_id[NR_CPUS];
 unsigned long loops_per_jiffy = (1<<12);	// from linux/init/main.c
+
+/* FIXME: where these declarations should be there ? */
+extern void load_region_regs(struct vcpu *);
+extern void show_registers(struct pt_regs *regs);
 
 void ia64_mca_init(void) { printf("ia64_mca_init() skipped (Machine check abort handling)\n"); }
 void ia64_mca_cpu_init(void *x) { }
@@ -168,7 +174,11 @@ void __free_pages(struct page *page, unsigned int order)
 
 void *pgtable_quicklist_alloc(void)
 {
-	return alloc_xenheap_pages(0);
+    void *p;
+    p = alloc_xenheap_pages(0);
+    if (p) 
+        clear_page(p);
+    return p;
 }
 
 void pgtable_quicklist_free(void *pgtable_entry)
@@ -247,6 +257,7 @@ ia64_peek (struct task_struct *child, struct switch_stack *child_stack,
 	   unsigned long user_rbs_end, unsigned long addr, long *val)
 {
 	printk("ia64_peek: called, not implemented\n");
+	return 1;
 }
 
 long
@@ -254,6 +265,7 @@ ia64_poke (struct task_struct *child, struct switch_stack *child_stack,
 	   unsigned long user_rbs_end, unsigned long addr, long val)
 {
 	printk("ia64_poke: called, not implemented\n");
+	return 1;
 }
 
 void
@@ -291,6 +303,7 @@ unsigned long context_switch_count = 0;
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     uint64_t spsr;
+    uint64_t pta;
 
     local_irq_save(spsr);
     if(VMX_DOMAIN(prev)){
@@ -298,9 +311,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     }
 	context_switch_count++;
 	switch_to(prev,next,prev);
-    if(VMX_DOMAIN(current)){
-        vtm_domain_in(current);
-    }
+//    if(VMX_DOMAIN(current)){
+//        vtm_domain_in(current);
+//    }
 
 // leave this debug for now: it acts as a heartbeat when more than
 // one domain is active
@@ -309,22 +322,30 @@ static long cnt[16] = { 50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50};
 static int i = 100;
 int id = ((struct vcpu *)current)->domain->domain_id & 0xf;
 if (!cnt[id]--) { printk("%x",id); cnt[id] = 500000; }
-if (!i--) { printk("+",id); i = 1000000; }
+if (!i--) { printk("+"); i = 1000000; }
 }
 
     if (VMX_DOMAIN(current)){
+        vtm_domain_in(current);
 		vmx_load_all_rr(current);
     }else{
-	extern char ia64_ivt;
-	ia64_set_iva(&ia64_ivt);
-	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
-		VHPT_ENABLED);
+    	extern char ia64_ivt;
+    	ia64_set_iva(&ia64_ivt);
     	if (!is_idle_domain(current->domain)) {
+        	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
+		        VHPT_ENABLED);
 	    	load_region_regs(current);
 	    	vcpu_load_kernel_regs(current);
-		    if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
-    	}
-	    if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
+		    if (vcpu_timer_expired(current))
+                vcpu_pend_timer(current);
+    	}else {
+        /* When switching to idle domain, only need to disable vhpt
+        * walker. Then all accesses happen within idle context will
+        * be handled by TR mapping and identity mapping.
+        */
+           pta = ia64_get_pta();
+           ia64_set_pta(pta & ~VHPT_ENABLED);
+        }
     }
 
     local_irq_restore(spsr);
@@ -345,12 +366,12 @@ void panic_domain(struct pt_regs *regs, const char *fmt, ...)
 	va_list args;
 	char buf[128];
 	struct vcpu *v = current;
-	static volatile int test = 1;	// so can continue easily in debug
-	extern spinlock_t console_lock;
-	unsigned long flags;
+//	static volatile int test = 1;	// so can continue easily in debug
+//	extern spinlock_t console_lock;
+//	unsigned long flags;
     
 loop:
-	printf("$$$$$ PANIC in domain %d (k6=%p): ",
+	printf("$$$$$ PANIC in domain %d (k6=0x%lx): ",
 		v->domain->domain_id, 
 		__get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT]);
 	va_start(args, fmt);
@@ -365,7 +386,7 @@ loop:
 	}
 	domain_pause_by_systemcontroller(current->domain);
 	v->domain->shutdown_code = SHUTDOWN_crash;
-	set_bit(_DOMF_shutdown, v->domain->domain_flags);
+	set_bit(_DOMF_shutdown, &v->domain->domain_flags);
 	if (v->domain->domain_id == 0) {
 		int i = 1000000000L;
 		// if domain0 crashes, just periodically print out panic

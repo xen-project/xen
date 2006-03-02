@@ -30,6 +30,9 @@
 #include <linux/jiffies.h>	// not included by xen/sched.h
 #include <xen/softirq.h>
 
+/* FIXME: where these declarations should be there ? */
+extern void ia64_init_itm(void);
+
 seqlock_t xtime_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
 
 #define TIME_KEEPER_ID  0
@@ -70,7 +73,7 @@ static inline u64 get_time_delta(void)
 s_time_t get_s_time(void)
 {
     s_time_t now;
-    unsigned long flags, seq;
+    unsigned long seq;
 
     do {
 	seq = read_seqbegin(&xtime_lock);
@@ -202,7 +205,7 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static struct irqaction xen_timer_irqaction = {
-	.handler =	xen_timer_interrupt,
+	.handler =	(void *) xen_timer_interrupt,
 	.name =		"timer"
 };
 
@@ -217,8 +220,6 @@ ia64_time_init (void)
 /* Late init function (after all CPUs are booted). */
 int __init init_xen_time()
 {
-    struct timespec tm;
-
     ia64_time_init();
     itc_scale  = 1000000000UL << 32 ;
     itc_scale /= local_cpu_data->itc_freq;
@@ -253,7 +254,7 @@ int reprogram_timer(s_time_t timeout)
 	} while (unlikely(read_seqretry(&xtime_lock, seq)));
 
 	local_cpu_data->itm_next = itm_next;
-	vcpu_set_next_timer(current);
+	vcpu_set_next_timer(v);
 	return 1;
 }
 

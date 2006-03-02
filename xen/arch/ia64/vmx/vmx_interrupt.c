@@ -86,7 +86,7 @@ collect_interruption(VCPU *vcpu)
 
 }
 
-int
+void
 inject_guest_interruption(VCPU *vcpu, u64 vec)
 {
     u64 viva;
@@ -334,6 +334,7 @@ _nat_consumption_fault(VCPU *vcpu, u64 vadr, miss_type t)
  *  @ Nat Consumption Vector
  * Refer to SDM Vol2 Table 5-6 & 8-1
  */
+
 static void
 ir_nat_page_consumption (VCPU *vcpu, u64 vadr)
 {

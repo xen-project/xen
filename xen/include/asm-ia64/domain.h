@@ -9,14 +9,15 @@
 #include <public/arch-ia64.h>
 #include <asm/vmx_platform.h>
 #include <xen/list.h>
+#include <xen/cpumask.h>
 
 extern void domain_relinquish_resources(struct domain *);
 
 struct arch_domain {
     struct mm_struct *active_mm;
     struct mm_struct *mm;
-    int metaphysical_rr0;
-    int metaphysical_rr4;
+    unsigned long metaphysical_rr0;
+    unsigned long metaphysical_rr4;
     int starting_rid;		/* first RID assigned to domain */
     int ending_rid;		/* one beyond highest RID assigned to domain */
     int rid_bits;		/* number of virtual rid bits (default: 18) */
@@ -32,11 +33,6 @@ struct arch_domain {
     u64 xen_vastart;
     u64 xen_vaend;
     u64 shared_info_va;
-#ifdef DOMU_AUTO_RESTART
-    u64 image_start;
-    u64 image_len;
-    u64 entry;
-#endif
     unsigned long initrd_start;
     unsigned long initrd_len;
     char *cmdline;
@@ -63,13 +59,12 @@ struct arch_vcpu {
 	unsigned long domain_itm;
 	unsigned long domain_itm_last;
 	unsigned long xen_itm;
-	unsigned long xen_timer_interval;
 #endif
     mapped_regs_t *privregs; /* save the state of vcpu */
-    int metaphysical_rr0;		// from arch_domain (so is pinned)
-    int metaphysical_rr4;		// from arch_domain (so is pinned)
-    int metaphysical_saved_rr0;		// from arch_domain (so is pinned)
-    int metaphysical_saved_rr4;		// from arch_domain (so is pinned)
+    unsigned long metaphysical_rr0;		// from arch_domain (so is pinned)
+    unsigned long metaphysical_rr4;		// from arch_domain (so is pinned)
+    unsigned long metaphysical_saved_rr0;	// from arch_domain (so is pinned)
+    unsigned long metaphysical_saved_rr4;	// from arch_domain (so is pinned)
     int breakimm;			// from arch_domain (so is pinned)
     int starting_rid;		/* first RID assigned to domain */
     int ending_rid;		/* one beyond highest RID assigned to domain */
@@ -112,6 +107,7 @@ struct mm_struct {
 						 * by mmlist_lock
 						 */
 
+#ifndef XEN
 	unsigned long start_code, end_code, start_data, end_data;
 	unsigned long start_brk, brk, start_stack;
 	unsigned long arg_start, arg_end, env_start, env_end;
@@ -121,6 +117,7 @@ struct mm_struct {
 	unsigned long saved_auxv[40]; /* for /proc/PID/auxv */
 
 	unsigned dumpable:1;
+#endif
 #ifdef CONFIG_HUGETLB_PAGE
 	int used_hugetlb;
 #endif

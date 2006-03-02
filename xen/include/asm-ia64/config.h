@@ -3,11 +3,8 @@
 
 #undef USE_PAL_EMULATOR
 // control flags for turning on/off features under test
-#undef CLONE_DOMAIN0
-//#define CLONE_DOMAIN0 1
 #undef DOMU_BUILD_STAGING
 #define VHPT_GLOBAL
-#define DOMU_AUTO_RESTART
 
 #undef DEBUG_PFMON
 
@@ -24,7 +21,7 @@
 #define CONFIG_EFI_PCDP
 #define CONFIG_SERIAL_SGI_L1_CONSOLE
 
-#undef CONFIG_XEN_SMP
+#define CONFIG_XEN_SMP
 
 #ifdef CONFIG_XEN_SMP
 #define CONFIG_SMP 1
@@ -72,7 +69,7 @@ typedef unsigned long paddr_t;
 extern unsigned long xenheap_phys_end;
 extern unsigned long xen_pstart;
 extern unsigned long xenheap_size;
-extern struct domain *dom0;
+//extern struct domain *dom0;
 extern unsigned long dom0_start;
 extern unsigned long dom0_size;
 
@@ -211,9 +208,9 @@ void sort_main_extable(void);
 
 // see include/asm-ia64/mm.h, handle remaining page_info uses until gone
 #define page_info page
-
-// see common/memory.c
-#define set_gpfn_from_mfn(x,y)	do { } while (0)
+// Deprivated linux inf and put here for short time compatibility
+#define kmalloc(s, t) xmalloc_bytes((s))
+#define kfree(s) xfree((s))
 
 // see common/keyhandler.c
 #define	nop()	asm volatile ("nop 0")
@@ -254,10 +251,8 @@ struct screen_info { };
 #define seq_printf(a,b...) printf(b)
 #define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
 
-#define FORCE_CRASH()	asm("break 0;;");
-
 void dummy_called(char *function);
-#define dummy()	dummy_called(__FUNCTION__)
+#define dummy()	dummy_called((char *) __FUNCTION__)
 
 // these declarations got moved at some point, find a better place for them
 extern int ht_per_core;
@@ -295,14 +290,17 @@ extern int ht_per_core;
 #endif /* __XEN_IA64_CONFIG_H__ */
 
 // needed for include/xen/smp.h
-#ifdef CONFIG_SMP
-#define raw_smp_processor_id()	current->processor
-#else
-#define raw_smp_processor_id()	0
-#endif
+//#ifdef CONFIG_SMP
+//#define raw_smp_processor_id()	current->processor
+//#else
+//#define raw_smp_processor_id()	0
+//#endif
 
 #ifndef __ASSEMBLY__
 #include <linux/linkage.h>
+#define FORCE_CRASH()	asm("break.m 0;;");
+#else
+#define FORCE_CRASH	break.m 0;;
 #endif
 
 #endif	/* _IA64_CONFIG_H_ */

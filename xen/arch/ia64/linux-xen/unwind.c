@@ -484,7 +484,8 @@ unw_access_fr (struct unw_frame_info *info, int regnum, struct ia64_fpreg *val, 
 	} else if (regnum <= 15) {
 		if (regnum <= 11) {
 			pt = get_scratch_regs(info);
-			addr = &pt->f6  + (regnum - 6);
+			//XXX struct ia64_fpreg and struct pt_fpreg are same.
+			addr = (struct ia64_fpreg*)(&pt->f6  + (regnum - 6));
 		}
 		else
 			addr = &info->sw->f12 + (regnum - 12);

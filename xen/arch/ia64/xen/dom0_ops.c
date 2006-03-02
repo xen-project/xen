@@ -17,6 +17,7 @@
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <public/sched_ctl.h>
+#include <asm/vmx.h>
 
 long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 {
@@ -143,7 +144,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             n += j;
         }
 
-        free_xenheap_page((unsigned long)l_arr);
+        free_xenheap_page((void *) l_arr);
 
         put_domain(d);
     }
@@ -160,7 +161,6 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         unsigned long nr_pages = op->u.getmemlist.max_pfns & 0xffffffff;
         unsigned long mfn;
         unsigned long *buffer = op->u.getmemlist.buffer;
-        struct page *page;
 
         ret = -EINVAL;
         if ( d != NULL )

@@ -23,12 +23,22 @@
 #ifndef XEN_TLBthash_H
 #define XEN_TLBthash_H
 
+#define         MAX_CCN_DEPTH           15       // collision chain depth
+#define         VCPU_VTLB_SHIFT          (20)    // 1M for VTLB
+#define         VCPU_VTLB_SIZE           (1UL<<VCPU_VTLB_SHIFT)
+#define         VCPU_VTLB_ORDER          (VCPU_VTLB_SHIFT - PAGE_SHIFT)
+#define         VCPU_VHPT_SHIFT          (24)    // 16M for VTLB
+#define         VCPU_VHPT_SIZE           (1UL<<VCPU_VHPT_SHIFT)
+#define         VCPU_VHPT_ORDER          (VCPU_VHPT_SHIFT - PAGE_SHIFT)
+
+#ifndef __ASSEMBLY__
+
 #include <xen/config.h>
 #include <xen/types.h>
 #include <public/xen.h>
 #include <asm/tlb.h>
 #include <asm/regionreg.h>
-
+#include <asm/vmx_mm_def.h>
 //#define         THASH_TLB_TR            0
 //#define         THASH_TLB_TC            1
 
@@ -39,7 +49,15 @@
 
 /*
  * Next bit definition must be same with THASH_TLB_XX
+#define         PTA_BASE_SHIFT          (15)
  */
+
+
+
+
+#define HIGH_32BITS(x)  bits(x,32,63)
+#define LOW_32BITS(x)   bits(x,0,31)
+
 typedef union search_section {
         struct {
                 u32 tr : 1;
@@ -49,15 +67,6 @@ typedef union search_section {
         u32     v;
 } search_section_t;
 
-#define         MAX_CCN_DEPTH           4       // collision chain depth
-#define         VCPU_TLB_SHIFT          (22)
-#define         VCPU_TLB_SIZE           (1UL<<VCPU_TLB_SHIFT)
-#define         VCPU_TLB_ORDER          VCPU_TLB_SHIFT - PAGE_SHIFT
-#define         PTA_BASE_SHIFT          (15)
-
-#ifndef __ASSEMBLY__
-#define HIGH_32BITS(x)  bits(x,32,63)
-#define LOW_32BITS(x)   bits(x,0,31)
 
 typedef enum {
         ISIDE_TLB=0,
@@ -77,18 +86,21 @@ typedef struct thash_data {
             u64 ppn  : 38; // 12-49
             u64 rv2  :  2; // 50-51
             u64 ed   :  1; // 52
-            u64 ig1  :  11; //53-63
+            u64 ig1  :  3; // 53-55
+            u64 len  :  4; // 56-59
+            u64 ig2  :  3; // 60-63
         };
         struct {
             u64 __rv1 : 53;	// 0-52
+            u64 contiguous : 1; //53
+            u64 tc : 1;     // 54 TR or TC
+            CACHE_LINE_TYPE cl : 1; // 55 I side or D side cache line
             // next extension to ig1, only for TLB instance
-            u64 tc : 1;     // 53 TR or TC
-            u64 locked  : 1;	// 54 entry locked or not
-            CACHE_LINE_TYPE cl : 1; // I side or D side cache line
-            u64 nomap : 1;   // entry cann't be inserted into machine TLB.
-            u64 __ig1  :  5; // 56-61
-            u64 checked : 1; // for VTLB/VHPT sanity check
-            u64 invalid : 1; // invalid entry
+            u64 __ig1  :  4; // 56-59
+            u64 locked  : 1;	// 60 entry locked or not
+            u64 nomap : 1;   // 61 entry cann't be inserted into machine TLB.
+            u64 checked : 1; // 62 for VTLB/VHPT sanity check
+            u64 invalid : 1; // 63 invalid entry
         };
         u64 page_flags;
     };                  // same for VHPT and TLB
@@ -128,10 +140,37 @@ typedef struct thash_data {
     };
 } thash_data_t;
 
+#define INVALIDATE_VHPT_HEADER(hdata)   \
+{	((hdata)->page_flags)=0;	\
+	((hdata)->ti)=1;	\
+	((hdata)->next)=0; }
+
+#define INVALIDATE_TLB_HEADER(hdata)   \
+{	((hdata)->page_flags)=0;	\
+	((hdata)->ti)=1;		\
+	((hdata)->next)=0; }
+
 #define INVALID_VHPT(hdata)     ((hdata)->ti)
-#define INVALID_TLB(hdata)      ((hdata)->invalid)
-#define INVALID_ENTRY(hcb, hdata)                       \
-        ((hcb)->ht==THASH_TLB ? INVALID_TLB(hdata) : INVALID_VHPT(hdata))
+#define INVALID_TLB(hdata)      ((hdata)->ti)
+#define INVALID_TR(hdata)      ((hdata)->invalid)
+#define INVALID_ENTRY(hcb, hdata)       INVALID_VHPT(hdata)
+
+/*        ((hcb)->ht==THASH_TLB ? INVALID_TLB(hdata) : INVALID_VHPT(hdata)) */
+
+
+/*
+ * Architecture ppn is in 4KB unit while XEN
+ * page may be different(1<<PAGE_SHIFT).
+ */
+static inline u64 arch_to_xen_ppn(u64 appn)
+{
+    return (appn >>(PAGE_SHIFT-ARCH_PAGE_SHIFT));
+}
+
+static inline u64 xen_to_arch_ppn(u64 xppn)
+{
+    return (xppn <<(PAGE_SHIFT- ARCH_PAGE_SHIFT));
+}
 
 typedef enum {
         THASH_TLB=0,
@@ -166,11 +205,11 @@ typedef struct tlb_special {
         struct thash_cb  *vhpt;
 } tlb_special_t;
 
-typedef struct vhpt_cb {
+//typedef struct vhpt_cb {
         //u64     pta;    // pta value.
-        GET_MFN_FN      *get_mfn;
-        TTAG_FN         *tag_func;
-} vhpt_special;
+//        GET_MFN_FN      *get_mfn;
+//        TTAG_FN         *tag_func;
+//} vhpt_special;
 
 typedef struct thash_internal {
         thash_data_t *hash_base;
@@ -198,36 +237,38 @@ typedef struct thash_cb {
         u64     hash_sz;        // size of above data.
         void    *cch_buf;       // base address of collision chain.
         u64     cch_sz;         // size of above data.
-        THASH_FN        *hash_func;
-        GET_RR_FN       *get_rr_fn;
-        RECYCLE_FN      *recycle_notifier;
+//        THASH_FN        *hash_func;
+//        GET_RR_FN       *get_rr_fn;
+//        RECYCLE_FN      *recycle_notifier;
         thash_cch_mem_t *cch_freelist;
         struct vcpu *vcpu;
         PTA     pta;
         /* VTLB/VHPT common information */
-        FIND_OVERLAP_FN *find_overlap;
-        FIND_NEXT_OVL_FN *next_overlap;
-        REM_THASH_FN    *rem_hash; // remove hash entry.
-        INS_THASH_FN    *ins_hash; // insert hash entry.
-        REM_NOTIFIER_FN *remove_notifier;
+//        FIND_OVERLAP_FN *find_overlap;
+//        FIND_NEXT_OVL_FN *next_overlap;
+//        REM_THASH_FN    *rem_hash; // remove hash entry.
+//        INS_THASH_FN    *ins_hash; // insert hash entry.
+//        REM_NOTIFIER_FN *remove_notifier;
         /* private information */
-        thash_internal_t  priv;
+//        thash_internal_t  priv;
         union {
                 tlb_special_t  *ts;
-                vhpt_special   *vs;
+//                vhpt_special   *vs;
         };
         // Internal positon information, buffer and storage etc. TBD
 } thash_cb_t;
 
 #define ITR(hcb,id)             ((hcb)->ts->itr[id])
 #define DTR(hcb,id)             ((hcb)->ts->dtr[id])
-#define INVALIDATE_HASH(hcb,hash)           {   \
-           if ((hcb)->ht==THASH_TLB)            \
-             INVALID_TLB(hash) = 1;             \
-           else                                 \
-             INVALID_VHPT(hash) = 1;            \
-           hash->next = NULL; }
-
+#define INVALIDATE_HASH_HEADER(hcb,hash)    INVALIDATE_TLB_HEADER(hash)
+/*              \
+{           if ((hcb)->ht==THASH_TLB){            \
+            INVALIDATE_TLB_HEADER(hash);             \
+           }else{                                 \
+             INVALIDATE_VHPT_HEADER(hash);            \
+            }                                       \
+}
+ */
 #define PURGABLE_ENTRY(hcb,en)  1
 //		((hcb)->ht == THASH_VHPT || ( (en)->tc && !(en->locked)) )
 
@@ -242,18 +283,20 @@ extern void thash_init(thash_cb_t *hcb, u64 sz);
  *    NOTES:
  *      1: TLB entry may be TR, TC or Foreign Map. For TR entry,
  *         itr[]/dtr[] need to be updated too.
- *      2: Inserting to collision chain may trigger recycling if 
+ *      2: Inserting to collision chain may trigger recycling if
  *         the buffer for collision chain is empty.
  *      3: The new entry is inserted at the hash table.
  *         (I.e. head of the collision chain)
  *      4: Return the entry in hash table or collision chain.
  *
  */
-extern void thash_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va);
+extern void thash_vhpt_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va);
+//extern void thash_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va);
 extern void thash_tr_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va, int idx);
-
+extern thash_data_t *vtr_find_overlap(thash_cb_t *hcb, thash_data_t *data, char cl);
+extern u64 get_mfn(struct domain *d, u64 gpfn);
 /*
- * Force to delete a found entry no matter TR or foreign map for TLB. 
+ * Force to delete a found entry no matter TR or foreign map for TLB.
  *    NOTES:
  *      1: TLB entry may be TR, TC or Foreign Map. For TR entry,
  *         itr[]/dtr[] need to be updated too.
@@ -307,7 +350,7 @@ extern void thash_purge_entries_ex(thash_cb_t *hcb,
                         u64 rid, u64 va, u64 sz, 
                         search_section_t p_sect, 
                         CACHE_LINE_TYPE cl);
-extern void thash_purge_and_insert(thash_cb_t *hcb, thash_data_t *in);
+extern void thash_purge_and_insert(thash_cb_t *hcb, thash_data_t *in, u64 va);
 
 /*
  * Purge all TCs or VHPT entries including those in Hash table.
@@ -335,8 +378,11 @@ extern void purge_machine_tc_by_domid(domid_t domid);
 extern void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb);
 extern ia64_rr vmmu_get_rr(struct vcpu *vcpu, u64 va);
 extern thash_cb_t *init_domain_tlb(struct vcpu *d);
+extern thash_data_t * vsa_thash(PTA vpta, u64 va, u64 vrr, u64 *tag);
+extern thash_data_t * vhpt_lookup(u64 va);
+extern void machine_tlb_purge(u64 va, u64 ps);
 
-#define   VTLB_DEBUG
+//#define   VTLB_DEBUG
 #ifdef   VTLB_DEBUG
 extern void check_vtlb_sanity(thash_cb_t *vtlb);
 extern void dump_vtlb(thash_cb_t *vtlb);

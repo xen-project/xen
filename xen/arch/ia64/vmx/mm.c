@@ -106,17 +106,18 @@ int vmx_do_mmu_update(mmu_update_t *ureqs,u64 count,u64 *pdone,u64 foreigndom)
     u64 mfn, gpfn;
     VCPU *vcpu;
     mmu_update_t req;
-    ia64_rr rr;
+    /* ia64_rr rr; */
     thash_cb_t *hcb;
-    thash_data_t entry={0},*ovl;
+    /* thash_data_t entry={0},*ovl; */
     vcpu = current;
-    search_section_t sections;
+    /* search_section_t sections; */
     hcb = vmx_vcpu_get_vtlb(vcpu);
     for ( i = 0; i < count; i++ )
     {
         copy_from_user(&req, ureqs, sizeof(req));
         cmd = req.ptr&3;
         req.ptr &= ~3;
+/*
         if(cmd ==MMU_NORMAL_PT_UPDATE){
             entry.page_flags = req.val;
             entry.locked = 1;
@@ -133,10 +134,12 @@ int vmx_do_mmu_update(mmu_update_t *ureqs,u64 count,u64 *pdone,u64 foreigndom)
             if (ovl) {
                   // generate MCA.
                 panic("Tlb conflict!!");
-                return;
+                return -1;
             }
-            thash_purge_and_insert(hcb, &entry);
-        }else if(cmd == MMU_MACHPHYS_UPDATE){
+            thash_purge_and_insert(hcb, &entry, req.ptr);
+        }else
+ */
+        if(cmd == MMU_MACHPHYS_UPDATE){
             mfn = req.ptr >>PAGE_SHIFT;
             gpfn = req.val;
             set_machinetophys(mfn,gpfn);

@@ -16,15 +16,4 @@ vmx_do_mmu_update(
     u64 *pdone,
     u64 foreigndom);
 
-extern int
-do_lock_page(
-    VCPU *vcpu,
-    u64 va,
-    u64 lock);
-
-extern int
-do_set_shared_page(
-    VCPU *vcpu,
-    u64 gpa);
-
 #endif /* __ASM_IA64_HYPERCALL_H__ */

@@ -39,7 +39,8 @@ unsigned long dom_pa(unsigned long imva)
 		while(1);
 	}
 	if (imva - imva_fw_base > PAGE_SIZE) {
-		printf("dom_pa: bad offset! imva=%p, imva_fw_base=%p (spinning...)\n",imva,imva_fw_base);
+		printf("dom_pa: bad offset! imva=0x%lx, imva_fw_base=0x%lx (spinning...)\n",
+			imva, imva_fw_base);
 		while(1);
 	}
 	return dom_fw_base_mpa + (imva - imva_fw_base);
@@ -48,31 +49,29 @@ unsigned long dom_pa(unsigned long imva)
 // builds a hypercall bundle at domain physical address
 void dom_efi_hypercall_patch(struct domain *d, unsigned long paddr, unsigned long hypercall)
 {
-	unsigned long imva;
+	unsigned long *imva;
 
 	if (d == dom0) paddr += dom0_start;
-	imva = domain_mpa_to_imva(d,paddr);
-	build_hypercall_bundle(imva,d->arch.breakimm,hypercall,1);
+	imva = (unsigned long *) domain_mpa_to_imva(d, paddr);
+	build_hypercall_bundle(imva, d->arch.breakimm, hypercall, 1);
 }
 
 
 // builds a hypercall bundle at domain physical address
 static void dom_fw_hypercall_patch(struct domain *d, unsigned long paddr, unsigned long hypercall,unsigned long ret)
 {
-	unsigned long imva;
+	unsigned long *imva;
 
-	imva = domain_mpa_to_imva(d,paddr);
-	build_hypercall_bundle(imva,d->arch.breakimm,hypercall,ret);
+	imva = (unsigned long *) domain_mpa_to_imva(d, paddr);
+	build_hypercall_bundle(imva, d->arch.breakimm, hypercall, ret);
 }
 
 static void dom_fw_pal_hypercall_patch(struct domain *d, unsigned long paddr)
 {
 	unsigned long *imva;
 
-	imva = (unsigned long *)domain_mpa_to_imva(d,paddr);
-
-	build_pal_hypercall_bundles (imva, d->arch.breakimm,
-				      FW_HYPERCALL_PAL_CALL);
+	imva = (unsigned long *) domain_mpa_to_imva(d, paddr);
+	build_pal_hypercall_bundles(imva, d->arch.breakimm, FW_HYPERCALL_PAL_CALL);
 }
 
 
@@ -85,15 +84,13 @@ unsigned long dom_fw_setup(struct domain *d, char *args, int arglen)
 
 	dom_fw_base_mpa = 0;
 	if (d == dom0) dom_fw_base_mpa += dom0_start;
-	imva_fw_base = domain_mpa_to_imva(d,dom_fw_base_mpa);
-	bp = dom_fw_init(d,args,arglen,imva_fw_base,PAGE_SIZE);
-	return dom_pa((unsigned long)bp);
+	imva_fw_base = domain_mpa_to_imva(d, dom_fw_base_mpa);
+	bp = dom_fw_init(d, args, arglen, (char *) imva_fw_base, PAGE_SIZE);
+	return dom_pa((unsigned long) bp);
 }
 
 
 /* the following heavily leveraged from linux/arch/ia64/hp/sim/fw-emu.c */
-
-#define MB	(1024*1024UL)
 
 #define NUM_EFI_SYS_TABLES 6
 # define NUM_MEM_DESCS	5
@@ -256,7 +253,8 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 			if (((in1 & ~0xffffffffUL) && (in4 == 0)) ||
 			    (in4 > 1) ||
 			    (in2 > 8) || (in2 & (in2-1)))
-			    	printf("*** SAL_PCI_CONF_WRITE?!?(adr=%p,typ=%p,sz=%p,val=%p)\n",in1,in4,in2,in3);
+				printf("*** SAL_PCI_CONF_WRITE?!?(adr=0x%lx,typ=0x%lx,sz=0x%lx,val=0x%lx)\n",
+					in1,in4,in2,in3);
 			// note that args are in a different order!!
 			status = ia64_sal_pci_config_write(in1,in4,in2,in3);
 		}
@@ -296,7 +294,7 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 	long status = -1;
 
 	if (running_on_sim) return pal_emulator_static(index);
-	printk("xen_pal_emulator: index=%d\n",index);
+	printk("xen_pal_emulator: index=%lu\n", index);
 	// pal code must be mapped by a TR when pal is called, however
 	// calls are rare enough that we will map it lazily rather than
 	// at every context switch
@@ -312,10 +310,16 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 		status = ia64_pal_proc_get_features(&r9,&r10,&r11);
 		break;
 	    case PAL_BUS_GET_FEATURES:
-		status = ia64_pal_bus_get_features(&r9,&r10,&r11);
+		status = ia64_pal_bus_get_features(
+				(pal_bus_features_u_t *) &r9,
+				(pal_bus_features_u_t *) &r10,
+				(pal_bus_features_u_t *) &r11);
 		break;
 	    case PAL_FREQ_RATIOS:
-		status = ia64_pal_freq_ratios(&r9,&r10,&r11);
+		status = ia64_pal_freq_ratios(
+				(struct pal_freq_ratio *) &r9,
+				(struct pal_freq_ratio *) &r10,
+				(struct pal_freq_ratio *) &r11);
 		break;
 	    case PAL_PTCE_INFO:
 		{
@@ -326,7 +330,9 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 		}
 		break;
 	    case PAL_VERSION:
-		status = ia64_pal_version(&r9,&r10);
+		status = ia64_pal_version(
+				(pal_version_u_t *) &r9,
+				(pal_version_u_t *) &r10);
 		break;
 	    case PAL_VM_PAGE_SIZE:
 		status = ia64_pal_vm_page_size(&r9,&r10);
@@ -341,13 +347,21 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 		// FIXME: what should xen return for these, figure out later
 		// For now, linux does the right thing if pal call fails
 		// In particular, rid_size must be set properly!
-		//status = ia64_pal_vm_summary(&r9,&r10);
+		//status = ia64_pal_vm_summary(
+		//		(pal_vm_info_1_u_t *) &r9,
+		//		(pal_vm_info_2_u_t *) &r10);
 		break;
 	    case PAL_RSE_INFO:
-		status = ia64_pal_rse_info(&r9,&r10);
+		status = ia64_pal_rse_info(
+				&r9,
+				(pal_hints_u_t *) &r10);
 		break;
 	    case PAL_VM_INFO:
-		status = ia64_pal_vm_info(in1,in2,&r9,&r10);
+		status = ia64_pal_vm_info(
+				in1,
+				in2,
+				(pal_tc_info_u_t *) &r9,
+				&r10);
 		break;
 	    case PAL_REGISTER_INFO:
 		status = ia64_pal_register_info(in1,&r9,&r10);
@@ -360,11 +374,12 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 	    case PAL_PERF_MON_INFO:
 		{
 			unsigned long pm_buffer[16];
-			int i;
-			status = ia64_pal_perf_mon_info(pm_buffer,&r9);
+			status = ia64_pal_perf_mon_info(
+					pm_buffer,
+					(pal_perf_mon_info_u_t *) &r9);
 			if (status != 0) {
 				while(1)
-				printk("PAL_PERF_MON_INFO fails ret=%d\n",status);
+				printk("PAL_PERF_MON_INFO fails ret=%ld\n", status);
 				break;
 			}
 			if (copy_to_user((void __user *)in1,pm_buffer,128)) {
@@ -409,7 +424,7 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 			    domain_shutdown (current->domain, 0);
 		    break;
 	    default:
-		printk("xen_pal_emulator: UNIMPLEMENTED PAL CALL %d!!!!\n",
+		printk("xen_pal_emulator: UNIMPLEMENTED PAL CALL %lu!!!!\n",
 				index);
 		break;
 	}
@@ -434,7 +449,7 @@ static u32 lsapic_flag=1;
 
 /* Provide only one LP to guest */
 static int 
-acpi_update_lsapic (acpi_table_entry_header *header)
+acpi_update_lsapic (acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_lsapic *lsapic;
 
@@ -529,8 +544,8 @@ dom_fw_fake_acpi(struct fake_acpi_tables *tables)
 	strcpy(xsdt->asl_compiler_id, "XEN");
 	xsdt->asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
 
-	xsdt->table_offset_entry[0] = dom_pa(fadt);
-	tables->madt_ptr = dom_pa(madt);
+	xsdt->table_offset_entry[0] = dom_pa((unsigned long) fadt);
+	tables->madt_ptr = dom_pa((unsigned long) madt);
 
 	xsdt->checksum = generate_acpi_checksum(xsdt, xsdt->length);
 
@@ -547,8 +562,8 @@ dom_fw_fake_acpi(struct fake_acpi_tables *tables)
 	facs->version = 1;
 	facs->length = sizeof(struct facs_descriptor_rev2);
 
-	fadt->xfirmware_ctrl = dom_pa(facs);
-	fadt->Xdsdt = dom_pa(dsdt);
+	fadt->xfirmware_ctrl = dom_pa((unsigned long) facs);
+	fadt->Xdsdt = dom_pa((unsigned long) dsdt);
 
 	/*
 	 * All of the below FADT entries are filled it to prevent warnings
@@ -558,15 +573,15 @@ dom_fw_fake_acpi(struct fake_acpi_tables *tables)
 	fadt->pm1_evt_len = 4;
 	fadt->xpm1a_evt_blk.address_space_id = ACPI_ADR_SPACE_SYSTEM_MEMORY;
 	fadt->xpm1a_evt_blk.register_bit_width = 8;
-	fadt->xpm1a_evt_blk.address = dom_pa(&tables->pm1a_evt_blk);
+	fadt->xpm1a_evt_blk.address = dom_pa((unsigned long) &tables->pm1a_evt_blk);
 	fadt->pm1_cnt_len = 1;
 	fadt->xpm1a_cnt_blk.address_space_id = ACPI_ADR_SPACE_SYSTEM_MEMORY;
 	fadt->xpm1a_cnt_blk.register_bit_width = 8;
-	fadt->xpm1a_cnt_blk.address = dom_pa(&tables->pm1a_cnt_blk);
+	fadt->xpm1a_cnt_blk.address = dom_pa((unsigned long) &tables->pm1a_cnt_blk);
 	fadt->pm_tm_len = 4;
 	fadt->xpm_tmr_blk.address_space_id = ACPI_ADR_SPACE_SYSTEM_MEMORY;
 	fadt->xpm_tmr_blk.register_bit_width = 8;
-	fadt->xpm_tmr_blk.address = dom_pa(&tables->pm_tmr_blk);
+	fadt->xpm_tmr_blk.address = dom_pa((unsigned long) &tables->pm_tmr_blk);
 
 	fadt->checksum = generate_acpi_checksum(fadt, fadt->length);
 
@@ -575,7 +590,7 @@ dom_fw_fake_acpi(struct fake_acpi_tables *tables)
 	strcpy(rsdp->oem_id, "XEN");
 	rsdp->revision = 2; /* ACPI 2.0 includes XSDT */
 	rsdp->length = sizeof(struct acpi20_table_rsdp);
-	rsdp->xsdt_address = dom_pa(xsdt);
+	rsdp->xsdt_address = dom_pa((unsigned long) xsdt);
 
 	rsdp->checksum = generate_acpi_checksum(rsdp,
 	                                        ACPI_RSDP_CHECKSUM_LENGTH);
@@ -640,7 +655,7 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 	unsigned long maxmem = (d->max_pages - d->arch.sys_pgnr) * PAGE_SIZE;
 	const unsigned long start_mpaddr = ((d==dom0)?dom0_start:0);
 
-#	define MAKE_MD(typ, attr, start, end, abs) 	\	
+#	define MAKE_MD(typ, attr, start, end, abs) 	\
 	do {						\
 		md = efi_memmap + i++;			\
 		md->type = typ;				\
@@ -669,7 +684,7 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 	sal_ed      = (void *) cp; cp += sizeof(*sal_ed);
 	efi_memmap  = (void *) cp; cp += NUM_MEM_DESCS*sizeof(*efi_memmap);
 	bp	    = (void *) cp; cp += sizeof(*bp);
-	pfn        = (void *) cp; cp += NFUNCPTRS * 2 * sizeof(pfn);
+	pfn         = (void *) cp; cp += NFUNCPTRS * 2 * sizeof(pfn);
 	cmd_line    = (void *) cp;
 
 	if (args) {
@@ -690,19 +705,19 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 	cp += sizeof(FW_VENDOR) + (8-((unsigned long)cp & 7)); // round to 64-bit boundary
 
 	memcpy(fw_vendor,FW_VENDOR,sizeof(FW_VENDOR));
-	efi_systab->fw_vendor = dom_pa(fw_vendor);
+	efi_systab->fw_vendor = dom_pa((unsigned long) fw_vendor);
 	
 	efi_systab->fw_revision = 1;
-	efi_systab->runtime = (void *) dom_pa(efi_runtime);
+	efi_systab->runtime = (void *) dom_pa((unsigned long) efi_runtime);
 	efi_systab->nr_tables = NUM_EFI_SYS_TABLES;
-	efi_systab->tables = dom_pa(efi_tables);
+	efi_systab->tables = dom_pa((unsigned long) efi_tables);
 
 	efi_runtime->hdr.signature = EFI_RUNTIME_SERVICES_SIGNATURE;
 	efi_runtime->hdr.revision = EFI_RUNTIME_SERVICES_REVISION;
 	efi_runtime->hdr.headersize = sizeof(efi_runtime->hdr);
 #define EFI_HYPERCALL_PATCH(tgt,call) do { \
     dom_efi_hypercall_patch(d,FW_HYPERCALL_##call##_PADDR,FW_HYPERCALL_##call); \
-    tgt = dom_pa(pfn); \
+    tgt = dom_pa((unsigned long) pfn); \
     *pfn++ = FW_HYPERCALL_##call##_PADDR + start_mpaddr; \
     *pfn++ = 0; \
     } while (0)
@@ -719,7 +734,7 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 	EFI_HYPERCALL_PATCH(efi_runtime->reset_system,EFI_RESET_SYSTEM);
 
 	efi_tables[0].guid = SAL_SYSTEM_TABLE_GUID;
-	efi_tables[0].table = dom_pa(sal_systab);
+	efi_tables[0].table = dom_pa((unsigned long) sal_systab);
 	for (i = 1; i < NUM_EFI_SYS_TABLES; i++) {
 		efi_tables[i].guid = NULL_GUID;
 		efi_tables[i].table = 0;
@@ -730,7 +745,7 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 		if (efi.mps) {
 			efi_tables[i].guid = MPS_TABLE_GUID;
 			efi_tables[i].table = __pa(efi.mps);
-			printf(" MPS=%0xlx",efi_tables[i].table);
+			printf(" MPS=0x%lx",efi_tables[i].table);
 			i++;
 		}
 
@@ -739,25 +754,25 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 		if (efi.acpi20) {
 			efi_tables[i].guid = ACPI_20_TABLE_GUID;
 			efi_tables[i].table = __pa(efi.acpi20);
-			printf(" ACPI 2.0=%0xlx",efi_tables[i].table);
+			printf(" ACPI 2.0=0x%lx",efi_tables[i].table);
 			i++;
 		}
 		if (efi.acpi) {
 			efi_tables[i].guid = ACPI_TABLE_GUID;
 			efi_tables[i].table = __pa(efi.acpi);
-			printf(" ACPI=%0xlx",efi_tables[i].table);
+			printf(" ACPI=0x%lx",efi_tables[i].table);
 			i++;
 		}
 		if (efi.smbios) {
 			efi_tables[i].guid = SMBIOS_TABLE_GUID;
 			efi_tables[i].table = __pa(efi.smbios);
-			printf(" SMBIOS=%0xlx",efi_tables[i].table);
+			printf(" SMBIOS=0x%lx",efi_tables[i].table);
 			i++;
 		}
 		if (efi.hcdp) {
 			efi_tables[i].guid = HCDP_TABLE_GUID;
 			efi_tables[i].table = __pa(efi.hcdp);
-			printf(" HCDP=%0xlx",efi_tables[i].table);
+			printf(" HCDP=0x%lx",efi_tables[i].table);
 			i++;
 		}
 		printf("\n");
@@ -773,8 +788,8 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 			dom_fw_fake_acpi(acpi_tables);
 
 			efi_tables[i].guid = ACPI_20_TABLE_GUID;
-			efi_tables[i].table = dom_pa(acpi_tables);
-			printf(" ACPI 2.0=%0xlx",efi_tables[i].table);
+			efi_tables[i].table = dom_pa((unsigned long) acpi_tables);
+			printf(" ACPI 2.0=0x%lx",efi_tables[i].table);
 			i++;
 		}
 	}
@@ -850,12 +865,12 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 		MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
 	}
 
-	bp->efi_systab = dom_pa(fw_mem);
-	bp->efi_memmap = dom_pa(efi_memmap);
+	bp->efi_systab = dom_pa((unsigned long) fw_mem);
+	bp->efi_memmap = dom_pa((unsigned long) efi_memmap);
 	bp->efi_memmap_size = NUM_MEM_DESCS*sizeof(efi_memory_desc_t);
 	bp->efi_memdesc_size = sizeof(efi_memory_desc_t);
 	bp->efi_memdesc_version = 1;
-	bp->command_line = dom_pa(cmd_line);
+	bp->command_line = dom_pa((unsigned long) cmd_line);
 	bp->console_info.num_cols = 80;
 	bp->console_info.num_rows = 25;
 	bp->console_info.orig_x = 0;
@@ -870,7 +885,7 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 		bp->initrd_start = d->arch.initrd_start;
 		bp->initrd_size  = d->arch.initrd_len;
 	}
-	printf(" initrd start %0xlx", bp->initrd_start);
-	printf(" initrd size %0xlx", bp->initrd_size);
+	printf(" initrd start 0x%lx", bp->initrd_start);
+	printf(" initrd size 0x%lx\n", bp->initrd_size);
 	return bp;
 }

@@ -15,12 +15,13 @@
 #include <asm/dma.h>
 #include <asm/vhpt.h>
 
-unsigned long vhpt_paddr, vhpt_pend, vhpt_pte;
+DEFINE_PER_CPU (unsigned long, vhpt_paddr);
+DEFINE_PER_CPU (unsigned long, vhpt_pend);
 
 void vhpt_flush(void)
 {
 	struct vhpt_lf_entry *v = (void *)VHPT_ADDR;
-	int i, cnt = 0;
+	int i;
 #if 0
 static int firsttime = 2;
 
@@ -47,7 +48,6 @@ printf("vhpt_flush: *********************************************\n");
 #ifdef VHPT_GLOBAL
 void vhpt_flush_address(unsigned long vadr, unsigned long addr_range)
 {
-	unsigned long ps;
 	struct vhpt_lf_entry *vlfe;
 
 	if ((vadr >> 61) == 7) {
@@ -77,12 +77,12 @@ void vhpt_flush_address(unsigned long vadr, unsigned long addr_range)
 }
 #endif
 
-void vhpt_map(void)
+static void vhpt_map(unsigned long pte)
 {
 	unsigned long psr;
 
 	psr = ia64_clear_ic();
-	ia64_itr(0x2, IA64_TR_VHPT, VHPT_ADDR, vhpt_pte, VHPT_SIZE_LOG2);
+	ia64_itr(0x2, IA64_TR_VHPT, VHPT_ADDR, pte, VHPT_SIZE_LOG2);
 	ia64_set_psr(psr);
 	ia64_srlz_i();
 }
@@ -121,29 +121,35 @@ void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte, unsigned long 
 
 void vhpt_init(void)
 {
-	unsigned long vhpt_total_size, vhpt_alignment, vhpt_imva;
+	unsigned long vhpt_total_size, vhpt_alignment;
+	unsigned long paddr, pte;
+	struct page_info *page;
 #if !VHPT_ENABLED
 	return;
 #endif
 	// allocate a huge chunk of physical memory.... how???
 	vhpt_total_size = 1 << VHPT_SIZE_LOG2;	// 4MB, 16MB, 64MB, or 256MB
 	vhpt_alignment = 1 << VHPT_SIZE_LOG2;	// 4MB, 16MB, 64MB, or 256MB
-	printf("vhpt_init: vhpt size=%p, align=%p\n",vhpt_total_size,vhpt_alignment);
+	printf("vhpt_init: vhpt size=0x%lx, align=0x%lx\n",
+		vhpt_total_size, vhpt_alignment);
 	/* This allocation only holds true if vhpt table is unique for
 	 * all domains. Or else later new vhpt table should be allocated
 	 * from domain heap when each domain is created. Assume xen buddy
 	 * allocator can provide natural aligned page by order?
 	 */
-	vhpt_imva = alloc_xenheap_pages(VHPT_SIZE_LOG2 - PAGE_SHIFT);
-	if (!vhpt_imva) {
+//	vhpt_imva = alloc_xenheap_pages(VHPT_SIZE_LOG2 - PAGE_SHIFT);
+	page = alloc_domheap_pages(NULL, VHPT_SIZE_LOG2 - PAGE_SHIFT, 0);
+	if (!page) {
 		printf("vhpt_init: can't allocate VHPT!\n");
 		while(1);
 	}
-	vhpt_paddr = __pa(vhpt_imva);
-	vhpt_pend = vhpt_paddr + vhpt_total_size - 1;
-	printf("vhpt_init: vhpt paddr=%p, end=%p\n",vhpt_paddr,vhpt_pend);
-	vhpt_pte = pte_val(pfn_pte(vhpt_paddr >> PAGE_SHIFT, PAGE_KERNEL));
-	vhpt_map();
+	paddr = page_to_maddr(page);
+	__get_cpu_var(vhpt_paddr) = paddr;
+	__get_cpu_var(vhpt_pend) = paddr + vhpt_total_size - 1;
+	printf("vhpt_init: vhpt paddr=0x%lx, end=0x%lx\n",
+		paddr, __get_cpu_var(vhpt_pend));
+	pte = pte_val(pfn_pte(paddr >> PAGE_SHIFT, PAGE_KERNEL));
+	vhpt_map(pte);
 	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
 		VHPT_ENABLED);
 	vhpt_flush();
@@ -167,6 +173,6 @@ int dump_vhpt_stats(char *buf)
 		if (v->CChain) vhpt_chains++;
 	}
 	s += sprintf(s,"VHPT usage: %ld/%ld (%ld collision chains)\n",
-		vhpt_valid,VHPT_NUM_ENTRIES,vhpt_chains);
+		vhpt_valid, (unsigned long) VHPT_NUM_ENTRIES, vhpt_chains);
 	return s - buf;
 }

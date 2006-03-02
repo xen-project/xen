@@ -178,7 +178,7 @@ acpi_parse_lapic_addr_ovr (
 
 	if (lapic->address) {
 		iounmap((void *) ipi_base_addr);
-		ipi_base_addr = (unsigned long) ioremap(lapic->address, 0);
+		ipi_base_addr = (void __iomem *) ioremap(lapic->address, 0);
 	}
 	return 0;
 }
@@ -265,7 +265,9 @@ acpi_parse_plat_int_src (
 	acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_plat_int_src *plintsrc;
+#if 0
 	int vector;
+#endif
 
 	plintsrc = (struct acpi_table_plat_int_src *) header;
 
@@ -369,9 +371,9 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 	/* Get base address of IPI Message Block */
 
 	if (acpi_madt->lapic_address)
-		ipi_base_addr = (unsigned long) ioremap(acpi_madt->lapic_address, 0);
+		ipi_base_addr = (void __iomem *) ioremap(acpi_madt->lapic_address, 0);
 
-	printk(KERN_INFO PREFIX "Local APIC address 0x%lx\n", ipi_base_addr);
+	printk(KERN_INFO PREFIX "Local APIC address %p\n", ipi_base_addr);
 
 	acpi_madt_oem_check(acpi_madt->header.oem_id,
 		acpi_madt->header.oem_table_id);

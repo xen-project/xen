@@ -61,6 +61,9 @@
 #include <asm/system.h>
 #include <asm/unistd.h>
 #include <asm/system.h>
+#ifdef CONFIG_XEN
+#include <asm/hypervisor.h>
+#endif
 
 #if defined(CONFIG_SMP) && (IA64_CPU_SIZE > PAGE_SIZE)
 # error "struct cpuinfo_ia64 too big!"
@@ -243,6 +246,14 @@ reserve_memory (void)
 	rsvd_region[n].end   = (unsigned long) ia64_imva(_end);
 	n++;
 
+#ifdef CONFIG_XEN
+	if (running_on_xen) {
+		rsvd_region[n].start = (unsigned long)__va((HYPERVISOR_shared_info->arch.start_info_pfn << PAGE_SHIFT));
+		rsvd_region[n].end   = rsvd_region[n].start + PAGE_SIZE;
+		n++;
+ 	}
+#endif
+
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (ia64_boot_param->initrd_start) {
 		rsvd_region[n].start = (unsigned long)__va(ia64_boot_param->initrd_start);
@@ -260,6 +271,7 @@ reserve_memory (void)
 	n++;
 
 	num_rsvd_regions = n;
+	BUG_ON(IA64_MAX_RSVD_REGIONS + 1 < n);
 
 	sort_regions(rsvd_region, num_rsvd_regions);
 }

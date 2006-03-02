@@ -46,7 +46,11 @@ ia64_get_lid (void)
 #define SMP_IRQ_REDIRECTION	(1 << 0)
 #define SMP_IPI_REDIRECTION	(1 << 1)
 
+#ifdef XEN
+#define raw_smp_processor_id() (current->processor)
+#else
 #define raw_smp_processor_id() (current_thread_info()->cpu)
+#endif
 
 extern struct smp_boot_data {
 	int cpu_count;

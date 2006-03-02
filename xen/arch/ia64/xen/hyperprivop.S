@@ -1336,7 +1336,7 @@ ENTRY(hyper_ssm_dt)
 	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
 	ld8 r22=[r22];;
 	adds r22=IA64_VCPU_META_SAVED_RR0_OFFSET,r22;;
-	ld4 r23=[r22];;
+	ld8 r23=[r22];;
 	mov rr[r0]=r23;;
 	srlz.i;;
 	st4 [r20]=r0 ;;
@@ -1372,7 +1372,7 @@ ENTRY(hyper_rsm_dt)
 	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
 	ld8 r22=[r22];;
 	adds r22=IA64_VCPU_META_RR0_OFFSET,r22;;
-	ld4 r23=[r22];;
+	ld8 r23=[r22];;
 	mov rr[r0]=r23;;
 	srlz.i;;
 	adds r21=1,r0 ;;
@@ -1733,7 +1733,7 @@ ENTRY(hyper_set_rr)
 	dep r23=r28,r23,16,8;;
 	dep r23=r29,r23,8,8
 	cmp.eq p6,p0=r25,r0;;	// if rr0, save for metaphysical
-(p6)	st4 [r24]=r23
+(p6)	st8 [r24]=r23
 	mov rr[r8]=r23;;
 	// done, mosey on back
 1:	mov r24=cr.ipsr

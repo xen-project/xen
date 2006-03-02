@@ -269,6 +269,10 @@ ENTRY(vmx_alt_itlb_miss)
 (p7)br.sptk vmx_fault_3
 vmx_alt_itlb_miss_1:
 	mov r16=cr.ifa		// get address that caused the TLB miss
+    ;;
+    tbit.z p6,p7=r16,63
+(p6)br.sptk vmx_fault_3
+    ;;
 	movl r17=PAGE_KERNEL
 	mov r24=cr.ipsr
 	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
@@ -300,6 +304,10 @@ ENTRY(vmx_alt_dtlb_miss)
 (p7)br.sptk vmx_fault_4
 vmx_alt_dtlb_miss_1:
 	mov r16=cr.ifa		// get address that caused the TLB miss
+    ;;
+    tbit.z p6,p7=r16,63
+(p6)br.sptk vmx_fault_4
+    ;;
 	movl r17=PAGE_KERNEL
 	mov r20=cr.isr
 	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
@@ -397,7 +405,7 @@ END(vmx_break_fault)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3000 Entry 12 (size 64 bundles) External Interrupt (4)
 ENTRY(vmx_interrupt)
-    VMX_DBG_FAULT(12)
+//    VMX_DBG_FAULT(12)
 	mov r31=pr		// prepare to save predicates
     mov r19=12
     mov r29=cr.ipsr
@@ -734,7 +742,7 @@ END(vmx_single_step_trap)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6100 Entry 37 (size 16 bundles) Virtualization Fault
 ENTRY(vmx_virtualization_fault)
-    VMX_DBG_FAULT(37)
+//    VMX_DBG_FAULT(37)
 	mov r31=pr
     mov r19=37
     adds r16 = IA64_VCPU_CAUSE_OFFSET,r21
@@ -1138,5 +1146,5 @@ hyper_call_table:
     data8 hyper_not_support     //hyper_boot_vcpu
     data8 hyper_not_support     //hyper_ni_hypercall       /* 25 */
     data8 hyper_not_support     //hyper_mmuext_op
-    data8 hyper_lock_page
+    data8 hyper_not_support     //tata8 hyper_lock_page
     data8 hyper_set_shared_page

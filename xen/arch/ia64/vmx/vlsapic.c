@@ -47,6 +47,9 @@
 /*
  * Update the checked last_itc.
  */
+
+extern void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
+     UINT64 vector,REGS *regs);
 static void update_last_itc(vtime_t *vtm, uint64_t cur_itc)
 {
     vtm->last_itc = cur_itc;
@@ -483,7 +486,7 @@ int vmx_vcpu_pend_interrupt(VCPU *vcpu, uint8_t vector)
 
     if (vector & ~0xff) {
         DPRINTK("vmx_vcpu_pend_interrupt: bad vector\n");
-        return;
+        return -1;
     }
     local_irq_save(spsr);
     ret = test_and_set_bit(vector, &VCPU(vcpu, irr[0]));
@@ -572,12 +575,13 @@ void guest_write_eoi(VCPU *vcpu)
     VLSAPIC_INSVC(vcpu,vec>>6) &= ~(1UL <<(vec&63));
     local_irq_restore(spsr);
     VCPU(vcpu, eoi)=0;    // overwrite the data
-    vmx_check_pending_irq(vcpu);
+    vcpu->arch.irq_new_pending=1;
+//    vmx_check_pending_irq(vcpu);
 }
 
 uint64_t guest_read_vivr(VCPU *vcpu)
 {
-    int vec, next, h_inservice;
+    int vec, h_inservice;
     uint64_t  spsr;
 
     local_irq_save(spsr);
@@ -609,7 +613,7 @@ static void generate_exirq(VCPU *vcpu)
     vmx_reflect_interruption(0,isr,0, 12, regs); // EXT IRQ
 }
 
-vhpi_detection(VCPU *vcpu)
+void vhpi_detection(VCPU *vcpu)
 {
     uint64_t    threshold,vhpi;
     tpr_t       vtpr;
@@ -626,7 +630,7 @@ vhpi_detection(VCPU *vcpu)
     }
 }
 
-vmx_vexirq(VCPU *vcpu)
+void vmx_vexirq(VCPU *vcpu)
 {
     static  uint64_t  vexirq_count=0;
 

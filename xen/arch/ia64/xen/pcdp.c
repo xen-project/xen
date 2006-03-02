@@ -71,7 +71,9 @@ efi_setup_pcdp_console(char *cmdline)
 {
 	struct pcdp *pcdp;
 	struct pcdp_uart *uart;
+#ifndef XEN
 	struct pcdp_device *dev, *end;
+#endif
 	int i, serial = 0;
 
 	pcdp = efi.hcdp;
