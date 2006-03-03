@@ -12,7 +12,7 @@
 #include <xen/sched.h>
 #include <xen/mm.h>
 #include <public/version.h>
-//#include <xen/delay.h>
+#include <xen/gdbstub.h>
 #include <xen/compile.h>
 #include <xen/console.h>
 #include <xen/serial.h>
@@ -359,6 +359,8 @@ printk("About to call __cpu_up(%d)\n",i);
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
     smp_cpus_done(max_cpus);
 #endif
+
+    initialise_gdb(); /* could be moved earlier */
 
     do_initcalls();
 printk("About to call sort_main_extable()\n");

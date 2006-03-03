@@ -13,6 +13,7 @@
 #include <xen/multiboot.h>
 #include <xen/domain_page.h>
 #include <xen/compile.h>
+#include <xen/gdbstub.h>
 #include <public/version.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
@@ -478,6 +479,8 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
     smp_cpus_done(max_cpus);
+
+    initialise_gdb(); /* could be moved earlier */
 
     do_initcalls();
 

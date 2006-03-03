@@ -41,7 +41,6 @@ boolean_param("hpet_force", opt_hpet_force);
 unsigned long cpu_khz;  /* CPU clock frequency in kHz. */
 unsigned long hpet_address;
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
-int timer_ack = 0;
 unsigned long volatile jiffies;
 static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
 static spinlock_t wc_lock = SPIN_LOCK_UNLOCKED;
@@ -148,16 +147,6 @@ void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
     ASSERT(local_irq_is_enabled());
 
-    if ( timer_ack ) 
-    {
-        extern spinlock_t i8259A_lock;
-        spin_lock_irq(&i8259A_lock);
-        outb(0x0c, 0x20);
-        /* Ack the IRQ; AEOI will end it automatically. */
-        inb(0x20);
-        spin_unlock_irq(&i8259A_lock);
-    }
-    
     /* Update jiffies counter. */
     (*(unsigned long *)&jiffies)++;
 

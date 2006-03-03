@@ -274,6 +274,10 @@ class HVMImageHandler(ImageHandler):
                 uname = sxp.child_value(info, 'uname')
                 typedev = sxp.child_value(info, 'dev')
                 (_, vbdparam) = string.split(uname, ':', 1)
+
+                if 'file:' in uname and not os.path.isfile(vbdparam):
+                   raise VmError('Disk image does not exist: %s' % vbdparam)
+
                 if 'ioemu:' in typedev:
                     (emtype, vbddev) = string.split(typedev, ':', 1)
                 else:

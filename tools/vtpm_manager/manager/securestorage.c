@@ -307,8 +307,8 @@ TPM_RESULT VTPM_SaveService(void) {
   TPM_RESULT status=TPM_SUCCESS;
   int fh, dmis=-1;
 
-  BYTE *flat_boot_key, *flat_dmis, *flat_enc;
-  buffer_t clear_flat_global, enc_flat_global;
+  BYTE *flat_boot_key=NULL, *flat_dmis=NULL, *flat_enc=NULL;
+  buffer_t clear_flat_global=NULL_BUF, enc_flat_global=NULL_BUF;
   UINT32 storageKeySize = buffer_len(&vtpm_globals->storageKeyWrap);
   UINT32 bootKeySize = buffer_len(&vtpm_globals->bootKeyWrap);
   struct pack_buf_t storage_key_pack = {storageKeySize, vtpm_globals->storageKeyWrap.bytes};
@@ -328,12 +328,9 @@ TPM_RESULT VTPM_SaveService(void) {
                                               sizeof(UINT32) +// storagekeysize
                                               storageKeySize, NULL) ); // storage key
 
-  flat_dmis_size = (hashtable_count(vtpm_globals->dmi_map) - 1) * // num DMIS (-1 for Dom0)
-                   (sizeof(UINT32) + 2*sizeof(TPM_DIGEST)); // Per DMI info
 
   flat_boot_key = (BYTE *) malloc( boot_key_size );
   flat_enc = (BYTE *) malloc( sizeof(UINT32) );
-  flat_dmis = (BYTE *) malloc( flat_dmis_size );
 
   boot_key_size = BSG_PackList(flat_boot_key, 1,
                                BSG_TPM_SIZE32_DATA, &boot_key_pack);
@@ -349,8 +346,12 @@ TPM_RESULT VTPM_SaveService(void) {
 
   BSG_PackConst(buffer_len(&enc_flat_global), 4, flat_enc);
 
-  // Per DMI values to be saved
+  // Per DMI values to be saved (if any exit)
   if (hashtable_count(vtpm_globals->dmi_map) > 0) {
+
+    flat_dmis_size = (hashtable_count(vtpm_globals->dmi_map) - 1) * // num DMIS (-1 for Dom0)
+                     (sizeof(UINT32) + 2*sizeof(TPM_DIGEST)); // Per DMI info
+    flat_dmis = (BYTE *) malloc( flat_dmis_size );
 
     dmi_itr = hashtable_iterator(vtpm_globals->dmi_map);
     do {

@@ -1410,7 +1410,13 @@ long do_set_trap_table(struct trap_info *traps)
     struct trap_info *dst = current->arch.guest_context.trap_ctxt;
     long rc = 0;
 
-    LOCK_BIGLOCK(current->domain);
+    /* If no table is presented then clear the entire virtual IDT. */
+    if ( traps == NULL )
+    {
+        memset(dst, 0, 256 * sizeof(*dst));
+        init_int80_direct_trap(current);
+        return 0;
+    }
 
     for ( ; ; )
     {
@@ -1439,8 +1445,6 @@ long do_set_trap_table(struct trap_info *traps)
 
         traps++;
     }
-
-    UNLOCK_BIGLOCK(current->domain);
 
     return rc;
 }

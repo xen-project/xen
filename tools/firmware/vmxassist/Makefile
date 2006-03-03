@@ -18,6 +18,9 @@
 # Place - Suite 330, Boston, MA 02111-1307 USA.
 #
 
+# External CFLAGS can do more harm than good.
+CFLAGS :=
+
 XEN_ROOT = ../../..
 include $(XEN_ROOT)/Config.mk
 

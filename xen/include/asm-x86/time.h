@@ -4,8 +4,6 @@
 
 #include <asm/msr.h>
 
-extern int timer_ack;
-
 extern void calibrate_tsc_bp(void);
 extern void calibrate_tsc_ap(void);
 

@@ -33,8 +33,8 @@ typedef struct physdevop_set_iobitmap {
 
 typedef struct physdevop_apic {
     /* IN */
-    uint32_t apic;
-    uint32_t offset;
+    unsigned long apic_physbase;
+    uint32_t reg;
     /* IN or OUT */
     uint32_t value;
 } physdevop_apic_t; 

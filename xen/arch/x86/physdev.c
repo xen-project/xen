@@ -11,8 +11,12 @@
 #include <public/xen.h>
 #include <public/physdev.h>
 
-extern int ioapic_guest_read(int apicid, int address, u32 *pval);
-extern int ioapic_guest_write(int apicid, int address, u32 pval);
+extern int
+ioapic_guest_read(
+    unsigned long physbase, unsigned int reg, u32 *pval);
+extern int
+ioapic_guest_write(
+    unsigned long physbase, unsigned int reg, u32 pval);
 
 /*
  * Demuxing hypercall.
@@ -49,7 +53,9 @@ long do_physdev_op(struct physdev_op *uop)
         if ( !IS_PRIV(current->domain) )
             break;
         ret = ioapic_guest_read(
-            op.u.apic_op.apic, op.u.apic_op.offset, &op.u.apic_op.value);
+            op.u.apic_op.apic_physbase,
+            op.u.apic_op.reg,
+            &op.u.apic_op.value);
         break;
 
     case PHYSDEVOP_APIC_WRITE:
@@ -57,7 +63,9 @@ long do_physdev_op(struct physdev_op *uop)
         if ( !IS_PRIV(current->domain) )
             break;
         ret = ioapic_guest_write(
-            op.u.apic_op.apic, op.u.apic_op.offset, op.u.apic_op.value);
+            op.u.apic_op.apic_physbase,
+            op.u.apic_op.reg,
+            op.u.apic_op.value);
         break;
 
     case PHYSDEVOP_ASSIGN_VECTOR:
