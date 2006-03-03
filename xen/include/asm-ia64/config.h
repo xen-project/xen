@@ -249,7 +249,7 @@ extern unsigned long loops_per_jiffy;
 extern char saved_command_line[];
 struct screen_info { };
 #define seq_printf(a,b...) printf(b)
-#define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
+//#define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
 
 void dummy_called(char *function);
 #define dummy()	dummy_called((char *) __FUNCTION__)
