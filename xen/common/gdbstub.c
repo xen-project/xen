@@ -376,7 +376,6 @@ process_command(struct cpu_user_regs *regs, struct gdb_context *ctx)
         break;
     case 'g': /* Read registers */
         gdb_arch_read_reg_array(regs, ctx);
-        ASSERT(!local_irq_is_enabled());
         break;
     case 'G': /* Write registers */
         gdb_arch_write_reg_array(regs, ctx->in_buf + 1, ctx);
@@ -395,7 +394,6 @@ process_command(struct cpu_user_regs *regs, struct gdb_context *ctx)
             return 0;
         }
         gdb_cmd_read_mem(addr, length, ctx);
-        ASSERT(!local_irq_is_enabled());
         break;
     case 'M': /* Write memory */
         addr = simple_strtoul(ctx->in_buf + 1, &ptr, 16);
@@ -477,7 +475,7 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
 {
     int resume = 0;
     int r;
-    unsigned flags;
+    unsigned long flags;
 
     if ( gdb_ctx->serhnd < 0 )
     {
@@ -506,7 +504,7 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
 
     if ( !gdb_ctx->connected )
     {
-        printk("GDB connection activated\n");
+        printk("GDB connection activated.\n");
         gdb_arch_print_state(regs);
         gdb_ctx->connected = 1;
     }
@@ -522,7 +520,7 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
 
     /* Shouldn't really do this, but otherwise we stop for no
        obvious reason, which is Bad */
-    printk("Waiting for GDB to attach to Gdb\n");
+    printk("Waiting for GDB to attach...\n");
 
     gdb_arch_enter(regs);
     gdb_ctx->signum = gdb_arch_signal_num(regs, cookie);
@@ -535,9 +533,7 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
 
     while ( resume == 0 )
     {
-        ASSERT(!local_irq_is_enabled());
         r = receive_command(gdb_ctx);
-        ASSERT(!local_irq_is_enabled());
         if ( r < 0 )
         {
             dbg_printk("GDB disappeared, trying to resume Xen...\n");
@@ -545,9 +541,7 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
         }
         else
         {
-            ASSERT(!local_irq_is_enabled());
             resume = process_command(regs, gdb_ctx);
-            ASSERT(!local_irq_is_enabled());
         }
     }
 
@@ -561,27 +555,13 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
     return 0;
 }
 
-/*
- * initialization
- * XXX TODO
- *     This should be an explicit call from architecture code.               
- *     initcall is far too late for some early debugging, and only the 
- *     architecture code knows when this call can be made.          
- */
-static int
-initialize_gdb(void)
+void
+initialise_gdb(void)
 {
-    if ( !strcmp(opt_gdb, "none") )
-        return 0;
     gdb_ctx->serhnd = serial_parse_handle(opt_gdb);
-    if ( gdb_ctx->serhnd == -1 )
-        panic("Can't parse %s as GDB serial info.\n", opt_gdb);
-
-    printk("Gdb initialised.\n");
-    return 0;
+    if ( gdb_ctx->serhnd != -1 )
+        printk("GDB stub initialised.\n");
 }
-
-__initcall(initialize_gdb);
 
 /*
  * Local variables:

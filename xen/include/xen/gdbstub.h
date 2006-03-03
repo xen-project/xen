@@ -21,6 +21,8 @@
 #ifndef __XEN_GDBSTUB_H__
 #define __XEN_GDBSTUB_H__
 
+#ifdef CRASH_DEBUG
+
 /* value <-> char (de)serialzers for arch specific gdb backends */
 char hex2char(unsigned long x); 
 int char2hex(unsigned char c); 
@@ -83,6 +85,14 @@ void gdb_arch_exit(struct cpu_user_regs *regs);
 #define SIGSEGV         11
 #define SIGALRM         14
 #define SIGTERM         15
+
+void initialise_gdb(void);
+
+#else
+
+#define initialise_gdb() ((void)0)
+
+#endif
 
 #endif /* __XEN_GDBSTUB_H__ */
 
