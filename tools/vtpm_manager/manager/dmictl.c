@@ -74,7 +74,13 @@ TPM_RESULT close_dmi( VTPM_DMI_RESOURCE *dmi_res) {
 	  
   close(dmi_res->guest_tx_fh); dmi_res->guest_tx_fh = -1;
   close(dmi_res->vtpm_tx_fh);  dmi_res->vtpm_tx_fh = -1; 
-		
+  vtpm_globals->connected_dmis--;
+
+  if (vtpm_globals->connected_dmis == 0) {
+    // No more DMI's connected. Close fifo to prevent a broken pipe.
+    close(vtpm_globals->guest_rx_fh);
+    vtpm_globals->guest_rx_fh = -1;
+  }
  #ifndef MANUAL_DM_LAUNCH
   if (dmi_res->dmi_id != VTPM_CTL_DM) {
     if (dmi_res->dmi_pid != 0) {
@@ -118,6 +124,7 @@ TPM_RESULT VTPM_Handle_New_DMI( const buffer_t *param_buf) {
     status = TPM_BAD_PARAMETER;
     goto abort_egress;
   } else {
+    vtpm_globals->connected_dmis++; // Put this here so we don't count Dom0
     BSG_UnpackList( param_buf->bytes, 3,
 		    BSG_TYPE_BYTE, &type,
 		    BSG_TYPE_UINT32, &domain_id,

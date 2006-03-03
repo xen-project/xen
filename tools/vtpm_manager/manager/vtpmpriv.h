@@ -98,6 +98,7 @@ typedef struct tdVTPM_GLOBALS {
 #ifndef VTPM_MULTI_VM
   int                 vtpm_rx_fh;
   int                 guest_rx_fh;
+  int                 connected_dmis;     // Used to close guest_rx when no dmis are connected
   
   pid_t               master_pid;
 #endif
