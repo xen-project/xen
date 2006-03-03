@@ -34,7 +34,7 @@ test_interleaved_transactions: test_interleaved_transactions.o
 
 testcode: xs_test xenstored_test xs_random
 
-xenstored: xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o tdb.o
+xenstored: xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o tdb.o hashtable.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -o $@
 
 $(CLIENTS): xenstore-%: xenstore_%.o libxenstore.so

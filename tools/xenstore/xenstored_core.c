@@ -51,11 +51,16 @@
 #include "xenctrl.h"
 #include "tdb.h"
 
+#include "hashtable.h"
+
+
 extern int eventchn_fd; /* in xenstored_domain.c */
 
-static bool verbose;
+static bool verbose = false;
 LIST_HEAD(connections);
 static int tracefd = -1;
+static bool recovery = true;
+static bool remove_local = true;
 static int reopen_log_pipe[2];
 static char *tracefile = NULL;
 static TDB_CONTEXT *tdb_ctx;
@@ -201,8 +206,8 @@ static void trace_io(const struct connection *conn,
 	now = time(NULL);
 	tm = localtime(&now);
 
-	trace("%s %p %p %04d%02d%02d %02d:%02d:%02d %s (", prefix, conn,
-	      conn->transaction, tm->tm_year + 1900, tm->tm_mon + 1,
+	trace("%s %p %04d%02d%02d %02d:%02d:%02d %s (", prefix, conn,
+	      tm->tm_year + 1900, tm->tm_mon + 1,
 	      tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
 	      sockmsg_string(data->hdr.msg.type));
 	
@@ -946,11 +951,23 @@ static void delete_node(struct connection *conn, struct node *node)
 	}
 }
 
+
 /* Delete memory using memmove. */
 static void memdel(void *mem, unsigned off, unsigned len, unsigned total)
 {
 	memmove(mem + off, mem + off + len, total - off - len);
 }
+
+
+static bool remove_child_entry(struct connection *conn, struct node *node,
+			       size_t offset)
+{
+	size_t childlen = strlen(node->children + offset);
+	memdel(node->children, offset, childlen + 1, node->childlen);
+	node->childlen -= childlen + 1;
+	return write_node(conn, node);
+}
+
 
 static bool delete_child(struct connection *conn,
 			 struct node *node, const char *childname)
@@ -959,10 +976,7 @@ static bool delete_child(struct connection *conn,
 
 	for (i = 0; i < node->childlen; i += strlen(node->children+i) + 1) {
 		if (streq(node->children+i, childname)) {
-			memdel(node->children, i, strlen(childname) + 1,
-			       node->childlen);
-			node->childlen -= strlen(childname) + 1;
-			return write_node(conn, node);
+			return remove_child_entry(conn, node, i);
 		}
 	}
 	corrupt(conn, "Can't find child '%s' in %s", childname, node->name);
@@ -997,6 +1011,7 @@ static void internal_rm(const char *name)
 	struct node *node = read_node(NULL, tname);
 	if (node)
 		_rm(NULL, node, tname);
+	talloc_free(node);
 	talloc_free(tname);
 }
 
@@ -1424,12 +1439,14 @@ static void setup_structure(void)
 
 		check_store();
 
-		internal_rm("/local");
-		create_node(NULL, tlocal, NULL, 0);
+		if (remove_local) {
+			internal_rm("/local");
+			create_node(NULL, tlocal, NULL, 0);
+
+			check_store();
+		}
 
 		talloc_free(tlocal);
-
-		check_store();
 	}
 	else {
 		tdb_ctx = tdb_open(tdbname, 7919, TDB_FLAGS, O_RDWR|O_CREAT,
@@ -1445,6 +1462,26 @@ static void setup_structure(void)
 	}
 }
 
+
+static unsigned int hash_from_key_fn(void *k)
+{
+	char *str = k;
+        unsigned int hash = 5381;
+        char c;
+
+        while ((c = *str++))
+		hash = ((hash << 5) + hash) + (unsigned int)c;
+
+        return hash;
+}
+
+
+static int keys_equal_fn(void *key1, void *key2)
+{
+	return 0 == strcmp((char *)key1, (char *)key2);
+}
+
+
 static char *child_name(const char *s1, const char *s2)
 {
 	if (strcmp(s1, "/")) {
@@ -1455,12 +1492,39 @@ static char *child_name(const char *s1, const char *s2)
 	}
 }
 
-static void check_store_(const char *name)
+
+static void remember_string(struct hashtable *hash, const char *str)
+{
+	char *k = malloc(strlen(str) + 1);
+	strcpy(k, str);
+	hashtable_insert(hash, k, (void *)1);
+}
+
+
+/**
+ * A node has a children field that names the children of the node, separated
+ * by NULs.  We check whether there are entries in there that are duplicated
+ * (and if so, delete the second one), and whether there are any that do not
+ * have a corresponding child node (and if so, delete them).  Each valid child
+ * is then recursively checked.
+ *
+ * No deleting is performed if the recovery flag is cleared (i.e. -R was
+ * passed on the command line).
+ *
+ * As we go, we record each node in the given reachable hashtable.  These
+ * entries will be used later in clean_store.
+ */
+static void check_store_(const char *name, struct hashtable *reachable)
 {
 	struct node *node = read_node(NULL, name);
 
 	if (node) {
 		size_t i = 0;
+
+		struct hashtable * children =
+			create_hashtable(16, hash_from_key_fn, keys_equal_fn);
+
+		remember_string(reachable, name);
 
 		while (i < node->childlen) {
 			size_t childlen = strlen(node->children + i);
@@ -1469,21 +1533,39 @@ static void check_store_(const char *name)
 			struct node *childnode = read_node(NULL, childname);
 			
 			if (childnode) {
-				check_store_(childname);
-				i += childlen + 1;
+				if (hashtable_search(children, childname)) {
+					log("check_store: '%s' is duplicated!",
+					    childname);
+
+					if (recovery) {
+						remove_child_entry(NULL, node,
+								   i);
+						i -= childlen + 1;
+					}
+				}
+				else {
+					remember_string(children, childname);
+					check_store_(childname, reachable);
+				}
 			}
 			else {
 				log("check_store: No child '%s' found!\n",
 				    childname);
 
-				memdel(node->children, i, childlen + 1,
-				       node->childlen);
-				node->childlen -= childlen + 1;
-				write_node(NULL, node);
+				if (recovery) {
+					remove_child_entry(NULL, node, i);
+					i -= childlen + 1;
+				}
 			}
 
+			talloc_free(childnode);
 			talloc_free(childname);
+			i += childlen + 1;
 		}
+
+		hashtable_destroy(children, 0 /* Don't free values (they are
+						 all (void *)1) */);
+		talloc_free(node);
 	}
 	else {
 		/* Impossible, because no database should ever be without the
@@ -1495,12 +1577,51 @@ static void check_store_(const char *name)
 }
 
 
+/**
+ * Helper to clean_store below.
+ */
+static int clean_store_(TDB_CONTEXT *tdb, TDB_DATA key, TDB_DATA val,
+			void *private)
+{
+	struct hashtable *reachable = private;
+	char * name = talloc_strndup(NULL, key.dptr, key.dsize);
+
+	if (!hashtable_search(reachable, name)) {
+		log("clean_store: '%s' is orphaned!", name);
+		if (recovery) {
+			tdb_delete(tdb, key);
+		}
+	}
+
+	talloc_free(name);
+
+	return 0;
+}
+
+
+/**
+ * Given the list of reachable nodes, iterate over the whole store, and
+ * remove any that were not reached.
+ */
+static void clean_store(struct hashtable *reachable)
+{
+	tdb_traverse(tdb_ctx, &clean_store_, reachable);
+}
+
+
 static void check_store()
 {
 	char * root = talloc_strdup(NULL, "/");
+	struct hashtable * reachable =
+		create_hashtable(16, hash_from_key_fn, keys_equal_fn);
+ 
 	log("Checking store ...");
-	check_store_(root);
+	check_store_(root, reachable);
+	clean_store(reachable);
 	log("Checking store complete.");
+
+	hashtable_destroy(reachable, 0 /* Don't free values (they are all
+					  (void *)1) */);
 	talloc_free(root);
 }
 
@@ -1589,6 +1710,9 @@ static void usage(void)
 "  --no-fork           to request that the daemon does not fork,\n"
 "  --output-pid        to request that the pid of the daemon is output,\n"
 "  --trace-file <file> giving the file for logging, and\n"
+"  --no-recovery       to request that no recovery should be attempted when\n"
+"                      the store is corrupted (debug only),\n"
+"  --preserve-local    to request that /local is preserved on start-up,\n"
 "  --verbose           to request verbose execution.\n");
 }
 
@@ -1600,6 +1724,8 @@ static struct option options[] = {
 	{ "no-fork", 0, NULL, 'N' },
 	{ "output-pid", 0, NULL, 'P' },
 	{ "trace-file", 1, NULL, 'T' },
+	{ "no-recovery", 0, NULL, 'R' },
+	{ "preserve-local", 0, NULL, 'L' },
 	{ "verbose", 0, NULL, 'V' },
 	{ NULL, 0, NULL, 0 } };
 
@@ -1615,7 +1741,7 @@ int main(int argc, char *argv[])
 	bool no_domain_init = false;
 	const char *pidfile = NULL;
 
-	while ((opt = getopt_long(argc, argv, "DF:HNPT:V", options,
+	while ((opt = getopt_long(argc, argv, "DF:HNPT:RLV", options,
 				  NULL)) != -1) {
 		switch (opt) {
 		case 'D':
@@ -1632,6 +1758,12 @@ int main(int argc, char *argv[])
 			break;
 		case 'P':
 			outputpid = true;
+			break;
+		case 'R':
+			recovery = false;
+			break;
+		case 'L':
+			remove_local = false;
 			break;
 		case 'T':
 			tracefile = optarg;
