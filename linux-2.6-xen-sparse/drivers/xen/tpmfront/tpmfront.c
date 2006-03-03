@@ -602,7 +602,6 @@ tpm_xmit(struct tpm_private *tp,
 
 		tx = &tp->tx->ring[i].req;
 
-		tx->id = i;
 		tx->addr = virt_to_machine(txb->data);
 		tx->size = txb->len;
 
