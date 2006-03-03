@@ -951,9 +951,25 @@ void xenbus_probe(void *unused)
 }
 
 
+static struct file_operations xsd_kva_fops;
 static struct proc_dir_entry *xsd_kva_intf;
 static struct proc_dir_entry *xsd_port_intf;
 
+static int xsd_kva_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	size_t size = vma->vm_end - vma->vm_start;
+
+	if ((size > PAGE_SIZE) || (vma->vm_pgoff != 0))
+		return -EINVAL;
+
+	vma->vm_pgoff = mfn_to_pfn(xen_start_info->store_mfn);
+
+	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+			    size, vma->vm_page_prot))
+		return -EAGAIN;
+
+	return 0;
+}
 
 static int xsd_kva_read(char *page, char **start, off_t off,
                         int count, int *eof, void *data)
@@ -1027,9 +1043,14 @@ static int __init xenbus_probe_init(void)
 		xen_start_info->store_evtchn = op.u.alloc_unbound.port;
 
 		/* And finally publish the above info in /proc/xen */
-		if((xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0400)))
+		if ((xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0400))) {
+			memcpy(&xsd_kva_fops, xsd_kva_intf->proc_fops,
+			       sizeof(xsd_kva_fops));
+			xsd_kva_fops.mmap = xsd_kva_mmap;
+			xsd_kva_intf->proc_fops = &xsd_kva_fops;
 			xsd_kva_intf->read_proc = xsd_kva_read;
-		if((xsd_port_intf = create_xen_proc_entry("xsd_port", 0400)))
+		}
+		if ((xsd_port_intf = create_xen_proc_entry("xsd_port", 0400)))
 			xsd_port_intf->read_proc = xsd_port_read;
 	}
 
