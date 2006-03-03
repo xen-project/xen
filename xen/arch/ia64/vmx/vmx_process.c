@@ -315,23 +315,20 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
         return;
     }
 */
-    if(vadr == 0x1ea18c00 ){
+/*    if(vadr == 0x1ea18c00 ){
         ia64_clear_ic();
         while(1);
     }
+ */
     if(is_physical_mode(v)&&(!(vadr<<1>>62))){
-        if(vec==1){
-            physical_itlb_miss(v, vadr);
-            return IA64_FAULT;
-        }
         if(vec==2){
             if(v->domain!=dom0&&__gpfn_is_io(v->domain,(vadr<<1)>>(PAGE_SHIFT+1))){
                 emulate_io_inst(v,((vadr<<1)>>1),4);   //  UC
-            }else{
-                physical_dtlb_miss(v, vadr);
+                return IA64_FAULT;
             }
-            return IA64_FAULT;
         }
+        physical_tlb_miss(v, vadr, vec);
+        return IA64_FAULT;
     }
     vrr = vmx_vcpu_rr(v, vadr);
     if(vec == 1) type = ISIDE_TLB;
