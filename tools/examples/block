@@ -321,7 +321,28 @@ mount it read-write in a guest domain."
               fi
             fi
 
-            f=$(readlink -f "$f")
+            # Canonicalise the filename for the comparison.
+
+            # I have seen this readlink fails because the filename given by
+            # losetup is only the basename.  This cannot happen when the loop
+            # device is set up through this script, because file is
+            # canonicalised above, but it may happen when loop devices are set
+            # up some other way.  This readlink may also conceivably fail if
+            # the file backing this loop device has been removed.
+
+            # For maximum safety, in the case that $f does not resolve, we
+            # assume that $file and $f are in the same directory.
+
+            # If you create a loopback filesystem, remove it and continue to
+            # run on it, and then create another file with the same name, then
+            # this check will block that -- don't do that.
+
+            # If you create loop devices through some other mechanism, use
+            # relative filenames, and then use the same filename through this
+            # script, then this check will block that -- don't do that either.
+
+            f=$(readlink -f "$f" || echo $(dirname "$file")/$(basename "$f"))
+
 
             if [ "$f" == "$file" ]
             then
