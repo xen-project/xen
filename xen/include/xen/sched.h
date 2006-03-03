@@ -311,7 +311,7 @@ void startup_cpu_idle_loop(void);
  *  'i' [unsigned] {char, int}
  *  'l' [unsigned] long
  *  'p' pointer (foo *)
- *  'h' guest handle (guest_handle(foo))
+ *  'h' guest handle (GUEST_HANDLE(foo))
  */
 unsigned long hypercall_create_continuation(
     unsigned int op, const char *format, ...);

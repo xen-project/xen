@@ -215,7 +215,7 @@ typedef struct vcpu_guest_context {
     uint64_t      gs_base_kernel;
     uint64_t      gs_base_user;
 } vcpu_guest_context_t;
-define_guest_handle(vcpu_guest_context_t);
+DEFINE_GUEST_HANDLE(vcpu_guest_context_t);
 
 typedef struct arch_shared_info {
     unsigned long max_pfn;                  /* max pfn that appears in table */

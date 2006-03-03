@@ -222,7 +222,7 @@ static void putchar_console_ring(int c)
         conringc = conringp - CONRING_SIZE;
 }
 
-long read_console_ring(guest_handle(char) str, u32 *pcount, int clear)
+long read_console_ring(GUEST_HANDLE(char) str, u32 *pcount, int clear)
 {
     unsigned int idx, len, max, sofar, c;
     unsigned long flags;

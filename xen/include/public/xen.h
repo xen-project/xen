@@ -10,25 +10,25 @@
 #define __XEN_PUBLIC_XEN_H__
 
 #ifdef __XEN__
-#define __define_guest_handle(name, type) \
+#define __DEFINE_GUEST_HANDLE(name, type) \
     typedef struct { type *p; } __guest_handle_ ## name
 #else
-#define __define_guest_handle(name, type) \
+#define __DEFINE_GUEST_HANDLE(name, type) \
     typedef type * __guest_handle_ ## name
 #endif
 
-#define define_guest_handle(name) __define_guest_handle(name, name)
-#define guest_handle(name)        __guest_handle_ ## name
+#define DEFINE_GUEST_HANDLE(name) __DEFINE_GUEST_HANDLE(name, name)
+#define GUEST_HANDLE(name)        __guest_handle_ ## name
 
 #ifndef __ASSEMBLY__
 /* Guest handles for primitive C types. */
-__define_guest_handle(uchar, unsigned char);
-__define_guest_handle(uint,  unsigned int);
-__define_guest_handle(ulong, unsigned long);
-define_guest_handle(char);
-define_guest_handle(int);
-define_guest_handle(long);
-define_guest_handle(void);
+__DEFINE_GUEST_HANDLE(uchar, unsigned char);
+__DEFINE_GUEST_HANDLE(uint,  unsigned int);
+__DEFINE_GUEST_HANDLE(ulong, unsigned long);
+DEFINE_GUEST_HANDLE(char);
+DEFINE_GUEST_HANDLE(int);
+DEFINE_GUEST_HANDLE(long);
+DEFINE_GUEST_HANDLE(void);
 #endif
 
 #if defined(__i386__)

@@ -132,7 +132,7 @@ void perfc_reset(unsigned char key)
 
 static dom0_perfc_desc_t perfc_d[NR_PERFCTRS];
 static int               perfc_init = 0;
-static int perfc_copy_info(guest_handle(dom0_perfc_desc_t) desc)
+static int perfc_copy_info(GUEST_HANDLE(dom0_perfc_desc_t) desc)
 {
     unsigned int i, j;
     atomic_t *counters = (atomic_t *)&perfcounters;

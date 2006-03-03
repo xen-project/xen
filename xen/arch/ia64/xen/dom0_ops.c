@@ -20,7 +20,7 @@
 #include <public/sched_ctl.h>
 #include <asm/vmx.h>
 
-long arch_do_dom0_op(dom0_op_t *op, guest_handle(dom0_op_t) u_dom0_op)
+long arch_do_dom0_op(dom0_op_t *op, GUEST_HANDLE(dom0_op_t) u_dom0_op)
 {
     long ret = 0;
 

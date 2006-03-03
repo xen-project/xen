@@ -24,7 +24,7 @@
 #include <acm/acm_hooks.h>
 
 extern long arch_do_dom0_op(
-    struct dom0_op *op, guest_handle(dom0_op_t) u_dom0_op);
+    struct dom0_op *op, GUEST_HANDLE(dom0_op_t) u_dom0_op);
 extern void arch_getdomaininfo_ctxt(
     struct vcpu *, struct vcpu_guest_context *);
 
@@ -90,7 +90,7 @@ static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
     memcpy(info->handle, d->handle, sizeof(xen_domain_handle_t));
 }
 
-long do_dom0_op(guest_handle(dom0_op_t) u_dom0_op)
+long do_dom0_op(GUEST_HANDLE(dom0_op_t) u_dom0_op)
 {
     long ret = 0;
     struct dom0_op curop, *op = &curop;
