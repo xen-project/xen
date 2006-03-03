@@ -1548,8 +1548,9 @@ static inline void check_timer(void)
      */
     apic_write_around(APIC_LVT0, APIC_LVT_MASKED | APIC_DM_EXTINT);
     init_8259A(1);
-    timer_ack = 1;
-    enable_8259A_irq(0);
+    /* XEN: Ripped out the legacy missed-tick logic, so below is not needed. */
+    /*timer_ack = 1;*/
+    /*enable_8259A_irq(0);*/
 
     pin1  = find_isa_irq_pin(0, mp_INT);
     apic1 = find_isa_irq_apic(0, mp_INT);
@@ -1617,7 +1618,7 @@ static inline void check_timer(void)
 
     printk(KERN_INFO "...trying to set up timer as ExtINT IRQ...");
 
-    timer_ack = 0;
+    /*timer_ack = 0;*/
     init_8259A(0);
     make_8259A_irq(0);
     apic_write_around(APIC_LVT0, APIC_DM_EXTINT);
