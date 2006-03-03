@@ -17,13 +17,14 @@
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <xen/iocap.h>
+#include <xen/guest_access.h>
 #include <asm/current.h>
 #include <public/dom0_ops.h>
 #include <public/sched_ctl.h>
 #include <acm/acm_hooks.h>
 
 extern long arch_do_dom0_op(
-    struct dom0_op *op, struct dom0_op *u_dom0_op);
+    struct dom0_op *op, guest_handle(dom0_op_t) u_dom0_op);
 extern void arch_getdomaininfo_ctxt(
     struct vcpu *, struct vcpu_guest_context *);
 
@@ -89,7 +90,7 @@ static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
     memcpy(info->handle, d->handle, sizeof(xen_domain_handle_t));
 }
 
-long do_dom0_op(struct dom0_op *u_dom0_op)
+long do_dom0_op(guest_handle(dom0_op_t) u_dom0_op)
 {
     long ret = 0;
     struct dom0_op curop, *op = &curop;
@@ -99,7 +100,7 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
     if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
-    if ( copy_from_user(op, u_dom0_op, sizeof(*op)) )
+    if ( copy_from_guest(op, u_dom0_op, 1) )
         return -EFAULT;
 
     if ( op->interface_version != DOM0_INTERFACE_VERSION )
@@ -239,7 +240,7 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
         ret = 0;
 
         op->u.createdomain.domain = d->domain_id;
-        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+        if ( copy_to_guest(u_dom0_op, op, 1) )
             ret = -EFAULT;
     }
     break;
@@ -357,7 +358,7 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
     case DOM0_SCHEDCTL:
     {
         ret = sched_ctl(&op->u.schedctl);
-        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+        if ( copy_to_guest(u_dom0_op, op, 1) )
             ret = -EFAULT;
     }
     break;
@@ -365,7 +366,7 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
     case DOM0_ADJUSTDOM:
     {
         ret = sched_adjdom(&op->u.adjustdom);
-        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+        if ( copy_to_guest(u_dom0_op, op, 1) )
             ret = -EFAULT;
     }
     break;
@@ -398,20 +399,17 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
 
         getdomaininfo(d, &op->u.getdomaininfo);
 
-        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )     
+        if ( copy_to_guest(u_dom0_op, op, 1) )
             ret = -EFAULT;
 
         put_domain(d);
     }
     break;
 
-
-
     case DOM0_GETDOMAININFOLIST:
     { 
         struct domain *d;
         dom0_getdomaininfo_t info;
-        dom0_getdomaininfo_t *buffer = op->u.getdomaininfolist.buffer;
         u32 num_domains = 0;
 
         read_lock(&domlist_lock);
@@ -432,13 +430,13 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
 
             put_domain(d);
 
-            if ( copy_to_user(buffer, &info, sizeof(dom0_getdomaininfo_t)) )
+            if ( copy_to_guest_offset(op->u.getdomaininfolist.buffer,
+                                      num_domains, &info, 1) )
             {
                 ret = -EFAULT;
                 break;
             }
             
-            buffer++;
             num_domains++;
         }
         
@@ -449,7 +447,7 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
         
         op->u.getdomaininfolist.num_domains = num_domains;
 
-        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+        if ( copy_to_guest(u_dom0_op, op, 1) )
             ret = -EFAULT;
     }
     break;
@@ -489,12 +487,12 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
         if ( v != current )
             vcpu_unpause(v);
 
-        if ( copy_to_user(op->u.getvcpucontext.ctxt, c, sizeof(*c)) )
+        if ( copy_to_guest(op->u.getvcpucontext.ctxt, c, 1) )
             ret = -EFAULT;
 
         xfree(c);
 
-        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )     
+        if ( copy_to_guest(u_dom0_op, op, 1) )
             ret = -EFAULT;
 
     getvcpucontext_out:
@@ -534,7 +532,7 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
                    (int)sizeof(op->u.getvcpuinfo.cpumap)));
         ret = 0;
 
-        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )     
+        if ( copy_to_guest(u_dom0_op, op, 1) )
             ret = -EFAULT;
 
     getvcpuinfo_out:
@@ -554,7 +552,7 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
     case DOM0_TBUFCONTROL:
     {
         ret = tb_control(&op->u.tbufcontrol);
-        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+        if ( copy_to_guest(u_dom0_op, op, 1) )
             ret = -EFAULT;
     }
     break;
@@ -562,10 +560,10 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
     case DOM0_READCONSOLE:
     {
         ret = read_console_ring(
-            &op->u.readconsole.buffer, 
+            op->u.readconsole.buffer, 
             &op->u.readconsole.count,
             op->u.readconsole.clear); 
-        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+        if ( copy_to_guest(u_dom0_op, op, 1) )
             ret = -EFAULT;
     }
     break;
@@ -573,7 +571,7 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
     case DOM0_SCHED_ID:
     {
         op->u.sched_id.sched_id = sched_id();
-        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+        if ( copy_to_guest(u_dom0_op, op, 1) )
             ret = -EFAULT;
         else
             ret = 0;
@@ -678,15 +676,15 @@ long do_dom0_op(struct dom0_op *u_dom0_op)
     {
         extern int perfc_control(dom0_perfccontrol_t *);
         ret = perfc_control(&op->u.perfccontrol);
-        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+        if ( copy_to_guest(u_dom0_op, op, 1) )
             ret = -EFAULT;
     }
     break;
 #endif
 
     default:
-        ret = arch_do_dom0_op(op,u_dom0_op);
-
+        ret = arch_do_dom0_op(op, u_dom0_op);
+        break;
     }
 
     spin_unlock(&dom0_lock);

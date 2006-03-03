@@ -20,6 +20,7 @@
 #include <xen/keyhandler.h>
 #include <xen/mm.h>
 #include <xen/delay.h>
+#include <xen/guest_access.h>
 #include <asm/current.h>
 #include <asm/uaccess.h>
 #include <asm/debugger.h>
@@ -221,9 +222,8 @@ static void putchar_console_ring(int c)
         conringc = conringp - CONRING_SIZE;
 }
 
-long read_console_ring(char **pstr, u32 *pcount, int clear)
+long read_console_ring(guest_handle(char) str, u32 *pcount, int clear)
 {
-    char *str = *pstr;
     unsigned int idx, len, max, sofar, c;
     unsigned long flags;
 
@@ -239,7 +239,7 @@ long read_console_ring(char **pstr, u32 *pcount, int clear)
             len = CONRING_SIZE - idx;
         if ( (sofar + len) > max )
             len = max - sofar;
-        if ( copy_to_user(str + sofar, &conring[idx], len) )
+        if ( copy_to_guest_offset(str, sofar, &conring[idx], len) )
             return -EFAULT;
         sofar += len;
         c += len;

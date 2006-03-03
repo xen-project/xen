@@ -130,6 +130,7 @@ typedef struct vcpu_guest_context {
     unsigned long failsafe_callback_eip;
     unsigned long vm_assist;                /* VMASST_TYPE_* bitmap */
 } vcpu_guest_context_t;
+define_guest_handle(vcpu_guest_context_t);
 
 typedef struct arch_shared_info {
     unsigned long max_pfn;                  /* max pfn that appears in table */

@@ -298,6 +298,7 @@ typedef struct vcpu_guest_context {
     arch_initrd_info_t initrd;
     char cmdline[IA64_COMMAND_LINE_SIZE];
 } vcpu_guest_context_t;
+define_guest_handle(vcpu_guest_context_t);
 
 #endif /* !__ASSEMBLY__ */
 

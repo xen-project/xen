@@ -5,9 +5,10 @@
 #include <xen/perfc.h>
 #include <xen/keyhandler.h> 
 #include <xen/spinlock.h>
+#include <xen/mm.h>
+#include <xen/guest_access.h>
 #include <public/dom0_ops.h>
 #include <asm/uaccess.h>
-#include <xen/mm.h>
 
 #undef  PERFCOUNTER
 #undef  PERFCOUNTER_CPU
@@ -131,12 +132,12 @@ void perfc_reset(unsigned char key)
 
 static dom0_perfc_desc_t perfc_d[NR_PERFCTRS];
 static int               perfc_init = 0;
-static int perfc_copy_info(dom0_perfc_desc_t *desc)
+static int perfc_copy_info(guest_handle(dom0_perfc_desc_t) desc)
 {
     unsigned int i, j;
     atomic_t *counters = (atomic_t *)&perfcounters;
 
-    if ( desc == NULL )
+    if ( guest_handle_is_null(desc) )
         return 0;
 
     /* We only copy the name and array-size information once. */
@@ -196,7 +197,7 @@ static int perfc_copy_info(dom0_perfc_desc_t *desc)
         }
     }
 
-    return (copy_to_user(desc, perfc_d, NR_PERFCTRS * sizeof(*desc)) ?
+    return (copy_to_guest(desc, (dom0_perfc_desc_t *)perfc_d, NR_PERFCTRS) ?
             -EFAULT : 0);
 }
 
