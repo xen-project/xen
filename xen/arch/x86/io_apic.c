@@ -1634,16 +1634,6 @@ static inline void check_timer(void)
           "report.  Then try booting with the 'noapic' option");
 }
 
-#define NR_IOAPIC_BIOSIDS 256
-static u8 ioapic_biosid_to_apic_enum[NR_IOAPIC_BIOSIDS];
-static void store_ioapic_biosid_mapping(void)
-{
-    u8 apic;
-    memset(ioapic_biosid_to_apic_enum, ~0, NR_IOAPIC_BIOSIDS);
-    for ( apic = 0; apic < nr_ioapics; apic++ )
-        ioapic_biosid_to_apic_enum[mp_ioapics[apic].mpc_apicid] = apic;
-}
-
 /*
  *
  * IRQ's that are handled by the PIC in the MPS IOAPIC case.
@@ -1655,8 +1645,6 @@ static void store_ioapic_biosid_mapping(void)
 
 void __init setup_IO_APIC(void)
 {
-    store_ioapic_biosid_mapping();
-
     enable_IO_APIC();
 
     if (acpi_ioapic)
@@ -1840,50 +1828,45 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 
 #endif /*CONFIG_ACPI_BOOT*/
 
-
-int ioapic_guest_read(int apicid, int address, u32 *pval)
+static int ioapic_physbase_to_id(unsigned long physbase)
 {
-    u32 val;
-    int apicenum;
-    union IO_APIC_reg_00 reg_00;
+    int apic;
+    for ( apic = 0; apic < nr_ioapics; apic++ )
+        if ( mp_ioapics[apic].mpc_apicaddr == physbase )
+            return apic;
+    return -EINVAL;
+}
+
+int ioapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval)
+{
+    int apic;
     unsigned long flags;
 
-    if ( (apicid >= NR_IOAPIC_BIOSIDS) ||
-         ((apicenum = ioapic_biosid_to_apic_enum[apicid]) >= nr_ioapics) )
-        return -EINVAL;
+    if ( (apic = ioapic_physbase_to_id(physbase)) < 0 )
+        return apic;
 
     spin_lock_irqsave(&ioapic_lock, flags);
-    val = io_apic_read(apicenum, address);
+    *pval = io_apic_read(apic, reg);
     spin_unlock_irqrestore(&ioapic_lock, flags);
 
-    /* Rewrite APIC ID to what the BIOS originally specified. */
-    if ( address == 0 )
-    {
-        reg_00.raw = val;
-        reg_00.bits.ID = apicid;
-        val = reg_00.raw;
-    }
-
-    *pval = val;
     return 0;
 }
 
-int ioapic_guest_write(int apicid, int address, u32 val)
+int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 {
-    int apicenum, pin, irq;
+    int apic, pin, irq;
     struct IO_APIC_route_entry rte = { 0 };
     struct irq_pin_list *entry;
     unsigned long flags;
 
-    if ( (apicid >= NR_IOAPIC_BIOSIDS) ||
-         ((apicenum = ioapic_biosid_to_apic_enum[apicid]) >= nr_ioapics) )
-        return -EINVAL;
+    if ( (apic = ioapic_physbase_to_id(physbase)) < 0 )
+        return apic;
 
     /* Only write to the first half of a route entry. */
-    if ( (address < 0x10) || (address & 1) )
+    if ( (reg < 0x10) || (reg & 1) )
         return 0;
     
-    pin = (address - 0x10) >> 1;
+    pin = (reg - 0x10) >> 1;
 
     *(u32 *)&rte = val;
     rte.dest.logical.logical_dest = cpu_mask_to_apicid(TARGET_CPUS);
@@ -1899,7 +1882,7 @@ int ioapic_guest_write(int apicid, int address, u32 val)
     if ( rte.delivery_mode > dest_LowestPrio )
     {
         printk("ERROR: Attempt to write weird IOAPIC destination mode!\n");
-        printk("       APIC=%d/%d, lo-reg=%x\n", apicid, pin, val);
+        printk("       APIC=%d/%d, lo-reg=%x\n", apic, pin, val);
         return -EINVAL;
     }
 
@@ -1924,19 +1907,19 @@ int ioapic_guest_write(int apicid, int address, u32 val)
         /* Record the pin<->irq mapping. */
         for ( entry = &irq_2_pin[irq]; ; entry = &irq_2_pin[entry->next] )
         {
-            if ( (entry->apic == apicenum) && (entry->pin == pin) )
+            if ( (entry->apic == apic) && (entry->pin == pin) )
                 break;
             if ( !entry->next )
             {
-                add_pin_to_irq(irq, apicenum, pin);
+                add_pin_to_irq(irq, apic, pin);
                 break;
             }
         }
     }
 
     spin_lock_irqsave(&ioapic_lock, flags);
-    io_apic_write(apicenum, 0x10 + 2 * pin, *(((int *)&rte) + 0));
-    io_apic_write(apicenum, 0x11 + 2 * pin, *(((int *)&rte) + 1));
+    io_apic_write(apic, 0x10 + 2 * pin, *(((int *)&rte) + 0));
+    io_apic_write(apic, 0x11 + 2 * pin, *(((int *)&rte) + 1));
     spin_unlock_irqrestore(&ioapic_lock, flags);
 
     return 0;
