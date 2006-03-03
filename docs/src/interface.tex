@@ -1059,6 +1059,21 @@ This path contains:
       \item[domain] the name of the frontend
       \end{description}
     \end{description}
+
+  \item[vtpm/] a directory containin vtpm backends
+    \begin{description}
+    \item[$<$domid$>$/] a directory containing vtpm's for domid
+      \begin{description}
+      \item[$<$vtpm number$>$/] a directory for each vtpm
+      \item[frontend-id] the domain id of the frontend
+      \item[frontend] the path to the frontend
+      \item[instance] the instance of the virtual TPM that is used
+      \item[pref{\textunderscore}instance] the instance number as given in the VM configuration file;
+           may be different from {\bf instance}
+      \item[domain] the name of the domain of the frontend
+      \end{description}
+    \end{description}
+
   \end{description}
 
   \item[device/] a directory containing the frontend devices for the
@@ -1094,6 +1109,18 @@ This path contains:
 	  \item[event-channel] the event channel used for the two ring queues 
 	  \end{description}
 	\end{description}
+
+      \item[vtpm/] a directory containing the vtpm frontend device for the
+        domain
+        \begin{description}
+        \item[$<$id$>$] a directory for vtpm id frontend device for the domain
+          \begin{description}
+	  \item[backend-id] the backend domain id
+          \item[backend] a path to the backend's store entry
+          \item[ring-ref] the grant table reference for the tx/rx ring
+          \item[event-channel] the event channel used for the ring
+          \end{description}
+        \end{description}
 	
       \item[device-misc/] miscellanous information for devices 
 	\begin{description}
@@ -1449,6 +1476,76 @@ The fields are as follows:
   Data will be transferred into frames at an offset determined by the
   value of {\tt first\_sect}.
 \end{description}
+
+\section{Virtual TPM}
+
+Virtual TPM (VTPM) support provides TPM functionality to each virtual
+machine that requests this functionality in its configuration file.
+The interface enables domains to access therr own private TPM like it
+was a hardware TPM built into the machine.
+
+The virtual TPM interface is implemented as a split driver,
+similar to the network and block interfaces described above.
+The user domain hosting the frontend exports a character device /dev/tpm0
+to user-level applications for communicating with the virtual TPM.
+This is the same device interface that is also offered if a hardware TPM
+is available in the system. The backend provides a single interface
+/dev/vtpm where the virtual TPM is waiting for commands from all domains
+that have located their backend in a given domain.
+
+\subsection{Data Transfer}
+
+A single shared memory ring is used between the frontend and backend
+drivers. TPM requests and responses are sent in pages where a pointer
+to those pages and other information is placed into the ring such that
+the backend can map the pages into its memory space using the grant
+table mechanism.
+
+The backend driver has been implemented to only accept well-formed
+TPM requests. To meet this requirement, the length inidicator in the
+TPM request must correctly indicate the length of the request.
+Otherwise an error message is automatically sent back by the device driver.
+
+The virtual TPM implementation listenes for TPM request on /dev/vtpm. Since
+it must be able to apply the TPM request packet to the virtual TPM instance
+associated with the virtual machine, a 4-byte virtual TPM instance
+identifier is prepended to each packet by the backend driver (in network
+byte order) for internal routing of the request.
+
+\subsection{Virtual TPM ring interface}
+
+The TPM protocol is a strict request/response protocol and therefore
+only one ring is used to send requests from the frontend to the backend
+and responses on the reverse path.
+
+The request/response structure is defined as follows:
+
+\scriptsize
+\begin{verbatim}
+typedef struct {
+    unsigned long addr;     /* Machine address of packet.     */
+    grant_ref_t ref;        /* grant table access reference.  */
+    uint16_t unused;        /* unused                         */
+    uint16_t size;          /* Packet size in bytes.          */
+} tpmif_tx_request_t;
+\end{verbatim}
+\normalsize
+
+The fields are as follows:
+
+\begin{description}
+\item[addr] The machine address of the page asscoiated with the TPM
+            request/response; a request/response may span multiple
+            pages
+\item[ref]  The grant table reference associated with the address.
+\item[size] The size of the remaining packet; up to
+            PAGE{\textunderscore}SIZE bytes can be found in the
+            page referenced by 'addr'
+\end{description}
+
+The frontend initially allocates several pages whose addresses
+are stored in the ring. Only these pages are used for exchange of
+requests and responses.
 
 
 \chapter{Further Information}
