@@ -406,16 +406,19 @@ static struct node *read_node(struct connection *conn, const char *name)
 	TDB_DATA key, data;
 	uint32_t *p;
 	struct node *node;
+	TDB_CONTEXT * context = tdb_context(conn);
 
 	key.dptr = (void *)name;
 	key.dsize = strlen(name);
-	data = tdb_fetch(tdb_context(conn), key);
+	data = tdb_fetch(context, key);
 
 	if (data.dptr == NULL) {
-		if (tdb_error(tdb_context(conn)) == TDB_ERR_NOEXIST)
+		if (tdb_error(context) == TDB_ERR_NOEXIST)
 			errno = ENOENT;
-		else
+		else {
+			log("TDB error on read: %s", tdb_errorstr(context));
 			errno = EIO;
+		}
 		return NULL;
 	}
 
