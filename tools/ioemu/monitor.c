@@ -676,19 +676,19 @@ static void monitor_handle_command(const char *cmdline)
             break;
         case '-':
             {
-                int has_option;
+                long has_option;
                 /* option */
-                
+
                 c = *typestr++;
                 if (c == '\0')
                     goto bad_type;
-                while (isspace(*p)) 
+                while (isspace(*p))
                     p++;
                 has_option = 0;
                 if (*p == '-') {
                     p++;
                     if (*p != c) {
-                        term_printf("%s: unsupported option -%c\n", 
+                        term_printf("%s: unsupported option -%c\n",
                                     cmdname, *p);
                         goto fail;
                     }

@@ -2788,7 +2788,7 @@ long do_update_descriptor(u64 pa, u64 desc)
 }
 
 
-long arch_memory_op(int op, guest_handle(void) arg)
+long arch_memory_op(int op, GUEST_HANDLE(void) arg)
 {
     struct xen_reserved_phys_area xrpa;
     unsigned long pfn;

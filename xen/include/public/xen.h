@@ -9,28 +9,6 @@
 #ifndef __XEN_PUBLIC_XEN_H__
 #define __XEN_PUBLIC_XEN_H__
 
-#ifdef __XEN__
-#define __define_guest_handle(name, type) \
-    typedef struct { type *p; } __guest_handle_ ## name
-#else
-#define __define_guest_handle(name, type) \
-    typedef type * __guest_handle_ ## name
-#endif
-
-#define define_guest_handle(name) __define_guest_handle(name, name)
-#define guest_handle(name)        __guest_handle_ ## name
-
-#ifndef __ASSEMBLY__
-/* Guest handles for primitive C types. */
-__define_guest_handle(uchar, unsigned char);
-__define_guest_handle(uint,  unsigned int);
-__define_guest_handle(ulong, unsigned long);
-define_guest_handle(char);
-define_guest_handle(int);
-define_guest_handle(long);
-define_guest_handle(void);
-#endif
-
 #if defined(__i386__)
 #include "arch-x86_32.h"
 #elif defined(__x86_64__)

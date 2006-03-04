@@ -10,6 +10,7 @@
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/guest_access.h>
 #include <public/dom0_ops.h>
 #include <xen/sched.h>
 #include <xen/event.h>
@@ -48,7 +49,7 @@ static void read_msr_for(void *unused)
         (void)rdmsr_safe(msr_addr, msr_lo, msr_hi);
 }
 
-long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
+long arch_do_dom0_op(struct dom0_op *op, GUEST_HANDLE(dom0_op_t) u_dom0_op)
 {
     long ret = 0;
 
@@ -75,7 +76,7 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
 
             op->u.msr.out1 = msr_lo;
             op->u.msr.out2 = msr_hi;
-            copy_to_user(u_dom0_op, op, sizeof(*op));
+            copy_to_guest(u_dom0_op, op, 1);
         }
         ret = 0;
     }
@@ -90,7 +91,7 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
         {
             ret = shadow_mode_control(d, &op->u.shadow_control);
             put_domain(d);
-            copy_to_user(u_dom0_op, op, sizeof(*op));
+            copy_to_guest(u_dom0_op, op, 1);
         } 
     }
     break;
@@ -102,10 +103,11 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
             op->u.add_memtype.nr_mfns,
             op->u.add_memtype.type,
             1);
-        if (ret > 0)
+        if ( ret > 0 )
         {
-            (void)__put_user(0, &u_dom0_op->u.add_memtype.handle);
-            (void)__put_user(ret, &u_dom0_op->u.add_memtype.reg);
+            op->u.add_memtype.handle = 0;
+            op->u.add_memtype.reg    = ret;
+            (void)copy_to_guest(u_dom0_op, op, 1);
             ret = 0;
         }
     }
@@ -136,9 +138,10 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
         if ( op->u.read_memtype.reg < num_var_ranges )
         {
             mtrr_if->get(op->u.read_memtype.reg, &mfn, &nr_mfns, &type);
-            (void)__put_user(mfn, &u_dom0_op->u.read_memtype.mfn);
-            (void)__put_user(nr_mfns, &u_dom0_op->u.read_memtype.nr_mfns);
-            (void)__put_user(type, &u_dom0_op->u.read_memtype.type);
+            op->u.read_memtype.mfn     = mfn;
+            op->u.read_memtype.nr_mfns = nr_mfns;
+            op->u.read_memtype.type    = type;
+            (void)copy_to_guest(u_dom0_op, op, 1);
             ret = 0;
         }
     }
@@ -147,7 +150,7 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
     case DOM0_MICROCODE:
     {
         extern int microcode_update(void *buf, unsigned long len);
-        ret = microcode_update(op->u.microcode.data, op->u.microcode.length);
+        ret = microcode_update(op->u.microcode.data.p, op->u.microcode.length);
     }
     break;
 
@@ -195,7 +198,7 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
         memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
         memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
         ret = 0;
-        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+        if ( copy_to_guest(u_dom0_op, op, 1) )
             ret = -EFAULT;
     }
     break;
@@ -245,7 +248,7 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
 
         put_domain(d);
 
-        copy_to_user(u_dom0_op, op, sizeof(*op));
+        copy_to_guest(u_dom0_op, op, 1);
     }
     break;
 
@@ -255,7 +258,6 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
         int n,j;
         int num = op->u.getpageframeinfo2.num;
         domid_t dom = op->u.getpageframeinfo2.domain;
-        unsigned long *s_ptr = (unsigned long*) op->u.getpageframeinfo2.array;
         struct domain *d;
         unsigned long *l_arr;
         ret = -ESRCH;
@@ -277,7 +279,8 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
         {
             int k = ((num-n)>GPF2_BATCH)?GPF2_BATCH:(num-n);
 
-            if ( copy_from_user(l_arr, &s_ptr[n], k*sizeof(unsigned long)) )
+            if ( copy_from_guest_offset(l_arr, op->u.getpageframeinfo2.array,
+                                        n, k) )
             {
                 ret = -EINVAL;
                 break;
@@ -320,7 +323,8 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
 
             }
 
-            if ( copy_to_user(&s_ptr[n], l_arr, k*sizeof(unsigned long)) )
+            if ( copy_to_guest_offset(op->u.getpageframeinfo2.array,
+                                      n, l_arr, k) )
             {
                 ret = -EINVAL;
                 break;
@@ -341,7 +345,6 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
         struct domain *d = find_domain_by_id(op->u.getmemlist.domain);
         unsigned long max_pfns = op->u.getmemlist.max_pfns;
         unsigned long mfn;
-        unsigned long *buffer = op->u.getmemlist.buffer;
         struct list_head *list_ent;
 
         ret = -EINVAL;
@@ -353,19 +356,20 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
             list_ent = d->page_list.next;
             for ( i = 0; (i < max_pfns) && (list_ent != &d->page_list); i++ )
             {
-                mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
-                if ( put_user(mfn, buffer) )
+                mfn = page_to_mfn(list_entry(
+                    list_ent, struct page_info, list));
+                if ( copy_to_guest_offset(op->u.getmemlist.buffer,
+                                          i, &mfn, 1) )
                 {
                     ret = -EFAULT;
                     break;
                 }
-                buffer++;
                 list_ent = mfn_to_page(mfn)->list.next;
             }
             spin_unlock(&d->page_alloc_lock);
 
             op->u.getmemlist.num_pfns = i;
-            copy_to_user(u_dom0_op, op, sizeof(*op));
+            copy_to_guest(u_dom0_op, op, 1);
             
             put_domain(d);
         }
@@ -401,13 +405,12 @@ long arch_do_dom0_op(struct dom0_op *op, struct dom0_op *u_dom0_op)
             entry.start  = e820.map[i].addr;
             entry.end    = e820.map[i].addr + e820.map[i].size;
             entry.is_ram = (e820.map[i].type == E820_RAM);
-            (void)copy_to_user(
-                &op->u.physical_memory_map.memory_map[i],
-                &entry, sizeof(entry));
+            (void)copy_to_guest_offset(
+                op->u.physical_memory_map.memory_map, i, &entry, 1);
         }
 
         op->u.physical_memory_map.nr_map_entries = i;
-        (void)copy_to_user(u_dom0_op, op, sizeof(*op));
+        (void)copy_to_guest(u_dom0_op, op, 1);
     }
     break;
 

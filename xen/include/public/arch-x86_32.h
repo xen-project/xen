@@ -9,6 +9,28 @@
 #ifndef __XEN_PUBLIC_ARCH_X86_32_H__
 #define __XEN_PUBLIC_ARCH_X86_32_H__
 
+#ifdef __XEN__
+#define __DEFINE_GUEST_HANDLE(name, type) \
+    typedef struct { type *p; } __guest_handle_ ## name
+#else
+#define __DEFINE_GUEST_HANDLE(name, type) \
+    typedef type * __guest_handle_ ## name
+#endif
+
+#define DEFINE_GUEST_HANDLE(name) __DEFINE_GUEST_HANDLE(name, name)
+#define GUEST_HANDLE(name)        __guest_handle_ ## name
+
+#ifndef __ASSEMBLY__
+/* Guest handles for primitive C types. */
+__DEFINE_GUEST_HANDLE(uchar, unsigned char);
+__DEFINE_GUEST_HANDLE(uint,  unsigned int);
+__DEFINE_GUEST_HANDLE(ulong, unsigned long);
+DEFINE_GUEST_HANDLE(char);
+DEFINE_GUEST_HANDLE(int);
+DEFINE_GUEST_HANDLE(long);
+DEFINE_GUEST_HANDLE(void);
+#endif
+
 /*
  * SEGMENT DESCRIPTOR TABLES
  */
@@ -130,6 +152,7 @@ typedef struct vcpu_guest_context {
     unsigned long failsafe_callback_eip;
     unsigned long vm_assist;                /* VMASST_TYPE_* bitmap */
 } vcpu_guest_context_t;
+DEFINE_GUEST_HANDLE(vcpu_guest_context_t);
 
 typedef struct arch_shared_info {
     unsigned long max_pfn;                  /* max pfn that appears in table */

@@ -17,6 +17,7 @@
 #include <xen/softirq.h>
 #include <xen/domain_page.h>
 #include <xen/rangeset.h>
+#include <xen/guest_access.h>
 #include <asm/debugger.h>
 #include <public/dom0_ops.h>
 #include <public/sched.h>
@@ -380,7 +381,7 @@ int set_info_guest(struct domain *d, dom0_setvcpucontext_t *setvcpucontext)
     domain_pause(d);
 
     rc = -EFAULT;
-    if ( copy_from_user(c, setvcpucontext->ctxt, sizeof(*c)) == 0 )
+    if ( copy_from_guest(c, setvcpucontext->ctxt, 1) == 0 )
         rc = arch_set_info_guest(v, c);
 
     domain_unpause(d);

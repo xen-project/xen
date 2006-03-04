@@ -2672,6 +2672,7 @@ int main(int argc, char **argv)
     char qemu_dm_logfilename[64];
     const char *loadvm = NULL;
     unsigned long nr_pages, extra_pages, ram_pages, *page_array;
+    xc_dominfo_t info;
     extern void *shared_page;
     extern void *shared_vram;
 
@@ -3132,7 +3133,7 @@ int main(int argc, char **argv)
 
     ram_pages = ram_size/PAGE_SIZE;
 #if defined(__i386__) || defined(__x86_64__)
-    vgaram_pages =  (vga_ram_size -1)/PAGE_SIZE + 1;
+    vgaram_pages =  (vga_ram_size -1) / PAGE_SIZE + 1;
     free_pages = vgaram_pages / L1_PAGETABLE_ENTRIES;
     extra_pages = vgaram_pages + free_pages;
 #else
@@ -3142,7 +3143,6 @@ int main(int argc, char **argv)
 
     xc_handle = xc_interface_open();
 
-    xc_dominfo_t info;
     xc_domain_getinfo(xc_handle, domid, 1, &info);
 
     nr_pages = info.nr_pages + extra_pages;

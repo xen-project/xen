@@ -27,7 +27,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <paths.h>
 
 //#define DEBUG
 #include "utils.h"
@@ -466,21 +465,8 @@ static int dom0_init(void)
 { 
 	int rc, fd;
 	evtchn_port_t port; 
-	unsigned long kva; 
 	char str[20]; 
 	struct domain *dom0; 
-
-	fd = open(XENSTORED_PROC_KVA, O_RDONLY); 
-	if (fd == -1)
-		return -1;
-
-	rc = read(fd, str, sizeof(str)); 
-	if (rc == -1)
-		goto outfd;
-	str[rc] = '\0'; 
-	kva = strtoul(str, NULL, 0); 
-
-	close(fd); 
 
 	fd = open(XENSTORED_PROC_PORT, O_RDONLY); 
 	if (fd == -1)
@@ -496,12 +482,12 @@ static int dom0_init(void)
 
 	dom0 = new_domain(NULL, 0, port); 
 
-	fd = open(_PATH_KMEM, O_RDWR);
+	fd = open(XENSTORED_PROC_KVA, O_RDWR);
 	if (fd == -1)
 		return -1;
 
 	dom0->interface = mmap(NULL, getpagesize(), PROT_READ|PROT_WRITE,
-			       MAP_SHARED, fd, kva);
+			       MAP_SHARED, fd, 0);
 	if (dom0->interface == MAP_FAILED)
 		goto outfd;
 
