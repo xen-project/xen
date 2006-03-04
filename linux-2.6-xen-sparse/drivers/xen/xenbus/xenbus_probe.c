@@ -888,16 +888,13 @@ static int all_devices_ready_(struct device *dev, void *data)
 {
 	struct xenbus_device *xendev = to_xenbus_device(dev);
 	int *result = data;
-	int state;
 
-	int err = xenbus_scanf(XBT_NULL, xendev->nodename, "state", "%d",
-			       &state);
-	if (err != 1 || state != XenbusStateConnected) {
+	if (xendev->state != XenbusStateConnected) {
 		result = 0;
 		return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 

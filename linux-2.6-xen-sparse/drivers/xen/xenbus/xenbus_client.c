@@ -95,18 +95,25 @@ int xenbus_switch_state(struct xenbus_device *dev,
 	 */
 
 	int current_state;
+	int err;
 
-	int err = xenbus_scanf(xbt, dev->nodename, "state", "%d",
+	if (state == dev->state)
+		return 0;
+
+	err = xenbus_scanf(xbt, dev->nodename, "state", "%d",
 			       &current_state);
-	if ((err == 1 && (XenbusState)current_state == state) ||
-	    err == -ENOENT)
+	if (err != 1)
 		return 0;
 
 	err = xenbus_printf(xbt, dev->nodename, "state", "%d", state);
 	if (err) {
-		xenbus_dev_fatal(dev, err, "writing new state");
+		if (state != XenbusStateClosing) /* Avoid looping */
+			xenbus_dev_fatal(dev, err, "writing new state");
 		return err;
 	}
+
+	dev->state = state;
+
 	return 0;
 }
 EXPORT_SYMBOL(xenbus_switch_state);
@@ -138,7 +145,6 @@ void _dev_error(struct xenbus_device *dev, int err, const char *fmt,
 	ret = vsnprintf(printf_buffer+len, PRINTF_BUFFER_SIZE-len, fmt, ap);
 
 	BUG_ON(len + ret > PRINTF_BUFFER_SIZE-1);
-	dev->has_error = 1;
 
 	dev_err(&dev->dev, "%s\n", printf_buffer);
 
