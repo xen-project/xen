@@ -138,11 +138,11 @@ void sp_info()
         req = &(shared_page->vcpu_iodata[i].vp_ioreq);
         term_printf("vcpu %d: event port %d\n",
                     i, shared_page->vcpu_iodata[i].vp_eport);
-        term_printf("  req state: %x, pvalid: %x, addr: %llx, "
-                    "data: %llx, count: %llx, size: %llx\n",
+        term_printf("  req state: %x, pvalid: %x, addr: %"PRIx64", "
+                    "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
                     req->state, req->pdata_valid, req->addr,
                     req->u.data, req->count, req->size);
-        term_printf("  IO totally occurred on this vcpu: %llx\n",
+        term_printf("  IO totally occurred on this vcpu: %"PRIx64"\n",
                     req->io_count);
     }
 }
@@ -158,8 +158,8 @@ static ioreq_t* __cpu_get_ioreq(int vcpu)
         return req;
 
     fprintf(logfile, "False I/O request ... in-service already: "
-                     "%x, pvalid: %x, port: %llx, "
-                     "data: %llx, count: %llx, size: %llx\n",
+                     "%x, pvalid: %x, port: %"PRIx64", "
+                     "data: %"PRIx64", count: %"PRIx64", size: %"PRIx64"\n",
                      req->state, req->pdata_valid, req->addr,
                      req->u.data, req->count, req->size);
     return NULL;
@@ -459,12 +459,6 @@ int main_loop(void)
         rfds = wakeup_rfds;
         FD_ZERO(&wakeup_rfds);
         FD_SET(evtchn_fd, &wakeup_rfds);
-
-#if __WORDSIZE == 32
-#define ULONGLONG_MAX   0xffffffffffffffffULL
-#else
-#define ULONGLONG_MAX   ULONG_MAX
-#endif
 
         tun_receive_handler(&rfds);
         if ( FD_ISSET(evtchn_fd, &rfds) ) {

@@ -123,6 +123,8 @@ setup_paging(void)
 void
 setup_gdt(void)
 {
+	unsigned long long addr = (unsigned long long) &tss;
+
 	/* setup task state segment */
 	memset(&tss, 0, sizeof(tss));
 	tss.ss0 = DATA_SELECTOR;
@@ -130,8 +132,7 @@ setup_gdt(void)
 	tss.iomap_base = offsetof(struct tss, iomap);
 
 	/* initialize gdt's tss selector */
-	unsigned long long addr = (unsigned long long) &tss;
-        gdt[TSS_SELECTOR / sizeof(gdt[0])] |=
+	gdt[TSS_SELECTOR / sizeof(gdt[0])] |=
 		((addr & 0xFF000000) << (56-24)) |
 		((addr & 0x00FF0000) << (32-16)) |
 		((addr & 0x0000FFFF) << (16)) |
