@@ -351,8 +351,9 @@ void new_thread(struct vcpu *v,
 		regs->cr_ipsr = 0x501008826008; /* Need to be expanded as macro */
 	} else {
 		regs->cr_ipsr = ia64_getreg(_IA64_REG_PSR)
-			| IA64_PSR_BITS_TO_SET | IA64_PSR_BN
-			& ~(IA64_PSR_BITS_TO_CLEAR | IA64_PSR_RI | IA64_PSR_IS);
+		  | IA64_PSR_BITS_TO_SET | IA64_PSR_BN;
+		regs->cr_ipsr &= ~(IA64_PSR_BITS_TO_CLEAR
+				   | IA64_PSR_RI | IA64_PSR_IS);
 		regs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT; // domain runs at PL2
 	}
 	regs->cr_iip = start_pc;

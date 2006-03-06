@@ -141,7 +141,7 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	new_itm = local_cpu_data->itm_next;
 
 	if (!VMX_DOMAIN(current) && !time_after(ia64_get_itc(), new_itm))
-		return;
+		return IRQ_HANDLED;
 
 	if (VMX_DOMAIN(current))
 		vcpu_wake(current);

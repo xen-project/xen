@@ -945,8 +945,8 @@ IA64FAULT vcpu_set_eoi(VCPU *vcpu, UINT64 val)
 	p = &PSCBX(vcpu,insvc[3]);
 	for (i = 3; (i >= 0) && !(bits = *p); i--, p--);
 	if (i < 0) {
-		printf("Trying to EOI interrupt when none are in-service.\r\n");
-		return;
+		printf("Trying to EOI interrupt when none are in-service.\n");
+		return IA64_NO_FAULT;
 	}
 	bitnum = ia64_fls(bits);
 	vec = bitnum + (i*64);
@@ -957,7 +957,7 @@ IA64FAULT vcpu_set_eoi(VCPU *vcpu, UINT64 val)
 	if (PSCB(vcpu,interrupt_delivery_enabled)) { // but only if enabled...
 		// worry about this later... Linux only calls eoi
 		// with interrupts disabled
-		printf("Trying to EOI interrupt with interrupts enabled\r\n");
+		printf("Trying to EOI interrupt with interrupts enabled\n");
 	}
 	if (vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
 		PSCB(vcpu,pending_interruption) = 1;

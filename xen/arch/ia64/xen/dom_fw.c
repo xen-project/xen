@@ -210,8 +210,8 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	      unsigned long in3, unsigned long in4, unsigned long in5,
 	      unsigned long in6, unsigned long in7)
 {
-	long r9  = 0;
-	long r10 = 0;
+	unsigned long r9  = 0;
+	unsigned long r10 = 0;
 	long r11 = 0;
 	long status;
 
@@ -285,12 +285,11 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 }
 
 struct ia64_pal_retval
-xen_pal_emulator(unsigned long index, unsigned long in1,
-	unsigned long in2, unsigned long in3)
+xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 {
-	long r9  = 0;
-	long r10 = 0;
-	long r11 = 0;
+	unsigned long r9  = 0;
+	unsigned long r10 = 0;
+	unsigned long r11 = 0;
 	long status = -1;
 
 	if (running_on_sim) return pal_emulator_static(index);
@@ -364,7 +363,7 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 				&r10);
 		break;
 	    case PAL_REGISTER_INFO:
-		status = ia64_pal_register_info(in1,&r9,&r10);
+		status = ia64_pal_register_info(in1, &r9, &r10);
 		break;
 	    case PAL_CACHE_FLUSH:
 		/* FIXME */
@@ -608,13 +607,13 @@ dom_fw_fake_acpi(struct fake_acpi_tables *tables)
 	/* Trivial namespace, avoids ACPI CA complaints */
 	tables->aml[0] = 0x10; /* Scope */
 	tables->aml[1] = 0x12; /* length/offset to next object */
-	strncpy(&tables->aml[2], "_SB_", 4);
+	strncpy((char *)&tables->aml[2], "_SB_", 4);
 
 	/* The processor object isn't absolutely necessary, revist for SMP */
 	tables->aml[6] = 0x5b; /* processor object */
 	tables->aml[7] = 0x83;
 	tables->aml[8] = 0x0b; /* next */
-	strncpy(&tables->aml[9], "CPU0", 4);
+	strncpy((char *)&tables->aml[9], "CPU0", 4);
 
 	dsdt->checksum = generate_acpi_checksum(dsdt, dsdt->length);
 
@@ -801,8 +800,8 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 	sal_systab->sal_rev_major = 0;
 	sal_systab->entry_count = 1;
 
-	strcpy(sal_systab->oem_id, "Xen/ia64");
-	strcpy(sal_systab->product_id, "Xen/ia64");
+	strcpy((char *)sal_systab->oem_id, "Xen/ia64");
+	strcpy((char *)sal_systab->product_id, "Xen/ia64");
 
 	/* fill in an entry point: */
 	sal_ed->type = SAL_DESC_ENTRY_POINT;

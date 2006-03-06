@@ -462,4 +462,6 @@ extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
 /* Arch-specific portion of memory_op hypercall. */
 #define arch_memory_op(op, arg) (-ENOSYS)
 
+extern void assign_domain_page(struct domain *d, unsigned long mpaddr,
+			       unsigned long physaddr);
 #endif /* __ASM_IA64_MM_H__ */

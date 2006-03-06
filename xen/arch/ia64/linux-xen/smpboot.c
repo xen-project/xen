@@ -482,16 +482,14 @@ do_boot_cpu (int sapicid, int cpu)
 do_rest:
 	task_for_booting_cpu = c_idle.idle;
 #else
-	struct domain *idle;
 	struct vcpu *v;
-	void *stack;
 
 	v = idle_vcpu[cpu] = alloc_vcpu(idle_vcpu[0]->domain, cpu, cpu);
 	BUG_ON(v == NULL);
 
-	printf ("do_boot_cpu: cpu=%d, domain=%p, vcpu=%p\n", cpu, idle, v);
+	//printf ("do_boot_cpu: cpu=%d, domain=%p, vcpu=%p\n", cpu, idle, v);
 
-	task_for_booting_cpu = v;
+	task_for_booting_cpu = (task_t *)v;
 
 	/* Set cpu number.  */
 	get_thread_info(v)->cpu = cpu;
@@ -522,6 +520,7 @@ do_rest:
 	return 0;
 }
 
+#ifndef XEN
 static int __init
 decay (char *str)
 {
@@ -531,6 +530,7 @@ decay (char *str)
 }
 
 __setup("decay=", decay);
+#endif
 
 /*
  * Initialize the logical CPU number to SAPICID mapping

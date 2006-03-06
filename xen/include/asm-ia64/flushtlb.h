@@ -1,6 +1,8 @@
 #ifndef __FLUSHTLB_H__
 #define __FLUSHTLB_H__
 
+#include <asm/tlbflush.h>
+
 /* The current time as shown by the virtual TLB clock. */
 extern u32 tlbflush_clock;
 
