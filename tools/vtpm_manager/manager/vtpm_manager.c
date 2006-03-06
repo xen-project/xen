@@ -754,6 +754,7 @@ TPM_RESULT VTPM_Init_Service() {
 #ifndef VTPM_MULTI_VM
   vtpm_globals->vtpm_rx_fh = -1;
   vtpm_globals->guest_rx_fh = -1;
+  vtpm_globals->connected_dmis = 0;
 #endif
   if ((vtpm_globals->dmi_map = create_hashtable(10, hashfunc32, equals32)) == NULL){
     status = TPM_FAIL;

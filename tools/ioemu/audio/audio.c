@@ -713,7 +713,7 @@ int AUD_calc_elapsed (SWVoice *sw)
     delta = now - sw->old_ticks;
     bytes = (delta * sw->bytes_per_second) / ticks_per_sec;
     if (delta < 0) {
-        dolog ("whoops delta(<0)=%lld\n", delta);
+        dolog ("whoops delta(<0)=%"PRId64"\n", delta);
         return 0;
     }
 

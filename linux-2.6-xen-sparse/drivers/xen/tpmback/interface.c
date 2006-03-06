@@ -19,8 +19,7 @@ int num_frontends = 0;
 
 LIST_HEAD(tpmif_list);
 
-tpmif_t *
-alloc_tpmif(domid_t domid, long int instance)
+static tpmif_t *alloc_tpmif(domid_t domid, long int instance)
 {
 	struct page *page;
 	tpmif_t *tpmif;
@@ -45,16 +44,14 @@ alloc_tpmif(domid_t domid, long int instance)
 	return tpmif;
 }
 
-void
-free_tpmif(tpmif_t * tpmif)
+static void free_tpmif(tpmif_t * tpmif)
 {
 	num_frontends--;
 	list_del(&tpmif->tpmif_list);
 	kmem_cache_free(tpmif_cachep, tpmif);
 }
 
-tpmif_t *
-tpmif_find(domid_t domid, long int instance)
+tpmif_t *tpmif_find(domid_t domid, long int instance)
 {
 	tpmif_t *tpmif;
 
@@ -72,8 +69,7 @@ tpmif_find(domid_t domid, long int instance)
 	return alloc_tpmif(domid, instance);
 }
 
-static int
-map_frontend_page(tpmif_t *tpmif, unsigned long shared_page)
+static int map_frontend_page(tpmif_t *tpmif, unsigned long shared_page)
 {
 	int ret;
 	struct gnttab_map_grant_ref op = {
@@ -99,8 +95,7 @@ map_frontend_page(tpmif_t *tpmif, unsigned long shared_page)
 	return 0;
 }
 
-static void
-unmap_frontend_page(tpmif_t *tpmif)
+static void unmap_frontend_page(tpmif_t *tpmif)
 {
 	struct gnttab_unmap_grant_ref op;
 	int ret;
@@ -115,14 +110,14 @@ unmap_frontend_page(tpmif_t *tpmif)
 	BUG_ON(ret);
 }
 
-int
-tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
+int tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 {
 	int err;
 	evtchn_op_t op = {
 		.cmd = EVTCHNOP_bind_interdomain,
 		.u.bind_interdomain.remote_dom = tpmif->domid,
-		.u.bind_interdomain.remote_port = evtchn };
+		.u.bind_interdomain.remote_port = evtchn,
+        };
 
         if (tpmif->irq) {
                 return 0;
@@ -156,8 +151,7 @@ tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 	return 0;
 }
 
-static void
-__tpmif_disconnect_complete(void *arg)
+static void __tpmif_disconnect_complete(void *arg)
 {
 	tpmif_t *tpmif = (tpmif_t *) arg;
 
@@ -172,22 +166,19 @@ __tpmif_disconnect_complete(void *arg)
 	free_tpmif(tpmif);
 }
 
-void
-tpmif_disconnect_complete(tpmif_t * tpmif)
+void tpmif_disconnect_complete(tpmif_t * tpmif)
 {
 	INIT_WORK(&tpmif->work, __tpmif_disconnect_complete, (void *)tpmif);
 	schedule_work(&tpmif->work);
 }
 
-void __init
-tpmif_interface_init(void)
+void __init tpmif_interface_init(void)
 {
 	tpmif_cachep = kmem_cache_create("tpmif_cache", sizeof (tpmif_t),
 					 0, 0, NULL, NULL);
 }
 
-void __init
-tpmif_interface_exit(void)
+void __init tpmif_interface_exit(void)
 {
 	kmem_cache_destroy(tpmif_cachep);
 }

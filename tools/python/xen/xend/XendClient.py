@@ -196,8 +196,9 @@ class Xend:
     def xend_domains(self):
         return self.xendGet(self.domainurl())
 
-    def xend_list_domains(self):
-        return self.xendGet(self.domainurl(), {'detail': '1'})
+    def xend_list_domains(self, detail = True):
+        return self.xendGet(self.domainurl(),
+                            {'detail': detail and '1' or '0'})
 
     def xend_domain_vcpuinfo(self, dom):
         return self.xendGet(self.domainurl(dom), {'op': 'vcpuinfo'})

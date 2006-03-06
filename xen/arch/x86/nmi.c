@@ -322,15 +322,9 @@ void __pminit setup_apic_nmi_watchdog(void)
     case X86_VENDOR_INTEL:
         switch (boot_cpu_data.x86) {
         case 6:
-            if (boot_cpu_data.x86_model > 0xd)
-                return;
-
             setup_p6_watchdog();
             break;
         case 15:
-            if (boot_cpu_data.x86_model > 0x4)
-                return;
-
             if (!setup_p4_watchdog())
                 return;
             break;

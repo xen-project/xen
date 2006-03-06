@@ -31,7 +31,7 @@
 static long
 increase_reservation(
     struct domain *d, 
-    GUEST_HANDLE(xen_ulong) extent_list,
+    GUEST_HANDLE(ulong) extent_list,
     unsigned int   nr_extents,
     unsigned int   extent_order,
     unsigned int   flags,
@@ -80,7 +80,7 @@ increase_reservation(
 static long
 populate_physmap(
     struct domain *d, 
-    GUEST_HANDLE(xen_ulong) extent_list,
+    GUEST_HANDLE(ulong) extent_list,
     unsigned int  nr_extents,
     unsigned int  extent_order,
     unsigned int  flags,
@@ -141,7 +141,7 @@ populate_physmap(
 static long
 decrease_reservation(
     struct domain *d,
-    GUEST_HANDLE(xen_ulong) extent_list,
+    GUEST_HANDLE(ulong) extent_list,
     unsigned int   nr_extents,
     unsigned int   extent_order,
     unsigned int   flags,

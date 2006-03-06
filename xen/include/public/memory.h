@@ -29,7 +29,7 @@ typedef struct xen_memory_reservation {
      *   OUT: GMFN bases of extents that were allocated
      *   (NB. This command also updates the mach_to_phys translation table)
      */
-    GUEST_HANDLE(xen_ulong) extent_start;
+    GUEST_HANDLE(ulong) extent_start;
 
     /* Number of extents, and size/alignment of each (2^extent_order pages). */
     unsigned long  nr_extents;
@@ -86,7 +86,7 @@ typedef struct xen_machphys_mfn_list {
      * any large discontiguities in the machine address space, 2MB gaps in
      * the machphys table will be represented by an MFN base of zero.
      */
-    GUEST_HANDLE(xen_ulong) extent_start;
+    GUEST_HANDLE(ulong) extent_start;
 
     /*
      * Number of extents written to the above array. This will be smaller
@@ -130,13 +130,13 @@ typedef struct xen_translate_gpfn_list {
     unsigned long nr_gpfns;
 
     /* List of GPFNs to translate. */
-    GUEST_HANDLE(xen_ulong) gpfn_list;
+    GUEST_HANDLE(ulong) gpfn_list;
 
     /*
      * Output list to contain MFN translations. May be the same as the input
      * list (in which case each input GPFN is overwritten with the output MFN).
      */
-    GUEST_HANDLE(xen_ulong) mfn_list;
+    GUEST_HANDLE(ulong) mfn_list;
 } xen_translate_gpfn_list_t;
 DEFINE_GUEST_HANDLE(xen_translate_gpfn_list_t);
 

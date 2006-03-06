@@ -108,8 +108,8 @@ static inline unsigned int xen_io_apic_read(unsigned int apic, unsigned int reg)
 	int ret;
 
 	op.cmd = PHYSDEVOP_APIC_READ;
-	op.u.apic_op.apic = mp_ioapics[apic].mpc_apicid;
-	op.u.apic_op.offset = reg;
+	op.u.apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
+	op.u.apic_op.reg = reg;
 	ret = HYPERVISOR_physdev_op(&op);
 	if (ret)
 		return ret;
@@ -121,8 +121,8 @@ static inline void xen_io_apic_write(unsigned int apic, unsigned int reg, unsign
 	physdev_op_t op;
 
 	op.cmd = PHYSDEVOP_APIC_WRITE;
-	op.u.apic_op.apic = mp_ioapics[apic].mpc_apicid;
-	op.u.apic_op.offset = reg;
+	op.u.apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
+	op.u.apic_op.reg = reg;
 	op.u.apic_op.value = value;
 	HYPERVISOR_physdev_op(&op);
 }

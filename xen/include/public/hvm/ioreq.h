@@ -71,8 +71,8 @@ typedef struct {
 typedef struct {
     ioreq_t         vp_ioreq;
     /* Event channel port */
-    unsigned long   vp_eport;   /* VMX vcpu uses this to notify DM */
-    unsigned long   dm_eport;   /* DM uses this to notify VMX vcpu */
+    unsigned int    vp_eport;   /* VMX vcpu uses this to notify DM */
+    unsigned int    dm_eport;   /* DM uses this to notify VMX vcpu */
 } vcpu_iodata_t;
 
 typedef struct {

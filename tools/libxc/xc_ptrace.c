@@ -7,14 +7,13 @@
 
 #include "xc_private.h"
 #include "xg_private.h"
-#include <thread_db.h>
 #include "xc_ptrace.h"
-
 
 /* XXX application state */
 static long                     nr_pages = 0;
 static unsigned long           *page_array = NULL;
 static int                      current_domid = -1;
+static int                      current_isfile;
 
 static cpumap_t                 online_cpumap;
 static cpumap_t                 regs_valid;
@@ -32,7 +31,8 @@ fetch_regs(int xc_handle, int cpu, int *online)
 
     if (online)
         *online = 0;
-    if ( !(regs_valid & (1 << cpu)) ) { 
+    if ( !(regs_valid & (1 << cpu)) )
+    { 
         retval = xc_vcpu_getcontext(xc_handle, current_domid, 
 						cpu, &ctxt[cpu]);
         if ( retval ) 
@@ -49,9 +49,6 @@ fetch_regs(int xc_handle, int cpu, int *online)
  done:
     return retval;    
 }
-
-#define FETCH_REGS(cpu) if (fetch_regs(xc_handle, cpu, NULL)) goto error_out;
-
 
 static struct thr_ev_handlers {
     thr_ev_handler_t td_create;
@@ -95,14 +92,12 @@ get_online_cpumap(int xc_handle, dom0_getdomaininfo_t *d, cpumap_t *cpumap)
     *cpumap = 0;
     for (i = 0; i <= d->max_vcpu_id; i++) {
         if ((retval = fetch_regs(xc_handle, i, &online)))
-            goto error_out;        
+            return retval;
         if (online)
             *cpumap |= (1 << i);            
     }
     
     return 0;
- error_out:
-    return retval;
 }
 
 /* 
@@ -118,7 +113,8 @@ online_vcpus_changed(cpumap_t cpumap)
     int index;
     
     while ( (index = ffsll(changed_cpumap)) ) {
-        if ( cpumap & (1 << (index - 1)) ) {
+        if ( cpumap & (1 << (index - 1)) )
+        {
             if (handlers.td_create) handlers.td_create(index - 1);
         } else {
             printf("thread death: %d\n", index - 1);
@@ -143,34 +139,32 @@ map_domain_va_pae(
     uint64_t *l3, *l2, *l1;
     static void *v;
 
-    FETCH_REGS(cpu);
+    if (fetch_regs(xc_handle, cpu, NULL))
+        return NULL;
 
     l3 = xc_map_foreign_range(
         xc_handle, current_domid, PAGE_SIZE, PROT_READ, ctxt[cpu].ctrlreg[3] >> PAGE_SHIFT);
     if ( l3 == NULL )
-        goto error_out;
+        return NULL;
 
     l2p = l3[l3_table_offset_pae(va)] >> PAGE_SHIFT;
     l2 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, PROT_READ, l2p);
     if ( l2 == NULL )
-        goto error_out;
+        return NULL;
 
     l1p = l2[l2_table_offset_pae(va)] >> PAGE_SHIFT;
     l1 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, l1p);
     if ( l1 == NULL )
-        goto error_out;
+        return NULL;
 
     p = l1[l1_table_offset_pae(va)] >> PAGE_SHIFT;
     if ( v != NULL )
         munmap(v, PAGE_SIZE);
     v = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, p);
     if ( v == NULL )
-        goto error_out;
+        return NULL;
 
     return (void *)((unsigned long)v | (va & (PAGE_SIZE - 1)));
-
- error_out:
-    return NULL;
 }
 
 static void *
@@ -215,17 +209,18 @@ map_domain_va(
         if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
         {
             printf("Could not allocate memory\n");
-            goto error_out;
+            return NULL;
         }
         if ( xc_get_pfn_list(xc_handle, current_domid,
                              page_array, nr_pages) != nr_pages )
         {
             printf("Could not get the page frame list\n");
-            goto error_out;
+            return NULL;
         }
     }
 
-    FETCH_REGS(cpu);
+    if (fetch_regs(xc_handle, cpu, NULL))
+        return NULL;
 
     if ( ctxt[cpu].ctrlreg[3] != cr3_phys[cpu] )
     {
@@ -236,10 +231,10 @@ map_domain_va(
             xc_handle, current_domid, PAGE_SIZE, PROT_READ,
             cr3_phys[cpu] >> PAGE_SHIFT);
         if ( cr3_virt[cpu] == NULL )
-            goto error_out;
+            return NULL;
     }
     if ( (pde = cr3_virt[cpu][vtopdi(va)]) == 0 )
-        goto error_out;
+        return NULL;
     if ( (ctxt[cpu].flags & VGCF_HVM_GUEST) && paging_enabled(&ctxt[cpu]) )
         pde = page_array[pde >> PAGE_SHIFT] << PAGE_SHIFT;
     if ( pde != pde_phys[cpu] )
@@ -251,10 +246,10 @@ map_domain_va(
             xc_handle, current_domid, PAGE_SIZE, PROT_READ,
             pde_phys[cpu] >> PAGE_SHIFT);
         if ( pde_virt[cpu] == NULL )
-            goto error_out;
+            return NULL;
     }
     if ( (page = pde_virt[cpu][vtopti(va)]) == 0 )
-        goto error_out;
+        return NULL;
     if ( (ctxt[cpu].flags & VGCF_HVM_GUEST) && paging_enabled(&ctxt[cpu]) )
         page = page_array[page >> PAGE_SHIFT] << PAGE_SHIFT;
     if ( (page != page_phys[cpu]) || (perm != prev_perm[cpu]) )
@@ -268,19 +263,16 @@ map_domain_va(
         if ( page_virt[cpu] == NULL )
         {
             page_phys[cpu] = 0;
-            goto error_out;
+            return NULL;
         }
         prev_perm[cpu] = perm;
     } 
 
     return (void *)(((unsigned long)page_virt[cpu]) | (va & BSD_PAGE_MASK));
-
- error_out:
-    return NULL;
 }
 
-int 
-xc_waitdomain(
+static int 
+__xc_waitdomain(
     int xc_handle,
     int domain,
     int *status,
@@ -335,7 +327,6 @@ xc_ptrace(
     long edata)
 {
     DECLARE_DOM0_OP;
-    int             status = 0;
     struct gdb_regs pt;
     long            retval = 0;
     unsigned long  *guest_va;
@@ -350,84 +341,83 @@ xc_ptrace(
     { 
     case PTRACE_PEEKTEXT:
     case PTRACE_PEEKDATA:
-        guest_va = (unsigned long *)map_domain_va(
-            xc_handle, cpu, addr, PROT_READ);
+        if (current_isfile)
+            guest_va = (unsigned long *)map_domain_va_core(current_domid, 
+                                cpu, addr, ctxt);
+        else
+            guest_va = (unsigned long *)map_domain_va(xc_handle, 
+                                cpu, addr, PROT_READ);
         if ( guest_va == NULL )
-        {
-            status = EFAULT;
-            goto error_out;
-        }
+            goto out_error;
         retval = *guest_va;
         break;
 
     case PTRACE_POKETEXT:
     case PTRACE_POKEDATA:
         /* XXX assume that all CPUs have the same address space */
-        guest_va = (unsigned long *)map_domain_va(
-                            xc_handle, cpu, addr, PROT_READ|PROT_WRITE);
-        if ( guest_va == NULL ) {
-            status = EFAULT;
-            goto error_out;
-        }
+        if (current_isfile)
+            guest_va = (unsigned long *)map_domain_va_core(current_domid, 
+                                cpu, addr, ctxt);
+        else
+            guest_va = (unsigned long *)map_domain_va(xc_handle, 
+                                cpu, addr, PROT_READ|PROT_WRITE);
+        if ( guest_va == NULL ) 
+            goto out_error;
         *guest_va = (unsigned long)data;
         break;
 
     case PTRACE_GETREGS:
+        if (!current_isfile && fetch_regs(xc_handle, cpu, NULL)) 
+            goto out_error;
+        SET_PT_REGS(pt, ctxt[cpu].user_regs); 
+        memcpy(data, &pt, sizeof(struct gdb_regs));
+        break;
+
     case PTRACE_GETFPREGS:
     case PTRACE_GETFPXREGS:
-        
-        FETCH_REGS(cpu);
-        if ( request == PTRACE_GETREGS )
-        {
-            SET_PT_REGS(pt, ctxt[cpu].user_regs); 
-            memcpy(data, &pt, sizeof(struct gdb_regs));
-        }
-        else if (request == PTRACE_GETFPREGS)
-        {
-            memcpy(data, &ctxt[cpu].fpu_ctxt, sizeof(ctxt[cpu].fpu_ctxt));
-        }
-        else /*if (request == PTRACE_GETFPXREGS)*/
-        {
-            memcpy(data, &ctxt[cpu].fpu_ctxt, sizeof(ctxt[cpu].fpu_ctxt));
-        }
+        if (!current_isfile && fetch_regs(xc_handle, cpu, NULL)) 
+                goto out_error;
+        memcpy(data, &ctxt[cpu].fpu_ctxt, sizeof(ctxt[cpu].fpu_ctxt));
         break;
 
     case PTRACE_SETREGS:
+        if (!current_isfile)
+                goto out_unspported; /* XXX not yet supported */
         SET_XC_REGS(((struct gdb_regs *)data), ctxt[cpu].user_regs);
-        retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu, &ctxt[cpu]);
-        if (retval)
-            goto error_out;
+        if ((retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu, 
+                                &ctxt[cpu])))
+            goto out_error_dom0;
         break;
 
     case PTRACE_SINGLESTEP:
+        if (!current_isfile)
+              goto out_unspported; /* XXX not yet supported */
         /*  XXX we can still have problems if the user switches threads
          *  during single-stepping - but that just seems retarded
          */
         ctxt[cpu].user_regs.eflags |= PSL_T; 
-        retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu, &ctxt[cpu]);
-        if ( retval )
-        {
-            perror("dom0 op failed");
-            goto error_out;
-        }
+        if ((retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu, 
+                                &ctxt[cpu])))
+            goto out_error_dom0;
         /* FALLTHROUGH */
 
     case PTRACE_CONT:
     case PTRACE_DETACH:
+        if (!current_isfile)
+            goto out_unspported; /* XXX not yet supported */
         if ( request != PTRACE_SINGLESTEP )
         {
             FOREACH_CPU(cpumap, index) {
                 cpu = index - 1;
-                FETCH_REGS(cpu);
+                if (fetch_regs(xc_handle, cpu, NULL)) 
+                    goto out_error;
                 /* Clear trace flag */
-                if ( ctxt[cpu].user_regs.eflags & PSL_T ) {
+                if ( ctxt[cpu].user_regs.eflags & PSL_T ) 
+                {
                     ctxt[cpu].user_regs.eflags &= ~PSL_T;
-                    retval = xc_vcpu_setcontext(xc_handle, current_domid, 
-                                                cpu, &ctxt[cpu]);
-                    if ( retval ) {
-                        perror("dom0 op failed");
-                        goto error_out;
-                    }
+                    if ((retval = xc_vcpu_setcontext(xc_handle, current_domid, 
+                                                cpu, &ctxt[cpu])))
+                        goto out_error_dom0;
                 }
             }
         }
@@ -436,31 +426,34 @@ xc_ptrace(
             op.cmd = DOM0_SETDEBUGGING;
             op.u.setdebugging.domain = current_domid;
             op.u.setdebugging.enable = 0;
-            retval = do_dom0_op(xc_handle, &op);
+            if ((retval = do_dom0_op(xc_handle, &op)))
+                goto out_error_dom0;
         }
         regs_valid = 0;
-        xc_domain_unpause(xc_handle, current_domid > 0 ? current_domid : -current_domid);
+        if ((retval = xc_domain_unpause(xc_handle, current_domid > 0 ? 
+                                current_domid : -current_domid)))
+            goto out_error_dom0;
         break;
 
     case PTRACE_ATTACH:
         current_domid = domid_tid;
+        current_isfile = (int)edata;
+        if (current_isfile)
+            break;
         op.cmd = DOM0_GETDOMAININFO;
         op.u.getdomaininfo.domain = current_domid;
         retval = do_dom0_op(xc_handle, &op);
         if ( retval || (op.u.getdomaininfo.domain != current_domid) )
-        {
-            perror("dom0 op failed");
-            goto error_out;
-        }
+            goto out_error_dom0;
         if ( op.u.getdomaininfo.flags & DOMFLAGS_PAUSED )
-        {
             printf("domain currently paused\n");
-        } else
-            retval = xc_domain_pause(xc_handle, current_domid);
+        else if ((retval = xc_domain_pause(xc_handle, current_domid)))
+            goto out_error_dom0;
         op.cmd = DOM0_SETDEBUGGING;
         op.u.setdebugging.domain = current_domid;
         op.u.setdebugging.enable = 1;
-        retval = do_dom0_op(xc_handle, &op);
+        if ((retval = do_dom0_op(xc_handle, &op)))
+            goto out_error_dom0;
 
         if (get_online_cpumap(xc_handle, &op.u.getdomaininfo, &cpumap))
             printf("get_online_cpumap failed\n");
@@ -474,26 +467,40 @@ xc_ptrace(
     case PTRACE_POKEUSER:
     case PTRACE_SYSCALL:
     case PTRACE_KILL:
-#ifdef DEBUG
-        printf("unsupported xc_ptrace request %s\n", ptrace_names[request]);
-#endif
-        /* XXX not yet supported */
-        status = ENOSYS;
-        break;
+        goto out_unspported; /* XXX not yet supported */
 
     case PTRACE_TRACEME:
         printf("PTRACE_TRACEME is an invalid request under Xen\n");
-        status = EINVAL;
-    }
-    
-    if ( status )
-    {
-        errno = status;
-        retval = -1;
+        goto out_error;
     }
 
- error_out:
     return retval;
+
+ out_error_dom0:
+    perror("dom0 op failed");
+ out_error:
+    errno = EINVAL;
+    return retval;
+
+ out_unspported:
+#ifdef DEBUG
+    printf("unsupported xc_ptrace request %s\n", ptrace_names[request]);
+#endif
+    errno = ENOSYS;
+    return -1;
+
+}
+
+int 
+xc_waitdomain(
+    int xc_handle,
+    int domain,
+    int *status,
+    int options)
+{
+    if (current_isfile)
+        return xc_waitdomain_core(xc_handle, domain, status, options, ctxt);
+    return __xc_waitdomain(xc_handle, domain, status, options);
 }
 
 /*

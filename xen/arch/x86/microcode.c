@@ -116,7 +116,7 @@ MODULE_LICENSE("GPL");
 #define exttable_size(et) ((et)->count * EXT_SIGNATURE_SIZE + EXT_HEADER_SIZE)
 
 /* serialize access to the physical write to MSR 0x79 */
-static spinlock_t microcode_update_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(microcode_update_lock);
 
 /* no concurrent ->write()s are allowed on /dev/cpu/microcode */
 static DECLARE_MUTEX(microcode_sem);
@@ -166,7 +166,8 @@ static void collect_cpu_info (void *unused)
 	}
 
 	wrmsr(MSR_IA32_UCODE_REV, 0, 0);
-	__asm__ __volatile__ ("cpuid" : : : "ax", "bx", "cx", "dx");
+	/* see notes above for revision 1.07.  Apparent chip bug */
+	sync_core();
 	/* get the current revision from MSR 0x8B */
 	rdmsr(MSR_IA32_UCODE_REV, val[0], uci->rev);
 	pr_debug("microcode: collect_cpu_info : sig=0x%x, pf=0x%x, rev=0x%x\n",
@@ -366,7 +367,7 @@ static void do_update_one (void * unused)
 	struct ucode_cpu_info *uci = ucode_cpu_info + cpu_num;
 
 	if (uci->mc == NULL) {
-		printk(KERN_INFO "microcode: No suitable data for CPU%d\n", cpu_num);
+		printk(KERN_INFO "microcode: No new microcode data for CPU%d\n", cpu_num);
 		return;
 	}
 
@@ -379,7 +380,9 @@ static void do_update_one (void * unused)
 		(unsigned long) uci->mc->bits >> 16 >> 16);
 	wrmsr(MSR_IA32_UCODE_REV, 0, 0);
 
-	__asm__ __volatile__ ("cpuid" : : : "ax", "bx", "cx", "dx");
+	/* see notes above for revision 1.07.  Apparent chip bug */
+	sync_core();
+
 	/* get the current revision from MSR 0x8B */
 	rdmsr(MSR_IA32_UCODE_REV, val[0], val[1]);
 

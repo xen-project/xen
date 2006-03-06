@@ -89,14 +89,18 @@ int xb_write(const void *data, unsigned len)
 {
 	struct xenstore_domain_interface *intf = xenstore_domain_interface();
 	XENSTORE_RING_IDX cons, prod;
+	int rc;
 
 	while (len != 0) {
 		void *dst;
 		unsigned int avail;
 
-		wait_event_interruptible(xb_waitq,
-					 (intf->req_prod - intf->req_cons) !=
-					 XENSTORE_RING_SIZE);
+		rc = wait_event_interruptible(
+			xb_waitq,
+			(intf->req_prod - intf->req_cons) !=
+			XENSTORE_RING_SIZE);
+		if (rc < 0)
+			return rc;
 
 		/* Read indexes, then verify. */
 		cons = intf->req_cons;
@@ -130,13 +134,17 @@ int xb_read(void *data, unsigned len)
 {
 	struct xenstore_domain_interface *intf = xenstore_domain_interface();
 	XENSTORE_RING_IDX cons, prod;
+	int rc;
 
 	while (len != 0) {
 		unsigned int avail;
 		const char *src;
 
-		wait_event_interruptible(xb_waitq,
-					 intf->rsp_cons != intf->rsp_prod);
+		rc = wait_event_interruptible(
+			xb_waitq,
+			intf->rsp_cons != intf->rsp_prod);
+		if (rc < 0)
+			return rc;
 
 		/* Read indexes, then verify. */
 		cons = intf->rsp_cons;

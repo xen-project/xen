@@ -51,14 +51,31 @@
 #include "xenctrl.h"
 #include "tdb.h"
 
+#include "hashtable.h"
+
+
 extern int eventchn_fd; /* in xenstored_domain.c */
 
-static bool verbose;
+static bool verbose = false;
 LIST_HEAD(connections);
 static int tracefd = -1;
+static bool recovery = true;
+static bool remove_local = true;
 static int reopen_log_pipe[2];
 static char *tracefile = NULL;
 static TDB_CONTEXT *tdb_ctx;
+
+static void corrupt(struct connection *conn, const char *fmt, ...);
+static void check_store();
+
+#define log(...)							\
+	do {								\
+		char *s = talloc_asprintf(NULL, __VA_ARGS__);		\
+		trace("%s\n", s);					\
+		syslog(LOG_ERR, "%s",  s);				\
+		talloc_free(s);						\
+	} while (0)
+
 
 #ifdef TESTING
 static bool failtest = false;
@@ -103,33 +120,6 @@ int test_mkdir(const char *dir, int perms)
 #endif /* TESTING */
 
 #include "xenstored_test.h"
-
-/* FIXME: Ideally, this should never be called.  Some can be eliminated. */
-/* Something is horribly wrong: shutdown immediately. */
-void __attribute__((noreturn)) corrupt(struct connection *conn,
-				       const char *fmt, ...)
-{
-	va_list arglist;
-	char *str;
-	int saved_errno = errno;
-
-	va_start(arglist, fmt);
-	str = talloc_vasprintf(NULL, fmt, arglist);
-	va_end(arglist);
-
-	trace("xenstored corruption: connection id %i: err %s: %s",
-		conn ? (int)conn->id : -1, strerror(saved_errno), str);
-	eprintf("xenstored corruption: connection id %i: err %s: %s",
-		conn ? (int)conn->id : -1, strerror(saved_errno), str);
-#ifdef TESTING
-	/* Allow them to attach debugger. */
-	sleep(30);
-#endif
-	syslog(LOG_DAEMON,
-	       "xenstored corruption: connection id %i: err %s: %s",
-	       conn ? (int)conn->id : -1, strerror(saved_errno), str);
-	_exit(2);
-}
 
 TDB_CONTEXT *tdb_context(struct connection *conn)
 {
@@ -216,8 +206,9 @@ static void trace_io(const struct connection *conn,
 	now = time(NULL);
 	tm = localtime(&now);
 
-	trace("%s %p %02d:%02d:%02d %s (", prefix, conn,
-	      tm->tm_hour, tm->tm_min, tm->tm_sec,
+	trace("%s %p %04d%02d%02d %02d:%02d:%02d %s (", prefix, conn,
+	      tm->tm_year + 1900, tm->tm_mon + 1,
+	      tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
 	      sockmsg_string(data->hdr.msg.type));
 	
 	for (i = 0; i < data->hdr.msg.len; i++)
@@ -415,16 +406,19 @@ static struct node *read_node(struct connection *conn, const char *name)
 	TDB_DATA key, data;
 	uint32_t *p;
 	struct node *node;
+	TDB_CONTEXT * context = tdb_context(conn);
 
 	key.dptr = (void *)name;
 	key.dsize = strlen(name);
-	data = tdb_fetch(tdb_context(conn), key);
+	data = tdb_fetch(context, key);
 
 	if (data.dptr == NULL) {
-		if (tdb_error(tdb_context(conn)) == TDB_ERR_NOEXIST)
+		if (tdb_error(context) == TDB_ERR_NOEXIST)
 			errno = ENOENT;
-		else
+		else {
+			log("TDB error on read: %s", tdb_errorstr(context));
 			errno = EIO;
+		}
 		return NULL;
 	}
 
@@ -837,8 +831,6 @@ static int destroy_node(void *_node)
 	return 0;
 }
 
-/* Be careful: create heirarchy, put entry in existing parent *last*.
- * This helps fsck if we die during this. */
 static struct node *create_node(struct connection *conn, 
 				const char *name,
 				void *data, unsigned int datalen)
@@ -939,8 +931,9 @@ static void delete_node(struct connection *conn, struct node *node)
 {
 	unsigned int i;
 
-	/* Delete self, then delete children.  If something goes wrong,
-	 * consistency check will clean up this way. */
+	/* Delete self, then delete children.  If we crash, then the worst
+	   that can happen is the children will continue to take up space, but
+	   will otherwise be unreachable. */
 	delete_node_single(conn, node);
 
 	/* Delete children, too. */
@@ -950,17 +943,34 @@ static void delete_node(struct connection *conn, struct node *node)
 		child = read_node(conn, 
 				  talloc_asprintf(node, "%s/%s", node->name,
 						  node->children + i));
-		if (!child)
-			corrupt(conn, "No child '%s' found", child);
-		delete_node(conn, child);
+		if (child) {
+			delete_node(conn, child);
+		}
+		else {
+			trace("delete_node: No child '%s/%s' found!\n",
+			      node->name, node->children + i);
+			/* Skip it, we've already deleted the parent. */
+		}
 	}
 }
+
 
 /* Delete memory using memmove. */
 static void memdel(void *mem, unsigned off, unsigned len, unsigned total)
 {
 	memmove(mem + off, mem + off + len, total - off - len);
 }
+
+
+static bool remove_child_entry(struct connection *conn, struct node *node,
+			       size_t offset)
+{
+	size_t childlen = strlen(node->children + offset);
+	memdel(node->children, offset, childlen + 1, node->childlen);
+	node->childlen -= childlen + 1;
+	return write_node(conn, node);
+}
+
 
 static bool delete_child(struct connection *conn,
 			 struct node *node, const char *childname)
@@ -969,19 +979,19 @@ static bool delete_child(struct connection *conn,
 
 	for (i = 0; i < node->childlen; i += strlen(node->children+i) + 1) {
 		if (streq(node->children+i, childname)) {
-			memdel(node->children, i, strlen(childname) + 1,
-			       node->childlen);
-			node->childlen -= strlen(childname) + 1;
-			return write_node(conn, node);
+			return remove_child_entry(conn, node, i);
 		}
 	}
 	corrupt(conn, "Can't find child '%s' in %s", childname, node->name);
+	return false;
 }
 
 
 static int _rm(struct connection *conn, struct node *node, const char *name)
 {
-	/* Delete from parent first, then if something explodes fsck cleans. */
+	/* Delete from parent first, then if we crash, the worst that can
+	   happen is the child will continue to take up space, but will
+	   otherwise be unreachable. */
 	struct node *parent = read_node(conn, get_parent(name));
 	if (!parent) {
 		send_error(conn, EINVAL);
@@ -1000,10 +1010,12 @@ static int _rm(struct connection *conn, struct node *node, const char *name)
 
 static void internal_rm(const char *name)
 {
-	char *tname = talloc_strdup(talloc_autofree_context(), name);
+	char *tname = talloc_strdup(NULL, name);
 	struct node *node = read_node(NULL, tname);
 	if (node)
 		_rm(NULL, node, tname);
+	talloc_free(node);
+	talloc_free(tname);
 }
 
 
@@ -1149,18 +1161,19 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 	case XS_DEBUG:
 		if (streq(in->buffer, "print"))
 			xprintf("debug: %s", in->buffer + get_string(in, 0));
+		if (streq(in->buffer, "check"))
+			check_store();
 #ifdef TESTING
 		/* For testing, we allow them to set id. */
 		if (streq(in->buffer, "setid")) {
 			conn->id = atoi(in->buffer + get_string(in, 0));
-			send_ack(conn, XS_DEBUG);
 		} else if (streq(in->buffer, "failtest")) {
 			if (get_string(in, 0) < in->used)
 				srandom(atoi(in->buffer + get_string(in, 0)));
-			send_ack(conn, XS_DEBUG);
 			failtest = true;
 		}
 #endif /* TESTING */
+		send_ack(conn, XS_DEBUG);
 		break;
 
 	case XS_WATCH:
@@ -1258,7 +1271,7 @@ static void handle_input(struct connection *conn)
 
 		if (in->hdr.msg.len > PATH_MAX) {
 #ifndef TESTING
-			syslog(LOG_DAEMON, "Client tried to feed us %i",
+			syslog(LOG_ERR, "Client tried to feed us %i",
 			       in->hdr.msg.len);
 #endif
 			goto bad_client;
@@ -1425,10 +1438,18 @@ static void setup_structure(void)
 		   balloon driver will pick up stale entries.  In the case of
 		   the balloon driver, this can be fatal.
 		*/
-		char *tlocal = talloc_strdup(talloc_autofree_context(),
-					     "/local");
-		internal_rm("/local");
-		create_node(NULL, tlocal, NULL, 0);
+		char *tlocal = talloc_strdup(NULL, "/local");
+
+		check_store();
+
+		if (remove_local) {
+			internal_rm("/local");
+			create_node(NULL, tlocal, NULL, 0);
+
+			check_store();
+		}
+
+		talloc_free(tlocal);
 	}
 	else {
 		tdb_ctx = tdb_open(tdbname, 7919, TDB_FLAGS, O_RDWR|O_CREAT,
@@ -1439,10 +1460,196 @@ static void setup_structure(void)
 		manual_node("/", "tool");
 		manual_node("/tool", "xenstored");
 		manual_node("/tool/xenstored", NULL);
+
+		check_store();
+	}
+}
+
+
+static unsigned int hash_from_key_fn(void *k)
+{
+	char *str = k;
+        unsigned int hash = 5381;
+        char c;
+
+        while ((c = *str++))
+		hash = ((hash << 5) + hash) + (unsigned int)c;
+
+        return hash;
+}
+
+
+static int keys_equal_fn(void *key1, void *key2)
+{
+	return 0 == strcmp((char *)key1, (char *)key2);
+}
+
+
+static char *child_name(const char *s1, const char *s2)
+{
+	if (strcmp(s1, "/")) {
+		return talloc_asprintf(NULL, "%s/%s", s1, s2);
+	}
+	else {
+		return talloc_asprintf(NULL, "/%s", s2);
+	}
+}
+
+
+static void remember_string(struct hashtable *hash, const char *str)
+{
+	char *k = malloc(strlen(str) + 1);
+	strcpy(k, str);
+	hashtable_insert(hash, k, (void *)1);
+}
+
+
+/**
+ * A node has a children field that names the children of the node, separated
+ * by NULs.  We check whether there are entries in there that are duplicated
+ * (and if so, delete the second one), and whether there are any that do not
+ * have a corresponding child node (and if so, delete them).  Each valid child
+ * is then recursively checked.
+ *
+ * No deleting is performed if the recovery flag is cleared (i.e. -R was
+ * passed on the command line).
+ *
+ * As we go, we record each node in the given reachable hashtable.  These
+ * entries will be used later in clean_store.
+ */
+static void check_store_(const char *name, struct hashtable *reachable)
+{
+	struct node *node = read_node(NULL, name);
+
+	if (node) {
+		size_t i = 0;
+
+		struct hashtable * children =
+			create_hashtable(16, hash_from_key_fn, keys_equal_fn);
+
+		remember_string(reachable, name);
+
+		while (i < node->childlen) {
+			size_t childlen = strlen(node->children + i);
+			char * childname = child_name(node->name,
+						      node->children + i);
+			struct node *childnode = read_node(NULL, childname);
+			
+			if (childnode) {
+				if (hashtable_search(children, childname)) {
+					log("check_store: '%s' is duplicated!",
+					    childname);
+
+					if (recovery) {
+						remove_child_entry(NULL, node,
+								   i);
+						i -= childlen + 1;
+					}
+				}
+				else {
+					remember_string(children, childname);
+					check_store_(childname, reachable);
+				}
+			}
+			else {
+				log("check_store: No child '%s' found!\n",
+				    childname);
+
+				if (recovery) {
+					remove_child_entry(NULL, node, i);
+					i -= childlen + 1;
+				}
+			}
+
+			talloc_free(childnode);
+			talloc_free(childname);
+			i += childlen + 1;
+		}
+
+		hashtable_destroy(children, 0 /* Don't free values (they are
+						 all (void *)1) */);
+		talloc_free(node);
+	}
+	else {
+		/* Impossible, because no database should ever be without the
+		   root, and otherwise, we've just checked in our caller
+		   (which made a recursive call to get here). */
+		   
+		log("check_store: No child '%s' found: impossible!", name);
+	}
+}
+
+
+/**
+ * Helper to clean_store below.
+ */
+static int clean_store_(TDB_CONTEXT *tdb, TDB_DATA key, TDB_DATA val,
+			void *private)
+{
+	struct hashtable *reachable = private;
+	char * name = talloc_strndup(NULL, key.dptr, key.dsize);
+
+	if (!hashtable_search(reachable, name)) {
+		log("clean_store: '%s' is orphaned!", name);
+		if (recovery) {
+			tdb_delete(tdb, key);
+		}
 	}
 
-	/* FIXME: Fsck */
+	talloc_free(name);
+
+	return 0;
 }
+
+
+/**
+ * Given the list of reachable nodes, iterate over the whole store, and
+ * remove any that were not reached.
+ */
+static void clean_store(struct hashtable *reachable)
+{
+	tdb_traverse(tdb_ctx, &clean_store_, reachable);
+}
+
+
+static void check_store()
+{
+	char * root = talloc_strdup(NULL, "/");
+	struct hashtable * reachable =
+		create_hashtable(16, hash_from_key_fn, keys_equal_fn);
+ 
+	log("Checking store ...");
+	check_store_(root, reachable);
+	clean_store(reachable);
+	log("Checking store complete.");
+
+	hashtable_destroy(reachable, 0 /* Don't free values (they are all
+					  (void *)1) */);
+	talloc_free(root);
+}
+
+
+/* Something is horribly wrong: check the store. */
+static void corrupt(struct connection *conn, const char *fmt, ...)
+{
+	va_list arglist;
+	char *str;
+	int saved_errno = errno;
+
+	va_start(arglist, fmt);
+	str = talloc_vasprintf(NULL, fmt, arglist);
+	va_end(arglist);
+
+	log("corruption detected by connection %i: err %s: %s",
+	    conn ? (int)conn->id : -1, strerror(saved_errno), str);
+
+#ifdef TESTING
+	/* Allow them to attach debugger. */
+	sleep(30);
+#endif
+	check_store();
+}
+
 
 static void write_pidfile(const char *pidfile)
 {
@@ -1506,6 +1713,9 @@ static void usage(void)
 "  --no-fork           to request that the daemon does not fork,\n"
 "  --output-pid        to request that the pid of the daemon is output,\n"
 "  --trace-file <file> giving the file for logging, and\n"
+"  --no-recovery       to request that no recovery should be attempted when\n"
+"                      the store is corrupted (debug only),\n"
+"  --preserve-local    to request that /local is preserved on start-up,\n"
 "  --verbose           to request verbose execution.\n");
 }
 
@@ -1517,6 +1727,8 @@ static struct option options[] = {
 	{ "no-fork", 0, NULL, 'N' },
 	{ "output-pid", 0, NULL, 'P' },
 	{ "trace-file", 1, NULL, 'T' },
+	{ "no-recovery", 0, NULL, 'R' },
+	{ "preserve-local", 0, NULL, 'L' },
 	{ "verbose", 0, NULL, 'V' },
 	{ NULL, 0, NULL, 0 } };
 
@@ -1532,7 +1744,7 @@ int main(int argc, char *argv[])
 	bool no_domain_init = false;
 	const char *pidfile = NULL;
 
-	while ((opt = getopt_long(argc, argv, "DF:HNPT:V", options,
+	while ((opt = getopt_long(argc, argv, "DF:HNPT:RLV", options,
 				  NULL)) != -1) {
 		switch (opt) {
 		case 'D':
@@ -1549,6 +1761,12 @@ int main(int argc, char *argv[])
 			break;
 		case 'P':
 			outputpid = true;
+			break;
+		case 'R':
+			recovery = false;
+			break;
+		case 'L':
+			remove_local = false;
 			break;
 		case 'T':
 			tracefile = optarg;

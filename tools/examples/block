@@ -129,7 +129,14 @@ check_sharing()
 same_vm()
 {
   local otherdom="$1"
-  local othervm=$(xenstore-read "/local/domain/$otherdom/vm")
+  # Note that othervm can be MISSING here, because Xend will be racing with
+  # the hotplug scripts -- the entries in /local/domain can be removed by
+  # Xend before the hotplug scripts have removed the entry in
+  # /local/domain/0/backend/.  In this case, we want to pretend that the
+  # VM is the same as FRONTEND_UUID, because that way the 'sharing' will be
+  # allowed.
+  local othervm=$(xenstore_read_default "/local/domain/$otherdom/vm"         \
+                  "$FRONTEND_UUID")
 
   [ "$FRONTEND_UUID" == "$othervm" ]
 }
@@ -314,7 +321,28 @@ mount it read-write in a guest domain."
               fi
             fi
 
-            f=$(readlink -f "$f")
+            # Canonicalise the filename for the comparison.
+
+            # I have seen this readlink fails because the filename given by
+            # losetup is only the basename.  This cannot happen when the loop
+            # device is set up through this script, because file is
+            # canonicalised above, but it may happen when loop devices are set
+            # up some other way.  This readlink may also conceivably fail if
+            # the file backing this loop device has been removed.
+
+            # For maximum safety, in the case that $f does not resolve, we
+            # assume that $file and $f are in the same directory.
+
+            # If you create a loopback filesystem, remove it and continue to
+            # run on it, and then create another file with the same name, then
+            # this check will block that -- don't do that.
+
+            # If you create loop devices through some other mechanism, use
+            # relative filenames, and then use the same filename through this
+            # script, then this check will block that -- don't do that either.
+
+            f=$(readlink -f "$f" || echo $(dirname "$file")/$(basename "$f"))
+
 
             if [ "$f" == "$file" ]
             then

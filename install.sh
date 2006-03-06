@@ -22,19 +22,29 @@ if ! [ -d $dst ]; then
   exit 1
 fi
 
+tmp="`mktemp -d`"
+
 echo "Installing Xen from '$src' to '$dst'..."
-(cd $src; tar -cf - --exclude etc/init.d --exclude etc/hotplug --exclude etc/udev * ) | tar -C $dst -xf -
-cp -fdRL $src/etc/init.d/* $dst/etc/init.d/
-echo "All done."
+(cd $src; tar -cf - * ) | tar -C "$tmp" -xf -
 
 [ -x "$(which udevinfo)" ] && \
   UDEV_VERSION=$(udevinfo -V | sed -e 's/^[^0-9]* \([0-9]\{1,\}\)[^0-9]\{0,\}/\1/')
 
 if [ -n "$UDEV_VERSION" ] && [ $UDEV_VERSION -ge 059 ]; then
-  cp -f $src/etc/udev/rules.d/*.rules $dst/etc/udev/rules.d/
+  echo " - installing for udev-based system"
+  rm -rf "$tmp/etc/hotplug"
 else
-  cp -f $src/etc/hotplug/*.agent $dst/etc/hotplug/
+  echo " - installing for hotplug-based system"
+  rm -rf "$tmp/etc/udev"
 fi
+
+echo " - modifying permissions"
+chmod -R a+rX "$tmp"
+
+(cd $tmp; tar -cf - *) | tar --no-same-owner -C "$dst" -xf -
+rm -rf "$tmp"
+
+echo "All done."
 
 echo "Checking to see whether prerequisite tools are installed..."
 cd $src/../check

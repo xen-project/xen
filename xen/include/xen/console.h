@@ -8,12 +8,13 @@
 #define __CONSOLE_H__
 
 #include <xen/spinlock.h>
+#include <xen/guest_access.h>
 
 extern spinlock_t console_lock;
 
 void set_printk_prefix(const char *prefix);
 
-long read_console_ring(char **, u32 *, int);
+long read_console_ring(GUEST_HANDLE(char), u32 *, int);
 
 void init_console(void);
 void console_endboot(int disable_vga);

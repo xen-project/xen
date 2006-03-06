@@ -82,6 +82,8 @@
 extern unsigned long start_pfn;
 extern struct edid_info edid_info;
 
+extern void machine_specific_modify_cpu_capabilities(struct cpuinfo_x86 *c);
+
 shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 EXPORT_SYMBOL(HYPERVISOR_shared_info);
 
@@ -1404,6 +1406,8 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 
 	select_idle_routine(c);
 	detect_ht(c); 
+
+	machine_specific_modify_cpu_capabilities(c);
 
 	/*
 	 * On SMP, boot_cpu_data holds the common feature set between

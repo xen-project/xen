@@ -43,49 +43,85 @@ static inline int uncached_access(struct file *file)
 static ssize_t read_mem(struct file * file, char __user * buf,
 			size_t count, loff_t *ppos)
 {
-	unsigned long i, p = *ppos;
-	ssize_t read = -EFAULT;
+	unsigned long p = *ppos, ignored;
+	ssize_t read = 0, sz;
 	void __iomem *v;
 
-	if ((v = ioremap(p, count)) == NULL) {
+	while (count > 0) {
 		/*
-		 * Some programs (e.g., dmidecode) groove off into weird RAM
-		 * areas where no table scan possibly exist (because Xen will
-		 * have stomped on them!). These programs get rather upset if
-                 * we let them know that Xen failed their access, so we fake
-                 * out a read of all zeroes. :-)
+		 * Handle first page in case it's not aligned
 		 */
-		for (i = 0; i < count; i++)
-			if (put_user(0, buf+i))
-				return -EFAULT;
-		return count;
-	}
-	if (copy_to_user(buf, v, count))
-		goto out;
+		if (-p & (PAGE_SIZE - 1))
+			sz = -p & (PAGE_SIZE - 1);
+		else
+			sz = PAGE_SIZE;
 
-	read = count;
+		sz = min_t(unsigned long, sz, count);
+
+		if ((v = ioremap(p, sz)) == NULL) {
+			/*
+			 * Some programs (e.g., dmidecode) groove off into weird RAM
+			 * areas where no tables can possibly exist (because Xen will
+			 * have stomped on them!). These programs get rather upset if
+			 * we let them know that Xen failed their access, so we fake
+			 * out a read of all zeroes. :-)
+			 */
+			if (clear_user(buf, count))
+				return -EFAULT;
+			read += count;
+			break;
+		}
+
+		ignored = copy_to_user(buf, v, sz);
+		iounmap(v);
+		if (ignored)
+			return -EFAULT;
+		buf += sz;
+		p += sz;
+		count -= sz;
+		read += sz;
+	}
+
 	*ppos += read;
-out:
-	iounmap(v);
 	return read;
 }
 
 static ssize_t write_mem(struct file * file, const char __user * buf, 
 			 size_t count, loff_t *ppos)
 {
-	unsigned long p = *ppos;
-	ssize_t written = -EFAULT;
+	unsigned long p = *ppos, ignored;
+	ssize_t written = 0, sz;
 	void __iomem *v;
 
-	if ((v = ioremap(p, count)) == NULL)
-		return -EFAULT;
-	if (copy_from_user(v, buf, count))
-		goto out;
+	while (count > 0) {
+		/*
+		 * Handle first page in case it's not aligned
+		 */
+		if (-p & (PAGE_SIZE - 1))
+			sz = -p & (PAGE_SIZE - 1);
+		else
+			sz = PAGE_SIZE;
 
-	written = count;
+		sz = min_t(unsigned long, sz, count);
+
+		if ((v = ioremap(p, sz)) == NULL)
+			break;
+
+		ignored = copy_from_user(v, buf, sz);
+		iounmap(v);
+		if (ignored) {
+			written += sz - ignored;
+			if (written)
+				break;
+			return -EFAULT;
+		}
+		buf += sz;
+		p += sz;
+		count -= sz;
+		written += sz;
+	}
+
 	*ppos += written;
-out:
-	iounmap(v);
 	return written;
 }
 

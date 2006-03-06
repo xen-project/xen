@@ -92,19 +92,26 @@ typedef struct xc_core_header {
     unsigned int xch_pages_offset;
 } xc_core_header_t;
 
+#define XC_CORE_MAGIC 0xF00FEBED
 
 long xc_ptrace_core(
     int xc_handle,
     enum __ptrace_request request, 
     uint32_t domid, 
     long addr, 
-    long data);
-
+    long data,
+    vcpu_guest_context_t *ctxt);
+void * map_domain_va_core(
+    unsigned long domfd, 
+    int cpu, 
+    void *guest_va,
+    vcpu_guest_context_t *ctxt);
 int xc_waitdomain_core(
     int xc_handle,
     int domain, 
     int *status, 
-    int options);
+    int options,
+    vcpu_guest_context_t *ctxt);
 
 /*
  * DOMAIN MANAGEMENT FUNCTIONS

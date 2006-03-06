@@ -52,20 +52,6 @@ static void ioapic_enable(hvm_vioapic_t *s, uint8_t enable)
         s->flags &= ~IOAPIC_ENABLE_FLAG;
 }
 
-static void ioapic_dump_redir(hvm_vioapic_t *s, uint8_t entry)
-{
-    RedirStatus redir = s->redirtbl[entry];
-
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_dump_redir "
-      "entry %x vector %x deliver_mod %x destmode %x delivestatus %x "
-      "polarity %x remote_irr %x trigmod %x mask %x dest_id %x\n",
-      entry, redir.RedirForm.vector, redir.RedirForm.deliver_mode,
-      redir.RedirForm.destmode, redir.RedirForm.delivestatus,
-      redir.RedirForm.polarity, redir.RedirForm.remoteirr,
-      redir.RedirForm.trigmod, redir.RedirForm.mask,
-      redir.RedirForm.dest_id);
-}
-
 #ifdef HVM_DOMAIN_SAVE_RESTORE
 void ioapic_save(QEMUFile* f, void* opaque)
 {
@@ -534,7 +520,19 @@ void hvm_vioapic_set_irq(struct domain *d, int irq, int level)
     if (!IOAPICEnabled(s) || s->redirtbl[irq].RedirForm.mask)
         return;
 
-    ioapic_dump_redir(s, irq);
+    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "hvm_vioapic_set_irq entry %x "
+      "vector %x deliver_mod %x destmode %x delivestatus %x "
+      "polarity %x remote_irr %x trigmod %x mask %x dest_id %x\n",
+      irq,
+      s->redirtbl[irq].RedirForm.vector,
+      s->redirtbl[irq].RedirForm.deliver_mode,
+      s->redirtbl[irq].RedirForm.destmode,
+      s->redirtbl[irq].RedirForm.delivestatus,
+      s->redirtbl[irq].RedirForm.polarity,
+      s->redirtbl[irq].RedirForm.remoteirr,
+      s->redirtbl[irq].RedirForm.trigmod,
+      s->redirtbl[irq].RedirForm.mask,
+      s->redirtbl[irq].RedirForm.dest_id);
 
     if (irq >= 0 && irq < IOAPIC_NUM_PINS) {
         uint32_t bit = 1 << irq;

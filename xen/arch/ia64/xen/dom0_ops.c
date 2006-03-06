@@ -16,10 +16,11 @@
 #include <asm/pdb.h>
 #include <xen/trace.h>
 #include <xen/console.h>
+#include <xen/guest_access.h>
 #include <public/sched_ctl.h>
 #include <asm/vmx.h>
 
-long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
+long arch_do_dom0_op(dom0_op_t *op, GUEST_HANDLE(dom0_op_t) u_dom0_op)
 {
     long ret = 0;
 
@@ -64,7 +65,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 
         put_domain(d);
 
-        copy_to_user(u_dom0_op, op, sizeof(*op));
+        copy_to_guest(u_dom0_op, op, 1);
     }
     break;
 
@@ -74,7 +75,6 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         int n,j;
         int num = op->u.getpageframeinfo2.num;
         domid_t dom = op->u.getpageframeinfo2.domain;
-        unsigned long *s_ptr = (unsigned long*) op->u.getpageframeinfo2.array;
         struct domain *d;
         unsigned long *l_arr;
         ret = -ESRCH;
@@ -95,7 +95,8 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         {
             int k = ((num-n)>GPF2_BATCH)?GPF2_BATCH:(num-n);
 
-            if ( copy_from_user(l_arr, &s_ptr[n], k*sizeof(unsigned long)) )
+            if ( copy_from_guest_offset(l_arr, op->u.getpageframeinfo2.array,
+                                        n, k) )
             {
                 ret = -EINVAL;
                 break;
@@ -135,7 +136,8 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 
             }
 
-            if ( copy_to_user(&s_ptr[n], l_arr, k*sizeof(unsigned long)) )
+            if ( copy_to_guest_offset(op->u.getpageframeinfo2.array,
+                                      n, l_arr, k) )
             {
                 ret = -EINVAL;
                 break;
@@ -160,7 +162,6 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         unsigned long start_page = op->u.getmemlist.max_pfns >> 32;
         unsigned long nr_pages = op->u.getmemlist.max_pfns & 0xffffffff;
         unsigned long mfn;
-        unsigned long *buffer = op->u.getmemlist.buffer;
 
         ret = -EINVAL;
         if ( d != NULL )
@@ -180,16 +181,16 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             {
                 mfn = gmfn_to_mfn_foreign(d, i);
 
-                if ( put_user(mfn, buffer) )
+                if ( copy_to_guest_offset(op->u.getmemlist.buffer,
+                                          i - start_page, &mfn, 1) )
                 {
                     ret = -EFAULT;
                     break;
                 }
-                buffer++;
             }
 
             op->u.getmemlist.num_pfns = i - start_page;
-            copy_to_user(u_dom0_op, op, sizeof(*op));
+            copy_to_guest(u_dom0_op, op, 1);
             
             put_domain(d);
         }
@@ -211,7 +212,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
         //memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
         ret = 0;
-        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+        if ( copy_to_guest(u_dom0_op, op, 1) )
             ret = -EFAULT;
     }
     break;

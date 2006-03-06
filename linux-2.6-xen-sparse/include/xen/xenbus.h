@@ -63,7 +63,7 @@ struct xenbus_device {
 	int otherend_id;
 	struct xenbus_watch otherend_watch;
 	struct device dev;
-	int has_error;
+	XenbusState state;
 	void *data;
 };
 

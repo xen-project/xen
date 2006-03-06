@@ -45,9 +45,7 @@
 #include <asm/hypervisor.h>
 #include <xen/xenbus.h>
 #include <xen/xen_proc.h>
-#include <xen/balloon.h>
 #include <xen/evtchn.h>
-#include <xen/public/evtchn.h>
 
 #include "xenbus_comms.h"
 
@@ -886,9 +884,33 @@ void unregister_xenstore_notifier(struct notifier_block *nb)
 EXPORT_SYMBOL(unregister_xenstore_notifier);
 
 
+static int all_devices_ready_(struct device *dev, void *data)
+{
+	struct xenbus_device *xendev = to_xenbus_device(dev);
+	int *result = data;
+
+	if (xendev->state != XenbusStateConnected) {
+		result = 0;
+		return 1;
+	}
+
+	return 0;
+}
+
+
+static int all_devices_ready(void)
+{
+	int ready = 1;
+	bus_for_each_dev(&xenbus_frontend.bus, NULL, &ready,
+			 all_devices_ready_);
+	return ready;
+}
+
 
 void xenbus_probe(void *unused)
 {
+	int i;
+
 	BUG_ON((xenstored_ready <= 0));
 
 	/* Enumerate devices in xenstore. */
@@ -901,12 +923,50 @@ void xenbus_probe(void *unused)
 
 	/* Notify others that xenstore is up */
 	notifier_call_chain(&xenstore_chain, 0, NULL);
+
+	/* On a 10 second timeout, waiting for all devices currently
+	   configured.  We need to do this to guarantee that the filesystems
+	   and / or network devices needed for boot are available, before we
+	   can allow the boot to proceed.
+
+	   A possible improvement here would be to have the tools add a
+	   per-device flag to the store entry, indicating whether it is needed
+	   at boot time.  This would allow people who knew what they were
+	   doing to accelerate their boot slightly, but of course needs tools
+	   or manual intervention to set up those flags correctly.
+	 */
+	for (i = 0; i < 10 * HZ; i++) {
+		if (all_devices_ready())
+			return;
+
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(1);
+	}
+
+	printk(KERN_WARNING
+	       "XENBUS: Timeout connecting to devices!\n");
 }
 
 
+static struct file_operations xsd_kva_fops;
 static struct proc_dir_entry *xsd_kva_intf;
 static struct proc_dir_entry *xsd_port_intf;
 
+static int xsd_kva_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	size_t size = vma->vm_end - vma->vm_start;
+
+	if ((size > PAGE_SIZE) || (vma->vm_pgoff != 0))
+		return -EINVAL;
+
+	vma->vm_pgoff = mfn_to_pfn(xen_start_info->store_mfn);
+
+	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+			    size, vma->vm_page_prot))
+		return -EAGAIN;
+
+	return 0;
+}
 
 static int xsd_kva_read(char *page, char **start, off_t off,
                         int count, int *eof, void *data)
@@ -980,9 +1040,14 @@ static int __init xenbus_probe_init(void)
 		xen_start_info->store_evtchn = op.u.alloc_unbound.port;
 
 		/* And finally publish the above info in /proc/xen */
-		if((xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0400)))
+		if ((xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0400))) {
+			memcpy(&xsd_kva_fops, xsd_kva_intf->proc_fops,
+			       sizeof(xsd_kva_fops));
+			xsd_kva_fops.mmap = xsd_kva_mmap;
+			xsd_kva_intf->proc_fops = &xsd_kva_fops;
 			xsd_kva_intf->read_proc = xsd_kva_read;
-		if((xsd_port_intf = create_xen_proc_entry("xsd_port", 0400)))
+		}
+		if ((xsd_port_intf = create_xen_proc_entry("xsd_port", 0400)))
 			xsd_port_intf->read_proc = xsd_port_read;
 	}
 

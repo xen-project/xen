@@ -16,7 +16,7 @@ static char * __init machine_specific_memory_setup(void)
 	return "Xen";
 }
 
-void __init machine_specific_modify_cpu_capabilities(struct cpuinfo_x86 *c)
+void __devinit machine_specific_modify_cpu_capabilities(struct cpuinfo_x86 *c)
 {
 	clear_bit(X86_FEATURE_VME, c->x86_capability);
 	clear_bit(X86_FEATURE_DE, c->x86_capability);

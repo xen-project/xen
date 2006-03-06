@@ -249,7 +249,7 @@ void pit_reset_hvm_vectors()
     req->u.data |= (irq << 16);
     req->u.data |= (hvm_channel << 24);
     req->u.data |= ((s->rw_mode) << 26);
-    fprintf(logfile, "HVM_PIT:pass info 0x%llx to HV!\n", req->u.data);
+    fprintf(logfile, "HVM_PIT:pass info 0x%"PRIx64" to HV!\n", req->u.data);
 }
 
 static inline void pit_load_count(PITChannelState *s, int val)

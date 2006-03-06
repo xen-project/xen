@@ -172,7 +172,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     switch(regs->ecx){
     case MSR_EFER:
         msr_content = msr->msr_items[VMX_INDEX_MSR_EFER];
-        HVM_DBG_LOG(DBG_LEVEL_2, "EFER msr_content %llx\n", (unsigned long long)msr_content);
+        HVM_DBG_LOG(DBG_LEVEL_2, "EFER msr_content %"PRIx64"\n", msr_content);
         if (test_bit(VMX_CPU_STATE_LME_ENABLED,
                      &vc->arch.hvm_vmx.cpu_state))
             msr_content |= 1 << _EFER_LME;
@@ -202,7 +202,8 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     default:
         return 0;
     }
-    HVM_DBG_LOG(DBG_LEVEL_2, "mode_do_msr_read: msr_content: %lx\n", msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_2, "mode_do_msr_read: msr_content: %"PRIx64"\n",
+                msr_content);
     regs->eax = msr_content & 0xffffffff;
     regs->edx = msr_content >> 32;
     return 1;
@@ -216,8 +217,9 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     struct vmx_msr_state * host_state =
         &percpu_msr[smp_processor_id()];
 
-    HVM_DBG_LOG(DBG_LEVEL_1, " mode_do_msr_write msr %lx msr_content %lx\n",
-                regs->ecx, msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_1, " mode_do_msr_write msr %lx "
+                "msr_content %"PRIx64"\n",
+                (unsigned long)regs->ecx, msr_content);
 
     switch (regs->ecx){
     case MSR_EFER:
@@ -882,7 +884,7 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
     __vmread(GUEST_RFLAGS, &eflags);
     vm86 = eflags & X86_EFLAGS_VM ? 1 : 0;
 
-    HVM_DBG_LOG(DBG_LEVEL_1,
+    HVM_DBG_LOG(DBG_LEVEL_IO,
                 "vmx_io_instruction: vm86 %d, eip=%lx:%lx, "
                 "exit_qualification = %lx",
                 vm86, cs, eip, exit_qualification);

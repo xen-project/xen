@@ -506,7 +506,6 @@ get_page_from_l2e(
     vaddr <<= PGT_va_shift;
     rc = get_page_and_type_from_pagenr(
         l2e_get_pfn(l2e), PGT_l1_page_table | vaddr, d);
-
 #if CONFIG_PAGING_LEVELS == 2
     if ( unlikely(!rc) )
         rc = get_linear_pagetable(l2e, pfn, d);
@@ -3187,8 +3186,8 @@ static int ptwr_emulated_update(
         ptwr_flush(d, PTWR_PT_INACTIVE);
 
     /* Read the PTE that maps the page being updated. */
-    if (__copy_from_user(&pte, &linear_pg_table[l1_linear_offset(addr)],
-                         sizeof(pte)))
+    if ( __copy_from_user(&pte, &linear_pg_table[l1_linear_offset(addr)],
+                          sizeof(pte)) )
     {
         MEM_LOG("ptwr_emulate: Cannot read thru linear_pg_table");
         return X86EMUL_UNHANDLEABLE;
@@ -3198,15 +3197,10 @@ static int ptwr_emulated_update(
     page = mfn_to_page(pfn);
 
     /* We are looking only for read-only mappings of p.t. pages. */
-    if ( ((l1e_get_flags(pte) & (_PAGE_RW|_PAGE_PRESENT)) != _PAGE_PRESENT) ||
-         ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) ||
-         (page_get_owner(page) != d) )
-    {
-        MEM_LOG("ptwr_emulate: Page is mistyped or bad pte "
-                "(%lx, %" PRtype_info ")",
-                l1e_get_pfn(pte), page->u.inuse.type_info);
-        return X86EMUL_UNHANDLEABLE;
-    }
+    ASSERT((l1e_get_flags(pte) & (_PAGE_RW|_PAGE_PRESENT)) == _PAGE_PRESENT);
+    ASSERT((page->u.inuse.type_info & PGT_type_mask) == PGT_l1_page_table);
+    ASSERT((page->u.inuse.type_info & PGT_count_mask) != 0);
+    ASSERT(page_get_owner(page) == d);
 
     /* Check the new PTE. */
     nl1e = l1e_from_intpte(val);
@@ -3266,8 +3260,11 @@ static int ptwr_emulated_cmpxchg8b(
     unsigned long new,
     unsigned long new_hi)
 {
-    return ptwr_emulated_update(
-        addr, ((u64)old_hi << 32) | old, ((u64)new_hi << 32) | new, 8, 1);
+    if ( CONFIG_PAGING_LEVELS == 2 )
+        return X86EMUL_UNHANDLEABLE;
+    else
+        return ptwr_emulated_update(
+            addr, ((u64)old_hi << 32) | old, ((u64)new_hi << 32) | new, 8, 1);
 }
 
 static struct x86_mem_emulator ptwr_mem_emulator = {

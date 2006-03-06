@@ -247,6 +247,7 @@ void svm_load_msrs(void)
 void svm_restore_msrs(struct vcpu *v)
 {
 }
+#endif
 
 #define IS_CANO_ADDRESS(add) 1
 
@@ -297,7 +298,7 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
         return 0;
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_2, "mode_do_msr_read: msr_content: %lx\n", 
+    HVM_DBG_LOG(DBG_LEVEL_2, "mode_do_msr_read: msr_content: %"PRIx64"\n", 
             msr_content);
 
     regs->eax = msr_content & 0xffffffff;
@@ -311,12 +312,14 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     struct vcpu *vc = current;
     struct vmcb_struct *vmcb = vc->arch.hvm_svm.vmcb;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "mode_do_msr_write msr %lx msr_content %lx\n", 
-                regs->ecx, msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_1, "mode_do_msr_write msr %lx "
+                "msr_content %"PRIx64"\n", 
+                (unsigned long)regs->ecx, msr_content);
 
     switch (regs->ecx)
     {
     case MSR_EFER:
+#ifdef __x86_64__
         if ((msr_content & EFER_LME) ^ test_bit(SVM_CPU_STATE_LME_ENABLED,
                                                 &vc->arch.hvm_svm.cpu_state))
         {
@@ -337,6 +340,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         if ((msr_content ^ vmcb->efer) & EFER_LME)
             msr_content &= ~EFER_LME;  
         /* No update for LME/LMA since it have no effect */
+#endif
         vmcb->efer = msr_content | EFER_SVME;
         break;
 
@@ -382,18 +386,6 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     }
     return 1;
 }
-
-#else
-static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
-{
-    return 0;
-}
-
-static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
-{
-    return 0;
-}
-#endif
 
 void svm_store_cpu_guest_ctrl_regs(struct vcpu *v, unsigned long crs[8])
 {
@@ -752,7 +744,8 @@ void svm_relinquish_resources(struct vcpu *v)
         /* unmap IO shared page */
         struct domain *d = v->domain;
         if ( d->arch.hvm_domain.shared_page_va )
-            unmap_domain_page((void *)d->arch.hvm_domain.shared_page_va);
+            unmap_domain_page_global(
+                (void *)d->arch.hvm_domain.shared_page_va);
         shadow_direct_map_clean(d);
     }
 
@@ -937,10 +930,8 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
 
     if (input == 1)
     {
-#ifndef __x86_64__
         if ( hvm_apic_support(v->domain) &&
                 !vlapic_global_enabled((VLAPIC(v))) )
-#endif
             clear_bit(X86_FEATURE_APIC, &edx);
 	    
 #if CONFIG_PAGING_LEVELS < 3

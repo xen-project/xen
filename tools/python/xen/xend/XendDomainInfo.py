@@ -13,7 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
-# Copyright (C) 2005 XenSource Ltd
+# Copyright (C) 2005, 2006 XenSource Ltd
 #============================================================================
 
 """Representation of a single domain.
@@ -82,7 +82,7 @@ restart_modes = [
 STATE_DOM_OK       = 1
 STATE_DOM_SHUTDOWN = 2
 
-SHUTDOWN_TIMEOUT = 30
+SHUTDOWN_TIMEOUT = 30.0
 
 ZOMBIE_PREFIX = 'Zombie-'
 
@@ -182,7 +182,7 @@ def create(config):
         vm.initDomain()
         vm.storeVmDetails()
         vm.storeDomDetails()
-        vm.registerWatch()
+        vm.registerWatches()
         vm.refreshShutdown()
         return vm
     except:
@@ -238,7 +238,7 @@ def recreate(xeninfo, priv):
         vm.storeVmDetails()
         vm.storeDomDetails()
 
-    vm.registerWatch()
+    vm.registerWatches()
     vm.refreshShutdown(xeninfo)
     return vm
 
@@ -443,7 +443,10 @@ class XendDomainInfo:
         self.console_mfn = None
 
         self.vmWatch = None
+        self.shutdownWatch = None
 
+        self.shutdownStartTime = None
+        
         self.state = STATE_DOM_OK
         self.state_updated = threading.Condition()
         self.refresh_shutdown_lock = threading.Condition()
@@ -648,7 +651,7 @@ class XendDomainInfo:
 
         self.introduceDomain()
         self.storeDomDetails()
-        self.registerWatch()
+        self.registerWatches()
         self.refreshShutdown()
 
         log.debug("XendDomainInfo.completeRestore done")
@@ -711,13 +714,15 @@ class XendDomainInfo:
 
     ## public:
 
-    def registerWatch(self):
-        """Register a watch on this VM's entries in the store, so that
-        when they are changed externally, we keep up to date.  This should
-        only be called by {@link #create}, {@link #recreate}, or {@link
-        #restore}, once the domain's details have been written, but before the
-        new instance is returned."""
+    def registerWatches(self):
+        """Register a watch on this VM's entries in the store, and the
+        domain's control/shutdown node, so that when they are changed
+        externally, we keep up to date.  This should only be called by {@link
+        #create}, {@link #recreate}, or {@link #restore}, once the domain's
+        details have been written, but before the new instance is returned."""
         self.vmWatch = xswatch(self.vmpath, self.storeChanged)
+        self.shutdownWatch = xswatch(self.dompath + '/control/shutdown',
+                                     self.handleShutdownWatch)
 
 
     def getDomid(self):
@@ -852,20 +857,14 @@ class XendDomainInfo:
                 # Domain is alive.  If we are shutting it down, then check
                 # the timeout on that, and destroy it if necessary.
 
-                sst = self.readDom('xend/shutdown_start_time')
-                if sst:
-                    sst = float(sst)
-                    timeout = SHUTDOWN_TIMEOUT - time.time() + sst
+                if self.shutdownStartTime:
+                    timeout = (SHUTDOWN_TIMEOUT - time.time() +
+                               self.shutdownStartTime)
                     if timeout < 0:
                         log.info(
                             "Domain shutdown timeout expired: name=%s id=%s",
                             self.info['name'], self.domid)
                         self.destroy()
-                    else:
-                        log.debug(
-                            "Scheduling refreshShutdown on domain %d in %ds.",
-                            self.domid, timeout)
-                        threading.Timer(timeout, self.refreshShutdown).start()
         finally:
             self.refresh_shutdown_lock.release()
 
@@ -873,12 +872,34 @@ class XendDomainInfo:
             self.maybeRestart(restart_reason)
 
 
+    def handleShutdownWatch(self, _):
+        log.debug('XendDomainInfo.handleShutdownWatch')
+        
+        reason = self.readDom('control/shutdown')
+
+        if reason and reason != 'suspend':
+            sst = self.readDom('xend/shutdown_start_time')
+            now = time.time()
+            if sst:
+                self.shutdownStartTime = float(sst)
+                timeout = float(sst) + SHUTDOWN_TIMEOUT - now
+            else:
+                self.shutdownStartTime = now
+                self.storeDom('xend/shutdown_start_time', now)
+                timeout = SHUTDOWN_TIMEOUT
+
+            log.trace(
+                "Scheduling refreshShutdown on domain %d in %ds.",
+                self.domid, timeout)
+            threading.Timer(timeout, self.refreshShutdown).start()
+
+        return 1
+
+
     def shutdown(self, reason):
         if not reason in shutdown_reasons.values():
             raise XendError('Invalid reason: %s' % reason)
         self.storeDom("control/shutdown", reason)
-        if reason != 'suspend':
-            self.storeDom('xend/shutdown_start_time', time.time())
 
 
     ## private:
@@ -1225,6 +1246,8 @@ class XendDomainInfo:
         """Cleanup domain resources; release devices.  Idempotent.  Nothrow
         guarantee."""
 
+        self.unwatchShutdown()
+
         self.release_devices()
 
         if self.image:
@@ -1274,6 +1297,20 @@ class XendDomainInfo:
                 self.vmWatch = None
         except:
             log.exception("Unwatching VM path failed.")
+
+
+    def unwatchShutdown(self):
+        """Remove the watch on the domain's control/shutdown node, if any.
+        Idempotent.  Nothrow guarantee."""
+
+        try:
+            try:
+                if self.shutdownWatch:
+                    self.shutdownWatch.unwatch()
+            finally:
+                self.shutdownWatch = None
+        except:
+            log.exception("Unwatching control/shutdown failed.")
 
 
     ## public:

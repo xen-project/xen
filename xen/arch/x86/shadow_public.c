@@ -29,6 +29,7 @@
 #include <xen/event.h>
 #include <xen/sched.h>
 #include <xen/trace.h>
+#include <xen/guest_access.h>
 #include <asm/shadow_64.h>
 
 static int alloc_p2m_table(struct domain *d);
@@ -413,7 +414,8 @@ static void alloc_monitor_pagetable(struct vcpu *v)
             (l3e_get_flags(mpl3e[i]) & _PAGE_PRESENT) ?
             l2e_from_pfn(l3e_get_pfn(mpl3e[i]), __PAGE_HYPERVISOR) :
             l2e_empty();
-    mpl2e[l2_table_offset(RO_MPT_VIRT_START)] = l2e_empty();
+    for ( i = 0; i < (MACHPHYS_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
+        mpl2e[l2_table_offset(RO_MPT_VIRT_START) + i] = l2e_empty();
 
     v->arch.monitor_table = mk_pagetable(m3mfn << PAGE_SHIFT); /* < 4GB */
     v->arch.monitor_vtable = (l2_pgentry_t *) mpl3e;
@@ -1266,14 +1268,14 @@ static int shadow_mode_table_op(
         d->arch.shadow_fault_count       = 0;
         d->arch.shadow_dirty_count       = 0;
  
-        if ( (sc->dirty_bitmap == NULL) || 
+        if ( guest_handle_is_null(sc->dirty_bitmap) ||
              (d->arch.shadow_dirty_bitmap == NULL) )
         {
             rc = -EINVAL;
             break;
         }
 
-        if(sc->pages > d->arch.shadow_dirty_bitmap_size)
+        if ( sc->pages > d->arch.shadow_dirty_bitmap_size )
             sc->pages = d->arch.shadow_dirty_bitmap_size; 
 
 #define chunk (8*1024) /* Transfer and clear in 1kB chunks for L1 cache. */
@@ -1282,10 +1284,10 @@ static int shadow_mode_table_op(
             int bytes = ((((sc->pages - i) > chunk) ?
                           chunk : (sc->pages - i)) + 7) / 8;
 
-            if (copy_to_user(
-                sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
+            if ( copy_to_guest_offset(
+                sc->dirty_bitmap, i/(8*sizeof(unsigned long)),
                 d->arch.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
-                bytes))
+                (bytes+sizeof(unsigned long)-1) / sizeof(unsigned long)) )
             {
                 rc = -EINVAL;
                 break;
@@ -1301,18 +1303,20 @@ static int shadow_mode_table_op(
         sc->stats.fault_count       = d->arch.shadow_fault_count;
         sc->stats.dirty_count       = d->arch.shadow_dirty_count;
  
-        if ( (sc->dirty_bitmap == NULL) || 
+        if ( guest_handle_is_null(sc->dirty_bitmap) ||
              (d->arch.shadow_dirty_bitmap == NULL) )
         {
             rc = -EINVAL;
             break;
         }
  
-        if(sc->pages > d->arch.shadow_dirty_bitmap_size)
+        if ( sc->pages > d->arch.shadow_dirty_bitmap_size )
             sc->pages = d->arch.shadow_dirty_bitmap_size; 
 
-        if (copy_to_user(sc->dirty_bitmap, 
-                         d->arch.shadow_dirty_bitmap, (sc->pages+7)/8))
+        if ( copy_to_guest(sc->dirty_bitmap, 
+                           d->arch.shadow_dirty_bitmap,
+                           (((sc->pages+7)/8)+sizeof(unsigned long)-1) /
+                           sizeof(unsigned long)) )
         {
             rc = -EINVAL;
             break;

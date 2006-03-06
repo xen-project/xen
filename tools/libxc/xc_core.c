@@ -61,7 +61,7 @@ xc_domain_dumpcore(int xc_handle,
  
     nr_pages = info.nr_pages;
 
-    header.xch_magic = 0xF00FEBED; 
+    header.xch_magic = XC_CORE_MAGIC;
     header.xch_nr_vcpus = nr_vcpus;
     header.xch_nr_pages = nr_pages;
     header.xch_ctxt_offset = sizeof(struct xc_core_header);
@@ -71,8 +71,12 @@ xc_domain_dumpcore(int xc_handle,
                                          (sizeof(vcpu_guest_context_t) * nr_vcpus) +
                                          (nr_pages * sizeof(unsigned long)));
 
-    write(dump_fd, &header, sizeof(struct xc_core_header));
-    write(dump_fd, &ctxt, sizeof(ctxt[0]) * nr_vcpus);
+    if (write(dump_fd, &header, sizeof(struct xc_core_header)) < 0 ||
+        write(dump_fd, &ctxt, sizeof(ctxt[0]) * nr_vcpus) < 0)
+    {
+        PERROR("write failed");
+        goto error_out;
+    }
 
     if ((page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL) {
         printf("Could not allocate memory\n");
@@ -82,7 +86,11 @@ xc_domain_dumpcore(int xc_handle,
         printf("Could not get the page frame list\n");
         goto error_out;
     }
-    write(dump_fd, page_array, nr_pages * sizeof(unsigned long));
+    if (write(dump_fd, page_array, nr_pages * sizeof(unsigned long)) < 0)
+    {
+        PERROR("write failed");
+        goto error_out;
+    }
     lseek(dump_fd, header.xch_pages_offset, SEEK_SET);
     for (dump_mem = dump_mem_start, i = 0; i < nr_pages; i++) {
         copy_from_domain_page(xc_handle, domid, page_array, i, dump_mem);

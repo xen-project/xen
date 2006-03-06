@@ -396,10 +396,8 @@ def xm_vcpu_list(args):
     if args:
         dominfo = map(server.xend_domain_vcpuinfo, args)
     else:
-        doms = server.xend_list_domains()
-        dominfo = map(
-            lambda x: server.xend_domain_vcpuinfo(sxp.child_value(x, 'name')),
-            doms)
+        doms = server.xend_list_domains(False)
+        dominfo = map(server.xend_domain_vcpuinfo, doms)
 
     print 'Name                              ID  VCPU  CPU  State  Time(s)  CPU Affinity'
 

@@ -1,6 +1,8 @@
 #ifndef XC_PTRACE_
 #define XC_PTRACE_
 
+#include <thread_db.h>
+
 #ifdef XC_PTRACE_PRIVATE
 #define X86_CR0_PE              0x00000001 /* Enable Protected Mode    (RW) */
 #define X86_CR0_PG              0x80000000 /* Paging                   (RW) */
@@ -8,33 +10,7 @@
 #define PDRSHIFT        22
 #define PSL_T  0x00000100 /* trace enable bit */
 
-char * ptrace_names[] = {
-    "PTRACE_TRACEME",
-    "PTRACE_PEEKTEXT",
-    "PTRACE_PEEKDATA",
-    "PTRACE_PEEKUSER",
-    "PTRACE_POKETEXT",
-    "PTRACE_POKEDATA",
-    "PTRACE_POKEUSER",
-    "PTRACE_CONT",
-    "PTRACE_KILL",
-    "PTRACE_SINGLESTEP",
-    "PTRACE_INVALID",
-    "PTRACE_INVALID",
-    "PTRACE_GETREGS",
-    "PTRACE_SETREGS",
-    "PTRACE_GETFPREGS",
-    "PTRACE_SETFPREGS",
-    "PTRACE_ATTACH",
-    "PTRACE_DETACH",
-    "PTRACE_GETFPXREGS",
-    "PTRACE_SETFPXREGS",
-    "PTRACE_INVALID",
-    "PTRACE_INVALID",
-    "PTRACE_INVALID",
-    "PTRACE_INVALID",
-    "PTRACE_SYSCALL",
-};
+extern const char const * ptrace_names[];
 
 struct gdb_regs {
     long ebx; /* 0 */
