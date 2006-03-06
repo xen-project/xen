@@ -21,6 +21,9 @@
 #ifndef __XEN_GDBSTUB_H__
 #define __XEN_GDBSTUB_H__
 
+#include <asm/atomic.h>
+#include <asm/page.h>
+
 #ifdef CRASH_DEBUG
 
 /* value <-> char (de)serialzers for arch specific gdb backends */
