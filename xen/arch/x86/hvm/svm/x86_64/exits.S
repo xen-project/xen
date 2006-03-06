@@ -157,6 +157,7 @@ svm_test_all_events:
         jnz   svm_process_softirqs
 svm_restore_all_guest:
         call svm_intr_assist
+        call svm_asid
         call svm_load_cr2
         sti
         /*
