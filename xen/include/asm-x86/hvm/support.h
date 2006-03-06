@@ -117,7 +117,7 @@ enum hval_bitmaps {
 #define DBG_LEVEL_VMMU              (1 << 5)
 #define DBG_LEVEL_VLAPIC            (1 << 6)
 #define DBG_LEVEL_VLAPIC_TIMER      (1 << 7)
-#define DBG_LEVEL_VLAPIC_INTERRUPT  (1 << 7)
+#define DBG_LEVEL_VLAPIC_INTERRUPT  (1 << 8)
 #define DBG_LEVEL_IOAPIC            (1 << 9)
 
 extern unsigned int opt_hvm_debug_level;
