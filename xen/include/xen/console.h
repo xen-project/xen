@@ -8,6 +8,7 @@
 #define __CONSOLE_H__
 
 #include <xen/spinlock.h>
+#include <xen/guest_access.h>
 
 extern spinlock_t console_lock;
 
