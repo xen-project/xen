@@ -380,8 +380,8 @@ typedef struct shared_info {
  *      a. relocated kernel image
  *      b. initial ram disk              [mod_start, mod_len]
  *      c. list of allocated page frames [mfn_list, nr_pages]
- *      d. bootstrap page tables         [pt_base, CR3 (x86)]
- *      e. start_info_t structure        [register ESI (x86)]
+ *      d. start_info_t structure        [register ESI (x86)]
+ *      e. bootstrap page tables         [pt_base, CR3 (x86)]
  *      f. bootstrap stack               [register ESP (x86)]
  *  5. Bootstrap elements are packed together, but each is 4kB-aligned.
  *  6. The initial ram disk may be omitted.
