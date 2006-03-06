@@ -452,6 +452,12 @@ def show_livestats():
         if c == ord('c'):
             cpu = (cpu + 1) % ncpu
 
+        # n/p = cycle to the next/previous CPU
+        if c == ord('n'):
+            cpu = (cpu + 1) % ncpu
+        if c == ord('p'):
+            cpu = (cpu - 1) % ncpu
+
         stdscr.erase()
 
     _c.nocbreak()
