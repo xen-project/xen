@@ -9,7 +9,7 @@
 #include "xc_ptrace.h"
 
 #ifdef DEBUG
-const char const * ptrace_names[] = {
+static char *ptrace_names[] = {
     "PTRACE_TRACEME",
     "PTRACE_PEEKTEXT",
     "PTRACE_PEEKDATA",
