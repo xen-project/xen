@@ -1039,7 +1039,7 @@ static int __init xenbus_probe_init(void)
 		xen_start_info->store_evtchn = op.u.alloc_unbound.port;
 
 		/* And finally publish the above info in /proc/xen */
-		xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0400);
+		xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0600);
 		if (xsd_kva_intf) {
 			memcpy(&xsd_kva_fops, xsd_kva_intf->proc_fops,
 			       sizeof(xsd_kva_fops));
