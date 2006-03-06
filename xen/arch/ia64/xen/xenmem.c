@@ -35,6 +35,8 @@ void
 paging_init (void)
 {
 	unsigned int mpt_order;
+	unsigned long i;
+
 	/* Create machine to physical mapping table
 	 * NOTE: similar to frame table, later we may need virtually
 	 * mapped mpt table if large hole exists. Also MAX_ORDER needs
@@ -47,7 +49,9 @@ paging_init (void)
 		panic("Not enough memory to bootstrap Xen.\n");
 
 	printk("machine to physical table: 0x%lx\n", (u64)mpt_table);
-	memset(mpt_table, INVALID_M2P_ENTRY, mpt_table_size);
+	for (i = 0; i < (1UL << mpt_order); i++) {
+		mpt_table[i] = INVALID_M2P_ENTRY;
+	}
 	/* Other mapping setup */
 
 	zero_page_memmap_ptr = virt_to_page(ia64_imva(empty_zero_page));

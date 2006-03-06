@@ -414,8 +414,8 @@ extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
 #undef machine_to_phys_mapping
 #define machine_to_phys_mapping	mpt_table
 
-#define INVALID_M2P_ENTRY        (~0U)
-#define VALID_M2P(_e)            (!((_e) & (1U<<63)))
+#define INVALID_M2P_ENTRY        (~0UL)
+#define VALID_M2P(_e)            (!((_e) & (1UL<<63)))
 #define IS_INVALID_M2P_ENTRY(_e) (!VALID_M2P(_e))
 
 #define set_gpfn_from_mfn(mfn, pfn) (machine_to_phys_mapping[(mfn)] = (pfn))
