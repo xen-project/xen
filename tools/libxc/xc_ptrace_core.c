@@ -6,8 +6,6 @@
 #include "xc_ptrace.h"
 #include <time.h>
 
-#define VCPU            0               /* XXX */
-
 /* XXX application state */
 
 static long   nr_pages = 0;
@@ -15,7 +13,6 @@ static unsigned long  *p2m_array = NULL;
 static unsigned long  *m2p_array = NULL;
 static unsigned long            pages_offset;
 static unsigned long            cr3[MAX_VIRT_CPUS];
-static vcpu_guest_context_t     ctxt[MAX_VIRT_CPUS];
 
 /* --------------------- */
 
@@ -23,11 +20,13 @@ static unsigned long
 map_mtop_offset(unsigned long ma)
 {
     return pages_offset + (m2p_array[ma >> PAGE_SHIFT] << PAGE_SHIFT);
+    return 0;
 }
 
 
-static void *
-map_domain_va(unsigned long domfd, int cpu, void * guest_va)
+void *
+map_domain_va_core(unsigned long domfd, int cpu, void * guest_va,
+                        vcpu_guest_context_t *ctxt)
 {
     unsigned long pde, page;
     unsigned long va = (unsigned long)guest_va;
@@ -99,7 +98,8 @@ xc_waitdomain_core(
     int xc_handle,
     int domfd,
     int *status,
-    int options)
+    int options,
+    vcpu_guest_context_t *ctxt)
 {
     int nr_vcpus;
     int i;
@@ -144,85 +144,6 @@ xc_waitdomain_core(
 
     }
     return 0;
-}
-
-long
-xc_ptrace_core(
-    int xc_handle,
-    enum __ptrace_request request,
-    uint32_t domfd,
-    long eaddr,
-    long edata)
-{
-    int             status = 0;
-    struct gdb_regs pt;
-    long            retval = 0;
-    unsigned long  *guest_va;
-    int             cpu = VCPU;
-    void           *addr = (char *)eaddr;
-    void           *data = (char *)edata;
-
-#if 0
-    printf("%20s %d, %p, %p \n", ptrace_names[request], domid, addr, data);
-#endif
-    switch (request) { 
-    case PTRACE_PEEKTEXT:
-    case PTRACE_PEEKDATA:
-        if ((guest_va = (unsigned long *)map_domain_va(domfd, cpu, addr)) == NULL) {
-            status = EFAULT;
-            goto error_out;
-        }
-
-        retval = *guest_va;
-        break;
-    case PTRACE_POKETEXT:
-    case PTRACE_POKEDATA:
-        if ((guest_va = (unsigned long *)map_domain_va(domfd, cpu, addr)) == NULL) {
-            status = EFAULT;
-            goto error_out;
-        }
-        *guest_va = (unsigned long)data;
-        break;
-    case PTRACE_GETREGS:
-    case PTRACE_GETFPREGS:
-    case PTRACE_GETFPXREGS:
-        if (request == PTRACE_GETREGS) {
-            SET_PT_REGS(pt, ctxt[cpu].user_regs); 
-            memcpy(data, &pt, sizeof(struct gdb_regs));
-        } else if (request == PTRACE_GETFPREGS)
-            memcpy(data, &ctxt[cpu].fpu_ctxt, sizeof(ctxt[cpu].fpu_ctxt));
-        else /*if (request == PTRACE_GETFPXREGS)*/
-            memcpy(data, &ctxt[cpu].fpu_ctxt, sizeof(ctxt[cpu].fpu_ctxt));
-        break;
-    case PTRACE_ATTACH:
-        retval = 0;
-        break;
-    case PTRACE_SETREGS:
-    case PTRACE_SINGLESTEP:
-    case PTRACE_CONT:
-    case PTRACE_DETACH:
-    case PTRACE_SETFPREGS:
-    case PTRACE_SETFPXREGS:
-    case PTRACE_PEEKUSER:
-    case PTRACE_POKEUSER:
-    case PTRACE_SYSCALL:
-    case PTRACE_KILL:
-#ifdef DEBUG
-        printf("unsupported xc_ptrace request %s\n", ptrace_names[request]);
-#endif
-        status = ENOSYS;
-        break;
-    case PTRACE_TRACEME:
-        printf("PTRACE_TRACEME is an invalid request under Xen\n");
-        status = EINVAL;
-    }
-    
-    if (status) {
-        errno = status;
-        retval = -1;
-    }
- error_out:
-    return retval;
 }
 
 /*

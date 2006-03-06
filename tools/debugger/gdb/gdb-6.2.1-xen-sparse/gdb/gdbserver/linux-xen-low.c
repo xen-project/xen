@@ -41,8 +41,6 @@
 
 #define TRACE_ENTER /* printf("enter %s\n", __FUNCTION__) */
 
-long (*myptrace)(int xc_handle, enum __ptrace_request, uint32_t, long, long);
-int (*myxcwait)(int xc_handle, int domain, int *status, int options) ;
 static int xc_handle;
 
 static inline int
@@ -170,7 +168,7 @@ linux_attach (int domid)
     add_thread (0, new_process);
     new_process->stop_expected = 0;
 
-    if (myptrace (xc_handle, PTRACE_ATTACH, domid, 0, 0) != 0) {
+    if (xc_ptrace (xc_handle, PTRACE_ATTACH, domid, 0, isfile) != 0) {
 	fprintf (stderr, "Cannot attach to domain %d: %s (%d)\n", domid,
 		 strerror (errno), errno);
 	fflush (stderr);
@@ -188,7 +186,7 @@ linux_kill_one_process (struct inferior_list_entry *entry)
 {
   struct thread_info *thread = (struct thread_info *) entry;
   struct process_info *process = get_thread_process (thread);
-  myptrace (xc_handle, PTRACE_KILL, pid_of (process), 0, 0);
+  xc_ptrace (xc_handle, PTRACE_KILL, pid_of (process), 0, 0);
 }
 
 
@@ -202,7 +200,7 @@ static void
 linux_detach_one_process (struct inferior_list_entry *entry)
 {
 
-  myptrace (xc_handle, PTRACE_DETACH, current_domid, 0, 0);
+  xc_ptrace (xc_handle, PTRACE_DETACH, current_domid, 0, 0);
 }
 
 
@@ -228,7 +226,7 @@ static unsigned char
 linux_wait (char *status)
 {
   int w;
-  if (myxcwait(xc_handle, current_domid, &w, 0))
+  if (xc_waitdomain(xc_handle, current_domid, &w, 0))
       return -1;
   
   linux_set_inferior();
@@ -250,7 +248,7 @@ linux_resume (struct thread_resume *resume_info)
   for_each_inferior(&all_threads, regcache_invalidate_one);
   if (debug_threads)
     fprintf(stderr, "step: %d\n", step);
-  myptrace (xc_handle, step ? PTRACE_SINGLESTEP : PTRACE_CONT, 
+  xc_ptrace (xc_handle, step ? PTRACE_SINGLESTEP : PTRACE_CONT, 
 	    resume_info->thread, 0, 0);
 
 }
@@ -275,7 +273,7 @@ regsets_fetch_inferior_registers ()
 	}
 
       buf = malloc (regset->size);
-      res = myptrace (xc_handle, regset->get_request, 
+      res = xc_ptrace (xc_handle, regset->get_request, 
 		      curvcpuid(),
 		      0, (PTRACE_XFER_TYPE)buf);
       if (res < 0)
@@ -329,7 +327,7 @@ regsets_store_inferior_registers ()
 
       buf = malloc (regset->size);
       regset->fill_function (buf);
-      res = myptrace (xc_handle, regset->set_request, curvcpuid(), 0, (PTRACE_XFER_TYPE)buf);
+      res = xc_ptrace (xc_handle, regset->set_request, curvcpuid(), 0, (PTRACE_XFER_TYPE)buf);
       if (res < 0)
 	{
 	  if (errno == EIO)
@@ -407,7 +405,7 @@ linux_read_memory (CORE_ADDR memaddr, char *myaddr, int len)
   for (i = 0; i < count; i++, addr += sizeof (PTRACE_XFER_TYPE))
     {
       errno = 0;
-      buffer[i] = myptrace (xc_handle, PTRACE_PEEKTEXT, curvcpuid(), (PTRACE_ARG3_TYPE) addr, 0);
+      buffer[i] = xc_ptrace (xc_handle, PTRACE_PEEKTEXT, curvcpuid(), (PTRACE_ARG3_TYPE) addr, 0);
       if (errno)
 	return errno;
     }
@@ -440,13 +438,13 @@ linux_write_memory (CORE_ADDR memaddr, const char *myaddr, int len)
 
   /* Fill start and end extra bytes of buffer with existing memory data.  */
 
-  buffer[0] = myptrace (xc_handle, PTRACE_PEEKTEXT, curvcpuid(),
+  buffer[0] = xc_ptrace (xc_handle, PTRACE_PEEKTEXT, curvcpuid(),
 		      (PTRACE_ARG3_TYPE) addr, 0);
 
   if (count > 1)
     {
       buffer[count - 1]
-	= myptrace (xc_handle, PTRACE_PEEKTEXT, curvcpuid(),
+	= xc_ptrace (xc_handle, PTRACE_PEEKTEXT, curvcpuid(),
 		  (PTRACE_ARG3_TYPE) (addr + (count - 1)
 				      * sizeof (PTRACE_XFER_TYPE)),
 		  0);
@@ -460,7 +458,7 @@ linux_write_memory (CORE_ADDR memaddr, const char *myaddr, int len)
   for (i = 0; i < count; i++, addr += sizeof (PTRACE_XFER_TYPE))
     {
       errno = 0;
-      myptrace (xc_handle, PTRACE_POKETEXT, curvcpuid(), 
+      xc_ptrace (xc_handle, PTRACE_POKETEXT, curvcpuid(), 
 		(PTRACE_ARG3_TYPE) addr, buffer[i]);
       if (errno)
 	return errno;
@@ -561,13 +559,6 @@ initialize_low (void)
 		       the_low_target.breakpoint_len);
   init_registers ();
   linux_init_signals ();
-  if (isfile) {
-      myptrace = xc_ptrace_core;
-      myxcwait = xc_waitdomain_core;
-  } else {
-      myptrace = xc_ptrace;
-      myxcwait = xc_waitdomain;
-  }
   using_threads = thread_db_init ();
 
 }

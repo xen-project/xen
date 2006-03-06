@@ -9,38 +9,11 @@
 #include "xg_private.h"
 #include "xc_ptrace.h"
 
-const char const * ptrace_names[] = {
-    "PTRACE_TRACEME",
-    "PTRACE_PEEKTEXT",
-    "PTRACE_PEEKDATA",
-    "PTRACE_PEEKUSER",
-    "PTRACE_POKETEXT",
-    "PTRACE_POKEDATA",
-    "PTRACE_POKEUSER",
-    "PTRACE_CONT",
-    "PTRACE_KILL",
-    "PTRACE_SINGLESTEP",
-    "PTRACE_INVALID",
-    "PTRACE_INVALID",
-    "PTRACE_GETREGS",
-    "PTRACE_SETREGS",
-    "PTRACE_GETFPREGS",
-    "PTRACE_SETFPREGS",
-    "PTRACE_ATTACH",
-    "PTRACE_DETACH",
-    "PTRACE_GETFPXREGS",
-    "PTRACE_SETFPXREGS",
-    "PTRACE_INVALID",
-    "PTRACE_INVALID",
-    "PTRACE_INVALID",
-    "PTRACE_INVALID",
-    "PTRACE_SYSCALL",
-};
-
 /* XXX application state */
 static long                     nr_pages = 0;
 static unsigned long           *page_array = NULL;
 static int                      current_domid = -1;
+static int                      current_isfile;
 
 static cpumap_t                 online_cpumap;
 static cpumap_t                 regs_valid;
@@ -298,8 +271,8 @@ map_domain_va(
     return (void *)(((unsigned long)page_virt[cpu]) | (va & BSD_PAGE_MASK));
 }
 
-int 
-xc_waitdomain(
+static int 
+__xc_waitdomain(
     int xc_handle,
     int domain,
     int *status,
@@ -368,8 +341,12 @@ xc_ptrace(
     { 
     case PTRACE_PEEKTEXT:
     case PTRACE_PEEKDATA:
-        guest_va = (unsigned long *)map_domain_va(
-            xc_handle, cpu, addr, PROT_READ);
+        if (current_isfile)
+            guest_va = (unsigned long *)map_domain_va_core(current_domid, 
+                                cpu, addr, ctxt);
+        else
+            guest_va = (unsigned long *)map_domain_va(xc_handle, 
+                                cpu, addr, PROT_READ);
         if ( guest_va == NULL )
             goto out_error;
         retval = *guest_va;
@@ -378,15 +355,19 @@ xc_ptrace(
     case PTRACE_POKETEXT:
     case PTRACE_POKEDATA:
         /* XXX assume that all CPUs have the same address space */
-        guest_va = (unsigned long *)map_domain_va(
-                            xc_handle, cpu, addr, PROT_READ|PROT_WRITE);
+        if (current_isfile)
+            guest_va = (unsigned long *)map_domain_va_core(current_domid, 
+                                cpu, addr, ctxt);
+        else
+            guest_va = (unsigned long *)map_domain_va(xc_handle, 
+                                cpu, addr, PROT_READ|PROT_WRITE);
         if ( guest_va == NULL ) 
             goto out_error;
         *guest_va = (unsigned long)data;
         break;
 
     case PTRACE_GETREGS:
-        if (fetch_regs(xc_handle, cpu, NULL))
+        if (!current_isfile && fetch_regs(xc_handle, cpu, NULL)) 
             goto out_error;
         SET_PT_REGS(pt, ctxt[cpu].user_regs); 
         memcpy(data, &pt, sizeof(struct gdb_regs));
@@ -394,12 +375,14 @@ xc_ptrace(
 
     case PTRACE_GETFPREGS:
     case PTRACE_GETFPXREGS:
-        if (fetch_regs(xc_handle, cpu, NULL)) 
-            goto out_error;
+        if (!current_isfile && fetch_regs(xc_handle, cpu, NULL)) 
+                goto out_error;
         memcpy(data, &ctxt[cpu].fpu_ctxt, sizeof(ctxt[cpu].fpu_ctxt));
         break;
 
     case PTRACE_SETREGS:
+        if (!current_isfile)
+                goto out_unspported; /* XXX not yet supported */
         SET_XC_REGS(((struct gdb_regs *)data), ctxt[cpu].user_regs);
         if ((retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu, 
                                 &ctxt[cpu])))
@@ -407,6 +390,8 @@ xc_ptrace(
         break;
 
     case PTRACE_SINGLESTEP:
+        if (!current_isfile)
+              goto out_unspported; /* XXX not yet supported */
         /*  XXX we can still have problems if the user switches threads
          *  during single-stepping - but that just seems retarded
          */
@@ -418,6 +403,8 @@ xc_ptrace(
 
     case PTRACE_CONT:
     case PTRACE_DETACH:
+        if (!current_isfile)
+            goto out_unspported; /* XXX not yet supported */
         if ( request != PTRACE_SINGLESTEP )
         {
             FOREACH_CPU(cpumap, index) {
@@ -450,6 +437,9 @@ xc_ptrace(
 
     case PTRACE_ATTACH:
         current_domid = domid_tid;
+        current_isfile = (int)edata;
+        if (current_isfile)
+            break;
         op.cmd = DOM0_GETDOMAININFO;
         op.u.getdomaininfo.domain = current_domid;
         retval = do_dom0_op(xc_handle, &op);
@@ -477,12 +467,7 @@ xc_ptrace(
     case PTRACE_POKEUSER:
     case PTRACE_SYSCALL:
     case PTRACE_KILL:
-#ifdef DEBUG
-        printf("unsupported xc_ptrace request %s\n", ptrace_names[request]);
-#endif
-        /* XXX not yet supported */
-        errno = ENOSYS;
-        return -1;
+        goto out_unspported; /* XXX not yet supported */
 
     case PTRACE_TRACEME:
         printf("PTRACE_TRACEME is an invalid request under Xen\n");
@@ -496,6 +481,26 @@ xc_ptrace(
  out_error:
     errno = EINVAL;
     return retval;
+
+ out_unspported:
+#ifdef DEBUG
+    printf("unsupported xc_ptrace request %s\n", ptrace_names[request]);
+#endif
+    errno = ENOSYS;
+    return -1;
+
+}
+
+int 
+xc_waitdomain(
+    int xc_handle,
+    int domain,
+    int *status,
+    int options)
+{
+    if (current_isfile)
+        return xc_waitdomain_core(xc_handle, domain, status, options, ctxt);
+    return __xc_waitdomain(xc_handle, domain, status, options);
 }
 
 /*
