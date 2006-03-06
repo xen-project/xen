@@ -173,7 +173,7 @@ typedef struct dom0_readconsole {
 } dom0_readconsole_t;
 DEFINE_GUEST_HANDLE(dom0_readconsole_t);
 
-/* 
+/*
  * Set which physical cpus a vcpu can execute on.
  */
 #define DOM0_SETVCPUAFFINITY  20
@@ -231,7 +231,7 @@ typedef struct dom0_sched_id {
 } dom0_sched_id_t;
 DEFINE_GUEST_HANDLE(dom0_sched_id_t);
 
-/* 
+/*
  * Control shadow pagetables operation
  */
 #define DOM0_SHADOW_CONTROL  25
@@ -248,8 +248,8 @@ DEFINE_GUEST_HANDLE(dom0_sched_id_t);
 typedef struct dom0_shadow_control_stats {
     uint32_t fault_count;
     uint32_t dirty_count;
-    uint32_t dirty_net_count;     
-    uint32_t dirty_block_count;     
+    uint32_t dirty_net_count;
+    uint32_t dirty_block_count;
 } dom0_shadow_control_stats_t;
 DEFINE_GUEST_HANDLE(dom0_shadow_control_stats_t);
 
@@ -402,7 +402,7 @@ typedef struct dom0_getdomaininfolist {
 } dom0_getdomaininfolist_t;
 DEFINE_GUEST_HANDLE(dom0_getdomaininfolist_t);
 
-#define DOM0_PLATFORM_QUIRK      39  
+#define DOM0_PLATFORM_QUIRK      39
 #define QUIRK_NOIRQBALANCING  1
 typedef struct dom0_platform_quirk {
     /* IN variables. */
@@ -463,14 +463,14 @@ typedef struct dom0_iomem_permission {
     uint8_t allow_access;     /* allow (!0) or deny (0) access to range? */
 } dom0_iomem_permission_t;
 DEFINE_GUEST_HANDLE(dom0_iomem_permission_t);
- 
+
 #define DOM0_HYPERCALL_INIT   48
 typedef struct dom0_hypercall_init {
     domid_t  domain;          /* domain to be affected */
     unsigned long mfn;        /* machine frame to be initialised */
 } dom0_hypercall_init_t;
 DEFINE_GUEST_HANDLE(dom0_hypercall_init_t);
- 
+
 typedef struct dom0_op {
     uint32_t cmd;
     uint32_t interface_version; /* DOM0_INTERFACE_VERSION */
@@ -507,7 +507,7 @@ typedef struct dom0_op {
         struct dom0_platform_quirk    platform_quirk;
         struct dom0_physical_memory_map physical_memory_map;
         struct dom0_max_vcpus         max_vcpus;
-        struct dom0_setdomainhandle   setdomainhandle;        
+        struct dom0_setdomainhandle   setdomainhandle;
         struct dom0_setdebugging      setdebugging;
         struct dom0_irq_permission    irq_permission;
         struct dom0_iomem_permission  iomem_permission;

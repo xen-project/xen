@@ -107,9 +107,9 @@ void xen_idle(void)
 {
 	local_irq_disable();
 
-	if (need_resched()) {
+	if (need_resched())
 		local_irq_enable();
-	} else {
+	else {
 		clear_thread_flag(TIF_POLLING_NRFLAG);
 		smp_mb__after_clear_bit();
 		stop_hz_timer();

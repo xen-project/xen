@@ -162,13 +162,12 @@ int tsc_disable __devinitdata = 0;
 static void delay_tsc(unsigned long loops)
 {
 	unsigned long bclock, now;
-	
+
 	rdtscl(bclock);
-	do
-	{
+	do {
 		rep_nop();
 		rdtscl(now);
-	} while ((now-bclock) < loops);
+	} while ((now - bclock) < loops);
 }
 
 struct timer_opts timer_tsc = {
@@ -187,7 +186,7 @@ static inline u64 scale_delta(u64 delta, u32 mul_frac, int shift)
 	u32 tmp1, tmp2;
 #endif
 
-	if ( shift < 0 )
+	if (shift < 0)
 		delta >>= -shift;
 	else
 		delta <<= shift;
@@ -226,7 +225,7 @@ void init_cpu_khz(void)
 	struct vcpu_time_info *info;
 	info = &HYPERVISOR_shared_info->vcpu_info[0].time;
 	do_div(__cpu_khz, info->tsc_to_system_mul);
-	if ( info->tsc_shift < 0 )
+	if (info->tsc_shift < 0)
 		cpu_khz = __cpu_khz << -info->tsc_shift;
 	else
 		cpu_khz = __cpu_khz >> info->tsc_shift;
@@ -284,8 +283,7 @@ static void update_wallclock(void)
 		shadow_tv.tv_sec  = s->wc_sec;
 		shadow_tv.tv_nsec = s->wc_nsec;
 		rmb();
-	}
-	while ((s->wc_version & 1) | (shadow_tv_version ^ s->wc_version));
+	} while ((s->wc_version & 1) | (shadow_tv_version ^ s->wc_version));
 
 	if (!independent_wallclock)
 		__update_wallclock(shadow_tv.tv_sec, shadow_tv.tv_nsec);
@@ -312,8 +310,7 @@ static void get_time_values_from_xen(void)
 		dst->tsc_to_nsec_mul   = src->tsc_to_system_mul;
 		dst->tsc_shift         = src->tsc_shift;
 		rmb();
-	}
-	while ((src->version & 1) | (dst->version ^ src->version));
+	} while ((src->version & 1) | (dst->version ^ src->version));
 
 	dst->tsc_to_usec_mul = dst->tsc_to_nsec_mul / 1000;
 }
@@ -324,7 +321,7 @@ static inline int time_values_up_to_date(int cpu)
 	struct shadow_time_info *dst;
 
 	src = &HYPERVISOR_shared_info->vcpu_info[cpu].time;
-	dst = &per_cpu(shadow_time, cpu); 
+	dst = &per_cpu(shadow_time, cpu);
 
 	return (dst->version == src->version);
 }
@@ -454,7 +451,7 @@ int do_settimeofday(struct timespec *tv)
 	 * overflows. If that were to happen then our shadow time values would
 	 * be stale, so we can retry with fresh ones.
 	 */
-	for ( ; ; ) {
+	for (;;) {
 		nsec = tv->tv_nsec - get_nsec_offset(shadow);
 		if (time_values_up_to_date(cpu))
 			break;
@@ -614,7 +611,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		get_time_values_from_xen();
 
 		/* Obtain a consistent snapshot of elapsed wallclock cycles. */
-		delta = delta_cpu = 
+		delta = delta_cpu =
 			shadow->system_timestamp + get_nsec_offset(shadow);
 		delta     -= processed_system_time;
 		delta_cpu -= per_cpu(processed_system_time, cpu);
@@ -633,8 +630,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				per_cpu(processed_blocked_time, cpu);
 			barrier();
 		} while (sched_time != runstate->state_entry_time);
-	}
-	while (!time_values_up_to_date(cpu));
+	} while (!time_values_up_to_date(cpu));
 
 	if ((unlikely(delta < -1000000LL) || unlikely(delta_cpu < 0))
 	    && printk_ratelimit()) {
@@ -938,7 +934,7 @@ void __init time_init(void)
 }
 
 /* Convert jiffies to system time. */
-static inline u64 jiffies_to_st(unsigned long j) 
+static inline u64 jiffies_to_st(unsigned long j)
 {
 	unsigned long seq;
 	long delta;
@@ -949,7 +945,7 @@ static inline u64 jiffies_to_st(unsigned long j)
 		delta = j - jiffies;
 		/* NB. The next check can trigger in some wrap-around cases,
 		 * but that's ok: we'll just end up with a shorter timeout. */
-		if (delta < 1) 
+		if (delta < 1)
 			delta = 1;
 		st = processed_system_time + (delta * (u64)NS_PER_TICK);
 	} while (read_seqretry(&xtime_lock, seq));
@@ -965,7 +961,7 @@ void stop_hz_timer(void)
 {
 	unsigned int cpu = smp_processor_id();
 	unsigned long j;
-	
+
 	/* We must do this /before/ checking rcu_pending(). */
 	cpu_set(cpu, nohz_cpu_mask);
 	smp_mb();
@@ -1012,7 +1008,7 @@ void local_setup_timer(unsigned int cpu)
 	do {
 		seq = read_seqbegin(&xtime_lock);
 		/* Use cpu0 timestamp: cpu's shadow is not initialised yet. */
-		per_cpu(processed_system_time, cpu) = 
+		per_cpu(processed_system_time, cpu) =
 			per_cpu(shadow_time, 0).system_timestamp;
 		init_missing_ticks_accounting(cpu);
 	} while (read_seqretry(&xtime_lock, seq));

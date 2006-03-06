@@ -72,7 +72,7 @@ DEFINE_PER_CPU(int, virq_to_irq[NR_VIRQS]);
 
 /* IRQ <-> IPI mapping. */
 #ifndef NR_IPIS
-#define NR_IPIS 1 
+#define NR_IPIS 1
 #endif
 DEFINE_PER_CPU(int, ipi_to_irq[NR_IPIS]);
 
@@ -209,7 +209,7 @@ static int bind_evtchn_to_irq(unsigned int evtchn)
 	irq_bindcount[irq]++;
 
 	spin_unlock(&irq_mapping_update_lock);
-    
+
 	return irq;
 }
 
@@ -238,7 +238,7 @@ static int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
 	irq_bindcount[irq]++;
 
 	spin_unlock(&irq_mapping_update_lock);
-    
+
 	return irq;
 }
 
@@ -535,9 +535,9 @@ static unsigned int startup_pirq(unsigned int irq)
 	/* NB. We are happy to share unless we are probing. */
 	op.u.bind_pirq.flags = probing_irq(irq) ? 0 : BIND_PIRQ__WILL_SHARE;
 	if (HYPERVISOR_event_channel_op(&op) != 0) {
-		if ( !probing_irq(irq) )
-			printk(KERN_INFO "Failed to obtain physical "
-			       "IRQ %d\n", irq);
+		if (!probing_irq(irq))
+			printk(KERN_INFO "Failed to obtain physical IRQ %d\n",
+			       irq);
 		return 0;
 	}
 	evtchn = op.u.bind_pirq.port;
@@ -669,7 +669,7 @@ void unmask_evtchn(int port)
 	 * like a real IO-APIC we 'lose the interrupt edge' if the channel is
 	 * masked.
 	 */
-	if (synch_test_bit(port, &s->evtchn_pending[0]) && 
+	if (synch_test_bit(port, &s->evtchn_pending[0]) &&
 	    !synch_test_and_set_bit(port / BITS_PER_LONG,
 				    &vcpu_info->evtchn_pending_sel)) {
 		vcpu_info->evtchn_upcall_pending = 1;
@@ -722,7 +722,7 @@ void irq_resume(void)
 		op.u.bind_virq.vcpu = 0;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
 		evtchn = op.u.bind_virq.port;
-        
+
 		/* Record the new mapping. */
 		evtchn_to_irq[evtchn] = irq;
 		irq_info[irq] = mk_irq_info(IRQT_VIRQ, virq, evtchn);
@@ -744,7 +744,7 @@ void irq_resume(void)
 		op.u.bind_ipi.vcpu = 0;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
 		evtchn = op.u.bind_ipi.port;
-        
+
 		/* Record the new mapping. */
 		evtchn_to_irq[evtchn] = irq;
 		irq_info[irq] = mk_irq_info(IRQT_IPI, ipi, evtchn);
@@ -794,8 +794,7 @@ void __init init_IRQ(void)
 	}
 
 	/* Phys IRQ space is statically bound (1:1 mapping). Nail refcnts. */
-	for (i = 0; i < NR_PIRQS; i++)
-	{
+	for (i = 0; i < NR_PIRQS; i++) {
 		irq_bindcount[pirq_to_irq(i)] = 1;
 
 #ifdef RTC_IRQ

@@ -1020,9 +1020,9 @@ struct page *follow_page(struct vm_area_struct *, unsigned long address,
 #define FOLL_ANON	0x08	/* give ZERO_PAGE if no pgtable */
 
 #ifdef CONFIG_XEN
-typedef int (*pte_fn_t)(pte_t *pte, struct page *pte_page, unsigned long addr, 
+typedef int (*pte_fn_t)(pte_t *pte, struct page *pte_page, unsigned long addr,
                         void *data);
-extern int generic_page_range(struct mm_struct *mm, unsigned long address, 
+extern int generic_page_range(struct mm_struct *mm, unsigned long address,
                               unsigned long size, pte_fn_t fn, void *data);
 #endif
 

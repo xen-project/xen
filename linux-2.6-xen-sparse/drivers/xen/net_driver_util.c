@@ -40,9 +40,8 @@ int xen_net_read_mac(struct xenbus_device *dev, u8 mac[])
 	int i;
 	char *e;
 	char *macstr = xenbus_read(XBT_NULL, dev->nodename, "mac", NULL);
-	if (IS_ERR(macstr)) {
+	if (IS_ERR(macstr))
 		return PTR_ERR(macstr);
-	}
 	s = macstr;
 	for (i = 0; i < ETH_ALEN; i++) {
 		mac[i] = simple_strtoul(s, &e, 16);

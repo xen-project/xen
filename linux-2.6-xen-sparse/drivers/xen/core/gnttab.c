@@ -40,7 +40,7 @@
 
 #if 1
 #define ASSERT(_p)							      \
-	if ( !(_p) ) { printk(KERN_ALERT"Assertion '%s': line %d, file %s\n", \
+	if (!(_p)) { printk(KERN_ALERT"Assertion '%s': line %d, file %s\n",   \
 	#_p , __LINE__, __FILE__); *(int*)0=0; }
 #else
 #define ASSERT(_p) ((void)0)
@@ -152,7 +152,7 @@ int
 gnttab_grant_foreign_access(domid_t domid, unsigned long frame, int readonly)
 {
 	int ref;
-    
+
 	if (unlikely((ref = get_free_entry()) == -1))
 		return -ENOSPC;
 
@@ -192,13 +192,12 @@ gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly)
 
 	nflags = shared[ref].flags;
 	do {
-		if ( (flags = nflags) & (GTF_reading|GTF_writing) ) {
+		if ((flags = nflags) & (GTF_reading|GTF_writing)) {
 			printk(KERN_ALERT "WARNING: g.e. still in use!\n");
 			return 0;
 		}
-	}
-	while ((nflags = synch_cmpxchg(&shared[ref].flags, flags, 0)) !=
-	       flags);
+	} while ((nflags = synch_cmpxchg(&shared[ref].flags, flags, 0)) !=
+		 flags);
 
 	return 1;
 }
@@ -211,8 +210,7 @@ gnttab_end_foreign_access(grant_ref_t ref, int readonly, unsigned long page)
 		if (page != 0) {
 			free_page(page);
 		}
-	}
-	else {
+	} else {
 		/* XXX This needs to be fixed so that the ref and page are
 		   placed on a list to be freed up later. */
 		printk(KERN_WARNING
@@ -253,7 +251,7 @@ gnttab_end_foreign_transfer_ref(grant_ref_t ref)
          * reference and return failure (== 0).
          */
 	while (!((flags = shared[ref].flags) & GTF_transfer_committed)) {
-		if ( synch_cmpxchg(&shared[ref].flags, flags, 0) == flags )
+		if (synch_cmpxchg(&shared[ref].flags, flags, 0) == flags)
 			return 0;
 		cpu_relax();
 	}

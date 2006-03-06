@@ -38,8 +38,8 @@
 
 static int xenbus_irq;
 
-extern void xenbus_probe(void *); 
-extern int xenstored_ready; 
+extern void xenbus_probe(void *);
+extern int xenstored_ready;
 static DECLARE_WORK(probe_work, xenbus_probe, NULL);
 
 DECLARE_WAIT_QUEUE_HEAD(xb_waitq);
@@ -52,9 +52,9 @@ static inline struct xenstore_domain_interface *xenstore_domain_interface(void)
 static irqreturn_t wake_waiting(int irq, void *unused, struct pt_regs *regs)
 {
 	if (unlikely(xenstored_ready == 0)) {
-		xenstored_ready = 1; 
-		schedule_work(&probe_work); 
-	} 
+		xenstored_ready = 1;
+		schedule_work(&probe_work);
+	}
 
 	wake_up(&xb_waitq);
 	return IRQ_HANDLED;

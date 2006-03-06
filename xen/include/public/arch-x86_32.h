@@ -157,7 +157,7 @@ DEFINE_GUEST_HANDLE(vcpu_guest_context_t);
 typedef struct arch_shared_info {
     unsigned long max_pfn;                  /* max pfn that appears in table */
     /* Frame containing list of mfns containing list of mfns containing p2m. */
-    unsigned long pfn_to_mfn_frame_list_list; 
+    unsigned long pfn_to_mfn_frame_list_list;
     unsigned long nmi_reason;
 } arch_shared_info_t;
 

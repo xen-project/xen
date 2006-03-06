@@ -22,13 +22,13 @@ union vmcs_arbytes {
         unsigned int seg_type : 4,
             s         : 1,
             dpl       : 2,
-            p         : 1, 
+            p         : 1,
             reserved0 : 4,
             avl       : 1,
-            reserved1 : 1,     
+            reserved1 : 1,
             default_ops_size: 1,
             g         : 1,
-            null_bit  : 1, 
+            null_bit  : 1,
             reserved2 : 15;
     } fields;
     unsigned int bytes;

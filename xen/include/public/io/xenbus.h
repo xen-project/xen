@@ -6,9 +6,8 @@
  * Copyright (C) 2005 XenSource Ltd.
  */
 
-#ifndef _XEN_XENBUS_H
-#define _XEN_XENBUS_H
-
+#ifndef _XEN_PUBLIC_IO_XENBUS_H
+#define _XEN_PUBLIC_IO_XENBUS_H
 
 /* The state of either end of the Xenbus, i.e. the current communication
    status of initialisation across the bus.  States here imply nothing about
@@ -30,8 +29,7 @@ typedef enum
 
 } XenbusState;
 
-
-#endif /* _XEN_XENBUS_H */
+#endif /* _XEN_PUBLIC_IO_XENBUS_H */
 
 /*
  * Local variables:

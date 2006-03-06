@@ -560,7 +560,7 @@ ENTRY(hypervisor_callback)
 	jmp  ret_from_intr
 
         ALIGN
-restore_all_enable_events:  
+restore_all_enable_events:
 	XEN_LOCKED_UNBLOCK_EVENTS(%esi)
 scrit:	/**** START OF CRITICAL REGION ****/
 	XEN_TEST_PENDING(%esi)
@@ -577,7 +577,7 @@ ecrit:  /**** END OF CRITICAL REGION ****/
 # registers are in each frame. We do this quickly using the lookup table
 # 'critical_fixup_table'. For each byte offset in the critical region, it
 # provides the number of bytes which have already been popped from the
-# interrupted stack frame. 
+# interrupted stack frame.
 critical_region_fixup:
 	addl $critical_fixup_table-scrit,%eax
 	movzbl (%eax),%eax		# %eax contains num bytes popped

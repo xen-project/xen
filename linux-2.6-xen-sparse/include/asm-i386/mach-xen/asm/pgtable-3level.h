@@ -131,8 +131,8 @@ static inline int pte_none(pte_t pte)
 	return !pte.pte_low && !pte.pte_high;
 }
 
-#define pte_mfn(_pte) ( ((_pte).pte_low >> PAGE_SHIFT) |\
-		        (((_pte).pte_high & 0xfff) << (32-PAGE_SHIFT)) )
+#define pte_mfn(_pte) (((_pte).pte_low >> PAGE_SHIFT) |\
+		       (((_pte).pte_high & 0xfff) << (32-PAGE_SHIFT)))
 #define pte_pfn(_pte) mfn_to_local_pfn(pte_mfn(_pte))
 
 extern unsigned long long __supported_pte_mask;

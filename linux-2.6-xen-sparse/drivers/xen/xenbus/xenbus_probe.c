@@ -366,7 +366,6 @@ fail:
 	xenbus_dev_error(dev, err, "xenbus_dev_probe on %s", dev->nodename);
 	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
 	return -ENODEV;
-	
 }
 
 static int xenbus_dev_remove(struct device *_dev)
@@ -495,9 +494,8 @@ static void xenbus_dev_free(struct xenbus_device *xendev)
 
 static void xenbus_dev_release(struct device *dev)
 {
-	if (dev) {
+	if (dev)
 		xenbus_dev_free(to_xenbus_device(dev));
-	}
 }
 
 /* Simplified asprintf. */
@@ -600,7 +598,7 @@ static int xenbus_probe_frontend(const char *type, const char *name)
 	nodename = kasprintf("%s/%s/%s", xenbus_frontend.root, type, name);
 	if (!nodename)
 		return -ENOMEM;
-	
+
 	DPRINTK("%s", nodename);
 
 	err = xenbus_probe_node(&xenbus_frontend, type, nodename);
@@ -972,6 +970,7 @@ static int xsd_kva_read(char *page, char **start, off_t off,
                         int count, int *eof, void *data)
 {
 	int len;
+
 	len  = sprintf(page, "0x%p", mfn_to_virt(xen_start_info->store_mfn));
 	*eof = 1;
 	return len;
@@ -1006,8 +1005,8 @@ static int __init xenbus_probe_init(void)
 	device_register(&xenbus_backend.dev);
 
 	/*
-	** Domain0 doesn't have a store_evtchn or store_mfn yet.
-	*/
+	 * Domain0 doesn't have a store_evtchn or store_mfn yet.
+	 */
 	dom0 = (xen_start_info->store_evtchn == 0);
 
 	if (dom0) {
@@ -1029,7 +1028,7 @@ static int __init xenbus_probe_init(void)
 		xen_start_info->store_mfn =
 			pfn_to_mfn(virt_to_phys((void *)page) >>
 				   PAGE_SHIFT);
-		
+
 		/* Next allocate a local port which xenstored can bind to */
 		op.cmd = EVTCHNOP_alloc_unbound;
 		op.u.alloc_unbound.dom        = DOMID_SELF;
@@ -1040,14 +1039,16 @@ static int __init xenbus_probe_init(void)
 		xen_start_info->store_evtchn = op.u.alloc_unbound.port;
 
 		/* And finally publish the above info in /proc/xen */
-		if ((xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0400))) {
+		xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0400);
+		if (xsd_kva_intf) {
 			memcpy(&xsd_kva_fops, xsd_kva_intf->proc_fops,
 			       sizeof(xsd_kva_fops));
 			xsd_kva_fops.mmap = xsd_kva_mmap;
 			xsd_kva_intf->proc_fops = &xsd_kva_fops;
 			xsd_kva_intf->read_proc = xsd_kva_read;
 		}
-		if ((xsd_port_intf = create_xen_proc_entry("xsd_port", 0400)))
+		xsd_port_intf = create_xen_proc_entry("xsd_port", 0400);
+		if (xsd_port_intf)
 			xsd_port_intf->read_proc = xsd_port_read;
 	}
 

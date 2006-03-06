@@ -80,7 +80,7 @@ typedef struct xen_machphys_mfn_list {
      * machphys table is smaller than max_extents * 2MB.
      */
     unsigned int max_extents;
-    
+
     /*
      * Pointer to buffer to fill with list of extent starts. If there are
      * any large discontiguities in the machine address space, 2MB gaps in

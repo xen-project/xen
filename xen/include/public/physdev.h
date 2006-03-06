@@ -37,14 +37,14 @@ typedef struct physdevop_apic {
     uint32_t reg;
     /* IN or OUT */
     uint32_t value;
-} physdevop_apic_t; 
+} physdevop_apic_t;
 
 typedef struct physdevop_irq {
     /* IN */
     uint32_t irq;
     /* OUT */
     uint32_t vector;
-} physdevop_irq_t; 
+} physdevop_irq_t;
 
 typedef struct physdev_op {
     uint32_t cmd;
