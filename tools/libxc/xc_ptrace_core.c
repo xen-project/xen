@@ -111,6 +111,13 @@ xc_waitdomain_core(
         if (read(domfd, &header, sizeof(header)) != sizeof(header))
             return -1;
 
+        if (header.xch_magic != XC_CORE_MAGIC) {
+                printf("Magic number missmatch: 0x%08x (file) != "
+                                        " 0x%08x (code)\n", header.xch_magic,
+                                        XC_CORE_MAGIC);
+                return -1;
+        }
+
         nr_pages = header.xch_nr_pages;
         nr_vcpus = header.xch_nr_vcpus;
         pages_offset = header.xch_pages_offset;

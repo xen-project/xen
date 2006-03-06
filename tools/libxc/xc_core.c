@@ -61,7 +61,7 @@ xc_domain_dumpcore(int xc_handle,
  
     nr_pages = info.nr_pages;
 
-    header.xch_magic = 0xF00FEBED; 
+    header.xch_magic = XC_CORE_MAGIC;
     header.xch_nr_vcpus = nr_vcpus;
     header.xch_nr_pages = nr_pages;
     header.xch_ctxt_offset = sizeof(struct xc_core_header);

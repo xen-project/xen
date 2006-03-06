@@ -92,6 +92,7 @@ typedef struct xc_core_header {
     unsigned int xch_pages_offset;
 } xc_core_header_t;
 
+#define XC_CORE_MAGIC 0xF00FEBED
 
 long xc_ptrace_core(
     int xc_handle,
