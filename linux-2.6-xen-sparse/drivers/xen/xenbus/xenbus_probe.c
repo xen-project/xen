@@ -957,9 +957,8 @@ static int xsd_kva_mmap(struct file *file, struct vm_area_struct *vma)
 	if ((size > PAGE_SIZE) || (vma->vm_pgoff != 0))
 		return -EINVAL;
 
-	vma->vm_pgoff = mfn_to_pfn(xen_start_info->store_mfn);
-
-	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+	if (remap_pfn_range(vma, vma->vm_start,
+			    mfn_to_pfn(xen_start_info->store_mfn),
 			    size, vma->vm_page_prot))
 		return -EAGAIN;
 
