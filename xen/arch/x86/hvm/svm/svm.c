@@ -744,7 +744,8 @@ void svm_relinquish_resources(struct vcpu *v)
         /* unmap IO shared page */
         struct domain *d = v->domain;
         if ( d->arch.hvm_domain.shared_page_va )
-            unmap_domain_page((void *)d->arch.hvm_domain.shared_page_va);
+            unmap_domain_page_global(
+                (void *)d->arch.hvm_domain.shared_page_va);
         shadow_direct_map_clean(d);
     }
 
