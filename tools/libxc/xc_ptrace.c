@@ -1,6 +1,5 @@
 #define XC_PTRACE_PRIVATE
 
-
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -8,6 +7,36 @@
 #include "xc_private.h"
 #include "xg_private.h"
 #include "xc_ptrace.h"
+
+#ifdef DEBUG
+const char const * ptrace_names[] = {
+    "PTRACE_TRACEME",
+    "PTRACE_PEEKTEXT",
+    "PTRACE_PEEKDATA",
+    "PTRACE_PEEKUSER",
+    "PTRACE_POKETEXT",
+    "PTRACE_POKEDATA",
+    "PTRACE_POKEUSER",
+    "PTRACE_CONT",
+    "PTRACE_KILL",
+    "PTRACE_SINGLESTEP",
+    "PTRACE_INVALID",
+    "PTRACE_INVALID",
+    "PTRACE_GETREGS",
+    "PTRACE_SETREGS",
+    "PTRACE_GETFPREGS",
+    "PTRACE_SETFPREGS",
+    "PTRACE_ATTACH",
+    "PTRACE_DETACH",
+    "PTRACE_GETFPXREGS",
+    "PTRACE_SETFPXREGS",
+    "PTRACE_INVALID",
+    "PTRACE_INVALID",
+    "PTRACE_INVALID",
+    "PTRACE_INVALID",
+    "PTRACE_SYSCALL",
+};
+#endif
 
 /* XXX application state */
 static long                     nr_pages = 0;
