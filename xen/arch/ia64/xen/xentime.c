@@ -116,6 +116,12 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	}
 #endif
 #endif
+
+#if 0
+	/* Nobody seems to be able to explain this code.
+	   It seems to be accumulated tricks, which are not required anymore.
+	   Also I have made many tests, I'd like to get confirmation from
+	   other site (TG).  */
 	if (current->domain == dom0) {
 		// FIXME: there's gotta be a better way of doing this...
 		// We have to ensure that domain0 is launched before we
@@ -130,6 +136,7 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 			vcpu_wake(dom0->vcpu[0]);
 		}
 	}
+#endif
 	if (!is_idle_domain(current->domain))  {
 		if (vcpu_timer_expired(current)) {
 			vcpu_pend_timer(current);
