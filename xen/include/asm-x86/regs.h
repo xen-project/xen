@@ -36,10 +36,12 @@ enum EFLAGS {
     unsigned long diff = (char *)guest_cpu_user_regs() - (char *)(r);         \
     /* Frame pointer must point into current CPU stack. */                    \
     ASSERT(diff < STACK_SIZE);                                                \
-    /* If a guest frame, it must not be a ring 0 frame (unless HVM guest). */ \
-    ASSERT((diff != 0) || VM86_MODE(r) || !RING_0(r) || HVM_DOMAIN(current)); \
-    /* If not a guest frame, it must be a ring 0 frame. */                    \
-    ASSERT((diff == 0) || (!VM86_MODE(r) && RING_0(r)));                      \
+    /* If a guest frame, it must be have guest privs (unless HVM guest).   */ \
+    /* We permit CS==0 which can come from an uninitialised trap entry. */    \
+    ASSERT((diff != 0) || VM86_MODE(r) || ((r->cs&3) >= GUEST_KERNEL_RPL) ||  \
+           (r->cs == 0) || HVM_DOMAIN(current));                              \
+    /* If not a guest frame, it must be a hypervisor frame. */                \
+    ASSERT((diff == 0) || (!VM86_MODE(r) && (r->cs == __HYPERVISOR_CS)));     \
     /* Return TRUE if it's a guest frame. */                                  \
     (diff == 0);                                                              \
 })
