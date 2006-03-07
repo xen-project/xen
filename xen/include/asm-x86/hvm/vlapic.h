@@ -101,15 +101,14 @@ static __inline__ int find_highest_bit(uint32_t *data, int length)
 #define VLAPIC_LVT_BIT_TRIG             (1 << 15)
 #define VLAPIC_LVT_TIMERMODE            (1 << 17)
 
-#define VLAPIC_DELIV_MODE_FIXED          0x0
-#define VLAPIC_DELIV_MODE_LPRI           0x1
-#define VLAPIC_DELIV_MODE_SMI            0x2
-#define VLAPIC_DELIV_MODE_RESERVED       0x3
-#define VLAPIC_DELIV_MODE_NMI            0x4
-#define VLAPIC_DELIV_MODE_INIT           0x5
-#define VLAPIC_DELIV_MODE_STARTUP        0x6
-#define VLAPIC_DELIV_MODE_EXT            0x7
-
+#define VLAPIC_DELIV_MODE_FIXED         0x0
+#define VLAPIC_DELIV_MODE_LPRI          0x1
+#define VLAPIC_DELIV_MODE_SMI           0x2
+#define VLAPIC_DELIV_MODE_RESERVED      0x3
+#define VLAPIC_DELIV_MODE_NMI           0x4
+#define VLAPIC_DELIV_MODE_INIT          0x5
+#define VLAPIC_DELIV_MODE_STARTUP       0x6
+#define VLAPIC_DELIV_MODE_EXT           0x7
 
 
 #define VLAPIC_NO_SHORTHAND             0x0
@@ -118,41 +117,29 @@ static __inline__ int find_highest_bit(uint32_t *data, int length)
 #define VLAPIC_SHORTHAND_EXCLUDE_SELF   0x3
 
 #define vlapic_lvt_timer_enabled(vlapic)    \
-  (!(vlapic->lvt[VLAPIC_LVT_TIMER] & VLAPIC_LVT_BIT_MASK))
+    (!((vlapic)->lvt[VLAPIC_LVT_TIMER] & VLAPIC_LVT_BIT_MASK))
 
-#define vlapic_lvt_vector(vlapic, type)   \
-  (vlapic->lvt[type] & VLAPIC_LVT_BIT_VECTOR)
+#define vlapic_lvt_vector(vlapic, type)     \
+    ((vlapic)->lvt[(type)] & VLAPIC_LVT_BIT_VECTOR)
 
-#define vlapic_lvt_dm(value)        ((value >> 8) && 7)
-#define vlapic_lvt_timer_period(vlapic) \
-  (vlapic->lvt[VLAPIC_LVT_TIMER] & VLAPIC_LVT_TIMERMODE)
+#define vlapic_lvt_dm(value)            (((value) >> 8) && 7)
+#define vlapic_lvt_timer_period(vlapic)     \
+    ((vlapic)->lvt[VLAPIC_LVT_TIMER] & VLAPIC_LVT_TIMERMODE)
 
-#define vlapic_isr_status(vlapic,vector)    \
-  test_bit(vector, &vlapic->isr[0])
+#define _VLAPIC_GLOB_DISABLE            0x0
+#define VLAPIC_GLOB_DISABLE_MASK        0x1
+#define VLAPIC_SOFTWARE_DISABLE_MASK    0x2
+#define _VLAPIC_BSP_ACCEPT_PIC          0x3
 
-#define vlapic_irr_status(vlapic,vector)    \
-  test_bit(vector, &vlapic->irr[0])
+#define vlapic_enabled(vlapic)              \
+    (!((vlapic)->status &                   \
+       (VLAPIC_GLOB_DISABLE_MASK | VLAPIC_SOFTWARE_DISABLE_MASK)))
 
-#define vlapic_set_isr(vlapic,vector) \
-  test_and_set_bit(vector, &vlapic->isr[0])
+#define vlapic_global_enabled(vlapic)       \
+    (!(test_bit(_VLAPIC_GLOB_DISABLE, &(vlapic)->status)))
 
-#define vlapic_set_irr(vlapic,vector)      \
-  test_and_set_bit(vector, &vlapic->irr[0])
-
-#define vlapic_clear_irr(vlapic,vector)      \
-  clear_bit(vector, &vlapic->irr[0])
-#define vlapic_clear_isr(vlapic,vector)     \
-  clear_bit(vector, &vlapic->isr[0])
-
-#define vlapic_enabled(vlapic)               \
-  (!(vlapic->status &                           \
-     (VLAPIC_GLOB_DISABLE_MASK | VLAPIC_SOFTWARE_DISABLE_MASK)))
-
-#define vlapic_global_enabled(vlapic)               \
-  !(test_bit(_VLAPIC_GLOB_DISABLE, &(vlapic)->status))
-
-#define VLAPIC_IRR(t) ((t)->irr[0])
-#define VLAPIC_ID(t)  ((t)->id)
+#define VLAPIC_IRR(t)   ((t)->irr[0])
+#define VLAPIC_ID(t)    ((t)->id)
 
 typedef struct direct_intr_info {
     int deliver_mode;
@@ -163,10 +150,6 @@ struct vlapic
 {
     //FIXME check what would be 64 bit on EM64T
     uint32_t           version;
-#define _VLAPIC_GLOB_DISABLE            0x0
-#define VLAPIC_GLOB_DISABLE_MASK        0x1
-#define VLAPIC_SOFTWARE_DISABLE_MASK    0x2
-#define _VLAPIC_BSP_ACCEPT_PIC          0x3
     uint32_t           status;
     uint32_t           id;
     uint32_t           vcpu_id;
@@ -180,10 +163,10 @@ struct vlapic
     uint32_t           dest_format;
     uint32_t           spurious_vec;
     uint32_t           lvt[6];
-    uint32_t           timer_initial;
-    uint32_t           timer_current;
+    uint32_t           timer_initial_count;
+    uint32_t           timer_current_count;
     uint32_t           timer_divconf;
-    uint32_t           timer_divide_counter;
+    uint32_t           timer_divide_count;
     struct timer       vlapic_timer;
     int                intr_pending_count[MAX_VECTOR];
     s_time_t           timer_current_update;
@@ -203,16 +186,16 @@ static inline int vlapic_set_irq(struct vlapic *t, uint8_t vec, uint8_t trig)
     int ret;
 
     ret = test_and_set_bit(vec, &t->irr[0]);
-    if (trig)
-       test_and_set_bit(vec, &t->tmr[0]);
+    if ( trig )
+       set_bit(vec, &t->tmr[0]);
 
     /* We may need to wake up target vcpu, besides set pending bit here */
     return ret;
 }
 
-static inline int  vlapic_timer_active(struct vlapic *vlapic)
+static inline int vlapic_timer_active(struct vlapic *vlapic)
 {
-    return  active_timer(&(vlapic->vlapic_timer));
+    return active_timer(&vlapic->vlapic_timer);
 }
 
 int vlapic_find_highest_irr(struct vlapic *vlapic);
@@ -244,6 +227,7 @@ struct vlapic* apic_round_robin(struct domain *d,
                                 uint32_t bitmap);
 
 s_time_t get_apictime_scheduled(struct vcpu *v);
+
 int hvm_apic_support(struct domain *d);
 
 #endif /* __ASM_X86_HVM_VLAPIC_H__ */

@@ -892,9 +892,9 @@ int __init calibrate_APIC_clock(void)
     return result;
 }
 
-unsigned int get_apic_bus_scale(void)
+u32 get_apic_bus_cycle(void)
 {
-    return bus_scale;
+    return bus_cycle;
 }
 
 static unsigned int calibration_result;
