@@ -5,22 +5,22 @@
 #ifndef __ASM_X86_HYPERCALL_H__
 #define __ASM_X86_HYPERCALL_H__
 
-struct trap_info;
+#include <public/physdev.h>
+
 extern long
 do_set_trap_table(
-    struct trap_info *traps);
+    GUEST_HANDLE(trap_info_t) traps);
 
-struct mmu_update;
 extern int
 do_mmu_update(
-    struct mmu_update *ureqs,
+    GUEST_HANDLE(mmu_update_t) ureqs,
     unsigned int count,
-    unsigned int *pdone,
+    GUEST_HANDLE(uint) pdone,
     unsigned int foreigndom);
 
 extern long
 do_set_gdt(
-    unsigned long *frame_list,
+    GUEST_HANDLE(ulong) frame_list,
     unsigned int entries);
 
 extern long
@@ -52,10 +52,9 @@ do_update_va_mapping(
     u64 val64,
     unsigned long flags);
 
-struct physdev_op;
 extern long
 do_physdev_op(
-    struct physdev_op *uop);
+    GUEST_HANDLE(physdev_op_t) uop);
 
 extern int
 do_update_va_mapping_otherdomain(
@@ -66,14 +65,19 @@ do_update_va_mapping_otherdomain(
 
 extern int
 do_mmuext_op(
-    struct mmuext_op *uops,
+    GUEST_HANDLE(mmuext_op_t) uops,
     unsigned int count,
-    unsigned int *pdone,
+    GUEST_HANDLE(uint) pdone,
     unsigned int foreigndom);
 
 extern unsigned long
 do_iret(
     void);
+
+struct vcpu;
+extern long
+arch_do_vcpu_op(
+    int cmd, struct vcpu *v, GUEST_HANDLE(void) arg);
 
 #ifdef __x86_64__
 

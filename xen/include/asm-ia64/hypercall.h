@@ -16,4 +16,6 @@ vmx_do_mmu_update(
     u64 *pdone,
     u64 foreigndom);
 
+#define arch_do_vcpu_op(cmd, vcpu, arg) (-ENOSYS)
+
 #endif /* __ASM_IA64_HYPERCALL_H__ */

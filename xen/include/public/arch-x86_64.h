@@ -136,15 +136,6 @@ struct iret_context {
     uint64_t rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;
     /* Bottom of iret stack frame. */
 };
-/*
- * For compatibility with HYPERVISOR_switch_to_user which is the old
- * name for HYPERVISOR_iret.
- */
-struct switch_to_user {
-    /* Top of stack (%rsp at point of hypercall). */
-    uint64_t rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;
-    /* Bottom of iret stack frame. */
-};
 
 /*
  * Send an array of these to HYPERVISOR_set_trap_table().
@@ -166,6 +157,7 @@ typedef struct trap_info {
     uint16_t      cs;      /* code selector                                 */
     unsigned long address; /* code offset                                   */
 } trap_info_t;
+DEFINE_GUEST_HANDLE(trap_info_t);
 
 #ifdef __GNUC__
 /* Anonymous union includes both 32- and 64-bit names (e.g., eax/rax). */
@@ -205,6 +197,7 @@ typedef struct cpu_user_regs {
     uint16_t fs, _pad5[3]; /* Non-zero => takes precedence over fs_base.     */
     uint16_t gs, _pad6[3]; /* Non-zero => takes precedence over gs_base_usr. */
 } cpu_user_regs_t;
+DEFINE_GUEST_HANDLE(cpu_user_regs_t);
 
 #undef __DECL_REG
 

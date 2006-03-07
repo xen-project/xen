@@ -23,6 +23,7 @@
 #include <xen/event.h>
 #include <xen/irq.h>
 #include <xen/iocap.h>
+#include <xen/guest_access.h>
 #include <asm/current.h>
 
 #include <public/xen.h>
@@ -578,12 +579,12 @@ static long evtchn_unmask(evtchn_unmask_t *unmask)
     return 0;
 }
 
-long do_event_channel_op(struct evtchn_op *uop)
+long do_event_channel_op(GUEST_HANDLE(evtchn_op_t) uop)
 {
     long rc;
     struct evtchn_op op;
 
-    if ( copy_from_user(&op, uop, sizeof(op)) != 0 )
+    if ( copy_from_guest(&op, uop, 1) != 0 )
         return -EFAULT;
 
     if (acm_pre_event_channel(&op))
@@ -593,31 +594,31 @@ long do_event_channel_op(struct evtchn_op *uop)
     {
     case EVTCHNOP_alloc_unbound:
         rc = evtchn_alloc_unbound(&op.u.alloc_unbound);
-        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
 
     case EVTCHNOP_bind_interdomain:
         rc = evtchn_bind_interdomain(&op.u.bind_interdomain);
-        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
 
     case EVTCHNOP_bind_virq:
         rc = evtchn_bind_virq(&op.u.bind_virq);
-        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
 
     case EVTCHNOP_bind_ipi:
         rc = evtchn_bind_ipi(&op.u.bind_ipi);
-        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
 
     case EVTCHNOP_bind_pirq:
         rc = evtchn_bind_pirq(&op.u.bind_pirq);
-        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
 
@@ -631,7 +632,7 @@ long do_event_channel_op(struct evtchn_op *uop)
 
     case EVTCHNOP_status:
         rc = evtchn_status(&op.u.status);
-        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
             rc = -EFAULT;
         break;
 

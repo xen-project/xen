@@ -1404,14 +1404,14 @@ void __init trap_init(void)
 }
 
 
-long do_set_trap_table(struct trap_info *traps)
+long do_set_trap_table(GUEST_HANDLE(trap_info_t) traps)
 {
     struct trap_info cur;
     struct trap_info *dst = current->arch.guest_context.trap_ctxt;
     long rc = 0;
 
     /* If no table is presented then clear the entire virtual IDT. */
-    if ( traps == NULL )
+    if ( guest_handle_is_null(traps) )
     {
         memset(dst, 0, 256 * sizeof(*dst));
         init_int80_direct_trap(current);
@@ -1423,11 +1423,11 @@ long do_set_trap_table(struct trap_info *traps)
         if ( hypercall_preempt_check() )
         {
             rc = hypercall_create_continuation(
-                __HYPERVISOR_set_trap_table, "p", traps);
+                __HYPERVISOR_set_trap_table, "h", traps);
             break;
         }
 
-        if ( copy_from_user(&cur, traps, sizeof(cur)) ) 
+        if ( copy_from_guest(&cur, traps, 1) )
         {
             rc = -EFAULT;
             break;
@@ -1443,7 +1443,7 @@ long do_set_trap_table(struct trap_info *traps)
         if ( cur.vector == 0x80 )
             init_int80_direct_trap(current);
 
-        traps++;
+        guest_handle_add_offset(traps, 1);
     }
 
     return rc;

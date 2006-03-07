@@ -1732,14 +1732,15 @@ static inline cpumask_t vcpumask_to_pcpumask(
 }
 
 int do_mmuext_op(
-    struct mmuext_op *uops,
+    GUEST_HANDLE(mmuext_op_t) uops,
     unsigned int count,
-    unsigned int *pdone,
+    GUEST_HANDLE(uint) pdone,
     unsigned int foreigndom)
 {
     struct mmuext_op op;
     int rc = 0, i = 0, okay, cpu = smp_processor_id();
-    unsigned long mfn, type, done = 0;
+    unsigned long mfn, type;
+    unsigned int done = 0;
     struct page_info *page;
     struct vcpu *v = current;
     struct domain *d = v->domain;
@@ -1751,8 +1752,8 @@ int do_mmuext_op(
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
         count &= ~MMU_UPDATE_PREEMPTED;
-        if ( unlikely(pdone != NULL) )
-            (void)get_user(done, pdone);
+        if ( unlikely(!guest_handle_is_null(pdone)) )
+            (void)copy_from_guest(&done, pdone, 1);
     }
 
     if ( !set_foreigndom(cpu, foreigndom) )
@@ -1761,7 +1762,7 @@ int do_mmuext_op(
         goto out;
     }
 
-    if ( unlikely(!array_access_ok(uops, count, sizeof(op))) )
+    if ( unlikely(!guest_handle_okay(uops, count)) )
     {
         rc = -EFAULT;
         goto out;
@@ -1772,14 +1773,14 @@ int do_mmuext_op(
         if ( hypercall_preempt_check() )
         {
             rc = hypercall_create_continuation(
-                __HYPERVISOR_mmuext_op, "pipi",
+                __HYPERVISOR_mmuext_op, "hihi",
                 uops, (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
             break;
         }
 
-        if ( unlikely(__copy_from_user(&op, uops, sizeof(op)) != 0) )
+        if ( unlikely(__copy_from_guest(&op, uops, 1) != 0) )
         {
-            MEM_LOG("Bad __copy_from_user");
+            MEM_LOG("Bad __copy_from_guest");
             rc = -EFAULT;
             break;
         }
@@ -1969,24 +1970,25 @@ int do_mmuext_op(
             break;
         }
 
-        uops++;
+        guest_handle_add_offset(uops, 1);
     }
 
  out:
     process_deferred_ops(cpu);
 
     /* Add incremental work we have done to the @done output parameter. */
-    if ( unlikely(pdone != NULL) )
-        __put_user(done + i, pdone);
+    done += i;
+    if ( unlikely(!guest_handle_is_null(pdone)) )
+        copy_to_guest(pdone, &done, 1);
 
     UNLOCK_BIGLOCK(d);
     return rc;
 }
 
 int do_mmu_update(
-    struct mmu_update *ureqs,
+    GUEST_HANDLE(mmu_update_t) ureqs,
     unsigned int count,
-    unsigned int *pdone,
+    GUEST_HANDLE(uint) pdone,
     unsigned int foreigndom)
 {
     struct mmu_update req;
@@ -2010,8 +2012,8 @@ int do_mmu_update(
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
         count &= ~MMU_UPDATE_PREEMPTED;
-        if ( unlikely(pdone != NULL) )
-            (void)get_user(done, pdone);
+        if ( unlikely(!guest_handle_is_null(pdone)) )
+            (void)copy_from_guest(&done, pdone, 1);
     }
 
     domain_mmap_cache_init(&mapcache);
@@ -2027,7 +2029,7 @@ int do_mmu_update(
     perfc_addc(num_page_updates, count);
     perfc_incr_histo(bpt_updates, count, PT_UPDATES);
 
-    if ( unlikely(!array_access_ok(ureqs, count, sizeof(req))) )
+    if ( unlikely(!guest_handle_okay(ureqs, count)) )
     {
         rc = -EFAULT;
         goto out;
@@ -2038,14 +2040,14 @@ int do_mmu_update(
         if ( hypercall_preempt_check() )
         {
             rc = hypercall_create_continuation(
-                __HYPERVISOR_mmu_update, "pipi",
+                __HYPERVISOR_mmu_update, "hihi",
                 ureqs, (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
             break;
         }
 
-        if ( unlikely(__copy_from_user(&req, ureqs, sizeof(req)) != 0) )
+        if ( unlikely(__copy_from_guest(&req, ureqs, 1) != 0) )
         {
-            MEM_LOG("Bad __copy_from_user");
+            MEM_LOG("Bad __copy_from_guest");
             rc = -EFAULT;
             break;
         }
@@ -2212,7 +2214,7 @@ int do_mmu_update(
             break;
         }
 
-        ureqs++;
+        guest_handle_add_offset(ureqs, 1);
     }
 
  out:
@@ -2222,8 +2224,9 @@ int do_mmu_update(
     process_deferred_ops(cpu);
 
     /* Add incremental work we have done to the @done output parameter. */
-    if ( unlikely(pdone != NULL) )
-        __put_user(done + i, pdone);
+    done += i;
+    if ( unlikely(!guest_handle_is_null(pdone)) )
+        copy_to_guest(pdone, &done, 1);
 
     if ( unlikely(shadow_mode_enabled(d)) )
         check_pagetable(v, "post-mmu"); /* debug */
@@ -2684,7 +2687,7 @@ long set_gdt(struct vcpu *v,
 }
 
 
-long do_set_gdt(unsigned long *frame_list, unsigned int entries)
+long do_set_gdt(GUEST_HANDLE(ulong) frame_list, unsigned int entries)
 {
     int nr_pages = (entries + 511) / 512;
     unsigned long frames[16];
@@ -2694,7 +2697,7 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
     if ( entries > FIRST_RESERVED_GDT_ENTRY )
         return -EINVAL;
     
-    if ( copy_from_user(frames, frame_list, nr_pages * sizeof(unsigned long)) )
+    if ( copy_from_guest((unsigned long *)frames, frame_list, nr_pages) )
         return -EFAULT;
 
     LOCK_BIGLOCK(current->domain);

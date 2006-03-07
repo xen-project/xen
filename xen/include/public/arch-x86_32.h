@@ -102,6 +102,7 @@ typedef struct trap_info {
     uint16_t      cs;      /* code selector                                 */
     unsigned long address; /* code offset                                   */
 } trap_info_t;
+DEFINE_GUEST_HANDLE(trap_info_t);
 
 typedef struct cpu_user_regs {
     uint32_t ebx;
@@ -125,6 +126,7 @@ typedef struct cpu_user_regs {
     uint16_t fs, _pad4;
     uint16_t gs, _pad5;
 } cpu_user_regs_t;
+DEFINE_GUEST_HANDLE(cpu_user_regs_t);
 
 typedef uint64_t tsc_timestamp_t; /* RDTSC timestamp */
 

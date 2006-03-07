@@ -10,7 +10,6 @@
 #include <xen/errno.h>
 #include <xen/bitmap.h>
 #include <xen/bitops.h>
-#include <asm/uaccess.h>
 
 /*
  * bitmaps provide an array of bits, implemented using an an

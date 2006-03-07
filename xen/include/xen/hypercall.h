@@ -9,6 +9,7 @@
 #include <xen/types.h>
 #include <xen/time.h>
 #include <public/xen.h>
+#include <public/acm_ops.h>
 #include <asm/hypercall.h>
 
 extern long
@@ -20,46 +21,43 @@ do_sched_op(
     int cmd,
     unsigned long arg);
 
-struct dom0_op;
 extern long
 do_dom0_op(
-    struct dom0_op *u_dom0_op);
+    GUEST_HANDLE(dom0_op_t) u_dom0_op);
 
 extern long
 do_memory_op(
     int cmd,
-    void *arg);
+    GUEST_HANDLE(void) arg);
 
-struct multicall_entry;
 extern long
 do_multicall(
-    struct multicall_entry *call_list,
+    GUEST_HANDLE(multicall_entry_t) call_list,
     unsigned int nr_calls);
 
 extern long
 do_set_timer_op(
     s_time_t timeout);
 
-struct evtchn_op;
 extern long
 do_event_channel_op(
-    struct evtchn_op *uop);
+    GUEST_HANDLE(evtchn_op_t) uop);
 
 extern long
 do_xen_version(
     int cmd,
-    void *arg);
+    GUEST_HANDLE(void) arg);
 
 extern long
 do_console_io(
     int cmd,
     int count,
-    char *buffer);
+    GUEST_HANDLE(char) buffer);
 
 extern long
 do_grant_table_op(
     unsigned int cmd,
-    void *uop,
+    GUEST_HANDLE(void) uop,
     unsigned int count);
 
 extern long
@@ -71,16 +69,15 @@ extern long
 do_vcpu_op(
     int cmd,
     int vcpuid,
-    void *arg);
+    GUEST_HANDLE(void) arg);
 
-struct acm_op;
 extern long
 do_acm_op(
-    struct acm_op *u_acm_op);
+    GUEST_HANDLE(acm_op_t) u_acm_op);
 
 extern long
 do_nmi_op(
     unsigned int cmd,
-    void *arg);
+    GUEST_HANDLE(void) arg);
 
 #endif /* __XEN_HYPERCALL_H__ */

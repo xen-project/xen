@@ -22,7 +22,7 @@
 #include <xen/config.h>
 #include <xen/errno.h>
 #include <asm/vmx_vcpu.h>
-//#include <public/xen.h>
+#include <xen/guest_access.h>
 #include <public/event_channel.h>
 #include <asm/vmmu.h>
 #include <asm/tlb.h>
@@ -34,9 +34,6 @@
 #include <public/version.h>
 #include <asm/dom_fw.h>
 #include <xen/domain.h>
-
-extern long do_sched_op(int cmd, unsigned long arg);
-
 
 void hyper_not_support(void)
 {
@@ -100,7 +97,7 @@ void hyper_dom0_op(void)
     VCPU *vcpu=current;
     u64 r32,ret;
     vcpu_get_gr_nat(vcpu,16,&r32);
-    ret=do_dom0_op((dom0_op_t *)r32);
+    ret=do_dom0_op(guest_handle_from_ptr(r32, dom0_op_t));
     vcpu_set_gr(vcpu, 8, ret, 0);
 
     vmx_vcpu_increment_iip(vcpu);
@@ -111,7 +108,7 @@ void hyper_event_channel_op(void)
     VCPU *vcpu=current;
     u64 r32,ret;
     vcpu_get_gr_nat(vcpu,16,&r32);
-    ret=do_event_channel_op((evtchn_op_t *)r32);
+    ret=do_event_channel_op(guest_handle_from_ptr(r32, evtchn_op_t));
     vcpu_set_gr(vcpu, 8, ret, 0);
     vmx_vcpu_increment_iip(vcpu);
 }
@@ -122,7 +119,7 @@ void hyper_xen_version(void)
     u64 r32,r33,ret;
     vcpu_get_gr_nat(vcpu,16,&r32);
     vcpu_get_gr_nat(vcpu,17,&r33);
-    ret=do_xen_version((int )r32,r33);
+    ret=do_xen_version((int )r32,guest_handle_from_ptr(r33, void));
     vcpu_set_gr(vcpu, 8, ret, 0);
     vmx_vcpu_increment_iip(vcpu);
 }

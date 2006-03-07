@@ -189,6 +189,7 @@ typedef struct evtchn_op {
         evtchn_unmask_t           unmask;
     } u;
 } evtchn_op_t;
+DEFINE_GUEST_HANDLE(evtchn_op_t);
 
 #endif /* __XEN_PUBLIC_EVENT_CHANNEL_H__ */
 

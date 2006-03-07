@@ -451,6 +451,43 @@ int arch_set_info_guest(
     return 0;
 }
 
+long
+arch_do_vcpu_op(
+    int cmd, struct vcpu *v, GUEST_HANDLE(void) arg)
+{
+    long rc = 0;
+
+    switch ( cmd )
+    {
+    case VCPUOP_register_runstate_memory_area:
+    {
+        struct vcpu_register_runstate_memory_area area;
+
+        rc = -EINVAL;
+        if ( v != current )
+            break;
+
+        rc = -EFAULT;
+        if ( copy_from_guest(&area, arg, 1) )
+            break;
+
+        if ( !access_ok(area.addr.v, sizeof(*area.addr.v)) )
+            break;
+
+        rc = 0;
+        v->runstate_guest = area.addr.v;
+        __copy_to_user(v->runstate_guest, &v->runstate, sizeof(v->runstate));
+
+        break;
+    }
+
+    default:
+        rc = -ENOSYS;
+        break;
+    }
+
+    return rc;
+}
 
 void new_thread(struct vcpu *d,
                 unsigned long start_pc,
@@ -831,7 +868,6 @@ void sync_vcpu_execstate(struct vcpu *v)
     {                                                                       \
     case 'i': __arg = (unsigned long)va_arg(args, unsigned int);  break;    \
     case 'l': __arg = (unsigned long)va_arg(args, unsigned long); break;    \
-    case 'p': __arg = (unsigned long)va_arg(args, void *);        break;    \
     case 'h': __arg = (unsigned long)va_arg(args, void *);        break;    \
     default:  __arg = 0; BUG();                                             \
     }                                                                       \

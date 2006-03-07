@@ -825,7 +825,6 @@ unsigned long hypercall_create_continuation(
             case 'l':
                 arg = (unsigned long)va_arg(args, unsigned long);
                 break;
-            case 'p':
             case 'h':
                 arg = (unsigned long)va_arg(args, void *);
                 break;

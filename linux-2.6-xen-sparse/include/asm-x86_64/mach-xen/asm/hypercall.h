@@ -36,6 +36,7 @@
 
 #include <xen/interface/xen.h>
 #include <xen/interface/sched.h>
+#include <xen/interface/nmi.h>
 
 #define __STR(x) #x
 #define STR(x) __STR(x)
@@ -304,8 +305,7 @@ HYPERVISOR_suspend(
 
 static inline int
 HYPERVISOR_nmi_op(
-	unsigned long op,
-	unsigned long arg)
+	unsigned long op, void *arg)
 {
 	return _hypercall2(int, nmi_op, op, arg);
 }

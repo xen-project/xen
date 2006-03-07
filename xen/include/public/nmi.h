@@ -31,9 +31,14 @@
 /*
  * Register NMI callback for this (calling) VCPU. Currently this only makes
  * sense for domain 0, vcpu 0. All other callers will be returned EINVAL.
- * arg == address of callback function.
+ * arg == pointer to xennmi_callback structure.
  */
 #define XENNMI_register_callback   0
+typedef struct xennmi_callback {
+    unsigned long handler_address;
+    unsigned long pad;
+} xennmi_callback_t;
+DEFINE_GUEST_HANDLE(xennmi_callback_t);
 
 /*
  * Deregister NMI callback for this (calling) VCPU.

@@ -10,6 +10,7 @@
 #include <xen/sched.h>
 #include <xen/hypercall.h>
 #include <xen/multicall.h>
+#include <xen/guest_access.h>
 
 #include <linux/efi.h>	/* FOR EFI_UNIMPLEMENTED */
 #include <asm/sal.h>	/* FOR struct ia64_sal_retval */
@@ -175,7 +176,8 @@ ia64_hypercall (struct pt_regs *regs)
 			(int) vcpu_get_gr(v,33));
 		break;
 	    case __HYPERVISOR_dom0_op:
-		regs->r8 = do_dom0_op((struct dom0_op *) regs->r14);
+		regs->r8 = do_dom0_op(guest_handle_from_ptr(regs->r14,
+							    dom0_op_t));
 		break;
 
 	    case __HYPERVISOR_memory_op:
@@ -194,30 +196,30 @@ ia64_hypercall (struct pt_regs *regs)
 			    regs->r8 = reservation.nr_extents;
 			break;
 		    default:
-			regs->r8 = do_memory_op((int) regs->r14, (void *)regs->r15);
+			regs->r8 = do_memory_op((int) regs->r14, guest_handle_from_ptr(regs->r15, void));
 			break;
 		    }
 		}
 		break;
 
 	    case __HYPERVISOR_event_channel_op:
-		regs->r8 = do_event_channel_op((struct evtchn_op *) regs->r14);
+		regs->r8 = do_event_channel_op(guest_handle_from_ptr(regs->r14, evtchn_op_t));
 		break;
 
 	    case __HYPERVISOR_grant_table_op:
-		regs->r8 = do_grant_table_op((unsigned int) regs->r14, (void *) regs->r15, (unsigned int) regs->r16);
+		regs->r8 = do_grant_table_op((unsigned int) regs->r14, guest_handle_from_ptr(regs->r15, void), (unsigned int) regs->r16);
 		break;
 
 	    case __HYPERVISOR_console_io:
-		regs->r8 = do_console_io((int) regs->r14, (int) regs->r15, (char *) regs->r16);
+		regs->r8 = do_console_io((int) regs->r14, (int) regs->r15, guest_handle_from_ptr(regs->r16, char));
 		break;
 
 	    case __HYPERVISOR_xen_version:
-		regs->r8 = do_xen_version((int) regs->r14, (void *) regs->r15);
+		regs->r8 = do_xen_version((int) regs->r14, guest_handle_from_ptr(regs->r15, void));
 		break;
 
 	    case __HYPERVISOR_multicall:
-		regs->r8 = do_multicall((struct multicall_entry *) regs->r14, (unsigned int) regs->r15);
+		regs->r8 = do_multicall(guest_handle_from_ptr(regs->r14, multicall_entry_t), (unsigned int) regs->r15);
 		break;
 
 	    default:

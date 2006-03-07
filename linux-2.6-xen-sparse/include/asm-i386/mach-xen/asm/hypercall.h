@@ -304,8 +304,7 @@ HYPERVISOR_suspend(
 
 static inline int
 HYPERVISOR_nmi_op(
-	unsigned long op,
-	unsigned long arg)
+	unsigned long op, void *arg)
 {
 	return _hypercall2(int, nmi_op, op, arg);
 }

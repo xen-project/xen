@@ -54,8 +54,6 @@
 #define __HYPERVISOR_vm_assist            21
 #define __HYPERVISOR_update_va_mapping_otherdomain 22
 #define __HYPERVISOR_iret                 23 /* x86 only */
-#define __HYPERVISOR_switch_vm86          23 /* x86/32 only (obsolete name) */
-#define __HYPERVISOR_switch_to_user       23 /* x86/64 only (obsolete name) */
 #define __HYPERVISOR_vcpu_op              24
 #define __HYPERVISOR_set_segment_base     25 /* x86/64 only */
 #define __HYPERVISOR_mmuext_op            26
@@ -162,7 +160,7 @@
 #define MMUEXT_NEW_USER_BASEPTR 15
 
 #ifndef __ASSEMBLY__
-struct mmuext_op {
+typedef struct mmuext_op {
     unsigned int cmd;
     union {
         /* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR */
@@ -176,7 +174,8 @@ struct mmuext_op {
         /* TLB_FLUSH_MULTI, INVLPG_MULTI */
         void *vcpumask;
     } arg2;
-};
+} mmuext_op_t;
+DEFINE_GUEST_HANDLE(mmuext_op_t);
 #endif
 
 /* These are passed as 'flags' to update_va_mapping. They can be ORed. */
@@ -243,6 +242,7 @@ typedef struct mmu_update {
     uint64_t ptr;       /* Machine address of PTE. */
     uint64_t val;       /* New contents of PTE.    */
 } mmu_update_t;
+DEFINE_GUEST_HANDLE(mmu_update_t);
 
 /*
  * Send an array of these to HYPERVISOR_multicall().
@@ -252,6 +252,7 @@ typedef struct multicall_entry {
     unsigned long op, result;
     unsigned long args[6];
 } multicall_entry_t;
+DEFINE_GUEST_HANDLE(multicall_entry_t);
 
 /*
  * Event channel endpoints per domain:
