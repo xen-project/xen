@@ -57,6 +57,12 @@
 #define WEIGHT_PERIOD (MILLISECS(100))
 #define WEIGHT_SAFETY (MILLISECS(5))
 
+/* FIXME: need to validate that these are sane */
+#define PERIOD_MAX ULONG_MAX
+#define PERIOD_MIN (MICROSECS(10))
+#define SLICE_MAX ULONG_MAX
+#define SLICE_MIN (MICROSECS(5))
+
 #define IMPLY(a, b) (!(a) || (b))
 #define EQ(a, b) ((!!(a)) == (!!(b)))
 
@@ -1609,7 +1615,10 @@ static int sedf_adjdom(struct domain *p, struct sched_adjdom_cmd *cmd)
                  * Sanity checking: note that disabling extra weight requires
                  * that we set a non-zero slice.
                  */
-                if ( (cmd->u.sedf.slice == 0) ||
+                if ( (cmd->u.sedf.period > PERIOD_MAX) ||
+                     (cmd->u.sedf.period < PERIOD_MIN) ||
+                     (cmd->u.sedf.slice  > SLICE_MAX)  ||
+                     (cmd->u.sedf.slice  < SLICE_MIN)  ||
                      (cmd->u.sedf.slice > cmd->u.sedf.period) )
                     return -EINVAL;
                 EDOM_INFO(v)->weight = 0;
