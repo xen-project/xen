@@ -118,7 +118,8 @@ static inline u32 pickle_domptr(struct domain *_d)
 #define page_set_owner(_p, _d)	((_p)->u.inuse._domain = pickle_domptr(_d))
 
 /* Dummy now */
-#define SHARE_PFN_WITH_DOMAIN(_pfn, _dom) do { } while (0)
+#define share_xen_page_with_guest(p, d, r) do { } while (0)
+#define share_xen_page_with_privileged_guests(p, r) do { } while (0)
 
 extern struct page_info *frame_table;
 extern unsigned long frame_table_size;

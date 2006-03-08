@@ -83,8 +83,9 @@ static int alloc_trace_bufs(void)
 
     /* Share pages so that xentrace can map them. */
     for ( i = 0; i < nr_pages; i++ )
-        SHARE_PFN_WITH_DOMAIN(virt_to_page(rawbuf + i * PAGE_SIZE), dom0);
-    
+        share_xen_page_with_privileged_guests(
+            virt_to_page(rawbuf) + i, XENSHARE_writable);
+
     for_each_online_cpu ( i )
     {
         buf = t_bufs[i] = (struct t_buf *)&rawbuf[i*opt_tbuf_size*PAGE_SIZE];

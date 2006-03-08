@@ -176,10 +176,9 @@ void __init init_frametable(void)
 
 void arch_init_memory(void)
 {
-    extern void subarch_init_memory(struct domain *);
+    extern void subarch_init_memory(void);
 
     unsigned long i, pfn, rstart_pfn, rend_pfn;
-    struct page_info *page;
 
     memset(percpu_info, 0, sizeof(percpu_info));
 
@@ -189,6 +188,7 @@ void arch_init_memory(void)
      * their domain field set to dom_xen.
      */
     dom_xen = alloc_domain();
+    spin_lock_init(&dom_xen->page_alloc_lock);
     atomic_set(&dom_xen->refcnt, 1);
     dom_xen->domain_id = DOMID_XEN;
 
@@ -198,17 +198,13 @@ void arch_init_memory(void)
      * array. Mappings occur at the priv of the caller.
      */
     dom_io = alloc_domain();
+    spin_lock_init(&dom_io->page_alloc_lock);
     atomic_set(&dom_io->refcnt, 1);
     dom_io->domain_id = DOMID_IO;
 
     /* First 1MB of RAM is historically marked as I/O. */
     for ( i = 0; i < 0x100; i++ )
-    {
-        page = mfn_to_page(i);
-        page->count_info        = PGC_allocated | 1;
-        page->u.inuse.type_info = PGT_writable_page | PGT_validated | 1;
-        page_set_owner(page, dom_io);
-    }
+        share_xen_page_with_guest(mfn_to_page(i), dom_io, XENSHARE_writable);
  
     /* Any areas not specified as RAM by the e820 map are considered I/O. */
     for ( i = 0, pfn = 0; i < e820.nr_map; i++ )
@@ -221,17 +217,45 @@ void arch_init_memory(void)
         for ( ; pfn < rstart_pfn; pfn++ )
         {
             BUG_ON(!mfn_valid(pfn));
-            page = mfn_to_page(pfn);
-            page->count_info        = PGC_allocated | 1;
-            page->u.inuse.type_info = PGT_writable_page | PGT_validated | 1;
-            page_set_owner(page, dom_io);
+            share_xen_page_with_guest(
+                mfn_to_page(pfn), dom_io, XENSHARE_writable);
         }
         /* Skip the RAM region. */
         pfn = rend_pfn;
     }
     BUG_ON(pfn != max_page);
 
-    subarch_init_memory(dom_xen);
+    subarch_init_memory();
+}
+
+void share_xen_page_with_guest(
+    struct page_info *page, struct domain *d, int readonly)
+{
+    if ( page_get_owner(page) == d )
+        return;
+
+    spin_lock(&d->page_alloc_lock);
+
+    /* The incremented type count pins as writable or read-only. */
+    page->u.inuse.type_info  = (readonly ? PGT_none : PGT_writable_page);
+    page->u.inuse.type_info |= PGT_validated | 1;
+
+    page_set_owner(page, d);
+    wmb(); /* install valid domain ptr before updating refcnt. */
+    ASSERT(page->count_info == 0);
+    page->count_info |= PGC_allocated | 1;
+
+    if ( unlikely(d->xenheap_pages++ == 0) )
+        get_knownalive_domain(d);
+    list_add_tail(&page->list, &d->xenpage_list);
+
+    spin_unlock(&d->page_alloc_lock);
+}
+
+void share_xen_page_with_privileged_guests(
+    struct page_info *page, int readonly)
+{
+    share_xen_page_with_guest(page, dom_xen, readonly);
 }
 
 void write_ptbase(struct vcpu *v)

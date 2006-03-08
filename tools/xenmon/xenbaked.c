@@ -299,7 +299,7 @@ struct t_buf *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
         exit(EXIT_FAILURE);
     }
 
-    tbufs_mapped = xc_map_foreign_range(xc_handle, 0 /* Dom 0 ID */,
+    tbufs_mapped = xc_map_foreign_range(xc_handle, DOMID_XEN,
                                         size * num, PROT_READ | PROT_WRITE,
                                         tbufs_mfn);
 

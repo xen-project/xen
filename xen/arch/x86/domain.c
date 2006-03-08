@@ -312,7 +312,8 @@ int arch_domain_create(struct domain *d)
             goto fail_nomem;
 
         memset(d->shared_info, 0, PAGE_SIZE);
-        SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
+        share_xen_page_with_guest(
+            virt_to_page(d->shared_info), d, XENSHARE_writable);
     }
 
     return 0;

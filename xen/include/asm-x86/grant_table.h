@@ -23,8 +23,9 @@ int steal_page_for_grant_transfer(
 
 #define gnttab_create_shared_page(d, t, i)                               \
     do {                                                                 \
-        SHARE_PFN_WITH_DOMAIN(                                           \
-            virt_to_page((char *)(t)->shared + ((i) * PAGE_SIZE)), (d)); \
+        share_xen_page_with_guest(                                       \
+            virt_to_page((char *)(t)->shared + ((i) * PAGE_SIZE)),       \
+            (d), XENSHARE_writable);                                     \
         set_gpfn_from_mfn(                                               \
             (virt_to_maddr((t)->shared) >> PAGE_SHIFT) + (i),            \
             INVALID_M2P_ENTRY);                                          \
