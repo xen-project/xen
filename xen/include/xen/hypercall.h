@@ -10,6 +10,7 @@
 #include <xen/time.h>
 #include <public/xen.h>
 #include <public/acm_ops.h>
+#include <public/event_channel.h>
 #include <asm/hypercall.h>
 
 extern long
