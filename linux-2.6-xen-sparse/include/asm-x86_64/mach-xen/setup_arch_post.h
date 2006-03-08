@@ -34,7 +34,7 @@ static void __init machine_specific_arch_setup(void)
 
 #ifdef CONFIG_X86_LOCAL_APIC
 	cb.handler_address = (unsigned long)&nmi;
-	HYPERVISOR_nmi_op(XENNMI_register_callback, cb);
+	HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
 #endif
 
 	machine_specific_modify_cpu_capabilities(&boot_cpu_data);
