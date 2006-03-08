@@ -468,6 +468,7 @@ static int __init balloon_init(void)
 		return -1;
 
 	current_pages = min(xen_start_info->nr_pages, max_pfn);
+	totalram_pages = current_pages;
 	target_pages  = current_pages;
 	balloon_low   = 0;
 	balloon_high  = 0;
@@ -547,6 +548,7 @@ struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 		&init_mm, vstart, PAGE_SIZE << order, dealloc_pte_fn, NULL);
 	BUG_ON(ret);
 	current_pages -= 1UL << order;
+	totalram_pages = current_pages;
 	balloon_unlock(flags);
 
 	schedule_work(&balloon_worker);
