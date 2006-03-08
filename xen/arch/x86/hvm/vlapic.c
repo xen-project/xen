@@ -239,9 +239,7 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
 
     case VLAPIC_DELIV_MODE_INIT:
         if ( !level && trig_mode == 1 )     //Deassert
-        {
             printk("This hvm_vlapic is for P4, no work for De-assert init\n");
-        }
         else
         {
             /* FIXME How to check the situation after vcpu reset? */
@@ -529,7 +527,6 @@ static void vlapic_read_aligned(struct vlapic *vlapic, unsigned int offset,
 
             counter_passed = passed /
                              (APIC_BUS_CYCLE_NS * vlapic->timer_divide_count);
-
             vlapic->timer_current_count -= counter_passed;
             if ( vlapic->timer_current_count <= 0 )
             {
@@ -769,16 +766,15 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
             offset = APIC_BUS_CYCLE_NS *
                      vlapic->timer_divide_count *
                      vlapic->timer_initial_count;
-            vlapic->vlapic_timer.expires = now + offset;
 
-            set_timer(&vlapic->vlapic_timer, vlapic->vlapic_timer.expires);
+            set_timer(&vlapic->vlapic_timer, now + offset);
 
             HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
                         "bus cycle is %"PRId64"ns, now 0x%016"PRIx64", "
                         "timer initial count 0x%x, offset 0x%016"PRIx64", "
                         "expire @ 0x%016"PRIx64".",
                         APIC_BUS_CYCLE_NS, now, vlapic->timer_initial_count,
-                        offset, vlapic->vlapic_timer.expires);
+                        offset, now + offset);
         }
         break;
 
@@ -873,8 +869,7 @@ void vlapic_timer_fn(void *data)
         offset = APIC_BUS_CYCLE_NS *
                  vlapic->timer_divide_count *
                  vlapic->timer_initial_count;
-        vlapic->vlapic_timer.expires = now + offset;
-        set_timer(&vlapic->vlapic_timer, vlapic->vlapic_timer.expires);
+        set_timer(&vlapic->vlapic_timer, now + offset);
     }
     else
         vlapic->timer_current_count = 0;
@@ -890,7 +885,8 @@ void vlapic_timer_fn(void *data)
                 "now 0x%016"PRIx64", expire @ 0x%016"PRIx64", "
                 "timer initial count 0x%x, timer current count 0x%x.",
                 now, vlapic->vlapic_timer.expires,
-                vlapic->timer_initial_count, vlapic->timer_current_count);
+                vlapic->timer_initial_count,
+                vlapic->timer_current_count);
 }
 
 #if 0
