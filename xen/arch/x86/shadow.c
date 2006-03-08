@@ -3583,6 +3583,11 @@ static inline int guest_page_fault(
 
     ASSERT( d->arch.ops->guest_paging_levels >= PAGING_L3 );
 
+#if CONFIG_PAGING_LEVELS >= 4
+    if ( (error_code & (ERROR_I | ERROR_P)) == (ERROR_I | ERROR_P) )
+        return 1;
+#endif
+
 #if CONFIG_PAGING_LEVELS == 4
     if ( d->arch.ops->guest_paging_levels == PAGING_L4 ) 
     {

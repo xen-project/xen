@@ -223,6 +223,11 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
     switch (regs->ecx){
     case MSR_EFER:
+        /* offending reserved bit will cause #GP */
+        if ( msr_content &
+                ~( EFER_LME | EFER_LMA | EFER_NX | EFER_SCE ) )
+             vmx_inject_exception(vc, TRAP_gp_fault, 0);
+
         if ((msr_content & EFER_LME) ^
             test_bit(VMX_CPU_STATE_LME_ENABLED,
                      &vc->arch.hvm_vmx.cpu_state)){
@@ -236,18 +241,9 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         if (msr_content & EFER_LME)
             set_bit(VMX_CPU_STATE_LME_ENABLED,
                     &vc->arch.hvm_vmx.cpu_state);
-        /* No update for LME/LMA since it have no effect */
+
         msr->msr_items[VMX_INDEX_MSR_EFER] =
             msr_content;
-        if (msr_content & ~(EFER_LME | EFER_LMA)){
-            msr->msr_items[VMX_INDEX_MSR_EFER] = msr_content;
-            if (!test_bit(VMX_INDEX_MSR_EFER, &msr->flags)){
-                rdmsrl(MSR_EFER,
-                       host_state->msr_items[VMX_INDEX_MSR_EFER]);
-                set_bit(VMX_INDEX_MSR_EFER, &host_state->flags);
-                set_bit(VMX_INDEX_MSR_EFER, &msr->flags);
-            }
-        }
         break;
 
     case MSR_FS_BASE:
