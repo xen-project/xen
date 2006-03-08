@@ -97,16 +97,15 @@ static void vtm_timer_fn(void *data)
 {
     vtime_t *vtm;
     VCPU    *vcpu = data;
-    u64	    cur_itc,vitm;
+    u64	    cur_itc,vitv;
 
-    UINT64  vec;
-    
-    vec = VCPU(vcpu, itv) & 0xff;
-    vmx_vcpu_pend_interrupt(vcpu, vec);
-
+    vitv = VCPU(vcpu, itv);
+    if ( !ITV_IRQ_MASK(vitv) ){
+        vmx_vcpu_pend_interrupt(vcpu, vitv & 0xff);
+    }
     vtm=&(vcpu->arch.arch_vmx.vtm);
     cur_itc = now_itc(vtm);
-    vitm =VCPU(vcpu, itm);
+ //    vitm =VCPU(vcpu, itm);
  //fire_itc2 = cur_itc;
  //fire_itm2 = vitm;
     update_last_itc(vtm,cur_itc);  // pseudo read to update vITC
@@ -135,51 +134,72 @@ uint64_t vtm_get_itc(VCPU *vcpu)
     vtime_t    *vtm;
 
     vtm=&(vcpu->arch.arch_vmx.vtm);
-    // FIXME: should use local_irq_disable & local_irq_enable ??
-    local_irq_save(spsr);
     guest_itc = now_itc(vtm);
-//    update_last_itc(vtm, guest_itc);
-
-    local_irq_restore(spsr);
     return guest_itc;
 }
 
+
+
+
 void vtm_set_itc(VCPU *vcpu, uint64_t new_itc)
 {
-    uint64_t    spsr;
+    uint64_t    vitm, vitv;
     vtime_t     *vtm;
-
+    vitm = VCPU(vcpu,itm);
+    vitv = VCPU(vcpu,itv);
     vtm=&(vcpu->arch.arch_vmx.vtm);
-    local_irq_save(spsr);
     vtm->vtm_offset = new_itc - ia64_get_itc();
     vtm->last_itc = new_itc;
-    vtm_interruption_update(vcpu, vtm);
-    local_irq_restore(spsr);
+    if(vitm < new_itc){
+        clear_bit(ITV_VECTOR(vitv), &VCPU(vcpu, irr[0]));
+        stop_timer(&vtm->vtm_timer);
+    }
 }
 
-void vtm_set_itv(VCPU *vcpu)
-{
-    uint64_t    spsr,itv;
-    vtime_t     *vtm;
 
+#define TIMER_SLOP (50*1000) /* ns */  /* copy from timer.c */
+extern u64 cycle_to_ns(u64 cyle);
+
+
+void vtm_set_itm(VCPU *vcpu, uint64_t val)
+{
+    vtime_t *vtm;
+    uint64_t   vitv, cur_itc, expires;
+    vitv = VCPU(vcpu, itv);
     vtm=&(vcpu->arch.arch_vmx.vtm);
-    local_irq_save(spsr);
-    itv = VCPU(vcpu, itv);
-    if ( ITV_IRQ_MASK(itv) )
+    // TODO; need to handle VHPI in future
+    clear_bit(ITV_VECTOR(vitv), &VCPU(vcpu, irr[0]));
+    VCPU(vcpu,itm)=val;
+    cur_itc =now_itc(vtm);
+    if(val >  vtm->last_itc){
+        expires = NOW() + cycle_to_ns(val-cur_itc) + TIMER_SLOP;
+        set_timer(&vtm->vtm_timer, expires);
+    }else{
         stop_timer(&vtm->vtm_timer);
-    vtm_interruption_update(vcpu, vtm);
-    local_irq_restore(spsr);
+    }
+}
+
+
+void vtm_set_itv(VCPU *vcpu, uint64_t val)
+{
+    uint64_t    olditv;
+    olditv = VCPU(vcpu, itv);
+    VCPU(vcpu, itv) = val;
+    if(ITV_IRQ_MASK(val)){
+        clear_bit(ITV_VECTOR(olditv), &VCPU(vcpu, irr[0]));
+    }else if(ITV_VECTOR(olditv)!=ITV_VECTOR(val)){
+        if(test_and_clear_bit(ITV_VECTOR(olditv), &VCPU(vcpu, irr[0])))
+            set_bit(ITV_VECTOR(val), &VCPU(vcpu, irr[0]));
+    }
 }
 
 
 /*
- * Update interrupt or hook the vtm timer for fire 
+ * Update interrupt or hook the vtm timer for fire
  * At this point vtm_timer should be removed if itv is masked.
  */
 /* Interrupt must be disabled at this point */
-
-extern u64 cycle_to_ns(u64 cyle);
-#define TIMER_SLOP (50*1000) /* ns */  /* copy from timer.c */
+/*
 void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
 {
     uint64_t    cur_itc,vitm,vitv;
@@ -197,8 +217,7 @@ void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
     cur_itc =now_itc(vtm);
     diff_last = vtm->last_itc - vitm;
     diff_now = cur_itc - vitm;
-    update_last_itc (vtm,cur_itc);
-    
+
     if ( diff_last >= 0 ) {
         // interrupt already fired.
         stop_timer(&vtm->vtm_timer);
@@ -207,28 +226,32 @@ void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
         // ITV is fired.
         vmx_vcpu_pend_interrupt(vcpu, vitv&0xff);
     }
+*/
     /* Both last_itc & cur_itc < itm, wait for fire condition */
-    else {
+/*    else {
         expires = NOW() + cycle_to_ns(0-diff_now) + TIMER_SLOP;
         set_timer(&vtm->vtm_timer, expires);
     }
     local_irq_restore(spsr);
 }
+ */
 
 /*
  * Action for vtm when the domain is scheduled out.
  * Remove the timer for vtm.
  */
+/*
 void vtm_domain_out(VCPU *vcpu)
 {
     if(!is_idle_domain(vcpu->domain))
 	stop_timer(&vcpu->arch.arch_vmx.vtm.vtm_timer);
 }
-
+ */
 /*
  * Action for vtm when the domain is scheduled in.
  * Fire vtm IRQ or add the timer for vtm.
  */
+/*
 void vtm_domain_in(VCPU *vcpu)
 {
     vtime_t     *vtm;
@@ -238,6 +261,7 @@ void vtm_domain_in(VCPU *vcpu)
 	vtm_interruption_update(vcpu, vtm);
     }
 }
+ */
 
 /*
  * Next for vLSapic

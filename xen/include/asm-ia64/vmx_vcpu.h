@@ -102,10 +102,11 @@ extern IA64FAULT vmx_vcpu_set_psr_l(VCPU *vcpu, UINT64 val);
 extern void vtm_init(VCPU *vcpu);
 extern uint64_t vtm_get_itc(VCPU *vcpu);
 extern void vtm_set_itc(VCPU *vcpu, uint64_t new_itc);
-extern void vtm_set_itv(VCPU *vcpu);
+extern void vtm_set_itv(VCPU *vcpu, uint64_t val);
+extern void vtm_set_itm(VCPU *vcpu, uint64_t val);
 extern void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm);
-extern void vtm_domain_out(VCPU *vcpu);
-extern void vtm_domain_in(VCPU *vcpu);
+//extern void vtm_domain_out(VCPU *vcpu);
+//extern void vtm_domain_in(VCPU *vcpu);
 extern void vlsapic_reset(VCPU *vcpu);
 extern int vmx_check_pending_irq(VCPU *vcpu);
 extern void guest_write_eoi(VCPU *vcpu);
@@ -255,10 +256,7 @@ static inline
 IA64FAULT
 vmx_vcpu_set_itm(VCPU *vcpu, u64 val)
 {
-    vtime_t     *vtm;
-    vtm=&(vcpu->arch.arch_vmx.vtm);
-    VCPU(vcpu,itm)=val;
-    vtm_interruption_update(vcpu, vtm);
+    vtm_set_itm(vcpu, val);
     return IA64_NO_FAULT;
 }
 static inline
@@ -299,8 +297,7 @@ IA64FAULT
 vmx_vcpu_set_itv(VCPU *vcpu, u64 val)
 {
 
-    VCPU(vcpu,itv)=val;
-    vtm_set_itv(vcpu);
+    vtm_set_itv(vcpu, val);
     return IA64_NO_FAULT;
 }
 static inline

@@ -306,9 +306,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     uint64_t pta;
 
     local_irq_save(spsr);
-    if(VMX_DOMAIN(prev)){
-    	vtm_domain_out(prev);
-    }
+//    if(VMX_DOMAIN(prev)){
+//    	vtm_domain_out(prev);
+//    }
 	context_switch_count++;
 	switch_to(prev,next,prev);
 //    if(VMX_DOMAIN(current)){
@@ -326,7 +326,7 @@ if (!i--) { printk("+"); i = 1000000; }
 }
 
     if (VMX_DOMAIN(current)){
-        vtm_domain_in(current);
+//        vtm_domain_in(current);
 		vmx_load_all_rr(current);
     }else{
     	extern char ia64_ivt;
