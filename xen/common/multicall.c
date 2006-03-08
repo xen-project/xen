@@ -34,7 +34,10 @@ do_multicall(
 
     for ( i = 0; i < nr_calls; i++ )
     {
-        if ( unlikely(__copy_from_guest_offset(&mcs->call, call_list, i, 1)) )
+        if ( hypercall_preempt_check() )
+            goto preempted;
+
+        if ( unlikely(__copy_from_guest(&mcs->call, call_list, 1)) )
             goto fault;
 
         do_multicall_call(&mcs->call);
@@ -47,33 +50,21 @@ do_multicall(
              */
             struct multicall_entry corrupt;
             memset(&corrupt, 0xAA, sizeof(corrupt));
-            (void)__copy_to_guest_offset(call_list, i, &corrupt, 1);
+            (void)__copy_to_guest(call_list, &corrupt, 1);
         }
 #endif
 
-        if ( unlikely(__copy_to_guest_offset(call_list, i, &mcs->call, 1)) )
+        if ( unlikely(__copy_field_to_guest(call_list, &mcs->call, result)) )
             goto fault;
 
-        if ( hypercall_preempt_check() )
+        if ( test_bit(_MCSF_call_preempted, &mcs->flags) )
         {
-            /*
-             * Copy the sub-call continuation if it was preempted.
-             * Otherwise skip over the sub-call entirely.
-             */
-            if ( !test_bit(_MCSF_call_preempted, &mcs->flags) )
-                i++;
-            else
-                (void)__copy_to_guest_offset(call_list, i, &mcs->call, 1);
-
-            /* Only create a continuation if there is work left to be done. */
-            if ( i < nr_calls )
-            {
-                mcs->flags = 0;
-                guest_handle_add_offset(call_list, i);
-                return hypercall_create_continuation(
-                    __HYPERVISOR_multicall, "hi", call_list, nr_calls-i);
-            }
+            /* Copy the sub-call continuation. */
+            (void)__copy_to_guest(call_list, &mcs->call, 1);
+            goto preempted;
         }
+
+        guest_handle_add_offset(call_list, 1);
     }
 
     mcs->flags = 0;
@@ -82,6 +73,11 @@ do_multicall(
  fault:
     mcs->flags = 0;
     return -EFAULT;
+
+ preempted:
+    mcs->flags = 0;
+    return hypercall_create_continuation(
+        __HYPERVISOR_multicall, "hi", call_list, nr_calls-i);
 }
 
 /*
