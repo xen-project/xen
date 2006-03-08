@@ -20,6 +20,7 @@
 
 #include <asm/vmx_vcpu.h>
 #include <asm/pal.h>
+#include <asm/sal.h>
 
 static void
 get_pal_parameters (VCPU *vcpu, UINT64 *gr29,
@@ -182,8 +183,16 @@ pal_fixed_addr(VCPU *vcpu){
 static struct ia64_pal_retval
 pal_freq_base(VCPU *vcpu){
     struct ia64_pal_retval result;
+    struct ia64_sal_retval isrv;
 
     PAL_CALL(result,PAL_FREQ_BASE, 0, 0, 0);
+    if(result.v0 == 0){ //PAL_FREQ_BASE may not be implemented in some platforms, call SAL instead.
+        SAL_CALL(isrv, SAL_FREQ_BASE, 
+                SAL_FREQ_BASE_PLATFORM, 0, 0, 0, 0, 0, 0);
+        result.status = isrv.status;
+        result.v0 = isrv.v0;
+        result.v1 = result.v2 =0;
+    }
     return result;
 }
 
