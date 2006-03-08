@@ -19,8 +19,8 @@
  *
  */
 
-#ifndef __ASM_X86_hvm_guest_H__
-#define __ASM_X86_hvm_guest_H__
+#ifndef __ASM_X86_HVM_DOMAIN_H__
+#define __ASM_X86_HVM_DOMAIN_H__
 
 #include <asm/e820.h>
 #include <asm/hvm/vpic.h>
@@ -49,5 +49,5 @@ struct hvm_domain {
     char                   pbuf[HVM_PBUF_SIZE];
 };
 
-#endif /* __ASM_X86_hvm_guest_H__ */
+#endif /* __ASM_X86_HVM_DOMAIN_H__ */
 

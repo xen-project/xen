@@ -116,7 +116,7 @@ int hvm_vioapic_add_lapic(struct vlapic *vlapic, struct vcpu *v);
 
 void ioapic_update_EOI(struct domain *d, int vector);
 
-#ifdef hvm_guest_SAVE_RESTORE
+#ifdef HVM_DOMAIN_SAVE_RESTORE
 void ioapic_save(QEMUFile* f, void* opaque);
 int ioapic_load(QEMUFile* f, void* opaque, int version_id);
 #endif
