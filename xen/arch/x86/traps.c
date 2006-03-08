@@ -431,6 +431,11 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     v->arch.guest_context.ctrlreg[2] = addr;
     v->vcpu_info->arch.cr2           = addr;
 
+    /* Re-set error_code.user flag appropriately for the guest. */
+    error_code &= ~4;
+    if ( !KERNEL_MODE(v, guest_cpu_user_regs()) )
+        error_code |= 4;
+
     ti = &v->arch.guest_context.trap_ctxt[TRAP_page_fault];
     tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
     tb->error_code = error_code;
@@ -541,7 +546,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
  * #PF error code:
  *  Bit 0: Protection violation (=1) ; Page not present (=0)
  *  Bit 1: Write access
- *  Bit 2: Supervisor mode
+ *  Bit 2: User mode (=1) ; Supervisor mode (=0)
  *  Bit 3: Reserved bit violation
  *  Bit 4: Instruction fetch
  */
