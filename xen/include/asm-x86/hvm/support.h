@@ -32,7 +32,7 @@
 #define HVM_DEBUG 0
 #endif
 
-#define	HVM_DOMAIN(v)	((v)->arch.guest_context.flags & VGCF_HVM_GUEST)
+#define	hvm_guest(v)	((v)->arch.guest_context.flags & VGCF_HVM_GUEST)
 
 static inline shared_iopage_t *get_sp(struct domain *d)
 {

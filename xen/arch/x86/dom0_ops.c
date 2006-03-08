@@ -458,7 +458,7 @@ void arch_getdomaininfo_ctxt(
 {
     memcpy(c, &v->arch.guest_context, sizeof(*c));
 
-    if ( HVM_DOMAIN(v) )
+    if ( hvm_guest(v) )
     {
         hvm_store_cpu_guest_regs(v, &c->user_regs);
         hvm_store_cpu_guest_ctrl_regs(v, c->ctrlreg);
@@ -473,9 +473,9 @@ void arch_getdomaininfo_ctxt(
     c->flags = 0;
     if ( test_bit(_VCPUF_fpu_initialised, &v->vcpu_flags) )
         c->flags |= VGCF_I387_VALID;
-    if ( KERNEL_MODE(v, &v->arch.guest_context.user_regs) )
+    if ( guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
         c->flags |= VGCF_IN_KERNEL;
-    if ( HVM_DOMAIN(v) )
+    if ( hvm_guest(v) )
         c->flags |= VGCF_HVM_GUEST;
 
     c->ctrlreg[3] = pagetable_get_paddr(v->arch.guest_table);

@@ -52,7 +52,7 @@ static void ioapic_enable(hvm_vioapic_t *s, uint8_t enable)
         s->flags &= ~IOAPIC_ENABLE_FLAG;
 }
 
-#ifdef HVM_DOMAIN_SAVE_RESTORE
+#ifdef hvm_guest_SAVE_RESTORE
 void ioapic_save(QEMUFile* f, void* opaque)
 {
     printk("no implementation for ioapic_save\n");

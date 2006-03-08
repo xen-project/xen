@@ -79,7 +79,7 @@ static void vmx_smp_clear_vmcs(void *info)
 {
     struct vcpu *v = (struct vcpu *)info;
 
-    ASSERT(HVM_DOMAIN(v));
+    ASSERT(hvm_guest(v));
 
     if (v->arch.hvm_vmx.launch_cpu == smp_processor_id())
         __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));
@@ -87,7 +87,7 @@ static void vmx_smp_clear_vmcs(void *info)
 
 void vmx_request_clear_vmcs(struct vcpu *v)
 {
-    ASSERT(HVM_DOMAIN(v));
+    ASSERT(hvm_guest(v));
 
     if (v->arch.hvm_vmx.launch_cpu == smp_processor_id())
         __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));

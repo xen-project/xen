@@ -24,7 +24,7 @@ void show_registers(struct cpu_user_regs *regs)
     char taint_str[TAINT_STRING_MAX_LEN];
     const char *context;
 
-    if ( HVM_DOMAIN(current) && GUEST_MODE(regs) )
+    if ( hvm_guest(current) && guest_mode(regs) )
     {
         context = "hvm";
         hvm_store_cpu_guest_regs(current, &fault_regs);
@@ -32,7 +32,7 @@ void show_registers(struct cpu_user_regs *regs)
     }
     else
     {
-        context = GUEST_MODE(regs) ? "guest" : "hypervisor";
+        context = guest_mode(regs) ? "guest" : "hypervisor";
         fault_crs[0] = read_cr0();
         fault_crs[3] = read_cr3();
         fault_regs.ds = read_segment_register(ds);
@@ -46,7 +46,7 @@ void show_registers(struct cpu_user_regs *regs)
            print_tainted(taint_str));
     printk("CPU:    %d\nRIP:    %04x:[<%016lx>]",
            smp_processor_id(), fault_regs.cs, fault_regs.rip);
-    if ( !GUEST_MODE(regs) )
+    if ( !guest_mode(regs) )
         print_symbol(" %s", fault_regs.rip);
     printk("\nRFLAGS: %016lx   CONTEXT: %s\n", fault_regs.rflags, context);
     printk("rax: %016lx   rbx: %016lx   rcx: %016lx\n",

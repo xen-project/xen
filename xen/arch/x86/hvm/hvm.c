@@ -186,7 +186,7 @@ void hvm_setup_platform(struct domain* d)
 {
     struct hvm_domain *platform;
 
-    if ( !HVM_DOMAIN(current) || (current->vcpu_id != 0) )
+    if ( !hvm_guest(current) || (current->vcpu_id != 0) )
         return;
 
     shadow_direct_map_init(d);
@@ -324,7 +324,7 @@ int hvm_bringup_ap(int vcpuid, int trampoline_vector)
     int rc = 0;
 
     /* current must be HVM domain BSP */
-    if ( !(HVM_DOMAIN(bsp) && bsp->vcpu_id == 0) ) {
+    if ( !(hvm_guest(bsp) && bsp->vcpu_id == 0) ) {
         printk("Not calling hvm_bringup_ap from BSP context.\n");
         domain_crash_synchronous();
     }

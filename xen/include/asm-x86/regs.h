@@ -31,17 +31,17 @@ enum EFLAGS {
     EF_ID   = 0x00200000,   /* id */
 };
 
-#define GUEST_MODE(r)                                                         \
+#define guest_mode(r)                                                         \
 ({                                                                            \
     unsigned long diff = (char *)guest_cpu_user_regs() - (char *)(r);         \
     /* Frame pointer must point into current CPU stack. */                    \
     ASSERT(diff < STACK_SIZE);                                                \
     /* If a guest frame, it must be have guest privs (unless HVM guest).   */ \
     /* We permit CS==0 which can come from an uninitialised trap entry. */    \
-    ASSERT((diff != 0) || VM86_MODE(r) || ((r->cs&3) >= GUEST_KERNEL_RPL) ||  \
-           (r->cs == 0) || HVM_DOMAIN(current));                              \
+    ASSERT((diff != 0) || vm86_mode(r) || ((r->cs&3) >= GUEST_KERNEL_RPL) ||  \
+           (r->cs == 0) || hvm_guest(current));                              \
     /* If not a guest frame, it must be a hypervisor frame. */                \
-    ASSERT((diff == 0) || (!VM86_MODE(r) && (r->cs == __HYPERVISOR_CS)));     \
+    ASSERT((diff == 0) || (!vm86_mode(r) && (r->cs == __HYPERVISOR_CS)));     \
     /* Return TRUE if it's a guest frame. */                                  \
     (diff == 0);                                                              \
 })

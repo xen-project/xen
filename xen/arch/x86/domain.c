@@ -719,7 +719,7 @@ static void __context_switch(void)
                stack_regs,
                CTXT_SWITCH_STACK_BYTES);
         unlazy_fpu(p);
-        if ( !HVM_DOMAIN(p) )
+        if ( !hvm_guest(p) )
         {
             save_segments(p);
         }
@@ -748,7 +748,7 @@ static void __context_switch(void)
             loaddebug(&n->arch.guest_context, 7);
         }
 
-        if ( !HVM_DOMAIN(n) )
+        if ( !hvm_guest(n) )
         {
             set_int80_direct_trap(n);
             switch_kernel_stack(n, cpu);
@@ -812,7 +812,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         /* Re-enable interrupts before restoring state which may fault. */
         local_irq_enable();
 
-        if ( !HVM_DOMAIN(next) )
+        if ( !hvm_guest(next) )
         {
             load_LDT(next);
             load_segments(next);
@@ -1030,7 +1030,7 @@ void domain_relinquish_resources(struct domain *d)
             v->arch.guest_table_user = mk_pagetable(0);
         }
 
-        if ( HVM_DOMAIN(v) )
+        if ( hvm_guest(v) )
             hvm_relinquish_guest_resources(v);
     }
 
