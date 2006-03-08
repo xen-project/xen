@@ -24,21 +24,19 @@ static int command_write(struct pci_dev *dev, int offset, u16 value, void *data)
 		if (unlikely(verbose_request))
 			printk(KERN_DEBUG "pciback: %s: enable\n",
 			       pci_name(dev));
-		dev->is_enabled = 1;
-		pcibios_enable_device(dev, (1 << PCI_NUM_RESOURCES) - 1);
+		pci_enable_device(dev);
 	} else if (dev->is_enabled && !is_enable_cmd(value)) {
 		if (unlikely(verbose_request))
 			printk(KERN_DEBUG "pciback: %s: disable\n",
 			       pci_name(dev));
-		pciback_disable_device(dev);
+		pci_disable_device(dev);
 	}
 
 	if (!dev->is_busmaster && is_master_cmd(value)) {
 		if (unlikely(verbose_request))
 			printk(KERN_DEBUG "pciback: %s: set bus master\n",
 			       pci_name(dev));
-		dev->is_busmaster = 1;
-		pcibios_set_master(dev);
+		pci_set_master(dev);
 	}
 
 	if (value & PCI_COMMAND_INVALIDATE) {

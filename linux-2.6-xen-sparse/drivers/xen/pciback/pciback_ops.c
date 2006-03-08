@@ -10,17 +10,6 @@
 int verbose_request = 0;
 module_param(verbose_request, int, 0644);
 
-/* For those architectures without a pcibios_disable_device */
-void __attribute__ ((weak)) pcibios_disable_device(struct pci_dev *dev) { }
-
-void pciback_disable_device(struct pci_dev *dev)
-{
-	if (dev->is_enabled) {
-		dev->is_enabled = 0;
-		pcibios_disable_device(dev);
-	}
-}
-
 /* Ensure a device is "turned off" and ready to be exported.
  * This also sets up the device's private data to keep track of what should
  * be in the base address registers (BARs) so that we can keep the
@@ -32,7 +21,7 @@ void pciback_reset_device(struct pci_dev *dev)
 
 	/* Disable devices (but not bridges) */
 	if (dev->hdr_type == PCI_HEADER_TYPE_NORMAL) {
-		pciback_disable_device(dev);
+		pci_disable_device(dev);
 
 		pci_write_config_word(dev, PCI_COMMAND, 0);
 

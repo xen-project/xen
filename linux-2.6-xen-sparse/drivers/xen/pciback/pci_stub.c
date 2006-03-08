@@ -208,8 +208,6 @@ static int __init pcistub_init_devices_late(void)
 	return 0;
 }
 
-device_initcall(pcistub_init_devices_late);
-
 static int __devinit pcistub_seize(struct pci_dev *dev)
 {
 	struct pci_stub_device *psdev;
@@ -367,6 +365,7 @@ static int __init pcistub_init(void)
 	return -EINVAL;
 }
 
+#ifndef MODULE
 /*
  * fs_initcall happens before device_initcall
  * so pciback *should* get called first (b/c we 
@@ -375,3 +374,34 @@ static int __init pcistub_init(void)
  * driver to register)
  */
 fs_initcall(pcistub_init);
+#endif
+
+static int __init pciback_init(void)
+{
+#ifndef MODULE
+	int err;
+
+	err = pcistub_init();
+	if (err < 0)
+		return err;
+#endif
+
+	if (list_empty(&pci_stub_device_ids))
+		return -ENODEV;
+	pcistub_init_devices_late();
+	pciback_xenbus_register();
+
+	__unsafe(THIS_MODULE);
+
+	return 0;
+}
+
+static void pciback_cleanup(void)
+{
+	BUG();
+}
+
+module_init(pciback_init);
+module_exit(pciback_cleanup);
+
+MODULE_LICENSE("Dual BSD/GPL");
