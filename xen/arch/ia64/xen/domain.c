@@ -118,20 +118,7 @@ void startup_cpu_idle_loop(void)
 	int cpu = smp_processor_id ();
 	/* Just some sanity to ensure that the scheduler is set up okay. */
 	ASSERT(current->domain == IDLE_DOMAIN_ID);
-	printf ("idle%dA\n", cpu);
 	raise_softirq(SCHEDULE_SOFTIRQ);
-#if 0   /* All this work is done within continue_cpu_idle_loop  */
-	printf ("idle%dB\n", cpu);
-	asm volatile ("mov ar.k2=r0");
-	do_softirq();
-	printf ("idle%dC\n", cpu);
-
-	/*
-	 * Declares CPU setup done to the boot processor.
-	 * Therefore memory barrier to ensure state is visible.
-	 */
-	smp_mb();
-#endif
 #if 0
 //do we have to ensure the idle task has a shared page so that, for example,
 //region registers can be loaded from it.  Apparently not...

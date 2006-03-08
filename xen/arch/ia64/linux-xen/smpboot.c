@@ -72,8 +72,7 @@ EXPORT_SYMBOL(cpu_online_map);
 
 #ifdef CONFIG_SMP /* ifdef XEN */
 
-//#define SMP_DEBUG 0
-#define SMP_DEBUG 1
+#define SMP_DEBUG 0
 
 #if SMP_DEBUG
 #define Dprintk(x...)  printk(x)

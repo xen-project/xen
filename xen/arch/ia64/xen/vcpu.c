@@ -1850,7 +1850,6 @@ IA64FAULT vcpu_fc(VCPU *vcpu, UINT64 vadr)
 	UINT64 mpaddr, paddr;
 	IA64FAULT fault;
 	unsigned long translate_domain_mpaddr(unsigned long);
-	IA64FAULT vcpu_tpa(VCPU *, UINT64, UINT64 *);
 
 	fault = vcpu_tpa(vcpu, vadr, &mpaddr);
 	if (fault == IA64_NO_FAULT) {

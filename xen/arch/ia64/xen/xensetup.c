@@ -331,7 +331,6 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
         if ( num_online_cpus() >= max_cpus )
             break;
         if ( !cpu_online(i) ) {
-printk("About to call __cpu_up(%d)\n",i);
             __cpu_up(i);
 	}
     }
