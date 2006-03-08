@@ -9,10 +9,10 @@ build:
 
 ifndef XEN_PYTHON_NATIVE_INSTALL
 install: all
-	CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)/usr"
+	CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)/usr" --force
 else
 install: all
-	CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)"
+	CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)" --force
 endif
 
 test:
