@@ -41,6 +41,7 @@ extern long platform_is_hp_ski(void);
 extern int ia64_hyperprivop(unsigned long, REGS *);
 extern int ia64_hypercall(struct pt_regs *regs);
 extern void vmx_do_launch(struct vcpu *);
+extern unsigned long lookup_domain_mpa(struct domain *,unsigned long);
 
 extern unsigned long dom0_start, dom0_size;
 
@@ -60,17 +61,7 @@ extern unsigned long dom0_start, dom0_size;
 #define PSCB(x,y)	VCPU(x,y)
 #define PSCBX(x,y)	x->arch.y
 
-extern unsigned long vcpu_verbose;
-
-long do_iopl(domid_t domain, unsigned int new_io_pl)
-{
-	dummy();
-	return 0;
-}
-
 #include <xen/sched-if.h>
-
-extern struct schedule_data schedule_data[NR_CPUS];
 
 void schedule_tail(struct vcpu *prev)
 {
@@ -95,9 +86,6 @@ unsigned long translate_domain_pte(unsigned long pteval,
 {
 	struct domain *d = current->domain;
 	unsigned long mask, pteval2, mpaddr;
-	unsigned long lookup_domain_mpa(struct domain *,unsigned long);
-	extern struct domain *dom0;
-	extern unsigned long dom0_start, dom0_size;
 
 	// FIXME address had better be pre-validated on insert
 	mask = ~itir_mask(itir);
@@ -127,7 +115,6 @@ unsigned long translate_domain_pte(unsigned long pteval,
 // given a current domain metaphysical address, return the physical address
 unsigned long translate_domain_mpaddr(unsigned long mpaddr)
 {
-	extern unsigned long lookup_domain_mpa(struct domain *,unsigned long);
 	unsigned long pteval;
 
 	if (current->domain == dom0) {
@@ -224,7 +211,7 @@ void reflect_interruption(unsigned long isr, struct pt_regs *regs, unsigned long
 
 void foodpi(void) {}
 
-unsigned long pending_false_positive = 0;
+static unsigned long pending_false_positive = 0;
 
 void reflect_extint(struct pt_regs *regs)
 {
@@ -543,7 +530,6 @@ unsigned long running_on_sim = 0;
 void
 do_ssc(unsigned long ssc, struct pt_regs *regs)
 {
-	extern unsigned long lookup_domain_mpa(struct domain *,unsigned long);
 	unsigned long arg0, arg1, arg2, arg3, retval;
 	char buf[2];
 /**/	static int last_fd, last_count;	// FIXME FIXME FIXME
@@ -653,14 +639,14 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 	vcpu_increment_iip(current);
 }
 
+/* Also read in hyperprivop.S  */
 int first_break = 1;
 
 void
 ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim)
 {
-	struct domain *d = (struct domain *) current->domain;
+	struct domain *d = current->domain;
 	struct vcpu *v = current;
-	extern unsigned long running_on_sim;
 
 	if (first_break) {
 		if (platform_is_hp_ski()) running_on_sim = 1;
@@ -668,8 +654,7 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 		first_break = 0;
 	}
 	if (iim == 0x80001 || iim == 0x80002) {	//FIXME: don't hardcode constant
-		if (running_on_sim) do_ssc(vcpu_get_gr(current,36), regs);
-		else do_ssc(vcpu_get_gr(current,36), regs);
+		do_ssc(vcpu_get_gr(current,36), regs);
 	} 
 #ifdef CRASH_DEBUG
 	else if ((iim == 0 || iim == CDB_BREAK_NUM) && !user_mode(regs)) {
@@ -711,6 +696,7 @@ ia64_handle_privop (unsigned long ifa, struct pt_regs *regs, unsigned long isr, 
 	}
 }
 
+/* Used in vhpt.h.  */
 #define INTR_TYPE_MAX	10
 UINT64 int_counts[INTR_TYPE_MAX];
 
