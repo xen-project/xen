@@ -16,6 +16,9 @@
 # Copyright (C) 2005 XenSource Ltd
 # Copyright (C) 2005 Jody Belka
 #============================================================================
+# This code based on tools/python/xen/xend/server/iopif.py and modified
+# to handle interrupts
+#============================================================================
 
 
 import types
@@ -31,20 +34,7 @@ from xen.xend.server.DevController import DevController
 xc = xen.lowlevel.xc.xc()
 
 
-def parse_ioport(val):
-    """Parse an i/o port field.
-    """
-    if isinstance(val, types.StringType):
-        radix = 10
-        if val.startswith('0x') or val.startswith('0X'):
-            radix = 16
-        v = int(val, radix)
-    else:
-        v = val
-    return v
-
-
-class IOPortsController(DevController):
+class IRQController(DevController):
 
     def __init__(self, vm):
         DevController.__init__(self, vm)
@@ -58,29 +48,26 @@ class IOPortsController(DevController):
                 val = sxp.child_value(config, field)
 
                 if not val:
-                    raise VmError('ioports: Missing %s config setting' % field)
+                    raise VmError('irq: Missing %s config setting' % field)
 
-                return parse_ioport(val)
+                if isinstance(val, types.StringType):
+                    return int(val,10)
+                    radix = 10
+                else:
+                    return val
             except:
-                raise VmError('ioports: Invalid config setting %s: %s' %
+                raise VmError('irq: Invalid config setting %s: %s' %
                               (field, val))
        
-        io_from = get_param('from')
-        io_to = get_param('to') 
+        pirq = get_param('irq')
 
-        if io_to < io_from or io_to >= 65536:
-            raise VmError('ioports: Invalid i/o range: %s - %s' %
-                          (io_from, io_to))
-
-        rc = xc.domain_ioport_permission(dom          = self.getDomid(),
-                                         first_port   = io_from,
-                                         nr_ports     = io_to - io_from + 1,
-                                         allow_access = True)
+        rc = xc.domain_irq_permission(dom          = self.getDomid(),
+                                      pirq         = pirq,
+                                      allow_access = True)
 
         if rc < 0:
             #todo non-fatal
             raise VmError(
-                'ioports: Failed to configure legacy i/o range: %s - %s' %
-                (io_from, io_to))
+                'irq: Failed to configure irq: %d' % (pirq))
 
         return (None, {}, {})
