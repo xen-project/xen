@@ -5,8 +5,16 @@
 
 from XmTestLib import *
 
-for i in range(0,10):
-    config = {"vif": ['' for _ in range(0, i)]}
+# The current device model, qemu-dm, only supports 8 MAX_NICS currently.
+if ENABLE_HVM_SUPPORT:
+    MAX_NICS = 8
+    nic = "type=ioemu, bridge=xenbr0"
+else:
+    MAX_NICS = 10
+    nic = ''
+
+for i in range(0,MAX_NICS):
+    config = {"vif": [ nic ] * i}
     domain = XmTestDomain(extraConfig=config)
 
     try:
