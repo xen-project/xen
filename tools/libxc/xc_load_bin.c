@@ -99,23 +99,22 @@ struct xen_bin_image_table
 #define FLAGS_REQUIRED XEN_REACTOS_FLAG_ADDRSVALID
 
 static struct xen_bin_image_table *
-findtable(char *image, unsigned long image_size);
+findtable(const char *image, unsigned long image_size);
 static int
 parsebinimage(
-    char *image, unsigned long image_size, struct domain_setup_info *dsi);
+    const char *image, unsigned long image_size,
+    struct domain_setup_info *dsi);
 static int
 loadbinimage(
-    char *image, unsigned long image_size, int xch, uint32_t dom,
+    const char *image, unsigned long image_size, int xch, uint32_t dom,
     unsigned long *parray, struct domain_setup_info *dsi);
 
-int probe_bin(char *image,
+int probe_bin(const char *image,
               unsigned long image_size,
               struct load_funcs *load_funcs)
 {
-    if ( NULL == findtable(image, image_size) )
-    {
+    if ( findtable(image, image_size) == NULL )
         return -EINVAL;
-    }
 
     load_funcs->parseimage = parsebinimage;
     load_funcs->loadimage = loadbinimage;
@@ -124,7 +123,7 @@ int probe_bin(char *image,
 }
 
 static struct xen_bin_image_table *
-findtable(char *image, unsigned long image_size)
+findtable(const char *image, unsigned long image_size)
 {
     struct xen_bin_image_table *table;
     unsigned long *probe_ptr;
@@ -133,15 +132,12 @@ findtable(char *image, unsigned long image_size)
 
     /* Don't go outside the image */
     if ( image_size < sizeof(struct xen_bin_image_table) )
-    {
         return NULL;
-    }
+
     probe_count = image_size;
     /* Restrict to first 8k */
-    if ( 8192 < probe_count )
-    {
+    if ( probe_count > 8192 )
         probe_count = 8192;
-    }
     probe_count = (probe_count - sizeof(struct xen_bin_image_table)) /
                   sizeof(unsigned long);
 
@@ -165,7 +161,7 @@ findtable(char *image, unsigned long image_size)
     return NULL;
 }
 
-static int parsebinimage(char *image, 
+static int parsebinimage(const char *image, 
                          unsigned long image_size,
                          struct domain_setup_info *dsi)
 {
@@ -238,7 +234,7 @@ static int parsebinimage(char *image,
 
 static int
 loadbinimage(
-    char *image, unsigned long image_size, int xch, uint32_t dom,
+    const char *image, unsigned long image_size, int xch, uint32_t dom,
     unsigned long *parray, struct domain_setup_info *dsi)
 {
     unsigned long size;

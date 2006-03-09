@@ -60,7 +60,7 @@ char *xc_read_image(const char *filename, unsigned long *size)
     return image;
 }
 
-char *xc_inflate_buffer(char *in_buf, unsigned long in_size,
+char *xc_inflate_buffer(const char *in_buf, unsigned long in_size,
                         unsigned long *out_size)
 {
     int           sts;
@@ -74,7 +74,7 @@ char *xc_inflate_buffer(char *in_buf, unsigned long in_size,
     {
         if ( out_size != NULL )
             *out_size = in_size;
-        return in_buf;
+        return (char *)in_buf;
     }
 
     out_len = in_buf[in_size-4] +

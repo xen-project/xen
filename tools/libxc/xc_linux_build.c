@@ -117,7 +117,7 @@ static int parse_features(
     return -EINVAL;
 }
 
-static int probeimageformat(char *image,
+static int probeimageformat(const char *image,
                             unsigned long image_size,
                             struct load_funcs *load_funcs)
 {
@@ -407,7 +407,7 @@ extern unsigned long xc_ia64_fpsr_default(void);
 static int setup_guest(int xc_handle,
                        uint32_t dom,
                        const char *image, unsigned long image_size,
-                       char *initrd, unsigned long initrd_len,
+                       const char *initrd, unsigned long initrd_len,
                        unsigned long nr_pages,
                        unsigned long *pvsi, unsigned long *pvke,
                        unsigned long *pvss, vcpu_guest_context_t *ctxt,
@@ -541,7 +541,7 @@ static int setup_guest(int xc_handle,
 static int setup_guest(int xc_handle,
                        uint32_t dom,
                        const char *image, unsigned long image_size,
-                       char *initrd, unsigned long initrd_len,
+                       const char *initrd, unsigned long initrd_len,
                        unsigned long nr_pages,
                        unsigned long *pvsi, unsigned long *pvke,
                        unsigned long *pvss, vcpu_guest_context_t *ctxt,
@@ -586,13 +586,13 @@ static int setup_guest(int xc_handle,
     unsigned long shadow_mode_enabled;
     uint32_t supported_features[XENFEAT_NR_SUBMAPS] = { 0, };
 
-    rc = probeimageformat((char *)image, (unsigned long)image_size, &load_funcs);
+    rc = probeimageformat(image, image_size, &load_funcs);
     if ( rc != 0 )
         goto error_out;
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
 
-    rc = (load_funcs.parseimage)((char *)image, (unsigned long)image_size, &dsi);
+    rc = (load_funcs.parseimage)(image, image_size, &dsi);
     if ( rc != 0 )
         goto error_out;
 
@@ -700,7 +700,7 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    (load_funcs.loadimage)((char *)image, image_size,
+    (load_funcs.loadimage)(image, image_size,
                            xc_handle, dom, page_array,
                            &dsi);
 
@@ -959,7 +959,7 @@ static int setup_guest(int xc_handle,
 
 static int xc_linux_build_internal(int xc_handle,
                                    uint32_t domid,
-                                   const char *image,
+                                   char *image,
                                    unsigned long image_size,
                                    char *initrd,
                                    unsigned long initrd_len,
@@ -1119,9 +1119,9 @@ static int xc_linux_build_internal(int xc_handle,
 
 int xc_linux_build_mem(int xc_handle,
                        uint32_t domid,
-                       char *image_buffer,
+                       const char *image_buffer,
                        unsigned long image_size,
-                       char *initrd,
+                       const char *initrd,
                        unsigned long initrd_len,
                        const char *cmdline,
                        const char *features,
@@ -1165,7 +1165,7 @@ int xc_linux_build_mem(int xc_handle,
     }
     else
     {
-        ram_buf = initrd;
+        ram_buf = (char *)initrd;
         ram_len = initrd_len;
     }
 

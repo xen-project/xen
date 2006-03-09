@@ -19,26 +19,25 @@
 
 static int
 parseelfimage(
-    char *image, unsigned long image_size, struct domain_setup_info *dsi);
+    const char *image, unsigned long image_size,
+    struct domain_setup_info *dsi);
 static int
 loadelfimage(
-    char *image, unsigned long image_size, int xch, uint32_t dom,
+    const char *image, unsigned long image_size, int xch, uint32_t dom,
     unsigned long *parray, struct domain_setup_info *dsi);
 static int
 loadelfsymtab(
-    char *image, int xch, uint32_t dom, unsigned long *parray,
+    const char *image, int xch, uint32_t dom, unsigned long *parray,
     struct domain_setup_info *dsi);
 
-int probe_elf(char *image,
+int probe_elf(const char *image,
               unsigned long image_size,
               struct load_funcs *load_funcs)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)image;
 
     if ( !IS_ELF(*ehdr) )
-    {
         return -EINVAL;
-    }
 
     load_funcs->parseimage = parseelfimage;
     load_funcs->loadimage = loadelfimage;
@@ -52,7 +51,7 @@ static inline int is_loadable_phdr(Elf_Phdr *phdr)
             ((phdr->p_flags & (PF_W|PF_X)) != 0));
 }
 
-static int parseelfimage(char *image, 
+static int parseelfimage(const char *image, 
                          unsigned long elfsize,
                          struct domain_setup_info *dsi)
 {
@@ -60,7 +59,8 @@ static int parseelfimage(char *image,
     Elf_Phdr *phdr;
     Elf_Shdr *shdr;
     unsigned long kernstart = ~0UL, kernend=0UL;
-    char *shstrtab, *guestinfo=NULL, *p;
+    const char *shstrtab;
+    char *guestinfo=NULL, *p;
     int h;
 
     if ( !IS_ELF(*ehdr) )
@@ -98,7 +98,7 @@ static int parseelfimage(char *image,
         if ( strcmp(&shstrtab[shdr->sh_name], "__xen_guest") != 0 )
             continue;
 
-        guestinfo = image + shdr->sh_offset;
+        guestinfo = (char *)image + shdr->sh_offset;
 
         if ( (strstr(guestinfo, "LOADER=generic") == NULL) &&
              (strstr(guestinfo, "GUEST_OS=linux") == NULL) )
@@ -171,7 +171,7 @@ static int parseelfimage(char *image,
 
 static int
 loadelfimage(
-    char *image, unsigned long elfsize, int xch, uint32_t dom,
+    const char *image, unsigned long elfsize, int xch, uint32_t dom,
     unsigned long *parray, struct domain_setup_info *dsi)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)image;
@@ -222,7 +222,7 @@ loadelfimage(
 
 static int
 loadelfsymtab(
-    char *image, int xch, uint32_t dom, unsigned long *parray,
+    const char *image, int xch, uint32_t dom, unsigned long *parray,
     struct domain_setup_info *dsi)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)image, *sym_ehdr;
@@ -271,8 +271,9 @@ loadelfsymtab(
              (shdr[h].sh_type == SHT_SYMTAB) )
         {
             if ( parray != NULL )
-                xc_map_memcpy(maxva, image + shdr[h].sh_offset, shdr[h].sh_size,
-                           xch, dom, parray, dsi->v_start);
+                xc_map_memcpy(maxva, image + shdr[h].sh_offset,
+                              shdr[h].sh_size,
+                              xch, dom, parray, dsi->v_start);
 
             /* Mangled to be based on ELF header location. */
             shdr[h].sh_offset = maxva - dsi->symtab_addr;

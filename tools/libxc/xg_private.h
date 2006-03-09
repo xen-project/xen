@@ -27,7 +27,7 @@
 
 
 char *xc_read_image(const char *filename, unsigned long *size);
-char *xc_inflate_buffer(char *in_buf,
+char *xc_inflate_buffer(const char *in_buf,
                         unsigned long in_size,
                         unsigned long *out_size);
 
@@ -145,9 +145,10 @@ struct domain_setup_info
     char *xen_guest_string;
 };
 
-typedef int (*parseimagefunc)(char *image, unsigned long image_size,
+typedef int (*parseimagefunc)(const char *image, unsigned long image_size,
                               struct domain_setup_info *dsi);
-typedef int (*loadimagefunc)(char *image, unsigned long image_size, int xch,
+typedef int (*loadimagefunc)(const char *image, unsigned long image_size,
+                             int xch,
                              uint32_t dom, unsigned long *parray,
                              struct domain_setup_info *dsi);
 
@@ -171,11 +172,11 @@ typedef struct mfn_mapper {
 } mfn_mapper_t;
 
 int xc_copy_to_domain_page(int xc_handle, uint32_t domid,
-                            unsigned long dst_pfn, void *src_page);
+                            unsigned long dst_pfn, const char *src_page);
 
 unsigned long xc_get_filesz(int fd);
 
-void xc_map_memcpy(unsigned long dst, char *src, unsigned long size,
+void xc_map_memcpy(unsigned long dst, const char *src, unsigned long size,
                    int xch, uint32_t dom, unsigned long *parray,
                    unsigned long vstart);
 
@@ -183,9 +184,12 @@ int pin_table(int xc_handle, unsigned int type, unsigned long mfn,
               domid_t dom);
 
 /* image loading */
-int probe_elf(char *image, unsigned long image_size, struct load_funcs *funcs);
-int probe_bin(char *image, unsigned long image_size, struct load_funcs *funcs);
-int probe_aout9(char *image, unsigned long image_size, struct load_funcs *funcs);
+int probe_elf(const char *image, unsigned long image_size,
+              struct load_funcs *funcs);
+int probe_bin(const char *image, unsigned long image_size,
+              struct load_funcs *funcs);
+int probe_aout9(const char *image, unsigned long image_size,
+                struct load_funcs *funcs);
 
 #endif
 
