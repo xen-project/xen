@@ -54,9 +54,14 @@ xc_domain_dumpcore(int xc_handle,
         goto error_out;
     }
  
-    for (i = 0; i < info.max_vcpu_id; i++)
+    if (domid != info.domid) {
+        PERROR("Domain %d does not exist", domid);
+        goto error_out;
+    }
+
+    for (i = 0; i <= info.max_vcpu_id; i++)
         if (xc_vcpu_getcontext(xc_handle, domid,
-                                       i, &ctxt[nr_vcpus]) == 0)
+                               i, &ctxt[nr_vcpus]) == 0)
             nr_vcpus++;
  
     nr_pages = info.nr_pages;
