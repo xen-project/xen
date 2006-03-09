@@ -280,7 +280,7 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 		return;
 	}
 
-	fault = vcpu_translate(current,address,is_data,&pteval,&itir,&iha);
+	fault = vcpu_translate(current,address,is_data,0,&pteval,&itir,&iha);
 	if (fault == IA64_NO_FAULT) {
 		pteval = translate_domain_pte(pteval,address,itir);
 		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,(itir>>2)&0x3f);

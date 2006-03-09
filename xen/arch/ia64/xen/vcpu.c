@@ -6,12 +6,6 @@
  *
  */
 
-#if 1
-// TEMPORARY PATCH for match_dtlb uses this, can be removed later
-// FIXME SMP
-int in_tpa = 0;
-#endif
-
 #include <linux/sched.h>
 #include <public/arch-ia64.h>
 #include <asm/ia64_int.h>
@@ -1290,7 +1284,7 @@ unsigned long recover_to_break_fault_count = 0;
 
 int warn_region0_address = 0; // FIXME later: tie to a boot parameter?
 
-IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
+IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, BOOLEAN in_tpa, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
 {
 	unsigned long region = address >> 61;
 	unsigned long pta, pte, rid, rr;
@@ -1402,9 +1396,7 @@ IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 	UINT64 pteval, itir, mask, iha;
 	IA64FAULT fault;
 
-	in_tpa = 1;
-	fault = vcpu_translate(vcpu, vadr, 1, &pteval, &itir, &iha);
-	in_tpa = 0;
+	fault = vcpu_translate(vcpu, vadr, TRUE, TRUE, &pteval, &itir, &iha);
 	if (fault == IA64_NO_FAULT)
 	{
 		mask = itir_mask(itir);
