@@ -378,7 +378,7 @@ fs_initcall(pcistub_init);
 
 static int __init pciback_init(void)
 {
-#ifndef MODULE
+#ifdef MODULE
 	int err;
 
 	err = pcistub_init();
