@@ -6,7 +6,7 @@
 #include <zlib.h>
 
 /* number of pages to write at a time */
-#define DUMP_INCREMENT 4 * 1024
+#define DUMP_INCREMENT (4 * 1024)
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 
 static int
