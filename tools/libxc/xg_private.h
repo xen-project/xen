@@ -26,7 +26,11 @@
 #endif
 
 
-char *xc_read_kernel_image(const char *filename, unsigned long *size);
+char *xc_read_image(const char *filename, unsigned long *size);
+char *xc_inflate_buffer(char *in_buf,
+                        unsigned long in_size,
+                        unsigned long *out_size);
+
 unsigned long csum_page (void * page);
 
 #define _PAGE_PRESENT   0x001
@@ -89,7 +93,7 @@ typedef unsigned long l4_pgentry_t;
 #define l2_table_offset_pae(_a) \
   (((_a) >> L2_PAGETABLE_SHIFT_PAE) & (L2_PAGETABLE_ENTRIES_PAE - 1))
 #define l3_table_offset_pae(_a) \
-	(((_a) >> L3_PAGETABLE_SHIFT_PAE) & (L3_PAGETABLE_ENTRIES_PAE - 1))
+  (((_a) >> L3_PAGETABLE_SHIFT_PAE) & (L3_PAGETABLE_ENTRIES_PAE - 1))
 
 #if defined(__i386__)
 #define l1_table_offset(_a) \
@@ -102,9 +106,9 @@ typedef unsigned long l4_pgentry_t;
 #define l2_table_offset(_a) \
   (((_a) >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES - 1))
 #define l3_table_offset(_a) \
-	(((_a) >> L3_PAGETABLE_SHIFT) & (L3_PAGETABLE_ENTRIES - 1))
+  (((_a) >> L3_PAGETABLE_SHIFT) & (L3_PAGETABLE_ENTRIES - 1))
 #define l4_table_offset(_a) \
-	(((_a) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1))
+  (((_a) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1))
 #endif
 
 #define ERROR(_m, _a...)                                \
@@ -142,10 +146,10 @@ struct domain_setup_info
 };
 
 typedef int (*parseimagefunc)(char *image, unsigned long image_size,
-			      struct domain_setup_info *dsi);
+                              struct domain_setup_info *dsi);
 typedef int (*loadimagefunc)(char *image, unsigned long image_size, int xch,
-			     uint32_t dom, unsigned long *parray,
-			     struct domain_setup_info *dsi);
+                             uint32_t dom, unsigned long *parray,
+                             struct domain_setup_info *dsi);
 
 struct load_funcs
 {
@@ -176,7 +180,7 @@ void xc_map_memcpy(unsigned long dst, char *src, unsigned long size,
                    unsigned long vstart);
 
 int pin_table(int xc_handle, unsigned int type, unsigned long mfn,
-	      domid_t dom);
+              domid_t dom);
 
 /* image loading */
 int probe_elf(char *image, unsigned long image_size, struct load_funcs *funcs);

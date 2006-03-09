@@ -406,8 +406,8 @@ extern unsigned long xc_ia64_fpsr_default(void);
 
 static int setup_guest(int xc_handle,
                        uint32_t dom,
-                       char *image, unsigned long image_size,
-                       gzFile initrd_gfd, unsigned long initrd_len,
+                       const char *image, unsigned long image_size,
+                       char *initrd, unsigned long initrd_len,
                        unsigned long nr_pages,
                        unsigned long *pvsi, unsigned long *pvke,
                        unsigned long *pvss, vcpu_guest_context_t *ctxt,
@@ -472,23 +472,17 @@ static int setup_guest(int xc_handle,
     (load_funcs.loadimage)(image, image_size, xc_handle, dom, page_array,
                            &dsi);
 
-    /* Load the initial ramdisk image. */
+    /* Load the initial ramdisk image, if present */
     if ( initrd_len != 0 )
     {
-        for ( i = (vinitrd_start - dsi.v_start);
-              i < (vinitrd_end - dsi.v_start); i += PAGE_SIZE )
-        {
-            char page[PAGE_SIZE];
-            if ( gzread(initrd_gfd, page, PAGE_SIZE) == -1 )
-            {
-                PERROR("Error reading initrd image, could not");
-                goto error_out;
-            }
+        /* Pages are not contiguous, so do the copy one page at a time */
+        for ( i = (vinitrd_start - dsi.v_start), offset = 0; 
+              i < (vinitrd_end - dsi.v_start);
+              i += PAGE_SIZE, offset += PAGE_SIZE )
             xc_copy_to_domain_page(xc_handle, dom,
-                                   page_array[i>>PAGE_SHIFT], page);
-        }
+                                   page_array[i>>PAGE_SHIFT],
+                                   &initrd[offset]);
     }
-
 
     *pvke = dsi.v_kernentry;
 
@@ -518,7 +512,7 @@ static int setup_guest(int xc_handle,
     start_info->store_evtchn = store_evtchn;
     start_info->console_mfn   = nr_pages - 1;
     start_info->console_evtchn = console_evtchn;
-    start_info->nr_pages       = nr_pages;	// FIXME?: nr_pages - 2 ????
+    start_info->nr_pages       = nr_pages; // FIXME?: nr_pages - 2 ????
     if ( initrd_len != 0 )
     {
         ctxt->initrd.start    = vinitrd_start;
@@ -546,8 +540,8 @@ static int setup_guest(int xc_handle,
 #else /* x86 */
 static int setup_guest(int xc_handle,
                        uint32_t dom,
-                       char *image, unsigned long image_size,
-                       gzFile initrd_gfd, unsigned long initrd_len,
+                       const char *image, unsigned long image_size,
+                       char *initrd, unsigned long initrd_len,
                        unsigned long nr_pages,
                        unsigned long *pvsi, unsigned long *pvke,
                        unsigned long *pvss, vcpu_guest_context_t *ctxt,
@@ -592,13 +586,13 @@ static int setup_guest(int xc_handle,
     unsigned long shadow_mode_enabled;
     uint32_t supported_features[XENFEAT_NR_SUBMAPS] = { 0, };
 
-    rc = probeimageformat(image, image_size, &load_funcs);
+    rc = probeimageformat((char *)image, (unsigned long)image_size, &load_funcs);
     if ( rc != 0 )
         goto error_out;
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
 
-    rc = (load_funcs.parseimage)(image, image_size, &dsi);
+    rc = (load_funcs.parseimage)((char *)image, (unsigned long)image_size, &dsi);
     if ( rc != 0 )
         goto error_out;
 
@@ -706,7 +700,8 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    (load_funcs.loadimage)(image, image_size, xc_handle, dom, page_array,
+    (load_funcs.loadimage)((char *)image, image_size,
+                           xc_handle, dom, page_array,
                            &dsi);
 
     /* Parse and validate kernel features. */
@@ -738,21 +733,17 @@ static int setup_guest(int xc_handle,
 
     shadow_mode_enabled = test_feature_bit(XENFEAT_auto_translated_physmap, required_features);
 
-    /* Load the initial ramdisk image. */
+    /* Load the initial ramdisk image, if present. */
     if ( initrd_len != 0 )
     {
-        for ( i = (vinitrd_start - dsi.v_start); 
-              i < (vinitrd_end - dsi.v_start); i += PAGE_SIZE )
-        {
-            char page[PAGE_SIZE];
-            if ( gzread(initrd_gfd, page, PAGE_SIZE) == -1 )
-            {
-                PERROR("Error reading initrd image, could not");
-                goto error_out;
-            }
+        int offset;
+        /* Pages are not contiguous, so do the inflation a page at a time. */
+        for ( i = (vinitrd_start - dsi.v_start), offset = 0;
+              i < (vinitrd_end - dsi.v_start);
+              i += PAGE_SIZE, offset += PAGE_SIZE )
             xc_copy_to_domain_page(xc_handle, dom,
-                                   page_array[i>>PAGE_SHIFT], page);
-        }
+                                   page_array[i>>PAGE_SHIFT],
+                                   &initrd[offset]);
     }
 
     /* setup page tables */
@@ -966,27 +957,25 @@ static int setup_guest(int xc_handle,
 }
 #endif
 
-int xc_linux_build(int xc_handle,
-                   uint32_t domid,
-                   const char *image_name,
-                   const char *ramdisk_name,
-                   const char *cmdline,
-                   const char *features,
-                   unsigned long flags,
-                   unsigned int store_evtchn,
-                   unsigned long *store_mfn,
-                   unsigned int console_evtchn,
-                   unsigned long *console_mfn)
+static int xc_linux_build_internal(int xc_handle,
+                                   uint32_t domid,
+                                   const char *image,
+                                   unsigned long image_size,
+                                   char *initrd,
+                                   unsigned long initrd_len,
+                                   const char *cmdline,
+                                   const char *features,
+                                   unsigned long flags,
+                                   unsigned int store_evtchn,
+                                   unsigned long *store_mfn,
+                                   unsigned int console_evtchn,
+                                   unsigned long *console_mfn)
 {
     dom0_op_t launch_op;
     DECLARE_DOM0_OP;
-    int initrd_fd = -1;
-    gzFile initrd_gfd = NULL;
     int rc, i;
     vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
     unsigned long nr_pages;
-    char         *image = NULL;
-    unsigned long image_size, initrd_size=0;
     unsigned long vstartinfo_start, vkern_entry, vstack_start;
     uint32_t      features_bitmap[XENFEAT_NR_SUBMAPS] = { 0, };
 
@@ -1003,26 +992,6 @@ int xc_linux_build(int xc_handle,
     {
         PERROR("Could not find total pages for domain");
         goto error_out;
-    }
-
-    if ( (image = xc_read_kernel_image(image_name, &image_size)) == NULL )
-        goto error_out;
-
-    if ( (ramdisk_name != NULL) && (strlen(ramdisk_name) != 0) )
-    {
-        if ( (initrd_fd = open(ramdisk_name, O_RDONLY)) < 0 )
-        {
-            PERROR("Could not open the initial ramdisk image");
-            goto error_out;
-        }
-
-        initrd_size = xc_get_filesz(initrd_fd);
-
-        if ( (initrd_gfd = gzdopen(initrd_fd, "rb")) == NULL )
-        {
-            PERROR("Could not allocate decompression state for initrd");
-            goto error_out;
-        }
     }
 
 #ifdef VALGRIND
@@ -1047,7 +1016,8 @@ int xc_linux_build(int xc_handle,
     memset(ctxt, 0, sizeof(*ctxt));
 
     if ( setup_guest(xc_handle, domid, image, image_size, 
-                     initrd_gfd, initrd_size, nr_pages, 
+                     initrd, initrd_len,
+                     nr_pages, 
                      &vstartinfo_start, &vkern_entry,
                      &vstack_start, ctxt, cmdline,
                      op.u.getdomaininfo.shared_info_frame,
@@ -1058,12 +1028,6 @@ int xc_linux_build(int xc_handle,
         ERROR("Error constructing guest OS");
         goto error_out;
     }
-
-    if ( initrd_fd >= 0 )
-        close(initrd_fd);
-    if ( initrd_gfd )
-        gzclose(initrd_gfd);
-    free(image);
 
 #ifdef __ia64__
     /* based on new_thread in xen/arch/ia64/domain.c */
@@ -1150,12 +1114,114 @@ int xc_linux_build(int xc_handle,
     return rc;
 
  error_out:
-    if ( initrd_gfd != NULL )
-        gzclose(initrd_gfd);
-    else if ( initrd_fd >= 0 )
-        close(initrd_fd);
-    free(image);
     return -1;
+}
+
+int xc_linux_build_mem(int xc_handle,
+                       uint32_t domid,
+                       char *image_buffer,
+                       unsigned long image_size,
+                       char *initrd,
+                       unsigned long initrd_len,
+                       const char *cmdline,
+                       const char *features,
+                       unsigned long flags,
+                       unsigned int store_evtchn,
+                       unsigned long *store_mfn,
+                       unsigned int console_evtchn,
+                       unsigned long *console_mfn)
+{
+    int            sts;
+    char          *img_buf, *ram_buf;
+    unsigned long  img_len, ram_len;
+
+    /* A kernel buffer is required */
+    if ( (image_buffer == NULL) || (image_size == 0) )
+    {
+        ERROR("kernel image buffer not present");
+        return EINVAL;
+    }
+
+    /* If it's gzipped, inflate it;  otherwise, use as is */
+    /* xc_inflate_buffer may return the same buffer pointer if */
+    /* the buffer is already inflated */
+    img_buf = xc_inflate_buffer(image_buffer, image_size, &img_len);
+    if ( img_buf == NULL )
+    {
+        ERROR("unable to inflate kernel image buffer");
+        return EFAULT;
+    }
+
+    /* RAM disks are optional; if we get one, inflate it */
+    if ( initrd != NULL )
+    {
+        ram_buf = xc_inflate_buffer(initrd, initrd_len, &ram_len);
+        if ( ram_buf == NULL )
+        {
+            ERROR("unable to inflate ram disk buffer");
+            sts = -1;
+            goto out;
+        }
+    }
+    else
+    {
+        ram_buf = initrd;
+        ram_len = initrd_len;
+    }
+
+    sts = xc_linux_build_internal(xc_handle, domid, img_buf, img_len,
+                                  ram_buf, ram_len, cmdline, features, flags,
+                                  store_evtchn, store_mfn,
+                                  console_evtchn, console_mfn);
+
+ out:
+    /* The inflation routines may pass back the same buffer so be */
+    /* sure that we have a buffer and that it's not the one passed in. */
+    /* Don't unnecessarily annoy/surprise/confound the caller */
+    if ( (img_buf != NULL) && (img_buf != image_buffer) )
+        free(img_buf);
+    if ( (ram_buf != NULL) && (ram_buf != initrd) )
+        free(ram_buf);
+
+    return sts;
+}
+
+int xc_linux_build(int xc_handle,
+                   uint32_t domid,
+                   const char *image_name,
+                   const char *initrd_name,
+                   const char *cmdline,
+                   const char *features,
+                   unsigned long flags,
+                   unsigned int store_evtchn,
+                   unsigned long *store_mfn,
+                   unsigned int console_evtchn,
+                   unsigned long *console_mfn)
+{
+    char *image, *ram = NULL;
+    unsigned long image_size, ram_size = 0;
+    int  sts;
+
+    if ( (image_name == NULL) ||
+         ((image = xc_read_image(image_name, &image_size)) == NULL ))
+        return -1;
+
+    if ( (initrd_name != NULL) && (strlen(initrd_name) != 0) &&
+         ((ram = xc_read_image(initrd_name, &ram_size)) == NULL) )
+    {
+        free(image);
+        return -1;
+    }
+
+    sts = xc_linux_build_internal(xc_handle, domid, image, image_size,
+                                  ram, ram_size, cmdline, features, flags,
+                                  store_evtchn, store_mfn,
+                                  console_evtchn, console_mfn);
+
+    free(image);
+    free(ram);
+
+    return sts;
 }
 
 /*

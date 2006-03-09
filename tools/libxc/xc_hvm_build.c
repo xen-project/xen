@@ -338,24 +338,29 @@ static int setup_guest(int xc_handle,
     return -1;
 }
 
-int xc_hvm_build(int xc_handle,
-                 uint32_t domid,
-                 int memsize,
-                 const char *image_name,
-                 unsigned int vcpus,
-                 unsigned int pae,
-                 unsigned int acpi,
-                 unsigned int apic,
-                 unsigned int store_evtchn,
-                 unsigned long *store_mfn)
+static int xc_hvm_build_internal(int xc_handle,
+                                 uint32_t domid,
+                                 int memsize,
+                                 char *image,
+                                 unsigned long image_size,
+                                 unsigned int vcpus,
+                                 unsigned int pae,
+                                 unsigned int acpi,
+                                 unsigned int apic,
+                                 unsigned int store_evtchn,
+                                 unsigned long *store_mfn)
 {
     dom0_op_t launch_op, op;
     int rc, i;
     vcpu_guest_context_t st_ctxt, *ctxt = &st_ctxt;
     unsigned long nr_pages;
-    char         *image = NULL;
-    unsigned long image_size;
     xen_capabilities_info_t xen_caps;
+
+    if ( (image == NULL) || (image_size == 0) )
+    {
+        ERROR("Image required");
+        goto error_out;
+    }
 
     if ( (rc = xc_version(xc_handle, XENVER_capabilities, &xen_caps)) != 0 )
     {
@@ -375,9 +380,6 @@ int xc_hvm_build(int xc_handle,
         PERROR("Could not find total pages for domain");
         goto error_out;
     }
-
-    if ( (image = xc_read_kernel_image(image_name, &image_size)) == NULL )
-        goto error_out;
 
     if ( mlock(&st_ctxt, sizeof(st_ctxt) ) )
     {
@@ -404,8 +406,6 @@ int xc_hvm_build(int xc_handle,
         ERROR("Error constructing guest OS");
         goto error_out;
     }
-
-    free(image);
 
     /* FPU is set up to default initial state. */
     memset(&ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
@@ -450,7 +450,6 @@ int xc_hvm_build(int xc_handle,
     return rc;
 
  error_out:
-    free(image);
     return -1;
 }
 
@@ -578,6 +577,92 @@ loadelfimage(
     }
 
     return 0;
+}
+
+/* xc_hvm_build
+ *
+ * Create a domain for a virtualized Linux, using files/filenames
+ *
+ */
+
+int xc_hvm_build(int xc_handle,
+                 uint32_t domid,
+                 int memsize,
+                 const char *image_name,
+                 unsigned int vcpus,
+                 unsigned int pae,
+                 unsigned int acpi,
+                 unsigned int apic,
+                 unsigned int store_evtchn,
+                 unsigned long *store_mfn)
+{
+    char *image;
+    int  sts;
+    unsigned long image_size;
+
+    if ( (image_name == NULL) ||
+         ((image = xc_read_image(image_name, &image_size)) == NULL) )
+        return -1;
+
+    sts = xc_hvm_build_internal(xc_handle, domid, memsize,
+                                image, image_size,
+                                vcpus, pae, acpi, apic,
+                                store_evtchn, store_mfn);
+
+    free(image);
+
+    return sts;
+}
+
+/* xc_hvm_build_mem
+ *
+ * Create a domain for a virtualized Linux, using buffers
+ *
+ */
+
+int xc_hvm_build_mem(int xc_handle,
+                     uint32_t domid,
+                     int memsize,
+                     char *image_buffer,
+                     unsigned long image_size,
+                     unsigned int vcpus,
+                     unsigned int pae,
+                     unsigned int acpi,
+                     unsigned int apic,
+                     unsigned int store_evtchn,
+                     unsigned long *store_mfn)
+{
+    int           sts;
+    unsigned long img_len;
+    char         *img;
+
+    /* Validate that there is a kernel buffer */
+
+    if ( (image_buffer == NULL) || (image_size == 0) )
+    {
+        ERROR("kernel image buffer not present");
+        return -EINVAL;
+    }
+
+    img = xc_inflate_buffer(image_buffer, image_size, &img_len);
+    if (img == NULL)
+    {
+        ERROR("unable to inflate ram disk buffer");
+        return -1;
+    }
+
+    sts = xc_hvm_build_internal(xc_handle, domid, memsize,
+                                img, img_len,
+                                vcpus, pae, acpi, apic,
+                                store_evtchn, store_mfn);
+
+    /* xc_inflate_buffer may return the original buffer pointer (for
+       for already inflated buffers), so exercise some care in freeing */
+
+    if ( (img != NULL) && (img != image_buffer) )
+        free(img);
+
+    return sts;
 }
 
 /*
