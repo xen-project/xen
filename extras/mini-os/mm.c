@@ -51,7 +51,8 @@
 unsigned long *phys_to_machine_mapping;
 extern char *stack;
 extern char _text, _etext, _edata, _end;
-
+extern void do_exit(void);
+extern void page_walk(unsigned long virt_addr);
 
 /*********************
  * ALLOCATION BITMAP
@@ -63,7 +64,6 @@ static unsigned long *alloc_bitmap;
 
 #define allocated_in_map(_pn) \
 (alloc_bitmap[(_pn)/PAGES_PER_MAPWORD] & (1<<((_pn)&(PAGES_PER_MAPWORD-1))))
-
 
 /*
  * Hint regarding bitwise arithmetic in map_{alloc,free}:
@@ -208,7 +208,6 @@ static void init_page_allocator(unsigned long min, unsigned long max)
     unsigned long range, bitmap_size;
     chunk_head_t *ch;
     chunk_tail_t *ct;
-
     for ( i = 0; i < FREELIST_SIZE; i++ )
     {
         free_head[i]       = &free_tail[i];
@@ -366,106 +365,181 @@ void free_pages(void *pointer, int order)
     free_head[order] = freed_ch;   
    
 }
-void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
-{
-    unsigned long pfn_to_map, pt_frame;
-    unsigned long mach_ptd, max_mach_ptd;
-    int count;
-    unsigned long mach_pte, virt_pte;
-    unsigned long *ptd = (unsigned long *)start_info.pt_base;
-    mmu_update_t mmu_updates[L1_PAGETABLE_ENTRIES + 1];
+
+
+void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn, 
+                                unsigned long offset, unsigned long level)
+{   
+    unsigned long *tab = (unsigned long *)start_info.pt_base;
+    unsigned long pt_page = (unsigned long)pfn_to_virt(*pt_pfn); 
+    unsigned long prot_e, prot_t, pincmd;
+    mmu_update_t mmu_updates[0];
     struct mmuext_op pin_request;
     
-    /* Firstly work out what is the first pfn that is not yet in page tables
-       NB. Assuming that builder fills whole pt_frames (which it does at the
-       moment)
-     */  
+    DEBUG("Allocating new L%d pt frame for pt_pfn=%lx, "
+           "prev_l_mfn=%lx, offset=%lx\n", 
+           level, *pt_pfn, prev_l_mfn, offset);
+
+    if (level == L1_FRAME)
+    {
+         prot_e = L1_PROT;
+         prot_t = L2_PROT;
+         pincmd = MMUEXT_PIN_L1_TABLE;
+    }
+#if (defined __x86_64__)
+    else if (level == L2_FRAME)
+    {
+         prot_e = L2_PROT;
+         prot_t = L3_PROT;
+         pincmd = MMUEXT_PIN_L2_TABLE;
+    }
+    else if (level == L3_FRAME)
+    {
+         prot_e = L3_PROT;
+         prot_t = L4_PROT;
+         pincmd = MMUEXT_PIN_L3_TABLE;
+    }
+#endif
+    else
+    {
+         printk("new_pt_frame() called with invalid level number %d\n", level);
+         do_exit();
+    }    
+
+    /* Update the entry */
+#if (defined __x86_64__)
+    tab = pte_to_virt(tab[l4_table_offset(pt_page)]);
+    tab = pte_to_virt(tab[l3_table_offset(pt_page)]);
+#endif
+    mmu_updates[0].ptr = (tab[l2_table_offset(pt_page)] & PAGE_MASK) + 
+                         sizeof(void *)* l1_table_offset(pt_page);
+    mmu_updates[0].val = pfn_to_mfn(*pt_pfn) << PAGE_SHIFT | 
+                         (prot_e & ~_PAGE_RW);
+    if(HYPERVISOR_mmu_update(mmu_updates, 1, NULL, DOMID_SELF) < 0)
+    {
+         printk("PTE for new page table page could not be updated\n");
+         do_exit();
+    }
+                        
+    /* Pin the page to provide correct protection */
+    pin_request.cmd = pincmd;
+    pin_request.arg1.mfn = pfn_to_mfn(*pt_pfn);
+    if(HYPERVISOR_mmuext_op(&pin_request, 1, NULL, DOMID_SELF) < 0)
+    {
+        printk("ERROR: pinning failed\n");
+        do_exit();
+    }
+
+    /* Now fill the new page table page with entries.
+       Update the page directory as well. */
+    mmu_updates[0].ptr = (prev_l_mfn << PAGE_SHIFT) + sizeof(void *) * offset;
+    mmu_updates[0].val = pfn_to_mfn(*pt_pfn) << PAGE_SHIFT | prot_t;
+    if(HYPERVISOR_mmu_update(mmu_updates, 1, NULL, DOMID_SELF) < 0) 
+    {            
+       printk("ERROR: mmu_update failed\n");
+       do_exit();
+    }
+
+    *pt_pfn += 1;
+}
+
+void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
+{
+    unsigned long start_address, end_address;
+    unsigned long pfn_to_map, pt_pfn = *start_pfn;
+    static mmu_update_t mmu_updates[L1_PAGETABLE_ENTRIES + 1];
+    unsigned long *tab = (unsigned long *)start_info.pt_base;
+    unsigned long mfn = pfn_to_mfn(virt_to_pfn(start_info.pt_base));
+    unsigned long page, offset;
+    int count = 0;
+
+#if defined(__x86_64__)
+    pfn_to_map = (start_info.nr_pt_frames - 3) * L1_PAGETABLE_ENTRIES;
+#else
     pfn_to_map = (start_info.nr_pt_frames - 1) * L1_PAGETABLE_ENTRIES;
-    DEBUG("start_pfn=%ld, first pfn_to_map %ld, max_pfn=%ld", 
-            *start_pfn, pfn_to_map, *max_pfn);
+#endif
+    start_address = (unsigned long)pfn_to_virt(pfn_to_map);
+    end_address = (unsigned long)pfn_to_virt(*max_pfn);
+    
+    /* We worked out the virtual memory range to map, now mapping loop */
+    printk("Mapping memory range 0x%lx - 0x%lx\n", start_address, end_address);
 
-    /* Machine address of page table directory */
-    mach_ptd = phys_to_machine(to_phys(start_info.pt_base));
-    mach_ptd += sizeof(void *) * 
-        l2_table_offset((unsigned long)to_virt(PFN_PHYS(pfn_to_map)));
-  
-    max_mach_ptd = sizeof(void *) * 
-        l2_table_offset((unsigned long)to_virt(PFN_PHYS(*max_pfn)));
-    
-    /* Check that we are not trying to access Xen region */
-    if(max_mach_ptd > sizeof(void *) * l2_table_offset(HYPERVISOR_VIRT_START))
+    while(start_address < end_address)
     {
-        printk("WARNING: mini-os will not use all the memory supplied\n");
-        max_mach_ptd = sizeof(void *) * l2_table_offset(HYPERVISOR_VIRT_START);
-        *max_pfn = virt_to_pfn(HYPERVISOR_VIRT_START - PAGE_SIZE);
-    }
-    max_mach_ptd += phys_to_machine(to_phys(start_info.pt_base));
-    DEBUG("Max_mach_ptd 0x%lx", max_mach_ptd); 
-   
-    pt_frame = *start_pfn;
-    /* Should not happen - no empty, mapped pages */
-    if(pt_frame >= pfn_to_map)
-    {
-        printk("ERROR: Not even a single empty, mapped page\n");
-        *(int*)0=0;
-    }
-    
-    while(mach_ptd < max_mach_ptd)
-    {
-        /* Correct protection needs to be set for the new page table frame */
-        virt_pte = (unsigned long)to_virt(PFN_PHYS(pt_frame));
-        mach_pte = ptd[l2_table_offset(virt_pte)] & ~(PAGE_SIZE-1);
-        mach_pte += sizeof(void *) * l1_table_offset(virt_pte);
-        DEBUG("New page table page: pfn=0x%lx, mfn=0x%lx, virt_pte=0x%lx, "
-                "mach_pte=0x%lx", pt_frame, pfn_to_mfn(pt_frame), 
-                virt_pte, mach_pte);
+        tab = (unsigned long *)start_info.pt_base;
+        mfn = pfn_to_mfn(virt_to_pfn(start_info.pt_base));
+
+#if defined(__x86_64__)
+        offset = l4_table_offset(start_address);
+        /* Need new L3 pt frame */
+        if(!(start_address & L3_MASK)) 
+            new_pt_frame(&pt_pfn, mfn, offset, L3_FRAME);
         
-        /* Update the entry */
-        mmu_updates[0].ptr = mach_pte;
-        mmu_updates[0].val = pfn_to_mfn(pt_frame) << PAGE_SHIFT | 
-                                                    (L1_PROT & ~_PAGE_RW);
-        if(HYPERVISOR_mmu_update(mmu_updates, 1, NULL, DOMID_SELF) < 0)
-        {
-            printk("PTE for new page table page could not be updated\n");
-            *(int*)0=0;
-        }
-        
-        /* Pin the page to provide correct protection */
-        pin_request.cmd = MMUEXT_PIN_L1_TABLE;
-        pin_request.arg1.mfn = pfn_to_mfn(pt_frame);
-        if(HYPERVISOR_mmuext_op(&pin_request, 1, NULL, DOMID_SELF) < 0)
-        {
-            printk("ERROR: pinning failed\n");
-            *(int*)0=0;
-        }
-        
-        /* Now fill the new page table page with entries.
-           Update the page directory as well. */
-        count = 0;
-        mmu_updates[count].ptr = mach_ptd;
-        mmu_updates[count].val = pfn_to_mfn(pt_frame) << PAGE_SHIFT |
-                                                         L2_PROT;
+        page = tab[offset];
+        mfn = pte_to_mfn(page);
+        tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
+        offset = l3_table_offset(start_address);
+        /* Need new L2 pt frame */
+        if(!(start_address & L2_MASK)) 
+            new_pt_frame(&pt_pfn, mfn, offset, L2_FRAME);
+
+        page = tab[offset];
+        mfn = pte_to_mfn(page);
+        tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
+#endif
+        offset = l2_table_offset(start_address);        
+        /* Need new L1 pt frame */
+        if(!(start_address & L1_MASK)) 
+            new_pt_frame(&pt_pfn, mfn, offset, L1_FRAME);
+       
+        page = tab[offset];
+        mfn = pte_to_mfn(page);
+        offset = l1_table_offset(start_address);
+
+        mmu_updates[count].ptr = (mfn << PAGE_SHIFT) + sizeof(void *) * offset;
+        mmu_updates[count].val = 
+            pfn_to_mfn(pfn_to_map++) << PAGE_SHIFT | L1_PROT;
         count++;
-        mach_ptd += sizeof(void *);
-        mach_pte = phys_to_machine(PFN_PHYS(pt_frame++));
-        
-        for(;count <= L1_PAGETABLE_ENTRIES && pfn_to_map <= *max_pfn; count++)
+        if (count == L1_PAGETABLE_ENTRIES || pfn_to_map == *max_pfn)
         {
-            mmu_updates[count].ptr = mach_pte;
-            mmu_updates[count].val = 
-                pfn_to_mfn(pfn_to_map++) << PAGE_SHIFT | L1_PROT;
-            if(count == 1) DEBUG("mach_pte 0x%lx", mach_pte);
-            mach_pte += sizeof(void *);
+            if(HYPERVISOR_mmu_update(mmu_updates, count, NULL, DOMID_SELF) < 0)
+            {
+                printk("PTE could not be updated\n");
+                do_exit();
+            }
+            count = 0;
         }
-        if(HYPERVISOR_mmu_update(mmu_updates, count, NULL, DOMID_SELF) < 0) 
-        {            
-            printk("ERROR: mmu_update failed\n");
-            *(int*)0=0;
-        }
-        (*start_pfn)++;
+        start_address += PAGE_SIZE;
     }
 
-    *start_pfn = pt_frame;
+    *start_pfn = pt_pfn;
+}
+
+
+void mem_test(unsigned long *start_add, unsigned long *end_add)
+{
+    unsigned long mask = 0x10000;
+    unsigned long *pointer;
+
+    for(pointer = start_add; pointer < end_add; pointer++)
+    {
+        if(!(((unsigned long)pointer) & 0xfffff))
+        {
+            printk("Writing to %lx\n", pointer);
+            page_walk((unsigned long)pointer);
+        }
+        *pointer = (unsigned long)pointer & ~mask;
+    }
+
+    for(pointer = start_add; pointer < end_add; pointer++)
+    {
+        if(((unsigned long)pointer & ~mask) != *pointer)
+            printk("Read error at 0x%lx. Read: 0x%lx, should read 0x%lx\n",
+                (unsigned long)pointer, 
+                *pointer, 
+                ((unsigned long)pointer & ~mask));
+    }
+
 }
 
 void init_mm(void)
@@ -485,23 +559,21 @@ void init_mm(void)
     phys_to_machine_mapping = (unsigned long *)start_info.mfn_list;
    
     /* First page follows page table pages and 3 more pages (store page etc) */
-    start_pfn = PFN_UP(to_phys(start_info.pt_base)) + start_info.nr_pt_frames + 3;
+    start_pfn = PFN_UP(to_phys(start_info.pt_base)) + 
+                start_info.nr_pt_frames + 3;
     max_pfn = start_info.nr_pages;
-
+   
     printk("  start_pfn:    %lx\n", start_pfn);
     printk("  max_pfn:      %lx\n", max_pfn);
 
-
-#ifdef __i386__
     build_pagetable(&start_pfn, &max_pfn);
-#endif
-
+    
     /*
      * now we can initialise the page allocator
      */
     printk("MM: Initialise page allocator for %lx(%lx)-%lx(%lx)\n",
            (u_long)to_virt(PFN_PHYS(start_pfn)), PFN_PHYS(start_pfn), 
            (u_long)to_virt(PFN_PHYS(max_pfn)), PFN_PHYS(max_pfn));
-    init_page_allocator(PFN_PHYS(start_pfn), PFN_PHYS(max_pfn));   
+    init_page_allocator(PFN_PHYS(start_pfn), PFN_PHYS(max_pfn));
     printk("MM: done\n");
 }
