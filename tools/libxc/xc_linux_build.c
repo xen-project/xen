@@ -46,6 +46,15 @@
 #define probe_aout9(image,image_size,load_funcs) 1
 #endif
 
+struct initrd_info {
+    enum { INITRD_none, INITRD_file, INITRD_mem } type;
+    unsigned long len;
+    union {
+        gzFile file_handle;
+        char *mem_addr;
+    } u;
+};
+
 static const char *feature_names[XENFEAT_NR_SUBMAPS*32] = {
     [XENFEAT_writable_page_tables]       = "writable_page_tables",
     [XENFEAT_writable_descriptor_tables] = "writable_descriptor_tables",
@@ -127,6 +136,42 @@ static int probeimageformat(const char *image,
     {
         ERROR( "Unrecognized image format" );
         return -EINVAL;
+    }
+
+    return 0;
+}
+
+int load_initrd(int xc_handle, domid_t dom,
+                struct initrd_info *initrd,
+                unsigned long physbase,
+                unsigned long *phys_to_mach)
+{
+    char page[PAGE_SIZE];
+    unsigned long pfn_start, pfn, nr_pages;
+
+    if ( initrd->type == INITRD_none )
+        return 0;
+
+    pfn_start = physbase >> PAGE_SHIFT;
+    nr_pages  = (initrd->len + PAGE_SIZE - 1) >> PAGE_SHIFT;
+
+    for ( pfn = pfn_start; pfn < (pfn_start + nr_pages); pfn++ )
+    {
+        if ( initrd->type == INITRD_mem )
+        {
+            xc_copy_to_domain_page(
+                xc_handle, dom, phys_to_mach[pfn],
+                &initrd->u.mem_addr[(pfn - pfn_start) << PAGE_SHIFT]);
+        }
+        else
+        {
+            if ( gzread(initrd->u.file_handle, page, PAGE_SIZE) == -1 )
+            {
+                PERROR("Error reading initrd image, could not");
+                return -EINVAL;
+            }
+            xc_copy_to_domain_page(xc_handle, dom, phys_to_mach[pfn], page);
+        }
     }
 
     return 0;
@@ -407,7 +452,7 @@ extern unsigned long xc_ia64_fpsr_default(void);
 static int setup_guest(int xc_handle,
                        uint32_t dom,
                        const char *image, unsigned long image_size,
-                       const char *initrd, unsigned long initrd_len,
+                       struct initrd_info *initrd,
                        unsigned long nr_pages,
                        unsigned long *pvsi, unsigned long *pvke,
                        unsigned long *pvss, vcpu_guest_context_t *ctxt,
@@ -441,7 +486,7 @@ static int setup_guest(int xc_handle,
 
     dsi.v_start      = round_pgdown(dsi.v_start);
     vinitrd_start    = round_pgup(dsi.v_end);
-    vinitrd_end      = vinitrd_start + initrd_len;
+    vinitrd_end      = vinitrd_start + initrd->len;
     v_end            = round_pgup(vinitrd_end);
 
     start_page = dsi.v_start >> PAGE_SHIFT;
@@ -452,7 +497,8 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    if ( xc_ia64_get_pfn_list(xc_handle, dom, page_array, start_page, pgnr) != pgnr )
+    if ( xc_ia64_get_pfn_list(xc_handle, dom, page_array,
+                              start_page, pgnr) != pgnr )
     {
         PERROR("Could not get the page frame list");
         goto error_out;
@@ -472,17 +518,9 @@ static int setup_guest(int xc_handle,
     (load_funcs.loadimage)(image, image_size, xc_handle, dom, page_array,
                            &dsi);
 
-    /* Load the initial ramdisk image, if present */
-    if ( initrd_len != 0 )
-    {
-        /* Pages are not contiguous, so do the copy one page at a time */
-        for ( i = (vinitrd_start - dsi.v_start), offset = 0; 
-              i < (vinitrd_end - dsi.v_start);
-              i += PAGE_SIZE, offset += PAGE_SIZE )
-            xc_copy_to_domain_page(xc_handle, dom,
-                                   page_array[i>>PAGE_SHIFT],
-                                   &initrd[offset]);
-    }
+    if ( load_initrd(xc_handle, dom, initrd,
+                     vinitrd_start - dsi.v_start, page_array) )
+        goto error_out;
 
     *pvke = dsi.v_kernentry;
 
@@ -513,10 +551,10 @@ static int setup_guest(int xc_handle,
     start_info->console_mfn   = nr_pages - 1;
     start_info->console_evtchn = console_evtchn;
     start_info->nr_pages       = nr_pages; // FIXME?: nr_pages - 2 ????
-    if ( initrd_len != 0 )
+    if ( initrd->len != 0 )
     {
         ctxt->initrd.start    = vinitrd_start;
-        ctxt->initrd.size     = initrd_len;
+        ctxt->initrd.size     = initrd->len;
     }
     else
     {
@@ -541,7 +579,7 @@ static int setup_guest(int xc_handle,
 static int setup_guest(int xc_handle,
                        uint32_t dom,
                        const char *image, unsigned long image_size,
-                       const char *initrd, unsigned long initrd_len,
+                       struct initrd_info *initrd,
                        unsigned long nr_pages,
                        unsigned long *pvsi, unsigned long *pvke,
                        unsigned long *pvss, vcpu_guest_context_t *ctxt,
@@ -610,7 +648,7 @@ static int setup_guest(int xc_handle,
      * which we solve by exhaustive search.
      */
     vinitrd_start    = round_pgup(dsi.v_end);
-    vinitrd_end      = vinitrd_start + initrd_len;
+    vinitrd_end      = vinitrd_start + initrd->len;
     vphysmap_start   = round_pgup(vinitrd_end);
     vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
     vstartinfo_start = round_pgup(vphysmap_end);
@@ -731,20 +769,12 @@ static int setup_guest(int xc_handle,
         }
     }
 
-    shadow_mode_enabled = test_feature_bit(XENFEAT_auto_translated_physmap, required_features);
+    shadow_mode_enabled = test_feature_bit(
+        XENFEAT_auto_translated_physmap, required_features);
 
-    /* Load the initial ramdisk image, if present. */
-    if ( initrd_len != 0 )
-    {
-        int offset;
-        /* Pages are not contiguous, so do the inflation a page at a time. */
-        for ( i = (vinitrd_start - dsi.v_start), offset = 0;
-              i < (vinitrd_end - dsi.v_start);
-              i += PAGE_SIZE, offset += PAGE_SIZE )
-            xc_copy_to_domain_page(xc_handle, dom,
-                                   page_array[i>>PAGE_SHIFT],
-                                   &initrd[offset]);
-    }
+    if ( load_initrd(xc_handle, dom, initrd,
+                     vinitrd_start - dsi.v_start, page_array) )
+        goto error_out;
 
     /* setup page tables */
 #if defined(__i386__)
@@ -901,10 +931,10 @@ static int setup_guest(int xc_handle,
     start_info->store_evtchn = store_evtchn;
     start_info->console_mfn   = guest_console_mfn;
     start_info->console_evtchn = console_evtchn;
-    if ( initrd_len != 0 )
+    if ( initrd->len != 0 )
     {
         start_info->mod_start    = vinitrd_start;
-        start_info->mod_len      = initrd_len;
+        start_info->mod_len      = initrd->len;
     }
     if ( cmdline != NULL )
     { 
@@ -961,8 +991,7 @@ static int xc_linux_build_internal(int xc_handle,
                                    uint32_t domid,
                                    char *image,
                                    unsigned long image_size,
-                                   char *initrd,
-                                   unsigned long initrd_len,
+                                   struct initrd_info *initrd,
                                    const char *cmdline,
                                    const char *features,
                                    unsigned long flags,
@@ -1016,7 +1045,7 @@ static int xc_linux_build_internal(int xc_handle,
     memset(ctxt, 0, sizeof(*ctxt));
 
     if ( setup_guest(xc_handle, domid, image, image_size, 
-                     initrd, initrd_len,
+                     initrd,
                      nr_pages, 
                      &vstartinfo_start, &vkern_entry,
                      &vstack_start, ctxt, cmdline,
@@ -1132,14 +1161,15 @@ int xc_linux_build_mem(int xc_handle,
                        unsigned long *console_mfn)
 {
     int            sts;
-    char          *img_buf, *ram_buf;
-    unsigned long  img_len, ram_len;
+    char          *img_buf;
+    unsigned long  img_len;
+    struct initrd_info initrd_info = { .type = INITRD_none };
 
     /* A kernel buffer is required */
     if ( (image_buffer == NULL) || (image_size == 0) )
     {
         ERROR("kernel image buffer not present");
-        return EINVAL;
+        return -1;
     }
 
     /* If it's gzipped, inflate it;  otherwise, use as is */
@@ -1149,28 +1179,25 @@ int xc_linux_build_mem(int xc_handle,
     if ( img_buf == NULL )
     {
         ERROR("unable to inflate kernel image buffer");
-        return EFAULT;
+        return -1;
     }
 
     /* RAM disks are optional; if we get one, inflate it */
     if ( initrd != NULL )
     {
-        ram_buf = xc_inflate_buffer(initrd, initrd_len, &ram_len);
-        if ( ram_buf == NULL )
+        initrd_info.type = INITRD_mem;
+        initrd_info.u.mem_addr = xc_inflate_buffer(
+            initrd, initrd_len, &initrd_info.len);
+        if ( initrd_info.u.mem_addr == NULL )
         {
             ERROR("unable to inflate ram disk buffer");
             sts = -1;
             goto out;
         }
     }
-    else
-    {
-        ram_buf = (char *)initrd;
-        ram_len = initrd_len;
-    }
 
     sts = xc_linux_build_internal(xc_handle, domid, img_buf, img_len,
-                                  ram_buf, ram_len, cmdline, features, flags,
+                                  &initrd_info, cmdline, features, flags,
                                   store_evtchn, store_mfn,
                                   console_evtchn, console_mfn);
 
@@ -1180,8 +1207,9 @@ int xc_linux_build_mem(int xc_handle,
     /* Don't unnecessarily annoy/surprise/confound the caller */
     if ( (img_buf != NULL) && (img_buf != image_buffer) )
         free(img_buf);
-    if ( (ram_buf != NULL) && (ram_buf != initrd) )
-        free(ram_buf);
+    if ( (initrd_info.u.mem_addr != NULL) &&
+         (initrd_info.u.mem_addr != initrd) )
+        free(initrd_info.u.mem_addr);
 
     return sts;
 }
@@ -1198,28 +1226,44 @@ int xc_linux_build(int xc_handle,
                    unsigned int console_evtchn,
                    unsigned long *console_mfn)
 {
-    char *image, *ram = NULL;
-    unsigned long image_size, ram_size = 0;
-    int  sts;
+    char *image = NULL;
+    unsigned long image_size;
+    struct initrd_info initrd_info = { .type = INITRD_none };
+    int fd = -1, sts = -1;
 
     if ( (image_name == NULL) ||
          ((image = xc_read_image(image_name, &image_size)) == NULL ))
         return -1;
 
-    if ( (initrd_name != NULL) && (strlen(initrd_name) != 0) &&
-         ((ram = xc_read_image(initrd_name, &ram_size)) == NULL) )
+    if ( (initrd_name != NULL) && (strlen(initrd_name) != 0) )
     {
-        free(image);
-        return -1;
+        initrd_info.type = INITRD_file;
+
+        if ( (fd = open(initrd_name, O_RDONLY)) < 0 )
+        {
+            PERROR("Could not open the initial ramdisk image");
+            goto error_out;
+        }
+
+        initrd_info.len = xc_get_filesz(fd);
+        if ( (initrd_info.u.file_handle = gzdopen(fd, "rb")) == NULL )
+        {
+            PERROR("Could not allocate decompression state for initrd");
+            goto error_out;
+        }
     }
 
     sts = xc_linux_build_internal(xc_handle, domid, image, image_size,
-                                  ram, ram_size, cmdline, features, flags,
+                                  &initrd_info, cmdline, features, flags,
                                   store_evtchn, store_mfn,
                                   console_evtchn, console_mfn);
 
+ error_out:
     free(image);
-    free(ram);
+    if ( fd >= 0 )
+        close(fd);
+    if ( initrd_info.u.file_handle )
+        gzclose(initrd_info.u.file_handle);
 
     return sts;
 }

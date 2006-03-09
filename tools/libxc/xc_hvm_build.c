@@ -641,7 +641,7 @@ int xc_hvm_build_mem(int xc_handle,
     if ( (image_buffer == NULL) || (image_size == 0) )
     {
         ERROR("kernel image buffer not present");
-        return -EINVAL;
+        return -1;
     }
 
     img = xc_inflate_buffer(image_buffer, image_size, &img_len);
