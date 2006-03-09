@@ -40,6 +40,8 @@ endif
 
 test-gcc-flag = $(shell $(1) -v --help 2>&1 | grep -q " $(2) " && echo $(2))
 
+CFLAGS += -Wall
+
 HOSTCFLAGS += $(call test-gcc-flag,$(HOSTCC),-Wdeclaration-after-statement)
 CFLAGS     += $(call test-gcc-flag,$(CC),-Wdeclaration-after-statement)
 

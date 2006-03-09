@@ -22,7 +22,6 @@ LIBS     := -lpthread -lz
 SRCS     :=
 SRCS     += blktaplib.c xenbus.c blkif.c
 
-CFLAGS   += -Wall
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
 #CFLAGS   += -O3

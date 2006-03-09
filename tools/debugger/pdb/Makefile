@@ -20,7 +20,6 @@ INCLUDES   += -I ./linux-2.6-module
 INCLUDES   += -I $(OCAML_ROOT)/lib/ocaml
 
 CFLAGS     += $(INCLUDES)
-CFLAGS     += -Wall
 CFLAGS     += -Werror
 CFLAGS     += -g
 

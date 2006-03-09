@@ -14,7 +14,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 SRCS     := xendebug.c
 
-CFLAGS   += -Wall -Werror -O3 -fno-strict-aliasing
+CFLAGS   += -Werror -O3 -fno-strict-aliasing
 CFLAGS   += $(INCLUDES) -I. -I$(XEN_ROOT)/tools/libxc
 # Get gcc to generate the dependencies for us.
 CFLAGS   += -Wp,-MD,.$(@F).d

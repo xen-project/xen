@@ -31,7 +31,6 @@ VDI_TOOLS += vdi_fill
 VDI_TOOLS += vdi_tree
 VDI_TOOLS += vdi_validate
 
-CFLAGS   += -Wall
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
 #CFLAGS   += -O3
@@ -58,7 +57,7 @@ parallax: $(PLX_SRCS)
 	$(CC) $(CFLAGS) -o parallax -L.. $(LDFLAGS) $(PLX_SRCS)
 
 ${VDI_TOOLS}: %: %.c $(VDI_SRCS)
-	$(CC) $(CFLAGS) -g3 -o $@ $@.c $(LDFLAGS) $(VDI_SRCS)
+	$(CC) $(CFLAGS) -o $@ $@.c $(LDFLAGS) $(VDI_SRCS)
 
 .PHONY: TAGS clean install rpm
 -include $(DEPS)

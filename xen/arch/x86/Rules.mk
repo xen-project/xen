@@ -9,7 +9,7 @@ pae ?= n
 supervisor_mode_kernel ?= n
 
 CFLAGS  += -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
-CFLAGS  += -iwithprefix include -Wall -Werror -Wno-pointer-arith -pipe
+CFLAGS  += -iwithprefix include -Werror -Wno-pointer-arith -pipe
 CFLAGS  += -I$(BASEDIR)/include 
 CFLAGS  += -I$(BASEDIR)/include/asm-x86/mach-generic
 CFLAGS  += -I$(BASEDIR)/include/asm-x86/mach-default

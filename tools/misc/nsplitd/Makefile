@@ -1,6 +1,6 @@
+XEN_ROOT := ../../..
+include $(XEN_ROOT)/tools/Rules.mk
 
-CC     = gcc
-CFLAGS = -Wall -O3
 CFILES = $(wildcard *.c)
 
 HDRS     = $(wildcard *.h)
@@ -16,7 +16,7 @@ clean:
 	$(RM) *.o $(TARGET) *~
 
 $(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
 
 %.o: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(HOSTCC) $(HOSTCFLAGS) -c -o $@ $<

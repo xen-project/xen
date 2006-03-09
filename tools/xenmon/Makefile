@@ -20,7 +20,7 @@ sbindir=/usr/sbin
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS += -Wall -Werror -g
+CFLAGS  += -Werror -g
 CFLAGS  += -I $(XEN_XC)
 CFLAGS  += -I $(XEN_LIBXC)
 LDFLAGS += -L $(XEN_LIBXC)

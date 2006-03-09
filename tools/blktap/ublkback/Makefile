@@ -9,7 +9,6 @@ INSTALL_PROG = $(INSTALL) -m0755
 IBIN         = ublkback
 INSTALL_DIR  = /usr/sbin
 
-CFLAGS   += -Wall
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
 #CFLAGS   += -O3

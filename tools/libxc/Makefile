@@ -48,7 +48,6 @@ BUILD_SRCS += xc_linux_save.c
 BUILD_SRCS += xc_hvm_build.c
 endif
 
-CFLAGS   += -Wall
 CFLAGS   += -Werror
 CFLAGS   += -O3
 CFLAGS   += -fno-strict-aliasing
