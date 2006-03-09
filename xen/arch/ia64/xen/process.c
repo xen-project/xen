@@ -286,7 +286,8 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,(itir>>2)&0x3f);
 		return;
 	}
-	if (IS_VMM_ADDRESS(iip)) {
+	if (!user_mode (regs)) {
+		/* The fault occurs inside Xen.  */
 		if (!ia64_done_with_exception(regs)) {
 			// should never happen.  If it does, region 0 addr may
 			// indicate a bad xen pointer
