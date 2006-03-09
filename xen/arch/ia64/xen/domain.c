@@ -115,7 +115,6 @@ static void continue_cpu_idle_loop(void)
 
 void startup_cpu_idle_loop(void)
 {
-	int cpu = smp_processor_id ();
 	/* Just some sanity to ensure that the scheduler is set up okay. */
 	ASSERT(current->domain == IDLE_DOMAIN_ID);
 	raise_softirq(SCHEDULE_SOFTIRQ);
