@@ -140,6 +140,21 @@ typedef struct xen_translate_gpfn_list {
 } xen_translate_gpfn_list_t;
 DEFINE_GUEST_HANDLE(xen_translate_gpfn_list_t);
 
+/*
+ * Sets the GPFN at which the shared_info_page appears in the specified
+ * guest's pseudophysical address space.
+ * arg == addr of xen_map_shared_info_t.
+ */
+#define XENMEM_map_shared_info      9
+typedef struct xen_map_shared_info {
+    /* Which domain to change the mapping for. */
+    domid_t domid;
+
+    /* GPFN where the shared_info_page should appear. */
+    unsigned long pfn;
+} xen_map_shared_info_t;
+DEFINE_GUEST_HANDLE(xen_map_shared_info_t);
+
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 
 /*

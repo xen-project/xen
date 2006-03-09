@@ -2817,14 +2817,15 @@ long do_update_descriptor(u64 pa, u64 desc)
 
 long arch_memory_op(int op, GUEST_HANDLE(void) arg)
 {
-    struct xen_reserved_phys_area xrpa;
     unsigned long pfn;
     struct domain *d;
     unsigned int i;
 
     switch ( op )
     {
-    case XENMEM_reserved_phys_area:
+    case XENMEM_reserved_phys_area: {
+        struct xen_reserved_phys_area xrpa;
+
         if ( copy_from_guest(&xrpa, arg, 1) )
             return -EFAULT;
 
@@ -2846,16 +2847,14 @@ long arch_memory_op(int op, GUEST_HANDLE(void) arg)
         if ( d->arch.first_reserved_pfn == 0 )
         {
             d->arch.first_reserved_pfn = pfn = d->max_pages;
-            guest_physmap_add_page(
-                d, pfn + 0, virt_to_maddr(d->shared_info) >> PAGE_SHIFT);
             for ( i = 0; i < NR_GRANT_FRAMES; i++ )
                 guest_physmap_add_page(
-                    d, pfn + 1 + i, gnttab_shared_mfn(d, d->grant_table, i));
+                    d, pfn + i, gnttab_shared_mfn(d, d->grant_table, i));
         }
         UNLOCK_BIGLOCK(d);
 
         xrpa.first_gpfn = d->arch.first_reserved_pfn;
-        xrpa.nr_gpfns   = 32;
+        xrpa.nr_gpfns   = NR_GRANT_FRAMES;
 
         put_domain(d);
 
@@ -2863,6 +2862,42 @@ long arch_memory_op(int op, GUEST_HANDLE(void) arg)
             return -EFAULT;
 
         break;
+    }
+
+    case XENMEM_map_shared_info: {
+        struct xen_map_shared_info xmsi;
+
+        if ( copy_from_guest(&xmsi, arg, 1) )
+            return -EFAULT;
+
+        if ( (d = find_domain_by_id(xmsi.domid)) == NULL )
+            return -ESRCH;
+
+        /* Only initialised translated guests can set the shared_info
+         * mapping. */
+        if ( !shadow_mode_translate(d) || (d->max_pages == 0) )
+        {
+            put_domain(d);
+            return -ESRCH;
+        }
+
+        if ( xmsi.pfn > d->max_pages ) {
+            put_domain(d);
+            return -EINVAL;
+        }
+
+        LOCK_BIGLOCK(d);
+        /* Remove previously mapped page if it was present. */
+        if ( mfn_valid(gmfn_to_mfn(d, xmsi.pfn)) )
+            guest_remove_page(d, xmsi.pfn);
+        guest_physmap_add_page(d, xmsi.pfn,
+                               virt_to_maddr(d->shared_info) >> PAGE_SHIFT);
+        UNLOCK_BIGLOCK(d);
+
+        put_domain(d);
+
+        break;
+    }
 
     default:
         return subarch_memory_op(op, arg);

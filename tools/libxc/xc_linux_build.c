@@ -606,15 +606,11 @@ static int setup_guest(int xc_handle,
     struct load_funcs load_funcs;
     struct domain_setup_info dsi;
     unsigned long vinitrd_start;
-    unsigned long vinitrd_end;
     unsigned long vphysmap_start;
-    unsigned long vphysmap_end;
     unsigned long vstartinfo_start;
-    unsigned long vstartinfo_end;
     unsigned long vstoreinfo_start;
-    unsigned long vstoreinfo_end;
     unsigned long vconsole_start;
-    unsigned long vconsole_end;
+    unsigned long vsharedinfo_start = 0; /* XXX gcc */
     unsigned long vstack_start;
     unsigned long vstack_end;
     unsigned long vpt_start;
@@ -640,6 +636,34 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
+    /* Parse and validate kernel features. */
+    p = strstr(dsi.xen_guest_string, "FEATURES=");
+    if ( p != NULL )
+    {
+        if ( !parse_features(p + strlen("FEATURES="),
+                             supported_features,
+                             required_features) )
+        {
+            ERROR("Failed to parse guest kernel features.\n");
+            goto error_out;
+        }
+
+        printf("Supported features  = { %08x }.\n", supported_features[0]);
+        printf("Required features   = { %08x }.\n", required_features[0]);
+    }
+
+    for ( i = 0; i < XENFEAT_NR_SUBMAPS; i++ )
+    {
+        if ( (supported_features[i]&required_features[i]) != required_features[i] )
+        {
+            ERROR("Guest kernel does not support a required feature.\n");
+            goto error_out;
+        }
+    }
+
+    shadow_mode_enabled = test_feature_bit(XENFEAT_auto_translated_physmap,
+                                           required_features);
+
     /*
      * Why do we need this? The number of page-table frames depends on the 
      * size of the bootstrap address space. But the size of the address space 
@@ -647,17 +671,22 @@ static int setup_guest(int xc_handle,
      * read-only). We have a pair of simultaneous equations in two unknowns, 
      * which we solve by exhaustive search.
      */
-    vinitrd_start    = round_pgup(dsi.v_end);
-    vinitrd_end      = vinitrd_start + initrd->len;
-    vphysmap_start   = round_pgup(vinitrd_end);
-    vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
-    vstartinfo_start = round_pgup(vphysmap_end);
-    vstartinfo_end   = vstartinfo_start + PAGE_SIZE;
-    vstoreinfo_start = vstartinfo_end;
-    vstoreinfo_end   = vstoreinfo_start + PAGE_SIZE;
-    vconsole_start   = vstoreinfo_end;
-    vconsole_end     = vconsole_start + PAGE_SIZE;
-    vpt_start        = vconsole_end; 
+    v_end = round_pgup(dsi.v_end);
+    vinitrd_start = v_end;
+    v_end += round_pgup(initrd->len);
+    vphysmap_start = v_end;
+    v_end += round_pgup(nr_pages * sizeof(unsigned long));
+    vstartinfo_start = v_end;
+    v_end += PAGE_SIZE;
+    vstoreinfo_start = v_end;
+    v_end += PAGE_SIZE;
+    vconsole_start = v_end;
+    v_end += PAGE_SIZE;
+    if ( shadow_mode_enabled ) {
+        vsharedinfo_start = v_end;
+        v_end += PAGE_SIZE;
+    }
+    vpt_start = v_end;
 
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
@@ -697,26 +726,22 @@ static int setup_guest(int xc_handle,
 
 #define _p(a) ((void *) (a))
 
-    printf("VIRTUAL MEMORY ARRANGEMENT:\n"
-           " Loaded kernel: %p->%p\n"
-           " Init. ramdisk: %p->%p\n"
-           " Phys-Mach map: %p->%p\n"
-           " Start info:    %p->%p\n"
-           " Store page:    %p->%p\n"
-           " Console page:  %p->%p\n"
-           " Page tables:   %p->%p\n"
-           " Boot stack:    %p->%p\n"
-           " TOTAL:         %p->%p\n",
-           _p(dsi.v_kernstart), _p(dsi.v_kernend), 
-           _p(vinitrd_start), _p(vinitrd_end),
-           _p(vphysmap_start), _p(vphysmap_end),
-           _p(vstartinfo_start), _p(vstartinfo_end),
-           _p(vstoreinfo_start), _p(vstoreinfo_end),
-           _p(vconsole_start), _p(vconsole_end),
-           _p(vpt_start), _p(vpt_end),
-           _p(vstack_start), _p(vstack_end),
-           _p(dsi.v_start), _p(v_end));
-    printf(" ENTRY ADDRESS: %p\n", _p(dsi.v_kernentry));
+    printf("VIRTUAL MEMORY ARRANGEMENT:\n");
+    printf(" Loaded kernel:    %p->%p\n", _p(dsi.v_kernstart),
+           _p(dsi.v_kernend));
+    if ( initrd->len )
+        printf(" Initial ramdisk:  %p->%p\n", _p(vinitrd_start),
+               _p(vinitrd_start + initrd->len));
+    printf(" Phys-Mach map:    %p\n", _p(vphysmap_start));
+    printf(" Start info:       %p\n", _p(vstartinfo_start));
+    printf(" Store page:       %p\n", _p(vstoreinfo_start));
+    printf(" Console page:     %p\n", _p(vconsole_start));
+    if ( shadow_mode_enabled )
+        printf(" Shared Info page: %p\n", _p(vsharedinfo_start));
+    printf(" Page tables:      %p\n", _p(vpt_start));
+    printf(" Boot stack:       %p\n", _p(vstack_start));
+    printf(" TOTAL:            %p->%p\n", _p(dsi.v_start), _p(v_end));
+    printf(" ENTRY ADDRESS:    %p\n", _p(dsi.v_kernentry));
 
     if ( ((v_end - dsi.v_start)>>PAGE_SHIFT) > nr_pages )
     {
@@ -741,36 +766,6 @@ static int setup_guest(int xc_handle,
     (load_funcs.loadimage)(image, image_size,
                            xc_handle, dom, page_array,
                            &dsi);
-
-    /* Parse and validate kernel features. */
-    p = strstr(dsi.xen_guest_string, "FEATURES=");
-    if ( p != NULL )
-    {
-        if ( !parse_features(p + strlen("FEATURES="),
-                             supported_features,
-                             required_features) )
-        {
-            ERROR("Failed to parse guest kernel features.\n");
-            goto error_out;
-        }
-
-        fprintf(stderr, "Supported features  = { %08x }.\n",
-                supported_features[0]);
-        fprintf(stderr, "Required features   = { %08x }.\n",
-                required_features[0]);
-    }
-
-    for ( i = 0; i < XENFEAT_NR_SUBMAPS; i++ )
-    {
-        if ( (supported_features[i]&required_features[i]) != required_features[i] )
-        {
-            ERROR("Guest kernel does not support a required feature.\n");
-            goto error_out;
-        }
-    }
-
-    shadow_mode_enabled = test_feature_bit(
-        XENFEAT_auto_translated_physmap, required_features);
 
     if ( load_initrd(xc_handle, dom, initrd,
                      vinitrd_start - dsi.v_start, page_array) )
@@ -869,6 +864,7 @@ static int setup_guest(int xc_handle,
     if ( shadow_mode_enabled )
     {
         struct xen_reserved_phys_area xrpa;
+        struct xen_map_shared_info xmsi;
 
         /* Enable shadow translate mode */
         if ( xc_shadow_control(xc_handle, dom,
@@ -889,7 +885,16 @@ static int setup_guest(int xc_handle,
             PERROR("Cannot find shared info pfn");
             goto error_out;
         }
-        guest_shared_info_mfn = xrpa.first_gpfn;
+
+        guest_shared_info_mfn = (vsharedinfo_start-dsi.v_start) >> PAGE_SHIFT;
+        xmsi.domid = dom;
+        xmsi.pfn = guest_shared_info_mfn;
+        rc = xc_memory_op(xc_handle, XENMEM_map_shared_info, &xmsi);
+        if ( rc != 0 )
+        {
+            PERROR("Cannot map shared info pfn");
+            goto error_out;
+        }
     }
     else
     {

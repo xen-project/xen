@@ -757,10 +757,16 @@ void __init paging_init(void)
 	free_area_init_node(0, NODE_DATA(0), zones,
 			    __pa(PAGE_OFFSET) >> PAGE_SHIFT, holes);
 
-	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
-	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+	if (!xen_feature(XENFEAT_auto_translated_physmap) ||
+	    xen_start_info->shared_info >= xen_start_info->nr_pages) {
+		/* Switch to the real shared_info page, and clear the
+		 * dummy page. */
+		set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
+		HYPERVISOR_shared_info =
+			(shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+		memset(empty_zero_page, 0, sizeof(empty_zero_page));
+	}
 
-	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 	init_mm.context.pinned = 1;
 
 	/* Setup mapping of lower 1st MB */

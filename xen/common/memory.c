@@ -137,7 +137,43 @@ populate_physmap(
  out:
     return i;
 }
-    
+
+int
+guest_remove_page(
+    struct domain *d,
+    unsigned long gmfn)
+{
+    struct page_info *page;
+    unsigned long mfn;
+
+    mfn = gmfn_to_mfn(d, gmfn);
+    if ( unlikely(!mfn_valid(mfn)) )
+    {
+        DPRINTK("Domain %u page number %lx invalid\n",
+                d->domain_id, mfn);
+        return 0;
+    }
+            
+    page = mfn_to_page(mfn);
+    if ( unlikely(!get_page(page, d)) )
+    {
+        DPRINTK("Bad page free for domain %u\n", d->domain_id);
+        return 0;
+    }
+
+    if ( test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
+        put_page_and_type(page);
+            
+    if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+        put_page(page);
+
+    guest_physmap_remove_page(d, gmfn, mfn);
+
+    put_page(page);
+
+    return 1;
+}
+
 static long
 decrease_reservation(
     struct domain *d,
@@ -147,8 +183,7 @@ decrease_reservation(
     unsigned int   flags,
     int           *preempted)
 {
-    struct page_info *page;
-    unsigned long    i, j, gmfn, mfn;
+    unsigned long    i, j, gmfn;
 
     if ( !guest_handle_okay(extent_list, nr_extents) )
         return 0;
@@ -166,30 +201,8 @@ decrease_reservation(
 
         for ( j = 0; j < (1 << extent_order); j++ )
         {
-            mfn = gmfn_to_mfn(d, gmfn + j);
-            if ( unlikely(!mfn_valid(mfn)) )
-            {
-                DPRINTK("Domain %u page number %lx invalid\n",
-                        d->domain_id, mfn);
+            if ( !guest_remove_page(d, gmfn + j) )
                 return i;
-            }
-            
-            page = mfn_to_page(mfn);
-            if ( unlikely(!get_page(page, d)) )
-            {
-                DPRINTK("Bad page free for domain %u\n", d->domain_id);
-                return i;
-            }
-
-            if ( test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
-                put_page_and_type(page);
-            
-            if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
-                put_page(page);
-
-            guest_physmap_remove_page(d, gmfn + j, mfn);
-
-            put_page(page);
         }
     }
 
