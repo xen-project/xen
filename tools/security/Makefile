@@ -2,7 +2,6 @@ XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS   += -Werror
-CFLAGS   += -O3
 CFLAGS   += -fno-strict-aliasing
 CFLAGS   += -I.
 

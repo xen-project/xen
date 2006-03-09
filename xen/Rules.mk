@@ -4,7 +4,6 @@
 # 'make clean' before rebuilding.
 #
 verbose     ?= n
-debug       ?= n
 perfc       ?= n
 perfc_arrays?= n
 crash_debug ?= n
@@ -47,12 +46,7 @@ include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
 CFLAGS += -g -D__XEN__
 
-ifneq ($(debug),y)
-CFLAGS += -DNDEBUG
-ifeq ($(verbose),y)
-CFLAGS += -DVERBOSE
-endif
-else
+ifneq ($(debug)$(verbose),nn)
 CFLAGS += -DVERBOSE
 endif
 

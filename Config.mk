@@ -1,5 +1,8 @@
 # -*- mode: Makefile; -*-
 
+# A debug build of Xen and tools?
+debug ?= n
+
 # Currently supported architectures: x86_32, x86_64
 XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
 XEN_TARGET_ARCH     ?= $(XEN_COMPILE_ARCH)
@@ -8,6 +11,14 @@ XEN_TARGET_X86_PAE  ?= n
 # Tools to run on system hosting the build
 HOSTCC     = gcc
 HOSTCFLAGS = -Wall -Werror -Wstrict-prototypes -O2 -fomit-frame-pointer
+
+ifneq ($(debug),y)
+# Optimisation flags are overridable
+CFLAGS    ?= -O3 -fomit-frame-pointer
+CFLAGS    += -DNDEBUG
+else
+CFLAGS    += -g
+endif
 
 AS         = $(CROSS_COMPILE)as
 LD         = $(CROSS_COMPILE)ld

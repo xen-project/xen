@@ -17,8 +17,6 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 XEN_ROOT=../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS      += -O3 
-
 HDRS         = $(wildcard *.h)
 SRCS         = $(wildcard *.c)
 OBJS         = $(patsubst %.c,%.o,$(SRCS))

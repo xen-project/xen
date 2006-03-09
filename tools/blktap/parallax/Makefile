@@ -33,8 +33,6 @@ VDI_TOOLS += vdi_validate
 
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
-#CFLAGS   += -O3
-CFLAGS   += -g3
 CFLAGS   += -fno-strict-aliasing
 CFLAGS   += $(INCLUDES)
 CFLAGS   += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE

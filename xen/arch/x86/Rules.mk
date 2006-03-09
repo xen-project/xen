@@ -14,10 +14,6 @@ CFLAGS  += -I$(BASEDIR)/include
 CFLAGS  += -I$(BASEDIR)/include/asm-x86/mach-generic
 CFLAGS  += -I$(BASEDIR)/include/asm-x86/mach-default
 
-ifneq ($(debug),y)
-CFLAGS  += -O3 -fomit-frame-pointer
-endif
-
 # Prevent floating-point variables from creeping into Xen.
 CFLAGS  += -msoft-float
 

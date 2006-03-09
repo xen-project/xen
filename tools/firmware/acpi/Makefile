@@ -16,11 +16,12 @@
 # *
 # */
 #
+
+XEN_ROOT = ../../..
+include $(XEN_ROOT)/tools/Rules.mk
+
 # Compiler flag
-CFLAG=-I. -I../../libxc
-	
-# Compiler tool	
-CC=gcc
+HOSTCFLAGS += -I. -I../../libxc
 
 # TARGET
 C_SRC=$(shell ls *.c)
@@ -33,7 +34,7 @@ IASL_URL=http://developer.intel.com/technology/iapc/acpi/downloads/$(IASL_VER).t
 
 vpath iasl $(PATH)
 all:$(ACPI_BIN)
-	
+
 acpi_dsdt.c:acpi_dsdt.asl
 	$(MAKE) iasl
 	iasl -oa -tc acpi_dsdt.asl
@@ -54,15 +55,13 @@ iasl:
 	install $(IASL_VER)/compiler/iasl /usr/bin/iasl
 
 $(ACPI_GEN):$(C_SRC) $(H_SRC) acpi_dsdt.c
-	$(CC) -o $(ACPI_GEN) $(CFLAG) $(shell ls *.c)
+	$(HOSTCC) -o $(ACPI_GEN) $(HOSTCFLAGS) $(shell ls *.c)
 
 $(ACPI_BIN):$(ACPI_GEN)
 	./$(ACPI_GEN) $(ACPI_BIN)
-	
+
 clean:
 	rm -rf *.o $(ACPI_GEN) $(ACPI_BIN) $(IASL_VER) 
-#   rm -f acpi_dsdt.c
 	rm -rf  $(IASL_VER).tar.gz
-install:all
-		
-	
+
+install: all

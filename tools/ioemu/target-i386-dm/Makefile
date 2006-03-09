@@ -13,7 +13,7 @@ ifdef CONFIG_USER_ONLY
 VPATH+=:$(SRC_PATH)/linux-user
 DEFINES+=-I$(SRC_PATH)/linux-user -I$(SRC_PATH)/linux-user/$(TARGET_ARCH)
 endif
-CFLAGS+=-O2 -g -fno-strict-aliasing
+CFLAGS+=-g -fno-strict-aliasing
 LDFLAGS=-g
 LIBS=
 HELPER_CFLAGS=$(CFLAGS)
@@ -99,7 +99,6 @@ LDFLAGS+=-static
 endif
 
 ifeq ($(ARCH),i386)
-CFLAGS+=-fomit-frame-pointer
 OP_CFLAGS=$(CFLAGS) -mpreferred-stack-boundary=2
 ifeq ($(HAVE_GCC3_OPTIONS),yes)
 OP_CFLAGS+= -falign-functions=0 -fno-gcse

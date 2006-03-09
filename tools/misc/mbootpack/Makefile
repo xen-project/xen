@@ -21,9 +21,7 @@ INCS	:= -I. -I-
 DEFS	:= 
 LDFLAGS	:= 
 CFLAGS	+= -Wpointer-arith -Wcast-qual -Wno-unused -Wno-format
-CFLAGS	+= -Wmissing-prototypes
-#CFLAGS	+= -pipe -g -O0 -Wcast-align
-CFLAGS	+= -pipe -O3 
+CFLAGS	+= -Wmissing-prototypes -pipe
 
 #  What object files need building for the program
 OBJS	:= mbootpack.o buildimage.o

@@ -7,14 +7,12 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 MAJOR    = 3.0
 MINOR    = 0
 
-CC       = gcc
-
 XEN_ROOT = ../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 SRCS     := xendebug.c
 
-CFLAGS   += -Werror -O3 -fno-strict-aliasing
+CFLAGS   += -Werror -fno-strict-aliasing
 CFLAGS   += $(INCLUDES) -I. -I$(XEN_ROOT)/tools/libxc
 # Get gcc to generate the dependencies for us.
 CFLAGS   += -Wp,-MD,.$(@F).d

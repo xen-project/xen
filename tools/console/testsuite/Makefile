@@ -1,5 +1,6 @@
-CFLAGS=-g -Wall
-CC=gcc
+XEN_ROOT = ../../..
+include $(XEN_ROOT)/tools/Rules.mk
+
 LDFLAGS=-static
 
 all: console-dom0 console-domU procpipe
