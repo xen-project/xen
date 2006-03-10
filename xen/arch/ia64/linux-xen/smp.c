@@ -296,7 +296,12 @@ smp_flush_tlb_mm (struct mm_struct *mm)
 {
 	preempt_disable();
 	/* this happens for the common case of a single-threaded fork():  */
+#ifdef XEN
+	if (likely(mm == current->domain->arch.mm
+		   && atomic_read(&mm->mm_users) == 1))
+#else
 	if (likely(mm == current->active_mm && atomic_read(&mm->mm_users) == 1))
+#endif
 	{
 		local_finish_flush_tlb_mm(mm);
 		preempt_enable();

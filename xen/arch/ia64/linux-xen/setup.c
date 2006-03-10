@@ -842,7 +842,9 @@ cpu_init (void)
 					| IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC));
 #endif
 	atomic_inc(&init_mm.mm_count);
+#ifndef XEN
 	current->active_mm = &init_mm;
+#endif
 #ifdef XEN
 	if (current->domain->arch.mm)
 #else

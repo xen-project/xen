@@ -80,7 +80,11 @@ flush_tlb_page (struct vm_area_struct *vma, unsigned long addr)
 #ifdef CONFIG_SMP
 	flush_tlb_range(vma, (addr & PAGE_MASK), (addr & PAGE_MASK) + PAGE_SIZE);
 #else
+#ifdef XEN
+	if (vma->vm_mm == current->domain->arch.mm)
+#else
 	if (vma->vm_mm == current->active_mm)
+#endif
 		ia64_ptcl(addr, (PAGE_SHIFT << 2));
 #ifndef XEN
 // FIXME SMP?
