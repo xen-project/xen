@@ -41,32 +41,33 @@ struct page
     /* Each frame can be threaded onto a doubly-linked list. */
     struct list_head list;
 
-    /* Timestamp from 'TLB clock', used to reduce need for safety flushes. */
-    u32 tlbflush_timestamp;
-
     /* Reference count and various PGC_xxx flags and fields. */
     u32 count_info;
 
     /* Context-dependent fields follow... */
     union {
 
-        /* Page is in use by a domain. */
+        /* Page is in use: ((count_info & PGC_count_mask) != 0). */
         struct {
-            /* Owner of this page. */
-            u32	_domain;
+            /* Owner of this page (NULL if page is anonymous). */
+            u32 _domain; /* pickled format */
             /* Type reference count and various PGT_xxx flags and fields. */
-            u32 type_info;
-        } inuse;
+            unsigned long type_info;
+        } __attribute__ ((packed)) inuse;
 
-        /* Page is on a free list. */
+        /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
         struct {
+            /* Order-size of the free chunk this page is the head of. */
+            u32 order;
             /* Mask of possibly-tainted TLBs. */
             cpumask_t cpumask;
-            /* Order-size of the free chunk this page is the head of. */
-            u8 order;
-        } free;
+        } __attribute__ ((packed)) free;
 
     } u;
+
+    /* Timestamp from 'TLB clock', used to reduce need for safety flushes. */
+    u32 tlbflush_timestamp;
+
 #if 0
 // following added for Linux compiling
     page_flags_t flags;
@@ -94,8 +95,15 @@ struct page
 #define _PGT_pinned         27
 #define PGT_pinned          (1U<<_PGT_pinned)
 
-/* 27-bit count of uses of this frame as its current type. */
-#define PGT_count_mask      ((1U<<27)-1)
+/* The 11 most significant bits of virt address if this is a page table. */
+#define PGT_va_shift        16
+#define PGT_va_mask         (((1U<<11)-1)<<PGT_va_shift)
+/* Is the back pointer still mutable (i.e. not fixed yet)? */
+#define PGT_va_mutable      (((1U<<11)-1)<<PGT_va_shift)
+/* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
+#define PGT_va_unknown      (((1U<<11)-2)<<PGT_va_shift)
+/* 16-bit count of uses of this frame as its current type. */
+#define PGT_count_mask      ((1U<<16)-1)
 
 /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated      31
@@ -138,7 +146,6 @@ extern unsigned long gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
 
 static inline void put_page(struct page_info *page)
 {
-#ifdef VALIDATE_VT	// doesn't work with non-VTI in grant tables yet
     u32 nx, x, y = page->count_info;
 
     do {
@@ -149,14 +156,12 @@ static inline void put_page(struct page_info *page)
 
     if (unlikely((nx & PGC_count_mask) == 0))
 	free_domheap_page(page);
-#endif
 }
 
 /* count_info and ownership are checked atomically. */
 static inline int get_page(struct page_info *page,
                            struct domain *domain)
 {
-#ifdef VALIDATE_VT
     u64 x, nx, y = *((u64*)&page->count_info);
     u32 _domain = pickle_domptr(domain);
 
@@ -172,14 +177,13 @@ static inline int get_page(struct page_info *page,
 	    return 0;
 	}
     }
-    while(unlikely(y = cmpxchg(&page->count_info, x, nx)) != x);
-#endif
+    while(unlikely((y = cmpxchg((u64*)&page->count_info, x, nx)) != x));
     return 1;
 }
 
-/* No type info now */
-#define put_page_type(page)
-#define get_page_type(page, type) 1
+extern void put_page_type(struct page_info *page);
+extern int get_page_type(struct page_info *page, u32 type);
+
 static inline void put_page_and_type(struct page_info *page)
 {
     put_page_type(page);
