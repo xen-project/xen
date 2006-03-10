@@ -13,7 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
-# Copyright (C) 2005 XenSource Ltd
+# Copyright (C) 2005, 2006 XenSource Ltd.
 #============================================================================
 
 
@@ -22,9 +22,10 @@ import types
 import logging
 import logging.handlers
 
+from xen.xend.server import params
 
-__all__ = [ 'log', 'init', 'getLogFilename', 'addLogStderr',
-            'removeLogStderr' ]
+
+__all__ = [ 'log', 'init', 'getLogFilename' ]
 
 
 if not 'TRACE' in logging.__dict__:
@@ -38,37 +39,28 @@ if not 'TRACE' in logging.__dict__:
 log = logging.getLogger("xend")
 
 
-DEFAULT_MAX_BYTES = 1 << 20  # 1MB
-DEFAULT_BACKUP_COUNT = 5
+MAX_BYTES = 1 << 20  # 1MB
+BACKUP_COUNT = 5
 
 STDERR_FORMAT = "[%(name)s] %(levelname)s (%(module)s:%(lineno)d) %(message)s"
 LOGFILE_FORMAT = "[%(asctime)s %(name)s] %(levelname)s (%(module)s:%(lineno)d) %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
-stderrHandler = logging.StreamHandler()
-stderrHandler.setFormatter(logging.Formatter(STDERR_FORMAT, DATE_FORMAT))
-
 logfilename = None
 
 
-def init(filename, level=logging.INFO, maxBytes=None, backupCount=None):
-    """Initialise logging. Logs to 'filename' by default, but does not log to
-    stderr unless addLogStderr() is called.
+def init(filename, level):
+    """Initialise logging.  Logs to the given filename, and logs to stderr if
+    XEND_DEBUG is set.
     """
 
     global logfilename
 
     def openFileHandler(fname):
-        return logging.handlers.RotatingFileHandler(fname,
-                                                    mode='a',
-                                                    maxBytes=maxBytes,
-                                                    backupCount=backupCount)
-
-    if not maxBytes:
-        maxBytes = DEFAULT_MAX_BYTES
-    if not backupCount:
-        backupCount = DEFAULT_BACKUP_COUNT
+        return logging.handlers.RotatingFileHandler(fname, mode = 'a',
+                                                    maxBytes = MAX_BYTES,
+                                                    backupCount = BACKUP_COUNT)
 
     # Rather unintuitively, getLevelName will get the number corresponding to
     # a level name, as well as getting the name corresponding to a level
@@ -89,16 +81,12 @@ def init(filename, level=logging.INFO, maxBytes=None, backupCount=None):
     fileHandler.setFormatter(logging.Formatter(LOGFILE_FORMAT, DATE_FORMAT))
     log.addHandler(fileHandler)
 
+    if params.XEND_DEBUG:
+        stderrHandler = logging.StreamHandler()
+        stderrHandler.setFormatter(logging.Formatter(STDERR_FORMAT,
+                                                     DATE_FORMAT))
+        log.addHandler(stderrHandler)
+
 
 def getLogFilename():
     return logfilename
-
-
-def addLogStderr():
-    """Add logging to stderr."""
-    log.addHandler(stderrHandler)
-
-
-def removeLogStderr():
-    """Remove logging to stderr."""
-    log.removeHandler(stderrHandler)
