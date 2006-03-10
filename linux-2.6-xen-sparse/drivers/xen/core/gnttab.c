@@ -31,6 +31,8 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/sched.h>
+#include <linux/mm.h>
+#include <linux/vmalloc.h>
 #include <asm/pgtable.h>
 #include <xen/interface/xen.h>
 #include <asm/fixmap.h>
@@ -77,7 +79,7 @@ static int gnttab_free_count;
 static grant_ref_t gnttab_free_head;
 static spinlock_t gnttab_list_lock = SPIN_LOCK_UNLOCKED;
 
-static grant_entry_t *shared;
+static grant_entry_t *shared = NULL;
 
 static struct gnttab_free_callback *gnttab_free_callback_list = NULL;
 
@@ -354,12 +356,35 @@ gnttab_request_free_callback(struct gnttab_free_callback *callback,
 	spin_unlock_irqrestore(&gnttab_list_lock, flags);
 }
 
+#ifndef __ia64__
+static int map_pte_fn(pte_t *pte, struct page *pte_page,
+		      unsigned long addr, void *data)
+{
+	unsigned long **frames = (unsigned long **)data;
+
+	set_pte_at(&init_mm, addr, pte, pfn_pte_ma((*frames)[0], PAGE_KERNEL));
+	(*frames)++;
+	return 0;
+}
+
+static int unmap_pte_fn(pte_t *pte, struct page *pte_page,
+		      unsigned long addr, void *data)
+{
+
+	set_pte_at(&init_mm, addr, pte, __pte(0));
+	return 0;
+}
+#endif
+
 int
 gnttab_resume(void)
 {
 	gnttab_setup_table_t setup;
-	unsigned long        frames[NR_GRANT_FRAMES];
-	int                  i;
+	unsigned long frames[NR_GRANT_FRAMES];
+#ifndef __ia64__
+	void *pframes = frames;
+	struct vm_struct *area;
+#endif
 
 	setup.dom        = DOMID_SELF;
 	setup.nr_frames  = NR_GRANT_FRAMES;
@@ -368,12 +393,18 @@ gnttab_resume(void)
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1));
 	BUG_ON(setup.status != 0);
 
-#ifdef __ia64__
+#ifndef __ia64__
+	if (shared == NULL) {
+		area = get_vm_area(PAGE_SIZE * NR_GRANT_FRAMES, VM_IOREMAP);
+		BUG_ON(area == NULL);
+		shared = area->addr;
+	}
+	BUG_ON(generic_page_range(&init_mm, (unsigned long)shared,
+				  PAGE_SIZE * NR_GRANT_FRAMES,
+				  map_pte_fn, &pframes));
+#else
 	shared = __va(frames[0] << PAGE_SHIFT);
 	printk("grant table at %p\n", shared);
-#else
-	for (i = 0; i < NR_GRANT_FRAMES; i++)
-		set_fixmap(FIX_GNTTAB_END - i, frames[i] << PAGE_SHIFT);
 #endif
 
 	return 0;
@@ -382,10 +413,12 @@ gnttab_resume(void)
 int
 gnttab_suspend(void)
 {
-	int i;
 
-	for (i = 0; i < NR_GRANT_FRAMES; i++)
-		clear_fixmap(FIX_GNTTAB_END - i);
+#ifndef __ia64__
+	generic_page_range(&init_mm, (unsigned long)shared,
+			   PAGE_SIZE * NR_GRANT_FRAMES,
+			   unmap_pte_fn, NULL);
+#endif
 
 	return 0;
 }
@@ -399,10 +432,6 @@ gnttab_init(void)
 		return -ENODEV;
 
 	BUG_ON(gnttab_resume());
-
-#ifndef __ia64__
-	shared = (grant_entry_t *)fix_to_virt(FIX_GNTTAB_END);
-#endif
 
 	for (i = NR_RESERVED_ENTRIES; i < NR_GRANT_ENTRIES; i++)
 		gnttab_list[i] = i + 1;
