@@ -32,6 +32,7 @@
 
 
 #include <xen/lib.h>
+#include <xen/mm.h>
 #include <asm/byteorder.h>
 #include <asm/debugger.h>
 #include <asm/uaccess.h>
