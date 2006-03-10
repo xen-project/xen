@@ -350,7 +350,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         unmap_domain_page(pt);
     }
 
-    void adjust_shadow_tables()
+    void adjust_shadow_tables(void)
     {
         struct shadow_status *a;
         unsigned long smfn, gmfn;
@@ -402,7 +402,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         }
     }
 
-    void adjust_oos_list()
+    void adjust_oos_list(void)
     {
         struct out_of_sync_entry *oos;
 
@@ -426,7 +426,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         }
     }
 
-    void adjust_for_pgtbase()
+    void adjust_for_pgtbase(void)
     {
         struct vcpu *v;
 
@@ -443,7 +443,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         }
     }
 
-    void adjust_guest_pages()
+    void adjust_guest_pages(void)
     {
         struct list_head *list_ent = d->page_list.next;
         struct page_info *page;

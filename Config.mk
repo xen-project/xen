@@ -12,14 +12,6 @@ XEN_TARGET_X86_PAE  ?= n
 HOSTCC     = gcc
 HOSTCFLAGS = -Wall -Werror -Wstrict-prototypes -O2 -fomit-frame-pointer
 
-ifneq ($(debug),y)
-# Optimisation flags are overridable
-CFLAGS    ?= -O3 -fomit-frame-pointer
-CFLAGS    += -DNDEBUG
-else
-CFLAGS    += -g
-endif
-
 AS         = $(CROSS_COMPILE)as
 LD         = $(CROSS_COMPILE)ld
 CC         = $(CROSS_COMPILE)gcc
@@ -38,6 +30,22 @@ INSTALL_DIR  = $(INSTALL) -d -m0755
 INSTALL_DATA = $(INSTALL) -m0644
 INSTALL_PROG = $(INSTALL) -m0755
 
+ifneq ($(debug),y)
+# Optimisation flags are overridable
+CFLAGS    ?= -O2 -fomit-frame-pointer
+CFLAGS    += -DNDEBUG
+else
+CFLAGS    += -g
+endif
+
+ifeq ($(XEN_TARGET_ARCH),x86_32)
+CFLAGS  += -m32 -march=i686
+endif
+
+ifeq ($(XEN_TARGET_ARCH),x86_64)
+CFLAGS  += -m64
+endif
+
 ifeq ($(XEN_TARGET_ARCH),x86_64)
 LIBDIR = lib64
 else
@@ -51,7 +59,7 @@ endif
 
 test-gcc-flag = $(shell $(1) -v --help 2>&1 | grep -q " $(2) " && echo $(2))
 
-CFLAGS += -Wall
+CFLAGS += -Wall -Wstrict-prototypes
 
 HOSTCFLAGS += $(call test-gcc-flag,$(HOSTCC),-Wdeclaration-after-statement)
 CFLAGS     += $(call test-gcc-flag,$(CC),-Wdeclaration-after-statement)

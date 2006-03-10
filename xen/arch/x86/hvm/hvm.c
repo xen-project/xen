@@ -205,12 +205,10 @@ void hvm_setup_platform(struct domain* d)
     }
 }
 
-void pic_irq_request(int *interrupt_request, int level)
+void pic_irq_request(void *data, int level)
 {
-    if (level)
-        *interrupt_request = 1;
-    else
-        *interrupt_request = 0;
+    int *interrupt_request = data;
+    *interrupt_request = level;
 }
 
 void hvm_pic_assist(struct vcpu *v)

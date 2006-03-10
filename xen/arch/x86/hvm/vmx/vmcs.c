@@ -363,7 +363,7 @@ static inline int construct_init_vmcs_guest(cpu_user_regs_t *regs)
     return error;
 }
 
-static inline int construct_vmcs_host()
+static inline int construct_vmcs_host(void)
 {
     int error = 0;
 #ifdef __x86_64__

@@ -18,7 +18,7 @@
 #include <errno.h>
 #include <string.h>
 
-void usage()
+void usage(void)
 {
     printf("xc_shadow: -[0|1|2]\n");
     printf("    set shadow mode\n");
@@ -28,7 +28,7 @@ void usage()
 int main(int argc, char *argv[])
 {
     int xc_handle;
-    int mode;
+    int mode = 0;
 
     if ( argc > 1 )
     {

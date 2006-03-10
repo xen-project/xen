@@ -407,7 +407,7 @@ static void pic_init1(int io_addr, int elcr_addr, PicState *s)
     pic_reset(s);
 }
 
-void pic_init(struct hvm_virpic *s, void (*irq_request)(), 
+void pic_init(struct hvm_virpic *s, void (*irq_request)(void *, int),
               void *irq_request_opaque)
 {
     memset(s, 0, sizeof(*s));
@@ -422,7 +422,8 @@ void pic_init(struct hvm_virpic *s, void (*irq_request)(),
     return; 
 }
 
-void pic_set_alt_irq_func(struct hvm_virpic *s, void (*alt_irq_func)(),
+void pic_set_alt_irq_func(struct hvm_virpic *s,
+                          void (*alt_irq_func)(void *, int, int),
                           void *alt_irq_opaque)
 {
     s->alt_irq_func = alt_irq_func;

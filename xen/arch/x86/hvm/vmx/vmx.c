@@ -479,12 +479,13 @@ void vmx_init_ap_context(struct vcpu_guest_context *ctxt,
 
 void do_nmi(struct cpu_user_regs *);
 
-static int check_vmx_controls(ctrls, msr)
+static int check_vmx_controls(u32 ctrls, u32 msr)
 {
     u32 vmx_msr_low, vmx_msr_high;
 
     rdmsr(msr, vmx_msr_low, vmx_msr_high);
-    if (ctrls < vmx_msr_low || ctrls > vmx_msr_high) {
+    if ( (ctrls < vmx_msr_low) || (ctrls > vmx_msr_high) )
+    {
         printk("Insufficient VMX capability 0x%x, "
                "msr=0x%x,low=0x%8x,high=0x%x\n",
                ctrls, msr, vmx_msr_low, vmx_msr_high);

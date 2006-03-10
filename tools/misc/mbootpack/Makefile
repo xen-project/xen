@@ -31,7 +31,7 @@ DEPFLAGS = -Wp,-MD,.$(@F).d
 DEPS     = .*.d
 
 mbootpack: $(OBJS)
-	$(HOSTCC) -o $@ $(filter-out %.a, $^) $(LDFLAGS)
+	$(HOSTCC) -o $@ $(filter-out %.a, $^)
 
 clean:
 	$(RM) mbootpack *.o $(DEPS) bootsect setup bzimage_header.c bin2c

@@ -158,8 +158,7 @@ shl(register digit *p, register int len, register int sh)
  * leading zeros).
  */
 u64
-__qdivrem(uq, vq, arq)
-	u64 uq, vq, *arq;
+__qdivrem(u64 uq, u64 vq, u64 *arq)
 {
 	union uu tmp;
 	digit *u, *v, *q;
@@ -382,8 +381,7 @@ __divdi3(s64 a, s64 b)
  * Divide two unsigned quads.
  */
 u64
-__udivdi3(a, b)
-        u64 a, b;
+__udivdi3(u64 a, u64 b)
 {
 
         return (__qdivrem(a, b, (u64 *)0));

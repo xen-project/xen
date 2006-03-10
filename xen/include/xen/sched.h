@@ -266,7 +266,7 @@ void sched_add_domain(struct vcpu *);
 void sched_rem_domain(struct vcpu *);
 long sched_ctl(struct sched_ctl_cmd *);
 long sched_adjdom(struct sched_adjdom_cmd *);
-int  sched_id();
+int  sched_id(void);
 void vcpu_wake(struct vcpu *d);
 void vcpu_sleep_nosync(struct vcpu *d);
 void vcpu_sleep_sync(struct vcpu *d);
