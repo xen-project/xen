@@ -863,8 +863,7 @@ static int setup_guest(int xc_handle,
 
     if ( shadow_mode_enabled )
     {
-        struct xen_reserved_phys_area xrpa;
-        struct xen_map_shared_info xmsi;
+        struct xen_add_to_physmap xatp;
 
         /* Enable shadow translate mode */
         if ( xc_shadow_control(xc_handle, dom,
@@ -875,25 +874,35 @@ static int setup_guest(int xc_handle,
             goto error_out;
         }
 
-        /* Find the shared info frame.  It's guaranteed to be at the
-           start of the PFN hole. */
-        xrpa.domid = dom;
-        xrpa.idx   = 0;
-        rc = xc_memory_op(xc_handle, XENMEM_reserved_phys_area, &xrpa);
-        if ( rc != 0 )
-        {
-            PERROR("Cannot find shared info pfn");
-            goto error_out;
-        }
-
         guest_shared_info_mfn = (vsharedinfo_start-dsi.v_start) >> PAGE_SHIFT;
-        xmsi.domid = dom;
-        xmsi.pfn = guest_shared_info_mfn;
-        rc = xc_memory_op(xc_handle, XENMEM_map_shared_info, &xmsi);
+
+        /* Map shared info frame into guest physmap. */
+        xatp.domid = dom;
+        xatp.space = XENMAPSPACE_shared_info;
+        xatp.idx   = 0;
+        xatp.gpfn  = guest_shared_info_mfn;
+        rc = xc_memory_op(xc_handle, XENMEM_add_to_physmap, &xatp);
         if ( rc != 0 )
         {
             PERROR("Cannot map shared info pfn");
             goto error_out;
+        }
+
+        /* Map grant table frames into guest physmap. */
+        for ( i = 0; ; i++ )
+        {
+            xatp.domid = dom;
+            xatp.space = XENMAPSPACE_grant_table;
+            xatp.idx   = i;
+            xatp.gpfn  = nr_pages + i;
+            rc = xc_memory_op(xc_handle, XENMEM_add_to_physmap, &xatp);
+            if ( rc != 0 )
+            {
+                if ( errno == EINVAL )
+                    break; /* done all grant tables */
+                PERROR("Cannot map grant table pfn");
+                goto error_out;
+            }
         }
     }
     else

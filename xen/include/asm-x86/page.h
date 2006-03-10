@@ -191,6 +191,10 @@ typedef struct { u64 pfn; } pagetable_t;
 #define __pa(x)             (virt_to_maddr(x))
 #define __va(x)             (maddr_to_virt(x))
 
+/* Convert between Xen-heap virtual addresses and machine frame numbers. */
+#define virt_to_mfn(va)     (virt_to_maddr(va) >> PAGE_SHIFT)
+#define mfn_to_virt(mfn)    (maddr_to_virt(mfn << PAGE_SHIFT))
+
 /* Convert between machine frame numbers and page-info structures. */
 #define mfn_to_page(mfn)    (frame_table + (mfn))
 #define page_to_mfn(pg)     ((unsigned long)((pg) - frame_table))
