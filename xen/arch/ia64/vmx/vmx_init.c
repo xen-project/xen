@@ -96,7 +96,7 @@ identify_vmx_feature(void)
 	if (!(vp_env_info & VP_OPCODE))
 		printk("WARNING: no opcode provided from hardware(%lx)!!!\n", vp_env_info);
 	vm_order = get_order(buffer_size);
-	printk("vm buffer size: %ld, order: %ld\n", buffer_size, vm_order);
+	printk("vm buffer size: %ld, order: %d\n", buffer_size, vm_order);
 
 	vmx_enabled = 1;
 no_vti:
@@ -161,7 +161,7 @@ static vpd_t *alloc_vpd(void)
 		return NULL;
 	}
 
-	printk("vpd base: 0x%lx, vpd size:%d\n", vpd, sizeof(vpd_t));
+	printk("vpd base: 0x%lp, vpd size:%ld\n", vpd, sizeof(vpd_t));
 	memset(vpd, 0, VPD_SIZE);
 	/* CPUID init */
 	for (i = 0; i < 5; i++)
@@ -234,7 +234,7 @@ vmx_load_state(struct vcpu *v)
 {
 	u64 status;
 
-	status = ia64_pal_vp_restore(v->arch.privregs, 0);
+	status = ia64_pal_vp_restore((u64)v->arch.privregs, 0);
 	if (status != PAL_STATUS_SUCCESS)
 		panic("Restore vp status failed\n");
 
@@ -307,7 +307,6 @@ io_range_t io_ranges[] = {
 
 int vmx_alloc_contig_pages(struct domain *d)
 {
-	unsigned int order;
 	unsigned long i, j, start,tmp, end, pgnr, conf_nr;
 	struct page_info *page;
 	struct vcpu *v = d->vcpu[0];

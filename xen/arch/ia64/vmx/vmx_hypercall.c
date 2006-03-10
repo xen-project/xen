@@ -36,7 +36,7 @@
 #include <xen/domain.h>
 
 extern long do_sched_op(int cmd, unsigned long arg);
-
+extern unsigned long domain_mpa_to_imva(struct domain *,unsigned long mpaddr);
 
 void hyper_not_support(void)
 {
@@ -126,7 +126,7 @@ void hyper_xen_version(void)
     vcpu_set_gr(vcpu, 8, ret, 0);
     vmx_vcpu_increment_iip(vcpu);
 }
-
+/*
 static int do_lock_page(VCPU *vcpu, u64 va, u64 lock)
 {
     ia64_rr rr;
@@ -135,7 +135,7 @@ static int do_lock_page(VCPU *vcpu, u64 va, u64 lock)
     rr = vmx_vcpu_rr(vcpu, va);
     return thash_lock_tc(hcb, va ,1U<<rr.ps, rr.rid, DSIDE_TLB, lock);
 }
-
+ */
 /*
  * Lock guest page in vTLB, so that it's not relinquished by recycle
  * session when HV is servicing that hypercall.

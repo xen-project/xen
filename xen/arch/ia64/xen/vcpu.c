@@ -36,8 +36,6 @@ typedef	union {
 
 // this def for vcpu_regs won't work if kernel stack is present
 //#define	vcpu_regs(vcpu) ((struct pt_regs *) vcpu->arch.regs
-#define	PSCB(x,y)	VCPU(x,y)
-#define	PSCBX(x,y)	x->arch.y
 
 #define	TRUE	1
 #define	FALSE	0
@@ -66,18 +64,6 @@ unsigned long tr_translate_count = 0;
 unsigned long phys_translate_count = 0;
 
 unsigned long vcpu_verbose = 0;
-#define verbose(a...) do {if (vcpu_verbose) printf(a);} while(0)
-
-//#define vcpu_quick_region_check(_tr_regions,_ifa)	1
-#define vcpu_quick_region_check(_tr_regions,_ifa)			\
-	(_tr_regions & (1 << ((unsigned long)_ifa >> 61)))
-#define vcpu_quick_region_set(_tr_regions,_ifa)				\
-	do {_tr_regions |= (1 << ((unsigned long)_ifa >> 61)); } while (0)
-
-// FIXME: also need to check && (!trp->key || vcpu_pkr_match(trp->key))
-#define vcpu_match_tr_entry(_trp,_ifa,_rid)				\
-	((_trp->p && (_trp->rid==_rid) && (_ifa >= _trp->vadr) &&	\
-	(_ifa < (_trp->vadr + (1L<< _trp->ps)) - 1)))
 
 /**************************************************************************
  VCPU general register access routines
@@ -1641,8 +1627,11 @@ IA64FAULT vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
 
 IA64FAULT vcpu_get_rr(VCPU *vcpu, UINT64 reg, UINT64 *pval)
 {
-	UINT val = PSCB(vcpu,rrs)[reg>>61];
-	*pval = val;
+	if(VMX_DOMAIN(vcpu)){
+		*pval = VMX(vcpu,vrr[reg>>61]);
+	}else{
+		*pval = PSCB(vcpu,rrs)[reg>>61];
+	}
 	return (IA64_NO_FAULT);
 }
 

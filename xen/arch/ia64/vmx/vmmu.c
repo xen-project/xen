@@ -31,6 +31,7 @@
 #include <asm/hw_irq.h>
 #include <asm/vmx_pal_vsa.h>
 #include <asm/kregs.h>
+#include <asm/vcpu.h>
 #include <xen/irq.h>
 
 /*
@@ -68,14 +69,14 @@ u64 get_mfn(struct domain *d, u64 gpfn)
 /*
  * The VRN bits of va stand for which rr to get.
  */
-ia64_rr vmmu_get_rr(VCPU *vcpu, u64 va)
-{
-    ia64_rr   vrr;
-    vmx_vcpu_get_rr(vcpu, va, &vrr.rrval);
-    return vrr;
-}
+//ia64_rr vmmu_get_rr(struct vcpu *vcpu, u64 va)
+//{
+//    ia64_rr   vrr;
+//    vcpu_get_rr(vcpu, va, &vrr.rrval);
+//    return vrr;
+//}
 
-
+/*
 void recycle_message(thash_cb_t *hcb, u64 para)
 {
     if(hcb->ht == THASH_VHPT)
@@ -84,7 +85,7 @@ void recycle_message(thash_cb_t *hcb, u64 para)
     }
     printk("hcb=%p recycled with %lx\n",hcb,para);
 }
-
+ */
 
 /*
  * Purge all guest TCs in logical processor.
@@ -102,7 +103,6 @@ purge_machine_tc_by_domid(domid_t domid)
     u32 stride1,stride2;
     u32 i,j;
     u64 psr;
-    
 
     result = ia64_pal_call_static(PAL_PTCE_INFO,0,0,0, 0);
     if ( result.status != 0 ) {
@@ -113,7 +113,7 @@ purge_machine_tc_by_domid(domid_t domid)
     count2 = LOW_32BITS (result.v1);
     stride1 = HIGH_32BITS(result.v2);
     stride2 = LOW_32BITS (result.v2);
-    
+
     local_irq_save(psr);
     for (i=0; i<count1; i++) {
         for (j=0; j<count2; j++) {
@@ -133,24 +133,10 @@ static thash_cb_t *init_domain_vhpt(struct vcpu *d, void *vbase, void *vcur)
 //    struct page_info *page;
     thash_cb_t  *vhpt;
     PTA pta_value;
-/*
-    page = alloc_domheap_pages (NULL, VCPU_VHPT_ORDER, 0);
-    if ( page == NULL ) {
-        panic("No enough contiguous memory for init_domain_mm\n");
-    }
-    vbase = page_to_virt(page);
-    printk("Allocate domain vhpt at 0x%lx\n", (u64)vbase);
-    memset(vbase, 0, VCPU_VHPT_SIZE);
- */
-//    vcur = (void*)((u64)vbase + VCPU_VHPT_SIZE);
     vcur -= sizeof (thash_cb_t);
     vhpt = vcur;
     vhpt->ht = THASH_VHPT;
     vhpt->vcpu = d;
-//    vhpt->hash_func = machine_thash;
-//    vcur -= sizeof (vhpt_special);
-//    vs = vcur;
-
     /* Setup guest pta */
     pta_value.val = 0;
     pta_value.ve = 1;
@@ -159,14 +145,10 @@ static thash_cb_t *init_domain_vhpt(struct vcpu *d, void *vbase, void *vcur)
     pta_value.base = ((u64)vbase) >> PTA_BASE_SHIFT;
     d->arch.arch_vmx.mpta = pta_value.val;
 
-//    vhpt->vs = vs;
-//    vhpt->vs->get_mfn = __gpfn_to_mfn_foreign;
-//    vhpt->vs->tag_func = machine_ttag;
     vhpt->hash = vbase;
     vhpt->hash_sz = VCPU_VHPT_SIZE/2;
     vhpt->cch_buf = (void *)(vbase + vhpt->hash_sz);
     vhpt->cch_sz = (u64)vcur - (u64)vhpt->cch_buf;
-//    vhpt->recycle_notifier = recycle_message;
     thash_init(vhpt,VCPU_VHPT_SHIFT-1);
     return vhpt;
 }
@@ -177,9 +159,8 @@ thash_cb_t *init_domain_tlb(struct vcpu *d)
 {
     struct page_info *page;
     void    *vbase, *vhptbase, *vcur;
-    tlb_special_t  *ts;
     thash_cb_t  *tlb;
-    
+
     page = alloc_domheap_pages (NULL, VCPU_VHPT_ORDER, 0);
     if ( page == NULL ) {
         panic("No enough contiguous memory for init_domain_mm\n");
@@ -193,10 +174,7 @@ thash_cb_t *init_domain_tlb(struct vcpu *d)
     tlb = vcur;
     tlb->ht = THASH_TLB;
     tlb->vcpu = d;
-    vcur -= sizeof (tlb_special_t);
-    ts = vcur;
-    tlb->ts = ts;
-    tlb->ts->vhpt = init_domain_vhpt(d,vhptbase,vbase);
+    tlb->vhpt = init_domain_vhpt(d,vhptbase,vbase);
 //    tlb->hash_func = machine_thash;
     tlb->hash = vbase;
     tlb->hash_sz = VCPU_VTLB_SIZE/2;
@@ -207,27 +185,6 @@ thash_cb_t *init_domain_tlb(struct vcpu *d)
     return tlb;
 }
 
-/* Allocate physical to machine mapping table for domN
- * FIXME: Later this interface may be removed, if that table is provided
- * by control panel. Dom0 has gpfn identical to mfn, which doesn't need
- * this interface at all.
- */
-#if 0
-void
-alloc_pmt(struct domain *d)
-{
-    struct page_info *page;
-
-    /* Only called once */
-    ASSERT(d->arch.pmt);
-
-    page = alloc_domheap_pages(NULL, get_order(d->max_pages), 0);
-    ASSERT(page);
-
-    d->arch.pmt = page_to_virt(page);
-    memset(d->arch.pmt, 0x55, d->max_pages * 8);
-}
-#endif
 /*
  * Insert guest TLB to machine TLB.
  *  data:   In TLB format
@@ -240,7 +197,6 @@ void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb)
     unsigned long mtlb_ppn;
     mtlb.ifa = tlb->vadr;
     mtlb.itir = tlb->itir & ~ITIR_RV_MASK;
-    //vmx_vcpu_get_rr(d, mtlb.ifa, &vrr.value);
     mtlb.page_flags = tlb->page_flags & ~PAGE_FLAGS_RV_MASK;
     mtlb.ppn = get_mfn(d->domain,tlb->ppn);
     mtlb_ppn=mtlb.ppn;
@@ -311,7 +267,7 @@ int vhpt_enabled(VCPU *vcpu, uint64_t vadr, vhpt_ref_t ref)
     IA64_PSR  vpsr; 
 
     vpsr.val = vmx_vcpu_get_psr(vcpu);
-    vrr = vmx_vcpu_rr(vcpu, vadr);
+    vcpu_get_rr(vcpu, vadr, &vrr.rrval);
     vmx_vcpu_get_pta(vcpu,&vpta.val);
 
     if ( vrr.ve & vpta.ve ) {
@@ -355,21 +311,18 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code1, u64 *code2)
     u64     *vpa;
     thash_data_t    *tlb;
     thash_cb_t *hcb;
-    ia64_rr vrr;
     u64     mfn;
 
     if ( !(VCPU(vcpu, vpsr) & IA64_PSR_IT) ) {   // I-side physical mode
         gpip = gip;
     }
     else {
-        vmx_vcpu_get_rr(vcpu, gip, &vrr.rrval);
-	hcb = vmx_vcpu_get_vtlb(vcpu);
-        tlb = vtlb_lookup_ex (hcb, vrr.rid, gip, ISIDE_TLB );
-        if( tlb == NULL )
-             tlb = vtlb_lookup_ex (hcb,
-                vrr.rid, gip, DSIDE_TLB );
-        if (tlb) 
-	        gpip = (tlb->ppn << 12) | ( gip & (PSIZE(tlb->ps)-1) );
+	    hcb = vmx_vcpu_get_vtlb(vcpu);
+        tlb = vtlb_lookup(hcb, gip, ISIDE_TLB);
+//        if( tlb == NULL )
+//             tlb = vtlb_lookup(hcb, gip, DSIDE_TLB );
+        if (tlb)
+	        gpip = (tlb->ppn >>(tlb->ps-12)<<tlb->ps) | ( gip & (PSIZE(tlb->ps)-1) );
     }
     if( gpip){
 	 mfn = gmfn_to_mfn(vcpu->domain, gpip >>PAGE_SHIFT);
@@ -388,236 +341,146 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code1, u64 *code2)
 
 IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 {
-
-    thash_data_t data, *ovl;
+    int slot;
+    u64 ps, va;
     thash_cb_t  *hcb;
-    search_section_t sections;
-    ia64_rr vrr;
 
-    hcb = vmx_vcpu_get_vtlb(vcpu);
-    data.page_flags=pte & ~PAGE_FLAGS_RV_MASK;
-    data.itir=itir;
-    data.vadr=PAGEALIGN(ifa,data.ps);
-    data.tc = 1;
-    data.cl=ISIDE_TLB;
-    vmx_vcpu_get_rr(vcpu, ifa, (UINT64 *)&vrr);
-    data.rid = vrr.rid;
-    
-    sections.tr = 1;
-    sections.tc = 0;
-
-    ovl = vtr_find_overlap(hcb, &data, ISIDE_TLB);
-    while (ovl) {
+    ps = itir_ps(itir);
+    va = PAGEALIGN(ifa, ps);
+    slot = vtr_find_overlap(vcpu, va, ps, ISIDE_TLB);
+    if (slot >=0) {
         // generate MCA.
         panic("Tlb conflict!!");
         return IA64_FAULT;
     }
-    thash_purge_and_insert(hcb, &data, ifa);
+    hcb = vmx_vcpu_get_vtlb(vcpu);
+    thash_purge_and_insert(hcb, pte, itir, ifa);
     return IA64_NO_FAULT;
 }
-
-
-
 
 IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 {
-
-    thash_data_t data, *ovl;
+    int slot;
+    u64 ps, va, gpfn;
     thash_cb_t  *hcb;
-    search_section_t sections;
-    ia64_rr vrr;
 
-    hcb = vmx_vcpu_get_vtlb(vcpu);
-    data.page_flags=pte & ~PAGE_FLAGS_RV_MASK;
-    data.itir=itir;
-    data.vadr=PAGEALIGN(ifa,data.ps);
-    data.tc = 1;
-    data.cl=DSIDE_TLB;
-    vmx_vcpu_get_rr(vcpu, ifa,(UINT64 *)&vrr);
-    data.rid = vrr.rid;
-    sections.tr = 1;
-    sections.tc = 0;
-
-    ovl = vtr_find_overlap(hcb, &data, DSIDE_TLB);
-    if (ovl) {
-          // generate MCA.
-        panic("Tlb conflict!!");
-        return IA64_FAULT;
-    }
-    thash_purge_and_insert(hcb, &data, ifa);
-    return IA64_NO_FAULT;
-}
-
-/*
- * Return TRUE/FALSE for success of lock operation
- */
-
-/*
-int vmx_lock_guest_dtc (VCPU *vcpu, UINT64 va, int lock)
-{
-
-    thash_cb_t  *hcb;
-    ia64_rr vrr;
-    u64	  preferred_size;
-
-    vmx_vcpu_get_rr(vcpu, va, &vrr);
-    hcb = vmx_vcpu_get_vtlb(vcpu);
-    va = PAGEALIGN(va,vrr.ps);
-    preferred_size = PSIZE(vrr.ps);
-    return thash_lock_tc(hcb, va, preferred_size, vrr.rid, DSIDE_TLB, lock);
-}
- */
-
-
-
-IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64 idx)
-{
-
-    thash_data_t data, *ovl;
-    thash_cb_t  *hcb;
-    search_section_t sections;
-    ia64_rr vrr;
-    /* u64 mfn,psr; */
-
-    hcb = vmx_vcpu_get_vtlb(vcpu);
-    data.page_flags=pte & ~PAGE_FLAGS_RV_MASK;
-    data.itir=itir;
-    data.vadr=PAGEALIGN(ifa,data.ps);
-    data.tc = 0;
-    data.cl=ISIDE_TLB;
-    vmx_vcpu_get_rr(vcpu, ifa, (UINT64 *)&vrr);
-    data.rid = vrr.rid;
-    sections.tr = 1;
-    sections.tc = 0;
-
-
-    ovl = vtr_find_overlap(hcb, &data, ISIDE_TLB);
-    if (ovl) {
+    ps = itir_ps(itir);
+    va = PAGEALIGN(ifa, ps);
+    slot = vtr_find_overlap(vcpu, va, ps, DSIDE_TLB);
+    if (slot >=0) {
         // generate MCA.
         panic("Tlb conflict!!");
         return IA64_FAULT;
     }
-    sections.tr = 0;
-    sections.tc = 1;
-    thash_purge_entries(hcb, &data, sections);
-/*    if((idx==IA64_TR_KERNEL)&&(data.ps == KERNEL_TR_PAGE_SHIFT)){
-        data.contiguous=1;
-    }
- */
-    thash_tr_insert(hcb, &data, ifa, idx);
-/*
-    if((idx==IA64_TR_KERNEL)&&(data.ps == KERNEL_TR_PAGE_SHIFT)){
-        mfn = __gpfn_to_mfn_foreign(vcpu->domain,arch_to_xen_ppn(data.ppn));
-        data.page_flags=pte&~PAGE_FLAGS_RV_MASK;
-        data.ppn = xen_to_arch_ppn(mfn);
-        psr = ia64_clear_ic();
-        ia64_itr(0x1, IA64_ITR_GUEST_KERNEL, data.vadr, data.page_flags, data.ps);
-        ia64_set_psr(psr);      // restore psr
-        ia64_srlz_i();
-//        return IA64_NO_FAULT;
-    }
-*/
+    hcb = vmx_vcpu_get_vtlb(vcpu);
+    gpfn = (pte & _PAGE_PPN_MASK)>> PAGE_SHIFT;
+    if(__gpfn_is_io(vcpu->domain,gpfn))
+        pte |= VTLB_PTE_IO;
+    thash_purge_and_insert(hcb, pte, itir, ifa);
     return IA64_NO_FAULT;
+
 }
 
-IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64 idx)
+
+
+
+IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
 {
-
-    thash_data_t data, *ovl;
+    int index;
+    u64 ps, va, rid;
     thash_cb_t  *hcb;
-    search_section_t sections;
-    ia64_rr    vrr;
-    /* u64 mfn,psr; */
 
-    hcb = vmx_vcpu_get_vtlb(vcpu);
-    data.page_flags=pte & ~PAGE_FLAGS_RV_MASK;
-    data.itir=itir;
-    data.vadr=PAGEALIGN(ifa,data.ps);
-    data.tc = 0;
-    data.cl=DSIDE_TLB;
-    vmx_vcpu_get_rr(vcpu, ifa,(UINT64 *)&vrr);
-    data.rid = vrr.rid;
-    sections.tr = 1;
-    sections.tc = 0;
-
-    ovl = vtr_find_overlap(hcb, &data, DSIDE_TLB);
-    while (ovl) {
+    ps = itir_ps(itir);
+    va = PAGEALIGN(ifa, ps);
+    index = vtr_find_overlap(vcpu, va, ps, ISIDE_TLB);
+    if (index >=0) {
         // generate MCA.
         panic("Tlb conflict!!");
         return IA64_FAULT;
     }
-    sections.tr = 0;
-    sections.tc = 1;
-    thash_purge_entries(hcb, &data, sections);
-/*
-    if((idx==IA64_TR_KERNEL)&&(data.ps == KERNEL_TR_PAGE_SHIFT)){
-        data.contiguous=1;
+    hcb = vmx_vcpu_get_vtlb(vcpu);
+    thash_purge_entries(hcb, va, ps);
+    vcpu_get_rr(vcpu, va, &rid);
+    rid = rid& RR_RID_MASK;
+    vmx_vcpu_set_tr((thash_data_t *)&vcpu->arch.itrs[slot], pte, itir, va, rid);
+    vcpu_quick_region_set(PSCBX(vcpu,itr_regions),va);
+    return IA64_NO_FAULT;
+}
+
+
+IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
+{
+    int index;
+    u64 ps, va, gpfn, rid;
+    thash_cb_t  *hcb;
+
+    ps = itir_ps(itir);
+    va = PAGEALIGN(ifa, ps);
+    index = vtr_find_overlap(vcpu, va, ps, DSIDE_TLB);
+    if (index>=0) {
+        // generate MCA.
+        panic("Tlb conflict!!");
+        return IA64_FAULT;
     }
- */
-    thash_tr_insert(hcb, &data, ifa, idx);
-/*
-    if((idx==IA64_TR_KERNEL)&&(data.ps == KERNEL_TR_PAGE_SHIFT)){
-        mfn = __gpfn_to_mfn_foreign(vcpu->domain,arch_to_xen_ppn(data.ppn));
-        data.page_flags=pte&~PAGE_FLAGS_RV_MASK;
-        data.ppn = xen_to_arch_ppn(mfn);
-        psr = ia64_clear_ic();
-        ia64_itr(0x2,IA64_DTR_GUEST_KERNEL , data.vadr, data.page_flags, data.ps);
-        ia64_set_psr(psr);      // restore psr
-        ia64_srlz_i();
-//        return IA64_NO_FAULT;
+    hcb = vmx_vcpu_get_vtlb(vcpu);
+    thash_purge_entries(hcb, va, ps);
+    gpfn = (pte & _PAGE_PPN_MASK)>> PAGE_SHIFT;
+    if(__gpfn_is_io(vcpu->domain,gpfn))
+        pte |= VTLB_PTE_IO;
+    vcpu_get_rr(vcpu, va, &rid);
+    rid = rid& RR_RID_MASK;
+    vmx_vcpu_set_tr((thash_data_t *)&vcpu->arch.dtrs[slot], pte, itir, va, rid);
+    vcpu_quick_region_set(PSCBX(vcpu,dtr_regions),va);
+    return IA64_NO_FAULT;
+}
+
+
+
+IA64FAULT vmx_vcpu_ptr_d(VCPU *vcpu,UINT64 ifa,UINT64 ps)
+{
+    int index;
+    u64 va;
+    thash_cb_t  *hcb;
+
+    va = PAGEALIGN(ifa, ps);
+    index = vtr_find_overlap(vcpu, va, ps, DSIDE_TLB);
+    if (index>=0) {
+        vcpu->arch.dtrs[index].p=0;
+        index = vtr_find_overlap(vcpu, va, ps, DSIDE_TLB);
     }
-*/
-
+    hcb = vmx_vcpu_get_vtlb(vcpu);
+    thash_purge_entries(hcb, va, ps);
     return IA64_NO_FAULT;
 }
 
+IA64FAULT vmx_vcpu_ptr_i(VCPU *vcpu,UINT64 ifa,UINT64 ps)
+{
+    int index;
+    u64 va;
+    thash_cb_t  *hcb;
 
+    va = PAGEALIGN(ifa, ps);
+    index = vtr_find_overlap(vcpu, va, ps, ISIDE_TLB);
+    if (index>=0) {
+        vcpu->arch.itrs[index].p=0;
+        index = vtr_find_overlap(vcpu, va, ps, ISIDE_TLB);
+    }
+    hcb = vmx_vcpu_get_vtlb(vcpu);
+    thash_purge_entries(hcb, va, ps);
+    return IA64_NO_FAULT;
+}
 
-IA64FAULT vmx_vcpu_ptr_d(VCPU *vcpu,UINT64 vadr,UINT64 ps)
+IA64FAULT vmx_vcpu_ptc_l(VCPU *vcpu, UINT64 va, UINT64 ps)
 {
     thash_cb_t  *hcb;
-    ia64_rr rr;
-    search_section_t sections;
-
+    va = PAGEALIGN(va, ps);
     hcb = vmx_vcpu_get_vtlb(vcpu);
-    rr=vmx_vcpu_rr(vcpu,vadr);
-    sections.tr = 1;
-    sections.tc = 1;
-    thash_purge_entries_ex(hcb,rr.rid,vadr,ps,sections,DSIDE_TLB);
-    return IA64_NO_FAULT;
-}
-
-IA64FAULT vmx_vcpu_ptr_i(VCPU *vcpu,UINT64 vadr,UINT64 ps)
-{
-    thash_cb_t  *hcb;
-    ia64_rr rr;
-    search_section_t sections;
-    hcb = vmx_vcpu_get_vtlb(vcpu);
-    rr=vmx_vcpu_rr(vcpu,vadr);
-    sections.tr = 1;
-    sections.tc = 1;
-    thash_purge_entries_ex(hcb,rr.rid,vadr,ps,sections,ISIDE_TLB);
-    return IA64_NO_FAULT;
-}
-
-IA64FAULT vmx_vcpu_ptc_l(VCPU *vcpu, UINT64 vadr, UINT64 ps)
-{
-    thash_cb_t  *hcb;
-    ia64_rr vrr;
-    search_section_t sections;
-    hcb = vmx_vcpu_get_vtlb(vcpu);
-    vrr=vmx_vcpu_rr(vcpu,vadr);
-    sections.tr = 0;
-    sections.tc = 1;
-    vadr = PAGEALIGN(vadr, ps);
-
-    thash_purge_entries_ex(hcb,vrr.rid,vadr,ps,sections,DSIDE_TLB);
-    thash_purge_entries_ex(hcb,vrr.rid,vadr,ps,sections,ISIDE_TLB);
+    thash_purge_entries(hcb, va, ps);
     return IA64_NO_FAULT;
 }
 
 
-IA64FAULT vmx_vcpu_ptc_e(VCPU *vcpu, UINT64 vadr)
+IA64FAULT vmx_vcpu_ptc_e(VCPU *vcpu, UINT64 va)
 {
     thash_cb_t  *hcb;
     hcb = vmx_vcpu_get_vtlb(vcpu);
@@ -625,15 +488,15 @@ IA64FAULT vmx_vcpu_ptc_e(VCPU *vcpu, UINT64 vadr)
     return IA64_NO_FAULT;
 }
 
-IA64FAULT vmx_vcpu_ptc_g(VCPU *vcpu, UINT64 vadr, UINT64 ps)
+IA64FAULT vmx_vcpu_ptc_g(VCPU *vcpu, UINT64 va, UINT64 ps)
 {
-    vmx_vcpu_ptc_l(vcpu, vadr, ps);
+    vmx_vcpu_ptc_l(vcpu, va, ps);
     return IA64_ILLOP_FAULT;
 }
 
-IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 ps)
+IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu,UINT64 va,UINT64 ps)
 {
-    vmx_vcpu_ptc_l(vcpu, vadr, ps);
+    vmx_vcpu_ptc_l(vcpu, va, ps);
     return IA64_NO_FAULT;
 }
 
@@ -644,7 +507,7 @@ IA64FAULT vmx_vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
     ia64_rr vrr;
     u64 vhpt_offset;
     vmx_vcpu_get_pta(vcpu, &vpta.val);
-    vrr=vmx_vcpu_rr(vcpu, vadr);
+    vcpu_get_rr(vcpu, vadr, &vrr.rrval);
     if(vpta.vf){
         panic("THASH,Don't support long format VHPT");
         *pval = ia64_call_vsa(PAL_VPS_THASH,vadr,vrr.rrval,vpta.val,0,0,0,0);
@@ -663,7 +526,7 @@ IA64FAULT vmx_vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
     ia64_rr vrr;
     PTA vpta;
     vmx_vcpu_get_pta(vcpu, &vpta.val);
-    vrr=vmx_vcpu_rr(vcpu, vadr);
+    vcpu_get_rr(vcpu, vadr, &vrr.rrval);
     if(vpta.vf){
         panic("THASH,Don't support long format VHPT");
         *pval = ia64_call_vsa(PAL_VPS_TTAG,vadr,vrr.rrval,0,0,0,0,0);
@@ -679,13 +542,11 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 {
     thash_data_t *data;
     thash_cb_t  *hcb;
-    ia64_rr vrr;
     ISR visr,pt_isr;
     REGS *regs;
     u64 vhpt_adr;
     IA64_PSR vpsr;
     hcb = vmx_vcpu_get_vtlb(vcpu);
-    vrr=vmx_vcpu_rr(vcpu,vadr);
     regs=vcpu_regs(vcpu);
     pt_isr.val=VMX(vcpu,cr_isr);
     visr.val=0;
@@ -696,7 +557,7 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
          visr.ni=1;
     }
     visr.na=1;
-    data = vtlb_lookup_ex(hcb, vrr.rid, vadr, DSIDE_TLB);
+    data = vtlb_lookup(hcb, vadr, DSIDE_TLB);
     if(data){
         if(data->p==0){
             visr.na=1;
@@ -744,8 +605,7 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
         }
         else{
             vmx_vcpu_thash(vcpu, vadr, &vhpt_adr);
-            vrr=vmx_vcpu_rr(vcpu,vhpt_adr);
-            data = vtlb_lookup_ex(hcb, vrr.rid, vhpt_adr, DSIDE_TLB);
+            data = vtlb_lookup(hcb, vhpt_adr, DSIDE_TLB);
             if(data){
                 if(vpsr.ic){
                     vcpu_set_isr(vcpu, visr.val);
@@ -776,7 +636,6 @@ IA64FAULT vmx_vcpu_tak(VCPU *vcpu, UINT64 vadr, UINT64 *key)
 {
     thash_data_t *data;
     thash_cb_t  *hcb;
-    ia64_rr rr;
     PTA vpta;
     vmx_vcpu_get_pta(vcpu, &vpta.val);
     if(vpta.vf==0 || unimplemented_gva(vcpu, vadr)){
@@ -784,8 +643,7 @@ IA64FAULT vmx_vcpu_tak(VCPU *vcpu, UINT64 vadr, UINT64 *key)
         return IA64_NO_FAULT;
     }
     hcb = vmx_vcpu_get_vtlb(vcpu);
-    rr=vmx_vcpu_rr(vcpu,vadr);
-    data = vtlb_lookup_ex(hcb, rr.rid, vadr, DSIDE_TLB);
+    data = vtlb_lookup(hcb, vadr, DSIDE_TLB);
     if(!data||!data->p){
         *key=1;
     }else{
@@ -821,11 +679,9 @@ __domain_va_to_ma(unsigned long va, unsigned long* ma, unsigned long *len)
     unsigned long	end;	/* end of the area mapped by current entry */
     thash_data_t	*entry;
     struct vcpu *v = current;
-    ia64_rr	vrr;
 
     vtlb = vmx_vcpu_get_vtlb(v); 
-    vrr = vmx_vcpu_rr(v, va);
-    entry = vtlb_lookup_ex(vtlb, vrr.rid, va, DSIDE_TLB);
+    entry = vtlb_lookup(vtlb, va, DSIDE_TLB);
     if (entry == NULL)
 	return -EFAULT;
 

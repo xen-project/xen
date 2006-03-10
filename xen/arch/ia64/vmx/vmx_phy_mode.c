@@ -218,7 +218,7 @@ vmx_load_all_rr(VCPU *vcpu)
     extern void * pal_vaddr;
     vmx_switch_rr7(vmx_vrrtomrr(vcpu,VMX(vcpu, vrr[VRN7])),(void *)vcpu->domain->shared_info,
                 (void *)vcpu->arch.privregs,
-                ( void *)vcpu->arch.vtlb->ts->vhpt->hash, pal_vaddr );
+                (void *)vcpu->arch.vtlb->vhpt->hash, pal_vaddr );
     ia64_set_pta(vcpu->arch.arch_vmx.mpta);
 
 	ia64_srlz_d();
@@ -260,10 +260,10 @@ switch_to_virtual_rid(VCPU *vcpu)
 
     psr=ia64_clear_ic();
 
-    mrr=vmx_vcpu_rr(vcpu,VRN0<<VRN_SHIFT);
+    vcpu_get_rr(vcpu,VRN0<<VRN_SHIFT,&mrr.rrval);
     ia64_set_rr(VRN0<<VRN_SHIFT, vmx_vrrtomrr(vcpu, mrr.rrval));
     ia64_srlz_d();
-    mrr=vmx_vcpu_rr(vcpu,VRN4<<VRN_SHIFT);
+    vcpu_get_rr(vcpu,VRN4<<VRN_SHIFT,&mrr.rrval);
     ia64_set_rr(VRN4<<VRN_SHIFT, vmx_vrrtomrr(vcpu, mrr.rrval));
     ia64_srlz_d();
     ia64_set_psr(psr);

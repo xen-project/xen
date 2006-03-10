@@ -66,17 +66,13 @@ extern void vmx_vcpu_set_psr_sync_mpsr(VCPU * vcpu, UINT64 value);
 extern IA64FAULT vmx_vcpu_cover(VCPU *vcpu);
 extern thash_cb_t *vmx_vcpu_get_vtlb(VCPU *vcpu);
 extern thash_cb_t *vmx_vcpu_get_vhpt(VCPU *vcpu);
-extern ia64_rr vmx_vcpu_rr(VCPU *vcpu,UINT64 vadr);
 extern IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val);
-#if 0
-extern IA64FAULT vmx_vcpu_get_rr(VCPU *vcpu, UINT64 reg, UINT64 *pval);
-#endif
 extern IA64FAULT vmx_vcpu_get_pkr(VCPU *vcpu, UINT64 reg, UINT64 *pval);
 IA64FAULT vmx_vcpu_set_pkr(VCPU *vcpu, UINT64 reg, UINT64 val);
 extern IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa);
 extern IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa);
-extern IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64 idx);
-extern IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64 idx);
+extern IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, UINT64 slot, UINT64 pte, UINT64 itir, UINT64 ifa);
+extern IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, UINT64 slot, UINT64 pte, UINT64 itir, UINT64 ifa);
 extern IA64FAULT vmx_vcpu_ptr_d(VCPU *vcpu,UINT64 vadr,UINT64 ps);
 extern IA64FAULT vmx_vcpu_ptr_i(VCPU *vcpu,UINT64 vadr,UINT64 ps);
 extern IA64FAULT vmx_vcpu_ptc_l(VCPU *vcpu, UINT64 vadr, UINT64 ps);
@@ -347,12 +343,14 @@ IA64FAULT vmx_vcpu_get_itc(VCPU *vcpu,UINT64 *val)
     *val = vtm_get_itc(vcpu);
     return  IA64_NO_FAULT;
 }
+/*
 static inline
 IA64FAULT vmx_vcpu_get_rr(VCPU *vcpu, UINT64 reg, UINT64 *pval)
 {
     *pval = VMX(vcpu,vrr[reg>>61]);
     return (IA64_NO_FAULT);
 }
+ */
 /**************************************************************************
  VCPU debug breakpoint register access routines
 **************************************************************************/

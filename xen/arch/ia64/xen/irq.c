@@ -1338,6 +1338,7 @@ typedef struct {
     struct domain *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
 
+/*
 static void __do_IRQ_guest(int irq)
 {
     irq_desc_t         *desc = &irq_desc[irq];
@@ -1353,7 +1354,7 @@ static void __do_IRQ_guest(int irq)
         send_guest_pirq(d, irq);
     }
 }
-
+ */
 int pirq_guest_unmask(struct domain *d)
 {
     irq_desc_t    *desc;

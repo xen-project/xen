@@ -572,7 +572,7 @@ IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
    }
 #endif // VMAL_NO_FAULT_CHECK
 
-    return (vmx_vcpu_itr_d(vcpu,pte,itir,ifa,slot));
+    return (vmx_vcpu_itr_d(vcpu,slot,pte,itir,ifa));
 }
 
 IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
@@ -631,7 +631,7 @@ IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
    }
 #endif // VMAL_NO_FAULT_CHECK
 
-   return (vmx_vcpu_itr_i(vcpu,pte,itir,ifa,slot));
+   return (vmx_vcpu_itr_i(vcpu,slot,pte,itir,ifa));
 }
 
 IA64FAULT itc_fault_check(VCPU *vcpu, INST64 inst, u64 *itir, u64 *ifa,u64 *pte)
@@ -972,7 +972,7 @@ IA64FAULT vmx_emul_mov_from_rr(VCPU *vcpu, INST64 inst)
         rsv_reg_field(vcpu);
     }
 #endif  //CHECK_FAULT
-    vmx_vcpu_get_rr(vcpu,r3,&r1);
+    vcpu_get_rr(vcpu,r3,&r1);
     return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
 }
 

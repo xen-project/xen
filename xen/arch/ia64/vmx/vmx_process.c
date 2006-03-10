@@ -292,10 +292,9 @@ IA64FAULT
 vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
 {
     IA64_PSR vpsr;
-    CACHE_LINE_TYPE type=ISIDE_TLB;
+    int type=ISIDE_TLB;
     u64 vhpt_adr, gppa;
     ISR misr;
-    ia64_rr vrr;
 //    REGS *regs;
     thash_cb_t *vtlb;
     thash_data_t *data;
@@ -330,16 +329,17 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
         physical_tlb_miss(v, vadr, vec);
         return IA64_FAULT;
     }
-    vrr = vmx_vcpu_rr(v, vadr);
     if(vec == 1) type = ISIDE_TLB;
     else if(vec == 2) type = DSIDE_TLB;
     else panic("wrong vec\n");
 
 //    prepare_if_physical_mode(v);
 
-    if((data=vtlb_lookup_ex(vtlb, vrr.rid, vadr,type))!=0){
-	gppa = (vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
-        if(v->domain!=dom0&&type==DSIDE_TLB && __gpfn_is_io(v->domain,gppa>>PAGE_SHIFT)){
+    if((data=vtlb_lookup(vtlb, vadr,type))!=0){
+//	gppa = (vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
+//        if(v->domain!=dom0&&type==DSIDE_TLB && __gpfn_is_io(v->domain,gppa>>PAGE_SHIFT)){
+        if(v->domain!=dom0 && data->io && type==DSIDE_TLB ){
+        	gppa = (vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
             emulate_io_inst(v, gppa, data->ma);
             return IA64_FAULT;
         }
@@ -353,7 +353,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
         }
         else{
  */
-            thash_vhpt_insert(vtlb->ts->vhpt,data,vadr);
+            thash_vhpt_insert(vtlb->vhpt,data->page_flags, data->itir ,vadr);
 //        }
 //	    }
     }else if(type == DSIDE_TLB){
@@ -374,8 +374,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
             }
         } else{
             vmx_vcpu_thash(v, vadr, &vhpt_adr);
-            vrr=vmx_vcpu_rr(v,vhpt_adr);
-            if(vhpt_lookup(vhpt_adr) ||  vtlb_lookup_ex(vtlb, vrr.rid, vhpt_adr, DSIDE_TLB)){
+            if(vhpt_lookup(vhpt_adr) ||  vtlb_lookup(vtlb, vhpt_adr, DSIDE_TLB)){
                 if(vpsr.ic){
                     vcpu_set_isr(v, misr.val);
                     dtlb_fault(v, vadr);
@@ -417,8 +416,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
             return IA64_FAULT;
         } else{
             vmx_vcpu_thash(v, vadr, &vhpt_adr);
-            vrr=vmx_vcpu_rr(v,vhpt_adr);
-            if(vhpt_lookup(vhpt_adr) || vtlb_lookup_ex(vtlb, vrr.rid, vhpt_adr, DSIDE_TLB)){
+            if(vhpt_lookup(vhpt_adr) || vtlb_lookup(vtlb, vhpt_adr, DSIDE_TLB)){
                 if(!vpsr.ic){
                     misr.ni=1;
                 }
