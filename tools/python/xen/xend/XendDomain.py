@@ -487,7 +487,17 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(domid)
         try:
-            return xc.sedf_domain_get(dominfo.getDomid())
+            
+            sedf_info = xc.sedf_domain_get(dominfo.getDomid())
+            # return sxpr
+            return ['sedf',
+                    ['domain',    sedf_info['domain']],
+                    ['period',    sedf_info['period']],
+                    ['slice',     sedf_info['slice']],
+                    ['latency',   sedf_info['latency']],
+                    ['extratime', sedf_info['extratime']],
+                    ['weight',    sedf_info['weight']]]
+
         except Exception, ex:
             raise XendError(str(ex))
 
