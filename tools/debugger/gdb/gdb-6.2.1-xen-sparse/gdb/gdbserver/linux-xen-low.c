@@ -229,8 +229,6 @@ linux_wait (char *status)
   if (xc_waitdomain(xc_handle, current_domid, &w, 0))
       return -1;
   
-  linux_set_inferior();
-
   *status = 'T';
   if (expect_signal)
       return expect_signal;
