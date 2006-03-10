@@ -102,6 +102,8 @@ struct mm_struct {
 #endif
 	spinlock_t page_table_lock;		/* Protects task page tables and mm->rss */
 
+	struct list_head pt_list;		/* List of pagetable */
+
 	struct list_head mmlist;		/* List of all active mm's.  These are globally strung
 						 * together off init_mm.mmlist, and are protected
 						 * by mmlist_lock

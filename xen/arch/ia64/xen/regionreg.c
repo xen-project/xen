@@ -157,7 +157,6 @@ int deallocate_rid_range(struct domain *d)
 	int rid_block_end = d->arch.ending_rid >> IA64_MIN_IMPL_RID_BITS;
 	int rid_block_start = d->arch.starting_rid >> IA64_MIN_IMPL_RID_BITS;
 
-	return 1;  // KLUDGE ALERT
 	//
 	// not all domains will have allocated RIDs (physical mode loaders for instance)
 	//
