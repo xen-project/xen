@@ -32,6 +32,7 @@ import pty
 import select
 import signal
 import re
+import glob
 
 TEST_PASS = 0
 TEST_FAIL = 255
@@ -184,7 +185,16 @@ def isConsoleDead():
     domain.destroy()
 
     return False
-    
+
+#
+# We currently can only load as many concurrent HVM domains as loop 
+# devices, need to find how many devices the system has.
+def getMaxHVMDomains():
+    nodes = glob.glob("/dev/loop*")
+    maxd = len(nodes)
+
+    return maxd
+
 
 if __name__ == "__main__":
 
