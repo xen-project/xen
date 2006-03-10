@@ -595,6 +595,7 @@ static void inline __update_guest_eip(unsigned long inst_len)
 
     __vmread(GUEST_RIP, &current_eip);
     __vmwrite(GUEST_RIP, current_eip + inst_len);
+    __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
 }
 
 
@@ -2025,6 +2026,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     case EXIT_REASON_PENDING_INTERRUPT:
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
                   MONITOR_CPU_BASED_EXEC_CONTROLS);
+        v->arch.hvm_vcpu.u.vmx.exec_control = MONITOR_CPU_BASED_EXEC_CONTROLS;
         break;
     case EXIT_REASON_TASK_SWITCH:
         __hvm_bug(&regs);

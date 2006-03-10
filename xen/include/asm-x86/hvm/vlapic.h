@@ -209,6 +209,7 @@ static uint32_t inline vlapic_get_base_address(struct vlapic *vlapic)
 
 void vlapic_post_injection(struct vcpu* v, int vector, int deliver_mode);
 
+int cpu_has_apic_interrupt(struct vcpu* v);
 int cpu_get_apic_interrupt(struct vcpu* v, int *mode);
 
 extern uint32_t vlapic_update_ppr(struct vlapic *vlapic);

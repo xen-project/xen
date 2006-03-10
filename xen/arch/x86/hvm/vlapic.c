@@ -943,6 +943,20 @@ int cpu_get_apic_interrupt(struct vcpu *v, int *mode)
     return -1;
 }
 
+int cpu_has_apic_interrupt(struct vcpu* v)
+{
+    struct vlapic *vlapic = VLAPIC(v);
+
+    if (vlapic && vlapic_enabled(vlapic)) {
+        int highest_irr = vlapic_find_highest_irr(vlapic);
+
+        if (highest_irr != -1 && highest_irr >= vlapic->processor_priority) {
+            return 1;
+        }
+    }
+    return 0;
+}
+ 
 void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
 {
     struct vlapic *vlapic = VLAPIC(v);

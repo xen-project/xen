@@ -219,6 +219,7 @@ static void vmx_do_launch(struct vcpu *v)
     error |= __vmwrite(CR0_READ_SHADOW, cr0);
     error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
                        MONITOR_CPU_BASED_EXEC_CONTROLS);
+    v->arch.hvm_vcpu.u.vmx.exec_control = MONITOR_CPU_BASED_EXEC_CONTROLS;
 
     __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (cr4) : );
 
