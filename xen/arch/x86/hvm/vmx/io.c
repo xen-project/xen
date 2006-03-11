@@ -165,7 +165,7 @@ asmlinkage void vmx_intr_assist(void)
     case VLAPIC_DELIV_MODE_EXT:
     case VLAPIC_DELIV_MODE_FIXED:
     case VLAPIC_DELIV_MODE_LPRI:
-        vmx_inject_extint(v, highest_vector, VMX_INVALID_ERROR_CODE);
+        vmx_inject_extint(v, highest_vector, VMX_DELIVER_NO_ERROR_CODE);
         TRACE_3D(TRC_VMX_INT, v->domain->domain_id, highest_vector, 0);
         break;
     case VLAPIC_DELIV_MODE_SMI:
