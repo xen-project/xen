@@ -38,7 +38,7 @@ direction = "disable"
 # NB: when disabling extratime(=0), must pass in a slice
 opts = "%s -e %s" %(domain.getName(), extratime)
 if extratime == "0":
-    opts += " -s %s" %( str( (int(p)/2)+1 ) )
+    opts += " -s %s" %( str( (float(p)/2)+1 ) )
     direction = "enable"
     
 (status, output) = traceCommand("xm sched-sedf %s" %(opts))

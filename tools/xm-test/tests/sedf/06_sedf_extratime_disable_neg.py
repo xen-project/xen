@@ -66,3 +66,6 @@ eyecatcher = "Failed to set sedf parameters"
 # check for failure
 if output.find(eyecatcher) >= 0:
     FAIL("sched-sedf let me disable extratime without a non-zero slice")
+
+# Stop the domain (nice shutdown)
+domain.stop()
