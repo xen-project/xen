@@ -120,8 +120,9 @@ To run the full test suite, do the following as root:
    # ./runtest.sh <logfile>
 
 This will run all tests, as well as generate and submit a report at
-the end.  All output files will begin with "<logfile>."  If you wish to
-prevent submission of a report, add "-d" to the command line like this:
+the end. All output files will begin with "<logfile>."
+If you wish to prevent submission of a report, add "-d" to the 
+command line like this:
 
    # ./runtest.sh -d <logfile>
 
@@ -131,15 +132,19 @@ submit the report at a later time.  To do so, run runtest.sh with the
 
    # ./runtest.sh -s <logfile>
 
-For people needing a quick test run instead the full suite, a quick
-mode has been added that will attempt to run a representative subset
-of tests.  This is not a substitute for the whole suite, but will
-verify that some of the major functions of xen and xm are working:
+Group test sets are supported in xm-test. This is form of layering of 
+tests groups/cases/tests. In the framework directory "grouptest",
+files exist for group processing. The user can add groups, casenames
+and test lists as required. Default group run is "grouptest/default".
 
-   # ./runtest.sh -q <logfile>
+   # ./runtest.sh -g <groupname> <logfile>
 
-Because of the current structure of the reporting software, submission
-of quick test run results is not supported.
+* NOTE: There is a quick set of tests in group mode, that was added to
+run certain casenames and tests. It is not a substitute for the full
+xm-test test suite.
+   # ./runtest.sh -g quick <logfile>
+
+
 
 It may be desirable to run a specific test group.  This can be
 accomplished by doing the following:
