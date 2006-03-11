@@ -39,7 +39,7 @@ created such that only the current user may access it."""
         os.makedirs(parent, stat.S_IRWXU)
 
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sock.bind(self.path)
+    sock.bind(path)
     return sock
 
 
