@@ -32,7 +32,7 @@ if status != 0:
 (name, domid, p, s, l, e, w) = params
 
 # set slice > than current period
-slice  = str(int(p)+1)
+slice  = str(float(p)+1)
 
 opts = "%s -s %s" %(domain.getName(), slice)
 (status, output) = traceCommand("xm sched-sedf %s" %(opts))
@@ -43,3 +43,6 @@ eyecatcher = "Failed to set sedf parameters"
 # check for failure
 if output.find(eyecatcher) >= 0:
     FAIL("sched-sedf let me set a slice bigger than my period.")
+
+# Stop the domain (nice shutdown)
+domain.stop()

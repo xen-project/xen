@@ -34,4 +34,7 @@ eyecatcher = "Failed to set sedf parameters"
 
 # check for failure
 if output.find(eyecatcher) >= 0:
-    FAIL("sched-sedf let me set bogus slice (%s)" %(slice)
+    FAIL("sched-sedf let me set bogus slice (%s)" %(slice))
+
+# Stop the domain (nice shutdown)
+domain.stop()

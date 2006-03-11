@@ -33,8 +33,8 @@ if status != 0:
 
 # NB: setting period requires non-zero slice 
 # scale current period in half
-period = str(int(p) / 2)
-slice  = str(int(p) / 4)
+period = str(float(p) / 2)
+slice  = str(float(p) / 4)
 
 opts = "%s -p %s -s %s" %(domain.getName(), period, slice)
 (status, output) = traceCommand("xm sched-sedf %s" %(opts))
@@ -53,10 +53,10 @@ if s != 0:
 (name,domid,p1,s1,l1,e1,w1) = params
 
 if p1 != period:
-    FAIL("Failed to change domain period from %d to %d" %(p, period))
+    FAIL("Failed to change domain period from %f to %f" %(p, period))
 
 if s1 != slice:
-    FAIL("Failed to change domain slice from %d to %d" %(s, slice))
+    FAIL("Failed to change domain slice from %f to %f" %(s, slice))
 
 # Stop the domain (nice shutdown)
 domain.stop()

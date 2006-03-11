@@ -28,7 +28,7 @@ period = "-1"
 
 # NB: setting period requires non-zero slice 
 # scale current period in half
-slice  = "1"
+slice  = "5"
 
 opts = "%s -p %s -s %s" %(domain.getName(), period, slice)
 (status, output) = traceCommand("xm sched-sedf %s" %(opts))
@@ -39,3 +39,6 @@ eyecatcher = "Failed to set sedf parameters"
 # check for failure
 if output.find(eyecatcher) >= 0:
     FAIL("sched-sedf let me set bogus period (%s)" %(period))
+
+# Stop the domain (nice shutdown)
+domain.stop()

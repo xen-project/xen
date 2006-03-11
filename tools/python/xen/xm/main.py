@@ -84,10 +84,11 @@ sched_bvt_help = """sched-bvt <Parameters>           Set Borrowed Virtual Time s
 sched_bvt_ctxallow_help = """sched-bvt-ctxallow <Allow>       Set the BVT scheduler context switch
                                     allowance"""
 sched_sedf_help = "sched-sedf [DOM] [OPTIONS]       Show|Set simple EDF parameters\n" + \
-"              -p, --period          Relative deadline(ns).\n\
-              -s, --slice           Worst-case execution time(ns) (slice < period).\n\
-              -l, --latency         scaled period(ns) in case the domain is doing\n\
-                                    heavy I/O.\n\
+"              -p, --period          Relative deadline(ms).\n\
+              -s, --slice           Worst-case execution time(ms)\n\
+                                    (slice < period).\n\
+              -l, --latency         scaled period(ms) in case the domain\n\
+                                    is doing heavy I/O.\n\
               -e, --extra           flag (0/1) which controls whether the\n\
                                     domain can run in extra-time\n\
               -w, --weight          mutually exclusive with period/slice and\n\
@@ -641,26 +642,25 @@ def xm_sched_bvt_ctxallow(args):
     server.xend_node_cpu_bvt_slice_set(slice)
 
 def xm_sched_sedf(args):
+    def ns_to_ms(val):
+        return float(val) * 0.000001
+    
+    def ms_to_ns(val):
+        return (float(val) / 0.000001)
+
     def print_sedf(info):
-        print( ("%(name)-32s %(dom)3d %(period)12d %(slice)12d %(latency)12d" +
-                " %(extratime)10d %(weight)7d") % info)
+        info['period']  = ns_to_ms(info['period'])
+        info['slice']   = ns_to_ms(info['slice'])
+        info['latency'] = ns_to_ms(info['latency'])
+        print( ("%(name)-32s %(dom)3d %(period)9.1f %(slice)9.1f" +
+                " %(latency)7.1f %(extratime)6d %(weight)6d") % info)
 
-    # FIXME: this can probably go away if someone points me to the proper way.
     def domid_match(domid, info):
-        d = ""
-        f = ""
-        try:
-            d = int(domid)
-            f = 'dom'
-        except:
-            d = domid 
-            f = 'name'
+        return domid is None or domid == info['name'] or domid == str(info['dom'])
 
-        return (d == info[f])
-          
     # we want to just display current info if no parameters are passed
     if len(args) == 0:
-        domid = '-1'
+        domid = None
     else:
         # we expect at least a domain id (name or number)
         # and at most a domid up to 5 options with values
@@ -677,13 +677,14 @@ def xm_sched_sedf(args):
         err(opterr)
         sys.exit(1)
     
+    # convert to nanoseconds if needed 
     for (k, v) in options:
         if k in ['-p', '--period']:
-            opts['period'] = v
+            opts['period'] = ms_to_ns(v)
         elif k in ['-s', '--slice']:
-            opts['slice'] = v
+            opts['slice'] = ms_to_ns(v)
         elif k in ['-l', '--latency']:
-            opts['latency'] = v
+            opts['latency'] = ms_to_ns(v)
         elif k in ['-e', '--extratime']:
             opts['extratime'] = v
         elif k in ['-w', '--weight']:
@@ -691,37 +692,35 @@ def xm_sched_sedf(args):
 
     # print header if we aren't setting any parameters
     if len(opts.keys()) == 0:
-        print '%-33s %-8s %-13s %-10s %-8s %-10s %-6s' %('Name','ID','Period',
-                                                         'Slice', 'Latency',
-                                                         'ExtraTime','Weight')
+        print '%-33s %-2s %-4s %-4s %-7s %-5s %-6s'%('Name','ID','Period(ms)',
+                                                     'Slice(ms)', 'Lat(ms)',
+                                                     'Extra','Weight')
 
     from xen.xend.XendClient import server
-    for dom in getDomains(""):
-        d = parse_doms_info(dom)
-        
-        if domid == '-1' or domid_match(domid, d):
+    doms = filter(lambda x : domid_match(domid, x),
+                        [parse_doms_info(dom) for dom in getDomains("")])
+    for d in doms:
+        # fetch current values so as not to clobber them
+        sedf_info = \
+            parse_sedf_info(server.xend_domain_cpu_sedf_get(d['dom']))
+        sedf_info['name'] = d['name']
 
-            # fetch current values so as not to clobber them
-            sedf_info = \
-                parse_sedf_info(server.xend_domain_cpu_sedf_get(d['dom']))
-            sedf_info['name'] = d['name']
+        # update values in case of call to set
+        if len(opts.keys()) > 0:
+            for k in opts.keys():
+                sedf_info[k]=opts[k]
+         
+            # send the update, converting user input
+            v = map(int, [sedf_info['period'], sedf_info['slice'],
+                          sedf_info['latency'],sedf_info['extratime'], 
+                          sedf_info['weight']])
+            rv = server.xend_domain_cpu_sedf_set(d['dom'], *v)
+            if int(rv) != 0:
+                err("Failed to set sedf parameters (rv=%d)."%(rv))
 
-            # update values in case of call to set
-            if len(opts.keys()) > 0:
-                for k in opts.keys():
-                    sedf_info[k]=opts[k]
-            
-                # send the update
-                v = map(int, [sedf_info['period'],  sedf_info['slice'],
-                              sedf_info['latency'], sedf_info['extratime'],
-                              sedf_info['weight']])
-                rv = server.xend_domain_cpu_sedf_set(d['dom'], *v)
-                if int(rv) != 0:
-                    err("Failed to set sedf parameters (rv=%d)."%(rv))
-
-            # not setting values, display info
-            else:
-                print_sedf(sedf_info)
+        # not setting values, display info
+        else:
+            print_sedf(sedf_info)
 
 
 def xm_info(args):
