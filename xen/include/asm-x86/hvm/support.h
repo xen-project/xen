@@ -99,7 +99,7 @@ enum hval_bitmaps {
 
 #define PC_DEBUG_PORT   0x80
 
-#define VMX_INVALID_ERROR_CODE  -1
+#define VMX_DELIVER_NO_ERROR_CODE  -1
 
 /*
  * This works for both 32bit & 64bit eflags filteration

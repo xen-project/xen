@@ -234,6 +234,8 @@ void share_xen_page_with_guest(
     if ( page_get_owner(page) == d )
         return;
 
+    set_gpfn_from_mfn(page_to_mfn(page), INVALID_M2P_ENTRY);
+
     spin_lock(&d->page_alloc_lock);
 
     /* The incremented type count pins as writable or read-only. */
@@ -2817,81 +2819,54 @@ long do_update_descriptor(u64 pa, u64 desc)
 
 long arch_memory_op(int op, GUEST_HANDLE(void) arg)
 {
-    unsigned long pfn;
-    struct domain *d;
-    unsigned int i;
-
     switch ( op )
     {
-    case XENMEM_reserved_phys_area: {
-        struct xen_reserved_phys_area xrpa;
+    case XENMEM_add_to_physmap:
+    {
+        struct xen_add_to_physmap xatp;
+        unsigned long mfn = 0, gpfn;
+        struct domain *d;
 
-        if ( copy_from_guest(&xrpa, arg, 1) )
+        if ( copy_from_guest(&xatp, arg, 1) )
             return -EFAULT;
 
-        /* No guest has more than one reserved area. */
-        if ( xrpa.idx != 0 )
+        if ( (d = find_domain_by_id(xatp.domid)) == NULL )
             return -ESRCH;
 
-        if ( (d = find_domain_by_id(xrpa.domid)) == NULL )
-            return -ESRCH;
-
-        /* Only initialised translated guests have a reserved area. */
-        if ( !shadow_mode_translate(d) || (d->max_pages == 0) )
+        switch ( xatp.space )
         {
-            put_domain(d);
-            return -ESRCH;
+        case XENMAPSPACE_shared_info:
+            if ( xatp.idx == 0 )
+                mfn = virt_to_mfn(d->shared_info);
+            break;
+        case XENMAPSPACE_grant_table:
+            if ( xatp.idx < NR_GRANT_FRAMES )
+                mfn = virt_to_mfn(d->grant_table->shared) + xatp.idx;
+            break;
+        default:
+            break;
         }
-
-        LOCK_BIGLOCK(d);
-        if ( d->arch.first_reserved_pfn == 0 )
+        
+        if ( !shadow_mode_translate(d) || (mfn == 0) )
         {
-            d->arch.first_reserved_pfn = pfn = d->max_pages;
-            for ( i = 0; i < NR_GRANT_FRAMES; i++ )
-                guest_physmap_add_page(
-                    d, pfn + i, gnttab_shared_mfn(d, d->grant_table, i));
-        }
-        UNLOCK_BIGLOCK(d);
-
-        xrpa.first_gpfn = d->arch.first_reserved_pfn;
-        xrpa.nr_gpfns   = NR_GRANT_FRAMES;
-
-        put_domain(d);
-
-        if ( copy_to_guest(arg, &xrpa, 1) )
-            return -EFAULT;
-
-        break;
-    }
-
-    case XENMEM_map_shared_info: {
-        struct xen_map_shared_info xmsi;
-
-        if ( copy_from_guest(&xmsi, arg, 1) )
-            return -EFAULT;
-
-        if ( (d = find_domain_by_id(xmsi.domid)) == NULL )
-            return -ESRCH;
-
-        /* Only initialised translated guests can set the shared_info
-         * mapping. */
-        if ( !shadow_mode_translate(d) || (d->max_pages == 0) )
-        {
-            put_domain(d);
-            return -ESRCH;
-        }
-
-        if ( xmsi.pfn > d->max_pages ) {
             put_domain(d);
             return -EINVAL;
         }
 
         LOCK_BIGLOCK(d);
+
         /* Remove previously mapped page if it was present. */
-        if ( mfn_valid(gmfn_to_mfn(d, xmsi.pfn)) )
-            guest_remove_page(d, xmsi.pfn);
-        guest_physmap_add_page(d, xmsi.pfn,
-                               virt_to_maddr(d->shared_info) >> PAGE_SHIFT);
+        if ( mfn_valid(gmfn_to_mfn(d, xatp.gpfn)) )
+            guest_remove_page(d, xatp.gpfn);
+
+        /* Unmap from old location, if any. */
+        gpfn = get_gpfn_from_mfn(mfn);
+        if ( gpfn != INVALID_M2P_ENTRY )
+            guest_physmap_remove_page(d, gpfn, mfn);
+
+        /* Map at new location. */
+        guest_physmap_add_page(d, xatp.gpfn, mfn);
+
         UNLOCK_BIGLOCK(d);
 
         put_domain(d);

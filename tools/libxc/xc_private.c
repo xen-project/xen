@@ -231,8 +231,8 @@ int xc_memory_op(int xc_handle,
             goto out1;
         }
         break;
-    case XENMEM_reserved_phys_area:
-        if ( mlock(arg, sizeof(struct xen_reserved_phys_area)) )
+    case XENMEM_add_to_physmap:
+        if ( mlock(arg, sizeof(struct xen_add_to_physmap)) )
         {
             PERROR("Could not mlock");
             goto out1;
@@ -277,8 +277,8 @@ int xc_memory_op(int xc_handle,
         safe_munlock(xmml->extent_start,
                      xmml->max_extents * sizeof(unsigned long));
         break;
-    case XENMEM_reserved_phys_area:
-        safe_munlock(arg, sizeof(struct xen_reserved_phys_area));
+    case XENMEM_add_to_physmap:
+        safe_munlock(arg, sizeof(struct xen_add_to_physmap));
         break;
     case XENMEM_translate_gpfn_list:
             safe_munlock(trans->mfn_list, trans->nr_gpfns * sizeof(long));

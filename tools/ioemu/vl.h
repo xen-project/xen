@@ -697,7 +697,7 @@ void lance_init(NetDriverState *nd, int irq, uint32_t leaddr, uint32_t ledaddr);
 void tcx_init(DisplayState *ds, uint32_t addr);
 
 /* sched.c */
-void sched_init();
+void sched_init(uint32_t, uint32_t);
 
 /* magic-load.c */
 void magic_init(const char *kfn, int kloadaddr, uint32_t addr);
@@ -799,7 +799,7 @@ void readline_start(const char *prompt, int is_password,
 
 int gdbserver_start(int port);
 void update_select_wakeup_events(void);
-void tun_receive_handler();
+void tun_receive_handler(fd_set *);
 
 extern char domain_name[];
 #endif /* VL_H */

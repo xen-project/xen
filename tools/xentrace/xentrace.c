@@ -258,7 +258,7 @@ struct t_rec **init_rec_ptrs(struct t_buf **meta, unsigned int num)
 /**
  * get_num_cpus - get the number of logical CPUs
  */
-unsigned int get_num_cpus()
+unsigned int get_num_cpus(void)
 {
     dom0_op_t op;
     int xc_handle = xc_interface_open();

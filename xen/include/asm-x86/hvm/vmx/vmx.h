@@ -119,7 +119,15 @@ extern unsigned int cpu_rev;
 #define EXIT_REASON_RDPMC               15
 #define EXIT_REASON_RDTSC               16
 #define EXIT_REASON_VMCALL              18
-
+#define EXIT_REASON_VMCLEAR             19
+#define EXIT_REASON_VMLAUNCH            20
+#define EXIT_REASON_VMPTRLD             21
+#define EXIT_REASON_VMPTRST             22
+#define EXIT_REASON_VMREAD              23
+#define EXIT_REASON_VMRESUME            24
+#define EXIT_REASON_VMWRITE             25
+#define EXIT_REASON_VMOFF               26
+#define EXIT_REASON_VMON                27
 #define EXIT_REASON_CR_ACCESS           28
 #define EXIT_REASON_DR_ACCESS           29
 #define EXIT_REASON_IO_INSTRUCTION      30
@@ -425,7 +433,7 @@ static inline int __vmx_inject_exception(struct vcpu *v, int trap, int type,
 
     /* Reflect it back into the guest */
     intr_fields = (INTR_INFO_VALID_MASK | type | trap);
-    if (error_code != VMX_INVALID_ERROR_CODE) {
+    if (error_code != VMX_DELIVER_NO_ERROR_CODE) {
         __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
         intr_fields |= INTR_INFO_DELIEVER_CODE_MASK;
      }
@@ -455,7 +463,7 @@ static inline int vmx_reflect_exception(struct vcpu *v)
     if (vector & INTR_INFO_DELIEVER_CODE_MASK)
         __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
     else
-        error_code = VMX_INVALID_ERROR_CODE;
+        error_code = VMX_DELIVER_NO_ERROR_CODE;
     vector &= 0xff;
 
 #ifndef NDEBUG

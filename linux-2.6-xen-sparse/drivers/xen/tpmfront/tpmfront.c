@@ -310,7 +310,8 @@ again:
 		goto abort_transaction;
 	}
 
-	err = xenbus_switch_state(dev, xbt, XenbusStateInitialised);
+	err = xenbus_printf(xbt, dev->nodename,
+	                    "state", "%d", XenbusStateInitialised);
 	if (err) {
 		goto abort_transaction;
 	}

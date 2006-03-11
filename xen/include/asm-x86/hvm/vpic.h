@@ -55,7 +55,7 @@ struct hvm_virpic {
     /* 0 is master pic, 1 is slave pic */
     /* XXX: better separation between the two pics */
     PicState pics[2];
-    void (*irq_request)(int *opaque, int level);
+    void (*irq_request)(void *opaque, int level);
     void *irq_request_opaque;
     /* IOAPIC callback support */
     void (*alt_irq_func)(void *opaque, int irq_num, int level);
@@ -66,10 +66,10 @@ struct hvm_virpic {
 void pic_set_irq(struct hvm_virpic *s, int irq, int level);
 void pic_set_irq_new(void *opaque, int irq, int level);
 void pic_init(struct hvm_virpic *s, 
-              void (*irq_request)(),
+              void (*irq_request)(void *, int),
               void *irq_request_opaque);
 void pic_set_alt_irq_func(struct hvm_virpic *s, 
-                          void(*alt_irq_func)(),
+                          void (*alt_irq_func)(void *, int, int),
                           void *alt_irq_opaque);
 int pic_read_irq(struct hvm_virpic *s);
 void pic_update_irq(struct hvm_virpic *s);

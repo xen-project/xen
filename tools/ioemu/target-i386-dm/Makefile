@@ -235,7 +235,7 @@ endif
 all: $(PROGS)
 
 $(QEMU_USER): $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^  $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^  $(LIBS)
 ifeq ($(ARCH),alpha)
 # Mark as 32 bit binary, i. e. it will be mapped into the low 31 bit of
 # the address space (31 bit so sign extending doesn't matter)
@@ -311,7 +311,7 @@ endif
 endif
 
 $(QEMU_SYSTEM): $(VL_OBJS) libqemu.a
-	$(CC) $(VL_LDFLAGS) -o $@ $^ $(LIBS) $(SDL_LIBS) $(VNC_LIBS) $(VL_LIBS) -lpthread
+	$(CC) $(CFLAGS) $(VL_LDFLAGS) -o $@ $^ $(LIBS) $(SDL_LIBS) $(VNC_LIBS) $(VL_LIBS) -lpthread
 
 vnc.o: vnc.c keyboard_rdesktop.c
 	$(CC) $(CFLAGS) $(DEFINES) $(VNC_CFLAGS) -c -o $@ $<

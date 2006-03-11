@@ -479,12 +479,13 @@ void vmx_init_ap_context(struct vcpu_guest_context *ctxt,
 
 void do_nmi(struct cpu_user_regs *);
 
-static int check_vmx_controls(ctrls, msr)
+static int check_vmx_controls(u32 ctrls, u32 msr)
 {
     u32 vmx_msr_low, vmx_msr_high;
 
     rdmsr(msr, vmx_msr_low, vmx_msr_high);
-    if (ctrls < vmx_msr_low || ctrls > vmx_msr_high) {
+    if ( (ctrls < vmx_msr_low) || (ctrls > vmx_msr_high) )
+    {
         printk("Insufficient VMX capability 0x%x, "
                "msr=0x%x,low=0x%8x,high=0x%x\n",
                ctrls, msr, vmx_msr_low, vmx_msr_high);
@@ -1916,7 +1917,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     /* don't bother H/W interrutps */
     if (exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT &&
         exit_reason != EXIT_REASON_VMCALL &&
-        exit_reason != EXIT_REASON_IO_INSTRUCTION)
+        exit_reason != EXIT_REASON_IO_INSTRUCTION) 
         HVM_DBG_LOG(DBG_LEVEL_0, "exit reason = %x", exit_reason);
 
     if (exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) {
@@ -2051,6 +2052,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __update_guest_eip(inst_len);
         break;
     }
+#if 0 /* keep this for debugging */
     case EXIT_REASON_VMCALL:
         __get_instruction_length(inst_len);
         __vmread(GUEST_RIP, &eip);
@@ -2059,6 +2061,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         hvm_print_line(v, regs.eax); /* provides the current domain */
         __update_guest_eip(inst_len);
         break;
+#endif
     case EXIT_REASON_CR_ACCESS:
     {
         __vmread(GUEST_RIP, &eip);
@@ -2099,6 +2102,21 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     case EXIT_REASON_MWAIT_INSTRUCTION:
         __hvm_bug(&regs);
         break;
+    case EXIT_REASON_VMCALL:
+    case EXIT_REASON_VMCLEAR:
+    case EXIT_REASON_VMLAUNCH:
+    case EXIT_REASON_VMPTRLD:
+    case EXIT_REASON_VMPTRST:
+    case EXIT_REASON_VMREAD:
+    case EXIT_REASON_VMRESUME:
+    case EXIT_REASON_VMWRITE:
+    case EXIT_REASON_VMOFF:
+    case EXIT_REASON_VMON:
+        /* Report invalid opcode exception when a VMX guest tries to execute 
+            any of the VMX instructions */
+        vmx_inject_exception(v, TRAP_invalid_op, VMX_DELIVER_NO_ERROR_CODE);
+        break;
+
     default:
         __hvm_bug(&regs);       /* should not happen */
     }

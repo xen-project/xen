@@ -407,6 +407,7 @@ static int eject_device(BlockDriverState *bs, int force)
 
 static void do_eject(int force, const char *filename)
 {
+    char cmd[1024];
     BlockDriverState *bs;
 
     bs = bdrv_find(filename);
@@ -415,6 +416,9 @@ static void do_eject(int force, const char *filename)
         return;
     }
     eject_device(bs, force);
+    sprintf(cmd, "eject %s", filename);
+    system(cmd);
+
 }
 
 static void do_change(const char *device, const char *filename)

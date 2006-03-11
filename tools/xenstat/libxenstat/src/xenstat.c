@@ -129,7 +129,7 @@ static xenstat_collector collectors[] = {
 /*
  * libxenstat API
  */
-xenstat_handle *xenstat_init()
+xenstat_handle *xenstat_init(void)
 {
 	xenstat_handle *handle;
 
