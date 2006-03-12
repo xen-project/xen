@@ -67,6 +67,7 @@ irqreturn_t pciback_handle_event(int irq, void *dev_id, struct pt_regs *regs)
 
 	wmb();
 	clear_bit(_XEN_PCIF_active, (unsigned long *)&pdev->sh_info->flags);
+	notify_remote_via_irq(pdev->evtchn_irq);
 
       out:
 	return IRQ_HANDLED;
