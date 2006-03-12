@@ -81,18 +81,14 @@ struct page_info
  /* The 11 most significant bits of virt address if this is a page table. */
 #define PGT_va_shift        16
 #define PGT_va_mask         (((1U<<11)-1)<<PGT_va_shift)
- /* Is the back pointer still mutable (i.e. not fixed yet)? */
-#define PGT_va_mutable      (((1U<<11)-1)<<PGT_va_shift)
  /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
-#define PGT_va_unknown      (((1U<<11)-2)<<PGT_va_shift)
+#define PGT_va_unknown      (((1U<<11)-1)<<PGT_va_shift)
 #elif defined(__x86_64__)
  /* The 27 most significant bits of virt address if this is a page table. */
 #define PGT_va_shift        32
 #define PGT_va_mask         ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
- /* Is the back pointer still mutable (i.e. not fixed yet)? */
-#define PGT_va_mutable      ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
  /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
-#define PGT_va_unknown      ((unsigned long)((1U<<28)-2)<<PGT_va_shift)
+#define PGT_va_unknown      ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
 #endif
 
  /* 16-bit count of uses of this frame as its current type. */
