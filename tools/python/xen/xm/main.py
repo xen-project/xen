@@ -159,8 +159,7 @@ domain_commands = [
 host_commands = [
     "dmesg",
     "info",
-    "log",
-    "top",
+    "log"
     ]
 
 scheduler_commands = [
