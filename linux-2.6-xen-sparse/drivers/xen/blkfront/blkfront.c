@@ -352,11 +352,7 @@ static void blkfront_closing(struct xenbus_device *dev)
 
 	DPRINTK("blkfront_closing: %s removed\n", dev->nodename);
 
-	if (info->mi) {
-		DPRINTK("Calling xlvbd_del\n");
-		xlvbd_del(info);
-		info->mi = NULL;
-	}
+	xlvbd_del(info);
 
 	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
 }
