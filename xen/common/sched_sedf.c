@@ -585,7 +585,7 @@ static void update_queues(
                 curinf->deadl_abs += 
                     DIV_UP(now - curinf->deadl_abs,
                            curinf->period) * curinf->period;
-            ASSERT(curinf->deadl_abs > now);
+            ASSERT(curinf->deadl_abs >= now);
             /*give a fresh slice*/
             curinf->cputime = 0;
             if (PERIOD_BEGIN(curinf) > now)
