@@ -157,6 +157,15 @@ static int __init __independent_wallclock(char *str)
 }
 __setup("independent_wallclock", __independent_wallclock);
 
+/* Permitted clock jitter, in usecs, beyond which a warning will be printed. */
+static unsigned long permitted_clock_jitter = 10000UL;
+static int __init __permitted_clock_jitter(char *str)
+{
+	permitted_clock_jitter = simple_strtoul(str, NULL, 0);
+	return 1;
+}
+__setup("permitted_clock_jitter=", __permitted_clock_jitter);
+
 int tsc_disable __devinitdata = 0;
 
 static void delay_tsc(unsigned long loops)
@@ -632,7 +641,8 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		} while (sched_time != runstate->state_entry_time);
 	} while (!time_values_up_to_date(cpu));
 
-	if ((unlikely(delta < -1000000LL) || unlikely(delta_cpu < 0))
+	if ((unlikely(delta < -(s64)permitted_clock_jitter) ||
+	     unlikely(delta_cpu < -(s64)permitted_clock_jitter))
 	    && printk_ratelimit()) {
 		printk("Timer ISR/%d: Time went backwards: "
 		       "delta=%lld cpu_delta=%lld shadow=%lld "
@@ -1037,13 +1047,31 @@ void local_teardown_timer(unsigned int cpu)
  * now however.
  */
 static ctl_table xen_subtable[] = {
-	{1, "independent_wallclock", &independent_wallclock,
-	 sizeof(independent_wallclock), 0644, NULL, proc_dointvec},
-	{0}
+	{
+		.ctl_name	= 1,
+		.procname	= "independent_wallclock",
+		.data		= &independent_wallclock,
+		.maxlen		= sizeof(independent_wallclock),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+	{
+		.ctl_name	= 2,
+		.procname	= "permitted_clock_jitter",
+		.data		= &permitted_clock_jitter,
+		.maxlen		= sizeof(permitted_clock_jitter),
+		.mode		= 0644,
+		.proc_handler	= proc_doulongvec_minmax
+	},
+	{ 0 }
 };
 static ctl_table xen_table[] = {
-	{123, "xen", NULL, 0, 0555, xen_subtable},
-	{0}
+	{
+		.ctl_name	= 123,
+		.procname	= "xen",
+		.mode		= 0555,
+		.child		= xen_subtable},
+	{ 0 }
 };
 static int __init xen_sysctl_init(void)
 {
