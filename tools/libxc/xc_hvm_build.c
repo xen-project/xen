@@ -132,7 +132,7 @@ set_hvm_info_checksum(struct hvm_info_table *t)
 }
 
 /*
- * Use E820 reserved memory 0x9F800 to pass HVM info to vmxloader
+ * Use E820 reserved memory 0x9F800 to pass HVM info to hvmloader
  * hvmloader will use this info to set BIOS accordingly
  */
 static int set_hvm_info(int xc_handle, uint32_t dom,
