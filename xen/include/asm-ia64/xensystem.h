@@ -75,5 +75,7 @@ extern struct task_struct *vmx_ia64_switch_to (void *next_task);
 // FIXME SMP... see system.h, does this need to be different?
 #define switch_to(prev,next,last)	__switch_to(prev, next, last)
 
+#define local_irq_is_enabled() (!irqs_disabled())
+
 #endif // __ASSEMBLY__
 #endif // _ASM_IA64_XENSYSTEM_H
