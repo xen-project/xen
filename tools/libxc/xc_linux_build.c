@@ -472,7 +472,6 @@ static int setup_guest(int xc_handle,
     unsigned long start_page, pgnr;
     start_info_t *start_info;
     int rc;
-    unsigned long i;
 
     rc = probeimageformat(image, image_size, &load_funcs);
     if ( rc != 0 )
