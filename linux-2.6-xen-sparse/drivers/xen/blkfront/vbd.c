@@ -216,6 +216,10 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
 	int nr_minors = 1;
 	int err = -ENODEV;
 
+	BUG_ON(info->gd != NULL);
+	BUG_ON(info->mi != NULL);
+	BUG_ON(info->rq != NULL);
+
 	mi = xlbd_get_major_info(vdevice);
 	if (mi == NULL)
 		goto out;
@@ -268,6 +272,7 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
  out:
 	if (mi)
 		xlbd_put_major_info(mi);
+	info->mi = NULL;
 	return err;
 }
 
@@ -294,22 +299,20 @@ xlvbd_add(blkif_sector_t capacity, int vdevice, u16 vdisk_info,
 void
 xlvbd_del(struct blkfront_info *info)
 {
-	struct block_device *bd;
-
-	bd = bdget(info->dev);
-	if (bd == NULL)
+	if (info->mi == NULL)
 		return;
 
-	if (info->gd == NULL)
-		return;
-
+	BUG_ON(info->gd == NULL);
 	del_gendisk(info->gd);
 	put_disk(info->gd);
+	info->gd = NULL;
+
 	xlbd_put_major_info(info->mi);
 	info->mi = NULL;
-	blk_cleanup_queue(info->rq);
 
-	bdput(bd);
+	BUG_ON(info->rq == NULL);
+	blk_cleanup_queue(info->rq);
+	info->rq = NULL;
 }
 
 /*

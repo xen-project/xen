@@ -48,7 +48,7 @@ $(LIB): $(OBJECTS)
 	$(RANLIB) $@
 
 $(SHLIB): $(OBJECTS)
-	$(CC) $(LDFLAGS) $(SONAME_FLAGS) -shared -o $@ $(OBJECTS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(SONAME_FLAGS) -shared -o $@ $(OBJECTS)
 
 src/xenstat.o: src/xenstat.c src/xenstat.h src/xen-interface.h
 	$(CC) $(CFLAGS) $(WARN_FLAGS) -c -o $@ $<

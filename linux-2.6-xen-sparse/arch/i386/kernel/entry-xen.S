@@ -79,6 +79,10 @@ VM_MASK		= 0x00020000
 /* Pseudo-eflags. */
 NMI_MASK	= 0x80000000
 
+#ifndef CONFIG_XEN
+#define DISABLE_INTERRUPTS	cli
+#define ENABLE_INTERRUPTS	sti
+#else
 /* Offsets into shared_info_t. */
 #define evtchn_upcall_pending		/* 0 */
 #define evtchn_upcall_mask		1
@@ -86,33 +90,24 @@ NMI_MASK	= 0x80000000
 #define sizeof_vcpu_shift		6
 
 #ifdef CONFIG_SMP
-#define preempt_disable(reg)	incl TI_preempt_count(reg)
-#define preempt_enable(reg)	decl TI_preempt_count(reg)
-#define XEN_GET_VCPU_INFO(reg)	preempt_disable(%ebp)			; \
-				movl TI_cpu(%ebp),reg			; \
-				shl  $sizeof_vcpu_shift,reg		; \
-				addl HYPERVISOR_shared_info,reg
-#define XEN_PUT_VCPU_INFO(reg) preempt_enable(%ebp)
-#define XEN_PUT_VCPU_INFO_fixup .byte 0xff,0xff,0xff
+#define GET_VCPU_INFO		movl TI_cpu(%ebp),%esi			; \
+				shl  $sizeof_vcpu_shift,%esi		; \
+				addl HYPERVISOR_shared_info,%esi
 #else
-#define XEN_GET_VCPU_INFO(reg) movl HYPERVISOR_shared_info,reg
-#define XEN_PUT_VCPU_INFO(reg)
-#define XEN_PUT_VCPU_INFO_fixup
+#define GET_VCPU_INFO		movl HYPERVISOR_shared_info,%esi
 #endif
 
-#define XEN_LOCKED_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
-#define XEN_LOCKED_UNBLOCK_EVENTS(reg)	movb $0,evtchn_upcall_mask(reg)
-#define XEN_BLOCK_EVENTS(reg)	XEN_GET_VCPU_INFO(reg)			; \
-				XEN_LOCKED_BLOCK_EVENTS(reg)		; \
-    				XEN_PUT_VCPU_INFO(reg)
-#define XEN_UNBLOCK_EVENTS(reg)	XEN_GET_VCPU_INFO(reg)			; \
-				XEN_LOCKED_UNBLOCK_EVENTS(reg)		; \
-    				XEN_PUT_VCPU_INFO(reg)
-#define XEN_TEST_PENDING(reg)	testb $0xFF,evtchn_upcall_pending(reg)
+#define __DISABLE_INTERRUPTS	movb $1,evtchn_upcall_mask(%esi)
+#define __ENABLE_INTERRUPTS	movb $0,evtchn_upcall_mask(%esi)
+#define DISABLE_INTERRUPTS	GET_VCPU_INFO				; \
+				__DISABLE_INTERRUPTS
+#define ENABLE_INTERRUPTS	GET_VCPU_INFO				; \
+				__ENABLE_INTERRUPTS
+#define __TEST_PENDING		testb $0xFF,evtchn_upcall_pending(%esi)
+#endif
 
 #ifdef CONFIG_PREEMPT
-#define preempt_stop		GET_THREAD_INFO(%ebp)			; \
-				XEN_BLOCK_EVENTS(%esi)
+#define preempt_stop		cli
 #else
 #define preempt_stop
 #define resume_kernel		restore_nocheck
@@ -159,21 +154,6 @@ NMI_MASK	= 0x80000000
 .previous
 
 
-#define RESTORE_ALL	\
-	RESTORE_REGS	\
-	addl $4, %esp;	\
-1:	iret;		\
-.section .fixup,"ax";   \
-2:	pushl $0;	\
-	pushl $do_iret_error;	\
-	jmp error_code;	\
-.previous;		\
-.section __ex_table,"a";\
-	.align 4;	\
-	.long 1b,2b;	\
-.previous
-
-
 ENTRY(ret_from_fork)
 	pushl %eax
 	call schedule_tail
@@ -199,7 +179,7 @@ ret_from_intr:
 	testl $(VM_MASK | 2), %eax
 	jz resume_kernel
 ENTRY(resume_userspace)
-	XEN_BLOCK_EVENTS(%esi)		# make sure we don't miss an interrupt
+	DISABLE_INTERRUPTS		# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
 	movl TI_flags(%ebp), %ecx
@@ -210,15 +190,15 @@ ENTRY(resume_userspace)
 
 #ifdef CONFIG_PREEMPT
 ENTRY(resume_kernel)
-	XEN_BLOCK_EVENTS(%esi)
+	cli
 	cmpl $0,TI_preempt_count(%ebp)	# non-zero preempt_count ?
 	jnz restore_nocheck
 need_resched:
 	movl TI_flags(%ebp), %ecx	# need_resched set ?
 	testb $_TIF_NEED_RESCHED, %cl
 	jz restore_all
-	testb $0xFF,EVENT_MASK(%esp)	# interrupts off (exception path) ?
-	jnz restore_all
+	testl $IF_MASK,EFLAGS(%esp)     # interrupts off (exception path) ?
+	jz restore_all
 	call preempt_schedule_irq
 	jmp need_resched
 #endif
@@ -289,7 +269,7 @@ syscall_call:
 	call *sys_call_table(,%eax,4)
 	movl %eax,EAX(%esp)		# store the return value
 syscall_exit:
-	XEN_BLOCK_EVENTS(%esi)		# make sure we don't miss an interrupt
+	DISABLE_INTERRUPTS		# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
 	movl TI_flags(%ebp), %ecx
@@ -297,7 +277,7 @@ syscall_exit:
 	jne syscall_exit_work
 
 restore_all:
-#if 0 /* XEN */
+#ifndef CONFIG_XEN
 	movl EFLAGS(%esp), %eax		# mix EFLAGS, SS and CS
 	# Warning: OLDSS(%esp) contains the wrong/random values if we
 	# are returning to the kernel.
@@ -307,22 +287,26 @@ restore_all:
 	andl $(VM_MASK | (4 << 8) | 3), %eax
 	cmpl $((4 << 8) | 3), %eax
 	je ldt_ss			# returning to user-space with LDT SS
-#endif /* XEN */
+restore_nocheck:
+#else
 restore_nocheck:
 	testl $(VM_MASK|NMI_MASK), EFLAGS(%esp)
 	jnz hypervisor_iret
 	movb EVENT_MASK(%esp), %al
 	notb %al			# %al == ~saved_mask
-	XEN_GET_VCPU_INFO(%esi)
+	GET_VCPU_INFO
 	andb evtchn_upcall_mask(%esi),%al
 	andb $1,%al			# %al == mask & ~saved_mask
 	jnz restore_all_enable_events	#     != 0 => reenable event delivery
-	XEN_PUT_VCPU_INFO(%esi)
+#endif
 	RESTORE_REGS
 	addl $4, %esp
 1:	iret
 .section .fixup,"ax"
 iret_exc:
+#ifndef CONFIG_XEN
+	sti
+#endif
 	pushl $0			# no error code
 	pushl $do_iret_error
 	jmp error_code
@@ -332,13 +316,7 @@ iret_exc:
 	.long 1b,iret_exc
 .previous
 
-hypervisor_iret:
-	andl $~NMI_MASK, EFLAGS(%esp)
-	RESTORE_REGS
-	addl $4, %esp
-	jmp  hypercall_page + (__HYPERVISOR_iret * 32)
-
-#if 0 /* XEN */
+#ifndef CONFIG_XEN
 ldt_ss:
 	larl OLDSS(%esp), %eax
 	jnz restore_nocheck
@@ -363,7 +341,13 @@ ldt_ss:
 	.align 4
 	.long 1b,iret_exc
 .previous
-#endif /* XEN */
+#else
+hypervisor_iret:
+	andl $~NMI_MASK, EFLAGS(%esp)
+	RESTORE_REGS
+	addl $4, %esp
+	jmp  hypercall_page + (__HYPERVISOR_iret * 32)
+#endif
 
 	# perform work that needs to be done immediately before resumption
 	ALIGN
@@ -372,7 +356,7 @@ work_pending:
 	jz work_notifysig
 work_resched:
 	call schedule
-	XEN_BLOCK_EVENTS(%esi)		# make sure we don't miss an interrupt
+	DISABLE_INTERRUPTS		# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
 	movl TI_flags(%ebp), %ecx
@@ -424,7 +408,7 @@ syscall_trace_entry:
 syscall_exit_work:
 	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SINGLESTEP), %cl
 	jz work_pending
-	XEN_UNBLOCK_EVENTS(%esi)	# could let do_syscall_trace() call
+	ENABLE_INTERRUPTS		# could let do_syscall_trace() call
 					# schedule() instead
 	movl %esp, %eax
 	movl $1, %edx
@@ -444,7 +428,7 @@ syscall_badsys:
 	movl $-ENOSYS,EAX(%esp)
 	jmp resume_userspace
 
-#if 0 /* XEN */
+#ifndef CONFIG_XEN
 #define FIXUP_ESPFIX_STACK \
 	movl %esp, %eax; \
 	/* switch to 32bit stack using the pointer on top of 16bit stack */ \
@@ -503,7 +487,9 @@ ENTRY(name)				\
 
 /* The include is where all of the SMP etc. interrupts come from */
 #include "entry_arch.h"
-#endif /* XEN */
+#else
+#define UNWIND_ESPFIX_STACK
+#endif
 
 ENTRY(divide_error)
 	pushl $0			# no error code
@@ -522,7 +508,7 @@ error_code:
 	pushl %ebx
 	cld
 	pushl %es
-#	UNWIND_ESPFIX_STACK
+	UNWIND_ESPFIX_STACK
 	popl %ecx
 	movl ES(%esp), %edi		# get the function address
 	movl ORIG_EAX(%esp), %edx	# get the error code
@@ -535,6 +521,7 @@ error_code:
 	call *%edi
 	jmp ret_from_exception
 
+#ifdef CONFIG_XEN
 # A note on the "critical region" in our callback handler.
 # We want to avoid stacking callback handlers due to events occurring
 # during handling of the last event. To do this, we keep events disabled
@@ -560,15 +547,24 @@ ENTRY(hypervisor_callback)
 	jmp  ret_from_intr
 
         ALIGN
-restore_all_enable_events:  
-	XEN_LOCKED_UNBLOCK_EVENTS(%esi)
+restore_all_enable_events:
+	__ENABLE_INTERRUPTS
 scrit:	/**** START OF CRITICAL REGION ****/
-	XEN_TEST_PENDING(%esi)
+	__TEST_PENDING
 	jnz  14f			# process more events if necessary...
-	XEN_PUT_VCPU_INFO(%esi)
-	RESTORE_ALL
-14:	XEN_LOCKED_BLOCK_EVENTS(%esi)
-	XEN_PUT_VCPU_INFO(%esi)
+	RESTORE_REGS
+	addl $4, %esp
+1:	iret
+.section .fixup,"ax"
+2:	pushl $0
+	pushl $do_iret_error
+	jmp error_code
+.previous
+.section __ex_table,"a"
+	.align 4
+	.long 1b,2b
+.previous
+14:	__DISABLE_INTERRUPTS
 	jmp  11b
 ecrit:  /**** END OF CRITICAL REGION ****/
 # [How we do the fixup]. We want to merge the current stack frame with the
@@ -577,14 +573,13 @@ ecrit:  /**** END OF CRITICAL REGION ****/
 # registers are in each frame. We do this quickly using the lookup table
 # 'critical_fixup_table'. For each byte offset in the critical region, it
 # provides the number of bytes which have already been popped from the
-# interrupted stack frame. 
+# interrupted stack frame.
 critical_region_fixup:
 	addl $critical_fixup_table-scrit,%eax
 	movzbl (%eax),%eax		# %eax contains num bytes popped
 	cmpb $0xff,%al                  # 0xff => vcpu_info critical region
 	jne  15f
 	GET_THREAD_INFO(%ebp)
-	XEN_PUT_VCPU_INFO(%esi)         # abort vcpu_info critical region
         xorl %eax,%eax
 15:	mov  %esp,%esi
 	add  %eax,%esi			# %esi points at end of src region
@@ -602,9 +597,8 @@ critical_region_fixup:
 	jmp  11b
 
 critical_fixup_table:
-	.byte 0xff,0xff,0xff		# testb $0xff,(%esi) = XEN_TEST_PENDING
+	.byte 0xff,0xff,0xff		# testb $0xff,(%esi) = __TEST_PENDING
 	.byte 0xff,0xff			# jnz  14f
-	XEN_PUT_VCPU_INFO_fixup
 	.byte 0x00			# pop  %ebx
 	.byte 0x04			# pop  %ecx
 	.byte 0x08			# pop  %edx
@@ -617,7 +611,6 @@ critical_fixup_table:
 	.byte 0x24,0x24,0x24		# add  $4,%esp
 	.byte 0x28			# iret
 	.byte 0xff,0xff,0xff,0xff	# movb $1,1(%esi)
-	XEN_PUT_VCPU_INFO_fixup
 	.byte 0x00,0x00			# jmp  11b
 
 # Hypervisor uses this for application faults while it executes.
@@ -646,6 +639,7 @@ ENTRY(failsafe_callback)
 	.long 3b,8b;	\
 	.long 4b,9b;	\
 .previous
+#endif
 
 ENTRY(coprocessor_error)
 	pushl $0
@@ -660,7 +654,17 @@ ENTRY(simd_coprocessor_error)
 ENTRY(device_not_available)
 	pushl $-1			# mark this as an int
 	SAVE_ALL
-	#preempt_stop /* This is already an interrupt gate on Xen. */
+#ifndef CONFIG_XEN
+	movl %cr0, %eax
+	testl $0x4, %eax		# EM (math emulation bit)
+	je device_available_emulate
+	pushl $0			# temporary storage for ORIG_EIP
+	call math_emulate
+	addl $4, %esp
+	jmp ret_from_exception
+device_available_emulate:
+#endif
+	preempt_stop
 	call math_state_restore
 	jmp ret_from_exception
 
@@ -703,16 +707,7 @@ debug_stack_correct:
 	jmp ret_from_exception
 	.previous .text
 
-ENTRY(nmi)
-	pushl %eax
-	SAVE_ALL
-	xorl %edx,%edx		# zero error code
-	movl %esp,%eax		# pt_regs pointer
-	call do_nmi
-	orl  $NMI_MASK, EFLAGS(%esp)
-	jmp restore_all
-
-#if 0 /* XEN */
+#ifndef CONFIG_XEN
 /*
  * NMI is doubly nasty. It can happen _while_ we're handling
  * a debug fault, and the debug fault hasn't yet been able to
@@ -783,7 +778,16 @@ nmi_16bit_stack:
 	.align 4
 	.long 1b,iret_exc
 .previous
-#endif /* XEN */
+#else
+ENTRY(nmi)
+	pushl %eax
+	SAVE_ALL
+	xorl %edx,%edx		# zero error code
+	movl %esp,%eax		# pt_regs pointer
+	call do_nmi
+	orl  $NMI_MASK, EFLAGS(%esp)
+	jmp restore_all
+#endif
 
 KPROBE_ENTRY(int3)
 	pushl $-1			# mark this as an int

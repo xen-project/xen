@@ -42,9 +42,6 @@ CPPFLAGS += -D USE_GC
 CPPFLAGS += -D __ARCH_I386_ATOMIC__
 
 #----------------------------------------------------------------------------
-CFLAGS += -g
-CFLAGS += -O2
-CFLAGS += -Wall
 CFLAGS += $(INCLUDES) $(LIBS)
 
 LDFLAGS += $(LIBS)

@@ -10,8 +10,6 @@
 #define PDRSHIFT        22
 #define PSL_T  0x00000100 /* trace enable bit */
 
-extern const char const * ptrace_names[];
-
 struct gdb_regs {
     long ebx; /* 0 */
     long ecx; /* 4 */

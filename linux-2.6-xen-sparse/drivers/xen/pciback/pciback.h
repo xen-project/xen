@@ -43,7 +43,6 @@ struct pci_dev *pcistub_get_pci_dev(struct pci_dev *dev);
 void pcistub_put_pci_dev(struct pci_dev *dev);
 
 /* Ensure a device is turned off or reset */
-void pciback_disable_device(struct pci_dev *dev);
 void pciback_reset_device(struct pci_dev *pdev);
 
 /* Access a virtual configuration space for a PCI device */
@@ -68,6 +67,8 @@ void pciback_release_devices(struct pciback_device *pdev);
 
 /* Handles events from front-end */
 irqreturn_t pciback_handle_event(int irq, void *dev_id, struct pt_regs *regs);
+
+int pciback_xenbus_register(void);
 
 extern int verbose_request;
 #endif

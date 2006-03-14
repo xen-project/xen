@@ -8,8 +8,14 @@ from XmTestLib import *
 import time
 import random
 
-MIN_DOMS    = 10
-MAX_DOMS    = 50
+if ENABLE_HVM_SUPPORT:
+    MAX_DOMS = getMaxHVMDomains()
+    if MAX_DOMS > 50:
+        MAX_DOMS = 50
+else:
+    MAX_DOMS = 50
+
+MIN_DOMS    = 5
 MEM_PER_DOM = 24
 
 domains = []

@@ -23,6 +23,7 @@
 #include <xen/event.h>
 #include <xen/irq.h>
 #include <xen/iocap.h>
+#include <xen/guest_access.h>
 #include <asm/current.h>
 
 #include <public/xen.h>
@@ -437,6 +438,47 @@ long evtchn_send(unsigned int lport)
     return ret;
 }
 
+void evtchn_set_pending(struct vcpu *v, int port)
+{
+    struct domain *d = v->domain;
+    shared_info_t *s = d->shared_info;
+
+    /*
+     * The following bit operations must happen in strict order.
+     * NB. On x86, the atomic bit operations also act as memory barriers.
+     * There is therefore sufficiently strict ordering for this architecture --
+     * others may require explicit memory barriers.
+     */
+
+    if ( test_and_set_bit(port, &s->evtchn_pending[0]) )
+        return;
+
+    if ( !test_bit        (port, &s->evtchn_mask[0])    &&
+         !test_and_set_bit(port / BITS_PER_LONG,
+                           &v->vcpu_info->evtchn_pending_sel) &&
+         !test_and_set_bit(0, &v->vcpu_info->evtchn_upcall_pending) )
+    {
+        evtchn_notify(v);
+    }
+    else if ( unlikely(test_bit(_VCPUF_blocked, &v->vcpu_flags) &&
+                       v->vcpu_info->evtchn_upcall_mask) )
+    {
+        /*
+         * Blocked and masked will usually mean that the VCPU executed 
+         * SCHEDOP_poll. Kick the VCPU in case this port is in its poll list.
+         */
+        vcpu_unblock(v);
+    }
+}
+
+void send_guest_virq(struct vcpu *v, int virq)
+{
+    int port = v->virq_to_evtchn[virq];
+
+    if ( likely(port != 0) )
+        evtchn_set_pending(v, port);
+}
+
 void send_guest_pirq(struct domain *d, int pirq)
 {
     int port = d->pirq_to_evtchn[pirq];
@@ -578,12 +620,12 @@ static long evtchn_unmask(evtchn_unmask_t *unmask)
     return 0;
 }
 
-long do_event_channel_op(struct evtchn_op *uop)
+long do_event_channel_op(GUEST_HANDLE(evtchn_op_t) uop)
 {
     long rc;
     struct evtchn_op op;
 
-    if ( copy_from_user(&op, uop, sizeof(op)) != 0 )
+    if ( copy_from_guest(&op, uop, 1) != 0 )
         return -EFAULT;
 
     if (acm_pre_event_channel(&op))
@@ -593,31 +635,31 @@ long do_event_channel_op(struct evtchn_op *uop)
     {
     case EVTCHNOP_alloc_unbound:
         rc = evtchn_alloc_unbound(&op.u.alloc_unbound);
-        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
 
     case EVTCHNOP_bind_interdomain:
         rc = evtchn_bind_interdomain(&op.u.bind_interdomain);
-        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
 
     case EVTCHNOP_bind_virq:
         rc = evtchn_bind_virq(&op.u.bind_virq);
-        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
 
     case EVTCHNOP_bind_ipi:
         rc = evtchn_bind_ipi(&op.u.bind_ipi);
-        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
 
     case EVTCHNOP_bind_pirq:
         rc = evtchn_bind_pirq(&op.u.bind_pirq);
-        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
 
@@ -631,7 +673,7 @@ long do_event_channel_op(struct evtchn_op *uop)
 
     case EVTCHNOP_status:
         rc = evtchn_status(&op.u.status);
-        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
             rc = -EFAULT;
         break;
 

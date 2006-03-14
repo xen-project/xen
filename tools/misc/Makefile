@@ -5,7 +5,7 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CFLAGS   += -Wall -Werror -O3 
+CFLAGS   += -Werror
 
 INCLUDES += -I $(XEN_XC)
 INCLUDES += -I $(XEN_LIBXC)

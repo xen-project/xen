@@ -10,6 +10,7 @@
 
 #include "xen.h"
 #include "sched_ctl.h"
+#include "acm.h"
 
 /*
  * Make sure you increment the interface version whenever you modify this file!
@@ -71,7 +72,7 @@ struct acm_getdecision {
     int acm_decision;           /* out */
 };
 
-struct acm_op {
+typedef struct acm_op {
     uint32_t cmd;
     uint32_t interface_version;      /* ACM_INTERFACE_VERSION */
     union {
@@ -81,7 +82,8 @@ struct acm_op {
         struct acm_getssid getssid;
         struct acm_getdecision getdecision;
     } u;
-};
+} acm_op_t;
+DEFINE_GUEST_HANDLE(acm_op_t);
 
 #endif                          /* __XEN_PUBLIC_ACM_OPS_H__ */
 

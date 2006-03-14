@@ -98,8 +98,17 @@ struct page_info
  /* 16-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1U<<16)-1)
 
+#ifdef __x86_64__
+#define PGT_high_mfn_shift  52
+#define PGT_high_mfn_mask   (0x7ffUL << PGT_high_mfn_shift)
+#define PGT_mfn_mask        (((1U<<23)-1) | PGT_high_mfn_mask)
+#define PGT_high_mfn_nx     (0x800UL << PGT_high_mfn_shift)
+#else
  /* 23-bit mfn mask for shadow types: good for up to 32GB RAM. */
 #define PGT_mfn_mask        ((1U<<23)-1)
+ /* NX for PAE xen is not supported yet */
+#define PGT_high_mfn_nx     (1ULL << 63)
+#endif
 
 #define PGT_score_shift     23
 #define PGT_score_mask      (((1U<<4)-1)<<PGT_score_shift)
@@ -138,21 +147,12 @@ static inline u32 pickle_domptr(struct domain *domain)
 #define page_get_owner(_p)    (unpickle_domptr((_p)->u.inuse._domain))
 #define page_set_owner(_p,_d) ((_p)->u.inuse._domain = pickle_domptr(_d))
 
-#define SHARE_PFN_WITH_DOMAIN(_pfn, _dom)                                   \
-    do {                                                                    \
-        page_set_owner((_pfn), (_dom));                                     \
-        /* The incremented type count is intended to pin to 'writable'. */  \
-        (_pfn)->u.inuse.type_info = PGT_writable_page | PGT_validated | 1;  \
-        wmb(); /* install valid domain ptr before updating refcnt. */       \
-        spin_lock(&(_dom)->page_alloc_lock);                                \
-        /* _dom holds an allocation reference */                            \
-        ASSERT((_pfn)->count_info == 0);                                    \
-        (_pfn)->count_info |= PGC_allocated | 1;                            \
-        if ( unlikely((_dom)->xenheap_pages++ == 0) )                       \
-            get_knownalive_domain(_dom);                                    \
-        list_add_tail(&(_pfn)->list, &(_dom)->xenpage_list);                \
-        spin_unlock(&(_dom)->page_alloc_lock);                              \
-    } while ( 0 )
+#define XENSHARE_writable 0
+#define XENSHARE_readonly 1
+extern void share_xen_page_with_guest(
+    struct page_info *page, struct domain *d, int readonly);
+extern void share_xen_page_with_privileged_guests(
+    struct page_info *page, int readonly);
 
 extern struct page_info *frame_table;
 extern unsigned long max_page;

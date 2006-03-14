@@ -139,9 +139,27 @@ int xc_domain_create(int xc_handle,
                      uint32_t *pdomid);
 
 
+/* Functions to produce a dump of a given domain
+ *  xc_domain_dumpcore - produces a dump to a specified file
+ *  xc_domain_dumpcore_via_callback - produces a dump, using a specified
+ *                                    callback function
+ */
 int xc_domain_dumpcore(int xc_handle, 
                        uint32_t domid,
                        const char *corename);
+
+/* Define the callback function type for xc_domain_dumpcore_via_callback.
+ *
+ * This function is called by the coredump code for every "write",
+ * and passes an opaque object for the use of the function and
+ * created by the caller of xc_domain_dumpcore_via_callback.
+ */
+typedef int (dumpcore_rtn_t)(void *arg, char *buffer, unsigned int length);
+
+int xc_domain_dumpcore_via_callback(int xc_handle, 
+                                    uint32_t domid,
+                                    void *arg,
+                                    dumpcore_rtn_t dump_rtn);
 
 /*
  * This function sets the maximum number of vcpus that a domain may create.
@@ -372,13 +390,13 @@ int xc_domain_memory_increase_reservation(int xc_handle,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
                                           unsigned int address_bits,
-					  unsigned long *extent_start);
+                                          unsigned long *extent_start);
 
 int xc_domain_memory_decrease_reservation(int xc_handle,
                                           uint32_t domid, 
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
-					  unsigned long *extent_start);
+                                          unsigned long *extent_start);
 
 int xc_domain_memory_populate_physmap(int xc_handle,
                                       uint32_t domid,
@@ -411,7 +429,7 @@ int xc_domain_iomem_permission(int xc_handle,
                                uint8_t allow_access);
 
 unsigned long xc_make_page_below_4G(int xc_handle, uint32_t domid, 
-				    unsigned long mfn);
+                                    unsigned long mfn);
 
 typedef dom0_perfc_desc_t xc_perfc_desc_t;
 /* IMPORTANT: The caller is responsible for mlock()'ing the @desc array. */
@@ -457,7 +475,7 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
  * @parm virt the virtual address to translate
  */
 unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
-					   int vcpu, unsigned long long virt);
+                                           int vcpu, unsigned long long virt);
 
 int xc_get_pfn_list(int xc_handle, uint32_t domid, unsigned long *pfn_buf, 
                     unsigned long max_pfns);
@@ -467,7 +485,7 @@ int xc_ia64_get_pfn_list(int xc_handle, uint32_t domid,
                          unsigned int start_page, unsigned int nr_pages);
 
 int xc_copy_to_domain_page(int xc_handle, uint32_t domid,
-			   unsigned long dst_pfn, void *src_page);
+                           unsigned long dst_pfn, const char *src_page);
 
 int xc_clear_domain_page(int xc_handle, uint32_t domid,
                          unsigned long dst_pfn);
@@ -478,7 +496,7 @@ int xc_ia64_copy_to_domain_pages(int xc_handle, uint32_t domid,
 long xc_get_max_pages(int xc_handle, uint32_t domid);
 
 int xc_mmuext_op(int xc_handle, struct mmuext_op *op, unsigned int nr_ops,
-		 domid_t dom);
+                 domid_t dom);
 
 int xc_memory_op(int xc_handle, int cmd, void *arg);
 

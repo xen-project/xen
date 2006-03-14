@@ -187,7 +187,7 @@ asmlinkage void svm_intr_assist(void)
             }
             /* let's inject this interrupt */
             TRACE_3D(TRC_VMX_INT, v->domain->domain_id, intr_vector, 0);
-            svm_inject_extint(v, intr_vector, VMX_INVALID_ERROR_CODE);
+            svm_inject_extint(v, intr_vector, VMX_DELIVER_NO_ERROR_CODE);
             interrupt_post_injection(v, intr_vector, intr_type);
             break;
         case VLAPIC_DELIV_MODE_SMI:

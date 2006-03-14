@@ -82,4 +82,6 @@ extern struct list_head page_scrub_list;
 #define sync_pagetable_state(d) ((void)0)
 #endif
 
+int guest_remove_page(struct domain *d, unsigned long gmfn);
+
 #endif /* __XEN_MM_H__ */

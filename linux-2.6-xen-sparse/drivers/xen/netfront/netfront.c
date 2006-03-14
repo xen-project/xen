@@ -91,7 +91,7 @@ struct netfront_info
 
 	struct net_device_stats stats;
 	unsigned int tx_full;
-    
+
 	netif_tx_front_ring_t tx;
 	netif_rx_front_ring_t rx;
 
@@ -129,9 +129,9 @@ struct netfront_info
 	struct sk_buff *rx_skbs[NET_RX_RING_SIZE+1];
 
 	grant_ref_t gref_tx_head;
-	grant_ref_t grant_tx_ref[NET_TX_RING_SIZE + 1]; 
+	grant_ref_t grant_tx_ref[NET_TX_RING_SIZE + 1];
 	grant_ref_t gref_rx_head;
-	grant_ref_t grant_rx_ref[NET_TX_RING_SIZE + 1]; 
+	grant_ref_t grant_rx_ref[NET_TX_RING_SIZE + 1];
 
 	struct xenbus_device *xbdev;
 	int tx_ring_ref;
@@ -433,7 +433,7 @@ static int send_fake_arp(struct net_device *dev)
 
 	skb = arp_create(ARPOP_REPLY, ETH_P_ARP,
 			 dst_ip, dev, src_ip,
-			 /*dst_hw*/ NULL, /*src_hw*/ NULL, 
+			 /*dst_hw*/ NULL, /*src_hw*/ NULL,
 			 /*target_hw*/ dev->dev_addr);
 	if (skb == NULL)
 		return -ENOMEM;
@@ -480,7 +480,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 				printk(KERN_ALERT "network_tx_buf_gc: warning "
 				       "-- grant still in use by backend "
 				       "domain.\n");
-				goto out; 
+				goto out;
 			}
 			gnttab_end_foreign_access_ref(
 				np->grant_tx_ref[id], GNTMAP_readonly);
@@ -490,9 +490,9 @@ static void network_tx_buf_gc(struct net_device *dev)
 			ADD_ID_TO_FREELIST(np->tx_skbs, id);
 			dev_kfree_skb_irq(skb);
 		}
-        
+
 		np->tx.rsp_cons = prod;
-        
+
 		/*
 		 * Set a new event, then check for race with update of tx_cons.
 		 * Note that it is essential to schedule a callback, no matter
@@ -506,7 +506,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 		mb();
 	} while (prod != np->tx.sring->rsp_prod);
 
- out: 
+ out:
 	if (np->tx_full &&
 	    ((np->tx.sring->req_prod - prod) < NET_TX_RING_SIZE)) {
 		np->tx_full = 0;
@@ -582,7 +582,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 		id = GET_ID_FROM_FREELIST(np->rx_skbs);
 
 		np->rx_skbs[id] = skb;
-        
+
 		RING_GET_REQUEST(&np->rx, req_prod + i)->id = id;
 		ref = gnttab_claim_grant_reference(&np->gref_rx_head);
 		BUG_ON((signed short)ref < 0);
@@ -628,11 +628,10 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 		/* Check return status of HYPERVISOR_memory_op(). */
 		if (unlikely(rx_mcl[i].result != i))
 			panic("Unable to reduce memory reservation\n");
-	} else {
+	} else
 		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
 					 &reservation) != i)
 			panic("Unable to reduce memory reservation\n");
-	}
 
 	/* Above is a suitable barrier to ensure backend will see requests. */
 	np->rx.req_prod_pvt = req_prod + i;
@@ -668,7 +667,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		dev_kfree_skb(skb);
 		skb = nskb;
 	}
-    
+
 	spin_lock_irq(&np->tx_lock);
 
 	if (np->backend_state != BEST_CONNECTED) {
@@ -765,7 +764,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	rp = np->rx.sring->rsp_prod;
 	rmb(); /* Ensure we see queued responses up to 'rp'. */
 
-	for (i = np->rx.rsp_cons, work_done = 0; 
+	for (i = np->rx.rsp_cons, work_done = 0;
 	     (i != rp) && (work_done < budget);
 	     i++, work_done++) {
 		rx = RING_GET_RESPONSE(&np->rx, i);
@@ -807,7 +806,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		skb->len  = rx->status;
 		skb->tail = skb->data + skb->len;
 
-		if ( rx->flags & NETRXF_csum_valid )
+		if (rx->flags & NETRXF_csum_valid)
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
 
 		np->stats.rx_packets++;
@@ -862,7 +861,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		 * Enough room in skbuff for the data we were passed? Also,
 		 * Linux expects at least 16 bytes headroom in each rx buffer.
 		 */
-		if (unlikely(skb->tail > skb->end) || 
+		if (unlikely(skb->tail > skb->end) ||
 		    unlikely((skb->data - skb->head) < 16)) {
 			if (net_ratelimit()) {
 				if (skb->tail > skb->end)
@@ -894,7 +893,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 			if ((skb = nskb) == NULL)
 				continue;
 		}
-        
+
 		/* Set the shinfo area, which is hidden behind the data. */
 		init_skb_shinfo(skb);
 		/* Ethernet work: Delayed to here as it peeks the header. */
@@ -995,9 +994,9 @@ static void network_connect(struct net_device *dev)
 
 		tx->id = i;
 		gnttab_grant_foreign_access_ref(
-			np->grant_tx_ref[i], np->xbdev->otherend_id, 
+			np->grant_tx_ref[i], np->xbdev->otherend_id,
 			virt_to_mfn(np->tx_skbs[i]->data),
-			GNTMAP_readonly); 
+			GNTMAP_readonly);
 		tx->gref = np->grant_tx_ref[i];
 		tx->offset = (unsigned long)skb->data & ~PAGE_MASK;
 		tx->size = skb->len;
@@ -1012,7 +1011,7 @@ static void network_connect(struct net_device *dev)
 	RING_PUSH_REQUESTS(&np->tx);
 
 	/* Rebuild the RX buffer freelist and the RX ring itself. */
-	for (requeue_idx = 0, i = 1; i <= NET_RX_RING_SIZE; i++) { 
+	for (requeue_idx = 0, i = 1; i <= NET_RX_RING_SIZE; i++) {
 		if ((unsigned long)np->rx_skbs[i] < __PAGE_OFFSET)
 			continue;
 		gnttab_grant_foreign_transfer_ref(
@@ -1021,7 +1020,7 @@ static void network_connect(struct net_device *dev)
 		RING_GET_REQUEST(&np->rx, requeue_idx)->gref =
 			np->grant_rx_ref[i];
 		RING_GET_REQUEST(&np->rx, requeue_idx)->id = i;
-		requeue_idx++; 
+		requeue_idx++;
 	}
 
 	np->rx.req_prod_pvt = requeue_idx;
@@ -1055,9 +1054,8 @@ static void show_device(struct netfront_info *np)
 			np->evtchn,
 			np->tx,
 			np->rx);
-	} else {
+	} else
 		IPRINTK("<vif NULL>\n");
-	}
 #endif
 }
 
@@ -1150,7 +1148,7 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 	SET_ETHTOOL_OPS(netdev, &network_ethtool_ops);
 	SET_MODULE_OWNER(netdev);
 	SET_NETDEV_DEV(netdev, &dev->dev);
-    
+
 	if ((err = register_netdev(netdev)) != 0) {
 		printk(KERN_WARNING "%s> register_netdev err=%d\n",
 		       __FUNCTION__, err);
@@ -1181,16 +1179,16 @@ static int create_netdev(int handle, struct xenbus_device *dev,
  * We use this notifier to send out a fake ARP reply to reset switches and
  * router ARP caches when an IP interface is brought up on a VIF.
  */
-static int 
+static int
 inetdev_notify(struct notifier_block *this, unsigned long event, void *ptr)
 {
-	struct in_ifaddr  *ifa = (struct in_ifaddr *)ptr; 
+	struct in_ifaddr  *ifa = (struct in_ifaddr *)ptr;
 	struct net_device *dev = ifa->ifa_dev->dev;
 
 	/* UP event and is it one of our devices? */
 	if (event == NETDEV_UP && dev->open == network_open)
 		(void)send_fake_arp(dev);
-        
+
 	return NOTIFY_DONE;
 }
 
@@ -1336,8 +1334,8 @@ static void netif_exit(void)
 module_exit(netif_exit);
 
 MODULE_LICENSE("Dual BSD/GPL");
- 
- 
+
+
 /* ** /proc **/
 
 
@@ -1354,9 +1352,8 @@ static int xennet_proc_read(
 		(struct net_device *)((unsigned long)data & ~3UL);
 	struct netfront_info *np = netdev_priv(dev);
 	int len = 0, which_target = (long)data & 3;
-    
-	switch (which_target)
-	{
+
+	switch (which_target) {
 	case TARGET_MIN:
 		len = sprintf(page, "%d\n", np->rx_min_target);
 		break;
@@ -1403,8 +1400,7 @@ static int xennet_proc_write(
 
 	spin_lock(&np->rx_lock);
 
-	switch (which_target)
-	{
+	switch (which_target) {
 	case TARGET_MIN:
 		if (target > np->rx_max_target)
 			np->rx_max_target = target;

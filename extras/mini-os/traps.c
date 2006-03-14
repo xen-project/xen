@@ -70,6 +70,30 @@ DO_ERROR(12, "stack segment", stack_segment)
 DO_ERROR_INFO(17, "alignment check", alignment_check, BUS_ADRALN, 0)
 DO_ERROR(18, "machine check", machine_check)
 
+void page_walk(unsigned long virt_address)
+{
+        unsigned long *tab = (unsigned long *)start_info.pt_base;
+        unsigned long addr = virt_address, page;
+        printk("Pagetable walk from virt %lx, base %lx:\n", virt_address, start_info.pt_base);
+    
+#if defined(__x86_64__)
+        page = tab[l4_table_offset(addr)];
+        tab = to_virt(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
+        printk(" L4 = %p (%p)  [offset = %lx]\n", page, tab, l4_table_offset(addr));
+
+        page = tab[l3_table_offset(addr)];
+        tab = to_virt(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
+        printk("  L3 = %p (%p)  [offset = %lx]\n", page, tab, l3_table_offset(addr));
+#endif
+        page = tab[l2_table_offset(addr)];
+        tab =  to_virt(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
+        printk("   L2 = %p (%p)  [offset = %lx]\n", page, tab, l2_table_offset(addr));
+        
+        page = tab[l1_table_offset(addr)];
+        printk("    L1 = %p (%p)  [offset = %lx]\n", page, tab, l1_table_offset(addr));
+
+}
+
 void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 								                     unsigned long addr)
 {

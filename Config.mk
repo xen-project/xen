@@ -1,5 +1,8 @@
 # -*- mode: Makefile; -*-
 
+# A debug build of Xen and tools?
+debug ?= n
+
 # Currently supported architectures: x86_32, x86_64
 XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
 XEN_TARGET_ARCH     ?= $(XEN_COMPILE_ARCH)
@@ -27,6 +30,22 @@ INSTALL_DIR  = $(INSTALL) -d -m0755
 INSTALL_DATA = $(INSTALL) -m0644
 INSTALL_PROG = $(INSTALL) -m0755
 
+ifneq ($(debug),y)
+# Optimisation flags are overridable
+CFLAGS    ?= -O2 -fomit-frame-pointer
+CFLAGS    += -DNDEBUG
+else
+CFLAGS    += -g
+endif
+
+ifeq ($(XEN_TARGET_ARCH),x86_32)
+CFLAGS  += -m32 -march=i686
+endif
+
+ifeq ($(XEN_TARGET_ARCH),x86_64)
+CFLAGS  += -m64
+endif
+
 ifeq ($(XEN_TARGET_ARCH),x86_64)
 LIBDIR = lib64
 else
@@ -39,6 +58,8 @@ EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBDIR)
 endif
 
 test-gcc-flag = $(shell $(1) -v --help 2>&1 | grep -q " $(2) " && echo $(2))
+
+CFLAGS += -Wall -Wstrict-prototypes
 
 HOSTCFLAGS += $(call test-gcc-flag,$(HOSTCC),-Wdeclaration-after-statement)
 CFLAGS     += $(call test-gcc-flag,$(CC),-Wdeclaration-after-statement)

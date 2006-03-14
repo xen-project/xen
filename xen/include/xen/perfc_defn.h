@@ -26,7 +26,7 @@ PERFCOUNTER_ARRAY(snapshot_copies,      "entries copied per snapshot",
 PERFCOUNTER_ARRAY(hypercalls,           "hypercalls", NR_hypercalls)
 PERFCOUNTER_ARRAY(exceptions,           "exceptions", 32)
 
-#define VMX_PERF_EXIT_REASON_SIZE 37
+#define VMX_PERF_EXIT_REASON_SIZE 44
 #define VMX_PERF_VECTOR_SIZE 0x20
 PERFCOUNTER_ARRAY(vmexits,              "vmexits", VMX_PERF_EXIT_REASON_SIZE)
 PERFCOUNTER_ARRAY(cause_vector,         "cause vector", VMX_PERF_VECTOR_SIZE)

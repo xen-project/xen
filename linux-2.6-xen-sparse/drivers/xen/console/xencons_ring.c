@@ -55,7 +55,7 @@ int xencons_ring_send(const char *data, unsigned len)
 	notify_daemon();
 
 	return sent;
-}	
+}
 
 static irqreturn_t handle_input(int irq, void *unused, struct pt_regs *regs)
 {

@@ -25,18 +25,34 @@
 #ifndef _MM_H_
 #define _MM_H_
 
-#ifdef __i386__
+#if defined(__i386__)
 #include <xen/arch-x86_32.h>
-#endif
-
-#ifdef __x86_64__
+#elif defined(__x86_64__)
 #include <xen/arch-x86_64.h>
+#else
+#error "Unsupported architecture"
 #endif
 
+#include <lib.h>
 
-#ifdef __x86_64__
+#define L1_FRAME                1
+#define L2_FRAME                2
+#define L3_FRAME                3
 
 #define L1_PAGETABLE_SHIFT      12
+
+#if defined(__i386__)
+
+#define L2_PAGETABLE_SHIFT      22
+
+#define L1_PAGETABLE_ENTRIES    1024
+#define L2_PAGETABLE_ENTRIES    1024
+
+#define PADDR_BITS              32
+#define PADDR_MASK              (~0UL)
+
+#elif defined(__x86_64__)
+
 #define L2_PAGETABLE_SHIFT      21
 #define L3_PAGETABLE_SHIFT      30
 #define L4_PAGETABLE_SHIFT      39
@@ -52,29 +68,29 @@
 #define PADDR_MASK              ((1UL << PADDR_BITS)-1)
 #define VADDR_MASK              ((1UL << VADDR_BITS)-1)
 
-#define pte_to_mfn(_pte) (((_pte) & (PADDR_MASK&PAGE_MASK)) >> L1_PAGETABLE_SHIFT)
+/* Get physical address of page mapped by pte (paddr_t). */
+#define l1e_get_paddr(x)           \
+    ((unsigned long)(((x) & (PADDR_MASK&PAGE_MASK))))
+#define l2e_get_paddr(x)           \
+    ((unsigned long)(((x) & (PADDR_MASK&PAGE_MASK))))
+#define l3e_get_paddr(x)           \
+    ((unsigned long)(((x) & (PADDR_MASK&PAGE_MASK))))
+#define l4e_get_paddr(x)           \
+    ((unsigned long)(((x) & (PADDR_MASK&PAGE_MASK))))
+
+#define L2_MASK  ((1UL << L3_PAGETABLE_SHIFT) - 1)
+#define L3_MASK  ((1UL << L4_PAGETABLE_SHIFT) - 1)
 
 #endif
 
-
-
-#ifdef __i386__
-
-#define L1_PAGETABLE_SHIFT      12
-#define L2_PAGETABLE_SHIFT      22
-
-#define L1_PAGETABLE_ENTRIES    1024
-#define L2_PAGETABLE_ENTRIES    1024
-
-#elif defined(__x86_64__)
-#endif
+#define L1_MASK  ((1UL << L2_PAGETABLE_SHIFT) - 1)
 
 /* Given a virtual address, get an entry offset into a page table. */
 #define l1_table_offset(_a) \
   (((_a) >> L1_PAGETABLE_SHIFT) & (L1_PAGETABLE_ENTRIES - 1))
 #define l2_table_offset(_a) \
   (((_a) >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES - 1))
-#ifdef __x86_64__
+#if defined(__x86_64__)
 #define l3_table_offset(_a) \
   (((_a) >> L3_PAGETABLE_SHIFT) & (L3_PAGETABLE_ENTRIES - 1))
 #define l4_table_offset(_a) \
@@ -92,8 +108,15 @@
 #define _PAGE_PSE      0x080UL
 #define _PAGE_GLOBAL   0x100UL
 
-#define L1_PROT (_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED)
-#define L2_PROT (_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_USER)
+#if defined(__i386__)
+#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
+#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY |_PAGE_USER)
+#elif defined(__x86_64__)
+#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
+#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#define L3_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#endif
 
 #define PAGE_SIZE       (1UL << L1_PAGETABLE_SHIFT)
 #define PAGE_SHIFT      L1_PAGETABLE_SHIFT
@@ -124,9 +147,9 @@ static __inline__ unsigned long machine_to_phys(unsigned long machine)
     return phys;
 }
 
-#ifdef __x86_64__
+#if defined(__x86_64__)
 #define VIRT_START              0xFFFFFFFF00000000UL
-#else
+#elif defined(__i386__)
 #define VIRT_START              0xC0000000UL
 #endif
 
@@ -136,6 +159,11 @@ static __inline__ unsigned long machine_to_phys(unsigned long machine)
 #define virt_to_pfn(_virt)         (PFN_DOWN(to_phys(_virt)))
 #define mach_to_virt(_mach)        (to_virt(machine_to_phys(_mach)))
 #define mfn_to_virt(_mfn)          (mach_to_virt(_mfn << PAGE_SHIFT))
+#define pfn_to_virt(_pfn)          (to_virt(_pfn << PAGE_SHIFT))
+
+/* Pagetable walking. */
+#define pte_to_mfn(_pte)           (((_pte) & (PADDR_MASK&PAGE_MASK)) >> L1_PAGETABLE_SHIFT)
+#define pte_to_virt(_pte)          to_virt(mfn_to_pfn(pte_to_mfn(_pte)) << PAGE_SHIFT)
 
 void init_mm(void);
 unsigned long alloc_pages(int order);

@@ -176,9 +176,8 @@ void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg)
 	if (err) {
 		msg->type = XS_ERROR;
 		ret = ERR_PTR(err);
-	} else {
+	} else
 		ret = read_reply(&msg->type, &msg->len);
-	}
 
 	up(&xs_state.request_mutex);
 
@@ -275,7 +274,7 @@ static unsigned int count_strings(const char *strings, unsigned int len)
 	return num;
 }
 
-/* Return the path to dir with /name appended. Buffer must be kfree()'ed. */ 
+/* Return the path to dir with /name appended. Buffer must be kfree()'ed. */
 static char *join(const char *dir, const char *name)
 {
 	char *buffer;

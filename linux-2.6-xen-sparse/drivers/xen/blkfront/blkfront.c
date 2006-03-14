@@ -95,20 +95,16 @@ static int blkfront_probe(struct xenbus_device *dev,
 		xenbus_dev_fatal(dev, -ENOMEM, "allocating info structure");
 		return -ENOMEM;
 	}
+
+	memset(info, 0, sizeof(*info));
 	info->xbdev = dev;
 	info->vdevice = vdevice;
 	info->connected = BLKIF_STATE_DISCONNECTED;
-	info->mi = NULL;
-	info->gd = NULL;
 	INIT_WORK(&info->work, blkif_restart_queue, (void *)info);
 
-	info->shadow_free = 0;
-	memset(info->shadow, 0, sizeof(info->shadow));
 	for (i = 0; i < BLK_RING_SIZE; i++)
 		info->shadow[i].req.id = i+1;
 	info->shadow[BLK_RING_SIZE-1].req.id = 0x0fffffff;
-
-	info->users = 0;
 
 	/* Front end dir is a number, which is used as the id. */
 	info->handle = simple_strtoul(strrchr(dev->nodename,'/')+1, NULL, 0);
@@ -182,9 +178,8 @@ again:
 	}
 
 	err = xenbus_switch_state(dev, xbt, XenbusStateInitialised);
-	if (err) {
+	if (err)
 		goto abort_transaction;
-	}
 
 	err = xenbus_transaction_end(xbt, 0);
 	if (err) {
@@ -295,17 +290,17 @@ static void backend_changed(struct xenbus_device *dev,
 /* ** Connection ** */
 
 
-/* 
-** Invoked when the backend is finally 'ready' (and has told produced 
-** the details about the physical device - #sectors, size, etc). 
-*/
+/*
+ * Invoked when the backend is finally 'ready' (and has told produced
+ * the details about the physical device - #sectors, size, etc).
+ */
 static void connect(struct blkfront_info *info)
 {
 	unsigned long sectors, sector_size;
 	unsigned int binfo;
 	int err;
 
-        if( (info->connected == BLKIF_STATE_CONNECTED) || 
+	if ((info->connected == BLKIF_STATE_CONNECTED) ||
 	    (info->connected == BLKIF_STATE_SUSPENDED) )
 		return;
 
@@ -330,7 +325,7 @@ static void connect(struct blkfront_info *info)
 		return;
 	}
 
-	(void)xenbus_switch_state(info->xbdev, XBT_NULL, XenbusStateConnected); 
+	(void)xenbus_switch_state(info->xbdev, XBT_NULL, XenbusStateConnected);
 
 	/* Kick pending requests. */
 	spin_lock_irq(&blkif_io_lock);
@@ -353,11 +348,7 @@ static void blkfront_closing(struct xenbus_device *dev)
 
 	DPRINTK("blkfront_closing: %s removed\n", dev->nodename);
 
-	if (info->mi) {
-		DPRINTK("Calling xlvbd_del\n");
-		xlvbd_del(info);
-		info->mi = NULL;
-	}
+	xlvbd_del(info);
 
 	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
 }
@@ -463,8 +454,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
 	DPRINTK_IOCTL("command: 0x%x, argument: 0x%lx, dev: 0x%04x\n",
 		      command, (long)argument, inode->i_rdev);
 
-	switch ( command )
-	{
+	switch (command) {
 	case HDIO_GETGEO:
 		/* return ENOSYS to use defaults */
 		return -ENOSYS;
@@ -490,7 +480,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
  * blkif_queue_request
  *
  * request block io
- * 
+ *
  * id: for guest use only.
  * operation: BLKIF_OP_{READ,WRITE,PROBE}
  * buffer: buffer to read/write into. this should be a
@@ -557,7 +547,7 @@ static int blkif_queue_request(struct request *req)
 			ring_req->seg[ring_req->nr_segments] =
 				(struct blkif_request_segment) {
 					.gref       = ref,
-					.first_sect = fsect, 
+					.first_sect = fsect,
 					.last_sect  = lsect };
 
 			ring_req->nr_segments++;
@@ -679,9 +669,8 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 		RING_FINAL_CHECK_FOR_RESPONSES(&info->ring, more_to_do);
 		if (more_to_do)
 			goto again;
-	} else {
+	} else
 		info->ring.sring->rsp_event = i + 1;
-	}
 
 	kick_pending_request_queues(info);
 
@@ -694,8 +683,8 @@ static void blkif_free(struct blkfront_info *info, int suspend)
 {
 	/* Prevent new requests being issued until we fix things up. */
 	spin_lock_irq(&blkif_io_lock);
-	info->connected = suspend ? 
-		BLKIF_STATE_SUSPENDED : BLKIF_STATE_DISCONNECTED; 
+	info->connected = suspend ?
+		BLKIF_STATE_SUSPENDED : BLKIF_STATE_DISCONNECTED;
 	spin_unlock_irq(&blkif_io_lock);
 
 	/* Free resources associated with old device channel. */
@@ -706,7 +695,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
 		info->ring.sring = NULL;
 	}
 	if (info->irq)
-		unbind_from_irqhandler(info->irq, info); 
+		unbind_from_irqhandler(info->irq, info);
 	info->evtchn = info->irq = 0;
 
 }
@@ -767,11 +756,11 @@ static void blkif_recover(struct blkfront_info *info)
 
 	kfree(copy);
 
-	(void)xenbus_switch_state(info->xbdev, XBT_NULL, XenbusStateConnected); 
-	
+	(void)xenbus_switch_state(info->xbdev, XBT_NULL, XenbusStateConnected);
+
 	/* Now safe for us to use the shared ring */
 	spin_lock_irq(&blkif_io_lock);
-        info->connected = BLKIF_STATE_CONNECTED;
+	info->connected = BLKIF_STATE_CONNECTED;
 	spin_unlock_irq(&blkif_io_lock);
 
 	/* Send off requeued requests */

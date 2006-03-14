@@ -430,10 +430,7 @@ static struct xenbus_driver xenbus_pciback_driver = {
 	.otherend_changed 	= pciback_frontend_changed,
 };
 
-static __init int pciback_xenbus_register(void)
+int __init pciback_xenbus_register(void)
 {
 	return xenbus_register_backend(&xenbus_pciback_driver);
 }
-
-/* Must only initialize our xenbus driver after the pcistub driver */
-device_initcall(pciback_xenbus_register);

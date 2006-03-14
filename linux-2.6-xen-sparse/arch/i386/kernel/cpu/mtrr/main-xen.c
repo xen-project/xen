@@ -8,6 +8,8 @@
 #include <asm/mtrr.h>
 #include "mtrr.h"
 
+static DECLARE_MUTEX(mtrr_sem);
+
 void generic_get_mtrr(unsigned int reg, unsigned long *base,
 		      unsigned int *size, mtrr_type * type)
 {
@@ -63,18 +65,23 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 	int error;
 	dom0_op_t op;
 
+	down(&mtrr_sem);
+
 	op.cmd = DOM0_ADD_MEMTYPE;
 	op.u.add_memtype.mfn     = base;
 	op.u.add_memtype.nr_mfns = size;
 	op.u.add_memtype.type    = type;
 	error = HYPERVISOR_dom0_op(&op);
 	if (error) {
+		up(&mtrr_sem);
 		BUG_ON(error > 0);
 		return error;
 	}
 
 	if (increment)
 		++usage_table[op.u.add_memtype.reg];
+
+	up(&mtrr_sem);
 
 	return op.u.add_memtype.reg;
 }
@@ -104,17 +111,18 @@ mtrr_add(unsigned long base, unsigned long size, unsigned int type,
 
 int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 {
-	int i, max;
+	unsigned i;
 	mtrr_type ltype;
 	unsigned long lbase;
 	unsigned int lsize;
 	int error = -EINVAL;
 	dom0_op_t op;
 
-	max = num_var_ranges;
+	down(&mtrr_sem);
+
 	if (reg < 0) {
 		/*  Search for existing MTRR  */
-		for (i = 0; i < max; ++i) {
+		for (i = 0; i < num_var_ranges; ++i) {
 			mtrr_if->get(i, &lbase, &lsize, &ltype);
 			if (lbase == base && lsize == size) {
 				reg = i;
@@ -143,6 +151,7 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 	}
 	error = reg;
  out:
+	up(&mtrr_sem);
 	return error;
 }
 

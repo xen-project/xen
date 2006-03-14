@@ -202,6 +202,16 @@ shadow_promote(struct domain *d, unsigned long gpfn, unsigned long gmfn,
  * tlbflush_timestamp holds a min & max index of valid page table entries
  * within the shadow page.
  */
+static inline void
+shadow_page_info_init(struct page_info *page,
+                      unsigned long gmfn,
+                      u32 psh_type)
+{
+    ASSERT( (gmfn & ~PGT_mfn_mask) == 0 );
+    page->u.inuse.type_info = psh_type | gmfn;
+    page->count_info = 0;
+    page->tlbflush_timestamp = 0;
+}
 
 static inline unsigned long
 alloc_shadow_page(struct domain *d,
@@ -249,6 +259,11 @@ alloc_shadow_page(struct domain *d,
                 l1 = map_domain_page(page_to_mfn(page + 1));
                 memset(l1, 0, PAGE_SIZE);
                 unmap_domain_page(l1);
+
+                /* we'd like to initialize the second continuous page here
+                 * and leave the first page initialization later */
+
+                shadow_page_info_init(page+1, gmfn, psh_type);
 #else
                 page = alloc_domheap_page(NULL);
                 if (!page)
@@ -294,10 +309,7 @@ alloc_shadow_page(struct domain *d,
 
     smfn = page_to_mfn(page);
 
-    ASSERT( (gmfn & ~PGT_mfn_mask) == 0 );
-    page->u.inuse.type_info = psh_type | gmfn;
-    page->count_info = 0;
-    page->tlbflush_timestamp = 0;
+    shadow_page_info_init(page, gmfn, psh_type);
 
     switch ( psh_type )
     {
@@ -3401,7 +3413,9 @@ static inline int l2e_rw_fault(
     l1_pgentry_t sl1e;
     l1_pgentry_t old_sl1e;
     l2_pgentry_t sl2e;
+#ifdef __x86_64__
     u64 nx = 0;
+#endif
     int put_ref_check = 0;
     /* Check if gpfn is 2M aligned */
 
@@ -3416,7 +3430,9 @@ static inline int l2e_rw_fault(
     l2e_remove_flags(tmp_l2e, _PAGE_PSE);
     if (l2e_get_flags(gl2e) & _PAGE_NX) {
         l2e_remove_flags(tmp_l2e, _PAGE_NX);
-        nx = 1ULL << 63;
+#ifdef __x86_64__
+        nx = PGT_high_mfn_nx;
+#endif
     }
 
 
@@ -3424,7 +3440,11 @@ static inline int l2e_rw_fault(
     if ( !__shadow_get_l2e(v, va, &sl2e) )
         sl2e = l2e_empty();
 
+#ifdef __x86_64__
     l1_mfn = __shadow_status(d, start_gpfn | nx, PGT_fl1_shadow);
+#else
+    l1_mfn = __shadow_status(d, start_gpfn, PGT_fl1_shadow);
+#endif
 
     /* Check the corresponding l2e */
     if (l1_mfn) {
@@ -3442,7 +3462,11 @@ static inline int l2e_rw_fault(
     } else {
         /* Allocate a new page as shadow page table if need */
         gmfn = gmfn_to_mfn(d, start_gpfn);
+#ifdef __x86_64__
         l1_mfn = alloc_shadow_page(d, start_gpfn | nx, gmfn, PGT_fl1_shadow);
+#else
+        l1_mfn = alloc_shadow_page(d, start_gpfn, gmfn, PGT_fl1_shadow);
+#endif
         if (unlikely(!l1_mfn)) {
             BUG();
         }
@@ -3582,6 +3606,11 @@ static inline int guest_page_fault(
     base_idx = get_cr3_idxval(v);
 
     ASSERT( d->arch.ops->guest_paging_levels >= PAGING_L3 );
+
+#if CONFIG_PAGING_LEVELS >= 4
+    if ( (error_code & (ERROR_I | ERROR_P)) == (ERROR_I | ERROR_P) )
+        return 1;
+#endif
 
 #if CONFIG_PAGING_LEVELS == 4
     if ( d->arch.ops->guest_paging_levels == PAGING_L4 ) 

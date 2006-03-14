@@ -658,7 +658,7 @@ int xc_hvm_build(int xc_handle,
         goto error_out;
     }
 
-    if ( (image = xc_read_kernel_image(image_name, &image_size)) == NULL ){
+    if ( (image = xc_read_image(image_name, &image_size)) == NULL ){
         PERROR("Could not read guest firmware image %s",image_name);
         goto error_out;
     }

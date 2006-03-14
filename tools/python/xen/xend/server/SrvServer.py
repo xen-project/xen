@@ -13,6 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2006 XenSource Ltd.
 #============================================================================
 
 """Example xend HTTP
@@ -106,11 +107,11 @@ def create():
     root.putChild('xend', SrvRoot())
     servers = XendServers()
     if xroot.get_xend_http_server():
-        port = xroot.get_xend_port()
-        interface = xroot.get_xend_address()
-        servers.add(HttpServer(root=root, interface=interface, port=port))
+        servers.add(HttpServer(root,
+                               xroot.get_xend_address(),
+                               xroot.get_xend_port()))
     if xroot.get_xend_unix_server():
         path = xroot.get_xend_unix_path()
         log.info('unix path=' + path)
-        servers.add(UnixHttpServer(path=path, root=root))
+        servers.add(UnixHttpServer(root, path))
     return servers

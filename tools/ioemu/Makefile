@@ -3,7 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 -include config-host.mak
 
-CFLAGS+=-Wall -O2 -g -fno-strict-aliasing 
+CFLAGS+=-g -fno-strict-aliasing 
 ifdef CONFIG_DARWIN
 CFLAGS+= -mdynamic-no-pic
 endif

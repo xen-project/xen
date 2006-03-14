@@ -22,7 +22,6 @@
 #include <xen/delay.h>
 #include <xen/guest_access.h>
 #include <asm/current.h>
-#include <asm/uaccess.h>
 #include <asm/debugger.h>
 #include <asm/io.h>
 
@@ -320,7 +319,7 @@ static void serial_rx(char c, struct cpu_user_regs *regs)
     __serial_rx(c, regs);
 }
 
-long guest_console_write(char *buffer, int count)
+static long guest_console_write(GUEST_HANDLE(char) buffer, int count)
 {
     char kbuf[128], *kptr;
     int kcount;
@@ -336,11 +335,11 @@ long guest_console_write(char *buffer, int count)
 
         if ( hypercall_preempt_check() )
             return hypercall_create_continuation(
-                __HYPERVISOR_console_io, "iip",
+                __HYPERVISOR_console_io, "iih",
                 CONSOLEIO_write, count, buffer);
 
         kcount = min_t(int, count, sizeof(kbuf)-1);
-        if ( copy_from_user(kbuf, buffer, kcount) )
+        if ( copy_from_guest((char *)kbuf, buffer, kcount) )
             return -EFAULT;
         kbuf[kcount] = '\0';
 
@@ -349,14 +348,14 @@ long guest_console_write(char *buffer, int count)
         for ( kptr = kbuf; *kptr != '\0'; kptr++ )
             putchar_console(*kptr);
 
-        buffer += kcount;
-        count  -= kcount;
+        guest_handle_add_offset(buffer, kcount);
+        count -= kcount;
     }
 
     return 0;
 }
 
-long do_console_io(int cmd, int count, char *buffer)
+long do_console_io(int cmd, int count, GUEST_HANDLE(char) buffer)
 {
     long rc;
     unsigned int idx, len;
@@ -382,7 +381,7 @@ long do_console_io(int cmd, int count, char *buffer)
                 len = SERIAL_RX_SIZE - idx;
             if ( (rc + len) > count )
                 len = count - rc;
-            if ( copy_to_user(&buffer[rc], &serial_rx_ring[idx], len) )
+            if ( copy_to_guest_offset(buffer, rc, &serial_rx_ring[idx], len) )
             {
                 rc = -EFAULT;
                 break;

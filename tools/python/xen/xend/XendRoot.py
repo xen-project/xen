@@ -102,15 +102,14 @@ class XendRoot:
         """
         print >>sys.stderr, "xend [ERROR]", fmt % args
 
+
     def configure(self):
         self.set_config()
-        logfile = self.get_config_value("logfile", self.logfile_default)
-        loglevel = self.get_config_value("loglevel", self.loglevel_default)
-        XendLogging.init(logfile, level = loglevel)
+        XendLogging.init(self.get_config_value("logfile",
+                                               self.logfile_default),
+                         self.get_config_value("loglevel",
+                                               self.loglevel_default))
 
-        from xen.xend.server import params
-        if params.XEND_DEBUG:
-            XendLogging.addLogStderr()
 
     def set_config(self):
         """If the config file exists, read it. If not, ignore it.

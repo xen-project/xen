@@ -22,11 +22,8 @@ LIBS     := -lpthread -lz
 SRCS     :=
 SRCS     += blktaplib.c xenbus.c blkif.c
 
-CFLAGS   += -Wall
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
-#CFLAGS   += -O3
-CFLAGS   += -g3
 CFLAGS   += -fno-strict-aliasing
 CFLAGS   += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 # get asprintf():

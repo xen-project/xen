@@ -32,7 +32,7 @@
 #define HVM_DEBUG 0
 #endif
 
-#define	HVM_DOMAIN(v)	((v)->arch.guest_context.flags & VGCF_HVM_GUEST)
+#define	hvm_guest(v)	((v)->arch.guest_context.flags & VGCF_HVM_GUEST)
 
 static inline shared_iopage_t *get_sp(struct domain *d)
 {
@@ -99,7 +99,7 @@ enum hval_bitmaps {
 
 #define PC_DEBUG_PORT   0x80
 
-#define VMX_INVALID_ERROR_CODE  -1
+#define VMX_DELIVER_NO_ERROR_CODE  -1
 
 /*
  * This works for both 32bit & 64bit eflags filteration
@@ -122,9 +122,9 @@ enum hval_bitmaps {
 
 extern unsigned int opt_hvm_debug_level;
 #define HVM_DBG_LOG(level, _f, _a...)           \
-    if ((level) & opt_hvm_debug_level)          \
-        printk("[HVM:%d.%d] " _f "\n",          \
-               current->domain->domain_id, current->vcpu_id, ## _a)
+    if ( (level) & opt_hvm_debug_level )        \
+        printk("[HVM:%d.%d] <%s> " _f "\n",     \
+               current->domain->domain_id, current->vcpu_id, __func__, ## _a)
 #else
 #define HVM_DBG_LOG(level, _f, _a...)
 #endif

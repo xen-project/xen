@@ -35,12 +35,21 @@ extern void nmi(void);
 static void __init machine_specific_arch_setup(void)
 {
 	struct xen_platform_parameters pp;
+	struct xennmi_callback cb;
+
+	if (xen_feature(XENFEAT_auto_translated_physmap) &&
+	    xen_start_info->shared_info < xen_start_info->nr_pages) {
+		HYPERVISOR_shared_info =
+			(shared_info_t *)__va(xen_start_info->shared_info);
+		memset(empty_zero_page, 0, sizeof(empty_zero_page));
+	}
 
 	HYPERVISOR_set_callbacks(
 	    __KERNEL_CS, (unsigned long)hypervisor_callback,
 	    __KERNEL_CS, (unsigned long)failsafe_callback);
 
-	HYPERVISOR_nmi_op(XENNMI_register_callback, (unsigned long)&nmi);
+	cb.handler_address = (unsigned long)&nmi;
+	HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
 
 	machine_specific_modify_cpu_capabilities(&boot_cpu_data);
 

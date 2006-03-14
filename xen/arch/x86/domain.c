@@ -312,7 +312,8 @@ int arch_domain_create(struct domain *d)
             goto fail_nomem;
 
         memset(d->shared_info, 0, PAGE_SIZE);
-        SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
+        share_xen_page_with_guest(
+            virt_to_page(d->shared_info), d, XENSHARE_writable);
     }
 
     return 0;
@@ -451,6 +452,43 @@ int arch_set_info_guest(
     return 0;
 }
 
+long
+arch_do_vcpu_op(
+    int cmd, struct vcpu *v, GUEST_HANDLE(void) arg)
+{
+    long rc = 0;
+
+    switch ( cmd )
+    {
+    case VCPUOP_register_runstate_memory_area:
+    {
+        struct vcpu_register_runstate_memory_area area;
+
+        rc = -EINVAL;
+        if ( v != current )
+            break;
+
+        rc = -EFAULT;
+        if ( copy_from_guest(&area, arg, 1) )
+            break;
+
+        if ( !access_ok(area.addr.v, sizeof(*area.addr.v)) )
+            break;
+
+        rc = 0;
+        v->runstate_guest = area.addr.v;
+        __copy_to_user(v->runstate_guest, &v->runstate, sizeof(v->runstate));
+
+        break;
+    }
+
+    default:
+        rc = -ENOSYS;
+        break;
+    }
+
+    return rc;
+}
 
 void new_thread(struct vcpu *d,
                 unsigned long start_pc,
@@ -682,7 +720,7 @@ static void __context_switch(void)
                stack_regs,
                CTXT_SWITCH_STACK_BYTES);
         unlazy_fpu(p);
-        if ( !HVM_DOMAIN(p) )
+        if ( !hvm_guest(p) )
         {
             save_segments(p);
         }
@@ -711,7 +749,7 @@ static void __context_switch(void)
             loaddebug(&n->arch.guest_context, 7);
         }
 
-        if ( !HVM_DOMAIN(n) )
+        if ( !hvm_guest(n) )
         {
             set_int80_direct_trap(n);
             switch_kernel_stack(n, cpu);
@@ -775,7 +813,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         /* Re-enable interrupts before restoring state which may fault. */
         local_irq_enable();
 
-        if ( !HVM_DOMAIN(next) )
+        if ( !hvm_guest(next) )
         {
             load_LDT(next);
             load_segments(next);
@@ -831,7 +869,6 @@ void sync_vcpu_execstate(struct vcpu *v)
     {                                                                       \
     case 'i': __arg = (unsigned long)va_arg(args, unsigned int);  break;    \
     case 'l': __arg = (unsigned long)va_arg(args, unsigned long); break;    \
-    case 'p': __arg = (unsigned long)va_arg(args, void *);        break;    \
     case 'h': __arg = (unsigned long)va_arg(args, void *);        break;    \
     default:  __arg = 0; BUG();                                             \
     }                                                                       \
@@ -994,7 +1031,7 @@ void domain_relinquish_resources(struct domain *d)
             v->arch.guest_table_user = mk_pagetable(0);
         }
 
-        if ( HVM_DOMAIN(v) )
+        if ( hvm_guest(v) )
             hvm_relinquish_guest_resources(v);
     }
 

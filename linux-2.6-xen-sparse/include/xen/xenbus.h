@@ -28,8 +28,8 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef _ASM_XEN_XENBUS_H
-#define _ASM_XEN_XENBUS_H
+#ifndef _XEN_XENBUS_H
+#define _XEN_XENBUS_H
 
 #include <linux/device.h>
 #include <linux/notifier.h>
@@ -170,7 +170,7 @@ void xenbus_resume(void);
  * be saved in the store.
  */
 int xenbus_watch_path(struct xenbus_device *dev, const char *path,
-		      struct xenbus_watch *watch, 
+		      struct xenbus_watch *watch,
 		      void (*callback)(struct xenbus_watch *,
 				       const char **, unsigned int));
 
@@ -185,7 +185,7 @@ int xenbus_watch_path(struct xenbus_device *dev, const char *path,
  * saved in the store.
  */
 int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
-		       const char *path2, struct xenbus_watch *watch, 
+		       const char *path2, struct xenbus_watch *watch,
 		       void (*callback)(struct xenbus_watch *,
 					const char **, unsigned int));
 
@@ -216,8 +216,8 @@ int xenbus_grant_ring(struct xenbus_device *dev, unsigned long ring_mfn);
  * page to that address, and sets *vaddr to that address.
  * xenbus_map_ring does not allocate the virtual address space (you must do
  * this yourself!). It only maps in the page to the specified address.
- * Returns 0 on success, and GNTST_* (see xen/include/public/grant_table.h) or
- * -ENOMEM on error. If an error is returned, device will switch to
+ * Returns 0 on success, and GNTST_* (see xen/include/interface/grant_table.h)
+ * or -ENOMEM on error. If an error is returned, device will switch to
  * XenbusStateClosing and the error message will be saved in XenStore.
  */
 int xenbus_map_ring_valloc(struct xenbus_device *dev,
@@ -231,7 +231,7 @@ int xenbus_map_ring(struct xenbus_device *dev, int gnt_ref,
  * Use xenbus_unmap_ring_vfree if you mapped in your memory with
  * xenbus_map_ring_valloc (it will free the virtual address space).
  * Returns 0 on success and returns GNTST_* on error
- * (see xen/include/public/grant_table.h).
+ * (see xen/include/interface/grant_table.h).
  */
 int xenbus_unmap_ring_vfree(struct xenbus_device *dev, void *vaddr);
 int xenbus_unmap_ring(struct xenbus_device *dev,
@@ -285,7 +285,7 @@ void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
 		      ...);
 
 
-#endif /* _ASM_XEN_XENBUS_H */
+#endif /* _XEN_XENBUS_H */
 
 /*
  * Local variables:

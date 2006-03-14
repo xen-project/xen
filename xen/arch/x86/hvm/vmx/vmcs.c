@@ -79,7 +79,7 @@ static void vmx_smp_clear_vmcs(void *info)
 {
     struct vcpu *v = (struct vcpu *)info;
 
-    ASSERT(HVM_DOMAIN(v));
+    ASSERT(hvm_guest(v));
 
     if (v->arch.hvm_vmx.launch_cpu == smp_processor_id())
         __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));
@@ -87,7 +87,7 @@ static void vmx_smp_clear_vmcs(void *info)
 
 void vmx_request_clear_vmcs(struct vcpu *v)
 {
-    ASSERT(HVM_DOMAIN(v));
+    ASSERT(hvm_guest(v));
 
     if (v->arch.hvm_vmx.launch_cpu == smp_processor_id())
         __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));
@@ -219,6 +219,7 @@ static void vmx_do_launch(struct vcpu *v)
     error |= __vmwrite(CR0_READ_SHADOW, cr0);
     error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
                        MONITOR_CPU_BASED_EXEC_CONTROLS);
+    v->arch.hvm_vcpu.u.vmx.exec_control = MONITOR_CPU_BASED_EXEC_CONTROLS;
 
     __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (cr4) : );
 
@@ -362,7 +363,7 @@ static inline int construct_init_vmcs_guest(cpu_user_regs_t *regs)
     return error;
 }
 
-static inline int construct_vmcs_host()
+static inline int construct_vmcs_host(void)
 {
     int error = 0;
 #ifdef __x86_64__

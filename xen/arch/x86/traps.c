@@ -132,10 +132,10 @@ static void show_guest_stack(struct cpu_user_regs *regs)
     int i;
     unsigned long *stack, addr;
 
-    if ( HVM_DOMAIN(current) )
+    if ( hvm_guest(current) )
         return;
 
-    if ( VM86_MODE(regs) )
+    if ( vm86_mode(regs) )
     {
         stack = (unsigned long *)((regs->ss << 4) + (regs->esp & 0xffff));
         printk("Guest stack trace from ss:sp = %04x:%04x (VM86)\n   ",
@@ -254,7 +254,7 @@ void show_stack(struct cpu_user_regs *regs)
     unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), addr;
     int i;
 
-    if ( GUEST_MODE(regs) )
+    if ( guest_mode(regs) )
         return show_guest_stack(regs);
 
     printk("Xen stack trace from "__OP"sp=%p:\n   ", stack);
@@ -333,7 +333,7 @@ static inline int do_trap(int trapnr, char *str,
 
     DEBUGGER_trap_entry(trapnr, regs);
 
-    if ( !GUEST_MODE(regs) )
+    if ( !guest_mode(regs) )
         goto xen_fault;
 
     ti = &current->arch.guest_context.trap_ctxt[trapnr];
@@ -399,7 +399,7 @@ asmlinkage int do_int3(struct cpu_user_regs *regs)
 
     DEBUGGER_trap_entry(TRAP_int3, regs);
 
-    if ( !GUEST_MODE(regs) )
+    if ( !guest_mode(regs) )
     {
         DEBUGGER_trap_fatal(TRAP_int3, regs);
         show_registers(regs);
@@ -430,6 +430,11 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
 
     v->arch.guest_context.ctrlreg[2] = addr;
     v->vcpu_info->arch.cr2           = addr;
+
+    /* Re-set error_code.user flag appropriately for the guest. */
+    error_code &= ~4;
+    if ( !guest_kernel_mode(v, guest_cpu_user_regs()) )
+        error_code |= 4;
 
     ti = &v->arch.guest_context.trap_ctxt[TRAP_page_fault];
     tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
@@ -469,7 +474,7 @@ static int handle_gdt_ldt_mapping_fault(
         if ( unlikely(ret == 0) )
         {
             /* In hypervisor mode? Leave it to the #PF handler to fix up. */
-            if ( !GUEST_MODE(regs) )
+            if ( !guest_mode(regs) )
                 return 0;
             /* In guest mode? Propagate #PF to guest, with adjusted %cr2. */
             propagate_page_fault(
@@ -501,7 +506,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
 
     if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
     {
-        if ( shadow_mode_external(d) && GUEST_MODE(regs) )
+        if ( shadow_mode_external(d) && guest_mode(regs) )
             return shadow_fault(addr, regs);
         if ( (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
             return handle_gdt_ldt_mapping_fault(
@@ -523,7 +528,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
             return EXCRET_fault_fixed;
         }
 
-        if ( KERNEL_MODE(v, regs) &&
+        if ( guest_kernel_mode(v, regs) &&
              /* Protection violation on write? No reserved-bit violation? */
              ((regs->error_code & 0xb) == 0x3) &&
              ptwr_do_page_fault(d, addr, regs) )
@@ -541,7 +546,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
  * #PF error code:
  *  Bit 0: Protection violation (=1) ; Page not present (=0)
  *  Bit 1: Write access
- *  Bit 2: Supervisor mode
+ *  Bit 2: User mode (=1) ; Supervisor mode (=0)
  *  Bit 3: Reserved bit violation
  *  Bit 4: Instruction fetch
  */
@@ -559,7 +564,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
     if ( unlikely((rc = fixup_page_fault(addr, regs)) != 0) )
         return rc;
 
-    if ( unlikely(!GUEST_MODE(regs)) )
+    if ( unlikely(!guest_mode(regs)) )
     {
         if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
         {
@@ -615,7 +620,7 @@ static inline int guest_io_okay(
 #define TOGGLE_MODE() ((void)0)
 #endif
 
-    if ( v->arch.iopl >= (KERNEL_MODE(v, regs) ? 1 : 3) )
+    if ( v->arch.iopl >= (guest_kernel_mode(v, regs) ? 1 : 3) )
         return 1;
 
     if ( v->arch.iobmp_limit > (port + bytes) )
@@ -844,7 +849,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0xfa: /* CLI */
     case 0xfb: /* STI */
-        if ( v->arch.iopl < (KERNEL_MODE(v, regs) ? 1 : 3) )
+        if ( v->arch.iopl < (guest_kernel_mode(v, regs) ? 1 : 3) )
             goto fail;
         /*
          * This is just too dangerous to allow, in my opinion. Consider if the
@@ -863,7 +868,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     }
 
     /* Remaining instructions only emulated from guest kernel. */
-    if ( !KERNEL_MODE(v, regs) )
+    if ( !guest_kernel_mode(v, regs) )
         goto fail;
 
     /* Privileged (ring 0) instructions. */
@@ -1065,7 +1070,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
     if ( regs->error_code & 1 )
         goto hardware_gp;
 
-    if ( !GUEST_MODE(regs) )
+    if ( !guest_mode(regs) )
         goto gp_in_kernel;
 
     /*
@@ -1092,7 +1097,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
     {
         /* This fault must be due to <INT n> instruction. */
         ti = &current->arch.guest_context.trap_ctxt[regs->error_code>>3];
-        if ( PERMIT_SOFTINT(TI_GET_DPL(ti), v, regs) )
+        if ( permit_softint(TI_GET_DPL(ti), v, regs) )
         {
             tb->flags = TBF_EXCEPTION;
             regs->eip += 2;
@@ -1300,7 +1305,7 @@ asmlinkage int do_debug(struct cpu_user_regs *regs)
 
     DEBUGGER_trap_entry(TRAP_debug, regs);
 
-    if ( !GUEST_MODE(regs) )
+    if ( !guest_mode(regs) )
     {
         /* Clear TF just for absolute sanity. */
         regs->eflags &= ~EF_TF;
@@ -1404,14 +1409,14 @@ void __init trap_init(void)
 }
 
 
-long do_set_trap_table(struct trap_info *traps)
+long do_set_trap_table(GUEST_HANDLE(trap_info_t) traps)
 {
     struct trap_info cur;
     struct trap_info *dst = current->arch.guest_context.trap_ctxt;
     long rc = 0;
 
     /* If no table is presented then clear the entire virtual IDT. */
-    if ( traps == NULL )
+    if ( guest_handle_is_null(traps) )
     {
         memset(dst, 0, 256 * sizeof(*dst));
         init_int80_direct_trap(current);
@@ -1423,11 +1428,11 @@ long do_set_trap_table(struct trap_info *traps)
         if ( hypercall_preempt_check() )
         {
             rc = hypercall_create_continuation(
-                __HYPERVISOR_set_trap_table, "p", traps);
+                __HYPERVISOR_set_trap_table, "h", traps);
             break;
         }
 
-        if ( copy_from_user(&cur, traps, sizeof(cur)) ) 
+        if ( copy_from_guest(&cur, traps, 1) )
         {
             rc = -EFAULT;
             break;
@@ -1443,7 +1448,7 @@ long do_set_trap_table(struct trap_info *traps)
         if ( cur.vector == 0x80 )
             init_int80_direct_trap(current);
 
-        traps++;
+        guest_handle_add_offset(traps, 1);
     }
 
     return rc;

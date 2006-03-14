@@ -83,7 +83,18 @@ sched_bvt_help = """sched-bvt <Parameters>           Set Borrowed Virtual Time s
                                     parameters"""
 sched_bvt_ctxallow_help = """sched-bvt-ctxallow <Allow>       Set the BVT scheduler context switch
                                     allowance"""
-sched_sedf_help = "sched-sedf <Parameters>          Set simple EDF parameters"
+sched_sedf_help = "sched-sedf [DOM] [OPTIONS]       Show|Set simple EDF parameters\n" + \
+"              -p, --period          Relative deadline(ms).\n\
+              -s, --slice           Worst-case execution time(ms)\n\
+                                    (slice < period).\n\
+              -l, --latency         scaled period(ms) in case the domain\n\
+                                    is doing heavy I/O.\n\
+              -e, --extra           flag (0/1) which controls whether the\n\
+                                    domain can run in extra-time\n\
+              -w, --weight          mutually exclusive with period/slice and\n\
+                                    specifies another way of setting a domain's\n\
+                                    cpu period/slice."
+
 block_attach_help = """block-attach <DomId> <BackDev> <FrontDev> <Mode>
                 [BackDomId]         Create a new virtual block device"""
 block_detach_help = """block-detach  <DomId> <DevId>    Destroy a domain's virtual block device,
@@ -148,8 +159,7 @@ domain_commands = [
 host_commands = [
     "dmesg",
     "info",
-    "log",
-    "top",
+    "log"
     ]
 
 scheduler_commands = [
@@ -374,6 +384,20 @@ def parse_doms_info(info):
         'state'    : get_info('state',        str,   '??'),
         'cpu_time' : get_info('cpu_time',     float, 0),
         'ssidref'  : get_info('ssidref',      int,   0),
+        }
+
+
+def parse_sedf_info(info):
+    def get_info(n, t, d):
+        return t(sxp.child_value(info, n, d))
+
+    return {
+        'dom'      : get_info('domain',        int,   -1),
+        'period'   : get_info('period',        int,   -1),
+        'slice'    : get_info('slice',         int,   -1),
+        'latency'  : get_info('latency',       int,   -1),
+        'extratime': get_info('extratime',     int,   -1),
+        'weight'   : get_info('weight',        int,   -1),
         }
 
 
@@ -617,12 +641,86 @@ def xm_sched_bvt_ctxallow(args):
     server.xend_node_cpu_bvt_slice_set(slice)
 
 def xm_sched_sedf(args):
-    arg_check(args, "sched-sedf", 6)
+    def ns_to_ms(val):
+        return float(val) * 0.000001
     
-    dom = args[0]
-    v = map(int, args[1:6])
+    def ms_to_ns(val):
+        return (float(val) / 0.000001)
+
+    def print_sedf(info):
+        info['period']  = ns_to_ms(info['period'])
+        info['slice']   = ns_to_ms(info['slice'])
+        info['latency'] = ns_to_ms(info['latency'])
+        print( ("%(name)-32s %(dom)3d %(period)9.1f %(slice)9.1f" +
+                " %(latency)7.1f %(extratime)6d %(weight)6d") % info)
+
+    def domid_match(domid, info):
+        return domid is None or domid == info['name'] or domid == str(info['dom'])
+
+    # we want to just display current info if no parameters are passed
+    if len(args) == 0:
+        domid = None
+    else:
+        # we expect at least a domain id (name or number)
+        # and at most a domid up to 5 options with values
+        arg_check(args, "sched-sedf", 1, 11)
+        domid = args[0]
+        # drop domid from args since get_opt doesn't recognize it
+        args = args[1:] 
+
+    opts = {}
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'p:s:l:e:w:',
+            ['period=', 'slice=', 'latency=', 'extratime=', 'weight='])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
+    
+    # convert to nanoseconds if needed 
+    for (k, v) in options:
+        if k in ['-p', '--period']:
+            opts['period'] = ms_to_ns(v)
+        elif k in ['-s', '--slice']:
+            opts['slice'] = ms_to_ns(v)
+        elif k in ['-l', '--latency']:
+            opts['latency'] = ms_to_ns(v)
+        elif k in ['-e', '--extratime']:
+            opts['extratime'] = v
+        elif k in ['-w', '--weight']:
+            opts['weight'] = v
+
+    # print header if we aren't setting any parameters
+    if len(opts.keys()) == 0:
+        print '%-33s %-2s %-4s %-4s %-7s %-5s %-6s'%('Name','ID','Period(ms)',
+                                                     'Slice(ms)', 'Lat(ms)',
+                                                     'Extra','Weight')
+
     from xen.xend.XendClient import server
-    server.xend_domain_cpu_sedf_set(dom, *v)
+    doms = filter(lambda x : domid_match(domid, x),
+                        [parse_doms_info(dom) for dom in getDomains("")])
+    for d in doms:
+        # fetch current values so as not to clobber them
+        sedf_info = \
+            parse_sedf_info(server.xend_domain_cpu_sedf_get(d['dom']))
+        sedf_info['name'] = d['name']
+
+        # update values in case of call to set
+        if len(opts.keys()) > 0:
+            for k in opts.keys():
+                sedf_info[k]=opts[k]
+         
+            # send the update, converting user input
+            v = map(int, [sedf_info['period'], sedf_info['slice'],
+                          sedf_info['latency'],sedf_info['extratime'], 
+                          sedf_info['weight']])
+            rv = server.xend_domain_cpu_sedf_set(d['dom'], *v)
+            if int(rv) != 0:
+                err("Failed to set sedf parameters (rv=%d)."%(rv))
+
+        # not setting values, display info
+        else:
+            print_sedf(sedf_info)
+
 
 def xm_info(args):
     arg_check(args, "info", 0)

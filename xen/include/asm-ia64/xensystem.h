@@ -75,35 +75,7 @@ extern struct task_struct *vmx_ia64_switch_to (void *next_task);
 // FIXME SMP... see system.h, does this need to be different?
 #define switch_to(prev,next,last)	__switch_to(prev, next, last)
 
-#define __cmpxchg_user(ptr, new, old, _size)				\
-({									\
-	register long __gu_r8 asm ("r8");				\
-	asm volatile ("mov ar.ccv=%0;;" :: "rO"(old));			\
-	asm volatile ("mov %1=r0;;\n"					\
-		"[1:]\tcmpxchg"_size".acq %0=[%2],%3,ar.ccv\n"		\
-		"\t.xdata4 \"__ex_table\", 1b-., 1f-.\n"		\
-		"[1:]"							\
-		: "=r"(old), "=r"(__gu_r8) :				\
-		"r"(ptr), "r"(new) : "memory");				\
-	__gu_r8;							\
-})
-
-
-// NOTE: Xen defines args as pointer,old,new whereas ia64 uses pointer,new,old
-//  so reverse them here
-#define cmpxchg_user(_p,_o,_n)					\
-({								\
-	register long _rc;					\
-	ia64_mf();						\
-	switch ( sizeof(*(_p)) ) {				\
-	    case 1: _rc = __cmpxchg_user(_p,_n,_o,"1"); break;	\
-	    case 2: _rc = __cmpxchg_user(_p,_n,_o,"2"); break;	\
-	    case 4: _rc = __cmpxchg_user(_p,_n,_o,"4"); break;	\
-	    case 8: _rc = __cmpxchg_user(_p,_n,_o,"8"); break;	\
-	}							\
-	ia64_mf();						\
-	_rc;							\
-})
+#define local_irq_is_enabled() (!irqs_disabled())
 
 #endif // __ASSEMBLY__
 #endif // _ASM_IA64_XENSYSTEM_H

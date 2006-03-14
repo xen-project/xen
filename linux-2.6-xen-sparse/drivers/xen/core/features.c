@@ -19,7 +19,7 @@ void setup_xen_features(void)
 	xen_feature_info_t fi;
 	int i, j;
 
-	for (i=0; i<XENFEAT_NR_SUBMAPS; i++) {
+	for (i = 0; i < XENFEAT_NR_SUBMAPS; i++) {
 		fi.submap_idx = i;
 		if (HYPERVISOR_xen_version(XENVER_get_features, &fi) < 0)
 			break;

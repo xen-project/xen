@@ -1646,7 +1646,7 @@ shadow_mode_page_writable(unsigned long va, struct cpu_user_regs *regs, unsigned
           || (va >= HYPERVISOR_VIRT_END)
 #endif
              ) &&
-         KERNEL_MODE(v, regs) )
+         guest_kernel_mode(v, regs) )
         return 1;
 
     return 0;
@@ -1700,7 +1700,7 @@ static inline void update_pagetables(struct vcpu *v)
     struct domain *d = v->domain;
     int paging_enabled;
 
-    if ( HVM_DOMAIN(v) )
+    if ( hvm_guest(v) )
         paging_enabled = hvm_paging_enabled(v);
     else
         // HACK ALERT: there's currently no easy way to figure out if a domU

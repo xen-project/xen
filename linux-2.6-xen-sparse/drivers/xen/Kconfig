@@ -30,12 +30,14 @@ config XEN_UNPRIVILEGED_GUEST
 	default !XEN_PRIVILEGED_GUEST
 
 config XEN_PCIDEV_BACKEND
-	bool "PCI device backend driver"
-	select PCI
-	default y if XEN_PRIVILEGED_GUEST
+	tristate "PCI device backend driver"
+	depends PCI
+	default XEN_PRIVILEGED_GUEST
 	help
 	  The PCI device backend driver allows the kernel to export arbitrary
-	  PCI devices to other guests.
+	  PCI devices to other guests. If you select this to be a module, you
+	  will need to make sure no other driver has bound to the device(s)
+	  you want to make visible to other guests.
 
 choice
 	prompt "PCI Backend Mode"

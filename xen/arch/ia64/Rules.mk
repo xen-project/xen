@@ -12,7 +12,7 @@ CPPFLAGS  += -I$(BASEDIR)/include -I$(BASEDIR)/include/asm-ia64 	\
 	     -I$(BASEDIR)/include/asm-ia64/linux-null 			\
              -I$(BASEDIR)/arch/ia64/linux -I$(BASEDIR)/arch/ia64/linux-xen
 
-CFLAGS  := -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
+CFLAGS  += -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
 #CFLAGS  += -O3		# -O3 over-inlines making debugging tough!
 CFLAGS  += -O2		# but no optimization causes compile errors!
 #CFLAGS  += -iwithprefix include -Wall -DMONITOR_BASE=$(MONITOR_BASE)

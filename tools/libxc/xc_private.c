@@ -231,8 +231,8 @@ int xc_memory_op(int xc_handle,
             goto out1;
         }
         break;
-    case XENMEM_reserved_phys_area:
-        if ( mlock(arg, sizeof(struct xen_reserved_phys_area)) )
+    case XENMEM_add_to_physmap:
+        if ( mlock(arg, sizeof(struct xen_add_to_physmap)) )
         {
             PERROR("Could not mlock");
             goto out1;
@@ -277,8 +277,8 @@ int xc_memory_op(int xc_handle,
         safe_munlock(xmml->extent_start,
                      xmml->max_extents * sizeof(unsigned long));
         break;
-    case XENMEM_reserved_phys_area:
-        safe_munlock(arg, sizeof(struct xen_reserved_phys_area));
+    case XENMEM_add_to_physmap:
+        safe_munlock(arg, sizeof(struct xen_add_to_physmap));
         break;
     case XENMEM_translate_gpfn_list:
             safe_munlock(trans->mfn_list, trans->nr_gpfns * sizeof(long));
@@ -364,7 +364,7 @@ long xc_get_tot_pages(int xc_handle, uint32_t domid)
 int xc_copy_to_domain_page(int xc_handle,
                            uint32_t domid,
                            unsigned long dst_pfn, 
-                           void *src_page)
+                           const char *src_page)
 {
     void *vaddr = xc_map_foreign_range(
         xc_handle, domid, PAGE_SIZE, PROT_WRITE, dst_pfn);
@@ -410,7 +410,7 @@ unsigned long xc_get_filesz(int fd)
     return sz;
 }
 
-void xc_map_memcpy(unsigned long dst, char *src, unsigned long size,
+void xc_map_memcpy(unsigned long dst, const char *src, unsigned long size,
                    int xch, uint32_t dom, unsigned long *parray,
                    unsigned long vstart)
 {

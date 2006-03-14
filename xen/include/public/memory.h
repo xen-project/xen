@@ -80,7 +80,7 @@ typedef struct xen_machphys_mfn_list {
      * machphys table is smaller than max_extents * 2MB.
      */
     unsigned int max_extents;
-    
+
     /*
      * Pointer to buffer to fill with list of extent starts. If there are
      * any large discontiguities in the machine address space, 2MB gaps in
@@ -97,25 +97,27 @@ typedef struct xen_machphys_mfn_list {
 DEFINE_GUEST_HANDLE(xen_machphys_mfn_list_t);
 
 /*
- * Returns the base and size of the specified reserved 'RAM hole' in the
- * specified guest's pseudophysical address space.
- * arg == addr of xen_reserved_phys_area_t.
+ * Sets the GPFN at which a particular page appears in the specified guest's
+ * pseudophysical address space.
+ * arg == addr of xen_add_to_physmap_t.
  */
-#define XENMEM_reserved_phys_area   7
-typedef struct xen_reserved_phys_area {
-    /* Which domain to report about? */
+#define XENMEM_add_to_physmap      7
+typedef struct xen_add_to_physmap {
+    /* Which domain to change the mapping for. */
     domid_t domid;
 
-    /*
-     * Which reserved area to report? Out-of-range request reports
-     * -ESRCH. Currently no architecture will have more than one reserved area.
-     */
-    unsigned int idx;
+    /* Source mapping space. */
+#define XENMAPSPACE_shared_info 0 /* shared info page */
+#define XENMAPSPACE_grant_table 1 /* grant table page */
+    unsigned int space;
 
-    /* Base and size of the specified reserved area. */
-    unsigned long first_gpfn, nr_gpfns;
-} xen_reserved_phys_area_t;
-DEFINE_GUEST_HANDLE(xen_reserved_phys_area_t);
+    /* Index into source mapping space. */
+    unsigned long idx;
+
+    /* GPFN where the source mapping page should appear. */
+    unsigned long gpfn;
+} xen_add_to_physmap_t;
+DEFINE_GUEST_HANDLE(xen_add_to_physmap_t);
 
 /*
  * Translates a list of domain-specific GPFNs into MFNs. Returns a -ve error

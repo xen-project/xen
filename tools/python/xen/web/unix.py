@@ -13,15 +13,34 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2005 Mike Wray <mike.wray@hp.com>
-# Copyright (C) 2005 XenSource Ltd.
+# Copyright (C) 2005-2006 XenSource Ltd.
 #============================================================================
 
 
-import socket
 import os
 import os.path
+import socket
+import stat
 
 import connection
+
+
+def bind(path):
+    """Create a Unix socket, and bind it to the given path.  The socket is
+created such that only the current user may access it."""
+
+    parent = os.path.dirname(path)
+    if os.path.exists(parent):
+        os.chown(parent, os.geteuid(), os.getegid())
+        os.chmod(parent, stat.S_IRWXU)
+        if os.path.exists(path):
+            os.unlink(path)
+    else:
+        os.makedirs(parent, stat.S_IRWXU)
+
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.bind(path)
+    return sock
 
 
 class UnixListener(connection.SocketListener):
@@ -31,19 +50,7 @@ class UnixListener(connection.SocketListener):
 
 
     def createSocket(self):
-        pathdir = os.path.dirname(self.path)
-        if not os.path.exists(pathdir):
-            os.makedirs(pathdir)
-        else:
-            try:
-                os.unlink(self.path)
-            except SystemExit:
-                raise
-            except Exception, ex:
-                pass
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.bind(self.path)
-        return sock
+        return bind(self.path)
 
 
     def acceptConnection(self, sock, _):

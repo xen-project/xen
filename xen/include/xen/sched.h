@@ -67,6 +67,8 @@ struct vcpu
     struct timer     timer;         /* one-shot timer for timeout values */
     unsigned long    sleep_tick;    /* tick at which this vcpu started sleep */
 
+    struct timer     poll_timer;    /* timeout for SCHEDOP_poll */
+
     void            *sched_priv;    /* scheduler-specific data */
 
     struct vcpu_runstate_info runstate;
@@ -266,7 +268,7 @@ void sched_add_domain(struct vcpu *);
 void sched_rem_domain(struct vcpu *);
 long sched_ctl(struct sched_ctl_cmd *);
 long sched_adjdom(struct sched_adjdom_cmd *);
-int  sched_id();
+int  sched_id(void);
 void vcpu_wake(struct vcpu *d);
 void vcpu_sleep_nosync(struct vcpu *d);
 void vcpu_sleep_sync(struct vcpu *d);
@@ -310,7 +312,6 @@ void startup_cpu_idle_loop(void);
  * It contains one character per argument as follows:
  *  'i' [unsigned] {char, int}
  *  'l' [unsigned] long
- *  'p' pointer (foo *)
  *  'h' guest handle (GUEST_HANDLE(foo))
  */
 unsigned long hypercall_create_continuation(

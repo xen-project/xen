@@ -66,7 +66,7 @@ static char *tracefile = NULL;
 static TDB_CONTEXT *tdb_ctx;
 
 static void corrupt(struct connection *conn, const char *fmt, ...);
-static void check_store();
+static void check_store(void);
 
 #define log(...)							\
 	do {								\
@@ -238,7 +238,7 @@ static void trigger_reopen_log(int signal __attribute__((unused)))
 }
 
 
-static void reopen_log()
+static void reopen_log(void)
 {
 	if (tracefile) {
 		if (tracefd > 0)
@@ -1612,7 +1612,7 @@ static void clean_store(struct hashtable *reachable)
 }
 
 
-static void check_store()
+static void check_store(void)
 {
 	char * root = talloc_strdup(NULL, "/");
 	struct hashtable * reachable =

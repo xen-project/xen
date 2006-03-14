@@ -195,7 +195,7 @@ done:
 	return fail;
 }
 
-void usage()
+void usage(void)
 {
 	fprintf(stderr, "You must specify at least -diskimage and -partition.\n");
 	fprintf(stderr, "All other arguments are passed through to 'mount'.\n");

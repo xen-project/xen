@@ -6,6 +6,7 @@
 #include <xen/sched.h>
 #include <xen/irq.h>
 #include <xen/event.h>
+#include <xen/guest_access.h>
 #include <asm/current.h>
 #include <asm/smpboot.h>
 #include <public/xen.h>
@@ -21,13 +22,13 @@ ioapic_guest_write(
 /*
  * Demuxing hypercall.
  */
-long do_physdev_op(struct physdev_op *uop)
+long do_physdev_op(GUEST_HANDLE(physdev_op_t) uop)
 {
     struct physdev_op op;
     long ret;
     int  irq;
 
-    if ( unlikely(copy_from_user(&op, uop, sizeof(op)) != 0) )
+    if ( unlikely(copy_from_guest(&op, uop, 1) != 0) )
         return -EFAULT;
 
     switch ( op.cmd )
@@ -101,7 +102,7 @@ long do_physdev_op(struct physdev_op *uop)
         break;
     }
 
-    if ( copy_to_user(uop, &op, sizeof(op)) )
+    if ( copy_to_guest(uop, &op, 1) )
         ret = -EFAULT;
 
     return ret;

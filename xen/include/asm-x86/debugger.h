@@ -88,7 +88,7 @@ static inline int debugger_trap_entry(
 {
     struct vcpu *v = current;
 
-    if ( KERNEL_MODE(v, regs) &&
+    if ( guest_kernel_mode(v, regs) &&
          test_bit(_DOMF_debugging, &v->domain->domain_flags) &&
          ((vector == TRAP_int3) || (vector == TRAP_debug)) )
     {

@@ -28,7 +28,7 @@ static inline struct vcpu *mapcache_current_vcpu(void)
      * then it means we are running on the idle domain's page table and must
      * therefore use its mapcache.
      */
-    if ( unlikely(!pagetable_get_pfn(v->arch.guest_table)) && !HVM_DOMAIN(v) )
+    if ( unlikely(!pagetable_get_pfn(v->arch.guest_table)) && !hvm_guest(v) )
     {
         /* If we really are idling, perform lazy context switch now. */
         if ( (v = idle_vcpu[smp_processor_id()]) == current )

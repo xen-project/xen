@@ -1,7 +1,11 @@
-
 SUBDIRS =
 
-TESTS = 01_sedf_multi_pos.test
+TESTS = 01_sedf_period_slice_pos.test \
+        02_sedf_period_lower_neg.test \
+        03_sedf_slice_lower_neg.test  \
+        04_sedf_slice_upper_neg.test  \
+        05_sedf_extratime_pos.test    \
+        06_sedf_extratime_disable_neg.test
 
 XFAIL_TESTS = 
 

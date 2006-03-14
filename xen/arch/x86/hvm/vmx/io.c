@@ -86,28 +86,53 @@ interrupt_post_injection(struct vcpu * v, int vector, int type)
 }
 
 static inline void
-enable_irq_window(unsigned long cpu_exec_control)
+enable_irq_window(struct vcpu *v)
 {
-    if (!(cpu_exec_control & CPU_BASED_VIRTUAL_INTR_PENDING)) {
-        cpu_exec_control |= CPU_BASED_VIRTUAL_INTR_PENDING;
-        __vmwrite(CPU_BASED_VM_EXEC_CONTROL, cpu_exec_control);
+    u32  *cpu_exec_control = &v->arch.hvm_vcpu.u.vmx.exec_control;
+    
+    if (!(*cpu_exec_control & CPU_BASED_VIRTUAL_INTR_PENDING)) {
+        *cpu_exec_control |= CPU_BASED_VIRTUAL_INTR_PENDING;
+        __vmwrite(CPU_BASED_VM_EXEC_CONTROL, *cpu_exec_control);
     }
 }
 
 static inline void
-disable_irq_window(unsigned long cpu_exec_control)
+disable_irq_window(struct vcpu *v)
 {
-    if ( cpu_exec_control & CPU_BASED_VIRTUAL_INTR_PENDING ) {
-        cpu_exec_control &= ~CPU_BASED_VIRTUAL_INTR_PENDING;
-        __vmwrite(CPU_BASED_VM_EXEC_CONTROL, cpu_exec_control);
+    u32  *cpu_exec_control = &v->arch.hvm_vcpu.u.vmx.exec_control;
+    
+    if ( *cpu_exec_control & CPU_BASED_VIRTUAL_INTR_PENDING ) {
+        *cpu_exec_control &= ~CPU_BASED_VIRTUAL_INTR_PENDING;
+        __vmwrite(CPU_BASED_VM_EXEC_CONTROL, *cpu_exec_control);
     }
+}
+
+static inline int is_interruptibility_state(void)
+{
+    int  interruptibility;
+    __vmread(GUEST_INTERRUPTIBILITY_INFO, &interruptibility);
+    return interruptibility;
+}
+
+/* check to see if there is pending interrupt  */
+int cpu_has_pending_irq(struct vcpu *v)
+{
+    struct hvm_domain *plat = &v->domain->arch.hvm_domain;
+
+    /* APIC */
+    if ( cpu_has_apic_interrupt(v) ) return 1;
+    
+    /* PIC */
+    if ( !vlapic_accept_pic_intr(v) ) return 0;
+
+    return plat->interrupt_request;
 }
 
 asmlinkage void vmx_intr_assist(void)
 {
     int intr_type = 0;
     int highest_vector;
-    unsigned long intr_fields, eflags, interruptibility, cpu_exec_control;
+    unsigned long eflags;
     struct vcpu *v = current;
     struct hvm_domain *plat=&v->domain->arch.hvm_domain;
     struct hvm_virpit *vpit = &plat->vpit;
@@ -121,42 +146,26 @@ asmlinkage void vmx_intr_assist(void)
         pic_set_irq(pic, 0, 1);
     }
 
-    __vmread_vcpu(v, CPU_BASED_VM_EXEC_CONTROL, &cpu_exec_control);
-    __vmread(VM_ENTRY_INTR_INFO_FIELD, &intr_fields);
+    if ( !cpu_has_pending_irq(v) ) return;
 
-    if (intr_fields & INTR_INFO_VALID_MASK) {
-        enable_irq_window(cpu_exec_control);
-        HVM_DBG_LOG(DBG_LEVEL_1, "vmx_intr_assist: intr_fields: %lx",
-                    intr_fields);
-        return;
-    }
-
-    __vmread(GUEST_INTERRUPTIBILITY_INFO, &interruptibility);
-
-    if (interruptibility) {
-        enable_irq_window(cpu_exec_control);
-        HVM_DBG_LOG(DBG_LEVEL_1, "interruptibility: %lx",interruptibility);
+    if ( is_interruptibility_state() ) {    /* pre-cleared for emulated instruction */
+        enable_irq_window(v);
+        HVM_DBG_LOG(DBG_LEVEL_1, "interruptibility");
         return;
     }
 
     __vmread(GUEST_RFLAGS, &eflags);
     if (irq_masked(eflags)) {
-        enable_irq_window(cpu_exec_control);
+        enable_irq_window(v);
         return;
     }
 
     highest_vector = cpu_get_interrupt(v, &intr_type); 
-
-    if (highest_vector == -1) {
-        disable_irq_window(cpu_exec_control);
-        return;
-    }
-
     switch (intr_type) {
     case VLAPIC_DELIV_MODE_EXT:
     case VLAPIC_DELIV_MODE_FIXED:
     case VLAPIC_DELIV_MODE_LPRI:
-        vmx_inject_extint(v, highest_vector, VMX_INVALID_ERROR_CODE);
+        vmx_inject_extint(v, highest_vector, VMX_DELIVER_NO_ERROR_CODE);
         TRACE_3D(TRC_VMX_INT, v->domain->domain_id, highest_vector, 0);
         break;
     case VLAPIC_DELIV_MODE_SMI:

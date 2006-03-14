@@ -596,7 +596,7 @@ do {									\
 	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	_vcpu->evtchn_upcall_mask = 0;					\
 	barrier(); /* unmask then check (avoid races) */		\
-	if ( unlikely(_vcpu->evtchn_upcall_pending) )			\
+	if (unlikely(_vcpu->evtchn_upcall_pending))			\
 		force_evtchn_callback();				\
 	preempt_enable();						\
 } while (0)
@@ -618,7 +618,7 @@ do {									\
 	_vcpu = &HYPERVISOR_shared_info->vcpu_info[__vcpu_id];		\
 	if ((_vcpu->evtchn_upcall_mask = (x)) == 0) {			\
 		barrier(); /* unmask then check (avoid races) */	\
-		if ( unlikely(_vcpu->evtchn_upcall_pending) )		\
+		if (unlikely(_vcpu->evtchn_upcall_pending))		\
 			force_evtchn_callback();			\
 		preempt_enable();					\
 	} else								\

@@ -12,20 +12,19 @@
 #error "Unsupported architecture"
 #endif
 
-
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define KZERO             0x80000000
 #define KOFFSET(_p)       ((_p)&~KZERO)
 
-static int parseaout9image(char *, unsigned long, struct domain_setup_info *);
-static int loadaout9image(char *, unsigned long, int, uint32_t, unsigned long *, struct domain_setup_info *);
-static void copyout(int, uint32_t, unsigned long *, unsigned long, void *, int);
-struct Exec *get_header(char *, unsigned long, struct Exec *);
+static int parseaout9image(const char *, unsigned long, struct domain_setup_info *);
+static int loadaout9image(const char *, unsigned long, int, uint32_t, unsigned long *, struct domain_setup_info *);
+static void copyout(int, uint32_t, unsigned long *, unsigned long, const char *, int);
+struct Exec *get_header(const char *, unsigned long, struct Exec *);
 
 
 int 
 probe_aout9(
-    char *image,
+    const char *image,
     unsigned long image_size,
     struct load_funcs *load_funcs)
 {
@@ -43,7 +42,7 @@ probe_aout9(
 
 static int 
 parseaout9image(
-    char *image,
+    const char *image,
     unsigned long image_size,
     struct domain_setup_info *dsi)
 {
@@ -77,7 +76,7 @@ parseaout9image(
 
 static int 
 loadaout9image(
-    char *image,
+    const char *image,
     unsigned long image_size,
     int xch, uint32_t dom,
     unsigned long *parray,
@@ -111,7 +110,7 @@ copyout(
     int xch, uint32_t dom,
     unsigned long *parray,
     unsigned long addr,
-    void *buf,
+    const char *buf,
     int sz)
 {
     unsigned long pgoff, chunksz, off;
@@ -143,7 +142,7 @@ copyout(
  */
 struct Exec *
 get_header(
-    char *image,
+    const char *image,
     unsigned long image_size,
     struct Exec *ehdr)
 {

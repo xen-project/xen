@@ -30,8 +30,6 @@ ENTRY(startup_32)
 	/* Set up the stack pointer */
 	movl $(init_thread_union+THREAD_SIZE),%esp
 
-checkCPUtype:
-
 	/* get vendor info */
 	xorl %eax,%eax			# call CPUID with 0 -> return vendor ID
 	cpuid

@@ -14,7 +14,7 @@ INSTALL_DIR     = $(INSTALL) -d -m0755
 TOOLS_INSTALL_DIR = $(DESTDIR)/usr/bin
 
 # General compiler flags
-CFLAGS	= -Wall -Werror -g3 -I.
+CFLAGS	= -Werror -g3 -I.
 
 # For generating dependencies
 CFLAGS	+= -Wp,-MD,.$(@F).d

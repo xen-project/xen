@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh 
 
 ##
 ## Test driver script
@@ -11,7 +11,7 @@ usage() {
     echo "  Where opts are:"
     echo "  -d          : do not submit a report for this run"
     echo "  -b          : do not ask any questions (batch mode)"
-    echo "  -q          : run a quick test set"
+    echo "  -g          : run a group test set"
     echo "  -e <email>  : set email address for report"
     echo "  -s <report> : just submit report <report>"
     echo "  -h | --help : show this help"
@@ -92,11 +92,12 @@ runnable_tests() {
     echo "Running sanity checks..."
     make -C tests/_sanity check 2>&1 | grep REASON
     if [ $? -eq 0 ]; then
-	echo "Sanity checks failed"
-	exit 1
+        echo "Sanity checks failed"
+        exit 1
     fi
 
 }
+
 
 # Get contact info if needed
 get_contact_info() {
@@ -128,26 +129,21 @@ get_contact_info() {
 
 # Run the tests
 run_tests() {
-    output=$1
-    echo Running real tests...
-    TEST_VERBOSE=1 make -k check > $output 2>&1
-}
+    groupentered=$1
+    output=$2
 
-run_tests_quick() {
+    exec <  grouptest/$groupentered
+    while read casename testlist; do
+       echo Running $casename tests...
+       echo "*** case $casename from group $groupentered" >> $output
+       if [ -z "$testlist" ]; then
+          echo "*** Running tests for case $casename" >> $output
+          (cd tests/$casename && TEST_VERBOSE=1 make -k check) >> $output 2>&1
+       else
+          echo "*** Running tests $testlist from case $casename" >> $output
+          (cd tests/$casename && TEST_VERBOSE=1 make -k check TESTS="$testlist") >> $output 2>&1
+       fi
 
-    output=$1
-
-    create_tests="01_create_basic_pos.test 07_create_mem64_pos.test 10_create_fastdestroy.test 14_create_blockroot_pos.test"
-    unpause_tests="01_unpause_basic_pos.test"
-    memset_tests="01_memset_basic_pos.test 03_memset_random_pos.test"
-    help_tests="06_help_allcmds.test"
-    testgroups="create unpause memset help"
-
-    echo "*** Quick test" > $output
-    for group in $testgroups; do
-	eval $(echo list=\$${group}_tests)
-	echo "*** Running tests [$list] from $group"
-	(cd tests/$group && TEST_VERBOSE=1 make -k check TESTS="$list") >> $output 2>&1
     done
 
 }
@@ -195,6 +191,7 @@ MAXFAIL=10
 report=yes
 batch=no
 run=yes
+GROUPENTERED=default
 
 # Resolve options
 while [ $# -gt 0 ]
@@ -213,8 +210,13 @@ while [ $# -gt 0 ]
 	  echo $1 > contact_info
 	  echo "(Email set to $1)"
 	  ;;
-      -q)
-	  run=quick
+      -g)
+	  shift
+          GROUPENTERED=$1
+          if [ ! -f grouptest/$GROUPENTERED ]; then
+             echo "No file for group $GROUPENTERED"
+             exit 1
+          fi
 	  ;;
       -s)
 	  run=no
@@ -265,18 +267,15 @@ fi
 if [ "$run" != "no" ]; then
     runnable_tests
     make_environment_report $OSREPORTTEMP $PROGREPORTTEMP
-    if [ "$run" = "yes" ]; then
-	run_tests $OUTPUT
-    else
-	run_tests_quick $OUTPUT
-    fi
+    run_tests $GROUPENTERED $OUTPUT
     make_text_reports $PASSFAIL $FAILURES $OUTPUT $TXTREPORT
     make_result_report $OUTPUT $RESULTREPORTTEMP
     cat $OSREPORTTEMP $PROGREPORTTEMP $RESULTREPORTTEMP > $XMLREPORT
     rm $OSREPORTTEMP $PROGREPORTTEMP $RESULTREPORTTEMP
+
 fi
 
-if [ "$report" = "yes" ] && [ "$run" = "yes" ]; then
+if [ "$report" = "yes" ]; then
     if [ ! -f "$XMLREPORT" ]; then
 	echo "No such file: $XMLREPORT"
 	exit 1

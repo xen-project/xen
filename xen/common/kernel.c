@@ -11,6 +11,7 @@
 #include <xen/compile.h>
 #include <xen/sched.h>
 #include <xen/shadow.h>
+#include <xen/guest_access.h>
 #include <asm/current.h>
 #include <public/nmi.h>
 #include <public/version.h>
@@ -116,7 +117,7 @@ void add_taint(unsigned flag)
  * Simple hypercalls.
  */
 
-long do_xen_version(int cmd, void *arg)
+long do_xen_version(int cmd, GUEST_HANDLE(void) arg)
 {
     switch ( cmd )
     {
@@ -129,7 +130,7 @@ long do_xen_version(int cmd, void *arg)
     {
         xen_extraversion_t extraversion;
         safe_strcpy(extraversion, XEN_EXTRAVERSION);
-        if ( copy_to_user(arg, extraversion, sizeof(extraversion)) )
+        if ( copy_to_guest(arg, (char *)extraversion, sizeof(extraversion)) )
             return -EFAULT;
         return 0;
     }
@@ -141,7 +142,7 @@ long do_xen_version(int cmd, void *arg)
         safe_strcpy(info.compile_by,     XEN_COMPILE_BY);
         safe_strcpy(info.compile_domain, XEN_COMPILE_DOMAIN);
         safe_strcpy(info.compile_date,   XEN_COMPILE_DATE);
-        if ( copy_to_user(arg, &info, sizeof(info)) )
+        if ( copy_to_guest(arg, &info, 1) )
             return -EFAULT;
         return 0;
     }
@@ -154,7 +155,7 @@ long do_xen_version(int cmd, void *arg)
         memset(info, 0, sizeof(info));
         arch_get_xen_caps(info);
 
-        if ( copy_to_user(arg, info, sizeof(info)) )
+        if ( copy_to_guest(arg, (char *)info, sizeof(info)) )
             return -EFAULT;
         return 0;
     }
@@ -164,7 +165,7 @@ long do_xen_version(int cmd, void *arg)
         xen_platform_parameters_t params = {
             .virt_start = HYPERVISOR_VIRT_START
         };
-        if ( copy_to_user(arg, &params, sizeof(params)) )
+        if ( copy_to_guest(arg, &params, 1) )
             return -EFAULT;
         return 0;
         
@@ -174,7 +175,7 @@ long do_xen_version(int cmd, void *arg)
     {
         xen_changeset_info_t chgset;
         safe_strcpy(chgset, XEN_CHANGESET);
-        if ( copy_to_user(arg, chgset, sizeof(chgset)) )
+        if ( copy_to_guest(arg, (char *)chgset, sizeof(chgset)) )
             return -EFAULT;
         return 0;
     }
@@ -183,7 +184,7 @@ long do_xen_version(int cmd, void *arg)
     {
         xen_feature_info_t fi;
 
-        if ( copy_from_user(&fi, arg, sizeof(fi)) )
+        if ( copy_from_guest(&fi, arg, 1) )
             return -EFAULT;
 
         switch ( fi.submap_idx )
@@ -202,7 +203,7 @@ long do_xen_version(int cmd, void *arg)
             return -EINVAL;
         }
 
-        if ( copy_to_user(arg, &fi, sizeof(fi)) )
+        if ( copy_to_guest(arg, &fi, 1) )
             return -EFAULT;
         return 0;
     }
@@ -212,31 +213,34 @@ long do_xen_version(int cmd, void *arg)
     return -ENOSYS;
 }
 
-long do_nmi_op(unsigned int cmd, void *arg)
+long do_nmi_op(unsigned int cmd, GUEST_HANDLE(void) arg)
 {
     struct vcpu *v = current;
     struct domain *d = current->domain;
+    struct xennmi_callback cb;
     long rc = 0;
 
     switch ( cmd )
     {
     case XENNMI_register_callback:
+        rc = -EINVAL;
         if ( (d->domain_id != 0) || (v->vcpu_id != 0) )
-        { 
-           rc = -EINVAL;
-        }
-        else
-        {
-            v->nmi_addr = (unsigned long)arg;
+            break;
+
+        rc = -EFAULT;
+        if ( copy_from_guest(&cb, arg, 1) )
+            break;
+
+        v->nmi_addr = cb.handler_address;
 #ifdef CONFIG_X86
-            /*
-             * If no handler was registered we can 'lose the NMI edge'.
-             * Re-assert it now.
-             */
-            if ( d->shared_info->arch.nmi_reason != 0 )
-                set_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
+        /*
+         * If no handler was registered we can 'lose the NMI edge'. Re-assert 
+         * it now.
+         */
+        if ( d->shared_info->arch.nmi_reason != 0 )
+            set_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
 #endif
-        }
+        rc = 0;
         break;
     case XENNMI_unregister_callback:
         v->nmi_addr = 0;

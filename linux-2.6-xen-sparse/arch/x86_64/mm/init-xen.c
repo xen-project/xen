@@ -244,7 +244,6 @@ static void set_pte_phys(unsigned long vaddr,
 	if (pud_none(*pud)) {
 		pmd = (pmd_t *) spp_getpage(); 
 		make_page_readonly(pmd, XENFEAT_writable_page_tables);
-		xen_pmd_pin(__pa(pmd));
 		set_pud(pud, __pud(__pa(pmd) | _KERNPG_TABLE | _PAGE_USER));
 		if (pmd != pmd_offset(pud, 0)) {
 			printk("PAGETABLE BUG #01! %p <-> %p\n", pmd, pmd_offset(pud,0));
@@ -255,7 +254,6 @@ static void set_pte_phys(unsigned long vaddr,
 	if (pmd_none(*pmd)) {
 		pte = (pte_t *) spp_getpage();
 		make_page_readonly(pte, XENFEAT_writable_page_tables);
-		xen_pte_pin(__pa(pte));
 		set_pmd(pmd, __pmd(__pa(pte) | _KERNPG_TABLE | _PAGE_USER));
 		if (pte != pte_offset_kernel(pmd, 0)) {
 			printk("PAGETABLE BUG #02!\n");
@@ -297,7 +295,6 @@ static void set_pte_phys_ma(unsigned long vaddr,
 
 		pmd = (pmd_t *) spp_getpage(); 
 		make_page_readonly(pmd, XENFEAT_writable_page_tables);
-		xen_pmd_pin(__pa(pmd));
 
 		set_pud(pud, __pud(__pa(pmd) | _KERNPG_TABLE | _PAGE_USER));
 
@@ -311,7 +308,6 @@ static void set_pte_phys_ma(unsigned long vaddr,
 	if (pmd_none(*pmd)) {
 		pte = (pte_t *) spp_getpage();
 		make_page_readonly(pte, XENFEAT_writable_page_tables);
-		xen_pte_pin(__pa(pte));
 
 		set_pmd(pmd, __pmd(__pa(pte) | _KERNPG_TABLE | _PAGE_USER));
 		if (pte != pte_offset_kernel(pmd, 0)) {
@@ -461,7 +457,6 @@ phys_pmd_init(pmd_t *pmd, unsigned long address, unsigned long end)
 		}
 		pte = pte_save;
 		early_make_page_readonly(pte, XENFEAT_writable_page_tables);
-		xen_pte_pin(pte_phys);
 		set_pmd(pmd, __pmd(pte_phys | _KERNPG_TABLE));
 	}
 }
@@ -500,7 +495,6 @@ static void __meminit phys_pud_init(pud_t *pud, unsigned long address, unsigned 
 
 		pmd = alloc_static_page(&pmd_phys);
 		early_make_page_readonly(pmd, XENFEAT_writable_page_tables);
-		xen_pmd_pin(pmd_phys);
 		spin_lock(&init_mm.page_table_lock);
 		set_pud(pud, __pud(pmd_phys | _KERNPG_TABLE));
 		phys_pmd_init(pmd, paddr, end);
@@ -545,9 +539,6 @@ void __init xen_init_pt(void)
 
 	xen_pgd_pin(__pa_symbol(init_level4_pgt));
 	xen_pgd_pin(__pa_symbol(init_level4_user_pgt));
-	xen_pud_pin(__pa_symbol(level3_kernel_pgt));
-	xen_pud_pin(__pa_symbol(level3_user_pgt));
-	xen_pmd_pin(__pa_symbol(level2_kernel_pgt));
 
 	set_pgd((pgd_t *)(init_level4_user_pgt + 511), 
 		mk_kernel_pgd(__pa_symbol(level3_user_pgt)));
@@ -581,7 +572,6 @@ void __init extend_init_mapping(void)
 			pte_page = alloc_static_page(&phys);
 			early_make_page_readonly(
 				pte_page, XENFEAT_writable_page_tables);
-			xen_pte_pin(phys);
 			set_pmd(pmd, __pmd(phys | _KERNPG_TABLE | _PAGE_USER));
 		} else {
 			addr = page[pmd_index(va)];
@@ -662,7 +652,6 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 			pud = alloc_static_page(&pud_phys);
 			early_make_page_readonly(pud, XENFEAT_writable_page_tables);
 		}
-		xen_pud_pin(pud_phys);
 		next = start + PGDIR_SIZE;
 		if (next > end) 
 			next = end; 
@@ -757,10 +746,16 @@ void __init paging_init(void)
 	free_area_init_node(0, NODE_DATA(0), zones,
 			    __pa(PAGE_OFFSET) >> PAGE_SHIFT, holes);
 
-	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
-	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+	if (!xen_feature(XENFEAT_auto_translated_physmap) ||
+	    xen_start_info->shared_info >= xen_start_info->nr_pages) {
+		/* Switch to the real shared_info page, and clear the
+		 * dummy page. */
+		set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
+		HYPERVISOR_shared_info =
+			(shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+		memset(empty_zero_page, 0, sizeof(empty_zero_page));
+	}
 
-	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 	init_mm.context.pinned = 1;
 
 	/* Setup mapping of lower 1st MB */
@@ -937,7 +932,6 @@ void free_initmem(void)
 		ClearPageReserved(virt_to_page(addr));
 		set_page_count(virt_to_page(addr), 1);
 		memset((void *)(addr & ~(PAGE_SIZE-1)), 0xcc, PAGE_SIZE); 
-		xen_pte_unpin(__pa(addr));
 		make_page_writable(
 			__va(__pa(addr)), XENFEAT_writable_page_tables);
 		/*

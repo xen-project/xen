@@ -280,7 +280,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     int            gs_override = 0;
 
     /* WARNING: We only work for ring-3 segments. */
-    if ( unlikely(VM86_MODE(regs)) || unlikely(!RING_3(regs)) )
+    if ( unlikely(vm86_mode(regs)) || unlikely(!ring_3(regs)) )
     {
         DPRINTK("Taken fault at bad CS %04x\n", regs->cs);
         goto fail;

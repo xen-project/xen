@@ -83,4 +83,4 @@ class IOPortsController(DevController):
                 'ioports: Failed to configure legacy i/o range: %s - %s' %
                 (io_from, io_to))
 
-        return (dev, {}, {})
+        return (None, {}, {})

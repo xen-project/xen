@@ -51,8 +51,11 @@ typedef struct { intpte_t l4; } l4_pgentry_t;
 #define READ_FAULT  0
 #define WRITE_FAULT 1
 
-#define ERROR_W    2
+#define ERROR_P     1
+#define ERROR_W     2
 #define ERROR_U     4
+#define ERROR_I     (1 << 4)
+
 #define X86_64_SHADOW_DEBUG 0
 
 #if X86_64_SHADOW_DEBUG

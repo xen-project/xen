@@ -14,6 +14,7 @@
 #include <xen/rangeset.h>
 #include <asm/debugger.h>
 #include <asm/shadow.h>
+#include <asm/div64.h>
 
 #define KEY_MAX 256
 #define STR_MAX  64
@@ -168,6 +169,58 @@ static void dump_domains(unsigned char key)
     read_unlock(&domlist_lock);
 }
 
+static cpumask_t read_clocks_cpumask = CPU_MASK_NONE;
+static s_time_t read_clocks_time[NR_CPUS];
+
+static void read_clocks_slave(void *unused)
+{
+    unsigned int cpu = smp_processor_id();
+    while ( !cpu_isset(cpu, read_clocks_cpumask) )
+        cpu_relax();
+    read_clocks_time[cpu] = NOW();
+    cpu_clear(cpu, read_clocks_cpumask);
+}
+
+static void read_clocks(unsigned char key)
+{
+    unsigned int cpu = smp_processor_id(), min_cpu, max_cpu;
+    u64 min, max, dif, difus;
+    static DEFINE_SPINLOCK(lock);
+
+    spin_lock(&lock);
+
+    smp_call_function(read_clocks_slave, NULL, 0, 0);
+
+    local_irq_disable();
+    read_clocks_cpumask = cpu_online_map;
+    read_clocks_time[cpu] = NOW();
+    cpu_clear(cpu, read_clocks_cpumask);
+    local_irq_enable();
+
+    while ( !cpus_empty(read_clocks_cpumask) )
+        cpu_relax();
+
+    min_cpu = max_cpu = cpu;
+    for_each_online_cpu ( cpu )
+    {
+        if ( read_clocks_time[cpu] < read_clocks_time[min_cpu] )
+            min_cpu = cpu;
+        if ( read_clocks_time[cpu] > read_clocks_time[max_cpu] )
+            max_cpu = cpu;
+    }
+
+    min = read_clocks_time[min_cpu];
+    max = read_clocks_time[max_cpu];
+
+    spin_unlock(&lock);
+
+    dif = difus = max - min;
+    do_div(difus, 1000);
+    printk("Min = %"PRIu64" ; Max = %"PRIu64" ; Diff = %"PRIu64
+           " (%"PRIu64" microseconds)\n",
+           min, max, dif, difus);
+}
+
 extern void dump_runq(unsigned char key);
 #ifndef NDEBUG
 extern void audit_domains_key(unsigned char key);
@@ -178,7 +231,7 @@ extern void perfc_printall(unsigned char key);
 extern void perfc_reset(unsigned char key);
 #endif
 
-void do_debug_key(unsigned char key, struct cpu_user_regs *regs)
+static void do_debug_key(unsigned char key, struct cpu_user_regs *regs)
 {
     (void)debugger_trap_fatal(0xf001, regs);
     nop(); /* Prevent the compiler doing tail call
@@ -187,7 +240,7 @@ void do_debug_key(unsigned char key, struct cpu_user_regs *regs)
 }
 
 #ifndef NDEBUG
-void debugtrace_key(unsigned char key)
+static void debugtrace_key(unsigned char key)
 {
     debugtrace_send_to_console = !debugtrace_send_to_console;
     debugtrace_dump();
@@ -210,6 +263,9 @@ void initialize_keytable(void)
         'r', dump_runq,      "dump run queues");
     register_irq_keyhandler(
         'R', halt_machine,   "reboot machine"); 
+
+    register_keyhandler(
+        't', read_clocks, "display multi-cpu clock info");
 
 #ifndef NDEBUG
     register_keyhandler(

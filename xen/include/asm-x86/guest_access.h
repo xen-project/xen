@@ -41,6 +41,20 @@
     copy_from_user(_y, _x+(off), sizeof(*_x)*(nr));     \
 })
 
+/* Copy sub-field of a structure to guest context via a guest handle. */
+#define copy_field_to_guest(hnd, ptr, field) ({         \
+    const typeof(&(ptr)->field) _x = &(hnd).p->field;   \
+    const typeof(&(ptr)->field) _y = &(ptr)->field;     \
+    copy_to_user(_x, _y, sizeof(*_x));                  \
+})
+
+/* Copy sub-field of a structure from guest context via a guest handle. */
+#define copy_field_from_guest(ptr, hnd, field) ({       \
+    const typeof(&(ptr)->field) _x = &(hnd).p->field;   \
+    const typeof(&(ptr)->field) _y = &(ptr)->field;     \
+    copy_from_user(_y, _x, sizeof(*_x));                \
+})
+
 /*
  * Pre-validate a guest handle.
  * Allows use of faster __copy_* functions.
@@ -58,6 +72,18 @@
     const typeof(ptr) _x = (hnd).p;                     \
     const typeof(ptr) _y = (ptr);                       \
     __copy_from_user(_y, _x+(off), sizeof(*_x)*(nr));   \
+})
+
+#define __copy_field_to_guest(hnd, ptr, field) ({       \
+    const typeof(&(ptr)->field) _x = &(hnd).p->field;   \
+    const typeof(&(ptr)->field) _y = &(ptr)->field;     \
+    __copy_to_user(_x, _y, sizeof(*_x));                \
+})
+
+#define __copy_field_from_guest(ptr, hnd, field) ({     \
+    const typeof(&(ptr)->field) _x = &(hnd).p->field;   \
+    const typeof(&(ptr)->field) _y = &(ptr)->field;     \
+    __copy_from_user(_y, _x, sizeof(*_x));              \
 })
 
 #endif /* __ASM_X86_GUEST_ACCESS_H__ */

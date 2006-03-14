@@ -39,7 +39,7 @@ extern char *kasprintf(const char *fmt, ...);
     pr_debug("xenbus_client (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 
 int xenbus_watch_path(struct xenbus_device *dev, const char *path,
-		      struct xenbus_watch *watch, 
+		      struct xenbus_watch *watch,
 		      void (*callback)(struct xenbus_watch *,
 				       const char **, unsigned int))
 {
@@ -62,7 +62,7 @@ EXPORT_SYMBOL(xenbus_watch_path);
 
 
 int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
-		       const char *path2, struct xenbus_watch *watch, 
+		       const char *path2, struct xenbus_watch *watch,
 		       void (*callback)(struct xenbus_watch *,
 					const char **, unsigned int))
 {
@@ -74,9 +74,8 @@ int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
 	}
 	err = xenbus_watch_path(dev, state, watch, callback);
 
-	if (err) {
+	if (err)
 		kfree(state);
-	}
 	return err;
 }
 EXPORT_SYMBOL(xenbus_watch_path2);
@@ -190,7 +189,7 @@ void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
 	va_start(ap, fmt);
 	_dev_error(dev, err, fmt, ap);
 	va_end(ap);
-	
+
 	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosing);
 }
 EXPORT_SYMBOL(xenbus_dev_fatal);
@@ -213,7 +212,6 @@ int xenbus_alloc_evtchn(struct xenbus_device *dev, int *port)
 		.u.alloc_unbound.dom = DOMID_SELF,
 		.u.alloc_unbound.remote_dom = dev->otherend_id
 	};
-
 	int err = HYPERVISOR_event_channel_op(&op);
 	if (err)
 		xenbus_dev_fatal(dev, err, "allocating event channel");
@@ -231,7 +229,6 @@ int xenbus_bind_evtchn(struct xenbus_device *dev, int remote_port, int *port)
 		.u.bind_interdomain.remote_dom = dev->otherend_id,
 		.u.bind_interdomain.remote_port = remote_port,
 	};
-
 	int err = HYPERVISOR_event_channel_op(&op);
 	if (err)
 		xenbus_dev_fatal(dev, err,
@@ -388,7 +385,6 @@ EXPORT_SYMBOL(xenbus_unmap_ring);
 XenbusState xenbus_read_driver_state(const char *path)
 {
 	XenbusState result;
-
 	int err = xenbus_gather(XBT_NULL, path, "state", "%d", &result, NULL);
 	if (err)
 		result = XenbusStateClosed;

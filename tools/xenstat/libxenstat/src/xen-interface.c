@@ -31,7 +31,7 @@ struct xi_handle {
 
 /* Initialize for xen-interface.  Returns a handle to be used with subsequent
  * calls to the xen-interface functions or NULL if an error occurs. */
-xi_handle *xi_init()
+xi_handle *xi_init(void)
 {
 	xi_handle *handle;
 

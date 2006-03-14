@@ -13,7 +13,9 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2006 XenSource Ltd.
 #============================================================================
+
 import threading
 
 import string
@@ -28,6 +30,7 @@ from xen.xend.Args import ArgError
 from xen.xend.XendError import XendError
 
 import http
+import unix
 from resource import Resource, ErrorPage
 from SrvDir import SrvDir
 
@@ -267,30 +270,27 @@ class HttpServer:
 
     closed = False
 
-    def __init__(self, interface='', port=8080, root=None):
-        if root is None:
-            root = SrvDir()
+    def __init__(self, root, interface, port=8080):
+        self.root = root
         self.interface = interface
         self.port = port
-        self.root = root
         # ready indicates when we are ready to begin accept connections
         # it should be set after a successful bind
         self.ready = False
-
-    def getRoot(self):
-        return self.root
-
-    def getPort(self):
-        return self.port
 
     def run(self):
         self.bind()
         self.listen()
         self.ready = True
-        self.requestLoop()
+
+        while not self.closed:
+            (sock, addr) = self.accept()
+            self.processRequest(sock, addr)
+
 
     def stop(self):
         self.close()
+
 
     def bind(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -303,23 +303,12 @@ class HttpServer:
     def accept(self):
         return self.socket.accept()
 
-    def requestLoop(self):
-        while not self.closed:
-            self.acceptRequest()
-
     def close(self):
         self.closed = True
         try:
             self.socket.close()
         except:
             pass
-
-    def acceptRequest(self):
-        try:
-            (sock, addr) = self.accept()
-            self.processRequest(sock, addr)
-        except socket.error:
-            return
 
     def processRequest(self, sock, addr):
         try:
@@ -340,23 +329,12 @@ class HttpServer:
     def getResource(self, req):
         return self.root.getRequestResource(req)
 
+
 class UnixHttpServer(HttpServer):
 
-    def __init__(self, path=None, root=None):
-        HttpServer.__init__(self, interface='localhost', root=root)
+    def __init__(self, root, path):
+        HttpServer.__init__(self, root, 'localhost')
         self.path = path
         
     def bind(self):
-        pathdir = os.path.dirname(self.path)
-        if not os.path.exists(pathdir):
-            os.makedirs(pathdir)
-        else:
-            try:
-                os.unlink(self.path)
-            except SystemExit:
-                raise
-            except Exception, ex:
-                pass
-        self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        #self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.socket.bind(self.path)
+        self.socket = unix.bind(self.path)

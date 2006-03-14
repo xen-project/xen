@@ -25,13 +25,14 @@
 #include <xen/event.h>
 #include <xen/trace.h>
 #include <xen/console.h>
+#include <xen/guest_access.h>
 #include <asm/shadow.h>
 #include <public/sched_ctl.h>
 #include <acm/acm_hooks.h>
 
 #ifndef ACM_SECURITY
 
-long do_acm_op(struct acm_op * u_acm_op)
+long do_acm_op(GUEST_HANDLE(acm_op_t) u_acm_op)
 {
     return -ENOSYS;
 }
@@ -56,7 +57,7 @@ int acm_authorize_acm_ops(struct domain *d, enum acm_operation pops)
     return 0;
 }
 
-long do_acm_op(struct acm_op * u_acm_op)
+long do_acm_op(GUEST_HANDLE(acm_op_t) u_acm_op)
 {
     long ret = 0;
     struct acm_op curop, *op = &curop;
@@ -64,7 +65,7 @@ long do_acm_op(struct acm_op * u_acm_op)
     if (acm_authorize_acm_ops(current->domain, POLICY))
         return -EPERM;
 
-    if (copy_from_user(op, u_acm_op, sizeof(*op)))
+    if (copy_from_guest(op, u_acm_op, 1))
         return -EFAULT;
 
     if (op->interface_version != ACM_INTERFACE_VERSION)
@@ -88,7 +89,7 @@ long do_acm_op(struct acm_op * u_acm_op)
             ret = acm_get_policy(op->u.getpolicy.pullcache,
                                  op->u.getpolicy.pullcache_size);
         if (!ret)
-            copy_to_user(u_acm_op, op, sizeof(*op));
+            copy_to_guest(u_acm_op, op, 1);
     }
     break;
 
@@ -99,7 +100,7 @@ long do_acm_op(struct acm_op * u_acm_op)
             ret = acm_dump_statistics(op->u.dumpstats.pullcache,
                                       op->u.dumpstats.pullcache_size);
         if (!ret)
-            copy_to_user(u_acm_op, op, sizeof(*op));
+            copy_to_guest(u_acm_op, op, 1);
     }
     break;
 
@@ -139,7 +140,7 @@ long do_acm_op(struct acm_op * u_acm_op)
                            op->u.getssid.ssidbuf,
                            op->u.getssid.ssidbuf_size);
         if (!ret)
-            copy_to_user(u_acm_op, op, sizeof(*op));
+            copy_to_guest(u_acm_op, op, 1);
     }
     break;
 
@@ -215,7 +216,7 @@ long do_acm_op(struct acm_op * u_acm_op)
             ret = -ESRCH;
 
         if (!ret)
-            copy_to_user(u_acm_op, op, sizeof(*op));
+            copy_to_guest(u_acm_op, op, 1);
     }
     break;
 

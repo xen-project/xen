@@ -26,7 +26,7 @@ typedef struct xenstat_network xenstat_network;
 
 /* Initialize the xenstat library.  Returns a handle to be used with
  * subsequent calls to the xenstat library, or NULL if an error occurs. */
-xenstat_handle *xenstat_init();
+xenstat_handle *xenstat_init(void);
 
 /* Release the handle to libxc, free resources, etc. */
 void xenstat_uninit(xenstat_handle * handle);

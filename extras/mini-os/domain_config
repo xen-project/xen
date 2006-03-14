@@ -15,3 +15,5 @@ memory = 32
 
 # A name for your domain. All domains must have different names.
 name = "Mini-OS"
+
+on_crash = 'destroy'

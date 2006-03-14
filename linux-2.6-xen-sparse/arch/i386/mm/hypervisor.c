@@ -201,56 +201,6 @@ void xen_pgd_unpin(unsigned long ptr)
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
-void xen_pte_pin(unsigned long ptr)
-{
-	struct mmuext_op op;
-	op.cmd = MMUEXT_PIN_L1_TABLE;
-	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
-	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
-}
-
-void xen_pte_unpin(unsigned long ptr)
-{
-	struct mmuext_op op;
-	op.cmd = MMUEXT_UNPIN_TABLE;
-	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
-	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
-}
-
-#ifdef CONFIG_X86_64
-void xen_pud_pin(unsigned long ptr)
-{
-	struct mmuext_op op;
-	op.cmd = MMUEXT_PIN_L3_TABLE;
-	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
-	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
-}
-
-void xen_pud_unpin(unsigned long ptr)
-{
-	struct mmuext_op op;
-	op.cmd = MMUEXT_UNPIN_TABLE;
-	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
-	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
-}
-
-void xen_pmd_pin(unsigned long ptr)
-{
-	struct mmuext_op op;
-	op.cmd = MMUEXT_PIN_L2_TABLE;
-	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
-	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
-}
-
-void xen_pmd_unpin(unsigned long ptr)
-{
-	struct mmuext_op op;
-	op.cmd = MMUEXT_UNPIN_TABLE;
-	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
-	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
-}
-#endif /* CONFIG_X86_64 */
-
 void xen_set_ldt(unsigned long ptr, unsigned long len)
 {
 	struct mmuext_op op;

@@ -7,8 +7,6 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 MAJOR    = 3.0
 MINOR    = 0
 
-CC       = gcc
-
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
@@ -48,9 +46,7 @@ BUILD_SRCS += xc_linux_save.c
 BUILD_SRCS += xc_hvm_build.c
 endif
 
-CFLAGS   += -Wall
 CFLAGS   += -Werror
-CFLAGS   += -O3
 CFLAGS   += -fno-strict-aliasing
 CFLAGS   += $(INCLUDES) -I.
 

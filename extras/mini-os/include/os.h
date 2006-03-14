@@ -59,6 +59,8 @@ extern shared_info_t *HYPERVISOR_shared_info;
 
 void trap_init(void);
 
+
+
 /* 
  * The use of 'barrier' in the following reflects their use as local-lock
  * operations. Reentrancy must be prevented (e.g., __cli()) /before/ following

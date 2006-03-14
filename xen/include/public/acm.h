@@ -152,7 +152,7 @@ struct acm_ste_stats_buffer {
     uint32_t ec_eval_count;
     uint32_t gt_eval_count;
     uint32_t ec_denied_count;
-    uint32_t gt_denied_count; 
+    uint32_t gt_denied_count;
     uint32_t ec_cachehit_count;
     uint32_t gt_cachehit_count;
 };

@@ -181,7 +181,6 @@ static inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long add
 static inline void pte_free_kernel(pte_t *pte)
 {
 	BUG_ON((unsigned long)pte & (PAGE_SIZE-1));
-        xen_pte_unpin(__pa(pte));
         make_page_writable(pte, XENFEAT_writable_page_tables);
 	free_page((unsigned long)pte); 
 }

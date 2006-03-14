@@ -20,10 +20,8 @@ GDB	:= gdb
 INCS	:= -I. -I-
 DEFS	:= 
 LDFLAGS	:= 
-CFLAGS	:= -Wall -Wpointer-arith -Wcast-qual -Wno-unused -Wno-format
-CFLAGS	+= -Wmissing-prototypes
-#CFLAGS	+= -pipe -g -O0 -Wcast-align
-CFLAGS	+= -pipe -O3 
+CFLAGS	+= -Wpointer-arith -Wcast-qual -Wno-unused -Wno-format
+CFLAGS	+= -Wmissing-prototypes -pipe
 
 #  What object files need building for the program
 OBJS	:= mbootpack.o buildimage.o
@@ -33,7 +31,7 @@ DEPFLAGS = -Wp,-MD,.$(@F).d
 DEPS     = .*.d
 
 mbootpack: $(OBJS)
-	$(HOSTCC) -o $@ $(filter-out %.a, $^) $(LDFLAGS)
+	$(HOSTCC) -o $@ $(filter-out %.a, $^)
 
 clean:
 	$(RM) mbootpack *.o $(DEPS) bootsect setup bzimage_header.c bin2c

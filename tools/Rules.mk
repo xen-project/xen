@@ -10,16 +10,6 @@ XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
 XEN_LIBXENSTAT     = $(XEN_ROOT)/tools/xenstat/libxenstat/src
 
-ifeq ($(XEN_TARGET_ARCH),x86_32)
-CFLAGS  += -m32 -march=i686
-LDFLAGS += -m32
-endif
-
-ifeq ($(XEN_TARGET_ARCH),x86_64)
-CFLAGS  += -m64
-LDFLAGS += -m64
-endif
-
 X11_LDPATH = -L/usr/X11R6/$(LIBDIR)
 
 %.opic: %.c

@@ -252,14 +252,20 @@ gopts.var('disk', val='phy:DEV,VDEV,MODE[,DOM]',
 gopts.var('pci', val='BUS:DEV.FUNC',
           fn=append_value, default=[],
           use="""Add a PCI device to a domain, using given params (in hex).
-         For example '-pci c0:02.1a'.
+         For example 'pci=c0:02.1a'.
          The option may be repeated to add more than one pci device.""")
 
 gopts.var('ioports', val='FROM[-TO]',
           fn=append_value, default=[],
           use="""Add a legacy I/O range to a domain, using given params (in hex).
-         For example '-ioports 02f8-02ff'.
+         For example 'ioports=02f8-02ff'.
          The option may be repeated to add more than one i/o range.""")
+
+gopts.var('irq', val='IRQ',
+          fn=append_value, default=[],
+          use="""Add an IRQ (interrupt line) to a domain.
+         For example 'irq=7'.
+         This option may be repeated to add more than one IRQ.""")
 
 gopts.var('usb', val='PATH',
           fn=append_value, default=[],
@@ -488,6 +494,13 @@ def configure_ioports(config_devs, vals):
         config_ioports = ['ioports', ['from', io_from], ['to', io_to]]
         config_devs.append(['device', config_ioports])
 
+def configure_irq(config_devs, vals):
+    """Create the config for irqs.
+    """
+    for irq in vals.irq:
+        config_irq = ['irq', ['irq', irq]]
+        config_devs.append(['device', config_irq])
+
 def configure_usb(config_devs, vals):
     for path in vals.usb:
         config_usb = ['usb', ['path', path]]
@@ -615,6 +628,7 @@ def make_config(vals):
     configure_disks(config_devs, vals)
     configure_pci(config_devs, vals)
     configure_ioports(config_devs, vals)
+    configure_irq(config_devs, vals)
     configure_vifs(config_devs, vals)
     configure_usb(config_devs, vals)
     configure_vtpm(config_devs, vals)

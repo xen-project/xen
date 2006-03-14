@@ -14,6 +14,9 @@
 #include "pciback.h"
 #include "conf_space.h"
 
+static int permissive = 0;
+module_param(permissive, bool, 0644);
+
 #define DEFINE_PCI_CONFIG(op,size,type) 					\
 int pciback_##op##_config_##size 							\
 (struct pci_dev *dev, int offset, type value, void *data)	\
@@ -198,7 +201,7 @@ int pciback_config_read(struct pci_dev *dev, int offset, int size,
 
 int pciback_config_write(struct pci_dev *dev, int offset, int size, u32 value)
 {
-	int err = 0;
+	int err = 0, handled = 0;
 	struct pciback_dev_data *dev_data = pci_get_drvdata(dev);
 	struct config_field_entry *cfg_entry;
 	struct config_field *field;
@@ -233,6 +236,21 @@ int pciback_config_write(struct pci_dev *dev, int offset, int size, u32 value)
 					      field_start - req_start);
 
 			err = conf_space_write(dev, cfg_entry, offset, tmp_val);
+			handled = 1;
+		}
+	}
+
+	if (!handled && !err && permissive) {
+		switch (size) {
+		case 1:
+			err = pci_write_config_byte(dev, offset, (u8)value);
+			break;
+		case 2:
+			err = pci_write_config_word(dev, offset, (u16)value);
+			break;
+		case 4:
+			err = pci_write_config_dword(dev, offset, (u32)value);
+			break;
 		}
 	}
 

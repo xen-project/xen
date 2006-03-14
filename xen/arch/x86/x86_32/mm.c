@@ -144,7 +144,7 @@ void __init zap_low_mappings(l2_pgentry_t *base)
     flush_tlb_all_pge();
 }
 
-void subarch_init_memory(struct domain *dom_xen)
+void subarch_init_memory(void)
 {
     unsigned long m2p_start_mfn;
     unsigned int i, j;
@@ -175,10 +175,7 @@ void subarch_init_memory(struct domain *dom_xen)
         for ( j = 0; j < L2_PAGETABLE_ENTRIES; j++ )
         {
             struct page_info *page = mfn_to_page(m2p_start_mfn + j);
-            page->count_info = PGC_allocated | 1;
-            /* Ensure it's only mapped read-only by domains. */
-            page->u.inuse.type_info = PGT_gdt_page | 1;
-            page_set_owner(page, dom_xen);
+            share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
         }
     }
 

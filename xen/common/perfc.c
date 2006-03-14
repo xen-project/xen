@@ -8,7 +8,6 @@
 #include <xen/mm.h>
 #include <xen/guest_access.h>
 #include <public/dom0_ops.h>
-#include <asm/uaccess.h>
 
 #undef  PERFCOUNTER
 #undef  PERFCOUNTER_CPU

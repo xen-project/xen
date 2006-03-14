@@ -27,6 +27,7 @@
 #include <xen/softirq.h>
 #include <xen/trace.h>
 #include <xen/mm.h>
+#include <xen/guest_access.h>
 #include <public/sched.h>
 #include <public/sched_ctl.h>
 
@@ -42,6 +43,7 @@ string_param("sched", opt_sched);
 static void s_timer_fn(void *unused);
 static void t_timer_fn(void *unused);
 static void dom_timer_fn(void *data);
+static void poll_timer_fn(void *data);
 
 /* This is global for now so that private implementations can reach it */
 struct schedule_data schedule_data[NR_CPUS];
@@ -164,8 +166,9 @@ struct vcpu *alloc_vcpu(
 
 void sched_add_domain(struct vcpu *v) 
 {
-    /* Initialise the per-domain timer. */
+    /* Initialise the per-domain timers. */
     init_timer(&v->timer, dom_timer_fn, v, v->processor);
+    init_timer(&v->poll_timer, poll_timer_fn, v, v->processor);
 
     if ( is_idle_vcpu(v) )
     {
@@ -181,6 +184,8 @@ void sched_add_domain(struct vcpu *v)
 void sched_rem_domain(struct vcpu *v) 
 {
     kill_timer(&v->timer);
+    kill_timer(&v->poll_timer);
+
     SCHED_OP(rem_task, v);
     TRACE_2D(TRC_SCHED_DOM_REM, v->domain->domain_id, v->vcpu_id);
 }
@@ -270,6 +275,55 @@ static long do_block(void)
     return 0;
 }
 
+static long do_poll(struct sched_poll *sched_poll)
+{
+    struct vcpu  *v = current;
+    evtchn_port_t port;
+    long          rc = 0;
+    unsigned int  i;
+
+    /* Fairly arbitrary limit. */
+    if ( sched_poll->nr_ports > 128 )
+        return -EINVAL;
+
+    if ( !guest_handle_okay(sched_poll->ports, sched_poll->nr_ports) )
+        return -EFAULT;
+
+    /* Ensure that upcalls are disabled: tested by evtchn_set_pending(). */
+    if ( !v->vcpu_info->evtchn_upcall_mask )
+        return -EINVAL;
+
+    set_bit(_VCPUF_blocked, &v->vcpu_flags);
+
+    /* Check for events /after/ blocking: avoids wakeup waiting race. */
+    for ( i = 0; i < sched_poll->nr_ports; i++ )
+    {
+        rc = -EFAULT;
+        if ( __copy_from_guest_offset(&port, sched_poll->ports, i, 1) )
+            goto out;
+
+        rc = -EINVAL;
+        if ( port >= MAX_EVTCHNS )
+            goto out;
+
+        rc = 0;
+        if ( evtchn_pending(v->domain, port) )
+            goto out;
+    }
+
+    if ( sched_poll->timeout != 0 )
+        set_timer(&v->poll_timer, sched_poll->timeout);
+
+    TRACE_2D(TRC_SCHED_BLOCK, v->domain->domain_id, v->vcpu_id);
+    __enter_scheduler();
+
+    stop_timer(&v->poll_timer);
+
+ out:
+    clear_bit(_VCPUF_blocked, &v->vcpu_flags);
+    return rc;
+}
+
 /* Voluntarily yield the processor for this allocation. */
 static long do_yield(void)
 {
@@ -301,6 +355,61 @@ long do_sched_op(int cmd, unsigned long arg)
         TRACE_3D(TRC_SCHED_SHUTDOWN,
                  current->domain->domain_id, current->vcpu_id, arg);
         domain_shutdown(current->domain, (u8)arg);
+        break;
+    }
+
+    default:
+        ret = -ENOSYS;
+    }
+
+    return ret;
+}
+
+long do_sched_op_new(int cmd, GUEST_HANDLE(void) arg)
+{
+    long ret = 0;
+
+    switch ( cmd )
+    {
+    case SCHEDOP_yield:
+    {
+        ret = do_yield();
+        break;
+    }
+
+    case SCHEDOP_block:
+    {
+        ret = do_block();
+        break;
+    }
+
+    case SCHEDOP_shutdown:
+    {
+        struct sched_shutdown sched_shutdown;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&sched_shutdown, arg, 1) )
+            break;
+
+        ret = 0;
+        TRACE_3D(TRC_SCHED_SHUTDOWN,
+                 current->domain->domain_id, current->vcpu_id,
+                 sched_shutdown.reason);
+        domain_shutdown(current->domain, (u8)sched_shutdown.reason);
+
+        break;
+    }
+
+    case SCHEDOP_poll:
+    {
+        struct sched_poll sched_poll;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&sched_poll, arg, 1) )
+            break;
+
+        ret = do_poll(&sched_poll);
+
         break;
     }
 
@@ -516,6 +625,13 @@ static void dom_timer_fn(void *data)
 
     update_dom_time(v);
     send_guest_virq(v, VIRQ_TIMER);
+}
+
+/* SCHEDOP_poll timeout callback. */
+static void poll_timer_fn(void *data)
+{
+    struct vcpu *v = data;
+    vcpu_unblock(v);
 }
 
 /* Initialise the data structures. */

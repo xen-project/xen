@@ -664,6 +664,13 @@ void __init setup_arch(char **cmdline_p)
 
 	setup_xen_features();
 
+	if (xen_feature(XENFEAT_auto_translated_physmap) &&
+	    xen_start_info->shared_info < xen_start_info->nr_pages) {
+		HYPERVISOR_shared_info =
+			(shared_info_t *)__va(xen_start_info->shared_info);
+		memset(empty_zero_page, 0, sizeof(empty_zero_page));
+	}
+
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_writable_pagetables);
 

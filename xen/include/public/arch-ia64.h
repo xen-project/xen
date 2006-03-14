@@ -60,8 +60,8 @@ typedef struct {
 
 #define INVALID_MFN       (~0UL)
 
-#define MEM_G   (1UL << 30)	
-#define MEM_M   (1UL << 20)	
+#define MEM_G   (1UL << 30)
+#define MEM_M   (1UL << 20)
 
 #define MMIO_START       (3 * MEM_G)
 #define MMIO_SIZE        (512 * MEM_M)
@@ -70,7 +70,7 @@ typedef struct {
 #define VGA_IO_SIZE      0x20000
 
 #define LEGACY_IO_START  (MMIO_START + MMIO_SIZE)
-#define LEGACY_IO_SIZE   (64*MEM_M)  
+#define LEGACY_IO_SIZE   (64*MEM_M)
 
 #define IO_PAGE_START (LEGACY_IO_START + LEGACY_IO_SIZE)
 #define IO_PAGE_SIZE  PAGE_SIZE
@@ -82,7 +82,7 @@ typedef struct {
 #define IO_SAPIC_SIZE    0x100000
 
 #define PIB_START 0xfee00000UL
-#define PIB_SIZE 0x100000 
+#define PIB_SIZE 0x100000
 
 #define GFW_START        (4*MEM_G -16*MEM_M)
 #define GFW_SIZE         (16*MEM_M)
@@ -300,7 +300,7 @@ typedef struct {
 
 typedef struct {
     unsigned long start;
-    unsigned long size; 
+    unsigned long size;
 } arch_initrd_info_t;
 
 #define IA64_COMMAND_LINE_SIZE 512

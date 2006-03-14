@@ -24,7 +24,7 @@ void show_registers(struct cpu_user_regs *regs)
     char taint_str[TAINT_STRING_MAX_LEN];
     const char *context;
 
-    if ( HVM_DOMAIN(current) && GUEST_MODE(regs) )
+    if ( hvm_guest(current) && guest_mode(regs) )
     {
         context = "hvm";
         hvm_store_cpu_guest_regs(current, &fault_regs);
@@ -32,9 +32,9 @@ void show_registers(struct cpu_user_regs *regs)
     }
     else
     {
-        context = GUEST_MODE(regs) ? "guest" : "hypervisor";
+        context = guest_mode(regs) ? "guest" : "hypervisor";
 
-        if ( !GUEST_MODE(regs) )
+        if ( !guest_mode(regs) )
         {
             fault_regs.esp = (unsigned long)&regs->esp;
             fault_regs.ss = read_segment_register(ss);
@@ -53,7 +53,7 @@ void show_registers(struct cpu_user_regs *regs)
            print_tainted(taint_str));
     printk("CPU:    %d\nEIP:    %04x:[<%08x>]",
            smp_processor_id(), fault_regs.cs, fault_regs.eip);
-    if ( !GUEST_MODE(regs) )
+    if ( !guest_mode(regs) )
         print_symbol(" %s", fault_regs.eip);
     printk("\nEFLAGS: %08x   CONTEXT: %s\n", fault_regs.eflags, context);
     printk("eax: %08x   ebx: %08x   ecx: %08x   edx: %08x\n",
@@ -172,17 +172,17 @@ unsigned long do_iret(void)
     regs->esp += 4;
     regs->eflags = (eflags & ~X86_EFLAGS_IOPL) | X86_EFLAGS_IF;
 
-    if ( VM86_MODE(regs) )
+    if ( vm86_mode(regs) )
     {
         /* Return to VM86 mode: pop and restore ESP,SS,ES,DS,FS and GS. */
         if ( __copy_from_user(&regs->esp, (void __user *)regs->esp, 24) )
             domain_crash_synchronous();
     }
-    else if ( unlikely(RING_0(regs)) )
+    else if ( unlikely(ring_0(regs)) )
     {
         domain_crash_synchronous();
     }
-    else if ( !RING_1(regs) )
+    else if ( !ring_1(regs) )
     {
         /* Return to ring 2/3: pop and restore ESP and SS. */
         if ( __copy_from_user(&regs->esp, (void __user *)regs->esp, 8) )

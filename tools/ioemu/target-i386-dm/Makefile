@@ -13,7 +13,7 @@ ifdef CONFIG_USER_ONLY
 VPATH+=:$(SRC_PATH)/linux-user
 DEFINES+=-I$(SRC_PATH)/linux-user -I$(SRC_PATH)/linux-user/$(TARGET_ARCH)
 endif
-CFLAGS+=-Wall -O2 -g -fno-strict-aliasing
+CFLAGS+=-g -fno-strict-aliasing
 LDFLAGS=-g
 LIBS=
 HELPER_CFLAGS=$(CFLAGS)
@@ -99,7 +99,6 @@ LDFLAGS+=-static
 endif
 
 ifeq ($(ARCH),i386)
-CFLAGS+=-fomit-frame-pointer
 OP_CFLAGS=$(CFLAGS) -mpreferred-stack-boundary=2
 ifeq ($(HAVE_GCC3_OPTIONS),yes)
 OP_CFLAGS+= -falign-functions=0 -fno-gcse
@@ -236,7 +235,7 @@ endif
 all: $(PROGS)
 
 $(QEMU_USER): $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^  $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^  $(LIBS)
 ifeq ($(ARCH),alpha)
 # Mark as 32 bit binary, i. e. it will be mapped into the low 31 bit of
 # the address space (31 bit so sign extending doesn't matter)
@@ -312,7 +311,7 @@ endif
 endif
 
 $(QEMU_SYSTEM): $(VL_OBJS) libqemu.a
-	$(CC) $(VL_LDFLAGS) -o $@ $^ $(LIBS) $(SDL_LIBS) $(VNC_LIBS) $(VL_LIBS) -lpthread
+	$(CC) $(CFLAGS) $(VL_LDFLAGS) -o $@ $^ $(LIBS) $(SDL_LIBS) $(VNC_LIBS) $(VL_LIBS) -lpthread
 
 vnc.o: vnc.c keyboard_rdesktop.c
 	$(CC) $(CFLAGS) $(DEFINES) $(VNC_CFLAGS) -c -o $@ $<

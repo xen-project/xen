@@ -1,0 +1,4 @@
+create 01_create_basic_pos.test 07_create_mem64_pos.test 10_create_fastdestroy.test 14_create_blockroot_pos.test
+unpause 01_unpause_basic_pos.test
+memset 01_memset_basic_pos.test 03_memset_random_pos.test
+help 06_help_allcmds.test

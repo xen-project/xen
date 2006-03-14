@@ -144,7 +144,7 @@ struct t_buf *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
         exit(EXIT_FAILURE);
     }
 
-    tbufs_mapped = xc_map_foreign_range(xc_handle, 0 /* Dom 0 ID */,
+    tbufs_mapped = xc_map_foreign_range(xc_handle, DOMID_XEN,
                                         size * num, PROT_READ | PROT_WRITE,
                                         tbufs_mfn);
 
@@ -258,7 +258,7 @@ struct t_rec **init_rec_ptrs(struct t_buf **meta, unsigned int num)
 /**
  * get_num_cpus - get the number of logical CPUs
  */
-unsigned int get_num_cpus()
+unsigned int get_num_cpus(void)
 {
     dom0_op_t op;
     int xc_handle = xc_interface_open();

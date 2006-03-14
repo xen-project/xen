@@ -40,9 +40,8 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 {
 	int err = 0;
 	struct xen_pci_op *active_op = &pdev->sh_info->op;
-	unsigned long irq_flags;
-
-	unsigned int volatile ttl = (1U << 29);
+	unsigned long irq_flags, poll_end;
+	evtchn_port_t port = pdev->evtchn;
 
 	spin_lock_irqsave(&pdev->sh_info_lock, irq_flags);
 
@@ -51,14 +50,17 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 	/* Go */
 	wmb();
 	set_bit(_XEN_PCIF_active, (unsigned long *)&pdev->sh_info->flags);
-	notify_remote_via_evtchn(pdev->evtchn);
+	notify_remote_via_evtchn(port);
 
-	/* IRQs are disabled for the pci config. space reads/writes,
-	 * which means no event channel to notify us that the backend
-	 * is done so spin while waiting for the answer */
-	while (test_bit
-	       (_XEN_PCIF_active, (unsigned long *)&pdev->sh_info->flags)) {
-		if (!ttl) {
+	poll_end = jiffies + 5*HZ;
+	clear_evtchn(port);
+
+	while (test_bit(_XEN_PCIF_active,
+			(unsigned long *)&pdev->sh_info->flags)) {
+		if (HYPERVISOR_poll(&port, 1, poll_end))
+			BUG();
+		clear_evtchn(port);
+		if (time_after(jiffies, poll_end)) {
 			dev_err(&pdev->xdev->dev,
 				"pciback not responding!!!\n");
 			clear_bit(_XEN_PCIF_active,
@@ -66,7 +68,6 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 			err = XEN_PCI_ERR_dev_not_found;
 			goto out;
 		}
-		ttl--;
 	}
 
 	memcpy(op, active_op, sizeof(struct xen_pci_op));

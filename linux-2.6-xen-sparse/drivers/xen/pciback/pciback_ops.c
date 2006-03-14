@@ -5,21 +5,11 @@
  */
 #include <linux/module.h>
 #include <asm/bitops.h>
+#include <xen/evtchn.h>
 #include "pciback.h"
 
 int verbose_request = 0;
 module_param(verbose_request, int, 0644);
-
-/* For those architectures without a pcibios_disable_device */
-void __attribute__ ((weak)) pcibios_disable_device(struct pci_dev *dev) { }
-
-void pciback_disable_device(struct pci_dev *dev)
-{
-	if (dev->is_enabled) {
-		dev->is_enabled = 0;
-		pcibios_disable_device(dev);
-	}
-}
 
 /* Ensure a device is "turned off" and ready to be exported.
  * This also sets up the device's private data to keep track of what should
@@ -32,7 +22,7 @@ void pciback_reset_device(struct pci_dev *dev)
 
 	/* Disable devices (but not bridges) */
 	if (dev->hdr_type == PCI_HEADER_TYPE_NORMAL) {
-		pciback_disable_device(dev);
+		pci_disable_device(dev);
 
 		pci_write_config_word(dev, PCI_COMMAND, 0);
 
@@ -78,6 +68,7 @@ irqreturn_t pciback_handle_event(int irq, void *dev_id, struct pt_regs *regs)
 
 	wmb();
 	clear_bit(_XEN_PCIF_active, (unsigned long *)&pdev->sh_info->flags);
+	notify_remote_via_irq(pdev->evtchn_irq);
 
       out:
 	return IRQ_HANDLED;

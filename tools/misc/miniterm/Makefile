@@ -1,9 +1,10 @@
+XEN_ROOT:=../../..
+include $(XEN_ROOT)/tools/Rules.mk
+
 INSTALL		= install
 INSTALL_PROG	= $(INSTALL) -m0755
 INSTALL_DIR	= $(INSTALL) -d -m0755
 
-CC     = gcc
-CFLAGS = -Wall -O3
 TARGET = miniterm
 
 all: $(TARGET)
@@ -16,4 +17,4 @@ clean:
 	$(RM) *.o $(TARGET) *~
 
 $(TARGET): $(TARGET).c
-	$(CC) $(CFLAGS) -o $@ $<
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<

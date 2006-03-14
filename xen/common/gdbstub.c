@@ -35,7 +35,6 @@
    than any actual intention.  It doesn't at the moment. */
 
 #include <xen/lib.h>
-#include <asm/uaccess.h>
 #include <xen/spinlock.h>
 #include <xen/serial.h>
 #include <xen/irq.h>
@@ -348,7 +347,10 @@ gdb_cmd_write_mem(unsigned long addr, unsigned long length,
         }
     }
 
-    gdb_write_to_packet_str((x != length) ? "OK" : "E11", ctx);
+    if (x == length)
+        gdb_write_to_packet_str("OK", ctx);
+    else
+        gdb_write_to_packet_str("E11", ctx);
 
     dbg_printk("Write done.\n");
 
@@ -397,13 +399,18 @@ process_command(struct cpu_user_regs *regs, struct gdb_context *ctx)
         break;
     case 'M': /* Write memory */
         addr = simple_strtoul(ctx->in_buf + 1, &ptr, 16);
-        if ( (ptr == (ctx->in_buf + 1)) || (ptr[0] != ':') )
+        if ( (ptr == (ctx->in_buf + 1)) || (ptr[0] != ',') )
         {
             gdb_send_reply("E03", ctx);
             return 0;
         }
         length = simple_strtoul(ptr + 1, &ptr, 16);
-        gdb_cmd_write_mem(addr, length, ptr, ctx);
+        if ( ptr[0] != ':')
+        {
+            gdb_send_reply("E04", ctx);
+            return 0;
+        }
+        gdb_cmd_write_mem(addr, length, ptr + 1, ctx);
         break;
     case 'p': /* read register */
         addr = simple_strtoul(ctx->in_buf + 1, &ptr, 16);
@@ -419,12 +426,6 @@ process_command(struct cpu_user_regs *regs, struct gdb_context *ctx)
         }
         gdb_arch_read_reg(addr, regs, ctx);
         break;
-    case 'Z': /* We need to claim to support these or gdb
-                 won't let you continue the process. */
-    case 'z':
-        gdb_send_reply("OK", ctx);
-        break;
-
     case 'D':
         ctx->currently_attached = 0;
         gdb_send_reply("OK", ctx);

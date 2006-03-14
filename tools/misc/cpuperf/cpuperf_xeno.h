@@ -13,7 +13,7 @@
 
 static int xc_handle;
 
-void xen_init()
+void xen_init(void)
 {
     if ( (xc_handle = xc_interface_open()) == -1 )
     {
@@ -24,12 +24,12 @@ void xen_init()
 
 }
 
-void dom0_wrmsr( int cpu_mask, int msr, unsigned int low, unsigned int high )
+void dom0_wrmsr(int cpu_mask, int msr, unsigned int low, unsigned int high)
 {
     xc_msr_write (xc_handle, cpu_mask, msr, low, high);
 }
 
-unsigned long long dom0_rdmsr( int cpu_mask, int msr )
+unsigned long long dom0_rdmsr(int cpu_mask, int msr)
 {
     return xc_msr_read(xc_handle, cpu_mask, msr);
 }

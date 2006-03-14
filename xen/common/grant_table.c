@@ -28,8 +28,9 @@
 #include <xen/sched.h>
 #include <xen/shadow.h>
 #include <xen/mm.h>
-#include <acm/acm_hooks.h>
 #include <xen/trace.h>
+#include <xen/guest_access.h>
+#include <acm/acm_hooks.h>
 
 #define PIN_FAIL(_lbl, _rc, _f, _a...)          \
     do {                                        \
@@ -187,7 +188,7 @@ __gnttab_map_grant_ref(
 
             /* Merge two 16-bit values into a 32-bit combined update. */
             /* NB. Endianness! */
-            prev_scombo = scombo = ((u32)sdom << 16) | (u32)sflags;
+            scombo = ((u32)sdom << 16) | (u32)sflags;
 
             new_scombo = scombo | GTF_reading;
             if ( !(op->flags & GNTMAP_readonly) )
@@ -198,12 +199,7 @@ __gnttab_map_grant_ref(
                              "Attempt to write-pin a r/o grant entry.\n");
             }
 
-            /* NB. prev_scombo is updated in place to seen value. */
-            if ( unlikely(cmpxchg_user((u32 *)&sha->flags,
-                                       prev_scombo,
-                                       new_scombo)) )
-                PIN_FAIL(unlock_out, GNTST_general_error,
-                         "Fault while modifying shared flags and domid.\n");
+            prev_scombo = cmpxchg((u32 *)&sha->flags, scombo, new_scombo);
 
             /* Did the combined update work (did we see what we expected?). */
             if ( likely(prev_scombo == scombo) )
@@ -306,17 +302,17 @@ __gnttab_map_grant_ref(
 
 static long
 gnttab_map_grant_ref(
-    struct gnttab_map_grant_ref *uop, unsigned int count)
+    GUEST_HANDLE(gnttab_map_grant_ref_t) uop, unsigned int count)
 {
     int i;
     struct gnttab_map_grant_ref op;
 
     for ( i = 0; i < count; i++ )
     {
-        if ( unlikely(__copy_from_user(&op, &uop[i], sizeof(op))) )
+        if ( unlikely(__copy_from_guest_offset(&op, uop, i, 1)) )
             return -EFAULT;
         __gnttab_map_grant_ref(&op);
-        if ( unlikely(__copy_to_user(&uop[i], &op, sizeof(op))) )
+        if ( unlikely(__copy_to_guest_offset(uop, i, &op, 1)) )
             return -EFAULT;
     }
 
@@ -443,17 +439,17 @@ __gnttab_unmap_grant_ref(
 
 static long
 gnttab_unmap_grant_ref(
-    struct gnttab_unmap_grant_ref *uop, unsigned int count)
+    GUEST_HANDLE(gnttab_unmap_grant_ref_t) uop, unsigned int count)
 {
     int i;
     struct gnttab_unmap_grant_ref op;
 
     for ( i = 0; i < count; i++ )
     {
-        if ( unlikely(__copy_from_user(&op, &uop[i], sizeof(op))) )
+        if ( unlikely(__copy_from_guest_offset(&op, uop, i, 1)) )
             goto fault;
         __gnttab_unmap_grant_ref(&op);
-        if ( unlikely(__copy_to_user(&uop[i], &op, sizeof(op))) )
+        if ( unlikely(__copy_to_guest_offset(uop, i, &op, 1)) )
             goto fault;
     }
 
@@ -467,7 +463,7 @@ fault:
 
 static long 
 gnttab_setup_table(
-    struct gnttab_setup_table *uop, unsigned int count)
+    GUEST_HANDLE(gnttab_setup_table_t) uop, unsigned int count)
 {
     struct gnttab_setup_table op;
     struct domain *d;
@@ -478,7 +474,7 @@ gnttab_setup_table(
     if ( count != 1 )
         return -EINVAL;
 
-    if ( unlikely(copy_from_user(&op, uop, sizeof(op)) != 0) )
+    if ( unlikely(copy_from_guest(&op, uop, 1) != 0) )
     {
         DPRINTK("Fault while reading gnttab_setup_table_t.\n");
         return -EFAULT;
@@ -517,14 +513,14 @@ gnttab_setup_table(
         for ( i = 0; i < op.nr_frames; i++ )
         {
             gmfn = gnttab_shared_gmfn(d, d->grant_table, i);
-            (void)copy_to_user(&op.frame_list[i], &gmfn, sizeof(gmfn));
+            (void)copy_to_guest_offset(op.frame_list, i, &gmfn, 1);
         }
     }
 
     put_domain(d);
 
  out:
-    if ( unlikely(copy_to_user(uop, &op, sizeof(op))) )
+    if ( unlikely(copy_to_guest(uop, &op, 1)) )
         return -EFAULT;
 
     return 0;
@@ -572,15 +568,10 @@ gnttab_prepare_for_transfer(
 
         /* Merge two 16-bit values into a 32-bit combined update. */
         /* NB. Endianness! */
-        prev_scombo = scombo = ((u32)sdom << 16) | (u32)sflags;
+        scombo = ((u32)sdom << 16) | (u32)sflags;
 
-        /* NB. prev_scombo is updated in place to seen value. */
-        if ( unlikely(cmpxchg_user((u32 *)&sha->flags, prev_scombo, 
-                                   prev_scombo | GTF_transfer_committed)) )
-        {
-            DPRINTK("Fault while modifying shared flags and domid.\n");
-            goto fail;
-        }
+        prev_scombo = cmpxchg((u32 *)&sha->flags, scombo,
+                              scombo | GTF_transfer_committed);
 
         /* Did the combined update work (did we see what we expected?). */
         if ( likely(prev_scombo == scombo) )
@@ -608,7 +599,7 @@ gnttab_prepare_for_transfer(
 
 static long
 gnttab_transfer(
-    struct gnttab_transfer *uop, unsigned int count)
+    GUEST_HANDLE(gnttab_transfer_t) uop, unsigned int count)
 {
     struct domain *d = current->domain;
     struct domain *e;
@@ -621,7 +612,7 @@ gnttab_transfer(
     for ( i = 0; i < count; i++ )
     {
         /* Read from caller address space. */
-        if ( unlikely(__copy_from_user(&gop, &uop[i], sizeof(gop))) )
+        if ( unlikely(__copy_from_guest_offset(&gop, uop, i, 1)) )
         {
             DPRINTK("gnttab_transfer: error reading req %d/%d\n", i, count);
             return -EFAULT;
@@ -708,7 +699,7 @@ gnttab_transfer(
         gop.status = GNTST_okay;
 
     copyback:
-        if ( unlikely(__copy_from_user(&uop[i], &gop, sizeof(gop))) )
+        if ( unlikely(__copy_to_guest_offset(uop, i, &gop, 1)) )
         {
             DPRINTK("gnttab_transfer: error writing resp %d/%d\n", i, count);
             return -EFAULT;
@@ -718,9 +709,9 @@ gnttab_transfer(
     return 0;
 }
 
-long 
+long
 do_grant_table_op(
-    unsigned int cmd, void *uop, unsigned int count)
+    unsigned int cmd, GUEST_HANDLE(void) uop, unsigned int count)
 {
     long rc;
     struct domain *d = current->domain;
@@ -736,27 +727,38 @@ do_grant_table_op(
     switch ( cmd )
     {
     case GNTTABOP_map_grant_ref:
-        if ( unlikely(!array_access_ok(
-            uop, count, sizeof(gnttab_map_grant_ref_t))) )
+    {
+        GUEST_HANDLE(gnttab_map_grant_ref_t) map =
+            guest_handle_cast(uop, gnttab_map_grant_ref_t);
+        if ( unlikely(!guest_handle_okay(map, count)) )
             goto out;
-        rc = gnttab_map_grant_ref((gnttab_map_grant_ref_t *)uop, count);
+        rc = gnttab_map_grant_ref(map, count);
         break;
+    }
     case GNTTABOP_unmap_grant_ref:
-        if ( unlikely(!array_access_ok(
-            uop, count, sizeof(gnttab_unmap_grant_ref_t))) )
+    {
+        GUEST_HANDLE(gnttab_unmap_grant_ref_t) unmap =
+            guest_handle_cast(uop, gnttab_unmap_grant_ref_t);
+        if ( unlikely(!guest_handle_okay(unmap, count)) )
             goto out;
-        rc = gnttab_unmap_grant_ref(
-            (gnttab_unmap_grant_ref_t *)uop, count);
+        rc = gnttab_unmap_grant_ref(unmap, count);
         break;
+    }
     case GNTTABOP_setup_table:
-        rc = gnttab_setup_table((gnttab_setup_table_t *)uop, count);
+    {
+        rc = gnttab_setup_table(
+            guest_handle_cast(uop, gnttab_setup_table_t), count);
         break;
+    }
     case GNTTABOP_transfer:
-        if (unlikely(!array_access_ok(
-            uop, count, sizeof(gnttab_transfer_t))))
+    {
+        GUEST_HANDLE(gnttab_transfer_t) transfer =
+            guest_handle_cast(uop, gnttab_transfer_t);
+        if ( unlikely(!guest_handle_okay(transfer, count)) )
             goto out;
-        rc = gnttab_transfer(uop, count);
+        rc = gnttab_transfer(transfer, count);
         break;
+    }
     default:
         rc = -ENOSYS;
         break;

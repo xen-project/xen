@@ -452,6 +452,12 @@ def show_livestats():
         if c == ord('c'):
             cpu = (cpu + 1) % ncpu
 
+        # n/p = cycle to the next/previous CPU
+        if c == ord('n'):
+            cpu = (cpu + 1) % ncpu
+        if c == ord('p'):
+            cpu = (cpu - 1) % ncpu
+
         stdscr.erase()
 
     _c.nocbreak()
@@ -502,6 +508,7 @@ def writelog():
     shm = mmap.mmap(shmf.fileno(), QOS_DATA_SIZE)
 
     interval = 0
+    curr = last = time.time()
     outfiles = {}
     for dom in range(0, NDOMAINS):
         outfiles[dom] = Delayed("%s-dom%d.log" % (options.prefix, dom), 'w')
@@ -561,9 +568,10 @@ def writelog():
                                      h1[dom][4], 
                                      h1[dom][5][0], h1[dom][5][1]))
                     outfiles[dom].flush()
-
-        interval += options.interval
-        time.sleep(1)
+            curr = time.time()
+            interval += (curr - last) * 1000
+            last = curr
+        time.sleep(options.interval / 1000.0)
 
     for dom in range(0, NDOMAINS):
         outfiles[dom].close()

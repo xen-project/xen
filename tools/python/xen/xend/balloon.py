@@ -27,7 +27,8 @@ from XendLogging import log
 from XendError import VmError
 
 
-PROC_XEN_BALLOON = "/proc/xen/balloon"
+PROC_XEN_BALLOON = '/proc/xen/balloon'
+
 BALLOON_OUT_SLACK = 1 # MiB.  We need this because the physinfo details are
                       # rounded.
 RETRY_LIMIT = 10
@@ -39,6 +40,47 @@ RETRY_LIMIT = 10
 # such requirements.
 SLEEP_TIME_GROWTH = 0.1
 
+# A mapping between easy-to-remember labels and the more verbose
+# label actually shown in the PROC_XEN_BALLOON file.
+labels = { 'current'      : 'Current allocation',
+           'target'       : 'Requested target',
+           'low-balloon'  : 'Low-mem balloon',
+           'high-balloon' : 'High-mem balloon',
+           'limit'        : 'Xen hard limit' }
+
+def _get_proc_balloon(label):
+    """Returns the value for the named label.  Returns None if the label was
+       not found or the value was non-numeric."""
+
+    f = file(PROC_XEN_BALLOON, 'r')
+    try:
+        for line in f:
+            keyvalue = line.split(':')
+            if keyvalue[0] == label:
+                values = keyvalue[1].split()
+                if values[0].isdigit():
+                    return int(values[0])
+                else:
+                    return None
+        return None
+    finally:
+        f.close()
+
+def get_dom0_current_alloc():
+    """Returns the current memory allocation (in MiB) of dom0."""
+
+    kb = _get_proc_balloon(labels['current'])
+    if kb == None:
+        raise VmError('Failed to query current memory allocation of dom0.')
+    return kb / 1024
+
+def get_dom0_target_alloc():
+    """Returns the target memory allocation (in MiB) of dom0."""
+
+    kb = _get_proc_balloon(labels['target'])
+    if kb == None:
+        raise VmError('Failed to query target memory allocation of dom0.')
+    return kb / 1024
 
 def free(required):
     """Balloon out memory from the privileged domain so that there is the
@@ -88,7 +130,7 @@ def free(required):
                 log.debug("Balloon: free %d; need %d.", free_mem, need_mem)
 
             if dom0_min_mem > 0:
-                dom0_alloc = _get_dom0_alloc()
+                dom0_alloc = get_dom0_current_alloc()
                 new_alloc = dom0_alloc - (need_mem - free_mem)
 
                 if (new_alloc >= dom0_min_mem and
@@ -121,20 +163,3 @@ def free(required):
 
     finally:
         del xc
-
-
-def _get_dom0_alloc():
-    """Return current allocation memory of dom0 (in MiB). Return 0 on error"""
-
-    f = file(PROC_XEN_BALLOON, 'r')
-    try:
-        line = f.readline()
-        for x in line.split():
-            for n in x:
-                if not n.isdigit():
-                    break
-            else:
-                return int(x) / 1024
-        return 0
-    finally:
-        f.close()

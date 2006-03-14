@@ -33,6 +33,7 @@
 #include <xen/interface/xen.h>
 #include <xen/interface/sched.h>
 #include <xen/interface/dom0_ops.h>
+#include <linux/errno.h>
 
 /* FIXME: temp place to hold these page related macros */
 #include <asm/page.h>
@@ -164,6 +165,31 @@ HYPERVISOR_sched_op(
     int cmd, unsigned long arg)
 {
 	return _hypercall2(int, sched_op, cmd, arg);
+}
+
+static inline int
+HYPERVISOR_sched_op_new(
+	int cmd, void *arg)
+{
+	return _hypercall2(int, sched_op_new, cmd, arg);
+}
+
+static inline int
+HYPERVISOR_poll(
+	evtchn_port_t *ports, unsigned int nr_ports, unsigned long timeout)
+{
+	struct sched_poll sched_poll = {
+		.ports = ports,
+		.nr_ports = nr_ports,
+		.timeout = jiffies_to_st(timeout)
+	};
+
+	int rc = HYPERVISOR_sched_op_new(SCHEDOP_poll, &sched_poll);
+
+	if (rc == -ENOSYS)
+		rc = HYPERVISOR_sched_op(SCHEDOP_yield, 0);
+
+	return rc;
 }
 
 static inline long
