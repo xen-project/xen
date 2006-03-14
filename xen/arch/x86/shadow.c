@@ -202,6 +202,16 @@ shadow_promote(struct domain *d, unsigned long gpfn, unsigned long gmfn,
  * tlbflush_timestamp holds a min & max index of valid page table entries
  * within the shadow page.
  */
+static inline void
+shadow_page_info_init(struct page_info *page,
+                      unsigned long gmfn,
+                      u32 psh_type)
+{
+    ASSERT( (gmfn & ~PGT_mfn_mask) == 0 );
+    page->u.inuse.type_info = psh_type | gmfn;
+    page->count_info = 0;
+    page->tlbflush_timestamp = 0;
+}
 
 static inline unsigned long
 alloc_shadow_page(struct domain *d,
@@ -249,6 +259,11 @@ alloc_shadow_page(struct domain *d,
                 l1 = map_domain_page(page_to_mfn(page + 1));
                 memset(l1, 0, PAGE_SIZE);
                 unmap_domain_page(l1);
+
+                /* we'd like to initialize the second continuous page here
+                 * and leave the first page initialization later */
+
+                shadow_page_info_init(page+1, gmfn, psh_type);
 #else
                 page = alloc_domheap_page(NULL);
                 if (!page)
@@ -294,10 +309,7 @@ alloc_shadow_page(struct domain *d,
 
     smfn = page_to_mfn(page);
 
-    ASSERT( (gmfn & ~PGT_mfn_mask) == 0 );
-    page->u.inuse.type_info = psh_type | gmfn;
-    page->count_info = 0;
-    page->tlbflush_timestamp = 0;
+    shadow_page_info_init(page, gmfn, psh_type);
 
     switch ( psh_type )
     {
