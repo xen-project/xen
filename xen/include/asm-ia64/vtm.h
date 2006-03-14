@@ -63,5 +63,4 @@ typedef struct vtime {
 
 #define	 VTM_FIRED(vtm)     	((vtm)->triggered)
 
-extern void vtm_init();
 #endif /* _STATS_H_ */
