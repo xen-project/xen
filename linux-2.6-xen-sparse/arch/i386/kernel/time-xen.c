@@ -645,7 +645,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	     unlikely(delta_cpu < -(s64)permitted_clock_jitter))
 	    && printk_ratelimit()) {
 		printk("Timer ISR/%d: Time went backwards: "
-		       "delta=%lld cpu_delta=%lld shadow=%lld "
+		       "delta=%lld delta_cpu=%lld shadow=%lld "
 		       "off=%lld processed=%lld cpu_processed=%lld\n",
 		       cpu, delta, delta_cpu, shadow->system_timestamp,
 		       (s64)get_nsec_offset(shadow),
@@ -675,8 +675,10 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 * HACK: Passing NULL to account_steal_time()
 	 * ensures that the ticks are accounted as stolen.
 	 */
-	if (stolen > 0) {
+	if ((stolen > 0) && (delta_cpu > 0)) {
 		delta_cpu -= stolen;
+		if (unlikely(delta_cpu < 0))
+			stolen += delta_cpu; /* clamp local-time progress */
 		do_div(stolen, NS_PER_TICK);
 		per_cpu(processed_stolen_time, cpu) += stolen * NS_PER_TICK;
 		per_cpu(processed_system_time, cpu) += stolen * NS_PER_TICK;
@@ -688,8 +690,10 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 * HACK: Passing idle_task to account_steal_time()
 	 * ensures that the ticks are accounted as idle/wait.
 	 */
-	if (blocked > 0) {
+	if ((blocked > 0) && (delta_cpu > 0)) {
 		delta_cpu -= blocked;
+		if (unlikely(delta_cpu < 0))
+			blocked += delta_cpu; /* clamp local-time progress */
 		do_div(blocked, NS_PER_TICK);
 		per_cpu(processed_blocked_time, cpu) += blocked * NS_PER_TICK;
 		per_cpu(processed_system_time, cpu)  += blocked * NS_PER_TICK;
