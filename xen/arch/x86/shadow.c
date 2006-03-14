@@ -3413,7 +3413,9 @@ static inline int l2e_rw_fault(
     l1_pgentry_t sl1e;
     l1_pgentry_t old_sl1e;
     l2_pgentry_t sl2e;
+#ifdef __x86_64__
     u64 nx = 0;
+#endif
     int put_ref_check = 0;
     /* Check if gpfn is 2M aligned */
 
@@ -3428,7 +3430,9 @@ static inline int l2e_rw_fault(
     l2e_remove_flags(tmp_l2e, _PAGE_PSE);
     if (l2e_get_flags(gl2e) & _PAGE_NX) {
         l2e_remove_flags(tmp_l2e, _PAGE_NX);
-        nx = 1ULL << 63;
+#ifdef __x86_64__
+        nx = PGT_high_mfn_nx;
+#endif
     }
 
 
@@ -3436,7 +3440,11 @@ static inline int l2e_rw_fault(
     if ( !__shadow_get_l2e(v, va, &sl2e) )
         sl2e = l2e_empty();
 
+#ifdef __x86_64__
     l1_mfn = __shadow_status(d, start_gpfn | nx, PGT_fl1_shadow);
+#else
+    l1_mfn = __shadow_status(d, start_gpfn, PGT_fl1_shadow);
+#endif
 
     /* Check the corresponding l2e */
     if (l1_mfn) {
@@ -3454,7 +3462,11 @@ static inline int l2e_rw_fault(
     } else {
         /* Allocate a new page as shadow page table if need */
         gmfn = gmfn_to_mfn(d, start_gpfn);
+#ifdef __x86_64__
         l1_mfn = alloc_shadow_page(d, start_gpfn | nx, gmfn, PGT_fl1_shadow);
+#else
+        l1_mfn = alloc_shadow_page(d, start_gpfn, gmfn, PGT_fl1_shadow);
+#endif
         if (unlikely(!l1_mfn)) {
             BUG();
         }

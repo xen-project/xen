@@ -98,8 +98,17 @@ struct page_info
  /* 16-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1U<<16)-1)
 
+#ifdef __x86_64__
+#define PGT_high_mfn_shift  52
+#define PGT_high_mfn_mask   (0x7ffUL << PGT_high_mfn_shift)
+#define PGT_mfn_mask        (((1U<<23)-1) | PGT_high_mfn_mask)
+#define PGT_high_mfn_nx     (0x800UL << PGT_high_mfn_shift)
+#else
  /* 23-bit mfn mask for shadow types: good for up to 32GB RAM. */
 #define PGT_mfn_mask        ((1U<<23)-1)
+ /* NX for PAE xen is not supported yet */
+#define PGT_high_mfn_nx     (1ULL << 63)
+#endif
 
 #define PGT_score_shift     23
 #define PGT_score_mask      (((1U<<4)-1)<<PGT_score_shift)
