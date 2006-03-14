@@ -686,7 +686,7 @@ check_start:
 	if (vector == (PSCB(vcpu,itv) & 0xff)) {
 		uint64_t now = ia64_get_itc();
 		if (now < PSCBX(vcpu,domain_itm)) {
-			printk("Ooops, pending guest timer before its due\n");
+//			printk("Ooops, pending guest timer before its due\n");
 			PSCBX(vcpu,irr[i]) &= ~mask;
 			goto check_start;
 		}
