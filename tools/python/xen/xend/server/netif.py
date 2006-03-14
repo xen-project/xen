@@ -72,8 +72,6 @@ class NetifController(DevController):
                               sxp.child_value(config, 'script',
                                               xroot.get_vif_script()))
         typ = sxp.child_value(config, 'type')
-        if typ == 'ioemu':
-            return (None,{},{})
         bridge  = sxp.child_value(config, 'bridge')
         mac     = sxp.child_value(config, 'mac')
         vifname = sxp.child_value(config, 'vifname')
@@ -87,15 +85,19 @@ class NetifController(DevController):
         back = { 'script' : script,
                  'mac'    : mac,
                  'handle' : "%i" % devid }
+
+        if typ == 'ioemu':
+            front = {}
+            back['type'] = 'ioemu'
+        else:
+            front = { 'handle' : "%i" % devid,
+                      'mac'    : mac }
         if ipaddr:
             back['ip'] = ' '.join(ipaddr)
         if bridge:
             back['bridge'] = bridge
         if vifname:
             back['vifname'] = vifname
-
-        front = { 'handle' : "%i" % devid,
-                  'mac'    : mac }
 
         return (devid, back, front)
 
