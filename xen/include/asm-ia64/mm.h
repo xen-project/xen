@@ -78,41 +78,46 @@ struct page
 
 #define set_page_count(p,v) 	atomic_set(&(p)->_count, v - 1)
 
-/* Still small set of flags defined by far on IA-64 */
+/*
+ * Still small set of flags defined by far on IA-64.
+ * IA-64 should make it a definition same as x86_64.
+ */
 /* The following page types are MUTUALLY EXCLUSIVE. */
 #define PGT_none            (0<<29) /* no special uses of this page */
 #define PGT_l1_page_table   (1<<29) /* using this page as an L1 page table? */
 #define PGT_l2_page_table   (2<<29) /* using this page as an L2 page table? */
 #define PGT_l3_page_table   (3<<29) /* using this page as an L3 page table? */
 #define PGT_l4_page_table   (4<<29) /* using this page as an L4 page table? */
-#define PGT_writable_page   (5<<29) /* has writable mappings of this page? */
-#define PGT_type_mask       (5<<29) /* Bits 29-31. */
+ /* Value 5 reserved. See asm-x86/mm.h */
+ /* Value 6 reserved. See asm-x86/mm.h */
+#define PGT_writable_page   (7<<29) /* has writable mappings of this page? */
+#define PGT_type_mask       (7<<29) /* Bits 29-31. */
 
  /* Has this page been validated for use as its current type? */
 #define _PGT_validated      28
 #define PGT_validated       (1<<_PGT_validated)
-/* Owning guest has pinned this page to its current type? */
+ /* Owning guest has pinned this page to its current type? */
 #define _PGT_pinned         27
 #define PGT_pinned          (1U<<_PGT_pinned)
 
-/* The 11 most significant bits of virt address if this is a page table. */
-#define PGT_va_shift        16
-#define PGT_va_mask         (((1U<<11)-1)<<PGT_va_shift)
-/* Is the back pointer still mutable (i.e. not fixed yet)? */
-#define PGT_va_mutable      (((1U<<11)-1)<<PGT_va_shift)
-/* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
-#define PGT_va_unknown      (((1U<<11)-2)<<PGT_va_shift)
-/* 16-bit count of uses of this frame as its current type. */
+ /* The 27 most significant bits of virt address if this is a page table. */
+#define PGT_va_shift        32
+#define PGT_va_mask         ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
+ /* Is the back pointer still mutable (i.e. not fixed yet)? */
+#define PGT_va_mutable      ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
+ /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
+#define PGT_va_unknown      ((unsigned long)((1U<<28)-2)<<PGT_va_shift)
+
+ /* 16-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1U<<16)-1)
 
-/* Cleared when the owning guest 'frees' this page. */
+ /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated      31
 #define PGC_allocated       (1U<<_PGC_allocated)
-/* Set when the page is used as a page table */
-#define _PGC_page_table     30
-#define PGC_page_table      (1U<<_PGC_page_table)
-/* 30-bit count of references to this frame. */
-#define PGC_count_mask      ((1U<<30)-1)
+ /* Bit 30 reserved. See asm-x86/mm.h */
+ /* Bit 29 reserved. See asm-x86/mm.h */
+ /* 29-bit count of references to this frame. */
+#define PGC_count_mask      ((1U<<29)-1)
 
 #define IS_XEN_HEAP_FRAME(_pfn) ((page_to_maddr(_pfn) < xenheap_phys_end) \
 				 && (page_to_maddr(_pfn) >= xen_pstart))
