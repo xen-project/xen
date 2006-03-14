@@ -67,6 +67,8 @@ struct vcpu
     struct timer     timer;         /* one-shot timer for timeout values */
     unsigned long    sleep_tick;    /* tick at which this vcpu started sleep */
 
+    struct timer     poll_timer;    /* timeout for SCHEDOP_poll */
+
     void            *sched_priv;    /* scheduler-specific data */
 
     struct vcpu_runstate_info runstate;

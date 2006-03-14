@@ -10,6 +10,7 @@
 #define __XEN_PUBLIC_EVENT_CHANNEL_H__
 
 typedef uint32_t evtchn_port_t;
+DEFINE_GUEST_HANDLE(evtchn_port_t);
 
 /*
  * EVTCHNOP_alloc_unbound: Allocate a port in domain <dom> and mark as

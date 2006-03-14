@@ -59,6 +59,7 @@
 #define __HYPERVISOR_mmuext_op            26
 #define __HYPERVISOR_acm_op               27
 #define __HYPERVISOR_nmi_op               28
+#define __HYPERVISOR_sched_op_new         29
 
 /* 
  * VIRTUAL INTERRUPTS

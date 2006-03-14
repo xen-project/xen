@@ -586,6 +586,13 @@ do_arch_sched_op:
         movl %eax,UREGS_eax(%ecx)
         jmp  do_sched_op
 
+do_arch_sched_op_new:
+        # Ensure we return success even if we return via schedule_tail()
+        xorl %eax,%eax
+        GET_GUEST_REGS(%ecx)
+        movl %eax,UREGS_eax(%ecx)
+        jmp  do_sched_op_new
+
 .data
 
 ENTRY(exception_table)
@@ -640,6 +647,7 @@ ENTRY(hypercall_table)
         .long do_mmuext_op
         .long do_acm_op
         .long do_nmi_op
+        .long do_arch_sched_op_new
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .long do_ni_hypercall
         .endr
@@ -674,6 +682,7 @@ ENTRY(hypercall_args_table)
         .byte 4 /* do_mmuext_op         */
         .byte 1 /* do_acm_op            */
         .byte 2 /* do_nmi_op            */
+        .byte 2 /* do_arch_sched_op_new */
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr

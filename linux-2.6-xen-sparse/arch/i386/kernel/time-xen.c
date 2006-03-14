@@ -949,7 +949,7 @@ void __init time_init(void)
 }
 
 /* Convert jiffies to system time. */
-static inline u64 jiffies_to_st(unsigned long j)
+u64 jiffies_to_st(unsigned long j)
 {
 	unsigned long seq;
 	long delta;
@@ -967,6 +967,7 @@ static inline u64 jiffies_to_st(unsigned long j)
 
 	return st;
 }
+EXPORT_SYMBOL(jiffies_to_st);
 
 /*
  * stop_hz_timer / start_hz_timer - enter/exit 'tickless mode' on an idle cpu

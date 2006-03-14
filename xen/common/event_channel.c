@@ -438,6 +438,47 @@ long evtchn_send(unsigned int lport)
     return ret;
 }
 
+void evtchn_set_pending(struct vcpu *v, int port)
+{
+    struct domain *d = v->domain;
+    shared_info_t *s = d->shared_info;
+
+    /*
+     * The following bit operations must happen in strict order.
+     * NB. On x86, the atomic bit operations also act as memory barriers.
+     * There is therefore sufficiently strict ordering for this architecture --
+     * others may require explicit memory barriers.
+     */
+
+    if ( test_and_set_bit(port, &s->evtchn_pending[0]) )
+        return;
+
+    if ( !test_bit        (port, &s->evtchn_mask[0])    &&
+         !test_and_set_bit(port / BITS_PER_LONG,
+                           &v->vcpu_info->evtchn_pending_sel) &&
+         !test_and_set_bit(0, &v->vcpu_info->evtchn_upcall_pending) )
+    {
+        evtchn_notify(v);
+    }
+    else if ( unlikely(test_bit(_VCPUF_blocked, &v->vcpu_flags) &&
+                       v->vcpu_info->evtchn_upcall_mask) )
+    {
+        /*
+         * Blocked and masked will usually mean that the VCPU executed 
+         * SCHEDOP_poll. Kick the VCPU in case this port is in its poll list.
+         */
+        vcpu_unblock(v);
+    }
+}
+
+void send_guest_virq(struct vcpu *v, int virq)
+{
+    int port = v->virq_to_evtchn[virq];
+
+    if ( likely(port != 0) )
+        evtchn_set_pending(v, port);
+}
+
 void send_guest_pirq(struct domain *d, int pirq)
 {
     int port = d->pirq_to_evtchn[pirq];

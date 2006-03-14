@@ -97,6 +97,9 @@ int xen_create_contiguous_region(
 void xen_destroy_contiguous_region(
     unsigned long vstart, unsigned int order);
 
+/* Turn jiffies into Xen system time. */
+u64 jiffies_to_st(unsigned long jiffies);
+
 #include <asm/hypercall.h>
 
 #if defined(CONFIG_X86_64)
