@@ -12,12 +12,11 @@
 static int
 copy_from_domain_page(int xc_handle,
                       uint32_t domid,
-                      unsigned long *page_array,
-                      unsigned long src_pfn,
+                      unsigned long mfn,
                       void *dst_page)
 {
     void *vaddr = xc_map_foreign_range(
-        xc_handle, domid, PAGE_SIZE, PROT_READ, page_array[src_pfn]);
+        xc_handle, domid, PAGE_SIZE, PROT_READ, mfn);
     if ( vaddr == NULL )
         return -1;
     memcpy(dst_page, vaddr, PAGE_SIZE);
@@ -32,7 +31,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
                                 dumpcore_rtn_t dump_rtn)
 {
     unsigned long nr_pages;
-    unsigned long *page_array;
+    unsigned long *page_array = NULL;
     xc_dominfo_t info;
     int i, nr_vcpus = 0;
     char *dump_mem, *dump_mem_start = NULL;
@@ -79,11 +78,11 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     
     sts = dump_rtn(args, (char *)&header, sizeof(struct xc_core_header));
     if ( sts != 0 )
-        return sts;
+        goto error_out;
 
     sts = dump_rtn(args, (char *)&ctxt, sizeof(ctxt[0]) * nr_vcpus);
     if ( sts != 0 )
-        return sts;
+        goto error_out;
 
     if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
     {
@@ -97,17 +96,17 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     }
     sts = dump_rtn(args, (char *)page_array, nr_pages * sizeof(unsigned long));
     if ( sts != 0 )
-        return sts;
+        goto error_out;
 
     /* Pad the output data to page alignment. */
     memset(dummy, 0, PAGE_SIZE);
     sts = dump_rtn(args, dummy, header.xch_pages_offset - dummy_len);
     if ( sts != 0 )
-        return sts;
+        goto error_out;
 
     for ( dump_mem = dump_mem_start, i = 0; i < nr_pages; i++ )
     {
-        copy_from_domain_page(xc_handle, domid, page_array, i, dump_mem);
+        copy_from_domain_page(xc_handle, domid, page_array[i], dump_mem);
         dump_mem += PAGE_SIZE;
         if ( ((i + 1) % DUMP_INCREMENT == 0) || ((i + 1) == nr_pages) )
         {
@@ -119,10 +118,12 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     }
 
     free(dump_mem_start);
+    free(page_array);
     return 0;
 
  error_out:
     free(dump_mem_start);
+    free(page_array);
     return -1;
 }
 
