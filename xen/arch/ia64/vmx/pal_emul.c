@@ -69,7 +69,6 @@ pal_cache_flush (VCPU *vcpu) {
 
 static struct ia64_pal_retval
 pal_vm_tr_read (VCPU *vcpu ) {
-#warning pal_vm_tr_read: to be implemented
 	struct ia64_pal_retval result;
 
 	result.status= -1; //unimplemented
@@ -102,7 +101,6 @@ pal_platform_addr(VCPU *vcpu) {
 
 static struct ia64_pal_retval
 pal_halt (VCPU *vcpu) {
-#warning pal_halt: to be implemented
 	//bugbug: to be implement. 
 	struct ia64_pal_retval result;
 
@@ -141,12 +139,18 @@ pal_cache_write (VCPU *vcpu) {
 
 static struct ia64_pal_retval
 pal_bus_get_features(VCPU *vcpu){
-	
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval
 pal_cache_summary(VCPU *vcpu){
-	
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval
@@ -158,22 +162,34 @@ pal_cache_init(VCPU *vcpu){
 
 static struct ia64_pal_retval
 pal_cache_info(VCPU *vcpu){
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval
 pal_cache_prot_info(VCPU *vcpu){
-}
+	struct ia64_pal_retval result;
 
-static struct ia64_pal_retval
-pal_cache_shared_info(VCPU *vcpu){
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval
 pal_mem_attrib(VCPU *vcpu){
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval
 pal_debug_info(VCPU *vcpu){
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval
@@ -206,46 +222,89 @@ pal_freq_ratios(VCPU *vcpu){
 
 static struct ia64_pal_retval
 pal_halt_info(VCPU *vcpu){
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval
 pal_logical_to_physica(VCPU *vcpu){
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval
 pal_perf_mon_info(VCPU *vcpu){
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval
 pal_proc_get_features(VCPU *vcpu){
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval
 pal_ptce_info(VCPU *vcpu){
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval
 pal_register_info(VCPU *vcpu){
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval
 pal_rse_info(VCPU *vcpu){
-}
+	struct ia64_pal_retval result;
 
+	result.status= -1; //unimplemented
+	return result;
+}
 static struct ia64_pal_retval
 pal_test_info(VCPU *vcpu){
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval
 pal_vm_summary(VCPU *vcpu){
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval
 pal_vm_info(VCPU *vcpu){
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval
 pal_vm_page_size(VCPU *vcpu){
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 void
 pal_emul( VCPU *vcpu) {
@@ -294,6 +353,82 @@ pal_emul( VCPU *vcpu) {
 
 		case PAL_FREQ_BASE:
 			result = pal_freq_base (vcpu);
+			break;
+
+		case PAL_BUS_GET_FEATURES :
+			result = pal_bus_get_features (vcpu);
+			break;
+
+		case PAL_CACHE_SUMMARY :
+			result = pal_cache_summary (vcpu);
+			break;
+
+		case PAL_CACHE_INIT :
+			result = pal_cache_init(vcpu);
+			break;
+
+		case PAL_CACHE_INFO :
+			result = pal_cache_info(vcpu);
+			break;
+
+		case PAL_CACHE_PROT_INFO :
+			result = pal_cache_prot_info(vcpu);
+			break;
+
+		case PAL_MEM_ATTRIB :
+			result = pal_mem_attrib(vcpu);
+			break;
+
+		case PAL_DEBUG_INFO :
+			result = pal_debug_info(vcpu);
+			break;
+
+		case PAL_FIXED_ADDR :
+			result = pal_fixed_addr(vcpu);
+			break;
+
+		case PAL_HALT_INFO :
+			result = pal_halt_info(vcpu);
+			break;
+
+		case PAL_LOGICAL_TO_PHYSICAL :
+			result = pal_logical_to_physica(vcpu);
+			break;
+
+		case PAL_PERF_MON_INFO :
+			result = pal_perf_mon_info(vcpu);
+			break;
+
+		case  PAL_PROC_GET_FEATURES:
+			result = pal_proc_get_features(vcpu);
+			break;
+
+		case PAL_PTCE_INFO :
+			result = pal_ptce_info(vcpu);
+			break;
+
+		case PAL_REGISTER_INFO :
+			result = pal_register_info(vcpu);
+			break;
+
+		case PAL_RSE_INFO :
+			result = pal_rse_info(vcpu);
+			break;
+
+		case PAL_TEST_PROC :
+			result = pal_test_info(vcpu);
+			break;
+
+		case PAL_VM_SUMMARY :
+			result = pal_vm_summary(vcpu);
+			break;
+
+		case PAL_VM_INFO :
+			result = pal_vm_info(vcpu);
+			break;
+
+		case PAL_VM_PAGE_SIZE :
+			result = pal_vm_page_size(vcpu);
 			break;
 
 		default:

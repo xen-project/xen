@@ -122,7 +122,7 @@ void hyper_xen_version(void)
     u64 r32,r33,ret;
     vcpu_get_gr_nat(vcpu,16,&r32);
     vcpu_get_gr_nat(vcpu,17,&r33);
-    ret=do_xen_version((int )r32,r33);
+    ret=do_xen_version((int )r32,(void *)r33);
     vcpu_set_gr(vcpu, 8, ret, 0);
     vmx_vcpu_increment_iip(vcpu);
 }

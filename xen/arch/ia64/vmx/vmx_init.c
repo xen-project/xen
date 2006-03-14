@@ -50,6 +50,8 @@
 #include <public/arch-ia64.h>
 #include <asm/hvm/vioapic.h>
 #include <public/event_channel.h>
+#include <xen/event.h>
+#include <asm/vlsapic.h>
 
 /* Global flag to identify whether Intel vmx feature is on */
 u32 vmx_enabled = 0;
@@ -161,7 +163,7 @@ static vpd_t *alloc_vpd(void)
 		return NULL;
 	}
 
-	printk("vpd base: 0x%lp, vpd size:%ld\n", vpd, sizeof(vpd_t));
+	printk("vpd base: 0x%p, vpd size:%ld\n", vpd, sizeof(vpd_t));
 	memset(vpd, 0, VPD_SIZE);
 	/* CPUID init */
 	for (i = 0; i < 5; i++)
@@ -234,7 +236,7 @@ vmx_load_state(struct vcpu *v)
 {
 	u64 status;
 
-	status = ia64_pal_vp_restore((u64)v->arch.privregs, 0);
+	status = ia64_pal_vp_restore((u64 *)v->arch.privregs, 0);
 	if (status != PAL_STATUS_SUCCESS)
 		panic("Restore vp status failed\n");
 

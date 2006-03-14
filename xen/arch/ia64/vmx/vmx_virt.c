@@ -34,6 +34,7 @@
 #include <asm/virt_event.h>
 #include <asm/vmx_phy_mode.h>
 extern UINT64 privop_trace;
+extern void vhpi_detection(VCPU *vcpu);//temporarily place here,need a header file.
 
 void
 ia64_priv_decoder(IA64_SLOT_TYPE slot_type, INST64 inst, UINT64  * cause)

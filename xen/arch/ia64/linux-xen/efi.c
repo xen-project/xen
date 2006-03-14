@@ -37,6 +37,7 @@
 #define EFI_DEBUG	0
 
 extern efi_status_t efi_call_phys (void *, ...);
+extern unsigned long long memparse (char *ptr, char **retptr);
 
 struct efi efi;
 EXPORT_SYMBOL(efi);

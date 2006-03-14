@@ -650,7 +650,7 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
  * and this must be checked independently; see vcpu_deliverable interrupts() */
 UINT64 vcpu_check_pending_interrupts(VCPU *vcpu)
 {
-	UINT64 *p, *q, *r, bits, bitnum, mask, i, vector;
+	UINT64 *p, *r, bits, bitnum, mask, i, vector;
 
 	/* Always check pending event, since guest may just ack the
 	 * event injection without handle. Later guest may throw out
@@ -664,8 +664,8 @@ check_start:
 
 	p = &PSCBX(vcpu,irr[3]);
 	r = &PSCBX(vcpu,insvc[3]);
-	for (i = 3; ; p--, q--, r--, i--) {
-		bits = *p /* & *q */;
+	for (i = 3; ; p--, r--, i--) {
+		bits = *p ;
 		if (bits) break; // got a potential interrupt
 		if (*r) {
 			// nothing in this word which is pending+inservice

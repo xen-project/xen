@@ -130,7 +130,7 @@ void vtm_init(VCPU *vcpu)
  */
 uint64_t vtm_get_itc(VCPU *vcpu)
 {
-    uint64_t    guest_itc, spsr;
+    uint64_t    guest_itc;
     vtime_t    *vtm;
 
     vtm=&(vcpu->arch.arch_vmx.vtm);
@@ -437,11 +437,12 @@ static int is_higher_class(int pending, int mic)
 {
     return ( (pending >> 4) > mic );
 }
-
+#if 0
 static int is_invalid_irq(int vec)
 {
     return (vec == 1 || ((vec <= 14 && vec >= 3)));
 }
+#endif //shadow it due to no use currently
 
 #define   IRQ_NO_MASKED         0
 #define   IRQ_MASKED_BY_VTPR    1

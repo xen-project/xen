@@ -376,6 +376,9 @@ extern thash_cb_t *init_domain_tlb(struct vcpu *d);
 extern thash_data_t * vsa_thash(PTA vpta, u64 va, u64 vrr, u64 *tag);
 extern thash_data_t * vhpt_lookup(u64 va);
 extern void machine_tlb_purge(u64 va, u64 ps);
+extern int fetch_code(struct vcpu *vcpu, u64 gip, u64 *code1, u64 *code2);
+extern void emulate_io_inst(struct vcpu *vcpu, u64 padr, u64 ma);
+extern int vhpt_enabled(struct vcpu *vcpu, uint64_t vadr, vhpt_ref_t ref);
 
 static inline void vmx_vcpu_set_tr (thash_data_t *trp, u64 pte, u64 itir, u64 va, u64 rid)
 {
