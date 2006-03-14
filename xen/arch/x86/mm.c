@@ -778,6 +778,7 @@ static inline int l1_backptr(
 {
     unsigned long l2_backptr = l2_type & PGT_va_mask;
     ASSERT(l2_backptr != PGT_va_unknown);
+    ASSERT(l2_backptr != PGT_va_mutable);
     *backptr = 
         ((l2_backptr >> PGT_va_shift) << L3_PAGETABLE_SHIFT) | 
         (offset_in_l2 << L2_PAGETABLE_SHIFT);
@@ -792,6 +793,7 @@ static inline int l1_backptr(
 {
     unsigned long l2_backptr = l2_type & PGT_va_mask;
     ASSERT(l2_backptr != PGT_va_unknown);
+    ASSERT(l2_backptr != PGT_va_mutable);
     *backptr = ((l2_backptr >> PGT_va_shift) << L3_PAGETABLE_SHIFT) | 
         (offset_in_l2 << L2_PAGETABLE_SHIFT);
     return 1;
@@ -802,6 +804,7 @@ static inline int l2_backptr(
 {
     unsigned long l3_backptr = l3_type & PGT_va_mask;
     ASSERT(l3_backptr != PGT_va_unknown);
+    ASSERT(l3_backptr != PGT_va_mutable);
     *backptr = ((l3_backptr >> PGT_va_shift) << L4_PAGETABLE_SHIFT) | 
         (offset_in_l3 << L3_PAGETABLE_SHIFT);
     return 1;
@@ -1431,6 +1434,12 @@ void put_page_type(struct page_info *page)
                 nx &= ~PGT_validated;
             }
         }
+        else if ( unlikely((nx & (PGT_pinned|PGT_type_mask|PGT_count_mask)) == 
+                           (PGT_pinned|PGT_l1_page_table|1)) )
+        {
+            /* Page is now only pinned. Make the back pointer mutable again. */
+            nx |= PGT_va_mutable;
+        }
     }
     while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
 }
@@ -1513,16 +1522,24 @@ int get_page_type(struct page_info *page, unsigned long type)
                                 get_gpfn_from_mfn(page_to_mfn(page)));
                     return 0;
                 }
+                else if ( (x & PGT_va_mask) == PGT_va_mutable )
+                {
+                    /* The va backpointer is mutable, hence we update it. */
+                    nx &= ~PGT_va_mask;
+                    nx |= type; /* we know the actual type is correct */
+                }
                 else
                 {
                     ASSERT((type & PGT_va_mask) != (x & PGT_va_mask));
+                    ASSERT((type & PGT_va_mask) != PGT_va_mutable);
 #ifdef CONFIG_X86_PAE
                     /* We use backptr as extra typing. Cannot be unknown. */
                     if ( (type & PGT_type_mask) == PGT_l2_page_table )
                         return 0;
 #endif
                     /* Fixme: add code to propagate va_unknown to subtables. */
-                    if ( (type & PGT_type_mask) >= PGT_l2_page_table )
+                    if ( ((type & PGT_type_mask) >= PGT_l2_page_table) &&
+                         !shadow_mode_refcounts(page_get_owner(page)) )
                         return 0;
                     /* This table is possibly mapped at multiple locations. */
                     nx &= ~PGT_va_mask;
@@ -1801,16 +1818,21 @@ int do_mmuext_op(
         switch ( op.cmd )
         {
         case MMUEXT_PIN_L1_TABLE:
+            type = PGT_l1_page_table | PGT_va_mutable;
+            goto pin_page;
+
         case MMUEXT_PIN_L2_TABLE:
         case MMUEXT_PIN_L3_TABLE:
         case MMUEXT_PIN_L4_TABLE:
+            /* Ignore pinning of subdirectories. */
             if ( (op.cmd - MMUEXT_PIN_L1_TABLE) != (CONFIG_PAGING_LEVELS - 1) )
                 break;
 
+            type = PGT_root_page_table;
+
+        pin_page:
             if ( shadow_mode_refcounts(FOREIGNDOM) )
                 break;
-
-            type = PGT_root_page_table;
 
             okay = get_page_and_type_from_pagenr(mfn, type, FOREIGNDOM);
             if ( unlikely(!okay) )
@@ -3350,7 +3372,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     
     /* Get the L2 index at which this L1 p.t. is always mapped. */
     l2_idx = page->u.inuse.type_info & PGT_va_mask;
-    if ( unlikely(l2_idx == PGT_va_unknown) )
+    if ( unlikely(l2_idx >= PGT_va_unknown) )
         goto emulate; /* Urk! This L1 is mapped in multiple L2 slots! */
     l2_idx >>= PGT_va_shift;
 
