@@ -272,7 +272,16 @@ static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm, unsigned long 
 	pte_t pte;
 	if (full) {
 		pte = *ptep;
+#ifdef CONFIG_X86_PAE
+		/* Cannot do this in a single step, as the compiler may
+		   issue the two stores in either order, but the hypervisor
+		   must not see the high part before the low one. */
+		ptep->pte_low = 0;
+		barrier();
+		ptep->pte_high = 0;
+#else
 		*ptep = __pte(0);
+#endif
 	} else {
 		pte = ptep_get_and_clear(mm, addr, ptep);
 	}
