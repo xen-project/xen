@@ -95,20 +95,16 @@ static int blkfront_probe(struct xenbus_device *dev,
 		xenbus_dev_fatal(dev, -ENOMEM, "allocating info structure");
 		return -ENOMEM;
 	}
+
+	memset(info, 0, sizeof(*info));
 	info->xbdev = dev;
 	info->vdevice = vdevice;
 	info->connected = BLKIF_STATE_DISCONNECTED;
-	info->mi = NULL;
-	info->gd = NULL;
 	INIT_WORK(&info->work, blkif_restart_queue, (void *)info);
 
-	info->shadow_free = 0;
-	memset(info->shadow, 0, sizeof(info->shadow));
 	for (i = 0; i < BLK_RING_SIZE; i++)
 		info->shadow[i].req.id = i+1;
 	info->shadow[BLK_RING_SIZE-1].req.id = 0x0fffffff;
-
-	info->users = 0;
 
 	/* Front end dir is a number, which is used as the id. */
 	info->handle = simple_strtoul(strrchr(dev->nodename,'/')+1, NULL, 0);
