@@ -332,6 +332,7 @@ static inline int time_values_up_to_date(int cpu)
 	src = &HYPERVISOR_shared_info->vcpu_info[cpu].time;
 	dst = &per_cpu(shadow_time, cpu);
 
+	rmb();
 	return (dst->version == src->version);
 }
 
@@ -558,11 +559,11 @@ unsigned long long monotonic_clock(void)
 
 	do {
 		local_time_version = shadow->version;
-		smp_rmb();
+		barrier();
 		time = shadow->system_timestamp + get_nsec_offset(shadow);
 		if (!time_values_up_to_date(cpu))
 			get_time_values_from_xen();
-		smp_rmb();
+		barrier();
 	} while (local_time_version != shadow->version);
 
 	put_cpu();
