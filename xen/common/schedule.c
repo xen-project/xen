@@ -574,7 +574,7 @@ static void __enter_scheduler(void)
     {
         update_dom_time(next);
         if ( next->sleep_tick != schedule_data[cpu].tick )
-            send_guest_virq(next, VIRQ_TIMER);
+            send_timer_event(next);
     }
 
     TRACE_4D(TRC_SCHED_SWITCH,
@@ -610,7 +610,7 @@ static void t_timer_fn(void *unused)
     if ( !is_idle_vcpu(v) )
     {
         update_dom_time(v);
-        send_guest_virq(v, VIRQ_TIMER);
+        send_timer_event(v);
     }
 
     page_scrub_schedule_work();
@@ -624,7 +624,7 @@ static void dom_timer_fn(void *data)
     struct vcpu *v = data;
 
     update_dom_time(v);
-    send_guest_virq(v, VIRQ_TIMER);
+    send_timer_event(v);
 }
 
 /* SCHEDOP_poll timeout callback. */

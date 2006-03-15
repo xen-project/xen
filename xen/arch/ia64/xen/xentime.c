@@ -258,4 +258,8 @@ int reprogram_timer(s_time_t timeout)
 	return 1;
 }
 
+void send_timer_event(struct vcpu *v)
+{
+	send_guest_virq(v, VIRQ_TIMER);
+}
 

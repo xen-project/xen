@@ -923,6 +923,11 @@ void __init early_time_init(void)
     setup_irq(0, &irq0);
 }
 
+void send_timer_event(struct vcpu *v)
+{
+    send_guest_virq(v, VIRQ_TIMER);
+}
+
 /*
  * Local variables:
  * mode: C
