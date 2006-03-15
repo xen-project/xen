@@ -1113,6 +1113,25 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
 	send_ack(conn, XS_SET_PERMS);
 }
 
+static void do_debug(struct connection *conn, struct buffered_data *in)
+{
+	if (streq(in->buffer, "print"))
+		xprintf("debug: %s", in->buffer + get_string(in, 0));
+	if (streq(in->buffer, "check"))
+		check_store();
+#ifdef TESTING
+	/* For testing, we allow them to set id. */
+	if (streq(in->buffer, "setid")) {
+		conn->id = atoi(in->buffer + get_string(in, 0));
+	} else if (streq(in->buffer, "failtest")) {
+		if (get_string(in, 0) < in->used)
+			srandom(atoi(in->buffer + get_string(in, 0)));
+		failtest = true;
+	}
+#endif /* TESTING */
+	send_ack(conn, XS_DEBUG);
+}
+
 /* Process "in" for conn: "in" will vanish after this conversation, so
  * we can talloc off it for temporary variables.  May free "conn".
  */
@@ -1159,21 +1178,7 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 		break;
 
 	case XS_DEBUG:
-		if (streq(in->buffer, "print"))
-			xprintf("debug: %s", in->buffer + get_string(in, 0));
-		if (streq(in->buffer, "check"))
-			check_store();
-#ifdef TESTING
-		/* For testing, we allow them to set id. */
-		if (streq(in->buffer, "setid")) {
-			conn->id = atoi(in->buffer + get_string(in, 0));
-		} else if (streq(in->buffer, "failtest")) {
-			if (get_string(in, 0) < in->used)
-				srandom(atoi(in->buffer + get_string(in, 0)));
-			failtest = true;
-		}
-#endif /* TESTING */
-		send_ack(conn, XS_DEBUG);
+		do_debug(conn, in);
 		break;
 
 	case XS_WATCH:
