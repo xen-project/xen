@@ -12,24 +12,18 @@
 #include "event_channel.h"
 
 /*
- * There are two forms of this hypercall.
- * 
- * The first and preferred version is only available from Xen 3.0.2. 
  * The prototype for this hypercall is:
  *  long sched_op_new(int cmd, void *arg)
  * @cmd == SCHEDOP_??? (scheduler operation).
  * @arg == Operation-specific extra argument(s), as described below.
  * 
- * The legacy version of this hypercall supports only the following commands:
- * SCHEDOP_yield, SCHEDOP_block, and SCHEDOP_shutdown. The prototype for the
- * legacy hypercall is:
+ * **NOTE**:
+ * Versions of Xen prior to 3.0.2 provide only the following legacy version
+ * of this hypercall, supporting only the commands yield, block and shutdown:
  *  long sched_op(int cmd, unsigned long arg)
  * @cmd == SCHEDOP_??? (scheduler operation).
  * @arg == 0               (SCHEDOP_yield and SCHEDOP_block)
  *      == SHUTDOWN_* code (SCHEDOP_shutdown)
- * 
- * The sub-command descriptions below describe extra arguments for the
- * sched_op_new() hypercall.
  */
 
 /*
