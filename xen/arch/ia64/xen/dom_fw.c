@@ -47,7 +47,7 @@ unsigned long dom_pa(unsigned long imva)
 }
 
 // builds a hypercall bundle at domain physical address
-void dom_efi_hypercall_patch(struct domain *d, unsigned long paddr, unsigned long hypercall)
+static void dom_efi_hypercall_patch(struct domain *d, unsigned long paddr, unsigned long hypercall)
 {
 	unsigned long *imva;
 
@@ -95,115 +95,6 @@ unsigned long dom_fw_setup(struct domain *d, char *args, int arglen)
 #define NUM_EFI_SYS_TABLES 6
 # define NUM_MEM_DESCS	5
 
-
-#define SECS_PER_HOUR   (60 * 60)
-#define SECS_PER_DAY    (SECS_PER_HOUR * 24)
-
-/* Compute the `struct tm' representation of *T,
-   offset OFFSET seconds east of UTC,
-   and store year, yday, mon, mday, wday, hour, min, sec into *TP.
-   Return nonzero if successful.  */
-int
-offtime (unsigned long t, efi_time_t *tp)
-{
-	const unsigned short int __mon_yday[2][13] =
-	{
-		/* Normal years.  */
-		{ 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365 },
-		/* Leap years.  */
-		{ 0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366 }
-	};
-	long int days, rem, y;
-	const unsigned short int *ip;
-
-	days = t / SECS_PER_DAY;
-	rem = t % SECS_PER_DAY;
-	while (rem < 0) {
-		rem += SECS_PER_DAY;
-		--days;
-	}
-	while (rem >= SECS_PER_DAY) {
-		rem -= SECS_PER_DAY;
-		++days;
-	}
-	tp->hour = rem / SECS_PER_HOUR;
-	rem %= SECS_PER_HOUR;
-	tp->minute = rem / 60;
-	tp->second = rem % 60;
-	/* January 1, 1970 was a Thursday.  */
-	y = 1970;
-
-#	define DIV(a, b) ((a) / (b) - ((a) % (b) < 0))
-#	define LEAPS_THRU_END_OF(y) (DIV (y, 4) - DIV (y, 100) + DIV (y, 400))
-#	define __isleap(year) \
-	  ((year) % 4 == 0 && ((year) % 100 != 0 || (year) % 400 == 0))
-
-	while (days < 0 || days >= (__isleap (y) ? 366 : 365)) {
-		/* Guess a corrected year, assuming 365 days per year.  */
-		long int yg = y + days / 365 - (days % 365 < 0);
-
-		/* Adjust DAYS and Y to match the guessed year.  */
-		days -= ((yg - y) * 365 + LEAPS_THRU_END_OF (yg - 1)
-			 - LEAPS_THRU_END_OF (y - 1));
-		y = yg;
-	}
-	tp->year = y;
-	ip = __mon_yday[__isleap(y)];
-	for (y = 11; days < (long int) ip[y]; --y)
-		continue;
-	days -= ip[y];
-	tp->month = y + 1;
-	tp->day = days + 1;
-	return 1;
-}
-
-/* Macro to emulate SAL call using legacy IN and OUT calls to CF8, CFC etc.. */
-
-#define BUILD_CMD(addr)		((0x80000000 | (addr)) & ~3)
-
-#define REG_OFFSET(addr)	(0x00000000000000FF & (addr))
-#define DEVICE_FUNCTION(addr)	(0x000000000000FF00 & (addr))
-#define BUS_NUMBER(addr)	(0x0000000000FF0000 & (addr))
-
-#ifndef XEN
-static efi_status_t
-fw_efi_get_time (efi_time_t *tm, efi_time_cap_t *tc)
-{
-#if defined(CONFIG_IA64_HP_SIM) || defined(CONFIG_IA64_GENERIC)
-	struct {
-		int tv_sec;	/* must be 32bits to work */
-		int tv_usec;
-	} tv32bits;
-
-	ssc((unsigned long) &tv32bits, 0, 0, 0, SSC_GET_TOD);
-
-	memset(tm, 0, sizeof(*tm));
-	offtime(tv32bits.tv_sec, tm);
-
-	if (tc)
-		memset(tc, 0, sizeof(*tc));
-#else
-#	error Not implemented yet...
-#endif
-	return EFI_SUCCESS;
-}
-
-static void
-efi_reset_system (int reset_type, efi_status_t status, unsigned long data_size, efi_char16_t *data)
-{
-#if defined(CONFIG_IA64_HP_SIM) || defined(CONFIG_IA64_GENERIC)
-	ssc(status, 0, 0, 0, SSC_EXIT);
-#else
-#	error Not implemented yet...
-#endif
-}
-
-static efi_status_t
-efi_unimplemented (void)
-{
-	return EFI_UNSUPPORTED;
-}
-#endif /* !XEN */
 
 struct sal_ret_values
 sal_emulator (long index, unsigned long in1, unsigned long in2,
@@ -433,7 +324,7 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 
 #define NFUNCPTRS 20
 
-void print_md(efi_memory_desc_t *md)
+static void print_md(efi_memory_desc_t *md)
 {
 #if 1
 	printk("domain mem: type=%u, attr=0x%lx, range=[0x%016lx-0x%016lx) (%luMB)\n",
@@ -495,7 +386,7 @@ acpi_update_madt_checksum (unsigned long phys_addr, unsigned long size)
 }
 
 /* base is physical address of acpi table */
-void touch_acpi_table(void)
+static void touch_acpi_table(void)
 {
 	if (acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_update_lsapic, 0) < 0)
 		printk("Error parsing MADT - no LAPIC entires\n");
