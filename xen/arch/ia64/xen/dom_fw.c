@@ -860,7 +860,10 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 		/* hypercall patches live here, masquerade as reserved PAL memory */
 		MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB,HYPERCALL_START,HYPERCALL_END, 1);
 		MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,HYPERCALL_END,maxmem, 1);
-		MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
+		/* Create a dummy entry for IO ports, so that IO accesses are
+		   trapped by Xen.  */
+		MAKE_MD(EFI_MEMORY_MAPPED_IO_PORT_SPACE,EFI_MEMORY_UC,
+			0x00000ffffc000000, 0x00000fffffffffff, 1);
 		MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
 	}
 
