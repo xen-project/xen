@@ -586,7 +586,8 @@ static void update_queues(
                     DIV_UP(now - curinf->deadl_abs,
                            curinf->period) * curinf->period;
             if (unlikely(curinf->deadl_abs < now))
-                printk("Fatal scheduler error: %lld %lld %lld diff=%lld\n",
+                printk("Fatal scheduler error: %"PRIu64" %"PRIu64" %"PRIu64
+                       " diff=%"PRIu64"\n",
                        curinf->deadl_abs, now, curinf->period,
                        now - curinf->deadl_abs);
             ASSERT(curinf->deadl_abs >= now);
