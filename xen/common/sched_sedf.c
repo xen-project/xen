@@ -585,6 +585,10 @@ static void update_queues(
                 curinf->deadl_abs += 
                     DIV_UP(now - curinf->deadl_abs,
                            curinf->period) * curinf->period;
+            if (unlikely(curinf->deadl_abs < now))
+                printk("Fatal scheduler error: %lld %lld %lld diff=%lld\n",
+                       curinf->deadl_abs, now, curinf->period,
+                       now - curinf->deadl_abs);
             ASSERT(curinf->deadl_abs >= now);
             /*give a fresh slice*/
             curinf->cputime = 0;
