@@ -1115,8 +1115,17 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
 
 static void do_debug(struct connection *conn, struct buffered_data *in)
 {
-	if (streq(in->buffer, "print"))
+	int num;
+
+	num = xs_count_strings(in->buffer, in->used);
+
+	if (streq(in->buffer, "print")) {
+		if (num < 2) {
+			send_error(conn, EINVAL);
+			return;
+		}
 		xprintf("debug: %s", in->buffer + get_string(in, 0));
+	}
 	if (streq(in->buffer, "check"))
 		check_store();
 #ifdef TESTING
