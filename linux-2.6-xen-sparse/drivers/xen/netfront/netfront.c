@@ -845,11 +845,11 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	}
 
 	while ((skb = __skb_dequeue(&rxq)) != NULL) {
-		if (skb->len > (dev->mtu + ETH_HLEN)) {
+		if (skb->len > (dev->mtu + ETH_HLEN + 4)) {
 			if (net_ratelimit())
 				printk(KERN_INFO "Received packet too big for "
 				       "MTU (%d > %d)\n",
-				       skb->len - ETH_HLEN, dev->mtu);
+				       skb->len - ETH_HLEN - 4, dev->mtu);
 			skb->len  = 0;
 			skb->tail = skb->data;
 			init_skb_shinfo(skb);
