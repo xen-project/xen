@@ -32,7 +32,7 @@ OBJS := $(TARGET_ARCH).o
 OBJS += $(patsubst %.c,%.o,$(wildcard *.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard lib/*.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard xenbus/*.c))
-#OBJS += $(patsubst %.c,%.o,$(wildcard console/*.c))
+OBJS += $(patsubst %.c,%.o,$(wildcard console/*.c))
 										   
 HDRS := $(wildcard include/*.h)
 HDRS += $(wildcard include/xen/*.h)

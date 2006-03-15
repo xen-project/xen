@@ -22,6 +22,7 @@
 #include <events.h>
 #include <lib.h>
 
+
 static ev_action_t ev_actions[NR_EVS];
 void default_handler(int port, struct pt_regs *regs);
 
@@ -58,7 +59,7 @@ int do_event(u32 port, struct pt_regs *regs)
 
 int bind_evtchn( u32 port, void (*handler)(int, struct pt_regs *) )
 {
- 	if(ev_actions[port].handler)
+ 	if(ev_actions[port].handler != default_handler)
         printk("WARN: Handler for port %d already registered, replacing\n",
 				port);
 
@@ -73,7 +74,7 @@ int bind_evtchn( u32 port, void (*handler)(int, struct pt_regs *) )
 
 void unbind_evtchn( u32 port )
 {
-	if (!ev_actions[port].handler)
+	if (ev_actions[port].handler)
 		printk("WARN: No handler for port %d when unbinding\n", port);
 	ev_actions[port].handler = NULL;
 	ev_actions[port].status |= EVS_DISABLED;

@@ -380,6 +380,10 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
            "prev_l_mfn=%lx, offset=%lx\n", 
            level, *pt_pfn, prev_l_mfn, offset);
 
+    /* We need to clear the page, otherwise we might fail to map it
+       as a page table page */
+    memset((unsigned long*)pfn_to_virt(*pt_pfn), 0, PAGE_SIZE);  
+ 
     if (level == L1_FRAME)
     {
          prot_e = L1_PROT;

@@ -56,13 +56,10 @@
 #define _LIB_H_
 
 #include <stdarg.h>
-
+#include <console.h>
 
 /* printing */
-#define printk  printf
-#define kprintf printf
 #define _p(_x) ((void *)(unsigned long)(_x))
-void printf(const char *fmt, ...);
 int vsnprintf(char *buf, size_t size, const char *fmt, va_list args);
 int vscnprintf(char *buf, size_t size, const char *fmt, va_list args);
 int snprintf(char * buf, size_t size, const char *fmt, ...);

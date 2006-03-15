@@ -556,19 +556,6 @@ int sprintf(char * buf, const char *fmt, ...)
     return i;
 }
 
-
-void printf(const char *fmt, ...)
-{
-    static char   buf[1024];
-    va_list       args;
-    
-    va_start(args, fmt);
-    (void)vsnprintf(buf, sizeof(buf), fmt, args);
-    va_end(args);        
-   
-    (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(buf), buf);
-}
-
 /**
  * vsscanf - Unformat a buffer into a list of arguments
  * @buf:	input buffer

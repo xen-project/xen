@@ -76,6 +76,8 @@ static shared_info_t *map_shared_info(unsigned long pa)
 }
 
 
+extern void init_console(void);
+
 /*
  * INITIAL C ENTRY POINT.
  */
@@ -127,15 +129,19 @@ void start_kernel(start_info_t *si)
 
     /* set up events */
     init_events();
+    
     /* init time and timers */
     init_time();
-    
+
+    /* init the console driver */
+    init_console();
+
     /* init scheduler */
     init_sched();
 
     /* init xenbus */
     xs_init();
-    
+   
     /* Everything initialised, start idle thread */
     run_idle_thread();
 }
