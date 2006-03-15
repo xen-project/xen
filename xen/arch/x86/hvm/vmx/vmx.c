@@ -231,10 +231,9 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         if ((msr_content & EFER_LME) ^
             test_bit(VMX_CPU_STATE_LME_ENABLED,
                      &vc->arch.hvm_vmx.cpu_state)){
-            if (test_bit(VMX_CPU_STATE_PG_ENABLED,
-                         &vc->arch.hvm_vmx.cpu_state) ||
-                !test_bit(VMX_CPU_STATE_PAE_ENABLED,
-                          &vc->arch.hvm_vmx.cpu_state)){
+            if ( vmx_paging_enabled(vc) ||
+                 !test_bit(VMX_CPU_STATE_PAE_ENABLED,
+                           &vc->arch.hvm_vmx.cpu_state)) {
                 vmx_inject_exception(vc, TRAP_gp_fault, 0);
             }
         }
