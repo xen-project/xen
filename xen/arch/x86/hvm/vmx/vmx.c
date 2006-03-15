@@ -1219,8 +1219,6 @@ static int vmx_set_cr0(unsigned long value)
 
     if ( (value & X86_CR0_PE) && (value & X86_CR0_PG) && !paging_enabled )
     {
-        unsigned long cr4;
-
         /*
          * Trying to enable guest paging.
          * The guest CR3 must be pointing to the guest physical.
@@ -1269,16 +1267,6 @@ static int vmx_set_cr0(unsigned long value)
                 domain_crash_synchronous(); /* need to take a clean path */
             }
 #endif
-        }
-
-        /* update CR4's PAE if needed */
-        __vmread(GUEST_CR4, &cr4);
-        if ( (!(cr4 & X86_CR4_PAE)) &&
-             test_bit(VMX_CPU_STATE_PAE_ENABLED,
-                      &v->arch.hvm_vmx.cpu_state) )
-        {
-            HVM_DBG_LOG(DBG_LEVEL_1, "enable PAE in cr4\n");
-            __vmwrite(GUEST_CR4, cr4 | X86_CR4_PAE);
         }
 
         /*
