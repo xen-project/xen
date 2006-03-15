@@ -726,12 +726,12 @@ UINT64 vcpu_deliverable_timer(VCPU *vcpu)
 
 IA64FAULT vcpu_get_lid(VCPU *vcpu, UINT64 *pval)
 {
-//extern unsigned long privop_trace;
-//privop_trace=1;
-	//TODO: Implement this
-	printf("vcpu_get_lid: WARNING: Getting cr.lid always returns zero\n");
-	//*pval = 0;
-	*pval = ia64_getreg(_IA64_REG_CR_LID);
+	/* Use real LID for domain0 until vIOSAPIC is present.
+	   Use EID=0, ID=vcpu_id for domU.  */
+	if (vcpu->domain == dom0)
+		*pval = ia64_getreg(_IA64_REG_CR_LID);
+	else
+		*pval = vcpu->vcpu_id << 24;
 	return IA64_NO_FAULT;
 }
 

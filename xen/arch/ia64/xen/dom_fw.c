@@ -513,15 +513,15 @@ struct fake_acpi_tables {
 	struct acpi_table_header dsdt;
 	u8 aml[16];
 	struct acpi_table_madt madt;
-	struct acpi_table_lsapic lsapic;
+	struct acpi_table_lsapic lsapic[MAX_VIRT_CPUS];
 	u8 pm1a_evt_blk[4];
 	u8 pm1a_cnt_blk[1];
 	u8 pm_tmr_blk[4];
 };
 
 /* Create enough of an ACPI structure to make the guest OS ACPI happy. */
-void
-dom_fw_fake_acpi(struct fake_acpi_tables *tables)
+static void
+dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 {
 	struct acpi20_table_rsdp *rsdp = &tables->rsdp;
 	struct xsdt_descriptor_rev2 *xsdt = &tables->xsdt;
@@ -529,7 +529,8 @@ dom_fw_fake_acpi(struct fake_acpi_tables *tables)
 	struct facs_descriptor_rev2 *facs = &tables->facs;
 	struct acpi_table_header *dsdt = &tables->dsdt;
 	struct acpi_table_madt *madt = &tables->madt;
-	struct acpi_table_lsapic *lsapic = &tables->lsapic;
+	struct acpi_table_lsapic *lsapic = tables->lsapic;
+	int i;
 
 	memset(tables, 0, sizeof(struct fake_acpi_tables));
 
@@ -621,16 +622,20 @@ dom_fw_fake_acpi(struct fake_acpi_tables *tables)
 	strncpy(madt->header.signature, APIC_SIG, 4);
 	madt->header.revision = 2;
 	madt->header.length = sizeof(struct acpi_table_madt) +
-	                      sizeof(struct acpi_table_lsapic);
+		MAX_VIRT_CPUS * sizeof(struct acpi_table_lsapic);
 	strcpy(madt->header.oem_id, "XEN");
 	strcpy(madt->header.oem_table_id, "Xen/ia64");
 	strcpy(madt->header.asl_compiler_id, "XEN");
 	madt->header.asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
 
-	/* A single LSAPIC entry describes the CPU.  Revisit for SMP guests */
-	lsapic->header.type = ACPI_MADT_LSAPIC;
-	lsapic->header.length = sizeof(struct acpi_table_lsapic);
-	lsapic->flags.enabled = 1;
+	/* An LSAPIC entry describes a CPU.  */
+	for (i = 0; i < MAX_VIRT_CPUS; i++) {
+		lsapic[i].header.type = ACPI_MADT_LSAPIC;
+		lsapic[i].header.length = sizeof(struct acpi_table_lsapic);
+		lsapic[i].id = i;
+		lsapic[i].eid = 0;
+		lsapic[i].flags.enabled = (d->vcpu[i] != NULL);
+	}
 
 	madt->header.checksum = generate_acpi_checksum(madt,
 	                                               madt->header.length);
@@ -784,7 +789,7 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 
 			acpi_tables = (void *)cp;
 			cp += sizeof(struct fake_acpi_tables);
-			dom_fw_fake_acpi(acpi_tables);
+			dom_fw_fake_acpi(d, acpi_tables);
 
 			efi_tables[i].guid = ACPI_20_TABLE_GUID;
 			efi_tables[i].table = dom_pa((unsigned long) acpi_tables);
