@@ -587,6 +587,8 @@ static void pgd_test_and_unpin(pgd_t *pgd)
 
 void mm_pin(struct mm_struct *mm)
 {
+	if (xen_feature(XENFEAT_writable_page_tables))
+	    return;
 	spin_lock(&mm->page_table_lock);
 	__pgd_pin(mm->pgd);
 	spin_unlock(&mm->page_table_lock);
@@ -594,6 +596,8 @@ void mm_pin(struct mm_struct *mm)
 
 void mm_unpin(struct mm_struct *mm)
 {
+	if (xen_feature(XENFEAT_writable_page_tables))
+	    return;
 	spin_lock(&mm->page_table_lock);
 	__pgd_unpin(mm->pgd);
 	spin_unlock(&mm->page_table_lock);
@@ -602,6 +606,8 @@ void mm_unpin(struct mm_struct *mm)
 void mm_pin_all(void)
 {
 	struct page *page;
+	if (xen_feature(XENFEAT_writable_page_tables))
+	    return;
 	for (page = pgd_list; page; page = (struct page *)page->index) {
 		if (!test_bit(PG_pinned, &page->flags))
 			__pgd_pin((pgd_t *)page_address(page));

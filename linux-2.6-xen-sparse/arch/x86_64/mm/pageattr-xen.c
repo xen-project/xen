@@ -71,6 +71,9 @@ static void mm_walk(struct mm_struct *mm, pgprot_t flags)
 
 void mm_pin(struct mm_struct *mm)
 {
+	if (xen_feature(XENFEAT_writable_page_tables))
+		return;
+
 	spin_lock(&mm->page_table_lock);
 
 	mm_walk(mm, PAGE_KERNEL_RO);
@@ -94,6 +97,9 @@ void mm_pin(struct mm_struct *mm)
 
 void mm_unpin(struct mm_struct *mm)
 {
+	if (xen_feature(XENFEAT_writable_page_tables))
+		return;
+
 	spin_lock(&mm->page_table_lock);
 
 	xen_pgd_unpin(__pa(mm->pgd));
@@ -116,6 +122,9 @@ void mm_unpin(struct mm_struct *mm)
 
 void mm_pin_all(void)
 {
+	if (xen_feature(XENFEAT_writable_page_tables))
+		return;
+
 	while (!list_empty(&mm_unpinned))	
 		mm_pin(list_entry(mm_unpinned.next, struct mm_struct,
 				  context.unpinned));
