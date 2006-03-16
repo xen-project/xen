@@ -27,6 +27,7 @@
 unsigned long xenheap_phys_end;
 
 char saved_command_line[COMMAND_LINE_SIZE];
+char dom0_command_line[COMMAND_LINE_SIZE];
 
 struct vcpu *idle_vcpu[NR_CPUS];
 
@@ -119,11 +120,12 @@ static char null[4] = { 0 };
 void early_cmdline_parse(char **cmdline_p)
 {
     char *guest_cmd;
-    char *split = "--";
+    static const char * const split = "--";
 
     if (*cmdline_p == NULL) {
 	*cmdline_p = &null[0];
 	saved_command_line[0] = '\0';
+	dom0_command_line[0] = '\0';
 	return;
     }
 
@@ -138,7 +140,8 @@ void early_cmdline_parse(char **cmdline_p)
 	while (*guest_cmd == ' ') guest_cmd++;
     }
 
-    strlcpy(saved_command_line, guest_cmd, COMMAND_LINE_SIZE);
+    strlcpy(saved_command_line, *cmdline_p, COMMAND_LINE_SIZE);
+    strlcpy(dom0_command_line, guest_cmd, COMMAND_LINE_SIZE);
     return;
 }
 

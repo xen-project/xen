@@ -26,6 +26,7 @@
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/hw_irq.h>
+#include <asm/setup.h>
 //#include <asm/mpspec.h>
 #include <xen/irq.h>
 #include <xen/event.h>
@@ -36,7 +37,6 @@
 #include <xen/elf.h>
 //#include <asm/page.h>
 #include <asm/pgalloc.h>
-#include <asm/dma.h>	/* for MAX_DMA_ADDRESS */
 
 #include <asm/asm-offsets.h>  /* for IA64_THREAD_INFO_SIZE */
 
@@ -49,6 +49,7 @@
 #include <asm/pal.h>
 #include <asm/vhpt.h>
 #include <public/hvm/ioreq.h>
+#include <public/arch-ia64.h>
 #include <asm/tlbflush.h>
 #include <asm/regionreg.h>
 
@@ -415,7 +416,7 @@ void new_thread(struct vcpu *v,
 {
 	struct domain *d = v->domain;
 	struct pt_regs *regs;
-	extern char saved_command_line[];
+	extern char dom0_command_line[];
 
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
 	if (d == dom0) start_pc += dom0_start;
@@ -439,24 +440,27 @@ void new_thread(struct vcpu *v,
 	if (VMX_DOMAIN(v)) {
 		vmx_init_all_rr(v);
 		if (d == dom0)
-//		    VCPU(v,vgr[12]) = dom_fw_setup(d,saved_command_line,256L);
-		    regs->r28 = dom_fw_setup(d,saved_command_line,256L);
+		    regs->r28 = dom_fw_setup(d,dom0_command_line,
+					     COMMAND_LINE_SIZE);
 		/* Virtual processor context setup */
 		VCPU(v, vpsr) = IA64_PSR_BN;
 		VCPU(v, dcr) = 0;
 	} else {
 		init_all_rr(v);
 		if (d == dom0) 
-		    regs->r28 = dom_fw_setup(d,saved_command_line,256L);
+		    regs->r28 = dom_fw_setup(d,dom0_command_line,
+					     COMMAND_LINE_SIZE);
 		else {
 		    regs->ar_rsc |= (2 << 2); /* force PL2/3 */
 		    if (*d->arch.cmdline == '\0') {
 #define DEFAULT_CMDLINE "nomca nosmp xencons=tty0 console=tty0 root=/dev/hda1"
-			regs->r28 = dom_fw_setup(d,DEFAULT_CMDLINE,256L);
+			regs->r28 = dom_fw_setup(d,DEFAULT_CMDLINE,
+						 sizeof (DEFAULT_CMDLINE));
 			printf("domU command line defaulted to"
 				DEFAULT_CMDLINE "\n");
 		    }
-		    else regs->r28 = dom_fw_setup(d,d->arch.cmdline,256L);
+		    else regs->r28 = dom_fw_setup(d,d->arch.cmdline, 
+						  IA64_COMMAND_LINE_SIZE);
 		}
 		VCPU(v, banknum) = 1;
 		VCPU(v, metaphysical_mode) = 1;
@@ -645,12 +649,13 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
 	if (d == dom0) {
+		pte_t pteval;
 		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
 			//printk("lookup_domain_mpa: bad dom0 mpaddr 0x%lx!\n",mpaddr);
 			//printk("lookup_domain_mpa: start=0x%lx,end=0x%lx!\n",dom0_start,dom0_start+dom0_size);
 			mpafoo(mpaddr);
 		}
-		pte_t pteval = pfn_pte(mpaddr >> PAGE_SHIFT,
+		pteval = pfn_pte(mpaddr >> PAGE_SHIFT,
 			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX));
 		pte = &pteval;
 		return *(unsigned long *)pte;

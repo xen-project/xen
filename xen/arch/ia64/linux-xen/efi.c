@@ -42,7 +42,12 @@ extern unsigned long long memparse (char *ptr, char **retptr);
 struct efi efi;
 EXPORT_SYMBOL(efi);
 static efi_runtime_services_t *runtime;
+#ifdef XEN
+// this is a temporary hack to avoid CONFIG_VIRTUAL_MEM_MAP
+static unsigned long mem_limit = ~0UL, max_addr = 0x100000000;
+#else
 static unsigned long mem_limit = ~0UL, max_addr = ~0UL;
+#endif
 
 #define efi_call_virt(f, args...)	(*(f))(args)
 
@@ -329,8 +334,6 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 		if (running_on_sim && md->type != EFI_CONVENTIONAL_MEMORY)
 			continue;
 }
-// this is a temporary hack to avoid CONFIG_VIRTUAL_MEM_MAP
-		if (md->phys_addr >= 0x100000000) continue;
 #endif
 		/*
 		 * granule_addr is the base of md's first granule.
