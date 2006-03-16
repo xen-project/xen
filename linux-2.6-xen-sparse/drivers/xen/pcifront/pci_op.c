@@ -8,6 +8,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/spinlock.h>
+#include <linux/time.h>
 #include <xen/evtchn.h>
 #include "pcifront.h"
 
