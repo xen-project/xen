@@ -78,30 +78,30 @@ void vmx_final_setup_guest(struct vcpu *v)
     }
 }
 
-void vmx_relinquish_resources(struct vcpu *v)
+static void vmx_relinquish_guest_resources(struct domain *d)
 {
-    struct hvm_virpit *vpit;
+    struct vcpu *v;
 
-    if (v->vcpu_id == 0) {
-        /* unmap IO shared page */
-        struct domain *d = v->domain;
-        if ( d->arch.hvm_domain.shared_page_va )
-            unmap_domain_page_global(
-	        (void *)d->arch.hvm_domain.shared_page_va);
-        shadow_direct_map_clean(d);
-    }
-
-    vmx_request_clear_vmcs(v);
-    destroy_vmcs(&v->arch.hvm_vmx);
-    free_monitor_pagetable(v);
-    vpit = &v->domain->arch.hvm_domain.vpit;
-    kill_timer(&vpit->pit_timer);
-    kill_timer(&v->arch.hvm_vmx.hlt_timer);
-    if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) )
+    for_each_vcpu ( d, v )
     {
-        kill_timer(&VLAPIC(v)->vlapic_timer);
-        xfree(VLAPIC(v));
+        vmx_request_clear_vmcs(v);
+        destroy_vmcs(&v->arch.hvm_vmx);
+        free_monitor_pagetable(v);
+        kill_timer(&v->arch.hvm_vmx.hlt_timer);
+        if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) )
+        {
+            kill_timer(&VLAPIC(v)->vlapic_timer);
+            xfree(VLAPIC(v));
+        }
     }
+
+    kill_timer(&d->arch.hvm_domain.vpit.pit_timer);
+
+    if ( d->arch.hvm_domain.shared_page_va )
+        unmap_domain_page_global(
+	        (void *)d->arch.hvm_domain.shared_page_va);
+
+    shadow_direct_map_clean(d);
 }
 
 #ifdef __x86_64__
@@ -323,12 +323,6 @@ void stop_vmx(void)
 int vmx_initialize_guest_resources(struct vcpu *v)
 {
     vmx_final_setup_guest(v);
-    return 1;
-}
-
-int vmx_relinquish_guest_resources(struct vcpu *v)
-{
-    vmx_relinquish_resources(v);
     return 1;
 }
 

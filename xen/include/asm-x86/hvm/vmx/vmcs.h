@@ -28,7 +28,6 @@ extern int start_vmx(void);
 extern void stop_vmx(void);
 
 void vmx_final_setup_guest(struct vcpu *v);
-void vmx_relinquish_resources(struct vcpu *v);
 
 void vmx_enter_scheduler(void);
 

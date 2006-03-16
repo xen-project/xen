@@ -35,8 +35,8 @@ struct hvm_function_table {
     /*
      * Initialize/relinguish HVM guest resources
      */
-    int (*initialize_guest_resources)(struct vcpu *v);
-    int (*relinquish_guest_resources)(struct vcpu *v);
+    int  (*initialize_guest_resources)(struct vcpu *v);
+    void (*relinquish_guest_resources)(struct domain *d);
 
     /*
      * Store and load guest state:
@@ -80,24 +80,23 @@ extern struct hvm_function_table hvm_funcs;
 static inline void
 hvm_disable(void)
 {
-    if (hvm_funcs.disable)
-	hvm_funcs.disable();
+    if ( hvm_funcs.disable )
+        hvm_funcs.disable();
 }
 
 static inline int
 hvm_initialize_guest_resources(struct vcpu *v)
 {
-    if (hvm_funcs.initialize_guest_resources)
-	return hvm_funcs.initialize_guest_resources(v);
+    if ( hvm_funcs.initialize_guest_resources )
+        return hvm_funcs.initialize_guest_resources(v);
     return 0;
 }
 
-static inline int
-hvm_relinquish_guest_resources(struct vcpu *v)
+static inline void
+hvm_relinquish_guest_resources(struct domain *d)
 {
     if (hvm_funcs.relinquish_guest_resources)
-	return hvm_funcs.relinquish_guest_resources(v);
-    return 0;
+        hvm_funcs.relinquish_guest_resources(d);
 }
 
 static inline void
@@ -134,9 +133,9 @@ hvm_restore_msrs(struct vcpu *v)
         hvm_funcs.restore_msrs(v);
 }
 #else
-#define	hvm_save_segments(v)	((void)0)
-#define	hvm_load_msrs(v)	((void)0)
-#define	hvm_restore_msrs(v)	((void)0)
+#define hvm_save_segments(v)    ((void)0)
+#define hvm_load_msrs(v)        ((void)0)
+#define hvm_restore_msrs(v)     ((void)0)
 #endif /* __x86_64__ */
 
 static inline void

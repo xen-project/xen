@@ -44,7 +44,6 @@ extern void svm_vmread(struct vcpu *v, int index, unsigned long *value);
 extern void svm_vmwrite(struct vcpu *v, int index, unsigned long value);
 extern void svm_final_setup_guest(struct vcpu *v); 
 extern int svm_paging_enabled(struct vcpu *v); 
-extern void svm_relinquish_resources(struct vcpu *v);
 extern void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb);
 extern void svm_stts(struct vcpu *v); 
 extern void svm_do_launch(struct vcpu *v);

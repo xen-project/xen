@@ -1030,10 +1030,10 @@ void domain_relinquish_resources(struct domain *d)
 
             v->arch.guest_table_user = mk_pagetable(0);
         }
-
-        if ( hvm_guest(v) )
-            hvm_relinquish_guest_resources(v);
     }
+
+    if ( hvm_guest(d->vcpu[0]) )
+        hvm_relinquish_guest_resources(d);
 
     shadow_mode_disable(d);
 
