@@ -405,7 +405,7 @@ static void sdl_send_mouse_event(void)
     if (state & SDL_BUTTON(SDL_BUTTON_WHEELDOWN))
         dz++;
 #endif
-    kbd_mouse_event(dx, dy, dz, buttons);
+    kbd_mouse_event(dx, dy, dz, buttons, 0, 0);
 }
 
 static void toggle_full_screen(DisplayState *ds)

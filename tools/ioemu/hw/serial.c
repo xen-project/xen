@@ -70,6 +70,11 @@
 #define UART_LSR_OE	0x02	/* Overrun error indicator */
 #define UART_LSR_DR	0x01	/* Receiver data ready */
 
+/*
+ * Size of ring buffer for characters to send to host
+ */
+#define MAXCHRS	256
+
 struct SerialState {
     uint8_t divider;
     uint8_t rbr; /* receive register */
@@ -84,11 +89,22 @@ struct SerialState {
        it can be reset while reading iir */
     int thr_ipending;
     int irq;
+    struct cbuf {
+	    uint8_t buf[MAXCHRS];
+	    int in;
+	    int out;
+    } cbuf;
     CharDriverState *chr;
 };
 
 static void serial_update_irq(SerialState *s)
 {
+    if ((s->lsr & UART_LSR_DR) == 0 && s->cbuf.in != s->cbuf.out) {
+	s->rbr = s->cbuf.buf[s->cbuf.out++];
+	if (s->cbuf.out >= MAXCHRS)
+	    s->cbuf.out = 0;
+	s->lsr |= UART_LSR_DR;
+    }
     if ((s->lsr & UART_LSR_DR) && (s->ier & UART_IER_RDI)) {
         s->iir = UART_IIR_RDI;
     } else if (s->thr_ipending && (s->ier & UART_IER_THRI)) {
@@ -220,6 +236,22 @@ static uint32_t serial_ioport_read(void *opaque, uint32_t addr)
     return ret;
 }
 
+void ser_queue(SerialState *s, unsigned char c)
+{
+    int n;
+
+    n = s->cbuf.in - s->cbuf.out;
+    if (n < 0)
+	n += MAXCHRS;
+    if (n < (MAXCHRS - 1)) {
+	s->cbuf.buf[s->cbuf.in++] = c;
+	if (s->cbuf.in >= MAXCHRS)
+	    s->cbuf.in = 0;
+	serial_update_irq(s);
+    }
+    return;
+}
+
 static int serial_can_receive(SerialState *s)
 {
     return !(s->lsr & UART_LSR_DR);
@@ -227,6 +259,9 @@ static int serial_can_receive(SerialState *s)
 
 static void serial_receive_byte(SerialState *s, int ch)
 {
+#ifdef	DEBUG_SERIAL
+    printf("serial: serial_receive_byte: ch=0x%02x\n", ch);
+#endif	// DEBUG_SERIAL
     s->rbr = ch;
     s->lsr |= UART_LSR_DR;
     serial_update_irq(s);
@@ -266,6 +301,8 @@ SerialState *serial_init(int base, int irq, CharDriverState *chr)
     s = qemu_mallocz(sizeof(SerialState));
     if (!s)
         return NULL;
+    s->cbuf.in = 0;
+    s->cbuf.out = 0;
     s->irq = irq;
     s->lsr = UART_LSR_TEMT | UART_LSR_THRE;
     s->iir = UART_IIR_NO_INT;
@@ -273,6 +310,7 @@ SerialState *serial_init(int base, int irq, CharDriverState *chr)
     register_ioport_write(base, 8, 1, serial_ioport_write, s);
     register_ioport_read(base, 8, 1, serial_ioport_read, s);
     s->chr = chr;
+    summa_init(s, chr);
     qemu_chr_add_read_handler(chr, serial_can_receive1, serial_receive1, s);
     qemu_chr_add_event_handler(chr, serial_event);
     return s;

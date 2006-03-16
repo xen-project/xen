@@ -46,8 +46,9 @@
 #endif
 
 static rfbScreenInfoPtr screen;
-static DisplayState* ds_sdl=0;
-static void* kbd_layout=0; // TODO: move into rfbClient
+static DisplayState* ds_sdl;
+static void* kbd_layout; // TODO: move into rfbClient
+static int ctl_keys; // Ctrl+Alt starts calibration
 
 /* mouse stuff */
 
@@ -123,12 +124,15 @@ typedef struct {
 static rectangle_t last_update, before_update;
 static int updates_since_mouse=0;
 
+extern int mouse_maxx, mouse_maxy;
 static int mouse_x,mouse_y;
 static int new_mouse_x,new_mouse_y,new_mouse_z,new_mouse_buttons;
 
-static void init_mouse(int initial_x,int initial_y) {
-	mouse_x=new_mouse_x=initial_x;
-	mouse_y=new_mouse_y=initial_y;
+static void init_mouse(int max_x,int max_y) {
+	mouse_maxx=max_x - 1;
+	mouse_maxy=max_y - 1;
+	mouse_x=new_mouse_x=max_x/2;
+	mouse_y=new_mouse_y=max_y/2;
 	new_mouse_z=new_mouse_buttons=0;
 	mouse_magic->calibration = 0;
 }
@@ -137,6 +141,15 @@ static void mouse_refresh() {
 	int dx=0,dy=0,dz=new_mouse_z;
 	static int counter=1;
 
+	/*
+	 *  Simulate lifting the mouse by pressing left <ctl><alt> together
+	 *  e.g. don't send mouse events.
+	 */
+	if (ctl_keys == 3) {
+		mouse_x = new_mouse_x;
+		mouse_y = new_mouse_y;
+		return;
+	}
 	counter++;
 	if(!mouse_magic->calibration && counter>=2) { counter=0; return; }
 
@@ -153,7 +166,7 @@ static void mouse_refresh() {
 		}
 	}
 	//fprintf(stderr,"sending mouse event %d,%d\n",dx,dy);
-	kbd_mouse_event(dx,dy,dz,new_mouse_buttons);
+	kbd_mouse_event(dx,dy,dz,new_mouse_buttons,new_mouse_x,new_mouse_y);
 	mouse_x+=dx;
 	mouse_y+=dy;
 		
@@ -237,7 +250,7 @@ static void mouse_calibration_refresh() {
 	
 	if(calibration_step==0) {
 		x=0; y=1;
-		kbd_mouse_event(0,-1,0,0);
+		kbd_mouse_event(0,-1,0,0,x,y);
 		calibration_step++;
 	} else if(calibration_step==1) {
 		// find out the initial position of the cursor
@@ -269,7 +282,7 @@ static void mouse_calibration_refresh() {
 		} else {
 			y++;
 move_calibrate:
-			kbd_mouse_event(-x,-y,0,0);
+			kbd_mouse_event(-x,-y,0,0,x,y);
 			before_update=last_update;
 		}
 	} else if(calibration_step==3) {
@@ -375,12 +388,11 @@ static void vnc_resize(DisplayState *ds, int w, int h)
 		fprintf(stderr,"Warning: mouse calibration interrupted by video mode change\n");
 		stop_mouse_calibration();
 	}
-	init_mouse(w/2,h/2);
+	init_mouse(w,h);
 }
 
 static void vnc_process_key(rfbBool down, rfbKeySym keySym, rfbClientPtr cl)
 {
-	static int magic=0; // Ctrl+Alt starts calibration
 
 	if(is_active_console(vga_console)) {
 		WORD keycode=keysym2scancode(kbd_layout, keySym);
@@ -416,24 +428,28 @@ static void vnc_process_key(rfbBool down, rfbKeySym keySym, rfbClientPtr cl)
 	}
 	if(down) {
 		if(keySym==XK_Control_L)
-			magic|=1;
+			ctl_keys|=1;
 		else if(keySym==XK_Alt_L)
-			magic|=2;
+			ctl_keys|=2;
 	} else {
-		if((magic&3)==3) {
+		if (keySym == XK_Control_L)
+			ctl_keys &= ~1;
+		else if (keySym == XK_Alt_L)
+			ctl_keys &= ~2;
+		if((ctl_keys&3)==3) {
 			switch(keySym) {
 				case XK_Control_L:
-					magic&=~1;
+					ctl_keys&=~1;
 					break;
 				case XK_Alt_L:
-					magic&=~2;
+					ctl_keys&=~2;
 					break;
 				case XK_m:
-					magic=0;
+					ctl_keys=0;
 					start_mouse_calibration();
 					break;
 				case XK_1 ... XK_9:
-					magic=0;
+					ctl_keys=0;
 					fprintf(stderr,"switch to %d\n",keySym-XK_1);
 					console_select(keySym - XK_1);
 					if (is_active_console(vga_console)) {
@@ -483,7 +499,8 @@ void vnc_display_init(DisplayState *ds, int useAlsoSDL,
     char  host[1024];
     char *p;
     rfbClientPtr cl;
-    
+
+	summa_ok = 1;
 	if(!keyboard_layout) {
 		fprintf(stderr, "No keyboard language specified\n");
 		exit(1);
@@ -513,6 +530,10 @@ void vnc_display_init(DisplayState *ds, int useAlsoSDL,
 	screen->serverFormat.redMax = 31;
 	screen->serverFormat.greenMax = 63;
 	screen->serverFormat.blueMax = 31;
+
+#ifdef	VNC_EAGER_EVENTS
+	screen->handleEventsEagerly = TRUE;
+#endif	// VNC_EAGER_EVENTS
 
     if (port != 0) 
         screen->port = port;
