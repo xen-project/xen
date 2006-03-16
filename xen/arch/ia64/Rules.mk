@@ -5,7 +5,7 @@ VALIDATE_VT	?= n
 ifneq ($(COMPILE_ARCH),$(TARGET_ARCH))
 CROSS_COMPILE ?= /usr/local/sp_env/v2.2.5/i686/bin/ia64-unknown-linux-
 endif
-AFLAGS  += -D__ASSEMBLY__
+AFLAGS  += -D__ASSEMBLY__ -nostdinc $(CPPFLAGS)
 CPPFLAGS  += -I$(BASEDIR)/include -I$(BASEDIR)/include/asm-ia64 	\
              -I$(BASEDIR)/include/asm-ia64/linux 			\
 	     -I$(BASEDIR)/include/asm-ia64/linux-xen 			\
