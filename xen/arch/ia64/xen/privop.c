@@ -20,6 +20,9 @@ extern void zero_reflect_counts(void);
 
 long priv_verbose=0;
 
+/* Set to 1 to handle privified instructions from the privify tool. */
+static const int privify_en = 0;
+
 /**************************************************************************
 Hypercall bundle creation
 **************************************************************************/
@@ -131,7 +134,8 @@ IA64FAULT priv_ptc_e(VCPU *vcpu, INST64 inst)
 	UINT src = inst.M28.r3;
 
 	// NOTE: ptc_e with source gr > 63 is emulated as a fc r(y-64)
-	if (src > 63) return(vcpu_fc(vcpu,vcpu_get_gr(vcpu,src - 64)));
+	if (privify_en && src > 63)
+		return(vcpu_fc(vcpu,vcpu_get_gr(vcpu,src - 64)));
 	return vcpu_ptc_e(vcpu,vcpu_get_gr(vcpu,src));
 }
 
@@ -178,7 +182,7 @@ IA64FAULT priv_tpa(VCPU *vcpu, INST64 inst)
 	UINT src = inst.M46.r3;
 
 	// NOTE: tpa with source gr > 63 is emulated as a ttag rx=r(y-64)
-	if (src > 63)
+	if (privify_en && src > 63)
 		fault = vcpu_ttag(vcpu,vcpu_get_gr(vcpu,src-64),&padr);
 	else fault = vcpu_tpa(vcpu,vcpu_get_gr(vcpu,src),&padr);
 	if (fault == IA64_NO_FAULT)
@@ -193,7 +197,7 @@ IA64FAULT priv_tak(VCPU *vcpu, INST64 inst)
 	UINT src = inst.M46.r3;
 
 	// NOTE: tak with source gr > 63 is emulated as a thash rx=r(y-64)
-	if (src > 63)
+	if (privify_en && src > 63)
 		fault = vcpu_thash(vcpu,vcpu_get_gr(vcpu,src-64),&key);
 	else fault = vcpu_tak(vcpu,vcpu_get_gr(vcpu,src),&key);
 	if (fault == IA64_NO_FAULT)
@@ -280,7 +284,8 @@ IA64FAULT priv_mov_to_ar_reg(VCPU *vcpu, INST64 inst)
 	// I26 and M29 are identical for these fields
 	UINT64 ar3 = inst.M29.ar3;
 
-	if (inst.M29.r2 > 63 && inst.M29.ar3 < 8) { // privified mov from kr
+	if (privify_en && inst.M29.r2 > 63 && inst.M29.ar3 < 8) {
+		// privified mov from kr
 		UINT64 val;
 		if (vcpu_get_ar(vcpu,ar3,&val) != IA64_ILLOP_FAULT)
 			return vcpu_set_gr(vcpu, inst.M29.r2-64, val,0);
@@ -404,14 +409,17 @@ IA64FAULT priv_mov_from_rr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 val;
 	IA64FAULT fault;
+	int reg;
 	
-	if (inst.M43.r1 > 63) { // privified mov from cpuid
-		fault = vcpu_get_cpuid(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
+	reg = vcpu_get_gr(vcpu,inst.M43.r3);
+	if (privify_en && inst.M43.r1 > 63) {
+		// privified mov from cpuid
+		fault = vcpu_get_cpuid(vcpu,reg,&val);
 		if (fault == IA64_NO_FAULT)
 			return vcpu_set_gr(vcpu, inst.M43.r1-64, val, 0);
 	}
 	else {
-		fault = vcpu_get_rr(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
+		fault = vcpu_get_rr(vcpu,reg,&val);
 		if (fault == IA64_NO_FAULT)
 			return vcpu_set_gr(vcpu, inst.M43.r1, val, 0);
 	}
@@ -455,14 +463,17 @@ IA64FAULT priv_mov_from_pmc(VCPU *vcpu, INST64 inst)
 {
 	UINT64 val;
 	IA64FAULT fault;
+	int reg;
 	
-	if (inst.M43.r1 > 63) { // privified mov from pmd
-		fault = vcpu_get_pmd(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
+	reg = vcpu_get_gr(vcpu,inst.M43.r3);
+	if (privify_en && inst.M43.r1 > 63) {
+		// privified mov from pmd
+		fault = vcpu_get_pmd(vcpu,reg,&val);
 		if (fault == IA64_NO_FAULT)
 			return vcpu_set_gr(vcpu, inst.M43.r1-64, val, 0);
 	}
 	else {
-		fault = vcpu_get_pmc(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
+		fault = vcpu_get_pmc(vcpu,reg,&val);
 		if (fault == IA64_NO_FAULT)
 			return vcpu_set_gr(vcpu, inst.M43.r1, val, 0);
 	}
@@ -666,7 +677,7 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 		else if (inst.generic.major != 1) break;
 		x6 = inst.M29.x6;
 		if (x6 == 0x2a) {
-			if (inst.M29.r2 > 63 && inst.M29.ar3 < 8)
+			if (privify_en && inst.M29.r2 > 63 && inst.M29.ar3 < 8)
 				privcnt.mov_from_ar++; // privified mov from kr
 			else privcnt.mov_to_ar_reg++;
 			return priv_mov_to_ar_reg(vcpu,inst);
@@ -674,14 +685,14 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 		if (inst.M29.x3 != 0) break;
 		if (!(pfunc = Mpriv_funcs[x6])) break;
 		if (x6 == 0x1e || x6 == 0x1f)  { // tpa or tak are "special"
-			if (inst.M46.r3 > 63) {
+			if (privify_en && inst.M46.r3 > 63) {
 				if (x6 == 0x1e) x6 = 0x1b;
 				else x6 = 0x1a;
 			}
 		}
-		if (x6 == 52 && inst.M28.r3 > 63)
+		if (privify_en && x6 == 52 && inst.M28.r3 > 63)
 			privcnt.fc++;
-		else if (x6 == 16 && inst.M43.r3 > 63)
+		else if (privify_en && x6 == 16 && inst.M43.r3 > 63)
 			privcnt.cpuid++;
 		else privcnt.Mpriv_cnt[x6]++;
 		return (*pfunc)(vcpu,inst);
@@ -718,7 +729,7 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 #endif
 		if (inst.I26.x3 != 0) break;  // I26.x3 == I27.x3
 		if (inst.I26.x6 == 0x2a) {
-			if (inst.I26.r2 > 63 && inst.I26.ar3 < 8)
+			if (privify_en && inst.I26.r2 > 63 && inst.I26.ar3 < 8)
 				privcnt.mov_from_ar++; // privified mov from kr
 			else privcnt.mov_to_ar_reg++;
 			return priv_mov_to_ar_reg(vcpu,inst);
