@@ -36,7 +36,7 @@ typedef unsigned long page_flags_t;
 
 #define PRtype_info "08x"
 
-struct page
+struct page_info
 {
     /* Each frame can be threaded onto a doubly-linked list. */
     struct list_head list;
@@ -228,7 +228,7 @@ void memguard_unguard_range(void *p, unsigned long l);
 
 // prototype of misc memory stuff
 //unsigned long __get_free_pages(unsigned int mask, unsigned int order);
-//void __free_pages(struct page *page, unsigned int order);
+//void __free_pages(struct page_info *page, unsigned int order);
 void *pgtable_quicklist_alloc(void);
 void pgtable_quicklist_free(void *pgtable_entry);
 
@@ -348,11 +348,11 @@ struct vm_area_struct {
 #define NODEZONE_SHIFT (sizeof(page_flags_t)*8 - MAX_NODES_SHIFT - MAX_ZONES_SHIFT)
 #define NODEZONE(node, zone)	((node << ZONES_SHIFT) | zone)
 
-static inline unsigned long page_zonenum(struct page *page)
+static inline unsigned long page_zonenum(struct page_info *page)
 {
 	return (page->flags >> NODEZONE_SHIFT) & (~(~0UL << ZONES_SHIFT));
 }
-static inline unsigned long page_to_nid(struct page *page)
+static inline unsigned long page_to_nid(struct page_info *page)
 {
 	return (page->flags >> (NODEZONE_SHIFT + ZONES_SHIFT));
 }
@@ -360,12 +360,12 @@ static inline unsigned long page_to_nid(struct page *page)
 struct zone;
 extern struct zone *zone_table[];
 
-static inline struct zone *page_zone(struct page *page)
+static inline struct zone *page_zone(struct page_info *page)
 {
 	return zone_table[page->flags >> NODEZONE_SHIFT];
 }
 
-static inline void set_page_zone(struct page *page, unsigned long nodezone_num)
+static inline void set_page_zone(struct page_info *page, unsigned long nodezone_num)
 {
 	page->flags &= ~(~0UL << NODEZONE_SHIFT);
 	page->flags |= nodezone_num << NODEZONE_SHIFT;
@@ -376,7 +376,7 @@ static inline void set_page_zone(struct page *page, unsigned long nodezone_num)
 extern unsigned long max_mapnr;
 #endif
 
-static inline void *lowmem_page_address(struct page *page)
+static inline void *lowmem_page_address(struct page_info *page)
 {
 	return __va(page_to_mfn(page) << PAGE_SHIFT);
 }
@@ -395,8 +395,8 @@ static inline void *lowmem_page_address(struct page *page)
 #endif
 
 #if defined(HASHED_PAGE_VIRTUAL)
-void *page_address(struct page *page);
-void set_page_address(struct page *page, void *virtual);
+void *page_address(struct page_info *page);
+void set_page_address(struct page_info *page, void *virtual);
 void page_address_init(void);
 #endif
 
@@ -409,7 +409,7 @@ void page_address_init(void);
 
 #ifndef CONFIG_DEBUG_PAGEALLOC
 static inline void
-kernel_map_pages(struct page *page, int numpages, int enable)
+kernel_map_pages(struct page_info *page, int numpages, int enable)
 {
 }
 #endif

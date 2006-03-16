@@ -171,7 +171,7 @@ unsigned long __get_free_pages(unsigned int mask, unsigned int order)
 	return (unsigned long)p;
 }
 
-void __free_pages(struct page *page, unsigned int order)
+void __free_pages(struct page_info *page, unsigned int order)
 {
 	if (order) BUG();
 	free_xenheap_page(page);

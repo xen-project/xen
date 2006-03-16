@@ -80,14 +80,14 @@ static void init_switch_stack(struct vcpu *v);
 /* this belongs in include/asm, but there doesn't seem to be a suitable place */
 void arch_domain_destroy(struct domain *d)
 {
-	struct page *page;
+	struct page_info *page;
 	struct list_head *ent, *prev;
 
 	if (d->arch.mm->pgd != NULL)
 	{
 		list_for_each ( ent, &d->arch.mm->pt_list )
 		{
-			page = list_entry(ent, struct page, list);
+			page = list_entry(ent, struct page_info, list);
 			prev = ent->prev;
 			list_del(ent);
 			free_xenheap_page(page_to_virt(page));
@@ -340,7 +340,7 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 static void relinquish_memory(struct domain *d, struct list_head *list)
 {
     struct list_head *ent;
-    struct page      *page;
+    struct page_info *page;
 #ifndef __ia64__
     unsigned long     x, y;
 #endif
@@ -350,7 +350,7 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
     ent = list->next;
     while ( ent != list )
     {
-        page = list_entry(ent, struct page, list);
+        page = list_entry(ent, struct page_info, list);
         /* Grab a reference to the page so it won't disappear from under us. */
         if ( unlikely(!get_page(page, d)) )
         {
@@ -468,7 +468,7 @@ void new_thread(struct vcpu *v,
 	}
 }
 
-static struct page * assign_new_domain0_page(unsigned long mpaddr)
+static struct page_info * assign_new_domain0_page(unsigned long mpaddr)
 {
 	if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
 		printk("assign_new_domain0_page: bad domain0 mpaddr 0x%lx!\n",mpaddr);
@@ -480,10 +480,10 @@ static struct page * assign_new_domain0_page(unsigned long mpaddr)
 }
 
 /* allocate new page for domain and map it to the specified metaphysical addr */
-struct page * assign_new_domain_page(struct domain *d, unsigned long mpaddr)
+struct page_info * assign_new_domain_page(struct domain *d, unsigned long mpaddr)
 {
 	struct mm_struct *mm = d->arch.mm;
-	struct page *pt, *p = (struct page *)0;
+	struct page_info *pt, *p = (struct page_info *)0;
 	pgd_t *pgd;
 	pud_t *pud;
 	pmd_t *pmd;
@@ -549,7 +549,7 @@ struct page * assign_new_domain_page(struct domain *d, unsigned long mpaddr)
 void assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr)
 {
 	struct mm_struct *mm = d->arch.mm;
-	struct page *pt;
+	struct page_info *pt;
 	pgd_t *pgd;
 	pud_t *pud;
 	pmd_t *pmd;
@@ -746,7 +746,7 @@ void loaddomainelfimage(struct domain *d, unsigned long image_start)
 	Elf_Phdr phdr;
 	int h, filesz, memsz;
 	unsigned long elfaddr, dom_mpaddr, dom_imva;
-	struct page *p;
+	struct page_info *p;
   
 	copy_memory(&ehdr, (void *) image_start, sizeof(Elf_Ehdr));
 	for ( h = 0; h < ehdr.e_phnum; h++ ) {

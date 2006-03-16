@@ -13,12 +13,12 @@
 #include <asm/pgtable.h>
 #include <xen/mm.h>
 
-extern struct page *zero_page_memmap_ptr;
+extern struct page_info *zero_page_memmap_ptr;
 struct page_info *frame_table;
 unsigned long frame_table_size;
 unsigned long max_page;
 
-struct page *mem_map;
+struct page_info *mem_map;
 #define MAX_DMA_ADDRESS ~0UL	// FIXME???
 
 #ifdef CONFIG_VIRTUAL_MEM_MAP

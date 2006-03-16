@@ -60,13 +60,13 @@ unsigned long MAX_DMA_ADDRESS = PAGE_OFFSET + 0x100000000UL;
 #ifdef CONFIG_VIRTUAL_MEM_MAP
 unsigned long vmalloc_end = VMALLOC_END_INIT;
 EXPORT_SYMBOL(vmalloc_end);
-struct page *vmem_map;
+struct page_info *vmem_map;
 EXPORT_SYMBOL(vmem_map);
 #endif
 
 // static int pgt_cache_water[2] = { 25, 50 };
 
-struct page *zero_page_memmap_ptr;		/* map entry for zero page */
+struct page_info *zero_page_memmap_ptr;	/* map entry for zero page */
 EXPORT_SYMBOL(zero_page_memmap_ptr);
 
 #ifdef XEN
@@ -172,7 +172,7 @@ pmd_t fastcall *__pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long addr
 pte_t fastcall * pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 {
 	if (!pmd_present(*pmd)) {
-		struct page *new;
+		struct page_info *new;
 
 		spin_unlock(&mm->page_table_lock);
 		new = pte_alloc_one(mm, address);
@@ -202,7 +202,7 @@ void
 update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte)
 {
 	unsigned long addr;
-	struct page *page;
+	struct page_info *page;
 
 	if (!pte_exec(pte))
 		return;				/* not an executable page... */
@@ -386,7 +386,7 @@ int
 create_mem_map_page_table (u64 start, u64 end, void *arg)
 {
 	unsigned long address, start_page, end_page;
-	struct page *map_start, *map_end;
+	struct page_info *map_start, *map_end;
 	int node;
 	pgd_t *pgd;
 	pmd_t *pmd;
@@ -417,8 +417,8 @@ create_mem_map_page_table (u64 start, u64 end, void *arg)
 }
 
 struct memmap_init_callback_data {
-	struct page *start;
-	struct page *end;
+	struct page_info *start;
+	struct page_info *end;
 	int nid;
 	unsigned long zone;
 };
@@ -427,7 +427,7 @@ static int
 virtual_memmap_init (u64 start, u64 end, void *arg)
 {
 	struct memmap_init_callback_data *args;
-	struct page *map_start, *map_end;
+	struct page_info *map_start, *map_end;
 
 	args = (struct memmap_init_callback_data *) arg;
 
@@ -440,13 +440,13 @@ virtual_memmap_init (u64 start, u64 end, void *arg)
 		map_end = args->end;
 
 	/*
-	 * We have to initialize "out of bounds" struct page elements that fit completely
+	 * We have to initialize "out of bounds" struct page_info elements that fit completely
 	 * on the same pages that were allocated for the "in bounds" elements because they
 	 * may be referenced later (and found to be "reserved").
 	 */
-	map_start -= ((unsigned long) map_start & (PAGE_SIZE - 1)) / sizeof(struct page);
+	map_start -= ((unsigned long) map_start & (PAGE_SIZE - 1)) / sizeof(struct page_info);
 	map_end += ((PAGE_ALIGN((unsigned long) map_end) - (unsigned long) map_end)
-		    / sizeof(struct page));
+		    / sizeof(struct page_info));
 
 	if (map_start < map_end)
 		memmap_init_zone(map_start, (unsigned long) (map_end - map_start),
@@ -455,7 +455,7 @@ virtual_memmap_init (u64 start, u64 end, void *arg)
 }
 
 void
-memmap_init (struct page *start, unsigned long size, int nid,
+memmap_init (struct page_info *start, unsigned long size, int nid,
 	     unsigned long zone, unsigned long start_pfn)
 {
 	if (!vmem_map)
@@ -476,7 +476,7 @@ int
 ia64_mfn_valid (unsigned long pfn)
 {
 	char byte;
-	struct page *pg = mfn_to_page(pfn);
+	struct page_info *pg = mfn_to_page(pfn);
 
 	return     (__get_user(byte, (char *) pg) == 0)
 		&& ((((u64)pg & PAGE_MASK) == (((u64)(pg + 1) - 1) & PAGE_MASK))
