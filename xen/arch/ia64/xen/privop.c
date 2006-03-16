@@ -797,12 +797,17 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 #define HYPERPRIVOP_GET_RR		0x10
 #define HYPERPRIVOP_SET_RR		0x11
 #define HYPERPRIVOP_SET_KR		0x12
-#define HYPERPRIVOP_MAX			0x12
+#define HYPERPRIVOP_FC			0x13
+#define HYPERPRIVOP_GET_CPUID		0x14
+#define HYPERPRIVOP_GET_PMD		0x15
+#define HYPERPRIVOP_GET_EFLAG		0x16
+#define HYPERPRIVOP_SET_EFLAG		0x17
+#define HYPERPRIVOP_MAX			0x17
 
 static const char * const hyperpriv_str[HYPERPRIVOP_MAX+1] = {
 	0, "rfi", "rsm.dt", "ssm.dt", "cover", "itc.d", "itc.i", "ssm.i",
 	"=ivr", "=tpr", "tpr=", "eoi", "itm=", "thash", "ptc.ga", "itr.d",
-	"=rr", "rr=", "kr="
+	"=rr", "rr=", "kr=", "fc", "=cpuid", "=pmd", "=ar.eflg", "ar.eflg="
 };
 
 unsigned long slow_hyperpriv_cnt[HYPERPRIVOP_MAX+1] = { 0 };
@@ -889,6 +894,24 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 	    case HYPERPRIVOP_SET_KR:
 		(void)vcpu_set_ar(v,regs->r8,regs->r9);
 		return 1;
+	    case HYPERPRIVOP_FC:
+		(void)vcpu_fc(v,regs->r8);
+		return 1;
+	    case HYPERPRIVOP_GET_CPUID:
+		(void)vcpu_get_cpuid(v,regs->r8,&val);
+		regs->r8 = val;
+		return 1;
+	    case HYPERPRIVOP_GET_PMD:
+		(void)vcpu_get_pmd(v,regs->r8,&val);
+		regs->r8 = val;
+		return 1;
+	    case HYPERPRIVOP_GET_EFLAG:
+		(void)vcpu_get_ar(v,24,&val);
+		regs->r8 = val;
+		return 1;
+	    case HYPERPRIVOP_SET_EFLAG:
+		(void)vcpu_set_ar(v,24,regs->r8);
+		return 1;
 	}
 	return 0;
 }
@@ -934,7 +957,7 @@ static const char * const cr_str[128] = {
 };
 
 // FIXME: should use snprintf to ensure no buffer overflow
-int dump_privop_counts(char *buf)
+static int dump_privop_counts(char *buf)
 {
 	int i, j;
 	UINT64 sum = 0;
@@ -1007,7 +1030,7 @@ int dump_privop_counts(char *buf)
 	return s - buf;
 }
 
-int zero_privop_counts(char *buf)
+static int zero_privop_counts(char *buf)
 {
 	int i, j;
 	char *s = buf;
@@ -1043,7 +1066,7 @@ void privop_count_addr(unsigned long iip, int inst)
 	v->overflow++;;
 }
 
-int dump_privop_addrs(char *buf)
+static int dump_privop_addrs(char *buf)
 {
 	int i,j;
 	char *s = buf;
@@ -1061,7 +1084,7 @@ int dump_privop_addrs(char *buf)
 	return s - buf;
 }
 
-void zero_privop_addrs(void)
+static void zero_privop_addrs(void)
 {
 	int i,j;
 	for (i = 0; i < PRIVOP_COUNT_NINSTS; i++) {
@@ -1085,7 +1108,7 @@ extern unsigned long idle_when_pending;
 extern unsigned long pal_halt_light_count;
 extern unsigned long context_switch_count;
 
-int dump_misc_stats(char *buf)
+static int dump_misc_stats(char *buf)
 {
 	char *s = buf;
 	s += sprintf(s,"Virtual TR translations: %ld\n",tr_translate_count);
@@ -1102,7 +1125,7 @@ int dump_misc_stats(char *buf)
 	return s - buf;
 }
 
-void zero_misc_stats(void)
+static void zero_misc_stats(void)
 {
 	dtlb_translate_count = 0;
 	tr_translate_count = 0;
@@ -1117,7 +1140,7 @@ void zero_misc_stats(void)
 	context_switch_count = 0;
 }
 
-int dump_hyperprivop_counts(char *buf)
+static int dump_hyperprivop_counts(char *buf)
 {
 	int i;
 	char *s = buf;
@@ -1138,7 +1161,7 @@ int dump_hyperprivop_counts(char *buf)
 	return s - buf;
 }
 
-void zero_hyperprivop_counts(void)
+static void zero_hyperprivop_counts(void)
 {
 	int i;
 	for (i = 0; i <= HYPERPRIVOP_MAX; i++) slow_hyperpriv_cnt[i] = 0;
