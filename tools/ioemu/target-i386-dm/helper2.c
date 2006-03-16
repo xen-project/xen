@@ -447,9 +447,9 @@ int main_loop(void)
             }
         }
 
-        /* Wait up to one seconds. */
+        /* Wait up to 10 msec. */
         tv.tv_sec = 0;
-        tv.tv_usec = 100000;
+        tv.tv_usec = 10000;
 
         retval = select(highest_fds+1, &wakeup_rfds, NULL, NULL, &tv);
         if (retval == -1) {
