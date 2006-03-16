@@ -1340,6 +1340,99 @@ void vga_invalidate_scanlines(VGAState *s, int y1, int y2)
     }
 }
 
+extern inline int cmp_vram(VGAState *s, int offset, int n)
+{
+    long *vp, *sp;
+
+    if (s->vram_shadow == NULL)
+        return 1;
+    vp = (long *)(s->vram_ptr + offset);
+    sp = (long *)(s->vram_shadow + offset);
+    while ((n -= sizeof(*vp)) >= 0) {
+        if (*vp++ != *sp++) {
+            memcpy(sp - 1, vp - 1, n + sizeof(*vp));
+            return 1;
+        }
+    }
+    return 0;
+}
+
+#ifdef USE_SSE2
+
+#include <signal.h>
+#include <setjmp.h>
+#include <emmintrin.h>
+
+int sse2_ok = 1;
+
+static inline unsigned int cpuid_edx(unsigned int op)
+{
+    unsigned int eax, edx;
+
+    __asm__("cpuid"
+            : "=a" (eax), "=d" (edx)
+            : "0" (op)
+            : "bx", "cx");
+
+    return edx;
+}
+
+jmp_buf sse_jbuf;
+
+void intr(int sig)
+{
+    sse2_ok = 0;
+    longjmp(sse_jbuf, 1);
+}
+
+void check_sse2(void)
+{
+    /* Check 1: What does CPUID say? */
+    if ((cpuid_edx(1) & 0x4000000) == 0) {
+        sse2_ok = 0;
+        return;
+    }
+
+    /* Check 2: Can we use SSE2 in anger? */
+    signal(SIGILL, intr);
+    if (setjmp(sse_jbuf) == 0)
+        __asm__("xorps %xmm0,%xmm0\n");
+}
+
+int vram_dirty(VGAState *s, int offset, int n)
+{
+    __m128i *sp, *vp;
+
+    if (s->vram_shadow == NULL)
+        return 1;
+    if (sse2_ok == 0)
+        return cmp_vram(s, offset, n);
+    vp = (__m128i *)(s->vram_ptr + offset);
+    sp = (__m128i *)(s->vram_shadow + offset);
+    while ((n -= sizeof(*vp)) >= 0) {
+        if (_mm_movemask_epi8(_mm_cmpeq_epi8(*sp, *vp)) != 0xffff) {
+            while (n >= 0) {
+                _mm_store_si128(sp++, _mm_load_si128(vp++));
+                n -= sizeof(*vp);
+            }
+            return 1;
+        }
+        sp++;
+        vp++;
+    }
+    return 0;
+}
+#else /* !USE_SSE2 */
+int vram_dirty(VGAState *s, int offset, int n)
+{
+    return cmp_vram(s, offset, n);
+}
+
+void check_sse2(void)
+{
+}
+#endif /* !USE_SSE2 */
+
 /* 
  * graphic modes
  */
@@ -1434,6 +1527,9 @@ static void vga_draw_graphic(VGAState *s, int full_update)
     printf("w=%d h=%d v=%d line_offset=%d cr[0x09]=0x%02x cr[0x17]=0x%02x linecmp=%d sr[0x01]=0x%02x\n",
            width, height, v, line_offset, s->cr[9], s->cr[0x17], s->line_compare, s->sr[0x01]);
 #endif
+    for (y = 0; y < s->vram_size; y += TARGET_PAGE_SIZE)
+        if (vram_dirty(s, y, TARGET_PAGE_SIZE))
+            cpu_physical_memory_set_dirty(s->vram_offset + y);
     addr1 = (s->start_addr * 4);
     bwidth = width * 4;
     y_start = -1;
@@ -1536,8 +1632,17 @@ static void vga_draw_blank(VGAState *s, int full_update)
 
 void vga_update_display(void)
 {
+    static int loop;
     VGAState *s = vga_state;
     int full_update, graphic_mode;
+
+    /*
+     * Only update the display every other time.  The responsiveness is
+     * acceptable and it cuts down on the overhead of the VRAM compare
+     * in `vram_dirty'.
+     */
+    if (loop++ & 1)
+        return;
 
     if (s->ds->depth == 0) {
         /* nothing to do */
@@ -1569,7 +1674,6 @@ void vga_update_display(void)
             full_update = 1;
         }
 
-        full_update = 1;
         switch(graphic_mode) {
         case GMODE_TEXT:
             vga_draw_text(s, full_update);
@@ -1874,7 +1978,13 @@ void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
 #else
     s->vram_ptr = qemu_malloc(vga_ram_size);
 #endif
-
+    check_sse2();
+    s->vram_shadow = qemu_malloc(vga_ram_size+TARGET_PAGE_SIZE+1);
+    if (s->vram_shadow == NULL)
+        fprintf(stderr, "Cannot allocate %d bytes for VRAM shadow, "
+                "mouse will be slow\n", vga_ram_size);
+    s->vram_shadow = (uint8_t *)((long)(s->vram_shadow + TARGET_PAGE_SIZE - 1)
+                                 & ~(TARGET_PAGE_SIZE - 1));
     s->vram_offset = vga_ram_offset;
     s->vram_size = vga_ram_size;
     s->ds = ds;
