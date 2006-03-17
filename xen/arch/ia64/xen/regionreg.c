@@ -249,13 +249,18 @@ int set_one_rr(unsigned long rr, unsigned long val)
 	newrrv.rid = newrid;
 	newrrv.ve = 1;  // VHPT now enabled for region 7!!
 	newrrv.ps = PAGE_SHIFT;
-	if (rreg == 0)
+
+	if (rreg == 0) {
 		v->arch.metaphysical_saved_rr0 = vmMangleRID(newrrv.rrval);
-	else if (rreg == 7)
+		if (!PSCB(v,metaphysical_mode))
+			set_rr(rr,newrrv.rrval);
+	} else if (rreg == 7) {
 		ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info,
 			     v->arch.privregs, __get_cpu_var(vhpt_paddr),
 			     (unsigned long) pal_vaddr);
-	else set_rr(rr,newrrv.rrval);
+	} else {
+		set_rr(rr,newrrv.rrval);
+	}
 #endif
 	return 1;
 }
