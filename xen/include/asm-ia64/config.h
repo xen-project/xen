@@ -73,9 +73,6 @@ extern unsigned long xenheap_size;
 extern unsigned long dom0_start;
 extern unsigned long dom0_size;
 
-// see include/asm-ia64/mm.h, handle remaining page_info uses until gone
-#define page_info page
-
 // from linux/include/linux/mm.h
 extern struct page_info *mem_map;
 
