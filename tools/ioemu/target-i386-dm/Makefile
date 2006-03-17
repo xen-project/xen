@@ -13,8 +13,15 @@ ifdef CONFIG_USER_ONLY
 VPATH+=:$(SRC_PATH)/linux-user
 DEFINES+=-I$(SRC_PATH)/linux-user -I$(SRC_PATH)/linux-user/$(TARGET_ARCH)
 endif
-CFLAGS+=-g -fno-strict-aliasing
-LDFLAGS=-g
+
+SSE2 := $(call test-gcc-flag,$(CC),-msse2)
+ifeq ($(SSE2),-msse2)
+CFLAGS += -DUSE_SSE2=1 -msse2
+endif
+
+CFLAGS += -g -fno-strict-aliasing $(LOCAL_CFLAGS)
+LDFLAGS = -g
+
 LIBS=
 HELPER_CFLAGS=$(CFLAGS)
 DYNGEN=../dyngen$(EXESUF)

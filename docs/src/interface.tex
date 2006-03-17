@@ -128,7 +128,7 @@ A list of all hypercalls is given in Appendix~\ref{a:hypercalls}.
 \section{Exceptions}
 
 A virtual IDT is provided --- a domain can submit a table of trap
-handlers to Xen via the {\tt set\_trap\_table()} hypercall.  The
+handlers to Xen via the {\bf set\_trap\_table} hypercall.  The
 exception stack frame presented to a virtual trap handler is identical
 to its native equivalent.
 
@@ -137,7 +137,7 @@ to its native equivalent.
 
 Interrupts are virtualized by mapping them to \emph{event channels},
 which are delivered asynchronously to the target domain using a callback
-supplied via the {\tt set\_callbacks()} hypercall.  A guest OS can map
+supplied via the {\bf set\_callbacks} hypercall.  A guest OS can map
 these events onto its standard interrupt dispatch mechanisms.  Xen is
 responsible for determining the target domain that will handle each
 physical interrupt source. For more details on the binding of event
@@ -167,7 +167,7 @@ is used for scheduling. The following notions of time are provided:
 
 \item[Wall clock time.]
 
-  This is the time of day in a Unix-style {\tt struct timeval}
+  This is the time of day in a Unix-style {\bf struct timeval}
   (seconds and microseconds since 1 January 1970, adjusted by leap
   seconds).  An NTP client hosted by {\it domain 0} can keep this
   value accurate.
@@ -200,8 +200,8 @@ currently executing domain every 10ms.  The Xen scheduler also sends a
 timer event whenever a domain is scheduled; this allows the guest OS
 to adjust for the time that has passed while it has been inactive.  In
 addition, Xen allows each domain to request that they receive a timer
-event sent at a specified system time by using the {\tt
-  set\_timer\_op()} hypercall.  Guest OSes may use this timer to
+event sent at a specified system time by using the {\bf
+  set\_timer\_op} hypercall.  Guest OSes may use this timer to
 implement timeout values when they block.
 
 
@@ -232,7 +232,7 @@ load-balancing between CPUs.
 
 
 %% More information on the characteristics and use of these schedulers
-%% is available in {\tt Sched-HOWTO.txt}.
+%% is available in {\bf Sched-HOWTO.txt}.
 
 
 \section{Privileged operations}
@@ -354,7 +354,7 @@ page-table page, when the domain is preempted, or whenever the guest
 uses Xen's explicit page-table update interfaces.
 
 Writable pagetable functionality is enabled when the guest requests
-it, using a {\tt vm\_assist} hypercall.  Writable pagetables do {\em
+it, using a {\bf vm\_assist} hypercall.  Writable pagetables do {\em
 not} provide full virtualisation of the MMU, so the memory management
 code of the guest still needs to be aware that it is running on Xen.
 Since the guest's page tables are used directly, it must translate
@@ -400,7 +400,7 @@ The following hypercall is used to specify a new GDT:
 \end{quote}
 
 The LDT is updated via the generic MMU update mechanism (i.e., via the
-{\tt mmu\_update()} hypercall.
+{\bf mmu\_update} hypercall.
 
 \section{Start of Day}
 
@@ -423,8 +423,8 @@ extra functionality to a guest.
 
 \hypercall{vm\_assist(unsigned int cmd, unsigned int type)}
 
-The {\tt cmd} parameter describes the action to be taken, whilst the
-{\tt type} parameter describes the kind of assist that is being
+The {\bf cmd} parameter describes the action to be taken, whilst the
+{\bf type} parameter describes the kind of assist that is being
 referred to.  Available commands are as follows:
 
 \begin{description}
@@ -453,18 +453,18 @@ between the guest OS and the hypervisor.  This information includes VCPU
 status, time information and event channel (virtual interrupt) state.
 The {\bf Start info page} is used to pass build-time information to
 the guest when it boots and when it is resumed from a suspended state.
-This chapter documents the fields included in the {\tt
-shared\_info\_t} and {\tt start\_info\_t} structures for use by the
+This chapter documents the fields included in the {\bf
+shared\_info\_t} and {\bf start\_info\_t} structures for use by the
 guest OS.
 
 \section{Shared info page}
 
-The {\tt shared\_info\_t} is accessed at run time by both Xen and the
+The {\bf shared\_info\_t} is accessed at run time by both Xen and the
 guest OS.  It is used to pass information relating to the
 virtual CPU and virtual machine state between the OS and the
 hypervisor.
 
-The structure is declared in {\tt xen/include/public/xen.h}:
+The structure is declared in {\bf xen/include/public/xen.h}:
 
 \scriptsize
 \begin{verbatim}
@@ -520,7 +520,7 @@ typedef struct shared_info {
 \normalsize
 
 \begin{description}
-\item[vcpu\_info] An array of {\tt vcpu\_info\_t} structures, each of
+\item[vcpu\_info] An array of {\bf vcpu\_info\_t} structures, each of
   which holds either runtime information about a virtual CPU, or is
   ``empty'' if the corresponding VCPU does not exist.
 \item[evtchn\_pending] Guest-global array, with one bit per event
@@ -579,11 +579,11 @@ typedef struct vcpu_info {
   that there are pending events to be received.
 \item[evtchn\_upcall\_mask] This is set non-zero to disable all
   interrupts for this CPU for short periods of time.  If individual
-  event channels need to be masked, the {\tt evtchn\_mask} in the {\tt
+  event channels need to be masked, the {\bf evtchn\_mask} in the {\bf
   shared\_info\_t} is used instead.
 \item[evtchn\_pending\_sel] When an event is delivered to this VCPU, a
-  bit is set in this selector to indicate which word of the {\tt
-  evtchn\_pending} array in the {\tt shared\_info\_t} contains the
+  bit is set in this selector to indicate which word of the {\bf
+  evtchn\_pending} array in the {\bf shared\_info\_t} contains the
   event in question.
 \item[arch] Architecture-specific VCPU info. On x86 this contains the
   virtualized CR2 register (page fault linear address) for this VCPU.
@@ -634,7 +634,7 @@ extrapolating current time).
 
 \subsection{arch\_shared\_info\_t}
 
-On x86, the {\tt arch\_shared\_info\_t} is defined as follows (from
+On x86, the {\bf arch\_shared\_info\_t} is defined as follows (from
 xen/public/arch-x86\_32.h):
 
 \scriptsize
@@ -656,7 +656,7 @@ typedef struct arch_shared_info {
 
 \section{Start info page}
 
-The start info structure is declared as the following (in {\tt
+The start info structure is declared as the following (in {\bf
 xen/include/public/xen.h}):
 
 \scriptsize
@@ -745,7 +745,7 @@ of certain operations in the guest kernel.
 
 The event channel operation hypercall is used for all operations on
 event channels / ports.  Operations are distinguished by the value of
-the {\tt cmd} field of the {\tt op} structure.  The possible commands
+the {\bf cmd} field of the {\bf op} structure.  The possible commands
 are described below:
 
 \begin{description}
@@ -880,12 +880,12 @@ table op hypercall takes three arguments:
 
 \hypercall{grant\_table\_op(unsigned int cmd, void *uop, unsigned int count)}
 
-{\tt cmd} indicates the grant table operation of interest.  {\tt uop}
+{\bf cmd} indicates the grant table operation of interest.  {\bf uop}
 is a pointer to a structure (or an array of structures) describing the
-operation to be performed.  The {\tt count} field describes how many
+operation to be performed.  The {\bf count} field describes how many
 grant table operations are being batched together.
 
-The core logic is situated in {\tt xen/common/grant\_table.c}.  The
+The core logic is situated in {\bf xen/common/grant\_table.c}.  The
 grant table operation hypercall can be used to perform the following
 actions:
 
@@ -957,9 +957,9 @@ There are three main paths in XenStore:
 \item[/tool] stores information for the various tools
 \end{description}
 
-The {\tt /vm} path stores configuration information for a domain.
+The {\bf /vm} path stores configuration information for a domain.
 This information doesn't change and is indexed by the domain's UUID.
-A {\tt /vm} entry contains the following information:
+A {\bf /vm} entry contains the following information:
 
 \begin{description}
 \item[ssidref] ssid reference for domain
@@ -974,7 +974,7 @@ A {\tt /vm} entry contains the following information:
 \end{description}
 
 
-{\tt /vm/$<$uuid$>$/image/}
+{\bf /vm/$<$uuid$>$/image/}
 
 The image path is only available for Domain-Us and contains:
 \begin{description}
@@ -984,7 +984,7 @@ The image path is only available for Domain-Us and contains:
 \item[ramdisk] path to ramdisk on domain-0
 \end{description}
 
-{\tt /local}
+{\bf /local}
 
 The {\tt /local} path currently only contains one directory, {\tt
 /local/domain} that is indexed by domain id.  It contains the running
@@ -993,7 +993,7 @@ during migration, the uuid doesn't change but the domain id does.  The
 {\tt /local/domain} directory can be created and populated before
 finalizing the migration enabling localhost to localhost migration.
 
-{\tt /local/domain/$<$domid$>$}
+{\bf /local/domain/$<$domid$>$}
 
 This path contains:
 
@@ -1663,10 +1663,10 @@ Register the normal (``event'') and failsafe callbacks for
 event processing. In each case the code segment selector and 
 address within that segment are provided. The selectors must
 have RPL 1; in XenLinux we simply use the kernel's CS for both 
-{\tt event\_selector} and {\tt failsafe\_selector}.
+{\bf event\_selector} and {\bf failsafe\_selector}.
 
-The value {\tt event\_address} specifies the address of the guest OSes
-event handling and dispatch routine; the {\tt failsafe\_address}
+The value {\bf event\_address} specifies the address of the guest OSes
+event handling and dispatch routine; the {\bf failsafe\_address}
 specifies a separate entry point which is used only if a fault occurs
 when Xen attempts to use the normal callback. 
 
@@ -1692,7 +1692,7 @@ install a `virtual IDT' by using the following hypercall:
 
 Install one or more entries into the per-domain 
 trap handler table (essentially a software version of the IDT). 
-Each entry in the array pointed to by {\tt table} includes the 
+Each entry in the array pointed to by {\bf table} includes the 
 exception vector number with the corresponding segment selector 
 and entry point. Most guest OSes can use the same handlers on 
 Xen as when running on the real hardware.
@@ -1718,17 +1718,44 @@ In addition, however, a domain may choose to explicitly
 control certain behavior with the following hypercall: 
 
 \begin{quote} 
-\hypercall{sched\_op(unsigned long op)} 
+\hypercall{sched\_op\_new(int cmd, void *extra\_args)}
 
-Request scheduling operation from hypervisor. The options are: {\it
-SCHEDOP\_yield}, {\it SCHEDOP\_block}, and {\it SCHEDOP\_shutdown}.
-{\it yield} keeps the calling domain runnable but may cause a
-reschedule if other domains are runnable.  {\it block} removes the
-calling domain from the run queue and cause is to sleeps until an
-event is delivered to it.  {\it shutdown} is used to end the domain's
-execution; the caller can additionally specify whether the domain
-should reboot, halt or suspend.
+Request scheduling operation from hypervisor. The following
+sub-commands are available:
+
+\begin{description}
+\item[SCHEDOP\_yield] voluntarily yields the CPU, but leaves the
+caller marked as runnable. No extra arguments are passed to this
+command. 
+\item[SCHEDOP\_block] removes the calling domain from the run queue
+and causes it to sleep until an event is delivered to it. No extra 
+arguments are passed to this command. 
+\item[SCHEDOP\_shutdown] is used to end the calling domain's
+execution. The extra argument is a {\bf sched\_shutdown} structure
+which indicates the reason why the domain suspended (e.g., for reboot,
+halt, power-off).
+\item[SCHEDOP\_poll] allows a VCPU to wait on a set of event channels
+with an optional timeout (all of which are specified in the {\bf
+sched\_poll} extra argument). The semantics are similar to the UNIX
+{\bf poll} system call. The caller must have event-channel upcalls
+masked when executing this command.
+\end{description}
 \end{quote} 
+
+{\bf sched\_op\_new}  was not available prior to Xen 3.0.2. Older versions
+provide only the following hypercall:
+
+\begin{quote} 
+\hypercall{sched\_op(int cmd, unsigned long extra\_arg)}
+
+This hypercall supports the following subset of {\bf sched\_op\_new} commands:
+
+\begin{description}
+\item[SCHEDOP\_yield] (extra argument is 0).
+\item[SCHEDOP\_block] (extra argument is 0).
+\item[SCHEDOP\_shutdown] (extra argument is numeric reason code).
+\end{description}
+\end{quote}
 
 To aid the implementation of a process scheduler within a guest OS,
 Xen provides a virtual programmable timer:
@@ -1737,12 +1764,11 @@ Xen provides a virtual programmable timer:
 \hypercall{set\_timer\_op(uint64\_t timeout)} 
 
 Request a timer event to be sent at the specified system time (time 
-in nanoseconds since system boot). The hypercall actually passes the 
-64-bit timeout value as a pair of 32-bit values. 
+in nanoseconds since system boot).
 
 \end{quote} 
 
-Note that calling {\tt set\_timer\_op()} prior to {\tt sched\_op} 
+Note that calling {\bf set\_timer\_op} prior to {\bf sched\_op} 
 allows block-with-timeout semantics. 
 
 
@@ -1757,20 +1783,20 @@ a new page-table base pointer, and more.
 \begin{quote} 
 \hypercall{mmu\_update(mmu\_update\_t *req, int count, int *success\_count)} 
 
-Update the page table for the domain; a set of {\tt count} updates are
-submitted for processing in a batch, with {\tt success\_count} being 
+Update the page table for the domain; a set of {\bf count} updates are
+submitted for processing in a batch, with {\bf success\_count} being 
 updated to report the number of successful updates.  
 
-Each element of {\tt req[]} contains a pointer (address) and value; 
+Each element of {\bf req[]} contains a pointer (address) and value; 
 the least significant 2-bits of the pointer are used to distinguish 
 the type of update requested as follows:
 \begin{description} 
 
-\item[\it MMU\_NORMAL\_PT\_UPDATE:] update a page directory entry or
+\item[MMU\_NORMAL\_PT\_UPDATE:] update a page directory entry or
 page table entry to the associated value; Xen will check that the
 update is safe, as described in Chapter~\ref{c:memory}.
 
-\item[\it MMU\_MACHPHYS\_UPDATE:] update an entry in the
+\item[MMU\_MACHPHYS\_UPDATE:] update an entry in the
   machine-to-physical table. The calling domain must own the machine
   page in question (or be privileged).
 \end{description}
@@ -1792,9 +1818,9 @@ This is catered for by the following:
 \hypercall{update\_va\_mapping(unsigned long va, uint64\_t val,
                          unsigned long flags)}
 
-Update the currently installed PTE that maps virtual address {\tt va}
-to new value {\tt val}. As with {\tt mmu\_update()}, Xen checks the
-modification  is safe before applying it. The {\tt flags} determine
+Update the currently installed PTE that maps virtual address {\bf va}
+to new value {\bf val}. As with {\bf mmu\_update}, Xen checks the
+modification  is safe before applying it. The {\bf flags} determine
 which kind of TLB flush, if any, should follow the update. 
 
 \end{quote} 
@@ -1806,8 +1832,8 @@ the pages of others:
 \hypercall{update\_va\_mapping(unsigned long va, uint64\_t val,
                          unsigned long flags, domid\_t domid)}
 
-Identical to {\tt update\_va\_mapping()} save that the pages being
-mapped must belong to the domain {\tt domid}. 
+Identical to {\bf update\_va\_mapping} save that the pages being
+mapped must belong to the domain {\bf domid}. 
 
 \end{quote}
 
@@ -1854,17 +1880,17 @@ this is context switched transparently whenever a domain is
 \begin{quote}
 \hypercall{set\_gdt(unsigned long *frame\_list, int entries)} 
 
-Install a global descriptor table for a domain; {\tt frame\_list} is
+Install a global descriptor table for a domain; {\bf frame\_list} is
 an array of up to 16 machine page frames within which the GDT resides,
-with {\tt entries} being the actual number of descriptor-entry
+with {\bf entries} being the actual number of descriptor-entry
 slots. All page frames must be mapped read-only within the guest's
 address space, and the table must be large enough to contain Xen's
-reserved entries (see {\tt xen/include/public/arch-x86\_32.h}).
+reserved entries (see {\bf xen/include/public/arch-x86\_32.h}).
 
 \end{quote}
 
 Many guest OSes will also wish to install LDTs; this is achieved by
-using {\tt mmu\_update()} with an extended command, passing the
+using {\bf mmu\_update} with an extended command, passing the
 linear address of the LDT base along with the number of entries. No
 special safety checks are required; Xen needs to perform this task
 simply since {\tt lldt} requires CPL 0.
@@ -1876,8 +1902,8 @@ individual segment descriptor in the GDT or LDT:
 \begin{quote}
 \hypercall{update\_descriptor(uint64\_t ma, uint64\_t desc)}
 
-Update the GDT/LDT entry at machine address {\tt ma}; the new
-8-byte descriptor is stored in {\tt desc}.
+Update the GDT/LDT entry at machine address {\bf ma}; the new
+8-byte descriptor is stored in {\bf desc}.
 Xen performs a number of checks to ensure the descriptor is 
 valid. 
 
@@ -1897,8 +1923,8 @@ stack pointer:
 \begin{quote} 
 \hypercall{stack\_switch(unsigned long ss, unsigned long esp)} 
 
-Request kernel stack switch from hypervisor; {\tt ss} is the new 
-stack segment, which {\tt esp} is the new stack pointer. 
+Request kernel stack switch from hypervisor; {\bf ss} is the new 
+stack segment, which {\bf esp} is the new stack pointer. 
 
 \end{quote} 
 
@@ -1939,18 +1965,18 @@ following call:
 \hypercall{memory\_op(unsigned int op, void *arg)}
 
 Increase or decrease current memory allocation (as determined by 
-the value of {\tt op}).  The available operations are:
+the value of {\bf op}).  The available operations are:
 
 \begin{description}
 \item[XENMEM\_increase\_reservation] Request an increase in machine
-  memory allocation; {\tt arg} must point to a {\tt
+  memory allocation; {\bf arg} must point to a {\bf
   xen\_memory\_reservation} structure.
 \item[XENMEM\_decrease\_reservation] Request a decrease in machine
-  memory allocation; {\tt arg} must point to a {\tt
+  memory allocation; {\bf arg} must point to a {\bf
   xen\_memory\_reservation} structure.
 \item[XENMEM\_maximum\_ram\_page] Request the frame number of the
-  highest-addressed frame of machine memory in the system.  {\tt arg}
-  must point to an {\tt unsigned long} where this value will be
+  highest-addressed frame of machine memory in the system.  {\bf arg}
+  must point to an {\bf unsigned long} where this value will be
   stored.
 \item[XENMEM\_current\_reservation] Returns current memory reservation
   of the specified domain.
@@ -1982,31 +2008,31 @@ The control and use of event channels involves the following hypercall:
 \begin{quote}
 \hypercall{event\_channel\_op(evtchn\_op\_t *op)} 
 
-Inter-domain event-channel management; {\tt op} is a discriminated 
+Inter-domain event-channel management; {\bf op} is a discriminated 
 union which allows the following 7 operations: 
 
 \begin{description} 
 
-\item[\it alloc\_unbound:] allocate a free (unbound) local
+\item[alloc\_unbound:] allocate a free (unbound) local
   port and prepare for connection from a specified domain. 
-\item[\it bind\_virq:] bind a local port to a virtual 
+\item[bind\_virq:] bind a local port to a virtual 
 IRQ; any particular VIRQ can be bound to at most one port per domain. 
-\item[\it bind\_pirq:] bind a local port to a physical IRQ;
+\item[bind\_pirq:] bind a local port to a physical IRQ;
 once more, a given pIRQ can be bound to at most one port per
 domain. Furthermore the calling domain must be sufficiently
 privileged.
-\item[\it bind\_interdomain:] construct an interdomain event 
+\item[bind\_interdomain:] construct an interdomain event 
 channel; in general, the target domain must have previously allocated 
 an unbound port for this channel, although this can be bypassed by 
 privileged domains during domain setup. 
-\item[\it close:] close an interdomain event channel. 
-\item[\it send:] send an event to the remote end of a 
+\item[close:] close an interdomain event channel. 
+\item[send:] send an event to the remote end of a 
 interdomain event channel. 
-\item[\it status:] determine the current status of a local port. 
+\item[status:] determine the current status of a local port. 
 \end{description} 
 
 For more details see
-{\tt xen/include/public/event\_channel.h}. 
+{\bf xen/include/public/event\_channel.h}. 
 
 \end{quote} 
 
@@ -2018,7 +2044,7 @@ high-performance inter-domain communication.
 
 Safe sharing of memory pages between guest OSes is carried out by
 granting access on a per page basis to individual domains. This is
-achieved by using the {\tt grant\_table\_op()} hypercall.
+achieved by using the {\tt grant\_table\_op} hypercall.
 
 \begin{quote}
 \hypercall{grant\_table\_op(unsigned int cmd, void *uop, unsigned int count)}
@@ -2047,7 +2073,7 @@ TSS IO bitmap.
 \end{quote} 
 
 
-For examples of using {\tt physdev\_op()}, see the 
+For examples of using {\tt physdev\_op}, see the 
 Xen-specific PCI code in the linux sparse tree. 
 
 \section{Administrative Operations}
@@ -2066,81 +2092,81 @@ below: for more details on any or all of these, please see
 Administrative domain operations for domain management. The options are:
 
 \begin{description} 
-\item [\it DOM0\_GETMEMLIST:] get list of pages used by the domain
+\item [DOM0\_GETMEMLIST:] get list of pages used by the domain
 
-\item [\it DOM0\_SCHEDCTL:]
+\item [DOM0\_SCHEDCTL:]
 
-\item [\it DOM0\_ADJUSTDOM:] adjust scheduling priorities for domain
+\item [DOM0\_ADJUSTDOM:] adjust scheduling priorities for domain
 
-\item [\it DOM0\_CREATEDOMAIN:] create a new domain
+\item [DOM0\_CREATEDOMAIN:] create a new domain
 
-\item [\it DOM0\_DESTROYDOMAIN:] deallocate all resources associated
+\item [DOM0\_DESTROYDOMAIN:] deallocate all resources associated
 with a domain
 
-\item [\it DOM0\_PAUSEDOMAIN:] remove a domain from the scheduler run 
+\item [DOM0\_PAUSEDOMAIN:] remove a domain from the scheduler run 
 queue. 
 
-\item [\it DOM0\_UNPAUSEDOMAIN:] mark a paused domain as schedulable
+\item [DOM0\_UNPAUSEDOMAIN:] mark a paused domain as schedulable
   once again. 
 
-\item [\it DOM0\_GETDOMAININFO:] get statistics about the domain
+\item [DOM0\_GETDOMAININFO:] get statistics about the domain
 
-\item [\it DOM0\_SETDOMAININFO:] set VCPU-related attributes
+\item [DOM0\_SETDOMAININFO:] set VCPU-related attributes
 
-\item [\it DOM0\_MSR:] read or write model specific registers
+\item [DOM0\_MSR:] read or write model specific registers
 
-\item [\it DOM0\_DEBUG:] interactively invoke the debugger
+\item [DOM0\_DEBUG:] interactively invoke the debugger
 
-\item [\it DOM0\_SETTIME:] set system time
+\item [DOM0\_SETTIME:] set system time
 
-\item [\it DOM0\_GETPAGEFRAMEINFO:] 
+\item [DOM0\_GETPAGEFRAMEINFO:] 
 
-\item [\it DOM0\_READCONSOLE:] read console content from hypervisor buffer ring
+\item [DOM0\_READCONSOLE:] read console content from hypervisor buffer ring
 
-\item [\it DOM0\_PINCPUDOMAIN:] pin domain to a particular CPU
+\item [DOM0\_PINCPUDOMAIN:] pin domain to a particular CPU
 
-\item [\it DOM0\_TBUFCONTROL:] get and set trace buffer attributes
+\item [DOM0\_TBUFCONTROL:] get and set trace buffer attributes
 
-\item [\it DOM0\_PHYSINFO:] get information about the host machine
+\item [DOM0\_PHYSINFO:] get information about the host machine
 
-\item [\it DOM0\_SCHED\_ID:] get the ID of the current Xen scheduler
+\item [DOM0\_SCHED\_ID:] get the ID of the current Xen scheduler
 
-\item [\it DOM0\_SHADOW\_CONTROL:] switch between shadow page-table modes
+\item [DOM0\_SHADOW\_CONTROL:] switch between shadow page-table modes
 
-\item [\it DOM0\_SETDOMAINMAXMEM:] set maximum memory allocation of a domain
+\item [DOM0\_SETDOMAINMAXMEM:] set maximum memory allocation of a domain
 
-\item [\it DOM0\_GETPAGEFRAMEINFO2:] batched interface for getting
+\item [DOM0\_GETPAGEFRAMEINFO2:] batched interface for getting
 page frame info
 
-\item [\it DOM0\_ADD\_MEMTYPE:] set MTRRs
+\item [DOM0\_ADD\_MEMTYPE:] set MTRRs
 
-\item [\it DOM0\_DEL\_MEMTYPE:] remove a memory type range
+\item [DOM0\_DEL\_MEMTYPE:] remove a memory type range
 
-\item [\it DOM0\_READ\_MEMTYPE:] read MTRR
+\item [DOM0\_READ\_MEMTYPE:] read MTRR
 
-\item [\it DOM0\_PERFCCONTROL:] control Xen's software performance
+\item [DOM0\_PERFCCONTROL:] control Xen's software performance
 counters
 
-\item [\it DOM0\_MICROCODE:] update CPU microcode
+\item [DOM0\_MICROCODE:] update CPU microcode
 
-\item [\it DOM0\_IOPORT\_PERMISSION:] modify domain permissions for an
+\item [DOM0\_IOPORT\_PERMISSION:] modify domain permissions for an
 IO port range (enable / disable a range for a particular domain)
 
-\item [\it DOM0\_GETVCPUCONTEXT:] get context from a VCPU
+\item [DOM0\_GETVCPUCONTEXT:] get context from a VCPU
 
-\item [\it DOM0\_GETVCPUINFO:] get current state for a VCPU
-\item [\it DOM0\_GETDOMAININFOLIST:] batched interface to get domain
+\item [DOM0\_GETVCPUINFO:] get current state for a VCPU
+\item [DOM0\_GETDOMAININFOLIST:] batched interface to get domain
 info
 
-\item [\it DOM0\_PLATFORM\_QUIRK:] inform Xen of a platform quirk it
+\item [DOM0\_PLATFORM\_QUIRK:] inform Xen of a platform quirk it
 needs to handle (e.g. noirqbalance)
 
-\item [\it DOM0\_PHYSICAL\_MEMORY\_MAP:] get info about dom0's memory
+\item [DOM0\_PHYSICAL\_MEMORY\_MAP:] get info about dom0's memory
 map
 
-\item [\it DOM0\_MAX\_VCPUS:] change max number of VCPUs for a domain
+\item [DOM0\_MAX\_VCPUS:] change max number of VCPUs for a domain
 
-\item [\it DOM0\_SETDOMAINHANDLE:] set the handle for a domain
+\item [DOM0\_SETDOMAINHANDLE:] set the handle for a domain
 
 \end{description} 
 \end{quote} 
@@ -2172,20 +2198,20 @@ A few additional hypercalls are mainly useful for debugging:
 
 Use Xen to interact with the console; operations are:
 
-{\it CONSOLEIO\_write}: Output count characters from buffer str.
+{CONSOLEIO\_write}: Output count characters from buffer str.
 
-{\it CONSOLEIO\_read}: Input at most count characters into buffer str.
+{CONSOLEIO\_read}: Input at most count characters into buffer str.
 \end{quote} 
 
 A pair of hypercalls allows access to the underlying debug registers: 
 \begin{quote}
 \hypercall{set\_debugreg(int reg, unsigned long value)}
 
-Set debug register {\tt reg} to {\tt value} 
+Set debug register {\bf reg} to {\bf value} 
 
 \hypercall{get\_debugreg(int reg)}
 
-Return the contents of the debug register {\tt reg}
+Return the contents of the debug register {\bf reg}
 \end{quote}
 
 And finally: 

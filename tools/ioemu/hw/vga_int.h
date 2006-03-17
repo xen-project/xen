@@ -76,6 +76,7 @@
 
 #define VGA_STATE_COMMON                                                \
     uint8_t *vram_ptr;                                                  \
+    uint8_t *vram_shadow;                                               \
     unsigned long vram_offset;                                          \
     unsigned int vram_size;                                             \
     uint32_t latch;                                                     \

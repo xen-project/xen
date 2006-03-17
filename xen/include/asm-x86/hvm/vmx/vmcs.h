@@ -28,13 +28,11 @@ extern int start_vmx(void);
 extern void stop_vmx(void);
 
 void vmx_final_setup_guest(struct vcpu *v);
-void vmx_relinquish_resources(struct vcpu *v);
 
 void vmx_enter_scheduler(void);
 
 enum {
-    VMX_CPU_STATE_PG_ENABLED=0,
-    VMX_CPU_STATE_PAE_ENABLED,
+    VMX_CPU_STATE_PAE_ENABLED=0,
     VMX_CPU_STATE_LME_ENABLED,
     VMX_CPU_STATE_LMA_ENABLED,
     VMX_CPU_STATE_ASSIST_ENABLED,

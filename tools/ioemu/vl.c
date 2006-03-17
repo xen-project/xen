@@ -464,11 +464,11 @@ void kbd_put_keycode(int keycode)
     }
 }
 
-void kbd_mouse_event(int dx, int dy, int dz, int buttons_state)
+void kbd_mouse_event(int dx, int dy, int dz, int buttons_state, int x, int y)
 {
     if (qemu_put_mouse_event) {
         qemu_put_mouse_event(qemu_put_mouse_event_opaque,
-                             dx, dy, dz, buttons_state);
+                             dx, dy, dz, buttons_state, x, y);
     }
 }
 

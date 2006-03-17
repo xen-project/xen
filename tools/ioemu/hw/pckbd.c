@@ -29,9 +29,6 @@
 /* debug PC keyboard : only mouse */
 //#define DEBUG_MOUSE
 
-/* enable synapatic touchpad device model */
-//#define SYNAPTIC
-
 /*	Keyboard Controller Commands */
 #define KBD_CCMD_READ_MODE	0x20	/* Read mode bits */
 #define KBD_CCMD_WRITE_MODE	0x60	/* Write mode bits */
@@ -114,18 +111,27 @@
 
 #define KBD_QUEUE_SIZE 256
 
+/*
+ * Summagraphics tablet defines
+ */
+#define SUMMA_BORDER	100
+#define SUMMA_MAXX	(16000 - 1)
+#define SUMMA_MAXY	(16000 - 1)
+
 typedef struct {
     uint8_t aux[KBD_QUEUE_SIZE];
     uint8_t data[KBD_QUEUE_SIZE];
     int rptr, wptr, count;
 } KBDQueue;
 
-#ifdef SYNAPTIC
-typedef struct {
-    int absolute;
-    int high;
-} TouchPad;
-#endif
+/*
+ *  Mouse types
+ */
+#define PS2	0
+#define IMPS2	3
+#define IMEX	4
+#define PAD	10
+#define TABLET	11
 
 typedef struct KBDState {
     KBDQueue queue;
@@ -143,16 +149,19 @@ typedef struct KBDState {
     uint8_t mouse_wrap;
     uint8_t mouse_type; /* 0 = PS2, 3 = IMPS/2, 4 = IMEX */
     uint8_t mouse_detect_state;
+    int mouse_x;  /* absolute coordinates (for mousepad) */
+    int mouse_y;
     int mouse_dx; /* current values, needed for 'poll' mode */
     int mouse_dy;
     int mouse_dz;
     uint8_t mouse_buttons;
-#ifdef SYNAPTIC
-    TouchPad touchpad;
-#endif
+    CharDriverState *chr;
+    void *cookie;
 } KBDState;
 
 KBDState kbd_state;
+
+int summa_ok;		/* Allow Summagraphics emulation if true */
 
 /* update irq and KBD_STAT_[MOUSE_]OBF */
 /* XXX: not generating the irqs if KBD_MODE_DISABLE_KBD is set may be
@@ -398,7 +407,9 @@ static void kbd_write_keyboard(KBDState *s, int val)
     }
 }
 
-static void kbd_mouse_send_packet(KBDState *s)
+int mouse_maxx, mouse_maxy;
+
+static int kbd_mouse_send_packet(KBDState *s)
 {
     unsigned int b;
     int dx1, dy1, dz1;
@@ -406,95 +417,73 @@ static void kbd_mouse_send_packet(KBDState *s)
     dx1 = s->mouse_dx;
     dy1 = s->mouse_dy;
     dz1 = s->mouse_dz;
-#ifdef SYNAPTIC
-    if (s->touchpad.absolute)
-    {
-	int dz2, dleftnright, dg, df;
-	if (dx1 > 6143)
-	    dx1 = 6143;
-	else if (dx1 < 0)
-	    dx1 = 0;
-	if (dy1 > 6143)
-	    dy1 = 6143;
-	else if (dy1 < 0)
-	    dy1 = 0;
-	dz2 = 80; /* normal finger pressure */
-	dg = 0; /* guesture not supported */
-	df = 0; /* finger not supported */
-	dleftnright = (s->mouse_buttons & 0x07);
-	/*
-	X: 13 bits --return absolute x ord
-	Y: 13 bits --return absolute y ord
-	Z: 8 bits --return constant 80 since we don't know how hard the user
-		is pressing on the mouse button ;) 80 is the default for pen
-		pressure, as touchpads cant sense what pressure a pen makes.
-	W: 4 bits --return 0, we don't support finger width (should we?)
-	left: 1 bit --is left button pressed
-	right: 1 bit --is right button pressed
-	guesture: 1 bit --we dont support, return 0
-	finger: 1 bit --ditto
-	total: 42 bits in 6 bytes
-	note that Synaptics drivers ignore the finger and guesture bits and
-	consider them redundant
-	*/
-	/*
-	note: the packet setup is different when Wmode = 1, but
-	    this doesn't apply since we don't support Wmode capability
-	format of packet is as follows:
-	*/
-	// 1 0 finger reserved 0 gesture right left
-	kbd_queue(s, (0x80 | (df ? 0x20 : 0) | (dg ? 0x04 : 0) | dleftnright), 1);
-	kbd_queue(s, ((dy1 & 0xF) * 256) + (dx1 & 0xF), 1);
-	kbd_queue(s, 80, 1); //byte 3
-	// 1 1 y-12 x-12 0 gesture right left
-	kbd_queue(s, (0xC0 | ((dy1 & 1000) ? 0x20 : 0) | ((dx1 & 1000) ? 0x10 : 0) | (dg ? 0x04 : 0) | dleftnright), 1);
-	kbd_queue(s, dx1 & 0xFF, 1);
-	kbd_queue(s, dy1 & 0xFF, 1);
-	return;
-    }
-#endif
-    /* XXX: increase range to 8 bits ? */
-    if (dx1 > 127)
-        dx1 = 127;
-    else if (dx1 < -127)
-        dx1 = -127;
-    if (dy1 > 127)
-        dy1 = 127;
-    else if (dy1 < -127)
-        dy1 = -127;
-    b = 0x08 | ((dx1 < 0) << 4) | ((dy1 < 0) << 5) | (s->mouse_buttons & 0x07);
-    kbd_queue(s, b, 1);
-    kbd_queue(s, dx1 & 0xff, 1);
-    kbd_queue(s, dy1 & 0xff, 1);
-    /* extra byte for IMPS/2 or IMEX */
     switch(s->mouse_type) {
-    default:
-        break;
-    case 3:
-        if (dz1 > 127)
-            dz1 = 127;
-        else if (dz1 < -127)
-                dz1 = -127;
-        kbd_queue(s, dz1 & 0xff, 1);
-        break;
-    case 4:
-        if (dz1 > 7)
-            dz1 = 7;
-        else if (dz1 < -7)
-            dz1 = -7;
-        b = (dz1 & 0x0f) | ((s->mouse_buttons & 0x18) << 1);
-        kbd_queue(s, b, 1);
-        break;
-    }
+  
+    case TABLET:        /* Summagraphics pen tablet */
+	dx1 = s->mouse_x;
+	dy1 = s->mouse_y;
+	dx1 = ((dx1 * SUMMA_MAXX) / mouse_maxx) + SUMMA_BORDER;
+	dy1 = ((dy1 * SUMMA_MAXY) / mouse_maxy) + SUMMA_BORDER;
+	ser_queue(s->cookie, 0x80 | (s->mouse_buttons & 7));
+	ser_queue(s->cookie, dx1 & 0x7f);
+	ser_queue(s->cookie, dx1 >> 7);
+	ser_queue(s->cookie, dy1 & 0x7f);
+	ser_queue(s->cookie, dy1 >> 7);
+	s->mouse_dx = 0; 
+	s->mouse_dy = 0;
+	s->mouse_dz = 0;
+	return 0;
 
-    /* update deltas */
-    s->mouse_dx -= dx1;
-    s->mouse_dy -= dy1;
-    s->mouse_dz -= dz1;
+    default:	/* PS/2 style mice */
+	/* XXX: increase range to 8 bits ? */
+	if (dx1 > 127)
+	    dx1 = 127;
+	else if (dx1 < -127)
+	    dx1 = -127;
+	if (dy1 > 127)
+	    dy1 = 127;
+	else if (dy1 < -127)
+	    dy1 = -127;
+	b = 0x08 | ((dx1 < 0) << 4) | ((dy1 < 0) << 5) | (s->mouse_buttons & 0x07);
+	kbd_queue(s, b, 1);
+	kbd_queue(s, dx1 & 0xff, 1);
+	kbd_queue(s, dy1 & 0xff, 1);
+	/* extra byte for IMPS/2 or IMEX */
+	switch(s->mouse_type) {
+
+	default:
+	    break;
+
+	case IMPS2:
+	    if (dz1 > 127)
+		dz1 = 127;
+	    else if (dz1 < -127)
+		dz1 = -127;
+	    kbd_queue(s, dz1 & 0xff, 1);
+	    break;
+
+	case IMEX:
+	    if (dz1 > 7)
+		dz1 = 7;
+	    else if (dz1 < -7)
+		dz1 = -7;
+	    b = (dz1 & 0x0f) | ((s->mouse_buttons & 0x18) << 1);
+	    kbd_queue(s, b, 1);
+	    break;
+	}
+
+	/* update deltas */
+	s->mouse_dx -= dx1;
+	s->mouse_dy -= dy1;
+	s->mouse_dz -= dz1;
+	return s->mouse_dx || s->mouse_dy || s->mouse_dz;
+
+    }
 }
 
 static void pc_kbd_mouse_event(void *opaque, 
-                               int dx, int dy, int dz, int buttons_state)
+                               int dx, int dy, int dz, int buttons_state,
+			       int x, int y)
 {
     KBDState *s = opaque;
 
@@ -502,6 +491,8 @@ static void pc_kbd_mouse_event(void *opaque,
     if (!(s->mouse_status & MOUSE_STATUS_ENABLED))
         return;
 
+    s->mouse_x = x;
+    s->mouse_y = y;
     s->mouse_dx += dx;
     s->mouse_dy -= dy;
     s->mouse_dz += dz;
@@ -513,23 +504,76 @@ static void pc_kbd_mouse_event(void *opaque,
     
     if (!(s->mouse_status & MOUSE_STATUS_REMOTE) &&
         (s->queue.count < (KBD_QUEUE_SIZE - 16))) {
-        for(;;) {
-            /* if not remote, send event. Multiple events are sent if
-               too big deltas */
-            kbd_mouse_send_packet(s);
-            if (s->mouse_dx == 0 && s->mouse_dy == 0 && s->mouse_dz == 0)
-                break;
-        }
+		while (kbd_mouse_send_packet(s))
+		    ;
     }
+}
+
+static void summa(KBDState *s, int val)
+{
+    static int summa = 0;
+
+    if (s->mouse_type == TABLET) {
+	switch (val) {
+
+	case '?':	/* read firmware ID */
+	    ser_queue(s->cookie, '0');
+	    break;
+
+	case 'a':	/* read config */
+	    /*
+	     *  Config looks like a movement packet but, because of scaling
+	     *    issues we can't use `kbd_send_packet' to do this.
+	     */
+	    ser_queue(s->cookie, 0);
+	    ser_queue(s->cookie, (SUMMA_MAXX & 0x7f));
+	    ser_queue(s->cookie, (SUMMA_MAXX >> 7));
+	    ser_queue(s->cookie, (SUMMA_MAXY & 0x7f));
+	    ser_queue(s->cookie, (SUMMA_MAXY >> 7));
+	    break;
+
+	default:	/* ignore all others */
+	    break;
+
+	}
+	return;
+    }
+    if (val == 'B') {
+	summa++;
+	return;
+    } else if (summa && val == 'z') {
+	s->mouse_type = TABLET;
+	return;
+    }
+    summa = 0;
+    return;
+}
+
+int summa_write(CharDriverState *chr, const uint8_t *buf, int len)
+{
+    KBDState *s = (KBDState *)chr->opaque;
+    int n;
+
+    n = len;
+    while (n-- > 0)
+	summa(s, *buf++);
+    return len;
+}
+
+void summa_init(void *cookie, CharDriverState *chr)
+{
+
+    if (summa_ok == 0)
+	return;
+    kbd_state.chr = chr;
+    kbd_state.cookie = (void *)cookie;
+    chr->chr_write = summa_write;
+    chr->opaque = (void *)&kbd_state;
+    return;
 }
 
 static void kbd_write_mouse(KBDState *s, int val)
 {
-#ifdef SYNAPTIC
-/* variables needed to store synaptics command info */
-static int rr = 0, ss = 0, tt = 0, uu = 0, res_count = 0, last_com = 0;
-int spare;
-#endif
 #ifdef DEBUG_MOUSE
     printf("kbd: write mouse 0x%02x\n", val);
 #endif
@@ -547,9 +591,6 @@ int spare;
                 return;
             }
         }
-#ifdef SYNAPTIC
-	last_com = val;
-#endif
         switch(val) {
         case AUX_SET_SCALE11:
             s->mouse_status &= ~MOUSE_STATUS_SCALE21;
@@ -581,121 +622,6 @@ int spare;
             kbd_queue(s, AUX_ACK, 1);
             break;
         case AUX_GET_SCALE:
-#ifdef SYNAPTIC
-	    if (res_count == 4)
-	    {
-		    /* time for the special stuff */
-		    kbd_queue(s, AUX_ACK, 1);
-		    /* below is how we get the real synaptic command */
-		    val = (rr*64) + (ss*16) + (tt*4) + uu;
-		    switch(val)
-		    {
-			    /* id touchpad */
-			    case 0x00:
-				    /* info Minor */
-				    kbd_queue(s, 0x00, 1);
-				    /* special verification byte */
-				    kbd_queue(s, 0x47, 1);
-				    /* info Major * 0x10 + Info ModelCode*/
-				    kbd_queue(s, 4 * 0x10 + 0, 1);
-				    break;
-				    /* read touchpad modes */
-			    case 0x01:
-				    /* special verification byte */
-				    kbd_queue(s, 0x3B, 1);
-				    /* mode */
-				    /*
-					bit 7 - absolute or relative position
-					bit 6 - 0 for 40 packets/sec, 1 for 80 pack/sec
-					bit 3 - 1 for sleep mode, 0 for normal
-					bit 2 - 1 to detect tap/drag, 0 to disable
-					bit 1 - packet size, only valid for serial protocol
-					bit 0 - 0 for normal packets, 1 for enhanced packets
-					(absolute mode packets which have finger width)
-					*/
-				    if (s->touchpad.absolute && s->touchpad.high)
-				    {
-					    spare = 0xC0;
-				    }
-				    else if (s->touchpad.absolute)
-				    {
-					    spare = 0x80;
-				    }
-				    else if (s->touchpad.high)
-				    {
-					    spare = 0x40;
-				    }
-				    else
-				    {
-					    spare = 0x00;
-				    }
-				    kbd_queue(s, spare, 1);
-				    /* special verification byte */
-				    kbd_queue(s, 0x47, 1);
-				    break;
-				    /* read touchpad capabilites */
-			    case 0x02:
-				    /* extended capability first 8 bits */
-				    kbd_queue(s, 0x00, 1);
-				    /* special verification byte */
-				    kbd_queue(s, 0x47, 1);
-				    /* extended capability last 8 bits */
-				    kbd_queue(s, 0x00, 1);
-				    /* basicly, we don't have any capabilites ;0 */
-				    break;
-				    /* read model id */
-			    case 0x03:
-				    /*
-					bit 23 = 0 (1 for upsidedownpad)
-					bit 22 = 0 (1 for 90 degree rotated pad)
-					bits 21-16 = 1 (standard model)
-					bits 15-9 = ??? (reserved for synaptics use)
-					bit 7 = 1
-					bit 6 = 0 (1 for sensing pens)
-					bit 5 = 1
-					bits 3-0 = 1 (rectangular geometery)
-				    */
-				    kbd_queue(s, 0xFC, 1);
-				    kbd_queue(s, 0x00, 1);
-				    kbd_queue(s, 0xF5, 1); //F7 for sensing pens
-				    break;
-				    /* read serial number prefix */
-			    case 0x06:
-				    /* strange how they have this query even though
-					no touchpad actually has serial numbers */
-				    /* return serial prefix of 0 if we dont have one */
-				    kbd_queue(s, 0x00, 1);
-				    kbd_queue(s, 0x00, 1);
-				    kbd_queue(s, 0x00, 1);
-				    break;
-				    /* read serial number suffix */
-			    case 0x07:
-				    /* undefined if we dont have a valid serial prefix */
-				    kbd_queue(s, 0x00, 1);
-				    kbd_queue(s, 0x00, 1);
-				    kbd_queue(s, 0x00, 1);
-				    break;
-				    /* read resolutions */
-			    case 0x08:
-				    /* going to go with infoSensor = 1 (Standard model) here */
-				    /* absolute X in abolute units per mm */
-				    kbd_queue(s, 85, 1);
-				    /* undefined but first bit 7 will be set to 1...
-					hell I'm going to set them all to 1 */
-				    kbd_queue(s, 0xFF, 1);
-				    /* absolute Y in abolute units per mm */
-				    kbd_queue(s, 94, 1);
-				    break;
-			    default:
-				    /* invalid commands return undefined data */
-				    kbd_queue(s, 0x00, 1);
-				    kbd_queue(s, 0x00, 1);
-				    kbd_queue(s, 0x00, 1);
-				    break;
-		    }
-	    }
-	    else
-#endif
 	    {
 		    /* not a special command, just do the regular stuff */
             kbd_queue(s, AUX_ACK, 1);
@@ -720,18 +646,12 @@ int spare;
             s->mouse_sample_rate = 100;
             s->mouse_resolution = 2;
             s->mouse_status = 0;
-#ifdef SYNAPTIC
-       	    s->touchpad.absolute = 0;
-#endif
             kbd_queue(s, AUX_ACK, 1);
             break;
         case AUX_RESET:
             s->mouse_sample_rate = 100;
             s->mouse_resolution = 2;
             s->mouse_status = 0;
-#ifdef SYNAPTIC
-	    s->touchpad.absolute = 0;
-#endif
             kbd_queue(s, AUX_ACK, 1);
             kbd_queue(s, 0xaa, 1);
             kbd_queue(s, s->mouse_type, 1);
@@ -741,15 +661,6 @@ int spare;
         }
         break;
     case AUX_SET_SAMPLE:
-#ifdef SYNAPTIC
-	if (res_count == 4 && val == 0x14)
-	{
-		/* time for the special stuff */
-		/* below is how we get the real synaptic command */
-		val = (rr*64) + (ss*16) + (tt*4) + uu;
-		/* TODO: set the mode byte */
-	} else
-#endif
         s->mouse_sample_rate = val;
 #if 0
         /* detect IMPS/2 or IMEX */
@@ -769,12 +680,12 @@ int spare;
             break;
         case 2:
             if (val == 80) 
-                s->mouse_type = 3; /* IMPS/2 */
+                s->mouse_type = IMPS2; /* IMPS/2 */
             s->mouse_detect_state = 0;
             break;
         case 3:
             if (val == 80) 
-                s->mouse_type = 4; /* IMEX */
+                s->mouse_type = IMEX; /* IMEX */
             s->mouse_detect_state = 0;
             break;
         }
@@ -783,36 +694,6 @@ int spare;
         s->mouse_write_cmd = -1;
         break;
     case AUX_SET_RES:
-#ifdef SYNAPTIC
-	if (last_com != AUX_SET_RES)
-	{
-		/* if its not 4 in a row, its not a command */
-		/* FIXME: if we are set 8 of these in a row, or 12, or 16,
-		   or etc ... or 4^n commands, then the nth'd mode byte sent might
-		   still work. not sure if this is how things are suppose to be
-		   or not. */
-		res_count = 0;
-	}
-	res_count++;
-	if (res_count > 4) res_count = 4;
-	switch(res_count)
-		/* we need to save the val in the right spots to get the
-		   real command later */
-	{
-		case 1:
-			break;
-			rr = val;
-		case 2:
-			ss = val;
-			break;
-		case 3:
-			tt = val;
-			break;
-		case 4:
-			uu = val;
-			break;
-	}
-#endif
         s->mouse_resolution = val;
         kbd_queue(s, AUX_ACK, 1);
         s->mouse_write_cmd = -1;
@@ -881,23 +762,19 @@ static void kbd_save(QEMUFile* f, void* opaque)
     qemu_put_8s(f, &s->write_cmd);
     qemu_put_8s(f, &s->status);
     qemu_put_8s(f, &s->mode);
-    qemu_put_be32s(f, &s->kbd_write_cmd);
-    qemu_put_be32s(f, &s->scan_enabled);
-    qemu_put_be32s(f, &s->mouse_write_cmd);
+    qemu_put_be32s(f, (uint32_t *)&s->kbd_write_cmd);
+    qemu_put_be32s(f, (uint32_t *)&s->scan_enabled);
+    qemu_put_be32s(f, (uint32_t *)&s->mouse_write_cmd);
     qemu_put_8s(f, &s->mouse_status);
     qemu_put_8s(f, &s->mouse_resolution);
     qemu_put_8s(f, &s->mouse_sample_rate);
     qemu_put_8s(f, &s->mouse_wrap);
     qemu_put_8s(f, &s->mouse_type);
     qemu_put_8s(f, &s->mouse_detect_state);
-    qemu_put_be32s(f, &s->mouse_dx);
-    qemu_put_be32s(f, &s->mouse_dy);
-    qemu_put_be32s(f, &s->mouse_dz);
+    qemu_put_be32s(f, (uint32_t *)&s->mouse_dx);
+    qemu_put_be32s(f, (uint32_t *)&s->mouse_dy);
+    qemu_put_be32s(f, (uint32_t *)&s->mouse_dz);
     qemu_put_8s(f, &s->mouse_buttons);
-#ifdef SYNAPTIC
-    qemu_put_be32s(f, &s->touchpad.absolute);
-    qemu_put_be32s(f, &s->touchpad.high);
-#endif
 }
 
 static int kbd_load(QEMUFile* f, void* opaque, int version_id)
@@ -909,23 +786,19 @@ static int kbd_load(QEMUFile* f, void* opaque, int version_id)
     qemu_get_8s(f, &s->write_cmd);
     qemu_get_8s(f, &s->status);
     qemu_get_8s(f, &s->mode);
-    qemu_get_be32s(f, &s->kbd_write_cmd);
-    qemu_get_be32s(f, &s->scan_enabled);
-    qemu_get_be32s(f, &s->mouse_write_cmd);
+    qemu_get_be32s(f, (uint32_t *)&s->kbd_write_cmd);
+    qemu_get_be32s(f, (uint32_t *)&s->scan_enabled);
+    qemu_get_be32s(f, (uint32_t *)&s->mouse_write_cmd);
     qemu_get_8s(f, &s->mouse_status);
     qemu_get_8s(f, &s->mouse_resolution);
     qemu_get_8s(f, &s->mouse_sample_rate);
     qemu_get_8s(f, &s->mouse_wrap);
     qemu_get_8s(f, &s->mouse_type);
     qemu_get_8s(f, &s->mouse_detect_state);
-    qemu_get_be32s(f, &s->mouse_dx);
-    qemu_get_be32s(f, &s->mouse_dy);
-    qemu_get_be32s(f, &s->mouse_dz);
+    qemu_get_be32s(f, (uint32_t *)&s->mouse_dx);
+    qemu_get_be32s(f, (uint32_t *)&s->mouse_dy);
+    qemu_get_be32s(f, (uint32_t *)&s->mouse_dz);
     qemu_get_8s(f, &s->mouse_buttons);
-#ifdef SYNAPTIC
-    qemu_get_be32s(f, &s->touchpad.absolute);
-    qemu_get_be32s(f, &s->touchpad.high);
-#endif
     return 0;
 }
 
@@ -933,6 +806,7 @@ void kbd_init(void)
 {
     KBDState *s = &kbd_state;
     
+    s->mouse_type = PS2;
     kbd_reset(s);
     register_savevm("pckbd", 0, 2, kbd_save, kbd_load, s);
     register_ioport_read(0x60, 1, 1, kbd_read_data, s);

@@ -46,6 +46,7 @@
 #include <sched.h>
 #include <semaphore.h>
 
+
 #ifdef SCHED_DEBUG
 #define DEBUG(_f, _a...) \
     printk("MINI_OS(file=sched.c, line=%d) " _f "\n", __LINE__, ## _a)
@@ -61,7 +62,7 @@
 #define clear_runnable(_thread) (_thread->flags &= ~RUNNABLE_FLAG)
 
 
-struct thread *idle_thread;
+struct thread *idle_thread = NULL;
 LIST_HEAD(exited_threads);
 
 void dump_stack(struct thread *thread)
@@ -225,7 +226,6 @@ void idle_thread_fn(void *unused)
     for(;;)
     {
         schedule();
-        printk("Blocking the domain\n"); 
         block_domain(10000);
     }
 }

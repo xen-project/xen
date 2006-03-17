@@ -139,13 +139,13 @@ extern int graphic_depth;
 #define MOUSE_EVENT_MBUTTON 0x04
 
 typedef void QEMUPutKBDEvent(void *opaque, int keycode);
-typedef void QEMUPutMouseEvent(void *opaque, int dx, int dy, int dz, int buttons_state);
+typedef void QEMUPutMouseEvent(void *opaque, int dx, int dy, int dz, int buttons_state, int x, int y);
 
 void qemu_add_kbd_event_handler(QEMUPutKBDEvent *func, void *opaque);
 void qemu_add_mouse_event_handler(QEMUPutMouseEvent *func, void *opaque);
 
 void kbd_put_keycode(int keycode);
-void kbd_mouse_event(int dx, int dy, int dz, int buttons_state);
+void kbd_mouse_event(int dx, int dy, int dz, int buttons_state, int x, int y);
 
 /* keysym is a unicode code except for special keys (see QEMU_KEY_xxx
    constants) */
@@ -618,6 +618,12 @@ void kbd_init(void);
 extern const char* keyboard_layout;
 extern int repeat_key;
 
+/* Mice */
+
+void summa_init(void *cookie, CharDriverState *chr);
+
+extern int summa_ok;
+
 /* mc146818rtc.c */
 
 typedef struct RTCState RTCState;
@@ -630,6 +636,7 @@ void rtc_set_date(RTCState *s, const struct tm *tm);
 
 typedef struct SerialState SerialState;
 SerialState *serial_init(int base, int irq, CharDriverState *chr);
+void ser_queue(SerialState *s, unsigned char c);
 
 /* i8259.c */
 

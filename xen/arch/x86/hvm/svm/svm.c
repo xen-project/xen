@@ -77,6 +77,8 @@ void svm_manual_event_injection32(struct vcpu *v, struct cpu_user_regs *regs,
         int vector, int has_code);
 void svm_dump_regs(const char *from, struct cpu_user_regs *regs);
 
+static void svm_relinquish_guest_resources(struct domain *d);
+
 static struct asid_pool ASIDpool[NR_CPUS];
 
 /*
@@ -195,12 +197,6 @@ void stop_svm(void)
 int svm_initialize_guest_resources(struct vcpu *v)
 {
     svm_final_setup_guest(v);
-    return 1;
-}
-
-int svm_relinquish_guest_resources(struct vcpu *v)
-{
-    svm_relinquish_resources(v);
     return 1;
 }
 
@@ -722,43 +718,35 @@ void svm_final_setup_guest(struct vcpu *v)
 }
 
 
-void svm_relinquish_resources(struct vcpu *v)
+static void svm_relinquish_guest_resources(struct domain *d)
 {
-    struct hvm_virpit *vpit;
     extern void destroy_vmcb(struct arch_svm_struct *); /* XXX */
+    struct vcpu *v;
 
+    for_each_vcpu ( d, v )
+    {
 #if 0
-    /* 
-     * This is not stored at the moment. We need to keep it somewhere and free
-     * it Or maybe not, as it's a per-cpu-core item, and I guess we don't
-     * normally remove CPU's other than for hot-plug capable systems, where I
-     * guess we have to allocate and free host-save area in this case. Let's
-     * not worry about it at the moment, as loosing one page per CPU hot-plug
-     * event doesn't seem that excessive. But I may be wrong.
-     */
-    free_host_save_area(v->arch.hvm_svm.host_save_area);
+        /* Memory leak by not freeing this. XXXKAF: *Why* is not per core?? */
+        free_host_save_area(v->arch.hvm_svm.host_save_area);
 #endif
 
-    if ( v->vcpu_id == 0 )
-    {
-        /* unmap IO shared page */
-        struct domain *d = v->domain;
-        if ( d->arch.hvm_domain.shared_page_va )
-            unmap_domain_page_global(
-                (void *)d->arch.hvm_domain.shared_page_va);
-        shadow_direct_map_clean(d);
+        destroy_vmcb(&v->arch.hvm_svm);
+        free_monitor_pagetable(v);
+        kill_timer(&v->arch.hvm_svm.hlt_timer);
+        if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) ) 
+        {
+            kill_timer( &(VLAPIC(v)->vlapic_timer) );
+            xfree(VLAPIC(v));
+        }
     }
 
-    destroy_vmcb(&v->arch.hvm_svm);
-    free_monitor_pagetable(v);
-    vpit = &v->domain->arch.hvm_domain.vpit;
-    kill_timer(&vpit->pit_timer);
-    kill_timer(&v->arch.hvm_svm.hlt_timer);
-    if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) ) 
-    {
-        kill_timer( &(VLAPIC(v)->vlapic_timer) );
-        xfree( VLAPIC(v) );
-    }
+    kill_timer(&d->arch.hvm_domain.vpit.pit_timer);
+
+    if ( d->arch.hvm_domain.shared_page_va )
+        unmap_domain_page_global(
+            (void *)d->arch.hvm_domain.shared_page_va);
+
+    shadow_direct_map_clean(d);
 }
 
 

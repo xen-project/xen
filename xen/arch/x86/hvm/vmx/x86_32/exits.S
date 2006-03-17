@@ -89,7 +89,7 @@ ENTRY(vmx_asm_vmexit_handler)
         call vmx_vmexit_handler
         jmp vmx_asm_do_resume
 
-.macro vmx_asm_common launch initialized
+.macro vmx_asm_common launch, initialized
 1:
 /* vmx_test_all_events */
         .if \initialized
@@ -140,10 +140,10 @@ ENTRY(vmx_asm_vmexit_handler)
 .endm
 
 ENTRY(vmx_asm_do_launch)
-    vmx_asm_common 1 0
+    vmx_asm_common 1, 0
 
 ENTRY(vmx_asm_do_resume)
-    vmx_asm_common 0 1
+    vmx_asm_common 0, 1
 
 ENTRY(vmx_asm_do_relaunch)
-    vmx_asm_common 1 1
+    vmx_asm_common 1, 1

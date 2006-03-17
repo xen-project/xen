@@ -77,10 +77,11 @@ char *xc_inflate_buffer(const char *in_buf, unsigned long in_size,
         return (char *)in_buf;
     }
 
-    out_len = in_buf[in_size-4] +
-        (256 * (in_buf[in_size-3] +
-                (256 * (in_buf[in_size-2] +
-                        (256 * in_buf[in_size-1])))));
+    out_len = (unsigned char)in_buf[in_size-4] +
+        (256 * ((unsigned char)in_buf[in_size-3] +
+                (256 * ((unsigned char)in_buf[in_size-2] +
+                        (256 * (unsigned char)in_buf[in_size-1])))));
+
     bzero(&zStream, sizeof(zStream));
     out_buf = malloc(out_len + 16);        /* Leave a little extra space */
     if ( out_buf == NULL )

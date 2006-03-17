@@ -78,30 +78,30 @@ void vmx_final_setup_guest(struct vcpu *v)
     }
 }
 
-void vmx_relinquish_resources(struct vcpu *v)
+static void vmx_relinquish_guest_resources(struct domain *d)
 {
-    struct hvm_virpit *vpit;
+    struct vcpu *v;
 
-    if (v->vcpu_id == 0) {
-        /* unmap IO shared page */
-        struct domain *d = v->domain;
-        if ( d->arch.hvm_domain.shared_page_va )
-            unmap_domain_page_global(
-	        (void *)d->arch.hvm_domain.shared_page_va);
-        shadow_direct_map_clean(d);
-    }
-
-    vmx_request_clear_vmcs(v);
-    destroy_vmcs(&v->arch.hvm_vmx);
-    free_monitor_pagetable(v);
-    vpit = &v->domain->arch.hvm_domain.vpit;
-    kill_timer(&vpit->pit_timer);
-    kill_timer(&v->arch.hvm_vmx.hlt_timer);
-    if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) )
+    for_each_vcpu ( d, v )
     {
-        kill_timer(&VLAPIC(v)->vlapic_timer);
-        xfree(VLAPIC(v));
+        vmx_request_clear_vmcs(v);
+        destroy_vmcs(&v->arch.hvm_vmx);
+        free_monitor_pagetable(v);
+        kill_timer(&v->arch.hvm_vmx.hlt_timer);
+        if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) )
+        {
+            kill_timer(&VLAPIC(v)->vlapic_timer);
+            xfree(VLAPIC(v));
+        }
     }
+
+    kill_timer(&d->arch.hvm_domain.vpit.pit_timer);
+
+    if ( d->arch.hvm_domain.shared_page_va )
+        unmap_domain_page_global(
+	        (void *)d->arch.hvm_domain.shared_page_va);
+
+    shadow_direct_map_clean(d);
 }
 
 #ifdef __x86_64__
@@ -231,10 +231,9 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         if ((msr_content & EFER_LME) ^
             test_bit(VMX_CPU_STATE_LME_ENABLED,
                      &vc->arch.hvm_vmx.cpu_state)){
-            if (test_bit(VMX_CPU_STATE_PG_ENABLED,
-                         &vc->arch.hvm_vmx.cpu_state) ||
-                !test_bit(VMX_CPU_STATE_PAE_ENABLED,
-                          &vc->arch.hvm_vmx.cpu_state)){
+            if ( vmx_paging_enabled(vc) ||
+                 !test_bit(VMX_CPU_STATE_PAE_ENABLED,
+                           &vc->arch.hvm_vmx.cpu_state)) {
                 vmx_inject_exception(vc, TRAP_gp_fault, 0);
             }
         }
@@ -324,12 +323,6 @@ void stop_vmx(void)
 int vmx_initialize_guest_resources(struct vcpu *v)
 {
     vmx_final_setup_guest(v);
-    return 1;
-}
-
-int vmx_relinquish_guest_resources(struct vcpu *v)
-{
-    vmx_relinquish_resources(v);
     return 1;
 }
 
@@ -677,27 +670,31 @@ static void vmx_do_no_device_fault(void)
 /* Reserved bits: [31:15], [12:11], [9], [6], [2:1] */
 #define VMX_VCPU_CPUID_L1_RESERVED 0xffff9a46
 
-static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
+static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
 {
+    unsigned int input = (unsigned int)regs->eax;
+    unsigned int count = (unsigned int)regs->ecx;
     unsigned int eax, ebx, ecx, edx;
     unsigned long eip;
     struct vcpu *v = current;
 
     __vmread(GUEST_RIP, &eip);
 
-    HVM_DBG_LOG(DBG_LEVEL_1,
-                "do_cpuid: (eax) %lx, (ebx) %lx, (ecx) %lx, (edx) %lx,"
-                " (esi) %lx, (edi) %lx",
+    HVM_DBG_LOG(DBG_LEVEL_3, "(eax) 0x%08lx, (ebx) 0x%08lx, "
+                "(ecx) 0x%08lx, (edx) 0x%08lx, (esi) 0x%08lx, (edi) 0x%08lx",
                 (unsigned long)regs->eax, (unsigned long)regs->ebx,
                 (unsigned long)regs->ecx, (unsigned long)regs->edx,
                 (unsigned long)regs->esi, (unsigned long)regs->edi);
 
-    cpuid(input, &eax, &ebx, &ecx, &edx);
+    if ( input == 4 )
+        cpuid_count(input, count, &eax, &ebx, &ecx, &edx);
+    else
+        cpuid(input, &eax, &ebx, &ecx, &edx);
 
     if ( input == 1 )
     {
         if ( hvm_apic_support(v->domain) &&
-                !vlapic_global_enabled((VLAPIC(v))) )
+             !vlapic_global_enabled((VLAPIC(v))) )
             clear_bit(X86_FEATURE_APIC, &edx);
 
 #if CONFIG_PAGING_LEVELS < 3
@@ -732,10 +729,12 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
     regs->ecx = (unsigned long) ecx;
     regs->edx = (unsigned long) edx;
 
-    HVM_DBG_LOG(DBG_LEVEL_1,
-                "vmx_vmexit_do_cpuid: eip: %lx, input: %lx, out:eax=%x, ebx=%x, ecx=%x, edx=%x",
-                eip, input, eax, ebx, ecx, edx);
-
+    HVM_DBG_LOG(DBG_LEVEL_3, "eip@%lx, input: 0x%lx, "
+                "output: eax = 0x%08lx, ebx = 0x%08lx, "
+                "ecx = 0x%08lx, edx = 0x%08lx",
+                (unsigned long)eip, (unsigned long)input,
+                (unsigned long)eax, (unsigned long)ebx,
+                (unsigned long)ecx, (unsigned long)edx);
 }
 
 #define CASE_GET_REG_P(REG, reg)    \
@@ -1220,8 +1219,6 @@ static int vmx_set_cr0(unsigned long value)
 
     if ( (value & X86_CR0_PE) && (value & X86_CR0_PG) && !paging_enabled )
     {
-        unsigned long cr4;
-
         /*
          * Trying to enable guest paging.
          * The guest CR3 must be pointing to the guest physical.
@@ -1270,16 +1267,6 @@ static int vmx_set_cr0(unsigned long value)
                 domain_crash_synchronous(); /* need to take a clean path */
             }
 #endif
-        }
-
-        /* update CR4's PAE if needed */
-        __vmread(GUEST_CR4, &cr4);
-        if ( (!(cr4 & X86_CR4_PAE)) &&
-             test_bit(VMX_CPU_STATE_PAE_ENABLED,
-                      &v->arch.hvm_vmx.cpu_state) )
-        {
-            HVM_DBG_LOG(DBG_LEVEL_1, "enable PAE in cr4\n");
-            __vmwrite(GUEST_CR4, cr4 | X86_CR4_PAE);
         }
 
         /*
@@ -2033,8 +2020,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __hvm_bug(&regs);
         break;
     case EXIT_REASON_CPUID:
+        vmx_vmexit_do_cpuid(&regs);
         __get_instruction_length(inst_len);
-        vmx_vmexit_do_cpuid(regs.eax, &regs);
         __update_guest_eip(inst_len);
         break;
     case EXIT_REASON_HLT:

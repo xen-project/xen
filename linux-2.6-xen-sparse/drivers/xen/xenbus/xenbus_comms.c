@@ -106,8 +106,10 @@ int xb_write(const void *data, unsigned len)
 		cons = intf->req_cons;
 		prod = intf->req_prod;
 		mb();
-		if (!check_indexes(cons, prod))
+		if (!check_indexes(cons, prod)) {
+			intf->req_cons = intf->req_prod = 0;
 			return -EIO;
+		}
 
 		dst = get_output_chunk(cons, prod, intf->req, &avail);
 		if (avail == 0)
@@ -150,8 +152,10 @@ int xb_read(void *data, unsigned len)
 		cons = intf->rsp_cons;
 		prod = intf->rsp_prod;
 		mb();
-		if (!check_indexes(cons, prod))
+		if (!check_indexes(cons, prod)) {
+			intf->rsp_cons = intf->rsp_prod = 0;
 			return -EIO;
+		}
 
 		src = get_input_chunk(cons, prod, intf->rsp, &avail);
 		if (avail == 0)

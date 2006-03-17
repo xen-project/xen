@@ -97,11 +97,9 @@ xlbd_alloc_major_info(int major, int minor, int index)
 {
 	struct xlbd_major_info *ptr;
 
-	ptr = kmalloc(sizeof(struct xlbd_major_info), GFP_KERNEL);
+	ptr = kzalloc(sizeof(struct xlbd_major_info), GFP_KERNEL);
 	if (ptr == NULL)
 		return NULL;
-
-	memset(ptr, 0, sizeof(struct xlbd_major_info));
 
 	ptr->major = major;
 

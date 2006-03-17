@@ -8,6 +8,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/spinlock.h>
+#include <linux/time.h>
 #include <xen/evtchn.h>
 #include "pcifront.h"
 
@@ -40,8 +41,10 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 {
 	int err = 0;
 	struct xen_pci_op *active_op = &pdev->sh_info->op;
-	unsigned long irq_flags, poll_end;
+	unsigned long irq_flags;
 	evtchn_port_t port = pdev->evtchn;
+	nsec_t ns, ns_timeout;
+	struct timeval tv;
 
 	spin_lock_irqsave(&pdev->sh_info_lock, irq_flags);
 
@@ -52,15 +55,25 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 	set_bit(_XEN_PCIF_active, (unsigned long *)&pdev->sh_info->flags);
 	notify_remote_via_evtchn(port);
 
-	poll_end = jiffies + 5*HZ;
+	/*
+	 * We set a poll timeout of 5 seconds but give up on return after
+	 * 4 seconds. It is better to time out too late rather than too early
+	 * (in the latter case we end up continually re-executing poll() with a
+	 * timeout in the past). 1s difference gives plenty of slack for error.
+	 */
+	do_gettimeofday(&tv);
+	ns_timeout = timeval_to_ns(&tv) + 4 * (nsec_t)NSEC_PER_SEC;
+
 	clear_evtchn(port);
 
 	while (test_bit(_XEN_PCIF_active,
 			(unsigned long *)&pdev->sh_info->flags)) {
-		if (HYPERVISOR_poll(&port, 1, poll_end))
+		if (HYPERVISOR_poll(&port, 1, jiffies + 5*HZ))
 			BUG();
 		clear_evtchn(port);
-		if (time_after(jiffies, poll_end)) {
+		do_gettimeofday(&tv);
+		ns = timeval_to_ns(&tv);
+		if (ns > ns_timeout) {
 			dev_err(&pdev->xdev->dev,
 				"pciback not responding!!!\n");
 			clear_bit(_XEN_PCIF_active,

@@ -683,8 +683,6 @@ void panic(const char *fmt, ...)
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
-    debugger_trap_immediate();
-
     /* Spit out multiline message in one go. */
     spin_lock_irqsave(&lock, flags);
     printk("\n****************************************\n");
@@ -693,6 +691,8 @@ void panic(const char *fmt, ...)
     printk("****************************************\n\n");
     printk("Reboot in five seconds...\n");
     spin_unlock_irqrestore(&lock, flags);
+
+    debugger_trap_immediate();
 
     watchdog_disable();
     mdelay(5000);

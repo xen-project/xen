@@ -238,6 +238,29 @@ fi
 
 fi
 
+if test "$vnc" = "yes" ; then
+
+# check for eager event handling
+cat > $TMPC <<EOF
+#include "rfb/rfb.h"
+int main(void) {
+	rfbScreenInfoPtr screen;
+
+	screen->handleEventsEagerly = 1;
+}
+EOF
+
+if $cc `libvncserver-config --cflags` -o $TMPO $TMPC 2> /dev/null ; then
+   have_eager_events="yes"
+else
+   echo "!!"
+   echo "!! Slow VNC mouse, LibVNCServer doesn't support eager events"
+   echo "!!"
+   have_eager_events="no"
+fi
+
+fi
+
 ##########################################
 # SDL probe
 
@@ -472,6 +495,9 @@ if test "$vnc" = "yes"; then
     vnc_cflags="/usr/include"
   fi
   echo "VNC_CFLAGS=$vnc_cflags" >> $config_mak
+  if test "$have_eager_events" = "yes" ; then
+    echo "#define VNC_EAGER_EVENTS 1" >> $config_h
+  fi
 fi
 
 if test "$sdl" = "yes"; then

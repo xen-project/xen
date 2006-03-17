@@ -100,7 +100,7 @@ struct page_info
 
 #ifdef __x86_64__
 #define PGT_high_mfn_shift  52
-#define PGT_high_mfn_mask   (0x7ffUL << PGT_high_mfn_shift)
+#define PGT_high_mfn_mask   (0xfffUL << PGT_high_mfn_shift)
 #define PGT_mfn_mask        (((1U<<23)-1) | PGT_high_mfn_mask)
 #define PGT_high_mfn_nx     (0x800UL << PGT_high_mfn_shift)
 #else
@@ -363,8 +363,8 @@ void audit_domains(void);
 
 #ifdef PERF_ARRAYS
 
-void ptwr_eip_stat_reset();
-void ptwr_eip_stat_print();
+void ptwr_eip_stat_reset(void);
+void ptwr_eip_stat_print(void);
 
 #else
 

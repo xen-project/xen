@@ -237,7 +237,14 @@ static void *xs_talkv(xenbus_transaction_t t,
 		return ERR_PTR(-err);
 	}
 
-	BUG_ON(msg.type != type);
+	if (msg.type != type) {
+		if (printk_ratelimit())
+			printk(KERN_WARNING
+			       "XENBUS unexpected type [%d], expected [%d]\n",
+			       msg.type, type);
+		kfree(ret);
+		return ERR_PTR(-EINVAL);
+	}
 	return ret;
 }
 
