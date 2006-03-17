@@ -66,10 +66,10 @@ EXPORT_SYMBOL(vmem_map);
 
 // static int pgt_cache_water[2] = { 25, 50 };
 
+#ifndef XEN
 struct page_info *zero_page_memmap_ptr;	/* map entry for zero page */
 EXPORT_SYMBOL(zero_page_memmap_ptr);
 
-#ifndef XEN
 void *high_memory;
 EXPORT_SYMBOL(high_memory);
 

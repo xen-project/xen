@@ -13,7 +13,6 @@
 #include <asm/pgtable.h>
 #include <xen/mm.h>
 
-extern struct page_info *zero_page_memmap_ptr;
 struct page_info *frame_table;
 unsigned long frame_table_size;
 unsigned long max_page;
@@ -52,9 +51,6 @@ paging_init (void)
 	for (i = 0; i < (1UL << mpt_order); i++) {
 		mpt_table[i] = INVALID_M2P_ENTRY;
 	}
-	/* Other mapping setup */
-
-	zero_page_memmap_ptr = virt_to_page(ia64_imva(empty_zero_page));
 }
 
 /* FIXME: postpone support to machines with big holes between physical memorys.
