@@ -14,8 +14,8 @@ arch_libdir = 'lib'
 # Kernel image file.
 kernel = "/boot/Flash.fd"
 
-# The domain build function. VMX domain uses 'vmx'.
-builder='vmx'
+# The domain build function. VTI domain uses 'hvm'.
+builder='hvm'
 
 # Initial memory allocation (in megabytes) for the new domain.
 memory = 256
