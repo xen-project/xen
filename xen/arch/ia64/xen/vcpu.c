@@ -1283,13 +1283,23 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, BOOLEAN in
 // FIXME: This seems to happen even though it shouldn't.  Need to track
 // this down, but since it has been apparently harmless, just flag it for now
 //			panic_domain(vcpu_regs(vcpu),
-			printk(
-			 "vcpu_translate: bad physical address: 0x%lx\n",address);
+
+			/*
+			 * Guest may execute itc.d and rfi with psr.dt=0
+			 * When VMM try to fetch opcode, tlb miss may happen,
+			 * At this time PSCB(vcpu,metaphysical_mode)=1,
+			 * region=5,VMM need to handle this tlb miss as if
+			 * PSCB(vcpu,metaphysical_mode)=0
+			 */           
+			printk("vcpu_translate: bad physical address: 0x%lx\n",
+			       address);
+		} else {
+			*pteval = (address & _PAGE_PPN_MASK) | __DIRTY_BITS |
+			          _PAGE_PL_2 | _PAGE_AR_RWX;
+			*itir = PAGE_SHIFT << 2;
+			phys_translate_count++;
+			return IA64_NO_FAULT;
 		}
-		*pteval = (address & _PAGE_PPN_MASK) | __DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX;
-		*itir = PAGE_SHIFT << 2;
-		phys_translate_count++;
-		return IA64_NO_FAULT;
 	}
 	else if (!region && warn_region0_address) {
 		REGS *regs = vcpu_regs(vcpu);
