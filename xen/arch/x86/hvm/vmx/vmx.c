@@ -670,27 +670,31 @@ static void vmx_do_no_device_fault(void)
 /* Reserved bits: [31:15], [12:11], [9], [6], [2:1] */
 #define VMX_VCPU_CPUID_L1_RESERVED 0xffff9a46
 
-static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
+static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
 {
+    unsigned int input = (unsigned int)regs->eax;
+    unsigned int count = (unsigned int)regs->ecx;
     unsigned int eax, ebx, ecx, edx;
     unsigned long eip;
     struct vcpu *v = current;
 
     __vmread(GUEST_RIP, &eip);
 
-    HVM_DBG_LOG(DBG_LEVEL_1,
-                "do_cpuid: (eax) %lx, (ebx) %lx, (ecx) %lx, (edx) %lx,"
-                " (esi) %lx, (edi) %lx",
+    HVM_DBG_LOG(DBG_LEVEL_3, "(eax) 0x%08lx, (ebx) 0x%08lx, "
+                "(ecx) 0x%08lx, (edx) 0x%08lx, (esi) 0x%08lx, (edi) 0x%08lx",
                 (unsigned long)regs->eax, (unsigned long)regs->ebx,
                 (unsigned long)regs->ecx, (unsigned long)regs->edx,
                 (unsigned long)regs->esi, (unsigned long)regs->edi);
 
-    cpuid(input, &eax, &ebx, &ecx, &edx);
+    if ( input == 4 )
+        cpuid_count(input, count, &eax, &ebx, &ecx, &edx);
+    else
+        cpuid(input, &eax, &ebx, &ecx, &edx);
 
     if ( input == 1 )
     {
         if ( hvm_apic_support(v->domain) &&
-                !vlapic_global_enabled((VLAPIC(v))) )
+             !vlapic_global_enabled((VLAPIC(v))) )
             clear_bit(X86_FEATURE_APIC, &edx);
 
 #if CONFIG_PAGING_LEVELS < 3
@@ -725,10 +729,12 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
     regs->ecx = (unsigned long) ecx;
     regs->edx = (unsigned long) edx;
 
-    HVM_DBG_LOG(DBG_LEVEL_1,
-                "vmx_vmexit_do_cpuid: eip: %lx, input: %lx, out:eax=%x, ebx=%x, ecx=%x, edx=%x",
-                eip, input, eax, ebx, ecx, edx);
-
+    HVM_DBG_LOG(DBG_LEVEL_3, "eip@%lx, input: 0x%lx, "
+                "output: eax = 0x%08lx, ebx = 0x%08lx, "
+                "ecx = 0x%08lx, edx = 0x%08lx",
+                (unsigned long)eip, (unsigned long)input,
+                (unsigned long)eax, (unsigned long)ebx,
+                (unsigned long)ecx, (unsigned long)edx);
 }
 
 #define CASE_GET_REG_P(REG, reg)    \
@@ -2014,8 +2020,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __hvm_bug(&regs);
         break;
     case EXIT_REASON_CPUID:
+        vmx_vmexit_do_cpuid(&regs);
         __get_instruction_length(inst_len);
-        vmx_vmexit_do_cpuid(regs.eax, &regs);
         __update_guest_eip(inst_len);
         break;
     case EXIT_REASON_HLT:
