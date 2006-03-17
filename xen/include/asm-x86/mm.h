@@ -363,8 +363,8 @@ void audit_domains(void);
 
 #ifdef PERF_ARRAYS
 
-void ptwr_eip_stat_reset();
-void ptwr_eip_stat_print();
+void ptwr_eip_stat_reset(void);
+void ptwr_eip_stat_print(void);
 
 #else
 
