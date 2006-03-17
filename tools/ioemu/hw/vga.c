@@ -1340,7 +1340,7 @@ void vga_invalidate_scanlines(VGAState *s, int y1, int y2)
     }
 }
 
-extern inline int cmp_vram(VGAState *s, int offset, int n)
+static inline int cmp_vram(VGAState *s, int offset, int n)
 {
     long *vp, *sp;
 
