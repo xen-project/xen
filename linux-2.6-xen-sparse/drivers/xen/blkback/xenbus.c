@@ -116,15 +116,13 @@ static int blkback_probe(struct xenbus_device *dev,
 			 const struct xenbus_device_id *id)
 {
 	int err;
-	struct backend_info *be = kmalloc(sizeof(struct backend_info),
+	struct backend_info *be = kzalloc(sizeof(struct backend_info),
 					  GFP_KERNEL);
 	if (!be) {
 		xenbus_dev_fatal(dev, -ENOMEM,
 				 "allocating backend structure");
 		return -ENOMEM;
 	}
-	memset(be, 0, sizeof(*be));
-
 	be->dev = dev;
 	dev->data = be;
 

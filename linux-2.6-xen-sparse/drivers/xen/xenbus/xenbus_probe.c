@@ -552,10 +552,9 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 	}
 
 	stringlen = strlen(nodename) + 1 + strlen(type) + 1;
-	xendev = kmalloc(sizeof(*xendev) + stringlen, GFP_KERNEL);
+	xendev = kzalloc(sizeof(*xendev) + stringlen, GFP_KERNEL);
 	if (!xendev)
 		return -ENOMEM;
-	memset(xendev, 0, sizeof(*xendev));
 
 	/* Copy the strings into the extra space. */
 

@@ -179,11 +179,10 @@ static int xenbus_dev_open(struct inode *inode, struct file *filp)
 
 	nonseekable_open(inode, filp);
 
-	u = kmalloc(sizeof(*u), GFP_KERNEL);
+	u = kzalloc(sizeof(*u), GFP_KERNEL);
 	if (u == NULL)
 		return -ENOMEM;
 
-	memset(u, 0, sizeof(*u));
 	INIT_LIST_HEAD(&u->transactions);
 	init_waitqueue_head(&u->read_waitq);
 

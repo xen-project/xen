@@ -67,7 +67,7 @@ static int tpmback_probe(struct xenbus_device *dev,
                          const struct xenbus_device_id *id)
 {
 	int err;
-	struct backend_info *be = kmalloc(sizeof(struct backend_info),
+	struct backend_info *be = kzalloc(sizeof(struct backend_info),
 	                                  GFP_KERNEL);
 
 	if (!be) {
@@ -75,8 +75,6 @@ static int tpmback_probe(struct xenbus_device *dev,
 		                 "allocating backend structure");
 		return -ENOMEM;
 	}
-
-	memset(be, 0, sizeof(*be));
 
 	be->is_instance_set = 0;
 	be->dev = dev;
