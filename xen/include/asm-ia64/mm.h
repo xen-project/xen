@@ -10,8 +10,6 @@
 #include <xen/perfc.h>
 #include <xen/sched.h>
 
-#include <linux/rbtree.h>
-
 #include <asm/processor.h>
 #include <asm/atomic.h>
 #include <asm/flushtlb.h>

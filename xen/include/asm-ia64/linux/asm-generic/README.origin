@@ -10,7 +10,6 @@ errno-base.h		-> linux/include/asm-generic/errno-base.h
 errno.h			-> linux/include/asm-generic/errno.h
 ide_iops.h		-> linux/include/asm-generic/ide_iops.h
 iomap.h			-> linux/include/asm-generic/iomap.h
-pci-dma-compat.h	-> linux/include/asm-generic/pci-dma-compat.h
 pci.h			-> linux/include/asm-generic/pci.h
 pgtable.h		-> linux/include/asm-generic/pgtable.h
 pgtable-nopud.h		-> linux/include/asm-generic/pgtable-nopud.h

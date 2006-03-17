@@ -106,11 +106,13 @@ static inline void pmd_free(pmd_t * pmd)
 
 #define __pmd_free_tlb(tlb, pmd)	pmd_free(pmd)
 
+#ifndef XEN
 static inline void
 pmd_populate(struct mm_struct *mm, pmd_t * pmd_entry, struct page *pte)
 {
 	pmd_val(*pmd_entry) = page_to_maddr(pte);
 }
+#endif
 
 static inline void
 pmd_populate_kernel(struct mm_struct *mm, pmd_t * pmd_entry, pte_t * pte)
@@ -118,11 +120,13 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t * pmd_entry, pte_t * pte)
 	pmd_val(*pmd_entry) = __pa(pte);
 }
 
+#ifndef XEN
 static inline struct page *pte_alloc_one(struct mm_struct *mm,
 					 unsigned long addr)
 {
 	return virt_to_page(pgtable_quicklist_alloc());
 }
+#endif
 
 static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm,
 					  unsigned long addr)
@@ -130,6 +134,7 @@ static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm,
 	return pgtable_quicklist_alloc();
 }
 
+#ifndef XEN
 static inline void pte_free(struct page *pte)
 {
 	pgtable_quicklist_free(page_address(pte));
@@ -141,6 +146,7 @@ static inline void pte_free_kernel(pte_t * pte)
 }
 
 #define __pte_free_tlb(tlb, pte)	pte_free(pte)
+#endif
 
 extern void check_pgt_cache(void);
 

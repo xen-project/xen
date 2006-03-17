@@ -114,23 +114,6 @@ while(1);
 #endif
 
 ///////////////////////////////
-// from arch/ia64/page_alloc.c
-///////////////////////////////
-DEFINE_PER_CPU(struct page_state, page_states) = {0};
-unsigned long totalram_pages;
-
-void __mod_page_state(unsigned long offset, unsigned long delta)
-{
-	unsigned long flags;
-	void* ptr;
-
-	local_irq_save(flags);
-	ptr = &__get_cpu_var(page_states);
-	*(unsigned long*)(ptr + offset) += delta;
-	local_irq_restore(flags);
-}
-
-///////////////////////////////
 // from arch/x86/flushtlb.c
 ///////////////////////////////
 

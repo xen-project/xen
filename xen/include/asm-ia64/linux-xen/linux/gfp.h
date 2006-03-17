@@ -82,11 +82,11 @@ struct vm_area_struct;
  * optimized to &contig_page_data at compile-time.
  */
 
+#ifndef XEN
 #ifndef HAVE_ARCH_FREE_PAGE
 static inline void arch_free_page(struct page *page, int order) { }
 #endif
 
-#ifndef XEN
 extern struct page *
 FASTCALL(__alloc_pages(unsigned int, unsigned int, struct zonelist *));
 
@@ -119,7 +119,6 @@ extern struct page *alloc_page_vma(unsigned __nocast gfp_mask,
 #define alloc_page_vma(gfp_mask, vma, addr) alloc_pages(gfp_mask, 0)
 #endif
 #define alloc_page(gfp_mask) alloc_pages(gfp_mask, 0)
-#endif /* XEN */
 
 extern unsigned long FASTCALL(__get_free_pages(unsigned int __nocast gfp_mask, unsigned int order));
 extern unsigned long FASTCALL(get_zeroed_page(unsigned int __nocast gfp_mask));
@@ -137,6 +136,7 @@ extern void FASTCALL(free_cold_page(struct page *page));
 
 #define __free_page(page) __free_pages((page), 0)
 #define free_page(addr) free_pages((addr),0)
+#endif /* XEN */
 
 void page_alloc_init(void);
 #ifdef CONFIG_NUMA

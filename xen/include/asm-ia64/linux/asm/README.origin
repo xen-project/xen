@@ -42,7 +42,6 @@ ptrace_offsets.h	-> linux/include/asm-ia64/ptrace_offsets.h
 rse.h			-> linux/include/asm-ia64/rse.h
 rwsem.h			-> linux/include/asm-ia64/rwsem.h
 sal.h			-> linux/include/asm-ia64/sal.h
-scatterlist.h		-> linux/include/asm-ia64/scatterlist.h
 sections.h		-> linux/include/asm-ia64/sections.h
 semaphore.h		-> linux/include/asm-ia64/semaphore.h
 setup.h			-> linux/include/asm-ia64/setup.h

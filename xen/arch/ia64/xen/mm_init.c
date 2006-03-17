@@ -69,7 +69,7 @@ EXPORT_SYMBOL(vmem_map);
 struct page_info *zero_page_memmap_ptr;	/* map entry for zero page */
 EXPORT_SYMBOL(zero_page_memmap_ptr);
 
-#ifdef XEN
+#ifndef XEN
 void *high_memory;
 EXPORT_SYMBOL(high_memory);
 

@@ -467,8 +467,10 @@ extern void paging_init (void);
  * for zero-mapped memory areas etc..
  */
 extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
+#ifndef XEN
 extern struct page *zero_page_memmap_ptr;
 #define ZERO_PAGE(vaddr) (zero_page_memmap_ptr)
+#endif
 
 /* We provide our own get_unmapped_area to cope with VA holes for userland */
 #define HAVE_ARCH_UNMAPPED_AREA
