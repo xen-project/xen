@@ -818,7 +818,7 @@ ENTRY(do_hypervisor_callback)   # do_hyperviosr_callback(struct *pt_regs)
 	jmp  error_exit
 
 #ifdef CONFIG_X86_LOCAL_APIC
-ENTRY(nmi)
+KPROBE_ENTRY(nmi)
 	zeroentry do_nmi_callback
 ENTRY(do_nmi_callback)
         addq $8, %rsp
@@ -828,6 +828,7 @@ ENTRY(do_nmi_callback)
         XEN_BLOCK_EVENTS(%rsi)
         GET_THREAD_INFO(%rcx)
         jmp  retint_restore_args
+	.previous .text
 #endif
 
         ALIGN
