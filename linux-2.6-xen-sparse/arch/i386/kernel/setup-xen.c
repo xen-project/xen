@@ -1819,6 +1819,10 @@ void __init setup_arch(char **cmdline_p)
 	op.u.set_iopl.iopl = 1;
 	HYPERVISOR_physdev_op(&op);
 
+#ifdef CONFIG_X86_IO_APIC
+	check_acpi_pci();	/* Checks more than just ACPI actually */
+#endif
+
 #ifdef CONFIG_ACPI
 	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
 		printk(KERN_INFO "ACPI in unprivileged domain disabled\n");
