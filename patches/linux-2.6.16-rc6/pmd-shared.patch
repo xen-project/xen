@@ -1,6 +1,6 @@
-diff -pruN ../pristine-linux-2.6.16-rc5/arch/i386/mm/pageattr.c ./arch/i386/mm/pageattr.c
---- ../pristine-linux-2.6.16-rc5/arch/i386/mm/pageattr.c	2006-02-27 15:46:58.000000000 +0000
-+++ ./arch/i386/mm/pageattr.c	2006-02-27 15:55:31.000000000 +0000
+diff -pruN ../pristine-linux-2.6.16-rc6/arch/i386/mm/pageattr.c ./arch/i386/mm/pageattr.c
+--- ../pristine-linux-2.6.16-rc6/arch/i386/mm/pageattr.c	2006-03-17 22:59:01.000000000 +0000
++++ ./arch/i386/mm/pageattr.c	2006-03-17 23:04:21.000000000 +0000
 @@ -78,7 +78,7 @@ static void set_pmd_pte(pte_t *kpte, uns
  	unsigned long flags;
  
@@ -10,9 +10,9 @@ diff -pruN ../pristine-linux-2.6.16-rc5/arch/i386/mm/pageattr.c ./arch/i386/mm/p
  		return;
  
  	spin_lock_irqsave(&pgd_lock, flags);
-diff -pruN ../pristine-linux-2.6.16-rc5/arch/i386/mm/pgtable.c ./arch/i386/mm/pgtable.c
---- ../pristine-linux-2.6.16-rc5/arch/i386/mm/pgtable.c	2006-01-03 03:21:10.000000000 +0000
-+++ ./arch/i386/mm/pgtable.c	2006-02-27 15:55:31.000000000 +0000
+diff -pruN ../pristine-linux-2.6.16-rc6/arch/i386/mm/pgtable.c ./arch/i386/mm/pgtable.c
+--- ../pristine-linux-2.6.16-rc6/arch/i386/mm/pgtable.c	2006-01-03 03:21:10.000000000 +0000
++++ ./arch/i386/mm/pgtable.c	2006-03-17 23:04:21.000000000 +0000
 @@ -215,9 +215,10 @@ void pgd_ctor(void *pgd, kmem_cache_t *c
  		spin_lock_irqsave(&pgd_lock, flags);
  	}
@@ -85,9 +85,9 @@ diff -pruN ../pristine-linux-2.6.16-rc5/arch/i386/mm/pgtable.c ./arch/i386/mm/pg
  	/* in the non-PAE case, free_pgtables() clears user pgd entries */
  	kmem_cache_free(pgd_cache, pgd);
  }
-diff -pruN ../pristine-linux-2.6.16-rc5/include/asm-i386/pgtable-2level-defs.h ./include/asm-i386/pgtable-2level-defs.h
---- ../pristine-linux-2.6.16-rc5/include/asm-i386/pgtable-2level-defs.h	2006-01-03 03:21:10.000000000 +0000
-+++ ./include/asm-i386/pgtable-2level-defs.h	2006-02-27 15:55:31.000000000 +0000
+diff -pruN ../pristine-linux-2.6.16-rc6/include/asm-i386/pgtable-2level-defs.h ./include/asm-i386/pgtable-2level-defs.h
+--- ../pristine-linux-2.6.16-rc6/include/asm-i386/pgtable-2level-defs.h	2006-01-03 03:21:10.000000000 +0000
++++ ./include/asm-i386/pgtable-2level-defs.h	2006-03-17 23:04:21.000000000 +0000
 @@ -1,6 +1,8 @@
  #ifndef _I386_PGTABLE_2LEVEL_DEFS_H
  #define _I386_PGTABLE_2LEVEL_DEFS_H
@@ -97,9 +97,9 @@ diff -pruN ../pristine-linux-2.6.16-rc5/include/asm-i386/pgtable-2level-defs.h .
  /*
   * traditional i386 two-level paging structure:
   */
-diff -pruN ../pristine-linux-2.6.16-rc5/include/asm-i386/pgtable-3level-defs.h ./include/asm-i386/pgtable-3level-defs.h
---- ../pristine-linux-2.6.16-rc5/include/asm-i386/pgtable-3level-defs.h	2006-01-03 03:21:10.000000000 +0000
-+++ ./include/asm-i386/pgtable-3level-defs.h	2006-02-27 15:55:31.000000000 +0000
+diff -pruN ../pristine-linux-2.6.16-rc6/include/asm-i386/pgtable-3level-defs.h ./include/asm-i386/pgtable-3level-defs.h
+--- ../pristine-linux-2.6.16-rc6/include/asm-i386/pgtable-3level-defs.h	2006-01-03 03:21:10.000000000 +0000
++++ ./include/asm-i386/pgtable-3level-defs.h	2006-03-17 23:04:21.000000000 +0000
 @@ -1,6 +1,8 @@
  #ifndef _I386_PGTABLE_3LEVEL_DEFS_H
  #define _I386_PGTABLE_3LEVEL_DEFS_H
