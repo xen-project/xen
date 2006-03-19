@@ -36,18 +36,13 @@ HDRS    := $(subst $(BASEDIR)/include/asm-$(TARGET_ARCH)/asm-offsets.h,,$(HDRS))
 HDRS    := $(subst $(BASEDIR)/include/xen/banner.h,,$(HDRS))
 HDRS    := $(subst $(BASEDIR)/include/xen/compile.h,,$(HDRS))
 
-C_SRCS  := $(wildcard *.c)
-S_SRCS  := $(wildcard *.S)
-OBJS    := $(patsubst %.S,%.o,$(S_SRCS))
-OBJS    += $(patsubst %.c,%.o,$(C_SRCS))
-
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
 # Note that link order matters!
 ALL_OBJS-y               += $(BASEDIR)/common/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/drivers/built_in.o
 ALL_OBJS-$(ACM_SECURITY) += $(BASEDIR)/acm/built_in.o
-ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/arch.o
+ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
 
 CFLAGS-y               += -g -D__XEN__
 CFLAGS-$(ACM_SECURITY) += -DACM_SECURITY
