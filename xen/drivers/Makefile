@@ -1,8 +1,6 @@
+include $(BASEDIR)/Rules.mk
 
-default:
-	$(MAKE) -C char
-	$(MAKE) -C acpi
+subdirs-y := char/
+subdirs-$(HAS_ACPI) += acpi/
 
-clean:
-	$(MAKE) -C char clean
-	$(MAKE) -C acpi clean
+include $(BASEDIR)/Post.mk

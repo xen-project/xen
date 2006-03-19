@@ -1,6 +1,8 @@
 ########################################
 # x86-specific definitions
 
+HAS_ACPI := y
+
 #
 # If you change any of these configuration options then you must
 # 'make clean' before rebuilding.

@@ -1,6 +1,7 @@
 ########################################
 # ia64-specific definitions
 
+HAS_ACPI := y
 VALIDATE_VT	?= n
 ifneq ($(COMPILE_ARCH),$(TARGET_ARCH))
 CROSS_COMPILE ?= /usr/local/sp_env/v2.2.5/i686/bin/ia64-unknown-linux-
