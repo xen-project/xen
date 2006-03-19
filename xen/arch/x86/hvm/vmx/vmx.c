@@ -50,9 +50,14 @@
 static unsigned long trace_values[NR_CPUS][4];
 #define TRACE_VMEXIT(index,value) trace_values[smp_processor_id()][index]=value
 
+static void vmx_ctxt_switch_from(struct vcpu *v);
+static void vmx_ctxt_switch_to(struct vcpu *v);
+
 void vmx_final_setup_guest(struct vcpu *v)
 {
-    v->arch.schedule_tail = arch_vmx_do_launch;
+    v->arch.schedule_tail    = arch_vmx_do_launch;
+    v->arch.ctxt_switch_from = vmx_ctxt_switch_from;
+    v->arch.ctxt_switch_to   = vmx_ctxt_switch_to;
 
     if ( v->vcpu_id == 0 )
     {
@@ -105,6 +110,7 @@ static void vmx_relinquish_guest_resources(struct domain *d)
 }
 
 #ifdef __x86_64__
+
 static struct vmx_msr_state percpu_msr[NR_CPUS];
 
 static u32 msr_data_index[VMX_MSR_COUNT] =
@@ -113,7 +119,7 @@ static u32 msr_data_index[VMX_MSR_COUNT] =
     MSR_SYSCALL_MASK, MSR_EFER,
 };
 
-void vmx_save_segments(struct vcpu *v)
+static void vmx_save_segments(struct vcpu *v)
 {
     rdmsrl(MSR_SHADOW_GS_BASE, v->arch.hvm_vmx.msr_content.shadow_gs);
 }
@@ -124,7 +130,7 @@ void vmx_save_segments(struct vcpu *v)
  * are not modified once set for generic domains, we don't save them,
  * but simply reset them to the values set at percpu_traps_init().
  */
-void vmx_load_msrs(void)
+static void vmx_load_msrs(void)
 {
     struct vmx_msr_state *host_state = &percpu_msr[smp_processor_id()];
     int i;
@@ -302,8 +308,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     return 1;
 }
 
-void
-vmx_restore_msrs(struct vcpu *v)
+static void vmx_restore_msrs(struct vcpu *v)
 {
     int i = 0;
     struct vmx_msr_state *guest_state;
@@ -323,22 +328,42 @@ vmx_restore_msrs(struct vcpu *v)
 
         HVM_DBG_LOG(DBG_LEVEL_2,
                     "restore guest's index %d msr %lx with %lx\n",
-                    i, (unsigned long) msr_data_index[i], (unsigned long) guest_state->msr_items[i]);
+                    i, (unsigned long)msr_data_index[i],
+                    (unsigned long)guest_state->msr_items[i]);
         set_bit(i, &host_state->flags);
         wrmsrl(msr_data_index[i], guest_state->msr_items[i]);
         clear_bit(i, &guest_flags);
     }
 }
 #else  /* __i386__ */
-#define  vmx_save_init_msrs()   ((void)0)
 
-static inline int  long_mode_do_msr_read(struct cpu_user_regs *regs){
+#define vmx_save_segments(v)      ((void)0)
+#define vmx_load_msrs()           ((void)0)
+#define vmx_restore_msrs(v)       ((void)0)
+#define vmx_save_init_msrs()      ((void)0)
+
+static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
+{
     return 0;
 }
-static inline int  long_mode_do_msr_write(struct cpu_user_regs *regs){
+
+static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
+{
     return 0;
 }
-#endif
+
+#endif /* __i386__ */
+
+static void vmx_ctxt_switch_from(struct vcpu *v)
+{
+    vmx_save_segments(v);
+    vmx_load_msrs();
+}
+
+static void vmx_ctxt_switch_to(struct vcpu *v)
+{
+    vmx_restore_msrs(v);
+}
 
 void stop_vmx(void)
 {
@@ -579,12 +604,6 @@ int start_vmx(void)
 
     hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = vmx_load_cpu_guest_regs;
-
-#ifdef __x86_64__
-    hvm_funcs.save_segments = vmx_save_segments;
-    hvm_funcs.load_msrs = vmx_load_msrs;
-    hvm_funcs.restore_msrs = vmx_restore_msrs;
-#endif
 
     hvm_funcs.store_cpu_guest_ctrl_regs = vmx_store_cpu_guest_ctrl_regs;
     hvm_funcs.modify_guest_state = vmx_modify_guest_state;
