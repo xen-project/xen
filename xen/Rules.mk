@@ -41,18 +41,12 @@ S_SRCS  := $(wildcard *.S)
 OBJS    := $(patsubst %.S,%.o,$(S_SRCS))
 OBJS    += $(patsubst %.c,%.o,$(C_SRCS))
 
-ALL_OBJS-y :=
-CFLAGS-y   :=
-subdirs-y  :=
-subdirs-n  :=
-
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
 # Note that link order matters!
-ALL_OBJS-y               += $(BASEDIR)/common/common.o
-ALL_OBJS-y               += $(BASEDIR)/drivers/char/driver.o
-ALL_OBJS-$(HAS_ACPI)     += $(BASEDIR)/drivers/acpi/driver.o
-ALL_OBJS-$(ACM_SECURITY) += $(BASEDIR)/acm/acm.o
+ALL_OBJS-y               += $(BASEDIR)/common/built_in.o
+ALL_OBJS-y               += $(BASEDIR)/drivers/built_in.o
+ALL_OBJS-$(ACM_SECURITY) += $(BASEDIR)/acm/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/arch.o
 
 CFLAGS-y               += -g -D__XEN__

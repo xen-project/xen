@@ -1,12 +1,10 @@
-
 include $(BASEDIR)/Rules.mk
 
-default: driver.o
-driver.o: $(OBJS)
-	$(LD) $(LDFLAGS) -r -o driver.o $(OBJS)
+obj-y += console.o
+obj-y += ns16550.o
+obj-y += serial.o
 
-clean:
-	rm -f *.o *~ core
+include $(BASEDIR)/Post.mk
 
 # Object file contains changeset and compiler information.
 console.o: $(BASEDIR)/include/xen/compile.h
