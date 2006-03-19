@@ -354,8 +354,18 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
 #endif /* __i386__ */
 
+static void vmx_freeze_time(struct vcpu *v)
+{
+    struct hvm_virpit *vpit = &v->domain->arch.hvm_domain.vpit;
+    
+    v->domain->arch.hvm_domain.guest_time = get_guest_time(v);
+    if ( vpit->first_injected )
+        stop_timer(&(vpit->pit_timer));
+}
+
 static void vmx_ctxt_switch_from(struct vcpu *v)
 {
+    vmx_freeze_time(v);
     vmx_save_segments(v);
     vmx_load_msrs();
 }
@@ -1707,7 +1717,7 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
 
         rdtscll(msr_content);
         vpit = &(v->domain->arch.hvm_domain.vpit);
-        msr_content += vpit->shift;
+        msr_content += vpit->cache_tsc_offset;
         break;
     }
     case MSR_IA32_SYSENTER_CS:
@@ -1751,22 +1761,8 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
 
     switch (regs->ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:
-    {
-        struct hvm_virpit *vpit;
-        u64 host_tsc, drift;
-
-        rdtscll(host_tsc);
-        vpit = &(v->domain->arch.hvm_domain.vpit);
-        drift = v->arch.hvm_vmx.tsc_offset - vpit->shift;
-        vpit->shift = msr_content - host_tsc;
-	v->arch.hvm_vmx.tsc_offset = vpit->shift + drift;
-        __vmwrite(TSC_OFFSET, vpit->shift);
-
-#if defined (__i386__)
-        __vmwrite(TSC_OFFSET_HIGH, ((vpit->shift)>>32));
-#endif
+        set_guest_time(v, msr_content);
         break;
-    }
     case MSR_IA32_SYSENTER_CS:
         __vmwrite(GUEST_SYSENTER_CS, msr_content);
         break;
