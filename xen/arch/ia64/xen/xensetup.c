@@ -168,6 +168,9 @@ void start_kernel(void)
     unsigned long dom0_initrd_start, dom0_initrd_size;
     unsigned long initial_images_start, initial_images_end;
     struct domain *idle_domain;
+#ifdef CONFIG_SMP
+    int i;
+#endif
 
     running_on_sim = is_platform_hp_ski();
     /* Kernel may be relocated by EFI loader */
@@ -311,8 +314,6 @@ printk("About to call timer_init()\n");
 #endif
 
 #ifdef CONFIG_SMP
-    int i;
-
     if ( opt_nosmp )
     {
         max_cpus = 0;

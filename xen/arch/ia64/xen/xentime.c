@@ -29,6 +29,7 @@
 #include <asm/vcpu.h>
 #include <linux/jiffies.h>	// not included by xen/sched.h
 #include <xen/softirq.h>
+#include <xen/event.h>
 
 /* FIXME: where these declarations should be there ? */
 extern void ia64_init_itm(void);

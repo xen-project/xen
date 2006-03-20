@@ -74,6 +74,7 @@ vcpu_get_gr(VCPU *vcpu, unsigned long reg)
 {
 	REGS *regs = vcpu_regs(vcpu);
 	UINT64 val;
+
 	if (!reg) return 0;
 	getreg(reg,&val,0,regs);	// FIXME: handle NATs later
 	return val;
@@ -82,10 +83,11 @@ IA64FAULT
 vcpu_get_gr_nat(VCPU *vcpu, unsigned long reg, UINT64 *val)
 {
 	REGS *regs = vcpu_regs(vcpu);
-    int nat;
+	int nat;
+
 	getreg(reg,val,&nat,regs);	// FIXME: handle NATs later
-    if(nat)
-        return IA64_NAT_CONSUMPTION_VECTOR;
+	if (nat)
+		return IA64_NAT_CONSUMPTION_VECTOR;
 	return 0;
 }
 
@@ -96,8 +98,10 @@ IA64FAULT
 vcpu_set_gr(VCPU *vcpu, unsigned long reg, UINT64 value, int nat)
 {
 	REGS *regs = vcpu_regs(vcpu);
+	long sof;
+
 	if (!reg) return IA64_ILLOP_FAULT;
-	long sof = (regs->cr_ifs) & 0x7f;
+	sof = (regs->cr_ifs) & 0x7f;
 	if (reg >= sof + 32) return IA64_ILLOP_FAULT;
 	setreg(reg,value,nat,regs);	// FIXME: handle NATs later
 	return IA64_NO_FAULT;
@@ -1247,7 +1251,7 @@ IA64FAULT vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
 	UINT64 VHPT_addr2a =
 		((pta_base >> 15) & 0x3fffffffffff) & compMask_60_15;
 	UINT64 VHPT_addr2b =
-		((VHPT_offset >> 15) & 0x3fffffffffff) & Mask_60_15;;
+		((VHPT_offset >> 15) & 0x3fffffffffff) & Mask_60_15;
 	UINT64 VHPT_addr3 = VHPT_offset & 0x7fff;
 	UINT64 VHPT_addr = VHPT_addr1 | ((VHPT_addr2a | VHPT_addr2b) << 15) |
 			VHPT_addr3;
