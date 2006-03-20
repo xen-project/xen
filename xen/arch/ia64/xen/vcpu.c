@@ -6,12 +6,6 @@
  *
  */
 
-#if 1
-// TEMPORARY PATCH for match_dtlb uses this, can be removed later
-// FIXME SMP
-int in_tpa = 0;
-#endif
-
 #include <linux/sched.h>
 #include <public/arch-ia64.h>
 #include <asm/ia64_int.h>
@@ -30,19 +24,18 @@ extern void getreg(unsigned long regnum, unsigned long *val, int *nat, struct pt
 extern void setreg(unsigned long regnum, unsigned long val, int nat, struct pt_regs *regs);
 extern void panic_domain(struct pt_regs *, const char *, ...);
 extern int set_metaphysical_rr0(void);
+extern unsigned long translate_domain_pte(UINT64,UINT64,UINT64);
+extern unsigned long translate_domain_mpaddr(unsigned long);
+extern void ia64_global_tlb_purge(UINT64 start, UINT64 end, UINT64 nbits);
+
 
 typedef	union {
 	struct ia64_psr ia64_psr;
 	unsigned long i64;
 } PSR;
 
-//typedef	struct pt_regs	REGS;
-//typedef struct domain VCPU;
-
 // this def for vcpu_regs won't work if kernel stack is present
 //#define	vcpu_regs(vcpu) ((struct pt_regs *) vcpu->arch.regs
-#define	PSCB(x,y)	VCPU(x,y)
-#define	PSCBX(x,y)	x->arch.y
 
 #define	TRUE	1
 #define	FALSE	0
@@ -71,18 +64,6 @@ unsigned long tr_translate_count = 0;
 unsigned long phys_translate_count = 0;
 
 unsigned long vcpu_verbose = 0;
-#define verbose(a...) do {if (vcpu_verbose) printf(a);} while(0)
-
-//#define vcpu_quick_region_check(_tr_regions,_ifa)	1
-#define vcpu_quick_region_check(_tr_regions,_ifa)			\
-	(_tr_regions & (1 << ((unsigned long)_ifa >> 61)))
-#define vcpu_quick_region_set(_tr_regions,_ifa)				\
-	do {_tr_regions |= (1 << ((unsigned long)_ifa >> 61)); } while (0)
-
-// FIXME: also need to check && (!trp->key || vcpu_pkr_match(trp->key))
-#define vcpu_match_tr_entry(_trp,_ifa,_rid)				\
-	((_trp->p && (_trp->rid==_rid) && (_ifa >= _trp->vadr) &&	\
-	(_ifa < (_trp->vadr + (1L<< _trp->ps)) - 1)))
 
 /**************************************************************************
  VCPU general register access routines
@@ -238,7 +219,6 @@ IA64FAULT vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24)
 	return IA64_NO_FAULT;
 }
 
-extern UINT64 vcpu_check_pending_interrupts(VCPU *vcpu);
 #define SPURIOUS_VECTOR 0xf
 
 IA64FAULT vcpu_set_psr_dt(VCPU *vcpu)
@@ -659,13 +639,6 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
     }
 }
 
-void early_tick(VCPU *vcpu)
-{
-	UINT64 *p = &PSCBX(vcpu,irr[3]);
-	printf("vcpu_check_pending: about to deliver early tick\n");
-	printf("&irr[0]=%p, irr[0]=0x%lx\n",p,*p);
-}
-
 #define	IA64_TPR_MMI	0x10000
 #define	IA64_TPR_MIC	0x000f0
 
@@ -677,7 +650,7 @@ void early_tick(VCPU *vcpu)
  * and this must be checked independently; see vcpu_deliverable interrupts() */
 UINT64 vcpu_check_pending_interrupts(VCPU *vcpu)
 {
-	UINT64 *p, *q, *r, bits, bitnum, mask, i, vector;
+	UINT64 *p, *r, bits, bitnum, mask, i, vector;
 
 	/* Always check pending event, since guest may just ack the
 	 * event injection without handle. Later guest may throw out
@@ -691,8 +664,8 @@ check_start:
 
 	p = &PSCBX(vcpu,irr[3]);
 	r = &PSCBX(vcpu,insvc[3]);
-	for (i = 3; ; p--, q--, r--, i--) {
-		bits = *p /* & *q */;
+	for (i = 3; ; p--, r--, i--) {
+		bits = *p ;
 		if (bits) break; // got a potential interrupt
 		if (*r) {
 			// nothing in this word which is pending+inservice
@@ -713,7 +686,7 @@ check_start:
 	if (vector == (PSCB(vcpu,itv) & 0xff)) {
 		uint64_t now = ia64_get_itc();
 		if (now < PSCBX(vcpu,domain_itm)) {
-			printk("Ooops, pending guest timer before its due\n");
+//			printk("Ooops, pending guest timer before its due\n");
 			PSCBX(vcpu,irr[i]) &= ~mask;
 			goto check_start;
 		}
@@ -753,12 +726,12 @@ UINT64 vcpu_deliverable_timer(VCPU *vcpu)
 
 IA64FAULT vcpu_get_lid(VCPU *vcpu, UINT64 *pval)
 {
-//extern unsigned long privop_trace;
-//privop_trace=1;
-	//TODO: Implement this
-	printf("vcpu_get_lid: WARNING: Getting cr.lid always returns zero\n");
-	//*pval = 0;
-	*pval = ia64_getreg(_IA64_REG_CR_LID);
+	/* Use real LID for domain0 until vIOSAPIC is present.
+	   Use EID=0, ID=vcpu_id for domU.  */
+	if (vcpu->domain == dom0)
+		*pval = ia64_getreg(_IA64_REG_CR_LID);
+	else
+		*pval = vcpu->vcpu_id << 24;
 	return IA64_NO_FAULT;
 }
 
@@ -932,6 +905,7 @@ IA64FAULT vcpu_set_tpr(VCPU *vcpu, UINT64 val)
 {
 	if (val & 0xff00) return IA64_RSVDREG_FAULT;
 	PSCB(vcpu,tpr) = val;
+	/* This can unmask interrupts.  */
 	if (vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
 		PSCB(vcpu,pending_interruption) = 1;
 	return (IA64_NO_FAULT);
@@ -945,8 +919,8 @@ IA64FAULT vcpu_set_eoi(VCPU *vcpu, UINT64 val)
 	p = &PSCBX(vcpu,insvc[3]);
 	for (i = 3; (i >= 0) && !(bits = *p); i--, p--);
 	if (i < 0) {
-		printf("Trying to EOI interrupt when none are in-service.\r\n");
-		return;
+		printf("Trying to EOI interrupt when none are in-service.\n");
+		return IA64_NO_FAULT;
 	}
 	bitnum = ia64_fls(bits);
 	vec = bitnum + (i*64);
@@ -957,7 +931,7 @@ IA64FAULT vcpu_set_eoi(VCPU *vcpu, UINT64 val)
 	if (PSCB(vcpu,interrupt_delivery_enabled)) { // but only if enabled...
 		// worry about this later... Linux only calls eoi
 		// with interrupts disabled
-		printf("Trying to EOI interrupt with interrupts enabled\r\n");
+		printf("Trying to EOI interrupt with interrupts enabled\n");
 	}
 	if (vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
 		PSCB(vcpu,pending_interruption) = 1;
@@ -1296,7 +1270,7 @@ unsigned long recover_to_break_fault_count = 0;
 
 int warn_region0_address = 0; // FIXME later: tie to a boot parameter?
 
-IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
+IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, BOOLEAN in_tpa, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
 {
 	unsigned long region = address >> 61;
 	unsigned long pta, pte, rid, rr;
@@ -1309,13 +1283,23 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 // FIXME: This seems to happen even though it shouldn't.  Need to track
 // this down, but since it has been apparently harmless, just flag it for now
 //			panic_domain(vcpu_regs(vcpu),
-			printk(
-			 "vcpu_translate: bad physical address: 0x%lx\n",address);
+
+			/*
+			 * Guest may execute itc.d and rfi with psr.dt=0
+			 * When VMM try to fetch opcode, tlb miss may happen,
+			 * At this time PSCB(vcpu,metaphysical_mode)=1,
+			 * region=5,VMM need to handle this tlb miss as if
+			 * PSCB(vcpu,metaphysical_mode)=0
+			 */           
+			printk("vcpu_translate: bad physical address: 0x%lx\n",
+			       address);
+		} else {
+			*pteval = (address & _PAGE_PPN_MASK) | __DIRTY_BITS |
+			          _PAGE_PL_2 | _PAGE_AR_RWX;
+			*itir = PAGE_SHIFT << 2;
+			phys_translate_count++;
+			return IA64_NO_FAULT;
 		}
-		*pteval = (address & _PAGE_PPN_MASK) | __DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX;
-		*itir = PAGE_SHIFT << 2;
-		phys_translate_count++;
-		return IA64_NO_FAULT;
 	}
 	else if (!region && warn_region0_address) {
 		REGS *regs = vcpu_regs(vcpu);
@@ -1408,9 +1392,7 @@ IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 	UINT64 pteval, itir, mask, iha;
 	IA64FAULT fault;
 
-	in_tpa = 1;
-	fault = vcpu_translate(vcpu, vadr, 1, &pteval, &itir, &iha);
-	in_tpa = 0;
+	fault = vcpu_translate(vcpu, vadr, TRUE, TRUE, &pteval, &itir, &iha);
 	if (fault == IA64_NO_FAULT)
 	{
 		mask = itir_mask(itir);
@@ -1655,8 +1637,11 @@ IA64FAULT vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
 
 IA64FAULT vcpu_get_rr(VCPU *vcpu, UINT64 reg, UINT64 *pval)
 {
-	UINT val = PSCB(vcpu,rrs)[reg>>61];
-	*pval = val;
+	if(VMX_DOMAIN(vcpu)){
+		*pval = VMX(vcpu,vrr[reg>>61]);
+	}else{
+		*pval = PSCB(vcpu,rrs)[reg>>61];
+	}
 	return (IA64_NO_FAULT);
 }
 
@@ -1693,7 +1678,7 @@ IA64FAULT vcpu_set_pkr(VCPU *vcpu, UINT64 reg, UINT64 val)
  VCPU translation register access routines
 **************************************************************************/
 
-static void vcpu_purge_tr_entry(TR_ENTRY *trp)
+static inline void vcpu_purge_tr_entry(TR_ENTRY *trp)
 {
 	trp->p = 0;
 }
@@ -1747,8 +1732,6 @@ IA64FAULT vcpu_itr_i(VCPU *vcpu, UINT64 slot, UINT64 pte,
 
 void foobar(void) { /*vcpu_verbose = 1;*/ }
 
-extern struct domain *dom0;
-
 void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 mp_pte, UINT64 logps)
 {
 	unsigned long psr;
@@ -1793,7 +1776,6 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 {
 	unsigned long pteval, logps = itir_ps(itir);
-	unsigned long translate_domain_pte(UINT64,UINT64,UINT64);
 	BOOLEAN swap_rr0 = (!(ifa>>61) && PSCB(vcpu,metaphysical_mode));
 
 	if (logps < PAGE_SHIFT) {
@@ -1813,7 +1795,6 @@ IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 IA64FAULT vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 {
 	unsigned long pteval, logps = itir_ps(itir);
-	unsigned long translate_domain_pte(UINT64,UINT64,UINT64);
 	BOOLEAN swap_rr0 = (!(ifa>>61) && PSCB(vcpu,metaphysical_mode));
 
 	// FIXME: validate ifa here (not in Xen space), COULD MACHINE CHECK!
@@ -1849,8 +1830,6 @@ IA64FAULT vcpu_fc(VCPU *vcpu, UINT64 vadr)
 	// TODO: Only allowed for current vcpu
 	UINT64 mpaddr, paddr;
 	IA64FAULT fault;
-	unsigned long translate_domain_mpaddr(unsigned long);
-	IA64FAULT vcpu_tpa(VCPU *, UINT64, UINT64 *);
 
 	fault = vcpu_tpa(vcpu, vadr, &mpaddr);
 	if (fault == IA64_NO_FAULT) {
@@ -1885,7 +1864,6 @@ IA64FAULT vcpu_ptc_g(VCPU *vcpu, UINT64 vadr, UINT64 addr_range)
 
 IA64FAULT vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 {
-	extern void ia64_global_tlb_purge(UINT64 start, UINT64 end, UINT64 nbits);
 	// FIXME: validate not flushing Xen addresses
 	// if (Xen address) return(IA64_ILLOP_FAULT);
 	// FIXME: ??breaks if domain PAGE_SIZE < Xen PAGE_SIZE

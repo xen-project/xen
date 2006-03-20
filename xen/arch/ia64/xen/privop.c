@@ -20,6 +20,9 @@ extern void zero_reflect_counts(void);
 
 long priv_verbose=0;
 
+/* Set to 1 to handle privified instructions from the privify tool. */
+static const int privify_en = 0;
+
 /**************************************************************************
 Hypercall bundle creation
 **************************************************************************/
@@ -131,7 +134,8 @@ IA64FAULT priv_ptc_e(VCPU *vcpu, INST64 inst)
 	UINT src = inst.M28.r3;
 
 	// NOTE: ptc_e with source gr > 63 is emulated as a fc r(y-64)
-	if (src > 63) return(vcpu_fc(vcpu,vcpu_get_gr(vcpu,src - 64)));
+	if (privify_en && src > 63)
+		return(vcpu_fc(vcpu,vcpu_get_gr(vcpu,src - 64)));
 	return vcpu_ptc_e(vcpu,vcpu_get_gr(vcpu,src));
 }
 
@@ -178,7 +182,7 @@ IA64FAULT priv_tpa(VCPU *vcpu, INST64 inst)
 	UINT src = inst.M46.r3;
 
 	// NOTE: tpa with source gr > 63 is emulated as a ttag rx=r(y-64)
-	if (src > 63)
+	if (privify_en && src > 63)
 		fault = vcpu_ttag(vcpu,vcpu_get_gr(vcpu,src-64),&padr);
 	else fault = vcpu_tpa(vcpu,vcpu_get_gr(vcpu,src),&padr);
 	if (fault == IA64_NO_FAULT)
@@ -193,7 +197,7 @@ IA64FAULT priv_tak(VCPU *vcpu, INST64 inst)
 	UINT src = inst.M46.r3;
 
 	// NOTE: tak with source gr > 63 is emulated as a thash rx=r(y-64)
-	if (src > 63)
+	if (privify_en && src > 63)
 		fault = vcpu_thash(vcpu,vcpu_get_gr(vcpu,src-64),&key);
 	else fault = vcpu_tak(vcpu,vcpu_get_gr(vcpu,src),&key);
 	if (fault == IA64_NO_FAULT)
@@ -280,7 +284,8 @@ IA64FAULT priv_mov_to_ar_reg(VCPU *vcpu, INST64 inst)
 	// I26 and M29 are identical for these fields
 	UINT64 ar3 = inst.M29.ar3;
 
-	if (inst.M29.r2 > 63 && inst.M29.ar3 < 8) { // privified mov from kr
+	if (privify_en && inst.M29.r2 > 63 && inst.M29.ar3 < 8) {
+		// privified mov from kr
 		UINT64 val;
 		if (vcpu_get_ar(vcpu,ar3,&val) != IA64_ILLOP_FAULT)
 			return vcpu_set_gr(vcpu, inst.M29.r2-64, val,0);
@@ -404,14 +409,17 @@ IA64FAULT priv_mov_from_rr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 val;
 	IA64FAULT fault;
+	int reg;
 	
-	if (inst.M43.r1 > 63) { // privified mov from cpuid
-		fault = vcpu_get_cpuid(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
+	reg = vcpu_get_gr(vcpu,inst.M43.r3);
+	if (privify_en && inst.M43.r1 > 63) {
+		// privified mov from cpuid
+		fault = vcpu_get_cpuid(vcpu,reg,&val);
 		if (fault == IA64_NO_FAULT)
 			return vcpu_set_gr(vcpu, inst.M43.r1-64, val, 0);
 	}
 	else {
-		fault = vcpu_get_rr(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
+		fault = vcpu_get_rr(vcpu,reg,&val);
 		if (fault == IA64_NO_FAULT)
 			return vcpu_set_gr(vcpu, inst.M43.r1, val, 0);
 	}
@@ -455,14 +463,17 @@ IA64FAULT priv_mov_from_pmc(VCPU *vcpu, INST64 inst)
 {
 	UINT64 val;
 	IA64FAULT fault;
+	int reg;
 	
-	if (inst.M43.r1 > 63) { // privified mov from pmd
-		fault = vcpu_get_pmd(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
+	reg = vcpu_get_gr(vcpu,inst.M43.r3);
+	if (privify_en && inst.M43.r1 > 63) {
+		// privified mov from pmd
+		fault = vcpu_get_pmd(vcpu,reg,&val);
 		if (fault == IA64_NO_FAULT)
 			return vcpu_set_gr(vcpu, inst.M43.r1-64, val, 0);
 	}
 	else {
-		fault = vcpu_get_pmc(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
+		fault = vcpu_get_pmc(vcpu,reg,&val);
 		if (fault == IA64_NO_FAULT)
 			return vcpu_set_gr(vcpu, inst.M43.r1, val, 0);
 	}
@@ -666,7 +677,7 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 		else if (inst.generic.major != 1) break;
 		x6 = inst.M29.x6;
 		if (x6 == 0x2a) {
-			if (inst.M29.r2 > 63 && inst.M29.ar3 < 8)
+			if (privify_en && inst.M29.r2 > 63 && inst.M29.ar3 < 8)
 				privcnt.mov_from_ar++; // privified mov from kr
 			else privcnt.mov_to_ar_reg++;
 			return priv_mov_to_ar_reg(vcpu,inst);
@@ -674,14 +685,14 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 		if (inst.M29.x3 != 0) break;
 		if (!(pfunc = Mpriv_funcs[x6])) break;
 		if (x6 == 0x1e || x6 == 0x1f)  { // tpa or tak are "special"
-			if (inst.M46.r3 > 63) {
+			if (privify_en && inst.M46.r3 > 63) {
 				if (x6 == 0x1e) x6 = 0x1b;
 				else x6 = 0x1a;
 			}
 		}
-		if (x6 == 52 && inst.M28.r3 > 63)
+		if (privify_en && x6 == 52 && inst.M28.r3 > 63)
 			privcnt.fc++;
-		else if (x6 == 16 && inst.M43.r3 > 63)
+		else if (privify_en && x6 == 16 && inst.M43.r3 > 63)
 			privcnt.cpuid++;
 		else privcnt.Mpriv_cnt[x6]++;
 		return (*pfunc)(vcpu,inst);
@@ -718,7 +729,7 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 #endif
 		if (inst.I26.x3 != 0) break;  // I26.x3 == I27.x3
 		if (inst.I26.x6 == 0x2a) {
-			if (inst.I26.r2 > 63 && inst.I26.ar3 < 8)
+			if (privify_en && inst.I26.r2 > 63 && inst.I26.ar3 < 8)
 				privcnt.mov_from_ar++; // privified mov from kr
 			else privcnt.mov_to_ar_reg++;
 			return priv_mov_to_ar_reg(vcpu,inst);
@@ -797,12 +808,17 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 #define HYPERPRIVOP_GET_RR		0x10
 #define HYPERPRIVOP_SET_RR		0x11
 #define HYPERPRIVOP_SET_KR		0x12
-#define HYPERPRIVOP_MAX			0x12
+#define HYPERPRIVOP_FC			0x13
+#define HYPERPRIVOP_GET_CPUID		0x14
+#define HYPERPRIVOP_GET_PMD		0x15
+#define HYPERPRIVOP_GET_EFLAG		0x16
+#define HYPERPRIVOP_SET_EFLAG		0x17
+#define HYPERPRIVOP_MAX			0x17
 
 static const char * const hyperpriv_str[HYPERPRIVOP_MAX+1] = {
 	0, "rfi", "rsm.dt", "ssm.dt", "cover", "itc.d", "itc.i", "ssm.i",
 	"=ivr", "=tpr", "tpr=", "eoi", "itm=", "thash", "ptc.ga", "itr.d",
-	"=rr", "rr=", "kr="
+	"=rr", "rr=", "kr=", "fc", "=cpuid", "=pmd", "=ar.eflg", "ar.eflg="
 };
 
 unsigned long slow_hyperpriv_cnt[HYPERPRIVOP_MAX+1] = { 0 };
@@ -889,6 +905,24 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 	    case HYPERPRIVOP_SET_KR:
 		(void)vcpu_set_ar(v,regs->r8,regs->r9);
 		return 1;
+	    case HYPERPRIVOP_FC:
+		(void)vcpu_fc(v,regs->r8);
+		return 1;
+	    case HYPERPRIVOP_GET_CPUID:
+		(void)vcpu_get_cpuid(v,regs->r8,&val);
+		regs->r8 = val;
+		return 1;
+	    case HYPERPRIVOP_GET_PMD:
+		(void)vcpu_get_pmd(v,regs->r8,&val);
+		regs->r8 = val;
+		return 1;
+	    case HYPERPRIVOP_GET_EFLAG:
+		(void)vcpu_get_ar(v,24,&val);
+		regs->r8 = val;
+		return 1;
+	    case HYPERPRIVOP_SET_EFLAG:
+		(void)vcpu_set_ar(v,24,regs->r8);
+		return 1;
 	}
 	return 0;
 }
@@ -934,7 +968,7 @@ static const char * const cr_str[128] = {
 };
 
 // FIXME: should use snprintf to ensure no buffer overflow
-int dump_privop_counts(char *buf)
+static int dump_privop_counts(char *buf)
 {
 	int i, j;
 	UINT64 sum = 0;
@@ -1007,7 +1041,7 @@ int dump_privop_counts(char *buf)
 	return s - buf;
 }
 
-int zero_privop_counts(char *buf)
+static int zero_privop_counts(char *buf)
 {
 	int i, j;
 	char *s = buf;
@@ -1043,7 +1077,7 @@ void privop_count_addr(unsigned long iip, int inst)
 	v->overflow++;;
 }
 
-int dump_privop_addrs(char *buf)
+static int dump_privop_addrs(char *buf)
 {
 	int i,j;
 	char *s = buf;
@@ -1061,7 +1095,7 @@ int dump_privop_addrs(char *buf)
 	return s - buf;
 }
 
-void zero_privop_addrs(void)
+static void zero_privop_addrs(void)
 {
 	int i,j;
 	for (i = 0; i < PRIVOP_COUNT_NINSTS; i++) {
@@ -1085,7 +1119,7 @@ extern unsigned long idle_when_pending;
 extern unsigned long pal_halt_light_count;
 extern unsigned long context_switch_count;
 
-int dump_misc_stats(char *buf)
+static int dump_misc_stats(char *buf)
 {
 	char *s = buf;
 	s += sprintf(s,"Virtual TR translations: %ld\n",tr_translate_count);
@@ -1102,7 +1136,7 @@ int dump_misc_stats(char *buf)
 	return s - buf;
 }
 
-void zero_misc_stats(void)
+static void zero_misc_stats(void)
 {
 	dtlb_translate_count = 0;
 	tr_translate_count = 0;
@@ -1117,7 +1151,7 @@ void zero_misc_stats(void)
 	context_switch_count = 0;
 }
 
-int dump_hyperprivop_counts(char *buf)
+static int dump_hyperprivop_counts(char *buf)
 {
 	int i;
 	char *s = buf;
@@ -1138,7 +1172,7 @@ int dump_hyperprivop_counts(char *buf)
 	return s - buf;
 }
 
-void zero_hyperprivop_counts(void)
+static void zero_hyperprivop_counts(void)
 {
 	int i;
 	for (i = 0; i <= HYPERPRIVOP_MAX; i++) slow_hyperpriv_cnt[i] = 0;

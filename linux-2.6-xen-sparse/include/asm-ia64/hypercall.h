@@ -32,6 +32,7 @@
 
 #include <xen/interface/xen.h>
 #include <xen/interface/sched.h>
+#include <xen/interface/dom0_ops.h>
 #include <linux/errno.h>
 
 /* FIXME: temp place to hold these page related macros */

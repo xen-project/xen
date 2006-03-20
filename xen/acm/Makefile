@@ -1,15 +1,9 @@
-
 include $(BASEDIR)/Rules.mk
-OBJS =  acm_core.o 
-OBJS += acm_policy.o
-OBJS += acm_simple_type_enforcement_hooks.o
-OBJS += acm_chinesewall_hooks.o
-OBJS += acm_null_hooks.o
 
-default: acm.o
+obj-y += acm_core.o 
+obj-y += acm_policy.o
+obj-y += acm_simple_type_enforcement_hooks.o
+obj-y += acm_chinesewall_hooks.o
+obj-y += acm_null_hooks.o
 
-acm.o: $(OBJS)
-	$(LD) $(LDFLAGS) -r -o acm.o $(OBJS)
-
-clean:
-	rm -f *.o *~ core
+include $(BASEDIR)/Post.mk

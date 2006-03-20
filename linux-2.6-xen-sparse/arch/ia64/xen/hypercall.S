@@ -254,7 +254,6 @@ GLOBAL_ENTRY(xen_set_kr)
 	st8 [r11]=r10
 	;;
 	br.ret.sptk.many rp
-	;;
 END(xen_set_rr)
 
 GLOBAL_ENTRY(xen_fc)
@@ -264,7 +263,16 @@ GLOBAL_ENTRY(xen_fc)
 (p7)	fc r32;;
 (p7)	br.ret.sptk.many rp
 	;;
-	ptc.e r96		// this is a "privified" fc r32
+	movl r9=XSI_PSR_IC
+	mov r8=r32
+	;;
+	ld8 r10=[r9]
+	;;
+	st8 [r9]=r0
+	;;
+	XEN_HYPER_FC
+	;;
+	st8 [r9]=r10
 	;;
 	br.ret.sptk.many rp
 END(xen_fc)
@@ -276,7 +284,16 @@ GLOBAL_ENTRY(xen_get_cpuid)
 (p7)	mov r8=cpuid[r32];;
 (p7)	br.ret.sptk.many rp
 	;;
-	mov r72=rr[r32]		// this is a "privified" mov r8=cpuid[r32]
+	movl r9=XSI_PSR_IC
+	mov r8=r32
+	;;
+	ld8 r10=[r9]
+	;;
+	st8 [r9]=r0
+	;;
+	XEN_HYPER_GET_CPUID
+	;;
+	st8 [r9]=r10
 	;;
 	br.ret.sptk.many rp
 END(xen_get_cpuid)
@@ -288,7 +305,16 @@ GLOBAL_ENTRY(xen_get_pmd)
 (p7)	mov r8=pmd[r32];;
 (p7)	br.ret.sptk.many rp
 	;;
-	mov r72=pmc[r32] 	// this is a "privified" mov r8=pmd[r32]
+	movl r9=XSI_PSR_IC
+	mov r8=r32
+	;;
+	ld8 r10=[r9]
+	;;
+	st8 [r9]=r0
+	;;
+	XEN_HYPER_GET_PMD
+	;;
+	st8 [r9]=r10
 	;;
 	br.ret.sptk.many rp
 END(xen_get_pmd)
@@ -301,10 +327,20 @@ GLOBAL_ENTRY(xen_get_eflag)
 (p7)	mov r8=ar24;;
 (p7)	br.ret.sptk.many rp
 	;;
-	mov ar24=r72		// this is a "privified" mov r8=ar.eflg
+	movl r9=XSI_PSR_IC
+	mov r8=r32
+	;;
+	ld8 r10=[r9]
+	;;
+	st8 [r9]=r0
+	;;
+	XEN_HYPER_GET_EFLAG
+	;;
+	st8 [r9]=r10
 	;;
 	br.ret.sptk.many rp
 END(xen_get_eflag)
+	
 // some bits aren't set if pl!=0, see SDM vol1 3.1.8
 GLOBAL_ENTRY(xen_set_eflag)
 	movl r8=running_on_xen;;
@@ -313,11 +349,17 @@ GLOBAL_ENTRY(xen_set_eflag)
 (p7)	mov ar24=r32
 (p7)	br.ret.sptk.many rp
 	;;
-	// FIXME: this remains no-op'd because it generates
-	// a privileged register (general exception) trap rather than
-	// a privileged operation fault
-	//mov ar24=r32
+	movl r9=XSI_PSR_IC
+	mov r8=r32
+	;;
+	ld8 r10=[r9]
+	;;
+	st8 [r9]=r0
+	;;
+	XEN_HYPER_SET_EFLAG
+	;;
+	st8 [r9]=r10
 	;;
 	br.ret.sptk.many rp
-END(xen_get_eflag)
+END(xen_set_eflag)
 #endif

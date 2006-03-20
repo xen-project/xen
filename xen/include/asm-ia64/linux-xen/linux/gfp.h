@@ -3,6 +3,7 @@
 
 #ifdef XEN
 #include <asm/bitops.h>
+#include <linux/topology.h>
 #endif
 #include <linux/mmzone.h>
 #include <linux/stddef.h>
@@ -81,6 +82,7 @@ struct vm_area_struct;
  * optimized to &contig_page_data at compile-time.
  */
 
+#ifndef XEN
 #ifndef HAVE_ARCH_FREE_PAGE
 static inline void arch_free_page(struct page *page, int order) { }
 #endif
@@ -134,6 +136,7 @@ extern void FASTCALL(free_cold_page(struct page *page));
 
 #define __free_page(page) __free_pages((page), 0)
 #define free_page(addr) free_pages((addr),0)
+#endif /* XEN */
 
 void page_alloc_init(void);
 #ifdef CONFIG_NUMA

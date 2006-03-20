@@ -334,12 +334,13 @@ _nat_consumption_fault(VCPU *vcpu, u64 vadr, miss_type t)
  *  @ Nat Consumption Vector
  * Refer to SDM Vol2 Table 5-6 & 8-1
  */
-
+#if 0
 static void
 ir_nat_page_consumption (VCPU *vcpu, u64 vadr)
 {
     _nat_consumption_fault(vcpu, vadr, DATA);
 }
+#endif //shadow it due to no use currently 
 
 /*
  * Instruction Nat Page Consumption Fault

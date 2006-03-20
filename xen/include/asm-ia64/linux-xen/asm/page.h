@@ -75,7 +75,7 @@ do {						\
 	flush_dcache_page(page);		\
 } while (0)
 
-
+#ifndef XEN
 #define alloc_zeroed_user_highpage(vma, vaddr) \
 ({						\
 	struct page *page = alloc_page_vma(GFP_HIGHUSER | __GFP_ZERO, vma, vaddr); \
@@ -83,6 +83,7 @@ do {						\
  		flush_dcache_page(page);	\
 	page;					\
 })
+#endif
 
 #define __HAVE_ARCH_ALLOC_ZEROED_USER_HIGHPAGE
 

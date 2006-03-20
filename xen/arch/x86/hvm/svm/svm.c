@@ -200,7 +200,8 @@ int svm_initialize_guest_resources(struct vcpu *v)
     return 1;
 }
 
-void svm_store_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
+static void svm_store_cpu_guest_regs(
+    struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
@@ -227,23 +228,11 @@ void svm_store_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 #endif
 }
 
-void svm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
+static void svm_load_cpu_guest_regs(
+    struct vcpu *v, struct cpu_user_regs *regs)
 {
     svm_load_cpu_user_regs(v, regs);
 }
-
-#ifdef __x86_64__
-
-void svm_save_segments(struct vcpu *v)
-{
-}
-void svm_load_msrs(void)
-{
-}
-void svm_restore_msrs(struct vcpu *v)
-{
-}
-#endif
 
 #define IS_CANO_ADDRESS(add) 1
 
@@ -458,12 +447,6 @@ int start_svm(void)
 
     hvm_funcs.store_cpu_guest_regs = svm_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = svm_load_cpu_guest_regs;
-
-#ifdef __x86_64__
-    hvm_funcs.save_segments = svm_save_segments;
-    hvm_funcs.load_msrs = svm_load_msrs;
-    hvm_funcs.restore_msrs = svm_restore_msrs;
-#endif
 
     hvm_funcs.store_cpu_guest_ctrl_regs = svm_store_cpu_guest_ctrl_regs;
     hvm_funcs.modify_guest_state = svm_modify_guest_state;
@@ -687,9 +670,19 @@ static void arch_svm_do_launch(struct vcpu *v)
     reset_stack_and_jump(svm_asm_do_launch);
 }
 
+static void svm_ctxt_switch_from(struct vcpu *v)
+{
+}
+
+static void svm_ctxt_switch_to(struct vcpu *v)
+{
+}
+
 void svm_final_setup_guest(struct vcpu *v)
 {
-    v->arch.schedule_tail = arch_svm_do_launch;
+    v->arch.schedule_tail    = arch_svm_do_launch;
+    v->arch.ctxt_switch_from = svm_ctxt_switch_from;
+    v->arch.ctxt_switch_to   = svm_ctxt_switch_to;
 
     if (v == v->domain->vcpu[0]) 
     {

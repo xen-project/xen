@@ -26,6 +26,7 @@
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/hw_irq.h>
+#include <asm/setup.h>
 //#include <asm/mpspec.h>
 #include <xen/irq.h>
 #include <xen/event.h>
@@ -36,7 +37,6 @@
 #include <xen/elf.h>
 //#include <asm/page.h>
 #include <asm/pgalloc.h>
-#include <asm/dma.h>	/* for MAX_DMA_ADDRESS */
 
 #include <asm/asm-offsets.h>  /* for IA64_THREAD_INFO_SIZE */
 
@@ -49,6 +49,9 @@
 #include <asm/pal.h>
 #include <asm/vhpt.h>
 #include <public/hvm/ioreq.h>
+#include <public/arch-ia64.h>
+#include <asm/tlbflush.h>
+#include <asm/regionreg.h>
 
 #define CONFIG_DOMAIN0_CONTIGUOUS
 unsigned long dom0_start = -1L;
@@ -69,10 +72,7 @@ extern unsigned long dom_fw_setup(struct domain *, char *, int);
 /* FIXME: where these declarations should be there ? */
 extern void domain_pend_keyboard_interrupt(int);
 extern long platform_is_hp_ski(void);
-extern unsigned long allocate_metaphysical_rr(void);
-extern int allocate_rid_range(struct domain *, unsigned long);
 extern void sync_split_caches(void);
-extern void init_all_rr(struct vcpu *);
 extern void serial_input_init(void);
 
 static void init_switch_stack(struct vcpu *v);
@@ -80,9 +80,33 @@ static void init_switch_stack(struct vcpu *v);
 /* this belongs in include/asm, but there doesn't seem to be a suitable place */
 void arch_domain_destroy(struct domain *d)
 {
-	printf("arch_domain_destroy: not implemented\n");
-	//free_page((unsigned long)d->mm.perdomain_pt);
-	free_xenheap_page(d->shared_info);
+	struct page_info *page;
+	struct list_head *ent, *prev;
+
+	if (d->arch.mm->pgd != NULL)
+	{
+		list_for_each ( ent, &d->arch.mm->pt_list )
+		{
+			page = list_entry(ent, struct page_info, list);
+			prev = ent->prev;
+			list_del(ent);
+			free_xenheap_page(page_to_virt(page));
+			ent = prev;
+		}
+		pgd_free(d->arch.mm->pgd);
+	}
+	if (d->arch.mm != NULL)
+		xfree(d->arch.mm);
+	if (d->shared_info != NULL)
+		free_xenheap_page(d->shared_info);
+
+	deallocate_rid_range(d);
+
+	/* It is really good in this? */
+	flush_tlb_all();
+
+	/* It is really good in this? */
+	vhpt_flush();
 }
 
 static void default_idle(void)
@@ -115,23 +139,9 @@ static void continue_cpu_idle_loop(void)
 
 void startup_cpu_idle_loop(void)
 {
-	int cpu = smp_processor_id ();
 	/* Just some sanity to ensure that the scheduler is set up okay. */
 	ASSERT(current->domain == IDLE_DOMAIN_ID);
-	printf ("idle%dA\n", cpu);
 	raise_softirq(SCHEDULE_SOFTIRQ);
-#if 0   /* All this work is done within continue_cpu_idle_loop  */
-	printf ("idle%dB\n", cpu);
-	asm volatile ("mov ar.k2=r0");
-	do_softirq();
-	printf ("idle%dC\n", cpu);
-
-	/*
-	 * Declares CPU setup done to the boot processor.
-	 * Therefore memory barrier to ensure state is visible.
-	 */
-	smp_mb();
-#endif
 #if 0
 //do we have to ensure the idle task has a shared page so that, for example,
 //region registers can be loaded from it.  Apparently not...
@@ -201,6 +211,8 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 
 void free_vcpu_struct(struct vcpu *v)
 {
+	if (v->arch.privregs != NULL)
+		free_xenheap_pages(v->arch.privregs, get_order(sizeof(mapped_regs_t)));
 	free_xenheap_pages(v, KERNEL_STACK_SIZE_ORDER);
 }
 
@@ -253,6 +265,7 @@ int arch_domain_create(struct domain *d)
 	if ((d->arch.mm = xmalloc(struct mm_struct)) == NULL)
 	    goto fail_nomem;
 	memset(d->arch.mm, 0, sizeof(*d->arch.mm));
+	INIT_LIST_HEAD(&d->arch.mm->pt_list);
 
 	if ((d->arch.mm->pgd = pgd_alloc(d->arch.mm)) == NULL)
 	    goto fail_nomem;
@@ -324,10 +337,74 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	return 0;
 }
 
+static void relinquish_memory(struct domain *d, struct list_head *list)
+{
+    struct list_head *ent;
+    struct page_info *page;
+#ifndef __ia64__
+    unsigned long     x, y;
+#endif
+
+    /* Use a recursive lock, as we may enter 'free_domheap_page'. */
+    spin_lock_recursive(&d->page_alloc_lock);
+    ent = list->next;
+    while ( ent != list )
+    {
+        page = list_entry(ent, struct page_info, list);
+        /* Grab a reference to the page so it won't disappear from under us. */
+        if ( unlikely(!get_page(page, d)) )
+        {
+            /* Couldn't get a reference -- someone is freeing this page. */
+            ent = ent->next;
+            continue;
+        }
+
+        if ( test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
+            put_page_and_type(page);
+
+        if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+            put_page(page);
+
+#ifndef __ia64__
+        /*
+         * Forcibly invalidate base page tables at this point to break circular
+         * 'linear page table' references. This is okay because MMU structures
+         * are not shared across domains and this domain is now dead. Thus base
+         * tables are not in use so a non-zero count means circular reference.
+         */
+        y = page->u.inuse.type_info;
+        for ( ; ; )
+        {
+            x = y;
+            if ( likely((x & (PGT_type_mask|PGT_validated)) !=
+                        (PGT_base_page_table|PGT_validated)) )
+                break;
+
+            y = cmpxchg(&page->u.inuse.type_info, x, x & ~PGT_validated);
+            if ( likely(y == x) )
+            {
+                free_page_type(page, PGT_base_page_table);
+                break;
+            }
+        }
+#endif
+
+        /* Follow the list chain and /then/ potentially free the page. */
+        ent = ent->next;
+        put_page(page);
+    }
+
+    spin_unlock_recursive(&d->page_alloc_lock);
+}
+
 void domain_relinquish_resources(struct domain *d)
 {
-	/* FIXME */
-	printf("domain_relinquish_resources: not implemented\n");
+    /* Relinquish every page of memory. */
+
+    /* xenheap_list is not used in ia64. */
+    BUG_ON(!list_empty(&d->xenpage_list));
+
+    relinquish_memory(d, &d->page_list);
 }
 
 // heavily leveraged from linux/arch/ia64/kernel/process.c:copy_thread()
@@ -339,7 +416,7 @@ void new_thread(struct vcpu *v,
 {
 	struct domain *d = v->domain;
 	struct pt_regs *regs;
-	extern char saved_command_line[];
+	extern char dom0_command_line[];
 
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
 	if (d == dom0) start_pc += dom0_start;
@@ -351,8 +428,9 @@ void new_thread(struct vcpu *v,
 		regs->cr_ipsr = 0x501008826008; /* Need to be expanded as macro */
 	} else {
 		regs->cr_ipsr = ia64_getreg(_IA64_REG_PSR)
-			| IA64_PSR_BITS_TO_SET | IA64_PSR_BN
-			& ~(IA64_PSR_BITS_TO_CLEAR | IA64_PSR_RI | IA64_PSR_IS);
+		  | IA64_PSR_BITS_TO_SET | IA64_PSR_BN;
+		regs->cr_ipsr &= ~(IA64_PSR_BITS_TO_CLEAR
+				   | IA64_PSR_RI | IA64_PSR_IS);
 		regs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT; // domain runs at PL2
 	}
 	regs->cr_iip = start_pc;
@@ -362,24 +440,27 @@ void new_thread(struct vcpu *v,
 	if (VMX_DOMAIN(v)) {
 		vmx_init_all_rr(v);
 		if (d == dom0)
-//		    VCPU(v,vgr[12]) = dom_fw_setup(d,saved_command_line,256L);
-		    regs->r28 = dom_fw_setup(d,saved_command_line,256L);
+		    regs->r28 = dom_fw_setup(d,dom0_command_line,
+					     COMMAND_LINE_SIZE);
 		/* Virtual processor context setup */
 		VCPU(v, vpsr) = IA64_PSR_BN;
 		VCPU(v, dcr) = 0;
 	} else {
 		init_all_rr(v);
 		if (d == dom0) 
-		    regs->r28 = dom_fw_setup(d,saved_command_line,256L);
+		    regs->r28 = dom_fw_setup(d,dom0_command_line,
+					     COMMAND_LINE_SIZE);
 		else {
 		    regs->ar_rsc |= (2 << 2); /* force PL2/3 */
 		    if (*d->arch.cmdline == '\0') {
 #define DEFAULT_CMDLINE "nomca nosmp xencons=tty0 console=tty0 root=/dev/hda1"
-			regs->r28 = dom_fw_setup(d,DEFAULT_CMDLINE,256L);
+			regs->r28 = dom_fw_setup(d,DEFAULT_CMDLINE,
+						 sizeof (DEFAULT_CMDLINE));
 			printf("domU command line defaulted to"
 				DEFAULT_CMDLINE "\n");
 		    }
-		    else regs->r28 = dom_fw_setup(d,d->arch.cmdline,256L);
+		    else regs->r28 = dom_fw_setup(d,d->arch.cmdline, 
+						  IA64_COMMAND_LINE_SIZE);
 		}
 		VCPU(v, banknum) = 1;
 		VCPU(v, metaphysical_mode) = 1;
@@ -387,7 +468,7 @@ void new_thread(struct vcpu *v,
 	}
 }
 
-static struct page * assign_new_domain0_page(unsigned long mpaddr)
+static struct page_info * assign_new_domain0_page(unsigned long mpaddr)
 {
 	if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
 		printk("assign_new_domain0_page: bad domain0 mpaddr 0x%lx!\n",mpaddr);
@@ -399,10 +480,10 @@ static struct page * assign_new_domain0_page(unsigned long mpaddr)
 }
 
 /* allocate new page for domain and map it to the specified metaphysical addr */
-struct page * assign_new_domain_page(struct domain *d, unsigned long mpaddr)
+struct page_info * assign_new_domain_page(struct domain *d, unsigned long mpaddr)
 {
 	struct mm_struct *mm = d->arch.mm;
-	struct page *p = (struct page *)0;
+	struct page_info *pt, *p = (struct page_info *)0;
 	pgd_t *pgd;
 	pud_t *pud;
 	pmd_t *pmd;
@@ -414,16 +495,28 @@ struct page * assign_new_domain_page(struct domain *d, unsigned long mpaddr)
 	}
 	pgd = pgd_offset(mm,mpaddr);
 	if (pgd_none(*pgd))
+	{
 		pgd_populate(mm, pgd, pud_alloc_one(mm,mpaddr));
+		pt = maddr_to_page(pgd_val(*pgd));
+		list_add_tail(&pt->list, &d->arch.mm->pt_list);
+	}
 
 	pud = pud_offset(pgd, mpaddr);
 	if (pud_none(*pud))
+	{
 		pud_populate(mm, pud, pmd_alloc_one(mm,mpaddr));
+		pt = maddr_to_page(pud_val(*pud));
+		list_add_tail(&pt->list, &d->arch.mm->pt_list);
+	}
 
 	pmd = pmd_offset(pud, mpaddr);
 	if (pmd_none(*pmd))
+	{
 		pmd_populate_kernel(mm, pmd, pte_alloc_one_kernel(mm,mpaddr));
 //		pmd_populate(mm, pmd, pte_alloc_one(mm,mpaddr));
+		pt = maddr_to_page(pmd_val(*pmd));
+		list_add_tail(&pt->list, &d->arch.mm->pt_list);
+	}
 
 	pte = pte_offset_map(pmd, mpaddr);
 	if (pte_none(*pte)) {
@@ -456,6 +549,7 @@ struct page * assign_new_domain_page(struct domain *d, unsigned long mpaddr)
 void assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr)
 {
 	struct mm_struct *mm = d->arch.mm;
+	struct page_info *pt;
 	pgd_t *pgd;
 	pud_t *pud;
 	pmd_t *pmd;
@@ -467,16 +561,28 @@ void assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long ph
 	}
 	pgd = pgd_offset(mm,mpaddr);
 	if (pgd_none(*pgd))
+	{
 		pgd_populate(mm, pgd, pud_alloc_one(mm,mpaddr));
+		pt = maddr_to_page(pgd_val(*pgd));
+		list_add_tail(&pt->list, &d->arch.mm->pt_list);
+	}
 
 	pud = pud_offset(pgd, mpaddr);
 	if (pud_none(*pud))
+	{
 		pud_populate(mm, pud, pmd_alloc_one(mm,mpaddr));
+		pt = maddr_to_page(pud_val(*pud));
+		list_add_tail(&pt->list, &d->arch.mm->pt_list);
+	}
 
 	pmd = pmd_offset(pud, mpaddr);
 	if (pmd_none(*pmd))
+	{
 		pmd_populate_kernel(mm, pmd, pte_alloc_one_kernel(mm,mpaddr));
 //		pmd_populate(mm, pmd, pte_alloc_one(mm,mpaddr));
+		pt = maddr_to_page(pmd_val(*pmd));
+		list_add_tail(&pt->list, &d->arch.mm->pt_list);
+	}
 
 	pte = pte_offset_map(pmd, mpaddr);
 	if (pte_none(*pte)) {
@@ -543,12 +649,13 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
 	if (d == dom0) {
+		pte_t pteval;
 		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
 			//printk("lookup_domain_mpa: bad dom0 mpaddr 0x%lx!\n",mpaddr);
 			//printk("lookup_domain_mpa: start=0x%lx,end=0x%lx!\n",dom0_start,dom0_start+dom0_size);
 			mpafoo(mpaddr);
 		}
-		pte_t pteval = pfn_pte(mpaddr >> PAGE_SHIFT,
+		pteval = pfn_pte(mpaddr >> PAGE_SHIFT,
 			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX));
 		pte = &pteval;
 		return *(unsigned long *)pte;
@@ -639,7 +746,7 @@ void loaddomainelfimage(struct domain *d, unsigned long image_start)
 	Elf_Phdr phdr;
 	int h, filesz, memsz;
 	unsigned long elfaddr, dom_mpaddr, dom_imva;
-	struct page *p;
+	struct page_info *p;
   
 	copy_memory(&ehdr, (void *) image_start, sizeof(Elf_Ehdr));
 	for ( h = 0; h < ehdr.e_phnum; h++ ) {

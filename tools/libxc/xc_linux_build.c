@@ -536,8 +536,12 @@ static int setup_guest(int xc_handle,
 
     *store_mfn = page_array[1];
     *console_mfn = page_array[2];
-    printf("store_mfn: 0x%lx, console_mfn: 0x%lx\n",
-           (uint64_t)store_mfn, (uint64_t)console_mfn);
+    printf("start_info: 0x%lx at 0x%lx, "
+           "store_mfn: 0x%lx at 0x%lx, "
+           "console_mfn: 0x%lx at 0x%lx\n",
+           page_array[0], nr_pages,
+           *store_mfn,    nr_pages - 2,
+           *console_mfn,  nr_pages - 1);
 
     start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, page_array[0]);

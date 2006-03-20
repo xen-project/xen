@@ -384,6 +384,9 @@ setup_arch (char **cmdline_p)
 	*cmdline_p = __va(ia64_boot_param->command_line);
 #ifndef XEN
 	strlcpy(saved_command_line, *cmdline_p, COMMAND_LINE_SIZE);
+#else
+	early_cmdline_parse(cmdline_p);
+	cmdline_parse(*cmdline_p);
 #endif
 
 	efi_init();
@@ -414,10 +417,6 @@ setup_arch (char **cmdline_p)
 	}
 #endif
 
-#ifdef XEN
-	early_cmdline_parse(cmdline_p);
-	cmdline_parse(*cmdline_p);
-#endif
 	if (early_console_setup(*cmdline_p) == 0)
 		mark_bsp_online();
 
@@ -842,7 +841,9 @@ cpu_init (void)
 					| IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC));
 #endif
 	atomic_inc(&init_mm.mm_count);
+#ifndef XEN
 	current->active_mm = &init_mm;
+#endif
 #ifdef XEN
 	if (current->domain->arch.mm)
 #else

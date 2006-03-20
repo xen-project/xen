@@ -40,4 +40,6 @@ struct irqaction;
 struct pt_regs;
 int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);
 
+extern fastcall unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs);
+
 #endif /* _ASM_IA64_IRQ_H */

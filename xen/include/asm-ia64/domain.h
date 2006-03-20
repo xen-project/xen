@@ -14,7 +14,6 @@
 extern void domain_relinquish_resources(struct domain *);
 
 struct arch_domain {
-    struct mm_struct *active_mm;
     struct mm_struct *mm;
     unsigned long metaphysical_rr0;
     unsigned long metaphysical_rr4;
@@ -68,7 +67,6 @@ struct arch_vcpu {
     int breakimm;			// from arch_domain (so is pinned)
     int starting_rid;		/* first RID assigned to domain */
     int ending_rid;		/* one beyond highest RID assigned to domain */
-    struct mm_struct *active_mm;
     struct thread_struct _thread;	// this must be last
 
     thash_cb_t *vtlb;
@@ -81,7 +79,6 @@ struct arch_vcpu {
     struct arch_vmx_struct arch_vmx; /* Virtual Machine Extensions */
 };
 
-#define active_mm arch.active_mm
 //#define thread arch._thread
 
 // FOLLOWING FROM linux-2.6.7/include/sched.h
@@ -101,6 +98,8 @@ struct mm_struct {
 	struct rw_semaphore mmap_sem;
 #endif
 	spinlock_t page_table_lock;		/* Protects task page tables and mm->rss */
+
+	struct list_head pt_list;		/* List of pagetable */
 
 	struct list_head mmlist;		/* List of all active mm's.  These are globally strung
 						 * together off init_mm.mmlist, and are protected

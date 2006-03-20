@@ -14,13 +14,10 @@ initrd.h		-> linux/include/linux/initrd.h
 jiffies.h		-> linux/include/linux/jiffies.h
 kmalloc_sizes.h		-> linux/include/linux/kmalloc_sizes.h
 linkage.h		-> linux/include/linux/linkage.h
-mmzone.h		-> linux/include/linux/mmzone.h
 notifier.h		-> linux/include/linux/notifier.h
 numa.h			-> linux/include/linux/numa.h
-page-flags.h		-> linux/include/linux/page-flags.h
 percpu.h		-> linux/include/linux/percpu.h
 preempt.h		-> linux/include/linux/preempt.h
-rbtree.h		-> linux/include/linux/rbtree.h
 rwsem.h			-> linux/include/linux/rwsem.h
 seqlock.h		-> linux/include/linux/seqlock.h
 sort.h			-> linux/include/linux/sort.h

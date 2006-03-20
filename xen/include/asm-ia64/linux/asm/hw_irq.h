@@ -85,6 +85,7 @@ extern int assign_irq_vector (int irq);	/* allocate a free vector */
 extern void free_irq_vector (int vector);
 extern void ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect);
 extern void register_percpu_irq (ia64_vector vec, struct irqaction *action);
+extern int xen_do_IRQ(ia64_vector vector);
 
 static inline void
 hw_resend_irq (struct hw_interrupt_type *h, unsigned int vector)

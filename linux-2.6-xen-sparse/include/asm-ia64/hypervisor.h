@@ -44,6 +44,8 @@ extern start_info_t *xen_start_info;
 
 void force_evtchn_callback(void);
 
+int xen_init(void);
+
 /* Turn jiffies into Xen system time. XXX Implement me. */
 #define jiffies_to_st(j)	0
 

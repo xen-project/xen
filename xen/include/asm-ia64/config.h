@@ -74,7 +74,7 @@ extern unsigned long dom0_start;
 extern unsigned long dom0_size;
 
 // from linux/include/linux/mm.h
-extern struct page *mem_map;
+extern struct page_info *mem_map;
 
 // xen/include/asm/config.h
 extern char _end[]; /* standard ELF symbol */
@@ -133,9 +133,6 @@ extern int smp_num_siblings;
 #else
 #define smp_num_siblings 1
 #endif
-
-// from linux/include/linux/mm.h
-struct page;
 
 // function calls; see decl in xen/include/xen/sched.h
 #undef free_task_struct
@@ -206,8 +203,6 @@ void sort_main_extable(void);
 #define _atomic_read(v) ((v).counter)
 #define atomic_compareandswap(old, new, v) ((atomic_t){ cmpxchg(v, _atomic_read(old), _atomic_read(new)) })
 
-// see include/asm-ia64/mm.h, handle remaining page_info uses until gone
-#define page_info page
 // Deprivated linux inf and put here for short time compatibility
 #define kmalloc(s, t) xmalloc_bytes((s))
 #define kfree(s) xfree((s))
@@ -249,7 +244,7 @@ extern unsigned long loops_per_jiffy;
 extern char saved_command_line[];
 struct screen_info { };
 #define seq_printf(a,b...) printf(b)
-#define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
+//#define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
 
 void dummy_called(char *function);
 #define dummy()	dummy_called((char *) __FUNCTION__)

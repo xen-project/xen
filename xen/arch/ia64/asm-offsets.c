@@ -84,7 +84,6 @@ void foo(void)
 	//DEFINE(IA64_TASK_SIGHAND_OFFSET,offsetof (struct task_struct, sighand));
 	//DEFINE(IA64_TASK_SIGNAL_OFFSET,offsetof (struct task_struct, signal));
 	//DEFINE(IA64_TASK_TGID_OFFSET, offsetof (struct task_struct, tgid));
-	DEFINE(IA64_PGD, offsetof(struct domain, arch.mm));
 	DEFINE(IA64_TASK_THREAD_KSP_OFFSET, offsetof (struct vcpu, arch._thread.ksp));
 	DEFINE(IA64_TASK_THREAD_ON_USTACK_OFFSET, offsetof (struct vcpu, arch._thread.on_ustack));
 

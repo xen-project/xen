@@ -75,11 +75,11 @@
 #define PHY_PAGE_UC (_PAGE_A|_PAGE_D|_PAGE_P|_PAGE_MA_UC|_PAGE_AR_RWX)
 #define PHY_PAGE_WB (_PAGE_A|_PAGE_D|_PAGE_P|_PAGE_MA_WB|_PAGE_AR_RWX)
 
-#ifdef PHY_16M  /* 16M: large granule for test*/
-#define EMUL_PHY_PAGE_SHIFT 24
-#else   /* 4K: emulated physical page granule */
-#define EMUL_PHY_PAGE_SHIFT 12
-#endif
+//#ifdef PHY_16M  /* 16M: large granule for test*/
+//#define EMUL_PHY_PAGE_SHIFT 24
+//#else   /* 4K: emulated physical page granule */
+//#define EMUL_PHY_PAGE_SHIFT 12
+//#endif
 #define IA64_RSC_MODE       0x0000000000000003
 #define XEN_RR7_RID    (0xf00010)
 #define GUEST_IN_PHY    0x1
@@ -96,8 +96,7 @@ extern void prepare_if_physical_mode(VCPU *vcpu);
 extern void recover_if_physical_mode(VCPU *vcpu);
 extern void vmx_init_all_rr(VCPU *vcpu);
 extern void vmx_load_all_rr(VCPU *vcpu);
-extern void physical_itlb_miss(VCPU *vcpu, u64 vadr);
-extern void physical_dtlb_miss(VCPU *vcpu, u64 vadr);
+extern void physical_tlb_miss(VCPU *vcpu, u64 vadr, u64 vec);
 /*
  * No sanity check here, since all psr changes have been
  * checked in switch_mm_mode().

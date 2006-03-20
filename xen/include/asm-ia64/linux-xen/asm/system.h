@@ -290,6 +290,9 @@ void cpu_idle_wait(void);
 
 #ifdef XEN
 #include <asm/xensystem.h>
+#ifndef __ASSEMBLY__
+struct resource;
+#endif
 #endif
 
 #endif /* _ASM_IA64_SYSTEM_H */

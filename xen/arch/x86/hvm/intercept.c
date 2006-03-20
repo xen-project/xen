@@ -338,10 +338,10 @@ void hlt_timer_fn(void *data)
 
 static __inline__ void missed_ticks(struct hvm_virpit*vpit)
 {
-    int        missed_ticks;
+    int missed_ticks;
 
     missed_ticks = (NOW() - vpit->scheduled)/(s_time_t) vpit->period;
-    if ( missed_ticks > 0 ) {
+    if ( missed_ticks++ >= 0 ) {
         vpit->pending_intr_nr += missed_ticks;
         vpit->scheduled += missed_ticks * vpit->period;
     }
@@ -355,22 +355,16 @@ static void pit_timer_fn(void *data)
 
     /* pick up missed timer tick */
     missed_ticks(vpit);
-
-    vpit->pending_intr_nr++;
     if ( test_bit(_VCPUF_running, &v->vcpu_flags) ) {
-        vpit->scheduled += vpit->period;
         set_timer(&vpit->pit_timer, vpit->scheduled);
     }
 }
 
+/* pick up missed timer ticks at deactive time */
 void pickup_deactive_ticks(struct hvm_virpit *vpit)
 {
-
     if ( !active_timer(&(vpit->pit_timer)) ) {
-        /* pick up missed timer tick */
         missed_ticks(vpit);
-    
-        vpit->scheduled += vpit->period;
         set_timer(&vpit->pit_timer, vpit->scheduled);
     }
 }

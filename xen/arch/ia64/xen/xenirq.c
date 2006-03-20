@@ -68,7 +68,7 @@ void irq_exit(void)
  * ONLY gets called from ia64_leave_kernel
  * ONLY call with interrupts enabled
  */
-void process_soft_irq()
+void process_soft_irq(void)
 {
 	if (!in_interrupt() && local_softirq_pending()) {
 		add_preempt_count(SOFTIRQ_OFFSET);

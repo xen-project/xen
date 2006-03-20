@@ -204,32 +204,24 @@ vmx_vcpu_get_plat(VCPU *vcpu)
 }
 
 
-ia64_rr vmx_vcpu_rr(VCPU *vcpu,UINT64 vadr)
-{
-        return (ia64_rr)VMX(vcpu,vrr[vadr>>61]);
-}
-
 
 IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
 {
     ia64_rr oldrr,newrr;
     thash_cb_t *hcb;
     extern void * pal_vaddr;
-    oldrr=vmx_vcpu_rr(vcpu,reg);
+    vcpu_get_rr(vcpu, reg, &oldrr.rrval);
     newrr.rrval=val;
-#if 1
     if(oldrr.ps!=newrr.ps){
         hcb = vmx_vcpu_get_vtlb(vcpu);
         thash_purge_all(hcb);
     }
-#endif
     VMX(vcpu,vrr[reg>>61]) = val;
-
     switch((u64)(reg>>61)) {
     case VRN7:
-       vmx_switch_rr7(vmx_vrrtomrr(vcpu,val),vcpu->domain->shared_info,
+        vmx_switch_rr7(vmx_vrrtomrr(vcpu,val),vcpu->domain->shared_info,
         (void *)vcpu->arch.privregs,
-       ( void *)vcpu->arch.vtlb->ts->vhpt->hash, pal_vaddr );
+        (void *)vcpu->arch.vtlb->vhpt->hash, pal_vaddr );
        break;
     default:
         ia64_set_rr(reg,vmx_vrrtomrr(vcpu,val));
@@ -275,7 +267,7 @@ check_entry(u64 va, u64 ps, char *str)
 u64 vmx_vcpu_get_itir_on_fault(VCPU *vcpu, u64 ifa)
 {
     ia64_rr rr,rr1;
-    rr=vmx_vcpu_rr(vcpu,ifa);
+    vcpu_get_rr(vcpu,ifa,&rr.rrval);
     rr1.rrval=0;
     rr1.ps=rr.ps;
     rr1.rid=rr.rid;

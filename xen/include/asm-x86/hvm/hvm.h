@@ -41,18 +41,11 @@ struct hvm_function_table {
     /*
      * Store and load guest state:
      * 1) load/store guest register state,
-     * 2) load/store segment state (x86_64 only),
-     * 3) load/store msr register state (x86_64 only),
-     * 4) store guest control register state (used for panic dumps),
-     * 5) modify guest state (e.g., set debug flags).
+     * 2) store guest control register state (used for panic dumps),
+     * 3) modify guest state (e.g., set debug flags).
      */
     void (*store_cpu_guest_regs)(struct vcpu *v, struct cpu_user_regs *r);
     void (*load_cpu_guest_regs)(struct vcpu *v, struct cpu_user_regs *r);
-#ifdef __x86_64__
-    void (*save_segments)(struct vcpu *v);
-    void (*load_msrs)(void);
-    void (*restore_msrs)(struct vcpu *v);
-#endif
     void (*store_cpu_guest_ctrl_regs)(struct vcpu *v, unsigned long crs[8]);
     void (*modify_guest_state)(struct vcpu *v);
 
@@ -110,33 +103,6 @@ hvm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *r)
 {
     hvm_funcs.load_cpu_guest_regs(v, r);
 }
-
-#ifdef __x86_64__
-static inline void
-hvm_save_segments(struct vcpu *v)
-{
-    if (hvm_funcs.save_segments)
-        hvm_funcs.save_segments(v);
-}
-
-static inline void
-hvm_load_msrs(void)
-{
-    if (hvm_funcs.load_msrs)
-        hvm_funcs.load_msrs();
-}
-
-static inline void
-hvm_restore_msrs(struct vcpu *v)
-{
-    if (hvm_funcs.restore_msrs)
-        hvm_funcs.restore_msrs(v);
-}
-#else
-#define hvm_save_segments(v)    ((void)0)
-#define hvm_load_msrs(v)        ((void)0)
-#define hvm_restore_msrs(v)     ((void)0)
-#endif /* __x86_64__ */
 
 static inline void
 hvm_store_cpu_guest_ctrl_regs(struct vcpu *v, unsigned long crs[8])

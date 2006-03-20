@@ -1,11 +1,5 @@
-
 include $(BASEDIR)/Rules.mk
 
-OBJS := tables.o
+obj-y += tables.o
 
-default: driver.o
-driver.o: $(OBJS)
-	$(LD) $(LDFLAGS) -r -o driver.o $(OBJS)
-
-clean:
-	rm -f *.o *~ core
+include $(BASEDIR)/Post.mk

@@ -723,15 +723,11 @@ ENTRY(dirty_bit)
 	movl r30=1f				// load continuation point in case of nested fault
 	;;
 #ifdef CONFIG_XEN
-#if 1
 	mov r18=r8;
 	mov r8=r16;
 	XEN_HYPER_THASH;;
 	mov r17=r8;
 	mov r8=r18;;
-#else
-	tak r17=r80				// "privified" thash
-#endif
 #else
 	thash r17=r16				// compute virtual address of L3 PTE
 #endif
@@ -812,15 +808,11 @@ ENTRY(iaccess_bit)
 #endif /* CONFIG_ITANIUM */
 	;;
 #ifdef CONFIG_XEN
-#if 1
 	mov r18=r8;
 	mov r8=r16;
 	XEN_HYPER_THASH;;
 	mov r17=r8;
 	mov r8=r18;;
-#else
-	tak r17=r80				// "privified" thash
-#endif
 #else
 	thash r17=r16				// compute virtual address of L3 PTE
 #endif
@@ -898,15 +890,11 @@ ENTRY(daccess_bit)
 	movl r30=1f				// load continuation point in case of nested fault
 	;;
 #ifdef CONFIG_XEN
-#if 1
 	mov r18=r8;
 	mov r8=r16;
 	XEN_HYPER_THASH;;
 	mov r17=r8;
 	mov r8=r18;;
-#else
-	tak r17=r80				// "privified" thash
-#endif
 #else
 	thash r17=r16				// compute virtual address of L3 PTE
 #endif

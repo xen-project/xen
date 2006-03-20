@@ -37,6 +37,7 @@ struct hvm_domain {
     unsigned int           pae_enabled;
 
     struct hvm_virpit      vpit;
+    u64                    guest_time;
     struct hvm_virpic      vpic;
     struct hvm_vioapic     vioapic;
     struct hvm_io_handler  io_handler;

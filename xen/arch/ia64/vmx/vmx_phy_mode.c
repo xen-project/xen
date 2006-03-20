@@ -104,57 +104,51 @@ physical_mode_init(VCPU *vcpu)
     vcpu->arch.mode_flags = GUEST_IN_PHY;
 }
 
-extern u64 get_mfn(struct domain *d, u64 gpfn);
 extern void vmx_switch_rr7(unsigned long ,shared_info_t*,void *,void *,void *);
-void
-physical_itlb_miss_dom0(VCPU *vcpu, u64 vadr)
+/*void
+physical_itlb_miss(VCPU *vcpu, u64 vadr)
 {
     u64 psr;
     IA64_PSR vpsr;
-    u64 mppn,gppn;
+    u64 xen_mppn,xen_gppn;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
-    gppn=(vadr<<1)>>13;
-    mppn = get_mfn(vcpu->domain,gppn);
-    mppn=(mppn<<12)|(vpsr.cpl<<7); 
-//    if(vadr>>63)
-//       mppn |= PHY_PAGE_UC;
-//    else
-    mppn |= PHY_PAGE_WB;
+    xen_gppn=(vadr<<1)>>(PAGE_SHIFT+1);
+    xen_mppn = gmfn_to_mfn(vcpu->domain, xen_gppn);
+    xen_mppn=(xen_mppn<<PAGE_SHIFT)|(vpsr.cpl<<7);
+    if(vadr>>63)
+        xen_mppn |= PHY_PAGE_UC;
+    else
+        xen_mppn |= PHY_PAGE_WB;
 
     psr=ia64_clear_ic();
-    ia64_itc(1,vadr&(~0xfff),mppn,EMUL_PHY_PAGE_SHIFT);
+    ia64_itc(1,vadr&PAGE_MASK,xen_mppn,PAGE_SHIFT);
     ia64_set_psr(psr);
     ia64_srlz_i();
     return;
 }
 
-
+*/
+/* 
+ *      vec=1, itlb miss
+ *      vec=2, dtlb miss
+ */
 void
-physical_itlb_miss(VCPU *vcpu, u64 vadr)
-{
-        physical_itlb_miss_dom0(vcpu, vadr);
-}
-
-
-void
-physical_dtlb_miss(VCPU *vcpu, u64 vadr)
+physical_tlb_miss(VCPU *vcpu, u64 vadr, u64 vec)
 {
     u64 psr;
     IA64_PSR vpsr;
-    u64 mppn,gppn;
-//    if(vcpu->domain!=dom0)
-//        panic("dom n physical dtlb miss happen\n");
+    u64 xen_mppn,xen_gppn;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
-    gppn=(vadr<<1)>>13;
-    mppn = get_mfn(vcpu->domain, gppn);
-    mppn=(mppn<<12)|(vpsr.cpl<<7);
+    xen_gppn=(vadr<<1)>>(PAGE_SHIFT+1);
+    xen_mppn = gmfn_to_mfn(vcpu->domain, xen_gppn);
+    xen_mppn=(xen_mppn<<PAGE_SHIFT)|(vpsr.cpl<<7);
     if(vadr>>63)
-        mppn |= PHY_PAGE_UC;
+        xen_mppn |= PHY_PAGE_UC;
     else
-        mppn |= PHY_PAGE_WB;
+        xen_mppn |= PHY_PAGE_WB;
 
     psr=ia64_clear_ic();
-    ia64_itc(2,vadr&(~0xfff),mppn,EMUL_PHY_PAGE_SHIFT);
+    ia64_itc(vec,vadr&PAGE_MASK,xen_mppn,PAGE_SHIFT);
     ia64_set_psr(psr);
     ia64_srlz_i();
     return;
@@ -193,13 +187,13 @@ vmx_load_all_rr(VCPU *vcpu)
 	if (is_physical_mode(vcpu)) {
 		if (vcpu->arch.mode_flags & GUEST_PHY_EMUL)
 			panic("Unexpected domain switch in phy emul\n");
-		phy_rr.rrval = vcpu->domain->arch.metaphysical_rr0;
-    	phy_rr.ps = EMUL_PHY_PAGE_SHIFT;
+		phy_rr.rrval = vcpu->arch.metaphysical_rr0;
+ //   	phy_rr.ps = PAGE_SHIFT;
     	phy_rr.ve = 1;
 
 		ia64_set_rr((VRN0 << VRN_SHIFT), phy_rr.rrval);
-		phy_rr.rrval = vcpu->domain->arch.metaphysical_rr4;
-    	phy_rr.ps = EMUL_PHY_PAGE_SHIFT;
+		phy_rr.rrval = vcpu->arch.metaphysical_rr4;
+//    	phy_rr.ps = PAGE_SHIFT;
 	    phy_rr.ve = 1;
 
 		ia64_set_rr((VRN4 << VRN_SHIFT), phy_rr.rrval);
@@ -224,7 +218,7 @@ vmx_load_all_rr(VCPU *vcpu)
     extern void * pal_vaddr;
     vmx_switch_rr7(vmx_vrrtomrr(vcpu,VMX(vcpu, vrr[VRN7])),(void *)vcpu->domain->shared_info,
                 (void *)vcpu->arch.privregs,
-                ( void *)vcpu->arch.vtlb->ts->vhpt->hash, pal_vaddr );
+                (void *)vcpu->arch.vtlb->vhpt->hash, pal_vaddr );
     ia64_set_pta(vcpu->arch.arch_vmx.mpta);
 
 	ia64_srlz_d();
@@ -242,12 +236,12 @@ switch_to_physical_rid(VCPU *vcpu)
     /* Save original virtual mode rr[0] and rr[4] */
     psr=ia64_clear_ic();
     phy_rr.rrval = vcpu->domain->arch.metaphysical_rr0;
-    phy_rr.ps = EMUL_PHY_PAGE_SHIFT;
+//    phy_rr.ps = EMUL_PHY_PAGE_SHIFT;
     phy_rr.ve = 1;
     ia64_set_rr(VRN0<<VRN_SHIFT, phy_rr.rrval);
     ia64_srlz_d();
     phy_rr.rrval = vcpu->domain->arch.metaphysical_rr4;
-    phy_rr.ps = EMUL_PHY_PAGE_SHIFT;
+//    phy_rr.ps = EMUL_PHY_PAGE_SHIFT;
     phy_rr.ve = 1;
     ia64_set_rr(VRN4<<VRN_SHIFT, phy_rr.rrval);
     ia64_srlz_d();
@@ -266,10 +260,10 @@ switch_to_virtual_rid(VCPU *vcpu)
 
     psr=ia64_clear_ic();
 
-    mrr=vmx_vcpu_rr(vcpu,VRN0<<VRN_SHIFT);
+    vcpu_get_rr(vcpu,VRN0<<VRN_SHIFT,&mrr.rrval);
     ia64_set_rr(VRN0<<VRN_SHIFT, vmx_vrrtomrr(vcpu, mrr.rrval));
     ia64_srlz_d();
-    mrr=vmx_vcpu_rr(vcpu,VRN4<<VRN_SHIFT);
+    vcpu_get_rr(vcpu,VRN4<<VRN_SHIFT,&mrr.rrval);
     ia64_set_rr(VRN4<<VRN_SHIFT, vmx_vrrtomrr(vcpu, mrr.rrval));
     ia64_srlz_d();
     ia64_set_psr(psr);

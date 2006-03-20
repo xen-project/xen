@@ -47,7 +47,7 @@ unsigned long dom_pa(unsigned long imva)
 }
 
 // builds a hypercall bundle at domain physical address
-void dom_efi_hypercall_patch(struct domain *d, unsigned long paddr, unsigned long hypercall)
+static void dom_efi_hypercall_patch(struct domain *d, unsigned long paddr, unsigned long hypercall)
 {
 	unsigned long *imva;
 
@@ -96,122 +96,13 @@ unsigned long dom_fw_setup(struct domain *d, char *args, int arglen)
 # define NUM_MEM_DESCS	5
 
 
-#define SECS_PER_HOUR   (60 * 60)
-#define SECS_PER_DAY    (SECS_PER_HOUR * 24)
-
-/* Compute the `struct tm' representation of *T,
-   offset OFFSET seconds east of UTC,
-   and store year, yday, mon, mday, wday, hour, min, sec into *TP.
-   Return nonzero if successful.  */
-int
-offtime (unsigned long t, efi_time_t *tp)
-{
-	const unsigned short int __mon_yday[2][13] =
-	{
-		/* Normal years.  */
-		{ 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365 },
-		/* Leap years.  */
-		{ 0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366 }
-	};
-	long int days, rem, y;
-	const unsigned short int *ip;
-
-	days = t / SECS_PER_DAY;
-	rem = t % SECS_PER_DAY;
-	while (rem < 0) {
-		rem += SECS_PER_DAY;
-		--days;
-	}
-	while (rem >= SECS_PER_DAY) {
-		rem -= SECS_PER_DAY;
-		++days;
-	}
-	tp->hour = rem / SECS_PER_HOUR;
-	rem %= SECS_PER_HOUR;
-	tp->minute = rem / 60;
-	tp->second = rem % 60;
-	/* January 1, 1970 was a Thursday.  */
-	y = 1970;
-
-#	define DIV(a, b) ((a) / (b) - ((a) % (b) < 0))
-#	define LEAPS_THRU_END_OF(y) (DIV (y, 4) - DIV (y, 100) + DIV (y, 400))
-#	define __isleap(year) \
-	  ((year) % 4 == 0 && ((year) % 100 != 0 || (year) % 400 == 0))
-
-	while (days < 0 || days >= (__isleap (y) ? 366 : 365)) {
-		/* Guess a corrected year, assuming 365 days per year.  */
-		long int yg = y + days / 365 - (days % 365 < 0);
-
-		/* Adjust DAYS and Y to match the guessed year.  */
-		days -= ((yg - y) * 365 + LEAPS_THRU_END_OF (yg - 1)
-			 - LEAPS_THRU_END_OF (y - 1));
-		y = yg;
-	}
-	tp->year = y;
-	ip = __mon_yday[__isleap(y)];
-	for (y = 11; days < (long int) ip[y]; --y)
-		continue;
-	days -= ip[y];
-	tp->month = y + 1;
-	tp->day = days + 1;
-	return 1;
-}
-
-/* Macro to emulate SAL call using legacy IN and OUT calls to CF8, CFC etc.. */
-
-#define BUILD_CMD(addr)		((0x80000000 | (addr)) & ~3)
-
-#define REG_OFFSET(addr)	(0x00000000000000FF & (addr))
-#define DEVICE_FUNCTION(addr)	(0x000000000000FF00 & (addr))
-#define BUS_NUMBER(addr)	(0x0000000000FF0000 & (addr))
-
-#ifndef XEN
-static efi_status_t
-fw_efi_get_time (efi_time_t *tm, efi_time_cap_t *tc)
-{
-#if defined(CONFIG_IA64_HP_SIM) || defined(CONFIG_IA64_GENERIC)
-	struct {
-		int tv_sec;	/* must be 32bits to work */
-		int tv_usec;
-	} tv32bits;
-
-	ssc((unsigned long) &tv32bits, 0, 0, 0, SSC_GET_TOD);
-
-	memset(tm, 0, sizeof(*tm));
-	offtime(tv32bits.tv_sec, tm);
-
-	if (tc)
-		memset(tc, 0, sizeof(*tc));
-#else
-#	error Not implemented yet...
-#endif
-	return EFI_SUCCESS;
-}
-
-static void
-efi_reset_system (int reset_type, efi_status_t status, unsigned long data_size, efi_char16_t *data)
-{
-#if defined(CONFIG_IA64_HP_SIM) || defined(CONFIG_IA64_GENERIC)
-	ssc(status, 0, 0, 0, SSC_EXIT);
-#else
-#	error Not implemented yet...
-#endif
-}
-
-static efi_status_t
-efi_unimplemented (void)
-{
-	return EFI_UNSUPPORTED;
-}
-#endif /* !XEN */
-
 struct sal_ret_values
 sal_emulator (long index, unsigned long in1, unsigned long in2,
 	      unsigned long in3, unsigned long in4, unsigned long in5,
 	      unsigned long in6, unsigned long in7)
 {
-	long r9  = 0;
-	long r10 = 0;
+	unsigned long r9  = 0;
+	unsigned long r10 = 0;
 	long r11 = 0;
 	long status;
 
@@ -285,12 +176,11 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 }
 
 struct ia64_pal_retval
-xen_pal_emulator(unsigned long index, unsigned long in1,
-	unsigned long in2, unsigned long in3)
+xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 {
-	long r9  = 0;
-	long r10 = 0;
-	long r11 = 0;
+	unsigned long r9  = 0;
+	unsigned long r10 = 0;
+	unsigned long r11 = 0;
 	long status = -1;
 
 	if (running_on_sim) return pal_emulator_static(index);
@@ -364,7 +254,7 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 				&r10);
 		break;
 	    case PAL_REGISTER_INFO:
-		status = ia64_pal_register_info(in1,&r9,&r10);
+		status = ia64_pal_register_info(in1, &r9, &r10);
 		break;
 	    case PAL_CACHE_FLUSH:
 		/* FIXME */
@@ -434,7 +324,7 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 
 #define NFUNCPTRS 20
 
-void print_md(efi_memory_desc_t *md)
+static void print_md(efi_memory_desc_t *md)
 {
 #if 1
 	printk("domain mem: type=%u, attr=0x%lx, range=[0x%016lx-0x%016lx) (%luMB)\n",
@@ -496,7 +386,7 @@ acpi_update_madt_checksum (unsigned long phys_addr, unsigned long size)
 }
 
 /* base is physical address of acpi table */
-void touch_acpi_table(void)
+static void touch_acpi_table(void)
 {
 	if (acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_update_lsapic, 0) < 0)
 		printk("Error parsing MADT - no LAPIC entires\n");
@@ -514,15 +404,15 @@ struct fake_acpi_tables {
 	struct acpi_table_header dsdt;
 	u8 aml[16];
 	struct acpi_table_madt madt;
-	struct acpi_table_lsapic lsapic;
+	struct acpi_table_lsapic lsapic[MAX_VIRT_CPUS];
 	u8 pm1a_evt_blk[4];
 	u8 pm1a_cnt_blk[1];
 	u8 pm_tmr_blk[4];
 };
 
 /* Create enough of an ACPI structure to make the guest OS ACPI happy. */
-void
-dom_fw_fake_acpi(struct fake_acpi_tables *tables)
+static void
+dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 {
 	struct acpi20_table_rsdp *rsdp = &tables->rsdp;
 	struct xsdt_descriptor_rev2 *xsdt = &tables->xsdt;
@@ -530,7 +420,8 @@ dom_fw_fake_acpi(struct fake_acpi_tables *tables)
 	struct facs_descriptor_rev2 *facs = &tables->facs;
 	struct acpi_table_header *dsdt = &tables->dsdt;
 	struct acpi_table_madt *madt = &tables->madt;
-	struct acpi_table_lsapic *lsapic = &tables->lsapic;
+	struct acpi_table_lsapic *lsapic = tables->lsapic;
+	int i;
 
 	memset(tables, 0, sizeof(struct fake_acpi_tables));
 
@@ -608,13 +499,13 @@ dom_fw_fake_acpi(struct fake_acpi_tables *tables)
 	/* Trivial namespace, avoids ACPI CA complaints */
 	tables->aml[0] = 0x10; /* Scope */
 	tables->aml[1] = 0x12; /* length/offset to next object */
-	strncpy(&tables->aml[2], "_SB_", 4);
+	strncpy((char *)&tables->aml[2], "_SB_", 4);
 
 	/* The processor object isn't absolutely necessary, revist for SMP */
 	tables->aml[6] = 0x5b; /* processor object */
 	tables->aml[7] = 0x83;
 	tables->aml[8] = 0x0b; /* next */
-	strncpy(&tables->aml[9], "CPU0", 4);
+	strncpy((char *)&tables->aml[9], "CPU0", 4);
 
 	dsdt->checksum = generate_acpi_checksum(dsdt, dsdt->length);
 
@@ -622,16 +513,20 @@ dom_fw_fake_acpi(struct fake_acpi_tables *tables)
 	strncpy(madt->header.signature, APIC_SIG, 4);
 	madt->header.revision = 2;
 	madt->header.length = sizeof(struct acpi_table_madt) +
-	                      sizeof(struct acpi_table_lsapic);
+		MAX_VIRT_CPUS * sizeof(struct acpi_table_lsapic);
 	strcpy(madt->header.oem_id, "XEN");
 	strcpy(madt->header.oem_table_id, "Xen/ia64");
 	strcpy(madt->header.asl_compiler_id, "XEN");
 	madt->header.asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
 
-	/* A single LSAPIC entry describes the CPU.  Revisit for SMP guests */
-	lsapic->header.type = ACPI_MADT_LSAPIC;
-	lsapic->header.length = sizeof(struct acpi_table_lsapic);
-	lsapic->flags.enabled = 1;
+	/* An LSAPIC entry describes a CPU.  */
+	for (i = 0; i < MAX_VIRT_CPUS; i++) {
+		lsapic[i].header.type = ACPI_MADT_LSAPIC;
+		lsapic[i].header.length = sizeof(struct acpi_table_lsapic);
+		lsapic[i].id = i;
+		lsapic[i].eid = 0;
+		lsapic[i].flags.enabled = (d->vcpu[i] != NULL);
+	}
 
 	madt->header.checksum = generate_acpi_checksum(madt,
 	                                               madt->header.length);
@@ -785,7 +680,7 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 
 			acpi_tables = (void *)cp;
 			cp += sizeof(struct fake_acpi_tables);
-			dom_fw_fake_acpi(acpi_tables);
+			dom_fw_fake_acpi(d, acpi_tables);
 
 			efi_tables[i].guid = ACPI_20_TABLE_GUID;
 			efi_tables[i].table = dom_pa((unsigned long) acpi_tables);
@@ -801,8 +696,8 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 	sal_systab->sal_rev_major = 0;
 	sal_systab->entry_count = 1;
 
-	strcpy(sal_systab->oem_id, "Xen/ia64");
-	strcpy(sal_systab->product_id, "Xen/ia64");
+	strcpy((char *)sal_systab->oem_id, "Xen/ia64");
+	strcpy((char *)sal_systab->product_id, "Xen/ia64");
 
 	/* fill in an entry point: */
 	sal_ed->type = SAL_DESC_ENTRY_POINT;
@@ -861,7 +756,10 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 		/* hypercall patches live here, masquerade as reserved PAL memory */
 		MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB,HYPERCALL_START,HYPERCALL_END, 1);
 		MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,HYPERCALL_END,maxmem, 1);
-		MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
+		/* Create a dummy entry for IO ports, so that IO accesses are
+		   trapped by Xen.  */
+		MAKE_MD(EFI_MEMORY_MAPPED_IO_PORT_SPACE,EFI_MEMORY_UC,
+			0x00000ffffc000000, 0x00000fffffffffff, 1);
 		MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
 	}
 

@@ -33,6 +33,11 @@
 #define	XEN_HYPER_GET_RR		break 0x10
 #define	XEN_HYPER_SET_RR		break 0x11
 #define	XEN_HYPER_SET_KR		break 0x12
+#define	XEN_HYPER_FC			break 0x13
+#define	XEN_HYPER_GET_CPUID		break 0x14
+#define	XEN_HYPER_GET_PMD		break 0x15
+#define	XEN_HYPER_GET_EFLAG		break 0x16
+#define	XEN_HYPER_SET_EFLAG		break 0x17
 #endif
 
 #ifndef __ASSEMBLY__

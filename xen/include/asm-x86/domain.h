@@ -124,6 +124,9 @@ struct arch_vcpu
 
     void (*schedule_tail) (struct vcpu *);
 
+    void (*ctxt_switch_from) (struct vcpu *);
+    void (*ctxt_switch_to) (struct vcpu *);
+
     /* Bounce information for propagating an exception to guest OS. */
     struct trap_bounce trap_bounce;
 

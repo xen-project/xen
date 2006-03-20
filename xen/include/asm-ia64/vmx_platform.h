@@ -22,7 +22,6 @@
 #include <public/xen.h>
 #include <public/arch-ia64.h>
 #include <asm/hvm/vioapic.h>
-
 struct mmio_list;
 typedef struct virtual_platform_def {
     unsigned long       shared_page_va;
@@ -51,9 +50,8 @@ typedef struct vlapic {
 } vlapic_t;
 
 extern uint64_t dummy_tmr[];
-#define VCPU(_v,_x)	_v->arch.privregs->_x
-#define VLAPIC_ID(l) (uint16_t)(VCPU((l)->vcpu, lid) >> 16)
-#define VLAPIC_IRR(l) VCPU((l)->vcpu, irr[0])
+#define VLAPIC_ID(l) (uint16_t)(((l)->vcpu->arch.privregs->lid) >> 16)
+#define VLAPIC_IRR(l) ((l)->vcpu->arch.privregs->irr[0])
 struct vlapic* apic_round_robin(struct domain *d, uint8_t dest_mode, uint8_t vector, uint32_t bitmap);
 extern int vmx_vcpu_pend_interrupt(struct vcpu *vcpu, uint8_t vector);
 static inline int vlapic_set_irq(struct vlapic *t, uint8_t vec, uint8_t trig)

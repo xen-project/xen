@@ -33,6 +33,7 @@
 #include <asm/mm.h>
 #include <asm/vmx.h>
 #include <public/event_channel.h>
+#include <linux/event.h>
 
 /*
 struct mmio_list *lookup_mmio(u64 gpa, struct mmio_list *mio_base)

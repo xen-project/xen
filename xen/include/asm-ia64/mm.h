@@ -10,8 +10,6 @@
 #include <xen/perfc.h>
 #include <xen/sched.h>
 
-#include <linux/rbtree.h>
-
 #include <asm/processor.h>
 #include <asm/atomic.h>
 #include <asm/flushtlb.h>
@@ -36,13 +34,10 @@ typedef unsigned long page_flags_t;
 
 #define PRtype_info "08x"
 
-struct page
+struct page_info
 {
     /* Each frame can be threaded onto a doubly-linked list. */
     struct list_head list;
-
-    /* Timestamp from 'TLB clock', used to reduce need for safety flushes. */
-    u32 tlbflush_timestamp;
 
     /* Reference count and various PGC_xxx flags and fields. */
     u32 count_info;
@@ -50,23 +45,27 @@ struct page
     /* Context-dependent fields follow... */
     union {
 
-        /* Page is in use by a domain. */
+        /* Page is in use: ((count_info & PGC_count_mask) != 0). */
         struct {
-            /* Owner of this page. */
-            u32	_domain;
+            /* Owner of this page (NULL if page is anonymous). */
+            u32 _domain; /* pickled format */
             /* Type reference count and various PGT_xxx flags and fields. */
-            u32 type_info;
-        } inuse;
+            unsigned long type_info;
+        } __attribute__ ((packed)) inuse;
 
-        /* Page is on a free list. */
+        /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
         struct {
+            /* Order-size of the free chunk this page is the head of. */
+            u32 order;
             /* Mask of possibly-tainted TLBs. */
             cpumask_t cpumask;
-            /* Order-size of the free chunk this page is the head of. */
-            u8 order;
-        } free;
+        } __attribute__ ((packed)) free;
 
     } u;
+
+    /* Timestamp from 'TLB clock', used to reduce need for safety flushes. */
+    u32 tlbflush_timestamp;
+
 #if 0
 // following added for Linux compiling
     page_flags_t flags;
@@ -77,34 +76,46 @@ struct page
 
 #define set_page_count(p,v) 	atomic_set(&(p)->_count, v - 1)
 
-/* Still small set of flags defined by far on IA-64 */
+/*
+ * Still small set of flags defined by far on IA-64.
+ * IA-64 should make it a definition same as x86_64.
+ */
 /* The following page types are MUTUALLY EXCLUSIVE. */
 #define PGT_none            (0<<29) /* no special uses of this page */
 #define PGT_l1_page_table   (1<<29) /* using this page as an L1 page table? */
 #define PGT_l2_page_table   (2<<29) /* using this page as an L2 page table? */
 #define PGT_l3_page_table   (3<<29) /* using this page as an L3 page table? */
 #define PGT_l4_page_table   (4<<29) /* using this page as an L4 page table? */
-#define PGT_writable_page   (5<<29) /* has writable mappings of this page? */
-#define PGT_type_mask       (5<<29) /* Bits 29-31. */
+ /* Value 5 reserved. See asm-x86/mm.h */
+ /* Value 6 reserved. See asm-x86/mm.h */
+#define PGT_writable_page   (7<<29) /* has writable mappings of this page? */
+#define PGT_type_mask       (7<<29) /* Bits 29-31. */
 
  /* Has this page been validated for use as its current type? */
 #define _PGT_validated      28
 #define PGT_validated       (1<<_PGT_validated)
-/* Owning guest has pinned this page to its current type? */
+ /* Owning guest has pinned this page to its current type? */
 #define _PGT_pinned         27
 #define PGT_pinned          (1U<<_PGT_pinned)
 
-/* 27-bit count of uses of this frame as its current type. */
-#define PGT_count_mask      ((1U<<27)-1)
+ /* The 27 most significant bits of virt address if this is a page table. */
+#define PGT_va_shift        32
+#define PGT_va_mask         ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
+ /* Is the back pointer still mutable (i.e. not fixed yet)? */
+#define PGT_va_mutable      ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
+ /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
+#define PGT_va_unknown      ((unsigned long)((1U<<28)-2)<<PGT_va_shift)
 
-/* Cleared when the owning guest 'frees' this page. */
+ /* 16-bit count of uses of this frame as its current type. */
+#define PGT_count_mask      ((1U<<16)-1)
+
+ /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated      31
 #define PGC_allocated       (1U<<_PGC_allocated)
-/* Set when the page is used as a page table */
-#define _PGC_page_table     30
-#define PGC_page_table      (1U<<_PGC_page_table)
-/* 30-bit count of references to this frame. */
-#define PGC_count_mask      ((1U<<30)-1)
+ /* Bit 30 reserved. See asm-x86/mm.h */
+ /* Bit 29 reserved. See asm-x86/mm.h */
+ /* 29-bit count of references to this frame. */
+#define PGC_count_mask      ((1U<<29)-1)
 
 #define IS_XEN_HEAP_FRAME(_pfn) ((page_to_maddr(_pfn) < xenheap_phys_end) \
 				 && (page_to_maddr(_pfn) >= xen_pstart))
@@ -139,7 +150,6 @@ extern unsigned long gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
 
 static inline void put_page(struct page_info *page)
 {
-#ifdef VALIDATE_VT	// doesn't work with non-VTI in grant tables yet
     u32 nx, x, y = page->count_info;
 
     do {
@@ -150,14 +160,12 @@ static inline void put_page(struct page_info *page)
 
     if (unlikely((nx & PGC_count_mask) == 0))
 	free_domheap_page(page);
-#endif
 }
 
 /* count_info and ownership are checked atomically. */
 static inline int get_page(struct page_info *page,
                            struct domain *domain)
 {
-#ifdef VALIDATE_VT
     u64 x, nx, y = *((u64*)&page->count_info);
     u32 _domain = pickle_domptr(domain);
 
@@ -173,14 +181,13 @@ static inline int get_page(struct page_info *page,
 	    return 0;
 	}
     }
-    while(unlikely(y = cmpxchg(&page->count_info, x, nx)) != x);
-#endif
+    while(unlikely((y = cmpxchg((u64*)&page->count_info, x, nx)) != x));
     return 1;
 }
 
-/* No type info now */
-#define put_page_type(page)
-#define get_page_type(page, type) 1
+extern void put_page_type(struct page_info *page);
+extern int get_page_type(struct page_info *page, u32 type);
+
 static inline void put_page_and_type(struct page_info *page)
 {
     put_page_type(page);
@@ -219,7 +226,7 @@ void memguard_unguard_range(void *p, unsigned long l);
 
 // prototype of misc memory stuff
 //unsigned long __get_free_pages(unsigned int mask, unsigned int order);
-//void __free_pages(struct page *page, unsigned int order);
+//void __free_pages(struct page_info *page, unsigned int order);
 void *pgtable_quicklist_alloc(void);
 void pgtable_quicklist_free(void *pgtable_entry);
 
@@ -339,11 +346,11 @@ struct vm_area_struct {
 #define NODEZONE_SHIFT (sizeof(page_flags_t)*8 - MAX_NODES_SHIFT - MAX_ZONES_SHIFT)
 #define NODEZONE(node, zone)	((node << ZONES_SHIFT) | zone)
 
-static inline unsigned long page_zonenum(struct page *page)
+static inline unsigned long page_zonenum(struct page_info *page)
 {
 	return (page->flags >> NODEZONE_SHIFT) & (~(~0UL << ZONES_SHIFT));
 }
-static inline unsigned long page_to_nid(struct page *page)
+static inline unsigned long page_to_nid(struct page_info *page)
 {
 	return (page->flags >> (NODEZONE_SHIFT + ZONES_SHIFT));
 }
@@ -351,12 +358,12 @@ static inline unsigned long page_to_nid(struct page *page)
 struct zone;
 extern struct zone *zone_table[];
 
-static inline struct zone *page_zone(struct page *page)
+static inline struct zone *page_zone(struct page_info *page)
 {
 	return zone_table[page->flags >> NODEZONE_SHIFT];
 }
 
-static inline void set_page_zone(struct page *page, unsigned long nodezone_num)
+static inline void set_page_zone(struct page_info *page, unsigned long nodezone_num)
 {
 	page->flags &= ~(~0UL << NODEZONE_SHIFT);
 	page->flags |= nodezone_num << NODEZONE_SHIFT;
@@ -367,7 +374,7 @@ static inline void set_page_zone(struct page *page, unsigned long nodezone_num)
 extern unsigned long max_mapnr;
 #endif
 
-static inline void *lowmem_page_address(struct page *page)
+static inline void *lowmem_page_address(struct page_info *page)
 {
 	return __va(page_to_mfn(page) << PAGE_SHIFT);
 }
@@ -386,8 +393,8 @@ static inline void *lowmem_page_address(struct page *page)
 #endif
 
 #if defined(HASHED_PAGE_VIRTUAL)
-void *page_address(struct page *page);
-void set_page_address(struct page *page, void *virtual);
+void *page_address(struct page_info *page);
+void set_page_address(struct page_info *page, void *virtual);
 void page_address_init(void);
 #endif
 
@@ -400,7 +407,7 @@ void page_address_init(void);
 
 #ifndef CONFIG_DEBUG_PAGEALLOC
 static inline void
-kernel_map_pages(struct page *page, int numpages, int enable)
+kernel_map_pages(struct page_info *page, int numpages, int enable)
 {
 }
 #endif
@@ -415,8 +422,8 @@ extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
 #undef machine_to_phys_mapping
 #define machine_to_phys_mapping	mpt_table
 
-#define INVALID_M2P_ENTRY        (~0U)
-#define VALID_M2P(_e)            (!((_e) & (1U<<63)))
+#define INVALID_M2P_ENTRY        (~0UL)
+#define VALID_M2P(_e)            (!((_e) & (1UL<<63)))
 #define IS_INVALID_M2P_ENTRY(_e) (!VALID_M2P(_e))
 
 #define set_gpfn_from_mfn(mfn, pfn) (machine_to_phys_mapping[(mfn)] = (pfn))
@@ -463,4 +470,6 @@ extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
 /* Arch-specific portion of memory_op hypercall. */
 #define arch_memory_op(op, arg) (-ENOSYS)
 
+extern void assign_domain_page(struct domain *d, unsigned long mpaddr,
+			       unsigned long physaddr);
 #endif /* __ASM_IA64_MM_H__ */

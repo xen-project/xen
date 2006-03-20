@@ -40,20 +40,33 @@
 
 #define BSP_CPU(v)    (!(v->vcpu_id))
 
-void vmx_set_tsc_shift(struct vcpu *v, struct hvm_virpit *vpit)
+static inline 
+void __set_tsc_offset(u64  offset)
 {
-    u64   drift;
-
-    if ( vpit->first_injected )
-        drift = vpit->period_cycles * vpit->pending_intr_nr;
-    else 
-        drift = 0;
-    vpit->shift = v->arch.hvm_vmx.tsc_offset - drift;
-    __vmwrite(TSC_OFFSET, vpit->shift);
-
+    __vmwrite(TSC_OFFSET, offset);
 #if defined (__i386__)
-    __vmwrite(TSC_OFFSET_HIGH, ((vpit->shift)>> 32));
+    __vmwrite(TSC_OFFSET_HIGH, offset >> 32);
 #endif
+}
+
+u64 get_guest_time(struct vcpu *v)
+{
+    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
+    u64    host_tsc;
+    
+    rdtscll(host_tsc);
+    return host_tsc + vpit->cache_tsc_offset;
+}
+
+void set_guest_time(struct vcpu *v, u64 gtime)
+{
+    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
+    u64    host_tsc;
+   
+    rdtscll(host_tsc);
+    
+    vpit->cache_tsc_offset = gtime - host_tsc;
+    __set_tsc_offset(vpit->cache_tsc_offset);
 }
 
 static inline void
@@ -64,6 +77,7 @@ interrupt_post_injection(struct vcpu * v, int vector, int type)
     if ( is_pit_irq(v, vector, type) ) {
         if ( !vpit->first_injected ) {
             vpit->pending_intr_nr = 0;
+            vpit->last_pit_gtime = get_guest_time(v);
             vpit->scheduled = NOW() + vpit->period;
             set_timer(&vpit->pit_timer, vpit->scheduled);
             vpit->first_injected = 1;
@@ -71,7 +85,9 @@ interrupt_post_injection(struct vcpu * v, int vector, int type)
             vpit->pending_intr_nr--;
         }
         vpit->inject_point = NOW();
-        vmx_set_tsc_shift (v, vpit);
+
+        vpit->last_pit_gtime += vpit->period;
+        set_guest_time(v, vpit->last_pit_gtime);
     }
 
     switch(type)
@@ -189,14 +205,15 @@ void vmx_do_resume(struct vcpu *v)
 
     vmx_stts();
 
+    /* pick up the elapsed PIT ticks and re-enable pit_timer */
+    if ( vpit->first_injected) {
+        set_guest_time(v, v->domain->arch.hvm_domain.guest_time);
+        pickup_deactive_ticks(vpit);
+    }
+
     if ( test_bit(iopacket_port(v), &d->shared_info->evtchn_pending[0]) ||
          test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags) )
         hvm_wait_io();
-
-    /* pick up the elapsed PIT ticks and re-enable pit_timer */
-    if ( vpit->first_injected )
-        pickup_deactive_ticks(vpit);
-    vmx_set_tsc_shift(v, vpit);
 
     /* We can't resume the guest if we're waiting on I/O */
     ASSERT(!test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags));

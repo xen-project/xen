@@ -7,7 +7,6 @@
 //#include "thread.h"
 #include <asm/ia64_int.h>
 #include <public/arch-ia64.h>
-
 typedef	unsigned long UINT64;
 typedef	unsigned int UINT;
 typedef	int BOOLEAN;
@@ -16,7 +15,10 @@ typedef	struct vcpu VCPU;
 
 typedef cpu_user_regs_t REGS;
 
-#define VCPU(_v,_x)	_v->arch.privregs->_x
+
+#define VCPU(_v,_x)	(_v->arch.privregs->_x)
+#define PSCB(_v,_x) VCPU(_v,_x)
+#define PSCBX(_v,_x) (_v->arch._x)
 
 #define PRIVOP_ADDR_COUNT
 #ifdef PRIVOP_ADDR_COUNT
@@ -140,7 +142,9 @@ extern IA64FAULT vcpu_ptc_g(VCPU *vcpu, UINT64 vadr, UINT64 addr_range);
 extern IA64FAULT vcpu_ptc_ga(VCPU *vcpu, UINT64 vadr, UINT64 addr_range);
 extern IA64FAULT vcpu_ptr_d(VCPU *vcpu,UINT64 vadr, UINT64 addr_range);
 extern IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr, UINT64 addr_range);
-extern IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir, UINT64 *iha);
+extern IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address,
+				BOOLEAN is_data, BOOLEAN in_tpa,
+				UINT64 *pteval, UINT64 *itir, UINT64 *iha);
 extern IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr);
 extern IA64FAULT vcpu_force_data_miss(VCPU *vcpu, UINT64 ifa);
 extern IA64FAULT vcpu_fc(VCPU *vcpu, UINT64 vadr);
@@ -172,5 +176,19 @@ itir_mask(UINT64 itir)
 {
     return (~((1UL << itir_ps(itir)) - 1));
 }
+
+#define verbose(a...) do {if (vcpu_verbose) printf(a);} while(0)
+
+//#define vcpu_quick_region_check(_tr_regions,_ifa) 1
+#define vcpu_quick_region_check(_tr_regions,_ifa)           \
+    (_tr_regions & (1 << ((unsigned long)_ifa >> 61)))
+#define vcpu_quick_region_set(_tr_regions,_ifa)             \
+    do {_tr_regions |= (1 << ((unsigned long)_ifa >> 61)); } while (0)
+
+// FIXME: also need to check && (!trp->key || vcpu_pkr_match(trp->key))
+#define vcpu_match_tr_entry(_trp,_ifa,_rid)             \
+    ((_trp->p && (_trp->rid==_rid) && (_ifa >= _trp->vadr) &&   \
+    (_ifa < (_trp->vadr + (1L<< _trp->ps)) - 1)))
+
 
 #endif
