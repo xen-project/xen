@@ -70,7 +70,7 @@ pristine-%/.valid-pristine: %.tar.bz2
 	rm -rf tmp-pristine-$* $(@D)
 	mkdir -p tmp-pristine-$*
 	tar -C tmp-pristine-$* -jxf $<
-	-@rm tmp-pristine-$*/pax_global_header
+	-@rm -f tmp-pristine-$*/pax_global_header
 	mv tmp-pristine-$*/* $(@D)
 	@rm -rf tmp-pristine-$*
 	touch $(@D)/.hgskip

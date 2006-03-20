@@ -1,6 +1,6 @@
-diff -pruN ../pristine-linux-2.6.16-rc6/arch/i386/kernel/traps.c ./arch/i386/kernel/traps.c
---- ../pristine-linux-2.6.16-rc6/arch/i386/kernel/traps.c	2006-03-17 22:59:01.000000000 +0000
-+++ ./arch/i386/kernel/traps.c	2006-03-17 23:04:16.000000000 +0000
+diff -pruN ../pristine-linux-2.6.16/arch/i386/kernel/traps.c ./arch/i386/kernel/traps.c
+--- ../pristine-linux-2.6.16/arch/i386/kernel/traps.c	2006-03-20 05:53:29.000000000 +0000
++++ ./arch/i386/kernel/traps.c	2006-03-20 19:38:17.000000000 +0000
 @@ -567,18 +567,11 @@ static void mem_parity_error(unsigned ch
  
  static void io_check_error(unsigned char reason, struct pt_regs * regs)
@@ -21,9 +21,9 @@ diff -pruN ../pristine-linux-2.6.16-rc6/arch/i386/kernel/traps.c ./arch/i386/ker
  }
  
  static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
-diff -pruN ../pristine-linux-2.6.16-rc6/include/asm-i386/mach-default/mach_traps.h ./include/asm-i386/mach-default/mach_traps.h
---- ../pristine-linux-2.6.16-rc6/include/asm-i386/mach-default/mach_traps.h	2006-01-03 03:21:10.000000000 +0000
-+++ ./include/asm-i386/mach-default/mach_traps.h	2006-03-17 23:04:16.000000000 +0000
+diff -pruN ../pristine-linux-2.6.16/include/asm-i386/mach-default/mach_traps.h ./include/asm-i386/mach-default/mach_traps.h
+--- ../pristine-linux-2.6.16/include/asm-i386/mach-default/mach_traps.h	2006-03-20 05:53:29.000000000 +0000
++++ ./include/asm-i386/mach-default/mach_traps.h	2006-03-20 19:38:17.000000000 +0000
 @@ -15,6 +15,18 @@ static inline void clear_mem_error(unsig
  	outb(reason, 0x61);
  }
