@@ -91,10 +91,6 @@ gopts.opt('config', short='F', val='FILE',
           SXP configurations can be hand-written or generated from Python configuration
           scripts, using the -n (dryrun) option to print the configuration.""")
 
-gopts.opt('load', short='L', val='FILE',
-          fn=set_value, default=None,
-          use='Domain saved state to load.')
-
 gopts.opt('dryrun', short='n',
           fn=set_true, default=0,
           use="""Dry run - print the configuration but don't create the domain.
@@ -819,11 +815,7 @@ def make_domain(opts, config):
     """
 
     try:
-        if opts.vals.load:
-            filename = os.path.abspath(opts.vals.load)
-            dominfo = server.xend_domain_restore(filename, config)
-        else:
-            dominfo = server.xend_domain_create(config)
+        dominfo = server.xend_domain_create(config)
     except XendError, ex:
         import signal
         if vncpid:
