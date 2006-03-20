@@ -5,7 +5,6 @@
 #include <asm/genapic.h>
 
 #define GET_APIC_ID (genapic->get_apic_id)
-#define APIC_ID_MASK (genapic->apic_id_mask)
 #endif
 
 #endif

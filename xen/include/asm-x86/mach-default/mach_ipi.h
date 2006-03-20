@@ -4,9 +4,30 @@
 void send_IPI_mask_bitmask(cpumask_t mask, int vector);
 void __send_IPI_shortcut(unsigned int shortcut, int vector);
 
+extern int no_broadcast;
+
 static inline void send_IPI_mask(cpumask_t mask, int vector)
 {
 	send_IPI_mask_bitmask(mask, vector);
+}
+
+static inline void __local_send_IPI_allbutself(int vector)
+{
+	if (no_broadcast) {
+		cpumask_t mask = cpu_online_map;
+
+		cpu_clear(smp_processor_id(), mask);
+		send_IPI_mask(mask, vector);
+	} else
+		__send_IPI_shortcut(APIC_DEST_ALLBUT, vector);
+}
+
+static inline void __local_send_IPI_all(int vector)
+{
+	if (no_broadcast)
+		send_IPI_mask(cpu_online_map, vector);
+	else
+		__send_IPI_shortcut(APIC_DEST_ALLINC, vector);
 }
 
 static inline void send_IPI_allbutself(int vector)
@@ -18,13 +39,13 @@ static inline void send_IPI_allbutself(int vector)
 	if (!(num_online_cpus() > 1))
 		return;
 
-	__send_IPI_shortcut(APIC_DEST_ALLBUT, vector);
+	__local_send_IPI_allbutself(vector);
 	return;
 }
 
 static inline void send_IPI_all(int vector)
 {
-	__send_IPI_shortcut(APIC_DEST_ALLINC, vector);
+	__local_send_IPI_all(vector);
 }
 
 #endif /* __ASM_MACH_IPI_H */

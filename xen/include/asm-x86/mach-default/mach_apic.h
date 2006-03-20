@@ -60,11 +60,6 @@ static inline void clustered_apic_check(void)
 					"Flat", nr_ioapics);
 }
 
-static inline int multi_timer_check(int apic, int irq)
-{
-	return 0;
-}
-
 static inline int apicid_to_node(int logical_apicid)
 {
 	return 0;
@@ -87,21 +82,6 @@ static inline int cpu_present_to_apicid(int mps_cpu)
 static inline physid_mask_t apicid_to_cpu_present(int phys_apicid)
 {
 	return physid_mask_of_physid(phys_apicid);
-}
-
-static inline int mpc_apic_id(struct mpc_config_processor *m, 
-			struct mpc_config_translation *translation_record)
-{
-	printk("Processor #%d %d:%d APIC version %d\n",
-			m->mpc_apicid,
-			(m->mpc_cpufeature & CPU_FAMILY_MASK) >> 8,
-			(m->mpc_cpufeature & CPU_MODEL_MASK) >> 4,
-			m->mpc_apicver);
-	return (m->mpc_apicid);
-}
-
-static inline void setup_portio_remap(void)
-{
 }
 
 static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)

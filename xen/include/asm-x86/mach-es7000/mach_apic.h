@@ -89,11 +89,6 @@ static inline void clustered_apic_check(void)
 		"Physical Cluster" : "Logical Cluster", nr_ioapics, cpus_addr(TARGET_CPUS)[0]);
 }
 
-static inline int multi_timer_check(int apic, int irq)
-{
-	return 0;
-}
-
 static inline int apicid_to_node(int logical_apicid)
 {
 	return 0;
@@ -128,25 +123,10 @@ static inline int cpu_to_logical_apicid(int cpu)
        return (int)cpu_2_logical_apicid[cpu];
 }
 
-static inline int mpc_apic_id(struct mpc_config_processor *m, struct mpc_config_translation *unused)
-{
-	printk("Processor #%d %d:%d APIC version %d\n",
-	        m->mpc_apicid,
-	        (m->mpc_cpufeature & CPU_FAMILY_MASK) >> 8,
-	        (m->mpc_cpufeature & CPU_MODEL_MASK) >> 4,
-	        m->mpc_apicver);
-	return (m->mpc_apicid);
-}
-
 static inline physid_mask_t ioapic_phys_id_map(physid_mask_t phys_map)
 {
 	/* For clustered we don't have a good way to do this yet - hack */
 	return physids_promote(0xff);
-}
-
-
-static inline void setup_portio_remap(void)
-{
 }
 
 extern unsigned int boot_cpu_physical_apicid;

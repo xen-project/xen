@@ -34,23 +34,13 @@ struct genapic {
 	physid_mask_t (*ioapic_phys_id_map)(physid_mask_t map);
 
 	void (*clustered_apic_check)(void);
-	int (*multi_timer_check)(int apic, int irq);
 	int (*apicid_to_node)(int logical_apicid); 
 	int (*cpu_to_logical_apicid)(int cpu);
 	int (*cpu_present_to_apicid)(int mps_cpu);
 	physid_mask_t (*apicid_to_cpu_present)(int phys_apicid);
-	int (*mpc_apic_id)(struct mpc_config_processor *m, 
-			   struct mpc_config_translation *t); 
-	void (*setup_portio_remap)(void); 
 	int (*check_phys_apicid_present)(int boot_cpu_physical_apicid);
 	void (*enable_apic_mode)(void);
 	u32 (*phys_pkg_id)(u32 cpuid_apic, int index_msb);
-
-	/* mpparse */
-	void (*mpc_oem_bus_info)(struct mpc_config_bus *, char *, 
-				 struct mpc_config_translation *);
-	void (*mpc_oem_pci_bus)(struct mpc_config_bus *, 
-				struct mpc_config_translation *); 
 
 	/* When one of the next two hooks returns 1 the genapic
 	   is switched to this. Essentially they are additional probe 
@@ -60,7 +50,6 @@ struct genapic {
 	int (*acpi_madt_oem_check)(char *oem_id, char *oem_table_id);
 
 	unsigned (*get_apic_id)(unsigned long x);
-	unsigned long apic_id_mask;
 	unsigned int (*cpu_mask_to_apicid)(cpumask_t cpumask);
 	
 	/* ipi */
@@ -86,19 +75,13 @@ struct genapic {
 	APICFUNC(init_apic_ldr), \
 	APICFUNC(ioapic_phys_id_map), \
 	APICFUNC(clustered_apic_check), \
-	APICFUNC(multi_timer_check), \
 	APICFUNC(apicid_to_node), \
 	APICFUNC(cpu_to_logical_apicid), \
 	APICFUNC(cpu_present_to_apicid), \
 	APICFUNC(apicid_to_cpu_present), \
-	APICFUNC(mpc_apic_id), \
-	APICFUNC(setup_portio_remap), \
 	APICFUNC(check_phys_apicid_present), \
-	APICFUNC(mpc_oem_bus_info), \
-	APICFUNC(mpc_oem_pci_bus), \
 	APICFUNC(mps_oem_check), \
 	APICFUNC(get_apic_id), \
-	.apic_id_mask = APIC_ID_MASK, \
 	APICFUNC(cpu_mask_to_apicid), \
 	APICFUNC(acpi_madt_oem_check), \
 	APICFUNC(send_IPI_mask), \
