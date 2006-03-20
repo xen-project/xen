@@ -35,7 +35,11 @@
 
 #include <asm/asmmacro.h>
 #include <asm/cache.h>
+#ifdef XEN
+#include <xen/errno.h>
+#else
 #include <asm/errno.h>
+#endif
 #include <asm/kregs.h>
 #include <asm/offsets.h>
 #include <asm/pgtable.h>

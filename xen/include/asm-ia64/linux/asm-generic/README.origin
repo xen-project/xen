@@ -4,10 +4,7 @@
 # needs to be changed, move it to ../linux-xen and follow
 # the instructions in the README there.
 
-bug.h			-> linux/include/asm-generic/bug.h
 div64.h			-> linux/include/asm-generic/div64.h
-errno-base.h		-> linux/include/asm-generic/errno-base.h
-errno.h			-> linux/include/asm-generic/errno.h
 ide_iops.h		-> linux/include/asm-generic/ide_iops.h
 iomap.h			-> linux/include/asm-generic/iomap.h
 pci.h			-> linux/include/asm-generic/pci.h

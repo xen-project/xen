@@ -70,7 +70,11 @@
 #include <asm/system.h>
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
+#ifdef XEN
+#include <xen/errno.h>
+#else
 #include <asm/errno.h>
+#endif
 
 #if 1
 # define PSR_DEFAULT_BITS	psr.ac

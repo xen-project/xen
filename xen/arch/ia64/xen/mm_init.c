@@ -219,6 +219,7 @@ update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte)
 }
 #endif
 
+#if 0
 inline void
 ia64_set_rbs_bot (void)
 {
@@ -232,6 +233,7 @@ ia64_set_rbs_bot (void)
 		stack_size = MAX_USER_STACK_SIZE;
 	current->arch._thread.rbs_bot = STACK_TOP - stack_size;
 }
+#endif
 
 /*
  * This performs some platform-dependent address space initialization.
@@ -239,6 +241,7 @@ ia64_set_rbs_bot (void)
  * store (which grows upwards) and install the gateway page which is
  * used for signal trampolines, etc.
  */
+#if 0
 void
 ia64_init_addr_space (void)
 {
@@ -279,6 +282,7 @@ printf("ia64_init_addr_space: called, not implemented\n");
 	}
 #endif
 }
+#endif
 
 void setup_gate (void)
 {

@@ -7,9 +7,7 @@
 bcd.h			-> linux/include/linux/bcd.h
 bitmap.h		-> linux/include/linux/bitmap.h
 bitops.h		-> linux/include/linux/bitops.h
-dma-mapping.h		-> linux/include/linux/dma-mapping.h
 efi.h			-> linux/include/linux/efi.h
-err.h			-> linux/include/linux/err.h
 initrd.h		-> linux/include/linux/initrd.h
 jiffies.h		-> linux/include/linux/jiffies.h
 kmalloc_sizes.h		-> linux/include/linux/kmalloc_sizes.h
@@ -18,7 +16,6 @@ notifier.h		-> linux/include/linux/notifier.h
 numa.h			-> linux/include/linux/numa.h
 percpu.h		-> linux/include/linux/percpu.h
 preempt.h		-> linux/include/linux/preempt.h
-rwsem.h			-> linux/include/linux/rwsem.h
 seqlock.h		-> linux/include/linux/seqlock.h
 sort.h			-> linux/include/linux/sort.h
 stddef.h		-> linux/include/linux/stddef.h

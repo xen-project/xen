@@ -9,7 +9,6 @@ asmmacro.h		-> linux/include/asm-ia64/asmmacro.h
 atomic.h		-> linux/include/asm-ia64/atomic.h
 bitops.h		-> linux/include/asm-ia64/bitops.h
 break.h			-> linux/include/asm-ia64/break.h
-bug.h			-> linux/include/asm-ia64/bug.h
 byteorder.h		-> linux/include/asm-ia64/byteorder.h
 cacheflush.h		-> linux/include/asm-ia64/cacheflush.h
 checksum.h		-> linux/include/asm-ia64/checksum.h
@@ -17,8 +16,6 @@ current.h		-> linux/include/asm-ia64/current.h
 delay.h			-> linux/include/asm-ia64/delay.h
 div64.h			-> linux/include/asm-ia64/div64.h
 dma.h			-> linux/include/asm-ia64/dma.h
-dma-mapping.h		-> linux/include/asm-ia64/dma-mapping.h
-errno.h			-> linux/include/asm-ia64/errno.h
 fpu.h			-> linux/include/asm-ia64/fpu.h
 hardirq.h		-> linux/include/asm-ia64/hardirq.h
 hdreg.h			-> linux/include/asm-ia64/hdreg.h
@@ -31,19 +28,15 @@ machvec.h		-> linux/include/asm-ia64/machvec.h
 machvec_hpsim.h		-> linux/include/asm-ia64/machvec_hpsim.h
 mca.h			-> linux/include/asm-ia64/mca.h
 meminit.h		-> linux/include/asm-ia64/meminit.h
-mman.h			-> linux/include/asm-ia64/mman.h
 numa.h			-> linux/include/asm-ia64/numa.h
 numnodes.h		-> linux/include/asm-ia64/numnodes.h
 param.h			-> linux/include/asm-ia64/param.h
 patch.h			-> linux/include/asm-ia64/patch.h
 pci.h			-> linux/include/asm-ia64/pci.h
 percpu.h		-> linux/include/asm-ia64/percpu.h
-ptrace_offsets.h	-> linux/include/asm-ia64/ptrace_offsets.h
 rse.h			-> linux/include/asm-ia64/rse.h
-rwsem.h			-> linux/include/asm-ia64/rwsem.h
 sal.h			-> linux/include/asm-ia64/sal.h
 sections.h		-> linux/include/asm-ia64/sections.h
-semaphore.h		-> linux/include/asm-ia64/semaphore.h
 setup.h			-> linux/include/asm-ia64/setup.h
 string.h		-> linux/include/asm-ia64/string.h
 thread_info.h		-> linux/include/asm-ia64/thread_info.h
@@ -52,4 +45,3 @@ topology.h		-> linux/include/asm-ia64/topology.h
 unaligned.h		-> linux/include/asm-ia64/unaligned.h
 unistd.h		-> linux/include/asm-ia64/unistd.h
 unwind.h		-> linux/include/asm-ia64/unwind.h
-ustack.h		-> linux/include/asm-ia64/ustack.h
