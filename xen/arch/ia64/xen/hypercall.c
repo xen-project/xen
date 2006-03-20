@@ -231,14 +231,27 @@ fw_hypercall (struct pt_regs *regs)
 	return 1;
 }
 
+/* opt_unsafe_hypercall: If true, unsafe debugging hypercalls are allowed.
+   These can create security hole.  */
+static int opt_unsafe_hypercall = 0;
+boolean_param("unsafe_hypercall", opt_unsafe_hypercall);
+
 int
 ia64_hypercall (struct pt_regs *regs)
 {
 	struct vcpu *v = current;
 	unsigned long index = regs->r2;
+	int privlvl = (regs->cr_ipsr & IA64_PSR_CPL) >> IA64_PSR_CPL0_BIT;
 
 	if (index >= FW_HYPERCALL_FIRST_USER) {
-	    switch (index) {
+	    /* Note: user hypercalls are not safe, since Xen doesn't
+	       check memory access privilege: Xen does not deny reading
+	       or writing to kernel memory.  */
+	    if (!opt_unsafe_hypercall) {
+		printf("user xen/ia64 hypercalls disabled\n");
+		regs->r8 = -1;
+	    }
+	    else switch (index) {
 		case 0xffff:
 			regs->r8 = dump_privop_counts_to_user(
 				(char *) vcpu_get_gr(v,32),
@@ -255,19 +268,18 @@ ia64_hypercall (struct pt_regs *regs)
 	    }
 	    return 1;
 	}
-	else if (index >= FW_HYPERCALL_FIRST_ARCH) {
-	    int privlvl;
 
-	    /* Firmware calls are only allowed in kernel.  */
-	    privlvl = (regs->cr_ipsr & IA64_PSR_CPL) >> IA64_PSR_CPL0_BIT;
-	    if (privlvl != 2) {
-		/* FIXME: Return a better error value ?
-		   Reflextion ? Illegal operation ?  */
-		regs->r8 = -1;
-		return 1;
-	    }
-	    else
-		return fw_hypercall (regs);
-	} else
+	/* Hypercalls are only allowed by kernel.
+	   Kernel checks memory accesses.  */
+	if (privlvl != 2) {
+	    /* FIXME: Return a better error value ?
+	       Reflection ? Illegal operation ?  */
+	    regs->r8 = -1;
+	    return 1;
+	}
+
+	if (index >= FW_HYPERCALL_FIRST_ARCH)
+	    return fw_hypercall (regs);
+	else
 	    return xen_hypercall (regs);
 }
