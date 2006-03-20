@@ -98,10 +98,9 @@ IA64FAULT
 vcpu_set_gr(VCPU *vcpu, unsigned long reg, UINT64 value, int nat)
 {
 	REGS *regs = vcpu_regs(vcpu);
-	long sof;
+	long sof = (regs->cr_ifs) & 0x7f;
 
 	if (!reg) return IA64_ILLOP_FAULT;
-	sof = (regs->cr_ifs) & 0x7f;
 	if (reg >= sof + 32) return IA64_ILLOP_FAULT;
 	setreg(reg,value,nat,regs);	// FIXME: handle NATs later
 	return IA64_NO_FAULT;
