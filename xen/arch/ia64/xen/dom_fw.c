@@ -106,12 +106,9 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	long r11 = 0;
 	long status;
 
-	/*
-	 * Don't do a "switch" here since that gives us code that
-	 * isn't self-relocatable.
-	 */
 	status = 0;
-	if (index == SAL_FREQ_BASE) {
+	switch (index) {
+	    case SAL_FREQ_BASE:
 		if (!running_on_sim)
 			status = ia64_sal_freq_base(in1,&r9,&r10);
 		else switch (in1) {
@@ -131,15 +128,18 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 			status = -1;
 			break;
 		}
-	} else if (index == SAL_PCI_CONFIG_READ) {
+		break;
+	    case SAL_PCI_CONFIG_READ:
 		if (current->domain == dom0) {
 			u64 value;
 			// note that args 2&3 are swapped!!
 			status = ia64_sal_pci_config_read(in1,in3,in2,&value);
 			r9 = value;
 		}
-		else printf("NON-PRIV DOMAIN CALLED SAL_PCI_CONFIG_READ\n");
-	} else if (index == SAL_PCI_CONFIG_WRITE) {
+		else
+		     printf("NON-PRIV DOMAIN CALLED SAL_PCI_CONFIG_READ\n");
+		break;
+	    case SAL_PCI_CONFIG_WRITE:
 		if (current->domain == dom0) {
 			if (((in1 & ~0xffffffffUL) && (in4 == 0)) ||
 			    (in4 > 1) ||
@@ -149,28 +149,40 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 			// note that args are in a different order!!
 			status = ia64_sal_pci_config_write(in1,in4,in2,in3);
 		}
-		else printf("NON-PRIV DOMAIN CALLED SAL_PCI_CONFIG_WRITE\n");
-	} else if (index == SAL_SET_VECTORS) {
+		else
+		     printf("NON-PRIV DOMAIN CALLED SAL_PCI_CONFIG_WRITE\n");
+		break;
+	    case SAL_SET_VECTORS:
 		printf("*** CALLED SAL_SET_VECTORS.  IGNORED...\n");
-	} else if (index == SAL_GET_STATE_INFO) {
+		break;
+	    case SAL_GET_STATE_INFO:
 		printf("*** CALLED SAL_GET_STATE_INFO.  IGNORED...\n");
-	} else if (index == SAL_GET_STATE_INFO_SIZE) {
+		break;
+	    case SAL_GET_STATE_INFO_SIZE:
 		printf("*** CALLED SAL_GET_STATE_INFO_SIZE.  IGNORED...\n");
-	} else if (index == SAL_CLEAR_STATE_INFO) {
+		break;
+	    case SAL_CLEAR_STATE_INFO:
 		printf("*** CALLED SAL_CLEAR_STATE_INFO.  IGNORED...\n");
-	} else if (index == SAL_MC_RENDEZ) {
+		break;
+	    case SAL_MC_RENDEZ:
 		printf("*** CALLED SAL_MC_RENDEZ.  IGNORED...\n");
-	} else if (index == SAL_MC_SET_PARAMS) {
+		break;
+	    case SAL_MC_SET_PARAMS:
 		printf("*** CALLED SAL_MC_SET_PARAMS.  IGNORED...\n");
-	} else if (index == SAL_CACHE_FLUSH) {
+		break;
+	    case SAL_CACHE_FLUSH:
 		printf("*** CALLED SAL_CACHE_FLUSH.  IGNORED...\n");
-	} else if (index == SAL_CACHE_INIT) {
+		break;
+	    case SAL_CACHE_INIT:
 		printf("*** CALLED SAL_CACHE_INIT.  IGNORED...\n");
-	} else if (index == SAL_UPDATE_PAL) {
+		break;
+	    case SAL_UPDATE_PAL:
 		printf("*** CALLED SAL_UPDATE_PAL.  IGNORED...\n");
-	} else {
+		break;
+	    default:
 		printf("*** CALLED SAL_ WITH UNKNOWN INDEX.  IGNORED...\n");
 		status = -1;
+		break;
 	}
 	return ((struct sal_ret_values) {status, r9, r10, r11});
 }
@@ -183,8 +195,9 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 	unsigned long r11 = 0;
 	long status = -1;
 
-	if (running_on_sim) return pal_emulator_static(index);
-	printk("xen_pal_emulator: index=%lu\n", index);
+	if (running_on_sim)
+		return pal_emulator_static(index);
+
 	// pal code must be mapped by a TR when pal is called, however
 	// calls are rare enough that we will map it lazily rather than
 	// at every context switch
