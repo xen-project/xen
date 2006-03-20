@@ -66,13 +66,71 @@ hypercall_t ia64_hypercall_table[] =
 	(hypercall_t)do_ni_hypercall		/*  */
 	};
 
-int
-ia64_hypercall (struct pt_regs *regs)
+static int
+xen_hypercall (struct pt_regs *regs)
+{
+	switch (regs->r2) {
+	    case __HYPERVISOR_dom0_op:
+		regs->r8 = do_dom0_op(guest_handle_from_ptr(regs->r14,
+							    dom0_op_t));
+		break;
+
+	    case __HYPERVISOR_memory_op:
+		/* we don't handle reservations; just return success */
+		{
+		    struct xen_memory_reservation reservation;
+		    void *arg = (void *) regs->r15;
+
+		    switch(regs->r14) {
+		    case XENMEM_increase_reservation:
+		    case XENMEM_decrease_reservation:
+			if (copy_from_user(&reservation, arg,
+				sizeof(reservation)))
+			    regs->r8 = -EFAULT;
+			else
+			    regs->r8 = reservation.nr_extents;
+			break;
+		    default:
+			regs->r8 = do_memory_op((int) regs->r14, guest_handle_from_ptr(regs->r15, void));
+			break;
+		    }
+		}
+		break;
+
+	    case __HYPERVISOR_event_channel_op:
+		regs->r8 = do_event_channel_op(guest_handle_from_ptr(regs->r14, evtchn_op_t));
+		break;
+
+	    case __HYPERVISOR_grant_table_op:
+		regs->r8 = do_grant_table_op((unsigned int) regs->r14, guest_handle_from_ptr(regs->r15, void), (unsigned int) regs->r16);
+		break;
+
+	    case __HYPERVISOR_console_io:
+		regs->r8 = do_console_io((int) regs->r14, (int) regs->r15, guest_handle_from_ptr(regs->r16, char));
+		break;
+
+	    case __HYPERVISOR_xen_version:
+		regs->r8 = do_xen_version((int) regs->r14, guest_handle_from_ptr(regs->r15, void));
+		break;
+
+	    case __HYPERVISOR_multicall:
+		regs->r8 = do_multicall(guest_handle_from_ptr(regs->r14, multicall_entry_t), (unsigned int) regs->r15);
+		break;
+
+	    default:
+		printf("unknown xen hypercall %lx\n", regs->r2);
+		regs->r8 = do_ni_hypercall();
+	}
+	return 1;
+}
+
+
+static int
+fw_hypercall (struct pt_regs *regs)
 {
 	struct vcpu *v = current;
 	struct sal_ret_values x;
 	unsigned long *tv, *tc;
-	int pi;
 
 	switch (regs->r2) {
 	    case FW_HYPERCALL_PAL_CALL:
@@ -87,6 +145,7 @@ ia64_hypercall (struct pt_regs *regs)
 		VCPU(v,pending_interruption) = 1;
 #endif
 		if (regs->r28 == PAL_HALT_LIGHT) {
+			int pi;
 #define SPURIOUS_VECTOR 15
 			pi = vcpu_check_pending_interrupts(v);
 			if (pi != SPURIOUS_VECTOR) {
@@ -165,66 +224,50 @@ ia64_hypercall (struct pt_regs *regs)
 		// FIXME: need fixes in efi.h from 2.6.9
 		regs->r8 = EFI_UNSUPPORTED;
 		break;
-	    case 0xffff:
-		regs->r8 = dump_privop_counts_to_user(
-			(char *) vcpu_get_gr(v,32),
-			(int) vcpu_get_gr(v,33));
-		break;
-	    case 0xfffe:
-		regs->r8 = zero_privop_counts_to_user(
-			(char *) vcpu_get_gr(v,32),
-			(int) vcpu_get_gr(v,33));
-		break;
-	    case __HYPERVISOR_dom0_op:
-		regs->r8 = do_dom0_op(guest_handle_from_ptr(regs->r14,
-							    dom0_op_t));
-		break;
-
-	    case __HYPERVISOR_memory_op:
-		/* we don't handle reservations; just return success */
-		{
-		    struct xen_memory_reservation reservation;
-		    void *arg = (void *) regs->r15;
-
-		    switch(regs->r14) {
-		    case XENMEM_increase_reservation:
-		    case XENMEM_decrease_reservation:
-			if (copy_from_user(&reservation, arg,
-				sizeof(reservation)))
-			    regs->r8 = -EFAULT;
-			else
-			    regs->r8 = reservation.nr_extents;
-			break;
-		    default:
-			regs->r8 = do_memory_op((int) regs->r14, guest_handle_from_ptr(regs->r15, void));
-			break;
-		    }
-		}
-		break;
-
-	    case __HYPERVISOR_event_channel_op:
-		regs->r8 = do_event_channel_op(guest_handle_from_ptr(regs->r14, evtchn_op_t));
-		break;
-
-	    case __HYPERVISOR_grant_table_op:
-		regs->r8 = do_grant_table_op((unsigned int) regs->r14, guest_handle_from_ptr(regs->r15, void), (unsigned int) regs->r16);
-		break;
-
-	    case __HYPERVISOR_console_io:
-		regs->r8 = do_console_io((int) regs->r14, (int) regs->r15, guest_handle_from_ptr(regs->r16, char));
-		break;
-
-	    case __HYPERVISOR_xen_version:
-		regs->r8 = do_xen_version((int) regs->r14, guest_handle_from_ptr(regs->r15, void));
-		break;
-
-	    case __HYPERVISOR_multicall:
-		regs->r8 = do_multicall(guest_handle_from_ptr(regs->r14, multicall_entry_t), (unsigned int) regs->r15);
-		break;
-
 	    default:
-		printf("unknown hypercall %lx\n", regs->r2);
+		printf("unknown ia64 fw hypercall %lx\n", regs->r2);
 		regs->r8 = do_ni_hypercall();
 	}
 	return 1;
+}
+
+int
+ia64_hypercall (struct pt_regs *regs)
+{
+	struct vcpu *v = current;
+	unsigned long index = regs->r2;
+
+	if (index >= FW_HYPERCALL_FIRST_USER) {
+	    switch (index) {
+		case 0xffff:
+			regs->r8 = dump_privop_counts_to_user(
+				(char *) vcpu_get_gr(v,32),
+				(int) vcpu_get_gr(v,33));
+			break;
+		case 0xfffe:
+			regs->r8 = zero_privop_counts_to_user(
+				(char *) vcpu_get_gr(v,32),
+				(int) vcpu_get_gr(v,33));
+			break;
+		default:
+			printf("unknown user xen/ia64 hypercall %lx\n", index);
+			regs->r8 = do_ni_hypercall();
+	    }
+	    return 1;
+	}
+	else if (index >= FW_HYPERCALL_FIRST_ARCH) {
+	    int privlvl;
+
+	    /* Firmware calls are only allowed in kernel.  */
+	    privlvl = (regs->cr_ipsr & IA64_PSR_CPL) >> IA64_PSR_CPL0_BIT;
+	    if (privlvl != 2) {
+		/* FIXME: Return a better error value ?
+		   Reflextion ? Illegal operation ?  */
+		regs->r8 = -1;
+		return 1;
+	    }
+	    else
+		return fw_hypercall (regs);
+	} else
+	    return xen_hypercall (regs);
 }
