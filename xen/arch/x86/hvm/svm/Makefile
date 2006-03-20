@@ -1,7 +1,7 @@
 include $(BASEDIR)/Rules.mk
 
-subdirs-$(x86_32) += x86_32
-subdirs-$(x86_64) += x86_64
+subdir-$(x86_32) += x86_32
+subdir-$(x86_64) += x86_64
 
 obj-y += emulate.o
 obj-y += instrlen.o

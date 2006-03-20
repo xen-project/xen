@@ -1,7 +1,7 @@
 include $(BASEDIR)/Rules.mk
 
-subdirs-y += mcheck
-subdirs-y += mtrr
+subdir-y += mcheck
+subdir-y += mtrr
 
 obj-y += amd.o
 obj-y += common.o

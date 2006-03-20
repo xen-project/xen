@@ -1,7 +1,7 @@
 include $(BASEDIR)/Rules.mk
 
-subdirs-y += svm
-subdirs-y += vmx
+subdir-y += svm
+subdir-y += vmx
 
 obj-y += hvm.o
 obj-y += i8259.o

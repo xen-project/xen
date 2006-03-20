@@ -1,12 +1,12 @@
 include $(BASEDIR)/Rules.mk
 
-subdirs-y += acpi
-subdirs-y += cpu
-subdirs-y += genapic
-subdirs-y += hvm
+subdir-y += acpi
+subdir-y += cpu
+subdir-y += genapic
+subdir-y += hvm
 
-subdirs-$(x86_32) += x86_32
-subdirs-$(x86_64) += x86_64
+subdir-$(x86_32) += x86_32
+subdir-$(x86_64) += x86_64
 
 obj-y += apic.o
 obj-y += audit.o
