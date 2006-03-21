@@ -157,7 +157,7 @@ static int __init __independent_wallclock(char *str)
 }
 __setup("independent_wallclock", __independent_wallclock);
 
-/* Permitted clock jitter, in usecs, beyond which a warning will be printed. */
+/* Permitted clock jitter, in nsecs, beyond which a warning will be printed. */
 static unsigned long permitted_clock_jitter = 10000000UL; /* 10ms */
 static int __init __permitted_clock_jitter(char *str)
 {
