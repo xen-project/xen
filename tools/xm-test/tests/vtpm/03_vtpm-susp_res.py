@@ -8,26 +8,11 @@
 #                check list of pcrs again
 
 from XmTestLib import *
+from vtpm_utils import *
 import commands
 import os
 import os.path
 
-def vtpm_cleanup(domName):
-    # Since this is only a temporary domain I clean up the domain from the
-    # virtual TPM directory
-    os.system("/etc/xen/scripts/vtpm-delete %s" % domName)
-
-if ENABLE_HVM_SUPPORT:
-    SKIP("vtpm-list not supported for HVM domains")
-
-if os.path.exists("/dev/tpm0") == False:
-    SKIP("This machine has no hardware TPM; cannot run this test")
-
-output = commands.getoutput("ps aux | grep vtpm_manager | grep -v grep")
-if output == "":
-    SKIP("virtual TPM manager must be started to run this test")
-
-# vtpm manager has been detected
 config = {"vtpm":"instance=1,backend=0"}
 domain = XmTestDomain(extraConfig=config)
 

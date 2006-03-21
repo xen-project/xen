@@ -8,16 +8,9 @@
 
 
 from XmTestLib import *
+from vtpm_utils import *
 import commands
 import os
-
-def vtpm_cleanup(domName):
-    # Since this is only a temporary domain I clean up the domain from the
-    # virtual TPM directory
-    os.system("/etc/xen/scripts/vtpm-delete %s" % domName)
-
-if ENABLE_HVM_SUPPORT:
-    SKIP("vtpm-list not supported for HVM domains")
 
 config = {"vtpm":"instance=1,backend=0"}
 domain = XmTestDomain(extraConfig=config)

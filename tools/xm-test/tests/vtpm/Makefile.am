@@ -1,4 +1,3 @@
-
 SUBDIRS =
 
 TESTS = 01_vtpm-list_pos.test \
@@ -7,8 +6,7 @@ TESTS = 01_vtpm-list_pos.test \
 
 XFAIL_TESTS =
 
-EXTRA_DIST = $(TESTS) $(XFAIL_TESTS)
-
+EXTRA_DIST = $(TESTS) $(XFAIL_TESTS) vtpm_utils.py
 TESTS_ENVIRONMENT=@TENV@
 
 %.test: %.py
