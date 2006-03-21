@@ -33,6 +33,7 @@ extern void local_flush_tlb_all (void);
 # define flush_tlb_all()	local_flush_tlb_all()
 #endif
 
+#ifndef XEN
 static inline void
 local_finish_flush_tlb_mm (struct mm_struct *mm)
 {
@@ -109,6 +110,8 @@ flush_tlb_pgtables (struct mm_struct *mm, unsigned long start, unsigned long end
 
 
 #define flush_tlb_kernel_range(start, end)	flush_tlb_all()	/* XXX fix me */
+#endif /* XEN */
+
 #ifdef XEN
 extern void flush_tlb_mask(cpumask_t mask);
 #endif

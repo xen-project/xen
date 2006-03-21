@@ -765,8 +765,10 @@ cpu_init (void)
 {
 	extern void __devinit ia64_mmu_init (void *);
 	unsigned long num_phys_stacked;
+#ifndef XEN
 	pal_vm_info_2_u_t vmi;
 	unsigned int max_ctx;
+#endif
 	struct cpuinfo_ia64 *cpu_info;
 	void *cpu_data;
 
@@ -874,6 +876,7 @@ cpu_init (void)
 	normal_xtp();
 #endif
 
+#ifndef XEN
 	/* set ia64_ctx.max_rid to the maximum RID that is supported by all CPUs: */
 	if (ia64_pal_vm_summary(NULL, &vmi) == 0)
 		max_ctx = (1U << (vmi.pal_vm_info_2_s.rid_size - 3)) - 1;
@@ -886,6 +889,7 @@ cpu_init (void)
 		if (cmpxchg(&ia64_ctx.max_ctx, old, max_ctx) == old)
 			break;
 	}
+#endif
 
 	if (ia64_pal_rse_info(&num_phys_stacked, NULL) != 0) {
 		printk(KERN_WARNING "cpu_init: PAL RSE info failed; assuming 96 physical "

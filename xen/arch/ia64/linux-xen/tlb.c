@@ -28,6 +28,7 @@ static struct {
 	unsigned long max_bits;	/* log2() of largest supported purge page-size */
 } purge;
 
+#ifndef XEN
 struct ia64_ctx ia64_ctx = {
 	.lock =		SPIN_LOCK_UNLOCKED,
 	.next =		1,
@@ -43,9 +44,6 @@ DEFINE_PER_CPU(u8, ia64_need_tlb_flush);
 void
 wrap_mmu_context (struct mm_struct *mm)
 {
-#ifdef XEN
-printf("wrap_mmu_context: called, not implemented\n");
-#else
 	unsigned long tsk_context, max_ctx = ia64_ctx.max_ctx;
 	struct task_struct *tsk;
 	int i;
@@ -86,8 +84,8 @@ printf("wrap_mmu_context: called, not implemented\n");
 		put_cpu();
 	}
 	local_flush_tlb_all();
-#endif
 }
+#endif /* XEN */
 
 void
 ia64_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbits)
@@ -133,12 +131,10 @@ local_flush_tlb_all (void)
 }
 EXPORT_SYMBOL(local_flush_tlb_all);
 
+#ifndef XEN
 void
 flush_tlb_range (struct vm_area_struct *vma, unsigned long start, unsigned long end)
 {
-#ifdef XEN
-printf("flush_tlb_range: called, not implemented\n");
-#else
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long size = end - start;
 	unsigned long nbits;
@@ -170,9 +166,9 @@ printf("flush_tlb_range: called, not implemented\n");
 # endif
 
 	ia64_srlz_i();			/* srlz.i implies srlz.d */
-#endif
 }
 EXPORT_SYMBOL(flush_tlb_range);
+#endif
 
 void __devinit
 ia64_tlb_init (void)
