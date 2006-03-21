@@ -24,6 +24,7 @@ Author: Mike Wray <mike.wray@hp.com>
 
 """
 
+import errno
 import logging
 import string
 import time
@@ -893,7 +894,7 @@ class XendDomainInfo:
                 self.domid, timeout)
             threading.Timer(timeout, self.refreshShutdown).start()
 
-        return 1
+        return True
 
 
     def shutdown(self, reason):
@@ -1246,30 +1247,34 @@ class XendDomainInfo:
         """Cleanup domain resources; release devices.  Idempotent.  Nothrow
         guarantee."""
 
-        self.unwatchShutdown()
+        self.refresh_shutdown_lock.acquire()
+        try:
+            self.unwatchShutdown()
 
-        self.release_devices()
+            self.release_devices()
 
-        if self.image:
+            if self.image:
+                try:
+                    self.image.destroy()
+                except:
+                    log.exception(
+                        "XendDomainInfo.cleanup: image.destroy() failed.")
+                self.image = None
+
             try:
-                self.image.destroy()
+                self.removeDom()
             except:
-                log.exception(
-                    "XendDomainInfo.cleanup: image.destroy() failed.")
-            self.image = None
+                log.exception("Removing domain path failed.")
 
-        try:
-            self.removeDom()
-        except:
-            log.exception("Removing domain path failed.")
+            try:
+                if not self.info['name'].startswith(ZOMBIE_PREFIX):
+                    self.info['name'] = ZOMBIE_PREFIX + self.info['name']
+            except:
+                log.exception("Renaming Zombie failed.")
 
-        try:
-            if not self.info['name'].startswith(ZOMBIE_PREFIX):
-                self.info['name'] = ZOMBIE_PREFIX + self.info['name']
-        except:
-            log.exception("Renaming Zombie failed.")
-
-        self.state_set(STATE_DOM_SHUTDOWN)
+            self.state_set(STATE_DOM_SHUTDOWN)
+        finally:
+            self.refresh_shutdown_lock.release()
 
 
     def cleanupVm(self):
@@ -1301,7 +1306,8 @@ class XendDomainInfo:
 
     def unwatchShutdown(self):
         """Remove the watch on the domain's control/shutdown node, if any.
-        Idempotent.  Nothrow guarantee."""
+        Idempotent.  Nothrow guarantee.  Expects to be protected by the
+        refresh_shutdown_lock."""
 
         try:
             try:
