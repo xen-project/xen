@@ -13,6 +13,7 @@ usage() {
     echo "  -b          : do not ask any questions (batch mode)"
     echo "  -g          : run a group test set"
     echo "  -e <email>  : set email address for report"
+    echo "  -r <url>    : url of test results repository to use"
     echo "  -s <report> : just submit report <report>"
     echo "  -h | --help : show this help"
 }
@@ -22,7 +23,7 @@ submit_report() {
 
     reportfile=$1
 
-    ./lib/XmTestReport/Report.py $reportfile
+    ./lib/XmTestReport/Report.py $reportserver $reportfile
 }
 
 # Generate XML result report from output file
@@ -189,6 +190,7 @@ EOF
 # Defaults
 MAXFAIL=10
 report=yes
+reportserver=${xmtest_repo:-'http://xmtest.dague.org/cgi-bin/report-results'}
 batch=no
 run=yes
 GROUPENTERED=default
@@ -217,6 +219,10 @@ while [ $# -gt 0 ]
              echo "No file for group $GROUPENTERED"
              exit 1
           fi
+	  ;;
+      -r)
+	  shift
+	  reportserver=$1
 	  ;;
       -s)
 	  run=no
