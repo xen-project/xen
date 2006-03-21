@@ -129,6 +129,9 @@ vncviewer=1
 # no graphics, use serial port
 #nographic=0
 
+#----------------------------------------------------------------------------
+# enable stdvga, default = 0 (use cirrus logic device model)
+stdvga=0
 
 #-----------------------------------------------------------------------------
 #   serial port re-direct to pty deivce, /dev/pts/n 

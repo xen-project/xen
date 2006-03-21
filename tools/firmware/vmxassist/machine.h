@@ -37,10 +37,11 @@
 #define CR4_PVI		(1 << 1)
 #define CR4_PSE		(1 << 4)
 
+#define EFLAGS_ZF	(1 << 6)
 #define EFLAGS_TF	(1 << 8)
 #define EFLAGS_IF	(1 << 9)
 #define EFLAGS_DF	(1 << 10)
-#define EFLAGS_IOPL (3 << 12)
+#define EFLAGS_IOPL	(3 << 12)
 #define EFLAGS_VM	((1 << 17) | EFLAGS_IOPL)
 #define EFLAGS_VIF	(1 << 19)
 #define EFLAGS_VIP	(1 << 20)
