@@ -2,3 +2,7 @@
 
 mount -a
 
+# If we're running 2.6, make sure /sys is mounted
+if uname -r | grep -q '^2.6'; then
+	mount -t sysfs none /sys
+fi
