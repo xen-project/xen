@@ -1,0 +1,24 @@
+include $(BASEDIR)/Rules.mk
+
+obj-y += hvm_vioapic.o
+obj-y += mm.o
+obj-y += mmio.o
+obj-y += pal_emul.o
+obj-y += vlsapic.o
+obj-y += vmmu.o
+obj-y += vmx_entry.o
+obj-y += vmx_hypercall.o
+obj-y += vmx_init.o
+obj-y += vmx_interrupt.o
+obj-y += vmx_irq_ia64.o
+obj-y += vmx_ivt.o
+obj-y += vmx_phy_mode.o
+obj-y += vmx_process.o
+obj-y += vmx_support.o
+obj-y += vmx_utility.o
+obj-y += vmx_vcpu.o
+obj-y += vmx_virt.o
+obj-y += vmx_vsa.o
+obj-y += vtlb.o
+
+include $(BASEDIR)/Post.mk
