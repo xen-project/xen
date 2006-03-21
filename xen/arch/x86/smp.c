@@ -266,7 +266,7 @@ void smp_send_event_check_mask(cpumask_t mask)
 }
 
 /*
- * Structure and data for smp_call_function().
+ * Structure and data for smp_call_function()/on_selected_cpus().
  */
 
 struct call_data_struct {
@@ -275,41 +275,48 @@ struct call_data_struct {
     int wait;
     atomic_t started;
     atomic_t finished;
+    cpumask_t selected;
 };
 
-static spinlock_t call_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(call_lock);
 static struct call_data_struct *call_data;
 
-/*
- * Run a function on all other CPUs.
- *  @func: The function to run. This must be fast and non-blocking.
- *  @info: An arbitrary pointer to pass to the function.
- *  @wait: If true, spin until function has completed on other CPUs.
- *  Returns: 0 on success, else a negative status code.
- */
 int smp_call_function(
-    void (*func) (void *info), void *info, int unused, int wait)
+    void (*func) (void *info),
+    void *info,
+    int retry,
+    int wait)
+{
+    cpumask_t allbutself = cpu_online_map;
+    cpu_clear(smp_processor_id(), allbutself);
+    return on_selected_cpus(allbutself, func, info, retry, wait);
+}
+
+extern int on_selected_cpus(
+    cpumask_t selected,
+    void (*func) (void *info),
+    void *info,
+    int retry,
+    int wait)
 {
     struct call_data_struct data;
-    unsigned int nr_cpus = num_online_cpus() - 1;
+    unsigned int nr_cpus = cpus_weight(selected);
 
     ASSERT(local_irq_is_enabled());
-
-    if ( nr_cpus == 0 )
-        return 0;
 
     data.func = func;
     data.info = info;
     data.wait = wait;
     atomic_set(&data.started, 0);
     atomic_set(&data.finished, 0);
+    data.selected = selected;
 
     spin_lock(&call_lock);
 
     call_data = &data;
     wmb();
 
-    send_IPI_allbutself(CALL_FUNCTION_VECTOR);
+    send_IPI_mask(selected, CALL_FUNCTION_VECTOR);
 
     while ( atomic_read(wait ? &data.finished : &data.started) != nr_cpus )
         cpu_relax();
@@ -352,6 +359,9 @@ fastcall void smp_call_function_interrupt(struct cpu_user_regs *regs)
 
     ack_APIC_irq();
     perfc_incrc(ipis);
+
+    if ( !cpu_isset(smp_processor_id(), call_data->selected) )
+        return;
 
     if ( call_data->wait )
     {
