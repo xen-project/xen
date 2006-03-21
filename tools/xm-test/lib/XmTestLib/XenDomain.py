@@ -74,7 +74,7 @@ HVMDefaults =      {"memory"       : 64,
                     "vcpus"        : 1,
                     "acpi"         : 0,
                     "apic"         : 0,
-                    "disk"         : ["file:%s/disk.img,ioemu:%s,w" %
+                    "disk"         : ["file:%s/disk.img,ioemu:%s,w!" %
                                    (getRdPath(), BLOCK_ROOT_DEV)],
                     "kernel"       : "/usr/lib/xen/boot/hvmloader",
                     "builder"      : "hvm",
