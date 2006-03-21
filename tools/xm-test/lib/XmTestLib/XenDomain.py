@@ -251,9 +251,6 @@ class XmTestDomain(XenDomain):
         if ENABLE_HVM_SUPPORT:
             waitForBoot()
 
-    def startNow(self):
-        XenDomain.start(self)
-
     def minSafeMem(self):
         return 16
 
