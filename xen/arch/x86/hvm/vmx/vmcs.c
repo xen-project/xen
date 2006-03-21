@@ -195,7 +195,6 @@ static void vmx_do_launch(struct vcpu *v)
 /* Update CR3, GDT, LDT, TR */
     unsigned int  error = 0;
     unsigned long cr0, cr4;
-    u64     host_tsc;
 
     if (v->vcpu_id == 0)
         hvm_setup_platform(v->domain);
@@ -250,9 +249,7 @@ static void vmx_do_launch(struct vcpu *v)
     v->arch.hvm_vmx.launch_cpu = smp_processor_id();
 
     /* init guest tsc to start from 0 */
-    rdtscll(host_tsc);
-    v->arch.hvm_vmx.tsc_offset = 0 - host_tsc;
-    vmx_set_tsc_shift(v, &v->domain->arch.hvm_domain.vpit);
+    set_guest_time(v, 0);
 }
 
 /*

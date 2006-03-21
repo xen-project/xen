@@ -51,7 +51,7 @@ loadelfimage(
     char *elfbase, int xch, uint32_t dom, unsigned long *parray,
     struct domain_setup_info *dsi);
 
-static unsigned char build_e820map(void *e820_page, unsigned long mem_size)
+static unsigned char build_e820map(void *e820_page, unsigned long long mem_size)
 {
     struct e820entry *e820entry =
         (struct e820entry *)(((unsigned char *)e820_page) + E820_MAP_OFFSET);
@@ -81,22 +81,22 @@ static unsigned char build_e820map(void *e820_page, unsigned long mem_size)
 #define STATIC_PAGES    2       /* for ioreq_t and store_mfn */
     /* Most of the ram goes here */
     e820entry[nr_map].addr = 0x100000;
-    e820entry[nr_map].size = mem_size - 0x100000 - STATIC_PAGES*PAGE_SIZE;
+    e820entry[nr_map].size = mem_size - 0x100000 - STATIC_PAGES * PAGE_SIZE;
     e820entry[nr_map].type = E820_RAM;
     nr_map++;
 
     /* Statically allocated special pages */
 
+    /* For xenstore */
+    e820entry[nr_map].addr = mem_size - 2 * PAGE_SIZE;
+    e820entry[nr_map].size = PAGE_SIZE;
+    e820entry[nr_map].type = E820_XENSTORE;
+    nr_map++;
+
     /* Shared ioreq_t page */
     e820entry[nr_map].addr = mem_size - PAGE_SIZE;
     e820entry[nr_map].size = PAGE_SIZE;
     e820entry[nr_map].type = E820_SHARED_PAGE;
-    nr_map++;
-
-    /* For xenstore */
-    e820entry[nr_map].addr = mem_size - 2*PAGE_SIZE;
-    e820entry[nr_map].size = PAGE_SIZE;
-    e820entry[nr_map].type = E820_XENSTORE;
     nr_map++;
 
     e820entry[nr_map].addr = mem_size;
@@ -117,8 +117,7 @@ static unsigned char build_e820map(void *e820_page, unsigned long mem_size)
     return (*(((unsigned char *)e820_page) + E820_MAP_NR_OFFSET) = nr_map);
 }
 
-static void
-set_hvm_info_checksum(struct hvm_info_table *t)
+static void set_hvm_info_checksum(struct hvm_info_table *t)
 {
     uint8_t *ptr = (uint8_t *)t, sum = 0;
     unsigned int i;
@@ -142,19 +141,16 @@ static int set_hvm_info(int xc_handle, uint32_t dom,
     char *va_map;
     struct hvm_info_table *va_hvm;
 
-
-    va_map = xc_map_foreign_range(
-        xc_handle,
-        dom,
-        PAGE_SIZE,
-        PROT_READ|PROT_WRITE,
-        pfn_list[HVM_INFO_PFN]);
+    va_map = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                  PROT_READ | PROT_WRITE,
+                                  pfn_list[HVM_INFO_PFN]);
 
     if ( va_map == NULL )
         return -1;
 
     va_hvm = (struct hvm_info_table *)(va_map + HVM_INFO_OFFSET);
     memset(va_hvm, 0, sizeof(*va_hvm));
+
     strncpy(va_hvm->signature, "HVM INFO", 8);
     va_hvm->length       = sizeof(struct hvm_info_table);
     va_hvm->acpi_enabled = acpi;
@@ -183,58 +179,59 @@ static int setup_guest(int xc_handle,
                        unsigned long *store_mfn)
 {
     unsigned long *page_array = NULL;
-
     unsigned long count, i;
+    unsigned long long ptr;
+    xc_mmu_t *mmu = NULL;
+
     shared_info_t *shared_info;
     void *e820_page;
     unsigned char e820_map_nr;
-    xc_mmu_t *mmu = NULL;
-    int rc;
 
     struct domain_setup_info dsi;
-    unsigned long v_end;
+    unsigned long long v_end;
 
     unsigned long shared_page_frame = 0;
     shared_iopage_t *sp;
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
 
-    if ( (rc = parseelfimage(image, image_size, &dsi)) != 0 )
+    if ( (parseelfimage(image, image_size, &dsi)) != 0 )
         goto error_out;
 
-    if ( (dsi.v_start & (PAGE_SIZE-1)) != 0 )
+    if ( (dsi.v_kernstart & (PAGE_SIZE - 1)) != 0 )
     {
         PERROR("Guest OS must load to a page boundary.\n");
         goto error_out;
     }
 
     /* memsize is in megabytes */
-    v_end              = (unsigned long)memsize << 20;
+    v_end = (unsigned long long)memsize << 20;
 
     printf("VIRTUAL MEMORY ARRANGEMENT:\n"
-           " Loaded HVM loader: %08lx->%08lx\n"
-           " TOTAL:         %08lx->%08lx\n",
+           "  Loaded HVM loader:    %08lx->%08lx\n"
+           "  TOTAL:                %08lx->%016llx\n",
            dsi.v_kernstart, dsi.v_kernend,
            dsi.v_start, v_end);
-    printf(" ENTRY ADDRESS: %08lx\n", dsi.v_kernentry);
+    printf("  ENTRY ADDRESS:        %08lx\n", dsi.v_kernentry);
 
-    if ( (v_end - dsi.v_start) > (nr_pages * PAGE_SIZE) )
+    if ( (v_end - dsi.v_start) > ((unsigned long long)nr_pages << PAGE_SHIFT) )
     {
-        ERROR("Initial guest OS requires too much space\n"
-               "(%luMB is greater than %luMB limit)\n",
-               (v_end-dsi.v_start)>>20, (nr_pages<<PAGE_SHIFT)>>20);
+        PERROR("Initial guest OS requires too much space: "
+               "(%lluMB is greater than %lluMB limit)\n",
+               (unsigned long long)(v_end - dsi.v_start) >> 20,
+               ((unsigned long long)nr_pages << PAGE_SHIFT) >> 20);
         goto error_out;
     }
 
     if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
     {
-        PERROR("Could not allocate memory");
+        PERROR("Could not allocate memory.\n");
         goto error_out;
     }
 
     if ( xc_get_pfn_list(xc_handle, dom, page_array, nr_pages) != nr_pages )
     {
-        PERROR("Could not get the page frame list");
+        PERROR("Could not get the page frame list.\n");
         goto error_out;
     }
 
@@ -246,20 +243,21 @@ static int setup_guest(int xc_handle,
     /* Write the machine->phys table entries. */
     for ( count = 0; count < nr_pages; count++ )
     {
+        ptr = (unsigned long long)page_array[count] << PAGE_SHIFT;
         if ( xc_add_mmu_update(xc_handle, mmu,
-                               (page_array[count] << PAGE_SHIFT) |
-                               MMU_MACHPHYS_UPDATE, count) )
+                               ptr | MMU_MACHPHYS_UPDATE, count) )
             goto error_out;
     }
 
-    if ( set_hvm_info(xc_handle, dom, page_array, vcpus, pae, acpi, apic) ) {
-        fprintf(stderr, "Couldn't set hvm info for HVM guest.\n");
+    if ( set_hvm_info(xc_handle, dom, page_array, vcpus, pae, acpi, apic) )
+    {
+        ERROR("Couldn't set hvm info for HVM guest.\n");
         goto error_out;
     }
 
     if ( (e820_page = xc_map_foreign_range(
-         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
-         page_array[E820_MAP_PAGE >> PAGE_SHIFT])) == 0 )
+              xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
+              page_array[E820_MAP_PAGE >> PAGE_SHIFT])) == 0 )
         goto error_out;
     memset(e820_page, 0, PAGE_SIZE);
     e820_map_nr = build_e820map(e820_page, v_end);
@@ -267,8 +265,8 @@ static int setup_guest(int xc_handle,
 
     /* shared_info page starts its life empty. */
     if ( (shared_info = xc_map_foreign_range(
-         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
-         shared_info_frame)) == 0 )
+              xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
+              shared_info_frame)) == 0 )
         goto error_out;
     memset(shared_info, 0, sizeof(shared_info_t));
     /* Mask all upcalls... */
@@ -279,8 +277,8 @@ static int setup_guest(int xc_handle,
     /* Populate the event channel port in the shared page */
     shared_page_frame = page_array[(v_end >> PAGE_SHIFT) - 1];
     if ( (sp = (shared_iopage_t *) xc_map_foreign_range(
-         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
-         shared_page_frame)) == 0 )
+              xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
+              shared_page_frame)) == 0 )
         goto error_out;
     memset(sp, 0, PAGE_SIZE);
 
@@ -290,7 +288,7 @@ static int setup_guest(int xc_handle,
 
         vp_eport = xc_evtchn_alloc_unbound(xc_handle, dom, 0);
         if ( vp_eport < 0 ) {
-            fprintf(stderr, "Couldn't get unbound port from VMX guest.\n");
+            PERROR("Couldn't get unbound port from VMX guest.\n");
             goto error_out;
         }
         sp->vcpu_iodata[i].vp_eport = vp_eport;

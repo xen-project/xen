@@ -51,6 +51,9 @@ struct percpu_ctxt {
 } __cacheline_aligned;
 static struct percpu_ctxt percpu_ctxt[NR_CPUS];
 
+static void paravirt_ctxt_switch_from(struct vcpu *v);
+static void paravirt_ctxt_switch_to(struct vcpu *v);
+
 static void continue_idle_domain(struct vcpu *v)
 {
     reset_stack_and_jump(idle_loop);
@@ -225,6 +228,9 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
     {
         v->arch.schedule_tail = continue_nonidle_domain;
     }
+
+    v->arch.ctxt_switch_from = paravirt_ctxt_switch_from;
+    v->arch.ctxt_switch_to   = paravirt_ctxt_switch_to;
 
     v->arch.perdomain_ptes =
         d->arch.mm_perdomain_pt + (vcpu_id << GDT_LDT_VCPU_SHIFT);
@@ -685,21 +691,32 @@ static void save_segments(struct vcpu *v)
     percpu_ctxt[smp_processor_id()].dirty_segment_mask = dirty_segment_mask;
 }
 
-#define switch_kernel_stack(_n,_c) ((void)0)
+#define switch_kernel_stack(v) ((void)0)
 
 #elif defined(__i386__)
 
 #define load_segments(n) ((void)0)
 #define save_segments(p) ((void)0)
 
-static inline void switch_kernel_stack(struct vcpu *n, unsigned int cpu)
+static inline void switch_kernel_stack(struct vcpu *v)
 {
-    struct tss_struct *tss = &init_tss[cpu];
-    tss->esp1 = n->arch.guest_context.kernel_sp;
-    tss->ss1  = n->arch.guest_context.kernel_ss;
+    struct tss_struct *tss = &init_tss[smp_processor_id()];
+    tss->esp1 = v->arch.guest_context.kernel_sp;
+    tss->ss1  = v->arch.guest_context.kernel_ss;
 }
 
-#endif
+#endif /* __i386__ */
+
+static void paravirt_ctxt_switch_from(struct vcpu *v)
+{
+    save_segments(v);
+}
+
+static void paravirt_ctxt_switch_to(struct vcpu *v)
+{
+    set_int80_direct_trap(v);
+    switch_kernel_stack(v);
+}
 
 #define loaddebug(_v,_reg) \
     __asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
@@ -720,15 +737,7 @@ static void __context_switch(void)
                stack_regs,
                CTXT_SWITCH_STACK_BYTES);
         unlazy_fpu(p);
-        if ( !hvm_guest(p) )
-        {
-            save_segments(p);
-        }
-        else
-        {
-            hvm_save_segments(p);
-            hvm_load_msrs();
-        }
+        p->arch.ctxt_switch_from(p);
     }
 
     if ( !is_idle_vcpu(n) )
@@ -749,15 +758,7 @@ static void __context_switch(void)
             loaddebug(&n->arch.guest_context, 7);
         }
 
-        if ( !hvm_guest(n) )
-        {
-            set_int80_direct_trap(n);
-            switch_kernel_stack(n, cpu);
-        }
-        else
-        {
-            hvm_restore_msrs(n);
-        }
+        n->arch.ctxt_switch_to(n);
     }
 
     if ( p->domain != n->domain )

@@ -101,29 +101,24 @@ def test_sysrq(name):
     if not re.search("[Ee]rror", output):
         FAIL("sysrq failed to report error after destroy!")
 
-def runTests(tests, wait):
+def runTests(tests):
     for test in tests:
         domain = XmTestDomain()
 
         # Create a domain
 
         try:
-            if wait:
-                domain.start()
-            else:
-                domain.startNow()
+            domain.start()
         except DomainError, e:
             FAIL(str(e))
 
-
-        if wait:
-            # Attach a console and make sure it's live
-            try:
-                console = XmConsole(domain.getName())
-                console.sendInput("foo")
-                console.runCmd("ls")
-            except ConsoleError, e:
-                FAIL(str(e))
+        # Attach a console and make sure it's live
+        try:
+            console = XmConsole(domain.getName())
+            console.sendInput("foo")
+            console.runCmd("ls")
+        except ConsoleError, e:
+            FAIL(str(e))
 
         # Destroy it
                 
@@ -137,9 +132,5 @@ tests = [test_mem_set, test_pause, test_unpause, test_reboot, test_save,
          test_block_list, test_shutdown, test_domid, test_domname]
 
 if verbose:
-    print "Running stale tests (nice mode)"
-runTests(tests, True)
-
-if verbose:
-    print "Running stale tests (mean mode)"
-runTests(tests, False)
+    print "Running stale tests"
+runTests(tests)

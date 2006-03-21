@@ -36,6 +36,7 @@
 #include <linux/notifier.h>
 #include <linux/wait.h>
 #include <linux/fs.h>
+#include <linux/poll.h>
 
 #include "xenbus_comms.h"
 
@@ -207,11 +208,22 @@ static int xenbus_dev_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+static unsigned int xenbus_dev_poll(struct file *file, poll_table *wait)
+{
+	struct xenbus_dev_data *u = file->private_data;
+
+	poll_wait(file, &u->read_waitq, wait);
+	if (u->read_cons != u->read_prod)
+		return POLLIN | POLLRDNORM;
+	return 0;
+}
+
 static struct file_operations xenbus_dev_file_ops = {
 	.read = xenbus_dev_read,
 	.write = xenbus_dev_write,
 	.open = xenbus_dev_open,
 	.release = xenbus_dev_release,
+	.poll = xenbus_dev_poll,
 };
 
 static int __init

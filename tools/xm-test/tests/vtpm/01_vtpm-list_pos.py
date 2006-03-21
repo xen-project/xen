@@ -1,21 +1,16 @@
 #!/usr/bin/python
 
 # Copyright (C) International Business Machines Corp., 2006
-# Author: Stefan Berger <stefanb@us.ibm.com)
+# Author: Stefan Berger <stefanb@us.ibm.com>
 
 # Positive Test: create domain with virtual TPM attached at build time,
 #                verify list
 
 
 from XmTestLib import *
-
-def vtpm_cleanup(domName):
-	# Since this is only a temporary domain I clean up the domain from the
-	# virtual TPM directory
-	traceCommand("/etc/xen/scripts/vtpm-delete %s" % domName)
-
-if ENABLE_HVM_SUPPORT:
-    SKIP("vtpm-list not supported for HVM domains")
+from vtpm_utils import *
+import commands
+import os
 
 config = {"vtpm":"instance=1,backend=0"}
 domain = XmTestDomain(extraConfig=config)

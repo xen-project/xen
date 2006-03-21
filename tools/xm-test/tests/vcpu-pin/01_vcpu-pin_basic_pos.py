@@ -46,3 +46,5 @@ cpu = getVcpuInfo(domain.getName())[0]
 
 if cpu != 1:
     FAIL("failed to switch VCPU 0 to CPU 1")
+
+domain.stop()

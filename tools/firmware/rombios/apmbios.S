@@ -217,14 +217,22 @@ APMSYM(03):
 ; APM interface disconnect
 APMSYM(04):
   cmp al, #0x04
+  jne APMSYM(05)
+  jmp APMSYM(ok)
+
+;-----------------
+; APM cpu idle
+APMSYM(05):
+  cmp al, #0x05
   jne APMSYM(07)
+  hlt
   jmp APMSYM(ok)
 
 ;-----------------
 ; APM Set Power State
 APMSYM(07):
   cmp al, #0x07
-  jne APMSYM(0a)
+  jne APMSYM(08)
   
   cmp bx, #1
   jne APMSYM(ok)
@@ -268,6 +276,14 @@ APMSYM(07_standby):
   jmp APMSYM(ok)
 
 ;-----------------
+; APM Enable / Disable
+APMSYM(08):
+  cmp al, #0x08
+  jne APMSYM(0a)
+
+  jmp APMSYM(ok)
+
+;-----------------
 ; Get Power Status
 APMSYM(0a):
   cmp al, #0x0a
@@ -297,11 +313,30 @@ APMSYM(0b):
 ; APM Driver Version
 APMSYM(0e):
   cmp al, #0x0e
-  jne APMSYM(unimplemented)
+  jne APMSYM(0f)
   
   mov ah, #1
   mov al, #2
   
+  jmp APMSYM(ok)
+
+;-----------------
+; APM Engage / Disengage
+APMSYM(0f):
+  cmp al, #0x0f
+  jne APMSYM(10)
+
+  jmp APMSYM(ok)
+
+;-----------------
+; APM Get Capabilities
+APMSYM(10):
+  cmp al, #0x10
+  jne APMSYM(unimplemented)
+
+  mov bl, #0
+  mov cx, #0
+
   jmp APMSYM(ok)
 
 ;-----------------

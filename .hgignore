@@ -13,6 +13,7 @@
 .*\.flc$
 .*\.orig$
 .*\.rej$
+.*/a\.out$
 ^[^/]*\.bz2$
 ^TAGS$
 ^dist/.*$

@@ -1,6 +1,8 @@
 ########################################
 # x86-specific definitions
 
+HAS_ACPI := y
+
 #
 # If you change any of these configuration options then you must
 # 'make clean' before rebuilding.
@@ -31,13 +33,17 @@ CFLAGS  += -DCONFIG_X86_SUPERVISOR_MODE_KERNEL=1
 endif
 
 ifeq ($(XEN_TARGET_ARCH),x86_32)
-LDFLAGS += -m elf_i386 
+LDFLAGS += -m elf_i386
+x86_32 := y
+x86_64 := n
 endif
 
 ifeq ($(TARGET_SUBARCH),x86_64)
 CFLAGS  += -mno-red-zone -fpic -fno-reorder-blocks
 CFLAGS  += -fno-asynchronous-unwind-tables
 LDFLAGS += -m elf_x86_64
+x86_32 := n
+x86_64 := y
 endif
 
 # Test for at least GCC v3.2.x.

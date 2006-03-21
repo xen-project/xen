@@ -13,7 +13,9 @@ usage() {
     echo "  -b          : do not ask any questions (batch mode)"
     echo "  -g          : run a group test set"
     echo "  -e <email>  : set email address for report"
+    echo "  -r <url>    : url of test results repository to use"
     echo "  -s <report> : just submit report <report>"
+    echo "  -u          : unsafe -- do not run the sanity checks before starting"
     echo "  -h | --help : show this help"
 }
 
@@ -22,7 +24,7 @@ submit_report() {
 
     reportfile=$1
 
-    ./lib/XmTestReport/Report.py $reportfile
+    ./lib/XmTestReport/Report.py $reportserver $reportfile
 }
 
 # Generate XML result report from output file
@@ -189,8 +191,10 @@ EOF
 # Defaults
 MAXFAIL=10
 report=yes
+reportserver=${xmtest_repo:-'http://xmtest.dague.org/cgi-bin/report-results'}
 batch=no
 run=yes
+unsafe=no
 GROUPENTERED=default
 
 # Resolve options
@@ -218,8 +222,17 @@ while [ $# -gt 0 ]
              exit 1
           fi
 	  ;;
+      -r)
+	  shift
+	  reportserver=$1
+	  ;;
       -s)
 	  run=no
+	  ;;
+      -u)
+	  echo "(Unsafe mode)"
+	  unsafe=yes
+	  report=no
 	  ;;
       -h|--help)
           usage
@@ -264,15 +277,25 @@ if [ ! -f contact_info ]; then
     fi
 fi
 
+if [ "$GROUPENTERED" != "default" ]; then
+   report=no;
+fi
+
 if [ "$run" != "no" ]; then
-    runnable_tests
-    make_environment_report $OSREPORTTEMP $PROGREPORTTEMP
+    if [ "$unsafe" = "no" ]; then
+      runnable_tests
+    fi
+    rm -f $REPORT"*"
+    if [ "$unsafe" = "no" ]; then
+      make_environment_report $OSREPORTTEMP $PROGREPORTTEMP
+    fi
     run_tests $GROUPENTERED $OUTPUT
     make_text_reports $PASSFAIL $FAILURES $OUTPUT $TXTREPORT
-    make_result_report $OUTPUT $RESULTREPORTTEMP
-    cat $OSREPORTTEMP $PROGREPORTTEMP $RESULTREPORTTEMP > $XMLREPORT
-    rm $OSREPORTTEMP $PROGREPORTTEMP $RESULTREPORTTEMP
-
+    if [ "$unsafe" = "no" ]; then
+      make_result_report $OUTPUT $RESULTREPORTTEMP
+      cat $OSREPORTTEMP $PROGREPORTTEMP $RESULTREPORTTEMP > $XMLREPORT
+      rm $OSREPORTTEMP $PROGREPORTTEMP $RESULTREPORTTEMP
+    fi
 fi
 
 if [ "$report" = "yes" ]; then

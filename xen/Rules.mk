@@ -8,6 +8,15 @@ perfc       ?= n
 perfc_arrays?= n
 crash_debug ?= n
 
+# Hardcoded configuration implications and dependencies.
+# Do this is a neater way if it becomes unwieldy.
+ifeq ($(debug),y)
+verbose := y
+endif
+ifeq ($(perfc_arrays),y)
+perfc := y
+endif
+
 XEN_ROOT=$(BASEDIR)/..
 include $(XEN_ROOT)/Config.mk
 
@@ -27,41 +36,23 @@ HDRS    := $(subst $(BASEDIR)/include/asm-$(TARGET_ARCH)/asm-offsets.h,,$(HDRS))
 HDRS    := $(subst $(BASEDIR)/include/xen/banner.h,,$(HDRS))
 HDRS    := $(subst $(BASEDIR)/include/xen/compile.h,,$(HDRS))
 
-C_SRCS  := $(wildcard *.c)
-S_SRCS  := $(wildcard *.S)
-OBJS    := $(patsubst %.S,%.o,$(S_SRCS))
-OBJS    += $(patsubst %.c,%.o,$(C_SRCS))
-
-# Note that link order matters!
-ALL_OBJS := $(BASEDIR)/common/common.o
-ALL_OBJS += $(BASEDIR)/drivers/char/driver.o
-ALL_OBJS += $(BASEDIR)/drivers/acpi/driver.o
-ifeq ($(ACM_SECURITY),y)
-ALL_OBJS += $(BASEDIR)/acm/acm.o
-CFLAGS += -DACM_SECURITY
-endif
-ALL_OBJS += $(BASEDIR)/arch/$(TARGET_ARCH)/arch.o
-
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
-CFLAGS += -g -D__XEN__
+# Note that link order matters!
+ALL_OBJS-y               += $(BASEDIR)/common/built_in.o
+ALL_OBJS-y               += $(BASEDIR)/drivers/built_in.o
+ALL_OBJS-$(ACM_SECURITY) += $(BASEDIR)/acm/built_in.o
+ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
 
-ifneq ($(debug)$(verbose),nn)
-CFLAGS += -DVERBOSE
-endif
+CFLAGS-y               += -g -D__XEN__
+CFLAGS-$(ACM_SECURITY) += -DACM_SECURITY
+CFLAGS-$(verbose)      += -DVERBOSE
+CFLAGS-$(crash_debug)  += -DCRASH_DEBUG
+CFLAGS-$(perfc)        += -DPERF_COUNTERS
+CFLAGS-$(perfc_arrays) += -DPERF_ARRAYS
 
-ifeq ($(crash_debug),y)
-CFLAGS += -DCRASH_DEBUG
-endif
-
-ifeq ($(perfc),y)
-CFLAGS += -DPERF_COUNTERS
-ifeq ($(perfc_arrays),y)
-CFLAGS += -DPERF_ARRAYS
-endif
-endif
-
-CFLAGS := $(strip $(CFLAGS))
+ALL_OBJS := $(ALL_OBJS-y)
+CFLAGS   := $(strip $(CFLAGS) $(CFLAGS-y))
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -c $< -o $@

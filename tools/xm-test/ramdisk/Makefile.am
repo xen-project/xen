@@ -14,6 +14,8 @@ HVM_SCRIPT = bin/create_disk_image
 XMTEST_MAJ_VER = $(shell echo @PACKAGE_VERSION@ | perl -pe 's/(\d+)\.(\d+)\.\d+/\1.\2/')
 XMTEST_VER_IMG = initrd-$(XMTEST_MAJ_VER).img
 
+EXTRA_ROOT_DIRS = sys
+
 if HVM
 all: initrd.img disk.img
 else
@@ -36,7 +38,8 @@ $(BR_IMG): $(BR_SRC)
 
 $(XMTEST_VER_IMG): $(BR_IMG)
 	chmod a+x skel/etc/init.d/rcS
-	(cd skel; tar cf - .) | (cd $(BR_SRC)/$(BR_ROOT); tar xvf -)
+	(cd skel; mkdir -p $(EXTRA_ROOT_DIRS); tar cf - .) \
+		| (cd $(BR_SRC)/$(BR_ROOT); tar xvf -)
 	cd $(BR_SRC) && make
 	cp $(BR_IMG) initrd-$(XMTEST_MAJ_VER).img
 

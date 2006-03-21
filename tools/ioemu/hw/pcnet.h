@@ -225,9 +225,11 @@ static inline void pcnet_tmd_load(PCNetState *s, struct pcnet_TMD *tmd, target_p
         ((uint32_t *)tmd)[3] = 0;
     }
     else
-    if (BCR_SWSTYLE(s) != 3)
-        cpu_physical_memory_read(addr, (void *)tmd, 16);
-    else {
+    if (BCR_SWSTYLE(s) != 3) {
+        ((uint32_t *)tmd)[2] = 0;
+        cpu_physical_memory_read(addr+4, (void *)&tmd->tmd1, 4);
+        cpu_physical_memory_read(addr, (void *)&tmd->tmd0, 4);
+    } else {
         uint32_t xda[4];
         cpu_physical_memory_read(addr,
                 (void *)&xda[0], sizeof(xda));
@@ -253,9 +255,10 @@ static inline void pcnet_tmd_store(PCNetState *s, struct pcnet_TMD *tmd, target_
         cpu_physical_memory_set_dirty(addr+7);
     }
     else {
-        if (BCR_SWSTYLE(s) != 3)
-            cpu_physical_memory_write(addr, (void *)tmd, 16);
-        else {
+        if (BCR_SWSTYLE(s) != 3) {
+            cpu_physical_memory_write(addr+8, (void *)&tmd->tmd2, 4);
+            cpu_physical_memory_write(addr+4, (void *)&tmd->tmd1, 4);
+        } else {
             uint32_t xda[4];
             xda[0] = ((uint32_t *)tmd)[2];
             xda[1] = ((uint32_t *)tmd)[1];
@@ -282,9 +285,11 @@ static inline void pcnet_rmd_load(PCNetState *s, struct pcnet_RMD *rmd, target_p
         ((uint32_t *)rmd)[3] = 0;
     }
     else
-    if (BCR_SWSTYLE(s) != 3)
-        cpu_physical_memory_read(addr, (void *)rmd, 16);
-    else {
+    if (BCR_SWSTYLE(s) != 3) {
+        rmd->rmd2.zeros = 0;
+        cpu_physical_memory_read(addr+4, (void *)&rmd->rmd1, 4);
+        cpu_physical_memory_read(addr, (void *)&rmd->rmd0, 4);
+    } else {
         uint32_t rda[4];
         cpu_physical_memory_read(addr,
                 (void *)&rda[0], sizeof(rda));
@@ -310,9 +315,10 @@ static inline void pcnet_rmd_store(PCNetState *s, struct pcnet_RMD *rmd, target_
         cpu_physical_memory_set_dirty(addr+7);
     }
     else {
-        if (BCR_SWSTYLE(s) != 3)
-            cpu_physical_memory_write(addr, (void *)rmd, 16);
-        else {
+        if (BCR_SWSTYLE(s) != 3) {
+            cpu_physical_memory_write(addr+8, (void *)&rmd->rmd2, 4);
+            cpu_physical_memory_write(addr+4, (void *)&rmd->rmd1, 4);
+        } else {
             uint32_t rda[4];
             rda[0] = ((uint32_t *)rmd)[2];
             rda[1] = ((uint32_t *)rmd)[1];
@@ -339,8 +345,7 @@ static inline void pcnet_rmd_store(PCNetState *s, struct pcnet_RMD *rmd, target_
 #define CHECK_RMD(ADDR,RES) do {                \
     struct pcnet_RMD rmd;                       \
     RMDLOAD(&rmd,(ADDR));                       \
-    (RES) |= (rmd.rmd1.ones != 15)              \
-          || (rmd.rmd2.zeros != 0);             \
+    (RES) |= (rmd.rmd1.ones != 15);             \
 } while (0)
 
 #define CHECK_TMD(ADDR,RES) do {                \

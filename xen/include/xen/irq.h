@@ -71,6 +71,5 @@ struct vcpu;
 extern int pirq_guest_unmask(struct domain *p);
 extern int pirq_guest_bind(struct vcpu *p, int irq, int will_share);
 extern int pirq_guest_unbind(struct domain *p, int irq);
-extern  fastcall unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs);
 
 #endif /* __XEN_IRQ_H__ */

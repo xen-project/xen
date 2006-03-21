@@ -213,7 +213,8 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosed:
-		kobject_uevent(&dev->dev.kobj, KOBJ_OFFLINE);
+		if (be->netif != NULL)
+			kobject_uevent(&dev->dev.kobj, KOBJ_OFFLINE);
 		device_unregister(&dev->dev);
 		break;
 

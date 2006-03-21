@@ -1,57 +1,59 @@
-
 include $(BASEDIR)/Rules.mk
 
-OBJS += $(patsubst %.S,%.o,$(wildcard $(TARGET_SUBARCH)/*.S))
-OBJS += $(patsubst %.c,%.o,$(wildcard $(TARGET_SUBARCH)/*.c))
-OBJS += $(patsubst %.c,%.o,$(wildcard acpi/*.c))
-OBJS += $(patsubst %.c,%.o,$(wildcard genapic/*.c))
-OBJS += $(patsubst %.c,%.o,$(wildcard cpu/*.c))
-OBJS += $(patsubst %.c,%.o,$(wildcard cpu/mcheck/*.c))
-OBJS += $(patsubst %.c,%.o,$(wildcard cpu/mtrr/*.c))
-OBJS += $(patsubst %.c,%.o,$(wildcard hvm/*.c))
-OBJS += $(patsubst %.c,%.o,$(wildcard hvm/vmx/*.c))
-OBJS += $(patsubst %.S,%.o,$(wildcard hvm/vmx/$(TARGET_SUBARCH)/*.S))
-OBJS += $(patsubst %.c,%.o,$(wildcard hvm/svm/*.c))
-OBJS += $(patsubst %.S,%.o,$(wildcard hvm/svm/$(TARGET_SUBARCH)/*.S))
+subdir-y += acpi
+subdir-y += cpu
+subdir-y += genapic
+subdir-y += hvm
 
-ifeq ($(TARGET_SUBARCH),x86_64) 
-OBJS := $(subst cpu/centaur.o,,$(OBJS))
-OBJS := $(subst cpu/cyrix.o,,$(OBJS))
-OBJS := $(subst cpu/rise.o,,$(OBJS))
-OBJS := $(subst cpu/transmeta.o,,$(OBJS))
+subdir-$(x86_32) += x86_32
+subdir-$(x86_64) += x86_64
+
+obj-y += apic.o
+obj-y += audit.o
+obj-y += bitops.o
+obj-y += delay.o
+obj-y += dmi_scan.o
+obj-y += dom0_ops.o
+obj-y += domain.o
+obj-y += domain_build.o
+obj-y += e820.o
+obj-y += extable.o
+obj-y += flushtlb.o
+obj-y += i387.o
+obj-y += i8259.o
+obj-y += io_apic.o
+obj-y += irq.o
+obj-y += microcode.o
+obj-y += mm.o
+obj-y += mpparse.o
+obj-y += nmi.o
+obj-y += physdev.o
+obj-y += rwlock.o
+obj-y += setup.o
+obj-y += smp.o
+obj-y += smpboot.o
+obj-y += string.o
+obj-y += time.o
+obj-y += trampoline.o
+obj-y += traps.o
+obj-y += usercopy.o
+obj-y += x86_emulate.o
+
+ifneq ($(pae),n)
+obj-$(x86_32) += shadow.o shadow_public.o shadow_guest32.o
+else
+obj-$(x86_32) += shadow32.o
 endif
 
-OBJS := $(patsubst shadow%.o,,$(OBJS))	# drop all
-ifeq ($(TARGET_SUBARCH),x86_64) 
- OBJS += shadow.o shadow_public.o shadow_guest32.o shadow_guest32pae.o	# x86_64: new code
-endif
-ifeq ($(TARGET_SUBARCH),x86_32) 
- ifneq ($(pae),n)
-  OBJS += shadow.o shadow_public.o shadow_guest32.o	# x86_32p: new code
- else
-  OBJS += shadow32.o			# x86_32: old code
- endif
-endif
+obj-$(x86_64) += shadow.o shadow_public.o shadow_guest32.o shadow_guest32pae.o
 
-ifneq ($(supervisor_mode_kernel),y)
-OBJS := $(subst x86_32/supervisor_mode_kernel.o,,$(OBJS))
-endif
+obj-$(crash_debug) += gdbstub.o
 
-OBJS := $(subst $(TARGET_SUBARCH)/asm-offsets.o,,$(OBJS))
-OBJS := $(subst $(TARGET_SUBARCH)/xen.lds.o,,$(OBJS))
-
-ifneq ($(crash_debug),y)
-OBJS := $(patsubst gdbstub%.o,,$(OBJS))
-endif
-
-default: $(TARGET)
+include $(BASEDIR)/Post.mk
 
 $(TARGET): $(TARGET)-syms boot/mkelf32
 	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
 	`$(NM) $(TARGET)-syms | sort | tail -n 1 | sed -e 's/^\([^ ]*\).*/0x\1/'`
-
-$(CURDIR)/arch.o: $(OBJS)
-	$(LD) $(LDFLAGS) -r -o $@ $(OBJS)
 
 $(TARGET)-syms: boot/$(TARGET_SUBARCH).o $(ALL_OBJS) xen.lds
 	$(LD) $(LDFLAGS) -T xen.lds -N \
@@ -77,21 +79,5 @@ boot/mkelf32: boot/mkelf32.c
 
 shadow_guest32.o: shadow.c
 
-clean:
-	rm -f *.o *.s *~ core boot/*.o boot/*~ boot/core boot/mkelf32
-	rm -f x86_32/*.o x86_32/*~ x86_32/core
-	rm -f x86_64/*.o x86_64/*~ x86_64/core
-	rm -f mtrr/*.o mtrr/*~ mtrr/core
-	rm -f acpi/*.o acpi/*~ acpi/core
-	rm -f genapic/*.o genapic/*~ genapic/core
-	rm -f cpu/*.o cpu/*~ cpu/core
-	rm -f hvm/*.o hvm/*~ hvm/core
-	rm -f hvm/vmx/*.o hvm/vmx/*~ hvm/vmx/core
-	rm -f hvm/vmx/x86_32/*.o hvm/vmx/x86_32/*~ hvm/vmx/x86_32/core
-	rm -f hvm/vmx/x86_64/*.o hvm/vmx/x86_64/*~ hvm/vmx/x86_64/core
-	rm -f hvm/svm/*.o hvm/svm/*~ hvm/svm/core
-	rm -f hvm/svm/x86_32/*.o hvm/svm/x86_32/*~ hvm/svm/x86_32/core
-	rm -f hvm/svm/x86_64/*.o hvm/svm/x86_64/*~ hvm/svm/x86_64/core
-	rm -f xen.lds
-
-.PHONY: default clean
+clean:: FORCE
+	rm -f asm-offsets.s xen.lds boot/*.o boot/*~ boot/core boot/mkelf32

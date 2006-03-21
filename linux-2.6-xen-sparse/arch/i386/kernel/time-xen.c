@@ -157,8 +157,8 @@ static int __init __independent_wallclock(char *str)
 }
 __setup("independent_wallclock", __independent_wallclock);
 
-/* Permitted clock jitter, in usecs, beyond which a warning will be printed. */
-static unsigned long permitted_clock_jitter = 10000UL;
+/* Permitted clock jitter, in nsecs, beyond which a warning will be printed. */
+static unsigned long permitted_clock_jitter = 10000000UL; /* 10ms */
 static int __init __permitted_clock_jitter(char *str)
 {
 	permitted_clock_jitter = simple_strtoul(str, NULL, 0);
@@ -840,9 +840,9 @@ static int timer_resume(struct sys_device *dev)
 	write_seqlock_irqsave(&xtime_lock, flags);
 	xtime.tv_sec = sec;
 	xtime.tv_nsec = 0;
-	write_sequnlock_irqrestore(&xtime_lock, flags);
-	jiffies += sleep_length;
+	jiffies_64 += sleep_length;
 	wall_jiffies += sleep_length;
+	write_sequnlock_irqrestore(&xtime_lock, flags);
 	if (last_timer->resume)
 		last_timer->resume();
 	cur_timer = last_timer;

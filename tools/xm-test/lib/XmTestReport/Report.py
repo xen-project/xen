@@ -32,11 +32,7 @@ import xml.dom.minidom
 import httplib
 import urllib
 import re
-
-#REPORT_HOST = "xmtest-dev.dague.org"
-REPORT_HOST = "xmtest.dague.org"
-REPORT_URL  = "/cgi-bin/report-results";
-VIEW_URL = "cgi-bin/display?view=single&testid="
+from urlparse import urlparse
 
 class XmTestReport:
 
@@ -88,8 +84,11 @@ def encodeForm(fieldList):
 
     return 'multipart/form-data; boundary=%s' % boundary, textBody
 
-def postResults(results):
-    conn = httplib.HTTPConnection(REPORT_HOST)
+def postResults(report_server, results):
+    if not re.match('http://', report_server):
+	report_server = 'http://'+report_server
+    (report_host,report_url) = urlparse(report_server)[1:3]
+    conn = httplib.HTTPConnection(report_host)
 
     type, body = encodeForm({"log" : results})
 
@@ -100,22 +99,17 @@ def postResults(results):
     # print "%s\n" % type
     # print headers
     
-    conn.request("POST", REPORT_URL, body, headers)
+    conn.request("POST", report_url, body, headers)
     
     resp = conn.getresponse()
     data = resp.read()
 
     if resp.status == 200:
         print >>sys.stderr, "Your results have been submitted successfully!"
-        match = re.match("^id=([0-9]+)$", data.split("\n")[1])
-        if match:
-            id = match.group(1)
-            print >>sys.stderr, "See your report at:"
-            print >>sys.stderr, "http://%s/%s%s" % (REPORT_HOST, VIEW_URL, id)
     else:
         print >>sys.stderr, "Unable to submit results:"
-        print >>sys.stderr, "[http://%s%s] said %i: %s" % (REPORT_HOST,
-                                                           REPORT_URL,
+        print >>sys.stderr, "[http://%s%s] said %i: %s" % (report_host,
+                                                           report_url,
                                                            resp.status,
                                                            resp.reason)
         print >>sys.stderr, data
@@ -133,7 +127,9 @@ if __name__ == "__main__":
     dump = False
     files = []
 
-    for a in sys.argv[1:]:
+    report_server = sys.argv[1]
+
+    for a in sys.argv[2:]:
         if a == "-d":
             submit = False
             dump = True
@@ -156,5 +152,5 @@ if __name__ == "__main__":
         print xmlout
 
     if submit:
-        postResults(xmlout)
+        postResults(report_server, xmlout)
     

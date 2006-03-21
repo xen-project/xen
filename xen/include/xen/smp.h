@@ -45,32 +45,34 @@ extern void smp_cpus_done(unsigned int max_cpus);
  * Call a function on all other processors
  */
 extern int smp_call_function(
-    void (*func) (void *info), void *info, int retry, int wait);
+    void (*func) (void *info),
+    void *info,
+    int retry,
+    int wait);
+
+/* 
+ * Call a function on a selection of processors
+ */
+extern int on_selected_cpus(
+    cpumask_t selected,
+    void (*func) (void *info),
+    void *info,
+    int retry,
+    int wait);
 
 /*
  * Call a function on all processors
  */
-static inline int on_each_cpu(void (*func) (void *info), void *info,
-                              int retry, int wait)
+static inline int on_each_cpu(
+    void (*func) (void *info),
+    void *info,
+    int retry,
+    int wait)
 {
     int ret = smp_call_function(func, info, retry, wait);
     func(info);
     return ret;
 }
-
-extern volatile unsigned long smp_msg_data;
-extern volatile int smp_src_cpu;
-extern volatile int smp_msg_id;
-
-#define MSG_ALL_BUT_SELF	0x8000	/* Assume <32768 CPU's */
-#define MSG_ALL			0x8001
-
-#define MSG_INVALIDATE_TLB	0x0001	/* Remote processor TLB invalidate */
-#define MSG_STOP_CPU		0x0002	/* Sent to shut down slave CPU's
-					 * when rebooting
-					 */
-#define MSG_RESCHEDULE		0x0003	/* Reschedule request from master CPU*/
-#define MSG_CALL_FUNCTION       0x0004  /* Call function on all other CPUs */
 
 /*
  * Mark the boot cpu "online" so that it can call console drivers in
@@ -92,6 +94,18 @@ void smp_prepare_boot_cpu(void);
 #define on_each_cpu(func,info,retry,wait)	({ func(info); 0; })
 #define num_booting_cpus()			1
 #define smp_prepare_boot_cpu()			do {} while (0)
+
+static inline int on_selected_cpus(
+    cpumask_t selected,
+    void (*func) (void *info),
+    void *info,
+    int retry,
+    int wait)
+{
+    if ( cpu_isset(0, selected) )
+        func(info);
+    return 0;
+}
 
 #endif
 

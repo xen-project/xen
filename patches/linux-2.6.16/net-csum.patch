@@ -1,6 +1,6 @@
-diff -pruN ../pristine-linux-2.6.16-rc5/net/ipv4/netfilter/ip_nat_proto_tcp.c ./net/ipv4/netfilter/ip_nat_proto_tcp.c
---- ../pristine-linux-2.6.16-rc5/net/ipv4/netfilter/ip_nat_proto_tcp.c	2006-02-27 15:47:38.000000000 +0000
-+++ ./net/ipv4/netfilter/ip_nat_proto_tcp.c	2006-02-27 15:55:25.000000000 +0000
+diff -pruN ../pristine-linux-2.6.16/net/ipv4/netfilter/ip_nat_proto_tcp.c ./net/ipv4/netfilter/ip_nat_proto_tcp.c
+--- ../pristine-linux-2.6.16/net/ipv4/netfilter/ip_nat_proto_tcp.c	2006-03-20 05:53:29.000000000 +0000
++++ ./net/ipv4/netfilter/ip_nat_proto_tcp.c	2006-03-20 19:38:19.000000000 +0000
 @@ -129,10 +129,14 @@ tcp_manip_pkt(struct sk_buff **pskb,
  	if (hdrsize < sizeof(*hdr))
  		return 1;
@@ -17,9 +17,9 @@ diff -pruN ../pristine-linux-2.6.16-rc5/net/ipv4/netfilter/ip_nat_proto_tcp.c ./
  	return 1;
  }
  
-diff -pruN ../pristine-linux-2.6.16-rc5/net/ipv4/netfilter/ip_nat_proto_udp.c ./net/ipv4/netfilter/ip_nat_proto_udp.c
---- ../pristine-linux-2.6.16-rc5/net/ipv4/netfilter/ip_nat_proto_udp.c	2006-02-27 15:47:38.000000000 +0000
-+++ ./net/ipv4/netfilter/ip_nat_proto_udp.c	2006-02-27 15:55:25.000000000 +0000
+diff -pruN ../pristine-linux-2.6.16/net/ipv4/netfilter/ip_nat_proto_udp.c ./net/ipv4/netfilter/ip_nat_proto_udp.c
+--- ../pristine-linux-2.6.16/net/ipv4/netfilter/ip_nat_proto_udp.c	2006-03-20 05:53:29.000000000 +0000
++++ ./net/ipv4/netfilter/ip_nat_proto_udp.c	2006-03-20 19:38:19.000000000 +0000
 @@ -113,11 +113,16 @@ udp_manip_pkt(struct sk_buff **pskb,
  		newport = tuple->dst.u.udp.port;
  		portptr = &hdr->dest;
