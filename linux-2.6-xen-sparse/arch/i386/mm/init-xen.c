@@ -42,6 +42,11 @@
 #include <asm/tlbflush.h>
 #include <asm/sections.h>
 #include <asm/hypervisor.h>
+#if defined(CONFIG_SWIOTLB)
+#include <linux/dma-mapping.h>
+#include <asm/scatterlist.h>
+#include <asm/swiotlb.h>
+#endif
 
 extern unsigned long *contiguous_bitmap;
 
