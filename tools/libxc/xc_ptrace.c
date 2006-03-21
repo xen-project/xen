@@ -251,35 +251,39 @@ map_domain_va(
     if (fetch_regs(xc_handle, cpu, NULL))
         return NULL;
 
-    if ( ctxt[cpu].ctrlreg[3] != cr3_phys[cpu] )
-    {
-        cr3_phys[cpu] = ctxt[cpu].ctrlreg[3];
-        if ( cr3_virt[cpu] )
-            munmap(cr3_virt[cpu], PAGE_SIZE);
-        cr3_virt[cpu] = xc_map_foreign_range(
-            xc_handle, current_domid, PAGE_SIZE, PROT_READ,
-            cr3_phys[cpu] >> PAGE_SHIFT);
-        if ( cr3_virt[cpu] == NULL )
+    if (paging_enabled(&ctxt[cpu])) {
+       if ( ctxt[cpu].ctrlreg[3] != cr3_phys[cpu] )
+        {
+            cr3_phys[cpu] = ctxt[cpu].ctrlreg[3];
+            if ( cr3_virt[cpu] )
+                munmap(cr3_virt[cpu], PAGE_SIZE);
+            cr3_virt[cpu] = xc_map_foreign_range(
+                xc_handle, current_domid, PAGE_SIZE, PROT_READ,
+                cr3_phys[cpu] >> PAGE_SHIFT);
+            if ( cr3_virt[cpu] == NULL )
+                return NULL;
+        }
+        if ( (pde = cr3_virt[cpu][vtopdi(va)]) == 0 )
             return NULL;
-    }
-    if ( (pde = cr3_virt[cpu][vtopdi(va)]) == 0 )
-        return NULL;
-    if ( (ctxt[cpu].flags & VGCF_HVM_GUEST) && paging_enabled(&ctxt[cpu]) )
-        pde = page_array[pde >> PAGE_SHIFT] << PAGE_SHIFT;
-    if ( pde != pde_phys[cpu] )
-    {
-        pde_phys[cpu] = pde;
-        if ( pde_virt[cpu] )
-            munmap(pde_virt[cpu], PAGE_SIZE);
-        pde_virt[cpu] = xc_map_foreign_range(
-            xc_handle, current_domid, PAGE_SIZE, PROT_READ,
-            pde_phys[cpu] >> PAGE_SHIFT);
-        if ( pde_virt[cpu] == NULL )
+        if ( (ctxt[cpu].flags & VGCF_HVM_GUEST) && paging_enabled(&ctxt[cpu]) )
+            pde = page_array[pde >> PAGE_SHIFT] << PAGE_SHIFT;
+        if ( pde != pde_phys[cpu] )
+        {
+            pde_phys[cpu] = pde;
+            if ( pde_virt[cpu] )
+                munmap(pde_virt[cpu], PAGE_SIZE);
+            pde_virt[cpu] = xc_map_foreign_range(
+                xc_handle, current_domid, PAGE_SIZE, PROT_READ,
+                pde_phys[cpu] >> PAGE_SHIFT);
+            if ( pde_virt[cpu] == NULL )
+                return NULL;
+        }
+        if ( (page = pde_virt[cpu][vtopti(va)]) == 0 )
             return NULL;
+    } else {
+        page = va;
     }
-    if ( (page = pde_virt[cpu][vtopti(va)]) == 0 )
-        return NULL;
-    if ( (ctxt[cpu].flags & VGCF_HVM_GUEST) && paging_enabled(&ctxt[cpu]) )
+    if (ctxt[cpu].flags & VGCF_HVM_GUEST)
         page = page_array[page >> PAGE_SHIFT] << PAGE_SHIFT;
     if ( (page != page_phys[cpu]) || (perm != prev_perm[cpu]) )
     {
