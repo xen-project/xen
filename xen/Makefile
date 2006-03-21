@@ -55,14 +55,6 @@ $(TARGET): delete-unfresh-files
 	[ -e include/asm ] || ln -sf asm-$(TARGET_ARCH) include/asm
 	$(MAKE) -C arch/$(TARGET_ARCH) asm-offsets.s
 	$(MAKE) include/asm-$(TARGET_ARCH)/asm-offsets.h
-ifneq ($(TARGET_ARCH),x86)
-	$(MAKE) -C common
-	$(MAKE) -C drivers
-ifeq ($(ACM_SECURITY),y)
-	$(MAKE) -C acm
-endif
-	$(MAKE) -C arch/$(TARGET_ARCH)
-endif
 	$(MAKE) -C arch/$(TARGET_ARCH) $(TARGET)
 
 # drivers/char/console.o contains static banner/compile info. Blow it away.
