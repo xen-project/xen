@@ -264,8 +264,13 @@ if [ ! -f contact_info ]; then
     fi
 fi
 
+if [ "$GROUPENTERED" != "default" ]; then
+   report=no;
+fi
+
 if [ "$run" != "no" ]; then
     runnable_tests
+    rm -f $REPORT"*"
     make_environment_report $OSREPORTTEMP $PROGREPORTTEMP
     run_tests $GROUPENTERED $OUTPUT
     make_text_reports $PASSFAIL $FAILURES $OUTPUT $TXTREPORT
