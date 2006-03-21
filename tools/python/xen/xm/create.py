@@ -14,7 +14,7 @@
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
 # Copyright (C) 2005 Nguyen Anh Quynh <aquynh@gmail.com>
-# Copyright (C) 2005 XenSource Ltd
+# Copyright (C) 2005-2006 XenSource Ltd
 #============================================================================
 
 """Domain creation.
@@ -27,8 +27,6 @@ import socket
 import commands
 import time
 import re
-
-import xen.lowlevel.xc
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
