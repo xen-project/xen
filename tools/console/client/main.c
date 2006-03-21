@@ -242,7 +242,7 @@ int main(int argc, char **argv)
 
 	now = time(0);
 	while (str_pty == NULL && (now + 5) > time(0)) {
-		struct timeval tv = { 0, 500 };
+		struct timeval tv = { 0, 250000 };
 		select(0, NULL, NULL, NULL, &tv); /* pause briefly */
 
 		str_pty = xs_read(xs, XBT_NULL, path, &len);
