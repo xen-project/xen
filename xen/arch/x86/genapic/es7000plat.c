@@ -165,7 +165,7 @@ find_unisys_acpi_oem_table(unsigned long *oem_addr)
 	unsigned long			rsdp_phys = 0;
 	struct acpi_table_header 	*header = NULL;
 	int				i;
-	struct acpi_table_sdt		sdt;
+	struct acpi_table_sdt		sdt = { 0 }; /* initialise sdt.count */
 
 	rsdp_phys = acpi_find_rsdp();
 	rsdp = __va(rsdp_phys);
