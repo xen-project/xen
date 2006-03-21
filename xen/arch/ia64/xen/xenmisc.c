@@ -124,11 +124,6 @@ u32 tlbflush_time[NR_CPUS];
 // from arch/x86/memory.c
 ///////////////////////////////
 
-void init_percpu_info(void)
-{
-	dummy();
-    //memset(percpu_info, 0, sizeof(percpu_info));
-}
 
 void free_page_type(struct page_info *page, u32 type)
 {
@@ -201,8 +196,6 @@ void dump_pageframe_info(struct domain *d)
 {
 	printk("dump_pageframe_info not implemented\n");
 }
-
-int nmi_count(int x) { return x; }
 
 ///////////////////////////////
 // called from arch/ia64/head.S

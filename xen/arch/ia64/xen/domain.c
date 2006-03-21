@@ -480,7 +480,7 @@ static struct page_info * assign_new_domain0_page(unsigned long mpaddr)
 }
 
 /* allocate new page for domain and map it to the specified metaphysical addr */
-struct page_info * assign_new_domain_page(struct domain *d, unsigned long mpaddr)
+static struct page_info * assign_new_domain_page(struct domain *d, unsigned long mpaddr)
 {
 	struct mm_struct *mm = d->arch.mm;
 	struct page_info *pt, *p = (struct page_info *)0;
@@ -738,7 +738,7 @@ static void copy_memory(void *dst, void *src, int size)
 	}
 }
 
-void loaddomainelfimage(struct domain *d, unsigned long image_start)
+static void loaddomainelfimage(struct domain *d, unsigned long image_start)
 {
 	char *elfbase = (char *) image_start;
 	//Elf_Ehdr *ehdr = (Elf_Ehdr *)image_start;
@@ -797,46 +797,6 @@ void loaddomainelfimage(struct domain *d, unsigned long image_start)
 	}
 }
 
-int
-parsedomainelfimage(char *elfbase, unsigned long elfsize, unsigned long *entry)
-{
-	Elf_Ehdr ehdr;
-
-	copy_memory(&ehdr,elfbase,sizeof(Elf_Ehdr));
-
-	if ( !elf_sanity_check(&ehdr) ) {
-		printk("ELF sanity check failed.\n");
-		return -EINVAL;
-	}
-
-	if ( (ehdr.e_phoff + (ehdr.e_phnum * ehdr.e_phentsize)) > elfsize )
-	{
-		printk("ELF program headers extend beyond end of image.\n");
-		return -EINVAL;
-	}
-
-	if ( (ehdr.e_shoff + (ehdr.e_shnum * ehdr.e_shentsize)) > elfsize )
-	{
-		printk("ELF section headers extend beyond end of image.\n");
-		return -EINVAL;
-	}
-
-#if 0
-	/* Find the section-header strings table. */
-	if ( ehdr.e_shstrndx == SHN_UNDEF )
-	{
-		printk("ELF image has no section-header strings table (shstrtab).\n");
-		return -EINVAL;
-	}
-#endif
-
-	*entry = ehdr.e_entry;
-	printf("parsedomainelfimage: entry point = 0x%lx\n", *entry);
-
-	return 0;
-}
-
-
 void alloc_dom0(void)
 {
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
@@ -871,7 +831,7 @@ void alloc_dom0(void)
  * handled with order > 0 request. Dom0 requires that bit set to
  * allocate memory for other domains.
  */
-void physdev_init_dom0(struct domain *d)
+static void physdev_init_dom0(struct domain *d)
 {
 	if (iomem_permit_access(d, 0UL, ~0UL))
 		BUG();
@@ -879,7 +839,7 @@ void physdev_init_dom0(struct domain *d)
 		BUG();
 }
 
-unsigned int vmx_dom0 = 0;
+static unsigned int vmx_dom0 = 0;
 int construct_dom0(struct domain *d, 
 	               unsigned long image_start, unsigned long image_len, 
 	               unsigned long initrd_start, unsigned long initrd_len,
