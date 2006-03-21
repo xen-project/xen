@@ -189,6 +189,14 @@ config XEN_DISABLE_SERIAL
 	  Disable serial port drivers, allowing the Xen console driver
 	  to provide a serial console at ttyS0.
 
+config XEN_SYSFS
+	tristate "Export Xen attributes in sysfs"
+	depends on XEN
+	depends on SYSFS
+	default y
+	help
+		Xen hypervisor attributes will show up under /sys/hypervisor/.
+
 endmenu
 
 config HAVE_ARCH_ALLOC_SKB
