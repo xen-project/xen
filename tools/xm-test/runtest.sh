@@ -15,6 +15,7 @@ usage() {
     echo "  -e <email>  : set email address for report"
     echo "  -r <url>    : url of test results repository to use"
     echo "  -s <report> : just submit report <report>"
+    echo "  -u          : unsafe -- do not run the sanity checks before starting"
     echo "  -h | --help : show this help"
 }
 
@@ -193,6 +194,7 @@ report=yes
 reportserver=${xmtest_repo:-'http://xmtest.dague.org/cgi-bin/report-results'}
 batch=no
 run=yes
+unsafe=no
 GROUPENTERED=default
 
 # Resolve options
@@ -226,6 +228,11 @@ while [ $# -gt 0 ]
 	  ;;
       -s)
 	  run=no
+	  ;;
+      -u)
+	  echo "(Unsafe mode)"
+	  unsafe=yes
+	  report=no
 	  ;;
       -h|--help)
           usage
@@ -275,15 +282,20 @@ if [ "$GROUPENTERED" != "default" ]; then
 fi
 
 if [ "$run" != "no" ]; then
-    runnable_tests
+    if [ "$unsafe" = "no" ]; then
+      runnable_tests
+    fi
     rm -f $REPORT"*"
-    make_environment_report $OSREPORTTEMP $PROGREPORTTEMP
+    if [ "$unsafe" = "no" ]; then
+      make_environment_report $OSREPORTTEMP $PROGREPORTTEMP
+    fi
     run_tests $GROUPENTERED $OUTPUT
     make_text_reports $PASSFAIL $FAILURES $OUTPUT $TXTREPORT
-    make_result_report $OUTPUT $RESULTREPORTTEMP
-    cat $OSREPORTTEMP $PROGREPORTTEMP $RESULTREPORTTEMP > $XMLREPORT
-    rm $OSREPORTTEMP $PROGREPORTTEMP $RESULTREPORTTEMP
-
+    if [ "$unsafe" = "no" ]; then
+      make_result_report $OUTPUT $RESULTREPORTTEMP
+      cat $OSREPORTTEMP $PROGREPORTTEMP $RESULTREPORTTEMP > $XMLREPORT
+      rm $OSREPORTTEMP $PROGREPORTTEMP $RESULTREPORTTEMP
+    fi
 fi
 
 if [ "$report" = "yes" ]; then
