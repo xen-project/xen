@@ -18,6 +18,7 @@
 #include <xen/acpi.h>
 
 #include <asm/dom_fw.h>
+#include <public/sched.h>
 
 static struct ia64_boot_param *dom_fw_init(struct domain *, char *,int,char *,int);
 extern unsigned long domain_mpa_to_imva(struct domain *,unsigned long mpaddr);
@@ -324,7 +325,8 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 			    (*efi.reset_system)(EFI_RESET_SHUTDOWN,0,0,NULL);
 		    }
 		    else
-			    domain_shutdown (current->domain, 0);
+			    domain_shutdown (current->domain,
+					     SHUTDOWN_poweroff);
 		    break;
 	    default:
 		printk("xen_pal_emulator: UNIMPLEMENTED PAL CALL %lu!!!!\n",

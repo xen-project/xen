@@ -196,7 +196,8 @@ fw_hypercall (struct pt_regs *regs)
 			printf("(by dom0)\n ");
 			(*efi.reset_system)(EFI_RESET_WARM,0,0,NULL);
 		}
-		printf("(not supported for non-0 domain)\n");
+		else
+			domain_shutdown (current->domain, SHUTDOWN_reboot);
 		regs->r8 = EFI_UNSUPPORTED;
 		break;
 	    case FW_HYPERCALL_EFI_GET_TIME:
