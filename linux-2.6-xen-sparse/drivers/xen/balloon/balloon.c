@@ -7,8 +7,11 @@
  * Copyright (c) 2003-2004, M Williamson, K Fraser
  * Copyright (c) 2005 Dan M. Smith, IBM Corporation
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -572,9 +575,11 @@ void balloon_dealloc_empty_page_range(
 	schedule_work(&balloon_worker);
 }
 
-EXPORT_SYMBOL(balloon_update_driver_allowance);
-EXPORT_SYMBOL(balloon_alloc_empty_page_range);
-EXPORT_SYMBOL(balloon_dealloc_empty_page_range);
+EXPORT_SYMBOL_GPL(balloon_update_driver_allowance);
+EXPORT_SYMBOL_GPL(balloon_alloc_empty_page_range);
+EXPORT_SYMBOL_GPL(balloon_dealloc_empty_page_range);
+
+MODULE_LICENSE("Dual BSD/GPL");
 
 /*
  * Local variables:

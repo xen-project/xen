@@ -6,8 +6,11 @@
  *
  * Copyright (C) 2005 Rusty Russell, IBM Corporation
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -333,7 +336,7 @@ char **xenbus_directory(xenbus_transaction_t t,
 
 	return split(strings, len, num);
 }
-EXPORT_SYMBOL(xenbus_directory);
+EXPORT_SYMBOL_GPL(xenbus_directory);
 
 /* Check if a path exists. Return 1 if it does. */
 int xenbus_exists(xenbus_transaction_t t,
@@ -348,7 +351,7 @@ int xenbus_exists(xenbus_transaction_t t,
 	kfree(d);
 	return 1;
 }
-EXPORT_SYMBOL(xenbus_exists);
+EXPORT_SYMBOL_GPL(xenbus_exists);
 
 /* Get the value of a single file.
  * Returns a kmalloced value: call free() on it after use.
@@ -368,7 +371,7 @@ void *xenbus_read(xenbus_transaction_t t,
 	kfree(path);
 	return ret;
 }
-EXPORT_SYMBOL(xenbus_read);
+EXPORT_SYMBOL_GPL(xenbus_read);
 
 /* Write the value of a single file.
  * Returns -err on failure.
@@ -393,7 +396,7 @@ int xenbus_write(xenbus_transaction_t t,
 	kfree(path);
 	return ret;
 }
-EXPORT_SYMBOL(xenbus_write);
+EXPORT_SYMBOL_GPL(xenbus_write);
 
 /* Create a new directory. */
 int xenbus_mkdir(xenbus_transaction_t t,
@@ -410,7 +413,7 @@ int xenbus_mkdir(xenbus_transaction_t t,
 	kfree(path);
 	return ret;
 }
-EXPORT_SYMBOL(xenbus_mkdir);
+EXPORT_SYMBOL_GPL(xenbus_mkdir);
 
 /* Destroy a file or directory (directories must be empty). */
 int xenbus_rm(xenbus_transaction_t t, const char *dir, const char *node)
@@ -426,7 +429,7 @@ int xenbus_rm(xenbus_transaction_t t, const char *dir, const char *node)
 	kfree(path);
 	return ret;
 }
-EXPORT_SYMBOL(xenbus_rm);
+EXPORT_SYMBOL_GPL(xenbus_rm);
 
 /* Start a transaction: changes by others will not be seen during this
  * transaction, and changes will not be visible to others until end.
@@ -447,7 +450,7 @@ int xenbus_transaction_start(xenbus_transaction_t *t)
 	kfree(id_str);
 	return 0;
 }
-EXPORT_SYMBOL(xenbus_transaction_start);
+EXPORT_SYMBOL_GPL(xenbus_transaction_start);
 
 /* End a transaction.
  * If abandon is true, transaction is discarded instead of committed.
@@ -468,7 +471,7 @@ int xenbus_transaction_end(xenbus_transaction_t t, int abort)
 
 	return err;
 }
-EXPORT_SYMBOL(xenbus_transaction_end);
+EXPORT_SYMBOL_GPL(xenbus_transaction_end);
 
 /* Single read and scanf: returns -errno or num scanned. */
 int xenbus_scanf(xenbus_transaction_t t,
@@ -491,7 +494,7 @@ int xenbus_scanf(xenbus_transaction_t t,
 		return -ERANGE;
 	return ret;
 }
-EXPORT_SYMBOL(xenbus_scanf);
+EXPORT_SYMBOL_GPL(xenbus_scanf);
 
 /* Single printf and write: returns -errno or 0. */
 int xenbus_printf(xenbus_transaction_t t,
@@ -517,7 +520,7 @@ int xenbus_printf(xenbus_transaction_t t,
 
 	return ret;
 }
-EXPORT_SYMBOL(xenbus_printf);
+EXPORT_SYMBOL_GPL(xenbus_printf);
 
 /* Takes tuples of names, scanf-style args, and void **, NULL terminated. */
 int xenbus_gather(xenbus_transaction_t t, const char *dir, ...)
@@ -547,7 +550,7 @@ int xenbus_gather(xenbus_transaction_t t, const char *dir, ...)
 	va_end(ap);
 	return ret;
 }
-EXPORT_SYMBOL(xenbus_gather);
+EXPORT_SYMBOL_GPL(xenbus_gather);
 
 static int xs_watch(const char *path, const char *token)
 {
@@ -617,7 +620,7 @@ int register_xenbus_watch(struct xenbus_watch *watch)
 
 	return err;
 }
-EXPORT_SYMBOL(register_xenbus_watch);
+EXPORT_SYMBOL_GPL(register_xenbus_watch);
 
 void unregister_xenbus_watch(struct xenbus_watch *watch)
 {
@@ -659,7 +662,7 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 		up(&xenwatch_mutex);
 	}
 }
-EXPORT_SYMBOL(unregister_xenbus_watch);
+EXPORT_SYMBOL_GPL(unregister_xenbus_watch);
 
 void xs_suspend(void)
 {

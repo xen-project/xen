@@ -6,8 +6,11 @@
  * Copyright (c) 2005, Christopher Clark
  * Copyright (c) 2004-2005, K A Fraser
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -52,21 +55,21 @@
 	printk(KERN_WARNING "xen_grant: " fmt, ##args)
 
 
-EXPORT_SYMBOL(gnttab_grant_foreign_access);
-EXPORT_SYMBOL(gnttab_end_foreign_access_ref);
-EXPORT_SYMBOL(gnttab_end_foreign_access);
-EXPORT_SYMBOL(gnttab_query_foreign_access);
-EXPORT_SYMBOL(gnttab_grant_foreign_transfer);
-EXPORT_SYMBOL(gnttab_end_foreign_transfer_ref);
-EXPORT_SYMBOL(gnttab_end_foreign_transfer);
-EXPORT_SYMBOL(gnttab_alloc_grant_references);
-EXPORT_SYMBOL(gnttab_free_grant_references);
-EXPORT_SYMBOL(gnttab_free_grant_reference);
-EXPORT_SYMBOL(gnttab_claim_grant_reference);
-EXPORT_SYMBOL(gnttab_release_grant_reference);
-EXPORT_SYMBOL(gnttab_request_free_callback);
-EXPORT_SYMBOL(gnttab_grant_foreign_access_ref);
-EXPORT_SYMBOL(gnttab_grant_foreign_transfer_ref);
+EXPORT_SYMBOL_GPL(gnttab_grant_foreign_access);
+EXPORT_SYMBOL_GPL(gnttab_end_foreign_access_ref);
+EXPORT_SYMBOL_GPL(gnttab_end_foreign_access);
+EXPORT_SYMBOL_GPL(gnttab_query_foreign_access);
+EXPORT_SYMBOL_GPL(gnttab_grant_foreign_transfer);
+EXPORT_SYMBOL_GPL(gnttab_end_foreign_transfer_ref);
+EXPORT_SYMBOL_GPL(gnttab_end_foreign_transfer);
+EXPORT_SYMBOL_GPL(gnttab_alloc_grant_references);
+EXPORT_SYMBOL_GPL(gnttab_free_grant_references);
+EXPORT_SYMBOL_GPL(gnttab_free_grant_reference);
+EXPORT_SYMBOL_GPL(gnttab_claim_grant_reference);
+EXPORT_SYMBOL_GPL(gnttab_release_grant_reference);
+EXPORT_SYMBOL_GPL(gnttab_request_free_callback);
+EXPORT_SYMBOL_GPL(gnttab_grant_foreign_access_ref);
+EXPORT_SYMBOL_GPL(gnttab_grant_foreign_transfer_ref);
 
 /* External tools reserve first few grant table entries. */
 #define NR_RESERVED_ENTRIES 8

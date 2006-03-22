@@ -5,8 +5,11 @@
  * Copyright (C) 2005 Mike Wray, Hewlett-Packard
  * Copyright (C) 2005 XenSource Ltd
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -408,7 +411,7 @@ int xenbus_register_frontend(struct xenbus_driver *drv)
 
 	return xenbus_register_driver_common(drv, &xenbus_frontend);
 }
-EXPORT_SYMBOL(xenbus_register_frontend);
+EXPORT_SYMBOL_GPL(xenbus_register_frontend);
 
 int xenbus_register_backend(struct xenbus_driver *drv)
 {
@@ -416,13 +419,13 @@ int xenbus_register_backend(struct xenbus_driver *drv)
 
 	return xenbus_register_driver_common(drv, &xenbus_backend);
 }
-EXPORT_SYMBOL(xenbus_register_backend);
+EXPORT_SYMBOL_GPL(xenbus_register_backend);
 
 void xenbus_unregister_driver(struct xenbus_driver *drv)
 {
 	driver_unregister(&drv->driver);
 }
-EXPORT_SYMBOL(xenbus_unregister_driver);
+EXPORT_SYMBOL_GPL(xenbus_unregister_driver);
 
 struct xb_find_info
 {
@@ -845,7 +848,7 @@ void xenbus_suspend(void)
 	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, suspend_dev);
 	xs_suspend();
 }
-EXPORT_SYMBOL(xenbus_suspend);
+EXPORT_SYMBOL_GPL(xenbus_suspend);
 
 void xenbus_resume(void)
 {
@@ -854,7 +857,7 @@ void xenbus_resume(void)
 	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, resume_dev);
 	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, resume_dev);
 }
-EXPORT_SYMBOL(xenbus_resume);
+EXPORT_SYMBOL_GPL(xenbus_resume);
 
 
 /* A flag to determine if xenstored is 'ready' (i.e. has started) */
@@ -872,13 +875,13 @@ int register_xenstore_notifier(struct notifier_block *nb)
 
 	return ret;
 }
-EXPORT_SYMBOL(register_xenstore_notifier);
+EXPORT_SYMBOL_GPL(register_xenstore_notifier);
 
 void unregister_xenstore_notifier(struct notifier_block *nb)
 {
 	notifier_chain_unregister(&xenstore_chain, nb);
 }
-EXPORT_SYMBOL(unregister_xenstore_notifier);
+EXPORT_SYMBOL_GPL(unregister_xenstore_notifier);
 
 
 static int all_devices_ready_(struct device *dev, void *data)
