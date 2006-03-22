@@ -43,8 +43,7 @@
 #include <linux/init.h>
 #include <xen/tpmfe.h>
 #include <linux/err.h>
-
-#include <asm/semaphore.h>
+#include <linux/mutex.h>
 #include <asm/io.h>
 #include <xen/evtchn.h>
 #include <xen/interface/grant_table.h>
@@ -153,8 +152,8 @@ static inline void tpm_private_free(void)
 
 **************************************************************/
 
-static DECLARE_MUTEX(upperlayer_lock);
-static DECLARE_MUTEX(suspend_lock);
+static DEFINE_MUTEX(upperlayer_lock);
+static DEFINE_MUTEX(suspend_lock);
 static struct tpmfe_device *upperlayer_tpmfe;
 
 /*
@@ -164,9 +163,9 @@ int tpm_fe_send(struct tpm_private *tp, const u8 * buf, size_t count, void *ptr)
 {
 	int sent;
 
-	down(&suspend_lock);
+	mutex_lock(&suspend_lock);
 	sent = tpm_xmit(tp, buf, count, 0, ptr);
-	up(&suspend_lock);
+	mutex_unlock(&suspend_lock);
 
 	return sent;
 }
@@ -179,7 +178,7 @@ int tpm_fe_register_receiver(struct tpmfe_device *tpmfe_dev)
 {
 	int rc = 0;
 
-	down(&upperlayer_lock);
+	mutex_lock(&upperlayer_lock);
 	if (NULL == upperlayer_tpmfe) {
 		upperlayer_tpmfe = tpmfe_dev;
 		tpmfe_dev->max_tx_size = TPMIF_TX_RING_SIZE * PAGE_SIZE;
@@ -190,7 +189,7 @@ int tpm_fe_register_receiver(struct tpmfe_device *tpmfe_dev)
 	} else {
 		rc = -EBUSY;
 	}
-	up(&upperlayer_lock);
+	mutex_unlock(&upperlayer_lock);
 	return rc;
 }
 EXPORT_SYMBOL(tpm_fe_register_receiver);
@@ -200,9 +199,9 @@ EXPORT_SYMBOL(tpm_fe_register_receiver);
  */
 void tpm_fe_unregister_receiver(void)
 {
-	down(&upperlayer_lock);
+	mutex_lock(&upperlayer_lock);
 	upperlayer_tpmfe = NULL;
-	up(&upperlayer_lock);
+	mutex_unlock(&upperlayer_lock);
 }
 EXPORT_SYMBOL(tpm_fe_unregister_receiver);
 
@@ -215,12 +214,12 @@ static int tpm_fe_send_upperlayer(const u8 * buf, size_t count,
 {
 	int rc = 0;
 
-	down(&upperlayer_lock);
+	mutex_lock(&upperlayer_lock);
 
 	if (upperlayer_tpmfe && upperlayer_tpmfe->receive)
 		rc = upperlayer_tpmfe->receive(buf, count, ptr);
 
-	up(&upperlayer_lock);
+	mutex_unlock(&upperlayer_lock);
 	return rc;
 }
 
@@ -415,7 +414,7 @@ tpmfront_suspend(struct xenbus_device *dev)
 	u32 ctr;
 
 	/* lock, so no app can send */
-	down(&suspend_lock);
+	mutex_lock(&suspend_lock);
 	tp->is_suspended = 1;
 
 	for (ctr = 0; atomic_read(&tp->tx_busy) && ctr <= 25; ctr++) {
@@ -647,7 +646,7 @@ static void tpmif_notify_upperlayer(struct tpm_private *tp)
 	 * Notify upper layer about the state of the connection
 	 * to the BE.
 	 */
-	down(&upperlayer_lock);
+	mutex_lock(&upperlayer_lock);
 
 	if (upperlayer_tpmfe != NULL) {
 		if (tp->is_connected) {
@@ -656,7 +655,7 @@ static void tpmif_notify_upperlayer(struct tpm_private *tp)
 			upperlayer_tpmfe->status(0);
 		}
 	}
-	up(&upperlayer_lock);
+	mutex_unlock(&upperlayer_lock);
 }
 
 
@@ -665,21 +664,21 @@ static void tpmif_set_connected_state(struct tpm_private *tp, u8 is_connected)
 	/*
 	 * Don't notify upper layer if we are in suspend mode and
 	 * should disconnect - assumption is that we will resume
-	 * The semaphore keeps apps from sending.
+	 * The mutex keeps apps from sending.
 	 */
 	if (is_connected == 0 && tp->is_suspended == 1) {
 		return;
 	}
 
 	/*
-	 * Unlock the semaphore if we are connected again
+	 * Unlock the mutex if we are connected again
 	 * after being suspended - now resuming.
 	 * This also removes the suspend state.
 	 */
 	if (is_connected == 1 && tp->is_suspended == 1) {
 		tp->is_suspended = 0;
 		/* unlock, so apps can resume sending */
-		up(&suspend_lock);
+		mutex_unlock(&suspend_lock);
 	}
 
 	if (is_connected != tp->is_connected) {

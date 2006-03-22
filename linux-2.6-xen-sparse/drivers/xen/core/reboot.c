@@ -122,7 +122,7 @@ static int __do_suspend(void *ignore)
 	lock_cpu_hotplug();
 #ifdef CONFIG_SMP
 	/*
-	 * Take all other CPUs offline. We hold the hotplug semaphore to
+	 * Take all other CPUs offline. We hold the hotplug mutex to
 	 * avoid other processes bringing up CPUs under our feet.
 	 */
 	cpus_clear(prev_online_cpus);

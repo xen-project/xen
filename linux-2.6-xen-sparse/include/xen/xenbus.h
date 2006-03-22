@@ -36,7 +36,7 @@
 
 #include <linux/device.h>
 #include <linux/notifier.h>
-#include <asm/semaphore.h>
+#include <linux/mutex.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/grant_table.h>
 #include <xen/interface/io/xenbus.h>

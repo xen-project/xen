@@ -52,7 +52,7 @@
 
 #include "xenbus_comms.h"
 
-extern struct semaphore xenwatch_mutex;
+extern struct mutex xenwatch_mutex;
 
 #define streq(a, b) (strcmp((a), (b)) == 0)
 
@@ -399,9 +399,9 @@ static int xenbus_register_driver_common(struct xenbus_driver *drv,
 	drv->driver.probe = xenbus_dev_probe;
 	drv->driver.remove = xenbus_dev_remove;
 
-	down(&xenwatch_mutex);
+	mutex_lock(&xenwatch_mutex);
 	ret = driver_register(&drv->driver);
-	up(&xenwatch_mutex);
+	mutex_unlock(&xenwatch_mutex);
 	return ret;
 }
 

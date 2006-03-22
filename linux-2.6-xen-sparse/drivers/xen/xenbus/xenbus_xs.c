@@ -41,6 +41,7 @@
 #include <linux/slab.h>
 #include <linux/fcntl.h>
 #include <linux/kthread.h>
+#include <linux/rwsem.h>
 #include <xen/xenbus.h>
 #include "xenbus_comms.h"
 
@@ -76,7 +77,7 @@ struct xs_handle {
 	wait_queue_head_t reply_waitq;
 
 	/* One request at a time. */
-	struct semaphore request_mutex;
+	struct mutex request_mutex;
 
 	/* Protect transactions against save/restore. */
 	struct rw_semaphore suspend_mutex;
@@ -99,7 +100,7 @@ static DEFINE_SPINLOCK(watch_events_lock);
  * carrying out work.
  */
 static pid_t xenwatch_pid;
-/* static */ DECLARE_MUTEX(xenwatch_mutex);
+/* static */ DEFINE_MUTEX(xenwatch_mutex);
 static DECLARE_WAIT_QUEUE_HEAD(watch_events_waitq);
 
 static int get_error(const char *errorstring)
@@ -156,12 +157,12 @@ void xenbus_debug_write(const char *str, unsigned int count)
 	msg.type = XS_DEBUG;
 	msg.len = sizeof("print") + count + 1;
 
-	down(&xs_state.request_mutex);
+	mutex_lock(&xs_state.request_mutex);
 	xb_write(&msg, sizeof(msg));
 	xb_write("print", sizeof("print"));
 	xb_write(str, count);
 	xb_write("", 1);
-	up(&xs_state.request_mutex);
+	mutex_unlock(&xs_state.request_mutex);
 }
 
 void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg)
@@ -173,7 +174,7 @@ void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg)
 	if (req_msg.type == XS_TRANSACTION_START)
 		down_read(&xs_state.suspend_mutex);
 
-	down(&xs_state.request_mutex);
+	mutex_lock(&xs_state.request_mutex);
 
 	err = xb_write(msg, sizeof(*msg) + msg->len);
 	if (err) {
@@ -182,7 +183,7 @@ void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg)
 	} else
 		ret = read_reply(&msg->type, &msg->len);
 
-	up(&xs_state.request_mutex);
+	mutex_unlock(&xs_state.request_mutex);
 
 	if ((msg->type == XS_TRANSACTION_END) ||
 	    ((req_msg.type == XS_TRANSACTION_START) &&
@@ -211,25 +212,25 @@ static void *xs_talkv(xenbus_transaction_t t,
 	for (i = 0; i < num_vecs; i++)
 		msg.len += iovec[i].iov_len;
 
-	down(&xs_state.request_mutex);
+	mutex_lock(&xs_state.request_mutex);
 
 	err = xb_write(&msg, sizeof(msg));
 	if (err) {
-		up(&xs_state.request_mutex);
+		mutex_unlock(&xs_state.request_mutex);
 		return ERR_PTR(err);
 	}
 
 	for (i = 0; i < num_vecs; i++) {
 		err = xb_write(iovec[i].iov_base, iovec[i].iov_len);;
 		if (err) {
-			up(&xs_state.request_mutex);
+			mutex_unlock(&xs_state.request_mutex);
 			return ERR_PTR(err);
 		}
 	}
 
 	ret = read_reply(&msg.type, len);
 
-	up(&xs_state.request_mutex);
+	mutex_unlock(&xs_state.request_mutex);
 
 	if (IS_ERR(ret))
 		return ret;
@@ -658,8 +659,8 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 
 	/* Flush any currently-executing callback, unless we are it. :-) */
 	if (current->pid != xenwatch_pid) {
-		down(&xenwatch_mutex);
-		up(&xenwatch_mutex);
+		mutex_lock(&xenwatch_mutex);
+		mutex_unlock(&xenwatch_mutex);
 	}
 }
 EXPORT_SYMBOL_GPL(unregister_xenbus_watch);
@@ -667,7 +668,7 @@ EXPORT_SYMBOL_GPL(unregister_xenbus_watch);
 void xs_suspend(void)
 {
 	down_write(&xs_state.suspend_mutex);
-	down(&xs_state.request_mutex);
+	mutex_lock(&xs_state.request_mutex);
 }
 
 void xs_resume(void)
@@ -675,7 +676,7 @@ void xs_resume(void)
 	struct xenbus_watch *watch;
 	char token[sizeof(watch) * 2 + 1];
 
-	up(&xs_state.request_mutex);
+	mutex_unlock(&xs_state.request_mutex);
 
 	/* No need for watches_lock: the suspend_mutex is sufficient. */
 	list_for_each_entry(watch, &watches, list) {
@@ -698,7 +699,7 @@ static int xenwatch_thread(void *unused)
 		if (kthread_should_stop())
 			break;
 
-		down(&xenwatch_mutex);
+		mutex_lock(&xenwatch_mutex);
 
 		spin_lock(&watch_events_lock);
 		ent = watch_events.next;
@@ -716,7 +717,7 @@ static int xenwatch_thread(void *unused)
 			kfree(msg);
 		}
 
-		up(&xenwatch_mutex);
+		mutex_unlock(&xenwatch_mutex);
 	}
 
 	return 0;
@@ -809,7 +810,7 @@ int xs_init(void)
 	spin_lock_init(&xs_state.reply_lock);
 	init_waitqueue_head(&xs_state.reply_waitq);
 
-	init_MUTEX(&xs_state.request_mutex);
+	mutex_init(&xs_state.request_mutex);
 	init_rwsem(&xs_state.suspend_mutex);
 
 	/* Initialize the shared memory rings to talk to xenstored */
