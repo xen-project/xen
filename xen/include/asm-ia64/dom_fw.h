@@ -6,7 +6,7 @@
  */
 
 extern unsigned long dom_pa(unsigned long);
-extern unsigned long dom_fw_setup(struct domain *, char *, int);
+extern unsigned long dom_fw_setup(struct domain *, const char *, int);
 
 #ifndef MB
 #define MB (1024*1024)
@@ -135,5 +135,3 @@ extern struct ia64_pal_retval pal_emulator_static (unsigned long);
 
 extern void build_pal_hypercall_bundles(unsigned long *imva, unsigned long brkimm, unsigned long hypnum);
 extern void build_hypercall_bundle(UINT64 *imva, UINT64 brkimm, UINT64 hypnum, UINT64 ret);
-
-

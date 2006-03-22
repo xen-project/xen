@@ -52,11 +52,16 @@
 #include <public/arch-ia64.h>
 #include <asm/tlbflush.h>
 #include <asm/regionreg.h>
+#include <asm/dom_fw.h>
 
 #define CONFIG_DOMAIN0_CONTIGUOUS
 unsigned long dom0_start = -1L;
 unsigned long dom0_size = 512*1024*1024;
 unsigned long dom0_align = 64*1024*1024;
+
+/* dom0_max_vcpus: maximum number of VCPUs to create for dom0.  */
+static unsigned int dom0_max_vcpus = 1;
+integer_param("dom0_max_vcpus", dom0_max_vcpus); 
 
 // initialized by arch/ia64/setup.c:find_initrd()
 unsigned long initrd_start = 0, initrd_end = 0;
@@ -64,11 +69,6 @@ extern unsigned long running_on_sim;
 
 #define IS_XEN_ADDRESS(d,a) ((a >= d->xen_vastart) && (a <= d->xen_vaend))
 
-//extern int loadelfimage(char *);
-extern int readelfimage_base_and_size(char *, unsigned long,
-	              unsigned long *, unsigned long *, unsigned long *);
-
-extern unsigned long dom_fw_setup(struct domain *, char *, int);
 /* FIXME: where these declarations should be there ? */
 extern void domain_pend_keyboard_interrupt(int);
 extern long platform_is_hp_ski(void);
@@ -315,22 +315,28 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	}
 
 	*regs = c->regs;
-	d->arch.sys_pgnr = c->sys_pgnr;
-	d->arch.initrd_start = c->initrd.start;
-	d->arch.initrd_len   = c->initrd.size;
-	d->arch.cmdline      = c->cmdline;
+	if (v == d->vcpu[0]) {
+	    /* Only for first vcpu.  */
+	    d->arch.sys_pgnr = c->sys_pgnr;
+	    d->arch.initrd_start = c->initrd.start;
+	    d->arch.initrd_len   = c->initrd.size;
+	    d->arch.cmdline      = c->cmdline;
+	    d->shared_info->arch = c->shared;
+
+	    /* FIXME: it is required here ?  */
+	    sync_split_caches();
+	}
 	new_thread(v, regs->cr_iip, 0, 0);
 
-	sync_split_caches();
  	v->vcpu_info->arch.evtchn_vector = c->vcpu.evtchn_vector;
 	if ( c->vcpu.privregs && copy_from_user(v->arch.privregs,
 			   c->vcpu.privregs, sizeof(mapped_regs_t))) {
-	    printk("Bad ctxt address in arch_set_info_guest: %p\n", c->vcpu.privregs);
+	    printk("Bad ctxt address in arch_set_info_guest: %p\n",
+		   c->vcpu.privregs);
 	    return -EFAULT;
 	}
 
 	v->arch.domain_itm_last = -1L;
-	d->shared_info->arch = c->shared;
 
 	/* Don't redo final setup */
 	set_bit(_VCPUF_initialised, &v->vcpu_flags);
@@ -419,7 +425,7 @@ void new_thread(struct vcpu *v,
 	extern char dom0_command_line[];
 
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
-	if (d == dom0) start_pc += dom0_start;
+	if (d == dom0 && v->vcpu_id == 0) start_pc += dom0_start;
 #endif
 
 	regs = vcpu_regs (v);
@@ -447,24 +453,33 @@ void new_thread(struct vcpu *v,
 		VCPU(v, dcr) = 0;
 	} else {
 		init_all_rr(v);
-		if (d == dom0) 
-		    regs->r28 = dom_fw_setup(d,dom0_command_line,
-					     COMMAND_LINE_SIZE);
-		else {
-		    regs->ar_rsc |= (2 << 2); /* force PL2/3 */
-		    if (*d->arch.cmdline == '\0') {
+		if (v->vcpu_id == 0) {
+			/* Build the firmware.  */
+			if (d == dom0) 
+				regs->r28 = dom_fw_setup(d,dom0_command_line,
+							 COMMAND_LINE_SIZE);
+			else {
+				const char *cmdline = d->arch.cmdline;
+				int len;
+
+				if (*cmdline == 0) {
 #define DEFAULT_CMDLINE "nomca nosmp xencons=tty0 console=tty0 root=/dev/hda1"
-			regs->r28 = dom_fw_setup(d,DEFAULT_CMDLINE,
-						 sizeof (DEFAULT_CMDLINE));
-			printf("domU command line defaulted to"
-				DEFAULT_CMDLINE "\n");
-		    }
-		    else regs->r28 = dom_fw_setup(d,d->arch.cmdline, 
-						  IA64_COMMAND_LINE_SIZE);
+					cmdline = DEFAULT_CMDLINE;
+					len = sizeof (DEFAULT_CMDLINE);
+					printf("domU command line defaulted to"
+					       DEFAULT_CMDLINE "\n");
+				}
+				else
+					len = IA64_COMMAND_LINE_SIZE;
+
+				regs->r28 = dom_fw_setup (d, cmdline, len);
+			}
+			d->shared_info->arch.flags = (d == dom0) ?
+				(SIF_INITDOMAIN|SIF_PRIVILEGED) : 0;
 		}
+		regs->ar_rsc |= (2 << 2); /* force PL2/3 */
 		VCPU(v, banknum) = 1;
 		VCPU(v, metaphysical_mode) = 1;
-		d->shared_info->arch.flags = (d == dom0) ? (SIF_INITDOMAIN|SIF_PRIVILEGED) : 0;
 	}
 }
 
@@ -959,6 +974,18 @@ int construct_dom0(struct domain *d,
 	/* Mask all upcalls... */
 	for ( i = 1; i < MAX_VIRT_CPUS; i++ )
 	    d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
+
+	if (dom0_max_vcpus == 0)
+	    dom0_max_vcpus = MAX_VIRT_CPUS;
+	if (dom0_max_vcpus > num_online_cpus())
+	    dom0_max_vcpus = num_online_cpus();
+	if (dom0_max_vcpus > MAX_VIRT_CPUS)
+	    dom0_max_vcpus = MAX_VIRT_CPUS;
+	
+	printf ("Dom0 max_vcpus=%d\n", dom0_max_vcpus);
+	for ( i = 1; i < dom0_max_vcpus; i++ )
+	    if (alloc_vcpu(d, i, i) == NULL)
+		printf ("Cannot allocate dom0 vcpu %d\n", i);
 
 #ifdef VALIDATE_VT 
 	/* Construct a frame-allocation list for the initial domain, since these
