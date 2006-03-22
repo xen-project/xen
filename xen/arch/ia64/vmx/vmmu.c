@@ -185,6 +185,20 @@ thash_cb_t *init_domain_tlb(struct vcpu *d)
     return tlb;
 }
 
+void free_domain_tlb(struct vcpu *v)
+{
+    struct page_info *page;
+    void *vhptbase;
+    thash_cb_t *tlb;
+
+    if ( v->arch.vtlb ) {
+        tlb = v->arch.vtlb;
+        vhptbase = (void*)((u64)tlb + sizeof (thash_cb_t)) - VCPU_VHPT_SIZE;
+        page = virt_to_page(vhptbase);
+        free_domheap_pages(page, VCPU_VHPT_ORDER);
+    }
+}
+
 /*
  * Insert guest TLB to machine TLB.
  *  data:   In TLB format

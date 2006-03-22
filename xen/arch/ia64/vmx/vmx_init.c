@@ -186,6 +186,13 @@ static vpd_t *alloc_vpd(void)
 	return vpd;
 }
 
+/* Free vpd to xenheap */
+static void
+free_vpd(struct vcpu *v)
+{
+	if ( v->arch.privregs )
+		free_xenheap_pages(v->arch.privregs, get_order(VPD_SIZE));
+}
 
 /*
  * Create a VP on intialized VMX environment.
@@ -261,6 +268,8 @@ vmx_final_setup_guest(struct vcpu *v)
 {
 	vpd_t *vpd;
 
+	free_xenheap_pages(v->arch.privregs, get_order(sizeof(mapped_regs_t)));
+
 	vpd = alloc_vpd();
 	ASSERT(vpd);
 
@@ -288,6 +297,17 @@ vmx_final_setup_guest(struct vcpu *v)
 
 	/* One more step to enable interrupt assist */
 	set_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags);
+}
+
+void
+vmx_relinquish_vcpu_resources(struct vcpu *v)
+{
+	vtime_t *vtm = &(v->arch.arch_vmx.vtm);
+
+	kill_timer(&vtm->vtm_timer);
+
+	free_domain_tlb(v);
+	free_vpd(v);
 }
 
 typedef struct io_range {

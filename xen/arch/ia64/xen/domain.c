@@ -211,8 +211,13 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 
 void free_vcpu_struct(struct vcpu *v)
 {
-	if (v->arch.privregs != NULL)
-		free_xenheap_pages(v->arch.privregs, get_order(sizeof(mapped_regs_t)));
+	if (VMX_DOMAIN(v))
+		vmx_relinquish_vcpu_resources(v);
+	else {
+		if (v->arch.privregs != NULL)
+			free_xenheap_pages(v->arch.privregs, get_order(sizeof(mapped_regs_t)));
+	}
+
 	free_xenheap_pages(v, KERNEL_STACK_SIZE_ORDER);
 }
 

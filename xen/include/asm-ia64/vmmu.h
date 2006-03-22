@@ -373,6 +373,7 @@ extern void purge_machine_tc_by_domid(domid_t domid);
 extern void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb);
 extern ia64_rr vmmu_get_rr(struct vcpu *vcpu, u64 va);
 extern thash_cb_t *init_domain_tlb(struct vcpu *d);
+extern void free_domain_tlb(struct vcpu *v);
 extern thash_data_t * vsa_thash(PTA vpta, u64 va, u64 vrr, u64 *tag);
 extern thash_data_t * vhpt_lookup(u64 va);
 extern void machine_tlb_purge(u64 va, u64 ps);

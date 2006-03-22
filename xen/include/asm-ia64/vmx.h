@@ -51,7 +51,9 @@ extern void set_ifa_itir_iha (struct vcpu *vcpu, u64 vadr,
 extern void inject_guest_interruption(struct vcpu *vcpu, u64 vec);
 extern void vmx_intr_assist(struct vcpu *v);
 extern void set_illegal_op_isr (struct vcpu *vcpu);
-extern  void illegal_op (struct vcpu *vcpu);
+extern void illegal_op (struct vcpu *vcpu);
+extern void vmx_relinquish_vcpu_resources(struct vcpu *v);
+
 static inline vcpu_iodata_t *get_vio(struct domain *d, unsigned long cpu)
 {
     return &((shared_iopage_t *)d->arch.vmx_platform.shared_page_va)->vcpu_iodata[cpu];

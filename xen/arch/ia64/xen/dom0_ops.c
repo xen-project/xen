@@ -174,8 +174,11 @@ long arch_do_dom0_op(dom0_op_t *op, GUEST_HANDLE(dom0_op_t) u_dom0_op)
              */
             if ( (op->u.getmemlist.max_pfns == -1UL) &&
                  !test_bit(ARCH_VMX_CONTIG_MEM,
-                           &d->vcpu[0]->arch.arch_vmx.flags) )
-                return vmx_alloc_contig_pages(d) ? (-ENOMEM) : 0;
+                           &d->vcpu[0]->arch.arch_vmx.flags) ) {
+                ret = (long) vmx_alloc_contig_pages(d);
+                put_domain(d);
+                return ret ? (-ENOMEM) : 0;
+            }
 
             for ( i = start_page; i < (start_page + nr_pages); i++ )
             {
