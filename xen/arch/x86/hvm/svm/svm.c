@@ -1243,20 +1243,19 @@ static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs)
                 "svm_io_instruction: port 0x%lx real %d, eip=%lx:%lx, "
                 "exit_qualification = %lx",
                 (unsigned long) port, real, cs, eip, (unsigned long)info.bytes);
-
-    /* 
-     * On SVM, the RIP of the intruction following the IN/OUT is saved in
-     * ExitInfo2
-     */
-    vmcb->rip = vmcb->exitinfo2;
-
     /* string instruction */
     if (info.fields.str)
     { 
         unsigned long addr, count = 1;
         int sign = regs->eflags & EF_DF ? -1 : 1;
 
+        /* Need the original rip, here. */
         addr = svm_get_io_address(vmcb, regs, dir, real);
+        /* 
+         * On SVM, the RIP of the intruction following the IN/OUT is saved in
+         * ExitInfo2
+         */
+        vmcb->rip = vmcb->exitinfo2;
 
         /* "rep" prefix */
         if (info.fields.rep) 
@@ -1295,6 +1294,12 @@ static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs)
     } 
     else 
     {
+        /* 
+         * On SVM, the RIP of the intruction following the IN/OUT is saved in
+         * ExitInfo2
+         */
+        vmcb->rip = vmcb->exitinfo2;
+
         if (port == 0xe9 && dir == IOREQ_WRITE && size == 1) 
             hvm_print_line(v, regs->eax); /* guest debug output */
     
