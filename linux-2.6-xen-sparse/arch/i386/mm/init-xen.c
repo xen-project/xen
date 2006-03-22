@@ -29,6 +29,8 @@
 #include <linux/efi.h>
 #include <linux/memory_hotplug.h>
 #include <linux/initrd.h>
+#include <linux/dma-mapping.h>
+#include <linux/scatterlist.h>
 
 #include <asm/processor.h>
 #include <asm/system.h>
@@ -42,11 +44,7 @@
 #include <asm/tlbflush.h>
 #include <asm/sections.h>
 #include <asm/hypervisor.h>
-#if defined(CONFIG_SWIOTLB)
-#include <linux/dma-mapping.h>
-#include <asm/scatterlist.h>
 #include <asm/swiotlb.h>
-#endif
 
 extern unsigned long *contiguous_bitmap;
 

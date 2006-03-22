@@ -38,8 +38,8 @@ XEN_HOTPLUG_SCRIPTS = xen-backend.agent
 UDEV_RULES_DIR = /etc/udev
 UDEV_RULES = xen-backend.rules
 
-DI = $(shell readlink -f $(DISTDIR))
-DE = $(shell readlink -f $(DESTDIR))
+DI = $(if $(DISTDIR),$(shell readlink -f $(DISTDIR)),)
+DE = $(if $(DESTDIR),$(shell readlink -f $(DESTDIR)),)
 ifeq ($(findstring $(DI),$(DE)),$(DI))
 HOTPLUGS=install-hotplug install-udev
 else

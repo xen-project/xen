@@ -58,6 +58,7 @@ static inline int svm_inject_extint(struct vcpu *v, int trap, int error_code)
     intr.fields.intr_masking = 1;
     intr.fields.vector = trap;
     intr.fields.prio = 0xF;
+    intr.fields.ign_tpr = 1;
     vmcb->vintr = intr;
 //  printf( "IRQ = %d\n", trap );
     return 0;
@@ -160,18 +161,21 @@ asmlinkage void svm_intr_assist(void)
     }
     /* Now let's check for newer interrrupts  */
     else {
-        /* Interrput pending at the PIC? */
-        hvm_pic_assist(v);
 
-        if (vpit->pending_intr_nr) {
-            pic_set_irq(pic, 0, 0);
-            pic_set_irq(pic, 0, 1);
-        }
+      if ( v->vcpu_id == 0 )
+         hvm_pic_assist(v);
 
-        if (plat->interrupt_request) {
-            intr_vector = cpu_get_interrupt(v, &intr_type);
-            plat->interrupt_request = 0;
-        }
+      /* Before we deal with PIT interrupts, let's check
+         for interrupts set by the device model.
+      */
+      if ( cpu_has_pending_irq(v) ) {
+           intr_vector = cpu_get_interrupt(v, &intr_type);
+      }
+      else  if ( (v->vcpu_id == 0) && vpit->pending_intr_nr ) {
+          pic_set_irq(pic, 0, 0);
+          pic_set_irq(pic, 0, 1);
+          intr_vector = cpu_get_interrupt(v, &intr_type);
+      }
     }
 
     /* have we got an interrupt to inject? */

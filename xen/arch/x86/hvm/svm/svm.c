@@ -1243,20 +1243,19 @@ static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs)
                 "svm_io_instruction: port 0x%lx real %d, eip=%lx:%lx, "
                 "exit_qualification = %lx",
                 (unsigned long) port, real, cs, eip, (unsigned long)info.bytes);
-
-    /* 
-     * On SVM, the RIP of the intruction following the IN/OUT is saved in
-     * ExitInfo2
-     */
-    vmcb->rip = vmcb->exitinfo2;
-
     /* string instruction */
     if (info.fields.str)
     { 
         unsigned long addr, count = 1;
         int sign = regs->eflags & EF_DF ? -1 : 1;
 
+        /* Need the original rip, here. */
         addr = svm_get_io_address(vmcb, regs, dir, real);
+        /* 
+         * On SVM, the RIP of the intruction following the IN/OUT is saved in
+         * ExitInfo2
+         */
+        vmcb->rip = vmcb->exitinfo2;
 
         /* "rep" prefix */
         if (info.fields.rep) 
@@ -1295,6 +1294,12 @@ static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs)
     } 
     else 
     {
+        /* 
+         * On SVM, the RIP of the intruction following the IN/OUT is saved in
+         * ExitInfo2
+         */
+        vmcb->rip = vmcb->exitinfo2;
+
         if (port == 0xe9 && dir == IOREQ_WRITE && size == 1) 
             hvm_print_line(v, regs->eax); /* guest debug output */
     
@@ -1772,6 +1777,10 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
 
     __update_guest_eip(vmcb, 1);
 
+    /* check for interrupt not handled or new interrupt */
+    if ( vmcb->vintr.fields.irq || cpu_has_pending_irq(v) )
+       return; 
+
     if ( !v->vcpu_id )
         next_pit = get_pit_scheduled(v, vpit);
     next_wakeup = get_apictime_scheduled(v);
@@ -1779,9 +1788,7 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
         next_wakeup = next_pit;
     if ( next_wakeup != - 1 )
         set_timer(&current->arch.hvm_svm.hlt_timer, next_wakeup);
-/* temporary workaround for 8828/8822 evtchn patches causing SVM failure.
     hvm_safe_block();
-*/
 }
 
 
@@ -2405,6 +2412,15 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 
     case VMEXIT_NMI:
         do_nmi(&regs, 0);
+        break;
+
+    case VMEXIT_SMI:
+        /*
+         * For asynchronous SMI's, we just need to allow global interrupts 
+         * so that the SMI is taken properly in the context of the host.  The
+         * standard code does a STGI after the VMEXIT which should accomplish 
+         * this task.  Continue as normal and restart the guest.
+         */
         break;
 
 #ifdef XEN_DEBUGGER

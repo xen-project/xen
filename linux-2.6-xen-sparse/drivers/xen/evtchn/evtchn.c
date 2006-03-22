@@ -6,8 +6,11 @@
  * Copyright (c) 2004-2005, K A Fraser
  * Multi-process extensions Copyright (c) 2004, Steven Smith
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -447,6 +450,8 @@ static void evtchn_cleanup(void)
 
 module_init(evtchn_init);
 module_exit(evtchn_cleanup);
+
+MODULE_LICENSE("Dual BSD/GPL");
 
 /*
  * Local variables:

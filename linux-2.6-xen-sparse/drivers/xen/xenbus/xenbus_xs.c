@@ -6,8 +6,11 @@
  *
  * Copyright (C) 2005 Rusty Russell, IBM Corporation
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -38,13 +41,12 @@
 #include <linux/slab.h>
 #include <linux/fcntl.h>
 #include <linux/kthread.h>
+#include <linux/rwsem.h>
 #include <xen/xenbus.h>
 #include "xenbus_comms.h"
 
 /* xenbus_probe.c */
 extern char *kasprintf(const char *fmt, ...);
-
-#define streq(a, b) (strcmp((a), (b)) == 0)
 
 struct xs_stored_msg {
 	struct list_head list;
@@ -73,7 +75,7 @@ struct xs_handle {
 	wait_queue_head_t reply_waitq;
 
 	/* One request at a time. */
-	struct semaphore request_mutex;
+	struct mutex request_mutex;
 
 	/* Protect transactions against save/restore. */
 	struct rw_semaphore suspend_mutex;
@@ -96,14 +98,14 @@ static DEFINE_SPINLOCK(watch_events_lock);
  * carrying out work.
  */
 static pid_t xenwatch_pid;
-/* static */ DECLARE_MUTEX(xenwatch_mutex);
+/* static */ DEFINE_MUTEX(xenwatch_mutex);
 static DECLARE_WAIT_QUEUE_HEAD(watch_events_waitq);
 
 static int get_error(const char *errorstring)
 {
 	unsigned int i;
 
-	for (i = 0; !streq(errorstring, xsd_errors[i].errstring); i++) {
+	for (i = 0; strcmp(errorstring, xsd_errors[i].errstring) != 0; i++) {
 		if (i == ARRAY_SIZE(xsd_errors) - 1) {
 			printk(KERN_WARNING
 			       "XENBUS xen store gave: unknown error %s",
@@ -153,12 +155,12 @@ void xenbus_debug_write(const char *str, unsigned int count)
 	msg.type = XS_DEBUG;
 	msg.len = sizeof("print") + count + 1;
 
-	down(&xs_state.request_mutex);
+	mutex_lock(&xs_state.request_mutex);
 	xb_write(&msg, sizeof(msg));
 	xb_write("print", sizeof("print"));
 	xb_write(str, count);
 	xb_write("", 1);
-	up(&xs_state.request_mutex);
+	mutex_unlock(&xs_state.request_mutex);
 }
 
 void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg)
@@ -170,7 +172,7 @@ void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg)
 	if (req_msg.type == XS_TRANSACTION_START)
 		down_read(&xs_state.suspend_mutex);
 
-	down(&xs_state.request_mutex);
+	mutex_lock(&xs_state.request_mutex);
 
 	err = xb_write(msg, sizeof(*msg) + msg->len);
 	if (err) {
@@ -179,7 +181,7 @@ void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg)
 	} else
 		ret = read_reply(&msg->type, &msg->len);
 
-	up(&xs_state.request_mutex);
+	mutex_unlock(&xs_state.request_mutex);
 
 	if ((msg->type == XS_TRANSACTION_END) ||
 	    ((req_msg.type == XS_TRANSACTION_START) &&
@@ -208,25 +210,25 @@ static void *xs_talkv(xenbus_transaction_t t,
 	for (i = 0; i < num_vecs; i++)
 		msg.len += iovec[i].iov_len;
 
-	down(&xs_state.request_mutex);
+	mutex_lock(&xs_state.request_mutex);
 
 	err = xb_write(&msg, sizeof(msg));
 	if (err) {
-		up(&xs_state.request_mutex);
+		mutex_unlock(&xs_state.request_mutex);
 		return ERR_PTR(err);
 	}
 
 	for (i = 0; i < num_vecs; i++) {
 		err = xb_write(iovec[i].iov_base, iovec[i].iov_len);;
 		if (err) {
-			up(&xs_state.request_mutex);
+			mutex_unlock(&xs_state.request_mutex);
 			return ERR_PTR(err);
 		}
 	}
 
 	ret = read_reply(&msg.type, len);
 
-	up(&xs_state.request_mutex);
+	mutex_unlock(&xs_state.request_mutex);
 
 	if (IS_ERR(ret))
 		return ret;
@@ -333,7 +335,7 @@ char **xenbus_directory(xenbus_transaction_t t,
 
 	return split(strings, len, num);
 }
-EXPORT_SYMBOL(xenbus_directory);
+EXPORT_SYMBOL_GPL(xenbus_directory);
 
 /* Check if a path exists. Return 1 if it does. */
 int xenbus_exists(xenbus_transaction_t t,
@@ -348,7 +350,7 @@ int xenbus_exists(xenbus_transaction_t t,
 	kfree(d);
 	return 1;
 }
-EXPORT_SYMBOL(xenbus_exists);
+EXPORT_SYMBOL_GPL(xenbus_exists);
 
 /* Get the value of a single file.
  * Returns a kmalloced value: call free() on it after use.
@@ -368,7 +370,7 @@ void *xenbus_read(xenbus_transaction_t t,
 	kfree(path);
 	return ret;
 }
-EXPORT_SYMBOL(xenbus_read);
+EXPORT_SYMBOL_GPL(xenbus_read);
 
 /* Write the value of a single file.
  * Returns -err on failure.
@@ -393,7 +395,7 @@ int xenbus_write(xenbus_transaction_t t,
 	kfree(path);
 	return ret;
 }
-EXPORT_SYMBOL(xenbus_write);
+EXPORT_SYMBOL_GPL(xenbus_write);
 
 /* Create a new directory. */
 int xenbus_mkdir(xenbus_transaction_t t,
@@ -410,7 +412,7 @@ int xenbus_mkdir(xenbus_transaction_t t,
 	kfree(path);
 	return ret;
 }
-EXPORT_SYMBOL(xenbus_mkdir);
+EXPORT_SYMBOL_GPL(xenbus_mkdir);
 
 /* Destroy a file or directory (directories must be empty). */
 int xenbus_rm(xenbus_transaction_t t, const char *dir, const char *node)
@@ -426,7 +428,7 @@ int xenbus_rm(xenbus_transaction_t t, const char *dir, const char *node)
 	kfree(path);
 	return ret;
 }
-EXPORT_SYMBOL(xenbus_rm);
+EXPORT_SYMBOL_GPL(xenbus_rm);
 
 /* Start a transaction: changes by others will not be seen during this
  * transaction, and changes will not be visible to others until end.
@@ -447,7 +449,7 @@ int xenbus_transaction_start(xenbus_transaction_t *t)
 	kfree(id_str);
 	return 0;
 }
-EXPORT_SYMBOL(xenbus_transaction_start);
+EXPORT_SYMBOL_GPL(xenbus_transaction_start);
 
 /* End a transaction.
  * If abandon is true, transaction is discarded instead of committed.
@@ -468,7 +470,7 @@ int xenbus_transaction_end(xenbus_transaction_t t, int abort)
 
 	return err;
 }
-EXPORT_SYMBOL(xenbus_transaction_end);
+EXPORT_SYMBOL_GPL(xenbus_transaction_end);
 
 /* Single read and scanf: returns -errno or num scanned. */
 int xenbus_scanf(xenbus_transaction_t t,
@@ -491,7 +493,7 @@ int xenbus_scanf(xenbus_transaction_t t,
 		return -ERANGE;
 	return ret;
 }
-EXPORT_SYMBOL(xenbus_scanf);
+EXPORT_SYMBOL_GPL(xenbus_scanf);
 
 /* Single printf and write: returns -errno or 0. */
 int xenbus_printf(xenbus_transaction_t t,
@@ -517,7 +519,7 @@ int xenbus_printf(xenbus_transaction_t t,
 
 	return ret;
 }
-EXPORT_SYMBOL(xenbus_printf);
+EXPORT_SYMBOL_GPL(xenbus_printf);
 
 /* Takes tuples of names, scanf-style args, and void **, NULL terminated. */
 int xenbus_gather(xenbus_transaction_t t, const char *dir, ...)
@@ -547,7 +549,7 @@ int xenbus_gather(xenbus_transaction_t t, const char *dir, ...)
 	va_end(ap);
 	return ret;
 }
-EXPORT_SYMBOL(xenbus_gather);
+EXPORT_SYMBOL_GPL(xenbus_gather);
 
 static int xs_watch(const char *path, const char *token)
 {
@@ -617,7 +619,7 @@ int register_xenbus_watch(struct xenbus_watch *watch)
 
 	return err;
 }
-EXPORT_SYMBOL(register_xenbus_watch);
+EXPORT_SYMBOL_GPL(register_xenbus_watch);
 
 void unregister_xenbus_watch(struct xenbus_watch *watch)
 {
@@ -655,16 +657,16 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 
 	/* Flush any currently-executing callback, unless we are it. :-) */
 	if (current->pid != xenwatch_pid) {
-		down(&xenwatch_mutex);
-		up(&xenwatch_mutex);
+		mutex_lock(&xenwatch_mutex);
+		mutex_unlock(&xenwatch_mutex);
 	}
 }
-EXPORT_SYMBOL(unregister_xenbus_watch);
+EXPORT_SYMBOL_GPL(unregister_xenbus_watch);
 
 void xs_suspend(void)
 {
 	down_write(&xs_state.suspend_mutex);
-	down(&xs_state.request_mutex);
+	mutex_lock(&xs_state.request_mutex);
 }
 
 void xs_resume(void)
@@ -672,7 +674,7 @@ void xs_resume(void)
 	struct xenbus_watch *watch;
 	char token[sizeof(watch) * 2 + 1];
 
-	up(&xs_state.request_mutex);
+	mutex_unlock(&xs_state.request_mutex);
 
 	/* No need for watches_lock: the suspend_mutex is sufficient. */
 	list_for_each_entry(watch, &watches, list) {
@@ -695,7 +697,7 @@ static int xenwatch_thread(void *unused)
 		if (kthread_should_stop())
 			break;
 
-		down(&xenwatch_mutex);
+		mutex_lock(&xenwatch_mutex);
 
 		spin_lock(&watch_events_lock);
 		ent = watch_events.next;
@@ -713,7 +715,7 @@ static int xenwatch_thread(void *unused)
 			kfree(msg);
 		}
 
-		up(&xenwatch_mutex);
+		mutex_unlock(&xenwatch_mutex);
 	}
 
 	return 0;
@@ -806,7 +808,7 @@ int xs_init(void)
 	spin_lock_init(&xs_state.reply_lock);
 	init_waitqueue_head(&xs_state.reply_waitq);
 
-	init_MUTEX(&xs_state.request_mutex);
+	mutex_init(&xs_state.request_mutex);
 	init_rwsem(&xs_state.suspend_mutex);
 
 	/* Initialize the shared memory rings to talk to xenstored */

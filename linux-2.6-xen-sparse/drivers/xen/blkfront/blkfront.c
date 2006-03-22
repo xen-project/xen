@@ -810,7 +810,6 @@ module_exit(xlblk_exit);
 
 MODULE_LICENSE("Dual BSD/GPL");
 
-
 /*
  * Local variables:
  *  c-file-style: "linux"

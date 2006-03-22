@@ -68,9 +68,6 @@
 #define NET_TX_RING_SIZE __RING_SIZE((netif_tx_sring_t *)0, PAGE_SIZE)
 #define NET_RX_RING_SIZE __RING_SIZE((netif_rx_sring_t *)0, PAGE_SIZE)
 
-#ifndef __GFP_NOWARN
-#define __GFP_NOWARN 0
-#endif
 #define alloc_xen_skb(_l) __dev_alloc_skb((_l), GFP_ATOMIC|__GFP_NOWARN)
 
 #define init_skb_shinfo(_skb)                         \

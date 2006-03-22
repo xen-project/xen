@@ -5,8 +5,11 @@
  *
  * Copyright (C) 2005 XenSource Ltd
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -58,7 +61,7 @@ int xenbus_watch_path(struct xenbus_device *dev, const char *path,
 
 	return err;
 }
-EXPORT_SYMBOL(xenbus_watch_path);
+EXPORT_SYMBOL_GPL(xenbus_watch_path);
 
 
 int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
@@ -78,7 +81,7 @@ int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
 		kfree(state);
 	return err;
 }
-EXPORT_SYMBOL(xenbus_watch_path2);
+EXPORT_SYMBOL_GPL(xenbus_watch_path2);
 
 
 int xenbus_switch_state(struct xenbus_device *dev,
@@ -115,7 +118,7 @@ int xenbus_switch_state(struct xenbus_device *dev,
 
 	return 0;
 }
-EXPORT_SYMBOL(xenbus_switch_state);
+EXPORT_SYMBOL_GPL(xenbus_switch_state);
 
 
 /**
@@ -178,7 +181,7 @@ void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt,
 	_dev_error(dev, err, fmt, ap);
 	va_end(ap);
 }
-EXPORT_SYMBOL(xenbus_dev_error);
+EXPORT_SYMBOL_GPL(xenbus_dev_error);
 
 
 void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
@@ -192,7 +195,7 @@ void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
 
 	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosing);
 }
-EXPORT_SYMBOL(xenbus_dev_fatal);
+EXPORT_SYMBOL_GPL(xenbus_dev_fatal);
 
 
 int xenbus_grant_ring(struct xenbus_device *dev, unsigned long ring_mfn)
@@ -202,7 +205,7 @@ int xenbus_grant_ring(struct xenbus_device *dev, unsigned long ring_mfn)
 		xenbus_dev_fatal(dev, err, "granting access to ring page");
 	return err;
 }
-EXPORT_SYMBOL(xenbus_grant_ring);
+EXPORT_SYMBOL_GPL(xenbus_grant_ring);
 
 
 int xenbus_alloc_evtchn(struct xenbus_device *dev, int *port)
@@ -219,7 +222,7 @@ int xenbus_alloc_evtchn(struct xenbus_device *dev, int *port)
 		*port = op.u.alloc_unbound.port;
 	return err;
 }
-EXPORT_SYMBOL(xenbus_alloc_evtchn);
+EXPORT_SYMBOL_GPL(xenbus_alloc_evtchn);
 
 
 int xenbus_bind_evtchn(struct xenbus_device *dev, int remote_port, int *port)
@@ -238,7 +241,7 @@ int xenbus_bind_evtchn(struct xenbus_device *dev, int remote_port, int *port)
 		*port = op.u.bind_interdomain.local_port;
 	return err;
 }
-EXPORT_SYMBOL(xenbus_bind_evtchn);
+EXPORT_SYMBOL_GPL(xenbus_bind_evtchn);
 
 
 int xenbus_free_evtchn(struct xenbus_device *dev, int port)
@@ -290,7 +293,7 @@ int xenbus_map_ring_valloc(struct xenbus_device *dev, int gnt_ref, void **vaddr)
 	*vaddr = area->addr;
 	return 0;
 }
-EXPORT_SYMBOL(xenbus_map_ring_valloc);
+EXPORT_SYMBOL_GPL(xenbus_map_ring_valloc);
 
 
 int xenbus_map_ring(struct xenbus_device *dev, int gnt_ref,
@@ -314,7 +317,7 @@ int xenbus_map_ring(struct xenbus_device *dev, int gnt_ref,
 
 	return op.status;
 }
-EXPORT_SYMBOL(xenbus_map_ring);
+EXPORT_SYMBOL_GPL(xenbus_map_ring);
 
 
 /* Based on Rusty Russell's skeleton driver's unmap_page */
@@ -359,7 +362,7 @@ int xenbus_unmap_ring_vfree(struct xenbus_device *dev, void *vaddr)
 
 	return op.status;
 }
-EXPORT_SYMBOL(xenbus_unmap_ring_vfree);
+EXPORT_SYMBOL_GPL(xenbus_unmap_ring_vfree);
 
 
 int xenbus_unmap_ring(struct xenbus_device *dev,
@@ -379,7 +382,7 @@ int xenbus_unmap_ring(struct xenbus_device *dev,
 
 	return op.status;
 }
-EXPORT_SYMBOL(xenbus_unmap_ring);
+EXPORT_SYMBOL_GPL(xenbus_unmap_ring);
 
 
 XenbusState xenbus_read_driver_state(const char *path)
@@ -391,7 +394,7 @@ XenbusState xenbus_read_driver_state(const char *path)
 
 	return result;
 }
-EXPORT_SYMBOL(xenbus_read_driver_state);
+EXPORT_SYMBOL_GPL(xenbus_read_driver_state);
 
 
 /*

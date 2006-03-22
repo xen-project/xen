@@ -4,9 +4,11 @@
  *
  * Copyright (c) 2005 XenSource Ltd.
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following
- * license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this source file (the "Software"), to deal in the Software without
@@ -26,7 +28,6 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-
 
 #include <linux/if_ether.h>
 #include <linux/err.h>
@@ -54,7 +55,7 @@ int xen_net_read_mac(struct xenbus_device *dev, u8 mac[])
 	kfree(macstr);
 	return 0;
 }
-EXPORT_SYMBOL(xen_net_read_mac);
+EXPORT_SYMBOL_GPL(xen_net_read_mac);
 
 /*
  * Local variables:

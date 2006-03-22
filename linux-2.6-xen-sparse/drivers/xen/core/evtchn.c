@@ -5,8 +5,11 @@
  * 
  * Copyright (c) 2002-2005, K A Fraser
  * 
- * This file may be distributed separately from the Linux kernel, or
- * incorporated into other software packages, subject to the following license:
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
@@ -147,7 +150,7 @@ void force_evtchn_callback(void)
 {
 	(void)HYPERVISOR_xen_version(0, NULL);
 }
-EXPORT_SYMBOL(force_evtchn_callback);
+EXPORT_SYMBOL_GPL(force_evtchn_callback);
 
 /* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
@@ -323,7 +326,7 @@ int bind_evtchn_to_irqhandler(
 
 	return irq;
 }
-EXPORT_SYMBOL(bind_evtchn_to_irqhandler);
+EXPORT_SYMBOL_GPL(bind_evtchn_to_irqhandler);
 
 int bind_virq_to_irqhandler(
 	unsigned int virq,
@@ -345,7 +348,7 @@ int bind_virq_to_irqhandler(
 
 	return irq;
 }
-EXPORT_SYMBOL(bind_virq_to_irqhandler);
+EXPORT_SYMBOL_GPL(bind_virq_to_irqhandler);
 
 int bind_ipi_to_irqhandler(
 	unsigned int ipi,
@@ -367,14 +370,14 @@ int bind_ipi_to_irqhandler(
 
 	return irq;
 }
-EXPORT_SYMBOL(bind_ipi_to_irqhandler);
+EXPORT_SYMBOL_GPL(bind_ipi_to_irqhandler);
 
 void unbind_from_irqhandler(unsigned int irq, void *dev_id)
 {
 	free_irq(irq, dev_id);
 	unbind_from_irq(irq);
 }
-EXPORT_SYMBOL(unbind_from_irqhandler);
+EXPORT_SYMBOL_GPL(unbind_from_irqhandler);
 
 #ifdef CONFIG_SMP
 static void do_nothing_function(void *ign)
@@ -639,14 +642,14 @@ void notify_remote_via_irq(int irq)
 	if (VALID_EVTCHN(evtchn))
 		notify_remote_via_evtchn(evtchn);
 }
-EXPORT_SYMBOL(notify_remote_via_irq);
+EXPORT_SYMBOL_GPL(notify_remote_via_irq);
 
 void mask_evtchn(int port)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
 	synch_set_bit(port, &s->evtchn_mask[0]);
 }
-EXPORT_SYMBOL(mask_evtchn);
+EXPORT_SYMBOL_GPL(mask_evtchn);
 
 void unmask_evtchn(int port)
 {
@@ -677,7 +680,7 @@ void unmask_evtchn(int port)
 			force_evtchn_callback();
 	}
 }
-EXPORT_SYMBOL(unmask_evtchn);
+EXPORT_SYMBOL_GPL(unmask_evtchn);
 
 void irq_resume(void)
 {

@@ -48,7 +48,8 @@ dump_regs(struct regs *regs)
 		printf("trapno %8x errno  %8x\n", regs->trapno, regs->errno);
 
 	printf("cr0    %8lx cr2    %8x cr3    %8lx cr4    %8lx\n",
-		oldctx.cr0, get_cr2(), oldctx.cr3, oldctx.cr4);
+		(long)oldctx.cr0, get_cr2(),
+		(long)oldctx.cr3, (long)oldctx.cr4);
 }
 
 #ifdef DEBUG
@@ -104,15 +105,25 @@ print_e820_map(struct e820entry *map, int entries)
 }
 
 void
-dump_dtr(unsigned long base, unsigned long limit)
+dump_dtr(unsigned long addr, unsigned long size)
 {
 	unsigned long long entry;
+	unsigned long base, limit;
 	int i;
 
-	for (i = 0; i < limit; i += 8) {
-		entry = ((unsigned long long *) base)[i >> 3];
-		printf("[0x%x] = 0x%08x%08x\n", i,
-			(unsigned)(entry >> 32), (unsigned)(entry));
+	for (i = 0; i < size; i += 8) {
+		entry = ((unsigned long long *) addr)[i >> 3];
+		base = (((entry >> (56-24)) & 0xFF000000) |
+			((entry >> (32-16)) & 0x00FF0000) |
+			((entry >> (   16)) & 0x0000FFFF));
+		limit = (((entry >> (48-16)) & 0x000F0000) |
+		         ((entry           ) & 0x0000FFFF));
+		if (entry & (1ULL << (23+32))) /* G */
+			limit = (limit << 12) | 0xFFF;
+
+		printf("[0x%x] = 0x%08x%08x, base 0x%lx, limit 0x%lx\n", i,
+			(unsigned)(entry >> 32), (unsigned)(entry),
+			base, limit);
 	}
 }
 
@@ -120,18 +131,19 @@ void
 dump_vmx_context(struct vmx_assist_context *c)
 {
 	printf("eip 0x%lx, esp 0x%lx, eflags 0x%lx\n",
-		c->eip, c->esp, c->eflags);
+		(long) c->eip, (long) c->esp, (long) c->eflags);
 
-	printf("cr0 0x%lx, cr3 0x%lx, cr4 0x%lx\n", c->cr0, c->cr3, c->cr4);
+	printf("cr0 0x%lx, cr3 0x%lx, cr4 0x%lx\n",
+		(long)c->cr0, (long)c->cr3, (long)c->cr4);
 
 	printf("idtr: limit 0x%lx, base 0x%lx\n",
-		c->idtr_limit, c->idtr_base);
+		(long)c->idtr_limit, (long)c->idtr_base);
 
 	printf("gdtr: limit 0x%lx, base 0x%lx\n",
-		c->gdtr_limit, c->gdtr_base);
+		(long)c->gdtr_limit, (long)c->gdtr_base);
 
 	printf("cs: sel 0x%lx, limit 0x%lx, base 0x%lx\n",
-		c->cs_sel, c->cs_limit, c->cs_base);
+		(long)c->cs_sel, (long)c->cs_limit, (long)c->cs_base);
 	printf("\ttype %d, s %d, dpl %d, p %d, avl %d, ops %d, g %d, nul %d\n",
 		c->cs_arbytes.fields.seg_type,
 		c->cs_arbytes.fields.s,
@@ -143,7 +155,7 @@ dump_vmx_context(struct vmx_assist_context *c)
 		c->cs_arbytes.fields.null_bit);
 
 	printf("ds: sel 0x%lx, limit 0x%lx, base 0x%lx\n",
-		c->ds_sel, c->ds_limit, c->ds_base);
+		(long)c->ds_sel, (long)c->ds_limit, (long)c->ds_base);
 	printf("\ttype %d, s %d, dpl %d, p %d, avl %d, ops %d, g %d, nul %d\n",
 		c->ds_arbytes.fields.seg_type,
 		c->ds_arbytes.fields.s,
@@ -155,7 +167,7 @@ dump_vmx_context(struct vmx_assist_context *c)
 		c->ds_arbytes.fields.null_bit);
 
 	printf("es: sel 0x%lx, limit 0x%lx, base 0x%lx\n",
-		c->es_sel, c->es_limit, c->es_base);
+		(long)c->es_sel, (long)c->es_limit, (long)c->es_base);
 	printf("\ttype %d, s %d, dpl %d, p %d, avl %d, ops %d, g %d, nul %d\n",
 		c->es_arbytes.fields.seg_type,
 		c->es_arbytes.fields.s,
@@ -167,7 +179,7 @@ dump_vmx_context(struct vmx_assist_context *c)
 		c->es_arbytes.fields.null_bit);
 
 	printf("ss: sel 0x%lx, limit 0x%lx, base 0x%lx\n",
-		c->ss_sel, c->ss_limit, c->ss_base);
+		(long)c->ss_sel, (long)c->ss_limit, (long)c->ss_base);
 	printf("\ttype %d, s %d, dpl %d, p %d, avl %d, ops %d, g %d, nul %d\n",
 		c->ss_arbytes.fields.seg_type,
 		c->ss_arbytes.fields.s,
@@ -179,7 +191,7 @@ dump_vmx_context(struct vmx_assist_context *c)
 		c->ss_arbytes.fields.null_bit);
 
 	printf("fs: sel 0x%lx, limit 0x%lx, base 0x%lx\n",
-		c->fs_sel, c->fs_limit, c->fs_base);
+		(long)c->fs_sel, (long)c->fs_limit, (long)c->fs_base);
 	printf("\ttype %d, s %d, dpl %d, p %d, avl %d, ops %d, g %d, nul %d\n",
 		c->fs_arbytes.fields.seg_type,
 		c->fs_arbytes.fields.s,
@@ -191,7 +203,7 @@ dump_vmx_context(struct vmx_assist_context *c)
 		c->fs_arbytes.fields.null_bit);
 
 	printf("gs: sel 0x%lx, limit 0x%lx, base 0x%lx\n",
-		c->gs_sel, c->gs_limit, c->gs_base);
+		(long)c->gs_sel, (long)c->gs_limit, (long)c->gs_base);
 	printf("\ttype %d, s %d, dpl %d, p %d, avl %d, ops %d, g %d, nul %d\n",
 		c->gs_arbytes.fields.seg_type,
 		c->gs_arbytes.fields.s,
@@ -203,7 +215,7 @@ dump_vmx_context(struct vmx_assist_context *c)
 		c->gs_arbytes.fields.null_bit);
 
 	printf("tr: sel 0x%lx, limit 0x%lx, base 0x%lx\n",
-		c->tr_sel, c->tr_limit, c->tr_base);
+		(long)c->tr_sel, (long)c->tr_limit, (long)c->tr_base);
 	printf("\ttype %d, s %d, dpl %d, p %d, avl %d, ops %d, g %d, nul %d\n",
 		c->tr_arbytes.fields.seg_type,
 		c->tr_arbytes.fields.s,
@@ -215,7 +227,7 @@ dump_vmx_context(struct vmx_assist_context *c)
 		c->tr_arbytes.fields.null_bit);
 
 	printf("ldtr: sel 0x%lx, limit 0x%lx, base 0x%lx\n",
-		c->ldtr_sel, c->ldtr_limit, c->ldtr_base);
+		(long)c->ldtr_sel, (long)c->ldtr_limit, (long)c->ldtr_base);
 	printf("\ttype %d, s %d, dpl %d, p %d, avl %d, ops %d, g %d, nul %d\n",
 		c->ldtr_arbytes.fields.seg_type,
 		c->ldtr_arbytes.fields.s,
@@ -226,7 +238,8 @@ dump_vmx_context(struct vmx_assist_context *c)
 		c->ldtr_arbytes.fields.g,
 		c->ldtr_arbytes.fields.null_bit);
 
-	printf("GDTR <0x%lx,0x%lx>:\n", c->gdtr_base,  c->gdtr_limit);
+	printf("GDTR <0x%lx,0x%lx>:\n",
+		(long)c->gdtr_base, (long)c->gdtr_limit);
 	dump_dtr(c->gdtr_base, c->gdtr_limit);
 }
 #endif /* DEBUG */
