@@ -2414,6 +2414,15 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
         do_nmi(&regs, 0);
         break;
 
+    case VMEXIT_SMI:
+        /*
+         * For asynchronous SMI's, we just need to allow global interrupts 
+         * so that the SMI is taken properly in the context of the host.  The
+         * standard code does a STGI after the VMEXIT which should accomplish 
+         * this task.  Continue as normal and restart the guest.
+         */
+        break;
+
 #ifdef XEN_DEBUGGER
     case VMEXIT_EXCEPTION_BP:
         svm_debug_save_cpu_user_regs(&regs);

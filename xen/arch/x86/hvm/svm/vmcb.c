@@ -123,7 +123,7 @@ static int construct_vmcb_controls(struct arch_svm_struct *arch_svm)
           GENERAL1_INTERCEPT_RDTSC         | GENERAL1_INTERCEPT_PUSHF      |
           GENERAL1_INTERCEPT_SWINT         | GENERAL1_INTERCEPT_POPF       | 
           GENERAL1_INTERCEPT_IRET          | GENERAL1_INTERCEPT_PAUSE      |
-          GENERAL1_INTERCEPT_TASK_SWITCH
+          GENERAL1_INTERCEPT_TASK_SWITCH   | GENERAL1_INTERCEPT_SMI
         );
 
     /* turn on the general 2 intercepts */
