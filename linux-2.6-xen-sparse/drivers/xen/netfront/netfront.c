@@ -68,18 +68,12 @@
 #define NET_TX_RING_SIZE __RING_SIZE((netif_tx_sring_t *)0, PAGE_SIZE)
 #define NET_RX_RING_SIZE __RING_SIZE((netif_rx_sring_t *)0, PAGE_SIZE)
 
-#define alloc_xen_skb(_l) __dev_alloc_skb((_l), GFP_ATOMIC|__GFP_NOWARN)
-
-#define init_skb_shinfo(_skb)                         \
-    do {                                              \
-        atomic_set(&(skb_shinfo(_skb)->dataref), 1);  \
-        skb_shinfo(_skb)->nr_frags = 0;               \
-        skb_shinfo(_skb)->frag_list = NULL;           \
-    } while (0)
-
-static unsigned long rx_pfn_array[NET_RX_RING_SIZE];
-static multicall_entry_t rx_mcl[NET_RX_RING_SIZE+1];
-static mmu_update_t rx_mmu[NET_RX_RING_SIZE];
+static inline void init_skb_shinfo(struct sk_buff *skb)
+{
+	atomic_set(&(skb_shinfo(skb)->dataref), 1);
+	skb_shinfo(skb)->nr_frags = 0;
+	skb_shinfo(skb)->frag_list = NULL;
+}
 
 struct netfront_info
 {
@@ -134,16 +128,28 @@ struct netfront_info
 	int tx_ring_ref;
 	int rx_ring_ref;
 	u8 mac[ETH_ALEN];
+
+	unsigned long rx_pfn_array[NET_RX_RING_SIZE];
+	multicall_entry_t rx_mcl[NET_RX_RING_SIZE+1];
+	mmu_update_t rx_mmu[NET_RX_RING_SIZE];
 };
 
-/* Access macros for acquiring freeing slots in {tx,rx}_skbs[]. */
-#define ADD_ID_TO_FREELIST(_list, _id)			\
-	(_list)[(_id)] = (_list)[0];			\
-	(_list)[0]     = (void *)(unsigned long)(_id);
-#define GET_ID_FROM_FREELIST(_list)				\
-	({ unsigned long _id = (unsigned long)(_list)[0];	\
-	   (_list)[0]  = (_list)[_id];				\
-	   (unsigned short)_id; })
+/*
+ * Access macros for acquiring freeing slots in {tx,rx}_skbs[].
+ */
+
+static inline void add_id_to_freelist(struct sk_buff **list, unsigned short id)
+{
+	list[id] = list[0];
+	list[0]  = (void *)(unsigned long)id;
+}
+
+static inline unsigned short get_id_from_freelist(struct sk_buff **list)
+{
+	unsigned int id = (unsigned int)(unsigned long)list[0];
+	list[0] = list[id];
+	return id;
+}
 
 #ifdef DEBUG
 static char *be_state_name[] = {
@@ -484,7 +490,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 			gnttab_release_grant_reference(
 				&np->gref_tx_head, np->grant_tx_ref[id]);
 			np->grant_tx_ref[id] = GRANT_INVALID_REF;
-			ADD_ID_TO_FREELIST(np->tx_skbs, id);
+			add_id_to_freelist(np->tx_skbs, id);
 			dev_kfree_skb_irq(skb);
 		}
 
@@ -545,9 +551,10 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 		 * Subtract dev_alloc_skb headroom (16 bytes) and shared info
 		 * tailroom then round down to SKB_DATA_ALIGN boundary.
 		 */
-		skb = alloc_xen_skb(
+		skb = __dev_alloc_skb(
 			((PAGE_SIZE - sizeof(struct skb_shared_info)) &
-			 (-SKB_DATA_ALIGN(1))) - 16);
+			 (-SKB_DATA_ALIGN(1))) - 16,
+			GFP_ATOMIC|__GFP_NOWARN);
 		if (skb == NULL) {
 			/* Any skbuffs queued for refill? Force them out. */
 			if (i != 0)
@@ -576,7 +583,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
 		skb->dev = dev;
 
-		id = GET_ID_FROM_FREELIST(np->rx_skbs);
+		id = get_id_from_freelist(np->rx_skbs);
 
 		np->rx_skbs[id] = skb;
 
@@ -588,13 +595,13 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 						  np->xbdev->otherend_id,
 						  __pa(skb->head) >> PAGE_SHIFT);
 		RING_GET_REQUEST(&np->rx, req_prod + i)->gref = ref;
-		rx_pfn_array[i] = virt_to_mfn(skb->head);
+		np->rx_pfn_array[i] = virt_to_mfn(skb->head);
 
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 			/* Remove this page before passing back to Xen. */
 			set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT,
 					    INVALID_P2M_ENTRY);
-			MULTI_update_va_mapping(rx_mcl+i,
+			MULTI_update_va_mapping(np->rx_mcl+i,
 						(unsigned long)skb->head,
 						__pte(0), 0);
 		}
@@ -603,7 +610,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	/* Tell the ballon driver what is going on. */
 	balloon_update_driver_allowance(i);
 
-	reservation.extent_start = rx_pfn_array;
+	reservation.extent_start = np->rx_pfn_array;
 	reservation.nr_extents   = i;
 	reservation.extent_order = 0;
 	reservation.address_bits = 0;
@@ -611,19 +618,19 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
 	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 		/* After all PTEs have been zapped, flush the TLB. */
-		rx_mcl[i-1].args[MULTI_UVMFLAGS_INDEX] =
+		np->rx_mcl[i-1].args[MULTI_UVMFLAGS_INDEX] =
 			UVMF_TLB_FLUSH|UVMF_ALL;
 
 		/* Give away a batch of pages. */
-		rx_mcl[i].op = __HYPERVISOR_memory_op;
-		rx_mcl[i].args[0] = XENMEM_decrease_reservation;
-		rx_mcl[i].args[1] = (unsigned long)&reservation;
+		np->rx_mcl[i].op = __HYPERVISOR_memory_op;
+		np->rx_mcl[i].args[0] = XENMEM_decrease_reservation;
+		np->rx_mcl[i].args[1] = (unsigned long)&reservation;
 
 		/* Zap PTEs and give away pages in one big multicall. */
-		(void)HYPERVISOR_multicall(rx_mcl, i+1);
+		(void)HYPERVISOR_multicall(np->rx_mcl, i+1);
 
 		/* Check return status of HYPERVISOR_memory_op(). */
-		if (unlikely(rx_mcl[i].result != i))
+		if (unlikely(np->rx_mcl[i].result != i))
 			panic("Unable to reduce memory reservation\n");
 	} else
 		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
@@ -656,7 +663,8 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (unlikely((((unsigned long)skb->data & ~PAGE_MASK) + skb->len) >=
 		     PAGE_SIZE)) {
 		struct sk_buff *nskb;
-		if (unlikely((nskb = alloc_xen_skb(skb->len)) == NULL))
+		nskb = __dev_alloc_skb(skb->len, GFP_ATOMIC|__GFP_NOWARN);
+		if (unlikely(nskb == NULL))
 			goto drop;
 		skb_put(nskb, skb->len);
 		memcpy(nskb->data, skb->data, skb->len);
@@ -674,7 +682,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	i = np->tx.req_prod_pvt;
 
-	id = GET_ID_FROM_FREELIST(np->tx_skbs);
+	id = get_id_from_freelist(np->tx_skbs);
 	np->tx_skbs[id] = skb;
 
 	tx = RING_GET_REQUEST(&np->tx, i);
@@ -739,8 +747,8 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	struct sk_buff *skb, *nskb;
 	netif_rx_response_t *rx;
 	RING_IDX i, rp;
-	mmu_update_t *mmu = rx_mmu;
-	multicall_entry_t *mcl = rx_mcl;
+	mmu_update_t *mmu = np->rx_mmu;
+	multicall_entry_t *mcl = np->rx_mcl;
 	int work_done, budget, more_to_do = 1;
 	struct sk_buff_head rxq;
 	unsigned long flags;
@@ -796,7 +804,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		np->grant_rx_ref[rx->id] = GRANT_INVALID_REF;
 
 		skb = np->rx_skbs[rx->id];
-		ADD_ID_TO_FREELIST(np->rx_skbs, rx->id);
+		add_id_to_freelist(np->rx_skbs, rx->id);
 
 		/* NB. We handle skb overflow later. */
 		skb->data = skb->head + rx->offset;
@@ -831,14 +839,14 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	balloon_update_driver_allowance(-work_done);
 
 	/* Do all the remapping work, and M2P updates, in one big hypercall. */
-	if (likely((mcl - rx_mcl) != 0)) {
+	if (likely((mcl - np->rx_mcl) != 0)) {
 		mcl->op = __HYPERVISOR_mmu_update;
-		mcl->args[0] = (unsigned long)rx_mmu;
-		mcl->args[1] = mmu - rx_mmu;
+		mcl->args[0] = (unsigned long)np->rx_mmu;
+		mcl->args[1] = mmu - np->rx_mmu;
 		mcl->args[2] = 0;
 		mcl->args[3] = DOMID_SELF;
 		mcl++;
-		(void)HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
+		(void)HYPERVISOR_multicall(np->rx_mcl, mcl - np->rx_mcl);
 	}
 
 	while ((skb = __skb_dequeue(&rxq)) != NULL) {
@@ -871,7 +879,8 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 					       16 - (skb->data - skb->head));
 			}
 
-			nskb = alloc_xen_skb(skb->len + 2);
+			nskb = __dev_alloc_skb(skb->len + 2,
+					       GFP_ATOMIC|__GFP_NOWARN);
 			if (nskb != NULL) {
 				skb_reserve(nskb, 2);
 				skb_put(nskb, skb->len);

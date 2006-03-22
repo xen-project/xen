@@ -16,18 +16,6 @@ static char * __init machine_specific_memory_setup(void)
 	return "Xen";
 }
 
-void __devinit machine_specific_modify_cpu_capabilities(struct cpuinfo_x86 *c)
-{
-	clear_bit(X86_FEATURE_VME, c->x86_capability);
-	clear_bit(X86_FEATURE_DE, c->x86_capability);
-	clear_bit(X86_FEATURE_PSE, c->x86_capability);
-	clear_bit(X86_FEATURE_PGE, c->x86_capability);
-	clear_bit(X86_FEATURE_SEP, c->x86_capability);
-	if (!(xen_start_info->flags & SIF_PRIVILEGED))
-		clear_bit(X86_FEATURE_MTRR, c->x86_capability);
-	c->hlt_works_ok = 0;
-}
-
 extern void hypervisor_callback(void);
 extern void failsafe_callback(void);
 extern void nmi(void);
@@ -50,8 +38,6 @@ static void __init machine_specific_arch_setup(void)
 
 	cb.handler_address = (unsigned long)&nmi;
 	HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
-
-	machine_specific_modify_cpu_capabilities(&boot_cpu_data);
 
 	if (HYPERVISOR_xen_version(XENVER_platform_parameters,
 				   &pp) == 0)

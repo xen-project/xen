@@ -286,7 +286,7 @@ asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
     unsigned long cr2;
     static char *trapstr[] = { 
         "divide error", "debug", "nmi", "bkpt", "overflow", "bounds", 
-        "invalid operation", "device not available", "double fault", 
+        "invalid opcode", "device not available", "double fault", 
         "coprocessor segment", "invalid tss", "segment not found", 
         "stack error", "general protection fault", "page fault", 
         "spurious interrupt", "coprocessor error", "alignment check", 
@@ -382,7 +382,6 @@ asmlinkage int do_##name(struct cpu_user_regs *regs) \
 DO_ERROR_NOCODE( 0, "divide error", divide_error)
 DO_ERROR_NOCODE( 4, "overflow", overflow)
 DO_ERROR_NOCODE( 5, "bounds", bounds)
-DO_ERROR_NOCODE( 6, "invalid operand", invalid_op)
 DO_ERROR_NOCODE( 9, "coprocessor segment overrun", coprocessor_segment_overrun)
 DO_ERROR(10, "invalid TSS", invalid_TSS)
 DO_ERROR(11, "segment not present", segment_not_present)
@@ -390,6 +389,85 @@ DO_ERROR(12, "stack segment", stack_segment)
 DO_ERROR_NOCODE(16, "fpu error", coprocessor_error)
 DO_ERROR(17, "alignment check", alignment_check)
 DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
+
+static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
+{
+    char signature[5], instr[2];
+    unsigned long a, b, c, d, eip;
+
+    a = regs->eax;
+    b = regs->ebx;
+    c = regs->ecx;
+    d = regs->edx;
+    eip = regs->eip;
+
+    /* Check for forced emulation signature: ud2 ; .ascii "xen". */
+    if ( copy_from_user(signature, (char *)eip, sizeof(signature)) ||
+         memcmp(signature, "\xf\xbxen", sizeof(signature)) )
+        return 0;
+    eip += sizeof(signature);
+
+    /* We only emulate CPUID. */
+    if ( copy_from_user(instr, (char *)eip, sizeof(instr)) ||
+         memcmp(instr, "\xf\xa2", sizeof(instr)) )
+        return 0;
+    eip += sizeof(instr);
+
+    __asm__ ( 
+        "cpuid"
+        : "=a" (a), "=b" (b), "=c" (c), "=d" (d)
+        : "0" (a), "1" (b), "2" (c), "3" (d) );
+
+    if ( regs->eax == 1 )
+    {
+        /* Modify Feature Information. */
+        clear_bit(X86_FEATURE_VME, &d);
+        clear_bit(X86_FEATURE_DE,  &d);
+        clear_bit(X86_FEATURE_PSE, &d);
+        clear_bit(X86_FEATURE_PGE, &d);
+        clear_bit(X86_FEATURE_SEP, &d);
+        if ( !IS_PRIV(current->domain) )
+            clear_bit(X86_FEATURE_MTRR, &d);
+    }
+
+    regs->eax = a;
+    regs->ebx = b;
+    regs->ecx = c;
+    regs->edx = d;
+    regs->eip = eip;
+
+    return EXCRET_fault_fixed;
+}
+
+asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+    struct trap_bounce *tb = &v->arch.trap_bounce;
+    struct trap_info *ti;
+    int rc;
+
+    DEBUGGER_trap_entry(TRAP_invalid_op, regs);
+
+    if ( unlikely(!guest_mode(regs)) )
+    {
+        DEBUGGER_trap_fatal(trapnr, regs);
+        show_registers(regs);
+        panic("CPU%d FATAL TRAP: vector = %d (invalid opcode)\n",
+              smp_processor_id(), TRAP_invalid_op);
+    }
+
+    if ( (rc = emulate_forced_invalid_op(regs)) != 0 )
+        return rc;
+
+    ti = &current->arch.guest_context.trap_ctxt[TRAP_invalid_op];
+    tb->flags = TBF_EXCEPTION;
+    tb->cs    = ti->cs;
+    tb->eip   = ti->address;
+    if ( TI_GET_IF(ti) )
+        tb->flags |= TBF_INTERRUPT;
+
+    return 0;
+}
 
 asmlinkage int do_int3(struct cpu_user_regs *regs)
 {
