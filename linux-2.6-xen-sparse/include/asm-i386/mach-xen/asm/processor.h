@@ -146,7 +146,7 @@ static inline void detect_ht(struct cpuinfo_x86 *c) {}
  */
 static inline void cpuid(unsigned int op, unsigned int *eax, unsigned int *ebx, unsigned int *ecx, unsigned int *edx)
 {
-	__asm__("cpuid"
+	__asm__(XEN_CPUID
 		: "=a" (*eax),
 		  "=b" (*ebx),
 		  "=c" (*ecx),
@@ -158,7 +158,7 @@ static inline void cpuid(unsigned int op, unsigned int *eax, unsigned int *ebx, 
 static inline void cpuid_count(int op, int count, int *eax, int *ebx, int *ecx,
 	       	int *edx)
 {
-	__asm__("cpuid"
+	__asm__(XEN_CPUID
 		: "=a" (*eax),
 		  "=b" (*ebx),
 		  "=c" (*ecx),
@@ -173,7 +173,7 @@ static inline unsigned int cpuid_eax(unsigned int op)
 {
 	unsigned int eax;
 
-	__asm__("cpuid"
+	__asm__(XEN_CPUID
 		: "=a" (eax)
 		: "0" (op)
 		: "bx", "cx", "dx");
@@ -183,7 +183,7 @@ static inline unsigned int cpuid_ebx(unsigned int op)
 {
 	unsigned int eax, ebx;
 
-	__asm__("cpuid"
+	__asm__(XEN_CPUID
 		: "=a" (eax), "=b" (ebx)
 		: "0" (op)
 		: "cx", "dx" );
@@ -193,7 +193,7 @@ static inline unsigned int cpuid_ecx(unsigned int op)
 {
 	unsigned int eax, ecx;
 
-	__asm__("cpuid"
+	__asm__(XEN_CPUID
 		: "=a" (eax), "=c" (ecx)
 		: "0" (op)
 		: "bx", "dx" );
@@ -203,7 +203,7 @@ static inline unsigned int cpuid_edx(unsigned int op)
 {
 	unsigned int eax, edx;
 
-	__asm__("cpuid"
+	__asm__(XEN_CPUID
 		: "=a" (eax), "=d" (edx)
 		: "0" (op)
 		: "bx", "cx");
