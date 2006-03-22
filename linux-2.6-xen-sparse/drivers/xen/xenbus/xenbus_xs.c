@@ -48,8 +48,6 @@
 /* xenbus_probe.c */
 extern char *kasprintf(const char *fmt, ...);
 
-#define streq(a, b) (strcmp((a), (b)) == 0)
-
 struct xs_stored_msg {
 	struct list_head list;
 
@@ -107,7 +105,7 @@ static int get_error(const char *errorstring)
 {
 	unsigned int i;
 
-	for (i = 0; !streq(errorstring, xsd_errors[i].errstring); i++) {
+	for (i = 0; strcmp(errorstring, xsd_errors[i].errstring) != 0; i++) {
 		if (i == ARRAY_SIZE(xsd_errors) - 1) {
 			printk(KERN_WARNING
 			       "XENBUS xen store gave: unknown error %s",
