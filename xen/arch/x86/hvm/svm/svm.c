@@ -1777,6 +1777,10 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
 
     __update_guest_eip(vmcb, 1);
 
+    /* check for interrupt not handled or new interrupt */
+    if ( vmcb->vintr.fields.irq || cpu_has_pending_irq(v) )
+       return; 
+
     if ( !v->vcpu_id )
         next_pit = get_pit_scheduled(v, vpit);
     next_wakeup = get_apictime_scheduled(v);
@@ -1784,9 +1788,7 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
         next_wakeup = next_pit;
     if ( next_wakeup != - 1 )
         set_timer(&current->arch.hvm_svm.hlt_timer, next_wakeup);
-/* temporary workaround for 8828/8822 evtchn patches causing SVM failure.
     hvm_safe_block();
-*/
 }
 
 
