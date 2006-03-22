@@ -97,6 +97,13 @@ config VT
 	help
 	  Hack to turn off CONFIG_VT for domU
 
+config XEN_SYSFS
+	bool "Export Xen attributes in sysfs"
+	depends on XEN && SYSFS
+	default y
+	help
+		Xen hypervisor attributes will show up under /sys/hypervisor/.
+
 config SCHED_NO_NO_OMIT_FRAME_POINTER
 	bool
 	default y

@@ -22,3 +22,5 @@ obj-y   += reboot.o evtchn.o fixup.o
 obj-$(CONFIG_SMP)     += smp.o		# setup_profiling_timer def'd in ia64
 obj-$(CONFIG_NET)     += skbuff.o	# until networking is up on ia64
 endif
+obj-$(CONFIG_SYSFS)   += hypervisor_sysfs.o
+obj-$(CONFIG_XEN_SYSFS) += xen_sysfs.o
