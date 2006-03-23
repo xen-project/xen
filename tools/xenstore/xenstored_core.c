@@ -1231,39 +1231,17 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 	conn->transaction = NULL;
 }
 
-static int out_of_mem(void *data)
-{
-	longjmp(*(jmp_buf *)data, 1);
-}
-
 static void consider_message(struct connection *conn)
 {
-	jmp_buf talloc_fail;
-
 	if (verbose)
 		xprintf("Got message %s len %i from %p\n",
 			sockmsg_string(conn->in->hdr.msg.type),
 			conn->in->hdr.msg.len, conn);
 
-	/* For simplicity, we kill the connection on OOM. */
-	talloc_set_fail_handler(out_of_mem, &talloc_fail);
-	if (setjmp(talloc_fail)) {
-		talloc_free(conn);
-		goto end;
-	}
-
 	process_message(conn, conn->in);
 
 	talloc_free(conn->in);
 	conn->in = new_buffer(conn);
-
-end:
-	talloc_set_fail_handler(NULL, NULL);
-	if (talloc_total_blocks(NULL)
-	    != talloc_total_blocks(talloc_autofree_context()) + 1) {
-		talloc_report_full(NULL, stderr);
-		abort();
-	}
 }
 
 /* Errors in reading or allocating here mean we get out of sync, so we
