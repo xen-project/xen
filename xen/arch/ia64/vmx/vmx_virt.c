@@ -714,6 +714,7 @@ IA64FAULT vmx_emul_itc_i(VCPU *vcpu, INST64 inst)
 IA64FAULT vmx_emul_mov_to_ar_imm(VCPU *vcpu, INST64 inst)
 {
     // I27 and M30 are identical for these fields
+    UINT64  imm;
     if(inst.M30.ar3!=44){
         panic("Can't support ar register other than itc");
     }
@@ -727,7 +728,6 @@ IA64FAULT vmx_emul_mov_to_ar_imm(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif // CHECK_FAULT
-    UINT64  imm;
     if(inst.M30.s){
         imm = -inst.M30.imm;
     }else{
@@ -767,6 +767,7 @@ IA64FAULT vmx_emul_mov_to_ar_reg(VCPU *vcpu, INST64 inst)
 IA64FAULT vmx_emul_mov_from_ar_reg(VCPU *vcpu, INST64 inst)
 {
     // I27 and M30 are identical for these fields
+    u64 r1;
     if(inst.M31.ar3!=44){
         panic("Can't support ar register other than itc");
     }
@@ -785,7 +786,6 @@ IA64FAULT vmx_emul_mov_from_ar_reg(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif // CHECK_FAULT
-    u64 r1;
     vmx_vcpu_get_itc(vcpu,&r1);
     vcpu_set_gr(vcpu,inst.M31.r1,r1,0);
     return IA64_NO_FAULT;
@@ -844,8 +844,8 @@ IA64FAULT vmx_emul_mov_to_rr(VCPU *vcpu, INST64 inst)
 
 IA64FAULT vmx_emul_mov_to_dbr(VCPU *vcpu, INST64 inst)
 {
-    return IA64_NO_FAULT;
     u64 r3,r2;
+    return IA64_NO_FAULT;
 #ifdef  CHECK_FAULT
     IA64_PSR vpsr;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
@@ -868,8 +868,8 @@ IA64FAULT vmx_emul_mov_to_dbr(VCPU *vcpu, INST64 inst)
 
 IA64FAULT vmx_emul_mov_to_ibr(VCPU *vcpu, INST64 inst)
 {
-    return IA64_NO_FAULT;
     u64 r3,r2;
+    return IA64_NO_FAULT;
 #ifdef  CHECK_FAULT
     IA64_PSR vpsr;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
@@ -1156,6 +1156,7 @@ IA64FAULT vmx_emul_mov_from_cpuid(VCPU *vcpu, INST64 inst)
 IA64FAULT vmx_emul_mov_to_cr(VCPU *vcpu, INST64 inst)
 {
     u64 r2;
+    extern u64 cr_igfld_mask(int index, u64 value);
 #ifdef  CHECK_FAULT
     IA64_PSR  vpsr;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
@@ -1187,7 +1188,6 @@ IA64FAULT vmx_emul_mov_to_cr(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif  //CHECK_FAULT
-    extern u64 cr_igfld_mask(int index, u64 value);
     r2 = cr_igfld_mask(inst.M32.cr3,r2);
     VCPU(vcpu, vcr[inst.M32.cr3]) = r2;
     switch (inst.M32.cr3) {

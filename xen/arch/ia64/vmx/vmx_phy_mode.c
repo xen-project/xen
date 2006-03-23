@@ -177,6 +177,7 @@ vmx_load_all_rr(VCPU *vcpu)
 {
 	unsigned long psr;
 	ia64_rr phy_rr;
+	extern void * pal_vaddr;
 
 	local_irq_save(psr);
 
@@ -188,13 +189,13 @@ vmx_load_all_rr(VCPU *vcpu)
 		if (vcpu->arch.mode_flags & GUEST_PHY_EMUL)
 			panic("Unexpected domain switch in phy emul\n");
 		phy_rr.rrval = vcpu->arch.metaphysical_rr0;
- //   	phy_rr.ps = PAGE_SHIFT;
-    	phy_rr.ve = 1;
+//		phy_rr.ps = PAGE_SHIFT;
+		phy_rr.ve = 1;
 
 		ia64_set_rr((VRN0 << VRN_SHIFT), phy_rr.rrval);
 		phy_rr.rrval = vcpu->arch.metaphysical_rr4;
-//    	phy_rr.ps = PAGE_SHIFT;
-	    phy_rr.ve = 1;
+//		phy_rr.ps = PAGE_SHIFT;
+		phy_rr.ve = 1;
 
 		ia64_set_rr((VRN4 << VRN_SHIFT), phy_rr.rrval);
 	} else {
@@ -206,24 +207,24 @@ vmx_load_all_rr(VCPU *vcpu)
 
 	/* rr567 will be postponed to last point when resuming back to guest */
 	ia64_set_rr((VRN1 << VRN_SHIFT),
-		     vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN1])));
+			vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN1])));
 	ia64_set_rr((VRN2 << VRN_SHIFT),
-		     vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN2])));
+			vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN2])));
 	ia64_set_rr((VRN3 << VRN_SHIFT),
-		     vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN3])));
-    ia64_set_rr((VRN5 << VRN_SHIFT),
-            vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN5])));
-    ia64_set_rr((VRN6 << VRN_SHIFT),
-            vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN6])));
-    extern void * pal_vaddr;
-    vmx_switch_rr7(vmx_vrrtomrr(vcpu,VMX(vcpu, vrr[VRN7])),(void *)vcpu->domain->shared_info,
-                (void *)vcpu->arch.privregs,
-                (void *)vcpu->arch.vtlb->vhpt->hash, pal_vaddr );
-    ia64_set_pta(vcpu->arch.arch_vmx.mpta);
+			vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN3])));
+	ia64_set_rr((VRN5 << VRN_SHIFT),
+			vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN5])));
+	ia64_set_rr((VRN6 << VRN_SHIFT),
+			vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN6])));
+	vmx_switch_rr7(vmx_vrrtomrr(vcpu,VMX(vcpu, vrr[VRN7])),
+			(void *)vcpu->domain->shared_info,
+			(void *)vcpu->arch.privregs,
+			(void *)vcpu->arch.vtlb->vhpt->hash, pal_vaddr );
+	ia64_set_pta(vcpu->arch.arch_vmx.mpta);
 
 	ia64_srlz_d();
 	ia64_set_psr(psr);
-    ia64_srlz_i();
+	ia64_srlz_i();
 }
 
 void
