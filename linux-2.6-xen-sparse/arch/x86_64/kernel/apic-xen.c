@@ -114,8 +114,6 @@ void smp_apic_timer_interrupt(struct pt_regs *regs)
 	irq_exit();
 }
 
-int __initdata unsync_tsc_on_multicluster;
-
 /*
  * This interrupt should _never_ happen with our APIC/SMP architecture
  */
