@@ -106,6 +106,16 @@ void send_IPI_self(int vector)
     __send_IPI_shortcut(APIC_DEST_SELF, vector);
 }
 
+static inline void check_IPI_mask(cpumask_t cpumask)
+{
+    /*
+     * Sanity, and necessary. An IPI with no target generates a send accept
+     * error with Pentium and P6 APICs.
+     */
+    ASSERT(cpus_subset(cpumask, cpu_online_map));
+    ASSERT(!cpus_empty(cpumask));
+}
+
 /*
  * This is only used on smaller machines.
  */
@@ -114,6 +124,8 @@ void send_IPI_mask_bitmask(cpumask_t cpumask, int vector)
     unsigned long mask = cpus_addr(cpumask)[0];
     unsigned long cfg;
     unsigned long flags;
+
+    check_IPI_mask(cpumask);
 
     local_irq_save(flags);
 
@@ -145,6 +157,8 @@ inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 {
     unsigned long cfg, flags;
     unsigned int query_cpu;
+
+    check_IPI_mask(mask);
 
     /*
      * Hack. The clustered APIC addressing mode doesn't allow us to send 
@@ -303,6 +317,9 @@ extern int on_selected_cpus(
     unsigned int nr_cpus = cpus_weight(selected);
 
     ASSERT(local_irq_is_enabled());
+
+    if ( nr_cpus == 0 )
+        return 0;
 
     data.func = func;
     data.info = info;
