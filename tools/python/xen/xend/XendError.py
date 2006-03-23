@@ -17,10 +17,12 @@
 
 from xmlrpclib import Fault
 
+import XendClient
+
 class XendError(Fault):
     
     def __init__(self, value):
-        Fault.__init__(self, 2, value)
+        Fault.__init__(self, XendClient.ERROR_GENERIC, value)
         self.value = value
 
     def __str__(self):

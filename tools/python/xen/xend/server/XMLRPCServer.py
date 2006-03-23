@@ -13,25 +13,45 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2006 Anthony Liguori <aliguori@us.ibm.com>
-# Copyright (C) 2006 XenSource Ltd
+# Copyright (C) 2006 XenSource Ltd.
 #============================================================================
+
+import xmlrpclib
 
 from xen.xend import XendDomain, XendDomainInfo, XendNode, \
                      XendLogging, XendDmesg
 from xen.util.xmlrpclib2 import UnixXMLRPCServer, TCPXMLRPCServer
 
-from xen.xend.XendClient import XML_RPC_SOCKET
+from xen.xend.XendClient import XML_RPC_SOCKET, ERROR_INVALID_DOMAIN
 
 def lookup(domid):
-    return XendDomain.instance().domain_lookup_by_name_or_id(domid)
+    try:
+        return XendDomain.instance().domain_lookup_by_name_or_id(domid)
+    except exn:
+        log.exception(exn)
+        raise exn
 
 def dispatch(domid, fn, args):
     info = lookup(domid)
-    return getattr(info, fn)(*args)
+    if info:
+        try:
+            return getattr(info, fn)(*args)
+        except exn:
+            log.exception(exn)
+            raise exn
+    else:
+        raise xmlrpclib.Fault(ERROR_INVALID_DOMAIN, domid)
 
 def domain(domid):
     info = lookup(domid)
-    return info.sxpr()
+    if info:
+        try:
+            return info.sxpr()
+        except exn:
+            log.exception(exn)
+            raise exn
+    else:
+        raise xmlrpclib.Fault(ERROR_INVALID_DOMAIN, domid)
 
 def domains(detail=1):
     if detail < 1:

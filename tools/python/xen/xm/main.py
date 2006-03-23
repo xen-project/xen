@@ -1,6 +1,6 @@
 # (C) Copyright IBM Corp. 2005
 # Copyright (C) 2004 Mike Wray
-# Copyright (c) 2005 XenSource Ltd
+# Copyright (c) 2005-2006 XenSource Ltd.
 #
 # Authors:
 #     Sean Dague <sean at dague dot net>
@@ -38,7 +38,7 @@ from xen.xend import sxp
 from xen.xm.opts import *
 
 import console
-
+import xen.xend.XendClient
 from xen.xend.XendClient import server
 
 # getopt.gnu_getopt is better, but only exists in Python 2.3+.  Use
@@ -1111,7 +1111,10 @@ def main(argv=sys.argv):
         except SystemExit:
             sys.exit(1)
         except xmlrpclib.Fault, ex:
-            print "Error: %s" % ex.faultString
+            if ex.faultCode == xen.xend.XendClient.ERROR_INVALID_DOMAIN:
+                print "Error: the domain '%s' does not exist." % ex.faultString
+            else:
+                print "Error: %s" % ex.faultString
             sys.exit(1)
         except:
             print "Unexpected error:", sys.exc_info()[0]
