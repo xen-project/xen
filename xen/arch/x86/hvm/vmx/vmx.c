@@ -358,9 +358,10 @@ static void vmx_freeze_time(struct vcpu *v)
 {
     struct hvm_virpit *vpit = &v->domain->arch.hvm_domain.vpit;
     
-    v->domain->arch.hvm_domain.guest_time = get_guest_time(v);
-    if ( vpit->first_injected )
+    if ( vpit->first_injected && !v->domain->arch.hvm_domain.guest_time ) {
+        v->domain->arch.hvm_domain.guest_time = get_guest_time(v);
         stop_timer(&(vpit->pit_timer));
+    }
 }
 
 static void vmx_ctxt_switch_from(struct vcpu *v)
