@@ -32,13 +32,13 @@
 #endif
 
 static int direct_remap_area_pte_fn(pte_t *pte, 
-				    struct page *pte_page,
+				    struct page *pmd_page,
 				    unsigned long address, 
 				    void *data)
 {
 	mmu_update_t **v = (mmu_update_t **)data;
 
-	(*v)->ptr = ((u64)pfn_to_mfn(page_to_pfn(pte_page)) <<
+	(*v)->ptr = ((u64)pfn_to_mfn(page_to_pfn(pmd_page)) <<
 		     PAGE_SHIFT) | ((unsigned long)pte & ~PAGE_MASK);
 	(*v)++;
 
@@ -67,9 +67,9 @@ static int __direct_remap_pfn_range(struct mm_struct *mm,
 	for (i = 0; i < size; i += PAGE_SIZE) {
 		if ((v - u) == (PAGE_SIZE / sizeof(mmu_update_t))) {
 			/* Fill in the PTE pointers. */
-			rc = generic_page_range(mm, start_address, 
-						address - start_address,
-						direct_remap_area_pte_fn, &w);
+			rc = apply_to_page_range(mm, start_address, 
+						 address - start_address,
+						 direct_remap_area_pte_fn, &w);
 			if (rc)
 				goto out;
 			w = u;
@@ -93,8 +93,9 @@ static int __direct_remap_pfn_range(struct mm_struct *mm,
 
 	if (v != u) {
 		/* get the ptep's filled in */
-		rc = generic_page_range(mm, start_address, address - start_address,
-				   direct_remap_area_pte_fn, &w);
+		rc = apply_to_page_range(mm, start_address,
+					 address - start_address,
+					 direct_remap_area_pte_fn, &w);
 		if (rc)
 			goto out;
 		rc = -EFAULT;
@@ -142,11 +143,11 @@ int direct_kernel_remap_pfn_range(unsigned long address,
 EXPORT_SYMBOL(direct_kernel_remap_pfn_range);
 
 static int lookup_pte_fn(
-	pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
+	pte_t *pte, struct page *pmd_page, unsigned long addr, void *data)
 {
 	uint64_t *ptep = (uint64_t *)data;
 	if (ptep)
-		*ptep = ((uint64_t)pfn_to_mfn(page_to_pfn(pte_page)) <<
+		*ptep = ((uint64_t)pfn_to_mfn(page_to_pfn(pmd_page)) <<
 			 PAGE_SHIFT) | ((unsigned long)pte & ~PAGE_MASK);
 	return 0;
 }
@@ -155,13 +156,14 @@ int create_lookup_pte_addr(struct mm_struct *mm,
 			   unsigned long address,
 			   uint64_t *ptep)
 {
-	return generic_page_range(mm, address, PAGE_SIZE, lookup_pte_fn, ptep);
+	return apply_to_page_range(mm, address, PAGE_SIZE,
+				   lookup_pte_fn, ptep);
 }
 
 EXPORT_SYMBOL(create_lookup_pte_addr);
 
 static int noop_fn(
-	pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
+	pte_t *pte, struct page *pmd_page, unsigned long addr, void *data)
 {
 	return 0;
 }
@@ -170,7 +172,7 @@ int touch_pte_range(struct mm_struct *mm,
 		    unsigned long address,
 		    unsigned long size)
 {
-	return generic_page_range(mm, address, size, noop_fn, NULL);
+	return apply_to_page_range(mm, address, size, noop_fn, NULL);
 } 
 
 EXPORT_SYMBOL(touch_pte_range);
