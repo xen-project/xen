@@ -13,6 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2006 Anthony Liguori <aliguori@us.ibm.com>
+# Copyright (C) 2006 XenSource Ltd
 #============================================================================
 
 from xen.xend import XendDomain, XendDomainInfo, XendNode, \
@@ -69,9 +70,9 @@ class XMLRPCServer:
         if self.use_tcp:
             # bind to something fixed for now as we may eliminate
             # tcp support completely.
-            self.server = TCPXMLRPCServer(("localhost", 8005))
+            self.server = TCPXMLRPCServer(("localhost", 8005, False))
         else:
-            self.server = UnixXMLRPCServer(XML_RPC_SOCKET)
+            self.server = UnixXMLRPCServer(XML_RPC_SOCKET, False)
 
         # Functions in XendDomainInfo
         for name in methods:

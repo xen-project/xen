@@ -99,11 +99,11 @@ class UnixXMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
 class UnixXMLRPCServer(TCPXMLRPCServer):
     address_family = socket.AF_UNIX
 
-    def __init__(self, addr, requestHandler=UnixXMLRPCRequestHandler,
-                 logRequests=1):
+    def __init__(self, addr, logRequests):
         if self.allow_reuse_address:
             try:
                 os.unlink(addr)
             except OSError, exc:
                 pass
-        TCPXMLRPCServer.__init__(self, addr, requestHandler, logRequests)
+        TCPXMLRPCServer.__init__(self, addr, UnixXMLRPCRequestHandler,
+                                 logRequests)
