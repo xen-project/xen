@@ -32,7 +32,7 @@ name = "ExampleVTIDomain"
 # Random MACs are assigned if not given.
 #vif = [ 'type=ioemu, mac=00:16:3e:00:00:11, bridge=xenbr0' ]
 # type=ioemu specify the NIC is an ioemu device not netfront
-vif = [ 'type=ioemu, bridge=xenbr0' ]
+#vif = [ 'type=ioemu, bridge=xenbr0' ]
 # for multiple NICs in device model, 3 in this example
 #vif = [ 'type=ioemu, bridge=xenbr0', 'type=ioemu', 'type=ioemu']
 
