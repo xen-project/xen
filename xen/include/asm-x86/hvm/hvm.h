@@ -41,12 +41,12 @@ struct hvm_function_table {
     /*
      * Store and load guest state:
      * 1) load/store guest register state,
-     * 2) store guest control register state (used for panic dumps),
-     * 3) modify guest state (e.g., set debug flags).
+     * 2) modify guest state (e.g., set debug flags).
      */
-    void (*store_cpu_guest_regs)(struct vcpu *v, struct cpu_user_regs *r);
-    void (*load_cpu_guest_regs)(struct vcpu *v, struct cpu_user_regs *r);
-    void (*store_cpu_guest_ctrl_regs)(struct vcpu *v, unsigned long crs[8]);
+    void (*store_cpu_guest_regs)(
+        struct vcpu *v, struct cpu_user_regs *r, unsigned long *crs);
+    void (*load_cpu_guest_regs)(
+        struct vcpu *v, struct cpu_user_regs *r);
     void (*modify_guest_state)(struct vcpu *v);
 
     /*
@@ -93,21 +93,16 @@ hvm_relinquish_guest_resources(struct domain *d)
 }
 
 static inline void
-hvm_store_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *r)
+hvm_store_cpu_guest_regs(
+    struct vcpu *v, struct cpu_user_regs *r, unsigned long *crs)
 {
-    hvm_funcs.store_cpu_guest_regs(v, r);
+    hvm_funcs.store_cpu_guest_regs(v, r, crs);
 }
 
 static inline void
 hvm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *r)
 {
     hvm_funcs.load_cpu_guest_regs(v, r);
-}
-
-static inline void
-hvm_store_cpu_guest_ctrl_regs(struct vcpu *v, unsigned long crs[8])
-{
-    hvm_funcs.store_cpu_guest_ctrl_regs(v, crs);
 }
 
 static inline void

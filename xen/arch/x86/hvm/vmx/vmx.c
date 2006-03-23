@@ -398,31 +398,81 @@ void vmx_migrate_timers(struct vcpu *v)
         migrate_timer(&(VLAPIC(v)->vlapic_timer), v->processor);
 }
 
-void vmx_store_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
+struct vmx_store_cpu_guest_regs_callback_info {
+    struct vcpu *v;
+    struct cpu_user_regs *regs;
+    unsigned long *crs;
+};
+
+static void vmx_store_cpu_guest_regs(
+    struct vcpu *v, struct cpu_user_regs *regs, unsigned long *crs);
+
+static void vmx_store_cpu_guest_regs_callback(void *data)
 {
+    struct vmx_store_cpu_guest_regs_callback_info *info = data;
+    vmx_store_cpu_guest_regs(info->v, info->regs, info->crs);
+}
+
+static void vmx_store_cpu_guest_regs(
+    struct vcpu *v, struct cpu_user_regs *regs, unsigned long *crs)
+{
+    if ( v != current )
+    {
+        /* Non-current VCPUs must be paused to get a register snapshot. */
+        ASSERT(atomic_read(&v->pausecnt) != 0);
+
+        if ( v->arch.hvm_vmx.launch_cpu != smp_processor_id() )
+        {
+            /* Get register details from remote CPU. */
+            struct vmx_store_cpu_guest_regs_callback_info info = {
+                .v = v, .regs = regs, .crs = crs };
+            cpumask_t cpumask = cpumask_of_cpu(v->arch.hvm_vmx.launch_cpu);
+            on_selected_cpus(cpumask, vmx_store_cpu_guest_regs_callback,
+                             &info, 1, 1);
+            return;
+        }
+
+        /* Register details are on this CPU. Load the correct VMCS. */
+        __vmptrld(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+    }
+
+    ASSERT(v->arch.hvm_vmx.launch_cpu == smp_processor_id());
+
+    if ( regs != NULL )
+    {
 #if defined (__x86_64__)
-    __vmread(GUEST_RFLAGS, &regs->rflags);
-    __vmread(GUEST_SS_SELECTOR, &regs->ss);
-    __vmread(GUEST_CS_SELECTOR, &regs->cs);
-    __vmread(GUEST_DS_SELECTOR, &regs->ds);
-    __vmread(GUEST_ES_SELECTOR, &regs->es);
-    __vmread(GUEST_GS_SELECTOR, &regs->gs);
-    __vmread(GUEST_FS_SELECTOR, &regs->fs);
-    __vmread(GUEST_RIP, &regs->rip);
-    __vmread(GUEST_RSP, &regs->rsp);
+        __vmread(GUEST_RFLAGS, &regs->rflags);
+        __vmread(GUEST_SS_SELECTOR, &regs->ss);
+        __vmread(GUEST_CS_SELECTOR, &regs->cs);
+        __vmread(GUEST_DS_SELECTOR, &regs->ds);
+        __vmread(GUEST_ES_SELECTOR, &regs->es);
+        __vmread(GUEST_GS_SELECTOR, &regs->gs);
+        __vmread(GUEST_FS_SELECTOR, &regs->fs);
+        __vmread(GUEST_RIP, &regs->rip);
+        __vmread(GUEST_RSP, &regs->rsp);
 #elif defined (__i386__)
-    __vmread(GUEST_RFLAGS, &regs->eflags);
-    __vmread(GUEST_SS_SELECTOR, &regs->ss);
-    __vmread(GUEST_CS_SELECTOR, &regs->cs);
-    __vmread(GUEST_DS_SELECTOR, &regs->ds);
-    __vmread(GUEST_ES_SELECTOR, &regs->es);
-    __vmread(GUEST_GS_SELECTOR, &regs->gs);
-    __vmread(GUEST_FS_SELECTOR, &regs->fs);
-    __vmread(GUEST_RIP, &regs->eip);
-    __vmread(GUEST_RSP, &regs->esp);
-#else
-#error Unsupported architecture
+        __vmread(GUEST_RFLAGS, &regs->eflags);
+        __vmread(GUEST_SS_SELECTOR, &regs->ss);
+        __vmread(GUEST_CS_SELECTOR, &regs->cs);
+        __vmread(GUEST_DS_SELECTOR, &regs->ds);
+        __vmread(GUEST_ES_SELECTOR, &regs->es);
+        __vmread(GUEST_GS_SELECTOR, &regs->gs);
+        __vmread(GUEST_FS_SELECTOR, &regs->fs);
+        __vmread(GUEST_RIP, &regs->eip);
+        __vmread(GUEST_RSP, &regs->esp);
 #endif
+    }
+
+    if ( crs != NULL )
+    {
+        __vmread(CR0_READ_SHADOW, &crs[0]);
+        __vmread(GUEST_CR3, &crs[3]);
+        __vmread(CR4_READ_SHADOW, &crs[4]);
+    }
+
+    /* Reload current VCPU's VMCS if it was temporarily unloaded. */
+    if ( (v != current) && hvm_guest(current) )
+        __vmptrld(virt_to_maddr(current->arch.hvm_vmx.vmcs));
 }
 
 void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
@@ -454,13 +504,6 @@ void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 #else
 #error Unsupported architecture
 #endif
-}
-
-void vmx_store_cpu_guest_ctrl_regs(struct vcpu *v, unsigned long crs[8])
-{
-    __vmread(CR0_READ_SHADOW, &crs[0]);
-    __vmread(GUEST_CR3, &crs[3]);
-    __vmread(CR4_READ_SHADOW, &crs[4]);
 }
 
 void vmx_modify_guest_state(struct vcpu *v)
@@ -616,7 +659,6 @@ int start_vmx(void)
     hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = vmx_load_cpu_guest_regs;
 
-    hvm_funcs.store_cpu_guest_ctrl_regs = vmx_store_cpu_guest_ctrl_regs;
     hvm_funcs.modify_guest_state = vmx_modify_guest_state;
 
     hvm_funcs.realmode = vmx_realmode;

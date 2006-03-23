@@ -201,31 +201,41 @@ int svm_initialize_guest_resources(struct vcpu *v)
 }
 
 static void svm_store_cpu_guest_regs(
-    struct vcpu *v, struct cpu_user_regs *regs)
+    struct vcpu *v, struct cpu_user_regs *regs, unsigned long *crs)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
+    if ( regs != NULL )
+    {
 #if defined (__x86_64__)
-    regs->rip    = vmcb->rip;
-    regs->rsp    = vmcb->rsp;
-    regs->rflags = vmcb->rflags;
-    regs->cs     = vmcb->cs.sel;
-    regs->ds     = vmcb->ds.sel;
-    regs->es     = vmcb->es.sel;
-    regs->ss     = vmcb->ss.sel;
-    regs->gs     = vmcb->gs.sel;
-    regs->fs     = vmcb->fs.sel;
+        regs->rip    = vmcb->rip;
+        regs->rsp    = vmcb->rsp;
+        regs->rflags = vmcb->rflags;
+        regs->cs     = vmcb->cs.sel;
+        regs->ds     = vmcb->ds.sel;
+        regs->es     = vmcb->es.sel;
+        regs->ss     = vmcb->ss.sel;
+        regs->gs     = vmcb->gs.sel;
+        regs->fs     = vmcb->fs.sel;
 #elif defined (__i386__)
-    regs->eip    = vmcb->rip;
-    regs->esp    = vmcb->rsp;
-    regs->eflags = vmcb->rflags;
-    regs->cs     = vmcb->cs.sel;
-    regs->ds     = vmcb->ds.sel;
-    regs->es     = vmcb->es.sel;
-    regs->ss     = vmcb->ss.sel;
-    regs->gs     = vmcb->gs.sel;
-    regs->fs     = vmcb->fs.sel;
+        regs->eip    = vmcb->rip;
+        regs->esp    = vmcb->rsp;
+        regs->eflags = vmcb->rflags;
+        regs->cs     = vmcb->cs.sel;
+        regs->ds     = vmcb->ds.sel;
+        regs->es     = vmcb->es.sel;
+        regs->ss     = vmcb->ss.sel;
+        regs->gs     = vmcb->gs.sel;
+        regs->fs     = vmcb->fs.sel;
 #endif
+    }
+
+    if ( crs != NULL )
+    {
+        crs[0] = vmcb->cr0;
+        crs[3] = vmcb->cr3;
+        crs[4] = vmcb->cr4;
+    }
 }
 
 static void svm_load_cpu_guest_regs(
@@ -372,15 +382,6 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     return 1;
 }
 
-void svm_store_cpu_guest_ctrl_regs(struct vcpu *v, unsigned long crs[8])
-{
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    crs[0] = vmcb->cr0;
-    crs[3] = vmcb->cr3;
-    crs[4] = vmcb->cr4;
-}
-
 void svm_modify_guest_state(struct vcpu *v)
 {
     svm_modify_vmcb(v, &v->arch.guest_context.user_regs);
@@ -448,7 +449,6 @@ int start_svm(void)
     hvm_funcs.store_cpu_guest_regs = svm_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = svm_load_cpu_guest_regs;
 
-    hvm_funcs.store_cpu_guest_ctrl_regs = svm_store_cpu_guest_ctrl_regs;
     hvm_funcs.modify_guest_state = svm_modify_guest_state;
 
     hvm_funcs.realmode = svm_realmode;
