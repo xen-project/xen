@@ -121,8 +121,11 @@ static void ns16550_interrupt(
 
     while ( !(ns_read_reg(uart, IIR) & IIR_NOINT) )
     {
-        serial_tx_interrupt(port, regs);
-        serial_rx_interrupt(port, regs);
+        char lsr = ns_read_reg(uart, LSR);
+        if ( lsr & LSR_THRE )
+            serial_tx_interrupt(port, regs);
+        if ( lsr & LSR_DR )
+            serial_rx_interrupt(port, regs);
     }
 }
 

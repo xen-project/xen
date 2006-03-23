@@ -7,6 +7,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/delay.h>
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/keyhandler.h> 
@@ -15,8 +16,8 @@
 #include <xen/serial.h>
 
 static struct serial_port com[2] = {
-    { .lock = SPIN_LOCK_UNLOCKED }, 
-    { .lock = SPIN_LOCK_UNLOCKED }
+    { .rx_lock = SPIN_LOCK_UNLOCKED, .tx_lock = SPIN_LOCK_UNLOCKED }, 
+    { .rx_lock = SPIN_LOCK_UNLOCKED, .tx_lock = SPIN_LOCK_UNLOCKED }
 };
 
 void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
@@ -25,7 +26,7 @@ void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
     serial_rx_fn fn = NULL;
     unsigned long flags;
 
-    spin_lock_irqsave(&port->lock, flags);
+    spin_lock_irqsave(&port->rx_lock, flags);
 
     if ( port->driver->getc(port, &c) )
     {
@@ -39,7 +40,7 @@ void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
             port->rxbuf[MASK_SERIAL_RXBUF_IDX(port->rxbufp++)] = c;            
     }
 
-    spin_unlock_irqrestore(&port->lock, flags);
+    spin_unlock_irqrestore(&port->rx_lock, flags);
 
     if ( fn != NULL )
         (*fn)(c & 0x7f, regs);
@@ -50,7 +51,19 @@ void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
     int i;
     unsigned long flags;
 
-    spin_lock_irqsave(&port->lock, flags);
+    local_irq_save(flags);
+
+    /*
+     * Avoid spinning for a long time: if there is a long-term lock holder
+     * then we know that they'll be stuffing bytes into the transmitter which
+     * will therefore not be empty for long.
+     */
+    while ( !spin_trylock(&port->tx_lock) )
+    {
+        if ( !port->driver->tx_empty(port) )
+            return;
+        cpu_relax();
+    }
 
     if ( port->driver->tx_empty(port) )
     {
@@ -63,7 +76,7 @@ void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
         }
     }
 
-    spin_unlock_irqrestore(&port->lock, flags);
+    spin_unlock_irqrestore(&port->tx_lock, flags);
 }
 
 static void __serial_putc(struct serial_port *port, char c)
@@ -117,7 +130,7 @@ void serial_putc(int handle, char c)
     if ( (handle == -1) || !port->driver || !port->driver->putc )
         return;
 
-    spin_lock_irqsave(&port->lock, flags);
+    spin_lock_irqsave(&port->tx_lock, flags);
 
     if ( (c == '\n') && (handle & SERHND_COOKED) )
         __serial_putc(port, '\r');
@@ -129,7 +142,7 @@ void serial_putc(int handle, char c)
 
     __serial_putc(port, c);
 
-    spin_unlock_irqrestore(&port->lock, flags);
+    spin_unlock_irqrestore(&port->tx_lock, flags);
 }
 
 void serial_puts(int handle, const char *s)
@@ -141,7 +154,7 @@ void serial_puts(int handle, const char *s)
     if ( (handle == -1) || !port->driver || !port->driver->putc )
         return;
 
-    spin_lock_irqsave(&port->lock, flags);
+    spin_lock_irqsave(&port->tx_lock, flags);
 
     while ( (c = *s++) != '\0' )
     {
@@ -156,7 +169,7 @@ void serial_puts(int handle, const char *s)
         __serial_putc(port, c);
     }
 
-    spin_unlock_irqrestore(&port->lock, flags);
+    spin_unlock_irqrestore(&port->tx_lock, flags);
 }
 
 char serial_getc(int handle)
@@ -168,27 +181,28 @@ char serial_getc(int handle)
     if ( (handle == -1) || !port->driver || !port->driver->getc )
         return '\0';
 
-    do {        
+    do {
         for ( ; ; )
         {
-            spin_lock_irqsave(&port->lock, flags);
+            spin_lock_irqsave(&port->rx_lock, flags);
             
             if ( port->rxbufp != port->rxbufc )
             {
                 c = port->rxbuf[MASK_SERIAL_RXBUF_IDX(port->rxbufc++)];
-                spin_unlock_irqrestore(&port->lock, flags);
+                spin_unlock_irqrestore(&port->rx_lock, flags);
                 break;
             }
             
             if ( port->driver->getc(port, &c) )
             {
-                spin_unlock_irqrestore(&port->lock, flags);
+                spin_unlock_irqrestore(&port->rx_lock, flags);
                 break;
             }
 
-            spin_unlock_irqrestore(&port->lock, flags);
+            spin_unlock_irqrestore(&port->rx_lock, flags);
 
             cpu_relax();
+            udelay(100);
         }
     } while ( ((handle & SERHND_LO) &&  (c & 0x80)) ||
               ((handle & SERHND_HI) && !(c & 0x80)) );
@@ -241,7 +255,7 @@ void serial_set_rx_handler(int handle, serial_rx_fn fn)
     if ( handle == -1 )
         return;
 
-    spin_lock_irqsave(&port->lock, flags);
+    spin_lock_irqsave(&port->rx_lock, flags);
 
     if ( port->rx != NULL )
         goto fail;
@@ -265,11 +279,11 @@ void serial_set_rx_handler(int handle, serial_rx_fn fn)
         port->rx = fn;
     }
 
-    spin_unlock_irqrestore(&port->lock, flags);
+    spin_unlock_irqrestore(&port->rx_lock, flags);
     return;
 
  fail:
-    spin_unlock_irqrestore(&port->lock, flags);
+    spin_unlock_irqrestore(&port->rx_lock, flags);
     printk("ERROR: Conflicting receive handlers for COM%d\n", 
            handle & SERHND_IDX);
 }
@@ -277,8 +291,13 @@ void serial_set_rx_handler(int handle, serial_rx_fn fn)
 void serial_force_unlock(int handle)
 {
     struct serial_port *port = &com[handle & SERHND_IDX];
-    if ( handle != -1 )
-        port->lock = SPIN_LOCK_UNLOCKED;
+
+    if ( handle == -1 )
+        return;
+
+    port->rx_lock = SPIN_LOCK_UNLOCKED;
+    port->tx_lock = SPIN_LOCK_UNLOCKED;
+
     serial_start_sync(handle);
 }
 
@@ -290,7 +309,7 @@ void serial_start_sync(int handle)
     if ( handle == -1 )
         return;
     
-    spin_lock_irqsave(&port->lock, flags);
+    spin_lock_irqsave(&port->tx_lock, flags);
 
     if ( port->sync++ == 0 )
     {
@@ -303,7 +322,7 @@ void serial_start_sync(int handle)
         }
     }
 
-    spin_unlock_irqrestore(&port->lock, flags);
+    spin_unlock_irqrestore(&port->tx_lock, flags);
 }
 
 void serial_end_sync(int handle)
@@ -314,11 +333,11 @@ void serial_end_sync(int handle)
     if ( handle == -1 )
         return;
     
-    spin_lock_irqsave(&port->lock, flags);
+    spin_lock_irqsave(&port->tx_lock, flags);
 
     port->sync--;
 
-    spin_unlock_irqrestore(&port->lock, flags);
+    spin_unlock_irqrestore(&port->tx_lock, flags);
 }
 
 int serial_tx_space(int handle)
