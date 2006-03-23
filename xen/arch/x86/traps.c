@@ -450,7 +450,7 @@ asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
 
     if ( unlikely(!guest_mode(regs)) )
     {
-        DEBUGGER_trap_fatal(trapnr, regs);
+        DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
         show_registers(regs);
         panic("CPU%d FATAL TRAP: vector = %d (invalid opcode)\n",
               smp_processor_id(), TRAP_invalid_op);
