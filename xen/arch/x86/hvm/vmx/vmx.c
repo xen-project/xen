@@ -1308,7 +1308,8 @@ static int vmx_set_cr0(unsigned long value)
             vm_entry_value |= VM_ENTRY_CONTROLS_IA32E_MODE;
             __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
 
-            if ( !shadow_set_guest_paging_levels(v->domain, 4) ) {
+            if ( !shadow_set_guest_paging_levels(v->domain, PAGING_L4) )
+            {
                 printk("Unsupported guest paging levels\n");
                 domain_crash_synchronous(); /* need to take a clean path */
             }
@@ -1317,9 +1318,26 @@ static int vmx_set_cr0(unsigned long value)
 #endif  /* __x86_64__ */
         {
 #if CONFIG_PAGING_LEVELS >= 3
-            if ( !shadow_set_guest_paging_levels(v->domain, 2) ) {
-                printk("Unsupported guest paging levels\n");
-                domain_crash_synchronous(); /* need to take a clean path */
+            /* seems it's a 32-bit or 32-bit PAE guest */
+
+            if ( test_bit(VMX_CPU_STATE_PAE_ENABLED,
+                        &v->arch.hvm_vmx.cpu_state) )
+            {
+                /* The guest enables PAE first and then it enables PG, it is
+                 * really a PAE guest */
+                if ( !shadow_set_guest_paging_levels(v->domain, PAGING_L3) )
+                {
+                    printk("Unsupported guest paging levels\n");
+                    domain_crash_synchronous();
+                }
+            }
+            else
+            {
+                if ( !shadow_set_guest_paging_levels(v->domain, PAGING_L2) )
+                {
+                    printk("Unsupported guest paging levels\n");
+                    domain_crash_synchronous(); /* need to take a clean path */
+                }
             }
 #endif
         }
@@ -1398,6 +1416,12 @@ static int vmx_set_cr0(unsigned long value)
                         "Restoring to %%eip 0x%lx\n", eip);
             return 0; /* do not update eip! */
         }
+    }
+    else if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
+    {
+        /* we should take care of this kind of situation */
+        clear_all_shadow_status(v->domain);
+        __vmwrite(GUEST_CR3, pagetable_get_paddr(v->domain->arch.phys_table));
     }
 
     return 1;
@@ -1528,11 +1552,11 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
 
             if ( vmx_pgbit_test(v) )
             {
-                /* The guest is 32 bit. */
+                /* The guest is a 32-bit PAE guest. */
 #if CONFIG_PAGING_LEVELS >= 4
                 unsigned long mfn, old_base_mfn;
 
-                if( !shadow_set_guest_paging_levels(v->domain, 3) )
+                if( !shadow_set_guest_paging_levels(v->domain, PAGING_L3) )
                 {
                     printk("Unsupported guest paging levels\n");
                     domain_crash_synchronous(); /* need to take a clean path */
@@ -1572,12 +1596,31 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             }
             else
             {
-                /*  The guest is 64 bit. */
+                /*  The guest is a 64 bit or 32-bit PAE guest. */
 #if CONFIG_PAGING_LEVELS >= 4
-                if ( !shadow_set_guest_paging_levels(v->domain, 4) )
+                if ( (v->domain->arch.ops != NULL) &&
+                        v->domain->arch.ops->guest_paging_levels == PAGING_L2)
                 {
-                    printk("Unsupported guest paging levels\n");
-                    domain_crash_synchronous(); /* need to take a clean path */
+                    /* Seems the guest first enables PAE without enabling PG,
+                     * it must enable PG after that, and it is a 32-bit PAE
+                     * guest */
+
+                    if ( !shadow_set_guest_paging_levels(v->domain,
+                                                            PAGING_L3) )
+                    {
+                        printk("Unsupported guest paging levels\n");
+                        /* need to take a clean path */
+                        domain_crash_synchronous();
+                    }
+                }
+                else
+                {
+                    if ( !shadow_set_guest_paging_levels(v->domain,
+                                                            PAGING_L4) )
+                    {
+                        printk("Unsupported guest paging levels\n");
+                        domain_crash_synchronous();
+                    }
                 }
 #endif
             }
