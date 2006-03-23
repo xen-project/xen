@@ -1105,7 +1105,7 @@ def main(argv=sys.argv):
         except SystemExit:
             sys.exit(1)
         except xmlrpclib.Fault, ex:
-            print "Xend generated an internal fault: %s" % ex.faultString
+            print "Error: %s" % ex.faultString
             sys.exit(1)
         except:
             print "Unexpected error:", sys.exc_info()[0]
