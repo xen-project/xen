@@ -811,7 +811,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		skb->len  = rx->status;
 		skb->tail = skb->data + skb->len;
 
-		if (rx->flags & NETRXF_csum_valid)
+		if (rx->flags & NETRXF_data_validated)
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
 
 		np->stats.rx_packets++;
