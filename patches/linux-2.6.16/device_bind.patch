@@ -1,0 +1,14 @@
+--- linux-2.6.16/drivers/base/bus.c	2006-03-16 10:50:20.000000000 -0500
++++ linux-2.6.16/drivers/base/bus.c	2006-03-16 11:02:08.000000000 -0500
+@@ -188,6 +188,11 @@ static ssize_t driver_bind(struct device
+ 		up(&dev->sem);
+ 		if (dev->parent)
+ 			up(&dev->parent->sem);
++
++		if (err > 0) 		/* success */
++			err = count;
++		else if (err == 0)	/* driver didn't accept device */
++			err = -ENODEV;
+ 	}
+ 	put_device(dev);
+ 	put_bus(bus);
