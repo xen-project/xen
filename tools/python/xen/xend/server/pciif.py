@@ -118,10 +118,12 @@ class PciController(DevController):
                     "parse it's resources - %s"+str(e))
 
         if dev.driver!='pciback':
-            raise VmError(("pci: PCI Backend does not own device "+
-                    "%s\n"+
-                    "See the pciback.hide kernel "+
-                    "command-line parameter")%(dev.name))
+            raise VmError(("pci: PCI Backend does not own device "+ \
+                    "%s\n"+ \
+                    "See the pciback.hide kernel "+ \
+                    "command-line parameter or\n"+ \
+                    "bind your slot/device to the PCI backend using sysfs" \
+                    )%(dev.name))
 
         for (start, size) in dev.ioports:
             log.debug('pci: enabling ioport 0x%x/0x%x'%(start,size))

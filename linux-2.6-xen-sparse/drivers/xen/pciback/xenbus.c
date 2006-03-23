@@ -12,7 +12,7 @@
 
 #define INVALID_EVTCHN_IRQ  (-1)
 
-struct pciback_device *alloc_pdev(struct xenbus_device *xdev)
+static struct pciback_device *alloc_pdev(struct xenbus_device *xdev)
 {
 	struct pciback_device *pdev;
 
@@ -38,7 +38,7 @@ struct pciback_device *alloc_pdev(struct xenbus_device *xdev)
 	return pdev;
 }
 
-void free_pdev(struct pciback_device *pdev)
+static void free_pdev(struct pciback_device *pdev)
 {
 	if (pdev->be_watching)
 		unregister_xenbus_watch(&pdev->be_watch);
@@ -247,7 +247,7 @@ static int pciback_export_device(struct pciback_device *pdev,
 	dev_dbg(&pdev->xdev->dev, "exporting dom %x bus %x slot %x func %x\n",
 		domain, bus, slot, func);
 
-	dev = pcistub_get_pci_dev_by_slot(domain, bus, slot, func);
+	dev = pcistub_get_pci_dev_by_slot(pdev, domain, bus, slot, func);
 	if (!dev) {
 		err = -EINVAL;
 		xenbus_dev_fatal(pdev->xdev, err,
@@ -433,4 +433,9 @@ static struct xenbus_driver xenbus_pciback_driver = {
 int __init pciback_xenbus_register(void)
 {
 	return xenbus_register_backend(&xenbus_pciback_driver);
+}
+
+void __exit pciback_xenbus_unregister(void)
+{
+	xenbus_unregister_driver(&xenbus_pciback_driver);
 }
