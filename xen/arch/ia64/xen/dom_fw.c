@@ -20,7 +20,7 @@
 #include <asm/dom_fw.h>
 #include <public/sched.h>
 
-static struct ia64_boot_param *dom_fw_init(struct domain *, char *,int,char *,int);
+static struct ia64_boot_param *dom_fw_init(struct domain *, const char *,int,char *,int);
 extern unsigned long domain_mpa_to_imva(struct domain *,unsigned long mpaddr);
 extern struct domain *dom0;
 extern unsigned long dom0_start;
@@ -553,7 +553,7 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 }
 
 static struct ia64_boot_param *
-dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_size)
+dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int fw_mem_size)
 {
 	efi_system_table_t *efi_systab;
 	efi_runtime_services_t *efi_runtime;

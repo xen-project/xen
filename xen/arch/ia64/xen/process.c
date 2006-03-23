@@ -98,9 +98,16 @@ unsigned long translate_domain_pte(unsigned long pteval,
 		}
 	}
 	else if ((mpaddr >> PAGE_SHIFT) > d->max_pages) {
-		if ((mpaddr & ~0x1fffL ) != (1L << 40))
-		printf("translate_domain_pte: bad mpa=0x%lx (> 0x%lx),vadr=0x%lx,pteval=0x%lx,itir=0x%lx\n",
-			mpaddr, (unsigned long) d->max_pages<<PAGE_SHIFT, address, pteval, itir);
+		/* Address beyond the limit.  However the grant table is
+		   also beyond the limit.  Display a message if not in the
+		   grant table.  */
+		if (mpaddr >= IA64_GRANT_TABLE_PADDR
+		    && mpaddr < (IA64_GRANT_TABLE_PADDR 
+				 + (ORDER_GRANT_FRAMES << PAGE_SHIFT)))
+			printf("translate_domain_pte: bad mpa=0x%lx (> 0x%lx),"
+			       "vadr=0x%lx,pteval=0x%lx,itir=0x%lx\n",
+			       mpaddr, (unsigned long)d->max_pages<<PAGE_SHIFT,
+			       address, pteval, itir);
 		tdpfoo();
 	}
 	pteval2 = lookup_domain_mpa(d,mpaddr);
