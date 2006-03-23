@@ -57,7 +57,8 @@ class XendRoot:
     """Default level of information to be logged."""
     loglevel_default = 'DEBUG'
 
-    """Default for the flag indicating whether xend should run an http server."""
+    """Default for the flag indicating whether xend should run an http server
+    (deprecated)."""
     xend_http_server_default = 'no'
 
     xend_tcp_xmlrpc_server_default = 'no'
@@ -81,8 +82,9 @@ class XendRoot:
 
     xend_relocation_hosts_allow_default = ''
 
-    """Default for the flag indicating whether xend should run a unix-domain server."""
-    xend_unix_server_default = 'yes'
+    """Default for the flag indicating whether xend should run a unix-domain
+    server (deprecated)."""
+    xend_unix_server_default = 'no'
 
     """Default path the unix-domain server listens at."""
     xend_unix_path_default = '/var/lib/xend/xend-socket'
