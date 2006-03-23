@@ -15,7 +15,7 @@ TESTS = 01_create_basic_pos.test \
 	14_create_blockroot_pos.test \
 	15_create_smallmem_pos.test
 
-EXTRA_DIST = $(TESTS) $(XFAIL_TESTS)
+EXTRA_DIST = $(TESTS)
 
 TESTS_ENVIRONMENT=@TENV@
 
