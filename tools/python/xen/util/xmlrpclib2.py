@@ -13,6 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2006 Anthony Liguori <aliguori@us.ibm.com>
+# Copyright (C) 2006 XenSource Ltd.
 #============================================================================
 
 """
