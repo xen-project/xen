@@ -50,6 +50,8 @@ static void free_pdev(struct pcifront_device *pdev)
 {
 	dev_dbg(&pdev->xdev->dev, "freeing pdev @ 0x%p\n", pdev);
 
+	pcifront_free_roots(pdev);
+
 	if (pdev->evtchn != INVALID_EVTCHN)
 		xenbus_free_evtchn(pdev->xdev, pdev->evtchn);
 

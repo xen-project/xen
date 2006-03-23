@@ -56,19 +56,19 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 	notify_remote_via_evtchn(port);
 
 	/*
-	 * We set a poll timeout of 5 seconds but give up on return after
-	 * 4 seconds. It is better to time out too late rather than too early
+	 * We set a poll timeout of 3 seconds but give up on return after
+	 * 2 seconds. It is better to time out too late rather than too early
 	 * (in the latter case we end up continually re-executing poll() with a
 	 * timeout in the past). 1s difference gives plenty of slack for error.
 	 */
 	do_gettimeofday(&tv);
-	ns_timeout = timeval_to_ns(&tv) + 4 * (nsec_t)NSEC_PER_SEC;
+	ns_timeout = timeval_to_ns(&tv) + 2 * (nsec_t)NSEC_PER_SEC;
 
 	clear_evtchn(port);
 
 	while (test_bit(_XEN_PCIF_active,
 			(unsigned long *)&pdev->sh_info->flags)) {
-		if (HYPERVISOR_poll(&port, 1, jiffies + 5*HZ))
+		if (HYPERVISOR_poll(&port, 1, jiffies + 3*HZ))
 			BUG();
 		clear_evtchn(port);
 		do_gettimeofday(&tv);
@@ -173,7 +173,7 @@ static void pcifront_claim_resource(struct pci_dev *dev, void *data)
 
 		if (!r->parent && r->start && r->flags) {
 			dev_dbg(&pdev->xdev->dev, "claiming resource %s/%d\n",
-					pci_name(dev), i);
+				pci_name(dev), i);
 			pci_claim_resource(dev, i);
 		}
 	}
@@ -234,25 +234,38 @@ int pcifront_scan_root(struct pcifront_device *pdev,
 	return err;
 }
 
+static void free_root_bus_devs(struct pci_bus *bus)
+{
+	struct pci_dev *dev;
+
+	spin_lock(&pci_bus_lock);
+	while (!list_empty(&bus->devices)) {
+		dev = container_of(bus->devices.next, struct pci_dev, bus_list);
+		spin_unlock(&pci_bus_lock);
+
+		dev_dbg(&dev->dev, "removing device\n");
+		pci_remove_bus_device(dev);
+
+		spin_lock(&pci_bus_lock);
+	}
+	spin_unlock(&pci_bus_lock);
+}
+
 void pcifront_free_roots(struct pcifront_device *pdev)
 {
 	struct pci_bus_entry *bus_entry, *t;
 
+	dev_dbg(&pdev->xdev->dev, "cleaning up root buses\n");
+
 	list_for_each_entry_safe(bus_entry, t, &pdev->root_buses, list) {
-		/* TODO: Removing a PCI Bus is untested (as it normally
-		 * just goes away on domain shutdown)
-		 */
 		list_del(&bus_entry->list);
 
-		spin_lock(&pci_bus_lock);
-		list_del(&bus_entry->bus->node);
-		spin_unlock(&pci_bus_lock);
+		free_root_bus_devs(bus_entry->bus);
 
 		kfree(bus_entry->bus->sysdata);
 
 		device_unregister(bus_entry->bus->bridge);
-
-		/* Do we need to free() the bus itself? */
+		pci_remove_bus(bus_entry->bus);
 
 		kfree(bus_entry);
 	}
