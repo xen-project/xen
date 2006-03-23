@@ -1378,36 +1378,39 @@ int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 EXPORT_SYMBOL(remap_pfn_range);
 
 #ifdef CONFIG_XEN
-static inline int generic_pte_range(struct mm_struct *mm, pmd_t *pmd,
-				    unsigned long addr, unsigned long end,
-				    pte_fn_t fn, void *data)
+static inline int apply_to_pte_range(struct mm_struct *mm, pmd_t *pmd,
+				     unsigned long addr, unsigned long end,
+				     pte_fn_t fn, void *data)
 {
 	pte_t *pte;
 	int err;
-	struct page *pte_page;
+	struct page *pmd_page;
+	spinlock_t *ptl;
 
 	pte = (mm == &init_mm) ?
 		pte_alloc_kernel(pmd, addr) :
-		pte_alloc_map(mm, pmd, addr);
+		pte_alloc_map_lock(mm, pmd, addr, &ptl);
 	if (!pte)
 		return -ENOMEM;
 
-	pte_page = pmd_page(*pmd);
+	BUG_ON(pmd_huge(*pmd));
+
+	pmd_page = pmd_page(*pmd);
 
 	do {
-		err = fn(pte, pte_page, addr, data);
+		err = fn(pte, pmd_page, addr, data);
 		if (err)
 			break;
 	} while (pte++, addr += PAGE_SIZE, addr != end);
 
 	if (mm != &init_mm)
-		pte_unmap(pte-1);
+		pte_unmap_unlock(pte-1, ptl);
 	return err;
 }
 
-static inline int generic_pmd_range(struct mm_struct *mm, pud_t *pud,
-				    unsigned long addr, unsigned long end,
-				    pte_fn_t fn, void *data)
+static inline int apply_to_pmd_range(struct mm_struct *mm, pud_t *pud,
+				     unsigned long addr, unsigned long end,
+				     pte_fn_t fn, void *data)
 {
 	pmd_t *pmd;
 	unsigned long next;
@@ -1418,16 +1421,16 @@ static inline int generic_pmd_range(struct mm_struct *mm, pud_t *pud,
 		return -ENOMEM;
 	do {
 		next = pmd_addr_end(addr, end);
-		err = generic_pte_range(mm, pmd, addr, next, fn, data);
+		err = apply_to_pte_range(mm, pmd, addr, next, fn, data);
 		if (err)
 			break;
 	} while (pmd++, addr = next, addr != end);
 	return err;
 }
 
-static inline int generic_pud_range(struct mm_struct *mm, pgd_t *pgd,
-				    unsigned long addr, unsigned long end,
-				    pte_fn_t fn, void *data)
+static inline int apply_to_pud_range(struct mm_struct *mm, pgd_t *pgd,
+				     unsigned long addr, unsigned long end,
+				     pte_fn_t fn, void *data)
 {
 	pud_t *pud;
 	unsigned long next;
@@ -1438,7 +1441,7 @@ static inline int generic_pud_range(struct mm_struct *mm, pgd_t *pgd,
 		return -ENOMEM;
 	do {
 		next = pud_addr_end(addr, end);
-		err = generic_pmd_range(mm, pud, addr, next, fn, data);
+		err = apply_to_pmd_range(mm, pud, addr, next, fn, data);
 		if (err)
 			break;
 	} while (pud++, addr = next, addr != end);
@@ -1449,8 +1452,8 @@ static inline int generic_pud_range(struct mm_struct *mm, pgd_t *pgd,
  * Scan a region of virtual memory, filling in page tables as necessary
  * and calling a provided function on each leaf page table.
  */
-int generic_page_range(struct mm_struct *mm, unsigned long addr,
-		       unsigned long size, pte_fn_t fn, void *data)
+int apply_to_page_range(struct mm_struct *mm, unsigned long addr,
+			unsigned long size, pte_fn_t fn, void *data)
 {
 	pgd_t *pgd;
 	unsigned long next;
@@ -1461,12 +1464,13 @@ int generic_page_range(struct mm_struct *mm, unsigned long addr,
 	pgd = pgd_offset(mm, addr);
 	do {
 		next = pgd_addr_end(addr, end);
-		err = generic_pud_range(mm, pgd, addr, next, fn, data);
+		err = apply_to_pud_range(mm, pgd, addr, next, fn, data);
 		if (err)
 			break;
 	} while (pgd++, addr = next, addr != end);
 	return err;
 }
+EXPORT_SYMBOL_GPL(apply_to_page_range);
 #endif
 
 /*

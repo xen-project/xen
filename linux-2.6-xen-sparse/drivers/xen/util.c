@@ -6,9 +6,9 @@
 #include <asm/uaccess.h>
 #include <xen/driver_util.h>
 
-static int f(pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
+static int f(pte_t *pte, struct page *pmd_page, unsigned long addr, void *data)
 {
-	/* generic_page_range() does all the hard work. */
+	/* apply_to_page_range() does all the hard work. */
 	return 0;
 }
 
@@ -24,8 +24,8 @@ struct vm_struct *alloc_vm_area(unsigned long size)
 	 * This ensures that page tables are constructed for this region
 	 * of kernel virtual address space and mapped into init_mm.
 	 */
-	if (generic_page_range(&init_mm, (unsigned long)area->addr,
-			       area->size, f, NULL)) {
+	if (apply_to_page_range(&init_mm, (unsigned long)area->addr,
+				area->size, f, NULL)) {
 		free_vm_area(area);
 		return NULL;
 	}

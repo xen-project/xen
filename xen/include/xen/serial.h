@@ -42,7 +42,7 @@ struct serial_port {
     char                rxbuf[SERIAL_RXBUFSZ];
     unsigned int        rxbufp, rxbufc;
     /* Serial I/O is concurrency-safe. */
-    spinlock_t          lock;
+    spinlock_t          rx_lock, tx_lock;
 };
 
 struct uart_driver {

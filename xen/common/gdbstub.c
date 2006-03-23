@@ -562,6 +562,7 @@ initialise_gdb(void)
     gdb_ctx->serhnd = serial_parse_handle(opt_gdb);
     if ( gdb_ctx->serhnd != -1 )
         printk("GDB stub initialised.\n");
+    serial_start_sync(gdb_ctx->serhnd);
 }
 
 /*

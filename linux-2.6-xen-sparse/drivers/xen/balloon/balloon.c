@@ -517,7 +517,7 @@ void balloon_update_driver_allowance(long delta)
 }
 
 static int dealloc_pte_fn(
-	pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
+	pte_t *pte, struct page *pmd_page, unsigned long addr, void *data)
 {
 	unsigned long mfn = pte_mfn(*pte);
 	int ret;
@@ -547,8 +547,8 @@ struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 	scrub_pages(vstart, 1 << order);
 
 	balloon_lock(flags);
-	ret = generic_page_range(
-		&init_mm, vstart, PAGE_SIZE << order, dealloc_pte_fn, NULL);
+	ret = apply_to_page_range(&init_mm, vstart,
+				  PAGE_SIZE << order, dealloc_pte_fn, NULL);
 	BUG_ON(ret);
 	current_pages -= 1UL << order;
 	totalram_pages = current_pages;

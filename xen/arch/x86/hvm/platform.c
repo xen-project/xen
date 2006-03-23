@@ -773,7 +773,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     mmio_opp = &v->arch.hvm_vcpu.mmio_op;
 
     regs = mmio_opp->inst_decoder_regs;
-    hvm_store_cpu_guest_regs(v, regs);
+    hvm_store_cpu_guest_regs(v, regs, NULL);
 
     if ((inst_len = hvm_instruction_length(v)) <= 0) {
         printf("handle_mmio: failed to get instruction length\n");

@@ -460,8 +460,7 @@ void arch_getdomaininfo_ctxt(
 
     if ( hvm_guest(v) )
     {
-        hvm_store_cpu_guest_regs(v, &c->user_regs);
-        hvm_store_cpu_guest_ctrl_regs(v, c->ctrlreg);
+        hvm_store_cpu_guest_regs(v, &c->user_regs, c->ctrlreg);
     }
     else
     {

@@ -27,8 +27,7 @@ void show_registers(struct cpu_user_regs *regs)
     if ( hvm_guest(current) && guest_mode(regs) )
     {
         context = "hvm";
-        hvm_store_cpu_guest_regs(current, &fault_regs);
-        hvm_store_cpu_guest_ctrl_regs(current, fault_crs);
+        hvm_store_cpu_guest_regs(current, &fault_regs, fault_crs);
     }
     else
     {
