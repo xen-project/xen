@@ -670,8 +670,18 @@ static void arch_svm_do_launch(struct vcpu *v)
     reset_stack_and_jump(svm_asm_do_launch);
 }
 
+static void svm_freeze_time(struct vcpu *v)
+{
+    struct hvm_virpit *vpit = &v->domain->arch.hvm_domain.vpit;
+    
+    v->domain->arch.hvm_domain.guest_time = svm_get_guest_time(v);
+    if ( vpit->first_injected )
+        stop_timer(&(vpit->pit_timer));
+}
+
 static void svm_ctxt_switch_from(struct vcpu *v)
 {
+    svm_freeze_time(v);
 }
 
 static void svm_ctxt_switch_to(struct vcpu *v)
@@ -911,7 +921,7 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
 
     if (input == 1)
     {
-        if ( hvm_apic_support(v->domain) &&
+        if ( !hvm_apic_support(v->domain) ||
                 !vlapic_global_enabled((VLAPIC(v))) )
             clear_bit(X86_FEATURE_APIC, &edx);
 	    
@@ -1693,7 +1703,7 @@ static inline void svm_do_msr_access(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int  inst_len;
-    int64_t tsc_sum;
+    u64 msr_content=0;
 
     ASSERT(vmcb);
 
@@ -1708,24 +1718,27 @@ static inline void svm_do_msr_access(struct vcpu *v, struct cpu_user_regs *regs)
         inst_len = __get_instruction_length(vmcb, INSTR_RDMSR, NULL);
 
         regs->edx = 0;
-        switch (regs->ecx)
+        switch (regs->ecx) {
+        case MSR_IA32_TIME_STAMP_COUNTER:
         {
+            struct hvm_virpit *vpit;
+
+            rdtscll(msr_content);
+            vpit = &(v->domain->arch.hvm_domain.vpit);
+            msr_content += vpit->cache_tsc_offset;
+            break;
+        }
         case MSR_IA32_SYSENTER_CS:
-            regs->eax = vmcb->sysenter_cs;
+            msr_content = vmcb->sysenter_cs;
             break;
         case MSR_IA32_SYSENTER_ESP: 
-            regs->eax = vmcb->sysenter_esp;
+            msr_content = vmcb->sysenter_esp;
             break;
         case MSR_IA32_SYSENTER_EIP:     
-            regs->eax = vmcb->sysenter_eip;
+            msr_content = vmcb->sysenter_eip;
             break;
-        case MSR_IA32_TIME_STAMP_COUNTER:
-            __asm__ __volatile__("rdtsc" : "=a" (regs->eax), "=d" (regs->edx));
-            tsc_sum = regs->edx;
-            tsc_sum = (tsc_sum << 32) + regs->eax;
-            tsc_sum += (int64_t) vmcb->tsc_offset;
-            regs->eax = tsc_sum & 0xFFFFFFFF;
-            regs->edx = (tsc_sum >> 32) & 0xFFFFFFFF;
+        case MSR_IA32_APICBASE:
+            msr_content = VLAPIC(v) ? VLAPIC(v)->apic_base_msr : 0;
             break;
         default:
             if (long_mode_do_msr_read(regs))
@@ -1733,21 +1746,30 @@ static inline void svm_do_msr_access(struct vcpu *v, struct cpu_user_regs *regs)
             rdmsr_safe(regs->ecx, regs->eax, regs->edx);
             break;
         }
+        regs->eax = msr_content & 0xFFFFFFFF;
+        regs->edx = msr_content >> 32;
     }
     else
     {
         inst_len = __get_instruction_length(vmcb, INSTR_WRMSR, NULL);
+        msr_content = (regs->eax & 0xFFFFFFFF) | ((u64)regs->edx << 32);
 
         switch (regs->ecx)
         {
+        case MSR_IA32_TIME_STAMP_COUNTER:
+            svm_set_guest_time(v, msr_content);
+            break;
         case MSR_IA32_SYSENTER_CS:
-            vmcb->sysenter_cs = regs->eax;
+            vmcb->sysenter_cs = msr_content;
             break;
         case MSR_IA32_SYSENTER_ESP: 
-            vmcb->sysenter_esp = regs->eax;
+            vmcb->sysenter_esp = msr_content;
             break;
         case MSR_IA32_SYSENTER_EIP:     
-            vmcb->sysenter_eip = regs->eax;
+            vmcb->sysenter_eip = msr_content;
+            break;
+        case MSR_IA32_APICBASE:
+            vlapic_msr_set(VLAPIC(v), msr_content);
             break;
         default:
             long_mode_do_msr_write(regs);

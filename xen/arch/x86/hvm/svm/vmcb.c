@@ -467,6 +467,8 @@ void svm_do_launch(struct vcpu *v)
     v->arch.hvm_svm.injecting_event  = 0;
     v->arch.hvm_svm.saved_irq_vector = -1;
 
+    svm_set_guest_time(v, 0);
+	
     if (svm_dbg_on)
         svm_dump_vmcb(__func__, vmcb);
 }
@@ -494,15 +496,16 @@ void svm_do_resume(struct vcpu *v)
     struct hvm_virpit *vpit = &d->arch.hvm_domain.vpit;
 
     svm_stts(v);
+    
+    /* pick up the elapsed PIT ticks and re-enable pit_timer */
+    if ( vpit->first_injected) {
+        svm_set_guest_time(v, v->domain->arch.hvm_domain.guest_time);
+        pickup_deactive_ticks(vpit);
+    }
 
     if ( test_bit(iopacket_port(v), &d->shared_info->evtchn_pending[0]) ||
          test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags) )
         hvm_wait_io();
-
-    /* pick up the elapsed PIT ticks and re-enable pit_timer */
-    if ( vpit->first_injected )
-        pickup_deactive_ticks(vpit);
-    svm_set_tsc_shift(v, vpit);
 
     /* We can't resume the guest if we're waiting on I/O */
     ASSERT(!test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags));
