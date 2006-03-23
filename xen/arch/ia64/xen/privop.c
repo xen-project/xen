@@ -409,7 +409,7 @@ IA64FAULT priv_mov_from_rr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 val;
 	IA64FAULT fault;
-	int reg;
+	UINT64 reg;
 	
 	reg = vcpu_get_gr(vcpu,inst.M43.r3);
 	if (privify_en && inst.M43.r1 > 63) {
