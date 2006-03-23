@@ -15,9 +15,12 @@
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
 #============================================================================
 
-class XendError(ValueError):
+from xmlrpclib import Fault
+
+class XendError(Fault):
     
     def __init__(self, value):
+        Fault.__init__(self, 2, value)
         self.value = value
 
     def __str__(self):

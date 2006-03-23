@@ -60,4 +60,4 @@ def main(argv):
         opts.err('Invalid arguments: ' + str(args))
     dom = args[0]
     dst = args[1]
-    server.xend_domain_migrate(dom, dst, opts.vals.live, opts.vals.resource, opts.vals.port)
+    server.xend.domain.migrate(dom, dst, opts.vals.live, opts.vals.resource, opts.vals.port)

@@ -60,6 +60,10 @@ class XendRoot:
     """Default for the flag indicating whether xend should run an http server."""
     xend_http_server_default = 'no'
 
+    xend_tcp_xmlrpc_server_default = 'no'
+
+    xend_unix_xmlrpc_server_default = 'yes'
+
     """Default interface address xend listens at. """
     xend_address_default      = ''
 
@@ -179,6 +183,12 @@ class XendRoot:
         """Get the flag indicating whether xend should run an http server.
         """
         return self.get_config_bool("xend-http-server", self.xend_http_server_default)
+
+    def get_xend_tcp_xmlrpc_server(self):
+        return self.get_config_bool("xend-tcp-xmlrpc-server", self.xend_tcp_xmlrpc_server_default)
+
+    def get_xend_unix_xmlrpc_server(self):
+        return self.get_config_bool("xend-unix-xmlrpc-server", self.xend_unix_xmlrpc_server_default)
 
     def get_xend_relocation_server(self):
         """Get the flag indicating whether xend should run a relocation server.

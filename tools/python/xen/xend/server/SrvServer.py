@@ -52,6 +52,7 @@ from xen.xend.XendLogging import log
 from xen.web.SrvDir import SrvDir
 
 from SrvRoot import SrvRoot
+from XMLRPCServer import XMLRPCServer
 
 
 xroot = XendRoot.instance()
@@ -114,4 +115,10 @@ def create():
         path = xroot.get_xend_unix_path()
         log.info('unix path=' + path)
         servers.add(UnixHttpServer(root, path))
+
+    if xroot.get_xend_tcp_xmlrpc_server():
+        servers.add(XMLRPCServer(True))
+
+    if xroot.get_xend_unix_xmlrpc_server():
+        servers.add(XMLRPCServer())
     return servers
