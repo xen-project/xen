@@ -551,7 +551,7 @@ ENTRY(vmx_interrupt)
 	movl r14=ia64_leave_nested
 	;;
 	mov rp=r14
-	br.call.sptk.many b6=vmx_ia64_handle_irq
+	br.call.sptk.many b6=ia64_handle_irq
 	;;
 END(vmx_interrupt)
 
@@ -1110,7 +1110,7 @@ ENTRY(vmx_dispatch_interrupt)
 	mov rp=r14
 	;;
 	add out1=16,sp		// pass pointer to pt_regs as second arg
-	br.call.sptk.many b6=vmx_ia64_handle_irq
+	br.call.sptk.many b6=ia64_handle_irq
 END(vmx_dispatch_interrupt)
 
 

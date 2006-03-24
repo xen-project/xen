@@ -10,7 +10,6 @@ obj-y += vmx_entry.o
 obj-y += vmx_hypercall.o
 obj-y += vmx_init.o
 obj-y += vmx_interrupt.o
-obj-y += vmx_irq_ia64.o
 obj-y += vmx_ivt.o
 obj-y += vmx_phy_mode.o
 obj-y += vmx_process.o
