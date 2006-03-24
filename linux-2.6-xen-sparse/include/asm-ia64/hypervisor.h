@@ -53,6 +53,8 @@ int xen_init(void);
 /* Turn jiffies into Xen system time. XXX Implement me. */
 #define jiffies_to_st(j)	0
 
+#include <asm/hypercall.h>
+
 // for drivers/xen/privcmd/privcmd.c
 #define direct_remap_pfn_range(a,b,c,d,e,f) remap_pfn_range(a,b,c,d,e)
 #define	pfn_to_mfn(x)	(x)
