@@ -32,7 +32,7 @@ typedef unsigned long page_flags_t;
  */
 #define PFN_ORDER(_pfn)	((_pfn)->u.free.order)
 
-#define PRtype_info "08x"
+#define PRtype_info "016lx"
 
 struct page_info
 {
@@ -175,9 +175,10 @@ static inline int get_page(struct page_info *page,
 	if (unlikely((x & PGC_count_mask) == 0) ||	/* Not allocated? */
 	    unlikely((nx & PGC_count_mask) == 0) ||	/* Count overflow? */
 	    unlikely((x >> 32) != _domain)) {		/* Wrong owner? */
-	    DPRINTK("Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%08x\n",
-		page_to_mfn(page), domain, unpickle_domptr(domain),
-		x, page->u.inuse.type_info);
+
+	    DPRINTK("Error pfn %lx: rd=%p, od=%p, caf=%016lx, taf=%"
+		PRtype_info "\n", page_to_mfn(page), domain,
+		unpickle_domptr(x >> 32), x, page->u.inuse.type_info);
 	    return 0;
 	}
     }

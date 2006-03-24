@@ -539,9 +539,8 @@ int get_page_type(struct page_info *page, u32 type)
                     }
                     if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
                          ((type & PGT_type_mask) != PGT_l1_page_table) )
-                        MEM_LOG("Bad type (saw %" PRtype_info
-                                " != exp %" PRtype_info ") "
-                                "for mfn %lx (pfn %lx)",
+                        MEM_LOG("Bad type (saw %08x != exp %08x) "
+                                "for mfn %016lx (pfn %016lx)",
                                 x, type, page_to_mfn(page),
                                 get_gpfn_from_mfn(page_to_mfn(page)));
                     return 0;
@@ -581,8 +580,8 @@ int get_page_type(struct page_info *page, u32 type)
         /* Try to validate page type; drop the new reference on failure. */
         if ( unlikely(!alloc_page_type(page, type)) )
         {
-            MEM_LOG("Error while validating mfn %lx (pfn %lx) for type %"
-                    PRtype_info ": caf=%08x taf=%" PRtype_info,
+            MEM_LOG("Error while validating mfn %lx (pfn %lx) for type %08x"
+                    ": caf=%08x taf=%" PRtype_info,
                     page_to_mfn(page), get_gpfn_from_mfn(page_to_mfn(page)),
                     type, page->count_info, page->u.inuse.type_info);
             /* Noone else can get a reference. We hold the only ref. */
