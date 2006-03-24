@@ -37,6 +37,7 @@
 #include <xen/interface/sched.h>
 #include <xen/interface/dom0_ops.h>
 #include <linux/errno.h>
+#include <asm/hypervisor.h> // for jiffies_to_st()
 
 /* FIXME: temp place to hold these page related macros */
 #include <asm/page.h>
