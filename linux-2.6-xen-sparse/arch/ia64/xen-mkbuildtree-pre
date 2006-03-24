@@ -24,21 +24,21 @@ fi
 
 # need to grab a couple of xen-modified files for generic_page_range and
 # typedef pte_fn_t which are used by driver/xen blkif
-cp mm.xen-x86/memory.c mm/memory.c
-cp include/linux.xen-x86/mm.h include/linux/mm.h
+ln -sf ../mm.xen-x86/memory.c mm/
+ln -sf ../linux.xen-x86/mm.h include/linux/
 
 #eventually asm-xsi-offsets needs to be part of hypervisor.h/hypercall.h
-cp ../xen/include/asm-ia64/asm-xsi-offsets.h include/asm-ia64/xen/
+ln -sf ../../../../xen/include/asm-ia64/asm-xsi-offsets.h include/asm-ia64/xen/
 
 #ia64 drivers/xen isn't fully functional yet, workaround...
 #also ignore core/evtchn.c which uses a different irq mechanism than ia64
 #(warning: there be dragons here if these files diverge)
-cp arch/ia64/xen/drivers/Makefile drivers/xen/Makefile
-cp arch/ia64/xen/drivers/coreMakefile drivers/xen/core/Makefile
+ln -sf ../../arch/ia64/xen/drivers/Makefile drivers/xen/Makefile
+ln -sf ../../../arch/ia64/xen/drivers/coreMakefile drivers/xen/core/Makefile
 
 #not sure where these ia64-specific files will end up in the future
-cp arch/ia64/xen/drivers/xenia64_init.c drivers/xen/core
-cp arch/ia64/xen/drivers/evtchn_ia64.c drivers/xen/core
+ln -sf ../../../arch/ia64/xen/drivers/xenia64_init.c drivers/xen/core
+ln -sf ../../../arch/ia64/xen/drivers/evtchn_ia64.c drivers/xen/core
 
 #still a few x86-ism's in various drivers/xen files, patch them
 #cd drivers/xen
