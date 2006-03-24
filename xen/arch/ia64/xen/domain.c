@@ -488,80 +488,46 @@ void new_thread(struct vcpu *v,
 	}
 }
 
-static struct page_info * assign_new_domain0_page(unsigned long mpaddr)
-{
-	if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
-		printk("assign_new_domain0_page: bad domain0 mpaddr 0x%lx!\n",mpaddr);
-		printk("assign_new_domain0_page: start=0x%lx,end=0x%lx!\n",
-			dom0_start, dom0_start+dom0_size);
-		while(1);
-	}
-	return mfn_to_page((mpaddr >> PAGE_SHIFT));
-}
 
-/* allocate new page for domain and map it to the specified metaphysical addr */
+/* Allocate a new page for domain and map it to the specified metaphysical 
+   address.  */
 static struct page_info * assign_new_domain_page(struct domain *d, unsigned long mpaddr)
 {
-	struct mm_struct *mm = d->arch.mm;
-	struct page_info *pt, *p = (struct page_info *)0;
-	pgd_t *pgd;
-	pud_t *pud;
-	pmd_t *pmd;
-	pte_t *pte;
+	unsigned long maddr;
+	struct page_info *p;
 
-	if (!mm->pgd) {
-		printk("assign_new_domain_page: domain pgd must exist!\n");
+#ifdef CONFIG_DOMAIN0_CONTIGUOUS
+	if (d == dom0) {
+		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
+			/* FIXME: is it true ?
+			   dom0 memory is not contiguous!  */
+			printk("assign_new_domain_page: bad domain0 "
+			       "mpaddr=%lx, start=%lx, end=%lx!\n",
+			       mpaddr, dom0_start, dom0_start+dom0_size);
+			while(1);
+		}
+		p = mfn_to_page((mpaddr >> PAGE_SHIFT));
+	}
+	else
+#endif
+	{
+		p = alloc_domheap_page(d);
+		// zero out pages for security reasons
+		if (p) memset(__va(page_to_maddr(p)),0,PAGE_SIZE);
+	}
+	if (unlikely(!p)) {
+		printf("assign_new_domain_page: Can't alloc!!!! Aaaargh!\n");
 		return(p);
 	}
-	pgd = pgd_offset(mm,mpaddr);
-	if (pgd_none(*pgd))
-	{
-		pgd_populate(mm, pgd, pud_alloc_one(mm,mpaddr));
-		pt = maddr_to_page(pgd_val(*pgd));
-		list_add_tail(&pt->list, &d->arch.mm->pt_list);
+	maddr = page_to_maddr (p);
+	if (unlikely(maddr > __get_cpu_var(vhpt_paddr)
+		     && maddr < __get_cpu_var(vhpt_pend))) {
+		/* FIXME: how can this happen ?
+		   vhpt is allocated by alloc_domheap_page.  */
+		printf("assign_new_domain_page: reassigned vhpt page %lx!!\n",
+		       maddr);
 	}
-
-	pud = pud_offset(pgd, mpaddr);
-	if (pud_none(*pud))
-	{
-		pud_populate(mm, pud, pmd_alloc_one(mm,mpaddr));
-		pt = maddr_to_page(pud_val(*pud));
-		list_add_tail(&pt->list, &d->arch.mm->pt_list);
-	}
-
-	pmd = pmd_offset(pud, mpaddr);
-	if (pmd_none(*pmd))
-	{
-		pmd_populate_kernel(mm, pmd, pte_alloc_one_kernel(mm,mpaddr));
-//		pmd_populate(mm, pmd, pte_alloc_one(mm,mpaddr));
-		pt = maddr_to_page(pmd_val(*pmd));
-		list_add_tail(&pt->list, &d->arch.mm->pt_list);
-	}
-
-	pte = pte_offset_map(pmd, mpaddr);
-	if (pte_none(*pte)) {
-#ifdef CONFIG_DOMAIN0_CONTIGUOUS
-		if (d == dom0) p = assign_new_domain0_page(mpaddr);
-		else
-#endif
-		{
-			p = alloc_domheap_page(d);
-			// zero out pages for security reasons
-			if (p) memset(__va(page_to_maddr(p)),0,PAGE_SIZE);
-		}
-		if (unlikely(!p)) {
-			printf("assign_new_domain_page: Can't alloc!!!! Aaaargh!\n");
-			return(p);
-		}
-		if (unlikely(page_to_maddr(p) > __get_cpu_var(vhpt_paddr)
-			     && page_to_maddr(p) < __get_cpu_var(vhpt_pend))) {
-			printf("assign_new_domain_page: reassigned vhpt page %lx!!\n",
-				page_to_maddr(p));
-		}
-		set_pte(pte, pfn_pte(page_to_maddr(p) >> PAGE_SHIFT,
-			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
-	}
-	else printk("assign_new_domain_page: mpaddr %lx already mapped!\n",mpaddr);
+	assign_domain_page (d, mpaddr, maddr);
 	return p;
 }
 

@@ -172,14 +172,6 @@ typedef union {
     };
 } tpr_t;
 
-#define IA64_ISR_CODE_MASK0     0xf
-#define IA64_UNIMPL_DADDR_FAULT     0x30
-#define IA64_UNIMPL_IADDR_TRAP      0x10
-#define IA64_RESERVED_REG_FAULT     0x30
-#define IA64_REG_NAT_CONSUMPTION_FAULT  0x10
-#define IA64_NAT_CONSUMPTION_FAULT  0x20
-#define IA64_PRIV_OP_FAULT      0x10
-
 /* indirect register type */
 enum {
     IA64_CPUID,     /*  cpuid */
