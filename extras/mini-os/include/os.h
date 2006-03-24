@@ -9,6 +9,7 @@
 
 #define NULL 0
 
+
 #if __GNUC__ == 2 && __GNUC_MINOR__ < 96
 #define __builtin_expect(x, expected_value) (x)
 #endif
@@ -20,6 +21,10 @@
 #ifndef __ASSEMBLY__
 #include <types.h>
 #include <hypervisor.h>
+
+extern void do_exit(void);
+#define BUG do_exit
+
 #endif
 #include <xen/xen.h>
 

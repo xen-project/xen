@@ -41,8 +41,7 @@ default: $(TARGET)
 
 links:
 	[ -e include/xen ] || ln -sf ../../../xen/include/public include/xen
-	[ -e xenbus/xenstored.h ] || ln -sf ../../../tools/xenstore/xenstored.h xenbus/xenstored.h
-	
+
 $(TARGET): links $(OBJS)
 	$(LD) -N -T minios-$(TARGET_ARCH).lds $(OBJS) -o $@.elf
 	gzip -f -9 -c $@.elf >$@.gz

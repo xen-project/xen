@@ -116,12 +116,12 @@ void print(int direct, const char *fmt, va_list args)
     {
         (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(buf), buf);
         return;
-    }
-    
-    if(!console_initialised)
-        (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(buf), buf);
+    } else {
+        if(!console_initialised)
+            (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(buf), buf);
         
-    console_print(buf, strlen(buf));
+        console_print(buf, strlen(buf));
+    }
 }
 
 void printk(const char *fmt, ...)

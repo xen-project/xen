@@ -65,6 +65,8 @@
 struct thread *idle_thread = NULL;
 LIST_HEAD(exited_threads);
 
+void idle_thread_fn(void *unused);
+
 void dump_stack(struct thread *thread)
 {
     unsigned long *bottom = (unsigned long *)thread->stack + 2048; 
@@ -132,7 +134,7 @@ void schedule(void)
             xfree(thread);
         }
     }
-    next = idle_thread;    
+    next = idle_thread;   
     /* Thread list needs to be protected */
     list_for_each(iterator, &idle_thread->thread_list)
     {
@@ -203,8 +205,13 @@ struct thread* create_thread(char *name, void (*function)(void *), void *data)
     set_runnable(thread);
     
     local_irq_save(flags);
-    if(idle_thread != NULL)
+    if(idle_thread != NULL) {
         list_add_tail(&thread->thread_list, &idle_thread->thread_list); 
+    } else if(function != idle_thread_fn)
+    {
+        printk("BUG: Not allowed to create thread before initialising scheduler.\n");
+        BUG();
+    }
     local_irq_restore(flags);
 
     return thread;
@@ -282,19 +289,9 @@ void th_f2(void *data)
 
 void init_sched(void)
 {
-    printk("Initialising scheduler\n");
-       
+    printk("Initialising scheduler, idle_thread %p\n", idle_thread);
+
     idle_thread = create_thread("Idle", idle_thread_fn, NULL);
     INIT_LIST_HEAD(&idle_thread->thread_list);
-
-    
-/*    create_thread("1", th_f1, (void *)0x1234);    
-    create_thread("2", th_f1, (void *)0x1234);    
-    create_thread("3", th_f1, (void *)0x1234);    
-    create_thread("4", th_f1, (void *)0x1234);    
-    create_thread("5", th_f1, (void *)0x1234);    
-    create_thread("6", th_f1, (void *)0x1234);    
-    create_thread("second", th_f2, NULL);
-*/   
 }
 
