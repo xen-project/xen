@@ -620,6 +620,46 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     return 0;
 }
 
+static int spurious_page_fault(unsigned long addr, struct cpu_user_regs *regs)
+{
+    struct vcpu   *v = current;
+    struct domain *d = v->domain;
+    int            rc;
+
+    /*
+     * The only possible reason for a spurious page fault not to be picked
+     * up already is that a page directory was unhooked by writable page table
+     * logic and then reattached before the faulting VCPU could detect it.
+     */
+    if ( is_idle_domain(d) ||               /* no ptwr in idle domain       */
+         IN_HYPERVISOR_RANGE(addr) ||       /* no ptwr on hypervisor addrs  */
+         shadow_mode_enabled(d) ||          /* no ptwr logic in shadow mode */
+         ((regs->error_code & 0x1d) != 0) ) /* simple not-present fault?    */
+        return 0;
+
+    LOCK_BIGLOCK(d);
+
+    /*
+     * The page directory could have been detached again while we weren't
+     * holding the per-domain lock. Detect that and fix up if it's the case.
+     */
+    if ( unlikely(d->arch.ptwr[PTWR_PT_ACTIVE].l1va) &&
+         unlikely(l2_linear_offset(addr) ==
+                  d->arch.ptwr[PTWR_PT_ACTIVE].l2_idx) )
+    {
+        ptwr_flush(d, PTWR_PT_ACTIVE);
+        rc = 1;
+    }
+    else
+    {
+        /* Okay, walk the page tables. Only check for not-present faults.*/
+        rc = __spurious_page_fault(addr);
+    }
+
+    UNLOCK_BIGLOCK(d);
+    return rc;
+}
+
 /*
  * #PF error code:
  *  Bit 0: Protection violation (=1) ; Page not present (=0)
@@ -644,6 +684,13 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
     if ( unlikely(!guest_mode(regs)) )
     {
+        if ( spurious_page_fault(addr, regs) )
+        {
+            DPRINTK("Spurious fault in domain %u:%u at addr %lx\n",
+                    current->domain->domain_id, current->vcpu_id, addr);
+            return EXCRET_not_a_fault;
+        }
+
         if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
         {
             perfc_incrc(copy_user_faults);

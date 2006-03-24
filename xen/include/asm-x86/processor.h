@@ -524,6 +524,7 @@ extern always_inline void prefetchw(const void *x)
 void show_stack(struct cpu_user_regs *regs);
 void show_registers(struct cpu_user_regs *regs);
 void show_page_walk(unsigned long addr);
+int __spurious_page_fault(unsigned long addr);
 asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs);
 
 extern void mtrr_ap_init(void);
