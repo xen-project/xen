@@ -37,6 +37,7 @@ install: check
 		$(MAKE) -C $$subdir $@; \
 	done
 	$(MAKE) ioemuinstall
+	$(INSTALL_DIR) -p $(DESTDIR)/var/xen/dump
 
 clean: check_clean
 	@set -e; for subdir in $(SUBDIRS); do \
