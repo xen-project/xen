@@ -988,7 +988,7 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
         port = (exit_qualification >> 16) & 0xFFFF;
     else
         port = regs->edx & 0xffff;
-    TRACE_VMEXIT(2, port);
+    TRACE_VMEXIT(1, port);
     size = (exit_qualification & 7) + 1;
     dir = test_bit(3, &exit_qualification); /* direction */
 
@@ -1913,6 +1913,7 @@ static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
 
     vector &= 0xff;
     local_irq_disable();
+    TRACE_VMEXIT(1,vector);
 
     switch(vector) {
     case LOCAL_TIMER_VECTOR:
@@ -2042,7 +2043,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
     {
         __vmread(GUEST_RIP, &eip);
-        TRACE_3D(TRC_VMX_VMEXIT, v->domain->domain_id, eip, exit_reason);
         TRACE_VMEXIT(0,exit_reason);
     }
 
@@ -2066,7 +2066,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         TRACE_VMEXIT(1,vector);
         perfc_incra(cause_vector, vector);
 
-        TRACE_3D(TRC_VMX_VECTOR, v->domain->domain_id, eip, vector);
         switch (vector) {
 #ifdef XEN_DEBUGGER
         case TRAP_debug:
@@ -2250,7 +2249,7 @@ asmlinkage void vmx_load_cr2(void)
 
 asmlinkage void vmx_trace_vmentry (void)
 {
-    TRACE_5D(TRC_VMENTRY,
+    TRACE_5D(TRC_VMX_VMENTRY,
              trace_values[smp_processor_id()][0],
              trace_values[smp_processor_id()][1],
              trace_values[smp_processor_id()][2],
@@ -2266,7 +2265,7 @@ asmlinkage void vmx_trace_vmentry (void)
 
 asmlinkage void vmx_trace_vmexit (void)
 {
-    TRACE_3D(TRC_VMEXIT,0,0,0);
+    TRACE_3D(TRC_VMX_VMEXIT,0,0,0);
     return;
 }
 
