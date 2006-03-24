@@ -438,6 +438,9 @@ extern void __ia64_save_fpu (struct ia64_fpreg *fph);
 extern void __ia64_load_fpu (struct ia64_fpreg *fph);
 extern void ia64_save_debug_regs (unsigned long *save_area);
 extern void ia64_load_debug_regs (unsigned long *save_area);
+#ifdef XEN
+extern void dump_stack(void);
+#endif
 
 #ifdef CONFIG_IA32_SUPPORT
 extern void ia32_save_state (struct task_struct *task);

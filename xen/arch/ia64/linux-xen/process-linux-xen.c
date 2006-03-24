@@ -102,7 +102,6 @@ show_stack (struct task_struct *task, unsigned long *sp)
 	}
 }
 
-#ifndef XEN
 void
 dump_stack (void)
 {
@@ -110,7 +109,6 @@ dump_stack (void)
 }
 
 EXPORT_SYMBOL(dump_stack);
-#endif
 
 #ifdef XEN
 void
