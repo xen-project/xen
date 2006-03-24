@@ -22,8 +22,6 @@
 #ifndef __ASM_DEBUGGER_H__
 #define __ASM_DEBUGGER_H__
 
-#include <xen/softirq.h>
-
 // this number is an arbitary number which is not used for any other purpose
 // __builtin_trap(), FORCE_CRASH() 0x0
 // ski  0x80001, 0x80002
@@ -38,6 +36,8 @@
 
 #ifndef __ASSEMBLY__
 
+#include <xen/sched.h>
+#include <xen/softirq.h>
 #include <xen/gdbstub.h>
 
 void show_registers(struct cpu_user_regs *regs);
