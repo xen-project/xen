@@ -25,8 +25,7 @@ $(TARGET): $(TARGET)-syms
 	$(NM) -n $(TARGET)-syms | grep -v '\( [aUw] \)\|\(__crc_\)\|\( \$[adt]\)'\
 		 > $(BASEDIR)/System.map
 
-
-asm-offsets.s: asm-offsets.c $(BASEDIR)/include/asm-ia64/.offsets.h.stamp $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
+asm-offsets.s: asm-offsets.c $(BASEDIR)/include/asm-ia64/.offsets.h.stamp $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h $(HDRS)
 	$(CC) $(CFLAGS) -S -o $@ $<
 
 asm-xsi-offsets.s: asm-xsi-offsets.c 
