@@ -1807,6 +1807,16 @@ static int resync_all(struct domain *d, u32 stype)
                   entry_has_changed(
                       guest_pt[i], snapshot_pt[i], PAGE_FLAG_MASK) )
                 {
+
+                    unsigned long gpfn;
+
+                    gpfn = entry_get_pfn(guest_pt[i]);
+                    /*
+                     * Looks like it's longer a page table.
+                     */
+                    if ( unlikely(gpfn != (gpfn & PGT_mfn_mask)) )
+                        continue;
+
                     need_flush |= validate_entry_change(
                         d, &guest_pt[i], &shadow_pt[i],
                         shadow_type_to_level(stype));
@@ -1851,6 +1861,14 @@ static int resync_all(struct domain *d, u32 stype)
                 {
 #ifndef GUEST_PGENTRY_32
                     l4_pgentry_t *shadow4 = shadow;
+                    unsigned long gpfn;
+
+                    gpfn = l4e_get_pfn(new_root_e);
+                    /*
+                     * Looks like it's longer a page table.
+                     */
+                    if ( unlikely(gpfn != (gpfn & PGT_mfn_mask)) )
+                        continue;
 
                     if ( d->arch.ops->guest_paging_levels == PAGING_L4 ) 
                     {
@@ -1894,7 +1912,7 @@ static int resync_all(struct domain *d, u32 stype)
         unmap_domain_page(snapshot);
         unmap_domain_page(guest);
 
-        if ( unlikely(unshadow) )
+        if ( unlikely(unshadow && stype == PGT_root_page_table) )
         {
             for_each_vcpu(d, v)
                 if(smfn == pagetable_get_pfn(v->arch.shadow_table))
