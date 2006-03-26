@@ -47,7 +47,8 @@ extern void debugtrace_printk(const char *fmt, ...);
 #define printk(_f , _a...) printf( _f , ## _a )
 extern void printf(const char *format, ...)
     __attribute__ ((format (printf, 1, 2)));
-extern void panic(const char *format, ...);
+extern void panic(const char *format, ...)
+    __attribute__ ((format (printf, 1, 2)));
 extern long vm_assist(struct domain *, unsigned int, unsigned int);
 
 /* vsprintf.c */

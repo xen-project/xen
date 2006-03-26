@@ -705,7 +705,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
         panic("CPU%d FATAL PAGE FAULT\n"
               "[error_code=%04x]\n"
               "Faulting linear address: %p\n",
-              smp_processor_id(), regs->error_code, addr);
+              smp_processor_id(), regs->error_code, _p(addr));
     }
 
     propagate_page_fault(addr, regs->error_code);
