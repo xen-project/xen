@@ -89,6 +89,8 @@ static void vmx_relinquish_guest_resources(struct domain *d)
 
     for_each_vcpu ( d, v )
     {
+        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+            continue;
         vmx_request_clear_vmcs(v);
         destroy_vmcs(&v->arch.hvm_vmx);
         free_monitor_pagetable(v);

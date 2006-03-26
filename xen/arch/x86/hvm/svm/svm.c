@@ -728,6 +728,8 @@ static void svm_relinquish_guest_resources(struct domain *d)
 
     for_each_vcpu ( d, v )
     {
+        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+            continue;
 #if 0
         /* Memory leak by not freeing this. XXXKAF: *Why* is not per core?? */
         free_host_save_area(v->arch.hvm_svm.host_save_area);
