@@ -21,13 +21,9 @@ SRCS       += xc_private.c
 SRCS       += xc_sedf.c
 SRCS       += xc_tbuf.c
 
-ifeq ($(XEN_TARGET_ARCH),x86_32)
+ifeq ($(patsubst x86%,x86,$(XEN_TARGET_ARCH)),x86)
 SRCS       += xc_ptrace.c
 SRCS       += xc_ptrace_core.c
-SRCS       += xc_pagetab.c
-endif
-
-ifeq ($(XEN_TARGET_ARCH),x86_64)
 SRCS       += xc_pagetab.c
 endif
 
