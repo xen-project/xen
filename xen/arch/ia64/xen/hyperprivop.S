@@ -287,7 +287,7 @@ ENTRY(hyper_ssm_i)
 	// set shared_mem ifs and incomplete_regframe to 0
 	cover ;;
 	mov r20=cr.ifs;;
-	adds r21=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
+	adds r21=XSI_INCOMPL_REGFR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st4 [r21]=r0 ;;
 	adds r21=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r0 ;;
@@ -304,8 +304,8 @@ ENTRY(hyper_ssm_i)
 	mov cr.iip=r24;;
 	// OK, now all set to go except for switch to virtual bank0
 	mov r30=r2; mov r29=r3;;
-	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
-	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
+	adds r2=XSI_BANK1_R16_OFS-XSI_PSR_IC_OFS,r18;
+	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18;;
 	bsw.1;;
 	// FIXME?: ar.unat is not really handled correctly,
 	// but may not matter if the OS is NaT-clean
@@ -460,7 +460,7 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	// set shared_mem ifs and incomplete_regframe to 0
 	cover ;;
 	mov r20=cr.ifs;;
-	adds r21=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
+	adds r21=XSI_INCOMPL_REGFR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st4 [r21]=r0 ;;
 	adds r21=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r0 ;;
@@ -478,8 +478,8 @@ GLOBAL_ENTRY(fast_tick_reflect)
 #ifdef HANDLE_AR_UNAT
 	mov r28=ar.unat;
 #endif
-	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
-	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
+	adds r2=XSI_BANK1_R16_OFS-XSI_PSR_IC_OFS,r18;
+	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18;;
 	bsw.1;;
 	.mem.offset 0,0; st8.spill [r2]=r16,16;
 	.mem.offset 8,0; st8.spill [r3]=r17,16 ;;
@@ -633,7 +633,7 @@ ENTRY(fast_reflect)
 	// set shared_mem ifs and incomplete_regframe to 0
 	cover ;;
 	mov r24=cr.ifs;;
-	adds r21=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
+	adds r21=XSI_INCOMPL_REGFR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st4 [r21]=r0 ;;
 	adds r21=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r0 ;;
@@ -654,8 +654,8 @@ ENTRY(fast_reflect)
 #ifdef HANDLE_AR_UNAT
 	mov r28=ar.unat;
 #endif
-	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
-	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
+	adds r2=XSI_BANK1_R16_OFS-XSI_PSR_IC_OFS,r18;
+	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18;;
 	bsw.1;;
 	.mem.offset 0,0; st8.spill [r2]=r16,16;
 	.mem.offset 8,0; st8.spill [r3]=r17,16 ;;
@@ -1055,7 +1055,7 @@ ENTRY(hyper_rfi)
 just_do_rfi:
 	// r18=&vpsr.i|vpsr.ic, r21==vpsr, r22=vcr.iip
 	mov cr.iip=r22;;
-	adds r20=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
+	adds r20=XSI_INCOMPL_REGFR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st4 [r20]=r0 ;;
 	adds r20=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r20=[r20];;
@@ -1088,8 +1088,8 @@ just_do_rfi:
 	mov r30=r2; mov r29=r3;;
     mov r17=ar.unat;;
     adds r16=XSI_B1NATS_OFS-XSI_PSR_IC_OFS,r18
-	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
-	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
+	adds r2=XSI_BANK1_R16_OFS-XSI_PSR_IC_OFS,r18;
+	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18;;
     ld8 r16=[r16];;
     mov ar.unat=r16;;
 	bsw.1;;
@@ -1296,7 +1296,7 @@ ENTRY(hyper_cover)
 	mov r25=cr.iip;;
 	// skip test for vpsr.ic.. it's a prerequisite for hyperprivops
 	cover ;;
-	adds r20=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
+	adds r20=XSI_INCOMPL_REGFR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	mov r30=cr.ifs;;
 	adds r22=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18
 	ld4 r21=[r20] ;;

@@ -70,6 +70,8 @@ $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 # Solve circular reference on asm-offsets.h
 	[ -f $(BASEDIR)/include/asm-ia64/asm-offsets.h ] \
 	 || echo "#define IA64_TASK_SIZE 0" > $(BASEDIR)/include/asm-ia64/asm-offsets.h
+	[ -f $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h ] \
+	 || touch $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
 #Bad hack. Force asm-offsets.h out-of-date
 	 sleep 1
 	 touch $@

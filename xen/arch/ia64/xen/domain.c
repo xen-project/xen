@@ -38,7 +38,7 @@
 //#include <asm/page.h>
 #include <asm/pgalloc.h>
 
-#include <asm/asm-offsets.h>  /* for IA64_THREAD_INFO_SIZE */
+#include <asm/offsets.h>  /* for IA64_THREAD_INFO_SIZE */
 
 #include <asm/vcpu.h>   /* for function declarations */
 #include <public/arch-ia64.h>

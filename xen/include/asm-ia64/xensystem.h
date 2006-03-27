@@ -22,10 +22,11 @@
 #undef KERNEL_START
 #define KERNEL_START		 0xf000000004000000
 #undef PERCPU_ADDR
-#define PERCPU_ADDR		 0xf100000000000000-PERCPU_PAGE_SIZE
 #define SHAREDINFO_ADDR		 0xf100000000000000
+#define SHARED_ARCHINFO_ADDR	 (SHAREDINFO_ADDR + PAGE_SIZE)
+#define PERCPU_ADDR		 (SHAREDINFO_ADDR - PERCPU_PAGE_SIZE)
+#define XSI_OFS 		 (SHARED_ARCHINFO_ADDR - SHAREDINFO_ADDR)
 #define VHPT_ADDR		 0xf200000000000000
-#define SHARED_ARCHINFO_ADDR	 0xf300000000000000
 #define XEN_END_ADDR		 0xf400000000000000
 
 #ifndef __ASSEMBLY__
@@ -34,7 +35,6 @@
 #define IA64_HAS_EXTRA_STATE(t) 0
 
 #undef __switch_to
-#if     1
 extern struct task_struct *vmx_ia64_switch_to (void *next_task);
 #define __switch_to(prev,next,last) do {	\
        ia64_save_fpu(prev->arch._thread.fph);	\
@@ -57,19 +57,6 @@ extern struct task_struct *vmx_ia64_switch_to (void *next_task);
     	   vcpu_set_next_timer(current);    		\
        }                                       \
 } while (0)
-#else
-#define __switch_to(prev,next,last) do {							 \
-	ia64_save_fpu(prev->arch._thread.fph);							\
-	ia64_load_fpu(next->arch._thread.fph);							\
-	if (IA64_HAS_EXTRA_STATE(prev))								 \
-		ia64_save_extra(prev);								 \
-	if (IA64_HAS_EXTRA_STATE(next))								 \
-		ia64_load_extra(next);								 \
-	/*ia64_psr(ia64_task_regs(next))->dfh = !ia64_is_local_fpu_owner(next);*/			 \
-	(last) = ia64_switch_to((next));							 \
-	vcpu_set_next_timer(current);								\
-} while (0)
-#endif
 
 #undef switch_to
 // FIXME SMP... see system.h, does this need to be different?

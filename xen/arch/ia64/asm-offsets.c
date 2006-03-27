@@ -41,38 +41,6 @@ void foo(void)
 
 	BLANK();
 
-	DEFINE(XSI_PSR_IC_OFS, offsetof(mapped_regs_t, interrupt_collection_enabled));
-	DEFINE(XSI_PSR_IC, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, interrupt_collection_enabled)));
-	DEFINE(XSI_PSR_I_OFS, offsetof(mapped_regs_t, interrupt_delivery_enabled));
-	DEFINE(XSI_IIP_OFS, offsetof(mapped_regs_t, iip));
-	DEFINE(XSI_IIP, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, iip)));
-	DEFINE(XSI_IFA_OFS, offsetof(mapped_regs_t, ifa));
-	DEFINE(XSI_IFA, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, ifa)));
-	DEFINE(XSI_ITIR_OFS, offsetof(mapped_regs_t, itir));
-	DEFINE(XSI_ITIR, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, itir)));
-
-	DEFINE(XSI_IPSR, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, ipsr)));
-	DEFINE(XSI_IPSR_OFS, offsetof(mapped_regs_t, ipsr));
-	DEFINE(XSI_IFS_OFS, offsetof(mapped_regs_t, ifs));
-	DEFINE(XSI_IFS, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, ifs)));
-	DEFINE(XSI_ISR_OFS, offsetof(mapped_regs_t, isr));
-	DEFINE(XSI_IIM_OFS, offsetof(mapped_regs_t, iim));
-	DEFINE(XSI_BANKNUM_OFS, offsetof(mapped_regs_t, banknum));
-	DEFINE(XSI_BANK0_OFS, offsetof(mapped_regs_t, bank0_regs[0]));
-	DEFINE(XSI_BANK1_OFS, offsetof(mapped_regs_t, bank1_regs[0]));
-	DEFINE(XSI_B0NATS_OFS, offsetof(mapped_regs_t, vbnat));
-	DEFINE(XSI_B1NATS_OFS, offsetof(mapped_regs_t, vnat));
-	DEFINE(XSI_RR0_OFS, offsetof(mapped_regs_t, rrs[0]));
-	DEFINE(XSI_METAPHYS_OFS, offsetof(mapped_regs_t, metaphysical_mode));
-	DEFINE(XSI_PRECOVER_IFS_OFS, offsetof(mapped_regs_t, precover_ifs));
-	DEFINE(XSI_INCOMPL_REG_OFS, offsetof(mapped_regs_t, incomplete_regframe));
-	DEFINE(XSI_PEND_OFS, offsetof(mapped_regs_t, pending_interruption));
-	DEFINE(XSI_RR0_OFS, offsetof(mapped_regs_t, rrs[0]));
-	DEFINE(XSI_IHA_OFS, offsetof(mapped_regs_t, iha));
-	DEFINE(XSI_TPR_OFS, offsetof(mapped_regs_t, tpr));
-	DEFINE(XSI_PTA_OFS, offsetof(mapped_regs_t, pta));
-	DEFINE(XSI_ITV_OFS, offsetof(mapped_regs_t, itv));
-	DEFINE(XSI_KR0_OFS, offsetof(mapped_regs_t, krs[0]));
 	DEFINE(IA64_TASK_THREAD_KSP_OFFSET, offsetof (struct vcpu, arch._thread.ksp));
 	DEFINE(IA64_TASK_THREAD_ON_USTACK_OFFSET, offsetof (struct vcpu, arch._thread.on_ustack));
 
