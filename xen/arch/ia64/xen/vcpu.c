@@ -1865,16 +1865,63 @@ IA64FAULT vcpu_ptc_g(VCPU *vcpu, UINT64 vadr, UINT64 addr_range)
 	return IA64_ILLOP_FAULT;
 }
 
+#if defined(CONFIG_XEN_SMP) && defined(VHPT_GLOBAL)
+struct ptc_ga_args {
+	unsigned long vadr;
+	unsigned long addr_range;
+};
+
+static void ptc_ga_remote_func (void *varg)
+{
+	struct ptc_ga_args *args = (struct ptc_ga_args *)varg;
+	vhpt_flush_address (args->vadr, args->addr_range);
+}
+#endif
+
 IA64FAULT vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 {
 	// FIXME: validate not flushing Xen addresses
 	// if (Xen address) return(IA64_ILLOP_FAULT);
 	// FIXME: ??breaks if domain PAGE_SIZE < Xen PAGE_SIZE
 //printf("######## vcpu_ptc_ga(%p,%p) ##############\n",vadr,addr_range);
+
+#ifdef CONFIG_XEN_SMP
+	struct domain *d = vcpu->domain;
+	struct vcpu *v;
+	struct ptc_ga_args args;
+
+	args.vadr = vadr;
+	args.addr_range = addr_range;
+
+	/* This method is very conservative and should be optimized:
+	   - maybe IPI calls can be avoided,
+	   - a processor map can be built to avoid duplicate purge
+	   - maybe ptc.ga can be replaced by ptc.l+invala.
+	   Hopefully, it has no impact when UP.
+	*/
+	for_each_vcpu (d, v) {
+		if (v != vcpu) {
+			/* Purge tc entry.
+			   Can we do this directly ?  Well, this is just a
+			   single atomic write.  */
+			vcpu_purge_tr_entry(&PSCBX(v,dtlb));
+			vcpu_purge_tr_entry(&PSCBX(v,itlb));
+#ifdef VHPT_GLOBAL
+			/* Flush VHPT on remote processors.
+			   FIXME: invalidate directly the entries? */
+			smp_call_function_single
+				(v->processor, &ptc_ga_remote_func,
+				 &args, 0, 1);
+#endif
+		}
+	}
+#endif
+
 #ifdef VHPT_GLOBAL
 	vhpt_flush_address(vadr,addr_range);
 #endif
 	ia64_global_tlb_purge(vadr,vadr+addr_range,PAGE_SHIFT);
+	/* Purge tc.  */
 	vcpu_purge_tr_entry(&PSCBX(vcpu,dtlb));
 	vcpu_purge_tr_entry(&PSCBX(vcpu,itlb));
 	return IA64_NO_FAULT;
