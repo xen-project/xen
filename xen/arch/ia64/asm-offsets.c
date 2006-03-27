@@ -28,9 +28,7 @@ void foo(void)
 	DEFINE(IA64_THREAD_INFO_SIZE, sizeof (struct thread_info));
 	DEFINE(IA64_PT_REGS_SIZE, sizeof (struct pt_regs));
 	DEFINE(IA64_SWITCH_STACK_SIZE, sizeof (struct switch_stack));
-	//DEFINE(IA64_SIGINFO_SIZE, sizeof (struct siginfo));
 	DEFINE(IA64_CPU_SIZE, sizeof (struct cpuinfo_ia64));
-	//DEFINE(SIGFRAME_SIZE, sizeof (struct sigframe));
 	DEFINE(UNW_FRAME_INFO_SIZE, sizeof (struct unw_frame_info));
 
 	BLANK();
@@ -75,15 +73,6 @@ void foo(void)
 	DEFINE(XSI_PTA_OFS, offsetof(mapped_regs_t, pta));
 	DEFINE(XSI_ITV_OFS, offsetof(mapped_regs_t, itv));
 	DEFINE(XSI_KR0_OFS, offsetof(mapped_regs_t, krs[0]));
-	//DEFINE(IA64_TASK_BLOCKED_OFFSET,offsetof (struct task_struct, blocked));
-	//DEFINE(IA64_TASK_CLEAR_CHILD_TID_OFFSET,offsetof (struct task_struct, clear_child_tid));
-	//DEFINE(IA64_TASK_GROUP_LEADER_OFFSET, offsetof (struct task_struct, group_leader));
-	//DEFINE(IA64_TASK_PENDING_OFFSET,offsetof (struct task_struct, pending));
-	//DEFINE(IA64_TASK_PID_OFFSET, offsetof (struct task_struct, pid));
-	//DEFINE(IA64_TASK_REAL_PARENT_OFFSET, offsetof (struct task_struct, real_parent));
-	//DEFINE(IA64_TASK_SIGHAND_OFFSET,offsetof (struct task_struct, sighand));
-	//DEFINE(IA64_TASK_SIGNAL_OFFSET,offsetof (struct task_struct, signal));
-	//DEFINE(IA64_TASK_TGID_OFFSET, offsetof (struct task_struct, tgid));
 	DEFINE(IA64_TASK_THREAD_KSP_OFFSET, offsetof (struct vcpu, arch._thread.ksp));
 	DEFINE(IA64_TASK_THREAD_ON_USTACK_OFFSET, offsetof (struct vcpu, arch._thread.on_ustack));
 
@@ -108,13 +97,6 @@ void foo(void)
 	DEFINE(IA64_CPUINFO_ITM_NEXT_OFFSET, offsetof (struct cpuinfo_ia64, itm_next));
 	DEFINE(IA64_CPUINFO_KSOFTIRQD_OFFSET, offsetof (struct cpuinfo_ia64, ksoftirqd));
 
-	//DEFINE(IA64_SIGHAND_SIGLOCK_OFFSET,offsetof (struct sighand_struct, siglock));
-
-	BLANK();
-
-	//DEFINE(IA64_SIGNAL_GROUP_STOP_COUNT_OFFSET,offsetof (struct signal_struct,
-							     //group_stop_count));
-	//DEFINE(IA64_SIGNAL_SHARED_PENDING_OFFSET,offsetof (struct signal_struct, shared_pending));
 
 	BLANK();
 
@@ -175,12 +157,12 @@ void foo(void)
 	DEFINE(IA64_PT_REGS_R7_OFFSET, offsetof (struct pt_regs, r7));
 	DEFINE(IA64_PT_REGS_EML_UNAT_OFFSET, offsetof (struct pt_regs, eml_unat));
 	DEFINE(IA64_PT_REGS_RFI_PFS_OFFSET, offsetof (struct pt_regs, rfi_pfs));
-    DEFINE(IA64_VCPU_IIPA_OFFSET, offsetof (struct vcpu, arch.arch_vmx.cr_iipa));
-    DEFINE(IA64_VCPU_ISR_OFFSET, offsetof (struct vcpu, arch.arch_vmx.cr_isr));
-    DEFINE(IA64_VCPU_CAUSE_OFFSET, offsetof (struct vcpu, arch.arch_vmx.cause));
-    DEFINE(IA64_VCPU_OPCODE_OFFSET, offsetof (struct vcpu, arch.arch_vmx.opcode));
+	DEFINE(IA64_VCPU_IIPA_OFFSET, offsetof (struct vcpu, arch.arch_vmx.cr_iipa));
+	DEFINE(IA64_VCPU_ISR_OFFSET, offsetof (struct vcpu, arch.arch_vmx.cr_isr));
+	DEFINE(IA64_VCPU_CAUSE_OFFSET, offsetof (struct vcpu, arch.arch_vmx.cause));
+	DEFINE(IA64_VCPU_OPCODE_OFFSET, offsetof (struct vcpu, arch.arch_vmx.opcode));
 	DEFINE(SWITCH_MPTA_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.mpta));
-    DEFINE(IA64_PT_REGS_R16_SLOT, (((offsetof(struct pt_regs, r16)-sizeof(struct pt_regs))>>3)&0x3f));
+	DEFINE(IA64_PT_REGS_R16_SLOT, (((offsetof(struct pt_regs, r16)-sizeof(struct pt_regs))>>3)&0x3f));
 	DEFINE(IA64_VCPU_FLAGS_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.flags));
 
 	BLANK();
@@ -236,67 +218,15 @@ void foo(void)
 	DEFINE(XXX_THASH_SIZE, sizeof (thash_data_t));
 
 	BLANK();
-	//DEFINE(IA64_SIGCONTEXT_IP_OFFSET, offsetof (struct sigcontext, sc_ip));
-	//DEFINE(IA64_SIGCONTEXT_AR_BSP_OFFSET, offsetof (struct sigcontext, sc_ar_bsp));
-	//DEFINE(IA64_SIGCONTEXT_AR_FPSR_OFFSET, offsetof (struct sigcontext, sc_ar_fpsr));
-	//DEFINE(IA64_SIGCONTEXT_AR_RNAT_OFFSET, offsetof (struct sigcontext, sc_ar_rnat));
-	//DEFINE(IA64_SIGCONTEXT_AR_UNAT_OFFSET, offsetof (struct sigcontext, sc_ar_unat));
-	//DEFINE(IA64_SIGCONTEXT_B0_OFFSET, offsetof (struct sigcontext, sc_br[0]));
-	//DEFINE(IA64_SIGCONTEXT_CFM_OFFSET, offsetof (struct sigcontext, sc_cfm));
-	//DEFINE(IA64_SIGCONTEXT_FLAGS_OFFSET, offsetof (struct sigcontext, sc_flags));
-	//DEFINE(IA64_SIGCONTEXT_FR6_OFFSET, offsetof (struct sigcontext, sc_fr[6]));
-	//DEFINE(IA64_SIGCONTEXT_PR_OFFSET, offsetof (struct sigcontext, sc_pr));
-	//DEFINE(IA64_SIGCONTEXT_R12_OFFSET, offsetof (struct sigcontext, sc_gr[12]));
-	//DEFINE(IA64_SIGCONTEXT_RBS_BASE_OFFSET,offsetof (struct sigcontext, sc_rbs_base));
-	//DEFINE(IA64_SIGCONTEXT_LOADRS_OFFSET, offsetof (struct sigcontext, sc_loadrs));
-
-	//BLANK();
-
-	//DEFINE(IA64_SIGPENDING_SIGNAL_OFFSET, offsetof (struct sigpending, signal));
-
-	//BLANK();
-
-	//DEFINE(IA64_SIGFRAME_ARG0_OFFSET, offsetof (struct sigframe, arg0));
-	//DEFINE(IA64_SIGFRAME_ARG1_OFFSET, offsetof (struct sigframe, arg1));
-	//DEFINE(IA64_SIGFRAME_ARG2_OFFSET, offsetof (struct sigframe, arg2));
-	//DEFINE(IA64_SIGFRAME_HANDLER_OFFSET, offsetof (struct sigframe, handler));
-	//DEFINE(IA64_SIGFRAME_SIGCONTEXT_OFFSET, offsetof (struct sigframe, sc));
-	//BLANK();
-    /* for assembly files which can't include sched.h: */
-	//DEFINE(IA64_CLONE_VFORK, CLONE_VFORK);
-	//DEFINE(IA64_CLONE_VM, CLONE_VM);
-
-	BLANK();
 	DEFINE(IA64_CPUINFO_NSEC_PER_CYC_OFFSET, offsetof (struct cpuinfo_ia64, nsec_per_cyc));
 	DEFINE(IA64_TIMESPEC_TV_NSEC_OFFSET, offsetof (struct timespec, tv_nsec));
 
 
 	DEFINE(CLONE_IDLETASK_BIT, 12);
 	DEFINE(CLONE_SETTLS_BIT, 19);
-//#if CLONE_SETTLS != (1<<19)
-//# error "CLONE_SETTLS_BIT incorrect, please fix"
-//#endif
-
-	//BLANK();
-	//DEFINE(IA64_MCA_TLB_INFO_SIZE, sizeof (struct ia64_mca_tlb_info));
-	/* used by head.S */
 	DEFINE(IA64_CPUINFO_NSEC_PER_CYC_OFFSET, offsetof (struct cpuinfo_ia64, nsec_per_cyc));
 
 	BLANK();
-	/* used by fsys_gettimeofday in arch/ia64/kernel/fsys.S */
-	//DEFINE(IA64_TIME_INTERPOLATOR_ADDRESS_OFFSET, offsetof (struct time_interpolator, addr));
-	//DEFINE(IA64_TIME_INTERPOLATOR_SOURCE_OFFSET, offsetof (struct time_interpolator, source));
-	//DEFINE(IA64_TIME_INTERPOLATOR_SHIFT_OFFSET, offsetof (struct time_interpolator, shift));
-	//DEFINE(IA64_TIME_INTERPOLATOR_NSEC_OFFSET, offsetof (struct time_interpolator, nsec_per_cyc));
-	//DEFINE(IA64_TIME_INTERPOLATOR_OFFSET_OFFSET, offsetof (struct time_interpolator, offset));
-	//DEFINE(IA64_TIME_INTERPOLATOR_LAST_CYCLE_OFFSET, offsetof (struct time_interpolator, last_cycle));
-	//DEFINE(IA64_TIME_INTERPOLATOR_LAST_COUNTER_OFFSET, offsetof (struct time_interpolator, last_counter));
-	//DEFINE(IA64_TIME_INTERPOLATOR_JITTER_OFFSET, offsetof (struct time_interpolator, jitter));
-	//DEFINE(IA64_TIME_INTERPOLATOR_MASK_OFFSET, offsetof (struct time_interpolator, mask));
-	//DEFINE(IA64_TIME_SOURCE_CPU, TIME_SOURCE_CPU);
-	//DEFINE(IA64_TIME_SOURCE_MMIO64, TIME_SOURCE_MMIO64);
-	//DEFINE(IA64_TIME_SOURCE_MMIO32, TIME_SOURCE_MMIO32);
-	//DEFINE(IA64_TIMESPEC_TV_NSEC_OFFSET, offsetof (struct timespec, tv_nsec));
 	DEFINE(IA64_KR_CURRENT_OFFSET, offsetof (cpu_kr_ia64_t, _kr[IA64_KR_CURRENT]));
 	DEFINE(IA64_KR_PT_BASE_OFFSET, offsetof (cpu_kr_ia64_t, _kr[IA64_KR_PT_BASE]));
 	DEFINE(IA64_KR_IO_BASE_OFFSET, offsetof (cpu_kr_ia64_t, _kr[IA64_KR_IO_BASE]));
