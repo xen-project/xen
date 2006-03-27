@@ -118,41 +118,17 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 #endif
 #endif
 
-#if 0
-	/* Nobody seems to be able to explain this code.
-	   It seems to be accumulated tricks, which are not required anymore.
-	   Also I have made many tests, I'd like to get confirmation from
-	   other site (TG).  */
-	if (current->domain == dom0) {
-		// FIXME: there's gotta be a better way of doing this...
-		// We have to ensure that domain0 is launched before we
-		// call vcpu_timer_expired on it
-		//domain0_ready = 1; // moved to xensetup.c
-		VCPU(current,pending_interruption) = 1;
-	}
-	if (domain0_ready && current->domain != dom0) {
-		if(vcpu_timer_expired(dom0->vcpu[0])) {
-			vcpu_pend_timer(dom0->vcpu[0]);
-			//vcpu_set_next_timer(dom0->vcpu[0]);
-			vcpu_wake(dom0->vcpu[0]);
-		}
-	}
-#endif
-	if (!is_idle_domain(current->domain))  {
+	if (!is_idle_domain(current->domain))
 		if (vcpu_timer_expired(current)) {
 			vcpu_pend_timer(current);
 			// ensure another timer interrupt happens even if domain doesn't
 			vcpu_set_next_timer(current);
-			vcpu_wake(current);
 		}
-	}
+
 	new_itm = local_cpu_data->itm_next;
 
 	if (!VMX_DOMAIN(current) && !time_after(ia64_get_itc(), new_itm))
 		return IRQ_HANDLED;
-
-	if (VMX_DOMAIN(current))
-		vcpu_wake(current);
 
 	while (1) {
 		new_itm += local_cpu_data->itm_delta;
@@ -199,12 +175,7 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 		 */
 		while (!time_after(new_itm, ia64_get_itc() + local_cpu_data->itm_delta/2))
 			new_itm += local_cpu_data->itm_delta;
-//#ifdef XEN
-//		vcpu_set_next_timer(current);
-//#else
-//printf("***** timer_interrupt: Setting itm to %lx\n",new_itm);
 		ia64_set_itm(new_itm);
-//#endif
 		/* double check, in case we got hit by a (slow) PMI: */
 	} while (time_after_eq(ia64_get_itc(), new_itm));
 	raise_softirq(TIMER_SOFTIRQ);
