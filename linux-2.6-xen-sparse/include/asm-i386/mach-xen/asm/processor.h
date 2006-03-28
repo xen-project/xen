@@ -237,20 +237,11 @@ extern unsigned long mmu_cr4_features;
 
 static inline void set_in_cr4 (unsigned long mask)
 {
+	unsigned cr4;
 	mmu_cr4_features |= mask;
-	switch (mask) {
-	case X86_CR4_OSFXSR:
-	case X86_CR4_OSXMMEXCPT:
-		break;
-	default:
-		do {
-			const char *msg = "Xen unsupported cr4 update\n";
-			(void)HYPERVISOR_console_io(
-				CONSOLEIO_write, __builtin_strlen(msg),
-				(char *)msg);
-			BUG();
-		} while (0);
-	}
+	cr4 = read_cr4();
+	cr4 |= mask;
+	write_cr4(cr4);
 }
 
 static inline void clear_in_cr4 (unsigned long mask)
