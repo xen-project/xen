@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.16-rc3-xenU
-# Thu Feb 16 13:47:59 2006
+# Linux kernel version: 2.6.16-xenU
+# Mon Mar 27 14:01:13 2006
 #
 
 #
@@ -92,8 +92,7 @@ CONFIG_ARCH_XEN=y
 CONFIG_XEN_PRIVILEGED_GUEST=y
 CONFIG_XEN_BLKDEV_GRANT=y
 CONFIG_XEN_BLKDEV_FRONTEND=y
-# CONFIG_XEN_VT is not set
-# CONFIG_VT is not set
+CONFIG_XEN_BLKDEV_BACKEND=y
 CONFIG_XEN_SYSFS=y
 CONFIG_SCHED_NO_NO_OMIT_FRAME_POINTER=y
 CONFIG_DMA_IS_DMA32=y
@@ -607,6 +606,9 @@ CONFIG_SERIO=y
 #
 # Character devices
 #
+CONFIG_VT=y
+CONFIG_VT_CONSOLE=y
+CONFIG_HW_CONSOLE=y
 # CONFIG_SERIAL_NONSTANDARD is not set
 
 #
@@ -863,6 +865,13 @@ CONFIG_FB_RADEON_DEBUG=y
 # CONFIG_FB_VOODOO1 is not set
 # CONFIG_FB_TRIDENT is not set
 # CONFIG_FB_VIRTUAL is not set
+
+#
+# Console display driver support
+#
+CONFIG_VGA_CONSOLE=y
+CONFIG_DUMMY_CONSOLE=y
+# CONFIG_FRAMEBUFFER_CONSOLE is not set
 
 #
 # Logo configuration
@@ -1122,11 +1131,7 @@ CONFIG_USB_MON=y
 # CONFIG_INFINIBAND is not set
 
 #
-# SN Devices
-#
-
-#
-# EDAC - error detection and reporting (RAS)
+# EDAC - error detection and reporting (RAS) (EXPERIMENTAL)
 #
 
 #

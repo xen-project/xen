@@ -177,6 +177,26 @@ struct pcnet_RMD {
     } rmd3;    
 };
 
+typedef struct PCNetState_st PCNetState;
+
+struct PCNetState_st {
+    PCIDevice dev;
+    NetDriverState *nd;
+    int mmio_io_addr, rap, isr, lnkst;
+    target_phys_addr_t rdra, tdra;
+    uint8_t prom[16];
+    uint16_t csr[128];
+    uint16_t bcr[32];
+    uint64_t timer;
+    int recv_pos;
+    uint8_t tx_buffer[2048];
+    uint8_t rx_buffer[2048];
+    struct pcnet_TMD tmd;
+    struct pcnet_RMD crmd;
+    struct pcnet_RMD nrmd;
+    struct pcnet_RMD nnrmd;
+};
+
 
 #define PRINT_TMD(T) printf(    \
         "TMD0 : TBADR=0x%08x\n" \
@@ -230,18 +250,17 @@ static inline void pcnet_tmd_load(PCNetState *s, struct pcnet_TMD *tmd, target_p
         cpu_physical_memory_read(addr+4, (void *)&tmd->tmd1, 4);
         cpu_physical_memory_read(addr, (void *)&tmd->tmd0, 4);
     } else {
-        uint32_t xda[4];
-        cpu_physical_memory_read(addr,
-                (void *)&xda[0], sizeof(xda));
-        ((uint32_t *)tmd)[0] = xda[2];
-        ((uint32_t *)tmd)[1] = xda[1];
-        ((uint32_t *)tmd)[2] = xda[0];
-        ((uint32_t *)tmd)[3] = xda[3];
+        uint32_t xda[2];
+        cpu_physical_memory_read(addr+4, (void *)&xda[0], sizeof(xda));
+        ((uint32_t *)tmd)[0] = xda[1];
+        ((uint32_t *)tmd)[1] = xda[0];
+        ((uint32_t *)tmd)[2] = 0;
     }
 }
 
 static inline void pcnet_tmd_store(PCNetState *s, struct pcnet_TMD *tmd, target_phys_addr_t addr)
 {
+    tmd->tmd1.own = 0;
     cpu_physical_memory_set_dirty(addr);
     if (!BCR_SWSTYLE(s)) {
         uint16_t xda[4];
@@ -259,13 +278,10 @@ static inline void pcnet_tmd_store(PCNetState *s, struct pcnet_TMD *tmd, target_
             cpu_physical_memory_write(addr+8, (void *)&tmd->tmd2, 4);
             cpu_physical_memory_write(addr+4, (void *)&tmd->tmd1, 4);
         } else {
-            uint32_t xda[4];
+            uint32_t xda[2];
             xda[0] = ((uint32_t *)tmd)[2];
             xda[1] = ((uint32_t *)tmd)[1];
-            xda[2] = ((uint32_t *)tmd)[0];
-            xda[3] = ((uint32_t *)tmd)[3];
-            cpu_physical_memory_write(addr,
-                    (void *)&xda[0], sizeof(xda));
+            cpu_physical_memory_write(addr, (void *)&xda[0], sizeof(xda));
         }
         cpu_physical_memory_set_dirty(addr+15);
     }
@@ -286,22 +302,21 @@ static inline void pcnet_rmd_load(PCNetState *s, struct pcnet_RMD *rmd, target_p
     }
     else
     if (BCR_SWSTYLE(s) != 3) {
-        rmd->rmd2.zeros = 0;
+        ((uint32_t *)rmd)[2] = 0;
         cpu_physical_memory_read(addr+4, (void *)&rmd->rmd1, 4);
         cpu_physical_memory_read(addr, (void *)&rmd->rmd0, 4);
     } else {
-        uint32_t rda[4];
-        cpu_physical_memory_read(addr,
-                (void *)&rda[0], sizeof(rda));
-        ((uint32_t *)rmd)[0] = rda[2];
-        ((uint32_t *)rmd)[1] = rda[1];
-        ((uint32_t *)rmd)[2] = rda[0];
-        ((uint32_t *)rmd)[3] = rda[3];
+        uint32_t rda[2];
+        cpu_physical_memory_read(addr+4, (void *)&rda[0], sizeof(rda));
+        ((uint32_t *)rmd)[0] = rda[1];
+        ((uint32_t *)rmd)[1] = rda[0];
+        ((uint32_t *)rmd)[2] = 0;
     }
 }
 
 static inline void pcnet_rmd_store(PCNetState *s, struct pcnet_RMD *rmd, target_phys_addr_t addr)
 {
+    rmd->rmd1.own = 0;
     cpu_physical_memory_set_dirty(addr);
     if (!BCR_SWSTYLE(s)) {
         uint16_t rda[4];                        \
@@ -319,13 +334,10 @@ static inline void pcnet_rmd_store(PCNetState *s, struct pcnet_RMD *rmd, target_
             cpu_physical_memory_write(addr+8, (void *)&rmd->rmd2, 4);
             cpu_physical_memory_write(addr+4, (void *)&rmd->rmd1, 4);
         } else {
-            uint32_t rda[4];
+            uint32_t rda[2];
             rda[0] = ((uint32_t *)rmd)[2];
             rda[1] = ((uint32_t *)rmd)[1];
-            rda[2] = ((uint32_t *)rmd)[0];
-            rda[3] = ((uint32_t *)rmd)[3];
-            cpu_physical_memory_write(addr,
-                    (void *)&rda[0], sizeof(rda));
+            cpu_physical_memory_write(addr, (void *)&rda[0], sizeof(rda));
         }
         cpu_physical_memory_set_dirty(addr+15);
     }
@@ -340,79 +352,16 @@ static inline void pcnet_rmd_store(PCNetState *s, struct pcnet_RMD *rmd, target_
 
 #define RMDSTORE(RMD,ADDR) pcnet_rmd_store(s,RMD,ADDR)
 
-#if 1
-
-#define CHECK_RMD(ADDR,RES) do {                \
-    struct pcnet_RMD rmd;                       \
-    RMDLOAD(&rmd,(ADDR));                       \
-    (RES) |= (rmd.rmd1.ones != 15);             \
+#define CHECK_RMD(RMD,ADDR,RES) do {            \
+    RMDLOAD((RMD),(ADDR));                      \
+    (RES) |= ((RMD)->rmd1.ones != 15);          \
 } while (0)
 
-#define CHECK_TMD(ADDR,RES) do {                \
-    struct pcnet_TMD tmd;                       \
-    TMDLOAD(&tmd,(ADDR));                       \
-    (RES) |= (tmd.tmd1.ones != 15);             \
+#define CHECK_TMD(ADDR,RES) do {            \
+    TMDLOAD(&(s->tmd),(ADDR));                       \
+    (RES) |= (s->tmd.tmd1.ones != 15);             \
 } while (0)
 
-#else
-
-#define CHECK_RMD(ADDR,RES) do {                \
-    switch (BCR_SWSTYLE(s)) {                   \
-    case 0x00:                                  \
-        do {                                    \
-            uint16_t rda[4];                    \
-            cpu_physical_memory_read((ADDR),    \
-                (void *)&rda[0], sizeof(rda));  \
-            (RES) |= (rda[2] & 0xf000)!=0xf000; \
-            (RES) |= (rda[3] & 0xf000)!=0x0000; \
-        } while (0);                            \
-        break;                                  \
-    case 0x01:                                  \
-    case 0x02:                                  \
-        do {                                    \
-            uint32_t rda[4];                    \
-            cpu_physical_memory_read((ADDR),    \
-                (void *)&rda[0], sizeof(rda)); \
-            (RES) |= (rda[1] & 0x0000f000L)!=0x0000f000L; \
-            (RES) |= (rda[2] & 0x0000f000L)!=0x00000000L; \
-        } while (0);                            \
-        break;                                  \
-    case 0x03:                                  \
-        do {                                    \
-            uint32_t rda[4];                    \
-            cpu_physical_memory_read((ADDR),    \
-                (void *)&rda[0], sizeof(rda)); \
-            (RES) |= (rda[0] & 0x0000f000L)!=0x00000000L; \
-            (RES) |= (rda[1] & 0x0000f000L)!=0x0000f000L; \
-        } while (0);                            \
-        break;                                  \
-    }                                           \
-} while (0)
-
-#define CHECK_TMD(ADDR,RES) do {                \
-    switch (BCR_SWSTYLE(s)) {                   \
-    case 0x00:                                  \
-        do {                                    \
-            uint16_t xda[4];                    \
-            cpu_physical_memory_read((ADDR),    \
-                (void *)&xda[0], sizeof(xda));  \
-            (RES) |= (xda[2] & 0xf000)!=0xf000;\
-        } while (0);                            \
-        break;                                  \
-    case 0x01:                                  \
-    case 0x02:                                  \
-    case 0x03:                                  \
-        do {                                    \
-            uint32_t xda[4];                    \
-            cpu_physical_memory_read((ADDR),    \
-                (void *)&xda[0], sizeof(xda));  \
-            (RES) |= (xda[1] & 0x0000f000L)!=0x0000f000L; \
-        } while (0);                            \
-        break;                                  \
-    }                                           \
-} while (0)
-
-#endif
 
 #define PRINT_PKTHDR(BUF) do {                  \
     struct ether_header *hdr = (void *)(BUF);   \

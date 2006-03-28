@@ -10,7 +10,6 @@
 
 
 /* TODO - need to define BUG_ON for whole mini-os, need crash-dump as well */
-extern void do_exit(void);
 #define BUG_ON(_cond)   do{if(_cond) do_exit();} while(0);
 
 static inline struct xencons_interface *xencons_interface(void)
@@ -29,7 +28,6 @@ int xencons_ring_send_no_notify(const char *data, unsigned len)
     int sent = 0;
 	struct xencons_interface *intf = xencons_interface();
 	XENCONS_RING_IDX cons, prod;
-
 	cons = intf->out_cons;
 	prod = intf->out_prod;
 	mb();

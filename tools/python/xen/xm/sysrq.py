@@ -28,4 +28,4 @@ def main(argv):
     if len(args) < 2: opts.err('Missing sysrq character')
     dom = args[0]
     req = ord(args[1][0])
-    server.xend_domain_sysrq(dom, req)
+    server.xend.domain.send_sysrq(dom, req)

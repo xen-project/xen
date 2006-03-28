@@ -27,8 +27,7 @@ void show_registers(struct cpu_user_regs *regs)
     if ( hvm_guest(current) && guest_mode(regs) )
     {
         context = "hvm";
-        hvm_store_cpu_guest_regs(current, &fault_regs);
-        hvm_store_cpu_guest_ctrl_regs(current, fault_crs);
+        hvm_store_cpu_guest_regs(current, &fault_regs, fault_crs);
     }
     else
     {
@@ -71,38 +70,77 @@ void show_registers(struct cpu_user_regs *regs)
 
 void show_page_walk(unsigned long addr)
 {
-    unsigned long mfn = read_cr3() >> PAGE_SHIFT;
-    intpte_t *ptab, ent;
-    unsigned long pfn; 
+    unsigned long pfn, mfn = read_cr3() >> PAGE_SHIFT;
+#ifdef CONFIG_X86_PAE
+    l3_pgentry_t l3e, *l3t;
+#endif
+    l2_pgentry_t l2e, *l2t;
+    l1_pgentry_t l1e, *l1t;
 
     printk("Pagetable walk from %08lx:\n", addr);
 
 #ifdef CONFIG_X86_PAE
-    ptab = map_domain_page(mfn);
-    ent  = ptab[l3_table_offset(addr)];
-    pfn  = get_gpfn_from_mfn((u32)(ent >> PAGE_SHIFT)); 
-    printk(" L3 = %"PRIpte" %08lx\n", ent, pfn);
-    unmap_domain_page(ptab);
-    if ( !(ent & _PAGE_PRESENT) )
+    l3t = map_domain_page(mfn);
+    l3e = l3t[l3_table_offset(addr)];
+    mfn = l3e_get_pfn(l3e);
+    pfn = get_gpfn_from_mfn(mfn);
+    printk(" L3 = %"PRIpte" %08lx\n", l3e_get_intpte(l3e), pfn);
+    unmap_domain_page(l3t);
+    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
         return;
-    mfn = ent >> PAGE_SHIFT;
 #endif
 
-    ptab = map_domain_page(mfn);
-    ent  = ptab[l2_table_offset(addr)];
-    pfn  = get_gpfn_from_mfn((u32)(ent >> PAGE_SHIFT));
-    printk("  L2 = %"PRIpte" %08lx %s\n", ent, pfn, 
-           (ent & _PAGE_PSE) ? "(PSE)" : "");
-    unmap_domain_page(ptab);
-    if ( !(ent & _PAGE_PRESENT) || (ent & _PAGE_PSE) )
+    l2t = map_domain_page(mfn);
+    l2e = l2t[l2_table_offset(addr)];
+    mfn = l2e_get_pfn(l2e);
+    pfn = get_gpfn_from_mfn(mfn);
+    printk("  L2 = %"PRIpte" %08lx %s\n", l2e_get_intpte(l2e), pfn, 
+           (l2e_get_flags(l2e) & _PAGE_PSE) ? "(PSE)" : "");
+    unmap_domain_page(l2t);
+    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) ||
+         (l2e_get_flags(l2e) & _PAGE_PSE) )
         return;
-    mfn = ent >> PAGE_SHIFT;
 
-    ptab = map_domain_page(ent >> PAGE_SHIFT);
-    ent  = ptab[l1_table_offset(addr)];
-    pfn  = get_gpfn_from_mfn((u32)(ent >> PAGE_SHIFT));
-    printk("   L1 = %"PRIpte" %08lx\n", ent, pfn);
-    unmap_domain_page(ptab);
+    l1t = map_domain_page(mfn);
+    l1e = l1t[l1_table_offset(addr)];
+    mfn = l1e_get_pfn(l1e);
+    pfn = get_gpfn_from_mfn(mfn);
+    printk("   L1 = %"PRIpte" %08lx\n", l1e_get_intpte(l1e), pfn);
+    unmap_domain_page(l1t);
+}
+
+int __spurious_page_fault(unsigned long addr)
+{
+    unsigned long mfn = read_cr3() >> PAGE_SHIFT;
+#ifdef CONFIG_X86_PAE
+    l3_pgentry_t l3e, *l3t;
+#endif
+    l2_pgentry_t l2e, *l2t;
+    l1_pgentry_t l1e, *l1t;
+
+#ifdef CONFIG_X86_PAE
+    l3t = map_domain_page(mfn);
+    l3e = l3t[l3_table_offset(addr)];
+    mfn = l3e_get_pfn(l3e);
+    unmap_domain_page(l3t);
+    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+        return 0;
+#endif
+
+    l2t = map_domain_page(mfn);
+    l2e = l2t[l2_table_offset(addr)];
+    mfn = l2e_get_pfn(l2e);
+    unmap_domain_page(l2t);
+    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+        return 0;
+    if ( l2e_get_flags(l2e) & _PAGE_PSE )
+        return 1;
+
+    l1t = map_domain_page(mfn);
+    l1e = l1t[l1_table_offset(addr)];
+    mfn = l1e_get_pfn(l1e);
+    unmap_domain_page(l1t);
+    return !!(l1e_get_flags(l1e) & _PAGE_PRESENT);
 }
 
 #define DOUBLEFAULT_STACK_SIZE 1024

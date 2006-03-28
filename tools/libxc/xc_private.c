@@ -4,7 +4,6 @@
  * Helper functions for the rest of the library.
  */
 
-#include <zlib.h>
 #include "xc_private.h"
 #include <xen/memory.h>
 

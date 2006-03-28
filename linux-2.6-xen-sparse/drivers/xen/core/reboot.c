@@ -25,9 +25,10 @@ void (*pm_power_off)(void);
 EXPORT_SYMBOL(pm_power_off);
 #endif
 
+extern void ctrl_alt_del(void);
+
 #define SHUTDOWN_INVALID  -1
 #define SHUTDOWN_POWEROFF  0
-#define SHUTDOWN_REBOOT    1
 #define SHUTDOWN_SUSPEND   2
 /* Code 3 is SHUTDOWN_CRASH, which we don't use because the domain can only
  * report a crash, not be instructed to crash!
@@ -234,33 +235,19 @@ static int shutdown_process(void *__unused)
 {
 	static char *envp[] = { "HOME=/", "TERM=linux",
 				"PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
-	static char *restart_argv[]  = { "/sbin/reboot", NULL };
 	static char *poweroff_argv[] = { "/sbin/poweroff", NULL };
 
 	extern asmlinkage long sys_reboot(int magic1, int magic2,
 					  unsigned int cmd, void *arg);
 
-	daemonize("shutdown");
-
-	switch (shutting_down) {
-	case SHUTDOWN_POWEROFF:
-	case SHUTDOWN_HALT:
+	if ((shutting_down == SHUTDOWN_POWEROFF) ||
+	    (shutting_down == SHUTDOWN_HALT)) {
 		if (execve("/sbin/poweroff", poweroff_argv, envp) < 0) {
 			sys_reboot(LINUX_REBOOT_MAGIC1,
 				   LINUX_REBOOT_MAGIC2,
 				   LINUX_REBOOT_CMD_POWER_OFF,
 				   NULL);
 		}
-		break;
-
-	case SHUTDOWN_REBOOT:
-		if (execve("/sbin/reboot", restart_argv, envp) < 0) {
-			sys_reboot(LINUX_REBOOT_MAGIC1,
-				   LINUX_REBOOT_MAGIC2,
-				   LINUX_REBOOT_CMD_RESTART,
-				   NULL);
-		}
-		break;
 	}
 
 	shutting_down = SHUTDOWN_INVALID; /* could try again */
@@ -331,7 +318,7 @@ static void shutdown_handler(struct xenbus_watch *watch,
 	if (strcmp(str, "poweroff") == 0)
 		shutting_down = SHUTDOWN_POWEROFF;
 	else if (strcmp(str, "reboot") == 0)
-		shutting_down = SHUTDOWN_REBOOT;
+		ctrl_alt_del();
 	else if (strcmp(str, "suspend") == 0)
 		shutting_down = SHUTDOWN_SUSPEND;
 	else if (strcmp(str, "halt") == 0)
@@ -391,8 +378,6 @@ static struct xenbus_watch sysrq_watch = {
 };
 #endif
 
-static struct notifier_block xenstore_notifier;
-
 static int setup_shutdown_watcher(struct notifier_block *notifier,
                                   unsigned long event,
                                   void *data)
@@ -420,11 +405,10 @@ static int setup_shutdown_watcher(struct notifier_block *notifier,
 
 static int __init setup_shutdown_event(void)
 {
-
-	xenstore_notifier.notifier_call = setup_shutdown_watcher;
-
+	static struct notifier_block xenstore_notifier = {
+		.notifier_call = setup_shutdown_watcher
+	};
 	register_xenstore_notifier(&xenstore_notifier);
-
 	return 0;
 }
 

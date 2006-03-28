@@ -15,7 +15,9 @@
 #(loglevel DEBUG)
 
 #(xend-http-server no)
-#(xend-unix-server yes)
+#(xend-unix-server no)
+#(xend-tcp-xmlrpc-server no)
+#(xend-unix-xmlrpc-server yes)
 #(xend-relocation-server no)
 (xend-relocation-server yes)
 

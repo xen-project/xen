@@ -53,8 +53,8 @@ gopts.opt('reboot', short='R',
           use='Shutdown and reboot.')
 
 def shutdown(opts, doms, mode, wait):
-    if doms == None: doms = server.xend_domains()
-    dom0_name = sxp.child_value(server.xend_domain(0), 'name')
+    if doms == None: doms = server.xend.domains(0)
+    dom0_name = sxp.child_value(server.xend.domain(0), 'name')
     for x in [dom0_name, DOM0_ID]:
         if x in doms:
             if opts.vals.all:
@@ -62,10 +62,10 @@ def shutdown(opts, doms, mode, wait):
             else:
                 opts.err("Can't specify Domain-0")
     for d in doms:
-        server.xend_domain_shutdown(d, mode)
+        server.xend.domain.shutdown(d, mode)
     if wait:
         while doms:
-            alive = server.xend_domains()
+            alive = server.xend.domains(0)
             dead = []
             for d in doms:
                 if d in alive: continue

@@ -131,12 +131,12 @@ def becomeNonRoot():
         if os.geteuid() == 0:
             FAIL("Could not become a non-root user")
 
-def FAIL(reason):
-    print "\nREASON: %s" % reason
+def FAIL(format, *args):
+    print "\nREASON:", (format % args)
     sys.exit(TEST_FAIL)
 
-def SKIP(reason):
-    print "\nREASON: %s" % reason
+def SKIP(format, *args):
+    print "\nREASON:", (format % args)
     sys.exit(TEST_SKIP)
 
 def saveLog(logText, filename=None):

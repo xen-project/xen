@@ -34,8 +34,6 @@ static int disable_x86_serial_nr __devinitdata = 1;
 
 struct cpu_dev * cpu_devs[X86_VENDOR_NUM] = {};
 
-extern void machine_specific_modify_cpu_capabilities(struct cpuinfo_x86 *c);
-
 extern int disable_pse;
 
 static void default_init(struct cpuinfo_x86 * c)
@@ -424,8 +422,6 @@ void __devinit identify_cpu(struct cpuinfo_x86 *c)
 			sprintf(c->x86_model_id, "%02x/%02x",
 				c->x86_vendor, c->x86_model);
 	}
-
-	machine_specific_modify_cpu_capabilities(c);
 
 	/* Now the feature flags better reflect actual CPU features! */
 

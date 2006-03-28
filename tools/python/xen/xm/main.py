@@ -1,6 +1,6 @@
 # (C) Copyright IBM Corp. 2005
 # Copyright (C) 2004 Mike Wray
-# Copyright (c) 2005 XenSource Ltd
+# Copyright (c) 2005-2006 XenSource Ltd.
 #
 # Authors:
 #     Sean Dague <sean at dague dot net>
@@ -29,8 +29,8 @@ import getopt
 import socket
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
+import xmlrpclib
 
-import xen.xend.XendError
 import xen.xend.XendProtocol
 
 from xen.xend import PrettyPrint
@@ -38,7 +38,8 @@ from xen.xend import sxp
 from xen.xm.opts import *
 
 import console
-
+import xen.xend.XendClient
+from xen.xend.XendClient import server
 
 # getopt.gnu_getopt is better, but only exists in Python 2.3+.  Use
 # getopt.getopt if gnu_getopt is not available.  This will mean that options
@@ -319,8 +320,7 @@ def xm_save(args):
         err("xm save: Unable to create file %s" % savefile)
         sys.exit(1)
     
-    from xen.xend.XendClient import server
-    server.xend_domain_save(dom, savefile)
+    server.xend.domain.save(dom, savefile)
     
 def xm_restore(args):
     arg_check(args, "restore", 1)
@@ -331,16 +331,14 @@ def xm_restore(args):
         err("xm restore: Unable to read file %s" % savefile)
         sys.exit(1)
 
-    from xen.xend.XendClient import server
-    server.xend_domain_restore(savefile)
+    server.xend.domain.restore(savefile)
 
 
 def getDomains(domain_names):
-    from xen.xend.XendClient import server
     if domain_names:
-        return map(server.xend_domain, domain_names)
+        return map(server.xend.domain, domain_names)
     else:
-        return server.xend_list_domains()
+        return server.xend.domains(1)
 
 
 def xm_list(args):
@@ -416,12 +414,11 @@ def xm_brief_list(doms):
 
 def xm_vcpu_list(args):
 
-    from xen.xend.XendClient import server
     if args:
-        dominfo = map(server.xend_domain_vcpuinfo, args)
+        dominfo = map(server.xend.domain.getVCPUInfo, args)
     else:
-        doms = server.xend_list_domains(False)
-        dominfo = map(server.xend_domain_vcpuinfo, doms)
+        doms = server.xend.domains(False)
+        dominfo = map(server.xend.domain.getVCPUInfo, doms)
 
     print 'Name                              ID  VCPU  CPU  State  Time(s)  CPU Affinity'
 
@@ -475,8 +472,7 @@ def xm_vcpu_list(args):
             cpumap = map(lambda x: int(x), cpumap)
             cpumap.sort()
 
-            from xen.xend.XendClient import server
-            for x in server.xend_node()[1:]:
+            for x in server.xend.node.info()[1:]:
                 if len(x) > 1 and x[0] == 'nr_cpus':
                     nr_cpus = int(x[1])
                     # normalize cpumap by modulus nr_cpus, and drop duplicates
@@ -532,21 +528,18 @@ def xm_pause(args):
     arg_check(args, "pause", 1)
     dom = args[0]
 
-    from xen.xend.XendClient import server
-    server.xend_domain_pause(dom)
+    server.xend.domain.pause(dom)
 
 def xm_unpause(args):
     arg_check(args, "unpause", 1)
     dom = args[0]
 
-    from xen.xend.XendClient import server
-    server.xend_domain_unpause(dom)
+    server.xend.domain.unpause(dom)
 
 def xm_rename(args):
     arg_check(args, "rename", 2)
 
-    from xen.xend.XendClient import server
-    server.xend_domain_rename(args[0], args[1])
+    server.xend.domain.setName(args[0], args[1])
 
 def xm_subcommand(command, args):
     cmd = __import__(command, globals(), locals(), 'xen.xm')
@@ -574,8 +567,7 @@ def xm_vcpu_pin(args):
     vcpu = int(args[1])
     cpumap = cpu_make_map(args[2])
     
-    from xen.xend.XendClient import server
-    server.xend_domain_pincpu(dom, vcpu, cpumap)
+    server.xend.domain.pincpu(dom, vcpu, cpumap)
 
 def xm_mem_max(args):
     arg_check(args, "mem-max", 2)
@@ -583,8 +575,7 @@ def xm_mem_max(args):
     dom = args[0]
     mem = int_unit(args[1], 'm')
 
-    from xen.xend.XendClient import server
-    server.xend_domain_maxmem_set(dom, mem)
+    server.xend.domain.maxmem_set(dom, mem)
     
 def xm_mem_set(args):
     arg_check(args, "mem-set", 2)
@@ -592,20 +583,17 @@ def xm_mem_set(args):
     dom = args[0]
     mem_target = int_unit(args[1], 'm')
 
-    from xen.xend.XendClient import server
-    server.xend_domain_mem_target_set(dom, mem_target)
+    server.xend.domain.setMemoryTarget(dom, mem_target)
     
 def xm_vcpu_set(args):
     arg_check(args, "vcpu-set", 2)
     
-    from xen.xend.XendClient import server
-    server.xend_domain_set_vcpus(args[0], int(args[1]))
+    server.xend.domain.setVCpuCount(args[0], int(args[1]))
 
 
 def xm_destroy(args):
     arg_check(args, "destroy", 1)
-    from xen.xend.XendClient import server
-    server.xend_domain_destroy(args[0])
+    server.xend.domain.destroy(args[0])
 
 
 def xm_domid(args):
@@ -613,8 +601,7 @@ def xm_domid(args):
 
     name = args[0]
 
-    from xen.xend.XendClient import server
-    dom = server.xend_domain(name)
+    dom = server.xend.domain(name)
     print sxp.child_value(dom, 'domid')
     
 def xm_domname(args):
@@ -622,23 +609,20 @@ def xm_domname(args):
 
     name = args[0]
 
-    from xen.xend.XendClient import server
-    dom = server.xend_domain(name)
+    dom = server.xend.domain(name)
     print sxp.child_value(dom, 'name')
 
 def xm_sched_bvt(args):
     arg_check(args, "sched-bvt", 6)
     dom = args[0]
     v = map(long, args[1:6])
-    from xen.xend.XendClient import server
-    server.xend_domain_cpu_bvt_set(dom, *v)
+    server.xend.domain.cpu_bvt_set(dom, *v)
 
 def xm_sched_bvt_ctxallow(args):
     arg_check(args, "sched-bvt-ctxallow", 1)
 
     slice = int(args[0])
-    from xen.xend.XendClient import server
-    server.xend_node_cpu_bvt_slice_set(slice)
+    server.xend.node.cpu_bvt_slice_set(slice)
 
 def xm_sched_sedf(args):
     def ns_to_ms(val):
@@ -695,13 +679,12 @@ def xm_sched_sedf(args):
                                                      'Slice(ms)', 'Lat(ms)',
                                                      'Extra','Weight')
 
-    from xen.xend.XendClient import server
     doms = filter(lambda x : domid_match(domid, x),
                         [parse_doms_info(dom) for dom in getDomains("")])
     for d in doms:
         # fetch current values so as not to clobber them
         sedf_info = \
-            parse_sedf_info(server.xend_domain_cpu_sedf_get(d['dom']))
+            parse_sedf_info(server.xend.domain.cpu_sedf_get(d['dom']))
         sedf_info['name'] = d['name']
 
         # update values in case of call to set
@@ -713,7 +696,7 @@ def xm_sched_sedf(args):
             v = map(int, [sedf_info['period'], sedf_info['slice'],
                           sedf_info['latency'],sedf_info['extratime'], 
                           sedf_info['weight']])
-            rv = server.xend_domain_cpu_sedf_set(d['dom'], *v)
+            rv = server.xend.domain.cpu_sedf_set(d['dom'], *v)
             if int(rv) != 0:
                 err("Failed to set sedf parameters (rv=%d)."%(rv))
 
@@ -725,8 +708,7 @@ def xm_sched_sedf(args):
 def xm_info(args):
     arg_check(args, "info", 0)
 
-    from xen.xend.XendClient import server
-    info = server.xend_node()
+    info = server.xend.node.info()
     
     for x in info[1:]:
         if len(x) < 2: 
@@ -738,8 +720,7 @@ def xm_console(args):
     arg_check(args, "console", 1)
 
     dom = args[0]
-    from xen.xend.XendClient import server
-    info = server.xend_domain(dom)
+    info = server.xend.domain(dom)
     domid = int(sxp.child_value(info, 'domid', '-1'))
     console.execConsole(domid)
 
@@ -768,17 +749,15 @@ its contents if the [-c|--clear] flag is specified.
     if not (1 <= len(myargs) <= 2):
         err('Invalid arguments: ' + str(myargs))
 
-    from xen.xend.XendClient import server
     if not gopts.vals.clear:
-        print server.xend_node_get_dmesg()
+        print server.xend.node.dmesg.info()
     else:
-        server.xend_node_clear_dmesg()
+        server.xend.node.dmesg.clear()
 
 def xm_log(args):
     arg_check(args, "log", 0)
     
-    from xen.xend.XendClient import server
-    print server.xend_node_log()
+    print server.xend.node.log()
 
 def parse_dev_info(info):
     def get_info(n, t, d):
@@ -826,13 +805,12 @@ def xm_network_list(args):
         print 'No domain parameter given'
         sys.exit(1)
     dom = params[0]
-    from xen.xend.XendClient import server
     if use_long:
-        devs = server.xend_domain_devices(dom, 'vif')
+        devs = server.xend.domain.getDeviceSxprs(dom, 'vif')
         map(PrettyPrint.prettyprint, devs)
     else:
         hdr = 0
-        for x in server.xend_domain_devices(dom, 'vif'):
+        for x in server.xend.domain.getDeviceSxprs(dom, 'vif'):
             if hdr == 0:
                 print 'Idx BE     MAC Addr.     handle state evt-ch tx-/rx-ring-ref BE-path'
                 hdr = 1
@@ -857,13 +835,12 @@ def xm_block_list(args):
         print 'No domain parameter given'
         sys.exit(1)
     dom = params[0]
-    from xen.xend.XendClient import server
     if use_long:
-        devs = server.xend_domain_devices(dom, 'vbd')
+        devs = server.xend.domain.getDeviceSxprs(dom, 'vbd')
         map(PrettyPrint.prettyprint, devs)
     else:
         hdr = 0
-        for x in server.xend_domain_devices(dom, 'vbd'):
+        for x in server.xend.domain.getDeviceSxprs(dom, 'vbd'):
             if hdr == 0:
                 print 'Vdev  BE handle state evt-ch ring-ref BE-path'
                 hdr = 1
@@ -887,13 +864,12 @@ def xm_vtpm_list(args):
         print 'No domain parameter given'
         sys.exit(1)
     dom = params[0]
-    from xen.xend.XendClient import server
     if use_long:
-        devs = server.xend_domain_devices(dom, 'vtpm')
+        devs = server.xend.domain.getDeviceSxprs(dom, 'vtpm')
         map(PrettyPrint.prettyprint, devs)
     else:
         hdr = 0
-        for x in server.xend_domain_devices(dom, 'vtpm'):
+        for x in server.xend.domain.getDeviceSxprs(dom, 'vtpm'):
             if hdr == 0:
                 print 'Idx  BE handle state evt-ch ring-ref BE-path'
                 hdr = 1
@@ -919,8 +895,7 @@ def xm_block_attach(args):
     if len(args) == 5:
         vbd.append(['backend', args[4]])
 
-    from xen.xend.XendClient import server
-    server.xend_domain_device_create(dom, vbd)
+    server.xend.domain.device_create(dom, vbd)
 
 
 def xm_network_attach(args):
@@ -932,8 +907,7 @@ def xm_network_attach(args):
     for a in args[1:]:
         vif.append(a.split("="))
 
-    from xen.xend.XendClient import server
-    server.xend_domain_device_create(dom, vif)
+    server.xend.domain.device_create(dom, vif)
 
 
 def detach(args, command, deviceClass):
@@ -942,8 +916,7 @@ def detach(args, command, deviceClass):
     dom = args[0]
     dev = args[1]
 
-    from xen.xend.XendClient import server
-    server.xend_domain_device_destroy(dom, deviceClass, dev)
+    server.xend.domain.destroyDevice(dom, deviceClass, dev)
 
 
 def xm_block_detach(args):
@@ -955,7 +928,6 @@ def xm_network_detach(args):
 
 
 def xm_vnet_list(args):
-    from xen.xend.XendClient import server
     try:
         (options, params) = getopt.gnu_getopt(args, 'l', ['long'])
     except getopt.GetoptError, opterr:
@@ -990,13 +962,11 @@ def xm_vnet_create(args):
         print "File not found: %s" % conf
         sys.exit(1)
 
-    from xen.xend.XendClient import server
     server.xend_vnet_create(conf)
 
 def xm_vnet_delete(args):
     arg_check(args, "vnet-delete", 1)
     vnet = args[0]
-    from xen.xend.XendClient import server
     server.xend_vnet_delete(vnet)
 
 commands = {
@@ -1132,23 +1102,13 @@ def main(argv=sys.argv):
             else:
                 err("Error connecting to xend: %s." % ex[1])
             sys.exit(1)
-        except xen.xend.XendError.XendError, ex:
-            if len(args) > 0:
-                handle_xend_error(argv[1], args, ex)
-            else:
-                print "Unexpected error:", sys.exc_info()[0]
-                print
-                print "Please report to xen-devel@lists.xensource.com"
-                raise
-        except xen.xend.XendProtocol.XendError, ex:
-            if len(args) > 0:
-                handle_xend_error(argv[1], args, ex)
-            else:
-                print "Unexpected error:", sys.exc_info()[0]
-                print
-                print "Please report to xen-devel@lists.xensource.com"
-                raise
         except SystemExit:
+            sys.exit(1)
+        except xmlrpclib.Fault, ex:
+            if ex.faultCode == xen.xend.XendClient.ERROR_INVALID_DOMAIN:
+                print "Error: the domain '%s' does not exist." % ex.faultString
+            else:
+                print "Error: %s" % ex.faultString
             sys.exit(1)
         except:
             print "Unexpected error:", sys.exc_info()[0]

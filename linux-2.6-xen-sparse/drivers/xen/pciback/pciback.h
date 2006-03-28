@@ -37,9 +37,11 @@ struct pciback_dev_data {
 };
 
 /* Get/Put PCI Devices that are hidden from the PCI Backend Domain */
-struct pci_dev *pcistub_get_pci_dev_by_slot(int domain, int bus,
+struct pci_dev *pcistub_get_pci_dev_by_slot(struct pciback_device *pdev,
+					    int domain, int bus,
 					    int slot, int func);
-struct pci_dev *pcistub_get_pci_dev(struct pci_dev *dev);
+struct pci_dev *pcistub_get_pci_dev(struct pciback_device *pdev,
+				    struct pci_dev *dev);
 void pcistub_put_pci_dev(struct pci_dev *dev);
 
 /* Ensure a device is turned off or reset */
@@ -57,6 +59,7 @@ int pciback_config_write(struct pci_dev *dev, int offset, int size, u32 value);
 typedef int (*publish_pci_root_cb) (struct pciback_device * pdev,
 				    unsigned int domain, unsigned int bus);
 int pciback_add_pci_dev(struct pciback_device *pdev, struct pci_dev *dev);
+void pciback_release_pci_dev(struct pciback_device *pdev, struct pci_dev *dev);
 struct pci_dev *pciback_get_pci_dev(struct pciback_device *pdev,
 				    unsigned int domain, unsigned int bus,
 				    unsigned int devfn);
@@ -69,6 +72,7 @@ void pciback_release_devices(struct pciback_device *pdev);
 irqreturn_t pciback_handle_event(int irq, void *dev_id, struct pt_regs *regs);
 
 int pciback_xenbus_register(void);
+void pciback_xenbus_unregister(void);
 
 extern int verbose_request;
 #endif

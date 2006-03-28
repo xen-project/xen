@@ -3,7 +3,6 @@
 #include "xc_elf.h"
 #include <stdlib.h>
 #include <unistd.h>
-#include <zlib.h>
 
 /* number of pages to write at a time */
 #define DUMP_INCREMENT (4 * 1024)

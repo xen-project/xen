@@ -48,6 +48,8 @@ extern void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb);
 extern void svm_stts(struct vcpu *v); 
 extern void svm_do_launch(struct vcpu *v);
 extern void svm_do_resume(struct vcpu *v);
+extern void svm_set_guest_time(struct vcpu *v, u64 gtime);
+extern u64 svm_get_guest_time(struct vcpu *v);
 extern void arch_svm_do_resume(struct vcpu *v);
 extern int load_vmcb(struct arch_svm_struct *arch_svm, u64 phys_hsa);
 /* For debugging. Remove when no longer needed. */

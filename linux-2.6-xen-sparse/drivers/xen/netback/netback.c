@@ -331,7 +331,7 @@ static void net_rx_action(unsigned long unused)
 		if (make_rx_response(netif, id, status,
 				     (unsigned long)skb->data & ~PAGE_MASK,
 				     size, skb->proto_csum_valid ?
-				     NETRXF_csum_valid : 0) &&
+				     NETRXF_data_validated : 0) &&
 		    (rx_notify[irq] == 0)) {
 			rx_notify[irq] = 1;
 			notify_list[notify_nr++] = irq;

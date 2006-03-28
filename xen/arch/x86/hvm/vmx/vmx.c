@@ -89,6 +89,8 @@ static void vmx_relinquish_guest_resources(struct domain *d)
 
     for_each_vcpu ( d, v )
     {
+        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+            continue;
         vmx_request_clear_vmcs(v);
         destroy_vmcs(&v->arch.hvm_vmx);
         free_monitor_pagetable(v);
@@ -358,9 +360,10 @@ static void vmx_freeze_time(struct vcpu *v)
 {
     struct hvm_virpit *vpit = &v->domain->arch.hvm_domain.vpit;
     
-    v->domain->arch.hvm_domain.guest_time = get_guest_time(v);
-    if ( vpit->first_injected )
+    if ( vpit->first_injected && !v->domain->arch.hvm_domain.guest_time ) {
+        v->domain->arch.hvm_domain.guest_time = get_guest_time(v);
         stop_timer(&(vpit->pit_timer));
+    }
 }
 
 static void vmx_ctxt_switch_from(struct vcpu *v)
@@ -397,31 +400,81 @@ void vmx_migrate_timers(struct vcpu *v)
         migrate_timer(&(VLAPIC(v)->vlapic_timer), v->processor);
 }
 
-void vmx_store_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
+struct vmx_store_cpu_guest_regs_callback_info {
+    struct vcpu *v;
+    struct cpu_user_regs *regs;
+    unsigned long *crs;
+};
+
+static void vmx_store_cpu_guest_regs(
+    struct vcpu *v, struct cpu_user_regs *regs, unsigned long *crs);
+
+static void vmx_store_cpu_guest_regs_callback(void *data)
 {
+    struct vmx_store_cpu_guest_regs_callback_info *info = data;
+    vmx_store_cpu_guest_regs(info->v, info->regs, info->crs);
+}
+
+static void vmx_store_cpu_guest_regs(
+    struct vcpu *v, struct cpu_user_regs *regs, unsigned long *crs)
+{
+    if ( v != current )
+    {
+        /* Non-current VCPUs must be paused to get a register snapshot. */
+        ASSERT(atomic_read(&v->pausecnt) != 0);
+
+        if ( v->arch.hvm_vmx.launch_cpu != smp_processor_id() )
+        {
+            /* Get register details from remote CPU. */
+            struct vmx_store_cpu_guest_regs_callback_info info = {
+                .v = v, .regs = regs, .crs = crs };
+            cpumask_t cpumask = cpumask_of_cpu(v->arch.hvm_vmx.launch_cpu);
+            on_selected_cpus(cpumask, vmx_store_cpu_guest_regs_callback,
+                             &info, 1, 1);
+            return;
+        }
+
+        /* Register details are on this CPU. Load the correct VMCS. */
+        __vmptrld(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+    }
+
+    ASSERT(v->arch.hvm_vmx.launch_cpu == smp_processor_id());
+
+    if ( regs != NULL )
+    {
 #if defined (__x86_64__)
-    __vmread(GUEST_RFLAGS, &regs->rflags);
-    __vmread(GUEST_SS_SELECTOR, &regs->ss);
-    __vmread(GUEST_CS_SELECTOR, &regs->cs);
-    __vmread(GUEST_DS_SELECTOR, &regs->ds);
-    __vmread(GUEST_ES_SELECTOR, &regs->es);
-    __vmread(GUEST_GS_SELECTOR, &regs->gs);
-    __vmread(GUEST_FS_SELECTOR, &regs->fs);
-    __vmread(GUEST_RIP, &regs->rip);
-    __vmread(GUEST_RSP, &regs->rsp);
+        __vmread(GUEST_RFLAGS, &regs->rflags);
+        __vmread(GUEST_SS_SELECTOR, &regs->ss);
+        __vmread(GUEST_CS_SELECTOR, &regs->cs);
+        __vmread(GUEST_DS_SELECTOR, &regs->ds);
+        __vmread(GUEST_ES_SELECTOR, &regs->es);
+        __vmread(GUEST_GS_SELECTOR, &regs->gs);
+        __vmread(GUEST_FS_SELECTOR, &regs->fs);
+        __vmread(GUEST_RIP, &regs->rip);
+        __vmread(GUEST_RSP, &regs->rsp);
 #elif defined (__i386__)
-    __vmread(GUEST_RFLAGS, &regs->eflags);
-    __vmread(GUEST_SS_SELECTOR, &regs->ss);
-    __vmread(GUEST_CS_SELECTOR, &regs->cs);
-    __vmread(GUEST_DS_SELECTOR, &regs->ds);
-    __vmread(GUEST_ES_SELECTOR, &regs->es);
-    __vmread(GUEST_GS_SELECTOR, &regs->gs);
-    __vmread(GUEST_FS_SELECTOR, &regs->fs);
-    __vmread(GUEST_RIP, &regs->eip);
-    __vmread(GUEST_RSP, &regs->esp);
-#else
-#error Unsupported architecture
+        __vmread(GUEST_RFLAGS, &regs->eflags);
+        __vmread(GUEST_SS_SELECTOR, &regs->ss);
+        __vmread(GUEST_CS_SELECTOR, &regs->cs);
+        __vmread(GUEST_DS_SELECTOR, &regs->ds);
+        __vmread(GUEST_ES_SELECTOR, &regs->es);
+        __vmread(GUEST_GS_SELECTOR, &regs->gs);
+        __vmread(GUEST_FS_SELECTOR, &regs->fs);
+        __vmread(GUEST_RIP, &regs->eip);
+        __vmread(GUEST_RSP, &regs->esp);
 #endif
+    }
+
+    if ( crs != NULL )
+    {
+        __vmread(CR0_READ_SHADOW, &crs[0]);
+        __vmread(GUEST_CR3, &crs[3]);
+        __vmread(CR4_READ_SHADOW, &crs[4]);
+    }
+
+    /* Reload current VCPU's VMCS if it was temporarily unloaded. */
+    if ( (v != current) && hvm_guest(current) )
+        __vmptrld(virt_to_maddr(current->arch.hvm_vmx.vmcs));
 }
 
 void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
@@ -453,13 +506,6 @@ void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 #else
 #error Unsupported architecture
 #endif
-}
-
-void vmx_store_cpu_guest_ctrl_regs(struct vcpu *v, unsigned long crs[8])
-{
-    __vmread(CR0_READ_SHADOW, &crs[0]);
-    __vmread(GUEST_CR3, &crs[3]);
-    __vmread(CR4_READ_SHADOW, &crs[4]);
 }
 
 void vmx_modify_guest_state(struct vcpu *v)
@@ -615,7 +661,6 @@ int start_vmx(void)
     hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = vmx_load_cpu_guest_regs;
 
-    hvm_funcs.store_cpu_guest_ctrl_regs = vmx_store_cpu_guest_ctrl_regs;
     hvm_funcs.modify_guest_state = vmx_modify_guest_state;
 
     hvm_funcs.realmode = vmx_realmode;
@@ -945,7 +990,7 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
         port = (exit_qualification >> 16) & 0xFFFF;
     else
         port = regs->edx & 0xffff;
-    TRACE_VMEXIT(2, port);
+    TRACE_VMEXIT(1, port);
     size = (exit_qualification & 7) + 1;
     dir = test_bit(3, &exit_qualification); /* direction */
 
@@ -1308,7 +1353,8 @@ static int vmx_set_cr0(unsigned long value)
             vm_entry_value |= VM_ENTRY_CONTROLS_IA32E_MODE;
             __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
 
-            if ( !shadow_set_guest_paging_levels(v->domain, 4) ) {
+            if ( !shadow_set_guest_paging_levels(v->domain, PAGING_L4) )
+            {
                 printk("Unsupported guest paging levels\n");
                 domain_crash_synchronous(); /* need to take a clean path */
             }
@@ -1317,9 +1363,26 @@ static int vmx_set_cr0(unsigned long value)
 #endif  /* __x86_64__ */
         {
 #if CONFIG_PAGING_LEVELS >= 3
-            if ( !shadow_set_guest_paging_levels(v->domain, 2) ) {
-                printk("Unsupported guest paging levels\n");
-                domain_crash_synchronous(); /* need to take a clean path */
+            /* seems it's a 32-bit or 32-bit PAE guest */
+
+            if ( test_bit(VMX_CPU_STATE_PAE_ENABLED,
+                        &v->arch.hvm_vmx.cpu_state) )
+            {
+                /* The guest enables PAE first and then it enables PG, it is
+                 * really a PAE guest */
+                if ( !shadow_set_guest_paging_levels(v->domain, PAGING_L3) )
+                {
+                    printk("Unsupported guest paging levels\n");
+                    domain_crash_synchronous();
+                }
+            }
+            else
+            {
+                if ( !shadow_set_guest_paging_levels(v->domain, PAGING_L2) )
+                {
+                    printk("Unsupported guest paging levels\n");
+                    domain_crash_synchronous(); /* need to take a clean path */
+                }
             }
 #endif
         }
@@ -1398,6 +1461,12 @@ static int vmx_set_cr0(unsigned long value)
                         "Restoring to %%eip 0x%lx\n", eip);
             return 0; /* do not update eip! */
         }
+    }
+    else if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
+    {
+        /* we should take care of this kind of situation */
+        clear_all_shadow_status(v->domain);
+        __vmwrite(GUEST_CR3, pagetable_get_paddr(v->domain->arch.phys_table));
     }
 
     return 1;
@@ -1528,11 +1597,11 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
 
             if ( vmx_pgbit_test(v) )
             {
-                /* The guest is 32 bit. */
+                /* The guest is a 32-bit PAE guest. */
 #if CONFIG_PAGING_LEVELS >= 4
                 unsigned long mfn, old_base_mfn;
 
-                if( !shadow_set_guest_paging_levels(v->domain, 3) )
+                if( !shadow_set_guest_paging_levels(v->domain, PAGING_L3) )
                 {
                     printk("Unsupported guest paging levels\n");
                     domain_crash_synchronous(); /* need to take a clean path */
@@ -1572,12 +1641,31 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             }
             else
             {
-                /*  The guest is 64 bit. */
+                /*  The guest is a 64 bit or 32-bit PAE guest. */
 #if CONFIG_PAGING_LEVELS >= 4
-                if ( !shadow_set_guest_paging_levels(v->domain, 4) )
+                if ( (v->domain->arch.ops != NULL) &&
+                        v->domain->arch.ops->guest_paging_levels == PAGING_L2)
                 {
-                    printk("Unsupported guest paging levels\n");
-                    domain_crash_synchronous(); /* need to take a clean path */
+                    /* Seems the guest first enables PAE without enabling PG,
+                     * it must enable PG after that, and it is a 32-bit PAE
+                     * guest */
+
+                    if ( !shadow_set_guest_paging_levels(v->domain,
+                                                            PAGING_L3) )
+                    {
+                        printk("Unsupported guest paging levels\n");
+                        /* need to take a clean path */
+                        domain_crash_synchronous();
+                    }
+                }
+                else
+                {
+                    if ( !shadow_set_guest_paging_levels(v->domain,
+                                                            PAGING_L4) )
+                    {
+                        printk("Unsupported guest paging levels\n");
+                        domain_crash_synchronous();
+                    }
                 }
 #endif
             }
@@ -1827,6 +1915,7 @@ static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
 
     vector &= 0xff;
     local_irq_disable();
+    TRACE_VMEXIT(1,vector);
 
     switch(vector) {
     case LOCAL_TIMER_VECTOR:
@@ -1956,7 +2045,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
     {
         __vmread(GUEST_RIP, &eip);
-        TRACE_3D(TRC_VMX_VMEXIT, v->domain->domain_id, eip, exit_reason);
         TRACE_VMEXIT(0,exit_reason);
     }
 
@@ -1980,7 +2068,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         TRACE_VMEXIT(1,vector);
         perfc_incra(cause_vector, vector);
 
-        TRACE_3D(TRC_VMX_VECTOR, v->domain->domain_id, eip, vector);
         switch (vector) {
 #ifdef XEN_DEBUGGER
         case TRAP_debug:
@@ -2164,7 +2251,7 @@ asmlinkage void vmx_load_cr2(void)
 
 asmlinkage void vmx_trace_vmentry (void)
 {
-    TRACE_5D(TRC_VMENTRY,
+    TRACE_5D(TRC_VMX_VMENTRY,
              trace_values[smp_processor_id()][0],
              trace_values[smp_processor_id()][1],
              trace_values[smp_processor_id()][2],
@@ -2180,7 +2267,7 @@ asmlinkage void vmx_trace_vmentry (void)
 
 asmlinkage void vmx_trace_vmexit (void)
 {
-    TRACE_3D(TRC_VMEXIT,0,0,0);
+    TRACE_3D(TRC_VMX_VMEXIT,0,0,0);
     return;
 }
 

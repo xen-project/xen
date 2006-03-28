@@ -53,8 +53,8 @@ static union irq_ctx *softirq_ctx[NR_CPUS];
  */
 fastcall unsigned int do_IRQ(struct pt_regs *regs)
 {	
-	/* high bits used in ret_from_ code */
-	int irq = regs->orig_eax & __IRQ_MASK(HARDIRQ_BITS);
+	/* high bit used in ret_from_ code */
+	int irq = regs->orig_eax & __IRQ_MASK(BITS_PER_LONG - 1);
 #ifdef CONFIG_4KSTACKS
 	union irq_ctx *curctx, *irqctx;
 	u32 *isp;

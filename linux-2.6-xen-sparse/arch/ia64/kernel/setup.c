@@ -506,6 +506,22 @@ setup_arch (char **cmdline_p)
 			conswitchp = &vga_con;
 # endif
 	}
+#ifdef CONFIG_XEN
+	if (running_on_xen) {
+		extern shared_info_t *HYPERVISOR_shared_info;
+
+		/* xen_start_info isn't setup yet, get the flags manually */
+		if (HYPERVISOR_shared_info->arch.flags & SIF_INITDOMAIN) {
+			if (!(HYPERVISOR_shared_info->arch.flags & SIF_PRIVILEGED))
+				panic("Xen granted us console access "
+				      "but not privileged status");
+		} else {
+			extern int console_use_vt;
+			conswitchp = NULL;
+			console_use_vt = 0;
+		}
+	}
+#endif
 #endif
 
 	/* enable IA-64 Machine Check Abort Handling unless disabled */

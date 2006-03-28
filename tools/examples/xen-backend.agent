@@ -2,6 +2,10 @@
 
 PATH=/etc/xen/scripts:$PATH
 
+. /etc/xen/scripts/locking.sh
+
+claim_lock xenbus_hotplug_global
+
 case "$XENBUS_TYPE" in
   vbd)
     /etc/xen/scripts/block "$ACTION"
@@ -25,3 +29,5 @@ case "$ACTION" in
   offline)
     ;;
 esac
+
+release_lock xenbus_hotplug_global

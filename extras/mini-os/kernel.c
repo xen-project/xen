@@ -35,7 +35,6 @@
 #include <lib.h>
 #include <sched.h>
 #include <xenbus.h>
-#include "xenbus/xenbus_comms.h"
 
 /*
  * Shared page for communicating with the hypervisor.
@@ -76,7 +75,15 @@ static shared_info_t *map_shared_info(unsigned long pa)
 }
 
 
-extern void init_console(void);
+void test_xenbus(void);
+
+/* Do initialisation from a thread once the scheduler's available */
+static void init_xs(void *ign)
+{
+    init_xenbus();
+
+    test_xenbus();
+}
 
 /*
  * INITIAL C ENTRY POINT.
@@ -84,11 +91,13 @@ extern void init_console(void);
 void start_kernel(start_info_t *si)
 {
     static char hello[] = "Bootstrapping...\n";
+
     (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(hello), hello);
 
     /* Copy the start_info struct to a globally-accessible area. */
+    /* WARN: don't do printk before here, it uses information from
+       shared_info. Use xprintk instead. */
     memcpy(&start_info, si, sizeof(*si));
-
     /* Grab the shared_info pointer and put it in a safe place. */
     HYPERVISOR_shared_info = map_shared_info(start_info.shared_info);
 
@@ -120,28 +129,24 @@ void start_kernel(start_info_t *si)
            si->cmd_line ? (const char *)si->cmd_line : "NULL");
 
 
-    /*
-     * If used for porting another OS, start here to figure out your
-     * guest os entry point. Otherwise continue below...
-     */
-    /* init memory management */
+    /* Init memory management. */
     init_mm();
 
-    /* set up events */
+    /* Set up events. */
     init_events();
     
-    /* init time and timers */
+    /* Init time and timers. */
     init_time();
 
-    /* init the console driver */
+    /* Init the console driver. */
     init_console();
-
-    /* init scheduler */
+ 
+   /* Init scheduler. */
     init_sched();
-
-    /* init xenbus */
-    xs_init();
-   
+ 
+    /* Init XenBus from a separate thread */
+    create_thread("init_xs", init_xs, NULL);
+    
     /* Everything initialised, start idle thread */
     run_idle_thread();
 }
@@ -156,6 +161,6 @@ void start_kernel(start_info_t *si)
 
 void do_exit(void)
 {
-    printk("do_exit called!\n");
+    printk("Do_exit called!\n");
     for ( ;; ) HYPERVISOR_sched_op(SCHEDOP_shutdown, SHUTDOWN_crash);
 }

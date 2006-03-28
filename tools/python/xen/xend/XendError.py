@@ -15,9 +15,18 @@
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
 #============================================================================
 
-class XendError(ValueError):
+from xmlrpclib import Fault
+
+import XendClient
+
+class XendInvalidDomain(Fault):
+    def __init__(self, value):
+        Fault.__init__(self, XendClient.ERROR_INVALID_DOMAIN, value)
+
+class XendError(Fault):
     
     def __init__(self, value):
+        Fault.__init__(self, XendClient.ERROR_GENERIC, value)
         self.value = value
 
     def __str__(self):

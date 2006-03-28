@@ -74,9 +74,9 @@ int bind_evtchn( u32 port, void (*handler)(int, struct pt_regs *) )
 
 void unbind_evtchn( u32 port )
 {
-	if (ev_actions[port].handler)
+	if (ev_actions[port].handler == default_handler)
 		printk("WARN: No handler for port %d when unbinding\n", port);
-	ev_actions[port].handler = NULL;
+	ev_actions[port].handler = default_handler;
 	ev_actions[port].status |= EVS_DISABLED;
 }
 

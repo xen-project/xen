@@ -58,17 +58,37 @@ static int evtchn_to_irq[NR_EVENT_CHANNELS];
 
 /* Packed IRQ information: binding type, sub-type index, and event channel. */
 static u32 irq_info[NR_IRQS];
+
 /* Binding types. */
 enum { IRQT_UNBOUND, IRQT_PIRQ, IRQT_VIRQ, IRQT_IPI, IRQT_EVTCHN };
+
 /* Constructor for packed IRQ information. */
-#define mk_irq_info(type, index, evtchn)				\
-	(((u32)(type) << 24) | ((u32)(index) << 16) | (u32)(evtchn))
+static inline u32 mk_irq_info(u32 type, u32 index, u32 evtchn)
+{
+	return ((type << 24) | (index << 16) | evtchn);
+}
+
 /* Convenient shorthand for packed representation of an unbound IRQ. */
 #define IRQ_UNBOUND	mk_irq_info(IRQT_UNBOUND, 0, 0)
-/* Accessor macros for packed IRQ information. */
-#define evtchn_from_irq(irq) ((u16)(irq_info[irq]))
-#define index_from_irq(irq)  ((u8)(irq_info[irq] >> 16))
-#define type_from_irq(irq)   ((u8)(irq_info[irq] >> 24))
+
+/*
+ * Accessors for packed IRQ information.
+ */
+
+static inline unsigned int evtchn_from_irq(int irq)
+{
+	return (u16)(irq_info[irq]);
+}
+
+static inline unsigned int index_from_irq(int irq)
+{
+	return (u8)(irq_info[irq] >> 16);
+}
+
+static inline unsigned int type_from_irq(int irq)
+{
+	return (u8)(irq_info[irq] >> 24);
+}
 
 /* IRQ <-> VIRQ mapping. */
 DEFINE_PER_CPU(int, virq_to_irq[NR_VIRQS]);
@@ -90,10 +110,13 @@ static unsigned long pirq_needs_unmask_notify[NR_PIRQS/sizeof(unsigned long)];
 static u8 cpu_evtchn[NR_EVENT_CHANNELS];
 static unsigned long cpu_evtchn_mask[NR_CPUS][NR_EVENT_CHANNELS/BITS_PER_LONG];
 
-#define active_evtchns(cpu,sh,idx)		\
-	((sh)->evtchn_pending[idx] &		\
-	 cpu_evtchn_mask[cpu][idx] &		\
-	 ~(sh)->evtchn_mask[idx])
+static inline unsigned long active_evtchns(unsigned int cpu, shared_info_t *sh,
+					   unsigned int idx)
+{
+	return (sh->evtchn_pending[idx] &
+		cpu_evtchn_mask[cpu][idx] &
+		~sh->evtchn_mask[idx]);
+}
 
 static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
 {
@@ -109,16 +132,31 @@ static void init_evtchn_cpu_bindings(void)
 	memset(cpu_evtchn_mask[0], ~0, sizeof(cpu_evtchn_mask[0]));
 }
 
-#define cpu_from_evtchn(evtchn)		(cpu_evtchn[evtchn])
+static inline unsigned int cpu_from_evtchn(unsigned int evtchn)
+{
+	return cpu_evtchn[evtchn];
+}
 
 #else
 
-#define active_evtchns(cpu,sh,idx)		\
-	((sh)->evtchn_pending[idx] &		\
-	 ~(sh)->evtchn_mask[idx])
-#define bind_evtchn_to_cpu(chn,cpu)	((void)0)
-#define init_evtchn_cpu_bindings()	((void)0)
-#define cpu_from_evtchn(evtchn)		(0)
+static inline unsigned long active_evtchns(unsigned int cpu, shared_info_t *sh,
+					   unsigned int idx)
+{
+	return (sh->evtchn_pending[idx] & ~sh->evtchn_mask[idx]);
+}
+
+static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
+{
+}
+
+static void init_evtchn_cpu_bindings(void)
+{
+}
+
+static inline unsigned int cpu_from_evtchn(unsigned int evtchn)
+{
+	return 0;
+}
 
 #endif
 
@@ -132,9 +170,9 @@ static inline void exit_idle(void) {}
 #include <asm/idle.h>
 #define IRQ_REG orig_rax
 #endif
-#define do_IRQ(irq, regs) do {			\
-	(regs)->IRQ_REG = (irq);		\
-	do_IRQ((regs));				\
+#define do_IRQ(irq, regs) do {					\
+	(regs)->IRQ_REG = (irq) | (1UL << (BITS_PER_LONG - 1));	\
+	do_IRQ((regs));						\
 } while (0)
 #endif
 

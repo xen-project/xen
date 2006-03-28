@@ -3351,8 +3351,9 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
      * permissions in page directories by writing back to the linear mapping.
      */
     if ( (flags = l1e_get_flags(pte) & WRPT_PTE_FLAGS) == WRPT_PTE_FLAGS )
-        return !__put_user(
-            pte.l1, &linear_pg_table[l1_linear_offset(addr)].l1);
+        return __put_user(
+            pte.l1, &linear_pg_table[l1_linear_offset(addr)].l1) ?
+            0 : EXCRET_not_a_fault;
 
     /* We are looking only for read-only mappings of p.t. pages. */
     if ( ((flags | _PAGE_RW) != WRPT_PTE_FLAGS) ||

@@ -30,10 +30,10 @@ shared_info:
 hypercall_page:
         .org 0x3000
 
-ES		= 0x20
-ORIG_EAX	= 0x24
-EIP		= 0x28
-CS		= 0x2C
+ES		= 0x1c
+ORIG_EAX	= 0x20
+EIP		= 0x24
+CS		= 0x28
 
 #define ENTRY(X) .globl X ; X :
 
@@ -94,32 +94,6 @@ do_exception:
 	call *%edi
     addl $8,%esp
     
-/*    pushl %ds
-	pushl %eax
-	xorl %eax,%eax
-	pushl %ebp
-	pushl %edi
-	pushl %esi
-	pushl %edx
-	decl %eax			# eax = -1
-	pushl %ecx
-	pushl %ebx
-	cld
-	movl %es,%ecx
-	movl ORIG_EAX(%esp), %esi	# get the error code
-	movl ES(%esp), %edi		# get the function address
-	movl %eax, ORIG_EAX(%esp)
-	movl %ecx, ES(%esp)
-	movl %esp,%edx
-	pushl %esi			# push the error code
-	pushl %edx			# push the pt_regs pointer
-	movl $(__KERNEL_DS),%edx
-	movl %edx,%ds
-	movl %edx,%es
-	call *%edi
-	addl $8,%esp  */
-
-        
 ret_from_exception:
         movb CS(%esp),%cl
 	test $2,%cl          # slow return to ring 2 or 3
@@ -290,15 +264,16 @@ ENTRY(page_fault)
 	pushl %ecx
 	pushl %ebx
 	cld
-	movl %es,%edi
-	movl ES(%esp), %ecx		/* get the faulting address */
-	movl ORIG_EAX(%esp), %edx	/* get the error code */
+	movl ORIG_EAX(%esp), %edi
 	movl %eax, ORIG_EAX(%esp)
-	movl %edi, ES(%esp)
+	movl %es, %ecx
+	movl %ecx, ES(%esp)
 	movl $(__KERNEL_DS),%eax
 	movl %eax, %ds
 	movl %eax, %es
-	movl %esp,%eax			/* pt_regs pointer */
+	pushl %edi
+	movl %esp, %eax
+	pushl %eax
 	call do_page_fault
 	jmp ret_from_exception
 

@@ -29,11 +29,18 @@ void spurious_interrupt_bug(void);
 void machine_check(void);
 
 
-extern void do_exit(void);
-
 void dump_regs(struct pt_regs *regs)
 {
-    printk("FIXME: proper register dump (with the stack dump)\n");
+    printk("EIP: %x, EFLAGS %x.\n", regs->eip, regs->eflags);
+    printk("EBX: %08x ECX: %08x EDX: %08x\n",
+	   regs->ebx, regs->ecx, regs->edx);
+    printk("ESI: %08x EDI: %08x EBP: %08x EAX: %08x\n",
+	   regs->esi, regs->edi, regs->ebp, regs->eax);
+    printk("DS: %04x ES: %04x orig_eax: %08x, eip: %08x\n",
+	   regs->xds, regs->xes, regs->orig_eax, regs->eip);
+    printk("CS: %04x EFLAGS: %08x esp: %08x ss: %04x\n",
+	   regs->xcs, regs->eflags, regs->esp, regs->xss);
+
 }	
 
 
@@ -94,10 +101,14 @@ void page_walk(unsigned long virt_address)
 
 }
 
-void do_page_fault(struct pt_regs *regs, unsigned long error_code,
-								                     unsigned long addr)
+#define read_cr2() \
+        (HYPERVISOR_shared_info->vcpu_info[smp_processor_id()].arch.cr2)
+
+void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 {
-    printk("Page fault at linear address %p\n", addr);
+    unsigned long addr = read_cr2();
+    printk("Page fault at linear address %p, regs %p, code %lx\n", addr, regs,
+	   error_code);
     dump_regs(regs);
 #ifdef __x86_64__
     /* FIXME: _PAGE_PSE */

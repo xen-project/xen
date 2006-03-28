@@ -32,14 +32,14 @@ ENTRY(startup_32)
 
 	/* get vendor info */
 	xorl %eax,%eax			# call CPUID with 0 -> return vendor ID
-	cpuid
+	XEN_CPUID
 	movl %eax,X86_CPUID		# save CPUID level
 	movl %ebx,X86_VENDOR_ID		# lo 4 chars
 	movl %edx,X86_VENDOR_ID+4	# next 4 chars
 	movl %ecx,X86_VENDOR_ID+8	# last 4 chars
 
 	movl $1,%eax		# Use the CPUID instruction to get CPU type
-	cpuid
+	XEN_CPUID
 	movb %al,%cl		# save reg for future use
 	andb $0x0f,%ah		# mask processor family
 	movb %ah,X86

@@ -51,7 +51,6 @@
 unsigned long *phys_to_machine_mapping;
 extern char *stack;
 extern char _text, _etext, _edata, _end;
-extern void do_exit(void);
 extern void page_walk(unsigned long virt_addr);
 
 /*********************
@@ -373,7 +372,7 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
     unsigned long *tab = (unsigned long *)start_info.pt_base;
     unsigned long pt_page = (unsigned long)pfn_to_virt(*pt_pfn); 
     unsigned long prot_e, prot_t, pincmd;
-    mmu_update_t mmu_updates[0];
+    mmu_update_t mmu_updates[1];
     struct mmuext_op pin_request;
     
     DEBUG("Allocating new L%d pt frame for pt_pfn=%lx, "

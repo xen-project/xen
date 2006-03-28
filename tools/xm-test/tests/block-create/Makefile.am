@@ -12,7 +12,7 @@ TESTS = 01_block_attach_device_pos.test  \
 	11_block_attach_shared_dom0.test \
 	12_block_attach_shared_domU.test
 
-EXTRA_DIST = $(TESTS) $(XFAIL_TESTS)
+EXTRA_DIST = $(TESTS)
 
 TESTS_ENVIRONMENT=@TENV@
 

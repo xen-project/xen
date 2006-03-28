@@ -44,6 +44,58 @@
  */
 #define BSP_CPU(v)    (!(v->vcpu_id))
 
+u64 svm_get_guest_time(struct vcpu *v)
+{
+    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
+    u64    host_tsc;
+    
+    rdtscll(host_tsc);
+    return host_tsc + vpit->cache_tsc_offset;
+}
+
+void svm_set_guest_time(struct vcpu *v, u64 gtime)
+{
+    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
+    u64    host_tsc;
+   
+    rdtscll(host_tsc);
+    
+    vpit->cache_tsc_offset = gtime - host_tsc;
+    v->arch.hvm_svm.vmcb->tsc_offset = vpit->cache_tsc_offset;
+}
+
+static inline void
+interrupt_post_injection(struct vcpu * v, int vector, int type)
+{
+    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
+
+    if ( is_pit_irq(v, vector, type) ) {
+        if ( !vpit->first_injected ) {
+            vpit->pending_intr_nr = 0;
+            vpit->last_pit_gtime = svm_get_guest_time(v);
+            vpit->scheduled = NOW() + vpit->period;
+            set_timer(&vpit->pit_timer, vpit->scheduled);
+            vpit->first_injected = 1;
+        } else {
+            vpit->pending_intr_nr--;
+        }
+        vpit->inject_point = NOW();
+
+        vpit->last_pit_gtime += vpit->period;
+        svm_set_guest_time(v, vpit->last_pit_gtime);
+    }
+
+    switch(type)
+    {
+    case VLAPIC_DELIV_MODE_EXT:
+        break;
+
+    default:
+        vlapic_post_injection(v, vector, type);
+        break;
+    }
+}
+
 static inline int svm_inject_extint(struct vcpu *v, int trap, int error_code)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -62,45 +114,6 @@ static inline int svm_inject_extint(struct vcpu *v, int trap, int error_code)
     vmcb->vintr = intr;
 //  printf( "IRQ = %d\n", trap );
     return 0;
-}
-
-void svm_set_tsc_shift(struct vcpu *v, struct hvm_virpit *vpit)
-{
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    u64    drift;
-
-    if ( vpit->first_injected )
-        drift = vpit->period_cycles * vpit->pending_intr_nr;
-    else
-        drift = 0;
-    vmcb->tsc_offset = ( 0 - drift );
-}
-
-static inline void
-interrupt_post_injection(struct vcpu * v, int vector, int type)
-{
-    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
-
-    if ( is_pit_irq(v, vector, type) ) {
-            if ( !vpit->first_injected ) {
-                vpit->first_injected = 1;
-                vpit->pending_intr_nr = 0;
-            }
-            else if (vpit->pending_intr_nr) {
-                --vpit->pending_intr_nr;
-            }
-            vpit->inject_point = NOW();
-            svm_set_tsc_shift (v, vpit);
-    }
-
-    switch(type)
-    {
-    case VLAPIC_DELIV_MODE_EXT:
-        break;
-
-    default:
-        vlapic_post_injection(v, vector, type);
-    }
 }
 
 asmlinkage void svm_intr_assist(void) 

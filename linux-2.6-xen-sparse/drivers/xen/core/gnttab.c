@@ -360,7 +360,7 @@ gnttab_request_free_callback(struct gnttab_free_callback *callback,
 }
 
 #ifndef __ia64__
-static int map_pte_fn(pte_t *pte, struct page *pte_page,
+static int map_pte_fn(pte_t *pte, struct page *pmd_page,
 		      unsigned long addr, void *data)
 {
 	unsigned long **frames = (unsigned long **)data;
@@ -370,7 +370,7 @@ static int map_pte_fn(pte_t *pte, struct page *pte_page,
 	return 0;
 }
 
-static int unmap_pte_fn(pte_t *pte, struct page *pte_page,
+static int unmap_pte_fn(pte_t *pte, struct page *pmd_page,
 		      unsigned long addr, void *data)
 {
 
@@ -384,6 +384,7 @@ gnttab_resume(void)
 {
 	gnttab_setup_table_t setup;
 	unsigned long frames[NR_GRANT_FRAMES];
+	int rc;
 #ifndef __ia64__
 	void *pframes = frames;
 	struct vm_struct *area;
@@ -393,8 +394,8 @@ gnttab_resume(void)
 	setup.nr_frames  = NR_GRANT_FRAMES;
 	setup.frame_list = frames;
 
-	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1));
-	BUG_ON(setup.status != 0);
+	rc = HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1);
+	BUG_ON(rc || setup.status);
 
 #ifndef __ia64__
 	if (shared == NULL) {
@@ -402,9 +403,10 @@ gnttab_resume(void)
 		BUG_ON(area == NULL);
 		shared = area->addr;
 	}
-	BUG_ON(generic_page_range(&init_mm, (unsigned long)shared,
-				  PAGE_SIZE * NR_GRANT_FRAMES,
-				  map_pte_fn, &pframes));
+	rc = apply_to_page_range(&init_mm, (unsigned long)shared,
+				 PAGE_SIZE * NR_GRANT_FRAMES,
+				 map_pte_fn, &pframes);
+	BUG_ON(rc);
 #else
 	shared = __va(frames[0] << PAGE_SHIFT);
 	printk("grant table at %p\n", shared);
@@ -418,9 +420,9 @@ gnttab_suspend(void)
 {
 
 #ifndef __ia64__
-	generic_page_range(&init_mm, (unsigned long)shared,
-			   PAGE_SIZE * NR_GRANT_FRAMES,
-			   unmap_pte_fn, NULL);
+	apply_to_page_range(&init_mm, (unsigned long)shared,
+			    PAGE_SIZE * NR_GRANT_FRAMES,
+			    unmap_pte_fn, NULL);
 #endif
 
 	return 0;

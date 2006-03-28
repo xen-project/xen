@@ -66,6 +66,14 @@ static inline void wake_up(struct wait_queue_head *head)
     }
 }
 
+#define add_waiter(w, wq) do {  \
+    unsigned long flags;        \
+    local_irq_save(flags);      \
+    add_wait_queue(&wq, &w);    \
+    block(current);             \
+    local_irq_restore(flags);   \
+} while (0)
+
 #define wait_event(wq, condition) do{             \
     unsigned long flags;                          \
     if(condition)                                 \
