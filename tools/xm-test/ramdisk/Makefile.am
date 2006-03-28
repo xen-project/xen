@@ -1,3 +1,4 @@
+INITRD ?= http://xm-test.xensource.com/ramdisks
 
 EXTRA_DIST = skel configs patches
 
@@ -60,7 +61,7 @@ disk.img: existing
 	fi
 
 existing:
-	@if test -n "$(INITRD)"; then \
+	@if [ -n "$(INITRD)" ] && [ ! -f $(XMTEST_VER_IMG) ] ; then \
 		wget $(INITRD)/$(XMTEST_VER_IMG); \
 	fi
 	@if [ -f $(XMTEST_VER_IMG) ] ; then \

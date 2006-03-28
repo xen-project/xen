@@ -24,6 +24,7 @@ from httplib import HTTPConnection, HTTP
 from xmlrpclib import Transport
 from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
 import xmlrpclib, socket, os, traceback
+import SocketServer
 
 # A new ServerProxy that also supports httpu urls.  An http URL comes in the
 # form:
@@ -62,7 +63,7 @@ class ServerProxy(xmlrpclib.ServerProxy):
 # true, and has an improved marshaller that serializes unknown exceptions
 # with full traceback information.
 
-class TCPXMLRPCServer(SimpleXMLRPCServer):
+class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
     allow_reuse_address = True
 
     def _marshaled_dispatch(self, data, dispatch_method = None):
