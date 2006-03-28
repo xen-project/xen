@@ -68,6 +68,9 @@ unsigned long avail_domheap_pages(void);
 
 #define ALLOC_DOM_DMA 1
 
+/* Up to 2^20 pages can be allocated at once. */
+#define MAX_ORDER 20
+
 /* Automatic page scrubbing for dead domains. */
 extern struct list_head page_scrub_list;
 #define page_scrub_schedule_work()              \

@@ -70,31 +70,79 @@ void show_registers(struct cpu_user_regs *regs)
 
 void show_page_walk(unsigned long addr)
 {
-    unsigned long page = read_cr3();
-    
+    unsigned long pfn, mfn = read_cr3() >> PAGE_SHIFT;
+    l4_pgentry_t l4e, *l4t;
+    l3_pgentry_t l3e, *l3t;
+    l2_pgentry_t l2e, *l2t;
+    l1_pgentry_t l1e, *l1t;
+
     printk("Pagetable walk from %016lx:\n", addr);
 
-    page &= PAGE_MASK;
-    page = ((unsigned long *) __va(page))[l4_table_offset(addr)];
-    printk(" L4 = %016lx\n", page);
-    if ( !(page & _PAGE_PRESENT) )
+    l4t = mfn_to_virt(mfn);
+    l4e = l4t[l4_table_offset(addr)];
+    mfn = l4e_get_pfn(l4e);
+    pfn = get_gpfn_from_mfn(mfn);
+    printk(" L4 = %"PRIpte" %016lx\n", l4e_get_intpte(l4e), pfn);
+    if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) )
         return;
 
-    page &= PAGE_MASK;
-    page = ((unsigned long *) __va(page))[l3_table_offset(addr)];
-    printk("  L3 = %016lx\n", page);
-    if ( !(page & _PAGE_PRESENT) )
+    l3t = mfn_to_virt(mfn);
+    l3e = l3t[l3_table_offset(addr)];
+    mfn = l3e_get_pfn(l3e);
+    pfn = get_gpfn_from_mfn(mfn);
+    printk("  L3 = %"PRIpte" %016lx\n", l3e_get_intpte(l3e), pfn);
+    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
         return;
 
-    page &= PAGE_MASK;
-    page = ((unsigned long *) __va(page))[l2_table_offset(addr)];
-    printk("   L2 = %016lx %s\n", page, (page & _PAGE_PSE) ? "(2MB)" : "");
-    if ( !(page & _PAGE_PRESENT) || (page & _PAGE_PSE) )
+    l2t = mfn_to_virt(mfn);
+    l2e = l2t[l2_table_offset(addr)];
+    mfn = l2e_get_pfn(l2e);
+    pfn = get_gpfn_from_mfn(mfn);
+    printk("   L2 = %"PRIpte" %016lx %s\n", l2e_get_intpte(l2e), pfn,
+           (l2e_get_flags(l2e) & _PAGE_PSE) ? "(PSE)" : "");
+    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) ||
+         (l2e_get_flags(l2e) & _PAGE_PSE) )
         return;
 
-    page &= PAGE_MASK;
-    page = ((unsigned long *) __va(page))[l1_table_offset(addr)];
-    printk("    L1 = %016lx\n", page);
+    l1t = mfn_to_virt(mfn);
+    l1e = l1t[l1_table_offset(addr)];
+    mfn = l1e_get_pfn(l1e);
+    pfn = get_gpfn_from_mfn(mfn);
+    printk("    L1 = %"PRIpte" %016lx\n", l1e_get_intpte(l1e), pfn);
+}
+
+int __spurious_page_fault(unsigned long addr)
+{
+    unsigned long mfn = read_cr3() >> PAGE_SHIFT;
+    l4_pgentry_t l4e, *l4t;
+    l3_pgentry_t l3e, *l3t;
+    l2_pgentry_t l2e, *l2t;
+    l1_pgentry_t l1e, *l1t;
+
+    l4t = mfn_to_virt(mfn);
+    l4e = l4t[l4_table_offset(addr)];
+    mfn = l4e_get_pfn(l4e);
+    if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) )
+        return 0;
+
+    l3t = mfn_to_virt(mfn);
+    l3e = l3t[l3_table_offset(addr)];
+    mfn = l3e_get_pfn(l3e);
+    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+        return 0;
+
+    l2t = mfn_to_virt(mfn);
+    l2e = l2t[l2_table_offset(addr)];
+    mfn = l2e_get_pfn(l2e);
+    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+        return 0;
+    if ( l2e_get_flags(l2e) & _PAGE_PSE )
+        return 1;
+
+    l1t = mfn_to_virt(mfn);
+    l1e = l1t[l1_table_offset(addr)];
+    mfn = l1e_get_pfn(l1e);
+    return !!(l1e_get_flags(l1e) & _PAGE_PRESENT);
 }
 
 asmlinkage void double_fault(void);

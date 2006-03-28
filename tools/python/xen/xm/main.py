@@ -1102,12 +1102,6 @@ def main(argv=sys.argv):
             else:
                 err("Error connecting to xend: %s." % ex[1])
             sys.exit(1)
-        except xmlrpclib.ProtocolError, ex:
-            if os.geteuid() != 0:
-                err("Most commands need root access.  Please try again as root.")
-            else:
-                err("Error connecting to xend: %s." % ex.errmsg)
-            sys.exit(1)
         except SystemExit:
             sys.exit(1)
         except xmlrpclib.Fault, ex:

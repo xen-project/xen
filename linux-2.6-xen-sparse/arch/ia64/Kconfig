@@ -84,19 +84,6 @@ config XEN_BLKDEV_BACKEND
 	bool
 	default y
 
-config XEN_VT
-	bool "Override for turning on CONFIG_VT for domU"
-	default y
-	help
-	  Hack to turn off CONFIG_VT for domU
-
-config VT
-	bool
-	default y if XEN && XEN_VT
-	default n if XEN && !XEN_VT
-	help
-	  Hack to turn off CONFIG_VT for domU
-
 config XEN_SYSFS
 	bool "Export Xen attributes in sysfs"
 	depends on XEN && SYSFS

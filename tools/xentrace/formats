@@ -16,6 +16,6 @@
 0x00080002	CPU%(cpu)d      %(tsc)d		VMX_VECTOR		[ domid = 0x%(1)08x, eip = 0x%(2)08x, vector = 0x%(3)08x ]
 0x00080003	CPU%(cpu)d      %(tsc)d		VMX_INT			[ domid = 0x%(1)08x, trap = 0x%(2)08x, va = 0x%(3)08x ]
 
-0x00090001      CPU%(cpu)d      %(tsc)d         VMENTRY                 0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
-0x00090002      CPU%(cpu)d      %(tsc)d         VMEXIT                  0x%(1)08x 0x%(2)08x 0x%(3)08x 
+0x00081001      CPU%(cpu)d      %(tsc)d         VMEXIT                  0x%(1)08x 0x%(2)08x 0x%(3)08x 
+0x00081002      CPU%(cpu)d      %(tsc)d         VMENTRY                 0x%(1)08x 0x%(2)08x 0x%(3)08x 0x%(4)08x 0x%(5)08x
 

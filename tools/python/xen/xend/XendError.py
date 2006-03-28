@@ -19,6 +19,10 @@ from xmlrpclib import Fault
 
 import XendClient
 
+class XendInvalidDomain(Fault):
+    def __init__(self, value):
+        Fault.__init__(self, XendClient.ERROR_INVALID_DOMAIN, value)
+
 class XendError(Fault):
     
     def __init__(self, value):

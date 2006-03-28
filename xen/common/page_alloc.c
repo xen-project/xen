@@ -219,8 +219,6 @@ unsigned long alloc_boot_pages(unsigned long nr_pfns, unsigned long pfn_align)
 #define pfn_dom_zone_type(_pfn)                                 \
     (((_pfn) <= MAX_DMADOM_PFN) ? MEMZONE_DMADOM : MEMZONE_DOM)
 
-/* Up to 2^20 pages can be allocated at once. */
-#define MAX_ORDER 20
 static struct list_head heap[NR_ZONES][MAX_ORDER+1];
 
 static unsigned long avail[NR_ZONES];

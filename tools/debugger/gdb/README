@@ -11,8 +11,8 @@ To build the GDB server:
     to your test machine.
 
 To build a debuggable guest kernel image:
- 1. cd linux-2.6.12-xenU
- 2. ARCH=xen make menuconfig
+ 1. cd linux-2.6.xx-xenU
+ 2. make menuconfig
  3. From within the configurator, enable the following options:
     # Kernel hacking -> Compile the kernel with debug info [*]
                      -> Compile the kernel with frame pointers

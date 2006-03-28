@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.16-rc3-xen0
-# Thu Feb 16 13:20:46 2006
+# Linux kernel version: 2.6.16-xen0
+# Mon Mar 27 14:46:03 2006
 #
 
 #
@@ -95,8 +95,7 @@ CONFIG_ARCH_XEN=y
 CONFIG_XEN_PRIVILEGED_GUEST=y
 CONFIG_XEN_BLKDEV_GRANT=y
 CONFIG_XEN_BLKDEV_FRONTEND=y
-CONFIG_XEN_VT=y
-CONFIG_VT=y
+CONFIG_XEN_BLKDEV_BACKEND=y
 CONFIG_XEN_SYSFS=y
 CONFIG_SCHED_NO_NO_OMIT_FRAME_POINTER=y
 CONFIG_DMA_IS_DMA32=y
@@ -378,7 +377,7 @@ CONFIG_BLK_DEV_IDESCSI=y
 #
 # IDE chipset support/bugfixes
 #
-CONFIG_IDE_GENERIC=y
+# CONFIG_IDE_GENERIC is not set
 CONFIG_BLK_DEV_IDEPCI=y
 # CONFIG_IDEPCI_SHARE_IRQ is not set
 # CONFIG_BLK_DEV_OFFBOARD is not set
@@ -706,6 +705,7 @@ CONFIG_GAMEPORT=y
 #
 # Character devices
 #
+CONFIG_VT=y
 CONFIG_VT_CONSOLE=y
 CONFIG_HW_CONSOLE=y
 CONFIG_SERIAL_NONSTANDARD=y
@@ -1252,11 +1252,7 @@ CONFIG_USB_MON=y
 # CONFIG_INFINIBAND is not set
 
 #
-# SN Devices
-#
-
-#
-# EDAC - error detection and reporting (RAS)
+# EDAC - error detection and reporting (RAS) (EXPERIMENTAL)
 #
 
 #

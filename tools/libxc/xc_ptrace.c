@@ -38,9 +38,6 @@ static char *ptrace_names[] = {
 };
 #endif
 
-/* XXX application state */
-static long                     nr_pages = 0;
-static unsigned long           *page_array = NULL;
 static int                      current_domid = -1;
 static int                      current_isfile;
 
@@ -196,6 +193,60 @@ map_domain_va_pae(
     return (void *)((unsigned long)v | (va & (PAGE_SIZE - 1)));
 }
 
+#ifdef __x86_64__
+static void *
+map_domain_va(
+    int xc_handle,
+    int cpu,
+    void *guest_va,
+    int perm)
+{
+    unsigned long l3p, l2p, l1p, p, va = (unsigned long)guest_va;
+    uint64_t *l4, *l3, *l2, *l1;
+    static void *v;
+
+    if ((ctxt[cpu].ctrlreg[4] & 0x20) == 0 ) /* legacy ia32 mode */
+        return map_domain_va_pae(xc_handle, cpu, guest_va, perm);
+
+    if (fetch_regs(xc_handle, cpu, NULL))
+        return NULL;
+
+    l4 = xc_map_foreign_range(
+        xc_handle, current_domid, PAGE_SIZE, PROT_READ, ctxt[cpu].ctrlreg[3] >> PAGE_SHIFT);
+    if ( l4 == NULL )
+        return NULL;
+
+    l3p = l4[l4_table_offset(va)] >> PAGE_SHIFT;
+    l3 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, PROT_READ, l3p);
+    if ( l3 == NULL )
+        return NULL;
+
+    l2p = l3[l3_table_offset(va)] >> PAGE_SHIFT;
+    l2 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, PROT_READ, l2p);
+    if ( l2 == NULL )
+        return NULL;
+
+    l1p = l2[l2_table_offset(va)] >> PAGE_SHIFT;
+    l1 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, l1p);
+    if ( l1 == NULL )
+        return NULL;
+
+    p = l1[l1_table_offset(va)] >> PAGE_SHIFT;
+    if ( v != NULL )
+        munmap(v, PAGE_SIZE);
+    v = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, p);
+    if ( v == NULL )
+        return NULL;
+
+    return (void *)((unsigned long)v | (va & (PAGE_SIZE - 1)));
+}
+#endif
+
+#ifdef __i386__
+/* XXX application state */
+static long                     nr_pages = 0;
+static unsigned long           *page_array = NULL;
+
 static void *
 map_domain_va(
     int xc_handle,
@@ -216,15 +267,18 @@ map_domain_va(
     static unsigned long  page_phys[MAX_VIRT_CPUS];
     static unsigned long *page_virt[MAX_VIRT_CPUS];    
     static int            prev_perm[MAX_VIRT_CPUS];
-    static enum { MODE_UNKNOWN, MODE_32, MODE_PAE } mode;
+    static enum { MODE_UNKNOWN, MODE_32, MODE_PAE, MODE_64 } mode;
 
     if ( mode == MODE_UNKNOWN )
     {
         xen_capabilities_info_t caps;
         (void)xc_version(xc_handle, XENVER_capabilities, caps);
-        mode = MODE_32;
-        if ( strstr(caps, "_x86_32p") )
+        if ( strstr(caps, "-x86_64") )
+            mode = MODE_64;
+        else if ( strstr(caps, "-x86_32p") )
             mode = MODE_PAE;
+        else if ( strstr(caps, "-x86_32") ) 
+            mode = MODE_32;
     }
 
     if ( mode == MODE_PAE )
@@ -303,6 +357,8 @@ map_domain_va(
 
     return (void *)(((unsigned long)page_virt[cpu]) | (va & BSD_PAGE_MASK));
 }
+
+#endif
 
 static int 
 __xc_waitdomain(

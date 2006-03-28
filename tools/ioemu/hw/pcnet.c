@@ -45,21 +45,6 @@
 #define PCNET_PNPMMIO_SIZE      0x20
 
 
-typedef struct PCNetState_st PCNetState;
-
-struct PCNetState_st {
-    PCIDevice dev;
-    NetDriverState *nd;
-    int mmio_io_addr, rap, isr, lnkst;
-    target_phys_addr_t rdra, tdra;
-    uint8_t prom[16];
-    uint16_t csr[128];
-    uint16_t bcr[32];
-    uint64_t timer;
-    int xmit_pos, recv_pos;
-    uint8_t buffer[4096];
-};
-
 #include "pcnet.h"
 
 static void pcnet_poll(PCNetState *s);
@@ -217,6 +202,11 @@ static void pcnet_init(PCNetState *s)
     CSR_RCVRC(s) = CSR_RCVRL(s);
     CSR_XMTRC(s) = CSR_XMTRL(s);
 
+    /* flush any cached receive descriptors */
+    s->crmd.rmd1.own = 0;
+    s->nrmd.rmd1.own = 0;
+    s->nnrmd.rmd1.own = 0;
+
 #ifdef PCNET_DEBUG
     printf("pcnet ss32=%d rdra=0x%08x[%d] tdra=0x%08x[%d]\n", 
         BCR_SSIZE32(s),
@@ -239,6 +229,11 @@ static void pcnet_start(PCNetState *s)
     if (!CSR_DRX(s))
         s->csr[0] |= 0x0020;    /* set RXON */
 
+    /* flush any cached receive descriptors */
+    s->crmd.rmd1.own = 0;
+    s->nrmd.rmd1.own = 0;
+    s->nnrmd.rmd1.own = 0;
+
     s->csr[0] &= ~0x0004;       /* clear STOP bit */
     s->csr[0] |= 0x0002;
 }
@@ -260,29 +255,21 @@ static void pcnet_rdte_poll(PCNetState *s)
     s->csr[28] = s->csr[29] = 0;
     if (s->rdra) {
         int bad = 0;
-#if 1
         target_phys_addr_t crda = pcnet_rdra_addr(s, CSR_RCVRC(s));
         target_phys_addr_t nrda = pcnet_rdra_addr(s, -1 + CSR_RCVRC(s));
         target_phys_addr_t nnrd = pcnet_rdra_addr(s, -2 + CSR_RCVRC(s));
-#else
-        target_phys_addr_t crda = s->rdra + 
-            (CSR_RCVRL(s) - CSR_RCVRC(s)) *
-            (BCR_SWSTYLE(s) ? 16 : 8 );
-        int nrdc = CSR_RCVRC(s)<=1 ? CSR_RCVRL(s) : CSR_RCVRC(s)-1;
-        target_phys_addr_t nrda = s->rdra + 
-            (CSR_RCVRL(s) - nrdc) *
-            (BCR_SWSTYLE(s) ? 16 : 8 );
-        int nnrc = nrdc<=1 ? CSR_RCVRL(s) : nrdc-1;
-        target_phys_addr_t nnrd = s->rdra + 
-            (CSR_RCVRL(s) - nnrc) *
-            (BCR_SWSTYLE(s) ? 16 : 8 );
-#endif
 
-        CHECK_RMD(PHYSADDR(s,crda), bad);
+	if (!s->crmd.rmd1.own) {
+	    CHECK_RMD(&(s->crmd),PHYSADDR(s,crda), bad);
+	}
         if (!bad) {
-            CHECK_RMD(PHYSADDR(s,nrda), bad);
+	    if (s->crmd.rmd1.own && !s->nrmd.rmd1.own) {
+		CHECK_RMD(&(s->nrmd),PHYSADDR(s,nrda), bad);
+	    }
             if (bad || (nrda == crda)) nrda = 0;
-            CHECK_RMD(PHYSADDR(s,nnrd), bad);
+	    if (s->crmd.rmd1.own && s->nrmd.rmd1.own && !s->nnrmd.rmd1.own) {
+		CHECK_RMD(&(s->nnrmd),PHYSADDR(s,nnrd), bad);
+	    }
             if (bad || (nnrd == crda)) nnrd = 0;
 
             s->csr[28] = crda & 0xffff;
@@ -303,14 +290,12 @@ static void pcnet_rdte_poll(PCNetState *s)
     }
     
     if (CSR_CRDA(s)) {
-        struct pcnet_RMD rmd;
-        RMDLOAD(&rmd, PHYSADDR(s,CSR_CRDA(s)));
-        CSR_CRBC(s) = rmd.rmd1.bcnt;
-        CSR_CRST(s) = ((uint32_t *)&rmd)[1] >> 16;
+        CSR_CRBC(s) = s->crmd.rmd1.bcnt;
+        CSR_CRST(s) = ((uint32_t *)&(s->crmd))[1] >> 16;
 #ifdef PCNET_DEBUG_RMD_X
         printf("CRDA=0x%08x CRST=0x%04x RCVRC=%d RMD1=0x%08x RMD2=0x%08x\n",
                 PHYSADDR(s,CSR_CRDA(s)), CSR_CRST(s), CSR_RCVRC(s),
-                ((uint32_t *)&rmd)[1], ((uint32_t *)&rmd)[2]);
+                ((uint32_t *)&(s->crmd))[1], ((uint32_t *)&(s->crmd))[2]);
         PRINT_RMD(&rmd);
 #endif
     } else {
@@ -318,10 +303,8 @@ static void pcnet_rdte_poll(PCNetState *s)
     }
     
     if (CSR_NRDA(s)) {
-        struct pcnet_RMD rmd;
-        RMDLOAD(&rmd, PHYSADDR(s,CSR_NRDA(s)));
-        CSR_NRBC(s) = rmd.rmd1.bcnt;
-        CSR_NRST(s) = ((uint32_t *)&rmd)[1] >> 16;
+        CSR_NRBC(s) = s->nrmd.rmd1.bcnt;
+        CSR_NRST(s) = ((uint32_t *)&(s->nrmd))[1] >> 16;
     } else {
         CSR_NRBC(s) = CSR_NRST(s) = 0;
     }
@@ -336,6 +319,7 @@ static int pcnet_tdte_poll(PCNetState *s)
             (CSR_XMTRL(s) - CSR_XMTRC(s)) *
             (BCR_SWSTYLE(s) ? 16 : 8 );
         int bad = 0;
+	s->csr[0] &= ~0x0008;   /* clear TDMD */
         CHECK_TMD(PHYSADDR(s, cxda),bad);
         if (!bad) {
             if (CSR_CXDA(s) != cxda) {
@@ -354,12 +338,8 @@ static int pcnet_tdte_poll(PCNetState *s)
     }
 
     if (CSR_CXDA(s)) {
-        struct pcnet_TMD tmd;
-
-        TMDLOAD(&tmd, PHYSADDR(s,CSR_CXDA(s)));                
-
-        CSR_CXBC(s) = tmd.tmd1.bcnt;
-        CSR_CXST(s) = ((uint32_t *)&tmd)[1] >> 16;
+        CSR_CXBC(s) = s->tmd.tmd1.bcnt;
+        CSR_CXST(s) = ((uint32_t *)&(s->tmd))[1] >> 16;
     } else {
         CSR_CXBC(s) = CSR_CXST(s) = 0;
     }
@@ -373,14 +353,11 @@ static int pcnet_can_receive(void *opaque)
     if (CSR_STOP(s) || CSR_SPND(s))
         return 0;
         
-    if (s->recv_pos > 0)
-        return 0;
-
     pcnet_rdte_poll(s);
     if (!(CSR_CRST(s) & 0x8000)) {
         return 0;
     }
-    return sizeof(s->buffer)-16;
+    return sizeof(s->rx_buffer)-16;
 }
 
 #define MIN_BUF_SIZE 60
@@ -389,7 +366,7 @@ static void pcnet_receive(void *opaque, const uint8_t *buf, int size)
 {
     PCNetState *s = opaque;
     int is_padr = 0, is_bcast = 0, is_ladr = 0;
-    uint8_t buf1[60];
+    int pad;
 
     if (CSR_DRX(s) || CSR_STOP(s) || CSR_SPND(s) || !size)
         return;
@@ -399,12 +376,10 @@ static void pcnet_receive(void *opaque, const uint8_t *buf, int size)
 #endif
 
     /* if too small buffer, then expand it */
-    if (size < MIN_BUF_SIZE) {
-        memcpy(buf1, buf, size);
-        memset(buf1 + size, 0, MIN_BUF_SIZE - size);
-        buf = buf1;
-        size = MIN_BUF_SIZE;
-    }
+    if (size < MIN_BUF_SIZE)
+        pad = MIN_BUF_SIZE - size + 4;
+    else 
+	pad = 4;
 
     if (CSR_PROM(s) 
         || (is_padr=padr_match(s, buf, size)) 
@@ -413,124 +388,74 @@ static void pcnet_receive(void *opaque, const uint8_t *buf, int size)
 
         pcnet_rdte_poll(s);
 
-        if (!(CSR_CRST(s) & 0x8000) && s->rdra) {
-            struct pcnet_RMD rmd;
-            int rcvrc = CSR_RCVRC(s)-1,i;
-            target_phys_addr_t nrda;
-            for (i = CSR_RCVRL(s)-1; i > 0; i--, rcvrc--) {
-                if (rcvrc <= 1)
-                    rcvrc = CSR_RCVRL(s);
-                nrda = s->rdra +
-                    (CSR_RCVRL(s) - rcvrc) *
-                    (BCR_SWSTYLE(s) ? 16 : 8 );
-                RMDLOAD(&rmd, PHYSADDR(s,nrda));                  
-                if (rmd.rmd1.own) {                
+	if (size > 2000) {
 #ifdef PCNET_DEBUG_RMD
-                    printf("pcnet - scan buffer: RCVRC=%d PREV_RCVRC=%d\n", 
-                                rcvrc, CSR_RCVRC(s));
+	    printf("pcnet - oversize packet discarded.\n");
 #endif
-                    CSR_RCVRC(s) = rcvrc;
-                    pcnet_rdte_poll(s);
-                    break;
-                }
-            }
-        }
-
-        if (!(CSR_CRST(s) & 0x8000)) {
+	} else if (!(CSR_CRST(s) & 0x8000)) {
 #ifdef PCNET_DEBUG_RMD
             printf("pcnet - no buffer: RCVRC=%d\n", CSR_RCVRC(s));
 #endif
             s->csr[0] |= 0x1000; /* Set MISS flag */
             CSR_MISSC(s)++;
         } else {
-            uint8_t *src = &s->buffer[8];
+            uint8_t *src = &s->rx_buffer[8];
             target_phys_addr_t crda = CSR_CRDA(s);
-            struct pcnet_RMD rmd;
+            target_phys_addr_t nrda = CSR_NRDA(s);
+            target_phys_addr_t nnrda = CSR_NNRD(s);
             int pktcount = 0;
+	    int packet_size = size + pad;
 
             memcpy(src, buf, size);
-            
-            if (!CSR_ASTRP_RCV(s)) {
-                uint32_t fcs = ~0;
-#if 0            
-                uint8_t *p = s->buffer;
-                
-                ((uint32_t *)p)[0] = ((uint32_t *)p)[1] = 0xaaaaaaaa;
-                p[7] = 0xab;
-#else
-                uint8_t *p = src;
-#endif
-
-                while (size < 46) {
-                    src[size++] = 0;
-                }
-                
-                while (p != &src[size]) {
-                    CRC(fcs, *p++);
-                }
-                ((uint32_t *)&src[size])[0] = htonl(fcs);
-                size += 4; /* FCS at end of packet */
-            } else size += 4;
+	    memset(src + size, 0, pad); 
+            size += pad;
 
 #ifdef PCNET_DEBUG_MATCH
             PRINT_PKTHDR(buf);
 #endif
 
-            RMDLOAD(&rmd, PHYSADDR(s,crda));
-            /*if (!CSR_LAPPEN(s))*/
-                rmd.rmd1.stp = 1;
+	    s->crmd.rmd1.stp = 1;
+	    do {
+		int count = MIN(4096 - s->crmd.rmd1.bcnt,size);
+		target_phys_addr_t rbadr = PHYSADDR(s, s->crmd.rmd0.rbadr);
+		cpu_physical_memory_write(rbadr, src, count);
+		cpu_physical_memory_set_dirty(rbadr);
+		cpu_physical_memory_set_dirty(rbadr+count);
+		src += count; size -= count;
+		if (size > 0 && s->nrmd.rmd1.own) {
+		    RMDSTORE(&(s->crmd), PHYSADDR(s,crda));
+		    crda = nrda;
+		    nrda = nnrda;
+		    s->crmd = s->nrmd;
+		    s->nrmd = s->nnrmd;
+		    s->nnrmd.rmd1.own = 0;
+		}
+		pktcount++;
+	    } while (size > 0 && s->crmd.rmd1.own);
 
-#define PCNET_RECV_STORE() do {                                 \
-    int count = MIN(4096 - rmd.rmd1.bcnt,size);                 \
-    target_phys_addr_t rbadr = PHYSADDR(s, rmd.rmd0.rbadr);     \
-    cpu_physical_memory_write(rbadr, src, count);               \
-    cpu_physical_memory_set_dirty(rbadr);                       \
-    cpu_physical_memory_set_dirty(rbadr+count);                 \
-    src += count; size -= count;                                \
-    rmd.rmd2.mcnt = count; rmd.rmd1.own = 0;                    \
-    RMDSTORE(&rmd, PHYSADDR(s,crda));                           \
-    pktcount++;                                                 \
-} while (0)
-
-            PCNET_RECV_STORE();
-            if ((size > 0) && CSR_NRDA(s)) {
-                target_phys_addr_t nrda = CSR_NRDA(s);
-                RMDLOAD(&rmd, PHYSADDR(s,nrda));
-                if (rmd.rmd1.own) {
-                    crda = nrda;
-                    PCNET_RECV_STORE();
-                    if ((size > 0) && (nrda=CSR_NNRD(s))) {
-                        RMDLOAD(&rmd, PHYSADDR(s,nrda));
-                        if (rmd.rmd1.own) {
-                            crda = nrda;
-                            PCNET_RECV_STORE();
-                        }
-                    }
-                }                
-            }
-
-#undef PCNET_RECV_STORE
-
-            RMDLOAD(&rmd, PHYSADDR(s,crda));
             if (size == 0) {
-                rmd.rmd1.enp = 1;
-                rmd.rmd1.pam = !CSR_PROM(s) && is_padr;
-                rmd.rmd1.lafm = !CSR_PROM(s) && is_ladr;
-                rmd.rmd1.bam = !CSR_PROM(s) && is_bcast;
+                s->crmd.rmd1.enp = 1;
+		s->crmd.rmd2.mcnt = packet_size;
+                s->crmd.rmd1.pam = !CSR_PROM(s) && is_padr;
+                s->crmd.rmd1.lafm = !CSR_PROM(s) && is_ladr;
+                s->crmd.rmd1.bam = !CSR_PROM(s) && is_bcast;
             } else {
-                rmd.rmd1.oflo = 1;
-                rmd.rmd1.buff = 1;
-                rmd.rmd1.err = 1;
+                s->crmd.rmd1.oflo = 1;
+                s->crmd.rmd1.buff = 1;
+                s->crmd.rmd1.err = 1;
             }
-            RMDSTORE(&rmd, PHYSADDR(s,crda));
+            RMDSTORE(&(s->crmd), PHYSADDR(s,crda));
             s->csr[0] |= 0x0400;
+	    s->crmd = s->nrmd;
+	    s->nrmd = s->nnrmd;
+	    s->nnrmd.rmd1.own = 0;
 
 #ifdef PCNET_DEBUG
             printf("RCVRC=%d CRDA=0x%08x BLKS=%d\n", 
                 CSR_RCVRC(s), PHYSADDR(s,CSR_CRDA(s)), pktcount);
 #endif
 #ifdef PCNET_DEBUG_RMD
-            PRINT_RMD(&rmd);
+            PRINT_RMD(&s->crmd);
 #endif        
 
             while (pktcount--) {
@@ -551,80 +476,88 @@ static void pcnet_receive(void *opaque, const uint8_t *buf, int size)
 
 static void pcnet_transmit(PCNetState *s)
 {
-    target_phys_addr_t xmit_cxda = 0;
+    target_phys_addr_t start_addr = 0;
+    struct pcnet_TMD start_tmd;
     int count = CSR_XMTRL(s)-1;
-    s->xmit_pos = -1;
+    int xmit_pos = 0;
+    int len;
+
     
     if (!CSR_TXON(s)) {
         s->csr[0] &= ~0x0008;
         return;
     }
     
-    txagain:
-    if (pcnet_tdte_poll(s)) {
-        struct pcnet_TMD tmd;
-
-        TMDLOAD(&tmd, PHYSADDR(s,CSR_CXDA(s)));                
+    while (pcnet_tdte_poll(s)) {
 
 #ifdef PCNET_DEBUG_TMD
         printf("  TMDLOAD 0x%08x\n", PHYSADDR(s,CSR_CXDA(s)));
-        PRINT_TMD(&tmd);
+        PRINT_TMD(&(s->tmd));
 #endif
-        if (tmd.tmd1.stp) {
-            s->xmit_pos = 0;                
-            if (!tmd.tmd1.enp) {
-                cpu_physical_memory_read(PHYSADDR(s, tmd.tmd0.tbadr),
-                        s->buffer, 4096 - tmd.tmd1.bcnt);
-                s->xmit_pos += 4096 - tmd.tmd1.bcnt;
-            } 
-            xmit_cxda = PHYSADDR(s,CSR_CXDA(s));
-        }
-        if (tmd.tmd1.enp && (s->xmit_pos >= 0)) {
-            cpu_physical_memory_read(PHYSADDR(s, tmd.tmd0.tbadr),
-                    s->buffer + s->xmit_pos, 4096 - tmd.tmd1.bcnt);
-            s->xmit_pos += 4096 - tmd.tmd1.bcnt;
-
-	    tmd.tmd1.own = 0;
-	    TMDSTORE(&tmd, PHYSADDR(s,CSR_CXDA(s)));
-
-#ifdef PCNET_DEBUG
-            printf("pcnet_transmit size=%d\n", s->xmit_pos);
-#endif            
-            if (CSR_LOOP(s))
-                pcnet_receive(s, s->buffer, s->xmit_pos);
-            else
-                qemu_send_packet(s->nd, s->buffer, s->xmit_pos);
-
-            s->csr[0] &= ~0x0008;   /* clear TDMD */
-            s->csr[4] |= 0x0004;    /* set TXSTRT */
-            s->xmit_pos = -1;
-        } else {
-	    tmd.tmd1.own = 0;
-	    TMDSTORE(&tmd, PHYSADDR(s,CSR_CXDA(s)));
-	}
-        if (!CSR_TOKINTD(s) || (CSR_LTINTEN(s) && tmd.tmd1.ltint))
-            s->csr[0] |= 0x0200;    /* set TINT */
-
-        if (CSR_XMTRC(s)<=1)
+	len = 4096 - s->tmd.tmd1.bcnt;
+        if (CSR_XMTRC(s) <= 1)
             CSR_XMTRC(s) = CSR_XMTRL(s);
         else
             CSR_XMTRC(s)--;
-        if (count--)
-            goto txagain;
 
-    } else 
-    if (s->xmit_pos >= 0) {
-        struct pcnet_TMD tmd;
-        TMDLOAD(&tmd, PHYSADDR(s,xmit_cxda));                
-        tmd.tmd2.buff = tmd.tmd2.uflo = tmd.tmd1.err = 1;
-        tmd.tmd1.own = 0;
-        TMDSTORE(&tmd, PHYSADDR(s,xmit_cxda));
+	/* handle start followed by start */
+        if (s->tmd.tmd1.stp && start_addr) {
+	    TMDSTORE(&start_tmd, start_addr);
+	    start_addr = 0;
+	    xmit_pos = 0;
+	}
+	if ((xmit_pos + len) < sizeof(s->tx_buffer)) {
+	    cpu_physical_memory_read(PHYSADDR(s, s->tmd.tmd0.tbadr),
+			s->tx_buffer + xmit_pos, len);
+	    xmit_pos += len;
+	} else {
+	    s->tmd.tmd2.buff = s->tmd.tmd2.uflo = s->tmd.tmd1.err = 1;
+	    TMDSTORE(&(s->tmd), PHYSADDR(s,CSR_CXDA(s)));
+	    if (start_addr == PHYSADDR(s,CSR_CXDA(s)))
+	    	start_addr = 0;		/* don't clear own bit twice */
+	    continue;
+	}
+        if (s->tmd.tmd1.stp) {
+	    if (s->tmd.tmd1.enp) {
+		if (CSR_LOOP(s))
+		    pcnet_receive(s, s->tx_buffer, xmit_pos);
+		else
+		    qemu_send_packet(s->nd, s->tx_buffer, xmit_pos);
+
+		s->csr[4] |= 0x0008;    /* set TXSTRT */
+		TMDSTORE(&(s->tmd), PHYSADDR(s,CSR_CXDA(s)));
+		xmit_pos = 0;
+		count--;
+	    } else {
+	        start_tmd = s->tmd;
+		start_addr = PHYSADDR(s,CSR_CXDA(s));
+	    }
+        } else if (s->tmd.tmd1.enp) {
+	    TMDSTORE(&(s->tmd), PHYSADDR(s,CSR_CXDA(s)));
+	    if (start_addr) {
+		TMDSTORE(&start_tmd, start_addr);
+	    }
+	    start_addr = 0;
+	    xmit_pos = 0;
+	    count--;
+
+        } else {
+	    TMDSTORE(&(s->tmd), PHYSADDR(s,CSR_CXDA(s)));
+	}
+        if (!CSR_TOKINTD(s) || (CSR_LTINTEN(s) && s->tmd.tmd1.ltint))
+            s->csr[0] |= 0x0200;    /* set TINT */
+
+        if (count <= 0)
+            break;
+
+    }
+    if (start_addr) {
+        start_tmd.tmd2.buff = start_tmd.tmd2.uflo = start_tmd.tmd1.err = 1;
+        TMDSTORE(&start_tmd, PHYSADDR(s,start_addr));
         s->csr[0] |= 0x0200;    /* set TINT */
         if (!CSR_DXSUFLO(s)) {
             s->csr[0] &= ~0x0010;
-        } else
-        if (count--)
-          goto txagain;
+        }
     }
 }
 

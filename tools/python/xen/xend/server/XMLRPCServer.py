@@ -23,35 +23,21 @@ from xen.xend import XendDomain, XendDomainInfo, XendNode, \
 from xen.util.xmlrpclib2 import UnixXMLRPCServer, TCPXMLRPCServer
 
 from xen.xend.XendClient import XML_RPC_SOCKET, ERROR_INVALID_DOMAIN
+from xen.xend.XendError import *
 
 def lookup(domid):
-    try:
-        return XendDomain.instance().domain_lookup_by_name_or_id(domid)
-    except exn:
-        log.exception(exn)
-        raise exn
+    info = XendDomain.instance().domain_lookup_by_name_or_id(domid)
+    if not info:
+        raise XendInvalidDomain(str(domid))
+    return info
 
 def dispatch(domid, fn, args):
     info = lookup(domid)
-    if info:
-        try:
-            return getattr(info, fn)(*args)
-        except exn:
-            log.exception(exn)
-            raise exn
-    else:
-        raise xmlrpclib.Fault(ERROR_INVALID_DOMAIN, domid)
+    return getattr(info, fn)(*args)
 
 def domain(domid):
     info = lookup(domid)
-    if info:
-        try:
-            return info.sxpr()
-        except exn:
-            log.exception(exn)
-            raise exn
-    else:
-        raise xmlrpclib.Fault(ERROR_INVALID_DOMAIN, domid)
+    return info.sxpr()
 
 def domains(detail=1):
     if detail < 1:
@@ -90,7 +76,7 @@ class XMLRPCServer:
         if self.use_tcp:
             # bind to something fixed for now as we may eliminate
             # tcp support completely.
-            self.server = TCPXMLRPCServer(("localhost", 8005, False))
+            self.server = TCPXMLRPCServer(("localhost", 8005), logRequests=False)
         else:
             self.server = UnixXMLRPCServer(XML_RPC_SOCKET, False)
 

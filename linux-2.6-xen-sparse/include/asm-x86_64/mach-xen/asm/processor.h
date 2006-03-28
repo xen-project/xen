@@ -141,31 +141,21 @@ extern unsigned long mmu_cr4_features;
 static inline void set_in_cr4 (unsigned long mask)
 {
 	mmu_cr4_features |= mask;
-	switch (mask) {
-	case X86_CR4_OSFXSR:
-	case X86_CR4_OSXMMEXCPT:
-		break;
-	default:
-		do {
-			const char *msg = "Xen unsupported cr4 update\n";
-			(void)HYPERVISOR_console_io(
-				CONSOLEIO_write, __builtin_strlen(msg),
-				(char *)msg);
-			BUG();
-		} while (0);
-	}
+	__asm__("movq %%cr4,%%rax\n\t"
+		"orq %0,%%rax\n\t"
+		"movq %%rax,%%cr4\n"
+		: : "irg" (mask)
+		:"ax");
 }
 
 static inline void clear_in_cr4 (unsigned long mask)
 {
-#ifndef CONFIG_XEN
 	mmu_cr4_features &= ~mask;
 	__asm__("movq %%cr4,%%rax\n\t"
 		"andq %0,%%rax\n\t"
 		"movq %%rax,%%cr4\n"
 		: : "irg" (~mask)
 		:"ax");
-#endif
 }
 
 

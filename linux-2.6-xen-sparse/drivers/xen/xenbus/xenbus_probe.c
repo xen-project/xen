@@ -1039,8 +1039,7 @@ static int __init xenbus_probe_init(void)
 		xsd_port_intf = create_xen_proc_entry("xsd_port", 0400);
 		if (xsd_port_intf)
 			xsd_port_intf->read_proc = xsd_port_read;
-	}
-	else
+	} else
 		xenstored_ready = 1;
 
 	/* Initialize the interface to xenstore. */

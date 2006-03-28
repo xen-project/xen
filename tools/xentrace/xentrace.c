@@ -498,7 +498,7 @@ int main(int argc, char **argv)
     }
 
     if ( opts.outfile )
-        outfd = open(opts.outfile, O_WRONLY | O_CREAT);
+        outfd = open(opts.outfile, O_WRONLY | O_CREAT | O_LARGEFILE, 0644);
 
     if(outfd < 0)
     {
