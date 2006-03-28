@@ -1263,11 +1263,6 @@ static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs)
 
         /* Need the original rip, here. */
         addr = svm_get_io_address(vmcb, regs, dir, real);
-        /* 
-         * On SVM, the RIP of the intruction following the IN/OUT is saved in
-         * ExitInfo2
-         */
-        vmcb->rip = vmcb->exitinfo2;
 
         /* "rep" prefix */
         if (info.fields.rep) 
@@ -1300,6 +1295,8 @@ static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs)
                 else
                     count = (addr & ~PAGE_MASK) / size;
             }
+            else    
+                vmcb->rip = vmcb->exitinfo2;
 
             send_pio_req(regs, port, count, size, addr, dir, 1);
         }
