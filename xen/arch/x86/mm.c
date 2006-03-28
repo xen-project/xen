@@ -1528,10 +1528,9 @@ int get_page_type(struct page_info *page, unsigned long type)
                     nx &= ~PGT_va_mask;
                     nx |= type; /* we know the actual type is correct */
                 }
-                else
+                else if ( (type & PGT_va_mask) != PGT_va_mutable )
                 {
                     ASSERT((type & PGT_va_mask) != (x & PGT_va_mask));
-                    ASSERT((type & PGT_va_mask) != PGT_va_mutable);
 #ifdef CONFIG_X86_PAE
                     /* We use backptr as extra typing. Cannot be unknown. */
                     if ( (type & PGT_type_mask) == PGT_l2_page_table )
