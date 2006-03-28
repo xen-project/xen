@@ -55,8 +55,17 @@ struct xenbus_watch
 	/* Callback (executed in a process context with no locks held). */
 	void (*callback)(struct xenbus_watch *,
 			 const char **vec, unsigned int len);
+
+	/* See XBWF_ definitions below. */
+	unsigned long flags;
 };
 
+/*
+ * Execute callback in its own kthread. Useful if the callback is long
+ * running or heavily serialised, to avoid taking out the main xenwatch thread
+ * for a long period of time (or even unwittingly causing a deadlock).
+ */
+#define XBWF_new_thread	1
 
 /* A xenbus device. */
 struct xenbus_device {
