@@ -462,7 +462,7 @@ vector=0
 ENTRY(irq_entries_start)
 .rept NR_IRQS
 	ALIGN
-1:	pushl $vector-256
+1:	pushl 0x80000000+$vector
 	jmp common_interrupt
 .data
 	.long 1b
@@ -479,7 +479,7 @@ common_interrupt:
 
 #define BUILD_INTERRUPT(name, nr)	\
 ENTRY(name)				\
-	pushl $nr-256;			\
+	pushl 0x80000000+$nr;		\
 	SAVE_ALL			\
 	movl %esp,%eax;			\
 	call smp_/**/name;		\
