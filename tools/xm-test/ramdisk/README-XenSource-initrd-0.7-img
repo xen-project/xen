@@ -1,11 +1,12 @@
 XenSource xm-test 0.7 initrd.img
 ================================
 
-initrd-0.7.img is an initrd suitable for use with Xen's xm-test regression
-testing suite.  It has been built and provided by XenSource, for the
-convenience of Xen users.  xm-test initrds may be mixed across minor xm-test
-versions, but not across major versions; this initrd is suitable for all 0.7.x
-versions of xm-test (as shipped with Xen 3.0.x).
+http://xm-test.xensource.com/ramdisks/initrd-0.7.img is an initrd suitable for
+use with Xen's xm-test regression testing suite.  It has been built and
+provided by XenSource, for the convenience of Xen users.  xm-test initrds may
+be mixed across minor xm-test versions, but not across major versions; this
+initrd is suitable for all 0.7.x versions of xm-test (as shipped with Xen
+3.0.x).
 
 In order to use this initrd, run "./autogen; ./configure; make existing"
 inside the xm-test directory, and the initrd will be downloaded automatically.
@@ -20,10 +21,12 @@ included in full inside the file
 http://xm-test.xensource.com/ramdisks/initrd.0.7.img-buildroot.tar.bz2, or
 alongside this file.  Copyright statements and licences are contained therein.
 The remaining source code is included in the Xen distribution, at
-http://www.xensource.com/xen/downloads/archives.html.  The configuration used
-for BusyBox is available as
-http://xm-test.xensource.com/ramdisks/initrd-0.7-busybox-config, or alongside
-this file.
+http://www.xensource.com/xen/downloads/archives.html.  The configurations used
+for BusyBox, uClibc, and Buildroot are available as
+http://xm-test.xensource.com/ramdisks/initrd-0.7-busybox-config,
+http://xm-test.xensource.com/ramdisks/initrd-0.7-uClibc-config, and
+http://xm-test.xensource.com/ramdisks/initrd-0.7-buildroot-config
+respectively, or alongside this file.
 
 XenSource and the Xen contributors are grateful to the authors of these
 software packages for their contributions to free and open-source software.
