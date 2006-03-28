@@ -81,7 +81,8 @@ class XendDomain:
             # that we're sure that we haven't missed any releases, but inside
             # the domains_lock, as we don't want the watch to fire until after
             # the refresh call has completed.
-            xswatch("@releaseDomain", self.onReleaseDomain)
+            xswatch("@introduceDomain", self.onChangeDomain)
+            xswatch("@releaseDomain",   self.onChangeDomain)
             
             self.refresh(True)
         finally:
@@ -121,7 +122,7 @@ class XendDomain:
 
     ## private:
 
-    def onReleaseDomain(self, _):
+    def onChangeDomain(self, _):
         self.domains_lock.acquire()
         try:
             self.refresh()
