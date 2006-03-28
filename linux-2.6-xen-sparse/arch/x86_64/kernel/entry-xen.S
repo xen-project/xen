@@ -855,32 +855,12 @@ ecrit:  /**** END OF CRITICAL REGION ****/
 # i.e. it just resumes from the next instruction interrupted with the same context. 
 	
 # Hypervisor uses this for application faults while it executes.
+# Unlike i386 there is no need to reload the saved segment selectors:
+# Xen already reloaded all valid ones and zeroed the others.
 ENTRY(failsafe_callback)
-	addq $0x10,%rsp /* skip rcx and r11 */	
-1:	mov  (%rsp),%ds
-2:	mov  8(%rsp),%es
-3:	mov  16(%rsp),%fs
-4:	mov  24(%rsp),%gs
-	addq $0x20,%rsp /* skip the above selectors */		
+	addq $0x30,%rsp /* skip %rcx,%r11,%ds,%es,%fs,%gs */
 	SAVE_ALL
 	jmp  error_exit
-.section .fixup,"ax";	\
-6:	movq $0,(%rsp);	\
-	jmp 1b;		\
-7:	movq $0,8(%rsp);	\
-	jmp 2b;		\
-8:	movq $0,16(%rsp);	\
-	jmp 3b;		\
-9:	movq $0,24(%rsp);	\
-	jmp 4b;		\
-.previous;		\
-.section __ex_table,"a";\
-	.align 16;	\
-	.quad 1b,6b;	\
-	.quad 2b,7b;	\
-	.quad 3b,8b;	\
-	.quad 4b,9b;	\
-.previous
  
 #if 0	      
         .section __ex_table,"a"
