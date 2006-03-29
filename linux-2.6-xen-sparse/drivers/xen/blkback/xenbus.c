@@ -253,15 +253,20 @@ static void frontend_changed(struct xenbus_device *dev,
 
 	switch (frontend_state) {
 	case XenbusStateInitialising:
-	case XenbusStateConnected:
 		break;
 
 	case XenbusStateInitialised:
+	case XenbusStateConnected:
+		/* Ensure we connect even when two watches fire in 
+		   close successsion and we miss the intermediate value 
+		   of frontend_state. */
+		if (dev->state == XenbusStateConnected)
+			break;
+
 		err = connect_ring(be);
-		if (err) {
-			return;
-		}
-		update_blkif_status(be->blkif); 
+		if (err)
+			break;
+		update_blkif_status(be->blkif);
 		break;
 
 	case XenbusStateClosing:
