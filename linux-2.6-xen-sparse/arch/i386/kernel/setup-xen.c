@@ -1633,9 +1633,9 @@ void __init setup_arch(char **cmdline_p)
 	physdev_op_t op;
 	unsigned long max_low_pfn;
 
-	/* Force a quick death if the kernel panics. */
+	/* Force a quick death if the kernel panics (not domain 0). */
 	extern int panic_timeout;
-	if (panic_timeout == 0)
+	if (!panic_timeout && !(xen_start_info->flags & SIF_INITDOMAIN))
 		panic_timeout = 1;
 
 	/* Register a call for panic conditions. */
