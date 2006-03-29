@@ -135,6 +135,8 @@ extern int set_p2m_entry(
     struct domain_mmap_cache *l1cache);
 extern void remove_shadow(struct domain *d, unsigned long gpfn, u32 stype);
 
+extern void free_shadow_page(unsigned long smfn);
+
 extern void shadow_l1_normal_pt_update(struct domain *d,
                                        paddr_t pa, l1_pgentry_t l1e,
                                        struct domain_mmap_cache *cache);
@@ -660,54 +662,12 @@ static inline void shadow_sync_and_drop_references(
     if ( likely(!shadow_mode_refcounts(d)) )
         return;
 
-    shadow_lock(d);
-
     if ( page_out_of_sync(page) )
         __shadow_sync_mfn(d, page_to_mfn(page));
 
     shadow_remove_all_access(d, page_to_mfn(page));
-
-    shadow_unlock(d);
 }
 #endif
-
-static inline void guest_physmap_add_page(
-    struct domain *d, unsigned long gpfn, unsigned long mfn)
-{
-    struct domain_mmap_cache c1, c2;
-
-    if ( likely(!shadow_mode_translate(d)) )
-        return;
-
-    domain_mmap_cache_init(&c1);
-    domain_mmap_cache_init(&c2);
-    shadow_lock(d);
-    shadow_sync_and_drop_references(d, mfn_to_page(mfn));
-    set_p2m_entry(d, gpfn, mfn, &c1, &c2);
-    set_gpfn_from_mfn(mfn, gpfn);
-    shadow_unlock(d);
-    domain_mmap_cache_destroy(&c1);
-    domain_mmap_cache_destroy(&c2);
-}
-
-static inline void guest_physmap_remove_page(
-    struct domain *d, unsigned long gpfn, unsigned long mfn)
-{
-    struct domain_mmap_cache c1, c2;
-
-    if ( likely(!shadow_mode_translate(d)) )
-        return;
-
-    domain_mmap_cache_init(&c1);
-    domain_mmap_cache_init(&c2);
-    shadow_lock(d);
-    shadow_sync_and_drop_references(d, mfn_to_page(mfn));
-    set_p2m_entry(d, gpfn, -1, &c1, &c2);
-    set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
-    shadow_unlock(d);
-    domain_mmap_cache_destroy(&c1);
-    domain_mmap_cache_destroy(&c2);
-}
 
 /************************************************************************/
 
@@ -738,8 +698,6 @@ get_shadow_ref(unsigned long smfn)
 
     return 1;
 }
-
-extern void free_shadow_page(unsigned long smfn);
 
 /*
  * Drop a shadow reference to smfn.
@@ -1521,6 +1479,46 @@ static inline void set_shadow_status(
         // permissions for a page...
         //
     }
+}
+
+/************************************************************************/
+
+static inline void guest_physmap_add_page(
+    struct domain *d, unsigned long gpfn, unsigned long mfn)
+{
+    struct domain_mmap_cache c1, c2;
+
+    if ( likely(!shadow_mode_translate(d)) )
+        return;
+
+    domain_mmap_cache_init(&c1);
+    domain_mmap_cache_init(&c2);
+    shadow_lock(d);
+    shadow_sync_and_drop_references(d, mfn_to_page(mfn));
+    set_p2m_entry(d, gpfn, mfn, &c1, &c2);
+    set_gpfn_from_mfn(mfn, gpfn);
+    shadow_unlock(d);
+    domain_mmap_cache_destroy(&c1);
+    domain_mmap_cache_destroy(&c2);
+}
+
+static inline void guest_physmap_remove_page(
+    struct domain *d, unsigned long gpfn, unsigned long mfn)
+{
+    struct domain_mmap_cache c1, c2;
+
+    if ( likely(!shadow_mode_translate(d)) )
+        return;
+
+    domain_mmap_cache_init(&c1);
+    domain_mmap_cache_init(&c2);
+    shadow_lock(d);
+    shadow_sync_and_drop_references(d, mfn_to_page(mfn));
+    set_p2m_entry(d, gpfn, -1, &c1, &c2);
+    set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
+    shadow_unlock(d);
+    domain_mmap_cache_destroy(&c1);
+    domain_mmap_cache_destroy(&c2);
 }
 
 /************************************************************************/
