@@ -6,21 +6,31 @@
 # for building (as all files in mv'd directories are thought by hg
 # to have been deleted).  I don't know how to avoid this right now,
 # but if someone has a better way, I'm all ears
-if [ ! -e mm.xen-x86 ]
-then
-	mv mm mm.xen-x86
-	mkdir mm
-	mv net net.xen-x86
-	mv kernel kernel.xen-x86
-	mv drivers/acpi/tables.c drivers/acpi/tables.c.xen-x86
-#	mv arch/xen/kernel drivers/xen/core
-#	mv arch/xen arch/xen.xen-x86
-#	mkdir arch/xen
-#	mv arch/xen.xen-x86/configs arch/xen
-#	mv include/asm-generic include/asm-generic.xen-x86
-	mv include/linux include/linux.xen-x86
-	mkdir include/linux
-fi
+
+function try_to_mv() {
+	if [ ! -e $2 ]
+	then
+		mv $1 $2
+	fi
+}
+
+function try_to_mkdir() {
+	if [ ! -e $2 ]
+	then
+		mv $1 $2
+		mkdir $1
+	fi
+}
+
+try_to_mkdir mm mm.xen-x86
+try_to_mv net net.xen-x86
+try_to_mv kernel kernel.xen-x86
+try_to_mv drivers/acpi/tables.c drivers/acpi/tables.c.xen-x86
+#try_to_mv arch/xen/kernel drivers/xen/core
+#try_to_mkdir arch/xen arch/xen.xen-x86
+#try_to_mv arch/xen.xen-x86/configs arch/xen
+#try_to_mv include/asm-generic include/asm-generic.xen-x86
+try_to_mkdir include/linux include/linux.xen-x86
 
 # need to grab a couple of xen-modified files for generic_page_range and
 # typedef pte_fn_t which are used by driver/xen blkif
