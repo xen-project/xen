@@ -2,7 +2,7 @@
  * Copied from arch/xen/i386/kernel/entry.S
  */                        
 /* Offsets into shared_info_t. */                
-#define evtchn_upcall_pending		0
+#define evtchn_upcall_pending		/* 0 */
 #define evtchn_upcall_mask		1
 
 #define sizeof_vcpu_shift		6
@@ -35,7 +35,6 @@
     				XEN_PUT_VCPU_INFO(reg)
 #define XEN_TEST_PENDING(reg)	testb $0xFF,evtchn_upcall_pending(reg)
 
-EVENT_MASK      = (CS+4)
 VGCF_IN_SYSCALL = (1<<8)
         
 	

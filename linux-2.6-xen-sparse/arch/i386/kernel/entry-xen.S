@@ -65,7 +65,6 @@ ES		= 0x20
 ORIG_EAX	= 0x24
 EIP		= 0x28
 CS		= 0x2C
-EVENT_MASK	= 0x2E
 EFLAGS		= 0x30
 OLDESP		= 0x34
 OLDSS		= 0x38
@@ -290,14 +289,14 @@ restore_all:
 restore_nocheck:
 #else
 restore_nocheck:
-	testl $(VM_MASK|NMI_MASK), EFLAGS(%esp)
+	movl EFLAGS(%esp), %eax
+	testl $(VM_MASK|NMI_MASK), %eax
 	jnz hypervisor_iret
-	movb EVENT_MASK(%esp), %al
-	notb %al			# %al == ~saved_mask
+	shr $9, %eax			# EAX[0] == IRET_EFLAGS.IF
 	GET_VCPU_INFO
 	andb evtchn_upcall_mask(%esi),%al
-	andb $1,%al			# %al == mask & ~saved_mask
-	jnz restore_all_enable_events	#     != 0 => reenable event delivery
+	andb $1,%al			# EAX[0] == IRET_EFLAGS.IF & event_mask
+	jnz restore_all_enable_events	#        != 0 => enable event delivery
 #endif
 	RESTORE_REGS
 	addl $4, %esp
@@ -555,14 +554,9 @@ scrit:	/**** START OF CRITICAL REGION ****/
 	RESTORE_REGS
 	addl $4, %esp
 1:	iret
-.section .fixup,"ax"
-2:	pushl $0
-	pushl $do_iret_error
-	jmp error_code
-.previous
 .section __ex_table,"a"
 	.align 4
-	.long 1b,2b
+	.long 1b,iret_exc
 .previous
 14:	__DISABLE_INTERRUPTS
 	jmp  11b
@@ -614,30 +608,51 @@ critical_fixup_table:
 	.byte 0x00,0x00			# jmp  11b
 
 # Hypervisor uses this for application faults while it executes.
+# We get here for two reasons:
+#  1. Fault while reloading DS, ES, FS or GS
+#  2. Fault while executing IRET
+# Category 1 we fix up by reattempting the load, and zeroing the segment
+# register if the load fails.
+# Category 2 we fix up by jumping to do_iret_error. We cannot use the
+# normal Linux return path in this case because if we use the IRET hypercall
+# to pop the stack frame we end up in an infinite loop of failsafe callbacks.
+# We distinguish between categories by maintaining a status value in EAX.
 ENTRY(failsafe_callback)
-1:	popl %ds
-2:	popl %es
-3:	popl %fs
-4:	popl %gs
-	subl $4,%esp
+	pushl %eax
+	movl $1,%eax
+1:	mov 4(%esp),%ds
+2:	mov 8(%esp),%es
+3:	mov 12(%esp),%fs
+4:	mov 16(%esp),%gs
+	testl %eax,%eax
+	popl %eax
+	jz 5f
+	addl $16,%esp		# EAX != 0 => Category 2 (Bad IRET)
+	jmp iret_exc
+5:	addl $16,%esp		# EAX == 0 => Category 1 (Bad segment)
+	pushl $0
 	SAVE_ALL
-	jmp  ret_from_exception
-.section .fixup,"ax";	\
-6:	movl $0,(%esp);	\
-	jmp 1b;		\
-7:	movl $0,(%esp);	\
-	jmp 2b;		\
-8:	movl $0,(%esp);	\
-	jmp 3b;		\
-9:	movl $0,(%esp);	\
-	jmp 4b;		\
-.previous;		\
-.section __ex_table,"a";\
-	.align 4;	\
-	.long 1b,6b;	\
-	.long 2b,7b;	\
-	.long 3b,8b;	\
-	.long 4b,9b;	\
+	jmp ret_from_exception
+.section .fixup,"ax";		\
+6:	xorl %eax,%eax;		\
+	movl %eax,4(%esp);	\
+	jmp 1b;			\
+7:	xorl %eax,%eax;		\
+	movl %eax,8(%esp);	\
+	jmp 2b;			\
+8:	xorl %eax,%eax;		\
+	movl %eax,12(%esp);	\
+	jmp 3b;			\
+9:	xorl %eax,%eax;		\
+	movl %eax,16(%esp);	\
+	jmp 4b;			\
+.previous;			\
+.section __ex_table,"a";	\
+	.align 4;		\
+	.long 1b,6b;		\
+	.long 2b,7b;		\
+	.long 3b,8b;		\
+	.long 4b,9b;		\
 .previous
 #endif
 

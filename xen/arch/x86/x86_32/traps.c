@@ -230,8 +230,8 @@ unsigned long do_iret(void)
     /* No longer in NMI context. */
     clear_bit(_VCPUF_nmi_masked, &current->vcpu_flags);
 
-    /* Restore upcall mask from saved value. */
-    current->vcpu_info->evtchn_upcall_mask = regs->saved_upcall_mask;
+    /* Restore upcall mask from supplied EFLAGS.IF. */
+    current->vcpu_info->evtchn_upcall_mask = !(eflags & X86_EFLAGS_IF);
 
     /*
      * The hypercall exit path will overwrite EAX with this return

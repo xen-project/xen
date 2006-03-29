@@ -520,13 +520,13 @@ retint_check:
 	CFI_REMEMBER_STATE
 	jnz  retint_careful
 retint_restore_args:
-        movb EVENT_MASK-REST_SKIP(%rsp), %al
-        notb %al			# %al == ~saved_mask
-        XEN_GET_VCPU_INFO(%rsi)
-        andb evtchn_upcall_mask(%rsi),%al
-	andb $1,%al			# %al == mask & ~saved_mask
-	jnz restore_all_enable_events	# != 0 => reenable event delivery      
-        XEN_PUT_VCPU_INFO(%rsi)
+	movl EFLAGS-REST_SKIP(%rsp), %eax
+	shr $9, %eax			# EAX[0] == IRET_EFLAGS.IF
+	XEN_GET_VCPU_INFO(%rsi)
+	andb evtchn_upcall_mask(%rsi),%al
+	andb $1,%al			# EAX[0] == IRET_EFLAGS.IF & event_mask
+	jnz restore_all_enable_events	#        != 0 => enable event delivery
+	XEN_PUT_VCPU_INFO(%rsi)
 		
 	RESTORE_ARGS 0,8,0
 	HYPERVISOR_IRET 0
@@ -803,12 +803,11 @@ ENTRY(hypervisor_callback)
 # So, on entry to the handler we detect whether we interrupted an
 # existing activation in its critical region -- if so, we pop the current
 # activation and restart the handler using the previous one.
-ENTRY(do_hypervisor_callback)   # do_hyperviosr_callback(struct *pt_regs)
+ENTRY(do_hypervisor_callback)   # do_hypervisor_callback(struct *pt_regs)
 # Since we don't modify %rdi, evtchn_do_upall(struct *pt_regs) will
 # see the correct pointer to the pt_regs
 	movq %rdi, %rsp            # we don't return, adjust the stack frame
-11:	movb $0, EVENT_MASK(%rdi)
-	movq %gs:pda_irqstackptr,%rax
+11:	movq %gs:pda_irqstackptr,%rax
 	incl %gs:pda_irqcount
 	cmovzq %rax,%rsp
 	pushq %rdi
@@ -853,15 +852,44 @@ ecrit:  /**** END OF CRITICAL REGION ****/
 # When the kernel is interrupted in the critical section, the kernel 
 # will do IRET in that case, and everything will be restored at that point, 
 # i.e. it just resumes from the next instruction interrupted with the same context. 
-	
+
 # Hypervisor uses this for application faults while it executes.
-# Unlike i386 there is no need to reload the saved segment selectors:
-# Xen already reloaded all valid ones and zeroed the others.
+# We get here for two reasons:
+#  1. Fault while reloading DS, ES, FS or GS
+#  2. Fault while executing IRET
+# Category 1 we do not need to fix up as Xen has already reloaded all segment
+# registers that could be reloaded and zeroed the others.
+# Category 2 we fix up by killing the current process. We cannot use the
+# normal Linux return path in this case because if we use the IRET hypercall
+# to pop the stack frame we end up in an infinite loop of failsafe callbacks.
+# We distinguish between categories by comparing each saved segment register
+# with its current contents: any discrepancy means we in category 1.
 ENTRY(failsafe_callback)
-	addq $0x30,%rsp /* skip %rcx,%r11,%ds,%es,%fs,%gs */
+	movw %ds,%cx
+	cmpw %cx,0x10(%rsp)
+	jne 1f
+	movw %es,%cx
+	cmpw %cx,0x18(%rsp)
+	jne 1f
+	movw %fs,%cx
+	cmpw %cx,0x20(%rsp)
+	jne 1f
+	movw %gs,%cx
+	cmpw %cx,0x28(%rsp)
+	jne 1f
+	/* All segments match their saved values => Category 2 (Bad IRET). */
+	movq (%rsp),%rcx
+	movq 8(%rsp),%r11
+	addq $0x30,%rsp
+	movq $-9999,%rdi	/* better code? */
+	jmp do_exit			
+1:	/* Segment mismatch => Category 1 (Bad segment). Retry the IRET. */
+	movq (%rsp),%rcx
+	movq 8(%rsp),%r11
+	addq $0x30,%rsp
+	pushq $0
 	SAVE_ALL
-	jmp  error_exit
- 
+	jmp error_exit
 #if 0	      
         .section __ex_table,"a"
         .align 8

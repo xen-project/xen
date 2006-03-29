@@ -44,7 +44,6 @@ void __dummy__(void)
     OFFSET(UREGS_eflags, struct cpu_user_regs, eflags);
     OFFSET(UREGS_error_code, struct cpu_user_regs, error_code);
     OFFSET(UREGS_entry_vector, struct cpu_user_regs, entry_vector);
-    OFFSET(UREGS_saved_upcall_mask, struct cpu_user_regs, saved_upcall_mask);
     OFFSET(UREGS_kernel_sizeof, struct cpu_user_regs, esp);
     DEFINE(UREGS_user_sizeof, sizeof(struct cpu_user_regs));
     BLANK();
