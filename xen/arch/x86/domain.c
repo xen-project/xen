@@ -208,6 +208,11 @@ void dump_pageframe_info(struct domain *d)
     }
 }
 
+void set_current_execstate(struct vcpu *v)
+{
+    percpu_ctxt[smp_processor_id()].curr_vcpu = v;
+}
+
 struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 {
     struct vcpu *v;
@@ -219,15 +224,8 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 
     v->arch.flags = TF_kernel_mode;
 
-    if ( is_idle_domain(d) )
-    {
-        percpu_ctxt[vcpu_id].curr_vcpu = v;
-        v->arch.schedule_tail = continue_idle_domain;
-    }
-    else
-    {
-        v->arch.schedule_tail = continue_nonidle_domain;
-    }
+    v->arch.schedule_tail = is_idle_domain(d) ?
+        continue_idle_domain : continue_nonidle_domain;
 
     v->arch.ctxt_switch_from = paravirt_ctxt_switch_from;
     v->arch.ctxt_switch_to   = paravirt_ctxt_switch_to;

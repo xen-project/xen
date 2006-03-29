@@ -441,7 +441,7 @@ void __devinit smp_callin(void)
 	calibrate_tsc_ap();
 }
 
-static int cpucount;
+static int cpucount, booting_cpu;
 
 /* representing cpus for which sibling maps can be computed */
 static cpumask_t cpu_sibling_setup_map;
@@ -524,12 +524,13 @@ void __devinit start_secondary(void *unused)
 	 * booting is too fragile that we want to limit the
 	 * things done here to the most necessary things.
 	 */
-	unsigned int cpu = cpucount;
+	unsigned int cpu = booting_cpu;
 
 	extern void percpu_traps_init(void);
 
-	set_current(idle_vcpu[cpu]);
 	set_processor_id(cpu);
+	set_current(idle_vcpu[cpu]);
+	set_current_execstate(idle_vcpu[cpu]);
 
 	percpu_traps_init();
 
@@ -889,6 +890,8 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	int vcpu_id;
 
 	++cpucount;
+
+	booting_cpu = cpu;
 
 	if ((vcpu_id = cpu % MAX_VIRT_CPUS) == 0) {
 		d = domain_create(IDLE_DOMAIN_ID, cpu);

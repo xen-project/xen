@@ -53,4 +53,6 @@ static inline struct cpu_info *get_cpu_info(void)
 
 #define schedule_tail(_ed) (((_ed)->arch.schedule_tail)(_ed))
 
+extern void set_current_execstate(struct vcpu *v);
+
 #endif /* __X86_CURRENT_H__ */
