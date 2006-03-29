@@ -51,6 +51,10 @@ CFLAGS-$(crash_debug)  += -DCRASH_DEBUG
 CFLAGS-$(perfc)        += -DPERF_COUNTERS
 CFLAGS-$(perfc_arrays) += -DPERF_ARRAYS
 
+ifneq ($(max_phys_cpus),)
+CFLAGS-y               += -DMAX_PHYS_CPUS=$(max_phys_cpus)
+endif
+
 ALL_OBJS := $(ALL_OBJS-y)
 CFLAGS   := $(strip $(CFLAGS) $(CFLAGS-y))
 

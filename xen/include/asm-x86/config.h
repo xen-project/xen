@@ -35,7 +35,15 @@
 
 #define OPT_CONSOLE_STR "com1,vga"
 
+#ifdef MAX_PHYS_CPUS
+#define NR_CPUS MAX_PHYS_CPUS
+#else
 #define NR_CPUS 32
+#endif
+
+#if defined(__i386__) && (NR_CPUS > 32)
+#error "Maximum of 32 physical processors supported by Xen on x86_32"
+#endif
 
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
 # define supervisor_mode_kernel (1)

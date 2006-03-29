@@ -880,18 +880,30 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
  * Returns zero if CPU booted OK, else error code from wakeup_secondary_cpu.
  */
 {
-	struct vcpu *v;
 	unsigned long boot_error;
 	int timeout;
 	unsigned long start_eip;
 	unsigned short nmi_high = 0, nmi_low = 0;
+	struct domain *d;
+	struct vcpu *v;
+	int vcpu_id;
 
 	++cpucount;
 
-	v = idle_vcpu[cpu] = alloc_vcpu(idle_vcpu[0]->domain, cpu, cpu);
-        BUG_ON(v == NULL);
+	if ((vcpu_id = cpu % MAX_VIRT_CPUS) == 0) {
+		d = domain_create(IDLE_DOMAIN_ID, cpu);
+		BUG_ON(d == NULL);
+		v = d->vcpu[0];
+	} else {
+		d = idle_vcpu[cpu - vcpu_id]->domain;
+		BUG_ON(d == NULL);
+		v = alloc_vcpu(d, vcpu_id, cpu);
+	}
 
-        v->arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
+	idle_vcpu[cpu] = v;
+	BUG_ON(v == NULL);
+
+	v->arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
 
 	/* start_eip had better be page-aligned! */
 	start_eip = setup_trampoline();
