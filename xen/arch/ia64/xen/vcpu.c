@@ -172,10 +172,10 @@ void vcpu_set_metaphysical_mode(VCPU *vcpu, BOOLEAN newmode)
 {
 	/* only do something if mode changes */
 	if (!!newmode ^ !!PSCB(vcpu,metaphysical_mode)) {
+		PSCB(vcpu,metaphysical_mode) = newmode;
 		if (newmode) set_metaphysical_rr0();
 		else if (PSCB(vcpu,rrs[0]) != -1)
 			set_one_rr(0, PSCB(vcpu,rrs[0]));
-		PSCB(vcpu,metaphysical_mode) = newmode;
 	}
 }
 
