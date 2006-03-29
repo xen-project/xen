@@ -253,6 +253,7 @@ static void frontend_changed(struct xenbus_device *dev,
 
 	switch (frontend_state) {
 	case XenbusStateInitialising:
+	case XenbusStateConnected:
 		break;
 
 	case XenbusStateInitialised:

@@ -662,10 +662,14 @@ static inline void shadow_sync_and_drop_references(
     if ( likely(!shadow_mode_refcounts(d)) )
         return;
 
+    shadow_lock(d);
+
     if ( page_out_of_sync(page) )
         __shadow_sync_mfn(d, page_to_mfn(page));
 
     shadow_remove_all_access(d, page_to_mfn(page));
+
+    shadow_unlock(d);
 }
 #endif
 
@@ -698,6 +702,46 @@ get_shadow_ref(unsigned long smfn)
 
     return 1;
 }
+
+    shadow_sync_and_drop_references(d, mfn_to_page(mfn));
+    set_p2m_entry(d, gpfn, -1, &c1, &c2);
+    set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
+    shadow_unlock(d);
+    domain_mmap_cache_destroy(&c1);
+    domain_mmap_cache_destroy(&c2);
+}
+
+/************************************************************************/
+
+/*
+ * Add another shadow reference to smfn.
+ */
+static inline int
+get_shadow_ref(unsigned long smfn)
+{
+    u32 x, nx;
+
+    ASSERT(mfn_valid(smfn));
+
+    x = mfn_to_page(smfn)->count_info;
+    nx = x + 1;
+
+    if ( unlikely(nx == 0) )
+    {
+        printk("get_shadow_ref overflow, gmfn=%" PRtype_info  " smfn=%lx\n",
+               mfn_to_page(smfn)->u.inuse.type_info & PGT_mfn_mask,
+               smfn);
+        BUG();
+    }
+    
+    // Guarded by the shadow lock...
+    //
+    mfn_to_page(smfn)->count_info = nx;
+
+    return 1;
+}
+
+extern void free_shadow_page(unsigned long smfn);
 
 /*
  * Drop a shadow reference to smfn.
