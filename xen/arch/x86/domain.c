@@ -226,13 +226,6 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 
     v->arch.schedule_tail = is_idle_domain(d) ?
         continue_idle_domain : continue_nonidle_domain;
-        percpu_ctxt[vcpu_id].curr_vcpu = v;
-        v->arch.schedule_tail = continue_idle_domain;
-    }
-    else
-    {
-        v->arch.schedule_tail = continue_nonidle_domain;
-    }
 
     v->arch.ctxt_switch_from = paravirt_ctxt_switch_from;
     v->arch.ctxt_switch_to   = paravirt_ctxt_switch_to;

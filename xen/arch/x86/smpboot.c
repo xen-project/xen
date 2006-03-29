@@ -881,7 +881,6 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
  * Returns zero if CPU booted OK, else error code from wakeup_secondary_cpu.
  */
 {
-	struct vcpu *v;
 	unsigned long boot_error;
 	int timeout;
 	unsigned long start_eip;
