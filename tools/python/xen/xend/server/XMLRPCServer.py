@@ -24,6 +24,7 @@ from xen.util.xmlrpclib2 import UnixXMLRPCServer, TCPXMLRPCServer
 
 from xen.xend.XendClient import XML_RPC_SOCKET, ERROR_INVALID_DOMAIN
 from xen.xend.XendError import *
+from types import ListType
 
 def lookup(domid):
     info = XendDomain.instance().domain_lookup_by_name_or_id(domid)
@@ -35,24 +36,36 @@ def dispatch(domid, fn, args):
     info = lookup(domid)
     return getattr(info, fn)(*args)
 
+# vcpu_avail is a long and is not needed by the clients.  It's far easier
+# to just remove it then to try and marshal the long.
+def fixup_sxpr(sexpr):
+    ret = []
+    for k in sexpr:
+        if type(k) is ListType:
+            if len(k) != 2 or k[0] != 'vcpu_avail':
+                ret.append(fixup_sxpr(k))
+        else:
+            ret.append(k)
+    return ret
+
 def domain(domid):
     info = lookup(domid)
-    return info.sxpr()
+    return fixup_sxpr(info.sxpr())
 
 def domains(detail=1):
     if detail < 1:
         return XendDomain.instance().list_names()
     else:
         domains = XendDomain.instance().list_sorted()
-        return map(lambda dom: dom.sxpr(), domains)
+        return map(lambda dom: fixup_sxpr(dom.sxpr()), domains)
 
 def domain_create(config):
     info = XendDomain.instance().domain_create(config)
-    return info.sxpr()
+    return fixup_sxpr(info.sxpr())
 
 def domain_restore(src):
     info = XendDomain.instance().domain_restore(src)
-    return info.sxpr()    
+    return fixup_sxpr(info.sxpr())
 
 def get_log():
     f = open(XendLogging.getLogFilename(), 'r')
