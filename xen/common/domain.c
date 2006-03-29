@@ -19,6 +19,7 @@
 #include <xen/rangeset.h>
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
+#include <xen/delay.h>
 #include <asm/debugger.h>
 #include <public/dom0_ops.h>
 #include <public/sched.h>
@@ -221,6 +222,13 @@ void domain_shutdown(struct domain *d, u8 reason)
         {
             printk("Domain 0 halted: halting machine.\n");
             machine_halt();
+        }
+        else if ( reason == SHUTDOWN_crash )
+        {
+            printk("Domain 0 crashed: rebooting machine in 5 seconds.\n");
+            watchdog_disable();
+            mdelay(5000);
+            machine_restart(0);
         }
         else
         {
