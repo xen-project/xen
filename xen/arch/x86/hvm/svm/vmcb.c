@@ -498,8 +498,11 @@ void svm_do_resume(struct vcpu *v)
     svm_stts(v);
     
     /* pick up the elapsed PIT ticks and re-enable pit_timer */
-    if ( vpit->first_injected) {
-        svm_set_guest_time(v, v->domain->arch.hvm_domain.guest_time);
+    if ( vpit->first_injected ) {
+        if ( v->domain->arch.hvm_domain.guest_time ) {
+            svm_set_guest_time(v, v->domain->arch.hvm_domain.guest_time);
+            v->domain->arch.hvm_domain.guest_time = 0;
+        }
         pickup_deactive_ticks(vpit);
     }
 
@@ -510,7 +513,6 @@ void svm_do_resume(struct vcpu *v)
     /* We can't resume the guest if we're waiting on I/O */
     ASSERT(!test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags));
 }
-
 
 void svm_launch_fail(unsigned long eflags)
 {

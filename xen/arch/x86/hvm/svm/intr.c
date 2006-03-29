@@ -81,7 +81,7 @@ interrupt_post_injection(struct vcpu * v, int vector, int type)
         }
         vpit->inject_point = NOW();
 
-        vpit->last_pit_gtime += vpit->period;
+        vpit->last_pit_gtime += vpit->period_cycles;
         svm_set_guest_time(v, vpit->last_pit_gtime);
     }
 
