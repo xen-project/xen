@@ -1506,6 +1506,7 @@ static inline void guest_physmap_remove_page(
     struct domain *d, unsigned long gpfn, unsigned long mfn)
 {
     struct domain_mmap_cache c1, c2;
+    unsigned long type;
 
     if ( likely(!shadow_mode_translate(d)) )
         return;
@@ -1514,6 +1515,8 @@ static inline void guest_physmap_remove_page(
     domain_mmap_cache_init(&c2);
     shadow_lock(d);
     shadow_sync_and_drop_references(d, mfn_to_page(mfn));
+    while ( (type = shadow_max_pgtable_type(d, gpfn, NULL)) != PGT_none )
+        free_shadow_page(__shadow_status(d, gpfn, type));
     set_p2m_entry(d, gpfn, -1, &c1, &c2);
     set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
     shadow_unlock(d);
