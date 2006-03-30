@@ -106,7 +106,7 @@ void arch_domain_destroy(struct domain *d)
 	flush_tlb_all();
 
 	/* It is really good in this? */
-	vhpt_flush();
+	vhpt_flush_all();
 }
 
 static void default_idle(void)

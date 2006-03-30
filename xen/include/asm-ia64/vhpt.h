@@ -16,6 +16,12 @@
 
 #define	VHPT_PAGE_SHIFT			VHPT_SIZE_LOG2
 
+
+#ifdef CONFIG_SMP
+# define vhpt_flush_all()	smp_vhpt_flush_all()
+#else
+# define vhpt_flush_all()   vhpt_flush()
+#endif
 // FIXME: These should be automatically generated
 
 #define	VLE_PGFLAGS_OFFSET		0

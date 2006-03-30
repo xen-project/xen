@@ -20,7 +20,7 @@ DEFINE_PER_CPU (unsigned long, vhpt_pend);
 
 void vhpt_flush(void)
 {
-	struct vhpt_lf_entry *v = (void *)VHPT_ADDR;
+	struct vhpt_lf_entry *v =__va(__ia64_per_cpu_var(vhpt_paddr));
 	int i;
 #if 0
 static int firsttime = 2;
