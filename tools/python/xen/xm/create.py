@@ -27,9 +27,11 @@ import socket
 import commands
 import time
 import re
+import xmlrpclib
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
+import xen.xend.XendClient
 from xen.xend.XendClient import server
 from xen.xend.XendBootloader import bootloader
 from xen.util import blkif
@@ -814,6 +816,14 @@ def make_domain(opts, config):
 
     try:
         dominfo = server.xend.domain.create(config)
+    except xmlrpclib.Fault, ex:
+        import signal
+        if vncpid:
+            os.kill(vncpid, signal.SIGKILL)
+        if ex.faultCode == xen.xend.XendClient.ERROR_INVALID_DOMAIN:
+            err("the domain '%s' does not exist." % ex.faultString)
+        else:
+            err("%s" % ex.faultString)
     except Exception, ex:
         import signal
         if vncpid:
@@ -824,6 +834,9 @@ def make_domain(opts, config):
 
     try:
         server.xend.domain.waitForDevices(dom)
+    except xmlrpclib.Fault, ex:
+        server.xend.domain.destroy(dom)
+        err("%s" % ex.faultString)
     except:
         server.xend.domain.destroy(dom)
         err("Device creation failed for domain %s" % dom)
