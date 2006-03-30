@@ -364,7 +364,7 @@ static int xenbus_dev_probe(struct device *_dev)
 	return 0;
 fail:
 	xenbus_dev_error(dev, err, "xenbus_dev_probe on %s", dev->nodename);
-	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
+	xenbus_switch_state(dev, XenbusStateClosed);
 	return -ENODEV;
 }
 
@@ -381,7 +381,7 @@ static int xenbus_dev_remove(struct device *_dev)
 	if (drv->remove)
 		drv->remove(dev);
 
-	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
+	xenbus_switch_state(dev, XenbusStateClosed);
 	return 0;
 }
 

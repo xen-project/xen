@@ -87,7 +87,7 @@ static int tpmback_probe(struct xenbus_device *dev,
 		goto fail;
 	}
 
-	err = xenbus_switch_state(dev, XBT_NULL, XenbusStateInitWait);
+	err = xenbus_switch_state(dev, XenbusStateInitWait);
 	if (err) {
 		goto fail;
 	}
@@ -175,7 +175,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		xenbus_switch_state(dev, XBT_NULL, XenbusStateClosing);
+		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 
 	case XenbusStateClosed:
@@ -247,18 +247,15 @@ again:
 		goto abort;
 	}
 
-	err = xenbus_switch_state(dev, xbt, XenbusStateConnected);
-	if (err)
-		goto abort;
-
-	be->tpmif->status = CONNECTED;
-
 	err = xenbus_transaction_end(xbt, 0);
 	if (err == -EAGAIN)
 		goto again;
-	if (err) {
+	if (err)
 		xenbus_dev_fatal(be->dev, err, "end of transaction");
-	}
+
+	err = xenbus_switch_state(dev, XenbusStateConnected);
+	if (!err)
+		be->tpmif->status = CONNECTED;
 	return;
 abort:
 	xenbus_transaction_end(xbt, 1);

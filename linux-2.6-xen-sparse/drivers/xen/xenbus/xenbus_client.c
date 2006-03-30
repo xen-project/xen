@@ -84,9 +84,7 @@ int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
 EXPORT_SYMBOL_GPL(xenbus_watch_path2);
 
 
-int xenbus_switch_state(struct xenbus_device *dev,
-			xenbus_transaction_t xbt,
-			XenbusState state)
+int xenbus_switch_state(struct xenbus_device *dev, XenbusState state)
 {
 	/* We check whether the state is currently set to the given value, and
 	   if not, then the state is set.  We don't want to unconditionally
@@ -94,6 +92,12 @@ int xenbus_switch_state(struct xenbus_device *dev,
 	   unnecessarily.  Furthermore, if the node has gone, we don't write
 	   to it, as the device will be tearing down, and we don't want to
 	   resurrect that directory.
+
+	   Note that, because of this cached value of our state, this function
+	   will not work inside a Xenstore transaction (something it was
+	   trying to in the past) because dev->state would not get reset if
+	   the transaction was aborted.
+
 	 */
 
 	int current_state;
@@ -102,12 +106,12 @@ int xenbus_switch_state(struct xenbus_device *dev,
 	if (state == dev->state)
 		return 0;
 
-	err = xenbus_scanf(xbt, dev->nodename, "state", "%d",
-			       &current_state);
+	err = xenbus_scanf(XBT_NULL, dev->nodename, "state", "%d",
+			   &current_state);
 	if (err != 1)
 		return 0;
 
-	err = xenbus_printf(xbt, dev->nodename, "state", "%d", state);
+	err = xenbus_printf(XBT_NULL, dev->nodename, "state", "%d", state);
 	if (err) {
 		if (state != XenbusStateClosing) /* Avoid looping */
 			xenbus_dev_fatal(dev, err, "writing new state");
@@ -193,7 +197,7 @@ void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
 	_dev_error(dev, err, fmt, ap);
 	va_end(ap);
 
-	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosing);
+	xenbus_switch_state(dev, XenbusStateClosing);
 }
 EXPORT_SYMBOL_GPL(xenbus_dev_fatal);
 

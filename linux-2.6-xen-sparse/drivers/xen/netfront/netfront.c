@@ -1216,7 +1216,7 @@ static void netfront_closing(struct xenbus_device *dev)
 
 	close_netdev(info);
 
-	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
+	xenbus_switch_state(dev, XenbusStateClosed);
 }
 
 

@@ -92,7 +92,7 @@ static int netback_probe(struct xenbus_device *dev,
 	if (err)
 		goto fail;
 
-	err = xenbus_switch_state(dev, XBT_NULL, XenbusStateInitWait);
+	err = xenbus_switch_state(dev, XenbusStateInitWait);
 	if (err) {
 		goto fail;
 	}
@@ -209,7 +209,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		xenbus_switch_state(dev, XBT_NULL, XenbusStateClosing);
+		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 
 	case XenbusStateClosed:
@@ -254,7 +254,7 @@ static void connect(struct backend_info *be)
 		return;
 	}
 
-	xenbus_switch_state(dev, XBT_NULL, XenbusStateConnected);
+	xenbus_switch_state(dev, XenbusStateConnected);
 }
 
 
