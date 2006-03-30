@@ -47,8 +47,6 @@ struct hvm_function_table {
         struct vcpu *v, struct cpu_user_regs *r, unsigned long *crs);
     void (*load_cpu_guest_regs)(
         struct vcpu *v, struct cpu_user_regs *r);
-    void (*modify_guest_state)(struct vcpu *v);
-
     /*
      * Examine specifics of the guest state:
      * 1) determine whether the guest is in real or vm8086 mode,
@@ -103,12 +101,6 @@ static inline void
 hvm_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *r)
 {
     hvm_funcs.load_cpu_guest_regs(v, r);
-}
-
-static inline void
-hvm_modify_guest_state(struct vcpu *v)
-{
-    hvm_funcs.modify_guest_state(v);
 }
 
 static inline int

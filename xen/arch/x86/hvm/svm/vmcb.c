@@ -161,23 +161,6 @@ static int construct_vmcb_controls(struct arch_svm_struct *arch_svm)
 
 
 /*
- * modify guest eflags and execption bitmap for gdb
- */
-int svm_modify_vmcb(struct vcpu *v, struct cpu_user_regs *regs)
-{
-    int error;
-    if ((error = load_vmcb(&v->arch.hvm_svm, v->arch.hvm_svm.host_save_pa))) 
-    {
-        printk("svm_modify_vmcb: load_vmcb failed: VMCB = %lx\n",
-                (unsigned long) v->arch.hvm_svm.host_save_pa);
-        return -EINVAL; 
-    }
-    svm_load_cpu_user_regs(v,regs);
-    return 0;
-}
-
-
-/*
  * Initially set the same environement as host.
  */
 static int construct_init_vmcb_guest(struct arch_svm_struct *arch_svm, 

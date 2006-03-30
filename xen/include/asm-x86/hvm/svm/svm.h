@@ -39,7 +39,6 @@ extern unsigned int cpu_rev;
 extern void svm_stop(void);
 extern void svm_save_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *regs);
 extern void svm_load_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *regs);
-extern int svm_modify_vmcb(struct vcpu *v, struct cpu_user_regs *regs);
 extern void svm_vmread(struct vcpu *v, int index, unsigned long *value);
 extern void svm_vmwrite(struct vcpu *v, int index, unsigned long value);
 extern void svm_final_setup_guest(struct vcpu *v); 

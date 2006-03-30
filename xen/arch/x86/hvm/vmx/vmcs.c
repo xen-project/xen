@@ -487,32 +487,6 @@ void destroy_vmcs(struct arch_vmx_struct *arch_vmx)
     arch_vmx->io_bitmap_b = NULL;
 }
 
-/*
- * modify guest eflags and execption bitmap for gdb
- */
-int modify_vmcs(struct arch_vmx_struct *arch_vmx,
-                struct cpu_user_regs *regs)
-{
-    int error;
-    u64 vmcs_phys_ptr, old, old_phys_ptr;
-    vmcs_phys_ptr = (u64) virt_to_maddr(arch_vmx->vmcs);
-
-    old_phys_ptr = virt_to_maddr(&old);
-    __vmptrst(old_phys_ptr);
-    if ((error = load_vmcs(arch_vmx, vmcs_phys_ptr))) {
-        printk("modify_vmcs: load_vmcs failed: VMCS = %lx\n",
-               (unsigned long) vmcs_phys_ptr);
-        return -EINVAL;
-    }
-
-/* XXX VMX change modify_vmcs arg to v */
-    hvm_load_cpu_guest_regs(current, regs);
-
-    __vmptrld(old_phys_ptr);
-
-    return 0;
-}
-
 void vm_launch_fail(unsigned long eflags)
 {
     unsigned long error;

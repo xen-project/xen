@@ -31,7 +31,7 @@ struct gdb_regs
   unsigned long orig_rax;
   unsigned long rip;
   unsigned long xcs;
-  unsigned long eflags;
+  unsigned long rflags;
   unsigned long rsp;
   unsigned long xss;
   unsigned long fs_base;
@@ -61,7 +61,7 @@ struct gdb_regs
     pt.rax = xc.rax;                            \
     pt.rip = xc.rip;                            \
     pt.xcs = xc.cs;                             \
-    pt.eflags = xc.eflags;                      \
+    pt.rflags = xc.rflags;                      \
     pt.rsp = xc.rsp;                            \
     pt.xss = xc.ss;                             \
     pt.xes = xc.es;                             \
@@ -89,7 +89,7 @@ struct gdb_regs
     xc.rax = pt->rax;                           \
     xc.rip = pt->rip;                           \
     xc.cs = pt->xcs;                            \
-    xc.eflags = pt->eflags;                     \
+    xc.rflags = pt->rflags & 0xffffffff;        \
     xc.rsp = pt->rsp;                           \
     xc.ss = pt->xss;                            \
     xc.es = pt->xes;                            \

@@ -382,11 +382,6 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     return 1;
 }
 
-void svm_modify_guest_state(struct vcpu *v)
-{
-    svm_modify_vmcb(v, &v->arch.guest_context.user_regs);
-}
-
 int svm_realmode(struct vcpu *v)
 {
     unsigned long cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
@@ -448,8 +443,6 @@ int start_svm(void)
 
     hvm_funcs.store_cpu_guest_regs = svm_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = svm_load_cpu_guest_regs;
-
-    hvm_funcs.modify_guest_state = svm_modify_guest_state;
 
     hvm_funcs.realmode = svm_realmode;
     hvm_funcs.paging_enabled = svm_paging_enabled;
