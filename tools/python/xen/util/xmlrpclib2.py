@@ -23,7 +23,7 @@ An enhanced XML-RPC client/server interface for Python.
 from httplib import HTTPConnection, HTTP
 from xmlrpclib import Transport
 from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
-import xmlrpclib, socket, os
+import xmlrpclib, socket, os, stat
 import SocketServer
 
 import xen.xend.XendClient
@@ -105,10 +105,13 @@ class UnixXMLRPCServer(TCPXMLRPCServer):
     address_family = socket.AF_UNIX
 
     def __init__(self, addr, logRequests):
-        if self.allow_reuse_address:
-            try:
+        parent = os.path.dirname(addr)
+        if os.path.exists(parent):
+            os.chown(parent, os.geteuid(), os.getegid())
+            os.chmod(parent, stat.S_IRWXU)
+            if self.allow_reuse_address and os.path.exists(addr):
                 os.unlink(addr)
-            except OSError, exc:
-                pass
+        else:
+            os.makedirs(parent, stat.S_IRWXU)
         TCPXMLRPCServer.__init__(self, addr, UnixXMLRPCRequestHandler,
                                  logRequests)

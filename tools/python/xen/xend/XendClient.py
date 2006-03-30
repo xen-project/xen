@@ -19,10 +19,10 @@
 
 from xen.util.xmlrpclib2 import ServerProxy
 
-XML_RPC_SOCKET = "/var/run/xend-xmlrpc.sock"
+XML_RPC_SOCKET = "/var/run/xend/xmlrpc.sock"
 
 ERROR_INTERNAL = 1
 ERROR_GENERIC = 2
 ERROR_INVALID_DOMAIN = 3
 
-server = ServerProxy('httpu:///var/run/xend-xmlrpc.sock')
+server = ServerProxy('httpu:///var/run/xend/xmlrpc.sock')
