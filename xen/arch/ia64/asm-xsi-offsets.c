@@ -50,8 +50,8 @@ void foo(void)
 	/* First is shared info page, and then arch specific vcpu context */
 	DEFINE(XSI_BASE, SHAREDINFO_ADDR);
 
-	DEFINE(XSI_PSR_I_OFS, (XSI_OFS + offsetof(mapped_regs_t, interrupt_delivery_enabled)));
-	DEFINE(XSI_PSR_I, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, interrupt_delivery_enabled)));
+	DEFINE(XSI_PSR_I_ADDR_OFS, (XSI_OFS + offsetof(mapped_regs_t, interrupt_mask_addr)));
+	DEFINE(XSI_PSR_I_ADDR, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, interrupt_mask_addr)));
 	DEFINE(XSI_IPSR, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, ipsr)));
 	DEFINE(XSI_IPSR_OFS, (XSI_OFS + offsetof(mapped_regs_t, ipsr)));
 	DEFINE(XSI_IIP_OFS, (XSI_OFS + offsetof(mapped_regs_t, iip)));
@@ -104,5 +104,4 @@ void foo(void)
 	DEFINE(XSI_PKR0, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, pkrs[0])));
 	DEFINE(XSI_TMP0_OFS, (XSI_OFS + offsetof(mapped_regs_t, tmp[0])));
 	DEFINE(XSI_TMP0, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, tmp[0])));
-	
 }

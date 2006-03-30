@@ -87,7 +87,7 @@
 //	r16 == cr.isr
 //	r17 == cr.iim
 //	r18 == XSI_PSR_IC_OFS
-//	r19 == vpsr.ic (low 32 bits) | vpsr.i (high 32 bits)
+//	r19 == vpsr.ic
 //	r31 == pr
 GLOBAL_ENTRY(fast_hyperprivop)
 #ifndef FAST_HYPERPRIVOPS // see beginning of file
@@ -223,7 +223,7 @@ GLOBAL_ENTRY(fast_hyperprivop)
 //	r16 == cr.isr
 //	r17 == cr.iim
 //	r18 == XSI_PSR_IC
-//	r19 == vpsr.ic (low 32 bits) | vpsr.i (high 32 bits)
+//	r19 == vpsr.ic 
 //	r31 == pr
 ENTRY(hyper_ssm_i)
 #ifndef FAST_SSM_I
@@ -278,11 +278,15 @@ ENTRY(hyper_ssm_i)
 	movl r27=~(IA64_PSR_BE|IA64_PSR_BN);;
 	or r30=r30,r28;;
 	and r30=r30,r27;;
+	mov r20=1
+	adds r22=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18
 	adds r21=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r22=[r22]
 	st8 [r21]=r30 ;;
 	// set shared_mem interrupt_delivery_enabled to 0
 	// set shared_mem interrupt_collection_enabled to 0
-	st8 [r18]=r0;;
+	st1 [r22]=r20;;
+	st4 [r18]=r0;;
 	// cover and set shared_mem precover_ifs to cr.ifs
 	// set shared_mem ifs and incomplete_regframe to 0
 	cover ;;
@@ -405,9 +409,10 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	cmp.eq p6,p0=r16,r0;;
 (p6)	br.cond.spnt.few fast_tick_reflect_done;;
 	// if guest vpsr.i is off, we're done
-	adds r21=XSI_PSR_I_OFS-XSI_PSR_IC_OFS,r18 ;;
-	ld4 r21=[r21];;
-	cmp.eq p6,p0=r21,r0
+	adds r21=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r21=[r21];;
+	ld1 r21=[r21];;
+	cmp.eq p0,p6=r21,r0
 (p6)	br.cond.spnt.few fast_tick_reflect_done;;
 
 	// OK, we have a clock tick to deliver to the active domain!
@@ -445,17 +450,22 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	dep r21=-1,r21,IA64_PSR_CPL1_BIT,1 ;;
 	or r17=r17,r28;;
 	and r17=r17,r27;;
-	ld4 r16=[r18],4;;
+	ld4 r16=[r18],XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS;;
 	cmp.ne p6,p0=r16,r0;;
+	ld8 r16=[r18],XSI_PSR_IC_OFS-XSI_PSR_I_ADDR_OFS
 (p6)	dep r17=-1,r17,IA64_PSR_IC_BIT,1 ;;
-	ld4 r16=[r18],-4;;
-	cmp.ne p6,p0=r16,r0;;
+	ld1 r16=[r16];;
+	cmp.eq p6,p0=r16,r0;;
 (p6)	dep r17=-1,r17,IA64_PSR_I_BIT,1 ;;
+	mov r20=1
+	adds r22=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18
 	adds r21=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r22=[r22]
 	st8 [r21]=r17 ;;
 	// set shared_mem interrupt_delivery_enabled to 0
 	// set shared_mem interrupt_collection_enabled to 0
-	st8 [r18]=r0;;
+	st1 [r22]=r20;;
+	st4 [r18]=r0;;
 	// cover and set shared_mem precover_ifs to cr.ifs
 	// set shared_mem ifs and incomplete_regframe to 0
 	cover ;;
@@ -530,7 +540,7 @@ END(fast_tick_reflect)
 //	r16 == cr.isr
 //	r17 == cr.iim
 //	r18 == XSI_PSR_IC
-//	r19 == vpsr.ic (low 32 bits) | vpsr.i (high 32 bits)
+//	r19 == vpsr.ic
 //	r31 == pr
 GLOBAL_ENTRY(fast_break_reflect)
 #ifndef FAST_BREAK // see beginning of file
@@ -594,12 +604,13 @@ ENTRY(fast_reflect)
 #endif
 	// save iip in shared_info (DON'T POINT TO NEXT INSTRUCTION!)
 	adds r21=XSI_IIP_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st8 [r21]=r29;;
+	st8 [r21]=r29,XSI_ISR_OFS-XSI_IIP_OFS;;
 	// set shared_mem isr
-	adds r21=XSI_ISR_OFS-XSI_PSR_IC_OFS,r18 ;; 
 	st8 [r21]=r16 ;;
 	// set cr.ipsr
+	adds r21=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18
 	mov r29=r30 ;;
+	ld8 r21=[r21]
 	movl r28=DELIVER_PSR_SET;;
 	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0);;
 	or r29=r29,r28;;
@@ -616,19 +627,22 @@ ENTRY(fast_reflect)
 	or r30=r30,r28;;
 	and r30=r30,r27;;
 	// also set shared_mem ipsr.i and ipsr.ic appropriately
-	ld8 r24=[r18];;
-	extr.u r22=r24,32,32
+	ld1 r22=[r21]
+	ld4 r24=[r18];;
 	cmp4.eq p6,p7=r24,r0;;
 (p6)	dep r30=0,r30,IA64_PSR_IC_BIT,1
 (p7)	dep r30=-1,r30,IA64_PSR_IC_BIT,1 ;;
-	cmp4.eq p6,p7=r22,r0;;
+	mov r24=r21
+	cmp.ne p6,p7=r22,r0;;
 (p6)	dep r30=0,r30,IA64_PSR_I_BIT,1
 (p7)	dep r30=-1,r30,IA64_PSR_I_BIT,1 ;;
+	mov r22=1
 	adds r21=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r30 ;;
 	// set shared_mem interrupt_delivery_enabled to 0
 	// set shared_mem interrupt_collection_enabled to 0
-	st8 [r18]=r0;;
+	st1 [r24]=r22
+	st4 [r18]=r0;;
 	// cover and set shared_mem precover_ifs to cr.ifs
 	// set shared_mem ifs and incomplete_regframe to 0
 	cover ;;
@@ -639,8 +653,6 @@ ENTRY(fast_reflect)
 	st8 [r21]=r0 ;;
 	adds r21=XSI_PRECOVER_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r24 ;;
-	// vpsr.i = vpsr.ic = 0 on delivery of interruption
-	st8 [r18]=r0;;
 	// FIXME: need to save iipa and isr to be arch-compliant
 	// set iip to go to domain IVA break instruction vector
 	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
@@ -723,7 +735,7 @@ GLOBAL_ENTRY(fast_access_reflect)
 	cmp.eq p7,p0=r21,r0
 (p7)	br.spnt.few dispatch_reflection ;;
 	movl r18=XSI_PSR_IC;;
-	ld8 r21=[r18];;
+	ld4 r21=[r18];;
 	cmp.eq p7,p0=r0,r21
 (p7)	br.spnt.few dispatch_reflection ;;
 	// set shared_mem ifa, FIXME: should we validate it?
@@ -1062,17 +1074,20 @@ just_do_rfi:
 	dep r20=0,r20,38,25;; // ensure ifs has no reserved bits set
 	mov cr.ifs=r20 ;;
 	// ipsr.cpl == (vcr.ipsr.cpl == 0) 2 : 3;
+	adds r20=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18
 	dep r21=-1,r21,IA64_PSR_CPL1_BIT,1 ;;
 	// vpsr.i = vcr.ipsr.i; vpsr.ic = vcr.ipsr.ic
-	mov r19=r0 ;;
+	ld8 r20=[r20]
+	mov r19=1 
 	extr.u r23=r21,IA64_PSR_I_BIT,1 ;;
 	cmp.ne p7,p6=r23,r0 ;;
 	// not done yet
-(p7)	dep r19=-1,r19,32,1
+(p7)	st1 [r20]=r0
+(p6)	st1 [r20]=r19;;
 	extr.u r23=r21,IA64_PSR_IC_BIT,1 ;;
 	cmp.ne p7,p6=r23,r0 ;;
-(p7)	dep r19=-1,r19,0,1 ;;
-	st8 [r18]=r19 ;;
+(p7)	st4 [r18]=r19;;
+(p6)	st4 [r18]=r0;;
 	// force on psr.ic, i, dt, rt, it, bn
 	movl r20=(IA64_PSR_I|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_IT|IA64_PSR_BN)
 	;;
@@ -1209,10 +1224,12 @@ GLOBAL_ENTRY(rfi_with_interrupt)
 	extr.u r20=r21,41,2 ;;	// get v(!)psr.ri
 	dep r16=r20,r16,41,2 ;; // deposit cr.isr.ei
 	adds r22=XSI_ISR_OFS-XSI_PSR_IC_OFS,r18 ;; 
-	st8 [r22]=r16 ;;
+	st8 [r22]=r16,XSI_PSR_I_ADDR_OFS-XSI_ISR_OFS ;;
 	// set cr.ipsr (make sure cpl==2!)
 	mov r29=r17 ;;
 	movl r28=DELIVER_PSR_SET;;
+	mov r20=1
+	ld8 r22=[r22]
 	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0);;
 	or r29=r29,r28;;
 	and r29=r29,r27;;
@@ -1220,7 +1237,8 @@ GLOBAL_ENTRY(rfi_with_interrupt)
 	// v.ipsr and v.iip are already set (and v.iip validated) as rfi target
 	// set shared_mem interrupt_delivery_enabled to 0
 	// set shared_mem interrupt_collection_enabled to 0
-	st8 [r18]=r0;;
+	st1 [r22]=r20
+	st4 [r18]=r0;;
 	// cover and set shared_mem precover_ifs to cr.ifs
 	// set shared_mem ifs and incomplete_regframe to 0
 #if 0

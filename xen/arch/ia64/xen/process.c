@@ -206,9 +206,9 @@ void reflect_interruption(unsigned long isr, struct pt_regs *regs, unsigned long
 #ifdef CONFIG_SMP
 #warning "SMP FIXME: sharedinfo doesn't handle smp yet, need page per vcpu"
 #endif
-	regs->r31 = (unsigned long) &(((mapped_regs_t *)SHARED_ARCHINFO_ADDR)->ipsr);
+	regs->r31 = XSI_IPSR;
 
-	PSCB(v,interrupt_delivery_enabled) = 0;
+	v->vcpu_info->evtchn_upcall_mask = 1;
 	PSCB(v,interrupt_collection_enabled) = 0;
 
 	inc_slow_reflect_count(vector);

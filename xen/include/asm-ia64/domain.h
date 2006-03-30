@@ -39,6 +39,9 @@ struct arch_domain {
 #define xen_vastart arch.xen_vastart
 #define xen_vaend arch.xen_vaend
 #define shared_info_va arch.shared_info_va
+#define INT_ENABLE_OFFSET(v) 		  \
+    (sizeof(vcpu_info_t) * (v)->vcpu_id + \
+    offsetof(vcpu_info_t, evtchn_upcall_mask))
 
 struct arch_vcpu {
 #if 1

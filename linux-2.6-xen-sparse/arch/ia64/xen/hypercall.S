@@ -8,6 +8,27 @@
 #include <asm/processor.h>
 #include <asm/asmmacro.h>
 
+/* To clear vpsr.ic, vpsr.i needs to be cleared first */
+#define XEN_CLEAR_PSR_IC				\
+	mov r14=1;					\
+	movl r15=XSI_PSR_I_ADDR;			\
+	movl r2=XSI_PSR_IC;				\
+	;;						\
+	ld8 r15=[r15];					\
+	ld4 r3=[r2];					\
+	;;						\
+	ld1 r16=[r15];					\
+	;;						\
+	st1 [r15]=r14;					\
+	st4 [r2]=r0;					\
+	;;
+
+/* First restore vpsr.ic, and then vpsr.i */
+#define XEN_RESTORE_PSR_IC				\
+	st4 [r2]=r3;					\
+	st1 [r15]=r16;					\
+	;;
+
 GLOBAL_ENTRY(xen_get_ivr)
 	movl r8=running_on_xen;;
 	ld4 r8=[r8];;
@@ -15,15 +36,12 @@ GLOBAL_ENTRY(xen_get_ivr)
 (p7)	mov r8=cr.ivr;;
 (p7)	br.ret.sptk.many rp
 	;;
-	movl r9=XSI_PSR_IC
-	;;
-	ld8 r10=[r9]
-	;;
-	st8 [r9]=r0
+	XEN_CLEAR_PSR_IC
 	;;
 	XEN_HYPER_GET_IVR
 	;;
-	st8 [r9]=r10
+	XEN_RESTORE_PSR_IC
+	;;
 	br.ret.sptk.many rp
 	;;
 END(xen_get_ivr)
@@ -35,15 +53,12 @@ GLOBAL_ENTRY(xen_get_tpr)
 (p7)	mov r8=cr.tpr;;
 (p7)	br.ret.sptk.many rp
 	;;
-	movl r9=XSI_PSR_IC
-	;;
-	ld8 r10=[r9]
-	;;
-	st8 [r9]=r0
+	XEN_CLEAR_PSR_IC
 	;;
 	XEN_HYPER_GET_TPR
 	;;
-	st8 [r9]=r10
+	XEN_RESTORE_PSR_IC
+	;;
 	br.ret.sptk.many rp
 	;;
 END(xen_get_tpr)
@@ -55,16 +70,14 @@ GLOBAL_ENTRY(xen_set_tpr)
 (p7)	mov cr.tpr=r32;;
 (p7)	br.ret.sptk.many rp
 	;;
-	movl r9=XSI_PSR_IC
 	mov r8=r32
 	;;
-	ld8 r10=[r9]
-	;;
-	st8 [r9]=r0
+	XEN_CLEAR_PSR_IC
 	;;
 	XEN_HYPER_SET_TPR
 	;;
-	st8 [r9]=r10
+	XEN_RESTORE_PSR_IC
+	;;
 	br.ret.sptk.many rp
 	;;
 END(xen_set_tpr)
@@ -76,16 +89,14 @@ GLOBAL_ENTRY(xen_eoi)
 (p7)	mov cr.eoi=r0;;
 (p7)	br.ret.sptk.many rp
 	;;
-	movl r9=XSI_PSR_IC
 	mov r8=r32
 	;;
-	ld8 r10=[r9]
-	;;
-	st8 [r9]=r0
+	XEN_CLEAR_PSR_IC
 	;;
 	XEN_HYPER_EOI
 	;;
-	st8 [r9]=r10
+	XEN_RESTORE_PSR_IC
+	;;
 	br.ret.sptk.many rp
 	;;
 END(xen_eoi)
@@ -97,16 +108,13 @@ GLOBAL_ENTRY(xen_thash)
 (p7)	thash r8=r32;;
 (p7)	br.ret.sptk.many rp
 	;;
-	movl r9=XSI_PSR_IC
 	mov r8=r32
 	;;
-	ld8 r10=[r9]
-	;;
-	st8 [r9]=r0
+	XEN_CLEAR_PSR_IC
 	;;
 	XEN_HYPER_THASH
 	;;
-	st8 [r9]=r10
+	XEN_RESTORE_PSR_IC
 	;;
 	br.ret.sptk.many rp
 	;;
@@ -119,16 +127,13 @@ GLOBAL_ENTRY(xen_set_itm)
 (p7)	mov cr.itm=r32;;
 (p7)	br.ret.sptk.many rp
 	;;
-	movl r9=XSI_PSR_IC
 	mov r8=r32
 	;;
-	ld8 r10=[r9]
-	;;
-	st8 [r9]=r0
+	XEN_CLEAR_PSR_IC
 	;;
 	XEN_HYPER_SET_ITM
 	;;
-	st8 [r9]=r10
+	XEN_RESTORE_PSR_IC
 	;;
 	br.ret.sptk.many rp
 	;;
@@ -141,17 +146,14 @@ GLOBAL_ENTRY(xen_ptcga)
 (p7)	ptc.ga r32,r33;;
 (p7)	br.ret.sptk.many rp
 	;;
-	movl r11=XSI_PSR_IC
 	mov r8=r32
 	mov r9=r33
 	;;
-	ld8 r10=[r11]
-	;;
-	st8 [r11]=r0
+	XEN_CLEAR_PSR_IC
 	;;
 	XEN_HYPER_PTC_GA
 	;;
-	st8 [r11]=r10
+	XEN_RESTORE_PSR_IC
 	;;
 	br.ret.sptk.many rp
 	;;
@@ -164,16 +166,13 @@ GLOBAL_ENTRY(xen_get_rr)
 (p7)	mov r8=rr[r32];;
 (p7)	br.ret.sptk.many rp
 	;;
-	movl r9=XSI_PSR_IC
 	mov r8=r32
 	;;
-	ld8 r10=[r9]
-	;;
-	st8 [r9]=r0
+	XEN_CLEAR_PSR_IC
 	;;
 	XEN_HYPER_GET_RR
 	;;
-	st8 [r9]=r10
+	XEN_RESTORE_PSR_IC
 	;;
 	br.ret.sptk.many rp
 	;;
@@ -186,17 +185,14 @@ GLOBAL_ENTRY(xen_set_rr)
 (p7)	mov rr[r32]=r33;;
 (p7)	br.ret.sptk.many rp
 	;;
-	movl r11=XSI_PSR_IC
 	mov r8=r32
 	mov r9=r33
 	;;
-	ld8 r10=[r11]
-	;;
-	st8 [r11]=r0
+	XEN_CLEAR_PSR_IC
 	;;
 	XEN_HYPER_SET_RR
 	;;
-	st8 [r11]=r10
+	XEN_RESTORE_PSR_IC
 	;;
 	br.ret.sptk.many rp
 	;;
@@ -241,17 +237,14 @@ GLOBAL_ENTRY(xen_set_kr)
 (p7)	mov ar7=r9
 (p7)	br.ret.sptk.many rp;;
 
-1:	movl r11=XSI_PSR_IC
-	mov r8=r32
+1:	mov r8=r32
 	mov r9=r33
 	;;
-	ld8 r10=[r11]
-	;;
-	st8 [r11]=r0
+	XEN_CLEAR_PSR_IC
 	;;
 	XEN_HYPER_SET_KR
 	;;
-	st8 [r11]=r10
+	XEN_RESTORE_PSR_IC
 	;;
 	br.ret.sptk.many rp
 END(xen_set_rr)
@@ -263,16 +256,13 @@ GLOBAL_ENTRY(xen_fc)
 (p7)	fc r32;;
 (p7)	br.ret.sptk.many rp
 	;;
-	movl r9=XSI_PSR_IC
 	mov r8=r32
 	;;
-	ld8 r10=[r9]
-	;;
-	st8 [r9]=r0
+	XEN_CLEAR_PSR_IC
 	;;
 	XEN_HYPER_FC
 	;;
-	st8 [r9]=r10
+	XEN_RESTORE_PSR_IC
 	;;
 	br.ret.sptk.many rp
 END(xen_fc)
@@ -284,16 +274,13 @@ GLOBAL_ENTRY(xen_get_cpuid)
 (p7)	mov r8=cpuid[r32];;
 (p7)	br.ret.sptk.many rp
 	;;
-	movl r9=XSI_PSR_IC
 	mov r8=r32
 	;;
-	ld8 r10=[r9]
-	;;
-	st8 [r9]=r0
+	XEN_CLEAR_PSR_IC
 	;;
 	XEN_HYPER_GET_CPUID
 	;;
-	st8 [r9]=r10
+	XEN_RESTORE_PSR_IC
 	;;
 	br.ret.sptk.many rp
 END(xen_get_cpuid)
@@ -305,16 +292,13 @@ GLOBAL_ENTRY(xen_get_pmd)
 (p7)	mov r8=pmd[r32];;
 (p7)	br.ret.sptk.many rp
 	;;
-	movl r9=XSI_PSR_IC
 	mov r8=r32
 	;;
-	ld8 r10=[r9]
-	;;
-	st8 [r9]=r0
+	XEN_CLEAR_PSR_IC
 	;;
 	XEN_HYPER_GET_PMD
 	;;
-	st8 [r9]=r10
+	XEN_RESTORE_PSR_IC
 	;;
 	br.ret.sptk.many rp
 END(xen_get_pmd)
@@ -327,16 +311,13 @@ GLOBAL_ENTRY(xen_get_eflag)
 (p7)	mov r8=ar24;;
 (p7)	br.ret.sptk.many rp
 	;;
-	movl r9=XSI_PSR_IC
 	mov r8=r32
 	;;
-	ld8 r10=[r9]
-	;;
-	st8 [r9]=r0
+	XEN_CLEAR_PSR_IC
 	;;
 	XEN_HYPER_GET_EFLAG
 	;;
-	st8 [r9]=r10
+	XEN_RESTORE_PSR_IC
 	;;
 	br.ret.sptk.many rp
 END(xen_get_eflag)
@@ -349,16 +330,13 @@ GLOBAL_ENTRY(xen_set_eflag)
 (p7)	mov ar24=r32
 (p7)	br.ret.sptk.many rp
 	;;
-	movl r9=XSI_PSR_IC
 	mov r8=r32
 	;;
-	ld8 r10=[r9]
-	;;
-	st8 [r9]=r0
+	XEN_CLEAR_PSR_IC
 	;;
 	XEN_HYPER_SET_EFLAG
 	;;
-	st8 [r9]=r10
+	XEN_RESTORE_PSR_IC
 	;;
 	br.ret.sptk.many rp
 END(xen_set_eflag)

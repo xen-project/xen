@@ -485,6 +485,8 @@ void new_thread(struct vcpu *v,
 		regs->ar_rsc |= (2 << 2); /* force PL2/3 */
 		VCPU(v, banknum) = 1;
 		VCPU(v, metaphysical_mode) = 1;
+		VCPU(v, interrupt_mask_addr) =
+		    (uint64_t)SHAREDINFO_ADDR + INT_ENABLE_OFFSET(v);
 	}
 }
 

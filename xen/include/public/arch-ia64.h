@@ -268,7 +268,11 @@ typedef struct {
             unsigned long precover_ifs;
             unsigned long unat;  // not sure if this is needed until NaT arch is done
             int interrupt_collection_enabled; // virtual psr.ic
-            int interrupt_delivery_enabled; // virtual psr.i
+            /* virtual interrupt deliverable flag is evtchn_upcall_mask in
+             * shared info area now. interrupt_mask_addr is the address
+             * of evtchn_upcall_mask for current vcpu
+             */
+            unsigned long interrupt_mask_addr;
             int pending_interruption;
             int incomplete_regframe; // see SDM vol2 6.8
             unsigned long reserved5_1[4];

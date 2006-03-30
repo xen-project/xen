@@ -87,9 +87,14 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
  * Others, like "pend", are abstractions based on privileged registers.
  * "Pend" is guaranteed to be set if reading cr.ivr would return a
  * (non-spurious) interrupt. */
-#define xen_get_virtual_psr_i()		(*(int *)(XSI_PSR_I))
-#define xen_set_virtual_psr_i(_val)	({ *(int *)(XSI_PSR_I) = _val ? 1:0; })
-#define xen_set_virtual_psr_ic(_val)	({ *(int *)(XSI_PSR_IC) = _val ? 1:0; })
+#define XSI_PSR_I			\
+	(*(uint64_t *)(XSI_PSR_I_ADDR))
+#define xen_get_virtual_psr_i()		\
+	(!(*(uint8_t *)(XSI_PSR_I)))
+#define xen_set_virtual_psr_i(_val)	\
+	({ *(uint8_t *)(XSI_PSR_I) = (uint8_t)(_val) ? 0:1; })
+#define xen_set_virtual_psr_ic(_val)	\
+	({ *(int *)(XSI_PSR_IC) = _val ? 1:0; })
 #define xen_get_virtual_pend()		(*(int *)(XSI_PEND))
 
 /* Hyperprivops are "break" instructions with a well-defined API.

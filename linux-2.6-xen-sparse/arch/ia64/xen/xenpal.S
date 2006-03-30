@@ -43,11 +43,14 @@ GLOBAL_ENTRY(xen_pal_call_static)
 	// from the idle loop so confuses privop counting
 	movl r31=XSI_PSR_IC
 	;;
-(p6)	st8 [r31]=r0
+(p6)	st4 [r31]=r0
 	;;
-(p7)	adds r31=XSI_PSR_I-XSI_PSR_IC,r31
+(p7)	adds r31=XSI_PSR_I_ADDR-XSI_PSR_IC,r31
+(p7)	mov r22=1
 	;;
-(p7)	st4 [r31]=r0
+(p7)	ld8 r31=[r31]
+	;;
+(p7)	st1 [r31]=r22
 	;;
 	mov r31 = in3
 	mov b7 = loc2

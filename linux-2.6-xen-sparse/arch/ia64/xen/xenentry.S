@@ -312,9 +312,12 @@ ENTRY(ia64_leave_syscall)
 	cmp.eq p6,p0=r21,r0		// p6 <- pUStk || (preempt_count == 0)
 #else /* !CONFIG_PREEMPT */
 #ifdef CONFIG_XEN
-	movl r2=XSI_PSR_I
+	movl r2=XSI_PSR_I_ADDR
+	mov r18=1
 	;;
-(pUStk)	st4 [r2]=r0
+	ld8 r2=[r2]
+	;;
+(pUStk)	st1 [r2]=r18
 #else
 (pUStk)	rsm psr.i
 #endif
@@ -345,9 +348,14 @@ ENTRY(ia64_leave_syscall)
 	;;
 	invala			// M0|1 invalidate ALAT
 #ifdef CONFIG_XEN
+	movl r28=XSI_PSR_I_ADDR
 	movl r29=XSI_PSR_IC
 	;;
-	st8	[r29]=r0	// note: clears both vpsr.i and vpsr.ic!
+	ld8 r28=[r28]
+	mov r30=1
+	;;
+	st1	[r28]=r30
+	st4	[r29]=r0	// note: clears both vpsr.i and vpsr.ic!
 	;;
 #else
 	rsm psr.i | psr.ic	// M2 initiate turning off of interrupt and interruption collection
@@ -441,9 +449,12 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	cmp.eq p6,p0=r21,r0		// p6 <- pUStk || (preempt_count == 0)
 #else
 #ifdef CONFIG_XEN
-(pUStk)	movl r17=XSI_PSR_I
-	;;
-(pUStk)	st4 [r17]=r0
+(pUStk)	movl r17=XSI_PSR_I_ADDR
+(pUStk)	mov r31=1
+		;;
+(pUStk) 	ld8 r17=[r17]
+		;;
+(pUStk)	st1 [r17]=r31
 	;;
 #else
 (pUStk)	rsm psr.i
@@ -496,9 +507,14 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	mov ar.ssd=r31
 	;;
 #ifdef CONFIG_XEN
+	movl r23=XSI_PSR_I_ADDR
 	movl r22=XSI_PSR_IC
 	;;
-	st8 [r22]=r0		// note: clears both vpsr.i and vpsr.ic!
+	ld8 r23=[r23]
+	mov r25=1
+	;;
+	st1 [r23]=r25
+	st4 [r22]=r0		// note: clears both vpsr.i and vpsr.ic!
 	;;
 #else
 	rsm psr.i | psr.ic	// initiate turning off of interrupt and interruption collection
@@ -803,9 +819,12 @@ skip_rbs_switch:
 	br.call.spnt.many rp=schedule
 .ret9:	cmp.eq p6,p0=r0,r0				// p6 <- 1
 #ifdef CONFIG_XEN
-	movl r2=XSI_PSR_I
+	movl r2=XSI_PSR_I_ADDR
+	mov r20=1
 	;;
-	st4 [r2]=r0
+	ld8 r2=[r2]
+	;;
+	st1 [r2]=r20
 #else
 	rsm psr.i		// disable interrupts
 #endif

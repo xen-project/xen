@@ -197,7 +197,8 @@ IA64FAULT vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24)
 	ipsr = (struct ia64_psr *)&regs->cr_ipsr;
 	imm = *(struct ia64_psr *)&imm24;
 	// interrupt flag
-	if (imm.i) PSCB(vcpu,interrupt_delivery_enabled) = 0;
+	if (imm.i)
+	    vcpu->vcpu_info->evtchn_upcall_mask = 1;
 	if (imm.ic)  PSCB(vcpu,interrupt_collection_enabled) = 0;
 	// interrupt collection flag
 	//if (imm.ic) PSCB(vcpu,interrupt_delivery_enabled) = 0;
@@ -232,7 +233,7 @@ IA64FAULT vcpu_set_psr_dt(VCPU *vcpu)
 
 IA64FAULT vcpu_set_psr_i(VCPU *vcpu)
 {
-	PSCB(vcpu,interrupt_delivery_enabled) = 1;
+	vcpu->vcpu_info->evtchn_upcall_mask = 0;
 	PSCB(vcpu,interrupt_collection_enabled) = 1;
 	return IA64_NO_FAULT;
 }
@@ -261,11 +262,11 @@ IA64FAULT vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm24)
 	}
 	if (imm.sp) { ipsr->sp = 1; psr.sp = 1; }
 	if (imm.i) {
-		if (!PSCB(vcpu,interrupt_delivery_enabled)) {
+		if (vcpu->vcpu_info->evtchn_upcall_mask) {
 //printf("vcpu_set_psr_sm: psr.ic 0->1 ");
 			enabling_interrupts = 1;
 		}
-		PSCB(vcpu,interrupt_delivery_enabled) = 1;
+		vcpu->vcpu_info->evtchn_upcall_mask = 0;
 	}
 	if (imm.ic)  PSCB(vcpu,interrupt_collection_enabled) = 1;
 	// TODO: do this faster
@@ -312,9 +313,9 @@ IA64FAULT vcpu_set_psr_l(VCPU *vcpu, UINT64 val)
 	if (newpsr.up) { ipsr->up = 1; psr.up = 1; }
 	if (newpsr.sp) { ipsr->sp = 1; psr.sp = 1; }
 	if (newpsr.i) {
-		if (!PSCB(vcpu,interrupt_delivery_enabled))
+		if (vcpu->vcpu_info->evtchn_upcall_mask)
 			enabling_interrupts = 1;
-		PSCB(vcpu,interrupt_delivery_enabled) = 1;
+		vcpu->vcpu_info->evtchn_upcall_mask = 0;
 	}
 	if (newpsr.ic)  PSCB(vcpu,interrupt_collection_enabled) = 1;
 	if (newpsr.mfl) { ipsr->mfl = 1; psr.mfl = 1; }
@@ -340,7 +341,7 @@ IA64FAULT vcpu_get_psr(VCPU *vcpu, UINT64 *pval)
 
 	newpsr = *(struct ia64_psr *)&regs->cr_ipsr;
 	if (newpsr.cpl == 2) newpsr.cpl = 0;
-	if (PSCB(vcpu,interrupt_delivery_enabled)) newpsr.i = 1;
+	if (!vcpu->vcpu_info->evtchn_upcall_mask) newpsr.i = 1;
 	else newpsr.i = 0;
 	if (PSCB(vcpu,interrupt_collection_enabled)) newpsr.ic = 1;
 	else newpsr.ic = 0;
@@ -360,7 +361,7 @@ BOOLEAN vcpu_get_psr_ic(VCPU *vcpu)
 
 BOOLEAN vcpu_get_psr_i(VCPU *vcpu)
 {
-	return !!PSCB(vcpu,interrupt_delivery_enabled);
+	return !vcpu->vcpu_info->evtchn_upcall_mask;
 }
 
 UINT64 vcpu_get_ipsr_int_state(VCPU *vcpu,UINT64 prevpsr)
@@ -373,7 +374,7 @@ UINT64 vcpu_get_ipsr_int_state(VCPU *vcpu,UINT64 prevpsr)
 	psr.ia64_psr.be = 0; if (dcr & IA64_DCR_BE) psr.ia64_psr.be = 1;
 	psr.ia64_psr.pp = 0; if (dcr & IA64_DCR_PP) psr.ia64_psr.pp = 1;
 	psr.ia64_psr.ic = PSCB(vcpu,interrupt_collection_enabled);
-	psr.ia64_psr.i = PSCB(vcpu,interrupt_delivery_enabled);
+	psr.ia64_psr.i = !vcpu->vcpu_info->evtchn_upcall_mask;
 	psr.ia64_psr.bn = PSCB(vcpu,banknum);
 	psr.ia64_psr.dt = 1; psr.ia64_psr.it = 1; psr.ia64_psr.rt = 1;
 	if (psr.ia64_psr.cpl == 2) psr.ia64_psr.cpl = 0; // !!!! fool domain
@@ -931,7 +932,7 @@ IA64FAULT vcpu_set_eoi(VCPU *vcpu, UINT64 val)
 	bits &= ~(1L << bitnum);
 	*p = bits;
 	/* clearing an eoi bit may unmask another pending interrupt... */
-	if (PSCB(vcpu,interrupt_delivery_enabled)) { // but only if enabled...
+	if (!vcpu->vcpu_info->evtchn_upcall_mask) { // but only if enabled...
 		// worry about this later... Linux only calls eoi
 		// with interrupts disabled
 		printf("Trying to EOI interrupt with interrupts enabled\n");
@@ -1186,7 +1187,6 @@ IA64FAULT vcpu_rfi(VCPU *vcpu)
 
 	psr.i64 = PSCB(vcpu,ipsr);
 	if (psr.ia64_psr.cpl < 3) psr.ia64_psr.cpl = 2;
-	if (psr.ia64_psr.i) PSCB(vcpu,interrupt_delivery_enabled) = 1;
 	int_enable = psr.ia64_psr.i;
 	if (psr.ia64_psr.ic)  PSCB(vcpu,interrupt_collection_enabled) = 1;
 	if (psr.ia64_psr.dt && psr.ia64_psr.rt && psr.ia64_psr.it) vcpu_set_metaphysical_mode(vcpu,FALSE);
@@ -1218,7 +1218,7 @@ IA64FAULT vcpu_rfi(VCPU *vcpu)
 	}
 	PSCB(vcpu,interrupt_collection_enabled) = 1;
 	vcpu_bsw1(vcpu);
-	PSCB(vcpu,interrupt_delivery_enabled) = int_enable;
+	vcpu->vcpu_info->evtchn_upcall_mask = !int_enable;
 	return (IA64_NO_FAULT);
 }
 

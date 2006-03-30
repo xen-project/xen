@@ -5,6 +5,7 @@
 #include <asm/sal.h>
 #include <asm/hypervisor.h>
 /* #include <asm-xen/evtchn.h> */
+#include <xen/interface/arch-ia64.h>
 #include <linux/vmalloc.h>
 
 shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)0xf100000000000000;

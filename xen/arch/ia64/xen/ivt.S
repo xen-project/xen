@@ -930,7 +930,7 @@ ENTRY(break_fault)
 #endif
 	movl r18=XSI_PSR_IC
 	;;
-	ld8 r19=[r18]
+	ld4 r19=[r18]
 	;;
 	cmp.eq p7,p0=r0,r17			// is this a psuedo-cover?
 (p7)	br.spnt.many dispatch_privop_fault

@@ -683,9 +683,11 @@ ENTRY(dkey_miss)
 	// Leaving this code inline above results in an IVT section overflow
 	// There is no particular reason for this code to be here...
 xen_page_fault:
-(p15)	movl r3=XSI_PSR_I
+(p15)	movl r3=XSI_PSR_I_ADDR
 	;;
-(p15)	st4 [r3]=r14,XSI_PEND-XSI_PSR_I		// if (p15) vpsr.i = 1
+(p15)	ld8 r3=[r3]
+	;;
+(p15)	st1 [r3]=r0,XSI_PEND-XSI_PSR_I_ADDR	// if (p15) vpsr.i = 1
 	mov r14=r0
 	;;
 (p15)	ld4 r14=[r3]				// if (pending_interrupts)
@@ -1043,9 +1045,11 @@ ENTRY(break_fault)
 	mov r16=1
 	;;
 #if 1
-	st4 [r3]=r16,XSI_PSR_I-XSI_PSR_IC	// vpsr.ic = 1
+	st4 [r3]=r16,XSI_PSR_I_ADDR-XSI_PSR_IC	// vpsr.ic = 1
 	;;
-(p15)	st4 [r3]=r16,XSI_PEND-XSI_PSR_I		// if (p15) vpsr.i = 1
+(p15)	ld8 r3=[r3]
+	;;
+(p15)	st1 [r3]=r0,XSI_PEND-XSI_PSR_I_ADDR	// if (p15) vpsr.i = 1
 	mov r16=r0
 	;;
 (p15)	ld4 r16=[r3]				// if (pending_interrupts)
@@ -1055,10 +1059,12 @@ ENTRY(break_fault)
 (p6)	ssm	psr.i				//   do a real ssm psr.i
 	;;
 #else
-//	st4 [r3]=r16,XSI_PSR_I-XSI_PSR_IC	// vpsr.ic = 1
-	adds r3=XSI_PSR_I-XSI_PSR_IC,r3		// SKIP vpsr.ic = 1
+//	st4 [r3]=r16,XSI_PSR_I_ADDR-XSI_PSR_IC	// vpsr.ic = 1
+	adds r3=XSI_PSR_I_ADDR-XSI_PSR_IC,r3	// SKIP vpsr.ic = 1
 	;;
-(p15)	st4 [r3]=r16,XSI_PEND-XSI_PSR_I		// if (p15) vpsr.i = 1
+(p15)	ld8 r3=[r3]
+	;;
+(p15)	st1 [r3]=r0,XSI_PEND-XSI_PSR_I_ADDR	// if (p15) vpsr.i = 1
 	mov r16=r0
 	;;
 (p15)	ld4 r16=[r3]				// if (pending_interrupts)
