@@ -55,11 +55,14 @@ ifneq ($(max_phys_cpus),)
 CFLAGS-y               += -DMAX_PHYS_CPUS=$(max_phys_cpus)
 endif
 
+AFLAGS-y               += -D__ASSEMBLY__
+
 ALL_OBJS := $(ALL_OBJS-y)
 CFLAGS   := $(strip $(CFLAGS) $(CFLAGS-y))
+AFLAGS   := $(strip $(AFLAGS) $(AFLAGS-y))
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 %.o: %.S $(HDRS) Makefile
-	$(CC) $(CFLAGS) -D__ASSEMBLY__ -c $< -o $@
+	$(CC) $(CFLAGS) $(AFLAGS) -c $< -o $@
