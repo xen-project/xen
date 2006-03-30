@@ -212,13 +212,13 @@ extern unsigned long _end; /* standard ELF symbol */
  *                                                       ------ ------
  *  I/O remapping area                                   ( 4MB)
  *  Direct-map (1:1) area [Xen code/data/heap]           (12MB)
- *  Per-domain mappings (inc. 4MB map_domain_page cache) ( 4MB)
+ *  Per-domain mappings (inc. 4MB map_domain_page cache) ( 8MB)
  *  Shadow linear pagetable                              ( 4MB) ( 8MB)
  *  Guest linear pagetable                               ( 4MB) ( 8MB)
  *  Machine-to-physical translation table [writable]     ( 4MB) (16MB)
  *  Frame-info table                                     (24MB) (96MB)
  *   * Start of guest inaccessible area
- *  Machine-to-physical translation table [read-only]    ( 4MB)
+ *  Machine-to-physical translation table [read-only]    ( 4MB) (16MB)
  *   * Start of guest unmodifiable area
  */
 

@@ -76,7 +76,7 @@ $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 
 # I'm sure a Makefile wizard would know a better way to do this
 xen.lds.s: xen/xen.lds.S
-	$(CC) -E $(CPPFLAGS) -P -DXEN -D__ASSEMBLY__ \
+	$(CC) -E $(CPPFLAGS) -P -DXEN $(AFLAGS) \
 		-o xen.lds.s xen/xen.lds.S
 
 clean:: FORCE

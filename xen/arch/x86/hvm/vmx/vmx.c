@@ -400,7 +400,7 @@ void vmx_migrate_timers(struct vcpu *v)
         migrate_timer(&(VLAPIC(v)->vlapic_timer), v->processor);
 }
 
-struct vmx_store_cpu_guest_regs_callback_info {
+struct vmx_cpu_guest_regs_callback_info {
     struct vcpu *v;
     struct cpu_user_regs *regs;
     unsigned long *crs;
@@ -409,10 +409,19 @@ struct vmx_store_cpu_guest_regs_callback_info {
 static void vmx_store_cpu_guest_regs(
     struct vcpu *v, struct cpu_user_regs *regs, unsigned long *crs);
 
+static void vmx_load_cpu_guest_regs(
+    struct vcpu *v, struct cpu_user_regs *regs);
+
 static void vmx_store_cpu_guest_regs_callback(void *data)
 {
-    struct vmx_store_cpu_guest_regs_callback_info *info = data;
+    struct vmx_cpu_guest_regs_callback_info *info = data;
     vmx_store_cpu_guest_regs(info->v, info->regs, info->crs);
+}
+
+static void vmx_load_cpu_guest_regs_callback(void *data)
+{
+    struct vmx_cpu_guest_regs_callback_info *info = data;
+    vmx_load_cpu_guest_regs(info->v, info->regs);
 }
 
 static void vmx_store_cpu_guest_regs(
@@ -426,7 +435,7 @@ static void vmx_store_cpu_guest_regs(
         if ( v->arch.hvm_vmx.launch_cpu != smp_processor_id() )
         {
             /* Get register details from remote CPU. */
-            struct vmx_store_cpu_guest_regs_callback_info info = {
+            struct vmx_cpu_guest_regs_callback_info info = {
                 .v = v, .regs = regs, .crs = crs };
             cpumask_t cpumask = cpumask_of_cpu(v->arch.hvm_vmx.launch_cpu);
             on_selected_cpus(cpumask, vmx_store_cpu_guest_regs_callback,
@@ -479,8 +488,33 @@ static void vmx_store_cpu_guest_regs(
 
 void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 {
+    if ( v != current )
+    {
+        /* Non-current VCPUs must be paused to set the register snapshot. */
+        ASSERT(atomic_read(&v->pausecnt) != 0);
+
+        if ( v->arch.hvm_vmx.launch_cpu != smp_processor_id() )
+        {
+            struct vmx_cpu_guest_regs_callback_info info = {
+                .v = v, .regs = regs };
+            cpumask_t cpumask = cpumask_of_cpu(v->arch.hvm_vmx.launch_cpu);
+            on_selected_cpus(cpumask, vmx_load_cpu_guest_regs_callback,
+                             &info, 1, 1);
+            return;
+        }
+
+        /* Register details are on this CPU. Load the correct VMCS. */
+        __vmptrld(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+    }
+
+    ASSERT(v->arch.hvm_vmx.launch_cpu == smp_processor_id());
+
 #if defined (__x86_64__)
     __vmwrite(GUEST_SS_SELECTOR, regs->ss);
+    __vmwrite(GUEST_DS_SELECTOR, regs->ds);
+    __vmwrite(GUEST_ES_SELECTOR, regs->es);
+    __vmwrite(GUEST_GS_SELECTOR, regs->gs);
+    __vmwrite(GUEST_FS_SELECTOR, regs->fs);
     __vmwrite(GUEST_RSP, regs->rsp);
 
     __vmwrite(GUEST_RFLAGS, regs->rflags);
@@ -493,6 +527,11 @@ void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
     __vmwrite(GUEST_RIP, regs->rip);
 #elif defined (__i386__)
     __vmwrite(GUEST_SS_SELECTOR, regs->ss);
+    __vmwrite(GUEST_DS_SELECTOR, regs->ds);
+    __vmwrite(GUEST_ES_SELECTOR, regs->es);
+    __vmwrite(GUEST_GS_SELECTOR, regs->gs);
+    __vmwrite(GUEST_FS_SELECTOR, regs->fs);
+
     __vmwrite(GUEST_RSP, regs->esp);
 
     __vmwrite(GUEST_RFLAGS, regs->eflags);
@@ -503,14 +542,11 @@ void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 
     __vmwrite(GUEST_CS_SELECTOR, regs->cs);
     __vmwrite(GUEST_RIP, regs->eip);
-#else
-#error Unsupported architecture
 #endif
-}
 
-void vmx_modify_guest_state(struct vcpu *v)
-{
-    modify_vmcs(&v->arch.hvm_vmx, &v->arch.guest_context.user_regs);
+    /* Reload current VCPU's VMCS if it was temporarily unloaded. */
+    if ( (v != current) && hvm_guest(current) )
+        __vmptrld(virt_to_maddr(current->arch.hvm_vmx.vmcs));
 }
 
 int vmx_realmode(struct vcpu *v)
@@ -660,8 +696,6 @@ int start_vmx(void)
 
     hvm_funcs.store_cpu_guest_regs = vmx_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = vmx_load_cpu_guest_regs;
-
-    hvm_funcs.modify_guest_state = vmx_modify_guest_state;
 
     hvm_funcs.realmode = vmx_realmode;
     hvm_funcs.paging_enabled = vmx_paging_enabled;
