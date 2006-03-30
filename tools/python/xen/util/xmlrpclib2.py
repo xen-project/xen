@@ -23,8 +23,12 @@ An enhanced XML-RPC client/server interface for Python.
 from httplib import HTTPConnection, HTTP
 from xmlrpclib import Transport
 from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
-import xmlrpclib, socket, os, traceback
+import xmlrpclib, socket, os
 import SocketServer
+
+import xen.xend.XendClient
+from xen.xend.XendLogging import log
+
 
 # A new ServerProxy that also supports httpu urls.  An http URL comes in the
 # form:
@@ -60,8 +64,7 @@ class ServerProxy(xmlrpclib.ServerProxy):
                                        verbose, allow_none)
 
 # This is a base XML-RPC server for TCP.  It sets allow_reuse_address to
-# true, and has an improved marshaller that serializes unknown exceptions
-# with full traceback information.
+# true, and has an improved marshaller that logs and serializes exceptions.
 
 class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
     allow_reuse_address = True
@@ -80,10 +83,10 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
                                        allow_none=1)
         except xmlrpclib.Fault, fault:
             response = xmlrpclib.dumps(fault)
-        except:
+        except Exception, exn:
+            log.exception(exn)
             response = xmlrpclib.dumps(
-                xmlrpclib.Fault(1, traceback.format_exc())
-                )
+                xmlrpclib.Fault(xen.xend.XendClient.ERROR_INTERNAL, str(exn)))
 
         return response
 
