@@ -20,7 +20,7 @@
 #ifdef CONFIG_SMP
 # define vhpt_flush_all()	smp_vhpt_flush_all()
 #else
-# define vhpt_flush_all()   vhpt_flush()
+# define vhpt_flush_all()	vhpt_flush()
 #endif
 // FIXME: These should be automatically generated
 
