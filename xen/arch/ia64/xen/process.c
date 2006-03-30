@@ -30,6 +30,7 @@
 #include <asm/vcpu.h>
 #include <asm/ia64_int.h>
 #include <asm/dom_fw.h>
+#include <asm/vhpt.h>
 #include "hpsim_ssc.h"
 #include <xen/multicall.h>
 #include <asm/debugger.h>
@@ -63,11 +64,15 @@ extern unsigned long dom0_start, dom0_size;
 
 void schedule_tail(struct vcpu *prev)
 {
+	extern char ia64_ivt;
 	context_saved(prev);
 
 	if (VMX_DOMAIN(current)) {
 		vmx_do_launch(current);
 	} else {
+		ia64_set_iva(&ia64_ivt);
+        	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
+		        VHPT_ENABLED);
 		load_region_regs(current);
 		vcpu_load_kernel_regs(current);
 	}
