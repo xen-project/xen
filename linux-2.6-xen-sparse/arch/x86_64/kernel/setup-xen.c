@@ -999,7 +999,7 @@ void __init setup_arch(char **cmdline_p)
 static int
 xen_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
-	HYPERVISOR_sched_op(SCHEDOP_shutdown, SHUTDOWN_crash);
+	HYPERVISOR_shutdown(SHUTDOWN_crash);
 	/* we're never actually going to get here... */
 	return NOTIFY_DONE;
 }

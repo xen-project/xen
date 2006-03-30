@@ -45,6 +45,11 @@ CFLAGS				+= $(shell if [ $(call cc-version) -lt 0400 ] ; then echo $(call cc-op
 
 CFLAGS += $(cflags-y)
 
+cppflags-$(CONFIG_XEN) += \
+	-D__XEN_INTERFACE_VERSION__=$(CONFIG_XEN_INTERFACE_VERSION)
+
+CPPFLAGS += $(cppflags-y)
+
 # Default subarch .c files
 mcore-y  := mach-default
 
@@ -107,7 +112,7 @@ boot := arch/i386/boot
 	zdisk bzdisk fdimage fdimage144 fdimage288 install
 
 ifdef CONFIG_XEN
-CPPFLAGS        := -D__KERNEL__ -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(LINUXINCLUDE)
+CPPFLAGS := -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(CPPFLAGS)
 head-y := arch/i386/kernel/head-xen.o arch/i386/kernel/init_task-xen.o
 boot := arch/i386/boot-xen
 .PHONY: vmlinuz

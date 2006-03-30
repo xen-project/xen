@@ -37,8 +37,11 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/version.h>
+#include <linux/errno.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/dom0_ops.h>
+#include <xen/interface/sched.h>
+#include <xen/interface/nmi.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
 #if defined(__i386__)
@@ -114,6 +117,64 @@ u64 jiffies_to_st(unsigned long jiffies);
 #endif
 
 #define xen_init()	(0)
+
+static inline int
+HYPERVISOR_yield(
+	void)
+{
+	int rc = HYPERVISOR_sched_op(SCHEDOP_yield, NULL);
+
+	if (rc == -ENOSYS)
+		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
+
+	return rc;
+}
+
+static inline int
+HYPERVISOR_block(
+	void)
+{
+	int rc = HYPERVISOR_sched_op(SCHEDOP_block, NULL);
+
+	if (rc == -ENOSYS)
+		rc = HYPERVISOR_sched_op_compat(SCHEDOP_block, 0);
+
+	return rc;
+}
+
+static inline int
+HYPERVISOR_shutdown(
+	unsigned int reason)
+{
+	struct sched_shutdown sched_shutdown = {
+		.reason = reason
+	};
+
+	int rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
+
+	if (rc == -ENOSYS)
+		rc = HYPERVISOR_sched_op_compat(SCHEDOP_shutdown, reason);
+
+	return rc;
+}
+
+static inline int
+HYPERVISOR_poll(
+	evtchn_port_t *ports, unsigned int nr_ports, u64 timeout)
+{
+	struct sched_poll sched_poll = {
+		.ports = ports,
+		.nr_ports = nr_ports,
+		.timeout = jiffies_to_st(timeout)
+	};
+
+	int rc = HYPERVISOR_sched_op(SCHEDOP_poll, &sched_poll);
+
+	if (rc == -ENOSYS)
+		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
+
+	return rc;
+}
 
 static inline void
 MULTI_update_va_mapping(

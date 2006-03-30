@@ -114,7 +114,7 @@ void xen_idle(void)
 		smp_mb__after_clear_bit();
 		stop_hz_timer();
 		/* Blocking includes an implicit local_irq_enable(). */
-		HYPERVISOR_sched_op(SCHEDOP_block, 0);
+		HYPERVISOR_block();
 		start_hz_timer();
 		set_thread_flag(TIF_POLLING_NRFLAG);
 	}

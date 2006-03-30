@@ -42,7 +42,7 @@ void machine_emergency_restart(void)
 {
 	/* We really want to get pending console data out before we die. */
 	xencons_force_flush();
-	HYPERVISOR_sched_op(SCHEDOP_shutdown, SHUTDOWN_reboot);
+	HYPERVISOR_shutdown(SHUTDOWN_reboot);
 }
 
 void machine_restart(char * __unused)
@@ -59,7 +59,7 @@ void machine_power_off(void)
 {
 	/* We really want to get pending console data out before we die. */
 	xencons_force_flush();
-	HYPERVISOR_sched_op(SCHEDOP_shutdown, SHUTDOWN_poweroff);
+	HYPERVISOR_shutdown(SHUTDOWN_poweroff);
 }
 
 int reboot_thru_bios = 0;	/* for dmi_scan.c */
