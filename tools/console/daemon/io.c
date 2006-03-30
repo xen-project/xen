@@ -434,25 +434,36 @@ void enum_domains(void)
 	}
 }
 
+static int ring_free_bytes(struct domain *dom)
+{
+	struct xencons_interface *intf = dom->interface;
+	XENCONS_RING_IDX cons, prod, space;
+
+	cons = intf->in_cons;
+	prod = intf->in_prod;
+	mb();
+
+	space = prod - cons;
+	if (space > sizeof(intf->in))
+		return 0; /* ring is screwed: ignore it */
+
+	return (sizeof(intf->in) - space);
+}
+
 static void handle_tty_read(struct domain *dom)
 {
 	ssize_t len = 0;
 	char msg[80];
 	int i;
 	struct xencons_interface *intf = dom->interface;
-	XENCONS_RING_IDX cons, prod;
+	XENCONS_RING_IDX prod;
 
-	cons = intf->in_cons;
-	prod = intf->in_prod;
-	mb();
-
-	if (sizeof(intf->in) > (prod - cons))
-		len = sizeof(intf->in) - (prod - cons);
-	if (len > sizeof(msg))
-		len = sizeof(msg);
-
+	len = ring_free_bytes(dom);
 	if (len == 0)
 		return;
+
+	if (len > sizeof(msg))
+		len = sizeof(msg);
 
 	len = read(dom->tty_fd, msg, len);
 	if (len < 1) {
@@ -465,6 +476,7 @@ static void handle_tty_read(struct domain *dom)
 			shutdown_domain(dom);
 		}
 	} else if (domain_is_valid(dom->domid)) {
+		prod = intf->in_prod;
 		for (i = 0; i < len; i++) {
 			intf->in[MASK_XENCONS_IDX(prod++, intf->in)] =
 				msg[i];
@@ -514,7 +526,7 @@ static void handle_ring_read(struct domain *dom)
 	(void)write_sync(dom->evtchn_fd, &v, sizeof(v));
 }
 
-static void handle_xs(int fd)
+static void handle_xs(void)
 {
 	char **vec;
 	int domid;
@@ -560,7 +572,7 @@ void handle_io(void)
 			}
 
 			if (d->tty_fd != -1) {
-				if (!d->is_dead)
+				if (!d->is_dead && ring_free_bytes(d))
 					FD_SET(d->tty_fd, &readfds);
 
 				if (!buffer_empty(&d->buffer))
@@ -572,7 +584,7 @@ void handle_io(void)
 		ret = select(max_fd + 1, &readfds, &writefds, 0, NULL);
 
 		if (FD_ISSET(xs_fileno(xs), &readfds))
-			handle_xs(xs_fileno(xs));
+			handle_xs();
 
 		for (d = dom_head; d; d = n) {
 			n = d->next;
