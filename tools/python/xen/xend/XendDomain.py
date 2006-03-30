@@ -34,7 +34,7 @@ import XendDomainInfo
 
 from xen.xend import XendRoot
 from xen.xend import XendCheckpoint
-from xen.xend.XendError import XendError
+from xen.xend.XendError import XendError, XendInvalidDomain
 from xen.xend.XendLogging import log
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
@@ -357,6 +357,8 @@ class XendDomain:
         """Unpause domain execution."""
         try:
             dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+            if not dominfo:
+                raise XendInvalidDomain(str(domid))
             log.info("Domain %s (%d) unpaused.", dominfo.getName(),
                      dominfo.getDomid())
             return dominfo.unpause()
@@ -368,6 +370,8 @@ class XendDomain:
         """Pause domain execution."""
         try:
             dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+            if not dominfo:
+                raise XendInvalidDomain(str(domid))
             log.info("Domain %s (%d) paused.", dominfo.getName(),
                      dominfo.getDomid())
             return dominfo.pause()
@@ -395,6 +399,8 @@ class XendDomain:
         """Start domain migration."""
 
         dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
 
         if dominfo.getDomid() == PRIV_DOMAIN:
             raise XendError("Cannot migrate privileged domain %i" % domid)
@@ -420,6 +426,8 @@ class XendDomain:
 
         try:
             dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+            if not dominfo:
+                raise XendInvalidDomain(str(domid))
 
             if dominfo.getDomid() == PRIV_DOMAIN:
                 raise XendError("Cannot save privileged domain %i" % domid)
@@ -440,9 +448,9 @@ class XendDomain:
         @param cpumap:  string repr of list of usable cpus
         """
         dominfo = self.domain_lookup_by_name_or_id_nr(domid)
-        # convert cpumap string into a list of ints
-        cpumap = map(lambda x: int(x),
-                     cpumap.replace("[", "").replace("]", "").split(","))
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
+
         try:
             return xc.vcpu_setaffinity(dominfo.getDomid(), vcpu, cpumap)
         except Exception, ex:
@@ -453,6 +461,8 @@ class XendDomain:
         """Set BVT (Borrowed Virtual Time) scheduler parameters for a domain.
         """
         dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
         try:
             return xc.bvtsched_domain_set(dom=dominfo.getDomid(),
                                           mcuadv=mcuadv,
@@ -466,6 +476,8 @@ class XendDomain:
         """Get BVT (Borrowed Virtual Time) scheduler parameters for a domain.
         """
         dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
         try:
             return xc.bvtsched_domain_get(dominfo.getDomid())
         except Exception, ex:
@@ -477,6 +489,8 @@ class XendDomain:
         """Set Simple EDF scheduler parameters for a domain.
         """
         dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
         try:
             return xc.sedf_domain_set(dominfo.getDomid(), period, slice_,
                                       latency, extratime, weight)
@@ -487,8 +501,9 @@ class XendDomain:
         """Get Simple EDF scheduler parameters for a domain.
         """
         dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
         try:
-            
             sedf_info = xc.sedf_domain_get(dominfo.getDomid())
             # return sxpr
             return ['sedf',
@@ -509,6 +524,8 @@ class XendDomain:
         @return: 0 on success, -1 on error
         """
         dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
         maxmem = int(mem) * 1024
         try:
             return xc.domain_setmaxmem(dominfo.getDomid(), maxmem)
@@ -523,6 +540,8 @@ class XendDomain:
         @return: 0 on success, -1 on error
         """
         dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
         nr_ports = last - first + 1
         try:
             return xc.domain_ioport_permission(dominfo.getDomid(),
@@ -540,6 +559,8 @@ class XendDomain:
         @return: 0 on success, -1 on error
         """
         dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
         nr_ports = last - first + 1
         try:
             return xc.domain_ioport_permission(dominfo.getDomid(),
