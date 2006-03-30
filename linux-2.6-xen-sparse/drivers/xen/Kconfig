@@ -10,12 +10,11 @@ config XEN
 	help
 	  This is the Linux Xen port.
 
-config NO_IDLE_HZ
-	bool
-	depends on XEN
-	default y
-
 if XEN
+config XEN_INTERFACE_VERSION
+	hex
+	default 0x00030101
+
 menu "XEN"
 
 config XEN_PRIVILEGED_GUEST
@@ -191,7 +190,6 @@ config XEN_DISABLE_SERIAL
 
 config XEN_SYSFS
 	tristate "Export Xen attributes in sysfs"
-	depends on XEN
 	depends on SYSFS
 	default y
 	help
@@ -204,6 +202,10 @@ config HAVE_ARCH_ALLOC_SKB
 	default y
 
 config HAVE_ARCH_DEV_ALLOC_SKB
+	bool
+	default y
+
+config NO_IDLE_HZ
 	bool
 	default y
 

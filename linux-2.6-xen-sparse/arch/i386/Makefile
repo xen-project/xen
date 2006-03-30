@@ -45,6 +45,11 @@ CFLAGS				+= $(shell if [ $(call cc-version) -lt 0400 ] ; then echo $(call cc-op
 
 CFLAGS += $(cflags-y)
 
+cppflags-$(CONFIG_XEN) += \
+	-D__XEN_INTERFACE_VERSION__=$(CONFIG_XEN_INTERFACE_VERSION)
+
+CPPFLAGS += $(cppflags-y)
+
 # Default subarch .c files
 mcore-y  := mach-default
 

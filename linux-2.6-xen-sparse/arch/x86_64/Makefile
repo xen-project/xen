@@ -31,6 +31,10 @@ cflags-$(CONFIG_MK8) += $(call cc-option,-march=k8)
 cflags-$(CONFIG_MPSC) += $(call cc-option,-march=nocona)
 CFLAGS += $(cflags-y)
 
+cppflags-$(CONFIG_XEN) += \
+	-D__XEN_INTERFACE_VERSION__=$(CONFIG_XEN_INTERFACE_VERSION)
+CPPFLAGS += $(cppflags-y)
+
 CFLAGS += -m64
 CFLAGS += -mno-red-zone
 CFLAGS += -mcmodel=kernel
