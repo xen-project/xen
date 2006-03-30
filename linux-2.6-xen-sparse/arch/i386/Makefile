@@ -107,7 +107,7 @@ boot := arch/i386/boot
 	zdisk bzdisk fdimage fdimage144 fdimage288 install
 
 ifdef CONFIG_XEN
-CPPFLAGS        := -D__KERNEL__ -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(LINUXINCLUDE)
+CPPFLAGS := -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(CPPFLAGS)
 head-y := arch/i386/kernel/head-xen.o arch/i386/kernel/init_task-xen.o
 boot := arch/i386/boot-xen
 .PHONY: vmlinuz

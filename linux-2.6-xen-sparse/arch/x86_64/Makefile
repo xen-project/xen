@@ -71,7 +71,7 @@ boot := arch/x86_64/boot
 	fdimage fdimage144 fdimage288 archclean
 
 ifdef CONFIG_XEN
-CPPFLAGS := -D__KERNEL__ -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(LINUXINCLUDE)
+CPPFLAGS := -Iinclude$(if $(KBUILD_SRC),2)/asm/mach-xen $(CPPFLAGS)
 head-y := arch/x86_64/kernel/head-xen.o arch/x86_64/kernel/head64-xen.o arch/x86_64/kernel/init_task.o
 LDFLAGS_vmlinux := -e _start
 boot := arch/i386/boot-xen
