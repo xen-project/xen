@@ -584,7 +584,7 @@ retint_kernel:
  */		
 	.macro apicinterrupt num,func
 	INTR_FRAME
-	pushq 0x8000000000000000+$\num
+	pushq $~(\num)
 	CFI_ADJUST_CFA_OFFSET 8
 	interrupt \func
 	jmp error_entry
