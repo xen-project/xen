@@ -16,6 +16,7 @@ typedef	struct vcpu VCPU;
 typedef cpu_user_regs_t REGS;
 
 
+/* Note: PSCB stands for Privilegied State Communication Block.  */
 #define VCPU(_v,_x)	(_v->arch.privregs->_x)
 #define PSCB(_v,_x) VCPU(_v,_x)
 #define PSCBX(_v,_x) (_v->arch._x)
@@ -184,11 +185,6 @@ itir_mask(UINT64 itir)
     (_tr_regions & (1 << ((unsigned long)_ifa >> 61)))
 #define vcpu_quick_region_set(_tr_regions,_ifa)             \
     do {_tr_regions |= (1 << ((unsigned long)_ifa >> 61)); } while (0)
-
-// FIXME: also need to check && (!trp->key || vcpu_pkr_match(trp->key))
-#define vcpu_match_tr_entry(_trp,_ifa,_rid)             \
-    ((_trp->p && (_trp->rid==_rid) && (_ifa >= _trp->vadr) &&   \
-    (_ifa < (_trp->vadr + (1L<< _trp->ps)) - 1)))
 
 
 #endif

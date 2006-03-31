@@ -1273,6 +1273,14 @@ unsigned long recover_to_break_fault_count = 0;
 
 int warn_region0_address = 0; // FIXME later: tie to a boot parameter?
 
+// FIXME: also need to check && (!trp->key || vcpu_pkr_match(trp->key))
+static inline int vcpu_match_tr_entry(TR_ENTRY *trp, UINT64 ifa, UINT64 rid)
+{
+	return trp->p && trp->rid == rid 
+		&& ifa >= trp->vadr
+		&& ifa <= (trp->vadr + (1L << trp->ps) - 1);
+}
+
 IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, BOOLEAN in_tpa, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
 {
 	unsigned long region = address >> 61;
