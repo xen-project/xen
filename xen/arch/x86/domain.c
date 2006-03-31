@@ -79,15 +79,12 @@ void idle_loop(void)
 
     for ( ; ; )
     {
-        irq_stat[cpu].idle_timestamp = jiffies;
+        page_scrub_schedule_work();
 
-        while ( !softirq_pending(cpu) )
-        {
-            page_scrub_schedule_work();
-            default_idle();
-        }
+        default_idle();
 
-        do_softirq();
+        if ( softirq_pending(cpu) )
+            do_softirq();
     }
 }
 
