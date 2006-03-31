@@ -91,6 +91,11 @@ config XEN_SYSFS
 	help
 		Xen hypervisor attributes will show up under /sys/hypervisor/.
 
+config XEN_INTERFACE_VERSION
+	hex
+	depends on XEN
+	default 0x00030101
+
 config SCHED_NO_NO_OMIT_FRAME_POINTER
 	bool
 	default y
