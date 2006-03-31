@@ -864,7 +864,14 @@ def parseCommandLine(argv):
         gopts.vals.display = os.getenv("DISPLAY")
 
     if not gopts.vals.xauthority:
-        gopts.vals.xauthority = os.getenv("XAUTHORITY")
+        xauth = os.getenv("XAUTHORITY")
+        if not xauth:
+            home = os.getenv("HOME")
+            if not home:
+                import posix, pwd
+                home = pwd.getpwuid(posix.getuid())[5]
+            xauth = home + "/.Xauthority"
+        gopts.vals.xauthority = xauth
 
     # Process remaining args as config variables.
     for arg in args:
