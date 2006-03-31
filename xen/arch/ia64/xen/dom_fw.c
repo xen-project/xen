@@ -157,13 +157,17 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 		printf("*** CALLED SAL_SET_VECTORS.  IGNORED...\n");
 		break;
 	    case SAL_GET_STATE_INFO:
-		printf("*** CALLED SAL_GET_STATE_INFO.  IGNORED...\n");
+		/* No more info.  */
+		status = -5;
+		r9 = 0;
 		break;
 	    case SAL_GET_STATE_INFO_SIZE:
-		printf("*** CALLED SAL_GET_STATE_INFO_SIZE.  IGNORED...\n");
+		/* Return a dummy size.  */
+		status = 0;
+		r9 = 128;
 		break;
 	    case SAL_CLEAR_STATE_INFO:
-		printf("*** CALLED SAL_CLEAR_STATE_INFO.  IGNORED...\n");
+		/* Noop.  */
 		break;
 	    case SAL_MC_RENDEZ:
 		printf("*** CALLED SAL_MC_RENDEZ.  IGNORED...\n");
