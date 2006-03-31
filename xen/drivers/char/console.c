@@ -684,6 +684,7 @@ void panic(const char *fmt, ...)
     va_end(args);
 
     /* Spit out multiline message in one go. */
+    console_start_sync();
     spin_lock_irqsave(&lock, flags);
     printk("\n****************************************\n");
     printk("Panic on CPU %d:\n", smp_processor_id());
