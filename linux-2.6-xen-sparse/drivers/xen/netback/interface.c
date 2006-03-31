@@ -293,25 +293,6 @@ void free_netif(netif_t *netif)
 	schedule_work(&netif->free_work);
 }
 
-void netif_creditlimit(netif_t *netif)
-{
-#if 0
-	/* Set the credit limit (reset remaining credit to new limit). */
-	netif->credit_bytes     = creditlimit->credit_bytes;
-	netif->remaining_credit = creditlimit->credit_bytes;
-	netif->credit_usec      = creditlimit->period_usec;
-
-	if (netif->status == CONNECTED) {
-		/*
-		 * Schedule work so that any packets waiting under previous
-		 * credit limit are dealt with (acts as a replenishment point).
-		 */
-		netif->credit_timeout.expires = jiffies;
-		netif_schedule_work(netif);
-	}
-#endif
-}
-
 void netif_disconnect(netif_t *netif)
 {
 	switch (netif->status) {

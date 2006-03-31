@@ -233,9 +233,44 @@ static void frontend_changed(struct xenbus_device *dev,
 
 static void maybe_connect(struct backend_info *be)
 {
-	if (be->netif != NULL && be->frontend_state == XenbusStateConnected) {
+	if (be->netif && (be->frontend_state == XenbusStateConnected))
 		connect(be);
-	}
+}
+
+static void xen_net_read_rate(struct xenbus_device *dev,
+			      unsigned long *bytes, unsigned long *usec)
+{
+	char *s, *e;
+	unsigned long b, u;
+	char *ratestr;
+
+	/* Default to unlimited bandwidth. */
+	*bytes = ~0UL;
+	*usec = 0;
+
+	ratestr = xenbus_read(XBT_NULL, dev->nodename, "rate", NULL);
+	if (IS_ERR(ratestr))
+		return;
+
+	s = ratestr;
+	b = simple_strtoul(s, &e, 10);
+	if ((s == e) || (*e != ','))
+		goto fail;
+
+	s = e + 1;
+	u = simple_strtoul(s, &e, 10);
+	if ((s == e) || (*e != '\0'))
+		goto fail;
+
+	*bytes = b;
+	*usec = u;
+
+	kfree(ratestr);
+	return;
+
+ fail:
+	WPRINTK("Failed to parse network rate limit. Traffic unlimited.\n");
+	kfree(ratestr);
 }
 
 
@@ -253,6 +288,10 @@ static void connect(struct backend_info *be)
 		xenbus_dev_fatal(dev, err, "parsing %s/mac", dev->nodename);
 		return;
 	}
+
+	xen_net_read_rate(dev, &be->netif->credit_bytes,
+			  &be->netif->credit_usec);
+	be->netif->remaining_credit = be->netif->credit_bytes;
 
 	xenbus_switch_state(dev, XenbusStateConnected);
 }
