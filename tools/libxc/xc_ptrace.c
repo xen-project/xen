@@ -401,6 +401,8 @@ map_domain_va(
     return map_domain_va_32(xc_handle, cpu, guest_va, perm);
 }
 
+int control_c_pressed_flag = 0;
+
 static int 
 __xc_waitdomain(
     int xc_handle,
@@ -419,7 +421,6 @@ __xc_waitdomain(
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = domain;
     
-    
  retry:
     retval = do_dom0_op(xc_handle, &op);
     if ( retval || (op.u.getdomaininfo.domain != domain) )
@@ -432,12 +433,17 @@ __xc_waitdomain(
     if ( options & WNOHANG )
         goto done;
 
+    if (control_c_pressed_flag) {
+        xc_domain_pause(xc_handle, domain);
+        control_c_pressed_flag = 0;
+        goto done;
+    }
+
     if ( !(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED) )
     {
         nanosleep(&ts,NULL);
         goto retry;
     }
-    /* XXX check for ^C here */
  done:
     if (get_online_cpumap(xc_handle, &op.u.getdomaininfo, &cpumap))
         printf("get_online_cpumap failed\n");

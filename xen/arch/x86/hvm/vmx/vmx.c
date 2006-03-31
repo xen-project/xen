@@ -2130,6 +2130,14 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
             break;
         }
+        case TRAP_int3:
+        {
+            if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
+                domain_pause_for_debugger();
+            else 
+                vmx_inject_exception(v, TRAP_int3, VMX_DELIVER_NO_ERROR_CODE);
+            break;
+        }
 #endif
         case TRAP_no_device:
         {

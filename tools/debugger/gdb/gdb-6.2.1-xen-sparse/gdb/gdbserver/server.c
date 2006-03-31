@@ -287,6 +287,21 @@ handle_v_requests (char *own_buf, char *status, unsigned char *signal)
 }
 
 void
+handle_breakpoint_requests (char *own_buf, char *status, unsigned char *signal)
+{
+  /*  Currently we only support software breakpoints */
+    switch (own_buf[1]) {
+        case '0': /* software breakpoint, int3 based */
+	      own_buf[0] = '\0';
+            break;
+        case '1': /* hardware breakpoint */
+        default:
+		  write_enn (own_buf);
+            break;
+    }
+}
+
+void
 myresume (int step, int sig)
 {
   struct thread_resume resume_info[2];
@@ -321,6 +336,18 @@ gdbserver_usage (void)
 	 "COMM may either be a tty device (for serial debugging), or \n"
 	 "HOST:PORT to listen for a TCP connection.\n");
 }
+
+extern control_c_pressed_flag;
+#include <signal.h>
+
+void ctrl_c_handler(int signo)
+{
+    printf("Ctrl-C pressed: Quit from the attached gdb first\n");
+    control_c_pressed_flag = 1;
+}
+
+struct sigaction ctrl_c_sigaction = { .sa_handler = ctrl_c_handler };
+struct sigaction old_sigaction;
 
 int
 main (int argc, char *argv[])
@@ -396,9 +423,11 @@ main (int argc, char *argv[])
 	}
     }
 
+
   while (1)
     {
       remote_open (argv[1]);
+      sigaction(SIGINT, &ctrl_c_sigaction, &old_sigaction);
 
     restart:
       setjmp (toplevel);
@@ -587,6 +616,9 @@ main (int argc, char *argv[])
 	      /* Extended (long) request.  */
 	      handle_v_requests (own_buf, &status, &signal);
 	      break;
+	    case 'Z':
+	      handle_breakpoint_requests (own_buf, &status, &signal);
+	      break;
 	    default:
 	      /* It is a request we don't understand.  Respond with an
 	         empty packet so that gdb knows that we don't support this
@@ -643,5 +675,6 @@ main (int argc, char *argv[])
 			   "GDBserver will reopen the connection.\n");
 	  remote_close ();
 	}
+    sigaction(SIGINT, &old_sigaction, NULL);
     }
 }
