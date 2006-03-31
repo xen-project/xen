@@ -395,7 +395,10 @@ gnttab_resume(void)
 	setup.frame_list = frames;
 
 	rc = HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1);
-	BUG_ON(rc || setup.status);
+	if (rc < 0)
+		return rc;
+
+	BUG_ON(setup.status);
 
 #ifndef __ia64__
 	if (shared == NULL) {
@@ -436,7 +439,8 @@ gnttab_init(void)
 	if (xen_init() < 0)
 		return -ENODEV;
 
-	BUG_ON(gnttab_resume());
+	if (gnttab_resume() < 0)
+		return -ENODEV;
 
 	for (i = NR_RESERVED_ENTRIES; i < NR_GRANT_ENTRIES; i++)
 		gnttab_list[i] = i + 1;

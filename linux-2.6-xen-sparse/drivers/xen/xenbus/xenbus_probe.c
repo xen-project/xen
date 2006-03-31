@@ -998,6 +998,14 @@ static int __init xenbus_probe_init(void)
 	device_register(&xenbus_backend.dev);
 
 	/*
+         * The supervisor_mode_kernel feature only allows a single
+         * domain so there is no need to initialise event channels
+         * etc.
+         */
+	if (xen_feature(XENFEAT_supervisor_mode_kernel))
+		return -ENODEV;
+
+	/*
 	 * Domain0 doesn't have a store_evtchn or store_mfn yet.
 	 */
 	dom0 = (xen_start_info->store_evtchn == 0);
