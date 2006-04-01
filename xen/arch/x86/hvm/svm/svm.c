@@ -1163,16 +1163,12 @@ static unsigned int check_for_null_selector(struct vmcb_struct *vmcb,
             seg = vmcb->ds;
             break;
         default:
-            if (dir == IOREQ_READ)
+            if (dir == IOREQ_READ) /* IN/INS instruction? */
                 seg = vmcb->es;
             else
                 seg = vmcb->ds;
         }
         
-        /* In real Mode */
-        if (real)
-            seg.base = seg.sel << 4;
-
         if (base)
             *base = seg.base;
 
