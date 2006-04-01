@@ -42,6 +42,20 @@
 static char opt_badpage[100] = "";
 string_param("badpage", opt_badpage);
 
+/*
+ * Amount of memory to reserve in a low-memory (<4GB) pool for specific
+ * allocation requests. Ordinary requests will not fall back to the
+ * lowmem emergency pool.
+ */
+static unsigned long lowmem_emergency_pool_pages;
+static void parse_lowmem_emergency_pool(char *s)
+{
+    unsigned long long bytes;
+    bytes = parse_size_and_unit(s);
+    lowmem_emergency_pool_pages = bytes >> PAGE_SHIFT;
+}
+custom_param("lowmem_emergency_pool", parse_lowmem_emergency_pool);
+
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 
@@ -514,7 +528,15 @@ struct page_info *alloc_domheap_pages(
     ASSERT(!in_irq());
 
     if ( !(flags & ALLOC_DOM_DMA) )
+    {
         pg = alloc_heap_pages(MEMZONE_DOM, order);
+        /* Failure? Then check if we can fall back to the DMA pool. */
+        if ( unlikely(pg == NULL) &&
+             ((order > MAX_ORDER) ||
+              (avail[MEMZONE_DMADOM] <
+               (lowmem_emergency_pool_pages + (1UL << order)))) )
+            return NULL;
+    }
 
     if ( pg == NULL )
         if ( (pg = alloc_heap_pages(MEMZONE_DMADOM, order)) == NULL )
@@ -657,7 +679,17 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
 
 unsigned long avail_domheap_pages(void)
 {
-    return avail[MEMZONE_DOM] + avail[MEMZONE_DMADOM];
+    unsigned long avail_nrm, avail_dma;
+
+    avail_nrm = avail[MEMZONE_DOM];
+
+    avail_dma = avail[MEMZONE_DMADOM];
+    if ( avail_dma > lowmem_emergency_pool_pages )
+        avail_dma -= lowmem_emergency_pool_pages;
+    else
+        avail_dma = 0;
+
+    return avail_nrm + avail_dma;
 }
 
 
