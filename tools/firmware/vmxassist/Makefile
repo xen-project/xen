@@ -53,25 +53,25 @@ vmxassist.bin: vmxassist.ld $(OBJECTS)
 	dd if=vmxassist.tmp of=vmxassist.bin ibs=512 conv=sync
 	rm -f vmxassist.tmp
 
-head.o: machine.h head.S
+head.o: machine.h vm86.h head.S
 	$(CC) $(CFLAGS) -D__ASSEMBLY__ $(DEFINES) -c head.S
 
-trap.o: machine.h offsets.h trap.S
+trap.o: machine.h vm86.h offsets.h trap.S
 	$(CC) $(CFLAGS) -D__ASSEMBLY__ $(DEFINES) -c trap.S
 
-vm86.o: machine.h vm86.c
+vm86.o: machine.h vm86.h vm86.c
 	$(CC) $(CFLAGS) -c vm86.c
 
-setup.o: machine.h setup.c
+setup.o: machine.h vm86.h setup.c
 	$(CC) $(CFLAGS) -c setup.c
 
-util.o: machine.h util.c
+util.o: machine.h vm86.h util.c
 	$(CC) $(CFLAGS) -c util.c
 
 offsets.h: gen
 	./gen > offsets.h
 
-gen:	gen.c
+gen:	vm86.h gen.c
 	$(HOSTCC) $(HOSTCFLAGS) -I. $(XENINC) -o gen gen.c
 
 clean:

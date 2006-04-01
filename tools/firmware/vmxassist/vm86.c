@@ -34,7 +34,7 @@
 #define	SEG_FS		0x0040
 #define	SEG_GS		0x0080
 
-unsigned prev_eip = 0;
+static unsigned prev_eip = 0;
 enum vm86_mode mode = 0;
 
 #ifdef DEBUG
@@ -50,23 +50,41 @@ char *states[] = {
 static char *rnames[] = { "ax", "cx", "dx", "bx", "sp", "bp", "si", "di" };
 #endif /* DEBUG */
 
-unsigned
+static unsigned
 address(struct regs *regs, unsigned seg, unsigned off)
 {
 	unsigned long long entry;
-	unsigned addr;
+	unsigned seg_base, seg_limit;
+	unsigned entry_low, entry_high;
 
-	if (seg == 0)
-		return off;
+	if (seg == 0) {
+		if (mode == VM86_REAL || mode == VM86_REAL_TO_PROTECTED)
+			return off;
+		else
+			panic("segment is zero, but not in real mode!\n");
+	}
 
-	if (seg > oldctx.gdtr_limit)
+	if (mode == VM86_REAL || seg > oldctx.gdtr_limit ||
+	    (mode == VM86_REAL_TO_PROTECTED && regs->cs == seg))
 		return ((seg & 0xFFFF) << 4) + off;
 
 	entry = ((unsigned long long *) oldctx.gdtr_base)[seg >> 3];
-	addr = (((entry >> (56-24)) & 0xFF000000) |
-		((entry >> (32-16)) & 0x00FF0000) |
-		((entry >> (   16)) & 0x0000FFFF)) + off;
-	return addr;
+	entry_high = entry >> 32;
+	entry_low = entry & 0xFFFFFFFF;
+
+	seg_base  = (entry_high & 0xFF000000) | ((entry >> 16) & 0xFFFFFF);
+	seg_limit = (entry_high & 0xF0000) | (entry_low & 0xFFFF);
+
+	if (entry_high & 0x8000 &&
+	    ((entry_high & 0x800000 && off >> 12 <= seg_limit) ||
+	    (!(entry_high & 0x800000) && off <= seg_limit)))
+		return seg_base + off;
+
+	panic("should never reach here in function address():\n\t"
+	      "entry=0x%08x%08x, mode=%d, seg=0x%08x, offset=0x%08x\n",
+	      entry_high, entry_low, mode, seg, off);
+
+	return 0;
 }
 
 #ifdef DEBUG
@@ -194,7 +212,7 @@ fetch8(struct regs *regs)
 	return read8(addr);
 }
 
-unsigned
+static unsigned
 getreg32(struct regs *regs, int r)
 {
 	switch (r & 7) {
@@ -210,13 +228,13 @@ getreg32(struct regs *regs, int r)
 	return ~0;
 }
 
-unsigned
+static unsigned
 getreg16(struct regs *regs, int r)
 {
 	return MASK16(getreg32(regs, r));
 }
 
-unsigned
+static unsigned
 getreg8(struct regs *regs, int r)
 {
 	switch (r & 7) {
@@ -232,7 +250,7 @@ getreg8(struct regs *regs, int r)
 	return ~0;
 }
 
-void
+static void
 setreg32(struct regs *regs, int r, unsigned v)
 {
 	switch (r & 7) {
@@ -247,13 +265,13 @@ setreg32(struct regs *regs, int r, unsigned v)
 	}
 }
 
-void
+static void
 setreg16(struct regs *regs, int r, unsigned v)
 {
 	setreg32(regs, r, (getreg32(regs, r) & ~0xFFFF) | MASK16(v));
 }
 
-void
+static void
 setreg8(struct regs *regs, int r, unsigned v)
 {
 	v &= 0xFF;
@@ -269,7 +287,7 @@ setreg8(struct regs *regs, int r, unsigned v)
 	}
 }
 
-unsigned
+static unsigned
 segment(unsigned prefix, struct regs *regs, unsigned seg)
 {
 	if (prefix & SEG_ES)
@@ -287,7 +305,7 @@ segment(unsigned prefix, struct regs *regs, unsigned seg)
 	return seg;
 }
 
-unsigned
+static unsigned
 sib(struct regs *regs, int mod, unsigned byte)
 {
 	unsigned scale = (byte >> 6) & 3;
@@ -319,7 +337,7 @@ sib(struct regs *regs, int mod, unsigned byte)
 /*
  * Operand (modrm) decode
  */
-unsigned
+static unsigned
 operand(unsigned prefix, struct regs *regs, unsigned modrm)
 {
 	int mod, disp = 0, seg;
@@ -418,7 +436,7 @@ operand(unsigned prefix, struct regs *regs, unsigned modrm)
 /*
  * Load new IDT
  */
-int
+static int
 lidt(struct regs *regs, unsigned prefix, unsigned modrm)
 {
 	unsigned eip = regs->eip - 3;
@@ -438,7 +456,7 @@ lidt(struct regs *regs, unsigned prefix, unsigned modrm)
 /*
  * Load new GDT
  */
-int
+static int
 lgdt(struct regs *regs, unsigned prefix, unsigned modrm)
 {
 	unsigned eip = regs->eip - 3;
@@ -458,7 +476,7 @@ lgdt(struct regs *regs, unsigned prefix, unsigned modrm)
 /*
  * Modify CR0 either through an lmsw instruction.
  */
-int
+static int
 lmsw(struct regs *regs, unsigned prefix, unsigned modrm)
 {
 	unsigned eip = regs->eip - 3;
@@ -481,7 +499,7 @@ lmsw(struct regs *regs, unsigned prefix, unsigned modrm)
  * We need to handle moves that address memory beyond the 64KB segment
  * limit that VM8086 mode enforces.
  */
-int
+static int
 movr(struct regs *regs, unsigned prefix, unsigned opc)
 {
 	unsigned eip = regs->eip - 1;
@@ -546,7 +564,7 @@ movr(struct regs *regs, unsigned prefix, unsigned opc)
 /*
  * Move to and from a control register.
  */
-int
+static int
 movcr(struct regs *regs, unsigned prefix, unsigned opc)
 {
 	unsigned eip = regs->eip - 2;
@@ -618,7 +636,7 @@ static inline void set_eflags_ZF(unsigned mask, unsigned v1, struct regs *regs)
  * We need to handle cmp opcodes that address memory beyond the 64KB
  * segment limit that VM8086 mode enforces.
  */
-int
+static int
 cmp(struct regs *regs, unsigned prefix, unsigned opc)
 {
 	unsigned eip = regs->eip - 1;
@@ -658,7 +676,7 @@ cmp(struct regs *regs, unsigned prefix, unsigned opc)
  * We need to handle test opcodes that address memory beyond the 64KB
  * segment limit that VM8086 mode enforces.
  */
-int
+static int
 test(struct regs *regs, unsigned prefix, unsigned opc)
 {
 	unsigned eip = regs->eip - 1;
@@ -691,7 +709,7 @@ test(struct regs *regs, unsigned prefix, unsigned opc)
  * We need to handle pop opcodes that address memory beyond the 64KB
  * segment limit that VM8086 mode enforces.
  */
-int
+static int
 pop(struct regs *regs, unsigned prefix, unsigned opc)
 {
 	unsigned eip = regs->eip - 1;
@@ -721,7 +739,7 @@ pop(struct regs *regs, unsigned prefix, unsigned opc)
 /*
  * Emulate a segment load in protected mode
  */
-int
+static int
 load_seg(unsigned long sel, uint32_t *base, uint32_t *limit, union vmcs_arbytes *arbytes)
 {
 	unsigned long long entry;
@@ -768,7 +786,7 @@ load_seg(unsigned long sel, uint32_t *base, uint32_t *limit, union vmcs_arbytes 
 /*
  * Transition to protected mode
  */
-void
+static void
 protected_mode(struct regs *regs)
 {
 	regs->eflags &= ~(EFLAGS_TF|EFLAGS_VM);
@@ -842,7 +860,7 @@ protected_mode(struct regs *regs)
 /*
  * Start real-mode emulation
  */
-void
+static void
 real_mode(struct regs *regs)
 {
 	regs->eflags |= EFLAGS_VM | 0x02;
@@ -935,7 +953,7 @@ set_mode(struct regs *regs, enum vm86_mode newmode)
 	TRACE((regs, 0, states[mode]));
 }
 
-void
+static void
 jmpl(struct regs *regs, int prefix)
 {
 	unsigned n = regs->eip;
@@ -963,7 +981,7 @@ jmpl(struct regs *regs, int prefix)
 		panic("jmpl");
 }
 
-void
+static void
 retl(struct regs *regs, int prefix)
 {
 	unsigned cs, eip;
@@ -990,7 +1008,7 @@ retl(struct regs *regs, int prefix)
 		panic("retl");
 }
 
-void
+static void
 interrupt(struct regs *regs, int n)
 {
 	TRACE((regs, 0, "external interrupt %d", n));
@@ -1008,7 +1026,7 @@ interrupt(struct regs *regs, int n)
  * interrupt vectors. The following simple state machine catches
  * these attempts and rewrites them.
  */
-int
+static int
 outbyte(struct regs *regs, unsigned prefix, unsigned opc)
 {
 	static char icw2[2] = { 0 };
@@ -1059,7 +1077,7 @@ outbyte(struct regs *regs, unsigned prefix, unsigned opc)
 	return 1;
 }
 
-int
+static int
 inbyte(struct regs *regs, unsigned prefix, unsigned opc)
 {
 	int port;
@@ -1086,7 +1104,7 @@ enum { OPC_INVALID, OPC_EMULATED };
  * a small subset of the opcodes, and not all opcodes are implemented for each
  * of the four modes we can operate in.
  */
-int
+static int
 opcode(struct regs *regs)
 {
 	unsigned eip = regs->eip;
@@ -1246,7 +1264,7 @@ opcode(struct regs *regs)
 			if ((mode == VM86_REAL_TO_PROTECTED) ||
 			    (mode == VM86_PROTECTED_TO_REAL)) {
 				retl(regs, prefix);
-				return OPC_EMULATED;
+				return OPC_INVALID;
 			}
 			goto invalid;
 
@@ -1284,7 +1302,7 @@ opcode(struct regs *regs)
 			if ((mode == VM86_REAL_TO_PROTECTED) ||
 			    (mode == VM86_PROTECTED_TO_REAL)) {
 				jmpl(regs, prefix);
-				return OPC_EMULATED;
+				return OPC_INVALID;
 			}
 			goto invalid;
 
