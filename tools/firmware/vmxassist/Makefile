@@ -21,6 +21,7 @@
 # External CFLAGS can do more harm than good.
 CFLAGS :=
 
+XEN_TARGET_ARCH = x86_32
 XEN_ROOT = ../../..
 include $(XEN_ROOT)/Config.mk
 
@@ -37,8 +38,7 @@ CFLAGS  += $(call test-gcc-flag,$(CC),-fno-stack-protector-all)
 
 CPP      = cpp -P
 OBJCOPY  = objcopy -p -O binary -R .note -R .comment -R .bss -S --gap-fill=0
-CFLAGS  += $(DEFINES) -I. $(XENINC) -Wall -fno-builtin -O2 -msoft-float
-CFLAGS  += -m32 -march=i686
+CFLAGS  += $(DEFINES) -I. $(XENINC) -fno-builtin -O2 -msoft-float
 LDFLAGS  = -m elf_i386
 
 OBJECTS = head.o trap.o vm86.o setup.o util.o

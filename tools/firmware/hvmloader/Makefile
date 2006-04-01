@@ -21,6 +21,7 @@
 # External CFLAGS can do more harm than good.
 CFLAGS :=
 
+XEN_TARGET_ARCH = x86_32
 XEN_ROOT = ../../..
 include $(XEN_ROOT)/Config.mk
 
@@ -38,8 +39,7 @@ CFLAGS  += $(call test-gcc-flag,$(CC),-fno-stack-protector)
 CFLAGS  += $(call test-gcc-flag,$(CC),-fno-stack-protector-all)
 
 OBJCOPY  = objcopy
-CFLAGS  += $(DEFINES) -I. $(XENINC) -Wall -fno-builtin -O2 -msoft-float
-CFLAGS  += -m32 -march=i686
+CFLAGS  += $(DEFINES) -I. $(XENINC) -fno-builtin -O2 -msoft-float
 LDFLAGS  = -m32 -nostdlib -Wl,-N -Wl,-Ttext -Wl,$(LOADADDR)
 
 all: hvmloader
