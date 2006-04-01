@@ -38,7 +38,7 @@ hypercall_t ia64_hypercall_table[] =
 	(hypercall_t)do_ni_hypercall,		/* do_stack_switch */
 	(hypercall_t)do_ni_hypercall,		/* do_set_callbacks */
 	(hypercall_t)do_ni_hypercall,		/* do_fpu_taskswitch */		/*  5 */
-	(hypercall_t)do_ni_hypercall,		/* do_sched_op */
+	(hypercall_t)do_ni_hypercall,		/* do_sched_op_compat */
 	(hypercall_t)do_dom0_op,
 	(hypercall_t)do_ni_hypercall,		/* do_set_debugreg */
 	(hypercall_t)do_ni_hypercall,		/* do_get_debugreg */
@@ -160,7 +160,7 @@ fw_hypercall (struct pt_regs *regs)
 			}
 			else {
 				pal_halt_light_count++;
-				do_sched_op(SCHEDOP_yield, 0);
+				do_sched_op_compat(SCHEDOP_yield, 0);
 			}
 			regs->r8 = 0;
 			regs->r9 = 0;

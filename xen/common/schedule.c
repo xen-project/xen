@@ -332,7 +332,7 @@ static long do_yield(void)
     return 0;
 }
 
-long do_sched_op(int cmd, unsigned long arg)
+long do_sched_op_compat(int cmd, unsigned long arg)
 {
     long ret = 0;
 
@@ -365,7 +365,7 @@ long do_sched_op(int cmd, unsigned long arg)
     return ret;
 }
 
-long do_sched_op_new(int cmd, GUEST_HANDLE(void) arg)
+long do_sched_op(int cmd, GUEST_HANDLE(void) arg)
 {
     long ret = 0;
 

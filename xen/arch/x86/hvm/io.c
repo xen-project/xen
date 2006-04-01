@@ -713,7 +713,7 @@ void hvm_wait_io(void)
         if ( !test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags) )
             break;
 
-        do_sched_op(SCHEDOP_block, 0);
+        do_sched_op_compat(SCHEDOP_block, 0);
     }
 
     /*
@@ -743,7 +743,7 @@ void hvm_safe_block(void)
         if ( test_bit(port, &d->shared_info->evtchn_pending[0]) )
             break;
 
-        do_sched_op(SCHEDOP_block, 0);
+        do_sched_op_compat(SCHEDOP_block, 0);
     }
 
     /* Reflect pending event in selector and master flags. */

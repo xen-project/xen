@@ -13,17 +13,17 @@
 
 /*
  * The prototype for this hypercall is:
- *  long sched_op_new(int cmd, void *arg)
+ *  long sched_op(int cmd, void *arg)
  * @cmd == SCHEDOP_??? (scheduler operation).
  * @arg == Operation-specific extra argument(s), as described below.
  * 
- * **NOTE**:
- * Versions of Xen prior to 3.0.2 provide only the following legacy version
+ * Versions of Xen prior to 3.0.2 provided only the following legacy version
  * of this hypercall, supporting only the commands yield, block and shutdown:
  *  long sched_op(int cmd, unsigned long arg)
  * @cmd == SCHEDOP_??? (scheduler operation).
  * @arg == 0               (SCHEDOP_yield and SCHEDOP_block)
  *      == SHUTDOWN_* code (SCHEDOP_shutdown)
+ * This legacy version is available to new guests as sched_op_compat().
  */
 
 /*

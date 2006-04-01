@@ -579,19 +579,19 @@ ENTRY(setup_vm86_frame)
         addl $16,%esp
         ret
 
+do_arch_sched_op_compat:
+        # Ensure we return success even if we return via schedule_tail()
+        xorl %eax,%eax
+        GET_GUEST_REGS(%ecx)
+        movl %eax,UREGS_eax(%ecx)
+        jmp  do_sched_op_compat
+
 do_arch_sched_op:
         # Ensure we return success even if we return via schedule_tail()
         xorl %eax,%eax
         GET_GUEST_REGS(%ecx)
         movl %eax,UREGS_eax(%ecx)
         jmp  do_sched_op
-
-do_arch_sched_op_new:
-        # Ensure we return success even if we return via schedule_tail()
-        xorl %eax,%eax
-        GET_GUEST_REGS(%ecx)
-        movl %eax,UREGS_eax(%ecx)
-        jmp  do_sched_op_new
 
 .data
 
@@ -624,7 +624,7 @@ ENTRY(hypercall_table)
         .long do_stack_switch
         .long do_set_callbacks
         .long do_fpu_taskswitch     /*  5 */
-        .long do_arch_sched_op
+        .long do_arch_sched_op_compat
         .long do_dom0_op
         .long do_set_debugreg
         .long do_get_debugreg
@@ -647,7 +647,7 @@ ENTRY(hypercall_table)
         .long do_mmuext_op
         .long do_acm_op
         .long do_nmi_op
-        .long do_arch_sched_op_new
+        .long do_arch_sched_op
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .long do_ni_hypercall
         .endr
@@ -659,7 +659,7 @@ ENTRY(hypercall_args_table)
         .byte 2 /* do_stack_switch      */
         .byte 4 /* do_set_callbacks     */
         .byte 1 /* do_fpu_taskswitch    */  /*  5 */
-        .byte 2 /* do_arch_sched_op     */
+        .byte 2 /* do_arch_sched_op_compat */
         .byte 1 /* do_dom0_op           */
         .byte 2 /* do_set_debugreg      */
         .byte 1 /* do_get_debugreg      */
@@ -682,7 +682,7 @@ ENTRY(hypercall_args_table)
         .byte 4 /* do_mmuext_op         */
         .byte 1 /* do_acm_op            */
         .byte 2 /* do_nmi_op            */
-        .byte 2 /* do_arch_sched_op_new */
+        .byte 2 /* do_arch_sched_op     */
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr

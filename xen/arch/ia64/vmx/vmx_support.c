@@ -43,7 +43,7 @@ void vmx_wait_io(void)
     do {
 	if (!test_bit(port,
 		&d->shared_info->evtchn_pending[0]))
-            do_sched_op(SCHEDOP_block, 0);
+            do_sched_op_compat(SCHEDOP_block, 0);
 
 	/* Unblocked when some event is coming. Clear pending indication
 	 * immediately if deciding to go for io assist

@@ -1125,7 +1125,7 @@ hyper_call_table:
     data8 hyper_not_support     //hyper_stack_switch
     data8 hyper_not_support     //hyper_set_callbacks
     data8 hyper_not_support     //hyper_fpu_taskswitch     /*  5 */
-    data8 hyper_sched_op
+    data8 hyper_sched_op_compat
     data8 hyper_dom0_op
     data8 hyper_not_support     //hyper_set_debugreg
     data8 hyper_not_support     //hyper_get_debugreg
