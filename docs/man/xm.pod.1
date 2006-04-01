@@ -360,7 +360,7 @@ your Linux Kernel sources.
 Moves a domain out of the paused state.  This will allow a previously
 paused domain to now be eligible for scheduling by the Xen hypervisor.
 
-=item B<set-vcpus> I<domain-id> I<vcpu-count>
+=item B<vcpu-set> I<domain-id> I<vcpu-count>
 
 Enables the I<vcpu-count> virtual CPUs for the domain in question.
 Like mem-set, this command can only allocate up to the maximum virtual
@@ -370,8 +370,8 @@ If the I<vcpu-count> is smaller than the current number of active
 VCPUs, the highest number VCPUs will be hotplug removed.  This may be
 important for pinning purposes.
 
-Attempting to set-vcpus to a number larger than the initially
-configured VCPU count is an error.  Trying to set-vcpus to < 1 will be
+Attempting to set the VCPUs to a number larger than the initially
+configured VCPU count is an error.  Trying to set VCPUs to < 1 will be
 quietly ignored.
 
 =item B<vcpu-list> I<[domain-id]>
