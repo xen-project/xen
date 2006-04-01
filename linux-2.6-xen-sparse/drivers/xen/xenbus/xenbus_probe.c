@@ -49,6 +49,7 @@
 #include <xen/xenbus.h>
 #include <xen/xen_proc.h>
 #include <xen/evtchn.h>
+#include <xen/features.h>
 
 #include "xenbus_comms.h"
 
