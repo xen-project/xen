@@ -38,7 +38,7 @@ hypercall_t ia64_hypercall_table[] =
 	(hypercall_t)do_ni_hypercall,		/* do_stack_switch */
 	(hypercall_t)do_ni_hypercall,		/* do_set_callbacks */
 	(hypercall_t)do_ni_hypercall,		/* do_fpu_taskswitch */		/*  5 */
-	(hypercall_t)do_ni_hypercall,		/* do_sched_op_compat */
+	(hypercall_t)do_sched_op_compat,
 	(hypercall_t)do_dom0_op,
 	(hypercall_t)do_ni_hypercall,		/* do_set_debugreg */
 	(hypercall_t)do_ni_hypercall,		/* do_get_debugreg */
@@ -61,7 +61,7 @@ hypercall_t ia64_hypercall_table[] =
 	(hypercall_t)do_ni_hypercall,		/* do_mmuext_op */
 	(hypercall_t)do_ni_hypercall,		/* do_acm_op */
 	(hypercall_t)do_ni_hypercall,		/* do_nmi_op */
-	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_sched_op,
 	(hypercall_t)do_ni_hypercall,		/*  */				/* 30 */
 	(hypercall_t)do_ni_hypercall		/*  */
 	};
@@ -70,6 +70,11 @@ static int
 xen_hypercall (struct pt_regs *regs)
 {
 	switch (regs->r2) {
+	    case __HYPERVISOR_sched_op_compat:
+		regs->r8 = do_sched_op_compat((int) regs->r14,
+		                              (unsigned long) regs->r15);
+		break;
+
 	    case __HYPERVISOR_dom0_op:
 		regs->r8 = do_dom0_op(guest_handle_from_ptr(regs->r14,
 							    dom0_op_t));
@@ -115,6 +120,11 @@ xen_hypercall (struct pt_regs *regs)
 
 	    case __HYPERVISOR_multicall:
 		regs->r8 = do_multicall(guest_handle_from_ptr(regs->r14, multicall_entry_t), (unsigned int) regs->r15);
+		break;
+
+	    case __HYPERVISOR_sched_op:
+		regs->r8 = do_sched_op((int) regs->r14,
+		                       guest_handle_from_ptr(regs->r15, void));
 		break;
 
 	    default:
