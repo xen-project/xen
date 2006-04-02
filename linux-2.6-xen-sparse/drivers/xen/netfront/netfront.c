@@ -696,7 +696,12 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	tx->gref = np->grant_tx_ref[id] = ref;
 	tx->offset = (unsigned long)skb->data & ~PAGE_MASK;
 	tx->size = skb->len;
-	tx->flags = (skb->ip_summed == CHECKSUM_HW) ? NETTXF_csum_blank : 0;
+
+	tx->flags = 0;
+	if (skb->ip_summed == CHECKSUM_HW)
+		tx->flags |= NETTXF_csum_blank;
+	if (skb->proto_data_valid)
+		tx->flags |= NETTXF_data_validated;
 
 	np->tx.req_prod_pvt = i + 1;
 	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&np->tx, notify);
@@ -811,8 +816,14 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		skb->len  = rx->status;
 		skb->tail = skb->data + skb->len;
 
-		if (rx->flags & NETRXF_data_validated)
+		if (rx->flags & NETRXF_data_validated) {
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
+			skb->proto_data_valid = 1;
+		} else {
+			skb->ip_summed = CHECKSUM_NONE;
+			skb->proto_data_valid = 0;
+		}
+		skb->proto_csum_blank = !!(rx->flags & NETRXF_csum_blank);
 
 		np->stats.rx_packets++;
 		np->stats.rx_bytes += rx->status;

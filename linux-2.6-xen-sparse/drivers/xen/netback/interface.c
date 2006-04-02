@@ -31,6 +31,7 @@
  */
 
 #include "common.h"
+#include <linux/ethtool.h>
 #include <linux/rtnetlink.h>
 
 static void __netif_up(netif_t *netif)
@@ -71,6 +72,12 @@ static int net_close(struct net_device *dev)
 	return 0;
 }
 
+static struct ethtool_ops network_ethtool_ops =
+{
+	.get_tx_csum = ethtool_op_get_tx_csum,
+	.set_tx_csum = ethtool_op_set_tx_csum,
+};
+
 netif_t *alloc_netif(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 {
 	int err = 0, i;
@@ -101,7 +108,9 @@ netif_t *alloc_netif(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 	dev->get_stats       = netif_be_get_stats;
 	dev->open            = net_open;
 	dev->stop            = net_close;
-	dev->features        = NETIF_F_NO_CSUM;
+	dev->features        = NETIF_F_IP_CSUM;
+
+	SET_ETHTOOL_OPS(dev, &network_ethtool_ops);
 
 	/* Disable queuing. */
 	dev->tx_queue_len = 0;
