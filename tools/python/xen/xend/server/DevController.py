@@ -85,6 +85,13 @@ class DevController:
                                                      front)
 
         import xen.xend.XendDomain
+        xd = xen.xend.XendDomain.instance()
+        backdom_name = sxp.child_value(config, 'backend')
+        if backdom_name is None:
+            backdom = xen.xend.XendDomain.PRIV_DOMAIN
+        else:
+            bd = xd.domain_lookup_by_name_nr(backdom_name)
+            backdom = bd.getDomid()
         count = 0
         while True:
             t = xstransact()
@@ -112,9 +119,13 @@ class DevController:
 
                 t.mkdir(backpath)
                 t.set_permissions(backpath,
-                                  {'dom': xen.xend.XendDomain.PRIV_DOMAIN },
+                                  {'dom': backdom },
                                   {'dom'  : self.vm.getDomid(),
                                    'read' : True })
+                t.mkdir(frontpath)
+                t.set_permissions(frontpath,
+                                  {'dom': self.vm.getDomid()},
+                                  {'dom': backdom, 'read': True})
 
                 t.write2(frontpath, front)
                 t.write2(backpath,  back)
