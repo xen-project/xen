@@ -176,7 +176,9 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 		printf("*** CALLED SAL_MC_SET_PARAMS.  IGNORED...\n");
 		break;
 	    case SAL_CACHE_FLUSH:
-		printf("*** CALLED SAL_CACHE_FLUSH.  IGNORED...\n");
+	        /*  The best we can do is to flush with fc all the domain.  */
+	        domain_cache_flush (current->domain, in1 == 4 ? 1 : 0);
+		status = 0;
 		break;
 	    case SAL_CACHE_INIT:
 		printf("*** CALLED SAL_CACHE_INIT.  IGNORED...\n");

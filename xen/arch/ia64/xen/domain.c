@@ -674,6 +674,61 @@ tryagain:
 	return 0;
 }
 
+/* Flush cache of domain d.  */
+void domain_cache_flush (struct domain *d, int sync_only)
+{
+	struct mm_struct *mm = d->arch.mm;
+	pgd_t *pgd = mm->pgd;
+	unsigned long maddr;
+	int i,j,k, l;
+	int nbr_page = 0;
+	void (*flush_func)(unsigned long start, unsigned long end);
+	extern void flush_dcache_range (unsigned long, unsigned long);
+
+	if (sync_only)
+		flush_func = &flush_icache_range;
+	else
+		flush_func = &flush_dcache_range;
+
+#ifdef CONFIG_DOMAIN0_CONTIGUOUS
+	if (d == dom0) {
+		/* This is not fully correct (because of hole), but it should
+		   be enough for now.  */
+		(*flush_func)(__va_ul (dom0_start),
+			      __va_ul (dom0_start + dom0_size));
+		return;
+	}
+#endif
+	for (i = 0; i < PTRS_PER_PGD; pgd++, i++) {
+		pud_t *pud;
+		if (!pgd_present(*pgd))
+			continue;
+		pud = pud_offset(pgd, 0);
+		for (j = 0; j < PTRS_PER_PUD; pud++, j++) {
+			pmd_t *pmd;
+			if (!pud_present(*pud))
+				continue;
+			pmd = pmd_offset(pud, 0);
+			for (k = 0; k < PTRS_PER_PMD; pmd++, k++) {
+				pte_t *pte;
+				if (!pmd_present(*pmd))
+					continue;
+				pte = pte_offset_map(pmd, 0);
+				for (l = 0; l < PTRS_PER_PTE; pte++, l++) {
+					if (!pte_present(*pte))
+						continue;
+					/* Convert PTE to maddr.  */
+					maddr = __va_ul (pte_val(*pte)
+							 & _PAGE_PPN_MASK);
+					(*flush_func)(maddr, maddr+ PAGE_SIZE);
+					nbr_page++;
+				}
+			}
+		}
+	}
+	//printf ("domain_cache_flush: %d %d pages\n", d->domain_id, nbr_page);
+}
+
 // FIXME: ONLY USE FOR DOMAIN PAGE_SIZE == PAGE_SIZE
 #if 1
 unsigned long domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)

@@ -105,6 +105,11 @@ extern void early_cmdline_parse(char **);
 #define	I_CACHE_STRIDE_SHIFT	5	/* Safest way to go: 32 bytes by 32 bytes */
 unsigned long ia64_i_cache_stride_shift = ~0;
 
+#ifdef XEN
+#define D_CACHE_STRIDE_SHIFT	5	/* Safest.  */
+unsigned long ia64_d_cache_stride_shift = ~0;
+#endif
+
 /*
  * The merge_mask variable needs to be set to (max(iommu_page_size(iommu)) - 1).  This
  * mask specifies a mask of address bits that must be 0 in order for two buffers to be
@@ -718,6 +723,9 @@ get_max_cacheline_size (void)
                 max = SMP_CACHE_BYTES;
 		/* Safest setup for "flush_icache_range()" */
 		ia64_i_cache_stride_shift = I_CACHE_STRIDE_SHIFT;
+#ifdef XEN
+		ia64_d_cache_stride_shift = D_CACHE_STRIDE_SHIFT;
+#endif
 		goto out;
         }
 
@@ -733,6 +741,10 @@ get_max_cacheline_size (void)
 			cci.pcci_stride = I_CACHE_STRIDE_SHIFT;
 			cci.pcci_unified = 1;
 		}
+#ifdef XEN
+		if (cci.pcci_stride < ia64_d_cache_stride_shift)
+			ia64_d_cache_stride_shift = cci.pcci_stride;
+#endif
 		line_size = 1 << cci.pcci_line_size;
 		if (line_size > max)
 			max = line_size;
@@ -754,6 +766,11 @@ get_max_cacheline_size (void)
   out:
 	if (max > ia64_max_cacheline_size)
 		ia64_max_cacheline_size = max;
+#ifdef XEN
+	if (ia64_d_cache_stride_shift > ia64_i_cache_stride_shift)
+		ia64_d_cache_stride_shift = ia64_i_cache_stride_shift;
+#endif
+
 }
 
 /*

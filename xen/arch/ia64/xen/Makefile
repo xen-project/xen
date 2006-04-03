@@ -24,6 +24,7 @@ obj-y += xenmem.o
 obj-y += xenmisc.o
 obj-y += xensetup.o
 obj-y += xentime.o
+obj-y += flushd.o
 
 obj-$(crash_debug) += gdbstub.o
 

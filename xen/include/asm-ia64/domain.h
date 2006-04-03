@@ -13,6 +13,11 @@
 
 extern void domain_relinquish_resources(struct domain *);
 
+/* Flush cache of domain d.
+   If sync_only is true, only synchronize I&D caches,
+   if false, flush and invalidate caches.  */
+extern void domain_cache_flush (struct domain *d, int sync_only);
+
 struct arch_domain {
     struct mm_struct *mm;
     unsigned long metaphysical_rr0;

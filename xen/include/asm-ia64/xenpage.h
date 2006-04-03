@@ -55,6 +55,9 @@ static inline int get_order_from_pages(unsigned long nr_pages)
 #define __pa(x)		({xen_va _v; _v.l = (long) (x); _v.f.reg = 0; _v.l;})
 #define __va(x)		({xen_va _v; _v.l = (long) (x); _v.f.reg = -1; _v.p;})
 
+/* It is sometimes very useful to have unsigned long as result.  */
+#define __va_ul(x)	({xen_va _v; _v.l = (long) (x); _v.f.reg = -1; _v.l;})
+
 #undef PAGE_OFFSET
 #define PAGE_OFFSET	__IA64_UL_CONST(0xf000000000000000)
 
