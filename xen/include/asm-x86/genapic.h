@@ -54,8 +54,6 @@ struct genapic {
 	
 	/* ipi */
 	void (*send_IPI_mask)(cpumask_t mask, int vector);
-	void (*send_IPI_allbutself)(int vector);
-	void (*send_IPI_all)(int vector);
 }; 
 
 #define APICFUNC(x) .x = x
@@ -85,8 +83,6 @@ struct genapic {
 	APICFUNC(cpu_mask_to_apicid), \
 	APICFUNC(acpi_madt_oem_check), \
 	APICFUNC(send_IPI_mask), \
-	APICFUNC(send_IPI_allbutself), \
-	APICFUNC(send_IPI_all), \
 	APICFUNC(enable_apic_mode), \
 	APICFUNC(phys_pkg_id), \
 	}
