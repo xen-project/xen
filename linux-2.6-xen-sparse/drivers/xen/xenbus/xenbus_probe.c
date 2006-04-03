@@ -984,6 +984,7 @@ static int xsd_port_read(char *page, char **start, off_t off,
 static int __init xenbus_probe_init(void)
 {
 	int err = 0, dom0;
+	unsigned long page = 0;
 
 	DPRINTK("");
 
@@ -992,19 +993,9 @@ static int __init xenbus_probe_init(void)
 		return -ENODEV;
 	}
 
-	/* Register ourselves with the kernel bus & device subsystems */
+	/* Register ourselves with the kernel bus subsystem */
 	bus_register(&xenbus_frontend.bus);
 	bus_register(&xenbus_backend.bus);
-	device_register(&xenbus_frontend.dev);
-	device_register(&xenbus_backend.dev);
-
-	/*
-         * The supervisor_mode_kernel feature only allows a single
-         * domain so there is no need to initialise event channels
-         * etc.
-         */
-	if (xen_feature(XENFEAT_supervisor_mode_kernel))
-		return -ENODEV;
 
 	/*
 	 * Domain0 doesn't have a store_evtchn or store_mfn yet.
@@ -1012,11 +1003,7 @@ static int __init xenbus_probe_init(void)
 	dom0 = (xen_start_info->store_evtchn == 0);
 
 	if (dom0) {
-
-		unsigned long page;
 		evtchn_op_t op = { 0 };
-		int ret;
-
 
 		/* Allocate page. */
 		page = get_zeroed_page(GFP_KERNEL);
@@ -1032,8 +1019,10 @@ static int __init xenbus_probe_init(void)
 		op.u.alloc_unbound.dom        = DOMID_SELF;
 		op.u.alloc_unbound.remote_dom = 0;
 
-		ret = HYPERVISOR_event_channel_op(&op);
-		BUG_ON(ret);
+		err = HYPERVISOR_event_channel_op(&op);
+		if (err == -ENOSYS)
+			goto err;
+		BUG_ON(err);
 		xen_start_info->store_evtchn = op.u.alloc_unbound.port;
 
 		/* And finally publish the above info in /proc/xen */
@@ -1056,13 +1045,29 @@ static int __init xenbus_probe_init(void)
 	if (err) {
 		printk(KERN_WARNING
 		       "XENBUS: Error initializing xenstore comms: %i\n", err);
-		return err;
+		goto err;
 	}
+
+	/* Register ourselves with the kernel device subsystem */
+	device_register(&xenbus_frontend.dev);
+	device_register(&xenbus_backend.dev);
 
 	if (!dom0)
 		xenbus_probe(NULL);
 
 	return 0;
+
+ err:
+	if (page)
+		free_page(page);
+
+	/*
+         * Do not unregister the xenbus front/backend buses here. The
+         * buses must exist because front/backend drivers will use
+         * them when they are registered.
+         */
+
+	return err;
 }
 
 postcore_initcall(xenbus_probe_init);

@@ -395,10 +395,10 @@ gnttab_resume(void)
 	setup.frame_list = frames;
 
 	rc = HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1);
-	if (rc < 0)
-		return rc;
+	if (rc == -ENOSYS)
+		return -ENOSYS;
 
-	BUG_ON(setup.status);
+	BUG_ON(rc || setup.status);
 
 #ifndef __ia64__
 	if (shared == NULL) {
