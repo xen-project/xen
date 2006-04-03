@@ -90,7 +90,7 @@ class DevController:
         if backdom_name is None:
             backdom = xen.xend.XendDomain.PRIV_DOMAIN
         else:
-            bd = xd.domain_lookup_by_name_nr(backdom_name)
+            bd = xd.domain_lookup_by_name_or_id_nr(backdom_name)
             backdom = bd.getDomid()
         count = 0
         while True:
