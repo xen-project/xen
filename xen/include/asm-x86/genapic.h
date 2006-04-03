@@ -49,16 +49,15 @@ struct genapic {
 			      char *productid);
 	int (*acpi_madt_oem_check)(char *oem_id, char *oem_table_id);
 
-	unsigned (*get_apic_id)(unsigned long x);
 	unsigned int (*cpu_mask_to_apicid)(cpumask_t cpumask);
 	
 	/* ipi */
-	void (*send_IPI_mask)(cpumask_t mask, int vector);
+	void (*send_ipi_mask)(cpumask_t mask, int vector);
 }; 
 
 #define APICFUNC(x) .x = x
 
-#define APIC_INIT(aname, aprobe) { \
+#define APIC_INIT(aname, aprobe) \
 	.name = aname, \
 	.probe = aprobe, \
 	.int_delivery_mode = INT_DELIVERY_MODE, \
@@ -79,13 +78,10 @@ struct genapic {
 	APICFUNC(apicid_to_cpu_present), \
 	APICFUNC(check_phys_apicid_present), \
 	APICFUNC(mps_oem_check), \
-	APICFUNC(get_apic_id), \
 	APICFUNC(cpu_mask_to_apicid), \
 	APICFUNC(acpi_madt_oem_check), \
-	APICFUNC(send_IPI_mask), \
 	APICFUNC(enable_apic_mode), \
-	APICFUNC(phys_pkg_id), \
-	}
+	APICFUNC(phys_pkg_id)
 
 extern struct genapic *genapic;
 

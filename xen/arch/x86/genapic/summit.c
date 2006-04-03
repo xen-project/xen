@@ -1,7 +1,6 @@
 /* 
  * APIC driver for the IBM "Summit" chipset.
  */
-#define APIC_DEFINITION 1
 #include <xen/config.h>
 #include <xen/cpumask.h>
 #include <asm/current.h>
@@ -13,9 +12,8 @@
 #include <xen/string.h>
 #include <xen/smp.h>
 #include <xen/init.h>
+#include <asm/mach_ipi.h>
 #include <asm/mach-summit/mach_apic.h>
-#include <asm/mach-summit/mach_apicdef.h>
-#include <asm/mach-summit/mach_ipi.h>
 #include <asm/mach-summit/mach_mpparse.h>
 
 static __init int probe_summit(void)
@@ -24,4 +22,7 @@ static __init int probe_summit(void)
 	return 0;
 } 
 
-struct genapic apic_summit = APIC_INIT("summit", probe_summit); 
+struct genapic apic_summit = {
+	APIC_INIT("summit", probe_summit),
+	.send_ipi_mask = send_IPI_mask_sequence
+};

@@ -20,8 +20,8 @@
 #include <asm/flushtlb.h>
 #include <asm/smpboot.h>
 #include <asm/hardirq.h>
+#include <asm/mach_ipi.h>
 #include <mach_apic.h>
-#include <mach_ipi.h>
 
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
@@ -119,7 +119,7 @@ void send_IPI_mask_bitmask(cpumask_t cpumask, int vector)
     local_irq_restore(flags);
 }
 
-inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
+void send_IPI_mask_sequence(cpumask_t mask, int vector)
 {
     unsigned long cfg, flags;
     unsigned int query_cpu;
