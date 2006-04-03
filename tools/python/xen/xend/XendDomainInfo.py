@@ -333,7 +333,7 @@ def parseConfig(config):
                 else:
                     # remove this element from the list 
                     if c[0] == '^':
-                        cpus = [x for x in cpus if x != int(c[1])]
+                        cpus = [x for x in cpus if x != int(c[1:])]
                     else:
                         cpus.append(int(c))
 
