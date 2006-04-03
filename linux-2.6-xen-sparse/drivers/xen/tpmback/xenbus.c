@@ -55,6 +55,7 @@ static int tpmback_remove(struct xenbus_device *dev)
 		be->backend_watch.node = NULL;
 	}
 	if (be->tpmif) {
+		vtpm_release_packets(be->tpmif, 0);
 		tpmif_put(be->tpmif);
 		be->tpmif = NULL;
 	}
