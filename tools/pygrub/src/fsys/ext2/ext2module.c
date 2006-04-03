@@ -213,7 +213,9 @@ ext2_fs_open (Ext2Fs *fs, PyObject *args, PyObject *kwargs)
     int flags = 0, superblock = 0, offset = 0, err;
     unsigned int block_size = 0;
     ext2_filsys efs;
+#ifdef HAVE_EXT2FS_OPEN2
     char offsetopt[30];
+#endif
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|iiii", kwlist, 
                                      &name, &flags, &superblock, 
@@ -225,19 +227,24 @@ ext2_fs_open (Ext2Fs *fs, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
+#ifdef HAVE_EXT2FS_OPEN2
     if (offset != 0) {
         snprintf(offsetopt, 29, "offset=%d", offset);
     }
 
-#ifdef HAVE_EXT2FS_OPEN2
     err = ext2fs_open2(name, offsetopt, flags, superblock, block_size, 
                        unix_io_manager, &efs);
 #else
+    if (offset != 0) {
+        PyErr_SetString(PyExc_ValueError, "offset argument not supported");
+        return NULL;
+    }
+
     err = ext2fs_open(name, flags, superblock, block_size,
                       unix_io_manager, &efs);
 #endif
     if (err) {
-        PyErr_SetString(PyExc_ValueError, "unable to open file");
+        PyErr_SetString(PyExc_ValueError, "unable to open filesystem");
         return NULL;
     }
 
