@@ -41,10 +41,6 @@
 #include <xen/kernel.h>
 #include <xen/multicall.h>
 
-/* opt_noreboot: If true, machine will need manual reset on error. */
-static int opt_noreboot = 0;
-boolean_param("noreboot", opt_noreboot);
-
 struct percpu_ctxt {
     struct vcpu *curr_vcpu;
     unsigned int dirty_segment_mask;
@@ -98,84 +94,6 @@ void startup_cpu_idle_loop(void)
 
     reset_stack_and_jump(idle_loop);
 }
-
-static long no_idt[2];
-static int reboot_mode;
-
-static inline void kb_wait(void)
-{
-    int i;
-
-    for ( i = 0; i < 0x10000; i++ )
-        if ( (inb_p(0x64) & 0x02) == 0 )
-            break;
-}
-
-void __attribute__((noreturn)) __machine_halt(void *unused)
-{
-    for ( ; ; )
-        safe_halt();
-}
-
-void machine_halt(void)
-{
-    watchdog_disable();
-    console_start_sync();
-    smp_call_function(__machine_halt, NULL, 1, 0);
-    __machine_halt(NULL);
-}
-
-void machine_restart(char * __unused)
-{
-    int i;
-
-    if ( opt_noreboot )
-    {
-        printk("Reboot disabled on cmdline: require manual reset\n");
-        machine_halt();
-    }
-
-    watchdog_disable();
-    console_start_sync();
-
-    local_irq_enable();
-
-    /* Ensure we are the boot CPU. */
-    if ( GET_APIC_ID(apic_read(APIC_ID)) != boot_cpu_physical_apicid )
-    {
-        smp_call_function((void *)machine_restart, NULL, 1, 0);
-        for ( ; ; )
-            safe_halt();
-    }
-
-    /*
-     * Stop all CPUs and turn off local APICs and the IO-APIC, so
-     * other OSs see a clean IRQ state.
-     */
-    smp_send_stop();
-    disable_IO_APIC();
-    hvm_disable();
-
-    /* Rebooting needs to touch the page at absolute address 0. */
-    *((unsigned short *)__va(0x472)) = reboot_mode;
-
-    for ( ; ; )
-    {
-        /* Pulse the keyboard reset line. */
-        for ( i = 0; i < 100; i++ )
-        {
-            kb_wait();
-            udelay(50);
-            outb(0xfe,0x64); /* pulse reset low */
-            udelay(50);
-        }
-
-        /* That didn't work - force a triple fault.. */
-        __asm__ __volatile__("lidt %0": "=m" (no_idt));
-        __asm__ __volatile__("int3");
-    }
-}
-
 
 void dump_pageframe_info(struct domain *d)
 {

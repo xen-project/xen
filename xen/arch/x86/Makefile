@@ -30,6 +30,7 @@ obj-y += nmi.o
 obj-y += physdev.o
 obj-y += rwlock.o
 obj-y += setup.o
+obj-y += shutdown.o
 obj-y += smp.o
 obj-y += smpboot.o
 obj-y += string.o
