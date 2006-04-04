@@ -365,29 +365,42 @@ static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     unsigned long old_eax;
     int sign = p->df ? -1 : 1;
 
-    if (p->dir == IOREQ_WRITE) {
-        if (p->pdata_valid) {
+    if (p->pdata_valid || (mmio_opp->flags & OVERLAP)) {
+        if (mmio_opp->flags & REPZ)
+            regs->ecx -= p->count;
+        if (p->dir == IOREQ_READ) {
+            regs->edi += sign * p->count * p->size;
+
+            if (mmio_opp->flags & OVERLAP) {
+                /* 
+                 * If we are doing in IN and it's overlapping a page boundary, 
+                 * we need to copy the data back to user's page with hvm_copy. 
+                 * Note that overlap * can only be set with paging enabled, so 
+                 * we don't need to worry about * real-mode stuff.  
+                 */
+                unsigned long addr;
+                {
+                    /* 
+		     * We completely ignore segment registers here - 
+                     * it's not a good idea. We also may use upper bits
+                     * in edi when in 16-bit real/protected mode.
+                     * We really need to get the actual address back from
+                     * the arch-dependant HVM portion.
+                     */
+                    struct vcpu *v = current;
+                    if (hvm_realmode(v))
+                        __hvm_bug(regs);
+                }
+                addr = regs->edi;
+                if (sign > 0)
+                    addr -= p->size;
+                hvm_copy(&p->u.data, addr, p->size, HVM_COPY_OUT);
+            }
+        } else
             regs->esi += sign * p->count * p->size;
-            if (mmio_opp->flags & REPZ)
-                regs->ecx -= p->count;
-        }
+
     } else {
-        if (mmio_opp->flags & OVERLAP) {
-            unsigned long addr;
-
-            regs->edi += sign * p->count * p->size;
-            if (mmio_opp->flags & REPZ)
-                regs->ecx -= p->count;
-
-            addr = regs->edi;
-            if (sign > 0)
-                addr -= p->size;
-            hvm_copy(&p->u.data, addr, p->size, HVM_COPY_OUT);
-        } else if (p->pdata_valid) {
-            regs->edi += sign * p->count * p->size;
-            if (mmio_opp->flags & REPZ)
-                regs->ecx -= p->count;
-        } else {
+        if (p->dir == IOREQ_READ) {
             old_eax = regs->eax;
             switch (p->size) {
             case 1:
