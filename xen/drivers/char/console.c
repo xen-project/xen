@@ -200,10 +200,11 @@ static void putchar_console(int c)
     }
     else
     {
+        if ( xpos >= COLUMNS )
+            put_newline();
         video[(xpos + ypos * COLUMNS) * 2]     = c & 0xFF;
         video[(xpos + ypos * COLUMNS) * 2 + 1] = ATTRIBUTE;
-        if ( ++xpos >= COLUMNS )
-            put_newline();
+        ++xpos;
     }
 }
 
