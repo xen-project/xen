@@ -12,8 +12,6 @@
 #include <xen/string.h>
 #include <xen/smp.h>
 #include <xen/init.h>
-#include <asm/mach_ipi.h>
-#include <asm/mach-summit/mach_apic.h>
 #include <asm/mach-summit/mach_mpparse.h>
 
 static __init int probe_summit(void)
@@ -24,5 +22,5 @@ static __init int probe_summit(void)
 
 struct genapic apic_summit = {
 	APIC_INIT("summit", probe_summit),
-	.send_ipi_mask = send_IPI_mask_sequence
+	GENAPIC_PHYS
 };

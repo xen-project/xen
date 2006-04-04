@@ -2,28 +2,40 @@
 #define __ASM_MACH_APIC_H
 
 #include <asm/genapic.h>
+#include <asm/smp.h>
 
-#define esr_disable (genapic->ESR_DISABLE)
-#define NO_BALANCE_IRQ (genapic->no_balance_irq)
+/* ESR was originally disabled in Linux for NUMA-Q. Do we really need to? */
+#define esr_disable (0)
+
+/* The following are dependent on APIC delivery mode (logical vs. physical). */
 #define INT_DELIVERY_MODE (genapic->int_delivery_mode)
 #define INT_DEST_MODE (genapic->int_dest_mode)
-#undef APIC_DEST_LOGICAL
-#define APIC_DEST_LOGICAL (genapic->apic_destination_logical)
 #define TARGET_CPUS	  (genapic->target_cpus())
-#define apic_id_registered (genapic->apic_id_registered)
 #define init_apic_ldr (genapic->init_apic_ldr)
-#define ioapic_phys_id_map (genapic->ioapic_phys_id_map)
 #define clustered_apic_check (genapic->clustered_apic_check) 
-#define apicid_to_node (genapic->apicid_to_node)
-#define cpu_to_logical_apicid (genapic->cpu_to_logical_apicid) 
-#define cpu_present_to_apicid (genapic->cpu_present_to_apicid)
-#define apicid_to_cpu_present (genapic->apicid_to_cpu_present)
-#define check_apicid_present (genapic->check_apicid_present)
-#define check_phys_apicid_present (genapic->check_phys_apicid_present)
-#define check_apicid_used (genapic->check_apicid_used)
 #define cpu_mask_to_apicid (genapic->cpu_mask_to_apicid)
-#define enable_apic_mode (genapic->enable_apic_mode)
-#define phys_pkg_id (genapic->phys_pkg_id)
+
+extern void es7000_sw_apic(void);
+static inline void enable_apic_mode(void)
+{
+	es7000_sw_apic();
+	return;
+}
+
+/* No sane NUMA support right now. We should parse ACPI SRAT. */
+static inline int apicid_to_node(int logical_apicid)
+{
+	return 0;
+}
+
+extern u8 bios_cpu_apicid[];
+static inline int cpu_present_to_apicid(int mps_cpu)
+{
+	if (mps_cpu < NR_CPUS)
+		return (int)bios_cpu_apicid[mps_cpu];
+	else
+		return BAD_APICID;
+}
 
 static inline int mpc_apic_id(struct mpc_config_processor *m, 
 			struct mpc_config_translation *translation_record)
@@ -46,5 +58,42 @@ static inline int multi_timer_check(int apic, int irq)
 }
 
 extern void generic_bigsmp_probe(void);
+
+/*
+ * The following functions based around phys_cpu_present_map are disabled in
+ * some i386 Linux subarchitectures, and in x86_64 'cluster' genapic mode. I'm
+ * really not sure why, since all local APICs should have distinct physical
+ * IDs, and we need to know what they are.
+ */
+static inline int apic_id_registered(void)
+{
+	return physid_isset(GET_APIC_ID(apic_read(APIC_ID)),
+			    phys_cpu_present_map);
+}
+
+static inline physid_mask_t ioapic_phys_id_map(physid_mask_t phys_map)
+{
+	return phys_map;
+}
+
+static inline unsigned long check_apicid_used(physid_mask_t bitmap, int apicid)
+{
+	return physid_isset(apicid, bitmap);
+}
+
+static inline unsigned long check_apicid_present(int apicid)
+{
+	return physid_isset(apicid, phys_cpu_present_map);
+}
+
+static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
+{
+	return physid_isset(boot_cpu_physical_apicid, phys_cpu_present_map);
+}
+
+static inline physid_mask_t apicid_to_cpu_present(int phys_apicid)
+{
+	return physid_mask_of_physid(phys_apicid);
+}
 
 #endif /* __ASM_MACH_APIC_H */

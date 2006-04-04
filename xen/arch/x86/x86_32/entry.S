@@ -561,7 +561,7 @@ defer_nmi:
         testl $APIC_ICR_BUSY,%ebx
         jnz   1b
         # __send_IPI_shortcut(APIC_DEST_SELF, TRAP_deferred_nmi)
-        movl  $(APIC_DM_FIXED | APIC_DEST_SELF | APIC_DEST_LOGICAL | \
+        movl  $(APIC_DM_FIXED | APIC_DEST_SELF | APIC_DEST_PHYSICAL | \
                 TRAP_deferred_nmi),%ss:APIC_ICR(%eax)
         jmp   restore_all_xen
 #endif /* !CONFIG_X86_SUPERVISOR_MODE_KERNEL */

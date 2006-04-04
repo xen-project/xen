@@ -12,8 +12,6 @@
 #include <xen/string.h>
 #include <xen/smp.h>
 #include <xen/init.h>
-#include <asm/mach_ipi.h>
-#include <asm/mach-default/mach_apic.h>
 #include <asm/mach-default/mach_mpparse.h>
 
 /* should be called last. */
@@ -24,5 +22,5 @@ static __init int probe_default(void)
 
 struct genapic apic_default = {
 	APIC_INIT("default", probe_default),
-	.send_ipi_mask = send_IPI_mask_bitmask
+	GENAPIC_FLAT
 };
