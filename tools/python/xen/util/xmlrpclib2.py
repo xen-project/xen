@@ -20,6 +20,8 @@
 An enhanced XML-RPC client/server interface for Python.
 """
 
+import types
+
 from httplib import HTTPConnection, HTTP
 from xmlrpclib import Transport
 from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
@@ -76,6 +78,15 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
                 response = dispatch_method(method, params)
             else:
                 response = self._dispatch(method, params)
+
+            # Convert strings to unicode strings so that they are escaped
+            # properly by xmlrpclib.  We use latin-1 here, but any
+            # ASCII-compatible scheme would do -- we just care about getting
+            # the bytes across the wire.
+            # Any message handler that actually cares about the charset in
+            # use should be returning Unicode strings.
+            if isinstance(response, types.StringType):
+                response = unicode(response, 'iso-8859-1')
 
             response = (response,)
             response = xmlrpclib.dumps(response,
