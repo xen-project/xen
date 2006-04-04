@@ -487,6 +487,7 @@ void new_thread(struct vcpu *v,
 		VCPU(v, metaphysical_mode) = 1;
 		VCPU(v, interrupt_mask_addr) =
 		    (uint64_t)SHAREDINFO_ADDR + INT_ENABLE_OFFSET(v);
+		VCPU(v, itv) = (1 << 16); /* timer vector masked */
 	}
 }
 

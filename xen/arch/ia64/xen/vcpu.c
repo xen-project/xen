@@ -823,46 +823,26 @@ IA64FAULT vcpu_get_eoi(VCPU *vcpu, UINT64 *pval)
 
 IA64FAULT vcpu_get_irr0(VCPU *vcpu, UINT64 *pval)
 {
-#ifndef IRR_USE_FIXED
-	printk("vcpu_get_irr: called, not implemented yet\n");
-	return IA64_ILLOP_FAULT;
-#else
-	*pval = vcpu->irr[0];
+	*pval = PSCBX(vcpu, irr[0]);
 	return (IA64_NO_FAULT);
-#endif
 }
 
 IA64FAULT vcpu_get_irr1(VCPU *vcpu, UINT64 *pval)
 {
-#ifndef IRR_USE_FIXED
-	printk("vcpu_get_irr: called, not implemented yet\n");
-	return IA64_ILLOP_FAULT;
-#else
-	*pval = vcpu->irr[1];
+	*pval = PSCBX(vcpu, irr[1]);
 	return (IA64_NO_FAULT);
-#endif
 }
 
 IA64FAULT vcpu_get_irr2(VCPU *vcpu, UINT64 *pval)
 {
-#ifndef IRR_USE_FIXED
-	printk("vcpu_get_irr: called, not implemented yet\n");
-	return IA64_ILLOP_FAULT;
-#else
-	*pval = vcpu->irr[2];
+	*pval = PSCBX(vcpu, irr[2]);
 	return (IA64_NO_FAULT);
-#endif
 }
 
 IA64FAULT vcpu_get_irr3(VCPU *vcpu, UINT64 *pval)
 {
-#ifndef IRR_USE_FIXED
-	printk("vcpu_get_irr: called, not implemented yet\n");
-	return IA64_ILLOP_FAULT;
-#else
-	*pval = vcpu->irr[3];
+	*pval = PSCBX(vcpu, irr[3]);
 	return (IA64_NO_FAULT);
-#endif
 }
 
 IA64FAULT vcpu_get_itv(VCPU *vcpu, UINT64 *pval)
