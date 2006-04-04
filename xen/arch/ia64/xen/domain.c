@@ -76,6 +76,7 @@ extern void sync_split_caches(void);
 extern void serial_input_init(void);
 
 static void init_switch_stack(struct vcpu *v);
+void build_physmap_table(struct domain *d);
 
 /* this belongs in include/asm, but there doesn't seem to be a suitable place */
 void arch_domain_destroy(struct domain *d)
@@ -272,6 +273,7 @@ int arch_domain_create(struct domain *d)
 	memset(d->arch.mm, 0, sizeof(*d->arch.mm));
 	INIT_LIST_HEAD(&d->arch.mm->pt_list);
 
+	d->arch.physmap_built = 0;
 	if ((d->arch.mm->pgd = pgd_alloc(d->arch.mm)) == NULL)
 	    goto fail_nomem;
 
@@ -317,7 +319,8 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 		vmx_setup_platform(d, c);
 
 	    vmx_final_setup_guest(v);
-	}
+	} else if (!d->arch.physmap_built)
+	    build_physmap_table(d);
 
 	*regs = c->regs;
 	if (v == d->vcpu[0]) {
@@ -583,44 +586,24 @@ void assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long ph
         *(mpt_table + (physaddr>>PAGE_SHIFT))=(mpaddr>>PAGE_SHIFT);
     }
 }
-#if 0
-/* map a physical address with specified I/O flag */
-void assign_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long flags)
+
+void build_physmap_table(struct domain *d)
 {
-	struct mm_struct *mm = d->arch.mm;
-	pgd_t *pgd;
-	pud_t *pud;
-	pmd_t *pmd;
-	pte_t *pte;
-	pte_t io_pte;
+	struct list_head *list_ent = d->page_list.next;
+	unsigned long mfn, i = 0;
 
-	if (!mm->pgd) {
-		printk("assign_domain_page: domain pgd must exist!\n");
-		return;
+	ASSERT(!d->arch.physmap_built);
+	while(list_ent != &d->page_list) {
+	    mfn = page_to_mfn(list_entry(
+		list_ent, struct page_info, list));
+	    assign_domain_page(d, i << PAGE_SHIFT, mfn << PAGE_SHIFT);
+
+	    i++;
+	    list_ent = mfn_to_page(mfn)->list.next;
 	}
-	ASSERT(flags & GPFN_IO_MASK);
-
-	pgd = pgd_offset(mm,mpaddr);
-	if (pgd_none(*pgd))
-		pgd_populate(mm, pgd, pud_alloc_one(mm,mpaddr));
-
-	pud = pud_offset(pgd, mpaddr);
-	if (pud_none(*pud))
-		pud_populate(mm, pud, pmd_alloc_one(mm,mpaddr));
-
-	pmd = pmd_offset(pud, mpaddr);
-	if (pmd_none(*pmd))
-		pmd_populate_kernel(mm, pmd, pte_alloc_one_kernel(mm,mpaddr));
-//		pmd_populate(mm, pmd, pte_alloc_one(mm,mpaddr));
-
-	pte = pte_offset_map(pmd, mpaddr);
-	if (pte_none(*pte)) {
-		pte_val(io_pte) = flags;
-		set_pte(pte, io_pte);
-	}
-	else printk("assign_domain_page: mpaddr %lx already mapped!\n",mpaddr);
+	d->arch.physmap_built = 1;
 }
-#endif
+
 void mpafoo(unsigned long mpaddr)
 {
 	extern unsigned long privop_trace;
@@ -650,7 +633,6 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 		return *(unsigned long *)pte;
 	}
 #endif
-tryagain:
 	if (pgd_present(*pgd)) {
 		pud = pud_offset(pgd,mpaddr);
 		if (pud_present(*pud)) {
@@ -665,12 +647,12 @@ tryagain:
 			}
 		}
 	}
-	/* if lookup fails and mpaddr is "legal", "create" the page */
 	if ((mpaddr >> PAGE_SHIFT) < d->max_pages) {
-		if (assign_new_domain_page(d,mpaddr)) goto tryagain;
-	}
-	printk("lookup_domain_mpa: bad mpa 0x%lx (> 0x%lx)\n",
-		mpaddr, (unsigned long) d->max_pages<<PAGE_SHIFT);
+		printk("lookup_domain_mpa: non-allocated mpa 0x%lx (< 0x%lx)\n",
+			mpaddr, (unsigned long) d->max_pages<<PAGE_SHIFT);
+	} else
+		printk("lookup_domain_mpa: bad mpa 0x%lx (> 0x%lx)\n",
+			mpaddr, (unsigned long) d->max_pages<<PAGE_SHIFT);
 	mpafoo(mpaddr);
 	return 0;
 }

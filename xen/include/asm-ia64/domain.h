@@ -27,6 +27,7 @@ struct arch_domain {
     int rid_bits;		/* number of virtual rid bits (default: 18) */
     int breakimm;
 
+    int physmap_built;		/* Whether is physmap built or not */
     int imp_va_msb;
     /* System pages out of guest memory, like for xenstore/console */
     unsigned long sys_pgnr;

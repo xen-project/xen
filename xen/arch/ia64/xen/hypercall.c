@@ -76,25 +76,8 @@ xen_hypercall (struct pt_regs *regs)
 		break;
 
 	    case __HYPERVISOR_memory_op:
-		/* we don't handle reservations; just return success */
-		{
-		    struct xen_memory_reservation reservation;
-		    void *arg = (void *) regs->r15;
-
-		    switch(regs->r14) {
-		    case XENMEM_increase_reservation:
-		    case XENMEM_decrease_reservation:
-			if (copy_from_user(&reservation, arg,
-				sizeof(reservation)))
-			    regs->r8 = -EFAULT;
-			else
-			    regs->r8 = reservation.nr_extents;
-			break;
-		    default:
-			regs->r8 = do_memory_op((int) regs->r14, guest_handle_from_ptr(regs->r15, void));
-			break;
-		    }
-		}
+		regs->r8 = do_memory_op(regs->r14,
+			guest_handle_from_ptr(regs->r15, void));
 		break;
 
 	    case __HYPERVISOR_event_channel_op:
@@ -102,19 +85,24 @@ xen_hypercall (struct pt_regs *regs)
 		break;
 
 	    case __HYPERVISOR_grant_table_op:
-		regs->r8 = do_grant_table_op((unsigned int) regs->r14, guest_handle_from_ptr(regs->r15, void), (unsigned int) regs->r16);
+		regs->r8 = do_grant_table_op((unsigned int) regs->r14,
+			guest_handle_from_ptr(regs->r15, void),
+			(unsigned int) regs->r16);
 		break;
 
 	    case __HYPERVISOR_console_io:
-		regs->r8 = do_console_io((int) regs->r14, (int) regs->r15, guest_handle_from_ptr(regs->r16, char));
+		regs->r8 = do_console_io((int) regs->r14, (int) regs->r15,
+			guest_handle_from_ptr(regs->r16, char));
 		break;
 
 	    case __HYPERVISOR_xen_version:
-		regs->r8 = do_xen_version((int) regs->r14, guest_handle_from_ptr(regs->r15, void));
+		regs->r8 = do_xen_version((int) regs->r14,
+			guest_handle_from_ptr(regs->r15, void));
 		break;
 
 	    case __HYPERVISOR_multicall:
-		regs->r8 = do_multicall(guest_handle_from_ptr(regs->r14, multicall_entry_t), (unsigned int) regs->r15);
+		regs->r8 = do_multicall(guest_handle_from_ptr(regs->r14,
+			multicall_entry_t), (unsigned int) regs->r15);
 		break;
 
 	    default:

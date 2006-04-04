@@ -327,13 +327,15 @@ io_range_t io_ranges[] = {
 #define VMX_SYS_PAGES	(2 + (GFW_SIZE >> PAGE_SHIFT))
 #define VMX_CONFIG_PAGES(d) ((d)->max_pages - VMX_SYS_PAGES)
 
-int vmx_alloc_contig_pages(struct domain *d)
+int vmx_build_physmap_table(struct domain *d)
 {
-	unsigned long i, j, start,tmp, end, pgnr, conf_nr;
-	struct page_info *page;
+	unsigned long i, j, start, tmp, end, mfn;
 	struct vcpu *v = d->vcpu[0];
+	struct list_head *list_ent = d->page_list.next;
 
+	ASSERT(!d->arch.physmap_built);
 	ASSERT(!test_bit(ARCH_VMX_CONTIG_MEM, &v->arch.arch_vmx.flags));
+	ASSERT(d->max_pages == d->tot_pages);
 
 	/* Mark I/O ranges */
 	for (i = 0; i < (sizeof(io_ranges) / sizeof(io_range_t)); i++) {
@@ -343,103 +345,54 @@ int vmx_alloc_contig_pages(struct domain *d)
 		assign_domain_page(d, j, io_ranges[i].type);
 	}
 
-	conf_nr = VMX_CONFIG_PAGES(d);
-    if((conf_nr<<PAGE_SHIFT)<(1UL<<(_PAGE_SIZE_64M+1)))
-        panic("vti domain needs 128M memory at least\n");
-/*
-	order = get_order_from_pages(conf_nr);
-	if (unlikely((page = alloc_domheap_pages(d, order, 0)) == NULL)) {
-	    printk("Could not allocate order=%d pages for vmx contig alloc\n",
-			order);
-	    return -1;
-	}
-*/
- 
-/* reserve contiguous 64M for linux kernel */
-
-    if (unlikely((page = alloc_domheap_pages(d,(KERNEL_TR_PAGE_SHIFT-PAGE_SHIFT), 0)) == NULL)) {
-        printk("No enough memory for vti domain!!!\n");
-        return -1;
-    }
-    pgnr = page_to_mfn(page);
-	for (i=(1UL<<KERNEL_TR_PAGE_SHIFT);i<(1UL<<(KERNEL_TR_PAGE_SHIFT+1));i+=PAGE_SIZE,pgnr++){
-	    assign_domain_page(d, i, pgnr << PAGE_SHIFT);
-    }
-
-	for (i = 0; i < (1UL<<KERNEL_TR_PAGE_SHIFT) ; i += PAGE_SIZE){
-        if (unlikely((page = alloc_domheap_pages(d, 0, 0)) == NULL)) {
-            printk("No enough memory for vti domain!!!\n");
-            return -1;
-        }
-	    pgnr = page_to_mfn(page);
-	    assign_domain_page(d, i, pgnr << PAGE_SHIFT);
-    }
-
 	/* Map normal memory below 3G */
-	end = conf_nr << PAGE_SHIFT;
-    tmp = end < MMIO_START ? end : MMIO_START;
-	for (i = (1UL<<(KERNEL_TR_PAGE_SHIFT+1)); i < tmp; i += PAGE_SIZE){
-        if (unlikely((page = alloc_domheap_pages(d, 0, 0)) == NULL)) {
-            printk("No enough memory for vti domain!!!\n");
-            return -1;
-        }
-	    pgnr = page_to_mfn(page);
-	    assign_domain_page(d, i, pgnr << PAGE_SHIFT);
-    }
+	end = VMX_CONFIG_PAGES(d) << PAGE_SHIFT;
+	tmp = end < MMIO_START ? end : MMIO_START;
+	for (i = 0; (i < tmp) && (list_ent != &d->page_list); i += PAGE_SIZE) {
+	    mfn = page_to_mfn(list_entry(
+		list_ent, struct page_info, list));
+	    assign_domain_page(d, i, mfn << PAGE_SHIFT);
+	    list_ent = mfn_to_page(mfn)->list.next;
+	}
+	ASSERT(list_ent != &d->page_list);
+
 	/* Map normal memory beyond 4G */
 	if (unlikely(end > MMIO_START)) {
 	    start = 4 * MEM_G;
 	    end = start + (end - 3 * MEM_G);
-	    for (i = start; i < end; i += PAGE_SIZE){
-            if (unlikely((page = alloc_domheap_pages(d, 0, 0)) == NULL)) {
-                printk("No enough memory for vti domain!!!\n");
-                return -1;
-            }
-            pgnr = page_to_mfn(page);
-            assign_domain_page(d, i, pgnr << PAGE_SHIFT);
+	    for (i = start; (i < end) &&
+		 (list_ent != &d->page_list); i += PAGE_SIZE) {
+		mfn = page_to_mfn(list_entry(
+		    list_ent, struct page_info, list));
+		assign_domain_page(d, i, mfn << PAGE_SHIFT);
+		list_ent = mfn_to_page(mfn)->list.next;
+	    }
+	    ASSERT(list_ent != &d->page_list);
         }
+	 
+	/* Map guest firmware */
+	for (i = GFW_START; (i < GFW_START + GFW_SIZE) &&
+		(list_ent != &d->page_list); i += PAGE_SIZE) {
+	    mfn = page_to_mfn(list_entry(
+		list_ent, struct page_info, list));
+	    assign_domain_page(d, i, mfn << PAGE_SHIFT);
+	    list_ent = mfn_to_page(mfn)->list.next;
 	}
+	ASSERT(list_ent != &d->page_list);
+
+	/* Map for shared I/O page and xenstore */
+	mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
+	assign_domain_page(d, IO_PAGE_START, mfn << PAGE_SHIFT);
+	list_ent = mfn_to_page(mfn)->list.next;
+	ASSERT(list_ent != &d->page_list);
+
+	mfn = page_to_mfn(list_entry(list_ent, struct page_info, list));
+	assign_domain_page(d, STORE_PAGE_START, mfn << PAGE_SHIFT);
+	list_ent = mfn_to_page(mfn)->list.next;
+	ASSERT(list_ent == &d->page_list);
 
 	d->arch.max_pfn = end >> PAGE_SHIFT;
-/*
-	order = get_order_from_pages(GFW_SIZE >> PAGE_SHIFT);
-	if (unlikely((page = alloc_domheap_pages(d, order, 0)) == NULL)) {
-	    printk("Could not allocate order=%d pages for vmx contig alloc\n",
-			order);`
-	    return -1;
-	}
-*/
-	/* Map guest firmware */
-	for (i = GFW_START; i < GFW_START + GFW_SIZE; i += PAGE_SIZE, pgnr++){
-        if (unlikely((page = alloc_domheap_pages(d, 0, 0)) == NULL)) {
-            printk("No enough memory for vti domain!!!\n");
-            return -1;
-        }
-	    pgnr = page_to_mfn(page);
-	    assign_domain_page(d, i, pgnr << PAGE_SHIFT);
-    }
-
-/*
-	if (unlikely((page = alloc_domheap_pages(d, 1, 0)) == NULL)) {
-	    printk("Could not allocate order=1 pages for vmx contig alloc\n");
-	    return -1;
-	}
-*/
-	/* Map for shared I/O page and xenstore */
-    if (unlikely((page = alloc_domheap_pages(d, 0, 0)) == NULL)) {
-        printk("No enough memory for vti domain!!!\n");
-        return -1;
-    }
-	pgnr = page_to_mfn(page);
-	assign_domain_page(d, IO_PAGE_START, pgnr << PAGE_SHIFT);
-
-    if (unlikely((page = alloc_domheap_pages(d, 0, 0)) == NULL)) {
-        printk("No enough memory for vti domain!!!\n");
-        return -1;
-    }
-	pgnr = page_to_mfn(page);
-	assign_domain_page(d, STORE_PAGE_START, pgnr << PAGE_SHIFT);
-
+	d->arch.physmap_built = 1;
 	set_bit(ARCH_VMX_CONTIG_MEM, &v->arch.arch_vmx.flags);
 	return 0;
 }
@@ -447,6 +400,10 @@ int vmx_alloc_contig_pages(struct domain *d)
 void vmx_setup_platform(struct domain *d, struct vcpu_guest_context *c)
 {
 	ASSERT(d != dom0); /* only for non-privileged vti domain */
+
+	if (!d->arch.physmap_built)
+	    vmx_build_physmap_table(d);
+
 	d->arch.vmx_platform.shared_page_va =
 		(unsigned long)__va(__gpa_to_mpa(d, IO_PAGE_START));
 	/* TEMP */

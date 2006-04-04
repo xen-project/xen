@@ -3226,7 +3226,8 @@ int main(int argc, char **argv)
     }
 
     if ( xc_ia64_get_pfn_list(xc_handle, domid,
-                              page_array, IO_PAGE_START >> PAGE_SHIFT, 1) != 1 )
+                              page_array,
+                              ram_pages + (GFW_SIZE >> PAGE_SHIFT), 1) != 1 )
     {
         fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
         exit(-1);
