@@ -363,7 +363,7 @@ int arch_set_info_guest(
     update_pagetables(v);
 
     if ( v->vcpu_id == 0 )
-        init_domain_time(d);
+        update_domain_wallclock_time(d);
 
     /* Don't redo final setup */
     set_bit(_VCPUF_initialised, &v->vcpu_flags);

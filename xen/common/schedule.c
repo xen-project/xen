@@ -572,7 +572,7 @@ static void __enter_scheduler(void)
     /* Ensure that the domain has an up-to-date time base. */
     if ( !is_idle_vcpu(next) )
     {
-        update_dom_time(next);
+        update_vcpu_system_time(next);
         if ( next->sleep_tick != schedule_data[cpu].tick )
             send_timer_event(next);
     }
@@ -609,7 +609,7 @@ static void t_timer_fn(void *unused)
 
     if ( !is_idle_vcpu(v) )
     {
-        update_dom_time(v);
+        update_vcpu_system_time(v);
         send_timer_event(v);
     }
 
@@ -623,7 +623,7 @@ static void dom_timer_fn(void *data)
 {
     struct vcpu *v = data;
 
-    update_dom_time(v);
+    update_vcpu_system_time(v);
     send_timer_event(v);
 }
 

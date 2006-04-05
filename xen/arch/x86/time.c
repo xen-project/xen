@@ -670,7 +670,7 @@ static inline void version_update_end(u32 *version)
     (*version)++;
 }
 
-static inline void __update_dom_time(struct vcpu *v)
+static inline void __update_vcpu_system_time(struct vcpu *v)
 {
     struct cpu_time       *t;
     struct vcpu_time_info *u;
@@ -688,11 +688,21 @@ static inline void __update_dom_time(struct vcpu *v)
     version_update_end(&u->version);
 }
 
-void update_dom_time(struct vcpu *v)
+void update_vcpu_system_time(struct vcpu *v)
 {
     if ( v->domain->shared_info->vcpu_info[v->vcpu_id].time.tsc_timestamp != 
          cpu_time[smp_processor_id()].local_tsc_stamp )
-        __update_dom_time(v);
+        __update_vcpu_system_time(v);
+}
+
+void update_domain_wallclock_time(struct domain *d)
+{
+    spin_lock(&wc_lock);
+    version_update_begin(&d->shared_info->wc_version);
+    d->shared_info->wc_sec  = wc_sec;
+    d->shared_info->wc_nsec = wc_nsec;
+    version_update_end(&d->shared_info->wc_version);
+    spin_unlock(&wc_lock);
 }
 
 /* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
@@ -701,38 +711,19 @@ void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
     u64 x;
     u32 y, _wc_sec, _wc_nsec;
     struct domain *d;
-    shared_info_t *s;
 
     x = (secs * 1000000000ULL) + (u64)nsecs - system_time_base;
     y = do_div(x, 1000000000);
 
+    spin_lock(&wc_lock);
     wc_sec  = _wc_sec  = (u32)x;
     wc_nsec = _wc_nsec = (u32)y;
+    spin_unlock(&wc_lock);
 
     read_lock(&domlist_lock);
-    spin_lock(&wc_lock);
-
     for_each_domain ( d )
-    {
-        s = d->shared_info;
-        version_update_begin(&s->wc_version);
-        s->wc_sec  = _wc_sec;
-        s->wc_nsec = _wc_nsec;
-        version_update_end(&s->wc_version);
-    }
-
-    spin_unlock(&wc_lock);
+        update_domain_wallclock_time(d);
     read_unlock(&domlist_lock);
-}
-
-void init_domain_time(struct domain *d)
-{
-    spin_lock(&wc_lock);
-    version_update_begin(&d->shared_info->wc_version);
-    d->shared_info->wc_sec  = wc_sec;
-    d->shared_info->wc_nsec = wc_nsec;
-    version_update_end(&d->shared_info->wc_version);
-    spin_unlock(&wc_lock);
 }
 
 static void local_time_calibration(void *unused)

@@ -773,7 +773,7 @@ int construct_dom0(struct domain *d,
     zap_low_mappings(idle_pg_table_l2);
 #endif
 
-    init_domain_time(d);
+    update_domain_wallclock_time(d);
 
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
