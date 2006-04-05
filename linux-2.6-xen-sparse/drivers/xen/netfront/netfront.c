@@ -698,9 +698,9 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	tx->size = skb->len;
 
 	tx->flags = 0;
-	if (skb->ip_summed == CHECKSUM_HW)
-		tx->flags |= NETTXF_csum_blank;
-	if (skb->proto_data_valid)
+	if (skb->ip_summed == CHECKSUM_HW) /* local packet? */
+		tx->flags |= NETTXF_csum_blank | NETTXF_data_validated;
+	if (skb->proto_data_valid) /* remote but checksummed? */
 		tx->flags |= NETTXF_data_validated;
 
 	np->tx.req_prod_pvt = i + 1;
@@ -816,7 +816,11 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		skb->len  = rx->status;
 		skb->tail = skb->data + skb->len;
 
-		if (rx->flags & NETRXF_data_validated) {
+		/*
+		 * Old backends do not assert data_validated but we
+		 * can infer it from csum_blank so test both flags.
+		 */
+		if (rx->flags & (NETRXF_data_validated|NETRXF_csum_blank)) {
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
 			skb->proto_data_valid = 1;
 		} else {
@@ -1017,8 +1021,11 @@ static void network_connect(struct net_device *dev)
 		tx->gref = np->grant_tx_ref[i];
 		tx->offset = (unsigned long)skb->data & ~PAGE_MASK;
 		tx->size = skb->len;
-		tx->flags = (skb->ip_summed == CHECKSUM_HW) ?
-			NETTXF_csum_blank : 0;
+		tx->flags = 0;
+		if (skb->ip_summed == CHECKSUM_HW) /* local packet? */
+			tx->flags |= NETTXF_csum_blank | NETTXF_data_validated;
+		if (skb->proto_data_valid) /* remote but checksummed? */
+			tx->flags |= NETTXF_data_validated;
 
 		np->stats.tx_bytes += skb->len;
 		np->stats.tx_packets++;

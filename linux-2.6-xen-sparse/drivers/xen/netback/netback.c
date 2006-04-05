@@ -329,9 +329,9 @@ static void net_rx_action(unsigned long unused)
 		irq = netif->irq;
 		id = RING_GET_REQUEST(&netif->rx, netif->rx.rsp_prod_pvt)->id;
 		flags = 0;
-		if (skb->ip_summed == CHECKSUM_HW)
-			flags |= NETRXF_csum_blank;
-		if (skb->proto_data_valid)
+		if (skb->ip_summed == CHECKSUM_HW) /* local packet? */
+			flags |= NETRXF_csum_blank | NETRXF_data_validated;
+		else if (skb->proto_data_valid) /* remote but checksummed? */
 			flags |= NETRXF_data_validated;
 		if (make_rx_response(netif, id, status,
 				     (unsigned long)skb->data & ~PAGE_MASK,
@@ -658,7 +658,11 @@ static void net_tx_action(unsigned long unused)
 		skb->dev      = netif->dev;
 		skb->protocol = eth_type_trans(skb, skb->dev);
 
-		if (txreq.flags & NETTXF_data_validated) {
+		/*
+		 * Old frontends do not assert data_validated but we
+		 * can infer it from csum_blank so test both flags.
+		 */
+		if (txreq.flags & (NETTXF_data_validated|NETTXF_csum_blank)) {
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
 			skb->proto_data_valid = 1;
 		} else {
