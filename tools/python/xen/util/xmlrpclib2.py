@@ -20,6 +20,7 @@
 An enhanced XML-RPC client/server interface for Python.
 """
 
+import string
 import types
 
 from httplib import HTTPConnection, HTTP
@@ -54,6 +55,18 @@ class UnixTransport(Transport):
     def make_connection(self, host):
         return HTTPUnix(self.__handler)
 
+
+# See _marshalled_dispatch below.
+def conv_string(x):
+    if (isinstance(x, types.StringType) or
+        isinstance(x, unicode)):
+        s = string.replace(x, "'", r"\047")
+        exec "s = '" + s + "'"
+        return s
+    else:
+        return x
+
+
 class ServerProxy(xmlrpclib.ServerProxy):
     def __init__(self, uri, transport=None, encoding=None, verbose=0,
                  allow_none=1):
@@ -64,6 +77,16 @@ class ServerProxy(xmlrpclib.ServerProxy):
                 transport = UnixTransport()
         xmlrpclib.ServerProxy.__init__(self, uri, transport, encoding,
                                        verbose, allow_none)
+
+
+    def __request(self, methodname, params):
+        response = xmlrpclib.ServerProxy.__request(self, methodname, params)
+
+        if isinstance(response, tuple):
+            return tuple([conv_string(x) for x in response])
+        else:
+            return conv_string(response)
+
 
 # This is a base XML-RPC server for TCP.  It sets allow_reuse_address to
 # true, and has an improved marshaller that logs and serializes exceptions.
@@ -79,14 +102,17 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
             else:
                 response = self._dispatch(method, params)
 
-            # Convert strings to unicode strings so that they are escaped
-            # properly by xmlrpclib.  We use latin-1 here, but any
-            # ASCII-compatible scheme would do -- we just care about getting
-            # the bytes across the wire.
-            # Any message handler that actually cares about the charset in
-            # use should be returning Unicode strings.
-            if isinstance(response, types.StringType):
-                response = unicode(response, 'iso-8859-1')
+            # With either Unicode or normal strings, we can only transmit
+            # \t, \n, \r, \u0020-\ud7ff, \ue000-\ufffd, and \u10000-\u10ffff
+            # in an XML document.  xmlrpclib does not escape these values
+            # properly, and then breaks when it comes to parse the document.
+            # To hack around this problem, we use repr here and exec above
+            # to transmit the string using Python encoding.
+            # Thanks to David Mertz <mertz@gnosis.cx> for the trick (buried
+            # in xml_pickle.py).
+            if (isinstance(response, types.StringType) or
+                isinstance(response, unicode)):
+                response = repr(response)[1:-1]
 
             response = (response,)
             response = xmlrpclib.dumps(response,
