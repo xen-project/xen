@@ -17,12 +17,16 @@
 /* Guest physical address of the grant table.  */
 #define IA64_GRANT_TABLE_PADDR (1UL << 40)
 
-#define gnttab_shared_gmfn(d, t, i)                                     \
-    ( ((d) == dom0) ?                                                   \
-      ((virt_to_maddr((t)->shared) >> PAGE_SHIFT) + (i)) :              \
-      (assign_domain_page((d), IA64_GRANT_TABLE_PADDR, 			\
-       virt_to_maddr((t)->shared)), IA64_GRANT_TABLE_PADDR >> PAGE_SHIFT) \
-    )
+#define gnttab_shared_maddr(d, t, i)                        \
+    virt_to_maddr((char*)(t)->shared + ((i) << PAGE_SHIFT))
+
+#define gnttab_shared_gmfn(d, t, i)                                          \
+    ({ ((d) == dom0) ?                                                       \
+            (virt_to_maddr((t)->shared) >> PAGE_SHIFT) + (i):                \
+            assign_domain_page((d),                                          \
+                               IA64_GRANT_TABLE_PADDR + ((i) << PAGE_SHIFT), \
+                               gnttab_shared_maddr(d, t, i)),                \
+            (IA64_GRANT_TABLE_PADDR >> PAGE_SHIFT) + (i);})
 
 #define gnttab_log_dirty(d, f) ((void)0)
 
