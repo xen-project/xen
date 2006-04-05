@@ -1,5 +1,3 @@
-include $(BASEDIR)/Rules.mk
-
 subdir-y += mcheck
 subdir-y += mtrr
 
@@ -12,5 +10,3 @@ obj-$(x86_32) += centaur.o
 obj-$(x86_32) += cyrix.o
 obj-$(x86_32) += rise.o
 obj-$(x86_32) += transmeta.o
-
-include $(BASEDIR)/Post.mk

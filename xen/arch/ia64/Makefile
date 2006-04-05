@@ -1,21 +1,17 @@
-include $(BASEDIR)/Rules.mk
-
 subdir-y += xen
 subdir-y += vmx
 subdir-y += linux
 subdir-y += linux-xen
 
-include $(BASEDIR)/Post.mk
-
 $(TARGET)-syms: linux-xen/head.o $(ALL_OBJS) xen.lds.s
 	$(LD) $(LDFLAGS) -T xen.lds.s -N \
 		-Map map.out linux-xen/head.o $(ALL_OBJS) -o $@
 	$(NM) -n $@ | $(BASEDIR)/tools/symbols > $(BASEDIR)/xen-syms.S
-	$(MAKE) $(BASEDIR)/xen-syms.o
+	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/xen-syms.o
 	$(LD) $(LDFLAGS) -T xen.lds.s -N \
 		-Map map.out linux-xen/head.o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
 	$(NM) -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
-	$(MAKE) $(BASEDIR)/xen-syms.o
+	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/xen-syms.o
 	$(LD) $(LDFLAGS) -T xen.lds.s -N \
 		-Map map.out linux-xen/head.o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
 	rm -f $(BASEDIR)/xen-syms.S $(BASEDIR)/xen-syms.o

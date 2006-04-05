@@ -1,5 +1,3 @@
-include $(BASEDIR)/Rules.mk
-
 subdir-y += acpi
 subdir-y += cpu
 subdir-y += genapic
@@ -50,8 +48,6 @@ obj-$(x86_64) += shadow.o shadow_public.o shadow_guest32.o shadow_guest32pae.o
 
 obj-$(crash_debug) += gdbstub.o
 
-include $(BASEDIR)/Post.mk
-
 $(TARGET): $(TARGET)-syms boot/mkelf32
 	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
 	`$(NM) $(TARGET)-syms | sort | tail -n 1 | sed -e 's/^\([^ ]*\).*/0x\1/'`
@@ -60,11 +56,11 @@ $(TARGET)-syms: boot/$(TARGET_SUBARCH).o $(ALL_OBJS) xen.lds
 	$(LD) $(LDFLAGS) -T xen.lds -N \
 	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) -o $@
 	$(NM) -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
-	$(MAKE) $(BASEDIR)/xen-syms.o
+	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/xen-syms.o
 	$(LD) $(LDFLAGS) -T xen.lds -N \
 	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
 	$(NM) -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
-	$(MAKE) $(BASEDIR)/xen-syms.o
+	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/xen-syms.o
 	$(LD) $(LDFLAGS) -T xen.lds -N \
 	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
 	rm -f $(BASEDIR)/xen-syms.S $(BASEDIR)/xen-syms.o

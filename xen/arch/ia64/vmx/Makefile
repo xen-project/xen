@@ -1,5 +1,3 @@
-include $(BASEDIR)/Rules.mk
-
 obj-y += hvm_vioapic.o
 obj-y += mm.o
 obj-y += mmio.o
@@ -20,5 +18,3 @@ obj-y += vmx_vcpu.o
 obj-y += vmx_virt.o
 obj-y += vmx_vsa.o
 obj-y += vtlb.o
-
-include $(BASEDIR)/Post.mk
