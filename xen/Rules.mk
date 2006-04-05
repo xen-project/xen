@@ -26,17 +26,23 @@ override TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
 override COMPILE_ARCH    := $(patsubst x86%,x86,$(XEN_COMPILE_ARCH))
 override TARGET_ARCH     := $(patsubst x86%,x86,$(XEN_TARGET_ARCH))
 
-TARGET  := $(BASEDIR)/xen
-HDRS    := $(wildcard $(BASEDIR)/include/xen/*.h)
-HDRS    += $(wildcard $(BASEDIR)/include/public/*.h)
-HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/*.h)
-HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/$(TARGET_SUBARCH)/*.h)
-# Do not depend on auto-generated header files.
-HDRS    := $(subst $(BASEDIR)/include/asm-$(TARGET_ARCH)/asm-offsets.h,,$(HDRS))
-HDRS    := $(subst $(BASEDIR)/include/xen/banner.h,,$(HDRS))
-HDRS    := $(subst $(BASEDIR)/include/xen/compile.h,,$(HDRS))
+TARGET := $(BASEDIR)/xen
+
+HDRS := $(wildcard $(BASEDIR)/include/xen/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/public/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/$(TARGET_SUBARCH)/*.h)
+
+INSTALL      := install
+INSTALL_DATA := $(INSTALL) -m0644
+INSTALL_DIR  := $(INSTALL) -d -m0755
 
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
+
+# Do not depend on auto-generated header files.
+HDRS := $(subst $(BASEDIR)/include/asm-$(TARGET_ARCH)/asm-offsets.h,,$(HDRS))
+HDRS := $(subst $(BASEDIR)/include/xen/banner.h,,$(HDRS))
+HDRS := $(subst $(BASEDIR)/include/xen/compile.h,,$(HDRS))
 
 # Note that link order matters!
 ALL_OBJS-y               += $(BASEDIR)/common/built_in.o
@@ -60,6 +66,36 @@ AFLAGS-y               += -D__ASSEMBLY__
 ALL_OBJS := $(ALL_OBJS-y)
 CFLAGS   := $(strip $(CFLAGS) $(CFLAGS-y))
 AFLAGS   := $(strip $(AFLAGS) $(AFLAGS-y))
+
+include Makefile
+
+# Ensure each subdirectory has exactly one trailing slash.
+subdir-n := $(patsubst %,%/,$(patsubst %/,%,$(subdir-n)))
+subdir-y := $(patsubst %,%/,$(patsubst %/,%,$(subdir-y)))
+
+# Add explicitly declared subdirectories to the object list.
+obj-y += $(patsubst %,%/built_in.o,$(subdir-y))
+
+# Add implicitly declared subdirectories (in the object list) to the
+# subdirectory list, and rewrite the object-list entry.
+subdir-y += $(filter %/,$(obj-y))
+obj-y    := $(patsubst %/,%/built-in.o,$(obj-y))
+
+subdir-all := $(subdir-y) $(subdir-n)
+
+built_in.o: $(obj-y)
+	$(LD) $(LDFLAGS) -r -o $@ $^
+
+.PHONY: FORCE
+FORCE:
+
+%/built_in.o: FORCE
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* built_in.o
+
+clean:: $(addprefix _clean_, $(subdir-all)) FORCE
+	rm -f *.o *~ core
+_clean_%/: FORCE
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* clean
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -c $< -o $@

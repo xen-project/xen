@@ -1,5 +1,3 @@
-include $(BASEDIR)/Rules.mk
-
 obj-y += efi.o
 obj-y += entry.o
 obj-y += irq_ia64.o
@@ -15,5 +13,3 @@ obj-y += time.o
 obj-y += tlb.o
 obj-y += unaligned.o
 obj-y += unwind.o
-
-include $(BASEDIR)/Post.mk

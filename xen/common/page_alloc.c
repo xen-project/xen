@@ -170,7 +170,7 @@ paddr_t init_boot_allocator(paddr_t bitmap_start)
 
 void init_boot_pages(paddr_t ps, paddr_t pe)
 {
-    unsigned long bad_pfn;
+    unsigned long bad_spfn, bad_epfn, i;
     char *p;
 
     ps = round_pgup(ps);
@@ -184,18 +184,31 @@ void init_boot_pages(paddr_t ps, paddr_t pe)
     p = opt_badpage;
     while ( *p != '\0' )
     {
-        bad_pfn = simple_strtoul(p, &p, 0);
+        bad_spfn = simple_strtoul(p, &p, 0);
+        bad_epfn = bad_spfn;
+
+        if ( *p == '-' )
+        {
+            p++;
+            bad_epfn = simple_strtoul(p, &p, 0);
+            if ( bad_epfn < bad_spfn )
+                bad_epfn = bad_spfn;
+        }
 
         if ( *p == ',' )
             p++;
         else if ( *p != '\0' )
             break;
 
-        if ( (bad_pfn < max_page) && !allocated_in_map(bad_pfn) )
-        {
-            printk("Marking page %lx as bad\n", bad_pfn);
-            map_alloc(bad_pfn, 1);
-        }
+        if ( bad_epfn == bad_spfn )
+            printk("Marking page %lx as bad\n", bad_spfn);
+        else
+            printk("Marking pages %lx through %lx as bad\n",
+                   bad_spfn, bad_epfn);
+
+        for ( i = bad_spfn; i <= bad_epfn; i++ )
+            if ( (i < max_page) && !allocated_in_map(i) )
+                map_alloc(i, 1);
     }
 }
 

@@ -35,7 +35,7 @@
 
 /* Have we found an MP table */
 int smp_found_config;
-unsigned int __initdata maxcpus = NR_CPUS;
+unsigned int __devinitdata maxcpus = NR_CPUS;
 
 #ifdef CONFIG_HOTPLUG_CPU
 #define CPU_HOTPLUG_ENABLED	(1)
@@ -226,16 +226,11 @@ static void __devinit MP_processor_info (struct mpc_config_processor *m)
 	num_processors++;
 
 	if (CPU_HOTPLUG_ENABLED || (num_processors > 8)) {
-		switch (boot_cpu_data.x86_vendor) {
-		case X86_VENDOR_INTEL:
-			if (!APIC_XAPIC(ver)) {
-				def_to_bigsmp = 0;
-				break;
-			}
-			/* If P4 and above fall through */
-		case X86_VENDOR_AMD:
-			def_to_bigsmp = 1;
-		}
+		/*
+		 * No need for processor or APIC checks: physical delivery
+		 * (bigsmp) mode should always work.
+		 */
+		def_to_bigsmp = 1;
 	}
 	bios_cpu_apicid[num_processors - 1] = m->mpc_apicid;
 }
@@ -916,6 +911,7 @@ void __init mp_register_ioapic (
 	u32			gsi_base)
 {
 	int			idx = 0;
+	int			tmpid;
 
 	if (nr_ioapics >= MAX_IO_APICS) {
 		printk(KERN_ERR "ERROR: Max # of I/O APICs (%d) exceeded "
@@ -936,9 +932,14 @@ void __init mp_register_ioapic (
 
 	set_fixmap_nocache(FIX_IO_APIC_BASE_0 + idx, address);
 	if ((boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) && (boot_cpu_data.x86 < 15))
-		mp_ioapics[idx].mpc_apicid = io_apic_get_unique_id(idx, id);
+		tmpid = io_apic_get_unique_id(idx, id);
 	else
-		mp_ioapics[idx].mpc_apicid = id;
+		tmpid = id;
+	if (tmpid == -1) {
+		nr_ioapics--;
+		return;
+	}
+	mp_ioapics[idx].mpc_apicid = tmpid;
 	mp_ioapics[idx].mpc_apicver = io_apic_get_version(idx);
 	
 	/* 

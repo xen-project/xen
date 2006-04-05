@@ -20,7 +20,7 @@
 #include <asm/flushtlb.h>
 #include <asm/smpboot.h>
 #include <asm/hardirq.h>
-#include <asm/mach_ipi.h>
+#include <asm/ipi.h>
 #include <mach_apic.h>
 
 /*
@@ -67,7 +67,7 @@
 
 static inline int __prepare_ICR (unsigned int shortcut, int vector)
 {
-    return APIC_DM_FIXED | shortcut | vector | APIC_DEST_LOGICAL;
+    return APIC_DM_FIXED | shortcut | vector;
 }
 
 static inline int __prepare_ICR2 (unsigned int mask)
@@ -85,7 +85,7 @@ static inline void check_IPI_mask(cpumask_t cpumask)
     ASSERT(!cpus_empty(cpumask));
 }
 
-void send_IPI_mask_bitmask(cpumask_t cpumask, int vector)
+void send_IPI_mask_flat(cpumask_t cpumask, int vector)
 {
     unsigned long mask = cpus_addr(cpumask)[0];
     unsigned long cfg;
@@ -99,18 +99,18 @@ void send_IPI_mask_bitmask(cpumask_t cpumask, int vector)
      * Wait for idle.
      */
     apic_wait_icr_idle();
-		
+
     /*
      * prepare target chip field
      */
     cfg = __prepare_ICR2(mask);
     apic_write_around(APIC_ICR2, cfg);
-		
+
     /*
      * program the ICR
      */
-    cfg = __prepare_ICR(0, vector);
-			
+    cfg = __prepare_ICR(0, vector) | APIC_DEST_LOGICAL;
+
     /*
      * Send the IPI. The write to APIC_ICR fires this off.
      */
@@ -119,7 +119,7 @@ void send_IPI_mask_bitmask(cpumask_t cpumask, int vector)
     local_irq_restore(flags);
 }
 
-void send_IPI_mask_sequence(cpumask_t mask, int vector)
+void send_IPI_mask_phys(cpumask_t mask, int vector)
 {
     unsigned long cfg, flags;
     unsigned int query_cpu;
@@ -140,18 +140,18 @@ void send_IPI_mask_sequence(cpumask_t mask, int vector)
          * Wait for idle.
          */
         apic_wait_icr_idle();
-		
+
         /*
          * prepare target chip field
          */
-        cfg = __prepare_ICR2(cpu_to_logical_apicid(query_cpu));
+        cfg = __prepare_ICR2(cpu_physical_id(query_cpu));
         apic_write_around(APIC_ICR2, cfg);
-		
+
         /*
          * program the ICR
          */
-        cfg = __prepare_ICR(0, vector);
-			
+        cfg = __prepare_ICR(0, vector) | APIC_DEST_PHYSICAL;
+
         /*
          * Send the IPI. The write to APIC_ICR fires this off.
          */

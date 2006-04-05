@@ -12,6 +12,8 @@ XEN_LIBXENSTAT     = $(XEN_ROOT)/tools/xenstat/libxenstat/src
 
 X11_LDPATH = -L/usr/X11R6/$(LIBDIR)
 
+CFLAGS += -D__XEN_INTERFACE_VERSION__=0x00030101
+
 %.opic: %.c
 	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
 

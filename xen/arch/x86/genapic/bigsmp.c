@@ -1,7 +1,3 @@
-/* 
- * APIC driver for "bigsmp" XAPIC machines with more than 8 virtual CPUs.
- * Drives the local APIC in "clustered mode".
- */
 #include <xen/config.h>
 #include <xen/cpumask.h>
 #include <asm/current.h>
@@ -13,8 +9,6 @@
 #include <xen/smp.h>
 #include <xen/init.h>
 #include <xen/dmi.h>
-#include <asm/mach_ipi.h>
-#include <asm/mach-bigsmp/mach_apic.h>
 #include <asm/mach-default/mach_mpparse.h>
 
 static int dmi_bigsmp; /* can be set by dmi scanners */
@@ -52,5 +46,5 @@ static __init int probe_bigsmp(void)
 
 struct genapic apic_bigsmp = {
 	APIC_INIT("bigsmp", probe_bigsmp),
-	.send_ipi_mask = send_IPI_mask_sequence
+	GENAPIC_PHYS
 };

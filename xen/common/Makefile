@@ -1,5 +1,3 @@
-include $(BASEDIR)/Rules.mk
-
 obj-y += acm_ops.o
 obj-y += bitmap.o
 obj-y += dom0_ops.o
@@ -27,8 +25,6 @@ obj-y += xmalloc.o
 
 obj-$(perfc)       += perfc.o
 obj-$(crash_debug) += gdbstub.o
-
-include $(BASEDIR)/Post.mk
 
 # Object file contains changeset and compiler information.
 kernel.o: $(BASEDIR)/include/xen/compile.h
