@@ -294,7 +294,7 @@ static void __serial_rx(char c, struct cpu_user_regs *regs)
     if ( (serial_rx_prod-serial_rx_cons) != SERIAL_RX_SIZE )
         serial_rx_ring[SERIAL_RX_MASK(serial_rx_prod++)] = c;
     /* Always notify the guest: prevents receive path from getting stuck. */
-    send_guest_virq(dom0->vcpu[0], VIRQ_CONSOLE);
+    send_guest_global_virq(dom0, VIRQ_CONSOLE);
 }
 
 static void serial_rx(char c, struct cpu_user_regs *regs)

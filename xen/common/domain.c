@@ -137,7 +137,7 @@ void domain_kill(struct domain *d)
         domain_relinquish_resources(d);
         put_domain(d);
 
-        send_guest_virq(dom0->vcpu[0], VIRQ_DOM_EXC);
+        send_guest_global_virq(dom0, VIRQ_DOM_EXC);
     }
 }
 
@@ -192,7 +192,7 @@ static void domain_shutdown_finalise(void)
 
     /* Don't set DOMF_shutdown until execution contexts are sync'ed. */
     if ( !test_and_set_bit(_DOMF_shutdown, &d->domain_flags) )
-        send_guest_virq(dom0->vcpu[0], VIRQ_DOM_EXC);
+        send_guest_global_virq(dom0, VIRQ_DOM_EXC);
 
     UNLOCK_BIGLOCK(d);
 
@@ -267,7 +267,7 @@ void domain_pause_for_debugger(void)
     for_each_vcpu ( d, v )
         vcpu_sleep_nosync(v);
 
-    send_guest_virq(dom0->vcpu[0], VIRQ_DEBUGGER);
+    send_guest_global_virq(dom0, VIRQ_DEBUGGER);
 }
 
 
@@ -307,7 +307,7 @@ void domain_destroy(struct domain *d)
 
     free_domain(d);
 
-    send_guest_virq(dom0->vcpu[0], VIRQ_DOM_EXC);
+    send_guest_global_virq(dom0, VIRQ_DOM_EXC);
 }
 
 void vcpu_pause(struct vcpu *v)

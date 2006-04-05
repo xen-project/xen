@@ -916,7 +916,7 @@ void __init early_time_init(void)
 
 void send_timer_event(struct vcpu *v)
 {
-    send_guest_virq(v, VIRQ_TIMER);
+    send_guest_vcpu_virq(v, VIRQ_TIMER);
 }
 
 /*

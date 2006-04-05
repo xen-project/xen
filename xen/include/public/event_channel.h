@@ -50,9 +50,13 @@ typedef struct evtchn_bind_interdomain {
  * EVTCHNOP_bind_virq: Bind a local event channel to VIRQ <irq> on specified
  * vcpu.
  * NOTES:
- *  1. A virtual IRQ may be bound to at most one event channel per vcpu.
- *  2. The allocated event channel is bound to the specified vcpu. The binding
- *     may not be changed.
+ *  1. Virtual IRQs are classified as per-vcpu or global. See the VIRQ list
+ *     in xen.h for the classification of each VIRQ.
+ *  2. Global VIRQs must be allocated on VCPU0 but can subsequently be
+ *     re-bound via EVTCHNOP_bind_vcpu.
+ *  3. Per-vcpu VIRQs may be bound to at most one event channel per vcpu.
+ *     The allocated event channel is bound to the specified vcpu and the
+ *     binding cannot be changed.
  */
 #define EVTCHNOP_bind_virq        1
 typedef struct evtchn_bind_virq {
@@ -152,9 +156,11 @@ typedef struct evtchn_status {
  * EVTCHNOP_bind_vcpu: Specify which vcpu a channel should notify when an
  * event is pending.
  * NOTES:
- *  1. IPI- and VIRQ-bound channels always notify the vcpu that initialised
- *     the binding. This binding cannot be changed.
- *  2. All other channels notify vcpu0 by default. This default is set when
+ *  1. IPI-bound channels always notify the vcpu specified at bind time.
+ *     This binding cannot be changed.
+ *  2. Per-VCPU VIRQ channels always notify the vcpu specified at bind time.
+ *     This binding cannot be changed.
+ *  3. All other channels notify vcpu0 by default. This default is set when
  *     the channel is allocated (a port that is freed and subsequently reused
  *     has its binding reset to vcpu0).
  */

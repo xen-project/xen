@@ -65,12 +65,17 @@
  * VIRTUAL INTERRUPTS
  * 
  * Virtual interrupts that a guest OS may receive from Xen.
+ * 
+ * In the side comments, 'V.' denotes a per-VCPU VIRQ while 'G.' denotes a
+ * global VIRQ. The former can be bound once per VCPU and cannot be re-bound.
+ * The latter can be allocated only once per guest: they must initially be
+ * allocated to VCPU0 but can subsequently be re-bound.
  */
-#define VIRQ_TIMER      0  /* Timebase update, and/or requested timeout.  */
-#define VIRQ_DEBUG      1  /* Request guest to dump debug info.           */
-#define VIRQ_CONSOLE    2  /* (DOM0) Bytes received on emergency console. */
-#define VIRQ_DOM_EXC    3  /* (DOM0) Exceptional event for some domain.   */
-#define VIRQ_DEBUGGER   6  /* (DOM0) A domain has paused for debugging.   */
+#define VIRQ_TIMER      0  /* V. Timebase update, and/or requested timeout.  */
+#define VIRQ_DEBUG      1  /* V. Request guest to dump debug info.           */
+#define VIRQ_CONSOLE    2  /* G. (DOM0) Bytes received on emergency console. */
+#define VIRQ_DOM_EXC    3  /* G. (DOM0) Exceptional event for some domain.   */
+#define VIRQ_DEBUGGER   6  /* G. (DOM0) A domain has paused for debugging.   */
 #define NR_VIRQS        8
 
 /*
