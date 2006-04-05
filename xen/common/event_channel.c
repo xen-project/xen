@@ -46,6 +46,7 @@
         goto out;                                                   \
     } while ( 0 )
 
+
 static int get_free_port(struct domain *d)
 {
     struct evtchn *chn;
@@ -360,7 +361,7 @@ static long __evtchn_close(struct domain *d1, int port1)
             rc = -EINVAL;
             goto out;
         }
-    
+
         port2 = chn1->u.interdomain.remote_port;
         BUG_ON(!port_is_valid(d2, port2));
 
@@ -438,6 +439,7 @@ long evtchn_send(unsigned int lport)
     return ret;
 }
 
+
 void evtchn_set_pending(struct vcpu *v, int port)
 {
     struct domain *d = v->domain;
@@ -471,6 +473,7 @@ void evtchn_set_pending(struct vcpu *v, int port)
     }
 }
 
+
 void send_guest_virq(struct vcpu *v, int virq)
 {
     int port = v->virq_to_evtchn[virq];
@@ -479,12 +482,14 @@ void send_guest_virq(struct vcpu *v, int virq)
         evtchn_set_pending(v, port);
 }
 
+
 void send_guest_pirq(struct domain *d, int pirq)
 {
     int port = d->pirq_to_evtchn[pirq];
     struct evtchn *chn = evtchn_from_port(d, port);
     evtchn_set_pending(d->vcpu[chn->notify_vcpu_id], port);
 }
+
 
 static long evtchn_status(evtchn_status_t *status)
 {
@@ -550,6 +555,7 @@ static long evtchn_status(evtchn_status_t *status)
     return rc;
 }
 
+
 long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
 {
     struct domain *d = current->domain;
@@ -585,6 +591,7 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
     return rc;
 }
 
+
 static long evtchn_unmask(evtchn_unmask_t *unmask)
 {
     struct domain *d = current->domain;
@@ -619,6 +626,7 @@ static long evtchn_unmask(evtchn_unmask_t *unmask)
 
     return 0;
 }
+
 
 long do_event_channel_op(GUEST_HANDLE(evtchn_op_t) uop)
 {
@@ -691,6 +699,48 @@ long do_event_channel_op(GUEST_HANDLE(evtchn_op_t) uop)
     }
 
     return rc;
+}
+
+
+int evtchn_open_reserved_port(struct domain *d)
+{
+    struct evtchn *chn;
+    int            port;
+
+    spin_lock(&d->evtchn_lock);
+
+    if ( (port = get_free_port(d)) >= 0 )
+    {
+        chn = evtchn_from_port(d, port);
+        chn->state = ECS_RESERVED;
+    }
+
+    spin_unlock(&d->evtchn_lock);
+
+    return port;
+}
+
+
+void evtchn_close_reserved_port(struct domain *d, int port)
+{
+    struct evtchn *chn;
+
+    spin_lock(&d->evtchn_lock);
+
+    BUG_ON(!port_is_valid(d, port));
+
+    chn = evtchn_from_port(d, port);
+    chn->state          = ECS_FREE;
+    chn->notify_vcpu_id = 0;
+
+    spin_unlock(&d->evtchn_lock);
+}
+
+
+void evtchn_notify_reserved_port(struct domain *d, int port)
+{
+    struct evtchn *chn = evtchn_from_port(d, port);
+    evtchn_set_pending(d->vcpu[chn->notify_vcpu_id], port);
 }
 
 

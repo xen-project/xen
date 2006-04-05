@@ -45,4 +45,9 @@ extern long evtchn_send(unsigned int lport);
 /* Bind a local event-channel port to the specified VCPU. */
 extern long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id);
 
+/* Reserved event-channel ports for other Xen subsystems. */
+int evtchn_open_reserved_port(struct domain *d);
+void evtchn_close_reserved_port(struct domain *d, int port);
+void evtchn_notify_reserved_port(struct domain *d, int port);
+
 #endif /* __XEN_EVENT_H__ */
