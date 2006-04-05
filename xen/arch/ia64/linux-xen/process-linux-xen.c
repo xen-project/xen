@@ -126,6 +126,13 @@ show_regs (struct pt_regs *regs)
 	printk("psr : %016lx ifs : %016lx ip  : [<%016lx>]    %s\n",
 	       regs->cr_ipsr, regs->cr_ifs, ip, print_tainted());
 #else
+	struct vcpu* vcpu = current;
+	if (vcpu != NULL) {
+		struct domain* d = vcpu->domain;
+		printk("d 0x%p domid %d\n", d, d->domain_id);
+		printk("vcpu 0x%p vcpu %d\n",
+		       vcpu, vcpu->vcpu_id);
+	}
 	printk("\nCPU %d\n", smp_processor_id());
 	printk("psr : %016lx ifs : %016lx ip  : [<%016lx>]\n",
 	       regs->cr_ipsr, regs->cr_ifs, ip);
