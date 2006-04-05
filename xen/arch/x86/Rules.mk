@@ -46,6 +46,10 @@ x86_32 := n
 x86_64 := y
 endif
 
+HDRS += $(wildcard $(BASEDIR)/include/asm-x86/hvm/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-x86/hvm/svm/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-x86/hvm/vmx/*.h)
+
 # Test for at least GCC v3.2.x.
 gcc-ver = $(shell $(CC) -dumpversion | sed -e 's/^\(.\)\.\(.\)\.\(.\)/\$(1)/')
 ifeq ($(call gcc-ver,1),1)

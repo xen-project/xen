@@ -26,20 +26,19 @@ override TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
 override COMPILE_ARCH    := $(patsubst x86%,x86,$(XEN_COMPILE_ARCH))
 override TARGET_ARCH     := $(patsubst x86%,x86,$(XEN_TARGET_ARCH))
 
-TARGET  := $(BASEDIR)/xen
-HDRS    := $(wildcard $(BASEDIR)/include/xen/*.h)
-HDRS    += $(wildcard $(BASEDIR)/include/public/*.h)
-HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/*.h)
-HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/$(TARGET_SUBARCH)/*.h)
-HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/hvm/*.h)
-HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/hvm/svm/*.h)
-HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/hvm/vmx/*.h)
-# Do not depend on auto-generated header files.
-HDRS    := $(subst $(BASEDIR)/include/asm-$(TARGET_ARCH)/asm-offsets.h,,$(HDRS))
-HDRS    := $(subst $(BASEDIR)/include/xen/banner.h,,$(HDRS))
-HDRS    := $(subst $(BASEDIR)/include/xen/compile.h,,$(HDRS))
+TARGET := $(BASEDIR)/xen
+
+HDRS := $(wildcard $(BASEDIR)/include/xen/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/public/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/$(TARGET_SUBARCH)/*.h)
 
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
+
+# Do not depend on auto-generated header files.
+HDRS := $(subst $(BASEDIR)/include/asm-$(TARGET_ARCH)/asm-offsets.h,,$(HDRS))
+HDRS := $(subst $(BASEDIR)/include/xen/banner.h,,$(HDRS))
+HDRS := $(subst $(BASEDIR)/include/xen/compile.h,,$(HDRS))
 
 # Note that link order matters!
 ALL_OBJS-y               += $(BASEDIR)/common/built_in.o
