@@ -34,6 +34,7 @@
 #define IOREQ_TYPE_AND          2
 #define IOREQ_TYPE_OR           3
 #define IOREQ_TYPE_XOR          4
+#define IOREQ_TYPE_XCHG         5
 
 /*
  * VMExit dispatcher should cooperate with instruction decoder to

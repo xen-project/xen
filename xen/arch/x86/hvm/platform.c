@@ -439,6 +439,14 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
         GET_OP_SIZE_FOR_BYTE(size_reg);
         return mem_reg(size_reg, opcode, instr, rex);
 
+    case 0x87:  /* xchg {r/m16|r/m32}, {m/r16|m/r32} */
+        instr->instr = INSTR_XCHG;
+        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+        if (((*(opcode+1)) & 0xc7) == 5)
+            return reg_mem(instr->op_size, opcode, instr, rex);
+        else
+            return mem_reg(instr->op_size, opcode, instr, rex);
+
     case 0x88: /* mov r8, m8 */
         instr->instr = INSTR_MOV;
         instr->op_size = BYTE;
@@ -935,6 +943,17 @@ void handle_mmio(unsigned long va, unsigned long gpa)
                           mmio_inst.op_size, 0, IOREQ_READ, 0);
             break;
         }
+
+    case INSTR_XCHG:
+        mmio_opp->flags = mmio_inst.flags;
+        mmio_opp->instr = mmio_inst.instr;
+        mmio_opp->operand[0] = mmio_inst.operand[0]; /* source */
+        mmio_opp->operand[1] = mmio_inst.operand[1]; /* destination */
+
+        /* send the request and wait for the value */
+        send_mmio_req(IOREQ_TYPE_XCHG, gpa, 1,
+                      mmio_inst.op_size, 0, IOREQ_WRITE, 0);
+        break;
 
     default:
         printf("Unhandled MMIO instruction\n");
