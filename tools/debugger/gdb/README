@@ -1,16 +1,17 @@
 
-DomU GDB server for 32-bit (PAE and non-PAE) systems
+DomU & HVM GDB server for 32-bit (PAE and non-PAE) and x86_64 systems
 ----------------------------------------------------
 
 Lines marked below with [*] are optional, if you want full
 source-level debugging of your kernel image.
 
 To build the GDB server:
+ 0. Build rest of the Xen first from the base directory
  1. Run ./gdbbuild from within this directory.
  2. Copy ./gdb-6.2.1-linux-i386-xen/gdb/gdbserver/gdbserver-xen
     to your test machine.
 
-To build a debuggable guest kernel image:
+To build a debuggable guest domU kernel image:
  1. cd linux-2.6.xx-xenU
  2. make menuconfig
  3. From within the configurator, enable the following options:
@@ -28,7 +29,7 @@ To debug a running guest:
     # bt
     # disass
 
-To debug a crashed guest:
+To debug a crashed domU guest:
  1. Add '(enable-dump yes)' to /etc/xen/xend-config.sxp before
     starting xend.
  2. When the domain crashes, a core file is written to
