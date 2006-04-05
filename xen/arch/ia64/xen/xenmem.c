@@ -47,8 +47,12 @@ paging_init (void)
 	if ((mpt_table = alloc_xenheap_pages(mpt_order)) == NULL)
 		panic("Not enough memory to bootstrap Xen.\n");
 
-	printk("machine to physical table: 0x%lx\n", (u64)mpt_table);
-	for (i = 0; i < (1UL << mpt_order); i++) {
+	printk("machine to physical table: 0x%lx mpt_table_size 0x%lx\n"
+	       "mpt_order %u max_page 0x%lx\n",
+	       (u64)mpt_table, mpt_table_size, mpt_order, max_page);
+	for (i = 0;
+	     i < ((1UL << mpt_order) << PAGE_SHIFT) / sizeof(mpt_table[0]);
+	     i++) {
 		mpt_table[i] = INVALID_M2P_ENTRY;
 	}
 }
