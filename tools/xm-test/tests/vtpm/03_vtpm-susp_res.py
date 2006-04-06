@@ -47,6 +47,7 @@ except ConsoleError, e:
     FAIL(str(e))
 
 if re.search("No such file",run["output"]):
+    vtpm_cleanup(domName)
     FAIL("TPM frontend support not compiled into (domU?) kernel")
 
 console.closeConsole()
