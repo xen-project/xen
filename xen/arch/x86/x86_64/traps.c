@@ -186,13 +186,19 @@ unsigned long do_iret(void)
 
     if ( unlikely(copy_from_user(&iret_saved, (void *)regs->rsp,
                                  sizeof(iret_saved))) )
+    {
+        DPRINTK("Fault while reading IRET context from guest stack\n");
         domain_crash_synchronous();
+    }
 
     /* Returning to user mode? */
     if ( (iret_saved.cs & 3) == 3 )
     {
         if ( unlikely(pagetable_get_paddr(v->arch.guest_table_user) == 0) )
-            return -EFAULT;
+        {
+            DPRINTK("Guest switching to user mode with no user page tables\n");
+            domain_crash_synchronous();
+        }
         toggle_guest_mode(v);
     }
 
