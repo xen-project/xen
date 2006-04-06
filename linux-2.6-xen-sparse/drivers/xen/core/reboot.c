@@ -85,6 +85,23 @@ void smp_resume(void);
 #define smp_resume()	((void)0)
 #endif
 
+/* Ensure we run on the idle task page tables so that we will
+   switch page tables before running user space. This is needed
+   on architectures with separate kernel and user page tables
+   because the user page table pointer is not saved/restored. */
+static void switch_idle_mm(void)
+{
+	struct mm_struct *mm = current->active_mm;
+
+	if (mm == &init_mm)
+		return;
+
+	atomic_inc(&init_mm.mm_count);
+	switch_mm(mm, &init_mm, current);
+	current->active_mm = &init_mm;
+	mmdrop(mm);
+}
+
 static int __do_suspend(void *ignore)
 {
 	int i, j, k, fpp, err;
@@ -163,6 +180,8 @@ static int __do_suspend(void *ignore)
 	irq_resume();
 
 	time_resume();
+
+	switch_idle_mm();
 
 	__sti();
 
