@@ -1317,6 +1317,11 @@ void __init setup_bootmem_allocator(void)
 		}
 	}
 #endif
+#ifdef CONFIG_KEXEC
+	if (crashk_res.start != crashk_res.end)
+		reserve_bootmem(crashk_res.start,
+			crashk_res.end - crashk_res.start + 1);
+#endif
 
 	if (!xen_feature(XENFEAT_auto_translated_physmap))
 		phys_to_machine_mapping =
@@ -1435,11 +1440,6 @@ legacy_init_iomem_resources(struct resource *code_resource, struct resource *dat
 #endif
 		}
 	}
-#endif
-#ifdef CONFIG_KEXEC
-	if (crashk_res.start != crashk_res.end)
-		reserve_bootmem(crashk_res.start,
-			crashk_res.end - crashk_res.start + 1);
 #endif
 }
 
