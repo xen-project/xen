@@ -646,18 +646,14 @@ int xc_linux_restore(int xc_handle, int io_fd,
         goto out;
     }
 
-    if ((pt_levels == 2) && ((pfn_type[pfn]&LTABTYPE_MASK) != L2TAB)) { 
+    if ( (pfn_type[pfn] & LTABTYPE_MASK) != 
+         ((unsigned long)pt_levels<<LTAB_SHIFT) ) {
         ERR("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
-            pfn, max_pfn, pfn_type[pfn], (unsigned long)L2TAB);
+            pfn, max_pfn, pfn_type[pfn], 
+            (unsigned long)pt_levels<<LTAB_SHIFT); 
         goto out;
     }
 
-    if ((pt_levels == 3) && ((pfn_type[pfn]&LTABTYPE_MASK) != L3TAB)) { 
-        ERR("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
-            pfn, max_pfn, pfn_type[pfn], (unsigned long)L3TAB);
-        goto out;
-    }
-    
     ctxt.ctrlreg[3] = p2m[pfn] << PAGE_SHIFT;
 
     /* clear any pending events and the selector */
