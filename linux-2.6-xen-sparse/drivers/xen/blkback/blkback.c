@@ -225,8 +225,11 @@ int blkif_schedule(void *arg)
 	while (!kthread_should_stop()) {
 		wait_event_interruptible(
 			blkif->wq,
-			(atomic_read(&blkif->io_pending) &&
-			 !list_empty(&pending_free)) ||
+			atomic_read(&blkif->io_pending) ||
+			kthread_should_stop());
+		wait_event_interruptible(
+			pending_free_wq,
+			!list_empty(&pending_free) ||
 			kthread_should_stop());
 
 		atomic_set(&blkif->io_pending, 0);
