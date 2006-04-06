@@ -357,6 +357,7 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
         ret = -EINVAL;
         break;
     }
+
     return ret;
 }
 
@@ -372,7 +373,7 @@ long do_callback_op(int cmd, GUEST_HANDLE(void) arg)
         struct callback_register reg;
 
         ret = -EFAULT;
-        if ( copy_from_guest( &reg, arg, 1 ) )
+        if ( copy_from_guest(&reg, arg, 1) )
             break;
 
         ret = register_guest_callback(&reg);
@@ -384,7 +385,7 @@ long do_callback_op(int cmd, GUEST_HANDLE(void) arg)
         struct callback_unregister unreg;
 
         ret = -EFAULT;
-        if ( copy_from_guest( &unreg, arg, 1 ) )
+        if ( copy_from_guest(&unreg, arg, 1) )
             break;
 
         ret = unregister_guest_callback(&unreg);
@@ -403,15 +404,15 @@ long do_set_callbacks(unsigned long event_address,
                       unsigned long failsafe_address,
                       unsigned long syscall_address)
 {
-    callback_register_t event = {
+    struct callback_register event = {
         .type = CALLBACKTYPE_event,
         .address = event_address,
     };
-    callback_register_t failsafe = {
+    struct callback_register failsafe = {
         .type = CALLBACKTYPE_failsafe,
         .address = failsafe_address,
     };
-    callback_register_t syscall = {
+    struct callback_register syscall = {
         .type = CALLBACKTYPE_syscall,
         .address = syscall_address,
     };

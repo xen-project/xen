@@ -322,8 +322,7 @@ static long register_guest_callback(struct callback_register *reg)
     long ret = 0;
     struct vcpu *v = current;
 
-    if ( reg->address.cs )
-        fixup_guest_code_selector(reg->address.cs);
+    fixup_guest_code_selector(reg->address.cs);
 
     switch ( reg->type )
     {
@@ -355,6 +354,7 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
         ret = -EINVAL;
         break;
     }
+
     return ret;
 }
 
@@ -370,7 +370,7 @@ long do_callback_op(int cmd, GUEST_HANDLE(void) arg)
         struct callback_register reg;
 
         ret = -EFAULT;
-        if ( copy_from_guest( &reg, arg, 1 ) )
+        if ( copy_from_guest(&reg, arg, 1) )
             break;
 
         ret = register_guest_callback(&reg);
@@ -382,7 +382,7 @@ long do_callback_op(int cmd, GUEST_HANDLE(void) arg)
         struct callback_unregister unreg;
 
         ret = -EFAULT;
-        if ( copy_from_guest( &unreg, arg, 1 ) )
+        if ( copy_from_guest(&unreg, arg, 1) )
             break;
 
         ret = unregister_guest_callback(&unreg);

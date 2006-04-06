@@ -14,15 +14,15 @@ extern void nmi(void);
 
 static void __init machine_specific_arch_setup(void)
 {
-	callback_register_t event = {
+	struct callback_register event = {
 		.type = CALLBACKTYPE_event,
 		.address = (unsigned long) hypervisor_callback,
 	};
-	callback_register_t failsafe = {
+	struct callback_register failsafe = {
 		.type = CALLBACKTYPE_failsafe,
 		.address = (unsigned long)failsafe_callback,
 	};
-	callback_register_t syscall = {
+	struct callback_register syscall = {
 		.type = CALLBACKTYPE_syscall,
 		.address = (unsigned long)system_call,
 	};
