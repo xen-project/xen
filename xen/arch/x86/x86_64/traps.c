@@ -10,6 +10,7 @@
 #include <xen/symbols.h>
 #include <xen/console.h>
 #include <xen/sched.h>
+#include <xen/reboot.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
@@ -166,8 +167,7 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
     console_force_lock();
 
     /* Wait for manual reset. */
-    for ( ; ; )
-        __asm__ __volatile__ ( "hlt" );
+    machine_halt();
 }
 
 void toggle_guest_mode(struct vcpu *v)

@@ -9,6 +9,7 @@
 #include <xen/mm.h>
 #include <xen/irq.h>
 #include <xen/symbols.h>
+#include <xen/reboot.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/hvm/hvm.h>
@@ -180,8 +181,7 @@ asmlinkage void do_double_fault(void)
     console_force_lock();
 
     /* Wait for manual reset. */
-    for ( ; ; )
-        __asm__ __volatile__ ( "hlt" );
+    machine_halt();
 }
 
 unsigned long do_iret(void)

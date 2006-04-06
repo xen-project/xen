@@ -32,6 +32,7 @@
 #include <xen/errno.h>
 #include <xen/mm.h>
 #include <xen/console.h>
+#include <xen/reboot.h>
 #include <asm/regs.h>
 #include <xen/delay.h>
 #include <xen/event.h>
@@ -318,8 +319,7 @@ asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
     console_force_lock();
 
     /* Wait for manual reset. */
-    for ( ; ; )
-        __asm__ __volatile__ ( "hlt" );
+    machine_halt();
 }
 
 static inline int do_trap(int trapnr, char *str,
