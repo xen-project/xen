@@ -993,8 +993,8 @@ static void network_connect(struct net_device *dev)
 	 * the RX ring because some of our pages are currently flipped out
 	 * so we can't just free the RX skbs.
 	 * NB2. Freelist index entries are always going to be less than
-	 *  __PAGE_OFFSET, whereas pointers to skbs will always be equal or
-	 * greater than __PAGE_OFFSET: we use this property to distinguish
+	 *  PAGE_OFFSET, whereas pointers to skbs will always be equal or
+	 * greater than PAGE_OFFSET: we use this property to distinguish
 	 * them.
 	 */
 
@@ -1005,7 +1005,7 @@ static void network_connect(struct net_device *dev)
 	 * interface has been down.
 	 */
 	for (requeue_idx = 0, i = 1; i <= NET_TX_RING_SIZE; i++) {
-		if ((unsigned long)np->tx_skbs[i] < __PAGE_OFFSET)
+		if ((unsigned long)np->tx_skbs[i] < PAGE_OFFSET)
 			continue;
 
 		skb = np->tx_skbs[i];
@@ -1036,7 +1036,7 @@ static void network_connect(struct net_device *dev)
 
 	/* Rebuild the RX buffer freelist and the RX ring itself. */
 	for (requeue_idx = 0, i = 1; i <= NET_RX_RING_SIZE; i++) {
-		if ((unsigned long)np->rx_skbs[i] < __PAGE_OFFSET)
+		if ((unsigned long)np->rx_skbs[i] < PAGE_OFFSET)
 			continue;
 		gnttab_grant_foreign_transfer_ref(
 			np->grant_rx_ref[i], np->xbdev->otherend_id,
