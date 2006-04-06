@@ -177,6 +177,32 @@ int touch_pte_range(struct mm_struct *mm,
 
 EXPORT_SYMBOL(touch_pte_range);
 
+void *vm_map_xen_pages (unsigned long maddr, int vm_size, pgprot_t prot)
+{
+	int error;
+       
+	struct vm_struct *vma;
+	vma = get_vm_area (vm_size, VM_IOREMAP);
+      
+	if (vma == NULL) {
+		printk ("ioremap.c,vm_map_xen_pages(): "
+			"Failed to get VMA area\n");
+		return NULL;
+	}
+
+	error = direct_kernel_remap_pfn_range((unsigned long) vma->addr,
+					      maddr >> PAGE_SHIFT, vm_size,
+					      prot, DOMID_SELF );
+	if (error == 0) {
+		return vma->addr;
+	} else {
+		printk ("ioremap.c,vm_map_xen_pages(): "
+			"Failed to map xen shared pages into kernel space\n");
+		return NULL;
+	}
+}
+EXPORT_SYMBOL(vm_map_xen_pages);
+
 /*
  * Does @address reside within a non-highmem page that is local to this virtual
  * machine (i.e., not an I/O page, nor a memory page belonging to another VM).

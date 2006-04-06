@@ -14,6 +14,7 @@
 #include <xen/grant_table.h>
 #include <xen/rangeset.h>
 #include <asm/domain.h>
+#include <xen/xenoprof.h>
 
 extern unsigned long volatile jiffies;
 extern rwlock_t domlist_lock;
@@ -155,6 +156,9 @@ struct domain
 
     /* Control-plane tools handle for this domain. */
     xen_domain_handle_t handle;
+
+    /* pointer to xenoprof data (oprofile support) */
+    xenoprof_t *xenoprof;
 };
 
 struct domain_setup_info

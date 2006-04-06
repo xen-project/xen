@@ -915,6 +915,8 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
     spin_unlock_recursive(&d->page_alloc_lock);
 }
 
+extern void free_xenoprof_pages(struct domain *d);
+
 void domain_relinquish_resources(struct domain *d)
 {
     struct vcpu *v;
@@ -961,6 +963,10 @@ void domain_relinquish_resources(struct domain *d)
     /* Relinquish every page of memory. */
     relinquish_memory(d, &d->xenpage_list);
     relinquish_memory(d, &d->page_list);
+
+    /* Free page used by xen oprofile buffer */
+    free_xenoprof_pages(d);
+
 }
 
 void arch_dump_domain_info(struct domain *d)

@@ -1231,6 +1231,7 @@ CONFIG_NLS_ISO8859_1=y
 #
 # Instrumentation Support
 #
+# CONFIG_PROFILING is not set
 # CONFIG_KPROBES is not set
 
 #

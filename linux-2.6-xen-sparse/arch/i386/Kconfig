@@ -1116,9 +1116,7 @@ source "fs/Kconfig"
 menu "Instrumentation Support"
 	depends on EXPERIMENTAL
 
-if !X86_XEN
 source "arch/i386/oprofile/Kconfig"
-endif
 
 config KPROBES
 	bool "Kprobes (EXPERIMENTAL)"
