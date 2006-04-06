@@ -60,6 +60,7 @@
 #define __HYPERVISOR_acm_op               27
 #define __HYPERVISOR_nmi_op               28
 #define __HYPERVISOR_sched_op             29
+#define __HYPERVISOR_callback_op          30
 
 /* 
  * VIRTUAL INTERRUPTS

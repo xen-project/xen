@@ -14,6 +14,8 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 
+#include <public/callback.h>
+
 /* All CPUs have their own IDT to allow int80 direct trap. */
 idt_entry_t *idt_tables[NR_CPUS] = { 0 };
 
@@ -315,20 +317,102 @@ void init_int80_direct_trap(struct vcpu *v)
         set_int80_direct_trap(v);
 }
 
+static long register_guest_callback(struct callback_register *reg)
+{
+    long ret = 0;
+    struct vcpu *v = current;
+
+    if ( reg->address.cs )
+        fixup_guest_code_selector(reg->address.cs);
+
+    switch ( reg->type )
+    {
+    case CALLBACKTYPE_event:
+        v->arch.guest_context.event_callback_cs     = reg->address.cs;
+        v->arch.guest_context.event_callback_eip    = reg->address.eip;
+        break;
+
+    case CALLBACKTYPE_failsafe:
+        v->arch.guest_context.failsafe_callback_cs  = reg->address.cs;
+        v->arch.guest_context.failsafe_callback_eip = reg->address.eip;
+        break;
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+    return ret;
+}
+
+static long unregister_guest_callback(struct callback_unregister *unreg)
+{
+    long ret;
+
+    switch ( unreg->type )
+    {
+    default:
+        ret = -EINVAL;
+        break;
+    }
+    return ret;
+}
+
+
+long do_callback_op(int cmd, GUEST_HANDLE(void) arg)
+{
+    long ret;
+
+    switch ( cmd )
+    {
+    case CALLBACKOP_register:
+    {
+        struct callback_register reg;
+
+        ret = -EFAULT;
+        if ( copy_from_guest( &reg, arg, 1 ) )
+            break;
+
+        ret = register_guest_callback(&reg);
+    }
+    break;
+
+    case CALLBACKOP_unregister:
+    {
+        struct callback_unregister unreg;
+
+        ret = -EFAULT;
+        if ( copy_from_guest( &unreg, arg, 1 ) )
+            break;
+
+        ret = unregister_guest_callback(&unreg);
+    }
+    break;
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+    return ret;
+}
+
 long do_set_callbacks(unsigned long event_selector,
                       unsigned long event_address,
                       unsigned long failsafe_selector,
                       unsigned long failsafe_address)
 {
-    struct vcpu *d = current;
+    struct callback_register event = {
+        .type = CALLBACKTYPE_event,
+        .address = { event_selector, event_address },
+    };
+    struct callback_register failsafe = {
+        .type = CALLBACKTYPE_failsafe,
+        .address = { failsafe_selector, failsafe_address },
+    };
 
-    fixup_guest_code_selector(event_selector);
-    fixup_guest_code_selector(failsafe_selector);
-
-    d->arch.guest_context.event_callback_cs     = event_selector;
-    d->arch.guest_context.event_callback_eip    = event_address;
-    d->arch.guest_context.failsafe_callback_cs  = failsafe_selector;
-    d->arch.guest_context.failsafe_callback_eip = failsafe_address;
+    register_guest_callback(&event);
+    register_guest_callback(&failsafe);
 
     return 0;
 }

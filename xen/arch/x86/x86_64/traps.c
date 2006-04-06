@@ -17,6 +17,8 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 
+#include <public/callback.h>
+
 void show_registers(struct cpu_user_regs *regs)
 {
     struct cpu_user_regs fault_regs = *regs;
@@ -312,15 +314,105 @@ void __init percpu_traps_init(void)
     wrmsr(MSR_SYSCALL_MASK, EF_VM|EF_RF|EF_NT|EF_DF|EF_IE|EF_TF, 0U);
 }
 
+static long register_guest_callback(struct callback_register *reg)
+{
+    long ret = 0;
+    struct vcpu *v = current;
+
+    switch ( reg->type )
+    {
+    case CALLBACKTYPE_event:
+        v->arch.guest_context.event_callback_eip    = reg->address;
+        break;
+
+    case CALLBACKTYPE_failsafe:
+        v->arch.guest_context.failsafe_callback_eip = reg->address;
+        break;
+
+    case CALLBACKTYPE_syscall:
+        v->arch.guest_context.syscall_callback_eip  = reg->address;
+        break;
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+    return ret;
+}
+
+static long unregister_guest_callback(struct callback_unregister *unreg)
+{
+    long ret;
+
+    switch ( unreg->type )
+    {
+    default:
+        ret = -EINVAL;
+        break;
+    }
+    return ret;
+}
+
+
+long do_callback_op(int cmd, GUEST_HANDLE(void) arg)
+{
+    long ret;
+
+    switch ( cmd )
+    {
+    case CALLBACKOP_register:
+    {
+        struct callback_register reg;
+
+        ret = -EFAULT;
+        if ( copy_from_guest( &reg, arg, 1 ) )
+            break;
+
+        ret = register_guest_callback(&reg);
+    }
+    break;
+
+    case CALLBACKOP_unregister:
+    {
+        struct callback_unregister unreg;
+
+        ret = -EFAULT;
+        if ( copy_from_guest( &unreg, arg, 1 ) )
+            break;
+
+        ret = unregister_guest_callback(&unreg);
+    }
+    break;
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+    return ret;
+}
+
 long do_set_callbacks(unsigned long event_address,
                       unsigned long failsafe_address,
                       unsigned long syscall_address)
 {
-    struct vcpu *d = current;
+    callback_register_t event = {
+        .type = CALLBACKTYPE_event,
+        .address = event_address,
+    };
+    callback_register_t failsafe = {
+        .type = CALLBACKTYPE_failsafe,
+        .address = failsafe_address,
+    };
+    callback_register_t syscall = {
+        .type = CALLBACKTYPE_syscall,
+        .address = syscall_address,
+    };
 
-    d->arch.guest_context.event_callback_eip    = event_address;
-    d->arch.guest_context.failsafe_callback_eip = failsafe_address;
-    d->arch.guest_context.syscall_callback_eip  = syscall_address;
+    register_guest_callback(&event);
+    register_guest_callback(&failsafe);
+    register_guest_callback(&syscall);
 
     return 0;
 }

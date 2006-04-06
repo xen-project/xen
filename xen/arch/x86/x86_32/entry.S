@@ -648,6 +648,7 @@ ENTRY(hypercall_table)
         .long do_acm_op
         .long do_nmi_op
         .long do_arch_sched_op
+        .long do_callback_op        /* 30 */
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .long do_ni_hypercall
         .endr
@@ -683,6 +684,7 @@ ENTRY(hypercall_args_table)
         .byte 1 /* do_acm_op            */
         .byte 2 /* do_nmi_op            */
         .byte 2 /* do_arch_sched_op     */
+        .byte 2 /* do_callback_op       */  /* 30 */
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr
