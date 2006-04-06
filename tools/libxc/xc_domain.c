@@ -58,6 +58,35 @@ int xc_domain_destroy(int xc_handle,
     return do_dom0_op(xc_handle, &op);
 }
 
+int xc_domain_shutdown(int xc_handle,
+                       uint32_t domid,
+                       int reason)
+{
+    int ret = -1;
+    sched_remote_shutdown_t arg;
+    DECLARE_HYPERCALL;
+
+    hypercall.op     = __HYPERVISOR_sched_op;
+    hypercall.arg[0] = (unsigned long)SCHEDOP_remote_shutdown;
+    hypercall.arg[1] = (unsigned long)&arg;
+    arg.domain_id = domid;
+    arg.reason = reason;
+
+    if ( mlock(&arg, sizeof(arg)) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        goto out1;
+    }
+
+    ret = do_xen_hypercall(xc_handle, &hypercall);
+
+    safe_munlock(&arg, sizeof(arg));
+
+ out1:
+    return ret;
+}
+
+
 int xc_vcpu_setaffinity(int xc_handle,
                         uint32_t domid, 
                         int vcpu,

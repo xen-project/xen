@@ -413,6 +413,30 @@ long do_sched_op(int cmd, GUEST_HANDLE(void) arg)
         break;
     }
 
+    case SCHEDOP_remote_shutdown:
+    {
+        struct domain *d;
+        struct sched_remote_shutdown sched_remote_shutdown;
+
+        if ( !IS_PRIV(current->domain) )
+            return -EPERM;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&sched_remote_shutdown, arg, 1) )
+            break;
+
+        ret = -ESRCH;
+        d = find_domain_by_id(sched_remote_shutdown.domain_id);
+        if ( d == NULL )
+            break;
+
+        domain_shutdown(d, (u8)sched_remote_shutdown.reason);
+        put_domain(d);
+        ret = 0;
+
+        break;
+    }
+
     default:
         ret = -ENOSYS;
     }

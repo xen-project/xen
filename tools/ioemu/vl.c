@@ -2556,8 +2556,10 @@ static int set_mm_mapping(int xc_handle,
         return -1;
     }
 
+#if 0 /* Generates lots of log file output - turn on for debugging */
     for (i = 0; i < nr_pages; i++)
         fprintf(stderr, "set_map result i %x result %lx\n", i, extent_start[i]);
+#endif
 
     return 0;
 }
