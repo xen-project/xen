@@ -65,14 +65,18 @@ static irqreturn_t tpmif_int(int irq,
                              void *tpm_priv,
                              struct pt_regs *ptregs);
 static void tpmif_rx_action(unsigned long unused);
-static void tpmif_connect(struct tpm_private *tp, domid_t domid);
+static int tpmif_connect(struct xenbus_device *dev,
+                         struct tpm_private *tp,
+                         domid_t domid);
 static DECLARE_TASKLET(tpmif_rx_tasklet, tpmif_rx_action, 0);
-static int tpm_allocate_buffers(struct tpm_private *tp);
+static int tpmif_allocate_tx_buffers(struct tpm_private *tp);
+static void tpmif_free_tx_buffers(struct tpm_private *tp);
 static void tpmif_set_connected_state(struct tpm_private *tp,
                                       u8 newstate);
 static int tpm_xmit(struct tpm_private *tp,
                     const u8 * buf, size_t count, int userbuffer,
                     void *remember);
+static void destroy_tpmring(struct tpm_private *tp);
 
 #define DPRINTK(fmt, args...) \
     pr_debug("xen_tpm_fr (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
@@ -80,6 +84,8 @@ static int tpm_xmit(struct tpm_private *tp,
     printk(KERN_INFO "xen_tpm_fr: " fmt, ##args)
 #define WPRINTK(fmt, args...) \
     printk(KERN_WARNING "xen_tpm_fr: " fmt, ##args)
+
+#define GRANT_INVALID_REF	0
 
 
 static inline int
@@ -119,6 +125,14 @@ static inline struct tx_buffer *tx_buffer_alloc(void)
 }
 
 
+static inline void tx_buffer_free(struct tx_buffer *txb)
+{
+	if (txb) {
+		free_page((long)txb->data);
+		kfree(txb);
+	}
+}
+
 /**************************************************************
  Utility function for the tpm_private structure
 **************************************************************/
@@ -128,21 +142,27 @@ static inline void tpm_private_init(struct tpm_private *tp)
 	init_waitqueue_head(&tp->wait_q);
 }
 
+static inline void tpm_private_free(void)
+{
+	tpmif_free_tx_buffers(my_priv);
+	kfree(my_priv);
+	my_priv = NULL;
+}
+
 static struct tpm_private *tpm_private_get(void)
 {
+	int err;
 	if (!my_priv) {
 		my_priv = kzalloc(sizeof(struct tpm_private), GFP_KERNEL);
 		if (my_priv) {
 			tpm_private_init(my_priv);
+			err = tpmif_allocate_tx_buffers(my_priv);
+			if (err < 0) {
+				tpm_private_free();
+			}
 		}
 	}
 	return my_priv;
-}
-
-static inline void tpm_private_free(void)
-{
-	kfree(my_priv);
-	my_priv = NULL;
 }
 
 /**************************************************************
@@ -233,14 +253,14 @@ static int setup_tpmring(struct xenbus_device *dev,
 	tpmif_tx_interface_t *sring;
 	int err;
 
+	tp->ring_ref = GRANT_INVALID_REF;
+
 	sring = (void *)__get_free_page(GFP_KERNEL);
 	if (!sring) {
 		xenbus_dev_fatal(dev, -ENOMEM, "allocating shared ring");
 		return -ENOMEM;
 	}
 	tp->tx = sring;
-
-	tpm_allocate_buffers(tp);
 
 	err = xenbus_grant_ring(dev, virt_to_mfn(tp->tx));
 	if (err < 0) {
@@ -251,14 +271,13 @@ static int setup_tpmring(struct xenbus_device *dev,
 	}
 	tp->ring_ref = err;
 
-	err = xenbus_alloc_evtchn(dev, &tp->evtchn);
+	err = tpmif_connect(dev, tp, dev->otherend_id);
 	if (err)
 		goto fail;
 
-	tpmif_connect(tp, dev->otherend_id);
-
 	return 0;
 fail:
+	destroy_tpmring(tp);
 	return err;
 }
 
@@ -266,14 +285,17 @@ fail:
 static void destroy_tpmring(struct tpm_private *tp)
 {
 	tpmif_set_connected_state(tp, 0);
-	if (tp->tx != NULL) {
+
+	if (tp->ring_ref != GRANT_INVALID_REF) {
 		gnttab_end_foreign_access(tp->ring_ref, 0,
 					  (unsigned long)tp->tx);
+		tp->ring_ref = GRANT_INVALID_REF;
 		tp->tx = NULL;
 	}
 
 	if (tp->irq)
-		unbind_from_irqhandler(tp->irq, NULL);
+		unbind_from_irqhandler(tp->irq, tp);
+
 	tp->evtchn = tp->irq = 0;
 }
 
@@ -377,6 +399,9 @@ static int tpmfront_probe(struct xenbus_device *dev,
 	int handle;
 	struct tpm_private *tp = tpm_private_get();
 
+	if (!tp)
+		return -ENOMEM;
+
 	err = xenbus_scanf(XBT_NULL, dev->nodename,
 	                   "handle", "%i", &handle);
 	if (XENBUS_EXIST_ERR(err))
@@ -402,15 +427,14 @@ static int tpmfront_probe(struct xenbus_device *dev,
 
 static int tpmfront_remove(struct xenbus_device *dev)
 {
-	struct tpm_private *tp = dev->data;
+	struct tpm_private *tp = (struct tpm_private *)dev->data;
 	destroy_tpmring(tp);
 	return 0;
 }
 
-static int
-tpmfront_suspend(struct xenbus_device *dev)
+static int tpmfront_suspend(struct xenbus_device *dev)
 {
-	struct tpm_private *tp = dev->data;
+	struct tpm_private *tp = (struct tpm_private *)dev->data;
 	u32 ctr;
 
 	/* lock, so no app can send */
@@ -437,29 +461,35 @@ tpmfront_suspend(struct xenbus_device *dev)
 	return 0;
 }
 
-static int
-tpmfront_resume(struct xenbus_device *dev)
+static int tpmfront_resume(struct xenbus_device *dev)
 {
-	struct tpm_private *tp = dev->data;
+	struct tpm_private *tp = (struct tpm_private *)dev->data;
+	destroy_tpmring(tp);
 	return talk_to_backend(dev, tp);
 }
 
-static void
-tpmif_connect(struct tpm_private *tp, domid_t domid)
+static int tpmif_connect(struct xenbus_device *dev,
+                         struct tpm_private *tp,
+                         domid_t domid)
 {
 	int err;
 
 	tp->backend_id = domid;
+
+	err = xenbus_alloc_evtchn(dev, &tp->evtchn);
+	if (err)
+		return err;
 
 	err = bind_evtchn_to_irqhandler(tp->evtchn,
 					tpmif_int, SA_SAMPLE_RANDOM, "tpmif",
 					tp);
 	if (err <= 0) {
 		WPRINTK("bind_evtchn_to_irqhandler failed (err=%d)\n", err);
-		return;
+		return err;
 	}
 
 	tp->irq = err;
+	return 0;
 }
 
 static struct xenbus_device_id tpmfront_ids[] = {
@@ -488,19 +518,30 @@ static void __exit exit_tpm_xenbus(void)
 	xenbus_unregister_driver(&tpmfront);
 }
 
-
-static int
-tpm_allocate_buffers(struct tpm_private *tp)
+static int tpmif_allocate_tx_buffers(struct tpm_private *tp)
 {
 	unsigned int i;
 
-	for (i = 0; i < TPMIF_TX_RING_SIZE; i++)
+	for (i = 0; i < TPMIF_TX_RING_SIZE; i++) {
 		tp->tx_buffers[i] = tx_buffer_alloc();
-	return 1;
+		if (!tp->tx_buffers[i]) {
+			tpmif_free_tx_buffers(tp);
+			return -ENOMEM;
+		}
+	}
+	return 0;
 }
 
-static void
-tpmif_rx_action(unsigned long priv)
+static void tpmif_free_tx_buffers(struct tpm_private *tp)
+{
+	unsigned int i;
+
+	for (i = 0; i < TPMIF_TX_RING_SIZE; i++) {
+		tx_buffer_free(tp->tx_buffers[i]);
+	}
+}
+
+static void tpmif_rx_action(unsigned long priv)
 {
 	struct tpm_private *tp = (struct tpm_private *)priv;
 
@@ -545,8 +586,7 @@ exit:
 }
 
 
-static irqreturn_t
-tpmif_int(int irq, void *tpm_priv, struct pt_regs *ptregs)
+static irqreturn_t tpmif_int(int irq, void *tpm_priv, struct pt_regs *ptregs)
 {
 	struct tpm_private *tp = tpm_priv;
 	unsigned long flags;
@@ -560,10 +600,9 @@ tpmif_int(int irq, void *tpm_priv, struct pt_regs *ptregs)
 }
 
 
-static int
-tpm_xmit(struct tpm_private *tp,
-         const u8 * buf, size_t count, int isuserbuffer,
-         void *remember)
+static int tpm_xmit(struct tpm_private *tp,
+                    const u8 * buf, size_t count, int isuserbuffer,
+                    void *remember)
 {
 	tpmif_tx_request_t *tx;
 	TPMIF_RING_IDX i;
@@ -693,8 +732,7 @@ static void tpmif_set_connected_state(struct tpm_private *tp, u8 is_connected)
  * =================================================================
  */
 
-static int __init
-tpmif_init(void)
+static int __init tpmif_init(void)
 {
 	IPRINTK("Initialising the vTPM driver.\n");
 	if ( gnttab_alloc_grant_references ( TPMIF_TX_RING_SIZE,
@@ -709,8 +747,7 @@ tpmif_init(void)
 
 module_init(tpmif_init);
 
-static void __exit
-tpmif_exit(void)
+static void __exit tpmif_exit(void)
 {
 	exit_tpm_xenbus();
 	gnttab_free_grant_references(gref_head);
