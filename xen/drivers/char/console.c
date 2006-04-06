@@ -520,6 +520,7 @@ void console_force_unlock(void)
 {
     console_lock = SPIN_LOCK_UNLOCKED;
     serial_force_unlock(sercon_handle);
+    console_start_sync();
 }
 
 void console_force_lock(void)

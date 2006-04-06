@@ -331,8 +331,7 @@ HYPERVISOR_nmi_op(
 
 static inline int
 HYPERVISOR_callback_op(
-	int cmd,
-	void *arg)
+	int cmd, void *arg)
 {
 	return _hypercall2(int, callback_op, cmd, arg);
 }

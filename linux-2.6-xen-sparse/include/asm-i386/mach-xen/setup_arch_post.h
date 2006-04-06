@@ -25,11 +25,11 @@ extern void nmi(void);
 static void __init machine_specific_arch_setup(void)
 {
 	struct xen_platform_parameters pp;
-	callback_register_t event = {
+	struct callback_register event = {
 		.type = CALLBACKTYPE_event,
 		.address = { __KERNEL_CS, (unsigned long)hypervisor_callback },
 	};
-	callback_register_t failsafe = {
+	struct callback_register failsafe = {
 		.type = CALLBACKTYPE_failsafe,
 		.address = { __KERNEL_CS, (unsigned long)failsafe_callback },
 	};

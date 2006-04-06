@@ -68,7 +68,7 @@ FIX1:   popq  -15*8-8(%rsp)            # error_code/entry_vector
         leaq  DBLFLT1(%rip),%rax
         pushq %rax                     # RIP
         pushq %rsi                     # error_code/entry_vector
-        jmp   error_code
+        jmp   handle_exception
 DBLFLT1:GET_CURRENT(%rbx)
         jmp   test_all_events
 failsafe_callback:
@@ -320,15 +320,6 @@ domain_crash_synchronous:
         jmp  __domain_crash_synchronous
 
         ALIGN
-/* %rbx: struct vcpu */
-process_guest_exception_and_events:
-        leaq  VCPU_trap_bounce(%rbx),%rdx
-        testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
-        jz    test_all_events
-        call  create_bounce_frame
-        jmp   test_all_events
-
-        ALIGN
 /* No special register assumptions. */
 ENTRY(ret_from_intr)
         GET_CURRENT(%rbx)
@@ -338,7 +329,7 @@ ENTRY(ret_from_intr)
 
         ALIGN
 /* No special register assumptions. */
-error_code:
+handle_exception:
         SAVE_ALL
         testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%rsp)
         jz    exception_with_ints_disabled
@@ -351,7 +342,11 @@ error_code:
         callq *(%rdx,%rax,8)
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
-        jmp   process_guest_exception_and_events
+        leaq  VCPU_trap_bounce(%rbx),%rdx
+        testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
+        jz    test_all_events
+        call  create_bounce_frame
+        jmp   test_all_events
 
 /* No special register assumptions. */
 exception_with_ints_disabled:
@@ -384,90 +379,90 @@ FATAL_exception_with_ints_disabled:
 ENTRY(divide_error)
         pushq $0
         movl  $TRAP_divide_error,4(%rsp)
-        jmp   error_code
+        jmp   handle_exception
 
 ENTRY(coprocessor_error)
         pushq $0
         movl  $TRAP_copro_error,4(%rsp)
-	jmp   error_code
+	jmp   handle_exception
 
 ENTRY(simd_coprocessor_error)
         pushq $0
         movl  $TRAP_simd_error,4(%rsp)
-	jmp error_code
+	jmp   handle_exception
 
 ENTRY(device_not_available)
         pushq $0
         movl  $TRAP_no_device,4(%rsp)
-        jmp   error_code
+        jmp   handle_exception
 
 ENTRY(debug)
         pushq $0
         movl  $TRAP_debug,4(%rsp)
-	jmp   error_code
+	jmp   handle_exception
 
 ENTRY(int3)
         pushq $0
 	movl  $TRAP_int3,4(%rsp)
-	jmp   error_code
+	jmp   handle_exception
 
 ENTRY(overflow)
         pushq $0
 	movl  $TRAP_overflow,4(%rsp)
-	jmp   error_code
+	jmp   handle_exception
 
 ENTRY(bounds)
         pushq $0
 	movl  $TRAP_bounds,4(%rsp)
-	jmp   error_code
+	jmp   handle_exception
 
 ENTRY(invalid_op)
         pushq $0
 	movl  $TRAP_invalid_op,4(%rsp)
-	jmp   error_code
+	jmp   handle_exception
 
 ENTRY(coprocessor_segment_overrun)
         pushq $0
 	movl  $TRAP_copro_seg,4(%rsp)
-	jmp   error_code
+	jmp   handle_exception
 
 ENTRY(invalid_TSS)
         movl  $TRAP_invalid_tss,4(%rsp)
-	jmp   error_code
+	jmp   handle_exception
 
 ENTRY(segment_not_present)
         movl  $TRAP_no_segment,4(%rsp)
-	jmp   error_code
+	jmp   handle_exception
 
 ENTRY(stack_segment)
         movl  $TRAP_stack_error,4(%rsp)
-	jmp   error_code
+	jmp   handle_exception
 
 ENTRY(general_protection)
         movl  $TRAP_gp_fault,4(%rsp)
-	jmp   error_code
+	jmp   handle_exception
 
 ENTRY(alignment_check)
         movl  $TRAP_alignment_check,4(%rsp)
-	jmp   error_code
+	jmp   handle_exception
 
 ENTRY(page_fault)
         movl  $TRAP_page_fault,4(%rsp)
-	jmp   error_code
+	jmp   handle_exception
 
 ENTRY(machine_check)
         pushq $0
         movl  $TRAP_machine_check,4(%rsp)
-	jmp   error_code
+	jmp   handle_exception
 
 ENTRY(spurious_interrupt_bug)
         pushq $0
         movl  $TRAP_spurious_int,4(%rsp)
-	jmp   error_code
+	jmp   handle_exception
 
 ENTRY(double_fault)
         movl  $TRAP_double_fault,4(%rsp)
-        jmp   error_code
+        jmp   handle_exception
 
 ENTRY(nmi)
         pushq $0
