@@ -52,7 +52,7 @@ ia64_set_rr (unsigned long rr, unsigned long rrv)
 #endif
 
 // use this to allocate a rid out of the "Xen reserved rid block"
-unsigned long allocate_reserved_rid(void)
+static unsigned long allocate_reserved_rid(void)
 {
 	static unsigned long currentrid = XEN_DEFAULT_RID+1;
 	unsigned long t = currentrid;
@@ -91,14 +91,14 @@ int deallocate_metaphysical_rid(unsigned long rid)
 static int implemented_rid_bits = 0;
 static struct domain *ridblock_owner[MAX_RID_BLOCKS] = { 0 };
 
-void get_impl_rid_bits(void)
+static void get_impl_rid_bits(void)
 {
-	// FIXME (call PAL)
-//#ifdef CONFIG_MCKINLEY
-	implemented_rid_bits = IA64_MAX_IMPL_RID_BITS;
-//#else
-//#error "rid ranges won't work on Merced"
-//#endif
+	pal_vm_info_2_u_t vm_info_2;
+
+	/* Get machine rid_size.  */
+	BUG_ON (ia64_pal_vm_summary (NULL, &vm_info_2) != 0);
+	implemented_rid_bits = vm_info_2.pal_vm_info_2_s.rid_size;
+
 	if (implemented_rid_bits <= IA64_MIN_IMPL_RID_BITS ||
 	    implemented_rid_bits > IA64_MAX_IMPL_RID_BITS)
 		BUG();
@@ -177,29 +177,11 @@ int deallocate_rid_range(struct domain *d)
 	return 1;
 }
 
-
-static inline void
-set_rr_no_srlz(unsigned long rr, unsigned long rrval)
-{
-	ia64_set_rr(rr, vmMangleRID(rrval));
-}
-
-void
+static void
 set_rr(unsigned long rr, unsigned long rrval)
 {
 	ia64_set_rr(rr, vmMangleRID(rrval));
 	ia64_srlz_d();
-}
-
-static inline int validate_page_size(unsigned long ps)
-{
-	switch(ps) {
-	    case 12: case 13: case 14: case 16: case 18:
-	    case 20: case 22: case 24: case 26: case 28:
-		return 1;
-	    default:
-		return 0;
-	}
 }
 
 // validates and changes a single region register
@@ -280,8 +262,8 @@ int set_metaphysical_rr0(void)
 // validates/changes region registers 0-6 in the currently executing domain
 // Note that this is the one and only SP API (other than executing a privop)
 // for a domain to use to change region registers
-int set_all_rr( u64 rr0, u64 rr1, u64 rr2, u64 rr3,
-		     u64 rr4, u64 rr5, u64 rr6, u64 rr7)
+static int set_all_rr(u64 rr0, u64 rr1, u64 rr2, u64 rr3,
+		      u64 rr4, u64 rr5, u64 rr6, u64 rr7)
 {
 	if (!set_one_rr(0x0000000000000000L, rr0)) return 0;
 	if (!set_one_rr(0x2000000000000000L, rr1)) return 0;
@@ -316,25 +298,6 @@ if (!v->vcpu_info) { printf("Stopping in init_all_rr\n"); dummy(); }
 
 
 /* XEN/ia64 INTERNAL ROUTINES */
-
-unsigned long physicalize_rid(struct vcpu *v, unsigned long rrval)
-{
-	ia64_rr rrv;
-	    
-	rrv.rrval = rrval;
-	rrv.rid += v->arch.starting_rid;
-	return rrv.rrval;
-}
-
-unsigned long
-virtualize_rid(struct vcpu *v, unsigned long rrval)
-{
-	ia64_rr rrv;
-	    
-	rrv.rrval = rrval;
-	rrv.rid -= v->arch.starting_rid;
-	return rrv.rrval;
-}
 
 // loads a thread's region register (0-6) state into
 // the real physical region registers.  Returns the

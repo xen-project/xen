@@ -37,15 +37,12 @@
 
 extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 /* FIXME: where these declarations shold be there ? */
-extern void load_region_regs(struct vcpu *);
 extern void panic_domain(struct pt_regs *, const char *, ...);
 extern long platform_is_hp_ski(void);
 extern int ia64_hyperprivop(unsigned long, REGS *);
 extern int ia64_hypercall(struct pt_regs *regs);
 extern void vmx_do_launch(struct vcpu *);
 extern unsigned long lookup_domain_mpa(struct domain *,unsigned long);
-
-extern unsigned long dom0_start, dom0_size;
 
 #define IA64_PSR_CPL1	(__IA64_UL(1) << IA64_PSR_CPL1_BIT)
 // note IA64_PSR_PK removed from following, why is this necessary?

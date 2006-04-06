@@ -29,7 +29,6 @@ int phys_proc_id[NR_CPUS];
 unsigned long loops_per_jiffy = (1<<12);	// from linux/init/main.c
 
 /* FIXME: where these declarations should be there ? */
-extern void load_region_regs(struct vcpu *);
 extern void show_registers(struct pt_regs *regs);
 
 void ia64_mca_init(void) { printf("ia64_mca_init() skipped (Machine check abort handling)\n"); }

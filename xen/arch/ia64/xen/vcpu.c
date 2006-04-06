@@ -23,7 +23,6 @@
 extern void getreg(unsigned long regnum, unsigned long *val, int *nat, struct pt_regs *regs);
 extern void setreg(unsigned long regnum, unsigned long val, int nat, struct pt_regs *regs);
 extern void panic_domain(struct pt_regs *, const char *, ...);
-extern int set_metaphysical_rr0(void);
 extern unsigned long translate_domain_pte(UINT64,UINT64,UINT64);
 extern unsigned long translate_domain_mpaddr(unsigned long);
 extern void ia64_global_tlb_purge(UINT64 start, UINT64 end, UINT64 nbits);
