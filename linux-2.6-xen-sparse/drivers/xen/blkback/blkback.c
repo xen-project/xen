@@ -225,16 +225,16 @@ int blkif_schedule(void *arg)
 	while (!kthread_should_stop()) {
 		wait_event_interruptible(
 			blkif->wq,
-			atomic_read(&blkif->io_pending) ||
-			kthread_should_stop());
+			blkif->waiting_reqs || kthread_should_stop());
 		wait_event_interruptible(
 			pending_free_wq,
-			!list_empty(&pending_free) ||
-			kthread_should_stop());
+			!list_empty(&pending_free) || kthread_should_stop());
 
-		atomic_set(&blkif->io_pending, 0);
+		blkif->waiting_reqs = 0;
+		smp_mb(); /* clear flag *before* checking for work */
+
 		if (do_block_io_op(blkif))
-			atomic_inc(&blkif->io_pending);
+			blkif->waiting_reqs = 1;
 		unplug_queue(blkif);
 
 		if (log_stats && time_after(jiffies, blkif->st_print))
@@ -287,12 +287,15 @@ static int end_block_io_op(struct bio *bio, unsigned int done, int error)
  * NOTIFICATION FROM GUEST OS.
  */
 
+void blkif_notify_work(blkif_t *blkif)
+{
+	blkif->waiting_reqs = 1;
+	wake_up(&blkif->wq);
+}
+
 irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 {
-	blkif_t *blkif = dev_id;
-
-	atomic_inc(&blkif->io_pending);
-	wake_up(&blkif->wq);
+	blkif_notify_work(dev_id);
 	return IRQ_HANDLED;
 }
 
@@ -512,10 +515,8 @@ static void make_response(blkif_t *blkif, unsigned long id,
 	}
 	spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
 
-	if (more_to_do) {
-		atomic_inc(&blkif->io_pending);
-		wake_up(&blkif->wq);
-	}
+	if (more_to_do)
+		blkif_notify_work(blkif);
 	if (notify)
 		notify_remote_via_irq(blkif->irq);
 }
