@@ -129,7 +129,6 @@ void blkif_interface_init(void);
 
 void blkif_xenbus_init(void);
 
-void blkif_notify_work(blkif_t *blkif);
 irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs);
 int blkif_schedule(void *arg);
 
