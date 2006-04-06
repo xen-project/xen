@@ -14,8 +14,11 @@
 #if defined(__XEN__)
 /* Xen is built with matching headers and implements the latest interface. */
 #define __XEN_INTERFACE_VERSION__ __XEN_LATEST_INTERFACE_VERSION__
-#elif !defined(__XEN_INTERFACE_VERSION__)
+#elif (__XEN_INTERFACE_VERSION__ - 0) == 0
 /* Guests which do not specify a version get the legacy interface. */
+#ifdef __XEN_INTERFACE_VERSION__
+#undef __XEN_INTERFACE_VERSION__
+#endif
 #define __XEN_INTERFACE_VERSION__ 0x00000000
 #endif
 
