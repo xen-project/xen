@@ -46,10 +46,29 @@ static void backend_changed(struct xenbus_watch *, const char **,
 
 static void update_blkif_status(blkif_t *blkif)
 { 
-	if (blkif->irq && blkif->vbd.bdev &&
-	    (blkif->be->dev->state != XenbusStateConnected)) {
-		connect(blkif->be);
-		blkif_notify_work(blkif);
+	int err;
+
+	/* Not ready to connect? */
+	if (!blkif->irq || !blkif->vbd.bdev)
+		return;
+
+	/* Already connected? */
+	if (blkif->be->dev->state == XenbusStateConnected)
+		return;
+
+	/* Attempt to connect: exit if we fail to. */
+	connect(blkif->be);
+	if (blkif->be->dev->state != XenbusStateConnected)
+		return;
+
+	blkif->xenblkd = kthread_run(blkif_schedule, blkif,
+				     "xvd %d %02x:%02x",
+				     blkif->domid,
+				     blkif->be->major, blkif->be->minor);
+	if (IS_ERR(blkif->xenblkd)) {
+		err = PTR_ERR(blkif->xenblkd);
+		blkif->xenblkd = NULL;
+		xenbus_dev_error(blkif->be->dev, err, "start xenblkd");
 	}
 }
 
@@ -212,17 +231,6 @@ static void backend_changed(struct xenbus_watch *watch,
 			be->major = 0;
 			be->minor = 0;
 			xenbus_dev_fatal(dev, err, "creating vbd structure");
-			return;
-		}
-
-		be->blkif->xenblkd = kthread_run(blkif_schedule, be->blkif,
-						 "xvd %d %02x:%02x",
-						 be->blkif->domid,
-						 be->major, be->minor);
-		if (IS_ERR(be->blkif->xenblkd)) {
-			err = PTR_ERR(be->blkif->xenblkd);
-			be->blkif->xenblkd = NULL;
-			xenbus_dev_error(dev, err, "start xenblkd");
 			return;
 		}
 

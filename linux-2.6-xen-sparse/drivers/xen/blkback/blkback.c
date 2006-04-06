@@ -287,7 +287,7 @@ static int end_block_io_op(struct bio *bio, unsigned int done, int error)
  * NOTIFICATION FROM GUEST OS.
  */
 
-void blkif_notify_work(blkif_t *blkif)
+static void blkif_notify_work(blkif_t *blkif)
 {
 	blkif->waiting_reqs = 1;
 	wake_up(&blkif->wq);
