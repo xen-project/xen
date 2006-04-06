@@ -301,9 +301,6 @@ static void net_rx_action(unsigned long unused)
 		netif   = netdev_priv(skb->dev);
 		size    = skb->tail - skb->data;
 
-		/* Rederive the machine addresses. */
-		new_mfn = mcl->args[1] >> PAGE_SHIFT;
-		old_mfn = gop->mfn;
 		atomic_set(&(skb_shinfo(skb)->dataref), 1);
 		skb_shinfo(skb)->nr_frags = 0;
 		skb_shinfo(skb)->frag_list = NULL;
