@@ -51,6 +51,7 @@ class test_create(unittest.TestCase):
                  'path'      : '.:/etc/xen',
                  'builder'   : 'linux',
                  'nics'      : -1,
+                 'xauthority': xen.xm.create.get_xauthority(),
                  })
 
 
@@ -99,6 +100,8 @@ on_crash    = 'destroy'
                  'interface'   : 'eth0',
                  'path'        : '.:/etc/xen',
                  'builder'     : 'linux',
+
+                 'xauthority'  : xen.xm.create.get_xauthority(),
                })
 
 
@@ -138,6 +141,8 @@ cpu_weight = 0.75
                  'path'       : '.:/etc/xen',
                  'builder'    : 'linux',
                  'nics'       : -1,
+
+                 'xauthority' : xen.xm.create.get_xauthority(),
                  })
             
 
@@ -188,6 +193,8 @@ ne2000=0
                  'dhcp'        : 'off',
                  'interface'   : 'eth0',
                  'path'        : '.:/etc/xen',
+
+                 'xauthority'  : xen.xm.create.get_xauthority(),
                })
 
 

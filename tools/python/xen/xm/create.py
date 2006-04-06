@@ -850,6 +850,18 @@ def make_domain(opts, config):
     opts.info("Started domain %s" % (dom))
     return int(sxp.child_value(dominfo, 'domid'))
 
+
+def get_xauthority():
+    xauth = os.getenv("XAUTHORITY")
+    if not xauth:
+        home = os.getenv("HOME")
+        if not home:
+            import posix, pwd
+            home = pwd.getpwuid(posix.getuid())[5]
+        xauth = home + "/.Xauthority"
+    return xauth
+
+
 def parseCommandLine(argv):
     gopts.reset()
     args = gopts.parse(argv)
@@ -864,14 +876,7 @@ def parseCommandLine(argv):
         gopts.vals.display = os.getenv("DISPLAY")
 
     if not gopts.vals.xauthority:
-        xauth = os.getenv("XAUTHORITY")
-        if not xauth:
-            home = os.getenv("HOME")
-            if not home:
-                import posix, pwd
-                home = pwd.getpwuid(posix.getuid())[5]
-            xauth = home + "/.Xauthority"
-        gopts.vals.xauthority = xauth
+        gopts.vals.xauthority = get_xauthority()
 
     # Process remaining args as config variables.
     for arg in args:
