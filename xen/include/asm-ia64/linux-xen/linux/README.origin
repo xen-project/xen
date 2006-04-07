@@ -5,6 +5,7 @@
 # (e.g. with #ifdef XEN or XEN in a comment) so that they can be
 # easily updated to future versions of the corresponding Linux files.
 
+efi.h			-> linux/include/linux/efi.h
 gfp.h	 		-> linux/include/linux/gfp.h
 hardirq.h 		-> linux/include/linux/hardirq.h
 interrupt.h 		-> linux/include/linux/interrupt.h

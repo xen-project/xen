@@ -7,7 +7,6 @@
 bcd.h			-> linux/include/linux/bcd.h
 bitmap.h		-> linux/include/linux/bitmap.h
 bitops.h		-> linux/include/linux/bitops.h
-efi.h			-> linux/include/linux/efi.h
 initrd.h		-> linux/include/linux/initrd.h
 jiffies.h		-> linux/include/linux/jiffies.h
 kmalloc_sizes.h		-> linux/include/linux/kmalloc_sizes.h
