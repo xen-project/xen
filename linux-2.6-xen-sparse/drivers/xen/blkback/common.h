@@ -72,7 +72,6 @@ typedef struct blkif_st {
 	/* Back pointer to the backend_info. */
 	struct backend_info *be; 
 	/* Private fields. */
-	enum { DISCONNECTED, CONNECTED } status;
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
 	/* Is this a blktap frontend */
 	unsigned int     is_blktap;
@@ -82,7 +81,7 @@ typedef struct blkif_st {
 
 	wait_queue_head_t   wq;
 	struct task_struct  *xenblkd;
-	atomic_t            io_pending;
+	unsigned int        waiting_reqs;
 	request_queue_t     *plug;
 
 	/* statistics */
@@ -132,8 +131,6 @@ void blkif_xenbus_init(void);
 
 irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs);
 int blkif_schedule(void *arg);
-
-void update_blkif_status(blkif_t *blkif); 
 
 #endif /* __BLKIF__BACKEND__COMMON_H__ */
 

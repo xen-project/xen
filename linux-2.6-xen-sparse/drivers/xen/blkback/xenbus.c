@@ -17,7 +17,6 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-
 #include <stdarg.h>
 #include <linux/module.h>
 #include <linux/kthread.h>
@@ -25,36 +24,52 @@
 #include "common.h"
 
 #undef DPRINTK
-#define DPRINTK(fmt, args...) \
-    pr_debug("blkback/xenbus (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
-
+#define DPRINTK(fmt, args...)				\
+	pr_debug("blkback/xenbus (%s:%d) " fmt ".\n",	\
+		 __FUNCTION__, __LINE__, ##args)
 
 struct backend_info
 {
 	struct xenbus_device *dev;
 	blkif_t *blkif;
 	struct xenbus_watch backend_watch;
-
 	unsigned major;
 	unsigned minor;
 	char *mode;
 };
 
-
-static void maybe_connect(struct backend_info *);
 static void connect(struct backend_info *);
 static int connect_ring(struct backend_info *);
 static void backend_changed(struct xenbus_watch *, const char **,
 			    unsigned int);
 
 
-void update_blkif_status(blkif_t *blkif)
+static void update_blkif_status(blkif_t *blkif)
 { 
-	if(blkif->irq && blkif->vbd.bdev) {
-		blkif->status = CONNECTED; 
-		(void)blkif_be_int(0, blkif, NULL); 
+	int err;
+
+	/* Not ready to connect? */
+	if (!blkif->irq || !blkif->vbd.bdev)
+		return;
+
+	/* Already connected? */
+	if (blkif->be->dev->state == XenbusStateConnected)
+		return;
+
+	/* Attempt to connect: exit if we fail to. */
+	connect(blkif->be);
+	if (blkif->be->dev->state != XenbusStateConnected)
+		return;
+
+	blkif->xenblkd = kthread_run(blkif_schedule, blkif,
+				     "xvd %d %02x:%02x",
+				     blkif->domid,
+				     blkif->be->major, blkif->be->minor);
+	if (IS_ERR(blkif->xenblkd)) {
+		err = PTR_ERR(blkif->xenblkd);
+		blkif->xenblkd = NULL;
+		xenbus_dev_error(blkif->be->dev, err, "start xenblkd");
 	}
-	maybe_connect(blkif->be); 
 }
 
 
@@ -91,7 +106,6 @@ static int blkback_remove(struct xenbus_device *dev)
 		be->backend_watch.node = NULL;
 	}
 	if (be->blkif) {
-		be->blkif->status = DISCONNECTED; 
 		if (be->blkif->xenblkd)
 			kthread_stop(be->blkif->xenblkd);
 		blkif_put(be->blkif);
@@ -185,8 +199,8 @@ static void backend_changed(struct xenbus_watch *watch,
 		return;
 	}
 
-	if (be->major && be->minor &&
-	    (be->major != major || be->minor != minor)) {
+	if ((be->major || be->minor) &&
+	    ((be->major != major) || (be->minor != minor))) {
 		printk(KERN_WARNING
 		       "blkback: changing physical device (from %x:%x to "
 		       "%x:%x) not supported.\n", be->major, be->minor,
@@ -217,17 +231,6 @@ static void backend_changed(struct xenbus_watch *watch,
 			be->major = 0;
 			be->minor = 0;
 			xenbus_dev_fatal(dev, err, "creating vbd structure");
-			return;
-		}
-
-		be->blkif->xenblkd = kthread_run(blkif_schedule, be->blkif,
-						 "xvd %d %02x:%02x",
-						 be->blkif->domid,
-						 be->major, be->minor);
-		if (IS_ERR(be->blkif->xenblkd)) {
-			err = PTR_ERR(be->blkif->xenblkd);
-			be->blkif->xenblkd = NULL;
-			xenbus_dev_error(dev, err, "start xenblkd");
 			return;
 		}
 
@@ -288,14 +291,6 @@ static void frontend_changed(struct xenbus_device *dev,
 
 
 /* ** Connection ** */
-
-
-static void maybe_connect(struct backend_info *be)
-{
-	if ((be->major != 0 || be->minor != 0) &&
-	    be->blkif->status == CONNECTED)
-		connect(be);
-}
 
 
 /**

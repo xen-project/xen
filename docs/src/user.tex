@@ -2052,7 +2052,7 @@ dev86 & The dev86 package provides an assembler and linker for real mode 80x86 i
 
 If the dev86 package is not available on the x86\_64 distribution, you can install the i386 version of it. The dev86 rpm package for various distributions can be found at {\scriptsize {\tt http://www.rpmfind.net/linux/rpm2html/search.php?query=dev86\&submit=Search}} \\
 
-LibVNCServer & The unmodified guest's VGA display, keyboard, and mouse are virtualized using the vncserver library provided by this package. You can get the sources of libvncserver from {\small {\tt http://sourceforge.net/projects/libvncserver}}. Build and install the sources on the build system to get the libvncserver library. The 0.8pre version of libvncserver is currently working well with Xen.\\
+LibVNCServer & The unmodified guest's VGA display, keyboard, and mouse can be virtualized by the vncserver library. You can get the sources of libvncserver from {\small {\tt http://sourceforge.net/projects/libvncserver}}. Build and install the sources on the build system to get the libvncserver library. There is a significant performance degradation in 0.8 version. The current sources in the CVS tree have fixed this degradation. So it is highly recommended to download the latest CVS sources and install them.\\
 
 SDL-devel, SDL & Simple DirectMedia Layer (SDL) is another way of virtualizing the unmodified guest console. It provides an X window for the guest console. 
 
@@ -2076,6 +2076,8 @@ builder &       The domain build function. The VMX domain uses the vmx builder.\
 acpi & Enable VMX guest ACPI, default=0 (disabled)\\
 
 apic & Enable VMX guest APIC, default=0 (disabled)\\
+
+pae & Enable VMX guest PAE, default=0 (disabled)\\
 
 vif     & Optionally defines MAC address and/or bridge for the network interfaces. Random MACs are assigned if not given. {\small {\tt type=ioemu}} means ioemu is used to virtualize the VMX NIC. If no type is specified, vbd is used, as with paravirtualized guests.\\
 
@@ -2229,6 +2231,30 @@ Simply follow the usual method of creating the guest, using the -f parameter and
 
 In the default configuration, VNC is on and SDL is off. Therefore VNC windows will open when VMX guests are created. If you want to use SDL to create VMX guests, set {\small {\tt sdl=1}} in your VMX configuration file. You can also turn off VNC by setting {\small {\tt vnc=0}}.
  
+\subsection{Use mouse in VNC window}
+The default PS/2 mouse will not work properly in VMX by a VNC window. Summagraphics mouse emulation does work in this environment. A Summagraphics mouse can be enabled by reconfiguring 2 services:
+
+{\small {\tt 1. General Purpose Mouse (GPM). The GPM daemon is configured in different ways in different Linux distributions. On a Redhat distribution, this is accomplished by changing the file `/etc/sysconfig/mouse' to have the following:\\
+MOUSETYPE="summa"\\
+XMOUSETYPE="SUMMA"\\
+DEVICE=/dev/ttyS0\\
+\\
+2. X11. For all Linux distributions, change the Mouse0 stanza in `/etc/X11/xorg.conf' to:\\
+Section "InputDevice"\\
+Identifier "Mouse0"\\
+Driver "summa"\\
+Option "Device" "/dev/ttyS0"\\
+Option "InputFashion" "Tablet"\\
+Option "Mode" "Absolute"\\
+Option "Name" "EasyPen"\\
+Option "Compatible" "True"\\
+Option "Protocol" "Auto"\\
+Option "SendCoreEvents" "on"\\
+Option "Vendor" "GENIUS"\\
+EndSection}}
+
+If the Summagraphics mouse isn't the default mouse, you can manually kill 'gpm' and restart it with the command "gpm -m /dev/ttyS0 -t summa". Note that Summagraphics mouse makes no sense in an SDL window and is therefore not available in this environment.
+
 \subsection{Destroy VMX guests}
 VMX guests can be destroyed in the same way as can paravirtualized guests. We recommend that you type the command 
 

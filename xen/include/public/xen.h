@@ -60,6 +60,8 @@
 #define __HYPERVISOR_acm_op               27
 #define __HYPERVISOR_nmi_op               28
 #define __HYPERVISOR_sched_op             29
+#define __HYPERVISOR_callback_op          30
+#define __HYPERVISOR_xenoprof_op          31
 
 /* 
  * VIRTUAL INTERRUPTS
@@ -76,6 +78,7 @@
 #define VIRQ_CONSOLE    2  /* G. (DOM0) Bytes received on emergency console. */
 #define VIRQ_DOM_EXC    3  /* G. (DOM0) Exceptional event for some domain.   */
 #define VIRQ_DEBUGGER   6  /* G. (DOM0) A domain has paused for debugging.   */
+#define VIRQ_XENOPROF   7  /* V. XenOprofile interrupt: new sample available */
 #define NR_VIRQS        8
 
 /*

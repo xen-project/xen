@@ -140,15 +140,16 @@ typedef struct dom0_settime {
 DEFINE_GUEST_HANDLE(dom0_settime_t);
 
 #define DOM0_GETPAGEFRAMEINFO 18
+#define LTAB_SHIFT 28
 #define NOTAB 0         /* normal page */
-#define L1TAB (1<<28)
-#define L2TAB (2<<28)
-#define L3TAB (3<<28)
-#define L4TAB (4<<28)
+#define L1TAB (1<<LTAB_SHIFT)
+#define L2TAB (2<<LTAB_SHIFT)
+#define L3TAB (3<<LTAB_SHIFT)
+#define L4TAB (4<<LTAB_SHIFT)
 #define LPINTAB  (1<<31)
-#define XTAB  (0xf<<28) /* invalid page */
+#define XTAB  (0xf<<LTAB_SHIFT) /* invalid page */
 #define LTAB_MASK XTAB
-#define LTABTYPE_MASK (0x7<<28)
+#define LTABTYPE_MASK (0x7<<LTAB_SHIFT)
 
 typedef struct dom0_getpageframeinfo {
     /* IN variables. */

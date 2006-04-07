@@ -261,12 +261,6 @@ function vtpm_create_instance () {
 
 	if [ "$REASON" == "create" ]; then
 		vtpm_reset $instance
-	elif [ "$REASON" == "resume" ]; then
-		vtpm_setup $instance
-	else
-		#default case for 'now'
-		#vtpm_reset $instance
-		true
 	fi
 	xenstore_write $XENBUS_PATH/instance $instance
 }

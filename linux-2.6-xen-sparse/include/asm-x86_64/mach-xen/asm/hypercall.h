@@ -330,6 +330,20 @@ HYPERVISOR_nmi_op(
 	return _hypercall2(int, nmi_op, op, arg);
 }
 
+static inline int
+HYPERVISOR_callback_op(
+	int cmd, void *arg)
+{
+	return _hypercall2(int, callback_op, cmd, arg);
+}
+
+static inline int
+HYPERVISOR_xenoprof_op(
+	int op, unsigned long arg1, unsigned long arg2)
+{
+	return _hypercall3(int, xenoprof_op, op, arg1, arg2);
+}
+
 #endif /* __HYPERCALL_H__ */
 
 /*

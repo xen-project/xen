@@ -65,6 +65,19 @@ typedef struct sched_poll {
 DEFINE_GUEST_HANDLE(sched_poll_t);
 
 /*
+ * Declare a shutdown for another domain. The main use of this function is
+ * in interpreting shutdown requests and reasons for fully-virtualized
+ * domains.  A para-virtualized domain may use SCHEDOP_shutdown directly.
+ * @arg == pointer to sched_remote_shutdown structure.
+ */
+#define SCHEDOP_remote_shutdown        4
+typedef struct sched_remote_shutdown {
+    domid_t domain_id;         /* Remote domain ID */
+    unsigned int reason;       /* SHUTDOWN_xxx reason */
+} sched_remote_shutdown_t;
+DEFINE_GUEST_HANDLE(sched_remote_shutdown_t);
+
+/*
  * Reason codes for SCHEDOP_shutdown. These may be interpreted by control
  * software to determine the appropriate action. For the most part, Xen does
  * not care about the shutdown code.

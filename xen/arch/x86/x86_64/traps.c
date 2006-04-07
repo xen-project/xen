@@ -10,12 +10,15 @@
 #include <xen/symbols.h>
 #include <xen/console.h>
 #include <xen/sched.h>
+#include <xen/reboot.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
 #include <asm/shadow.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
+
+#include <public/callback.h>
 
 void show_registers(struct cpu_user_regs *regs)
 {
@@ -164,8 +167,7 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
     console_force_lock();
 
     /* Wait for manual reset. */
-    for ( ; ; )
-        __asm__ __volatile__ ( "hlt" );
+    machine_halt();
 }
 
 void toggle_guest_mode(struct vcpu *v)
@@ -184,13 +186,19 @@ unsigned long do_iret(void)
 
     if ( unlikely(copy_from_user(&iret_saved, (void *)regs->rsp,
                                  sizeof(iret_saved))) )
+    {
+        DPRINTK("Fault while reading IRET context from guest stack\n");
         domain_crash_synchronous();
+    }
 
     /* Returning to user mode? */
     if ( (iret_saved.cs & 3) == 3 )
     {
         if ( unlikely(pagetable_get_paddr(v->arch.guest_table_user) == 0) )
-            return -EFAULT;
+        {
+            DPRINTK("Guest switching to user mode with no user page tables\n");
+            domain_crash_synchronous();
+        }
         toggle_guest_mode(v);
     }
 
@@ -312,15 +320,106 @@ void __init percpu_traps_init(void)
     wrmsr(MSR_SYSCALL_MASK, EF_VM|EF_RF|EF_NT|EF_DF|EF_IE|EF_TF, 0U);
 }
 
+static long register_guest_callback(struct callback_register *reg)
+{
+    long ret = 0;
+    struct vcpu *v = current;
+
+    switch ( reg->type )
+    {
+    case CALLBACKTYPE_event:
+        v->arch.guest_context.event_callback_eip    = reg->address;
+        break;
+
+    case CALLBACKTYPE_failsafe:
+        v->arch.guest_context.failsafe_callback_eip = reg->address;
+        break;
+
+    case CALLBACKTYPE_syscall:
+        v->arch.guest_context.syscall_callback_eip  = reg->address;
+        break;
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+    return ret;
+}
+
+static long unregister_guest_callback(struct callback_unregister *unreg)
+{
+    long ret;
+
+    switch ( unreg->type )
+    {
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+    return ret;
+}
+
+
+long do_callback_op(int cmd, GUEST_HANDLE(void) arg)
+{
+    long ret;
+
+    switch ( cmd )
+    {
+    case CALLBACKOP_register:
+    {
+        struct callback_register reg;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&reg, arg, 1) )
+            break;
+
+        ret = register_guest_callback(&reg);
+    }
+    break;
+
+    case CALLBACKOP_unregister:
+    {
+        struct callback_unregister unreg;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&unreg, arg, 1) )
+            break;
+
+        ret = unregister_guest_callback(&unreg);
+    }
+    break;
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+    return ret;
+}
+
 long do_set_callbacks(unsigned long event_address,
                       unsigned long failsafe_address,
                       unsigned long syscall_address)
 {
-    struct vcpu *d = current;
+    struct callback_register event = {
+        .type = CALLBACKTYPE_event,
+        .address = event_address,
+    };
+    struct callback_register failsafe = {
+        .type = CALLBACKTYPE_failsafe,
+        .address = failsafe_address,
+    };
+    struct callback_register syscall = {
+        .type = CALLBACKTYPE_syscall,
+        .address = syscall_address,
+    };
 
-    d->arch.guest_context.event_callback_eip    = event_address;
-    d->arch.guest_context.failsafe_callback_eip = failsafe_address;
-    d->arch.guest_context.syscall_callback_eip  = syscall_address;
+    register_guest_callback(&event);
+    register_guest_callback(&failsafe);
+    register_guest_callback(&syscall);
 
     return 0;
 }

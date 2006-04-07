@@ -215,52 +215,26 @@ static void print_stats(blkif_t *blkif)
 
 int blkif_schedule(void *arg)
 {
-	blkif_t          *blkif = arg;
+	blkif_t *blkif = arg;
 
 	blkif_get(blkif);
+
 	if (debug_lvl)
 		printk(KERN_DEBUG "%s: started\n", current->comm);
-	for (;;) {
-		if (kthread_should_stop()) {
-			/* asked to quit? */
-			if (!atomic_read(&blkif->io_pending))
-				break;
-			if (debug_lvl)
-				printk(KERN_DEBUG "%s: I/O pending, "
-				       "delaying exit\n", current->comm);
-		}
 
-		if (!atomic_read(&blkif->io_pending)) {
-			/* Wait for work to do. */
-			wait_event_interruptible(
-				blkif->wq,
-				(atomic_read(&blkif->io_pending) ||
-				 kthread_should_stop()));
-		} else if (list_empty(&pending_free)) {
-			/* Wait for pending_req becoming available. */
-			wait_event_interruptible(
-				pending_free_wq,
-				!list_empty(&pending_free));
-		}
+	while (!kthread_should_stop()) {
+		wait_event_interruptible(
+			blkif->wq,
+			blkif->waiting_reqs || kthread_should_stop());
+		wait_event_interruptible(
+			pending_free_wq,
+			!list_empty(&pending_free) || kthread_should_stop());
 
-		if (blkif->status != CONNECTED) {
-			/* make sure we are connected */
-			if (debug_lvl)
-				printk(KERN_DEBUG "%s: not connected "
-				       "(%d pending)\n",
-				       current->comm,
-				       atomic_read(&blkif->io_pending));
-			wait_event_interruptible(
-				blkif->wq,
-				(blkif->status == CONNECTED ||
-				 kthread_should_stop()));
-			continue;
-		}
+		blkif->waiting_reqs = 0;
+		smp_mb(); /* clear flag *before* checking for work */
 
-		/* Schedule I/O */
-		atomic_set(&blkif->io_pending, 0);
 		if (do_block_io_op(blkif))
-			atomic_inc(&blkif->io_pending);
+			blkif->waiting_reqs = 1;
 		unplug_queue(blkif);
 
 		if (log_stats && time_after(jiffies, blkif->st_print))
@@ -271,8 +245,10 @@ int blkif_schedule(void *arg)
 		print_stats(blkif);
 	if (debug_lvl)
 		printk(KERN_DEBUG "%s: exiting\n", current->comm);
+
 	blkif->xenblkd = NULL;
 	blkif_put(blkif);
+
 	return 0;
 }
 
@@ -311,12 +287,15 @@ static int end_block_io_op(struct bio *bio, unsigned int done, int error)
  * NOTIFICATION FROM GUEST OS.
  */
 
+static void blkif_notify_work(blkif_t *blkif)
+{
+	blkif->waiting_reqs = 1;
+	wake_up(&blkif->wq);
+}
+
 irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 {
-	blkif_t *blkif = dev_id;
-
-	atomic_inc(&blkif->io_pending);
-	wake_up(&blkif->wq);
+	blkif_notify_work(dev_id);
 	return IRQ_HANDLED;
 }
 
@@ -536,10 +515,8 @@ static void make_response(blkif_t *blkif, unsigned long id,
 	}
 	spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
 
-	if (more_to_do) {
-		atomic_inc(&blkif->io_pending);
-		wake_up(&blkif->wq);
-	}
+	if (more_to_do)
+		blkif_notify_work(blkif);
 	if (notify)
 		notify_remote_via_irq(blkif->irq);
 }

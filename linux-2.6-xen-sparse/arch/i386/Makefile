@@ -162,3 +162,4 @@ define archhelp
 endef
 
 CLEAN_FILES += arch/$(ARCH)/boot/fdimage arch/$(ARCH)/boot/mtools.conf
+CLEAN_FILES += vmlinuz vmlinux-stripped

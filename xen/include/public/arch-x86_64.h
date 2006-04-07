@@ -244,6 +244,8 @@ typedef struct {
     unsigned long pad; /* sizeof(vcpu_info_t) == 64 */
 } arch_vcpu_info_t;
 
+typedef unsigned long xen_callback_t;
+
 #endif /* !__ASSEMBLY__ */
 
 /*

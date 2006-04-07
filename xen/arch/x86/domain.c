@@ -961,6 +961,10 @@ void domain_relinquish_resources(struct domain *d)
     /* Relinquish every page of memory. */
     relinquish_memory(d, &d->xenpage_list);
     relinquish_memory(d, &d->page_list);
+
+    /* Free page used by xen oprofile buffer */
+    free_xenoprof_pages(d);
+
 }
 
 void arch_dump_domain_info(struct domain *d)

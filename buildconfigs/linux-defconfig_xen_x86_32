@@ -2892,6 +2892,7 @@ CONFIG_NLS_UTF8=m
 #
 # Instrumentation Support
 #
+# CONFIG_PROFILING is not set
 # CONFIG_KPROBES is not set
 
 #

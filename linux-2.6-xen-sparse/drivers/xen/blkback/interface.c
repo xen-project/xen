@@ -45,7 +45,6 @@ blkif_t *alloc_blkif(domid_t domid)
 
 	memset(blkif, 0, sizeof(*blkif));
 	blkif->domid = domid;
-	blkif->status = DISCONNECTED;
 	spin_lock_init(&blkif->blk_ring_lock);
 	atomic_set(&blkif->refcnt, 1);
 	init_waitqueue_head(&blkif->wq);
@@ -137,9 +136,6 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 
 	blkif->irq = bind_evtchn_to_irqhandler(
 		blkif->evtchn, blkif_be_int, 0, "blkif-backend", blkif);
-
-	/* We're potentially connected now */
-	update_blkif_status(blkif); 
 
 	return 0;
 }
