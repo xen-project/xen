@@ -915,8 +915,6 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
     spin_unlock_recursive(&d->page_alloc_lock);
 }
 
-extern void free_xenoprof_pages(struct domain *d);
-
 void domain_relinquish_resources(struct domain *d)
 {
     struct vcpu *v;

@@ -6,7 +6,7 @@ DRIVER_OBJS = $(addprefix ../../../drivers/oprofile/, \
 		oprofilefs.o oprofile_stats.o  \
 		timer_int.o )
 
-ifdef CONFIG_X86_XEN
+ifdef CONFIG_XEN
 oprofile-y				:= $(DRIVER_OBJS) xenoprof.o
 else 
 oprofile-y				:= $(DRIVER_OBJS) init.o backtrace.o

@@ -20,13 +20,12 @@
 #define XENOPROF_READY             2
 #define XENOPROF_PROFILING         3
 
-
-typedef struct xenoprof_vcpu {
+struct xenoprof_vcpu {
     int event_size;
-    xenoprof_buf_t *buffer;
-} xenoprof_vcpu_t;
+    struct xenoprof_buf *buffer;
+};
 
-typedef struct xenoprof {
+struct xenoprof {
     char* rawbuf;
     int npages;
     int nbuf;
@@ -34,7 +33,10 @@ typedef struct xenoprof {
     int domain_type;
     int domain_ready;
     int is_primary;
-    xenoprof_vcpu_t vcpu [MAX_VIRT_CPUS];
-} xenoprof_t;
+    struct xenoprof_vcpu vcpu [MAX_VIRT_CPUS];
+};
+
+struct domain;
+void free_xenoprof_pages(struct domain *d);
 
 #endif  /* __XEN__XENOPROF_H__ */

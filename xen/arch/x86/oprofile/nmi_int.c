@@ -45,31 +45,23 @@ extern size_t strlcpy(char *dest, const char *src, size_t size);
 
 int nmi_callback(struct cpu_user_regs *regs, int cpu)
 {
-	int xen_mode = 0;
-	int ovf;
+	int xen_mode, ovf;
 
 	ovf = model->check_ctrs(cpu, &cpu_msrs[cpu], regs);
 	xen_mode = ring_0(regs);
-	if ( ovf )
-	{
-		if ( is_active(current->domain) )
-		{
-			if ( !xen_mode )
-			{
-				send_guest_vcpu_virq(current, VIRQ_XENOPROF);
-			} 
-		}
-	}
+	if ( ovf && is_active(current->domain) && !xen_mode )
+		send_guest_vcpu_virq(current, VIRQ_XENOPROF);
+
 	return 1;
 }
  
  
-static void nmi_cpu_save_registers(struct op_msrs * msrs)
+static void nmi_cpu_save_registers(struct op_msrs *msrs)
 {
 	unsigned int const nr_ctrs = model->num_counters;
 	unsigned int const nr_ctrls = model->num_controls; 
-	struct op_msr * counters = msrs->counters;
-	struct op_msr * controls = msrs->controls;
+	struct op_msr *counters = msrs->counters;
+	struct op_msr *controls = msrs->controls;
 	unsigned int i;
 
 	for (i = 0; i < nr_ctrs; ++i) {

@@ -157,8 +157,8 @@ struct domain
     /* Control-plane tools handle for this domain. */
     xen_domain_handle_t handle;
 
-    /* pointer to xenoprof data (oprofile support) */
-    xenoprof_t *xenoprof;
+    /* OProfile support. */
+    struct xenoprof *xenoprof;
 };
 
 struct domain_setup_info

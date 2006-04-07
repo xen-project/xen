@@ -57,6 +57,7 @@ static int virq_is_global(int virq)
     {
     case VIRQ_TIMER:
     case VIRQ_DEBUG:
+    case VIRQ_XENOPROF:
         rc = 0;
         break;
     default:
