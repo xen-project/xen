@@ -59,6 +59,10 @@ void machine_power_off(void)
 {
 	/* We really want to get pending console data out before we die. */
 	xencons_force_flush();
+#if defined(__i386__) || defined(__x86_64__)
+	if (pm_power_off)
+		pm_power_off();
+#endif
 	HYPERVISOR_shutdown(SHUTDOWN_poweroff);
 }
 
