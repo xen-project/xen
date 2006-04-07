@@ -171,26 +171,20 @@ static void __do_IRQ_guest(int vector)
 int pirq_guest_unmask(struct domain *d)
 {
     irq_desc_t    *desc;
-    unsigned int   i, j, pirq;
-    u32            m;
+    unsigned int   pirq;
     shared_info_t *s = d->shared_info;
 
-    for ( i = 0; i < ARRAY_SIZE(d->pirq_mask); i++ )
+    for ( pirq = find_first_bit(d->pirq_mask, NR_PIRQS);
+          pirq < NR_PIRQS;
+          pirq = find_next_bit(d->pirq_mask, NR_PIRQS, pirq) )
     {
-        m = d->pirq_mask[i];
-        while ( m != 0 )
-        {
-            j = find_first_set_bit(m);
-            m &= ~(1 << j);
-            pirq = (i << 5) + j;
-            desc = &irq_desc[irq_to_vector(pirq)];
-            spin_lock_irq(&desc->lock);
-            if ( !test_bit(d->pirq_to_evtchn[pirq], &s->evtchn_mask[0]) &&
-                 test_and_clear_bit(pirq, &d->pirq_mask) &&
-                 (--((irq_guest_action_t *)desc->action)->in_flight == 0) )
-                desc->handler->end(irq_to_vector(pirq));
-            spin_unlock_irq(&desc->lock);
-        }
+        desc = &irq_desc[irq_to_vector(pirq)];
+        spin_lock_irq(&desc->lock);
+        if ( !test_bit(d->pirq_to_evtchn[pirq], &s->evtchn_mask[0]) &&
+             test_and_clear_bit(pirq, &d->pirq_mask) &&
+             (--((irq_guest_action_t *)desc->action)->in_flight == 0) )
+            desc->handler->end(irq_to_vector(pirq));
+        spin_unlock_irq(&desc->lock);
     }
 
     return 0;
