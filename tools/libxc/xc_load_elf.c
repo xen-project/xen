@@ -69,6 +69,21 @@ static int parseelfimage(const char *image,
         return -EINVAL;
     }
 
+    if (
+#if defined(__i386__)
+        (ehdr->e_ident[EI_CLASS] != ELFCLASS32) ||
+        (ehdr->e_machine != EM_386) ||
+#elif defined(__x86_64__)
+        (ehdr->e_ident[EI_CLASS] != ELFCLASS64) ||
+        (ehdr->e_machine != EM_X86_64) ||
+#endif
+        (ehdr->e_ident[EI_DATA] != ELFDATA2LSB) ||
+        (ehdr->e_type != ET_EXEC) )
+    {
+        ERROR("Kernel not a Xen-compatible Elf image.");
+        return -EINVAL;
+    }
+
     if ( (ehdr->e_phoff + (ehdr->e_phnum * ehdr->e_phentsize)) > elfsize )
     {
         ERROR("ELF program headers extend beyond end of image.");
