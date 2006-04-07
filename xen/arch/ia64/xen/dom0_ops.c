@@ -209,14 +209,16 @@ long arch_do_dom0_op(dom0_op_t *op, GUEST_HANDLE(dom0_op_t) u_dom0_op)
     {
         dom0_physinfo_t *pi = &op->u.physinfo;
 
-        pi->threads_per_core = smp_num_siblings;
-        pi->cores_per_socket = 1; // FIXME
+        pi->threads_per_core =
+            cpus_weight(cpu_sibling_map[0]);
+        pi->cores_per_socket =
+            cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
         pi->sockets_per_node = 
-            num_online_cpus() / (pi->threads_per_core * pi->cores_per_socket);
+            num_online_cpus() / cpus_weight(cpu_core_map[0]);
         pi->nr_nodes         = 1;
         pi->total_pages      = 99;  // FIXME
         pi->free_pages       = avail_domheap_pages();
-        pi->cpu_khz          = 100;  // FIXME cpu_khz;
+        pi->cpu_khz          = local_cpu_data->proc_freq / 1000;
         memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
         //memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
         ret = 0;
