@@ -31,7 +31,7 @@ DEFINE_GUEST_HANDLE(void);
 
 /* Maximum number of virtual CPUs in multi-processor guests. */
 /* WARNING: before changing this, check that shared_info fits on a page */
-#define MAX_VIRT_CPUS 4
+#define MAX_VIRT_CPUS 64
 
 #ifndef __ASSEMBLY__
 

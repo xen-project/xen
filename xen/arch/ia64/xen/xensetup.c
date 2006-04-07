@@ -24,6 +24,12 @@
 #include <asm/vmx.h>
 #include <linux/efi.h>
 
+/* Be sure the struct shared_info fits on a page because it is mapped in
+   domain. */
+#if SHARED_INFO_SIZE > PAGE_SIZE
+ #error "struct shared_info does not not fit in PAGE_SIZE"
+#endif
+
 unsigned long xenheap_phys_end;
 
 char saved_command_line[COMMAND_LINE_SIZE];
@@ -321,7 +327,13 @@ printk("About to call timer_init()\n");
         //boot_cpu_data.x86_num_cores = 1;
     }
 
+    /* A vcpu is created for the idle domain on every physical cpu.
+       Limit the number of cpus to the maximum number of vcpus.  */
+    if (max_cpus > MAX_VIRT_CPUS)
+        max_cpus = MAX_VIRT_CPUS;
+
     smp_prepare_cpus(max_cpus);
+
     /* We aren't hotplug-capable yet. */
     for_each_cpu ( i )
         cpu_set(i, cpu_present_map);

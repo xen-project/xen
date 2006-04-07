@@ -25,17 +25,12 @@
 
 #ifdef CONFIG_XEN_SMP
 #define CONFIG_SMP 1
-#define NR_CPUS 8
-#define CONFIG_NR_CPUS 8
+#define NR_CPUS 64
 #else
 #undef CONFIG_SMP
 #define NR_CPUS 1
-#define CONFIG_NR_CPUS 1
 #endif
-//#define NR_CPUS 16
-//#define CONFIG_NR_CPUS 16
-//leave SMP for a later time
-//#undef CONFIG_SMP
+#define CONFIG_NR_CPUS NR_CPUS
 
 #define supervisor_mode_kernel (0)
 
@@ -121,9 +116,6 @@ extern char _end[]; /* standard ELF symbol */
 #define CMPXCHG_BUGCHECK_DECL
 
 // from include/asm-ia64/smp.h
-#ifdef CONFIG_SMP
-//#warning "Lots of things to fix to enable CONFIG_SMP!"
-#endif
 #define	get_cpu()	smp_processor_id()
 #define put_cpu()	do {} while(0)
 
@@ -283,13 +275,6 @@ extern int ht_per_core;
 #define CONFIG_XEN_ATTENTION_KEY 1
 #endif /* __ASSEMBLY__ */
 #endif /* __XEN_IA64_CONFIG_H__ */
-
-// needed for include/xen/smp.h
-//#ifdef CONFIG_SMP
-//#define raw_smp_processor_id()	current->processor
-//#else
-//#define raw_smp_processor_id()	0
-//#endif
 
 #ifndef __ASSEMBLY__
 #include <linux/linkage.h>
