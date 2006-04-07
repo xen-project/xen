@@ -176,7 +176,7 @@ int pirq_guest_unmask(struct domain *d)
 
     for ( pirq = find_first_bit(d->pirq_mask, NR_PIRQS);
           pirq < NR_PIRQS;
-          pirq = find_next_bit(d->pirq_mask, NR_PIRQS, pirq) )
+          pirq = find_next_bit(d->pirq_mask, NR_PIRQS, pirq+1) )
     {
         desc = &irq_desc[irq_to_vector(pirq)];
         spin_lock_irq(&desc->lock);
