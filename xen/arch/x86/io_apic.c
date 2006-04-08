@@ -1897,12 +1897,11 @@ int ioapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval)
 }
 
 #define WARN_BOGUS_WRITE(f, a...)                                       \
-    printk("%s: apic=%d,pin=%d,oirq=%d,nirq=%d\n"                       \
-           "%s: oent=%08x:%08x,nent=%08x:%08x\n"                        \
-           "%s: " f, __FUNCTION__, apic, pin, old_irq, new_irq,         \
-           __FUNCTION__, *(u32 *)&old_rte, *((u32 *)&old_rte+1),        \
-           *(u32 *)&new_rte, *((u32 *)&new_rte+1),                      \
-           __FUNCTION__ , ##a )
+    DPRINTK("\n%s: apic=%d, pin=%d, old_irq=%d, new_irq=%d\n"           \
+            "%s: old_entry=%08x, new_entry=%08x\n"                      \
+            "%s: " f, __FUNCTION__, apic, pin, old_irq, new_irq,        \
+            __FUNCTION__, *(u32 *)&old_rte, *(u32 *)&new_rte,           \
+            __FUNCTION__ , ##a )
 
 int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 {
