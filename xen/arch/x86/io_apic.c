@@ -110,7 +110,6 @@ static void add_pin_to_irq(unsigned int irq, int apic, int pin)
 static void remove_pin_at_irq(unsigned int irq, int apic, int pin)
 {
     struct irq_pin_list *entry, *prev;
-    int idx;
 
     for (entry = &irq_2_pin[irq]; ; entry = &irq_2_pin[entry->next]) {
         if ((entry->apic == apic) && (entry->pin == pin))
@@ -119,18 +118,24 @@ static void remove_pin_at_irq(unsigned int irq, int apic, int pin)
             BUG();
     }
 
-    entry->pin  = -1;
-    entry->apic = -1;
+    entry->pin = entry->apic = -1;
     
-    idx = entry - irq_2_pin;
-    if (idx >= NR_IRQS) {
-        while (prev->next != idx)
+    if (entry != &irq_2_pin[irq]) {
+        /* Removed entry is not at head of list. */
+        prev = &irq_2_pin[irq];
+        while (&irq_2_pin[prev->next] != entry)
             prev = &irq_2_pin[prev->next];
         prev->next = entry->next;
         entry->next = irq_2_pin_free_entry;
-        irq_2_pin_free_entry = idx;
-    } else {
-        entry->next = 0;
+        irq_2_pin_free_entry = entry - irq_2_pin;
+    } else if (entry->next != 0) {
+        /* Removed entry is at head of multi-item list. */
+        prev  = entry;
+        entry = &irq_2_pin[entry->next];
+        *prev = *entry;
+        entry->pin = entry->apic = -1;
+        entry->next = irq_2_pin_free_entry;
+        irq_2_pin_free_entry = entry - irq_2_pin;
     }
 }
 
