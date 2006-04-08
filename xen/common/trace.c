@@ -27,6 +27,8 @@
 #include <xen/smp.h>
 #include <xen/trace.h>
 #include <xen/errno.h>
+#include <xen/event.h>
+#include <xen/softirq.h>
 #include <xen/init.h>
 #include <asm/atomic.h>
 #include <public/dom0_ops.h>
@@ -40,6 +42,11 @@ static struct t_buf *t_bufs[NR_CPUS];
 static struct t_rec *t_recs[NR_CPUS];
 static int nr_recs;
 
+/* High water mark for trace buffers; */
+/* Send virtual interrupt when buffer level reaches this point */
+static int t_buf_highwater;
+
+
 /* a flag recording whether initialization has been done */
 /* or more properly, if the tbuf subsystem is enabled right now */
 int tb_init_done;
@@ -49,6 +56,12 @@ static unsigned long tb_cpu_mask = (~0UL);
 
 /* which tracing events are enabled */
 static u32 tb_event_mask = TRC_ALL;
+
+static void trace_notify_guest(void)
+{
+    send_guest_global_virq(dom0, VIRQ_TBUF);
+}
+
 
 /**
  * alloc_trace_bufs - performs initialization of the per-cpu trace buffers.
@@ -92,6 +105,9 @@ static int alloc_trace_bufs(void)
         buf->cons = buf->prod = 0;
         t_recs[i] = (struct t_rec *)(buf + 1);
     }
+
+    t_buf_highwater = nr_recs >> 1; /* 50% high water */
+    open_softirq(TRACE_SOFTIRQ, trace_notify_guest);
 
     return 0;
 }
@@ -272,6 +288,13 @@ void trace(u32 event, unsigned long d1, unsigned long d2,
     buf->prod++;
 
     local_irq_restore(flags);
+
+    /*
+     * Notify trace buffer consumer that we've reached the high water mark.
+     *
+     */
+    if ( (buf->prod - buf->cons) == t_buf_highwater )
+        raise_softirq(TRACE_SOFTIRQ);
 }
 
 /*
