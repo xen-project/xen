@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.16-rc3-xen0
-# Thu Feb 16 22:52:42 2006
+# Linux kernel version: 2.6.16-xen0
+# Sat Apr  8 11:34:07 2006
 #
 CONFIG_X86_32=y
 CONFIG_SEMAPHORE_SLEEPERS=y
@@ -208,7 +208,6 @@ CONFIG_ACPI_BLACKLIST_YEAR=0
 CONFIG_ACPI_EC=y
 CONFIG_ACPI_POWER=y
 CONFIG_ACPI_SYSTEM=y
-# CONFIG_X86_PM_TIMER is not set
 # CONFIG_ACPI_CONTAINER is not set
 
 #
@@ -392,7 +391,13 @@ CONFIG_PREVENT_FIRMWARE_BUILD=y
 #
 # Plug and Play support
 #
-# CONFIG_PNP is not set
+CONFIG_PNP=y
+CONFIG_PNP_DEBUG=y
+
+#
+# Protocols
+#
+CONFIG_PNPACPI=y
 
 #
 # Block devices
@@ -440,6 +445,7 @@ CONFIG_BLK_DEV_IDECD=y
 #
 CONFIG_IDE_GENERIC=y
 # CONFIG_BLK_DEV_CMD640 is not set
+# CONFIG_BLK_DEV_IDEPNP is not set
 CONFIG_BLK_DEV_IDEPCI=y
 # CONFIG_IDEPCI_SHARE_IRQ is not set
 # CONFIG_BLK_DEV_OFFBOARD is not set
@@ -623,6 +629,7 @@ CONFIG_NETDEVICES=y
 # CONFIG_BONDING is not set
 # CONFIG_EQUALIZER is not set
 CONFIG_TUN=y
+# CONFIG_NET_SB1000 is not set
 
 #
 # ARCnet devices
@@ -1064,11 +1071,7 @@ CONFIG_USB_MON=y
 # CONFIG_INFINIBAND is not set
 
 #
-# SN Devices
-#
-
-#
-# EDAC - error detection and reporting (RAS)
+# EDAC - error detection and reporting (RAS) (EXPERIMENTAL)
 #
 # CONFIG_EDAC is not set
 
@@ -1306,7 +1309,7 @@ CONFIG_CRYPTO_CRC32C=m
 #
 # CONFIG_CRYPTO_DEV_PADLOCK is not set
 CONFIG_XEN=y
-CONFIG_NO_IDLE_HZ=y
+CONFIG_XEN_INTERFACE_VERSION=0x00030101
 
 #
 # XEN
@@ -1332,6 +1335,7 @@ CONFIG_XEN_DISABLE_SERIAL=y
 CONFIG_XEN_SYSFS=y
 CONFIG_HAVE_ARCH_ALLOC_SKB=y
 CONFIG_HAVE_ARCH_DEV_ALLOC_SKB=y
+CONFIG_NO_IDLE_HZ=y
 
 #
 # Library routines
@@ -1344,4 +1348,6 @@ CONFIG_ZLIB_INFLATE=y
 CONFIG_GENERIC_HARDIRQS=y
 CONFIG_GENERIC_IRQ_PROBE=y
 CONFIG_X86_BIOS_REBOOT=y
+CONFIG_X86_NO_TSS=y
+CONFIG_X86_NO_IDT=y
 CONFIG_KTIME_SCALAR=y

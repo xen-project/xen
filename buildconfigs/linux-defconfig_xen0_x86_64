@@ -327,7 +327,13 @@ CONFIG_STANDALONE=y
 #
 # Plug and Play support
 #
-# CONFIG_PNP is not set
+CONFIG_PNP=y
+CONFIG_PNP_DEBUG=y
+
+#
+# Protocols
+#
+CONFIG_PNPACPI=y
 
 #
 # Block devices
