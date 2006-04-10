@@ -912,12 +912,12 @@ CONFIG_PARPORT_1284=y
 # Plug and Play support
 #
 CONFIG_PNP=y
-# CONFIG_PNP_DEBUG is not set
+CONFIG_PNP_DEBUG=y
 
 #
 # Protocols
 #
-# CONFIG_PNPACPI is not set
+CONFIG_PNPACPI=y
 
 #
 # Block devices

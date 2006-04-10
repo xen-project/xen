@@ -77,6 +77,7 @@
 #define VIRQ_DEBUG      1  /* V. Request guest to dump debug info.           */
 #define VIRQ_CONSOLE    2  /* G. (DOM0) Bytes received on emergency console. */
 #define VIRQ_DOM_EXC    3  /* G. (DOM0) Exceptional event for some domain.   */
+#define VIRQ_TBUF       4  /* G. (DOM0) Trace buffer has records available.  */
 #define VIRQ_DEBUGGER   6  /* G. (DOM0) A domain has paused for debugging.   */
 #define VIRQ_XENOPROF   7  /* V. XenOprofile interrupt: new sample available */
 #define NR_VIRQS        8

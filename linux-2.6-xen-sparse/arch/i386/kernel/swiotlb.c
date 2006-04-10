@@ -32,7 +32,7 @@ EXPORT_SYMBOL(swiotlb);
 
 #define OFFSET(val,align) ((unsigned long)((val) & ( (align) - 1)))
 
-#define SG_ENT_PHYS_ADDRESS(sg)	(page_to_phys((sg)->page) + (sg)->offset)
+#define SG_ENT_PHYS_ADDRESS(sg)	(page_to_bus((sg)->page) + (sg)->offset)
 
 /*
  * Maximum allowable number of contiguous slabs to map,
@@ -607,7 +607,7 @@ swiotlb_map_page(struct device *hwdev, struct page *page,
 	dma_addr_t dev_addr;
 	char *map;
 
-	dev_addr = page_to_phys(page) + offset;
+	dev_addr = page_to_bus(page) + offset;
 	if (address_needs_mapping(hwdev, dev_addr)) {
 		buffer.page   = page;
 		buffer.offset = offset;

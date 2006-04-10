@@ -1848,10 +1848,6 @@ void __init setup_arch(char **cmdline_p)
 		get_smp_config();
 #endif
 
-	/* XXX Disable irqdebug until we have a way to avoid interrupt
-	 * conflicts. */
-	noirqdebug_setup("");
-
 	register_memory();
 
 	if (xen_start_info->flags & SIF_INITDOMAIN) {

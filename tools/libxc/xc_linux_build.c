@@ -110,10 +110,10 @@ static int parse_features(
 
         if ( i == XENFEAT_NR_SUBMAPS*32 )
         {
-            ERROR("Unknown feature \"%.*s\".\n", (int)(p-feats), feats);
+            ERROR("Unknown feature \"%.*s\".", (int)(p-feats), feats);
             if ( req )
             {
-                ERROR("Kernel requires an unknown hypervisor feature.\n");
+                ERROR("Kernel requires an unknown hypervisor feature.");
                 return -EINVAL;
             }
         }
@@ -579,6 +579,31 @@ static int setup_guest(int xc_handle,
     return -1;
 }
 #else /* x86 */
+
+/* Check if the platform supports the guest kernel format */
+static int compat_check(int xc_handle, struct domain_setup_info *dsi)
+{
+    xen_capabilities_info_t xen_caps = "";
+
+    if (xc_version(xc_handle, XENVER_capabilities, &xen_caps) != 0) {
+        ERROR("Cannot determine host capabilities.");
+        return 0;
+    }
+
+    if (strstr(xen_caps, "xen-3.0-x86_32p")) {
+        if (!dsi->pae_kernel) {
+            ERROR("Non PAE-kernel on PAE host.");
+            return 0;
+        }
+    } else if (dsi->pae_kernel) {
+        ERROR("PAE-kernel on non-PAE host.");
+        return 0;
+    }
+
+    return 1;
+}
+
+
 static int setup_guest(int xc_handle,
                        uint32_t dom,
                        const char *image, unsigned long image_size,
@@ -635,9 +660,12 @@ static int setup_guest(int xc_handle,
 
     if ( (dsi.v_start & (PAGE_SIZE-1)) != 0 )
     {
-        PERROR("Guest OS must load to a page boundary.\n");
+        PERROR("Guest OS must load to a page boundary.");
         goto error_out;
     }
+
+    if (!compat_check(xc_handle, &dsi))
+        goto error_out;
 
     /* Parse and validate kernel features. */
     p = strstr(dsi.xen_guest_string, "FEATURES=");
@@ -647,7 +675,7 @@ static int setup_guest(int xc_handle,
                              supported_features,
                              required_features) )
         {
-            ERROR("Failed to parse guest kernel features.\n");
+            ERROR("Failed to parse guest kernel features.");
             goto error_out;
         }
 
@@ -659,7 +687,7 @@ static int setup_guest(int xc_handle,
     {
         if ( (supported_features[i]&required_features[i]) != required_features[i] )
         {
-            ERROR("Guest kernel does not support a required feature.\n");
+            ERROR("Guest kernel does not support a required feature.");
             goto error_out;
         }
     }

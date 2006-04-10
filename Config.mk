@@ -24,6 +24,7 @@ OBJCOPY    = $(CROSS_COMPILE)objcopy
 OBJDUMP    = $(CROSS_COMPILE)objdump
 
 DISTDIR     ?= $(XEN_ROOT)/dist
+DESTDIR     ?= /
 
 INSTALL      = install
 INSTALL_DIR  = $(INSTALL) -d -m0755

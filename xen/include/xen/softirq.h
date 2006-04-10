@@ -9,7 +9,8 @@
 #define NMI_SOFTIRQ                       4
 #define PAGE_SCRUB_SOFTIRQ                5
 #define DOMAIN_SHUTDOWN_FINALISE_SOFTIRQ  6
-#define NR_SOFTIRQS                       7
+#define TRACE_SOFTIRQ                     7
+#define NR_SOFTIRQS                       8
 
 #ifndef __ASSEMBLY__
 

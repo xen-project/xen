@@ -74,7 +74,7 @@ subdir-n := $(patsubst %,%/,$(patsubst %/,%,$(subdir-n)))
 subdir-y := $(patsubst %,%/,$(patsubst %/,%,$(subdir-y)))
 
 # Add explicitly declared subdirectories to the object list.
-obj-y += $(patsubst %,%/built_in.o,$(subdir-y))
+obj-y += $(patsubst %/,%/built_in.o,$(subdir-y))
 
 # Add implicitly declared subdirectories (in the object list) to the
 # subdirectory list, and rewrite the object-list entry.

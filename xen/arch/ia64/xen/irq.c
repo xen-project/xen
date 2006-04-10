@@ -1358,25 +1358,20 @@ static void __do_IRQ_guest(int irq)
 int pirq_guest_unmask(struct domain *d)
 {
     irq_desc_t    *desc;
-    int            i, j, pirq;
-    u32            m;
+    int            pirq;
     shared_info_t *s = d->shared_info;
 
-    for ( i = 0; i < ARRAY_SIZE(d->pirq_mask); i++ )
+    for ( pirq = find_first_bit(d->pirq_mask, NR_PIRQS);
+          pirq < NR_PIRQS;
+          pirq = find_next_bit(d->pirq_mask, NR_PIRQS, pirq+1) )
     {
-        m = d->pirq_mask[i];
-        while ( (j = ffs(m)) != 0 )
-        {
-            m &= ~(1 << --j);
-            pirq = (i << 5) + j;
-            desc = &irq_desc[pirq];
-            spin_lock_irq(&desc->lock);
-            if ( !test_bit(d->pirq_to_evtchn[pirq], &s->evtchn_mask[0]) &&
-                 test_and_clear_bit(pirq, &d->pirq_mask) &&
-                 (--((irq_guest_action_t *)desc->action)->in_flight == 0) )
-                desc->handler->end(pirq);
-            spin_unlock_irq(&desc->lock);
-        }
+        desc = &irq_desc[pirq];
+        spin_lock_irq(&desc->lock);
+        if ( !test_bit(d->pirq_to_evtchn[pirq], &s->evtchn_mask[0]) &&
+             test_and_clear_bit(pirq, &d->pirq_mask) &&
+             (--((irq_guest_action_t *)desc->action)->in_flight == 0) )
+            desc->handler->end(pirq);
+        spin_unlock_irq(&desc->lock);
     }
 
     return 0;

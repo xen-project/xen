@@ -134,7 +134,7 @@ struct domain
      */
 #define NR_PIRQS 256 /* Put this somewhere sane! */
     u16              pirq_to_evtchn[NR_PIRQS];
-    u32              pirq_mask[NR_PIRQS/32];
+    DECLARE_BITMAP(pirq_mask, NR_PIRQS);
 
     /* I/O capabilities (access to IRQs and memory-mapped I/O). */
     struct rangeset *iomem_caps;

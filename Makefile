@@ -115,18 +115,6 @@ distclean: clean
 # Linux name for GNU distclean
 mrproper: distclean
 
-install-logging: LOGGING=logging-0.4.9.2
-install-logging:
-	[ -f $(LOGGING).tar.gz ] || wget http://www.red-dove.com/$(LOGGING).tar.gz
-	tar -zxf $(LOGGING).tar.gz
-	cd $(LOGGING) && python setup.py install
-
-# handy target to upgrade iptables (use rpm or apt-get in preference)
-install-iptables:
-	wget http://www.netfilter.org/files/iptables-1.2.11.tar.bz2
-	tar -jxf iptables-1.2.11.tar.bz2
-	$(MAKE) -C iptables-1.2.11 PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install
-
 help:
 	@echo 'Installation targets:'
 	@echo '  install          - build and install everything'
@@ -147,23 +135,25 @@ help:
 	@echo '  dev-docs         - build developer-only documentation'
 	@echo ''
 	@echo 'Cleaning targets:'
-	@echo '  clean            - clean the Xen, tools and docs (but not'
-	@echo '                     guest kernel) trees'
-	@echo '  distclean        - clean plus delete kernel tarballs and kernel'
-	@echo '                     build trees'
+	@echo '  clean            - clean the Xen, tools and docs (but not guest kernel trees)'
+	@echo '  distclean        - clean plus delete kernel build trees and'
+	@echo '                     local downloaded files'
 	@echo '  kdelete          - delete guest kernel build trees'
 	@echo '  kclean           - clean guest kernel build trees'
-	@echo ''
-	@echo 'Dependency installation targets:'
-	@echo '  install-logging  - install the Python Logging package'
-	@echo '  install-iptables - install iptables tools'
 	@echo ''
 	@echo 'Miscellaneous targets:'
 	@echo '  prep-kernels     - prepares kernel directories, does not build'
 	@echo '  mkpatches        - make patches against vanilla kernels from'
 	@echo '                     sparse trees'
-	@echo '  uninstall        - attempt to remove installed Xen tools (use'
-	@echo '                     with extreme care!)'
+	@echo '  uninstall        - attempt to remove installed Xen tools'
+	@echo '                     (use with extreme care!)'
+	@echo
+	@echo 'Environment:'
+	@echo '  XEN_PYTHON_NATIVE_INSTALL=y'
+	@echo '                   - native python install or dist'
+	@echo '                     install into prefix/lib/python<VERSION>'
+	@echo '                     instead of <PREFIX>/lib/python'
+	@echo '                     true if set to non-empty value, false otherwise'
 
 # Use this target with extreme care!
 uninstall: D=$(DESTDIR)
