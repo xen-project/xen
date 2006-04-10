@@ -13,8 +13,7 @@ SUBDIRS += acpi
 SUBDIRS += vmxassist
 SUBDIRS += hvmloader
 
-.PHONY: all install clean
-
+.PHONY: all
 all:
 	@set -e; if ! `which bcc 1>/dev/null 2>/dev/null`; then \
 	echo "***********************************************************"; \
@@ -28,10 +27,12 @@ all:
 	fi
 
 
+.PHONY: install
 install: all
 	[ -d $(INSTALL_DIR) ] || install -d -m0755 $(INSTALL_DIR)
 	[ ! -e $(TARGET) ] || install -m0644 $(TARGET) $(INSTALL_DIR)
 
+.PHONY: clean
 clean: 
 	@set -e; for subdir in $(SUBDIRS); do \
 		$(MAKE) -C $$subdir $@; \

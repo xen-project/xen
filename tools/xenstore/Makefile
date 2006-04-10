@@ -27,11 +27,13 @@ CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm
 CLIENTS += xenstore-write
 CLIENTS_OBJS := $(patsubst xenstore-%,xenstore_%.o,$(CLIENTS))
 
+.PHONY: all
 all: libxenstore.so xenstored $(CLIENTS) xs_tdb_dump xenstore-control xenstore-ls
 
 test_interleaved_transactions: test_interleaved_transactions.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -L. -lxenstore -o $@
 
+.PHONY: testcode
 testcode: xs_test xenstored_test xs_random
 
 xenstored: xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o tdb.o hashtable.o
@@ -55,14 +57,17 @@ xenstored_test: xenstored_core_test.o xenstored_watch_test.o xenstored_domain_te
 xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
+.PHONY: xs_test xs_random xs_stress xs_crashme
 xs_test xs_random xs_stress xs_crashme: LDFLAGS+=-lpthread
 xs_test: xs_test.o xs_lib.o utils.o
 xs_random: xs_random.o xs_test_lib.o xs_lib.o talloc.o utils.o
 xs_stress: xs_stress.o xs_test_lib.o xs_lib.o talloc.o utils.o
 xs_crashme: xs_crashme.o xs_lib.o talloc.o utils.o
 
+.PHONY: speedtest
 speedtest: speedtest.o xs.o xs_lib.o utils.o talloc.o
 
+.PHONY: check-speed
 check-speed: speedtest xenstored_test $(TESTDIR)
 	$(TESTENV) time ./speedtest 100
 
@@ -80,6 +85,7 @@ talloc_test.o: talloc.c
 libxenstore.so: xs.opic xs_lib.opic
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenstore.so -shared -o $@ $^ -lpthread
 
+.PHONY: clean
 clean: testsuite-clean
 	rm -f *.o *.opic *.so
 	rm -f xenstored xs_random xs_stress xs_crashme
@@ -87,55 +93,69 @@ clean: testsuite-clean
 	rm -f $(CLIENTS)
 	$(RM) $(PROG_DEP)
 
+.PHONY: print-dir
 print-dir:
 	@echo -n tools/xenstore: 
 
+.PHONY: print-end
 print-end:
 	@echo
 
+.PHONY: check
 check: print-dir testsuite-fast randomcheck-fast print-end
 
+.PHONY: fullcheck
 fullcheck: testsuite-run randomcheck stresstest
 
 $(TESTDIR):
 	mkdir $@
 
+.PHONY: testsuite-run
 testsuite-run: xenstored_test xs_test $(TESTDIR)
 	$(TESTENV) testsuite/test.sh && echo
 
+.PHONY: testsuite-fast
 testsuite-fast: xenstored_test xs_test $(TESTDIR)
 	@$(TESTENV) testsuite/test.sh --fast
 
+.PHONY: testsuite-clean
 testsuite-clean:
 	rm -rf $(TESTDIR)
 
 # Make this visible so they can see repeat tests without --fast if they
 # fail.
 RANDSEED=$(shell date +%s)
+.PHONY: randomcheck
 randomcheck: xs_random xenstored_test $(TESTDIR)
 	$(TESTENV) ./xs_random --simple --fast /tmp/xs_random 200000 $(RANDSEED) && echo
 	$(TESTENV) ./xs_random --fast /tmp/xs_random 100000 $(RANDSEED) && echo
 #	$(TESTENV) ./xs_random --fail /tmp/xs_random 10000 $(RANDSEED)
 
+.PHONY: crashme
 crashme:  xs_crashme xenstored_test $(TESTDIR)
 	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions /tmp/xs_crashme.vglog* /tmp/trace
 	export $(TESTENV); ./xs_crashme 5000 $(RANDSEED) 2>/dev/null
 	if [ -n "`cat /tmp/xs_crashme.vglog*`" ]; then echo Valgrind complained; cat /tmp/xs_crashme.vglog*; exit 1; fi
 	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions /tmp/xs_crashme.vglog* /tmp/trace
 
+.PHONY: randomcheck-fast
 randomcheck-fast: xs_random xenstored_test $(TESTDIR)
 	@$(TESTENV) ./xs_random --fast /tmp/xs_random 2000 $(RANDSEED)
 
+.PHONY: stresstest
 stresstest: xs_stress xenstored_test $(TESTDIR)
 	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions
 	export $(TESTENV); PID=`./xenstored_test --output-pid --trace-file=/tmp/trace`; ./xs_stress 5000; ret=$$?; kill $$PID; exit $$ret
 
+.PHONY: TAGS
 TAGS:
 	etags `find . -name '*.[ch]'`
 
+.PHONY: tarball
 tarball: clean
 	cd .. && tar -c -j -v -h -f xenstore.tar.bz2 xenstore/
 
+.PHONY: install
 install: all
 	$(INSTALL_DIR) -p $(DESTDIR)/var/run/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/var/lib/xenstored

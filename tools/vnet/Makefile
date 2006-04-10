@@ -5,10 +5,6 @@ export VNET_ROOT = $(shell pwd)
 include $(VNET_ROOT)/Make.env
 endif
 
-.PHONY: all compile install dist clean pristine
-.PHONY: gc-all gc-install gc-clean
-.PHONY: help
-
 SUBDIRS:=
 SUBDIRS+= examples
 SUBDIRS+= scripts
@@ -17,11 +13,13 @@ SUBDIRS+= libxutil
 SUBDIRS+= vnetd
 SUBDIRS+= vnet-module
 
+.PHONY: all
 all: compile
 
 gc.tar.gz:
 	wget http://www.hpl.hp.com/personal/Hans_Boehm/gc/gc_source/$@
 
+.PHONY: gc
 gc: gc.tar.gz
 	tar xfz gc.tar.gz
 	ln -sf gc?.? gc
@@ -31,10 +29,13 @@ $(GC_LIB_A): gc
 	make -C gc
 	DESTDIR="" make -C gc install
 
+.PHONY: gc-all
 gc-all: $(GC_LIB_A)
 
+.PHONY: gc-install
 gc-install:
 
+.PHONY: gc-clean
 gc-clean:
 	-@$(RM) -r gc?.? gc
 
@@ -50,19 +51,25 @@ subtgt = $(patsubst %,%-$(1),$(SUBDIRS))
 %-install:
 	$(call submak,install)
 
+.PHONY: compile
 compile: $(call subtgt,all)
 
+.PHONY: install
 install: DESTDIR=
 install: dist
 
+.PHONY: dist
 dist: compile $(call subtgt,install)
 
+.PHONY: clean
 clean: $(call subtgt,clean)
 	-@$(RM) -r build
 
+.PHONY: pristine
 pristine: clean
 	-@$(RM) gc.tar.gz
 
+.PHONY: help
 help:
 	@echo 'Cleaning targets:'
 	@echo '  clean     - clean subdirs and remove the build dir'

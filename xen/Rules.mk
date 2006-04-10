@@ -86,13 +86,15 @@ subdir-all := $(subdir-y) $(subdir-n)
 built_in.o: $(obj-y)
 	$(LD) $(LDFLAGS) -r -o $@ $^
 
+# Force execution of pattern rules (for which PHONY cannot be directly used).
 .PHONY: FORCE
 FORCE:
 
 %/built_in.o: FORCE
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* built_in.o
 
-clean:: $(addprefix _clean_, $(subdir-all)) FORCE
+.PHONY: clean
+clean:: $(addprefix _clean_, $(subdir-all))
 	rm -f *.o *~ core
 _clean_%/: FORCE
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* clean

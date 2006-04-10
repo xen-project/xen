@@ -329,6 +329,7 @@ sdl.o: sdl.c keyboard_rdesktop.c
 sdlaudio.o: sdlaudio.c
 	$(CC) $(CFLAGS) $(DEFINES) $(SDL_CFLAGS) -c -o $@ $<
 
+.PHONY: depend
 depend: $(SRCS)
 	$(CC) -MM $(CFLAGS) $(DEFINES) $^ 1>.depend
 
@@ -382,12 +383,15 @@ mixeng.o: mixeng.c mixeng.h mixeng_template.h
 %.o: %.S
 	$(CC) $(DEFINES) -c -o $@ $<
 
+.PHONY: clean
 clean:
 	rm -rf *.o  *.a *~ $(PROGS) gen-op.h opc.h op.h nwfpe slirp
 	rm -rf config.mak config.h
 
+.PHONY: distclean
 distclean: clean
 
+.PHONY: install
 install: all 
 	if [ ! -d $(INSTALL_DIR) ];then mkdir -p $(INSTALL_DIR);fi
 	if [ ! -d $(DESTDIR)$(configdir) ];then mkdir -p $(DESTDIR)$(configdir);fi

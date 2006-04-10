@@ -1369,10 +1369,16 @@ static inline unsigned int cpuid_edx(unsigned int op)
 {
     unsigned int eax, edx;
 
-    __asm__("pushl %%ebx; cpuid; popl %%ebx"
+#ifdef __x86_64__
+#define __bx "rbx"
+#else
+#define __bx "ebx"
+#endif
+    __asm__("push %%"__bx"; cpuid; pop %%"__bx
             : "=a" (eax), "=d" (edx)
             : "0" (op)
             : "cx");
+#undef __bx
 
     return edx;
 }

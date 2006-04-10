@@ -18,7 +18,10 @@ TARGETS  = xenperf xc_shadow
 INSTALL_BIN  = $(TARGETS) xencons
 INSTALL_SBIN = netfix xm xen-bugtool xend xenperf
 
+.PHONY: all
 all: build
+
+.PHONY: build
 build: $(TARGETS)
 	$(MAKE) -C miniterm
 	$(MAKE) -C cpuperf
@@ -27,6 +30,7 @@ ifneq ($(XEN_TARGET_ARCH),ia64)
 endif
 	$(MAKE) -C lomount
 
+.PHONY: install
 install: build
 	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
 	[ -d $(DESTDIR)/usr/sbin ] || $(INSTALL_DIR) $(DESTDIR)/usr/sbin
@@ -39,6 +43,7 @@ install: build
 #       Likewise mbootpack
 #	$(MAKE) -C mbootpack install
 
+.PHONY: clean
 clean:
 	$(RM) *.o $(TARGETS) *~
 	$(MAKE) -C miniterm clean

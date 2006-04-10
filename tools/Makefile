@@ -24,14 +24,14 @@ SUBDIRS += python
 SUBDIRS += pygrub
 endif
 
-.PHONY: all install clean check check_clean ioemu eioemuinstall ioemuclean
-
+.PHONY: all
 all: check
 	@set -e; for subdir in $(SUBDIRS); do \
 		$(MAKE) -C $$subdir $@; \
 	done
 	$(MAKE) ioemu
 
+.PHONY: install
 install: check
 	@set -e; for subdir in $(SUBDIRS); do \
 		$(MAKE) -C $$subdir $@; \
@@ -39,18 +39,22 @@ install: check
 	$(MAKE) ioemuinstall
 	$(INSTALL_DIR) -p $(DESTDIR)/var/xen/dump
 
+.PHONY: clean
 clean: check_clean
 	@set -e; for subdir in $(SUBDIRS); do \
 		$(MAKE) -C $$subdir $@; \
 	done
 	$(MAKE) ioemuclean
 
+.PHONY: check
 check:
 	$(MAKE) -C check
 
+.PHONY: check_clean
 check_clean:
 	$(MAKE) -C check clean
 
+.PHONY: ioemu ioemuinstall ioemuclean
 ifndef XEN_NO_IOEMU
 ioemu ioemuinstall ioemuclean:
 	[ -f ioemu/config-host.h ] || \

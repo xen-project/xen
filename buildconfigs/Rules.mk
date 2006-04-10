@@ -6,8 +6,6 @@ export DESTDIR
 ALLKERNELS = $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.*))
 ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
 
-.PHONY:	mkpatches mrproper
-
 # Setup pristine search path
 PRISTINE_SRC_PATH	?= .:..
 vpath pristine-% $(PRISTINE_SRC_PATH)
@@ -61,6 +59,7 @@ ifneq ($(PATCHDIRS),)
 $(patsubst patches/%,patches/%/.makedep,$(PATCHDIRS)): patches/%/.makedep: 
 	@echo 'ref-$*/.valid-ref: $$(wildcard patches/$*/*.patch)' >$@
 
+.PHONY: clean
 clean::
 	rm -f patches/*/.makedep
 
@@ -115,6 +114,7 @@ linux-2.6-xen.patch: ref-linux-$(LINUX_VER)/.valid-ref
 	rm -rf pristine-$(*)* ref-$(*)* $*.tar.bz2
 	rm -rf $*-xen.patch
 
+.PHONY: config-update-pae
 config-update-pae:
 ifeq ($(XEN_TARGET_X86_PAE),y)
 	sed -e 's!^CONFIG_HIGHMEM4G=y$$!\# CONFIG_HIGHMEM4G is not set!;s!^\# CONFIG_HIGHMEM64G is not set$$!CONFIG_HIGHMEM64G=y!' $(CONFIG_FILE) > $(CONFIG_FILE)- && mv $(CONFIG_FILE)- $(CONFIG_FILE)

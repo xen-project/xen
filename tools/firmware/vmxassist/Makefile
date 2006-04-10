@@ -43,6 +43,7 @@ LDFLAGS  = -m elf_i386
 
 OBJECTS = head.o trap.o vm86.o setup.o util.o
 
+.PHONY: all
 all: vmxassist.bin
 
 vmxassist.bin: vmxassist.ld $(OBJECTS)
@@ -74,6 +75,7 @@ offsets.h: gen
 gen:	vm86.h gen.c
 	$(HOSTCC) $(HOSTCFLAGS) -I. $(XENINC) -o gen gen.c
 
+.PHONY: clean
 clean:
 	rm -f vmxassist vmxassist.tmp vmxassist.bin vmxassist.run vmxassist.sym head.s
 	rm -f $(OBJECTS)

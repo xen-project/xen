@@ -21,19 +21,21 @@ DEPS     = .*.d
 
 OBJS     = $(patsubst %.c,%.o,$(SRCS))
 
+.PHONY: all
 all: $(IBIN)
 
 LINUX_ROOT := $(wildcard $(XEN_ROOT)/linux-2.6.*-xen-sparse)
 
+.PHONY: install
 install:
 	$(INSTALL_PROG) $(IBIN) $(DESTDIR)$(INSTALL_DIR)
+
+.PHONY: clean
 clean:
 	rm -rf *.o*~ $(DEPS) xen TAGS $(IBIN)
 
 ublkback: 
 	$(CC) $(CFLAGS) -o ublkback -L$(XEN_LIBXC) -L. -L..  \
 	      -lblktap -laio ublkback.c ublkbacklib.c -pg
-
-.PHONY: clean install
 
 -include $(DEPS)

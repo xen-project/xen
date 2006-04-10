@@ -67,10 +67,14 @@ LIB += libxenctrl.so libxenctrl.so.$(MAJOR) libxenctrl.so.$(MAJOR).$(MINOR)
 LIB += libxenguest.a
 LIB += libxenguest.so libxenguest.so.$(MAJOR) libxenguest.so.$(MAJOR).$(MINOR)
 
+.PHONY: all
 all: build
+
+.PHONY: build
 build: check-for-zlib mk-symlinks
 	$(MAKE) $(LIB)
 
+.PHONY: check-for-zlib
 check-for-zlib:
 	@if [ ! -e /usr/include/zlib.h ]; then \
 	echo "***********************************************************"; \
@@ -79,6 +83,7 @@ check-for-zlib:
 	false; \
 	fi
 
+.PHONY: install
 install: build
 	[ -d $(DESTDIR)/usr/$(LIBDIR) ] || $(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)
 	[ -d $(DESTDIR)/usr/include ] || $(INSTALL_DIR) $(DESTDIR)/usr/include
@@ -94,14 +99,15 @@ install: build
 	ln -sf libxenguest.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxenguest.so
 	$(INSTALL_DATA) xenguest.h $(DESTDIR)/usr/include
 
-.PHONY: TAGS clean rpm install all
-
+.PHONY: TAGS
 TAGS:
 	etags -t *.c *.h
 
+.PHONY: clean
 clean:
 	rm -rf *.a *.so* *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen
 
+.PHONY: rpm
 rpm: build
 	rm -rf staging
 	mkdir staging

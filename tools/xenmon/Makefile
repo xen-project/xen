@@ -28,16 +28,20 @@ LDFLAGS += -L $(XEN_LIBXC)
 BIN = setmask xenbaked
 SCRIPTS = xenmon.py
 
+.PHONY: all
 all: build
 
+.PHONY: build
 build: $(BIN)
 
+.PHONY: install
 install: xenbaked setmask
 	[ -d $(DESTDIR)$(sbindir) ] || $(INSTALL_DIR) $(DESTDIR)$(sbindir)
 	$(INSTALL_PROG) xenbaked $(DESTDIR)$(sbindir)/xenbaked
 	$(INSTALL_PROG) setmask  $(DESTDIR)$(sbindir)/setmask
 	$(INSTALL_PROG) xenmon.py  $(DESTDIR)$(sbindir)/xenmon.py
 
+.PHONY: clean
 clean:
 	rm -f $(BIN)
 

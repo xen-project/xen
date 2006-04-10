@@ -26,22 +26,28 @@ DOC_HTML	:= $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX))
 
 GFX = $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
 
-.PHONY:	all build dev-docs python-dev-docs ps pdf html clean install
-
+.PHONY: all
 all: build
+
+.PHONY: build
 build: ps pdf html man-pages
 	rm -f *.aux *.dvi *.bbl *.blg *.glo *.idx *.ilg *.log *.ind *.toc
 
+.PHONY: dev-docs
 dev-docs: python-dev-docs
 
+.PHONY: ps
 ps: $(DOC_PS)
 
+.PHONY: pdf
 pdf: $(DOC_PDF)
 
+.PHONY: html
 html:
 	@if which $(LATEX2HTML) 1>/dev/null 2>/dev/null; then \
 	$(MAKE) $(DOC_HTML); fi
 
+.PHONY: python-dev-docs
 python-dev-docs:
 	@mkdir -v -p api/tools/python
 	@if which $(DOXYGEN) 1>/dev/null 2>/dev/null; then         \
@@ -50,6 +56,7 @@ python-dev-docs:
 	$(MAKE) -C api/tools/python/latex ; else                   \
         echo "Doxygen not installed; skipping python-dev-docs."; fi
 
+.PHONY: man-pages
 man-pages:
 	@if which $(POD2MAN) 1>/dev/null 2>/dev/null; then \
 	$(MAKE) $(DOC_MAN1) $(DOC_MAN5); fi
@@ -64,6 +71,7 @@ man5/%.5: man/%.pod.5 Makefile
 	$(POD2MAN) --release=$(VERSION) --name=`echo $@ | sed 's/^man5.//'| \
 		sed 's/.5//'` -s 5 -c "Xen" $< $@
 
+.PHONY: clean
 clean:
 	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
 	rm -rf *.ilg *.log *.ind *.toc *.bak core
@@ -72,6 +80,7 @@ clean:
 	rm -rf man5
 	rm -rf man1
 
+.PHONY: install
 install: all
 	rm -rf $(DESTDIR)$(pkgdocdir)
 	$(INSTALL_DIR) $(DESTDIR)$(pkgdocdir)

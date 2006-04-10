@@ -23,6 +23,7 @@ CFLAGS += -D__XEN_INTERFACE_VERSION__=0x00030101
 %.o: %.cc
 	$(CC) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
+.PHONY: mk-symlinks
 mk-symlinks: LINUX_ROOT=$(XEN_ROOT)/linux-2.6-xen-sparse
 mk-symlinks:
 	mkdir -p xen

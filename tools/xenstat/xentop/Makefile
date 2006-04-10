@@ -14,6 +14,7 @@ XEN_ROOT=../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 ifneq ($(XENSTAT_XENTOP),y)
+.PHONY: all install xentop
 all install xentop:
 else
 
@@ -30,15 +31,19 @@ CFLAGS += -DGCC_PRINTF -Wall -Werror -I$(XEN_LIBXENSTAT)
 LDFLAGS += -L$(XEN_LIBXENSTAT)
 LDLIBS += -lxenstat -lncurses
 
+.PHONY: all
 all: xentop
 
+.PHONY: xentop
 xentop: xentop.o
 
+.PHONY: install
 install: xentop xentop.1
 	$(INSTALL_PROG) xentop $(DESTDIR)$(sbindir)/xentop
 	$(INSTALL_DATA) xentop.1 $(DESTDIR)$(man1dir)/xentop.1
 
 endif
 
+.PHONY: clean
 clean:
 	rm -f xentop xentop.o
