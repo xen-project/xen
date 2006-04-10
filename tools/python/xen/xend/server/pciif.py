@@ -115,7 +115,7 @@ class PciController(DevController):
             dev = PciDevice(domain, bus, slot, func)
         except Exception, e:
             raise VmError("pci: failed to locate device and "+
-                    "parse it's resources - %s"+str(e))
+                    "parse it's resources - "+str(e))
 
         if dev.driver!='pciback':
             raise VmError(("pci: PCI Backend does not own device "+ \
@@ -131,7 +131,7 @@ class PciController(DevController):
                     nr_ports = size, allow_access = True)
             if rc<0:
                 raise VmError(('pci: failed to configure I/O ports on device '+
-                            '%s - errno=%d')&(dev.name,rc))
+                            '%s - errno=%d')%(dev.name,rc))
             
         for (start, size) in dev.iomem:
             # Convert start/size from bytes to page frame sizes
@@ -147,7 +147,7 @@ class PciController(DevController):
                     allow_access = True)
             if rc<0:
                 raise VmError(('pci: failed to configure I/O memory on device '+
-                            '%s - errno=%d')&(dev.name,rc))
+                            '%s - errno=%d')%(dev.name,rc))
 
         if dev.irq>0:
             log.debug('pci: enabling irq %d'%dev.irq)
@@ -155,7 +155,7 @@ class PciController(DevController):
                     allow_access = True)
             if rc<0:
                 raise VmError(('pci: failed to configure irq on device '+
-                            '%s - errno=%d')&(dev.name,rc))
+                            '%s - errno=%d')%(dev.name,rc))
 
     def waitForBackend(self,devid):
         return (0, "ok - no hotplug")
