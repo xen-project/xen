@@ -40,29 +40,6 @@ patch-%.bz2:
 	@echo "Cannot find $(@F) in path $(LINUX_SRC_PATH)"
 	wget $(KERNEL_REPO)/pub/linux/kernel/v$(_LINUX_VDIR)/$(_LINUX_XDIR)/$(@F) -O./$@
 
-# Expand NetBSD release to NetBSD version
-NETBSD_RELEASE  ?= 2.0
-NETBSD_VER      ?= $(patsubst netbsd-%-xen-sparse,%,$(wildcard netbsd-$(NETBSD_RELEASE)*-xen-sparse))
-NETBSD_CVSSNAP  ?= 20050309
-
-# Setup NetBSD search path
-NETBSD_SRC_PATH	?= .:..
-vpath netbsd-%.tar.bz2 $(NETBSD_SRC_PATH)
-
-# download a pristine NetBSD tarball if there isn't one in NETBSD_SRC_PATH
-netbsd-%-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2:
-	@echo "Cannot find $@ in path $(NETBSD_SRC_PATH)"
-	wget http://www.cl.cam.ac.uk/Research/SRG/netos/xen/downloads/$@ -O./$@
-
-netbsd-%.tar.bz2: netbsd-%-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2
-	ln -fs $< $@
-
-ifeq ($(OS),linux)
-OS_VER = $(LINUX_VER)
-else
-OS_VER = $(NETBSD_VER)
-endif
-
 pristine-%: pristine-%/.valid-pristine
 	@true
 
@@ -134,16 +111,9 @@ linux-2.6-xen.patch: ref-linux-$(LINUX_VER)/.valid-ref
 	diff -Nurp $(patsubst ref%,pristine%,$(<D)) tmp-$@ > $@ || true
 	rm -rf tmp-$@
 
-%-mrproper: %-mrproper-extra
+%-mrproper:
 	rm -rf pristine-$(*)* ref-$(*)* $*.tar.bz2
 	rm -rf $*-xen.patch
-
-netbsd-%-mrproper-extra:
-	rm -rf netbsd-$*-tools netbsd-$*-tools.tar.bz2
-	rm -f netbsd-$*-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2
-
-%-mrproper-extra:
-	@: # do nothing
 
 config-update-pae:
 ifeq ($(XEN_TARGET_X86_PAE),y)
