@@ -748,6 +748,7 @@ GLOBAL_ENTRY(fast_access_reflect)
 	adds r21=XSI_RR0_OFS-XSI_PSR_IC_OFS,r18 ;;
 	shladd r22=r22,3,r21;;
 	ld8 r22=[r22];;
+	and r22=~3,r22;;
 	st8 [r23]=r22;;
 	br.cond.sptk.many fast_reflect;;
 
