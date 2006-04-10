@@ -48,6 +48,12 @@ xc_plan9_build(int xc_handle,
     PERROR("xc_plan9_build not implemented\n");
     return -1;
 }
+/*  
+    VMM uses put_user to copy pfn_list to guest buffer, this maybe fail,
+    VMM don't handle this now.
+    This method will touch guest buffer to make sure the buffer's mapping
+    is tracked by VMM,
+  */
 
 int xc_ia64_get_pfn_list(int xc_handle,
                          uint32_t domid, 
@@ -56,27 +62,48 @@ int xc_ia64_get_pfn_list(int xc_handle,
                          unsigned int nr_pages)
 {
     dom0_op_t op;
-    int ret;
-    unsigned long max_pfns = ((unsigned long)start_page << 32) | nr_pages;
+    int num_pfns,ret;
+    unsigned int __start_page, __nr_pages;
+    unsigned long max_pfns;
+    unsigned long *__pfn_buf;
+    __start_page = start_page;
+    __nr_pages = nr_pages;
+    __pfn_buf = pfn_buf;
+  
+    while(__nr_pages){
+        max_pfns = ((unsigned long)__start_page << 32) | __nr_pages;
+        op.cmd = DOM0_GETMEMLIST;
+        op.u.getmemlist.domain   = (domid_t)domid;
+        op.u.getmemlist.max_pfns = max_pfns;
+        op.u.getmemlist.buffer   = __pfn_buf;
 
-    op.cmd = DOM0_GETMEMLIST;
-    op.u.getmemlist.domain   = (domid_t)domid;
-    op.u.getmemlist.max_pfns = max_pfns;
-    op.u.getmemlist.buffer   = pfn_buf;
+        if ( (max_pfns != -1UL)
+		    && mlock(__pfn_buf, __nr_pages * sizeof(unsigned long)) != 0 )
+        {
+            PERROR("Could not lock pfn list buffer");
+            return -1;
+        }    
 
-    if ( (max_pfns != -1UL)
-		&& mlock(pfn_buf, nr_pages * sizeof(unsigned long)) != 0 )
-    {
-        PERROR("Could not lock pfn list buffer");
-        return -1;
+        ret = do_dom0_op(xc_handle, &op);
+
+        if (max_pfns != -1UL)
+        	(void)munlock(__pfn_buf, __nr_pages * sizeof(unsigned long));
+
+        if (max_pfns == -1UL)
+            return 0;
+        
+        num_pfns = op.u.getmemlist.num_pfns;
+        __start_page += num_pfns;
+        __nr_pages -= num_pfns;
+        __pfn_buf += num_pfns;
+
+        if (ret < 0) 
+            // dummy write to make sure this tlb mapping is tracked by VMM 
+            *__pfn_buf = 0;
+        else 
+            return nr_pages;    
     }    
-
-    ret = do_dom0_op(xc_handle, &op);
-
-    if (max_pfns != -1UL)
-    	(void)munlock(pfn_buf, nr_pages * sizeof(unsigned long));
-
-    return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
+    return nr_pages;
 }
 
 long xc_get_max_pages(int xc_handle, uint32_t domid)
