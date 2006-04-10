@@ -115,18 +115,6 @@ distclean: clean
 # Linux name for GNU distclean
 mrproper: distclean
 
-install-logging: LOGGING=logging-0.4.9.2
-install-logging:
-	[ -f $(LOGGING).tar.gz ] || wget http://www.red-dove.com/$(LOGGING).tar.gz
-	tar -zxf $(LOGGING).tar.gz
-	cd $(LOGGING) && python setup.py install
-
-# handy target to upgrade iptables (use rpm or apt-get in preference)
-install-iptables:
-	wget http://www.netfilter.org/files/iptables-1.2.11.tar.bz2
-	tar -jxf iptables-1.2.11.tar.bz2
-	$(MAKE) -C iptables-1.2.11 PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install
-
 help:
 	@echo 'Installation targets:'
 	@echo '  install          - build and install everything'
@@ -153,10 +141,6 @@ help:
 	@echo '                     build trees'
 	@echo '  kdelete          - delete guest kernel build trees'
 	@echo '  kclean           - clean guest kernel build trees'
-	@echo ''
-	@echo 'Dependency installation targets:'
-	@echo '  install-logging  - install the Python Logging package'
-	@echo '  install-iptables - install iptables tools'
 	@echo ''
 	@echo 'Miscellaneous targets:'
 	@echo '  prep-kernels     - prepares kernel directories, does not build'
