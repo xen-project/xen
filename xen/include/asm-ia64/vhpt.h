@@ -122,6 +122,8 @@ extern void vhpt_init (void);
 extern void zero_vhpt_stats(void);
 extern int dump_vhpt_stats(char *buf);
 extern void vhpt_flush_address(unsigned long vadr, unsigned long addr_range);
+extern void vhpt_flush_address_remote(int cpu, unsigned long vadr,
+				      unsigned long addr_range);
 extern void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte,
 				 unsigned long logps);
 extern void vhpt_insert (unsigned long vadr, unsigned long ptr,

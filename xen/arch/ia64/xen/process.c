@@ -287,12 +287,24 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 		return;
 	}
 
+ again:
 	fault = vcpu_translate(current,address,is_data,0,&pteval,&itir,&iha);
-	if (fault == IA64_NO_FAULT) {
+	if (fault == IA64_NO_FAULT || fault == IA64_USE_TLB) {
 		pteval = translate_domain_pte(pteval,address,itir);
 		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,(itir>>2)&0x3f);
+		if (fault == IA64_USE_TLB && !current->arch.dtlb.pte.p) {
+			/* dtlb has been purged in-between.  This dtlb was
+			   matching.  Undo the work.  */
+#ifdef VHPT_GLOBAL
+			vhpt_flush_address (address, 1);
+#endif
+			ia64_ptcl(address, 1<<2);
+			ia64_srlz_i();
+			goto again;
+		}
 		return;
 	}
+
 	if (!user_mode (regs)) {
 		/* The fault occurs inside Xen.  */
 		if (!ia64_done_with_exception(regs)) {

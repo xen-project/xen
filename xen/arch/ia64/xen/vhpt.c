@@ -75,6 +75,20 @@ void vhpt_flush_address(unsigned long vadr, unsigned long addr_range)
 		vadr += PAGE_SIZE;
 	}
 }
+
+void vhpt_flush_address_remote(int cpu,
+			       unsigned long vadr, unsigned long addr_range)
+{
+	while ((long)addr_range > 0) {
+		/* Get the VHPT entry.  */
+		unsigned int off = ia64_thash(vadr) - VHPT_ADDR;
+		volatile struct vhpt_lf_entry *v;
+		v =__va(per_cpu(vhpt_paddr, cpu) + off);
+		v->ti_tag = INVALID_TI_TAG;
+		addr_range -= PAGE_SIZE;
+		vadr += PAGE_SIZE;
+	}
+}
 #endif
 
 static void vhpt_map(unsigned long pte)

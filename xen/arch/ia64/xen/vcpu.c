@@ -1253,17 +1253,23 @@ unsigned long recover_to_break_fault_count = 0;
 int warn_region0_address = 0; // FIXME later: tie to a boot parameter?
 
 // FIXME: also need to check && (!trp->key || vcpu_pkr_match(trp->key))
-static inline int vcpu_match_tr_entry(TR_ENTRY *trp, UINT64 ifa, UINT64 rid)
+static inline int vcpu_match_tr_entry_no_p(TR_ENTRY *trp, UINT64 ifa, UINT64 rid)
 {
-	return trp->p && trp->rid == rid 
+	return trp->rid == rid 
 		&& ifa >= trp->vadr
 		&& ifa <= (trp->vadr + (1L << trp->ps) - 1);
+}
+
+static inline int vcpu_match_tr_entry(TR_ENTRY *trp, UINT64 ifa, UINT64 rid)
+{
+	return trp->pte.p && vcpu_match_tr_entry_no_p(trp, ifa, rid);
 }
 
 IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, BOOLEAN in_tpa, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
 {
 	unsigned long region = address >> 61;
-	unsigned long pta, pte, rid, rr;
+	unsigned long pta, rid, rr;
+	union pte_flags pte;
 	int i;
 	TR_ENTRY *trp;
 
@@ -1283,6 +1289,7 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, BOOLEAN in
 			 */           
 			printk("vcpu_translate: bad physical address: 0x%lx\n",
 			       address);
+
 		} else {
 			*pteval = (address & _PAGE_PPN_MASK) | __DIRTY_BITS |
 			          _PAGE_PL_2 | _PAGE_AR_RWX;
@@ -1307,7 +1314,7 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, BOOLEAN in
 		if (vcpu_quick_region_check(vcpu->arch.dtr_regions,address)) {
 			for (trp = vcpu->arch.dtrs, i = NDTRS; i; i--, trp++) {
 				if (vcpu_match_tr_entry(trp,address,rid)) {
-					*pteval = trp->page_flags;
+					*pteval = trp->pte.val;
 					*itir = trp->itir;
 					tr_translate_count++;
 					return IA64_NO_FAULT;
@@ -1320,7 +1327,7 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, BOOLEAN in
 		if (vcpu_quick_region_check(vcpu->arch.itr_regions,address)) {
 			for (trp = vcpu->arch.itrs, i = NITRS; i; i--, trp++) {
 				if (vcpu_match_tr_entry(trp,address,rid)) {
-					*pteval = trp->page_flags;
+					*pteval = trp->pte.val;
 					*itir = trp->itir;
 					tr_translate_count++;
 					return IA64_NO_FAULT;
@@ -1332,12 +1339,14 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, BOOLEAN in
 	/* check 1-entry TLB */
 	// FIXME?: check dtlb for inst accesses too, else bad things happen?
 	trp = &vcpu->arch.dtlb;
-	if (/* is_data && */ vcpu_match_tr_entry(trp,address,rid)) {
-		if (vcpu->domain==dom0 && !in_tpa) *pteval = trp->page_flags;
+	pte = trp->pte;
+	if (/* is_data && */ pte.p
+	    && vcpu_match_tr_entry_no_p(trp,address,rid)) {
+		if (vcpu->domain==dom0 && !in_tpa) *pteval = pte.val;
 		else *pteval = vcpu->arch.dtlb_pte;
 		*itir = trp->itir;
 		dtlb_translate_count++;
-		return IA64_NO_FAULT;
+		return IA64_USE_TLB;
 	}
 
 	/* check guest VHPT */
@@ -1358,7 +1367,8 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, BOOLEAN in
 	if (((address ^ pta) & ((itir_mask(pta) << 3) >> 3)) == 0)
 		return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
 
-	if (__copy_from_user(&pte, (void *)(*iha), sizeof(pte)) != 0)
+	if (!__access_ok (*iha)
+	    || __copy_from_user(&pte, (void *)(*iha), sizeof(pte)) != 0)
 		// virtual VHPT walker "missed" in TLB
 		return IA64_VHPT_FAULT;
 
@@ -1367,12 +1377,12 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, BOOLEAN in
 	* instead of inserting a not-present translation, this allows
 	* vectoring directly to the miss handler.
 	*/
-	if (!(pte & _PAGE_P))
+	if (!pte.p)
 		return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
 
 	/* found mapping in guest VHPT! */
 	*itir = rr & RR_PS_MASK;
-	*pteval = pte;
+	*pteval = pte.val;
 	vhpt_translate_count++;
 	return IA64_NO_FAULT;
 }
@@ -1383,7 +1393,7 @@ IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 	IA64FAULT fault;
 
 	fault = vcpu_translate(vcpu, vadr, TRUE, TRUE, &pteval, &itir, &iha);
-	if (fault == IA64_NO_FAULT)
+	if (fault == IA64_NO_FAULT || fault == IA64_USE_TLB)
 	{
 		mask = itir_mask(itir);
 		*padr = (pteval & _PAGE_PPN_MASK & mask) | (vadr & ~mask);
@@ -1670,24 +1680,27 @@ IA64FAULT vcpu_set_pkr(VCPU *vcpu, UINT64 reg, UINT64 val)
 
 static inline void vcpu_purge_tr_entry(TR_ENTRY *trp)
 {
-	trp->p = 0;
+	trp->pte.val = 0;
 }
 
 static void vcpu_set_tr_entry(TR_ENTRY *trp, UINT64 pte, UINT64 itir, UINT64 ifa)
 {
 	UINT64 ps;
+	union pte_flags new_pte;
 
 	trp->itir = itir;
 	trp->rid = VCPU(current,rrs[ifa>>61]) & RR_RID_MASK;
-	trp->p = 1;
 	ps = trp->ps;
-	trp->page_flags = pte;
-	if (trp->pl < 2) trp->pl = 2;
+	new_pte.val = pte;
+	if (new_pte.pl < 2) new_pte.pl = 2;
 	trp->vadr = ifa & ~0xfff;
 	if (ps > 12) { // "ignore" relevant low-order bits
-		trp->ppn &= ~((1UL<<(ps-12))-1);
+		new_pte.ppn &= ~((1UL<<(ps-12))-1);
 		trp->vadr &= ~((1UL<<ps)-1);
 	}
+
+	/* Atomic write.  */
+	trp->pte.val = new_pte.val;
 }
 
 IA64FAULT vcpu_itr_d(VCPU *vcpu, UINT64 slot, UINT64 pte,
@@ -1852,19 +1865,6 @@ IA64FAULT vcpu_ptc_g(VCPU *vcpu, UINT64 vadr, UINT64 addr_range)
 	return IA64_ILLOP_FAULT;
 }
 
-#if defined(CONFIG_XEN_SMP) && defined(VHPT_GLOBAL)
-struct ptc_ga_args {
-	unsigned long vadr;
-	unsigned long addr_range;
-};
-
-static void ptc_ga_remote_func (void *varg)
-{
-	struct ptc_ga_args *args = (struct ptc_ga_args *)varg;
-	vhpt_flush_address (args->vadr, args->addr_range);
-}
-#endif
-
 IA64FAULT vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 {
 	// FIXME: validate not flushing Xen addresses
@@ -1875,32 +1875,20 @@ IA64FAULT vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 #ifdef CONFIG_XEN_SMP
 	struct domain *d = vcpu->domain;
 	struct vcpu *v;
-	struct ptc_ga_args args;
 
-	args.vadr = vadr;
-	args.addr_range = addr_range;
-
-	/* This method is very conservative and should be optimized:
-	   - maybe IPI calls can be avoided,
-	   - a processor map can be built to avoid duplicate purge
-	   - maybe ptc.ga can be replaced by ptc.l+invala.
-	   Hopefully, it has no impact when UP.
-	*/
 	for_each_vcpu (d, v) {
-		if (v != vcpu) {
-			/* Purge tc entry.
-			   Can we do this directly ?  Well, this is just a
-			   single atomic write.  */
-			vcpu_purge_tr_entry(&PSCBX(v,dtlb));
-			vcpu_purge_tr_entry(&PSCBX(v,itlb));
+		if (v == vcpu)
+			continue;
+
+		/* Purge TC entries.
+		   FIXME: clear only if match.  */
+		vcpu_purge_tr_entry(&PSCBX(vcpu,dtlb));
+		vcpu_purge_tr_entry(&PSCBX(vcpu,itlb));
+
 #ifdef VHPT_GLOBAL
-			/* Flush VHPT on remote processors.
-			   FIXME: invalidate directly the entries? */
-			smp_call_function_single
-				(v->processor, &ptc_ga_remote_func,
-				 &args, 0, 1);
+		/* Invalidate VHPT entries.  */
+		vhpt_flush_address_remote (v->processor, vadr, addr_range);
 #endif
-		}
 	}
 #endif
 
