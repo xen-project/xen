@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2005 Rusty Russell, IBM Corporation
  * Copyright (C) 2005 Mike Wray, Hewlett-Packard
- * Copyright (C) 2005 XenSource Ltd
+ * Copyright (C) 2005, 2006 XenSource Ltd
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
@@ -883,7 +883,7 @@ static int all_devices_ready_(struct device *dev, void *data)
 	int *result = data;
 
 	if (xendev->state != XenbusStateConnected) {
-		result = 0;
+		*result = 0;
 		return 1;
 	}
 
@@ -902,8 +902,6 @@ static int all_devices_ready(void)
 
 void xenbus_probe(void *unused)
 {
-	int i;
-
 	BUG_ON((xenstored_ready <= 0));
 
 	/* Enumerate devices in xenstore. */
@@ -916,28 +914,6 @@ void xenbus_probe(void *unused)
 
 	/* Notify others that xenstore is up */
 	notifier_call_chain(&xenstore_chain, 0, NULL);
-
-	/* On a 10 second timeout, waiting for all devices currently
-	   configured.  We need to do this to guarantee that the filesystems
-	   and / or network devices needed for boot are available, before we
-	   can allow the boot to proceed.
-
-	   A possible improvement here would be to have the tools add a
-	   per-device flag to the store entry, indicating whether it is needed
-	   at boot time.  This would allow people who knew what they were
-	   doing to accelerate their boot slightly, but of course needs tools
-	   or manual intervention to set up those flags correctly.
-	 */
-	for (i = 0; i < 10 * HZ; i++) {
-		if (all_devices_ready())
-			return;
-
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(1);
-	}
-
-	printk(KERN_WARNING
-	       "XENBUS: Timeout connecting to devices!\n");
 }
 
 
@@ -1071,6 +1047,41 @@ static int __init xenbus_probe_init(void)
 }
 
 postcore_initcall(xenbus_probe_init);
+
+
+/*
+ * On a 10 second timeout, wait for all devices currently configured.  We need
+ * to do this to guarantee that the filesystems and / or network devices
+ * needed for boot are available, before we can allow the boot to proceed.
+ *
+ * This needs to be on a late_initcall, to happen after the frontend device
+ * drivers have been initialised, but before the root fs is mounted.
+ *
+ * A possible improvement here would be to have the tools add a per-device
+ * flag to the store entry, indicating whether it is needed at boot time.
+ * This would allow people who knew what they were doing to accelerate their
+ * boot slightly, but of course needs tools or manual intervention to set up
+ * those flags correctly.
+ */
+static int __init wait_for_devices(void)
+{
+	int i;
+
+	for (i = 0; i < 10 * HZ; i++) {
+		if (all_devices_ready()) {
+			return;
+		}
+
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(1);
+	}
+
+	printk(KERN_WARNING
+	       "XENBUS: Timeout connecting to devices!\n");
+}
+
+late_initcall(wait_for_devices);
+
 
 /*
  * Local variables:
