@@ -130,6 +130,7 @@ static inline void * phys_to_virt(unsigned long address)
  */
 #define page_to_pseudophys(page) ((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
 #define page_to_phys(page)	 (phys_to_machine(page_to_pseudophys(page)))
+#define page_to_bus(page)	 (phys_to_machine(page_to_pseudophys(page)))
 
 #define bio_to_pseudophys(bio)	 (page_to_pseudophys(bio_page((bio))) + \
 				  (unsigned long) bio_offset((bio)))
