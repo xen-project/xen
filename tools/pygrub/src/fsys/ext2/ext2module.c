@@ -228,7 +228,10 @@ ext2_fs_open (Ext2Fs *fs, PyObject *args, PyObject *kwargs)
     }
 
 #ifdef HAVE_EXT2FS_OPEN2
-    if (offset != 0) {
+    if (offset == 0) {
+        offsetopt[0] = '\0';
+    }
+    else {
         snprintf(offsetopt, 29, "offset=%d", offset);
     }
 

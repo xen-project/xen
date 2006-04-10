@@ -33,6 +33,7 @@ LIBS       += unix str
 
 # bc = byte-code, dc = debug byte-code
 # patches = patch linux domU source code
+.PHONY: all 
 all : dc
 
 SOURCES    += pdb_caml_xc.c 
@@ -51,5 +52,6 @@ RESULT      = pdb
 include $(OCAMLMAKEFILE)
 
 PATCHDIR    = ./linux-2.6-patches
+.PHONY: patches 
 patches :
 	make -C $(PATCHDIR) patches

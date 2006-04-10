@@ -8,9 +8,13 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 XEN_ROOT=../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
+.PHONY: all
 all: build
+
+.PHONY: build
 build: mbootpack
 
+.PHONY: install
 install: build
 	$(INSTALL_PROG) mbootpack $(DESTDIR)/usr/bin
 
@@ -33,6 +37,7 @@ DEPS     = .*.d
 mbootpack: $(OBJS)
 	$(HOSTCC) -o $@ $(filter-out %.a, $^)
 
+.PHONY: clean
 clean:
 	$(RM) mbootpack *.o $(DEPS) bootsect setup bzimage_header.c bin2c
 
@@ -60,7 +65,6 @@ buildimage.c: bzimage_header.c
 %.o: %.c
 	$(HOSTCC) $(DEPFLAGS) $(CFLAGS) $(INCS) $(DEFS) -c $< -o $@
 
-.PHONY: all clean gdb
 .PRECIOUS: $(OBJS) $(OBJS:.o=.c) $(DEPS)
 .SUFFIXES: 
 

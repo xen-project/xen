@@ -28,9 +28,13 @@ ifeq ($(XEN_TARGET_ARCH),x86_64)
 LIBBIN  += xenctx
 endif
 
+.PHONY: all
 all: build
+
+.PHONY: build
 build: $(BIN) $(LIBBIN)
 
+.PHONY: install
 install: build
 	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
 	[ -z "$(LIBBIN)" ] || [ -d $(DESTDIR)/usr/$(LIBDIR)/xen/bin ] || \
@@ -44,6 +48,7 @@ install: build
 	$(INSTALL_DATA) $(MAN1) $(DESTDIR)/usr/share/man/man1
 	$(INSTALL_DATA) $(MAN8) $(DESTDIR)/usr/share/man/man8
 
+.PHONY: clean
 clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) $(LIBBIN)
 

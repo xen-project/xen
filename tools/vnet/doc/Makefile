@@ -23,8 +23,10 @@ DOC_MAN5	:= $(patsubst man/%.pod.5,man5/%.5,$(DOC_MAN5SRC))
 
 .PHONY: all man clean install
 
+.PHONY: all
 all: man
 
+.PHONY: man
 man:
 	@if which $(POD2MAN) 1>/dev/null 2>/dev/null; then \
 	$(MAKE) $(DOC_MAN1) $(DOC_MAN5); fi
@@ -39,10 +41,12 @@ man5/%.5: man/%.pod.5 Makefile
 	$(POD2MAN) --release=$(VERSION) --name=`echo $@ | sed 's/^man5.//'| \
 		sed 's/.5//'` -s 5 -c $(HEADER) $< $@
 
+.PHONY: clean
 clean:
 	@$(RM) -rf man5
 	@$(RM) -rf man1
 
+.PHONY:  install
  install: all
 	$(INSTALL_DIR) $(DESTDIR)$(MAN_DIR)
 	$(CP) -dR man1 $(DESTDIR)$(MAN_DIR)

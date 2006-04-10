@@ -3,10 +3,13 @@ BIOS_BUILDS = BIOS-bochs-latest
 #BIOS_BUILDS += BIOS-bochs-4-processors
 #BIOS_BUILDS += BIOS-bochs-8-processors
 
+.PHONY: all
 all: bios
 
+.PHONY: bios
 bios: biossums ${BIOS_BUILDS}
 
+.PHONY: clean
 clean:
 	rm -f  *.o *.a *.s rombios.bin _rombios*_.c
 	rm -f  as86-sym.txt ld86-sym.txt 

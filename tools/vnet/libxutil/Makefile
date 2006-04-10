@@ -42,8 +42,10 @@ LIB      += libxutil.so.$(MAJOR)
 LIB      += libxutil.so.$(MAJOR).$(MINOR)
 LIB      += libxutil.a
 
+.PHONY: all
 all: build
 
+.PHONY: build
 build: #check-for-zlib
 	$(MAKE) $(LIB)
 
@@ -61,6 +63,7 @@ libxutil.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
 libxutil.a: $(LIB_OBJS)
 	$(AR) rc $@ $^
 
+.PHONY: check-for-zlib
 check-for-zlib:
 	@if [ ! -e /usr/include/zlib.h ]; then \
 	echo "***********************************************************"; \
@@ -69,6 +72,7 @@ check-for-zlib:
 	false; \
 	fi
 
+.PHONY: install
 install: build
 	[ -d $(DESTDIR)/usr/$(LIBDIR) ] || $(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_PROG) libxutil.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
@@ -76,6 +80,7 @@ install: build
 	ln -sf libxutil.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxutil.so.$(MAJOR)
 	ln -sf libxutil.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxutil.so
 
+.PHONY: clean
 clean:
 	-@$(RM) *.a *.so* *.o *.opic *.rpm 
 	-@$(RM) *~

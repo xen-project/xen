@@ -41,7 +41,7 @@ def diagnose(dom):
     global dompath
     
     try:
-        domain = server.xend_domain(dom)
+        domain = server.xend.domain(dom)
         state = sxp.child_value(domain, 'state')
         domid = int(sxp.child_value(domain, 'domid'))
         name = sxp.child_value(domain, 'name')

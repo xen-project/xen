@@ -8,9 +8,8 @@ LINUX_DIR    = linux-$(LINUX_VER)-$(EXTRAVERSION)
 
 include buildconfigs/Rules.mk
 
-.PHONY: build clean delete
-
 # The real action starts here!
+.PHONY: build
 build: $(LINUX_DIR)/include/linux/autoconf.h
 	if grep "^CONFIG_MODULES=" $(LINUX_DIR)/.config ; then \
 	    $(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) modules ; \
@@ -39,14 +38,18 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-linux-$(LINUX_VER)/.valid-ref
 	  rm -f Makefile ; mv Mk.tmp Makefile )
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) oldconfig
 
+.PHONY: prep
 prep: $(LINUX_DIR)/include/linux/autoconf.h
 
+.PHONY: config
 config: CONFIGMODE = menuconfig
 config: $(LINUX_DIR)/include/linux/autoconf.h
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) $(CONFIGMODE)
 
+.PHONY: clean
 clean::
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) clean
 
+.PHONY: delete
 delete: 
 	rm -rf tmp-linux-$(LINUX_VER) $(LINUX_DIR) 

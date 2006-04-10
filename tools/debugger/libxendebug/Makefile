@@ -26,10 +26,14 @@ PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS))
 LIB      := libxendebug.a libxendebug.so
 LIB      += libxendebug.so.$(MAJOR) libxendebug.so.$(MAJOR).$(MINOR)
 
+.PHONY: all
 all: build
+
+.PHONY: build
 build:
 	$(MAKE) $(LIB)
 
+.PHONY: install
 install: build
 	[ -d $(DESTDIR)/usr/$(LIBDIR) ] || $(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)
 	[ -d $(DESTDIR)/usr/include ] || $(INSTALL_DIR) $(DESTDIR)/usr/include
@@ -39,14 +43,15 @@ install: build
 	ln -sf libxendebug.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxendebug.so
 	$(INSTALL_DATA) xendebug.h $(DESTDIR)/usr/include
 
-.PHONY: TAGS clean rpm install all
-
+.PHONY: TAGS
 TAGS:
 	etags -t $(SRCS) *.h
 
+.PHONY: clean
 clean:
 	rm -rf *.a *.so* *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen
 
+.PHONY: rpm
 rpm: build
 	rm -rf staging
 	mkdir staging

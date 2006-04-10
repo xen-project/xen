@@ -77,5 +77,6 @@ boot/mkelf32: boot/mkelf32.c
 
 shadow_guest32.o: shadow.c
 
-clean:: FORCE
+.PHONY: clean
+clean::
 	rm -f asm-offsets.s xen.lds boot/*.o boot/*~ boot/core boot/mkelf32

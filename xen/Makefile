@@ -7,17 +7,21 @@ export XEN_FULLVERSION  := $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION)
 
 export BASEDIR := $(CURDIR)
 
+.PHONY: default
 default: build
 
 ifeq ($(XEN_ROOT),)
 
+.PHONY: build install clean
 build install clean:
 	make -f Rules.mk $@
 
 else
 
+.PHONY: build
 build: $(TARGET).gz
 
+.PHONY: install
 install: $(TARGET).gz
 	[ -d $(DESTDIR)/boot ] || $(INSTALL_DIR) $(DESTDIR)/boot
 	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_FULLVERSION).gz
@@ -31,6 +35,7 @@ install: $(TARGET).gz
 	$(INSTALL_DATA) include/public/io/*.h $(DESTDIR)/usr/include/xen/io
 	$(INSTALL_DATA) include/public/COPYING $(DESTDIR)/usr/include/xen
 
+.PHONY: clean
 clean:: delete-unfresh-files
 	$(MAKE) -C tools clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C common clean
@@ -43,9 +48,11 @@ clean:: delete-unfresh-files
 
 endif
 
+.PHONY: install
 dist: install
 
-debug: FORCE
+.PHONY: debug
+debug:
 	objdump -D -S $(TARGET)-syms > $(TARGET).s
 
 $(TARGET).gz: $(TARGET)
@@ -63,6 +70,7 @@ $(TARGET): delete-unfresh-files
 
 # drivers/char/console.o contains static banner/compile info. Blow it away.
 # Don't refresh these files during e.g., 'sudo make install'
+.PHONY: delete-unfresh-files
 delete-unfresh-files:
 	@if [ ! -r include/xen/compile.h -o -O include/xen/compile.h ]; then \
 		rm -f include/xen/{banner,compile}.h; \
@@ -119,8 +127,6 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 	  echo ""; \
 	  echo "#endif") <$< >$@
 
-.PHONY: default debug build install dist clean delete-unfresh-files TAGS tags
-
 SUBDIRS = acm arch/$(TARGET_ARCH) common drivers 
 define all_sources
     ( find include/asm-$(TARGET_ARCH) -name SCCS -prune -o -name '*.h' -print; \
@@ -128,12 +134,20 @@ define all_sources
             -name config \) -prune -o -name '*.h' -print; \
       find $(SUBDIRS) -name SCCS -prune -o -name '*.[chS]' -print )
 endef
+
+.PHONY: TAGS
 TAGS: 
 	$(all_sources) | etags -
+
+.PHONY: tags
 tags: 
 	$(all_sources) | xargs ctags
+
+.PHONY: cscope
 cscope: 
 	$(all_sources) > cscope.files
 	cscope -k -b -q
+
+.PHONY: MAP
 MAP:
 	$(NM) $(TARGET) | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map

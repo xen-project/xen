@@ -50,11 +50,16 @@ HOTPLUGS=install-hotplug
 endif
 endif
 
+.PHONY: all
 all:
+
+.PHONY: build
 build:
 
+.PHONY: install
 install: all install-initd install-configs install-scripts $(HOTPLUGS)
 
+.PHONY: install-initd
 install-initd:
 	[ -d $(DESTDIR)/etc/init.d ] || $(INSTALL_DIR) $(DESTDIR)/etc/init.d
 	[ -d $(DESTDIR)/etc/sysconfig ] || $(INSTALL_DIR) $(DESTDIR)/etc/sysconfig
@@ -62,6 +67,7 @@ install-initd:
 	$(INSTALL_PROG) $(XENDOMAINS_INITD) $(DESTDIR)/etc/init.d
 	$(INSTALL_PROG) $(XENDOMAINS_SYSCONFIG) $(DESTDIR)/etc/sysconfig/xendomains
 
+.PHONY: install-configs
 install-configs: $(XEN_CONFIGS)
 	[ -d $(DESTDIR)$(XEN_CONFIG_DIR) ] || \
 		$(INSTALL_DIR) $(DESTDIR)$(XEN_CONFIG_DIR)
@@ -72,6 +78,7 @@ install-configs: $(XEN_CONFIGS)
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_CONFIG_DIR); \
 	done
 
+.PHONY: install-scripts
 install-scripts:
 	[ -d $(DESTDIR)$(XEN_SCRIPT_DIR) ] || \
 		$(INSTALL_DIR) $(DESTDIR)$(XEN_SCRIPT_DIR)
@@ -84,6 +91,7 @@ install-scripts:
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_SCRIPT_DIR); \
 	done
 
+.PHONY: install-hotplug
 install-hotplug:
 	[ -d $(DESTDIR)$(XEN_HOTPLUG_DIR) ] || \
 		$(INSTALL_DIR) $(DESTDIR)$(XEN_HOTPLUG_DIR)
@@ -92,6 +100,7 @@ install-hotplug:
 	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_HOTPLUG_DIR); \
 	done
 
+.PHONY: install-udev
 install-udev:
 	[ -d $(DESTDIR)$(UDEV_RULES_DIR) ] || \
 		$(INSTALL_DIR) $(DESTDIR)$(UDEV_RULES_DIR)/rules.d
@@ -102,4 +111,5 @@ install-udev:
 	        ln -sf ../$$i . ) \
 	done
 
+.PHONY: clean
 clean:

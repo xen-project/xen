@@ -75,7 +75,8 @@ xen.lds.s: xen/xen.lds.S
 	$(CC) -E $(CPPFLAGS) -P -DXEN $(AFLAGS) \
 		-o xen.lds.s xen/xen.lds.S
 
-clean:: FORCE
+.PHONY: clean
+clean::
 	rm -f *.o *~ core  xen.lds.s $(BASEDIR)/include/asm-ia64/.offsets.h.stamp asm-offsets.s map.out
 	rm -f asm-xsi-offsets.s $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
 	rm -f $(BASEDIR)/System.map

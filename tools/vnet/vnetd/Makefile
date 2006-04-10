@@ -19,6 +19,7 @@
 VNET_ROOT = $(shell cd .. && pwd)
 include $(VNET_ROOT)/Make.env
 
+.PHONY: all
 all: vnetd
 
 #----------------------------------------------------------------------------
@@ -104,10 +105,12 @@ VNETD_LIBS:= $(GC_LIB_A)
 vnetd: $(VNETD_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(VNETD_LIBS) -ldl -lpthread
 
+.PHONY: install
 install: vnetd
 	mkdir -p $(DESTDIR)$(VNETD_INSTALL_DIR)
 	install -m 0755 vnetd $(DESTDIR)$(VNETD_INSTALL_DIR)
 
+.PHONY: clean
 clean:
 	-@$(RM) *.a *.o *~
 	-@$(RM) vnetd

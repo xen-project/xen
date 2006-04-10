@@ -19,6 +19,7 @@ LDFLAGS+=-static
 endif
 #DOCS=qemu-doc.html qemu-tech.html qemu.1
 
+.PHONY: all
 all: $(DOCS) HEADERS
 	for d in $(TARGET_DIRS); do \
 	$(MAKE) -C $$d $@ || exit 1 ; \
@@ -30,6 +31,7 @@ qemu-img: qemu-img.c block.c block-cow.c block-qcow.c aes.c block-vmdk.c block-c
 dyngen$(EXESUF): dyngen.c
 	$(HOST_CC) $(CFLAGS) $(DEFINES) -o $@ $^
 
+.PHONY: clean
 clean:
 # avoid old build problems by removing potentially incorrect old files
 	rm -f config.mak config.h op-i386.h opc-i386.h gen-op-i386.h op-arm.h opc-arm.h gen-op-arm.h 
@@ -41,6 +43,7 @@ clean:
 	rm -f config-host.mak config-host.h
 	rm -f keysym_adapter_sdl.h keysym_adapter_vnc.h
 
+.PHONY: distclean
 distclean: clean
 	rm -f config-host.mak config-host.h
 	rm -f keysym_adapter_sdl.h keysym_adapter_vnc.h
@@ -52,6 +55,7 @@ KEYMAPS=da     en-gb  et  fr     fr-ch  is  lt  modifiers  no  pt-br  sv \
 ar      de     en-us  fi  fr-be  hr     it  lv  nl         pl  ru     th \
 common  de-ch  es     fo  fr-ca  hu     ja  mk  nl-be      pt  sl     tr
 
+.PHONY: install
 install: all 
 	mkdir -p "$(bindir)"
 	mkdir -p "$(DESTDIR)/$(datadir)"
@@ -62,9 +66,11 @@ install: all
         done
 
 # various test targets
+.PHONY: test speed test2
 test speed test2: all
 	$(MAKE) -C tests $@
 
+.PHONY: TAGS
 TAGS: 
 	etags *.[ch] tests/*.[ch]
 
@@ -79,6 +85,7 @@ qemu.1: qemu-doc.texi
 FILE=qemu-$(shell cat VERSION)
 
 # tar release (use 'make -k tar' on a checkouted tree)
+.PHONY: tar
 tar:
 	rm -rf /tmp/$(FILE)
 	cp -r . /tmp/$(FILE)
@@ -86,6 +93,7 @@ tar:
 	rm -rf /tmp/$(FILE)
 
 # generate a binary distribution
+.PHONY: tarbin
 tarbin:
 	( cd $(DESTDIR) ; tar zcvf ~/qemu-$(VERSION)-i386.tar.gz \
 	$(DESTDIR)/$(bindir)/qemu $(DESTDIR)/$(bindir)/qemu-fast \
@@ -100,6 +108,7 @@ ifneq ($(wildcard .depend),)
 include .depend
 endif
 
+.PHONY: HEADERS
 HEADERS:
 
 ifdef CONFIG_SDL

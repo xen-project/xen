@@ -32,6 +32,8 @@ LDLIBS			= -L$(XEN_LIBXC) -lxenguest -lxenctrl
 
 .PHONY: all
 all: build
+
+.PHONY: build
 build: $(PROGRAMS)
 
 $(PROGRAMS): %: %.o
@@ -44,6 +46,7 @@ install: build
 	$(INSTALL_PROG) $(PROGRAMS) $(DESTDIR)$(PROGRAMS_INSTALL_DIR)
 
 
+.PHONY: clean
 clean:
 	$(RM) *.o $(PROGRAMS)
 	$(RM) $(PROG_DEP)
