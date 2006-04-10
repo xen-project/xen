@@ -147,6 +147,13 @@ help:
 	@echo '                     sparse trees'
 	@echo '  uninstall        - attempt to remove installed Xen tools'
 	@echo '                     (use with extreme care!)'
+	@echo
+	@echo 'Environment:'
+	@echo '  XEN_PYTHON_NATIVE_INSTALL=y'
+	@echo '                   - native python install or dist'
+	@echo '                     install into prefix/lib/python<VERSION>'
+	@echo '                     instead of <PREFIX>/lib/python'
+	@echo '                     true if set to non-empty value, false otherwise'
 
 # Use this target with extreme care!
 uninstall: D=$(DESTDIR)
