@@ -1378,7 +1378,7 @@ static inline unsigned int cpuid_edx(unsigned int op)
             : "=a" (eax), "=d" (edx)
             : "0" (op)
             : "cx");
-#undef __ebx
+#undef __bx
 
     return edx;
 }

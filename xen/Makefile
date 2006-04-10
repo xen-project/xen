@@ -48,7 +48,7 @@ clean:: delete-unfresh-files
 
 endif
 
-.PHONY: install
+.PHONY: dist
 dist: install
 
 .PHONY: debug
