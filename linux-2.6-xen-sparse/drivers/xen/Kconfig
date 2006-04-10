@@ -28,9 +28,16 @@ config XEN_UNPRIVILEGED_GUEST
 	bool
 	default !XEN_PRIVILEGED_GUEST
 
+config XEN_BACKEND
+        tristate "Backend driver support"
+        default y
+        help
+          Support for backend device drivers that provide I/O services
+          to other virtual machines.
+
 config XEN_PCIDEV_BACKEND
 	tristate "PCI device backend driver"
-	depends PCI
+	depends on PCI && XEN_BACKEND
 	default XEN_PRIVILEGED_GUEST
 	help
 	  The PCI device backend driver allows the kernel to export arbitrary
@@ -70,6 +77,7 @@ config XEN_PCIDEV_BE_DEBUG
 
 config XEN_BLKDEV_BACKEND
 	tristate "Block-device backend driver"
+        depends on XEN_BACKEND
 	default y
 	help
 	  The block-device backend driver allows the kernel to export its
@@ -91,6 +99,7 @@ config XEN_BLKDEV_TAP_BE
 
 config XEN_NETDEV_BACKEND
 	tristate "Network-device backend driver"
+        depends on XEN_BACKEND
 	default y
 	help
 	  The network-device backend driver allows the kernel to export its
@@ -120,6 +129,7 @@ config XEN_NETDEV_LOOPBACK
 
 config XEN_TPMDEV_BACKEND
 	tristate "TPM-device backend driver"
+        depends on XEN_BACKEND
 	default n
 	help
 	  The TPM-device backend driver
@@ -155,6 +165,7 @@ config XEN_NETDEV_FRONTEND
 
 config XEN_BLKDEV_TAP
 	tristate "Block device tap driver"
+        depends on XEN_BACKEND
 	default n
 	help
 	  This driver allows a VM to interact on block device channels
