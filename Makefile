@@ -135,10 +135,9 @@ help:
 	@echo '  dev-docs         - build developer-only documentation'
 	@echo ''
 	@echo 'Cleaning targets:'
-	@echo '  clean            - clean the Xen, tools and docs (but not'
-	@echo '                     guest kernel) trees'
-	@echo '  distclean        - clean plus delete kernel tarballs and kernel'
-	@echo '                     build trees'
+	@echo '  clean            - clean the Xen, tools and docs (but not guest kernel trees)'
+	@echo '  distclean        - clean plus delete kernel build trees and'
+	@echo '                     local downloaded files'
 	@echo '  kdelete          - delete guest kernel build trees'
 	@echo '  kclean           - clean guest kernel build trees'
 	@echo ''
@@ -146,8 +145,8 @@ help:
 	@echo '  prep-kernels     - prepares kernel directories, does not build'
 	@echo '  mkpatches        - make patches against vanilla kernels from'
 	@echo '                     sparse trees'
-	@echo '  uninstall        - attempt to remove installed Xen tools (use'
-	@echo '                     with extreme care!)'
+	@echo '  uninstall        - attempt to remove installed Xen tools'
+	@echo '                     (use with extreme care!)'
 
 # Use this target with extreme care!
 uninstall: D=$(DESTDIR)
