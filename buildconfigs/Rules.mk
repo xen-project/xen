@@ -124,14 +124,14 @@ linux-2.6-xen.patch: ref-linux-$(LINUX_VER)/.valid-ref
 	rm -rf tmp-$@
 	cp -al $(<D) tmp-$@
 	( cd linux-2.6-xen-sparse && ./mkbuildtree ../tmp-$@ )	
-	diff -Nurp $(<D) tmp-$@ > $@ || true
+	diff -Nurp $(patsubst ref%,pristine%,$(<D)) tmp-$@ > $@ || true
 	rm -rf tmp-$@
 
 %-xen.patch: ref-%/.valid-ref
 	rm -rf tmp-$@
 	cp -al $(<D) tmp-$@
 	( cd $*-xen-sparse && ./mkbuildtree ../tmp-$@ )	
-	diff -Nurp $(<D) tmp-$@ > $@ || true
+	diff -Nurp $(patsubst ref%,pristine%,$(<D)) tmp-$@ > $@ || true
 	rm -rf tmp-$@
 
 %-mrproper: %-mrproper-extra
