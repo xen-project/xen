@@ -61,7 +61,7 @@ pal_cache_flush (VCPU *vcpu) {
 //				result.v1,1LL);
 //	}
 	while (result.status != 0) {
-        panic("PAL_CACHE_FLUSH ERROR, status %d", result.status);
+        panic("PAL_CACHE_FLUSH ERROR, status %ld", result.status);
 	}
 
 	return result;

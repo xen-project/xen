@@ -70,7 +70,7 @@ static void pib_write(VCPU *vcpu, void *src, uint64_t pib_off, size_t s, int ma)
     default:
         if ( PIB_LOW_HALF(pib_off) ) {   // lower half
             if ( s != 8 || ma != 0x4 /* UC */ ) {
-                panic("Undefined IPI-LHF write with s %d, ma %d!\n", s, ma);
+                panic("Undefined IPI-LHF write with s %ld, ma %d!\n", s, ma);
             }
             else {
                 write_ipi(vcpu, pib_off, *(uint64_t *)src);
@@ -172,7 +172,7 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 
     vio = get_vio(v->domain, v->vcpu_id);
     if (vio == 0) {
-        panic("bad shared page: %lx");
+        panic("bad shared page\n");
     }
     p = &vio->vp_ioreq;
     p->addr = TO_LEGACY_IO(pa&0x3ffffffUL);
