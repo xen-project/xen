@@ -77,7 +77,7 @@ struct instruction {
     __u32   flags;
 };
 
-#define MAX_INST_LEN      32
+#define MAX_INST_LEN      15 /* Maximum instruction length = 15 bytes */
 
 struct mmio_op {
     int                    flags;

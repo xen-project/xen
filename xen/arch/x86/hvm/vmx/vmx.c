@@ -1947,7 +1947,7 @@ static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
         && !(vector & INTR_INFO_VALID_MASK))
         __hvm_bug(regs);
 
-    vector &= 0xff;
+    vector &= INTR_INFO_VECTOR_MASK;
     local_irq_disable();
     TRACE_VMEXIT(1,vector);
 
@@ -2077,10 +2077,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         return;
     }
 
-    {
-        __vmread(GUEST_RIP, &eip);
-        TRACE_VMEXIT(0,exit_reason);
-    }
+    __vmread(GUEST_RIP, &eip);
+    TRACE_VMEXIT(0,exit_reason);
 
     switch (exit_reason) {
     case EXIT_REASON_EXCEPTION_NMI:
@@ -2097,7 +2095,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         if ((error = __vmread(VM_EXIT_INTR_INFO, &vector))
             || !(vector & INTR_INFO_VALID_MASK))
             __hvm_bug(&regs);
-        vector &= 0xff;
+        vector &= INTR_INFO_VECTOR_MASK;
 
         TRACE_VMEXIT(1,vector);
         perfc_incra(cause_vector, vector);
