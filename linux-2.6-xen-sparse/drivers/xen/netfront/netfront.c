@@ -300,13 +300,6 @@ again:
 		goto abort_transaction;
 	}
 
-	err = xenbus_printf(xbt, dev->nodename,
-			    "state", "%d", XenbusStateConnected);
-	if (err) {
-		message = "writing frontend XenbusStateConnected";
-		goto abort_transaction;
-	}
-
 	err = xenbus_transaction_end(xbt, 0);
 	if (err) {
 		if (err == -EAGAIN)
@@ -314,6 +307,8 @@ again:
 		xenbus_dev_fatal(dev, err, "completing transaction");
 		goto destroy_ring;
 	}
+
+	xenbus_switch_state(dev, XenbusStateConnected);
 
 	return 0;
 

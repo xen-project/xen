@@ -32,4 +32,9 @@ static inline void evtchn_notify(struct vcpu *v)
 	vcpu_pend_interrupt(v, v->vcpu_info->arch.evtchn_vector);
 }
 
+/* Note: Bitwise operations result in fast code with no branches. */
+#define event_pending(v)                        \
+    (!!(v)->vcpu_info->evtchn_upcall_pending &  \
+      !(v)->vcpu_info->evtchn_upcall_mask)
+
 #endif

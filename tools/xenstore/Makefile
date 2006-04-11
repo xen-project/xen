@@ -57,14 +57,12 @@ xenstored_test: xenstored_core_test.o xenstored_watch_test.o xenstored_domain_te
 xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
-.PHONY: xs_test xs_random xs_stress xs_crashme
 xs_test xs_random xs_stress xs_crashme: LDFLAGS+=-lpthread
 xs_test: xs_test.o xs_lib.o utils.o
 xs_random: xs_random.o xs_test_lib.o xs_lib.o talloc.o utils.o
 xs_stress: xs_stress.o xs_test_lib.o xs_lib.o talloc.o utils.o
 xs_crashme: xs_crashme.o xs_lib.o talloc.o utils.o
 
-.PHONY: speedtest
 speedtest: speedtest.o xs.o xs_lib.o utils.o talloc.o
 
 .PHONY: check-speed

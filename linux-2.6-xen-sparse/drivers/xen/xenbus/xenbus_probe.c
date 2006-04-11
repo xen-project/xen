@@ -1065,19 +1065,16 @@ postcore_initcall(xenbus_probe_init);
  */
 static int __init wait_for_devices(void)
 {
-	int i;
+	unsigned long timeout = jiffies + 10*HZ;
 
-	for (i = 0; i < 10 * HZ; i++) {
-		if (all_devices_ready()) {
-			return;
-		}
-
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(1);
+	while (time_before(jiffies, timeout)) {
+		if (all_devices_ready())
+			return 0;
+		schedule_timeout_interruptible(HZ/10);
 	}
 
-	printk(KERN_WARNING
-	       "XENBUS: Timeout connecting to devices!\n");
+	printk(KERN_WARNING "XENBUS: Timeout connecting to devices!\n");
+	return 0;
 }
 
 late_initcall(wait_for_devices);

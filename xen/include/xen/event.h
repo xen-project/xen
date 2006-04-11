@@ -38,11 +38,6 @@ extern void send_guest_global_virq(struct domain *d, int virq);
  */
 extern void send_guest_pirq(struct domain *d, int pirq);
 
-/* Note: Bitwise operations result in fast code with no branches. */
-#define event_pending(v)                        \
-    (!!(v)->vcpu_info->evtchn_upcall_pending &  \
-      !(v)->vcpu_info->evtchn_upcall_mask)
-
 #define evtchn_pending(d, p)                    \
     (test_bit((p), &(d)->shared_info->evtchn_pending[0]))
 

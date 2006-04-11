@@ -34,9 +34,6 @@ LDLIBS += -lxenstat -lncurses
 .PHONY: all
 all: xentop
 
-.PHONY: xentop
-xentop: xentop.o
-
 .PHONY: install
 install: xentop xentop.1
 	$(INSTALL_PROG) xentop $(DESTDIR)$(sbindir)/xentop

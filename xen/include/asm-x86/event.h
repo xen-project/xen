@@ -26,4 +26,9 @@ static inline void evtchn_notify(struct vcpu *v)
         smp_send_event_check_cpu(v->processor);
 }
 
+/* Note: Bitwise operations result in fast code with no branches. */
+#define event_pending(v)                        \
+    (!!(v)->vcpu_info->evtchn_upcall_pending &  \
+      !(v)->vcpu_info->evtchn_upcall_mask)
+
 #endif

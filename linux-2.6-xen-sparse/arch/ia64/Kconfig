@@ -79,8 +79,13 @@ config XEN_BLKDEV_FRONTEND
 	bool
 	default y
 
-config XEN_BLKDEV_BACKEND
+config XEN_BACKEND
 	depends on XEN
+	bool
+	default y
+
+config XEN_BLKDEV_BACKEND
+	depends on XEN && XEN_BACKEND
 	bool
 	default y
 
