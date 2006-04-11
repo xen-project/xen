@@ -11,6 +11,5 @@ clean:
 	$(MAKE) -C figlet clean
 	rm -f *.o symbols
 
-.PHONY: symbols
 symbols: symbols.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
