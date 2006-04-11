@@ -19,7 +19,6 @@ obj-y += sn_console.o
 obj-y += vcpu.o
 obj-y += vhpt.o
 obj-y += xenasm.o
-obj-y += xenirq.o
 obj-y += xenmem.o
 obj-y += xenmisc.o
 obj-y += xensetup.o
