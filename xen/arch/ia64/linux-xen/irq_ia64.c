@@ -150,9 +150,6 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 			ia64_setreg(_IA64_REG_CR_TPR, vector);
 			ia64_srlz_d();
 
-#ifdef XEN
-			if (!xen_do_IRQ(vector))
-#endif
 			__do_IRQ(local_vector_to_irq(vector), regs);
 
 			/*

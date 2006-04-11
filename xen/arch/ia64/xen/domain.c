@@ -1081,7 +1081,7 @@ int construct_dom0(struct domain *d,
 	sync_split_caches();
 
 	// FIXME: Hack for keyboard input
-	serial_input_init();
+	//serial_input_init();
 
 	return 0;
 }
