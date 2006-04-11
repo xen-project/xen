@@ -132,16 +132,16 @@ On Linux:
 
    The make command line defaults to building the kernel vmlinuz-2.6.x-xen. 
    You can override this default by specifying KERNELS=kernelname. For 
-   example, you can make two kernels - linux-2.6.16-xen0 
-   and linux-2.6.16-xenU - which are smaller builds containing only selected 
-   modules, intended primarilly for developers that don't like to wait 
+   example, you can make two kernels - linux-2.6-xen0 
+   and linux-2.6-xenU - which are smaller builds containing only selected 
+   modules, intended primarily for developers that don't like to wait 
    for a full -xen kernel to build. The -xenU kernel is particularly small,
    as it does not contain any physical device drivers, and hence is
    only useful for guest domains.
 
    To make these two kernels, simply specify
 
-   KERNELS="linux-2.6.16-xen0 linux-2.6.16-xenU"
+   KERNELS="linux-2.6-xen0 linux-2.6-xenU"
 
    in the make command line.
 
@@ -172,5 +172,5 @@ On Linux:
 
    Depending on your config, you may need to use 'mkinitrd' to create
    an initial ram disk, just like a native system e.g. 
-    # depmod 2.6.12.6-xen
-    # mkinitrd -v -f --with=aacraid --with=sd_mod --with=scsi_mod initrd-2.6.12.6-xen.img 2.6.12.6-xen
+    # depmod 2.6.16-xen
+    # mkinitrd -v -f --with=aacraid --with=sd_mod --with=scsi_mod initrd-2.6.16-xen.img 2.6.16-xen
