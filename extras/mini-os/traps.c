@@ -4,6 +4,7 @@
 #include <hypervisor.h>
 #include <mm.h>
 #include <lib.h>
+#include <sched.h>
 
 /*
  * These are assembler stubs in entry.S.
@@ -31,6 +32,8 @@ void machine_check(void);
 
 void dump_regs(struct pt_regs *regs)
 {
+    printk("Thread: %s\n", current->name);
+#ifdef __i386__    
     printk("EIP: %x, EFLAGS %x.\n", regs->eip, regs->eflags);
     printk("EBX: %08x ECX: %08x EDX: %08x\n",
 	   regs->ebx, regs->ecx, regs->edx);
@@ -40,9 +43,22 @@ void dump_regs(struct pt_regs *regs)
 	   regs->xds, regs->xes, regs->orig_eax, regs->eip);
     printk("CS: %04x EFLAGS: %08x esp: %08x ss: %04x\n",
 	   regs->xcs, regs->eflags, regs->esp, regs->xss);
-
-}	
-
+#else
+    printk("RIP: %04lx:[<%016lx>] ", regs->cs & 0xffff, regs->rip);
+    printk("\nRSP: %04lx:%016lx  EFLAGS: %08lx\n", 
+           regs->ss, regs->rsp, regs->eflags);
+    printk("RAX: %016lx RBX: %016lx RCX: %016lx\n",
+           regs->rax, regs->rbx, regs->rcx);
+    printk("RDX: %016lx RSI: %016lx RDI: %016lx\n",
+           regs->rdx, regs->rsi, regs->rdi); 
+    printk("RBP: %016lx R08: %016lx R09: %016lx\n",
+           regs->rbp, regs->r8, regs->r9); 
+    printk("R10: %016lx R11: %016lx R12: %016lx\n",
+           regs->r10, regs->r11, regs->r12); 
+    printk("R13: %016lx R14: %016lx R15: %016lx\n",
+           regs->r13, regs->r14, regs->r15); 
+#endif
+}
 
 static void do_trap(int trapnr, char *str, struct pt_regs * regs, unsigned long error_code)
 {
@@ -110,36 +126,17 @@ void do_page_fault(struct pt_regs *regs, unsigned long error_code)
     printk("Page fault at linear address %p, regs %p, code %lx\n", addr, regs,
 	   error_code);
     dump_regs(regs);
-#ifdef __x86_64__
-    /* FIXME: _PAGE_PSE */
-    {
-        unsigned long *tab = (unsigned long *)start_info.pt_base;
-        unsigned long page;
-    
-        printk("Pagetable walk from %p:\n", tab);
-        
-        page = tab[l4_table_offset(addr)];
-        tab = to_virt(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
-        printk(" L4 = %p (%p)\n", page, tab);
-
-        page = tab[l3_table_offset(addr)];
-        tab = to_virt(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
-        printk("  L3 = %p (%p)\n", page, tab);
-        
-        page = tab[l2_table_offset(addr)];
-        tab =  to_virt(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
-        printk("   L2 = %p (%p)\n", page, tab);
-        
-        page = tab[l1_table_offset(addr)];
-        printk("    L1 = %p\n", page);
-    }
-#endif
+    page_walk(addr);
     do_exit();
 }
 
 void do_general_protection(struct pt_regs *regs, long error_code)
 {
-    printk("GPF %p, error_code=%lx\n", regs, error_code);
+#ifdef __i386__
+    printk("GPF eip: %p, error_code=%lx\n", regs->eip, error_code);
+#else    
+    printk("GPF rip: %p, error_code=%lx\n", regs->rip, error_code);
+#endif
     dump_regs(regs);
     do_exit();
 }

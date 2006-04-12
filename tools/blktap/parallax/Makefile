@@ -43,11 +43,14 @@ DEPS     = .*.d
 OBJS     = $(patsubst %.c,%.o,$(SRCS))
 IBINS    = parallax $(VDI_TOOLS)
 
+.PHONY: all
 all: $(VDI_TOOLS) parallax blockstored
 
+.PHONY: install
 install: all
 	$(INSTALL_PROG) $(IBINS) $(DESTDIR)$(PARALLAX_INSTALL_DIR)
 
+.PHONY: clean
 clean:
 	rm -rf *.o *~ $(DEPS) xen TAGS $(VDI_TOOLS) parallax vdi_unittest
 
@@ -57,5 +60,4 @@ parallax: $(PLX_SRCS)
 ${VDI_TOOLS}: %: %.c $(VDI_SRCS)
 	$(CC) $(CFLAGS) -o $@ $@.c $(LDFLAGS) $(VDI_SRCS)
 
-.PHONY: TAGS clean install rpm
 -include $(DEPS)

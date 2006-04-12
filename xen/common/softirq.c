@@ -21,9 +21,10 @@ irq_cpustat_t irq_stat[NR_CPUS];
 
 static softirq_handler softirq_handlers[NR_SOFTIRQS];
 
-asmlinkage void do_softirq()
+asmlinkage void do_softirq(void)
 {
-    unsigned int i, pending, cpu = smp_processor_id();
+    unsigned int i, cpu = smp_processor_id();
+    unsigned long pending;
 
     pending = softirq_pending(cpu);
     ASSERT(pending != 0);

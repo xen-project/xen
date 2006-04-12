@@ -365,44 +365,46 @@ static void hvm_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     unsigned long old_eax;
     int sign = p->df ? -1 : 1;
 
-    if (p->dir == IOREQ_WRITE) {
-        if (p->pdata_valid) {
-            regs->esi += sign * p->count * p->size;
-            if (mmio_opp->flags & REPZ)
-                regs->ecx -= p->count;
-        }
-    } else {
-        if (mmio_opp->flags & OVERLAP) {
-            unsigned long addr;
-
+    if ( p->pdata_valid || (mmio_opp->flags & OVERLAP) )
+    {
+        if ( mmio_opp->flags & REPZ )
+            regs->ecx -= p->count;
+        if ( p->dir == IOREQ_READ )
+        {
             regs->edi += sign * p->count * p->size;
-            if (mmio_opp->flags & REPZ)
-                regs->ecx -= p->count;
-
-            addr = regs->edi;
-            if (sign > 0)
-                addr -= p->size;
-            hvm_copy(&p->u.data, addr, p->size, HVM_COPY_OUT);
-        } else if (p->pdata_valid) {
-            regs->edi += sign * p->count * p->size;
-            if (mmio_opp->flags & REPZ)
-                regs->ecx -= p->count;
-        } else {
-            old_eax = regs->eax;
-            switch (p->size) {
-            case 1:
-                regs->eax = (old_eax & 0xffffff00) | (p->u.data & 0xff);
-                break;
-            case 2:
-                regs->eax = (old_eax & 0xffff0000) | (p->u.data & 0xffff);
-                break;
-            case 4:
-                regs->eax = (p->u.data & 0xffffffff);
-                break;
-            default:
-                printk("Error: %s unknown port size\n", __FUNCTION__);
-                domain_crash_synchronous();
+            if ( mmio_opp->flags & OVERLAP )
+            {
+                unsigned long addr = regs->edi;
+                if (hvm_realmode(current))
+                    addr += regs->es << 4;
+                if (sign > 0)
+                    addr -= p->size;
+                hvm_copy(&p->u.data, addr, p->size, HVM_COPY_OUT);
             }
+        }
+        else /* p->dir == IOREQ_WRITE */
+        {
+            ASSERT(p->dir == IOREQ_WRITE);
+            regs->esi += sign * p->count * p->size;
+        }
+    }
+    else if ( p->dir == IOREQ_READ )
+    {
+        old_eax = regs->eax;
+        switch ( p->size )
+        {
+        case 1:
+            regs->eax = (old_eax & 0xffffff00) | (p->u.data & 0xff);
+            break;
+        case 2:
+            regs->eax = (old_eax & 0xffff0000) | (p->u.data & 0xffff);
+            break;
+        case 4:
+            regs->eax = (p->u.data & 0xffffffff);
+            break;
+        default:
+            printk("Error: %s unknown port size\n", __FUNCTION__);
+            domain_crash_synchronous();
         }
     }
 }
@@ -713,7 +715,7 @@ void hvm_wait_io(void)
         if ( !test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags) )
             break;
 
-        do_sched_op(SCHEDOP_block, 0);
+        do_sched_op_compat(SCHEDOP_block, 0);
     }
 
     /*
@@ -743,7 +745,7 @@ void hvm_safe_block(void)
         if ( test_bit(port, &d->shared_info->evtchn_pending[0]) )
             break;
 
-        do_sched_op(SCHEDOP_block, 0);
+        do_sched_op_compat(SCHEDOP_block, 0);
     }
 
     /* Reflect pending event in selector and master flags. */

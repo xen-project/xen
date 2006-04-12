@@ -6,6 +6,8 @@
  *	use of all of the static functions.
  **/
 
+#include <xen/interface/callback.h>
+
 static char * __init machine_specific_memory_setup(void)
 {
 	unsigned long max_pfn = xen_start_info->nr_pages;
@@ -23,6 +25,14 @@ extern void nmi(void);
 static void __init machine_specific_arch_setup(void)
 {
 	struct xen_platform_parameters pp;
+	struct callback_register event = {
+		.type = CALLBACKTYPE_event,
+		.address = { __KERNEL_CS, (unsigned long)hypervisor_callback },
+	};
+	struct callback_register failsafe = {
+		.type = CALLBACKTYPE_failsafe,
+		.address = { __KERNEL_CS, (unsigned long)failsafe_callback },
+	};
 	struct xennmi_callback cb;
 
 	if (xen_feature(XENFEAT_auto_translated_physmap) &&
@@ -32,9 +42,8 @@ static void __init machine_specific_arch_setup(void)
 		memset(empty_zero_page, 0, sizeof(empty_zero_page));
 	}
 
-	HYPERVISOR_set_callbacks(
-	    __KERNEL_CS, (unsigned long)hypervisor_callback,
-	    __KERNEL_CS, (unsigned long)failsafe_callback);
+	HYPERVISOR_callback_op(CALLBACKOP_register, &event);
+	HYPERVISOR_callback_op(CALLBACKOP_register, &failsafe);
 
 	cb.handler_address = (unsigned long)&nmi;
 	HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);

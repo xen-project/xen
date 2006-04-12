@@ -168,6 +168,11 @@ typedef struct {
     unsigned long pad[5]; /* sizeof(vcpu_info_t) == 64 */
 } arch_vcpu_info_t;
 
+typedef struct {
+    unsigned long cs;
+    unsigned long eip;
+} xen_callback_t;
+
 #endif /* !__ASSEMBLY__ */
 
 /*

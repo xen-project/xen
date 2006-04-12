@@ -1,5 +1,3 @@
-include $(BASEDIR)/Rules.mk
-
 obj-y += acpi.o
 obj-y += dom0_ops.o
 obj-y += domain.o
@@ -26,5 +24,3 @@ obj-y += xentime.o
 obj-y += flushd.o
 
 obj-$(crash_debug) += gdbstub.o
-
-include $(BASEDIR)/Post.mk

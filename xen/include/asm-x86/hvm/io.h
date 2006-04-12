@@ -66,6 +66,7 @@
 #define INSTR_STOS  10
 #define INSTR_TEST  11
 #define INSTR_BT    12
+#define INSTR_XCHG  13
 
 struct instruction {
     __s8    instr;        /* instruction type */
@@ -76,7 +77,7 @@ struct instruction {
     __u32   flags;
 };
 
-#define MAX_INST_LEN      32
+#define MAX_INST_LEN      15 /* Maximum instruction length = 15 bytes */
 
 struct mmio_op {
     int                    flags;

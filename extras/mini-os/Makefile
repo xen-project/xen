@@ -37,8 +37,10 @@ OBJS += $(patsubst %.c,%.o,$(wildcard console/*.c))
 HDRS := $(wildcard include/*.h)
 HDRS += $(wildcard include/xen/*.h)
 
+.PHONY: default
 default: $(TARGET)
 
+.PHONY: links
 links:
 	[ -e include/xen ] || ln -sf ../../../xen/include/public include/xen
 
@@ -46,6 +48,7 @@ $(TARGET): links $(OBJS)
 	$(LD) -N -T minios-$(TARGET_ARCH).lds $(OBJS) -o $@.elf
 	gzip -f -9 -c $@.elf >$@.gz
 
+.PHONY: clean
 clean:
 	find . -type f -name '*.o' | xargs rm -f
 	rm -f *.o *~ core $(TARGET).elf $(TARGET).raw $(TARGET) $(TARGET).gz

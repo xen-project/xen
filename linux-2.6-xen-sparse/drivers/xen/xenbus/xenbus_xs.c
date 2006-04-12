@@ -685,6 +685,24 @@ void xs_resume(void)
 	up_write(&xs_state.suspend_mutex);
 }
 
+static int xenwatch_handle_callback(void *data)
+{
+	struct xs_stored_msg *msg = data;
+
+	msg->u.watch.handle->callback(msg->u.watch.handle,
+				      (const char **)msg->u.watch.vec,
+				      msg->u.watch.vec_size);
+
+	kfree(msg->u.watch.vec);
+	kfree(msg);
+
+	/* Kill this kthread if we were spawned just for this callback. */
+	if (current->pid != xenwatch_pid)
+		do_exit(0);
+
+	return 0;
+}
+
 static int xenwatch_thread(void *unused)
 {
 	struct list_head *ent;
@@ -707,12 +725,11 @@ static int xenwatch_thread(void *unused)
 
 		if (ent != &watch_events) {
 			msg = list_entry(ent, struct xs_stored_msg, list);
-			msg->u.watch.handle->callback(
-				msg->u.watch.handle,
-				(const char **)msg->u.watch.vec,
-				msg->u.watch.vec_size);
-			kfree(msg->u.watch.vec);
-			kfree(msg);
+			if (msg->u.watch.handle->flags & XBWF_new_thread)
+				kthread_run(xenwatch_handle_callback,
+					    msg, "xenwatch_cb");
+			else
+				xenwatch_handle_callback(msg);
 		}
 
 		mutex_unlock(&xenwatch_mutex);

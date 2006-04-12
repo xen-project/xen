@@ -176,10 +176,6 @@ again:
 		goto abort_transaction;
 	}
 
-	err = xenbus_switch_state(dev, xbt, XenbusStateInitialised);
-	if (err)
-		goto abort_transaction;
-
 	err = xenbus_transaction_end(xbt, 0);
 	if (err) {
 		if (err == -EAGAIN)
@@ -187,6 +183,8 @@ again:
 		xenbus_dev_fatal(dev, err, "completing transaction");
 		goto destroy_blkring;
 	}
+
+	xenbus_switch_state(dev, XenbusStateInitialised);
 
 	return 0;
 
@@ -324,7 +322,7 @@ static void connect(struct blkfront_info *info)
 		return;
 	}
 
-	(void)xenbus_switch_state(info->xbdev, XBT_NULL, XenbusStateConnected);
+	(void)xenbus_switch_state(info->xbdev, XenbusStateConnected);
 
 	/* Kick pending requests. */
 	spin_lock_irq(&blkif_io_lock);
@@ -349,7 +347,7 @@ static void blkfront_closing(struct xenbus_device *dev)
 
 	xlvbd_del(info);
 
-	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
+	xenbus_switch_state(dev, XenbusStateClosed);
 }
 
 
@@ -755,7 +753,7 @@ static void blkif_recover(struct blkfront_info *info)
 
 	kfree(copy);
 
-	(void)xenbus_switch_state(info->xbdev, XBT_NULL, XenbusStateConnected);
+	(void)xenbus_switch_state(info->xbdev, XenbusStateConnected);
 
 	/* Now safe for us to use the shared ring */
 	spin_lock_irq(&blkif_io_lock);

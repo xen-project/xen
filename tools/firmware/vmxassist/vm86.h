@@ -58,7 +58,6 @@ extern struct vmx_assist_context oldctx;
 extern struct vmx_assist_context newctx;
 
 extern void emulate(struct regs *);
-extern void interrupt(struct regs *, int);
 extern void dump_regs(struct regs *);
 extern void trace(struct regs *, int, char *, ...);
 

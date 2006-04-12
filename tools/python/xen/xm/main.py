@@ -291,18 +291,6 @@ def int_unit(str, dest):
 def err(msg):
     print >>sys.stderr, "Error:", msg
 
-def handle_xend_error(cmd, args, ex):
-    non_option = filter(lambda x: x[0] != '-', args)
-    dom = len(non_option) > 0 and non_option[0] or None
-
-    error = str(ex)
-    if error == "Not found" and dom != None:
-        err("Domain '%s' not found when running 'xm %s'" % (dom, cmd))
-    else:
-        err(error)
-
-    sys.exit(1)
-    
 
 #########################################################################
 #
@@ -1106,9 +1094,10 @@ def main(argv=sys.argv):
             sys.exit(1)
         except xmlrpclib.Fault, ex:
             if ex.faultCode == xen.xend.XendClient.ERROR_INVALID_DOMAIN:
-                print "Error: the domain '%s' does not exist." % ex.faultString
+                print  >>sys.stderr, (
+                    "Error: the domain '%s' does not exist." % ex.faultString)
             else:
-                print "Error: %s" % ex.faultString
+                print  >>sys.stderr, "Error: %s" % ex.faultString
             sys.exit(1)
         except:
             print "Unexpected error:", sys.exc_info()[0]

@@ -96,10 +96,6 @@ static int pcifront_publish_info(struct pcifront_device *pdev)
 	if (!err)
 		err = xenbus_printf(trans, pdev->xdev->nodename,
 				    "magic", XEN_PCI_MAGIC);
-	if (!err)
-		err =
-		    xenbus_switch_state(pdev->xdev, trans,
-					XenbusStateInitialised);
 
 	if (err) {
 		xenbus_transaction_end(trans, 1);
@@ -117,6 +113,8 @@ static int pcifront_publish_info(struct pcifront_device *pdev)
 			goto out;
 		}
 	}
+
+	xenbus_switch_state(pdev->xdev, XenbusStateInitialised);
 
 	dev_dbg(&pdev->xdev->dev, "publishing successful!\n");
 
@@ -186,7 +184,7 @@ static int pcifront_try_connect(struct pcifront_device *pdev)
 		}
 	}
 
-	err = xenbus_switch_state(pdev->xdev, XBT_NULL, XenbusStateConnected);
+	err = xenbus_switch_state(pdev->xdev, XenbusStateConnected);
 	if (err)
 		goto out;
 
@@ -205,8 +203,7 @@ static int pcifront_try_disconnect(struct pcifront_device *pdev)
 	prev_state = xenbus_read_driver_state(pdev->xdev->nodename);
 
 	if (prev_state < XenbusStateClosing)
-		err = xenbus_switch_state(pdev->xdev, XBT_NULL,
-					XenbusStateClosing);
+		err = xenbus_switch_state(pdev->xdev, XenbusStateClosing);
 
 	if (!err && prev_state == XenbusStateConnected)
 		pcifront_disconnect(pdev);

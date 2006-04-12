@@ -33,6 +33,7 @@ IASL_VER=acpica-unix-20050513
 IASL_URL=http://developer.intel.com/technology/iapc/acpi/downloads/$(IASL_VER).tar.gz
 
 vpath iasl $(PATH)
+.PHONY: all
 all:$(ACPI_BIN)
 
 acpi_dsdt.c:acpi_dsdt.asl
@@ -42,6 +43,7 @@ acpi_dsdt.c:acpi_dsdt.asl
 	echo "int DsdtLen=sizeof(AmlCode);" >> acpi_dsdt.c
 	rm *.aml
 
+.PHONY: iasl
 iasl:
 	@echo
 	@echo "ACPI ASL compiler(iasl) is needed"
@@ -60,8 +62,10 @@ $(ACPI_GEN):$(C_SRC) $(H_SRC) acpi_dsdt.c
 $(ACPI_BIN):$(ACPI_GEN)
 	./$(ACPI_GEN) $(ACPI_BIN)
 
+.PHONY: clean
 clean:
 	rm -rf *.o $(ACPI_GEN) $(ACPI_BIN) $(IASL_VER) 
 	rm -rf  $(IASL_VER).tar.gz
 
+.PHONY: install
 install: all

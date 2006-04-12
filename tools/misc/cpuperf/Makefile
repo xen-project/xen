@@ -26,8 +26,10 @@ TARGETS      = cpuperf-xen cpuperf-perfcntr
 INSTALL_BIN  = $(TARGETS)
 
 
+.PHONY: all
 all: $(TARGETS)
 
+.PHONY: clean
 clean:
 	$(RM) *.o $(TARGETS)
 
@@ -40,6 +42,7 @@ cpuperf-xen: cpuperf.c $(HDRS) Makefile
 cpuperf-perfcntr: cpuperf.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -DPERFCNTR -o $@ $<
 
+.PHONY: install
 install: all
 	$(INSTALL_PROG) $(INSTALL_BIN) $(DESTDIR)/usr/bin
 

@@ -55,8 +55,17 @@ struct xenbus_watch
 	/* Callback (executed in a process context with no locks held). */
 	void (*callback)(struct xenbus_watch *,
 			 const char **vec, unsigned int len);
+
+	/* See XBWF_ definitions below. */
+	unsigned long flags;
 };
 
+/*
+ * Execute callback in its own kthread. Useful if the callback is long
+ * running or heavily serialised, to avoid taking out the main xenwatch thread
+ * for a long period of time (or even unwittingly causing a deadlock).
+ */
+#define XBWF_new_thread	1
 
 /* A xenbus device. */
 struct xenbus_device {
@@ -195,14 +204,10 @@ int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
 
 /**
  * Advertise in the store a change of the given driver to the given new_state.
- * Perform the change inside the given transaction xbt.  xbt may be NULL, in
- * which case this is performed inside its own transaction.  Return 0 on
- * success, or -errno on error.  On error, the device will switch to
- * XenbusStateClosing, and the error will be saved in the store.
+ * Return 0 on success, or -errno on error.  On error, the device will switch
+ * to XenbusStateClosing, and the error will be saved in the store.
  */
-int xenbus_switch_state(struct xenbus_device *dev,
-			xenbus_transaction_t xbt,
-			XenbusState new_state);
+int xenbus_switch_state(struct xenbus_device *dev, XenbusState new_state);
 
 
 /**

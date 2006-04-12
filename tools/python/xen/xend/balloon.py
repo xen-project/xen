@@ -152,7 +152,7 @@ def free(required):
                            'I cannot release any more.  I need %d MiB but '
                            'only have %d.') %
                           (need_mem, free_mem))
-        elif new_alloc >= dom0_min_mem:
+        elif new_alloc < dom0_min_mem:
             raise VmError(
                 ('I need %d MiB, but dom0_min_mem is %d and shrinking to '
                  '%d MiB would leave only %d MiB free.') %

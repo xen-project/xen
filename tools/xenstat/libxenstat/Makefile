@@ -41,6 +41,7 @@ WARN_FLAGS=-Wall -Werror
 CFLAGS+=-Isrc -I$(XEN_LIBXC) -I$(XEN_XENSTORE)
 LDFLAGS+=-Lsrc
 
+.PHONY: all
 all: $(LIB)
 
 $(LIB): $(OBJECTS)
@@ -62,6 +63,7 @@ src/libxenstat.so.$(MAJOR): $(LIB)
 src/libxenstat.so: src/libxenstat.so.$(MAJOR)
 	$(MAKE_LINK) $(<F) $@
 
+.PHONY: install
 install: all
 #install: all
 #	$(INSTALL_DATA) src/xenstat.h $(DESTDIR)$(includedir)/xenstat.h
@@ -84,6 +86,7 @@ BINDINGS=$(PYLIB) $(PYMOD) $(PERLLIB) $(PERLMOD)
 BINDINGSRC=$(PYSRC) $(PERLSRC)
 
 # The all-bindings target builds all the language bindings
+.PHONY: all-bindings
 all-bindings: perl-bindings python-bindings
 
 # The install-bindings target installs all the language bindings
@@ -110,6 +113,7 @@ install-python-bindings: $(PYLIB) $(PYMOD)
 	$(INSTALL_PROG) $(PYMOD) $(DESTDIR)$(pythonlibdir)/xenstat.py
 
 ifeq ($(XENSTAT_PYTHON_BINDINGS),y)
+.PHONY: all
 all: python-bindings
 install: install-python-bindings
 endif
@@ -122,8 +126,10 @@ $(PERLSRC) $(PERLMOD): bindings/swig/xenstat.i
 $(PERLLIB): $(PERLSRC)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(PERL_FLAGS) -shared -lxenstat -o $@ $<
 
+.PHONY: perl-bindings
 perl-bindings: $(PERLLIB) $(PERLMOD)
 
+.PHONY: install-perl-bindings
 perllibdir=$(prefix)/lib/perl5
 perlmoddir=$(prefix)/share/perl5
 install-perl-bindings: $(PERLLIB) $(PERLMOD)
@@ -131,10 +137,14 @@ install-perl-bindings: $(PERLLIB) $(PERLMOD)
 	$(INSTALL_PROG) $(PERLMOD) $(DESTDIR)$(perlmoddir)/xenstat.pm
 
 ifeq ($(XENSTAT_PERL_BINDINGS),y)
+.PHONY: all
 all: perl-bindings
+
+.PHONY: install
 install: install-perl-bindings
 endif
 
+.PHONY: clean
 clean:
 	rm -f $(LIB) $(SHLIB) $(SHLIB_LINKS) $(OBJECTS) \
 	      $(BINDINGS) $(BINDINGSRC)

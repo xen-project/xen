@@ -35,7 +35,7 @@
 #include <asm/dom_fw.h>
 #include <xen/domain.h>
 
-extern long do_sched_op(int cmd, unsigned long arg);
+extern long do_sched_op_compat(int cmd, unsigned long arg);
 extern unsigned long domain_mpa_to_imva(struct domain *,unsigned long mpaddr);
 
 void hyper_not_support(void)
@@ -83,13 +83,13 @@ void hyper_dom_mem_op(void)
 }
 
 
-void hyper_sched_op(void)
+void hyper_sched_op_compat(void)
 {
     VCPU *vcpu=current;
     u64 r32,r33,ret;
     vcpu_get_gr_nat(vcpu,16,&r32);
     vcpu_get_gr_nat(vcpu,17,&r33);
-    ret=do_sched_op(r32,r33);
+    ret=do_sched_op_compat(r32,r33);
     vcpu_set_gr(vcpu, 8, ret, 0);
 
     vmx_vcpu_increment_iip(vcpu);

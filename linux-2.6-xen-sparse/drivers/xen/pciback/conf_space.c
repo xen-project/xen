@@ -106,7 +106,7 @@ static inline int valid_request(int offset, int size)
 }
 
 static inline u32 merge_value(u32 val, u32 new_val, u32 new_val_mask,
-			      u32 offset)
+			      int offset)
 {
 	if (offset >= 0) {
 		new_val_mask <<= (offset * 8);
@@ -180,7 +180,8 @@ int pciback_config_read(struct pci_dev *dev, int offset, int size,
 
 		if ((req_start >= field_start && req_start < field_end)
 		    || (req_end > field_start && req_end <= field_end)) {
-			err = conf_space_read(dev, cfg_entry, offset, &tmp_val);
+			err = conf_space_read(dev, cfg_entry, field_start,
+					      &tmp_val);
 			if (err)
 				goto out;
 
@@ -228,14 +229,16 @@ int pciback_config_write(struct pci_dev *dev, int offset, int size, u32 value)
 		    || (req_end > field_start && req_end <= field_end)) {
 			tmp_val = 0;
 
-			err = pciback_config_read(dev, offset, size, &tmp_val);
+			err = pciback_config_read(dev, field_start,
+						  field->size, &tmp_val);
 			if (err)
 				break;
 
 			tmp_val = merge_value(tmp_val, value, get_mask(size),
-					      field_start - req_start);
+					      req_start - field_start);
 
-			err = conf_space_write(dev, cfg_entry, offset, tmp_val);
+			err = conf_space_write(dev, cfg_entry, field_start,
+					       tmp_val);
 			handled = 1;
 		}
 	}

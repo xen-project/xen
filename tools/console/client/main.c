@@ -36,7 +36,6 @@
 #include <errno.h>
 #include <pty.h>
 
-#include "xenctrl.h"
 #include "xs.h"
 
 #define ESCAPE_CHARACTER 0x1d
@@ -92,7 +91,7 @@ static void restore_term(int fd, struct termios *old)
 	tcsetattr(fd, TCSAFLUSH, old);
 }
 
-static int console_loop(int xc_handle, domid_t domid, int fd)
+static int console_loop(int fd)
 {
 	int ret;
 
@@ -161,7 +160,6 @@ int main(int argc, char **argv)
 {
 	struct termios attr;
 	int domid;
-	int xc_handle;
 	char *sopt = "h";
 	int ch;
 	int opt_ind=0;
@@ -206,11 +204,6 @@ int main(int argc, char **argv)
 		err(errno, "Could not contact XenStore");
 	}
 
-	xc_handle = xc_interface_open();
-	if (xc_handle == -1) {
-		err(errno, "xc_interface_open()");
-	}
-	
 	signal(SIGTERM, sighandler);
 
 	path = xs_get_domain_path(xs, domid);
@@ -260,7 +253,7 @@ int main(int argc, char **argv)
 	free(path);
 
 	init_term(STDIN_FILENO, &attr);
-	console_loop(xc_handle, domid, spty);
+	console_loop(spty);
 	restore_term(STDIN_FILENO, &attr);
 
 	return 0;

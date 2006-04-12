@@ -148,12 +148,14 @@ void subarch_init_memory(void)
     if ( ((offsetof(struct page_info, u.inuse._domain) != 
            (offsetof(struct page_info, count_info) + sizeof(u32)))) ||
          ((offsetof(struct page_info, count_info) & 7) != 0) ||
-         (sizeof(struct page_info) != 40) )
+         (sizeof(struct page_info) !=
+          (32 + BITS_TO_LONGS(NR_CPUS)*sizeof(long))) )
     {
-        printk("Weird page_info layout (%ld,%ld,%ld)\n",
+        printk("Weird page_info layout (%ld,%ld,%ld,%ld)\n",
                offsetof(struct page_info, count_info),
                offsetof(struct page_info, u.inuse._domain),
-               sizeof(struct page_info));
+               sizeof(struct page_info),
+               32 + BITS_TO_LONGS(NR_CPUS)*sizeof(long));
         for ( ; ; ) ;
     }
 

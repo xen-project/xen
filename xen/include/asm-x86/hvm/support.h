@@ -94,6 +94,7 @@ enum hval_bitmaps {
 #else
 #define MONITOR_DEFAULT_EXCEPTION_BITMAP        \
     ( EXCEPTION_BITMAP_PG |                     \
+      EXCEPTION_BITMAP_BP |                     \
       EXCEPTION_BITMAP_GP )
 #endif
 

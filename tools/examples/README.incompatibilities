@@ -24,6 +24,13 @@ Gentoo doesn't have ifup/ifdown; appropriate alternatives are defined in
 xen-network-common.sh.
 
 
+ip
+--
+
+Newer ip commands (from iproute2) do not accept the abbreviated syntax "ip r a
+..." etc.  "ip route add ..." must be used instead.
+
+
 sed
 ---
 

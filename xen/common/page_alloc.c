@@ -42,6 +42,20 @@
 static char opt_badpage[100] = "";
 string_param("badpage", opt_badpage);
 
+/*
+ * Amount of memory to reserve in a low-memory (<4GB) pool for specific
+ * allocation requests. Ordinary requests will not fall back to the
+ * lowmem emergency pool.
+ */
+static unsigned long lowmem_emergency_pool_pages;
+static void parse_lowmem_emergency_pool(char *s)
+{
+    unsigned long long bytes;
+    bytes = parse_size_and_unit(s);
+    lowmem_emergency_pool_pages = bytes >> PAGE_SHIFT;
+}
+custom_param("lowmem_emergency_pool", parse_lowmem_emergency_pool);
+
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 
@@ -156,7 +170,7 @@ paddr_t init_boot_allocator(paddr_t bitmap_start)
 
 void init_boot_pages(paddr_t ps, paddr_t pe)
 {
-    unsigned long bad_pfn;
+    unsigned long bad_spfn, bad_epfn, i;
     char *p;
 
     ps = round_pgup(ps);
@@ -170,18 +184,31 @@ void init_boot_pages(paddr_t ps, paddr_t pe)
     p = opt_badpage;
     while ( *p != '\0' )
     {
-        bad_pfn = simple_strtoul(p, &p, 0);
+        bad_spfn = simple_strtoul(p, &p, 0);
+        bad_epfn = bad_spfn;
+
+        if ( *p == '-' )
+        {
+            p++;
+            bad_epfn = simple_strtoul(p, &p, 0);
+            if ( bad_epfn < bad_spfn )
+                bad_epfn = bad_spfn;
+        }
 
         if ( *p == ',' )
             p++;
         else if ( *p != '\0' )
             break;
 
-        if ( (bad_pfn < max_page) && !allocated_in_map(bad_pfn) )
-        {
-            printk("Marking page %lx as bad\n", bad_pfn);
-            map_alloc(bad_pfn, 1);
-        }
+        if ( bad_epfn == bad_spfn )
+            printk("Marking page %lx as bad\n", bad_spfn);
+        else
+            printk("Marking pages %lx through %lx as bad\n",
+                   bad_spfn, bad_epfn);
+
+        for ( i = bad_spfn; i <= bad_epfn; i++ )
+            if ( (i < max_page) && !allocated_in_map(i) )
+                map_alloc(i, 1);
     }
 }
 
@@ -514,7 +541,15 @@ struct page_info *alloc_domheap_pages(
     ASSERT(!in_irq());
 
     if ( !(flags & ALLOC_DOM_DMA) )
+    {
         pg = alloc_heap_pages(MEMZONE_DOM, order);
+        /* Failure? Then check if we can fall back to the DMA pool. */
+        if ( unlikely(pg == NULL) &&
+             ((order > MAX_ORDER) ||
+              (avail[MEMZONE_DMADOM] <
+               (lowmem_emergency_pool_pages + (1UL << order)))) )
+            return NULL;
+    }
 
     if ( pg == NULL )
         if ( (pg = alloc_heap_pages(MEMZONE_DMADOM, order)) == NULL )
@@ -657,7 +692,17 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
 
 unsigned long avail_domheap_pages(void)
 {
-    return avail[MEMZONE_DOM] + avail[MEMZONE_DMADOM];
+    unsigned long avail_nrm, avail_dma;
+
+    avail_nrm = avail[MEMZONE_DOM];
+
+    avail_dma = avail[MEMZONE_DMADOM];
+    if ( avail_dma > lowmem_emergency_pool_pages )
+        avail_dma -= lowmem_emergency_pool_pages;
+    else
+        avail_dma = 0;
+
+    return avail_nrm + avail_dma;
 }
 
 

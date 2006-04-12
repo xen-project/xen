@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2005 Rusty Russell, IBM Corporation
  * Copyright (C) 2005 Mike Wray, Hewlett-Packard
- * Copyright (C) 2005 XenSource Ltd
+ * Copyright (C) 2005, 2006 XenSource Ltd
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
@@ -49,6 +49,7 @@
 #include <xen/xenbus.h>
 #include <xen/xen_proc.h>
 #include <xen/evtchn.h>
+#include <xen/features.h>
 
 #include "xenbus_comms.h"
 
@@ -364,7 +365,7 @@ static int xenbus_dev_probe(struct device *_dev)
 	return 0;
 fail:
 	xenbus_dev_error(dev, err, "xenbus_dev_probe on %s", dev->nodename);
-	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
+	xenbus_switch_state(dev, XenbusStateClosed);
 	return -ENODEV;
 }
 
@@ -381,7 +382,7 @@ static int xenbus_dev_remove(struct device *_dev)
 	if (drv->remove)
 		drv->remove(dev);
 
-	xenbus_switch_state(dev, XBT_NULL, XenbusStateClosed);
+	xenbus_switch_state(dev, XenbusStateClosed);
 	return 0;
 }
 
@@ -882,7 +883,7 @@ static int all_devices_ready_(struct device *dev, void *data)
 	int *result = data;
 
 	if (xendev->state != XenbusStateConnected) {
-		result = 0;
+		*result = 0;
 		return 1;
 	}
 
@@ -901,8 +902,6 @@ static int all_devices_ready(void)
 
 void xenbus_probe(void *unused)
 {
-	int i;
-
 	BUG_ON((xenstored_ready <= 0));
 
 	/* Enumerate devices in xenstore. */
@@ -915,28 +914,6 @@ void xenbus_probe(void *unused)
 
 	/* Notify others that xenstore is up */
 	notifier_call_chain(&xenstore_chain, 0, NULL);
-
-	/* On a 10 second timeout, waiting for all devices currently
-	   configured.  We need to do this to guarantee that the filesystems
-	   and / or network devices needed for boot are available, before we
-	   can allow the boot to proceed.
-
-	   A possible improvement here would be to have the tools add a
-	   per-device flag to the store entry, indicating whether it is needed
-	   at boot time.  This would allow people who knew what they were
-	   doing to accelerate their boot slightly, but of course needs tools
-	   or manual intervention to set up those flags correctly.
-	 */
-	for (i = 0; i < 10 * HZ; i++) {
-		if (all_devices_ready())
-			return;
-
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(1);
-	}
-
-	printk(KERN_WARNING
-	       "XENBUS: Timeout connecting to devices!\n");
 }
 
 
@@ -983,6 +960,7 @@ static int xsd_port_read(char *page, char **start, off_t off,
 static int __init xenbus_probe_init(void)
 {
 	int err = 0, dom0;
+	unsigned long page = 0;
 
 	DPRINTK("");
 
@@ -991,11 +969,9 @@ static int __init xenbus_probe_init(void)
 		return -ENODEV;
 	}
 
-	/* Register ourselves with the kernel bus & device subsystems */
+	/* Register ourselves with the kernel bus subsystem */
 	bus_register(&xenbus_frontend.bus);
 	bus_register(&xenbus_backend.bus);
-	device_register(&xenbus_frontend.dev);
-	device_register(&xenbus_backend.dev);
 
 	/*
 	 * Domain0 doesn't have a store_evtchn or store_mfn yet.
@@ -1003,11 +979,7 @@ static int __init xenbus_probe_init(void)
 	dom0 = (xen_start_info->store_evtchn == 0);
 
 	if (dom0) {
-
-		unsigned long page;
 		evtchn_op_t op = { 0 };
-		int ret;
-
 
 		/* Allocate page. */
 		page = get_zeroed_page(GFP_KERNEL);
@@ -1023,8 +995,10 @@ static int __init xenbus_probe_init(void)
 		op.u.alloc_unbound.dom        = DOMID_SELF;
 		op.u.alloc_unbound.remote_dom = 0;
 
-		ret = HYPERVISOR_event_channel_op(&op);
-		BUG_ON(ret);
+		err = HYPERVISOR_event_channel_op(&op);
+		if (err == -ENOSYS)
+			goto err;
+		BUG_ON(err);
 		xen_start_info->store_evtchn = op.u.alloc_unbound.port;
 
 		/* And finally publish the above info in /proc/xen */
@@ -1047,16 +1021,64 @@ static int __init xenbus_probe_init(void)
 	if (err) {
 		printk(KERN_WARNING
 		       "XENBUS: Error initializing xenstore comms: %i\n", err);
-		return err;
+		goto err;
 	}
+
+	/* Register ourselves with the kernel device subsystem */
+	device_register(&xenbus_frontend.dev);
+	device_register(&xenbus_backend.dev);
 
 	if (!dom0)
 		xenbus_probe(NULL);
 
 	return 0;
+
+ err:
+	if (page)
+		free_page(page);
+
+	/*
+         * Do not unregister the xenbus front/backend buses here. The
+         * buses must exist because front/backend drivers will use
+         * them when they are registered.
+         */
+
+	return err;
 }
 
 postcore_initcall(xenbus_probe_init);
+
+
+/*
+ * On a 10 second timeout, wait for all devices currently configured.  We need
+ * to do this to guarantee that the filesystems and / or network devices
+ * needed for boot are available, before we can allow the boot to proceed.
+ *
+ * This needs to be on a late_initcall, to happen after the frontend device
+ * drivers have been initialised, but before the root fs is mounted.
+ *
+ * A possible improvement here would be to have the tools add a per-device
+ * flag to the store entry, indicating whether it is needed at boot time.
+ * This would allow people who knew what they were doing to accelerate their
+ * boot slightly, but of course needs tools or manual intervention to set up
+ * those flags correctly.
+ */
+static int __init wait_for_devices(void)
+{
+	unsigned long timeout = jiffies + 10*HZ;
+
+	while (time_before(jiffies, timeout)) {
+		if (all_devices_ready())
+			return 0;
+		schedule_timeout_interruptible(HZ/10);
+	}
+
+	printk(KERN_WARNING "XENBUS: Timeout connecting to devices!\n");
+	return 0;
+}
+
+late_initcall(wait_for_devices);
+
 
 /*
  * Local variables:

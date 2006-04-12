@@ -162,7 +162,7 @@ static void dump_domains(unsigned char key)
                             &d->shared_info->evtchn_mask[0]),
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG]/BITS_PER_LONG, 
                             &v->vcpu_info->evtchn_pending_sel));
-            send_guest_virq(v, VIRQ_DEBUG);
+            send_guest_vcpu_virq(v, VIRQ_DEBUG);
         }
     }
 

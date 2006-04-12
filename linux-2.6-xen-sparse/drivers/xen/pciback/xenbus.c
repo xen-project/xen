@@ -16,7 +16,7 @@ static struct pciback_device *alloc_pdev(struct xenbus_device *xdev)
 {
 	struct pciback_device *pdev;
 
-	pdev = kmalloc(sizeof(struct pciback_device), GFP_KERNEL);
+	pdev = kzalloc(sizeof(struct pciback_device), GFP_KERNEL);
 	if (pdev == NULL)
 		goto out;
 	dev_dbg(&xdev->dev, "allocated pdev @ 0x%p\n", pdev);
@@ -137,7 +137,7 @@ static int pciback_attach(struct pciback_device *pdev)
 
 	dev_dbg(&pdev->xdev->dev, "Connecting...\n");
 
-	err = xenbus_switch_state(pdev->xdev, XBT_NULL, XenbusStateConnected);
+	err = xenbus_switch_state(pdev->xdev, XenbusStateConnected);
 	if (err)
 		xenbus_dev_fatal(pdev->xdev, err,
 				 "Error switching to connected state!");
@@ -165,7 +165,7 @@ static void pciback_frontend_changed(struct xenbus_device *xdev,
 		break;
 
 	case XenbusStateClosing:
-		xenbus_switch_state(xdev, XBT_NULL, XenbusStateClosing);
+		xenbus_switch_state(xdev, XenbusStateClosing);
 		break;
 
 	case XenbusStateClosed:
@@ -341,7 +341,7 @@ static int pciback_setup_backend(struct pciback_device *pdev)
 		goto out;
 	}
 
-	err = xenbus_switch_state(pdev->xdev, XBT_NULL, XenbusStateInitialised);
+	err = xenbus_switch_state(pdev->xdev, XenbusStateInitialised);
 	if (err)
 		xenbus_dev_fatal(pdev->xdev, err,
 				 "Error switching to initialised state!");
@@ -386,7 +386,7 @@ static int pciback_xenbus_probe(struct xenbus_device *dev,
 	}
 
 	/* wait for xend to configure us */
-	err = xenbus_switch_state(dev, XBT_NULL, XenbusStateInitWait);
+	err = xenbus_switch_state(dev, XenbusStateInitWait);
 	if (err)
 		goto out;
 

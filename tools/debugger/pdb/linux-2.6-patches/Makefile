@@ -3,6 +3,7 @@ LINUX_DIR  = linux-2.6.12-xenU
 KDIR       = $(XEN_ROOT)/$(LINUX_DIR)
 PATCH_DIR  = $(CURDIR)
 
+.PHONY: patches 
 patches : patches-done
 
 patches-done :

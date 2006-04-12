@@ -27,9 +27,11 @@ import socket
 import commands
 import time
 import re
+import xmlrpclib
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
+import xen.xend.XendClient
 from xen.xend.XendClient import server
 from xen.xend.XendBootloader import bootloader
 from xen.util import blkif
@@ -550,7 +552,7 @@ def configure_vifs(config_devs, vals):
 
         def f(k):
             if k not in ['backend', 'bridge', 'ip', 'mac', 'script', 'type',
-                         'vifname']:
+                         'vifname', 'rate']:
                 err('Invalid vif option: ' + k)
 
             config_vif.append([k, d[k]])
@@ -814,6 +816,14 @@ def make_domain(opts, config):
 
     try:
         dominfo = server.xend.domain.create(config)
+    except xmlrpclib.Fault, ex:
+        import signal
+        if vncpid:
+            os.kill(vncpid, signal.SIGKILL)
+        if ex.faultCode == xen.xend.XendClient.ERROR_INVALID_DOMAIN:
+            err("the domain '%s' does not exist." % ex.faultString)
+        else:
+            err("%s" % ex.faultString)
     except Exception, ex:
         import signal
         if vncpid:
@@ -824,6 +834,9 @@ def make_domain(opts, config):
 
     try:
         server.xend.domain.waitForDevices(dom)
+    except xmlrpclib.Fault, ex:
+        server.xend.domain.destroy(dom)
+        err("%s" % ex.faultString)
     except:
         server.xend.domain.destroy(dom)
         err("Device creation failed for domain %s" % dom)
@@ -836,6 +849,18 @@ def make_domain(opts, config):
             err("Failed to unpause domain %s" % dom)
     opts.info("Started domain %s" % (dom))
     return int(sxp.child_value(dominfo, 'domid'))
+
+
+def get_xauthority():
+    xauth = os.getenv("XAUTHORITY")
+    if not xauth:
+        home = os.getenv("HOME")
+        if not home:
+            import posix, pwd
+            home = pwd.getpwuid(posix.getuid())[5]
+        xauth = home + "/.Xauthority"
+    return xauth
+
 
 def parseCommandLine(argv):
     gopts.reset()
@@ -851,7 +876,7 @@ def parseCommandLine(argv):
         gopts.vals.display = os.getenv("DISPLAY")
 
     if not gopts.vals.xauthority:
-        gopts.vals.xauthority = os.getenv("XAUTHORITY")
+        gopts.vals.xauthority = get_xauthority()
 
     # Process remaining args as config variables.
     for arg in args:

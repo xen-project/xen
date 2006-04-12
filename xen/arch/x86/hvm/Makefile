@@ -1,5 +1,3 @@
-include $(BASEDIR)/Rules.mk
-
 subdir-y += svm
 subdir-y += vmx
 
@@ -10,5 +8,3 @@ obj-y += io.o
 obj-y += platform.o
 obj-y += vioapic.o
 obj-y += vlapic.o
-
-include $(BASEDIR)/Post.mk

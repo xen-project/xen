@@ -14,6 +14,7 @@
 #include <xen/grant_table.h>
 #include <xen/rangeset.h>
 #include <asm/domain.h>
+#include <xen/xenoprof.h>
 
 extern unsigned long volatile jiffies;
 extern rwlock_t domlist_lock;
@@ -133,7 +134,7 @@ struct domain
      */
 #define NR_PIRQS 256 /* Put this somewhere sane! */
     u16              pirq_to_evtchn[NR_PIRQS];
-    u32              pirq_mask[NR_PIRQS/32];
+    DECLARE_BITMAP(pirq_mask, NR_PIRQS);
 
     /* I/O capabilities (access to IRQs and memory-mapped I/O). */
     struct rangeset *iomem_caps;
@@ -155,6 +156,9 @@ struct domain
 
     /* Control-plane tools handle for this domain. */
     xen_domain_handle_t handle;
+
+    /* OProfile support. */
+    struct xenoprof *xenoprof;
 };
 
 struct domain_setup_info

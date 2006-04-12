@@ -16,8 +16,10 @@ CFLAGS  += -I $(XEN_XENSTORE)
 
 BIN      = xenconsoled xenconsole
 
+.PHONY: all
 all: $(BIN)
 
+.PHONY: clean
 clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN)
 	$(RM) client/*.o daemon/*.o
@@ -30,6 +32,7 @@ xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
 	$(CC) $(CFLAGS) $^ -o $@ -L$(XEN_LIBXC) -L$(XEN_XENSTORE) \
 	      -lxenctrl -lxenstore
 
+.PHONY: install
 install: $(BIN)
 	$(INSTALL_DIR) -p $(DESTDIR)/$(DAEMON_INSTALL_DIR)
 	$(INSTALL_PROG) xenconsoled $(DESTDIR)/$(DAEMON_INSTALL_DIR)

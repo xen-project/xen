@@ -69,7 +69,7 @@ dma_map_sg(struct device *hwdev, struct scatterlist *sg, int nents,
 	} else {
 		for (i = 0; i < nents; i++ ) {
 			sg[i].dma_address =
-				page_to_phys(sg[i].page) + sg[i].offset;
+				page_to_bus(sg[i].page) + sg[i].offset;
 			sg[i].dma_length  = sg[i].length;
 			BUG_ON(!sg[i].page);
 			IOMMU_BUG_ON(address_needs_mapping(
@@ -105,7 +105,7 @@ dma_map_page(struct device *dev, struct page *page, unsigned long offset,
 		dma_addr = swiotlb_map_page(
 			dev, page, offset, size, direction);
 	} else {
-		dma_addr = page_to_phys(page) + offset;
+		dma_addr = page_to_bus(page) + offset;
 		IOMMU_BUG_ON(address_needs_mapping(dev, dma_addr));
 	}
 

@@ -123,6 +123,16 @@ static inline void hvm_mmio_access(struct vcpu *v,
         req->u.data = tmp1;
         break;
 
+    case IOREQ_TYPE_XCHG:
+        /* 
+         * Note that we don't need to be atomic here since VCPU is accessing
+         * its own local APIC.
+         */
+        tmp1 = read_handler(v, req->addr, req->size);
+        write_handler(v, req->addr, req->size, (unsigned long) req->u.data);
+        req->u.data = tmp1;
+        break;
+
     default:
         printk("error ioreq type for local APIC %x\n", req->type);
         domain_crash_synchronous();
@@ -143,7 +153,7 @@ int hvm_mmio_intercept(ioreq_t *p)
         if ( hvm_mmio_handlers[i]->check_handler(v, p->addr) ) {
             hvm_mmio_access(v, p,
                             hvm_mmio_handlers[i]->read_handler,
-	                    hvm_mmio_handlers[i]->write_handler);
+                            hvm_mmio_handlers[i]->write_handler);
             return 1;
         }
     }

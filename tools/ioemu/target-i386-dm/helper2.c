@@ -409,12 +409,20 @@ int xc_handle;
 void
 destroy_hvm_domain(void)
 {
-    extern FILE* logfile;
-    char destroy_cmd[32];
-
-    sprintf(destroy_cmd, "xm destroy %d", domid);
-    if (system(destroy_cmd) == -1)
-        fprintf(logfile, "%s failed.!\n", destroy_cmd);
+   int xcHandle;
+   int sts;
+ 
+   xcHandle = xc_interface_open();
+   if (xcHandle < 0)
+     fprintf(logfile, "Cannot acquire xenctrl handle\n");
+   else {
+     sts = xc_domain_shutdown(xcHandle, domid, SHUTDOWN_poweroff);
+     if (sts != 0)
+       fprintf(logfile, "? xc_domain_shutdown failed to issue poweroff, sts %d, errno %d\n", sts, errno);
+     else
+       fprintf(logfile, "Issued domain %d poweroff\n", domid);
+     xc_interface_close(xcHandle);
+   }
 }
 
 fd_set wakeup_rfds;
@@ -480,13 +488,24 @@ int main_loop(void)
 
 static void qemu_hvm_reset(void *unused)
 {
-    char cmd[64];
+   int xcHandle;
+   int sts;
 
-    /* pause domain first, to avoid repeated reboot request*/
-    xc_domain_pause(xc_handle, domid);
+   /* pause domain first, to avoid repeated reboot request*/
+   xc_domain_pause(xc_handle, domid);
 
-    sprintf(cmd, "xm shutdown -R %d", domid);
-    system(cmd);
+   xcHandle = xc_interface_open();
+   if (xcHandle < 0)
+     fprintf(logfile, "Cannot acquire xenctrl handle\n");
+   else {
+     sts = xc_domain_shutdown(xcHandle, domid, SHUTDOWN_reboot);
+     if (sts != 0)
+       fprintf(logfile, "? xc_domain_shutdown failed to issue reboot, sts %d\n", sts);
+     else
+       fprintf(logfile, "Issued domain %d reboot\n", domid);
+     xc_interface_close(xcHandle);
+   }
+ 
 }
 
 CPUState * cpu_init()

@@ -8,10 +8,13 @@ OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
 
 TARGET   = nsplitd
 
+.PHONY: all
 all: $(TARGET)
 
+.PHONY: install
 install: all
 
+.PHONY: clean
 clean:
 	$(RM) *.o $(TARGET) *~
 

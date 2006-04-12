@@ -41,10 +41,6 @@
 #include <xen/kernel.h>
 #include <xen/multicall.h>
 
-/* opt_noreboot: If true, machine will need manual reset on error. */
-static int opt_noreboot = 0;
-boolean_param("noreboot", opt_noreboot);
-
 struct percpu_ctxt {
     struct vcpu *curr_vcpu;
     unsigned int dirty_segment_mask;
@@ -79,15 +75,12 @@ void idle_loop(void)
 
     for ( ; ; )
     {
-        irq_stat[cpu].idle_timestamp = jiffies;
+        page_scrub_schedule_work();
 
-        while ( !softirq_pending(cpu) )
-        {
-            page_scrub_schedule_work();
-            default_idle();
-        }
+        default_idle();
 
-        do_softirq();
+        if ( softirq_pending(cpu) )
+            do_softirq();
     }
 }
 
@@ -101,84 +94,6 @@ void startup_cpu_idle_loop(void)
 
     reset_stack_and_jump(idle_loop);
 }
-
-static long no_idt[2];
-static int reboot_mode;
-
-static inline void kb_wait(void)
-{
-    int i;
-
-    for ( i = 0; i < 0x10000; i++ )
-        if ( (inb_p(0x64) & 0x02) == 0 )
-            break;
-}
-
-void __attribute__((noreturn)) __machine_halt(void *unused)
-{
-    for ( ; ; )
-        safe_halt();
-}
-
-void machine_halt(void)
-{
-    watchdog_disable();
-    console_start_sync();
-    smp_call_function(__machine_halt, NULL, 1, 0);
-    __machine_halt(NULL);
-}
-
-void machine_restart(char * __unused)
-{
-    int i;
-
-    if ( opt_noreboot )
-    {
-        printk("Reboot disabled on cmdline: require manual reset\n");
-        machine_halt();
-    }
-
-    watchdog_disable();
-    console_start_sync();
-
-    local_irq_enable();
-
-    /* Ensure we are the boot CPU. */
-    if ( GET_APIC_ID(apic_read(APIC_ID)) != boot_cpu_physical_apicid )
-    {
-        smp_call_function((void *)machine_restart, NULL, 1, 0);
-        for ( ; ; )
-            safe_halt();
-    }
-
-    /*
-     * Stop all CPUs and turn off local APICs and the IO-APIC, so
-     * other OSs see a clean IRQ state.
-     */
-    smp_send_stop();
-    disable_IO_APIC();
-    hvm_disable();
-
-    /* Rebooting needs to touch the page at absolute address 0. */
-    *((unsigned short *)__va(0x472)) = reboot_mode;
-
-    for ( ; ; )
-    {
-        /* Pulse the keyboard reset line. */
-        for ( i = 0; i < 100; i++ )
-        {
-            kb_wait();
-            udelay(50);
-            outb(0xfe,0x64); /* pulse reset low */
-            udelay(50);
-        }
-
-        /* That didn't work - force a triple fault.. */
-        __asm__ __volatile__("lidt %0": "=m" (no_idt));
-        __asm__ __volatile__("int3");
-    }
-}
-
 
 void dump_pageframe_info(struct domain *d)
 {
@@ -208,6 +123,11 @@ void dump_pageframe_info(struct domain *d)
     }
 }
 
+void set_current_execstate(struct vcpu *v)
+{
+    percpu_ctxt[smp_processor_id()].curr_vcpu = v;
+}
+
 struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 {
     struct vcpu *v;
@@ -219,15 +139,8 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 
     v->arch.flags = TF_kernel_mode;
 
-    if ( is_idle_domain(d) )
-    {
-        percpu_ctxt[vcpu_id].curr_vcpu = v;
-        v->arch.schedule_tail = continue_idle_domain;
-    }
-    else
-    {
-        v->arch.schedule_tail = continue_nonidle_domain;
-    }
+    v->arch.schedule_tail = is_idle_domain(d) ?
+        continue_idle_domain : continue_nonidle_domain;
 
     v->arch.ctxt_switch_from = paravirt_ctxt_switch_from;
     v->arch.ctxt_switch_to   = paravirt_ctxt_switch_to;
@@ -395,7 +308,7 @@ int arch_set_info_guest(
     }
     else if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
     {
-        hvm_modify_guest_state(v);
+        hvm_load_cpu_guest_regs(v, &v->arch.guest_context.user_regs);
     }
 
     if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
@@ -450,7 +363,7 @@ int arch_set_info_guest(
     update_pagetables(v);
 
     if ( v->vcpu_id == 0 )
-        init_domain_time(d);
+        update_domain_wallclock_time(d);
 
     /* Don't redo final setup */
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
@@ -1048,6 +961,10 @@ void domain_relinquish_resources(struct domain *d)
     /* Relinquish every page of memory. */
     relinquish_memory(d, &d->xenpage_list);
     relinquish_memory(d, &d->page_list);
+
+    /* Free page used by xen oprofile buffer */
+    free_xenoprof_pages(d);
+
 }
 
 void arch_dump_domain_info(struct domain *d)

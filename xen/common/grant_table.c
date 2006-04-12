@@ -618,8 +618,10 @@ gnttab_transfer(
             return -EFAULT;
         }
 
+        mfn = gmfn_to_mfn(d, gop.mfn);
+
         /* Check the passed page frame for basic validity. */
-        if ( unlikely(!mfn_valid(gop.mfn)) )
+        if ( unlikely(!mfn_valid(mfn)) )
         { 
             DPRINTK("gnttab_transfer: out-of-range %lx\n",
                     (unsigned long)gop.mfn);
@@ -627,7 +629,6 @@ gnttab_transfer(
             goto copyback;
         }
 
-        mfn = gmfn_to_mfn(d, gop.mfn);
         page = mfn_to_page(mfn);
         if ( unlikely(IS_XEN_HEAP_FRAME(page)) )
         { 

@@ -99,6 +99,9 @@ static struct ns16550 {
 #define PARITY_MARK     (5<<3)
 #define PARITY_SPACE    (7<<3)
 
+/* Frequency of external clock source. This definition assumes PC platform. */
+#define UART_CLOCK_HZ   1843200
+
 static char ns_read_reg(struct ns16550 *uart, int reg)
 {
     if ( uart->remapped_io_base == NULL )
@@ -171,6 +174,7 @@ static void ns16550_init_preirq(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
     unsigned char lcr;
+    unsigned int  divisor;
 
     /* I/O ports are distinguished by their size (16 bits). */
     if ( uart->io_base >= 0x10000 )
@@ -182,13 +186,22 @@ static void ns16550_init_preirq(struct serial_port *port)
     ns_write_reg(uart, IER, 0);
 
     /* Line control and baud-rate generator. */
+    ns_write_reg(uart, LCR, lcr | LCR_DLAB);
     if ( uart->baud != BAUD_AUTO )
     {
-        ns_write_reg(uart, LCR, lcr | LCR_DLAB);
-        ns_write_reg(uart, DLL, 115200/uart->baud); /* baud lo */
-        ns_write_reg(uart, DLM, 0);                 /* baud hi */
+        /* Baud rate specified: program it into the divisor latch. */
+        divisor = UART_CLOCK_HZ / (uart->baud * 16);
+        ns_write_reg(uart, DLL, (char)divisor);
+        ns_write_reg(uart, DLM, (char)(divisor >> 8));
     }
-    ns_write_reg(uart, LCR, lcr);               /* parity, data, stop */
+    else
+    {
+        /* Baud rate already set: read it out from the divisor latch. */
+        divisor  = ns_read_reg(uart, DLL);
+        divisor |= ns_read_reg(uart, DLM) << 8;
+        uart->baud = UART_CLOCK_HZ / (divisor * 16);
+    }
+    ns_write_reg(uart, LCR, lcr);
 
     /* No flow ctrl: DTR and RTS are both wedged high to keep remote happy. */
     ns_write_reg(uart, MCR, MCR_DTR | MCR_RTS);

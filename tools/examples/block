@@ -72,7 +72,7 @@ check_sharing()
   then
     toskip="^$"
   else
-    toskip="^[^ ]* [^ ]* [^ ]* ro "
+    toskip="^[^ ]* [^ ]* [^ ]* ro[, ]"
   fi
 
   for file in $(cat /proc/mounts | grep -v "$toskip" | cut -f 1 -d ' ')

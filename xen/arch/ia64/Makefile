@@ -1,21 +1,17 @@
-include $(BASEDIR)/Rules.mk
-
 subdir-y += xen
 subdir-y += vmx
 subdir-y += linux
 subdir-y += linux-xen
 
-include $(BASEDIR)/Post.mk
-
 $(TARGET)-syms: linux-xen/head.o $(ALL_OBJS) xen.lds.s
 	$(LD) $(LDFLAGS) -T xen.lds.s -N \
 		-Map map.out linux-xen/head.o $(ALL_OBJS) -o $@
 	$(NM) -n $@ | $(BASEDIR)/tools/symbols > $(BASEDIR)/xen-syms.S
-	$(MAKE) $(BASEDIR)/xen-syms.o
+	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/xen-syms.o
 	$(LD) $(LDFLAGS) -T xen.lds.s -N \
 		-Map map.out linux-xen/head.o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
 	$(NM) -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
-	$(MAKE) $(BASEDIR)/xen-syms.o
+	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/xen-syms.o
 	$(LD) $(LDFLAGS) -T xen.lds.s -N \
 		-Map map.out linux-xen/head.o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
 	rm -f $(BASEDIR)/xen-syms.S $(BASEDIR)/xen-syms.o
@@ -78,10 +74,11 @@ $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 
 # I'm sure a Makefile wizard would know a better way to do this
 xen.lds.s: xen/xen.lds.S
-	$(CC) -E $(CPPFLAGS) -P -DXEN -D__ASSEMBLY__ \
+	$(CC) -E $(CPPFLAGS) -P -DXEN $(AFLAGS) \
 		-o xen.lds.s xen/xen.lds.S
 
-clean:: FORCE
+.PHONY: clean
+clean::
 	rm -f *.o *~ core  xen.lds.s $(BASEDIR)/include/asm-ia64/.offsets.h.stamp asm-offsets.s map.out
 	rm -f asm-xsi-offsets.s $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
 	rm -f $(BASEDIR)/System.map

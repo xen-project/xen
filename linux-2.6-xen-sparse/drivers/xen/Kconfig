@@ -10,12 +10,11 @@ config XEN
 	help
 	  This is the Linux Xen port.
 
-config NO_IDLE_HZ
-	bool
-	depends on XEN
-	default y
-
 if XEN
+config XEN_INTERFACE_VERSION
+	hex
+	default 0x00030101
+
 menu "XEN"
 
 config XEN_PRIVILEGED_GUEST
@@ -29,9 +28,16 @@ config XEN_UNPRIVILEGED_GUEST
 	bool
 	default !XEN_PRIVILEGED_GUEST
 
+config XEN_BACKEND
+        tristate "Backend driver support"
+        default y
+        help
+          Support for backend device drivers that provide I/O services
+          to other virtual machines.
+
 config XEN_PCIDEV_BACKEND
 	tristate "PCI device backend driver"
-	depends PCI
+	depends on PCI && XEN_BACKEND
 	default XEN_PRIVILEGED_GUEST
 	help
 	  The PCI device backend driver allows the kernel to export arbitrary
@@ -71,6 +77,7 @@ config XEN_PCIDEV_BE_DEBUG
 
 config XEN_BLKDEV_BACKEND
 	tristate "Block-device backend driver"
+        depends on XEN_BACKEND
 	default y
 	help
 	  The block-device backend driver allows the kernel to export its
@@ -92,6 +99,7 @@ config XEN_BLKDEV_TAP_BE
 
 config XEN_NETDEV_BACKEND
 	tristate "Network-device backend driver"
+        depends on XEN_BACKEND
 	default y
 	help
 	  The network-device backend driver allows the kernel to export its
@@ -121,6 +129,7 @@ config XEN_NETDEV_LOOPBACK
 
 config XEN_TPMDEV_BACKEND
 	tristate "TPM-device backend driver"
+        depends on XEN_BACKEND
 	default n
 	help
 	  The TPM-device backend driver
@@ -156,6 +165,7 @@ config XEN_NETDEV_FRONTEND
 
 config XEN_BLKDEV_TAP
 	tristate "Block device tap driver"
+        depends on XEN_BACKEND
 	default n
 	help
 	  This driver allows a VM to interact on block device channels
@@ -191,7 +201,6 @@ config XEN_DISABLE_SERIAL
 
 config XEN_SYSFS
 	tristate "Export Xen attributes in sysfs"
-	depends on XEN
 	depends on SYSFS
 	default y
 	help
@@ -204,6 +213,10 @@ config HAVE_ARCH_ALLOC_SKB
 	default y
 
 config HAVE_ARCH_DEV_ALLOC_SKB
+	bool
+	default y
+
+config NO_IDLE_HZ
 	bool
 	default y
 

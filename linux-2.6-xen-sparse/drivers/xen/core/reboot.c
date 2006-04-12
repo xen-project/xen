@@ -15,6 +15,7 @@
 #include <xen/xenbus.h>
 #include <linux/cpu.h>
 #include <linux/kthread.h>
+#include <xen/gnttab.h>
 #include <xen/xencons.h>
 
 #if defined(__i386__) || defined(__x86_64__)
@@ -41,7 +42,7 @@ void machine_emergency_restart(void)
 {
 	/* We really want to get pending console data out before we die. */
 	xencons_force_flush();
-	HYPERVISOR_sched_op(SCHEDOP_shutdown, SHUTDOWN_reboot);
+	HYPERVISOR_shutdown(SHUTDOWN_reboot);
 }
 
 void machine_restart(char * __unused)
@@ -58,7 +59,11 @@ void machine_power_off(void)
 {
 	/* We really want to get pending console data out before we die. */
 	xencons_force_flush();
-	HYPERVISOR_sched_op(SCHEDOP_shutdown, SHUTDOWN_poweroff);
+#if defined(__i386__) || defined(__x86_64__)
+	if (pm_power_off)
+		pm_power_off();
+#endif
+	HYPERVISOR_shutdown(SHUTDOWN_poweroff);
 }
 
 int reboot_thru_bios = 0;	/* for dmi_scan.c */
@@ -76,30 +81,40 @@ static int shutting_down = SHUTDOWN_INVALID;
 static void __shutdown_handler(void *unused);
 static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
 
-#ifndef CONFIG_HOTPLUG_CPU
-#define cpu_down(x) (-EOPNOTSUPP)
-#define cpu_up(x) (-EOPNOTSUPP)
+#ifdef CONFIG_SMP
+int  smp_suspend(void);
+void smp_resume(void);
+#else
+#define smp_suspend()	(0)
+#define smp_resume()	((void)0)
 #endif
 
+/* Ensure we run on the idle task page tables so that we will
+   switch page tables before running user space. This is needed
+   on architectures with separate kernel and user page tables
+   because the user page table pointer is not saved/restored. */
+static void switch_idle_mm(void)
+{
+	struct mm_struct *mm = current->active_mm;
+
+	if (mm == &init_mm)
+		return;
+
+	atomic_inc(&init_mm.mm_count);
+	switch_mm(mm, &init_mm, current);
+	current->active_mm = &init_mm;
+	mmdrop(mm);
+}
 
 static int __do_suspend(void *ignore)
 {
-	int i, j, k, fpp;
+	int i, j, k, fpp, err;
 
 	extern unsigned long max_pfn;
 	extern unsigned long *pfn_to_mfn_frame_list_list;
 	extern unsigned long *pfn_to_mfn_frame_list[];
 
-	extern int gnttab_suspend(void);
-	extern int gnttab_resume(void);
 	extern void time_resume(void);
-
-#ifdef CONFIG_SMP
-	cpumask_t prev_online_cpus;
-	int vcpu_prepare(int vcpu);
-#endif
-
-	int err = 0;
 
 	BUG_ON(smp_processor_id() != 0);
 	BUG_ON(in_interrupt());
@@ -110,50 +125,21 @@ static int __do_suspend(void *ignore)
 		return -EOPNOTSUPP;
 	}
 
-#if defined(CONFIG_SMP) && !defined(CONFIG_HOTPLUG_CPU)
-	if (num_online_cpus() > 1) {
-		printk(KERN_WARNING "Can't suspend SMP guests "
-		       "without CONFIG_HOTPLUG_CPU\n");
-		return -EOPNOTSUPP;
-	}
-#endif
+	err = smp_suspend();
+	if (err)
+		return err;
 
 	xenbus_suspend();
-
-	lock_cpu_hotplug();
-#ifdef CONFIG_SMP
-	/*
-	 * Take all other CPUs offline. We hold the hotplug mutex to
-	 * avoid other processes bringing up CPUs under our feet.
-	 */
-	cpus_clear(prev_online_cpus);
-	while (num_online_cpus() > 1) {
-		for_each_online_cpu(i) {
-			if (i == 0)
-				continue;
-			unlock_cpu_hotplug();
-			err = cpu_down(i);
-			lock_cpu_hotplug();
-			if (err != 0) {
-				printk(KERN_CRIT "Failed to take all CPUs "
-				       "down: %d.\n", err);
-				goto out_reenable_cpus;
-			}
-			cpu_set(i, prev_online_cpus);
-		}
-	}
-#endif
 
 	preempt_disable();
 
 #ifdef __i386__
 	kmem_cache_shrink(pgd_cache);
-	mm_pin_all();
 #endif
+	mm_pin_all();
 
 	__cli();
 	preempt_enable();
-	unlock_cpu_hotplug();
 
 	gnttab_suspend();
 
@@ -199,34 +185,15 @@ static int __do_suspend(void *ignore)
 
 	time_resume();
 
+	switch_idle_mm();
+
 	__sti();
 
 	xencons_resume();
 
-#ifdef CONFIG_SMP
-	for_each_cpu(i)
-		vcpu_prepare(i);
-
-#endif
-
-	/*
-	 * Only resume xenbus /after/ we've prepared our VCPUs; otherwise
-	 * the VCPU hotplug callback can race with our vcpu_prepare
-	 */
 	xenbus_resume();
 
-#ifdef CONFIG_SMP
- out_reenable_cpus:
-	for_each_cpu_mask(i, prev_online_cpus) {
-		j = cpu_up(i);
-		if ((j != 0) && !cpu_online(i)) {
-			printk(KERN_CRIT "Failed to bring cpu "
-			       "%d back up (%d).\n",
-			       i, j);
-			err = j;
-		}
-	}
-#endif
+	smp_resume();
 
 	return err;
 }
@@ -334,7 +301,6 @@ static void shutdown_handler(struct xenbus_watch *watch,
 	kfree(str);
 }
 
-#ifdef CONFIG_MAGIC_SYSRQ
 static void sysrq_handler(struct xenbus_watch *watch, const char **vec,
 			  unsigned int len)
 {
@@ -360,45 +326,35 @@ static void sysrq_handler(struct xenbus_watch *watch, const char **vec,
 	if (err == -EAGAIN)
 		goto again;
 
-	if (sysrq_key != '\0') {
+#ifdef CONFIG_MAGIC_SYSRQ
+	if (sysrq_key != '\0')
 		handle_sysrq(sysrq_key, NULL, NULL);
-	}
-}
 #endif
+}
 
 static struct xenbus_watch shutdown_watch = {
 	.node = "control/shutdown",
 	.callback = shutdown_handler
 };
 
-#ifdef CONFIG_MAGIC_SYSRQ
 static struct xenbus_watch sysrq_watch = {
 	.node ="control/sysrq",
 	.callback = sysrq_handler
 };
-#endif
 
 static int setup_shutdown_watcher(struct notifier_block *notifier,
                                   unsigned long event,
                                   void *data)
 {
-	int err1 = 0;
-#ifdef CONFIG_MAGIC_SYSRQ
-	int err2 = 0;
-#endif
+	int err;
 
-	err1 = register_xenbus_watch(&shutdown_watch);
-#ifdef CONFIG_MAGIC_SYSRQ
-	err2 = register_xenbus_watch(&sysrq_watch);
-#endif
-
-	if (err1)
+	err = register_xenbus_watch(&shutdown_watch);
+	if (err)
 		printk(KERN_ERR "Failed to set shutdown watcher\n");
 
-#ifdef CONFIG_MAGIC_SYSRQ
-	if (err2)
+	err = register_xenbus_watch(&sysrq_watch);
+	if (err)
 		printk(KERN_ERR "Failed to set sysrq watcher\n");
-#endif
 
 	return NOTIFY_DONE;
 }

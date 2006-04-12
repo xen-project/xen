@@ -1317,6 +1317,11 @@ void __init setup_bootmem_allocator(void)
 		}
 	}
 #endif
+#ifdef CONFIG_KEXEC
+	if (crashk_res.start != crashk_res.end)
+		reserve_bootmem(crashk_res.start,
+			crashk_res.end - crashk_res.start + 1);
+#endif
 
 	if (!xen_feature(XENFEAT_auto_translated_physmap))
 		phys_to_machine_mapping =
@@ -1435,11 +1440,6 @@ legacy_init_iomem_resources(struct resource *code_resource, struct resource *dat
 #endif
 		}
 	}
-#endif
-#ifdef CONFIG_KEXEC
-	if (crashk_res.start != crashk_res.end)
-		reserve_bootmem(crashk_res.start,
-			crashk_res.end - crashk_res.start + 1);
 #endif
 }
 
@@ -1633,9 +1633,9 @@ void __init setup_arch(char **cmdline_p)
 	physdev_op_t op;
 	unsigned long max_low_pfn;
 
-	/* Force a quick death if the kernel panics. */
+	/* Force a quick death if the kernel panics (not domain 0). */
 	extern int panic_timeout;
-	if (panic_timeout == 0)
+	if (!panic_timeout && !(xen_start_info->flags & SIF_INITDOMAIN))
 		panic_timeout = 1;
 
 	/* Register a call for panic conditions. */
@@ -1848,10 +1848,6 @@ void __init setup_arch(char **cmdline_p)
 		get_smp_config();
 #endif
 
-	/* XXX Disable irqdebug until we have a way to avoid interrupt
-	 * conflicts. */
-	noirqdebug_setup("");
-
 	register_memory();
 
 	if (xen_start_info->flags & SIF_INITDOMAIN) {
@@ -1877,7 +1873,7 @@ void __init setup_arch(char **cmdline_p)
 static int
 xen_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
-	HYPERVISOR_sched_op(SCHEDOP_shutdown, SHUTDOWN_crash);
+	HYPERVISOR_shutdown(SHUTDOWN_crash);
 	/* we're never actually going to get here... */
 	return NOTIFY_DONE;
 }

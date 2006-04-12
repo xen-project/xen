@@ -404,6 +404,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     BUG_ON(idle_domain == NULL);
 
     set_current(idle_domain->vcpu[0]);
+    set_current_execstate(idle_domain->vcpu[0]);
     idle_vcpu[0] = current;
 
     paging_init();

@@ -84,7 +84,13 @@ s_time_t get_s_time(void)
     return now; 
 }
 
-void update_dom_time(struct vcpu *v)
+void update_vcpu_system_time(struct vcpu *v)
+{
+    /* N-op here, and let dom0 to manage system time directly */
+    return;
+}
+
+void update_domain_wallclock_time(struct domain *d)
 {
     /* N-op here, and let dom0 to manage system time directly */
     return;
@@ -239,6 +245,6 @@ int reprogram_timer(s_time_t timeout)
 
 void send_timer_event(struct vcpu *v)
 {
-	send_guest_virq(v, VIRQ_TIMER);
+	send_guest_vcpu_virq(v, VIRQ_TIMER);
 }
 

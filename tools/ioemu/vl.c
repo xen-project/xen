@@ -2556,8 +2556,10 @@ static int set_mm_mapping(int xc_handle,
         return -1;
     }
 
+#if 0 /* Generates lots of log file output - turn on for debugging */
     for (i = 0; i < nr_pages; i++)
         fprintf(stderr, "set_map result i %x result %lx\n", i, extent_start[i]);
+#endif
 
     return 0;
 }
@@ -3244,8 +3246,17 @@ int main(int argc, char **argv)
     /* we always create the cdrom drive, even if no disk is there */
     bdrv_init();
     if (has_cdrom) {
-        bs_table[2] = bdrv_new("cdrom");
-        bdrv_set_type_hint(bs_table[2], BDRV_TYPE_CDROM);
+        int fd;
+        if ( (fd = open(hd_filename[2], O_RDONLY | O_BINARY)) < 0) {
+                hd_filename[2]=NULL;
+                bs_table[2]=NULL;
+                fprintf(logfile, "Could not open CD %s.\n", hd_filename[i]);
+        }
+        else {
+                close(fd);
+                bs_table[2] = bdrv_new("cdrom");
+                bdrv_set_type_hint(bs_table[2], BDRV_TYPE_CDROM);
+        }
     }
 
     /* open the virtual block devices */

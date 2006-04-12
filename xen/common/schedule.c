@@ -332,7 +332,7 @@ static long do_yield(void)
     return 0;
 }
 
-long do_sched_op(int cmd, unsigned long arg)
+long do_sched_op_compat(int cmd, unsigned long arg)
 {
     long ret = 0;
 
@@ -365,7 +365,7 @@ long do_sched_op(int cmd, unsigned long arg)
     return ret;
 }
 
-long do_sched_op_new(int cmd, GUEST_HANDLE(void) arg)
+long do_sched_op(int cmd, GUEST_HANDLE(void) arg)
 {
     long ret = 0;
 
@@ -409,6 +409,30 @@ long do_sched_op_new(int cmd, GUEST_HANDLE(void) arg)
             break;
 
         ret = do_poll(&sched_poll);
+
+        break;
+    }
+
+    case SCHEDOP_remote_shutdown:
+    {
+        struct domain *d;
+        struct sched_remote_shutdown sched_remote_shutdown;
+
+        if ( !IS_PRIV(current->domain) )
+            return -EPERM;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&sched_remote_shutdown, arg, 1) )
+            break;
+
+        ret = -ESRCH;
+        d = find_domain_by_id(sched_remote_shutdown.domain_id);
+        if ( d == NULL )
+            break;
+
+        domain_shutdown(d, (u8)sched_remote_shutdown.reason);
+        put_domain(d);
+        ret = 0;
 
         break;
     }
@@ -572,7 +596,7 @@ static void __enter_scheduler(void)
     /* Ensure that the domain has an up-to-date time base. */
     if ( !is_idle_vcpu(next) )
     {
-        update_dom_time(next);
+        update_vcpu_system_time(next);
         if ( next->sleep_tick != schedule_data[cpu].tick )
             send_timer_event(next);
     }
@@ -609,7 +633,7 @@ static void t_timer_fn(void *unused)
 
     if ( !is_idle_vcpu(v) )
     {
-        update_dom_time(v);
+        update_vcpu_system_time(v);
         send_timer_event(v);
     }
 
@@ -623,7 +647,7 @@ static void dom_timer_fn(void *data)
 {
     struct vcpu *v = data;
 
-    update_dom_time(v);
+    update_vcpu_system_time(v);
     send_timer_event(v);
 }
 

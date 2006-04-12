@@ -21,6 +21,7 @@
 # External CFLAGS can do more harm than good.
 CFLAGS :=
 
+XEN_TARGET_ARCH = x86_32
 XEN_ROOT = ../../..
 include $(XEN_ROOT)/Config.mk
 
@@ -38,10 +39,10 @@ CFLAGS  += $(call test-gcc-flag,$(CC),-fno-stack-protector)
 CFLAGS  += $(call test-gcc-flag,$(CC),-fno-stack-protector-all)
 
 OBJCOPY  = objcopy
-CFLAGS  += $(DEFINES) -I. $(XENINC) -Wall -fno-builtin -O2 -msoft-float
-CFLAGS  += -m32 -march=i686
+CFLAGS  += $(DEFINES) -I. $(XENINC) -fno-builtin -O2 -msoft-float
 LDFLAGS  = -m32 -nostdlib -Wl,-N -Wl,-Ttext -Wl,$(LOADADDR)
 
+.PHONY: all
 all: hvmloader
 
 hvmloader: roms.h hvmloader.c acpi_madt.c
@@ -57,6 +58,7 @@ roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabi
 	./mkhex vmxassist ../vmxassist/vmxassist.bin >> roms.h
 	./mkhex acpi ../acpi/acpi.bin >> roms.h
 
+.PHONY: clean
 clean:
 	rm -f roms.h acpi.h
 	rm -f hvmloader hvmloader.tmp hvmloader.o $(OBJECTS)

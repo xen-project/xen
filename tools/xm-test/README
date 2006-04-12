@@ -140,9 +140,11 @@ and test lists as required. Default group run is "grouptest/default".
    # ./runtest.sh -g <groupname> <logfile>
 
 * NOTE: There is a quick set of tests in group mode, that was added to
-run certain casenames and tests. It is not a substitute for the full
+run certain casenames and tests, and there is a "medium" group, which is a
+medium-length run (around 20 minutes).  Neither is a substitute for the full
 xm-test test suite.
    # ./runtest.sh -g quick <logfile>
+   # ./runtest.sh -g medium <logfile>
 
 
 

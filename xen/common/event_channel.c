@@ -3,7 +3,7 @@
  * 
  * Event notifications from VIRQs, PIRQs, and other domains.
  * 
- * Copyright (c) 2003-2005, K A Fraser.
+ * Copyright (c) 2003-2006, K A Fraser.
  * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -45,6 +45,29 @@
         rc = (_errno);                                              \
         goto out;                                                   \
     } while ( 0 )
+
+
+static int virq_is_global(int virq)
+{
+    int rc;
+
+    ASSERT((virq >= 0) && (virq < NR_VIRQS));
+
+    switch ( virq )
+    {
+    case VIRQ_TIMER:
+    case VIRQ_DEBUG:
+    case VIRQ_XENOPROF:
+        rc = 0;
+        break;
+    default:
+        rc = 1;
+        break;
+    }
+
+    return rc;
+}
+
 
 static int get_free_port(struct domain *d)
 {
@@ -179,6 +202,9 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
     long           rc = 0;
 
     if ( virq >= ARRAY_SIZE(v->virq_to_evtchn) )
+        return -EINVAL;
+
+    if ( virq_is_global(virq) && (vcpu != 0) )
         return -EINVAL;
 
     if ( (vcpu >= ARRAY_SIZE(d->vcpu)) || ((v = d->vcpu[vcpu]) == NULL) )
@@ -360,7 +386,7 @@ static long __evtchn_close(struct domain *d1, int port1)
             rc = -EINVAL;
             goto out;
         }
-    
+
         port2 = chn1->u.interdomain.remote_port;
         BUG_ON(!port_is_valid(d2, port2));
 
@@ -438,6 +464,7 @@ long evtchn_send(unsigned int lport)
     return ret;
 }
 
+
 void evtchn_set_pending(struct vcpu *v, int port)
 {
     struct domain *d = v->domain;
@@ -471,20 +498,47 @@ void evtchn_set_pending(struct vcpu *v, int port)
     }
 }
 
-void send_guest_virq(struct vcpu *v, int virq)
-{
-    int port = v->virq_to_evtchn[virq];
 
-    if ( likely(port != 0) )
-        evtchn_set_pending(v, port);
+void send_guest_vcpu_virq(struct vcpu *v, int virq)
+{
+    int port;
+
+    ASSERT(!virq_is_global(virq));
+
+    port = v->virq_to_evtchn[virq];
+    if ( unlikely(port == 0) )
+        return;
+
+    evtchn_set_pending(v, port);
 }
+
+void send_guest_global_virq(struct domain *d, int virq)
+{
+    int port;
+    struct evtchn *chn;
+
+    ASSERT(virq_is_global(virq));
+
+    port = d->vcpu[0]->virq_to_evtchn[virq];
+    if ( unlikely(port == 0) )
+        return;
+
+    chn = evtchn_from_port(d, port);
+    evtchn_set_pending(d->vcpu[chn->notify_vcpu_id], port);
+}
+
 
 void send_guest_pirq(struct domain *d, int pirq)
 {
     int port = d->pirq_to_evtchn[pirq];
-    struct evtchn *chn = evtchn_from_port(d, port);
+    struct evtchn *chn;
+
+    ASSERT(port != 0);
+
+    chn = evtchn_from_port(d, port);
     evtchn_set_pending(d->vcpu[chn->notify_vcpu_id], port);
 }
+
 
 static long evtchn_status(evtchn_status_t *status)
 {
@@ -550,6 +604,7 @@ static long evtchn_status(evtchn_status_t *status)
     return rc;
 }
 
+
 long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
 {
     struct domain *d = current->domain;
@@ -570,6 +625,12 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
     chn = evtchn_from_port(d, port);
     switch ( chn->state )
     {
+    case ECS_VIRQ:
+        if ( virq_is_global(chn->u.virq) )
+            chn->notify_vcpu_id = vcpu_id;
+        else
+            rc = -EINVAL;
+        break;
     case ECS_UNBOUND:
     case ECS_INTERDOMAIN:
     case ECS_PIRQ:
@@ -584,6 +645,7 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
     spin_unlock(&d->evtchn_lock);
     return rc;
 }
+
 
 static long evtchn_unmask(evtchn_unmask_t *unmask)
 {
@@ -619,6 +681,7 @@ static long evtchn_unmask(evtchn_unmask_t *unmask)
 
     return 0;
 }
+
 
 long do_event_channel_op(GUEST_HANDLE(evtchn_op_t) uop)
 {
@@ -691,6 +754,13 @@ long do_event_channel_op(GUEST_HANDLE(evtchn_op_t) uop)
     }
 
     return rc;
+}
+
+
+void evtchn_notify_reserved_port(struct domain *d, int port)
+{
+    struct evtchn *chn = evtchn_from_port(d, port);
+    evtchn_set_pending(d->vcpu[chn->notify_vcpu_id], port);
 }
 
 

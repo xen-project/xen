@@ -110,6 +110,9 @@ void gnttab_grant_foreign_transfer_ref(grant_ref_t, domid_t domid,
 #define gnttab_map_vaddr(map) ((void *)(map.host_virt_addr))
 #endif
 
+int gnttab_suspend(void);
+int gnttab_resume(void);
+
 #endif /* __ASM_GNTTAB_H__ */
 
 /*

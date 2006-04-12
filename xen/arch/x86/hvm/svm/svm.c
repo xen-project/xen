@@ -382,11 +382,6 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     return 1;
 }
 
-void svm_modify_guest_state(struct vcpu *v)
-{
-    svm_modify_vmcb(v, &v->arch.guest_context.user_regs);
-}
-
 int svm_realmode(struct vcpu *v)
 {
     unsigned long cr0 = v->arch.hvm_svm.cpu_shadow_cr0;
@@ -448,8 +443,6 @@ int start_svm(void)
 
     hvm_funcs.store_cpu_guest_regs = svm_store_cpu_guest_regs;
     hvm_funcs.load_cpu_guest_regs = svm_load_cpu_guest_regs;
-
-    hvm_funcs.modify_guest_state = svm_modify_guest_state;
 
     hvm_funcs.realmode = svm_realmode;
     hvm_funcs.paging_enabled = svm_paging_enabled;
@@ -674,9 +667,10 @@ static void svm_freeze_time(struct vcpu *v)
 {
     struct hvm_virpit *vpit = &v->domain->arch.hvm_domain.vpit;
     
-    v->domain->arch.hvm_domain.guest_time = svm_get_guest_time(v);
-    if ( vpit->first_injected )
+    if ( vpit->first_injected && !v->domain->arch.hvm_domain.guest_time ) {
+        v->domain->arch.hvm_domain.guest_time = svm_get_guest_time(v);
         stop_timer(&(vpit->pit_timer));
+    }
 }
 
 static void svm_ctxt_switch_from(struct vcpu *v)
@@ -1169,16 +1163,12 @@ static unsigned int check_for_null_selector(struct vmcb_struct *vmcb,
             seg = vmcb->ds;
             break;
         default:
-            if (dir == IOREQ_READ)
+            if (dir == IOREQ_READ) /* IN/INS instruction? */
                 seg = vmcb->es;
             else
                 seg = vmcb->ds;
         }
         
-        /* In real Mode */
-        if (real)
-            seg.base = seg.sel << 4;
-
         if (base)
             *base = seg.base;
 

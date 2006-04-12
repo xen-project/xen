@@ -1,8 +1,6 @@
 #ifndef __ASM_MACH_MPPARSE_H
 #define __ASM_MACH_MPPARSE_H
 
-#include <mach_apic.h>
-
 extern int use_cyclone;
 
 #ifdef CONFIG_X86_SUMMIT_NUMA

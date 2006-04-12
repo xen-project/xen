@@ -79,6 +79,15 @@ EXPORT_SYMBOL(x86_cpu_to_apicid);
 unsigned int maxcpus = NR_CPUS;
 #endif
 
+/*
+ * Set of CPUs that remote admin software will allow us to bring online.
+ * Notified to us via xenbus.
+ */
+static cpumask_t xenbus_allowed_cpumask;
+
+/* Set of CPUs that local admin will allow us to bring online. */
+static cpumask_t local_allowed_cpumask = CPU_MASK_ALL;
+
 void __init prefill_possible_map(void)
 {
 	int i, rc;
@@ -146,7 +155,7 @@ static void cpu_bringup(void)
 	cpu_idle();
 }
 
-void vcpu_prepare(int vcpu)
+static void vcpu_prepare(int vcpu)
 {
 	vcpu_guest_context_t ctxt;
 	struct task_struct *idle = idle_task(vcpu);
@@ -278,6 +287,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		vcpu_prepare(cpu);
 	}
 
+	xenbus_allowed_cpumask = cpu_present_map;
+
 	/* Currently, Xen gives no dynamic NUMA/HT info. */
 	for (cpu = 1; cpu < NR_CPUS; cpu++) {
 		cpu_sibling_map[cpu] = cpumask_of_cpu(cpu);
@@ -299,6 +310,15 @@ void __devinit smp_prepare_boot_cpu(void)
 	prefill_possible_map();
 	cpu_present_map  = cpumask_of_cpu(0);
 	cpu_online_map   = cpumask_of_cpu(0);
+}
+
+static int local_cpu_hotplug_request(void)
+{
+	/*
+	 * We assume a CPU hotplug request comes from local admin if it is made
+	 * via a userspace process (i.e., one with a real mm_struct).
+	 */
+	return (current->mm != NULL);
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -331,8 +351,10 @@ static void vcpu_hotplug(unsigned int cpu)
 	}
 
 	if (strcmp(state, "online") == 0) {
+		cpu_set(cpu, xenbus_allowed_cpumask);
 		(void)cpu_up(cpu);
 	} else if (strcmp(state, "offline") == 0) {
+		cpu_clear(cpu, xenbus_allowed_cpumask);
 		(void)cpu_down(cpu);
 	} else {
 		printk(KERN_ERR "XENBUS: unknown state(%s) on CPU%d\n",
@@ -353,6 +375,22 @@ static void handle_vcpu_hotplug_event(
 	}
 }
 
+static int smpboot_cpu_notify(struct notifier_block *notifier,
+			      unsigned long action, void *hcpu)
+{
+	int cpu = (long)hcpu;
+
+	/*
+	 * We do this in a callback notifier rather than __cpu_disable()
+	 * because local_cpu_hotplug_request() does not work in the latter
+	 * as it's always executed from within a stopmachine kthread.
+	 */
+	if ((action == CPU_DOWN_PREPARE) && local_cpu_hotplug_request())
+		cpu_clear(cpu, local_allowed_cpumask);
+
+	return NOTIFY_OK;
+}
+
 static int setup_cpu_watcher(struct notifier_block *notifier,
 			      unsigned long event, void *data)
 {
@@ -360,7 +398,8 @@ static int setup_cpu_watcher(struct notifier_block *notifier,
 
 	static struct xenbus_watch cpu_watch = {
 		.node = "cpu",
-		.callback = handle_vcpu_hotplug_event };
+		.callback = handle_vcpu_hotplug_event,
+		.flags = XBWF_new_thread };
 	(void)register_xenbus_watch(&cpu_watch);
 
 	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
@@ -375,13 +414,61 @@ static int setup_cpu_watcher(struct notifier_block *notifier,
 
 static int __init setup_vcpu_hotplug_event(void)
 {
+	static struct notifier_block hotplug_cpu = {
+		.notifier_call = smpboot_cpu_notify };
 	static struct notifier_block xsn_cpu = {
 		.notifier_call = setup_cpu_watcher };
+
+	register_cpu_notifier(&hotplug_cpu);
 	register_xenstore_notifier(&xsn_cpu);
+
 	return 0;
 }
 
 arch_initcall(setup_vcpu_hotplug_event);
+
+int smp_suspend(void)
+{
+	int i, err;
+
+	lock_cpu_hotplug();
+
+	/*
+	 * Take all other CPUs offline. We hold the hotplug mutex to
+	 * avoid other processes bringing up CPUs under our feet.
+	 */
+	while (num_online_cpus() > 1) {
+		unlock_cpu_hotplug();
+		for_each_online_cpu(i) {
+			if (i == 0)
+				continue;
+			err = cpu_down(i);
+			if (err) {
+				printk(KERN_CRIT "Failed to take all CPUs "
+				       "down: %d.\n", err);
+				for_each_cpu(i)
+					vcpu_hotplug(i);
+				return err;
+			}
+		}
+		lock_cpu_hotplug();
+	}
+
+	return 0;
+}
+
+void smp_resume(void)
+{
+	int i;
+
+	for_each_cpu(i)
+		vcpu_prepare(i);
+
+	unlock_cpu_hotplug();
+
+	for_each_cpu(i)
+		vcpu_hotplug(i);
+}
 
 int __cpu_disable(void)
 {
@@ -415,6 +502,20 @@ void __cpu_die(unsigned int cpu)
 
 #else /* !CONFIG_HOTPLUG_CPU */
 
+int smp_suspend(void)
+{
+	if (num_online_cpus() > 1) {
+		printk(KERN_WARNING "Can't suspend SMP guests "
+		       "without CONFIG_HOTPLUG_CPU\n");
+		return -EOPNOTSUPP;
+	}
+	return 0;
+}
+
+void smp_resume(void)
+{
+}
+
 int __cpu_disable(void)
 {
 	return -ENOSYS;
@@ -429,6 +530,20 @@ void __cpu_die(unsigned int cpu)
 
 int __devinit __cpu_up(unsigned int cpu)
 {
+	int rc;
+
+	if (local_cpu_hotplug_request()) {
+		cpu_set(cpu, local_allowed_cpumask);
+		if (!cpu_isset(cpu, xenbus_allowed_cpumask)) {
+			printk("%s: attempt to bring up CPU %u disallowed by "
+			       "remote admin.\n", __FUNCTION__, cpu);
+			return -EBUSY;
+		}
+	} else if (!cpu_isset(cpu, local_allowed_cpumask) ||
+		   !cpu_isset(cpu, xenbus_allowed_cpumask)) {
+		return -EBUSY;
+	}
+
 #ifdef CONFIG_SMP_ALTERNATIVES
 	if (num_online_cpus() == 1)
 		prepare_for_smp();
@@ -436,7 +551,9 @@ int __devinit __cpu_up(unsigned int cpu)
 
 	xen_smp_intr_init(cpu);
 	cpu_set(cpu, cpu_online_map);
-	if (HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL) != 0)
+
+	rc = HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
+	if (rc != 0)
 		BUG();
 
 	return 0;

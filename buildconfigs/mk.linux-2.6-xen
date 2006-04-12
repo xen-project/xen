@@ -1,19 +1,15 @@
-
-OS           = linux
-
 LINUX_SERIES = 2.6
 LINUX_VER    = 2.6.16
 LINUX_SRCS = linux-2.6.16.tar.bz2
 
 EXTRAVERSION ?= xen
 
-LINUX_DIR    = $(OS)-$(LINUX_VER)-$(EXTRAVERSION)
+LINUX_DIR    = linux-$(LINUX_VER)-$(EXTRAVERSION)
 
 include buildconfigs/Rules.mk
 
-.PHONY: build clean delete
-
 # The real action starts here!
+.PHONY: build
 build: $(LINUX_DIR)/include/linux/autoconf.h
 	if grep "^CONFIG_MODULES=" $(LINUX_DIR)/.config ; then \
 	    $(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) modules ; \
@@ -22,7 +18,7 @@ build: $(LINUX_DIR)/include/linux/autoconf.h
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(DESTDIR) vmlinuz
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(DESTDIR) install
 
-$(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
+$(LINUX_DIR)/include/linux/autoconf.h: ref-linux-$(LINUX_VER)/.valid-ref
 	rm -rf $(LINUX_DIR)
 	cp -al $(<D) $(LINUX_DIR)
 	# Apply arch-xen patches
@@ -42,14 +38,18 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
 	  rm -f Makefile ; mv Mk.tmp Makefile )
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) oldconfig
 
+.PHONY: prep
 prep: $(LINUX_DIR)/include/linux/autoconf.h
 
+.PHONY: config
 config: CONFIGMODE = menuconfig
 config: $(LINUX_DIR)/include/linux/autoconf.h
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) $(CONFIGMODE)
 
+.PHONY: clean
 clean::
 	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) clean
 
+.PHONY: delete
 delete: 
-	rm -rf tmp-$(OS)-$(LINUX_VER) $(LINUX_DIR) 
+	rm -rf tmp-linux-$(LINUX_VER) $(LINUX_DIR) 

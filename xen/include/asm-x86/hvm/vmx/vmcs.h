@@ -89,8 +89,6 @@ struct arch_vmx_struct {
 
 void vmx_do_resume(struct vcpu *);
 struct vmcs_struct *alloc_vmcs(void);
-int modify_vmcs(struct arch_vmx_struct *arch_vmx,
-                struct cpu_user_regs *regs);
 void destroy_vmcs(struct arch_vmx_struct *arch_vmx);
 
 extern void vmx_request_clear_vmcs(struct vcpu *v);

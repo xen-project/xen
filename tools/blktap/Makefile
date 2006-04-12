@@ -39,11 +39,13 @@ IBINS   :=
 
 LIB      = libblktap.so libblktap.so.$(MAJOR) libblktap.so.$(MAJOR).$(MINOR)
 
+.PHONY: all
 all: mk-symlinks libblktap.so #blkdump
 	@set -e; for subdir in $(SUBDIRS); do \
 		$(MAKE) -C $$subdir $@;       \
 	done
 
+.PHONY: install
 install: all
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/include
@@ -54,12 +56,14 @@ install: all
 		$(MAKE) -C $$subdir $@;       \
 	done
 
+.PHONY: clean
 clean:
 	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS blkdump
 	@set -e; for subdir in $(SUBDIRS); do \
 		$(MAKE) -C $$subdir $@;       \
 	done
 
+.PHONY: rpm
 rpm: all
 	rm -rf staging
 	mkdir staging
@@ -82,6 +86,7 @@ blkdump: libblktap.so
 
 .PHONY: TAGS clean install mk-symlinks rpm
 
+.PHONY: TAGS
 TAGS:
 	etags -t $(SRCS) *.h
 

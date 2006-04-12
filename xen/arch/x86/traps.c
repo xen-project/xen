@@ -32,6 +32,7 @@
 #include <xen/errno.h>
 #include <xen/mm.h>
 #include <xen/console.h>
+#include <xen/reboot.h>
 #include <asm/regs.h>
 #include <xen/delay.h>
 #include <xen/event.h>
@@ -138,13 +139,13 @@ static void show_guest_stack(struct cpu_user_regs *regs)
     if ( vm86_mode(regs) )
     {
         stack = (unsigned long *)((regs->ss << 4) + (regs->esp & 0xffff));
-        printk("Guest stack trace from ss:sp = %04x:%04x (VM86)\n   ",
+        printk("Guest stack trace from ss:sp = %04x:%04x (VM86)\n  ",
                regs->ss, (uint16_t)(regs->esp & 0xffff));
     }
     else
     {
         stack = (unsigned long *)regs->esp;
-        printk("Guest stack trace from "__OP"sp=%p:\n   ", stack);
+        printk("Guest stack trace from "__OP"sp=%p:\n  ", stack);
     }
 
     for ( i = 0; i < (debug_stack_lines*stack_words_per_line); i++ )
@@ -160,8 +161,8 @@ static void show_guest_stack(struct cpu_user_regs *regs)
             break;
         }
         if ( (i != 0) && ((i % stack_words_per_line) == 0) )
-            printk("\n   ");
-        printk("%p ", _p(addr));
+            printk("\n  ");
+        printk(" %p", _p(addr));
         stack++;
     }
     if ( i == 0 )
@@ -257,16 +258,16 @@ void show_stack(struct cpu_user_regs *regs)
     if ( guest_mode(regs) )
         return show_guest_stack(regs);
 
-    printk("Xen stack trace from "__OP"sp=%p:\n   ", stack);
+    printk("Xen stack trace from "__OP"sp=%p:\n  ", stack);
 
     for ( i = 0; i < (debug_stack_lines*stack_words_per_line); i++ )
     {
         if ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) == 0 )
             break;
         if ( (i != 0) && ((i % stack_words_per_line) == 0) )
-            printk("\n   ");
+            printk("\n  ");
         addr = *stack++;
-        printk("%p ", _p(addr));
+        printk(" %p", _p(addr));
     }
     if ( i == 0 )
         printk("Stack empty.");
@@ -318,8 +319,7 @@ asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
     console_force_lock();
 
     /* Wait for manual reset. */
-    for ( ; ; )
-        __asm__ __volatile__ ( "hlt" );
+    machine_halt();
 }
 
 static inline int do_trap(int trapnr, char *str,

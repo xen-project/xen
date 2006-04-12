@@ -13,14 +13,18 @@ TPM_EMULATOR_TARFILE = tpm_emulator-0.2b.tar.gz
 
 GMP_HEADER = /usr/include/gmp.h
 
+.PHONY: all
 all: build
 
+.PHONY: build
 build: $(TPM_EMULATOR_DIR) $(VTPM_DIR) build_sub
 
+.PHONY: install
 install: build
 	$(MAKE) -C $(TPM_EMULATOR_DIR) $@
 	$(MAKE) -C $(VTPM_DIR) $@
 
+.PHONY: clean
 clean:
 	@if [ -d $(TPM_EMULATOR_DIR) ]; \
 		then $(MAKE) -C $(TPM_EMULATOR_DIR) clean; \
@@ -29,6 +33,7 @@ clean:
 		then $(MAKE) -C $(VTPM_DIR) clean; \
 	fi
 
+.PHONY: mrproper
 mrproper:
 	rm -f $(TPM_EMULATOR_TARFILE)
 	rm -rf $(TPM_EMULATOR_DIR)
@@ -58,6 +63,7 @@ $(VTPM_DIR): $(TPM_EMULATOR_TARFILE) tpm_emulator-0.2b-x86_64.patch vtpm.patch
 	patch -p1 < ../tpm_emulator-0.2b-x86_64.patch; \
 	patch -p1 <../vtpm.patch
 
+.PHONY: build_sub
 build_sub:
 	@if [ -e $(GMP_HEADER) ]; then \
 		$(MAKE) -C $(VTPM_DIR); \

@@ -171,7 +171,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 				     skb->len + hlen);
 		BUG_ON(ret);
 		nskb->dev = skb->dev;
-		nskb->proto_csum_valid = skb->proto_csum_valid;
+		nskb->proto_data_valid = skb->proto_data_valid;
 		dev_kfree_skb(skb);
 		skb = nskb;
 	}
@@ -213,7 +213,7 @@ static void net_rx_action(unsigned long unused)
 {
 	netif_t *netif = NULL; 
 	s8 status;
-	u16 size, id, irq;
+	u16 size, id, irq, flags;
 	multicall_entry_t *mcl;
 	mmu_update_t *mmu;
 	gnttab_transfer_t *gop;
@@ -301,9 +301,6 @@ static void net_rx_action(unsigned long unused)
 		netif   = netdev_priv(skb->dev);
 		size    = skb->tail - skb->data;
 
-		/* Rederive the machine addresses. */
-		new_mfn = mcl->args[1] >> PAGE_SHIFT;
-		old_mfn = gop->mfn;
 		atomic_set(&(skb_shinfo(skb)->dataref), 1);
 		skb_shinfo(skb)->nr_frags = 0;
 		skb_shinfo(skb)->frag_list = NULL;
@@ -328,10 +325,14 @@ static void net_rx_action(unsigned long unused)
 		}
 		irq = netif->irq;
 		id = RING_GET_REQUEST(&netif->rx, netif->rx.rsp_prod_pvt)->id;
+		flags = 0;
+		if (skb->ip_summed == CHECKSUM_HW) /* local packet? */
+			flags |= NETRXF_csum_blank | NETRXF_data_validated;
+		else if (skb->proto_data_valid) /* remote but checksummed? */
+			flags |= NETRXF_data_validated;
 		if (make_rx_response(netif, id, status,
 				     (unsigned long)skb->data & ~PAGE_MASK,
-				     size, skb->proto_csum_valid ?
-				     NETRXF_data_validated : 0) &&
+				     size, flags) &&
 		    (rx_notify[irq] == 0)) {
 			rx_notify[irq] = 1;
 			notify_list[notify_nr++] = irq;
@@ -655,11 +656,16 @@ static void net_tx_action(unsigned long unused)
 		skb->protocol = eth_type_trans(skb, skb->dev);
 
 		/*
-                 * No checking needed on localhost, but remember the field is
-                 * blank. 
-                 */
-		skb->ip_summed        = CHECKSUM_UNNECESSARY;
-		skb->proto_csum_valid = 1;
+		 * Old frontends do not assert data_validated but we
+		 * can infer it from csum_blank so test both flags.
+		 */
+		if (txreq.flags & (NETTXF_data_validated|NETTXF_csum_blank)) {
+			skb->ip_summed = CHECKSUM_UNNECESSARY;
+			skb->proto_data_valid = 1;
+		} else {
+			skb->ip_summed = CHECKSUM_NONE;
+			skb->proto_data_valid = 0;
+		}
 		skb->proto_csum_blank = !!(txreq.flags & NETTXF_csum_blank);
 
 		netif->stats.rx_bytes += txreq.size;

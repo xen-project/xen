@@ -189,7 +189,7 @@ enum {
  *	@local_df: allow local fragmentation
  *	@cloned: Head may be cloned (check refcnt to be sure)
  *	@nohdr: Payload reference only, must not modify header
- *	@proto_csum_valid: Protocol csum validated since arriving at localhost
+ *	@proto_data_valid: Protocol data validated since arriving at localhost
  *	@proto_csum_blank: Protocol csum must be added before leaving localhost
  *	@pkt_type: Packet class
  *	@fclone: skbuff clone status
@@ -271,7 +271,7 @@ struct sk_buff {
 				ipvs_property:1;
 #else
 				ipvs_property:1,
-				proto_csum_valid:1,
+				proto_data_valid:1,
 				proto_csum_blank:1;
 #endif
 	__be16			protocol;

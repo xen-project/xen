@@ -1649,12 +1649,12 @@ int netif_receive_skb(struct sk_buff *skb)
 #ifdef CONFIG_XEN
 	switch (skb->ip_summed) {
 	case CHECKSUM_UNNECESSARY:
-		skb->proto_csum_valid = 1;
+		skb->proto_data_valid = 1;
 		break;
 	case CHECKSUM_HW:
 		/* XXX Implement me. */
 	default:
-		skb->proto_csum_valid = 0;
+		skb->proto_data_valid = 0;
 		break;
 	}
 #endif

@@ -35,7 +35,15 @@
 
 #define OPT_CONSOLE_STR "com1,vga"
 
+#ifdef MAX_PHYS_CPUS
+#define NR_CPUS MAX_PHYS_CPUS
+#else
 #define NR_CPUS 32
+#endif
+
+#if defined(__i386__) && (NR_CPUS > 32)
+#error "Maximum of 32 physical processors supported by Xen on x86_32"
+#endif
 
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
 # define supervisor_mode_kernel (1)
@@ -57,7 +65,12 @@
 
 #define barrier() __asm__ __volatile__("": : :"memory")
 
+/* A power-of-two value greater than or equal to number of hypercalls. */
 #define NR_hypercalls 32
+
+#if NR_hypercalls & (NR_hypercalls - 1)
+#error "NR_hypercalls must be a power-of-two value"
+#endif
 
 #ifndef NDEBUG
 #define MEMORY_GUARD
@@ -204,13 +217,13 @@ extern unsigned long _end; /* standard ELF symbol */
  *                                                       ------ ------
  *  I/O remapping area                                   ( 4MB)
  *  Direct-map (1:1) area [Xen code/data/heap]           (12MB)
- *  Per-domain mappings (inc. 4MB map_domain_page cache) ( 4MB)
+ *  Per-domain mappings (inc. 4MB map_domain_page cache) ( 8MB)
  *  Shadow linear pagetable                              ( 4MB) ( 8MB)
  *  Guest linear pagetable                               ( 4MB) ( 8MB)
  *  Machine-to-physical translation table [writable]     ( 4MB) (16MB)
  *  Frame-info table                                     (24MB) (96MB)
  *   * Start of guest inaccessible area
- *  Machine-to-physical translation table [read-only]    ( 4MB)
+ *  Machine-to-physical translation table [read-only]    ( 4MB) (16MB)
  *   * Start of guest unmodifiable area
  */
 

@@ -54,8 +54,10 @@ ACM_POLICY_SUFFIX = security_policy.xml
 ACM_LABEL_SUFFIX  = security_label_template.xml
 
 ifeq ($(ACM_SECURITY),y)
+.PHONY: all
 all: build
 
+.PHONY: install
 install: all $(ACM_CONFIG_FILE)
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/sbin
 	$(INSTALL_PROG) -p $(ACM_INST_TOOLS) $(DESTDIR)/usr/sbin
@@ -79,11 +81,14 @@ else
 	python python/setup.py install --root="$(DESTDIR)"
 endif
 else
+.PHONY: all
 all:
 
+.PHONY: install
 install:
 endif
 
+.PHONY: build
 build: mk-symlinks $(ACM_INST_TOOLS) $(ACM_NOINST_TOOLS)
 	python python/setup.py build
 	chmod 700 $(ACM_SCRIPTS)
@@ -100,6 +105,7 @@ get_decision: $(OBJS_GETD)
 xensec_gen: xensec_gen.py
 	cp -f $^ $@
 
+.PHONY: clean
 clean:
 	$(RM) $(ACM_INST_TOOLS) $(ACM_NOINST_TOOLS)
 	$(RM) $(ACM_OBJS)
@@ -107,8 +113,10 @@ clean:
 	$(RM) -r xen
 	$(RM) -r build
 
+.PHONY: mrproper
 mrproper: clean
 
+.PHONY: boot_install
 boot_install: install
 	$(ACM_SCRIPT_DIR)/updategrub.sh $(POLICY) $(KERNEL_VERSION)
 

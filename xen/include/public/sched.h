@@ -13,17 +13,17 @@
 
 /*
  * The prototype for this hypercall is:
- *  long sched_op_new(int cmd, void *arg)
+ *  long sched_op(int cmd, void *arg)
  * @cmd == SCHEDOP_??? (scheduler operation).
  * @arg == Operation-specific extra argument(s), as described below.
  * 
- * **NOTE**:
- * Versions of Xen prior to 3.0.2 provide only the following legacy version
+ * Versions of Xen prior to 3.0.2 provided only the following legacy version
  * of this hypercall, supporting only the commands yield, block and shutdown:
  *  long sched_op(int cmd, unsigned long arg)
  * @cmd == SCHEDOP_??? (scheduler operation).
  * @arg == 0               (SCHEDOP_yield and SCHEDOP_block)
  *      == SHUTDOWN_* code (SCHEDOP_shutdown)
+ * This legacy version is available to new guests as sched_op_compat().
  */
 
 /*
@@ -63,6 +63,19 @@ typedef struct sched_poll {
     uint64_t timeout;
 } sched_poll_t;
 DEFINE_GUEST_HANDLE(sched_poll_t);
+
+/*
+ * Declare a shutdown for another domain. The main use of this function is
+ * in interpreting shutdown requests and reasons for fully-virtualized
+ * domains.  A para-virtualized domain may use SCHEDOP_shutdown directly.
+ * @arg == pointer to sched_remote_shutdown structure.
+ */
+#define SCHEDOP_remote_shutdown        4
+typedef struct sched_remote_shutdown {
+    domid_t domain_id;         /* Remote domain ID */
+    unsigned int reason;       /* SHUTDOWN_xxx reason */
+} sched_remote_shutdown_t;
+DEFINE_GUEST_HANDLE(sched_remote_shutdown_t);
 
 /*
  * Reason codes for SCHEDOP_shutdown. These may be interpreted by control

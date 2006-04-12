@@ -14,6 +14,7 @@ export XEN_TARGET_ARCH SUBARCH XEN_SYSTYPE
 endif
 
 # Default target must appear before any include lines
+.PHONY: all
 all: dist
 
 XEN_ROOT=$(CURDIR)
@@ -24,12 +25,11 @@ ifeq ($(XEN_TARGET_X86_PAE),y)
 export pae=y
 endif
 
-.PHONY:	all dist install xen kernels tools dev-docs docs world clean
-.PHONY:	mkpatches mrproper kbuild kdelete kclean
-
 # build and install everything into the standard system directories
+.PHONY: install
 install: install-xen install-kernels install-tools install-docs
 
+.PHONY: build
 build: kernels
 	$(MAKE) -C xen build
 	$(MAKE) -C tools build
@@ -38,10 +38,12 @@ build: kernels
 # The test target is for unit tests that can run without an installation.  Of
 # course, many tests require a machine running Xen itself, and these are
 # handled elsewhere.
+.PHONY: test
 test:
 	$(MAKE) -C tools/python test
 
 # build and install everything into local dist directory
+.PHONY: dist
 dist: DESTDIR=$(DISTDIR)/install
 dist: dist-xen dist-kernels dist-tools dist-docs
 	$(INSTALL_DIR) $(DISTDIR)/check
@@ -54,79 +56,83 @@ dist-%: install-%
 	@: # do nothing
 
 # Legacy dist targets
+.PHONY: xen tools kernels docs
 xen: dist-xen
 tools: dist-tools
 kernels: dist-kernels
 docs: dist-docs
 
+.PHONY: prep-kernels
 prep-kernels:
 	for i in $(XKERNELS) ; do $(MAKE) $$i-prep || exit 1; done
 
+.PHONY: install-xen
 install-xen:
 	$(MAKE) -C xen install
 
+.PHONY: install-tools
 install-tools:
 	$(MAKE) -C tools install
 
+.PHONY: install-kernels
 install-kernels:
 	for i in $(XKERNELS) ; do $(MAKE) $$i-install || exit 1; done
 
+.PHONY: install-docs
 install-docs:
 	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
 
+.PHONY: dev-docs
 dev-docs:
 	$(MAKE) -C docs dev-docs
 
 # Build all the various kernels and modules
+.PHONY: kbuild
 kbuild: kernels
 
 # Delete the kernel build trees entirely
+.PHONY: kdelete
 kdelete:
 	for i in $(XKERNELS) ; do $(MAKE) $$i-delete ; done
 
 # Clean the kernel build trees
+.PHONY: kclean
 kclean:
 	for i in $(XKERNELS) ; do $(MAKE) $$i-clean ; done
 
 # Make patches from kernel sparse trees
+.PHONY: mkpatches
 mkpatches:
 	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-xen.patch; done
 
 # build xen, the tools, and a domain 0 plus unprivileged linux-xen images,
 # and place them in the install directory. 'make install' should then
 # copy them to the normal system directories
+.PHONY: world
 world: 
 	$(MAKE) clean
 	$(MAKE) kdelete
 	$(MAKE) dist
 
 # clean doesn't do a kclean
+.PHONY: clean
 clean:: 
 	$(MAKE) -C xen clean
 	$(MAKE) -C tools clean
 	$(MAKE) -C docs clean
 
 # clean, but blow away kernel build tree plus tarballs
+.PHONY: distclean
 distclean: clean
 	rm -rf dist patches/tmp
 	for i in $(ALLKERNELS) ; do $(MAKE) $$i-delete ; done
 	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-mrproper ; done
 
 # Linux name for GNU distclean
+.PHONY: mrproper
 mrproper: distclean
 
-install-logging: LOGGING=logging-0.4.9.2
-install-logging:
-	[ -f $(LOGGING).tar.gz ] || wget http://www.red-dove.com/$(LOGGING).tar.gz
-	tar -zxf $(LOGGING).tar.gz
-	cd $(LOGGING) && python setup.py install
-
-# handy target to upgrade iptables (use rpm or apt-get in preference)
-install-iptables:
-	wget http://www.netfilter.org/files/iptables-1.2.11.tar.bz2
-	tar -jxf iptables-1.2.11.tar.bz2
-	$(MAKE) -C iptables-1.2.11 PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install
-
+.PHONY: help
 help:
 	@echo 'Installation targets:'
 	@echo '  install          - build and install everything'
@@ -147,25 +153,28 @@ help:
 	@echo '  dev-docs         - build developer-only documentation'
 	@echo ''
 	@echo 'Cleaning targets:'
-	@echo '  clean            - clean the Xen, tools and docs (but not'
-	@echo '                     guest kernel) trees'
-	@echo '  distclean        - clean plus delete kernel tarballs and kernel'
-	@echo '                     build trees'
+	@echo '  clean            - clean the Xen, tools and docs (but not guest kernel trees)'
+	@echo '  distclean        - clean plus delete kernel build trees and'
+	@echo '                     local downloaded files'
 	@echo '  kdelete          - delete guest kernel build trees'
 	@echo '  kclean           - clean guest kernel build trees'
-	@echo ''
-	@echo 'Dependency installation targets:'
-	@echo '  install-logging  - install the Python Logging package'
-	@echo '  install-iptables - install iptables tools'
 	@echo ''
 	@echo 'Miscellaneous targets:'
 	@echo '  prep-kernels     - prepares kernel directories, does not build'
 	@echo '  mkpatches        - make patches against vanilla kernels from'
 	@echo '                     sparse trees'
-	@echo '  uninstall        - attempt to remove installed Xen tools (use'
-	@echo '                     with extreme care!)'
+	@echo '  uninstall        - attempt to remove installed Xen tools'
+	@echo '                     (use with extreme care!)'
+	@echo
+	@echo 'Environment:'
+	@echo '  XEN_PYTHON_NATIVE_INSTALL=y'
+	@echo '                   - native python install or dist'
+	@echo '                     install into prefix/lib/python<VERSION>'
+	@echo '                     instead of <PREFIX>/lib/python'
+	@echo '                     true if set to non-empty value, false otherwise'
 
 # Use this target with extreme care!
+.PHONY: uninstall
 uninstall: D=$(DESTDIR)
 uninstall:
 	[ -d $(D)/etc/xen ] && mv -f $(D)/etc/xen $(D)/etc/xen.old-`date +%s` || true
@@ -199,5 +208,6 @@ uninstall:
 	rm -rf $(D)/usr/share/man/man8/xen*
 
 # Legacy targets for compatibility
+.PHONY: linux26
 linux26:
 	$(MAKE) 'KERNELS=linux-2.6*' kernels

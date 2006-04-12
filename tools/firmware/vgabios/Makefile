@@ -10,17 +10,22 @@ RELVERS = `pwd | sed "s-.*/--" | sed "s/vgabios//" | sed "s/-//"`
 
 VGABIOS_DATE = "-DVGABIOS_DATE=\"$(RELDATE)\""
 
+.PHONY: all
 all: bios cirrus-bios
 
+.PHONY: bios
 bios: biossums vgabios.bin vgabios.debug.bin 
 
+.PHONY: cirrus-bios
 cirrus-bios: vgabios-cirrus.bin vgabios-cirrus.debug.bin
 
+.PHONY: clean
 clean:
 	rm -f biossums *.o *.s *.ld86 \
           temp.awk.* vgabios*.orig _vgabios_* _vgabios-debug_* core vgabios*.bin vgabios*.txt $(RELEASE).bin *.bak
 	rm -f VGABIOS-lgpl-latest*.bin
 
+.PHONY: release
 release: 
 	VGABIOS_VERS=\"-DVGABIOS_VERS=\\\"$(RELVERS)\\\"\" make bios cirrus-bios
 	/bin/rm -f  *.o *.s *.ld86 \

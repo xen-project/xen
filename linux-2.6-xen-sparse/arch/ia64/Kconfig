@@ -79,8 +79,13 @@ config XEN_BLKDEV_FRONTEND
 	bool
 	default y
 
-config XEN_BLKDEV_BACKEND
+config XEN_BACKEND
 	depends on XEN
+	bool
+	default y
+
+config XEN_BLKDEV_BACKEND
+	depends on XEN && XEN_BACKEND
 	bool
 	default y
 
@@ -90,6 +95,11 @@ config XEN_SYSFS
 	default y
 	help
 		Xen hypervisor attributes will show up under /sys/hypervisor/.
+
+config XEN_INTERFACE_VERSION
+	hex
+	depends on XEN
+	default 0x00030101
 
 config SCHED_NO_NO_OMIT_FRAME_POINTER
 	bool

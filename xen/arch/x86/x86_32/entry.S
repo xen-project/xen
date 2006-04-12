@@ -119,7 +119,7 @@ FIX1:   SET_XEN_SEGMENTS(a)
         movl  $DBLFLT1,%eax
         pushl %eax                     # EIP
         pushl %esi                     # error_code/entry_vector
-        jmp   error_code
+        jmp   handle_exception
 DBLFLT1:GET_CURRENT(%ebx)
         jmp   test_all_events
 failsafe_callback:
@@ -381,14 +381,6 @@ domain_crash_synchronous:
         jmp   __domain_crash_synchronous
 
         ALIGN
-process_guest_exception_and_events:
-        leal VCPU_trap_bounce(%ebx),%edx
-        testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%edx)
-        jz   test_all_events
-        call create_bounce_frame
-        jmp  test_all_events
-
-        ALIGN
 ENTRY(ret_from_intr)
         GET_CURRENT(%ebx)
         movl  UREGS_eflags(%esp),%eax
@@ -400,7 +392,7 @@ ENTRY(ret_from_intr)
 ENTRY(divide_error)
 	pushl $TRAP_divide_error<<16
 	ALIGN
-error_code:
+handle_exception:
         FIXUP_RING0_GUEST_STACK
         SAVE_ALL_NOSEGREGS(a)
         SET_XEN_SEGMENTS(a)
@@ -419,7 +411,11 @@ error_code:
         movb  UREGS_cs(%esp),%al
         testl $(3|X86_EFLAGS_VM),%eax
 	jz    restore_all_xen
-        jmp   process_guest_exception_and_events
+        leal  VCPU_trap_bounce(%ebx),%edx
+        testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%edx)
+        jz    test_all_events
+        call  create_bounce_frame
+        jmp   test_all_events
 
 exception_with_ints_disabled:
         movl  UREGS_eflags(%esp),%eax
@@ -452,71 +448,71 @@ FATAL_exception_with_ints_disabled:
                                         
 ENTRY(coprocessor_error)
 	pushl $TRAP_copro_error<<16
-	jmp error_code
+	jmp   handle_exception
 
 ENTRY(simd_coprocessor_error)
 	pushl $TRAP_simd_error<<16
-	jmp error_code
+	jmp   handle_exception
 
 ENTRY(device_not_available)
 	pushl $TRAP_no_device<<16
-        jmp   error_code
+        jmp   handle_exception
 
 ENTRY(debug)
 	pushl $TRAP_debug<<16
-	jmp error_code
+	jmp   handle_exception
 
 ENTRY(int3)
 	pushl $TRAP_int3<<16
-	jmp error_code
+	jmp   handle_exception
 
 ENTRY(overflow)
 	pushl $TRAP_overflow<<16
-	jmp error_code
+	jmp   handle_exception
 
 ENTRY(bounds)
 	pushl $TRAP_bounds<<16
-	jmp error_code
+	jmp   handle_exception
 
 ENTRY(invalid_op)
 	pushl $TRAP_invalid_op<<16
-	jmp error_code
+	jmp   handle_exception
 
 ENTRY(coprocessor_segment_overrun)
 	pushl $TRAP_copro_seg<<16
-	jmp error_code
+	jmp   handle_exception
 
 ENTRY(invalid_TSS)
-        movw $TRAP_invalid_tss,2(%esp)
-	jmp error_code
+        movw  $TRAP_invalid_tss,2(%esp)
+	jmp   handle_exception
 
 ENTRY(segment_not_present)
-        movw $TRAP_no_segment,2(%esp)
-	jmp error_code
+        movw  $TRAP_no_segment,2(%esp)
+	jmp   handle_exception
 
 ENTRY(stack_segment)
-        movw $TRAP_stack_error,2(%esp)
-	jmp error_code
+        movw  $TRAP_stack_error,2(%esp)
+	jmp   handle_exception
 
 ENTRY(general_protection)
-        movw $TRAP_gp_fault,2(%esp)
-	jmp error_code
+        movw  $TRAP_gp_fault,2(%esp)
+	jmp   handle_exception
 
 ENTRY(alignment_check)
-        movw $TRAP_alignment_check,2(%esp)
-	jmp error_code
+        movw  $TRAP_alignment_check,2(%esp)
+	jmp   handle_exception
 
 ENTRY(page_fault)
-        movw $TRAP_page_fault,2(%esp)
-	jmp error_code
+        movw  $TRAP_page_fault,2(%esp)
+	jmp   handle_exception
 
 ENTRY(machine_check)
         pushl $TRAP_machine_check<<16
-	jmp error_code
+	jmp   handle_exception
 
 ENTRY(spurious_interrupt_bug)
         pushl $TRAP_spurious_int<<16
-	jmp error_code
+	jmp   handle_exception
 
 ENTRY(nmi)
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
@@ -561,7 +557,7 @@ defer_nmi:
         testl $APIC_ICR_BUSY,%ebx
         jnz   1b
         # __send_IPI_shortcut(APIC_DEST_SELF, TRAP_deferred_nmi)
-        movl  $(APIC_DM_FIXED | APIC_DEST_SELF | APIC_DEST_LOGICAL | \
+        movl  $(APIC_DM_FIXED | APIC_DEST_SELF | APIC_DEST_PHYSICAL | \
                 TRAP_deferred_nmi),%ss:APIC_ICR(%eax)
         jmp   restore_all_xen
 #endif /* !CONFIG_X86_SUPERVISOR_MODE_KERNEL */
@@ -579,19 +575,19 @@ ENTRY(setup_vm86_frame)
         addl $16,%esp
         ret
 
+do_arch_sched_op_compat:
+        # Ensure we return success even if we return via schedule_tail()
+        xorl %eax,%eax
+        GET_GUEST_REGS(%ecx)
+        movl %eax,UREGS_eax(%ecx)
+        jmp  do_sched_op_compat
+
 do_arch_sched_op:
         # Ensure we return success even if we return via schedule_tail()
         xorl %eax,%eax
         GET_GUEST_REGS(%ecx)
         movl %eax,UREGS_eax(%ecx)
         jmp  do_sched_op
-
-do_arch_sched_op_new:
-        # Ensure we return success even if we return via schedule_tail()
-        xorl %eax,%eax
-        GET_GUEST_REGS(%ecx)
-        movl %eax,UREGS_eax(%ecx)
-        jmp  do_sched_op_new
 
 .data
 
@@ -624,7 +620,7 @@ ENTRY(hypercall_table)
         .long do_stack_switch
         .long do_set_callbacks
         .long do_fpu_taskswitch     /*  5 */
-        .long do_arch_sched_op
+        .long do_arch_sched_op_compat
         .long do_dom0_op
         .long do_set_debugreg
         .long do_get_debugreg
@@ -647,7 +643,9 @@ ENTRY(hypercall_table)
         .long do_mmuext_op
         .long do_acm_op
         .long do_nmi_op
-        .long do_arch_sched_op_new
+        .long do_arch_sched_op
+        .long do_callback_op        /* 30 */
+        .long do_xenoprof_op
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .long do_ni_hypercall
         .endr
@@ -659,7 +657,7 @@ ENTRY(hypercall_args_table)
         .byte 2 /* do_stack_switch      */
         .byte 4 /* do_set_callbacks     */
         .byte 1 /* do_fpu_taskswitch    */  /*  5 */
-        .byte 2 /* do_arch_sched_op     */
+        .byte 2 /* do_arch_sched_op_compat */
         .byte 1 /* do_dom0_op           */
         .byte 2 /* do_set_debugreg      */
         .byte 1 /* do_get_debugreg      */
@@ -682,7 +680,9 @@ ENTRY(hypercall_args_table)
         .byte 4 /* do_mmuext_op         */
         .byte 1 /* do_acm_op            */
         .byte 2 /* do_nmi_op            */
-        .byte 2 /* do_arch_sched_op_new */
+        .byte 2 /* do_arch_sched_op     */
+        .byte 2 /* do_callback_op       */  /* 30 */
+        .byte 3 /* do_xenoprof_op       */
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr

@@ -924,7 +924,8 @@ set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn,
         }
 
         l1 = map_domain_page_with_cache(page_to_mfn(l1page), l1cache);
-        memset(l1, 0, PAGE_SIZE);
+        /* Initialise entries to INVALID_MFN = ~0 */
+        memset(l1, -1, PAGE_SIZE);
         unmap_domain_page_with_cache(l1, l1cache);
 
         l2e = l2e_from_page(l1page, __PAGE_HYPERVISOR);
@@ -1686,8 +1687,10 @@ get_mfn_from_gpfn_foreign(struct domain *d, unsigned long gpfn)
         unmap_domain_page(l2);
         if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
         {
+#if 0
             printk("%s(d->id=%d, gpfn=%lx) => 0 l2e=%" PRIpte "\n",
                    __func__, d->domain_id, gpfn, l2e_get_intpte(l2e));
+#endif
             return INVALID_MFN;
         }
         l1 = map_domain_page(l2e_get_pfn(l2e));

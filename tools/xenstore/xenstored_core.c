@@ -469,6 +469,7 @@ static bool write_node(struct connection *conn, const struct node *node)
 
 	/* TDB should set errno, but doesn't even set ecode AFAICT. */
 	if (tdb_store(tdb_context(conn), key, data, TDB_REPLACE) != 0) {
+		corrupt(conn, "Write of %s = %s failed", key, data);
 		errno = ENOSPC;
 		return false;
 	}
