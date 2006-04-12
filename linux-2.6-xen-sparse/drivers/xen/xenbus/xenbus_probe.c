@@ -825,6 +825,8 @@ static int resume_dev(struct device *dev, void *data)
 		return err;
 	}
 
+	xdev->state = XenbusStateInitialising;
+
 	if (drv->resume)
 		err = drv->resume(xdev);
 	if (err)
