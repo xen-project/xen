@@ -485,6 +485,7 @@ void svm_do_resume(struct vcpu *v)
     if ( vpit->first_injected ) {
         if ( v->domain->arch.hvm_domain.guest_time ) {
             svm_set_guest_time(v, v->domain->arch.hvm_domain.guest_time);
+            vpit->count_point = NOW();
             v->domain->arch.hvm_domain.guest_time = 0;
         }
         pickup_deactive_ticks(vpit);

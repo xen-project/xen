@@ -208,8 +208,9 @@ int register_io_handler(unsigned long addr, unsigned long size,
 
 static void pit_cal_count(struct hvm_virpit *vpit)
 {
-    u64 nsec_delta = (unsigned int)((NOW() - vpit->inject_point));
+    u64 nsec_delta = (unsigned int)((NOW() - vpit->count_point));
 
+    nsec_delta += vpit->count_advance;
     if (nsec_delta > vpit->period)
         HVM_DBG_LOG(DBG_LEVEL_1,
 	            "HVM_PIT: long time has passed from last injection!");

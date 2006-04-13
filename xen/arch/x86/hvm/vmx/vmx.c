@@ -362,6 +362,7 @@ static void vmx_freeze_time(struct vcpu *v)
     
     if ( vpit->first_injected && !v->domain->arch.hvm_domain.guest_time ) {
         v->domain->arch.hvm_domain.guest_time = get_guest_time(v);
+        vpit->count_advance += (NOW() - vpit->count_point);
         stop_timer(&(vpit->pit_timer));
     }
 }
