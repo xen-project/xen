@@ -180,12 +180,10 @@ static void put_newline(void)
 
     if (ypos >= LINES)
     {
-        static char zeroarr[2*COLUMNS] = { 0 };
         ypos = LINES-1;
-        memcpy((char*)video, 
-               (char*)video + 2*COLUMNS, (LINES-1)*2*COLUMNS);
-        memcpy((char*)video + (LINES-1)*2*COLUMNS, 
-               zeroarr, 2*COLUMNS);
+        memmove((char*)video, 
+                (char*)video + 2*COLUMNS, (LINES-1)*2*COLUMNS);
+        memset((char*)video + (LINES-1)*2*COLUMNS, 0, 2*COLUMNS);
     }
 }
 
