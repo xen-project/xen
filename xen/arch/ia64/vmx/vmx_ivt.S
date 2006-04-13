@@ -266,12 +266,12 @@ ENTRY(vmx_alt_itlb_miss)
     mov r29=cr.ipsr;
     ;;
     tbit.z p6,p7=r29,IA64_PSR_VM_BIT;
-(p7)br.sptk vmx_fault_3
+(p7)br.spnt vmx_fault_3
 vmx_alt_itlb_miss_1:
 	mov r16=cr.ifa		// get address that caused the TLB miss
     ;;
     tbit.z p6,p7=r16,63
-(p6)br.sptk vmx_fault_3
+(p6)br.spnt vmx_fault_3
     ;;
 	movl r17=PAGE_KERNEL
 	mov r24=cr.ipsr
@@ -301,12 +301,12 @@ ENTRY(vmx_alt_dtlb_miss)
     mov r29=cr.ipsr;
     ;;
     tbit.z p6,p7=r29,IA64_PSR_VM_BIT;
-(p7)br.sptk vmx_fault_4
+(p7)br.spnt vmx_fault_4
 vmx_alt_dtlb_miss_1:
 	mov r16=cr.ifa		// get address that caused the TLB miss
     ;;
     tbit.z p6,p7=r16,63
-(p6)br.sptk vmx_fault_4
+(p6)br.spnt vmx_fault_4
     ;;
 	movl r17=PAGE_KERNEL
 	mov r20=cr.isr
@@ -391,9 +391,12 @@ ENTRY(vmx_break_fault)
     mov r30=cr.iim
     movl r29=0x1100
     ;;
+#ifdef VTI_DEBUG
+    // break 0 is already handled in vmx_ia64_handle_break.
     cmp.eq p6,p7=r30,r0
     (p6) br.sptk vmx_fault_11
     ;;
+#endif
     cmp.eq  p6,p7=r29,r30
     (p6) br.dptk.few vmx_hypercall_dispatch
     (p7) br.sptk.many vmx_dispatch_break_fault
@@ -640,8 +643,8 @@ END(vmx_daccess_rights)
 // 0x5400 Entry 24 (size 16 bundles) General Exception (5,32,34,36,38,39)
 ENTRY(vmx_general_exception)
     VMX_DBG_FAULT(24)
-    VMX_FAULT(24)
-//    VMX_REFLECT(24)
+    VMX_REFLECT(24)
+//    VMX_FAULT(24)
 END(vmx_general_exception)
 
 	.org vmx_ia64_ivt+0x5500
