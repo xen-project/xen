@@ -103,11 +103,13 @@ struct page_info
 #define PGT_high_mfn_mask   (0xfffUL << PGT_high_mfn_shift)
 #define PGT_mfn_mask        (((1U<<23)-1) | PGT_high_mfn_mask)
 #define PGT_high_mfn_nx     (0x800UL << PGT_high_mfn_shift)
+#define PGT_pae_idx_shift   PGT_high_mfn_shift
 #else
  /* 23-bit mfn mask for shadow types: good for up to 32GB RAM. */
 #define PGT_mfn_mask        ((1U<<23)-1)
  /* NX for PAE xen is not supported yet */
 #define PGT_high_mfn_nx     (1ULL << 63)
+#define PGT_pae_idx_shift   23
 #endif
 
 #define PGT_score_shift     23

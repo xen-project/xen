@@ -102,6 +102,15 @@ void free_shadow_pages(struct domain *d);
 
 int shadow_set_guest_paging_levels(struct domain *d, int levels)
 {
+    struct vcpu *v = current;
+
+    /*
+     * Need to wait for VCPU0 to complete the on-going shadow ops.
+     */
+
+    if ( v->vcpu_id )
+        return 1;
+
     shadow_lock(d);
 
     switch(levels) {
@@ -692,7 +701,6 @@ void free_fake_shadow_l2(struct domain *d, unsigned long smfn)
 void free_shadow_page(unsigned long smfn)
 {
     struct page_info *page = mfn_to_page(smfn);
-
     unsigned long gmfn = page->u.inuse.type_info & PGT_mfn_mask;
     struct domain *d = page_get_owner(mfn_to_page(gmfn));
     unsigned long gpfn = mfn_to_gmfn(d, gmfn);
@@ -709,10 +717,9 @@ void free_shadow_page(unsigned long smfn)
         if ( !mfn )
             gpfn |= (1UL << 63);
     }
-    if (d->arch.ops->guest_paging_levels == PAGING_L3)
-        if (type == PGT_l4_shadow ) {
-            gpfn = ((unsigned long)page->tlbflush_timestamp << PGT_score_shift) | gpfn;
-        }
+    if ( d->arch.ops->guest_paging_levels == PAGING_L3 )
+        if ( type == PGT_l4_shadow ) 
+            gpfn = ((unsigned long)page->tlbflush_timestamp << PGT_pae_idx_shift) | gpfn;
 #endif
 
     delete_shadow_status(d, gpfn, gmfn, type);
@@ -743,9 +750,24 @@ void free_shadow_page(unsigned long smfn)
 #if CONFIG_PAGING_LEVELS >= 3
     case PGT_l2_shadow:
     case PGT_l3_shadow:
+        shadow_demote(d, gpfn, gmfn);
+        free_shadow_tables(d, smfn, shadow_type_to_level(type));
+        d->arch.shadow_page_count--;
+        break;
+
     case PGT_l4_shadow:
         gpfn = gpfn & PGT_mfn_mask;
-        shadow_demote(d, gpfn, gmfn);
+        if ( d->arch.ops->guest_paging_levels == PAGING_L3 )
+        {
+            /*
+             * Since a single PDPT page can have multiple PDPs, it's possible
+             * that shadow_demote() has been already called for gmfn.
+             */
+            if ( mfn_is_page_table(gmfn) )
+                shadow_demote(d, gpfn, gmfn);
+        } else
+            shadow_demote(d, gpfn, gmfn);
+
         free_shadow_tables(d, smfn, shadow_type_to_level(type));
         d->arch.shadow_page_count--;
         break;
@@ -2041,7 +2063,16 @@ void shadow_sync_and_drop_references(
 
 void clear_all_shadow_status(struct domain *d)
 {
+    struct vcpu *v = current;
+
+    /*
+     * Don't clean up while other vcpus are working.
+     */
+    if ( v->vcpu_id )
+        return;
+
     shadow_lock(d);
+
     free_shadow_pages(d);
     free_shadow_ht_entries(d);
     d->arch.shadow_ht = 
@@ -2054,6 +2085,7 @@ void clear_all_shadow_status(struct domain *d)
            shadow_ht_buckets * sizeof(struct shadow_status));
 
     free_out_of_sync_entries(d);
+
     shadow_unlock(d);
 }
 
