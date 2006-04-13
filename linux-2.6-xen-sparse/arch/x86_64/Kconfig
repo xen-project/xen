@@ -568,7 +568,6 @@ config UNORDERED_IO
 	 from i386. Requires that the driver writer used memory barriers
 	 properly.
 
-if !X86_64_XEN
 source "drivers/pci/pcie/Kconfig"
 
 source "drivers/pci/Kconfig"
@@ -576,7 +575,6 @@ source "drivers/pci/Kconfig"
 source "drivers/pcmcia/Kconfig"
 
 source "drivers/pci/hotplug/Kconfig"
-endif
 
 endmenu
 
