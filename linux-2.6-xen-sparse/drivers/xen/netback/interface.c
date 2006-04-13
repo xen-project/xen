@@ -150,10 +150,8 @@ static int map_frontend_pages(
 	struct gnttab_map_grant_ref op;
 	int ret;
 
-	op.host_addr = (unsigned long)netif->tx_comms_area->addr;
-	op.flags     = GNTMAP_host_map;
-	op.ref       = tx_ring_ref;
-	op.dom       = netif->domid;
+	gnttab_set_map_op(&op, (unsigned long)netif->tx_comms_area->addr,
+			  GNTMAP_host_map, tx_ring_ref, netif->domid);
     
 	lock_vm_area(netif->tx_comms_area);
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1);
@@ -168,10 +166,8 @@ static int map_frontend_pages(
 	netif->tx_shmem_ref    = tx_ring_ref;
 	netif->tx_shmem_handle = op.handle;
 
-	op.host_addr = (unsigned long)netif->rx_comms_area->addr;
-	op.flags     = GNTMAP_host_map;
-	op.ref       = rx_ring_ref;
-	op.dom       = netif->domid;
+	gnttab_set_map_op(&op, (unsigned long)netif->rx_comms_area->addr,
+			  GNTMAP_host_map, rx_ring_ref, netif->domid);
 
 	lock_vm_area(netif->rx_comms_area);
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1);
@@ -194,18 +190,16 @@ static void unmap_frontend_pages(netif_t *netif)
 	struct gnttab_unmap_grant_ref op;
 	int ret;
 
-	op.host_addr    = (unsigned long)netif->tx_comms_area->addr;
-	op.handle       = netif->tx_shmem_handle;
-	op.dev_bus_addr = 0;
+	gnttab_set_unmap_op(&op, (unsigned long)netif->tx_comms_area->addr,
+			    GNTMAP_host_map, netif->tx_shmem_handle);
 
 	lock_vm_area(netif->tx_comms_area);
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1);
 	unlock_vm_area(netif->tx_comms_area);
 	BUG_ON(ret);
 
-	op.host_addr    = (unsigned long)netif->rx_comms_area->addr;
-	op.handle       = netif->rx_shmem_handle;
-	op.dev_bus_addr = 0;
+	gnttab_set_unmap_op(&op, (unsigned long)netif->rx_comms_area->addr,
+			    GNTMAP_host_map, netif->rx_shmem_handle);
 
 	lock_vm_area(netif->rx_comms_area);
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1);
