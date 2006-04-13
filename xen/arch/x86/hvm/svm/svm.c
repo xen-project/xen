@@ -2434,6 +2434,12 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
          */
         break;
 
+    case VMEXIT_INIT:
+        /*
+         * Nothing to do, in fact we should never get to this point. 
+         */
+        break;
+
 #ifdef XEN_DEBUGGER
     case VMEXIT_EXCEPTION_BP:
         svm_debug_save_cpu_user_regs(&regs);
