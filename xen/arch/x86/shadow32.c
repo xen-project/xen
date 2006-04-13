@@ -2886,7 +2886,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
     SH_VVLOG("shadow_fault( va=%lx, code=%lu )",
              va, (unsigned long)regs->error_code);
     perfc_incrc(shadow_fault_calls);
-    
+
     check_pagetable(v, "pre-sf");
 
     /*
@@ -2917,7 +2917,16 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
     // the mapping is in-sync, so the check of the PDE's present bit, above,
     // covers this access.
     //
-    orig_gpte = gpte = linear_pg_table[l1_linear_offset(va)];
+    if ( __copy_from_user(&gpte,
+                          &linear_pg_table[l1_linear_offset(va)],
+                          sizeof(gpte)) ) {
+        printk("%s() failed, crashing domain %d "
+               "due to a unaccessible linear page table (gpde=%" PRIpte "), va=%lx\n",
+               __func__, d->domain_id, l2e_get_intpte(gpde), va);
+        domain_crash_synchronous();
+    }
+    orig_gpte = gpte;
+
     if ( unlikely(!(l1e_get_flags(gpte) & _PAGE_PRESENT)) )
     {
         SH_VVLOG("shadow_fault - EXIT: gpte not present (%" PRIpte ") (gpde %" PRIpte ")",
@@ -2928,7 +2937,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
     }
 
     /* Write fault? */
-    if ( regs->error_code & 2 )  
+    if ( regs->error_code & 2 )
     {
         int allow_writes = 0;
 
@@ -2942,7 +2951,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
             else
             {
                 /* Write fault on a read-only mapping. */
-                SH_VVLOG("shadow_fault - EXIT: wr fault on RO page (%" PRIpte ")", 
+                SH_VVLOG("shadow_fault - EXIT: wr fault on RO page (%" PRIpte ")",
                          l1e_get_intpte(gpte));
                 perfc_incrc(shadow_fault_bail_ro_mapping);
                 goto fail;
@@ -2955,10 +2964,10 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
         }
 
         /* User access violation in guest? */
-        if ( unlikely((regs->error_code & 4) && 
+        if ( unlikely((regs->error_code & 4) &&
                       !(l1e_get_flags(gpte) & _PAGE_USER)))
         {
-            SH_VVLOG("shadow_fault - EXIT: wr fault on super page (%" PRIpte ")", 
+            SH_VVLOG("shadow_fault - EXIT: wr fault on super page (%" PRIpte ")",
                     l1e_get_intpte(gpte));
             goto fail;
 
@@ -2980,7 +2989,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
         /* Read-protection violation in guest? */
         if ( unlikely((regs->error_code & 1) ))
         {
-            SH_VVLOG("shadow_fault - EXIT: read fault on super page (%" PRIpte ")", 
+            SH_VVLOG("shadow_fault - EXIT: read fault on super page (%" PRIpte ")",
                     l1e_get_intpte(gpte));
             goto fail;
 
