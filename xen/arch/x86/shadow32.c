@@ -583,6 +583,13 @@ static void free_shadow_pages(struct domain *d)
         {
             put_shadow_ref(pagetable_get_pfn(v->arch.shadow_table));
             v->arch.shadow_table = mk_pagetable(0);
+
+            if ( shadow_mode_external(d) )
+            {
+                if ( v->arch.shadow_vtable )
+                    unmap_domain_page_global(v->arch.shadow_vtable);
+                v->arch.shadow_vtable = NULL;
+            }
         }
 
         if ( v->arch.monitor_shadow_ref )
