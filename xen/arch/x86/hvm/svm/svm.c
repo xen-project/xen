@@ -2588,13 +2588,18 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
          */
         break;
 
-#ifdef XEN_DEBUGGER
     case VMEXIT_EXCEPTION_BP:
+#ifdef XEN_DEBUGGER
         svm_debug_save_cpu_user_regs(&regs);
         pdb_handle_exception(3, &regs, 1);
         svm_debug_restore_cpu_user_regs(&regs);
-        break;
+#else
+        if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
+            domain_pause_for_debugger();
+        else 
+            svm_inject_exception(vmcb, TRAP_int3, 0, 0);
 #endif
+        break;
 
     case VMEXIT_EXCEPTION_NM:
         svm_do_no_device_fault(vmcb);
