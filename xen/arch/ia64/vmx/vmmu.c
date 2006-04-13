@@ -523,8 +523,8 @@ IA64FAULT vmx_vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
     vmx_vcpu_get_pta(vcpu, &vpta.val);
     vcpu_get_rr(vcpu, vadr, &vrr.rrval);
     if(vpta.vf){
-        panic("THASH,Don't support long format VHPT");
         *pval = ia64_call_vsa(PAL_VPS_THASH,vadr,vrr.rrval,vpta.val,0,0,0,0);
+        *pval = vpta.val & ~0xffff;
     }else{
         vhpt_offset=((vadr>>vrr.ps)<<3)&((1UL<<(vpta.size))-1);
         *pval = (vadr&VRN_MASK)|
@@ -542,7 +542,6 @@ IA64FAULT vmx_vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
     vmx_vcpu_get_pta(vcpu, &vpta.val);
     vcpu_get_rr(vcpu, vadr, &vrr.rrval);
     if(vpta.vf){
-        panic("THASH,Don't support long format VHPT");
         *pval = ia64_call_vsa(PAL_VPS_TTAG,vadr,vrr.rrval,0,0,0,0,0);
     }else{
         *pval = 1;
