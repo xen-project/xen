@@ -82,12 +82,12 @@ void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
 {
     VCPU *vcpu = current;
     UINT64 vpsr = vmx_vcpu_get_psr(vcpu);
-    if(!(vpsr&IA64_PSR_IC)&&(vector!=5)){
-        panic("Guest nested fault!");
+    vector=vec2off[vector];
+    if(!(vpsr&IA64_PSR_IC)&&(vector!=0x1400)){
+        panic_domain(regs, "Guest nested fault vector=%lx!\n", vector);
     }
     VCPU(vcpu,isr)=isr;
     VCPU(vcpu,iipa) = regs->cr_iip;
-    vector=vec2off[vector];
     if (vector == IA64_BREAK_VECTOR || vector == IA64_SPECULATION_VECTOR)
         VCPU(vcpu,iim) = iim;
     else {
@@ -96,24 +96,92 @@ void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
     inject_guest_interruption(vcpu, vector);
 }
 
+static void
+vmx_handle_hypercall (VCPU *v, REGS *regs)
+{
+    struct ia64_pal_retval y;
+    struct sal_ret_values x;
+    unsigned long i, sal_param[8];
+
+    switch (regs->r2) {
+        case FW_HYPERCALL_PAL_CALL:
+            //printf("*** PAL hypercall: index=%d\n",regs->r28);
+            //FIXME: This should call a C routine
+            y = pal_emulator_static(VCPU(v, vgr[12]));
+            regs->r8 = y.status; regs->r9 = y.v0;
+            regs->r10 = y.v1; regs->r11 = y.v2;
+#if 0
+            if (regs->r8)
+                printk("Failed vpal emulation, with index:0x%lx\n",
+                       VCPU(v, vgr[12]));
+#endif
+            break;
+        case FW_HYPERCALL_SAL_CALL:
+            for (i = 0; i < 8; i++)
+                vcpu_get_gr_nat(v, 32+i, &sal_param[i]);
+            x = sal_emulator(sal_param[0], sal_param[1],
+                             sal_param[2], sal_param[3],
+                             sal_param[4], sal_param[5],
+                             sal_param[6], sal_param[7]);
+            regs->r8 = x.r8; regs->r9 = x.r9;
+            regs->r10 = x.r10; regs->r11 = x.r11;
+#if 0
+            if (regs->r8)
+                printk("Failed vsal emulation, with index:0x%lx\n",
+                       sal_param[0]);
+#endif
+            break;
+        case FW_HYPERCALL_EFI_RESET_SYSTEM:
+            printf("efi.reset_system called ");
+            if (current->domain == dom0) {
+                printf("(by dom0)\n ");
+                (*efi.reset_system)(EFI_RESET_WARM,0,0,NULL);
+            }
+            printf("(not supported for non-0 domain)\n");
+            regs->r8 = EFI_UNSUPPORTED;
+            break;
+        case FW_HYPERCALL_EFI_GET_TIME:
+            {
+                unsigned long *tv, *tc;
+                vcpu_get_gr_nat(v, 32, (u64 *)&tv);
+                vcpu_get_gr_nat(v, 33, (u64 *)&tc);
+                printf("efi_get_time(%p,%p) called...",tv,tc);
+                tv = __va(translate_domain_mpaddr((unsigned long)tv));
+                if (tc) tc = __va(translate_domain_mpaddr((unsigned long)tc));
+                regs->r8 = (*efi.get_time)((efi_time_t *)tv,(efi_time_cap_t *)tc);
+                printf("and returns %lx\n",regs->r8);
+            }
+            break;
+        case FW_HYPERCALL_EFI_SET_TIME:
+        case FW_HYPERCALL_EFI_GET_WAKEUP_TIME:
+        case FW_HYPERCALL_EFI_SET_WAKEUP_TIME:
+            // FIXME: need fixes in efi.h from 2.6.9
+        case FW_HYPERCALL_EFI_SET_VIRTUAL_ADDRESS_MAP:
+            // FIXME: WARNING!! IF THIS EVER GETS IMPLEMENTED
+            // SOME OF THE OTHER EFI EMULATIONS WILL CHANGE AS
+            // POINTER ARGUMENTS WILL BE VIRTUAL!!
+        case FW_HYPERCALL_EFI_GET_VARIABLE:
+            // FIXME: need fixes in efi.h from 2.6.9
+        case FW_HYPERCALL_EFI_GET_NEXT_VARIABLE:
+        case FW_HYPERCALL_EFI_SET_VARIABLE:
+        case FW_HYPERCALL_EFI_GET_NEXT_HIGH_MONO_COUNT:
+            // FIXME: need fixes in efi.h from 2.6.9
+            regs->r8 = EFI_UNSUPPORTED;
+            break;
+    }
+#if 0
+    if (regs->r8)
+        printk("Failed vgfw emulation, with index:0x%lx\n",
+               regs->r2);
+#endif
+}
+
 IA64FAULT
 vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim)
 {
-	struct domain *d = (struct domain *) current->domain;
-	struct vcpu *v = (struct vcpu *) current;
-	unsigned long i, sal_param[8];
+    struct domain *d = current->domain;
+    struct vcpu *v = current;
 
-#if 0
-	if (first_time) {
-		if (platform_is_hp_ski()) running_on_sim = 1;
-		else running_on_sim = 0;
-		first_time = 0;
-	}
-	if (iim == 0x80001 || iim == 0x80002) {	//FIXME: don't hardcode constant
-		if (running_on_sim) do_ssc(vcpu_get_gr_nat(current,36), regs);
-		else do_ssc(vcpu_get_gr_nat(current,36), regs);
-	}
-#endif
 #ifdef CRASH_DEBUG
 	if ((iim == 0 || iim == CDB_BREAK_NUM) && !user_mode(regs) &&
         IS_VMM_ADDRESS(regs->cr_iip)) {
@@ -122,88 +190,24 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 		debugger_trap_fatal(0 /* don't care */, regs);
 	} else
 #endif
-	if (iim == d->arch.breakimm) {
-		struct ia64_pal_retval y;
-		struct sal_ret_values x;
-		switch (regs->r2) {
-		    case FW_HYPERCALL_PAL_CALL:
-			//printf("*** PAL hypercall: index=%d\n",regs->r28);
-			//FIXME: This should call a C routine
-			y = pal_emulator_static(VCPU(v, vgr[12]));
-			regs->r8 = y.status; regs->r9 = y.v0;
-			regs->r10 = y.v1; regs->r11 = y.v2;
-#if 0
-			if (regs->r8)
-				printk("Failed vpal emulation, with index:0x%lx\n",
-					VCPU(v, vgr[12]));
-#endif
-			break;
-		    case FW_HYPERCALL_SAL_CALL:
-			for (i = 0; i < 8; i++)
-				vcpu_get_gr_nat(v, 32+i, &sal_param[i]);
-			x = sal_emulator(sal_param[0], sal_param[1],
-					 sal_param[2], sal_param[3],
-					 sal_param[4], sal_param[5],
-					 sal_param[6], sal_param[7]);
-			regs->r8 = x.r8; regs->r9 = x.r9;
-			regs->r10 = x.r10; regs->r11 = x.r11;
-#if 0
-			if (regs->r8)
-				printk("Failed vsal emulation, with index:0x%lx\n",
-					sal_param[0]);
-#endif
-			break;
-		    case FW_HYPERCALL_EFI_RESET_SYSTEM:
-			printf("efi.reset_system called ");
-			if (current->domain == dom0) {
-				printf("(by dom0)\n ");
-				(*efi.reset_system)(EFI_RESET_WARM,0,0,NULL);
-			}
-			printf("(not supported for non-0 domain)\n");
-			regs->r8 = EFI_UNSUPPORTED;
-			break;
-		    case FW_HYPERCALL_EFI_GET_TIME:
-			{
-			unsigned long *tv, *tc;
-			vcpu_get_gr_nat(v, 32, (u64 *)&tv);
-			vcpu_get_gr_nat(v, 33, (u64 *)&tc);
-			printf("efi_get_time(%p,%p) called...",tv,tc);
-			tv = __va(translate_domain_mpaddr((unsigned long)tv));
-			if (tc) tc = __va(translate_domain_mpaddr((unsigned long)tc));
-			regs->r8 = (*efi.get_time)((efi_time_t *)tv,(efi_time_cap_t *)tc);
-			printf("and returns %lx\n",regs->r8);
-			}
-			break;
-		    case FW_HYPERCALL_EFI_SET_TIME:
-		    case FW_HYPERCALL_EFI_GET_WAKEUP_TIME:
-		    case FW_HYPERCALL_EFI_SET_WAKEUP_TIME:
-			// FIXME: need fixes in efi.h from 2.6.9
-		    case FW_HYPERCALL_EFI_SET_VIRTUAL_ADDRESS_MAP:
-			// FIXME: WARNING!! IF THIS EVER GETS IMPLEMENTED
-			// SOME OF THE OTHER EFI EMULATIONS WILL CHANGE AS
-			// POINTER ARGUMENTS WILL BE VIRTUAL!!
-		    case FW_HYPERCALL_EFI_GET_VARIABLE:
-			// FIXME: need fixes in efi.h from 2.6.9
-		    case FW_HYPERCALL_EFI_GET_NEXT_VARIABLE:
-		    case FW_HYPERCALL_EFI_SET_VARIABLE:
-		    case FW_HYPERCALL_EFI_GET_NEXT_HIGH_MONO_COUNT:
-			// FIXME: need fixes in efi.h from 2.6.9
-			regs->r8 = EFI_UNSUPPORTED;
-			break;
-		}
-#if 0
-		if (regs->r8)
-			printk("Failed vgfw emulation, with index:0x%lx\n",
-				regs->r2);
-#endif
-		vmx_vcpu_increment_iip(current);
-	}else if(iim == DOMN_PAL_REQUEST){
-        pal_emul(current);
-		vmx_vcpu_increment_iip(current);
-    } else {
-		if (iim == 0) 
-			die_if_kernel("bug check", regs, iim);
-		vmx_reflect_interruption(ifa,isr,iim,11,regs);
+    {
+        if (iim == 0) 
+            die_if_kernel("bug check", regs, iim);
+
+        if (!user_mode(regs)) {
+            /* Allow hypercalls only when cpl = 0.  */
+            if (iim == d->arch.breakimm) {
+                vmx_handle_hypercall (v ,regs);
+                vmx_vcpu_increment_iip(current);
+                return IA64_NO_FAULT;
+            }
+            else if(iim == DOMN_PAL_REQUEST){
+                pal_emul(current);
+                vmx_vcpu_increment_iip(current);
+                return IA64_NO_FAULT;
+            }
+        }
+        vmx_reflect_interruption(ifa,isr,iim,11,regs);
     }
     return IA64_NO_FAULT;
 }
