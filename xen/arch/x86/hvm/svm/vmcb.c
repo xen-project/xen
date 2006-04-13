@@ -257,7 +257,8 @@ static int construct_init_vmcb_guest(struct arch_svm_struct *arch_svm,
     /* CR3 is set in svm_final_setup_guest */
 
     __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (crn) :); 
-    arch_svm->cpu_shadow_cr4 = crn & ~(X86_CR4_PGE | X86_CR4_PSE);
+    crn &= ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_PAE);
+    arch_svm->cpu_shadow_cr4 = crn;
     vmcb->cr4 = crn | SVM_CR4_HOST_MASK;
 
     vmcb->rsp = 0;

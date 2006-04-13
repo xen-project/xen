@@ -315,19 +315,29 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     {
     case MSR_EFER:
 #ifdef __x86_64__
-        if ((msr_content & EFER_LME) ^ test_bit(SVM_CPU_STATE_LME_ENABLED,
-                                                &vc->arch.hvm_svm.cpu_state))
+        /* offending reserved bit will cause #GP */
+        if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
         {
-            if (test_bit(SVM_CPU_STATE_PG_ENABLED, &vc->arch.hvm_svm.cpu_state)
-                    || !test_bit(SVM_CPU_STATE_PAE_ENABLED,
-                                 &vc->arch.hvm_svm.cpu_state))
-            {
-                svm_inject_exception(vmcb, TRAP_gp_fault, 1, 0);
-            }
+            printk("trying to set reserved bit in EFER\n");
+            svm_inject_exception(vmcb, TRAP_gp_fault, 1, 0);
+            return 0;
         }
 
-        if (msr_content & EFER_LME)
+        /* LME: 0 -> 1 */
+        if ( msr_content & EFER_LME &&
+             !test_bit(SVM_CPU_STATE_LME_ENABLED, &vc->arch.hvm_svm.cpu_state) )
+        {
+            if ( svm_paging_enabled(vc) ||
+                 !test_bit(SVM_CPU_STATE_PAE_ENABLED,
+                           &vc->arch.hvm_svm.cpu_state) )
+            {
+                printk("trying to set LME bit when "
+                       "in paging mode or PAE bit is not set\n");
+                svm_inject_exception(vmcb, TRAP_gp_fault, 1, 0);
+                return 0;
+            }
             set_bit(SVM_CPU_STATE_LME_ENABLED, &vc->arch.hvm_svm.cpu_state);
+        }
 
         /* We have already recorded that we want LME, so it will be set 
          * next time CR0 gets updated. So we clear that bit and continue.
@@ -757,7 +767,8 @@ void arch_svm_do_resume(struct vcpu *v)
         reset_stack_and_jump( svm_asm_do_resume );
     }
     else {
-        printk("VCPU core pinned: %d to %d\n", v->arch.hvm_svm.launch_core, smp_processor_id() );
+        printk("VCPU core pinned: %d to %d\n", 
+                v->arch.hvm_svm.launch_core, smp_processor_id() );
         v->arch.hvm_svm.launch_core = smp_processor_id();
         svm_migrate_timers( v );
         svm_do_resume( v );
@@ -922,6 +933,7 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
             clear_bit(X86_FEATURE_APIC, &edx);
 	    
 #if CONFIG_PAGING_LEVELS < 3
+        clear_bit(X86_FEATURE_NX, &edx);
         clear_bit(X86_FEATURE_PAE, &edx);
         clear_bit(X86_FEATURE_PSE, &edx);
         clear_bit(X86_FEATURE_PSE36, &edx);
@@ -929,12 +941,14 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
         if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
         {
             if ( !v->domain->arch.hvm_domain.pae_enabled )
-                clear_bit(X86_FEATURE_PAE, &edx);
+            {
+               clear_bit(X86_FEATURE_PAE, &edx);
+               clear_bit(X86_FEATURE_NX, &edx);
+            }
             clear_bit(X86_FEATURE_PSE, &edx);
             clear_bit(X86_FEATURE_PSE36, &edx);
         }
-#endif
-	
+#endif	
         /* Clear out reserved bits. */
         ecx &= ~SVM_VCPU_CPUID_L1_RESERVED; /* mask off reserved bits */
         clear_bit(X86_FEATURE_MWAIT & 31, &ecx);
@@ -1312,8 +1326,7 @@ static int svm_set_cr0(unsigned long value)
     unsigned long mfn;
     int paging_enabled;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    unsigned long crn;
-
+  
     ASSERT(vmcb);
 
     /* We don't want to lose PG.  ET is reserved and should be always be 1*/
@@ -1358,35 +1371,37 @@ static int svm_set_cr0(unsigned long value)
             set_bit(SVM_CPU_STATE_LMA_ENABLED,
                     &v->arch.hvm_svm.cpu_state);
             vmcb->efer |= (EFER_LMA | EFER_LME);
-
-#if CONFIG_PAGING_LEVELS >= 4 
-            if (!shadow_set_guest_paging_levels(v->domain, 4)) 
+            if (!shadow_set_guest_paging_levels(v->domain, PAGING_L4) )
             {
                 printk("Unsupported guest paging levels\n");
                 domain_crash_synchronous(); /* need to take a clean path */
             }
-#endif
         }
         else
 #endif  /* __x86_64__ */
         {
 #if CONFIG_PAGING_LEVELS >= 3
-            if (!shadow_set_guest_paging_levels(v->domain, 2))
+            /* seems it's a 32-bit or 32-bit PAE guest */
+            if ( test_bit(SVM_CPU_STATE_PAE_ENABLED,
+                        &v->arch.hvm_svm.cpu_state) )
             {
-                printk("Unsupported guest paging levels\n");
-                domain_crash_synchronous(); /* need to take a clean path */
+                /* The guest enables PAE first and then it enables PG, it is
+                 * really a PAE guest */
+                if ( !shadow_set_guest_paging_levels(v->domain, PAGING_L3) )
+                {
+                    printk("Unsupported guest paging levels\n");
+                    domain_crash_synchronous();
+                }
+            }
+            else
+            {
+                if ( !shadow_set_guest_paging_levels(v->domain, PAGING_L2) )
+                {
+                    printk("Unsupported guest paging levels\n");
+                    domain_crash_synchronous(); /* need to take a clean path */
+                }
             }
 #endif
-        }
-
-        /* update CR4's PAE if needed */
-        crn = vmcb->cr4;
-        if ((!(crn & X86_CR4_PAE)) 
-                && test_bit(SVM_CPU_STATE_PAE_ENABLED, 
-                    &v->arch.hvm_svm.cpu_state))
-        {
-            HVM_DBG_LOG(DBG_LEVEL_1, "enable PAE on cr4\n");
-            vmcb->cr4 |= X86_CR4_PAE;
         }
 
         /* Now arch.guest_table points to machine physical. */
@@ -1402,7 +1417,16 @@ static int svm_set_cr0(unsigned long value)
         /* arch->shadow_table should hold the next CR3 for shadow */
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx\n", 
                     v->arch.hvm_svm.cpu_cr3, mfn);
+
+        return 1;
     }
+
+    if ( !((value & X86_CR0_PE) && (value & X86_CR0_PG)) && paging_enabled )
+        if ( v->arch.hvm_svm.cpu_cr3 ) {
+            put_page(mfn_to_page(get_mfn_from_gpfn(
+                      v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT)));
+            v->arch.guest_table = mk_pagetable(0);
+        }
 
     /*
      * SVM implements paged real-mode and when we return to real-mode
@@ -1415,6 +1439,14 @@ static int svm_set_cr0(unsigned long value)
             return 0;
         }
 
+        clear_all_shadow_status( v->domain );
+        set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
+        vmcb->cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
+    }
+    else if ( (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PE )
+    {
+        /* we should take care of this kind of situation */
+        clear_all_shadow_status(v->domain);
         set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
         vmcb->cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
     }
@@ -1438,15 +1470,21 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
     {
     case 0:
         value = v->arch.hvm_svm.cpu_shadow_cr0;
-        break;
+        if (svm_dbg_on)
+            printk("CR0 read =%lx \n", value );
+          break;
     case 2:
         value = vmcb->cr2;
         break;
     case 3:
         value = (unsigned long) v->arch.hvm_svm.cpu_cr3;
-        break;
+        if (svm_dbg_on)
+            printk("CR3 read =%lx \n", value );
+          break;
     case 4:
         value = (unsigned long) v->arch.hvm_svm.cpu_shadow_cr4;
+        if (svm_dbg_on)
+           printk( "CR4 read=%lx\n", value );
         break;
     case 8:
 #if 0
@@ -1463,6 +1501,12 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
     set_reg(gp, value, regs, vmcb);
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "mov_from_cr: CR%d, value = %lx,", cr, value);
+}
+
+
+static inline int svm_pgbit_test(struct vcpu *v)
+{
+   return v->arch.hvm_svm.cpu_shadow_cr0 & X86_CR0_PG;
 }
 
 
@@ -1486,12 +1530,15 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
     switch (cr) 
     {
     case 0: 
+        if (svm_dbg_on)
+            printk("CR0 write =%lx \n", value );
         return svm_set_cr0(value);
 
     case 3: 
     {
         unsigned long old_base_mfn, mfn;
-
+        if (svm_dbg_on)
+            printk("CR3 write =%lx \n", value );
         /* If paging is not enabled yet, simply copy the value to CR3. */
         if (!svm_paging_enabled(v)) {
             v->arch.hvm_svm.cpu_cr3 = value;
@@ -1533,19 +1580,104 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             if (old_base_mfn)
                 put_page(mfn_to_page(old_base_mfn));
 
-            update_pagetables(v);
-            
-            /* arch.shadow_table should now hold the next CR3 for shadow*/
+            /*
+             * arch.shadow_table should now hold the next CR3 for shadow
+             */
+#if CONFIG_PAGING_LEVELS >= 3
+            if ( v->domain->arch.ops->guest_paging_levels == PAGING_L3 )
+                shadow_sync_all(v->domain);
+#endif
             v->arch.hvm_svm.cpu_cr3 = value;
+            update_pagetables(v);
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", value);
             vmcb->cr3 = pagetable_get_paddr(v->arch.shadow_table);
         }
         break;
     }
 
-    case 4:         
-        /* CR4 */
-        if (value & X86_CR4_PAE) {
+    case 4: /* CR4 */
+    {
+        if (svm_dbg_on)
+            printk( "write cr4=%lx, cr0=%lx\n", 
+                     value,  v->arch.hvm_svm.cpu_shadow_cr0 );
+        old_cr = v->arch.hvm_svm.cpu_shadow_cr4;
+        if ( value & X86_CR4_PAE && !(old_cr & X86_CR4_PAE) )
+        {
+            set_bit(SVM_CPU_STATE_PAE_ENABLED, &v->arch.hvm_svm.cpu_state);
+            if ( svm_pgbit_test(v) )
+            {
+                /* The guest is a 32-bit PAE guest. */
+#if CONFIG_PAGING_LEVELS >= 4
+                unsigned long mfn, old_base_mfn;
+
+                if( !shadow_set_guest_paging_levels(v->domain, PAGING_L3) )
+                {
+                    printk("Unsupported guest paging levels\n");
+                    domain_crash_synchronous(); /* need to take a clean path */
+                }
+
+                if ( !VALID_MFN(mfn = get_mfn_from_gpfn(
+                                    v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT)) ||
+                     !get_page(mfn_to_page(mfn), v->domain) )
+                {
+                    printk("Invalid CR3 value = %lx", v->arch.hvm_svm.cpu_cr3);
+                    domain_crash_synchronous(); /* need to take a clean path */
+                }
+
+                old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+                if ( old_base_mfn )
+                    put_page(mfn_to_page(old_base_mfn));
+
+                /*
+                 * Now arch.guest_table points to machine physical.
+                 */
+
+                v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
+                update_pagetables(v);
+
+                HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
+                            (unsigned long) (mfn << PAGE_SHIFT));
+
+                vmcb->cr3 = pagetable_get_paddr(v->arch.shadow_table);
+
+                /*
+                 * arch->shadow_table should hold the next CR3 for shadow
+                 */
+
+                HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx",
+                            v->arch.hvm_svm.cpu_cr3, mfn);
+#endif
+            }
+            else
+            {
+                /*  The guest is a 64 bit or 32-bit PAE guest. */
+#if CONFIG_PAGING_LEVELS >= 4
+                if ( (v->domain->arch.ops != NULL) &&
+                        v->domain->arch.ops->guest_paging_levels == PAGING_L2)
+                {
+                    /* Seems the guest first enables PAE without enabling PG,
+                     * it must enable PG after that, and it is a 32-bit PAE
+                     * guest */
+
+                    if ( !shadow_set_guest_paging_levels(v->domain, PAGING_L3) )
+                    {
+                        printk("Unsupported guest paging levels\n");
+                        domain_crash_synchronous();
+                    }                   
+                }
+                else
+                {
+                    if ( !shadow_set_guest_paging_levels(v->domain,
+                                                            PAGING_L4) )
+                    {
+                        printk("Unsupported guest paging levels\n");
+                        domain_crash_synchronous();
+                    }
+                }
+#endif
+            }
+        }
+        else if (value & X86_CR4_PAE) {
             set_bit(SVM_CPU_STATE_PAE_ENABLED, &v->arch.hvm_svm.cpu_state);
         } else {
             if (test_bit(SVM_CPU_STATE_LMA_ENABLED,
@@ -1555,7 +1687,6 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             clear_bit(SVM_CPU_STATE_PAE_ENABLED, &v->arch.hvm_svm.cpu_state);
         }
 
-        old_cr = v->arch.hvm_svm.cpu_shadow_cr4;
         v->arch.hvm_svm.cpu_shadow_cr4 = value;
         vmcb->cr4 = value | SVM_CR4_HOST_MASK;
   
@@ -1569,6 +1700,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             shadow_sync_all(v->domain);
         }
         break;
+    }
 
     default:
         printk("invalid cr: %d\n", cr);
@@ -1933,6 +2065,7 @@ static int svm_do_vmmcall_reset_to_realmode(struct vcpu *v,
 
     vmcb->cr4 = SVM_CR4_HOST_MASK;
     v->arch.hvm_svm.cpu_shadow_cr4 = 0;
+    clear_bit(SVM_CPU_STATE_PAE_ENABLED, &v->arch.hvm_svm.cpu_state);
 
     /* This will jump to ROMBIOS */
     vmcb->rip = 0xFFF0;
@@ -2280,7 +2413,8 @@ void walk_shadow_and_guest_pt(unsigned long gva)
     gpte.l1 = 0;
     __copy_from_user(&gpte, &linear_pg_table[ l1_linear_offset(gva) ], sizeof(gpte) );
     printk( "G-PTE = %x, flags=%x\n", gpte.l1, l1e_get_flags(gpte) );
-    __copy_from_user( &spte, &phys_to_machine_mapping[ l1e_get_pfn( gpte ) ], sizeof(spte) );
+    __copy_from_user( &spte, &phys_to_machine_mapping[ l1e_get_pfn( gpte ) ], 
+                      sizeof(spte) );
     printk( "S-PTE = %x, flags=%x\n", spte.l1, l1e_get_flags(spte));
 }
 #endif /* SVM_WALK_GUEST_PAGES */
@@ -2314,18 +2448,29 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
     {
         if (svm_paging_enabled(v) && !mmio_space(gva_to_gpa(vmcb->exitinfo2)))
         {
+            printk("I%08ld,ExC=%s(%d),IP=%x:%llx,I1=%llx,I2=%llx,INT=%llx, gpa=%llx\n", 
+                    intercepts_counter,
+                    exit_reasons[exit_reason], exit_reason, regs.cs,
+		    (unsigned long long) regs.rip,
+		    (unsigned long long) vmcb->exitinfo1,
+		    (unsigned long long) vmcb->exitinfo2,
+		    (unsigned long long) vmcb->exitintinfo.bytes,
+            (unsigned long long) gva_to_gpa( vmcb->exitinfo2 ) );
+        }
+        else 
+        {
             printk("I%08ld,ExC=%s(%d),IP=%x:%llx,I1=%llx,I2=%llx,INT=%llx\n", 
                     intercepts_counter,
                     exit_reasons[exit_reason], exit_reason, regs.cs,
 		    (unsigned long long) regs.rip,
 		    (unsigned long long) vmcb->exitinfo1,
 		    (unsigned long long) vmcb->exitinfo2,
-		    (unsigned long long) vmcb->exitintinfo.bytes);
+		    (unsigned long long) vmcb->exitintinfo.bytes );
         }
     } 
-    else if (svm_dbg_on 
-            && exit_reason != VMEXIT_IOIO 
-            && exit_reason != VMEXIT_INTR) 
+    else if ( svm_dbg_on 
+              && exit_reason != VMEXIT_IOIO 
+              && exit_reason != VMEXIT_INTR) 
     {
 
         if (exit_reasons[exit_reason])
@@ -2350,7 +2495,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
     }
 
 #ifdef SVM_WALK_GUEST_PAGES
-    if( exit_reason == VMEXIT_EXCEPTION_PF && ( ( vmcb->exitinfo2 == vmcb->rip )|| vmcb->exitintinfo.bytes) )
+    if( exit_reason == VMEXIT_EXCEPTION_PF 
+        && ( ( vmcb->exitinfo2 == vmcb->rip )
+        || vmcb->exitintinfo.bytes) )
     {
        if (svm_paging_enabled(v) && !mmio_space(gva_to_gpa(vmcb->exitinfo2)))     
            walk_shadow_and_guest_pt( vmcb->exitinfo2 );
