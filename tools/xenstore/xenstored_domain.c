@@ -74,6 +74,12 @@ struct domain
 
 	/* Have we noticed that this domain is shutdown? */
 	int shutdown;
+
+	/* number of entry from this domain in the store */
+	int nbentry;
+
+	/* number of watch for this domain */
+	int nbwatch;
 };
 
 static LIST_HEAD(domains);
@@ -285,6 +291,8 @@ static struct domain *new_domain(void *context, unsigned int domid,
 	domain->conn->id = domid;
 
 	domain->remote_port = port;
+	domain->nbentry = 0;
+	domain->nbwatch = 0;
 
 	return domain;
 }
@@ -560,6 +568,50 @@ int domain_init(void)
 	virq_port = rc;
 
 	return eventchn_fd;
+}
+
+void domain_entry_inc(struct connection *conn)
+{
+	if (!conn || !conn->domain)
+		return;
+	conn->domain->nbentry++;
+}
+
+void domain_entry_dec(struct connection *conn)
+{
+	if (!conn || !conn->domain)
+		return;
+	if (conn->domain->nbentry)
+		conn->domain->nbentry--;
+}
+
+int domain_entry(struct connection *conn)
+{
+	return (conn && conn->domain && conn->domain->domid)
+		? conn->domain->nbentry
+		: 0;
+}
+
+void domain_watch_inc(struct connection *conn)
+{
+	if (!conn || !conn->domain)
+		return;
+	conn->domain->nbwatch++;
+}
+
+void domain_watch_dec(struct connection *conn)
+{
+	if (!conn || !conn->domain)
+		return;
+	if (conn->domain->nbwatch)
+		conn->domain->nbwatch--;
+}
+
+int domain_watch(struct connection *conn)
+{
+	return (conn && conn->domain && conn->domain->domid)
+		? conn->domain->nbwatch
+		: 0;
 }
 
 /*

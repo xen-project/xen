@@ -32,6 +32,8 @@
 #include "xenstored_test.h"
 #include "xenstored_domain.h"
 
+extern int quota_nb_watch_per_domain;
+
 struct watch
 {
 	/* Watches on this connection */
@@ -135,6 +137,11 @@ void do_watch(struct connection *conn, struct buffered_data *in)
 		}
 	}
 
+	if (domain_watch(conn) > quota_nb_watch_per_domain) {
+		send_error(conn, E2BIG);
+		return;
+	}
+
 	watch = talloc(conn, struct watch);
 	watch->node = talloc_strdup(watch, vec[0]);
 	watch->token = talloc_strdup(watch, vec[1]);
@@ -145,6 +152,7 @@ void do_watch(struct connection *conn, struct buffered_data *in)
 
 	INIT_LIST_HEAD(&watch->events);
 
+	domain_watch_inc(conn);
 	list_add_tail(&watch->list, &conn->watches);
 	trace_create(watch, "watch");
 	talloc_set_destructor(watch, destroy_watch);
@@ -169,6 +177,7 @@ void do_unwatch(struct connection *conn, struct buffered_data *in)
 		if (streq(watch->node, node) && streq(watch->token, vec[1])) {
 			list_del(&watch->list);
 			talloc_free(watch);
+			domain_watch_dec(conn);
 			send_ack(conn, XS_UNWATCH);
 			return;
 		}
