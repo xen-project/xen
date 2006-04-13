@@ -113,7 +113,7 @@ else
 
  # Turn linux into xenolinux then build it
  cd xenolinux-${LINUX_VER}-sparse
- ./mkbuildtree ../../linux-${LINUX_VER}
+ bash ./mkbuildtree ../../linux-${LINUX_VER}
  cd ../..
  mv linux-${LINUX_VER} xenolinux-${LINUX_VER}
  cd xenolinux-${LINUX_VER}

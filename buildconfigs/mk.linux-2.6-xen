@@ -22,8 +22,8 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-linux-$(LINUX_VER)/.valid-ref
 	rm -rf $(LINUX_DIR)
 	cp -al $(<D) $(LINUX_DIR)
 	# Apply arch-xen patches
-	( cd linux-$(LINUX_SERIES)-xen-sparse ; \
-          LINUX_ARCH=$(LINUX_ARCH) ./mkbuildtree ../$(LINUX_DIR) )
+	( cd linux-$(LINUX_SERIES)-xen-sparse && \
+          LINUX_ARCH=$(LINUX_ARCH) bash ./mkbuildtree ../$(LINUX_DIR) )
 	# Re-use config from install dir if one exits else use default config
 	CONFIG_VERSION=$$(sed -ne 's/^EXTRAVERSION = //p' $(LINUX_DIR)/Makefile); \
 	[ -r $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION-$(EXTRAVERSION) ] && \

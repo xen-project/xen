@@ -90,8 +90,8 @@ abs_to_rel ${AD} ${AS}
 RS=$DESTPATH
 
 # Arch-specific pre-processing
-if [ -x arch/${LINUX_ARCH}/xen-mkbuildtree-pre ]; then
-	arch/${LINUX_ARCH}/xen-mkbuildtree-pre
+if [ -e arch/${LINUX_ARCH}/xen-mkbuildtree-pre ]; then
+	bash arch/${LINUX_ARCH}/xen-mkbuildtree-pre
 fi
 
 # Remove old copies of files and directories at the destination
@@ -115,6 +115,6 @@ relative_lndir ../../../${RS}/../xen/include/public
 
 # Arch-specific post-processing
 cd ${AD}
-if [ -x arch/${LINUX_ARCH}/xen-mkbuildtree-post ]; then
-	arch/${LINUX_ARCH}/xen-mkbuildtree-post
+if [ -e arch/${LINUX_ARCH}/xen-mkbuildtree-post ]; then
+	bash arch/${LINUX_ARCH}/xen-mkbuildtree-post
 fi
