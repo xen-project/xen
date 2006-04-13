@@ -10,19 +10,22 @@ export BASEDIR := $(CURDIR)
 .PHONY: default
 default: build
 
-ifeq ($(XEN_ROOT),)
+.PHONY: dist
+dist: install
 
-.PHONY: build install clean
-build install clean:
-	make -f Rules.mk $@
+.PHONY: debug
+debug:
+	objdump -D -S $(TARGET)-syms > $(TARGET).s
 
-else
+.PHONY: build install clean cscope TAGS tags
+build install clean cscope TAGS tags::
+	make -f Rules.mk _$@
 
-.PHONY: build
-build: $(TARGET).gz
+.PHONY: _build
+_build: $(TARGET).gz
 
-.PHONY: install
-install: $(TARGET).gz
+.PHONY: _install
+_install: $(TARGET).gz
 	[ -d $(DESTDIR)/boot ] || $(INSTALL_DIR) $(DESTDIR)/boot
 	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_FULLVERSION).gz
 	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION).gz
@@ -35,8 +38,8 @@ install: $(TARGET).gz
 	$(INSTALL_DATA) include/public/io/*.h $(DESTDIR)/usr/include/xen/io
 	$(INSTALL_DATA) include/public/COPYING $(DESTDIR)/usr/include/xen
 
-.PHONY: clean
-clean:: delete-unfresh-files
+.PHONY: _clean
+_clean: delete-unfresh-files
 	$(MAKE) -C tools clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C common clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C drivers clean
@@ -45,15 +48,6 @@ clean:: delete-unfresh-files
 	rm -f include/asm *.o $(TARGET)* *~ core
 	rm -f include/asm-*/asm-offsets.h
 	rm -f include/xen/acm_policy.h
-
-endif
-
-.PHONY: dist
-dist: install
-
-.PHONY: debug
-debug:
-	objdump -D -S $(TARGET)-syms > $(TARGET).s
 
 $(TARGET).gz: $(TARGET)
 	gzip -f -9 < $< > $@.new
@@ -134,10 +128,6 @@ define all_sources
             -name config \) -prune -o -name '*.h' -print; \
       find $(SUBDIRS) -name SCCS -prune -o -name '*.[chS]' -print )
 endef
-
-.PHONY: cscope TAGS tags
-cscope TAGS tags:
-	make -f $(BASEDIR)/Rules.mk _$@
 
 .PHONY: _TAGS
 _TAGS: 
