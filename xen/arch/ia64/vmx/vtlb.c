@@ -393,7 +393,8 @@ void vtlb_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 va)
     vcpu_get_rr(current, va, &vrr.rrval);
     if (vrr.ps != ps) {
 //        machine_tlb_insert(hcb->vcpu, entry);
-    	panic("not preferred ps with va: 0x%lx\n", va);
+    	panic_domain(NULL, "not preferred ps with va: 0x%lx vrr.ps=%d ps=%d\n",
+		     va, vrr.ps, ps);
     	return;
     }
     hash_table = vsa_thash(hcb->pta, va, vrr.rrval, &tag);
