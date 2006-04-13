@@ -135,16 +135,20 @@ define all_sources
       find $(SUBDIRS) -name SCCS -prune -o -name '*.[chS]' -print )
 endef
 
-.PHONY: TAGS
-TAGS: 
+.PHONY: cscope TAGS tags
+cscope TAGS tags:
+	make -f $(BASEDIR)/Rules.mk _$@
+
+.PHONY: _TAGS
+_TAGS: 
 	$(all_sources) | etags -
 
-.PHONY: tags
-tags: 
+.PHONY: _tags
+_tags: 
 	$(all_sources) | xargs ctags
 
-.PHONY: cscope
-cscope: 
+.PHONY: _cscope
+_cscope:
 	$(all_sources) > cscope.files
 	cscope -k -b -q
 
