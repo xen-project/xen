@@ -346,11 +346,7 @@ void panic_domain(struct pt_regs *regs, const char *fmt, ...)
 	va_list args;
 	char buf[128];
 	struct vcpu *v = current;
-//	static volatile int test = 1;	// so can continue easily in debug
-//	extern spinlock_t console_lock;
-//	unsigned long flags;
     
-loop:
 	printf("$$$$$ PANIC in domain %d (k6=0x%lx): ",
 		v->domain->domain_id, 
 		__get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT]);
@@ -364,16 +360,7 @@ loop:
 	} else {
 		debugger_trap_immediate();
 	}
-	domain_pause_by_systemcontroller(current->domain);
-	v->domain->shutdown_code = SHUTDOWN_crash;
-	set_bit(_DOMF_shutdown, &v->domain->domain_flags);
-	if (v->domain->domain_id == 0) {
-		int i = 1000000000L;
-		// if domain0 crashes, just periodically print out panic
-		// message to make post-mortem easier
-		while(i--);
-		goto loop;
-	}
+	domain_crash_synchronous ();
 }
 
 /* FIXME: for the forseeable future, all cpu's that enable VTi have split
