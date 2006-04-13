@@ -2122,6 +2122,7 @@ static int svm_do_vmmcall_reset_to_realmode(struct vcpu *v,
     vmcb->idtr.base = 0x00;
 
     vmcb->rax = 0;
+    vmcb->rsp = 0;
 
     return 0;
 }
