@@ -321,17 +321,6 @@ ENTRY(dtlb_miss)
 	;; 
 (p7)	br.cond.spnt 2f
 
-	// is non-access bit on?
-	tbit.nz p8,p0=r17,IA64_ISR_NA_BIT	
-	;;
-(p8)	br.cond.spnt 2f
-
-	// cr.isr.code == IA64_ISR_CODE_LFETCH?
-	and r18=IA64_ISR_CODE_MASK,r17		// get the isr.code field
-	;; 
-	cmp.eq p9,p0=IA64_ISR_CODE_LFETCH,r18	// check isr.code field
-(p9)	br.cond.spnt 2f
-
 	// Is the faulted iip in vmm area?
 	// check [59:58] bit
 	// 00, 11: guest
