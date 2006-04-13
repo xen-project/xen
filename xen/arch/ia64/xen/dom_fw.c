@@ -200,7 +200,7 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 	unsigned long r9  = 0;
 	unsigned long r10 = 0;
 	unsigned long r11 = 0;
-	long status = -1;
+	long status = PAL_STATUS_UNIMPLEMENTED;
 
 	if (running_on_sim)
 		return pal_emulator_static(index);
@@ -254,24 +254,83 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		status = ia64_pal_cache_summary(&r9,&r10);
 		break;
 	    case PAL_VM_SUMMARY:
-		// FIXME: what should xen return for these, figure out later
-		// For now, linux does the right thing if pal call fails
-		// In particular, rid_size must be set properly!
-		//status = ia64_pal_vm_summary(
-		//		(pal_vm_info_1_u_t *) &r9,
-		//		(pal_vm_info_2_u_t *) &r10);
+	        {
+			/* Use xen-specific values.
+			   hash_tag_id is somewhat random! */
+			const pal_vm_info_1_u_t v1 =
+				{.pal_vm_info_1_s =
+				 { .vw = 1,
+				   .phys_add_size = 44,
+				   .key_size = 16,
+				   .max_pkr = 15,
+				   .hash_tag_id = 0x30,
+				   .max_dtr_entry = NDTRS - 1,
+				   .max_itr_entry = NITRS - 1,
+#ifdef VHPT_GLOBAL
+				   .max_unique_tcs = 3,
+				   .num_tc_levels = 2
+#else
+				   .max_unique_tcs = 2,
+				   .num_tc_levels = 1
+#endif
+				 }};
+			const pal_vm_info_2_u_t v2 =
+				{ .pal_vm_info_2_s =
+				  { .impl_va_msb = 50,
+				    .rid_size = current->domain->arch.rid_bits,
+				    .reserved = 0 }};
+			r9 = v1.pvi1_val;
+			r10 = v2.pvi2_val;
+			status = PAL_STATUS_SUCCESS;
+		}
+		break;
+	    case PAL_VM_INFO:
+#ifdef VHPT_GLOBAL
+		if (in1 == 0 && in2 == 2) {
+			/* Level 1: VHPT  */
+			const pal_tc_info_u_t v =
+				{ .pal_tc_info_s = {.num_sets = 128,
+						    .associativity = 1,
+						    .num_entries = 128,
+						    .pf = 1,
+						    .unified = 1,
+						    .reduce_tr = 0,
+						    .reserved = 0}};
+			r9 = v.pti_val;
+			/* Only support PAGE_SIZE tc.  */
+			r10 = PAGE_SIZE;
+			status = PAL_STATUS_SUCCESS;
+		}
+#endif
+	        else if (
+#ifdef VHPT_GLOBAL 
+	                in1 == 1 /* Level 2. */
+#else
+			in1 == 0 /* Level 1. */
+#endif
+			 && (in2 == 1 || in2 == 2))
+		{
+			/* itlb/dtlb, 1 entry.  */
+			const pal_tc_info_u_t v =
+				{ .pal_tc_info_s = {.num_sets = 1,
+						    .associativity = 1,
+						    .num_entries = 1,
+						    .pf = 1,
+						    .unified = 0,
+						    .reduce_tr = 0,
+						    .reserved = 0}};
+			r9 = v.pti_val;
+			/* Only support PAGE_SIZE tc.  */
+			r10 = PAGE_SIZE;
+			status = PAL_STATUS_SUCCESS;
+		}
+	        else
+			status = PAL_STATUS_EINVAL;
 		break;
 	    case PAL_RSE_INFO:
 		status = ia64_pal_rse_info(
 				&r9,
 				(pal_hints_u_t *) &r10);
-		break;
-	    case PAL_VM_INFO:
-		status = ia64_pal_vm_info(
-				in1,
-				in2,
-				(pal_tc_info_u_t *) &r9,
-				&r10);
 		break;
 	    case PAL_REGISTER_INFO:
 		status = ia64_pal_register_info(in1, &r9, &r10);
@@ -296,7 +355,7 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 				while(1)
 				printk("xen_pal_emulator: PAL_PERF_MON_INFO "
 					"can't copy to user!!!!\n");
-				status = -1;
+				status = PAL_STATUS_UNIMPLEMENTED;
 				break;
 			}
 		}
