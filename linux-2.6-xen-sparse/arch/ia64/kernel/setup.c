@@ -409,6 +409,10 @@ void __init
 setup_arch (char **cmdline_p)
 {
 	unw_init();
+#ifdef CONFIG_XEN
+	if (running_on_xen)
+		setup_xen_features();
+#endif
 
 	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end___vtop_patchlist);
 
