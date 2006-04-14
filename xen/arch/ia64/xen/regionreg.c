@@ -21,6 +21,8 @@ extern void *pal_vaddr;
 /* FIXME: where these declarations should be there ? */
 extern void panic_domain(struct pt_regs *, const char *, ...);
 
+#define DOMAIN_RID_BITS_DEFAULT 18
+
 #define	IA64_MIN_IMPL_RID_BITS	(IA64_MIN_IMPL_RID_MSB+1)
 #define	IA64_MAX_IMPL_RID_BITS	24
 
@@ -51,26 +53,12 @@ ia64_set_rr (unsigned long rr, unsigned long rrv)
 }
 #endif
 
-// use this to allocate a rid out of the "Xen reserved rid block"
-static unsigned long allocate_reserved_rid(void)
-{
-	static unsigned long currentrid = XEN_DEFAULT_RID+1;
-	unsigned long t = currentrid;
-
-	unsigned long max = RIDS_PER_RIDBLOCK;
-
-	if (++currentrid >= max) return(-1UL);
-	return t;
-}
-
-
-// returns -1 if none available
-unsigned long allocate_metaphysical_rr(void)
+static unsigned long allocate_metaphysical_rr(struct domain *d, int n)
 {
 	ia64_rr rrv;
 
 	rrv.rrval = 0;	// Or else may see reserved bit fault
-	rrv.rid = allocate_reserved_rid();
+	rrv.rid = d->arch.starting_mp_rid + n;
 	rrv.ps = PAGE_SHIFT;
 	rrv.ve = 0;
 	/* Mangle metaphysical rid */
@@ -78,30 +66,37 @@ unsigned long allocate_metaphysical_rr(void)
 	return rrv.rrval;
 }
 
-int deallocate_metaphysical_rid(unsigned long rid)
-{
-	// fix this when the increment allocation mechanism is fixed.
-	return 1;
-}
-
 /*************************************
   Region Block setup/management
 *************************************/
 
 static int implemented_rid_bits = 0;
+static int mp_rid_shift;
 static struct domain *ridblock_owner[MAX_RID_BLOCKS] = { 0 };
 
-static void get_impl_rid_bits(void)
+void init_rid_allocator (void)
 {
+	int log_blocks;
 	pal_vm_info_2_u_t vm_info_2;
 
 	/* Get machine rid_size.  */
 	BUG_ON (ia64_pal_vm_summary (NULL, &vm_info_2) != 0);
 	implemented_rid_bits = vm_info_2.pal_vm_info_2_s.rid_size;
 
-	if (implemented_rid_bits <= IA64_MIN_IMPL_RID_BITS ||
-	    implemented_rid_bits > IA64_MAX_IMPL_RID_BITS)
-		BUG();
+	/* We need at least a few space...  */
+	BUG_ON (implemented_rid_bits <= IA64_MIN_IMPL_RID_BITS);
+
+	/* And we can accept too much space.  */
+	if (implemented_rid_bits > IA64_MAX_IMPL_RID_BITS)
+		implemented_rid_bits = IA64_MAX_IMPL_RID_BITS;
+
+	log_blocks = (implemented_rid_bits - IA64_MIN_IMPL_RID_BITS);
+
+	printf ("Maximum of simultaneous domains: %d\n",
+		(1 << log_blocks) - 1);
+
+	mp_rid_shift = IA64_MIN_IMPL_RID_BITS - log_blocks;
+	BUG_ON (mp_rid_shift < 3);
 }
 
 
@@ -113,13 +108,14 @@ int allocate_rid_range(struct domain *d, unsigned long ridbits)
 {
 	int i, j, n_rid_blocks;
 
-	if (implemented_rid_bits == 0) get_impl_rid_bits();
-	
+	if (ridbits == 0)
+		ridbits = DOMAIN_RID_BITS_DEFAULT;
+
 	if (ridbits >= IA64_MAX_IMPL_RID_BITS)
-	ridbits = IA64_MAX_IMPL_RID_BITS - 1;
+		ridbits = IA64_MAX_IMPL_RID_BITS - 1;
 	
 	if (ridbits < IA64_MIN_IMPL_RID_BITS)
-	ridbits = IA64_MIN_IMPL_RID_BITS;
+		ridbits = IA64_MIN_IMPL_RID_BITS;
 
 	// convert to rid_blocks and find one
 	n_rid_blocks = 1UL << (ridbits - IA64_MIN_IMPL_RID_BITS);
@@ -128,24 +124,37 @@ int allocate_rid_range(struct domain *d, unsigned long ridbits)
 	for (i = n_rid_blocks; i < MAX_RID_BLOCKS; i += n_rid_blocks) {
 		if (ridblock_owner[i] == NULL) {
 			for (j = i; j < i + n_rid_blocks; ++j) {
-				if (ridblock_owner[j]) break;
+				if (ridblock_owner[j])
+					break;
 			}
-			if (ridblock_owner[j] == NULL) break;
+			if (ridblock_owner[j] == NULL)
+				break;
 		}
 	}
 	
-	if (i >= MAX_RID_BLOCKS) return 0;
+	if (i >= MAX_RID_BLOCKS)
+		return 0;
 	
 	// found an unused block:
 	//   (i << min_rid_bits) <= rid < ((i + n) << min_rid_bits)
 	// mark this block as owned
-	for (j = i; j < i + n_rid_blocks; ++j) ridblock_owner[j] = d;
+	for (j = i; j < i + n_rid_blocks; ++j)
+		ridblock_owner[j] = d;
 	
 	// setup domain struct
 	d->arch.rid_bits = ridbits;
-	d->arch.starting_rid = i << IA64_MIN_IMPL_RID_BITS; d->arch.ending_rid = (i+n_rid_blocks) << IA64_MIN_IMPL_RID_BITS;
-printf("###allocating rid_range, domain %p: starting_rid=%x, ending_rid=%x\n",
-d,d->arch.starting_rid, d->arch.ending_rid);
+	d->arch.starting_rid = i << IA64_MIN_IMPL_RID_BITS;
+	d->arch.ending_rid = (i+n_rid_blocks) << IA64_MIN_IMPL_RID_BITS;
+	
+	d->arch.starting_mp_rid = i << mp_rid_shift;
+	d->arch.ending_mp_rid = (i + 1) << mp_rid_shift;
+
+	d->arch.metaphysical_rr0 = allocate_metaphysical_rr(d, 0);
+	d->arch.metaphysical_rr4 = allocate_metaphysical_rr(d, 1);
+
+	printf("###allocating rid_range, domain %p: rid=%x-%x mp_rid=%x\n",
+	       d, d->arch.starting_rid, d->arch.ending_rid,
+	       d->arch.starting_mp_rid);
 	
 	return 1;
 }
@@ -169,11 +178,13 @@ int deallocate_rid_range(struct domain *d)
 #endif
 	
 	for (i = rid_block_start; i < rid_block_end; ++i)
-	ridblock_owner[i] = NULL;
+		ridblock_owner[i] = NULL;
 	
 	d->arch.rid_bits = 0;
 	d->arch.starting_rid = 0;
 	d->arch.ending_rid = 0;
+	d->arch.starting_mp_rid = 0;
+	d->arch.ending_mp_rid = 0;
 	return 1;
 }
 
@@ -256,23 +267,6 @@ int set_metaphysical_rr0(void)
 //	rrv.ve = 1; 	FIXME: TURN ME BACK ON WHEN VHPT IS WORKING
 	ia64_set_rr(0,v->arch.metaphysical_rr0);
 	ia64_srlz_d();
-	return 1;
-}
-
-// validates/changes region registers 0-6 in the currently executing domain
-// Note that this is the one and only SP API (other than executing a privop)
-// for a domain to use to change region registers
-static int set_all_rr(u64 rr0, u64 rr1, u64 rr2, u64 rr3,
-		      u64 rr4, u64 rr5, u64 rr6, u64 rr7)
-{
-	if (!set_one_rr(0x0000000000000000L, rr0)) return 0;
-	if (!set_one_rr(0x2000000000000000L, rr1)) return 0;
-	if (!set_one_rr(0x4000000000000000L, rr2)) return 0;
-	if (!set_one_rr(0x6000000000000000L, rr3)) return 0;
-	if (!set_one_rr(0x8000000000000000L, rr4)) return 0;
-	if (!set_one_rr(0xa000000000000000L, rr5)) return 0;
-	if (!set_one_rr(0xc000000000000000L, rr6)) return 0;
-	if (!set_one_rr(0xe000000000000000L, rr7)) return 0;
 	return 1;
 }
 

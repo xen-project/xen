@@ -202,6 +202,18 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 	    v->arch.metaphysical_rr4 = d->arch.metaphysical_rr4;
 	    v->arch.metaphysical_saved_rr0 = d->arch.metaphysical_rr0;
 	    v->arch.metaphysical_saved_rr4 = d->arch.metaphysical_rr4;
+
+	    /* Is it correct ?
+	       It depends on the domain rid usage.
+
+	       A domain may share rid among its processor (eg having a
+	       global VHPT).  In this case, we should also share rid
+	       among vcpus and the rid range should be the same.
+
+	       However a domain may have per cpu rid allocation.  In
+	       this case we don't want to share rid among vcpus, but we may
+	       do it if two vcpus are on the same cpu... */
+
 	    v->arch.starting_rid = d->arch.starting_rid;
 	    v->arch.ending_rid = d->arch.ending_rid;
 	    v->arch.breakimm = d->arch.breakimm;
@@ -259,12 +271,8 @@ int arch_domain_create(struct domain *d)
 	 * to see guest issue uncacheable access in metaphysical mode. But
 	 * keep such info here may be more sane.
 	 */
-	if (((d->arch.metaphysical_rr0 = allocate_metaphysical_rr()) == -1UL)
-	 || ((d->arch.metaphysical_rr4 = allocate_metaphysical_rr()) == -1UL))
-		BUG();
-#define DOMAIN_RID_BITS_DEFAULT 18
-	if (!allocate_rid_range(d,DOMAIN_RID_BITS_DEFAULT)) // FIXME
-		BUG();
+	if (!allocate_rid_range(d,0))
+		goto fail_nomem;
 	d->arch.breakimm = 0x1000;
 	d->arch.sys_pgnr = 0;
 

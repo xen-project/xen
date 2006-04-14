@@ -64,10 +64,12 @@ vmMangleRID(unsigned long RIDVal)
 // since vmMangleRID is symmetric, use it for unmangling also
 #define vmUnmangleRID(x)	vmMangleRID(x)
 
-extern unsigned long allocate_metaphysical_rr(void);
-extern int deallocate_metaphysical_rid(unsigned long rid);
+extern void init_rid_allocator (void);
 
 struct domain;
+
+/* Allocate RIDs range and metaphysical RIDs for domain d.
+   If ridbits is 0, a default value is used instead.  */
 extern int allocate_rid_range(struct domain *d, unsigned long ridbits);
 extern int deallocate_rid_range(struct domain *d);
 

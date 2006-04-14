@@ -22,10 +22,19 @@ struct arch_domain {
     struct mm_struct *mm;
     unsigned long metaphysical_rr0;
     unsigned long metaphysical_rr4;
+
+    /* There are two ranges of RID for a domain:
+       one big range, used to virtualize domain RID,
+       one small range for internal Xen use (metaphysical).  */
+    /* Big range.  */
     int starting_rid;		/* first RID assigned to domain */
     int ending_rid;		/* one beyond highest RID assigned to domain */
     int rid_bits;		/* number of virtual rid bits (default: 18) */
-    int breakimm;
+    /* Metaphysical range.  */
+    int starting_mp_rid;
+    int ending_mp_rid;
+
+    int breakimm;     /* The imm value for hypercalls.  */
 
     int physmap_built;		/* Whether is physmap built or not */
     int imp_va_msb;

@@ -364,6 +364,8 @@ printk("About to call sort_main_extable()\n");
     sort_main_extable();
 
 
+    init_rid_allocator ();
+
     /* Create initial domain 0. */
 printk("About to call domain_create()\n");
     dom0 = domain_create(0, 0);
