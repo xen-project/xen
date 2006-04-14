@@ -46,7 +46,7 @@ get_maptrack_handle(
     unsigned int h;
     if ( unlikely((h = t->maptrack_head) == (t->maptrack_limit - 1)) )
         return -1;
-    t->maptrack_head = t->maptrack[h].ref_and_flags >> MAPTRACK_REF_SHIFT;
+    t->maptrack_head = t->maptrack[h].ref;
     t->map_count++;
     return h;
 }
@@ -55,7 +55,7 @@ static inline void
 put_maptrack_handle(
     grant_table_t *t, int handle)
 {
-    t->maptrack[handle].ref_and_flags = t->maptrack_head << MAPTRACK_REF_SHIFT;
+    t->maptrack[handle].ref = t->maptrack_head;
     t->maptrack_head = handle;
     t->map_count--;
 }
@@ -147,7 +147,7 @@ __gnttab_map_grant_ref(
 
         memcpy(new_mt, lgt->maptrack, PAGE_SIZE << lgt->maptrack_order);
         for ( i = lgt->maptrack_limit; i < (lgt->maptrack_limit << 1); i++ )
-            new_mt[i].ref_and_flags = (i+1) << MAPTRACK_REF_SHIFT;
+            new_mt[i].ref = i+1;
 
         free_xenheap_pages(lgt->maptrack, lgt->maptrack_order);
         lgt->maptrack          = new_mt;
@@ -265,8 +265,8 @@ __gnttab_map_grant_ref(
     TRACE_1D(TRC_MEM_PAGE_GRANT_MAP, op->dom);
 
     ld->grant_table->maptrack[handle].domid         = op->dom;
-    ld->grant_table->maptrack[handle].ref_and_flags =
-        (op->ref << MAPTRACK_REF_SHIFT) |
+    ld->grant_table->maptrack[handle].ref = op->ref;
+    ld->grant_table->maptrack[handle].flags =
         (op->flags & MAPTRACK_GNTMAP_MASK);
 
     op->dev_bus_addr = (u64)frame << PAGE_SHIFT;
@@ -340,7 +340,7 @@ __gnttab_unmap_grant_ref(
     map = &ld->grant_table->maptrack[op->handle];
 
     if ( unlikely(op->handle >= ld->grant_table->maptrack_limit) ||
-         unlikely(!(map->ref_and_flags & MAPTRACK_GNTMAP_MASK)) )
+         unlikely(!map->flags) )
     {
         DPRINTK("Bad handle (%d).\n", op->handle);
         op->status = GNTST_bad_handle;
@@ -348,8 +348,8 @@ __gnttab_unmap_grant_ref(
     }
 
     dom   = map->domid;
-    ref   = map->ref_and_flags >> MAPTRACK_REF_SHIFT;
-    flags = map->ref_and_flags & MAPTRACK_GNTMAP_MASK;
+    ref   = map->ref;
+    flags = map->flags;
 
     if ( unlikely((rd = find_domain_by_id(dom)) == NULL) ||
          unlikely(ld == rd) )
@@ -380,7 +380,7 @@ __gnttab_unmap_grant_ref(
         if ( flags & GNTMAP_device_map )
         {
             ASSERT(act->pin & (GNTPIN_devw_mask | GNTPIN_devr_mask));
-            map->ref_and_flags &= ~GNTMAP_device_map;
+            map->flags &= ~GNTMAP_device_map;
             if ( flags & GNTMAP_readonly )
             {
                 act->pin -= GNTPIN_devr_inc;
@@ -401,7 +401,7 @@ __gnttab_unmap_grant_ref(
             goto unmap_out;
 
         ASSERT(act->pin & (GNTPIN_hstw_mask | GNTPIN_hstr_mask));
-        map->ref_and_flags &= ~GNTMAP_host_map;
+        map->flags &= ~GNTMAP_host_map;
         if ( flags & GNTMAP_readonly )
         {
             act->pin -= GNTPIN_hstr_inc;
@@ -414,9 +414,9 @@ __gnttab_unmap_grant_ref(
         }
     }
 
-    if ( (map->ref_and_flags & (GNTMAP_device_map|GNTMAP_host_map)) == 0 )
+    if ( (map->flags & (GNTMAP_device_map|GNTMAP_host_map)) == 0 )
     {
-        map->ref_and_flags = 0;
+        map->flags = 0;
         put_maptrack_handle(ld->grant_table, op->handle);
     }
 
@@ -778,6 +778,7 @@ grant_table_create(
     grant_table_t *t;
     int            i;
 
+    BUG_ON(MAPTRACK_MAX_ENTRIES < NR_GRANT_ENTRIES);
     if ( (t = xmalloc(grant_table_t)) == NULL )
         goto no_mem;
 
@@ -798,7 +799,7 @@ grant_table_create(
     t->maptrack_limit = PAGE_SIZE / sizeof(grant_mapping_t);
     memset(t->maptrack, 0, PAGE_SIZE);
     for ( i = 0; i < t->maptrack_limit; i++ )
-        t->maptrack[i].ref_and_flags = (i+1) << MAPTRACK_REF_SHIFT;
+        t->maptrack[i].ref = i+1;
 
     /* Shared grant table. */
     t->shared = alloc_xenheap_pages(ORDER_GRANT_FRAMES);
@@ -841,14 +842,13 @@ gnttab_release_mappings(
     for ( handle = 0; handle < gt->maptrack_limit; handle++ )
     {
         map = &gt->maptrack[handle];
-        if ( !(map->ref_and_flags & (GNTMAP_device_map|GNTMAP_host_map)) )
+        if ( !(map->flags & (GNTMAP_device_map|GNTMAP_host_map)) )
             continue;
 
-        ref = map->ref_and_flags >> MAPTRACK_REF_SHIFT;
+        ref = map->ref;
 
         DPRINTK("Grant release (%hu) ref:(%hu) flags:(%x) dom:(%hu)\n",
-                handle, ref, map->ref_and_flags & MAPTRACK_GNTMAP_MASK,
-                map->domid);
+                handle, ref, map->flags, map->domid);
 
         rd = find_domain_by_id(map->domid);
         BUG_ON(rd == NULL);
@@ -858,16 +858,16 @@ gnttab_release_mappings(
         act = &rd->grant_table->active[ref];
         sha = &rd->grant_table->shared[ref];
 
-        if ( map->ref_and_flags & GNTMAP_readonly )
+        if ( map->flags & GNTMAP_readonly )
         {
-            if ( map->ref_and_flags & GNTMAP_device_map )
+            if ( map->flags & GNTMAP_device_map )
             {
                 BUG_ON(!(act->pin & GNTPIN_devr_mask));
                 act->pin -= GNTPIN_devr_inc;
                 put_page(mfn_to_page(act->frame));
             }
 
-            if ( map->ref_and_flags & GNTMAP_host_map )
+            if ( map->flags & GNTMAP_host_map )
             {
                 BUG_ON(!(act->pin & GNTPIN_hstr_mask));
                 act->pin -= GNTPIN_hstr_inc;
@@ -877,14 +877,14 @@ gnttab_release_mappings(
         }
         else
         {
-            if ( map->ref_and_flags & GNTMAP_device_map )
+            if ( map->flags & GNTMAP_device_map )
             {
                 BUG_ON(!(act->pin & GNTPIN_devw_mask));
                 act->pin -= GNTPIN_devw_inc;
                 put_page_and_type(mfn_to_page(act->frame));
             }
 
-            if ( map->ref_and_flags & GNTMAP_host_map )
+            if ( map->flags & GNTMAP_host_map )
             {
                 BUG_ON(!(act->pin & GNTPIN_hstw_mask));
                 act->pin -= GNTPIN_hstw_inc;
@@ -903,7 +903,7 @@ gnttab_release_mappings(
 
         put_domain(rd);
 
-        map->ref_and_flags = 0;
+        map->flags = 0;
     }
 }
 
