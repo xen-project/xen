@@ -190,6 +190,18 @@ static void __unmask_IO_APIC_irq (unsigned int irq)
     __modify_IO_APIC_irq(irq, 0, 0x00010000);
 }
 
+/* trigger = 0 */
+static void __edge_IO_APIC_irq (unsigned int irq)
+{
+    __modify_IO_APIC_irq(irq, 0, 0x00008000);
+}
+
+/* trigger = 1 */
+static void __level_IO_APIC_irq (unsigned int irq)
+{
+    __modify_IO_APIC_irq(irq, 0x00008000, 0);
+}
+
 /* mask = 1, trigger = 0 */
 static void __mask_and_edge_IO_APIC_irq (unsigned int irq)
 {
@@ -1321,14 +1333,62 @@ static unsigned int startup_level_ioapic_irq (unsigned int irq)
     return 0; /* don't check for pending */
 }
 
+static int new_ack;
+boolean_param("new_ack", new_ack);
+
 static void mask_and_ack_level_ioapic_irq (unsigned int irq)
 {
+    unsigned long v;
+    int i;
+
+    if ( new_ack )
+        return;
+
+    mask_IO_APIC_irq(irq);
+/*
+ * It appears there is an erratum which affects at least version 0x11
+ * of I/O APIC (that's the 82093AA and cores integrated into various
+ * chipsets).  Under certain conditions a level-triggered interrupt is
+ * erroneously delivered as edge-triggered one but the respective IRR
+ * bit gets set nevertheless.  As a result the I/O unit expects an EOI
+ * message but it will never arrive and further interrupts are blocked
+ * from the source.  The exact reason is so far unknown, but the
+ * phenomenon was observed when two consecutive interrupt requests
+ * from a given source get delivered to the same CPU and the source is
+ * temporarily disabled in between.
+ *
+ * A workaround is to simulate an EOI message manually.  We achieve it
+ * by setting the trigger mode to edge and then to level when the edge
+ * trigger mode gets detected in the TMR of a local APIC for a
+ * level-triggered interrupt.  We mask the source for the time of the
+ * operation to prevent an edge-triggered interrupt escaping meanwhile.
+ * The idea is from Manfred Spraul.  --macro
+ */
+    i = IO_APIC_VECTOR(irq);
+
+    v = apic_read(APIC_TMR + ((i & ~0x1f) >> 1));
+
+    ack_APIC_irq();
+
+    if (!(v & (1 << (i & 0x1f)))) {
+        atomic_inc(&irq_mis_count);
+        spin_lock(&ioapic_lock);
+        __edge_IO_APIC_irq(irq);
+        __level_IO_APIC_irq(irq);
+        spin_unlock(&ioapic_lock);
+    }
 }
 
 static void end_level_ioapic_irq (unsigned int irq)
 {
     unsigned long v;
     int i;
+
+    if ( !new_ack )
+    {
+        unmask_IO_APIC_irq(irq);
+        return;
+    }
 
 /*
  * It appears there is an erratum which affects at least version 0x11
@@ -1693,6 +1753,7 @@ void __init setup_IO_APIC(void)
         io_apic_irqs = ~PIC_IRQS;
 
     printk("ENABLING IO-APIC IRQs\n");
+    printk(" -> Using %s ACK method\n", new_ack ? "new" : "old");
 
     /*
      * Set up IO-APIC IRQ routing.
