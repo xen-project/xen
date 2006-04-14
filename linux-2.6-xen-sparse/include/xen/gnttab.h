@@ -91,6 +91,8 @@ void gnttab_free_grant_reference(grant_ref_t ref);
 
 void gnttab_free_grant_references(grant_ref_t head);
 
+int gnttab_empty_grant_references(const grant_ref_t *pprivate_head);
+
 int gnttab_claim_grant_reference(grant_ref_t *pprivate_head);
 
 void gnttab_release_grant_reference(grant_ref_t *private_head,

@@ -65,6 +65,7 @@ EXPORT_SYMBOL_GPL(gnttab_end_foreign_transfer);
 EXPORT_SYMBOL_GPL(gnttab_alloc_grant_references);
 EXPORT_SYMBOL_GPL(gnttab_free_grant_references);
 EXPORT_SYMBOL_GPL(gnttab_free_grant_reference);
+EXPORT_SYMBOL_GPL(gnttab_empty_grant_references);
 EXPORT_SYMBOL_GPL(gnttab_claim_grant_reference);
 EXPORT_SYMBOL_GPL(gnttab_release_grant_reference);
 EXPORT_SYMBOL_GPL(gnttab_request_free_callback);
@@ -322,6 +323,12 @@ gnttab_alloc_grant_references(u16 count, grant_ref_t *head)
 	*head = h;
 
 	return 0;
+}
+
+int
+gnttab_empty_grant_references(const grant_ref_t *private_head)
+{
+	return (*private_head == GNTTAB_LIST_END);
 }
 
 int
