@@ -1395,6 +1395,38 @@ class XendDomainInfo:
         if self.image:
             self.image.createDeviceModel()
 
+    ## public:
+
+    def testMigrateDevices(self, live, dst):
+        """ Notify all device about intention of migration
+        @raise: XendError for a device that cannot be migrated
+        """
+        for (n, c) in self.info['device']:
+            rc = self.migrateDevice(n, c, live, dst, 0)
+            if rc != 0:
+                raise XendError("Device of type '%s' refuses migration." % n)
+
+    def migrateDevices(self, live, dst, step, domName=''):
+        """Notify the devices about migration
+        """
+        ctr = 0
+        try:
+            for (n, c) in self.info['device']:
+                self.migrateDevice(n, c, live, dst, step, domName)
+                ctr = ctr + 1
+        except:
+            for (n, c) in self.info['device']:
+                if ctr == 0:
+                    step = step - 1
+                ctr = ctr - 1
+                self.recoverMigrateDevice(n, c, live, dst, step, domName)
+            raise
+
+    def migrateDevice(self, deviceClass, deviceConfig, live, dst, step, domName=''):
+        return self.getDeviceController(deviceClass).migrate(deviceConfig, live, dst, step, domName)
+
+    def recoverMigrateDevice(self, deviceClass, deviceConfig, live, dst, step, domName=''):
+        return self.getDeviceController(deviceClass).recover_migrate(deviceConfig, live, dst, step, domName)
 
     def waitForDevices(self):
         """Wait for this domain's configured devices to connect.

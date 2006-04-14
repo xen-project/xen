@@ -267,6 +267,41 @@ class DevController:
 
         raise NotImplementedError()
 
+    def migrate(self, deviceConfig, live, dst, step, domName):
+        """ Migration of a device. The 'live' parameter indicates
+            whether the device is live-migrated (live=1). 'dst' then gives
+            the hostname of the machine to migrate to.
+        This function is called for 4 steps:
+        If step == 0: Check whether the device is ready to be migrated
+                      or can at all be migrated; return a '-1' if
+                      the device is NOT ready, a '0' otherwise. If it is
+                      not ready ( = not possible to migrate this device),
+                      migration will not take place.
+           step == 1: Called immediately after step 0; migration
+                      of the kernel has started;
+           step == 2: Called after the suspend has been issued
+                      to the domain and the domain is not scheduled anymore.
+                      Synchronize with what was started in step 1, if necessary.
+                      Now the device should initiate its transfer to the
+                      given target. Since there might be more than just
+                      one device initiating a migration, this step should
+                      put the process performing the transfer into the
+                      background and return immediately to achieve as much
+                      concurrency as possible.
+           step == 3: Synchronize with the migration of the device that
+                      was initiated in step 2.
+                      Make sure that the migration has finished and only
+                      then return from the call.
+        """
+        return 0
+
+
+    def recover_migrate(self, deviceConfig, list, dst, step, domName):
+        """ Recover from device migration. The given step was the
+            last one that was successfully executed.
+        """
+        return 0
+
 
     def getDomid(self):
         """Stub to {@link XendDomainInfo.getDomid}, for use by our
