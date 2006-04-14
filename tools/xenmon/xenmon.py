@@ -5,7 +5,7 @@
 # There is a curses interface for live monitoring. XenMon also allows
 # logging to a file. For options, run python xenmon.py -h
 #
-# Copyright (C) 2005 by Hewlett Packard, Palo Alto and Fort Collins
+# Copyright (C) 2005,2006 by Hewlett Packard, Palo Alto and Fort Collins
 # Authors: Lucy Cherkasova, lucy.cherkasova@hp.com
 #          Rob Gardner, rob.gardner@hp.com
 #          Diwaker Gupta, diwaker.gupta@hp.com
@@ -85,6 +85,33 @@ def setup_cmdline_parser():
     parser.add_option("--ms_per_sample", dest="mspersample",
             action="store", type="int", default=100,
             help = "determines how many ms worth of data goes in a sample")
+    parser.add_option("--cpu", dest="cpu", action="store", type="int", default=0,
+            help = "specifies which cpu to display data for")
+
+    parser.add_option("--allocated", dest="allocated", action="store_true",
+                      default=False, help="Display allocated time for each domain")
+    parser.add_option("--noallocated", dest="allocated", action="store_false",
+                      default=False, help="Don't display allocated time for each domain")
+
+    parser.add_option("--blocked", dest="blocked", action="store_true",
+                      default=True, help="Display blocked time for each domain")
+    parser.add_option("--noblocked", dest="blocked", action="store_false",
+                      default=True, help="Don't display blocked time for each domain")
+
+    parser.add_option("--waited", dest="waited", action="store_true",
+                      default=True, help="Display waiting time for each domain")
+    parser.add_option("--nowaited", dest="waited", action="store_false",
+                      default=True, help="Don't display waiting time for each domain")
+
+    parser.add_option("--excount", dest="excount", action="store_true",
+                      default=False, help="Display execution count for each domain")
+    parser.add_option("--noexcount", dest="excount", action="store_false",
+                      default=False, help="Don't display execution count for each domain")
+    parser.add_option("--iocount", dest="iocount", action="store_true",
+                      default=False, help="Display I/O count for each domain")
+    parser.add_option("--noiocount", dest="iocount", action="store_false",
+                      default=False, help="Don't display I/O count for each domain")
+
     return parser
 
 # encapsulate information about a domain
@@ -227,19 +254,17 @@ def display(scr, row, col, str, attr=0):
 
 
 # the live monitoring code
-def show_livestats():
-    cpu = 0          # cpu of interest to display data for
+def show_livestats(cpu):
     ncpu = 1         # number of cpu's on this platform
     slen = 0         # size of shared data structure, incuding padding
-    global dom_in_use
+    cpu_1sec_usage = 0.0
+    cpu_10sec_usage = 0.0
+    heartbeat = 1
+    global dom_in_use, options
     
     # mmap the (the first chunk of the) file
     shmf = open(SHM_FILE, "r+")
     shm = mmap.mmap(shmf.fileno(), QOS_DATA_SIZE)
-
-    samples = []
-    doms = []
-    dom_in_use = []
 
     # initialize curses
     stdscr = _c.initscr()
@@ -253,7 +278,8 @@ def show_livestats():
     # display in a loop
     while True:
 
-        for cpuidx in range(0, ncpu):
+        cpuidx = 0
+        while cpuidx < ncpu:
 
             # calculate offset in mmap file to start from
             idx = cpuidx * slen
@@ -261,6 +287,7 @@ def show_livestats():
 
             samples = []
             doms = []
+            dom_in_use = []
 
             # read in data
             for i in range(0, NSAMPLES):
@@ -279,6 +306,8 @@ def show_livestats():
 #		dom_in_use.append(in_use)
                 dom_in_use.append(dom[8])
                 idx += len
+#            print "dom_in_use(cpu=%d): " % cpuidx, dom_in_use
+
 
             len = struct.calcsize("4i")
             oldncpu = ncpu
@@ -294,6 +323,8 @@ def show_livestats():
             # stop examining mmap data and start displaying stuff
             if cpuidx == cpu:
                 break
+
+            cpuidx = cpuidx + 1
 
         # calculate starting and ending datapoints; never look at "next" since
         # it represents live data that may be in transition. 
@@ -312,12 +343,15 @@ def show_livestats():
         row = 0
         display(stdscr, row, 1, "CPU = %d" % cpu, _c.A_STANDOUT)
 
-        display(stdscr, row, 10, "%sLast 10 seconds%sLast 1 second" % (6*' ', 30*' '), _c.A_BOLD)
+        display(stdscr, row, 10, "%sLast 10 seconds (%3.2f%%)%sLast 1 second (%3.2f%%)" % (6*' ', cpu_10sec_usage, 30*' ', cpu_1sec_usage), _c.A_BOLD)
         row +=1
         display(stdscr, row, 1, "%s" % ((maxx-2)*'='))
 
         total_h1_cpu = 0
         total_h2_cpu = 0
+
+        cpu_1sec_usage = 0.0
+        cpu_10sec_usage = 0.0
 
         for dom in range(0, NDOMAINS):
             if not dom_in_use[dom]:
@@ -332,92 +366,102 @@ def show_livestats():
                 display(stdscr, row, col, "%s" % time_scale(h2[dom][0][0]))
                 col += 12
                 display(stdscr, row, col, "%3.2f%%" % h2[dom][0][1])
+                if dom != NDOMAINS - 1:
+                    cpu_10sec_usage += h2[dom][0][1]
                 col += 12
                 display(stdscr, row, col, "%s/ex" % time_scale(h2[dom][0][2]))
                 col += 18
                 display(stdscr, row, col, "%s" % time_scale(h1[dom][0][0]))
                 col += 12
-                display(stdscr, row, col, "%3.2f%%" % h1[dom][0][1])
+                display(stdscr, row, col, "%3.2f%%" % h1[dom][0][1], _c.A_STANDOUT)
                 col += 12
                 display(stdscr, row, col, "%s/ex" % time_scale(h1[dom][0][2]))
                 col += 18
                 display(stdscr, row, col, "Gotten")
+
+                if dom != NDOMAINS - 1:
+                    cpu_1sec_usage = cpu_1sec_usage + h1[dom][0][1]
     
                 # display allocated
-                row += 1
-                col = 2
-                display(stdscr, row, col, "%d" % dom)
-                col += 28
-                display(stdscr, row, col, "%s/ex" % time_scale(h2[dom][1]))
-                col += 42
-                display(stdscr, row, col, "%s/ex" % time_scale(h1[dom][1]))
-                col += 18
-                display(stdscr, row, col, "Allocated")
+                if options.allocated:
+                    row += 1
+                    col = 2
+                    display(stdscr, row, col, "%d" % dom)
+                    col += 28
+                    display(stdscr, row, col, "%s/ex" % time_scale(h2[dom][1]))
+                    col += 42
+                    display(stdscr, row, col, "%s/ex" % time_scale(h1[dom][1]))
+                    col += 18
+                    display(stdscr, row, col, "Allocated")
 
                 # display blocked
-                row += 1
-                col = 2
-                display(stdscr, row, col, "%d" % dom)
-                col += 4
-                display(stdscr, row, col, "%s" % time_scale(h2[dom][2][0]))
-                col += 12
-                display(stdscr, row, col, "%3.2f%%" % h2[dom][2][1])
-                col += 12
-                display(stdscr, row, col, "%s/io" % time_scale(h2[dom][2][2]))
-                col += 18
-                display(stdscr, row, col, "%s" % time_scale(h1[dom][2][0]))
-                col += 12
-                display(stdscr, row, col, "%3.2f%%" % h1[dom][2][1])
-                col += 12
-                display(stdscr, row, col, "%s/io" % time_scale(h1[dom][2][2]))
-                col += 18
-                display(stdscr, row, col, "Blocked")
+                if options.blocked:
+                    row += 1
+                    col = 2
+                    display(stdscr, row, col, "%d" % dom)
+                    col += 4
+                    display(stdscr, row, col, "%s" % time_scale(h2[dom][2][0]))
+                    col += 12
+                    display(stdscr, row, col, "%3.2f%%" % h2[dom][2][1])
+                    col += 12
+                    display(stdscr, row, col, "%s/io" % time_scale(h2[dom][2][2]))
+                    col += 18
+                    display(stdscr, row, col, "%s" % time_scale(h1[dom][2][0]))
+                    col += 12
+                    display(stdscr, row, col, "%3.2f%%" % h1[dom][2][1])
+                    col += 12
+                    display(stdscr, row, col, "%s/io" % time_scale(h1[dom][2][2]))
+                    col += 18
+                    display(stdscr, row, col, "Blocked")
 
                 # display waited
-                row += 1
-                col = 2
-                display(stdscr, row, col, "%d" % dom)
-                col += 4
-                display(stdscr, row, col, "%s" % time_scale(h2[dom][3][0]))
-                col += 12
-                display(stdscr, row, col, "%3.2f%%" % h2[dom][3][1])
-                col += 12
-                display(stdscr, row, col, "%s/ex" % time_scale(h2[dom][3][2]))
-                col += 18
-                display(stdscr, row, col, "%s" % time_scale(h1[dom][3][0]))
-                col += 12
-                display(stdscr, row, col, "%3.2f%%" % h1[dom][3][1])
-                col += 12
-                display(stdscr, row, col, "%s/ex" % time_scale(h1[dom][3][2]))
-                col += 18
-                display(stdscr, row, col, "Waited")
+                if options.waited:
+                    row += 1
+                    col = 2
+                    display(stdscr, row, col, "%d" % dom)
+                    col += 4
+                    display(stdscr, row, col, "%s" % time_scale(h2[dom][3][0]))
+                    col += 12
+                    display(stdscr, row, col, "%3.2f%%" % h2[dom][3][1])
+                    col += 12
+                    display(stdscr, row, col, "%s/ex" % time_scale(h2[dom][3][2]))
+                    col += 18
+                    display(stdscr, row, col, "%s" % time_scale(h1[dom][3][0]))
+                    col += 12
+                    display(stdscr, row, col, "%3.2f%%" % h1[dom][3][1])
+                    col += 12
+                    display(stdscr, row, col, "%s/ex" % time_scale(h1[dom][3][2]))
+                    col += 18
+                    display(stdscr, row, col, "Waited")
 
                 # display ex count
-                row += 1
-                col = 2
-                display(stdscr, row, col, "%d" % dom)
-
-                col += 28
-                display(stdscr, row, col, "%d/s" % h2[dom][4])
-                col += 42
-                display(stdscr, row, col, "%d" % h1[dom][4])
-                col += 18
-                display(stdscr, row, col, "Execution count")
+                if options.excount:
+                    row += 1
+                    col = 2
+                    display(stdscr, row, col, "%d" % dom)
+                    
+                    col += 28
+                    display(stdscr, row, col, "%d/s" % h2[dom][4])
+                    col += 42
+                    display(stdscr, row, col, "%d" % h1[dom][4])
+                    col += 18
+                    display(stdscr, row, col, "Execution count")
 
                 # display io count
-                row += 1
-                col = 2
-                display(stdscr, row, col, "%d" % dom)
-                col += 4
-                display(stdscr, row, col, "%d/s" % h2[dom][5][0])
-                col += 24
-                display(stdscr, row, col, "%d/ex" % h2[dom][5][1])
-                col += 18
-                display(stdscr, row, col, "%d" % h1[dom][5][0])
-                col += 24
-                display(stdscr, row, col, "%3.2f/ex" % h1[dom][5][1])
-                col += 18
-                display(stdscr, row, col, "I/O Count")
+                if options.iocount:
+                    row += 1
+                    col = 2
+                    display(stdscr, row, col, "%d" % dom)
+                    col += 4
+                    display(stdscr, row, col, "%d/s" % h2[dom][5][0])
+                    col += 24
+                    display(stdscr, row, col, "%d/ex" % h2[dom][5][1])
+                    col += 18
+                    display(stdscr, row, col, "%d" % h1[dom][5][0])
+                    col += 24
+                    display(stdscr, row, col, "%3.2f/ex" % h1[dom][5][1])
+                    col += 18
+                    display(stdscr, row, col, "I/O Count")
 
             #row += 1
             #stdscr.hline(row, 1, '-', maxx - 2)
@@ -426,6 +470,9 @@ def show_livestats():
 
 
         row += 1
+        star = heartbeat * '*'
+        heartbeat = 1 - heartbeat
+        display(stdscr, row, 1, star)
         display(stdscr, row, 2, TOTALS % (total_h2_cpu, total_h1_cpu))
         row += 1
 #        display(stdscr, row, 2, 
@@ -515,10 +562,10 @@ def writelog():
         outfiles[dom].delayed_write("# passed cpu dom cpu(tot) cpu(%) cpu/ex allocated/ex blocked(tot) blocked(%) blocked/io waited(tot) waited(%) waited/ex ex/s io(tot) io/ex\n")
 
     while options.duration == 0 or interval < (options.duration * 1000):
-        for cpuidx in range(0, ncpu):
+        cpuidx = 0
+        while cpuidx < ncpu:
 
             idx = cpuidx * slen      # offset needed in mmap file
-
 
             samples = []
             doms = []
@@ -571,6 +618,7 @@ def writelog():
             curr = time.time()
             interval += (curr - last) * 1000
             last = curr
+            cpuidx = cpuidx + 1
         time.sleep(options.interval / 1000.0)
 
     for dom in range(0, NDOMAINS):
@@ -601,7 +649,7 @@ def main():
     
     start_xenbaked()
     if options.live:
-        show_livestats()
+        show_livestats(options.cpu)
     else:
         try:
             writelog()
