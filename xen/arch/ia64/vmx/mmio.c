@@ -489,11 +489,11 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
         mmio_access(vcpu, padr, &data, size, ma, dir);
     }else{
         mmio_access(vcpu, padr, &data, size, ma, dir);
-        if(size==0)
+        if(size==1)
             data = (value & 0xffffffffffffff00U) | (data & 0xffU);
-        else if(size==1)
-            data = (value & 0xffffffffffff0000U) | (data & 0xffffU);
         else if(size==2)
+            data = (value & 0xffffffffffff0000U) | (data & 0xffffU);
+        else if(size==4)
             data = (value & 0xffffffff00000000U) | (data & 0xffffffffU);
 
         if(inst_type==SL_INTEGER){       //gp
