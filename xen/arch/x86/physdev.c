@@ -18,6 +18,9 @@ ioapic_guest_read(
 extern int
 ioapic_guest_write(
     unsigned long physbase, unsigned int reg, u32 pval);
+extern int
+pirq_acktype(
+    int irq);
 
 /*
  * Demuxing hypercall.
@@ -43,8 +46,7 @@ long do_physdev_op(GUEST_HANDLE(physdev_op_t) uop)
         if ( (irq < 0) || (irq >= NR_IRQS) )
             break;
         op.u.irq_status_query.flags = 0;
-        /* Edge-triggered interrupts don't need an explicit unmask downcall. */
-        if ( !strstr(irq_desc[irq_to_vector(irq)].handler->typename, "edge") )
+        if ( pirq_acktype(irq) != 0 )
             op.u.irq_status_query.flags |= PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY;
         ret = 0;
         break;
