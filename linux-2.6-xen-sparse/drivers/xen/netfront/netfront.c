@@ -106,7 +106,7 @@ struct netfront_info
 	/* Receive-ring batched refills. */
 #define RX_MIN_TARGET 8
 #define RX_DFL_MIN_TARGET 64
-#define RX_MAX_TARGET NET_RX_RING_SIZE
+#define RX_MAX_TARGET min_t(int, NET_RX_RING_SIZE, 256)
 	int rx_min_target, rx_max_target, rx_target;
 	struct sk_buff_head rx_batch;
 
@@ -119,6 +119,7 @@ struct netfront_info
 	struct sk_buff *tx_skbs[NET_TX_RING_SIZE+1];
 	struct sk_buff *rx_skbs[NET_RX_RING_SIZE+1];
 
+#define TX_MAX_TARGET min_t(int, NET_RX_RING_SIZE, 256)
 	grant_ref_t gref_tx_head;
 	grant_ref_t grant_tx_ref[NET_TX_RING_SIZE + 1];
 	grant_ref_t gref_rx_head;
@@ -505,8 +506,9 @@ static void network_tx_buf_gc(struct net_device *dev)
 	} while (prod != np->tx.sring->rsp_prod);
 
  out:
-	if (np->tx_full &&
-	    ((np->tx.sring->req_prod - prod) < NET_TX_RING_SIZE)) {
+	if ((np->tx_full) &&
+	    ((np->tx.sring->req_prod - prod) < NET_TX_RING_SIZE) &&
+	    !gnttab_empty_grant_references(&np->gref_tx_head)) {
 		np->tx_full = 0;
 		if (np->user_state == UST_OPEN)
 			netif_wake_queue(dev);
@@ -705,7 +707,8 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	network_tx_buf_gc(dev);
 
-	if (RING_FULL(&np->tx)) {
+	if (RING_FULL(&np->tx) ||
+	    gnttab_empty_grant_references(&np->gref_tx_head)) {
 		np->tx_full = 1;
 		netif_stop_queue(dev);
 	}
@@ -1140,14 +1143,14 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 	}
 
 	/* A grant for every tx ring slot */
-	if (gnttab_alloc_grant_references(NET_TX_RING_SIZE,
+	if (gnttab_alloc_grant_references(TX_MAX_TARGET,
 					  &np->gref_tx_head) < 0) {
 		printk(KERN_ALERT "#### netfront can't alloc tx grant refs\n");
 		err = -ENOMEM;
 		goto exit;
 	}
 	/* A grant for every rx ring slot */
-	if (gnttab_alloc_grant_references(NET_RX_RING_SIZE,
+	if (gnttab_alloc_grant_references(RX_MAX_TARGET,
 					  &np->gref_rx_head) < 0) {
 		printk(KERN_ALERT "#### netfront can't alloc rx grant refs\n");
 		gnttab_free_grant_references(np->gref_tx_head);
