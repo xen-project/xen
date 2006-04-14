@@ -65,11 +65,12 @@ spinlock_t console_lock = SPIN_LOCK_UNLOCKED;
 #define COLUMNS     80
 #define LINES       25
 #define ATTRIBUTE    7
+#define VIDEO_SIZE  (COLUMNS * LINES * 2)
 
 /* Clear the screen and initialize VIDEO, XPOS and YPOS.  */
 static void cls(void)
 {
-    memset(video, 0, COLUMNS * LINES * 2);
+    memset(video, 0, VIDEO_SIZE);
     xpos = ypos = 0;
     outw(10+(1<<(5+8)), 0x3d4); /* cursor off */
 }
@@ -107,9 +108,9 @@ static int detect_vga(void)
      * 
      * These checks are basically to detect headless server boxes.
      */
-    return (detect_video(__va(0xA0000)) || 
-            detect_video(__va(0xB0000)) || 
-            detect_video(__va(0xB8000)));
+    return (detect_video(ioremap(0xA0000, VIDEO_SIZE)) || 
+            detect_video(ioremap(0xB0000, VIDEO_SIZE)) || 
+            detect_video(ioremap(0xB8000, VIDEO_SIZE)));
 }
 
 /* This is actually code from vgaHWRestore in an old version of XFree86 :-) */
@@ -143,7 +144,7 @@ static void init_vga(void)
         return;
     }
 
-    video = __va(0xB8000);
+    video = ioremap(0xB8000, VIDEO_SIZE);
 
     tmp = inb(0x3da);
     outb(0x00, 0x3c0);
