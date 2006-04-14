@@ -158,7 +158,7 @@ gopts.var('cpu', val='CPU',
           use="CPU to run the VCPU0 on.")
 
 gopts.var('cpus', val='CPUS',
-          fn=set_int, default=None,
+          fn=set_value, default=None,
           use="CPUS to run the domain on.")
 
 gopts.var('pae', val='PAE',
