@@ -41,7 +41,7 @@
 
 static inline int
 get_maptrack_handle(
-    grant_table_t *t)
+    struct grant_table *t)
 {
     unsigned int h;
     if ( unlikely((h = t->maptrack_head) == (t->maptrack_limit - 1)) )
@@ -53,7 +53,7 @@ get_maptrack_handle(
 
 static inline void
 put_maptrack_handle(
-    grant_table_t *t, int handle)
+    struct grant_table *t, int handle)
 {
     t->maptrack[handle].ref = t->maptrack_head;
     t->maptrack_head = handle;
@@ -76,7 +76,7 @@ __gnttab_map_grant_ref(
     int            handle;
     unsigned long  frame = 0;
     int            rc = GNTST_okay;
-    active_grant_entry_t *act;
+    struct active_grant_entry *act;
 
     /* Entry details from @rd's shared grant table. */
     grant_entry_t *sha;
@@ -123,9 +123,9 @@ __gnttab_map_grant_ref(
     /* Get a maptrack handle. */
     if ( unlikely((handle = get_maptrack_handle(ld->grant_table)) == -1) )
     {
-        int              i;
-        grant_mapping_t *new_mt;
-        grant_table_t   *lgt = ld->grant_table;
+        int                   i;
+        struct grant_mapping *new_mt;
+        struct grant_table   *lgt = ld->grant_table;
 
         if ( (lgt->maptrack_limit << 1) > MAPTRACK_MAX_ENTRIES )
         {
@@ -264,10 +264,9 @@ __gnttab_map_grant_ref(
 
     TRACE_1D(TRC_MEM_PAGE_GRANT_MAP, op->dom);
 
-    ld->grant_table->maptrack[handle].domid         = op->dom;
-    ld->grant_table->maptrack[handle].ref = op->ref;
-    ld->grant_table->maptrack[handle].flags =
-        (op->flags & MAPTRACK_GNTMAP_MASK);
+    ld->grant_table->maptrack[handle].domid = op->dom;
+    ld->grant_table->maptrack[handle].ref   = op->ref;
+    ld->grant_table->maptrack[handle].flags = op->flags;
 
     op->dev_bus_addr = (u64)frame << PAGE_SHIFT;
     op->handle       = handle;
@@ -326,9 +325,9 @@ __gnttab_unmap_grant_ref(
     domid_t          dom;
     grant_ref_t      ref;
     struct domain   *ld, *rd;
-    active_grant_entry_t *act;
+    struct active_grant_entry *act;
     grant_entry_t   *sha;
-    grant_mapping_t *map;
+    struct grant_mapping *map;
     u16              flags;
     s16              rc = 0;
     unsigned long    frame;
@@ -534,12 +533,12 @@ static int
 gnttab_prepare_for_transfer(
     struct domain *rd, struct domain *ld, grant_ref_t ref)
 {
-    grant_table_t *rgt;
-    grant_entry_t *sha;
-    domid_t        sdom;
-    u16            sflags;
-    u32            scombo, prev_scombo;
-    int            retries = 0;
+    struct grant_table *rgt;
+    struct grant_entry *sha;
+    domid_t             sdom;
+    u16                 sflags;
+    u32                 scombo, prev_scombo;
+    int                 retries = 0;
 
     if ( unlikely((rgt = rd->grant_table) == NULL) ||
          unlikely(ref >= NR_GRANT_ENTRIES) )
@@ -775,11 +774,11 @@ int
 grant_table_create(
     struct domain *d)
 {
-    grant_table_t *t;
-    int            i;
+    struct grant_table *t;
+    int                 i;
 
     BUG_ON(MAPTRACK_MAX_ENTRIES < NR_GRANT_ENTRIES);
-    if ( (t = xmalloc(grant_table_t)) == NULL )
+    if ( (t = xmalloc(struct grant_table)) == NULL )
         goto no_mem;
 
     /* Simple stuff. */
@@ -787,16 +786,16 @@ grant_table_create(
     spin_lock_init(&t->lock);
 
     /* Active grant table. */
-    if ( (t->active = xmalloc_array(active_grant_entry_t, NR_GRANT_ENTRIES))
-         == NULL )
+    t->active = xmalloc_array(struct active_grant_entry, NR_GRANT_ENTRIES);
+    if ( t->active == NULL )
         goto no_mem;
-    memset(t->active, 0, sizeof(active_grant_entry_t) * NR_GRANT_ENTRIES);
+    memset(t->active, 0, sizeof(struct active_grant_entry) * NR_GRANT_ENTRIES);
 
     /* Tracking of mapped foreign frames table */
     if ( (t->maptrack = alloc_xenheap_page()) == NULL )
         goto no_mem;
     t->maptrack_order = 0;
-    t->maptrack_limit = PAGE_SIZE / sizeof(grant_mapping_t);
+    t->maptrack_limit = PAGE_SIZE / sizeof(struct grant_mapping);
     memset(t->maptrack, 0, PAGE_SIZE);
     for ( i = 0; i < t->maptrack_limit; i++ )
         t->maptrack[i].ref = i+1;
@@ -829,13 +828,13 @@ void
 gnttab_release_mappings(
     struct domain *d)
 {
-    grant_table_t        *gt = d->grant_table;
-    grant_mapping_t      *map;
+    struct grant_table   *gt = d->grant_table;
+    struct grant_mapping *map;
     grant_ref_t           ref;
     grant_handle_t        handle;
     struct domain        *rd;
-    active_grant_entry_t *act;
-    grant_entry_t        *sha;
+    struct active_grant_entry *act;
+    struct grant_entry   *sha;
 
     BUG_ON(!test_bit(_DOMF_dying, &d->domain_flags));
 
@@ -912,7 +911,7 @@ void
 grant_table_destroy(
     struct domain *d)
 {
-    grant_table_t *t = d->grant_table;
+    struct grant_table *t = d->grant_table;
 
     if ( t == NULL )
         return;

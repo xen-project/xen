@@ -29,11 +29,11 @@
 #include <asm/grant_table.h>
 
 /* Active grant entry - used for shadowing GTF_permit_access grants. */
-typedef struct {
+struct active_grant_entry {
     u32           pin;    /* Reference count information.  */
     domid_t       domid;  /* Domain being granted access.  */
     unsigned long frame;  /* Frame being granted.          */
-} active_grant_entry_t;
+};
 
  /* Count of writable host-CPU mappings. */
 #define GNTPIN_hstw_shift    (0)
@@ -60,29 +60,30 @@ typedef struct {
  * Tracks a mapping of another domain's grant reference. Each domain has a
  * table of these, indexes into which are returned as a 'mapping handle'.
  */
-typedef struct {
+struct grant_mapping {
     u32      ref;           /* grant ref */
     u16      flags;         /* 0-4: GNTMAP_* ; 5-15: unused */
     domid_t  domid;         /* granting domain */
-} grant_mapping_t;
-#define MAPTRACK_GNTMAP_MASK  0x1f
-#define MAPTRACK_MAX_ENTRIES  (~((u32)0))
+};
+
+/* Fairly arbitrary. [POLICY] */
+#define MAPTRACK_MAX_ENTRIES 16384
 
 /* Per-domain grant information. */
-typedef struct {
+struct grant_table {
     /* Shared grant table (see include/public/grant_table.h). */
-    grant_entry_t        *shared;
+    struct grant_entry   *shared;
     /* Active grant table. */
-    active_grant_entry_t *active;
+    struct active_grant_entry *active;
     /* Mapping tracking table. */
-    grant_mapping_t      *maptrack;
+    struct grant_mapping *maptrack;
     unsigned int          maptrack_head;
     unsigned int          maptrack_order;
     unsigned int          maptrack_limit;
     unsigned int          map_count;
     /* Lock protecting updates to active and shared grant tables. */
     spinlock_t            lock;
-} grant_table_t;
+};
 
 /* Create/destroy per-domain grant table context. */
 int grant_table_create(
