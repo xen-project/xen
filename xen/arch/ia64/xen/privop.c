@@ -60,7 +60,9 @@ void build_hypercall_bundle(UINT64 *imva, UINT64 brkimm, UINT64 hypnum, UINT64 r
 	bundle.slot0 = slot0.inst; bundle.slot2 = slot2.inst;
 	bundle.slot1a = slot1.inst; bundle.slot1b = slot1.inst >> 18;
 	
-	*imva++ = bundle.i64[0]; *imva = bundle.i64[1];
+	imva[0] = bundle.i64[0]; imva[1] = bundle.i64[1];
+	ia64_fc (imva);
+	ia64_fc (imva + 1);
 }
 
 void build_pal_hypercall_bundles(UINT64 *imva, UINT64 brkimm, UINT64 hypnum)
@@ -83,6 +85,8 @@ void build_pal_hypercall_bundles(UINT64 *imva, UINT64 brkimm, UINT64 hypnum)
 	bundle.slot0 = slot_a5.inst;
 	imva[0] = bundle.i64[0];
 	imva[1] = bundle.i64[1];
+	ia64_fc (imva);
+	ia64_fc (imva + 1);
 	
 	/* Copy the second bundle and patch the hypercall vector.  */
 	bundle.i64[0] = pal_call_stub[2];
@@ -93,6 +97,8 @@ void build_pal_hypercall_bundles(UINT64 *imva, UINT64 brkimm, UINT64 hypnum)
 	bundle.slot0 = slot_m37.inst;
 	imva[2] = bundle.i64[0];
 	imva[3] = bundle.i64[1];
+	ia64_fc (imva + 2);
+	ia64_fc (imva + 3);
 }
 
 

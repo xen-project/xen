@@ -339,8 +339,9 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	    d->arch.cmdline      = c->cmdline;
 	    d->shared_info->arch = c->shared;
 
-	    /* FIXME: it is required here ?  */
-	    sync_split_caches();
+	    /* Cache synchronization seems to be done by the linux kernel
+	       during mmap/unmap operation.  However be conservative.  */
+	    domain_cache_flush (d, 1);
 	}
 	new_thread(v, regs->cr_iip, 0, 0);
 
@@ -784,50 +785,68 @@ static void loaddomainelfimage(struct domain *d, unsigned long image_start)
   
 	copy_memory(&ehdr, (void *) image_start, sizeof(Elf_Ehdr));
 	for ( h = 0; h < ehdr.e_phnum; h++ ) {
-		copy_memory(&phdr,elfbase + ehdr.e_phoff + (h*ehdr.e_phentsize),
-		sizeof(Elf_Phdr));
-	    //if ( !is_loadable_phdr(phdr) )
-	    if ((phdr.p_type != PT_LOAD)) {
-	        continue;
-	}
-	filesz = phdr.p_filesz; memsz = phdr.p_memsz;
-	elfaddr = (unsigned long) elfbase + phdr.p_offset;
-	dom_mpaddr = phdr.p_paddr;
+		copy_memory(&phdr,
+			    elfbase + ehdr.e_phoff + (h*ehdr.e_phentsize),
+			    sizeof(Elf_Phdr));
+		if ((phdr.p_type != PT_LOAD))
+		    continue;
+
+		filesz = phdr.p_filesz;
+		memsz = phdr.p_memsz;
+		elfaddr = (unsigned long) elfbase + phdr.p_offset;
+		dom_mpaddr = phdr.p_paddr;
+
 //printf("p_offset: %x, size=%x\n",elfaddr,filesz);
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
-	if (d == dom0) {
-		if (dom_mpaddr+memsz>dom0_size || dom_mpaddr+filesz>dom0_size) {
-			printf("Domain0 doesn't fit in allocated space!\n");
-			while(1);
-		}
-		dom_imva = (unsigned long) __va(dom_mpaddr + dom0_start);
-		copy_memory((void *) dom_imva, (void *) elfaddr, filesz);
-		if (memsz > filesz) memset((void *) dom_imva+filesz, 0, memsz-filesz);
+		if (d == dom0) {
+			if (dom_mpaddr+memsz>dom0_size)
+				panic("Dom0 doesn't fit in memory space!\n");
+			dom_imva = __va_ul(dom_mpaddr + dom0_start);
+			copy_memory((void *)dom_imva, (void *)elfaddr, filesz);
+			if (memsz > filesz)
+				memset((void *)dom_imva+filesz, 0,
+				       memsz-filesz);
 //FIXME: This test for code seems to find a lot more than objdump -x does
-		if (phdr.p_flags & PF_X) privify_memory(dom_imva,filesz);
-	}
-	else
-#endif
-	while (memsz > 0) {
-		p = assign_new_domain_page(d,dom_mpaddr);
-		if (unlikely(!p)) BUG();
-		dom_imva = (unsigned long) __va(page_to_maddr(p));
-		if (filesz > 0) {
-			if (filesz >= PAGE_SIZE)
-				copy_memory((void *) dom_imva, (void *) elfaddr, PAGE_SIZE);
-			else { // copy partial page, zero the rest of page
-				copy_memory((void *) dom_imva, (void *) elfaddr, filesz);
-				memset((void *) dom_imva+filesz, 0, PAGE_SIZE-filesz);
+			if (phdr.p_flags & PF_X) {
+				privify_memory(dom_imva,filesz);
+				flush_icache_range (dom_imva, dom_imva+filesz);
 			}
-//FIXME: This test for code seems to find a lot more than objdump -x does
-			if (phdr.p_flags & PF_X)
-				privify_memory(dom_imva,PAGE_SIZE);
 		}
-		else if (memsz > 0) // always zero out entire page
-			memset((void *) dom_imva, 0, PAGE_SIZE);
-		memsz -= PAGE_SIZE; filesz -= PAGE_SIZE;
-		elfaddr += PAGE_SIZE; dom_mpaddr += PAGE_SIZE;
-	}
+		else
+#endif
+		while (memsz > 0) {
+			p = assign_new_domain_page(d,dom_mpaddr);
+			BUG_ON (unlikely(p == NULL));
+			dom_imva = __va_ul(page_to_maddr(p));
+			if (filesz > 0) {
+				if (filesz >= PAGE_SIZE)
+					copy_memory((void *) dom_imva,
+						    (void *) elfaddr,
+						    PAGE_SIZE);
+				else {
+					// copy partial page
+					copy_memory((void *) dom_imva,
+						    (void *) elfaddr, filesz);
+					// zero the rest of page
+					memset((void *) dom_imva+filesz, 0,
+					       PAGE_SIZE-filesz);
+				}
+//FIXME: This test for code seems to find a lot more than objdump -x does
+				if (phdr.p_flags & PF_X) {
+					privify_memory(dom_imva,PAGE_SIZE);
+					flush_icache_range(dom_imva,
+							   dom_imva+PAGE_SIZE);
+				}
+			}
+			else if (memsz > 0) {
+                                /* always zero out entire page */
+				memset((void *) dom_imva, 0, PAGE_SIZE);
+			}
+			memsz -= PAGE_SIZE;
+			filesz -= PAGE_SIZE;
+			elfaddr += PAGE_SIZE;
+			dom_mpaddr += PAGE_SIZE;
+		}
 	}
 }
 
@@ -1086,7 +1105,6 @@ int construct_dom0(struct domain *d,
 
 	new_thread(v, pkern_entry, 0, 0);
 	physdev_init_dom0(d);
-	sync_split_caches();
 
 	// FIXME: Hack for keyboard input
 	//serial_input_init();
