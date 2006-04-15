@@ -585,9 +585,16 @@ long do_dom0_op(GUEST_HANDLE(dom0_op_t) u_dom0_op)
         d = find_domain_by_id(op->u.setdomainmaxmem.domain);
         if ( d != NULL )
         {
-            d->max_pages = op->u.setdomainmaxmem.max_memkb >> (PAGE_SHIFT-10);
+            unsigned long new_max;
+            new_max = op->u.setdomainmaxmem.max_memkb >> (PAGE_SHIFT-10);
+            if (new_max < d->tot_pages) 
+                ret = -EINVAL;
+            else 
+            {  
+                d->max_pages = new_max;
+                ret = 0;
+            }
             put_domain(d);
-            ret = 0;
         }
     }
     break;
