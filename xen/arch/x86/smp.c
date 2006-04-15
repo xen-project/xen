@@ -261,7 +261,7 @@ int smp_call_function(
     return on_selected_cpus(allbutself, func, info, retry, wait);
 }
 
-extern int on_selected_cpus(
+int on_selected_cpus(
     cpumask_t selected,
     void (*func) (void *info),
     void *info,
