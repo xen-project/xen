@@ -1,8 +1,8 @@
 /******************************************************************************
  * xc_bvtsched.c
- * 
+ *
  * API for manipulating parameters of the Borrowed Virtual Time scheduler.
- * 
+ *
  * Copyright (c) 2003, K A Fraser.
  */
 
@@ -26,7 +26,7 @@ int xc_bvtsched_global_get(int xc_handle,
 {
     DECLARE_DOM0_OP;
     int ret;
-    
+
     op.cmd = DOM0_SCHEDCTL;
     op.u.schedctl.sched_id = SCHED_BVT;
     op.u.schedctl.direction = SCHED_INFO_GET;
@@ -71,7 +71,7 @@ int xc_bvtsched_domain_get(int xc_handle,
                            long long *warpl,
                            long long *warpu)
 {
-    
+
     DECLARE_DOM0_OP;
     int ret;
     struct bvt_adjdom *adjptr = &op.u.adjustdom.u.bvt;

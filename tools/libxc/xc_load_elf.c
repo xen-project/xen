@@ -51,7 +51,7 @@ static inline int is_loadable_phdr(Elf_Phdr *phdr)
             ((phdr->p_flags & (PF_W|PF_X)) != 0));
 }
 
-static int parseelfimage(const char *image, 
+static int parseelfimage(const char *image,
                          unsigned long elfsize,
                          struct domain_setup_info *dsi)
 {
@@ -102,10 +102,10 @@ static int parseelfimage(const char *image,
         ERROR("ELF image has no section-header strings table (shstrtab).");
         return -EINVAL;
     }
-    shdr = (Elf_Shdr *)(image + ehdr->e_shoff + 
+    shdr = (Elf_Shdr *)(image + ehdr->e_shoff +
                         (ehdr->e_shstrndx*ehdr->e_shentsize));
     shstrtab = image + shdr->sh_offset;
-    
+
     /* Find the special '__xen_guest' section and check its contents. */
     for ( h = 0; h < ehdr->e_shnum; h++ )
     {
@@ -148,7 +148,7 @@ static int parseelfimage(const char *image,
 
     dsi->xen_guest_string = guestinfo;
 
-    for ( h = 0; h < ehdr->e_phnum; h++ ) 
+    for ( h = 0; h < ehdr->e_phnum; h++ )
     {
         phdr = (Elf_Phdr *)(image + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
@@ -159,8 +159,8 @@ static int parseelfimage(const char *image,
             kernend = phdr->p_paddr + phdr->p_memsz;
     }
 
-    if ( (kernstart > kernend) || 
-         (ehdr->e_entry < kernstart) || 
+    if ( (kernstart > kernend) ||
+         (ehdr->e_entry < kernstart) ||
          (ehdr->e_entry > kernend) )
     {
         ERROR("Malformed ELF image.");
@@ -196,12 +196,12 @@ loadelfimage(
     char         *va;
     unsigned long pa, done, chunksz;
 
-    for ( h = 0; h < ehdr->e_phnum; h++ ) 
+    for ( h = 0; h < ehdr->e_phnum; h++ )
     {
         phdr = (Elf_Phdr *)(image + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
             continue;
-        
+
         for ( done = 0; done < phdr->p_filesz; done += chunksz )
         {
             pa = (phdr->p_paddr + done) - dsi->v_start;
@@ -265,7 +265,7 @@ loadelfsymtab(
     shdr = (Elf_Shdr *)(p + sizeof(int) + sizeof(Elf_Ehdr));
     memcpy(shdr, image + ehdr->e_shoff, ehdr->e_shnum * sizeof(Elf_Shdr));
 
-    for ( h = 0; h < ehdr->e_shnum; h++ ) 
+    for ( h = 0; h < ehdr->e_shnum; h++ )
     {
         if ( shdr[h].sh_type == SHT_STRTAB )
         {

@@ -1,6 +1,6 @@
 /******************************************************************************
  * xc_private.c
- * 
+ *
  * Helper functions for the rest of the library.
  */
 
@@ -10,7 +10,7 @@
 void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
                            unsigned long *arr, int num )
 {
-    privcmd_mmapbatch_t ioctlx; 
+    privcmd_mmapbatch_t ioctlx;
     void *addr;
     addr = mmap(NULL, num*PAGE_SIZE, prot, MAP_SHARED, xc_handle, 0);
     if ( addr == MAP_FAILED )
@@ -38,8 +38,8 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
                            int size, int prot,
                            unsigned long mfn )
 {
-    privcmd_mmap_t ioctlx; 
-    privcmd_mmap_entry_t entry; 
+    privcmd_mmap_t ioctlx;
+    privcmd_mmap_entry_t entry;
     void *addr;
     addr = mmap(NULL, size, prot, MAP_SHARED, xc_handle, 0);
     if ( addr == MAP_FAILED )
@@ -64,7 +64,7 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
 /*******************/
 
 /* NB: arr must be mlock'ed */
-int xc_get_pfn_type_batch(int xc_handle, 
+int xc_get_pfn_type_batch(int xc_handle,
                           uint32_t dom, int num, unsigned long *arr)
 {
     DECLARE_DOM0_OP;
@@ -76,8 +76,8 @@ int xc_get_pfn_type_batch(int xc_handle,
 }
 
 #define GETPFN_ERR (~0U)
-unsigned int get_pfn_type(int xc_handle, 
-                          unsigned long mfn, 
+unsigned int get_pfn_type(int xc_handle,
+                          unsigned long mfn,
                           uint32_t dom)
 {
     DECLARE_DOM0_OP;
@@ -119,7 +119,7 @@ int xc_mmuext_op(
 
  out1:
     return ret;
-}    
+}
 
 static int flush_mmu_updates(int xc_handle, xc_mmu_t *mmu)
 {
@@ -166,7 +166,7 @@ xc_mmu_t *xc_init_mmu_updates(int xc_handle, domid_t dom)
     return mmu;
 }
 
-int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu, 
+int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu,
                       unsigned long long ptr, unsigned long long val)
 {
     mmu->updates[mmu->idx].ptr = ptr;
@@ -288,7 +288,7 @@ int xc_memory_op(int xc_handle,
 
  out1:
     return ret;
-}    
+}
 
 
 long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
@@ -308,8 +308,8 @@ long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
 
 
 int xc_get_pfn_list(int xc_handle,
-                    uint32_t domid, 
-                    unsigned long *pfn_buf, 
+                    uint32_t domid,
+                    unsigned long *pfn_buf,
                     unsigned long max_pfns)
 {
     DECLARE_DOM0_OP;
@@ -327,7 +327,7 @@ int xc_get_pfn_list(int xc_handle,
     {
         PERROR("xc_get_pfn_list: pfn_buf mlock failed");
         return -1;
-    }    
+    }
 
     ret = do_dom0_op(xc_handle, &op);
 
@@ -356,13 +356,13 @@ long xc_get_tot_pages(int xc_handle, uint32_t domid)
     DECLARE_DOM0_OP;
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
-    return (do_dom0_op(xc_handle, &op) < 0) ? 
+    return (do_dom0_op(xc_handle, &op) < 0) ?
         -1 : op.u.getdomaininfo.tot_pages;
 }
 
 int xc_copy_to_domain_page(int xc_handle,
                            uint32_t domid,
-                           unsigned long dst_pfn, 
+                           unsigned long dst_pfn,
                            const char *src_page)
 {
     void *vaddr = xc_map_foreign_range(
@@ -481,7 +481,7 @@ unsigned long xc_make_page_below_4G(
 {
     unsigned long new_mfn;
 
-    if ( xc_domain_memory_decrease_reservation( 
+    if ( xc_domain_memory_decrease_reservation(
         xc_handle, domid, 1, 0, &mfn) != 0 )
     {
         fprintf(stderr,"xc_make_page_below_4G decrease failed. mfn=%lx\n",mfn);

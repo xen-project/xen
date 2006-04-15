@@ -1,8 +1,8 @@
 /******************************************************************************
  * xc_physdev.c
- * 
+ *
  * API for manipulating physical-device access permissions.
- * 
+ *
  * Copyright (c) 2004, Rolf Neugebauer (Intel Research Cambridge)
  * Copyright (c) 2004, K A Fraser (University of Cambridge)
  */

@@ -1,8 +1,8 @@
 /******************************************************************************
  * xenctrl.h
- * 
+ *
  * A library for low-level access to the Xen control interfaces.
- * 
+ *
  * Copyright (c) 2003-2004, K A Fraser.
  */
 
@@ -30,7 +30,7 @@
 
 /*
  *  DEFINITIONS FOR CPU BARRIERS
- */ 
+ */
 
 #if defined(__i386__)
 #define mb()  __asm__ __volatile__ ( "lock; addl $0,0(%%esp)" : : : "memory" )
@@ -51,7 +51,7 @@
 
 /*
  *  INITIALIZATION FUNCTIONS
- */ 
+ */
 
 /**
  * This function opens a handle to the hypervisor interface.  This function can
@@ -96,20 +96,20 @@ typedef struct xc_core_header {
 
 long xc_ptrace_core(
     int xc_handle,
-    enum __ptrace_request request, 
-    uint32_t domid, 
-    long addr, 
+    enum __ptrace_request request,
+    uint32_t domid,
+    long addr,
     long data,
     vcpu_guest_context_t *ctxt);
 void * map_domain_va_core(
-    unsigned long domfd, 
-    int cpu, 
+    unsigned long domfd,
+    int cpu,
     void *guest_va,
     vcpu_guest_context_t *ctxt);
 int xc_waitdomain_core(
     int xc_handle,
-    int domain, 
-    int *status, 
+    int domain,
+    int *status,
     int options,
     vcpu_guest_context_t *ctxt);
 
@@ -120,7 +120,7 @@ int xc_waitdomain_core(
 typedef struct {
     uint32_t      domid;
     uint32_t      ssidref;
-    unsigned int  dying:1, crashed:1, shutdown:1, 
+    unsigned int  dying:1, crashed:1, shutdown:1,
                   paused:1, blocked:1, running:1;
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
     unsigned long nr_pages;
@@ -133,7 +133,7 @@ typedef struct {
 } xc_dominfo_t;
 
 typedef dom0_getdomaininfo_t xc_domaininfo_t;
-int xc_domain_create(int xc_handle, 
+int xc_domain_create(int xc_handle,
                      uint32_t ssidref,
                      xen_domain_handle_t handle,
                      uint32_t *pdomid);
@@ -144,7 +144,7 @@ int xc_domain_create(int xc_handle,
  *  xc_domain_dumpcore_via_callback - produces a dump, using a specified
  *                                    callback function
  */
-int xc_domain_dumpcore(int xc_handle, 
+int xc_domain_dumpcore(int xc_handle,
                        uint32_t domid,
                        const char *corename);
 
@@ -156,7 +156,7 @@ int xc_domain_dumpcore(int xc_handle,
  */
 typedef int (dumpcore_rtn_t)(void *arg, char *buffer, unsigned int length);
 
-int xc_domain_dumpcore_via_callback(int xc_handle, 
+int xc_domain_dumpcore_via_callback(int xc_handle,
                                     uint32_t domid,
                                     void *arg,
                                     dumpcore_rtn_t dump_rtn);
@@ -170,7 +170,7 @@ int xc_domain_dumpcore_via_callback(int xc_handle,
  * @return 0 on success, -1 on failure.
  */
 int xc_domain_max_vcpus(int xc_handle,
-                        uint32_t domid, 
+                        uint32_t domid,
                         unsigned int max);
 
 /**
@@ -181,7 +181,7 @@ int xc_domain_max_vcpus(int xc_handle,
  * @parm domid the domain id to pause
  * @return 0 on success, -1 on failure.
  */
-int xc_domain_pause(int xc_handle, 
+int xc_domain_pause(int xc_handle,
                     uint32_t domid);
 /**
  * This function unpauses a domain.  The domain should have been previously
@@ -191,7 +191,7 @@ int xc_domain_pause(int xc_handle,
  * @parm domid the domain id to unpause
  * return 0 on success, -1 on failure
  */
-int xc_domain_unpause(int xc_handle, 
+int xc_domain_unpause(int xc_handle,
                       uint32_t domid);
 
 /**
@@ -203,7 +203,7 @@ int xc_domain_unpause(int xc_handle,
  * @parm domid the domain id to destroy
  * @return 0 on success, -1 on failure
  */
-int xc_domain_destroy(int xc_handle, 
+int xc_domain_destroy(int xc_handle,
                       uint32_t domid);
 
 /**
@@ -217,7 +217,7 @@ int xc_domain_destroy(int xc_handle,
  * @parm reason is the reason (SHUTDOWN_xxx) for the shutdown
  * @return 0 on success, -1 on failure
  */
-int xc_domain_shutdown(int xc_handle, 
+int xc_domain_shutdown(int xc_handle,
                        uint32_t domid,
                        int reason);
 
@@ -242,7 +242,7 @@ int xc_vcpu_setaffinity(int xc_handle,
  * @return the number of domains enumerated or -1 on error
  */
 int xc_domain_getinfo(int xc_handle,
-                      uint32_t first_domid, 
+                      uint32_t first_domid,
                       unsigned int max_doms,
                       xc_dominfo_t *info);
 
@@ -307,12 +307,12 @@ long long xc_domain_get_cpu_usage(int xc_handle,
                                   domid_t domid,
                                   int vcpu);
 
-int xc_domain_sethandle(int xc_handle, uint32_t domid, 
+int xc_domain_sethandle(int xc_handle, uint32_t domid,
                         xen_domain_handle_t handle);
 
 typedef dom0_shadow_control_stats_t xc_shadow_control_stats_t;
 int xc_shadow_control(int xc_handle,
-                      uint32_t domid, 
+                      uint32_t domid,
                       unsigned int sop,
                       unsigned long *dirty_bitmap,
                       unsigned long pages,
@@ -386,7 +386,7 @@ int xc_physdev_pci_access_modify(int xc_handle,
 
 int xc_readconsolering(int xc_handle,
                        char **pbuffer,
-                       unsigned int *pnr_chars, 
+                       unsigned int *pnr_chars,
                        int clear);
 
 typedef dom0_physinfo_t xc_physinfo_t;
@@ -397,18 +397,18 @@ int xc_sched_id(int xc_handle,
                 int *sched_id);
 
 int xc_domain_setmaxmem(int xc_handle,
-                        uint32_t domid, 
+                        uint32_t domid,
                         unsigned int max_memkb);
 
 int xc_domain_memory_increase_reservation(int xc_handle,
-                                          uint32_t domid, 
+                                          uint32_t domid,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
                                           unsigned int address_bits,
                                           unsigned long *extent_start);
 
 int xc_domain_memory_decrease_reservation(int xc_handle,
-                                          uint32_t domid, 
+                                          uint32_t domid,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
                                           unsigned long *extent_start);
@@ -443,7 +443,7 @@ int xc_domain_iomem_permission(int xc_handle,
                                unsigned long nr_mfns,
                                uint8_t allow_access);
 
-unsigned long xc_make_page_below_4G(int xc_handle, uint32_t domid, 
+unsigned long xc_make_page_below_4G(int xc_handle, uint32_t domid,
                                     unsigned long mfn);
 
 typedef dom0_perfc_desc_t xc_perfc_desc_t;
@@ -492,11 +492,11 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
 unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
                                            int vcpu, unsigned long long virt);
 
-int xc_get_pfn_list(int xc_handle, uint32_t domid, unsigned long *pfn_buf, 
+int xc_get_pfn_list(int xc_handle, uint32_t domid, unsigned long *pfn_buf,
                     unsigned long max_pfns);
 
 int xc_ia64_get_pfn_list(int xc_handle, uint32_t domid,
-                         unsigned long *pfn_buf, 
+                         unsigned long *pfn_buf,
                          unsigned int start_page, unsigned int nr_pages);
 
 int xc_copy_to_domain_page(int xc_handle, uint32_t domid,
@@ -551,7 +551,7 @@ int xc_tbuf_enable(int xc_handle, int enable);
 int xc_tbuf_set_size(int xc_handle, uint32_t size);
 
 /**
- * This function retrieves the current size of the trace buffers. 
+ * This function retrieves the current size of the trace buffers.
  * Note that the size returned is in terms of bytes, not pages.
 
  * @parm xc_handle a handle to an open hypervisor interface
@@ -577,7 +577,7 @@ struct xc_mmu {
 };
 typedef struct xc_mmu xc_mmu_t;
 xc_mmu_t *xc_init_mmu_updates(int xc_handle, domid_t dom);
-int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu, 
+int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu,
                    unsigned long long ptr, unsigned long long val);
 int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu);
 

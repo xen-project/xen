@@ -1,8 +1,8 @@
 /******************************************************************************
  * xenguest.h
- * 
+ *
  * A library for guest domain management in Xen.
- * 
+ *
  * Copyright (c) 2003-2004, K A Fraser.
  */
 
@@ -21,7 +21,7 @@
  * @parm dom the id of the domain
  * @return 0 on success, -1 on failure
  */
-int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters, 
+int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                   uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
                   int (*suspend)(int domid));
 
@@ -37,8 +37,8 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
  * @parm store_mfn returned with the mfn of the store page
  * @return 0 on success, -1 on failure
  */
-int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, 
-                     unsigned long nr_pfns, unsigned int store_evtchn, 
+int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom,
+                     unsigned long nr_pfns, unsigned int store_evtchn,
                      unsigned long *store_mfn, unsigned int console_evtchn,
                      unsigned long *console_mfn);
 

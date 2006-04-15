@@ -107,7 +107,7 @@ struct gdb_regs {
     long esi; /* 12 */
     long edi; /* 16 */
     long ebp; /* 20 */
-    long eax; /* 24 */ 
+    long eax; /* 24 */
     int  xds; /* 28 */
     int  xes; /* 32 */
     int  xfs; /* 36 */
@@ -116,7 +116,7 @@ struct gdb_regs {
     long eip;    /* 48 */
     int  xcs;    /* 52 */
     long eflags; /* 56 */
-    long esp;    /* 60 */     
+    long esp;    /* 60 */
     int  xss;    /* 64 */
 };
 
@@ -169,20 +169,20 @@ struct gdb_regs {
 typedef void (*thr_ev_handler_t)(long);
 
 void xc_register_event_handler(
-    thr_ev_handler_t h, 
+    thr_ev_handler_t h,
     td_event_e e);
 
 long xc_ptrace(
     int xc_handle,
-    enum __ptrace_request request, 
+    enum __ptrace_request request,
     uint32_t  domid,
-    long addr, 
+    long addr,
     long data);
 
 int xc_waitdomain(
     int xc_handle,
-    int domain, 
-    int *status, 
+    int domain,
+    int *status,
     int options);
 
 #endif /* XC_PTRACE */

@@ -1,6 +1,6 @@
 /******************************************************************************
  * xg_private.c
- * 
+ *
  * Helper functions for the rest of the library.
  */
 

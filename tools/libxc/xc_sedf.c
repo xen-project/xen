@@ -1,8 +1,8 @@
 /******************************************************************************
  * xc_sedf.c
- * 
+ *
  * API for manipulating parameters of the Simple EDF scheduler.
- * 
+ *
  * changes by Stephan Diestelhorst
  * based on code
  * by Mark Williamson, Copyright (c) 2004 Intel Research Cambridge.
@@ -35,7 +35,7 @@ int xc_sedf_domain_get(int xc_handle, uint32_t domid, uint64_t *period, uint64_t
     int ret;
     struct sedf_adjdom *p = &op.u.adjustdom.u.sedf;
 
-    op.cmd = DOM0_ADJUSTDOM;    
+    op.cmd = DOM0_ADJUSTDOM;
     op.u.adjustdom.domain = (domid_t)domid;
     op.u.adjustdom.sched_id = SCHED_SEDF;
     op.u.adjustdom.direction = SCHED_INFO_GET;
