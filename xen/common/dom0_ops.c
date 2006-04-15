@@ -581,27 +581,31 @@ long do_dom0_op(GUEST_HANDLE(dom0_op_t) u_dom0_op)
     case DOM0_SETDOMAINMAXMEM:
     {
         struct domain *d; 
+        unsigned long new_max;
+
         ret = -ESRCH;
         d = find_domain_by_id(op->u.setdomainmaxmem.domain);
-        if ( d != NULL )
+        if ( d == NULL )
+            break;
+
+        ret = -EINVAL;
+        new_max = op->u.setdomainmaxmem.max_memkb >> (PAGE_SHIFT-10);
+
+        spin_lock(&d->page_alloc_lock);
+        if ( new_max >= d->tot_pages )
         {
-            unsigned long new_max;
-            new_max = op->u.setdomainmaxmem.max_memkb >> (PAGE_SHIFT-10);
-            if (new_max < d->tot_pages) 
-                ret = -EINVAL;
-            else 
-            {  
-                d->max_pages = new_max;
-                ret = 0;
-            }
-            put_domain(d);
+            d->max_pages = new_max;
+            ret = 0;
         }
+        spin_unlock(&d->page_alloc_lock);
+
+        put_domain(d);
     }
     break;
 
     case DOM0_SETDOMAINHANDLE:
     {
-        struct domain *d; 
+        struct domain *d;
         ret = -ESRCH;
         d = find_domain_by_id(op->u.setdomainhandle.domain);
         if ( d != NULL )
