@@ -149,12 +149,22 @@ typedef struct {
     u8 in_flight;
     u8 shareable;
     u8 ack_type;
-#define ACKTYPE_NONE   0 /* Final ACK is not required */
-#define ACKTYPE_SINGLE 1 /* Final ACK on any CPU */
-#define ACKTYPE_MULTI  2 /* Final ACK on the CPU that was interrupted */
-    cpumask_t cpu_ack_map;
+#define ACKTYPE_NONE   0     /* No final acknowledgement is required */
+#define ACKTYPE_UNMASK 1     /* Unmask PIC hardware (from any CPU)   */
+#define ACKTYPE_LAPIC_EOI  2 /* EOI on the CPU that was interrupted  */
+    cpumask_t cpu_eoi_map;   /* CPUs that need to EOI this interrupt */
     struct domain *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
+
+/*
+ * Stack of interrupts awaiting EOI on each CPU. These must be popped in
+ * order, as only the current highest-priority pending irq can be EOIed.
+ */
+static struct {
+    u8 vector;
+    u8 ready_to_end;
+} pending_lapic_eoi[NR_CPUS][NR_VECTORS] __cacheline_aligned;
+#define pending_lapic_eoi_sp(cpu) (pending_lapic_eoi[cpu][NR_VECTORS-1].vector)
 
 static void __do_IRQ_guest(int vector)
 {
@@ -162,18 +172,26 @@ static void __do_IRQ_guest(int vector)
     irq_desc_t         *desc = &irq_desc[vector];
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
     struct domain      *d;
-    int                 i;
+    int                 i, sp, cpu = smp_processor_id();
 
     if ( unlikely(action->nr_guests == 0) )
     {
-        /* An interrupt may slip through while freeing an ACKTYPE_MULTI irq. */
-        ASSERT(action->ack_type == ACKTYPE_MULTI);
+        /* An interrupt may slip through while freeing a LAPIC_EOI irq. */
+        ASSERT(action->ack_type == ACKTYPE_LAPIC_EOI);
         desc->handler->end(vector);
         return;
     }
 
-    if ( action->ack_type == ACKTYPE_MULTI )
-        cpu_set(smp_processor_id(), action->cpu_ack_map);
+    if ( action->ack_type == ACKTYPE_LAPIC_EOI )
+    {
+        sp = pending_lapic_eoi_sp(cpu);
+        ASSERT((sp == 0) || (pending_lapic_eoi[cpu][sp-1].vector < vector));
+        ASSERT(sp < (NR_VECTORS-1));
+        pending_lapic_eoi[cpu][sp].vector = vector;
+        pending_lapic_eoi[cpu][sp].ready_to_end = 0;
+        pending_lapic_eoi_sp(cpu) = sp+1;
+        cpu_set(cpu, action->cpu_eoi_map);
+    }
 
     for ( i = 0; i < action->nr_guests; i++ )
     {
@@ -190,20 +208,49 @@ static void end_guest_irq(void *data)
     irq_desc_t         *desc = data;
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
     unsigned long       flags;
+    int                 vector, sp, cpu = smp_processor_id();
+
+    vector = desc - irq_desc;
 
     spin_lock_irqsave(&desc->lock, flags);
+
     if ( (desc->status & IRQ_GUEST) &&
          (action->in_flight == 0) &&
-         test_and_clear_bit(smp_processor_id(), &action->cpu_ack_map) )
-        desc->handler->end(desc - irq_desc);
-    spin_unlock_irqrestore(&desc->lock, flags);    
+         test_and_clear_bit(cpu, &action->cpu_eoi_map) )
+    {
+        sp = pending_lapic_eoi_sp(cpu);
+        do {
+            ASSERT(sp > 0);
+        } while ( pending_lapic_eoi[cpu][--sp].vector != vector );
+        ASSERT(!pending_lapic_eoi[cpu][sp].ready_to_end);
+        pending_lapic_eoi[cpu][sp].ready_to_end = 1;
+    }
+
+    for ( ; ; )
+    {
+        sp = pending_lapic_eoi_sp(cpu);
+        if ( (sp == 0) || !pending_lapic_eoi[cpu][sp-1].ready_to_end )
+        {
+            spin_unlock_irqrestore(&desc->lock, flags);    
+            return;
+        }
+        if ( pending_lapic_eoi[cpu][sp-1].vector != vector )
+        {
+            spin_unlock(&desc->lock);
+            vector = pending_lapic_eoi[cpu][sp-1].vector;
+            desc = &irq_desc[vector];
+            spin_lock(&desc->lock);
+        }
+        desc->handler->end(vector);
+        pending_lapic_eoi_sp(cpu) = sp-1;
+    }
 }
 
 int pirq_guest_unmask(struct domain *d)
 {
     irq_desc_t         *desc;
     irq_guest_action_t *action;
-    cpumask_t           cpu_ack_map = CPU_MASK_NONE;
+    cpumask_t           cpu_eoi_map = CPU_MASK_NONE;
     unsigned int        pirq, cpu = smp_processor_id();
     shared_info_t      *s = d->shared_info;
 
@@ -221,24 +268,27 @@ int pirq_guest_unmask(struct domain *d)
             ASSERT(action->ack_type != ACKTYPE_NONE);
             if ( --action->in_flight == 0 )
             {
-                if ( (action->ack_type == ACKTYPE_SINGLE) ||
-                     test_and_clear_bit(cpu, &action->cpu_ack_map) )
+                if ( action->ack_type == ACKTYPE_UNMASK )
                     desc->handler->end(irq_to_vector(pirq));
-                cpu_ack_map = action->cpu_ack_map;
+                cpu_eoi_map = action->cpu_eoi_map;
             }
         }
         spin_unlock_irq(&desc->lock);
 
-        if ( !cpus_empty(cpu_ack_map) )
+        if ( __test_and_clear_bit(cpu, &cpu_eoi_map) )
+            end_guest_irq(desc);
+
+        if ( !cpus_empty(cpu_eoi_map) )
         {
-            on_selected_cpus(cpu_ack_map, end_guest_irq, desc, 1, 0);
-            cpu_ack_map = CPU_MASK_NONE;
+            on_selected_cpus(cpu_eoi_map, end_guest_irq, desc, 1, 0);
+            cpu_eoi_map = CPU_MASK_NONE;
         }
     }
 
     return 0;
 }
 
+extern int ioapic_ack_new;
 int pirq_acktype(int irq)
 {
     irq_desc_t  *desc;
@@ -259,14 +309,17 @@ int pirq_acktype(int irq)
 
     /* Legacy PIC interrupts can be acknowledged from any CPU. */
     if ( !strcmp(desc->handler->typename, "XT-PIC") )
-        return ACKTYPE_SINGLE;
+        return ACKTYPE_UNMASK;
 
     /*
-     * By default assume that an interrupt must be finally acknowledged on
-     * the CPU on which it was received. This is true for level-triggered
-     * IO-APIC interrupts, for example, where we tickle the LAPIC to EOI.
+     * Level-triggered IO-APIC interrupts need to be acknowledged on the CPU
+     * on which they were received. This is because we tickle the LAPIC to EOI.
      */
-    return ACKTYPE_MULTI;
+    if ( !strcmp(desc->handler->typename, "IO-APIC-level") )
+        return ioapic_ack_new ? ACKTYPE_LAPIC_EOI : ACKTYPE_UNMASK;
+
+    BUG();
+    return 0;
 }
 
 int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
@@ -313,7 +366,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
         action->in_flight   = 0;
         action->shareable   = will_share;
         action->ack_type    = pirq_acktype(irq);
-        action->cpu_ack_map = CPU_MASK_NONE;
+        action->cpu_eoi_map = CPU_MASK_NONE;
 
         desc->depth = 0;
         desc->status |= IRQ_GUEST;
@@ -352,7 +405,7 @@ int pirq_guest_unbind(struct domain *d, int irq)
     unsigned int        vector = irq_to_vector(irq);
     irq_desc_t         *desc = &irq_desc[vector];
     irq_guest_action_t *action;
-    cpumask_t           cpu_ack_map;
+    cpumask_t           cpu_eoi_map;
     unsigned long       flags;
     int                 i;
 
@@ -370,30 +423,30 @@ int pirq_guest_unbind(struct domain *d, int irq)
 
     switch ( action->ack_type )
     {
-    case ACKTYPE_SINGLE:
+    case ACKTYPE_UNMASK:
         if ( test_and_clear_bit(irq, &d->pirq_mask) &&
              (--action->in_flight == 0) )
             desc->handler->end(vector);
         break;
-    case ACKTYPE_MULTI:
+    case ACKTYPE_LAPIC_EOI:
         if ( test_and_clear_bit(irq, &d->pirq_mask) )
             --action->in_flight;
         while ( action->in_flight == 0 )
         {
             /* We cannot release guest info until all pending ACKs are done. */
-            cpu_ack_map = action->cpu_ack_map;
-            if ( cpus_empty(cpu_ack_map) )
+            cpu_eoi_map = action->cpu_eoi_map;
+            if ( cpus_empty(cpu_eoi_map) )
                 break;
 
             /* We cannot hold the lock while interrupting other CPUs. */
             spin_unlock_irqrestore(&desc->lock, flags);    
-            on_selected_cpus(cpu_ack_map, end_guest_irq, desc, 1, 1);
+            on_selected_cpus(cpu_eoi_map, end_guest_irq, desc, 1, 1);
             spin_lock_irqsave(&desc->lock, flags);
 
             /* The world can change while we do not hold the lock. */
             if ( !(desc->status & IRQ_GUEST) )
                 goto out;
-            if ( (action->ack_type != ACKTYPE_MULTI) ||
+            if ( (action->ack_type != ACKTYPE_LAPIC_EOI) ||
                  (action->nr_guests != 0) )
                 break;
         }
@@ -406,7 +459,7 @@ int pirq_guest_unbind(struct domain *d, int irq)
         goto out;
 
     BUG_ON(action->in_flight != 0);
-    BUG_ON(!cpus_empty(action->cpu_ack_map));
+    BUG_ON(!cpus_empty(action->cpu_eoi_map));
 
     desc->action = NULL;
     xfree(action);
@@ -487,3 +540,61 @@ static int __init setup_dump_irqs(void)
     return 0;
 }
 __initcall(setup_dump_irqs);
+
+static struct timer end_irq_timer[NR_CPUS];
+
+static void end_irq_timeout(void *unused)
+{
+    irq_desc_t         *desc;
+    irq_guest_action_t *action;
+    cpumask_t           cpu_eoi_map;
+    unsigned int        cpu = smp_processor_id();
+    int                 sp, vector, i;
+
+    local_irq_disable();
+
+    if ( (sp = pending_lapic_eoi_sp(cpu)) == 0 )
+    {
+        local_irq_enable();
+        return;
+    }
+
+    vector = pending_lapic_eoi[cpu][sp-1].vector;
+    ASSERT(!pending_lapic_eoi[cpu][sp-1].ready_to_end);
+
+    desc = &irq_desc[vector];
+    spin_lock(&desc->lock);
+    action = (irq_guest_action_t *)desc->action;
+    ASSERT(action->ack_type == ACKTYPE_LAPIC_EOI);
+    ASSERT(desc->status & IRQ_GUEST);
+    for ( i = 0; i < action->nr_guests; i++ )
+        clear_bit(vector_to_irq(vector), &action->guest[i]->pirq_mask);
+    action->in_flight = 0;
+    cpu_eoi_map = action->cpu_eoi_map;
+    spin_unlock(&desc->lock);
+
+    local_irq_enable();
+
+    if ( !cpus_empty(cpu_eoi_map) )
+        on_selected_cpus(cpu_eoi_map, end_guest_irq, desc, 1, 0);
+
+    set_timer(&end_irq_timer[cpu], NOW() + MILLISECS(1000));
+}
+
+static void __init __setup_irq_timeout(void *unused)
+{
+    int cpu = smp_processor_id();
+    init_timer(&end_irq_timer[cpu], end_irq_timeout, NULL, cpu);
+    set_timer(&end_irq_timer[cpu], NOW() + MILLISECS(1000));
+}
+
+static int force_intack;
+boolean_param("force_intack", force_intack);
+
+static int __init setup_irq_timeout(void)
+{
+    if ( force_intack )
+        on_each_cpu(__setup_irq_timeout, NULL, 1, 1);
+    return 0;
+}
+__initcall(setup_irq_timeout);

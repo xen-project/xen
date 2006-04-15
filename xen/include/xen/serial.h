@@ -57,6 +57,8 @@ struct uart_driver {
     void (*putc)(struct serial_port *, char);
     /* Get a character from the serial line: returns 0 if none available. */
     int  (*getc)(struct serial_port *, char *);
+    /* Get IRQ number for this port's serial line: returns -1 if none. */
+    int  (*irq)(struct serial_port *);
 };
 
 /* 'Serial handles' are composed from the following fields. */
@@ -98,6 +100,9 @@ void serial_end_sync(int handle);
 
 /* Return number of bytes headroom in transmit buffer. */
 int serial_tx_space(int handle);
+
+/* Return irq number for specified serial port (identified by index). */
+int serial_irq(int idx);
 
 /*
  * Initialisation and helper functions for uart drivers.
