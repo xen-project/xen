@@ -58,10 +58,8 @@ static int map_frontend_page(blkif_t *blkif, unsigned long shared_page)
 	struct gnttab_map_grant_ref op;
 	int ret;
 
-	op.host_addr = (unsigned long)blkif->blk_ring_area->addr;
-	op.flags     = GNTMAP_host_map;
-	op.ref       = shared_page;
-	op.dom       = blkif->domid;
+	gnttab_set_map_op(&op, (unsigned long)blkif->blk_ring_area->addr,
+			  GNTMAP_host_map, shared_page, blkif->domid);
 
 	lock_vm_area(blkif->blk_ring_area);
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1);
@@ -90,9 +88,8 @@ static void unmap_frontend_page(blkif_t *blkif)
 	struct gnttab_unmap_grant_ref op;
 	int ret;
 
-	op.host_addr    = (unsigned long)blkif->blk_ring_area->addr;
-	op.handle       = blkif->shmem_handle;
-	op.dev_bus_addr = 0;
+	gnttab_set_unmap_op(&op, (unsigned long)blkif->blk_ring_area->addr,
+			    GNTMAP_host_map, blkif->shmem_handle);
 
 	lock_vm_area(blkif->blk_ring_area);
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1);

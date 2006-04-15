@@ -186,9 +186,8 @@ static void fast_flush_area(pending_req_t *req)
 		handle = pending_handle(req, i);
 		if (handle == BLKBACK_INVALID_HANDLE)
 			continue;
-		unmap[invcount].host_addr    = vaddr(req, i);
-		unmap[invcount].dev_bus_addr = 0;
-		unmap[invcount].handle       = handle;
+		gnttab_set_unmap_op(&unmap[i], vaddr(req, i), GNTMAP_host_map,
+				    handle);
 		pending_handle(req, i) = BLKBACK_INVALID_HANDLE;
 		invcount++;
 	}
@@ -384,6 +383,8 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	pending_req->nr_pages  = nseg;
 
 	for (i = 0; i < nseg; i++) {
+		uint32_t flags;
+
 		seg[i].nsec = req->seg[i].last_sect -
 			req->seg[i].first_sect + 1;
 
@@ -392,12 +393,11 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 			goto fail_response;
 		preq.nr_sects += seg[i].nsec;
 
-		map[i].host_addr = vaddr(pending_req, i);
-		map[i].dom = blkif->domid;
-		map[i].ref = req->seg[i].gref;
-		map[i].flags = GNTMAP_host_map;
+		flags = GNTMAP_host_map;
 		if ( operation == WRITE )
-			map[i].flags |= GNTMAP_readonly;
+			flags |= GNTMAP_readonly;
+		gnttab_set_map_op(&map[i], vaddr(pending_req, i), flags,
+				  req->seg[i].gref, blkif->domid);
 	}
 
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, map, nseg);

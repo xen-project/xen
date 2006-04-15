@@ -334,12 +334,6 @@ again:
 		goto abort_transaction;
 	}
 
-	err = xenbus_printf(xbt, dev->nodename,
-	                    "state", "%d", XenbusStateInitialised);
-	if (err) {
-		goto abort_transaction;
-	}
-
 	err = xenbus_transaction_end(xbt, 0);
 	if (err == -EAGAIN)
 		goto again;
@@ -347,6 +341,9 @@ again:
 		xenbus_dev_fatal(dev, err, "completing transaction");
 		goto destroy_tpmring;
 	}
+
+	xenbus_switch_state(dev, XenbusStateConnected);
+
 	return 0;
 
 abort_transaction:
@@ -387,6 +384,7 @@ static void backend_changed(struct xenbus_device *dev,
 		if (tp->is_suspended == 0) {
 			device_unregister(&dev->dev);
 		}
+		xenbus_switch_state(dev, XenbusStateClosed);
 		break;
 	}
 }
@@ -439,6 +437,7 @@ static int tpmfront_suspend(struct xenbus_device *dev)
 
 	/* lock, so no app can send */
 	mutex_lock(&suspend_lock);
+	xenbus_switch_state(dev, XenbusStateClosed);
 	tp->is_suspended = 1;
 
 	for (ctr = 0; atomic_read(&tp->tx_busy) && ctr <= 25; ctr++) {

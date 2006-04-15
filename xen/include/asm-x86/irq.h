@@ -11,8 +11,8 @@
 #define IO_APIC_IRQ(irq)    (((irq) >= 16) || ((1<<(irq)) & io_apic_irqs))
 #define IO_APIC_VECTOR(irq) (irq_vector[irq])
 
-#define LEGACY_VECTOR(irq)          ((irq) + FIRST_EXTERNAL_VECTOR)
-#define LEGACY_IRQ_FROM_VECTOR(vec) ((vec) - FIRST_EXTERNAL_VECTOR)
+#define LEGACY_VECTOR(irq)          ((irq) + FIRST_LEGACY_VECTOR)
+#define LEGACY_IRQ_FROM_VECTOR(vec) ((vec) - FIRST_LEGACY_VECTOR)
 
 #define irq_to_vector(irq)  \
     (IO_APIC_IRQ(irq) ? IO_APIC_VECTOR(irq) : LEGACY_VECTOR(irq))

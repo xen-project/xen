@@ -237,7 +237,7 @@ static int setup_pg_tables(int xc_handle, uint32_t dom,
         else
         {
             *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
-            if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) && 
+            if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) &&
                  (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) )
                 *vl1e &= ~_PAGE_RW;
         }
@@ -314,7 +314,7 @@ static int setup_pg_tables_pae(int xc_handle, uint32_t dom,
             else
                 *vl2e++ = l1tab | L2_PROT;
         }
-        
+
         if ( shadow_mode_enabled )
         {
             *vl1e = (count << PAGE_SHIFT) | L1_PROT;
@@ -323,12 +323,12 @@ static int setup_pg_tables_pae(int xc_handle, uint32_t dom,
         {
             *vl1e = ((uint64_t)page_array[count] << PAGE_SHIFT) | L1_PROT;
             if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) &&
-                 (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) ) 
+                 (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) )
                 *vl1e &= ~_PAGE_RW;
         }
         vl1e++;
     }
-     
+
     munmap(vl1tab, PAGE_SIZE);
     munmap(vl2tab, PAGE_SIZE);
     munmap(vl3tab, PAGE_SIZE);
@@ -376,13 +376,13 @@ static int setup_pg_tables_64(int xc_handle, uint32_t dom,
         ctxt->ctrlreg[3] = pl4tab;
     else
         ctxt->ctrlreg[3] = l4tab;
-    
+
     for ( count = 0; count < ((v_end-dsi_v_start)>>PAGE_SHIFT); count++)
     {
         if ( !((unsigned long)vl1e & (PAGE_SIZE-1)) )
         {
             alloc_pt(l1tab, vl1tab, pl1tab);
-            
+
             if ( !((unsigned long)vl2e & (PAGE_SIZE-1)) )
             {
                 alloc_pt(l2tab, vl2tab, pl2tab);
@@ -410,7 +410,7 @@ static int setup_pg_tables_64(int xc_handle, uint32_t dom,
                 *vl2e = l1tab | L2_PROT;
             vl2e++;
         }
-        
+
         if ( shadow_mode_enabled )
         {
             *vl1e = (count << PAGE_SHIFT) | L1_PROT;
@@ -419,14 +419,14 @@ static int setup_pg_tables_64(int xc_handle, uint32_t dom,
         {
             *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
             if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) &&
-                 (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) ) 
+                 (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) )
                 {
                     *vl1e &= ~_PAGE_RW;
                 }
         }
         vl1e++;
     }
-     
+
     munmap(vl1tab, PAGE_SIZE);
     munmap(vl2tab, PAGE_SIZE);
     munmap(vl3tab, PAGE_SIZE);
@@ -509,7 +509,7 @@ static int setup_guest(int xc_handle,
            " Loaded kernel: %p->%p\n"
            " Init. ramdisk: %p->%p\n"
            " TOTAL:         %p->%p\n",
-           _p(dsi.v_kernstart), _p(dsi.v_kernend), 
+           _p(dsi.v_kernstart), _p(dsi.v_kernend),
            _p(vinitrd_start),   _p(vinitrd_end),
            _p(dsi.v_start),     _p(v_end));
     printf(" ENTRY ADDRESS: %p\n", _p(dsi.v_kernentry));
@@ -696,10 +696,10 @@ static int setup_guest(int xc_handle,
                                            required_features);
 
     /*
-     * Why do we need this? The number of page-table frames depends on the 
-     * size of the bootstrap address space. But the size of the address space 
-     * depends on the number of page-table frames (since each one is mapped 
-     * read-only). We have a pair of simultaneous equations in two unknowns, 
+     * Why do we need this? The number of page-table frames depends on the
+     * size of the bootstrap address space. But the size of the address space
+     * depends on the number of page-table frames (since each one is mapped
+     * read-only). We have a pair of simultaneous equations in two unknowns,
      * which we solve by exhaustive search.
      */
     v_end = round_pgup(dsi.v_end);
@@ -731,13 +731,13 @@ static int setup_guest(int xc_handle,
         if ( dsi.pae_kernel )
         {
             /* FIXME: assumes one L2 pgtable @ 0xc0000000 */
-            if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT_PAE)-1)) >> 
+            if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT_PAE)-1)) >>
                    L2_PAGETABLE_SHIFT_PAE) + 2) <= nr_pt_pages )
                 break;
         }
         else
         {
-            if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT)-1)) >> 
+            if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT)-1)) >>
                    L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
                 break;
         }
@@ -873,7 +873,7 @@ static int setup_guest(int xc_handle,
             count) )
         {
             fprintf(stderr,"m2p update failure p=%lx m=%lx\n",
-                    count, page_array[count]); 
+                    count, page_array[count]);
             munmap(physmap, PAGE_SIZE);
             goto error_out;
         }
@@ -982,7 +982,7 @@ static int setup_guest(int xc_handle,
         start_info->mod_len      = initrd->len;
     }
     if ( cmdline != NULL )
-    { 
+    {
         strncpy((char *)start_info->cmd_line, cmdline, MAX_GUEST_CMDLINE);
         start_info->cmd_line[MAX_GUEST_CMDLINE-1] = '\0';
     }
@@ -1073,14 +1073,14 @@ static int xc_linux_build_internal(int xc_handle,
 #endif
 
     if ( mlock(&st_ctxt, sizeof(st_ctxt) ) )
-    {   
+    {
         PERROR("%s: ctxt mlock failed", __func__);
         return 1;
     }
 
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
-    if ( (xc_dom0_op(xc_handle, &op) < 0) || 
+    if ( (xc_dom0_op(xc_handle, &op) < 0) ||
          ((uint16_t)op.u.getdomaininfo.domain != domid) )
     {
         PERROR("Could not get info on domain");
@@ -1089,9 +1089,9 @@ static int xc_linux_build_internal(int xc_handle,
 
     memset(ctxt, 0, sizeof(*ctxt));
 
-    if ( setup_guest(xc_handle, domid, image, image_size, 
+    if ( setup_guest(xc_handle, domid, image, image_size,
                      initrd,
-                     nr_pages, 
+                     nr_pages,
                      &vstartinfo_start, &vkern_entry,
                      &vstack_start, ctxt, cmdline,
                      op.u.getdomaininfo.shared_info_frame,
@@ -1152,7 +1152,7 @@ static int xc_linux_build_internal(int xc_handle,
 
     /* No LDT. */
     ctxt->ldt_ents = 0;
-    
+
     /* Use the default Xen-provided GDT. */
     ctxt->gdt_ents = 0;
 
@@ -1184,7 +1184,7 @@ static int xc_linux_build_internal(int xc_handle,
 
     launch_op.cmd = DOM0_SETVCPUCONTEXT;
     rc = xc_dom0_op(xc_handle, &launch_op);
-    
+
     return rc;
 
  error_out:

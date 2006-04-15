@@ -39,7 +39,7 @@ map_domain_va_core(unsigned long domfd, int cpu, void * guest_va,
     static unsigned long  page_phys[MAX_VIRT_CPUS];
     static unsigned long *page_virt[MAX_VIRT_CPUS];
 
-    if (cr3[cpu] != cr3_phys[cpu]) 
+    if (cr3[cpu] != cr3_phys[cpu])
     {
         cr3_phys[cpu] = cr3[cpu];
         if (cr3_virt[cpu])
@@ -53,12 +53,12 @@ map_domain_va_core(unsigned long domfd, int cpu, void * guest_va,
             return NULL;
         }
         cr3_virt[cpu] = v;
-    } 
+    }
     if ((pde = cr3_virt[cpu][vtopdi(va)]) == 0) /* logical address */
         return NULL;
     if (ctxt[cpu].flags & VGCF_HVM_GUEST)
         pde = p2m_array[pde >> PAGE_SHIFT] << PAGE_SHIFT;
-    if (pde != pde_phys[cpu]) 
+    if (pde != pde_phys[cpu])
     {
         pde_phys[cpu] = pde;
         if (pde_virt[cpu])
@@ -74,7 +74,7 @@ map_domain_va_core(unsigned long domfd, int cpu, void * guest_va,
         return NULL;
     if (ctxt[cpu].flags & VGCF_HVM_GUEST)
         page = p2m_array[page >> PAGE_SHIFT] << PAGE_SHIFT;
-    if (page != page_phys[cpu]) 
+    if (page != page_phys[cpu])
     {
         page_phys[cpu] = page;
         if (page_virt[cpu])
@@ -89,11 +89,11 @@ map_domain_va_core(unsigned long domfd, int cpu, void * guest_va,
             return NULL;
         }
         page_virt[cpu] = v;
-    } 
+    }
     return (void *)(((unsigned long)page_virt[cpu]) | (va & BSD_PAGE_MASK));
 }
 
-int 
+int
 xc_waitdomain_core(
     int xc_handle,
     int domfd,
@@ -122,7 +122,7 @@ xc_waitdomain_core(
         nr_vcpus = header.xch_nr_vcpus;
         pages_offset = header.xch_pages_offset;
 
-        if (read(domfd, ctxt, sizeof(vcpu_guest_context_t)*nr_vcpus) != 
+        if (read(domfd, ctxt, sizeof(vcpu_guest_context_t)*nr_vcpus) !=
             sizeof(vcpu_guest_context_t)*nr_vcpus)
             return -1;
 
@@ -134,7 +134,7 @@ xc_waitdomain_core(
             printf("Could not allocate p2m_array\n");
             return -1;
         }
-        if (read(domfd, p2m_array, sizeof(unsigned long)*nr_pages) != 
+        if (read(domfd, p2m_array, sizeof(unsigned long)*nr_pages) !=
             sizeof(unsigned long)*nr_pages)
             return -1;
 

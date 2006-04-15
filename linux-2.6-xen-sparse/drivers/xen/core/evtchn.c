@@ -513,6 +513,8 @@ static void ack_dynirq(unsigned int irq)
 {
 	int evtchn = evtchn_from_irq(irq);
 
+	move_native_irq(irq);
+
 	if (VALID_EVTCHN(evtchn)) {
 		mask_evtchn(evtchn);
 		clear_evtchn(evtchn);
@@ -635,6 +637,8 @@ static void disable_pirq(unsigned int irq)
 static void ack_pirq(unsigned int irq)
 {
 	int evtchn = evtchn_from_irq(irq);
+
+	move_native_irq(irq);
 
 	if (VALID_EVTCHN(evtchn)) {
 		mask_evtchn(evtchn);

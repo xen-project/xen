@@ -86,6 +86,9 @@ class XendRoot:
     server (deprecated)."""
     xend_unix_server_default = 'no'
 
+    """Default external migration tool """
+    external_migration_tool_default = ''
+
     """Default path the unix-domain server listens at."""
     xend_unix_path_default = '/var/lib/xend/xend-socket'
 
@@ -250,6 +253,9 @@ class XendRoot:
         else:
             return None
 
+    def get_external_migration_tool(self):
+        """@return the name of the tool to handle virtual TPM migration."""
+        return self.get_config_value('external-migration-tool', self.external_migration_tool_default)
 
     def get_enable_dump(self):
         return self.get_config_bool('enable-dump', 'no')

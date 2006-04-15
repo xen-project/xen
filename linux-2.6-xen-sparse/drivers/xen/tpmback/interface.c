@@ -13,6 +13,7 @@
 
 #include "common.h"
 #include <xen/balloon.h>
+#include <xen/gnttab.h>
 
 static kmem_cache_t *tpmif_cachep;
 int num_frontends = 0;
@@ -72,12 +73,10 @@ tpmif_t *tpmif_find(domid_t domid, long int instance)
 static int map_frontend_page(tpmif_t *tpmif, unsigned long shared_page)
 {
 	int ret;
-	struct gnttab_map_grant_ref op = {
-		.host_addr = (unsigned long)tpmif->tx_area->addr,
-		.flags = GNTMAP_host_map,
-		.ref = shared_page,
-		.dom = tpmif->domid,
-	};
+	struct gnttab_map_grant_ref op;
+
+	gnttab_set_map_op(&op, (unsigned long)tpmif->tx_area->addr,
+			  GNTMAP_host_map, shared_page, tpmif->domid);
 
 	lock_vm_area(tpmif->tx_area);
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1);
@@ -100,9 +99,8 @@ static void unmap_frontend_page(tpmif_t *tpmif)
 	struct gnttab_unmap_grant_ref op;
 	int ret;
 
-	op.host_addr    = (unsigned long)tpmif->tx_area->addr;
-	op.handle       = tpmif->shmem_handle;
-	op.dev_bus_addr = 0;
+	gnttab_set_unmap_op(&op, (unsigned long)tpmif->tx_area->addr,
+			    GNTMAP_host_map, tpmif->shmem_handle);
 
 	lock_vm_area(tpmif->tx_area);
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1);

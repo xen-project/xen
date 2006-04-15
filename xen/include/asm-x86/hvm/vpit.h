@@ -38,7 +38,8 @@
 struct hvm_virpit {
     /* for simulation of counter 0 in mode 2 */
     u64 period_cycles;          /* pit frequency in cpu cycles */
-    s_time_t inject_point;      /* the time inject virt intr */
+    s_time_t count_advance;     /* accumulated count advance since last fire */
+    s_time_t count_point;        /* last point accumulating count advance */
     s_time_t scheduled;         /* scheduled timer interrupt */
     struct timer pit_timer;     /* periodic timer for mode 2*/
     unsigned int channel;       /* the pit channel, counter 0~2 */

@@ -1,8 +1,8 @@
 /******************************************************************************
  * xc_domain.c
- * 
+ *
  * API for manipulating and obtaining information on domains.
- * 
+ *
  * Copyright (c) 2003, K A Fraser.
  */
 
@@ -26,17 +26,17 @@ int xc_domain_create(int xc_handle,
 
     *pdomid = (uint16_t)op.u.createdomain.domain;
     return 0;
-}    
+}
 
 
-int xc_domain_pause(int xc_handle, 
+int xc_domain_pause(int xc_handle,
                     uint32_t domid)
 {
     DECLARE_DOM0_OP;
     op.cmd = DOM0_PAUSEDOMAIN;
     op.u.pausedomain.domain = (domid_t)domid;
     return do_dom0_op(xc_handle, &op);
-}    
+}
 
 
 int xc_domain_unpause(int xc_handle,
@@ -46,7 +46,7 @@ int xc_domain_unpause(int xc_handle,
     op.cmd = DOM0_UNPAUSEDOMAIN;
     op.u.unpausedomain.domain = (domid_t)domid;
     return do_dom0_op(xc_handle, &op);
-}    
+}
 
 
 int xc_domain_destroy(int xc_handle,
@@ -88,7 +88,7 @@ int xc_domain_shutdown(int xc_handle,
 
 
 int xc_vcpu_setaffinity(int xc_handle,
-                        uint32_t domid, 
+                        uint32_t domid,
                         int vcpu,
                         cpumap_t cpumap)
 {
@@ -109,7 +109,7 @@ int xc_domain_getinfo(int xc_handle,
     unsigned int nr_doms;
     uint32_t next_domid = first_domid;
     DECLARE_DOM0_OP;
-    int rc = 0; 
+    int rc = 0;
 
     memset(info, 0, max_doms*sizeof(xc_dominfo_t));
 
@@ -127,8 +127,8 @@ int xc_domain_getinfo(int xc_handle,
         info->blocked  = !!(op.u.getdomaininfo.flags & DOMFLAGS_BLOCKED);
         info->running  = !!(op.u.getdomaininfo.flags & DOMFLAGS_RUNNING);
 
-        info->shutdown_reason = 
-            (op.u.getdomaininfo.flags>>DOMFLAGS_SHUTDOWNSHIFT) & 
+        info->shutdown_reason =
+            (op.u.getdomaininfo.flags>>DOMFLAGS_SHUTDOWNSHIFT) &
             DOMFLAGS_SHUTDOWNMASK;
 
         if ( info->shutdown && (info->shutdown_reason == SHUTDOWN_crash) )
@@ -152,7 +152,7 @@ int xc_domain_getinfo(int xc_handle,
         info++;
     }
 
-    if( !nr_doms ) return rc; 
+    if( !nr_doms ) return rc;
 
     return nr_doms;
 }
@@ -167,7 +167,7 @@ int xc_domain_getinfolist(int xc_handle,
 
     if ( mlock(info, max_domains*sizeof(xc_domaininfo_t)) != 0 )
         return -1;
-    
+
     op.cmd = DOM0_GETDOMAININFOLIST;
     op.u.getdomaininfolist.first_domain = first_domain;
     op.u.getdomaininfolist.max_domains  = max_domains;
@@ -177,10 +177,10 @@ int xc_domain_getinfolist(int xc_handle,
         ret = -1;
     else
         ret = op.u.getdomaininfolist.num_domains;
-    
+
     if ( munlock(info, max_domains*sizeof(xc_domaininfo_t)) != 0 )
         ret = -1;
-    
+
     return ret;
 }
 
@@ -209,7 +209,7 @@ int xc_vcpu_getcontext(int xc_handle,
 
 
 int xc_shadow_control(int xc_handle,
-                      uint32_t domid, 
+                      uint32_t domid,
                       unsigned int sop,
                       unsigned long *dirty_bitmap,
                       unsigned long pages,
@@ -238,11 +238,11 @@ int xc_domain_setcpuweight(int xc_handle,
 {
     int sched_id;
     int ret;
-    
+
     /* Figure out which scheduler is currently used: */
     if ( (ret = xc_sched_id(xc_handle, &sched_id)) != 0 )
         return ret;
-    
+
     switch ( sched_id )
     {
         case SCHED_BVT:
@@ -253,20 +253,20 @@ int xc_domain_setcpuweight(int xc_handle,
             long long warpl;
             long long warpu;
 
-            /* Preserve all the scheduling parameters apart 
+            /* Preserve all the scheduling parameters apart
                of MCU advance. */
             if ( (ret = xc_bvtsched_domain_get(
-                xc_handle, domid, &mcuadv, 
+                xc_handle, domid, &mcuadv,
                 &warpback, &warpvalue, &warpl, &warpu)) != 0 )
                 return ret;
-            
+
             /* The MCU advance is inverse of the weight.
                Default value of the weight is 1, default mcuadv 10.
                The scaling factor is therefore 10. */
             if ( weight > 0 )
                 mcuadv = 10 / weight;
-            
-            ret = xc_bvtsched_domain_set(xc_handle, domid, mcuadv, 
+
+            ret = xc_bvtsched_domain_set(xc_handle, domid, mcuadv,
                                          warpback, warpvalue, warpl, warpu);
             break;
         }
@@ -276,7 +276,7 @@ int xc_domain_setcpuweight(int xc_handle,
 }
 
 int xc_domain_setmaxmem(int xc_handle,
-                        uint32_t domid, 
+                        uint32_t domid,
                         unsigned int max_memkb)
 {
     DECLARE_DOM0_OP;
@@ -287,7 +287,7 @@ int xc_domain_setmaxmem(int xc_handle,
 }
 
 int xc_domain_memory_increase_reservation(int xc_handle,
-                                          uint32_t domid, 
+                                          uint32_t domid,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
                                           unsigned int address_bits,
@@ -297,7 +297,7 @@ int xc_domain_memory_increase_reservation(int xc_handle,
     struct xen_memory_reservation reservation = {
         .extent_start = extent_start, /* may be NULL */
         .nr_extents   = nr_extents,
-        .extent_order = extent_order,  
+        .extent_order = extent_order,
         .address_bits = address_bits,
         .domid        = domid
     };
@@ -319,16 +319,16 @@ int xc_domain_memory_increase_reservation(int xc_handle,
 }
 
 int xc_domain_memory_decrease_reservation(int xc_handle,
-                                          uint32_t domid, 
+                                          uint32_t domid,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
                                           unsigned long *extent_start)
 {
     int err;
     struct xen_memory_reservation reservation = {
-        .extent_start = extent_start, 
+        .extent_start = extent_start,
         .nr_extents   = nr_extents,
-        .extent_order = extent_order,  
+        .extent_order = extent_order,
         .address_bits = 0,
         .domid        = domid
     };
@@ -411,7 +411,7 @@ int xc_domain_max_vcpus(int xc_handle, uint32_t domid, unsigned int max)
     return do_dom0_op(xc_handle, &op);
 }
 
-int xc_domain_sethandle(int xc_handle, uint32_t domid, 
+int xc_domain_sethandle(int xc_handle, uint32_t domid,
                         xen_domain_handle_t handle)
 {
     DECLARE_DOM0_OP;
@@ -506,7 +506,7 @@ int xc_domain_iomem_permission(int xc_handle,
     op.cmd = DOM0_IOMEM_PERMISSION;
     op.u.iomem_permission.domain = domid;
     op.u.iomem_permission.first_mfn = first_mfn;
-	op.u.iomem_permission.nr_mfns = nr_mfns;
+    op.u.iomem_permission.nr_mfns = nr_mfns;
     op.u.iomem_permission.allow_access = allow_access;
 
     return do_dom0_op(xc_handle, &op);

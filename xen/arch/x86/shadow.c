@@ -1531,14 +1531,10 @@ static void resync_pae_guest_l3(struct domain *d)
 
         idx = get_cr3_idxval(v);
         smfn = __shadow_status(
-            d, ((unsigned long)(idx << PGT_score_shift) | entry->gpfn), PGT_l4_shadow);
+            d, ((unsigned long)(idx << PGT_pae_idx_shift) | entry->gpfn), PGT_l4_shadow);
 
-#ifndef NDEBUG
         if ( !smfn ) 
-        {
-            BUG();
-        }
-#endif
+            continue;
 
         guest    = (pgentry_64_t *)map_domain_page(entry->gmfn);
         snapshot = (pgentry_64_t *)map_domain_page(entry->snapshot_mfn);
@@ -1550,9 +1546,35 @@ static void resync_pae_guest_l3(struct domain *d)
             if ( entry_has_changed(
                     guest[index], snapshot[index], PAGE_FLAG_MASK) ) 
             {
+                unsigned long gpfn;
+
+                /*
+                 * Looks like it's no longer a page table. 
+                 */
+                if ( unlikely(entry_get_value(guest[index]) & PAE_PDPT_RESERVED) )
+                {
+                    if ( entry_get_flags(shadow_l3[i]) & _PAGE_PRESENT )
+                        put_shadow_ref(entry_get_pfn(shadow_l3[i]));
+
+                    shadow_l3[i] = entry_empty();
+                    continue;
+                }
+
+                gpfn = entry_get_pfn(guest[index]);
+
+                if ( unlikely(gpfn != (gpfn & PGT_mfn_mask)) )
+                {
+                    if ( entry_get_flags(shadow_l3[i]) & _PAGE_PRESENT )
+                        put_shadow_ref(entry_get_pfn(shadow_l3[i]));
+
+                    shadow_l3[i] = entry_empty();
+                    continue;
+                }
+
                 validate_entry_change(d, &guest[index],
                                       &shadow_l3[i], PAGING_L3);
             }
+
             if ( entry_get_value(guest[index]) != 0 )
                 max = i;
 
@@ -1676,6 +1698,19 @@ static int resync_all(struct domain *d, u32 stype)
                 {
                     int error;
 
+#if CONFIG_PAGING_LEVELS == 4
+                    unsigned long gpfn;
+
+                    gpfn = guest_l1e_get_paddr(guest1[i]) >> PAGE_SHIFT;
+
+                    if ( unlikely(gpfn != (gpfn & PGT_mfn_mask)) )
+                    {
+                        guest_l1_pgentry_t tmp_gl1e = guest_l1e_empty();
+                        validate_pte_change(d, tmp_gl1e, sl1e_p);
+                        continue;
+                    }
+#endif
+
                     error = validate_pte_change(d, guest1[i], sl1e_p);
                     if ( error ==  -1 )
                         unshadow_l1 = 1;
@@ -1698,6 +1733,7 @@ static int resync_all(struct domain *d, u32 stype)
             perfc_incrc(resync_l1);
             perfc_incr_histo(wpt_updates, changed, PT_UPDATES);
             perfc_incr_histo(l1_entries_checked, max_shadow - min_shadow + 1, PT_UPDATES);
+
             if ( d->arch.ops->guest_paging_levels >= PAGING_L3 &&
                  unshadow_l1 ) {
                 pgentry_64_t l2e = { 0 };
@@ -1804,18 +1840,22 @@ static int resync_all(struct domain *d, u32 stype)
             for ( i = min_shadow; i <= max_shadow; i++ )
             {
                 if ( (i < min_snapshot) || (i > max_snapshot) ||
-                  entry_has_changed(
-                      guest_pt[i], snapshot_pt[i], PAGE_FLAG_MASK) )
+                    entry_has_changed(
+                        guest_pt[i], snapshot_pt[i], PAGE_FLAG_MASK) )
                 {
-
                     unsigned long gpfn;
 
                     gpfn = entry_get_pfn(guest_pt[i]);
                     /*
-                     * Looks like it's longer a page table.
+                     * Looks like it's no longer a page table.
                      */
                     if ( unlikely(gpfn != (gpfn & PGT_mfn_mask)) )
+                    {
+                        if ( entry_get_flags(shadow_pt[i]) & _PAGE_PRESENT )
+                            put_shadow_ref(entry_get_pfn(shadow_pt[i]));
+                         shadow_pt[i] = entry_empty(); 
                         continue;
+                    }
 
                     need_flush |= validate_entry_change(
                         d, &guest_pt[i], &shadow_pt[i],
@@ -1864,11 +1904,17 @@ static int resync_all(struct domain *d, u32 stype)
                     unsigned long gpfn;
 
                     gpfn = l4e_get_pfn(new_root_e);
+
                     /*
-                     * Looks like it's longer a page table.
+                     * Looks like it's no longer a page table.
                      */
                     if ( unlikely(gpfn != (gpfn & PGT_mfn_mask)) )
+                    {
+                        if ( l4e_get_flags(shadow4[i]) & _PAGE_PRESENT )
+                            put_shadow_ref(l4e_get_pfn(shadow4[i]));
+                        shadow4[i] = l4e_empty(); 
                         continue;
+                    }
 
                     if ( d->arch.ops->guest_paging_levels == PAGING_L4 ) 
                     {
@@ -2372,7 +2418,7 @@ static void shadow_update_pagetables(struct vcpu *v)
     if ( SH_GUEST_32PAE && d->arch.ops->guest_paging_levels == PAGING_L3 ) 
     {
         u32 index = get_cr3_idxval(v);
-        gpfn = (index << PGT_score_shift) | gpfn;
+        gpfn = ((unsigned long)index << PGT_pae_idx_shift) | gpfn;
     }
 #endif
 
@@ -3233,8 +3279,35 @@ update_top_level_shadow(struct vcpu *v, unsigned long smfn)
     int i;
 
     for ( i = 0; i < PAE_L3_PAGETABLE_ENTRIES; i++ )
+    {
+        unsigned long gpfn;
+
+        /*
+         * Looks like it's no longer a page table. 
+         */
+        if ( unlikely(entry_get_value(gple[index*4+i]) & PAE_PDPT_RESERVED) )
+        {
+            if ( entry_get_flags(sple[i]) & _PAGE_PRESENT )
+                put_shadow_ref(entry_get_pfn(sple[i]));
+
+            sple[i] = entry_empty();
+            continue;
+        }
+
+        gpfn = entry_get_pfn(gple[index*4+i]);
+
+        if ( unlikely(gpfn != (gpfn & PGT_mfn_mask)) )
+        {
+            if ( entry_get_flags(sple[i]) & _PAGE_PRESENT )
+                put_shadow_ref(entry_get_pfn(sple[i]));
+
+            sple[i] = entry_empty();
+            continue;
+        }
+
         validate_entry_change(
             v->domain, &gple[index*4+i], &sple[i], PAGING_L3);
+    }
 
     unmap_domain_page(sple);
 }

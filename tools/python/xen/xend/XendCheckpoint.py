@@ -53,7 +53,7 @@ def read_exact(fd, size, errmsg):
 
 
 
-def save(fd, dominfo, live):
+def save(fd, dominfo, live, dst):
     write_exact(fd, SIGNATURE, "could not write guest state file: signature")
 
     config = sxp.to_string(dominfo.sxpr())
@@ -65,6 +65,8 @@ def save(fd, dominfo, live):
     dominfo.setName('migrating-' + domain_name)
 
     try:
+        dominfo.migrateDevices(live, dst, 1, domain_name)
+
         write_exact(fd, pack("!i", len(config)),
                     "could not write guest state file: config len")
         write_exact(fd, config, "could not write guest state file: config")
@@ -85,7 +87,9 @@ def save(fd, dominfo, live):
                 log.debug("Suspending %d ...", dominfo.getDomid())
                 dominfo.shutdown('suspend')
                 dominfo.waitForShutdown()
+                dominfo.migrateDevices(live, dst, 2, domain_name)
                 log.info("Domain %d suspended.", dominfo.getDomid())
+                dominfo.migrateDevices(live, dst, 3, domain_name)
                 tochild.write("done\n")
                 tochild.flush()
                 log.debug('Written done')

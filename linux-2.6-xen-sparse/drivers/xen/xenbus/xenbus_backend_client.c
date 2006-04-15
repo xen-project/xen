@@ -37,11 +37,7 @@
 /* Based on Rusty Russell's skeleton driver's map_page */
 int xenbus_map_ring_valloc(struct xenbus_device *dev, int gnt_ref, void **vaddr)
 {
-	struct gnttab_map_grant_ref op = {
-		.flags = GNTMAP_host_map,
-		.ref   = gnt_ref,
-		.dom   = dev->otherend_id,
-	};
+	struct gnttab_map_grant_ref op;
 	struct vm_struct *area;
 
 	*vaddr = NULL;
@@ -50,8 +46,9 @@ int xenbus_map_ring_valloc(struct xenbus_device *dev, int gnt_ref, void **vaddr)
 	if (!area)
 		return -ENOMEM;
 
-	op.host_addr = (unsigned long)area->addr;
-
+	gnttab_set_map_op(&op, (unsigned long)area->addr, GNTMAP_host_map,
+			  gnt_ref, dev->otherend_id);
+	
 	lock_vm_area(area);
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1));
 	unlock_vm_area(area);
@@ -76,13 +73,10 @@ EXPORT_SYMBOL_GPL(xenbus_map_ring_valloc);
 int xenbus_map_ring(struct xenbus_device *dev, int gnt_ref,
 		   grant_handle_t *handle, void *vaddr)
 {
-	struct gnttab_map_grant_ref op = {
-		.host_addr = (unsigned long)vaddr,
-		.flags     = GNTMAP_host_map,
-		.ref       = gnt_ref,
-		.dom       = dev->otherend_id,
-	};
-
+	struct gnttab_map_grant_ref op;
+	
+	gnttab_set_map_op(&op, (unsigned long)vaddr, GNTMAP_host_map,
+			  gnt_ref, dev->otherend_id);
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1));
 
 	if (op.status != GNTST_okay) {
@@ -101,9 +95,7 @@ EXPORT_SYMBOL_GPL(xenbus_map_ring);
 int xenbus_unmap_ring_vfree(struct xenbus_device *dev, void *vaddr)
 {
 	struct vm_struct *area;
-	struct gnttab_unmap_grant_ref op = {
-		.host_addr = (unsigned long)vaddr,
-	};
+	struct gnttab_unmap_grant_ref op;
 
 	/* It'd be nice if linux/vmalloc.h provided a find_vm_area(void *addr)
 	 * method so that we don't have to muck with vmalloc internals here.
@@ -124,7 +116,8 @@ int xenbus_unmap_ring_vfree(struct xenbus_device *dev, void *vaddr)
 		return GNTST_bad_virt_addr;
 	}
 
-	op.handle = (grant_handle_t)area->phys_addr;
+	gnttab_set_unmap_op(&op, (unsigned long)vaddr, GNTMAP_host_map,
+			    (grant_handle_t)area->phys_addr);
 
 	lock_vm_area(area);
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
@@ -145,11 +138,10 @@ EXPORT_SYMBOL_GPL(xenbus_unmap_ring_vfree);
 int xenbus_unmap_ring(struct xenbus_device *dev,
 		     grant_handle_t handle, void *vaddr)
 {
-	struct gnttab_unmap_grant_ref op = {
-		.host_addr = (unsigned long)vaddr,
-		.handle    = handle,
-	};
+	struct gnttab_unmap_grant_ref op;
 
+	gnttab_set_unmap_op(&op, (unsigned long)vaddr, GNTMAP_host_map,
+			    handle);
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
 
 	if (op.status != GNTST_okay)

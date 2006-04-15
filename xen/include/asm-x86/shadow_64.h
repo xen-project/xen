@@ -119,6 +119,8 @@ typedef struct { intpte_t lo; } pgentry_64_t;
 #define PAE_CR3_IDX_MASK    0x7f
 #define PAE_CR3_IDX_NO      128
 
+#define PAE_PDPT_RESERVED   0x1e6 /* [8:5], [2,1] */
+
 /******************************************************************************/
 static inline int  table_offset_64(unsigned long va, int level)
 {

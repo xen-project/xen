@@ -22,7 +22,7 @@ static void copyout(int, uint32_t, unsigned long *, unsigned long, const char *,
 struct Exec *get_header(const char *, unsigned long, struct Exec *);
 
 
-int 
+int
 probe_aout9(
     const char *image,
     unsigned long image_size,
@@ -40,7 +40,7 @@ probe_aout9(
     return 0;
 }
 
-static int 
+static int
 parseaout9image(
     const char *image,
     unsigned long image_size,
@@ -74,7 +74,7 @@ parseaout9image(
     return 0;
 }
 
-static int 
+static int
 loadaout9image(
     const char *image,
     unsigned long image_size,
@@ -123,7 +123,7 @@ copyout(
         if(chunksz > PAGE_SIZE - pgoff)
             chunksz = PAGE_SIZE - pgoff;
 
-        pg = xc_map_foreign_range(xch, dom, PAGE_SIZE, PROT_WRITE, 
+        pg = xc_map_foreign_range(xch, dom, PAGE_SIZE, PROT_WRITE,
                                   parray[off>>PAGE_SHIFT]);
         memcpy(pg + pgoff, buf, chunksz);
         munmap(pg, PAGE_SIZE);

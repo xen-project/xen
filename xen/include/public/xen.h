@@ -286,7 +286,8 @@ typedef struct vcpu_time_info {
     uint64_t system_time;     /* Time, in nanosecs, since boot.    */
     /*
      * Current system time:
-     *   system_time + ((tsc - tsc_timestamp) << tsc_shift) * tsc_to_system_mul
+     *   system_time +
+     *   ((((tsc - tsc_timestamp) << tsc_shift) * tsc_to_system_mul) >> 32)
      * CPU frequency (Hz):
      *   ((10^9 << 32) / tsc_to_system_mul) >> tsc_shift
      */

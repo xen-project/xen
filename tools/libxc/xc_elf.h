@@ -46,7 +46,7 @@ typedef uint32_t	Elf64_Half;
 typedef uint16_t	Elf64_Quarter;
 
 /*
- * e_ident[] identification indexes 
+ * e_ident[] identification indexes
  * See http://www.caldera.com/developers/gabi/2000-07-17/ch4.eheader.html
  */
 #define EI_MAG0		0		/* file ID */
@@ -57,7 +57,7 @@ typedef uint16_t	Elf64_Quarter;
 #define EI_DATA		5		/* data encoding */
 #define EI_VERSION	6		/* ELF header version */
 #define EI_OSABI	7		/* OS/ABI ID */
-#define EI_ABIVERSION	8		/* ABI version */ 
+#define EI_ABIVERSION	8		/* ABI version */
 #define EI_PAD		9		/* start of pad bytes */
 #define EI_NIDENT	16		/* Size of e_ident[] */
 
@@ -119,7 +119,7 @@ typedef struct elfhdr {
 	Elf32_Half	e_phnum;	/* number of program header entries */
 	Elf32_Half	e_shentsize;	/* section header entry size */
 	Elf32_Half	e_shnum;	/* number of section header entries */
-	Elf32_Half	e_shstrndx;	/* section header table's "section 
+	Elf32_Half	e_shstrndx;	/* section header table's "section
 					   header string table" entry offset */
 } Elf32_Ehdr;
 
@@ -160,7 +160,7 @@ typedef struct {
 #define EM_486		6		/* Intel 80486 - unused? */
 #define EM_860		7		/* Intel 80860 */
 #define EM_MIPS		8		/* MIPS R3000 Big-Endian only */
-/* 
+/*
  * Don't know if EM_MIPS_RS4_BE,
  * EM_SPARC64, EM_PARISC,
  * or EM_PPC are ABI compliant
@@ -441,7 +441,7 @@ typedef struct {
 #define DT_NUM		25		/* Number used. */
 #define DT_LOPROC	0x70000000	/* reserved range for processor */
 #define DT_HIPROC	0x7fffffff	/*  specific dynamic array tags */
-	
+
 /* Standard ELF hashing function */
 unsigned int elf_hash(const unsigned char *name);
 

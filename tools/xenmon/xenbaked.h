@@ -1,5 +1,5 @@
 /******************************************************************************
- * tools/xenbaked.h
+ * TOOLS/xenbaked.h
  *
  * Header file for xenbaked
  *
@@ -30,6 +30,7 @@
 #define million 1000000LL
 #define billion 1000000000LL
 
+// caution: don't use QOS_ADD with negative numbers!
 #define QOS_ADD(N,A) ((N+A)<(NSAMPLES-1) ? (N+A) : A)
 #define QOS_INCR(N) ((N<(NSAMPLES-2)) ? (N+1) : 0)
 #define QOS_DECR(N) ((N==0) ? (NSAMPLES-1) : (N-1))
@@ -43,6 +44,8 @@
 /* Number of data points to keep */
 #define NSAMPLES 100
 
+#define ID(X) ((X>NDOMAINS-1)?(NDOMAINS-1):X)
+#define DEFAULT_TBUF_SIZE 20
 
 // per domain stuff
 typedef struct 

@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.16-rc3-xen0
-# Mon Feb 20 11:37:43 2006
+# Linux kernel version: 2.6.16-xen0
+# Thu Apr 13 14:58:29 2006
 #
 CONFIG_X86_64=y
 CONFIG_64BIT=y
@@ -99,6 +99,8 @@ CONFIG_X86_PC=y
 # CONFIG_MPSC is not set
 CONFIG_GENERIC_CPU=y
 CONFIG_X86_64_XEN=y
+CONFIG_X86_NO_TSS=y
+CONFIG_X86_NO_IDT=y
 CONFIG_X86_L1_CACHE_BYTES=128
 CONFIG_X86_L1_CACHE_SHIFT=7
 CONFIG_X86_GOOD_APIC=y
@@ -176,6 +178,19 @@ CONFIG_PCI_DIRECT=y
 CONFIG_XEN_PCIDEV_FRONTEND=y
 # CONFIG_XEN_PCIDEV_FE_DEBUG is not set
 # CONFIG_UNORDERED_IO is not set
+# CONFIG_PCIEPORTBUS is not set
+CONFIG_PCI_LEGACY_PROC=y
+# CONFIG_PCI_DEBUG is not set
+
+#
+# PCCARD (PCMCIA/CardBus) support
+#
+# CONFIG_PCCARD is not set
+
+#
+# PCI Hotplug Support
+#
+# CONFIG_HOTPLUG_PCI is not set
 
 #
 # Executable file formats / Emulations
@@ -1001,11 +1016,7 @@ CONFIG_INFINIBAND_IPOIB_DEBUG_DATA=y
 CONFIG_INFINIBAND_SRP=y
 
 #
-# SN Devices
-#
-
-#
-# EDAC - error detection and reporting (RAS)
+# EDAC - error detection and reporting (RAS) (EXPERIMENTAL)
 #
 # CONFIG_EDAC is not set
 
@@ -1239,7 +1250,7 @@ CONFIG_CRYPTO_CRC32C=m
 # Hardware crypto devices
 #
 CONFIG_XEN=y
-CONFIG_NO_IDLE_HZ=y
+CONFIG_XEN_INTERFACE_VERSION=0x00030101
 
 #
 # XEN
@@ -1266,6 +1277,7 @@ CONFIG_XEN_DISABLE_SERIAL=y
 CONFIG_XEN_SYSFS=y
 CONFIG_HAVE_ARCH_ALLOC_SKB=y
 CONFIG_HAVE_ARCH_DEV_ALLOC_SKB=y
+CONFIG_NO_IDLE_HZ=y
 
 #
 # Library routines

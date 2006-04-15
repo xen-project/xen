@@ -202,6 +202,18 @@ static void __level_IO_APIC_irq (unsigned int irq)
     __modify_IO_APIC_irq(irq, 0x00008000, 0);
 }
 
+/* mask = 1, trigger = 0 */
+static void __mask_and_edge_IO_APIC_irq (unsigned int irq)
+{
+    __modify_IO_APIC_irq(irq, 0x00010000, 0x00008000);
+}
+
+/* mask = 0, trigger = 1 */
+static void __unmask_and_level_IO_APIC_irq (unsigned int irq)
+{
+    __modify_IO_APIC_irq(irq, 0x00008000, 0x00010000);
+}
+
 static void mask_IO_APIC_irq (unsigned int irq)
 {
     unsigned long flags;
@@ -657,11 +669,11 @@ static inline int IO_APIC_irq_trigger(int irq)
 }
 
 /* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
-u8 irq_vector[NR_IRQ_VECTORS] __read_mostly = { FIRST_DEVICE_VECTOR , 0 };
+u8 irq_vector[NR_IRQ_VECTORS] __read_mostly;
 
 int assign_irq_vector(int irq)
 {
-    static int current_vector = FIRST_DEVICE_VECTOR, offset = 0;
+    static int current_vector = FIRST_DYNAMIC_VECTOR, offset = 0;
 
     BUG_ON(irq >= NR_IRQ_VECTORS);
     if (irq != AUTO_ASSIGN && IO_APIC_VECTOR(irq) > 0)
@@ -677,11 +689,11 @@ next:
     if (current_vector == 0x80)
         goto next;
 
-    if (current_vector >= FIRST_SYSTEM_VECTOR) {
+    if (current_vector > LAST_DYNAMIC_VECTOR) {
         offset++;
         if (!(offset%8))
             return -ENOSPC;
-        current_vector = FIRST_DEVICE_VECTOR + offset;
+        current_vector = FIRST_DYNAMIC_VECTOR + offset;
     }
 
     vector_irq[current_vector] = irq;
@@ -1321,10 +1333,25 @@ static unsigned int startup_level_ioapic_irq (unsigned int irq)
     return 0; /* don't check for pending */
 }
 
+int ioapic_ack_new = 1;
+static void setup_ioapic_ack(char *s)
+{
+    if ( !strcmp(s, "old") )
+        ioapic_ack_new = 0;
+    else if ( !strcmp(s, "new") )
+        ioapic_ack_new = 1;
+    else
+        printk("Unknown ioapic_ack value specified: '%s'\n", s);
+}
+custom_param("ioapic_ack", setup_ioapic_ack);
+
 static void mask_and_ack_level_ioapic_irq (unsigned int irq)
 {
     unsigned long v;
     int i;
+
+    if ( ioapic_ack_new )
+        return;
 
     mask_IO_APIC_irq(irq);
 /*
@@ -1363,7 +1390,47 @@ static void mask_and_ack_level_ioapic_irq (unsigned int irq)
 
 static void end_level_ioapic_irq (unsigned int irq)
 {
-    unmask_IO_APIC_irq(irq);
+    unsigned long v;
+    int i;
+
+    if ( !ioapic_ack_new )
+    {
+        unmask_IO_APIC_irq(irq);
+        return;
+    }
+
+/*
+ * It appears there is an erratum which affects at least version 0x11
+ * of I/O APIC (that's the 82093AA and cores integrated into various
+ * chipsets).  Under certain conditions a level-triggered interrupt is
+ * erroneously delivered as edge-triggered one but the respective IRR
+ * bit gets set nevertheless.  As a result the I/O unit expects an EOI
+ * message but it will never arrive and further interrupts are blocked
+ * from the source.  The exact reason is so far unknown, but the
+ * phenomenon was observed when two consecutive interrupt requests
+ * from a given source get delivered to the same CPU and the source is
+ * temporarily disabled in between.
+ *
+ * A workaround is to simulate an EOI message manually.  We achieve it
+ * by setting the trigger mode to edge and then to level when the edge
+ * trigger mode gets detected in the TMR of a local APIC for a
+ * level-triggered interrupt.  We mask the source for the time of the
+ * operation to prevent an edge-triggered interrupt escaping meanwhile.
+ * The idea is from Manfred Spraul.  --macro
+ */
+    i = IO_APIC_VECTOR(irq);
+
+    v = apic_read(APIC_TMR + ((i & ~0x1f) >> 1));
+
+    ack_APIC_irq();
+
+    if (!(v & (1 << (i & 0x1f)))) {
+        atomic_inc(&irq_mis_count);
+        spin_lock(&ioapic_lock);
+        __mask_and_edge_IO_APIC_irq(irq);
+        __unmask_and_level_IO_APIC_irq(irq);
+        spin_unlock(&ioapic_lock);
+    }
 }
 
 static unsigned int startup_edge_ioapic_vector(unsigned int vector)
@@ -1695,6 +1762,7 @@ void __init setup_IO_APIC(void)
         io_apic_irqs = ~PIC_IRQS;
 
     printk("ENABLING IO-APIC IRQs\n");
+    printk(" -> Using %s ACK method\n", ioapic_ack_new ? "new" : "old");
 
     /*
      * Set up IO-APIC IRQ routing.
@@ -1956,9 +2024,9 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
         return 0;
     }
 
-    if ( old_rte.vector >= FIRST_DEVICE_VECTOR )
+    if ( old_rte.vector >= FIRST_DYNAMIC_VECTOR )
         old_irq = vector_irq[old_rte.vector];
-    if ( new_rte.vector >= FIRST_DEVICE_VECTOR )
+    if ( new_rte.vector >= FIRST_DYNAMIC_VECTOR )
         new_irq = vector_irq[new_rte.vector];
 
     if ( (old_irq != new_irq) && (old_irq != -1) && IO_APIC_IRQ(old_irq) )
