@@ -3291,19 +3291,29 @@ void __update_pagetables(struct vcpu *v)
 
 void clear_all_shadow_status(struct domain *d)
 {
+    struct vcpu *v = current;
+
+    /*
+     * Don't clean up while other vcpus are working.
+     */
+    if ( v->vcpu_id )
+        return;
+
     shadow_lock(d);
+
     free_shadow_pages(d);
     free_shadow_ht_entries(d);
-    d->arch.shadow_ht = 
+    d->arch.shadow_ht =
         xmalloc_array(struct shadow_status, shadow_ht_buckets);
     if ( d->arch.shadow_ht == NULL ) {
-        printk("clear all shadow status:xmalloc fail\n");
+        printk("clear all shadow status: xmalloc failed\n");
         domain_crash_synchronous();
     }
     memset(d->arch.shadow_ht, 0,
            shadow_ht_buckets * sizeof(struct shadow_status));
 
     free_out_of_sync_entries(d);
+
     shadow_unlock(d);
 }
 
