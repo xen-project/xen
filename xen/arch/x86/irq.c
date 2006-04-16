@@ -151,7 +151,7 @@ typedef struct {
     u8 ack_type;
 #define ACKTYPE_NONE   0     /* No final acknowledgement is required */
 #define ACKTYPE_UNMASK 1     /* Unmask PIC hardware (from any CPU)   */
-#define ACKTYPE_LAPIC_EOI  2 /* EOI on the CPU that was interrupted  */
+#define ACKTYPE_EOI    2     /* EOI on the CPU that was interrupted  */
     cpumask_t cpu_eoi_map;   /* CPUs that need to EOI this interrupt */
     struct domain *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
@@ -161,10 +161,10 @@ typedef struct {
  * order, as only the current highest-priority pending irq can be EOIed.
  */
 static struct {
-    u8 vector;
-    u8 ready_to_end;
-} pending_lapic_eoi[NR_CPUS][NR_VECTORS] __cacheline_aligned;
-#define pending_lapic_eoi_sp(cpu) (pending_lapic_eoi[cpu][NR_VECTORS-1].vector)
+    u8 vector; /* Vector awaiting EOI */
+    u8 ready;  /* Ready for EOI now?  */
+} pending_eoi[NR_CPUS][NR_VECTORS] __cacheline_aligned;
+#define pending_eoi_sp(cpu) (pending_eoi[cpu][NR_VECTORS-1].vector)
 
 static void __do_IRQ_guest(int vector)
 {
@@ -176,20 +176,21 @@ static void __do_IRQ_guest(int vector)
 
     if ( unlikely(action->nr_guests == 0) )
     {
-        /* An interrupt may slip through while freeing a LAPIC_EOI irq. */
-        ASSERT(action->ack_type == ACKTYPE_LAPIC_EOI);
+        /* An interrupt may slip through while freeing an ACKTYPE_EOI irq. */
+        ASSERT(action->ack_type == ACKTYPE_EOI);
+        ASSERT(desc->status & IRQ_DISABLED);
         desc->handler->end(vector);
         return;
     }
 
-    if ( action->ack_type == ACKTYPE_LAPIC_EOI )
+    if ( action->ack_type == ACKTYPE_EOI )
     {
-        sp = pending_lapic_eoi_sp(cpu);
-        ASSERT((sp == 0) || (pending_lapic_eoi[cpu][sp-1].vector < vector));
+        sp = pending_eoi_sp(cpu);
+        ASSERT((sp == 0) || (pending_eoi[cpu][sp-1].vector < vector));
         ASSERT(sp < (NR_VECTORS-1));
-        pending_lapic_eoi[cpu][sp].vector = vector;
-        pending_lapic_eoi[cpu][sp].ready_to_end = 0;
-        pending_lapic_eoi_sp(cpu) = sp+1;
+        pending_eoi[cpu][sp].vector = vector;
+        pending_eoi[cpu][sp].ready = 0;
+        pending_eoi_sp(cpu) = sp+1;
         cpu_set(cpu, action->cpu_eoi_map);
     }
 
@@ -203,47 +204,93 @@ static void __do_IRQ_guest(int vector)
     }
 }
 
-static void end_guest_irq(void *data)
+/* Flush all ready EOIs from the top of this CPU's pending-EOI stack. */
+static void flush_ready_eoi(void *unused)
 {
-    irq_desc_t         *desc = data;
+    irq_desc_t *desc;
+    int         vector, sp, cpu = smp_processor_id();
+
+    ASSERT(!local_irq_is_enabled());
+
+    sp = pending_eoi_sp(cpu);
+
+    while ( (--sp >= 0) && pending_eoi[cpu][sp].ready )
+    {
+        vector = pending_eoi[cpu][sp].vector;
+        desc = &irq_desc[vector];
+        spin_lock(&desc->lock);
+        desc->handler->end(vector);
+        spin_unlock(&desc->lock);
+    }
+
+    pending_eoi_sp(cpu) = sp+1;
+}
+
+static void __set_eoi_ready(irq_desc_t *desc)
+{
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
-    unsigned long       flags;
     int                 vector, sp, cpu = smp_processor_id();
 
     vector = desc - irq_desc;
 
-    spin_lock_irqsave(&desc->lock, flags);
+    if ( !(desc->status & IRQ_GUEST) ||
+         (action->in_flight != 0) ||
+         !test_and_clear_bit(cpu, &action->cpu_eoi_map) )
+        return;
 
-    if ( (desc->status & IRQ_GUEST) &&
-         (action->in_flight == 0) &&
-         test_and_clear_bit(cpu, &action->cpu_eoi_map) )
+    sp = pending_eoi_sp(cpu);
+    do {
+        ASSERT(sp > 0);
+    } while ( pending_eoi[cpu][--sp].vector != vector );
+    ASSERT(!pending_eoi[cpu][sp].ready);
+    pending_eoi[cpu][sp].ready = 1;
+}
+
+/* Mark specified IRQ as ready-for-EOI (if it really is) and attempt to EOI. */
+static void set_eoi_ready(void *data)
+{
+    irq_desc_t *desc = data;
+
+    ASSERT(!local_irq_is_enabled());
+
+    spin_lock(&desc->lock);
+    __set_eoi_ready(desc);
+    spin_unlock(&desc->lock);
+
+    flush_ready_eoi(NULL);
+}
+
+/*
+ * Forcibly flush all pending EOIs on this CPU by emulating end-of-ISR
+ * notifications from guests. The caller of this function must ensure that
+ * all CPUs execute flush_ready_eoi().
+ */
+static void flush_all_pending_eoi(void *unused)
+{
+    irq_desc_t         *desc;
+    irq_guest_action_t *action;
+    int                 i, vector, sp, cpu = smp_processor_id();
+
+    ASSERT(!local_irq_is_enabled());
+
+    sp = pending_eoi_sp(cpu);
+    while ( --sp >= 0 )
     {
-        sp = pending_lapic_eoi_sp(cpu);
-        do {
-            ASSERT(sp > 0);
-        } while ( pending_lapic_eoi[cpu][--sp].vector != vector );
-        ASSERT(!pending_lapic_eoi[cpu][sp].ready_to_end);
-        pending_lapic_eoi[cpu][sp].ready_to_end = 1;
+        if ( pending_eoi[cpu][sp].ready )
+            continue;
+        vector = pending_eoi[cpu][sp].vector;
+        desc = &irq_desc[vector];
+        spin_lock(&desc->lock);
+        action = (irq_guest_action_t *)desc->action;
+        ASSERT(action->ack_type == ACKTYPE_EOI);
+        ASSERT(desc->status & IRQ_GUEST);
+        for ( i = 0; i < action->nr_guests; i++ )
+            clear_bit(vector_to_irq(vector), &action->guest[i]->pirq_mask);
+        action->in_flight = 0;
+        spin_unlock(&desc->lock);
     }
 
-    for ( ; ; )
-    {
-        sp = pending_lapic_eoi_sp(cpu);
-        if ( (sp == 0) || !pending_lapic_eoi[cpu][sp-1].ready_to_end )
-        {
-            spin_unlock_irqrestore(&desc->lock, flags);    
-            return;
-        }
-        if ( pending_lapic_eoi[cpu][sp-1].vector != vector )
-        {
-            spin_unlock(&desc->lock);
-            vector = pending_lapic_eoi[cpu][sp-1].vector;
-            desc = &irq_desc[vector];
-            spin_lock(&desc->lock);
-        }
-        desc->handler->end(vector);
-        pending_lapic_eoi_sp(cpu) = sp-1;
-    }
+    flush_ready_eoi(NULL);
 }
 
 int pirq_guest_unmask(struct domain *d)
@@ -262,6 +309,7 @@ int pirq_guest_unmask(struct domain *d)
         action = (irq_guest_action_t *)desc->action;
 
         spin_lock_irq(&desc->lock);
+
         if ( !test_bit(d->pirq_to_evtchn[pirq], &s->evtchn_mask[0]) &&
              test_and_clear_bit(pirq, &d->pirq_mask) )
         {
@@ -273,14 +321,22 @@ int pirq_guest_unmask(struct domain *d)
                 cpu_eoi_map = action->cpu_eoi_map;
             }
         }
-        spin_unlock_irq(&desc->lock);
 
         if ( __test_and_clear_bit(cpu, &cpu_eoi_map) )
-            end_guest_irq(desc);
+        {
+            __set_eoi_ready(desc);
+            spin_unlock(&desc->lock);
+            flush_ready_eoi(NULL);
+            local_irq_enable();
+        }
+        else
+        {
+            spin_unlock_irq(&desc->lock);
+        }
 
         if ( !cpus_empty(cpu_eoi_map) )
         {
-            on_selected_cpus(cpu_eoi_map, end_guest_irq, desc, 1, 0);
+            on_selected_cpus(cpu_eoi_map, set_eoi_ready, desc, 1, 0);
             cpu_eoi_map = CPU_MASK_NONE;
         }
     }
@@ -316,7 +372,7 @@ int pirq_acktype(int irq)
      * on which they were received. This is because we tickle the LAPIC to EOI.
      */
     if ( !strcmp(desc->handler->typename, "IO-APIC-level") )
-        return ioapic_ack_new ? ACKTYPE_LAPIC_EOI : ACKTYPE_UNMASK;
+        return ioapic_ack_new ? ACKTYPE_EOI : ACKTYPE_UNMASK;
 
     BUG();
     return 0;
@@ -334,6 +390,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     if ( (irq < 0) || (irq >= NR_IRQS) )
         return -EINVAL;
 
+ retry:
     vector = irq_to_vector(irq);
     if ( vector == 0 )
         return -EINVAL;
@@ -385,6 +442,18 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
         rc = -EBUSY;
         goto out;
     }
+    else if ( action->nr_guests == 0 )
+    {
+        /*
+         * Indicates that an ACKTYPE_EOI interrupt is being released.
+         * Wait for that to happen before continuing.
+         */
+        ASSERT(action->ack_type == ACKTYPE_EOI);
+        ASSERT(desc->status & IRQ_DISABLED);
+        spin_unlock_irqrestore(&desc->lock, flags);
+        cpu_relax();
+        goto retry;
+    }
 
     if ( action->nr_guests == IRQ_MAX_GUESTS )
     {
@@ -428,27 +497,16 @@ int pirq_guest_unbind(struct domain *d, int irq)
              (--action->in_flight == 0) )
             desc->handler->end(vector);
         break;
-    case ACKTYPE_LAPIC_EOI:
-        if ( test_and_clear_bit(irq, &d->pirq_mask) )
-            --action->in_flight;
-        while ( action->in_flight == 0 )
+    case ACKTYPE_EOI:
+        /* NB. If #guests == 0 then we clear the eoi_map later on. */
+        if ( test_and_clear_bit(irq, &d->pirq_mask) &&
+             (--action->in_flight == 0) &&
+             (action->nr_guests != 0) )
         {
-            /* We cannot release guest info until all pending ACKs are done. */
             cpu_eoi_map = action->cpu_eoi_map;
-            if ( cpus_empty(cpu_eoi_map) )
-                break;
-
-            /* We cannot hold the lock while interrupting other CPUs. */
             spin_unlock_irqrestore(&desc->lock, flags);    
-            on_selected_cpus(cpu_eoi_map, end_guest_irq, desc, 1, 1);
+            on_selected_cpus(cpu_eoi_map, set_eoi_ready, desc, 1, 0);
             spin_lock_irqsave(&desc->lock, flags);
-
-            /* The world can change while we do not hold the lock. */
-            if ( !(desc->status & IRQ_GUEST) )
-                goto out;
-            if ( (action->ack_type != ACKTYPE_LAPIC_EOI) ||
-                 (action->nr_guests != 0) )
-                break;
         }
         break;
     }
@@ -459,12 +517,31 @@ int pirq_guest_unbind(struct domain *d, int irq)
         goto out;
 
     BUG_ON(action->in_flight != 0);
+
+    /* Disabling IRQ before releasing the desc_lock avoids an IRQ storm. */
+    desc->depth   = 1;
+    desc->status |= IRQ_DISABLED;
+    desc->handler->disable(vector);
+
+    /*
+     * We may have a EOI languishing anywhere in one of the per-CPU
+     * EOI stacks. Forcibly flush the stack on every CPU where this might
+     * be the case.
+     */
+    cpu_eoi_map = action->cpu_eoi_map;
+    if ( !cpus_empty(cpu_eoi_map) )
+    {
+        BUG_ON(action->ack_type != ACKTYPE_EOI);
+        spin_unlock_irqrestore(&desc->lock, flags);
+        on_selected_cpus(cpu_eoi_map, flush_all_pending_eoi, NULL, 1, 1);
+        on_selected_cpus(cpu_online_map, flush_ready_eoi, NULL, 1, 1);
+        spin_lock_irqsave(&desc->lock, flags);
+    }
+
     BUG_ON(!cpus_empty(action->cpu_eoi_map));
 
     desc->action = NULL;
     xfree(action);
-    desc->depth   = 1;
-    desc->status |= IRQ_DISABLED;
     desc->status &= ~IRQ_GUEST;
     desc->handler->shutdown(vector);
 
@@ -543,40 +620,20 @@ __initcall(setup_dump_irqs);
 
 static struct timer end_irq_timer[NR_CPUS];
 
+/*
+ * force_intack: Forcibly emit all pending EOIs on each CPU every second.
+ * Mainly useful for debugging or poking lazy guests ISRs.
+ */
+
 static void end_irq_timeout(void *unused)
 {
-    irq_desc_t         *desc;
-    irq_guest_action_t *action;
-    cpumask_t           cpu_eoi_map;
-    unsigned int        cpu = smp_processor_id();
-    int                 sp, vector, i;
+    int cpu = smp_processor_id();
 
     local_irq_disable();
-
-    if ( (sp = pending_lapic_eoi_sp(cpu)) == 0 )
-    {
-        local_irq_enable();
-        return;
-    }
-
-    vector = pending_lapic_eoi[cpu][sp-1].vector;
-    ASSERT(!pending_lapic_eoi[cpu][sp-1].ready_to_end);
-
-    desc = &irq_desc[vector];
-    spin_lock(&desc->lock);
-    action = (irq_guest_action_t *)desc->action;
-    ASSERT(action->ack_type == ACKTYPE_LAPIC_EOI);
-    ASSERT(desc->status & IRQ_GUEST);
-    for ( i = 0; i < action->nr_guests; i++ )
-        clear_bit(vector_to_irq(vector), &action->guest[i]->pirq_mask);
-    action->in_flight = 0;
-    cpu_eoi_map = action->cpu_eoi_map;
-    spin_unlock(&desc->lock);
-
+    flush_all_pending_eoi(NULL);
     local_irq_enable();
 
-    if ( !cpus_empty(cpu_eoi_map) )
-        on_selected_cpus(cpu_eoi_map, end_guest_irq, desc, 1, 0);
+    on_selected_cpus(cpu_online_map, flush_ready_eoi, NULL, 1, 0);
 
     set_timer(&end_irq_timer[cpu], NOW() + MILLISECS(1000));
 }

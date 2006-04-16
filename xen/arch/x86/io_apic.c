@@ -202,18 +202,6 @@ static void __level_IO_APIC_irq (unsigned int irq)
     __modify_IO_APIC_irq(irq, 0x00008000, 0);
 }
 
-/* mask = 1, trigger = 0 */
-static void __mask_and_edge_IO_APIC_irq (unsigned int irq)
-{
-    __modify_IO_APIC_irq(irq, 0x00010000, 0x00008000);
-}
-
-/* mask = 0, trigger = 1 */
-static void __unmask_and_level_IO_APIC_irq (unsigned int irq)
-{
-    __modify_IO_APIC_irq(irq, 0x00008000, 0x00010000);
-}
-
 static void mask_IO_APIC_irq (unsigned int irq)
 {
     unsigned long flags;
@@ -1395,7 +1383,8 @@ static void end_level_ioapic_irq (unsigned int irq)
 
     if ( !ioapic_ack_new )
     {
-        unmask_IO_APIC_irq(irq);
+        if ( !(irq_desc[IO_APIC_VECTOR(irq)].status & IRQ_DISABLED) )
+            unmask_IO_APIC_irq(irq);
         return;
     }
 
@@ -1427,8 +1416,11 @@ static void end_level_ioapic_irq (unsigned int irq)
     if (!(v & (1 << (i & 0x1f)))) {
         atomic_inc(&irq_mis_count);
         spin_lock(&ioapic_lock);
-        __mask_and_edge_IO_APIC_irq(irq);
-        __unmask_and_level_IO_APIC_irq(irq);
+        __mask_IO_APIC_irq(irq);
+        __edge_IO_APIC_irq(irq);
+        __level_IO_APIC_irq(irq);
+        if ( !(irq_desc[IO_APIC_VECTOR(irq)].status & IRQ_DISABLED) )
+            __unmask_IO_APIC_irq(irq);
         spin_unlock(&ioapic_lock);
     }
 }
