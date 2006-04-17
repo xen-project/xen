@@ -139,11 +139,7 @@ extern spinlock_t free_list_lock;
 extern unsigned int free_pfns;
 extern unsigned long max_page;
 
-#ifdef CONFIG_VIRTUAL_MEM_MAP
-void __init init_frametable(void *frametable_vstart, unsigned long nr_pages);
-#else
 extern void __init init_frametable(void);
-#endif
 void add_to_domain_alloc_list(unsigned long ps, unsigned long pe);
 
 extern unsigned long gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
