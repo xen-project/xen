@@ -42,7 +42,7 @@ long arch_do_dom0_op(dom0_op_t *op, GUEST_HANDLE(dom0_op_t) u_dom0_op)
              unlikely((d = find_domain_by_id(dom)) == NULL) )
             break;
 
-        page = &frame_table[mfn];
+        page = mfn_to_page(mfn);
 
         if ( likely(get_page(page, d)) )
         {
@@ -110,7 +110,7 @@ long arch_do_dom0_op(dom0_op_t *op, GUEST_HANDLE(dom0_op_t) u_dom0_op)
                 if ( unlikely(mfn >= max_page) )
                     goto e2_err;
 
-                page = &frame_table[mfn];
+                page = mfn_to_page(mfn);
   
                 if ( likely(get_page(page, d)) )
                 {

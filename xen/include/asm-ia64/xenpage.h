@@ -8,7 +8,15 @@
 #undef mfn_valid
 #undef page_to_mfn
 #undef mfn_to_page
+#ifdef CONFIG_VIRTUAL_FRAME_TABLE
+#undef ia64_mfn_valid
+#ifndef __ASSEMBLY__
+extern int ia64_mfn_valid (unsigned long pfn);
+#endif
+# define mfn_valid(_pfn)	(((_pfn) < max_page) && ia64_mfn_valid(_pfn))
+#else
 # define mfn_valid(_pfn)	((_pfn) < max_page)
+#endif
 # define page_to_mfn(_page)	((unsigned long) ((_page) - frame_table))
 # define mfn_to_page(_pfn)	(frame_table + (_pfn))
 

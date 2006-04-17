@@ -305,6 +305,12 @@ ENTRY(vmx_alt_dtlb_miss)
 vmx_alt_dtlb_miss_1:
 	mov r16=cr.ifa		// get address that caused the TLB miss
     ;;
+#ifdef CONFIG_VIRTUAL_FRAME_TABLE
+	// Test for the address of virtual frame_table
+	shr r22=r16,56;;
+	cmp.eq p8,p0=((VIRT_FRAME_TABLE_ADDR>>56)&0xff)-0x100,r22
+(p8)	br.cond.sptk frametable_miss ;;
+#endif
     tbit.z p6,p7=r16,63
 (p6)br.spnt vmx_fault_4
     ;;

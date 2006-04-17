@@ -182,6 +182,12 @@ empty_zero_page:
 swapper_pg_dir:
 	.skip PAGE_SIZE
 
+#if defined(XEN) && defined(CONFIG_VIRTUAL_FRAME_TABLE)
+	.global frametable_pg_dir
+frametable_pg_dir:
+	.skip PAGE_SIZE
+#endif
+
 	.rodata
 halt_msg:
 	stringz "Halting kernel\n"

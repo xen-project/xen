@@ -18,6 +18,9 @@
 #define	CONFIG_IA64_PAGE_SIZE_16KB	// 4KB doesn't work?!?
 #define	CONFIG_IA64_GRANULE_16MB
 
+// this needs to be on to run on system with large memory hole
+#define	CONFIG_VIRTUAL_FRAME_TABLE
+
 #define CONFIG_EFI_PCDP
 #define CONFIG_SERIAL_SGI_L1_CONSOLE
 
@@ -261,10 +264,6 @@ extern int ht_per_core;
 #undef CONFIG_X86_LOCAL_APIC
 #undef CONFIG_X86_IO_APIC
 #undef CONFIG_X86_L1_CACHE_SHIFT
-
-// this needs to be on to run on hp zx1 with more than 4GB
-// it is hacked around for now though
-//#define	CONFIG_VIRTUAL_MEM_MAP
 
 //#ifndef CONFIG_IA64_HP_SIM
 // looks like this is hard to turn off for Xen

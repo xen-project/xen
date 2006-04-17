@@ -1033,7 +1033,7 @@ int construct_dom0(struct domain *d,
 	      mfn < (alloc_end>>PAGE_SHIFT); 
 	      mfn++ )
 	{
-            page = &frame_table[mfn];
+            page = mfn_to_page(mfn);
             page_set_owner(page, d);
             page->u.inuse.type_info = 0;
             page->count_info        = PGC_allocated | 1;

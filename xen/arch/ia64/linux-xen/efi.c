@@ -42,7 +42,7 @@ extern unsigned long long memparse (char *ptr, char **retptr);
 struct efi efi;
 EXPORT_SYMBOL(efi);
 static efi_runtime_services_t *runtime;
-#ifdef XEN
+#if defined(XEN) && !defined(CONFIG_VIRTUAL_FRAME_TABLE)
 // this is a temporary hack to avoid CONFIG_VIRTUAL_MEM_MAP
 static unsigned long mem_limit = ~0UL, max_addr = 0x100000000;
 #else
