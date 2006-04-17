@@ -116,6 +116,9 @@ ia64_ivt:
 // 0x0000 Entry 0 (size 64 bundles) VHPT Translation (8,20,47)
 ENTRY(vhpt_miss)
 	DBG_FAULT(0)
+#ifdef XEN
+	FAULT(0)
+#else
 	/*
 	 * The VHPT vector is invoked when the TLB entry for the virtual page table
 	 * is missing.  This happens only as a result of a previous
@@ -141,11 +144,7 @@ ENTRY(vhpt_miss)
 	;;
 	rsm psr.dt				// use physical addressing for data
 	mov r31=pr				// save the predicate registers
-#ifdef XEN
-	movl r19=THIS_CPU(cpu_kr)+IA64_KR_PT_BASE_OFFSET;;
-#else
 	mov r19=IA64_KR(PT_BASE)		// get page table base address
-#endif
 	shl r21=r16,3				// shift bit 60 into sign bit
 	shr.u r17=r16,61			// get the region number into r17
 	;;
@@ -241,6 +240,7 @@ ENTRY(vhpt_miss)
 
 	mov pr=r31,-1				// restore predicate registers
 	rfi
+#endif
 END(vhpt_miss)
 
 	.org ia64_ivt+0x400
@@ -625,7 +625,7 @@ ENTRY(nested_dtlb_miss)
 	mov b0=r30
 	br.sptk.many b0				// return to continuation point
 	;;
-#endif
+#else
 	/*
 	 * In the absence of kernel bugs, we get here when the virtually mapped linear
 	 * page table is accessed non-speculatively (e.g., in the Dirty-bit, Instruction
@@ -649,11 +649,7 @@ ENTRY(nested_dtlb_miss)
 	 * Clobbered:	b0, r18, r19, r21, psr.dt (cleared)
 	 */
 	rsm psr.dt				// switch to using physical data addressing
-#ifdef XEN
-	movl r19=THIS_CPU(cpu_kr)+IA64_KR_PT_BASE_OFFSET;;
-#else
 	mov r19=IA64_KR(PT_BASE)		// get the page table base address
-#endif
 	shl r21=r16,3				// shift bit 60 into sign bit
 	;;
 	shr.u r17=r16,61			// get the region number into r17
@@ -688,6 +684,7 @@ ENTRY(nested_dtlb_miss)
 (p6)	br.cond.spnt page_fault
 	mov b0=r30
 	br.sptk.many b0				// return to continuation point
+#endif
 END(nested_dtlb_miss)
 
 	.org ia64_ivt+0x1800

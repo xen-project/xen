@@ -859,8 +859,8 @@ cpu_init (void)
 	ia64_setreg(_IA64_REG_CR_DCR,  (  IA64_DCR_DP | IA64_DCR_DK | IA64_DCR_DX | IA64_DCR_DR
 					| IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC));
 #endif
-	atomic_inc(&init_mm.mm_count);
 #ifndef XEN
+	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
 #endif
 #ifdef XEN

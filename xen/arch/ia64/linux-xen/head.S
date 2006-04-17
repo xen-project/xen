@@ -178,9 +178,11 @@ RestRR:											\
 empty_zero_page:
 	.skip PAGE_SIZE
 
+#ifndef XEN
 	.global swapper_pg_dir
 swapper_pg_dir:
 	.skip PAGE_SIZE
+#endif
 
 #if defined(XEN) && defined(CONFIG_VIRTUAL_FRAME_TABLE)
 	.global frametable_pg_dir
