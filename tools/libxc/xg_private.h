@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 
 #include "xenctrl.h"
-#include "xenguest.h" 
+#include "xenguest.h"
 
 #include <xen/linux/privcmd.h>
 #include <xen/memory.h>
@@ -62,7 +62,7 @@ unsigned long csum_page (void * page);
 #define L2_PAGETABLE_ENTRIES_PAE  512
 #define L3_PAGETABLE_ENTRIES_PAE    4
 
-#if defined(__i386__) 
+#if defined(__i386__)
 #define L1_PAGETABLE_ENTRIES   1024
 #define L2_PAGETABLE_ENTRIES   1024
 #elif defined(__x86_64__)
@@ -71,7 +71,7 @@ unsigned long csum_page (void * page);
 #define L3_PAGETABLE_ENTRIES    512
 #define L4_PAGETABLE_ENTRIES    512
 #endif
- 
+
 #define PAGE_SHIFT              XC_PAGE_SHIFT
 #define PAGE_SIZE               (1UL << PAGE_SHIFT)
 #define PAGE_MASK               (~(PAGE_SIZE-1))
@@ -167,8 +167,8 @@ typedef struct mfn_mapper {
     int error;
     int max_queue_size;
     void * addr;
-    privcmd_mmap_t ioctl; 
-    
+    privcmd_mmap_t ioctl;
+
 } mfn_mapper_t;
 
 int xc_copy_to_domain_page(int xc_handle, uint32_t domid,

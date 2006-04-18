@@ -1294,6 +1294,7 @@ int dev_queue_xmit(struct sk_buff *skb)
 		if ((skb->h.raw + skb->csum + 2) > skb->tail)
 			goto out_kfree_skb;
 		skb->ip_summed = CHECKSUM_HW;
+		skb->proto_csum_blank = 0;
 	}
 #endif
 

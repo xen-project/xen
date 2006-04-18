@@ -7,6 +7,7 @@
  *
  * Copyright (C) 2004 by Intel Research Cambridge
  * Copyright (C) 2005 by Hewlett Packard, Palo Alto and Fort Collins
+ * Copyright (C) 2006 by Hewlett Packard Fort Collins
  *
  * Authors: Diwaker Gupta, diwaker.gupta@hp.com
  *          Rob Gardner, rob.gardner@hp.com
@@ -42,6 +43,8 @@
 #include <xenctrl.h>
 #include <xen/xen.h>
 #include <string.h>
+#include <sys/select.h>
+#include <xen/linux/evtchn.h>
 
 #include "xc_private.h"
 typedef struct { int counter; } atomic_t;
@@ -81,14 +84,13 @@ settings_t opts;
 
 int interrupted = 0; /* gets set if we get a SIGHUP */
 int rec_count = 0;
+int wakeups = 0;
 time_t start_time;
 int dom0_flips = 0;
 
 _new_qos_data *new_qos;
 _new_qos_data **cpu_qos_data;
 
-
-#define ID(X) ((X>NDOMAINS-1)?(NDOMAINS-1):X)
 
 // array of currently running domains, indexed by cpu
 int *running = NULL;
@@ -223,6 +225,9 @@ void dump_stats(void)
     printf("processed %d total records in %d seconds (%ld per second)\n",
             rec_count, (int)run_time, rec_count/run_time);
 
+    printf("woke up %d times in %d seconds (%ld per second)\n", wakeups,
+	   (int) run_time, wakeups/run_time);
+
     check_gotten_sum();
 }
 
@@ -243,6 +248,112 @@ void log_event(int event_id)
         stat_map[0].event_count++;	// other
 }
 
+#define EVTCHN_DEV_NAME  "/dev/xen/evtchn"
+#define EVTCHN_DEV_MAJOR 10
+#define EVTCHN_DEV_MINOR 201
+
+int virq_port;
+int eventchn_fd = -1;
+
+/* Returns the event channel handle. */
+/* Stolen from xenstore code */
+int eventchn_init(void)
+{
+  struct stat st;
+  struct ioctl_evtchn_bind_virq bind;
+  int rc;
+  
+  // to revert to old way:
+  if (0)
+    return -1;
+  
+  /* Make sure any existing device file links to correct device. */
+  if ((lstat(EVTCHN_DEV_NAME, &st) != 0) || !S_ISCHR(st.st_mode) ||
+      (st.st_rdev != makedev(EVTCHN_DEV_MAJOR, EVTCHN_DEV_MINOR)))
+    (void)unlink(EVTCHN_DEV_NAME);
+  
+ reopen:
+  eventchn_fd = open(EVTCHN_DEV_NAME, O_NONBLOCK|O_RDWR);
+  if (eventchn_fd == -1) {
+    if ((errno == ENOENT) &&
+	((mkdir("/dev/xen", 0755) == 0) || (errno == EEXIST)) &&
+	(mknod(EVTCHN_DEV_NAME, S_IFCHR|0600,
+	       makedev(EVTCHN_DEV_MAJOR, EVTCHN_DEV_MINOR)) == 0))
+      goto reopen;
+    return -errno;
+  }
+  
+  if (eventchn_fd < 0)
+    perror("Failed to open evtchn device");
+  
+  bind.virq = VIRQ_TBUF;
+  rc = ioctl(eventchn_fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
+  if (rc == -1)
+    perror("Failed to bind to domain exception virq port");
+  virq_port = rc;
+  
+  return eventchn_fd;
+}
+
+void wait_for_event(void)
+{
+  int ret;
+  fd_set inset;
+  evtchn_port_t port;
+  struct timeval tv;
+  
+  if (eventchn_fd < 0) {
+    nanosleep(&opts.poll_sleep, NULL);
+    return;
+  }
+
+  FD_ZERO(&inset);
+  FD_SET(eventchn_fd, &inset);
+  tv.tv_sec = 1;
+  tv.tv_usec = 0;
+  // tv = millis_to_timespec(&opts.poll_sleep);
+  ret = select(eventchn_fd+1, &inset, NULL, NULL, &tv);
+  
+  if ( (ret == 1) && FD_ISSET(eventchn_fd, &inset)) {
+    if (read(eventchn_fd, &port, sizeof(port)) != sizeof(port))
+      perror("Failed to read from event fd");
+    
+    //    if (port == virq_port)
+    //      printf("got the event I was looking for\r\n");
+    
+    if (write(eventchn_fd, &port, sizeof(port)) != sizeof(port))
+      perror("Failed to write to event fd");
+  }
+}
+
+void enable_tracing_or_die(int xc_handle) 
+{
+  int enable = 1;
+  int tbsize = DEFAULT_TBUF_SIZE;
+  
+  if (xc_tbuf_enable(xc_handle, enable) != 0) {
+    if (xc_tbuf_set_size(xc_handle, tbsize) != 0) {
+      perror("set_size Hypercall failure");
+      exit(1);
+    }
+    printf("Set default trace buffer allocation (%d pages)\n", tbsize);
+    if (xc_tbuf_enable(xc_handle, enable) != 0) {
+      perror("Could not enable trace buffers\n");
+      exit(1);
+    }
+  }
+  else
+    printf("Tracing enabled\n");
+}
+
+void disable_tracing(void)
+{
+  int enable = 0;
+  int xc_handle = xc_interface_open();
+    
+  xc_tbuf_enable(xc_handle, enable);
+  xc_interface_close(xc_handle);
+}
 
 
 /**
@@ -258,6 +369,17 @@ void get_tbufs(unsigned long *mfn, unsigned long *size)
     int ret;
     dom0_op_t op;                        /* dom0 op we'll build             */
     int xc_handle = xc_interface_open(); /* for accessing control interface */
+    unsigned int tbsize;
+
+    enable_tracing_or_die(xc_handle);
+
+    if (xc_tbuf_get_size(xc_handle, &tbsize) != 0) {
+      perror("Failure to get tbuf info from Xen. Guess size is 0?");
+      exit(1);
+    }
+    else
+      printf("Current tbuf size: 0x%x\n", tbsize);
+    
 
     op.cmd = DOM0_TBUFCONTROL;
     op.interface_version = DOM0_INTERFACE_VERSION;
@@ -448,6 +570,11 @@ int monitor_tbufs(void)
     meta  = init_bufs_ptrs (tbufs_mapped, num, size);
     data  = init_rec_ptrs(meta, num);
 
+    // Set up event channel for select()
+    if (eventchn_init() < 0) {
+      fprintf(stderr, "Failed to initialize event channel; Using POLL method\r\n");
+    }
+
     /* now, scan buffers for events */
     while ( !interrupted )
     {
@@ -460,7 +587,8 @@ int monitor_tbufs(void)
                 meta[i]->cons++;
             }
 
-        nanosleep(&opts.poll_sleep, NULL);
+	wait_for_event();
+	wakeups++;
     }
 
     /* cleanup */
@@ -640,6 +768,7 @@ int main(int argc, char **argv)
 
     dump_stats();
     msync(new_qos, sizeof(_new_qos_data), MS_SYNC);
+    disable_tracing();
 
     return ret;
 }
@@ -737,7 +866,9 @@ void qos_update_thread(int cpu, int domid, uint64_t now)
         start = new_qos->domain_info[id].start_time;
         if (start > now) {		// wrapped around
             run_time = now + (~0ULL - start);
-	    printf("warning: start > now\n");
+	    // this could happen if there is nothing going on within a cpu;
+	    // in this case the idle domain would run forever
+	    //        printf("warning: start > now\n");
         }
         else
             run_time = now - start;
@@ -746,11 +877,11 @@ void qos_update_thread(int cpu, int domid, uint64_t now)
         new_qos->domain_info[id].ns_oncpu_since_boot += run_time;
         new_qos->domain_info[id].start_time = now;
         new_qos->domain_info[id].ns_since_boot += time_since_update;
-#if 1
+
 	new_qos->qdata[n].ns_gotten[id] += run_time;
-	if (domid == 0 && cpu == 1)
-	  printf("adding run time for dom0 on cpu1\r\n");
-#endif
+	//	if (domid == 0 && cpu == 1)
+	//	  printf("adding run time for dom0 on cpu1\r\n");
+
     }
 
     new_qos->domain_info[id].runnable_at_last_update = domain_runnable(domid);
@@ -916,12 +1047,12 @@ void qos_state_runnable(int cpu, int domid, uint64_t now)
 {
     int id = ID(domid);
 
+    qos_update_thread_stats(cpu, domid, now);
+
     if (domain_runnable(id))	// double call?
         return;
     new_qos->domain_info[id].runnable = 1;
     update_blocked_time(domid, now);
-
-    qos_update_thread_stats(cpu, domid, now);
 
     new_qos->domain_info[id].blocked_start_time = 0; /* invalidate */
     new_qos->domain_info[id].runnable_start_time = now;
@@ -951,7 +1082,7 @@ int domain_ok(int cpu, int domid, uint64_t now)
     if (domid == IDLE_DOMAIN_ID)
         domid = NDOMAINS-1;
     if (domid < 0 || domid >= NDOMAINS) {
-        printf("bad domain id: %d\n", domid);
+        printf("bad domain id: %d\r\n", domid);
         return 0;
     }
     if (new_qos->domain_info[domid].in_use == 0)

@@ -41,6 +41,7 @@
 #include <xen/irq.h>
 #include <xen/delay.h>
 #include <xen/softirq.h>
+#include <xen/serial.h>
 #include <asm/current.h>
 #include <asm/mc146818rtc.h>
 #include <asm/desc.h>
@@ -1231,12 +1232,25 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 void __init smp_intr_init(void)
 {
+	int irq, seridx;
+
 	/*
 	 * IRQ0 must be given a fixed assignment and initialized,
 	 * because it's used before the IO-APIC is set up.
 	 */
-	irq_vector[0] = FIRST_DEVICE_VECTOR;
-	vector_irq[FIRST_DEVICE_VECTOR] = 0;
+	irq_vector[0] = FIRST_HIPRIORITY_VECTOR;
+	vector_irq[FIRST_HIPRIORITY_VECTOR] = 0;
+
+	/*
+	 * Also ensure serial interrupts are high priority. We do not
+	 * want them to be blocked by unacknowledged guest-bound interrupts.
+	 */
+	for (seridx = 0; seridx < 2; seridx++) {
+		if ((irq = serial_irq(seridx)) < 0)
+			continue;
+		irq_vector[irq] = FIRST_HIPRIORITY_VECTOR + seridx + 1;
+		vector_irq[FIRST_HIPRIORITY_VECTOR + seridx + 1] = irq;
+	}
 
 	/* IPI for event checking. */
 	set_intr_gate(EVENT_CHECK_VECTOR, event_check_interrupt);

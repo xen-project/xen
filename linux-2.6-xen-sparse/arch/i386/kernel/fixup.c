@@ -68,6 +68,7 @@ fastcall void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 	DP("");
 
 	for (i = 5; i > 0; i--) {
+		touch_softlockup_watchdog();
 		printk("Pausing... %d", i);
 		mdelay(1000);
 		printk("\b\b\b\b\b\b\b\b\b\b\b\b");

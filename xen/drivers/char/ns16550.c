@@ -260,13 +260,20 @@ static void ns16550_endboot(struct serial_port *port)
 #define ns16550_endboot NULL
 #endif
 
+static int ns16550_irq(struct serial_port *port)
+{
+    struct ns16550 *uart = port->uart;
+    return ((uart->irq > 0) ? uart->irq : -1);
+}
+
 static struct uart_driver ns16550_driver = {
     .init_preirq  = ns16550_init_preirq,
     .init_postirq = ns16550_init_postirq,
     .endboot      = ns16550_endboot,
     .tx_empty     = ns16550_tx_empty,
     .putc         = ns16550_putc,
-    .getc         = ns16550_getc
+    .getc         = ns16550_getc,
+    .irq          = ns16550_irq
 };
 
 static int parse_parity_char(int c)

@@ -127,3 +127,6 @@
 
 # Whether to enable core-dumps when domains crash.
 #(enable-dump no)
+
+# The tool used for initiating virtual TPM migration
+#(external-migration-tool '')

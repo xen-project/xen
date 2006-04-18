@@ -418,9 +418,9 @@ static void fast_flush_area(int idx, int nr_pages)
 		if (BLKTAP_INVALID_HANDLE(handle))
 			continue;
 
-		unmap[op].host_addr = MMAP_VADDR(mmap_vstart, idx, i);
-		unmap[op].dev_bus_addr = 0;
-		unmap[op].handle = handle->kernel;
+		gnttab_set_unmap_op(&unmap[op],
+				    MMAP_VADDR(mmap_vstart, idx, i),
+				    GNTMAP_host_map, handle->kernel);
 		op++;
 
 		if (create_lookup_pte_addr(
@@ -430,9 +430,10 @@ static void fast_flush_area(int idx, int nr_pages)
 			DPRINTK("Couldn't get a pte addr!\n");
 			return;
 		}
-		unmap[op].host_addr    = ptep;
-		unmap[op].dev_bus_addr = 0;
-		unmap[op].handle       = handle->user;
+		gnttab_set_unmap_grnat_ref(&unmap[op], ptep,
+					   GNTMAP_host_map |
+					   GNTMAP_application_map |
+					   GNTMAP_contains_pte, handle->user);
 		op++;
             
 		BLKTAP_INVALIDATE_HANDLE(handle);
@@ -703,21 +704,21 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 		unsigned long uvaddr;
 		unsigned long kvaddr;
 		uint64_t ptep;
+		uint32_t flags;
 
 		uvaddr = MMAP_VADDR(user_vstart, pending_idx, i);
 		kvaddr = MMAP_VADDR(mmap_vstart, pending_idx, i);
 
-		/* Map the remote page to kernel. */
-		map[op].host_addr = kvaddr;
-		map[op].dom   = blkif->domid;
-		map[op].ref   = req->seg[i].gref;
-		map[op].flags = GNTMAP_host_map;
+		flags = GNTMAP_host_map;
 		/* This needs a bit more thought in terms of interposition: 
 		 * If we want to be able to modify pages during write using 
 		 * grant table mappings, the guest will either need to allow 
 		 * it, or we'll need to incur a copy. Bit of an fbufs moment. ;) */
 		if (req->operation == BLKIF_OP_WRITE)
-			map[op].flags |= GNTMAP_readonly;
+			flags |= GNTMAP_readonly;
+		/* Map the remote page to kernel. */
+		gnttab_set_map_op(&map[op], kvaddr, flags, req->seg[i].gref,
+				  blkif->domid);
 		op++;
 
 		/* Now map it to user. */
@@ -728,14 +729,13 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 			goto bad_descriptor;
 		}
 
-		map[op].host_addr = ptep;
-		map[op].dom       = blkif->domid;
-		map[op].ref       = req->seg[i].gref;
-		map[op].flags     = GNTMAP_host_map | GNTMAP_application_map
+		flags = GNTMAP_host_map | GNTMAP_application_map
 			| GNTMAP_contains_pte;
 		/* Above interposition comment applies here as well. */
 		if (req->operation == BLKIF_OP_WRITE)
-			map[op].flags |= GNTMAP_readonly;
+			flags |= GNTMAP_readonly;
+		gnttab_set_map_op(&map[op], ptep, flags, req->seg[i].gref,
+				  blkif->domid);
 		op++;
 	}
 

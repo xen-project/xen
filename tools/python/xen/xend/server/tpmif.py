@@ -23,8 +23,16 @@
 
 from xen.xend import sxp
 from xen.xend.XendLogging import log
+from xen.xend.XendError import XendError
+from xen.xend import XendRoot
 
 from xen.xend.server.DevController import DevController
+
+import os
+import re
+
+
+xroot = XendRoot.instance()
 
 
 class TPMifController(DevController):
@@ -61,3 +69,43 @@ class TPMifController(DevController):
             result.append(['instance', instance])
 
         return result
+
+    def migrate(self, deviceConfig, live, dst, step, domName):
+        """@see DevContoller.migrate"""
+        if live:
+            tool = xroot.get_external_migration_tool()
+            if tool != '':
+                log.info("Request to live-migrate device to %s. step=%d.",
+                         dst, step)
+
+                if step == 0:
+                    """Assuming for now that everything is ok and migration
+                       with the given tool can proceed.
+                    """
+                    return 0
+                else:
+                    fd = os.popen("%s -type vtpm -step %d -host %s -domname %s" %
+                                  (tool, step, dst, domName),
+                                  'r')
+                    for line in fd.readlines():
+                        mo = re.search('Error', line)
+                        if mo:
+                            raise XendError("vtpm: Fatal error in migration step %d." %
+                                            step)
+                    return 0
+            else:
+                log.debug("External migration tool not in configuration.")
+                return -1
+        return 0
+
+    def recover_migrate(self, deviceConfig, live, dst, step, domName):
+        """@see DevContoller.recover_migrate"""
+        if live:
+            tool = xroot.get_external_migration_tool()
+            if tool != '':
+                log.info("Request to recover live-migrated device. last good step=%d.",
+                         step)
+                fd = os.popen("%s -type vtpm -step %d -host %s -domname %s -recover" %
+                              (tool, step, dst, domName),
+                              'r')
+        return 0

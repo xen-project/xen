@@ -57,7 +57,7 @@ static inline void safe_munlock(const void *addr, size_t len)
 }
 
 static inline int do_privcmd(int xc_handle,
-                             unsigned int cmd, 
+                             unsigned int cmd,
                              unsigned long data)
 {
     return ioctl(xc_handle, cmd, data);
@@ -67,7 +67,7 @@ static inline int do_xen_hypercall(int xc_handle,
                                    privcmd_hypercall_t *hypercall)
 {
     return do_privcmd(xc_handle,
-                      IOCTL_PRIVCMD_HYPERCALL, 
+                      IOCTL_PRIVCMD_HYPERCALL,
                       (unsigned long)hypercall);
 }
 
@@ -78,7 +78,7 @@ static inline int do_xen_version(int xc_handle, int cmd, void *dest)
     hypercall.op     = __HYPERVISOR_xen_version;
     hypercall.arg[0] = (unsigned long) cmd;
     hypercall.arg[1] = (unsigned long) dest;
-    
+
     return do_xen_hypercall(xc_handle, &hypercall);
 }
 
@@ -121,13 +121,13 @@ typedef struct privcmd_mmap_entry {
     unsigned long va;
     unsigned long mfn;
     unsigned long npages;
-} privcmd_mmap_entry_t; 
+} privcmd_mmap_entry_t;
 
 typedef struct privcmd_mmap {
     int num;
     domid_t dom;
     privcmd_mmap_entry_t *entry;
-} privcmd_mmap_t; 
+} privcmd_mmap_t;
 */
 
 #endif /* __XC_PRIVATE_H__ */

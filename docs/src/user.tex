@@ -1232,8 +1232,15 @@ customized variants for your site's preferred configuration.
 \subsection{PCI}
 \label{ss:pcidd}
 
-Individual PCI devices can be assigned to a given domain to allow that
-domain direct access to the PCI hardware. To use this functionality, ensure
+Individual PCI devices can be assigned to a given domain (a PCI driver domain)
+to allow that domain direct access to the PCI hardware.
+
+While PCI Driver Domains can increase the stability and security of a system
+by addressing a number of security concerns, there are some security issues
+that remain that you can read about in Section~\ref{s:ddsecurity}.
+
+\subsubsection{Compile-Time Setup}
+To use this functionality, ensure
 that the PCI Backend is compiled in to a privileged domain (e.g. domain 0)
 and that the domains which will be assigned PCI devices have the PCI Frontend
 compiled in. In XenLinux, the PCI Backend is available under the Xen
@@ -1241,21 +1248,73 @@ configuration section while the PCI Frontend is under the
 architecture-specific "Bus Options" section. You may compile both the backend
 and the frontend into the same kernel; they will not affect each other.
 
+\subsubsection{PCI Backend Configuration - Binding at Boot}
 The PCI devices you wish to assign to unprivileged domains must be "hidden"
 from your backend domain (usually domain 0) so that it does not load a driver
 for them. Use the \path{pciback.hide} kernel parameter which is specified on
 the kernel command-line and is configurable through GRUB (see
 Section~\ref{s:configure}). Note that devices are not really hidden from the
-backend domain. The PCI Backend ensures that no other device driver loads
-for those devices. PCI devices are identified by hexadecimal
-slot/funciton numbers (on Linux, use \path{lspci} to determine slot/funciton
-numbers of your devices) and can be specified with or without the PCI domain: \\
+backend domain. The PCI Backend appears to the Linux kernel as a regular PCI
+device driver. The PCI Backend ensures that no other device driver loads
+for the devices by binding itself as the device driver for those devices.
+PCI devices are identified by hexadecimal slot/funciton numbers (on Linux,
+use \path{lspci} to determine slot/funciton numbers of your devices) and
+can be specified with or without the PCI domain: \\
 \centerline{  {\tt ({\em bus}:{\em slot}.{\em func})} example {\tt (02:1d.3)}} \\
 \centerline{  {\tt ({\em domain}:{\em bus}:{\em slot}.{\em func})} example {\tt (0000:02:1d.3)}} \\
 
 An example kernel command-line which hides two PCI devices might be: \\
 \centerline{ {\tt root=/dev/sda4 ro console=tty0 pciback.hide=(02:01.f)(0000:04:1d.0) } } \\
 
+\subsubsection{PCI Backend Configuration - Late Binding}
+PCI devices can also be bound to the PCI Backend after boot through the manual
+binding/unbinding facilities provided by the Linux kernel in sysfs (allowing
+for a Xen user to give PCI devices to driver domains that were not specified
+on the kernel command-line). There are several attributes with the PCI
+Backend's sysfs directory (\path{/sys/bus/pci/drivers/pciback}) that can be
+used to bind/unbind devices:
+
+\begin{description}
+\item[slots] lists all of the PCI slots that the PCI Backend will try to seize
+  (or "hide" from Domain 0). A PCI slot must appear in this list before it can
+  be bound to the PCI Backend through the \path{bind} attribute.
+\item[new\_slot] write the name of a slot here (in 0000:00:00.0 format) to
+  have the PCI Backend seize the device in this slot.
+\item[remove\_slot] write the name of a slot here (same format as
+  \path{new\_slot}) to have the PCI Backend no longer try to seize devices in
+  this slot. Note that this does not unbind the driver from a device it has
+  already seized.
+\item[bind] write the name of a slot here (in 0000:00:00.0 format) to have
+  the Linux kernel attempt to bind the device in that slot to the PCI Backend
+  driver.
+\item[unbind] write the name of a skit here (same format as \path{bind}) to have
+  the Linux kernel unbind the device from the PCI Backend. DO NOT unbind a
+  device while it is currently given to a PCI driver domain!
+\end{description}
+
+Some examples:
+
+Bind a device to the PCI Backend which is not bound to any other driver.
+\begin{verbatim}
+# # Add a new slot to the PCI Backend's list
+# echo -n 0000:01:04.d > /sys/bus/pci/drivers/pciback/new_slot
+# # Now that the backend is watching for the slot, bind to it
+# echo -n 0000:01:04.d > /sys/bus/pci/drivers/pciback/bind
+\end{verbatim}
+
+Unbind a device from its driver and bind to the PCI Backend.
+\begin{verbatim}
+# # Unbind a PCI network card from its network driver
+# echo -n 0000:05:02.0 > /sys/bus/pci/drivers/3c905/unbind
+# # And now bind it to the PCI Backend
+# echo -n 0000:05:02.0 > /sys/bus/pci/drivers/pciback/new_slot
+# echo -n 0000:05:02.0 > /sys/bus/pci/drivers/pciback/bind
+\end{verbatim}
+
+Note that the "-n" option in the example is important as it causes echo to not
+output a new-line.
+
+\subsubsection{PCI Frontend Configuration}
 To configure a domU to receive a PCI device:
 
 \begin{description}
@@ -1281,9 +1340,6 @@ To configure a domU to receive a PCI device:
 \end{verbatim}
 }
 \end{description}
-
-There are a number of security concerns associated with PCI Driver Domains
-that you can read about in Section~\ref{s:ddsecurity}.
 
 %% There are two possible types of privileges: IO privileges and
 %% administration privileges.

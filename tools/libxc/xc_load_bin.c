@@ -161,7 +161,7 @@ findtable(const char *image, unsigned long image_size)
     return NULL;
 }
 
-static int parsebinimage(const char *image, 
+static int parsebinimage(const char *image,
                          unsigned long image_size,
                          struct domain_setup_info *dsi)
 {

@@ -125,7 +125,7 @@ struct domain
     struct evtchn   *evtchn[NR_EVTCHN_BUCKETS];
     spinlock_t       evtchn_lock;
 
-    grant_table_t   *grant_table;
+    struct grant_table *grant_table;
 
     /*
      * Interrupt to event-channel mappings. Updates should be protected by the 

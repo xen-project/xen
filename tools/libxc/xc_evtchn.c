@@ -1,8 +1,8 @@
 /******************************************************************************
  * xc_evtchn.c
- * 
+ *
  * API for manipulating and accessing inter-domain event channels.
- * 
+ *
  * Copyright (c) 2004, K A Fraser.
  */
 
@@ -44,7 +44,7 @@ int xc_evtchn_alloc_unbound(int xc_handle,
 
     if ( (rc = do_evtchn_op(xc_handle, &op)) == 0 )
         rc = op.u.alloc_unbound.port;
-    
+
     return rc;
 }
 
@@ -62,6 +62,6 @@ int xc_evtchn_status(int xc_handle,
 
     if ( (rc = do_evtchn_op(xc_handle, &op)) == 0 )
         memcpy(status, &op.u.status, sizeof(*status));
-    
+
     return rc;
 }

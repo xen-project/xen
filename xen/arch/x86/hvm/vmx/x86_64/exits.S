@@ -94,6 +94,7 @@
 ENTRY(vmx_asm_vmexit_handler)
         /* selectors are restored/saved by VMX */
         HVM_SAVE_ALL_NOSEGREGS
+        call vmx_trace_vmexit
         call vmx_vmexit_handler
         jmp vmx_asm_do_resume
 
@@ -114,6 +115,7 @@ ENTRY(vmx_asm_vmexit_handler)
 /* vmx_restore_all_guest */
         call vmx_intr_assist
         call vmx_load_cr2
+        call vmx_trace_vmentry
         .endif
         /* 
          * Check if we are going back to VMX-based VM

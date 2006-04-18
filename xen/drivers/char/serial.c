@@ -372,6 +372,15 @@ void serial_endboot(void)
             com[i].driver->endboot(&com[i]);
 }
 
+int serial_irq(int idx)
+{
+    if ( (idx >= 0) && (idx < ARRAY_SIZE(com)) &&
+         com[idx].driver && com[idx].driver->irq )
+        return com[idx].driver->irq(&com[idx]);
+
+    return -1;
+}
+
 void serial_register_uart(int idx, struct uart_driver *driver, void *uart)
 {
     /* Store UART-specific info. */

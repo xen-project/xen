@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.16-rc3-xen0
-# Thu Feb 16 22:56:02 2006
+# Linux kernel version: 2.6.16-xenU
+# Thu Apr 13 14:59:16 2006
 #
 CONFIG_X86_64=y
 CONFIG_64BIT=y
@@ -103,6 +103,8 @@ CONFIG_X86_PC=y
 CONFIG_MPSC=y
 # CONFIG_GENERIC_CPU is not set
 CONFIG_X86_64_XEN=y
+CONFIG_X86_NO_TSS=y
+CONFIG_X86_NO_IDT=y
 CONFIG_X86_L1_CACHE_BYTES=128
 CONFIG_X86_L1_CACHE_SHIFT=7
 CONFIG_X86_GOOD_APIC=y
@@ -145,6 +147,15 @@ CONFIG_GENERIC_PENDING_IRQ=y
 #
 # CONFIG_PCI is not set
 # CONFIG_UNORDERED_IO is not set
+
+#
+# PCCARD (PCMCIA/CardBus) support
+#
+# CONFIG_PCCARD is not set
+
+#
+# PCI Hotplug Support
+#
 
 #
 # Executable file formats / Emulations
@@ -844,11 +855,7 @@ CONFIG_DUMMY_CONSOLE=y
 #
 
 #
-# SN Devices
-#
-
-#
-# EDAC - error detection and reporting (RAS)
+# EDAC - error detection and reporting (RAS) (EXPERIMENTAL)
 #
 # CONFIG_EDAC is not set
 
@@ -1128,7 +1135,7 @@ CONFIG_CRYPTO_CRC32C=m
 # Hardware crypto devices
 #
 CONFIG_XEN=y
-CONFIG_NO_IDLE_HZ=y
+CONFIG_XEN_INTERFACE_VERSION=0x00030101
 
 #
 # XEN
@@ -1144,6 +1151,7 @@ CONFIG_XEN_DISABLE_SERIAL=y
 CONFIG_XEN_SYSFS=y
 CONFIG_HAVE_ARCH_ALLOC_SKB=y
 CONFIG_HAVE_ARCH_DEV_ALLOC_SKB=y
+CONFIG_NO_IDLE_HZ=y
 
 #
 # Library routines

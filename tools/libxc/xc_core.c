@@ -23,7 +23,7 @@ copy_from_domain_page(int xc_handle,
     return 0;
 }
 
-int 
+int
 xc_domain_dumpcore_via_callback(int xc_handle,
                                 uint32_t domid,
                                 void *args,
@@ -45,13 +45,13 @@ xc_domain_dumpcore_via_callback(int xc_handle,
         PERROR("Could not allocate dump_mem");
         goto error_out;
     }
- 
+
     if ( xc_domain_getinfo(xc_handle, domid, 1, &info) != 1 )
     {
         PERROR("Could not get info for domain");
         goto error_out;
     }
- 
+
     if ( domid != info.domid )
     {
         PERROR("Domain %d does not exist", domid);
@@ -61,10 +61,10 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     for ( i = 0; i <= info.max_vcpu_id; i++ )
         if ( xc_vcpu_getcontext(xc_handle, domid, i, &ctxt[nr_vcpus]) == 0)
             nr_vcpus++;
- 
+
     nr_pages = info.nr_pages;
 
-    header.xch_magic = XC_CORE_MAGIC; 
+    header.xch_magic = XC_CORE_MAGIC;
     header.xch_nr_vcpus = nr_vcpus;
     header.xch_nr_pages = nr_pages;
     header.xch_ctxt_offset = sizeof(struct xc_core_header);
@@ -74,7 +74,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
                  (sizeof(vcpu_guest_context_t) * nr_vcpus) +
                  (nr_pages * sizeof(unsigned long)));
     header.xch_pages_offset = round_pgup(dummy_len);
-    
+
     sts = dump_rtn(args, (char *)&header, sizeof(struct xc_core_header));
     if ( sts != 0 )
         goto error_out;
@@ -150,7 +150,7 @@ static int local_file_dump(void *args, char *buffer, unsigned int length)
     return 0;
 }
 
-int 
+int
 xc_domain_dumpcore(int xc_handle,
                    uint32_t domid,
                    const char *corename)
@@ -163,7 +163,7 @@ xc_domain_dumpcore(int xc_handle,
         PERROR("Could not open corefile %s: %s", corename, strerror(errno));
         return -errno;
     }
- 
+
     sts = xc_domain_dumpcore_via_callback(
         xc_handle, domid, &da, &local_file_dump);
 

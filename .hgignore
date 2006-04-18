@@ -184,6 +184,7 @@
 ^tools/xm-test/ramdisk/buildroot
 ^xen/BLOG$
 ^xen/TAGS$
+^xen/cscope\.*$
 ^xen/arch/x86/asm-offsets\.s$
 ^xen/arch/x86/boot/mkelf32$
 ^xen/arch/x86/xen\.lds$

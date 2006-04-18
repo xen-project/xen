@@ -47,4 +47,12 @@ void restore_existing_connections(void);
 bool domain_can_read(struct connection *conn);
 bool domain_can_write(struct connection *conn);
 
+/* Quota manipulation */
+void domain_entry_inc(struct connection *conn);
+void domain_entry_dec(struct connection *conn);
+int domain_entry(struct connection *conn);
+void domain_watch_inc(struct connection *conn);
+void domain_watch_dec(struct connection *conn);
+int domain_watch(struct connection *conn);
+
 #endif /* _XENSTORED_DOMAIN_H */

@@ -21,7 +21,7 @@
 # External CFLAGS can do more harm than good.
 CFLAGS :=
 
-XEN_TARGET_ARCH = x86_32
+override XEN_TARGET_ARCH = x86_32
 XEN_ROOT = ../../..
 include $(XEN_ROOT)/Config.mk
 

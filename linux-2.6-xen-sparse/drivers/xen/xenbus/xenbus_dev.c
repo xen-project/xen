@@ -114,6 +114,7 @@ static ssize_t xenbus_dev_write(struct file *filp,
 {
 	struct xenbus_dev_data *u = filp->private_data;
 	struct xenbus_dev_transaction *trans = NULL;
+	uint32_t msg_type;
 	void *reply;
 
 	if ((len + u->len) > sizeof(u->u.buffer))
@@ -126,7 +127,9 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	if (u->len < (sizeof(u->u.msg) + u->u.msg.len))
 		return len;
 
-	switch (u->u.msg.type) {
+	msg_type = u->u.msg.type;
+
+	switch (msg_type) {
 	case XS_TRANSACTION_START:
 	case XS_TRANSACTION_END:
 	case XS_DIRECTORY:
@@ -138,7 +141,7 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	case XS_MKDIR:
 	case XS_RM:
 	case XS_SET_PERMS:
-		if (u->u.msg.type == XS_TRANSACTION_START) {
+		if (msg_type == XS_TRANSACTION_START) {
 			trans = kmalloc(sizeof(*trans), GFP_KERNEL);
 			if (!trans)
 				return -ENOMEM;
@@ -150,10 +153,10 @@ static ssize_t xenbus_dev_write(struct file *filp,
 			return PTR_ERR(reply);
 		}
 
-		if (u->u.msg.type == XS_TRANSACTION_START) {
+		if (msg_type == XS_TRANSACTION_START) {
 			trans->handle = simple_strtoul(reply, NULL, 0);
 			list_add(&trans->list, &u->transactions);
-		} else if (u->u.msg.type == XS_TRANSACTION_END) {
+		} else if (msg_type == XS_TRANSACTION_END) {
 			list_for_each_entry(trans, &u->transactions, list)
 				if (trans->handle == u->u.msg.tx_id)
 					break;

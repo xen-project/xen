@@ -639,7 +639,7 @@ void _audit_domain(struct domain *d, int flags)
     void scan_for_pfn_in_grant_table(struct domain *d, unsigned xmfn)
     {
         int i;
-        active_grant_entry_t *act = d->grant_table->active;
+        struct active_grant_entry *act = d->grant_table->active;
 
         spin_lock(&d->grant_table->lock);
 

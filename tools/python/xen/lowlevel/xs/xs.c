@@ -589,7 +589,7 @@ static PyObject *xspy_transaction_end(XsHandle *self, PyObject *args,
 
 static PyObject *xspy_introduce_domain(XsHandle *self, PyObject *args)
 {
-    domid_t dom;
+    uint32_t dom;
     unsigned long page;
     unsigned int port;
 
@@ -620,7 +620,7 @@ static PyObject *xspy_introduce_domain(XsHandle *self, PyObject *args)
 
 static PyObject *xspy_release_domain(XsHandle *self, PyObject *args)
 {
-    domid_t dom;
+    uint32_t dom;
 
     struct xs_handle *xh = xshandle(self);
     bool result = 0;
@@ -677,7 +677,7 @@ static PyObject *xspy_close(XsHandle *self)
 static PyObject *xspy_get_domain_path(XsHandle *self, PyObject *args)
 {
     struct xs_handle *xh = xshandle(self);
-    int domid;
+    uint32_t domid;
     char *xsval;
 
     if (!xh)

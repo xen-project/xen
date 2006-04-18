@@ -21,6 +21,7 @@
 #include <asm/uaccess.h>
 #include <xen/xenbus.h>
 #include <xen/interface/grant_table.h>
+#include <xen/gnttab.h>
 
 /* local data structures */
 struct data_exchange {
@@ -278,10 +279,8 @@ int _packet_write(struct packet *pak,
 			return 0;
 		}
 
-		map_op.host_addr = MMAP_VADDR(tpmif, i);
-		map_op.flags = GNTMAP_host_map;
-		map_op.ref = tx->ref;
-		map_op.dom = tpmif->domid;
+		gnttab_set_map_op(&map_op, MMAP_VADDR(tpmif, i),
+				  GNTMAP_host_map, tx->ref, tpmif->domid);
 
 		if (unlikely(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
 						       &map_op, 1))) {
@@ -308,9 +307,8 @@ int _packet_write(struct packet *pak,
 		}
 		tx->size = tocopy;
 
-		unmap_op.host_addr = MMAP_VADDR(tpmif, i);
-		unmap_op.handle = handle;
-		unmap_op.dev_bus_addr = 0;
+		gnttab_set_unmap_op(&unmap_op, MMAP_VADDR(tpmif, i),
+				    GNTMAP_host_map, handle);
 
 		if (unlikely
 		    (HYPERVISOR_grant_table_op
@@ -422,10 +420,8 @@ static int packet_read_shmem(struct packet *pak,
 
 		tx = &tpmif->tx->ring[i].req;
 
-		map_op.host_addr = MMAP_VADDR(tpmif, i);
-		map_op.flags = GNTMAP_host_map;
-		map_op.ref = tx->ref;
-		map_op.dom = tpmif->domid;
+		gnttab_set_map_op(&map_op, MMAP_VADDR(tpmif, i),
+				  GNTMAP_host_map, tx->ref, tpmif->domid);
 
 		if (unlikely(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
 						       &map_op, 1))) {
@@ -461,9 +457,8 @@ static int packet_read_shmem(struct packet *pak,
 			tpmif->domid, buffer[offset], buffer[offset + 1],
 			buffer[offset + 2], buffer[offset + 3]);
 
-		unmap_op.host_addr = MMAP_VADDR(tpmif, i);
-		unmap_op.handle = handle;
-		unmap_op.dev_bus_addr = 0;
+		gnttab_set_unmap_op(&unmap_op, MMAP_VADDR(tpmif, i),
+				    GNTMAP_host_map, handle);
 
 		if (unlikely
 		    (HYPERVISOR_grant_table_op

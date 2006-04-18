@@ -7,7 +7,7 @@ rm -rf gdb-6.2.1 gdb-6.2.1-linux-i386-xen
 tar xjf gdb-6.2.1.tar.bz2
 
 cd gdb-6.2.1-xen-sparse
-./mkbuildtree ../gdb-6.2.1
+bash ./mkbuildtree ../gdb-6.2.1
 
 cd ..
 mkdir gdb-6.2.1-linux-i386-xen

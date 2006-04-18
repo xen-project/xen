@@ -84,6 +84,16 @@ Usage Notes and issues
    events cause a trace record to be emitted.
  - To exit xenmon, type 'q'
  - To cycle the display to other physical cpu's, type 'c'
+ - The first time xenmon is run, it attempts to allocate xen trace buffers
+   using a default size. If you wish to use a non-default value for the
+   trace buffer size, run the 'setsize' program (located in tools/xentrace)
+   and specify the number of memory pages as a parameter. The default is 20.
+ - Not well tested with domains using more than 1 virtual cpu
+ - If you create a lot of domains, or repeatedly kill a domain and restart it,
+   and the domain id's get to be bigger than NDOMAINS, then xenmon behaves badly.
+   This is a bug that is due to xenbaked's treatment of domain id's vs. domain
+   indices in a data array. Will be fixed in a future release; Workaround:
+   Increase NDOMAINS in xenbaked and rebuild.
 
 Future Work
 -----------

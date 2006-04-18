@@ -453,9 +453,9 @@ inline static void net_tx_action_dealloc(void)
 	gop = tx_unmap_ops;
 	while (dc != dp) {
 		pending_idx = dealloc_ring[MASK_PEND_IDX(dc++)];
-		gop->host_addr    = MMAP_VADDR(pending_idx);
-		gop->dev_bus_addr = 0;
-		gop->handle       = grant_tx_handle[pending_idx];
+		gnttab_set_unmap_op(gop, MMAP_VADDR(pending_idx),
+				    GNTMAP_host_map,
+				    grant_tx_handle[pending_idx]);
 		gop++;
 	}
 	ret = HYPERVISOR_grant_table_op(
@@ -579,10 +579,9 @@ static void net_tx_action(unsigned long unused)
 		/* Packets passed to netif_rx() must have some headroom. */
 		skb_reserve(skb, 16);
 
-		mop->host_addr = MMAP_VADDR(pending_idx);
-		mop->dom       = netif->domid;
-		mop->ref       = txreq.gref;
-		mop->flags     = GNTMAP_host_map | GNTMAP_readonly;
+		gnttab_set_map_op(mop, MMAP_VADDR(pending_idx),
+				  GNTMAP_host_map | GNTMAP_readonly,
+				  txreq.gref, netif->domid);
 		mop++;
 
 		memcpy(&pending_tx_info[pending_idx].req,

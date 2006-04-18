@@ -583,6 +583,13 @@ static void free_shadow_pages(struct domain *d)
         {
             put_shadow_ref(pagetable_get_pfn(v->arch.shadow_table));
             v->arch.shadow_table = mk_pagetable(0);
+
+            if ( shadow_mode_external(d) )
+            {
+                if ( v->arch.shadow_vtable )
+                    unmap_domain_page_global(v->arch.shadow_vtable);
+                v->arch.shadow_vtable = NULL;
+            }
         }
 
         if ( v->arch.monitor_shadow_ref )
@@ -2886,7 +2893,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
     SH_VVLOG("shadow_fault( va=%lx, code=%lu )",
              va, (unsigned long)regs->error_code);
     perfc_incrc(shadow_fault_calls);
-    
+
     check_pagetable(v, "pre-sf");
 
     /*
@@ -2917,7 +2924,16 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
     // the mapping is in-sync, so the check of the PDE's present bit, above,
     // covers this access.
     //
-    orig_gpte = gpte = linear_pg_table[l1_linear_offset(va)];
+    if ( __copy_from_user(&gpte,
+                          &linear_pg_table[l1_linear_offset(va)],
+                          sizeof(gpte)) ) {
+        printk("%s() failed, crashing domain %d "
+               "due to a unaccessible linear page table (gpde=%" PRIpte "), va=%lx\n",
+               __func__, d->domain_id, l2e_get_intpte(gpde), va);
+        domain_crash_synchronous();
+    }
+    orig_gpte = gpte;
+
     if ( unlikely(!(l1e_get_flags(gpte) & _PAGE_PRESENT)) )
     {
         SH_VVLOG("shadow_fault - EXIT: gpte not present (%" PRIpte ") (gpde %" PRIpte ")",
@@ -2928,7 +2944,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
     }
 
     /* Write fault? */
-    if ( regs->error_code & 2 )  
+    if ( regs->error_code & 2 )
     {
         int allow_writes = 0;
 
@@ -2942,7 +2958,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
             else
             {
                 /* Write fault on a read-only mapping. */
-                SH_VVLOG("shadow_fault - EXIT: wr fault on RO page (%" PRIpte ")", 
+                SH_VVLOG("shadow_fault - EXIT: wr fault on RO page (%" PRIpte ")",
                          l1e_get_intpte(gpte));
                 perfc_incrc(shadow_fault_bail_ro_mapping);
                 goto fail;
@@ -2955,10 +2971,10 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
         }
 
         /* User access violation in guest? */
-        if ( unlikely((regs->error_code & 4) && 
+        if ( unlikely((regs->error_code & 4) &&
                       !(l1e_get_flags(gpte) & _PAGE_USER)))
         {
-            SH_VVLOG("shadow_fault - EXIT: wr fault on super page (%" PRIpte ")", 
+            SH_VVLOG("shadow_fault - EXIT: wr fault on super page (%" PRIpte ")",
                     l1e_get_intpte(gpte));
             goto fail;
 
@@ -2980,7 +2996,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
         /* Read-protection violation in guest? */
         if ( unlikely((regs->error_code & 1) ))
         {
-            SH_VVLOG("shadow_fault - EXIT: read fault on super page (%" PRIpte ")", 
+            SH_VVLOG("shadow_fault - EXIT: read fault on super page (%" PRIpte ")",
                     l1e_get_intpte(gpte));
             goto fail;
 
@@ -3275,19 +3291,29 @@ void __update_pagetables(struct vcpu *v)
 
 void clear_all_shadow_status(struct domain *d)
 {
+    struct vcpu *v = current;
+
+    /*
+     * Don't clean up while other vcpus are working.
+     */
+    if ( v->vcpu_id )
+        return;
+
     shadow_lock(d);
+
     free_shadow_pages(d);
     free_shadow_ht_entries(d);
-    d->arch.shadow_ht = 
+    d->arch.shadow_ht =
         xmalloc_array(struct shadow_status, shadow_ht_buckets);
     if ( d->arch.shadow_ht == NULL ) {
-        printk("clear all shadow status:xmalloc fail\n");
+        printk("clear all shadow status: xmalloc failed\n");
         domain_crash_synchronous();
     }
     memset(d->arch.shadow_ht, 0,
            shadow_ht_buckets * sizeof(struct shadow_status));
 
     free_out_of_sync_entries(d);
+
     shadow_unlock(d);
 }
 

@@ -84,7 +84,8 @@ interrupt_post_injection(struct vcpu * v, int vector, int type)
         } else {
             vpit->pending_intr_nr--;
         }
-        vpit->inject_point = NOW();
+        vpit->count_advance = 0;
+        vpit->count_point = NOW();
 
         vpit->last_pit_gtime += vpit->period_cycles;
         set_guest_time(v, vpit->last_pit_gtime);
@@ -208,6 +209,7 @@ void vmx_do_resume(struct vcpu *v)
     /* pick up the elapsed PIT ticks and re-enable pit_timer */
     if ( vpit->first_injected ) {
         if ( v->domain->arch.hvm_domain.guest_time ) {
+            vpit->count_point = NOW();
             set_guest_time(v, v->domain->arch.hvm_domain.guest_time);
             v->domain->arch.hvm_domain.guest_time = 0;
         }

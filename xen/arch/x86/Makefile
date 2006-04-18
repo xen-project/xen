@@ -76,6 +76,7 @@ boot/mkelf32: boot/mkelf32.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 
 shadow_guest32.o: shadow.c
+shadow_guest32pae.o: shadow.c
 
 .PHONY: clean
 clean::

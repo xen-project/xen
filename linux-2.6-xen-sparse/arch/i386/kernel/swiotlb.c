@@ -206,8 +206,8 @@ swiotlb_init(void)
 }
 
 /*
- * We use __copy_to_user to transfer to the host buffer because the buffer
- * may be mapped read-only (e.g, in blkback driver) but lower-level
+ * We use __copy_to_user_inatomic to transfer to the host buffer because the
+ * buffer may be mapped read-only (e.g, in blkback driver) but lower-level
  * drivers map the buffer for DMA_BIDIRECTIONAL access. This causes an
  * unnecessary copy from the aperture to the host buffer, and a page fault.
  */
@@ -225,7 +225,7 @@ __sync_single(struct phys_addr buffer, char *dma_addr, size_t size, int dir)
 			dev  = dma_addr + size - len;
 			host = kmp + buffer.offset;
 			if (dir == DMA_FROM_DEVICE) {
-				if (__copy_to_user(host, dev, bytes))
+				if (__copy_to_user_inatomic(host, dev, bytes))
 					/* inaccessible */;
 			} else
 				memcpy(dev, host, bytes);
@@ -238,7 +238,7 @@ __sync_single(struct phys_addr buffer, char *dma_addr, size_t size, int dir)
 		char *host = (char *)phys_to_virt(
 			page_to_pseudophys(buffer.page)) + buffer.offset;
 		if (dir == DMA_FROM_DEVICE) {
-			if (__copy_to_user(host, dma_addr, size))
+			if (__copy_to_user_inatomic(host, dma_addr, size))
 				/* inaccessible */;
 		} else if (dir == DMA_TO_DEVICE)
 			memcpy(dma_addr, host, size);

@@ -77,6 +77,10 @@ static void check_store(void);
 	} while (0)
 
 
+int quota_nb_entry_per_domain = 1000;
+int quota_nb_watch_per_domain = 128;
+int quota_max_entry_size = 2048; /* 2K */
+
 #ifdef TESTING
 static bool failtest = false;
 
@@ -455,6 +459,10 @@ static bool write_node(struct connection *conn, const struct node *node)
 	data.dsize = 3*sizeof(uint32_t)
 		+ node->num_perms*sizeof(node->perms[0])
 		+ node->datalen + node->childlen;
+
+	if (data.dsize >= quota_max_entry_size)
+		goto error;
+
 	data.dptr = talloc_size(node, data.dsize);
 	((uint32_t *)data.dptr)[0] = node->num_perms;
 	((uint32_t *)data.dptr)[1] = node->datalen;
@@ -470,10 +478,12 @@ static bool write_node(struct connection *conn, const struct node *node)
 	/* TDB should set errno, but doesn't even set ecode AFAICT. */
 	if (tdb_store(tdb_context(conn), key, data, TDB_REPLACE) != 0) {
 		corrupt(conn, "Write of %s = %s failed", key, data);
-		errno = ENOSPC;
-		return false;
+		goto error;
 	}
 	return true;
+ error:
+	errno = ENOSPC;
+	return false;
 }
 
 static enum xs_perm_type perm_for_conn(struct connection *conn,
@@ -765,8 +775,11 @@ static void delete_node_single(struct connection *conn, struct node *node)
 	key.dptr = (void *)node->name;
 	key.dsize = strlen(node->name);
 
-	if (tdb_delete(tdb_context(conn), key) != 0)
+	if (tdb_delete(tdb_context(conn), key) != 0) {
 		corrupt(conn, "Could not delete '%s'", node->name);
+		return;
+	}
+	domain_entry_dec(conn);
 }
 
 /* Must not be / */
@@ -788,7 +801,10 @@ static struct node *construct_node(struct connection *conn, const char *name)
 		parent = construct_node(conn, parentname);
 	if (!parent)
 		return NULL;
-	
+
+	if (domain_entry(conn) >= quota_nb_entry_per_domain)
+		return NULL;
+
 	/* Add child to parent. */
 	base = basename(name);
 	baselen = strlen(base) + 1;
@@ -814,6 +830,7 @@ static struct node *construct_node(struct connection *conn, const char *name)
 	node->children = node->data = NULL;
 	node->childlen = node->datalen = 0;
 	node->parent = parent;
+	domain_entry_inc(conn);
 	return node;
 }
 
@@ -848,8 +865,10 @@ static struct node *create_node(struct connection *conn,
 	/* We write out the nodes down, setting destructor in case
 	 * something goes wrong. */
 	for (i = node; i; i = i->parent) {
-		if (!write_node(conn, i))
+		if (!write_node(conn, i)) {
+			domain_entry_dec(conn);
 			return NULL;
+		}
 		talloc_set_destructor(i, destroy_node);
 	}
 
@@ -1706,6 +1725,9 @@ static void usage(void)
 "  --no-fork           to request that the daemon does not fork,\n"
 "  --output-pid        to request that the pid of the daemon is output,\n"
 "  --trace-file <file> giving the file for logging, and\n"
+"  --entry-nb <nb>     limit the number of entries per domain,\n"
+"  --entry-size <size> limit the size of entry per domain, and\n"
+"  --entry-watch <nb>  limit the number of watches per domain,\n"
 "  --no-recovery       to request that no recovery should be attempted when\n"
 "                      the store is corrupted (debug only),\n"
 "  --preserve-local    to request that /local is preserved on start-up,\n"
@@ -1715,14 +1737,17 @@ static void usage(void)
 
 static struct option options[] = {
 	{ "no-domain-init", 0, NULL, 'D' },
+	{ "entry-nb", 1, NULL, 'E' },
 	{ "pid-file", 1, NULL, 'F' },
 	{ "help", 0, NULL, 'H' },
 	{ "no-fork", 0, NULL, 'N' },
 	{ "output-pid", 0, NULL, 'P' },
+	{ "entry-size", 1, NULL, 'S' },
 	{ "trace-file", 1, NULL, 'T' },
 	{ "no-recovery", 0, NULL, 'R' },
 	{ "preserve-local", 0, NULL, 'L' },
 	{ "verbose", 0, NULL, 'V' },
+	{ "watch-nb", 1, NULL, 'W' },
 	{ NULL, 0, NULL, 0 } };
 
 extern void dump_conn(struct connection *conn); 
@@ -1737,11 +1762,14 @@ int main(int argc, char *argv[])
 	bool no_domain_init = false;
 	const char *pidfile = NULL;
 
-	while ((opt = getopt_long(argc, argv, "DF:HNPT:RLV", options,
+	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:T:RLVW:", options,
 				  NULL)) != -1) {
 		switch (opt) {
 		case 'D':
 			no_domain_init = true;
+			break;
+		case 'E':
+			quota_nb_entry_per_domain = strtol(optarg, NULL, 10);
 			break;
 		case 'F':
 			pidfile = optarg;
@@ -1761,11 +1789,17 @@ int main(int argc, char *argv[])
 		case 'L':
 			remove_local = false;
 			break;
+		case 'S':
+			quota_max_entry_size = strtol(optarg, NULL, 10);
+			break;
 		case 'T':
 			tracefile = optarg;
 			break;
 		case 'V':
 			verbose = true;
+			break;
+		case 'W':
+			quota_nb_watch_per_domain = strtol(optarg, NULL, 10);
 			break;
 		}
 	}
