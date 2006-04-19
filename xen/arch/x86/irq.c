@@ -198,7 +198,7 @@ static void __do_IRQ_guest(int vector)
     {
         d = action->guest[i];
         if ( (action->ack_type != ACKTYPE_NONE) &&
-             !test_and_set_bit(irq, &d->pirq_mask) )
+             !test_and_set_bit(irq, &d->pirq_mask[0]) )
             action->in_flight++;
         send_guest_pirq(d, irq);
     }
@@ -235,7 +235,7 @@ static void __set_eoi_ready(irq_desc_t *desc)
 
     if ( !(desc->status & IRQ_GUEST) ||
          (action->in_flight != 0) ||
-         !test_and_clear_bit(cpu, &action->cpu_eoi_map) )
+         !cpu_test_and_clear(cpu, action->cpu_eoi_map) )
         return;
 
     sp = pending_eoi_sp(cpu);
@@ -285,7 +285,7 @@ static void flush_all_pending_eoi(void *unused)
         ASSERT(action->ack_type == ACKTYPE_EOI);
         ASSERT(desc->status & IRQ_GUEST);
         for ( i = 0; i < action->nr_guests; i++ )
-            clear_bit(vector_to_irq(vector), &action->guest[i]->pirq_mask);
+            clear_bit(vector_to_irq(vector), &action->guest[i]->pirq_mask[0]);
         action->in_flight = 0;
         spin_unlock(&desc->lock);
     }
@@ -311,7 +311,7 @@ int pirq_guest_unmask(struct domain *d)
         spin_lock_irq(&desc->lock);
 
         if ( !test_bit(d->pirq_to_evtchn[pirq], &s->evtchn_mask[0]) &&
-             test_and_clear_bit(pirq, &d->pirq_mask) )
+             test_and_clear_bit(pirq, &d->pirq_mask[0]) )
         {
             ASSERT(action->ack_type != ACKTYPE_NONE);
             if ( --action->in_flight == 0 )
@@ -322,7 +322,7 @@ int pirq_guest_unmask(struct domain *d)
             }
         }
 
-        if ( __test_and_clear_bit(cpu, &cpu_eoi_map) )
+        if ( cpu_test_and_clear(cpu, cpu_eoi_map) )
         {
             __set_eoi_ready(desc);
             spin_unlock(&desc->lock);
@@ -493,13 +493,13 @@ int pirq_guest_unbind(struct domain *d, int irq)
     switch ( action->ack_type )
     {
     case ACKTYPE_UNMASK:
-        if ( test_and_clear_bit(irq, &d->pirq_mask) &&
+        if ( test_and_clear_bit(irq, &d->pirq_mask[0]) &&
              (--action->in_flight == 0) )
             desc->handler->end(vector);
         break;
     case ACKTYPE_EOI:
         /* NB. If #guests == 0 then we clear the eoi_map later on. */
-        if ( test_and_clear_bit(irq, &d->pirq_mask) &&
+        if ( test_and_clear_bit(irq, &d->pirq_mask[0]) &&
              (--action->in_flight == 0) &&
              (action->nr_guests != 0) )
         {
@@ -511,7 +511,7 @@ int pirq_guest_unbind(struct domain *d, int irq)
         break;
     }
 
-    BUG_ON(test_bit(irq, &d->pirq_mask));
+    BUG_ON(test_bit(irq, &d->pirq_mask[0]));
 
     if ( action->nr_guests != 0 )
         goto out;
