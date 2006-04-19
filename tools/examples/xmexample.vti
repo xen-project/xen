@@ -18,6 +18,10 @@ kernel = "/boot/Flash.fd"
 builder='hvm'
 
 # Initial memory allocation (in megabytes) for the new domain.
+#
+# WARNING: Creating a domain with insufficient memory may cause out of
+#          memory errors. The domain needs enough memory to boot kernel
+#          and modules. Allocating less than 32MBs is not recommended.
 memory = 256
 
 # A name for your domain. All domains must have different names.

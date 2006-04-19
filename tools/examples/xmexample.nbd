@@ -10,7 +10,12 @@
 
 kernel = "/boot/vmlinuz-2.6.13-15b-xen"
 ramdisk = "/boot/initrd-2.6.13-15b-xen"
+
+# WARNING: Creating a domain with insufficient memory may cause out of
+#          memory errors. The domain needs enough memory to boot kernel
+#          and modules. Allocating less than 32MBs is not recommended.
 memory = 128
+
 name = "nbd4"
 vif = [ '' ]
 # Please change PORT
