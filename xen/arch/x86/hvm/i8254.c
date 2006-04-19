@@ -562,7 +562,8 @@ void pickup_deactive_ticks(struct hvm_virpit *vpit)
         if (next_time > 0)
             set_timer(&(s->hvm_time->pit_timer), s->next_transition_time);
         else {
-            printk("HVM_PIT:not set_timer before resume next_time=%lld!\n", next_time);
+            printk("HVM_PIT:not set_timer before resume next_time=%"
+                   PRId64"!\n", next_time);
             next_time = s->next_transition_time;
         }
     }
