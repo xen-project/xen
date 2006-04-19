@@ -682,7 +682,7 @@ ENTRY(hypercall_args_table)
         .byte 2 /* do_nmi_op            */
         .byte 2 /* do_arch_sched_op     */
         .byte 2 /* do_callback_op       */  /* 30 */
-        .byte 3 /* do_xenoprof_op       */
+        .byte 2 /* do_xenoprof_op       */
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr

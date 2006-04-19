@@ -35,8 +35,9 @@ static void xenoprof_stop(void);
 void * vm_map_xen_pages(unsigned long maddr, int vm_size, pgprot_t prot);
 
 static int xenoprof_enabled = 0;
-static int num_events = 0;
+static unsigned int num_events = 0;
 static int is_primary = 0;
+static int active_defined;
 
 /* sample buffers shared with Xen */
 xenoprof_buf_t * xenoprof_buf[MAX_VIRT_CPUS];
@@ -106,7 +107,7 @@ static irqreturn_t
 xenoprof_ovf_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 {
 	int head, tail, size;
-	xenoprof_buf_t * buf;
+	struct xenoprof_buf * buf;
 	int cpu;
 
 	cpu = smp_processor_id();
@@ -196,28 +197,49 @@ static int bind_virq(void)
 static int xenoprof_setup(void)
 {
 	int ret;
+	int i;
 
 	ret = bind_virq();
 	if (ret)
 		return ret;
 
 	if (is_primary) {
-		ret = HYPERVISOR_xenoprof_op(XENOPROF_reserve_counters,
-					     (unsigned long)NULL,
-					     (unsigned long)NULL);
+		struct xenoprof_counter counter;
+
+		/* Define dom0 as an active domain if not done yet */
+		if (!active_defined) {
+			domid_t domid;
+			ret = HYPERVISOR_xenoprof_op(XENOPROF_reset_active_list, NULL);
+			if (ret)
+				goto err;
+			domid = 0;
+			ret = HYPERVISOR_xenoprof_op(XENOPROF_set_active, &domid);
+			if (ret)
+				goto err;
+			active_defined = 1;
+		}
+
+		ret = HYPERVISOR_xenoprof_op(XENOPROF_reserve_counters, NULL);
 		if (ret)
 			goto err;
+		for (i=0; i<num_events; i++) {
+			counter.ind       = i;
+			counter.count     = (uint64_t)counter_config[i].count;
+			counter.enabled   = (uint32_t)counter_config[i].enabled;
+			counter.event     = (uint32_t)counter_config[i].event;
+			counter.kernel    = (uint32_t)counter_config[i].kernel;
+			counter.user      = (uint32_t)counter_config[i].user;
+			counter.unit_mask = (uint64_t)counter_config[i].unit_mask;
+			HYPERVISOR_xenoprof_op(XENOPROF_counter, 
+					       &counter);
+		}
+		ret = HYPERVISOR_xenoprof_op(XENOPROF_setup_events, NULL);
 
-		ret = HYPERVISOR_xenoprof_op(XENOPROF_setup_events,
-					     (unsigned long)&counter_config,
-					     (unsigned long)num_events);
 		if (ret)
 			goto err;
 	}
 
-	ret = HYPERVISOR_xenoprof_op(XENOPROF_enable_virq,
-				     (unsigned long)NULL,
-				     (unsigned long)NULL);
+	ret = HYPERVISOR_xenoprof_op(XENOPROF_enable_virq, NULL);
 	if (ret)
 		goto err;
 
@@ -233,17 +255,15 @@ static void xenoprof_shutdown(void)
 {
 	xenoprof_enabled = 0;
 
-	HYPERVISOR_xenoprof_op(XENOPROF_disable_virq,
-			       (unsigned long)NULL,
-			       (unsigned long)NULL);
+	HYPERVISOR_xenoprof_op(XENOPROF_disable_virq, NULL);
 
 	if (is_primary) {
-		HYPERVISOR_xenoprof_op(XENOPROF_release_counters,
-				       (unsigned long)NULL,
-				       (unsigned long)NULL);
+		HYPERVISOR_xenoprof_op(XENOPROF_release_counters, NULL);
+		active_defined = 0;
 	}
 
 	unbind_virq();
+
 }
 
 
@@ -252,9 +272,8 @@ static int xenoprof_start(void)
 	int ret = 0;
 
 	if (is_primary)
-		ret = HYPERVISOR_xenoprof_op(XENOPROF_start,
-					     (unsigned long)NULL,
-					     (unsigned long)NULL);
+		ret = HYPERVISOR_xenoprof_op(XENOPROF_start, NULL);
+
 	return ret;
 }
 
@@ -262,20 +281,43 @@ static int xenoprof_start(void)
 static void xenoprof_stop(void)
 {
 	if (is_primary)
-		HYPERVISOR_xenoprof_op(XENOPROF_stop,
-				       (unsigned long)NULL,
-				       (unsigned long)NULL);
+		HYPERVISOR_xenoprof_op(XENOPROF_stop, NULL);
 }
 
 
 static int xenoprof_set_active(int * active_domains,
-			  unsigned int adomains)
+			       unsigned int adomains)
 {
 	int ret = 0;
-	if (is_primary)
-		ret = HYPERVISOR_xenoprof_op(XENOPROF_set_active,
-					     (unsigned long)active_domains,
-					     (unsigned long)adomains);
+	int i;
+	int set_dom0 = 0;
+	domid_t domid;
+
+	if (!is_primary)
+		return 0;
+
+	if (adomains > MAX_OPROF_DOMAINS)
+		return -E2BIG;
+
+	ret = HYPERVISOR_xenoprof_op(XENOPROF_reset_active_list, NULL);
+	if (ret)
+		return ret;
+
+	for (i=0; i<adomains; i++) {
+		domid = active_domains[i];
+		ret = HYPERVISOR_xenoprof_op(XENOPROF_set_active, &domid);
+		if (ret)
+			return (ret);
+		if (active_domains[i] == 0)
+			set_dom0 = 1;
+	}
+	/* dom0 must always be active but may not be in the list */ 
+	if (!set_dom0) {
+		domid = 0;
+		ret = HYPERVISOR_xenoprof_op(XENOPROF_set_active, &domid);
+	}
+	
+	active_defined = 1;
 	return ret;
 }
 
@@ -325,44 +367,48 @@ static int using_xenoprof;
 
 int __init oprofile_arch_init(struct oprofile_operations * ops)
 {
-	xenoprof_init_result_t result;
-	xenoprof_buf_t * buf;
-	int max_samples = 16;
+	struct xenoprof_init init;
+	struct xenoprof_buf * buf;
 	int vm_size;
 	int npages;
+	int ret;
 	int i;
 
-	int ret = HYPERVISOR_xenoprof_op(XENOPROF_init,
-					 (unsigned long)max_samples,
-					 (unsigned long)&result);
+	init.max_samples = 16;
+	ret = HYPERVISOR_xenoprof_op(XENOPROF_init, &init);
 
 	if (!ret) {
 		pgprot_t prot = __pgprot(_KERNPG_TABLE);
 
-		num_events = result.num_events;
-		is_primary = result.is_primary;
-		nbuf = result.nbuf;
+		num_events = init.num_events;
+		is_primary = init.is_primary;
+		nbuf = init.nbuf;
 
-		npages = (result.bufsize * nbuf - 1) / PAGE_SIZE + 1;
+		/* just in case - make sure we do not overflow event list 
+                   (i.e. counter_config list) */
+		if (num_events > OP_MAX_COUNTER)
+			num_events = OP_MAX_COUNTER;
+
+		npages = (init.bufsize * nbuf - 1) / PAGE_SIZE + 1;
 		vm_size = npages * PAGE_SIZE;
 
-		shared_buffer = (char *) vm_map_xen_pages(result.buf_maddr,
-							  vm_size, prot);
+		shared_buffer = (char *)vm_map_xen_pages(init.buf_maddr,
+							 vm_size, prot);
 		if (!shared_buffer) {
 			ret = -ENOMEM;
 			goto out;
 		}
 
 		for (i=0; i< nbuf; i++) {
-			buf = (xenoprof_buf_t*) 
-				&shared_buffer[i * result.bufsize];
+			buf = (struct xenoprof_buf*) 
+				&shared_buffer[i * init.bufsize];
 			BUG_ON(buf->vcpu_id >= MAX_VIRT_CPUS);
 			xenoprof_buf[buf->vcpu_id] = buf;
 		}
 
 		/*  cpu_type is detected by Xen */
 		cpu_type[XENOPROF_CPU_TYPE_SIZE-1] = 0;
-		strncpy(cpu_type, result.cpu_type, XENOPROF_CPU_TYPE_SIZE - 1);
+		strncpy(cpu_type, init.cpu_type, XENOPROF_CPU_TYPE_SIZE - 1);
 		xenoprof_ops.cpu_type = cpu_type;
 
 		init_driverfs();
@@ -371,6 +417,8 @@ int __init oprofile_arch_init(struct oprofile_operations * ops)
 
 		for (i=0; i<NR_CPUS; i++)
 			ovf_irq[i] = -1;
+
+		active_defined = 0;
 	}
  out:
 	printk(KERN_INFO "oprofile_arch_init: ret %d, events %d, "
@@ -389,7 +437,5 @@ void __exit oprofile_arch_exit(void)
 		shared_buffer = NULL;
 	}
 	if (is_primary)
-		HYPERVISOR_xenoprof_op(XENOPROF_shutdown,
-				       (unsigned long)NULL,
-				       (unsigned long)NULL);
+		HYPERVISOR_xenoprof_op(XENOPROF_shutdown, NULL);
 }
