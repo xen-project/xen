@@ -60,7 +60,7 @@ fi
 function vtpmdb_find_instance () {
 	local vmname=$1
 	local ret=0
-	instance=`cat $VTPMDB |                    \
+	instance=$(cat $VTPMDB |                   \
 	          awk -vvmname=$vmname             \
 	          '{                               \
 	             if ( 1 != index($1,"#")) {    \
@@ -69,7 +69,7 @@ function vtpmdb_find_instance () {
 	                 exit;                     \
 	               }                           \
 	             }                             \
-	           }'`
+	           }')
 	if [ "$instance" != "" ]; then
 		ret=$instance
 	fi
@@ -86,13 +86,13 @@ function vtpmdb_is_free_instancenum () {
 	if [ $instance -eq 0 -o $instance -gt 255 ]; then
 		avail=0
 	else
-		instances=`cat $VTPMDB |                 \
+		instances=$(cat $VTPMDB |                \
 		           gawk                          \
 		           '{                            \
 		               if (1 != index($1,"#")) { \
 		                 printf("%s ",$2);       \
 		               }                         \
-		            }'`
+		            }')
 		for i in $instances; do
 			if [ $i -eq $instance ]; then
 				avail=0
@@ -110,13 +110,13 @@ function vtpmdb_get_free_instancenum () {
 	local ctr
 	local instances
 	local don
-	instances=`cat $VTPMDB |                 \
+	instances=$(cat $VTPMDB |                \
 	           gawk                          \
 	           '{                            \
 	               if (1 != index($1,"#")) { \
 	                 printf("%s ",$2);       \
 	               }                         \
-	            }'`
+	            }')
 	ctr=1
 	don=0
 	while [ $don -eq 0 ]; do
@@ -163,7 +163,7 @@ function vtpmdb_validate_entry () {
 	local vmname=$1
 	local inst=$2
 
-	res=`cat $VTPMDB |             \
+	res=$(cat $VTPMDB |            \
 	     gawk -vvmname=$vmname     \
 	          -vinst=$inst         \
 	     '{                        \
@@ -179,7 +179,7 @@ function vtpmdb_validate_entry () {
 	            printf("2");       \
 	            exit;              \
 	         }                     \
-	     }'`
+	     }')
 
 	if [ "$res" == "1" ]; then
 		let rc=1
@@ -196,13 +196,13 @@ function vtpmdb_remove_entry () {
 	local vmname=$1
 	local instance=$2
 	local VTPMDB_TMP="$VTPMDB".tmp
-	`cat $VTPMDB |             \
+	$(cat $VTPMDB |            \
 	 gawk -vvmname=$vmname     \
 	 '{                        \
 	    if ( $1 != vmname ) {  \
 	      print $0;            \
 	    }                      \
-	 '} > $VTPMDB_TMP`
+	 '} > $VTPMDB_TMP)
 	if [ -e $VTPMDB_TMP ]; then
 		mv -f $VTPMDB_TMP $VTPMDB
 		vtpm_delete $instance
