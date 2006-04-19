@@ -252,10 +252,10 @@ ENTRY(idle_pg_table_4)
 ENTRY(idle_pg_table_l3)
         .quad idle_pg_table_l2 - __PAGE_OFFSET + 7
 
-/* Initial PDE -- level-2 page table. Maps first 64MB physical memory. */
+/* Initial PDE -- level-2 page table. Maps first 1GB physical memory. */
         .org 0x4000
 ENTRY(idle_pg_table_l2)
-        .macro identmap from=0, count=32
+        .macro identmap from=0, count=512
         .if \count-1
         identmap "(\from+0)","(\count/2)"
         identmap "(\from+(0x200000*(\count/2)))","(\count/2)"
