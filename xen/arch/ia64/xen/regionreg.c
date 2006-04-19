@@ -15,24 +15,39 @@
 #include <asm/regionreg.h>
 #include <asm/vhpt.h>
 #include <asm/vcpu.h>
+
+/* Defined in xemasm.S  */
 extern void ia64_new_rr7(unsigned long rid,void *shared_info, void *shared_arch_info, unsigned long p_vhpt, unsigned long v_pal);
+
 extern void *pal_vaddr;
 
-/* FIXME: where these declarations should be there ? */
-extern void panic_domain(struct pt_regs *, const char *, ...);
+/* RID virtualization mechanism is really simple:  domains have less rid bits
+   than the host and the host rid space is shared among the domains.  (Values
+   in parenthesis are usual default values).
 
-#define DOMAIN_RID_BITS_DEFAULT 18
+   The host rid space is partitionned into MAX_RID_BLOCKS (= 64)
+   blocks of 2**IA64_MIN_IMPL_RID_BITS (= 18) rids.  The first block is also
+   partitionned into MAX_RID_BLOCKS small blocks.  Small blocks are used for
+   metaphysical rids.  Small block 0 can't be allocated and is reserved for
+   Xen own rids during boot.
 
+   Blocks and small blocks are allocated together and a domain may
+   have one or more consecutive blocks (and small blocks).
+*/
+
+/* Minimum number of RID bits for a domain.  The current value is 18, which is
+   the minimum defined by the itanium architecture, but it can be lowered
+   to increase the number of domain.  */
 #define	IA64_MIN_IMPL_RID_BITS	(IA64_MIN_IMPL_RID_MSB+1)
+/* Maximum number of RID bits.  This is definitly 24.  */
 #define	IA64_MAX_IMPL_RID_BITS	24
 
-#define MIN_RIDS	(1 << IA64_MIN_IMPL_RID_BITS)
-#define	MIN_RID_MAX	(MIN_RIDS - 1)
-#define	MIN_RID_MASK	(MIN_RIDS - 1)
-#define	MAX_RIDS	(1 << (IA64_MAX_IMPL_RID_BITS))
-#define	MAX_RID		(MAX_RIDS - 1)
+/* Maximum number of blocks.  */
 #define	MAX_RID_BLOCKS	(1 << (IA64_MAX_IMPL_RID_BITS-IA64_MIN_IMPL_RID_BITS))
-#define RIDS_PER_RIDBLOCK MIN_RIDS
+
+/* Default number of rid bits for domains.  */
+static unsigned int domain_rid_bits_default = IA64_MIN_IMPL_RID_BITS;
+integer_param("dom_rid_bits", domain_rid_bits_default); 
 
 #if 0
 // following already defined in include/asm-ia64/gcc_intrin.h
@@ -90,11 +105,31 @@ void init_rid_allocator (void)
 	if (implemented_rid_bits > IA64_MAX_IMPL_RID_BITS)
 		implemented_rid_bits = IA64_MAX_IMPL_RID_BITS;
 
+	/* Due to RID mangling, we expect 24 RID bits!
+	   This test should be removed if RID mangling is removed/modified.  */
+	if (implemented_rid_bits != 24) {
+		printf ("RID mangling expected 24 RID bits, got only %d!\n",
+			implemented_rid_bits);
+		BUG();
+	}
+
+	/* Allow the creation of at least domain 0.  */
+	if (domain_rid_bits_default > implemented_rid_bits - 1)
+		domain_rid_bits_default = implemented_rid_bits - 1;
+
+	/* Check for too small values.  */
+	if (domain_rid_bits_default < IA64_MIN_IMPL_RID_BITS) {
+		printf ("Default domain rid bits %d is too small, use %d\n",
+			domain_rid_bits_default, IA64_MIN_IMPL_RID_BITS);
+		domain_rid_bits_default = IA64_MIN_IMPL_RID_BITS;
+	}
+
 	log_blocks = (implemented_rid_bits - IA64_MIN_IMPL_RID_BITS);
 
-	printf ("Maximum of simultaneous domains: %d\n",
-		(1 << log_blocks) - 1);
-
+	printf ("Maximum number of domains: %d; %d RID bits per domain\n",
+		(1 << (implemented_rid_bits - domain_rid_bits_default)) - 1,
+		domain_rid_bits_default);
+	
 	mp_rid_shift = IA64_MIN_IMPL_RID_BITS - log_blocks;
 	BUG_ON (mp_rid_shift < 3);
 }
@@ -109,7 +144,7 @@ int allocate_rid_range(struct domain *d, unsigned long ridbits)
 	int i, j, n_rid_blocks;
 
 	if (ridbits == 0)
-		ridbits = DOMAIN_RID_BITS_DEFAULT;
+		ridbits = domain_rid_bits_default;
 
 	if (ridbits >= IA64_MAX_IMPL_RID_BITS)
 		ridbits = IA64_MAX_IMPL_RID_BITS - 1;
@@ -152,7 +187,7 @@ int allocate_rid_range(struct domain *d, unsigned long ridbits)
 	d->arch.metaphysical_rr0 = allocate_metaphysical_rr(d, 0);
 	d->arch.metaphysical_rr4 = allocate_metaphysical_rr(d, 1);
 
-	printf("###allocating rid_range, domain %p: rid=%x-%x mp_rid=%x\n",
+	printf("### domain %p: rid=%x-%x mp_rid=%x\n",
 	       d, d->arch.starting_rid, d->arch.ending_rid,
 	       d->arch.starting_mp_rid);
 	
@@ -166,20 +201,16 @@ int deallocate_rid_range(struct domain *d)
 	int rid_block_end = d->arch.ending_rid >> IA64_MIN_IMPL_RID_BITS;
 	int rid_block_start = d->arch.starting_rid >> IA64_MIN_IMPL_RID_BITS;
 
-	//
-	// not all domains will have allocated RIDs (physical mode loaders for instance)
-	//
-	if (d->arch.rid_bits == 0) return 1;
+	/* Sanity check.  */
+	if (d->arch.rid_bits == 0)
+		return 1;
 
-#ifdef DEBUG
+	
 	for (i = rid_block_start; i < rid_block_end; ++i) {
 	        ASSERT(ridblock_owner[i] == d);
-	    }
-#endif
-	
-	for (i = rid_block_start; i < rid_block_end; ++i)
 		ridblock_owner[i] = NULL;
-	
+	}
+
 	d->arch.rid_bits = 0;
 	d->arch.starting_rid = 0;
 	d->arch.ending_rid = 0;

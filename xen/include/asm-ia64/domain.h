@@ -18,6 +18,10 @@ extern void domain_relinquish_resources(struct domain *);
    if false, flush and invalidate caches.  */
 extern void domain_cache_flush (struct domain *d, int sync_only);
 
+/* Cleanly crash the current domain with a message.  */
+extern void panic_domain(struct pt_regs *, const char *, ...)
+     __attribute__ ((noreturn, format (printf, 2, 3)));
+
 struct arch_domain {
     struct mm_struct *mm;
     unsigned long metaphysical_rr0;
