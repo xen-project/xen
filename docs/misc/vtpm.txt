@@ -17,13 +17,8 @@ Development Prerequisites: An emulator for TESTING ONLY is provided
 Compiling XEN tree:
 -------------------
 
-Compile the XEN tree as usual.
-
-make uninstall; make mrproper; make install 
-
-After compiling the tree, verify that in the linux-2.6.XX-xen0/.config 
-file at least the following entries are set as below (they should be set
-by default):
+Compile the XEN tree as usual after the following lines set in the
+linux-2.6.??-xen/.config file:
 
 CONFIG_XEN_TPMDEV_BACKEND=y
 CONFIG_XEN_TPMDEV_GRANT=y
@@ -32,18 +27,20 @@ CONFIG_TCG_TPM=m
 CONFIG_TCG_NSC=m
 CONFIG_TCG_ATMEL=m
 
+You must also enable the virtual TPM to be built:
 
-Verify that in the linux-2.6.XX-xenU/.config file at least the 
-Following entries are set as below (they should be set by default):
+In Config.mk in the Xen root directory set the line
 
-CONFIG_XEN_TPMDEV_FRONTEND=y
-CONFIG_XEN_TPMDEV_GRANT=y
+VTPM_TOOLS ?= y
 
-CONFIG_TCG_TPM=y
-CONFIG_TCG_XEN=y
+Now build the Xen sources from Xen's root directory:
+
+make install
 
 
-Reboot the machine with the created XEN-0 kernel.
+Also build the initial RAM disk if necessary.
+
+Reboot the machine with the created Xen kernel.
 
 Note: If you do not want any TPM-related code compiled into your
 kernel or built as module then comment all the above lines like
