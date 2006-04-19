@@ -22,6 +22,8 @@
 /* FIXME: where these declarations should be there ? */
 extern void getreg(unsigned long regnum, unsigned long *val, int *nat, struct pt_regs *regs);
 extern void setreg(unsigned long regnum, unsigned long val, int nat, struct pt_regs *regs);
+extern void getfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_regs *regs);
+
 extern void panic_domain(struct pt_regs *, const char *, ...);
 extern unsigned long translate_domain_pte(UINT64,UINT64,UINT64);
 extern unsigned long translate_domain_mpaddr(unsigned long);
@@ -104,6 +106,15 @@ vcpu_set_gr(VCPU *vcpu, unsigned long reg, UINT64 value, int nat)
 	setreg(reg,value,nat,regs);	// FIXME: handle NATs later
 	return IA64_NO_FAULT;
 }
+
+IA64FAULT
+vcpu_get_fpreg(VCPU *vcpu, unsigned long reg, struct ia64_fpreg *val)
+{
+	REGS *regs = vcpu_regs(vcpu);
+	getfpreg(reg,val,regs);	// FIXME: handle NATs later
+	return 0;
+}
+
 #else
 // returns:
 //   IA64_ILLOP_FAULT if the register would cause an Illegal Operation fault

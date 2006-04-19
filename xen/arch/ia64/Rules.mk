@@ -28,7 +28,7 @@ CFLAGS  += -I$(BASEDIR)/include/asm-ia64 -I$(BASEDIR)/include/asm-ia64/linux \
            -I$(BASEDIR)/arch/ia64/linux -I$(BASEDIR)/arch/ia64/linux-xen
 #CFLAGS  += -Wno-pointer-arith -Wredundant-decls
 CFLAGS  += -DIA64 -DXEN -DLINUX_2_6 -DV_IOSAPIC_READY
-CFLAGS	+= -ffixed-r13 -mfixed-range=f12-f15,f32-f127
+CFLAGS	+= -ffixed-r13 -mfixed-range=f2-f5,f12-f127
 CFLAGS	+= -g
 #CFLAGS  += -DVTI_DEBUG
 ifeq ($(VALIDATE_VT),y)

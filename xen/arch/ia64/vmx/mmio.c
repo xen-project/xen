@@ -57,20 +57,21 @@ static void pib_write(VCPU *vcpu, void *src, uint64_t pib_off, size_t s, int ma)
 {
     switch (pib_off) {
     case PIB_OFST_INTA:
-        panic("Undefined write on PIB INTA\n");
+        panic_domain(NULL,"Undefined write on PIB INTA\n");
         break;
     case PIB_OFST_XTP:
         if ( s == 1 && ma == 4 /* UC */) {
             vmx_vcpu_get_plat(vcpu)->xtp = *(uint8_t *)src;
         }
         else {
-            panic("Undefined write on PIB XTP\n");
+            panic_domain(NULL,"Undefined write on PIB XTP\n");
         }
         break;
     default:
         if ( PIB_LOW_HALF(pib_off) ) {   // lower half
             if ( s != 8 || ma != 0x4 /* UC */ ) {
-                panic("Undefined IPI-LHF write with s %ld, ma %d!\n", s, ma);
+                panic_domain
+		  (NULL,"Undefined IPI-LHF write with s %ld, ma %d!\n", s, ma);
             }
             else {
                 write_ipi(vcpu, pib_off, *(uint64_t *)src);
@@ -79,7 +80,7 @@ static void pib_write(VCPU *vcpu, void *src, uint64_t pib_off, size_t s, int ma)
         }
         else {      // upper half
             printf("IPI-UHF write %lx\n",pib_off);
-            panic("Not support yet for SM-VP\n");
+            panic_domain(NULL,"Not support yet for SM-VP\n");
         }
         break;
     }
@@ -94,7 +95,7 @@ static void pib_read(VCPU *vcpu, uint64_t pib_off, void *dest, size_t s, int ma)
             // TODO: INTA read from IOSAPIC
         }
         else {
-            panic("Undefined read on PIB INTA\n");
+            panic_domain(NULL,"Undefined read on PIB INTA\n");
         }
         break;
     case PIB_OFST_XTP:
@@ -102,13 +103,13 @@ static void pib_read(VCPU *vcpu, uint64_t pib_off, void *dest, size_t s, int ma)
             *((uint8_t*)dest) = vmx_vcpu_get_plat(vcpu)->xtp;
         }
         else {
-            panic("Undefined read on PIB XTP\n");
+            panic_domain(NULL,"Undefined read on PIB XTP\n");
         }
         break;
     default:
         if ( PIB_LOW_HALF(pib_off) ) {   // lower half
             if ( s != 8 || ma != 4 ) {
-                panic("Undefined IPI-LHF read!\n");
+                panic_domain(NULL,"Undefined IPI-LHF read!\n");
             }
             else {
 #ifdef  IPI_DEBUG
@@ -119,7 +120,7 @@ static void pib_read(VCPU *vcpu, uint64_t pib_off, void *dest, size_t s, int ma)
         }
         else {      // upper half
             if ( s != 1 || ma != 4 ) {
-                panic("Undefined PIB-UHF read!\n");
+                panic_domain(NULL,"Undefined PIB-UHF read!\n");
             }
             else {
 #ifdef  IPI_DEBUG
@@ -140,7 +141,7 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 
     vio = get_vio(v->domain, v->vcpu_id);
     if (vio == 0) {
-        panic("bad shared page: %lx", (unsigned long)vio);
+        panic_domain(NULL,"bad shared page: %lx", (unsigned long)vio);
     }
     p = &vio->vp_ioreq;
     p->addr = pa;
@@ -172,7 +173,7 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 
     vio = get_vio(v->domain, v->vcpu_id);
     if (vio == 0) {
-        panic("bad shared page\n");
+        panic_domain(NULL,"bad shared page\n");
     }
     p = &vio->vp_ioreq;
     p->addr = TO_LEGACY_IO(pa&0x3ffffffUL);
@@ -237,7 +238,7 @@ static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int
         legacy_io_access(vcpu, src_pa, dest, s, dir);
         break;
     default:
-        panic("Bad I/O access\n");
+        panic_domain(NULL,"Bad I/O access\n");
         break;
     }
     return;
@@ -285,7 +286,7 @@ memread_v(VCPU *vcpu, thash_data_t *vtlb, u64 *src, u64 *dest, size_t s)
     uint64_t pa;
 
     if (!vtlb->nomap)
-        panic("Normal memory write shouldn't go to this point!");
+        panic_domain(NULL,"Normal memory write shouldn't go to this point!");
     pa = PPN_2_PA(vtlb->ppn);
     pa += POFFSET((u64)src, vtlb->ps);
 
@@ -329,14 +330,14 @@ static void deliver_ipi (VCPU *vcpu, uint64_t dm, uint64_t vector)
         break;
     case 2:     // PMI
         // TODO -- inject guest PMI
-        panic ("Inject guest PMI!\n");
+        panic_domain (NULL, "Inject guest PMI!\n");
         break;
     case 4:     // NMI
         vmx_vcpu_pend_interrupt (vcpu, 2);
         break;
     case 5:     // INIT
         // TODO -- inject guest INIT
-        panic ("Inject guest INIT!\n");
+        panic_domain (NULL, "Inject guest INIT!\n");
         break;
     case 7:     // ExtINT
         vmx_vcpu_pend_interrupt (vcpu, 0);
@@ -345,7 +346,7 @@ static void deliver_ipi (VCPU *vcpu, uint64_t dm, uint64_t vector)
     case 3:
     case 6:
     default:
-        panic ("Deliver reserved IPI!\n");
+        panic_domain (NULL, "Deliver reserved IPI!\n");
         break;
     }
 }
@@ -379,7 +380,7 @@ static int write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value)
  
     target_cpu = lid_2_vcpu(vcpu->domain, 
     				((ipi_a_t)addr).id, ((ipi_a_t)addr).eid);
-    if ( target_cpu == NULL ) panic("Unknown IPI cpu\n");
+    if ( target_cpu == NULL ) panic_domain (NULL,"Unknown IPI cpu\n");
     if ( target_cpu == vcpu ) {
     	// IPI to self
         deliver_ipi (vcpu, ((ipi_d_t)value).dm, 
@@ -388,7 +389,7 @@ static int write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value)
     }
     else {
     	// TODO: send Host IPI to inject guest SMP IPI interruption
-        panic ("No SM-VP supported!\n");
+        panic_domain (NULL, "No SM-VP supported!\n");
         return 0;
     }
 }
@@ -473,15 +474,65 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
 
         }
     }
-    // Floating-point Load/Store
+    // Floating-point spill + Imm update
+    else if(inst.M10.major==7&&inst.M10.x6==0x3B){
+        struct ia64_fpreg v;
+	inst_type=SL_FLOATING;
+	dir=IOREQ_WRITE;
+	vcpu_get_fpreg(vcpu,inst.M10.f2,&v);
+	vcpu_get_gr_nat(vcpu,inst.M10.r3,&temp);
+	post_update = (inst.M10.i<<7)+inst.M10.imm7;
+	if(inst.M10.s)
+            temp -= post_update;
+	else
+            temp += post_update;
+	vcpu_set_gr(vcpu,inst.M10.r3,temp,0);
+
+	/* Write high word.
+	   FIXME: this is a kludge!  */
+	v.u.bits[1] &= 0x3ffff;
+	mmio_access(vcpu, padr + 8, &v.u.bits[1], 8, ma, IOREQ_WRITE);
+	data = v.u.bits[0];
+	size = 3;
+    }
+    // Floating-point stf8 + Imm update
+    else if(inst.M10.major==7&&inst.M10.x6==0x31){
+        struct ia64_fpreg v;
+	inst_type=SL_FLOATING;
+	dir=IOREQ_WRITE;
+	size=3;
+	vcpu_get_fpreg(vcpu,inst.M10.f2,&v);
+	data = v.u.bits[0]; /* Significand.  */
+	vcpu_get_gr_nat(vcpu,inst.M10.r3,&temp);
+	post_update = (inst.M10.i<<7)+inst.M10.imm7;
+	if(inst.M10.s)
+            temp -= post_update;
+	else
+            temp += post_update;
+	vcpu_set_gr(vcpu,inst.M10.r3,temp,0);
+    }
 //    else if(inst.M6.major==6&&inst.M6.m==0&&inst.M6.x==0&&inst.M6.x6==3){
 //        inst_type=SL_FLOATING;  //fp
 //        dir=IOREQ_READ;
 //        size=3;     //ldfd
 //    }
+    //  lfetch - do not perform accesses.
+    else if(inst.M15.major==7&&inst.M15.x6>=0x2c&&inst.M15.x6<=0x2f){
+	vcpu_get_gr_nat(vcpu,inst.M15.r3,&temp);
+	post_update = (inst.M15.i<<7)+inst.M15.imm7;
+	if(inst.M15.s)
+            temp -= post_update;
+	else
+            temp += post_update;
+	vcpu_set_gr(vcpu,inst.M15.r3,temp,0);
+
+	vmx_vcpu_increment_iip(vcpu);
+	return;
+    }
     else{
-        printf("This memory access instruction can't be emulated two: %lx\n ",inst.inst);
-        while(1);
+        panic_domain
+	  (NULL,"This memory access instr can't be emulated: %lx pc=%lx\n ",
+	   inst.inst, regs->cr_iip);
     }
 
     size = 1 << size;
@@ -499,7 +550,7 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
         if(inst_type==SL_INTEGER){       //gp
             vcpu_set_gr(vcpu,inst.M1.r1,data,0);
         }else{
-            panic("Don't support ldfd now !");
+            panic_domain(NULL, "Don't support ldfd now !");
 /*            switch(inst.M6.f1){
 
             case 6:

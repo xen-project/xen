@@ -170,6 +170,21 @@ typedef union U_INST64_M6 {
     struct { unsigned long qp:6, f1:7, un7:7, r3:7, x:1, hint:2, x6:6, m:1, major:4; };
 } INST64_M6;
 
+typedef union U_INST64_M9 {
+    IA64_INST inst;
+    struct { unsigned long qp:6, :7, f2:7, r3:7, x:1, hint:2, x6:6, m:1, major:4; };
+} INST64_M9;
+
+typedef union U_INST64_M10 {
+    IA64_INST inst;
+    struct { unsigned long qp:6, imm7:7, f2:7, r3:7, i:1, hint:2, x6:6, s:1, major:4; };
+} INST64_M10;
+
+typedef union U_INST64_M15 {
+    IA64_INST inst;
+    struct { unsigned long qp:6, :7, imm7:7, r3:7, i:1, hint:2, x6:6, s:1, major:4; };
+} INST64_M15;
+
 typedef union U_INST64 {
     IA64_INST inst;
     struct { unsigned long :37, major:4; } generic;
@@ -187,6 +202,9 @@ typedef union U_INST64 {
     INST64_M4  M4;	// st integer
     INST64_M5  M5;
     INST64_M6  M6;	// ldfd floating pointer
+    INST64_M9  M9;	// stfd floating pointer
+    INST64_M10 M10;	// stfd floating pointer
+    INST64_M15 M15;	// lfetch + imm update
     INST64_M28 M28;	// purge translation cache entry
     INST64_M29 M29;	// mov register to ar (M unit)
     INST64_M30 M30;	// mov immediate to ar (M unit)
