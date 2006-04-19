@@ -20,12 +20,14 @@
 #include <asm/percpu.h>
 
 #define GATE_ADDR		__IA64_UL_CONST(0xa000000000000000)
+#ifndef XEN
 /*
  * 0xa000000000000000+2*PERCPU_PAGE_SIZE
  * - 0xa000000000000000+3*PERCPU_PAGE_SIZE remain unmapped (guard page)
  */
 #define KERNEL_START		 __IA64_UL_CONST(0xa000000100000000)
 #define PERCPU_ADDR		(-PERCPU_PAGE_SIZE)
+#endif
 
 #ifndef __ASSEMBLY__
 
@@ -185,6 +187,7 @@ do {								\
 	(__ia64_id_flags & IA64_PSR_I) == 0;	\
 })
 
+#ifndef XEN
 #ifdef __KERNEL__
 
 #ifdef CONFIG_IA32_SUPPORT
@@ -285,6 +288,7 @@ void cpu_idle_wait(void);
 #define arch_align_stack(x) (x)
 
 #endif /* __KERNEL__ */
+#endif /* XEN */
 
 #endif /* __ASSEMBLY__ */
 

@@ -42,7 +42,6 @@
 #include <asm/pgtable.h>
 #include <asm/io.h>
 
-#define IS_VMM_ADDRESS(addr) ((((addr) >> 60) ^ ((addr) >> 59)) & 1)
 #define __access_ok(addr) (!IS_VMM_ADDRESS((unsigned long)(addr)))
 #define access_ok(addr, size) (__access_ok(addr))
 #define array_access_ok(addr,count,size)( __access_ok(addr))

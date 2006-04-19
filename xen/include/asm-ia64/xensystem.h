@@ -13,15 +13,17 @@
 #include <asm/config.h>
 #include <linux/kernel.h>
 
-/* Define HV space hierarchy */
+/* Define HV space hierarchy.
+   VMM memory space is protected by CPL for paravirtualized domains and
+   by VA for VTi domains.  VTi imposes VA bit 60 != VA bit 59 for VMM.  */
 #define XEN_VIRT_SPACE_LOW	 0xe800000000000000
 #define XEN_VIRT_SPACE_HIGH	 0xf800000000000000	
 
+#define __IA64_UNCACHED_OFFSET	 0xe800000000000000UL
+
 #define XEN_START_ADDR		 0xf000000000000000
 #define HYPERVISOR_VIRT_START	 0xf000000000000000
-#undef KERNEL_START
 #define KERNEL_START		 0xf000000004000000
-#undef PERCPU_ADDR
 #define SHAREDINFO_ADDR		 0xf100000000000000
 #define SHARED_ARCHINFO_ADDR	 (SHAREDINFO_ADDR + PAGE_SIZE)
 #define PERCPU_ADDR		 (SHAREDINFO_ADDR - PERCPU_PAGE_SIZE)
@@ -33,13 +35,19 @@
 #endif
 #define XEN_END_ADDR		 0xf400000000000000
 
+#define IS_VMM_ADDRESS(addr) ((((addr) >> 60) ^ ((addr) >> 59)) & 1)
+
 #ifndef __ASSEMBLY__
 
-#undef IA64_HAS_EXTRA_STATE
 #define IA64_HAS_EXTRA_STATE(t) 0
 
-#undef __switch_to
-extern struct task_struct *vmx_ia64_switch_to (void *next_task);
+struct vcpu;
+extern void ia64_save_extra (struct vcpu *v);
+extern void ia64_load_extra (struct vcpu *v);
+
+extern struct vcpu *vmx_ia64_switch_to (struct vcpu *next_task);
+extern struct vcpu *ia64_switch_to (struct vcpu *next_task);
+
 #define __switch_to(prev,next,last) do {	\
        ia64_save_fpu(prev->arch._thread.fph);	\
        ia64_load_fpu(next->arch._thread.fph);	\
@@ -62,7 +70,6 @@ extern struct task_struct *vmx_ia64_switch_to (void *next_task);
        }                                       \
 } while (0)
 
-#undef switch_to
 // FIXME SMP... see system.h, does this need to be different?
 #define switch_to(prev,next,last)	__switch_to(prev, next, last)
 

@@ -40,8 +40,6 @@
  */
 asm (".section \"__ex_table\", \"a\"\n\t.previous");
 
-/* VT-i reserves bit 60 for the VMM; guest addresses have bit 60 = bit 59 */
-#define IS_VMM_ADDRESS(addr) ((((addr) >> 60) ^ ((addr) >> 59)) & 1)
 /* For back compatibility */
 #define __access_ok(addr, size, segment)	1
 #define access_ok(addr, size, segment)	__access_ok((addr), (size), (segment))
