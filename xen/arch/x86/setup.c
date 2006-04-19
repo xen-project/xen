@@ -321,7 +321,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 #if defined (CONFIG_X86_64)
         /*
          * x86/64 maps all registered RAM. Points to note:
-         *  1. The initial pagetable already maps low 64MB, so skip that.
+         *  1. The initial pagetable already maps low 1GB, so skip that.
          *  2. We must map *only* RAM areas, taking care to avoid I/O holes.
          *     Failure to do this can cause coherency problems and deadlocks
          *     due to cache-attribute mismatches (e.g., AMD/AGP Linux bug).
@@ -329,13 +329,14 @@ void __init __start_xen(multiboot_info_t *mbi)
         {
             /* Calculate page-frame range, discarding partial frames. */
             unsigned long start, end;
+            unsigned long init_mapped = 1UL << (30 - PAGE_SHIFT); /* 1GB */
             start = PFN_UP(e820.map[i].addr);
             end   = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
             /* Clip the range to above 64MB. */
-            if ( end < (64UL << (20-PAGE_SHIFT)) )
+            if ( end < init_mapped )
                 continue;
-            if ( start < (64UL << (20-PAGE_SHIFT)) )
-                start = 64UL << (20-PAGE_SHIFT);
+            if ( start < init_mapped )
+                start = init_mapped;
             /* Request the mapping. */
             map_pages_to_xen(
                 PAGE_OFFSET + (start << PAGE_SHIFT),
