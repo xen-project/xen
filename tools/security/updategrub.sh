@@ -41,8 +41,8 @@ Usage: $prg [-d <policies root>] <policy name> [<kernel version>]
                    default is $acmroot
 <policy name>    : The name of the policy, i.e. xen_null
 <kernel version> : The version of the kernel to apply the policy
-                   against, i.e. 2.6.12.6-xen0
-                   If not specified, a kernel version ending with '-xen0'
+                   against, i.e. 2.6.16-xen
+                   If not specified, a kernel version ending with '-xen'
                    will be searched for in '/lib/modules'
 "
 }

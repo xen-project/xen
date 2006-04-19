@@ -147,23 +147,23 @@ findGrubConf()
 # will hold a pattern
 # Parameters:
 # 1st: the path to reach the root directory of the XEN build tree
-#      where linux-*-xen0 is located at
+#      where linux-*-xen is located at
 # Results:
 # The variable linux holds then name and version of the compiled
-# kernel, i.e., 'vmlinuz-2.6.12-xen0'
+# kernel, i.e., 'vmlinuz-2.6.12-xen'
 getLinuxVersion ()
 {
 	local path
 	local versionfile
 	local lnx
 	if [ "$1" == "" ]; then
-		path="/lib/modules/*-xen0"
+		path="/lib/modules/*-xen"
 	else
 		path="/lib/modules/$1"
 	fi
 
 	linux=""
-	for f in $path/linux-*-xen0 ; do
+	for f in $path ; do
 		versionfile=$f/build/include/linux/version.h
 		if [ -r $versionfile ]; then
 			lnx=`cat $versionfile | \
@@ -178,7 +178,7 @@ getLinuxVersion ()
 			                 numbers[2],           \
 			                 numbers[3]);          \
 			       } else {                        \
-			         printf("%s.%s.%s[.0-9]*-xen0",\
+			         printf("%s.%s.%s[.0-9]*-xen", \
 			                numbers[1],            \
 			                numbers[2],            \
 			                numbers[3]);           \
@@ -192,7 +192,7 @@ getLinuxVersion ()
 	done
 
 	#Last resort.
-	linux="vmlinuz-2.[45678].[0-9]*[.0-9]*-xen0$"
+	linux="vmlinuz-2.[45678].[0-9]*[.0-9]*-xen$"
 }
 
 
