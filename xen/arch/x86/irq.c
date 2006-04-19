@@ -198,7 +198,7 @@ static void __do_IRQ_guest(int vector)
     {
         d = action->guest[i];
         if ( (action->ack_type != ACKTYPE_NONE) &&
-             !test_and_set_bit(irq, &d->pirq_mask[0]) )
+             !test_and_set_bit(irq, d->pirq_mask) )
             action->in_flight++;
         send_guest_pirq(d, irq);
     }
@@ -285,7 +285,7 @@ static void flush_all_pending_eoi(void *unused)
         ASSERT(action->ack_type == ACKTYPE_EOI);
         ASSERT(desc->status & IRQ_GUEST);
         for ( i = 0; i < action->nr_guests; i++ )
-            clear_bit(vector_to_irq(vector), &action->guest[i]->pirq_mask[0]);
+            clear_bit(vector_to_irq(vector), action->guest[i]->pirq_mask);
         action->in_flight = 0;
         spin_unlock(&desc->lock);
     }
@@ -310,8 +310,8 @@ int pirq_guest_unmask(struct domain *d)
 
         spin_lock_irq(&desc->lock);
 
-        if ( !test_bit(d->pirq_to_evtchn[pirq], &s->evtchn_mask[0]) &&
-             test_and_clear_bit(pirq, &d->pirq_mask[0]) )
+        if ( !test_bit(d->pirq_to_evtchn[pirq], s->evtchn_mask) &&
+             test_and_clear_bit(pirq, d->pirq_mask) )
         {
             ASSERT(action->ack_type != ACKTYPE_NONE);
             if ( --action->in_flight == 0 )
@@ -493,13 +493,13 @@ int pirq_guest_unbind(struct domain *d, int irq)
     switch ( action->ack_type )
     {
     case ACKTYPE_UNMASK:
-        if ( test_and_clear_bit(irq, &d->pirq_mask[0]) &&
+        if ( test_and_clear_bit(irq, d->pirq_mask) &&
              (--action->in_flight == 0) )
             desc->handler->end(vector);
         break;
     case ACKTYPE_EOI:
         /* NB. If #guests == 0 then we clear the eoi_map later on. */
-        if ( test_and_clear_bit(irq, &d->pirq_mask[0]) &&
+        if ( test_and_clear_bit(irq, d->pirq_mask) &&
              (--action->in_flight == 0) &&
              (action->nr_guests != 0) )
         {
@@ -511,7 +511,7 @@ int pirq_guest_unbind(struct domain *d, int irq)
         break;
     }
 
-    BUG_ON(test_bit(irq, &d->pirq_mask[0]));
+    BUG_ON(test_bit(irq, d->pirq_mask));
 
     if ( action->nr_guests != 0 )
         goto out;
@@ -587,16 +587,16 @@ static void dump_irqs(unsigned char key)
                 printk("%u(%c%c%c%c)",
                        d->domain_id,
                        (test_bit(d->pirq_to_evtchn[irq],
-                                 &d->shared_info->evtchn_pending[0]) ?
+                                 d->shared_info->evtchn_pending) ?
                         'P' : '-'),
                        (test_bit(d->pirq_to_evtchn[irq]/BITS_PER_LONG,
                                  &d->shared_info->vcpu_info[0].
                                  evtchn_pending_sel) ?
                         'S' : '-'),
                        (test_bit(d->pirq_to_evtchn[irq],
-                                 &d->shared_info->evtchn_mask[0]) ?
+                                 d->shared_info->evtchn_mask) ?
                         'M' : '-'),
-                       (test_bit(irq, &d->pirq_mask) ?
+                       (test_bit(irq, d->pirq_mask) ?
                         'M' : '-'));
                 if ( i != action->nr_guests )
                     printk(",");
