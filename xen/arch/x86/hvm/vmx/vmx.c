@@ -102,7 +102,7 @@ static void vmx_relinquish_guest_resources(struct domain *d)
         }
     }
 
-    kill_timer(&d->arch.hvm_domain.vpit.pit_timer);
+    kill_timer(&d->arch.hvm_domain.vpit.time_info.pit_timer);
 
     if ( d->arch.hvm_domain.shared_page_va )
         unmap_domain_page_global(
@@ -358,12 +358,12 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
 static void vmx_freeze_time(struct vcpu *v)
 {
-    struct hvm_virpit *vpit = &v->domain->arch.hvm_domain.vpit;
+    struct hvm_time_info *time_info = &(v->domain->arch.hvm_domain.vpit.time_info);
     
-    if ( vpit->first_injected && !v->domain->arch.hvm_domain.guest_time ) {
+    if ( time_info->first_injected && !v->domain->arch.hvm_domain.guest_time ) {
         v->domain->arch.hvm_domain.guest_time = get_guest_time(v);
-        vpit->count_advance += (NOW() - vpit->count_point);
-        stop_timer(&(vpit->pit_timer));
+        time_info->count_advance += (NOW() - time_info->count_point);
+        stop_timer(&(time_info->pit_timer));
     }
 }
 
@@ -393,9 +393,9 @@ int vmx_initialize_guest_resources(struct vcpu *v)
 
 void vmx_migrate_timers(struct vcpu *v)
 {
-    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
+    struct hvm_time_info *time_info = &v->domain->arch.hvm_domain.vpit.time_info;
 
-    migrate_timer(&vpit->pit_timer, v->processor);
+    migrate_timer(&time_info->pit_timer, v->processor);
     migrate_timer(&v->arch.hvm_vmx.hlt_timer, v->processor);
     if ( hvm_apic_support(v->domain) && VLAPIC(v))
         migrate_timer(&(VLAPIC(v)->vlapic_timer), v->processor);
@@ -1836,11 +1836,11 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
     switch (regs->ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:
     {
-        struct hvm_virpit *vpit;
+        struct hvm_time_info *time_info;
 
         rdtscll(msr_content);
-        vpit = &(v->domain->arch.hvm_domain.vpit);
-        msr_content += vpit->cache_tsc_offset;
+        time_info = &(v->domain->arch.hvm_domain.vpit.time_info);
+        msr_content += time_info->cache_tsc_offset;
         break;
     }
     case MSR_IA32_SYSENTER_CS:

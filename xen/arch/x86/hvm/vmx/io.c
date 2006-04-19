@@ -51,44 +51,43 @@ void __set_tsc_offset(u64  offset)
 
 u64 get_guest_time(struct vcpu *v)
 {
-    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
+    struct hvm_time_info *time_info = &(v->domain->arch.hvm_domain.vpit.time_info);
     u64    host_tsc;
     
     rdtscll(host_tsc);
-    return host_tsc + vpit->cache_tsc_offset;
+    return host_tsc + time_info->cache_tsc_offset;
 }
 
 void set_guest_time(struct vcpu *v, u64 gtime)
 {
-    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
+    struct hvm_time_info *time_info = &(v->domain->arch.hvm_domain.vpit.time_info);
     u64    host_tsc;
    
     rdtscll(host_tsc);
     
-    vpit->cache_tsc_offset = gtime - host_tsc;
-    __set_tsc_offset(vpit->cache_tsc_offset);
+    time_info->cache_tsc_offset = gtime - host_tsc;
+    __set_tsc_offset(time_info->cache_tsc_offset);
 }
 
 static inline void
 interrupt_post_injection(struct vcpu * v, int vector, int type)
 {
     struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
+    struct hvm_time_info *time_info = &vpit->time_info;
 
     if ( is_pit_irq(v, vector, type) ) {
-        if ( !vpit->first_injected ) {
-            vpit->pending_intr_nr = 0;
-            vpit->last_pit_gtime = get_guest_time(v);
-            vpit->scheduled = NOW() + vpit->period;
-            set_timer(&vpit->pit_timer, vpit->scheduled);
-            vpit->first_injected = 1;
+        if ( !time_info->first_injected ) {
+            time_info->pending_intr_nr = 0;
+            time_info->last_pit_gtime = get_guest_time(v);
+            time_info->first_injected = 1;
         } else {
-            vpit->pending_intr_nr--;
+            time_info->pending_intr_nr--;
         }
-        vpit->count_advance = 0;
-        vpit->count_point = NOW();
+        time_info->count_advance = 0;
+        time_info->count_point = NOW();
 
-        vpit->last_pit_gtime += vpit->period_cycles;
-        set_guest_time(v, vpit->last_pit_gtime);
+        time_info->last_pit_gtime += time_info->period_cycles;
+        set_guest_time(v, time_info->last_pit_gtime);
     }
 
     switch(type)
@@ -152,13 +151,13 @@ asmlinkage void vmx_intr_assist(void)
     unsigned long eflags;
     struct vcpu *v = current;
     struct hvm_domain *plat=&v->domain->arch.hvm_domain;
-    struct hvm_virpit *vpit = &plat->vpit;
+    struct hvm_time_info *time_info = &plat->vpit.time_info;
     struct hvm_virpic *pic= &plat->vpic;
 
     if ( v->vcpu_id == 0 )
         hvm_pic_assist(v);
 
-    if ( (v->vcpu_id == 0) && vpit->pending_intr_nr ) {
+    if ( (v->vcpu_id == 0) && time_info->pending_intr_nr ) {
         pic_set_irq(pic, 0, 0);
         pic_set_irq(pic, 0, 1);
     }
@@ -203,13 +202,14 @@ void vmx_do_resume(struct vcpu *v)
 {
     struct domain *d = v->domain;
     struct hvm_virpit *vpit = &v->domain->arch.hvm_domain.vpit;
+    struct hvm_time_info *time_info = &vpit->time_info;
 
     vmx_stts();
 
     /* pick up the elapsed PIT ticks and re-enable pit_timer */
-    if ( vpit->first_injected ) {
+    if ( time_info->first_injected ) {
         if ( v->domain->arch.hvm_domain.guest_time ) {
-            vpit->count_point = NOW();
+            time_info->count_point = NOW();
             set_guest_time(v, v->domain->arch.hvm_domain.guest_time);
             v->domain->arch.hvm_domain.guest_time = 0;
         }

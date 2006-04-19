@@ -203,6 +203,8 @@ void hvm_setup_platform(struct domain* d)
         spin_lock_init(&d->arch.hvm_domain.round_robin_lock);
         hvm_vioapic_init(d);
     }
+
+    pit_init(&platform->vpit, current);
 }
 
 void pic_irq_request(void *data, int level)

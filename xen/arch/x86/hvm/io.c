@@ -674,8 +674,6 @@ void hvm_io_assist(struct vcpu *v)
     }
 
     p = &vio->vp_ioreq;
-    if (p->state == STATE_IORESP_HOOK)
-        hvm_hooks_assist(v);
 
     /* clear IO wait HVM flag */
     if (test_bit(ARCH_HVM_IO_WAIT, &v->arch.hvm_vcpu.ioflags)) {

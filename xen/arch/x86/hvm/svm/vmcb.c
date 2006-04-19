@@ -478,14 +478,15 @@ void svm_do_resume(struct vcpu *v)
 {
     struct domain *d = v->domain;
     struct hvm_virpit *vpit = &d->arch.hvm_domain.vpit;
+    struct hvm_time_info *time_info = &vpit->time_info;
 
     svm_stts(v);
     
     /* pick up the elapsed PIT ticks and re-enable pit_timer */
-    if ( vpit->first_injected ) {
+    if ( time_info->first_injected ) {
         if ( v->domain->arch.hvm_domain.guest_time ) {
             svm_set_guest_time(v, v->domain->arch.hvm_domain.guest_time);
-            vpit->count_point = NOW();
+            time_info->count_point = NOW();
             v->domain->arch.hvm_domain.guest_time = 0;
         }
         pickup_deactive_ticks(vpit);
