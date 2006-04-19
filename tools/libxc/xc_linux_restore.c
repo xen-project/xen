@@ -183,9 +183,9 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
 
     /* We want zeroed memory so use calloc rather than malloc. */
-    p2m        = calloc(sizeof(unsigned long), max_pfn);
-    pfn_type   = calloc(sizeof(unsigned long), max_pfn);
-    region_mfn = calloc(sizeof(unsigned long), MAX_BATCH_SIZE);
+    p2m        = calloc(max_pfn, sizeof(unsigned long));
+    pfn_type   = calloc(max_pfn, sizeof(unsigned long));
+    region_mfn = calloc(MAX_BATCH_SIZE, sizeof(unsigned long));
 
     if ((p2m == NULL) || (pfn_type == NULL) || (region_mfn == NULL)) {
         ERR("memory alloc failed");
