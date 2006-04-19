@@ -5,8 +5,9 @@
 
 from XmTestLib import *
 
-# 32MBs is the default lower limit for creating domains, it should work
-MEM = 32
+# This is under the default lower limit of 32 and we expect this test
+# to fail. 16MBs isn't enough for the -xen kernel.
+MEM = 16
 
 domain = XmTestDomain(extraConfig={"memory": MEM,
                                    "extra" :"mem=%iM" % MEM})
@@ -22,8 +23,10 @@ try:
     console.runCmd("ls")
 except ConsoleError, e:
     if e.reason == RUNAWAY:
-        FAIL("Bug #380: Starting a console with %i MB crashed the console daemon" % MEM)
+        print "Domain with %i MB has runaway console as expected" % MEM
     else:
-        FAIL("Starting a console with %i MB failed: domain dies immediately!" % MEM)
+        print "Starting a domain with %i MB failed as expected" % MEM
+else:
+    FAIL("Starting a console with %i MB passed, expected test to fail" % MEM)
 
 domain.destroy()
