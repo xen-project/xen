@@ -664,17 +664,13 @@ main (int argc, char *argv[])
 
          For the traditional remote protocol close the connection,
          and re-open it at the top of the loop.  */
-      if (extended_protocol)
-	{
-	  remote_close ();
+    detach_inferior ();
+    remote_close ();
+    if (extended_protocol)
 	  exit (0);
-	}
-      else
-	{
+    else
 	  fprintf (stderr, "Remote side has terminated connection.  "
 			   "GDBserver will reopen the connection.\n");
-	  remote_close ();
-	}
     sigaction(SIGINT, &old_sigaction, NULL);
     }
 }
