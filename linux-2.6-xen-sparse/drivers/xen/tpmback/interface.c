@@ -22,7 +22,6 @@ LIST_HEAD(tpmif_list);
 
 static tpmif_t *alloc_tpmif(domid_t domid, long int instance)
 {
-	struct page *page;
 	tpmif_t *tpmif;
 
 	tpmif = kmem_cache_alloc(tpmif_cachep, GFP_KERNEL);
@@ -35,9 +34,10 @@ static tpmif_t *alloc_tpmif(domid_t domid, long int instance)
 	tpmif->tpm_instance = instance;
 	atomic_set(&tpmif->refcnt, 1);
 
-	page = balloon_alloc_empty_page_range(TPMIF_TX_RING_SIZE);
-	BUG_ON(page == NULL);
-	tpmif->mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
+	tpmif->pagerange = balloon_alloc_empty_page_range(TPMIF_TX_RING_SIZE);
+	BUG_ON(tpmif->pagerange == NULL);
+	tpmif->mmap_vstart = (unsigned long)pfn_to_kaddr(
+	                                    page_to_pfn(tpmif->pagerange));
 
 	list_add(&tpmif->tpmif_list, &tpmif_list);
 	num_frontends++;
@@ -49,6 +49,7 @@ static void free_tpmif(tpmif_t * tpmif)
 {
 	num_frontends--;
 	list_del(&tpmif->tpmif_list);
+	balloon_dealloc_empty_page_range(tpmif->pagerange, TPMIF_TX_RING_SIZE);
 	kmem_cache_free(tpmif_cachep, tpmif);
 }
 
@@ -115,11 +116,11 @@ int tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 		.cmd = EVTCHNOP_bind_interdomain,
 		.u.bind_interdomain.remote_dom = tpmif->domid,
 		.u.bind_interdomain.remote_port = evtchn,
-        };
+	};
 
-        if (tpmif->irq) {
-                return 0;
-        }
+	if (tpmif->irq) {
+		return 0;
+	}
 
 	if ((tpmif->tx_area = alloc_vm_area(PAGE_SIZE)) == NULL)
 		return -ENOMEM;

@@ -271,6 +271,7 @@ int _packet_write(struct packet *pak,
 		struct gnttab_map_grant_ref map_op;
 		struct gnttab_unmap_grant_ref unmap_op;
 		tpmif_tx_request_t *tx;
+		unsigned long pfn, mfn, mfn_orig;
 
 		tx = &tpmif->tx->ring[i].req;
 
@@ -293,9 +294,12 @@ int _packet_write(struct packet *pak,
 			DPRINTK(" Grant table operation failure !\n");
 			return 0;
 		}
-		set_phys_to_machine(__pa(MMAP_VADDR(tpmif, i)) >> PAGE_SHIFT,
-				    FOREIGN_FRAME(map_op.
-						  dev_bus_addr >> PAGE_SHIFT));
+
+		pfn = __pa(MMAP_VADDR(tpmif, i)) >> PAGE_SHIFT;
+		mfn = FOREIGN_FRAME(map_op.dev_bus_addr >> PAGE_SHIFT);
+		mfn_orig = phys_to_machine_mapping[pfn];
+
+		set_phys_to_machine(pfn, mfn);
 
 		tocopy = MIN(size - offset, PAGE_SIZE);
 
@@ -306,6 +310,8 @@ int _packet_write(struct packet *pak,
 			return -EFAULT;
 		}
 		tx->size = tocopy;
+
+		set_phys_to_machine(pfn, mfn_orig);
 
 		gnttab_set_unmap_op(&unmap_op, MMAP_VADDR(tpmif, i),
 				    GNTMAP_host_map, handle);
