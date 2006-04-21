@@ -265,6 +265,14 @@ ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect)
 	unsigned long ipi_data;
 	unsigned long phys_cpu_id;
 
+#ifdef CONFIG_XEN
+        if (running_on_xen) {
+                extern void xen_send_ipi (int cpu, int vec);
+                xen_send_ipi (cpu, vector);
+                return;
+        }
+#endif /* CONFIG_XEN */
+
 #ifdef CONFIG_SMP
 	phys_cpu_id = cpu_physical_id(cpu);
 #else

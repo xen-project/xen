@@ -94,9 +94,24 @@ unsigned long dom_fw_setup(struct domain *d, const char *args, int arglen)
 
 /* the following heavily leveraged from linux/arch/ia64/hp/sim/fw-emu.c */
 
-#define NUM_EFI_SYS_TABLES 6
-# define NUM_MEM_DESCS	5
+/* Set IP and GR1 of not yet initialized vcpu.  */
+static void
+set_os_boot_rendez (struct domain *d, unsigned long pc, unsigned long gr1)
+{
+	struct vcpu *v;
+	int i;
 
+	printf ("set_os_boot_rendez: %lx %lx\n", pc, gr1);
+	for (i = 1; i < MAX_VIRT_CPUS; i++) {
+		v = d->vcpu[i];
+		if (v != NULL
+		    && !test_bit(_VCPUF_initialised, &v->vcpu_flags)) {
+			struct pt_regs *regs = vcpu_regs (v);
+			regs->cr_iip = pc;
+			regs->r1 = gr1;
+		}
+	}
+}
 
 struct sal_ret_values
 sal_emulator (long index, unsigned long in1, unsigned long in2,
@@ -155,7 +170,18 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 		     printf("NON-PRIV DOMAIN CALLED SAL_PCI_CONFIG_WRITE\n");
 		break;
 	    case SAL_SET_VECTORS:
-		printf("*** CALLED SAL_SET_VECTORS.  IGNORED...\n");
+ 		if (in1 == SAL_VECTOR_OS_BOOT_RENDEZ) {
+ 			if (in4 != 0 || in5 != 0 || in6 != 0 || in7 != 0) {
+ 				/* Sanity check: cs_length1 must be 0,
+ 				   second vector is reserved.  */
+ 				status = -2;
+ 			}
+ 			else
+ 				set_os_boot_rendez (current->domain, in2, in3);
+ 		}
+ 		else
+ 			printf("*** CALLED SAL_SET_VECTORS %lu.  IGNORED...\n",
+ 			       in1);
 		break;
 	    case SAL_GET_STATE_INFO:
 		/* No more info.  */
@@ -618,6 +644,9 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	return;
 }
 
+#define NUM_EFI_SYS_TABLES 6
+#define NUM_MEM_DESCS	5
+
 static struct ia64_boot_param *
 dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int fw_mem_size)
 {
@@ -625,8 +654,9 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	efi_runtime_services_t *efi_runtime;
 	efi_config_table_t *efi_tables;
 	struct ia64_sal_systab *sal_systab;
-	efi_memory_desc_t *efi_memmap, *md;
 	struct ia64_sal_desc_entry_point *sal_ed;
+	struct ia64_sal_desc_ap_wakeup *sal_wakeup;
+	efi_memory_desc_t *efi_memmap, *md;
 	struct ia64_boot_param *bp;
 	unsigned long *pfn;
 	unsigned char checksum = 0;
@@ -662,6 +692,7 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	efi_tables  = (void *) cp; cp += NUM_EFI_SYS_TABLES * sizeof(*efi_tables);
 	sal_systab  = (void *) cp; cp += sizeof(*sal_systab);
 	sal_ed      = (void *) cp; cp += sizeof(*sal_ed);
+	sal_wakeup  = (void *) cp; cp += sizeof(*sal_wakeup);
 	efi_memmap  = (void *) cp; cp += NUM_MEM_DESCS*sizeof(*efi_memmap);
 	bp	    = (void *) cp; cp += sizeof(*bp);
 	pfn         = (void *) cp; cp += NFUNCPTRS * 2 * sizeof(pfn);
@@ -779,7 +810,7 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	sal_systab->size = sizeof(*sal_systab);
 	sal_systab->sal_rev_minor = 1;
 	sal_systab->sal_rev_major = 0;
-	sal_systab->entry_count = 1;
+	sal_systab->entry_count = 2;
 
 	strcpy((char *)sal_systab->oem_id, "Xen/ia64");
 	strcpy((char *)sal_systab->product_id, "Xen/ia64");
@@ -791,6 +822,11 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	sal_ed->sal_proc = FW_HYPERCALL_SAL_CALL_PADDR + start_mpaddr;
 	dom_fw_hypercall_patch (d, sal_ed->sal_proc, FW_HYPERCALL_SAL_CALL, 1);
 	sal_ed->gp = 0;  // will be ignored
+
+	/* Fill an AP wakeup descriptor.  */
+	sal_wakeup->type = SAL_DESC_AP_WAKEUP;
+	sal_wakeup->mechanism = IA64_SAL_AP_EXTERNAL_INT;
+	sal_wakeup->vector = XEN_SAL_BOOT_RENDEZ_VEC;
 
 	for (cp = (char *) sal_systab; cp < (char *) efi_memmap; ++cp)
 		checksum += *cp;

@@ -132,6 +132,65 @@ xen_hypercall (struct pt_regs *regs)
 }
 
 
+static void
+fw_hypercall_ipi (struct pt_regs *regs)
+{
+	int cpu = regs->r14;
+	int vector = regs->r15;
+	struct vcpu *targ;
+		    
+	if (0 && vector == 254)
+		printf ("send_ipi from %d to %d vector=%d\n",
+			current->vcpu_id, cpu, vector);
+
+	if (cpu > MAX_VIRT_CPUS)
+		return;
+
+	targ = current->domain->vcpu[cpu];
+	if (targ == NULL)
+		return;
+
+	if (vector == XEN_SAL_BOOT_RENDEZ_VEC
+	    && !test_bit(_VCPUF_initialised, &targ->vcpu_flags)) {
+		struct pt_regs *targ_regs = vcpu_regs (targ);
+		struct vcpu_guest_context c;
+		
+		printf ("arch_boot_vcpu: %p %p\n",
+			(void *)targ_regs->cr_iip,
+			(void *)targ_regs->r1);
+		memset (&c, 0, sizeof (c));
+		/* Copy regs.  */
+		c.regs.cr_iip = targ_regs->cr_iip;
+		c.regs.r1 = targ_regs->r1;
+		
+		/* Copy from vcpu 0.  */
+		c.vcpu.evtchn_vector =
+			current->domain->vcpu[0]->vcpu_info->arch.evtchn_vector;
+		if (arch_set_info_guest (targ, &c) != 0) {
+			printf ("arch_boot_vcpu: failure\n");
+			return;
+		}
+		if (test_and_clear_bit(_VCPUF_down,
+				       &targ->vcpu_flags)) {
+			vcpu_wake(targ);
+			printf ("arch_boot_vcpu: vcpu %d awaken %016lx!\n",
+				targ->vcpu_id, targ_regs->cr_iip);
+		}
+		else
+			printf ("arch_boot_vcpu: huu, already awaken!");
+	}
+	else {
+		int running = test_bit(_VCPUF_running,
+				       &targ->vcpu_flags);
+		
+		vcpu_pend_interrupt(targ, vector);
+		vcpu_unblock(targ);
+		if (running)
+			smp_send_event_check_cpu(targ->processor);
+	}
+	return;
+}
+
 static int
 fw_hypercall (struct pt_regs *regs)
 {
@@ -231,6 +290,9 @@ fw_hypercall (struct pt_regs *regs)
 	    case FW_HYPERCALL_EFI_GET_NEXT_HIGH_MONO_COUNT:
 		// FIXME: need fixes in efi.h from 2.6.9
 		regs->r8 = EFI_UNSUPPORTED;
+		break;
+	    case FW_HYPERCALL_IPI:
+		fw_hypercall_ipi (regs);
 		break;
 	    default:
 		printf("unknown ia64 fw hypercall %lx\n", regs->r2);

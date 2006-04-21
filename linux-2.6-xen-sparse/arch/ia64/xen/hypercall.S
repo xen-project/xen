@@ -341,3 +341,13 @@ GLOBAL_ENTRY(xen_set_eflag)
 	br.ret.sptk.many rp
 END(xen_set_eflag)
 #endif
+
+GLOBAL_ENTRY(xen_send_ipi)
+        mov r14=r32
+        mov r15=r33
+        mov r2=0x380
+        break 0x1000
+        ;;
+        br.ret.sptk.many rp
+        ;;
+END(xen_send_ipi)
