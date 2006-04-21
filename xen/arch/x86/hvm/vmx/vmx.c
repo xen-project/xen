@@ -828,9 +828,16 @@ static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
 
     if ( input == 1 )
     {
-        if ( hvm_apic_support(v->domain) &&
+        if ( !hvm_apic_support(v->domain) ||
              !vlapic_global_enabled((VLAPIC(v))) )
+        {
             clear_bit(X86_FEATURE_APIC, &edx);
+            /* Since the apic is disabled, avoid any confusion about SMP cpus being available */
+            clear_bit(X86_FEATURE_HT, &edx);  /* clear the hyperthread bit */
+            ebx &= 0xFF00FFFF;  /* set the logical processor count to 1 */
+            ebx |= 0x00010000;
+        }
+
 
 #if CONFIG_PAGING_LEVELS < 3
         clear_bit(X86_FEATURE_PAE, &edx);
