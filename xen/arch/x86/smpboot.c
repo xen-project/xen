@@ -531,7 +531,7 @@ void __devinit start_secondary(void *unused)
 
 	set_processor_id(cpu);
 	set_current(idle_vcpu[cpu]);
-	set_current_execstate(idle_vcpu[cpu]);
+        this_cpu(curr_vcpu) = idle_vcpu[cpu];
 
 	percpu_traps_init();
 

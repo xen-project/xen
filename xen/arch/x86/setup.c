@@ -14,6 +14,7 @@
 #include <xen/domain_page.h>
 #include <xen/compile.h>
 #include <xen/gdbstub.h>
+#include <xen/percpu.h>
 #include <public/version.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
@@ -159,6 +160,38 @@ void discard_initial_images(void)
     init_domheap_pages(initial_images_start, initial_images_end);
 }
 
+extern char __per_cpu_start[], __per_cpu_data_end[], __per_cpu_end[];
+
+static void percpu_init_areas(void)
+{
+    unsigned int i, data_size = __per_cpu_data_end - __per_cpu_start;
+
+    BUG_ON(data_size > PERCPU_SIZE);
+
+    for ( i = 1; i < NR_CPUS; i++ )
+        memcpy(__per_cpu_start + (i << PERCPU_SHIFT),
+               __per_cpu_start,
+               data_size);
+}
+
+static void percpu_free_unused_areas(void)
+{
+    unsigned int i, first_unused;
+
+    /* Find first unused CPU number. */
+    for ( i = 0; i < NR_CPUS; i++ )
+        if ( !cpu_online(i) )
+            break;
+    first_unused = i;
+
+    /* Check that there are no holes in cpu_online_map. */
+    for ( ; i < NR_CPUS; i++ )
+        BUG_ON(cpu_online(i));
+
+    init_xenheap_pages(__pa(__per_cpu_start) + (first_unused << PERCPU_SHIFT),
+                       __pa(__per_cpu_end));
+}
+
 void __init __start_xen(multiboot_info_t *mbi)
 {
     char *cmdline;
@@ -208,6 +241,8 @@ void __init __start_xen(multiboot_info_t *mbi)
         printk("FATAL ERROR: Misaligned CPU0 stack.\n");
         EARLY_FAIL();
     }
+
+    percpu_init_areas();
 
     xenheap_phys_end = opt_xenheap_megabytes << 20;
 
@@ -405,7 +440,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     BUG_ON(idle_domain == NULL);
 
     set_current(idle_domain->vcpu[0]);
-    set_current_execstate(idle_domain->vcpu[0]);
+    this_cpu(curr_vcpu) = idle_domain->vcpu[0];
     idle_vcpu[0] = current;
 
     paging_init();
@@ -481,6 +516,8 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
     smp_cpus_done(max_cpus);
+
+    percpu_free_unused_areas();
 
     initialise_gdb(); /* could be moved earlier */
 

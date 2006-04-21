@@ -3,6 +3,7 @@
 
 #include <xen/config.h>
 #include <asm/page.h>
+#include <asm/percpu.h>
 #undef ENTRY
 #undef ALIGN
 
@@ -54,8 +55,15 @@ SECTIONS
   __initcall_start = .;
   .initcall.init : { *(.initcall.init) } :text
   __initcall_end = .;
-  . = ALIGN(STACK_SIZE);
+  . = ALIGN(PAGE_SIZE);
   __init_end = .;
+
+  __per_cpu_start = .;
+  .data.percpu : { *(.data.percpu) } :text
+  __per_cpu_data_end = .;
+  . = __per_cpu_start + (NR_CPUS << PERCPU_SHIFT);
+  . = ALIGN(STACK_SIZE);
+  __per_cpu_end = .;
 
   __bss_start = .;		/* BSS */
   .bss : {

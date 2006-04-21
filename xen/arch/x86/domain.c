@@ -21,6 +21,12 @@
 #include <xen/softirq.h>
 #include <xen/grant_table.h>
 #include <xen/iocap.h>
+#include <xen/kernel.h>
+#include <xen/multicall.h>
+#include <xen/irq.h>
+#include <xen/event.h>
+#include <xen/console.h>
+#include <xen/percpu.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
@@ -30,22 +36,12 @@
 #include <asm/i387.h>
 #include <asm/mpspec.h>
 #include <asm/ldt.h>
-#include <xen/irq.h>
-#include <xen/event.h>
 #include <asm/shadow.h>
-#include <xen/console.h>
-#include <xen/elf.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/msr.h>
-#include <xen/kernel.h>
-#include <xen/multicall.h>
 
-struct percpu_ctxt {
-    struct vcpu *curr_vcpu;
-    unsigned int dirty_segment_mask;
-} __cacheline_aligned;
-static struct percpu_ctxt percpu_ctxt[NR_CPUS];
+DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 
 static void paravirt_ctxt_switch_from(struct vcpu *v);
 static void paravirt_ctxt_switch_to(struct vcpu *v);
@@ -121,11 +117,6 @@ void dump_pageframe_info(struct domain *d)
                _p(page_to_maddr(page)), _p(page_to_mfn(page)),
                page->count_info, page->u.inuse.type_info);
     }
-}
-
-void set_current_execstate(struct vcpu *v)
-{
-    percpu_ctxt[smp_processor_id()].curr_vcpu = v;
 }
 
 struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
@@ -459,6 +450,7 @@ void new_thread(struct vcpu *d,
  * allowing load_segments() to avoid some expensive segment loads and
  * MSR writes.
  */
+static DEFINE_PER_CPU(unsigned int, dirty_segment_mask);
 #define DIRTY_DS           0x01
 #define DIRTY_ES           0x02
 #define DIRTY_FS           0x04
@@ -473,8 +465,8 @@ static void load_segments(struct vcpu *n)
     unsigned int dirty_segment_mask, cpu = smp_processor_id();
 
     /* Load and clear the dirty segment mask. */
-    dirty_segment_mask = percpu_ctxt[cpu].dirty_segment_mask;
-    percpu_ctxt[cpu].dirty_segment_mask = 0;
+    dirty_segment_mask = per_cpu(dirty_segment_mask, cpu);
+    per_cpu(dirty_segment_mask, cpu) = 0;
 
     /* Either selector != 0 ==> reload. */
     if ( unlikely((dirty_segment_mask & DIRTY_DS) | nctxt->user_regs.ds) )
@@ -601,7 +593,7 @@ static void save_segments(struct vcpu *v)
         dirty_segment_mask |= DIRTY_GS_BASE_USER;
     }
 
-    percpu_ctxt[smp_processor_id()].dirty_segment_mask = dirty_segment_mask;
+    this_cpu(dirty_segment_mask) = dirty_segment_mask;
 }
 
 #define switch_kernel_stack(v) ((void)0)
@@ -638,7 +630,7 @@ static void __context_switch(void)
 {
     struct cpu_user_regs *stack_regs = guest_cpu_user_regs();
     unsigned int          cpu = smp_processor_id();
-    struct vcpu          *p = percpu_ctxt[cpu].curr_vcpu;
+    struct vcpu          *p = per_cpu(curr_vcpu, cpu);
     struct vcpu          *n = current;
 
     ASSERT(p != n);
@@ -692,7 +684,7 @@ static void __context_switch(void)
         cpu_clear(cpu, p->domain->domain_dirty_cpumask);
     cpu_clear(cpu, p->vcpu_dirty_cpumask);
 
-    percpu_ctxt[cpu].curr_vcpu = n;
+    per_cpu(curr_vcpu, cpu) = n;
 }
 
 
@@ -716,7 +708,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     set_current(next);
 
-    if ( (percpu_ctxt[cpu].curr_vcpu == next) || is_idle_vcpu(next) )
+    if ( (per_cpu(curr_vcpu, cpu) == next) || is_idle_vcpu(next) )
     {
         local_irq_enable();
     }
@@ -758,7 +750,7 @@ int __sync_lazy_execstate(void)
 
     local_irq_save(flags);
 
-    switch_required = (percpu_ctxt[smp_processor_id()].curr_vcpu != current);
+    switch_required = (this_cpu(curr_vcpu) != current);
 
     if ( switch_required )
         __context_switch();

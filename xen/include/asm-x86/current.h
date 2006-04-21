@@ -16,7 +16,7 @@ struct vcpu;
 struct cpu_info {
     struct cpu_user_regs guest_cpu_user_regs;
     unsigned int         processor_id;
-    struct vcpu  *current_ed;
+    struct vcpu         *current_vcpu;
 };
 
 static inline struct cpu_info *get_cpu_info(void)
@@ -29,12 +29,12 @@ static inline struct cpu_info *get_cpu_info(void)
     return cpu_info;
 }
 
-#define get_current()         (get_cpu_info()->current_ed)
-#define set_current(_ed)      (get_cpu_info()->current_ed = (_ed))
+#define get_current()         (get_cpu_info()->current_vcpu)
+#define set_current(vcpu)     (get_cpu_info()->current_vcpu = (vcpu))
 #define current               (get_current())
 
 #define get_processor_id()    (get_cpu_info()->processor_id)
-#define set_processor_id(_id) (get_cpu_info()->processor_id = (_id))
+#define set_processor_id(id)  (get_cpu_info()->processor_id = (id))
 
 #define guest_cpu_user_regs() (&get_cpu_info()->guest_cpu_user_regs)
 
@@ -51,8 +51,14 @@ static inline struct cpu_info *get_cpu_info(void)
         "mov %0,%%"__OP"sp; jmp "STR(__fn)      \
         : : "r" (guest_cpu_user_regs()) : "memory" )
 
-#define schedule_tail(_ed) (((_ed)->arch.schedule_tail)(_ed))
+#define schedule_tail(vcpu) (((vcpu)->arch.schedule_tail)(vcpu))
 
-extern void set_current_execstate(struct vcpu *v);
+#include <xen/percpu.h>
+/*
+ * Which VCPU's state is currently running on each CPU?
+ * This is not necesasrily the same as 'current' as a CPU may be
+ * executing a lazy state switch.
+ */
+DECLARE_PER_CPU(struct vcpu *, curr_vcpu);
 
 #endif /* __X86_CURRENT_H__ */
