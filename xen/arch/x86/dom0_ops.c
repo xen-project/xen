@@ -391,8 +391,8 @@ long arch_do_dom0_op(struct dom0_op *op, GUEST_HANDLE(dom0_op_t) u_dom0_op)
         case QUIRK_IOAPIC_GOOD_REGSEL:
 #ifndef sis_apic_bug
             sis_apic_bug = (quirk_id == QUIRK_IOAPIC_BAD_REGSEL);
-            printk("Platform info -- IO-APIC REGSEL is %s\n",
-                   sis_apic_bug ? "bad" : "good");
+            DPRINTK("Domain 0 says that IO-APIC REGSEL is %s\n",
+                    sis_apic_bug ? "bad" : "good");
 #else
             BUG_ON(sis_apic_bug != (quirk_id == QUIRK_IOAPIC_BAD_REGSEL));
 #endif
