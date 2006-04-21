@@ -153,6 +153,9 @@ asmlinkage void vmx_intr_assist(void)
     struct hvm_domain *plat=&v->domain->arch.hvm_domain;
     struct hvm_time_info *time_info = &plat->vpit.time_info;
     struct hvm_virpic *pic= &plat->vpic;
+    unsigned int idtv_info_field;
+    unsigned long inst_len;
+    int    has_ext_irq;
 
     if ( v->vcpu_id == 0 )
         hvm_pic_assist(v);
@@ -162,8 +165,29 @@ asmlinkage void vmx_intr_assist(void)
         pic_set_irq(pic, 0, 1);
     }
 
-    if ( !cpu_has_pending_irq(v) ) return;
+    has_ext_irq = cpu_has_pending_irq(v);
+    __vmread(IDT_VECTORING_INFO_FIELD, &idtv_info_field);
+    if (idtv_info_field & INTR_INFO_VALID_MASK) {
+        __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
 
+        __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
+        if (inst_len >= 1 && inst_len <= 15)
+            __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
+
+        if (idtv_info_field & 0x800) { /* valid error code */
+            unsigned long error_code;
+            __vmread(IDT_VECTORING_ERROR_CODE, &error_code);
+            __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
+        }
+        if ( has_ext_irq )
+            enable_irq_window(v);
+
+        HVM_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x", idtv_info_field);
+
+        return;
+    }
+
+    if ( !has_ext_irq ) return;
     if ( is_interruptibility_state() ) {    /* pre-cleared for emulated instruction */
         enable_irq_window(v);
         HVM_DBG_LOG(DBG_LEVEL_1, "interruptibility");
