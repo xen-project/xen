@@ -7,11 +7,9 @@ vsyscall_int80_start:
 	.incbin "arch/i386/kernel/vsyscall-int80.so"
 vsyscall_int80_end:
 
-#ifdef CONFIG_X86_SYSENTER
 	.globl vsyscall_sysenter_start, vsyscall_sysenter_end
 vsyscall_sysenter_start:
 	.incbin "arch/i386/kernel/vsyscall-sysenter.so"
 vsyscall_sysenter_end:
-#endif
 
 __FINIT

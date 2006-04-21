@@ -1180,11 +1180,6 @@ config X86_NO_TSS
 	depends on X86_XEN
 	default y
 
-config X86_SYSENTER
-	bool
-	depends on !X86_NO_TSS
-	default y
-
 config X86_NO_IDT
 	bool
 	depends on X86_XEN

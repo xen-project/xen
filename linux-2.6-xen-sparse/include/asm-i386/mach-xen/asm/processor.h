@@ -497,13 +497,11 @@ struct thread_struct {
 static inline void __load_esp0(struct tss_struct *tss, struct thread_struct *thread)
 {
 	tss->esp0 = thread->esp0;
-#ifdef CONFIG_X86_SYSENTER
 	/* This can only happen when SEP is enabled, no need to test "SEP"arately */
 	if (unlikely(tss->ss1 != thread->sysenter_cs)) {
 		tss->ss1 = thread->sysenter_cs;
 		wrmsr(MSR_IA32_SYSENTER_CS, thread->sysenter_cs, 0);
 	}
-#endif
 }
 #define load_esp0(tss, thread) \
 	__load_esp0(tss, thread)

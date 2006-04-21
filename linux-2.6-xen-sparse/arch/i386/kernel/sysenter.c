@@ -24,7 +24,7 @@ extern asmlinkage void sysenter_entry(void);
 
 void enable_sep_cpu(void)
 {
-#ifdef CONFIG_X86_SYSENTER
+#ifndef CONFIG_X86_NO_TSS
 	int cpu = get_cpu();
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
 
@@ -54,14 +54,12 @@ int __init sysenter_setup(void)
 {
 	syscall_page = (void *)get_zeroed_page(GFP_ATOMIC);
 
-#ifdef CONFIG_X86_SYSENTER
 	if (boot_cpu_has(X86_FEATURE_SEP)) {
 		memcpy(syscall_page,
 		       &vsyscall_sysenter_start,
 		       &vsyscall_sysenter_end - &vsyscall_sysenter_start);
 		return 0;
 	}
-#endif
 
 	memcpy(syscall_page,
 	       &vsyscall_int80_start,
