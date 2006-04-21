@@ -182,7 +182,7 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	mov r21=loc6			// saved vhpt physical address
 	;;
 	or r23=r25,r21			// construct PA | page properties
-	mov r24=VHPT_PAGE_SHIFT<<2
+	mov r24=VHPT_SIZE_LOG2<<2
 	;;
 	ptr.d	r22,r24
 	;;
@@ -503,19 +503,6 @@ static:	cmp.eq p7,p8=6,r32		/* PAL_PTCE_INFO */
 stacked:
 	br.ret.sptk.few rp
 END(pal_emulator_static)
-
-GLOBAL_ENTRY(vhpt_insert)
-//	alloc loc0 = ar.pfs, 3, 1, 0, 0
-	mov r16=r32
-	mov r26=r33
-	mov r27=r34
-	;;
-	VHPT_INSERT()
-//	VHPT_INSERT1()	... add collision chains later
-//	mov ar.pfs = loc0
-	br.ret.sptk.few rp
-	;;
-END(vhpt_insert)
 
 //  These instructions are copied in the domains.
 //  This is the virtual PAL, which simply does an hypercall.

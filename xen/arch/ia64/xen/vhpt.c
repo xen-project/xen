@@ -15,6 +15,8 @@
 #include <asm/dma.h>
 #include <asm/vhpt.h>
 
+extern long running_on_sim;
+
 DEFINE_PER_CPU (unsigned long, vhpt_paddr);
 DEFINE_PER_CPU (unsigned long, vhpt_pend);
 
@@ -101,16 +103,26 @@ static void vhpt_map(unsigned long pte)
 	ia64_srlz_i();
 }
 
+void vhpt_insert (unsigned long vadr, unsigned long pte, unsigned long logps)
+{
+	struct vhpt_lf_entry *vlfe = (struct vhpt_lf_entry *)ia64_thash(vadr);
+	unsigned long tag = ia64_ttag (vadr);
+
+	/* No need to first disable the entry, since VHPT is per LP
+	   and VHPT is TR mapped.  */
+	vlfe->itir = logps;
+	vlfe->page_flags = pte | _PAGE_P;
+	vlfe->ti_tag = tag;
+}
+
 void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte, unsigned long logps)
 {
 	unsigned long mask = (1L << logps) - 1;
-	extern long running_on_sim;
 	int i;
 
 	if (logps-PAGE_SHIFT > 10 && !running_on_sim) {
 		// if this happens, we may want to revisit this algorithm
-		printf("vhpt_multiple_insert:logps-PAGE_SHIFT>10,spinning..\n");
-		while(1);
+		panic("vhpt_multiple_insert:logps-PAGE_SHIFT>10,spinning..\n");
 	}
 	if (logps-PAGE_SHIFT > 2) {
 		// FIXME: Should add counter here to see how often this
@@ -151,12 +163,9 @@ void vhpt_init(void)
 	 * from domain heap when each domain is created. Assume xen buddy
 	 * allocator can provide natural aligned page by order?
 	 */
-//	vhpt_imva = alloc_xenheap_pages(VHPT_SIZE_LOG2 - PAGE_SHIFT);
 	page = alloc_domheap_pages(NULL, VHPT_SIZE_LOG2 - PAGE_SHIFT, 0);
-	if (!page) {
-		printf("vhpt_init: can't allocate VHPT!\n");
-		while(1);
-	}
+	if (!page)
+		panic("vhpt_init: can't allocate VHPT!\n");
 	paddr = page_to_maddr(page);
 	__get_cpu_var(vhpt_paddr) = paddr;
 	__get_cpu_var(vhpt_pend) = paddr + vhpt_total_size - 1;

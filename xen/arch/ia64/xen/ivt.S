@@ -249,9 +249,21 @@ END(vhpt_miss)
 ENTRY(itlb_miss)
 	DBG_FAULT(1)
 #ifdef XEN
-	VHPT_CCHAIN_LOOKUP(itlb_miss,i)
+	mov r31 = pr
+	mov r16 = cr.ifa
+	;;
+	extr.u r17=r16,59,5
+	;;
+	/* If address belongs to VMM, go to alt tlb handler */
+	cmp.eq p6,p0=0x1e,r17
+(p6)	br.cond.spnt	late_alt_itlb_miss
+	;;
+	cmp.eq p6,p0=0x1d,r17
+(p6)	br.cond.spnt	late_alt_itlb_miss
+	;;
+	mov pr = r31, 0x1ffff
+	;;							
 #ifdef VHPT_GLOBAL
-//	br.cond.sptk page_fault
 	br.cond.sptk fast_tlb_miss_reflect
 	;;
 #endif
@@ -301,14 +313,23 @@ END(itlb_miss)
 ENTRY(dtlb_miss)
 	DBG_FAULT(2)
 #ifdef XEN
-	VHPT_CCHAIN_LOOKUP(dtlb_miss,d)
+	mov r31=pr
+	mov r16=cr.ifa				// get virtual address
+	;;
+	extr.u r17=r16,59,5
+	;;
+	/* If address belongs to VMM, go to alt tlb handler */
+	cmp.eq p6,p0=0x1e,r17
+(p6)	br.cond.spnt	late_alt_dtlb_miss
+	;;
+	cmp.eq p6,p0=0x1d,r17
+(p6)	br.cond.spnt	late_alt_dtlb_miss
+	;;
 #if VHPT_ENABLED
 	// XXX TODO optimization
-	mov r31=pr				// save predicates
 	mov r30=cr.ipsr
 	mov r28=cr.iip			
-	mov r16=cr.ifa				// get virtual address
-	mov r17=cr.isr				// save predicates
+	mov r17=cr.isr
 	;;
 
 	extr.u r18 = r30, IA64_PSR_CPL0_BIT, 2	// extract psr.cpl
@@ -414,13 +435,6 @@ END(dtlb_miss)
 ENTRY(alt_itlb_miss)
 	DBG_FAULT(3)
 #ifdef XEN
-//#ifdef VHPT_GLOBAL
-//	VHPT_CCHAIN_LOOKUP(alt_itlb_miss,i)
-//	br.cond.sptk page_fault
-//	;;
-//#endif
-#endif
-#ifdef XEN
 	mov r31=pr
 	mov r16=cr.ifa		// get address that caused the TLB miss
 	;;
@@ -478,13 +492,6 @@ END(alt_itlb_miss)
 // 0x1000 Entry 4 (size 64 bundles) Alt DTLB (7,46)
 ENTRY(alt_dtlb_miss)
 	DBG_FAULT(4)
-#ifdef XEN
-//#ifdef VHPT_GLOBAL
-//	VHPT_CCHAIN_LOOKUP(alt_dtlb_miss,d)
-//	br.cond.sptk page_fault
-//	;;
-//#endif
-#endif
 #ifdef XEN
 	mov r31=pr
 	mov r16=cr.ifa		// get address that caused the TLB miss
