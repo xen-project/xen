@@ -28,9 +28,11 @@ XEN_SCRIPTS += block
 XEN_SCRIPTS += block-enbd block-nbd
 XEN_SCRIPTS += vtpm vtpm-delete
 XEN_SCRIPTS += xen-hotplug-cleanup
+XEN_SCRIPTS += external-device-migrate
 XEN_SCRIPT_DATA = xen-script-common.sh locking.sh logging.sh
 XEN_SCRIPT_DATA += xen-hotplug-common.sh xen-network-common.sh vif-common.sh
 XEN_SCRIPT_DATA += block-common.sh vtpm-common.sh vtpm-hotplug-common.sh
+XEN_SCRIPT_DATA += vtpm-migration.sh
 
 XEN_HOTPLUG_DIR = /etc/hotplug
 XEN_HOTPLUG_SCRIPTS = xen-backend.agent

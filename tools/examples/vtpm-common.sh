@@ -48,6 +48,12 @@ if [ -z "$VTPM_IMPL_DEFINED" ]; then
 	function vtpm_delete() {
 		true
 	}
+	function vtpm_migrate() {
+		echo "Error: vTPM migration accross machines not implemented."
+	}
+	function vtpm_migrate_recover() {
+		true
+	}
 fi
 
 
@@ -299,4 +305,63 @@ function vtpm_delete_instance () {
 	fi
 
 	release_lock vtpmdb
+}
+
+# Determine whether the given address is local to this machine
+# Return values:
+#  "-1" : the given machine name is invalid
+#  "0"  : this is not an address of this machine
+#  "1"  : this is an address local to this machine
+function isLocalAddress() {
+	local addr=$(ping $1 -c 1 |  \
+	             gawk '{ print substr($3,2,length($3)-2); exit }')
+	if [ "$addr" == "" ]; then
+		echo "-1"
+		return
+	fi
+	local res=$(ifconfig | grep "inet addr" |  \
+	           gawk -vaddr=$addr               \
+	           '{                              \
+	              if ( addr == substr($2, 6)) {\
+	                print "1";                 \
+	              }                            \
+	           }'                              \
+	          )
+	if [ "$res" == "" ]; then
+		echo "0"
+		return
+	fi
+	echo "1"
+}
+
+# Perform a migration step. This function differentiates between migration
+# to the local host or to a remote machine.
+# Parameters:
+# 1st: destination host to migrate to
+# 2nd: name of the domain to migrate
+# 3rd: the migration step to perform
+function vtpm_migration_step() {
+	local instance=$(vtpmdb_find_instance $2)
+	if [ "$instance" == "" ]; then
+		echo "Error: Translation of domain name ($2) to instance failed. Check /etc/xen/vtpm.db"
+		log err "Error during translation of domain name"
+	else
+		res=$(isLocalAddress $1)
+		if [ "$res" == "0" ]; then
+			vtpm_migrate $1 $2 $3
+		fi
+	fi
+}
+
+# Recover from migration due to an error. This function differentiates
+# between migration to the local host or to a remote machine.
+# Parameters:
+# 1st: destination host the migration was going to
+# 2nd: name of the domain that was to be migrated
+# 3rd: the last successful migration step that was done
+function vtpm_recover() {
+	res=$(isLocalAddress $1)
+	if [ "$res" == "0" ]; then
+		vtpm_migrate_recover $1 $2 $3
+	fi
 }
