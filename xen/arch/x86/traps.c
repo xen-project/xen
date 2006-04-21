@@ -43,6 +43,7 @@
 #include <xen/domain_page.h>
 #include <xen/symbols.h>
 #include <xen/iocap.h>
+#include <xen/nmi.h>
 #include <asm/shadow.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -56,7 +57,6 @@
 #include <asm/debugger.h>
 #include <asm/msr.h>
 #include <asm/x86_emulate.h>
-#include <asm/nmi.h>
 
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
