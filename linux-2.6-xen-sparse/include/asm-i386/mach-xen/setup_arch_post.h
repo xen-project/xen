@@ -24,6 +24,7 @@ extern void nmi(void);
 
 static void __init machine_specific_arch_setup(void)
 {
+	int ret;
 	struct xen_platform_parameters pp;
 	struct callback_register event = {
 		.type = CALLBACKTYPE_event,
@@ -42,8 +43,14 @@ static void __init machine_specific_arch_setup(void)
 		memset(empty_zero_page, 0, sizeof(empty_zero_page));
 	}
 
-	HYPERVISOR_callback_op(CALLBACKOP_register, &event);
-	HYPERVISOR_callback_op(CALLBACKOP_register, &failsafe);
+	ret = HYPERVISOR_callback_op(CALLBACKOP_register, &event);
+	if (ret == 0)
+		ret = HYPERVISOR_callback_op(CALLBACKOP_register, &failsafe);
+	if (ret == -ENOSYS)
+		ret = HYPERVISOR_set_callbacks(
+			event.address.cs, event.address.eip,
+			failsafe.address.cs, failsafe.address.eip);
+	BUG_ON(ret);
 
 	cb.handler_address = (unsigned long)&nmi;
 	HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
