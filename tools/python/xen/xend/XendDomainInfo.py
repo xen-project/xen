@@ -87,6 +87,12 @@ SHUTDOWN_TIMEOUT = 30.0
 
 ZOMBIE_PREFIX = 'Zombie-'
 
+"""Constants for the different stages of ext. device migration """
+DEV_MIGRATE_TEST  = 0
+DEV_MIGRATE_STEP1 = 1
+DEV_MIGRATE_STEP2 = 2
+DEV_MIGRATE_STEP3 = 3
+
 """Minimum time between domain restarts in seconds."""
 MINIMUM_RESTART_TIME = 20
 
@@ -1402,7 +1408,7 @@ class XendDomainInfo:
         @raise: XendError for a device that cannot be migrated
         """
         for (n, c) in self.info['device']:
-            rc = self.migrateDevice(n, c, live, dst, 0)
+            rc = self.migrateDevice(n, c, live, dst, DEV_MIGRATE_TEST)
             if rc != 0:
                 raise XendError("Device of type '%s' refuses migration." % n)
 
