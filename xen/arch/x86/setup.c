@@ -194,7 +194,7 @@ static void percpu_free_unused_areas(void)
 
 void __init __start_xen(multiboot_info_t *mbi)
 {
-    char *cmdline;
+    char __cmdline[] = "", *cmdline = __cmdline;
     struct domain *idle_domain;
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
@@ -210,7 +210,8 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     /* Parse the command-line options. */
     if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
-        cmdline_parse(__va(mbi->cmdline));
+        cmdline = __va(mbi->cmdline);
+    cmdline_parse(cmdline);
 
     set_current((struct vcpu *)0xfffff000); /* debug sanity */
     set_processor_id(0); /* needed early, for smp_processor_id() */
@@ -227,6 +228,8 @@ void __init __start_xen(multiboot_info_t *mbi)
     serial_init_preirq();
 
     init_console();
+
+    printf("Command line: %s\n", cmdline);
 
     /* Check that we have at least one Multiboot module. */
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )

@@ -43,13 +43,19 @@ void cmdline_parse(char *cmdline)
         /* Grab the next whitespace-delimited option. */
         q = opt;
         while ( (*p != ' ') && (*p != '\0') )
-            *q++ = *p++;
+        {
+            if ( (q-opt) < (sizeof(opt)-1) ) /* avoid overflow */
+                *q++ = *p;
+            p++;
+        }
         *q = '\0';
 
         /* Search for value part of a key=value option. */
         optval = strchr(opt, '=');
         if ( optval != NULL )
-            *optval++ = '\0';
+            *optval++ = '\0'; /* nul-terminate the option value */
+        else
+            optval = q;       /* default option value is empty string */
 
         for ( param = &__setup_start; param <= &__setup_end; param++ )
         {
@@ -59,23 +65,18 @@ void cmdline_parse(char *cmdline)
             switch ( param->type )
             {
             case OPT_STR:
-                if ( optval != NULL )
-                {
-                    strncpy(param->var, optval, param->len);
-                    ((char *)param->var)[param->len-1] = '\0';
-                }
+                strncpy(param->var, optval, param->len);
+                ((char *)param->var)[param->len-1] = '\0';
                 break;
             case OPT_UINT:
-                if ( optval != NULL )
-                    *(unsigned int *)param->var =
-                        simple_strtol(optval, (char **)&optval, 0);
+                *(unsigned int *)param->var =
+                    simple_strtol(optval, (char **)&optval, 0);
                 break;
             case OPT_BOOL:
                 *(int *)param->var = 1;
                 break;
             case OPT_CUSTOM:
-                if ( optval != NULL )
-                    ((void (*)(char *))param->var)(optval);
+                ((void (*)(char *))param->var)(optval);
                 break;
             }
         }
