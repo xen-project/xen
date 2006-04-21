@@ -139,7 +139,11 @@ static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned i
  *
  * Older SiS APIC requires we rewrite the index regiser
  */
-#define sis_apic_bug 0 /* This may need propagating from domain0. */
+#ifdef __i386__
+extern int sis_apic_bug;
+#else
+#define sis_apic_bug 0
+#endif
 static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned int value)
 {
 	if (sis_apic_bug)

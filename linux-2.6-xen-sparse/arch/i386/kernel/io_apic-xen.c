@@ -2483,6 +2483,12 @@ static int __init io_apic_bug_finalize(void)
 {
 	if(sis_apic_bug == -1)
 		sis_apic_bug = 0;
+	if (xen_start_info->flags & SIF_INITDOMAIN) {
+		dom0_op_t op = { .cmd = DOM0_PLATFORM_QUIRK };
+		op.u.platform_quirk.quirk_id = sis_apic_bug ?
+			QUIRK_IOAPIC_BAD_REGSEL : QUIRK_IOAPIC_GOOD_REGSEL;
+		HYPERVISOR_dom0_op(&op);
+	}
 	return 0;
 }
 

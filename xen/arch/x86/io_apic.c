@@ -52,6 +52,14 @@ static DEFINE_SPINLOCK(vector_lock);
 
 int skip_ioapic_setup;
 
+#ifndef sis_apic_bug
+/*
+ * Is the SiS APIC rmw bug present?
+ * -1 = don't know, 0 = no, 1 = yes
+ */
+int sis_apic_bug = -1;
+#endif
+
 /*
  * # of IRQ routing registers
  */
