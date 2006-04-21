@@ -66,11 +66,11 @@ void foo(void)
 
 #ifndef CONFIG_X86_NO_TSS
 	/* Offset from the sysenter stack to tss.esp0 */
-	DEFINE(TSS_sysenter_esp0, offsetof(struct tss_struct, esp0) -
+	DEFINE(SYSENTER_stack_esp0, offsetof(struct tss_struct, esp0) -
 		 sizeof(struct tss_struct));
 #else
 	/* sysenter stack points directly to esp0 */
-	DEFINE(TSS_sysenter_esp0, 0);
+	DEFINE(SYSENTER_stack_esp0, 0);
 #endif
 
 	DEFINE(PAGE_SIZE_asm, PAGE_SIZE);
