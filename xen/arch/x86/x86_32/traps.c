@@ -10,6 +10,7 @@
 #include <xen/irq.h>
 #include <xen/symbols.h>
 #include <xen/reboot.h>
+#include <xen/nmi.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/hvm/hvm.h>
@@ -336,6 +337,10 @@ static long register_guest_callback(struct callback_register *reg)
         v->arch.guest_context.failsafe_callback_eip = reg->address.eip;
         break;
 
+    case CALLBACKTYPE_nmi:
+        ret = register_guest_nmi_callback(reg->address.eip);
+        break;
+
     default:
         ret = -EINVAL;
         break;
@@ -350,6 +355,10 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
 
     switch ( unreg->type )
     {
+    case CALLBACKTYPE_nmi:
+        ret = unregister_guest_nmi_callback();
+        break;
+
     default:
         ret = -EINVAL;
         break;

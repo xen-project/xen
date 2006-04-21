@@ -11,4 +11,19 @@
 
 #include <asm/nmi.h>
 
+/**
+ * register_guest_nmi_callback
+ *
+ * The default NMI handler passes the NMI to a guest callback. This
+ * function registers the address of that callback.
+ */
+extern long register_guest_nmi_callback(unsigned long address);
+
+/**
+ * unregister_guest_nmi_callback
+ *
+ * Unregister a guest NMI handler.
+ */
+extern long unregister_guest_nmi_callback(void);
+
 #endif /* __XEN_NMI_H__ */

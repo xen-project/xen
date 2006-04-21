@@ -213,37 +213,51 @@ long do_xen_version(int cmd, GUEST_HANDLE(void) arg)
     return -ENOSYS;
 }
 
-long do_nmi_op(unsigned int cmd, GUEST_HANDLE(void) arg)
+long register_guest_nmi_callback(unsigned long address)
 {
     struct vcpu *v = current;
     struct domain *d = current->domain;
+
+    if ( (d->domain_id != 0) || (v->vcpu_id != 0) )
+        return -EINVAL;
+
+    v->nmi_addr = address;
+#ifdef CONFIG_X86
+    /*
+     * If no handler was registered we can 'lose the NMI edge'. Re-assert it
+     * now.
+     */
+    if ( d->shared_info->arch.nmi_reason != 0 )
+        set_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
+#endif
+
+    return 0;
+}
+
+long unregister_guest_nmi_callback(void)
+{
+    struct vcpu *v = current;
+
+    v->nmi_addr = 0;
+
+    return 0;
+}
+
+long do_nmi_op(unsigned int cmd, GUEST_HANDLE(void) arg)
+{
     struct xennmi_callback cb;
     long rc = 0;
 
     switch ( cmd )
     {
     case XENNMI_register_callback:
-        rc = -EINVAL;
-        if ( (d->domain_id != 0) || (v->vcpu_id != 0) )
-            break;
-
         rc = -EFAULT;
         if ( copy_from_guest(&cb, arg, 1) )
             break;
-
-        v->nmi_addr = cb.handler_address;
-#ifdef CONFIG_X86
-        /*
-         * If no handler was registered we can 'lose the NMI edge'. Re-assert 
-         * it now.
-         */
-        if ( d->shared_info->arch.nmi_reason != 0 )
-            set_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
-#endif
-        rc = 0;
+        rc = register_guest_nmi_callback(cb.handler_address);
         break;
     case XENNMI_unregister_callback:
-        v->nmi_addr = 0;
+        rc = unregister_guest_nmi_callback();
         break;
     default:
         rc = -ENOSYS;

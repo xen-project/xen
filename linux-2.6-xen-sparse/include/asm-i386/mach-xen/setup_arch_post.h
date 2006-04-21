@@ -34,7 +34,10 @@ static void __init machine_specific_arch_setup(void)
 		.type = CALLBACKTYPE_failsafe,
 		.address = { __KERNEL_CS, (unsigned long)failsafe_callback },
 	};
-	struct xennmi_callback cb;
+	struct callback_register nmi_cb = {
+		.type = CALLBACKTYPE_nmi,
+		.address = { __KERNEL_CS, (unsigned long)nmi },
+	};
 
 	if (xen_feature(XENFEAT_auto_translated_physmap) &&
 	    xen_start_info->shared_info < xen_start_info->nr_pages) {
@@ -52,8 +55,14 @@ static void __init machine_specific_arch_setup(void)
 			failsafe.address.cs, failsafe.address.eip);
 	BUG_ON(ret);
 
-	cb.handler_address = (unsigned long)&nmi;
-	HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
+	ret = HYPERVISOR_callback_op(CALLBACKOP_register, &nmi_cb);
+	if (ret == -ENOSYS) {
+		struct xennmi_callback cb;
+
+		cb.handler_address = nmi_cb.address.eip;
+		ret = HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
+	}
+	BUG_ON(ret);
 
 	if (HYPERVISOR_xen_version(XENVER_platform_parameters,
 				   &pp) == 0)

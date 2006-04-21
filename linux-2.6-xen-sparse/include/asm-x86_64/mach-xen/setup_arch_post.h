@@ -28,7 +28,10 @@ static void __init machine_specific_arch_setup(void)
 		.address = (unsigned long)system_call,
 	};
 #ifdef CONFIG_X86_LOCAL_APIC
-	struct xennmi_callback cb;
+	struct callback_register nmi_cb = {
+		.type = CALLBACKTYPE_nmi,
+		.address = (unsigned long)nmi,
+	};
 #endif
 
 	ret = HYPERVISOR_callback_op(CALLBACKOP_register, &event);
@@ -44,7 +47,13 @@ static void __init machine_specific_arch_setup(void)
 	BUG_ON(ret);
 
 #ifdef CONFIG_X86_LOCAL_APIC
-	cb.handler_address = (unsigned long)&nmi;
-	HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
+	ret = HYPERVISOR_callback_op(CALLBACKOP_register, &nmi_cb);
+	if (ret == -ENOSYS) {
+		struct xennmi_callback cb;
+
+		cb.handler_address = nmi_cb.address;
+		ret = HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
+	}
+	BUG_ON(ret);
 #endif
 }
