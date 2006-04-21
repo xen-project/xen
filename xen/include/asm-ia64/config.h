@@ -35,6 +35,7 @@
 #endif
 #define CONFIG_NR_CPUS NR_CPUS
 
+#define CONFIG_IOSAPIC
 #define supervisor_mode_kernel (0)
 
 #define MAX_DMADOM_PFN (0x7FFFFFFFUL >> PAGE_SHIFT) /* 31 addressable bits */

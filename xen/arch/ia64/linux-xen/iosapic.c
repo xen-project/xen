@@ -75,7 +75,9 @@
 #include <linux/irq.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
+#ifndef XEN
 #include <linux/pci.h>
+#endif
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/string.h>
@@ -524,7 +526,11 @@ static struct iosapic_rte_info *iosapic_alloc_rte (void)
 	int preallocated = 0;
 
 	if (!iosapic_kmalloc_ok && list_empty(&free_rte_list)) {
+#ifdef XEN
+		rte = xmalloc_bytes(sizeof(struct iosapic_rte_info) * NR_PREALLOCATE_RTE_ENTRIES);
+#else
 		rte = alloc_bootmem(sizeof(struct iosapic_rte_info) * NR_PREALLOCATE_RTE_ENTRIES);
+#endif
 		if (!rte)
 			return NULL;
 		for (i = 0; i < NR_PREALLOCATE_RTE_ENTRIES; i++, rte++)

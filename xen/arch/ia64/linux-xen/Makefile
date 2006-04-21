@@ -13,3 +13,4 @@ obj-y += time.o
 obj-y += tlb.o
 obj-y += unaligned.o
 obj-y += unwind.o
+obj-y += iosapic.o
