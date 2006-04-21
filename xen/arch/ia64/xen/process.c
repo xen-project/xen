@@ -87,9 +87,12 @@ unsigned long translate_domain_pte(unsigned long pteval,
 	struct domain *d = current->domain;
 	unsigned long mask, pteval2, mpaddr;
 
+	pteval &= ((1UL << 53) - 1);// ignore [63:53] bits
+
 	// FIXME address had better be pre-validated on insert
 	mask = ~itir_mask(itir);
-	mpaddr = ((pteval & _PAGE_PPN_MASK) & ~mask) | (address & mask);
+	mpaddr = (((pteval & ~_PAGE_ED) & _PAGE_PPN_MASK) & ~mask) |
+	         (address & mask);
 	if (d == dom0) {
 		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
 			/*
@@ -114,6 +117,7 @@ unsigned long translate_domain_pte(unsigned long pteval,
 	}
 	pteval2 = lookup_domain_mpa(d,mpaddr);
 	pteval2 &= _PAGE_PPN_MASK; // ignore non-addr bits
+	pteval2 |= (pteval & _PAGE_ED);
 	pteval2 |= _PAGE_PL_2; // force PL0->2 (PL3 is unaffected)
 	pteval2 = (pteval & ~_PAGE_PPN_MASK) | pteval2;
 	return pteval2;
