@@ -33,7 +33,8 @@ unsigned long imva_fw_base = -1;
 
 // return domain (meta)physical address for a given imva
 // this function is a call-back from dom_fw_init
-unsigned long dom_pa(unsigned long imva)
+static unsigned long
+dom_pa(unsigned long imva)
 {
 	if (dom_fw_base_mpa == -1 || imva_fw_base == -1) {
 		printf("dom_pa: uninitialized! (spinning...)\n");

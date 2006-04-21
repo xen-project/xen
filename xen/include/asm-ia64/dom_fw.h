@@ -5,7 +5,6 @@
  *	Dan Magenheimer (dan.magenheimer@hp.com)
  */
 
-extern unsigned long dom_pa(unsigned long);
 extern unsigned long dom_fw_setup(struct domain *, const char *, int);
 
 #ifndef MB
