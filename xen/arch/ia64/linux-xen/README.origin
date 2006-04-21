@@ -26,3 +26,6 @@ unaligned.c		-> linux/arch/ia64/kernel/unaligned.c
 unwind.c		-> linux/arch/ia64/kernel/unwind.c
 unwind_decoder.c	-> linux/arch/ia64/kernel/unwind_decoder.c
 unwind_i.h		-> linux/arch/ia64/kernel/unwind_i.h
+
+# The files below are from Linux-2.6.16
+iosapic.c		-> linux/arch/ia64/kernel/iosapic.c
