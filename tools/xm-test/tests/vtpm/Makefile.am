@@ -2,7 +2,8 @@ SUBDIRS =
 
 TESTS = 01_vtpm-list_pos.test \
         02_vtpm-cat_pcrs.test \
-        03_vtpm-susp_res.test
+        03_vtpm-susp_res.test \
+        04_vtpm-loc_migr.test
 
 XFAIL_TESTS =
 
