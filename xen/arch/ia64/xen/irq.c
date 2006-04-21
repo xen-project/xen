@@ -33,7 +33,6 @@
 #include <linux/slab.h>
 #include <linux/ctype.h>
 #include <linux/init.h>
-#include <linux/irq.h>
 #include <linux/seq_file.h>
 
 #include <asm/atomic.h>
@@ -44,11 +43,10 @@
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
 #include <asm/delay.h>
-#include <asm/irq.h>
+#include <xen/irq.h>
+#include <asm/hw_irq.h>
 
 #include <xen/event.h>
-#define _irq_desc irq_desc
-#define irq_descp(irq) &irq_desc[irq]
 #define apicid_to_phys_cpu_present(x)	1
 
 /*
@@ -70,7 +68,7 @@
 /*
  * Controller mappings for all interrupt sources:
  */
-irq_desc_t _irq_desc[NR_IRQS] __cacheline_aligned = {
+irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
 	[0 ... NR_IRQS-1] = {
 		.status = IRQ_DISABLED | IRQ_GUEST,
 		.handler = &no_irq_type,

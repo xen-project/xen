@@ -60,7 +60,11 @@ __u8 isa_irq_to_vector_map[16] = {
 };
 EXPORT_SYMBOL(isa_irq_to_vector_map);
 
+#ifdef XEN
+unsigned long ia64_vector_mask[BITS_TO_LONGS(IA64_NUM_DEVICE_VECTORS)];
+#else
 static unsigned long ia64_vector_mask[BITS_TO_LONGS(IA64_NUM_DEVICE_VECTORS)];
+#endif
 
 int
 assign_irq_vector (int irq)

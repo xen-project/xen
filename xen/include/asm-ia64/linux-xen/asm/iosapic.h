@@ -134,10 +134,30 @@ static inline void list_move(struct list_head *list, struct list_head *head)
 #undef nop
 #endif
 
-/* nop for now */
-static inline void
-set_irq_affinity_info(unsigned int irq, int hwid, int redir) {}
+struct rte_entry {
+    union {
+	struct {
+	u32	vector		: 8,
+		delivery_mode	: 3,
+		dest_mode	: 1,	/* always 0 for iosapic */
+		delivery_status	: 1,
+		polarity	: 1,
+		__reserved0	: 1,
+		trigger		: 1,
+		mask		: 1,
+		__reserved1	: 15;
+	} lo;
+	struct {
+	u32	__reserved2	: 16,
+		eid		: 8,
+		id		: 8;
+	} hi;
+	u32 val;
+    };
+};
 
+#define IOSAPIC_RTEINDEX(reg)	(((reg) - 0x10) >> 1)
+extern unsigned long ia64_vector_mask[];
 #endif /* XEN */
 
 # endif /* !__ASSEMBLY__ */

@@ -53,6 +53,7 @@
 
 #define NR_IOSAPICS			256
 
+#ifndef CONFIG_XEN
 static inline unsigned int iosapic_read(char __iomem *iosapic, unsigned int reg)
 {
 	writel(reg, iosapic + IOSAPIC_REG_SELECT);
@@ -64,6 +65,7 @@ static inline void iosapic_write(char __iomem *iosapic, unsigned int reg, u32 va
 	writel(reg, iosapic + IOSAPIC_REG_SELECT);
 	writel(val, iosapic + IOSAPIC_WINDOW);
 }
+#endif
 
 static inline void iosapic_eoi(char __iomem *iosapic, u32 vector)
 {

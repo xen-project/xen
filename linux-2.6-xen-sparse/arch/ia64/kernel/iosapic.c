@@ -140,6 +140,68 @@ static unsigned char pcat_compat __devinitdata;	/* 8259 compatibility flag */
 static int iosapic_kmalloc_ok;
 static LIST_HEAD(free_rte_list);
 
+#ifdef CONFIG_XEN
+#include <xen/interface/xen.h>
+#include <xen/interface/physdev.h>
+#include <asm/hypervisor.h>
+static inline unsigned int xen_iosapic_read(char __iomem *iosapic, unsigned int reg)
+{
+	physdev_op_t op;
+	int ret;
+
+	op.cmd = PHYSDEVOP_APIC_READ;
+	op.u.apic_op.apic_physbase = (unsigned long)iosapic -
+					__IA64_UNCACHED_OFFSET;
+	op.u.apic_op.reg = reg;
+	ret = HYPERVISOR_physdev_op(&op);
+	if (ret)
+		return ret;
+	return op.u.apic_op.value;
+}
+
+static inline void xen_iosapic_write(char __iomem *iosapic, unsigned int reg, u32 val)
+{
+	physdev_op_t op;
+
+	op.cmd = PHYSDEVOP_APIC_WRITE;
+	op.u.apic_op.apic_physbase = (unsigned long)iosapic - 
+					__IA64_UNCACHED_OFFSET;
+	op.u.apic_op.reg = reg;
+	op.u.apic_op.value = val;
+	HYPERVISOR_physdev_op(&op);
+}
+
+static inline unsigned int iosapic_read(char __iomem *iosapic, unsigned int reg)
+{
+	if (!running_on_xen) {
+		writel(reg, iosapic + IOSAPIC_REG_SELECT);
+		return readl(iosapic + IOSAPIC_WINDOW);
+	} else
+		return xen_iosapic_read(iosapic, reg);
+}
+
+static inline void iosapic_write(char __iomem *iosapic, unsigned int reg, u32 val)
+{
+	if (!running_on_xen) {
+		writel(reg, iosapic + IOSAPIC_REG_SELECT);
+		writel(val, iosapic + IOSAPIC_WINDOW);
+	} else
+		xen_iosapic_write(iosapic, reg, val);
+}
+
+int xen_assign_irq_vector(int irq)
+{
+	physdev_op_t op;
+
+	op.cmd = PHYSDEVOP_ASSIGN_VECTOR;
+	op.u.irq_op.irq = irq;
+	if (HYPERVISOR_physdev_op(&op))
+		return -ENOSPC;
+
+	return op.u.irq_op.vector;
+}
+#endif /* XEN */
+
 /*
  * Find an IOSAPIC associated with a GSI
  */
@@ -953,6 +1015,10 @@ iosapic_system_init (int system_pcat_compat)
 	}
 
 	pcat_compat = system_pcat_compat;
+#ifdef CONFIG_XEN
+	if (running_on_xen)
+		return;
+#endif
 	if (pcat_compat) {
 		/*
 		 * Disable the compatibility mode interrupts (8259 style), needs IN/OUT support

@@ -1118,3 +1118,114 @@ static int __init iosapic_enable_kmalloc (void)
 	return 0;
 }
 core_initcall (iosapic_enable_kmalloc);
+
+#ifdef XEN
+/* nop for now */
+void set_irq_affinity_info(unsigned int irq, int hwid, int redir) {}
+
+static int iosapic_physbase_to_id(unsigned long physbase)
+{
+	int i;
+	unsigned long addr = physbase | __IA64_UNCACHED_OFFSET;
+
+	for (i = 0; i < NR_IOSAPICS; i++) {
+	    if ((unsigned long)(iosapic_lists[i].addr) == addr)
+		return i;
+	}
+
+	return -1;
+}
+
+int iosapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval)
+{
+	int id;
+	unsigned long flags;
+
+	if ((id = (iosapic_physbase_to_id(physbase))) < 0)
+	    return id;
+
+	spin_lock_irqsave(&iosapic_lock, flags);
+	*pval = iosapic_read(iosapic_lists[id].addr, reg);
+	spin_unlock_irqrestore(&iosapic_lock, flags);
+
+	return 0;
+}
+
+int iosapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
+{
+	unsigned int id, gsi, vec, dest, high32;
+	char rte_index;
+	struct iosapic *ios;
+	struct iosapic_intr_info *info;
+	struct rte_entry rte;
+	unsigned long flags;
+
+	if ((id = (iosapic_physbase_to_id(physbase))) < 0)
+	    return -EINVAL;
+	ios = &iosapic_lists[id];
+
+	/* Only handle first half of RTE update */
+	if ((reg < 0x10) || (reg & 1))
+	    return 0;
+
+	rte.val = val;
+	rte_index = IOSAPIC_RTEINDEX(reg);
+	vec = rte.lo.vector;
+#if 0
+	/* Take PMI/NMI/INIT/EXTINT handled by xen */ 
+	if (rte.delivery_mode > IOSAPIC_LOWEST_PRIORITY) {
+	    printk("Attempt to write IOSAPIC dest mode owned by xen!\n");
+	    printk("IOSAPIC/PIN = (%d/%d), lo = 0x%x\n",
+		id, rte_index, val);
+	    return -EINVAL;
+	}
+#endif
+
+	/* Sanity check. Vector should be allocated before this update */
+	if ((rte_index > ios->num_rte) ||
+	    ((vec > IA64_FIRST_DEVICE_VECTOR) &&
+	     (vec < IA64_LAST_DEVICE_VECTOR) &&
+	     (!test_bit(vec - IA64_FIRST_DEVICE_VECTOR, ia64_vector_mask))))
+	    return -EINVAL;
+
+	gsi = ios->gsi_base + rte_index;
+	info = &iosapic_intr_info[vec];
+	spin_lock_irqsave(&irq_descp(vec)->lock, flags);
+	spin_lock(&iosapic_lock);
+	if (!gsi_vector_to_rte(gsi, vec)) {
+	    register_intr(gsi, vec, IOSAPIC_LOWEST_PRIORITY,
+		rte.lo.polarity, rte.lo.trigger);
+	} else if (vector_is_shared(vec)) {
+	    if ((info->trigger != rte.lo.trigger) ||
+		(info->polarity != rte.lo.polarity)) {
+		printk("WARN: can't override shared interrupt vec\n");
+	        printk("IOSAPIC/PIN = (%d/%d), ori = 0x%x, new = 0x%x\n",
+			id, rte_index, info->low32, rte.val);
+		spin_unlock(&iosapic_lock);
+		spin_unlock_irqrestore(&irq_descp(vec)->lock, flags);
+		return -EINVAL;
+	    }
+
+	    /* If the vector is shared and already unmasked for other
+	     * interrupt sources, don't mask it.
+	     *
+	     * Same check may also apply to single gsi pin, which may
+	     * be shared by devices belonging to different domain. But
+	     * let's see how to act later on demand.
+	     */
+	    if (!(info->low32 & IOSAPIC_MASK))
+		rte.lo.mask = 0;
+	}
+
+	/* time to update physical RTE */
+	dest = cpu_physical_id(smp_processor_id());
+	high32 = (dest << IOSAPIC_DEST_SHIFT);
+	iosapic_write(iosapic_lists[id].addr, reg + 1, high32);
+	iosapic_write(iosapic_lists[id].addr, reg, rte.val);
+	info->low32 = rte.val;
+	info->dest = dest;
+	spin_unlock(&iosapic_lock);
+	spin_unlock_irqrestore(&irq_descp(vec)->lock, flags);
+	return 0;
+}
+#endif /* XEN */

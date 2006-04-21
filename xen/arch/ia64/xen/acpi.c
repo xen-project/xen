@@ -44,7 +44,7 @@
 #include <linux/efi.h>
 #include <linux/mmzone.h>
 #include <asm/io.h>
-//#include <asm/iosapic.h>
+#include <asm/iosapic.h>
 #include <asm/machvec.h>
 #include <asm/page.h>
 #include <asm/system.h>
@@ -121,9 +121,7 @@ acpi_get_sysname (void)
 #ifdef CONFIG_ACPI_BOOT
 
 #define ACPI_MAX_PLATFORM_INTERRUPTS	256
-#define NR_IOSAPICS 4
 
-#if 0
 /* Array to record platform interrupt vectors for generic interrupt routing. */
 int platform_intr_list[ACPI_MAX_PLATFORM_INTERRUPTS] = {
 	[0 ... ACPI_MAX_PLATFORM_INTERRUPTS - 1] = -1
@@ -147,7 +145,7 @@ acpi_request_vector (u32 int_type)
 		printk(KERN_ERR "acpi_request_vector(): invalid interrupt type\n");
 	return vector;
 }
-#endif
+
 char *
 __acpi_map_table (unsigned long phys_addr, unsigned long size)
 {
@@ -253,9 +251,7 @@ acpi_parse_iosapic (acpi_table_entry_header *header, const unsigned long end)
 
 	acpi_table_print_madt_entry(header);
 
-#if 0
 	iosapic_init(iosapic->address, iosapic->global_irq_base);
-#endif
 
 	return 0;
 }
@@ -265,9 +261,7 @@ acpi_parse_plat_int_src (
 	acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_plat_int_src *plintsrc;
-#if 0
 	int vector;
-#endif
 
 	plintsrc = (struct acpi_table_plat_int_src *) header;
 
@@ -276,7 +270,6 @@ acpi_parse_plat_int_src (
 
 	acpi_table_print_madt_entry(header);
 
-#if 0
 	/*
 	 * Get vector assignment for this interrupt, set attributes,
 	 * and program the IOSAPIC routing table.
@@ -290,7 +283,6 @@ acpi_parse_plat_int_src (
 						(plintsrc->flags.trigger == 1) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
 
 	platform_intr_list[plintsrc->type] = vector;
-#endif
 	return 0;
 }
 
@@ -308,11 +300,9 @@ acpi_parse_int_src_ovr (
 
 	acpi_table_print_madt_entry(header);
 
-#if 0
 	iosapic_override_isa_irq(p->bus_irq, p->global_irq,
 				 (p->flags.polarity == 1) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
 				 (p->flags.trigger == 1) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
-#endif
 	return 0;
 }
 
@@ -364,9 +354,7 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 #else
 	has_8259 = acpi_madt->flags.pcat_compat;
 #endif
-#if 0
 	iosapic_system_init(has_8259);
-#endif
 
 	/* Get base address of IPI Message Block */
 
