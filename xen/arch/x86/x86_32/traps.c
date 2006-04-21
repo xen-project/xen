@@ -318,6 +318,16 @@ void init_int80_direct_trap(struct vcpu *v)
         set_int80_direct_trap(v);
 }
 
+#ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
+static void do_update_sysenter(void *info)
+{
+    xen_callback_t *address = info;
+
+    wrmsr(MSR_IA32_SYSENTER_CS, address->cs, 0);
+    wrmsr(MSR_IA32_SYSENTER_EIP, address->eip, 0);
+}
+#endif
+
 static long register_guest_callback(struct callback_register *reg)
 {
     long ret = 0;
@@ -336,6 +346,15 @@ static long register_guest_callback(struct callback_register *reg)
         v->arch.guest_context.failsafe_callback_cs  = reg->address.cs;
         v->arch.guest_context.failsafe_callback_eip = reg->address.eip;
         break;
+
+#ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
+    case CALLBACKTYPE_sysenter:
+        if ( ! cpu_has_sep )
+            ret = -EINVAL;
+        else if ( on_each_cpu(do_update_sysenter, &reg->address, 1, 1) != 0 )
+            ret = -EIO;
+        break;
+#endif
 
     case CALLBACKTYPE_nmi:
         ret = register_guest_nmi_callback(reg->address.eip);

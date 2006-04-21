@@ -425,7 +425,8 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         clear_bit(X86_FEATURE_DE,  &d);
         clear_bit(X86_FEATURE_PSE, &d);
         clear_bit(X86_FEATURE_PGE, &d);
-        clear_bit(X86_FEATURE_SEP, &d);
+        if ( !supervisor_mode_kernel )
+            clear_bit(X86_FEATURE_SEP, &d);
         if ( !IS_PRIV(current->domain) )
             clear_bit(X86_FEATURE_MTRR, &d);
     }
