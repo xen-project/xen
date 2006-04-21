@@ -165,6 +165,37 @@ struct ns16550_defaults ns16550_com2 = {
     .stop_bits = 1
 };
 
+/* efi_print: print efi table at boot */
+static int opt_efi_print = 0;
+boolean_param("efi_print", opt_efi_print);
+
+/* print EFI memory map: */
+static void
+efi_print(void)
+{
+    void *efi_map_start, *efi_map_end;
+    u64 efi_desc_size;
+
+    efi_memory_desc_t *md;
+    void *p;
+    int i;
+
+    if (!opt_efi_print)
+        return;
+
+    efi_map_start = __va(ia64_boot_param->efi_memmap);
+    efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
+    efi_desc_size = ia64_boot_param->efi_memdesc_size;
+
+    for (i = 0, p = efi_map_start; p < efi_map_end; ++i, p += efi_desc_size) {
+        md = p;
+        printk("mem%02u: type=%u, attr=0x%lx, range=[0x%016lx-0x%016lx) (%luMB)\n",
+               i, md->type, md->attribute, md->phys_addr,
+               md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT),
+               md->num_pages >> (20 - EFI_PAGE_SHIFT));
+    }
+}
+
 void start_kernel(void)
 {
     unsigned char *cmdline;
@@ -268,6 +299,7 @@ void start_kernel(void)
 	- IA64_GRANULE_SIZE) >> PAGE_SHIFT;
     printf("find_memory: last granule reserved for dom0; xen max_page=%lx\n",
 	max_page);
+    efi_print();
 
     heap_start = memguard_init(ia64_imva(&_end));
     printf("Before heap_start: %p\n", heap_start);
