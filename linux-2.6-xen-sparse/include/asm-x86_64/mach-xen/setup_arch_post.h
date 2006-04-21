@@ -52,8 +52,7 @@ static void __init machine_specific_arch_setup(void)
 		struct xennmi_callback cb;
 
 		cb.handler_address = nmi_cb.address;
-		ret = HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
+		HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
 	}
-	BUG_ON(ret);
 #endif
 }
