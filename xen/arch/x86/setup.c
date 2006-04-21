@@ -332,7 +332,7 @@ void __init __start_xen(multiboot_info_t *mbi)
             unsigned long init_mapped = 1UL << (30 - PAGE_SHIFT); /* 1GB */
             start = PFN_UP(e820.map[i].addr);
             end   = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
-            /* Clip the range to above 64MB. */
+            /* Clip the range to exclude what the bootstrapper initialised. */
             if ( end < init_mapped )
                 continue;
             if ( start < init_mapped )
