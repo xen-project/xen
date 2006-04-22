@@ -39,3 +39,26 @@ diff -pruN ../pristine-linux-2.6.16/net/ipv4/netfilter/ip_nat_proto_udp.c ./net/
  	*portptr = newport;
  	return 1;
  }
+diff -r 601fa226a761 net/ipv4/xfrm4_output.c
+--- a/net/ipv4/xfrm4_output.c	Wed Apr 19 18:52:30 2006
++++ b/net/ipv4/xfrm4_output.c	Thu Apr 20 15:49:40 2006
+@@ -16,6 +16,8 @@
+ #include <net/ip.h>
+ #include <net/xfrm.h>
+ #include <net/icmp.h>
++
++extern int skb_checksum_setup(struct sk_buff *skb);
+ 
+ /* Add encapsulation header.
+  *
+@@ -103,6 +105,10 @@
+ 	struct xfrm_state *x = dst->xfrm;
+ 	int err;
+ 	
++	err = skb_checksum_setup(skb);
++	if (err)
++		goto error_nolock;
++
+ 	if (skb->ip_summed == CHECKSUM_HW) {
+ 		err = skb_checksum_help(skb, 0);
+ 		if (err)
