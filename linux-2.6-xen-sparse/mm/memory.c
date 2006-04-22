@@ -405,7 +405,7 @@ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr, pte_
 	 * Remove this test eventually!
 	 */
 	if (unlikely(!pfn_valid(pfn))) {
-		if (!vma->vm_flags & VM_RESERVED)
+		if (!(vma->vm_flags & VM_RESERVED))
 			print_bad_pte(vma, pte, addr);
 		return NULL;
 	}
