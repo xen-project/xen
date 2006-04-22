@@ -136,6 +136,9 @@ int pit_get_out(hvm_virpit *pit, int channel, s64 current_time)
 static __inline__ s64 missed_ticks(PITChannelState *s, s64 current_time)
 {
     struct hvm_time_info *hvm_time = s->hvm_time;
+    struct domain *d = (void *) s - 
+        offsetof(struct domain, arch.hvm_domain.vpit.channels[0]);
+
     /* ticks from current time(expected time) to NOW */ 
     int missed_ticks;
     /* current_time is expected time for next intr, check if it's true
@@ -145,7 +148,11 @@ static __inline__ s64 missed_ticks(PITChannelState *s, s64 current_time)
 
     if (missed_time >= 0) {
         missed_ticks = missed_time/(s_time_t)s->period + 1;
-        hvm_time->pending_intr_nr += missed_ticks;
+        if (test_bit(_DOMF_debugging, &d->domain_flags)) {
+            hvm_time->pending_intr_nr++;
+        } else {
+            hvm_time->pending_intr_nr += missed_ticks;
+        }
         s->next_transition_time = current_time + (missed_ticks ) * s->period;
     } else
         printk("HVM_PIT:missed ticks < 0 \n");
