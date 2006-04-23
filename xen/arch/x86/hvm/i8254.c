@@ -154,8 +154,7 @@ static __inline__ s64 missed_ticks(PITChannelState *s, s64 current_time)
             hvm_time->pending_intr_nr += missed_ticks;
         }
         s->next_transition_time = current_time + (missed_ticks ) * s->period;
-    } else
-        printk("HVM_PIT:missed ticks < 0 \n");
+    }
 
     return s->next_transition_time;
 }
@@ -184,9 +183,8 @@ s64 pit_get_next_transition_time(PITChannelState *s,
             return -1;
         break;
     case 2:
-        if (test_bit(_VCPUF_running, &(hvm_time->vcpu->vcpu_flags)) )
-            next_time = missed_ticks(s, current_time);
-        else
+        next_time = missed_ticks(s, current_time);
+        if ( !test_bit(_VCPUF_running, &(hvm_time->vcpu->vcpu_flags)) )
             return 0;
         break;
     case 3:
@@ -566,13 +564,8 @@ void pickup_deactive_ticks(struct hvm_virpit *vpit)
     PITChannelState *s = &(vpit->channels[0]);
     if ( !active_timer(&(vpit->time_info.pit_timer)) ) {
         next_time = pit_get_next_transition_time(s, s->next_transition_time); 
-        if (next_time > 0)
+        if (next_time >= 0)
             set_timer(&(s->hvm_time->pit_timer), s->next_transition_time);
-        else {
-            printk("HVM_PIT:not set_timer before resume next_time=%"
-                   PRId64"!\n", next_time);
-            next_time = s->next_transition_time;
-        }
     }
 }
 
