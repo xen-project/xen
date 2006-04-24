@@ -17,7 +17,7 @@
  * This makes sure that old versions of acm tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define ACM_INTERFACE_VERSION   0xAAAA0005
+#define ACM_INTERFACE_VERSION   0xAAAA0006
 
 /************************************************************************/
 

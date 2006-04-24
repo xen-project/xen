@@ -51,17 +51,17 @@
 
 /* policy: */
 #define ACM_POLICY_NAME(X) \
- ((X) == (ACM_NULL_POLICY)) ? "NULL policy" :                        \
-    ((X) == (ACM_CHINESE_WALL_POLICY)) ? "CHINESE WALL policy" :        \
-    ((X) == (ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY)) ? "SIMPLE TYPE ENFORCEMENT policy" : \
-    ((X) == (ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY)) ? "CHINESE WALL AND SIMPLE TYPE ENFORCEMENT policy" : \
-     "UNDEFINED policy"
+ ((X) == (ACM_NULL_POLICY)) ? "NULL" :                        \
+    ((X) == (ACM_CHINESE_WALL_POLICY)) ? "CHINESE WALL" :        \
+    ((X) == (ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY)) ? "SIMPLE TYPE ENFORCEMENT" : \
+    ((X) == (ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY)) ? "CHINESE WALL AND SIMPLE TYPE ENFORCEMENT" : \
+     "UNDEFINED"
 
 /* the following policy versions must be increased
  * whenever the interpretation of the related
  * policy's data structure changes
  */
-#define ACM_POLICY_VERSION 1
+#define ACM_POLICY_VERSION 2
 #define ACM_CHWALL_VERSION 1
 #define ACM_STE_VERSION  1
 
@@ -113,10 +113,15 @@ struct acm_policy_buffer {
     uint32_t policy_version; /* ACM_POLICY_VERSION */
     uint32_t magic;
     uint32_t len;
+    uint32_t policy_reference_offset;
     uint32_t primary_policy_code;
     uint32_t primary_buffer_offset;
     uint32_t secondary_policy_code;
     uint32_t secondary_buffer_offset;
+};
+
+struct acm_policy_reference_buffer {
+    uint32_t len;
 };
 
 struct acm_chwall_policy_buffer {
@@ -160,6 +165,7 @@ struct acm_ste_stats_buffer {
 struct acm_ssid_buffer {
     uint32_t len;
     ssidref_t ssidref;
+    uint32_t policy_reference_offset;
     uint32_t primary_policy_code;
     uint32_t primary_max_types;
     uint32_t primary_types_offset;
