@@ -31,6 +31,13 @@ xs = Extension("xs",
                libraries          = libraries,
                sources            = [ "xen/lowlevel/xs/xs.c" ])
 
+acm = Extension("acm",
+               extra_compile_args = extra_compile_args,
+               include_dirs       = include_dirs + [ "xen/lowlevel/acm" ],
+               library_dirs       = library_dirs,
+               libraries          = libraries,
+               sources            = [ "xen/lowlevel/acm/acm.c" ])
+
 setup(name            = 'xen',
       version         = '3.0',
       description     = 'Xen',
@@ -50,7 +57,7 @@ setup(name            = 'xen',
                          'xen.xm.tests'
                          ],
       ext_package = "xen.lowlevel",
-      ext_modules = [ xc, xs ]
+      ext_modules = [ xc, xs, acm ]
       )
 
 os.chdir('logging')
