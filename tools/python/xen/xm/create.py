@@ -35,6 +35,7 @@ import xen.xend.XendClient
 from xen.xend.XendClient import server
 from xen.xend.XendBootloader import bootloader
 from xen.util import blkif
+from xen.util import security
 
 from xen.xm.opts import *
 
@@ -144,10 +145,6 @@ gopts.var('builder', val='FUNCTION',
 gopts.var('memory', val='MEMORY',
           fn=set_int, default=128,
           use="Domain memory in MB.")
-
-gopts.var('ssidref', val='SSIDREF',
-          fn=set_u32, default=0, 
-          use="Security Identifier.")
 
 gopts.var('maxmem', val='MEMORY',
           fn=set_int, default=None,
@@ -292,6 +289,14 @@ gopts.var('vtpm', val="instance=INSTANCE,backend=DOM",
           The associtation between virtual machine and the TPM instance
           number can be found in /etc/xen/vtpm.db. Use the backend in the
           given domain.""")
+
+gopts.var('access_control', val="policy=POLICY,label=LABEL",
+          fn=append_value, default=[],
+          use="""Add a security label and the security policy reference that defines it.
+          The local ssid reference is calculated when starting/resuming the domain. At
+          this time, the policy is checked against the active policy as well. This way,
+          migrating through save/restore is covered and local labels are automatically
+          created correctly on the system where a domain is started / resumed.""")
 
 gopts.var('nics', val="NUM",
           fn=set_int, default=-1,
@@ -502,6 +507,43 @@ def configure_usb(config_devs, vals):
         config_usb = ['usb', ['path', path]]
         config_devs.append(['device', config_usb])
 
+
+def configure_security(config, vals):
+    """Create the config for ACM security labels.
+    """
+    access_control = vals.access_control
+    num = len(access_control)
+    if num == 1:
+        d = access_control[0]
+        policy = d.get('policy')
+        label = d.get('label')
+        if policy != security.active_policy:
+            err("Security policy (" + policy + ") incompatible with enforced policy ("
+                + security.active_policy + ")." )
+        config_access_control = ['access_control',
+                                 ['policy', policy],
+                                 ['label', label] ]
+
+        #ssidref cannot be specified together with access_control
+        if sxp.child_value(config, 'ssidref'):
+            err("ERROR: SSIDREF and access_control are mutually exclusive but both specified!")
+        #else calculate ssidre from label
+        ssidref = security.label2ssidref(label, policy)
+        if not ssidref :
+            err("ERROR calculating ssidref from access_control.")
+        security_label = ['security', [ config_access_control, ['ssidref' , ssidref ] ] ]
+        config.append(security_label)
+    elif num == 0:
+        if hasattr(vals, 'ssidref'):
+            if not security.on():
+                err("ERROR: Security ssidref specified but no policy active.")
+            ssidref = getattr(vals, 'ssidref')
+            security_label = ['security', [ [ 'ssidref' , int(ssidref) ] ] ]
+            config.append(security_label)
+    elif num > 1:
+        err("VM config error: Multiple access_control definitions!")
+
+
 def configure_vtpm(config_devs, vals):
     """Create the config for virtual TPM interfaces.
     """
@@ -595,9 +637,9 @@ def make_config(vals):
             if v:
                 config.append([n, v])
 
-    map(add_conf, ['name', 'memory', 'ssidref', 'maxmem', 'restart',
-                   'on_poweroff', 'on_reboot', 'on_crash', 'vcpus'])
-    
+    map(add_conf, ['name', 'memory', 'maxmem', 'restart', 'on_poweroff',
+                   'on_reboot', 'on_crash', 'vcpus'])
+
     if vals.uuid is not None:
         config.append(['uuid', vals.uuid])
     if vals.cpu is not None:
@@ -628,6 +670,7 @@ def make_config(vals):
     configure_vifs(config_devs, vals)
     configure_usb(config_devs, vals)
     configure_vtpm(config_devs, vals)
+    configure_security(config, vals)
     config += config_devs
 
     return config
@@ -695,6 +738,29 @@ def preprocess_vtpm(vals):
             d[k] = v
         vtpms.append(d)
     vals.vtpm = vtpms
+
+def preprocess_access_control(vals):
+    if not vals.access_control:
+        return
+    access_controls = []
+    num = len(vals.access_control)
+    if num == 1:
+        access_control = (vals.access_control)[0]
+        d = {}
+        a = access_control.split(',')
+        if len(a) > 2:
+            err('Too many elements in access_control specifier: ' + access_control)
+        for b in a:
+            (k, v) = b.strip().split('=', 1)
+            k = k.strip()
+            v = v.strip()
+            if k not in ['policy','label']:
+                err('Invalid access_control specifier: ' + access_control)
+            d[k] = v
+        access_controls.append(d)
+        vals.access_control = access_controls
+    elif num > 1:
+        err('Multiple access_control definitions.')
 
 def preprocess_ip(vals):
     if vals.ip or vals.dhcp != 'off':
@@ -785,6 +851,7 @@ def preprocess(vals):
     preprocess_nfs(vals)
     preprocess_vnc(vals)
     preprocess_vtpm(vals)
+    preprocess_access_control(vals)
 
 
 def comma_sep_kv_to_dict(c):
