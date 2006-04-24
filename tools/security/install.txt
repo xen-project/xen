@@ -3,10 +3,11 @@
 #
 # Author:
 # Reiner Sailer 08/15/2005 <sailer@watson.ibm.com>
+#               03/18/2006 update: new labeling
 #
 #
 # This file shows how to activate and install the access control
-# framework.
+# framework for Xen.
 ##
 
 
@@ -20,43 +21,54 @@ Simple Type Enforcement policy. Some file names need to be replaced
 below to activate the Chinese Wall OR the Type Enforcement policy
 exclusively (chwall_ste --> {chwall, ste}).
 
+0. build and install the xm man page. It includes the description of
+   available management commands for the security policy for Xen and
+   the labeling of domains. If not installed by default, you can make
+   and install the xm man page as follows:
+       # cd "xen_root"/doc
+       # make install
+   Then, use man xm to read it:
+       # man xm
+
 1. enable access control in Xen
        # cd "xen_root"
        # edit/xemacs/vi Config.mk
 
        change the lines:
        ACM_SECURITY ?= n
-       ACM_DEFAULT_SECURITY_POLICY ?= ACM_NULL_POLICY
-
        to:
        ACM_SECURITY ?= y
+
+       Now the hypervisor will boot into the policy that is specified
+       in the grub configuration. If you would like to boot into a
+       specific policy (even if you can't specify a boot policy but
+       need to set the policy later using the 'xensec_tool
+       loadpolicy'), then use the other config parameter to change
+       from NULL to any other default policy, e.g.:
        ACM_DEFAULT_SECURITY_POLICY ?= ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY
 
-       # make all
+       # make dist
        # ./install.sh
 
-2. compile the policy from xml to a binary format that can be loaded
-   into the hypervisor for enforcement
+2. Build acm and policy tools and create boot-able policy:
        # cd tools/security
-       # make
+       # make install
 
-       manual steps (alternative to make boot_install):
-       # ./xensec_xml2bin -d policies/ chwall_ste
-       # cp policies/chwall_ste/chwall_ste.bin /boot
-       # edit /boot/grub/grub.conf
-        add the follwoing line to your xen boot entry:
-       "module /boot/chwall_ste.bin"
+       For description of the following commands, please see the xm
+       man page (docs/man1/xm.1). If it is not built, then you can
+       create it manually: cd "xen_root"/docs; make; man man1/xm.1
 
-       alternatively, you can try our automatic translation and
-       installation of the policy:
-       # make boot_install
+       Step1: Building binary version of an example policy:
+       # xm makepolicy example.chwall_ste.client_v1
+       # xm cfgbootpolicy example.chwall_ste.client_v1
 
-       [we try hard to do the right thing to the right boot entry but
-        please verify boot entry in /boot/grub/grub.conf afterwards;
-        your xen boot entry should have an additional module line
-        specifying a chwall_ste.bin file with the correct directory
-        (e.g. "/" or "/boot").]
-
+       Please verify boot entry in /boot/grub/grub.conf (or menu.lst):
+        title Xen (2.6.16)
+        root (hd0,0)
+        kernel /xen.gz dom0_mem=2000000 console=vga
+        module /vmlinuz-2.6.16-xen ro root=/dev/VolGroup00/LogVol00 rhgb
+        module /initrd-2.6.165-xen-U.img
+        module /example.chwall_ste.client_v1.bin
 
 3. reboot into the newly compiled hypervisor
 
@@ -64,6 +76,12 @@ exclusively (chwall_ste --> {chwall, ste}).
 	# xm dmesg should show an entry about the policy being loaded
             during the boot process
 
-        # xensec_tool getpolicy
-            should print the new chwall_ste binary policy representation
+        # xm dumppolicy
+            should print the new binary policy representation
+            including the policy name example.chwall_ste.client_v1
 
+	# xm list --label
+	    should show security label names behind the running domains
+
+For more information about how to use the security-enabled Xen, see
+the examples.txt file in this directory.

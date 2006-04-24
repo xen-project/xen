@@ -59,22 +59,34 @@ migrate). These controls decide based on the active policy
 configuration (see i. and ii.) if the operation proceeds of if the
 operation is aborted (denied).
 
-
 In general, security policy instantiations in the Xen access control
-framework are defined by two files:
+framework are defined by XML policy files. Each security policy has
+exactly one file including all the information the hypervisor needs to
+enforce the policy.
 
-a) a single "policy-name"-security_policy.xml file that defines the
-types known to the ACM and policy rules based on these types
+The name of a policy is unique and consists of a colon-separated list
+of names, which can be translated into the location (subtree) where
+this policy must be located. The last part of the name is the file
+name pre-fix for the policy xml file. The preceding name parts are
+translated into the local path relative to the global policy root
+(/etc/xen/acm-security/policies) pointing to the policy xml file. For
+example: example.chwall_ste.client_v1 denotes the policy file
+example/chwall_ste/client_v1-security_policy.xml relative to the
+global policy root directory.
 
-b) a single "policy-name"-security_label_template.xml file that
-defines labels based on known types
+Every security policy has its own sub-directory under the global
+policy root directory /etc/xen/acm-security/policies, which is
+installed during the Xen installation or can be manually installed
+(when switching from a "security disabled" Xen to a "security enabled"
+Xen AFTER configuring security, see install.txt) by the command
+sequence:
 
-Every security policy has its own sub-directory under
-"Xen-root"/tools/security/policies in order to simplify their
-management and the security policy tools. We will describe those files
-for our example policy (Chinese Wall and Simple Type Enforcement) in
-more detail as we go along. Eventually, we will move towards a system
-installation where the policies will reside under /etc.
+   cd "Xen-root"/tools/security/policies; make install
+
+We will describe those files for our example policy (Chinese Wall and
+Simple Type Enforcement) in more detail as we go along. Eventually, we
+will move towards a system installation where the policies will reside
+under /etc.
 
 
 CHINESE WALL
@@ -117,9 +129,9 @@ constraints where necessary.
 Example of a Chinese Wall Policy Instantiation
 ----------------------------------------------
 
-The file chwall-security_policy.xml defines the Chinese Wall types as
-well as the conflict sets for our example policy (you find it in the
-directory "xen_root"/tools/security/policies/chwall).
+The file client_v1-security_policy.xml defines the Chinese Wall types
+as well as the conflict sets for our example policy (you find it in
+the directory "policy_root"/example/chwall).
 
 It defines four Chinese Wall types (prefixed with cw_) with the
 following meaning:
@@ -168,11 +180,11 @@ policy.
 SIMPLE TYPE ENFORCEMENT
 =======================
 
-The file ste-security_policy.xml defines the simple type enforcement
-types for our example policy (you find it in the directory
-"xen_root"/tools/security/policies/ste). The Simple Type Enforcement
-policy defines which domains can share information with which other
-domains. To this end, it controls
+The file client_v1-security_policy.xml defines the simple type
+enforcement types for our example policy (you find it in the directory
+"policy_root"/example/ste). The Simple Type Enforcement policy defines
+which domains can share information with which other domains. To this
+end, it controls
 
 i) inter-domain communication channels (e.g., network traffic, events,
 and shared memory).
