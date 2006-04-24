@@ -2,7 +2,8 @@
 # Grand Unified Makefile for Xen.
 #
 
-KERNELS ?= linux-2.6-xen
+#KERNELS ?= linux-2.6-xen
+KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
 # You may use wildcards in the above e.g. KERNELS=*2.6*
 
 XKERNELS := $(foreach kernel, $(KERNELS), $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.$(kernel))) )
