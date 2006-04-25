@@ -77,12 +77,13 @@ void pciback_do_op(void *data)
 	clear_bit(_XEN_PCIF_active, (unsigned long *)&pdev->sh_info->flags);
 	notify_remote_via_irq(pdev->evtchn_irq);
 
-	/* Mark that we're done */
-	wmb();
+	/* Mark that we're done. */
+	smp_mb__before_clear_bit(); /* /after/ clearing PCIF_active */
 	clear_bit(_PDEVF_op_active, &pdev->flags);
+	smp_mb__after_clear_bit(); /* /before/ final check for work */
 
-	/* Check to see if the driver domain tried to start another request
-	 * in between clearing _XEN_PCIF_active and clearing _PDEVF_op_active */
+	/* Check to see if the driver domain tried to start another request in
+	 * between clearing _XEN_PCIF_active and clearing _PDEVF_op_active. */
 	test_and_schedule_op(pdev);
 }
 
