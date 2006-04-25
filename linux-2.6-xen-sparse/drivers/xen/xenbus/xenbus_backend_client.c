@@ -95,7 +95,7 @@ int xenbus_unmap_ring_vfree(struct xenbus_device *dev, struct vm_struct *area)
 {
 	struct gnttab_unmap_grant_ref op;
 
-	gnttab_set_unmap_op(&op, (unsigned long)vaddr, GNTMAP_host_map,
+	gnttab_set_unmap_op(&op, (unsigned long)area->addr, GNTMAP_host_map,
 			    (grant_handle_t)area->phys_addr);
 
 	lock_vm_area(area);
