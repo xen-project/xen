@@ -478,9 +478,6 @@ late_alt_itlb_miss:
 	;;
 	or r19=r19,r18		// set bit 4 (uncached) if the access was to region 6
 (p8)	br.cond.spnt page_fault
-#ifdef XEN
-	FORCE_CRASH
-#endif	
 	;;
 	itc.i r19		// insert the TLB entry
 	mov pr=r31,-1
