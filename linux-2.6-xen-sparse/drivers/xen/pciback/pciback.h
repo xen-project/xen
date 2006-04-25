@@ -11,12 +11,17 @@
 #include <xen/xenbus.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <linux/workqueue.h>
+#include <asm/atomic.h>
 #include <xen/interface/io/pciif.h>
 
 struct pci_dev_entry {
 	struct list_head list;
 	struct pci_dev *dev;
 };
+
+#define _PDEVF_op_active 	(0)
+#define PDEVF_op_active 	(1<<(_PDEVF_op_active))
 
 struct pciback_device {
 	void *pci_dev_data;
@@ -31,6 +36,10 @@ struct pciback_device {
 
 	struct vm_struct *sh_area;
 	struct xen_pci_sharedinfo *sh_info;
+
+	unsigned long flags;
+
+	struct work_struct op_work;
 };
 
 struct pciback_dev_data {
@@ -71,6 +80,7 @@ void pciback_release_devices(struct pciback_device *pdev);
 
 /* Handles events from front-end */
 irqreturn_t pciback_handle_event(int irq, void *dev_id, struct pt_regs *regs);
+void pciback_do_op(void *data);
 
 int pciback_xenbus_register(void);
 void pciback_xenbus_unregister(void);

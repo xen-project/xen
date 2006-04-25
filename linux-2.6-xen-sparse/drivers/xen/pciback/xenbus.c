@@ -31,6 +31,8 @@ static struct pciback_device *alloc_pdev(struct xenbus_device *xdev)
 	pdev->evtchn_irq = INVALID_EVTCHN_IRQ;
 	pdev->be_watching = 0;
 
+	INIT_WORK(&pdev->op_work, pciback_do_op, pdev);
+
 	if (pciback_init_devices(pdev)) {
 		kfree(pdev);
 		pdev = NULL;
@@ -47,6 +49,11 @@ static void free_pdev(struct pciback_device *pdev)
 	/* Ensure the guest can't trigger our handler before removing devices */
 	if (pdev->evtchn_irq != INVALID_EVTCHN_IRQ)
 		unbind_from_irqhandler(pdev->evtchn_irq, pdev);
+
+	/* If the driver domain started an op, make sure we complete it or
+	 * delete it before releasing the shared memory */
+	cancel_delayed_work(&pdev->op_work);
+	flush_scheduled_work();
 
 	if (pdev->sh_info)
 		xenbus_unmap_ring_vfree(pdev->xdev, pdev->sh_area);
