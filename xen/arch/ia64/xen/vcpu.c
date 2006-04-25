@@ -24,6 +24,8 @@ extern void getreg(unsigned long regnum, unsigned long *val, int *nat, struct pt
 extern void setreg(unsigned long regnum, unsigned long val, int nat, struct pt_regs *regs);
 extern void getfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_regs *regs);
 
+extern void setfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_regs *regs);
+
 extern void panic_domain(struct pt_regs *, const char *, ...);
 extern unsigned long translate_domain_mpaddr(unsigned long);
 extern void ia64_global_tlb_purge(UINT64 start, UINT64 end, UINT64 nbits);
@@ -111,7 +113,16 @@ vcpu_get_fpreg(VCPU *vcpu, unsigned long reg, struct ia64_fpreg *val)
 {
 	REGS *regs = vcpu_regs(vcpu);
 	getfpreg(reg,val,regs);	// FIXME: handle NATs later
-	return 0;
+	return IA64_NO_FAULT;
+}
+
+IA64FAULT
+vcpu_set_fpreg(VCPU *vcpu, unsigned long reg, struct ia64_fpreg *val)
+{
+	REGS *regs = vcpu_regs(vcpu);
+	if(reg > 1)
+		setfpreg(reg,val,regs);	// FIXME: handle NATs later
+	return IA64_NO_FAULT;
 }
 
 #else

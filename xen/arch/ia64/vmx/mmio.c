@@ -529,6 +529,26 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
 	vmx_vcpu_increment_iip(vcpu);
 	return;
     }
+    // Floating-point Load Pair + Imm ldfp8 M12
+    else if(inst.M12.major==6&&inst.M12.m==1&&inst.M12.x==1&&inst.M12.x6==1){
+        struct ia64_fpreg v;
+        inst_type=SL_FLOATING;
+        dir = IOREQ_READ;
+        size = 8;     //ldfd
+        mmio_access(vcpu, padr, &data, size, ma, dir);
+        v.u.bits[0]=data;
+        v.u.bits[1]=0x1003E;
+        vcpu_set_fpreg(vcpu,inst.M12.f1,&v);
+        padr += 8;
+        mmio_access(vcpu, padr, &data, size, ma, dir);
+        v.u.bits[0]=data;
+        v.u.bits[1]=0x1003E;
+        vcpu_set_fpreg(vcpu,inst.M12.f2,&v);
+        padr += 8;
+        vcpu_set_gr(vcpu,inst.M12.r3,padr,0);
+        vmx_vcpu_increment_iip(vcpu);
+        return;
+    }					
     else{
         panic_domain
 	  (NULL,"This memory access instr can't be emulated: %lx pc=%lx\n ",
