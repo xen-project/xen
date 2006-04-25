@@ -30,21 +30,20 @@
  * IN THE SOFTWARE.
  */
 
+#include <linux/err.h>
 #include <xen/gnttab.h>
 #include <xen/xenbus.h>
 #include <xen/driver_util.h>
 
 /* Based on Rusty Russell's skeleton driver's map_page */
-int xenbus_map_ring_valloc(struct xenbus_device *dev, int gnt_ref, void **vaddr)
+struct vm_struct *xenbus_map_ring_valloc(struct xenbus_device *dev, int gnt_ref)
 {
 	struct gnttab_map_grant_ref op;
 	struct vm_struct *area;
 
-	*vaddr = NULL;
-
 	area = alloc_vm_area(PAGE_SIZE);
 	if (!area)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	gnttab_set_map_op(&op, (unsigned long)area->addr, GNTMAP_host_map,
 			  gnt_ref, dev->otherend_id);
@@ -58,14 +57,14 @@ int xenbus_map_ring_valloc(struct xenbus_device *dev, int gnt_ref, void **vaddr)
 		xenbus_dev_fatal(dev, op.status,
 				 "mapping in shared page %d from domain %d",
 				 gnt_ref, dev->otherend_id);
-		return op.status;
+		BUG_ON(!IS_ERR(ERR_PTR(op.status)));
+		return ERR_PTR(op.status);
 	}
 
 	/* Stuff the handle in an unused field */
 	area->phys_addr = (unsigned long)op.handle;
 
-	*vaddr = area->addr;
-	return 0;
+	return area;
 }
 EXPORT_SYMBOL_GPL(xenbus_map_ring_valloc);
 
@@ -92,29 +91,9 @@ EXPORT_SYMBOL_GPL(xenbus_map_ring);
 
 
 /* Based on Rusty Russell's skeleton driver's unmap_page */
-int xenbus_unmap_ring_vfree(struct xenbus_device *dev, void *vaddr)
+int xenbus_unmap_ring_vfree(struct xenbus_device *dev, struct vm_struct *area)
 {
-	struct vm_struct *area;
 	struct gnttab_unmap_grant_ref op;
-
-	/* It'd be nice if linux/vmalloc.h provided a find_vm_area(void *addr)
-	 * method so that we don't have to muck with vmalloc internals here.
-	 * We could force the user to hang on to their struct vm_struct from
-	 * xenbus_map_ring_valloc, but these 6 lines considerably simplify
-	 * this API.
-	 */
-	read_lock(&vmlist_lock);
-	for (area = vmlist; area != NULL; area = area->next) {
-		if (area->addr == vaddr)
-			break;
-	}
-	read_unlock(&vmlist_lock);
-
-	if (!area) {
-		xenbus_dev_error(dev, -ENOENT,
-				 "can't find mapped virtual address %p", vaddr);
-		return GNTST_bad_virt_addr;
-	}
 
 	gnttab_set_unmap_op(&op, (unsigned long)vaddr, GNTMAP_host_map,
 			    (grant_handle_t)area->phys_addr);
