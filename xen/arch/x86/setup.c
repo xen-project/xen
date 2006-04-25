@@ -634,7 +634,7 @@ void arch_get_xen_caps(xen_capabilities_info_t info)
     if ( hvm_enabled )
     {
         p += sprintf(p, "hvm-%d.%d-x86_32 ", XEN_VERSION, XEN_SUBVERSION);
-        //p += sprintf(p, "hvm-%d.%d-x86_32p ", XEN_VERSION, XEN_SUBVERSION);
+        p += sprintf(p, "hvm-%d.%d-x86_32p ", XEN_VERSION, XEN_SUBVERSION);
         p += sprintf(p, "hvm-%d.%d-x86_64 ", XEN_VERSION, XEN_SUBVERSION);
     }
 
