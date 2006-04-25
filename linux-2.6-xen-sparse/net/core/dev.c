@@ -1253,7 +1253,7 @@ out:
 	return -EPROTO;
 }
 #else
-inline int skb_checksum_setup(struct sk_buff *skb) {}
+inline int skb_checksum_setup(struct sk_buff *skb) { return 0; }
 #endif
 
 
