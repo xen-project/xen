@@ -751,7 +751,12 @@ unsigned long domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
 // see arch/x86/xxx/domain_build.c
 int elf_sanity_check(Elf_Ehdr *ehdr)
 {
-	return (IS_ELF(*ehdr));
+	if (!(IS_ELF(*ehdr)))
+	{
+		printk("DOM0 image is not a Xen-compatible Elf image.\n");
+		return 0;
+	}
+	return 1;
 }
 
 static void copy_memory(void *dst, void *src, int size)
