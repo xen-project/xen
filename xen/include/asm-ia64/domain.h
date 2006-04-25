@@ -169,6 +169,10 @@ void assign_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long
 #ifdef CONFIG_XEN_IA64_DOM0_VP
 unsigned long assign_domain_mmio_page(struct domain *d, unsigned long mpaddr, unsigned long size);
 unsigned long assign_domain_mach_page(struct domain *d, unsigned long mpaddr, unsigned long size);
+unsigned long do_dom0vp_op(unsigned long cmd, unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3);
+unsigned long dom0vp_populate_physmap(struct domain *d, unsigned long gpfn, unsigned int extent_order, unsigned int address_bits);
+unsigned long dom0vp_zap_physmap(struct domain *d, unsigned long gpfn, unsigned int extent_order);
+unsigned long dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn, unsigned int flags, domid_t domid);
 #endif
 
 #include <asm/uaccess.h> /* for KERNEL_DS */

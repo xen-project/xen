@@ -326,6 +326,41 @@ typedef struct vcpu_guest_context {
 } vcpu_guest_context_t;
 DEFINE_GUEST_HANDLE(vcpu_guest_context_t);
 
+// dom0 vp op
+#define __HYPERVISOR_ia64_dom0vp_op     256 // XXX sufficient large
+                                            // TODO
+                                            // arch specific hypercall
+                                            // number conversion
+#define IA64_DOM0VP_ioremap             0       // map io space in machine
+                                                // address to dom0 physical
+                                                // address space.
+                                                // currently physical
+                                                // assignedg address equals to
+                                                // machine address
+#define IA64_DOM0VP_phystomach          1       // convert a pseudo physical
+                                                // page frame number
+                                                // to the corresponding
+                                                // machine page frame number.
+                                                // if no page is assigned,
+                                                // INVALID_MFN or GPFN_INV_MASK
+                                                // is returned depending on
+                                                // domain's non-vti/vti mode.
+#define IA64_DOM0VP_machtophys          3       // convert a machine page
+                                                // frame number
+                                                // to the corresponding
+                                                // pseudo physical page frame
+                                                // number of the caller domain
+#define IA64_DOM0VP_populate_physmap    16      // allocate machine-contigusous
+                                                // memory region and
+                                                // map it to pseudo physical
+                                                // address
+#define IA64_DOM0VP_zap_physmap         17      // unmap and free pages
+                                                // contained in the specified
+                                                // pseudo physical region
+#define IA64_DOM0VP_add_physmap         18      // assigne machine page frane
+                                                // to dom0's pseudo physical
+                                                // address space.
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __HYPERVISOR_IF_IA64_H__ */

@@ -887,6 +887,151 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 	return 0;
 }
 
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+//XXX SMP
+unsigned long
+dom0vp_populate_physmap(struct domain *d, unsigned long gpfn,
+                        unsigned int extent_order, unsigned int address_bits)
+{
+    unsigned long ret = 0;
+    int flags = 0;
+    unsigned long mpaddr = gpfn << PAGE_SHIFT;
+    unsigned long extent_size = 1UL << extent_order;
+    unsigned long offset;
+    struct page_info* page;
+    unsigned long physaddr;
+
+    if (extent_order > 0 && !multipage_allocation_permitted(d)) {
+        ret = -EINVAL;
+        goto out;
+    }
+
+    if (gpfn + (1 << extent_order) < gpfn) {
+        ret = -EINVAL;
+        goto out;
+    }
+    if (gpfn > d->max_pages || gpfn + (1 << extent_order) > d->max_pages) {
+        ret = -EINVAL;
+        goto out;
+    }
+    if ((extent_size << PAGE_SHIFT) < extent_size) {
+        ret = -EINVAL;
+        goto out;
+    }
+
+    //XXX check address_bits and set flags = ALLOC_DOM_DMA if needed
+
+    // check the rage is not populated yet.
+    //XXX loop optimization
+    for (offset = 0; offset < extent_size << PAGE_SHIFT; offset += PAGE_SIZE) {
+        if (____lookup_domain_mpa(d, mpaddr + offset) != INVALID_MFN) {
+            ret = -EBUSY;
+            goto out;
+        }
+    }
+
+    page = alloc_domheap_pages(d, extent_order, flags);
+    if (page == NULL) {
+        ret = -ENOMEM;
+        DPRINTK("Could not allocate order=%d extent: id=%d flags=%x\n",
+                extent_order, d->domain_id, flags);
+        goto out;
+    }
+
+    //XXX loop optimization
+    physaddr = page_to_maddr(page);
+    for (offset = 0; offset < extent_size << PAGE_SHIFT; offset += PAGE_SIZE) {
+        assign_domain_page(d, mpaddr + offset, physaddr + offset);
+    }
+
+out:
+    return ret;
+}
+
+//XXX SMP
+unsigned long
+dom0vp_zap_physmap(struct domain *d, unsigned long gpfn,
+                   unsigned int extent_order)
+{
+    unsigned long ret = 0;
+    if (extent_order != 0) {
+        //XXX
+        ret = -ENOSYS;
+        goto out;
+    }
+
+    zap_domain_page_one(d, gpfn << PAGE_SHIFT);
+
+out:
+    return ret;
+}
+
+static void
+assign_domain_page_replace(struct domain *d, unsigned long mpaddr,
+                           unsigned long mfn, unsigned int flags)
+{
+    struct mm_struct *mm = d->arch.mm;
+    pte_t* pte;
+    pte_t old_pte;
+
+    pte = lookup_alloc_domain_pte(d, mpaddr);
+
+    // update pte
+    old_pte = ptep_get_and_clear(mm, mpaddr, pte);
+    set_pte(pte, pfn_pte(mfn,
+                         __pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
+    if (!pte_none(old_pte)) {
+        unsigned long old_mfn;
+        struct page_info* old_page;
+
+        // XXX should previous underlying page be removed?
+        //  or should error be returned because it is a due to a domain?
+        old_mfn = pte_pfn(old_pte);//XXX
+        old_page = mfn_to_page(old_mfn);
+
+        if (page_get_owner(old_page) == d) {
+            BUG_ON(get_gpfn_from_mfn(old_mfn) != (mpaddr >> PAGE_SHIFT));
+            set_gpfn_from_mfn(old_mfn, INVALID_M2P_ENTRY);
+        }
+
+        domain_page_flush(d, mpaddr, old_mfn, mfn);
+
+        put_page(old_page);
+    } else {
+        BUG_ON(page_get_owner(mfn_to_page(mfn)) == d &&
+               get_gpfn_from_mfn(mfn) != INVALID_M2P_ENTRY);
+    }
+}
+
+unsigned long
+dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn,
+                   unsigned int flags, domid_t domid)
+{
+    int error = 0;
+
+    struct domain* rd;
+    rd = find_domain_by_id(domid);
+    if (unlikely(rd == NULL)) {
+        error = -EINVAL;
+        goto out0;
+    }
+    if (unlikely(rd == d)) {
+        error = -EINVAL;
+        goto out1;
+    }
+    if (unlikely(get_page(mfn_to_page(mfn), rd) == 0)) {
+        error = -EINVAL;
+        goto out1;
+    }
+
+    assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn, 0/* flags:XXX */);
+out1:
+    put_domain(rd);
+out0:
+    return error;
+}
+#endif
+
 /* Flush cache of domain d.  */
 void domain_cache_flush (struct domain *d, int sync_only)
 {

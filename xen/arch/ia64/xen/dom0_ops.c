@@ -236,6 +236,55 @@ long arch_do_dom0_op(dom0_op_t *op, GUEST_HANDLE(dom0_op_t) u_dom0_op)
     return ret;
 }
 
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+unsigned long
+do_dom0vp_op(unsigned long cmd,
+             unsigned long arg0, unsigned long arg1, unsigned long arg2,
+             unsigned long arg3)
+{
+    unsigned long ret = 0;
+    struct domain *d = current->domain;
+
+    switch (cmd) {
+    case IA64_DOM0VP_ioremap:
+        ret = assign_domain_mmio_page(d, arg0, arg1);
+        break;
+    case IA64_DOM0VP_phystomach:
+        ret = ____lookup_domain_mpa(d, arg0 << PAGE_SHIFT);
+        if (ret == INVALID_MFN) {
+            DPRINTK("%s:%d INVALID_MFN ret: 0x%lx\n", __func__, __LINE__, ret);
+        } else {
+            ret = (ret & _PFN_MASK) >> PAGE_SHIFT;//XXX pte_pfn()
+        }
+        break;
+    case IA64_DOM0VP_machtophys:
+        if (max_page <= arg0) {
+            ret = INVALID_M2P_ENTRY;
+            break;
+        }
+        ret = get_gpfn_from_mfn(arg0);
+        break;
+    case IA64_DOM0VP_populate_physmap:
+        ret = dom0vp_populate_physmap(d, arg0,
+                                      (unsigned int)arg1, (unsigned int)arg2);
+        break;
+    case IA64_DOM0VP_zap_physmap:
+        ret = dom0vp_zap_physmap(d, arg0, (unsigned int)arg1);
+        break;
+    case IA64_DOM0VP_add_physmap:
+        ret = dom0vp_add_physmap(d, arg0, arg1, (unsigned int)arg2,
+                                 (domid_t)arg3);
+        break;
+    default:
+        ret = -1;
+		printf("unknown dom0_vp_op 0x%lx\n", cmd);
+        break;
+    }
+
+    return ret;
+}
+#endif
+
 /*
  * Local variables:
  * mode: C

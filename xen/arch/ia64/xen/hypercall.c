@@ -124,6 +124,12 @@ xen_hypercall (struct pt_regs *regs)
 		                       guest_handle_from_ptr(regs->r15, void));
 		break;
 
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+	    case __HYPERVISOR_ia64_dom0vp_op:
+		regs->r8 = do_dom0vp_op(regs->r14, regs->r15, regs->r16,
+		                        regs->r17, regs->r18);
+		break;
+#endif
 	    default:
 		printf("unknown xen hypercall %lx\n", regs->r2);
 		regs->r8 = do_ni_hypercall();
