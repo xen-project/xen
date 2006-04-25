@@ -108,7 +108,7 @@ int shadow_set_guest_paging_levels(struct domain *d, int levels)
      * Need to wait for VCPU0 to complete the on-going shadow ops.
      */
 
-    if ( v->vcpu_id )
+    if ( v->domain == d && v->vcpu_id )
         return 1;
 
     shadow_lock(d);
