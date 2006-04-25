@@ -1078,10 +1078,10 @@ static void loaddomainelfimage(struct domain *d, unsigned long image_start)
 
 void alloc_dom0(void)
 {
-#ifdef CONFIG_DOMAIN0_CONTIGUOUS
 	if (platform_is_hp_ski()) {
-	dom0_size = 128*1024*1024; //FIXME: Should be configurable
+		dom0_size = 128*1024*1024; //FIXME: Should be configurable
 	}
+#ifdef CONFIG_DOMAIN0_CONTIGUOUS
 	printf("alloc_dom0: starting (initializing %lu MB...)\n",dom0_size/(1024*1024));
  
 	/* FIXME: The first trunk (say 256M) should always be assigned to
@@ -1098,6 +1098,8 @@ void alloc_dom0(void)
 	}
 	printf("alloc_dom0: dom0_start=0x%lx\n", dom0_start);
 #else
+	// no need to allocate pages for now
+	// pages are allocated by map_new_domain_page() via loaddomainelfimage()
 	dom0_start = 0;
 #endif
 
@@ -1128,6 +1130,7 @@ int construct_dom0(struct domain *d,
 	unsigned long alloc_start, alloc_end;
 	start_info_t *si;
 	struct vcpu *v = d->vcpu[0];
+	unsigned long max_pages;
 
 	struct domain_setup_info dsi;
 	unsigned long p_start;
@@ -1136,11 +1139,8 @@ int construct_dom0(struct domain *d,
 	unsigned long pkern_end;
 	unsigned long pinitrd_start = 0;
 	unsigned long pstart_info;
-#if 0
-	char *dst;
-	unsigned long nr_pt_pages;
-	unsigned long count;
-#endif
+	struct page_info *start_info_page;
+
 #ifdef VALIDATE_VT
 	unsigned long mfn;
 	struct page_info *page = NULL;
@@ -1159,7 +1159,13 @@ int construct_dom0(struct domain *d,
 
 	alloc_start = dom0_start;
 	alloc_end = dom0_start + dom0_size;
-	d->tot_pages = d->max_pages = dom0_size/PAGE_SIZE;
+	max_pages = dom0_size / PAGE_SIZE;
+	d->max_pages = max_pages;
+#ifndef CONFIG_XEN_IA64_DOM0_VP
+	d->tot_pages = d->max_pages;
+#else
+	d->tot_pages = 0;
+#endif
 	dsi.image_addr = (unsigned long)image_start;
 	dsi.image_len  = image_len;
 	rc = parseelfimage(&dsi);
@@ -1196,15 +1202,27 @@ int construct_dom0(struct domain *d,
 	    return -EINVAL;
 	}
 
-        if(initrd_start&&initrd_len){
-             pinitrd_start=(dom0_start+dom0_size) -
-                          (PAGE_ALIGN(initrd_len) + 4*1024*1024);
+	pstart_info = PAGE_ALIGN(pkern_end);
+	if(initrd_start && initrd_len){
+	    unsigned long offset;
 
-             memcpy(__va(pinitrd_start), (void *) initrd_start, initrd_len);
-             pstart_info = PAGE_ALIGN(pinitrd_start + initrd_len);
-        } else {
-             pstart_info = PAGE_ALIGN(pkern_end);
-        }
+	    pinitrd_start= (dom0_start + dom0_size) -
+	                   (PAGE_ALIGN(initrd_len) + 4*1024*1024);
+	    if (pinitrd_start <= pstart_info)
+		panic("%s:enough memory is not assigned to dom0", __func__);
+
+	    for (offset = 0; offset < initrd_len; offset += PAGE_SIZE) {
+		struct page_info *p;
+		p = assign_new_domain_page(d, pinitrd_start + offset);
+		if (p == NULL)
+		    panic("%s: can't allocate page for initrd image", __func__);
+		if (initrd_len < offset + PAGE_SIZE)
+		    memcpy(page_to_virt(p), (void*)(initrd_start + offset),
+		           initrd_len - offset);
+		else
+		    copy_page(page_to_virt(p), (void*)(initrd_start + offset));
+	    }
+	}
 
 	printk("METAPHYSICAL MEMORY ARRANGEMENT:\n"
 	       " Kernel image:  %lx->%lx\n"
@@ -1214,12 +1232,12 @@ int construct_dom0(struct domain *d,
 	       pkern_start, pkern_end, pkern_entry, pinitrd_start, initrd_len,
 	       pstart_info, pstart_info + PAGE_SIZE);
 
-	if ( (pkern_end - pkern_start) > (d->max_pages * PAGE_SIZE) )
+	if ( (pkern_end - pkern_start) > (max_pages * PAGE_SIZE) )
 	{
 	    printk("Initial guest OS requires too much space\n"
 	           "(%luMB is greater than %luMB limit)\n",
 	           (pkern_end-pkern_start)>>20,
-	           (unsigned long) (d->max_pages<<PAGE_SHIFT)>>20);
+	           (max_pages <<PAGE_SHIFT)>>20);
 	    return -ENOMEM;
 	}
 
@@ -1227,13 +1245,6 @@ int construct_dom0(struct domain *d,
 
 	// if pkern end is after end of metaphysical memory, error
 	//  (we should be able to deal with this... later)
-
-
-	//
-
-#if 0
-	strcpy(d->name,"Domain0");
-#endif
 
 	/* Mask all upcalls... */
 	for ( i = 1; i < MAX_VIRT_CPUS; i++ )
@@ -1251,7 +1262,7 @@ int construct_dom0(struct domain *d,
 	    if (alloc_vcpu(d, i, i) == NULL)
 		printf ("Cannot allocate dom0 vcpu %d\n", i);
 
-#ifdef VALIDATE_VT 
+#if defined(VALIDATE_VT) && !defined(CONFIG_XEN_IA64_DOM0_VP)
 	/* Construct a frame-allocation list for the initial domain, since these
 	 * pages are allocated by boot allocator and pfns are not set properly
 	 */
@@ -1266,9 +1277,8 @@ int construct_dom0(struct domain *d,
             list_add_tail(&page->list, &d->page_list);
 
 	    /* Construct 1:1 mapping */
-	    machine_to_phys_mapping[mfn] = mfn;
+	    set_gpfn_from_mfn(mfn, mfn);
 	}
-
 #endif
 
 	/* Copy the OS image. */
@@ -1281,41 +1291,14 @@ int construct_dom0(struct domain *d,
 
 	/* Set up start info area. */
 	d->shared_info->arch.start_info_pfn = pstart_info >> PAGE_SHIFT;
-	si = __va(pstart_info);
+	start_info_page = assign_new_domain_page(d, pstart_info);
+	if (start_info_page == NULL)
+		panic("can't allocate start info page");
+	si = page_to_virt(start_info_page);
 	memset(si, 0, PAGE_SIZE);
 	sprintf(si->magic, "xen-%i.%i-ia64", XEN_VERSION, XEN_SUBVERSION);
-	si->nr_pages     = d->tot_pages;
+	si->nr_pages     = max_pages;
 
-#if 0
-	si->shared_info  = virt_to_maddr(d->shared_info);
-	si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
-	//si->pt_base      = vpt_start;
-	//si->nr_pt_frames = nr_pt_pages;
-	//si->mfn_list     = vphysmap_start;
-
-	if ( initrd_len != 0 )
-	{
-	    //si->mod_start = vinitrd_start;
-	    si->mod_len   = initrd_len;
-	    printk("Initrd len 0x%lx, start at 0x%08lx\n",
-	           si->mod_len, si->mod_start);
-	}
-
-	dst = si->cmd_line;
-	if ( cmdline != NULL )
-	{
-	    for ( i = 0; i < 255; i++ )
-	    {
-	        if ( cmdline[i] == '\0' )
-	            break;
-	        *dst++ = cmdline[i];
-	    }
-	}
-	*dst = '\0';
-
-	zap_low_mappings(); /* Do the same for the idle page tables. */
-#endif
-	
 	/* Give up the VGA console if DOM0 is configured to grab it. */
 	if (cmdline != NULL)
 	    console_endboot(strstr(cmdline, "tty0") != NULL);
@@ -1331,6 +1314,14 @@ int construct_dom0(struct domain *d,
 
 	new_thread(v, pkern_entry, 0, 0);
 	physdev_init_dom0(d);
+
+	// dom0 doesn't need build_physmap_table()
+	// see arch_set_info_guest()
+	// instead we allocate pages manually.
+	for (i = 0; i < max_pages; i++) {
+		assign_new_domain0_page(d, i << PAGE_SHIFT);
+	}
+	d->arch.physmap_built = 1;
 
 	// FIXME: Hack for keyboard input
 	//serial_input_init();
