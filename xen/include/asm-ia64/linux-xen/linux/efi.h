@@ -293,6 +293,10 @@ extern void *efi_get_pal_addr (void);
 extern void efi_map_pal_code (void);
 extern void efi_map_memmap(void);
 extern void efi_memmap_walk (efi_freemem_callback_t callback, void *arg);
+#ifdef XEN
+typedef int (*efi_walk_type_callback_t)(efi_memory_desc_t *md, void *arg);
+extern void efi_memmap_walk_type(u32 type, efi_walk_type_callback_t callback, void *arg);
+#endif
 extern void efi_gettimeofday (struct timespec *ts);
 extern void efi_enter_virtual_mode (void);	/* switch EFI to virtual mode, if possible */
 extern u64 efi_get_iobase (void);

@@ -455,6 +455,27 @@ efi_memmap_walk_uc (efi_freemem_callback_t callback)
 	}
 }
 
+#ifdef XEN
+void
+efi_memmap_walk_type(u32 type, efi_walk_type_callback_t callback, void *arg)
+{
+	void *efi_map_start, *efi_map_end, *p;
+	efi_memory_desc_t *md;
+	u64 efi_desc_size;
+
+	efi_map_start = __va(ia64_boot_param->efi_memmap);
+	efi_map_end = efi_map_start + ia64_boot_param->efi_memmap_size;
+	efi_desc_size = ia64_boot_param->efi_memdesc_size;
+
+	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
+		md = p;
+		if (md->type == type) {
+			if ((*callback)(md, arg) < 0)
+				return;
+		}
+	}
+}
+#endif
 
 /*
  * Look for the PAL_CODE region reported by EFI and maps it using an
