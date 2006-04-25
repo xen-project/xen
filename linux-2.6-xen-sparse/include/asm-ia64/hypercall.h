@@ -271,4 +271,210 @@ extern fastcall unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs);
 static inline void exit_idle(void) {}
 #define do_IRQ(irq, regs) __do_IRQ((irq), (regs))
 
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+#include <asm/xen/privop.h>
+
+#define _hypercall_imm1(type, name, imm, a1)			\
+({								\
+	long __res;						\
+	__asm__ __volatile__ (";;\n"				\
+			      "mov r14=%2\n"			\
+			      "mov r15=%3\n"			\
+			      "mov r2=%1\n"			\
+			      "break 0x1000 ;;\n"		\
+			      "mov %0=r8 ;;\n"			\
+			      : "=r" (__res)			\
+			      : "i" (__HYPERVISOR_##name),	\
+				"i" (imm),			\
+				"r" ((unsigned long)(a1))	\
+			      : "r14","r15","r2","r8",		\
+				"memory" );			\
+	(type)__res;						\
+})
+
+#define _hypercall_imm2(type, name, imm, a1, a2)		\
+({								\
+	long __res;						\
+	__asm__ __volatile__ (";;\n"				\
+			      "mov r14=%2\n"			\
+			      "mov r15=%3\n"			\
+			      "mov r16=%4\n"			\
+			      "mov r2=%1\n"			\
+			      "break 0x1000 ;;\n"		\
+			      "mov %0=r8 ;;\n"			\
+			      : "=r" (__res)			\
+			      : "i" (__HYPERVISOR_##name),	\
+				"i" (imm),			\
+				"r" ((unsigned long)(a1)),	\
+				"r" ((unsigned long)(a2))	\
+			      : "r14","r15","r16","r2","r8",	\
+				"memory" );			\
+	(type)__res;						\
+})
+
+#define _hypercall_imm3(type, name, imm, a1, a2, a3)		\
+({								\
+	long __res;						\
+	__asm__ __volatile__ (";;\n"				\
+			      "mov r14=%2\n"			\
+			      "mov r15=%3\n"			\
+			      "mov r16=%4\n"			\
+			      "mov r17=%5\n"			\
+			      "mov r2=%1\n"			\
+			      "break 0x1000 ;;\n"		\
+			      "mov %0=r8 ;;\n"			\
+			      : "=r" (__res)			\
+			      : "i" (__HYPERVISOR_##name),	\
+				"i" (imm),			\
+				"r" ((unsigned long)(a1)),	\
+				"r" ((unsigned long)(a2)),	\
+				"r" ((unsigned long)(a3))	\
+			      : "r14","r15","r16","r17",	\
+				"r2","r8",			\
+				"memory" );			\
+	(type)__res;						\
+})
+
+#define _hypercall_imm4(type, name, imm, a1, a2, a3, a4)	\
+({								\
+	long __res;						\
+	__asm__ __volatile__ (";;\n"				\
+			      "mov r14=%2\n"			\
+			      "mov r15=%3\n"			\
+			      "mov r16=%4\n"			\
+			      "mov r17=%5\n"			\
+			      "mov r18=%6\n"			\
+			      "mov r2=%1\n"			\
+			      "break 0x1000 ;;\n"		\
+			      "mov %0=r8 ;;\n"			\
+			      : "=r" (__res)			\
+			      : "i" (__HYPERVISOR_##name),	\
+				"i" (imm),			\
+				"r" ((unsigned long)(a1)),	\
+				"r" ((unsigned long)(a2)),	\
+				"r" ((unsigned long)(a3)),	\
+				"r" ((unsigned long)(a4))	\
+			      : "r14","r15","r16","r17","r18",	\
+				"r2","r8",			\
+				"memory" );			\
+	(type)__res;						\
+})
+
+static inline unsigned long
+__HYPERVISOR_ioremap(unsigned long ioaddr, unsigned long size)
+{
+	return _hypercall_imm2(unsigned long, ia64_dom0vp_op,
+			       IA64_DOM0VP_ioremap, ioaddr, size);
+}
+
+static inline unsigned long
+HYPERVISOR_ioremap(unsigned long ioaddr, unsigned long size)
+{
+	unsigned long ret = ioaddr;
+	if (running_on_xen) {
+		ret = __HYPERVISOR_ioremap(ioaddr, size);
+	}
+	return ret;
+}
+
+static inline unsigned long
+__HYPERVISOR_phystomach(unsigned long gpfn)
+{
+	return _hypercall_imm1(unsigned long, ia64_dom0vp_op,
+			       IA64_DOM0VP_phystomach, gpfn);
+}
+
+static inline unsigned long
+HYPERVISOR_phystomach(unsigned long gpfn)
+{
+	unsigned long ret = gpfn;
+	if (running_on_xen) {
+		ret = __HYPERVISOR_phystomach(gpfn);
+	}
+	return ret;
+}
+
+static inline unsigned long
+__HYPERVISOR_machtophys(unsigned long mfn)
+{
+	return _hypercall_imm1(unsigned long, ia64_dom0vp_op,
+			       IA64_DOM0VP_machtophys, mfn);
+}
+
+static inline unsigned long
+HYPERVISOR_machtophys(unsigned long mfn)
+{
+	unsigned long ret = mfn;
+	if (running_on_xen) {
+		ret = __HYPERVISOR_machtophys(mfn);
+	}
+	return ret;
+}
+
+static inline unsigned long
+__HYPERVISOR_populate_physmap(unsigned long gpfn, unsigned int extent_order,
+			      unsigned int address_bits)
+{
+	return _hypercall_imm3(unsigned long, ia64_dom0vp_op,
+			       IA64_DOM0VP_populate_physmap, gpfn, 
+			       extent_order, address_bits);
+}
+
+static inline unsigned long
+HYPERVISOR_populate_physmap(unsigned long gpfn, unsigned int extent_order,
+			    unsigned int address_bits)
+{
+	unsigned long ret = 0;
+	if (running_on_xen) {
+		ret = __HYPERVISOR_populate_physmap(gpfn, extent_order,
+						    address_bits);
+	}
+	return ret;
+}
+
+static inline unsigned long
+__HYPERVISOR_zap_physmap(unsigned long gpfn, unsigned int extent_order)
+{
+	return _hypercall_imm2(unsigned long, ia64_dom0vp_op,
+			       IA64_DOM0VP_zap_physmap, gpfn, extent_order);
+}
+
+static inline unsigned long
+HYPERVISOR_zap_physmap(unsigned long gpfn, unsigned int extent_order)
+{
+	unsigned long ret = 0;
+	if (running_on_xen) {
+		ret = __HYPERVISOR_zap_physmap(gpfn, extent_order);
+	}
+	return ret;
+}
+
+static inline unsigned long
+__HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
+			 unsigned int flags, domid_t domid)
+{
+	return _hypercall_imm4(unsigned long, ia64_dom0vp_op,
+			       IA64_DOM0VP_add_physmap, gpfn, mfn, flags,
+			       domid);
+}
+static inline unsigned long
+HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
+		       unsigned int flags, domid_t domid)
+{
+	unsigned long ret = 0;
+	BUG_ON(!running_on_xen);//XXX
+	if (running_on_xen) {
+		ret = __HYPERVISOR_add_physmap(gpfn, mfn, flags, domid);
+	}
+	return ret;
+}
+#else
+#define HYPERVISOR_ioremap(ioaddr, size)		({ioaddr;})
+#define HYPERVISOR_phystomach(gpfn)			({gpfn;})
+#define HYPERVISOR_machtophys(mfn)			({mfn;})
+#define HYPERVISOR_populate_physmap(gpfn, extent_order, address_bits) \
+							({0;})
+#define HYPERVISOR_zap_physmap(gpfn, extent_order)	({0;})
+#define HYPERVISOR_add_physmap(gpfn, mfn, flags)	({0;})
+#endif
 #endif /* __HYPERCALL_H__ */
