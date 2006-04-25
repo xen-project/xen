@@ -81,18 +81,25 @@ void tdpfoo(void) { }
 // address, convert the pte for a physical address for (possibly different)
 // Xen PAGE_SIZE and return modified pte.  (NOTE: TLB insert should use
 // PAGE_SIZE!)
-unsigned long translate_domain_pte(unsigned long pteval,
-	unsigned long address, unsigned long itir)
+u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
 {
 	struct domain *d = current->domain;
-	unsigned long mask, pteval2, mpaddr;
+	ia64_itir_t itir = {.itir = itir__};
+	u64 mask, mpaddr, pteval2;
 
 	pteval &= ((1UL << 53) - 1);// ignore [63:53] bits
 
 	// FIXME address had better be pre-validated on insert
-	mask = ~itir_mask(itir);
+	mask = ~itir_mask(itir.itir);
 	mpaddr = (((pteval & ~_PAGE_ED) & _PAGE_PPN_MASK) & ~mask) |
 	         (address & mask);
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+	if (itir.ps > PAGE_SHIFT) {
+		itir.ps = PAGE_SHIFT;
+	}
+#endif
+	*logps = itir.ps;
+#ifndef CONFIG_XEN_IA64_DOM0_VP
 	if (d == dom0) {
 		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
 			/*
@@ -112,9 +119,10 @@ unsigned long translate_domain_pte(unsigned long pteval,
 			printf("translate_domain_pte: bad mpa=0x%lx (> 0x%lx),"
 			       "vadr=0x%lx,pteval=0x%lx,itir=0x%lx\n",
 			       mpaddr, (unsigned long)d->max_pages<<PAGE_SHIFT,
-			       address, pteval, itir);
+			       address, pteval, itir.itir);
 		tdpfoo();
 	}
+#endif
 	pteval2 = lookup_domain_mpa(d,mpaddr);
 	pteval2 &= _PAGE_PPN_MASK; // ignore non-addr bits
 	pteval2 |= (pteval & _PAGE_ED);
@@ -128,6 +136,7 @@ unsigned long translate_domain_mpaddr(unsigned long mpaddr)
 {
 	unsigned long pteval;
 
+#ifndef CONFIG_XEN_IA64_DOM0_VP
 	if (current->domain == dom0) {
 		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
 			printk("translate_domain_mpaddr: out-of-bounds dom0 mpaddr 0x%lx! continuing...\n",
@@ -135,6 +144,7 @@ unsigned long translate_domain_mpaddr(unsigned long mpaddr)
 			tdpfoo();
 		}
 	}
+#endif
 	pteval = lookup_domain_mpa(current->domain,mpaddr);
 	return ((pteval & _PAGE_PPN_MASK) | (mpaddr & ~PAGE_MASK));
 }
@@ -294,8 +304,9 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
  again:
 	fault = vcpu_translate(current,address,is_data,0,&pteval,&itir,&iha);
 	if (fault == IA64_NO_FAULT || fault == IA64_USE_TLB) {
-		pteval = translate_domain_pte(pteval,address,itir);
-		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,(itir>>2)&0x3f);
+		u64 logps;
+		pteval = translate_domain_pte(pteval, address, itir, &logps);
+		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,logps);
 		if (fault == IA64_USE_TLB && !current->arch.dtlb.pte.p) {
 			/* dtlb has been purged in-between.  This dtlb was
 			   matching.  Undo the work.  */

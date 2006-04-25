@@ -54,7 +54,9 @@
 #include <asm/regionreg.h>
 #include <asm/dom_fw.h>
 
+#ifndef CONFIG_XEN_IA64_DOM0_VP
 #define CONFIG_DOMAIN0_CONTIGUOUS
+#endif
 unsigned long dom0_start = -1L;
 unsigned long dom0_size = 512*1024*1024;
 unsigned long dom0_align = 64*1024*1024;
@@ -503,98 +505,290 @@ void new_thread(struct vcpu *v,
 	}
 }
 
+static pte_t*
+lookup_alloc_domain_pte(struct domain* d, unsigned long mpaddr)
+{
+    struct page_info *pt;
+    struct mm_struct *mm = d->arch.mm;
+    pgd_t *pgd;
+    pud_t *pud;
+    pmd_t *pmd;
+
+    BUG_ON(mm->pgd == NULL);
+    pgd = pgd_offset(mm, mpaddr);
+    if (pgd_none(*pgd)) {
+        pgd_populate(mm, pgd, pud_alloc_one(mm,mpaddr));
+        pt = maddr_to_page(pgd_val(*pgd));
+        list_add_tail(&pt->list, &d->arch.mm->pt_list);
+    }
+
+    pud = pud_offset(pgd, mpaddr);
+    if (pud_none(*pud)) {
+        pud_populate(mm, pud, pmd_alloc_one(mm,mpaddr));
+        pt = maddr_to_page(pud_val(*pud));
+        list_add_tail(&pt->list, &d->arch.mm->pt_list);
+    }
+
+    pmd = pmd_offset(pud, mpaddr);
+    if (pmd_none(*pmd)) {
+        pmd_populate_kernel(mm, pmd, pte_alloc_one_kernel(mm, mpaddr));
+        pt = maddr_to_page(pmd_val(*pmd));
+        list_add_tail(&pt->list, &d->arch.mm->pt_list);
+    }
+
+    return pte_offset_map(pmd, mpaddr);
+}
+
+//XXX xxx_none() should be used instread of !xxx_present()?
+static pte_t*
+lookup_noalloc_domain_pte(struct domain* d, unsigned long mpaddr)
+{
+    struct mm_struct *mm = d->arch.mm;
+    pgd_t *pgd;
+    pud_t *pud;
+    pmd_t *pmd;
+
+    BUG_ON(mm->pgd == NULL);
+    pgd = pgd_offset(mm, mpaddr);
+    if (!pgd_present(*pgd))
+        goto not_present;
+
+    pud = pud_offset(pgd, mpaddr);
+    if (!pud_present(*pud))
+        goto not_present;
+
+    pmd = pmd_offset(pud, mpaddr);
+    if (!pmd_present(*pmd))
+        goto not_present;
+
+    return pte_offset_map(pmd, mpaddr);
+
+not_present:
+    return NULL;
+}
+
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+static pte_t*
+lookup_noalloc_domain_pte_none(struct domain* d, unsigned long mpaddr)
+{
+    struct mm_struct *mm = d->arch.mm;
+    pgd_t *pgd;
+    pud_t *pud;
+    pmd_t *pmd;
+
+    BUG_ON(mm->pgd == NULL);
+    pgd = pgd_offset(mm, mpaddr);
+    if (pgd_none(*pgd))
+        goto not_present;
+
+    pud = pud_offset(pgd, mpaddr);
+    if (pud_none(*pud))
+        goto not_present;
+
+    pmd = pmd_offset(pud, mpaddr);
+    if (pmd_none(*pmd))
+        goto not_present;
+
+    return pte_offset_map(pmd, mpaddr);
+
+not_present:
+    return NULL;
+}
+#endif
 
 /* Allocate a new page for domain and map it to the specified metaphysical 
    address.  */
-static struct page_info * assign_new_domain_page(struct domain *d, unsigned long mpaddr)
+struct page_info *
+__assign_new_domain_page(struct domain *d, unsigned long mpaddr, pte_t* pte)
 {
-	unsigned long maddr;
-	struct page_info *p;
+    struct page_info *p = NULL;
+    unsigned long maddr;
+
+    BUG_ON(!pte_none(*pte));
 
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
-	if (d == dom0) {
-		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
-			/* FIXME: is it true ?
-			   dom0 memory is not contiguous!  */
-			printk("assign_new_domain_page: bad domain0 "
-			       "mpaddr=%lx, start=%lx, end=%lx!\n",
-			       mpaddr, dom0_start, dom0_start+dom0_size);
-			while(1);
-		}
-		p = mfn_to_page((mpaddr >> PAGE_SHIFT));
-	}
-	else
+    if (d == dom0) {
+#if 0
+        if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
+            /* FIXME: is it true ?
+               dom0 memory is not contiguous!  */
+            panic("assign_new_domain_page: bad domain0 "
+                  "mpaddr=%lx, start=%lx, end=%lx!\n",
+                  mpaddr, dom0_start, dom0_start+dom0_size);
+        }
 #endif
-	{
-		p = alloc_domheap_page(d);
-		// zero out pages for security reasons
-		if (p) memset(__va(page_to_maddr(p)),0,PAGE_SIZE);
-	}
-	if (unlikely(!p)) {
-		printf("assign_new_domain_page: Can't alloc!!!! Aaaargh!\n");
-		return(p);
-	}
-	maddr = page_to_maddr (p);
-	if (unlikely(maddr > __get_cpu_var(vhpt_paddr)
-		     && maddr < __get_cpu_var(vhpt_pend))) {
-		/* FIXME: how can this happen ?
-		   vhpt is allocated by alloc_domheap_page.  */
-		printf("assign_new_domain_page: reassigned vhpt page %lx!!\n",
-		       maddr);
-	}
-	assign_domain_page (d, mpaddr, maddr);
-	return p;
+        p = mfn_to_page((mpaddr >> PAGE_SHIFT));
+        return p;
+    }
+    else
+#endif
+    {
+        p = alloc_domheap_page(d);
+        // zero out pages for security reasons
+        if (p)
+            clear_page(page_to_virt(p));
+    }
+    if (unlikely(!p)) {
+        printf("assign_new_domain_page: Can't alloc!!!! Aaaargh!\n");
+        return(p);
+    }
+    maddr = page_to_maddr (p);
+    if (unlikely(maddr > __get_cpu_var(vhpt_paddr)
+                 && maddr < __get_cpu_var(vhpt_pend))) {
+        /* FIXME: how can this happen ?
+           vhpt is allocated by alloc_domheap_page.  */
+        printf("assign_new_domain_page: reassigned vhpt page %lx!!\n",
+               maddr);
+    }
+
+    set_pte(pte, pfn_pte(maddr >> PAGE_SHIFT,
+                         __pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
+
+    //XXX CONFIG_XEN_IA64_DOM0_VP
+    //    TODO racy
+    if ((mpaddr & GPFN_IO_MASK) == GPFN_MEM)
+        set_gpfn_from_mfn(page_to_mfn(p), mpaddr >> PAGE_SHIFT);
+    return p;
+}
+
+struct page_info *
+assign_new_domain_page(struct domain *d, unsigned long mpaddr)
+{
+#ifdef CONFIG_DOMAIN0_CONTIGUOUS
+    pte_t dummy_pte = __pte(0);
+    return __assign_new_domain_page(d, mpaddr, &dummy_pte);
+#else
+    struct page_info *p = NULL;
+    pte_t *pte;
+
+    pte = lookup_alloc_domain_pte(d, mpaddr);
+    if (pte_none(*pte)) {
+        p = __assign_new_domain_page(d, mpaddr, pte);
+    } else {
+        DPRINTK("%s: d 0x%p mpaddr %lx already mapped!\n",
+                __func__, d, mpaddr);
+    }
+
+    return p;
+#endif
+}
+
+void
+assign_new_domain0_page(struct domain *d, unsigned long mpaddr)
+{
+#ifndef CONFIG_DOMAIN0_CONTIGUOUS
+    pte_t *pte;
+
+    BUG_ON(d != dom0);
+    pte = lookup_alloc_domain_pte(d, mpaddr);
+    if (pte_none(*pte)) {
+        struct page_info *p = __assign_new_domain_page(d, mpaddr, pte);
+        if (p == NULL) {
+            panic("%s: can't allocate page for dom0", __func__);
+        }
+    }
+#endif
 }
 
 /* map a physical address to the specified metaphysical addr */
 void assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr)
 {
-	struct mm_struct *mm = d->arch.mm;
-	struct page_info *pt;
-	pgd_t *pgd;
-	pud_t *pud;
-	pmd_t *pmd;
 	pte_t *pte;
 
-	if (!mm->pgd) {
-		printk("assign_domain_page: domain pgd must exist!\n");
-		return;
-	}
-	pgd = pgd_offset(mm,mpaddr);
-	if (pgd_none(*pgd))
-	{
-		pgd_populate(mm, pgd, pud_alloc_one(mm,mpaddr));
-		pt = maddr_to_page(pgd_val(*pgd));
-		list_add_tail(&pt->list, &d->arch.mm->pt_list);
-	}
-
-	pud = pud_offset(pgd, mpaddr);
-	if (pud_none(*pud))
-	{
-		pud_populate(mm, pud, pmd_alloc_one(mm,mpaddr));
-		pt = maddr_to_page(pud_val(*pud));
-		list_add_tail(&pt->list, &d->arch.mm->pt_list);
-	}
-
-	pmd = pmd_offset(pud, mpaddr);
-	if (pmd_none(*pmd))
-	{
-		pmd_populate_kernel(mm, pmd, pte_alloc_one_kernel(mm,mpaddr));
-//		pmd_populate(mm, pmd, pte_alloc_one(mm,mpaddr));
-		pt = maddr_to_page(pmd_val(*pmd));
-		list_add_tail(&pt->list, &d->arch.mm->pt_list);
-	}
-
-	pte = pte_offset_map(pmd, mpaddr);
+	pte = lookup_alloc_domain_pte(d, mpaddr);
 	if (pte_none(*pte)) {
 		set_pte(pte, pfn_pte(physaddr >> PAGE_SHIFT,
 			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
+
+	//XXX CONFIG_XEN_IA64_DOM0_VP
+	//    TODO racy
+	if ((mpaddr & GPFN_IO_MASK) == GPFN_MEM)
+		set_gpfn_from_mfn(physaddr >> PAGE_SHIFT, mpaddr >> PAGE_SHIFT);
 	}
 	else printk("assign_domain_page: mpaddr %lx already mapped!\n",mpaddr);
-    if((physaddr>>PAGE_SHIFT)<max_page){
-        *(mpt_table + (physaddr>>PAGE_SHIFT))=(mpaddr>>PAGE_SHIFT);
+}
+
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+static void
+assign_domain_same_page(struct domain *d,
+                          unsigned long mpaddr, unsigned long size)
+{
+    //XXX optimization
+    unsigned long end = mpaddr + size;
+    for (; mpaddr < end; mpaddr += PAGE_SIZE) {
+        assign_domain_page(d, mpaddr, mpaddr);
     }
 }
+
+unsigned long
+assign_domain_mmio_page(struct domain *d,
+                        unsigned long mpaddr, unsigned long size)
+{
+    if (size == 0) {
+        DPRINTK("%s: domain %p mpaddr 0x%lx size = 0x%lx\n",
+                __func__, d, mpaddr, size);
+    }
+    assign_domain_same_page(d, mpaddr, size);
+    return mpaddr;
+}
+
+unsigned long
+assign_domain_mach_page(struct domain *d,
+                        unsigned long mpaddr, unsigned long size)
+{
+    assign_domain_same_page(d, mpaddr, size);
+    return mpaddr;
+}
+
+//XXX selege hammer.
+//    flush finer range.
+void
+domain_page_flush(struct domain* d, unsigned long mpaddr,
+                  unsigned long old_mfn, unsigned long new_mfn)
+{
+    struct vcpu* v;
+    //XXX SMP
+    for_each_vcpu(d, v) {
+        vcpu_purge_tr_entry(&v->arch.dtlb);
+        vcpu_purge_tr_entry(&v->arch.itlb);
+    }
+
+    // flush vhpt
+    vhpt_flush();
+    // flush tlb
+    flush_tlb_all();
+}
+
+static void
+zap_domain_page_one(struct domain *d, unsigned long mpaddr)
+{
+    struct mm_struct *mm = d->arch.mm;
+    pte_t *pte;
+    pte_t old_pte;
+    unsigned long mfn;
+    struct page_info *page;
+
+    pte = lookup_noalloc_domain_pte_none(d, mpaddr);
+    if (pte == NULL)
+        return;
+    if (pte_none(*pte))
+        return;
+
+    // update pte
+    old_pte = ptep_get_and_clear(mm, mpaddr, pte);
+    mfn = pte_pfn(old_pte);
+    page = mfn_to_page(mfn);
+
+    if (page_get_owner(page) == d) {
+        BUG_ON(get_gpfn_from_mfn(mfn) != (mpaddr >> PAGE_SHIFT));
+        set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
+    }
+
+    domain_page_flush(d, mpaddr, mfn, INVALID_MFN);
+
+    put_page(page);
+}
+#endif
 
 void build_physmap_table(struct domain *d)
 {
@@ -620,12 +814,42 @@ void mpafoo(unsigned long mpaddr)
 		privop_trace = 1;
 }
 
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+unsigned long
+____lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
+{
+    pte_t *pte;
+
+    pte = lookup_noalloc_domain_pte(d, mpaddr);
+    if (pte == NULL)
+        goto not_present;
+
+    if (pte_present(*pte))
+        return (pte->pte & _PFN_MASK);
+    else if (VMX_DOMAIN(d->vcpu[0]))
+        return GPFN_INV_MASK;
+
+not_present:
+    return INVALID_MFN;
+}
+
+unsigned long
+__lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
+{
+    unsigned long machine = ____lookup_domain_mpa(d, mpaddr);
+    if (machine != INVALID_MFN)
+        return machine;
+
+    printk("%s: d 0x%p id %d current 0x%p id %d\n",
+           __func__, d, d->domain_id, current, current->vcpu_id);
+    printk("%s: bad mpa 0x%lx (max_pages 0x%lx)\n",
+           __func__, mpaddr, (unsigned long)d->max_pages << PAGE_SHIFT);
+    return INVALID_MFN;
+}
+#endif
+
 unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 {
-	struct mm_struct *mm = d->arch.mm;
-	pgd_t *pgd = pgd_offset(mm, mpaddr);
-	pud_t *pud;
-	pmd_t *pmd;
 	pte_t *pte;
 
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
@@ -642,26 +866,23 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 		return *(unsigned long *)pte;
 	}
 #endif
-	if (pgd_present(*pgd)) {
-		pud = pud_offset(pgd,mpaddr);
-		if (pud_present(*pud)) {
-			pmd = pmd_offset(pud,mpaddr);
-			if (pmd_present(*pmd)) {
-				pte = pte_offset_map(pmd,mpaddr);
-				if (pte_present(*pte)) {
+	pte = lookup_noalloc_domain_pte(d, mpaddr);
+	if (pte != NULL) {
+		if (pte_present(*pte)) {
 //printk("lookup_domain_page: found mapping for %lx, pte=%lx\n",mpaddr,pte_val(*pte));
-					return *(unsigned long *)pte;
-				} else if (VMX_DOMAIN(d->vcpu[0]))
-					return GPFN_INV_MASK;
-			}
-		}
+			return *(unsigned long *)pte;
+		} else if (VMX_DOMAIN(d->vcpu[0]))
+			return GPFN_INV_MASK;
 	}
-	if ((mpaddr >> PAGE_SHIFT) < d->max_pages) {
-		printk("lookup_domain_mpa: non-allocated mpa 0x%lx (< 0x%lx)\n",
-			mpaddr, (unsigned long) d->max_pages<<PAGE_SHIFT);
-	} else
-		printk("lookup_domain_mpa: bad mpa 0x%lx (> 0x%lx)\n",
-			mpaddr, (unsigned long) d->max_pages<<PAGE_SHIFT);
+
+	printk("%s: d 0x%p id %d current 0x%p id %d\n",
+	       __func__, d, d->domain_id, current, current->vcpu_id);
+	if ((mpaddr >> PAGE_SHIFT) < d->max_pages)
+		printk("%s: non-allocated mpa 0x%lx (< 0x%lx)\n", __func__,
+		       mpaddr, (unsigned long)d->max_pages << PAGE_SHIFT);
+	else
+		printk("%s: bad mpa 0x%lx (=> 0x%lx)\n", __func__,
+		       mpaddr, (unsigned long)d->max_pages << PAGE_SHIFT);
 	mpafoo(mpaddr);
 	return 0;
 }

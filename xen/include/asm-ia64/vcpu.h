@@ -133,6 +133,7 @@ extern IA64FAULT vcpu_get_pkr(VCPU *vcpu, UINT64 reg, UINT64 *pval);
 extern IA64FAULT vcpu_set_pkr(VCPU *vcpu, UINT64 reg, UINT64 val);
 extern IA64FAULT vcpu_tak(VCPU *vcpu, UINT64 vadr, UINT64 *key);
 /* TLB */
+extern void vcpu_purge_tr_entry(TR_ENTRY *trp);
 extern IA64FAULT vcpu_itr_d(VCPU *vcpu, UINT64 slot, UINT64 padr,
 		UINT64 itir, UINT64 ifa);
 extern IA64FAULT vcpu_itr_i(VCPU *vcpu, UINT64 slot, UINT64 padr,

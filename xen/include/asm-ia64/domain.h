@@ -162,6 +162,15 @@ struct mm_struct {
 
 extern struct mm_struct init_mm;
 
+struct page_info * assign_new_domain_page(struct domain *d, unsigned long mpaddr);
+void assign_new_domain0_page(struct domain *d, unsigned long mpaddr);
+void assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr);
+void assign_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long flags);
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+unsigned long assign_domain_mmio_page(struct domain *d, unsigned long mpaddr, unsigned long size);
+unsigned long assign_domain_mach_page(struct domain *d, unsigned long mpaddr, unsigned long size);
+#endif
+
 #include <asm/uaccess.h> /* for KERNEL_DS */
 #include <asm/pgtable.h>
 

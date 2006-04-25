@@ -87,9 +87,12 @@ void raise_actimer_softirq(void)
 unsigned long
 gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 {
+#ifndef CONFIG_XEN_IA64_DOM0_VP
 	if (d == dom0)
 		return(gpfn);
-	else {
+	else
+#endif
+	{
 		unsigned long pte = lookup_domain_mpa(d,gpfn << PAGE_SHIFT);
 		if (!pte) {
 printk("gmfn_to_mfn_foreign: bad gpfn. spinning...\n");

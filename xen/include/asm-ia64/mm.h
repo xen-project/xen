@@ -415,8 +415,12 @@ extern int nr_swap_pages;
 
 extern unsigned long *mpt_table;
 extern unsigned long gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
+extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps);
 extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
-#undef machine_to_phys_mapping
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+extern unsigned long __lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
+extern unsigned long ____lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
+#endif
 #define machine_to_phys_mapping	mpt_table
 
 #define INVALID_M2P_ENTRY        (~0UL)

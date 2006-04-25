@@ -25,7 +25,6 @@ extern void setreg(unsigned long regnum, unsigned long val, int nat, struct pt_r
 extern void getfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_regs *regs);
 
 extern void panic_domain(struct pt_regs *, const char *, ...);
-extern unsigned long translate_domain_pte(UINT64,UINT64,UINT64);
 extern unsigned long translate_domain_mpaddr(unsigned long);
 extern void ia64_global_tlb_purge(UINT64 start, UINT64 end, UINT64 nbits);
 
@@ -1276,6 +1275,7 @@ static inline int vcpu_match_tr_entry(TR_ENTRY *trp, UINT64 ifa, UINT64 rid)
 	return trp->pte.p && vcpu_match_tr_entry_no_p(trp, ifa, rid);
 }
 
+// in_tpa is not used when CONFIG_XEN_IA64_DOM0_VP
 IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, BOOLEAN in_tpa, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
 {
 	unsigned long region = address >> 61;
@@ -1353,8 +1353,12 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, BOOLEAN in
 	pte = trp->pte;
 	if (/* is_data && */ pte.p
 	    && vcpu_match_tr_entry_no_p(trp,address,rid)) {
-		if (vcpu->domain==dom0 && !in_tpa) *pteval = pte.val;
-		else *pteval = vcpu->arch.dtlb_pte;
+#ifndef CONFIG_XEN_IA64_DOM0_VP
+		if (vcpu->domain==dom0 && !in_tpa)
+			*pteval = pte.val;
+		else
+#endif
+		*pteval = vcpu->arch.dtlb_pte;
 		*itir = trp->itir;
 		dtlb_translate_count++;
 		return IA64_USE_TLB;
@@ -1689,7 +1693,7 @@ IA64FAULT vcpu_set_pkr(VCPU *vcpu, UINT64 reg, UINT64 val)
  VCPU translation register access routines
 **************************************************************************/
 
-static inline void vcpu_purge_tr_entry(TR_ENTRY *trp)
+void vcpu_purge_tr_entry(TR_ENTRY *trp)
 {
 	trp->pte.val = 0;
 }
@@ -1758,6 +1762,9 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 		//FIXME: kill domain here
 		while(1);
 	}
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+	BUG_ON(logps > PAGE_SHIFT);
+#endif
 	psr = ia64_clear_ic();
 	ia64_itc(IorD,vaddr,pte,ps); // FIXME: look for bigger mappings
 	ia64_set_psr(psr);
@@ -1798,7 +1805,7 @@ IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 		while(1);
 	}
 	//itir = (itir & ~0xfc) | (PAGE_SHIFT<<2); // ignore domain's pagesize
-	pteval = translate_domain_pte(pte,ifa,itir);
+	pteval = translate_domain_pte(pte, ifa, itir, &logps);
 	if (!pteval) return IA64_ILLOP_FAULT;
 	if (swap_rr0) set_one_rr(0x0,PSCB(vcpu,rrs[0]));
 	vcpu_itc_no_srlz(vcpu,2,ifa,pteval,pte,logps);
@@ -1818,7 +1825,7 @@ IA64FAULT vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 		while(1);
 	}
 	//itir = (itir & ~0xfc) | (PAGE_SHIFT<<2); // ignore domain's pagesize
-	pteval = translate_domain_pte(pte,ifa,itir);
+	pteval = translate_domain_pte(pte, ifa, itir, &logps);
 	// FIXME: what to do if bad physical address? (machine check?)
 	if (!pteval) return IA64_ILLOP_FAULT;
 	if (swap_rr0) set_one_rr(0x0,PSCB(vcpu,rrs[0]));

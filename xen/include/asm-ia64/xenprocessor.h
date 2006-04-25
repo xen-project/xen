@@ -221,4 +221,20 @@ typedef union {
 
 DECLARE_PER_CPU(cpu_kr_ia64_t, cpu_kr);
 
+typedef union {
+    struct {
+        u64 rv3  :  2; // 0-1
+        u64 ps   :  6; // 2-7
+        u64 key  : 24; // 8-31
+        u64 rv4  : 32; // 32-63
+    };
+    struct {
+        u64 __rv3  : 32; // 0-31
+        // next extension to rv4
+        u64 rid  : 24;  // 32-55
+        u64 __rv4  : 8; // 56-63
+    };
+    u64 itir;
+} ia64_itir_t;
+
 #endif // _ASM_IA64_XENPROCESSOR_H
