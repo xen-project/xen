@@ -89,6 +89,13 @@ config XEN_BLKDEV_BACKEND
 	bool
 	default y
 
+config XEN_IA64_DOM0_VP
+	depends on XEN
+	bool
+	default n
+	help
+	  dom0 vp model
+
 config XEN_SYSFS
 	bool "Export Xen attributes in sysfs"
 	depends on XEN && SYSFS
