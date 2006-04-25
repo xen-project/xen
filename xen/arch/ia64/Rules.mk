@@ -3,6 +3,8 @@
 
 HAS_ACPI := y
 VALIDATE_VT	?= n
+xen_ia64_dom0_virtual_physical	?= n
+
 ifneq ($(COMPILE_ARCH),$(TARGET_ARCH))
 CROSS_COMPILE ?= /usr/local/sp_env/v2.2.5/i686/bin/ia64-unknown-linux-
 endif
@@ -33,5 +35,8 @@ CFLAGS	+= -g
 #CFLAGS  += -DVTI_DEBUG
 ifeq ($(VALIDATE_VT),y)
 CFLAGS  += -DVALIDATE_VT
+endif
+ifeq ($(xen_ia64_dom0_virtual_physical),y)
+CFLAGS	+= -DCONFIG_XEN_IA64_DOM0_VP
 endif
 LDFLAGS := -g
