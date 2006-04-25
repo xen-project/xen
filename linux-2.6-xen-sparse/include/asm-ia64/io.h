@@ -71,6 +71,10 @@ extern unsigned int num_io_spaces;
 #include <asm/page.h>
 #include <asm/system.h>
 #include <asm-generic/iomap.h>
+#ifdef CONFIG_XEN
+#include <asm/privop.h>
+#include <asm/hypervisor.h>
+#endif
 
 /*
  * Change virtual addresses to physical addresses and vv.
@@ -95,9 +99,39 @@ extern int valid_mmap_phys_addr_range (unsigned long addr, size_t *count);
  * The following two macros are deprecated and scheduled for removal.
  * Please use the PCI-DMA interface defined in <asm/pci.h> instead.
  */
+#ifndef CONFIG_XEN_IA64_DOM0_VP
 #define bus_to_virt	phys_to_virt
 #define virt_to_bus	virt_to_phys
 #define page_to_bus	page_to_phys
+#define page_to_phys(page)	(page_to_pfn(page) << PAGE_SHIFT)
+#define page_to_pseudophys(page)	page_to_phys(page)
+#else
+#define bus_to_virt(bus)	\
+	phys_to_virt(machine_to_phys_for_dma(bus))
+#define virt_to_bus(virt)	\
+	phys_to_machine_for_dma(virt_to_phys(virt))
+#define page_to_bus(page)	\
+	phys_to_machine_for_dma(page_to_pseudophys(page))
+
+#define page_to_pseudophys(page) \
+	((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
+// XXX
+// the following drivers are broken because they use page_to_phys() to
+// get bus address. fix them.
+// drivers/ide/cris/ide-cris.c
+// drivers/scsi/dec_esp.c
+#define page_to_phys(page)	(page_to_pseudophys(page))
+#define bvec_to_bus(bv)		(page_to_bus((bv)->bv_page) + \
+				(unsigned long) (bv)->bv_offset)
+#define bio_to_pseudophys(bio)	(page_to_pseudophys(bio_page((bio))) +	\
+				 (unsigned long) bio_offset((bio)))
+#define bvec_to_pseudophys(bv)  (page_to_pseudophys((bv)->bv_page) +	\
+				 (unsigned long) (bv)->bv_offset)
+#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
+	(((bvec_to_bus((vec1)) + (vec1)->bv_len) == bvec_to_bus((vec2))) && \
+	 ((bvec_to_pseudophys((vec1)) + (vec1)->bv_len) ==		\
+	  bvec_to_pseudophys((vec2))))
+#endif
 
 # endif /* KERNEL */
 
@@ -425,6 +459,9 @@ __writeq (unsigned long val, volatile void __iomem *addr)
 static inline void __iomem *
 ioremap (unsigned long offset, unsigned long size)
 {
+#ifdef CONFIG_XEN
+	offset = HYPERVISOR_ioremap(offset, size);
+#endif
 	return (void __iomem *) (__IA64_UNCACHED_OFFSET | (offset));
 }
 

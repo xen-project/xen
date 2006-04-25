@@ -247,6 +247,21 @@ extern void machvec_init (const char *name);
 #  error Unknown configuration.  Update asm-ia64/machvec.h.
 # endif /* CONFIG_IA64_GENERIC */
 
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+# define platform_dma_map_sg		dma_map_sg
+# define platform_dma_unmap_sg		dma_unmap_sg
+# define platform_dma_mapping_error	dma_mapping_error
+# define platform_dma_supported		dma_supported
+# define platform_dma_alloc_coherent	dma_alloc_coherent
+# define platform_dma_free_coherent	dma_free_coherent
+# define platform_dma_map_single	dma_map_single
+# define platform_dma_unmap_single	dma_unmap_single
+# define platform_dma_sync_single_for_cpu \
+					dma_sync_single_for_cpu
+# define platform_dma_sync_single_for_device \
+					dma_sync_single_for_device
+#endif
+
 /*
  * Declare default routines which aren't declared anywhere else:
  */

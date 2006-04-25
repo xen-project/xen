@@ -41,6 +41,7 @@
 #include <xen/interface/xen.h>
 #include <xen/interface/dom0_ops.h>
 #include <xen/interface/sched.h>
+#include <asm/hypercall.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
 #include <asm/xen/privop.h> // for running_on_xen
@@ -54,8 +55,6 @@ int xen_init(void);
 
 /* Turn jiffies into Xen system time. XXX Implement me. */
 #define jiffies_to_st(j)	0
-
-#include <asm/hypercall.h>
 
 static inline int
 HYPERVISOR_yield(
@@ -117,9 +116,11 @@ HYPERVISOR_poll(
 
 // for drivers/xen/privcmd/privcmd.c
 #define direct_remap_pfn_range(a,b,c,d,e,f) remap_pfn_range(a,b,c,d,e)
+#define machine_to_phys_mapping 0
+#ifndef CONFIG_XEN_IA64_DOM0_VP
 #define	pfn_to_mfn(x)	(x)
 #define	mfn_to_pfn(x)	(x)
-#define machine_to_phys_mapping 0
+#endif
 
 // for drivers/xen/balloon/balloon.c
 #ifdef CONFIG_XEN_SCRUB_PAGES
@@ -128,12 +129,44 @@ HYPERVISOR_poll(
 #define scrub_pages(_p,_n) ((void)0)
 #endif
 #define	pte_mfn(_x)	pte_pfn(_x)
-#define INVALID_P2M_ENTRY	(~0UL)
 #define __pte_ma(_x)	((pte_t) {(_x)})
 #define phys_to_machine_mapping_valid(_x)	(1)
 #define	kmap_flush_unused()	do {} while (0)
+#define pfn_pte_ma(_x,_y)	__pte_ma(0)
+#ifndef CONFIG_XEN_IA64_DOM0_VP //XXX
 #define set_phys_to_machine(_x,_y)	do {} while (0)
 #define xen_machphys_update(_x,_y)	do {} while (0)
-#define pfn_pte_ma(_x,_y)	__pte_ma(0)
+#endif
+
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+int __xen_create_contiguous_region(unsigned long vstart, unsigned int order, unsigned int address_bits);
+static inline int
+xen_create_contiguous_region(unsigned long vstart,
+                             unsigned int order, unsigned int address_bits)
+{
+	int ret = 0;
+	if (running_on_xen) {
+		ret = __xen_create_contiguous_region(vstart, order,
+		                                     address_bits);
+	}
+	return ret;
+}
+
+void __xen_destroy_contiguous_region(unsigned long vstart, unsigned int order);
+static inline void
+xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
+{
+	if (running_on_xen)
+		__xen_destroy_contiguous_region(vstart, order);
+}
+#else
+#define xen_create_contiguous_region(vstart, order, address_bits)	({0;})
+#define xen_destroy_contiguous_region(vstart, order)	do {} while (0)
+#endif
+
+// for debug
+asmlinkage int xprintk(const char *fmt, ...);
+#define xprintd(fmt, ...)	xprintk("%s:%d " fmt, __func__, __LINE__, \
+					##__VA_ARGS__)
 
 #endif /* __HYPERVISOR_H__ */

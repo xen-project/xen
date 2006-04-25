@@ -37,13 +37,6 @@
 # error "please don't include this file directly"
 #endif
 
-/* FIXME: temp place to hold these page related macros */
-#include <asm/page.h>
-#define virt_to_machine(v) __pa(v)
-#define machine_to_virt(m) __va(m)
-#define virt_to_mfn(v)	((__pa(v)) >> PAGE_SHIFT)
-#define mfn_to_virt(m)	(__va((m) << PAGE_SHIFT))
-
 /*
  * Assembler stubs for hyper-calls.
  */

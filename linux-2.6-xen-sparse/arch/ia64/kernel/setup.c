@@ -64,6 +64,7 @@
 #ifdef CONFIG_XEN
 #include <asm/hypervisor.h>
 #endif
+#include <linux/dma-mapping.h>
 
 #if defined(CONFIG_SMP) && (IA64_CPU_SIZE > PAGE_SIZE)
 # error "struct cpuinfo_ia64 too big!"
@@ -534,6 +535,7 @@ setup_arch (char **cmdline_p)
 
 	platform_setup(cmdline_p);
 	paging_init();
+	contiguous_bitmap_init(max_pfn);
 }
 
 /*

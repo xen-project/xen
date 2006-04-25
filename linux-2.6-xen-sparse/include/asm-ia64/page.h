@@ -117,7 +117,6 @@ extern unsigned long max_low_pfn;
 # define pfn_to_page(pfn)	(vmem_map + (pfn))
 #endif
 
-#define page_to_phys(page)	(page_to_pfn(page) << PAGE_SHIFT)
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
 #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
 
@@ -218,5 +217,76 @@ get_order (unsigned long size)
 					 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC |		\
 					 (((current->personality & READ_IMPLIES_EXEC) != 0)	\
 					  ? VM_EXEC : 0))
+
+#ifndef __ASSEMBLY__
+#ifdef CONFIG_XEN
+
+#define INVALID_P2M_ENTRY	(~0UL)
+
+#ifndef CONFIG_XEN_IA64_DOM0_VP
+
+#define virt_to_machine(v) __pa(v)
+#define machine_to_virt(m) __va(m)
+#define virt_to_mfn(v)	((__pa(v)) >> PAGE_SHIFT)
+#define mfn_to_virt(m)	(__va((m) << PAGE_SHIFT))
+
+#else
+
+#include <linux/kernel.h>
+#include <asm/hypervisor.h>
+
+//XXX xen page size != page size
+
+static inline unsigned long
+pfn_to_mfn_for_dma(unsigned long pfn)
+{
+	unsigned long mfn;
+	mfn = HYPERVISOR_phystomach(pfn);
+	BUG_ON(mfn == 0); // XXX
+	BUG_ON(mfn == INVALID_P2M_ENTRY); // XXX
+	BUG_ON(mfn == INVALID_MFN);
+	return mfn;
+}
+
+static inline unsigned long
+phys_to_machine_for_dma(unsigned long phys)
+{
+	unsigned long machine =
+	              pfn_to_mfn_for_dma(phys >> PAGE_SHIFT) << PAGE_SHIFT;
+	machine |= (phys & ~PAGE_MASK);
+	return machine;
+}
+
+static inline unsigned long
+mfn_to_pfn_for_dma(unsigned long mfn)
+{
+	unsigned long pfn;
+	pfn = HYPERVISOR_machtophys(mfn);
+	BUG_ON(pfn == 0);
+	//BUG_ON(pfn == INVALID_M2P_ENTRY);
+	return pfn;
+}
+
+static inline unsigned long
+machine_to_phys_for_dma(unsigned long machine)
+{
+	unsigned long phys =
+	              mfn_to_pfn_for_dma(machine >> PAGE_SHIFT) << PAGE_SHIFT;
+	phys |= (machine & ~PAGE_MASK);
+	return phys;
+}
+
+#define set_phys_to_machine(pfn, mfn) do { } while (0)
+#define xen_machphys_update(mfn, pfn) do { } while (0)
+
+#define mfn_to_pfn(mfn)			({(mfn);})
+#define mfn_to_virt(mfn)		({__va((mfn) << PAGE_SHIFT);})
+#define pfn_to_mfn(pfn)			({(pfn);})
+#define virt_to_mfn(virt)		({__pa(virt) >> PAGE_SHIFT;})
+#define virt_to_machine(virt)		({__pa(virt);}) // for tpmfront.c
+
+#endif /* CONFIG_XEN_IA64_DOM0_VP */
+#endif /* CONFIG_XEN */
+#endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_IA64_PAGE_H */
