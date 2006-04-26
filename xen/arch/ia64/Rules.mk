@@ -9,7 +9,7 @@ ifneq ($(COMPILE_ARCH),$(TARGET_ARCH))
 CROSS_COMPILE ?= /usr/local/sp_env/v2.2.5/i686/bin/ia64-unknown-linux-
 endif
 AFLAGS  += -D__ASSEMBLY__ -nostdinc $(CPPFLAGS)
-AFLAGS  += -mconstant-gp -Wa,--fatal-warnings
+AFLAGS  += -mconstant-gp
 CPPFLAGS  += -I$(BASEDIR)/include -I$(BASEDIR)/include/asm-ia64 	\
              -I$(BASEDIR)/include/asm-ia64/linux 			\
 	     -I$(BASEDIR)/include/asm-ia64/linux-xen 			\
@@ -17,7 +17,7 @@ CPPFLAGS  += -I$(BASEDIR)/include -I$(BASEDIR)/include/asm-ia64 	\
              -I$(BASEDIR)/arch/ia64/linux -I$(BASEDIR)/arch/ia64/linux-xen
 
 CFLAGS  += -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
-CFLAGS  += -mconstant-gp -Wa,--fatal-warnings
+CFLAGS  += -mconstant-gp
 #CFLAGS  += -O3		# -O3 over-inlines making debugging tough!
 CFLAGS  += -O2		# but no optimization causes compile errors!
 #CFLAGS  += -iwithprefix include -Wall -DMONITOR_BASE=$(MONITOR_BASE)
