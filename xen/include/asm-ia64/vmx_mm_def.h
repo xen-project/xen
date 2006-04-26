@@ -28,6 +28,7 @@
 #define ARCH_PAGE_SHIFT   12
 #define ARCH_PAGE_SIZE    PSIZE(ARCH_PAGE_SHIFT)
 #define MAX_PHYS_ADDR_BITS  50
+#define GUEST_IMPL_VA_MSB   59
 #define PMASK(size)         (~((size) - 1))
 #define PSIZE(size)         (1UL<<(size))
 //#define PAGE_SIZE_4K        PSIZE(12)

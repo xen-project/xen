@@ -21,6 +21,8 @@
 #include <asm/vmx_vcpu.h>
 #include <asm/pal.h>
 #include <asm/sal.h>
+#include <asm/tlb.h>
+#include <asm/vmx_mm_def.h>
 
 static void
 get_pal_parameters (VCPU *vcpu, UINT64 *gr29,
@@ -285,9 +287,20 @@ pal_test_info(VCPU *vcpu){
 
 static struct ia64_pal_retval
 pal_vm_summary(VCPU *vcpu){
+	pal_vm_info_1_u_t vminfo1;
+	pal_vm_info_2_u_t vminfo2;	
 	struct ia64_pal_retval result;
-
-	result.status= -1; //unimplemented
+	
+	PAL_CALL(result,PAL_VM_SUMMARY,0,0,0);
+	if(!result.status){
+		vminfo1.pvi1_val = result.v0;
+		vminfo1.pal_vm_info_1_s.max_itr_entry = NITRS -1;
+		vminfo1.pal_vm_info_1_s.max_dtr_entry = NDTRS -1;
+		result.v0 = vminfo1.pvi1_val;
+		vminfo2.pal_vm_info_2_s.impl_va_msb = GUEST_IMPL_VA_MSB;
+		vminfo2.pal_vm_info_2_s.rid_size = current->domain->arch.rid_bits;
+		result.v1 = vminfo2.pvi2_val;
+	} 
 	return result;
 }
 
