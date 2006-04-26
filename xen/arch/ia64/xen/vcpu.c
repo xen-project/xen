@@ -965,13 +965,12 @@ IA64FAULT vcpu_set_lrr1(VCPU *vcpu, UINT64 val)
 
 IA64FAULT vcpu_set_itv(VCPU *vcpu, UINT64 val)
 {
-//extern unsigned long privop_trace;
-//privop_trace=1;
-	if (val & 0xef00) return (IA64_ILLOP_FAULT);
+	/* Check reserved fields.  */
+	if (val & 0xef00)
+		return (IA64_ILLOP_FAULT);
 	PSCB(vcpu,itv) = val;
 	if (val & 0x10000) {
-		printf("**** vcpu_set_itv(%lu): vitm=%lx, setting to 0\n",
-		       val,PSCBX(vcpu,domain_itm));
+		/* Disable itm.  */
 		PSCBX(vcpu,domain_itm) = 0;
 	}
 	else vcpu_set_next_timer(vcpu);
@@ -1091,7 +1090,12 @@ IA64FAULT vcpu_set_itc(VCPU *vcpu, UINT64 val)
 {
 #define DISALLOW_SETTING_ITC_FOR_NOW
 #ifdef DISALLOW_SETTING_ITC_FOR_NOW
-printf("vcpu_set_itc: Setting ar.itc is currently disabled\n");
+	static int did_print;
+	if (!did_print) {
+		printf("vcpu_set_itc: Setting ar.itc is currently disabled\n");
+		printf("(this message is only displayed one)\n");
+		did_print = 1;
+	}
 #else
 	UINT64 oldnow = ia64_get_itc();
 	UINT64 olditm = PSCBX(vcpu,domain_itm);

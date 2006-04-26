@@ -222,9 +222,18 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 		printf("*** CALLED SAL_MC_SET_PARAMS.  IGNORED...\n");
 		break;
 	    case SAL_CACHE_FLUSH:
-	        /*  The best we can do is to flush with fc all the domain.  */
-	        domain_cache_flush (current->domain, in1 == 4 ? 1 : 0);
-		status = 0;
+		if (1) {
+			/*  Flush using SAL.
+			    This method is faster but has a side effect on
+			    other vcpu running on this cpu.  */
+			status = ia64_sal_cache_flush (in1);
+		}
+		else {
+			/*  Flush with fc all the domain.
+			    This method is slower but has no side effects.  */
+			domain_cache_flush (current->domain, in1 == 4 ? 1 : 0);
+			status = 0;
+		}
 		break;
 	    case SAL_CACHE_INIT:
 		printf("*** CALLED SAL_CACHE_INIT.  IGNORED...\n");
