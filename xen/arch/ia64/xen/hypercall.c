@@ -24,6 +24,7 @@
 #include <xen/irq.h>
 #include <asm/hw_irq.h>
 #include <public/physdev.h>
+#include <xen/domain.h>
 
 extern unsigned long translate_domain_mpaddr(unsigned long);
 static long do_physdev_op(GUEST_HANDLE(physdev_op_t) uop);
@@ -55,7 +56,7 @@ hypercall_t ia64_hypercall_table[] =
 	(hypercall_t)do_event_channel_op,
 	(hypercall_t)do_xen_version,
 	(hypercall_t)do_console_io,
-	(hypercall_t)do_physdev_op,          	/* do_physdev_op */
+	(hypercall_t)do_physdev_op,
 	(hypercall_t)do_grant_table_op,						/* 20 */
 	(hypercall_t)do_ni_hypercall,		/* do_vm_assist */
 	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping_otherdomain */
@@ -73,67 +74,25 @@ hypercall_t ia64_hypercall_table[] =
 static int
 xen_hypercall (struct pt_regs *regs)
 {
-	switch (regs->r2) {
-	    case __HYPERVISOR_sched_op_compat:
-		regs->r8 = do_sched_op_compat((int) regs->r14,
-		                              (unsigned long) regs->r15);
-		break;
+	uint32_t cmd = (uint32_t)regs->r2;
 
-	    case __HYPERVISOR_dom0_op:
-		regs->r8 = do_dom0_op(guest_handle_from_ptr(regs->r14,
-							    dom0_op_t));
-		break;
-
-	    case __HYPERVISOR_memory_op:
-		regs->r8 = do_memory_op(regs->r14,
-			guest_handle_from_ptr(regs->r15, void));
-		break;
-
-	    case __HYPERVISOR_event_channel_op:
-		regs->r8 = do_event_channel_op(guest_handle_from_ptr(regs->r14, evtchn_op_t));
-		break;
-
-	    case __HYPERVISOR_physdev_op:
-		regs->r8 = do_physdev_op(guest_handle_from_ptr(regs->r14,
-			physdev_op_t));
-		break;
-
-	    case __HYPERVISOR_grant_table_op:
-		regs->r8 = do_grant_table_op((unsigned int) regs->r14,
-			guest_handle_from_ptr(regs->r15, void),
-			(unsigned int) regs->r16);
-		break;
-
-	    case __HYPERVISOR_console_io:
-		regs->r8 = do_console_io((int) regs->r14, (int) regs->r15,
-			guest_handle_from_ptr(regs->r16, char));
-		break;
-
-	    case __HYPERVISOR_xen_version:
-		regs->r8 = do_xen_version((int) regs->r14,
-			guest_handle_from_ptr(regs->r15, void));
-		break;
-
-	    case __HYPERVISOR_multicall:
-		regs->r8 = do_multicall(guest_handle_from_ptr(regs->r14,
-			multicall_entry_t), (unsigned int) regs->r15);
-		break;
-
-	    case __HYPERVISOR_sched_op:
-		regs->r8 = do_sched_op((int) regs->r14,
-		                       guest_handle_from_ptr(regs->r15, void));
-		break;
-
+	if (cmd < nr_hypercalls)
+		regs->r8 = (*ia64_hypercall_table[cmd])(
+			regs->r14,
+			regs->r15,
+			regs->r16,
+			regs->r17,
+			regs->r18,
+			regs->r19);
+	else
 #ifdef CONFIG_XEN_IA64_DOM0_VP
-	    case __HYPERVISOR_ia64_dom0vp_op:
+	if (cmd ==  __HYPERVISOR_ia64_dom0vp_op) 
 		regs->r8 = do_dom0vp_op(regs->r14, regs->r15, regs->r16,
 		                        regs->r17, regs->r18);
-		break;
+	else
 #endif
-	    default:
-		printf("unknown xen hypercall %lx\n", regs->r2);
-		regs->r8 = do_ni_hypercall();
-	}
+		regs->r8 = -ENOSYS;
+
 	return 1;
 }
 
