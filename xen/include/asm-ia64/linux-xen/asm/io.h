@@ -23,7 +23,9 @@
 #define __SLOW_DOWN_IO	do { } while (0)
 #define SLOW_DOWN_IO	do { } while (0)
 
-#ifndef XEN
+#ifdef XEN
+#include <asm/xensystem.h>
+#else
 #define __IA64_UNCACHED_OFFSET	0xc000000000000000UL	/* region 6 */
 #endif
 

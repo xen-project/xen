@@ -384,7 +384,9 @@ setup_arch (char **cmdline_p)
 {
 	unw_init();
 
+#ifndef XEN
 	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end___vtop_patchlist);
+#endif
 
 	*cmdline_p = __va(ia64_boot_param->command_line);
 #ifndef XEN
@@ -870,6 +872,11 @@ cpu_init (void)
 #endif
 		BUG();
 
+#ifdef XEN
+	ia64_fph_enable();
+	__ia64_init_fpu();
+#endif
+
 	ia64_mmu_init(ia64_imva(cpu_data));
 	ia64_mca_cpu_init(ia64_imva(cpu_data));
 
@@ -931,9 +938,11 @@ cpu_init (void)
 #endif
 }
 
+#ifndef XEN
 void
 check_bugs (void)
 {
 	ia64_patch_mckinley_e9((unsigned long) __start___mckinley_e9_bundles,
 			       (unsigned long) __end___mckinley_e9_bundles);
 }
+#endif

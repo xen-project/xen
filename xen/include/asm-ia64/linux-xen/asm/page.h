@@ -119,6 +119,7 @@ typedef union ia64_va {
 	void *p;
 } ia64_va;
 
+#ifndef XEN
 /*
  * Note: These macros depend on the fact that PAGE_OFFSET has all
  * region bits set to 1 and all other bits set to zero.  They are
@@ -127,6 +128,7 @@ typedef union ia64_va {
  */
 #define __pa(x)		({ia64_va _v; _v.l = (long) (x); _v.f.reg = 0; _v.l;})
 #define __va(x)		({ia64_va _v; _v.l = (long) (x); _v.f.reg = -1; _v.p;})
+#endif /* XEN */
 
 #define REGION_NUMBER(x)	({ia64_va _v; _v.l = (long) (x); _v.f.reg;})
 #define REGION_OFFSET(x)	({ia64_va _v; _v.l = (long) (x); _v.f.off;})
@@ -198,6 +200,7 @@ get_order (unsigned long size)
 # define __pgprot(x)	(x)
 #endif /* !STRICT_MM_TYPECHECKS */
 
+#ifndef XEN
 #define PAGE_OFFSET			__IA64_UL_CONST(0xe000000000000000)
 
 #define VM_DATA_DEFAULT_FLAGS		(VM_READ | VM_WRITE |					\
@@ -205,7 +208,7 @@ get_order (unsigned long size)
 					 (((current->personality & READ_IMPLIES_EXEC) != 0)	\
 					  ? VM_EXEC : 0))
 
-#ifdef XEN
+#else
 #include <asm/xenpage.h>
 #endif
 

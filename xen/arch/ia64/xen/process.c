@@ -219,9 +219,6 @@ void reflect_interruption(unsigned long isr, struct pt_regs *regs, unsigned long
 
 	regs->cr_iip = ((unsigned long) PSCBX(v,iva) + vector) & ~0xffUL;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
-#ifdef CONFIG_SMP
-#warning "SMP FIXME: sharedinfo doesn't handle smp yet, need page per vcpu"
-#endif
 	regs->r31 = XSI_IPSR;
 
 	v->vcpu_info->evtchn_upcall_mask = 1;

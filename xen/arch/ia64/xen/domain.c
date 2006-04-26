@@ -72,11 +72,8 @@ extern unsigned long running_on_sim;
 #define IS_XEN_ADDRESS(d,a) ((a >= d->xen_vastart) && (a <= d->xen_vaend))
 
 /* FIXME: where these declarations should be there ? */
-extern void domain_pend_keyboard_interrupt(int);
 extern long platform_is_hp_ski(void);
-extern void sync_split_caches(void);
 extern void serial_input_init(void);
-
 static void init_switch_stack(struct vcpu *v);
 void build_physmap_table(struct domain *d);
 
@@ -145,23 +142,6 @@ void startup_cpu_idle_loop(void)
 	/* Just some sanity to ensure that the scheduler is set up okay. */
 	ASSERT(current->domain == IDLE_DOMAIN_ID);
 	raise_softirq(SCHEDULE_SOFTIRQ);
-#if 0
-//do we have to ensure the idle task has a shared page so that, for example,
-//region registers can be loaded from it.  Apparently not...
-	idle0_task.shared_info = (void *)alloc_xenheap_page();
-	memset(idle0_task.shared_info, 0, PAGE_SIZE);
-	/* pin mapping */
-	// FIXME: Does this belong here?  Or do only at domain switch time?
-	{
-		/* WARNING: following must be inlined to avoid nested fault */
-		unsigned long psr = ia64_clear_ic();
-		ia64_itr(0x2, IA64_TR_SHARED_INFO, SHAREDINFO_ADDR,
-		 pte_val(pfn_pte(ia64_tpa(idle0_task.shared_info) >> PAGE_SHIFT, PAGE_KERNEL)),
-		 PAGE_SHIFT);
-		ia64_set_psr(psr);
-		ia64_srlz_i();
-	}
-#endif
 
 	continue_cpu_idle_loop();
 }
@@ -304,7 +284,6 @@ void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
 {
 	struct pt_regs *regs = vcpu_regs (v);
 
-	printf("arch_getdomaininfo_ctxt\n");
 	c->regs = *regs;
 	c->vcpu.evtchn_vector = v->vcpu_info->arch.evtchn_vector;
 
@@ -316,7 +295,6 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	struct pt_regs *regs = vcpu_regs (v);
 	struct domain *d = v->domain;
 
-	printf("arch_set_info_guest\n");
 	if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
             return 0;
 	if (c->flags & VGCF_VMX_GUEST) {
@@ -1237,9 +1215,8 @@ void alloc_dom0(void)
 	dom0_start = alloc_boot_pages(dom0_size >> PAGE_SHIFT, dom0_align >> PAGE_SHIFT);
 	dom0_start <<= PAGE_SHIFT;
 	if (!dom0_start) {
-	printf("alloc_dom0: can't allocate contiguous memory size=%lu\n",
+	  panic("alloc_dom0: can't allocate contiguous memory size=%lu\n",
 		dom0_size);
-	while(1);
 	}
 	printf("alloc_dom0: dom0_start=0x%lx\n", dom0_start);
 #else
@@ -1495,17 +1472,6 @@ void dummy_called(char *function)
 	while(1);
 }
 
-
-#if 0
-void switch_to(struct vcpu *prev, struct vcpu *next)
-{
- 	struct vcpu *last;
-
-	__switch_to(prev,next,last);
-	//set_current(next);
-}
-#endif
-
 void domain_pend_keyboard_interrupt(int irq)
 {
 	vcpu_pend_interrupt(dom0->vcpu[0],irq);
@@ -1513,13 +1479,9 @@ void domain_pend_keyboard_interrupt(int irq)
 
 void sync_vcpu_execstate(struct vcpu *v)
 {
-	ia64_save_fpu(v->arch._thread.fph);
+	__ia64_save_fpu(v->arch._thread.fph);
 	if (VMX_DOMAIN(v))
 		vmx_save_state(v);
-	else {
-		if (IA64_HAS_EXTRA_STATE(v))
-			ia64_save_extra(v);
-	}
 	// FIXME SMP: Anything else needed here for SMP?
 }
 

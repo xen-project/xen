@@ -187,7 +187,9 @@ do {								\
 	(__ia64_id_flags & IA64_PSR_I) == 0;	\
 })
 
-#ifndef XEN
+#ifdef XEN
+#define local_irq_is_enabled() (!irqs_disabled())
+#else
 #ifdef __KERNEL__
 
 #ifdef CONFIG_IA32_SUPPORT

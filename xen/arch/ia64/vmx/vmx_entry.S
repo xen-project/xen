@@ -37,48 +37,6 @@
 #include <asm/vmmu.h>
 #include "vmx_minstate.h"
 
-/*
- * prev_task <- vmx_ia64_switch_to(struct task_struct *next)
- *	With Ingo's new scheduler, interrupts are disabled when this routine gets
- *	called.  The code starting at .map relies on this.  The rest of the code
- *	doesn't care about the interrupt masking status.
- *
- * Since we allocate domain stack in xenheap, there's no need to map new
- * domain's stack since all xenheap is mapped by TR. Another different task
- * for vmx_ia64_switch_to is to switch to bank0 and change current pointer.
- */
-GLOBAL_ENTRY(vmx_ia64_switch_to)
-	.prologue
-	alloc r16=ar.pfs,1,0,0,0
-	DO_SAVE_SWITCH_STACK
-	.body
-
-	bsw.0	// Switch to bank0, because bank0 r21 is current pointer
-	;;
-	adds r22=IA64_TASK_THREAD_KSP_OFFSET,r13
-	movl r25=init_task
-	adds r26=IA64_TASK_THREAD_KSP_OFFSET,in0
-	;;
-	st8 [r22]=sp			// save kernel stack pointer of old task
-	;;
-	/*
-	 * TR always mapped this task's page, we can skip doing it again.
-	 */
-	ld8 sp=[r26]			// load kernel stack pointer of new task
-	mov r21=in0			// update "current" application register
-	mov r8=r13			// return pointer to previously running task
-	mov r13=in0			// set "current" pointer
-	;;
-	bsw.1
-	;;
-	DO_LOAD_SWITCH_STACK
-
-#ifdef CONFIG_SMP
-	sync.i				// ensure "fc"s done by this CPU are visible on other CPUs
-#endif
-	br.ret.sptk.many rp		// boogie on out in new context
-END(vmx_ia64_switch_to)
-
 GLOBAL_ENTRY(ia64_leave_nested)
 	rsm psr.i
 	;;

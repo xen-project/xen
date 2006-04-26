@@ -1,6 +1,6 @@
 /*
  * Xen misc
- * 
+ *
  * Functions/decls that are/may be needed to link with Xen because
  * of x86 dependencies
  *
@@ -21,11 +21,8 @@
 #include <asm/debugger.h>
 #include <asm/vmx.h>
 #include <asm/vmx_vcpu.h>
+#include <asm/vcpu.h>
 
-efi_memory_desc_t ia64_efi_io_md;
-EXPORT_SYMBOL(ia64_efi_io_md);
-unsigned long wait_init_idle;
-int phys_proc_id[NR_CPUS];
 unsigned long loops_per_jiffy = (1<<12);	// from linux/init/main.c
 
 /* FIXME: where these declarations should be there ? */
@@ -33,8 +30,6 @@ extern void show_registers(struct pt_regs *regs);
 
 void ia64_mca_init(void) { printf("ia64_mca_init() skipped (Machine check abort handling)\n"); }
 void ia64_mca_cpu_init(void *x) { }
-void ia64_patch_mckinley_e9(unsigned long a, unsigned long b) { }
-void ia64_patch_vtop(unsigned long a, unsigned long b) { }
 void hpsim_setup(char **x)
 {
 #ifdef CONFIG_SMP
@@ -68,21 +63,8 @@ platform_is_hp_ski(void)
 	return running_on_sim;
 }
 
-/* calls in xen/common code that are unused on ia64 */
-
-void sync_lazy_execstate_cpu(unsigned int cpu) {}
-
-#if 0
-int grant_table_create(struct domain *d) { return 0; }
-void grant_table_destroy(struct domain *d) { return; }
-#endif
 
 struct pt_regs *guest_cpu_user_regs(void) { return vcpu_regs(current); }
-
-void raise_actimer_softirq(void)
-{
-	raise_softirq(TIMER_SOFTIRQ);
-}
 
 unsigned long
 gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
@@ -127,15 +109,12 @@ u32 tlbflush_time[NR_CPUS];
 ///////////////////////////////
 
 
-void free_page_type(struct page_info *page, u32 type)
+static void free_page_type(struct page_info *page, u32 type)
 {
-//	dummy();
-	return;
 }
 
-int alloc_page_type(struct page_info *page, u32 type)
+static int alloc_page_type(struct page_info *page, u32 type)
 {
-//	dummy();
 	return 1;
 }
 
@@ -161,7 +140,7 @@ void *pgtable_quicklist_alloc(void)
 {
     void *p;
     p = alloc_xenheap_pages(0);
-    if (p) 
+    if (p)
         clear_page(p);
     return p;
 }
@@ -276,12 +255,10 @@ void *search_module_extables(unsigned long addr) { return NULL; }
 void *__module_text_address(unsigned long addr) { return NULL; }
 void *module_text_address(unsigned long addr) { return NULL; }
 
-void cs10foo(void) {}
-void cs01foo(void) {}
-
 unsigned long context_switch_count = 0;
 
-#include <asm/vcpu.h>
+extern struct vcpu *ia64_switch_to (struct vcpu *next_task);
+
 
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
@@ -289,14 +266,20 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     uint64_t pta;
 
     local_irq_save(spsr);
-//    if(VMX_DOMAIN(prev)){
-//    	vtm_domain_out(prev);
-//    }
-	context_switch_count++;
-	switch_to(prev,next,prev);
-//    if(VMX_DOMAIN(current)){
-//        vtm_domain_in(current);
-//    }
+    context_switch_count++;
+
+    __ia64_save_fpu(prev->arch._thread.fph);
+    __ia64_load_fpu(next->arch._thread.fph);
+    if (VMX_DOMAIN(prev))
+	    vmx_save_state(prev);
+    if (VMX_DOMAIN(next))
+	    vmx_load_state(next);
+    /*ia64_psr(ia64_task_regs(next))->dfh = !ia64_is_local_fpu_owner(next);*/
+    prev = ia64_switch_to(next);
+    if (!VMX_DOMAIN(current)){
+	    vcpu_set_next_timer(current);
+    }
+
 
 // leave this debug for now: it acts as a heartbeat when more than
 // one domain is active
@@ -309,28 +292,26 @@ if (!i--) { printk("+"); i = 1000000; }
 }
 
     if (VMX_DOMAIN(current)){
-//        vtm_domain_in(current);
 		vmx_load_all_rr(current);
     }else{
     	extern char ia64_ivt;
     	ia64_set_iva(&ia64_ivt);
     	if (!is_idle_domain(current->domain)) {
         	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
-		        VHPT_ENABLED);
+			     VHPT_ENABLED);
 	    	load_region_regs(current);
 	    	vcpu_load_kernel_regs(current);
-		    if (vcpu_timer_expired(current))
-                vcpu_pend_timer(current);
+		if (vcpu_timer_expired(current))
+			vcpu_pend_timer(current);
     	}else {
-        /* When switching to idle domain, only need to disable vhpt
-        * walker. Then all accesses happen within idle context will
-        * be handled by TR mapping and identity mapping.
-        */
-           pta = ia64_get_pta();
-           ia64_set_pta(pta & ~VHPT_ENABLED);
+		/* When switching to idle domain, only need to disable vhpt
+		 * walker. Then all accesses happen within idle context will
+		 * be handled by TR mapping and identity mapping.
+		 */
+		pta = ia64_get_pta();
+		ia64_set_pta(pta & ~VHPT_ENABLED);
         }
     }
-
     local_irq_restore(spsr);
     context_saved(prev);
 }
@@ -349,9 +330,9 @@ void panic_domain(struct pt_regs *regs, const char *fmt, ...)
 	va_list args;
 	char buf[128];
 	struct vcpu *v = current;
-    
+
 	printf("$$$$$ PANIC in domain %d (k6=0x%lx): ",
-		v->domain->domain_id, 
+		v->domain->domain_id,
 		__get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT]);
 	va_start(args, fmt);
 	(void)vsnprintf(buf, sizeof(buf), fmt, args);
@@ -395,19 +376,19 @@ void put_page_type(struct page_info *page)
         ASSERT((x & PGT_count_mask) != 0);
 
         /*
-         * The page should always be validated while a reference is held. The 
-         * exception is during domain destruction, when we forcibly invalidate 
+         * The page should always be validated while a reference is held. The
+         * exception is during domain destruction, when we forcibly invalidate
          * page-table pages if we detect a referential loop.
          * See domain.c:relinquish_list().
          */
-        ASSERT((x & PGT_validated) || 
+        ASSERT((x & PGT_validated) ||
                test_bit(_DOMF_dying, &page_get_owner(page)->domain_flags));
 
         if ( unlikely((nx & PGT_count_mask) == 0) )
         {
             /* Record TLB information for flush later. Races are harmless. */
             page->tlbflush_timestamp = tlbflush_current_time();
-            
+
             if ( unlikely((nx & PGT_type_mask) <= PGT_l4_page_table) &&
                  likely(nx & PGT_validated) )
             {
@@ -416,7 +397,7 @@ void put_page_type(struct page_info *page)
                  * 'free' is safe because the refcnt is non-zero and validated
                  * bit is clear => other ops will spin or fail.
                  */
-                if ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, 
+                if ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x,
                                            x & ~PGT_validated)) != x) )
                     goto again;
                 /* We cleared the 'valid bit' so we do the clean up. */
@@ -426,7 +407,7 @@ void put_page_type(struct page_info *page)
                 nx &= ~PGT_validated;
             }
         }
-        else if ( unlikely(((nx & (PGT_pinned | PGT_count_mask)) == 
+        else if ( unlikely(((nx & (PGT_pinned | PGT_count_mask)) ==
                             (PGT_pinned | 1)) &&
                            ((nx & PGT_type_mask) != PGT_writable_page)) )
         {

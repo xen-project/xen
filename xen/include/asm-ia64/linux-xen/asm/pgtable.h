@@ -349,6 +349,7 @@ pgd_offset (struct mm_struct *mm, unsigned long address)
 #define pte_unmap(pte)			do { } while (0)
 #define pte_unmap_nested(pte)		do { } while (0)
 
+#ifndef XEN
 /* atomic versions of the some PTE manipulations: */
 
 static inline int
@@ -418,6 +419,7 @@ pte_same (pte_t a, pte_t b)
 }
 
 #define update_mmu_cache(vma, address, pte) do { } while (0)
+#endif /* XEN */
 
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern void paging_init (void);
