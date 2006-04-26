@@ -283,7 +283,12 @@ vmx_alt_itlb_miss_1:
 	and r18=0x10,r18	// bit 4=address-bit(61)
 	or r19=r17,r19		// insert PTE control bits into r19
 	;;
+	movl r20=IA64_GRANULE_SHIFT<<2
 	or r19=r19,r18		// set bit 4 (uncached) if the access was to region 6
+	;;
+	mov cr.itir=r20
+	;;
+	srlz.i
 	;;
 	itc.i r19		// insert the TLB entry
 	mov pr=r31,-1
@@ -332,6 +337,11 @@ vmx_alt_dtlb_miss_1:
 	;;
 	or r19=r19,r18		// set bit 4 (uncached) if the access was to region 6
 (p6) mov cr.ipsr=r24
+	movl r20=IA64_GRANULE_SHIFT<<2
+	;;
+	mov cr.itir=r20
+	;;
+	srlz.i
 	;;
 (p7) itc.d r19		// insert the TLB entry
 	mov pr=r31,-1
