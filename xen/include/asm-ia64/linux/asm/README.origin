@@ -27,7 +27,6 @@ linkage.h		-> linux/include/asm-ia64/linkage.h
 machvec.h		-> linux/include/asm-ia64/machvec.h
 machvec_hpsim.h		-> linux/include/asm-ia64/machvec_hpsim.h
 mca.h			-> linux/include/asm-ia64/mca.h
-meminit.h		-> linux/include/asm-ia64/meminit.h
 numa.h			-> linux/include/asm-ia64/numa.h
 numnodes.h		-> linux/include/asm-ia64/numnodes.h
 param.h			-> linux/include/asm-ia64/param.h

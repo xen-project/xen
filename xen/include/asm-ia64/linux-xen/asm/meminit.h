@@ -13,13 +13,23 @@
  * Entries defined so far:
  * 	- boot param structure itself
  * 	- memory map
+#ifndef XEN
  * 	- initrd (optional)
+#endif
  * 	- command line string
  * 	- kernel code & data
+#ifdef XEN
+ * 	- dom0 code & data
+ * 	- initrd (optional)
+#endif
  *
  * More could be added if necessary
  */
+#ifndef XEN
 #define IA64_MAX_RSVD_REGIONS 5
+#else
+#define IA64_MAX_RSVD_REGIONS 6
+#endif
 
 struct rsvd_region {
 	unsigned long start;	/* virtual address of beginning of element */

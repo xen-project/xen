@@ -11,6 +11,7 @@ ia64regs.h		-> linux/include/asm-ia64/ia64regs.h
 io.h			-> linux/include/asm-ia64/io.h
 kregs.h			-> linux/include/asm-ia64/kregs.h
 mca_asm.h		-> linux/include/asm-ia64/mca_asm.h
+meminit.h		-> linux/include/asm-ia64/meminit.h
 page.h			-> linux/include/asm-ia64/page.h
 pal.h			-> linux/include/asm-ia64/pal.h
 pgalloc.h		-> linux/include/asm-ia64/pgalloc.h

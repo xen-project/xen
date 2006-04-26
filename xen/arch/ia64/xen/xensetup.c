@@ -279,16 +279,17 @@ void start_kernel(void)
     memmove(__va(initial_images_start),
           __va(ia64_boot_param->domain_start),
           ia64_boot_param->domain_size);
-//    ia64_boot_param->domain_start = initial_images_start;
+    ia64_boot_param->domain_start = initial_images_start;
 
     printk("ready to move initrd to 0x%lx with len %lx...",
           initial_images_start+PAGE_ALIGN(ia64_boot_param->domain_size),
           ia64_boot_param->initrd_size);
     memmove(__va(initial_images_start+PAGE_ALIGN(ia64_boot_param->domain_size)),
-
 	   __va(ia64_boot_param->initrd_start),
 	   ia64_boot_param->initrd_size);
     printk("Done\n");
+    ia64_boot_param->initrd_start = initial_images_start +
+	PAGE_ALIGN(ia64_boot_param->domain_size);
 
     /* first find highest page frame number */
     max_page = 0;

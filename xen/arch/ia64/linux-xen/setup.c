@@ -235,7 +235,13 @@ reserve_memory (void)
 #endif
 	n++;
 
-#ifdef CONFIG_BLK_DEV_INITRD
+#ifdef XEN
+	rsvd_region[n].start = (unsigned long) __va(ia64_boot_param->domain_start);
+	rsvd_region[n].end   = (rsvd_region[n].start + ia64_boot_param->domain_size);
+	n++;
+#endif
+
+#if defined(XEN)||defined(CONFIG_BLK_DEV_INITRD)
 	if (ia64_boot_param->initrd_start) {
 		rsvd_region[n].start = (unsigned long)__va(ia64_boot_param->initrd_start);
 		rsvd_region[n].end   = rsvd_region[n].start + ia64_boot_param->initrd_size;

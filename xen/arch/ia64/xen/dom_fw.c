@@ -1019,8 +1019,7 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	if (d == dom0) {
 		// XXX CONFIG_XEN_IA64_DOM0_VP
 		// initrd_start address is hard coded in start_kernel()
-		bp->initrd_start = (dom0_start+dom0_size) -
-		  (PAGE_ALIGN(ia64_boot_param->initrd_size) + 4*1024*1024);
+		bp->initrd_start = ia64_boot_param->initrd_start;
 		bp->initrd_size = ia64_boot_param->initrd_size;
 	}
 	else {
