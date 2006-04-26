@@ -363,8 +363,8 @@ start_ap:
 	;;
 	ssm psr.ic
 	srlz.d
-  	;;
 #endif
+  	;;
 	
 .load_current:
 	// load the "current" pointer (r13) and ar.k6 with the current task

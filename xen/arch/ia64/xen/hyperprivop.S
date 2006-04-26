@@ -2087,7 +2087,6 @@ GLOBAL_ENTRY(fast_insert)
 (p6)	itc.d r22;;
 (p7)	itc.i r22;;
 	dv_serialize_data
-	// FIXME: how do I make assembler warnings go away here?
 	// vhpt_insert(r23=vaddr,r22=pte,r24=logps<<2)
 	thash r28=r23
 	or r26=1,r22;;

@@ -277,4 +277,8 @@ extern int ht_per_core;
 #define FORCE_CRASH	break.m 0;;
 #endif
 
+/* Allow .serialize.data/instruction in asm files.
+   Old as doesn't handle this.  */
+#define HAVE_SERIALIZE_DIRECTIVE
+
 #endif	/* _IA64_CONFIG_H_ */

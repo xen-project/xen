@@ -193,29 +193,38 @@ vmx_load_all_rr(VCPU *vcpu)
 		phy_rr.ve = 1;
 
 		ia64_set_rr((VRN0 << VRN_SHIFT), phy_rr.rrval);
+		ia64_dv_serialize_data();
 		phy_rr.rrval = vcpu->arch.metaphysical_rr4;
 		//phy_rr.ps = PAGE_SHIFT;
 		phy_rr.ve = 1;
 
 		ia64_set_rr((VRN4 << VRN_SHIFT), phy_rr.rrval);
+		ia64_dv_serialize_data();
 	} else {
 		ia64_set_rr((VRN0 << VRN_SHIFT),
 			     vrrtomrr(vcpu, VMX(vcpu, vrr[VRN0])));
+		ia64_dv_serialize_data();
 		ia64_set_rr((VRN4 << VRN_SHIFT),
 			     vrrtomrr(vcpu, VMX(vcpu, vrr[VRN4])));
+		ia64_dv_serialize_data();
 	}
 
 	/* rr567 will be postponed to last point when resuming back to guest */
 	ia64_set_rr((VRN1 << VRN_SHIFT),
 		     vrrtomrr(vcpu, VMX(vcpu, vrr[VRN1])));
+	ia64_dv_serialize_data();
 	ia64_set_rr((VRN2 << VRN_SHIFT),
 		     vrrtomrr(vcpu, VMX(vcpu, vrr[VRN2])));
+	ia64_dv_serialize_data();
 	ia64_set_rr((VRN3 << VRN_SHIFT),
 		     vrrtomrr(vcpu, VMX(vcpu, vrr[VRN3])));
+	ia64_dv_serialize_data();
 	ia64_set_rr((VRN5 << VRN_SHIFT),
 		     vrrtomrr(vcpu, VMX(vcpu, vrr[VRN5])));
+	ia64_dv_serialize_data();
 	ia64_set_rr((VRN6 << VRN_SHIFT),
 		     vrrtomrr(vcpu, VMX(vcpu, vrr[VRN6])));
+	ia64_dv_serialize_data();
 	vmx_switch_rr7(vrrtomrr(vcpu,VMX(vcpu, vrr[VRN7])),
 			(void *)vcpu->domain->shared_info,
 			(void *)vcpu->arch.privregs,

@@ -921,8 +921,6 @@ setfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_regs *regs)
 		regs->f##reg.u.bits[1] = fpval->u.bits[1] ;	\
 		break
 	switch(regnum) {
-		CASE_FIXED_FP(0);
-		CASE_FIXED_FP(1);
 		CASE_FIXED_FP(2);
 		CASE_FIXED_FP(3);
 		CASE_FIXED_FP(4);

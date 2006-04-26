@@ -379,7 +379,7 @@ END(vmx_dkey_miss)
 ENTRY(vmx_dirty_bit)
     VMX_DBG_FAULT(8)
 	VMX_REFLECT(8)
-END(vmx_idirty_bit)
+END(vmx_dirty_bit)
 
 	.org vmx_ia64_ivt+0x2400
 /////////////////////////////////////////////////////////////////////////////////////////
