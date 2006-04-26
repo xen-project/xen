@@ -190,13 +190,6 @@ IA64FAULT vmx_vcpu_cover(VCPU *vcpu)
 }
 
 
-thash_cb_t *
-vmx_vcpu_get_vtlb(VCPU *vcpu)
-{
-    return vcpu->arch.vtlb;
-}
-
-
 struct virtual_platform_def *
 vmx_vcpu_get_plat(VCPU *vcpu)
 {
@@ -208,7 +201,6 @@ vmx_vcpu_get_plat(VCPU *vcpu)
 IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
 {
     ia64_rr oldrr,newrr;
-    thash_cb_t *hcb;
     extern void * pal_vaddr;
 
     vcpu_get_rr(vcpu, reg, &oldrr.rrval);
@@ -216,18 +208,17 @@ IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
     if (newrr.rid >= (1 << vcpu->domain->arch.rid_bits))
         panic_domain (NULL, "use of invalid rid %lx\n", newrr.rid);
     if(oldrr.ps!=newrr.ps){
-        hcb = vmx_vcpu_get_vtlb(vcpu);
-        thash_purge_all(hcb);
+        thash_purge_all(vcpu);
     }
     VMX(vcpu,vrr[reg>>61]) = val;
     switch((u64)(reg>>61)) {
     case VRN7:
-        vmx_switch_rr7(vmx_vrrtomrr(vcpu,val),vcpu->domain->shared_info,
+        vmx_switch_rr7(vrrtomrr(vcpu,val),vcpu->domain->shared_info,
         (void *)vcpu->arch.privregs,
-        (void *)vcpu->arch.vtlb->vhpt->hash, pal_vaddr );
+        (void *)vcpu->arch.vhpt.hash, pal_vaddr );
        break;
     default:
-        ia64_set_rr(reg,vmx_vrrtomrr(vcpu,val));
+        ia64_set_rr(reg,vrrtomrr(vcpu,val));
         break;
     }
 

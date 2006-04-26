@@ -279,8 +279,9 @@ vmx_final_setup_guest(struct vcpu *v)
 	/* Per-domain vTLB and vhpt implementation. Now vmx domain will stick
 	 * to this solution. Maybe it can be deferred until we know created
 	 * one as vmx domain */
-	v->arch.vtlb = init_domain_tlb(v);
-
+#ifndef HASH_VHPT     
+        init_domain_tlb(v);
+#endif
 	/* v->arch.schedule_tail = arch_vmx_do_launch; */
 	vmx_create_vp(v);
 

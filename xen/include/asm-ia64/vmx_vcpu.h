@@ -64,8 +64,6 @@ extern void vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value);
 extern UINT64 vmx_vcpu_sync_mpsr(UINT64 mipsr, UINT64 value);
 extern void vmx_vcpu_set_psr_sync_mpsr(VCPU * vcpu, UINT64 value);
 extern IA64FAULT vmx_vcpu_cover(VCPU *vcpu);
-extern thash_cb_t *vmx_vcpu_get_vtlb(VCPU *vcpu);
-extern thash_cb_t *vmx_vcpu_get_vhpt(VCPU *vcpu);
 extern IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val);
 extern IA64FAULT vmx_vcpu_get_pkr(VCPU *vcpu, UINT64 reg, UINT64 *pval);
 IA64FAULT vmx_vcpu_set_pkr(VCPU *vcpu, UINT64 reg, UINT64 val);
@@ -461,7 +459,7 @@ IA64FAULT vmx_vcpu_bsw1(VCPU *vcpu)
 #define redistribute_rid(rid)	(((rid) & ~0xffff) | (((rid) << 8) & 0xff00) | (((rid) >> 8) & 0xff))
 #endif
 static inline unsigned long
-vmx_vrrtomrr(VCPU *v, unsigned long val)
+vrrtomrr(VCPU *v, unsigned long val)
 {
     ia64_rr rr;
 
@@ -476,6 +474,17 @@ vmx_vrrtomrr(VCPU *v, unsigned long val)
     rr.rid = redistribute_rid(rid);
 #endif 
 
+}
+static inline thash_cb_t *
+vmx_vcpu_get_vtlb(VCPU *vcpu)
+{
+    return &vcpu->arch.vtlb;
+}
+
+static inline thash_cb_t *
+vcpu_get_vhpt(VCPU *vcpu)
+{
+    return &vcpu->arch.vhpt;
 }
 
 #define check_work_pending(v)	\

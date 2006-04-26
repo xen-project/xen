@@ -36,7 +36,7 @@ thash_data_t *__alloc_chain(thash_cb_t *);
 
 static void cch_mem_init(thash_cb_t *hcb)
 {
-    thash_cch_mem_t *p, *q;
+    thash_data_t *p, *q;
 
     hcb->cch_freelist = p = hcb->cch_buf;
 
@@ -49,11 +49,11 @@ static void cch_mem_init(thash_cb_t *hcb)
 
 static thash_data_t *cch_alloc(thash_cb_t *hcb)
 {
-    thash_cch_mem_t *p;
+    thash_data_t *p;
 
     if ( (p = hcb->cch_freelist) != NULL ) {
         hcb->cch_freelist = p->next;
-        return (thash_data_t *)p;
+        return p;
     }else{
         return NULL;
     }
@@ -61,10 +61,8 @@ static thash_data_t *cch_alloc(thash_cb_t *hcb)
 
 static void cch_free(thash_cb_t *hcb, thash_data_t *cch)
 {
-    thash_cch_mem_t *p = (thash_cch_mem_t*)cch;
-
-    p->next = hcb->cch_freelist;
-    hcb->cch_freelist = p;
+    cch->next = hcb->cch_freelist;
+    hcb->cch_freelist = cch;
 }
 
 /*
@@ -181,15 +179,16 @@ int __tlb_to_vhpt(thash_cb_t *hcb, thash_data_t *vhpt, u64 va)
 
 static void thash_remove_cch(thash_cb_t *hcb, thash_data_t *hash)
 {
-    thash_data_t *prev, *next;
-    prev = hash; next= hash->next;
-    while(next){
-    	prev=next;
-    	next=prev->next;
-    	cch_free(hcb, prev);
+    thash_data_t *p;
+    if(hash->next){
+        p=hash->next;
+        while(p->next)
+            p=p->next;
+        p->next=hcb->cch_freelist;
+        hcb->cch_freelist=hash->next;
+        hash->next=0;
+        hash->len=0;
     }
-    hash->next = NULL;
-    hash->len = 0;
 }
 
 /*  vhpt only has entries with PAGE_SIZE page size */
@@ -199,8 +198,6 @@ void thash_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
     thash_data_t   vhpt_entry, *hash_table, *cch;
     vhpt_entry.page_flags = pte & ~PAGE_FLAGS_RV_MASK;
     vhpt_entry.itir=itir;
-
-//    ia64_rr vrr;
 
     if ( !__tlb_to_vhpt(hcb, &vhpt_entry, ifa) ) {
         return;
@@ -469,10 +466,11 @@ int vtr_find_overlap(VCPU *vcpu, u64 va, u64 ps, int is_data)
 /*
  * Purge entries in VTLB and VHPT
  */
-void thash_purge_entries(thash_cb_t *hcb, u64 va, u64 ps)
+void thash_purge_entries(VCPU *v, u64 va, u64 ps)
 {
-    vtlb_purge(hcb, va, ps);
-    vhpt_purge(hcb->vhpt, va, ps);
+    if(vcpu_quick_region_check(v->arch.tc_regions,va))
+        vtlb_purge(&v->arch.vtlb, va, ps);
+    vhpt_purge(&v->arch.vhpt, va, ps);
 }
 
 
@@ -480,18 +478,21 @@ void thash_purge_entries(thash_cb_t *hcb, u64 va, u64 ps)
  * Purge overlap TCs and then insert the new entry to emulate itc ops.
  *    Notes: Only TC entry can purge and insert.
  */
-void thash_purge_and_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
+void thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa)
 {
     u64 ps, va;
     ps = itir_ps(itir);
     va = PAGEALIGN(ifa,ps);
-    vtlb_purge(hcb, va, ps);
-    vhpt_purge(hcb->vhpt, va, ps);
-    if((ps!=PAGE_SHIFT)||(pte&VTLB_PTE_IO))
-        vtlb_insert(hcb, pte, itir, va);
+    if(vcpu_quick_region_check(v->arch.tc_regions,va))
+        vtlb_purge(&v->arch.vtlb, va, ps);
+    vhpt_purge(&v->arch.vhpt, va, ps);
+    if((ps!=PAGE_SHIFT)||(pte&VTLB_PTE_IO)){
+        vtlb_insert(&v->arch.vtlb, pte, itir, va);
+	vcpu_quick_region_set(PSCBX(v,tc_regions),va);
+    }	
     if(!(pte&VTLB_PTE_IO)){
         va = PAGEALIGN(ifa,PAGE_SHIFT);
-        thash_vhpt_insert(hcb->vhpt, pte, itir, va);
+        thash_vhpt_insert(&v->arch.vhpt, pte, itir, va);
     }
 }
 
@@ -503,13 +504,14 @@ void thash_purge_and_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
  */
 
 // TODO: add sections.
-void thash_purge_all(thash_cb_t *hcb)
+void thash_purge_all(VCPU *v)
 {
     thash_data_t    *hash_table;
     /* thash_data_t    *entry; */
-    thash_cb_t  *vhpt;
+    thash_cb_t  *hcb,*vhpt;
     /* u64 i, start, end; */
-
+    hcb =&v->arch.vtlb;
+    vhpt =&v->arch.vhpt;
 #ifdef  VTLB_DEBUG
 	extern u64  sanity_check;
     static u64 statistics_before_purge_all=0;
@@ -526,7 +528,6 @@ void thash_purge_all(thash_cb_t *hcb)
     }
     cch_mem_init (hcb);
 
-    vhpt = hcb->vhpt;
     hash_table = (thash_data_t*)((u64)vhpt->hash + vhpt->hash_sz);
     for (--hash_table;(u64)hash_table >= (u64)vhpt->hash;hash_table--) {
         INVALIDATE_VHPT_HEADER(hash_table);
@@ -544,18 +545,22 @@ void thash_purge_all(thash_cb_t *hcb)
  *  in: TLB format for both VHPT & TLB.
  */
 
-thash_data_t *vtlb_lookup(thash_cb_t *hcb, u64 va,int is_data)
+thash_data_t *vtlb_lookup(VCPU *v, u64 va,int is_data)
 {
     thash_data_t    *hash_table, *cch;
     u64     tag;
     ia64_rr vrr;
-
+    thash_cb_t * hcb= &v->arch.vtlb;
     ASSERT ( hcb->ht == THASH_TLB );
 
-    cch = __vtr_lookup(hcb->vcpu, va, is_data);;
+    cch = __vtr_lookup(v, va, is_data);;
     if ( cch ) return cch;
 
-    vcpu_get_rr(hcb->vcpu,va,&vrr.rrval);
+    if(vcpu_quick_region_check(v->arch.tc_regions,va)==0)
+        return NULL;
+    
+
+    vcpu_get_rr(v,va,&vrr.rrval);
     hash_table = vsa_thash( hcb->pta, va, vrr.rrval, &tag);
 
     if ( INVALID_ENTRY(hcb, hash_table ) )
@@ -578,7 +583,6 @@ void thash_init(thash_cb_t *hcb, u64 sz)
     thash_data_t    *hash_table;
 
     cch_mem_init (hcb);
-    hcb->magic = THASH_CB_MAGIC;
     hcb->pta.val = (unsigned long)hcb->hash;
     hcb->pta.vf = 1;
     hcb->pta.ve = 1;

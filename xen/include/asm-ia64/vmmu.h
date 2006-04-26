@@ -30,7 +30,8 @@
 #define         VCPU_VHPT_SHIFT          (24)    // 16M for VTLB
 #define         VCPU_VHPT_SIZE           (1UL<<VCPU_VHPT_SHIFT)
 #define         VCPU_VHPT_ORDER          (VCPU_VHPT_SHIFT - PAGE_SHIFT)
-
+#define		VTLB(v,_x)		(v->arch.vtlb._x)
+#define		VHPT(v,_x)		(v->arch.vhpt._x)
 #ifndef __ASSEMBLY__
 
 #include <xen/config.h>
@@ -180,12 +181,6 @@ typedef enum {
 } THASH_TYPE;
 
 struct thash_cb;
-typedef union thash_cch_mem {
-        thash_data_t    data;
-        union thash_cch_mem *next;
-} thash_cch_mem_t;
-
-
 /*
  * Use to calculate the HASH index of thash_data_t.
  */
@@ -230,11 +225,11 @@ typedef struct thash_internal {
         u64     _eva;
 } thash_internal_t;
  */
-#define  THASH_CB_MAGIC         0x55aa00aa55aa55aaUL
+//#define  THASH_CB_MAGIC         0x55aa00aa55aa55aaUL
 typedef struct thash_cb {
         /* THASH base information */
-        THASH_TYPE      ht;     // For TLB or VHPT
-        u64             magic;
+//        THASH_TYPE      ht;     // For TLB or VHPT
+//        u64             magic;
         thash_data_t    *hash; // hash table pointer, aligned at thash_sz.
         u64     hash_sz;        // size of above data.
         void    *cch_buf;       // base address of collision chain.
@@ -242,10 +237,10 @@ typedef struct thash_cb {
 //        THASH_FN        *hash_func;
 //        GET_RR_FN       *get_rr_fn;
 //        RECYCLE_FN      *recycle_notifier;
-        thash_cch_mem_t *cch_freelist;
-        struct vcpu *vcpu;
+        thash_data_t *cch_freelist;
+//        struct vcpu *vcpu;
         PTA     pta;
-        struct thash_cb *vhpt;
+//        struct thash_cb *vhpt;
         /* VTLB/VHPT common information */
 //        FIND_OVERLAP_FN *find_overlap;
 //        FIND_NEXT_OVL_FN *next_overlap;
@@ -347,21 +342,21 @@ extern thash_data_t *thash_find_next_overlap(thash_cb_t *hcb);
  *    NOTES:
  *
  */
-extern void thash_purge_entries(thash_cb_t *hcb, u64 va, u64 ps);
-extern void thash_purge_and_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa);
+extern void thash_purge_entries(struct vcpu *v, u64 va, u64 ps);
+extern void thash_purge_and_insert(struct vcpu *v, u64 pte, u64 itir, u64 ifa);
 
 /*
  * Purge all TCs or VHPT entries including those in Hash table.
  *
  */
-extern void thash_purge_all(thash_cb_t *hcb);
+extern void thash_purge_all(struct vcpu *v);
 
 /*
  * Lookup the hash table and its collision chain to find an entry
  * covering this address rid:va.
  *
  */
-extern thash_data_t *vtlb_lookup(thash_cb_t *hcb,u64 va,int is_data);
+extern thash_data_t *vtlb_lookup(struct vcpu *v,u64 va,int is_data);
 extern int thash_lock_tc(thash_cb_t *hcb, u64 va, u64 size, int rid, char cl, int lock);
 
 
@@ -372,7 +367,7 @@ extern u64 machine_thash(PTA pta, u64 va);
 extern void purge_machine_tc_by_domid(domid_t domid);
 extern void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb);
 extern ia64_rr vmmu_get_rr(struct vcpu *vcpu, u64 va);
-extern thash_cb_t *init_domain_tlb(struct vcpu *d);
+extern void init_domain_tlb(struct vcpu *d);
 extern void free_domain_tlb(struct vcpu *v);
 extern thash_data_t * vsa_thash(PTA vpta, u64 va, u64 vrr, u64 *tag);
 extern thash_data_t * vhpt_lookup(u64 va);

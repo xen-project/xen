@@ -74,7 +74,8 @@ struct arch_vcpu {
 	unsigned long dtlb_pte;
 	unsigned long irr[4];
 	unsigned long insvc[4];
-    unsigned long iva;
+	unsigned long tc_regions;
+	unsigned long iva;
 	unsigned long dcr;
 	unsigned long itc;
 	unsigned long domain_itm;
@@ -91,7 +92,8 @@ struct arch_vcpu {
     int ending_rid;		/* one beyond highest RID assigned to domain */
     struct thread_struct _thread;	// this must be last
 
-    thash_cb_t *vtlb;
+    thash_cb_t vtlb;
+    thash_cb_t vhpt;
     char irq_new_pending;
     char irq_new_condition;    // vpsr.i/vtpr change, check for pending VHPI
     char hypercall_continuation;
