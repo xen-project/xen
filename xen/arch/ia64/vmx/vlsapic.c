@@ -121,7 +121,7 @@ void vtm_init(VCPU *vcpu)
     itc_freq = local_cpu_data->itc_freq;
     vtm->cfg_max_jump=itc_freq*MAX_JUMP_STEP/1000;
     vtm->cfg_min_grun=itc_freq*MIN_GUEST_RUNNING_TIME/1000;
-    init_timer(&vtm->vtm_timer, vtm_timer_fn, vcpu, 0);
+    init_timer(&vtm->vtm_timer, vtm_timer_fn, vcpu, vcpu->processor);
     vtm_reset(vcpu);
 }
 

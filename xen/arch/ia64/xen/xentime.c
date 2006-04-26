@@ -146,9 +146,9 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 			 * another CPU. We need to avoid to SMP race by acquiring the
 			 * xtime_lock.
 			 */
-#ifdef TURN_ME_OFF_FOR_NOW_IA64_XEN
+//#ifdef TURN_ME_OFF_FOR_NOW_IA64_XEN
 			write_seqlock(&xtime_lock);
-#endif
+//#endif
 #ifdef TURN_ME_OFF_FOR_NOW_IA64_XEN
 			do_timer(regs);
 #endif
@@ -159,9 +159,9 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 			itc_at_irq = ia64_get_itc();
 			stime_irq += cycle_to_ns(itc_at_irq - old_itc);
 
-#ifdef TURN_ME_OFF_FOR_NOW_IA64_XEN
+//#ifdef TURN_ME_OFF_FOR_NOW_IA64_XEN
 			write_sequnlock(&xtime_lock);
-#endif
+//#endif
 		} else
 			local_cpu_data->itm_next = new_itm;
 
