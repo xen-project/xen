@@ -26,19 +26,54 @@ void init_fpu(void)
 void save_init_fpu(struct vcpu *v)
 {
     unsigned long cr0 = read_cr0();
+    char *fpu_ctxt = v->arch.guest_context.fpu_ctxt.x;
 
     /* This can happen, if a paravirtualised guest OS has set its CR0.TS. */
     if ( cr0 & X86_CR0_TS )
         clts();
 
     if ( cpu_has_fxsr )
+    {
+#ifdef __i386__
         __asm__ __volatile__ (
-            "fxsave %0 ; fnclex"
-            : "=m" (v->arch.guest_context.fpu_ctxt) );
+            "fxsave %0"
+            : "=m" (*fpu_ctxt) );
+#else /* __x86_64__ */
+        /*
+         * The only way to force fxsaveq on a wide range of gas versions. On 
+         * older versions the rex64 prefix works only if we force an addressing 
+         * mode that doesn't require extended registers.
+         */
+        __asm__ __volatile__ (
+            "rex64/fxsave (%1)"
+            : "=m" (*fpu_ctxt) : "cdaSDb" (fpu_ctxt) );
+#endif
+
+        /* Clear exception flags if FSW.ES is set. */
+        if ( unlikely(fpu_ctxt[2] & 0x80) )
+            __asm__ __volatile__ ("fnclex");
+
+        /*
+         * AMD CPUs don't save/restore FDP/FIP/FOP unless an exception
+         * is pending. Clear the x87 state here by setting it to fixed
+         * values. The hypervisor data segment can be sometimes 0 and
+         * sometimes new user value. Both should be ok. Use the FPU saved
+         * data block as a safe address because it should be in L1.
+         */
+        if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+        {
+            __asm__ __volatile__ (
+                "emms\n\t"  /* clear stack tags */
+                "fildl %0"  /* load to clear state */
+                : : "m" (*fpu_ctxt) );
+        }
+    }
     else
+    {
         __asm__ __volatile__ (
             "fnsave %0 ; fwait"
-            : "=m" (v->arch.guest_context.fpu_ctxt) );
+            : "=m" (*fpu_ctxt) );
+    }
 
     clear_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags);
     write_cr0(cr0|X86_CR0_TS);
@@ -46,14 +81,22 @@ void save_init_fpu(struct vcpu *v)
 
 void restore_fpu(struct vcpu *v)
 {
+    char *fpu_ctxt = v->arch.guest_context.fpu_ctxt.x;
+
     /*
      * FXRSTOR can fault if passed a corrupted data block. We handle this
      * possibility, which may occur if the block was passed to us by control
      * tools, by silently clearing the block.
      */
     if ( cpu_has_fxsr )
+    {
         __asm__ __volatile__ (
+#ifdef __i386__
             "1: fxrstor %0            \n"
+#else /* __x86_64__ */
+            /* See above for why the operands/constraints are this way. */
+            "1: rex64/fxrstor (%2)    \n"
+#endif
             ".section .fixup,\"ax\"   \n"
             "2: push %%"__OP"ax       \n"
             "   push %%"__OP"cx       \n"
@@ -72,12 +115,19 @@ void restore_fpu(struct vcpu *v)
             "   "__FIXUP_WORD" 1b,2b  \n"
             ".previous                \n"
             : 
-            : "m" (v->arch.guest_context.fpu_ctxt),
-              "i" (sizeof(v->arch.guest_context.fpu_ctxt)/4) );
+            : "m" (*fpu_ctxt),
+              "i" (sizeof(v->arch.guest_context.fpu_ctxt)/4)
+#ifdef __x86_64__
+             ,"cdaSDb" (fpu_ctxt)
+#endif
+            );
+    }
     else
+    {
         __asm__ __volatile__ (
             "frstor %0"
             : : "m" (v->arch.guest_context.fpu_ctxt) );
+    }
 }
 
 /*
