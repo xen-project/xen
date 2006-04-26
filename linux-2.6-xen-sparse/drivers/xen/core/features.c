@@ -12,7 +12,8 @@
 #include <xen/features.h>
 
 u8 xen_features[XENFEAT_NR_SUBMAPS * 32] __read_mostly;
-EXPORT_SYMBOL_GPL(xen_features);
+/* Not a GPL symbol: used in ubiquitous macros, so too restrictive. */
+EXPORT_SYMBOL(xen_features);
 
 void setup_xen_features(void)
 {
