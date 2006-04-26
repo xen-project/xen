@@ -94,12 +94,6 @@ extern char _end[]; /* standard ELF symbol */
 //#define __cond_lock(x) (x)
 //#define __must_check
 #define __deprecated
-#ifndef RELOC_HIDE
-# define RELOC_HIDE(ptr, off)					\
-  ({ unsigned long __ptr;					\
-     __ptr = (unsigned long) (ptr);				\
-    (typeof(ptr)) (__ptr + (off)); })
-#endif
 
 // xen/include/asm/config.h
 //#define HZ 1000
