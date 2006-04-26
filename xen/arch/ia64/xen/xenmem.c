@@ -100,7 +100,7 @@ alloc_table_page(unsigned long fill)
 	return mfn;
 }
 
-int
+static int
 create_frametable_page_table (u64 start, u64 end, void *arg)
 {
 	unsigned long address, start_page, end_page;
@@ -136,7 +136,7 @@ create_frametable_page_table (u64 start, u64 end, void *arg)
 	return 0;
 }
 
-int
+static int
 create_mpttable_page_table (u64 start, u64 end, void *arg)
 {
 	unsigned long address, start_page, end_page;

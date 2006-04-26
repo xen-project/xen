@@ -598,14 +598,13 @@ __assign_new_domain_page(struct domain *d, unsigned long mpaddr, pte_t* pte)
         p = mfn_to_page((mpaddr >> PAGE_SHIFT));
         return p;
     }
-    else
 #endif
-    {
-        p = alloc_domheap_page(d);
-        // zero out pages for security reasons
-        if (p)
-            clear_page(page_to_virt(p));
-    }
+
+    p = alloc_domheap_page(d);
+    // zero out pages for security reasons
+    if (p)
+        clear_page(page_to_virt(p));
+
     if (unlikely(!p)) {
         printf("assign_new_domain_page: Can't alloc!!!! Aaaargh!\n");
         return(p);

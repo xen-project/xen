@@ -250,25 +250,6 @@ int set_one_rr(unsigned long rr, unsigned long val)
 		return 0;
 	}
 
-#if 0
-	memrrv.rrval = rrv.rrval;
-	if (rreg == 7) {
-		newrrv.rid = newrid;
-		newrrv.ve = VHPT_ENABLED_REGION_7;
-		newrrv.ps = IA64_GRANULE_SHIFT;
-		ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info,
-				v->arch.privregs);
-	}
-	else {
-		newrrv.rid = newrid;
-		// FIXME? region 6 needs to be uncached for EFI to work
-		if (rreg == 6) newrrv.ve = VHPT_ENABLED_REGION_7;
-		else newrrv.ve = VHPT_ENABLED_REGION_0_TO_6;
-		newrrv.ps = PAGE_SHIFT;
-		if (rreg == 0) v->arch.metaphysical_saved_rr0 = newrrv.rrval;
-		set_rr(rr,newrrv.rrval);
-	}
-#else
 	memrrv.rrval = rrv.rrval;
 	newrrv.rid = newrid;
 	newrrv.ve = 1;  // VHPT now enabled for region 7!!
@@ -285,7 +266,6 @@ int set_one_rr(unsigned long rr, unsigned long val)
 	} else {
 		set_rr(rr,newrrv.rrval);
 	}
-#endif
 	return 1;
 }
 

@@ -69,21 +69,19 @@ struct pt_regs *guest_cpu_user_regs(void) { return vcpu_regs(current); }
 unsigned long
 gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 {
+	unsigned long pte;
+
 #ifndef CONFIG_XEN_IA64_DOM0_VP
 	if (d == dom0)
 		return(gpfn);
-	else
 #endif
-	{
-		unsigned long pte = lookup_domain_mpa(d,gpfn << PAGE_SHIFT);
-		if (!pte) {
-printk("gmfn_to_mfn_foreign: bad gpfn. spinning...\n");
-while(1);
-			return 0;
-		}
-		return ((pte & _PFN_MASK) >> PAGE_SHIFT);
+	pte = lookup_domain_mpa(d,gpfn << PAGE_SHIFT);
+	if (!pte) {
+		panic("gmfn_to_mfn_foreign: bad gpfn. spinning...\n");
 	}
+	return ((pte & _PFN_MASK) >> PAGE_SHIFT);
 }
+
 #if 0
 u32
 mfn_to_gmfn(struct domain *d, unsigned long frame)
@@ -96,13 +94,6 @@ while(1);
 	return frame;
 }
 #endif
-
-///////////////////////////////
-// from arch/x86/flushtlb.c
-///////////////////////////////
-
-u32 tlbflush_clock;
-u32 tlbflush_time[NR_CPUS];
 
 ///////////////////////////////
 // from arch/x86/memory.c
@@ -287,8 +278,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 static long cnt[16] = { 50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50};
 static int i = 100;
 int id = ((struct vcpu *)current)->domain->domain_id & 0xf;
-if (!cnt[id]--) { printk("%x",id); cnt[id] = 500000; }
-if (!i--) { printk("+"); i = 1000000; }
+if (!cnt[id]--) { cnt[id] = 500000; printk("%x",id); }
+if (!i--) { i = 1000000; printk("+"); }
 }
 
     if (VMX_DOMAIN(current)){

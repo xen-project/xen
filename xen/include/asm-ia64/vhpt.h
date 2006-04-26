@@ -2,8 +2,6 @@
 #define ASM_VHPT_H
 
 #define VHPT_ENABLED 1
-#define VHPT_ENABLED_REGION_0_TO_6 1
-#define VHPT_ENABLED_REGION_7 0
 
 /* Size of the VHPT.  */
 #define	VHPT_SIZE_LOG2			24

@@ -57,7 +57,6 @@
 //Huh? This seems to be used on ia64 even if !CONFIG_SMP
 void flush_tlb_mask(cpumask_t mask)
 {
-#ifdef CONFIG_SMP
     int cpu;
 
     cpu = smp_processor_id();
@@ -66,6 +65,7 @@ void flush_tlb_mask(cpumask_t mask)
 	local_flush_tlb_all ();
     }
 
+#ifdef CONFIG_SMP
     if (cpus_empty(mask))
         return;
 
@@ -92,14 +92,6 @@ void smp_send_event_check_mask(cpumask_t mask)
     for (cpu = 0; cpu < NR_CPUS; ++cpu)
         if (cpu_isset(cpu, mask))
 	    platform_send_ipi(cpu, IA64_IPI_RESCHEDULE, IA64_IPI_DM_INT, 0);
-}
-
-
-//Huh? This seems to be used on ia64 even if !CONFIG_SMP
-int try_flush_tlb_mask(cpumask_t mask)
-{
-	dummy();
-	return 1;
 }
 #endif
 #endif
