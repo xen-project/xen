@@ -30,7 +30,7 @@
  #error "struct shared_info does not not fit in PAGE_SIZE"
 #endif
 
-unsigned long xenheap_phys_end;
+unsigned long xenheap_phys_end, total_pages;
 
 char saved_command_line[COMMAND_LINE_SIZE];
 char dom0_command_line[COMMAND_LINE_SIZE];
@@ -317,6 +317,7 @@ void start_kernel(void)
     printk("System RAM: %luMB (%lukB)\n",
 	nr_pages >> (20 - PAGE_SHIFT),
 	nr_pages << (PAGE_SHIFT - 10));
+    total_pages = nr_pages;
 
     init_frametable();
 

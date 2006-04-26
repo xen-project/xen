@@ -19,7 +19,7 @@
 #include <xen/guest_access.h>
 #include <public/sched_ctl.h>
 #include <asm/vmx.h>
-
+extern unsigned long total_pages;
 long arch_do_dom0_op(dom0_op_t *op, GUEST_HANDLE(dom0_op_t) u_dom0_op)
 {
     long ret = 0;
@@ -216,7 +216,7 @@ long arch_do_dom0_op(dom0_op_t *op, GUEST_HANDLE(dom0_op_t) u_dom0_op)
         pi->sockets_per_node = 
             num_online_cpus() / cpus_weight(cpu_core_map[0]);
         pi->nr_nodes         = 1;
-        pi->total_pages      = 99;  // FIXME
+        pi->total_pages      = total_pages; 
         pi->free_pages       = avail_domheap_pages();
         pi->cpu_khz          = local_cpu_data->proc_freq / 1000;
         memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
