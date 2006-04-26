@@ -1220,6 +1220,43 @@ int __skb_linearize(struct sk_buff *skb, gfp_t gfp_mask)
 	}						\
 }
 
+#ifdef CONFIG_XEN
+inline int skb_checksum_setup(struct sk_buff *skb)
+{
+	if (skb->proto_csum_blank) {
+		if (skb->protocol != htons(ETH_P_IP))
+			goto out;
+		skb->h.raw = (unsigned char *)skb->nh.iph + 4*skb->nh.iph->ihl;
+		if (skb->h.raw >= skb->tail)
+			goto out;
+		switch (skb->nh.iph->protocol) {
+		case IPPROTO_TCP:
+			skb->csum = offsetof(struct tcphdr, check);
+			break;
+		case IPPROTO_UDP:
+			skb->csum = offsetof(struct udphdr, check);
+			break;
+		default:
+			if (net_ratelimit())
+				printk(KERN_ERR "Attempting to checksum a non-"
+				       "TCP/UDP packet, dropping a protocol"
+				       " %d packet", skb->nh.iph->protocol);
+			goto out;
+		}
+		if ((skb->h.raw + skb->csum + 2) > skb->tail)
+			goto out;
+		skb->ip_summed = CHECKSUM_HW;
+		skb->proto_csum_blank = 0;
+	}
+	return 0;
+out:
+	return -EPROTO;
+}
+#else
+inline int skb_checksum_setup(struct sk_buff *skb) { return 0; }
+#endif
+
+
 /**
  *	dev_queue_xmit - transmit a buffer
  *	@skb: buffer to transmit
@@ -1266,38 +1303,12 @@ int dev_queue_xmit(struct sk_buff *skb)
 	    __skb_linearize(skb, GFP_ATOMIC))
 		goto out_kfree_skb;
 
-#ifdef CONFIG_XEN
-	/* If a checksum-deferred packet is forwarded to a device that needs a
-	 * checksum, correct the pointers and force checksumming.
-	 */
-	if (skb->proto_csum_blank) {
-		if (skb->protocol != htons(ETH_P_IP))
-			goto out_kfree_skb;
-		skb->h.raw = (unsigned char *)skb->nh.iph + 4*skb->nh.iph->ihl;
-		if (skb->h.raw >= skb->tail)
-			goto out_kfree_skb;
-		switch (skb->nh.iph->protocol) {
-		case IPPROTO_TCP:
-			skb->csum = offsetof(struct tcphdr, check);
-			break;
-		case IPPROTO_UDP:
-			skb->csum = offsetof(struct udphdr, check);
-			break;
-		default:
-			if (net_ratelimit())
-				printk(KERN_ERR "Attempting to checksum a non-"
-				       "TCP/UDP packet, dropping a protocol"
-				       " %d packet", skb->nh.iph->protocol);
-			rc = -EPROTO;
-			goto out_kfree_skb;
-		}
-		if ((skb->h.raw + skb->csum + 2) > skb->tail)
-			goto out_kfree_skb;
-		skb->ip_summed = CHECKSUM_HW;
-		skb->proto_csum_blank = 0;
-	}
-#endif
-
+ 	/* If a checksum-deferred packet is forwarded to a device that needs a
+ 	 * checksum, correct the pointers and force checksumming.
+ 	 */
+ 	if(skb_checksum_setup(skb))
+ 		goto out_kfree_skb;
+  
 	/* If packet is not checksummed and device does not support
 	 * checksumming for this protocol, complete checksumming here.
 	 */
@@ -3351,6 +3362,7 @@ EXPORT_SYMBOL(unregister_netdevice_notifier);
 EXPORT_SYMBOL(net_enable_timestamp);
 EXPORT_SYMBOL(net_disable_timestamp);
 EXPORT_SYMBOL(dev_get_flags);
+EXPORT_SYMBOL(skb_checksum_setup);
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 EXPORT_SYMBOL(br_handle_frame_hook);

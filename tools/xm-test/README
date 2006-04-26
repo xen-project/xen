@@ -212,6 +212,24 @@ use it with relatively few problems.
 Known Issues
 ============
 
+If you create a domain with a small amount of memory, under 32MBs, you
+may run into out of memory situations for the domain. There's no way
+to know the amount of memory needed by the kernel and modules used. Xm-test
+uses 64MBs as default and that should work. If there are out of memory
+issues, the default can be changed. Edit xm-test/lib/XmTestLib/XenDomain.py
+and change ParavirtDefaults and HVMDefaults "memory".
+
+There are two tests that work with small memory, 15_create_smallmem_pos.py 
+and 16_create_smallmem_neg.py. The first makes sure the default 32 MBs 
+limit works. The second checks a low memory fail situation. These tests
+are located in the xm-test/tests/create directory and can be easily edited
+to change the MEM value they should test. If the 32MBs test fails, the
+failure should be reported to the Xen xen-devel mailing list. The Xen
+tools use 32MBs as a lower acceptable limit for domain creation. The Xen
+mailing lists are located here:
+
+http://lists.xensource.com/
+
 
 Reporting Bugs
 ==============

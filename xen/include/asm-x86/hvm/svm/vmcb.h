@@ -473,10 +473,10 @@ enum {
 #define VMCB_EFLAGS_RESERVED_1          0x00000002 /* bitmap for 1 */
 
 /* These bits in the CR4 are owned by the host */
-#ifdef __i386__
-#define SVM_CR4_HOST_MASK (0)
-#else
+#if CONFIG_PAGING_LEVELS >= 3
 #define SVM_CR4_HOST_MASK (X86_CR4_PAE)
+#else
+#define SVM_CR4_HOST_MASK 0
 #endif
 
 

@@ -202,13 +202,12 @@ need_resched:
 	jmp need_resched
 #endif
 
-#ifdef CONFIG_X86_SYSENTER
 /* SYSENTER_RETURN points to after the "sysenter" instruction in
    the vsyscall page.  See vsyscall-sysentry.S, which defines the symbol.  */
 
 	# sysenter call handler stub
 ENTRY(sysenter_entry)
-	movl TSS_sysenter_esp0(%esp),%esp
+	movl SYSENTER_stack_esp0(%esp),%esp
 sysenter_past_esp:
 	sti
 	pushl $(__USER_DS)
@@ -240,7 +239,7 @@ sysenter_past_esp:
 	jae syscall_badsys
 	call *sys_call_table(,%eax,4)
 	movl %eax,EAX(%esp)
-	cli
+	DISABLE_INTERRUPTS
 	movl TI_flags(%ebp), %ecx
 	testw $_TIF_ALLWORK_MASK, %cx
 	jne syscall_exit_work
@@ -248,9 +247,23 @@ sysenter_past_esp:
 	movl EIP(%esp), %edx
 	movl OLDESP(%esp), %ecx
 	xorl %ebp,%ebp
+#ifdef CONFIG_XEN
+	__ENABLE_INTERRUPTS
+sysexit_scrit:	/**** START OF SYSEXIT CRITICAL REGION ****/
+	__TEST_PENDING
+	jnz  14f			# process more events if necessary...
+	movl ESI(%esp), %esi
+	sysexit
+14:	__DISABLE_INTERRUPTS
+sysexit_ecrit:	/**** END OF SYSEXIT CRITICAL REGION ****/
+	push %esp
+	call evtchn_do_upcall
+	add  $4,%esp
+	jmp  ret_from_intr
+#else
 	sti
 	sysexit
-#endif /* CONFIG_X86_SYSENTER */
+#endif /* !CONFIG_XEN */
 
 
 	# system call handler stub
@@ -532,6 +545,11 @@ error_code:
 # So, on entry to the handler we detect whether we interrupted an
 # existing activation in its critical region -- if so, we pop the current
 # activation and restart the handler using the previous one.
+#
+# The sysexit critical region is slightly different. sysexit
+# atomically removes the entire stack frame. If we interrupt in the
+# critical region we know that the entire frame is present and correct
+# so we can simply throw away the new one.
 ENTRY(hypervisor_callback)
 	pushl %eax
 	SAVE_ALL
@@ -540,6 +558,11 @@ ENTRY(hypervisor_callback)
 	jb   11f
 	cmpl $ecrit,%eax
 	jb   critical_region_fixup
+	cmpl $sysexit_scrit,%eax
+	jb   11f
+	cmpl $sysexit_ecrit,%eax
+	ja   11f
+	addl $0x34,%esp			# Remove cs...ebx from stack frame.
 11:	push %esp
 	call evtchn_do_upcall
 	add  $4,%esp
@@ -683,13 +706,13 @@ device_available_emulate:
 	call math_state_restore
 	jmp ret_from_exception
 
-#ifdef CONFIG_X86_SYSENTER
+#ifndef CONFIG_XEN
 /*
  * Debug traps and NMI can happen at the one SYSENTER instruction
  * that sets up the real kernel stack. Check here, since we can't
  * allow the wrong stack to be used.
  *
- * "TSS_sysenter_esp0+12" is because the NMI/debug handler will have
+ * "SYSENTER_stack_esp0+12" is because the NMI/debug handler will have
  * already pushed 3 words if it hits on the sysenter instruction:
  * eflags, cs and eip.
  *
@@ -701,19 +724,19 @@ device_available_emulate:
 	cmpw $__KERNEL_CS,4(%esp);		\
 	jne ok;					\
 label:						\
-	movl TSS_sysenter_esp0+offset(%esp),%esp;	\
+	movl SYSENTER_stack_esp0+offset(%esp),%esp;	\
 	pushfl;					\
 	pushl $__KERNEL_CS;			\
 	pushl $sysenter_past_esp
-#endif /* CONFIG_X86_SYSENTER */
+#endif /* CONFIG_XEN */
 
 KPROBE_ENTRY(debug)
-#ifdef CONFIG_X86_SYSENTER
+#ifndef CONFIG_XEN
 	cmpl $sysenter_entry,(%esp)
 	jne debug_stack_correct
 	FIX_STACK(12, debug_stack_correct, debug_esp_fix_insn)
 debug_stack_correct:
-#endif /* !CONFIG_X86_SYSENTER */
+#endif /* !CONFIG_XEN */
 	pushl $-1			# mark this as an int
 	SAVE_ALL
 	xorl %edx,%edx			# error code 0

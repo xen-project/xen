@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+#  -*- mode: python; -*-
+import sys
+import traceback
+import getopt
+
+# add fallback path for non-native python path installs if needed
+sys.path.insert(-1, '/usr/lib/python')
+sys.path.insert(-1, '/usr/lib64/python')
+
+from xen.util.security import ACMError, err, get_decision, active_policy
+
+def usage():
+    print "Usage: acm_getdecision -i domainid --label labelname"
+    print "  Test program illustrating the retrieval of"
+    print "  access control decisions from Xen. At this time,"
+    print "  only sharing (STE) policy decisions are supported."
+    print "  Arguments are two paramters in any combination:"
+    print "\t -i domain_id or --domid domain_id"
+    print "\t -l labelname or --label labelname"
+    print "  Return value:"
+    print "\t PERMITTED if access is permitted"
+    print "\t DENIED if access is denied"
+    print "\t ACMError -- e.g., unknown label or domain id"
+    err("Usage")
+
+try:
+
+    if len(sys.argv) != 5:
+        usage()
+
+    decision_args = []
+
+    for idx in range(1, len(sys.argv), 2):
+        if sys.argv[idx] in ['-i', '--domid']:
+            decision_args.append(['domid', sys.argv[idx+1]])
+        elif sys.argv[idx] in ['-l', '--label']:
+            decision_args.append(['access_control',
+                                  ['policy', active_policy],
+                                  ['label', sys.argv[idx+1]]
+                                  ])
+        else:
+            print "unknown argument %s" % sys.argv[idx]
+            usage()
+
+    if len(decision_args) != 2:
+        print "too many arguments"
+        usage()
+
+    print get_decision(decision_args[0], decision_args[1])
+
+except ACMError:
+	pass
+except:
+    traceback.print_exc(limit=1)

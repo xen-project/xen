@@ -43,13 +43,19 @@ void cmdline_parse(char *cmdline)
         /* Grab the next whitespace-delimited option. */
         q = opt;
         while ( (*p != ' ') && (*p != '\0') )
-            *q++ = *p++;
+        {
+            if ( (q-opt) < (sizeof(opt)-1) ) /* avoid overflow */
+                *q++ = *p;
+            p++;
+        }
         *q = '\0';
 
         /* Search for value part of a key=value option. */
         optval = strchr(opt, '=');
         if ( optval != NULL )
-            *optval++ = '\0';
+            *optval++ = '\0'; /* nul-terminate the option value */
+        else
+            optval = q;       /* default option value is empty string */
 
         for ( param = &__setup_start; param <= &__setup_end; param++ )
         {
@@ -59,23 +65,18 @@ void cmdline_parse(char *cmdline)
             switch ( param->type )
             {
             case OPT_STR:
-                if ( optval != NULL )
-                {
-                    strncpy(param->var, optval, param->len);
-                    ((char *)param->var)[param->len-1] = '\0';
-                }
+                strncpy(param->var, optval, param->len);
+                ((char *)param->var)[param->len-1] = '\0';
                 break;
             case OPT_UINT:
-                if ( optval != NULL )
-                    *(unsigned int *)param->var =
-                        simple_strtol(optval, (char **)&optval, 0);
+                *(unsigned int *)param->var =
+                    simple_strtol(optval, (char **)&optval, 0);
                 break;
             case OPT_BOOL:
                 *(int *)param->var = 1;
                 break;
             case OPT_CUSTOM:
-                if ( optval != NULL )
-                    ((void (*)(char *))param->var)(optval);
+                ((void (*)(char *))param->var)(optval);
                 break;
             }
         }
@@ -213,37 +214,51 @@ long do_xen_version(int cmd, GUEST_HANDLE(void) arg)
     return -ENOSYS;
 }
 
-long do_nmi_op(unsigned int cmd, GUEST_HANDLE(void) arg)
+long register_guest_nmi_callback(unsigned long address)
 {
     struct vcpu *v = current;
     struct domain *d = current->domain;
+
+    if ( (d->domain_id != 0) || (v->vcpu_id != 0) )
+        return -EINVAL;
+
+    v->nmi_addr = address;
+#ifdef CONFIG_X86
+    /*
+     * If no handler was registered we can 'lose the NMI edge'. Re-assert it
+     * now.
+     */
+    if ( d->shared_info->arch.nmi_reason != 0 )
+        set_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
+#endif
+
+    return 0;
+}
+
+long unregister_guest_nmi_callback(void)
+{
+    struct vcpu *v = current;
+
+    v->nmi_addr = 0;
+
+    return 0;
+}
+
+long do_nmi_op(unsigned int cmd, GUEST_HANDLE(void) arg)
+{
     struct xennmi_callback cb;
     long rc = 0;
 
     switch ( cmd )
     {
     case XENNMI_register_callback:
-        rc = -EINVAL;
-        if ( (d->domain_id != 0) || (v->vcpu_id != 0) )
-            break;
-
         rc = -EFAULT;
         if ( copy_from_guest(&cb, arg, 1) )
             break;
-
-        v->nmi_addr = cb.handler_address;
-#ifdef CONFIG_X86
-        /*
-         * If no handler was registered we can 'lose the NMI edge'. Re-assert 
-         * it now.
-         */
-        if ( d->shared_info->arch.nmi_reason != 0 )
-            set_bit(_VCPUF_nmi_pending, &v->vcpu_flags);
-#endif
-        rc = 0;
+        rc = register_guest_nmi_callback(cb.handler_address);
         break;
     case XENNMI_unregister_callback:
-        v->nmi_addr = 0;
+        rc = unregister_guest_nmi_callback();
         break;
     default:
         rc = -ENOSYS;

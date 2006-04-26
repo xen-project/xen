@@ -14,6 +14,7 @@
 #include <xen/domain_page.h>
 #include <xen/compile.h>
 #include <xen/gdbstub.h>
+#include <xen/percpu.h>
 #include <public/version.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
@@ -159,9 +160,41 @@ void discard_initial_images(void)
     init_domheap_pages(initial_images_start, initial_images_end);
 }
 
+extern char __per_cpu_start[], __per_cpu_data_end[], __per_cpu_end[];
+
+static void percpu_init_areas(void)
+{
+    unsigned int i, data_size = __per_cpu_data_end - __per_cpu_start;
+
+    BUG_ON(data_size > PERCPU_SIZE);
+
+    for ( i = 1; i < NR_CPUS; i++ )
+        memcpy(__per_cpu_start + (i << PERCPU_SHIFT),
+               __per_cpu_start,
+               data_size);
+}
+
+static void percpu_free_unused_areas(void)
+{
+    unsigned int i, first_unused;
+
+    /* Find first unused CPU number. */
+    for ( i = 0; i < NR_CPUS; i++ )
+        if ( !cpu_online(i) )
+            break;
+    first_unused = i;
+
+    /* Check that there are no holes in cpu_online_map. */
+    for ( ; i < NR_CPUS; i++ )
+        BUG_ON(cpu_online(i));
+
+    init_xenheap_pages(__pa(__per_cpu_start) + (first_unused << PERCPU_SHIFT),
+                       __pa(__per_cpu_end));
+}
+
 void __init __start_xen(multiboot_info_t *mbi)
 {
-    char *cmdline;
+    char __cmdline[] = "", *cmdline = __cmdline;
     struct domain *idle_domain;
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
@@ -177,7 +210,8 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     /* Parse the command-line options. */
     if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
-        cmdline_parse(__va(mbi->cmdline));
+        cmdline = __va(mbi->cmdline);
+    cmdline_parse(cmdline);
 
     set_current((struct vcpu *)0xfffff000); /* debug sanity */
     set_processor_id(0); /* needed early, for smp_processor_id() */
@@ -195,6 +229,8 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     init_console();
 
+    printf("Command line: %s\n", cmdline);
+
     /* Check that we have at least one Multiboot module. */
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )
     {
@@ -208,6 +244,8 @@ void __init __start_xen(multiboot_info_t *mbi)
         printk("FATAL ERROR: Misaligned CPU0 stack.\n");
         EARLY_FAIL();
     }
+
+    percpu_init_areas();
 
     xenheap_phys_end = opt_xenheap_megabytes << 20;
 
@@ -321,7 +359,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 #if defined (CONFIG_X86_64)
         /*
          * x86/64 maps all registered RAM. Points to note:
-         *  1. The initial pagetable already maps low 64MB, so skip that.
+         *  1. The initial pagetable already maps low 1GB, so skip that.
          *  2. We must map *only* RAM areas, taking care to avoid I/O holes.
          *     Failure to do this can cause coherency problems and deadlocks
          *     due to cache-attribute mismatches (e.g., AMD/AGP Linux bug).
@@ -329,13 +367,14 @@ void __init __start_xen(multiboot_info_t *mbi)
         {
             /* Calculate page-frame range, discarding partial frames. */
             unsigned long start, end;
+            unsigned long init_mapped = 1UL << (30 - PAGE_SHIFT); /* 1GB */
             start = PFN_UP(e820.map[i].addr);
             end   = PFN_DOWN(e820.map[i].addr + e820.map[i].size);
-            /* Clip the range to above 64MB. */
-            if ( end < (64UL << (20-PAGE_SHIFT)) )
+            /* Clip the range to exclude what the bootstrapper initialised. */
+            if ( end < init_mapped )
                 continue;
-            if ( start < (64UL << (20-PAGE_SHIFT)) )
-                start = 64UL << (20-PAGE_SHIFT);
+            if ( start < init_mapped )
+                start = init_mapped;
             /* Request the mapping. */
             map_pages_to_xen(
                 PAGE_OFFSET + (start << PAGE_SHIFT),
@@ -404,7 +443,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     BUG_ON(idle_domain == NULL);
 
     set_current(idle_domain->vcpu[0]);
-    set_current_execstate(idle_domain->vcpu[0]);
+    this_cpu(curr_vcpu) = idle_domain->vcpu[0];
     idle_vcpu[0] = current;
 
     paging_init();
@@ -480,6 +519,8 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
     smp_cpus_done(max_cpus);
+
+    percpu_free_unused_areas();
 
     initialise_gdb(); /* could be moved earlier */
 
@@ -593,7 +634,7 @@ void arch_get_xen_caps(xen_capabilities_info_t info)
     if ( hvm_enabled )
     {
         p += sprintf(p, "hvm-%d.%d-x86_32 ", XEN_VERSION, XEN_SUBVERSION);
-        //p += sprintf(p, "hvm-%d.%d-x86_32p ", XEN_VERSION, XEN_SUBVERSION);
+        p += sprintf(p, "hvm-%d.%d-x86_32p ", XEN_VERSION, XEN_SUBVERSION);
         p += sprintf(p, "hvm-%d.%d-x86_64 ", XEN_VERSION, XEN_SUBVERSION);
     }
 

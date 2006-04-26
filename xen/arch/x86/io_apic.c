@@ -48,8 +48,17 @@ atomic_t irq_mis_count;
 static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 
 static DEFINE_SPINLOCK(ioapic_lock);
+static DEFINE_SPINLOCK(vector_lock);
 
 int skip_ioapic_setup;
+
+#ifndef sis_apic_bug
+/*
+ * Is the SiS APIC rmw bug present?
+ * -1 = don't know, 0 = no, 1 = yes
+ */
+int sis_apic_bug = -1;
+#endif
 
 /*
  * # of IRQ routing registers
@@ -661,11 +670,17 @@ u8 irq_vector[NR_IRQ_VECTORS] __read_mostly;
 
 int assign_irq_vector(int irq)
 {
-    static int current_vector = FIRST_DYNAMIC_VECTOR, offset = 0;
+    static unsigned current_vector = FIRST_DYNAMIC_VECTOR, offset = 0;
+    unsigned vector;
 
     BUG_ON(irq >= NR_IRQ_VECTORS);
-    if (irq != AUTO_ASSIGN && IO_APIC_VECTOR(irq) > 0)
+    spin_lock(&vector_lock);
+
+    if (irq != AUTO_ASSIGN && IO_APIC_VECTOR(irq) > 0) {
+        spin_unlock(&vector_lock);
         return IO_APIC_VECTOR(irq);
+    }
+
 next:
     current_vector += 8;
 
@@ -679,16 +694,21 @@ next:
 
     if (current_vector > LAST_DYNAMIC_VECTOR) {
         offset++;
-        if (!(offset%8))
+        if (!(offset%8)) {
+            spin_unlock(&vector_lock);
             return -ENOSPC;
+        }
         current_vector = FIRST_DYNAMIC_VECTOR + offset;
     }
 
-    vector_irq[current_vector] = irq;
+    vector = current_vector;
+    vector_irq[vector] = irq;
     if (irq != AUTO_ASSIGN)
-        IO_APIC_VECTOR(irq) = current_vector;
+        IO_APIC_VECTOR(irq) = vector;
 
-    return current_vector;
+    spin_unlock(&vector_lock);
+
+    return vector;
 }
 
 static struct hw_interrupt_type ioapic_level_type;

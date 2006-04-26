@@ -443,7 +443,7 @@ int construct_dom0(struct domain *d,
     v->arch.guest_table = mk_pagetable((unsigned long)l3start);
 #else
     l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
-    memcpy(l2tab, &idle_pg_table[0], PAGE_SIZE);
+    memcpy(l2tab, idle_pg_table, PAGE_SIZE);
     l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         l2e_from_paddr((unsigned long)l2start, __PAGE_HYPERVISOR);
     v->arch.guest_table = mk_pagetable((unsigned long)l2start);
@@ -569,7 +569,7 @@ int construct_dom0(struct domain *d,
     /* WARNING: The new domain must have its 'processor' field filled in! */
     maddr_to_page(mpt_alloc)->u.inuse.type_info = PGT_l4_page_table;
     l4start = l4tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
-    memcpy(l4tab, &idle_pg_table[0], PAGE_SIZE);
+    memcpy(l4tab, idle_pg_table, PAGE_SIZE);
     l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_paddr(__pa(l4start), __PAGE_HYPERVISOR);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =

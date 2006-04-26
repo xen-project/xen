@@ -109,6 +109,12 @@ If the value is 0, all available CPUs will be used by Domain0.
 A boolean value that tells xend whether or not core dumps of guest
 domains should be saved when a crash occurrs.  Defaults to I<no>.
 
+=item I<external-migration-tool>
+
+The name of an application or script that can handle external device
+migration, such as for example virtual TPM migration. An example
+script is I</etc/xen/scripts/external-device-migrate>.
+
 =back
 
 =head1 EXAMPLES

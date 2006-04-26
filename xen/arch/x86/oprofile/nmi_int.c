@@ -15,8 +15,8 @@
 #include <xen/types.h>
 #include <xen/errno.h>
 #include <xen/init.h>
+#include <xen/nmi.h>
 #include <public/xen.h>
-#include <asm/nmi.h>
 #include <asm/msr.h>
 #include <asm/apic.h>
 #include <asm/regs.h>

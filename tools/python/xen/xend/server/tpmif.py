@@ -25,6 +25,7 @@ from xen.xend import sxp
 from xen.xend.XendLogging import log
 from xen.xend.XendError import XendError
 from xen.xend import XendRoot
+from xen.xend.XendDomainInfo import DEV_MIGRATE_TEST
 
 from xen.xend.server.DevController import DevController
 
@@ -78,7 +79,7 @@ class TPMifController(DevController):
                 log.info("Request to live-migrate device to %s. step=%d.",
                          dst, step)
 
-                if step == 0:
+                if step == DEV_MIGRATE_TEST:
                     """Assuming for now that everything is ok and migration
                        with the given tool can proceed.
                     """
@@ -90,8 +91,8 @@ class TPMifController(DevController):
                     for line in fd.readlines():
                         mo = re.search('Error', line)
                         if mo:
-                            raise XendError("vtpm: Fatal error in migration step %d." %
-                                            step)
+                            raise XendError("vtpm: Fatal error in migration step %d: %s" %
+                                            (step, line))
                     return 0
             else:
                 log.debug("External migration tool not in configuration.")

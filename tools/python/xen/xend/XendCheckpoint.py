@@ -21,7 +21,8 @@ import xen.lowlevel.xc
 import balloon
 from XendError import XendError
 from XendLogging import log
-
+from XendDomainInfo import DEV_MIGRATE_STEP1, DEV_MIGRATE_STEP2
+from XendDomainInfo import DEV_MIGRATE_STEP3
 
 SIGNATURE = "LinuxGuestRecord"
 XC_SAVE = "xc_save"
@@ -65,7 +66,7 @@ def save(fd, dominfo, live, dst):
     dominfo.setName('migrating-' + domain_name)
 
     try:
-        dominfo.migrateDevices(live, dst, 1, domain_name)
+        dominfo.migrateDevices(live, dst, DEV_MIGRATE_STEP1, domain_name)
 
         write_exact(fd, pack("!i", len(config)),
                     "could not write guest state file: config len")
@@ -87,9 +88,11 @@ def save(fd, dominfo, live, dst):
                 log.debug("Suspending %d ...", dominfo.getDomid())
                 dominfo.shutdown('suspend')
                 dominfo.waitForShutdown()
-                dominfo.migrateDevices(live, dst, 2, domain_name)
+                dominfo.migrateDevices(live, dst, DEV_MIGRATE_STEP2,
+                                       domain_name)
                 log.info("Domain %d suspended.", dominfo.getDomid())
-                dominfo.migrateDevices(live, dst, 3, domain_name)
+                dominfo.migrateDevices(live, dst, DEV_MIGRATE_STEP3,
+                                       domain_name)
                 tochild.write("done\n")
                 tochild.flush()
                 log.debug('Written done')

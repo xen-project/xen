@@ -477,10 +477,10 @@ void evtchn_set_pending(struct vcpu *v, int port)
      * others may require explicit memory barriers.
      */
 
-    if ( test_and_set_bit(port, &s->evtchn_pending[0]) )
+    if ( test_and_set_bit(port, s->evtchn_pending) )
         return;
 
-    if ( !test_bit        (port, &s->evtchn_mask[0])    &&
+    if ( !test_bit        (port, s->evtchn_mask) &&
          !test_and_set_bit(port / BITS_PER_LONG,
                            &v->vcpu_info->evtchn_pending_sel) &&
          !test_and_set_bit(0, &v->vcpu_info->evtchn_upcall_pending) )
@@ -668,8 +668,8 @@ static long evtchn_unmask(evtchn_unmask_t *unmask)
      * These operations must happen in strict order. Based on
      * include/xen/event.h:evtchn_set_pending(). 
      */
-    if ( test_and_clear_bit(port, &s->evtchn_mask[0]) &&
-         test_bit          (port, &s->evtchn_pending[0]) &&
+    if ( test_and_clear_bit(port, s->evtchn_mask) &&
+         test_bit          (port, s->evtchn_pending) &&
          !test_and_set_bit (port / BITS_PER_LONG,
                             &v->vcpu_info->evtchn_pending_sel) &&
          !test_and_set_bit (0, &v->vcpu_info->evtchn_upcall_pending) )

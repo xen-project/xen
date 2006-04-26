@@ -404,7 +404,9 @@ typedef struct dom0_getdomaininfolist {
 DEFINE_GUEST_HANDLE(dom0_getdomaininfolist_t);
 
 #define DOM0_PLATFORM_QUIRK      39
-#define QUIRK_NOIRQBALANCING  1
+#define QUIRK_NOIRQBALANCING      1 /* Do not restrict IO-APIC RTE targets */
+#define QUIRK_IOAPIC_BAD_REGSEL   2 /* IO-APIC REGSEL forgets its value    */
+#define QUIRK_IOAPIC_GOOD_REGSEL  3 /* IO-APIC REGSEL behaves properly     */
 typedef struct dom0_platform_quirk {
     /* IN variables. */
     uint32_t quirk_id;

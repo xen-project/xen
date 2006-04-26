@@ -252,7 +252,7 @@ class XmTestDomain(XenDomain):
             waitForBoot()
 
     def minSafeMem(self):
-        return 16
+        return 32
 
 if __name__ == "__main__":
 

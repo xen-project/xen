@@ -1,0 +1,31 @@
+Index: sysenter/linux-2.6-xen-sparse/arch/i386/kernel/entry.S
+===================================================================
+--- linux-2.6.16.orig/arch/i386/kernel/entry.S	2006-04-05 11:12:51.000000000 +0100
++++ linux-2.6.16/arch/i386/kernel/entry.S	2006-04-05 11:12:52.000000000 +0100
+@@ -177,7 +177,7 @@
+ 
+ 	# sysenter call handler stub
+ ENTRY(sysenter_entry)
+-	movl TSS_sysenter_esp0(%esp),%esp
++	movl SYSENTER_stack_esp0(%esp),%esp
+ sysenter_past_esp:
+ 	sti
+ 	pushl $(__USER_DS)
+@@ -492,7 +492,7 @@
+  * that sets up the real kernel stack. Check here, since we can't
+  * allow the wrong stack to be used.
+  *
+- * "TSS_sysenter_esp0+12" is because the NMI/debug handler will have
++ * "SYSENTER_stack_esp0+12" is because the NMI/debug handler will have
+  * already pushed 3 words if it hits on the sysenter instruction:
+  * eflags, cs and eip.
+  *
+@@ -504,7 +504,7 @@
+ 	cmpw $__KERNEL_CS,4(%esp);		\
+ 	jne ok;					\
+ label:						\
+-	movl TSS_sysenter_esp0+offset(%esp),%esp;	\
++	movl SYSENTER_stack_esp0+offset(%esp),%esp;	\
+ 	pushfl;					\
+ 	pushl $__KERNEL_CS;			\
+ 	pushl $sysenter_past_esp

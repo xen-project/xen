@@ -38,6 +38,7 @@ from xen.xend.XendError import XendError, XendInvalidDomain
 from xen.xend.XendLogging import log
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
+from xen.util import security
 
 
 xc = xen.lowlevel.xc.xc()
@@ -265,7 +266,7 @@ class XendDomain:
             # handling in the relocation-socket handling code (relocate.py) is
             # poor, so we need to log this for debugging.
             log.exception("Restore failed")
-            raise
+            raise XendError("Restore failed")
 
 
     def restore_(self, config):
@@ -283,6 +284,7 @@ class XendDomain:
         """
         self.domains_lock.acquire()
         try:
+            security.refresh_ssidref(config)
             dominfo = XendDomainInfo.restore(config)
             self._add_domain(dominfo)
             return dominfo

@@ -26,9 +26,12 @@ static struct pciback_device *alloc_pdev(struct xenbus_device *xdev)
 
 	spin_lock_init(&pdev->dev_lock);
 
+	pdev->sh_area = NULL;
 	pdev->sh_info = NULL;
 	pdev->evtchn_irq = INVALID_EVTCHN_IRQ;
 	pdev->be_watching = 0;
+
+	INIT_WORK(&pdev->op_work, pciback_do_op, pdev);
 
 	if (pciback_init_devices(pdev)) {
 		kfree(pdev);
@@ -47,8 +50,13 @@ static void free_pdev(struct pciback_device *pdev)
 	if (pdev->evtchn_irq != INVALID_EVTCHN_IRQ)
 		unbind_from_irqhandler(pdev->evtchn_irq, pdev);
 
+	/* If the driver domain started an op, make sure we complete it or
+	 * delete it before releasing the shared memory */
+	cancel_delayed_work(&pdev->op_work);
+	flush_scheduled_work();
+
 	if (pdev->sh_info)
-		xenbus_unmap_ring_vfree(pdev->xdev, pdev->sh_info);
+		xenbus_unmap_ring_vfree(pdev->xdev, pdev->sh_area);
 
 	pciback_release_devices(pdev);
 
@@ -63,15 +71,19 @@ static int pciback_do_attach(struct pciback_device *pdev, int gnt_ref,
 {
 	int err = 0;
 	int evtchn;
+	struct vm_struct *area;
+
 	dev_dbg(&pdev->xdev->dev,
 		"Attaching to frontend resources - gnt_ref=%d evtchn=%d\n",
 		gnt_ref, remote_evtchn);
 
-	err =
-	    xenbus_map_ring_valloc(pdev->xdev, gnt_ref,
-				   (void **)&pdev->sh_info);
-	if (err)
+	area = xenbus_map_ring_valloc(pdev->xdev, gnt_ref);
+	if (IS_ERR(area)) {
+		err = PTR_ERR(area);
 		goto out;
+	}
+	pdev->sh_area = area;
+	pdev->sh_info = area->addr;
 
 	err = xenbus_bind_evtchn(pdev->xdev, remote_evtchn, &evtchn);
 	if (err)

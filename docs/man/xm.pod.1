@@ -136,7 +136,7 @@ Displays the short help message (i.e. common commands).
 The I<--long> option prints out the complete set of B<xm> subcommands,
 grouped by function.
 
-=item B<list> I<[--long]> I<[domain-id, ...]>
+=item B<list> I<[--long | --label]> I<[domain-id, ...]>
 
 Prints information about one or more domains.  If no domains are
 specified it prints out information about all domains.
@@ -212,6 +212,18 @@ B<Note:> there is no stable guarantees on the format of this data.
 Use at your own risk.
 
 =back
+
+B<LABEL OUTPUT>
+
+=over 4
+
+If I<--label> is specified, the security labels are added to the
+output of xm list and the lines are sorted by the labels (ignoring
+case). The I<--long> option prints the labels by default and cannot be
+combined with I<--label>. See the ACCESS CONTROL SUBCOMMAND section of
+this man page for more information about labels.
+
+==back
 
 B<NOTES>
 
@@ -775,6 +787,262 @@ Delete a vnet.
 
 =back
 
+=head1 ACCESS CONTROL SUBCOMMANDS
+
+Access Control in Xen consists of two components: (i) The Access
+Control Policy (ACP) defines security labels and access rules based on
+these labels. (ii) The Access Control Module (ACM) makes access control
+decisions by interpreting the policy when domains require to
+communicate or to access resources. The Xen access control has
+sufficient mechanisms in place to enforce the access decisions even
+against maliciously acting user domains (mandatory access control).
+
+Access rights for domains in Xen are determined by the domain security
+label only and not based on the domain Name or ID. The ACP specifies
+security labels that can then be assigned to domains and
+resources. Every domain must be assigned exactly one security label,
+otherwise access control decisions could become indeterministic. ACPs
+are distinguished by their name, which is a parameter to most of the
+subcommands described below. Currently, the ACP specifies two ways to
+interpret labels:
+
+(1) Simple Type Enforcement: Labels are interpreted to decide access
+of domains to comunication means and virtual or physical
+resources. Communication between domains as well as access to
+resources are forbidden by default and can only take place if they are
+explicitly allowed by the security policy. The proper assignment of
+labels to domains controls the sharing of information (directly
+through communication or indirectly through shared resources) between
+domains. This interpretation allows to control the overt (intended)
+communication channels in Xen.
+
+(2) Chinese Wall: Labels are interpreted to decide which domains can
+co-exist (be run simultaneously) on the same system. This
+interpretation allows to prevent direct covert (unintended) channels
+and mitigates risks caused by imperfect core domain isolation
+(trade-off between security and other system requirements). For a
+short introduction to covert channels, please refer to
+http://www.multicians.org/timing-chn.html.
+
+The following subcommands help you to manage security policies in Xen
+and to assign security labels to domains. To enable access control
+security in Xen, you must compile Xen with ACM support enabled as
+described under "Configuring Security" below. There, you will find
+also examples of each subcommand described here.
+
+=item B<makepolicy> I<policy>
+
+Compiles the XML source representation of the security I<policy>. It
+creates a mapping (.map) as well as a binary (.bin) version of the
+policy. The compiled policy can be loaded into Xen with the
+B<loadpolicy> subcommand or can be configured to be loaded at boot
+time with the B<cfgbootpolicy> subcommand.
+
+=over 4
+
+I<policy> is a dot-separated list of names. The last part is the file
+name pre-fix for the policy xml file. The preceding name parts are
+translated into the local path pointing to the policy xml file
+relative to the global policy root directory
+(/etc/xen/acm-security/policies). For example,
+example.chwall_ste.client_v1 denotes the policy file
+example/chwall_ste/client_v1-security_policy.xml relative to the
+global policy root directory.
+
+=back
+
+=item B<loadpolicy> I<policy>
+
+Loads the binary representation of the I<policy> into Xen. The binary
+representation can be created with the B<makepolicy> subcommand.
+
+=item B<cfgbootpolicy> I<policy> [I<kernelversion>]
+
+Configures I<policy> as the boot policy for Xen. It copies the binary
+policy representation into the /boot directory and adds a module line
+specifying the binary policy to the /boot/grub/menu.lst file. If your
+boot configuration includes multiple Xen boot titles, then use the
+I<kernelversion> parameter to select the proper title.
+
+=item B<dumppolicy>
+
+Prints the current security policy state information of Xen.
+
+=item B<labels> [I<policy>] [I<type>=dom|res|any]
+
+Lists all labels of a I<type> (domain, resource, or both) that are
+defined in the I<policy>. Unless specified, the default I<policy> is
+the currently enforced access control policy. The default for I<type>
+is 'dom'. The labels are arranged in alphabetical order.
+
+=item B<addlabel> I<configfile> I<label> [I<policy>]
+
+Adds the security label with name I<label> to a domain
+I<configfile>. Unless specified, the default I<policy> is the
+currently enforced access control policy. This subcommand also
+verifies that the I<policy> definition supports the specified I<label>
+name.
+
+B<CONFIGURING SECURITY>
+
+=over 4
+
+In xen_source_dir/Config.mk set the following parameters:
+
+    ACM_SECURITY ?= y
+    ACM_DEFAULT_SECURITY_POLICY ?= \
+        ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY
+
+Then recompile and install xen and the security tools and then reboot:
+
+    cd xen_source_dir/xen; make clean; make; cp xen.gz /boot;
+    cd xen_source_dir/tools/security; make install;
+    reboot into xen
+
+=back
+
+B<COMPILING A SECURITY POLICY>
+
+=over 4
+
+This step creates client_v1.map and client_v1.bin files in
+/etc/xen/acm-security/policies/example/chwall_ste.
+
+    xm makepolicy example.chwall_ste.client_v1
+
+=back
+
+B<LOADING A SECURITY POLICY>
+
+=over 4
+
+This step activates client_v1.bin as new security policy in Xen. You
+can use the dumppolicy subcommand before and afterwards to see the
+change in the Xen policy state.
+
+    xm loadpolicy example.chwall_ste.client_v1
+
+=back
+
+B<CONFIGURING A BOOT SECURITY POLICY>
+
+=over 4
+
+This configures the boot loader to load client_v1.bin at boot
+time. During system start, the ACM configures Xen with this policy and
+Xen enforces this policy from then on.
+
+    xm cfgbootpolicy example.chwall_ste.client_v1
+
+=back
+
+B<LISTING SECURITY LABELS>
+
+=over 4
+
+This subcommand shows all labels that are defined and which can be
+attached to domains.
+
+    xm labels example.chwall_ste.client_v1 type=dom
+
+will print for our example policy:
+
+        dom_BoincClient
+        dom_Fun
+        dom_HomeBanking
+        dom_NetworkDomain
+        dom_StorageDomain
+        dom_SystemManagement
+
+=back
+
+B<ATTACHING A SECURITY LABEL TO A DOMAIN>
+
+=over 4
+
+This subcommand attaches a security label to a domain configuration
+file, here a HomeBanking label. The example policy ensures that this
+domain does not share information with other non-hombanking user
+domains (i.e., domains labeled as dom_Fun or dom_Boinc) and that it
+will not run simultaneously with domains labeled as dom_Fun.
+
+We assume that the specified myconfig.xm configuration file actually
+instantiates a domain that runs workloads related to home-banking,
+probably just a browser environment for online-banking.
+
+    xm addlabel myconfig.xm dom_HomeBanking
+
+The very simple configuration file might now look as printed
+below. The I<addlabel> subcommand added the B<access_control> entry at
+the end of the file, consisting of a label name and the policy that
+specifies this label name:
+
+    kernel = "/boot/vmlinuz-2.6.16-xen"
+    ramdisk="/boot/U1_home_banking_ramdisk.img"
+    memory = 164
+    name = "homebanking"
+    vif = [ '' ]
+    dhcp = "dhcp"
+    access_control = ['policy=example.chwall_ste.client_v1,
+                       label=dom_HomeBanking']
+
+Security labels must be assigned to domain configurations because
+these labels are essential for making access control decisions as
+early as during the configuration phase of a newly instantiated
+domain. Consequently, a security-enabled Xen hypervisor will only
+start domains that have a security label configured and whose security
+label is consistent with the currently enforced policy. Otherwise,
+starting the domain will fail with the error condition "operation not
+permitted".
+
+=back
+
+B<STARTING AND LISTING LABELED DOMAINS>
+
+=over 4
+
+    xm create myconfig.xm
+
+    xm list --label
+
+      Name         ID ...  Time(s)  Label
+      homebanking  23 ...      4.4  dom_HomeBanking
+      Domain-0      0 ...   2658.8  dom_SystemManagement
+
+=back
+
+B<POLICY REPRESENTATIONS>
+
+=over 4
+
+We distinguish three representations of the Xen access control policy:
+the I<source XML> version, its I<binary> counterpart, and a I<mapping>
+representation that enables the tools to deterministically translate
+back and forth between label names of the XML policy and label
+identifiers of the binary policy. All three versions must be kept
+consistent to achieve predictable security guarantees.
+
+The XML version is the version that users are supposed to create or
+change, either by manually editing the XML file or by using the Xen
+policy generation tool (B<xensec_gen>). After changing the XML file,
+run the B<makepolicy> subcommand to ensure that these changes are
+reflected in the other versions. Use, for example, the subcommand
+B<cfgbootpolicy> to activate the changes during the next system
+reboot.
+
+The binary version of the policy is derived from the XML policy by
+tokenizing the specified labels and is used inside Xen only. It is
+created with the B<makepolicy> subcommand. Essentially, the binary
+version is much more compact than the XML version and is easier to
+evaluate during access control decisions.
+
+The mapping version of the policy is created during the XML-to-binary
+policy translation (B<makepolicy>) and is used by the Xen management
+tools to translate between label names used as input to the tools and
+their binary identifiers (ssidrefs) used inside Xen.
+
+=back
+
 =head1 EXAMPLES
 
 =head1 SEE ALSO
@@ -791,5 +1059,6 @@ Operating Systems Review, pages 261-267
 
   Sean Dague <sean at dague dot net>
   Daniel Stekloff <dsteklof at us dot ibm dot com>
+  Reiner Sailer <sailer at us dot ibm dot com>
 
 =head1 BUGS

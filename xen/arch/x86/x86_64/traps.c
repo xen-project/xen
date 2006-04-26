@@ -11,6 +11,7 @@
 #include <xen/console.h>
 #include <xen/sched.h>
 #include <xen/reboot.h>
+#include <xen/nmi.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
@@ -339,6 +340,10 @@ static long register_guest_callback(struct callback_register *reg)
         v->arch.guest_context.syscall_callback_eip  = reg->address;
         break;
 
+    case CALLBACKTYPE_nmi:
+        ret = register_guest_nmi_callback(reg->address);
+        break;
+
     default:
         ret = -EINVAL;
         break;
@@ -353,6 +358,10 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
 
     switch ( unreg->type )
     {
+    case CALLBACKTYPE_nmi:
+        ret = unregister_guest_nmi_callback();
+        break;
+
     default:
         ret = -EINVAL;
         break;

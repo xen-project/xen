@@ -11,10 +11,11 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
-# Copyright (c) 2005 XenSource Ltd
+# Copyright (c) 2005-2006 XenSource Inc
 
 
 import re
+import socket
 import sys
 
 from xen.xend import sxp
@@ -45,7 +46,6 @@ def diagnose(dom):
         state = sxp.child_value(domain, 'state')
         domid = int(sxp.child_value(domain, 'domid'))
         name = sxp.child_value(domain, 'name')
-        dompath = '/local/domain/%d' % domid
 
         print "Domain ID is %d." % domid
         print "Domain name is %s." % name
@@ -55,12 +55,23 @@ def diagnose(dom):
 
         if state.find('c') != -1:
             print "Domain has crashed."
+    except socket.error, exn:
+        print "Cannot contact Xend."
 
-        diagnose_console()
-
-        diagnose_devices()
+        try:
+            domid = int(dom)
+            name = dom
+        except ValueError:
+            print \
+"Without Xend, you will have to specify the domain ID, not the domain name."
+            sys.exit(1)
     except xen.xend.XendProtocol.XendError, exn:
         print exn
+        sys.exit(1)
+
+    dompath = '/local/domain/%d' % domid
+    diagnose_console()
+    diagnose_devices()
 
 
 def diagnose_console():

@@ -48,6 +48,12 @@ if [ -z "$VTPM_IMPL_DEFINED" ]; then
 	function vtpm_delete() {
 		true
 	}
+	function vtpm_migrate() {
+		echo "Error: vTPM migration accross machines not implemented."
+	}
+	function vtpm_migrate_recover() {
+		true
+	}
 fi
 
 
@@ -60,7 +66,7 @@ fi
 function vtpmdb_find_instance () {
 	local vmname=$1
 	local ret=0
-	instance=`cat $VTPMDB |                    \
+	instance=$(cat $VTPMDB |                   \
 	          awk -vvmname=$vmname             \
 	          '{                               \
 	             if ( 1 != index($1,"#")) {    \
@@ -69,7 +75,7 @@ function vtpmdb_find_instance () {
 	                 exit;                     \
 	               }                           \
 	             }                             \
-	           }'`
+	           }')
 	if [ "$instance" != "" ]; then
 		ret=$instance
 	fi
@@ -86,13 +92,13 @@ function vtpmdb_is_free_instancenum () {
 	if [ $instance -eq 0 -o $instance -gt 255 ]; then
 		avail=0
 	else
-		instances=`cat $VTPMDB |                 \
+		instances=$(cat $VTPMDB |                \
 		           gawk                          \
 		           '{                            \
 		               if (1 != index($1,"#")) { \
 		                 printf("%s ",$2);       \
 		               }                         \
-		            }'`
+		            }')
 		for i in $instances; do
 			if [ $i -eq $instance ]; then
 				avail=0
@@ -110,13 +116,13 @@ function vtpmdb_get_free_instancenum () {
 	local ctr
 	local instances
 	local don
-	instances=`cat $VTPMDB |                 \
+	instances=$(cat $VTPMDB |                \
 	           gawk                          \
 	           '{                            \
 	               if (1 != index($1,"#")) { \
 	                 printf("%s ",$2);       \
 	               }                         \
-	            }'`
+	            }')
 	ctr=1
 	don=0
 	while [ $don -eq 0 ]; do
@@ -163,7 +169,7 @@ function vtpmdb_validate_entry () {
 	local vmname=$1
 	local inst=$2
 
-	res=`cat $VTPMDB |             \
+	res=$(cat $VTPMDB |            \
 	     gawk -vvmname=$vmname     \
 	          -vinst=$inst         \
 	     '{                        \
@@ -179,7 +185,7 @@ function vtpmdb_validate_entry () {
 	            printf("2");       \
 	            exit;              \
 	         }                     \
-	     }'`
+	     }')
 
 	if [ "$res" == "1" ]; then
 		let rc=1
@@ -196,13 +202,13 @@ function vtpmdb_remove_entry () {
 	local vmname=$1
 	local instance=$2
 	local VTPMDB_TMP="$VTPMDB".tmp
-	`cat $VTPMDB |             \
+	$(cat $VTPMDB |            \
 	 gawk -vvmname=$vmname     \
 	 '{                        \
 	    if ( $1 != vmname ) {  \
 	      print $0;            \
 	    }                      \
-	 '} > $VTPMDB_TMP`
+	 '} > $VTPMDB_TMP)
 	if [ -e $VTPMDB_TMP ]; then
 		mv -f $VTPMDB_TMP $VTPMDB
 		vtpm_delete $instance
@@ -299,4 +305,63 @@ function vtpm_delete_instance () {
 	fi
 
 	release_lock vtpmdb
+}
+
+# Determine whether the given address is local to this machine
+# Return values:
+#  "-1" : the given machine name is invalid
+#  "0"  : this is not an address of this machine
+#  "1"  : this is an address local to this machine
+function isLocalAddress() {
+	local addr=$(ping $1 -c 1 |  \
+	             gawk '{ print substr($3,2,length($3)-2); exit }')
+	if [ "$addr" == "" ]; then
+		echo "-1"
+		return
+	fi
+	local res=$(ifconfig | grep "inet addr" |  \
+	           gawk -vaddr=$addr               \
+	           '{                              \
+	              if ( addr == substr($2, 6)) {\
+	                print "1";                 \
+	              }                            \
+	           }'                              \
+	          )
+	if [ "$res" == "" ]; then
+		echo "0"
+		return
+	fi
+	echo "1"
+}
+
+# Perform a migration step. This function differentiates between migration
+# to the local host or to a remote machine.
+# Parameters:
+# 1st: destination host to migrate to
+# 2nd: name of the domain to migrate
+# 3rd: the migration step to perform
+function vtpm_migration_step() {
+	local instance=$(vtpmdb_find_instance $2)
+	if [ "$instance" == "" ]; then
+		echo "Error: Translation of domain name ($2) to instance failed. Check /etc/xen/vtpm.db"
+		log err "Error during translation of domain name"
+	else
+		res=$(isLocalAddress $1)
+		if [ "$res" == "0" ]; then
+			vtpm_migrate $1 $2 $3
+		fi
+	fi
+}
+
+# Recover from migration due to an error. This function differentiates
+# between migration to the local host or to a remote machine.
+# Parameters:
+# 1st: destination host the migration was going to
+# 2nd: name of the domain that was to be migrated
+# 3rd: the last successful migration step that was done
+function vtpm_recover() {
+	res=$(isLocalAddress $1)
+	if [ "$res" == "0" ]; then
+		vtpm_migrate_recover $1 $2 $3
+	fi
 }

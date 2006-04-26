@@ -108,7 +108,7 @@ int shadow_set_guest_paging_levels(struct domain *d, int levels)
      * Need to wait for VCPU0 to complete the on-going shadow ops.
      */
 
-    if ( v->vcpu_id )
+    if ( v->domain == d && v->vcpu_id )
         return 1;
 
     shadow_lock(d);
@@ -327,7 +327,7 @@ static void alloc_monitor_pagetable(struct vcpu *v)
 
     mmfn = page_to_mfn(mmfn_info);
     mpl4e = (l4_pgentry_t *) map_domain_page_global(mmfn);
-    memcpy(mpl4e, &idle_pg_table[0], PAGE_SIZE);
+    memcpy(mpl4e, idle_pg_table, PAGE_SIZE);
     mpl4e[l4_table_offset(PERDOMAIN_VIRT_START)] =
         l4e_from_paddr(__pa(d->arch.mm_perdomain_l3), __PAGE_HYPERVISOR);
 

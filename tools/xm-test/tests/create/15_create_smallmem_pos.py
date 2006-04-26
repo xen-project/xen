@@ -5,7 +5,8 @@
 
 from XmTestLib import *
 
-MEM = 16
+# 32MBs is the default lower limit for creating domains, it should work
+MEM = 32
 
 domain = XmTestDomain(extraConfig={"memory": MEM,
                                    "extra" :"mem=%iM" % MEM})
@@ -17,7 +18,6 @@ except DomainError, e:
 
 try:
     console = XmConsole(domain.getName())
-    console.setLimit(65536)
     console.sendInput("input")
     console.runCmd("ls")
 except ConsoleError, e:

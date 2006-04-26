@@ -48,9 +48,7 @@ void usage(char *progname)
            "ACTION is one of:\n"
            "\t getpolicy\n"
            "\t dumpstats\n"
-           "\t loadpolicy <binary policy file>\n"
-           "\t getssid -d <domainid> [-f]\n"
-           "\t getssid -s <ssidref> [-f]\n", progname);
+           "\t loadpolicy <binary policy file>\n", progname);
     exit(-1);
 }
 
@@ -68,7 +66,7 @@ static inline int do_xen_hypercall(int xc_handle,
                         (unsigned long) hypercall);
 }
 
-static inline int do_acm_op(int xc_handle, struct acm_op * op)
+static inline int do_acm_op(int xc_handle, struct acm_op *op)
 {
     int ret = -1;
     privcmd_hypercall_t hypercall;
@@ -78,15 +76,13 @@ static inline int do_acm_op(int xc_handle, struct acm_op * op)
     hypercall.op = __HYPERVISOR_acm_op;
     hypercall.arg[0] = (unsigned long) op;
 
-    if (mlock(op, sizeof(*op)) != 0)
-    {
+    if (mlock(op, sizeof(*op)) != 0) {
         PERROR("Could not lock memory for Xen policy hypercall");
         goto out1;
     }
 
-    if ((ret = do_xen_hypercall(xc_handle, &hypercall)) < 0)
-    {
-        printf( "ACM operation failed: errno=%d\n", errno );
+    if ((ret = do_xen_hypercall(xc_handle, &hypercall)) < 0) {
+        printf("ACM operation failed: errno=%d\n", errno);
         if (errno == EACCES)
             fprintf(stderr, "ACM operation failed -- need to"
                     " rebuild the user-space tool set?\n");
@@ -108,8 +104,7 @@ void acm_dump_chinesewall_buffer(void *buf, int buflen)
     int i, j;
 
 
-    if (htonl(cwbuf->policy_code) != ACM_CHINESE_WALL_POLICY)
-    {
+    if (htonl(cwbuf->policy_code) != ACM_CHINESE_WALL_POLICY) {
         printf("CHINESE WALL POLICY CODE not found ERROR!!\n");
         return;
     }
@@ -129,8 +124,7 @@ void acm_dump_chinesewall_buffer(void *buf, int buflen)
     printf("\nSSID To CHWALL-Type matrix:\n");
 
     ssids = (domaintype_t *) (buf + ntohl(cwbuf->chwall_ssid_offset));
-    for (i = 0; i < ntohl(cwbuf->chwall_max_ssidrefs); i++)
-    {
+    for (i = 0; i < ntohl(cwbuf->chwall_max_ssidrefs); i++) {
         printf("\n   ssidref%2x:  ", i);
         for (j = 0; j < ntohl(cwbuf->chwall_max_types); j++)
             printf("%02x ",
@@ -139,8 +133,7 @@ void acm_dump_chinesewall_buffer(void *buf, int buflen)
     printf("\n\nConfict Sets:\n");
     conflicts =
         (domaintype_t *) (buf + ntohl(cwbuf->chwall_conflict_sets_offset));
-    for (i = 0; i < ntohl(cwbuf->chwall_max_conflictsets); i++)
-    {
+    for (i = 0; i < ntohl(cwbuf->chwall_max_conflictsets); i++) {
         printf("\n   c-set%2x:    ", i);
         for (j = 0; j < ntohl(cwbuf->chwall_max_types); j++)
             printf("%02x ",
@@ -150,13 +143,11 @@ void acm_dump_chinesewall_buffer(void *buf, int buflen)
     printf("\n");
 
     printf("\nRunning\nTypes:         ");
-    if (ntohl(cwbuf->chwall_running_types_offset))
-    {
+    if (ntohl(cwbuf->chwall_running_types_offset)) {
         running_types =
             (domaintype_t *) (buf +
                               ntohl(cwbuf->chwall_running_types_offset));
-        for (i = 0; i < ntohl(cwbuf->chwall_max_types); i++)
-        {
+        for (i = 0; i < ntohl(cwbuf->chwall_max_types); i++) {
             printf("%02x ", ntohs(running_types[i]));
         }
         printf("\n");
@@ -164,13 +155,12 @@ void acm_dump_chinesewall_buffer(void *buf, int buflen)
         printf("Not Reported!\n");
     }
     printf("\nConflict\nAggregate Set: ");
-    if (ntohl(cwbuf->chwall_conflict_aggregate_offset))
-    {
+    if (ntohl(cwbuf->chwall_conflict_aggregate_offset)) {
         conflict_aggregate =
             (domaintype_t *) (buf +
-                              ntohl(cwbuf->chwall_conflict_aggregate_offset));
-        for (i = 0; i < ntohl(cwbuf->chwall_max_types); i++)
-        {
+                              ntohl(cwbuf->
+                                    chwall_conflict_aggregate_offset));
+        for (i = 0; i < ntohl(cwbuf->chwall_max_types); i++) {
             printf("%02x ", ntohs(conflict_aggregate[i]));
         }
         printf("\n\n");
@@ -201,11 +191,11 @@ void acm_dump_ste_buffer(void *buf, int buflen)
     printf("\nSSID To STE-Type matrix:\n");
 
     ssids = (domaintype_t *) (buf + ntohl(stebuf->ste_ssid_offset));
-    for (i = 0; i < ntohl(stebuf->ste_max_ssidrefs); i++)
-    {
+    for (i = 0; i < ntohl(stebuf->ste_max_ssidrefs); i++) {
         printf("\n   ssidref%2x: ", i);
         for (j = 0; j < ntohl(stebuf->ste_max_types); j++)
-            printf("%02x ", ntohs(ssids[i * ntohl(stebuf->ste_max_types) + j]));
+            printf("%02x ",
+                   ntohs(ssids[i * ntohl(stebuf->ste_max_types) + j]));
     }
     printf("\n\n");
 }
@@ -213,9 +203,12 @@ void acm_dump_ste_buffer(void *buf, int buflen)
 void acm_dump_policy_buffer(void *buf, int buflen)
 {
     struct acm_policy_buffer *pol = (struct acm_policy_buffer *) buf;
-
+    char *policy_reference_name =
+        (buf + ntohl(pol->policy_reference_offset) +
+         sizeof(struct acm_policy_reference_buffer));
     printf("\nPolicy dump:\n");
     printf("============\n");
+    printf("POLICY REFERENCE = %s.\n", policy_reference_name);
     printf("PolicyVer = %x.\n", ntohl(pol->policy_version));
     printf("Magic     = %x.\n", ntohl(pol->magic));
     printf("Len       = %x.\n", ntohl(pol->len));
@@ -227,8 +220,7 @@ void acm_dump_policy_buffer(void *buf, int buflen)
            ACM_POLICY_NAME(ntohl(pol->secondary_policy_code)),
            ntohl(pol->secondary_policy_code),
            ntohl(pol->secondary_buffer_offset));
-    switch (ntohl(pol->primary_policy_code))
-    {
+    switch (ntohl(pol->primary_policy_code)) {
     case ACM_CHINESE_WALL_POLICY:
         acm_dump_chinesewall_buffer(buf +
                                     ntohl(pol->primary_buffer_offset),
@@ -250,8 +242,7 @@ void acm_dump_policy_buffer(void *buf, int buflen)
         printf("UNKNOWN POLICY!\n");
     }
 
-    switch (ntohl(pol->secondary_policy_code))
-    {
+    switch (ntohl(pol->secondary_policy_code)) {
     case ACM_CHINESE_WALL_POLICY:
         acm_dump_chinesewall_buffer(buf +
                                     ntohl(pol->secondary_buffer_offset),
@@ -303,26 +294,22 @@ int acm_domain_loadpolicy(int xc_handle, const char *filename)
     off_t len;
     uint8_t *buffer;
 
-    if ((ret = stat(filename, &mystat)))
-    {
+    if ((ret = stat(filename, &mystat))) {
         printf("File %s not found.\n", filename);
         goto out;
     }
 
     len = mystat.st_size;
-    if ((buffer = malloc(len)) == NULL)
-    {
+    if ((buffer = malloc(len)) == NULL) {
         ret = -ENOMEM;
         goto out;
     }
-    if ((fd = open(filename, O_RDONLY)) <= 0)
-    {
+    if ((fd = open(filename, O_RDONLY)) <= 0) {
         ret = -ENOENT;
         printf("File %s not found.\n", filename);
         goto free_out;
     }
-    if (len == read(fd, buffer, len))
-    {
+    if (len == read(fd, buffer, len)) {
         struct acm_op op;
         /* dump it and then push it down into xen/acm */
         acm_dump_policy_buffer(buffer, len);
@@ -334,7 +321,7 @@ int acm_domain_loadpolicy(int xc_handle, const char *filename)
 
         if (ret)
             printf
-                ("ERROR setting policy. Try 'xm dmesg' to see details.\n");
+                ("ERROR setting policy.\n");
         else
             printf("Successfully changed policy.\n");
 
@@ -382,9 +369,9 @@ int acm_domain_dumpstats(int xc_handle)
     op.u.dumpstats.pullcache_size = sizeof(stats_buffer);
     ret = do_acm_op(xc_handle, &op);
 
-    if (ret < 0)
-    {
-        printf("ERROR dumping policy stats. Try 'xm dmesg' to see details.\n");
+    if (ret < 0) {
+        printf
+            ("ERROR dumping policy stats. Try 'xm dmesg' to see details.\n");
         return ret;
     }
     stats = (struct acm_stats_buffer *) stats_buffer;
@@ -394,8 +381,7 @@ int acm_domain_dumpstats(int xc_handle)
     printf("Magic     = %x.\n", ntohl(stats->magic));
     printf("Len       = %x.\n", ntohl(stats->len));
 
-    switch (ntohl(stats->primary_policy_code))
-    {
+    switch (ntohl(stats->primary_policy_code)) {
     case ACM_NULL_POLICY:
         printf("NULL Policy: No statistics apply.\n");
         break;
@@ -414,8 +400,7 @@ int acm_domain_dumpstats(int xc_handle)
         printf("UNKNOWN PRIMARY POLICY ERROR!\n");
     }
 
-    switch (ntohl(stats->secondary_policy_code))
-    {
+    switch (ntohl(stats->secondary_policy_code)) {
     case ACM_NULL_POLICY:
         printf("NULL Policy: No statistics apply.\n");
         break;
@@ -435,119 +420,6 @@ int acm_domain_dumpstats(int xc_handle)
     }
     return ret;
 }
-/************************ get ssidref & types ******************************/
-/*
- * the ssid (types) can be looked up either by domain id or by ssidref
- */
-int acm_domain_getssid(int xc_handle, int argc, char * const argv[])
-{
-    /* this includes header and a set of types */
-    #define MAX_SSIDBUFFER  2000
-    int ret, i;
-    struct acm_op op;
-    struct acm_ssid_buffer *hdr;
-    unsigned char *buf;
-	int nice_print = 1;
-
-    op.cmd = ACM_GETSSID;
-    op.interface_version = ACM_INTERFACE_VERSION;
-	op.u.getssid.get_ssid_by = UNSET;
-	/* arguments
-	   -d ... domain id to look up
-	   -s ... ssidref number to look up
-	   -f ... formatted print (scripts depend on this format)
-	*/
-	while (1)
-    {
-		int c = getopt(argc, argv, "d:s:f");
-		if (c == -1)
-			break;
-		if (c == 'd')
-        {
-			if (op.u.getssid.get_ssid_by != UNSET)
-				usage(argv[0]);
-			op.u.getssid.get_ssid_by = DOMAINID;
-			op.u.getssid.id.domainid = strtoul(optarg, NULL, 0);
-		}
-		else if (c== 's')
-        {
-			if (op.u.getssid.get_ssid_by != UNSET)
-				usage(argv[0]);
-			op.u.getssid.get_ssid_by = SSIDREF;
-			op.u.getssid.id.ssidref = strtoul(optarg, NULL, 0);
-		}
-		else if (c== 'f')
-		{
-			nice_print = 0;
-		}
-		else
-			usage(argv[0]);
-	}
-	if (op.u.getssid.get_ssid_by == UNSET)
-		usage(argv[0]);
-
-	buf = malloc(MAX_SSIDBUFFER);
-    if (!buf)
-        return -ENOMEM;
-
-    /* dump it and then push it down into xen/acm */
-    op.u.getssid.ssidbuf = buf;   /* out */
-    op.u.getssid.ssidbuf_size = MAX_SSIDBUFFER;
-    ret = do_acm_op(xc_handle, &op);
-
-    if (ret)
-    {
-        printf("ERROR getting ssidref. Try 'xm dmesg' to see details.\n");
-        goto out;
-    }
-    hdr = (struct acm_ssid_buffer *)buf;
-    if (hdr->len > MAX_SSIDBUFFER)
-    {
-        printf("ERROR: Buffer length inconsistent (ret=%d, hdr->len=%d)!\n",
-               ret, hdr->len);
-            return -EIO;
-    }
-	if (nice_print)
-    {
-		printf("SSID: ssidref = 0x%08x \n", hdr->ssidref);
-		printf("      P: %s, max_types = %d\n",
-			   ACM_POLICY_NAME(hdr->primary_policy_code), hdr->primary_max_types);
-		printf("	  Types: ");
-		for (i=0; i< hdr->primary_max_types; i++)
-			if (buf[hdr->primary_types_offset + i])
-				printf("%02x ", i);
-			else
-				printf("-- ");
-		printf("\n");
-
-		printf("      S: %s, max_types = %d\n",
-			   ACM_POLICY_NAME(hdr->secondary_policy_code), hdr->secondary_max_types);
-		printf("	  Types: ");
-		for (i=0; i< hdr->secondary_max_types; i++)
-			if (buf[hdr->secondary_types_offset + i])
-				printf("%02x ", i);
-			else
-				printf("-- ");
-		printf("\n");
-	}
-	else
-    {
-		/* formatted print for use with scripts (.sh)
-		 *  update scripts when updating here (usually
-		 *  used in combination with -d to determine a
-		 *  running domain's label
-		 */
-		printf("SSID: ssidref = 0x%08x \n", hdr->ssidref);
-	}
-
-    /* return ste ssidref */
-    if (hdr->primary_policy_code == ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY)
-        ret = (hdr->ssidref) & 0xffff;
-    else if (hdr->secondary_policy_code == ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY)
-        ret = (hdr->ssidref) >> 16;
- out:
-    return ret;
-}
 
 /***************************** main **************************************/
 
@@ -559,8 +431,7 @@ int main(int argc, char **argv)
     if (argc < 2)
         usage(argv[0]);
 
-    if ((acm_cmd_fd = open("/proc/xen/privcmd", O_RDONLY)) <= 0)
-    {
+    if ((acm_cmd_fd = open("/proc/xen/privcmd", O_RDONLY)) <= 0) {
         printf("ERROR: Could not open xen privcmd device!\n");
         exit(-1);
     }
@@ -577,8 +448,6 @@ int main(int argc, char **argv)
         if (argc != 2)
             usage(argv[0]);
         ret = acm_domain_dumpstats(acm_cmd_fd);
-    } else if (!strcmp(argv[1], "getssid")) {
-        ret = acm_domain_getssid(acm_cmd_fd, argc, argv);
     } else
         usage(argv[0]);
 

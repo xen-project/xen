@@ -251,12 +251,15 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
     }
 
     if ( active_timer(timer) )
+    {
         __stop_timer(timer);
-
-    timer->cpu = new_cpu;
-
-    if ( likely(!timer->killed) )
+        timer->cpu = new_cpu;
         __add_timer(timer);
+    }
+    else
+    {
+        timer->cpu = new_cpu;
+    }
 
     spin_unlock(&timers[old_cpu].lock);
     spin_unlock_irqrestore(&timers[new_cpu].lock, flags);

@@ -1,22 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Author: Ray Valdez, Reiner Sailer {rvaldez,sailer}@us.ibm.com -->
 <!--         This file defines the schema, which is used to define -->
-<!--         the security policy and the security labels in Xe.    -->
+<!--         the security policy and the security labels in Xen.    -->
 
 <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="http://www.ibm.com" xmlns="http://www.ibm.com" elementFormDefault="qualified">
 	<xsd:element name="SecurityPolicyDefinition">
 		<xsd:complexType>
 			<xsd:sequence>
-				<xsd:element ref="PolicyHeader" minOccurs="0" maxOccurs="1"></xsd:element>
+				<xsd:element ref="PolicyHeader" minOccurs="1" maxOccurs="1"></xsd:element>
 				<xsd:element ref="SimpleTypeEnforcement" minOccurs="0" maxOccurs="1"></xsd:element>
 				<xsd:element ref="ChineseWall" minOccurs="0" maxOccurs="1"></xsd:element>
+				<xsd:element ref="SecurityLabelTemplate" minOccurs="1" maxOccurs="1"></xsd:element>
 			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="PolicyHeader">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element name="PolicyName" minOccurs="1" maxOccurs="1" type="xsd:string"></xsd:element>
+				<xsd:element name="PolicyUrl" minOccurs="0" maxOccurs="1" type="xsd:string"></xsd:element>
+				<xsd:element name="Reference" type="xsd:string" minOccurs="0" maxOccurs="1" />
+				<xsd:element name="Date" minOccurs="0" maxOccurs="1" type="xsd:string"></xsd:element>
+				<xsd:element name="NameSpaceUrl" minOccurs="0" maxOccurs="1" type="xsd:string"></xsd:element>
+			</xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="ChineseWall">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element ref="ChineseWallTypes" minOccurs="1" maxOccurs="1" />
+				<xsd:element ref="ConflictSets" minOccurs="0" maxOccurs="1" />
+			</xsd:sequence>
+			<xsd:attribute name="priority" type="PolicyOrder" use="optional"></xsd:attribute>
+		</xsd:complexType>
+	</xsd:element>
+	<xsd:element name="SimpleTypeEnforcement">
+		<xsd:complexType>
+			<xsd:sequence>
+				<xsd:element ref="SimpleTypeEnforcementTypes" />
+			</xsd:sequence>
+			<xsd:attribute name="priority" type="PolicyOrder" use="optional"></xsd:attribute>
 		</xsd:complexType>
 	</xsd:element>
 	<xsd:element name="SecurityLabelTemplate">
 		<xsd:complexType>
 			<xsd:sequence>
-				<xsd:element ref="LabelHeader" minOccurs="1" maxOccurs="1"></xsd:element>
 				<xsd:element name="SubjectLabels" minOccurs="0" maxOccurs="1">
 					<xsd:complexType>
 						<xsd:sequence>
@@ -33,40 +61,6 @@
 					</xsd:complexType>
 				</xsd:element>
 			</xsd:sequence>
-		</xsd:complexType>
-	</xsd:element>
-	<xsd:element name="PolicyHeader">
-		<xsd:complexType>
-			<xsd:sequence>
-				<xsd:element ref="Name" minOccurs="1" maxOccurs="1" />
-				<xsd:element ref="Date" minOccurs="1" maxOccurs="1" />
-			</xsd:sequence>
-		</xsd:complexType>
-	</xsd:element>
-	<xsd:element name="LabelHeader">
-		<xsd:complexType>
-			<xsd:sequence>
-				<xsd:element ref="Name"></xsd:element>
-				<xsd:element ref="Date" minOccurs="1" maxOccurs="1"></xsd:element>
-				<xsd:element ref="PolicyName" minOccurs="1" maxOccurs="1"></xsd:element>
-			</xsd:sequence>
-		</xsd:complexType>
-	</xsd:element>
-	<xsd:element name="SimpleTypeEnforcement">
-		<xsd:complexType>
-			<xsd:sequence>
-				<xsd:element ref="SimpleTypeEnforcementTypes" />
-			</xsd:sequence>
-			<xsd:attribute name="priority" type="PolicyOrder" use="optional"></xsd:attribute>
-		</xsd:complexType>
-	</xsd:element>
-	<xsd:element name="ChineseWall">
-		<xsd:complexType>
-			<xsd:sequence>
-				<xsd:element ref="ChineseWallTypes" />
-				<xsd:element ref="ConflictSets" />
-			</xsd:sequence>
-			<xsd:attribute name="priority" type="PolicyOrder" use="optional"></xsd:attribute>
 		</xsd:complexType>
 	</xsd:element>
 	<xsd:element name="ChineseWallTypes">
@@ -115,24 +109,11 @@
 			</xsd:sequence>
 		</xsd:complexType>
 	</xsd:element>
-	<xsd:element name="PolicyName">
-		<xsd:complexType>
-			<xsd:sequence>
-				<xsd:element ref="Url" />
-				<xsd:element ref="Reference" />
-			</xsd:sequence>
-		</xsd:complexType>
-	</xsd:element>
-	<xsd:element name="Date" type="xsd:string" />
 	<xsd:element name="Name" type="xsd:string" />
 	<xsd:element name="Type" type="xsd:string" />
-	<xsd:element name="Reference" type="xsd:string" />
-	<xsd:element name="Url"></xsd:element>
-
 	<xsd:simpleType name="PolicyOrder">
 		<xsd:restriction base="xsd:string">
 			<xsd:enumeration value="PrimaryPolicyComponent"></xsd:enumeration>
 		</xsd:restriction>
 	</xsd:simpleType>
-
 </xsd:schema>

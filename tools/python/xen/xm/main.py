@@ -40,6 +40,7 @@ from xen.xm.opts import *
 import console
 import xen.xend.XendClient
 from xen.xend.XendClient import server
+from xen.util import security
 
 # getopt.gnu_getopt is better, but only exists in Python 2.3+.  Use
 # getopt.getopt if gnu_getopt is not available.  This will mean that options
@@ -55,6 +56,8 @@ create_help =  """create [-c] <ConfigFile>
 destroy_help = "destroy <DomId>                  Terminate a domain immediately"
 help_help =    "help                             Display this message"
 list_help =    "list [--long] [DomId, ...]       List information about domains"
+list_label_help = "list [--label] [DomId, ...]      List information about domains including their labels"
+
 mem_max_help = "mem-max <DomId> <Mem>            Set maximum memory reservation for a domain"
 mem_set_help = "mem-set <DomId> <Mem>            Adjust the current memory usage for a domain"
 migrate_help = "migrate <DomId> <Host>           Migrate a domain to another machine"
@@ -114,6 +117,12 @@ vnet_list_help = "vnet-list [-l|--long]            list vnets"
 vnet_create_help = "vnet-create <config>             create a vnet from a config file"
 vnet_delete_help = "vnet-delete <vnetid>             delete a vnet"
 vtpm_list_help = "vtpm-list <DomId> [--long]       list virtual TPM devices"
+addlabel_help =  "addlabel <ConfigFile> <label>    Add security label to ConfigFile"
+cfgbootpolicy_help = "cfgbootpolicy <policy>           Add policy to boot configuration "
+dumppolicy_help = "dumppolicy                       Print hypervisor ACM state information"
+loadpolicy_help = "loadpolicy <policy>              Load binary policy into hypervisor"
+makepolicy_help = "makepolicy <policy>              Build policy and create .bin/.map files"
+labels_help     = "labels [policy] [type=DOM|..]    List <type> labels for (active) policy."
 
 short_command_list = [
     "console",
@@ -140,6 +149,7 @@ domain_commands = [
     "domid",
     "domname",
     "list",
+    "list_label",
     "mem-max",
     "mem-set",
     "migrate",
@@ -185,8 +195,17 @@ vnet_commands = [
     "vnet-delete",
     ]
 
+acm_commands = [
+    "labels",
+    "addlabel",
+    "makepolicy",
+    "loadpolicy",
+    "cfgbootpolicy",
+    "dumppolicy"
+    ]
+
 all_commands = (domain_commands + host_commands + scheduler_commands +
-                device_commands + vnet_commands)
+                device_commands + vnet_commands + acm_commands)
 
 
 def commandToHelp(cmd):
@@ -224,6 +243,9 @@ xm full list of subcommands:
 
   Vnet commands:
    """ + help_spacer.join(map(commandToHelp,  vnet_commands)) + """
+
+  Access Control commands:
+   """ + help_spacer.join(map(commandToHelp,  acm_commands)) + """
 
 <DomName> can be substituted for <DomId> in xm subcommands.
 
@@ -332,8 +354,9 @@ def getDomains(domain_names):
 def xm_list(args):
     use_long = 0
     show_vcpus = 0
+    show_labels = 0
     try:
-        (options, params) = getopt.gnu_getopt(args, 'lv', ['long','vcpus'])
+        (options, params) = getopt.gnu_getopt(args, 'lv', ['long','vcpus','label'])
     except getopt.GetoptError, opterr:
         err(opterr)
         sys.exit(1)
@@ -343,6 +366,8 @@ def xm_list(args):
             use_long = 1
         if k in ['-v', '--vcpus']:
             show_vcpus = 1
+        if k in ['--label']:
+            show_labels = 1
 
     if show_vcpus:
         print >>sys.stderr, (
@@ -354,6 +379,8 @@ def xm_list(args):
 
     if use_long:
         map(PrettyPrint.prettyprint, doms)
+    elif show_labels:
+        xm_label_list(doms)
     else:
         xm_brief_list(doms)
 
@@ -369,7 +396,7 @@ def parse_doms_info(info):
         'vcpus'    : get_info('online_vcpus', int,   0),
         'state'    : get_info('state',        str,   '??'),
         'cpu_time' : get_info('cpu_time',     float, 0),
-        'ssidref'  : get_info('ssidref',      int,   0),
+        'seclabel' : security.get_security_printlabel(info),
         }
 
 
@@ -391,13 +418,29 @@ def xm_brief_list(doms):
     print 'Name                              ID Mem(MiB) VCPUs State  Time(s)'
     for dom in doms:
         d = parse_doms_info(dom)
-        if (d['ssidref'] != 0):
-            d['ssidstr'] = (" s:%04x/p:%04x" % 
-                            ((d['ssidref'] >> 16) & 0xffff,
-                              d['ssidref']        & 0xffff))
+        print ("%(name)-32s %(dom)3d %(mem)8d %(vcpus)5d %(state)5s %(cpu_time)7.1f" % d)
+
+
+def xm_label_list(doms):
+    output = []
+    print 'Name                              ID Mem(MiB) VCPUs State  Time(s)  Label'
+    for dom in doms:
+        d = parse_doms_info(dom)
+        l = "%(name)-32s %(dom)3d %(mem)8d %(vcpus)5d %(state)5s %(cpu_time)7.1f  " % d
+        if security.active_policy not in ['INACTIVE', 'NULL', 'DEFAULT']:
+            if d['seclabel']:
+                line = (l, d['seclabel'])
+            else:
+                line = (l, "ERROR")
+        elif security.active_policy in ['DEFAULT']:
+            line = (l, "DEFAULT")
         else:
-            d['ssidstr'] = ""
-        print ("%(name)-32s %(dom)3d %(mem)8d %(vcpus)5d %(state)5s %(cpu_time)7.1f%(ssidstr)s" % d)
+            line = (l, "INACTIVE")
+        output.append(line)
+    #sort by labels
+    output.sort(lambda x,y: cmp( x[1].lower(), y[1].lower()))
+    for l in output:
+        print l[0] + l[1]
 
 
 def xm_vcpu_list(args):
@@ -1010,7 +1053,13 @@ subcommands = [
     'create',
     'migrate',
     'sysrq',
-    'shutdown'
+    'shutdown',
+    'labels',
+    'addlabel',
+    'cfgbootpolicy',
+    'makepolicy',
+    'loadpolicy',
+    'dumppolicy'
     ]
 
 for c in subcommands:

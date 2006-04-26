@@ -33,7 +33,7 @@ import threading
 import xen.lowlevel.xc
 from xen.util import asserts
 from xen.util.blkif import blkdev_uname_to_file
-
+from xen.util import security
 import balloon
 import image
 import sxp
@@ -87,6 +87,12 @@ SHUTDOWN_TIMEOUT = 30.0
 
 ZOMBIE_PREFIX = 'Zombie-'
 
+"""Constants for the different stages of ext. device migration """
+DEV_MIGRATE_TEST  = 0
+DEV_MIGRATE_STEP1 = 1
+DEV_MIGRATE_STEP2 = 2
+DEV_MIGRATE_STEP3 = 3
+
 """Minimum time between domain restarts in seconds."""
 MINIMUM_RESTART_TIME = 20
 
@@ -120,7 +126,6 @@ VM_CONFIG_PARAMS = [
 # file, so those are handled separately.
 ROUNDTRIPPING_CONFIG_ENTRIES = [
     ('uuid',       str),
-    ('ssidref',    int),
     ('vcpus',      int),
     ('vcpu_avail', int),
     ('cpu_weight', float),
@@ -138,7 +143,6 @@ ROUNDTRIPPING_CONFIG_ENTRIES += VM_CONFIG_PARAMS
 #
 VM_STORE_ENTRIES = [
     ('uuid',       str),
-    ('ssidref',    int),
     ('vcpus',      int),
     ('vcpu_avail', int),
     ('memory',     int),
@@ -291,6 +295,9 @@ def parseConfig(config):
     result['cpu']   = get_cfg('cpu',  int)
     result['cpus']  = get_cfg('cpus', str)
     result['image'] = get_cfg('image')
+    tmp_security = get_cfg('security')
+    if tmp_security:
+        result['security'] = tmp_security
 
     try:
         if result['image']:
@@ -437,7 +444,7 @@ class XendDomainInfo:
         self.validateInfo()
 
         self.image = None
-
+        self.security = None
         self.store_port = None
         self.store_mfn = None
         self.console_port = None
@@ -515,6 +522,7 @@ class XendDomainInfo:
         else:
             entries = VM_STORE_ENTRIES
         entries.append(('image', str))
+        entries.append(('security', str))
 
         map(lambda x, y: useIfNeeded(x[0], y), entries,
             self.readVMDetails(entries))
@@ -538,7 +546,6 @@ class XendDomainInfo:
 
         try:
             defaultInfo('name',         lambda: "Domain-%d" % self.domid)
-            defaultInfo('ssidref',      lambda: 0)
             defaultInfo('on_poweroff',  lambda: "destroy")
             defaultInfo('on_reboot',    lambda: "restart")
             defaultInfo('on_crash',     lambda: "restart")
@@ -565,11 +572,15 @@ class XendDomainInfo:
             defaultInfo('backend',      lambda: [])
             defaultInfo('device',       lambda: [])
             defaultInfo('image',        lambda: None)
+            defaultInfo('security',     lambda: None)
 
             self.check_name(self.info['name'])
 
             if isinstance(self.info['image'], str):
                 self.info['image'] = sxp.from_string(self.info['image'])
+
+            if isinstance(self.info['security'], str):
+                self.info['security'] = sxp.from_string(self.info['security'])
 
             if self.info['memory'] == 0:
                 if self.infoIsSet('mem_kb'):
@@ -668,6 +679,20 @@ class XendDomainInfo:
         if self.infoIsSet('image'):
             to_store['image'] = sxp.to_string(self.info['image'])
 
+        if self.infoIsSet('security'):
+            security = self.info['security']
+            to_store['security'] = sxp.to_string(security)
+            for idx in range(0, len(security)):
+                if security[idx][0] == 'access_control':
+                    to_store['security/access_control'] = sxp.to_string([ security[idx][1] , security[idx][2] ])
+                    for aidx in range(1, len(security[idx])):
+                        if security[idx][aidx][0] == 'label':
+                            to_store['security/access_control/label'] = security[idx][aidx][1]
+                        if security[idx][aidx][0] == 'policy':
+                            to_store['security/access_control/policy'] = security[idx][aidx][1]
+                if security[idx][0] == 'ssidref':
+                    to_store['security/ssidref'] = str(security[idx][1])
+
         log.debug("Storing VM details: %s", to_store)
 
         self.writeVm(to_store)
@@ -760,9 +785,8 @@ class XendDomainInfo:
         self.storeVm('vcpu_avail', self.info['vcpu_avail'])
         self.writeDom(self.vcpuDomDetails())
 
-
-    def getSsidref(self):
-        return self.info['ssidref']
+    def getLabel(self):
+        return security.get_security_info(self.info, 'label')
 
     def getMemoryTarget(self):
         """Get this domain's target memory size, in KB."""
@@ -954,12 +978,21 @@ class XendDomainInfo:
         """
 
         log.trace("XendDomainInfo.update(%s) on domain %d", info, self.domid)
-
         if not info:
             info = dom_get(self.domid)
             if not info:
                 return
             
+        #manually update ssidref / security fields
+        if security.on() and info.has_key('ssidref'):
+            if (info['ssidref'] != 0) and self.info.has_key('security'):
+                security_field = self.info['security']
+                if not security_field:
+                    #create new security element
+                    self.info.update({'security': [['ssidref', str(info['ssidref'])]]})
+            #ssidref field not used any longer
+        info.pop('ssidref')
+
         self.info.update(info)
         self.validateInfo()
         self.refreshShutdown(info)
@@ -996,7 +1029,6 @@ class XendDomainInfo:
         s += " id=" + str(self.domid)
         s += " name=" + self.info['name']
         s += " memory=" + str(self.info['memory'])
-        s += " ssidref=" + str(self.info['ssidref'])
         s += ">"
         return s
 
@@ -1057,6 +1089,9 @@ class XendDomainInfo:
         
         if self.infoIsSet('image'):
             sxpr.append(['image', self.info['image']])
+
+        if self.infoIsSet('security'):
+            sxpr.append(['security', self.info['security']])
 
         for cls in controllerClasses:
             for config in self.getDeviceConfigurations(cls):
@@ -1159,12 +1194,11 @@ class XendDomainInfo:
         @raise: VmError on error
         """
 
-        log.debug('XendDomainInfo.construct: %s %s',
-                  self.domid,
-                  self.info['ssidref'])
+        log.debug('XendDomainInfo.construct: %s',
+                  self.domid)
 
         self.domid = xc.domain_create(
-            dom = 0, ssidref = self.info['ssidref'],
+            dom = 0, ssidref = security.get_security_info(self.info, 'ssidref'),
             handle = uuid.fromString(self.info['uuid']))
 
         if self.domid < 0:
@@ -1402,7 +1436,7 @@ class XendDomainInfo:
         @raise: XendError for a device that cannot be migrated
         """
         for (n, c) in self.info['device']:
-            rc = self.migrateDevice(n, c, live, dst, 0)
+            rc = self.migrateDevice(n, c, live, dst, DEV_MIGRATE_TEST)
             if rc != 0:
                 raise XendError("Device of type '%s' refuses migration." % n)
 

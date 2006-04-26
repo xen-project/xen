@@ -104,6 +104,7 @@
 #define cpu_has_pae		boot_cpu_has(X86_FEATURE_PAE)
 #define cpu_has_pge		boot_cpu_has(X86_FEATURE_PGE)
 #define cpu_has_apic		boot_cpu_has(X86_FEATURE_APIC)
+#define cpu_has_sep		boot_cpu_has(X86_FEATURE_SEP)
 #define cpu_has_mtrr		boot_cpu_has(X86_FEATURE_MTRR)
 #define cpu_has_mmx		boot_cpu_has(X86_FEATURE_MMX)
 #define cpu_has_fxsr		boot_cpu_has(X86_FEATURE_FXSR)
@@ -125,6 +126,7 @@
 #define cpu_has_pae		1
 #define cpu_has_pge		1
 #define cpu_has_apic		boot_cpu_has(X86_FEATURE_APIC)
+#define cpu_has_sep		0
 #define cpu_has_mtrr		1
 #define cpu_has_mmx		1
 #define cpu_has_fxsr		1

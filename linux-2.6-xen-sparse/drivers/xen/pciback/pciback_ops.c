@@ -40,17 +40,24 @@ void pciback_reset_device(struct pci_dev *dev)
 	pciback_config_reset(dev);
 }
 
-irqreturn_t pciback_handle_event(int irq, void *dev_id, struct pt_regs *regs)
+static inline void test_and_schedule_op(struct pciback_device *pdev)
 {
-	struct pciback_device *pdev = dev_id;
+	/* Check that frontend is requesting an operation and that we are not
+	 * already processing a request */
+	if (test_bit(_XEN_PCIF_active, (unsigned long *)&pdev->sh_info->flags)
+	    && !test_and_set_bit(_PDEVF_op_active, &pdev->flags))
+		schedule_work(&pdev->op_work);
+}
+
+/* Performing the configuration space reads/writes must not be done in atomic
+ * context because some of the pci_* functions can sleep (mostly due to ACPI
+ * use of semaphores). This function is intended to be called from a work
+ * queue in process context taking a struct pciback_device as a parameter */
+void pciback_do_op(void *data)
+{
+	struct pciback_device *pdev = data;
 	struct pci_dev *dev;
 	struct xen_pci_op *op = &pdev->sh_info->op;
-
-	if (unlikely(!test_bit(_XEN_PCIF_active,
-			       (unsigned long *)&pdev->sh_info->flags))) {
-		pr_debug("pciback: interrupt, but no active operation\n");
-		goto out;
-	}
 
 	dev = pciback_get_pci_dev(pdev, op->domain, op->bus, op->devfn);
 
@@ -65,10 +72,26 @@ irqreturn_t pciback_handle_event(int irq, void *dev_id, struct pt_regs *regs)
 	else
 		op->err = XEN_PCI_ERR_not_implemented;
 
+	/* Tell the driver domain that we're done. */ 
 	wmb();
 	clear_bit(_XEN_PCIF_active, (unsigned long *)&pdev->sh_info->flags);
 	notify_remote_via_irq(pdev->evtchn_irq);
 
-      out:
+	/* Mark that we're done. */
+	smp_mb__before_clear_bit(); /* /after/ clearing PCIF_active */
+	clear_bit(_PDEVF_op_active, &pdev->flags);
+	smp_mb__after_clear_bit(); /* /before/ final check for work */
+
+	/* Check to see if the driver domain tried to start another request in
+	 * between clearing _XEN_PCIF_active and clearing _PDEVF_op_active. */
+	test_and_schedule_op(pdev);
+}
+
+irqreturn_t pciback_handle_event(int irq, void *dev_id, struct pt_regs *regs)
+{
+	struct pciback_device *pdev = dev_id;
+
+	test_and_schedule_op(pdev);
+
 	return IRQ_HANDLED;
 }

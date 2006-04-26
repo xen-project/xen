@@ -675,12 +675,12 @@ static void arch_svm_do_launch(struct vcpu *v)
 
 static void svm_freeze_time(struct vcpu *v)
 {
-    struct hvm_virpit *vpit = &v->domain->arch.hvm_domain.vpit;
+    struct hvm_time_info *time_info = &v->domain->arch.hvm_domain.vpit.time_info;
     
-    if ( vpit->first_injected && !v->domain->arch.hvm_domain.guest_time ) {
+    if ( time_info->first_injected && !v->domain->arch.hvm_domain.guest_time ) {
         v->domain->arch.hvm_domain.guest_time = svm_get_guest_time(v);
-        vpit->count_advance += (NOW() - vpit->count_point);
-        stop_timer(&(vpit->pit_timer));
+        time_info->count_advance += (NOW() - time_info->count_point);
+        stop_timer(&(time_info->pit_timer));
     }
 }
 
@@ -750,7 +750,7 @@ static void svm_relinquish_guest_resources(struct domain *d)
         }
     }
 
-    kill_timer(&d->arch.hvm_domain.vpit.pit_timer);
+    kill_timer(&d->arch.hvm_domain.vpit.time_info.pit_timer);
 
     if ( d->arch.hvm_domain.shared_page_va )
         unmap_domain_page_global(
@@ -780,10 +780,10 @@ void arch_svm_do_resume(struct vcpu *v)
 
 void svm_migrate_timers(struct vcpu *v)
 {
-    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
+    struct hvm_time_info *time_info = &v->domain->arch.hvm_domain.vpit.time_info;
 
-    migrate_timer( &vpit->pit_timer, v->processor );
-    migrate_timer( &v->arch.hvm_svm.hlt_timer, v->processor );
+    migrate_timer(&time_info->pit_timer, v->processor);
+    migrate_timer(&v->arch.hvm_svm.hlt_timer, v->processor);
     if ( hvm_apic_support(v->domain) && VLAPIC( v ))
         migrate_timer( &(VLAPIC(v)->vlapic_timer ), v->processor );
 }
@@ -931,7 +931,13 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
     {
         if ( !hvm_apic_support(v->domain) ||
                 !vlapic_global_enabled((VLAPIC(v))) )
+        {
             clear_bit(X86_FEATURE_APIC, &edx);
+            /* Since the apic is disabled, avoid any confusion about SMP cpus being available */
+            clear_bit(X86_FEATURE_HT, &edx);  /* clear the hyperthread bit */
+            ebx &= 0xFF00FFFF;  /* set the logical processor count to 1 */
+            ebx |= 0x00010000;
+        }
 	    
 #if CONFIG_PAGING_LEVELS < 3
         clear_bit(X86_FEATURE_NX, &edx);
@@ -1843,11 +1849,11 @@ static inline void svm_do_msr_access(struct vcpu *v, struct cpu_user_regs *regs)
         switch (regs->ecx) {
         case MSR_IA32_TIME_STAMP_COUNTER:
         {
-            struct hvm_virpit *vpit;
+            struct hvm_time_info *time_info;
 
             rdtscll(msr_content);
-            vpit = &(v->domain->arch.hvm_domain.vpit);
-            msr_content += vpit->cache_tsc_offset;
+            time_info = &v->domain->arch.hvm_domain.vpit.time_info;
+            msr_content += time_info->cache_tsc_offset;
             break;
         }
         case MSR_IA32_SYSENTER_CS:

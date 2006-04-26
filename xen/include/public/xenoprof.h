@@ -12,18 +12,22 @@
 #define __XEN_PUBLIC_XENOPROF_H__
 
 /*
- * Commands to HYPERVISOR_pmc_op().
+ * Commands to HYPERVISOR_xenoprof_op().
  */
-#define XENOPROF_init               0
-#define XENOPROF_set_active         1
-#define XENOPROF_reserve_counters   3
-#define XENOPROF_setup_events       4
-#define XENOPROF_enable_virq        5
-#define XENOPROF_start              6
-#define XENOPROF_stop               7
-#define XENOPROF_disable_virq       8
-#define XENOPROF_release_counters   9
-#define XENOPROF_shutdown          10
+#define XENOPROF_init                0
+#define XENOPROF_reset_active_list   1
+#define XENOPROF_reset_passive_list  2
+#define XENOPROF_set_active          3
+#define XENOPROF_set_passive         4
+#define XENOPROF_reserve_counters    5
+#define XENOPROF_counter             6
+#define XENOPROF_setup_events        7
+#define XENOPROF_enable_virq         8
+#define XENOPROF_start               9
+#define XENOPROF_stop               10
+#define XENOPROF_disable_virq       11
+#define XENOPROF_release_counters   12
+#define XENOPROF_shutdown           13
 
 #define MAX_OPROF_EVENTS    32
 #define MAX_OPROF_DOMAINS   25	
@@ -50,25 +54,29 @@ typedef struct xenoprof_buf {
 } xenoprof_buf_t;
 DEFINE_GUEST_HANDLE(xenoprof_buf_t);
 
-typedef struct xenoprof_init_result {
+typedef struct xenoprof_init {
+    int32_t  max_samples;
     int32_t  num_events;
     int32_t  is_primary;
     int32_t  nbuf;
     int32_t  bufsize;
     uint64_t buf_maddr;
     char cpu_type[XENOPROF_CPU_TYPE_SIZE];
-} xenoprof_init_result_t;
-DEFINE_GUEST_HANDLE(xenoprof_init_result_t);
+} xenoprof_init_t;
+DEFINE_GUEST_HANDLE(xenoprof_init_t);
 
-typedef struct xenoprof_counter_config {
-    unsigned long count;
-    unsigned long enabled;
-    unsigned long event;
-    unsigned long kernel;
-    unsigned long user;
-    unsigned long unit_mask;
-} xenoprof_counter_config_t;
-DEFINE_GUEST_HANDLE(xenoprof_counter_config_t);
+typedef struct xenoprof_counter {
+    uint32_t ind;
+    uint64_t count;
+    uint32_t enabled;
+    uint32_t event;
+    uint32_t hypervisor;
+    uint32_t kernel;
+    uint32_t user;
+    uint64_t unit_mask;
+} xenoprof_counter_t;
+DEFINE_GUEST_HANDLE(xenoprof_counter_t);
+
 
 #endif /* __XEN_PUBLIC_XENOPROF_H__ */
 

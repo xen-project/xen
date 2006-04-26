@@ -85,13 +85,19 @@ acm_set_policy(void *buf, u32 buf_size, int isuserbuffer)
     /* get bin_policy lock and rewrite policy (release old one) */
     write_lock(&acm_bin_pol_rwlock);
 
-    /* 3. set primary policy data */
+    /* 3. set label reference name */
+    if (acm_set_policy_reference(buf + ntohl(pol->policy_reference_offset),
+                                 ntohl(pol->primary_buffer_offset) -
+                                 ntohl(pol->policy_reference_offset)))
+        goto error_lock_free;
+
+    /* 4. set primary policy data */
     if (acm_primary_ops->set_binary_policy(buf + ntohl(pol->primary_buffer_offset),
                                            ntohl(pol->secondary_buffer_offset) -
                                            ntohl(pol->primary_buffer_offset)))
         goto error_lock_free;
 
-    /* 4. set secondary policy data */
+    /* 5. set secondary policy data */
     if (acm_secondary_ops->set_binary_policy(buf + ntohl(pol->secondary_buffer_offset),
                                              ntohl(pol->len) - 
                                              ntohl(pol->secondary_buffer_offset)))
@@ -130,9 +136,18 @@ acm_get_policy(void *buf, u32 buf_size)
     bin_pol->secondary_policy_code = htonl(acm_bin_pol.secondary_policy_code);
 
     bin_pol->len = htonl(sizeof(struct acm_policy_buffer));
+    bin_pol->policy_reference_offset = htonl(ntohl(bin_pol->len));
     bin_pol->primary_buffer_offset = htonl(ntohl(bin_pol->len));
     bin_pol->secondary_buffer_offset = htonl(ntohl(bin_pol->len));
      
+    ret = acm_dump_policy_reference(policy_buffer + ntohl(bin_pol->policy_reference_offset),
+                                    buf_size - ntohl(bin_pol->policy_reference_offset));
+    if (ret < 0)
+        goto error_free_unlock;
+
+    bin_pol->len = htonl(ntohl(bin_pol->len) + ret);
+    bin_pol->primary_buffer_offset = htonl(ntohl(bin_pol->len));
+
     ret = acm_primary_ops->dump_binary_policy (policy_buffer + ntohl(bin_pol->primary_buffer_offset),
                                                buf_size - ntohl(bin_pol->primary_buffer_offset));
     if (ret < 0)
@@ -227,6 +242,14 @@ acm_get_ssid(ssidref_t ssidref, u8 *buf, u16 buf_size)
     acm_ssid->ssidref = ssidref;
     acm_ssid->primary_policy_code = acm_bin_pol.primary_policy_code;
     acm_ssid->secondary_policy_code = acm_bin_pol.secondary_policy_code;
+
+    acm_ssid->policy_reference_offset = acm_ssid->len;
+    ret = acm_dump_policy_reference(ssid_buffer + acm_ssid->policy_reference_offset,
+                                    buf_size - acm_ssid->policy_reference_offset);
+    if (ret < 0)
+        goto error_free_unlock;
+
+    acm_ssid->len += ret;
     acm_ssid->primary_types_offset = acm_ssid->len;
 
     /* ret >= 0 --> ret == max_types */

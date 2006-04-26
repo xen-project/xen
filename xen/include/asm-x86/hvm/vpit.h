@@ -30,47 +30,65 @@
 
 #define PIT_FREQ 1193181
 
-#define LSByte          0
-#define MSByte          1
-#define LSByte_multiple 2
-#define MSByte_multiple 3
+#define PIT_BASE 0x40
+#define HVM_PIT_ACCEL_MODE 2
 
-struct hvm_virpit {
-    /* for simulation of counter 0 in mode 2 */
+typedef struct PITChannelState {
+    int count; /* can be 65536 */
+    u16 latched_count;
+    u8 count_latched;
+    u8 status_latched;
+    u8 status;
+    u8 read_state;
+    u8 write_state;
+    u8 write_latch;
+    u8 rw_mode;
+    u8 mode;
+    u8 bcd; /* not supported */
+    u8 gate; /* timer start */
+    s64 count_load_time;
+    /* irq handling */
+    s64 next_transition_time;
+    int irq;
+    struct hvm_time_info *hvm_time;
+    u32 period; /* period(ns) based on count */
+} PITChannelState;
+
+struct hvm_time_info {
+    /* extra info for the mode 2 channel */
+    struct timer pit_timer;
+    struct vcpu *vcpu;          /* which vcpu the ac_timer bound to */
     u64 period_cycles;          /* pit frequency in cpu cycles */
     s_time_t count_advance;     /* accumulated count advance since last fire */
     s_time_t count_point;        /* last point accumulating count advance */
-    s_time_t scheduled;         /* scheduled timer interrupt */
-    struct timer pit_timer;     /* periodic timer for mode 2*/
-    unsigned int channel;       /* the pit channel, counter 0~2 */
     unsigned int pending_intr_nr; /* the couner for pending timer interrupts */
-    u32 period;                 /* pit frequency in ns */
     int first_injected;         /* flag to prevent shadow window */
     s64 cache_tsc_offset;       /* cache of VMCS TSC_OFFSET offset */
     u64 last_pit_gtime;         /* guest time when last pit is injected */
-
-    /* virtual PIT state for handle related I/O */
-    int read_state;
-    int count_LSB_latched;
-    int count_MSB_latched;
-
-    unsigned int count;  /* the 16 bit channel count */
-    unsigned int init_val; /* the init value for the counter */
 };
+
+typedef struct hvm_virpit {
+    PITChannelState channels[3];
+    struct hvm_time_info time_info;
+    int speaker_data_on;
+    int dummy_refresh_clock;
+}hvm_virpit;
+
 
 static __inline__ s_time_t get_pit_scheduled(
     struct vcpu *v,
     struct hvm_virpit *vpit)
 {
+    struct PITChannelState *s = &(vpit->channels[0]);
     if ( is_irq_enabled(v, 0) ) {
-        return vpit->scheduled;
+        return s->next_transition_time;
     }
     else
         return -1;
 }
 
 /* to hook the ioreq packet to get the PIT initialization info */
-extern void hvm_hooks_assist(struct vcpu *v);
-void pickup_deactive_ticks(struct hvm_virpit *vpit);
+extern void pit_init(struct hvm_virpit *pit, struct vcpu *v);
+extern void pickup_deactive_ticks(struct hvm_virpit *vpit);
 
 #endif /* __ASM_X86_HVM_VPIT_H__ */

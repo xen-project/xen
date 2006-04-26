@@ -75,7 +75,7 @@ static kbd_layout_t* parse_keyboard_layout(const char* language,kbd_layout_t* k)
     char* file_name=malloc(strlen(prefix)+strlen(language)+strlen(bios_dir)+1);
 
 	if(!k)
-		k=calloc(sizeof(kbd_layout_t),1);
+		k=calloc(1, sizeof(kbd_layout_t));
 	strcpy(file_name,bios_dir);
 	strcat(file_name,prefix);
 	strcat(file_name,language);

@@ -13,12 +13,8 @@ default: build
 .PHONY: dist
 dist: install
 
-.PHONY: debug
-debug:
-	objdump -D -S $(TARGET)-syms > $(TARGET).s
-
 .PHONY: build install clean cscope TAGS tags
-build install clean cscope TAGS tags::
+build install debug clean cscope TAGS tags::
 	make -f Rules.mk _$@
 
 .PHONY: _build
@@ -37,6 +33,10 @@ _install: $(TARGET).gz
 	$(INSTALL_DATA) include/public/*.h $(DESTDIR)/usr/include/xen
 	$(INSTALL_DATA) include/public/io/*.h $(DESTDIR)/usr/include/xen/io
 	$(INSTALL_DATA) include/public/COPYING $(DESTDIR)/usr/include/xen
+
+.PHONY: _debug
+_debug:
+	objdump -D -S $(TARGET)-syms > $(TARGET).s
 
 .PHONY: _clean
 _clean: delete-unfresh-files

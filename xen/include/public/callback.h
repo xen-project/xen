@@ -21,6 +21,12 @@
 #define CALLBACKTYPE_event                 0
 #define CALLBACKTYPE_failsafe              1
 #define CALLBACKTYPE_syscall               2 /* x86_64 only */
+/*
+ * sysenter is only available on x86_32 with the
+ * supervisor_mode_kernel option enabled.
+ */
+#define CALLBACKTYPE_sysenter              3
+#define CALLBACKTYPE_nmi                   4
 
 /*
  * Register a callback.

@@ -40,7 +40,6 @@ int speaker_data_on;
 int dummy_refresh_clock;
 static fdctrl_t *floppy_controller;
 static RTCState *rtc_state;
-static PITState *pit;
 
 static void ioport80_write(void *opaque, uint32_t addr, uint32_t data)
 {
@@ -243,17 +242,13 @@ static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_
 
 static void speaker_ioport_write(void *opaque, uint32_t addr, uint32_t val)
 {
-    speaker_data_on = (val >> 1) & 1;
-    pit_set_gate(pit, 2, val & 1);
+    fprintf(stderr, "speaker port should not be handled in DM!\n");
 }
 
 static uint32_t speaker_ioport_read(void *opaque, uint32_t addr)
 {
-    int out;
-    out = pit_get_out(pit, 2, qemu_get_clock(vm_clock));
-    dummy_refresh_clock ^= 1;
-    return (speaker_data_on << 1) | pit_get_gate(pit, 2) | (out << 5) |
-      (dummy_refresh_clock << 4);
+    fprintf(stderr, "speaker port should not be handled in DM!\n");
+    return 0;
 }
 
 static void ioport92_write(void *opaque, uint32_t addr, uint32_t val)
@@ -529,7 +524,6 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
     register_ioport_write(0x92, 1, 1, ioport92_write, NULL);
 
     pic_init();
-    pit = pit_init(0x40, 0);
 
     for(i = 0; i < MAX_SERIAL_PORTS; i++) {
         if (serial_hds[i]) {

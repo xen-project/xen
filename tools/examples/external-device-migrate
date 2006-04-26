@@ -1,0 +1,85 @@
+#!/bin/sh
+
+# Copyright (c) 2005 IBM Corporation
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+
+
+# This script is called by XenD for migration of external devices
+# It does not handle the migration of those devices itself, but
+# passes the requests on to further applications
+# It handles the low-level command line parsing and some of the
+# synchronization
+
+dir=$(dirname "$0")
+. "$dir/logging.sh"
+
+
+function usage() {
+	echo " Pass the following command line paremeters to the script:"
+	echo ""
+	echo "-step <n>     : n-th migration step"
+	echo "-host <host>  : the destination host"
+	echo "-domname <domain name> : name of the domain that is migrating"
+	echo "-type <device type>    : the type of device that is migrating"
+	echo "-recover               : indicates recovery request; an error"
+	echo "                         occurred during migration"
+	echo "-help                  : display this help screen"
+}
+
+while [ 1 ]; do
+	if [ "$1" == "-step" ]; then
+		shift
+		step=$1
+	elif [ "$1" == "-host" ]; then
+		shift
+		host=$1
+	elif [ "$1" == "-domname" ]; then
+		shift
+		domname=$1
+	elif [ "$1" == "-type" ]; then
+		shift
+		typ=$1
+	elif [ "$1" == "-recover" ]; then
+		recover=1
+	elif [ "$1" == "-help" ]; then
+		usage
+		exit
+	else
+		break
+	fi
+	shift
+done
+
+if [ "$step"    == "" -o \
+     "$host"    == "" -o \
+     "$typ"     == "" -o \
+     "$domname" == "" ]; then
+	echo "Error: Parameter(s) missing (-step/-host/-type/-domname)"
+set
+	echo ""
+	echo "$0 --help for usage."
+	exit
+fi
+
+. "$dir/$typ-migration.sh"
+
+if [ "$recover" == "1" ]; then
+	func="$typ"_recover
+	eval $func $host $domname $step
+else
+	func="$typ"_migration_step
+	eval $func $host $domname $step
+fi

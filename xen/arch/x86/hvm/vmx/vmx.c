@@ -102,7 +102,7 @@ static void vmx_relinquish_guest_resources(struct domain *d)
         }
     }
 
-    kill_timer(&d->arch.hvm_domain.vpit.pit_timer);
+    kill_timer(&d->arch.hvm_domain.vpit.time_info.pit_timer);
 
     if ( d->arch.hvm_domain.shared_page_va )
         unmap_domain_page_global(
@@ -358,12 +358,12 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
 static void vmx_freeze_time(struct vcpu *v)
 {
-    struct hvm_virpit *vpit = &v->domain->arch.hvm_domain.vpit;
+    struct hvm_time_info *time_info = &(v->domain->arch.hvm_domain.vpit.time_info);
     
-    if ( vpit->first_injected && !v->domain->arch.hvm_domain.guest_time ) {
+    if ( time_info->first_injected && !v->domain->arch.hvm_domain.guest_time ) {
         v->domain->arch.hvm_domain.guest_time = get_guest_time(v);
-        vpit->count_advance += (NOW() - vpit->count_point);
-        stop_timer(&(vpit->pit_timer));
+        time_info->count_advance += (NOW() - time_info->count_point);
+        stop_timer(&(time_info->pit_timer));
     }
 }
 
@@ -393,9 +393,9 @@ int vmx_initialize_guest_resources(struct vcpu *v)
 
 void vmx_migrate_timers(struct vcpu *v)
 {
-    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
+    struct hvm_time_info *time_info = &v->domain->arch.hvm_domain.vpit.time_info;
 
-    migrate_timer(&vpit->pit_timer, v->processor);
+    migrate_timer(&time_info->pit_timer, v->processor);
     migrate_timer(&v->arch.hvm_vmx.hlt_timer, v->processor);
     if ( hvm_apic_support(v->domain) && VLAPIC(v))
         migrate_timer(&(VLAPIC(v)->vlapic_timer), v->processor);
@@ -828,9 +828,16 @@ static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
 
     if ( input == 1 )
     {
-        if ( hvm_apic_support(v->domain) &&
+        if ( !hvm_apic_support(v->domain) ||
              !vlapic_global_enabled((VLAPIC(v))) )
+        {
             clear_bit(X86_FEATURE_APIC, &edx);
+            /* Since the apic is disabled, avoid any confusion about SMP cpus being available */
+            clear_bit(X86_FEATURE_HT, &edx);  /* clear the hyperthread bit */
+            ebx &= 0xFF00FFFF;  /* set the logical processor count to 1 */
+            ebx |= 0x00010000;
+        }
+
 
 #if CONFIG_PAGING_LEVELS < 3
         clear_bit(X86_FEATURE_PAE, &edx);
@@ -1836,11 +1843,11 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
     switch (regs->ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:
     {
-        struct hvm_virpit *vpit;
+        struct hvm_time_info *time_info;
 
         rdtscll(msr_content);
-        vpit = &(v->domain->arch.hvm_domain.vpit);
-        msr_content += vpit->cache_tsc_offset;
+        time_info = &(v->domain->arch.hvm_domain.vpit.time_info);
+        msr_content += time_info->cache_tsc_offset;
         break;
     }
     case MSR_IA32_SYSENTER_CS:
@@ -2039,7 +2046,7 @@ void restore_cpu_user_regs(struct cpu_user_regs *regs)
 
 asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 {
-    unsigned int exit_reason, idtv_info_field;
+    unsigned int exit_reason;
     unsigned long exit_qualification, eip, inst_len = 0;
     struct vcpu *v = current;
     int error;
@@ -2048,23 +2055,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __hvm_bug(&regs);
 
     perfc_incra(vmexits, exit_reason);
-
-    __vmread(IDT_VECTORING_INFO_FIELD, &idtv_info_field);
-    if (idtv_info_field & INTR_INFO_VALID_MASK) {
-        __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
-
-        __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
-        if (inst_len >= 1 && inst_len <= 15)
-            __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
-
-        if (idtv_info_field & 0x800) { /* valid error code */
-            unsigned long error_code;
-            __vmread(IDT_VECTORING_ERROR_CODE, &error_code);
-            __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
-        }
-
-        HVM_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x", idtv_info_field);
-    }
 
     /* don't bother H/W interrutps */
     if (exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT &&

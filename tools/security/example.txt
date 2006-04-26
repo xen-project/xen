@@ -3,119 +3,79 @@
 #
 # Author:
 # Reiner Sailer 08/15/2005 <sailer@watson.ibm.com>
+#               04/07/2006 update to using labels instead of ssidref
 #
 #
 # This file introduces into the tools to manage policies
 # and to label domains and resources.
 ##
 
-We will show how to install and use the example chwall_ste policy.
-Other policies work similarly. Feedback welcome!
+We will show how to install and use the example one of the client_v1
+policies. Other policies work similarly. Feedback welcome!
 
 
 
-1. Using xensec_xml2bin to translate the chwall_ste policy:
-===========================================================
+1. Using xm tools to translate example.chwall_ste.client_v1 policy:
+===================================================================
 
-#xensec_xml2bin chwall_ste
-
-Successful execution should print:
-
-    [root@laptopxn security]# xensec_xml2bin chwall_ste
-    Validating label file /etc/xen/acm-security/policies/chwall_ste/chwall_ste-security_label_template.xml...
-    XML Schema /etc/xen/acm-security/policies/security_policy.xsd valid.
-    Validating policy file /etc/xen/acm-security/policies/chwall_ste/chwall_ste-security_policy.xml...
-    XML Schema /etc/xen/acm-security/policies/security_policy.xsd valid.
-    Creating ssid mappings ...
-    Creating label mappings ...
-    Max chwall labels:  7
-    Max chwall-types:   4
-    Max chwall-ssids:   5
-    Max ste labels:     14
-    Max ste-types:      6
-    Max ste-ssids:      10
+#xm makepolicy example.chwall_ste.client_v1
 
 By default, the tool looks in directory /etc/xen/acm-security/policies
-for a directory that matches the policy name (i.e. chwall_ste) to find
-the label and policy files.
-The '-d' option can be used to override the /etc/xen/acm-security/policies
-directory, for example if running the tool in the Xen security tool build
-directory.
+for a directory that matches the policy name
+(here:example/chwall_ste/client_v1-security_policy.xml) to find the
+policy files.  The '-d' option can be used to override the default
+/etc/xen/acm-security/policies policy-root directory.
 
 The default policy directory structure under /etc/xen/acm-security (and
 the Xen security tool build directory - tools/security) looks like:
 
 policies
 |-- security_policy.xsd
-|-- chwall
-|   |-- chwall-security_label_template.xml
-|   `-- chwall-security_policy.xml
-|-- chwall_ste
-|   |-- chwall_ste-security_label_template.xml
-|   `-- chwall_ste-security_policy.xml
-|-- null
-|   |-- null-security_label_template.xml
-|   `-- null-security_policy.xml
-`-- ste
-    |-- ste-security_label_template.xml
-    `-- ste-security_policy.xml
+|-- example
+    |-- chwall
+    |   |-- client_v1-security_policy.xml
+    |
+    |-- chwall_ste
+    |   |-- client_v1-security_policy.xml
+    |
+    |-- ste
+        |-- client_v1-security_policy.xml
 
-The security_policy.xsd file contains the schema against which both the
-label-template and the policy files must validate during translation.
+The security_policy.xsd file contains the schema against which the
+policy files must validate during translation.
 
-The files ending in -security_policy.xml define the policies and the
-types known to the policies.
+The policy files, ending in -security_policy.xml, define the policies,
+the types known to the policies, and the label definitions that group
+types together and make them easier to use for users.
 
-The files ending in -security_label_template.xml contain the label
-definitions that group types together and make them easier to use for
-users.
+After executing the above 'xm makepolicy' command, you will find 2 new
+files in the /etc/xen/acm-security/policies/example/chwall_ste
+sub-directory:
 
-After executing the above xensec_xml2bin command, you will find 2 new
-files in the /etc/xen/acm-security/policies/chwall_ste sub-directory:
-
-  chwall_ste.map ... this file includes the mapping
+  client_v1.map ... this file includes the mapping
     of names from the xml files into their binary code representation.
 
-  chwall_ste.bin ... this is the binary policy file,
-    the result of parsing the xml files and using the mapping to extract a
-    binary version that can be loaded into the hypervisor.
+  client_v1.bin ... this is the binary policy file, the result of
+    parsing the xml files and using the mapping to create a binary
+    version that can be loaded into the hypervisor.
 
 
 
 2. Loading and activating the policy:
 =====================================
 
-We assume that xen is already configured to use the chwall_ste policy;
+We assume that xen is already configured for security;
 please refer to install.txt for instructions.
 
-To activate the policy from the command line (assuming that the
-currently established policy is the minimal boot-policy that is
-hard-coded into the hypervisor):
+To activate the policy from the command line:
 
-# xensec_tool loadpolicy /etc/xen/acm-security/policies/chwall_ste/chwall_ste.bin
+# xm loadpolicy example.chwall_ste.client_v1
 
-To activate the policy at next reboot:
-
-# cp /etc/xen/acm-security/policies/chwall_ste/chwall_ste.bin /boot
-
-Add a module line to your /boot/grub/grub.conf Xen entry.
-My boot entry with chwall_ste enabled looks like this:
-
-    title Xen (2.6.12)
-        root (hd0,5)
-        kernel /boot/xen.gz dom0_mem=1200000 console=vga
-        module /boot/vmlinuz-2.6.12-xen0 ro root=/dev/hda6 rhgb
-        module /boot/initrd-2.6.12-xen0.img
-        module /boot/chwall_ste.bin
-
-This tells the grub boot-loader to load the binary policy, which
-the hypervisor will recognize. The hypervisor will then establish
-this binary policy during boot instead of the minimal policy that
-is hardcoded as default.
-
-If you have any trouble here, maks sure you have the access control
-framework enabled (see: install.txt).
-
+See install.txt for how to install a policy at boot time. This the
+recommended default. You can only load a policy if the currently
+enforced policy is "DEFAULT", a minimal startup policy, or if the
+currently enforced policy has the same name as the new one. Support
+for dynamic policy changes at run-time are a current working item.
 
 
 3. Labeling domains:
@@ -127,156 +87,143 @@ The chwall_ste-security_label_template.xml file includes an attribute
 "bootstrap", which is set to the label name that will be assigned to
 Dom0 (this label will be mapped to ssidref 1/1, the default for Dom0).
 
-b) Labeling User Domains:
-
-Use the script tools/security/setlabel.sh to choose a label and to
-assign labels to user domains.
-
-To show available labels for the chwall_ste policy:
-
-# /etc/xen/acm-security/scripts/setlabel.sh -l
-
-lists all available labels. For the default chwall_ste it should print
-the following:
-
-    [root@laptopxn security]# /etc/xen/acm-security/scripts/setlabel.sh -l chwall_ste
-    The following labels are available:
-    dom_SystemManagement
-    dom_HomeBanking
-    dom_Fun
-    dom_BoincClient
-    dom_StorageDomain
-    dom_NetworkDomain
-
-You need to have compiled the policy beforehand so that a .map file
-exists. Setlabel.sh uses the mapping file created throughout the
-policy translation to translate a user-friendly label string into a
-ssidref-number that is eventually used by the Xen hypervisor.
+b) Labeling User Domains (domains started from dom0 using xm commands):
 
 We distinguish two kinds of labels: a) VM labels (for domains) and RES
-Labels (for resources). We are currently working on support for
-resource labeling but will focus here on VM labels.
+Labels (for resources). We focus here on VM labels. Resource labels
+will be supported later.
 
-Setlabel.sh only prints VM labels (which we have prefixed with "dom_")
-since only those are used at this time.
+To list all available domain labels of a policy, use:
+   #xm labels example.chwall_ste.client_v1
 
-If you would like to assign the dom_HomeBanking label to one of your
-user domains (which you hopefully keep clean), look at the hypothetical
-domain configuration contained in /etc/xen/homebanking.xm:
+To list all available labels including resource labels (their support
+is current work), use:
 
-    #------HOMEBANKING---------
-    kernel = "/boot/vmlinuz-2.6.12-xenU"
+   #xm labels example.chwall_ste.client_v1 type=any
+
+The policy parameter is optional. The currently enforced hypervisor
+policy is used by default.
+
+If you would like to assign the dom_HomeBanking label to one of your user domains,
+look at the hypothetical domain configuration contained in /etc/xen/homebanking.xm:
+
+    #------FOR HOME/ONLINE BANKING---------
+    kernel = "/boot/vmlinuz-2.6.16-xen"
     ramdisk="/boot/U1_ramdisk.img"
-    memory = 65
-    name = "test34"
-    cpu = -1   # leave to Xen to pick
-    # Number of network interfaces. Default is 1.
-    nics=1
-    dhcp="dhcp"
+    memory = 164
+    name = "homebanking"
+    vif=['']
+    dhcp = "dhcp"
     #-------------------------
 
-Now we label this domain
+Now we label this domain (policy name is optional, see above):
 
-[root@laptopxn security]# /etc/xen/acm-securit/scripts/setlabel.sh /etc/xen/homebanking.xm dom_HomeBanking chwall_ste
-Mapped label 'dom_HomeBanking' to ssidref '0x00020002'.
+    # xm addlabel homebanking.xm dom_HomeBanking example.chwall_ste.client_v1
 
-The domain configuration my look now like:
+The domain configuration should look now like:
 
-    [root@laptopxn security]# cat homebanking.xm
-    #------HOMEBANKING---------
-    kernel = "/boot/vmlinuz-2.6.12-xenU"
+    # cat homebanking.xm
+    #------FOR HOME/ONLINE BANKING---------
+    kernel = "/boot/vmlinuz-2.6.16-xen"
     ramdisk="/boot/U1_ramdisk.img"
-    memory = 65
-    name = "test34"
-    cpu = -1   # leave to Xen to pick
-    # Number of network interfaces. Default is 1.
-    nics=1
-    dhcp="dhcp"
-    #-------------------------
-    #ACM_POLICY=chwall_ste-security_policy.xml
-    #ACM_LABEL=dom_HomeBanking
-    ssidref = 0x00020002
+    memory = 164
+    name = "homebanking"
+    vif=['']
+    dhcp = "dhcp"
+    access_control = ['policy=example.chwall_ste.client_v1, label=dom_HomeBanking']
 
-You can see 3 new entries, two of which are comments.  The only value
-that the hypervisor cares about is the ssidref that will reference
-those types assigned to this label. You can look them up in the
-xml label-template file for the chwall_ste policy.
+You can see the access_control line that was added to the
+configuration. This label will be translated into a local ssidref when
+a domain is created or resumed (also after migration and
+live-migration). The ssidref is a local security reference that is
+used inside the hypervisor instead of the security label for
+efficiency reasons. Since the same label can be mapped onto different
+ssidrefs in different policy translations (e.g., if the position of
+the label definition is changed in the policy file) or on different
+systems, the ssidref is re-calculated from the label each time a
+domain is instantiated or re-instantiated.
 
-This script will eventually move into the domain management and will
-be called when the domain is instantiated. For now, the setlabel
-script must be run on domains whenever the policy files change since
-the mapping between label names and ssidrefs can change in this case.
+Currently, the labels are not held in the hypervisor but only in
+.map files in the /etc/xen/acm-security/policies subdirectories. Only
+ssidrefs are known inside the hypervisr. This of course can change in
+the future.
 
 
 4. Starting a labeled domain
 ============================
 
 Now, start the domain:
-    #xm create -c homebanking.xm
+
+    #xm create homebanking.xm
+    Using config file "homebanking.xm".
+    Started domain fun
 
 
-If you label another domain configuration as dom_Fun and try to start
-it afterwards, its start will fail. Why?
+[root@941e-4 VMconfigs]# xm list --label
 
-Because the running homebanking domain has the chinese wall type
-"cw_Sensitive". The new domain dom_Fun has the chinese wall label
-"cw_Distrusted". This domain is not allowed to run simultaneously
-because of the defined conflict set
+Name         ID Mem(MiB) VCPUs State  Time(s)  Label
+fun           1       64     1 -b----     5.9  dom_HomeBanking
+Domain-0      0     1954     1 r-----  1321.4  dom_SystemManagement
+
+
+
+If you label another domain configuration as dom_Fun and if
+you try to start it afterwards, this create will fail.
+
+Why? -- Because the running 'homebanking' domain has the chinese
+wall type "cw_Sensitive". The new domain 'fun' has the chinese wall
+label "cw_Distrusted". These domains are not allowed to run simultaneously
+on the same system because of the defined conflict set
 
 			<conflictset name="Protection1">
 				<type>cw_Sensitive</type>
 				<type>cw_Distrusted</type>
 			</conflictset>
 
-(in chwall_ste-security_policy.xml), which says that only one of the
+(in client_v1-security_policy.xml), which says that only one of the
 types cw_Sensitive and cw_Distrusted can run at a time.
 
-If you save or shutdown the HomeBanking domain, you will be able to
-start the "Fun" domain. You can look into the Xen log to see if a
+If you save or shutdown the 'homebanking' domain, you will be able to
+start the 'fun' domain. You can look into the Xen log to see if a
 domain was denied to start because of the access control framework
 with the command 'xm dmesg'.
 
 It is important (and usually non-trivial) to define the labels in a
 way that the semantics of the labels are enforced and supported by the
-types and the conflict sets.
+types and the conflict sets. Usually, a workload abstraction seems
+helpful on the hypervisor level.
 
 Note: While the chinese wall policy enforcement is complete, the type
-enforcement is currently enforced in the Xen hypervisor
+enforcement is currently enforced inside the Xen hypervisor
 only. Therefore, only point-to-point sharing with regard to the type
-enforcement is currently controlled. We are working on enhancements to
-Dom0 that enforce types also for network traffic that is routed
-through Dom0 and on the enforcement of resource labeling when binding
-resources to domains (e.g., enforcing types between domains and
-hardware resources, such as disk partitions).
+enforcement is currently controlled. Enforcing the STE policy while
+sharing virtual resources is ongoing work and assumed to be complete
+by year end as well as enforcing the STE policy for network traffic
+routed through dom0.
 
 
-4. Adding your own policies
+5. Adding your own policies
 ===========================
 
-Writing your own policy (e.g. "mypolicy") requires the following:
+Writing your own policy (e.g. "mypolicy.chwall.test") requires the policy
+definition (types etc.) and the label definitions. Any policy name
+must have chwall, ste, or chwall_ste in its name. This is used by the
+configuration tool to identify existing binary policy entries in the
+boot configuration file (menu.lst, grub.con). This part should, of
+course, be consistent with policy type that is defined.
 
-a) the policy definition (types etc.) file
-b) the label template definition (labels etc.) file
-
-If your policy name is "mypolicy", you need to create a
-subdirectory mypolicy in /etc/xen/acm-security/policies.
-
-Then you create
-/etc/xen/acm-security/policies/mypolicy/mypolicy-security_policy.xml and
-/etc/xen/acm-security/policies/mypolicy/mypolicy-security_label_template.xml.
+First, you create
+/etc/xen/acm-security/policies/mypolicy/chwall/test-security_policy.xml.
 
 You need to keep to the schema as defined in
-/etc/xen/acm-security/security_policy.xsd since the translation tool
-xensec_xml2bin is written against this schema.
-
-If you keep to the security policy schema, then you can use all the
-tools described above. Refer to install.txt to install it.
+/etc/xen/acm-security/security_policy.xsd since the translation tools
+are written against this schema.
 
 You can hand-edit the xml files to create your policy or you can use the
 xensec_gen utility.
 
 
-5. Generating policy files using xensec_gen:
+6. Generating policy files using xensec_gen:
 ============================================
 
 The xensec_gen utility starts a web-server that can be used to generate the
@@ -290,25 +237,28 @@ to see the full list of options available.
 Once the xensec_gen utility is running, point a browser at the host and port
 on which the utility is running (e.g. http://localhost:7777/).  You will be
 presented with a web page that allows you to create or modify the XML policy
-files:
+file:
 
-  - The Security Policy section allows you to create or modify a policy
-    definition file
+  - The Security Policy types section allows you to create or modify
+    the policy types and conflict set definitions
 
   - The Security Policy Labeling section allows you to create or modify a
-    label template definition file
+    label definitions
 
-  Security Policy:
-  ----------------
-  The Security Policy section allows you to modify an existing policy definition
-  file or create a new policy definition file.  To modify an existing policy
-  definition, enter the full path to the existing file (the "Browse" button can
-  be used to aid in this) in the Policy File entry field.  To create a new
-  policy definition file leave the Policy File entry field blank.  At this point
-  click the "Create" button to begin modifying or creating your policy definition.
+The policy generation tool allows you to modify an existing policy
+definition or create a new policy definition file. To modify an
+existing policy definition, enter the full path to the existing file
+(the "Browse" button can be used to aid in this) in the Policy File
+entry field.  To create a new policy definition file leave the Policy
+File entry field blank.  At this point click the "Create" button to
+begin modifying or creating your policy definition.
 
-  You will then be presented with a web page that will allow you to create either
-  Simple Type Enforcement types or Chinese Wall types or both.
+  Security Policy Types Section
+  -----------------------------
+
+You will then be presented with a web page. The upper part of it will
+allow you to create either Simple Type Enforcement types or Chinese
+Wall types or both, as well as Chinese Wall conflict type sets.
 
   As an example:
     - To add a Simple Type Enforcement type:
@@ -326,32 +276,13 @@ files:
   Wall Conflict Set will allow you to add Chinese Wall types from the list of
   defined Chinese Wall types.
 
-  To create your policy definition file, click on the "Generate XML" button on
-  the top of the page.  This will present you with a dialog box to save the
-  generated XML file on your system.  The default name will be security_policy.xml
-  which you should change to follow the policy file naming conventions based on
-  the policy name that you choose to use.
-
-  To get a feel for the tool, you could use one of the example policy definition
-  files from /etc/xen/acm-security/policies as input.
-
-
   Security Policy Labeling:
   -------------------------
-  The Security Policy Labeling section allows you to modify an existing label
-  template definition file or create a new label template definition file.  To
-  modify an existing label template definition, enter the full path to the
-  existing file (the "Browse" button can be used to aid in this) in the Policy
-  Labeling File entry field.  Whether creating a new label template definition
-  file or modifying an existing one, you will need to specify the policy
-  definition file that is or will be associated with this label template
-  definition file.  At this point click the "Create" button to begin modifying
-  or creating your label template definition file.
 
-  You will then be presented with a web page that will allow you to create labels
-  for classes of virtual machines.  The input policy definition file will provide
-  the available types (Simple Type Enforcement and/or Chinese Wall) that can be
-  assigned to a virtual machine class.
+  The security policy label section of the web page allows you to create labels
+  for classes of virtual machines.  The input policy type definitions on the upper
+  part of the web page will provide the available types (Simple Type Enforcement
+  and/or Chinese Wall) that can be assigned to a virtual machine class.
 
   As an example:
     - To add a Virtual Machine class (the name entered will become the label
@@ -372,11 +303,74 @@ files:
   bootstrap domain (or Dom0 domain).  By default, the first Virtual Machine class
   created will be associated as the bootstrap domain.
 
-  To create your label template definition file, click on the "Generate XML" button
+  To save your policy definition file, click on the "Generate XML" button
   on the top of the page.  This will present you with a dialog box to save the
   generated XML file on your system.  The default name will be
-  security_label_template.xml which you should change to follow the policy file
+  security_policy.xml which you should change to follow the policy file
   naming conventions based on the policy name that you choose to use.
 
-  To get a feel for the tool, you could use one of the example policy definition
-  and label template definition files from /etc/xen/acm-security/policies as input.
+  To get a feel for the tool, you could use one of the example policy definitions
+  files from /etc/xen/acm-security/policies/example as input.
+
+
+7. Hypervisor - OS Security Interface
+=====================================
+
+We currently provide 2 hypercalls through which user operating systems
+can interact with the hypervisor Access Control Module. Examples of
+using them are under "xen_root"/tools/security/python/xensec_tools:
+
+
+I) acm_getdecision -i domainid -l labelname
+   Call this example script without arguments to show its usage
+   information.
+
+   This script enables a domain to retrieve an access control decision
+   regarding the STE policy from the hypervisor. It will be used to
+   control access to virtual/real resources in hosting domains.
+
+   The script can be provided with any combination of domain ids or
+   labelnames. Before calling into the hypervisor, labels are translated
+   into ssidrefs. The hypervisor then retrieves for any domain id
+   paramter the ssidref before deciding access.
+
+   Example:
+   #/etc/xen/acm-security/scripts/acm_getdecision -l dom_Fun
+						 -l dom_SystemManagement
+   PERMITTED
+
+   #/etc/xen/acm-security/scripts/acm_getdecision -i 0 -i 1
+   PERMITTED
+
+   #/etc/xen/acm-security/scripts/acm_getdecision -i 0 -l dom_Fun
+   PERMITTED
+
+   #/etc/xen/acm-security/scripts/acm_getdecision -i 0 -l no_label
+   ACMError: Label 'nolabel' not found.
+
+   Now, assume domain 123454 does not exist:
+   #/etc/xen/acm-security/scripts/acm_getdecision -i 123454 -l dom_Fun
+   ACMError: Cannot determine decision (Invalid parameter).
+
+   Return values:
+            * DENIED: access is denied based on the current hypervisor
+                      policy
+
+            * PERMITTED: access is permitted based on the current
+
+            * Exception ACMError: one of the parameters was illegal,
+                                  i.e. an unknown label or a
+                                  non-existing domain id
+
+I) acm_getlabel -i domainid
+   Retrieves the label of a runing domain. This function can be used
+   by domains to determine their own label or (if authorized) the label
+   other domains.
+
+   Example (result is broken up into different lines to simplify description):
+   # /etc/xen/acm-security/scripts/acm_getlabel -i 0
+  ('example.chwall.client_v1',         <--- policy describing labels etc.
+   'dom_SystemManagement',             <--- label name of the domain
+   'CHINESE WALL',                     <--- policy type
+   65537)                              <--- hypervisor internal ssidref
+

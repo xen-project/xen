@@ -277,7 +277,7 @@ endif
 
 # Hardware support
 VL_OBJS+= ide.o ne2000.o pckbd.o vga.o dma.o
-VL_OBJS+= fdc.o mc146818rtc.o serial.o i8259_stub.o i8254.o pc.o port-e9.o
+VL_OBJS+= fdc.o mc146818rtc.o serial.o i8259_stub.o pc.o port-e9.o
 VL_OBJS+= cirrus_vga.o pcnet.o
 VL_OBJS+= $(SOUND_HW) $(AUDIODRV) mixeng.o
 

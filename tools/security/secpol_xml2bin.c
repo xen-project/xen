@@ -101,22 +101,30 @@ int have_chwall = 0;
 
 /* input/output file names */
 char *policy_filename = NULL,
-    *label_filename = NULL,
-    *binary_filename = NULL, *mapping_filename = NULL,
-    *schema_filename = NULL;
+    *binary_filename = NULL,
+    *mapping_filename = NULL, *schema_filename = NULL;
+
+char *policy_reference_name = NULL;
+
+void walk_labels(xmlNode * start, xmlDocPtr doc, unsigned long state);
 
 void usage(char *prg)
 {
     printf("Usage: %s [OPTIONS] POLICYNAME\n", prg);
-    printf("POLICYNAME is the directory name within the policy directory\n");
-    printf("that contains the policy files.  The default policy directory\n");
-    printf("is '%s' (see the '-d' option below to change it)\n", POLICY_DIR);
-    printf("The policy files contained in the POLICYNAME directory must be named:\n");
+    printf
+        ("POLICYNAME is the directory name within the policy directory\n");
+    printf
+        ("that contains the policy files.  The default policy directory\n");
+    printf("is '%s' (see the '-d' option below to change it)\n",
+           POLICY_DIR);
+    printf
+        ("The policy files contained in the POLICYNAME directory must be named:\n");
     printf("\tPOLICYNAME-security_policy.xml\n");
     printf("\tPOLICYNAME-security_label_template.xml\n\n");
     printf("OPTIONS:\n");
     printf("\t-d POLICYDIR\n");
-    printf("\t\tUse POLICYDIR as the policy directory. This directory must contain\n");
+    printf
+        ("\t\tUse POLICYDIR as the policy directory. This directory must contain\n");
     printf("\t\tthe policy schema file 'security_policy.xsd'\n");
     exit(EXIT_FAILURE);
 }
@@ -147,8 +155,7 @@ struct type_entry *lookup(struct tailhead *head, char *name)
 int add_entry(struct tailhead *head, char *name, type_t mapping)
 {
     struct type_entry *e;
-    if (lookup(head, name))
-    {
+    if (lookup(head, name)) {
         printf("Error: Type >%s< defined more than once.\n", name);
         return -EFAULT;         /* already in the list */
     }
@@ -204,16 +211,14 @@ int register_type(xmlNode * cur_node, xmlDocPtr doc, unsigned long state)
 
 
     text = xmlNodeListGetString(doc, cur_node->xmlChildrenNode, 1);
-    if (!text)
-    {
+    if (!text) {
         printf("Error reading type name!\n");
         return -EFAULT;
     }
 
     switch (state) {
     case XML2BIN_stetype_S:
-        if (add_entry(&ste_head, (char *) text, max_ste_types))
-        {
+        if (add_entry(&ste_head, (char *) text, max_ste_types)) {
             xmlFree(text);
             return -EFAULT;
         }
@@ -221,8 +226,7 @@ int register_type(xmlNode * cur_node, xmlDocPtr doc, unsigned long state)
         break;
 
     case XML2BIN_chwalltype_S:
-        if (add_entry(&chwall_head, (char *) text, max_chwall_types))
-        {
+        if (add_entry(&chwall_head, (char *) text, max_chwall_types)) {
             xmlFree(text);
             return -EFAULT;
         }
@@ -232,16 +236,15 @@ int register_type(xmlNode * cur_node, xmlDocPtr doc, unsigned long state)
     case XML2BIN_conflictsettype_S:
         /* a) search the type in the chwall_type list */
         e = lookup(&chwall_head, (char *) text);
-        if (e == NULL)
-        {
+        if (e == NULL) {
             printf("CS type >%s< not a CHWALL type.\n", text);
             xmlFree(text);
             return -EFAULT;
         }
         /* b) add type entry to the current cs set */
-        if (current_conflictset_p->row[e->mapping])
-        {
-            printf("ERROR: Double entry of type >%s< in conflict set %d.\n",
+        if (current_conflictset_p->row[e->mapping]) {
+            printf
+                ("ERROR: Double entry of type >%s< in conflict set %d.\n",
                  text, current_conflictset_p->num);
             xmlFree(text);
             return -EFAULT;
@@ -262,16 +265,15 @@ void set_component_type(xmlNode * cur_node, enum policycomponent pc)
 {
     xmlChar *order;
 
-    if ((order = xmlGetProp(cur_node, (xmlChar *) PRIMARY_COMPONENT_ATTR_NAME))) {
-        if (strcmp((char *) order, PRIMARY_COMPONENT))
-        {
+    if ((order =
+         xmlGetProp(cur_node, (xmlChar *) PRIMARY_COMPONENT_ATTR_NAME))) {
+        if (strcmp((char *) order, PRIMARY_COMPONENT)) {
             printf("ERROR: Illegal attribut value >order=%s<.\n",
                    (char *) order);
             xmlFree(order);
             exit(EXIT_FAILURE);
         }
-        if (primary != NULLPOLICY)
-        {
+        if (primary != NULLPOLICY) {
             printf("ERROR: Primary Policy Component set twice!\n");
             exit(EXIT_FAILURE);
         }
@@ -285,10 +287,8 @@ void walk_policy(xmlNode * start, xmlDocPtr doc, unsigned long state)
     xmlNode *cur_node = NULL;
     int code;
 
-    for (cur_node = start; cur_node; cur_node = cur_node->next)
-    {
-        if ((code = totoken((char *) cur_node->name)) < 0)
-        {
+    for (cur_node = start; cur_node; cur_node = cur_node->next) {
+        if ((code = totoken((char *) cur_node->name)) < 0) {
             printf("Unknown token: >%s<. Aborting.\n", cur_node->name);
             exit(EXIT_FAILURE);
         }
@@ -297,13 +297,32 @@ void walk_policy(xmlNode * start, xmlDocPtr doc, unsigned long state)
         case XML2BIN_STETYPES:
         case XML2BIN_CHWALLTYPES:
         case XML2BIN_CONFLICTSETS:
+        case XML2BIN_POLICYHEADER:
             walk_policy(cur_node->children, doc, state | (1 << code));
             break;
 
+        case XML2BIN_POLICYNAME:       /* get policy reference name .... */
+            if (state != XML2BIN_PN_S) {
+                printf("ERROR: >Url< >%s< out of context.\n",
+                       (char *) xmlNodeListGetString(doc,
+                                                     cur_node->
+                                                     xmlChildrenNode, 1));
+                exit(EXIT_FAILURE);
+            }
+            policy_reference_name = (char *)
+                xmlNodeListGetString(doc, cur_node->xmlChildrenNode, 1);
+            if (!policy_reference_name) {
+                printf("ERROR: empty >policy reference name (Url)<!\n");
+                exit(EXIT_FAILURE);
+            } else
+                printf("Policy Reference name (Url): %s\n",
+                       policy_reference_name);
+            break;
+
         case XML2BIN_STE:
-            if (WRITTEN_AGAINST_ACM_STE_VERSION != ACM_STE_VERSION)
-            {
-                printf("ERROR: This program was written against another STE version.\n");
+            if (WRITTEN_AGAINST_ACM_STE_VERSION != ACM_STE_VERSION) {
+                printf
+                    ("ERROR: This program was written against another STE version.\n");
                 exit(EXIT_FAILURE);
             }
             have_ste = 1;
@@ -312,9 +331,9 @@ void walk_policy(xmlNode * start, xmlDocPtr doc, unsigned long state)
             break;
 
         case XML2BIN_CHWALL:
-            if (WRITTEN_AGAINST_ACM_CHWALL_VERSION != ACM_CHWALL_VERSION)
-            {
-                printf("ERROR: This program was written against another CHWALL version.\n");
+            if (WRITTEN_AGAINST_ACM_CHWALL_VERSION != ACM_CHWALL_VERSION) {
+                printf
+                    ("ERROR: This program was written against another CHWALL version.\n");
                 exit(EXIT_FAILURE);
             }
             have_chwall = 1;
@@ -328,8 +347,7 @@ void walk_policy(xmlNode * start, xmlDocPtr doc, unsigned long state)
             if (!current_conflictset_name)
                 current_conflictset_name = "";
 
-            if (init_next_conflictset())
-            {
+            if (init_next_conflictset()) {
                 printf
                     ("ERROR: creating new conflictset structure failed.\n");
                 exit(EXIT_FAILURE);
@@ -343,14 +361,18 @@ void walk_policy(xmlNode * start, xmlDocPtr doc, unsigned long state)
             /* type leaf */
             break;
 
+        case XML2BIN_LABELTEMPLATE:    /* handle in second pass */
         case XML2BIN_TEXT:
         case XML2BIN_COMMENT:
-        case XML2BIN_POLICYHEADER:
+        case XML2BIN_DATE:
+        case XML2BIN_REFERENCE:
+        case XML2BIN_NSURL:    /* for future use: where to find global label / type name mappings */
+        case XML2BIN_URL:      /* for future use: where to find policy */
             /* leaf - nothing to do */
             break;
 
         default:
-            printf("Unkonwn token Error (%d)\n", code);
+            printf("Unkonwn token Error (%d) in Policy\n", code);
             exit(EXIT_FAILURE);
         }
 
@@ -358,21 +380,21 @@ void walk_policy(xmlNode * start, xmlDocPtr doc, unsigned long state)
     return;
 }
 
-int create_type_mapping(xmlDocPtr doc)
+void init_type_mapping(void)
 {
-    xmlNode *root_element = xmlDocGetRootElement(doc);
-    struct type_entry *te;
-    struct ssid_entry *se;
-    int i;
-
     printf("Creating ssid mappings ...\n");
 
     /* initialize the ste and chwall type lists */
     TAILQ_INIT(&ste_head);
     TAILQ_INIT(&chwall_head);
     TAILQ_INIT(&conflictsets_head);
+}
 
-    walk_policy(root_element, doc, XML2BIN_NULL);
+void post_type_mapping(void)
+{
+    struct type_entry *te;
+    struct ssid_entry *se;
+    int i;
 
     /* determine primary/secondary policy component orders */
     if ((primary == NULLPOLICY) && have_chwall)
@@ -400,19 +422,17 @@ int create_type_mapping(xmlDocPtr doc)
     }
 
     if (!DEBUG)
-        return 0;
+        return;
 
     /* print queues */
-    if (have_ste)
-    {
+    if (have_ste) {
         printf("STE-Type queue (%s):\n",
                (primary == STE) ? "PRIMARY" : "SECONDARY");
         for (te = ste_head.tqh_first; te != NULL;
              te = te->entries.tqe_next)
             printf("name=%22s, map=%x\n", te->name, te->mapping);
     }
-    if (have_chwall)
-    {
+    if (have_chwall) {
         printf("CHWALL-Type queue (%s):\n",
                (primary == CHWALL) ? "PRIMARY" : "SECONDARY");
         for (te = chwall_head.tqh_first; te != NULL;
@@ -421,8 +441,7 @@ int create_type_mapping(xmlDocPtr doc)
 
         printf("Conflictset queue (max=%d):\n", max_conflictsets);
         for (se = conflictsets_head.tqh_first; se != NULL;
-             se = se->entries.tqe_next)
-        {
+             se = se->entries.tqe_next) {
             printf("conflictset name >%s<\n",
                    se->name ? se->name : "NONAME");
             for (i = 0; i < max_chwall_types; i++)
@@ -431,7 +450,6 @@ int create_type_mapping(xmlDocPtr doc)
             printf("\n");
         }
     }
-    return 0;
 }
 
 
@@ -554,8 +572,7 @@ int add_type(xmlNode * cur_node, xmlDocPtr doc, unsigned long state)
     struct type_entry *e;
 
     text = xmlNodeListGetString(doc, cur_node->xmlChildrenNode, 1);
-    if (!text)
-    {
+    if (!text) {
         printf("Error reading type name!\n");
         return -EFAULT;
     }
@@ -564,8 +581,7 @@ int add_type(xmlNode * cur_node, xmlDocPtr doc, unsigned long state)
     case XML2BIN_VM_STE_S:
     case XML2BIN_RES_STE_S:
         /* lookup the type mapping and include the type mapping into the array */
-        if (!(e = lookup(&ste_head, (char *) text)))
-        {
+        if (!(e = lookup(&ste_head, (char *) text))) {
             printf("ERROR: unknown VM STE type >%s<.\n", text);
             exit(EXIT_FAILURE);
         }
@@ -577,8 +593,7 @@ int add_type(xmlNode * cur_node, xmlDocPtr doc, unsigned long state)
 
     case XML2BIN_VM_CHWALL_S:
         /* lookup the type mapping and include the type mapping into the array */
-        if (!(e = lookup(&chwall_head, (char *) text)))
-        {
+        if (!(e = lookup(&chwall_head, (char *) text))) {
             printf("ERROR: unknown VM CHWALL type >%s<.\n", text);
             exit(EXIT_FAILURE);
         }
@@ -602,8 +617,9 @@ void set_bootstrap_label(xmlNode * cur_node)
 {
     xmlChar *order;
 
-    if ((order = xmlGetProp(cur_node, (xmlChar *) BOOTSTRAP_LABEL_ATTR_NAME)))
-        bootstrap_label = (char *)order;
+    if ((order =
+         xmlGetProp(cur_node, (xmlChar *) BOOTSTRAP_LABEL_ATTR_NAME)))
+        bootstrap_label = (char *) order;
     else {
         printf("ERROR: No bootstrap label defined!\n");
         exit(EXIT_FAILURE);
@@ -615,45 +631,40 @@ void walk_labels(xmlNode * start, xmlDocPtr doc, unsigned long state)
     xmlNode *cur_node = NULL;
     int code;
 
-    for (cur_node = start; cur_node; cur_node = cur_node->next)
-    {
-        if ((code = totoken((char *) cur_node->name)) < 0)
-        {
+    for (cur_node = start; cur_node; cur_node = cur_node->next) {
+        if ((code = totoken((char *) cur_node->name)) < 0) {
             printf("Unkonwn token: >%s<. Aborting.\n", cur_node->name);
             exit(EXIT_FAILURE);
         }
         switch (code) {         /* adjust state to new state */
-
         case XML2BIN_SUBJECTS:
             set_bootstrap_label(cur_node);
             /* fall through */
+        case XML2BIN_SECPOL:
+        case XML2BIN_LABELTEMPLATE:
         case XML2BIN_VM:
         case XML2BIN_RES:
-        case XML2BIN_SECTEMPLATE:
         case XML2BIN_OBJECTS:
             walk_labels(cur_node->children, doc, state | (1 << code));
             break;
 
         case XML2BIN_STETYPES:
             /* create new ssid entry to use and point current to it */
-            if (init_next_ste_ssid(state))
-            {
+            if (init_next_ste_ssid(state)) {
                 printf("ERROR: creating new ste ssid structure failed.\n");
                 exit(EXIT_FAILURE);
             }
             walk_labels(cur_node->children, doc, state | (1 << code));
-
             break;
 
         case XML2BIN_CHWALLTYPES:
             /* create new ssid entry to use and point current to it */
-            if (init_next_chwall_ssid(state))
-            {
-                printf("ERROR: creating new chwall ssid structure failed.\n");
+            if (init_next_chwall_ssid(state)) {
+                printf
+                    ("ERROR: creating new chwall ssid structure failed.\n");
                 exit(EXIT_FAILURE);
             }
             walk_labels(cur_node->children, doc, state | (1 << code));
-
             break;
 
         case XML2BIN_TYPE:
@@ -663,115 +674,66 @@ void walk_labels(xmlNode * start, xmlDocPtr doc, unsigned long state)
             break;
 
         case XML2BIN_NAME:
-            if ((state != XML2BIN_VM_S) && (state != XML2BIN_RES_S))
-            {
-                printf("ERROR: >name< out of VM/RES context.\n");
-                exit(EXIT_FAILURE);
-            }
-            current_ssid_name = (char *)
-                xmlNodeListGetString(doc, cur_node->xmlChildrenNode, 1);
-
-            if (!current_ssid_name)
-            {
-                printf("ERROR: empty >name<!\n");
+            if ((state == XML2BIN_VM_S) || (state == XML2BIN_RES_S)) {
+                current_ssid_name = (char *)
+                    xmlNodeListGetString(doc, cur_node->xmlChildrenNode,
+                                         1);
+                if (!current_ssid_name) {
+                    printf("ERROR: empty >vm/res name<!\n");
+                    exit(EXIT_FAILURE);
+                }
+            } else {
+                printf
+                    ("ERROR: >name< >%s< out of context (state = 0x%lx.\n",
+                     (char *) xmlNodeListGetString(doc,
+                                                   cur_node->
+                                                   xmlChildrenNode, 1),
+                     state);
                 exit(EXIT_FAILURE);
             }
             break;
 
         case XML2BIN_TEXT:
         case XML2BIN_COMMENT:
-        case XML2BIN_LABELHEADER:
+        case XML2BIN_POLICYHEADER:
+        case XML2BIN_STE:
+        case XML2BIN_CHWALL:
             break;
 
         default:
-            printf("Unkonwn token Error (%d)\n", code);
+            printf("Unkonwn token Error (%d) in Label Template\n", code);
             exit(EXIT_FAILURE);
         }
-
     }
     return;
-}
-
-/* this function walks through a ssid queue
- * and transforms double entries into references
- * of the first definition (we need to keep the
- * entry to map labels but we don't want double
- * ssids in the binary policy
- */
-void
-remove_doubles(struct tailhead_ssid *head,
-                        u_int32_t max_types, u_int32_t * max_ssids)
-{
-    struct ssid_entry *np, *ni;
-
-    /* walk once through the list */
-    for (np = head->tqh_first; np != NULL; np = np->entries.tqe_next)
-    {
-        /* now search from the start until np for the same entry */
-        for (ni = head->tqh_first; ni != np; ni = ni->entries.tqe_next)
-        {
-            if (ni->is_ref)
-                continue;
-            if (memcmp(np->row, ni->row, max_types))
-                continue;
-            /* found one, set np reference to ni */
-            np->is_ref = 1;
-            np->num = ni->num;
-            (*max_ssids)--;
-        }
-    }
-
-    /* now minimize the ssid numbers used (doubles introduce holes) */
-    (*max_ssids) = 0; /* reset */
-
-    for (np = head->tqh_first; np != NULL; np = np->entries.tqe_next)
-    {
-        if (np->is_ref)
-            continue;
-
-        if (np->num != (*max_ssids)) {
-                /* first reset all later references to the new max_ssid */
-                for (ni = np->entries.tqe_next; ni != NULL; ni = ni->entries.tqe_next)
-                {
-                    if (ni->num == np->num)
-                        ni->num = (*max_ssids);
-                }
-                /* now reset num */
-                np->num = (*max_ssids)++;
-        }
-        else
-            (*max_ssids)++;
-    }
 }
 
 /*
  * will go away as soon as we have non-static bootstrap ssidref for dom0
  */
 void fixup_bootstrap_label(struct tailhead_ssid *head,
-                         u_int32_t max_types, u_int32_t * max_ssids)
+                           u_int32_t max_types, u_int32_t * max_ssids)
 {
     struct ssid_entry *np;
     int i;
 
     /* should not happen if xml / xsd checks work */
-    if (!bootstrap_label)
-    {
+    if (!bootstrap_label) {
         printf("ERROR: No bootstrap label defined.\n");
         exit(EXIT_FAILURE);
     }
 
     /* search bootstrap_label */
-    for (np = head->tqh_first; np != NULL; np = np->entries.tqe_next)
-    {
-        if (!strcmp(np->name, bootstrap_label))
-        {
+    for (np = head->tqh_first; np != NULL; np = np->entries.tqe_next) {
+        if (!strcmp(np->name, bootstrap_label)) {
             break;
         }
     }
 
     if (!np) {
         /* bootstrap label not found */
-        printf("ERROR: Bootstrap label >%s< not found.\n", bootstrap_label);
+        printf("ERROR: Bootstrap label >%s< not found.\n",
+               bootstrap_label);
         exit(EXIT_FAILURE);
     }
 
@@ -781,16 +743,14 @@ void fixup_bootstrap_label(struct tailhead_ssid *head,
     TAILQ_INSERT_AFTER(head, head->tqh_first, np, entries);
 
     /* renumber the ssids (we could also just switch places with 1st element) */
-    for (np = head->tqh_first, i=0; np != NULL; np = np->entries.tqe_next, i++)
-        np->num   = i;
+    for (np = head->tqh_first, i = 0; np != NULL;
+         np = np->entries.tqe_next, i++)
+        np->num = i;
 
 }
 
-int create_ssid_mapping(xmlDocPtr doc)
+void init_label_mapping(void)
 {
-    xmlNode *root_element = xmlDocGetRootElement(doc);
-    struct ssid_entry *np;
-    int i;
 
     printf("Creating label mappings ...\n");
     /* initialize the ste and chwall type lists */
@@ -798,14 +758,16 @@ int create_ssid_mapping(xmlDocPtr doc)
     TAILQ_INIT(&ste_ssid_head);
 
     /* init with default ssids */
-    if (init_ssid_queues())
-    {
+    if (init_ssid_queues()) {
         printf("ERROR adding default ssids.\n");
         exit(EXIT_FAILURE);
     }
+}
 
-    /* now walk the template DOM tree and fill in ssids */
-    walk_labels(root_element, doc, XML2BIN_NULL);
+void post_label_mapping(void)
+{
+    struct ssid_entry *np;
+    int i;
 
     /*
      * now sort bootstrap label to the head of the list
@@ -814,30 +776,20 @@ int create_ssid_mapping(xmlDocPtr doc)
      */
     if (have_chwall)
         fixup_bootstrap_label(&chwall_ssid_head, max_chwall_types,
-                                &max_chwall_ssids);
+                              &max_chwall_ssids);
     if (have_ste)
         fixup_bootstrap_label(&ste_ssid_head, max_ste_types,
-                                &max_ste_ssids);
-
-    /* remove any double entries (insert reference instead) */
-    if (have_chwall)
-        remove_doubles(&chwall_ssid_head, max_chwall_types,
-                       &max_chwall_ssids);
-    if (have_ste)
-        remove_doubles(&ste_ssid_head, max_ste_types,
-                       &max_ste_ssids);
+                              &max_ste_ssids);
 
     if (!DEBUG)
-        return 0;
+        return;
 
     /* print queues */
-    if (have_chwall)
-    {
+    if (have_chwall) {
         printf("CHWALL SSID queue (max ssidrefs=%d):\n", max_chwall_ssids);
         np = NULL;
         for (np = chwall_ssid_head.tqh_first; np != NULL;
-             np = np->entries.tqe_next)
-        {
+             np = np->entries.tqe_next) {
             printf("SSID #%02u (Label=%s)\n", np->num, np->name);
             if (np->is_ref)
                 printf("REFERENCE");
@@ -848,13 +800,11 @@ int create_ssid_mapping(xmlDocPtr doc)
             printf("\n\n");
         }
     }
-    if (have_ste)
-    {
+    if (have_ste) {
         printf("STE SSID queue (max ssidrefs=%d):\n", max_ste_ssids);
         np = NULL;
         for (np = ste_ssid_head.tqh_first; np != NULL;
-             np = np->entries.tqe_next)
-        {
+             np = np->entries.tqe_next) {
             printf("SSID #%02u (Label=%s)\n", np->num, np->name);
             if (np->is_ref)
                 printf("REFERENCE");
@@ -865,7 +815,19 @@ int create_ssid_mapping(xmlDocPtr doc)
             printf("\n\n");
         }
     }
-    return 0;
+}
+
+void create_mappings(xmlDocPtr doc)
+{
+    xmlNode *doc_root_node = xmlDocGetRootElement(doc);
+
+    /* walk the XML policy tree and fill in types and labels */
+    init_type_mapping();
+    walk_policy(doc_root_node, doc, XML2BIN_NULL);      /* first pass: types */
+    post_type_mapping();
+    init_label_mapping();
+    walk_labels(doc_root_node, doc, XML2BIN_NULL);      /* second pass: labels */
+    post_label_mapping();
 }
 
 /***************** writing the binary policy *********************/
@@ -888,19 +850,16 @@ int write_mapping(char *filename)
     if ((file = fopen(filename, "w")) == NULL)
         return -EIO;
 
+    fprintf(file, "POLICYREFERENCENAME    %s\n", policy_reference_name);
     fprintf(file, "MAGIC                  %08x\n", ACM_MAGIC);
-    fprintf(file, "POLICY                 %s\n",
-            basename(policy_filename));
-    fprintf(file, "BINARY                 %s\n",
-            basename(binary_filename));
-    if (have_chwall)
-    {
+    fprintf(file, "POLICY FILE            %s\n", policy_filename);
+    fprintf(file, "BINARY FILE            %s\n", binary_filename);
+    if (have_chwall) {
         fprintf(file, "MAX-CHWALL-TYPES       %08x\n", max_chwall_types);
         fprintf(file, "MAX-CHWALL-SSIDS       %08x\n", max_chwall_ssids);
         fprintf(file, "MAX-CHWALL-LABELS      %08x\n", max_chwall_labels);
     }
-    if (have_ste)
-    {
+    if (have_ste) {
         fprintf(file, "MAX-STE-TYPES          %08x\n", max_ste_types);
         fprintf(file, "MAX-STE-SSIDS          %08x\n", max_ste_ssids);
         fprintf(file, "MAX-STE-LABELS         %08x\n", max_ste_labels);
@@ -939,11 +898,9 @@ int write_mapping(char *filename)
     fprintf(file, "\n");
 
     /* first labels to ssid mappings */
-    if (have_chwall)
-    {
+    if (have_chwall) {
         for (e = chwall_ssid_head.tqh_first; e != NULL;
-             e = e->entries.tqe_next)
-        {
+             e = e->entries.tqe_next) {
             fprintf(file, "LABEL->SSID %s CHWALL %-25s %8x\n",
                     (e->type ==
                      VM) ? "VM " : ((e->type == RES) ? "RES" : "ANY"),
@@ -951,11 +908,9 @@ int write_mapping(char *filename)
         }
         fprintf(file, "\n");
     }
-    if (have_ste)
-    {
+    if (have_ste) {
         for (e = ste_ssid_head.tqh_first; e != NULL;
-             e = e->entries.tqe_next)
-        {
+             e = e->entries.tqe_next) {
             fprintf(file, "LABEL->SSID %s STE    %-25s %8x\n",
                     (e->type ==
                      VM) ? "VM " : ((e->type == RES) ? "RES" : "ANY"),
@@ -965,11 +920,9 @@ int write_mapping(char *filename)
     }
 
     /* second ssid to type mappings */
-    if (have_chwall)
-    {
+    if (have_chwall) {
         for (e = chwall_ssid_head.tqh_first; e != NULL;
-             e = e->entries.tqe_next)
-        {
+             e = e->entries.tqe_next) {
             if (e->is_ref)
                 continue;
 
@@ -985,8 +938,7 @@ int write_mapping(char *filename)
     }
     if (have_ste) {
         for (e = ste_ssid_head.tqh_first; e != NULL;
-             e = e->entries.tqe_next)
-        {
+             e = e->entries.tqe_next) {
             if (e->is_ref)
                 continue;
 
@@ -1001,18 +953,15 @@ int write_mapping(char *filename)
         fprintf(file, "\n");
     }
     /* third type mappings */
-    if (have_chwall)
-    {
-        for (t = chwall_head.tqh_first; t != NULL; t = t->entries.tqe_next)
-        {
+    if (have_chwall) {
+        for (t = chwall_head.tqh_first; t != NULL; t = t->entries.tqe_next) {
             fprintf(file, "TYPE CHWALL            %-25s %8x\n",
                     t->name, t->mapping);
         }
         fprintf(file, "\n");
     }
     if (have_ste) {
-        for (t = ste_head.tqh_first; t != NULL; t = t->entries.tqe_next)
-        {
+        for (t = ste_head.tqh_first; t != NULL; t = t->entries.tqe_next) {
             fprintf(file, "TYPE STE               %-25s %8x\n",
                     t->name, t->mapping);
         }
@@ -1021,6 +970,38 @@ int write_mapping(char *filename)
     fclose(file);
     return 0;
 }
+
+
+unsigned char *write_policy_reference_binary(u_int32_t * len_pr)
+{
+    unsigned char *buf, *ptr;
+    struct acm_policy_reference_buffer *pr_header;
+    u_int32_t len;
+
+    if (policy_reference_name == NULL) {
+        printf("ERROR: No policy reference name found.\n");
+        exit(EXIT_FAILURE);
+    }
+    len = (sizeof(struct acm_policy_reference_buffer) +
+           strlen(policy_reference_name) + 1);
+    buf = malloc(len);
+    ptr = buf;
+
+    if (!buf) {
+        printf
+            ("ERROR: out of memory allocating label reference buffer.\n");
+        exit(EXIT_FAILURE);
+    }
+    pr_header = (struct acm_policy_reference_buffer *) buf;
+    pr_header->len =
+        htonl(strlen(policy_reference_name) + 1 /* strend \'0' */ );
+    ptr += sizeof(struct acm_policy_reference_buffer);
+    strcpy((char *) ptr, policy_reference_name);
+
+    (*len_pr) = len;
+    return buf;
+}
+
 
 unsigned char *write_chwall_binary(u_int32_t * len_chwall)
 {
@@ -1040,8 +1021,7 @@ unsigned char *write_chwall_binary(u_int32_t * len_chwall)
     buf = malloc(len);
     ptr = buf;
 
-    if (!buf)
-    {
+    if (!buf) {
         printf("ERROR: out of memory allocating chwall buffer.\n");
         exit(EXIT_FAILURE);
     }
@@ -1058,14 +1038,13 @@ unsigned char *write_chwall_binary(u_int32_t * len_chwall)
     chwall_header->chwall_conflict_sets_offset =
         htonl(ntohl(chwall_header->chwall_ssid_offset) +
               sizeof(domaintype_t) * max_chwall_ssids * max_chwall_types);
-    chwall_header->chwall_running_types_offset = 0;     /* not set, only retrieved */
-    chwall_header->chwall_conflict_aggregate_offset = 0;        /* not set, only retrieved */
+    chwall_header->chwall_running_types_offset = 0;
+    chwall_header->chwall_conflict_aggregate_offset = 0;
     ptr += sizeof(struct acm_chwall_policy_buffer);
 
     /* types */
     for (e = chwall_ssid_head.tqh_first; e != NULL;
-         e = e->entries.tqe_next)
-    {
+         e = e->entries.tqe_next) {
         if (e->is_ref)
             continue;
 
@@ -1077,16 +1056,14 @@ unsigned char *write_chwall_binary(u_int32_t * len_chwall)
 
     /* conflictsets */
     for (e = conflictsets_head.tqh_first; e != NULL;
-         e = e->entries.tqe_next)
-    {
+         e = e->entries.tqe_next) {
         for (i = 0; i < max_chwall_types; i++)
             ((type_t *) ptr)[i] = htons((type_t) e->row[i]);
 
         ptr += sizeof(type_t) * max_chwall_types;
     }
 
-    if ((ptr - buf) != len)
-    {
+    if ((ptr - buf) != len) {
         printf("ERROR: wrong lengths in %s.\n", __func__);
         exit(EXIT_FAILURE);
     }
@@ -1112,8 +1089,7 @@ unsigned char *write_ste_binary(u_int32_t * len_ste)
     buf = malloc(len);
     ptr = buf;
 
-    if (!buf)
-    {
+    if (!buf) {
         printf("ERROR: out of memory allocating chwall buffer.\n");
         exit(EXIT_FAILURE);
     }
@@ -1130,8 +1106,7 @@ unsigned char *write_ste_binary(u_int32_t * len_ste)
     ptr += sizeof(struct acm_ste_policy_buffer);
 
     /* types */
-    for (e = ste_ssid_head.tqh_first; e != NULL; e = e->entries.tqe_next)
-    {
+    for (e = ste_ssid_head.tqh_first; e != NULL; e = e->entries.tqe_next) {
         if (e->is_ref)
             continue;
 
@@ -1141,8 +1116,7 @@ unsigned char *write_ste_binary(u_int32_t * len_ste)
         ptr += sizeof(type_t) * max_ste_types;
     }
 
-    if ((ptr - buf) != len)
-    {
+    if ((ptr - buf) != len) {
         printf("ERROR: wrong lengths in %s.\n", __func__);
         exit(EXIT_FAILURE);
     }
@@ -1153,16 +1127,21 @@ unsigned char *write_ste_binary(u_int32_t * len_ste)
 int write_binary(char *filename)
 {
     struct acm_policy_buffer header;
-    unsigned char *ste_buffer = NULL, *chwall_buffer = NULL;
+    unsigned char *ste_buffer = NULL, *chwall_buffer =
+        NULL, *policy_reference_buffer = NULL;
     u_int32_t len;
-    int fd;
+    int fd, ret = 0;
 
-    u_int32_t len_ste = 0, len_chwall = 0;      /* length of policy components */
+    u_int32_t len_ste = 0, len_chwall = 0, len_pr = 0;  /* length of policy components */
 
     /* open binary file */
-    if ((fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR)) <= 0)
-        return -EIO;
-
+    if ((fd =
+         open(filename, O_WRONLY | O_CREAT | O_TRUNC,
+              S_IRUSR | S_IWUSR)) <= 0) {
+        ret = -EIO;
+        goto out1;
+    }
+    policy_reference_buffer = write_policy_reference_binary(&len_pr);
     ste_buffer = write_ste_binary(&len_ste);
     chwall_buffer = write_chwall_binary(&len_chwall);
 
@@ -1175,24 +1154,26 @@ int write_binary(char *filename)
         len += len_chwall;
     if (have_ste)
         len += len_ste;
+    len += len_pr;              /* policy reference is mandatory */
     header.len = htonl(len);
 
-    header.primary_buffer_offset = htonl(sizeof(struct acm_policy_buffer));
-    if (primary == CHWALL)
-    {
+    header.policy_reference_offset =
+        htonl(sizeof(struct acm_policy_buffer));
+
+    header.primary_buffer_offset =
+        htonl(sizeof(struct acm_policy_buffer) + len_pr);
+    if (primary == CHWALL) {
         header.primary_policy_code = htonl(ACM_CHINESE_WALL_POLICY);
         header.secondary_buffer_offset =
-            htonl((sizeof(struct acm_policy_buffer)) + len_chwall);
-    }
-    else if (primary == STE)
-    {
+            htonl((sizeof(struct acm_policy_buffer)) + len_pr +
+                  len_chwall);
+    } else if (primary == STE) {
         header.primary_policy_code =
             htonl(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY);
         header.secondary_buffer_offset =
-            htonl((sizeof(struct acm_policy_buffer)) + len_ste);
-    }
-    else
-    {
+            htonl((sizeof(struct acm_policy_buffer)) + len_pr +
+                  len_ste);
+    } else {
         /* null policy */
         header.primary_policy_code = htonl(ACM_NULL_POLICY);
         header.secondary_buffer_offset =
@@ -1208,36 +1189,52 @@ int write_binary(char *filename)
         header.secondary_policy_code = htonl(ACM_NULL_POLICY);
 
     if (write(fd, (void *) &header, sizeof(struct acm_policy_buffer))
-        != sizeof(struct acm_policy_buffer))
-        return -EIO;
+        != sizeof(struct acm_policy_buffer)) {
+        ret = -EIO;
+        goto out1;
+    }
 
+    /* write label reference name */
+    if (write(fd, policy_reference_buffer, len_pr) != len_pr) {
+        ret = -EIO;
+        goto out1;
+    }
     /* write primary policy component */
-    if (primary == CHWALL)
-    {
-        if (write(fd, chwall_buffer, len_chwall) != len_chwall)
-            return -EIO;
-    }
-    else if (primary == STE)
-    {
-        if (write(fd, ste_buffer, len_ste) != len_ste)
-            return -EIO;
-    } else
-        ;                     /* NULL POLICY has no policy data */
-
-    /* write secondary policy component */
-    if (secondary == CHWALL)
-    {
-        if (write(fd, chwall_buffer, len_chwall) != len_chwall)
-            return -EIO;
-    }
-    else if (secondary == STE)
-    {
-        if (write(fd, ste_buffer, len_ste) != len_ste)
-            return -EIO;
+    if (primary == CHWALL) {
+        if (write(fd, chwall_buffer, len_chwall) != len_chwall) {
+            ret = -EIO;
+            goto out1;
+        }
+    } else if (primary == STE) {
+        if (write(fd, ste_buffer, len_ste) != len_ste) {
+            ret = -EIO;
+            goto out1;
+        }
     } else;                     /* NULL POLICY has no policy data */
 
+    /* write secondary policy component */
+    if (secondary == CHWALL) {
+        if (write(fd, chwall_buffer, len_chwall) != len_chwall) {
+            ret = -EIO;
+            goto out1;
+        }
+    } else if (secondary == STE) {
+        if (write(fd, ste_buffer, len_ste) != len_ste) {
+            ret = -EIO;
+            goto out1;
+        }
+    } else;                     /* NULL POLICY has no policy data */
+
+  out1:
+    /* cleanup */
+    if (policy_reference_buffer)
+        free(policy_reference_buffer);
+    if (chwall_buffer)
+        free(chwall_buffer);
+    if (ste_buffer)
+        free(ste_buffer);
     close(fd);
-    return 0;
+    return ret;
 }
 
 int is_valid(xmlDocPtr doc)
@@ -1253,18 +1250,15 @@ int is_valid(xmlDocPtr doc)
 
 #ifdef VALIDATE_SCHEMA
     /* only tested to be available from libxml2-2.6.20 upwards */
-    if ((err = xmlSchemaIsValid(schemavalid_ctxt)) != 1)
-    {
+    if ((err = xmlSchemaIsValid(schemavalid_ctxt)) != 1) {
         printf("ERROR: Invalid schema file %s (err=%d)\n",
                schema_filename, err);
         err = -EIO;
         goto out;
-    }
-    else
+    } else
         printf("XML Schema %s valid.\n", schema_filename);
 #endif
-    if ((err = xmlSchemaValidateDoc(schemavalid_ctxt, doc)))
-    {
+    if ((err = xmlSchemaValidateDoc(schemavalid_ctxt, doc))) {
         err = -EIO;
         goto out;
     }
@@ -1277,10 +1271,9 @@ int is_valid(xmlDocPtr doc)
 
 int main(int argc, char **argv)
 {
-    xmlDocPtr labeldoc = NULL;
     xmlDocPtr policydoc = NULL;
 
-    int err = EXIT_SUCCESS;
+    int err = EXIT_FAILURE;
 
     char *file_prefix;
     int prefix_len;
@@ -1288,16 +1281,18 @@ int main(int argc, char **argv)
     int opt_char;
     char *policy_dir = POLICY_DIR;
 
-    if (ACM_POLICY_VERSION != WRITTEN_AGAINST_ACM_POLICY_VERSION)
-    {
-        printf("ERROR: This program was written against an older ACM version.\n");
+    if (ACM_POLICY_VERSION != WRITTEN_AGAINST_ACM_POLICY_VERSION) {
+        printf
+            ("ERROR: This program was written against an older ACM version.\n");
+        printf("ERROR: ACM_POLICY_VERSION=%d, WRITTEN AGAINST= %d.\n",
+               ACM_POLICY_VERSION, WRITTEN_AGAINST_ACM_POLICY_VERSION);
         exit(EXIT_FAILURE);
     }
 
     while ((opt_char = getopt(argc, argv, "d:")) != -1) {
         switch (opt_char) {
         case 'd':
-            policy_dir = malloc(strlen(optarg) + 2); // null terminator and possibly "/"
+            policy_dir = malloc(strlen(optarg) + 2);    /* null terminator and possibly "/" */
             if (!policy_dir) {
                 printf("ERROR allocating directory name memory.\n");
                 exit(EXIT_FAILURE);
@@ -1315,20 +1310,21 @@ int main(int argc, char **argv)
     if ((argc - optind) != 1)
         usage(basename(argv[0]));
 
-    prefix_len = strlen(policy_dir) +
-        strlen(argv[optind]) + 1 /* "/" */  +
-        strlen(argv[optind]) + 1 /* null terminator */ ;
+    printf("arg=%s\n", argv[optind]);
+
+    prefix_len =
+        strlen(policy_dir) + strlen(argv[optind]) +
+        1 /* null terminator */ ;
 
     file_prefix = malloc(prefix_len);
     policy_filename = malloc(prefix_len + strlen(POLICY_EXTENSION));
-    label_filename = malloc(prefix_len + strlen(LABEL_EXTENSION));
     binary_filename = malloc(prefix_len + strlen(BINARY_EXTENSION));
     mapping_filename = malloc(prefix_len + strlen(MAPPING_EXTENSION));
-    schema_filename = malloc(strlen(policy_dir) + strlen(SCHEMA_FILENAME) + 1);
+    schema_filename =
+        malloc(strlen(policy_dir) + strlen(SCHEMA_FILENAME) + 1);
 
-    if (!file_prefix || !policy_filename || !label_filename ||
-        !binary_filename || !mapping_filename || !schema_filename)
-    {
+    if (!file_prefix || !policy_filename ||
+        !binary_filename || !mapping_filename || !schema_filename) {
         printf("ERROR allocating file name memory.\n");
         goto out2;
     }
@@ -1336,85 +1332,56 @@ int main(int argc, char **argv)
     /* create input/output filenames out of prefix */
     strcpy(file_prefix, policy_dir);
     strcat(file_prefix, argv[optind]);
-    strcat(file_prefix, "/");
-    strcat(file_prefix, argv[optind]);
 
     strcpy(policy_filename, file_prefix);
-    strcpy(label_filename, file_prefix);
     strcpy(binary_filename, file_prefix);
     strcpy(mapping_filename, file_prefix);
 
     strcat(policy_filename, POLICY_EXTENSION);
-    strcat(label_filename, LABEL_EXTENSION);
     strcat(binary_filename, BINARY_EXTENSION);
     strcat(mapping_filename, MAPPING_EXTENSION);
 
     strcpy(schema_filename, policy_dir);
     strcat(schema_filename, SCHEMA_FILENAME);
 
-    labeldoc = xmlParseFile(label_filename);
-
-    if (labeldoc == NULL)
-    {
-        printf("Error: could not parse file %s.\n", argv[optind]);
-        goto out2;
-    }
-
-    printf("Validating label file %s...\n", label_filename);
-    if (!is_valid(labeldoc))
-    {
-        printf("ERROR: Failed schema-validation for file %s (err=%d)\n",
-               label_filename, err);
-        goto out1;
-    }
-
     policydoc = xmlParseFile(policy_filename);
 
-    if (policydoc == NULL)
-    {
+    if (policydoc == NULL) {
         printf("Error: could not parse file %s.\n", argv[optind]);
-        goto out1;
+        goto out;
     }
 
     printf("Validating policy file %s...\n", policy_filename);
 
-    if (!is_valid(policydoc))
-    {
+    if (!is_valid(policydoc)) {
         printf("ERROR: Failed schema-validation for file %s (err=%d)\n",
                policy_filename, err);
         goto out;
     }
 
-    /* Init queues and parse policy */
-    create_type_mapping(policydoc);
-
-    /* create ssids */
-    create_ssid_mapping(labeldoc);
+    /* create mappings */
+    create_mappings(policydoc);
 
     /* write label mapping file */
-    if (write_mapping(mapping_filename))
-    {
+    if (write_mapping(mapping_filename)) {
         printf("ERROR: writing mapping file %s.\n", mapping_filename);
         goto out;
     }
 
     /* write binary file */
-    if (write_binary(binary_filename))
-    {
+    if (write_binary(binary_filename)) {
         printf("ERROR: writing binary file %s.\n", binary_filename);
         goto out;
     }
-
+    err = EXIT_SUCCESS;
     /* write stats */
-    if (have_chwall)
-    {
+    if (have_chwall) {
         printf("Max chwall labels:  %u\n", max_chwall_labels);
         printf("Max chwall-types:   %u\n", max_chwall_types);
         printf("Max chwall-ssids:   %u\n", max_chwall_ssids);
     }
 
-    if (have_ste)
-    {
+    if (have_ste) {
         printf("Max ste labels:     %u\n", max_ste_labels);
         printf("Max ste-types:      %u\n", max_ste_types);
         printf("Max ste-ssids:      %u\n", max_ste_ssids);
@@ -1422,10 +1389,17 @@ int main(int argc, char **argv)
     /* cleanup */
   out:
     xmlFreeDoc(policydoc);
-  out1:
-    xmlFreeDoc(labeldoc);
   out2:
     xmlCleanupParser();
     return err;
 }
 
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

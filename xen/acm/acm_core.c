@@ -70,14 +70,43 @@ acm_set_endian(void)
     u32 test = 1;
     if (*((u8 *)&test) == 1)
     {
-        printk("ACM module running in LITTLE ENDIAN.\n");
+        printkd("ACM module running in LITTLE ENDIAN.\n");
         little_endian = 1;
     }
     else
     {
-        printk("ACM module running in BIG ENDIAN.\n");
+        printkd("ACM module running in BIG ENDIAN.\n");
         little_endian = 0;
     }
+}
+
+int
+acm_set_policy_reference(u8 * buf, u32 buf_size)
+{
+    struct acm_policy_reference_buffer *pr = (struct acm_policy_reference_buffer *)buf;
+    acm_bin_pol.policy_reference_name = (char *)xmalloc_array(u8, ntohl(pr->len));
+
+    if (!acm_bin_pol.policy_reference_name)
+        return -ENOMEM;
+
+    strcpy(acm_bin_pol.policy_reference_name, (char *)(buf + sizeof(struct acm_policy_reference_buffer)));
+    printk("%s: Activating policy %s\n", __func__, acm_bin_pol.policy_reference_name);
+    return 0;
+}
+
+int
+acm_dump_policy_reference(u8 *buf, u32 buf_size)
+{
+    struct acm_policy_reference_buffer *pr_buf = (struct acm_policy_reference_buffer *)buf;
+    int ret = sizeof(struct acm_policy_reference_buffer) + strlen(acm_bin_pol.policy_reference_name) + 1;
+
+    if (buf_size < ret)
+        return -EINVAL;
+
+    pr_buf->len = htonl(strlen(acm_bin_pol.policy_reference_name) + 1); /* including stringend '\0' */
+    strcpy((char *)(buf + sizeof(struct acm_policy_reference_buffer)),
+           acm_bin_pol.policy_reference_name);
+    return ret;
 }
 
 int
@@ -198,7 +227,7 @@ acm_setup(unsigned int *initrdidx,
                                 0);
             if (rc == ACM_OK)
             {
-                printf("Policy len  0x%lx, start at %p.\n",_policy_len,_policy_start);
+                printkd("Policy len  0x%lx, start at %p.\n",_policy_len,_policy_start);
                 if (i == 1)
                 {
                     if (mbi->mods_count > 2)
@@ -218,6 +247,8 @@ acm_setup(unsigned int *initrdidx,
             else
             {
                 printk("Invalid policy. %d.th module line.\n", i+1);
+                /* load default policy later */
+                acm_active_security_policy = ACM_POLICY_UNDEFINED;
             }
         } /* end if a binary policy definition, i.e., (ntohl(pol->magic) == ACM_MAGIC ) */
     }
@@ -239,10 +270,8 @@ acm_init(unsigned int *initrdidx,
 
     if (acm_active_security_policy != ACM_POLICY_UNDEFINED)
     {
-        printk("%s: Boot-Policy. Enforcing %s: Primary %s, Secondary %s.\n", __func__,
-               ACM_POLICY_NAME(acm_active_security_policy),
-               ACM_POLICY_NAME(acm_bin_pol.primary_policy_code),
-               ACM_POLICY_NAME(acm_bin_pol.secondary_policy_code));
+        printk("%s: Enforcing %s boot policy.\n", __func__,
+               ACM_POLICY_NAME(acm_active_security_policy));
         goto out;
     }
     /* else continue with the minimal hardcoded default startup policy */
@@ -254,6 +283,10 @@ acm_init(unsigned int *initrdidx,
         goto out;
     }
     acm_active_security_policy = ACM_DEFAULT_SECURITY_POLICY;
+    if (acm_active_security_policy != ACM_NULL_POLICY)
+        acm_bin_pol.policy_reference_name = "DEFAULT";
+    else
+        acm_bin_pol.policy_reference_name = "NULL";
 
  out:
     if (ret != ACM_OK)
@@ -314,7 +347,7 @@ acm_init_domain_ssid(domid_t id, ssidref_t ssidref)
         put_domain(subj);
         return ACM_INIT_SSID_ERROR;
     }
-    printk("%s: assigned domain %x the ssidref=%x.\n",
+    printkd("%s: assigned domain %x the ssidref=%x.\n",
            __func__, id, ssid->ssidref);
     put_domain(subj);
     return ACM_OK;

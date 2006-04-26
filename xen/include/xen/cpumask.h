@@ -113,6 +113,12 @@ static inline int __cpu_test_and_set(int cpu, cpumask_t *addr)
 	return test_and_set_bit(cpu, addr->bits);
 }
 
+#define cpu_test_and_clear(cpu, cpumask) __cpu_test_and_clear((cpu), &(cpumask))
+static inline int __cpu_test_and_clear(int cpu, cpumask_t *addr)
+{
+	return test_and_clear_bit(cpu, addr->bits);
+}
+
 #define cpus_and(dst, src1, src2) __cpus_and(&(dst), &(src1), &(src2), NR_CPUS)
 static inline void __cpus_and(cpumask_t *dstp, const cpumask_t *src1p,
 					const cpumask_t *src2p, int nbits)

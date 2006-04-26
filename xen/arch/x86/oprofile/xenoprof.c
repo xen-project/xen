@@ -4,6 +4,7 @@
  *            (email: xenoprof@groups.hp.com)
  */
 
+#include <xen/guest_access.h>
 #include <xen/sched.h>
 #include <public/xenoprof.h>
 
@@ -12,7 +13,7 @@
 /* Limit amount of pages used for shared buffer (per domain) */
 #define MAX_OPROF_SHARED_PAGES 32
 
-int active_domains[MAX_OPROF_DOMAINS];
+domid_t active_domains[MAX_OPROF_DOMAINS];
 int active_ready[MAX_OPROF_DOMAINS];
 unsigned int adomains;
 unsigned int activated;
@@ -84,7 +85,8 @@ static void xenoprof_reset_buf(struct domain *d)
 
 int active_index(struct domain *d)
 {
-    int i, id = d->domain_id;
+    int i;
+    domid_t id = d->domain_id;
 
     for ( i = 0; i < adomains; i++ )
         if ( active_domains[i] == id )
@@ -137,13 +139,11 @@ int reset_active(struct domain *d)
     return 0;
 }
 
-int set_active_domains(int num)
+int reset_active_list(void)
 {
-    int primary;
     int i;
     struct domain *d;
 
-    /* Reset any existing active domains from previous runs. */
     for ( i = 0; i < adomains; i++ )
     {
         if ( active_ready[i] )
@@ -157,24 +157,20 @@ int set_active_domains(int num)
         }
     }
 
-    adomains = num;
-
-    /* Add primary profiler to list of active domains if not there yet */
-    primary = active_index(primary_profiler);
-    if ( primary == -1 )
-    {
-        /* Return if there is no space left on list. */
-        if ( num >= MAX_OPROF_DOMAINS )
-            return -E2BIG;
-        active_domains[num] = primary_profiler->domain_id;
-        num++;
-    }
-
-    adomains = num;
+    adomains = 0;
     activated = 0;
 
-    for ( i = 0; i < adomains; i++ )
-        active_ready[i] = 0;
+    return 0;
+}
+
+int add_active_list (domid_t domid)
+{
+    if ( adomains >= MAX_OPROF_DOMAINS )
+        return -E2BIG;
+
+    active_domains[adomains] = domid;
+    active_ready[adomains] = 0;
+    adomains++;
 
     return 0;
 }
@@ -353,26 +349,31 @@ void free_xenoprof_pages(struct domain *d)
     d->xenoprof = NULL;
 }
 
-int xenoprof_init(int max_samples, xenoprof_init_result_t *init_result)
+int xenoprof_op_init(GUEST_HANDLE(void) arg)
 {
-    xenoprof_init_result_t result;
+    struct xenoprof_init xenoprof_init;
     int is_primary, num_events;
     struct domain *d = current->domain;
     int ret;
 
-    ret = nmi_init(&num_events, &is_primary, result.cpu_type);
-    if ( is_primary )
-        primary_profiler = current->domain;
+    if ( copy_from_guest(&xenoprof_init, arg, 1) )
+        return -EFAULT;
 
+    ret = nmi_init(&num_events, 
+                   &is_primary, 
+                   xenoprof_init.cpu_type);
     if ( ret < 0 )
         goto err;
+
+    if ( is_primary )
+        primary_profiler = current->domain;
 
     /*
      * We allocate xenoprof struct and buffers only at first time xenoprof_init
      * is called. Memory is then kept until domain is destroyed.
      */
     if ( (d->xenoprof == NULL) &&
-         ((ret = alloc_xenoprof_struct(d, max_samples)) < 0) )
+         ((ret = alloc_xenoprof_struct(d, xenoprof_init.max_samples)) < 0) )
         goto err;
 
     xenoprof_reset_buf(d);
@@ -381,13 +382,13 @@ int xenoprof_init(int max_samples, xenoprof_init_result_t *init_result)
     d->xenoprof->domain_ready = 0;
     d->xenoprof->is_primary = is_primary;
 
-    result.is_primary = is_primary;
-    result.num_events = num_events;
-    result.nbuf = d->xenoprof->nbuf;
-    result.bufsize = d->xenoprof->bufsize;
-    result.buf_maddr = __pa(d->xenoprof->rawbuf);
+    xenoprof_init.is_primary = is_primary;
+    xenoprof_init.num_events = num_events;
+    xenoprof_init.nbuf = d->xenoprof->nbuf;
+    xenoprof_init.bufsize = d->xenoprof->bufsize;
+    xenoprof_init.buf_maddr = __pa(d->xenoprof->rawbuf);
 
-    if ( copy_to_user((void *)init_result, (void *)&result, sizeof(result)) )
+    if ( copy_to_guest(arg, &xenoprof_init, 1) )
     {
         ret = -EFAULT;
         goto err;
@@ -409,7 +410,7 @@ int xenoprof_init(int max_samples, xenoprof_init_result_t *init_result)
                    || (op == XENOPROF_release_counters) \
                    || (op == XENOPROF_shutdown))
 
-int do_xenoprof_op(int op, unsigned long arg1, unsigned long arg2)
+int do_xenoprof_op(int op, GUEST_HANDLE(void) arg)
 {
     int ret = 0;
 
@@ -423,20 +424,24 @@ int do_xenoprof_op(int op, unsigned long arg1, unsigned long arg2)
     switch ( op )
     {
     case XENOPROF_init:
-        ret = xenoprof_init((int)arg1, (xenoprof_init_result_t *)arg2);
+        ret = xenoprof_op_init(arg);
         break;
 
+    case XENOPROF_reset_active_list:
+    {
+        ret = reset_active_list();
+        break;
+    }
     case XENOPROF_set_active:
+    {
+        domid_t domid;
         if ( xenoprof_state != XENOPROF_IDLE )
             return -EPERM;
-        if ( arg2 > MAX_OPROF_DOMAINS )
-            return -E2BIG;
-        if ( copy_from_user((void *)&active_domains, 
-                            (void *)arg1, arg2*sizeof(int)) )
+        if ( copy_from_guest(&domid, arg, 1) )
             return -EFAULT;
-        ret = set_active_domains(arg2);
+        ret = add_active_list(domid);
         break;
-
+    }
     case XENOPROF_reserve_counters:
         if ( xenoprof_state != XENOPROF_IDLE )
             return -EPERM;
@@ -445,15 +450,34 @@ int do_xenoprof_op(int op, unsigned long arg1, unsigned long arg2)
             xenoprof_state = XENOPROF_COUNTERS_RESERVED;
         break;
 
-    case XENOPROF_setup_events:
+    case XENOPROF_counter:
+    {
+        struct xenoprof_counter counter;
         if ( xenoprof_state != XENOPROF_COUNTERS_RESERVED )
             return -EPERM;
         if ( adomains == 0 )
-            set_active_domains(0);
+            return -EPERM;
 
-        if ( copy_from_user((void *)&counter_config, (void *)arg1, 
-                            arg2 * sizeof(struct op_counter_config)) )
+        if ( copy_from_guest(&counter, arg, 1) )
             return -EFAULT;
+
+        if ( counter.ind > OP_MAX_COUNTER )
+            return -E2BIG;
+
+        counter_config[counter.ind].count     = (unsigned long) counter.count;
+        counter_config[counter.ind].enabled   = (unsigned long) counter.enabled;
+        counter_config[counter.ind].event     = (unsigned long) counter.event;
+        counter_config[counter.ind].kernel    = (unsigned long) counter.kernel;
+        counter_config[counter.ind].user      = (unsigned long) counter.user;
+        counter_config[counter.ind].unit_mask = (unsigned long) counter.unit_mask;
+
+        ret = 0;
+        break;
+    }
+
+    case XENOPROF_setup_events:
+        if ( xenoprof_state != XENOPROF_COUNTERS_RESERVED )
+            return -EPERM;
         ret = nmi_setup_events();
         if ( !ret )
             xenoprof_state = XENOPROF_READY;
@@ -526,3 +550,13 @@ int do_xenoprof_op(int op, unsigned long arg1, unsigned long arg2)
 
     return ret;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

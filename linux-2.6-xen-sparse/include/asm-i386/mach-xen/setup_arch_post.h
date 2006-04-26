@@ -24,6 +24,7 @@ extern void nmi(void);
 
 static void __init machine_specific_arch_setup(void)
 {
+	int ret;
 	struct xen_platform_parameters pp;
 	struct callback_register event = {
 		.type = CALLBACKTYPE_event,
@@ -33,7 +34,10 @@ static void __init machine_specific_arch_setup(void)
 		.type = CALLBACKTYPE_failsafe,
 		.address = { __KERNEL_CS, (unsigned long)failsafe_callback },
 	};
-	struct xennmi_callback cb;
+	struct callback_register nmi_cb = {
+		.type = CALLBACKTYPE_nmi,
+		.address = { __KERNEL_CS, (unsigned long)nmi },
+	};
 
 	if (xen_feature(XENFEAT_auto_translated_physmap) &&
 	    xen_start_info->shared_info < xen_start_info->nr_pages) {
@@ -42,11 +46,22 @@ static void __init machine_specific_arch_setup(void)
 		memset(empty_zero_page, 0, sizeof(empty_zero_page));
 	}
 
-	HYPERVISOR_callback_op(CALLBACKOP_register, &event);
-	HYPERVISOR_callback_op(CALLBACKOP_register, &failsafe);
+	ret = HYPERVISOR_callback_op(CALLBACKOP_register, &event);
+	if (ret == 0)
+		ret = HYPERVISOR_callback_op(CALLBACKOP_register, &failsafe);
+	if (ret == -ENOSYS)
+		ret = HYPERVISOR_set_callbacks(
+			event.address.cs, event.address.eip,
+			failsafe.address.cs, failsafe.address.eip);
+	BUG_ON(ret);
 
-	cb.handler_address = (unsigned long)&nmi;
-	HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
+	ret = HYPERVISOR_callback_op(CALLBACKOP_register, &nmi_cb);
+	if (ret == -ENOSYS) {
+		struct xennmi_callback cb;
+
+		cb.handler_address = nmi_cb.address.eip;
+		HYPERVISOR_nmi_op(XENNMI_register_callback, &cb);
+	}
 
 	if (HYPERVISOR_xen_version(XENVER_platform_parameters,
 				   &pp) == 0)

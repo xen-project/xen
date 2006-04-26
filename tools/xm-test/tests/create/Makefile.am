@@ -13,7 +13,8 @@ TESTS = 01_create_basic_pos.test \
 	12_create_concurrent_stress_pos.test \
 	13_create_multinic_pos.test \
 	14_create_blockroot_pos.test \
-	15_create_smallmem_pos.test
+	15_create_smallmem_pos.test \
+	16_create_smallmem_neg.test
 
 EXTRA_DIST = $(TESTS)
 

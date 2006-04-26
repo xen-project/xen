@@ -49,6 +49,8 @@ static int tpmback_remove(struct xenbus_device *dev)
 {
 	struct backend_info *be = dev->data;
 
+	if (!be) return 0;
+
 	if (be->backend_watch.node) {
 		unregister_xenbus_watch(&be->backend_watch);
 		kfree(be->backend_watch.node);
@@ -119,37 +121,9 @@ static void backend_changed(struct xenbus_watch *watch,
 		return;
 	}
 
-	if (be->is_instance_set != 0 && be->instance != instance) {
-		printk(KERN_WARNING
-		       "tpmback: changing instance (from %ld to %ld) "
-		       "not allowed.\n",
-		       be->instance, instance);
-		return;
-	}
-
 	if (be->is_instance_set == 0) {
-		be->tpmif = tpmif_find(dev->otherend_id,
-		                       instance);
-		if (IS_ERR(be->tpmif)) {
-			err = PTR_ERR(be->tpmif);
-			be->tpmif = NULL;
-			xenbus_dev_fatal(dev,err,"creating block interface");
-			return;
-		}
 		be->instance = instance;
 		be->is_instance_set = 1;
-
-		/*
-		 * There's an unfortunate problem:
-		 * Sometimes after a suspend/resume the
-		 * state switch to XenbusStateInitialised happens
-		 * *before* I get to this point here. Since then
-		 * the connect_ring() must have failed (be->tpmif is
-		 * still NULL), I just call it here again indirectly.
-		 */
-		if (be->frontend_state == XenbusStateInitialised) {
-			frontend_changed(dev, be->frontend_state);
-		}
 	}
 }
 
@@ -186,6 +160,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		 */
 		tpmif_vtpm_close(be->instance);
 		device_unregister(&be->dev->dev);
+		tpmback_remove(dev);
 		break;
 
 	case XenbusStateUnknown:
@@ -279,6 +254,18 @@ static int connect_ring(struct backend_info *be)
 				 dev->otherend);
 		return err;
 	}
+
+	if (!be->tpmif) {
+		be->tpmif = tpmif_find(dev->otherend_id,
+		                       be->instance);
+		if (IS_ERR(be->tpmif)) {
+			err = PTR_ERR(be->tpmif);
+			be->tpmif = NULL;
+			xenbus_dev_fatal(dev,err,"creating vtpm interface");
+			return err;
+		}
+	}
+
 	if (be->tpmif != NULL) {
 		err = tpmif_map(be->tpmif, ring_ref, evtchn);
 		if (err) {

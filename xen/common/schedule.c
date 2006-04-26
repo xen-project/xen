@@ -42,7 +42,7 @@ string_param("sched", opt_sched);
 /* Various timer handlers. */
 static void s_timer_fn(void *unused);
 static void t_timer_fn(void *unused);
-static void dom_timer_fn(void *data);
+static void vcpu_timer_fn(void *data);
 static void poll_timer_fn(void *data);
 
 /* This is global for now so that private implementations can reach it */
@@ -167,7 +167,7 @@ struct vcpu *alloc_vcpu(
 void sched_add_domain(struct vcpu *v) 
 {
     /* Initialise the per-domain timers. */
-    init_timer(&v->timer, dom_timer_fn, v, v->processor);
+    init_timer(&v->timer, vcpu_timer_fn, v, v->processor);
     init_timer(&v->poll_timer, poll_timer_fn, v, v->processor);
 
     if ( is_idle_vcpu(v) )
@@ -642,12 +642,10 @@ static void t_timer_fn(void *unused)
     set_timer(&t_timer[cpu], NOW() + MILLISECS(10));
 }
 
-/* Domain timer function, sends a virtual timer interrupt to domain */
-static void dom_timer_fn(void *data)
+/* Per-VCPU timer function: sends a virtual timer interrupt. */
+static void vcpu_timer_fn(void *data)
 {
     struct vcpu *v = data;
-
-    update_vcpu_system_time(v);
     send_timer_event(v);
 }
 

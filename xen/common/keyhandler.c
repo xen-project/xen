@@ -157,9 +157,9 @@ static void dump_domains(unsigned char key)
             printk("    Notifying guest (virq %d, port %d, stat %d/%d/%d)\n",
                    VIRQ_DEBUG, v->virq_to_evtchn[VIRQ_DEBUG],
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 
-                            &d->shared_info->evtchn_pending[0]),
+                            d->shared_info->evtchn_pending),
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 
-                            &d->shared_info->evtchn_mask[0]),
+                            d->shared_info->evtchn_mask),
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG]/BITS_PER_LONG, 
                             &v->vcpu_info->evtchn_pending_sel));
             send_guest_vcpu_virq(v, VIRQ_DEBUG);

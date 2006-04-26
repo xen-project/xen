@@ -43,6 +43,7 @@
 #include <xen/domain_page.h>
 #include <xen/symbols.h>
 #include <xen/iocap.h>
+#include <xen/nmi.h>
 #include <asm/shadow.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -56,7 +57,6 @@
 #include <asm/debugger.h>
 #include <asm/msr.h>
 #include <asm/x86_emulate.h>
-#include <asm/nmi.h>
 
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
@@ -425,7 +425,8 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         clear_bit(X86_FEATURE_DE,  &d);
         clear_bit(X86_FEATURE_PSE, &d);
         clear_bit(X86_FEATURE_PGE, &d);
-        clear_bit(X86_FEATURE_SEP, &d);
+        if ( !supervisor_mode_kernel )
+            clear_bit(X86_FEATURE_SEP, &d);
         if ( !IS_PRIV(current->domain) )
             clear_bit(X86_FEATURE_MTRR, &d);
     }

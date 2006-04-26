@@ -46,7 +46,7 @@ class ConsoleError(Exception):
 
 class XmConsole:
 
-    def __init__(self, domain, historyLimit=256, historySaveAll=True, historySaveCmds=False):
+    def __init__(self, domain, historyLimit=256, historySaveAll=True, historySaveCmds=False, cLimit=131072):
         """
         Parameters:
           historyLimit:     specifies how many lines of history are maintained
@@ -65,7 +65,7 @@ class XmConsole:
         self.historySaveAll   = historySaveAll
         self.historySaveCmds  = historySaveCmds
         self.debugMe          = False
-        self.limit            = None
+        self.limit            = cLimit
 
         consoleCmd = ["/usr/sbin/xm", "xm", "console", domain]
 
