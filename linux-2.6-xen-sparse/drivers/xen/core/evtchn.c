@@ -188,7 +188,8 @@ void force_evtchn_callback(void)
 {
 	(void)HYPERVISOR_xen_version(0, NULL);
 }
-EXPORT_SYMBOL_GPL(force_evtchn_callback);
+/* Not a GPL symbol: used in ubiquitous macros, so too restrictive. */
+EXPORT_SYMBOL(force_evtchn_callback);
 
 /* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
