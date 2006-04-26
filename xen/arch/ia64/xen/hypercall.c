@@ -71,6 +71,9 @@ hypercall_t ia64_hypercall_table[] =
 	(hypercall_t)do_ni_hypercall		/*  */
 	};
 
+uint32_t nr_hypercalls =
+	sizeof(ia64_hypercall_table) / sizeof(hypercall_t);
+
 static int
 xen_hypercall (struct pt_regs *regs)
 {
