@@ -171,7 +171,7 @@ int xc_domain_getinfolist(int xc_handle,
     op.cmd = DOM0_GETDOMAININFOLIST;
     op.u.getdomaininfolist.first_domain = first_domain;
     op.u.getdomaininfolist.max_domains  = max_domains;
-    op.u.getdomaininfolist.buffer       = info;
+    SET_XEN_GUEST_HANDLE(op.u.getdomaininfolist.buffer, info);
 
     if ( xc_dom0_op(xc_handle, &op) < 0 )
         ret = -1;
@@ -195,7 +195,7 @@ int xc_vcpu_getcontext(int xc_handle,
     op.cmd = DOM0_GETVCPUCONTEXT;
     op.u.getvcpucontext.domain = (domid_t)domid;
     op.u.getvcpucontext.vcpu   = (uint16_t)vcpu;
-    op.u.getvcpucontext.ctxt   = ctxt;
+    SET_XEN_GUEST_HANDLE(op.u.getvcpucontext.ctxt, ctxt);
 
     if ( (rc = mlock(ctxt, sizeof(*ctxt))) != 0 )
         return rc;
@@ -220,7 +220,7 @@ int xc_shadow_control(int xc_handle,
     op.cmd = DOM0_SHADOW_CONTROL;
     op.u.shadow_control.domain = (domid_t)domid;
     op.u.shadow_control.op     = sop;
-    op.u.shadow_control.dirty_bitmap = dirty_bitmap;
+    SET_XEN_GUEST_HANDLE(op.u.shadow_control.dirty_bitmap, dirty_bitmap);
     op.u.shadow_control.pages  = pages;
 
     rc = do_dom0_op(xc_handle, &op);
@@ -295,12 +295,14 @@ int xc_domain_memory_increase_reservation(int xc_handle,
 {
     int err;
     struct xen_memory_reservation reservation = {
-        .extent_start = extent_start, /* may be NULL */
         .nr_extents   = nr_extents,
         .extent_order = extent_order,
         .address_bits = address_bits,
         .domid        = domid
     };
+
+    /* may be NULL */
+    SET_XEN_GUEST_HANDLE(reservation.extent_start, extent_start);
 
     err = xc_memory_op(xc_handle, XENMEM_increase_reservation, &reservation);
     if ( err == nr_extents )
@@ -326,12 +328,13 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
 {
     int err;
     struct xen_memory_reservation reservation = {
-        .extent_start = extent_start,
         .nr_extents   = nr_extents,
         .extent_order = extent_order,
         .address_bits = 0,
         .domid        = domid
     };
+
+    SET_XEN_GUEST_HANDLE(reservation.extent_start, extent_start);
 
     if ( extent_start == NULL )
     {
@@ -364,12 +367,12 @@ int xc_domain_memory_populate_physmap(int xc_handle,
 {
     int err;
     struct xen_memory_reservation reservation = {
-        .extent_start = extent_start,
         .nr_extents   = nr_extents,
         .extent_order = extent_order,
         .address_bits = address_bits,
         .domid        = domid
     };
+    SET_XEN_GUEST_HANDLE(reservation.extent_start, extent_start);
 
     err = xc_memory_op(xc_handle, XENMEM_populate_physmap, &reservation);
     if ( err == nr_extents )
@@ -395,9 +398,9 @@ int xc_domain_translate_gpfn_list(int xc_handle,
     struct xen_translate_gpfn_list op = {
         .domid        = domid,
         .nr_gpfns     = nr_gpfns,
-        .gpfn_list    = gpfn_list,
-        .mfn_list     = mfn_list
     };
+    SET_XEN_GUEST_HANDLE(op.gpfn_list, gpfn_list);
+    SET_XEN_GUEST_HANDLE(op.mfn_list, mfn_list);
 
     return xc_memory_op(xc_handle, XENMEM_translate_gpfn_list, &op);
 }
@@ -467,7 +470,7 @@ int xc_vcpu_setcontext(int xc_handle,
     op.cmd = DOM0_SETVCPUCONTEXT;
     op.u.setvcpucontext.domain = domid;
     op.u.setvcpucontext.vcpu = vcpu;
-    op.u.setvcpucontext.ctxt = ctxt;
+    SET_XEN_GUEST_HANDLE(op.u.setvcpucontext.ctxt, ctxt);
 
     if ( (rc = mlock(ctxt, sizeof(*ctxt))) != 0 )
         return rc;

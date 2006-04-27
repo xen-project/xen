@@ -399,7 +399,7 @@ gnttab_resume(void)
 
 	setup.dom        = DOMID_SELF;
 	setup.nr_frames  = NR_GRANT_FRAMES;
-	setup.frame_list = frames;
+	SET_XEN_GUEST_HANDLE(setup.frame_list, frames);
 
 	rc = HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1);
 	if (rc == -ENOSYS)

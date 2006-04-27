@@ -271,11 +271,11 @@ int xen_create_contiguous_region(
 	pte_t         *pte;
 	unsigned long  frame, i, flags;
 	struct xen_memory_reservation reservation = {
-		.extent_start = &frame,
 		.nr_extents   = 1,
 		.extent_order = 0,
 		.domid        = DOMID_SELF
 	};
+	SET_XEN_GUEST_HANDLE(reservation.extent_start, &frame);
 
 	/*
 	 * Currently an auto-translated guest will not perform I/O, nor will
@@ -357,11 +357,11 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	pte_t         *pte;
 	unsigned long  frame, i, flags;
 	struct xen_memory_reservation reservation = {
-		.extent_start = &frame,
 		.nr_extents   = 1,
 		.extent_order = 0,
 		.domid        = DOMID_SELF
 	};
+	SET_XEN_GUEST_HANDLE(reservation.extent_start, &frame);
 
 	if (xen_feature(XENFEAT_auto_translated_physmap))
 		return;

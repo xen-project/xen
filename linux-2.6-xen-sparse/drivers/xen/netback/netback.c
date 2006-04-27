@@ -105,11 +105,11 @@ static unsigned long alloc_mfn(void)
 {
 	unsigned long mfn = 0, flags;
 	struct xen_memory_reservation reservation = {
-		.extent_start = mfn_list,
 		.nr_extents   = MAX_MFN_ALLOC,
 		.extent_order = 0,
 		.domid        = DOMID_SELF
 	};
+	SET_XEN_GUEST_HANDLE(reservation.extent_start, mfn_list);
 	spin_lock_irqsave(&mfn_lock, flags);
 	if ( unlikely(alloc_index == 0) )
 		alloc_index = HYPERVISOR_memory_op(

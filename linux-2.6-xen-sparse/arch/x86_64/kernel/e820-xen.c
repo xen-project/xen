@@ -600,7 +600,7 @@ void __init e820_reserve_resources(void)
 
 	map = alloc_bootmem_low_pages(PAGE_SIZE);
 	op.cmd = DOM0_PHYSICAL_MEMORY_MAP;
-	op.u.physical_memory_map.memory_map = map;
+	SET_XEN_GUEST_HANDLE(op.u.physical_memory_map.memory_map, map);
 	op.u.physical_memory_map.max_map_entries =
 		PAGE_SIZE / sizeof(struct dom0_memory_map_entry);
 	BUG_ON(HYPERVISOR_dom0_op(&op));

@@ -70,7 +70,7 @@ static int do_microcode_update (void)
 		return err;
 
 	op.cmd = DOM0_MICROCODE;
-	op.u.microcode.data = user_buffer;
+	SET_XEN_GUEST_HANDLE(op.u.microcode.data, user_buffer);
 	op.u.microcode.length = user_buffer_size;
 	err = HYPERVISOR_dom0_op(&op);
 

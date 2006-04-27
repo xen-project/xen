@@ -9,16 +9,13 @@
 #ifndef __XEN_PUBLIC_ARCH_X86_64_H__
 #define __XEN_PUBLIC_ARCH_X86_64_H__
 
-#ifdef __XEN__
 #define __DEFINE_XEN_GUEST_HANDLE(name, type) \
     typedef struct { type *p; } __guest_handle_ ## name
-#else
-#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
-    typedef type * __guest_handle_ ## name
-#endif
 
-#define DEFINE_XEN_GUEST_HANDLE(name) __DEFINE_XEN_GUEST_HANDLE(name, name)
-#define XEN_GUEST_HANDLE(name)        __guest_handle_ ## name
+#define DEFINE_XEN_GUEST_HANDLE(name)   __DEFINE_XEN_GUEST_HANDLE(name, name)
+#define XEN_GUEST_HANDLE(name)          __guest_handle_ ## name
+#define SET_XEN_GUEST_HANDLE(hnd, val)  do { (hnd).p = val; } while (0)
+#define GET_XEN_GUEST_HANDLE(val, hnd)  do { val = (hnd).p; } while (0)
 
 #ifndef __ASSEMBLY__
 /* Guest handles for primitive C types. */

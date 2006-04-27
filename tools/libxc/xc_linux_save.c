@@ -509,16 +509,18 @@ static unsigned long *xc_map_m2p(int xc_handle,
     privcmd_mmap_entry_t *entries;
     unsigned long m2p_chunks, m2p_size;
     unsigned long *m2p;
+    unsigned long *extent_start;
     int i, rc;
 
     m2p_size   = M2P_SIZE(max_mfn);
     m2p_chunks = M2P_CHUNKS(max_mfn);
 
     xmml.max_extents = m2p_chunks;
-    if (!(xmml.extent_start = malloc(m2p_chunks * sizeof(unsigned long)))) {
+    if (!(extent_start = malloc(m2p_chunks * sizeof(unsigned long)))) {
         ERR("failed to allocate space for m2p mfns");
         return NULL;
     }
+    SET_XEN_GUEST_HANDLE(xmml.extent_start, extent_start);
 
     if (xc_memory_op(xc_handle, XENMEM_machphys_mfn_list, &xmml) ||
         (xmml.nr_extents != m2p_chunks)) {
@@ -543,7 +545,7 @@ static unsigned long *xc_map_m2p(int xc_handle,
 
     for (i=0; i < m2p_chunks; i++) {
         entries[i].va = (unsigned long)(((void *)m2p) + (i * M2P_CHUNK_SIZE));
-        entries[i].mfn = xmml.extent_start[i];
+        entries[i].mfn = extent_start[i];
         entries[i].npages = M2P_CHUNK_SIZE >> PAGE_SHIFT;
     }
 
@@ -552,7 +554,7 @@ static unsigned long *xc_map_m2p(int xc_handle,
         return NULL;
     }
 
-    free(xmml.extent_start);
+    free(extent_start);
     free(entries);
 
     return m2p;

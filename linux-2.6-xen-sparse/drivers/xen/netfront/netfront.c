@@ -607,7 +607,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	/* Tell the ballon driver what is going on. */
 	balloon_update_driver_allowance(i);
 
-	reservation.extent_start = np->rx_pfn_array;
+	SET_XEN_GUEST_HANDLE(reservation.extent_start, np->rx_pfn_array);
 	reservation.nr_extents   = i;
 	reservation.extent_order = 0;
 	reservation.address_bits = 0;

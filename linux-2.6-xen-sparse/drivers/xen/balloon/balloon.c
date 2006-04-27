@@ -195,14 +195,14 @@ static int increase_reservation(unsigned long nr_pages)
 		page = balloon_next_page(page);
 	}
 
-	reservation.extent_start = frame_list;
+	SET_XEN_GUEST_HANDLE(reservation.extent_start, frame_list);
 	reservation.nr_extents   = nr_pages;
 	rc = HYPERVISOR_memory_op(
 		XENMEM_populate_physmap, &reservation);
 	if (rc < nr_pages) {
 		int ret;
 		/* We hit the Xen hard limit: reprobe. */
-		reservation.extent_start = frame_list;
+		SET_XEN_GUEST_HANDLE(reservation.extent_start, frame_list);
 		reservation.nr_extents   = rc;
 		ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
 				&reservation);
@@ -308,7 +308,7 @@ static int decrease_reservation(unsigned long nr_pages)
 		balloon_append(pfn_to_page(pfn));
 	}
 
-	reservation.extent_start = frame_list;
+	SET_XEN_GUEST_HANDLE(reservation.extent_start, frame_list);
 	reservation.nr_extents   = nr_pages;
 	ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
 	BUG_ON(ret != nr_pages);
@@ -522,11 +522,11 @@ static int dealloc_pte_fn(
 	unsigned long mfn = pte_mfn(*pte);
 	int ret;
 	struct xen_memory_reservation reservation = {
-		.extent_start = &mfn,
 		.nr_extents   = 1,
 		.extent_order = 0,
 		.domid        = DOMID_SELF
 	};
+	SET_XEN_GUEST_HANDLE(reservation.extent_start, &mfn);
 	set_pte_at(&init_mm, addr, pte, __pte_ma(0));
 	set_phys_to_machine(__pa(addr) >> PAGE_SHIFT, INVALID_P2M_ENTRY);
 	ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
