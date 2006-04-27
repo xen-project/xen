@@ -679,7 +679,7 @@ void assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long ph
 
 	//XXX CONFIG_XEN_IA64_DOM0_VP
 	//    TODO racy
-	if ((mpaddr & GPFN_IO_MASK) == GPFN_MEM)
+	if ((physaddr & GPFN_IO_MASK) == GPFN_MEM)
 		set_gpfn_from_mfn(physaddr >> PAGE_SHIFT, mpaddr >> PAGE_SHIFT);
 	}
 	else printk("assign_domain_page: mpaddr %lx already mapped!\n",mpaddr);
