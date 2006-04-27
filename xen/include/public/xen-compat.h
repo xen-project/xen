@@ -11,7 +11,7 @@
 
 #define __XEN_LATEST_INTERFACE_VERSION__ 0x00030201
 
-#if defined(__XEN__)
+#if defined(__XEN__) || defined(__XEN_TOOLS__)
 /* Xen is built with matching headers and implements the latest interface. */
 #define __XEN_INTERFACE_VERSION__ __XEN_LATEST_INTERFACE_VERSION__
 #elif !defined(__XEN_INTERFACE_VERSION__)
