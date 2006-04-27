@@ -677,7 +677,10 @@ void alloc_qos_data(int ncpu)
     for (n=0; n<ncpu; n++) {
 
       for (i=0; i<sizeof(_new_qos_data); i=i+pgsize)
-        write(qos_fd, dummy, pgsize);
+          if ((write(qos_fd, dummy, pgsize)) != pgsize) {
+              PERROR(SHARED_MEM_FILE);
+              exit(2);
+          }
 
       new_qos = (_new_qos_data *) mmap(0, sizeof(_new_qos_data), PROT_READ|PROT_WRITE, 
 				       MAP_SHARED, qos_fd, off);
