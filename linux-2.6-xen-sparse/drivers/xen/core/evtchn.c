@@ -226,7 +226,8 @@ static int find_unbound_irq(void)
 {
 	int irq;
 
-	for (irq = 0; irq < NR_IRQS; irq++)
+	/* Only allocate from dynirq range */
+	for (irq = DYNIRQ_BASE; irq < NR_IRQS; irq++)
 		if (irq_bindcount[irq] == 0)
 			break;
 
