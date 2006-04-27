@@ -106,7 +106,7 @@ config XEN_SYSFS
 config XEN_INTERFACE_VERSION
 	hex
 	depends on XEN
-	default 0x00030101
+	default 0x00030201
 
 config SCHED_NO_NO_OMIT_FRAME_POINTER
 	bool
