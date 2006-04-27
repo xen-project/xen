@@ -52,7 +52,7 @@ typedef struct xenoprof_buf {
     uint64_t lost_samples;
     struct event_log event_log[1];
 } xenoprof_buf_t;
-DEFINE_GUEST_HANDLE(xenoprof_buf_t);
+DEFINE_XEN_GUEST_HANDLE(xenoprof_buf_t);
 
 typedef struct xenoprof_init {
     int32_t  max_samples;
@@ -63,7 +63,7 @@ typedef struct xenoprof_init {
     uint64_t buf_maddr;
     char cpu_type[XENOPROF_CPU_TYPE_SIZE];
 } xenoprof_init_t;
-DEFINE_GUEST_HANDLE(xenoprof_init_t);
+DEFINE_XEN_GUEST_HANDLE(xenoprof_init_t);
 
 typedef struct xenoprof_counter {
     uint32_t ind;
@@ -75,7 +75,7 @@ typedef struct xenoprof_counter {
     uint32_t user;
     uint64_t unit_mask;
 } xenoprof_counter_t;
-DEFINE_GUEST_HANDLE(xenoprof_counter_t);
+DEFINE_XEN_GUEST_HANDLE(xenoprof_counter_t);
 
 
 #endif /* __XEN_PUBLIC_XENOPROF_H__ */

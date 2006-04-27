@@ -349,7 +349,7 @@ void free_xenoprof_pages(struct domain *d)
     d->xenoprof = NULL;
 }
 
-int xenoprof_op_init(GUEST_HANDLE(void) arg)
+int xenoprof_op_init(XEN_GUEST_HANDLE(void) arg)
 {
     struct xenoprof_init xenoprof_init;
     int is_primary, num_events;
@@ -410,7 +410,7 @@ int xenoprof_op_init(GUEST_HANDLE(void) arg)
                    || (op == XENOPROF_release_counters) \
                    || (op == XENOPROF_shutdown))
 
-int do_xenoprof_op(int op, GUEST_HANDLE(void) arg)
+int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
 {
     int ret = 0;
 

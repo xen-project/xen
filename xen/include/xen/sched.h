@@ -316,7 +316,7 @@ void startup_cpu_idle_loop(void);
  * It contains one character per argument as follows:
  *  'i' [unsigned] {char, int}
  *  'l' [unsigned] long
- *  'h' guest handle (GUEST_HANDLE(foo))
+ *  'h' guest handle (XEN_GUEST_HANDLE(foo))
  */
 unsigned long hypercall_create_continuation(
     unsigned int op, const char *format, ...);

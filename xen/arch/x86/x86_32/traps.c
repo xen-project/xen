@@ -387,7 +387,7 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
 }
 
 
-long do_callback_op(int cmd, GUEST_HANDLE(void) arg)
+long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     long ret;
 

@@ -364,7 +364,7 @@ int arch_set_info_guest(
 
 long
 arch_do_vcpu_op(
-    int cmd, struct vcpu *v, GUEST_HANDLE(void) arg)
+    int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg)
 {
     long rc = 0;
 

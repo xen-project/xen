@@ -56,7 +56,7 @@ typedef struct physdev_op {
         physdevop_irq_t                   irq_op;
     } u;
 } physdev_op_t;
-DEFINE_GUEST_HANDLE(physdev_op_t);
+DEFINE_XEN_GUEST_HANDLE(physdev_op_t);
 
 #endif /* __XEN_PUBLIC_PHYSDEV_H__ */
 

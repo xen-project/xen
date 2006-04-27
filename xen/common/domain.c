@@ -408,7 +408,7 @@ int boot_vcpu(struct domain *d, int vcpuid, struct vcpu_guest_context *ctxt)
     return arch_set_info_guest(v, ctxt);
 }
 
-long do_vcpu_op(int cmd, int vcpuid, GUEST_HANDLE(void) arg)
+long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
 {
     struct domain *d = current->domain;
     struct vcpu *v;

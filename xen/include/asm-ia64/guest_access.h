@@ -18,10 +18,10 @@
 /* Cast a guest handle to the specified type of handle. */
 #define guest_handle_cast(hnd, type) ({         \
     type *_x = (hnd).p;                         \
-    (GUEST_HANDLE(type)) { _x };                \
+    (XEN_GUEST_HANDLE(type)) { _x };                \
 })
 
-#define guest_handle_from_ptr(ptr, type) ((GUEST_HANDLE(type)) { (type *)ptr })
+#define guest_handle_from_ptr(ptr, type) ((XEN_GUEST_HANDLE(type)) { (type *)ptr })
 
 /*
  * Copy an array of objects to guest context via a guest handle,

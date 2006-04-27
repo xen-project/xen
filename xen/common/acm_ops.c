@@ -32,7 +32,7 @@
 
 #ifndef ACM_SECURITY
 
-long do_acm_op(GUEST_HANDLE(acm_op_t) u_acm_op)
+long do_acm_op(XEN_GUEST_HANDLE(acm_op_t) u_acm_op)
 {
     return -ENOSYS;
 }
@@ -57,7 +57,7 @@ int acm_authorize_acm_ops(struct domain *d, enum acm_operation pops)
     return 0;
 }
 
-long do_acm_op(GUEST_HANDLE(acm_op_t) u_acm_op)
+long do_acm_op(XEN_GUEST_HANDLE(acm_op_t) u_acm_op)
 {
     long ret = 0;
     struct acm_op curop, *op = &curop;

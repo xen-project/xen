@@ -185,7 +185,7 @@ typedef struct mmuext_op {
         void *vcpumask;
     } arg2;
 } mmuext_op_t;
-DEFINE_GUEST_HANDLE(mmuext_op_t);
+DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 #endif
 
 /* These are passed as 'flags' to update_va_mapping. They can be ORed. */
@@ -252,7 +252,7 @@ typedef struct mmu_update {
     uint64_t ptr;       /* Machine address of PTE. */
     uint64_t val;       /* New contents of PTE.    */
 } mmu_update_t;
-DEFINE_GUEST_HANDLE(mmu_update_t);
+DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
 
 /*
  * Send an array of these to HYPERVISOR_multicall().
@@ -262,7 +262,7 @@ typedef struct multicall_entry {
     unsigned long op, result;
     unsigned long args[6];
 } multicall_entry_t;
-DEFINE_GUEST_HANDLE(multicall_entry_t);
+DEFINE_XEN_GUEST_HANDLE(multicall_entry_t);
 
 /*
  * Event channel endpoints per domain:

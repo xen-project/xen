@@ -25,7 +25,7 @@ pirq_acktype(
 /*
  * Demuxing hypercall.
  */
-long do_physdev_op(GUEST_HANDLE(physdev_op_t) uop)
+long do_physdev_op(XEN_GUEST_HANDLE(physdev_op_t) uop)
 {
     struct physdev_op op;
     long ret;

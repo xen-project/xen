@@ -189,7 +189,7 @@ void subarch_init_memory(void)
     }
 }
 
-long subarch_memory_op(int op, GUEST_HANDLE(void) arg)
+long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 {
     struct xen_machphys_mfn_list xmml;
     unsigned long mfn;

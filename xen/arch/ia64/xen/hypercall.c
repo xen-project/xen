@@ -27,7 +27,7 @@
 #include <xen/domain.h>
 
 extern unsigned long translate_domain_mpaddr(unsigned long);
-static long do_physdev_op(GUEST_HANDLE(physdev_op_t) uop);
+static long do_physdev_op(XEN_GUEST_HANDLE(physdev_op_t) uop);
 /* FIXME: where these declarations should be there ? */
 extern int dump_privop_counts_to_user(char *, int);
 extern int zero_privop_counts_to_user(char *, int);
@@ -330,7 +330,7 @@ extern int
 iosapic_guest_write(
     unsigned long physbase, unsigned int reg, u32 pval);
 
-static long do_physdev_op(GUEST_HANDLE(physdev_op_t) uop)
+static long do_physdev_op(XEN_GUEST_HANDLE(physdev_op_t) uop)
 {
     struct physdev_op op;
     long ret;

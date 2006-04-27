@@ -49,7 +49,7 @@ static void read_msr_for(void *unused)
         (void)rdmsr_safe(msr_addr, msr_lo, msr_hi);
 }
 
-long arch_do_dom0_op(struct dom0_op *op, GUEST_HANDLE(dom0_op_t) u_dom0_op)
+long arch_do_dom0_op(struct dom0_op *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
 {
     long ret = 0;
 

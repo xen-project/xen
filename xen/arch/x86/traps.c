@@ -1535,7 +1535,7 @@ void __init trap_init(void)
 }
 
 
-long do_set_trap_table(GUEST_HANDLE(trap_info_t) traps)
+long do_set_trap_table(XEN_GUEST_HANDLE(trap_info_t) traps)
 {
     struct trap_info cur;
     struct trap_info *dst = current->arch.guest_context.trap_ctxt;

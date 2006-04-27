@@ -683,7 +683,7 @@ static long evtchn_unmask(evtchn_unmask_t *unmask)
 }
 
 
-long do_event_channel_op(GUEST_HANDLE(evtchn_op_t) uop)
+long do_event_channel_op(XEN_GUEST_HANDLE(evtchn_op_t) uop)
 {
     long rc;
     struct evtchn_op op;

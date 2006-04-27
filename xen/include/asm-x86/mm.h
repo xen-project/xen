@@ -382,7 +382,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code);
 int __sync_lazy_execstate(void);
 
 /* Arch-specific portion of memory_op hypercall. */
-long arch_memory_op(int op, GUEST_HANDLE(void) arg);
-long subarch_memory_op(int op, GUEST_HANDLE(void) arg);
+long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
+long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
 
 #endif /* __ASM_X86_MM_H__ */
