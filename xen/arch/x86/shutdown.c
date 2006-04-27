@@ -218,7 +218,9 @@ void machine_restart(char * __unused)
     /* Ensure we are the boot CPU. */
     if ( GET_APIC_ID(apic_read(APIC_ID)) != boot_cpu_physical_apicid )
     {
-        smp_call_function((void *)machine_restart, NULL, 1, 0);
+        /* Send IPI to the boot CPU (logical cpu 0). */
+        on_selected_cpus(cpumask_of_cpu(0), (void *)machine_restart,
+                         NULL, 1, 0);
         for ( ; ; )
             safe_halt();
     }
