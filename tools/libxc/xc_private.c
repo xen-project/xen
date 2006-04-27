@@ -226,7 +226,7 @@ int xc_memory_op(int xc_handle,
             PERROR("Could not mlock");
             goto out1;
         }
-        GET_XEN_GUEST_HANDLE(extent_start, reservation->extent_start);
+        GET_XEN_GUEST_HANDLE(extent_start, xmml->extent_start);
         if ( mlock(extent_start,
                    xmml->max_extents * sizeof(unsigned long)) != 0 )
         {
@@ -281,7 +281,7 @@ int xc_memory_op(int xc_handle,
         break;
     case XENMEM_machphys_mfn_list:
         safe_munlock(xmml, sizeof(*xmml));
-        GET_XEN_GUEST_HANDLE(extent_start, reservation->extent_start);
+        GET_XEN_GUEST_HANDLE(extent_start, xmml->extent_start);
         safe_munlock(extent_start,
                      xmml->max_extents * sizeof(unsigned long));
         break;
