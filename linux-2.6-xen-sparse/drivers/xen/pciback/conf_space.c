@@ -17,10 +17,10 @@
 static int permissive = 0;
 module_param(permissive, bool, 0644);
 
-#define DEFINE_PCI_CONFIG(op,size,type) 					\
-int pciback_##op##_config_##size 							\
+#define DEFINE_PCI_CONFIG(op,size,type) 			\
+int pciback_##op##_config_##size 				\
 (struct pci_dev *dev, int offset, type value, void *data)	\
-{															\
+{								\
 	return pci_##op##_config_##size (dev, offset, value);	\
 }
 
@@ -175,8 +175,8 @@ int pciback_config_read(struct pci_dev *dev, int offset, int size,
 
 		req_start = offset;
 		req_end = offset + size;
-		field_start = field->offset;
-		field_end = field->offset + field->size;
+		field_start = OFFSET(cfg_entry);
+		field_end = OFFSET(cfg_entry) + field->size;
 
 		if ((req_start >= field_start && req_start < field_end)
 		    || (req_end > field_start && req_end <= field_end)) {
@@ -222,8 +222,8 @@ int pciback_config_write(struct pci_dev *dev, int offset, int size, u32 value)
 
 		req_start = offset;
 		req_end = offset + size;
-		field_start = field->offset;
-		field_end = field->offset + field->size;
+		field_start = OFFSET(cfg_entry);
+		field_end = OFFSET(cfg_entry) + field->size;
 
 		if ((req_start >= field_start && req_start < field_end)
 		    || (req_end > field_start && req_end <= field_end)) {
@@ -239,46 +239,83 @@ int pciback_config_write(struct pci_dev *dev, int offset, int size, u32 value)
 
 			err = conf_space_write(dev, cfg_entry, field_start,
 					       tmp_val);
+
+			/* handled is set true here, but not every byte
+			 * may have been written! Properly detecting if
+			 * every byte is handled is unnecessary as the
+			 * flag is used to detect devices that need
+			 * special helpers to work correctly.
+			 */
 			handled = 1;
 		}
 	}
 
-	if (!handled && !err && permissive) {
-		switch (size) {
-		case 1:
-			err = pci_write_config_byte(dev, offset, (u8)value);
-			break;
-		case 2:
-			err = pci_write_config_word(dev, offset, (u16)value);
-			break;
-		case 4:
-			err = pci_write_config_dword(dev, offset, (u32)value);
-			break;
+	if (!handled && !err) {
+		/* By default, anything not specificially handled above is
+		 * read-only. The permissive flag changes this behavior so
+		 * that anything not specifically handled above is writable.
+		 * This means that some fields may still be read-only because
+		 * they have entries in the config_field list that intercept
+		 * the write and do nothing. */
+		if (permissive) {
+			switch (size) {
+			case 1:
+				err = pci_write_config_byte(dev, offset,
+							    (u8)value);
+				break;
+			case 2:
+				err = pci_write_config_word(dev, offset,
+							    (u16)value);
+				break;
+			case 4:
+				err = pci_write_config_dword(dev, offset,
+							     (u32)value);
+				break;
+			}
+		} else if (!dev_data->warned_on_write) {
+			dev_data->warned_on_write = 1;
+			dev_warn(&dev->dev, "Driver wrote to a read-only "
+				 "configuration space field!\n");
+			dev_warn(&dev->dev, "Write at offset 0x%x size %d\n",
+				offset, size);
+			dev_warn(&dev->dev, "This may be harmless, but if\n");
+			dev_warn(&dev->dev, "you have problems with your "
+				 "device:\n");
+			dev_warn(&dev->dev, "1) see the permissive "
+				 "attribute in sysfs.\n");
+			dev_warn(&dev->dev, "2) report problems to the "
+				 "xen-devel mailing list along\n");
+			dev_warn(&dev->dev, "   with details of your device "
+				 "obtained from lspci.\n");
 		}
 	}
 
 	return pcibios_err_to_errno(err);
 }
 
-void pciback_config_reset(struct pci_dev *dev)
+void pciback_config_reset_dev(struct pci_dev *dev)
 {
 	struct pciback_dev_data *dev_data = pci_get_drvdata(dev);
 	struct config_field_entry *cfg_entry;
 	struct config_field *field;
 
+	dev_dbg(&dev->dev, "resetting virtual configuration space\n");
+
 	list_for_each_entry(cfg_entry, &dev_data->config_fields, list) {
 		field = cfg_entry->field;
 
 		if (field->reset)
-			field->reset(dev, field->offset, cfg_entry->data);
+			field->reset(dev, OFFSET(cfg_entry), cfg_entry->data);
 	}
 }
 
-void pciback_config_free(struct pci_dev *dev)
+void pciback_config_free_dev(struct pci_dev *dev)
 {
 	struct pciback_dev_data *dev_data = pci_get_drvdata(dev);
 	struct config_field_entry *cfg_entry, *t;
 	struct config_field *field;
+
+	dev_dbg(&dev->dev, "free-ing virtual configuration space fields\n");
 
 	list_for_each_entry_safe(cfg_entry, t, &dev_data->config_fields, list) {
 		list_del(&cfg_entry->list);
@@ -286,13 +323,15 @@ void pciback_config_free(struct pci_dev *dev)
 		field = cfg_entry->field;
 
 		if (field->release)
-			field->release(dev, field->offset, cfg_entry->data);
+			field->release(dev, OFFSET(cfg_entry), cfg_entry->data);
 
 		kfree(cfg_entry);
 	}
 }
 
-int pciback_config_add_field(struct pci_dev *dev, struct config_field *field)
+int pciback_config_add_field_offset(struct pci_dev *dev,
+				    struct config_field *field,
+				    unsigned int offset)
 {
 	int err = 0;
 	struct pciback_dev_data *dev_data = pci_get_drvdata(dev);
@@ -307,9 +346,10 @@ int pciback_config_add_field(struct pci_dev *dev, struct config_field *field)
 
 	cfg_entry->data = NULL;
 	cfg_entry->field = field;
+	cfg_entry->base_offset = offset;
 
 	if (field->init) {
-		tmp = field->init(dev, field->offset);
+		tmp = field->init(dev, OFFSET(cfg_entry));
 
 		if (IS_ERR(tmp)) {
 			err = PTR_ERR(tmp);
@@ -319,6 +359,8 @@ int pciback_config_add_field(struct pci_dev *dev, struct config_field *field)
 		cfg_entry->data = tmp;
 	}
 
+	dev_dbg(&dev->dev, "added config field at offset 0x%02x\n",
+		OFFSET(cfg_entry));
 	list_add_tail(&cfg_entry->list, &dev_data->config_fields);
 
       out:
@@ -332,14 +374,30 @@ int pciback_config_add_field(struct pci_dev *dev, struct config_field *field)
  * certain registers (like the base address registers (BARs) so that we can
  * keep the client from manipulating them directly.
  */
-int pciback_config_init(struct pci_dev *dev)
+int pciback_config_init_dev(struct pci_dev *dev)
 {
 	int err = 0;
 	struct pciback_dev_data *dev_data = pci_get_drvdata(dev);
 
+	dev_dbg(&dev->dev, "initializing virtual configuration space\n");
+
 	INIT_LIST_HEAD(&dev_data->config_fields);
 
 	err = pciback_config_header_add_fields(dev);
+	if (err)
+		goto out;
+
+	err = pciback_config_capability_add_fields(dev);
+
+      out:
+	return err;
+}
+
+int pciback_config_init(void)
+{
+	int err;
+
+	err = pciback_config_capability_init();
 
 	return err;
 }

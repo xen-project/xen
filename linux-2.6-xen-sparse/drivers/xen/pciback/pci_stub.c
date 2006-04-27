@@ -76,7 +76,7 @@ static void pcistub_device_release(struct kref *kref)
 
 	/* Clean-up the device */
 	pciback_reset_device(psdev->dev);
-	pciback_config_free(psdev->dev);
+	pciback_config_free_dev(psdev->dev);
 	kfree(pci_get_drvdata(psdev->dev));
 	pci_set_drvdata(psdev->dev, NULL);
 
@@ -180,7 +180,7 @@ void pcistub_put_pci_dev(struct pci_dev *dev)
 	 * (so it's ready for the next domain)
 	 */
 	pciback_reset_device(found_psdev->dev);
-	pciback_config_reset(found_psdev->dev);
+	pciback_config_reset_dev(found_psdev->dev);
 
 	spin_lock_irqsave(&found_psdev->lock, flags);
 	found_psdev->pdev = NULL;
@@ -235,7 +235,7 @@ static int __devinit pcistub_init_device(struct pci_dev *dev)
 	 * would need to be called somewhere to free the memory allocated
 	 * here and then to call kfree(pci_get_drvdata(psdev->dev)).
 	 */
-	dev_data = kmalloc(sizeof(*dev_data), GFP_ATOMIC);
+	dev_data = kzalloc(sizeof(*dev_data), GFP_ATOMIC);
 	if (!dev_data) {
 		err = -ENOMEM;
 		goto out;
@@ -243,7 +243,7 @@ static int __devinit pcistub_init_device(struct pci_dev *dev)
 	pci_set_drvdata(dev, dev_data);
 
 	dev_dbg(&dev->dev, "initializing config\n");
-	err = pciback_config_init(dev);
+	err = pciback_config_init_dev(dev);
 	if (err)
 		goto out;
 
@@ -268,7 +268,7 @@ static int __devinit pcistub_init_device(struct pci_dev *dev)
 	return 0;
 
       config_release:
-	pciback_config_free(dev);
+	pciback_config_free_dev(dev);
 
       out:
 	pci_set_drvdata(dev, NULL);
@@ -324,40 +324,31 @@ static int __devinit pcistub_seize(struct pci_dev *dev)
 {
 	struct pcistub_device *psdev;
 	unsigned long flags;
-	int initialize_devices_copy;
 	int err = 0;
 
 	psdev = pcistub_device_alloc(dev);
 	if (!psdev)
 		return -ENOMEM;
 
-	/* initialize_devices has to be accessed under a spin lock. But since
-	 * it can only change from 0 -> 1, if it's already 1, we don't have to
-	 * worry about it changing. That's why we can take a *copy* of
-	 * initialize_devices and wait till we're outside of the lock to
-	 * check if it's 1 (don't ever check if it's 0 outside of the lock)
-	 */
 	spin_lock_irqsave(&pcistub_devices_lock, flags);
 
-	initialize_devices_copy = initialize_devices;
+	if (initialize_devices) {
+		spin_unlock_irqrestore(&pcistub_devices_lock, flags);
 
-	if (!initialize_devices_copy) {
+		/* don't want irqs disabled when calling pcistub_init_device */
+		err = pcistub_init_device(psdev->dev);
+
+		spin_lock_irqsave(&pcistub_devices_lock, flags);
+
+		if (!err)
+			list_add(&psdev->dev_list, &pcistub_devices);
+	} else {
 		dev_dbg(&dev->dev, "deferring initialization\n");
 		list_add(&psdev->dev_list, &seized_devices);
 	}
 
 	spin_unlock_irqrestore(&pcistub_devices_lock, flags);
 
-	if (initialize_devices_copy) {
-		/* don't want irqs disabled when calling pcistub_init_device */
-		err = pcistub_init_device(psdev->dev);
-		if (err)
-			goto out;
-
-		list_add(&psdev->dev_list, &pcistub_devices);
-	}
-
-      out:
 	if (err)
 		pcistub_device_put(psdev);
 
@@ -663,9 +654,13 @@ fs_initcall(pcistub_init);
 
 static int __init pciback_init(void)
 {
-#ifdef MODULE
 	int err;
 
+	err = pciback_config_init();
+	if (err)
+		return err;
+
+#ifdef MODULE
 	err = pcistub_init();
 	if (err < 0)
 		return err;

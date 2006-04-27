@@ -36,8 +36,6 @@ void pciback_reset_device(struct pci_dev *dev)
 			dev->is_busmaster = 0;
 		}
 	}
-
-	pciback_config_reset(dev);
 }
 
 static inline void test_and_schedule_op(struct pciback_device *pdev)

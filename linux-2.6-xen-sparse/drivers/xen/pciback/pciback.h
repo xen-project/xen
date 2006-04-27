@@ -44,6 +44,7 @@ struct pciback_device {
 
 struct pciback_dev_data {
 	struct list_head config_fields;
+	int warned_on_write;
 };
 
 /* Get/Put PCI Devices that are hidden from the PCI Backend Domain */
@@ -58,9 +59,10 @@ void pcistub_put_pci_dev(struct pci_dev *dev);
 void pciback_reset_device(struct pci_dev *pdev);
 
 /* Access a virtual configuration space for a PCI device */
-int pciback_config_init(struct pci_dev *dev);
-void pciback_config_reset(struct pci_dev *dev);
-void pciback_config_free(struct pci_dev *dev);
+int pciback_config_init(void);
+int pciback_config_init_dev(struct pci_dev *dev);
+void pciback_config_reset_dev(struct pci_dev *dev);
+void pciback_config_free_dev(struct pci_dev *dev);
 int pciback_config_read(struct pci_dev *dev, int offset, int size,
 			u32 * ret_val);
 int pciback_config_write(struct pci_dev *dev, int offset, int size, u32 value);
