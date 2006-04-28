@@ -26,6 +26,12 @@ def checkXmLongList(domain):
     else:
         return False
 
+def checkBlockState(domain):
+    s, o = traceCommand("xm block-list %s | awk '{print $4}' |tail -n 1" % domain.getName())
+    if s != 0:
+        FAIL("block-list failed")
+    return int(o)
+
 if ENABLE_HVM_SUPPORT:
     SKIP("Block-detach not supported for HVM domains")
 
@@ -46,7 +52,11 @@ if not checkBlockList(domain):
 if not checkXmLongList(domain):
     FAIL("xm long list does not show that hda1 was attached")
 
-time.sleep(2)
+for i in range(1, 10):
+    time.sleep(1)
+    state = checkBlockState(domain)
+    if state == 4:
+        break
 
 s, o = traceCommand("xm block-detach %s hda1" % domain.getName())
 if s != 0:
