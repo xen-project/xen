@@ -1234,6 +1234,11 @@ class XendDomainInfo:
                   self.domid,
                   self.info['cpu_weight'])
 
+        # if we have a boot loader but no image, then we need to set things
+        # up by running the boot loader non-interactively
+        if self.infoIsSet('bootloader') and not self.infoIsSet('image'):
+            self.configure_bootloader()
+
         if not self.infoIsSet('image'):
             raise VmError('Missing image in configuration')
 
@@ -1613,23 +1618,25 @@ class XendDomainInfo:
 
 
     def configure_bootloader(self):
+        """Run the bootloader if we're configured to do so."""
         if not self.info['bootloader']:
             return
-        # if we're restarting with a bootloader, we need to run it
         blcfg = None
-        config = self.sxpr()
-        # FIXME: this assumes that we want to use the first disk
-        for dev in sxp.children(config, "device"):
-            disk = sxp.child(dev, "vbd")
+        # FIXME: this assumes that we want to use the first disk device
+        for (n,c) in self.info['device']:
+            if not n or not c or n != "vbd":
+                continue
+            disk = sxp.child_value(c, "uname")
             if disk is None:
                 continue
-            fn = blkdev_uname_to_file(sxp.child_value(disk, "uname"))
+            fn = blkdev_uname_to_file(disk)
             blcfg = bootloader(self.info['bootloader'], fn, 1)
+            break
         if blcfg is None:
             msg = "Had a bootloader specified, but can't find disk"
             log.error(msg)
             raise VmError(msg)
-        self.info['image'] = sxp.to_string(blcfg)
+        self.info['image'] = blcfg
 
 
     def send_sysrq(self, key):
