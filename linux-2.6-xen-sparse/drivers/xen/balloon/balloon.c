@@ -216,7 +216,8 @@ static int increase_reservation(unsigned long nr_pages)
 		BUG_ON(page == NULL);
 
 		pfn = page_to_pfn(page);
-		BUG_ON(phys_to_machine_mapping_valid(pfn));
+		BUG_ON(!xen_feature(XENFEAT_auto_translated_physmap) &&
+		       phys_to_machine_mapping_valid(pfn));
 
 		/* Update P->M and M->P tables. */
 		set_phys_to_machine(pfn, frame_list[i]);
