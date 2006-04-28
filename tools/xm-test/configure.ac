@@ -1,7 +1,7 @@
 # xm-test configure.ac input script
 
 # Basic header information
-AC_INIT([xm-test], [0.7.0])
+AC_INIT([xm-test], [0.8.0])
 AM_INIT_AUTOMAKE([1.7 foreign])
 
 # Check for dependencies
