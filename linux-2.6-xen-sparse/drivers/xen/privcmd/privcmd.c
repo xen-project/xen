@@ -159,12 +159,14 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	break;
 
 	case IOCTL_PRIVCMD_MMAPBATCH: {
+#ifndef __ia64__
 		mmu_update_t u;
+		uint64_t ptep;
+#endif
 		privcmd_mmapbatch_t m;
 		struct vm_area_struct *vma = NULL;
 		unsigned long __user *p;
 		unsigned long addr, mfn; 
-		uint64_t ptep;
 		int i;
 
 		if (copy_from_user(&m, udata, sizeof(m))) {
@@ -199,11 +201,9 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 			if (get_user(mfn, p))
 				return -EFAULT;
 #ifdef __ia64__
-			ret = remap_pfn_range(vma,
-					      addr&PAGE_MASK,
-					      mfn,
-					      1<<PAGE_SHIFT,
-					      vma->vm_page_prot);
+			ret = direct_remap_pfn_range(vma, addr & PAGE_MASK,
+						     mfn, 1 << PAGE_SHIFT,
+						     vma->vm_page_prot, m.dom);
 			if (ret < 0)
 			    goto batch_err;
 #else
