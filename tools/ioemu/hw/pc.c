@@ -166,14 +166,20 @@ static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_
     switch(boot_device) {
     case 'a':
     case 'b':
-        rtc_set_memory(s, 0x3d, 0x01); /* floppy boot */
+        //rtc_set_memory(s, 0x3d, 0x01); /* floppy boot */
+        rtc_set_memory(s, 0x3d, 0x21);   /* a->c->d */
+        rtc_set_memory(s, 0x38, 0x30);
         break;
     default:
     case 'c':
-        rtc_set_memory(s, 0x3d, 0x02); /* hard drive boot */
+        //rtc_set_memory(s, 0x3d, 0x02); /* hard drive boot */
+        rtc_set_memory(s, 0x3d, 0x32);   /* c->d->a */
+        rtc_set_memory(s, 0x38, 0x10);
         break;
     case 'd':
-        rtc_set_memory(s, 0x3d, 0x03); /* CD-ROM boot */
+        //rtc_set_memory(s, 0x3d, 0x03); /* CD-ROM boot */
+        rtc_set_memory(s, 0x3d, 0x23);   /* d->c->a */
+        rtc_set_memory(s, 0x38, 0x10);
         break;
     }
 
