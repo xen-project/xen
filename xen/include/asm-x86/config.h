@@ -66,7 +66,7 @@
 #define barrier() __asm__ __volatile__("": : :"memory")
 
 /* A power-of-two value greater than or equal to number of hypercalls. */
-#define NR_hypercalls 32
+#define NR_hypercalls 64
 
 #if NR_hypercalls & (NR_hypercalls - 1)
 #error "NR_hypercalls must be a power-of-two value"

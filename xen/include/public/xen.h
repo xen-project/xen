@@ -63,6 +63,16 @@
 #define __HYPERVISOR_callback_op          30
 #define __HYPERVISOR_xenoprof_op          31
 
+/* Architecture-specific hypercall definitions. */
+#define __HYPERVISOR_arch_0               48
+#define __HYPERVISOR_arch_1               49
+#define __HYPERVISOR_arch_2               50
+#define __HYPERVISOR_arch_3               51
+#define __HYPERVISOR_arch_4               52
+#define __HYPERVISOR_arch_5               53
+#define __HYPERVISOR_arch_6               54
+#define __HYPERVISOR_arch_7               55
+
 /* 
  * VIRTUAL INTERRUPTS
  * 
