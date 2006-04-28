@@ -15,7 +15,7 @@ BR2_i386=y
 # BR2_sh is not set
 # BR2_sparc is not set
 # BR2_x86_64 is not set
-BR2_x86_i386=y
+BR2_x86_i386=y         
 # BR2_x86_i486 is not set
 # BR2_x86_i586 is not set
 # BR2_x86_i686 is not set
@@ -69,34 +69,29 @@ BR2_PTHREADS_OLD=y
 # BR2_BINUTILS_VERSION_2_15 is not set
 # BR2_BINUTILS_VERSION_2_15_94_0_2_2 is not set
 # BR2_BINUTILS_VERSION_2_15_97 is not set
-# BR2_BINUTILS_VERSION_2_16_1 is not set
+BR2_BINUTILS_VERSION_2_16_1=y
 # BR2_BINUTILS_VERSION_2_16_90_0_3 is not set
 # BR2_BINUTILS_VERSION_2_16_91_0_3 is not set
 # BR2_BINUTILS_VERSION_2_16_91_0_4 is not set
 # BR2_BINUTILS_VERSION_2_16_91_0_5 is not set
 # BR2_BINUTILS_VERSION_2_16_91_0_6 is not set
-BR2_BINUTILS_VERSION_2_16_91_0_7=y
-BR2_BINUTILS_VERSION="2.16.91.0.7"
-BR2_EXTRA_BINUTILS_CONFIG_OPTIONS=""
+BR2_BINUTILS_VERSION="2.16.1"
 
 #
 # Gcc Options
 #
 # BR2_GCC_VERSION_3_3_5 is not set
 # BR2_GCC_VERSION_3_3_6 is not set
-# BR2_GCC_VERSION_3_4_2 is not set
+BR2_GCC_VERSION_3_4_2=y
 # BR2_GCC_VERSION_3_4_3 is not set
 # BR2_GCC_VERSION_3_4_4 is not set
 # BR2_GCC_VERSION_3_4_5 is not set
-BR2_GCC_VERSION_3_4_6=y
 # BR2_GCC_VERSION_4_0_0 is not set
 # BR2_GCC_VERSION_4_0_1 is not set
 # BR2_GCC_VERSION_4_0_2 is not set
-# BR2_GCC_VERSION_4_0_3 is not set
 # BR2_GCC_VERSION_4_1_0 is not set
-# BR2_GCC_VERSION_4_2 is not set
-# BR2_GCC_IS_SNAP is not set
-BR2_GCC_VERSION="3.4.6"
+# BR2_GCC_VERSION_4_2_0 is not set
+BR2_GCC_VERSION="3.4.2"
 # BR2_GCC_USE_SJLJ_EXCEPTIONS is not set
 BR2_EXTRA_GCC_CONFIG_OPTIONS=""
 # BR2_INSTALL_LIBSTDCPP is not set
@@ -112,7 +107,7 @@ BR2_CCACHE=y
 #
 # BR2_PACKAGE_GDB is not set
 # BR2_PACKAGE_GDB_SERVER is not set
-# BR2_PACKAGE_GDB_HOST is not set
+# BR2_PACKAGE_GDB_CLIENT is not set
 
 #
 # elf2flt
@@ -181,7 +176,6 @@ BR2_PACKAGE_BUSYBOX_CONFIG="package/busybox/busybox.config"
 # BR2_PACKAGE_DM is not set
 # BR2_PACKAGE_DNSMASQ is not set
 # BR2_PACKAGE_DROPBEAR is not set
-# BR2_PACKAGE_ETHTOOL is not set
 # BR2_PACKAGE_EXPAT is not set
 # BR2_PACKAGE_E2FSPROGS is not set
 # BR2_PACKAGE_FAKEROOT is not set
@@ -190,7 +184,6 @@ BR2_PACKAGE_BUSYBOX_CONFIG="package/busybox/busybox.config"
 # BR2_PACKAGE_GETTEXT is not set
 # BR2_PACKAGE_LIBINTL is not set
 # BR2_PACKAGE_GZIP is not set
-# BR2_PACKAGE_HASERL is not set
 # BR2_PACKAGE_HOSTAP is not set
 # BR2_PACKAGE_HOTPLUG is not set
 # BR2_PACKAGE_IOSTAT is not set
@@ -260,7 +253,6 @@ BR2_QTE_TMAKE_VERSION="1.13"
 # BR2_PACKAGE_SMARTMONTOOLS is not set
 # BR2_PACKAGE_SOCAT is not set
 # BR2_PACKAGE_STRACE is not set
-# BR2_PACKAGE_SUDO is not set
 # BR2_PACKAGE_SYSKLOGD is not set
 # BR2_PACKAGE_SYSVINIT is not set
 # BR2_PACKAGE_TCL is not set
@@ -273,7 +265,6 @@ BR2_QTE_TMAKE_VERSION="1.13"
 # BR2_PACKAGE_TTCP is not set
 # BR2_PACKAGE_UDEV is not set
 # BR2_PACKAGE_UDHCP is not set
-# BR2_PACKAGE_UEMACS is not set
 # BR2_PACKAGE_USBUTILS is not set
 # BR2_PACKAGE_UTIL-LINUX is not set
 # BR2_PACKAGE_VALGRIND is not set
@@ -307,7 +298,6 @@ BR2_TARGET_ROOTFS_EXT2_COPYTO=""
 # BR2_TARGET_ROOTFS_JFFS2 is not set
 # BR2_TARGET_ROOTFS_SQUASHFS is not set
 # BR2_TARGET_ROOTFS_TAR is not set
-# BR2_TARGET_ROOTFS_ISO9660 is not set
 
 #
 # bootloader for target device
