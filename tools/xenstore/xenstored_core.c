@@ -173,7 +173,7 @@ void trace(const char *fmt, ...)
 	va_list arglist;
 	char *str;
 	char sbuf[1024];
-	int ret;
+	int ret, dummy;
 
 	if (tracefd < 0)
 		return;
@@ -184,7 +184,7 @@ void trace(const char *fmt, ...)
 	va_end(arglist);
 
 	if (ret <= 1024) {
-		write(tracefd, sbuf, ret);
+		dummy = write(tracefd, sbuf, ret);
 		return;
 	}
 
@@ -192,7 +192,7 @@ void trace(const char *fmt, ...)
 	va_start(arglist, fmt);
 	str = talloc_vasprintf(NULL, fmt, arglist);
 	va_end(arglist);
-	write(tracefd, str, strlen(str));
+	dummy = write(tracefd, str, strlen(str));
 	talloc_free(str);
 }
 
@@ -238,7 +238,8 @@ void trace_destroy(const void *data, const char *type)
 static void trigger_reopen_log(int signal __attribute__((unused)))
 {
 	char c = 'A';
-	write(reopen_log_pipe[1], &c, 1);
+	int dummy;
+	dummy = write(reopen_log_pipe[1], &c, 1);
 }
 
 
@@ -1678,7 +1679,8 @@ static void write_pidfile(const char *pidfile)
 		exit(0);
 
 	len = sprintf(buf, "%d\n", getpid());
-	write(fd, buf, len);
+	if (write(fd, buf, len) != len)
+		barf_perror("Writing pid file %s", pidfile);
 }
 
 /* Stevens. */
@@ -1703,7 +1705,8 @@ static void daemonize(void)
 
 #ifndef TESTING	/* Relative paths for socket names */
 	/* Move off any mount points we might be in. */
-	chdir("/");
+	if (chdir("/") == -1)
+		barf_perror("Failed to chdir");
 #endif
 	/* Discard our parent's old-fashioned umask prejudices. */
 	umask(0);
@@ -1900,7 +1903,8 @@ int main(int argc, char *argv[])
 
 		if (FD_ISSET(reopen_log_pipe[0], &inset)) {
 			char c;
-			read(reopen_log_pipe[0], &c, 1);
+			if (read(reopen_log_pipe[0], &c, 1) != 1)
+				barf_perror("read failed");
 			reopen_log();
 		}
 
