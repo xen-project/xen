@@ -45,7 +45,7 @@ obj-$(CONFIG_TEXTSEARCH_BM) += ts_bm.o
 obj-$(CONFIG_TEXTSEARCH_FSM) += ts_fsm.o
 
 obj-$(CONFIG_SWIOTLB) += swiotlb.o
-ifneq ($(CONFIG_IA64),y)
+ifneq ($(CONFIG_IA64)$(CONFIG_XEN_IA64_DOM0_VP),yn)
 swiotlb-$(CONFIG_XEN) := ../arch/i386/kernel/swiotlb.o
 endif
 
