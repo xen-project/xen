@@ -80,7 +80,18 @@
 #define VIRQ_TBUF       4  /* G. (DOM0) Trace buffer has records available.  */
 #define VIRQ_DEBUGGER   6  /* G. (DOM0) A domain has paused for debugging.   */
 #define VIRQ_XENOPROF   7  /* V. XenOprofile interrupt: new sample available */
-#define NR_VIRQS        8
+
+/* Architecture-specific VIRQ definitions. */
+#define VIRQ_ARCH_0    16
+#define VIRQ_ARCH_1    17
+#define VIRQ_ARCH_2    18
+#define VIRQ_ARCH_3    19
+#define VIRQ_ARCH_4    20
+#define VIRQ_ARCH_5    21
+#define VIRQ_ARCH_6    22
+#define VIRQ_ARCH_7    23
+
+#define NR_VIRQS       24
 
 /*
  * MMU-UPDATE REQUESTS

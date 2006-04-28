@@ -28,6 +28,9 @@ DEFINE_XEN_GUEST_HANDLE(long);
 DEFINE_XEN_GUEST_HANDLE(void);
 #endif
 
+/* Arch specific VIRQs definition */
+#define VIRQ_ITC        VIRQ_ARCH_0 /* V. Virtual itc timer */
+
 /* Maximum number of virtual CPUs in multi-processor guests. */
 /* WARNING: before changing this, check that shared_info fits on a page */
 #define MAX_VIRT_CPUS 64
