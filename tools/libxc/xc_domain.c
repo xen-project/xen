@@ -171,7 +171,7 @@ int xc_domain_getinfolist(int xc_handle,
     op.cmd = DOM0_GETDOMAININFOLIST;
     op.u.getdomaininfolist.first_domain = first_domain;
     op.u.getdomaininfolist.max_domains  = max_domains;
-    SET_XEN_GUEST_HANDLE(op.u.getdomaininfolist.buffer, info);
+    set_xen_guest_handle(op.u.getdomaininfolist.buffer, info);
 
     if ( xc_dom0_op(xc_handle, &op) < 0 )
         ret = -1;
@@ -195,7 +195,7 @@ int xc_vcpu_getcontext(int xc_handle,
     op.cmd = DOM0_GETVCPUCONTEXT;
     op.u.getvcpucontext.domain = (domid_t)domid;
     op.u.getvcpucontext.vcpu   = (uint16_t)vcpu;
-    SET_XEN_GUEST_HANDLE(op.u.getvcpucontext.ctxt, ctxt);
+    set_xen_guest_handle(op.u.getvcpucontext.ctxt, ctxt);
 
     if ( (rc = mlock(ctxt, sizeof(*ctxt))) != 0 )
         return rc;
@@ -220,7 +220,7 @@ int xc_shadow_control(int xc_handle,
     op.cmd = DOM0_SHADOW_CONTROL;
     op.u.shadow_control.domain = (domid_t)domid;
     op.u.shadow_control.op     = sop;
-    SET_XEN_GUEST_HANDLE(op.u.shadow_control.dirty_bitmap, dirty_bitmap);
+    set_xen_guest_handle(op.u.shadow_control.dirty_bitmap, dirty_bitmap);
     op.u.shadow_control.pages  = pages;
 
     rc = do_dom0_op(xc_handle, &op);
@@ -302,7 +302,7 @@ int xc_domain_memory_increase_reservation(int xc_handle,
     };
 
     /* may be NULL */
-    SET_XEN_GUEST_HANDLE(reservation.extent_start, extent_start);
+    set_xen_guest_handle(reservation.extent_start, extent_start);
 
     err = xc_memory_op(xc_handle, XENMEM_increase_reservation, &reservation);
     if ( err == nr_extents )
@@ -334,7 +334,7 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
         .domid        = domid
     };
 
-    SET_XEN_GUEST_HANDLE(reservation.extent_start, extent_start);
+    set_xen_guest_handle(reservation.extent_start, extent_start);
 
     if ( extent_start == NULL )
     {
@@ -372,7 +372,7 @@ int xc_domain_memory_populate_physmap(int xc_handle,
         .address_bits = address_bits,
         .domid        = domid
     };
-    SET_XEN_GUEST_HANDLE(reservation.extent_start, extent_start);
+    set_xen_guest_handle(reservation.extent_start, extent_start);
 
     err = xc_memory_op(xc_handle, XENMEM_populate_physmap, &reservation);
     if ( err == nr_extents )
@@ -399,8 +399,8 @@ int xc_domain_translate_gpfn_list(int xc_handle,
         .domid        = domid,
         .nr_gpfns     = nr_gpfns,
     };
-    SET_XEN_GUEST_HANDLE(op.gpfn_list, gpfn_list);
-    SET_XEN_GUEST_HANDLE(op.mfn_list, mfn_list);
+    set_xen_guest_handle(op.gpfn_list, gpfn_list);
+    set_xen_guest_handle(op.mfn_list, mfn_list);
 
     return xc_memory_op(xc_handle, XENMEM_translate_gpfn_list, &op);
 }
@@ -470,7 +470,7 @@ int xc_vcpu_setcontext(int xc_handle,
     op.cmd = DOM0_SETVCPUCONTEXT;
     op.u.setvcpucontext.domain = domid;
     op.u.setvcpucontext.vcpu = vcpu;
-    SET_XEN_GUEST_HANDLE(op.u.setvcpucontext.ctxt, ctxt);
+    set_xen_guest_handle(op.u.setvcpucontext.ctxt, ctxt);
 
     if ( (rc = mlock(ctxt, sizeof(*ctxt))) != 0 )
         return rc;

@@ -520,7 +520,7 @@ static unsigned long *xc_map_m2p(int xc_handle,
         ERR("failed to allocate space for m2p mfns");
         return NULL;
     }
-    SET_XEN_GUEST_HANDLE(xmml.extent_start, extent_start);
+    set_xen_guest_handle(xmml.extent_start, extent_start);
 
     if (xc_memory_op(xc_handle, XENMEM_machphys_mfn_list, &xmml) ||
         (xmml.nr_extents != m2p_chunks)) {

@@ -155,7 +155,7 @@ int xi_get_domaininfolist(xi_handle *handle, dom0_getdomaininfo_t *info,
 	dom0_op_t op;
 	op.u.getdomaininfolist.first_domain = first_domain;
 	op.u.getdomaininfolist.max_domains = max_domains;
-	SET_XEN_GUEST_HANDLE(op.u.getdomaininfolist.buffer, info);
+	set_xen_guest_handle(op.u.getdomaininfolist.buffer, info);
 
 	if (mlock( info, max_domains * sizeof(dom0_getdomaininfo_t)) < 0) {
 		perror("Failed to mlock domaininfo array");

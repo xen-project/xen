@@ -14,9 +14,9 @@
 
 #define DEFINE_XEN_GUEST_HANDLE(name)   __DEFINE_XEN_GUEST_HANDLE(name, name)
 #define XEN_GUEST_HANDLE(name)          __guest_handle_ ## name
-#define SET_XEN_GUEST_HANDLE(hnd, val)  do { (hnd).p = val; } while (0)
+#define set_xen_guest_handle(hnd, val)  do { (hnd).p = val; } while (0)
 #ifdef __XEN_TOOLS__
-#define GET_XEN_GUEST_HANDLE(val, hnd)  do { val = (hnd).p; } while (0)
+#define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
 #endif
 
 #ifndef __ASSEMBLY__

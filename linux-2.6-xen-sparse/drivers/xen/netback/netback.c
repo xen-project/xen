@@ -109,7 +109,7 @@ static unsigned long alloc_mfn(void)
 		.extent_order = 0,
 		.domid        = DOMID_SELF
 	};
-	SET_XEN_GUEST_HANDLE(reservation.extent_start, mfn_list);
+	set_xen_guest_handle(reservation.extent_start, mfn_list);
 	spin_lock_irqsave(&mfn_lock, flags);
 	if ( unlikely(alloc_index == 0) )
 		alloc_index = HYPERVISOR_memory_op(

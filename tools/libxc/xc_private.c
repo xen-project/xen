@@ -71,7 +71,7 @@ int xc_get_pfn_type_batch(int xc_handle,
     op.cmd = DOM0_GETPAGEFRAMEINFO2;
     op.u.getpageframeinfo2.domain = (domid_t)dom;
     op.u.getpageframeinfo2.num    = num;
-    SET_XEN_GUEST_HANDLE(op.u.getpageframeinfo2.array, arr);
+    set_xen_guest_handle(op.u.getpageframeinfo2.array, arr);
     return do_dom0_op(xc_handle, &op);
 }
 
@@ -210,7 +210,7 @@ int xc_memory_op(int xc_handle,
             PERROR("Could not mlock");
             goto out1;
         }
-        GET_XEN_GUEST_HANDLE(extent_start, reservation->extent_start);
+        get_xen_guest_handle(extent_start, reservation->extent_start);
         if ( (extent_start != NULL) &&
              (mlock(extent_start,
                     reservation->nr_extents * sizeof(unsigned long)) != 0) )
@@ -226,7 +226,7 @@ int xc_memory_op(int xc_handle,
             PERROR("Could not mlock");
             goto out1;
         }
-        GET_XEN_GUEST_HANDLE(extent_start, xmml->extent_start);
+        get_xen_guest_handle(extent_start, xmml->extent_start);
         if ( mlock(extent_start,
                    xmml->max_extents * sizeof(unsigned long)) != 0 )
         {
@@ -248,14 +248,14 @@ int xc_memory_op(int xc_handle,
             PERROR("Could not mlock");
             goto out1;
         }
-        GET_XEN_GUEST_HANDLE(gpfn_list, trans->gpfn_list);
+        get_xen_guest_handle(gpfn_list, trans->gpfn_list);
         if ( mlock(gpfn_list, trans->nr_gpfns * sizeof(long)) != 0 )
         {
             PERROR("Could not mlock");
             safe_munlock(trans, sizeof(*trans));
             goto out1;
         }
-        GET_XEN_GUEST_HANDLE(mfn_list, trans->mfn_list);
+        get_xen_guest_handle(mfn_list, trans->mfn_list);
         if ( mlock(mfn_list, trans->nr_gpfns * sizeof(long)) != 0 )
         {
             PERROR("Could not mlock");
@@ -274,14 +274,14 @@ int xc_memory_op(int xc_handle,
     case XENMEM_decrease_reservation:
     case XENMEM_populate_physmap:
         safe_munlock(reservation, sizeof(*reservation));
-        GET_XEN_GUEST_HANDLE(extent_start, reservation->extent_start);
+        get_xen_guest_handle(extent_start, reservation->extent_start);
         if ( extent_start != NULL )
             safe_munlock(extent_start,
                          reservation->nr_extents * sizeof(unsigned long));
         break;
     case XENMEM_machphys_mfn_list:
         safe_munlock(xmml, sizeof(*xmml));
-        GET_XEN_GUEST_HANDLE(extent_start, xmml->extent_start);
+        get_xen_guest_handle(extent_start, xmml->extent_start);
         safe_munlock(extent_start,
                      xmml->max_extents * sizeof(unsigned long));
         break;
@@ -289,9 +289,9 @@ int xc_memory_op(int xc_handle,
         safe_munlock(arg, sizeof(struct xen_add_to_physmap));
         break;
     case XENMEM_translate_gpfn_list:
-            GET_XEN_GUEST_HANDLE(mfn_list, trans->mfn_list);
+            get_xen_guest_handle(mfn_list, trans->mfn_list);
             safe_munlock(mfn_list, trans->nr_gpfns * sizeof(long));
-            GET_XEN_GUEST_HANDLE(gpfn_list, trans->gpfn_list);
+            get_xen_guest_handle(gpfn_list, trans->gpfn_list);
             safe_munlock(gpfn_list, trans->nr_gpfns * sizeof(long));
             safe_munlock(trans, sizeof(*trans));
         break;
@@ -328,7 +328,7 @@ int xc_get_pfn_list(int xc_handle,
     op.cmd = DOM0_GETMEMLIST;
     op.u.getmemlist.domain   = (domid_t)domid;
     op.u.getmemlist.max_pfns = max_pfns;
-    SET_XEN_GUEST_HANDLE(op.u.getmemlist.buffer, pfn_buf);
+    set_xen_guest_handle(op.u.getmemlist.buffer, pfn_buf);
 
 #ifdef VALGRIND
     memset(pfn_buf, 0, max_pfns * sizeof(unsigned long));

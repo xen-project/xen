@@ -30,7 +30,7 @@ int xc_readconsolering(int xc_handle,
     unsigned int nr_chars = *pnr_chars;
 
     op.cmd = DOM0_READCONSOLE;
-    SET_XEN_GUEST_HANDLE(op.u.readconsole.buffer, buffer);
+    set_xen_guest_handle(op.u.readconsole.buffer, buffer);
     op.u.readconsole.count  = nr_chars;
     op.u.readconsole.clear  = clear;
 
@@ -88,7 +88,7 @@ int xc_perfc_control(int xc_handle,
 
     op.cmd = DOM0_PERFCCONTROL;
     op.u.perfccontrol.op   = opcode;
-    SET_XEN_GUEST_HANDLE(op.u.perfccontrol.desc, desc);
+    set_xen_guest_handle(op.u.perfccontrol.desc, desc);
 
     rc = do_dom0_op(xc_handle, &op);
 
