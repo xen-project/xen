@@ -456,8 +456,6 @@ def configure_image(vals):
         config_image.append(['root', cmdline_root])
     if vals.extra:
         config_image.append(['args', vals.extra])
-    if vals.features:
-        config_image.append(['features', vals.features])
 
     if vals.builder == 'hvm':
         configure_hvm(config_image, vals)
@@ -638,7 +636,7 @@ def make_config(vals):
                 config.append([n, v])
 
     map(add_conf, ['name', 'memory', 'maxmem', 'restart', 'on_poweroff',
-                   'on_reboot', 'on_crash', 'vcpus'])
+                   'on_reboot', 'on_crash', 'vcpus', 'features'])
 
     if vals.uuid is not None:
         config.append(['uuid', vals.uuid])

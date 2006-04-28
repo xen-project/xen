@@ -132,6 +132,7 @@ ROUNDTRIPPING_CONFIG_ENTRIES = [
     ('memory',     int),
     ('maxmem',     int),
     ('bootloader', str),
+    ('features', str),
     ]
 
 ROUNDTRIPPING_CONFIG_ENTRIES += VM_CONFIG_PARAMS
@@ -549,6 +550,7 @@ class XendDomainInfo:
             defaultInfo('on_poweroff',  lambda: "destroy")
             defaultInfo('on_reboot',    lambda: "restart")
             defaultInfo('on_crash',     lambda: "restart")
+            defaultInfo('features',     lambda: "")
             defaultInfo('cpu',          lambda: None)
             defaultInfo('cpus',         lambda: [])
             defaultInfo('cpu_weight',   lambda: 1.0)
@@ -775,6 +777,9 @@ class XendDomainInfo:
         """For use only by image.py and XendCheckpoint.py"""
         return self.console_port
 
+    def getFeatures(self):
+        """For use only by image.py."""
+        return self.info['features']
 
     def getVCpuCount(self):
         return self.info['vcpus']
