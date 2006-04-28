@@ -75,7 +75,7 @@ int xc_ia64_get_pfn_list(int xc_handle,
         op.cmd = DOM0_GETMEMLIST;
         op.u.getmemlist.domain   = (domid_t)domid;
         op.u.getmemlist.max_pfns = max_pfns;
-        op.u.getmemlist.buffer   = __pfn_buf;
+        set_xen_guest_handle(op.u.getmemlist.buffer, __pfn_buf);
 
         if ( (max_pfns != -1UL)
             && mlock(__pfn_buf, __nr_pages * sizeof(unsigned long)) != 0 )
@@ -729,7 +729,7 @@ int xc_hvm_build(int xc_handle,
 
     launch_op.u.setvcpucontext.domain = (domid_t)domid;
     launch_op.u.setvcpucontext.vcpu   = 0;
-    launch_op.u.setvcpucontext.ctxt   = ctxt;
+    set_xen_guest_handle(launch_op.u.setvcpucontext.ctxt, ctxt);
 
     launch_op.cmd = DOM0_SETVCPUCONTEXT;
     rc = do_dom0_op(xc_handle, &launch_op);
