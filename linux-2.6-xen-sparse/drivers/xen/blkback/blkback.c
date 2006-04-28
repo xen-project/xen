@@ -410,7 +410,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		}
 
 		pending_handle(pending_req, i) = map[i].handle;
-#ifdef __ia64__
+#if defined(__ia64__) && !defined(CONFIG_XEN_IA64_DOM0_VP)
 		pending_vaddrs[vaddr_pagenr(pending_req, i)] =
 			(unsigned long)gnttab_map_vaddr(map[i]);
 #else
@@ -546,7 +546,7 @@ static int __init blkif_init(void)
 
 	blkif_interface_init();
 	
-#ifdef __ia64__
+#if defined(__ia64__) && !defined(CONFIG_XEN_IA64_DOM0_VP)
 	extern unsigned long alloc_empty_foreign_map_page_range(
 		unsigned long pages);
 	mmap_vstart = (unsigned long)
