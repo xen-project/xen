@@ -623,7 +623,7 @@ def run_bootloader(vals):
     file = blkif.blkdev_uname_to_file(uname)
 
     return bootloader(vals.bootloader, file, not vals.console_autoconnect,
-                      vals.vcpus, vals.bootentry)
+                      vals.bootentry)
 
 def make_config(vals):
     """Create the domain configuration.

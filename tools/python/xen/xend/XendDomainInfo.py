@@ -1619,8 +1619,7 @@ class XendDomainInfo:
             if disk is None:
                 continue
             fn = blkdev_uname_to_file(sxp.child_value(disk, "uname"))
-            blcfg = bootloader(self.info['bootloader'], fn, 1,
-                               self.info['vcpus'])
+            blcfg = bootloader(self.info['bootloader'], fn, 1)
         if blcfg is None:
             msg = "Had a bootloader specified, but can't find disk"
             log.error(msg)

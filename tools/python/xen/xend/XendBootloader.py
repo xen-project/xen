@@ -19,13 +19,12 @@ import sxp
 from XendLogging import log
 from XendError import VmError
 
-def bootloader(blexec, disk, quiet = 0, vcpus = None, entry = None):
+def bootloader(blexec, disk, quiet = 0, entry = None):
     """Run the boot loader executable on the given disk and return a
     config image.
     @param blexec  Binary to use as the boot loader
     @param disk Disk to run the boot loader on.
     @param quiet Run in non-interactive mode, just booting the default.
-    @param vcpus Number of vcpus for the domain.
     @param entry Default entry to boot."""
     
     if not os.access(blexec, os.X_OK):
@@ -87,9 +86,4 @@ def bootloader(blexec, disk, quiet = 0, vcpus = None, entry = None):
     pin = sxp.Parser()
     pin.input(ret)
     pin.input_eof()
-
-    config_image = pin.val
-    if vcpus and sxp.child_value(config_image, "vcpus") is None:
-        config_image.append(['vcpus', vcpus])
-
-    return config_image
+    return pin.val
