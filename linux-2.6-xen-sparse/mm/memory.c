@@ -968,6 +968,7 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 {
 	int i;
 	unsigned int vm_flags;
+	int xenpage = 0;
 
 	/* 
 	 * Require read or write permissions.
@@ -1025,10 +1026,14 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		if (vma && (vma->vm_flags & VM_FOREIGN)) {
 			struct page **map = vma->vm_private_data;
 			int offset = (start - vma->vm_start) >> PAGE_SHIFT;
-
+			xenpage =1;
 			if (map[offset] != NULL) {
-				if (pages)
-					pages[i] = map[offset];
+			        if (pages) {
+			                struct page *page = map[offset];
+					
+					pages[i] = page;
+					get_page(page);
+				}
 				if (vmas)
 					vmas[i] = vma;
 				i++;
