@@ -550,9 +550,22 @@ struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 	scrub_pages(vstart, 1 << order);
 
 	balloon_lock(flags);
-	ret = apply_to_page_range(&init_mm, vstart,
-				  PAGE_SIZE << order, dealloc_pte_fn, NULL);
-	BUG_ON(ret);
+	if (xen_feature(XENFEAT_auto_translated_physmap)) {
+		unsigned long gmfn = __pa(vstart) >> PAGE_SHIFT;
+		struct xen_memory_reservation reservation = {
+			.nr_extents   = 1,
+			.extent_order = order,
+			.domid        = DOMID_SELF
+		};
+		set_xen_guest_handle(reservation.extent_start, &gmfn);
+		ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
+					   &reservation);
+		BUG_ON(ret != 1);
+	} else {
+		ret = apply_to_page_range(&init_mm, vstart, PAGE_SIZE << order,
+					  dealloc_pte_fn, NULL);
+		BUG_ON(ret);
+	}
 	current_pages -= 1UL << order;
 	totalram_pages = current_pages;
 	balloon_unlock(flags);
