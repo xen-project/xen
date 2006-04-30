@@ -9,7 +9,7 @@
 #ifndef __XEN_PUBLIC_XEN_COMPAT_H__
 #define __XEN_PUBLIC_XEN_COMPAT_H__
 
-#define __XEN_LATEST_INTERFACE_VERSION__ 0x00030201
+#define __XEN_LATEST_INTERFACE_VERSION__ 0x00030202
 
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 /* Xen is built with matching headers and implements the latest interface. */
@@ -34,6 +34,14 @@
 #undef __DEFINE_XEN_GUEST_HANDLE
 #define __DEFINE_XEN_GUEST_HANDLE(name, type) \
     typedef type * __guest_handle_ ## name
+#endif
+
+/* New event-channel and physdev hypercalls introduced in 0x00030202. */
+#if __XEN_INTERFACE_VERSION__ < 0x00030202
+#undef __HYPERVISOR_event_channel_op
+#define __HYPERVISOR_event_channel_op __HYPERVISOR_event_channel_op_compat
+#undef __HYPERVISOR_physdev_op
+#define __HYPERVISOR_physdev_op __HYPERVISOR_physdev_op_compat
 #endif
 
 #endif /* __XEN_PUBLIC_XEN_COMPAT_H__ */

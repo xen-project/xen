@@ -959,11 +959,10 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_XEN
 	{
-		physdev_op_t op;
+		struct physdev_set_iopl set_iopl;
 
-		op.cmd             = PHYSDEVOP_SET_IOPL;
-		op.u.set_iopl.iopl = 1;
-		HYPERVISOR_physdev_op(&op);
+		set_iopl.iopl = 1;
+		HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
 
 		if (xen_start_info->flags & SIF_INITDOMAIN) {
 			if (!(xen_start_info->flags & SIF_PRIVILEGED))

@@ -37,7 +37,7 @@
 #define __HYPERVISOR_stack_switch          3
 #define __HYPERVISOR_set_callbacks         4
 #define __HYPERVISOR_fpu_taskswitch        5
-#define __HYPERVISOR_sched_op_compat       6 /* compat as of 0x00030101 */
+#define __HYPERVISOR_sched_op_compat       6 /* compat since 0x00030101 */
 #define __HYPERVISOR_dom0_op               7
 #define __HYPERVISOR_set_debugreg          8
 #define __HYPERVISOR_get_debugreg          9
@@ -46,10 +46,10 @@
 #define __HYPERVISOR_multicall            13
 #define __HYPERVISOR_update_va_mapping    14
 #define __HYPERVISOR_set_timer_op         15
-#define __HYPERVISOR_event_channel_op     16
+#define __HYPERVISOR_event_channel_op_compat 16 /* compat since 0x00030202 */
 #define __HYPERVISOR_xen_version          17
 #define __HYPERVISOR_console_io           18
-#define __HYPERVISOR_physdev_op           19
+#define __HYPERVISOR_physdev_op_compat    19 /* compat since 0x00030202 */
 #define __HYPERVISOR_grant_table_op       20
 #define __HYPERVISOR_vm_assist            21
 #define __HYPERVISOR_update_va_mapping_otherdomain 22
@@ -62,6 +62,8 @@
 #define __HYPERVISOR_sched_op             29
 #define __HYPERVISOR_callback_op          30
 #define __HYPERVISOR_xenoprof_op          31
+#define __HYPERVISOR_event_channel_op     32
+#define __HYPERVISOR_physdev_op           33
 
 /* Architecture-specific hypercall definitions. */
 #define __HYPERVISOR_arch_0               48

@@ -538,10 +538,10 @@ ENTRY(hypercall_table)
         .quad do_multicall
         .quad do_update_va_mapping
         .quad do_set_timer_op       /* 15 */
-        .quad do_event_channel_op
+        .quad do_event_channel_op_compat
         .quad do_xen_version
         .quad do_console_io
-        .quad do_physdev_op
+        .quad do_physdev_op_compat
         .quad do_grant_table_op     /* 20 */
         .quad do_vm_assist
         .quad do_update_va_mapping_otherdomain
@@ -554,6 +554,8 @@ ENTRY(hypercall_table)
         .quad do_arch_sched_op
         .quad do_callback_op        /* 30 */
         .quad do_xenoprof_op
+        .quad do_event_channel_op
+        .quad do_physdev_op
         .rept NR_hypercalls-((.-hypercall_table)/8)
         .quad do_ni_hypercall
         .endr
@@ -575,10 +577,10 @@ ENTRY(hypercall_args_table)
         .byte 2 /* do_multicall         */
         .byte 3 /* do_update_va_mapping */
         .byte 1 /* do_set_timer_op      */  /* 15 */
-        .byte 1 /* do_event_channel_op  */
+        .byte 1 /* do_event_channel_op_compat */
         .byte 2 /* do_xen_version       */
         .byte 3 /* do_console_io        */
-        .byte 1 /* do_physdev_op        */
+        .byte 1 /* do_physdev_op_compat */
         .byte 3 /* do_grant_table_op    */  /* 20 */
         .byte 2 /* do_vm_assist         */
         .byte 4 /* do_update_va_mapping_otherdomain */
@@ -591,6 +593,8 @@ ENTRY(hypercall_args_table)
         .byte 2 /* do_arch_sched_op     */
         .byte 2 /* do_callback_op       */  /* 30 */
         .byte 2 /* do_xenoprof_op       */
+        .byte 2 /* do_event_channel_op  */
+        .byte 2 /* do_physdev_op        */
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr

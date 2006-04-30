@@ -27,6 +27,7 @@
 #include <xen/domain.h>
 
 extern unsigned long translate_domain_mpaddr(unsigned long);
+static long do_physdev_op_compat(int cmd, XEN_GUEST_HANDLE(void) arg);
 static long do_physdev_op(XEN_GUEST_HANDLE(physdev_op_t) uop);
 /* FIXME: where these declarations should be there ? */
 extern int dump_privop_counts_to_user(char *, int);
@@ -53,10 +54,10 @@ hypercall_t ia64_hypercall_table[] =
 	(hypercall_t)do_multicall,
 	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping */
 	(hypercall_t)do_ni_hypercall,		/* do_set_timer_op */		/* 15 */
-	(hypercall_t)do_event_channel_op,
+	(hypercall_t)do_event_channel_op_compat,
 	(hypercall_t)do_xen_version,
 	(hypercall_t)do_console_io,
-	(hypercall_t)do_physdev_op,
+	(hypercall_t)do_physdev_op_compat,
 	(hypercall_t)do_grant_table_op,						/* 20 */
 	(hypercall_t)do_ni_hypercall,		/* do_vm_assist */
 	(hypercall_t)do_ni_hypercall,		/* do_update_va_mapping_otherdomain */
@@ -68,7 +69,9 @@ hypercall_t ia64_hypercall_table[] =
 	(hypercall_t)do_ni_hypercall,		/* do_nmi_op */
 	(hypercall_t)do_sched_op,
 	(hypercall_t)do_ni_hypercall,		/*  */				/* 30 */
-	(hypercall_t)do_ni_hypercall		/*  */
+	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_event_channel_op,
+	(hypercall_t)do_physdev_op
 	};
 
 uint32_t nr_hypercalls =
@@ -330,71 +333,117 @@ extern int
 iosapic_guest_write(
     unsigned long physbase, unsigned int reg, u32 pval);
 
-static long do_physdev_op(XEN_GUEST_HANDLE(physdev_op_t) uop)
+static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
-    struct physdev_op op;
+    int irq;
     long ret;
-    int  irq;
 
-    if ( unlikely(copy_from_guest(&op, uop, 1) != 0) )
-        return -EFAULT;
-
-    switch ( op.cmd )
+    switch ( cmd )
     {
-    case PHYSDEVOP_IRQ_UNMASK_NOTIFY:
+    case PHYSDEVOP_eoi: {
+        struct physdev_eoi eoi;
+        ret = -EFAULT;
+        if ( copy_from_guest(&eoi, arg, 1) != 0 )
+            break;
+        ret = pirq_guest_eoi(current->domain, eoi.irq);
+        break;
+    }
+
+    /* Legacy since 0x00030202. */
+    case PHYSDEVOP_IRQ_UNMASK_NOTIFY: {
         ret = pirq_guest_unmask(current->domain);
         break;
+    }
 
-    case PHYSDEVOP_IRQ_STATUS_QUERY:
-        irq = op.u.irq_status_query.irq;
+    case PHYSDEVOP_irq_status_query: {
+        struct physdev_irq_status_query irq_status_query;
+        ret = -EFAULT;
+        if ( copy_from_guest(&irq_status_query, arg, 1) != 0 )
+            break;
+        irq = irq_status_query.irq;
         ret = -EINVAL;
         if ( (irq < 0) || (irq >= NR_IRQS) )
             break;
-        op.u.irq_status_query.flags = 0;
+        irq_status_query.flags = 0;
         /* Edge-triggered interrupts don't need an explicit unmask downcall. */
         if ( !strstr(irq_desc[irq_to_vector(irq)].handler->typename, "edge") )
-            op.u.irq_status_query.flags |= PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY;
-        ret = 0;
+            irq_status_query.flags |= XENIRQSTAT_needs_eoi;
+        ret = copy_to_guest(arg, &irq_status_query, 1) ? -EFAULT : 0;
         break;
+    }
 
-    case PHYSDEVOP_APIC_READ:
+    case PHYSDEVOP_apic_read: {
+        struct physdev_apic apic;
+        ret = -EFAULT;
+        if ( copy_from_guest(&apic, arg, 1) != 0 )
+            break;
         ret = -EPERM;
         if ( !IS_PRIV(current->domain) )
             break;
-        ret = iosapic_guest_read(
-            op.u.apic_op.apic_physbase,
-            op.u.apic_op.reg,
-            &op.u.apic_op.value);
+        ret = iosapic_guest_read(apic.apic_physbase, apic.reg, &apic.value);
+        if ( copy_to_guest(arg, &apic, 1) != 0 )
+            ret = -EFAULT;
         break;
+    }
 
-    case PHYSDEVOP_APIC_WRITE:
+    case PHYSDEVOP_apic_write: {
+        struct physdev_apic apic;
+        ret = -EFAULT;
+        if ( copy_from_guest(&apic, arg, 1) != 0 )
+            break;
         ret = -EPERM;
         if ( !IS_PRIV(current->domain) )
             break;
-        ret = iosapic_guest_write(
-            op.u.apic_op.apic_physbase,
-            op.u.apic_op.reg,
-            op.u.apic_op.value);
+        ret = iosapic_guest_write(apic.apic_physbase, apic.reg, apic.value);
         break;
+    }
 
-    case PHYSDEVOP_ASSIGN_VECTOR:
+    case PHYSDEVOP_alloc_irq_vector: {
+        struct physdev_irq irq_op;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&irq_op, arg, 1) != 0 )
+            break;
+
+        ret = -EPERM;
         if ( !IS_PRIV(current->domain) )
-            return -EPERM;
+            break;
 
-        if ( (irq = op.u.irq_op.irq) >= NR_IRQS )
-            return -EINVAL;
+        ret = -EINVAL;
+        if ( (irq = irq_op.irq) >= NR_IRQS )
+            break;
         
-        op.u.irq_op.vector = assign_irq_vector(irq);
-        ret = 0;
+        irq_op.vector = assign_irq_vector(irq);
+        ret = copy_to_guest(arg, &irq_op, 1) ? -EFAULT : 0;
         break;
+    }
 
     default:
         ret = -EINVAL;
         break;
     }
 
-    if ( copy_to_guest(uop, &op, 1) )
-        ret = -EFAULT;
-
     return ret;
+}
+
+/* Legacy hypercall (as of 0x00030202). */
+static long do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop)
+{
+    struct physdev_op op;
+
+    if ( unlikely(copy_from_guest(&op, uop, 1) != 0) )
+        return -EFAULT;
+
+    return do_physdev_op(op.cmd, guest_handle_from_ptr(&uop.p->u, void));
+}
+
+/* Legacy hypercall (as of 0x00030202). */
+long do_event_channel_op_compat(XEN_GUEST_HANDLE(evtchn_op_t) uop)
+{
+    struct evtchn_op op;
+
+    if ( unlikely(copy_from_guest(&op, uop, 1) != 0) )
+        return -EFAULT;
+
+    return do_event_channel_op(op.cmd, guest_handle_from_ptr(&uop.p->u, void));
 }

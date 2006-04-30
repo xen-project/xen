@@ -8,6 +8,14 @@
 #include <public/physdev.h>
 
 extern long
+do_event_channel_op_compat(
+    XEN_GUEST_HANDLE(evtchn_op_t) uop);
+
+extern long
+do_physdev_op_compat(
+    XEN_GUEST_HANDLE(physdev_op_t) uop);
+
+extern long
 do_set_trap_table(
     XEN_GUEST_HANDLE(trap_info_t) traps);
 
@@ -54,7 +62,7 @@ do_update_va_mapping(
 
 extern long
 do_physdev_op(
-    XEN_GUEST_HANDLE(physdev_op_t) uop);
+    int cmd, XEN_GUEST_HANDLE(void) arg);
 
 extern int
 do_update_va_mapping_otherdomain(

@@ -22,90 +22,122 @@ extern int
 pirq_acktype(
     int irq);
 
-/*
- * Demuxing hypercall.
- */
-long do_physdev_op(XEN_GUEST_HANDLE(physdev_op_t) uop)
+long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
-    struct physdev_op op;
+    int irq;
     long ret;
-    int  irq;
 
-    if ( unlikely(copy_from_guest(&op, uop, 1) != 0) )
-        return -EFAULT;
-
-    switch ( op.cmd )
+    switch ( cmd )
     {
-    case PHYSDEVOP_IRQ_UNMASK_NOTIFY:
+    case PHYSDEVOP_eoi: {
+        struct physdev_eoi eoi;
+        ret = -EFAULT;
+        if ( copy_from_guest(&eoi, arg, 1) != 0 )
+            break;
+        ret = pirq_guest_eoi(current->domain, eoi.irq);
+        break;
+    }
+
+    /* Legacy since 0x00030202. */
+    case PHYSDEVOP_IRQ_UNMASK_NOTIFY: {
         ret = pirq_guest_unmask(current->domain);
         break;
+    }
 
-    case PHYSDEVOP_IRQ_STATUS_QUERY:
-        irq = op.u.irq_status_query.irq;
+    case PHYSDEVOP_irq_status_query: {
+        struct physdev_irq_status_query irq_status_query;
+        ret = -EFAULT;
+        if ( copy_from_guest(&irq_status_query, arg, 1) != 0 )
+            break;
+        irq = irq_status_query.irq;
         ret = -EINVAL;
         if ( (irq < 0) || (irq >= NR_IRQS) )
             break;
-        op.u.irq_status_query.flags = 0;
+        irq_status_query.flags = 0;
         if ( pirq_acktype(irq) != 0 )
-            op.u.irq_status_query.flags |= PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY;
-        ret = 0;
+            irq_status_query.flags |= XENIRQSTAT_needs_eoi;
+        ret = copy_to_guest(arg, &irq_status_query, 1) ? -EFAULT : 0;
         break;
+    }
 
-    case PHYSDEVOP_APIC_READ:
+    case PHYSDEVOP_apic_read: {
+        struct physdev_apic apic;
+        ret = -EFAULT;
+        if ( copy_from_guest(&apic, arg, 1) != 0 )
+            break;
         ret = -EPERM;
         if ( !IS_PRIV(current->domain) )
             break;
-        ret = ioapic_guest_read(
-            op.u.apic_op.apic_physbase,
-            op.u.apic_op.reg,
-            &op.u.apic_op.value);
+        ret = ioapic_guest_read(apic.apic_physbase, apic.reg, &apic.value);
+        if ( copy_to_guest(arg, &apic, 1) != 0 )
+            ret = -EFAULT;
         break;
+    }
 
-    case PHYSDEVOP_APIC_WRITE:
+    case PHYSDEVOP_apic_write: {
+        struct physdev_apic apic;
+        ret = -EFAULT;
+        if ( copy_from_guest(&apic, arg, 1) != 0 )
+            break;
         ret = -EPERM;
         if ( !IS_PRIV(current->domain) )
             break;
-        ret = ioapic_guest_write(
-            op.u.apic_op.apic_physbase,
-            op.u.apic_op.reg,
-            op.u.apic_op.value);
+        ret = ioapic_guest_write(apic.apic_physbase, apic.reg, apic.value);
         break;
+    }
 
-    case PHYSDEVOP_ASSIGN_VECTOR:
+    case PHYSDEVOP_alloc_irq_vector: {
+        struct physdev_irq irq_op;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&irq_op, arg, 1) != 0 )
+            break;
+
+        ret = -EPERM;
         if ( !IS_PRIV(current->domain) )
-            return -EPERM;
+            break;
 
-        if ( (irq = op.u.irq_op.irq) >= NR_IRQS )
-            return -EINVAL;
+        ret = -EINVAL;
+        if ( (irq = irq_op.irq) >= NR_IRQS )
+            break;
         
-        op.u.irq_op.vector = assign_irq_vector(irq);
-        ret = 0;
+        irq_op.vector = assign_irq_vector(irq);
+        ret = copy_to_guest(arg, &irq_op, 1) ? -EFAULT : 0;
         break;
+    }
 
-    case PHYSDEVOP_SET_IOPL:
+    case PHYSDEVOP_set_iopl: {
+        struct physdev_set_iopl set_iopl;
+        ret = -EFAULT;
+        if ( copy_from_guest(&set_iopl, arg, 1) != 0 )
+            break;
         ret = -EINVAL;
-        if ( op.u.set_iopl.iopl > 3 )
+        if ( set_iopl.iopl > 3 )
             break;
         ret = 0;
-        current->arch.iopl = op.u.set_iopl.iopl;
+        current->arch.iopl = set_iopl.iopl;
         break;
+    }
 
-    case PHYSDEVOP_SET_IOBITMAP:
+    case PHYSDEVOP_set_iobitmap: {
+        struct physdev_set_iobitmap set_iobitmap;
+        ret = -EFAULT;
+        if ( copy_from_guest(&set_iobitmap, arg, 1) != 0 )
+            break;
         ret = -EINVAL;
-        if ( !access_ok(op.u.set_iobitmap.bitmap, IOBMP_BYTES) ||
-             (op.u.set_iobitmap.nr_ports > 65536) )
+        if ( !access_ok(set_iobitmap.bitmap, IOBMP_BYTES) ||
+             (set_iobitmap.nr_ports > 65536) )
             break;
         ret = 0;
-        current->arch.iobmp       = op.u.set_iobitmap.bitmap;
-        current->arch.iobmp_limit = op.u.set_iobitmap.nr_ports;
+        current->arch.iobmp       = set_iobitmap.bitmap;
+        current->arch.iobmp_limit = set_iobitmap.nr_ports;
         break;
+    }
+
     default:
         ret = -EINVAL;
         break;
     }
-
-    if ( copy_to_guest(uop, &op, 1) )
-        ret = -EFAULT;
 
     return ret;
 }

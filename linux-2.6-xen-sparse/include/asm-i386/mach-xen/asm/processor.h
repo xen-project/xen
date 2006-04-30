@@ -534,12 +534,11 @@ static inline void __load_esp0(struct tss_struct *tss, struct thread_struct *thr
  */
 static inline void set_iopl_mask(unsigned mask)
 {
-	physdev_op_t op;
+	struct physdev_set_iopl set_iopl;
 
 	/* Force the change at ring 0. */
-	op.cmd = PHYSDEVOP_SET_IOPL;
-	op.u.set_iopl.iopl = (mask == 0) ? 1 : (mask >> 12) & 3;
-	HYPERVISOR_physdev_op(&op);
+	set_iopl.iopl = (mask == 0) ? 1 : (mask >> 12) & 3;
+	HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
 }
 
 /* Forward declaration, a strange C thing */

@@ -61,9 +61,8 @@ void unmask_evtchn(int port)
 #if 0	// FIXME: diverged from x86 evtchn.c
 	/* Slow path (hypercall) if this is a non-local port. */
 	if (unlikely(cpu != cpu_from_evtchn(port))) {
-		evtchn_op_t op = { .cmd = EVTCHNOP_unmask,
-				   .u.unmask.port = port };
-		(void)HYPERVISOR_event_channel_op(&op);
+		struct evtchn_unmask op = { .port = port };
+		(void)HYPERVISOR_event_channel_op(EVTCHNOP_unmask, &op);
 		return;
 	}
 #endif
@@ -95,16 +94,16 @@ int bind_virq_to_irqhandler(
 	const char *devname,
 	void *dev_id)
 {
-    evtchn_op_t op;
+    struct evtchn_bind_virq bind_virq;
     int evtchn;
 
     spin_lock(&irq_mapping_update_lock);
 
-    op.cmd = EVTCHNOP_bind_virq;
-    op.u.bind_virq.virq = virq;
-    op.u.bind_virq.vcpu = cpu;
-    BUG_ON(HYPERVISOR_event_channel_op(&op) != 0 );
-    evtchn = op.u.bind_virq.port;
+    bind_virq.virq = virq;
+    bind_virq.vcpu = cpu;
+    if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq, &bind_virq) != 0)
+        BUG();
+    evtchn = bind_virq.port;
 
     if (!unbound_irq(evtchn)) {
         evtchn = -EINVAL;
@@ -158,7 +157,7 @@ int bind_ipi_to_irqhandler(
 
 void unbind_from_irqhandler(unsigned int irq, void *dev_id)
 {
-    evtchn_op_t op;
+    struct evtchn_close close;
     int evtchn = evtchn_from_irq(irq);
 
     spin_lock(&irq_mapping_update_lock);
@@ -166,9 +165,9 @@ void unbind_from_irqhandler(unsigned int irq, void *dev_id)
     if (unbound_irq(irq))
         goto out;
 
-    op.cmd = EVTCHNOP_close;
-    op.u.close.port = evtchn;
-    BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
+    close.port = evtchn;
+    if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close) != 0)
+        BUG();
 
     switch (type_from_irq(irq)) {
 	case IRQT_VIRQ:

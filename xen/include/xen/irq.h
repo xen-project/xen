@@ -68,8 +68,9 @@ extern void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs);
 
 struct domain;
 struct vcpu;
-extern int pirq_guest_unmask(struct domain *p);
-extern int pirq_guest_bind(struct vcpu *p, int irq, int will_share);
-extern int pirq_guest_unbind(struct domain *p, int irq);
+extern int pirq_guest_eoi(struct domain *d, int irq);
+extern int pirq_guest_unmask(struct domain *d);
+extern int pirq_guest_bind(struct vcpu *v, int irq, int will_share);
+extern int pirq_guest_unbind(struct domain *d, int irq);
 
 #endif /* __XEN_IRQ_H__ */

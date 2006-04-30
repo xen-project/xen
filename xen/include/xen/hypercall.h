@@ -9,6 +9,7 @@
 #include <xen/types.h>
 #include <xen/time.h>
 #include <public/xen.h>
+#include <public/dom0_ops.h>
 #include <public/acm_ops.h>
 #include <public/event_channel.h>
 #include <asm/hypercall.h>
@@ -47,7 +48,7 @@ do_set_timer_op(
 
 extern long
 do_event_channel_op(
-    XEN_GUEST_HANDLE(evtchn_op_t) uop);
+    int cmd, XEN_GUEST_HANDLE(void) arg);
 
 extern long
 do_xen_version(

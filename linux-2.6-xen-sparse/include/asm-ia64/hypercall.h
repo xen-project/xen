@@ -202,9 +202,16 @@ HYPERVISOR_memory_op(
 
 static inline int
 HYPERVISOR_event_channel_op(
-    void *op)
+    int cmd, void *arg)
 {
-    return _hypercall1(int, event_channel_op, op);
+    int rc = _hypercall2(int, event_channel_op, cmd, arg);
+    if (unlikely(rc == -ENOSYS)) {
+        struct evtchn_op op;
+        op.cmd = cmd;
+        memcpy(&op.u, arg, sizeof(op.u));
+        rc = _hypercall1(int, event_channel_op_compat, &op);
+    }
+    return rc;
 }
 
 static inline int
@@ -223,9 +230,16 @@ HYPERVISOR_console_io(
 
 static inline int
 HYPERVISOR_physdev_op(
-    void *physdev_op)
+    int cmd, void *arg)
 {
-    return _hypercall1(int, physdev_op, physdev_op);
+    int rc = _hypercall2(int, physdev_op, cmd, arg);
+    if (unlikely(rc == -ENOSYS)) {
+        struct physdev_op op;
+        op.cmd = cmd;
+        memcpy(&op.u, arg, sizeof(op.u));
+        rc = _hypercall1(int, physdev_op_compat, &op);
+    }
+    return rc;
 }
 
 static inline int

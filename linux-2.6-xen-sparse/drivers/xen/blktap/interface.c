@@ -70,10 +70,7 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 {
 	blkif_sring_t *sring;
 	int err;
-	evtchn_op_t op = {
-		.cmd = EVTCHNOP_bind_interdomain,
-		.u.bind_interdomain.remote_dom  = blkif->domid,
-		.u.bind_interdomain.remote_port = evtchn };
+	struct evtchn_bind_interdomain bind_interdomain;
 
 	if ((blkif->blk_ring_area = alloc_vm_area(PAGE_SIZE)) == NULL)
 		return -ENOMEM;
@@ -84,14 +81,18 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 		return err;
 	}
 
-	err = HYPERVISOR_event_channel_op(&op);
+	bind_interdomain.remote_dom  = blkif->domid;
+	bind_interdomain.remote_port = evtchn;
+
+	err = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain,
+					  &bind_interdomain);
 	if (err) {
 		unmap_frontend_page(blkif);
 		free_vm_area(blkif->blk_ring_area);
 		return err;
 	}
 
-	blkif->evtchn = op.u.bind_interdomain.local_port;
+	blkif->evtchn = bind_interdomain.local_port;
 
 	sring = (blkif_sring_t *)blkif->blk_ring_area->addr;
 	BACK_RING_INIT(&blkif->blk_ring, sring, PAGE_SIZE);

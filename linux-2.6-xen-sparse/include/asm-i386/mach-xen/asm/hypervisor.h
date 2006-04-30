@@ -40,6 +40,8 @@
 #include <linux/errno.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/dom0_ops.h>
+#include <xen/interface/event_channel.h>
+#include <xen/interface/physdev.h>
 #include <xen/interface/sched.h>
 #include <xen/interface/nmi.h>
 #include <asm/ptrace.h>

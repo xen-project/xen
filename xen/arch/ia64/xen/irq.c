@@ -411,22 +411,40 @@ void __do_IRQ_guest(int irq)
     }
 }
 
+int pirq_guest_eoi(struct domain *d, int irq)
+{
+    irq_desc_t *desc;
+
+    if ( (irq < 0) || (irq >= NR_IRQS) )
+        return -EINVAL;
+
+    desc = &irq_desc[irq];
+    spin_lock_irq(&desc->lock);
+    if ( test_and_clear_bit(irq, &d->pirq_mask) &&
+         (--((irq_guest_action_t *)desc->action)->in_flight == 0) )
+        desc->handler->end(irq);
+    spin_unlock_irq(&desc->lock);
+
+    return 0;
+
+}
+
 int pirq_guest_unmask(struct domain *d)
 {
     irq_desc_t    *desc;
-    int            pirq;
+    int            irq;
     shared_info_t *s = d->shared_info;
 
-    for ( pirq = find_first_bit(d->pirq_mask, NR_PIRQS);
-          pirq < NR_PIRQS;
-          pirq = find_next_bit(d->pirq_mask, NR_PIRQS, pirq+1) )
+    for ( irq = find_first_bit(d->pirq_mask, NR_PIRQS);
+          irq < NR_PIRQS;
+          irq = find_next_bit(d->pirq_mask, NR_PIRQS, irq+1) )
     {
-        desc = &irq_desc[pirq];
+        desc = &irq_desc[irq];
         spin_lock_irq(&desc->lock);
-        if ( !test_bit(d->pirq_to_evtchn[pirq], &s->evtchn_mask[0]) &&
-             test_and_clear_bit(pirq, &d->pirq_mask) &&
+        if ( !test_bit(d->pirq_to_evtchn[irq], &s->evtchn_mask[0]) &&
+             test_and_clear_bit(irq, &d->pirq_mask) &&
              (--((irq_guest_action_t *)desc->action)->in_flight == 0) )
-            desc->handler->end(pirq);
+            desc->handler->end(irq);
         spin_unlock_irq(&desc->lock);
     }
 

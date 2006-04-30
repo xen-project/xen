@@ -135,7 +135,9 @@ static inline void acm_post_dom0_op(struct dom0_op *op, void *ssid)
 { return; }
 static inline void acm_fail_dom0_op(struct dom0_op *op, void *ssid) 
 { return; }
-static inline int acm_pre_event_channel(struct evtchn_op *op) 
+static inline int acm_pre_eventchannel_unbound(domid_t id1, domid_t id2)
+{ return 0; }
+static inline int acm_pre_eventchannel_interdomain(domid_t id)
 { return 0; }
 static inline int acm_pre_grant_map_ref(domid_t id) 
 { return 0; }
@@ -287,26 +289,6 @@ static inline void acm_fail_dom0_op(struct dom0_op *op, void *ssid)
             current->domain->ssid, op->u.createdomain.ssidref);
         break;
     }
-}
-
-static inline int acm_pre_event_channel(struct evtchn_op *op) 
-{
-    int ret = -EACCES;
-
-    switch(op->cmd) {
-    case EVTCHNOP_alloc_unbound:
-        ret = acm_pre_eventchannel_unbound(
-                  op->u.alloc_unbound.dom,
-                  op->u.alloc_unbound.remote_dom);
-        break;
-    case EVTCHNOP_bind_interdomain:
-        ret = acm_pre_eventchannel_interdomain(
-                  op->u.bind_interdomain.remote_dom);
-        break;
-    default:
-        ret = 0; /* ok */
-    }
-    return ret;
 }
 
 static inline int acm_pre_grant_map_ref(domid_t id)

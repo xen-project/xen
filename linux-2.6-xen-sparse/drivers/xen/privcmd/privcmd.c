@@ -35,7 +35,7 @@
 static struct proc_dir_entry *privcmd_intf;
 static struct proc_dir_entry *capabilities_intf;
 
-#define NR_HYPERCALLS 32
+#define NR_HYPERCALLS 64
 static DECLARE_BITMAP(hypercall_permission_map, NR_HYPERCALLS);
 
 static int privcmd_ioctl(struct inode *inode, struct file *file,
