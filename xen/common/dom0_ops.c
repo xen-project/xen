@@ -641,7 +641,7 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         unsigned int pirq = op->u.irq_permission.pirq;
 
         ret = -EINVAL;
-        if ( pirq >= NR_PIRQS )
+        if ( pirq >= NR_IRQS )
             break;
 
         ret = -ESRCH;

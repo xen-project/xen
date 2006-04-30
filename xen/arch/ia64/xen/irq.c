@@ -435,9 +435,9 @@ int pirq_guest_unmask(struct domain *d)
     int            irq;
     shared_info_t *s = d->shared_info;
 
-    for ( irq = find_first_bit(d->pirq_mask, NR_PIRQS);
-          irq < NR_PIRQS;
-          irq = find_next_bit(d->pirq_mask, NR_PIRQS, irq+1) )
+    for ( irq = find_first_bit(d->pirq_mask, NR_IRQS);
+          irq < NR_IRQS;
+          irq = find_next_bit(d->pirq_mask, NR_IRQS, irq+1) )
     {
         desc = &irq_desc[irq];
         spin_lock_irq(&desc->lock);

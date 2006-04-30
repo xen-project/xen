@@ -356,9 +356,9 @@ int pirq_guest_unmask(struct domain *d)
     unsigned int   irq;
     shared_info_t *s = d->shared_info;
 
-    for ( irq = find_first_bit(d->pirq_mask, NR_PIRQS);
-          irq < NR_PIRQS;
-          irq = find_next_bit(d->pirq_mask, NR_PIRQS, irq+1) )
+    for ( irq = find_first_bit(d->pirq_mask, NR_IRQS);
+          irq < NR_IRQS;
+          irq = find_next_bit(d->pirq_mask, NR_IRQS, irq+1) )
     {
         if ( !test_bit(d->pirq_to_evtchn[irq], s->evtchn_mask) )
             __pirq_guest_eoi(d, irq);
@@ -409,9 +409,6 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     unsigned long       flags;
     int                 rc = 0;
     cpumask_t           cpumask = CPU_MASK_NONE;
-
-    if ( (irq < 0) || (irq >= NR_IRQS) )
-        return -EINVAL;
 
  retry:
     vector = irq_to_vector(irq);

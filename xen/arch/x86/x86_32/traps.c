@@ -243,6 +243,7 @@ unsigned long do_iret(void)
     return regs->eax;
 }
 
+#include <asm/asm_defns.h>
 BUILD_SMP_INTERRUPT(deferred_nmi, TRAP_deferred_nmi)
 fastcall void smp_deferred_nmi(struct cpu_user_regs *regs)
 {
