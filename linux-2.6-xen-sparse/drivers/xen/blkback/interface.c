@@ -74,7 +74,7 @@ static int map_frontend_page(blkif_t *blkif, unsigned long shared_page)
 	blkif->shmem_ref = shared_page;
 	blkif->shmem_handle = op.handle;
 
-#if defined(__ia64__) && !defined(CONFIG_XEN_IA64_DOM0_VP)
+#ifdef CONFIG_XEN_IA64_DOM0_NON_VP
 	/* on some arch's, map_grant_ref behaves like mmap, in that the
 	 * passed address is a hint and a different address may be returned */
 	blkif->blk_ring_area->addr = gnttab_map_vaddr(op);
