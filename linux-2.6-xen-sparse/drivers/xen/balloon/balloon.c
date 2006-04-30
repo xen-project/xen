@@ -540,6 +540,8 @@ struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 	unsigned long vstart, flags;
 	unsigned int  order = get_order(nr_pages * PAGE_SIZE);
 	int ret;
+	unsigned long i;
+	struct page *page;
 
 	vstart = __get_free_pages(GFP_KERNEL, order);
 	if (vstart == 0)
@@ -559,7 +561,12 @@ struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 
 	flush_tlb_all();
 
-	return virt_to_page(vstart);
+	page = virt_to_page(vstart);
+
+	for (i = 0; i < (1UL << order); i++)
+		set_page_count(page + i, 1);
+
+	return page;
 }
 
 void balloon_dealloc_empty_page_range(
@@ -569,8 +576,10 @@ void balloon_dealloc_empty_page_range(
 	unsigned int  order = get_order(nr_pages * PAGE_SIZE);
 
 	balloon_lock(flags);
-	for (i = 0; i < (1UL << order); i++)
+	for (i = 0; i < (1UL << order); i++) {
+		BUG_ON(page_count(page + i) != 1);
 		balloon_append(page + i);
+	}
 	balloon_unlock(flags);
 
 	schedule_work(&balloon_worker);
