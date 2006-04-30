@@ -241,6 +241,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	return ret;
 }
 
+#ifndef HAVE_ARCH_PRIVCMD_MMAP
 static int privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 {
 	/* DONTCOPY is essential for Xen as copy_page_range is broken. */
@@ -248,6 +249,7 @@ static int privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 
 	return 0;
 }
+#endif
 
 static struct file_operations privcmd_file_ops = {
 	.ioctl = privcmd_ioctl,
