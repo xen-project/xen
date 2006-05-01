@@ -235,23 +235,35 @@ static void net_rx_action(unsigned long unused)
 		vdata   = (unsigned long)skb->data;
 		old_mfn = virt_to_mfn(vdata);
 
-		/* Memory squeeze? Back off for an arbitrary while. */
-		if ((new_mfn = alloc_mfn()) == 0) {
-			if ( net_ratelimit() )
-				WPRINTK("Memory squeeze in netback driver.\n");
-			mod_timer(&net_timer, jiffies + HZ);
-			skb_queue_head(&rx_queue, skb);
-			break;
-		}
-		/*
-		 * Set the new P2M table entry before reassigning the old data
-		 * page. Heed the comment in pgtable-2level.h:pte_page(). :-)
-		 */
-		set_phys_to_machine(__pa(skb->data) >> PAGE_SHIFT, new_mfn);
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			/* Memory squeeze? Back off for an arbitrary while. */
+			if ((new_mfn = alloc_mfn()) == 0) {
+				if ( net_ratelimit() )
+					WPRINTK("Memory squeeze in netback "
+						"driver.\n");
+				mod_timer(&net_timer, jiffies + HZ);
+				skb_queue_head(&rx_queue, skb);
+				break;
+			}
+			/*
+			 * Set the new P2M table entry before reassigning
+			 * the old data page. Heed the comment in
+			 * pgtable-2level.h:pte_page(). :-)
+			 */
+			set_phys_to_machine(
+				__pa(skb->data) >> PAGE_SHIFT,
+				new_mfn);
 
-		MULTI_update_va_mapping(mcl, vdata,
-					pfn_pte_ma(new_mfn, PAGE_KERNEL), 0);
-		mcl++;
+			MULTI_update_va_mapping(mcl, vdata,
+						pfn_pte_ma(new_mfn,
+							   PAGE_KERNEL), 0);
+			mcl++;
+
+			mmu->ptr = ((maddr_t)new_mfn << PAGE_SHIFT) |
+				MMU_MACHPHYS_UPDATE;
+			mmu->val = __pa(vdata) >> PAGE_SHIFT;
+			mmu++;
+		}
 
 		gop->mfn = old_mfn;
 		gop->domid = netif->domid;
@@ -260,13 +272,6 @@ static void net_rx_action(unsigned long unused)
 		netif->rx.req_cons++;
 		gop++;
 
-		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-			mmu->ptr = ((maddr_t)new_mfn << PAGE_SHIFT) |
-				MMU_MACHPHYS_UPDATE;
-			mmu->val = __pa(vdata) >> PAGE_SHIFT;
-			mmu++;
-		}
-
 		__skb_queue_tail(&rxq, skb);
 
 		/* Filled the batch queue? */
@@ -274,22 +279,24 @@ static void net_rx_action(unsigned long unused)
 			break;
 	}
 
-	if (mcl == rx_mcl)
-		return;
+	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+		if (mcl == rx_mcl)
+			return;
 
-	mcl[-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
+		mcl[-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
 
-	if (mmu - rx_mmu) {
-		mcl->op = __HYPERVISOR_mmu_update;
-		mcl->args[0] = (unsigned long)rx_mmu;
-		mcl->args[1] = mmu - rx_mmu;
-		mcl->args[2] = 0;
-		mcl->args[3] = DOMID_SELF;
-		mcl++;
+		if (mmu - rx_mmu) {
+			mcl->op = __HYPERVISOR_mmu_update;
+			mcl->args[0] = (unsigned long)rx_mmu;
+			mcl->args[1] = mmu - rx_mmu;
+			mcl->args[2] = 0;
+			mcl->args[3] = DOMID_SELF;
+			mcl++;
+		}
+
+		ret = HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
+		BUG_ON(ret != 0);
 	}
-
-	ret = HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
-	BUG_ON(ret != 0);
 
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_transfer, grant_rx_op, 
 					gop - grant_rx_op);
@@ -308,8 +315,11 @@ static void net_rx_action(unsigned long unused)
 		netif->stats.tx_bytes += size;
 		netif->stats.tx_packets++;
 
-		/* The update_va_mapping() must not fail. */
-		BUG_ON(mcl->result != 0);
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			/* The update_va_mapping() must not fail. */
+			BUG_ON(mcl->result != 0);
+			mcl++;
+		}
 
 		/* Check the reassignment error code. */
 		status = NETIF_RSP_OKAY;
@@ -340,7 +350,6 @@ static void net_rx_action(unsigned long unused)
 
 		netif_put(netif);
 		dev_kfree_skb(skb);
-		mcl++;
 		gop++;
 	}
 
