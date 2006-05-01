@@ -41,7 +41,7 @@ static inline void kb_wait(void)
             break;
 }
 
-static void __machine_halt(void *unused) __attribute__((noreturn))
+static void  __attribute__((noreturn)) __machine_halt(void *unused)
 {
     for ( ; ; )
         __asm__ __volatile__ ( "hlt" );

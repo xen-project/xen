@@ -63,8 +63,6 @@
   name:
 #endif
 
-#define barrier() __asm__ __volatile__("": : :"memory")
-
 /* A power-of-two value greater than or equal to number of hypercalls. */
 #define NR_hypercalls 64
 

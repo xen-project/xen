@@ -79,8 +79,6 @@ extern struct page_info *mem_map;
 extern char _end[]; /* standard ELF symbol */
 
 // linux/include/linux/compiler.h
-#define __attribute_const__
-#define __user
 //#define __kernel
 //#define __safe
 #define __force
@@ -98,7 +96,6 @@ extern char _end[]; /* standard ELF symbol */
 // xen/include/asm/config.h
 //#define HZ 1000
 // FIXME SMP: leave SMP for a later time
-#define barrier() __asm__ __volatile__("": : :"memory")
 
 ///////////////////////////////////////////////////////////////
 // xen/include/asm/config.h

@@ -1,17 +1,21 @@
 #ifndef __LINUX_COMPILER_H
 #define __LINUX_COMPILER_H
 
-/* Somewhere in the middle of the GCC 2.96 development cycle, we implemented
-   a mechanism by which the user can annotate likely branch directions and
-   expect the blocks to be reordered appropriately.  Define __builtin_expect
-   to nothing for earlier compilers.  */
-
-#if __GNUC__ == 2 && __GNUC_MINOR__ < 96
-#define __builtin_expect(x, expected_value) (x)
+#if !defined(__GNUC__) || (__GNUC__ < 3)
+#error Sorry, your compiler is too old/not recognized.
 #endif
 
-#define likely(x)	__builtin_expect((x),1)
-#define unlikely(x)	__builtin_expect((x),0)
+#define barrier()     __asm__ __volatile__("": : :"memory")
+
+#define likely(x)     __builtin_expect((x),1)
+#define unlikely(x)   __builtin_expect((x),0)
+
+#define inline        __inline__
+#define always_inline __inline__ __attribute__ ((always_inline))
+#define noinline      __attribute__((noinline))
+
+#define __attribute_pure__  __attribute__((pure))
+#define __attribute_const__ __attribute__((__const__))
 
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 3)
 #define __attribute_used__ __attribute__((__used__))
@@ -23,6 +27,12 @@
 #define __must_check __attribute__((warn_unused_result))
 #else
 #define __must_check
+#endif
+
+#if __GNUC__ > 3
+#define offsetof(a,b) __builtin_offsetof(a,b)
+#else
+#define offsetof(a,b) ((unsigned long)&(((a *)0)->b))
 #endif
 
 /* This macro obfuscates arithmetic on a variable address so that gcc
