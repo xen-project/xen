@@ -37,6 +37,8 @@
 #ifndef __HYPERCALL_H__
 #define __HYPERCALL_H__
 
+#include <linux/string.h> /* memcpy() */
+
 #ifndef __HYPERVISOR_H__
 # error "please don't include this file directly"
 #endif
