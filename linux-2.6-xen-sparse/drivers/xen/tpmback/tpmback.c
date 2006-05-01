@@ -297,7 +297,7 @@ int _packet_write(struct packet *pak,
 
 		pfn = __pa(MMAP_VADDR(tpmif, i)) >> PAGE_SHIFT;
 		mfn = FOREIGN_FRAME(map_op.dev_bus_addr >> PAGE_SHIFT);
-		mfn_orig = phys_to_machine_mapping[pfn];
+		mfn_orig = pfn_to_mfn(pfn);
 
 		set_phys_to_machine(pfn, mfn);
 
