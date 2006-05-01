@@ -99,7 +99,7 @@ config XEN_BLKDEV_TAP_BE
 
 config XEN_NETDEV_BACKEND
 	tristate "Network-device backend driver"
-        depends on XEN_BACKEND
+        depends on XEN_BACKEND && NET
 	default y
 	help
 	  The network-device backend driver allows the kernel to export its
@@ -155,7 +155,7 @@ config XEN_BLKDEV_FRONTEND
 
 config XEN_NETDEV_FRONTEND
 	tristate "Network-device frontend driver"
-	depends on XEN
+	depends on XEN && NET
 	default y
 	help
 	  The network-device frontend driver allows the kernel to access
