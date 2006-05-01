@@ -41,7 +41,7 @@ static inline void kb_wait(void)
             break;
 }
 
-void __attribute__((noreturn)) __machine_halt(void *unused)
+static void __machine_halt(void *unused) __attribute__((noreturn))
 {
     for ( ; ; )
         __asm__ __volatile__ ( "hlt" );
@@ -127,7 +127,7 @@ static const unsigned char jump_to_bios [] =
  * specified by the code and length parameters.
  * We assume that length will aways be less that MAX_LENGTH!
  */
-void machine_real_restart(const unsigned char *code, unsigned length)
+static void machine_real_restart(const unsigned char *code, unsigned length)
 {
     local_irq_disable();
 
