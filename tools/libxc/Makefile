@@ -16,6 +16,7 @@ SRCS       += xc_core.c
 SRCS       += xc_domain.c
 SRCS       += xc_evtchn.c
 SRCS       += xc_misc.c
+SRCS       += xc_acm.c   
 SRCS       += xc_physdev.c
 SRCS       += xc_private.c
 SRCS       += xc_sedf.c
@@ -26,6 +27,10 @@ SRCS       += xc_ptrace.c
 SRCS       += xc_ptrace_core.c
 SRCS       += xc_pagetab.c
 endif
+
+SRCS_Linux += xc_linux.c
+
+SRCS       += $(SRCS_Linux)
 
 BUILD_SRCS :=
 BUILD_SRCS += xc_linux_build.c

@@ -6,19 +6,6 @@
 
 #include "xc_private.h"
 
-int xc_interface_open(void)
-{
-    int fd = open("/proc/xen/privcmd", O_RDWR);
-    if ( fd == -1 )
-        PERROR("Could not obtain handle on privileged command interface");
-    return fd;
-}
-
-int xc_interface_close(int xc_handle)
-{
-    return close(xc_handle);
-}
-
 int xc_readconsolering(int xc_handle,
                        char **pbuffer,
                        unsigned int *pnr_chars,

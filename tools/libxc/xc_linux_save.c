@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 
+#include "xc_private.h"
 #include "xg_private.h"
 #include "xg_save_restore.h"
 
@@ -505,7 +506,6 @@ static unsigned long *xc_map_m2p(int xc_handle,
                                  int prot)
 {
     struct xen_machphys_mfn_list xmml;
-    privcmd_mmap_t ioctlx;
     privcmd_mmap_entry_t *entries;
     unsigned long m2p_chunks, m2p_size;
     unsigned long *m2p;
@@ -539,18 +539,15 @@ static unsigned long *xc_map_m2p(int xc_handle,
         return NULL;
     }
 
-    ioctlx.num   = m2p_chunks;
-    ioctlx.dom   = DOMID_XEN;
-    ioctlx.entry = entries;
-
     for (i=0; i < m2p_chunks; i++) {
         entries[i].va = (unsigned long)(((void *)m2p) + (i * M2P_CHUNK_SIZE));
         entries[i].mfn = extent_start[i];
         entries[i].npages = M2P_CHUNK_SIZE >> PAGE_SHIFT;
     }
 
-    if ((rc = ioctl(xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx)) < 0) {
-        ERR("ioctl_mmap failed (rc = %d)", rc);
+    if ((rc = xc_map_foreign_ranges(xc_handle, DOMID_XEN,
+        entries, m2p_chunks)) < 0) {
+        ERR("xc_mmap_foreign_ranges failed (rc = %d)", rc);
         return NULL;
     }
 

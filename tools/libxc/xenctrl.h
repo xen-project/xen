@@ -19,6 +19,7 @@
 #include <xen/sched_ctl.h>
 #include <xen/memory.h>
 #include <xen/acm.h>
+#include <xen/acm_ops.h>
 
 #ifdef __ia64__
 #define XC_PAGE_SHIFT           14
@@ -560,6 +561,18 @@ int xc_tbuf_set_size(int xc_handle, uint32_t size);
  */
 int xc_tbuf_get_size(int xc_handle, uint32_t *size);
 
+/**
+ * This function retrieves the machine frame of the trace buffer.
+
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm mfn will contain the machine frame of the buffer.
+ * @return 0 on success, -1 on failure.
+ */
+int xc_tbuf_get_mfn(int xc_handle, unsigned long *mfn);
+
+int xc_tbuf_set_cpu_mask(int xc_handle, uint32_t mask);
+
+int xc_tbuf_set_evt_mask(int xc_handle, uint32_t mask);
 
 /* Execute a privileged dom0 operation. */
 int xc_dom0_op(int xc_handle, dom0_op_t *op);
@@ -580,5 +593,7 @@ xc_mmu_t *xc_init_mmu_updates(int xc_handle, domid_t dom);
 int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu,
                    unsigned long long ptr, unsigned long long val);
 int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu);
+
+int xc_acm_op(int xc_handle, struct acm_op *op);
 
 #endif

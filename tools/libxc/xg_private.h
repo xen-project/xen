@@ -13,7 +13,7 @@
 #include "xenctrl.h"
 #include "xenguest.h"
 
-#include <xen/linux/privcmd.h>
+#include <xen/sys/privcmd.h>
 #include <xen/memory.h>
 
 /* valgrind cannot see when a hypercall has filled in some values.  For this

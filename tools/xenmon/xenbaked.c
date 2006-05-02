@@ -410,14 +410,13 @@ void get_tbufs(unsigned long *mfn, unsigned long *size)
 struct t_buf *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
                         unsigned long size)
 {
-    int xc_handle;                  /* file descriptor for /proc/xen/privcmd */
+    int xc_handle;
     struct t_buf *tbufs_mapped;
 
     xc_handle = xc_interface_open();
 
     if ( xc_handle < 0 ) 
     {
-        PERROR("Open /proc/xen/privcmd when mapping trace buffers\n");
         exit(EXIT_FAILURE);
     }
 

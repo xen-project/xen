@@ -28,51 +28,22 @@
 #include <netinet/in.h>
 #include <xen/acm.h>
 #include <xen/acm_ops.h>
-#include <xen/linux/privcmd.h>
+
+#include <xenctrl.h>
 
 #define PERROR(_m, _a...) \
 fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a ,    \
     errno, strerror(errno))
 
-
-
-static inline int do_acm_op(int xc_handle, struct acm_op *op)
-{
-    int ret = -1;
-    privcmd_hypercall_t hypercall;
-
-    op->interface_version = ACM_INTERFACE_VERSION;
-
-    hypercall.op = __HYPERVISOR_acm_op;
-    hypercall.arg[0] = (unsigned long) op;
-
-    if (mlock(op, sizeof(*op)) != 0) {
-        PERROR("Could not lock memory for Xen policy hypercall");
-        goto out1;
-    }
-    ret = ioctl(xc_handle, IOCTL_PRIVCMD_HYPERCALL, &hypercall);
-    if (ret < 0) {
-        if (errno == EACCES)
-            PERROR("ACM operation failed.");
-        goto out2;
-    }
- out2:
-    munlock(op, sizeof(*op));
- out1:
-    return ret;
-}
-
-
-
 /* generic shared function */
 void * __getssid(int domid, uint32_t *buflen)
 {
     struct acm_op op;
-    int acm_cmd_fd;
+    int xc_handle;
     #define SSID_BUFFER_SIZE    4096
     void *buf = NULL;
 
-    if ((acm_cmd_fd = open("/proc/xen/privcmd", O_RDONLY)) < 0) {
+    if ((xc_handle = xc_interface_open()) < 0) {
         goto out1;
     }
     if ((buf = malloc(SSID_BUFFER_SIZE)) == NULL) {
@@ -87,7 +58,9 @@ void * __getssid(int domid, uint32_t *buflen)
     op.u.getssid.get_ssid_by = DOMAINID;
     op.u.getssid.id.domainid = domid;
 
-    if (do_acm_op(acm_cmd_fd, &op) < 0) {
+    if (xc_acm_op(xc_handle, &op) < 0) {
+        if (errno == EACCES)
+            PERROR("ACM operation failed.");
         free(buf);
         buf = NULL;
         goto out2;
@@ -96,7 +69,7 @@ void * __getssid(int domid, uint32_t *buflen)
         goto out2;
     }
  out2:
-    close(acm_cmd_fd);
+    xc_interface_close(xc_handle);
  out1:
     return buf;
 }
@@ -175,13 +148,13 @@ static PyObject *getdecision(PyObject * self, PyObject * args)
 {
     char *arg1_name, *arg1, *arg2_name, *arg2, *decision = NULL;
     struct acm_op op;
-    int acm_cmd_fd, ret;
+    int xc_handle;
 
     if (!PyArg_ParseTuple(args, "ssss", &arg1_name, &arg1, &arg2_name, &arg2)) {
         return NULL;
     }
 
-    if ((acm_cmd_fd = open("/proc/xen/privcmd", O_RDONLY)) <= 0) {
+    if ((xc_handle = xc_interface_open()) <= 0) {
         PERROR("Could not open xen privcmd device!\n");
         return NULL;
     }
@@ -208,8 +181,12 @@ static PyObject *getdecision(PyObject * self, PyObject * args)
         op.u.getdecision.id2.ssidref = atol(arg2);
     }
 
-    ret = do_acm_op(acm_cmd_fd, &op);
-    close(acm_cmd_fd);
+    if (xc_acm_op(xc_handle, &op) < 0) {
+        if (errno == EACCES)
+            PERROR("ACM operation failed.");
+    }
+
+    xc_interface_close(xc_handle);
 
     if (op.u.getdecision.acm_decision == ACM_ACCESS_PERMITTED)
         decision = "PERMITTED";

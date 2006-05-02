@@ -5,63 +5,6 @@
  */
 
 #include "xc_private.h"
-#include <xen/memory.h>
-
-void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
-                           unsigned long *arr, int num )
-{
-    privcmd_mmapbatch_t ioctlx;
-    void *addr;
-    addr = mmap(NULL, num*PAGE_SIZE, prot, MAP_SHARED, xc_handle, 0);
-    if ( addr == MAP_FAILED )
-        return NULL;
-
-    ioctlx.num=num;
-    ioctlx.dom=dom;
-    ioctlx.addr=(unsigned long)addr;
-    ioctlx.arr=arr;
-    if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx ) < 0 )
-    {
-        int saved_errno = errno;
-        perror("XXXXXXXX");
-        (void)munmap(addr, num*PAGE_SIZE);
-        errno = saved_errno;
-        return NULL;
-    }
-    return addr;
-
-}
-
-/*******************/
-
-void *xc_map_foreign_range(int xc_handle, uint32_t dom,
-                           int size, int prot,
-                           unsigned long mfn )
-{
-    privcmd_mmap_t ioctlx;
-    privcmd_mmap_entry_t entry;
-    void *addr;
-    addr = mmap(NULL, size, prot, MAP_SHARED, xc_handle, 0);
-    if ( addr == MAP_FAILED )
-        return NULL;
-
-    ioctlx.num=1;
-    ioctlx.dom=dom;
-    ioctlx.entry=&entry;
-    entry.va=(unsigned long) addr;
-    entry.mfn=mfn;
-    entry.npages=(size+PAGE_SIZE-1)>>PAGE_SHIFT;
-    if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx ) < 0 )
-    {
-        int saved_errno = errno;
-        (void)munmap(addr, size);
-        errno = saved_errno;
-        return NULL;
-    }
-    return addr;
-}
-
-/*******************/
 
 /* NB: arr must be mlock'ed */
 int xc_get_pfn_type_batch(int xc_handle,

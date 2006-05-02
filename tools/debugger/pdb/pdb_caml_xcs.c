@@ -21,7 +21,6 @@
 
 #include <xen/xen.h>
 #include <xen/io/domain_controller.h>
-#include <xen/linux/privcmd.h>
 
 #include <arpa/inet.h>
 #include <xcs_proto.h>

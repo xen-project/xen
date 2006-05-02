@@ -20,10 +20,21 @@
 #include <errno.h>
 #include <argp.h>
 #include <signal.h>
+#include <inttypes.h>
+#include <string.h>
 
-#include "xc_private.h"
-
+#include <xen/xen.h>
 #include <xen/trace.h>
+
+#include <xenctrl.h>
+
+#define PERROR(_m, _a...)                                       \
+do {                                                            \
+    int __saved_errno = errno;                                  \
+    fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a ,       \
+            __saved_errno, strerror(__saved_errno));            \
+    errno = __saved_errno;                                      \
+} while (0)
 
 extern FILE *stderr;
 
@@ -100,26 +111,22 @@ void write_rec(unsigned int cpu, struct t_rec *rec, FILE *out)
  */
 void get_tbufs(unsigned long *mfn, unsigned long *size)
 {
-    int ret;
-    dom0_op_t op;                        /* dom0 op we'll build             */
+    uint32_t size32;
     int xc_handle = xc_interface_open(); /* for accessing control interface */
 
-    op.cmd = DOM0_TBUFCONTROL;
-    op.interface_version = DOM0_INTERFACE_VERSION;
-    op.u.tbufcontrol.op  = DOM0_TBUF_GET_INFO;
+    if (xc_tbuf_get_size(xc_handle, &size32) != 0)
+        goto fail;
+    *size = size32;
 
-    ret = do_dom0_op(xc_handle, &op);
+    if (xc_tbuf_get_mfn(xc_handle, mfn) != 0)
+        goto fail;
 
     xc_interface_close(xc_handle);
+    return;
 
-    if ( ret != 0 )
-    {
-        PERROR("Failure to get trace buffer pointer from Xen");
-        exit(EXIT_FAILURE);
-    }
-
-    *mfn  = op.u.tbufcontrol.buffer_mfn;
-    *size = op.u.tbufcontrol.size;
+fail:
+    PERROR("Failure to get trace buffer pointer from Xen");
+    exit(EXIT_FAILURE);
 }
 
 /**
@@ -133,14 +140,13 @@ void get_tbufs(unsigned long *mfn, unsigned long *size)
 struct t_buf *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
                         unsigned long size)
 {
-    int xc_handle;                  /* file descriptor for /proc/xen/privcmd */
+    int xc_handle;
     struct t_buf *tbufs_mapped;
 
     xc_handle = xc_interface_open();
 
     if ( xc_handle < 0 ) 
     {
-        PERROR("Open /proc/xen/privcmd when mapping trace buffers\n");
         exit(EXIT_FAILURE);
     }
 
@@ -167,23 +173,16 @@ struct t_buf *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
  */
 void set_mask(uint32_t mask, int type)
 {
-    int ret;
-    dom0_op_t op;                        /* dom0 op we'll build             */
+    int ret = 0;
     int xc_handle = xc_interface_open(); /* for accessing control interface */
 
-    op.cmd = DOM0_TBUFCONTROL;
-    op.interface_version = DOM0_INTERFACE_VERSION;
-    if (type == 1) { /* cpu mask */
-        op.u.tbufcontrol.op  = DOM0_TBUF_SET_CPU_MASK;
-        op.u.tbufcontrol.cpu_mask = mask;
+    if (type == 1) {
+        ret = xc_tbuf_set_cpu_mask(xc_handle, mask);
         fprintf(stderr, "change cpumask to 0x%x\n", mask);
-    }else if (type == 0) { /* event mask */
-        op.u.tbufcontrol.op  = DOM0_TBUF_SET_EVT_MASK;
-        op.u.tbufcontrol.evt_mask = mask;
+    } else if (type == 0) {
+        ret = xc_tbuf_set_evt_mask(xc_handle, mask);
         fprintf(stderr, "change evtmask to 0x%x\n", mask);
     }
-
-    ret = do_dom0_op(xc_handle, &op);
 
     xc_interface_close(xc_handle);
 
@@ -192,7 +191,6 @@ void set_mask(uint32_t mask, int type)
         PERROR("Failure to get trace buffer pointer from Xen and set the new mask");
         exit(EXIT_FAILURE);
     }
-
 }
 
 /**
@@ -260,14 +258,11 @@ struct t_rec **init_rec_ptrs(struct t_buf **meta, unsigned int num)
  */
 unsigned int get_num_cpus(void)
 {
-    dom0_op_t op;
+    xc_physinfo_t physinfo;
     int xc_handle = xc_interface_open();
     int ret;
     
-    op.cmd = DOM0_PHYSINFO;
-    op.interface_version = DOM0_INTERFACE_VERSION;
-
-    ret = do_dom0_op(xc_handle, &op);
+    ret = xc_physinfo(xc_handle, &physinfo);
     
     if ( ret != 0 )
     {
@@ -277,10 +272,10 @@ unsigned int get_num_cpus(void)
 
     xc_interface_close(xc_handle);
 
-    return (op.u.physinfo.threads_per_core *
-            op.u.physinfo.cores_per_socket *
-            op.u.physinfo.sockets_per_node *
-            op.u.physinfo.nr_nodes);
+    return (physinfo.threads_per_core *
+            physinfo.cores_per_socket *
+            physinfo.sockets_per_node *
+            physinfo.nr_nodes);
 }
 
 

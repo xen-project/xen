@@ -15,7 +15,7 @@
 
 #include "xenctrl.h"
 
-#include <xen/linux/privcmd.h>
+#include <xen/sys/privcmd.h>
 
 /* valgrind cannot see when a hypercall has filled in some values.  For this
    reason, we must zero the privcmd_hypercall_t or dom0_op_t instance before a
@@ -56,20 +56,7 @@ static inline void safe_munlock(const void *addr, size_t len)
     errno = saved_errno;
 }
 
-static inline int do_privcmd(int xc_handle,
-                             unsigned int cmd,
-                             unsigned long data)
-{
-    return ioctl(xc_handle, cmd, data);
-}
-
-static inline int do_xen_hypercall(int xc_handle,
-                                   privcmd_hypercall_t *hypercall)
-{
-    return do_privcmd(xc_handle,
-                      IOCTL_PRIVCMD_HYPERCALL,
-                      (unsigned long)hypercall);
-}
+int do_xen_hypercall(int xc_handle, privcmd_hypercall_t *hypercall);
 
 static inline int do_xen_version(int xc_handle, int cmd, void *dest)
 {
@@ -111,23 +98,7 @@ static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
     return ret;
 }
 
-
-/*
- * ioctl-based mfn mapping interface
- */
-
-/*
-typedef struct privcmd_mmap_entry {
-    unsigned long va;
-    unsigned long mfn;
-    unsigned long npages;
-} privcmd_mmap_entry_t;
-
-typedef struct privcmd_mmap {
-    int num;
-    domid_t dom;
-    privcmd_mmap_entry_t *entry;
-} privcmd_mmap_t;
-*/
+int xc_map_foreign_ranges(int xc_handle, uint32_t dom,
+                          privcmd_mmap_entry_t *entries, int nr);
 
 #endif /* __XC_PRIVATE_H__ */
