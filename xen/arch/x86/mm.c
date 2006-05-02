@@ -2917,7 +2917,7 @@ static inline unsigned int ptwr_eip_stat_hash( unsigned long eip, domid_t id )
 
 static void ptwr_eip_stat_inc(u32 *n)
 {
-    int i, j;
+    unsigned int i, j;
 
     if ( ++(*n) != 0 )
         return;
@@ -2925,14 +2925,14 @@ static void ptwr_eip_stat_inc(u32 *n)
     *n = ~0;
 
     /* Re-scale all buckets. */
-    for ( i = 0; i <ptwr_eip_buckets; i++ )
+    for ( i = 0; i < ptwr_eip_buckets; i++ )
         for ( j = 0; j < ptwr_eip_stat_thresholdN; j++ )
             ptwr_eip_stats[i].val[j] >>= 1;
 }
 
 static void ptwr_eip_stat_update(unsigned long eip, domid_t id, int modified)
 {
-    int i, j, b;
+    unsigned int i, j, b;
 
     i = b = ptwr_eip_stat_hash(eip, id);
 
@@ -2946,7 +2946,7 @@ static void ptwr_eip_stat_update(unsigned long eip, domid_t id, int modified)
             memset(ptwr_eip_stats[i].val,0, sizeof(ptwr_eip_stats[i].val));
         }
 
-        if ( ptwr_eip_stats[i].eip == eip )
+        if ( ptwr_eip_stats[i].eip == eip && ptwr_eip_stats[i].id == id)
         {
             for ( j = 0; j < ptwr_eip_stat_thresholdN; j++ )
                 if ( modified <= ptwr_eip_stat_threshold[j] )
@@ -2975,7 +2975,7 @@ void ptwr_eip_stat_print(void)
 {
     struct domain *e;
     domid_t d;
-    int i, j;
+    unsigned int i, j;
 
     for_each_domain( e )
     {
@@ -2983,11 +2983,11 @@ void ptwr_eip_stat_print(void)
 
         for ( i = 0; i < ptwr_eip_buckets; i++ )
         {
-            if ( ptwr_eip_stats[i].eip && ptwr_eip_stats[i].id != d )
+            if ( !ptwr_eip_stats[i].eip || ptwr_eip_stats[i].id != d )
                 continue;
 
-            printk("D %d  eip %08lx ",
-                   ptwr_eip_stats[i].id, ptwr_eip_stats[i].eip);
+            printk("D %5d  eip %p ",
+                   ptwr_eip_stats[i].id, (void *)ptwr_eip_stats[i].eip);
 
             for ( j = 0; j < ptwr_eip_stat_thresholdN; j++ )
                 printk("<=%u %4u \t",
