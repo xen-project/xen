@@ -286,3 +286,11 @@ ENTRY(spurious_interrupt_bug)
 	pushl $0
 	pushl $do_spurious_interrupt_bug
 	jmp do_exception
+
+ENTRY(thread_starter)
+    popl %eax
+    popl %ebx
+    pushl %eax
+    call *%ebx
+    call exit_thread 
+    

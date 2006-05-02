@@ -7,8 +7,8 @@ struct thread
 {
     char *name;
     char *stack;
-    unsigned long eps;
-    unsigned long eip;
+    unsigned long sp;  /* Stack pointer */
+    unsigned long ip;  /* Instruction pointer */
     struct list_head thread_list;
     u32 flags;
 };
@@ -25,7 +25,9 @@ static inline struct thread* get_current(void)
     struct thread **current;
 #ifdef __i386__    
     __asm__("andl %%esp,%0; ":"=r" (current) : "r" (~8191UL));
-#endif    
+#else
+    __asm__("andq %%rsp,%0; ":"=r" (current) : "r" (~8191UL));
+#endif 
     return *current;
 }
           

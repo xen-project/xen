@@ -69,17 +69,27 @@ void idle_thread_fn(void *unused);
 
 void dump_stack(struct thread *thread)
 {
-    unsigned long *bottom = (unsigned long *)thread->stack + 2048; 
-    unsigned long *pointer = (unsigned long *)thread->eps;
+    unsigned long *bottom = (unsigned long *)(thread->stack + 2*4*1024); 
+    unsigned long *pointer = (unsigned long *)thread->sp;
     int count;
+    if(thread == current)
+    {
+#ifdef __i386__    
+        asm("movl %%esp,%0"
+            : "=r"(pointer));
+#else
+        asm("movq %%rsp,%0"
+            : "=r"(pointer));
+#endif
+    }
     printk("The stack for \"%s\"\n", thread->name);
-    for(count = 0; count < 15 && pointer < bottom; count ++)
+    for(count = 0; count < 25 && pointer < bottom; count ++)
     {
         printk("[0x%lx] 0x%lx\n", pointer, *pointer);
         pointer++;
     }
     
-    if(pointer < bottom) printk("Not the whole stack printed\n");
+    if(pointer < bottom) printk(" ... continues.\n");
 }
 
 #ifdef __i386__
@@ -95,13 +105,29 @@ void dump_stack(struct thread *thread)
                          "1:\t"                                         \
                          "popl %%ebp\n\t"                               \
                          "popfl"                                        \
-                         :"=m" (prev->eps),"=m" (prev->eip),            \
+                         :"=m" (prev->sp),"=m" (prev->ip),            \
                           "=S" (esi),"=D" (edi)             \
-                         :"m" (next->eps),"m" (next->eip),              \
+                         :"m" (next->sp),"m" (next->ip),              \
                           "2" (prev), "d" (next));                      \
 } while (0)
 #elif __x86_64__
-/* FIXME */
+#define switch_threads(prev, next) do {                                 \
+    unsigned long rsi,rdi;                                              \
+    __asm__ __volatile__("pushfq\n\t"                                   \
+                         "pushq %%rbp\n\t"                              \
+                         "movq %%rsp,%0\n\t"         /* save RSP */     \
+                         "movq %4,%%rsp\n\t"        /* restore RSP */   \
+                         "movq $1f,%1\n\t"          /* save RIP */      \
+                         "pushq %5\n\t"             /* restore RIP */   \
+                         "ret\n\t"                                      \
+                         "1:\t"                                         \
+                         "popq %%rbp\n\t"                               \
+                         "popfq"                                        \
+                         :"=m" (prev->sp),"=m" (prev->ip),            \
+                          "=S" (rsi),"=D" (rdi)             \
+                         :"m" (next->sp),"m" (next->ip),              \
+                          "2" (prev), "d" (next));                      \
+} while (0)
 #endif
 
 void inline print_runqueue(void)
@@ -151,17 +177,19 @@ void schedule(void)
     local_irq_restore(flags);
     /* Interrupting the switch is equivalent to having the next thread
        inturrupted at the return instruction. And therefore at safe point. */
-/* The thread switching only works for i386 at the moment */    
-#ifdef __i386__    
     if(prev != next) switch_threads(prev, next);
-#endif    
 }
 
 
+/* Gets run when a new thread is scheduled the first time ever, 
+   defined in x86_[32/64].S */
+extern void thread_starter(void);
 
-void exit_thread(struct thread *thread)
+
+void exit_thread(void)
 {
     unsigned long flags;
+    struct thread *thread = current;
     printk("Thread \"%s\" exited.\n", thread->name);
     local_irq_save(flags);
     /* Remove from the thread list */
@@ -174,6 +202,12 @@ void exit_thread(struct thread *thread)
     schedule();
 }
 
+/* Pushes the specified value onto the stack of the specified thread */
+static void stack_push(struct thread *thread, unsigned long value)
+{
+    thread->sp -= sizeof(unsigned long);
+    *((unsigned long *)thread->sp) = value;
+}
 
 struct thread* create_thread(char *name, void (*function)(void *), void *data)
 {
@@ -187,23 +221,17 @@ struct thread* create_thread(char *name, void (*function)(void *), void *data)
     printk("Thread \"%s\": pointer: 0x%lx, stack: 0x%lx\n", name, thread, 
             thread->stack);
     
-    thread->eps = (unsigned long)thread->stack + 4096 * 2 - 4;
+    thread->sp = (unsigned long)thread->stack + 4096 * 2;
     /* Save pointer to the thread on the stack, used by current macro */
     *((unsigned long *)thread->stack) = (unsigned long)thread;
-    *((unsigned long *)thread->eps) = (unsigned long)thread;
-    thread->eps -= 4; 
-    *((unsigned long *)thread->eps) = (unsigned long)data;
     
-    /* No return address */
-    thread->eps -= 4;
-    *((unsigned long *)thread->eps) = (unsigned long)exit_thread;
-    
-    thread->eip = (unsigned long)function;
+    stack_push(thread, (unsigned long) function);
+    stack_push(thread, (unsigned long) data);
+    thread->ip = (unsigned long) thread_starter;
      
     /* Not runable, not exited */ 
     thread->flags = 0;
     set_runnable(thread);
-    
     local_irq_save(flags);
     if(idle_thread != NULL) {
         list_add_tail(&thread->thread_list, &idle_thread->thread_list); 
@@ -213,7 +241,6 @@ struct thread* create_thread(char *name, void (*function)(void *), void *data)
         BUG();
     }
     local_irq_restore(flags);
-
     return thread;
 }
 
@@ -240,11 +267,19 @@ void idle_thread_fn(void *unused)
 void run_idle_thread(void)
 {
     /* Switch stacks and run the thread */ 
+#if defined(__i386__)
     __asm__ __volatile__("mov %0,%%esp\n\t"
                          "push %1\n\t" 
                          "ret"                                            
-                         :"=m" (idle_thread->eps)
-                         :"m" (idle_thread->eip));                          
+                         :"=m" (idle_thread->sp)
+                         :"m" (idle_thread->ip));                          
+#elif defined(__x86_64__)
+    __asm__ __volatile__("mov %0,%%rsp\n\t"
+                         "push %1\n\t" 
+                         "ret"                                            
+                         :"=m" (idle_thread->sp)
+                         :"m" (idle_thread->ip));                          
+#endif
 }
 
 
