@@ -37,7 +37,7 @@ struct perfcounter perfcounters;
 
 void perfc_printall(unsigned char key)
 {
-    int i, j, sum;
+    unsigned int i, j, sum;
     s_time_t now = NOW();
     atomic_t *counters = (atomic_t *)&perfcounters;
 
@@ -59,22 +59,28 @@ void perfc_printall(unsigned char key)
             sum = 0;
             for_each_online_cpu ( j )
                 sum += atomic_read(&counters[j]);
-            printk("TOTAL[%10d]  ", sum);
-            for_each_online_cpu ( j )
-                printk("CPU%02d[%10d]  ", j, atomic_read(&counters[j]));
+            printk("TOTAL[%10u]", sum);
+            if (sum)
+            {
+                for_each_online_cpu ( j )
+                    printk("  CPU%02d[%10d]", j, atomic_read(&counters[j]));
+            }
             counters += NR_CPUS;
             break;
         case TYPE_ARRAY:
         case TYPE_S_ARRAY:
             for ( j = sum = 0; j < perfc_info[i].nr_elements; j++ )
                 sum += atomic_read(&counters[j]);
-            printk("TOTAL[%10d]  ", sum);
+            printk("TOTAL[%10u]", sum);
 #ifdef PERF_ARRAYS
-            for ( j = 0; j < perfc_info[i].nr_elements; j++ )
+            if (sum)
             {
-                if ( (j != 0) && ((j % 4) == 0) )
-                    printk("\n                   ");
-                printk("ARR%02d[%10d]  ", j, atomic_read(&counters[j]));
+                for ( j = 0; j < perfc_info[i].nr_elements; j++ )
+                {
+                    if ( (j % 4) == 0 )
+                        printk("\n                 ");
+                    printk("  ARR%02d[%10d]", j, atomic_read(&counters[j]));
+                }
             }
 #endif
             counters += j;
@@ -90,7 +96,7 @@ void perfc_printall(unsigned char key)
 
 void perfc_reset(unsigned char key)
 {
-    int i, j;
+    unsigned int i, j;
     s_time_t now = NOW();
     atomic_t *counters = (atomic_t *)&perfcounters;
 
