@@ -116,7 +116,7 @@ void perfc_reset(unsigned char key)
             counters += NR_CPUS;
             break;
         case TYPE_ARRAY:
-            for ( j = 0; j < NR_CPUS; j++ )
+            for ( j = 0; j < perfc_info[i].nr_elements; j++ )
                 atomic_set(&counters[j],0);
         case TYPE_S_ARRAY:
             counters += perfc_info[i].nr_elements;
