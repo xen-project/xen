@@ -27,8 +27,8 @@
 #include <xen/domain.h>
 
 extern unsigned long translate_domain_mpaddr(unsigned long);
-static long do_physdev_op_compat(int cmd, XEN_GUEST_HANDLE(void) arg);
-static long do_physdev_op(XEN_GUEST_HANDLE(physdev_op_t) uop);
+static long do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop);
+static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg);
 /* FIXME: where these declarations should be there ? */
 extern int dump_privop_counts_to_user(char *, int);
 extern int zero_privop_counts_to_user(char *, int);
