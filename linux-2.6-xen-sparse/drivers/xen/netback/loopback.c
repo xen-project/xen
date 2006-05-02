@@ -127,6 +127,14 @@ static struct ethtool_ops network_ethtool_ops =
 	.set_tx_csum = ethtool_op_set_tx_csum,
 };
 
+/*
+ * Nothing to do here. Virtual interface is point-to-point and the
+ * physical interface is probably promiscuous anyway.
+ */
+static void loopback_set_multicast_list(struct net_device *dev)
+{
+}
+
 static void loopback_construct(struct net_device *dev, struct net_device *lo)
 {
 	struct net_private *np = netdev_priv(dev);
@@ -137,6 +145,7 @@ static void loopback_construct(struct net_device *dev, struct net_device *lo)
 	dev->stop            = loopback_close;
 	dev->hard_start_xmit = loopback_start_xmit;
 	dev->get_stats       = loopback_get_stats;
+	dev->set_multicast_list = loopback_set_multicast_list;
 
 	dev->tx_queue_len    = 0;
 
