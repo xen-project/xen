@@ -94,8 +94,8 @@ static void balloon_process(void *unused);
 static DECLARE_WORK(balloon_worker, balloon_process, NULL);
 static struct timer_list balloon_timer;
 
-#define PAGE_TO_LIST(p) (&(p)->ballooned)
-#define LIST_TO_PAGE(l) list_entry((l), struct page, ballooned)
+#define PAGE_TO_LIST(p) (&(p)->lru)
+#define LIST_TO_PAGE(l) list_entry((l), struct page, lru)
 #define UNLIST_PAGE(p)				\
 	do {					\
 		list_del(PAGE_TO_LIST(p));	\
