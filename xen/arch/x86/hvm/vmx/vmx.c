@@ -452,17 +452,6 @@ static void vmx_store_cpu_guest_regs(
 
     if ( regs != NULL )
     {
-#if defined (__x86_64__)
-        __vmread(GUEST_RFLAGS, &regs->rflags);
-        __vmread(GUEST_SS_SELECTOR, &regs->ss);
-        __vmread(GUEST_CS_SELECTOR, &regs->cs);
-        __vmread(GUEST_DS_SELECTOR, &regs->ds);
-        __vmread(GUEST_ES_SELECTOR, &regs->es);
-        __vmread(GUEST_GS_SELECTOR, &regs->gs);
-        __vmread(GUEST_FS_SELECTOR, &regs->fs);
-        __vmread(GUEST_RIP, &regs->rip);
-        __vmread(GUEST_RSP, &regs->rsp);
-#elif defined (__i386__)
         __vmread(GUEST_RFLAGS, &regs->eflags);
         __vmread(GUEST_SS_SELECTOR, &regs->ss);
         __vmread(GUEST_CS_SELECTOR, &regs->cs);
@@ -472,7 +461,6 @@ static void vmx_store_cpu_guest_regs(
         __vmread(GUEST_FS_SELECTOR, &regs->fs);
         __vmread(GUEST_RIP, &regs->eip);
         __vmread(GUEST_RSP, &regs->esp);
-#endif
     }
 
     if ( crs != NULL )
@@ -510,23 +498,6 @@ void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 
     ASSERT(v->arch.hvm_vmx.launch_cpu == smp_processor_id());
 
-#if defined (__x86_64__)
-    __vmwrite(GUEST_SS_SELECTOR, regs->ss);
-    __vmwrite(GUEST_DS_SELECTOR, regs->ds);
-    __vmwrite(GUEST_ES_SELECTOR, regs->es);
-    __vmwrite(GUEST_GS_SELECTOR, regs->gs);
-    __vmwrite(GUEST_FS_SELECTOR, regs->fs);
-    __vmwrite(GUEST_RSP, regs->rsp);
-
-    __vmwrite(GUEST_RFLAGS, regs->rflags);
-    if (regs->rflags & EF_TF)
-        __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
-    else
-        __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
-
-    __vmwrite(GUEST_CS_SELECTOR, regs->cs);
-    __vmwrite(GUEST_RIP, regs->rip);
-#elif defined (__i386__)
     __vmwrite(GUEST_SS_SELECTOR, regs->ss);
     __vmwrite(GUEST_DS_SELECTOR, regs->ds);
     __vmwrite(GUEST_ES_SELECTOR, regs->es);
@@ -543,7 +514,6 @@ void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 
     __vmwrite(GUEST_CS_SELECTOR, regs->cs);
     __vmwrite(GUEST_RIP, regs->eip);
-#endif
 
     /* Reload current VCPU's VMCS if it was temporarily unloaded. */
     if ( (v != current) && hvm_guest(current) )
