@@ -132,6 +132,7 @@ ROUNDTRIPPING_CONFIG_ENTRIES = [
     ('memory',     int),
     ('maxmem',     int),
     ('bootloader', str),
+    ('bootloader_args', str),
     ('features', str),
     ]
 
@@ -571,6 +572,7 @@ class XendDomainInfo:
             defaultInfo('memory',       lambda: 0)
             defaultInfo('maxmem',       lambda: 0)
             defaultInfo('bootloader',   lambda: None)
+            defaultInfo('bootloader_args', lambda: None)            
             defaultInfo('backend',      lambda: [])
             defaultInfo('device',       lambda: [])
             defaultInfo('image',        lambda: None)
@@ -1630,7 +1632,8 @@ class XendDomainInfo:
             if disk is None:
                 continue
             fn = blkdev_uname_to_file(disk)
-            blcfg = bootloader(self.info['bootloader'], fn, 1)
+            blcfg = bootloader(self.info['bootloader'], fn, 1,
+                               self.info['bootloader_args'])
             break
         if blcfg is None:
             msg = "Had a bootloader specified, but can't find disk"
