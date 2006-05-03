@@ -550,7 +550,7 @@ void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
         __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
     else
         __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
-    if (regs->rflags & EF_VM)
+    if (regs->eflags & EF_VM)
         fixup_vm86_seg_bases(regs);
 
     __vmwrite(GUEST_CS_SELECTOR, regs->cs);
