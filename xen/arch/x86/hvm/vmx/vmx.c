@@ -475,6 +475,45 @@ static void vmx_store_cpu_guest_regs(
         __vmptrld(virt_to_maddr(current->arch.hvm_vmx.vmcs));
 }
 
+/*
+ * The VMX spec (section 4.3.1.2, Checks on Guest Segment
+ * Registers) says that virtual-8086 mode guests' segment
+ * base-address fields in the VMCS must be equal to their
+ * corresponding segment selector field shifted right by
+ * four bits upon vmentry.
+ *
+ * This function (called only for VM86-mode guests) fixes
+ * the bases to be consistent with the selectors in regs
+ * if they're not already.  Without this, we can fail the
+ * vmentry check mentioned above.
+ */
+static void fixup_vm86_seg_bases(struct cpu_user_regs *regs)
+{
+    int err = 0;
+    unsigned long base;
+
+    err |= __vmread(GUEST_ES_BASE, &base);
+    if (regs->es << 4 != base)
+        err |= __vmwrite(GUEST_ES_BASE, regs->es << 4);
+    err |= __vmread(GUEST_CS_BASE, &base);
+    if (regs->cs << 4 != base)
+        err |= __vmwrite(GUEST_CS_BASE, regs->cs << 4);
+    err |= __vmread(GUEST_SS_BASE, &base);
+    if (regs->ss << 4 != base)
+        err |= __vmwrite(GUEST_SS_BASE, regs->ss << 4);
+    err |= __vmread(GUEST_DS_BASE, &base);
+    if (regs->ds << 4 != base)
+        err |= __vmwrite(GUEST_DS_BASE, regs->ds << 4);
+    err |= __vmread(GUEST_FS_BASE, &base);
+    if (regs->fs << 4 != base)
+        err |= __vmwrite(GUEST_FS_BASE, regs->fs << 4);
+    err |= __vmread(GUEST_GS_BASE, &base);
+    if (regs->gs << 4 != base)
+        err |= __vmwrite(GUEST_GS_BASE, regs->gs << 4);
+
+    BUG_ON(err);
+}
+
 void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 {
     if ( v != current )
@@ -511,6 +550,8 @@ void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
         __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
     else
         __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
+    if (regs->rflags & EF_VM)
+        fixup_vm86_seg_bases(regs);
 
     __vmwrite(GUEST_CS_SELECTOR, regs->cs);
     __vmwrite(GUEST_RIP, regs->eip);
