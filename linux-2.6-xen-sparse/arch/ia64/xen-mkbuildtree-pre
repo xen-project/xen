@@ -14,28 +14,12 @@ function try_to_mv() {
 	fi
 }
 
-function try_to_mkdir() {
-	if [ ! -e $2 ]
-	then
-		mv $1 $2
-		mkdir $1
-	fi
-}
-
-try_to_mkdir mm mm.xen-x86
-try_to_mv net net.xen-x86
-try_to_mv kernel kernel.xen-x86
-try_to_mv drivers/acpi/tables.c drivers/acpi/tables.c.xen-x86
-#try_to_mv arch/xen/kernel drivers/xen/core
-#try_to_mkdir arch/xen arch/xen.xen-x86
-#try_to_mv arch/xen.xen-x86/configs arch/xen
-#try_to_mv include/asm-generic include/asm-generic.xen-x86
-try_to_mkdir include/linux include/linux.xen-x86
+try_to_mv mm/Kconfig mm/Kconfig.xen-x86
 
 # need to grab a couple of xen-modified files for generic_page_range and
 # typedef pte_fn_t which are used by driver/xen blkif
-ln -sf ../mm.xen-x86/memory.c mm/
-ln -sf ../linux.xen-x86/mm.h include/linux/
+#ln -sf ../mm.xen-x86/memory.c mm/
+#ln -sf ../linux.xen-x86/mm.h include/linux/
 
 #eventually asm-xsi-offsets needs to be part of hypervisor.h/hypercall.h
 ln -sf ../../../../xen/include/asm-ia64/asm-xsi-offsets.h include/asm-ia64/xen/
