@@ -61,6 +61,9 @@ static unsigned long trace_values[NR_CPUS][4];
 /* Useful define */
 #define MAX_INST_SIZE  15
 
+#define set_segment_register(name, value)  \
+       __asm__ __volatile__ ( "movw %%ax ,%%" STR(name) "" : : "a" (value) )
+
 /* 
  * External functions, etc. We should move these to some suitable header file(s) */
 
@@ -681,6 +684,17 @@ static void svm_ctxt_switch_from(struct vcpu *v)
 
 static void svm_ctxt_switch_to(struct vcpu *v)
 {
+#if __x86_64__
+    /* 
+     * This is required, because VMRUN does consistency check
+     * and some of the DOM0 selectors are pointing to 
+     * invalid GDT locations, and cause AMD processors
+     * to shutdown.
+     */
+    set_segment_register(ds, 0);
+    set_segment_register(es, 0);
+    set_segment_register(ss, 0);
+#endif
 }
 
 void svm_final_setup_guest(struct vcpu *v)

@@ -428,6 +428,8 @@ void svm_do_launch(struct vcpu *v)
 	
     if (svm_dbg_on)
         svm_dump_vmcb(__func__, vmcb);
+
+    vmcb->tlb_control = 1;
 }
 
 
