@@ -7,9 +7,6 @@
 #ifndef _OS_H_
 #define _OS_H_
 
-#define NULL 0
-
-
 #if __GNUC__ == 2 && __GNUC_MINOR__ < 96
 #define __builtin_expect(x, expected_value) (x)
 #endif

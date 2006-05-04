@@ -324,7 +324,7 @@ void th_f2(void *data)
 
 void init_sched(void)
 {
-    printk("Initialising scheduler, idle_thread %p\n", idle_thread);
+    printk("Initialising scheduler\n");
 
     idle_thread = create_thread("Idle", idle_thread_fn, NULL);
     INIT_LIST_HEAD(&idle_thread->thread_list);

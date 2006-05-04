@@ -13,40 +13,6 @@
 #define ENTRY(X) .globl X ; X :
 .globl _start, shared_info, hypercall_page
 
-#define SAVE_ALL \
-        cld; \
-        pushq %rdi; \
-        pushq %rsi; \
-        pushq %rdx; \
-        pushq %rcx; \
-        pushq %rax; \
-        pushq %r8; \
-        pushq %r9; \
-        pushq %r10; \
-        pushq %r11; \
-        pushq %rbx; \
-        pushq %rbp; \
-        pushq %r12; \
-        pushq %r13; \
-        pushq %r14; \
-        pushq %r15;
-
-#define RESTORE_ALL \
-        popq  %r15; \
-        popq  %r14; \
-        popq  %r13; \
-        popq  %r12; \
-        popq  %rbp; \
-        popq  %rbx; \
-        popq  %r11; \
-        popq  %r10; \
-        popq  %r9; \
-        popq  %r8; \
-        popq  %rax; \
-        popq  %rcx; \
-        popq  %rdx; \
-        popq  %rsi; \
-        popq  %rdi
 
 _start:
         cld
@@ -240,7 +206,17 @@ error_call_handler:
 #	CFI_ENDPROC
 .endm	
 
-
+.macro errorentry sym
+#	XCPT_FRAME
+        movq (%rsp),%rcx
+        movq 8(%rsp),%r11
+        addq $0x10,%rsp /* rsp points to the error code */
+	pushq %rax
+#	CFI_ADJUST_CFA_OFFSET 8
+	leaq  \sym(%rip),%rax
+	jmp error_entry
+#	CFI_ENDPROC
+.endm
 
 #define XEN_GET_VCPU_INFO(reg)	movq HYPERVISOR_shared_info,reg
 #define XEN_PUT_VCPU_INFO(reg)
@@ -319,159 +295,84 @@ ENTRY(failsafe_callback)
         popq  %r11
         iretq
 
-error_code:
-        SAVE_ALL
-        movq  %rsp,%rdi
-        movl  15*8+4(%rsp),%eax
-        leaq  exception_table(%rip),%rdx
-        callq *(%rdx,%rax,8)
-        RESTORE_ALL
-        addq  $8,%rsp
-        iretq
-                        
-ENTRY(divide_error)
-        popq  %rcx
-        popq  %r11
-	pushq $0
-        movl  $TRAP_divide_error,4(%rsp)
-        jmp   error_code
-        
+
 ENTRY(coprocessor_error)
-        popq  %rcx
-        popq  %r11
-	pushq $0
-        movl  $TRAP_copro_error,4(%rsp)
-        jmp   error_code
+        zeroentry do_coprocessor_error
+
 
 ENTRY(simd_coprocessor_error)
-        popq  %rcx
-        popq  %r11
-	pushq $0
-        movl  $TRAP_simd_error,4(%rsp)
-        jmp   error_code
+        zeroentry do_simd_coprocessor_error
+
 
 ENTRY(device_not_available)
-        popq  %rcx
-        popq  %r11
-        movl  $TRAP_no_device,4(%rsp)
-        jmp   error_code
+        zeroentry do_device_not_available
+
 
 ENTRY(debug)
-        popq  %rcx
-        popq  %r11
-	pushq $0
-        movl  $TRAP_debug,4(%rsp)
-        jmp   error_code
+#       INTR_FRAME
+#       CFI_ADJUST_CFA_OFFSET 8 */
+        zeroentry do_debug
+#       CFI_ENDPROC
+
 
 ENTRY(int3)
-        popq  %rcx
-        popq  %r11
-	pushq $0
-        movl  $TRAP_int3,4(%rsp)
-        jmp   error_code
+#       INTR_FRAME
+#       CFI_ADJUST_CFA_OFFSET 8 */
+        zeroentry do_int3
+#       CFI_ENDPROC
 
 ENTRY(overflow)
-        popq  %rcx
-        popq  %r11
-	pushq $0
-        movl  $TRAP_overflow,4(%rsp)
-        jmp   error_code
+        zeroentry do_overflow
+
 
 ENTRY(bounds)
-        popq  %rcx
-        popq  %r11
-	pushq $0
-        movl  $TRAP_bounds,4(%rsp)
-        jmp   error_code
-
+        zeroentry do_bounds
+    
+    
 ENTRY(invalid_op)
-        popq  %rcx
-        popq  %r11
-	pushq $0
-        movl  $TRAP_invalid_op,4(%rsp)
-        jmp   error_code
+        zeroentry do_invalid_op
+
 
 ENTRY(coprocessor_segment_overrun)
-        popq  %rcx
-        popq  %r11
-	pushq $0
-        movl  $TRAP_copro_seg,4(%rsp)
-        jmp   error_code
+        zeroentry do_coprocessor_segment_overrun
+
 
 ENTRY(invalid_TSS)
-        popq  %rcx
-        popq  %r11
-        movl  $TRAP_invalid_tss,4(%rsp)
-        jmp   error_code
+        errorentry do_invalid_TSS
+
 
 ENTRY(segment_not_present)
-        popq  %rcx
-        popq  %r11
-        movl  $TRAP_no_segment,4(%rsp)
-        jmp   error_code
+        errorentry do_segment_not_present
 
+
+/* runs on exception stack */
 ENTRY(stack_segment)
-        popq  %rcx
-        popq  %r11
-        movl  $TRAP_stack_error,4(%rsp)
-        jmp   error_code
+#       XCPT_FRAME
+        errorentry do_stack_segment
+#       CFI_ENDPROC
+                    
 
 ENTRY(general_protection)
-        popq  %rcx
-        popq  %r11
-        movl  $TRAP_gp_fault,4(%rsp)
-        jmp   error_code
+        errorentry do_general_protection
+
 
 ENTRY(alignment_check)
-        popq  %rcx
-        popq  %r11
-        movl  $TRAP_alignment_check,4(%rsp)
-        jmp   error_code
+        errorentry do_alignment_check
 
-ENTRY(virt_cr2)
-        .quad 0
-ENTRY(page_fault)
-        popq  %rcx
-        popq  %r11
-        popq  virt_cr2(%rip)
-        movl  $TRAP_page_fault,4(%rsp)
-        jmp   error_code
-        
-ENTRY(machine_check)
-        popq  %rcx
-        popq  %r11
-	pushq $0
-        movl  $TRAP_machine_check,4(%rsp)
-        jmp   error_code
+
+ENTRY(divide_error)
+        zeroentry do_divide_error
+
 
 ENTRY(spurious_interrupt_bug)
-        popq  %rcx
-        popq  %r11
-	pushq $0
-        movl  $TRAP_spurious_int,4(%rsp)
-        jmp   error_code
+        zeroentry do_spurious_interrupt_bug
+            
 
-ENTRY(exception_table)
-        .quad do_divide_error
-        .quad do_debug
-        .quad 0 # nmi
-        .quad do_int3
-        .quad do_overflow
-        .quad do_bounds
-        .quad do_invalid_op
-        .quad 0
-        .quad 0
-        .quad do_coprocessor_segment_overrun
-        .quad do_invalid_TSS
-        .quad do_segment_not_present
-        .quad do_stack_segment
-        .quad do_general_protection
-        .quad do_page_fault
-        .quad do_spurious_interrupt_bug
-        .quad do_coprocessor_error
-        .quad do_alignment_check
-        .quad do_machine_check
-        .quad do_simd_coprocessor_error
+ENTRY(page_fault)
+        errorentry do_page_fault
+
+
+
 
 
 ENTRY(thread_starter)

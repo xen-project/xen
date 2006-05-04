@@ -56,6 +56,7 @@
 #define _LIB_H_
 
 #include <stdarg.h>
+#include <stddef.h>
 #include <console.h>
 
 /* printing */

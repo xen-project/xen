@@ -145,19 +145,11 @@ void subarch_init_memory(void)
      * count_info and domain fields must be adjacent, as we perform atomic
      * 64-bit operations on them.
      */
-    if ( ((offsetof(struct page_info, u.inuse._domain) != 
-           (offsetof(struct page_info, count_info) + sizeof(u32)))) ||
-         ((offsetof(struct page_info, count_info) & 7) != 0) ||
-         (sizeof(struct page_info) !=
-          (32 + BITS_TO_LONGS(NR_CPUS)*sizeof(long))) )
-    {
-        printk("Weird page_info layout (%ld,%ld,%ld,%ld)\n",
-               offsetof(struct page_info, count_info),
-               offsetof(struct page_info, u.inuse._domain),
-               sizeof(struct page_info),
-               32 + BITS_TO_LONGS(NR_CPUS)*sizeof(long));
-        for ( ; ; ) ;
-    }
+    BUILD_BUG_ON(offsetof(struct page_info, u.inuse._domain) != 
+                 (offsetof(struct page_info, count_info) + sizeof(u32)));
+    BUILD_BUG_ON((offsetof(struct page_info, count_info) & 7) != 0);
+    BUILD_BUG_ON(sizeof(struct page_info) !=
+                 (32 + BITS_TO_LONGS(NR_CPUS)*sizeof(long)));
 
     /* M2P table is mappable read-only by privileged domains. */
     for ( v  = RDWR_MPT_VIRT_START; 

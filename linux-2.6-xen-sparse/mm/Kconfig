@@ -126,14 +126,14 @@ comment "Memory hotplug is currently incompatible with Software Suspend"
 # Default to 4 for wider testing, though 8 might be more appropriate.
 # ARM's adjust_pte (unused if VIPT) depends on mm-wide page_table_lock.
 # PA-RISC 7xxx's spinlock_t would enlarge struct page from 32 to 44 bytes.
-# XEN uses the mapping field on pagetable pages to store a pointer to
-# the destructor.
+# XEN on x86 architecture uses the mapping field on pagetable pages to store a
+# pointer to the destructor. This conflicts with pte_lock_deinit().
 #
 config SPLIT_PTLOCK_CPUS
 	int
 	default "4096" if ARM && !CPU_CACHE_VIPT
 	default "4096" if PARISC && !PA20
-	default "4096" if XEN
+	default "4096" if X86_XEN || X86_64_XEN
 	default "4"
 
 #

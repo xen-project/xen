@@ -32,6 +32,7 @@ static tpmif_t *alloc_tpmif(domid_t domid, long int instance)
 	tpmif->domid = domid;
 	tpmif->status = DISCONNECTED;
 	tpmif->tpm_instance = instance;
+	snprintf(tpmif->devname, sizeof(tpmif->devname), "tpmif%d", domid);
 	atomic_set(&tpmif->refcnt, 1);
 
 	tpmif->pagerange = balloon_alloc_empty_page_range(TPMIF_TX_RING_SIZE);
@@ -144,7 +145,7 @@ int tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 	tpmif->tx = (tpmif_tx_interface_t *)tpmif->tx_area->addr;
 
 	tpmif->irq = bind_evtchn_to_irqhandler(
-		tpmif->evtchn, tpmif_be_int, 0, "tpmif-backend", tpmif);
+		tpmif->evtchn, tpmif_be_int, 0, tpmif->devname, tpmif);
 	tpmif->shmem_ref = shared_page;
 	tpmif->active = 1;
 

@@ -122,9 +122,13 @@ gopts.var('bootloader', val='FILE',
           fn=set_value, default=None,
           use="Path to bootloader.")
 
+gopts.var('bootargs', val='NAME',
+          fn=set_value, default=None,
+          use="Arguments to pass to boot loader")
+
 gopts.var('bootentry', val='NAME',
           fn=set_value, default=None,
-          use="Entry to boot via boot loader")
+          use="DEPRECATED.  Entry to boot via boot loader.  Use bootargs.")
 
 gopts.var('kernel', val='FILE',
           fn=set_value, default=None,
@@ -620,8 +624,13 @@ def run_bootloader(vals):
     (uname, dev, mode, backend) = vals.disk[0]
     file = blkif.blkdev_uname_to_file(uname)
 
+    if vals.bootentry:
+        warn("The bootentry option is deprecated.  Use bootargs and pass "
+             "--entry= directly.")
+        vals.bootargs = "--entry=%s" %(vals.bootentry,)
+
     return bootloader(vals.bootloader, file, not vals.console_autoconnect,
-                      vals.bootentry)
+                      vals.bootargs)
 
 def make_config(vals):
     """Create the domain configuration.
@@ -654,8 +663,10 @@ def make_config(vals):
         config.append(['backend', ['tpmif']])
 
     if vals.bootloader:
-        config.append(['bootloader', vals.bootloader])
         config_image = run_bootloader(vals)
+        config.append(['bootloader', vals.bootloader])
+        if vals.bootargs:
+            config.append(['bootloader_args'], vals.bootargs)
     else:
         config_image = configure_image(vals)
     config.append(['image', config_image])
