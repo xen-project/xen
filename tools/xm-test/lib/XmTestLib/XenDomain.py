@@ -28,6 +28,7 @@ from Xm import *
 from Test import *
 from config import *
 from Console import *
+from XenDevice import *
 
 BLOCK_ROOT_DEV = "hda"
 
@@ -195,6 +196,8 @@ class XenDomain:
 
         self.config = config
         self.console = None
+        self.devices = {}
+        self.netEnv = "bridge"
 
         # Set domain type, either PV for ParaVirt domU or HVM for 
         # FullVirt domain
@@ -216,6 +219,10 @@ class XenDomain:
         if self.getDomainType() == "HVM":
             waitForBoot()
 
+        # Go through device list and run console cmds
+        for dev in self.devices.keys():
+            self.devices[dev].execAddCmds()
+
         if self.console and noConsole == True:
             self.closeConsole()
 
@@ -229,6 +236,8 @@ class XenDomain:
         prog = "xm"
         cmd = " shutdown "
 
+        self.removeAllDevices()
+
         if self.console:
             self.closeConsole()
 
@@ -239,6 +248,8 @@ class XenDomain:
     def destroy(self):
         prog = "xm"
         cmd = " destroy "
+
+        self.removeAllDevices()
 
         if self.console:
             self.closeConsole()
@@ -274,6 +285,50 @@ class XenDomain:
 
         return self.console
 
+    def newDevice(self, Device, *args):
+        """Device Factory: Generic factory for creating new XenDevices.
+           All device creation should be done through the XenDomain
+           factory. Supply a XenDevice instance and its args and the
+           constructor will be called."""
+        # Make sure device with id hasn't already been added
+        if self.devices.has_key(args[0]):
+            raise DeviceError("Error: Domain already has device %s" % args[0])
+
+        # Call constructor for supplied Device instance
+        dargs = (self,)
+        dargs += args
+        dev = apply(Device, dargs)
+
+        if self.isRunning():
+            # Note: This needs to be done, XenDevice should have an attach
+            #       method.
+            print "Domain is running, need to attach new device to domain."
+
+        self.devices[dev.id] = dev
+        self.config.appOpt(dev.configNode, str(dev))
+        return dev
+
+    def removeDevice(self, id):
+        if self.devices.has_key(id):
+            self.devices[id].removeDevice()
+
+    def removeAllDevices(self):
+        for k in self.devices.keys():
+            self.removeDevice(k)
+
+    def isRunning(self):
+        return isDomainRunning(self.name)
+
+    def getNetEnv(self):
+        # We need to know the network environment: bridge, NAT, or routed.
+        return self.netEnv
+
+    def getDevice(self, id):
+        dev = self.devices[id]
+        if dev:
+            return dev
+        print "Device %s not found for domain %s" % (id, self.getName())
+
 
 class XmTestDomain(XenDomain):
 
@@ -297,6 +352,30 @@ class XmTestDomain(XenDomain):
 
     def minSafeMem(self):
         return 32
+
+class XmTestNetDomain(XmTestDomain):
+
+    def __init__(self, name=None, extraConfig=None, baseConfig=configDefaults):
+        """Create a new xm-test domain with one network device
+        @param name: The requested domain name
+        @param extraConfig: Additional configuration options
+        @param baseConfig: The initial configuration defaults to use
+        """
+        config = XenConfig()
+        config.setOpts(baseConfig)
+        if extraConfig:
+            config.setOpts(extraConfig)
+
+        if name:
+            config.setOpt("name", name)
+        elif not config.getOpt("name"):
+            config.setOpt("name", getUniqueName())
+
+        XenDomain.__init__(self, config.getOpt("name"), config=config)
+
+        # Add one network devices to domain
+        self.newDevice(XenNetDevice, "eth0")
+
 
 if __name__ == "__main__":
 

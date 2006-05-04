@@ -38,6 +38,36 @@ fi
 AM_CONDITIONAL(HVM, test x$ENABLE_HVM = xTrue)
 AC_SUBST(ENABLE_HVM)
 
+# Network needs to know ips to use: dhcp or a range of IPs in the form
+# of: 192.168.1.1-192.168.1.100
+# If not dhcp, a netmask and network address must be supplied. Defaults to
+# zeroconf range.
+NET_IP_RANGE="169.254.0.1-169.254.255.255"
+AC_ARG_WITH(net-ip-range,
+	[  --with-net-ip-range=ip-range	Set a range of ip addresses to use for xm-test guest domain networks. Can specify dhcp or a range of IPs: 192.168.1.1-192.168.1.100 [[default="169.254.0.1-169.254.255.255"]]],
+	[ NET_IP_RANGE="$withval" ])
+
+iprange=`echo $NET_IP_RANGE | perl -e 'while(<>) { print if /\d+\.\d+\.\d+\.\d+-\d+\.\d+\.\d+\.\d+/ }'`
+
+NETWORK_ADDRESS="169.254.0.0"
+AC_ARG_WITH(network-address,
+	[ --with-network-address=ip Set network address to use with ip range [[default="169.254.0.0"]]],
+	[ NETWORK_ADDRESS="$withval" ])
+
+NETMASK="255.255.0.0"
+AC_ARG_WITH(netmask,
+	[ --with-netmask=mask Set netmask to use with ip range [[default="255.255.0.0"]]],
+	[ NETMASK="$withval" ])
+
+if test "x$NET_IP_RANGE" != "xdhcp" && test -z "$iprange"
+then
+	AC_MSG_ERROR(Invalid net-ip-range.)
+fi
+
+AC_SUBST(NET_IP_RANGE)
+AC_SUBST(NETWORK_ADDRESS)
+AC_SUBST(NETMASK)
+
 AC_ARG_WITH(hvm-kernel,
       [[  --with-hvm-kernel=kernel       Use this kernel for hvm disk.img testing]],
       HVMKERNEL=$withval,

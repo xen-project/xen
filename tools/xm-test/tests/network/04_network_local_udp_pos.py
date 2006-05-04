@@ -20,24 +20,14 @@ trysizes = [ 1, 48, 64, 512, 1440, 1448, 1500, 1505, 4096, 4192,
 from XmTestLib import *
 rc = 0
 
-Net = XmNetwork()
+# Test creates 1 domain, which requires 2 ips: 1 for the domains and 1 for
+# aliases on dom0
+if xmtest_netconf.canRunNetTest(2) == False:
+    SKIP("Don't have enough free configured IPs to run this test")
 
-try:
-    # read an IP address from the config
-    ip   = Net.ip("dom1", "eth0")
-    mask = Net.mask("dom1", "eth0")
-except NetworkError, e:
-    FAIL(str(e))
+domain = XmTestDomain()
+domain.newDevice(XenNetDevice, "eth0")
 
-# Fire up a guest domain w/1 nic
-if ENABLE_HVM_SUPPORT:
-    brg = "xenbr0"
-    config = {"vif" : ['type=ioemu, bridge=%s' % brg]}
-else:
-    brg = None
-    config = {"vif" : ['ip=%s' % ip]}
-
-domain = XmTestDomain(extraConfig=config)
 try:
     console = domain.start()
 except DomainError, e:
@@ -47,10 +37,7 @@ except DomainError, e:
     FAIL(str(e))
 
 try:
-    # Bring up the "lo" interface.
-    console.runCmd("ifconfig lo 127.0.0.1")
-
-    console.runCmd("ifconfig eth0 inet "+ip+" netmask "+mask+" up")
+    console.setHistorySaveCmds(value=True)
 
     # First do loopback 
     lofails=""
@@ -63,6 +50,8 @@ try:
 
     # Next comes eth0
     eth0fails=""
+    netdev = domain.getDevice("eth0")
+    ip = netdev.getNetDevIP()
     for size in trysizes:
         out = console.runCmd("hping2 " + ip + " -E /dev/urandom -2 -q -c 20 "
               + "--fast -d " + str(size))
@@ -74,6 +63,7 @@ except ConsoleError, e:
 except NetworkError, e:
         FAIL(str(e))
 
+domain.stop()
 
 # Tally up failures
 failures=""

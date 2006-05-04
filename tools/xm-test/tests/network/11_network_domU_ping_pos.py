@@ -17,50 +17,37 @@ pingsizes = [ 1, 48, 64, 512, 1440, 1500, 1505, 4096, 4192,
 
 from XmTestLib import *
 
-def netDomain(ip):
-    if ENABLE_HVM_SUPPORT:
-        config = {"vif" : ['type=ioemu']}
-    else:
-        config = {"vif" : ['ip=%s' % ip ]}
+def netDomain():
 
-    dom = XmTestDomain(extraConfig=config)
+    dom = XmTestDomain()
+    dom.newDevice(XenNetDevice, "eth0")
     try:
         console = dom.start()
+        console.setHistorySaveCmds(value=True)
     except DomainError, e:
         if verbose:
             print "Failed to create test domain because:"
             print e.extra
         FAIL(str(e))
-    return console
+    return dom
     
 rc = 0
 
-Net = XmNetwork()
-
-try:
-    # pick an IP address 
-    ip1   = Net.ip("dom1", "eth2")
-    mask1 = Net.mask("dom1", "eth2")
-except NetworkError, e:
-    FAIL(str(e))
-
-try:
-    # pick another IP address 
-    ip2   = Net.ip("dom2", "eth2")
-    mask2 = Net.mask("dom2", "eth2")
-except NetworkError, e:
-    FAIL(str(e))
+# Test creates 2 domains, which requires 4 ips: 2 for the domains and 2 for
+# aliases on dom0
+if xmtest_netconf.canRunNetTest(4) == False:
+    SKIP("Don't have enough free configured IPs to run this test")
 
 # Fire up a pair of guest domains w/1 nic each
-pinger_console = netDomain(ip1)
-victim_console = netDomain(ip2)
+pinger = netDomain()
+pinger_console = pinger.getConsole()
+victim = netDomain()
 
 try:
-    pinger_console.runCmd("ifconfig eth0 inet "+ip1+" netmask "+mask1+" up")
-    victim_console.runCmd("ifconfig eth0 inet "+ip2+" netmask "+mask2+" up")
-
     # Ping the victim over eth0
     fails=""
+    v_netdev = victim.getDevice("eth0")
+    ip2 = v_netdev.getNetDevIP()
     for size in pingsizes:
         out = pinger_console.runCmd("ping -q -c 1 -s " + str(size) + " " + ip2)
         if out["return"]:
@@ -68,6 +55,8 @@ try:
 except ConsoleError, e:
     FAIL(str(e))
 
+pinger.stop()
+victim.stop()
+
 if len(fails):
     FAIL("Ping failed for size" + fails + ".")
-

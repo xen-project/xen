@@ -16,24 +16,17 @@
 pingsizes = [ 1, 48, 64, 512, 1440, 1500, 1505, 4096, 4192, 
               32767, 65507 ]
 
-
-
 from XmTestLib import *
 rc = 0
 
-Net = XmNetwork()
+# Test creates 1 domain, which requires 2 ips: 1 for the domains and 1 for
+# aliases on dom0
+if xmtest_netconf.canRunNetTest(2) == False:
+    SKIP("Don't have enough free configured IPs to run this test")
 
-# read an IP address from the config
-ip   = Net.ip("dom1", "eth0")
-mask = Net.mask("dom1", "eth0")
+domain = XmTestDomain()
+domain.newDevice(XenNetDevice, "eth0")
 
-# Fire up a guest domain w/1 nic
-if ENABLE_HVM_SUPPORT:
-    config = {"vif" : ['type=ioemu']}
-else:
-    config = {"vif" : ['ip=%s' % ip ]}
-
-domain = XmTestDomain(extraConfig=config)
 try:
     console = domain.start()
 except DomainError, e:
@@ -43,10 +36,7 @@ except DomainError, e:
     FAIL(str(e))
 
 try:
-    # Bring up the "lo" interface.
-    console.runCmd("ifconfig lo 127.0.0.1")
-
-    console.runCmd("ifconfig eth0 inet "+ip+" netmask "+mask+" up")
+    console.setHistorySaveCmds(value=True)
 
     # First the loopback pings
     lofails=""
@@ -57,6 +47,8 @@ try:
 
     # Next comes eth0
     eth0fails=""
+    netdev = domain.getDevice("eth0")
+    ip = netdev.getNetDevIP()
     for size in pingsizes:
         out = console.runCmd("ping -q -c 1 -s " + str(size) + " " + ip)
         if out["return"]:
@@ -66,6 +58,7 @@ except ConsoleError, e:
 except NetworkError, e:
         FAIL(str(e))
 
+domain.stop()
 
 # Tally up failures
 failures=""
