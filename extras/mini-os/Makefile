@@ -60,4 +60,12 @@ clean:
 %.o: %.S $(HDRS) Makefile
 	$(CC) $(CFLAGS) -D__ASSEMBLY__ -c $< -o $@
 
+define all_sources
+     ( find . -follow -name SCCS -prune -o -name '*.[chS]' -print )
+endef
+
+.PHONY: cscope
+cscope:
+	$(all_sources) > cscope.files
+	cscope -k -b -q
 
