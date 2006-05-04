@@ -34,8 +34,6 @@ typedef signed long         s64;
 typedef unsigned long       u64;
 #endif
 
-typedef unsigned int        size_t;
-
 /* FreeBSD compat types */
 typedef unsigned char       u_char;
 typedef unsigned int        u_int;
