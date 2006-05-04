@@ -193,6 +193,12 @@ class XenDomain:
             self.name = getUniqueName()
 
         self.config = config
+        # Set domain type, either PV for ParaVirt domU or HVM for 
+        # FullVirt domain
+        if ENABLE_HVM_SUPPORT:
+            self.type = "HVM"
+        else:
+            self.type = "PV"
 
     def start(self):
 
@@ -202,6 +208,10 @@ class XenDomain:
             raise DomainError("Failed to create domain",
                               extra=output,
                               errorcode=ret)
+
+        # HVM domains require waiting for boot
+        if self.getDomainType() == "HVM":
+            waitForBoot()
 
     def stop(self):
         prog = "xm"
@@ -225,6 +235,9 @@ class XenDomain:
     def getId(self):
         return domid(self.getName());
 
+    def getDomainType(self):
+        return self.type
+
 
 class XmTestDomain(XenDomain):
 
@@ -245,11 +258,6 @@ class XmTestDomain(XenDomain):
             config.setOpt("name", getUniqueName())
 
         XenDomain.__init__(self, config.getOpt("name"), config=config)
-
-    def start(self):
-        XenDomain.start(self)
-        if ENABLE_HVM_SUPPORT:
-            waitForBoot()
 
     def minSafeMem(self):
         return 32
