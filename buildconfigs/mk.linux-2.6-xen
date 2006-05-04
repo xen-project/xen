@@ -1,5 +1,5 @@
 LINUX_SERIES = 2.6
-LINUX_VER    = 2.6.16
+LINUX_VER    = 2.6.16.13
 
 EXTRAVERSION ?= xen
 
