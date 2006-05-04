@@ -1,5 +1,6 @@
---- linux-2.6.16/drivers/base/bus.c	2006-03-16 10:50:20.000000000 -0500
-+++ linux-2.6.16/drivers/base/bus.c	2006-03-16 11:02:08.000000000 -0500
+diff -pruN ../pristine-linux-2.6.16.13/drivers/base/bus.c ./drivers/base/bus.c
+--- ../pristine-linux-2.6.16.13/drivers/base/bus.c	2006-05-02 22:38:44.000000000 +0100
++++ ./drivers/base/bus.c	2006-05-04 17:41:30.000000000 +0100
 @@ -188,6 +188,11 @@ static ssize_t driver_bind(struct device
  		up(&dev->sem);
  		if (dev->parent)
