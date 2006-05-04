@@ -21,17 +21,23 @@ Compile the XEN tree as usual after the following lines set in the
 linux-2.6.??-xen/.config file:
 
 CONFIG_XEN_TPMDEV_BACKEND=y
-CONFIG_XEN_TPMDEV_GRANT=y
 
-CONFIG_TCG_TPM=m
+CONFIG_TCG_TPM=y
 CONFIG_TCG_NSC=m
 CONFIG_TCG_ATMEL=m
+CONFIG_TCG_XEN=y
 
 You must also enable the virtual TPM to be built:
 
 In Config.mk in the Xen root directory set the line
 
 VTPM_TOOLS ?= y
+
+and in
+
+tools/vtpm/Rules.mk set the line
+
+BUILD_EMULATOR = y
 
 Now build the Xen sources from Xen's root directory:
 
