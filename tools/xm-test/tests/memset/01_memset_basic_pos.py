@@ -28,17 +28,14 @@ domain = XmTestDomain()
 
 # Start it
 try:
-    domain.start() 
+    console = domain.start() 
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
         print e.extra
     FAIL(str(e))
 
-# Attach a console to it
 try:
-    console = XmConsole(domain.getName()) 
-    console.sendInput("input") 
     # Make sure it's up an running before we continue
     console.runCmd("ls")
 except ConsoleError, e:
@@ -96,7 +93,7 @@ if domUmem != newmem:
 
 # quiesce everything
 # Close the console
-console.closeConsole() 
+domain.closeConsole() 
 
 # Stop the domain (nice shutdown)
 domain.stop()

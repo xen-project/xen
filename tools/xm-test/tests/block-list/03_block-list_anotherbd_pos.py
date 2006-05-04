@@ -15,7 +15,7 @@ config = {"disk":"phy:/dev/ram0,hda1,w"}
 domain = XmTestDomain(extraConfig=config)
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print e.extra
@@ -43,16 +43,12 @@ elif (where1 < 0) and (where2 < 0):
 
 #Verify attached block device on DomainU
 try:
-    console = XmConsole(domain.getName())
-except ConsoleError, e:
-    FAIL(str(e))
-
-try:
-    console.sendInput("input")
     run = console.runCmd("cat /proc/partitions | grep hda1;cat /proc/partitions | grep hda2")
 except ConsoleError, e:
     saveLog(console.getHistory())
     FAIL(str(e))
+
+domain.stop()
 
 if run["return"] != 0:
     FAIL("Failed to verify that block dev is attached on DomainU")

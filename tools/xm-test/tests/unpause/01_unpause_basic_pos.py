@@ -22,29 +22,21 @@ domain = XmTestDomain()
 
 # Start it
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
         print e.extra
     FAIL(str(e))
 
-# Attach a console to it
 try:
-    console = XmConsole(domain.getName(), historySaveCmds=True)
-except ConsoleError, e:
-    FAIL(str(e))
-
-try:
-    # Activate the console
-    console.sendInput("foo")
     # Make sure a command succeeds
     run = console.runCmd("ls")
 except ConsoleError, e:
     FAIL(str(e))
 
 # Close the console
-console.closeConsole()
+domain.closeConsole()
 
 seed(time.time())
 
@@ -69,13 +61,13 @@ if status != 0:
 
 # Are we still alive after all that?
 try:
-    console = XmConsole(domain.getName(), historySaveCmds=True)
+    console = domain.getConsole()
     run = console.runCmd("ls")
 except ConsoleError, e:
     FAIL(str(e))
 
 # Close the console
-console.closeConsole()
+domain.closeConsole()
 
 if run["return"] != 0:
     FAIL("console failed to attach to supposedly unpaused domain")

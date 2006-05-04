@@ -20,7 +20,7 @@ if smpConcurrencyLevel() <= 1:
 domain = XmTestDomain()
 
 try:
-    domain.start()
+    domain.start(noConsole=True)
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"

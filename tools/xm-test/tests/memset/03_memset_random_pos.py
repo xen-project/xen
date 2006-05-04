@@ -14,7 +14,7 @@ if ENABLE_HVM_SUPPORT:
 domain = XmTestDomain()
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to start domain:"

@@ -7,8 +7,7 @@
 # Positive Test:
 # Test Description:
 # 1. Create a domain
-# 2. Attach a console to the domain. 
-# 3. Destroy the domain by id
+# 2. Destroy the domain by id
  
 import sys
 import re
@@ -21,7 +20,7 @@ domain = XmTestDomain()
 
 # Start it
 try:
-    domain.start()
+    domain.start(noConsole=True)
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"

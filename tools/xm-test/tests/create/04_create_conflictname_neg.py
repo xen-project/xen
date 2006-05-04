@@ -17,7 +17,7 @@ domain1 = XmTestDomain("default")
 
 #start it
 try:
-    domain1.start()
+    domain1.start(noConsole=True)
 except DomainError, e:
     if verbose:
         print "Failed to create test domain1 because:"
@@ -30,7 +30,7 @@ domain2 = XmTestDomain("default")
 #start it
 eyecatcher = "Pass"
 try:
-    domain2.start()
+    domain2.start(noConsole=True)
 except DomainError, e:
     eyecatcher = "Fail"
     # Stop the domain1 (nice shutdown)

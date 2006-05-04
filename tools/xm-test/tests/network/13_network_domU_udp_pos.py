@@ -25,18 +25,11 @@ def netDomain(ip):
 
     dom = XmTestDomain(extraConfig=config)
     try:
-        dom.start()
+        console = dom.start()
     except DomainError, e:
         if verbose:
             print "Failed to create test domain because:"
             print e.extra
-        FAIL(str(e))
-    try:
-        # Attach a console
-        console = XmConsole(dom.getName(), historySaveCmds=True)
-        # Activate the console
-        console.sendInput("bhs")
-    except ConsoleError, e:
         FAIL(str(e))
     return console
     

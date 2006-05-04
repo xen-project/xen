@@ -14,7 +14,7 @@ if ENABLE_HVM_SUPPORT:
 domain = XmTestDomain()
                                                                                               
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print e.extra
@@ -36,16 +36,12 @@ elif where < 0 :
 
 #Verify attached block device on DomainU
 try:
-    console = XmConsole(domain.getName())
-except ConsoleError, e:
-    FAIL(str(e))
-
-try:
-    console.sendInput("input")
     run = console.runCmd("cat /proc/partitions | grep hda1")
 except ConsoleError, e:
     saveLog(console.getHistory())
     FAIL(str(e))
+
+domain.stop()
 
 if run["return"] != 0:
     FAIL("Failed to verify that block dev is attached on DomainU")

@@ -40,24 +40,14 @@ else:
 
 domain = XmTestDomain(extraConfig=config)
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
         print e.extra
     FAIL(str(e))
 
-
-# Attach a console
 try:
-    console = XmConsole(domain.getName(), historySaveCmds=True)
-except ConsoleError, e:
-    FAIL(str(e))
-
-try:
-    # Activate the console
-    console.sendInput("bhs")
-
     # Bring up the "lo" interface.
     console.runCmd("ifconfig lo 127.0.0.1")
 

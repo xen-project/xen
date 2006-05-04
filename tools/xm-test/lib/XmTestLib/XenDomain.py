@@ -27,6 +27,7 @@ import time
 from Xm import *
 from Test import *
 from config import *
+from Console import *
 
 BLOCK_ROOT_DEV = "hda"
 
@@ -193,6 +194,8 @@ class XenDomain:
             self.name = getUniqueName()
 
         self.config = config
+        self.console = None
+
         # Set domain type, either PV for ParaVirt domU or HVM for 
         # FullVirt domain
         if ENABLE_HVM_SUPPORT:
@@ -200,7 +203,7 @@ class XenDomain:
         else:
             self.type = "PV"
 
-    def start(self):
+    def start(self, noConsole=False):
 
         ret, output = traceCommand("xm create %s" % self.config)
 
@@ -213,9 +216,21 @@ class XenDomain:
         if self.getDomainType() == "HVM":
             waitForBoot()
 
+        if self.console and noConsole == True:
+            self.closeConsole()
+
+        elif self.console and noConsole == False:
+            return self.console
+
+        elif not self.console and noConsole == False:
+            return self.getConsole()
+
     def stop(self):
         prog = "xm"
         cmd = " shutdown "
+
+        if self.console:
+            self.closeConsole()
 
         ret, output = traceCommand(prog + cmd + self.config.getOpt("name"))
 
@@ -224,6 +239,9 @@ class XenDomain:
     def destroy(self):
         prog = "xm"
         cmd = " destroy "
+
+        if self.console:
+            self.closeConsole()
 
         ret, output = traceCommand(prog + cmd + self.config.getOpt("name"))
 
@@ -237,6 +255,24 @@ class XenDomain:
 
     def getDomainType(self):
         return self.type
+
+    def closeConsole(self):
+        # The domain closeConsole command must be called by tests, not the
+        # console's close command. Once close is called, the console is
+        # gone. You can't get history or anything else from it.
+        if self.console:
+            self.console._XmConsole__closeConsole()
+            self.console = None
+
+    def getConsole(self):
+        if self.console:
+            self.closeConsole()
+
+        self.console = XmConsole(self.getName())
+        # Activate the console
+        self.console.sendInput("input")
+
+        return self.console
 
 
 class XmTestDomain(XenDomain):

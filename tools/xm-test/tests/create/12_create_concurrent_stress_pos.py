@@ -17,17 +17,11 @@ for i in range(0,DOMS):
     dom = XmTestDomain(extraConfig={"memory" : MEM})
 
     try:
-        dom.start()
+        cons = dom.start()
     except DomainError, e:
         if verbose:
             print str(e)
         FAIL("Failed to start %s" % dom.getName())
-
-    try:
-        cons = XmConsole(dom.getName())
-        cons.sendInput("foo")
-    except ConsoleError, e:
-        FAIL(str(e))
 
     if verbose:
         print "[%i/%i] Started %s" % (i, DOMS, dom.getName())
@@ -56,4 +50,3 @@ for d, c in domains:
     if run["return"] != 0:
         FAIL("Domain %s didn't survive!" % d.getName())
 
-        

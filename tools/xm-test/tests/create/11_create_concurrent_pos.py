@@ -43,15 +43,13 @@ for d in range(0, NUM_DOMS):
                        extraConfig={"memory":MEM_PER_DOM})
 
     try:
-        dom.start()
+        cons = dom.start()
     except DomainError, e:
         if verbose:
             print str(e)
         FAIL("[%i] Failed to create domain" % d)
 
     try:
-        cons = XmConsole(dom.getName())
-        cons.sendInput("foo")
         cons.runCmd("ls")
     except ConsoleError, e:
         FAIL("[%i] Failed to attach console to %s" % (d, dom.getName()))

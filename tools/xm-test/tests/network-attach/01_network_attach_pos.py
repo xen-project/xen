@@ -15,22 +15,14 @@ if ENABLE_HVM_SUPPORT:
 domain = XmTestDomain()
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
         print e.extra
     FAIL(str(e))
 
-# Attach a console to it
 try:
-    console = XmConsole(domain.getName(), historySaveCmds=True)
-except ConsoleError, e:
-    FAIL(str(e))
-
-try:
-    # Activate the console
-    console.sendInput("input")
     # Run 'ls'
     run = console.runCmd("ls")
 except ConsoleError, e:
@@ -45,7 +37,7 @@ if status:
 
 ##
 # Close the console
-console.closeConsole()
+domain.closeConsole()
 
 # Stop the domain (nice shutdown)
 domain.stop()

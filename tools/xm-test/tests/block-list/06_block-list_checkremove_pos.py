@@ -11,13 +11,8 @@ if ENABLE_HVM_SUPPORT:
 domain = XmTestDomain()
 
 try:
-    domain.start()
+    domain.start(noConsole=True)
 except DomainError, e:
-    FAIL(str(e))
-
-try:
-    console = XmConsole(domain.getName())
-except ConsoleError, e:
     FAIL(str(e))
 
 s, o = traceCommand("xm block-list %s" % domain.getName())
@@ -72,4 +67,4 @@ if o.find("770") != -1:
 if o:
     FAIL("block-list still shows something after all devices detached!")
     
-
+domain.stop()

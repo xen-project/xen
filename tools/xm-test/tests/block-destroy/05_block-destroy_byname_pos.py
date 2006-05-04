@@ -12,15 +12,13 @@ config = {"disk":"phy:/dev/ram0,hda1,w"}
 domain = XmTestDomain(extraConfig=config)
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print e.extra
     FAIL("Unable to create domain")
 
 try:
-    console  = XmConsole(domain.getName(), historySaveCmds=True)
-    console.sendInput("input")
     run = console.runCmd("cat /proc/partitions | grep hda1")
     run2 = console.runCmd("cat /proc/partitions")
 except ConsoleError, e:
@@ -41,7 +39,7 @@ except ConsoleError, e:
     saveLog(console.getHistory())
     FAIL(str(e))
 
-console.closeConsole()
+domain.closeConsole()
 domain.stop()
 
 if run["return"] == 0:

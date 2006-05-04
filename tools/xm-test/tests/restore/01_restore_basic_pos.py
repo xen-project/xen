@@ -18,7 +18,7 @@ if ENABLE_HVM_SUPPORT:
 domain = XmTestDomain()
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
@@ -27,13 +27,11 @@ except DomainError, e:
 
 # Make sure the domain isn't DOA
 try:
-    console = XmConsole(domain.getName())
-    console.sendInput("input")
     console.runCmd("foo=bar")
 except ConsoleError, e:
     FAIL(str(e))
 
-console.closeConsole()
+domain.closeConsole()
 
 # Save it out
 try:
@@ -67,7 +65,7 @@ if not isDomainRunning(domain.getName()):
 
 # Make sure it's alive
 try:
-    newConsole = XmConsole(domain.getName())
+    newConsole = domain.getConsole()
     # Enable debug dumping because this generates a Oops on x86_64
     newConsole.debugMe = True
     newConsole.sendInput("ls")
@@ -77,7 +75,7 @@ try:
 except ConsoleError, e:
     FAIL("Restored domain is dead (%s)" % str(e))
 
-newConsole.closeConsole()
+domain.closeConsole()
 
 # This only works because the domain
 # still has the same name

@@ -17,25 +17,16 @@ if ENABLE_HVM_SUPPORT:
 domain = XmTestDomain()
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
         print e.extra
     FAIL(str(e))
 
-# Attach a console to it
-try:
-    console = XmConsole(domain.getName(), historySaveCmds=True)
-    # network-detach is crashing, so we enable console debugging
-    # for now, so that reports include the oops
-    console.debugMe = True
-except ConsoleError, e:
-    FAIL(str(e))
+console.debugMe = True
 
 try:
-    # Activate the console
-    console.sendInput("input")
     # Run 'ls'
     run = console.runCmd("ls")
 except ConsoleError, e:
@@ -54,7 +45,7 @@ for i in range(10):
         FAIL(msg)
 
 # Close the console
-console.closeConsole()
+domain.closeConsole()
 
 # Stop the domain (nice shutdown)
 domain.stop()

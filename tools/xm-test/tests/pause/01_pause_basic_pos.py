@@ -20,29 +20,21 @@ domain = XmTestDomain()
 
 # Start it
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
         print e.extra
     FAIL(str(e))
 
-# Attach a console to it
 try:
-    console = XmConsole(domain.getName(), historySaveCmds=True)
-except ConsoleError, e:
-    FAIL(str(e))
-
-try:
-    # Activate the console
-    console.sendInput("foo")
     # Make sure a command succeeds
     run = console.runCmd("ls")
 except ConsoleError, e:
     FAIL(str(e))
 
 # Close the console
-console.closeConsole()
+domain.closeConsole()
 
 # Pause the domain
 status, output = traceCommand("xm pause %s" % domain.getName())
@@ -51,7 +43,8 @@ if status != 0:
 
 # Try to attach a console to it
 try:
-    console = XmConsole(domain.getName(), historySaveCmds=True)
+    console = domain.getConsole()
+    console.setHistorySaveCmds(value=True)
     run = console.runCmd("ls")
     #If we get here, console attached to paused domain (unexpected)
     FAIL("console attached to supposedly paused domain")
@@ -59,7 +52,7 @@ except ConsoleError, e:
     pass
 
 # Close the console
-console.closeConsole()
+domain.closeConsole()
 
 status, output = traceCommand("xm unpause %s" % domain.getName())
 if status != 0:

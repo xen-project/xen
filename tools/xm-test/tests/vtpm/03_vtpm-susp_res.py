@@ -15,9 +15,10 @@ import os.path
 
 config = {"vtpm":"instance=1,backend=0"}
 domain = XmTestDomain(extraConfig=config)
+consoleHistory = ""
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print e.extra
@@ -25,12 +26,6 @@ except DomainError, e:
     FAIL("Unable to create domain")
 
 domName = domain.getName()
-
-try:
-    console = XmConsole(domain.getName())
-except ConsoleError, e:
-    vtpm_cleanup(domName)
-    FAIL(str(e))
 
 try:
     console.sendInput("input")
@@ -50,19 +45,21 @@ if re.search("No such file",run["output"]):
     vtpm_cleanup(domName)
     FAIL("TPM frontend support not compiled into (domU?) kernel")
 
-console.closeConsole()
+consoleHistory = console.getHistory()
+domain.closeConsole()
 
 try:
     status, ouptut = traceCommand("xm save %s %s.save" %
                                   (domName, domName),
                                   timeout=30)
+
 except TimeoutError, e:
-    saveLog(console.getHistory())
+    saveLog(consoleHistory)
     vtpm_cleanup(domName)
     FAIL(str(e))
 
 if status != 0:
-    saveLog(console.getHistory())
+    saveLog(consoleHistory)
     vtpm_cleanup(domName)
     FAIL("xm save did not succeed")
 
@@ -72,19 +69,19 @@ try:
                                   timeout=30)
 except TimeoutError, e:
     os.remove("%s.save" % domName)
-    saveLog(console.getHistory())
+    saveLog(consoleHistory)
     vtpm_cleanup(domName)
     FAIL(str(e))
 
 os.remove("%s.save" % domName)
 
 if status != 0:
-    saveLog(console.getHistory())
+    saveLog(consoleHistory)
     vtpm_cleanup(domName)
     FAIL("xm restore did not succeed")
 
 try:
-    console = XmConsole(domain.getName())
+    console = domain.getConsole()
 except ConsoleError, e:
     vtpm_cleanup(domName)
     FAIL(str(e))
@@ -96,7 +93,7 @@ except ConsoleError, e:
     vtpm_cleanup(domName)
     FAIL(str(e))
 
-console.closeConsole()
+domain.closeConsole()
 
 domain.stop()
 
