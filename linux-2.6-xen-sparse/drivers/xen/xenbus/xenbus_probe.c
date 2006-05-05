@@ -1069,6 +1069,11 @@ static int __init wait_for_devices(void)
 {
 	unsigned long timeout = jiffies + 10*HZ;
 
+	if (xen_init() < 0) {
+		DPRINTK("failed");
+		return -ENODEV;
+	}
+
 	while (time_before(jiffies, timeout)) {
 		if (all_devices_ready())
 			return 0;

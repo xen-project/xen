@@ -318,6 +318,7 @@ static void __pirq_guest_eoi(struct domain *d, int irq)
     {
         ASSERT(cpus_empty(action->cpu_eoi_map));
         desc->handler->end(irq_to_vector(irq));
+        spin_unlock_irq(&desc->lock);
         return;
     }
 

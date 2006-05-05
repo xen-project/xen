@@ -674,6 +674,8 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
     unsigned long addr, fixup;
     int rc;
 
+    ASSERT(!in_irq());
+
     __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (addr) : );
 
     DEBUGGER_trap_entry(TRAP_page_fault, regs);

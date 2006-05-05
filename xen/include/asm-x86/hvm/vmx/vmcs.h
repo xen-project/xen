@@ -68,6 +68,7 @@ struct arch_vmx_struct {
     struct vmcs_struct      *vmcs;  /* VMCS pointer in virtual. */
     unsigned int            launch_cpu; /* VMCS is valid on this CPU. */
     u32                     exec_control; /* cache of cpu execution control */
+    u32                     vector_injected; /* if there is vector installed in the INTR_INFO_FIELD */
     unsigned long           flags;  /* VMCS flags */
     unsigned long           cpu_cr0; /* copy of guest CR0 */
     unsigned long           cpu_shadow_cr0; /* copy of guest read shadow CR0 */

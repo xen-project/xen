@@ -2821,11 +2821,7 @@ asmlinkage void svm_load_cr2(void)
     struct vcpu *v = current;
 
     local_irq_disable();
-#ifdef __i386__
-    asm volatile("movl %0,%%cr2": :"r" (v->arch.hvm_svm.cpu_cr2));
-#else
-    asm volatile("movq %0,%%cr2": :"r" (v->arch.hvm_svm.cpu_cr2));
-#endif
+    asm volatile("mov %0,%%cr2": :"r" (v->arch.hvm_svm.cpu_cr2));
 }
 
 asmlinkage void svm_asid(void)

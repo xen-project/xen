@@ -448,8 +448,11 @@ def strip(pre, s):
 def configure_image(vals):
     """Create the image config.
     """
+    if not vals.builder:
+        return None
     config_image = [ vals.builder ]
-    config_image.append([ 'kernel', os.path.abspath(vals.kernel) ])
+    if vals.kernel:
+        config_image.append([ 'kernel', os.path.abspath(vals.kernel) ])
     if vals.ramdisk:
         config_image.append([ 'ramdisk', os.path.abspath(vals.ramdisk) ])
     if vals.cmdline_ip:
@@ -616,7 +619,7 @@ def configure_hvm(config_image, vals):
         if (vals.__dict__[a]):
             config_image.append([a, vals.__dict__[a]])
 
-def run_bootloader(vals):
+def run_bootloader(vals, config_image):
     if not os.access(vals.bootloader, os.X_OK):
         err("Bootloader isn't executable")
     if len(vals.disk) < 1:
@@ -630,7 +633,7 @@ def run_bootloader(vals):
         vals.bootargs = "--entry=%s" %(vals.bootentry,)
 
     return bootloader(vals.bootloader, file, not vals.console_autoconnect,
-                      vals.bootargs)
+                      vals.bootargs, config_image)
 
 def make_config(vals):
     """Create the domain configuration.
@@ -662,13 +665,12 @@ def make_config(vals):
     if vals.tpmif:
         config.append(['backend', ['tpmif']])
 
+    config_image = configure_image(vals)
     if vals.bootloader:
-        config_image = run_bootloader(vals)
+        config_image = run_bootloader(vals, config_image)
         config.append(['bootloader', vals.bootloader])
         if vals.bootargs:
             config.append(['bootloader_args'], vals.bootargs)
-    else:
-        config_image = configure_image(vals)
     config.append(['image', config_image])
 
     config_devs = []

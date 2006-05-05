@@ -659,6 +659,7 @@ static void net_tx_action(unsigned long unused)
 
 		skb->data_len  = txreq.size - data_len;
 		skb->len      += skb->data_len;
+		skb->truesize += skb->data_len;
 
 		skb->dev      = netif->dev;
 		skb->protocol = eth_type_trans(skb, skb->dev);
