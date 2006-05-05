@@ -893,6 +893,20 @@ static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
 #define CASE_GET_REG_P(REG, reg)    \
     case REG_ ## REG: reg_p = (unsigned long *)&(regs->reg); break
 
+#ifdef __i386__
+#define CASE_EXTEND_GET_REG_P
+#else
+#define CASE_EXTEND_GET_REG_P       \
+    CASE_GET_REG_P(R8, r8);         \
+    CASE_GET_REG_P(R9, r9);         \
+    CASE_GET_REG_P(R10, r10);       \
+    CASE_GET_REG_P(R11, r11);       \
+    CASE_GET_REG_P(R12, r12);       \
+    CASE_GET_REG_P(R13, r13);       \
+    CASE_GET_REG_P(R14, r14);       \
+    CASE_GET_REG_P(R15, r15)
+#endif
+
 static void vmx_dr_access (unsigned long exit_qualification, struct cpu_user_regs *regs)
 {
     unsigned int reg;
@@ -908,14 +922,15 @@ static void vmx_dr_access (unsigned long exit_qualification, struct cpu_user_reg
                 "vmx_dr_access : eip=%lx, reg=%d, exit_qualification = %lx",
                 eip, reg, exit_qualification);
 
-    switch(exit_qualification & DEBUG_REG_ACCESS_REG) {
-        CASE_GET_REG_P(EAX, eax);
-        CASE_GET_REG_P(ECX, ecx);
-        CASE_GET_REG_P(EDX, edx);
-        CASE_GET_REG_P(EBX, ebx);
-        CASE_GET_REG_P(EBP, ebp);
-        CASE_GET_REG_P(ESI, esi);
-        CASE_GET_REG_P(EDI, edi);
+    switch ( exit_qualification & DEBUG_REG_ACCESS_REG ) {
+    CASE_GET_REG_P(EAX, eax);
+    CASE_GET_REG_P(ECX, ecx);
+    CASE_GET_REG_P(EDX, edx);
+    CASE_GET_REG_P(EBX, ebx);
+    CASE_GET_REG_P(EBP, ebp);
+    CASE_GET_REG_P(ESI, esi);
+    CASE_GET_REG_P(EDI, edi);
+    CASE_EXTEND_GET_REG_P;
     case REG_ESP:
         break;
     default:
@@ -1525,28 +1540,29 @@ static int vmx_set_cr0(unsigned long value)
     return 1;
 }
 
-#define CASE_GET_REG(REG, reg)  \
+#define CASE_SET_REG(REG, reg)      \
+    case REG_ ## REG: regs->reg = value; break
+#define CASE_GET_REG(REG, reg)      \
     case REG_ ## REG: value = regs->reg; break
 
-#define CASE_EXTEND_SET_REG \
-      CASE_EXTEND_REG(S)
-#define CASE_EXTEND_GET_REG \
-      CASE_EXTEND_REG(G)
+#define CASE_EXTEND_SET_REG         \
+    CASE_EXTEND_REG(S)
+#define CASE_EXTEND_GET_REG         \
+    CASE_EXTEND_REG(G)
 
 #ifdef __i386__
 #define CASE_EXTEND_REG(T)
 #else
-#define CASE_EXTEND_REG(T)    \
-    CASE_ ## T ## ET_REG(R8, r8); \
-    CASE_ ## T ## ET_REG(R9, r9); \
+#define CASE_EXTEND_REG(T)          \
+    CASE_ ## T ## ET_REG(R8, r8);   \
+    CASE_ ## T ## ET_REG(R9, r9);   \
     CASE_ ## T ## ET_REG(R10, r10); \
     CASE_ ## T ## ET_REG(R11, r11); \
     CASE_ ## T ## ET_REG(R12, r12); \
     CASE_ ## T ## ET_REG(R13, r13); \
     CASE_ ## T ## ET_REG(R14, r14); \
-    CASE_ ## T ## ET_REG(R15, r15);
+    CASE_ ## T ## ET_REG(R15, r15)
 #endif
-
 
 /*
  * Write to control registers
@@ -1557,31 +1573,28 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     unsigned long old_cr;
     struct vcpu *v = current;
 
-    switch (gp) {
-        CASE_GET_REG(EAX, eax);
-        CASE_GET_REG(ECX, ecx);
-        CASE_GET_REG(EDX, edx);
-        CASE_GET_REG(EBX, ebx);
-        CASE_GET_REG(EBP, ebp);
-        CASE_GET_REG(ESI, esi);
-        CASE_GET_REG(EDI, edi);
-        CASE_EXTEND_GET_REG
-            case REG_ESP:
-                __vmread(GUEST_RSP, &value);
+    switch ( gp ) {
+    CASE_GET_REG(EAX, eax);
+    CASE_GET_REG(ECX, ecx);
+    CASE_GET_REG(EDX, edx);
+    CASE_GET_REG(EBX, ebx);
+    CASE_GET_REG(EBP, ebp);
+    CASE_GET_REG(ESI, esi);
+    CASE_GET_REG(EDI, edi);
+    CASE_EXTEND_GET_REG;
+    case REG_ESP:
+        __vmread(GUEST_RSP, &value);
         break;
     default:
         printk("invalid gp: %d\n", gp);
         __hvm_bug(regs);
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "mov_to_cr: CR%d, value = %lx,", cr, value);
-    HVM_DBG_LOG(DBG_LEVEL_1, "current = %lx,", (unsigned long) current);
+    HVM_DBG_LOG(DBG_LEVEL_1, "CR%d, value = %lx", cr, value);
 
-    switch(cr) {
+    switch ( cr ) {
     case 0:
-    {
         return vmx_set_cr0(value);
-    }
     case 3:
     {
         unsigned long old_base_mfn, mfn;
@@ -1753,11 +1766,6 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     return 1;
 }
 
-#define CASE_SET_REG(REG, reg)      \
-    case REG_ ## REG:       \
-    regs->reg = value;      \
-    break
-
 /*
  * Read from control registers. CR0 and CR4 are read from the shadow.
  */
@@ -1766,22 +1774,22 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
     unsigned long value;
     struct vcpu *v = current;
 
-    if (cr != 3)
+    if ( cr != 3 )
         __hvm_bug(regs);
 
     value = (unsigned long) v->arch.hvm_vmx.cpu_cr3;
 
-    switch (gp) {
-        CASE_SET_REG(EAX, eax);
-        CASE_SET_REG(ECX, ecx);
-        CASE_SET_REG(EDX, edx);
-        CASE_SET_REG(EBX, ebx);
-        CASE_SET_REG(EBP, ebp);
-        CASE_SET_REG(ESI, esi);
-        CASE_SET_REG(EDI, edi);
-        CASE_EXTEND_SET_REG
-            case REG_ESP:
-                __vmwrite(GUEST_RSP, value);
+    switch ( gp ) {
+    CASE_SET_REG(EAX, eax);
+    CASE_SET_REG(ECX, ecx);
+    CASE_SET_REG(EDX, edx);
+    CASE_SET_REG(EBX, ebx);
+    CASE_SET_REG(EBP, ebp);
+    CASE_SET_REG(ESI, esi);
+    CASE_SET_REG(EDI, edi);
+    CASE_EXTEND_SET_REG;
+    case REG_ESP:
+        __vmwrite(GUEST_RSP, value);
         regs->esp = value;
         break;
     default:
@@ -1789,7 +1797,7 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
         __hvm_bug(regs);
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_VMMU, "mov_from_cr: CR%d, value = %lx,", cr, value);
+    HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR%d, value = %lx", cr, value);
 }
 
 static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs *regs)
