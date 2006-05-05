@@ -1633,7 +1633,8 @@ class XendDomainInfo:
                 continue
             fn = blkdev_uname_to_file(disk)
             blcfg = bootloader(self.info['bootloader'], fn, 1,
-                               self.info['bootloader_args'])
+                               self.info['bootloader_args'],
+                               self.info['image'])
             break
         if blcfg is None:
             msg = "Had a bootloader specified, but can't find disk"

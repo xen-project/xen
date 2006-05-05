@@ -19,7 +19,7 @@ import sxp
 from XendLogging import log
 from XendError import VmError
 
-def bootloader(blexec, disk, quiet = 0, blargs = None):
+def bootloader(blexec, disk, quiet = 0, blargs = None, imgcfg = None):
     """Run the boot loader executable on the given disk and return a
     config image.
     @param blexec  Binary to use as the boot loader
@@ -86,4 +86,10 @@ def bootloader(blexec, disk, quiet = 0, blargs = None):
     pin = sxp.Parser()
     pin.input(ret)
     pin.input_eof()
-    return pin.val
+    blcfg = pin.val
+
+    if imgcfg is None:
+        return blcfg
+    else:
+        c = sxp.merge(blcfg, imgcfg)
+        return c
