@@ -13,7 +13,7 @@ AC_CHECK_PROG([LILO],	lilo,	lilo,	"no",	[$PATH])
 # are two levels above the tests
 TESTLIB=../../lib
 RD_PATH=../../ramdisk
-TENV="PYTHONPATH=$PYTHONPATH:$TESTLIB:/usr/lib/python RD_PATH=$RD_PATH"
+TENV="PYTHONPATH=$PYTHONPATH:$TESTLIB RD_PATH=$RD_PATH"
 
 AC_ARG_ENABLE(hvm-support,
 	[[  --enable-hvm-support           enable hardware virtual machine assist]],

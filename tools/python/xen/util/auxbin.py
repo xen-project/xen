@@ -12,14 +12,15 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
-# Copyright (C) 2005 XenSource Ltd
+# Copyright (C) 2005-2006 XenSource Inc.
 #============================================================================
 
 
-LIB_BIN_32 = "/usr/lib/xen/bin"
-LIB_BIN_64 = "/usr/lib64/xen/bin"
+LIB_32 = "/usr/lib"
+LIB_64 = "/usr/lib64"
+LIB_BIN_SUFFIX = "xen/bin"
 
-## The architectures on which the LIB_BIN_64 directory is used.  This
+## The architectures on which the LIB_64 directory is used.  This
 # deliberately excludes ia64.
 LIB_64_ARCHS = [ 'x86_64', 'ppc64', 's390x', 'sparc64']
 
@@ -41,8 +42,12 @@ def pathTo(exe):
 
 
 def path():
+    return os.path.join(libpath(), LIB_BIN_SUFFIX)
+
+
+def libpath():
     machine = os.uname()[4]
-    if machine in LIB_64_ARCHS and os.path.exists(LIB_BIN_64):
-        return LIB_BIN_64
+    if machine in LIB_64_ARCHS and os.path.exists(LIB_64):
+        return LIB_64
     else:
-        return LIB_BIN_32
+        return LIB_32
