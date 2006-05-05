@@ -444,6 +444,7 @@ static inline int __vmx_inject_exception(struct vcpu *v, int trap, int type,
 
 static inline int vmx_inject_exception(struct vcpu *v, int trap, int error_code)
 {
+    v->arch.hvm_vmx.vector_injected = 1;
     return __vmx_inject_exception(v, trap, INTR_TYPE_EXCEPTION, error_code);
 }
 
