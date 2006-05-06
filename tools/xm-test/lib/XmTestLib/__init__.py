@@ -3,13 +3,8 @@
 # Author: Dan Smith <danms@us.ibm.com>
 #
 
-from Console import *
-from Test import *
-from Xm import *
-from XenDomain import *
-from config import *
-from XenDevice import *
-from NetConfig import *
+import os.path
+import sys
 
 # Use the auxbin module in Xend to determine the correct Python path.  We
 # take the first installed instance of auxbin that we find, and then run it
@@ -27,6 +22,14 @@ for p in ['python%s' % sys.version[:3], 'python']:
             sys.path = sys.path[:-1]
             sys.path.append(libpath)
             break
+
+from Console import *
+from Test import *
+from Xm import *
+from XenDomain import *
+from config import *
+from XenDevice import *
+from NetConfig import *
 
 # Give this test a clean slate
 destroyAllDomUs()
