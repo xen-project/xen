@@ -3,11 +3,10 @@
 # Copyright (C) International Business Machines Corp., 2005
 # Author: Murillo F. Bernardes <mfb@br.ibm.com>
 
-import sys
 import re
-import time
 
 from XmTestLib import *
+from XmTestLib.block_utils import *
 
 if ENABLE_HVM_SUPPORT:
     SKIP("Block-attach not supported for HVM domains")
@@ -33,9 +32,7 @@ except ConsoleError, e:
     FAIL(str(e))
     
 
-status, output = traceCommand("xm block-attach %s phy:ram1 sdb1 w" % domain.getName())
-if status != 0:
-        FAIL("xm block-attach returned invalid %i != 0" % status)
+block_attach(domain, "phy:ram1", "sdb1")
 
 try:	
 	run = console.runCmd("cat /proc/partitions")

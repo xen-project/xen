@@ -4,6 +4,7 @@
 # Author: Dan Smith <danms@us.ibm.com>
 
 from XmTestLib import *
+from XmTestLib.block_utils import block_detach
 
 if ENABLE_HVM_SUPPORT:
     SKIP("Block-detach not supported for HVM domains")
@@ -27,11 +28,7 @@ except ConsoleError, e:
 if run["return"] != 0:
     FAIL("block device isn't attached; can't detach!")
 
-status, output = traceCommand("xm block-detach %s hda1" % domain.getName(),
-                              logOutput=True)
-if status != 0:
-    FAIL("block-detach returned invalid %i != 0" % status)
-
+block_detach(domain, "hda1")
 try:
 
     run = console.runCmd("cat /proc/partitions | grep hda1")

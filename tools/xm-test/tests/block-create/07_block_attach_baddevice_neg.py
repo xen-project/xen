@@ -3,9 +3,7 @@
 # Copyright (C) International Business Machines Corp., 2005
 # Author: Murillo F. Bernardes <mfb@br.ibm.com>
 
-import sys
 import re
-import time
 
 from XmTestLib import *
 
