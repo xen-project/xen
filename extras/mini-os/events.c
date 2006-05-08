@@ -106,6 +106,17 @@ void unbind_virq( u32 port )
 	unbind_evtchn(port);
 }
 
+#if defined(__x86_64__)
+/* Allocate 4 pages for the irqstack */
+#define STACK_PAGES 4
+char irqstack[1024 * 4 * STACK_PAGES];
+
+static struct pda
+{
+    int irqcount;       /* offset 0 (used in x86_64.S) */
+    char *irqstackptr;  /*        8 */
+} cpu0_pda;
+#endif
 
 /*
  * Initially all events are without a handler and disabled
@@ -113,7 +124,12 @@ void unbind_virq( u32 port )
 void init_events(void)
 {
     int i;
-
+#if defined(__x86_64__)
+    asm volatile("movl %0,%%fs ; movl %0,%%gs" :: "r" (0));
+    wrmsrl(0xc0000101, &cpu0_pda); /* 0xc0000101 is MSR_GS_BASE */
+    cpu0_pda.irqcount = -1;
+    cpu0_pda.irqstackptr = irqstack + 1024 * 4 * STACK_PAGES;
+#endif
     /* inintialise event handler */
     for ( i = 0; i < NR_EVS; i++ )
     {

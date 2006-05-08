@@ -15,13 +15,11 @@ import re
 domain = XmTestDomain()
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     FAIL(str(e))
 
 try:
-    console = XmConsole(domain.getName())
-    console.sendInput("foo")
     run = console.runCmd("cat /proc/cpuinfo")
 except ConsoleError, e:
     FAIL(str(e))

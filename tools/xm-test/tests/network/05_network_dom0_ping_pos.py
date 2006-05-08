@@ -16,57 +16,31 @@
 pingsizes = [ 1, 48, 64, 512, 1440, 1500, 1505, 4096, 4192, 
                 32767, 65507 ]
 
-
-
 from XmTestLib import *
 rc = 0
 
-Net = XmNetwork()
-
-try:
-    # read an IP address from the config
-    ip     = Net.ip("dom1", "eth0")
-    mask   = Net.mask("dom1", "eth0")
-except NetworkError, e:
-        FAIL(str(e))
+# Test creates 1 domain, which requires 2 ips: 1 for the domains and 1 for
+# aliases on dom0
+if xmtest_netconf.canRunNetTest(2) == False:
+    SKIP("Don't have enough free configured IPs to run this test")
 
 # Fire up a guest domain w/1 nic
-if ENABLE_HVM_SUPPORT:
-    brg = "xenbr0"
-    config = {"vif" : ['type=ioemu, bridge=%s' % brg]}
-else:
-    config = {"vif" : ['ip=%s' % ip ]}
-    brg = None
+domain = XmTestDomain()
+domain.newDevice(XenNetDevice, "eth0")
 
-domain = XmTestDomain(extraConfig=config)
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
         print e.extra
     FAIL(str(e))
 
-
-# Attach a console
 try:
-    console = XmConsole(domain.getName(), historySaveCmds=True)
-    # Activate the console
-    console.sendInput("bhs")
-except ConsoleError, e:
-    FAIL(str(e))
-
-try:
-    # Add a suitable dom0 IP address 
-    dom0ip = Net.ip("dom0", "eth0", todomname=domain.getName(), toeth="eth0", bridge=brg)
-except NetworkError, e:
-        FAIL(str(e))
-
-try:
-    console.runCmd("ifconfig eth0 inet "+ip+" netmask "+mask+" up")
-
     # Ping dom0
     fails=""
+    netdev = domain.getDevice("eth0")
+    dom0ip = netdev.getDom0AliasIP()
     for size in pingsizes:
         out = console.runCmd("ping -q -c 1 -s " + str(size) + " " + dom0ip)
         if out["return"]:
@@ -74,6 +48,7 @@ try:
 except ConsoleError, e:
         FAIL(str(e))
 
+domain.stop()
+
 if len(fails):
     FAIL("Ping to dom0 failed for size" + fails + ".")
-

@@ -9,8 +9,15 @@
 #ifndef __XEN_PUBLIC_EVENT_CHANNEL_H__
 #define __XEN_PUBLIC_EVENT_CHANNEL_H__
 
+/*
+ * Prototype for this hypercall is:
+ *  int event_channel_op(int cmd, void *args)
+ * @cmd  == EVTCHNOP_??? (event-channel operation).
+ * @args == Operation-specific extra arguments (NULL if none).
+ */
+
 typedef uint32_t evtchn_port_t;
-DEFINE_GUEST_HANDLE(evtchn_port_t);
+DEFINE_XEN_GUEST_HANDLE(evtchn_port_t);
 
 /*
  * EVTCHNOP_alloc_unbound: Allocate a port in domain <dom> and mark as
@@ -181,6 +188,10 @@ typedef struct evtchn_unmask {
     evtchn_port_t port;
 } evtchn_unmask_t;
 
+/*
+ * Argument to event_channel_op_compat() hypercall. Superceded by new
+ * event_channel_op() hypercall since 0x00030202.
+ */
 typedef struct evtchn_op {
     uint32_t cmd; /* EVTCHNOP_* */
     union {
@@ -196,7 +207,7 @@ typedef struct evtchn_op {
         evtchn_unmask_t           unmask;
     } u;
 } evtchn_op_t;
-DEFINE_GUEST_HANDLE(evtchn_op_t);
+DEFINE_XEN_GUEST_HANDLE(evtchn_op_t);
 
 #endif /* __XEN_PUBLIC_EVENT_CHANNEL_H__ */
 

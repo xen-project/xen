@@ -12,7 +12,7 @@ XEN_LIBXENSTAT     = $(XEN_ROOT)/tools/xenstat/libxenstat/src
 
 X11_LDPATH = -L/usr/X11R6/$(LIBDIR)
 
-CFLAGS += -D__XEN_INTERFACE_VERSION__=0x00030101
+CFLAGS += -D__XEN_TOOLS__
 
 %.opic: %.c
 	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
@@ -23,15 +23,23 @@ CFLAGS += -D__XEN_INTERFACE_VERSION__=0x00030101
 %.o: %.cc
 	$(CC) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
-.PHONY: mk-symlinks
-mk-symlinks: LINUX_ROOT=$(XEN_ROOT)/linux-2.6-xen-sparse
-mk-symlinks:
+OS = $(shell uname -s)
+
+.PHONY: mk-symlinks mk-symlinks-xen mk-symlinks-$(OS)
+
+mk-symlinks-Linux: LINUX_ROOT=$(XEN_ROOT)/linux-2.6-xen-sparse
+mk-symlinks-Linux:
+	mkdir -p xen/linux
+	( cd xen/linux && \
+	  ln -sf ../../$(LINUX_ROOT)/include/xen/public/*.h . )
+	( cd xen && rm -f sys && ln -sf linux sys )
+
+mk-symlinks-xen:
 	mkdir -p xen
 	( cd xen && ln -sf ../$(XEN_ROOT)/xen/include/public/*.h . )
 	mkdir -p xen/hvm
 	( cd xen/hvm && ln -sf ../../$(XEN_ROOT)/xen/include/public/hvm/*.h . )
 	mkdir -p xen/io
 	( cd xen/io && ln -sf ../../$(XEN_ROOT)/xen/include/public/io/*.h . )
-	mkdir -p xen/linux
-	( cd xen/linux && \
-	  ln -sf ../../$(LINUX_ROOT)/include/xen/public/*.h . )
+
+mk-symlinks: mk-symlinks-xen mk-symlinks-$(OS)

@@ -108,14 +108,11 @@ def runTests(tests):
         # Create a domain
 
         try:
-            domain.start()
+            console = domain.start()
         except DomainError, e:
             FAIL(str(e))
 
-        # Attach a console and make sure it's live
         try:
-            console = XmConsole(domain.getName())
-            console.sendInput("foo")
             console.runCmd("ls")
         except ConsoleError, e:
             FAIL(str(e))

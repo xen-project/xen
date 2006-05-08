@@ -13,7 +13,7 @@ if ENABLE_HVM_SUPPORT:
 domain = XmTestDomain()
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to create domain:"
@@ -26,12 +26,6 @@ if status != 0:
 
 # Wait for the reboot to finish
 time.sleep(20)
-
-try:
-    console = XmConsole(domain.getName())
-    console.sendInput("input")
-except ConsoleError, e:
-    FAIL(str(e))
 
 status, output = traceCommand("xm sysrq %s s" % domain.getName())
 if status != 0:

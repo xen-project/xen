@@ -40,6 +40,8 @@
 #include <linux/errno.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/dom0_ops.h>
+#include <xen/interface/event_channel.h>
+#include <xen/interface/physdev.h>
 #include <xen/interface/sched.h>
 #include <asm/hypercall.h>
 #include <asm/ptrace.h>
@@ -101,13 +103,14 @@ HYPERVISOR_poll(
 	evtchn_port_t *ports, unsigned int nr_ports, u64 timeout)
 {
 	struct sched_poll sched_poll = {
-		.ports = ports,
 		.nr_ports = nr_ports,
 		.timeout = jiffies_to_st(timeout)
 	};
 
-	int rc = HYPERVISOR_sched_op(SCHEDOP_poll, &sched_poll);
+	int rc;
 
+	set_xen_guest_handle(sched_poll.ports, ports);
+	rc = HYPERVISOR_sched_op(SCHEDOP_poll, &sched_poll);
 	if (rc == -ENOSYS)
 		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
 
@@ -131,7 +134,6 @@ HYPERVISOR_poll(
 #define	pte_mfn(_x)	pte_pfn(_x)
 #define __pte_ma(_x)	((pte_t) {(_x)})
 #define phys_to_machine_mapping_valid(_x)	(1)
-#define	kmap_flush_unused()	do {} while (0)
 #define pfn_pte_ma(_x,_y)	__pte_ma(0)
 #ifndef CONFIG_XEN_IA64_DOM0_VP //XXX
 #define set_phys_to_machine(_x,_y)	do {} while (0)

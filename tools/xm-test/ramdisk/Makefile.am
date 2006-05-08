@@ -2,7 +2,7 @@ INITRD ?= http://xm-test.xensource.com/ramdisks
 
 EXTRA_DIST = skel configs patches
 
-BR_TAR = buildroot-20060215.tar.bz2
+BR_TAR = buildroot-20060427.tar.bz2
 BR_URL = http://buildroot.uclibc.org/downloads/snapshots/$(BR_TAR)
 #BR_URL = http://buildroot.uclibc.org/downloads/snapshots/buildroot-snapshot.tar.bz2
 BR_SRC = buildroot

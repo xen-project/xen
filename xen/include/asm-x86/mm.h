@@ -274,6 +274,8 @@ int check_descriptor(struct desc_struct *d);
  * been used by the read-only MPT map.
  */
 #define phys_to_machine_mapping ((unsigned long *)RO_MPT_VIRT_START)
+#define NR_P2M_TABLE_ENTRIES    ((unsigned long *)RO_MPT_VIRT_END \
+                                 - phys_to_machine_mapping)
 #define INVALID_MFN             (~0UL)
 #define VALID_MFN(_mfn)         (!((_mfn) & (1U<<31)))
 
@@ -282,7 +284,9 @@ static inline unsigned long get_mfn_from_gpfn(unsigned long pfn)
 {
     unsigned long mfn;
 
-    if ( __copy_from_user(&mfn, &phys_to_machine_mapping[pfn], sizeof(mfn)) )
+    if ( unlikely(pfn >= NR_P2M_TABLE_ENTRIES) ||
+         unlikely(__copy_from_user(&mfn, &phys_to_machine_mapping[pfn],
+                                   sizeof(mfn))) )
 	mfn = INVALID_MFN;
 
     return mfn;
@@ -382,7 +386,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code);
 int __sync_lazy_execstate(void);
 
 /* Arch-specific portion of memory_op hypercall. */
-long arch_memory_op(int op, GUEST_HANDLE(void) arg);
-long subarch_memory_op(int op, GUEST_HANDLE(void) arg);
+long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
+long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
 
 #endif /* __ASM_X86_MM_H__ */

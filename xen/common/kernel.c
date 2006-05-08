@@ -118,7 +118,7 @@ void add_taint(unsigned flag)
  * Simple hypercalls.
  */
 
-long do_xen_version(int cmd, GUEST_HANDLE(void) arg)
+long do_xen_version(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     switch ( cmd )
     {
@@ -244,7 +244,7 @@ long unregister_guest_nmi_callback(void)
     return 0;
 }
 
-long do_nmi_op(unsigned int cmd, GUEST_HANDLE(void) arg)
+long do_nmi_op(unsigned int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     struct xennmi_callback cb;
     long rc = 0;

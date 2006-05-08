@@ -221,7 +221,7 @@ static void putchar_console_ring(int c)
         conringc = conringp - CONRING_SIZE;
 }
 
-long read_console_ring(GUEST_HANDLE(char) str, u32 *pcount, int clear)
+long read_console_ring(XEN_GUEST_HANDLE(char) str, u32 *pcount, int clear)
 {
     unsigned int idx, len, max, sofar, c;
     unsigned long flags;
@@ -319,7 +319,7 @@ static void serial_rx(char c, struct cpu_user_regs *regs)
     __serial_rx(c, regs);
 }
 
-static long guest_console_write(GUEST_HANDLE(char) buffer, int count)
+static long guest_console_write(XEN_GUEST_HANDLE(char) buffer, int count)
 {
     char kbuf[128], *kptr;
     int kcount;
@@ -355,7 +355,7 @@ static long guest_console_write(GUEST_HANDLE(char) buffer, int count)
     return 0;
 }
 
-long do_console_io(int cmd, int count, GUEST_HANDLE(char) buffer)
+long do_console_io(int cmd, int count, XEN_GUEST_HANDLE(char) buffer)
 {
     long rc;
     unsigned int idx, len;

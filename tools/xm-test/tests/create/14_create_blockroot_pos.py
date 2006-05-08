@@ -31,20 +31,14 @@ else:
     domain = XenDomain(name=domConfig.getOpt("name"), config=domConfig)
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
       FAIL(str(e))
 
 #waitForBoot()
 
 try:
-    console = XmConsole(domain.getName(), historySaveCmds=True)
-except ConsoleError, e:
-    FAIL(str(e))
-
-try:
 #    console.debugMe = True
-    console.sendInput("foo")
     run = console.runCmd("ls")
 
 except ConsoleError, e:

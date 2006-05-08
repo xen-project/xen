@@ -11,7 +11,7 @@ if ENABLE_HVM_SUPPORT:
 domain = XmTestDomain()
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to start domain: "
@@ -19,8 +19,6 @@ except DomainError, e:
     FAIL(str(e))
 
 try:
-    console = XmConsole(domain.getName())
-    console.sendInput("input")
     # Make sure it's alive before we proceed
     console.runCmd("ls")
 except ConsoleError, e:

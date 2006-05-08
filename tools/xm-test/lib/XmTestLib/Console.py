@@ -234,11 +234,14 @@ class XmConsole:
             "return": 0,
             }
 
-    def closeConsole(self):
+    def __closeConsole(self):
         """Closes the console connection and ensures that the console
-        process is killed"""
-        os.close(self.consoleFd)
-        os.kill(self.consolePid, 2)
+        process is killed. This should only be called by the domain.
+        Tests should call domain.closeConsole()"""
+        if self.consolePid != 0:
+            os.close(self.consoleFd)
+            os.kill(self.consolePid, 2)
+            self.consolePid = 0
 
 
     def setLimit(self, limit):
@@ -249,6 +252,10 @@ class XmConsole:
             self.limit = int(limit)
         except Exception, e:
             self.limit = None
+ 
+    def setHistorySaveCmds(self, value):
+        # True or False
+        self.historySaveCmds = value
             
                    
 if __name__ == "__main__":
@@ -272,7 +279,7 @@ if __name__ == "__main__":
         print "Console failed (%)" % str(e)
         sys.exit(255)
         
-    t.closeConsole()
+    t._XmConsole__closeConsole()
     
     print run["output"],
     sys.exit(run["return"])

@@ -128,7 +128,7 @@ void printk(const char *fmt, ...)
 {
     va_list       args;
     va_start(args, fmt);
-    print(0, fmt, args);
+    print(1, fmt, args);
     va_end(args);        
 }
 

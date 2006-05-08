@@ -16,20 +16,14 @@ if ENABLE_HVM_SUPPORT:
 domain = XmTestDomain()
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
         print e.extra
     FAIL(str(e))
 
-# Make sure the domain isn't DOA
-try:
-    console = XmConsole(domain.getName())
-except ConsoleError, e:
-    FAIL(str(e))
-
-console.closeConsole()
+domain.closeConsole()
 
 # Save it out
 status, output = traceCommand("xm save %s /NOWHERE/test.state" % domain.getName())

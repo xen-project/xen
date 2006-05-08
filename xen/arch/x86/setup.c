@@ -391,17 +391,17 @@ void __init __start_xen(multiboot_info_t *mbi)
     total_pages = nr_pages;
 
     /* Sanity check for unwanted bloat of dom0_op structure. */
-    BUG_ON(sizeof(((struct dom0_op *)0)->u) !=
-           sizeof(((struct dom0_op *)0)->u.pad));
+    BUILD_BUG_ON(sizeof(((struct dom0_op *)0)->u) !=
+                 sizeof(((struct dom0_op *)0)->u.pad));
 
-    BUG_ON(sizeof(start_info_t) > PAGE_SIZE);
-    BUG_ON(sizeof(shared_info_t) > PAGE_SIZE);
-    BUG_ON(sizeof(vcpu_info_t) != 64);
+    BUILD_BUG_ON(sizeof(start_info_t) > PAGE_SIZE);
+    BUILD_BUG_ON(sizeof(shared_info_t) > PAGE_SIZE);
+    BUILD_BUG_ON(sizeof(vcpu_info_t) != 64);
 
     /* __foo are defined in public headers. Check they match internal defs. */
-    BUG_ON(__HYPERVISOR_VIRT_START != HYPERVISOR_VIRT_START);
+    BUILD_BUG_ON(__HYPERVISOR_VIRT_START != HYPERVISOR_VIRT_START);
 #ifdef HYPERVISOR_VIRT_END
-    BUG_ON(__HYPERVISOR_VIRT_END   != HYPERVISOR_VIRT_END);
+    BUILD_BUG_ON(__HYPERVISOR_VIRT_END   != HYPERVISOR_VIRT_END);
 #endif
 
     init_frametable();

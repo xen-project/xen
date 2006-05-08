@@ -50,6 +50,8 @@ typedef struct tpmif_st {
 	grant_handle_t shmem_handle;
 	grant_ref_t shmem_ref;
 	struct page *pagerange;
+
+	char devname[20];
 } tpmif_t;
 
 void tpmif_disconnect_complete(tpmif_t * tpmif);

@@ -15,6 +15,7 @@
 #include <xen/rangeset.h>
 #include <asm/domain.h>
 #include <xen/xenoprof.h>
+#include <xen/irq.h>
 
 extern unsigned long volatile jiffies;
 extern rwlock_t domlist_lock;
@@ -132,9 +133,8 @@ struct domain
      * domain's event-channel spinlock. Read accesses can also synchronise on 
      * the lock, but races don't usually matter.
      */
-#define NR_PIRQS 256 /* Put this somewhere sane! */
-    u16              pirq_to_evtchn[NR_PIRQS];
-    DECLARE_BITMAP(pirq_mask, NR_PIRQS);
+    u16              pirq_to_evtchn[NR_IRQS];
+    DECLARE_BITMAP(pirq_mask, NR_IRQS);
 
     /* I/O capabilities (access to IRQs and memory-mapped I/O). */
     struct rangeset *iomem_caps;
@@ -316,7 +316,7 @@ void startup_cpu_idle_loop(void);
  * It contains one character per argument as follows:
  *  'i' [unsigned] {char, int}
  *  'l' [unsigned] long
- *  'h' guest handle (GUEST_HANDLE(foo))
+ *  'h' guest handle (XEN_GUEST_HANDLE(foo))
  */
 unsigned long hypercall_create_continuation(
     unsigned int op, const char *format, ...);

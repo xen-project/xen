@@ -959,11 +959,10 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_XEN
 	{
-		physdev_op_t op;
+		struct physdev_set_iopl set_iopl;
 
-		op.cmd             = PHYSDEVOP_SET_IOPL;
-		op.u.set_iopl.iopl = 1;
-		HYPERVISOR_physdev_op(&op);
+		set_iopl.iopl = 1;
+		HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
 
 		if (xen_start_info->flags & SIF_INITDOMAIN) {
 			if (!(xen_start_info->flags & SIF_PRIVILEGED))
@@ -1157,6 +1156,10 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 	level = cpuid_eax(1);
 	if (c->x86 == 15 && ((level >= 0x0f48 && level < 0x0f50) || level >= 0x0f58))
 		set_bit(X86_FEATURE_REP_GOOD, &c->x86_capability);
+
+	/* Enable workaround for FXSAVE leak */
+	if (c->x86 >= 6)
+		set_bit(X86_FEATURE_FXSAVE_LEAK, &c->x86_capability);
 
 	r = get_model_name(c);
 	if (!r) { 

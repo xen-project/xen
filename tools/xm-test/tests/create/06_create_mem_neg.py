@@ -23,7 +23,7 @@ config1 = {"memory": 0}
 domain1=XmTestDomain(extraConfig=config1)
 
 try:
-    domain1.start()
+    domain1.start(noConsole=True)
     eyecatcher1 = "Created"
 except DomainError, e:
     eyecatcher1 = "Fail"
@@ -42,7 +42,7 @@ config2 = {"memory": extreme_mem}
 domain2=XmTestDomain(extraConfig=config2)
 
 try:
-    domain2.start()
+    domain2.start(noConsole=True)
     eyecatcher2 = "Created"
 except DomainError, e:
     eyecatcher2 = "Fail"

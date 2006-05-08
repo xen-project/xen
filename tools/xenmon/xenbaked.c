@@ -410,14 +410,13 @@ void get_tbufs(unsigned long *mfn, unsigned long *size)
 struct t_buf *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
                         unsigned long size)
 {
-    int xc_handle;                  /* file descriptor for /proc/xen/privcmd */
+    int xc_handle;
     struct t_buf *tbufs_mapped;
 
     xc_handle = xc_interface_open();
 
     if ( xc_handle < 0 ) 
     {
-        PERROR("Open /proc/xen/privcmd when mapping trace buffers\n");
         exit(EXIT_FAILURE);
     }
 
@@ -677,7 +676,10 @@ void alloc_qos_data(int ncpu)
     for (n=0; n<ncpu; n++) {
 
       for (i=0; i<sizeof(_new_qos_data); i=i+pgsize)
-        write(qos_fd, dummy, pgsize);
+          if ((write(qos_fd, dummy, pgsize)) != pgsize) {
+              PERROR(SHARED_MEM_FILE);
+              exit(2);
+          }
 
       new_qos = (_new_qos_data *) mmap(0, sizeof(_new_qos_data), PROT_READ|PROT_WRITE, 
 				       MAP_SHARED, qos_fd, off);

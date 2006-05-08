@@ -981,7 +981,7 @@ static int __init xenbus_probe_init(void)
 	dom0 = (xen_start_info->store_evtchn == 0);
 
 	if (dom0) {
-		evtchn_op_t op = { 0 };
+		struct evtchn_alloc_unbound alloc_unbound;
 
 		/* Allocate page. */
 		page = get_zeroed_page(GFP_KERNEL);
@@ -993,15 +993,15 @@ static int __init xenbus_probe_init(void)
 				   PAGE_SHIFT);
 
 		/* Next allocate a local port which xenstored can bind to */
-		op.cmd = EVTCHNOP_alloc_unbound;
-		op.u.alloc_unbound.dom        = DOMID_SELF;
-		op.u.alloc_unbound.remote_dom = 0;
+		alloc_unbound.dom        = DOMID_SELF;
+		alloc_unbound.remote_dom = 0;
 
-		err = HYPERVISOR_event_channel_op(&op);
+		err = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound,
+						  &alloc_unbound);
 		if (err == -ENOSYS)
 			goto err;
 		BUG_ON(err);
-		xen_start_info->store_evtchn = op.u.alloc_unbound.port;
+		xen_start_info->store_evtchn = alloc_unbound.port;
 
 		/* And finally publish the above info in /proc/xen */
 		xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0600);
@@ -1068,6 +1068,11 @@ postcore_initcall(xenbus_probe_init);
 static int __init wait_for_devices(void)
 {
 	unsigned long timeout = jiffies + 10*HZ;
+
+	if (xen_init() < 0) {
+		DPRINTK("failed");
+		return -ENODEV;
+	}
 
 	while (time_before(jiffies, timeout)) {
 		if (all_devices_ready())

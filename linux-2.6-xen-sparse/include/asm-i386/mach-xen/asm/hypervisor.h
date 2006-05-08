@@ -40,6 +40,8 @@
 #include <linux/errno.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/dom0_ops.h>
+#include <xen/interface/event_channel.h>
+#include <xen/interface/physdev.h>
 #include <xen/interface/sched.h>
 #include <xen/interface/nmi.h>
 #include <asm/ptrace.h>
@@ -162,14 +164,14 @@ static inline int
 HYPERVISOR_poll(
 	evtchn_port_t *ports, unsigned int nr_ports, u64 timeout)
 {
+	int rc;
 	struct sched_poll sched_poll = {
-		.ports = ports,
 		.nr_ports = nr_ports,
 		.timeout = jiffies_to_st(timeout)
 	};
+	set_xen_guest_handle(sched_poll.ports, ports);
 
-	int rc = HYPERVISOR_sched_op(SCHEDOP_poll, &sched_poll);
-
+	rc = HYPERVISOR_sched_op(SCHEDOP_poll, &sched_poll);
 	if (rc == -ENOSYS)
 		rc = HYPERVISOR_sched_op_compat(SCHEDOP_yield, 0);
 

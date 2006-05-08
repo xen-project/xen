@@ -148,7 +148,7 @@ static __inline__ unsigned long machine_to_phys(unsigned long machine)
 }
 
 #if defined(__x86_64__)
-#define VIRT_START              0xFFFFFFFF00000000UL
+#define VIRT_START              0xFFFFFFFF80000000UL
 #elif defined(__i386__)
 #define VIRT_START              0xC0000000UL
 #endif

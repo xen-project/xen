@@ -31,7 +31,7 @@
 static long
 increase_reservation(
     struct domain *d, 
-    GUEST_HANDLE(ulong) extent_list,
+    XEN_GUEST_HANDLE(ulong) extent_list,
     unsigned int   nr_extents,
     unsigned int   extent_order,
     unsigned int   flags,
@@ -80,7 +80,7 @@ increase_reservation(
 static long
 populate_physmap(
     struct domain *d, 
-    GUEST_HANDLE(ulong) extent_list,
+    XEN_GUEST_HANDLE(ulong) extent_list,
     unsigned int  nr_extents,
     unsigned int  extent_order,
     unsigned int  flags,
@@ -177,7 +177,7 @@ guest_remove_page(
 static long
 decrease_reservation(
     struct domain *d,
-    GUEST_HANDLE(ulong) extent_list,
+    XEN_GUEST_HANDLE(ulong) extent_list,
     unsigned int   nr_extents,
     unsigned int   extent_order,
     unsigned int   flags,
@@ -211,7 +211,7 @@ decrease_reservation(
 
 static long
 translate_gpfn_list(
-    GUEST_HANDLE(xen_translate_gpfn_list_t) uop, unsigned long *progress)
+    XEN_GUEST_HANDLE(xen_translate_gpfn_list_t) uop, unsigned long *progress)
 {
     struct xen_translate_gpfn_list op;
     unsigned long i, gpfn, mfn;
@@ -270,7 +270,7 @@ translate_gpfn_list(
     return 0;
 }
 
-long do_memory_op(unsigned long cmd, GUEST_HANDLE(void) arg)
+long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
 {
     struct domain *d;
     int rc, op, flags = 0, preempted = 0;

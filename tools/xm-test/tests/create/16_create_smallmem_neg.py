@@ -13,14 +13,10 @@ domain = XmTestDomain(extraConfig={"memory": MEM,
                                    "extra" :"mem=%iM" % MEM})
 
 try:
-    domain.start()
+    console = domain.start()
+    console.runCmd("ls")
 except DomainError, e:
     FAIL("Unable to start a domain with %i MB" % MEM)
-
-try:
-    console = XmConsole(domain.getName())
-    console.sendInput("input")
-    console.runCmd("ls")
 except ConsoleError, e:
     if e.reason == RUNAWAY:
         print "Domain with %i MB has runaway console as expected" % MEM

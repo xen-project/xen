@@ -155,17 +155,10 @@ void subarch_init_memory(void)
      * 64-bit operations on them. Also, just for sanity, we assert the size
      * of the structure here.
      */
-    if ( (offsetof(struct page_info, u.inuse._domain) != 
-          (offsetof(struct page_info, count_info) + sizeof(u32))) ||
-         ((offsetof(struct page_info, count_info) & 7) != 0) ||
-         (sizeof(struct page_info) != 24) )
-    {
-        printk("Weird page_info layout (%ld,%ld,%d)\n",
-               offsetof(struct page_info, count_info),
-               offsetof(struct page_info, u.inuse._domain),
-               sizeof(struct page_info));
-        BUG();
-    }
+    BUILD_BUG_ON(offsetof(struct page_info, u.inuse._domain) != 
+                 (offsetof(struct page_info, count_info) + sizeof(u32)));
+    BUILD_BUG_ON((offsetof(struct page_info, count_info) & 7) != 0);
+    BUILD_BUG_ON(sizeof(struct page_info) != 24);
 
     /* M2P table is mappable read-only by privileged domains. */
     for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
@@ -189,7 +182,7 @@ void subarch_init_memory(void)
     }
 }
 
-long subarch_memory_op(int op, GUEST_HANDLE(void) arg)
+long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 {
     struct xen_machphys_mfn_list xmml;
     unsigned long mfn;

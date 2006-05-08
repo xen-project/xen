@@ -452,17 +452,6 @@ static void vmx_store_cpu_guest_regs(
 
     if ( regs != NULL )
     {
-#if defined (__x86_64__)
-        __vmread(GUEST_RFLAGS, &regs->rflags);
-        __vmread(GUEST_SS_SELECTOR, &regs->ss);
-        __vmread(GUEST_CS_SELECTOR, &regs->cs);
-        __vmread(GUEST_DS_SELECTOR, &regs->ds);
-        __vmread(GUEST_ES_SELECTOR, &regs->es);
-        __vmread(GUEST_GS_SELECTOR, &regs->gs);
-        __vmread(GUEST_FS_SELECTOR, &regs->fs);
-        __vmread(GUEST_RIP, &regs->rip);
-        __vmread(GUEST_RSP, &regs->rsp);
-#elif defined (__i386__)
         __vmread(GUEST_RFLAGS, &regs->eflags);
         __vmread(GUEST_SS_SELECTOR, &regs->ss);
         __vmread(GUEST_CS_SELECTOR, &regs->cs);
@@ -472,7 +461,6 @@ static void vmx_store_cpu_guest_regs(
         __vmread(GUEST_FS_SELECTOR, &regs->fs);
         __vmread(GUEST_RIP, &regs->eip);
         __vmread(GUEST_RSP, &regs->esp);
-#endif
     }
 
     if ( crs != NULL )
@@ -485,6 +473,45 @@ static void vmx_store_cpu_guest_regs(
     /* Reload current VCPU's VMCS if it was temporarily unloaded. */
     if ( (v != current) && hvm_guest(current) )
         __vmptrld(virt_to_maddr(current->arch.hvm_vmx.vmcs));
+}
+
+/*
+ * The VMX spec (section 4.3.1.2, Checks on Guest Segment
+ * Registers) says that virtual-8086 mode guests' segment
+ * base-address fields in the VMCS must be equal to their
+ * corresponding segment selector field shifted right by
+ * four bits upon vmentry.
+ *
+ * This function (called only for VM86-mode guests) fixes
+ * the bases to be consistent with the selectors in regs
+ * if they're not already.  Without this, we can fail the
+ * vmentry check mentioned above.
+ */
+static void fixup_vm86_seg_bases(struct cpu_user_regs *regs)
+{
+    int err = 0;
+    unsigned long base;
+
+    err |= __vmread(GUEST_ES_BASE, &base);
+    if (regs->es << 4 != base)
+        err |= __vmwrite(GUEST_ES_BASE, regs->es << 4);
+    err |= __vmread(GUEST_CS_BASE, &base);
+    if (regs->cs << 4 != base)
+        err |= __vmwrite(GUEST_CS_BASE, regs->cs << 4);
+    err |= __vmread(GUEST_SS_BASE, &base);
+    if (regs->ss << 4 != base)
+        err |= __vmwrite(GUEST_SS_BASE, regs->ss << 4);
+    err |= __vmread(GUEST_DS_BASE, &base);
+    if (regs->ds << 4 != base)
+        err |= __vmwrite(GUEST_DS_BASE, regs->ds << 4);
+    err |= __vmread(GUEST_FS_BASE, &base);
+    if (regs->fs << 4 != base)
+        err |= __vmwrite(GUEST_FS_BASE, regs->fs << 4);
+    err |= __vmread(GUEST_GS_BASE, &base);
+    if (regs->gs << 4 != base)
+        err |= __vmwrite(GUEST_GS_BASE, regs->gs << 4);
+
+    BUG_ON(err);
 }
 
 void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
@@ -510,23 +537,6 @@ void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 
     ASSERT(v->arch.hvm_vmx.launch_cpu == smp_processor_id());
 
-#if defined (__x86_64__)
-    __vmwrite(GUEST_SS_SELECTOR, regs->ss);
-    __vmwrite(GUEST_DS_SELECTOR, regs->ds);
-    __vmwrite(GUEST_ES_SELECTOR, regs->es);
-    __vmwrite(GUEST_GS_SELECTOR, regs->gs);
-    __vmwrite(GUEST_FS_SELECTOR, regs->fs);
-    __vmwrite(GUEST_RSP, regs->rsp);
-
-    __vmwrite(GUEST_RFLAGS, regs->rflags);
-    if (regs->rflags & EF_TF)
-        __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
-    else
-        __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
-
-    __vmwrite(GUEST_CS_SELECTOR, regs->cs);
-    __vmwrite(GUEST_RIP, regs->rip);
-#elif defined (__i386__)
     __vmwrite(GUEST_SS_SELECTOR, regs->ss);
     __vmwrite(GUEST_DS_SELECTOR, regs->ds);
     __vmwrite(GUEST_ES_SELECTOR, regs->es);
@@ -540,10 +550,11 @@ void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
         __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
     else
         __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
+    if (regs->eflags & EF_VM)
+        fixup_vm86_seg_bases(regs);
 
     __vmwrite(GUEST_CS_SELECTOR, regs->cs);
     __vmwrite(GUEST_RIP, regs->eip);
-#endif
 
     /* Reload current VCPU's VMCS if it was temporarily unloaded. */
     if ( (v != current) && hvm_guest(current) )
@@ -882,6 +893,20 @@ static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
 #define CASE_GET_REG_P(REG, reg)    \
     case REG_ ## REG: reg_p = (unsigned long *)&(regs->reg); break
 
+#ifdef __i386__
+#define CASE_EXTEND_GET_REG_P
+#else
+#define CASE_EXTEND_GET_REG_P       \
+    CASE_GET_REG_P(R8, r8);         \
+    CASE_GET_REG_P(R9, r9);         \
+    CASE_GET_REG_P(R10, r10);       \
+    CASE_GET_REG_P(R11, r11);       \
+    CASE_GET_REG_P(R12, r12);       \
+    CASE_GET_REG_P(R13, r13);       \
+    CASE_GET_REG_P(R14, r14);       \
+    CASE_GET_REG_P(R15, r15)
+#endif
+
 static void vmx_dr_access (unsigned long exit_qualification, struct cpu_user_regs *regs)
 {
     unsigned int reg;
@@ -897,14 +922,15 @@ static void vmx_dr_access (unsigned long exit_qualification, struct cpu_user_reg
                 "vmx_dr_access : eip=%lx, reg=%d, exit_qualification = %lx",
                 eip, reg, exit_qualification);
 
-    switch(exit_qualification & DEBUG_REG_ACCESS_REG) {
-        CASE_GET_REG_P(EAX, eax);
-        CASE_GET_REG_P(ECX, ecx);
-        CASE_GET_REG_P(EDX, edx);
-        CASE_GET_REG_P(EBX, ebx);
-        CASE_GET_REG_P(EBP, ebp);
-        CASE_GET_REG_P(ESI, esi);
-        CASE_GET_REG_P(EDI, edi);
+    switch ( exit_qualification & DEBUG_REG_ACCESS_REG ) {
+    CASE_GET_REG_P(EAX, eax);
+    CASE_GET_REG_P(ECX, ecx);
+    CASE_GET_REG_P(EDX, edx);
+    CASE_GET_REG_P(EBX, ebx);
+    CASE_GET_REG_P(EBP, ebp);
+    CASE_GET_REG_P(ESI, esi);
+    CASE_GET_REG_P(EDI, edi);
+    CASE_EXTEND_GET_REG_P;
     case REG_ESP:
         break;
     default:
@@ -1514,28 +1540,29 @@ static int vmx_set_cr0(unsigned long value)
     return 1;
 }
 
-#define CASE_GET_REG(REG, reg)  \
+#define CASE_SET_REG(REG, reg)      \
+    case REG_ ## REG: regs->reg = value; break
+#define CASE_GET_REG(REG, reg)      \
     case REG_ ## REG: value = regs->reg; break
 
-#define CASE_EXTEND_SET_REG \
-      CASE_EXTEND_REG(S)
-#define CASE_EXTEND_GET_REG \
-      CASE_EXTEND_REG(G)
+#define CASE_EXTEND_SET_REG         \
+    CASE_EXTEND_REG(S)
+#define CASE_EXTEND_GET_REG         \
+    CASE_EXTEND_REG(G)
 
 #ifdef __i386__
 #define CASE_EXTEND_REG(T)
 #else
-#define CASE_EXTEND_REG(T)    \
-    CASE_ ## T ## ET_REG(R8, r8); \
-    CASE_ ## T ## ET_REG(R9, r9); \
+#define CASE_EXTEND_REG(T)          \
+    CASE_ ## T ## ET_REG(R8, r8);   \
+    CASE_ ## T ## ET_REG(R9, r9);   \
     CASE_ ## T ## ET_REG(R10, r10); \
     CASE_ ## T ## ET_REG(R11, r11); \
     CASE_ ## T ## ET_REG(R12, r12); \
     CASE_ ## T ## ET_REG(R13, r13); \
     CASE_ ## T ## ET_REG(R14, r14); \
-    CASE_ ## T ## ET_REG(R15, r15);
+    CASE_ ## T ## ET_REG(R15, r15)
 #endif
-
 
 /*
  * Write to control registers
@@ -1546,31 +1573,28 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     unsigned long old_cr;
     struct vcpu *v = current;
 
-    switch (gp) {
-        CASE_GET_REG(EAX, eax);
-        CASE_GET_REG(ECX, ecx);
-        CASE_GET_REG(EDX, edx);
-        CASE_GET_REG(EBX, ebx);
-        CASE_GET_REG(EBP, ebp);
-        CASE_GET_REG(ESI, esi);
-        CASE_GET_REG(EDI, edi);
-        CASE_EXTEND_GET_REG
-            case REG_ESP:
-                __vmread(GUEST_RSP, &value);
+    switch ( gp ) {
+    CASE_GET_REG(EAX, eax);
+    CASE_GET_REG(ECX, ecx);
+    CASE_GET_REG(EDX, edx);
+    CASE_GET_REG(EBX, ebx);
+    CASE_GET_REG(EBP, ebp);
+    CASE_GET_REG(ESI, esi);
+    CASE_GET_REG(EDI, edi);
+    CASE_EXTEND_GET_REG;
+    case REG_ESP:
+        __vmread(GUEST_RSP, &value);
         break;
     default:
         printk("invalid gp: %d\n", gp);
         __hvm_bug(regs);
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "mov_to_cr: CR%d, value = %lx,", cr, value);
-    HVM_DBG_LOG(DBG_LEVEL_1, "current = %lx,", (unsigned long) current);
+    HVM_DBG_LOG(DBG_LEVEL_1, "CR%d, value = %lx", cr, value);
 
-    switch(cr) {
+    switch ( cr ) {
     case 0:
-    {
         return vmx_set_cr0(value);
-    }
     case 3:
     {
         unsigned long old_base_mfn, mfn;
@@ -1742,11 +1766,6 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     return 1;
 }
 
-#define CASE_SET_REG(REG, reg)      \
-    case REG_ ## REG:       \
-    regs->reg = value;      \
-    break
-
 /*
  * Read from control registers. CR0 and CR4 are read from the shadow.
  */
@@ -1755,22 +1774,22 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
     unsigned long value;
     struct vcpu *v = current;
 
-    if (cr != 3)
+    if ( cr != 3 )
         __hvm_bug(regs);
 
     value = (unsigned long) v->arch.hvm_vmx.cpu_cr3;
 
-    switch (gp) {
-        CASE_SET_REG(EAX, eax);
-        CASE_SET_REG(ECX, ecx);
-        CASE_SET_REG(EDX, edx);
-        CASE_SET_REG(EBX, ebx);
-        CASE_SET_REG(EBP, ebp);
-        CASE_SET_REG(ESI, esi);
-        CASE_SET_REG(EDI, edi);
-        CASE_EXTEND_SET_REG
-            case REG_ESP:
-                __vmwrite(GUEST_RSP, value);
+    switch ( gp ) {
+    CASE_SET_REG(EAX, eax);
+    CASE_SET_REG(ECX, ecx);
+    CASE_SET_REG(EDX, edx);
+    CASE_SET_REG(EBX, ebx);
+    CASE_SET_REG(EBP, ebp);
+    CASE_SET_REG(ESI, esi);
+    CASE_SET_REG(EDI, edi);
+    CASE_EXTEND_SET_REG;
+    case REG_ESP:
+        __vmwrite(GUEST_RSP, value);
         regs->esp = value;
         break;
     default:
@@ -1778,7 +1797,7 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
         __hvm_bug(regs);
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_VMMU, "mov_from_cr: CR%d, value = %lx,", cr, value);
+    HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR%d, value = %lx", cr, value);
 }
 
 static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs *regs)
@@ -2273,11 +2292,7 @@ asmlinkage void vmx_load_cr2(void)
     struct vcpu *v = current;
 
     local_irq_disable();
-#ifdef __i386__
-    asm volatile("movl %0,%%cr2": :"r" (v->arch.hvm_vmx.cpu_cr2));
-#else
-    asm volatile("movq %0,%%cr2": :"r" (v->arch.hvm_vmx.cpu_cr2));
-#endif
+    asm volatile("mov %0,%%cr2": :"r" (v->arch.hvm_vmx.cpu_cr2));
 }
 
 asmlinkage void vmx_trace_vmentry (void)

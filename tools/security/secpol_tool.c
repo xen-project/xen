@@ -14,7 +14,7 @@
  *
  * sHype policy management tool. This code runs in a domain and
  *     manages the Xen security policy by interacting with the
- *     Xen access control module via a /proc/xen/privcmd proc-ioctl,
+ *     Xen access control module via the privcmd device,
  *     which is translated into a acm_op hypercall into Xen.
  *
  * indent -i4 -kr -nut
@@ -36,7 +36,8 @@
 #include <stdint.h>
 #include <xen/acm.h>
 #include <xen/acm_ops.h>
-#include <xen/linux/privcmd.h>
+
+#include <xenctrl.h>
 
 #define PERROR(_m, _a...) \
 fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a ,	\
@@ -50,47 +51,6 @@ void usage(char *progname)
            "\t dumpstats\n"
            "\t loadpolicy <binary policy file>\n", progname);
     exit(-1);
-}
-
-static inline int do_policycmd(int xc_handle, unsigned int cmd,
-                               unsigned long data)
-{
-    return ioctl(xc_handle, cmd, data);
-}
-
-static inline int do_xen_hypercall(int xc_handle,
-                                   privcmd_hypercall_t * hypercall)
-{
-    return do_policycmd(xc_handle,
-                        IOCTL_PRIVCMD_HYPERCALL,
-                        (unsigned long) hypercall);
-}
-
-static inline int do_acm_op(int xc_handle, struct acm_op *op)
-{
-    int ret = -1;
-    privcmd_hypercall_t hypercall;
-
-    op->interface_version = ACM_INTERFACE_VERSION;
-
-    hypercall.op = __HYPERVISOR_acm_op;
-    hypercall.arg[0] = (unsigned long) op;
-
-    if (mlock(op, sizeof(*op)) != 0) {
-        PERROR("Could not lock memory for Xen policy hypercall");
-        goto out1;
-    }
-
-    if ((ret = do_xen_hypercall(xc_handle, &hypercall)) < 0) {
-        printf("ACM operation failed: errno=%d\n", errno);
-        if (errno == EACCES)
-            fprintf(stderr, "ACM operation failed -- need to"
-                    " rebuild the user-space tool set?\n");
-        goto out2;
-    }
-
-  out2:(void) munlock(op, sizeof(*op));
-  out1:return ret;
 }
 
 /*************************** DUMPS *******************************/
@@ -276,10 +236,15 @@ int acm_domain_getpolicy(int xc_handle)
 
     memset(pull_buffer, 0x00, sizeof(pull_buffer));
     op.cmd = ACM_GETPOLICY;
-    op.interface_version = ACM_INTERFACE_VERSION;
     op.u.getpolicy.pullcache = (void *) pull_buffer;
     op.u.getpolicy.pullcache_size = sizeof(pull_buffer);
-    ret = do_acm_op(xc_handle, &op);
+    if ((ret = xc_acm_op(xc_handle, &op)) < 0) {
+        printf("ACM operation failed: errno=%d\n", errno);
+        if (errno == EACCES)
+            fprintf(stderr, "ACM operation failed -- need to"
+                    " rebuild the user-space tool set?\n");
+    }
+
     /* dump policy  */
     acm_dump_policy_buffer(pull_buffer, sizeof(pull_buffer));
     return ret;
@@ -314,10 +279,9 @@ int acm_domain_loadpolicy(int xc_handle, const char *filename)
         /* dump it and then push it down into xen/acm */
         acm_dump_policy_buffer(buffer, len);
         op.cmd = ACM_SETPOLICY;
-        op.interface_version = ACM_INTERFACE_VERSION;
         op.u.setpolicy.pushcache = (void *) buffer;
         op.u.setpolicy.pushcache_size = len;
-        ret = do_acm_op(xc_handle, &op);
+        ret = xc_acm_op(xc_handle, &op);
 
         if (ret)
             printf
@@ -364,10 +328,9 @@ int acm_domain_dumpstats(int xc_handle)
 
     memset(stats_buffer, 0x00, sizeof(stats_buffer));
     op.cmd = ACM_DUMPSTATS;
-    op.interface_version = ACM_INTERFACE_VERSION;
     op.u.dumpstats.pullcache = (void *) stats_buffer;
     op.u.dumpstats.pullcache_size = sizeof(stats_buffer);
-    ret = do_acm_op(xc_handle, &op);
+    ret = xc_acm_op(xc_handle, &op);
 
     if (ret < 0) {
         printf
@@ -426,12 +389,12 @@ int acm_domain_dumpstats(int xc_handle)
 int main(int argc, char **argv)
 {
 
-    int acm_cmd_fd, ret = 0;
+    int xc_handle, ret = 0;
 
     if (argc < 2)
         usage(argv[0]);
 
-    if ((acm_cmd_fd = open("/proc/xen/privcmd", O_RDONLY)) <= 0) {
+    if ((xc_handle = xc_interface_open()) <= 0) {
         printf("ERROR: Could not open xen privcmd device!\n");
         exit(-1);
     }
@@ -439,18 +402,18 @@ int main(int argc, char **argv)
     if (!strcmp(argv[1], "getpolicy")) {
         if (argc != 2)
             usage(argv[0]);
-        ret = acm_domain_getpolicy(acm_cmd_fd);
+        ret = acm_domain_getpolicy(xc_handle);
     } else if (!strcmp(argv[1], "loadpolicy")) {
         if (argc != 3)
             usage(argv[0]);
-        ret = acm_domain_loadpolicy(acm_cmd_fd, argv[2]);
+        ret = acm_domain_loadpolicy(xc_handle, argv[2]);
     } else if (!strcmp(argv[1], "dumpstats")) {
         if (argc != 2)
             usage(argv[0]);
-        ret = acm_domain_dumpstats(acm_cmd_fd);
+        ret = acm_domain_dumpstats(xc_handle);
     } else
         usage(argv[0]);
 
-    close(acm_cmd_fd);
+    xc_interface_close(xc_handle);
     return ret;
 }

@@ -293,52 +293,76 @@ static void flush_all_pending_eoi(void *unused)
     flush_ready_eoi(NULL);
 }
 
-int pirq_guest_unmask(struct domain *d)
+static void __pirq_guest_eoi(struct domain *d, int irq)
 {
     irq_desc_t         *desc;
     irq_guest_action_t *action;
-    cpumask_t           cpu_eoi_map = CPU_MASK_NONE;
-    unsigned int        pirq, cpu = smp_processor_id();
-    shared_info_t      *s = d->shared_info;
+    cpumask_t           cpu_eoi_map;
 
-    for ( pirq = find_first_bit(d->pirq_mask, NR_PIRQS);
-          pirq < NR_PIRQS;
-          pirq = find_next_bit(d->pirq_mask, NR_PIRQS, pirq+1) )
+    desc   = &irq_desc[irq_to_vector(irq)];
+    action = (irq_guest_action_t *)desc->action;
+
+    spin_lock_irq(&desc->lock);
+
+    ASSERT(!test_bit(irq, d->pirq_mask) ||
+           (action->ack_type != ACKTYPE_NONE));
+
+    if ( unlikely(!test_and_clear_bit(irq, d->pirq_mask)) ||
+         unlikely(--action->in_flight != 0) )
     {
-        desc   = &irq_desc[irq_to_vector(pirq)];
-        action = (irq_guest_action_t *)desc->action;
+        spin_unlock_irq(&desc->lock);
+        return;
+    }
 
-        spin_lock_irq(&desc->lock);
+    if ( action->ack_type == ACKTYPE_UNMASK )
+    {
+        ASSERT(cpus_empty(action->cpu_eoi_map));
+        desc->handler->end(irq_to_vector(irq));
+        spin_unlock_irq(&desc->lock);
+        return;
+    }
 
-        if ( !test_bit(d->pirq_to_evtchn[pirq], s->evtchn_mask) &&
-             test_and_clear_bit(pirq, d->pirq_mask) )
-        {
-            ASSERT(action->ack_type != ACKTYPE_NONE);
-            if ( --action->in_flight == 0 )
-            {
-                if ( action->ack_type == ACKTYPE_UNMASK )
-                    desc->handler->end(irq_to_vector(pirq));
-                cpu_eoi_map = action->cpu_eoi_map;
-            }
-        }
+    ASSERT(action->ack_type == ACKTYPE_EOI);
+        
+    cpu_eoi_map = action->cpu_eoi_map;
 
-        if ( cpu_test_and_clear(cpu, cpu_eoi_map) )
-        {
-            __set_eoi_ready(desc);
-            spin_unlock(&desc->lock);
-            flush_ready_eoi(NULL);
-            local_irq_enable();
-        }
-        else
-        {
-            spin_unlock_irq(&desc->lock);
-        }
+    if ( cpu_test_and_clear(smp_processor_id(), cpu_eoi_map) )
+    {
+        __set_eoi_ready(desc);
+        spin_unlock(&desc->lock);
+        flush_ready_eoi(NULL);
+        local_irq_enable();
+    }
+    else
+    {
+        spin_unlock_irq(&desc->lock);
+    }
 
-        if ( !cpus_empty(cpu_eoi_map) )
-        {
-            on_selected_cpus(cpu_eoi_map, set_eoi_ready, desc, 1, 0);
-            cpu_eoi_map = CPU_MASK_NONE;
-        }
+    if ( !cpus_empty(cpu_eoi_map) )
+        on_selected_cpus(cpu_eoi_map, set_eoi_ready, desc, 1, 0);
+}
+
+int pirq_guest_eoi(struct domain *d, int irq)
+{
+    if ( (irq < 0) || (irq >= NR_IRQS) )
+        return -EINVAL;
+
+    __pirq_guest_eoi(d, irq);
+
+    return 0;
+}
+
+int pirq_guest_unmask(struct domain *d)
+{
+    unsigned int   irq;
+    shared_info_t *s = d->shared_info;
+
+    for ( irq = find_first_bit(d->pirq_mask, NR_IRQS);
+          irq < NR_IRQS;
+          irq = find_next_bit(d->pirq_mask, NR_IRQS, irq+1) )
+    {
+        if ( !test_bit(d->pirq_to_evtchn[irq], s->evtchn_mask) )
+            __pirq_guest_eoi(d, irq);
     }
 
     return 0;
@@ -386,9 +410,6 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     unsigned long       flags;
     int                 rc = 0;
     cpumask_t           cpumask = CPU_MASK_NONE;
-
-    if ( (irq < 0) || (irq >= NR_IRQS) )
-        return -EINVAL;
 
  retry:
     vector = irq_to_vector(irq);

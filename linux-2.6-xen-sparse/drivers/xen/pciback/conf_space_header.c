@@ -169,29 +169,61 @@ static int interrupt_read(struct pci_dev *dev, int offset, u8 * value,
 	return 0;
 }
 
-struct config_field header_common[] = {
+static int bist_write(struct pci_dev *dev, int offset, u8 value, void *data)
+{
+	u8 cur_value;
+	int err;
+
+	err = pci_read_config_byte(dev, offset, &cur_value);
+	if (err)
+		goto out;
+
+	if ((cur_value & ~PCI_BIST_START) == (value & ~PCI_BIST_START)
+	    || value == PCI_BIST_START)
+		err = pci_write_config_byte(dev, offset, value);
+
+      out:
+	return err;
+}
+
+static struct config_field header_common[] = {
 	{
 	 .offset    = PCI_COMMAND,
 	 .size      = 2,
 	 .u.w.read  = pciback_read_config_word,
 	 .u.w.write = command_write,
-	 },
+	},
 	{
 	 .offset    = PCI_INTERRUPT_LINE,
 	 .size      = 1,
 	 .u.b.read  = interrupt_read,
-	 .u.b.write = NULL,
-	 },
+	},
+	{
+	 .offset    = PCI_INTERRUPT_PIN,
+	 .size      = 1,
+	 .u.b.read  = pciback_read_config_byte,
+	},
 	{
 	 /* Any side effects of letting driver domain control cache line? */
 	 .offset    = PCI_CACHE_LINE_SIZE,
 	 .size      = 1,
 	 .u.b.read  = pciback_read_config_byte,
 	 .u.b.write = pciback_write_config_byte,
-	 },
+	},
+	{
+	 .offset    = PCI_LATENCY_TIMER,
+	 .size      = 1,
+	 .u.b.read  = pciback_read_config_byte,
+	},
+	{
+	 .offset    = PCI_BIST,
+	 .size      = 1,
+	 .u.b.read  = pciback_read_config_byte,
+	 .u.b.write = bist_write,
+	},
 	{
 	 .size = 0,
-	 },
+	},
 };
 
 #define CFG_FIELD_BAR(reg_offset) 			\
@@ -216,7 +248,7 @@ struct config_field header_common[] = {
 	 .u.dw.write = rom_write, 			\
 	 }
 
-struct config_field header_0[] = {
+static struct config_field header_0[] = {
 	CFG_FIELD_BAR(PCI_BASE_ADDRESS_0),
 	CFG_FIELD_BAR(PCI_BASE_ADDRESS_1),
 	CFG_FIELD_BAR(PCI_BASE_ADDRESS_2),
@@ -226,16 +258,16 @@ struct config_field header_0[] = {
 	CFG_FIELD_ROM(PCI_ROM_ADDRESS),
 	{
 	 .size = 0,
-	 },
+	},
 };
 
-struct config_field header_1[] = {
+static struct config_field header_1[] = {
 	CFG_FIELD_BAR(PCI_BASE_ADDRESS_0),
 	CFG_FIELD_BAR(PCI_BASE_ADDRESS_1),
 	CFG_FIELD_ROM(PCI_ROM_ADDRESS1),
 	{
 	 .size = 0,
-	 },
+	},
 };
 
 int pciback_config_header_add_fields(struct pci_dev *dev)

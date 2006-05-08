@@ -17,57 +17,37 @@ pingsizes = [ 1, 48, 64, 512, 1440, 1500, 1505, 4096, 4192, 16384, 24567,
 
 from XmTestLib import *
 
-def netDomain(ip):
-    if ENABLE_HVM_SUPPORT:
-        config = {"vif" : ['type=ioemu']}
-    else:
-        config = {"vif"  : ["ip=%s" % ip]}
+def netDomain():
 
-    dom = XmTestDomain(extraConfig=config)
+    dom = XmTestDomain()
+    dom.newDevice(XenNetDevice, "eth0")
     try:
-        dom.start()
+        console = dom.start()
+        console.setHistorySaveCmds(value=True)
     except DomainError, e:
         if verbose:
             print "Failed to create test domain because:"
             print e.extra
         FAIL(str(e))
-    try:
-        # Attach a console
-        console = XmConsole(dom.getName(), historySaveCmds=True)
-        # Activate the console
-        console.sendInput("bhs")
-    except ConsoleError, e:
-        FAIL(str(e))
-    return console
+    return dom
     
 rc = 0
 
-Net = XmNetwork()
-
-try:
-    # pick an IP address 
-    ip1   = Net.ip("dom1", "eth2")
-    mask1 = Net.mask("dom1", "eth2")
-except NetworkError, e:
-    FAIL(str(e))
-
-try:
-    # pick another IP address 
-    ip2   = Net.ip("dom2", "eth2")
-    mask2 = Net.mask("dom2", "eth2")
-except NetworkError, e:
-    FAIL(str(e))
+# Test creates 2 domains, which requires 4 ips: 2 for the domains and 2 for
+# aliases on dom0
+if xmtest_netconf.canRunNetTest(4) == False:
+    SKIP("Don't have enough free configured IPs to run this test")
 
 # Fire up a pair of guest domains w/1 nic each
-src_console = netDomain(ip1)
-dst_console = netDomain(ip2)
+src = netDomain()
+src_console = src.getConsole()
+dst = netDomain()
 
 try:
-    src_console.runCmd("ifconfig eth0 inet "+ip1+" netmask "+mask1+" up")
-    dst_console.runCmd("ifconfig eth0 inet "+ip2+" netmask "+mask2+" up")
-
     # Ping the victim over eth0
     fails=""
+    dst_netdev = dst.getDevice("eth0")
+    ip2 = dst_netdev.getNetDevIP()
     for size in pingsizes:
         out = src_console.runCmd("hping2 " + ip2 + " -E /dev/urandom -q -c 20 "
               + "--fast -d " + str(size))
@@ -77,6 +57,8 @@ try:
 except ConsoleError, e:
     FAIL(str(e))
 
+src.stop()
+dst.stop()
+
 if len(fails):
     FAIL("TCP hping2 failed for size" + fails + ".")
-

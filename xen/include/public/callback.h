@@ -36,7 +36,7 @@ typedef struct callback_register {
      int type;
      xen_callback_t address;
 } callback_register_t;
-DEFINE_GUEST_HANDLE(callback_register_t);
+DEFINE_XEN_GUEST_HANDLE(callback_register_t);
 
 /*
  * Unregister a callback.
@@ -48,7 +48,7 @@ DEFINE_GUEST_HANDLE(callback_register_t);
 typedef struct callback_unregister {
      int type;
 } callback_unregister_t;
-DEFINE_GUEST_HANDLE(callback_unregister_t);
+DEFINE_XEN_GUEST_HANDLE(callback_unregister_t);
 
 #endif /* __XEN_PUBLIC_CALLBACK_H__ */
 

@@ -3,11 +3,10 @@
 # Copyright (C) International Business Machines Corp., 2005
 # Author: Murillo F. Bernardes <mfb@br.ibm.com>
 
-import sys
 import re
-import time
 
 from XmTestLib import *
+from XmTestLib.block_utils import *
 
 if ENABLE_HVM_SUPPORT:
     SKIP("Block-attach not supported for HVM domains")
@@ -16,22 +15,15 @@ if ENABLE_HVM_SUPPORT:
 domain = XmTestDomain()
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
         print e.extra
     FAIL(str(e))
 
-# Attach a console to it
 try:
-    console = XmConsole(domain.getName(), historySaveCmds=True)
-except ConsoleError, e:
-    FAIL(str(e))
-
-try:
-    # Activate the console
-    console.sendInput("input")
+    console.setHistorySaveCmds(value=True)
     # Run 'ls'
     run = console.runCmd("ls")
 except ConsoleError, e:
@@ -40,24 +32,18 @@ except ConsoleError, e:
     
 
 for i in range(10):
-	status, output = traceCommand("xm block-attach %s phy:ram1 sdb1 w" % domain.getName())
-	if status != 0:
-        	FAIL("xm block-attach returned invalid %i != 0" % status)
-	# verify that it comes
+	block_attach(domain, "phy:ram1", "sdb1")
 	run = console.runCmd("cat /proc/partitions")
 	if not re.search("sdb1", run["output"]):
 		FAIL("Failed to attach block device: /proc/partitions does not show that!")
 		
-	status, output = traceCommand("xm block-detach %s 2065" % domain.getName())
-	if status != 0:
-		FAIL("xm block-detach returned invalid %i != 0" % status)
-	# verify that it goes
+	block_detach(domain, "sdb1")
 	run = console.runCmd("cat /proc/partitions")
 	if re.search("sdb1", run["output"]):
 		FAIL("Failed to dettach block device: /proc/partitions still showing that!")
 
 # Close the console
-console.closeConsole()
+domain.closeConsole()
 
 # Stop the domain (nice shutdown)
 domain.stop()

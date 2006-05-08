@@ -14,7 +14,7 @@ def get_sedf_params(domain):
 domain = XmTestDomain(extraConfig = {"sched":"sedf"})
 
 try:
-    domain.start()
+    domain.start(noConsole=True)
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"

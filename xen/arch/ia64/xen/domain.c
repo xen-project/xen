@@ -1237,7 +1237,7 @@ static void physdev_init_dom0(struct domain *d)
 {
 	if (iomem_permit_access(d, 0UL, ~0UL))
 		BUG();
-	if (irqs_permit_access(d, 0, NR_PIRQS-1))
+	if (irqs_permit_access(d, 0, NR_IRQS-1))
 		BUG();
 }
 

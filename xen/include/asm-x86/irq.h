@@ -5,7 +5,6 @@
 
 #include <xen/config.h>
 #include <asm/atomic.h>
-#include <asm/asm_defns.h>
 #include <irq_vectors.h>
 
 #define IO_APIC_IRQ(irq)    (((irq) >= 16) || ((1<<(irq)) & io_apic_irqs))

@@ -33,28 +33,26 @@ MINOR=0
 LIB=src/libxenstat.a
 SHLIB=src/libxenstat.so.$(MAJOR).$(MINOR)
 SHLIB_LINKS=src/libxenstat.so.$(MAJOR) src/libxenstat.so
-OBJECTS=src/xenstat.o src/xen-interface.o
+OBJECTS=src/xenstat.o
 SONAME_FLAGS=-Wl,-soname -Wl,libxenstat.so.$(MAJOR)
 
 WARN_FLAGS=-Wall -Werror
 
 CFLAGS+=-Isrc -I$(XEN_LIBXC) -I$(XEN_XENSTORE)
-LDFLAGS+=-Lsrc
+LDFLAGS+=-Lsrc -L$(XEN_XENSTORE)/ -L$(XEN_LIBXC)/
 
 .PHONY: all
 all: $(LIB)
 
 $(LIB): $(OBJECTS)
-	$(AR) rc $@ $^ $(XEN_XENSTORE)/libxenstore.so
+	$(AR) rc $@ $^ $(XEN_XENSTORE)/libxenstore.so $(XEN_LIBXC)/libxenctrl.so
 	$(RANLIB) $@
 
 $(SHLIB): $(OBJECTS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(SONAME_FLAGS) -shared -o $@ $(OBJECTS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(SONAME_FLAGS) -shared -o $@ $(OBJECTS) \
+		-lxenstore -lxenctrl
 
-src/xenstat.o: src/xenstat.c src/xenstat.h src/xen-interface.h
-	$(CC) $(CFLAGS) $(WARN_FLAGS) -c -o $@ $<
-
-src/xen-interface.o: src/xen-interface.c src/xen-interface.h
+src/xenstat.o: src/xenstat.c src/xenstat.h
 	$(CC) $(CFLAGS) $(WARN_FLAGS) -c -o $@ $<
 
 src/libxenstat.so.$(MAJOR): $(LIB)

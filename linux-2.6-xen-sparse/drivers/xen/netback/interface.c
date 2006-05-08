@@ -213,10 +213,7 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	int err = -ENOMEM;
 	netif_tx_sring_t *txs;
 	netif_rx_sring_t *rxs;
-	evtchn_op_t op = {
-		.cmd = EVTCHNOP_bind_interdomain,
-		.u.bind_interdomain.remote_dom = netif->domid,
-		.u.bind_interdomain.remote_port = evtchn };
+	struct evtchn_bind_interdomain bind_interdomain;
 
 	/* Already connected through? */
 	if (netif->irq)
@@ -233,11 +230,15 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	if (err)
 		goto err_map;
 
-	err = HYPERVISOR_event_channel_op(&op);
+	bind_interdomain.remote_dom = netif->domid;
+	bind_interdomain.remote_port = evtchn;
+
+	err = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain,
+					  &bind_interdomain);
 	if (err)
 		goto err_hypervisor;
 
-	netif->evtchn = op.u.bind_interdomain.local_port;
+	netif->evtchn = bind_interdomain.local_port;
 
 	netif->irq = bind_evtchn_to_irqhandler(
 		netif->evtchn, netif_be_int, 0, netif->dev->name, netif);

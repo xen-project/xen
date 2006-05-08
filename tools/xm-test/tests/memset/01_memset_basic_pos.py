@@ -28,24 +28,33 @@ domain = XmTestDomain()
 
 # Start it
 try:
-    domain.start() 
+    console = domain.start() 
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
         print e.extra
     FAIL(str(e))
 
-# Attach a console to it
 try:
-    console = XmConsole(domain.getName()) 
-    console.sendInput("input") 
     # Make sure it's up an running before we continue
     console.runCmd("ls")
 except ConsoleError, e:
     FAIL(str(e))
     
+try:
+    run = console.runCmd("cat /proc/xen/balloon | grep Current");
+except ConsoleError, e:
+    FAIL(str(e))
+
+match = re.match("[^0-9]+([0-9]+)", run["output"])
+if not match:
+    FAIL("Invalid domU meminfo line")
+        
+origmem = int(match.group(1)) / 1024
+newmem = origmem - 1
+
 # set mem-set for less than default
-cmd = "xm mem-set %s %i" % (domain.getName(), 63)
+cmd = "xm mem-set %s %i" % (domain.getName(), newmem)
 status, output = traceCommand(cmd)
 if status != 0:
     if verbose:
@@ -55,7 +64,7 @@ if status != 0:
 
 for i in [1,2,3,4,5,6,7,8,9,10]:
     mem = getDomMem(domain.getName())
-    if mem == 63:
+    if mem == newmem:
         break
     time.sleep(1)
 
@@ -63,8 +72,8 @@ for i in [1,2,3,4,5,6,7,8,9,10]:
 mem = getDomMem(domain.getName())
 if not mem:
     FAIL("Failed to get memory amount for domain %s" % domain.getName())
-elif mem != 63:
-    FAIL("Dom0 failed to verify 63 MB; got %i MB" % mem)
+elif mem != newmem:
+    FAIL("Dom0 failed to verify %i MB; got %i MB" % newmem,mem)
 
 # verify memory set internally
 try:
@@ -79,12 +88,12 @@ if not m:
 
 domUmem = int(m.group(1)) / 1024
 
-if domUmem != 63:
+if domUmem != newmem:
     FAIL("DomU reported incorrect memory amount: %i MB" % (domUmem))
 
 # quiesce everything
 # Close the console
-console.closeConsole() 
+domain.closeConsole() 
 
 # Stop the domain (nice shutdown)
 domain.stop()

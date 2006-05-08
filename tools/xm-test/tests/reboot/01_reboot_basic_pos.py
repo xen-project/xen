@@ -11,19 +11,14 @@ from XmTestLib import *
 domain = XmTestDomain()
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
         print e.extra
     FAIL(str(e))
 
-try:
-    console = XmConsole(domain.getName())
-except ConsoleError, e:
-    FAIL(str(e))
-
-console.closeConsole()
+domain.closeConsole()
 
 status, output = traceCommand("xm reboot %s" % domain.getName())
 
@@ -33,7 +28,7 @@ if status != 0:
 time.sleep(15)
 
 try:
-    console = XmConsole(domain.getName())
+    console = domain.getConsole()
 except ConsoleError, e:
     FAIL(str(e))
 
@@ -43,7 +38,7 @@ try:
 except ConsoleError, e:
     FAIL(str(e))
 
-console.closeConsole()
+domain.closeConsole()
 
 domain.destroy()
 

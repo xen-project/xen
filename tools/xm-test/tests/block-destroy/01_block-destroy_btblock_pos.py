@@ -4,6 +4,7 @@
 # Author: Dan Smith <danms@us.ibm.com>
 
 from XmTestLib import *
+from XmTestLib.block_utils import block_detach
 
 if ENABLE_HVM_SUPPORT:
     SKIP("Block-detach not supported for HVM domains")
@@ -12,15 +13,14 @@ config = {"disk":"phy:/dev/ram0,hda1,w"}
 domain = XmTestDomain(extraConfig=config)
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print e.extra
     FAIL("Unable to create domain")
 
 try:
-    console  = XmConsole(domain.getName(), historySaveCmds=True)
-    console.sendInput("input")
+    console.setHistorySaveCmds(value=True)
     run = console.runCmd("cat /proc/partitions | grep hda1")
     run2 = console.runCmd("cat /proc/partitions")
 except ConsoleError, e:
@@ -29,11 +29,7 @@ except ConsoleError, e:
 if run["return"] != 0:
     FAIL("block device isn't attached; can't detach!")
 
-status, output = traceCommand("xm block-detach %s 769" % domain.getName(),
-                              logOutput=True)
-if status != 0:
-    FAIL("block-detach returned invalid %i != 0" % status)
-
+block_detach(domain, "hda1")
 try:
 
     run = console.runCmd("cat /proc/partitions | grep hda1")
@@ -41,7 +37,7 @@ except ConsoleError, e:
     saveLog(console.getHistory())
     FAIL(str(e))
 
-console.closeConsole()
+domain.closeConsole()
 domain.stop()
 
 if run["return"] == 0:

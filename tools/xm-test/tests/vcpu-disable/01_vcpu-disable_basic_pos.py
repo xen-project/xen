@@ -42,7 +42,7 @@ if smpConcurrencyLevel() <= 1:
 domain = XmTestDomain(extraConfig={"vcpus":2})
 
 try:
-    domain.start()
+    domain.start(noConsole=True)
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"

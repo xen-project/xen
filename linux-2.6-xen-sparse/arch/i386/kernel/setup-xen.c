@@ -1368,7 +1368,7 @@ legacy_init_iomem_resources(struct resource *code_resource, struct resource *dat
 #ifdef CONFIG_XEN
 	map = alloc_bootmem_low_pages(PAGE_SIZE);
 	op.cmd = DOM0_PHYSICAL_MEMORY_MAP;
-	op.u.physical_memory_map.memory_map = map;
+	set_xen_guest_handle(op.u.physical_memory_map.memory_map, map);
 	op.u.physical_memory_map.max_map_entries =
 		PAGE_SIZE / sizeof(struct dom0_memory_map_entry);
 	BUG_ON(HYPERVISOR_dom0_op(&op));
@@ -1630,7 +1630,7 @@ static void set_mca_bus(int x) { }
 void __init setup_arch(char **cmdline_p)
 {
 	int i, j, k, fpp;
-	physdev_op_t op;
+	struct physdev_set_iopl set_iopl;
 	unsigned long max_low_pfn;
 
 	/* Force a quick death if the kernel panics (not domain 0). */
@@ -1815,9 +1815,8 @@ void __init setup_arch(char **cmdline_p)
 	if (efi_enabled)
 		efi_map_memmap();
 
-	op.cmd             = PHYSDEVOP_SET_IOPL;
-	op.u.set_iopl.iopl = 1;
-	HYPERVISOR_physdev_op(&op);
+	set_iopl.iopl = 1;
+	HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
 
 #ifdef CONFIG_X86_IO_APIC
 	check_acpi_pci();	/* Checks more than just ACPI actually */

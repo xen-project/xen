@@ -440,7 +440,7 @@ static int xc_hvm_build_internal(int xc_handle,
 
     launch_op.u.setvcpucontext.domain = (domid_t)domid;
     launch_op.u.setvcpucontext.vcpu   = 0;
-    launch_op.u.setvcpucontext.ctxt   = ctxt;
+    set_xen_guest_handle(launch_op.u.setvcpucontext.ctxt, ctxt);
 
     launch_op.cmd = DOM0_SETVCPUCONTEXT;
     rc = xc_dom0_op(xc_handle, &launch_op);

@@ -28,7 +28,7 @@ i = 0
 for i in range(0,50):
     domain = XmTestDomain("testdomain")
     try:
-        domain.start()
+        domain.start(noConsole=True)
     except DomainError,e:
         print "Failed: " + e.extra
         NSPerror = check_for_NSP_error(e.extra)

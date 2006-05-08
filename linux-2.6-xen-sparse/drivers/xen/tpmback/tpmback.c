@@ -28,7 +28,8 @@ struct data_exchange {
 	struct list_head pending_pak;
 	struct list_head current_pak;
 	unsigned int copied_so_far;
-	u8 has_opener;
+	u8 has_opener:1;
+	u8 aborted:1;
 	rwlock_t pak_lock;	// protects all of the previous fields
 	wait_queue_head_t wait_queue;
 };
@@ -101,6 +102,16 @@ static inline int copy_to_buffer(void *to,
 	return 0;
 }
 
+
+static void dataex_init(struct data_exchange *dataex)
+{
+	INIT_LIST_HEAD(&dataex->pending_pak);
+	INIT_LIST_HEAD(&dataex->current_pak);
+	dataex->has_opener = 0;
+	rwlock_init(&dataex->pak_lock);
+	init_waitqueue_head(&dataex->wait_queue);
+}
+
 /***************************************************************
  Packet-related functions
 ***************************************************************/
@@ -148,11 +159,12 @@ static struct packet *packet_alloc(tpmif_t * tpmif,
 				   u32 size, u8 req_tag, u8 flags)
 {
 	struct packet *pak = NULL;
-	pak = kzalloc(sizeof (struct packet), GFP_KERNEL);
+	pak = kzalloc(sizeof (struct packet), GFP_ATOMIC);
 	if (NULL != pak) {
 		if (tpmif) {
 			pak->tpmif = tpmif;
 			pak->tpm_instance = tpmif->tpm_instance;
+			tpmif_get(tpmif);
 		}
 		pak->data_len = size;
 		pak->req_tag = req_tag;
@@ -180,6 +192,9 @@ static void packet_free(struct packet *pak)
 	if (timer_pending(&pak->processing_timer)) {
 		BUG();
 	}
+
+	if (pak->tpmif)
+		tpmif_put(pak->tpmif);
 	kfree(pak->data_buffer);
 	/*
 	 * cannot do tpmif_put(pak->tpmif); bad things happen
@@ -271,7 +286,6 @@ int _packet_write(struct packet *pak,
 		struct gnttab_map_grant_ref map_op;
 		struct gnttab_unmap_grant_ref unmap_op;
 		tpmif_tx_request_t *tx;
-		unsigned long pfn, mfn, mfn_orig;
 
 		tx = &tpmif->tx->ring[i].req;
 
@@ -295,12 +309,6 @@ int _packet_write(struct packet *pak,
 			return 0;
 		}
 
-		pfn = __pa(MMAP_VADDR(tpmif, i)) >> PAGE_SHIFT;
-		mfn = FOREIGN_FRAME(map_op.dev_bus_addr >> PAGE_SHIFT);
-		mfn_orig = phys_to_machine_mapping[pfn];
-
-		set_phys_to_machine(pfn, mfn);
-
 		tocopy = MIN(size - offset, PAGE_SIZE);
 
 		if (copy_from_buffer((void *)(MMAP_VADDR(tpmif, i) |
@@ -310,8 +318,6 @@ int _packet_write(struct packet *pak,
 			return -EFAULT;
 		}
 		tx->size = tocopy;
-
-		set_phys_to_machine(pfn, mfn_orig);
 
 		gnttab_set_unmap_op(&unmap_op, MMAP_VADDR(tpmif, i),
 				    GNTMAP_host_map, handle);
@@ -514,27 +520,41 @@ static ssize_t vtpm_op_read(struct file *file,
 	unsigned long flags;
 
 	write_lock_irqsave(&dataex.pak_lock, flags);
+	if (dataex.aborted) {
+		dataex.aborted = 0;
+		dataex.copied_so_far = 0;
+		write_unlock_irqrestore(&dataex.pak_lock, flags);
+		return -EIO;
+	}
 
 	if (list_empty(&dataex.pending_pak)) {
 		write_unlock_irqrestore(&dataex.pak_lock, flags);
 		wait_event_interruptible(dataex.wait_queue,
 					 !list_empty(&dataex.pending_pak));
 		write_lock_irqsave(&dataex.pak_lock, flags);
+		dataex.copied_so_far = 0;
 	}
 
 	if (!list_empty(&dataex.pending_pak)) {
 		unsigned int left;
-		pak = list_entry(dataex.pending_pak.next, struct packet, next);
 
+		pak = list_entry(dataex.pending_pak.next, struct packet, next);
 		left = pak->data_len - dataex.copied_so_far;
+		list_del(&pak->next);
+		write_unlock_irqrestore(&dataex.pak_lock, flags);
 
 		DPRINTK("size given by app: %d, available: %d\n", size, left);
 
 		ret_size = MIN(size, left);
 
 		ret_size = packet_read(pak, ret_size, data, size, 1);
+
+		write_lock_irqsave(&dataex.pak_lock, flags);
+
 		if (ret_size < 0) {
-			ret_size = -EFAULT;
+			del_singleshot_timer_sync(&pak->processing_timer);
+			packet_free(pak);
+			dataex.copied_so_far = 0;
 		} else {
 			DPRINTK("Copied %d bytes to user buffer\n", ret_size);
 
@@ -545,7 +565,6 @@ static ssize_t vtpm_op_read(struct file *file,
 
 				del_singleshot_timer_sync(&pak->
 							  processing_timer);
-				list_del(&pak->next);
 				list_add_tail(&pak->next, &dataex.current_pak);
 				/*
 				 * The more fontends that are handled at the same time,
@@ -554,6 +573,8 @@ static ssize_t vtpm_op_read(struct file *file,
 				mod_timer(&pak->processing_timer,
 					  jiffies + (num_frontends * 60 * HZ));
 				dataex.copied_so_far = 0;
+			} else {
+				list_add(&pak->next, &dataex.pending_pak);
 			}
 		}
 	}
@@ -601,8 +622,8 @@ static ssize_t vtpm_op_write(struct file *file,
 
 	if (pak == NULL) {
 		write_unlock_irqrestore(&dataex.pak_lock, flags);
-		printk(KERN_ALERT "No associated packet! (inst=%d)\n",
-		       ntohl(vrh.instance_no));
+		DPRINTK(KERN_ALERT "No associated packet! (inst=%d)\n",
+		        ntohl(vrh.instance_no));
 		return -EFAULT;
 	}
 
@@ -784,15 +805,17 @@ static int tpm_send_fail_message(struct packet *pak, u8 req_tag)
 	return rc;
 }
 
-static void _vtpm_release_packets(struct list_head *head,
-				  tpmif_t * tpmif, int send_msgs)
+static int _vtpm_release_packets(struct list_head *head,
+				 tpmif_t * tpmif, int send_msgs)
 {
+	int aborted = 0;
+	int c = 0;
 	struct packet *pak;
-	struct list_head *pos,
-	         *tmp;
+	struct list_head *pos, *tmp;
 
 	list_for_each_safe(pos, tmp, head) {
 		pak = list_entry(pos, struct packet, next);
+		c += 1;
 
 		if (tpmif == NULL || pak->tpmif == tpmif) {
 			int can_send = 0;
@@ -808,8 +831,11 @@ static void _vtpm_release_packets(struct list_head *head,
 				tpm_send_fail_message(pak, pak->req_tag);
 			}
 			packet_free(pak);
+			if (c == 1)
+				aborted = 1;
 		}
 	}
+	return aborted;
 }
 
 int vtpm_release_packets(tpmif_t * tpmif, int send_msgs)
@@ -818,7 +844,9 @@ int vtpm_release_packets(tpmif_t * tpmif, int send_msgs)
 
 	write_lock_irqsave(&dataex.pak_lock, flags);
 
-	_vtpm_release_packets(&dataex.pending_pak, tpmif, send_msgs);
+	dataex.aborted = _vtpm_release_packets(&dataex.pending_pak,
+					       tpmif,
+					       send_msgs);
 	_vtpm_release_packets(&dataex.current_pak, tpmif, send_msgs);
 
 	write_unlock_irqrestore(&dataex.pak_lock, flags);
@@ -1020,11 +1048,7 @@ static int __init tpmback_init(void)
 		return rc;
 	}
 
-	INIT_LIST_HEAD(&dataex.pending_pak);
-	INIT_LIST_HEAD(&dataex.current_pak);
-	dataex.has_opener = 0;
-	rwlock_init(&dataex.pak_lock);
-	init_waitqueue_head(&dataex.wait_queue);
+	dataex_init(&dataex);
 
 	spin_lock_init(&tpm_schedule_list_lock);
 	INIT_LIST_HEAD(&tpm_schedule_list);
@@ -1041,6 +1065,7 @@ module_init(tpmback_init);
 
 static void __exit tpmback_exit(void)
 {
+	vtpm_release_packets(NULL, 0);
 	tpmif_xenbus_exit();
 	tpmif_interface_exit();
 	misc_deregister(&vtpms_miscdevice);

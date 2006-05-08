@@ -3,15 +3,14 @@
 # Copyright (C) International Business Machines Corp., 2005
 # Author: Murillo F. Bernardes <mfb@br.ibm.com>
 
-import sys
 import re
-import time
 import random
 from xen.util import blkif
 
 from os import path.basename
 
 from XmTestLib import *
+from XmTestLib.block_utils import *
 
 def availableRamdisks():
     i = 0
@@ -21,11 +20,7 @@ def availableRamdisks():
     return i
 
 def attach(phy, devname):
-    # Attach 
-    status, output = traceCommand("xm block-attach %s phy:%s %s w" % (domain.getName(), phy, devname))
-    if status != 0:
-    	return -1, "xm block-attach returned invalid %i != 0" % status
-	
+    block_attach(domain, "phy:%s" % phy, devname)
     run = console.runCmd("cat /proc/partitions")
     if not re.search(basename(devname), run["output"]):
         return -2, "Failed to attach block device: /proc/partitions does not show that!"
@@ -33,16 +28,12 @@ def attach(phy, devname):
     return 0, None
 
 
-def dettach(devname):
-    devnum = blkif.blkdev_name_to_number(devname)
-    
-    status, output = traceCommand("xm block-detach %s %d" % (domain.getName(), devnum))
-    if status != 0:
-        return -1, "xm block-attach returned invalid %i != 0" % status
+def detach(devname):
+    block_detach(domain, devname)
 
     run = console.runCmd("cat /proc/partitions")
     if re.search(basename(devname), run["output"]):
-        return -2, "Failed to dettach block device: /proc/partitions still showing that!"
+        return -2, "Failed to detach block device: /proc/partitions still showing that!"
 
     return 0, None
 	
@@ -53,22 +44,15 @@ if ENABLE_HVM_SUPPORT:
 domain = XmTestDomain()
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
         print e.extra
     FAIL(str(e))
 
-# Attach a console to it
 try:
-    console = XmConsole(domain.getName(), historySaveCmds=True)
-except ConsoleError, e:
-    FAIL(str(e))
-
-try:
-    # Activate the console
-    console.sendInput("input")
+    console.setHistorySaveCmds(value=True)
     # Run 'ls'
     run = console.runCmd("ls")
 except ConsoleError, e:
@@ -98,12 +82,12 @@ while i < ramdisks or devices:
         devname = random.choice(devices)
 	devices.remove(devname)
 	print "Detaching %s" % devname
-	status, msg = dettach(devname)
+	status, msg = detach(devname)
 	if status:
 	    FAIL(msg)
 
 # Close the console
-console.closeConsole()
+domain.closeConsole()
 
 # Stop the domain (nice shutdown)
 domain.stop()

@@ -29,7 +29,7 @@ typedef struct xen_memory_reservation {
      *   OUT: GMFN bases of extents that were allocated
      *   (NB. This command also updates the mach_to_phys translation table)
      */
-    GUEST_HANDLE(ulong) extent_start;
+    XEN_GUEST_HANDLE(ulong) extent_start;
 
     /* Number of extents, and size/alignment of each (2^extent_order pages). */
     unsigned long  nr_extents;
@@ -50,7 +50,7 @@ typedef struct xen_memory_reservation {
     domid_t        domid;
 
 } xen_memory_reservation_t;
-DEFINE_GUEST_HANDLE(xen_memory_reservation_t);
+DEFINE_XEN_GUEST_HANDLE(xen_memory_reservation_t);
 
 /*
  * Returns the maximum machine frame number of mapped RAM in this system.
@@ -86,7 +86,7 @@ typedef struct xen_machphys_mfn_list {
      * any large discontiguities in the machine address space, 2MB gaps in
      * the machphys table will be represented by an MFN base of zero.
      */
-    GUEST_HANDLE(ulong) extent_start;
+    XEN_GUEST_HANDLE(ulong) extent_start;
 
     /*
      * Number of extents written to the above array. This will be smaller
@@ -94,7 +94,7 @@ typedef struct xen_machphys_mfn_list {
      */
     unsigned int nr_extents;
 } xen_machphys_mfn_list_t;
-DEFINE_GUEST_HANDLE(xen_machphys_mfn_list_t);
+DEFINE_XEN_GUEST_HANDLE(xen_machphys_mfn_list_t);
 
 /*
  * Sets the GPFN at which a particular page appears in the specified guest's
@@ -117,7 +117,7 @@ typedef struct xen_add_to_physmap {
     /* GPFN where the source mapping page should appear. */
     unsigned long gpfn;
 } xen_add_to_physmap_t;
-DEFINE_GUEST_HANDLE(xen_add_to_physmap_t);
+DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_t);
 
 /*
  * Translates a list of domain-specific GPFNs into MFNs. Returns a -ve error
@@ -132,15 +132,15 @@ typedef struct xen_translate_gpfn_list {
     unsigned long nr_gpfns;
 
     /* List of GPFNs to translate. */
-    GUEST_HANDLE(ulong) gpfn_list;
+    XEN_GUEST_HANDLE(ulong) gpfn_list;
 
     /*
      * Output list to contain MFN translations. May be the same as the input
      * list (in which case each input GPFN is overwritten with the output MFN).
      */
-    GUEST_HANDLE(ulong) mfn_list;
+    XEN_GUEST_HANDLE(ulong) mfn_list;
 } xen_translate_gpfn_list_t;
-DEFINE_GUEST_HANDLE(xen_translate_gpfn_list_t);
+DEFINE_XEN_GUEST_HANDLE(xen_translate_gpfn_list_t);
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 

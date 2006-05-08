@@ -62,13 +62,6 @@ typedef struct privcmd_mmapbatch {
 	unsigned long __user *arr; /* array of mfns - top nibble set on err */
 } privcmd_mmapbatch_t; 
 
-typedef struct privcmd_blkmsg
-{
-	unsigned long op;
-	void         *buf;
-	int           buf_size;
-} privcmd_blkmsg_t;
-
 /*
  * @cmd: IOCTL_PRIVCMD_HYPERCALL
  * @arg: &privcmd_hypercall_t

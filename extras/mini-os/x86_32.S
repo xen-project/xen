@@ -30,10 +30,10 @@ shared_info:
 hypercall_page:
         .org 0x3000
 
-ES		= 0x1c
-ORIG_EAX	= 0x20
-EIP		= 0x24
-CS		= 0x28
+ES		= 0x20
+ORIG_EAX	= 0x24
+EIP		= 0x28
+CS		= 0x2C
 
 #define ENTRY(X) .globl X ; X :
 
@@ -69,7 +69,7 @@ ENTRY(divide_error)
 	pushl $0		# no error code
 	pushl $do_divide_error
 do_exception:
-	pushl %ds
+    pushl %ds
 	pushl %eax
 	xorl %eax, %eax
 	pushl %ebp
@@ -92,7 +92,7 @@ do_exception:
     pushl %edx
     pushl %eax
 	call *%edi
-    addl $8,%esp
+    jmp ret_from_exception
     
 ret_from_exception:
         movb CS(%esp),%cl
@@ -223,66 +223,59 @@ ENTRY(invalid_op)
 	pushl $do_invalid_op
 	jmp do_exception
 
+
 ENTRY(coprocessor_segment_overrun)
 	pushl $0
 	pushl $do_coprocessor_segment_overrun
 	jmp do_exception
 
+
 ENTRY(invalid_TSS)
 	pushl $do_invalid_TSS
 	jmp do_exception
+
 
 ENTRY(segment_not_present)
 	pushl $do_segment_not_present
 	jmp do_exception
 
+
 ENTRY(stack_segment)
 	pushl $do_stack_segment
 	jmp do_exception
+
 
 ENTRY(general_protection)
 	pushl $do_general_protection
 	jmp do_exception
 
+
 ENTRY(alignment_check)
 	pushl $do_alignment_check
 	jmp do_exception
 
-# This handler is special, because it gets an extra value on its stack,
-# which is the linear faulting address.
-# fastcall register usage:  %eax = pt_regs, %edx = error code,
-#			    %ecx = fault address
-ENTRY(page_fault)
-	pushl %ds
-	pushl %eax
-	xorl %eax, %eax
-	pushl %ebp
-	pushl %edi
-	pushl %esi
-	pushl %edx
-	decl %eax			/* eax = -1 */
-	pushl %ecx
-	pushl %ebx
-	cld
-	movl ORIG_EAX(%esp), %edi
-	movl %eax, ORIG_EAX(%esp)
-	movl %es, %ecx
-	movl %ecx, ES(%esp)
-	movl $(__KERNEL_DS),%eax
-	movl %eax, %ds
-	movl %eax, %es
-	pushl %edi
-	movl %esp, %eax
-	pushl %eax
-	call do_page_fault
-	jmp ret_from_exception
 
+ENTRY(page_fault)
+    pushl $do_page_fault
+    jmp do_exception
+    
 ENTRY(machine_check)
 	pushl $0
 	pushl $do_machine_check
 	jmp do_exception
 
+
 ENTRY(spurious_interrupt_bug)
 	pushl $0
 	pushl $do_spurious_interrupt_bug
 	jmp do_exception
+
+
+
+ENTRY(thread_starter)
+    popl %eax
+    popl %ebx
+    pushl %eax
+    call *%ebx
+    call exit_thread 
+    

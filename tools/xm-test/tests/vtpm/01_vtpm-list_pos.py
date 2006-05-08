@@ -16,7 +16,7 @@ config = {"vtpm":"instance=1,backend=0"}
 domain = XmTestDomain(extraConfig=config)
 
 try:
-    domain.start()
+    domain.start(noConsole=True)
 except DomainError, e:
     if verbose:
         print e.extra

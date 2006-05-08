@@ -41,7 +41,7 @@ static inline void kb_wait(void)
             break;
 }
 
-void __attribute__((noreturn)) __machine_halt(void *unused)
+static void  __attribute__((noreturn)) __machine_halt(void *unused)
 {
     for ( ; ; )
         __asm__ __volatile__ ( "hlt" );
@@ -127,7 +127,7 @@ static const unsigned char jump_to_bios [] =
  * specified by the code and length parameters.
  * We assume that length will aways be less that MAX_LENGTH!
  */
-void machine_real_restart(const unsigned char *code, unsigned length)
+static void machine_real_restart(const unsigned char *code, unsigned length)
 {
     local_irq_disable();
 
@@ -218,7 +218,9 @@ void machine_restart(char * __unused)
     /* Ensure we are the boot CPU. */
     if ( GET_APIC_ID(apic_read(APIC_ID)) != boot_cpu_physical_apicid )
     {
-        smp_call_function((void *)machine_restart, NULL, 1, 0);
+        /* Send IPI to the boot CPU (logical cpu 0). */
+        on_selected_cpus(cpumask_of_cpu(0), (void *)machine_restart,
+                         NULL, 1, 0);
         for ( ; ; )
             safe_halt();
     }

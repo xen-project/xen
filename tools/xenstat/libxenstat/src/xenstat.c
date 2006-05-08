@@ -20,9 +20,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <xen-interface.h>
 #include <xs.h>
 #include "xenstat.h"
+
+#include "xenctrl.h"
 
 /*
  * Types
@@ -31,7 +32,7 @@
 #define VERSION_SIZE (2 * SHORT_ASC_LEN + 1 + sizeof(xen_extraversion_t) + 1)
 
 struct xenstat_handle {
-	xi_handle *xihandle;
+	int xc_handle;
 	struct xs_handle *xshandle; /* xenstore handle */
 	int page_size;
 	FILE *procnetdev;
@@ -150,9 +151,9 @@ xenstat_handle *xenstat_init(void)
 	}
 #endif
 
-	handle->xihandle = xi_init();
-	if (handle->xihandle == NULL) {
-		perror("xi_init");
+	handle->xc_handle = xc_interface_open();
+	if (handle->xc_handle == -1) {
+		perror("xc_interface_open");
 		free(handle);
 		return NULL;
 	}
@@ -160,6 +161,7 @@ xenstat_handle *xenstat_init(void)
 	handle->xshandle = xs_daemon_open_readonly(); /* open handle to xenstore*/
 	if (handle->xshandle == NULL) {
 		perror("unable to open xenstore\n");
+		xc_interface_close(handle->xc_handle);
 		free(handle);
 		return NULL;
 	}
@@ -173,7 +175,7 @@ void xenstat_uninit(xenstat_handle * handle)
 	if (handle) {
 		for (i = 0; i < NUM_COLLECTORS; i++)
 			collectors[i].uninit(handle);
-		xi_uninit(handle->xihandle);
+		xc_interface_close(handle->xc_handle);
 		xs_daemon_close(handle->xshandle);
 		free(handle);
 	}
@@ -197,7 +199,7 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 	node->handle = handle;
 
 	/* Get information about the physical system */
-	if (xi_get_physinfo(handle->xihandle, &physinfo) < 0) {
+	if (xc_physinfo(handle->xc_handle, &physinfo) < 0) {
 		free(node);
 		return NULL;
 	}
@@ -223,9 +225,8 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 	do {
 		xenstat_domain *domain;
 
-		new_domains = xi_get_domaininfolist(handle->xihandle,
-		                                    domaininfo, num_domains,
-		                                    DOMAIN_CHUNK_SIZE);
+		new_domains = xc_domain_getinfolist(handle->xc_handle,
+			num_domains, DOMAIN_CHUNK_SIZE, domaininfo);
 
 		node->domains = realloc(node->domains,
 					(num_domains + new_domains)
@@ -467,8 +468,8 @@ static int xenstat_collect_vcpus(xenstat_node * node)
 			/* FIXME: need to be using a more efficient mechanism*/
 			dom0_getvcpuinfo_t info;
 
-			if (xi_get_domain_vcpu_info(node->handle->xihandle,
-			    node->domains[i].id, vcpu, &info) != 0)
+			if (xc_vcpu_getinfo(node->handle->xc_handle,
+				node->domains[i].id, vcpu, &info) != 0)
 				return 0;
 
 			node->domains[i].vcpus[vcpu].online = info.online;
@@ -677,8 +678,14 @@ static int xenstat_collect_xen_version(xenstat_node * node)
 	/* Collect Xen version information if not already collected */
 	if (node->handle->xen_version[0] == '\0') {
 		/* Get the Xen version number and extraversion string */
-		if (xi_get_xen_version(node->handle->xihandle,
-				       &vnum, &version) < 0)
+		vnum = xc_version(node->handle->xc_handle,
+			XENVER_version, NULL);
+
+		if (vnum < 0)
+			return 0;
+
+		if (xc_version(node->handle->xc_handle, XENVER_extraversion,
+			&version) < 0)
 			return 0;
 		/* Format the version information as a string and store it */
 		snprintf(node->handle->xen_version, VERSION_SIZE, "%ld.%ld%s",

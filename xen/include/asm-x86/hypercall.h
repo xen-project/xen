@@ -8,19 +8,27 @@
 #include <public/physdev.h>
 
 extern long
+do_event_channel_op_compat(
+    XEN_GUEST_HANDLE(evtchn_op_t) uop);
+
+extern long
+do_physdev_op_compat(
+    XEN_GUEST_HANDLE(physdev_op_t) uop);
+
+extern long
 do_set_trap_table(
-    GUEST_HANDLE(trap_info_t) traps);
+    XEN_GUEST_HANDLE(trap_info_t) traps);
 
 extern int
 do_mmu_update(
-    GUEST_HANDLE(mmu_update_t) ureqs,
+    XEN_GUEST_HANDLE(mmu_update_t) ureqs,
     unsigned int count,
-    GUEST_HANDLE(uint) pdone,
+    XEN_GUEST_HANDLE(uint) pdone,
     unsigned int foreigndom);
 
 extern long
 do_set_gdt(
-    GUEST_HANDLE(ulong) frame_list,
+    XEN_GUEST_HANDLE(ulong) frame_list,
     unsigned int entries);
 
 extern long
@@ -54,7 +62,7 @@ do_update_va_mapping(
 
 extern long
 do_physdev_op(
-    GUEST_HANDLE(physdev_op_t) uop);
+    int cmd, XEN_GUEST_HANDLE(void) arg);
 
 extern int
 do_update_va_mapping_otherdomain(
@@ -65,9 +73,9 @@ do_update_va_mapping_otherdomain(
 
 extern int
 do_mmuext_op(
-    GUEST_HANDLE(mmuext_op_t) uops,
+    XEN_GUEST_HANDLE(mmuext_op_t) uops,
     unsigned int count,
-    GUEST_HANDLE(uint) pdone,
+    XEN_GUEST_HANDLE(uint) pdone,
     unsigned int foreigndom);
 
 extern unsigned long
@@ -77,7 +85,7 @@ do_iret(
 struct vcpu;
 extern long
 arch_do_vcpu_op(
-    int cmd, struct vcpu *v, GUEST_HANDLE(void) arg);
+    int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg);
 
 #ifdef __x86_64__
 

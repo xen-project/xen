@@ -19,6 +19,7 @@
 #include <asm/bitops.h>
 #include <xen/delay.h>
 #include <asm/apic.h>
+#include <asm/asm_defns.h>
 #include <io_ports.h>
 
 /*

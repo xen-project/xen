@@ -8,8 +8,6 @@
 #include <xen/prefetch.h>
 #include <asm/page.h>
 
-#define __user
-
 #ifdef __x86_64__
 #include <asm/x86_64/uaccess.h>
 #else

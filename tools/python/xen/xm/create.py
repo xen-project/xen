@@ -122,9 +122,13 @@ gopts.var('bootloader', val='FILE',
           fn=set_value, default=None,
           use="Path to bootloader.")
 
+gopts.var('bootargs', val='NAME',
+          fn=set_value, default=None,
+          use="Arguments to pass to boot loader")
+
 gopts.var('bootentry', val='NAME',
           fn=set_value, default=None,
-          use="Entry to boot via boot loader")
+          use="DEPRECATED.  Entry to boot via boot loader.  Use bootargs.")
 
 gopts.var('kernel', val='FILE',
           fn=set_value, default=None,
@@ -444,8 +448,11 @@ def strip(pre, s):
 def configure_image(vals):
     """Create the image config.
     """
+    if not vals.builder:
+        return None
     config_image = [ vals.builder ]
-    config_image.append([ 'kernel', os.path.abspath(vals.kernel) ])
+    if vals.kernel:
+        config_image.append([ 'kernel', os.path.abspath(vals.kernel) ])
     if vals.ramdisk:
         config_image.append([ 'ramdisk', os.path.abspath(vals.ramdisk) ])
     if vals.cmdline_ip:
@@ -456,8 +463,6 @@ def configure_image(vals):
         config_image.append(['root', cmdline_root])
     if vals.extra:
         config_image.append(['args', vals.extra])
-    if vals.features:
-        config_image.append(['features', vals.features])
 
     if vals.builder == 'hvm':
         configure_hvm(config_image, vals)
@@ -614,7 +619,7 @@ def configure_hvm(config_image, vals):
         if (vals.__dict__[a]):
             config_image.append([a, vals.__dict__[a]])
 
-def run_bootloader(vals):
+def run_bootloader(vals, config_image):
     if not os.access(vals.bootloader, os.X_OK):
         err("Bootloader isn't executable")
     if len(vals.disk) < 1:
@@ -622,8 +627,13 @@ def run_bootloader(vals):
     (uname, dev, mode, backend) = vals.disk[0]
     file = blkif.blkdev_uname_to_file(uname)
 
+    if vals.bootentry:
+        warn("The bootentry option is deprecated.  Use bootargs and pass "
+             "--entry= directly.")
+        vals.bootargs = "--entry=%s" %(vals.bootentry,)
+
     return bootloader(vals.bootloader, file, not vals.console_autoconnect,
-                      vals.vcpus, vals.bootentry)
+                      vals.bootargs, config_image)
 
 def make_config(vals):
     """Create the domain configuration.
@@ -638,7 +648,7 @@ def make_config(vals):
                 config.append([n, v])
 
     map(add_conf, ['name', 'memory', 'maxmem', 'restart', 'on_poweroff',
-                   'on_reboot', 'on_crash', 'vcpus'])
+                   'on_reboot', 'on_crash', 'vcpus', 'features'])
 
     if vals.uuid is not None:
         config.append(['uuid', vals.uuid])
@@ -655,11 +665,12 @@ def make_config(vals):
     if vals.tpmif:
         config.append(['backend', ['tpmif']])
 
+    config_image = configure_image(vals)
     if vals.bootloader:
+        config_image = run_bootloader(vals, config_image)
         config.append(['bootloader', vals.bootloader])
-        config_image = run_bootloader(vals)
-    else:
-        config_image = configure_image(vals)
+        if vals.bootargs:
+            config.append(['bootloader_args'], vals.bootargs)
     config.append(['image', config_image])
 
     config_devs = []

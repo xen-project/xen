@@ -60,7 +60,7 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 {
 	struct thread_struct * t = &current->thread;
 	unsigned long *bitmap;
-	physdev_op_t op;
+	struct physdev_set_iobitmap set_iobitmap;
 
 	if ((from + num <= from) || (from + num > IO_BITMAP_BITS))
 		return -EINVAL;
@@ -80,10 +80,9 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 		memset(bitmap, 0xff, IO_BITMAP_BYTES);
 		t->io_bitmap_ptr = bitmap;
 
-		op.cmd = PHYSDEVOP_SET_IOBITMAP;
-		op.u.set_iobitmap.bitmap   = (char *)bitmap;
-		op.u.set_iobitmap.nr_ports = IO_BITMAP_BITS;
-		HYPERVISOR_physdev_op(&op);
+		set_iobitmap.bitmap   = (char *)bitmap;
+		set_iobitmap.nr_ports = IO_BITMAP_BITS;
+		HYPERVISOR_physdev_op(PHYSDEVOP_set_iobitmap, &set_iobitmap);
 	}
 
 	set_bitmap(t->io_bitmap_ptr, from, num, !turn_on);

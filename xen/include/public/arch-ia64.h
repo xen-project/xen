@@ -7,27 +7,29 @@
 #ifndef __HYPERVISOR_IF_IA64_H__
 #define __HYPERVISOR_IF_IA64_H__
 
-#ifdef __XEN__
-#define __DEFINE_GUEST_HANDLE(name, type) \
+#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
     typedef struct { type *p; } __guest_handle_ ## name
-#else
-#define __DEFINE_GUEST_HANDLE(name, type) \
-    typedef type * __guest_handle_ ## name
-#endif
 
-#define DEFINE_GUEST_HANDLE(name) __DEFINE_GUEST_HANDLE(name, name)
-#define GUEST_HANDLE(name)        __guest_handle_ ## name
+#define DEFINE_XEN_GUEST_HANDLE(name)   __DEFINE_XEN_GUEST_HANDLE(name, name)
+#define XEN_GUEST_HANDLE(name)          __guest_handle_ ## name
+#define set_xen_guest_handle(hnd, val)  do { (hnd).p = val; } while (0)
+#ifdef __XEN_TOOLS__
+#define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
+#endif
 
 #ifndef __ASSEMBLY__
 /* Guest handles for primitive C types. */
-__DEFINE_GUEST_HANDLE(uchar, unsigned char);
-__DEFINE_GUEST_HANDLE(uint,  unsigned int);
-__DEFINE_GUEST_HANDLE(ulong, unsigned long);
-DEFINE_GUEST_HANDLE(char);
-DEFINE_GUEST_HANDLE(int);
-DEFINE_GUEST_HANDLE(long);
-DEFINE_GUEST_HANDLE(void);
+__DEFINE_XEN_GUEST_HANDLE(uchar, unsigned char);
+__DEFINE_XEN_GUEST_HANDLE(uint,  unsigned int);
+__DEFINE_XEN_GUEST_HANDLE(ulong, unsigned long);
+DEFINE_XEN_GUEST_HANDLE(char);
+DEFINE_XEN_GUEST_HANDLE(int);
+DEFINE_XEN_GUEST_HANDLE(long);
+DEFINE_XEN_GUEST_HANDLE(void);
 #endif
+
+/* Arch specific VIRQs definition */
+#define VIRQ_ITC        VIRQ_ARCH_0 /* V. Virtual itc timer */
 
 /* Maximum number of virtual CPUs in multi-processor guests. */
 /* WARNING: before changing this, check that shared_info fits on a page */
@@ -324,7 +326,7 @@ typedef struct vcpu_guest_context {
     arch_initrd_info_t initrd;
     char cmdline[IA64_COMMAND_LINE_SIZE];
 } vcpu_guest_context_t;
-DEFINE_GUEST_HANDLE(vcpu_guest_context_t);
+DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
 // dom0 vp op
 #define __HYPERVISOR_ia64_dom0vp_op     256 // XXX sufficient large

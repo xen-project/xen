@@ -146,29 +146,27 @@ static LIST_HEAD(free_rte_list);
 #include <asm/hypervisor.h>
 static inline unsigned int xen_iosapic_read(char __iomem *iosapic, unsigned int reg)
 {
-	physdev_op_t op;
+	struct physdev_apic apic_op;
 	int ret;
 
-	op.cmd = PHYSDEVOP_APIC_READ;
-	op.u.apic_op.apic_physbase = (unsigned long)iosapic -
+	apic_op.apic_physbase = (unsigned long)iosapic -
 					__IA64_UNCACHED_OFFSET;
-	op.u.apic_op.reg = reg;
-	ret = HYPERVISOR_physdev_op(&op);
+	apic_op.reg = reg;
+	ret = HYPERVISOR_physdev_op(PHYSDEVOP_apic_read, &apic_op);
 	if (ret)
 		return ret;
-	return op.u.apic_op.value;
+	return apic_op.value;
 }
 
 static inline void xen_iosapic_write(char __iomem *iosapic, unsigned int reg, u32 val)
 {
-	physdev_op_t op;
+	struct physdev_apic apic_op;
 
-	op.cmd = PHYSDEVOP_APIC_WRITE;
-	op.u.apic_op.apic_physbase = (unsigned long)iosapic - 
+	apic_op.apic_physbase = (unsigned long)iosapic - 
 					__IA64_UNCACHED_OFFSET;
-	op.u.apic_op.reg = reg;
-	op.u.apic_op.value = val;
-	HYPERVISOR_physdev_op(&op);
+	apic_op.reg = reg;
+	apic_op.value = val;
+	HYPERVISOR_physdev_op(PHYSDEVOP_apic_write, &apic_op);
 }
 
 static inline unsigned int iosapic_read(char __iomem *iosapic, unsigned int reg)
@@ -191,14 +189,13 @@ static inline void iosapic_write(char __iomem *iosapic, unsigned int reg, u32 va
 
 int xen_assign_irq_vector(int irq)
 {
-	physdev_op_t op;
+	struct physdev_irq irq_op;
 
-	op.cmd = PHYSDEVOP_ASSIGN_VECTOR;
-	op.u.irq_op.irq = irq;
-	if (HYPERVISOR_physdev_op(&op))
+	irq_op.irq = irq;
+	if (HYPERVISOR_physdev_op(PHYSDEVOP_alloc_irq_vector, &irq_op))
 		return -ENOSPC;
 
-	return op.u.irq_op.vector;
+	return irq_op.vector;
 }
 #endif /* XEN */
 

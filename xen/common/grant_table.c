@@ -301,7 +301,7 @@ __gnttab_map_grant_ref(
 
 static long
 gnttab_map_grant_ref(
-    GUEST_HANDLE(gnttab_map_grant_ref_t) uop, unsigned int count)
+    XEN_GUEST_HANDLE(gnttab_map_grant_ref_t) uop, unsigned int count)
 {
     int i;
     struct gnttab_map_grant_ref op;
@@ -438,7 +438,7 @@ __gnttab_unmap_grant_ref(
 
 static long
 gnttab_unmap_grant_ref(
-    GUEST_HANDLE(gnttab_unmap_grant_ref_t) uop, unsigned int count)
+    XEN_GUEST_HANDLE(gnttab_unmap_grant_ref_t) uop, unsigned int count)
 {
     int i;
     struct gnttab_unmap_grant_ref op;
@@ -462,7 +462,7 @@ fault:
 
 static long 
 gnttab_setup_table(
-    GUEST_HANDLE(gnttab_setup_table_t) uop, unsigned int count)
+    XEN_GUEST_HANDLE(gnttab_setup_table_t) uop, unsigned int count)
 {
     struct gnttab_setup_table op;
     struct domain *d;
@@ -598,7 +598,7 @@ gnttab_prepare_for_transfer(
 
 static long
 gnttab_transfer(
-    GUEST_HANDLE(gnttab_transfer_t) uop, unsigned int count)
+    XEN_GUEST_HANDLE(gnttab_transfer_t) uop, unsigned int count)
 {
     struct domain *d = current->domain;
     struct domain *e;
@@ -711,7 +711,7 @@ gnttab_transfer(
 
 long
 do_grant_table_op(
-    unsigned int cmd, GUEST_HANDLE(void) uop, unsigned int count)
+    unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
 {
     long rc;
     struct domain *d = current->domain;
@@ -728,7 +728,7 @@ do_grant_table_op(
     {
     case GNTTABOP_map_grant_ref:
     {
-        GUEST_HANDLE(gnttab_map_grant_ref_t) map =
+        XEN_GUEST_HANDLE(gnttab_map_grant_ref_t) map =
             guest_handle_cast(uop, gnttab_map_grant_ref_t);
         if ( unlikely(!guest_handle_okay(map, count)) )
             goto out;
@@ -737,7 +737,7 @@ do_grant_table_op(
     }
     case GNTTABOP_unmap_grant_ref:
     {
-        GUEST_HANDLE(gnttab_unmap_grant_ref_t) unmap =
+        XEN_GUEST_HANDLE(gnttab_unmap_grant_ref_t) unmap =
             guest_handle_cast(uop, gnttab_unmap_grant_ref_t);
         if ( unlikely(!guest_handle_okay(unmap, count)) )
             goto out;
@@ -752,7 +752,7 @@ do_grant_table_op(
     }
     case GNTTABOP_transfer:
     {
-        GUEST_HANDLE(gnttab_transfer_t) transfer =
+        XEN_GUEST_HANDLE(gnttab_transfer_t) transfer =
             guest_handle_cast(uop, gnttab_transfer_t);
         if ( unlikely(!guest_handle_okay(transfer, count)) )
             goto out;

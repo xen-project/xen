@@ -28,8 +28,8 @@
 
 asmlinkage long sys_iopl(unsigned int new_iopl, struct pt_regs *regs)
 {
-        unsigned int old_iopl = current->thread.iopl;
-        physdev_op_t op;
+	unsigned int old_iopl = current->thread.iopl;
+	struct physdev_set_iopl set_iopl;
 
 	if (new_iopl > 3)
 		return -EINVAL;
@@ -42,9 +42,8 @@ asmlinkage long sys_iopl(unsigned int new_iopl, struct pt_regs *regs)
 	current->thread.iopl = new_iopl;
 
 	/* Force the change at ring 0. */
-	op.cmd             = PHYSDEVOP_SET_IOPL;
-	op.u.set_iopl.iopl = (new_iopl == 0) ? 1 : new_iopl;
-	HYPERVISOR_physdev_op(&op);
+	set_iopl.iopl = (new_iopl == 0) ? 1 : new_iopl;
+	HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
 
 	return 0;
 }

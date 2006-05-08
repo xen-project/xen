@@ -214,16 +214,19 @@ EXPORT_SYMBOL_GPL(xenbus_grant_ring);
 
 int xenbus_alloc_evtchn(struct xenbus_device *dev, int *port)
 {
-	evtchn_op_t op = {
-		.cmd = EVTCHNOP_alloc_unbound,
-		.u.alloc_unbound.dom = DOMID_SELF,
-		.u.alloc_unbound.remote_dom = dev->otherend_id
-	};
-	int err = HYPERVISOR_event_channel_op(&op);
+	struct evtchn_alloc_unbound alloc_unbound;
+	int err;
+
+	alloc_unbound.dom        = DOMID_SELF;
+	alloc_unbound.remote_dom = dev->otherend_id;
+
+	err = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound,
+					  &alloc_unbound);
 	if (err)
 		xenbus_dev_fatal(dev, err, "allocating event channel");
 	else
-		*port = op.u.alloc_unbound.port;
+		*port = alloc_unbound.port;
+
 	return err;
 }
 EXPORT_SYMBOL_GPL(xenbus_alloc_evtchn);
@@ -231,18 +234,21 @@ EXPORT_SYMBOL_GPL(xenbus_alloc_evtchn);
 
 int xenbus_bind_evtchn(struct xenbus_device *dev, int remote_port, int *port)
 {
-	evtchn_op_t op = {
-		.cmd = EVTCHNOP_bind_interdomain,
-		.u.bind_interdomain.remote_dom = dev->otherend_id,
-		.u.bind_interdomain.remote_port = remote_port,
-	};
-	int err = HYPERVISOR_event_channel_op(&op);
+	struct evtchn_bind_interdomain bind_interdomain;
+	int err;
+
+	bind_interdomain.remote_dom  = dev->otherend_id;
+	bind_interdomain.remote_port = remote_port,
+
+	err = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain,
+					  &bind_interdomain);
 	if (err)
 		xenbus_dev_fatal(dev, err,
 				 "binding to event channel %d from domain %d",
 				 remote_port, dev->otherend_id);
 	else
-		*port = op.u.bind_interdomain.local_port;
+		*port = bind_interdomain.local_port;
+
 	return err;
 }
 EXPORT_SYMBOL_GPL(xenbus_bind_evtchn);
@@ -250,13 +256,15 @@ EXPORT_SYMBOL_GPL(xenbus_bind_evtchn);
 
 int xenbus_free_evtchn(struct xenbus_device *dev, int port)
 {
-	evtchn_op_t op = {
-		.cmd = EVTCHNOP_close,
-		.u.close.port = port,
-	};
-	int err = HYPERVISOR_event_channel_op(&op);
+	struct evtchn_close close;
+	int err;
+
+	close.port = port;
+
+	err = HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
 	if (err)
 		xenbus_dev_error(dev, err, "freeing event channel %d", port);
+
 	return err;
 }
 

@@ -13,7 +13,7 @@ config XEN
 if XEN
 config XEN_INTERFACE_VERSION
 	hex
-	default 0x00030101
+	default 0x00030202
 
 menu "XEN"
 
@@ -99,7 +99,7 @@ config XEN_BLKDEV_TAP_BE
 
 config XEN_NETDEV_BACKEND
 	tristate "Network-device backend driver"
-        depends on XEN_BACKEND
+        depends on XEN_BACKEND && NET
 	default y
 	help
 	  The network-device backend driver allows the kernel to export its
@@ -155,7 +155,7 @@ config XEN_BLKDEV_FRONTEND
 
 config XEN_NETDEV_FRONTEND
 	tristate "Network-device frontend driver"
-	depends on XEN
+	depends on XEN && NET
 	default y
 	help
 	  The network-device frontend driver allows the kernel to access
@@ -172,14 +172,6 @@ config XEN_BLKDEV_TAP
 	  to other VMs.  Block messages may be passed through or redirected
 	  to a character device, allowing device prototyping in application
 	  space.  Odds are that you want to say N here.
-
-config XEN_TPMDEV_FRONTEND
-	tristate "TPM-device frontend driver"
-	default n
-	select TCG_TPM
-	select TCG_XEN
-	help
-	  The TPM-device frontend driver.
 
 config XEN_SCRUB_PAGES
 	bool "Scrub memory before freeing it to Xen"

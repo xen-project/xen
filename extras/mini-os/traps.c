@@ -123,8 +123,13 @@ void page_walk(unsigned long virt_address)
 void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 {
     unsigned long addr = read_cr2();
-    printk("Page fault at linear address %p, regs %p, code %lx\n", addr, regs,
-	   error_code);
+#if defined(__x86_64__)
+    printk("Page fault at linear address %p, rip %p, code %lx\n",
+           addr, regs->rip, error_code);
+#else
+    printk("Page fault at linear address %p, eip %p, code %lx\n",
+           addr, regs->eip, error_code);
+#endif
     dump_regs(regs);
     page_walk(addr);
     do_exit();
@@ -195,7 +200,6 @@ static trap_info_t trap_table[] = {
     { 15, 0, __KERNEL_CS, (unsigned long)spurious_interrupt_bug      },
     { 16, 0, __KERNEL_CS, (unsigned long)coprocessor_error           },
     { 17, 0, __KERNEL_CS, (unsigned long)alignment_check             },
-    { 18, 0, __KERNEL_CS, (unsigned long)machine_check               },
     { 19, 0, __KERNEL_CS, (unsigned long)simd_coprocessor_error      },
     {  0, 0,           0, 0                           }
 };

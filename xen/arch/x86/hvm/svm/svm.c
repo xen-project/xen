@@ -61,6 +61,9 @@ static unsigned long trace_values[NR_CPUS][4];
 /* Useful define */
 #define MAX_INST_SIZE  15
 
+#define set_segment_register(name, value)  \
+       __asm__ __volatile__ ( "movw %%ax ,%%" STR(name) "" : : "a" (value) )
+
 /* 
  * External functions, etc. We should move these to some suitable header file(s) */
 
@@ -79,6 +82,8 @@ void svm_dump_regs(const char *from, struct cpu_user_regs *regs);
 
 static void svm_relinquish_guest_resources(struct domain *d);
 
+/* Host save area */
+struct host_save_area *host_save_area[ NR_CPUS ] = {0};
 static struct asid_pool ASIDpool[NR_CPUS];
 
 /*
@@ -185,11 +190,16 @@ static inline void svm_inject_exception(struct vmcb_struct *vmcb,
 void stop_svm(void)
 {
     u32 eax, edx;    
+    int cpu = smp_processor_id();
 
     /* We turn off the EFER_SVME bit. */
     rdmsr(MSR_EFER, eax, edx);
     eax &= ~EFER_SVME;
     wrmsr(MSR_EFER, eax, edx);
+ 
+    /* release the HSA */
+    free_host_save_area( host_save_area[ cpu ] );
+    host_save_area[ cpu ] = NULL;
 
     printk("AMD SVM Extension is disabled.\n");
 }
@@ -431,8 +441,11 @@ unsigned long svm_get_ctrl_reg(struct vcpu *v, unsigned int num)
 int start_svm(void)
 {
     u32 eax, ecx, edx;
-    
-    /* Xen does not fill x86_capability words except 0. */
+    u32 phys_hsa_lo, phys_hsa_hi;   
+    u64 phys_hsa;
+    int cpu = smp_processor_id();
+ 
+   /* Xen does not fill x86_capability words except 0. */
     ecx = cpuid_ecx(0x80000001);
     boot_cpu_data.x86_capability[5] = ecx;
     
@@ -443,7 +456,14 @@ int start_svm(void)
     eax |= EFER_SVME;
     wrmsr(MSR_EFER, eax, edx);
     asidpool_init(smp_processor_id());    
-    printk("AMD SVM Extension is enabled for cpu %d.\n", smp_processor_id());
+    printk("AMD SVM Extension is enabled for cpu %d.\n", cpu );
+
+    /* Initialize the HSA for this core */
+    host_save_area[ cpu ] = alloc_host_save_area();
+    phys_hsa = (u64) virt_to_maddr( host_save_area[ cpu ] ); 
+    phys_hsa_lo = (u32) phys_hsa;
+    phys_hsa_hi = (u32) (phys_hsa >> 32);    
+    wrmsr(MSR_K8_VM_HSAVE_PA, phys_hsa_lo, phys_hsa_hi);
     
     /* Setup HVM interfaces */
     hvm_funcs.disable = stop_svm;
@@ -546,20 +566,6 @@ void save_svm_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *ctxt)
     ctxt->ds = vmcb->ds.sel;
 }
 
-#if defined (__x86_64__)
-void svm_store_cpu_user_regs(struct cpu_user_regs *regs, struct vcpu *v )
-{
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
-    regs->rip    = vmcb->rip;
-    regs->rsp    = vmcb->rsp;
-    regs->rflags = vmcb->rflags;
-    regs->cs     = vmcb->cs.sel;
-    regs->ds     = vmcb->ds.sel;
-    regs->es     = vmcb->es.sel;
-    regs->ss     = vmcb->ss.sel;
-}
-#elif defined (__i386__)
 void svm_store_cpu_user_regs(struct cpu_user_regs *regs, struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -571,11 +577,11 @@ void svm_store_cpu_user_regs(struct cpu_user_regs *regs, struct vcpu *v)
     regs->ds     = vmcb->ds.sel;
     regs->es     = vmcb->es.sel;
     regs->ss     = vmcb->ss.sel;
+    regs->fs     = vmcb->fs.sel;
+    regs->gs     = vmcb->gs.sel;
 }
-#endif
 
 /* XXX Use svm_load_cpu_guest_regs instead */
-#if defined (__i386__)
 void svm_load_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *regs)
 { 
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -588,30 +594,17 @@ void svm_load_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *regs)
     vmcb->rflags   = regs->eflags;
     vmcb->cs.sel   = regs->cs;
     vmcb->rip      = regs->eip;
+
+    vmcb->ds.sel   = regs->ds;
+    vmcb->es.sel   = regs->es;
+    vmcb->fs.sel   = regs->fs;
+    vmcb->gs.sel   = regs->gs;
+
     if (regs->eflags & EF_TF)
         *intercepts |= EXCEPTION_BITMAP_DB;
     else
         *intercepts &= ~EXCEPTION_BITMAP_DB;
 }
-#else /* (__i386__) */
-void svm_load_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *regs)
-{
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    u32 *intercepts = &v->arch.hvm_svm.vmcb->exception_intercepts;
-    
-    /* Write the guest register value into VMCB */
-    vmcb->rax      = regs->rax;
-    vmcb->ss.sel   = regs->ss;
-    vmcb->rsp      = regs->rsp;   
-    vmcb->rflags   = regs->rflags;
-    vmcb->cs.sel   = regs->cs;
-    vmcb->rip      = regs->rip;
-    if (regs->rflags & EF_TF)
-        *intercepts |= EXCEPTION_BITMAP_DB;
-    else
-        *intercepts &= ~EXCEPTION_BITMAP_DB;
-}
-#endif /* !(__i386__) */
 
 int svm_paging_enabled(struct vcpu *v)
 {
@@ -691,6 +684,17 @@ static void svm_ctxt_switch_from(struct vcpu *v)
 
 static void svm_ctxt_switch_to(struct vcpu *v)
 {
+#if __x86_64__
+    /* 
+     * This is required, because VMRUN does consistency check
+     * and some of the DOM0 selectors are pointing to 
+     * invalid GDT locations, and cause AMD processors
+     * to shutdown.
+     */
+    set_segment_register(ds, 0);
+    set_segment_register(es, 0);
+    set_segment_register(ss, 0);
+#endif
 }
 
 void svm_final_setup_guest(struct vcpu *v)
@@ -735,10 +739,6 @@ static void svm_relinquish_guest_resources(struct domain *d)
     {
         if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
             continue;
-#if 0
-        /* Memory leak by not freeing this. XXXKAF: *Why* is not per core?? */
-        free_host_save_area(v->arch.hvm_svm.host_save_area);
-#endif
 
         destroy_vmcb(&v->arch.hvm_svm);
         free_monitor_pagetable(v);
@@ -2821,11 +2821,7 @@ asmlinkage void svm_load_cr2(void)
     struct vcpu *v = current;
 
     local_irq_disable();
-#ifdef __i386__
-    asm volatile("movl %0,%%cr2": :"r" (v->arch.hvm_svm.cpu_cr2));
-#else
-    asm volatile("movq %0,%%cr2": :"r" (v->arch.hvm_svm.cpu_cr2));
-#endif
+    asm volatile("mov %0,%%cr2": :"r" (v->arch.hvm_svm.cpu_cr2));
 }
 
 asmlinkage void svm_asid(void)

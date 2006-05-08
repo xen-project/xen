@@ -132,6 +132,8 @@ ROUNDTRIPPING_CONFIG_ENTRIES = [
     ('memory',     int),
     ('maxmem',     int),
     ('bootloader', str),
+    ('bootloader_args', str),
+    ('features', str),
     ]
 
 ROUNDTRIPPING_CONFIG_ENTRIES += VM_CONFIG_PARAMS
@@ -549,6 +551,7 @@ class XendDomainInfo:
             defaultInfo('on_poweroff',  lambda: "destroy")
             defaultInfo('on_reboot',    lambda: "restart")
             defaultInfo('on_crash',     lambda: "restart")
+            defaultInfo('features',     lambda: "")
             defaultInfo('cpu',          lambda: None)
             defaultInfo('cpus',         lambda: [])
             defaultInfo('cpu_weight',   lambda: 1.0)
@@ -569,6 +572,7 @@ class XendDomainInfo:
             defaultInfo('memory',       lambda: 0)
             defaultInfo('maxmem',       lambda: 0)
             defaultInfo('bootloader',   lambda: None)
+            defaultInfo('bootloader_args', lambda: None)            
             defaultInfo('backend',      lambda: [])
             defaultInfo('device',       lambda: [])
             defaultInfo('image',        lambda: None)
@@ -775,6 +779,9 @@ class XendDomainInfo:
         """For use only by image.py and XendCheckpoint.py"""
         return self.console_port
 
+    def getFeatures(self):
+        """For use only by image.py."""
+        return self.info['features']
 
     def getVCpuCount(self):
         return self.info['vcpus']
@@ -1229,6 +1236,11 @@ class XendDomainInfo:
                   self.domid,
                   self.info['cpu_weight'])
 
+        # if we have a boot loader but no image, then we need to set things
+        # up by running the boot loader non-interactively
+        if self.infoIsSet('bootloader') and not self.infoIsSet('image'):
+            self.configure_bootloader()
+
         if not self.infoIsSet('image'):
             raise VmError('Missing image in configuration')
 
@@ -1608,24 +1620,27 @@ class XendDomainInfo:
 
 
     def configure_bootloader(self):
+        """Run the bootloader if we're configured to do so."""
         if not self.info['bootloader']:
             return
-        # if we're restarting with a bootloader, we need to run it
         blcfg = None
-        config = self.sxpr()
-        # FIXME: this assumes that we want to use the first disk
-        for dev in sxp.children(config, "device"):
-            disk = sxp.child(dev, "vbd")
+        # FIXME: this assumes that we want to use the first disk device
+        for (n,c) in self.info['device']:
+            if not n or not c or n != "vbd":
+                continue
+            disk = sxp.child_value(c, "uname")
             if disk is None:
                 continue
-            fn = blkdev_uname_to_file(sxp.child_value(disk, "uname"))
+            fn = blkdev_uname_to_file(disk)
             blcfg = bootloader(self.info['bootloader'], fn, 1,
-                               self.info['vcpus'])
+                               self.info['bootloader_args'],
+                               self.info['image'])
+            break
         if blcfg is None:
             msg = "Had a bootloader specified, but can't find disk"
             log.error(msg)
             raise VmError(msg)
-        self.info['image'] = sxp.to_string(blcfg)
+        self.info['image'] = blcfg
 
 
     def send_sysrq(self, key):

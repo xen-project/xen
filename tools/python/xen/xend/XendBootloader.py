@@ -19,14 +19,13 @@ import sxp
 from XendLogging import log
 from XendError import VmError
 
-def bootloader(blexec, disk, quiet = 0, vcpus = None, entry = None):
+def bootloader(blexec, disk, quiet = 0, blargs = None, imgcfg = None):
     """Run the boot loader executable on the given disk and return a
     config image.
     @param blexec  Binary to use as the boot loader
     @param disk Disk to run the boot loader on.
     @param quiet Run in non-interactive mode, just booting the default.
-    @param vcpus Number of vcpus for the domain.
-    @param entry Default entry to boot."""
+    @param blargs Arguments to pass to the bootloader."""
     
     if not os.access(blexec, os.X_OK):
         msg = "Bootloader isn't executable"
@@ -49,8 +48,8 @@ def bootloader(blexec, disk, quiet = 0, vcpus = None, entry = None):
         if quiet:
             args.append("-q")
         args.append("--output=%s" %(fifo,))
-        if entry is not None:
-            args.append("--entry=%s" %(entry,))
+        if blargs is not None:
+            args.extend(blargs.split())
         args.append(disk)
 
         try:
@@ -87,9 +86,10 @@ def bootloader(blexec, disk, quiet = 0, vcpus = None, entry = None):
     pin = sxp.Parser()
     pin.input(ret)
     pin.input_eof()
+    blcfg = pin.val
 
-    config_image = pin.val
-    if vcpus and sxp.child_value(config_image, "vcpus") is None:
-        config_image.append(['vcpus', vcpus])
-
-    return config_image
+    if imgcfg is None:
+        return blcfg
+    else:
+        c = sxp.merge(blcfg, imgcfg)
+        return c

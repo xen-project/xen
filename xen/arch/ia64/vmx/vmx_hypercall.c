@@ -106,12 +106,12 @@ void hyper_dom0_op(void)
     vmx_vcpu_increment_iip(vcpu);
 }
 
-void hyper_event_channel_op(void)
+void hyper_event_channel_op_compat(void)
 {
     VCPU *vcpu=current;
     u64 r32,ret;
     vcpu_get_gr_nat(vcpu,16,&r32);
-    ret=do_event_channel_op(guest_handle_from_ptr(r32, evtchn_op_t));
+    ret=do_event_channel_op_compat(guest_handle_from_ptr(r32, evtchn_op_t));
     vcpu_set_gr(vcpu, 8, ret, 0);
     vmx_vcpu_increment_iip(vcpu);
 }

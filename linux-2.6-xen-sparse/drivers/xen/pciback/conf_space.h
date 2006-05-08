@@ -8,7 +8,9 @@
 #define __XEN_PCIBACK_CONF_SPACE_H__
 
 #include <linux/list.h>
+#include <linux/err.h>
 
+/* conf_field_init can return an errno in a ptr with ERR_PTR() */
 typedef void *(*conf_field_init) (struct pci_dev * dev, int offset);
 typedef void (*conf_field_reset) (struct pci_dev * dev, int offset, void *data);
 typedef void (*conf_field_free) (struct pci_dev * dev, int offset, void *data);
@@ -55,13 +57,25 @@ struct config_field {
 struct config_field_entry {
 	struct list_head list;
 	struct config_field *field;
+	unsigned int base_offset;
 	void *data;
 };
+
+#define OFFSET(cfg_entry) ((cfg_entry)->base_offset+(cfg_entry)->field->offset)
 
 /* Add fields to a device - the add_fields macro expects to get a pointer to
  * the first entry in an array (of which the ending is marked by size==0)
  */
-int pciback_config_add_field(struct pci_dev *dev, struct config_field *field);
+int pciback_config_add_field_offset(struct pci_dev *dev,
+				    struct config_field *field,
+				    unsigned int offset);
+
+static inline int pciback_config_add_field(struct pci_dev *dev,
+					   struct config_field *field)
+{
+	return pciback_config_add_field_offset(dev, field, 0);
+}
+
 static inline int pciback_config_add_fields(struct pci_dev *dev,
 					    struct config_field *field)
 {
@@ -74,11 +88,18 @@ static inline int pciback_config_add_fields(struct pci_dev *dev,
 	return err;
 }
 
-/* Initializers which add fields to the virtual configuration space
- * ** We could add initializers to allow a guest domain to touch
- * the capability lists (for power management, the AGP bridge, etc.)
- */
-int pciback_config_header_add_fields(struct pci_dev *dev);
+static inline int pciback_config_add_fields_offset(struct pci_dev *dev,
+						   struct config_field *field,
+						   unsigned int offset)
+{
+	int i, err = 0;
+	for (i = 0; field[i].size != 0; i++) {
+		err = pciback_config_add_field_offset(dev, &field[i], offset);
+		if (err)
+			break;
+	}
+	return err;
+}
 
 /* Read/Write the real configuration space */
 int pciback_read_config_byte(struct pci_dev *dev, int offset, u8 * value,
@@ -93,5 +114,10 @@ int pciback_write_config_word(struct pci_dev *dev, int offset, u16 value,
 			      void *data);
 int pciback_write_config_dword(struct pci_dev *dev, int offset, u32 value,
 			       void *data);
+
+int pciback_config_capability_init(void);
+
+int pciback_config_header_add_fields(struct pci_dev *dev);
+int pciback_config_capability_add_fields(struct pci_dev *dev);
 
 #endif				/* __XEN_PCIBACK_CONF_SPACE_H__ */

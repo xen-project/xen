@@ -14,29 +14,21 @@ domain = XmTestDomain()
 
 # Start it
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
         print e.extra
     FAIL(str(e))
 
-# Attach a console to it
 try:
-    console = XmConsole(domain.getName(), historySaveCmds=True)
-except ConsoleError, e:
-    FAIL(str(e))
-
-try:
-    # Activate the console
-    console.sendInput("foo")
     # Run 'ls'
     run = console.runCmd("ls")
 except ConsoleError, e:
     FAIL(str(e))
 
 # Close the console
-console.closeConsole()
+domain.closeConsole()
 
 # Check the output of 'ls'
 if not re.search("proc", run["output"]):

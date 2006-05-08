@@ -364,7 +364,7 @@ int arch_set_info_guest(
 
 long
 arch_do_vcpu_op(
-    int cmd, struct vcpu *v, GUEST_HANDLE(void) arg)
+    int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg)
 {
     long rc = 0;
 
@@ -753,7 +753,10 @@ int __sync_lazy_execstate(void)
     switch_required = (this_cpu(curr_vcpu) != current);
 
     if ( switch_required )
+    {
+        ASSERT(current == idle_vcpu[smp_processor_id()]);
         __context_switch();
+    }
 
     local_irq_restore(flags);
 

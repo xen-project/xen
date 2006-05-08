@@ -28,11 +28,11 @@ $(obj)/vsyscall-sysenter.so $(obj)/vsyscall-syscall.so: \
 $(obj)/vsyscall-%.so: $(src)/vsyscall.lds $(obj)/vsyscall-%.o FORCE
 	$(call if_changed,syscall)
 
-AFLAGS_vsyscall-sysenter.o = -m32 -Iarch/i386/kernel
-AFLAGS_vsyscall-syscall.o = -m32 -Iarch/i386/kernel
+AFLAGS_vsyscall-sysenter.o = -m32 -Wa,-32 -Iarch/i386/kernel
+AFLAGS_vsyscall-syscall.o = -m32 -Wa,-32 -Iarch/i386/kernel
 
 ifdef CONFIG_XEN
-AFLAGS_vsyscall-int80.o = -m32 -Iarch/i386/kernel
+AFLAGS_vsyscall-int80.o = -m32 -Wa,-32 -Iarch/i386/kernel
 CFLAGS_syscall32-xen.o += -DUSE_INT80
 AFLAGS_syscall32_syscall-xen.o += -DUSE_INT80
 

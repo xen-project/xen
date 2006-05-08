@@ -37,7 +37,7 @@
 #define __HYPERVISOR_stack_switch          3
 #define __HYPERVISOR_set_callbacks         4
 #define __HYPERVISOR_fpu_taskswitch        5
-#define __HYPERVISOR_sched_op_compat       6 /* compat as of 0x00030101 */
+#define __HYPERVISOR_sched_op_compat       6 /* compat since 0x00030101 */
 #define __HYPERVISOR_dom0_op               7
 #define __HYPERVISOR_set_debugreg          8
 #define __HYPERVISOR_get_debugreg          9
@@ -46,10 +46,10 @@
 #define __HYPERVISOR_multicall            13
 #define __HYPERVISOR_update_va_mapping    14
 #define __HYPERVISOR_set_timer_op         15
-#define __HYPERVISOR_event_channel_op     16
+#define __HYPERVISOR_event_channel_op_compat 16 /* compat since 0x00030202 */
 #define __HYPERVISOR_xen_version          17
 #define __HYPERVISOR_console_io           18
-#define __HYPERVISOR_physdev_op           19
+#define __HYPERVISOR_physdev_op_compat    19 /* compat since 0x00030202 */
 #define __HYPERVISOR_grant_table_op       20
 #define __HYPERVISOR_vm_assist            21
 #define __HYPERVISOR_update_va_mapping_otherdomain 22
@@ -62,6 +62,18 @@
 #define __HYPERVISOR_sched_op             29
 #define __HYPERVISOR_callback_op          30
 #define __HYPERVISOR_xenoprof_op          31
+#define __HYPERVISOR_event_channel_op     32
+#define __HYPERVISOR_physdev_op           33
+
+/* Architecture-specific hypercall definitions. */
+#define __HYPERVISOR_arch_0               48
+#define __HYPERVISOR_arch_1               49
+#define __HYPERVISOR_arch_2               50
+#define __HYPERVISOR_arch_3               51
+#define __HYPERVISOR_arch_4               52
+#define __HYPERVISOR_arch_5               53
+#define __HYPERVISOR_arch_6               54
+#define __HYPERVISOR_arch_7               55
 
 /* 
  * VIRTUAL INTERRUPTS
@@ -80,7 +92,18 @@
 #define VIRQ_TBUF       4  /* G. (DOM0) Trace buffer has records available.  */
 #define VIRQ_DEBUGGER   6  /* G. (DOM0) A domain has paused for debugging.   */
 #define VIRQ_XENOPROF   7  /* V. XenOprofile interrupt: new sample available */
-#define NR_VIRQS        8
+
+/* Architecture-specific VIRQ definitions. */
+#define VIRQ_ARCH_0    16
+#define VIRQ_ARCH_1    17
+#define VIRQ_ARCH_2    18
+#define VIRQ_ARCH_3    19
+#define VIRQ_ARCH_4    20
+#define VIRQ_ARCH_5    21
+#define VIRQ_ARCH_6    22
+#define VIRQ_ARCH_7    23
+
+#define NR_VIRQS       24
 
 /*
  * MMU-UPDATE REQUESTS
@@ -185,7 +208,7 @@ typedef struct mmuext_op {
         void *vcpumask;
     } arg2;
 } mmuext_op_t;
-DEFINE_GUEST_HANDLE(mmuext_op_t);
+DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 #endif
 
 /* These are passed as 'flags' to update_va_mapping. They can be ORed. */
@@ -252,7 +275,7 @@ typedef struct mmu_update {
     uint64_t ptr;       /* Machine address of PTE. */
     uint64_t val;       /* New contents of PTE.    */
 } mmu_update_t;
-DEFINE_GUEST_HANDLE(mmu_update_t);
+DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
 
 /*
  * Send an array of these to HYPERVISOR_multicall().
@@ -262,7 +285,7 @@ typedef struct multicall_entry {
     unsigned long op, result;
     unsigned long args[6];
 } multicall_entry_t;
-DEFINE_GUEST_HANDLE(multicall_entry_t);
+DEFINE_XEN_GUEST_HANDLE(multicall_entry_t);
 
 /*
  * Event channel endpoints per domain:

@@ -18,7 +18,7 @@ struct mc_state mc_state[NR_CPUS];
 
 long
 do_multicall(
-    GUEST_HANDLE(multicall_entry_t) call_list, unsigned int nr_calls)
+    XEN_GUEST_HANDLE(multicall_entry_t) call_list, unsigned int nr_calls)
 {
     struct mc_state *mcs = &mc_state[smp_processor_id()];
     unsigned int     i;

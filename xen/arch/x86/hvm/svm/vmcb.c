@@ -36,9 +36,11 @@
 #include <xen/kernel.h>
 #include <xen/domain_page.h>
 
+extern struct host_save_area *host_save_area[];
 extern int svm_dbg_on;
 extern int asidpool_assign_next( struct vmcb_struct *vmcb, int retire_current,
                                   int oldcore, int newcore);
+extern void set_hsa_to_guest( struct arch_svm_struct *arch_svm );
 
 #define round_pgdown(_p) ((_p)&PAGE_MASK) /* coped from domain.c */
 
@@ -309,8 +311,6 @@ int construct_vmcb(struct arch_svm_struct *arch_svm, struct cpu_user_regs *regs)
 {
     int error;
     long rc=0;
-    struct host_save_area *hsa = NULL;
-    u64 phys_hsa;
 
     memset(arch_svm, 0, sizeof(struct arch_svm_struct));
 
@@ -320,36 +320,9 @@ int construct_vmcb(struct arch_svm_struct *arch_svm, struct cpu_user_regs *regs)
         goto err_out;
     }
 
-    /* 
-     * The following code is for allocating host_save_area.
-     * Note: We either allocate a Host Save Area per core or per VCPU. 
-     * However, we do not want a global data structure 
-     * for HSA per core, we decided to implement a HSA for each VCPU. 
-     * It will waste space since VCPU number is larger than core number. 
-     * But before we find a better place for HSA for each core, we will 
-     * stay will this solution.
-     */
-
-    if (!(hsa = alloc_host_save_area())) 
-    {
-        printk("Failed to allocate Host Save Area\n");
-        rc = -ENOMEM;
-        goto err_out;
-    }
-
-    phys_hsa = (u64) virt_to_maddr(hsa);
-    arch_svm->host_save_area = hsa;
-    arch_svm->host_save_pa   = phys_hsa;
-
+    /* update the HSA for the current Core */
+    set_hsa_to_guest( arch_svm );
     arch_svm->vmcb_pa  = (u64) virt_to_maddr(arch_svm->vmcb);
-
-    if ((error = load_vmcb(arch_svm, arch_svm->host_save_pa))) 
-    {
-        printk("construct_vmcb: load_vmcb failed: VMCB = %lx\n",
-               (unsigned long) arch_svm->host_save_pa);
-        rc = -EINVAL;         
-        goto err_out;
-    }
 
     if ((error = construct_vmcb_controls(arch_svm))) 
     {
@@ -455,21 +428,16 @@ void svm_do_launch(struct vcpu *v)
 	
     if (svm_dbg_on)
         svm_dump_vmcb(__func__, vmcb);
+
+    vmcb->tlb_control = 1;
 }
 
 
-int load_vmcb(struct arch_svm_struct *arch_svm, u64 phys_hsa) 
+void set_hsa_to_guest( struct arch_svm_struct *arch_svm ) 
 {
-    u32 phys_hsa_lo, phys_hsa_hi;
-    
-    phys_hsa_lo = (u32) phys_hsa;
-    phys_hsa_hi = (u32) (phys_hsa >> 32);
-    
-    wrmsr(MSR_K8_VM_HSAVE_PA, phys_hsa_lo, phys_hsa_hi);
-    set_bit(ARCH_SVM_VMCB_LOADED, &arch_svm->flags); 
-    return 0;
+    arch_svm->host_save_area = host_save_area[ smp_processor_id() ];
+    arch_svm->host_save_pa   = (u64)virt_to_maddr( arch_svm->host_save_area );
 }
-
 
 /* 
  * Resume the guest.
@@ -481,6 +449,9 @@ void svm_do_resume(struct vcpu *v)
     struct hvm_time_info *time_info = &vpit->time_info;
 
     svm_stts(v);
+
+    /* make sure the HSA is set for the current core */
+    set_hsa_to_guest( &v->arch.hvm_svm );
     
     /* pick up the elapsed PIT ticks and re-enable pit_timer */
     if ( time_info->first_injected ) {

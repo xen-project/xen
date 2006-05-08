@@ -1156,7 +1156,7 @@ hyper_call_table:
     data8 hyper_not_support     //hyper_multicall
     data8 hyper_not_support     //hyper_update_va_mapping
     data8 hyper_not_support     //hyper_set_timer_op       /* 15 */
-    data8 hyper_event_channel_op
+    data8 hyper_event_channel_op_compat
     data8 hyper_xen_version
     data8 hyper_not_support     //hyper_console_io
     data8 hyper_not_support     //hyper_physdev_op

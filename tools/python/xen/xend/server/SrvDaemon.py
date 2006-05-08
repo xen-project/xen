@@ -87,8 +87,6 @@ class Daemon:
 
 
     def daemonize(self):
-        if not XEND_DAEMONIZE: return
- 
         # Detach from TTY.
 
         # Become the group leader (already a child process)
@@ -133,6 +131,13 @@ class Daemon:
 
         ret = 0
 
+        # If we're not going to create a daemon, simply
+        # call the run method right here.
+        if not XEND_DAEMONIZE:
+            self.tracing(trace)
+            self.run(None)
+            return ret;
+        
         # we use a pipe to communicate between the parent and the child process
         # this way we know when the child has actually initialized itself so
         # we can avoid a race condition during startup

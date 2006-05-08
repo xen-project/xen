@@ -59,9 +59,8 @@ dir=$(dirname "$0")
 findCommand "$@"
 evalVariables "$@"
 
-vifnum=${vifnum:-0}
+vifnum=${vifnum:-$(ip route list | awk '/^default / { sub(/eth/,"",$NF); print $NF }')}
 bridge=${bridge:-xenbr${vifnum}}
-netdev=${netdev:-$(ip route list default scope global| awk '{ print $NF }')}
 netdev=${netdev:-eth${vifnum}}
 antispoof=${antispoof:-no}
 

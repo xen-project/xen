@@ -68,7 +68,6 @@ class ImageHandler:
         self.kernel = None
         self.ramdisk = None
         self.cmdline = None
-        self.features = None
 
         self.configure(imageConfig, deviceConfig)
 
@@ -90,7 +89,6 @@ class ImageHandler:
         if args:
             self.cmdline += " " + args
         self.ramdisk = get_cfg("ramdisk", '')
-        self.features = get_cfg("features", '')
         
         self.vm.storeVm(("image/ostype", self.ostype),
                         ("image/kernel", self.kernel),
@@ -177,7 +175,7 @@ class LinuxImageHandler(ImageHandler):
         log.debug("cmdline        = %s", self.cmdline)
         log.debug("ramdisk        = %s", self.ramdisk)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
-        log.debug("features       = %s", self.features)
+        log.debug("features       = %s", self.vm.getFeatures())
 
         return xc.linux_build(dom            = self.vm.getDomid(),
                               image          = self.kernel,
@@ -185,7 +183,7 @@ class LinuxImageHandler(ImageHandler):
                               console_evtchn = console_evtchn,
                               cmdline        = self.cmdline,
                               ramdisk        = self.ramdisk,
-                              features       = self.features)
+                              features       = self.vm.getFeatures())
 
 class HVMImageHandler(ImageHandler):
 

@@ -18,7 +18,6 @@
 #include <xenctrl.h>
 #include <xen/xen.h>
 #include <xen/io/domain_controller.h>
-#include <xen/linux/privcmd.h>
 #include "pdb_module.h"
 #include "pdb_caml_xen.h"
 

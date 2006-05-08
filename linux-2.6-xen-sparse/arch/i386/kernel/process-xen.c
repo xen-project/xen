@@ -297,9 +297,8 @@ void exit_thread(void)
 
 	/* The process may have allocated an io port bitmap... nuke it. */
 	if (unlikely(NULL != t->io_bitmap_ptr)) {
-		physdev_op_t op = { 0 };
-		op.cmd = PHYSDEVOP_SET_IOBITMAP;
-		HYPERVISOR_physdev_op(&op);
+		struct physdev_set_iobitmap set_iobitmap = { 0 };
+		HYPERVISOR_physdev_op(PHYSDEVOP_set_iobitmap, &set_iobitmap);
 		kfree(t->io_bitmap_ptr);
 		t->io_bitmap_ptr = NULL;
 	}
@@ -521,7 +520,8 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 #ifndef CONFIG_X86_NO_TSS
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
 #endif
-	physdev_op_t iopl_op, iobmp_op;
+	struct physdev_set_iopl iopl_op;
+	struct physdev_set_iobitmap iobmp_op;
 	multicall_entry_t _mcl[8], *mcl = _mcl;
 
 	/* XEN NOTE: FS/GS saved in switch_mm(), not here. */
@@ -568,23 +568,19 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 #undef C
 
 	if (unlikely(prev->iopl != next->iopl)) {
-		iopl_op.cmd             = PHYSDEVOP_SET_IOPL;
-		iopl_op.u.set_iopl.iopl = (next->iopl == 0) ? 1 :
-			(next->iopl >> 12) & 3;
+		iopl_op.iopl = (next->iopl == 0) ? 1 : (next->iopl >> 12) & 3;
 		mcl->op      = __HYPERVISOR_physdev_op;
-		mcl->args[0] = (unsigned long)&iopl_op;
+		mcl->args[0] = PHYSDEVOP_set_iopl;
+		mcl->args[1] = (unsigned long)&iopl_op;
 		mcl++;
 	}
 
 	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
-		iobmp_op.cmd                     =
-			PHYSDEVOP_SET_IOBITMAP;
-		iobmp_op.u.set_iobitmap.bitmap   =
-			(char *)next->io_bitmap_ptr;
-		iobmp_op.u.set_iobitmap.nr_ports =
-			next->io_bitmap_ptr ? IO_BITMAP_BITS : 0;
+		iobmp_op.bitmap   = (char *)next->io_bitmap_ptr;
+		iobmp_op.nr_ports = next->io_bitmap_ptr ? IO_BITMAP_BITS : 0;
 		mcl->op      = __HYPERVISOR_physdev_op;
-		mcl->args[0] = (unsigned long)&iobmp_op;
+		mcl->args[0] = PHYSDEVOP_set_iobitmap;
+		mcl->args[1] = (unsigned long)&iobmp_op;
 		mcl++;
 	}
 

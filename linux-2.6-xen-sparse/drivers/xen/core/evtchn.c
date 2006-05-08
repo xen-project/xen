@@ -103,7 +103,7 @@ DEFINE_PER_CPU(int, ipi_to_irq[NR_IPIS]);
 static int irq_bindcount[NR_IRQS];
 
 /* Bitmap indicating which PIRQs require Xen to be notified on unmask. */
-static unsigned long pirq_needs_unmask_notify[NR_PIRQS/sizeof(unsigned long)];
+static unsigned long pirq_needs_eoi[NR_PIRQS/sizeof(unsigned long)];
 
 #ifdef CONFIG_SMP
 
@@ -226,7 +226,8 @@ static int find_unbound_irq(void)
 {
 	int irq;
 
-	for (irq = 0; irq < NR_IRQS; irq++)
+	/* Only allocate from dynirq range */
+	for (irq = DYNIRQ_BASE; irq < NR_IRQS; irq++)
 		if (irq_bindcount[irq] == 0)
 			break;
 
@@ -257,16 +258,18 @@ static int bind_evtchn_to_irq(unsigned int evtchn)
 
 static int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
 {
-	evtchn_op_t op = { .cmd = EVTCHNOP_bind_virq };
+	struct evtchn_bind_virq bind_virq;
 	int evtchn, irq;
 
 	spin_lock(&irq_mapping_update_lock);
 
 	if ((irq = per_cpu(virq_to_irq, cpu)[virq]) == -1) {
-		op.u.bind_virq.virq = virq;
-		op.u.bind_virq.vcpu = cpu;
-		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
-		evtchn = op.u.bind_virq.port;
+		bind_virq.virq = virq;
+		bind_virq.vcpu = cpu;
+		if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq,
+						&bind_virq) != 0)
+			BUG();
+		evtchn = bind_virq.port;
 
 		irq = find_unbound_irq();
 		evtchn_to_irq[evtchn] = irq;
@@ -286,15 +289,17 @@ static int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
 
 static int bind_ipi_to_irq(unsigned int ipi, unsigned int cpu)
 {
-	evtchn_op_t op = { .cmd = EVTCHNOP_bind_ipi };
+	struct evtchn_bind_ipi bind_ipi;
 	int evtchn, irq;
 
 	spin_lock(&irq_mapping_update_lock);
 
 	if ((irq = per_cpu(ipi_to_irq, cpu)[ipi]) == -1) {
-		op.u.bind_ipi.vcpu = cpu;
-		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
-		evtchn = op.u.bind_ipi.port;
+		bind_ipi.vcpu = cpu;
+		if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_ipi,
+						&bind_ipi) != 0)
+			BUG();
+		evtchn = bind_ipi.port;
 
 		irq = find_unbound_irq();
 		evtchn_to_irq[evtchn] = irq;
@@ -314,14 +319,15 @@ static int bind_ipi_to_irq(unsigned int ipi, unsigned int cpu)
 
 static void unbind_from_irq(unsigned int irq)
 {
-	evtchn_op_t op = { .cmd = EVTCHNOP_close };
+	struct evtchn_close close;
 	int evtchn = evtchn_from_irq(irq);
 
 	spin_lock(&irq_mapping_update_lock);
 
 	if ((--irq_bindcount[irq] == 0) && VALID_EVTCHN(evtchn)) {
-		op.u.close.port = evtchn;
-		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
+		close.port = evtchn;
+		if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close) != 0)
+			BUG();
 
 		switch (type_from_irq(irq)) {
 		case IRQT_VIRQ:
@@ -427,7 +433,7 @@ static void do_nothing_function(void *ign)
 /* Rebind an evtchn so that it gets delivered to a specific cpu */
 static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
 {
-	evtchn_op_t op = { .cmd = EVTCHNOP_bind_vcpu };
+	struct evtchn_bind_vcpu bind_vcpu;
 	int evtchn;
 
 	spin_lock(&irq_mapping_update_lock);
@@ -439,15 +445,15 @@ static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
 	}
 
 	/* Send future instances of this interrupt to other vcpu. */
-	op.u.bind_vcpu.port = evtchn;
-	op.u.bind_vcpu.vcpu = tcpu;
+	bind_vcpu.port = evtchn;
+	bind_vcpu.vcpu = tcpu;
 
 	/*
 	 * If this fails, it usually just indicates that we're dealing with a 
 	 * virq or IPI channel, which don't actually need to be rebound. Ignore
 	 * it, but don't do the xenlinux-level rebind in that case.
 	 */
-	if (HYPERVISOR_event_channel_op(&op) >= 0)
+	if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_vcpu, &bind_vcpu) >= 0)
 		bind_evtchn_to_cpu(evtchn, tcpu);
 
 	spin_unlock(&irq_mapping_update_lock);
@@ -543,22 +549,19 @@ static struct hw_interrupt_type dynirq_type = {
 
 static inline void pirq_unmask_notify(int pirq)
 {
-	physdev_op_t op;
-	if (unlikely(test_bit(pirq, &pirq_needs_unmask_notify[0]))) {
-		op.cmd = PHYSDEVOP_IRQ_UNMASK_NOTIFY;
-		(void)HYPERVISOR_physdev_op(&op);
-	}
+	struct physdev_eoi eoi = { .irq = pirq };
+	if (unlikely(test_bit(pirq, &pirq_needs_eoi[0])))
+		(void)HYPERVISOR_physdev_op(PHYSDEVOP_eoi, &eoi);
 }
 
 static inline void pirq_query_unmask(int pirq)
 {
-	physdev_op_t op;
-	op.cmd = PHYSDEVOP_IRQ_STATUS_QUERY;
-	op.u.irq_status_query.irq = pirq;
-	(void)HYPERVISOR_physdev_op(&op);
-	clear_bit(pirq, &pirq_needs_unmask_notify[0]);
-	if (op.u.irq_status_query.flags & PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY)
-		set_bit(pirq, &pirq_needs_unmask_notify[0]);
+	struct physdev_irq_status_query irq_status;
+	irq_status.irq = pirq;
+	(void)HYPERVISOR_physdev_op(PHYSDEVOP_irq_status_query, &irq_status);
+	clear_bit(pirq, &pirq_needs_eoi[0]);
+	if (irq_status.flags & XENIRQSTAT_needs_eoi)
+		set_bit(pirq, &pirq_needs_eoi[0]);
 }
 
 /*
@@ -569,22 +572,22 @@ static inline void pirq_query_unmask(int pirq)
 
 static unsigned int startup_pirq(unsigned int irq)
 {
-	evtchn_op_t op = { .cmd = EVTCHNOP_bind_pirq };
+	struct evtchn_bind_pirq bind_pirq;
 	int evtchn = evtchn_from_irq(irq);
 
 	if (VALID_EVTCHN(evtchn))
 		goto out;
 
-	op.u.bind_pirq.pirq  = irq;
+	bind_pirq.pirq  = irq;
 	/* NB. We are happy to share unless we are probing. */
-	op.u.bind_pirq.flags = probing_irq(irq) ? 0 : BIND_PIRQ__WILL_SHARE;
-	if (HYPERVISOR_event_channel_op(&op) != 0) {
+	bind_pirq.flags = probing_irq(irq) ? 0 : BIND_PIRQ__WILL_SHARE;
+	if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_pirq, &bind_pirq) != 0) {
 		if (!probing_irq(irq))
 			printk(KERN_INFO "Failed to obtain physical IRQ %d\n",
 			       irq);
 		return 0;
 	}
-	evtchn = op.u.bind_pirq.port;
+	evtchn = bind_pirq.port;
 
 	pirq_query_unmask(irq_to_pirq(irq));
 
@@ -601,7 +604,7 @@ static unsigned int startup_pirq(unsigned int irq)
 
 static void shutdown_pirq(unsigned int irq)
 {
-	evtchn_op_t op = { .cmd = EVTCHNOP_close };
+	struct evtchn_close close;
 	int evtchn = evtchn_from_irq(irq);
 
 	if (!VALID_EVTCHN(evtchn))
@@ -609,8 +612,9 @@ static void shutdown_pirq(unsigned int irq)
 
 	mask_evtchn(evtchn);
 
-	op.u.close.port = evtchn;
-	BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
+	close.port = evtchn;
+	if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close) != 0)
+		BUG();
 
 	bind_evtchn_to_cpu(evtchn, 0);
 	evtchn_to_irq[evtchn] = -1;
@@ -702,9 +706,8 @@ void unmask_evtchn(int port)
 
 	/* Slow path (hypercall) if this is a non-local port. */
 	if (unlikely(cpu != cpu_from_evtchn(port))) {
-		evtchn_op_t op = { .cmd = EVTCHNOP_unmask,
-				   .u.unmask.port = port };
-		(void)HYPERVISOR_event_channel_op(&op);
+		struct evtchn_unmask unmask = { .port = port };
+		(void)HYPERVISOR_event_channel_op(EVTCHNOP_unmask, &unmask);
 		return;
 	}
 
@@ -727,8 +730,9 @@ EXPORT_SYMBOL_GPL(unmask_evtchn);
 
 void irq_resume(void)
 {
-	evtchn_op_t op;
-	int         cpu, pirq, virq, ipi, irq, evtchn;
+	struct evtchn_bind_virq bind_virq;
+	struct evtchn_bind_ipi  bind_ipi;
+	int cpu, pirq, virq, ipi, irq, evtchn;
 
 	init_evtchn_cpu_bindings();
 
@@ -762,12 +766,12 @@ void irq_resume(void)
 		BUG_ON(irq_info[irq] != mk_irq_info(IRQT_VIRQ, virq, 0));
 
 		/* Get a new binding from Xen. */
-		memset(&op, 0, sizeof(op));
-		op.cmd              = EVTCHNOP_bind_virq;
-		op.u.bind_virq.virq = virq;
-		op.u.bind_virq.vcpu = 0;
-		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
-		evtchn = op.u.bind_virq.port;
+		bind_virq.virq = virq;
+		bind_virq.vcpu = 0;
+		if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq,
+						&bind_virq) != 0)
+			BUG();
+		evtchn = bind_virq.port;
 
 		/* Record the new mapping. */
 		evtchn_to_irq[evtchn] = irq;
@@ -785,11 +789,11 @@ void irq_resume(void)
 		BUG_ON(irq_info[irq] != mk_irq_info(IRQT_IPI, ipi, 0));
 
 		/* Get a new binding from Xen. */
-		memset(&op, 0, sizeof(op));
-		op.cmd = EVTCHNOP_bind_ipi;
-		op.u.bind_ipi.vcpu = 0;
-		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
-		evtchn = op.u.bind_ipi.port;
+		bind_ipi.vcpu = 0;
+		if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_ipi,
+						&bind_ipi) != 0)
+			BUG();
+		evtchn = bind_ipi.port;
 
 		/* Record the new mapping. */
 		evtchn_to_irq[evtchn] = irq;

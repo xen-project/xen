@@ -1,8 +1,7 @@
-Index: sysenter/linux-2.6-xen-sparse/arch/i386/kernel/entry.S
-===================================================================
---- linux-2.6.16.orig/arch/i386/kernel/entry.S	2006-04-05 11:12:51.000000000 +0100
-+++ linux-2.6.16/arch/i386/kernel/entry.S	2006-04-05 11:12:52.000000000 +0100
-@@ -177,7 +177,7 @@
+diff -pruN ../pristine-linux-2.6.16.13/arch/i386/kernel/entry.S ./arch/i386/kernel/entry.S
+--- ../pristine-linux-2.6.16.13/arch/i386/kernel/entry.S	2006-05-02 22:38:44.000000000 +0100
++++ ./arch/i386/kernel/entry.S	2006-05-04 17:41:44.000000000 +0100
+@@ -177,7 +177,7 @@ need_resched:
  
  	# sysenter call handler stub
  ENTRY(sysenter_entry)
@@ -11,7 +10,7 @@ Index: sysenter/linux-2.6-xen-sparse/arch/i386/kernel/entry.S
  sysenter_past_esp:
  	sti
  	pushl $(__USER_DS)
-@@ -492,7 +492,7 @@
+@@ -492,7 +492,7 @@ device_not_available_emulate:
   * that sets up the real kernel stack. Check here, since we can't
   * allow the wrong stack to be used.
   *
@@ -20,7 +19,7 @@ Index: sysenter/linux-2.6-xen-sparse/arch/i386/kernel/entry.S
   * already pushed 3 words if it hits on the sysenter instruction:
   * eflags, cs and eip.
   *
-@@ -504,7 +504,7 @@
+@@ -504,7 +504,7 @@ device_not_available_emulate:
  	cmpw $__KERNEL_CS,4(%esp);		\
  	jne ok;					\
  label:						\

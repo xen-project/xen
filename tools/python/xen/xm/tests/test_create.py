@@ -112,7 +112,6 @@ on_crash    = 'destroy'
                      '''
 name       = "testname"
 memory     = 256
-ssidref    = 1
 kernel     = "/mykernel"
 maxmem     = 1024
 cpu        = 2
@@ -132,7 +131,6 @@ cpu_weight = 0.75
                  'memory'     : 256,
                  'maxmem'     : 1024,
                  'cpu'        : 2,
-                 'ssidref'    : 1,
                  'cpu_weight' : 0.75,
                  'vcpus'      : 1,
                  'boot'       : 'c',

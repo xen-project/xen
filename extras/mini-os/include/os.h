@@ -7,9 +7,6 @@
 #ifndef _OS_H_
 #define _OS_H_
 
-#define NULL 0
-
-
 #if __GNUC__ == 2 && __GNUC_MINOR__ < 96
 #define __builtin_expect(x, expected_value) (x)
 #endif
@@ -433,6 +430,13 @@ static __inline__ unsigned long __ffs(unsigned long word)
      asm volatile("rdtsc" : "=a" (__a), "=d" (__d)); \
      (val) = ((unsigned long)__a) | (((unsigned long)__d)<<32); \
 } while(0)
+
+#define wrmsr(msr,val1,val2) \
+      __asm__ __volatile__("wrmsr" \
+                           : /* no outputs */ \
+                           : "c" (msr), "a" (val1), "d" (val2))
+
+#define wrmsrl(msr,val) wrmsr(msr,(u32)((u64)(val)),((u64)(val))>>32)
 
 
 #else /* ifdef __x86_64__ */

@@ -19,29 +19,21 @@ domain = XmTestDomain()
 
 # Start it
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
         print e.extra
     FAIL(str(e))
 
-# Attach a console to it
 try:
-    console = XmConsole(domain.getName(), historySaveCmds=True)
-except ConsoleError, e:
-    FAIL(str(e))
-
-try:
-    # Activate the console
-    console.sendInput("foo")
     # Make sure a command succeeds
     run = console.runCmd("ls /bin")
 except ConsoleError, e:
     FAIL(str(e))
 
 # Close the console
-console.closeConsole()
+domain.closeConsole()
 
 # Stop the domain (nice shutdown)
 status, output = traceCommand("xm shutdown %s" % domain.getName())

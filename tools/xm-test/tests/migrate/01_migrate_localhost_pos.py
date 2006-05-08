@@ -25,29 +25,21 @@ domain = XmTestDomain()
 
 # Start it
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to create test domain because:"
         print e.extra
     FAIL(str(e))
 
-# Attach a console to it
 try:
-    console = XmConsole(domain.getName(), historySaveCmds=True)
-except ConsoleError, e:
-    FAIL(str(e))
-
-try:
-    # Activate the console
-    console.sendInput("foo")
     # Set a variable to check on the other side
     run = console.runCmd("foo=bar")
 except ConsoleError, e:
     FAIL(str(e))
 
 # Close the console
-console.closeConsole()
+domain.closeConsole()
 
 old_domid = domid(domain.getName())
 
@@ -68,11 +60,12 @@ if (old_domid == new_domid):
 
 # Attach a console to it
 try:
-    console = XmConsole(domain.getName(), historySaveCmds=True)
+    console = domain.getConsole()
     console.debugMe = True
 except ConsoleError, e:
     pass
 
+console.setHistorySaveCmds(value=True)
 console.sendInput("ls")
 
 # Run 'ls'
@@ -86,7 +79,7 @@ if not re.search("bar", run["output"]):
     FAIL("Migrated domain has been reset")
 
 # Close the console
-console.closeConsole()
+domain.closeConsole()
 
 # Stop the domain (nice shutdown)
 domain.stop()

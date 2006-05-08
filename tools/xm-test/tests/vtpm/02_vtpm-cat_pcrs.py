@@ -16,7 +16,7 @@ config = {"vtpm":"instance=1,backend=0"}
 domain = XmTestDomain(extraConfig=config)
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print e.extra
@@ -24,12 +24,6 @@ except DomainError, e:
     FAIL("Unable to create domain")
 
 domName = domain.getName()
-
-try:
-    console = XmConsole(domain.getName())
-except ConsoleError, e:
-    vtpm_cleanup(domName)
-    FAIL(str(e))
 
 try:
     console.sendInput("input")
@@ -49,7 +43,7 @@ if re.search("No such file",run["output"]):
     vtpm_cleanup(domName)
     FAIL("TPM frontend support not compiled into (domU?) kernel")
 
-console.closeConsole()
+domain.closeConsole()
 
 domain.stop()
 

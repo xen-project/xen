@@ -23,14 +23,11 @@ if s != 0:
     FAIL("Unable to mke2fs /dev/ram1 in dom0")
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     FAIL(str(e))
 
 try:
-    console = XmConsole(domain.getName())
-    console.sendInput("foo")
-
     run = console.runCmd("mkdir /mnt/a /mnt/b")
     if run["return"] != 0:
         FAIL("Unable to mkdir /mnt/a /mnt/b")
@@ -67,7 +64,7 @@ try:
 except ConsoleError, e:
     FAIL(str(e))
 
-console.closeConsole()
+domain.closeConsole()
 
 try:
     s, o = traceCommand("xm save %s /tmp/test.state" % domain.getName(),
@@ -91,7 +88,7 @@ if s != 0:
     FAIL("xm restore exited with %i != 0" % s)
 
 try:
-    console = XmConsole(domain.getName())
+    console = domain.getConsole()
     # Enable debug dumping, as this causes an Oops on x86_64
     console.debugMe = True
 

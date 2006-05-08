@@ -41,8 +41,8 @@ void do_hypervisor_callback(struct pt_regs *regs)
     shared_info_t *s = HYPERVISOR_shared_info;
     vcpu_info_t   *vcpu_info = &s->vcpu_info[cpu];
 
+   
     vcpu_info->evtchn_upcall_pending = 0;
-    
     /* NB. No need for a barrier here -- XCHG is a barrier on x86. */
     l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
     while ( l1 != 0 )

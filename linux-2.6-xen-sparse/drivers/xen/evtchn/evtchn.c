@@ -206,68 +206,71 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 	int rc;
 	struct per_user_data *u = file->private_data;
 	void __user *uarg = (void __user *) arg;
-	evtchn_op_t op = { 0 };
 
 	switch (cmd) {
 	case IOCTL_EVTCHN_BIND_VIRQ: {
 		struct ioctl_evtchn_bind_virq bind;
+		struct evtchn_bind_virq bind_virq;
 
 		rc = -EFAULT;
 		if (copy_from_user(&bind, uarg, sizeof(bind)))
 			break;
 
-		op.cmd = EVTCHNOP_bind_virq;
-		op.u.bind_virq.virq = bind.virq;
-		op.u.bind_virq.vcpu = 0;
-		rc = HYPERVISOR_event_channel_op(&op);
+		bind_virq.virq = bind.virq;
+		bind_virq.vcpu = 0;
+		rc = HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq,
+						 &bind_virq);
 		if (rc != 0)
 			break;
 
-		rc = op.u.bind_virq.port;
+		rc = bind_virq.port;
 		evtchn_bind_to_user(u, rc);
 		break;
 	}
 
 	case IOCTL_EVTCHN_BIND_INTERDOMAIN: {
 		struct ioctl_evtchn_bind_interdomain bind;
+		struct evtchn_bind_interdomain bind_interdomain;
 
 		rc = -EFAULT;
 		if (copy_from_user(&bind, uarg, sizeof(bind)))
 			break;
 
-		op.cmd = EVTCHNOP_bind_interdomain;
-		op.u.bind_interdomain.remote_dom  = bind.remote_domain;
-		op.u.bind_interdomain.remote_port = bind.remote_port;
-		rc = HYPERVISOR_event_channel_op(&op);
+		bind_interdomain.remote_dom  = bind.remote_domain;
+		bind_interdomain.remote_port = bind.remote_port;
+		rc = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain,
+						 &bind_interdomain);
 		if (rc != 0)
 			break;
 
-		rc = op.u.bind_interdomain.local_port;
+		rc = bind_interdomain.local_port;
 		evtchn_bind_to_user(u, rc);
 		break;
 	}
 
 	case IOCTL_EVTCHN_BIND_UNBOUND_PORT: {
 		struct ioctl_evtchn_bind_unbound_port bind;
+		struct evtchn_alloc_unbound alloc_unbound;
 
 		rc = -EFAULT;
 		if (copy_from_user(&bind, uarg, sizeof(bind)))
 			break;
 
-		op.cmd = EVTCHNOP_alloc_unbound;
-		op.u.alloc_unbound.dom        = DOMID_SELF;
-		op.u.alloc_unbound.remote_dom = bind.remote_domain;
-		rc = HYPERVISOR_event_channel_op(&op);
+		alloc_unbound.dom        = DOMID_SELF;
+		alloc_unbound.remote_dom = bind.remote_domain;
+		rc = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound,
+						 &alloc_unbound);
 		if (rc != 0)
 			break;
 
-		rc = op.u.alloc_unbound.port;
+		rc = alloc_unbound.port;
 		evtchn_bind_to_user(u, rc);
 		break;
 	}
 
 	case IOCTL_EVTCHN_UNBIND: {
 		struct ioctl_evtchn_unbind unbind;
+		struct evtchn_close close;
 		int ret;
 
 		rc = -EFAULT;
@@ -291,9 +294,8 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 
 		spin_unlock_irq(&port_user_lock);
 
-		op.cmd = EVTCHNOP_close;
-		op.u.close.port = unbind.port;
-		ret = HYPERVISOR_event_channel_op(&op);
+		close.port = unbind.port;
+		ret = HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
 		BUG_ON(ret);
 
 		rc = 0;
@@ -379,7 +381,7 @@ static int evtchn_release(struct inode *inode, struct file *filp)
 {
 	int i;
 	struct per_user_data *u = filp->private_data;
-	evtchn_op_t op = { 0 };
+	struct evtchn_close close;
 
 	spin_lock_irq(&port_user_lock);
 
@@ -393,9 +395,8 @@ static int evtchn_release(struct inode *inode, struct file *filp)
 		port_user[i] = NULL;
 		mask_evtchn(i);
 
-		op.cmd = EVTCHNOP_close;
-		op.u.close.port = i;
-		ret = HYPERVISOR_event_channel_op(&op);
+		close.port = i;
+		ret = HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
 		BUG_ON(ret);
 	}
 

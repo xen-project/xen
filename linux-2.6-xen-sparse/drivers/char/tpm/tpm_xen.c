@@ -1,536 +1,767 @@
 /*
- * Copyright (C) 2004 IBM Corporation
+ * Copyright (c) 2005, IBM Corporation
  *
- * Authors:
- * Leendert van Doorn <leendert@watson.ibm.com>
- * Dave Safford <safford@watson.ibm.com>
- * Reiner Sailer <sailer@watson.ibm.com>
- * Kylene Hall <kjhall@us.ibm.com>
- * Stefan Berger <stefanb@us.ibm.com>
+ * Author: Stefan Berger, stefanb@us.ibm.com
+ * Grant table support: Mahadevan Gomathisankaran
  *
- * Maintained by: <tpmdd_devel@lists.sourceforge.net>
+ * This code has been derived from drivers/xen/netfront/netfront.c
  *
- * Device driver for TCG/TCPA TPM (trusted platform module) for XEN.
- * Specifications at www.trustedcomputinggroup.org
+ * Copyright (c) 2002-2004, K A Fraser
  *
  * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, version 2 of the
- * License.
+ * modify it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation; or, when distributed
+ * separately from the Linux kernel or incorporated into other
+ * software packages, subject to the following license:
  *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this source file (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software,
+ * and to permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 
-#include <asm/uaccess.h>
-#include <linux/list.h>
-#include <xen/tpmfe.h>
-#include <linux/device.h>
+#include <linux/errno.h>
 #include <linux/interrupt.h>
-#include <linux/platform_device.h>
-#include "tpm.h"
+#include <linux/mutex.h>
+#include <asm/uaccess.h>
+#include <xen/evtchn.h>
+#include <xen/interface/grant_table.h>
+#include <xen/interface/io/tpmif.h>
+#include <xen/xenbus.h>
+#include "tpm_vtpm.h"
 
-/* read status bits */
-enum {
-	STATUS_BUSY = 0x01,
-	STATUS_DATA_AVAIL = 0x02,
-	STATUS_READY = 0x04
+#undef DEBUG
+
+/* local structures */
+struct tpm_private {
+	tpmif_tx_interface_t *tx;
+	atomic_t refcnt;
+	unsigned int evtchn;
+	unsigned int irq;
+	u8 is_connected;
+	u8 is_suspended;
+
+	spinlock_t tx_lock;
+
+	struct tx_buffer *tx_buffers[TPMIF_TX_RING_SIZE];
+
+	atomic_t tx_busy;
+	void *tx_remember;
+	domid_t backend_id;
+	wait_queue_head_t wait_q;
+
+	struct xenbus_device *dev;
+	int ring_ref;
 };
 
-#define MIN(x,y)  ((x) < (y)) ? (x) : (y)
-
-struct transmission {
-	struct list_head next;
-	unsigned char *request;
-	unsigned int request_len;
-	unsigned char *rcv_buffer;
-	unsigned int  buffersize;
-	unsigned int flags;
+struct tx_buffer {
+	unsigned int size;	// available space in data
+	unsigned int len;	// used space in data
+	unsigned char *data;	// pointer to a page
 };
 
-enum {
-	TRANSMISSION_FLAG_WAS_QUEUED = 0x1
-};
 
-struct data_exchange {
-	struct transmission *current_request;
-	spinlock_t           req_list_lock;
-	wait_queue_head_t    req_wait_queue;
-
-	struct list_head     queued_requests;
-
-	struct transmission *current_response;
-	spinlock_t           resp_list_lock;
-	wait_queue_head_t    resp_wait_queue;     // processes waiting for responses
-
-	struct transmission *req_cancelled;       // if a cancellation was encounterd
-
-	unsigned int         fe_status;
-	unsigned int         flags;
-};
-
-enum {
-	DATAEX_FLAG_QUEUED_ONLY = 0x1
-};
-
-static struct data_exchange dataex;
-
-static unsigned long disconnect_time;
-
-static struct tpmfe_device tpmfe;
+/* locally visible variables */
+static grant_ref_t gref_head;
+static struct tpm_private *my_priv;
 
 /* local function prototypes */
-static void __exit cleanup_xen(void);
+static irqreturn_t tpmif_int(int irq,
+                             void *tpm_priv,
+                             struct pt_regs *ptregs);
+static void tpmif_rx_action(unsigned long unused);
+static int tpmif_connect(struct xenbus_device *dev,
+                         struct tpm_private *tp,
+                         domid_t domid);
+static DECLARE_TASKLET(tpmif_rx_tasklet, tpmif_rx_action, 0);
+static int tpmif_allocate_tx_buffers(struct tpm_private *tp);
+static void tpmif_free_tx_buffers(struct tpm_private *tp);
+static void tpmif_set_connected_state(struct tpm_private *tp,
+                                      u8 newstate);
+static int tpm_xmit(struct tpm_private *tp,
+                    const u8 * buf, size_t count, int userbuffer,
+                    void *remember);
+static void destroy_tpmring(struct tpm_private *tp);
+
+#define DPRINTK(fmt, args...) \
+    pr_debug("xen_tpm_fr (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
+#define IPRINTK(fmt, args...) \
+    printk(KERN_INFO "xen_tpm_fr: " fmt, ##args)
+#define WPRINTK(fmt, args...) \
+    printk(KERN_WARNING "xen_tpm_fr: " fmt, ##args)
+
+#define GRANT_INVALID_REF	0
 
 
-/* =============================================================
- * Some utility functions
- * =============================================================
- */
-static inline struct transmission *
-transmission_alloc(void)
+static inline int
+tx_buffer_copy(struct tx_buffer *txb, const u8 * src, int len,
+               int isuserbuffer)
 {
-	return kzalloc(sizeof(struct transmission), GFP_KERNEL);
-}
+	int copied = len;
 
-static inline unsigned char *
-transmission_set_buffer(struct transmission *t,
-                        unsigned char *buffer, unsigned int len)
-{
-	kfree(t->request);
-	t->request = kmalloc(len, GFP_KERNEL);
-	if (t->request) {
-		memcpy(t->request,
-		       buffer,
-		       len);
-		t->request_len = len;
+	if (len > txb->size) {
+		copied = txb->size;
 	}
-	return t->request;
-}
-
-static inline void
-transmission_free(struct transmission *t)
-{
-	kfree(t->request);
-	kfree(t->rcv_buffer);
-	kfree(t);
-}
-
-/* =============================================================
- * Interface with the TPM shared memory driver for XEN
- * =============================================================
- */
-static int tpm_recv(const u8 *buffer, size_t count, const void *ptr)
-{
-	int ret_size = 0;
-	struct transmission *t;
-
-	/*
-	 * The list with requests must contain one request
-	 * only and the element there must be the one that
-	 * was passed to me from the front-end.
-	 */
-	if (dataex.current_request != ptr) {
-		printk("WARNING: The request pointer is different than the "
-		       "pointer the shared memory driver returned to me. "
-		       "%p != %p\n",
-		       dataex.current_request, ptr);
+	if (isuserbuffer) {
+		if (copy_from_user(txb->data, src, copied))
+			return -EFAULT;
+	} else {
+		memcpy(txb->data, src, copied);
 	}
+	txb->len = len;
+	return copied;
+}
 
-	/*
-	 * If the request has been cancelled, just quit here
-	 */
-	if (dataex.req_cancelled == (struct transmission *)ptr) {
-		if (dataex.current_request == dataex.req_cancelled) {
-			dataex.current_request = NULL;
+static inline struct tx_buffer *tx_buffer_alloc(void)
+{
+	struct tx_buffer *txb = kzalloc(sizeof (struct tx_buffer),
+					GFP_KERNEL);
+
+	if (txb) {
+		txb->len = 0;
+		txb->size = PAGE_SIZE;
+		txb->data = (unsigned char *)__get_free_page(GFP_KERNEL);
+		if (txb->data == NULL) {
+			kfree(txb);
+			txb = NULL;
 		}
-		transmission_free(dataex.req_cancelled);
-		dataex.req_cancelled = NULL;
-		return 0;
 	}
-
-	if (NULL != (t = dataex.current_request)) {
-		transmission_free(t);
-		dataex.current_request = NULL;
-	}
-
-	t = transmission_alloc();
-	if (t) {
-		unsigned long flags;
-		t->rcv_buffer = kmalloc(count, GFP_KERNEL);
-		if (! t->rcv_buffer) {
-			transmission_free(t);
-			return -ENOMEM;
-		}
-		t->buffersize = count;
-		memcpy(t->rcv_buffer, buffer, count);
-		ret_size = count;
-
-		spin_lock_irqsave(&dataex.resp_list_lock ,flags);
-		dataex.current_response = t;
-		spin_unlock_irqrestore(&dataex.resp_list_lock, flags);
-		wake_up_interruptible(&dataex.resp_wait_queue);
-	}
-	return ret_size;
+	return txb;
 }
 
 
-static void tpm_fe_status(unsigned int flags)
+static inline void tx_buffer_free(struct tx_buffer *txb)
 {
-	dataex.fe_status = flags;
-	if ((dataex.fe_status & TPMFE_STATUS_CONNECTED) == 0) {
-		disconnect_time = jiffies;
+	if (txb) {
+		free_page((long)txb->data);
+		kfree(txb);
 	}
 }
 
-/* =============================================================
- * Interface with the generic TPM driver
- * =============================================================
- */
-static int tpm_xen_recv(struct tpm_chip *chip, u8 * buf, size_t count)
+/**************************************************************
+ Utility function for the tpm_private structure
+**************************************************************/
+static inline void tpm_private_init(struct tpm_private *tp)
 {
-	unsigned long flags;
-	int rc = 0;
-
-	spin_lock_irqsave(&dataex.resp_list_lock, flags);
-	/*
-	 * Check if the previous operation only queued the command
-	 * In this case there won't be a response, so I just
-	 * return from here and reset that flag. In any other
-	 * case I should receive a response from the back-end.
-	 */
-	if ((dataex.flags & DATAEX_FLAG_QUEUED_ONLY) != 0) {
-		dataex.flags &= ~DATAEX_FLAG_QUEUED_ONLY;
-		spin_unlock_irqrestore(&dataex.resp_list_lock, flags);
-		/*
-		 * a little hack here. The first few measurements
-		 * are queued since there's no way to talk to the
-		 * TPM yet (due to slowness of the control channel)
-		 * So we just make IMA happy by giving it 30 NULL
-		 * bytes back where the most important part is
-		 * that the result code is '0'.
-		 */
-
-		count = MIN(count, 30);
-		memset(buf, 0x0, count);
-		return count;
-	}
-	/*
-	 * Check whether something is in the responselist and if
-	 * there's nothing in the list wait for something to appear.
-	 */
-
-	if (NULL == dataex.current_response) {
-		spin_unlock_irqrestore(&dataex.resp_list_lock, flags);
-		interruptible_sleep_on_timeout(&dataex.resp_wait_queue,
-		                               1000);
-		spin_lock_irqsave(&dataex.resp_list_lock ,flags);
-	}
-
-	if (NULL != dataex.current_response) {
-		struct transmission *t = dataex.current_response;
-		dataex.current_response = NULL;
-		rc = MIN(count, t->buffersize);
-		memcpy(buf, t->rcv_buffer, rc);
-		transmission_free(t);
-	}
-
-	spin_unlock_irqrestore(&dataex.resp_list_lock, flags);
-	return rc;
+	spin_lock_init(&tp->tx_lock);
+	init_waitqueue_head(&tp->wait_q);
+	atomic_set(&tp->refcnt, 1);
 }
 
-static int tpm_xen_send(struct tpm_chip *chip, u8 * buf, size_t count)
+static inline void tpm_private_put(void)
 {
-	/*
-	 * We simply pass the packet onto the XEN shared
-	 * memory driver.
-	 */
-	unsigned long flags;
-	int rc;
-	struct transmission *t = transmission_alloc();
-
-	spin_lock_irqsave(&dataex.req_list_lock, flags);
-	/*
-	 * If there's a current request, it must be the
-	 * previous request that has timed out.
-	 */
-	if (dataex.current_request != NULL) {
-		printk("WARNING: Sending although there is a request outstanding.\n"
-		       "         Previous request must have timed out.\n");
-		transmission_free(dataex.current_request);
-		dataex.current_request = NULL;
+	if ( atomic_dec_and_test(&my_priv->refcnt)) {
+		tpmif_free_tx_buffers(my_priv);
+		kfree(my_priv);
+		my_priv = NULL;
 	}
+}
 
-	if (t != NULL) {
-		unsigned int error = 0;
-		/*
-		 * Queue the packet if the driver below is not
-		 * ready, yet, or there is any packet already
-		 * in the queue.
-		 * If the driver below is ready, unqueue all
-		 * packets first before sending our current
-		 * packet.
-		 * For each unqueued packet, except for the
-		 * last (=current) packet, call the function
-		 * tpm_xen_recv to wait for the response to come
-		 * back.
-		 */
-		if ((dataex.fe_status & TPMFE_STATUS_CONNECTED) == 0) {
-			if (time_after(jiffies, disconnect_time + HZ * 10)) {
-				rc = -ENOENT;
-			} else {
-				/*
-				 * copy the request into the buffer
-				 */
-				if (transmission_set_buffer(t, buf, count)
-				    == NULL) {
-					transmission_free(t);
-					rc = -ENOMEM;
-					goto exit;
-				}
-				dataex.flags |= DATAEX_FLAG_QUEUED_ONLY;
-				list_add_tail(&t->next, &dataex.queued_requests);
-				rc = 0;
-			}
-		} else {
-			/*
-			 * Check whether there are any packets in the queue
-			 */
-			while (!list_empty(&dataex.queued_requests)) {
-				/*
-				 * Need to dequeue them.
-				 * Read the result into a dummy buffer.
-				 */
-				unsigned char buffer[1];
-				struct transmission *qt = (struct transmission *) dataex.queued_requests.next;
-				list_del(&qt->next);
-				dataex.current_request = qt;
-				spin_unlock_irqrestore(&dataex.req_list_lock,
-				                       flags);
-
-				rc = tpm_fe_send(tpmfe.tpm_private,
-				                 qt->request,
-				                 qt->request_len,
-				                 qt);
-
-				if (rc < 0) {
-					spin_lock_irqsave(&dataex.req_list_lock, flags);
-					if ((qt = dataex.current_request) != NULL) {
-						/*
-						 * requeue it at the beginning
-						 * of the list
-						 */
-						list_add(&qt->next,
-						         &dataex.queued_requests);
-					}
-					dataex.current_request = NULL;
-					error = 1;
-					break;
-				}
-				/*
-				 * After this point qt is not valid anymore!
-				 * It is freed when the front-end is delivering the data
-				 * by calling tpm_recv
-				 */
-
-				/*
-				 * Try to receive the response now into the provided dummy
-				 * buffer (I don't really care about this response since
-				 * there is no receiver anymore for this response)
-				 */
-				rc = tpm_xen_recv(chip, buffer, sizeof(buffer));
-
-				spin_lock_irqsave(&dataex.req_list_lock, flags);
-			}
-
-			if (error == 0) {
-				/*
-				 * Finally, send the current request.
-				 */
-				dataex.current_request = t;
-				/*
-				 * Call the shared memory driver
-				 * Pass to it the buffer with the request, the
-				 * amount of bytes in the request and
-				 * a void * pointer (here: transmission structure)
-				 */
-				rc = tpm_fe_send(tpmfe.tpm_private,
-				                 buf, count, t);
-				/*
-				 * The generic TPM driver will call
-				 * the function to receive the response.
-				 */
-				if (rc < 0) {
-					dataex.current_request = NULL;
-					goto queue_it;
-				}
-			} else {
-queue_it:
-				if (transmission_set_buffer(t, buf, count) == NULL) {
-					transmission_free(t);
-					rc = -ENOMEM;
-					goto exit;
-				}
-				/*
-				 * An error occurred. Don't event try
-				 * to send the current request. Just
-				 * queue it.
-				 */
-				dataex.flags |= DATAEX_FLAG_QUEUED_ONLY;
-				list_add_tail(&t->next,
-				              &dataex.queued_requests);
-				rc = 0;
+static struct tpm_private *tpm_private_get(void)
+{
+	int err;
+	if (!my_priv) {
+		my_priv = kzalloc(sizeof(struct tpm_private), GFP_KERNEL);
+		if (my_priv) {
+			tpm_private_init(my_priv);
+			err = tpmif_allocate_tx_buffers(my_priv);
+			if (err < 0) {
+				tpm_private_put();
 			}
 		}
 	} else {
-		rc = -ENOMEM;
+		atomic_inc(&my_priv->refcnt);
 	}
+	return my_priv;
+}
+
+/**************************************************************
+
+ The interface to let the tpm plugin register its callback
+ function and send data to another partition using this module
+
+**************************************************************/
+
+static DEFINE_MUTEX(suspend_lock);
+/*
+ * Send data via this module by calling this function
+ */
+int vtpm_vd_send(struct tpm_chip *chip,
+                 struct tpm_private *tp,
+                 const u8 * buf, size_t count, void *ptr)
+{
+	int sent;
+
+	mutex_lock(&suspend_lock);
+	sent = tpm_xmit(tp, buf, count, 0, ptr);
+	mutex_unlock(&suspend_lock);
+
+	return sent;
+}
+
+/**************************************************************
+ XENBUS support code
+**************************************************************/
+
+static int setup_tpmring(struct xenbus_device *dev,
+                         struct tpm_private *tp)
+{
+	tpmif_tx_interface_t *sring;
+	int err;
+
+	tp->ring_ref = GRANT_INVALID_REF;
+
+	sring = (void *)__get_free_page(GFP_KERNEL);
+	if (!sring) {
+		xenbus_dev_fatal(dev, -ENOMEM, "allocating shared ring");
+		return -ENOMEM;
+	}
+	tp->tx = sring;
+
+	err = xenbus_grant_ring(dev, virt_to_mfn(tp->tx));
+	if (err < 0) {
+		free_page((unsigned long)sring);
+		tp->tx = NULL;
+		xenbus_dev_fatal(dev, err, "allocating grant reference");
+		goto fail;
+	}
+	tp->ring_ref = err;
+
+	err = tpmif_connect(dev, tp, dev->otherend_id);
+	if (err)
+		goto fail;
+
+	return 0;
+fail:
+	destroy_tpmring(tp);
+	return err;
+}
+
+
+static void destroy_tpmring(struct tpm_private *tp)
+{
+	tpmif_set_connected_state(tp, 0);
+
+	if (tp->ring_ref != GRANT_INVALID_REF) {
+		gnttab_end_foreign_access(tp->ring_ref, 0,
+					  (unsigned long)tp->tx);
+		tp->ring_ref = GRANT_INVALID_REF;
+		tp->tx = NULL;
+	}
+
+	if (tp->irq)
+		unbind_from_irqhandler(tp->irq, tp);
+
+	tp->evtchn = tp->irq = 0;
+}
+
+
+static int talk_to_backend(struct xenbus_device *dev,
+                           struct tpm_private *tp)
+{
+	const char *message = NULL;
+	int err;
+	xenbus_transaction_t xbt;
+
+	err = setup_tpmring(dev, tp);
+	if (err) {
+		xenbus_dev_fatal(dev, err, "setting up ring");
+		goto out;
+	}
+
+again:
+	err = xenbus_transaction_start(&xbt);
+	if (err) {
+		xenbus_dev_fatal(dev, err, "starting transaction");
+		goto destroy_tpmring;
+	}
+
+	err = xenbus_printf(xbt, dev->nodename,
+	                    "ring-ref","%u", tp->ring_ref);
+	if (err) {
+		message = "writing ring-ref";
+		goto abort_transaction;
+	}
+
+	err = xenbus_printf(xbt, dev->nodename,
+			    "event-channel", "%u", tp->evtchn);
+	if (err) {
+		message = "writing event-channel";
+		goto abort_transaction;
+	}
+
+	err = xenbus_transaction_end(xbt, 0);
+	if (err == -EAGAIN)
+		goto again;
+	if (err) {
+		xenbus_dev_fatal(dev, err, "completing transaction");
+		goto destroy_tpmring;
+	}
+
+	xenbus_switch_state(dev, XenbusStateConnected);
+
+	return 0;
+
+abort_transaction:
+	xenbus_transaction_end(xbt, 1);
+	if (message)
+		xenbus_dev_error(dev, err, "%s", message);
+destroy_tpmring:
+	destroy_tpmring(tp);
+out:
+	return err;
+}
+
+/**
+ * Callback received when the backend's state changes.
+ */
+static void backend_changed(struct xenbus_device *dev,
+			    XenbusState backend_state)
+{
+	struct tpm_private *tp = dev->data;
+	DPRINTK("\n");
+
+	switch (backend_state) {
+	case XenbusStateInitialising:
+	case XenbusStateInitWait:
+	case XenbusStateInitialised:
+	case XenbusStateUnknown:
+		break;
+
+	case XenbusStateConnected:
+		tpmif_set_connected_state(tp, 1);
+		break;
+
+	case XenbusStateClosing:
+		tpmif_set_connected_state(tp, 0);
+		break;
+
+	case XenbusStateClosed:
+		if (tp->is_suspended == 0) {
+			device_unregister(&dev->dev);
+		}
+		xenbus_switch_state(dev, XenbusStateClosed);
+		break;
+	}
+}
+
+
+static int tpmfront_probe(struct xenbus_device *dev,
+                          const struct xenbus_device_id *id)
+{
+	int err;
+	int handle;
+	struct tpm_private *tp = tpm_private_get();
+
+	if (!tp)
+		return -ENOMEM;
+
+	err = xenbus_scanf(XBT_NULL, dev->nodename,
+	                   "handle", "%i", &handle);
+	if (XENBUS_EXIST_ERR(err))
+		return err;
+
+	if (err < 0) {
+		xenbus_dev_fatal(dev,err,"reading virtual-device");
+		return err;
+	}
+
+	tp->dev = dev;
+	dev->data = tp;
+
+	err = talk_to_backend(dev, tp);
+	if (err) {
+		tpm_private_put();
+		dev->data = NULL;
+		return err;
+	}
+	return 0;
+}
+
+
+static int tpmfront_remove(struct xenbus_device *dev)
+{
+	struct tpm_private *tp = (struct tpm_private *)dev->data;
+	destroy_tpmring(tp);
+	return 0;
+}
+
+static int tpmfront_suspend(struct xenbus_device *dev)
+{
+	struct tpm_private *tp = (struct tpm_private *)dev->data;
+	u32 ctr;
+
+	/* lock, so no app can send */
+	mutex_lock(&suspend_lock);
+	tp->is_suspended = 1;
+
+	for (ctr = 0; atomic_read(&tp->tx_busy) && ctr <= 25; ctr++) {
+		if ((ctr % 10) == 0)
+			printk("TPM-FE [INFO]: Waiting for outstanding request.\n");
+		/*
+		 * Wait for a request to be responded to.
+		 */
+		interruptible_sleep_on_timeout(&tp->wait_q, 100);
+	}
+	xenbus_switch_state(dev, XenbusStateClosed);
+
+	if (atomic_read(&tp->tx_busy)) {
+		/*
+		 * A temporary work-around.
+		 */
+		printk("TPM-FE [WARNING]: Resetting busy flag.");
+		atomic_set(&tp->tx_busy, 0);
+	}
+
+	return 0;
+}
+
+static int tpmfront_resume(struct xenbus_device *dev)
+{
+	struct tpm_private *tp = (struct tpm_private *)dev->data;
+	destroy_tpmring(tp);
+	return talk_to_backend(dev, tp);
+}
+
+static int tpmif_connect(struct xenbus_device *dev,
+                         struct tpm_private *tp,
+                         domid_t domid)
+{
+	int err;
+
+	tp->backend_id = domid;
+
+	err = xenbus_alloc_evtchn(dev, &tp->evtchn);
+	if (err)
+		return err;
+
+	err = bind_evtchn_to_irqhandler(tp->evtchn,
+					tpmif_int, SA_SAMPLE_RANDOM, "tpmif",
+					tp);
+	if (err <= 0) {
+		WPRINTK("bind_evtchn_to_irqhandler failed (err=%d)\n", err);
+		return err;
+	}
+
+	tp->irq = err;
+	return 0;
+}
+
+static struct xenbus_device_id tpmfront_ids[] = {
+	{ "vtpm" },
+	{ "" }
+};
+
+static struct xenbus_driver tpmfront = {
+	.name = "vtpm",
+	.owner = THIS_MODULE,
+	.ids = tpmfront_ids,
+	.probe = tpmfront_probe,
+	.remove =  tpmfront_remove,
+	.resume = tpmfront_resume,
+	.otherend_changed = backend_changed,
+	.suspend = tpmfront_suspend,
+};
+
+static void __init init_tpm_xenbus(void)
+{
+	xenbus_register_frontend(&tpmfront);
+}
+
+static void __exit exit_tpm_xenbus(void)
+{
+	xenbus_unregister_driver(&tpmfront);
+}
+
+static int tpmif_allocate_tx_buffers(struct tpm_private *tp)
+{
+	unsigned int i;
+
+	for (i = 0; i < TPMIF_TX_RING_SIZE; i++) {
+		tp->tx_buffers[i] = tx_buffer_alloc();
+		if (!tp->tx_buffers[i]) {
+			tpmif_free_tx_buffers(tp);
+			return -ENOMEM;
+		}
+	}
+	return 0;
+}
+
+static void tpmif_free_tx_buffers(struct tpm_private *tp)
+{
+	unsigned int i;
+
+	for (i = 0; i < TPMIF_TX_RING_SIZE; i++) {
+		tx_buffer_free(tp->tx_buffers[i]);
+	}
+}
+
+static void tpmif_rx_action(unsigned long priv)
+{
+	struct tpm_private *tp = (struct tpm_private *)priv;
+
+	int i = 0;
+	unsigned int received;
+	unsigned int offset = 0;
+	u8 *buffer;
+	tpmif_tx_request_t *tx;
+	tx = &tp->tx->ring[i].req;
+
+	atomic_set(&tp->tx_busy, 0);
+	wake_up_interruptible(&tp->wait_q);
+
+	received = tx->size;
+
+	buffer = kmalloc(received, GFP_ATOMIC);
+	if (NULL == buffer) {
+		goto exit;
+	}
+
+	for (i = 0; i < TPMIF_TX_RING_SIZE && offset < received; i++) {
+		struct tx_buffer *txb = tp->tx_buffers[i];
+		tpmif_tx_request_t *tx;
+		unsigned int tocopy;
+
+		tx = &tp->tx->ring[i].req;
+		tocopy = tx->size;
+		if (tocopy > PAGE_SIZE) {
+			tocopy = PAGE_SIZE;
+		}
+
+		memcpy(&buffer[offset], txb->data, tocopy);
+
+		gnttab_release_grant_reference(&gref_head, tx->ref);
+
+		offset += tocopy;
+	}
+
+	vtpm_vd_recv(buffer, received, tp->tx_remember);
+	kfree(buffer);
 
 exit:
-	spin_unlock_irqrestore(&dataex.req_list_lock, flags);
-	return rc;
+
+	return;
 }
 
-static void tpm_xen_cancel(struct tpm_chip *chip)
+
+static irqreturn_t tpmif_int(int irq, void *tpm_priv, struct pt_regs *ptregs)
 {
+	struct tpm_private *tp = tpm_priv;
 	unsigned long flags;
-	spin_lock_irqsave(&dataex.resp_list_lock,flags);
 
-	dataex.req_cancelled = dataex.current_request;
+	spin_lock_irqsave(&tp->tx_lock, flags);
+	tpmif_rx_tasklet.data = (unsigned long)tp;
+	tasklet_schedule(&tpmif_rx_tasklet);
+	spin_unlock_irqrestore(&tp->tx_lock, flags);
 
-	spin_unlock_irqrestore(&dataex.resp_list_lock,flags);
+	return IRQ_HANDLED;
 }
 
-static u8 tpm_xen_status(struct tpm_chip *chip)
+
+static int tpm_xmit(struct tpm_private *tp,
+                    const u8 * buf, size_t count, int isuserbuffer,
+                    void *remember)
 {
-	unsigned long flags;
-	u8 rc = 0;
-	spin_lock_irqsave(&dataex.resp_list_lock, flags);
-	/*
-	 * Data are available if:
-	 *  - there's a current response
-	 *  - the last packet was queued only (this is fake, but necessary to
-	 *      get the generic TPM layer to call the receive function.)
-	 */
-	if (NULL != dataex.current_response ||
-	    0 != (dataex.flags & DATAEX_FLAG_QUEUED_ONLY)) {
-		rc = STATUS_DATA_AVAIL;
+	tpmif_tx_request_t *tx;
+	TPMIF_RING_IDX i;
+	unsigned int offset = 0;
+
+	spin_lock_irq(&tp->tx_lock);
+
+	if (unlikely(atomic_read(&tp->tx_busy))) {
+		printk("tpm_xmit: There's an outstanding request/response "
+		       "on the way!\n");
+		spin_unlock_irq(&tp->tx_lock);
+		return -EBUSY;
 	}
-	spin_unlock_irqrestore(&dataex.resp_list_lock, flags);
-	return rc;
+
+	if (tp->is_connected != 1) {
+		spin_unlock_irq(&tp->tx_lock);
+		return -EIO;
+	}
+
+	for (i = 0; count > 0 && i < TPMIF_TX_RING_SIZE; i++) {
+		struct tx_buffer *txb = tp->tx_buffers[i];
+		int copied;
+
+		if (NULL == txb) {
+			DPRINTK("txb (i=%d) is NULL. buffers initilized?\n"
+				"Not transmitting anything!\n", i);
+			spin_unlock_irq(&tp->tx_lock);
+			return -EFAULT;
+		}
+		copied = tx_buffer_copy(txb, &buf[offset], count,
+		                        isuserbuffer);
+		if (copied < 0) {
+			/* An error occurred */
+			spin_unlock_irq(&tp->tx_lock);
+			return copied;
+		}
+		count -= copied;
+		offset += copied;
+
+		tx = &tp->tx->ring[i].req;
+
+		tx->addr = virt_to_machine(txb->data);
+		tx->size = txb->len;
+
+		DPRINTK("First 4 characters sent by TPM-FE are 0x%02x 0x%02x 0x%02x 0x%02x\n",
+		        txb->data[0],txb->data[1],txb->data[2],txb->data[3]);
+
+		/* get the granttable reference for this page */
+		tx->ref = gnttab_claim_grant_reference(&gref_head);
+
+		if (-ENOSPC == tx->ref) {
+			spin_unlock_irq(&tp->tx_lock);
+			DPRINTK(" Grant table claim reference failed in func:%s line:%d file:%s\n", __FUNCTION__, __LINE__, __FILE__);
+			return -ENOSPC;
+		}
+		gnttab_grant_foreign_access_ref( tx->ref,
+		                                 tp->backend_id,
+		                                 (tx->addr >> PAGE_SHIFT),
+		                                 0 /*RW*/);
+		wmb();
+	}
+
+	atomic_set(&tp->tx_busy, 1);
+	tp->tx_remember = remember;
+	mb();
+
+	DPRINTK("Notifying backend via event channel %d\n",
+	        tp->evtchn);
+
+	notify_remote_via_irq(tp->irq);
+
+	spin_unlock_irq(&tp->tx_lock);
+	return offset;
 }
 
-static struct file_operations tpm_xen_ops = {
-	.owner = THIS_MODULE,
-	.llseek = no_llseek,
-	.open = tpm_open,
-	.read = tpm_read,
-	.write = tpm_write,
-	.release = tpm_release,
+
+static void tpmif_notify_upperlayer(struct tpm_private *tp)
+{
+	/*
+	 * Notify upper layer about the state of the connection
+	 * to the BE.
+	 */
+	if (tp->is_connected) {
+		vtpm_vd_status(TPM_VD_STATUS_CONNECTED);
+	} else {
+		vtpm_vd_status(TPM_VD_STATUS_DISCONNECTED);
+	}
+}
+
+
+static void tpmif_set_connected_state(struct tpm_private *tp, u8 is_connected)
+{
+	/*
+	 * Don't notify upper layer if we are in suspend mode and
+	 * should disconnect - assumption is that we will resume
+	 * The mutex keeps apps from sending.
+	 */
+	if (is_connected == 0 && tp->is_suspended == 1) {
+		return;
+	}
+
+	/*
+	 * Unlock the mutex if we are connected again
+	 * after being suspended - now resuming.
+	 * This also removes the suspend state.
+	 */
+	if (is_connected == 1 && tp->is_suspended == 1) {
+		tp->is_suspended = 0;
+		/* unlock, so apps can resume sending */
+		mutex_unlock(&suspend_lock);
+	}
+
+	if (is_connected != tp->is_connected) {
+		tp->is_connected = is_connected;
+		tpmif_notify_upperlayer(tp);
+	}
+}
+
+
+
+/* =================================================================
+ * Initialization function.
+ * =================================================================
+ */
+
+struct tpm_virtual_device tvd = {
+	.max_tx_size = PAGE_SIZE * TPMIF_TX_RING_SIZE,
 };
 
-static DEVICE_ATTR(pubek, S_IRUGO, tpm_show_pubek, NULL);
-static DEVICE_ATTR(pcrs, S_IRUGO, tpm_show_pcrs, NULL);
-static DEVICE_ATTR(caps, S_IRUGO, tpm_show_caps, NULL);
-static DEVICE_ATTR(cancel, S_IWUSR |S_IWGRP, NULL, tpm_store_cancel);
-
-static struct attribute* xen_attrs[] = {
-	&dev_attr_pubek.attr,
-	&dev_attr_pcrs.attr,
-	&dev_attr_caps.attr,
-	&dev_attr_cancel.attr,
-	NULL,
-};
-
-static struct attribute_group xen_attr_grp = { .attrs = xen_attrs };
-
-static struct tpm_vendor_specific tpm_xen = {
-	.recv = tpm_xen_recv,
-	.send = tpm_xen_send,
-	.cancel = tpm_xen_cancel,
-	.status = tpm_xen_status,
-	.req_complete_mask = STATUS_BUSY | STATUS_DATA_AVAIL,
-	.req_complete_val  = STATUS_DATA_AVAIL,
-	.req_canceled = STATUS_READY,
-	.base = 0,
-	.attr_group = &xen_attr_grp,
-	.miscdev.fops = &tpm_xen_ops,
-	.buffersize = 64 * 1024,
-};
-
-static struct platform_device *pdev;
-
-static struct tpmfe_device tpmfe = {
-	.receive = tpm_recv,
-	.status  = tpm_fe_status,
-};
-
-
-static int __init init_xen(void)
+static int __init tpmif_init(void)
 {
 	int rc;
+	struct tpm_private *tp;
 
 	if ((xen_start_info->flags & SIF_INITDOMAIN)) {
 		return -EPERM;
 	}
-	/*
-	 * Register device with the low lever front-end
-	 * driver
-	 */
-	if ((rc = tpm_fe_register_receiver(&tpmfe)) < 0) {
-		goto err_exit;
+
+	tp = tpm_private_get();
+	if (!tp) {
+		rc = -ENOMEM;
+		goto failexit;
 	}
 
-	/*
-	 * Register our device with the system.
-	 */
-	pdev = platform_device_register_simple("tpm_vtpm", -1, NULL, 0);
-	if (IS_ERR(pdev)) {
-		rc = PTR_ERR(pdev);
-		goto err_unreg_fe;
+	tvd.tpm_private = tp;
+	rc = init_vtpm(&tvd);
+	if (rc)
+		goto init_vtpm_failed;
+
+	IPRINTK("Initialising the vTPM driver.\n");
+	if ( gnttab_alloc_grant_references ( TPMIF_TX_RING_SIZE,
+	                                     &gref_head ) < 0) {
+		rc = -EFAULT;
+		goto gnttab_alloc_failed;
 	}
 
-	tpm_xen.buffersize = tpmfe.max_tx_size;
-
-	if ((rc = tpm_register_hardware(&pdev->dev, &tpm_xen)) < 0) {
-		goto err_unreg_pdev;
-	}
-
-	dataex.current_request = NULL;
-	spin_lock_init(&dataex.req_list_lock);
-	init_waitqueue_head(&dataex.req_wait_queue);
-	INIT_LIST_HEAD(&dataex.queued_requests);
-
-	dataex.current_response = NULL;
-	spin_lock_init(&dataex.resp_list_lock);
-	init_waitqueue_head(&dataex.resp_wait_queue);
-
-	disconnect_time = jiffies;
-
+	init_tpm_xenbus();
 	return 0;
 
+gnttab_alloc_failed:
+	cleanup_vtpm();
+init_vtpm_failed:
+	tpm_private_put();
+failexit:
 
-err_unreg_pdev:
-	platform_device_unregister(pdev);
-err_unreg_fe:
-	tpm_fe_unregister_receiver();
-
-err_exit:
 	return rc;
 }
 
-static void __exit cleanup_xen(void)
+
+static void __exit tpmif_exit(void)
 {
-	struct tpm_chip *chip = dev_get_drvdata(&pdev->dev);
-	if (chip) {
-		tpm_remove_hardware(chip->dev);
-		platform_device_unregister(pdev);
-		tpm_fe_unregister_receiver();
-	}
+	cleanup_vtpm();
+	tpm_private_put();
+	exit_tpm_xenbus();
+	gnttab_free_grant_references(gref_head);
 }
 
-module_init(init_xen);
-module_exit(cleanup_xen);
+module_init(tpmif_init);
+module_exit(tpmif_exit);
 
-MODULE_AUTHOR("Stefan Berger (stefanb@us.ibm.com)");
-MODULE_DESCRIPTION("TPM Driver for XEN (shared memory)");
-MODULE_VERSION("1.0");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("Dual BSD/GPL");
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

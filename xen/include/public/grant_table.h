@@ -167,7 +167,7 @@ typedef struct gnttab_map_grant_ref {
     grant_handle_t handle;
     uint64_t dev_bus_addr;
 } gnttab_map_grant_ref_t;
-DEFINE_GUEST_HANDLE(gnttab_map_grant_ref_t);
+DEFINE_XEN_GUEST_HANDLE(gnttab_map_grant_ref_t);
 
 /*
  * GNTTABOP_unmap_grant_ref: Destroy one or more grant-reference mappings
@@ -189,7 +189,7 @@ typedef struct gnttab_unmap_grant_ref {
     /* OUT parameters. */
     int16_t  status;              /* GNTST_* */
 } gnttab_unmap_grant_ref_t;
-DEFINE_GUEST_HANDLE(gnttab_unmap_grant_ref_t);
+DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_grant_ref_t);
 
 /*
  * GNTTABOP_setup_table: Set up a grant table for <dom> comprising at least
@@ -207,9 +207,9 @@ typedef struct gnttab_setup_table {
     uint32_t nr_frames;
     /* OUT parameters. */
     int16_t  status;              /* GNTST_* */
-    GUEST_HANDLE(ulong) frame_list;
+    XEN_GUEST_HANDLE(ulong) frame_list;
 } gnttab_setup_table_t;
-DEFINE_GUEST_HANDLE(gnttab_setup_table_t);
+DEFINE_XEN_GUEST_HANDLE(gnttab_setup_table_t);
 
 /*
  * GNTTABOP_dump_table: Dump the contents of the grant table to the
@@ -222,7 +222,7 @@ typedef struct gnttab_dump_table {
     /* OUT parameters. */
     int16_t status;               /* GNTST_* */
 } gnttab_dump_table_t;
-DEFINE_GUEST_HANDLE(gnttab_dump_table_t);
+DEFINE_XEN_GUEST_HANDLE(gnttab_dump_table_t);
 
 /*
  * GNTTABOP_transfer_grant_ref: Transfer <frame> to a foreign domain. The
@@ -241,7 +241,7 @@ typedef struct gnttab_transfer {
     /* OUT parameters. */
     int16_t       status;
 } gnttab_transfer_t;
-DEFINE_GUEST_HANDLE(gnttab_transfer_t);
+DEFINE_XEN_GUEST_HANDLE(gnttab_transfer_t);
 
 /*
  * Bitfield values for update_pin_status.flags.

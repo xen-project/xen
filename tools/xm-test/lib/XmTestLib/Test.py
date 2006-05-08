@@ -173,8 +173,7 @@ def isConsoleDead():
     domain = XmTestDomain()
 
     try:
-        domain.start()
-        console = XmConsole(domain.getName())
+        console = domain.start()
         console.runCmd("ls")
     except DomainError, e:
         return True

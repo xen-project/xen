@@ -583,11 +583,11 @@ int xc_linux_restore(int xc_handle, int io_fd,
         if (count > 0) {
 
             struct xen_memory_reservation reservation = {
-                .extent_start = pfntab,
                 .nr_extents   = count,
                 .extent_order = 0,
                 .domid        = dom
             };
+            set_xen_guest_handle(reservation.extent_start, pfntab);
 
             if ((rc = xc_memory_op(xc_handle, XENMEM_decrease_reservation,
                                    &reservation)) != count) {
@@ -727,7 +727,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     op.cmd = DOM0_SETVCPUCONTEXT;
     op.u.setvcpucontext.domain = (domid_t)dom;
     op.u.setvcpucontext.vcpu   = 0;
-    op.u.setvcpucontext.ctxt   = &ctxt;
+    set_xen_guest_handle(op.u.setvcpucontext.ctxt, &ctxt);
     rc = xc_dom0_op(xc_handle, &op);
 
     if (rc != 0) {

@@ -674,6 +674,8 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
     unsigned long addr, fixup;
     int rc;
 
+    ASSERT(!in_irq());
+
     __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (addr) : );
 
     DEBUGGER_trap_entry(TRAP_page_fault, regs);
@@ -1535,7 +1537,7 @@ void __init trap_init(void)
 }
 
 
-long do_set_trap_table(GUEST_HANDLE(trap_info_t) traps)
+long do_set_trap_table(XEN_GUEST_HANDLE(trap_info_t) traps)
 {
     struct trap_info cur;
     struct trap_info *dst = current->arch.guest_context.trap_ctxt;

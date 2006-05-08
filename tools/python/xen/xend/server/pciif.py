@@ -94,7 +94,7 @@ class PciController(DevController):
 
         else:
             # Xen 2.0 configuration compatibility
-            domain = get_param(dev_config, 'domain', 0)
+            domain = get_param(config, 'domain', 0)
             bus  = get_param(config, 'bus')
             slot = get_param(config, 'dev')
             func = get_param(config, 'func')

@@ -51,7 +51,7 @@ config TCG_INFINEON
 
 config TCG_XEN
 	tristate "XEN TPM Interface"
-	depends on TCG_TPM && XEN && XEN_TPMDEV_FRONTEND
+	depends on TCG_TPM && XEN
 	---help---
 	  If you want to make TPM support available to a Xen
 	  user domain, say Yes and it will
@@ -60,4 +60,3 @@ config TCG_XEN
           tpm_xen.
 
 endmenu
-

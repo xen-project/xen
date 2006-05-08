@@ -97,7 +97,10 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     struct domain *d;
     int            port;
     domid_t        dom = alloc->dom;
-    long           rc = 0;
+    long           rc;
+
+    if ( (rc = acm_pre_eventchannel_unbound(dom, alloc->remote_dom)) != 0 )
+        return rc;
 
     if ( dom == DOMID_SELF )
         dom = current->domain->domain_id;
@@ -134,7 +137,10 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     struct domain *ld = current->domain, *rd;
     int            lport, rport = bind->remote_port;
     domid_t        rdom = bind->remote_dom;
-    long           rc = 0;
+    long           rc;
+
+    if ( (rc = acm_pre_eventchannel_interdomain(rdom)) != 0 )
+        return rc;
 
     if ( rdom == DOMID_SELF )
         rdom = current->domain->domain_id;
@@ -201,13 +207,14 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
     int            port, virq = bind->virq, vcpu = bind->vcpu;
     long           rc = 0;
 
-    if ( virq >= ARRAY_SIZE(v->virq_to_evtchn) )
+    if ( (virq < 0) || (virq >= ARRAY_SIZE(v->virq_to_evtchn)) )
         return -EINVAL;
 
     if ( virq_is_global(virq) && (vcpu != 0) )
         return -EINVAL;
 
-    if ( (vcpu >= ARRAY_SIZE(d->vcpu)) || ((v = d->vcpu[vcpu]) == NULL) )
+    if ( (vcpu < 0) || (vcpu >= ARRAY_SIZE(d->vcpu)) ||
+         ((v = d->vcpu[vcpu]) == NULL) )
         return -ENOENT;
 
     spin_lock(&d->evtchn_lock);
@@ -239,7 +246,8 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
     int            port, vcpu = bind->vcpu;
     long           rc = 0;
 
-    if ( (vcpu >= ARRAY_SIZE(d->vcpu)) || (d->vcpu[vcpu] == NULL) )
+    if ( (vcpu < 0) || (vcpu >= ARRAY_SIZE(d->vcpu)) ||
+         (d->vcpu[vcpu] == NULL) )
         return -ENOENT;
 
     spin_lock(&d->evtchn_lock);
@@ -267,7 +275,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     int            port, pirq = bind->pirq;
     long           rc;
 
-    if ( pirq >= ARRAY_SIZE(d->pirq_to_evtchn) )
+    if ( (pirq < 0) || (pirq >= ARRAY_SIZE(d->pirq_to_evtchn)) )
         return -EINVAL;
 
     if ( !irq_access_permitted(d, pirq) )
@@ -683,70 +691,103 @@ static long evtchn_unmask(evtchn_unmask_t *unmask)
 }
 
 
-long do_event_channel_op(GUEST_HANDLE(evtchn_op_t) uop)
+long do_event_channel_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     long rc;
-    struct evtchn_op op;
 
-    if ( copy_from_guest(&op, uop, 1) != 0 )
-        return -EFAULT;
-
-    if (acm_pre_event_channel(&op))
-        return -EACCES;
-
-    switch ( op.cmd )
+    switch ( cmd )
     {
-    case EVTCHNOP_alloc_unbound:
-        rc = evtchn_alloc_unbound(&op.u.alloc_unbound);
-        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
+    case EVTCHNOP_alloc_unbound: {
+        struct evtchn_alloc_unbound alloc_unbound;
+        if ( copy_from_guest(&alloc_unbound, arg, 1) != 0 )
+            return -EFAULT;
+        rc = evtchn_alloc_unbound(&alloc_unbound);
+        if ( (rc == 0) && (copy_to_guest(arg, &alloc_unbound, 1) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
+    }
 
-    case EVTCHNOP_bind_interdomain:
-        rc = evtchn_bind_interdomain(&op.u.bind_interdomain);
-        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
+    case EVTCHNOP_bind_interdomain: {
+        struct evtchn_bind_interdomain bind_interdomain;
+        if ( copy_from_guest(&bind_interdomain, arg, 1) != 0 )
+            return -EFAULT;
+        rc = evtchn_bind_interdomain(&bind_interdomain);
+        if ( (rc == 0) && (copy_to_guest(arg, &bind_interdomain, 1) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
+    }
 
-    case EVTCHNOP_bind_virq:
-        rc = evtchn_bind_virq(&op.u.bind_virq);
-        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
+    case EVTCHNOP_bind_virq: {
+        struct evtchn_bind_virq bind_virq;
+        if ( copy_from_guest(&bind_virq, arg, 1) != 0 )
+            return -EFAULT;
+        rc = evtchn_bind_virq(&bind_virq);
+        if ( (rc == 0) && (copy_to_guest(arg, &bind_virq, 1) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
+    }
 
-    case EVTCHNOP_bind_ipi:
-        rc = evtchn_bind_ipi(&op.u.bind_ipi);
-        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
+    case EVTCHNOP_bind_ipi: {
+        struct evtchn_bind_ipi bind_ipi;
+        if ( copy_from_guest(&bind_ipi, arg, 1) != 0 )
+            return -EFAULT;
+        rc = evtchn_bind_ipi(&bind_ipi);
+        if ( (rc == 0) && (copy_to_guest(arg, &bind_ipi, 1) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
+    }
 
-    case EVTCHNOP_bind_pirq:
-        rc = evtchn_bind_pirq(&op.u.bind_pirq);
-        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
+    case EVTCHNOP_bind_pirq: {
+        struct evtchn_bind_pirq bind_pirq;
+        if ( copy_from_guest(&bind_pirq, arg, 1) != 0 )
+            return -EFAULT;
+        rc = evtchn_bind_pirq(&bind_pirq);
+        if ( (rc == 0) && (copy_to_guest(arg, &bind_pirq, 1) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
+    }
 
-    case EVTCHNOP_close:
-        rc = evtchn_close(&op.u.close);
+    case EVTCHNOP_close: {
+        struct evtchn_close close;
+        if ( copy_from_guest(&close, arg, 1) != 0 )
+            return -EFAULT;
+        rc = evtchn_close(&close);
         break;
+    }
 
-    case EVTCHNOP_send:
-        rc = evtchn_send(op.u.send.port);
+    case EVTCHNOP_send: {
+        struct evtchn_send send;
+        if ( copy_from_guest(&send, arg, 1) != 0 )
+            return -EFAULT;
+        rc = evtchn_send(send.port);
         break;
+    }
 
-    case EVTCHNOP_status:
-        rc = evtchn_status(&op.u.status);
-        if ( (rc == 0) && (copy_to_guest(uop, &op, 1) != 0) )
+    case EVTCHNOP_status: {
+        struct evtchn_status status;
+        if ( copy_from_guest(&status, arg, 1) != 0 )
+            return -EFAULT;
+        rc = evtchn_status(&status);
+        if ( (rc == 0) && (copy_to_guest(arg, &status, 1) != 0) )
             rc = -EFAULT;
         break;
+    }
 
-    case EVTCHNOP_bind_vcpu:
-        rc = evtchn_bind_vcpu(op.u.bind_vcpu.port, op.u.bind_vcpu.vcpu);
+    case EVTCHNOP_bind_vcpu: {
+        struct evtchn_bind_vcpu bind_vcpu;
+        if ( copy_from_guest(&bind_vcpu, arg, 1) != 0 )
+            return -EFAULT;
+        rc = evtchn_bind_vcpu(bind_vcpu.port, bind_vcpu.vcpu);
         break;
+    }
 
-    case EVTCHNOP_unmask:
-        rc = evtchn_unmask(&op.u.unmask);
+    case EVTCHNOP_unmask: {
+        struct evtchn_unmask unmask;
+        if ( copy_from_guest(&unmask, arg, 1) != 0 )
+            return -EFAULT;
+        rc = evtchn_unmask(&unmask);
         break;
+    }
 
     default:
         rc = -ENOSYS;

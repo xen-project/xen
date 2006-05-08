@@ -1,6 +1,5 @@
 LINUX_SERIES = 2.6
-LINUX_VER    = 2.6.16
-LINUX_SRCS = linux-2.6.16.tar.bz2
+LINUX_VER    = 2.6.16.13
 
 EXTRAVERSION ?= xen
 

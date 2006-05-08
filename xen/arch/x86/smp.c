@@ -169,6 +169,7 @@ fastcall void smp_invalidate_interrupt(void)
 {
     ack_APIC_irq();
     perfc_incrc(ipis);
+    irq_enter();
     if ( !__sync_lazy_execstate() )
     {
         if ( flush_va == FLUSHVA_ALL )
@@ -177,6 +178,7 @@ fastcall void smp_invalidate_interrupt(void)
             local_flush_tlb_one(flush_va);
     }
     cpu_clear(smp_processor_id(), flush_cpumask);
+    irq_exit();
 }
 
 void __flush_tlb_mask(cpumask_t mask, unsigned long va)
@@ -335,6 +337,8 @@ fastcall void smp_call_function_interrupt(struct cpu_user_regs *regs)
     if ( !cpu_isset(smp_processor_id(), call_data->selected) )
         return;
 
+    irq_enter();
+
     if ( call_data->wait )
     {
         (*func)(info);
@@ -347,4 +351,6 @@ fastcall void smp_call_function_interrupt(struct cpu_user_regs *regs)
         atomic_inc(&call_data->started);
         (*func)(info);
     }
+
+    irq_exit();
 }

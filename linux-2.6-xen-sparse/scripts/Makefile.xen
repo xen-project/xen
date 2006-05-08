@@ -2,9 +2,9 @@
 # cherrypickxen($1 = allobj)
 cherrypickxen = $(foreach var, $(1), \
 		$(shell o=$(var); \
-			c=$${o/%.o/-xen.c}; \
-			s=$${o/%.o/-xen.S}; \
-			oxen=$${o/%.o/-xen.o}; \
+			c=$${o%.o}-xen.c; \
+			s=$${o%.o}-xen.S; \
+			oxen=$${o%.o}-xen.o; \
 			[ -f $(srctree)/$(src)/$${c} ] || \
 			   [ -f $(srctree)/$(src)/$${s} ] \
 				&& echo $$oxen \

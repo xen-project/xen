@@ -28,7 +28,7 @@ domain_mem64=XmTestDomain(extraConfig=config)
 
 #start it
 try:
-    domain_mem64.start()
+    domain_mem64.start(noConsole=True)
 except DomainError, e:
     if verbose:
         print "Failed to create test domain_mem64 because:"

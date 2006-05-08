@@ -166,20 +166,26 @@ asmlinkage void vmx_intr_assist(void)
     }
 
     has_ext_irq = cpu_has_pending_irq(v);
+
+    if (unlikely(v->arch.hvm_vmx.vector_injected)) {
+        v->arch.hvm_vmx.vector_injected=0;
+        if (unlikely(has_ext_irq)) enable_irq_window(v);
+        return;
+    }
+
     __vmread(IDT_VECTORING_INFO_FIELD, &idtv_info_field);
-    if (idtv_info_field & INTR_INFO_VALID_MASK) {
+    if (unlikely(idtv_info_field & INTR_INFO_VALID_MASK)) {
         __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
 
         __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
-        if (inst_len >= 1 && inst_len <= 15)
-            __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
+        __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
 
-        if (idtv_info_field & 0x800) { /* valid error code */
+        if (unlikely(idtv_info_field & 0x800)) { /* valid error code */
             unsigned long error_code;
             __vmread(IDT_VECTORING_ERROR_CODE, &error_code);
             __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
         }
-        if ( has_ext_irq )
+        if (unlikely(has_ext_irq))
             enable_irq_window(v);
 
         HVM_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x", idtv_info_field);
@@ -187,8 +193,9 @@ asmlinkage void vmx_intr_assist(void)
         return;
     }
 
-    if ( !has_ext_irq ) return;
-    if ( is_interruptibility_state() ) {    /* pre-cleared for emulated instruction */
+    if (likely(!has_ext_irq)) return;
+
+    if (unlikely(is_interruptibility_state())) {    /* pre-cleared for emulated instruction */
         enable_irq_window(v);
         HVM_DBG_LOG(DBG_LEVEL_1, "interruptibility");
         return;

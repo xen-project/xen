@@ -6,19 +6,6 @@
 
 #include "xc_private.h"
 
-int xc_interface_open(void)
-{
-    int fd = open("/proc/xen/privcmd", O_RDWR);
-    if ( fd == -1 )
-        PERROR("Could not obtain handle on privileged command interface");
-    return fd;
-}
-
-int xc_interface_close(int xc_handle)
-{
-    return close(xc_handle);
-}
-
 int xc_readconsolering(int xc_handle,
                        char **pbuffer,
                        unsigned int *pnr_chars,
@@ -30,7 +17,7 @@ int xc_readconsolering(int xc_handle,
     unsigned int nr_chars = *pnr_chars;
 
     op.cmd = DOM0_READCONSOLE;
-    op.u.readconsole.buffer = buffer;
+    set_xen_guest_handle(op.u.readconsole.buffer, buffer);
     op.u.readconsole.count  = nr_chars;
     op.u.readconsole.clear  = clear;
 
@@ -38,10 +25,7 @@ int xc_readconsolering(int xc_handle,
         return ret;
 
     if ( (ret = do_dom0_op(xc_handle, &op)) == 0 )
-    {
-        *pbuffer   = op.u.readconsole.buffer;
         *pnr_chars = op.u.readconsole.count;
-    }
 
     safe_munlock(buffer, nr_chars);
 
@@ -91,7 +75,7 @@ int xc_perfc_control(int xc_handle,
 
     op.cmd = DOM0_PERFCCONTROL;
     op.u.perfccontrol.op   = opcode;
-    op.u.perfccontrol.desc = desc;
+    set_xen_guest_handle(op.u.perfccontrol.desc, desc);
 
     rc = do_dom0_op(xc_handle, &op);
 

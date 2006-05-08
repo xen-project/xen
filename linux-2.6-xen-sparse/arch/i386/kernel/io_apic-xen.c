@@ -57,27 +57,25 @@ unsigned long io_apic_irqs;
 
 static inline unsigned int xen_io_apic_read(unsigned int apic, unsigned int reg)
 {
-	physdev_op_t op;
+	struct physdev_apic apic_op;
 	int ret;
 
-	op.cmd = PHYSDEVOP_APIC_READ;
-	op.u.apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
-	op.u.apic_op.reg = reg;
-	ret = HYPERVISOR_physdev_op(&op);
+	apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
+	apic_op.reg = reg;
+	ret = HYPERVISOR_physdev_op(PHYSDEVOP_apic_read, &apic_op);
 	if (ret)
 		return ret;
-	return op.u.apic_op.value;
+	return apic_op.value;
 }
 
 static inline void xen_io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
 {
-	physdev_op_t op;
+	struct physdev_apic apic_op;
 
-	op.cmd = PHYSDEVOP_APIC_WRITE;
-	op.u.apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
-	op.u.apic_op.reg = reg;
-	op.u.apic_op.value = value;
-	HYPERVISOR_physdev_op(&op);
+	apic_op.apic_physbase = mp_ioapics[apic].mpc_apicaddr;
+	apic_op.reg = reg;
+	apic_op.value = value;
+	HYPERVISOR_physdev_op(PHYSDEVOP_apic_write, &apic_op);
 }
 
 #define io_apic_read(a,r)    xen_io_apic_read(a,r)
@@ -1205,22 +1203,21 @@ u8 irq_vector[NR_IRQ_VECTORS] __read_mostly; /* = { FIRST_DEVICE_VECTOR , 0 }; *
 
 int assign_irq_vector(int irq)
 {
-	physdev_op_t op;
+	struct physdev_irq irq_op;
 
 	BUG_ON(irq >= NR_IRQ_VECTORS);
 	if (irq != AUTO_ASSIGN && IO_APIC_VECTOR(irq) > 0)
 		return IO_APIC_VECTOR(irq);
 
-	op.cmd = PHYSDEVOP_ASSIGN_VECTOR;
-	op.u.irq_op.irq = irq;
-	if (HYPERVISOR_physdev_op(&op))
+	irq_op.irq = irq;
+	if (HYPERVISOR_physdev_op(PHYSDEVOP_alloc_irq_vector, &irq_op))
 		return -ENOSPC;
 
-	vector_irq[op.u.irq_op.vector] = irq;
+	vector_irq[irq_op.vector] = irq;
 	if (irq != AUTO_ASSIGN)
-		IO_APIC_VECTOR(irq) = op.u.irq_op.vector;
+		IO_APIC_VECTOR(irq) = irq_op.vector;
 
-	return op.u.irq_op.vector;
+	return irq_op.vector;
 }
 
 #ifndef CONFIG_XEN

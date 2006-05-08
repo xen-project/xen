@@ -607,7 +607,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	/* Tell the ballon driver what is going on. */
 	balloon_update_driver_allowance(i);
 
-	reservation.extent_start = np->rx_pfn_array;
+	set_xen_guest_handle(reservation.extent_start, np->rx_pfn_array);
 	reservation.nr_extents   = i;
 	reservation.extent_order = 0;
 	reservation.address_bits = 0;
@@ -1094,6 +1094,14 @@ static struct ethtool_ops network_ethtool_ops =
 	.set_tx_csum = ethtool_op_set_tx_csum,
 };
 
+/*
+ * Nothing to do here. Virtual interface is point-to-point and the
+ * physical interface is probably promiscuous anyway.
+ */
+static void network_set_multicast_list(struct net_device *dev)
+{
+}
+
 /** Create a network device.
  * @param handle device handle
  * @param val return parameter for created device
@@ -1163,6 +1171,7 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 	netdev->stop            = network_close;
 	netdev->get_stats       = network_get_stats;
 	netdev->poll            = netif_poll;
+	netdev->set_multicast_list = network_set_multicast_list;
 	netdev->uninit          = netif_uninit;
 	netdev->weight          = 64;
 	netdev->features        = NETIF_F_IP_CSUM;

@@ -14,7 +14,7 @@ if ENABLE_HVM_SUPPORT:
 domain = XmTestDomain()
 
 try:
-    domain.start()
+    console = domain.start()
 except DomainError, e:
     if verbose:
         print "Failed to start domain:"
@@ -22,14 +22,24 @@ except DomainError, e:
     FAIL(str(e))
 
 times = random.randint(10,50)
-origmem = domain.config.getOpt("memory")
-currmem = domain.config.getOpt("memory")
 
 try:
     console = XmConsole(domain.getName())
     console.sendInput("input")
 except ConsoleError, e:
     FAIL(str(e))
+
+try:
+    run = console.runCmd("cat /proc/xen/balloon | grep Current");
+except ConsoleError, e:
+    FAIL(str(e))
+
+match = re.match("[^0-9]+([0-9]+)", run["output"])
+if not match:
+    FAIL("Invalid domU meminfo line")
+        
+origmem = int(match.group(1)) / 1024
+currmem = origmem
 
 for i in range(0,times):
     amt = random.randint(-10,10)

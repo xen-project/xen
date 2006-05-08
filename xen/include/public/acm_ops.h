@@ -83,7 +83,7 @@ typedef struct acm_op {
         struct acm_getdecision getdecision;
     } u;
 } acm_op_t;
-DEFINE_GUEST_HANDLE(acm_op_t);
+DEFINE_XEN_GUEST_HANDLE(acm_op_t);
 
 #endif                          /* __XEN_PUBLIC_ACM_OPS_H__ */
 

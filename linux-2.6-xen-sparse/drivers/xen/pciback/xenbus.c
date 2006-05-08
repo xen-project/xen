@@ -6,6 +6,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/list.h>
+#include <linux/vmalloc.h>
 #include <xen/xenbus.h>
 #include <xen/evtchn.h>
 #include "pciback.h"

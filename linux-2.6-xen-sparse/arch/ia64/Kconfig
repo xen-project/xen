@@ -90,11 +90,18 @@ config XEN_BLKDEV_BACKEND
 	default y
 
 config XEN_IA64_DOM0_VP
+	bool "dom0 vp model"
 	depends on XEN
-	bool
 	default n
 	help
 	  dom0 vp model
+
+config XEN_IA64_DOM0_NON_VP
+	bool
+	depends on !(XEN && XEN_IA64_DOM0_VP)
+	default y
+	help
+	  dom0 P=M model
 
 config XEN_SYSFS
 	bool "Export Xen attributes in sysfs"
@@ -106,7 +113,7 @@ config XEN_SYSFS
 config XEN_INTERFACE_VERSION
 	hex
 	depends on XEN
-	default 0x00030101
+	default 0x00030202
 
 config SCHED_NO_NO_OMIT_FRAME_POINTER
 	bool

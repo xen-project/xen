@@ -35,6 +35,8 @@
 #include <lib.h>
 #include <sched.h>
 #include <xenbus.h>
+#include <xen/features.h>
+#include <xen/version.h>
 
 /*
  * Shared page for communicating with the hypervisor.
@@ -85,6 +87,26 @@ static void init_xs(void *ign)
     test_xenbus();
 }
 
+
+u8 xen_features[XENFEAT_NR_SUBMAPS * 32];
+
+void setup_xen_features(void)
+{
+    xen_feature_info_t fi;
+    int i, j;
+
+    for (i = 0; i < XENFEAT_NR_SUBMAPS; i++) 
+    {
+        fi.submap_idx = i;
+        if (HYPERVISOR_xen_version(XENVER_get_features, &fi) < 0)
+            break;
+        
+        for (j=0; j<32; j++)
+            xen_features[i*32+j] = !!(fi.submap & 1<<j);
+    }
+}
+
+
 /*
  * INITIAL C ENTRY POINT.
  */
@@ -127,7 +149,9 @@ void start_kernel(start_info_t *si)
     printk("  flags:      0x%x\n",  (unsigned int)si->flags);
     printk("  cmd_line:   %s\n",  
            si->cmd_line ? (const char *)si->cmd_line : "NULL");
+    printk("  stack:      %p-%p\n", stack, stack + 8192);
 
+    setup_xen_features();
 
     /* Init memory management. */
     init_mm();
@@ -146,7 +170,7 @@ void start_kernel(start_info_t *si)
  
     /* Init XenBus from a separate thread */
     create_thread("init_xs", init_xs, NULL);
-    
+
     /* Everything initialised, start idle thread */
     run_idle_thread();
 }
