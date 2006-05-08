@@ -91,8 +91,12 @@ inject_guest_interruption(VCPU *vcpu, u64 vec)
 {
     u64 viva;
     REGS *regs;
+    ISR pt_isr;
     regs=vcpu_regs(vcpu);
-
+    // clear cr.isr.ri 
+    pt_isr.val = VMX(vcpu,cr_isr);
+    pt_isr.ir = 0;
+    VMX(vcpu,cr_isr) = pt_isr.val;
     collect_interruption(vcpu);
 
     vmx_vcpu_get_iva(vcpu,&viva);

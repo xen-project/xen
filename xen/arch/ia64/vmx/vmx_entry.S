@@ -315,7 +315,9 @@ vmx_dorfirfi_back:
     adds r18=IA64_VPD_BASE_OFFSET,r21
     ;;
     ld8 r18=[r18]   //vpd
+    adds r17=IA64_VCPU_ISR_OFFSET,r21
     ;;
+    ld8 r17=[r17]
     adds r19=VPD(VPSR),r18
     ;;
     ld8 r19=[r19]        //vpsr
@@ -337,6 +339,7 @@ GLOBAL_ENTRY(ia64_vmm_entry)
 /*
  *  must be at bank 0
  *  parameter:
+ *  r17:cr.isr
  *  r18:vpd
  *  r19:vpsr
  *  r20:__vsa_base
@@ -348,8 +351,14 @@ GLOBAL_ENTRY(ia64_vmm_entry)
     tbit.nz p1,p2 = r19,IA64_PSR_IC_BIT        // p1=vpsr.ic
     ;;
     (p1) add r29=PAL_VPS_RESUME_NORMAL,r20
+    (p1) br.sptk.many ia64_vmm_entry_out
+    ;;
+    tbit.nz p1,p2 = r17,IA64_ISR_IR_BIT		//p1=cr.isr.ir
+    ;;
+    (p1) add r29=PAL_VPS_RESUME_NORMAL,r20
     (p2) add r29=PAL_VPS_RESUME_HANDLER,r20
     ;;
+ia64_vmm_entry_out:    
     mov pr=r23,-2
     mov b0=r29
     ;;

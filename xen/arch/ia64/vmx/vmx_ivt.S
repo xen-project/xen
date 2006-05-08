@@ -172,6 +172,7 @@ vmx_itlb_loop:
     ;;
     srlz.i
     ;;
+    mov r17=cr.isr
     mov r23=r31
     mov r22=b0
     adds r16=IA64_VPD_BASE_OFFSET,r21
@@ -237,6 +238,7 @@ vmx_dtlb_loop:
     ;;
     srlz.d;
     ;;
+    mov r17=cr.isr
     mov r23=r31
     mov r22=b0
     adds r16=IA64_VPD_BASE_OFFSET,r21
