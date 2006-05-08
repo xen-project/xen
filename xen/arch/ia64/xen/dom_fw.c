@@ -462,7 +462,7 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 static void print_md(efi_memory_desc_t *md)
 {
 #if 1
-	printk("domain mem: type=%u, attr=0x%lx, range=[0x%016lx-0x%016lx) (%luMB)\n",
+	printk("domain mem: type=%2u, attr=0x%016lx, range=[0x%016lx-0x%016lx) (%luMB)\n",
 		md->type, md->attribute, md->phys_addr,
 		md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT),
 		md->num_pages >> (20 - EFI_PAGE_SHIFT));
