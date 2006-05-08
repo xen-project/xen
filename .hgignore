@@ -14,7 +14,7 @@
 .*\.orig$
 .*\.rej$
 .*/a\.out$
-.*cscope\.*$
+.*/cscope\.*$
 ^[^/]*\.bz2$
 ^TAGS$
 ^dist/.*$
