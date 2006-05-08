@@ -132,6 +132,7 @@ int xenbus_unmap_ring(struct xenbus_device *dev,
 }
 EXPORT_SYMBOL_GPL(xenbus_unmap_ring);
 
+MODULE_LICENSE("Dual BSD/GPL");
 
 /*
  * Local variables:
