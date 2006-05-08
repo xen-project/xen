@@ -415,8 +415,7 @@ printk("About to call domain_create()\n");
     printk("About to call construct_dom0()\n");
     dom0_memory_start = (unsigned long) __va(initial_images_start);
     dom0_memory_size = ia64_boot_param->domain_size;
-    dom0_initrd_start = (unsigned long) __va(initial_images_start +
-			     PAGE_ALIGN(ia64_boot_param->domain_size));
+    dom0_initrd_start = (unsigned long) __va(ia64_boot_param->initrd_start);
     dom0_initrd_size = ia64_boot_param->initrd_size;
  
     if ( construct_dom0(dom0, dom0_memory_start, dom0_memory_size,
