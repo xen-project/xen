@@ -11,33 +11,34 @@
 
 
 #include <asm/xen/asm-xsi-offsets.h>
+#include <xen/interface/arch-ia64.h>
 
 #define IA64_PARAVIRTUALIZED
 
 #ifdef __ASSEMBLY__
-#define	XEN_HYPER_RFI			break 0x1
-#define	XEN_HYPER_RSM_PSR_DT		break 0x2
-#define	XEN_HYPER_SSM_PSR_DT		break 0x3
-#define	XEN_HYPER_COVER			break 0x4
-#define	XEN_HYPER_ITC_D			break 0x5
-#define	XEN_HYPER_ITC_I			break 0x6
-#define	XEN_HYPER_SSM_I			break 0x7
-#define	XEN_HYPER_GET_IVR		break 0x8
-#define	XEN_HYPER_GET_TPR		break 0x9
-#define	XEN_HYPER_SET_TPR		break 0xa
-#define	XEN_HYPER_EOI			break 0xb
-#define	XEN_HYPER_SET_ITM		break 0xc
-#define	XEN_HYPER_THASH			break 0xd
-#define	XEN_HYPER_PTC_GA		break 0xe
-#define	XEN_HYPER_ITR_D			break 0xf
-#define	XEN_HYPER_GET_RR		break 0x10
-#define	XEN_HYPER_SET_RR		break 0x11
-#define	XEN_HYPER_SET_KR		break 0x12
-#define	XEN_HYPER_FC			break 0x13
-#define	XEN_HYPER_GET_CPUID		break 0x14
-#define	XEN_HYPER_GET_PMD		break 0x15
-#define	XEN_HYPER_GET_EFLAG		break 0x16
-#define	XEN_HYPER_SET_EFLAG		break 0x17
+#define	XEN_HYPER_RFI			break HYPERPRIVOP_RFI
+#define	XEN_HYPER_RSM_PSR_DT		break HYPERPRIVOP_RSM_DT
+#define	XEN_HYPER_SSM_PSR_DT		break HYPERPRIVOP_SSM_DT
+#define	XEN_HYPER_COVER			break HYPERPRIVOP_COVER
+#define	XEN_HYPER_ITC_D			break HYPERPRIVOP_ITC_D
+#define	XEN_HYPER_ITC_I			break HYPERPRIVOP_ITC_I
+#define	XEN_HYPER_SSM_I			break HYPERPRIVOP_SSM_I
+#define	XEN_HYPER_GET_IVR		break HYPERPRIVOP_GET_IVR
+#define	XEN_HYPER_GET_TPR		break HYPERPRIVOP_GET_TPR
+#define	XEN_HYPER_SET_TPR		break HYPERPRIVOP_SET_TPR
+#define	XEN_HYPER_EOI			break HYPERPRIVOP_EOI
+#define	XEN_HYPER_SET_ITM		break HYPERPRIVOP_SET_ITM
+#define	XEN_HYPER_THASH			break HYPERPRIVOP_THASH
+#define	XEN_HYPER_PTC_GA		break HYPERPRIVOP_PTC_GA
+#define	XEN_HYPER_ITR_D			break HYPERPRIVOP_ITR_D
+#define	XEN_HYPER_GET_RR		break HYPERPRIVOP_GET_RR
+#define	XEN_HYPER_SET_RR		break HYPERPRIVOP_SET_RR
+#define	XEN_HYPER_SET_KR		break HYPERPRIVOP_SET_KR
+#define	XEN_HYPER_FC			break HYPERPRIVOP_FC
+#define	XEN_HYPER_GET_CPUID		break HYPERPRIVOP_GET_CPUID
+#define	XEN_HYPER_GET_PMD		break HYPERPRIVOP_GET_PMD
+#define	XEN_HYPER_GET_EFLAG		break HYPERPRIVOP_GET_EFLAG
+#define	XEN_HYPER_SET_EFLAG		break HYPERPRIVOP_SET_EFLAG
 #endif
 
 #ifndef __ASSEMBLY__
@@ -48,8 +49,8 @@ extern int is_running_on_xen(void);
 extern int running_on_xen;
 #endif
 
-#define	XEN_HYPER_SSM_I			asm("break 0x7");
-#define	XEN_HYPER_GET_IVR		asm("break 0x8");
+#define	XEN_HYPER_SSM_I		asm("break %0" : : "i" (HYPERPRIVOP_SSM_I))
+#define	XEN_HYPER_GET_IVR	asm("break %0" : : "i" (HYPERPRIVOP_GET_IVR))
 
 /************************************************/
 /* Instructions paravirtualized for correctness */

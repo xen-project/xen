@@ -46,25 +46,6 @@
 #undef RFI_TO_INTERRUPT // not working yet
 #endif
 
-#define    XEN_HYPER_RFI           0x1
-#define    XEN_HYPER_RSM_DT        0x2
-#define    XEN_HYPER_SSM_DT        0x3
-#define    XEN_HYPER_COVER         0x4
-#define    XEN_HYPER_ITC_D         0x5
-#define    XEN_HYPER_ITC_I         0x6
-#define    XEN_HYPER_SSM_I         0x7
-#define    XEN_HYPER_GET_IVR       0x8
-#define    XEN_HYPER_GET_TPR       0x9
-#define    XEN_HYPER_SET_TPR       0xa
-#define    XEN_HYPER_EOI           0xb
-#define    XEN_HYPER_SET_ITM       0xc
-#define    XEN_HYPER_THASH         0xd
-#define    XEN_HYPER_PTC_GA        0xe
-#define    XEN_HYPER_ITR_D         0xf
-#define    XEN_HYPER_GET_RR        0x10
-#define    XEN_HYPER_SET_RR        0x11
-#define    XEN_HYPER_SET_KR        0x12
-
 #ifdef CONFIG_SMP
 #warning "FIXME: ptc.ga instruction requires spinlock for SMP"
 #undef FAST_PTC_GA
@@ -106,7 +87,7 @@ GLOBAL_ENTRY(fast_hyperprivop)
 #endif
 	// HYPERPRIVOP_SSM_I?
 	// assumes domain interrupts pending, so just do it
-	cmp.eq p7,p6=XEN_HYPER_SSM_I,r17
+	cmp.eq p7,p6=HYPERPRIVOP_SSM_I,r17
 (p7)	br.sptk.many hyper_ssm_i;;
 
 	// FIXME. This algorithm gives up (goes to the slow path) if there
@@ -127,70 +108,70 @@ GLOBAL_ENTRY(fast_hyperprivop)
 1:	// when we get to here r20=~=interrupts pending
 
 	// HYPERPRIVOP_RFI?
-	cmp.eq p7,p6=XEN_HYPER_RFI,r17
+	cmp.eq p7,p6=HYPERPRIVOP_RFI,r17
 (p7)	br.sptk.many hyper_rfi;;
 
 	// HYPERPRIVOP_GET_IVR?
-	cmp.eq p7,p6=XEN_HYPER_GET_IVR,r17
+	cmp.eq p7,p6=HYPERPRIVOP_GET_IVR,r17
 (p7)	br.sptk.many hyper_get_ivr;;
 
 	cmp.ne p7,p0=r20,r0
 (p7)	br.spnt.many dispatch_break_fault ;;
 
 	// HYPERPRIVOP_COVER?
-	cmp.eq p7,p6=XEN_HYPER_COVER,r17
+	cmp.eq p7,p6=HYPERPRIVOP_COVER,r17
 (p7)	br.sptk.many hyper_cover;;
 
 	// HYPERPRIVOP_SSM_DT?
-	cmp.eq p7,p6=XEN_HYPER_SSM_DT,r17
+	cmp.eq p7,p6=HYPERPRIVOP_SSM_DT,r17
 (p7)	br.sptk.many hyper_ssm_dt;;
 
 	// HYPERPRIVOP_RSM_DT?
-	cmp.eq p7,p6=XEN_HYPER_RSM_DT,r17
+	cmp.eq p7,p6=HYPERPRIVOP_RSM_DT,r17
 (p7)	br.sptk.many hyper_rsm_dt;;
 
 	// HYPERPRIVOP_GET_TPR?
-	cmp.eq p7,p6=XEN_HYPER_GET_TPR,r17
+	cmp.eq p7,p6=HYPERPRIVOP_GET_TPR,r17
 (p7)	br.sptk.many hyper_get_tpr;;
 
 	// HYPERPRIVOP_SET_TPR?
-	cmp.eq p7,p6=XEN_HYPER_SET_TPR,r17
+	cmp.eq p7,p6=HYPERPRIVOP_SET_TPR,r17
 (p7)	br.sptk.many hyper_set_tpr;;
 
 	// HYPERPRIVOP_EOI?
-	cmp.eq p7,p6=XEN_HYPER_EOI,r17
+	cmp.eq p7,p6=HYPERPRIVOP_EOI,r17
 (p7)	br.sptk.many hyper_eoi;;
 
 	// HYPERPRIVOP_SET_ITM?
-	cmp.eq p7,p6=XEN_HYPER_SET_ITM,r17
+	cmp.eq p7,p6=HYPERPRIVOP_SET_ITM,r17
 (p7)	br.sptk.many hyper_set_itm;;
 
 	// HYPERPRIVOP_SET_RR?
-	cmp.eq p7,p6=XEN_HYPER_SET_RR,r17
+	cmp.eq p7,p6=HYPERPRIVOP_SET_RR,r17
 (p7)	br.sptk.many hyper_set_rr;;
 
 	// HYPERPRIVOP_GET_RR?
-	cmp.eq p7,p6=XEN_HYPER_GET_RR,r17
+	cmp.eq p7,p6=HYPERPRIVOP_GET_RR,r17
 (p7)	br.sptk.many hyper_get_rr;;
 
 	// HYPERPRIVOP_PTC_GA?
-	cmp.eq p7,p6=XEN_HYPER_PTC_GA,r17
+	cmp.eq p7,p6=HYPERPRIVOP_PTC_GA,r17
 (p7)	br.sptk.many hyper_ptc_ga;;
 
 	// HYPERPRIVOP_ITC_D?
-	cmp.eq p7,p6=XEN_HYPER_ITC_D,r17
+	cmp.eq p7,p6=HYPERPRIVOP_ITC_D,r17
 (p7)	br.sptk.many hyper_itc_d;;
 
 	// HYPERPRIVOP_ITC_I?
-	cmp.eq p7,p6=XEN_HYPER_ITC_I,r17
+	cmp.eq p7,p6=HYPERPRIVOP_ITC_I,r17
 (p7)	br.sptk.many hyper_itc_i;;
 
 	// HYPERPRIVOP_THASH?
-	cmp.eq p7,p6=XEN_HYPER_THASH,r17
+	cmp.eq p7,p6=HYPERPRIVOP_THASH,r17
 (p7)	br.sptk.many hyper_thash;;
 
 	// HYPERPRIVOP_SET_KR?
-	cmp.eq p7,p6=XEN_HYPER_SET_KR,r17
+	cmp.eq p7,p6=HYPERPRIVOP_SET_KR,r17
 (p7)	br.sptk.many hyper_set_kr;;
 
 	// if not one of the above, give up for now and do it the slow way
@@ -250,7 +231,7 @@ ENTRY(hyper_ssm_i)
 	cmp.ne p7,p0=r21,r0
 (p7)	br.sptk.many dispatch_break_fault ;;
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_SSM_I);;
+	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_SSM_I);;
 	ld8 r21=[r20];;
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
@@ -1066,7 +1047,7 @@ ENTRY(hyper_rfi)
 
 1:	// OK now, let's do an rfi.
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_RFI);;
+	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_RFI);;
 	ld8 r23=[r20];;
 	adds r23=1,r23;;
 	st8 [r20]=r23;;
@@ -1318,7 +1299,7 @@ GLOBAL_ENTRY(rfi_with_interrupt)
 
 ENTRY(hyper_cover)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_COVER);;
+	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_COVER);;
 	ld8 r21=[r20];;
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
@@ -1353,7 +1334,7 @@ ENTRY(hyper_cover)
 // return from metaphysical mode (meta=1) to virtual mode (meta=0)
 ENTRY(hyper_ssm_dt)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_SSM_DT);;
+	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_SSM_DT);;
 	ld8 r21=[r20];;
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
@@ -1389,7 +1370,7 @@ ENTRY(hyper_ssm_dt)
 // go to metaphysical mode (meta=1) from virtual mode (meta=0)
 ENTRY(hyper_rsm_dt)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_RSM_DT);;
+	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_RSM_DT);;
 	ld8 r21=[r20];;
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
@@ -1425,7 +1406,7 @@ ENTRY(hyper_rsm_dt)
 
 ENTRY(hyper_get_tpr)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_GET_TPR);;
+	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_GET_TPR);;
 	ld8 r21=[r20];;
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
@@ -1454,7 +1435,7 @@ END(hyper_get_tpr)
 // (or accidentally missing) delivering an interrupt
 ENTRY(hyper_set_tpr)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_SET_TPR);;
+	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_SET_TPR);;
 	ld8 r21=[r20];;
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
@@ -1482,7 +1463,7 @@ END(hyper_set_tpr)
 
 ENTRY(hyper_get_ivr)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r22=fast_hyperpriv_cnt+(8*XEN_HYPER_GET_IVR);;
+	movl r22=fast_hyperpriv_cnt+(8*HYPERPRIVOP_GET_IVR);;
 	ld8 r21=[r22];;
 	adds r21=1,r21;;
 	st8 [r22]=r21;;
@@ -1594,7 +1575,7 @@ ENTRY(hyper_eoi)
 	cmp.ne p7,p0=r20,r0
 (p7)	br.spnt.many dispatch_break_fault ;;
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_EOI);;
+	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_EOI);;
 	ld8 r21=[r20];;
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
@@ -1658,7 +1639,7 @@ ENTRY(hyper_set_itm)
 	cmp.ne p7,p0=r20,r0
 (p7)	br.spnt.many dispatch_break_fault ;;
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_SET_ITM);;
+	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_SET_ITM);;
 	ld8 r21=[r20];;
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
@@ -1699,7 +1680,7 @@ END(hyper_set_itm)
 
 ENTRY(hyper_get_rr)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_GET_RR);;
+	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_GET_RR);;
 	ld8 r21=[r20];;
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
@@ -1731,7 +1712,7 @@ ENTRY(hyper_set_rr)
 	cmp.leu p7,p0=7,r25	// punt on setting rr7
 (p7)	br.spnt.many dispatch_break_fault ;;
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_SET_RR);;
+	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_SET_RR);;
 	ld8 r21=[r20];;
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
@@ -1789,7 +1770,7 @@ ENTRY(hyper_set_kr)
 	cmp.ne p7,p0=r0,r25	// if kr# > 7, go slow way
 (p7)	br.spnt.many dispatch_break_fault ;;
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_SET_KR);;
+	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_SET_KR);;
 	ld8 r21=[r20];;
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
@@ -1847,7 +1828,7 @@ END(hyper_set_kr)
 //	r31 == pr
 GLOBAL_ENTRY(hyper_thash)
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_THASH);;
+	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_THASH);;
 	ld8 r21=[r20];;
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
@@ -1916,7 +1897,7 @@ ENTRY(hyper_ptc_ga)
 #endif
 	// FIXME: validate not flushing Xen addresses
 #ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_PTC_GA);;
+	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_PTC_GA);;
 	ld8 r21=[r20];;
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
@@ -1995,7 +1976,7 @@ ENTRY(recover_and_dispatch_break_fault)
 	br.sptk.many dispatch_break_fault;;
 
 //  Registers at entry
-//	r17 = break immediate (XEN_HYPER_ITC_D or I)
+//	r17 = break immediate (HYPERPRIVOP_ITC_D or I)
 //	r18 == XSI_PSR_IC_OFS
 //	r31 == pr
 GLOBAL_ENTRY(hyper_itc)
@@ -2028,9 +2009,9 @@ ENTRY(hyper_itc_d)
 	cmp.ne p7,p0=r27,r28
 (p7)	br.spnt.many dispatch_break_fault ;;
 #ifdef FAST_HYPERPRIVOP_CNT
-	cmp.eq p6,p7=XEN_HYPER_ITC_D,r17;;
-(p6)	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_ITC_D);;
-(p7)	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_ITC_I);;
+	cmp.eq p6,p7=HYPERPRIVOP_ITC_D,r17;;
+(p6)	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_ITC_D);;
+(p7)	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_ITC_I);;
 	ld8 r21=[r20];;
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
