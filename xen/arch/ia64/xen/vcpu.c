@@ -1290,8 +1290,7 @@ static inline int vcpu_match_tr_entry(TR_ENTRY *trp, UINT64 ifa, UINT64 rid)
 	return trp->pte.p && vcpu_match_tr_entry_no_p(trp, ifa, rid);
 }
 
-// in_tpa is not used when CONFIG_XEN_IA64_DOM0_VP
-IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, BOOLEAN in_tpa, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
+IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
 {
 	unsigned long region = address >> 61;
 	unsigned long pta, rid, rr;
@@ -1368,12 +1367,7 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, BOOLEAN in
 	pte = trp->pte;
 	if (/* is_data && */ pte.p
 	    && vcpu_match_tr_entry_no_p(trp,address,rid)) {
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-		if (vcpu->domain==dom0 && !in_tpa)
-			*pteval = pte.val;
-		else
-#endif
-		*pteval = vcpu->arch.dtlb_pte;
+		*pteval = pte.val;
 		*itir = trp->itir;
 		dtlb_translate_count++;
 		return IA64_USE_TLB;
@@ -1422,7 +1416,7 @@ IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 	UINT64 pteval, itir, mask, iha;
 	IA64FAULT fault;
 
-	fault = vcpu_translate(vcpu, vadr, TRUE, TRUE, &pteval, &itir, &iha);
+	fault = vcpu_translate(vcpu, vadr, TRUE, &pteval, &itir, &iha);
 	if (fault == IA64_NO_FAULT || fault == IA64_USE_TLB)
 	{
 		mask = itir_mask(itir);
@@ -1800,12 +1794,10 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 	if ((mp_pte == -1UL) || (IorD & 0x4)) // don't place in 1-entry TLB
 		return;
 	if (IorD & 0x1) {
-		vcpu_set_tr_entry(&PSCBX(vcpu,itlb),pte,ps<<2,vaddr);
-		PSCBX(vcpu,itlb_pte) = mp_pte;
+		vcpu_set_tr_entry(&PSCBX(vcpu,itlb),mp_pte,ps<<2,vaddr);
 	}
 	if (IorD & 0x2) {
-		vcpu_set_tr_entry(&PSCBX(vcpu,dtlb),pte,ps<<2,vaddr);
-		PSCBX(vcpu,dtlb_pte) = mp_pte;
+		vcpu_set_tr_entry(&PSCBX(vcpu,dtlb),mp_pte,ps<<2,vaddr);
 	}
 }
 
@@ -1882,13 +1874,15 @@ IA64FAULT vcpu_ptc_e(VCPU *vcpu, UINT64 vadr)
 	// architected loop to purge the entire TLB, should use
 	//  base = stride1 = stride2 = 0, count0 = count 1 = 1
 
+	// just invalidate the "whole" tlb
+	vcpu_purge_tr_entry(&PSCBX(vcpu,dtlb));
+	vcpu_purge_tr_entry(&PSCBX(vcpu,itlb));
+
 #ifdef VHPT_GLOBAL
 	vhpt_flush();	// FIXME: This is overdoing it
 #endif
 	local_flush_tlb_all();
-	// just invalidate the "whole" tlb
-	vcpu_purge_tr_entry(&PSCBX(vcpu,dtlb));
-	vcpu_purge_tr_entry(&PSCBX(vcpu,itlb));
+
 	return IA64_NO_FAULT;
 }
 
@@ -1915,8 +1909,8 @@ IA64FAULT vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 
 		/* Purge TC entries.
 		   FIXME: clear only if match.  */
-		vcpu_purge_tr_entry(&PSCBX(vcpu,dtlb));
-		vcpu_purge_tr_entry(&PSCBX(vcpu,itlb));
+		vcpu_purge_tr_entry(&PSCBX(v,dtlb));
+		vcpu_purge_tr_entry(&PSCBX(v,itlb));
 
 #ifdef VHPT_GLOBAL
 		/* Invalidate VHPT entries.  */

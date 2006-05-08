@@ -30,7 +30,7 @@
 #undef FAST_ITC	//XXX CONFIG_XEN_IA64_DOM0_VP
 		//    TODO fast_itc doesn't suport dom0 vp yet.
 #else
-//#define FAST_ITC	// working but default off for now
+//#define FAST_ITC	// to be reviewed
 #endif
 #define FAST_BREAK
 #ifndef CONFIG_XEN_IA64_DOM0_VP
@@ -769,7 +769,7 @@ GLOBAL_ENTRY(fast_access_reflect)
 GLOBAL_ENTRY(fast_tlb_miss_reflect)
 #ifndef FAST_TLB_MISS_REFLECT // see beginning of file
 	br.spnt.few page_fault ;;
-#endif
+#else
 	mov r31=pr
 	mov r30=cr.ipsr
 	mov r29=cr.iip
@@ -1007,6 +1007,7 @@ page_not_present:
 	mov r29=cr.iip
 	mov r30=cr.ipsr
 	br.sptk.many fast_reflect;;
+#endif
 END(fast_tlb_miss_reflect)
 
 // ensure that, if giving up, registers at entry to fast_hyperprivop unchanged
@@ -2003,7 +2004,7 @@ ENTRY(hyper_itc_i)
 ENTRY(hyper_itc_d)
 #ifndef FAST_ITC
 	br.sptk.many dispatch_break_fault ;;
-#endif
+#else
 	// ensure itir.ps >= xen's pagesize
 	adds r23=XSI_ITIR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r23=[r23];;
@@ -2040,7 +2041,9 @@ ENTRY(hyper_itc_d)
 	movl r30=recover_and_dispatch_break_fault ;;
 	mov r16=r8;;
 	// fall through
+#endif
 
+#if defined(FAST_ITC) || defined (FAST_TLB_MISS_REFLECT)
 
 // fast_insert(PSCB(ifa),r24=ps,r16=pte)
 //	r16 == pte
@@ -2175,4 +2178,4 @@ no_inc_iip:
 	rfi
 	;;
 END(fast_insert)
-
+#endif

@@ -265,7 +265,8 @@ void deliver_pending_interrupt(struct pt_regs *regs)
 }
 unsigned long lazy_cover_count = 0;
 
-int handle_lazy_cover(struct vcpu *v, unsigned long isr, struct pt_regs *regs)
+static int
+handle_lazy_cover(struct vcpu *v, struct pt_regs *regs)
 {
 	if (!PSCB(v,interrupt_collection_enabled)) {
 		PSCB(v,ifs) = regs->cr_ifs;
@@ -285,7 +286,7 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 	unsigned long is_data = !((isr >> IA64_ISR_X_BIT) & 1UL);
 	IA64FAULT fault;
 
-	if ((isr & IA64_ISR_IR) && handle_lazy_cover(current, isr, regs)) return;
+	if ((isr & IA64_ISR_IR) && handle_lazy_cover(current, regs)) return;
 	if ((isr & IA64_ISR_SP)
 	    || ((isr & IA64_ISR_NA) && (isr & IA64_ISR_CODE_MASK) == IA64_ISR_CODE_LFETCH))
 	{
@@ -299,7 +300,7 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 	}
 
  again:
-	fault = vcpu_translate(current,address,is_data,0,&pteval,&itir,&iha);
+	fault = vcpu_translate(current,address,is_data,&pteval,&itir,&iha);
 	if (fault == IA64_NO_FAULT || fault == IA64_USE_TLB) {
 		u64 logps;
 		pteval = translate_domain_pte(pteval, address, itir, &logps);
@@ -813,7 +814,7 @@ printf("*** Handled privop masquerading as NaT fault\n");
 		while(vector);
 		return;
 	}
-	if (check_lazy_cover && (isr & IA64_ISR_IR) && handle_lazy_cover(v, isr, regs)) return;
+	if (check_lazy_cover && (isr & IA64_ISR_IR) && handle_lazy_cover(v, regs)) return;
 	PSCB(current,ifa) = ifa;
 	PSCB(current,itir) = vcpu_get_itir_on_fault(v,ifa);
 	reflect_interruption(isr,regs,vector);
