@@ -155,6 +155,8 @@
 	;;											\
 	ld4 r30=[r8];										\
 	;;											\
+	/* set XSI_INCOMPL_REGFR 0 */								\
+	st4 [r8]=r0;										\
 	cmp.eq	p6,p7=r30,r0;									\
 	;; /* not sure if this stop bit is necessary */						\
 (p6)	adds r8=XSI_PRECOVER_IFS-XSI_INCOMPL_REGFR,r8;						\
