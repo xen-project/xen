@@ -195,10 +195,10 @@ void check_bad_nested_interruption(unsigned long isr, struct pt_regs *regs, unsi
 	}
 	vector &= ~0xf;
 	if (vector != IA64_DATA_TLB_VECTOR &&
-		vector != IA64_ALT_DATA_TLB_VECTOR &&
-		vector != IA64_VHPT_TRANS_VECTOR) {
-panic_domain(regs,"psr.ic off, delivering fault=%lx,ipsr=%p,iip=%p,ifa=%p,isr=%p,PSCB.iip=%p\n",
-	vector,regs->cr_ipsr,regs->cr_iip,PSCB(v,ifa),isr,PSCB(v,iip));
+	    vector != IA64_ALT_DATA_TLB_VECTOR &&
+	    vector != IA64_VHPT_TRANS_VECTOR) {
+		panic_domain(regs,"psr.ic off, delivering fault=%lx,ipsr=%lx,iip=%lx,ifa=%lx,isr=%lx,PSCB.iip=%lx\n",
+		             vector,regs->cr_ipsr,regs->cr_iip,PSCB(v,ifa),isr,PSCB(v,iip));
 	}
 }
 
@@ -358,7 +358,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 	struct pt_regs *regs = (struct pt_regs *) &stack;
 	unsigned long code;
 	char buf[128];
-	static const char * const reason[] = {
+	static const char *reason[] = {
 		"IA-64 Illegal Operation fault",
 		"IA-64 Privileged Operation fault",
 		"IA-64 Privileged Register fault",

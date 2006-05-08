@@ -206,7 +206,7 @@ IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
     vcpu_get_rr(vcpu, reg, &oldrr.rrval);
     newrr.rrval=val;
     if (newrr.rid >= (1 << vcpu->domain->arch.rid_bits))
-        panic_domain (NULL, "use of invalid rid %lx\n", newrr.rid);
+        panic_domain (NULL, "use of invalid rid %x\n", newrr.rid);
     if(oldrr.ps!=newrr.ps){
         thash_purge_all(vcpu);
     }
