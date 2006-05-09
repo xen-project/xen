@@ -1,5 +1,7 @@
 
+ifneq ($(CONFIG_XEN_IA64_DOM0_VP),y)
 obj-y   += util.o
+endif
 
 obj-y	+= core/
 obj-y	+= console/
