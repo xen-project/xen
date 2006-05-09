@@ -394,6 +394,10 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
 
         /* Follow the list chain and /then/ potentially free the page. */
         ent = ent->next;
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+        if (page_get_owner(page) == d)
+            set_gpfn_from_mfn(page_to_mfn(page), INVALID_M2P_ENTRY);
+#endif
         put_page(page);
     }
 
@@ -483,6 +487,7 @@ void new_thread(struct vcpu *v,
 	}
 }
 
+//XXX !xxx_present() should be used instread of !xxx_none()?
 static pte_t*
 lookup_alloc_domain_pte(struct domain* d, unsigned long mpaddr)
 {
@@ -1006,6 +1011,175 @@ out1:
     put_domain(rd);
 out0:
     return error;
+}
+
+// grant table host mapping
+// mpaddr: host_addr: pseudo physical address
+// mfn: frame: machine page frame
+// flags: GNTMAP_readonly | GNTMAP_application_map | GNTMAP_contains_pte
+int
+create_grant_host_mapping(unsigned long gpaddr,
+			  unsigned long mfn, unsigned int flags)
+{
+    struct domain* d = current->domain;
+
+    if (flags & (GNTMAP_application_map | GNTMAP_contains_pte)) {
+        DPRINTK("%s: flags 0x%x\n", __func__, flags);
+        return GNTST_general_error;
+    }
+    if (flags & GNTMAP_readonly) {
+#if 0
+        DPRINTK("%s: GNTMAP_readonly is not implemented yet. flags %x\n",
+                __func__, flags);
+#endif
+        flags &= ~GNTMAP_readonly;
+    }
+
+    assign_domain_page_replace(d, gpaddr, mfn, flags);
+
+    return GNTST_okay;
+}
+
+// grant table host unmapping
+int
+destroy_grant_host_mapping(unsigned long gpaddr,
+			   unsigned long mfn, unsigned int flags)
+{
+    struct domain* d = current->domain;
+    pte_t* pte;
+    pte_t old_pte;
+    unsigned long old_mfn = INVALID_MFN;
+
+    if (flags & (GNTMAP_application_map | GNTMAP_contains_pte)) {
+        DPRINTK("%s: flags 0x%x\n", __func__, flags);
+        return GNTST_general_error;
+    }
+    if (flags & GNTMAP_readonly) {
+#if 0
+        DPRINTK("%s: GNTMAP_readonly is not implemented yet. flags %x\n",
+                __func__, flags);
+#endif
+        flags &= ~GNTMAP_readonly;
+    }
+
+    // get_page(mfn_to_page(mfn)) is not needed.
+    // the caller, __gnttab_map_grant_ref() does it.
+
+    pte = lookup_noalloc_domain_pte(d, gpaddr);
+    if (pte == NULL || !pte_present(*pte) || pte_pfn(*pte) != mfn)
+        return GNTST_general_error;//XXX GNTST_bad_pseudo_phys_addr
+
+    // update pte
+    old_pte = ptep_get_and_clear(d->arch.mm, gpaddr, pte);
+    if (pte_present(old_pte)) {
+        old_mfn = pte_pfn(old_pte);//XXX
+    }
+    domain_page_flush(d, gpaddr, old_mfn, INVALID_MFN);
+
+    return GNTST_okay;
+}
+
+//XXX needs refcount patch
+//XXX heavily depends on the struct page layout.
+//XXX SMP
+int
+steal_page_for_grant_transfer(struct domain *d, struct page_info *page)
+{
+#if 0 /* if big endian */
+# error "implement big endian version of steal_page_for_grant_transfer()"
+#endif
+    u32 _d, _nd;
+    u64 x, nx, y;
+    unsigned long mpaddr = get_gpfn_from_mfn(page_to_mfn(page)) << PAGE_SHIFT;
+    struct page_info *new;
+
+    // zap_domain_page_one() does put_page(page)
+    if (get_page(page, d) == 0) {
+        DPRINTK("%s:%d page %p mfn %ld d 0x%p id %d\n",
+                __func__, __LINE__, page, page_to_mfn(page), d, d->domain_id);
+        return -1;
+    }
+    zap_domain_page_one(d, mpaddr);
+
+    spin_lock(&d->page_alloc_lock);
+
+    /*
+     * The tricky bit: atomically release ownership while there is just one
+     * benign reference to the page (PGC_allocated). If that reference
+     * disappears then the deallocation routine will safely spin.
+     */
+    _d  = pickle_domptr(d);
+    y = *((u64*)&page->count_info);
+    do {
+        x = y;
+        nx = x & 0xffffffff;
+        // page->count_info: untouched
+        // page->u.inused._domain = 0;
+        _nd = x >> 32;
+
+        if (unlikely((x & (PGC_count_mask | PGC_allocated)) !=
+                     (1 | PGC_allocated)) ||
+            unlikely(_nd != _d)) {
+            struct domain* nd = unpickle_domptr(_nd);
+            if (nd == NULL) {
+                DPRINTK("gnttab_transfer: Bad page %p: ed=%p(%u) 0x%x, "
+                        "sd=%p 0x%x,"
+                        " caf=%016lx, taf=%" PRtype_info "\n",
+                        (void *) page_to_mfn(page),
+                        d, d->domain_id, _d,
+                        nd, _nd,
+                        x,
+                        page->u.inuse.type_info);
+            } else {
+                DPRINTK("gnttab_transfer: Bad page %p: ed=%p(%u) 0x%x, "
+                        "sd=%p(%u) 0x%x,"
+                        " caf=%016lx, taf=%" PRtype_info "\n",
+                        (void *) page_to_mfn(page),
+                        d, d->domain_id, _d,
+                        nd, nd->domain_id, _nd,
+                        x,
+                        page->u.inuse.type_info);
+            }
+            spin_unlock(&d->page_alloc_lock);
+            return -1;
+        }
+
+        y = cmpxchg((u64*)&page->count_info, x, nx);
+    } while (unlikely(y != x));
+
+    /*
+     * Unlink from 'd'. At least one reference remains (now anonymous), so
+     * noone else is spinning to try to delete this page from 'd'.
+     */
+    d->tot_pages--;
+    list_del(&page->list);
+
+    spin_unlock(&d->page_alloc_lock);
+
+#if 1
+    //XXX Until net_rx_action() fix
+    // assign new page for this mpaddr
+    new = assign_new_domain_page(d, mpaddr);
+    BUG_ON(new == NULL);//XXX
+#endif
+
+    return 0;
+}
+
+void
+guest_physmap_add_page(struct domain *d, unsigned long gpfn,
+                       unsigned long mfn)
+{
+    assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn, 0/* XXX */);
+    set_gpfn_from_mfn(mfn, gpfn);
+}
+
+void
+guest_physmap_remove_page(struct domain *d, unsigned long gpfn,
+                          unsigned long mfn)
+{
+    BUG_ON(mfn == 0);//XXX
+    zap_domain_page_one(d, gpfn << PAGE_SHIFT);
 }
 #endif
 

@@ -239,6 +239,10 @@ void dummy_called(char *function);
 // these declarations got moved at some point, find a better place for them
 extern int ht_per_core;
 
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+#define CONFIG_SHADOW	1
+#endif
+
 // xen/include/asm/config.h
 /******************************************************************************
  * config.h

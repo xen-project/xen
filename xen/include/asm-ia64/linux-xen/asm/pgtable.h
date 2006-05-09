@@ -383,6 +383,7 @@ ptep_test_and_clear_dirty (struct vm_area_struct *vma, unsigned long addr, pte_t
 	return 1;
 #endif
 }
+#endif
 
 static inline pte_t
 ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
@@ -396,6 +397,7 @@ ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 #endif
 }
 
+#ifndef XEN
 static inline void
 ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
