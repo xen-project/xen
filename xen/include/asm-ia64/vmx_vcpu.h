@@ -359,7 +359,7 @@ IA64FAULT vmx_vcpu_get_cpuid(VCPU *vcpu, UINT64 reg, UINT64 *pval)
     // TODO: unimplemented DBRs return a reserved register fault
     // TODO: Should set Logical CPU state, not just physical
     if(reg > 4){
-        panic("there are only five cpuid registers");
+        panic_domain(vcpu_regs(vcpu),"there are only five cpuid registers");
     }
     *pval=VCPU(vcpu,vcpuid[reg]);
     return (IA64_NO_FAULT);

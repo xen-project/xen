@@ -208,8 +208,9 @@ vmx_create_vp(struct vcpu *v)
 	ivt_base = (u64) &vmx_ia64_ivt;
 	printk("ivt_base: 0x%lx\n", ivt_base);
 	ret = ia64_pal_vp_create((u64 *)vpd, (u64 *)ivt_base, 0);
-	if (ret != PAL_STATUS_SUCCESS)
-		panic("ia64_pal_vp_create failed. \n");
+	if (ret != PAL_STATUS_SUCCESS){
+		panic_domain(vcpu_regs(v),"ia64_pal_vp_create failed. \n");
+	}
 }
 
 /* Other non-context related tasks can be done in context switch */
@@ -220,8 +221,9 @@ vmx_save_state(struct vcpu *v)
 
 	/* FIXME: about setting of pal_proc_vector... time consuming */
 	status = ia64_pal_vp_save((u64 *)v->arch.privregs, 0);
-	if (status != PAL_STATUS_SUCCESS)
-		panic("Save vp status failed\n");
+	if (status != PAL_STATUS_SUCCESS){
+		panic_domain(vcpu_regs(v),"Save vp status failed\n");
+	}
 
 
 	/* Need to save KR when domain switch, though HV itself doesn;t
@@ -244,8 +246,9 @@ vmx_load_state(struct vcpu *v)
 	u64 status;
 
 	status = ia64_pal_vp_restore((u64 *)v->arch.privregs, 0);
-	if (status != PAL_STATUS_SUCCESS)
-		panic("Restore vp status failed\n");
+	if (status != PAL_STATUS_SUCCESS){
+		panic_domain(vcpu_regs(v),"Restore vp status failed\n");
+	}
 
 	ia64_set_kr(0, v->arch.arch_vmx.vkr[0]);
 	ia64_set_kr(1, v->arch.arch_vmx.vkr[1]);

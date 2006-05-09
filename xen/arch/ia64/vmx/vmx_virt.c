@@ -182,8 +182,9 @@ IA64FAULT vmx_emul_mov_from_psr(VCPU *vcpu, INST64 inst)
 IA64FAULT vmx_emul_mov_to_psr(VCPU *vcpu, INST64 inst)
 {
     UINT64 val;
+
     if(vcpu_get_gr_nat(vcpu, inst.M35.r2, &val) != IA64_NO_FAULT)
-	panic(" get_psr nat bit fault\n");
+	panic_domain(vcpu_regs(vcpu),"get_psr nat bit fault\n");
 
 	val = (val & MASK(0, 32)) | (VCPU(vcpu, vpsr) & MASK(32, 32));
 #if 0
@@ -216,7 +217,7 @@ IA64FAULT vmx_emul_rfi(VCPU *vcpu, INST64 inst)
     regs=vcpu_regs(vcpu);
     vpsr.val=regs->cr_ipsr;
     if ( vpsr.is == 1 ) {
-        panic ("We do not support IA32 instruction yet");
+        panic_domain(regs,"We do not support IA32 instruction yet");
     }
 
     return vmx_vcpu_rfi(vcpu);
@@ -715,8 +716,9 @@ IA64FAULT vmx_emul_mov_to_ar_imm(VCPU *vcpu, INST64 inst)
 {
     // I27 and M30 are identical for these fields
     UINT64  imm;
+
     if(inst.M30.ar3!=44){
-        panic("Can't support ar register other than itc");
+        panic_domain(vcpu_regs(vcpu),"Can't support ar register other than itc");
     }
 #ifdef  CHECK_FAULT
     IA64_PSR vpsr;
@@ -741,7 +743,7 @@ IA64FAULT vmx_emul_mov_to_ar_reg(VCPU *vcpu, INST64 inst)
     // I26 and M29 are identical for these fields
     u64 r2;
     if(inst.M29.ar3!=44){
-        panic("Can't support ar register other than itc");
+        panic_domain(vcpu_regs(vcpu),"Can't support ar register other than itc");
     }
     if(vcpu_get_gr_nat(vcpu,inst.M29.r2,&r2)){
 #ifdef  CHECK_FAULT
@@ -769,7 +771,7 @@ IA64FAULT vmx_emul_mov_from_ar_reg(VCPU *vcpu, INST64 inst)
     // I27 and M30 are identical for these fields
     u64 r1;
     if(inst.M31.ar3!=44){
-        panic("Can't support ar register other than itc");
+        panic_domain(vcpu_regs(vcpu),"Can't support ar register other than itc");
     }
 #ifdef  CHECK_FAULT
     if(check_target_register(vcpu,inst.M31.r1)){
@@ -1359,8 +1361,7 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
     slot_type = slot_types[bundle.template][slot];
     ia64_priv_decoder(slot_type, inst, &cause);
     if(cause==0){
-        printf("This instruction at 0x%lx slot %d can't be  virtualized", iip, slot);
-        panic("123456\n");
+        panic_domain(regs,"This instruction at 0x%lx slot %d can't be  virtualized", iip, slot);
     }
 #else
     inst.inst=opcode;
@@ -1494,12 +1495,8 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
 	status=IA64_FAULT;
         break;
     default:
-        printf("unknown cause %ld, iip: %lx, ipsr: %lx\n", cause,regs->cr_iip,regs->cr_ipsr);
-        while(1);
-	/* For unknown cause, let hardware to re-execute */
-	status=IA64_RETRY;
+        panic_domain(regs,"unknown cause %ld, iip: %lx, ipsr: %lx\n", cause,regs->cr_iip,regs->cr_ipsr);
         break;
-//        panic("unknown cause in virtualization intercept");
     };
 
 #if 0

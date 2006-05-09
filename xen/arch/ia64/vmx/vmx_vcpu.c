@@ -91,7 +91,7 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
      * Otherwise panic
      */
     if ( value & (IA64_PSR_PK | IA64_PSR_IS | IA64_PSR_VM )) {
-        panic ("Setting unsupport guest psr!");
+        panic_domain (regs,"Setting unsupport guest psr!");
     }
 
     /*

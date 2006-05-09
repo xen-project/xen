@@ -338,7 +338,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
     }
     if(vec == 1) type = ISIDE_TLB;
     else if(vec == 2) type = DSIDE_TLB;
-    else panic("wrong vec\n");
+    else panic_domain(regs,"wrong vec:%0xlx\n",vec);
 
 //    prepare_if_physical_mode(v);
 

@@ -134,7 +134,7 @@ static void init_domain_vhpt(struct vcpu *v)
     void * vbase;
     page = alloc_domheap_pages (NULL, VCPU_VHPT_ORDER, 0);
     if ( page == NULL ) {
-        panic("No enough contiguous memory for init_domain_vhpt\n");
+        panic_domain(vcpu_regs(v),"No enough contiguous memory for init_domain_vhpt\n");
     }
     vbase = page_to_virt(page);
     memset(vbase, 0, VCPU_VHPT_SIZE);
@@ -157,7 +157,7 @@ void init_domain_tlb(struct vcpu *v)
     init_domain_vhpt(v);
     page = alloc_domheap_pages (NULL, VCPU_VTLB_ORDER, 0);
     if ( page == NULL ) {
-        panic("No enough contiguous memory for init_domain_tlb\n");
+        panic_domain(vcpu_regs(v),"No enough contiguous memory for init_domain_tlb\n");
     }
     vbase = page_to_virt(page);
     memset(vbase, 0, VCPU_VTLB_SIZE);
@@ -200,7 +200,7 @@ void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb)
     mtlb.ppn = get_mfn(d->domain,tlb->ppn);
     mtlb_ppn=mtlb.ppn;
     if (mtlb_ppn == INVALID_MFN)
-    panic("Machine tlb insert with invalid mfn number.\n");
+        panic_domain(vcpu_regs(d),"Machine tlb insert with invalid mfn number.\n");
 
     psr = ia64_clear_ic();
     if ( cl == ISIDE_TLB ) {
@@ -323,12 +323,12 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code1, u64 *code2)
     }
     if( gpip){
 	 mfn = gmfn_to_mfn(vcpu->domain, gpip >>PAGE_SHIFT);
-    	if( mfn == INVALID_MFN )  panic("fetch_code: invalid memory\n");
+    	if( mfn == INVALID_MFN )  panic_domain(vcpu_regs(vcpu),"fetch_code: invalid memory\n");
     	vpa =(u64 *)__va( (gip & (PAGE_SIZE-1)) | (mfn<<PAGE_SHIFT));
     }else{
 	tlb = vhpt_lookup(gip);
 	if( tlb == NULL)
-	    panic("No entry found in ITLB and DTLB\n");
+	    panic_domain(vcpu_regs(vcpu),"No entry found in ITLB and DTLB\n");
 	vpa =(u64 *)__va((tlb->ppn>>(PAGE_SHIFT-ARCH_PAGE_SHIFT)<<PAGE_SHIFT)|(gip&(PAGE_SIZE-1)));
     }
     *code1 = *vpa++;
@@ -345,7 +345,7 @@ IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
     slot = vtr_find_overlap(vcpu, va, ps, ISIDE_TLB);
     if (slot >=0) {
         // generate MCA.
-        panic("Tlb conflict!!");
+        panic_domain(vcpu_regs(vcpu),"Tlb conflict!!");
         return IA64_FAULT;
     }
     thash_purge_and_insert(vcpu, pte, itir, ifa);
@@ -361,7 +361,7 @@ IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
     slot = vtr_find_overlap(vcpu, va, ps, DSIDE_TLB);
     if (slot >=0) {
         // generate MCA.
-        panic("Tlb conflict!!");
+        panic_domain(vcpu_regs(vcpu),"Tlb conflict!!");
         return IA64_FAULT;
     }
     gpfn = (pte & _PAGE_PPN_MASK)>> PAGE_SHIFT;
@@ -385,7 +385,7 @@ IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
     index = vtr_find_overlap(vcpu, va, ps, ISIDE_TLB);
     if (index >=0) {
         // generate MCA.
-        panic("Tlb conflict!!");
+        panic_domain(vcpu_regs(vcpu),"Tlb conflict!!");
         return IA64_FAULT;
     }
     thash_purge_entries(vcpu, va, ps);
@@ -407,7 +407,7 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
     index = vtr_find_overlap(vcpu, va, ps, DSIDE_TLB);
     if (index>=0) {
         // generate MCA.
-        panic("Tlb conflict!!");
+        panic_domain(vcpu_regs(vcpu),"Tlb conflict!!");
         return IA64_FAULT;
     }
     thash_purge_entries(vcpu, va, ps);

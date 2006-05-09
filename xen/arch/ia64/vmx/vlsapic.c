@@ -568,7 +568,7 @@ int vmx_check_pending_irq(VCPU *vcpu)
     if (  vpsr.i && IRQ_NO_MASKED == mask ) {
         isr = vpsr.val & IA64_PSR_RI;
         if ( !vpsr.ic )
-            panic("Interrupt when IC=0\n");
+            panic_domain(regs,"Interrupt when IC=0\n");
         vmx_reflect_interruption(0,isr,0, 12, regs ); // EXT IRQ
         injected = 1;
     }
@@ -595,7 +595,8 @@ void guest_write_eoi(VCPU *vcpu)
     uint64_t  spsr;
 
     vec = highest_inservice_irq(vcpu);
-    if ( vec == NULL_VECTOR ) panic("Wrong vector to EOI\n");
+    if ( vec == NULL_VECTOR ) 
+	panic_domain(vcpu_regs(vcpu),"Wrong vector to EOI\n");
     local_irq_save(spsr);
     VLSAPIC_INSVC(vcpu,vec>>6) &= ~(1UL <<(vec&63));
     local_irq_restore(spsr);
@@ -634,7 +635,7 @@ static void generate_exirq(VCPU *vcpu)
     update_vhpi(vcpu, NULL_VECTOR);
     isr = vpsr.val & IA64_PSR_RI;
     if ( !vpsr.ic )
-        panic("Interrupt when IC=0\n");
+        panic_domain(regs,"Interrupt when IC=0\n");
     vmx_reflect_interruption(0,isr,0, 12, regs); // EXT IRQ
 }
 

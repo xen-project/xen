@@ -62,8 +62,8 @@ pal_cache_flush (VCPU *vcpu) {
 //		ia64_pal_call_static(gr28 ,gr29, gr30, 
 //				result.v1,1LL);
 //	}
-	while (result.status != 0) {
-        panic("PAL_CACHE_FLUSH ERROR, status %ld", result.status);
+	if(result.status != 0) {
+        	panic_domain(vcpu_regs(vcpu),"PAL_CACHE_FLUSH ERROR, status %ld", result.status);
 	}
 
 	return result;
@@ -445,7 +445,7 @@ pal_emul( VCPU *vcpu) {
 			break;
 
 		default:
-			panic("pal_emul(): guest call unsupported pal" );
+			panic_domain(vcpu_regs(vcpu),"pal_emul(): guest call unsupported pal" );
   }
 		set_pal_result (vcpu, result);
 }

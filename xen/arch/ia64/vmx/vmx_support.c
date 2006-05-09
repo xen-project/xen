@@ -92,12 +92,12 @@ void vmx_io_assist(struct vcpu *v)
      */
     vio = get_vio(v->domain, v->vcpu_id);
     if (!vio)
-	panic("Corruption: bad shared page: %lx\n", (unsigned long)vio);
+	panic_domain(vcpu_regs(v),"Corruption: bad shared page: %lx\n", (unsigned long)vio);
 
     p = &vio->vp_ioreq;
 
     if (p->state == STATE_IORESP_HOOK)
-	panic("Not supported: No hook available for DM request\n");
+	panic_domain(vcpu_regs(v),"Not supported: No hook available for DM request\n");
 
     if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags)) {
 	if (p->state != STATE_IORESP_READY) {
@@ -135,7 +135,7 @@ void vmx_intr_assist(struct vcpu *v)
      * out of vmx_wait_io, when guest is still waiting for response.
      */
     if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags))
-	panic("!!!Bad resume to guest before I/O emulation is done.\n");
+	panic_domain(vcpu_regs(v),"!!!Bad resume to guest before I/O emulation is done.\n");
 
     /* Clear indicator specific to interrupt delivered from DM */
     if (test_and_clear_bit(port,
@@ -154,7 +154,7 @@ void vmx_intr_assist(struct vcpu *v)
      */
     vio = get_vio(v->domain, v->vcpu_id);
     if (!vio)
-	panic("Corruption: bad shared page: %lx\n", (unsigned long)vio);
+	panic_domain(vcpu_regs(v),"Corruption: bad shared page: %lx\n", (unsigned long)vio);
 
 #ifdef V_IOSAPIC_READY
     /* Confirm virtual interrupt line signals, and set pending bits in vpd */

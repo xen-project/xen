@@ -186,8 +186,10 @@ vmx_load_all_rr(VCPU *vcpu)
 	 * mode in same region
 	 */
 	if (is_physical_mode(vcpu)) {
-		if (vcpu->arch.mode_flags & GUEST_PHY_EMUL)
-			panic("Unexpected domain switch in phy emul\n");
+		if (vcpu->arch.mode_flags & GUEST_PHY_EMUL){
+			panic_domain(vcpu_regs(vcpu),
+			             "Unexpected domain switch in phy emul\n");
+		}
 		phy_rr.rrval = vcpu->arch.metaphysical_rr0;
 		//phy_rr.ps = PAGE_SHIFT;
 		phy_rr.ve = 1;
@@ -322,8 +324,7 @@ switch_mm_mode(VCPU *vcpu, IA64_PSR old_psr, IA64_PSR new_psr)
         break;
     default:
         /* Sanity check */
-    printf("old: %lx, new: %lx\n", old_psr.val, new_psr.val);
-        panic("Unexpected virtual <--> physical mode transition");
+        panic_domain(vcpu_regs(vcpu),"Unexpected virtual <--> physical mode transition,old:%lx,new:%lx\n",old_psr.val,new_psr.val);
         break;
     }
     return;
