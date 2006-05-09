@@ -279,11 +279,11 @@ machine_to_phys_for_dma(unsigned long machine)
 #define set_phys_to_machine(pfn, mfn) do { } while (0)
 #define xen_machphys_update(mfn, pfn) do { } while (0)
 
-#define mfn_to_pfn(mfn)			({(mfn);})
-#define mfn_to_virt(mfn)		({__va((mfn) << PAGE_SHIFT);})
-#define pfn_to_mfn(pfn)			({(pfn);})
-#define virt_to_mfn(virt)		({__pa(virt) >> PAGE_SHIFT;})
-#define virt_to_machine(virt)		({__pa(virt);}) // for tpmfront.c
+#define mfn_to_pfn(mfn)			(mfn)
+#define mfn_to_virt(mfn)		(__va((mfn) << PAGE_SHIFT))
+#define pfn_to_mfn(pfn)			(pfn)
+#define virt_to_mfn(virt)		(__pa(virt) >> PAGE_SHIFT)
+#define virt_to_machine(virt)		__pa(virt) // for tpmfront.c
 
 #endif /* CONFIG_XEN_IA64_DOM0_VP */
 #endif /* CONFIG_XEN */

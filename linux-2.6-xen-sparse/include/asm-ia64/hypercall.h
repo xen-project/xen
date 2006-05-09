@@ -478,12 +478,12 @@ HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
 	return ret;
 }
 #else
-#define HYPERVISOR_ioremap(ioaddr, size)		({ioaddr;})
-#define HYPERVISOR_phystomach(gpfn)			({gpfn;})
-#define HYPERVISOR_machtophys(mfn)			({mfn;})
+#define HYPERVISOR_ioremap(ioaddr, size)		(ioaddr)
+#define HYPERVISOR_phystomach(gpfn)			(gpfn)
+#define HYPERVISOR_machtophys(mfn)			(mfn)
 #define HYPERVISOR_populate_physmap(gpfn, extent_order, address_bits) \
-							({0;})
-#define HYPERVISOR_zap_physmap(gpfn, extent_order)	({0;})
-#define HYPERVISOR_add_physmap(gpfn, mfn, flags)	({0;})
+							(0)
+#define HYPERVISOR_zap_physmap(gpfn, extent_order)	(0)
+#define HYPERVISOR_add_physmap(gpfn, mfn, flags)	(0)
 #endif
 #endif /* __HYPERCALL_H__ */

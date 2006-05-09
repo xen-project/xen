@@ -162,7 +162,7 @@ xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 		__xen_destroy_contiguous_region(vstart, order);
 }
 #else
-#define xen_create_contiguous_region(vstart, order, address_bits)	({0;})
+#define xen_create_contiguous_region(vstart, order, address_bits)	(0)
 #define xen_destroy_contiguous_region(vstart, order)	do {} while (0)
 #endif
 
