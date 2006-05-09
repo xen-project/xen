@@ -38,14 +38,20 @@
 //XXX xen/ia64 copy_from_guest() is broken.
 //    This is a temporal work around until it is fixed.
 //    used by balloon.c netfront.c
+
+// get_xen_guest_handle is defined only when __XEN_TOOLS__ is defined
+// if the definition in arch-ia64.h is changed, this must be updated.
+#define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
+
 int
 ia64_xenmem_reservation_op(unsigned long op,
 			   struct xen_memory_reservation* reservation__)
 {
 	struct xen_memory_reservation reservation = *reservation__;
-	unsigned long* frame_list = reservation__->extent_start;
+	unsigned long* frame_list;
 	unsigned long nr_extents = reservation__->nr_extents;
 	int ret = 0;
+	get_xen_guest_handle(frame_list, reservation__->extent_start);
 
 	BUG_ON(op != XENMEM_increase_reservation &&
 	       op != XENMEM_decrease_reservation &&
@@ -55,7 +61,7 @@ ia64_xenmem_reservation_op(unsigned long op,
 		int tmp_ret;
 		volatile unsigned long dummy;
 
-		reservation.extent_start = frame_list;
+		set_xen_guest_handle(reservation.extent_start, frame_list);
 		reservation.nr_extents = nr_extents;
 
 		dummy = frame_list[0];// re-install tlb entry before hypercall
