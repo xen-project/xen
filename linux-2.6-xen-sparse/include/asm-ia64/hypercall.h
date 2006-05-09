@@ -244,12 +244,19 @@ HYPERVISOR_physdev_op(
     return rc;
 }
 
+//XXX __HYPERVISOR_grant_table_op is used for this hypercall constant.
 static inline int
-HYPERVISOR_grant_table_op(
+____HYPERVISOR_grant_table_op(
     unsigned int cmd, void *uop, unsigned int count)
 {
     return _hypercall3(int, grant_table_op, cmd, uop, count);
 }
+#ifndef CONFIG_XEN_IA64_DOM0_VP
+#define HYPERVISOR_grant_table_op(cmd, uop, count) \
+	____HYPERVISOR_grant_table_op((cmd), (uop), (count))
+#else
+int HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count);
+#endif
 
 static inline int
 HYPERVISOR_vcpu_op(

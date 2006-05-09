@@ -201,6 +201,59 @@ out:
 
 
 ///////////////////////////////////////////////////////////////////////////
+// grant table hack
+// cmd: GNTTABOP_xxx
+
+#include <linux/mm.h>
+#include <xen/interface/xen.h>
+#include <xen/gnttab.h>
+
+static void
+gnttab_map_grant_ref_pre(struct gnttab_map_grant_ref *uop)
+{
+	uint32_t flags;
+
+	flags = uop->flags;
+	if (flags & GNTMAP_readonly) {
+#if 0
+		xprintd("GNTMAP_readonly is not supported yet\n");
+#endif
+		flags &= ~GNTMAP_readonly;
+	}
+
+	if (flags & GNTMAP_host_map) {
+		if (flags & GNTMAP_application_map) {
+			xprintd("GNTMAP_application_map is not supported yet: flags 0x%x\n", flags);
+			BUG();
+		}
+		if (flags & GNTMAP_contains_pte) {
+			xprintd("GNTMAP_contains_pte is not supported yet flags 0x%x\n", flags);
+			BUG();
+		}
+	} else if (flags & GNTMAP_device_map) {
+		xprintd("GNTMAP_device_map is not supported yet 0x%x\n", flags);
+		BUG();//XXX not yet. actually this flag is not used.
+	} else {
+		BUG();
+	}
+}
+
+int
+HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count)
+{
+	if (cmd == GNTTABOP_map_grant_ref) {
+		unsigned int i;
+		for (i = 0; i < count; i++) {
+			gnttab_map_grant_ref_pre(
+				(struct gnttab_map_grant_ref*)uop + i);
+		}
+	}
+
+	return ____HYPERVISOR_grant_table_op(cmd, uop, count);
+}
+
+
+///////////////////////////////////////////////////////////////////////////
 //XXX taken from balloon.c
 //    temporal hack until balloon driver support.
 #include <linux/module.h>
