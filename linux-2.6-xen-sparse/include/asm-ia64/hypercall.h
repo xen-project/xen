@@ -514,6 +514,10 @@ HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
 	}
 	return ret;
 }
+
+// for balloon driver
+#define HYPERVISOR_update_va_mapping(va, new_val, flags) (0)
+
 #else
 #define HYPERVISOR_ioremap(ioaddr, size)		(ioaddr)
 #define HYPERVISOR_phystomach(gpfn)			(gpfn)
