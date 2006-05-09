@@ -35,6 +35,43 @@
 #define balloon_unlock(flags)	((void)flags)
 #endif
 
+//XXX xen/ia64 copy_from_guest() is broken.
+//    This is a temporal work around until it is fixed.
+//    used by balloon.c netfront.c
+int
+ia64_xenmem_reservation_op(unsigned long op,
+			   struct xen_memory_reservation* reservation__)
+{
+	struct xen_memory_reservation reservation = *reservation__;
+	unsigned long* frame_list = reservation__->extent_start;
+	unsigned long nr_extents = reservation__->nr_extents;
+	int ret = 0;
+
+	BUG_ON(op != XENMEM_increase_reservation &&
+	       op != XENMEM_decrease_reservation &&
+	       op != XENMEM_populate_physmap);
+
+	while (nr_extents > 0) {
+		int tmp_ret;
+		volatile unsigned long dummy;
+
+		reservation.extent_start = frame_list;
+		reservation.nr_extents = nr_extents;
+
+		dummy = frame_list[0];// re-install tlb entry before hypercall
+		tmp_ret = ____HYPERVISOR_memory_op(op, &reservation);
+		if (tmp_ret < 0) {
+			if (ret == 0) {
+				ret = tmp_ret;
+			}
+			break;
+		}
+		frame_list += tmp_ret;
+		nr_extents -= tmp_ret;
+		ret += tmp_ret;
+	}
+	return ret;
+}
 
 //XXX same as i386, x86_64 contiguous_bitmap_set(), contiguous_bitmap_clear()
 // move those to lib/contiguous_bitmap?

@@ -195,12 +195,42 @@ HYPERVISOR_multicall(
     return _hypercall2(int, multicall, call_list, nr_calls);
 }
 
+#ifndef CONFIG_XEN_IA64_DOM0_VP
 static inline int
 HYPERVISOR_memory_op(
     unsigned int cmd, void *arg)
 {
     return _hypercall2(int, memory_op, cmd, arg);
 }
+#else
+//XXX xen/ia64 copy_from_guest() is broken.
+//    This is a temporal work around until it is fixed.
+static inline int
+____HYPERVISOR_memory_op(
+    unsigned int cmd, void *arg)
+{
+    return _hypercall2(int, memory_op, cmd, arg);
+}
+
+#include <xen/interface/memory.h>
+int ia64_xenmem_reservation_op(unsigned long op,
+		   struct xen_memory_reservation* reservation__);
+static inline int
+HYPERVISOR_memory_op(
+    unsigned int cmd, void *arg)
+{
+    switch (cmd) {
+    case XENMEM_increase_reservation:
+    case XENMEM_decrease_reservation:
+    case XENMEM_populate_physmap:
+        return ia64_xenmem_reservation_op(cmd, 
+                                          (struct xen_memory_reservation*)arg);
+    default:
+        return ____HYPERVISOR_memory_op(cmd, arg);
+    }
+    /* NOTREACHED */
+}
+#endif
 
 static inline int
 HYPERVISOR_event_channel_op(
