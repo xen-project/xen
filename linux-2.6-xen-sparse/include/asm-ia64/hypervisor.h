@@ -118,11 +118,22 @@ HYPERVISOR_poll(
 }
 
 // for drivers/xen/privcmd/privcmd.c
-#define direct_remap_pfn_range(a,b,c,d,e,f) remap_pfn_range(a,b,c,d,e)
 #define machine_to_phys_mapping 0
 #ifndef CONFIG_XEN_IA64_DOM0_VP
+#define direct_remap_pfn_range(a,b,c,d,e,f) remap_pfn_range(a,b,c,d,e)
 #define	pfn_to_mfn(x)	(x)
 #define	mfn_to_pfn(x)	(x)
+#else
+struct vm_area_struct;
+int direct_remap_pfn_range(struct vm_area_struct *vma,
+			   unsigned long address,
+			   unsigned long mfn,
+			   unsigned long size,
+			   pgprot_t prot,
+			   domid_t  domid);
+struct file;
+int privcmd_mmap(struct file * file, struct vm_area_struct * vma);
+#define HAVE_ARCH_PRIVCMD_MMAP
 #endif
 
 // for drivers/xen/balloon/balloon.c

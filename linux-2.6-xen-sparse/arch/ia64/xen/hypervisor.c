@@ -290,3 +290,284 @@ EXPORT_SYMBOL(balloon_update_driver_allowance);
 
 struct address_space xen_ia64_foreign_dummy_mapping;
 
+///////////////////////////////////////////////////////////////////////////
+// foreign mapping
+
+struct xen_ia64_privcmd_entry {
+	atomic_t	map_count;
+	struct page*	page;
+	unsigned long	mfn;
+};
+
+static void
+xen_ia64_privcmd_init_entry(struct xen_ia64_privcmd_entry* entry)
+{
+	atomic_set(&entry->map_count, 0);
+	entry->page = NULL;
+	entry->mfn = INVALID_MFN;
+}
+
+static int
+xen_ia64_privcmd_entry_mmap(struct vm_area_struct* vma,
+			    unsigned long addr,
+			    struct xen_ia64_privcmd_entry* entry,
+			    unsigned long mfn,
+			    pgprot_t prot,
+			    domid_t domid)
+{
+	int error = 0;
+	struct page* page;
+	unsigned long gpfn;
+
+	BUG_ON((addr & ~PAGE_MASK) != 0);
+	BUG_ON(mfn == INVALID_MFN);
+
+	if (entry->page != NULL) {
+		error = -EBUSY;
+		goto out;
+	}
+	page = alloc_page(GFP_KERNEL);
+	if (page == NULL) {
+		error = -ENOMEM;
+		goto out;
+	}
+	gpfn = page_to_pfn(page);
+
+	error = HYPERVISOR_add_physmap(gpfn, mfn, 0/* prot:XXX */,
+				       domid);
+	if (error != 0) {
+		goto out;
+	}
+
+	prot = vma->vm_page_prot;
+	error = remap_pfn_range(vma, addr, gpfn, 1 << PAGE_SHIFT, prot);
+	if (error != 0) {
+		(void)HYPERVISOR_zap_physmap(gpfn, 0);
+		error = HYPERVISOR_populate_physmap(gpfn, 0, 0);
+		if (error) {
+			BUG();//XXX
+		}
+		__free_page(page);
+	} else {
+		atomic_inc(&entry->map_count);
+		entry->page = page;
+		entry->mfn = mfn;
+	}
+
+out:
+	return error;
+}
+
+static void
+xen_ia64_privcmd_entry_munmap(struct xen_ia64_privcmd_entry* entry)
+{
+	struct page* page = entry->page;
+	unsigned long gpfn = page_to_pfn(page);
+	int error;
+
+	error = HYPERVISOR_zap_physmap(gpfn, 0);
+	if (error) {
+		BUG();//XXX
+	}
+
+	error = HYPERVISOR_populate_physmap(gpfn, 0, 0);
+	if (error) {
+		BUG();//XXX
+	}
+
+	entry->page = NULL;
+	entry->mfn = INVALID_MFN;
+	__free_page(page);
+}
+
+static int
+xen_ia64_privcmd_entry_open(struct xen_ia64_privcmd_entry* entry)
+{
+	if (entry->page != NULL) {
+		atomic_inc(&entry->map_count);
+	} else {
+		BUG_ON(atomic_read(&entry->map_count) != 0);
+	}
+}
+
+static int
+xen_ia64_privcmd_entry_close(struct xen_ia64_privcmd_entry* entry)
+{
+	if (entry->page != NULL && atomic_dec_and_test(&entry->map_count)) {
+		xen_ia64_privcmd_entry_munmap(entry);
+	}
+}
+
+struct xen_ia64_privcmd_file {
+	struct file*			file;
+	atomic_t			map_count;
+	unsigned long			pgoff; // in PAGE_SIZE
+
+	unsigned long			num_entries;
+	struct xen_ia64_privcmd_entry	entries[0];
+};
+
+struct xen_ia64_privcmd_vma {
+	struct xen_ia64_privcmd_file*	file;
+	unsigned long			num_entries;
+	struct xen_ia64_privcmd_entry*	entries;
+};
+
+static void xen_ia64_privcmd_vma_open(struct vm_area_struct* vma);
+static void xen_ia64_privcmd_vma_close(struct vm_area_struct* vma);
+
+struct vm_operations_struct xen_ia64_privcmd_vm_ops = {
+	.open = &xen_ia64_privcmd_vma_open,
+	.close = &xen_ia64_privcmd_vma_close,
+};
+
+static void
+__xen_ia64_privcmd_vma_open(struct vm_area_struct* vma,
+			    struct xen_ia64_privcmd_vma* privcmd_vma)
+{
+	struct xen_ia64_privcmd_file* privcmd_file =
+		(struct xen_ia64_privcmd_file*)vma->vm_file->private_data;
+	unsigned long entry_offset = vma->vm_pgoff - privcmd_file->pgoff;
+	unsigned long num_entries = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
+	unsigned long i;
+
+	BUG_ON(entry_offset < 0);
+	BUG_ON(entry_offset + num_entries > privcmd_file->num_entries);
+
+	privcmd_vma->file = privcmd_file;
+	privcmd_vma->num_entries = num_entries;
+	privcmd_vma->entries = &privcmd_file->entries[entry_offset];
+	vma->vm_private_data = privcmd_vma;
+	for (i = 0; i < privcmd_vma->num_entries; i++) {
+		xen_ia64_privcmd_entry_open(&privcmd_vma->entries[i]);
+	}
+
+	vma->vm_private_data = privcmd_vma;
+	vma->vm_ops = &xen_ia64_privcmd_vm_ops;
+}
+
+static void
+xen_ia64_privcmd_vma_open(struct vm_area_struct* vma)
+{
+	struct xen_ia64_privcmd_file* privcmd_file =
+		(struct xen_ia64_privcmd_file*)vma->vm_file->private_data;
+	struct xen_ia64_privcmd_vma* privcmd_vma;
+
+	atomic_inc(&privcmd_file->map_count);
+	// vm_op->open() can't fail.
+	privcmd_vma = kmalloc(sizeof(*privcmd_vma), GFP_KERNEL | __GFP_NOFAIL);
+
+	__xen_ia64_privcmd_vma_open(vma, privcmd_vma);
+}
+
+static void
+xen_ia64_privcmd_vma_close(struct vm_area_struct* vma)
+{
+	struct xen_ia64_privcmd_vma* privcmd_vma =
+		(struct xen_ia64_privcmd_vma*)vma->vm_private_data;
+	struct xen_ia64_privcmd_file* privcmd_file = privcmd_vma->file;
+	unsigned long i;
+
+	for (i = 0; i < privcmd_vma->num_entries; i++) {
+		xen_ia64_privcmd_entry_close(&privcmd_vma->entries[i]);
+	}
+	vma->vm_private_data = NULL;
+	kfree(privcmd_vma);
+
+	if (atomic_dec_and_test(&privcmd_file->map_count)) {
+#if 1
+		for (i = 0; i < privcmd_file->num_entries; i++) {
+			struct xen_ia64_privcmd_entry* entry =
+				&privcmd_vma->entries[i];
+			BUG_ON(atomic_read(&entry->map_count) != 0);
+			BUG_ON(entry->page != NULL);
+		}
+#endif
+		privcmd_file->file->private_data = NULL;
+		kfree(privcmd_file->file->private_data);
+	}
+}
+
+int
+privcmd_mmap(struct file * file, struct vm_area_struct * vma)
+{
+	unsigned long num_entries = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
+	struct xen_ia64_privcmd_file* privcmd_file;
+	struct xen_ia64_privcmd_vma* privcmd_vma;
+	unsigned long i;
+	BUG_ON(!running_on_xen);
+
+        /* DONTCOPY is essential for Xen as copy_page_range is broken. */
+        vma->vm_flags |= VM_RESERVED | VM_IO | VM_DONTCOPY;
+
+	if (file->private_data != NULL) {
+		return -EBUSY;
+	}
+
+	privcmd_file = kmalloc(sizeof(*privcmd_file) +
+			       sizeof(privcmd_file->entries[0]) * num_entries,
+			       GFP_KERNEL);
+	if (privcmd_file == NULL) {
+		goto out_enomem0;
+	}
+	privcmd_vma = kmalloc(sizeof(*privcmd_vma), GFP_KERNEL);
+	if (privcmd_vma == NULL) {
+		goto out_enomem1;
+	}
+
+	atomic_set(&privcmd_file->map_count, 1);
+	privcmd_file->num_entries = num_entries;
+	for (i = 0; i < privcmd_file->num_entries; i++) {
+		xen_ia64_privcmd_init_entry(&privcmd_file->entries[i]);
+	}
+	file->private_data = privcmd_file;
+	privcmd_file->file = file;
+	privcmd_file->pgoff = vma->vm_pgoff;
+
+	__xen_ia64_privcmd_vma_open(vma, privcmd_vma);
+	return 0;
+
+out_enomem1:
+	kfree(privcmd_vma);
+out_enomem0:
+	kfree(privcmd_file);
+	return -ENOMEM;
+}
+
+int
+direct_remap_pfn_range(struct vm_area_struct *vma,
+		       unsigned long address,	// process virtual address
+		       unsigned long mfn,	// mfn, mfn + 1, ... mfn + size/PAGE_SIZE
+		       unsigned long size,
+		       pgprot_t prot,
+		       domid_t  domid)		// target domain
+{
+	struct xen_ia64_privcmd_vma* privcmd_vma =
+		(struct xen_ia64_privcmd_vma*)vma->vm_private_data;
+	unsigned long i;
+	unsigned long offset;
+	int error = 0;
+	BUG_ON(!running_on_xen);
+
+#if 0
+	if (prot != vm->vm_page_prot) {
+		return -EINVAL;
+	}
+#endif
+
+	i = (address - vma->vm_start) >> PAGE_SHIFT;
+	for (offset = 0; offset < size; offset += PAGE_SIZE) {
+		struct xen_ia64_privcmd_entry* entry =
+			&privcmd_vma->file->entries[i];
+		error = xen_ia64_privcmd_entry_mmap(vma, (address + offset) & PAGE_MASK, entry, mfn, prot, domid);
+		if (error != 0) {
+			break;
+		}
+
+		i++;
+		mfn++;
+        }
+
+	return error;
+}
+
