@@ -35,6 +35,7 @@ int xen_init(void)
 	return 0;
 }
 
+#ifndef CONFIG_XEN_IA64_DOM0_VP
 /* We just need a range of legal va here, though finally identity
  * mapped one is instead used for gnttab mapping.
  */
@@ -47,6 +48,7 @@ unsigned long alloc_empty_foreign_map_page_range(unsigned long pages)
 
 	return (unsigned long)vma->addr;
 }
+#endif
 
 #if 0
 /* These should be define'd but some drivers use them without
