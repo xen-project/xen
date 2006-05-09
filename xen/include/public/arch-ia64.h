@@ -329,10 +329,7 @@ typedef struct vcpu_guest_context {
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
 // dom0 vp op
-#define __HYPERVISOR_ia64_dom0vp_op     256 // XXX sufficient large
-                                            // TODO
-                                            // arch specific hypercall
-                                            // number conversion
+#define __HYPERVISOR_ia64_dom0vp_op     __HYPERVISOR_arch_0
 #define IA64_DOM0VP_ioremap             0       // map io space in machine
                                                 // address to dom0 physical
                                                 // address space.

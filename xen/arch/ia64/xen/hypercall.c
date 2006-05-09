@@ -71,7 +71,33 @@ hypercall_t ia64_hypercall_table[] =
 	(hypercall_t)do_ni_hypercall,		/*  */				/* 30 */
 	(hypercall_t)do_ni_hypercall,		/*  */
 	(hypercall_t)do_event_channel_op,
-	(hypercall_t)do_physdev_op
+	(hypercall_t)do_physdev_op,
+	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_ni_hypercall,		/*  */                  /* 35 */
+	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_ni_hypercall,		/*  */                  /* 40 */
+	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_ni_hypercall,		/*  */                  /* 45 */
+	(hypercall_t)do_ni_hypercall,		/*  */
+	(hypercall_t)do_ni_hypercall,		/*  */
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+	(hypercall_t)do_dom0vp_op,			/* dom0vp_op */
+#else
+	(hypercall_t)do_ni_hypercall,		/* arch_0 */
+#endif
+	(hypercall_t)do_ni_hypercall,		/* arch_1 */
+	(hypercall_t)do_ni_hypercall,		/* arch_2 */            /* 50 */
+	(hypercall_t)do_ni_hypercall,		/* arch_3 */
+	(hypercall_t)do_ni_hypercall,		/* arch_4 */
+	(hypercall_t)do_ni_hypercall,		/* arch_5 */
+	(hypercall_t)do_ni_hypercall,		/* arch_6 */
+	(hypercall_t)do_ni_hypercall		/* arch_7 */            /* 55 */
 	};
 
 uint32_t nr_hypercalls =
@@ -91,12 +117,6 @@ xen_hypercall (struct pt_regs *regs)
 			regs->r18,
 			regs->r19);
 	else
-#ifdef CONFIG_XEN_IA64_DOM0_VP
-	if (cmd ==  __HYPERVISOR_ia64_dom0vp_op) 
-		regs->r8 = do_dom0vp_op(regs->r14, regs->r15, regs->r16,
-		                        regs->r17, regs->r18);
-	else
-#endif
 		regs->r8 = -ENOSYS;
 
 	return 1;
