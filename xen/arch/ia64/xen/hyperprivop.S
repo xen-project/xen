@@ -176,7 +176,7 @@ GLOBAL_ENTRY(fast_hyperprivop)
 
 	// if not one of the above, give up for now and do it the slow way
 	br.sptk.many dispatch_break_fault ;;
-
+END(fast_hyperprivop)
 
 // give up for now if: ipsr.be==1, ipsr.pp==1
 // from reflect_interruption, don't need to:
@@ -329,6 +329,7 @@ ENTRY(hyper_ssm_i)
 	mov pr=r31,-1 ;;
 	rfi
 	;;
+END(hyper_ssm_i)
 
 // reflect domain clock interrupt
 //	r31 == pr
@@ -575,7 +576,7 @@ GLOBAL_ENTRY(fast_break_reflect)
 	adds r21=XSI_IIM_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r17;;
 	// fall through
-
+END(fast_break_reflect)
 
 // reflect to domain ivt+r20
 // sets up isr,iip,ipsr,ifs (FIXME: do iipa too)
@@ -704,6 +705,7 @@ ENTRY(fast_reflect)
 	mov pr=r31,-1 ;;
 	rfi
 	;;
+END(fast_reflect)
 
 // reflect access faults (0x2400,0x2800,0x5300) directly to domain
 //	r16 == isr
@@ -743,6 +745,7 @@ GLOBAL_ENTRY(fast_access_reflect)
 	and r22=~3,r22;;
 	st8 [r23]=r22;;
 	br.cond.sptk.many fast_reflect;;
+END(fast_access_reflect)
 
 // when we get to here, VHPT_CCHAIN_LOOKUP has failed and everything
 // is as it was at the time of original miss.  We want to preserve that
@@ -938,6 +941,7 @@ fast_tlb_no_tr_match:
 	extr.u r24=r24,2,6;;
 	// IFA already in PSCB
 	br.cond.sptk.many fast_insert;;
+END(fast_tlb_miss_reflect)
 
 // we get here if fast_insert fails (e.g. due to metaphysical lookup)
 ENTRY(recover_and_page_fault)
@@ -1127,9 +1131,10 @@ just_do_rfi:
 	;;
 	rfi
 	;;
-
+END(hyper_rfi)
+	
 #ifdef RFI_TO_INTERRUPT
-GLOBAL_ENTRY(rfi_check_extint)
+ENTRY(rfi_check_extint)
 	//br.sptk.many dispatch_break_fault ;;
 
 	// r18=&vpsr.i|vpsr.ic, r21==vpsr, r22=vcr.iip
@@ -1196,11 +1201,12 @@ GLOBAL_ENTRY(rfi_check_extint)
 	adds r29=15,r29;;
 	cmp.ge p6,p0=r29,r26	// if tpr masks interrupt, just rfi
 (p6)	br.cond.spnt.few just_do_rfi;;
+END(rfi_check_extint)
 
 // this doesn't work yet (dies early after getting to user mode)
 // but happens relatively infrequently, so fix it later.
 // NOTE that these will be counted incorrectly for now (for privcnt output)
-GLOBAL_ENTRY(rfi_with_interrupt)
+ENTRY(rfi_with_interrupt)
 #if 1
 	br.sptk.many dispatch_break_fault ;;
 #endif
@@ -1295,6 +1301,7 @@ GLOBAL_ENTRY(rfi_with_interrupt)
 	st4 [r20]=r0 ;;
 	mov pr=r31,-1 ;;
 	rfi
+END(rfi_with_interrupt)
 #endif // RFI_TO_INTERRUPT
 
 ENTRY(hyper_cover)
@@ -1330,6 +1337,7 @@ ENTRY(hyper_cover)
 	mov pr=r31,-1 ;;
 	rfi
 	;;
+END(hyper_cover)
 
 // return from metaphysical mode (meta=1) to virtual mode (meta=0)
 ENTRY(hyper_ssm_dt)
@@ -1366,6 +1374,7 @@ ENTRY(hyper_ssm_dt)
 	mov pr=r31,-1 ;;
 	rfi
 	;;
+END(hyper_ssm_dt)
 
 // go to metaphysical mode (meta=1) from virtual mode (meta=0)
 ENTRY(hyper_rsm_dt)
@@ -1403,6 +1412,7 @@ ENTRY(hyper_rsm_dt)
 	mov pr=r31,-1 ;;
 	rfi
 	;;
+END(hyper_rsm_dt)
 
 ENTRY(hyper_get_tpr)
 #ifdef FAST_HYPERPRIVOP_CNT
@@ -1826,7 +1836,7 @@ END(hyper_set_kr)
 // On entry:
 //	r18 == XSI_PSR_IC
 //	r31 == pr
-GLOBAL_ENTRY(hyper_thash)
+ENTRY(hyper_thash)
 #ifdef FAST_HYPERPRIVOP_CNT
 	movl r20=fast_hyperpriv_cnt+(8*HYPERPRIVOP_THASH);;
 	ld8 r21=[r20];;
@@ -1974,15 +1984,16 @@ ENTRY(recover_and_dispatch_break_fault)
 #endif
 	mov b0=r29 ;;
 	br.sptk.many dispatch_break_fault;;
+END(recover_and_dispatch_break_fault)
 
 //  Registers at entry
 //	r17 = break immediate (HYPERPRIVOP_ITC_D or I)
 //	r18 == XSI_PSR_IC_OFS
 //	r31 == pr
-GLOBAL_ENTRY(hyper_itc)
-ENTRY(hyper_itc_i)
+ENTRY(hyper_itc)
+hyper_itc_i:	
 	// fall through, hyper_itc_d handles both i and d
-ENTRY(hyper_itc_d)
+hyper_itc_d:	
 #ifndef FAST_ITC
 	br.sptk.many dispatch_break_fault ;;
 #else
@@ -2023,6 +2034,7 @@ ENTRY(hyper_itc_d)
 	mov r16=r8;;
 	// fall through
 #endif
+END(hyper_itc)
 
 #if defined(FAST_ITC) || defined (FAST_TLB_MISS_REFLECT)
 
@@ -2034,7 +2046,7 @@ ENTRY(hyper_itc_d)
 //	r29 == saved value of b0 in case of recovery
 //	r30 == recovery ip if failure occurs
 //	r31 == pr
-GLOBAL_ENTRY(fast_insert)
+ENTRY(fast_insert)
 	// translate_domain_pte(r16=pteval,PSCB(ifa)=address,r24=itir)
 	mov r19=1;;
 	shl r20=r19,r24;;

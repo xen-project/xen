@@ -333,6 +333,7 @@ vmx_dorfirfi_back:
     mov b0=r16
     br.cond.sptk b0         // call the service
     ;;
+END(ia64_leave_hypervisor)
 switch_rr7:
 // fall through
 GLOBAL_ENTRY(ia64_vmm_entry)
@@ -363,7 +364,7 @@ ia64_vmm_entry_out:
     mov b0=r29
     ;;
     br.cond.sptk b0             // call pal service
-END(ia64_leave_hypervisor)
+END(ia64_vmm_entry)
 
 //r24 rfi_pfs
 //r17 address of rfi_pfs

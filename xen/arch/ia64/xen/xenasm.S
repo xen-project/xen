@@ -337,7 +337,7 @@ END(dorfirfi)
 GLOBAL_ENTRY(dorfi)
         rfi
 	;;
-END(dorfirfi)
+END(dorfi)
 
 //
 // Long's Peak UART Offsets
