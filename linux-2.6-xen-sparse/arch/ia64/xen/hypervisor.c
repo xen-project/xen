@@ -285,3 +285,8 @@ EXPORT_SYMBOL(balloon_dealloc_empty_page_range);
 EXPORT_SYMBOL(balloon_update_driver_allowance);
 
 
+///////////////////////////////////////////////////////////////////////////
+// PageForeign(), SetPageForeign(), ClearPageForeign()
+
+struct address_space xen_ia64_foreign_dummy_mapping;
+

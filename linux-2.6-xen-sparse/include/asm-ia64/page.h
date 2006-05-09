@@ -235,6 +235,41 @@ get_order (unsigned long size)
 #include <linux/kernel.h>
 #include <asm/hypervisor.h>
 
+// XXX hack!
+//     Linux/IA64 uses PG_arch_1.
+//     This hack will be removed once PG_foreign bit is taken.
+//#include <xen/foreign_page.h>
+#ifdef __ASM_XEN_FOREIGN_PAGE_H__
+# error "don't include include/xen/foreign_page.h!"
+#endif
+
+extern struct address_space xen_ia64_foreign_dummy_mapping;
+#define PageForeign(page)	\
+	((page)->mapping == &xen_ia64_foreign_dummy_mapping)
+
+#define SetPageForeign(page, dtor) do {				\
+	set_page_private((page), (unsigned long)(dtor));	\
+	(page)->mapping = &xen_ia64_foreign_dummy_mapping;	\
+	smp_rmb();						\
+} while (0)
+
+#define ClearPageForeign(page) do {	\
+	(page)->mapping = NULL;		\
+	smp_rmb();			\
+	set_page_private((page), 0);	\
+} while (0)
+
+#define PageForeignDestructor(page)	\
+	( (void (*) (struct page *)) page_private(page) )
+
+#define arch_free_page(_page,_order)			\
+({      int foreign = PageForeign(_page);               \
+	if (foreign)                                    \
+		(PageForeignDestructor(_page))(_page);  \
+	foreign;                                        \
+})
+#define HAVE_ARCH_FREE_PAGE
+
 //XXX xen page size != page size
 
 static inline unsigned long
@@ -278,6 +313,9 @@ machine_to_phys_for_dma(unsigned long machine)
 
 #define set_phys_to_machine(pfn, mfn) do { } while (0)
 #define xen_machphys_update(mfn, pfn) do { } while (0)
+
+//XXX to compile set_phys_to_machine(vaddr, FOREIGN_FRAME(m))
+#define FOREIGN_FRAME(m)        (INVALID_P2M_ENTRY)
 
 #define mfn_to_pfn(mfn)			(mfn)
 #define mfn_to_virt(mfn)		(__va((mfn) << PAGE_SHIFT))
