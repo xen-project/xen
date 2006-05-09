@@ -7,20 +7,6 @@
 # to have been deleted).  I don't know how to avoid this right now,
 # but if someone has a better way, I'm all ears
 
-function try_to_mv() {
-	if [ ! -e $2 ]
-	then
-		mv $1 $2
-	fi
-}
-
-try_to_mv mm/Kconfig mm/Kconfig.xen-x86
-
-# need to grab a couple of xen-modified files for generic_page_range and
-# typedef pte_fn_t which are used by driver/xen blkif
-#ln -sf ../mm.xen-x86/memory.c mm/
-#ln -sf ../linux.xen-x86/mm.h include/linux/
-
 #eventually asm-xsi-offsets needs to be part of hypervisor.h/hypercall.h
 ln -sf ../../../../xen/include/asm-ia64/asm-xsi-offsets.h include/asm-ia64/xen/
 
