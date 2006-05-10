@@ -2,22 +2,16 @@
 # Makefile for the linux kernel.
 #
 
-XENARCH	:= $(subst ",,$(CONFIG_XENARCH))
-
-CPPFLAGS_vmlinux.lds += -U$(XENARCH)
-
-$(obj)/vmlinux.lds.S:
-	@ln -fsn $(srctree)/arch/$(XENARCH)/kernel/vmlinux.lds.S $@
-
-
 obj-y   := gnttab.o features.o
 obj-$(CONFIG_PROC_FS) += xen_proc.o
 
 ifeq ($(ARCH),ia64)
 obj-y   += evtchn_ia64.o
 obj-y   += xenia64_init.o
+ifeq ($(CONFIG_XEN_IA64_DOM0_VP),y)
+obj-$(CONFIG_NET)     += skbuff.o
+endif
 else
-extra-y += vmlinux.lds
 obj-y   += reboot.o evtchn.o fixup.o 
 obj-$(CONFIG_SMP)     += smp.o		# setup_profiling_timer def'd in ia64
 obj-$(CONFIG_NET)     += skbuff.o	# until networking is up on ia64
