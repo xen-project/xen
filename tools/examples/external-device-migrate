@@ -27,59 +27,85 @@ dir=$(dirname "$0")
 . "$dir/logging.sh"
 
 
-function usage() {
-	echo " Pass the following command line paremeters to the script:"
-	echo ""
-	echo "-step <n>     : n-th migration step"
-	echo "-host <host>  : the destination host"
-	echo "-domname <domain name> : name of the domain that is migrating"
-	echo "-type <device type>    : the type of device that is migrating"
-	echo "-recover               : indicates recovery request; an error"
-	echo "                         occurred during migration"
-	echo "-help                  : display this help screen"
+function ext_dev_migrate_usage() {
+cat <<EOF
+Pass the following command line parameters to the script:
+
+-step <n>              : n-th migration step
+-host <host>           : the destination host
+-domname <domain name> : name of the domain that is migrating
+-type <device type>    : the type of device that is migrating
+-subtype <dev. subtype>: the subtype of the device
+-recover               : indicates recovery request; an error
+                         occurred during migration
+-help                  : display this help screen
+EOF
 }
 
-while [ 1 ]; do
-	if [ "$1" == "-step" ]; then
+# Parse the command line paramters. The following parameters must be
+# passed as the first ones in the sequence:
+#  -step       [required]
+#  -host       [required]
+#  -domname    [required]
+#  -type       [required]
+#  -subtype    [optional]
+#  -recover    [optional]
+# The remaining ones will be passed to the called function.
+function evaluate_params()
+{
+	local step host domname typ recover filename func stype
+	stype=""
+	while [ 1 ]; do
+		if [ "$1" == "-step" ]; then
+			shift
+			step=$1
+		elif [ "$1" == "-host" ]; then
+			shift
+			host=$1
+		elif [ "$1" == "-domname" ]; then
+			shift
+			domname=$1
+		elif [ "$1" == "-type" ]; then
+			shift
+			typ=$1
+		elif [ "$1" == "-subtype" ]; then
+			shift
+			stype="_$1"
+		elif [ "$1" == "-recover" ]; then
+			recover=1
+		elif [ "$1" == "-help" ]; then
+			ext_dev_migrate_usage
+			exit
+		else
+			break
+		fi
 		shift
-		step=$1
-	elif [ "$1" == "-host" ]; then
-		shift
-		host=$1
-	elif [ "$1" == "-domname" ]; then
-		shift
-		domname=$1
-	elif [ "$1" == "-type" ]; then
-		shift
-		typ=$1
-	elif [ "$1" == "-recover" ]; then
-		recover=1
-	elif [ "$1" == "-help" ]; then
-		usage
+	done
+
+	if [ "$step"    == "" -o \
+	     "$host"    == "" -o \
+	     "$typ"     == "" -o \
+	     "$domname" == "" ]; then
+	 	echo "Error: Parameter(s) missing (-step/-host/-type/-domname)"
+		echo ""
+		echo "$0 -help for usage."
 		exit
-	else
-		break
 	fi
-	shift
-done
 
-if [ "$step"    == "" -o \
-     "$host"    == "" -o \
-     "$typ"     == "" -o \
-     "$domname" == "" ]; then
-	echo "Error: Parameter(s) missing (-step/-host/-type/-domname)"
-set
-	echo ""
-	echo "$0 --help for usage."
-	exit
-fi
+	filename="$dir/$typ$stype-migration.sh"
+	if [ ! -r $filename ]; then
+		echo "Error: Could not find script '$filename'"
+		return
+	fi
+	. "$filename"
 
-. "$dir/$typ-migration.sh"
+	if [ "$recover" == "1" ]; then
+		func="$typ"_recover
+		eval $func $host $domname $step $*
+	else
+		func="$typ"_migration_step
+		eval $func $host $domname $step $*
+	fi
+}
 
-if [ "$recover" == "1" ]; then
-	func="$typ"_recover
-	eval $func $host $domname $step
-else
-	func="$typ"_migration_step
-	eval $func $host $domname $step
-fi
+evaluate_params $*

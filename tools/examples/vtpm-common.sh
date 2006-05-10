@@ -64,8 +64,10 @@ fi
 #  Returns '0' if instance number could not be found, otherwise
 #  it returns the instance number in the variable 'instance'
 function vtpmdb_find_instance () {
-	local vmname=$1
-	local ret=0
+	local vmname ret instance
+	vmname=$1
+	ret=0
+
 	instance=$(cat $VTPMDB |                   \
 	          awk -vvmname=$vmname             \
 	          '{                               \
@@ -86,8 +88,9 @@ function vtpmdb_find_instance () {
 # Check whether a particular instance number is still available
 # returns "0" if it is not available, "1" otherwise.
 function vtpmdb_is_free_instancenum () {
-	local instance=$1
-	local avail=1
+	local instance instances avail i
+	instance=$1
+	avail=1
 	#Allowed instance number range: 1-255
 	if [ $instance -eq 0 -o $instance -gt 255 ]; then
 		avail=0
@@ -113,9 +116,7 @@ function vtpmdb_is_free_instancenum () {
 # Get an available instance number given the database
 # Returns an unused instance number
 function vtpmdb_get_free_instancenum () {
-	local ctr
-	local instances
-	local don
+	local ctr instances don found
 	instances=$(cat $VTPMDB |                \
 	           gawk                          \
 	           '{                            \
@@ -126,7 +127,6 @@ function vtpmdb_get_free_instancenum () {
 	ctr=1
 	don=0
 	while [ $don -eq 0 ]; do
-		local found
 		found=0
 		for i in $instances; do
 			if [ $i -eq $ctr ]; then
@@ -147,8 +147,9 @@ function vtpmdb_get_free_instancenum () {
 
 # Add a domain name and instance number to the DB file
 function vtpmdb_add_instance () {
-	local vmname=$1
-	local inst=$2
+	local res vmname inst
+	vmname=$1
+	inst=$2
 
 	if [ ! -f $VTPMDB ]; then
 		echo "#Database for VM to vTPM association" > $VTPMDB
@@ -165,9 +166,10 @@ function vtpmdb_add_instance () {
 #Validate whether an entry is the same as passed to this
 #function
 function vtpmdb_validate_entry () {
-	local rc=0
-	local vmname=$1
-	local inst=$2
+	local res rc vmname inst
+	rc=0
+	vmname=$1
+	inst=$2
 
 	res=$(cat $VTPMDB |            \
 	     gawk -vvmname=$vmname     \
@@ -188,9 +190,9 @@ function vtpmdb_validate_entry () {
 	     }')
 
 	if [ "$res" == "1" ]; then
-		let rc=1
+		rc=1
 	elif [ "$res" == "2" ]; then
-		let rc=2
+		rc=2
 	fi
 	echo "$rc"
 }
@@ -199,9 +201,11 @@ function vtpmdb_validate_entry () {
 #Remove an entry from the vTPM database given its domain name
 #and instance number
 function vtpmdb_remove_entry () {
-	local vmname=$1
-	local instance=$2
-	local VTPMDB_TMP="$VTPMDB".tmp
+	local vmname instance VTPMDB_TMP
+	vmname=$1
+	instance=$2
+	VTPMDB_TMP="$VTPMDB".tmp
+
 	$(cat $VTPMDB |            \
 	 gawk -vvmname=$vmname     \
 	 '{                        \
@@ -219,13 +223,14 @@ function vtpmdb_remove_entry () {
 
 
 # Find the reason for the creation of this device:
-# Set global REASON variable to 'resume' or 'create'
+# Returns 'resume' or 'create'
 function vtpm_get_create_reason () {
-	local resume=$(xenstore-read $XENBUS_PATH/resume)
+	local resume
+	resume=$(xenstore-read $XENBUS_PATH/resume)
 	if [ "$resume" == "True" ]; then
-		REASON="resume"
+		echo "resume"
 	else
-		REASON="create"
+		echo "create"
 	fi
 }
 
@@ -234,10 +239,9 @@ function vtpm_get_create_reason () {
 # If no entry in the TPM database is found, the instance is
 # created and an entry added to the database.
 function vtpm_create_instance () {
-	local domname=$(xenstore_read "$XENBUS_PATH"/domain)
-	local res
-	local instance
-	vtpm_get_create_reason
+	local res instance domname reason
+	domname=$(xenstore_read "$XENBUS_PATH"/domain)
+	reason=$(vtpm_get_create_reason)
 
 	claim_lock vtpmdb
 	instance=$(vtpmdb_find_instance $domname)
@@ -252,20 +256,20 @@ function vtpm_create_instance () {
 		else
 			instance=$(vtpmdb_get_free_instancenum)
 		fi
-		vtpmdb_add_instance $domname $instance
-		if [ "$REASON" == "create" ]; then
+		if [ "$reason" == "create" ]; then
 			vtpm_create $instance
-		elif [ "$REASON" == "resume" ]; then
-			vtpm_resume $instance $domname
 		else
-			#default case for 'now'
-			vtpm_create $instance
+			vtpm_resume $instance $domname
+		fi
+		if [ $vtpm_fatal_error -eq 0 ]; then
+			vtpmdb_add_instance $domname $instance
 		fi
 	fi
 
 	release_lock vtpmdb
 
-	if [ "$REASON" == "create" ]; then
+	if [ $vtpm_fatal_error -eq 0 -a \
+	     "$reason" == "create" ]; then
 		vtpm_reset $instance
 	fi
 	xenstore_write $XENBUS_PATH/instance $instance
@@ -276,15 +280,18 @@ function vtpm_create_instance () {
 #Since it is assumed that the VM will appear again, the
 #entry is kept in the VTPMDB file.
 function vtpm_remove_instance () {
-	local domname=$(xenstore_read "$XENBUS_PATH"/domain)
+	local instance reason domname
+	domname=$(xenstore_read "$XENBUS_PATH"/domain)
 
-	claim_lock vtpmdb
+	if [ "$doname" != "" ]; then
+		claim_lock vtpmdb
 
-	instance=$(vtpmdb_find_instance $domname)
+		instance=$(vtpmdb_find_instance $domname)
 
-	if [ "$instance" != "0" ]; then
-		if [ "$REASON" == "suspend" ]; then
-			vtpm_suspend $instance
+		if [ "$instance" != "0" ]; then
+			if [ "$reason" == "suspend" ]; then
+				vtpm_suspend $instance
+			fi
 		fi
 	fi
 
@@ -295,7 +302,7 @@ function vtpm_remove_instance () {
 #Remove an entry in the VTPMDB file given the domain's name
 #1st parameter: The name of the domain
 function vtpm_delete_instance () {
-	local rc
+	local instance
 
 	claim_lock vtpmdb
 
@@ -313,20 +320,21 @@ function vtpm_delete_instance () {
 #  "0"  : this is not an address of this machine
 #  "1"  : this is an address local to this machine
 function isLocalAddress() {
-	local addr=$(ping $1 -c 1 |  \
-	             gawk '{ print substr($3,2,length($3)-2); exit }')
+	local addr res
+	addr=$(ping $1 -c 1 |  \
+	       gawk '{ print substr($3,2,length($3)-2); exit }')
 	if [ "$addr" == "" ]; then
 		echo "-1"
 		return
 	fi
-	local res=$(ifconfig | grep "inet addr" |  \
-	           gawk -vaddr=$addr               \
-	           '{                              \
-	              if ( addr == substr($2, 6)) {\
-	                print "1";                 \
-	              }                            \
-	           }'                              \
-	          )
+	res=$(ifconfig | grep "inet addr" |  \
+	     gawk -vaddr=$addr               \
+	     '{                              \
+	        if ( addr == substr($2, 6)) {\
+	          print "1";                 \
+	        }                            \
+	     }'                              \
+	    )
 	if [ "$res" == "" ]; then
 		echo "0"
 		return
@@ -341,7 +349,8 @@ function isLocalAddress() {
 # 2nd: name of the domain to migrate
 # 3rd: the migration step to perform
 function vtpm_migration_step() {
-	local instance=$(vtpmdb_find_instance $2)
+	local instance res
+	instance=$(vtpmdb_find_instance $2)
 	if [ "$instance" == "" ]; then
 		echo "Error: Translation of domain name ($2) to instance failed. Check /etc/xen/vtpm.db"
 		log err "Error during translation of domain name"
@@ -360,6 +369,7 @@ function vtpm_migration_step() {
 # 2nd: name of the domain that was to be migrated
 # 3rd: the last successful migration step that was done
 function vtpm_recover() {
+	local res
 	res=$(isLocalAddress $1)
 	if [ "$res" == "0" ]; then
 		vtpm_migrate_recover $1 $2 $3

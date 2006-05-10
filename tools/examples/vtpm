@@ -23,5 +23,6 @@ esac
 if [ $vtpm_fatal_error -eq 0 ]; then
 	log debug "Successful vTPM operation '$command'."
 	success
+else
+	fatal "Error while executing vTPM operation '$command'."
 fi
-
