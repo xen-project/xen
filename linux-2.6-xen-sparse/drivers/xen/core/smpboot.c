@@ -107,6 +107,18 @@ void __init smp_alloc_memory(void)
 {
 }
 
+static inline void
+set_cpu_sibling_map(int cpu)
+{
+	phys_proc_id[cpu] = cpu;
+	cpu_core_id[cpu]  = 0;
+
+	cpu_sibling_map[cpu] = cpumask_of_cpu(cpu);
+	cpu_core_map[cpu]    = cpumask_of_cpu(cpu);
+
+	cpu_data[cpu].booted_cores = 1;
+}
+
 static void xen_smp_intr_init(unsigned int cpu)
 {
 	sprintf(resched_name[cpu], "resched%d", cpu);
@@ -230,14 +242,20 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	struct Xgt_desc_struct *gdt_descr;
 #endif
 
+	boot_cpu_data.apicid = 0;
 	cpu_data[0] = boot_cpu_data;
 
 	cpu_2_logical_apicid[0] = 0;
 	x86_cpu_to_apicid[0] = 0;
 
 	current_thread_info()->cpu = 0;
-	cpu_sibling_map[0] = cpumask_of_cpu(0);
-	cpu_core_map[0]    = cpumask_of_cpu(0);
+
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		cpus_clear(cpu_sibling_map[cpu]);
+		cpus_clear(cpu_core_map[cpu]);
+	}
+
+	set_cpu_sibling_map(0);
 
 	xen_smp_intr_init(0);
 
@@ -262,6 +280,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 			XENFEAT_writable_descriptor_tables);
 
 		cpu_data[cpu] = boot_cpu_data;
+		cpu_data[cpu].apicid = cpu;
+
 		cpu_2_logical_apicid[cpu] = cpu;
 		x86_cpu_to_apicid[cpu] = cpu;
 
@@ -470,6 +490,18 @@ void smp_resume(void)
 		vcpu_hotplug(i);
 }
 
+static void
+remove_siblinginfo(int cpu)
+{
+	phys_proc_id[cpu] = BAD_APICID;
+	cpu_core_id[cpu]  = BAD_APICID;
+
+	cpus_clear(cpu_sibling_map[cpu]);
+	cpus_clear(cpu_core_map[cpu]);
+
+	cpu_data[cpu].booted_cores = 0;
+}
+
 int __cpu_disable(void)
 {
 	cpumask_t map = cpu_online_map;
@@ -477,6 +509,8 @@ int __cpu_disable(void)
 
 	if (cpu == 0)
 		return -EBUSY;
+
+	remove_siblinginfo(cpu);
 
 	cpu_clear(cpu, map);
 	fixup_irqs(map);
@@ -548,6 +582,10 @@ int __devinit __cpu_up(unsigned int cpu)
 	if (num_online_cpus() == 1)
 		prepare_for_smp();
 #endif
+
+	/* This must be done before setting cpu_online_map */
+	set_cpu_sibling_map(cpu);
+	wmb();
 
 	xen_smp_intr_init(cpu);
 	cpu_set(cpu, cpu_online_map);
