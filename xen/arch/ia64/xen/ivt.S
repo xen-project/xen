@@ -100,6 +100,15 @@
 	mov r19=n;;			/* prepare to save predicates */		\
 	br.sptk.many dispatch_to_fault_handler
 
+#define FAULT_OR_REFLECT(n)								\
+	mov r31=pr;	 	 							\
+	mov r20=cr.ipsr;;								\
+	mov r19=n;	/* prepare to save predicates */				\
+	extr.u r20=r20,IA64_PSR_CPL0_BIT,2;;   						\
+	cmp.ne p6,p0=r0,r20; 	/* cpl != 0?*/						\
+(p6)	br.dptk.many dispatch_reflection;						\
+	br.sptk.few dispatch_to_fault_handler
+
 #ifdef XEN
 #define REFLECT(n)									\
 	mov r31=pr;									\
@@ -697,7 +706,7 @@ END(nested_dtlb_miss)
 ENTRY(ikey_miss)
 	DBG_FAULT(6)
 #ifdef XEN
-	REFLECT(6)
+	FAULT_OR_REFLECT(6)
 #endif
 	FAULT(6)
 END(ikey_miss)
@@ -746,7 +755,7 @@ END(page_fault)
 ENTRY(dkey_miss)
 	DBG_FAULT(7)
 #ifdef XEN
-	REFLECT(7)
+	FAULT_OR_REFLECT(7)
 #endif
 	FAULT(7)
 END(dkey_miss)
@@ -757,7 +766,7 @@ END(dkey_miss)
 ENTRY(dirty_bit)
 	DBG_FAULT(8)
 #ifdef XEN
-	REFLECT(8)
+	FAULT_OR_REFLECT(8)
 #endif
 	/*
 	 * What we do here is to simply turn on the dirty bit in the PTE.  We need to
@@ -1523,7 +1532,7 @@ END(dispatch_to_fault_handler)
 ENTRY(page_not_present)
 	DBG_FAULT(20)
 #ifdef XEN
-	REFLECT(20)
+	FAULT_OR_REFLECT(20)
 #endif
 	mov r16=cr.ifa
 	rsm psr.dt
@@ -1546,7 +1555,7 @@ END(page_not_present)
 ENTRY(key_permission)
 	DBG_FAULT(21)
 #ifdef XEN
-	REFLECT(21)
+	FAULT_OR_REFLECT(21)
 #endif
 	mov r16=cr.ifa
 	rsm psr.dt
@@ -1562,7 +1571,7 @@ END(key_permission)
 ENTRY(iaccess_rights)
 	DBG_FAULT(22)
 #ifdef XEN
-	REFLECT(22)
+	FAULT_OR_REFLECT(22)
 #endif
 	mov r16=cr.ifa
 	rsm psr.dt
@@ -1637,7 +1646,7 @@ ENTRY(disabled_fp_reg)
 	mov pr=r20,-1
 	;;
 #endif
-	REFLECT(25)
+	FAULT_OR_REFLECT(25)
 //floating_panic:
 //	br.sptk.many floating_panic
 	;;
@@ -1656,7 +1665,7 @@ END(disabled_fp_reg)
 ENTRY(nat_consumption)
 	DBG_FAULT(26)
 #ifdef XEN
-	REFLECT(26)
+	FAULT_OR_REFLECT(26)
 #endif
 	FAULT(26)
 END(nat_consumption)
@@ -1668,7 +1677,7 @@ ENTRY(speculation_vector)
 	DBG_FAULT(27)
 #ifdef XEN
 	// this probably need not reflect...
-	REFLECT(27)
+	FAULT_OR_REFLECT(27)
 #endif
 	/*
 	 * A [f]chk.[as] instruction needs to take the branch to the recovery code but
@@ -1714,7 +1723,7 @@ END(speculation_vector)
 ENTRY(debug_vector)
 	DBG_FAULT(29)
 #ifdef XEN
-	REFLECT(29)
+	FAULT_OR_REFLECT(29)
 #endif
 	FAULT(29)
 END(debug_vector)
@@ -1725,7 +1734,7 @@ END(debug_vector)
 ENTRY(unaligned_access)
 	DBG_FAULT(30)
 #ifdef XEN
-	REFLECT(30)
+	FAULT_OR_REFLECT(30)
 #endif
 	mov r16=cr.ipsr
 	mov r31=pr		// prepare to save predicates
@@ -1739,7 +1748,7 @@ END(unaligned_access)
 ENTRY(unsupported_data_reference)
 	DBG_FAULT(31)
 #ifdef XEN
-	REFLECT(31)
+	FAULT_OR_REFLECT(31)
 #endif
 	FAULT(31)
 END(unsupported_data_reference)
@@ -1750,7 +1759,7 @@ END(unsupported_data_reference)
 ENTRY(floating_point_fault)
 	DBG_FAULT(32)
 #ifdef XEN
-	REFLECT(32)
+	FAULT_OR_REFLECT(32)
 #endif
 	FAULT(32)
 END(floating_point_fault)
@@ -1761,7 +1770,7 @@ END(floating_point_fault)
 ENTRY(floating_point_trap)
 	DBG_FAULT(33)
 #ifdef XEN
-	REFLECT(33)
+	FAULT_OR_REFLECT(33)
 #endif
 	FAULT(33)
 END(floating_point_trap)
@@ -1772,7 +1781,7 @@ END(floating_point_trap)
 ENTRY(lower_privilege_trap)
 	DBG_FAULT(34)
 #ifdef XEN
-	REFLECT(34)
+	FAULT_OR_REFLECT(34)
 #endif
 	FAULT(34)
 END(lower_privilege_trap)
@@ -1783,7 +1792,7 @@ END(lower_privilege_trap)
 ENTRY(taken_branch_trap)
 	DBG_FAULT(35)
 #ifdef XEN
-	REFLECT(35)
+	FAULT_OR_REFLECT(35)
 #endif
 	FAULT(35)
 END(taken_branch_trap)
@@ -1794,7 +1803,7 @@ END(taken_branch_trap)
 ENTRY(single_step_trap)
 	DBG_FAULT(36)
 #ifdef XEN
-	REFLECT(36)
+	FAULT_OR_REFLECT(36)
 #endif
 	FAULT(36)
 END(single_step_trap)
@@ -1853,7 +1862,7 @@ END(single_step_trap)
 ENTRY(ia32_exception)
 	DBG_FAULT(45)
 #ifdef XEN
-	REFLECT(45)
+	FAULT_OR_REFLECT(45)
 #endif
 	FAULT(45)
 END(ia32_exception)
@@ -1864,7 +1873,7 @@ END(ia32_exception)
 ENTRY(ia32_intercept)
 	DBG_FAULT(46)
 #ifdef XEN
-	REFLECT(46)
+	FAULT_OR_REFLECT(46)
 #endif
 #ifdef	CONFIG_IA32_SUPPORT
 	mov r31=pr
@@ -1897,7 +1906,7 @@ END(ia32_intercept)
 ENTRY(ia32_interrupt)
 	DBG_FAULT(47)
 #ifdef XEN
-	REFLECT(47)
+	FAULT_OR_REFLECT(47)
 #endif
 #ifdef CONFIG_IA32_SUPPORT
 	mov r31=pr

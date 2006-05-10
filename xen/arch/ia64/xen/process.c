@@ -367,10 +367,10 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		"Unknown fault 9", "Unknown fault 10", "Unknown fault 11", "Unknown fault 12",
 		"Unknown fault 13", "Unknown fault 14", "Unknown fault 15"
 	};
-#if 0
-printf("ia64_fault, vector=0x%p, ifa=%p, iip=%p, ipsr=%p, isr=%p\n",
- vector, ifa, regs->cr_iip, regs->cr_ipsr, isr);
-#endif
+
+	printf("ia64_fault, vector=0x%p, ifa=%p, iip=%p, ipsr=%p, isr=%p\n",
+	       vector, ifa, regs->cr_iip, regs->cr_ipsr, isr);
+
 
 	if ((isr & IA64_ISR_NA) && ((isr & IA64_ISR_CODE_MASK) == IA64_ISR_CODE_LFETCH)) {
 		/*
@@ -383,15 +383,48 @@ printf("ia64_fault, vector=0x%p, ifa=%p, iip=%p, ipsr=%p, isr=%p\n",
 	}
 
 	switch (vector) {
-	      case 24: /* General Exception */
+	    case 0:
+		printk("VHPT Translation.\n");
+		break;
+	  
+	    case 4:
+		printk("Alt ITLB.\n");
+		break;
+	  
+	    case 6:
+		printk("Instruction Key Miss.\n");
+		break;
+
+	    case 7: 
+		printk("Data Key Miss.\n");
+		break;
+
+	    case 8: 
+		printk("Dirty-bit.\n");
+		break;
+
+	    case 20:
+		printk("Page Not Found.\n");
+		break;
+
+	    case 21:
+		printk("Key Permission.\n");
+		break;
+
+	    case 22:
+		printk("Instruction Access Rights.\n");
+		break;
+
+	    case 24: /* General Exception */
 		code = (isr >> 4) & 0xf;
 		sprintf(buf, "General Exception: %s%s", reason[code],
-			(code == 3) ? ((isr & (1UL << 37))
-				       ? " (RSE access)" : " (data access)") : "");
+		        (code == 3) ? ((isr & (1UL << 37)) ? " (RSE access)" :
+		                       " (data access)") : "");
 		if (code == 8) {
 # ifdef CONFIG_IA64_PRINT_HAZARDS
 			printk("%s[%d]: possible hazard @ ip=%016lx (pr = %016lx)\n",
-			       current->comm, current->pid, regs->cr_iip + ia64_psr(regs)->ri,
+			       current->comm, current->pid,
+			       regs->cr_iip + ia64_psr(regs)->ri,
 			       regs->pr);
 # endif
 			printf("ia64_fault: returning on hazard\n");
@@ -399,162 +432,65 @@ printf("ia64_fault, vector=0x%p, ifa=%p, iip=%p, ipsr=%p, isr=%p\n",
 		}
 		break;
 
-	      case 25: /* Disabled FP-Register */
-		if (isr & 2) {
-			//disabled_fph_fault(regs);
-			//return;
-		}
-		sprintf(buf, "Disabled FPL fault---not supposed to happen!");
+	    case 25:
+		printk("Disabled FP-Register.\n");
 		break;
 
-	      case 26: /* NaT Consumption */
-		if (user_mode(regs)) {
-			void *addr;
-
-			if (((isr >> 4) & 0xf) == 2) {
-				/* NaT page consumption */
-				//sig = SIGSEGV;
-				//code = SEGV_ACCERR;
-				addr = (void *) ifa;
-			} else {
-				/* register NaT consumption */
-				//sig = SIGILL;
-				//code = ILL_ILLOPN;
-				addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
-			}
-			//siginfo.si_signo = sig;
-			//siginfo.si_code = code;
-			//siginfo.si_errno = 0;
-			//siginfo.si_addr = addr;
-			//siginfo.si_imm = vector;
-			//siginfo.si_flags = __ISR_VALID;
-			//siginfo.si_isr = isr;
-			//force_sig_info(sig, &siginfo, current);
-			//return;
-		} //else if (ia64_done_with_exception(regs))
-			//return;
-		sprintf(buf, "NaT consumption");
+	    case 26:
+		printk("NaT consumption.\n");
 		break;
 
-	      case 31: /* Unsupported Data Reference */
-		if (user_mode(regs)) {
-			//siginfo.si_signo = SIGILL;
-			//siginfo.si_code = ILL_ILLOPN;
-			//siginfo.si_errno = 0;
-			//siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
-			//siginfo.si_imm = vector;
-			//siginfo.si_flags = __ISR_VALID;
-			//siginfo.si_isr = isr;
-			//force_sig_info(SIGILL, &siginfo, current);
-			//return;
-		}
-		sprintf(buf, "Unsupported data reference");
+	    case 29:
+		printk("Debug.\n");
 		break;
 
-	      case 29: /* Debug */
-	      case 35: /* Taken Branch Trap */
-	      case 36: /* Single Step Trap */
-		//if (fsys_mode(current, regs)) {}
-		switch (vector) {
-		      case 29:
-			//siginfo.si_code = TRAP_HWBKPT;
-#ifdef CONFIG_ITANIUM
-			/*
-			 * Erratum 10 (IFA may contain incorrect address) now has
-			 * "NoFix" status.  There are no plans for fixing this.
-			 */
-			if (ia64_psr(regs)->is == 0)
-			  ifa = regs->cr_iip;
-#endif
-			break;
-		      case 35: ifa = 0; break;
-		      case 36: ifa = 0; break;
-		      //case 35: siginfo.si_code = TRAP_BRANCH; ifa = 0; break;
-		      //case 36: siginfo.si_code = TRAP_TRACE; ifa = 0; break;
-		}
-		//siginfo.si_signo = SIGTRAP;
-		//siginfo.si_errno = 0;
-		//siginfo.si_addr  = (void *) ifa;
-		//siginfo.si_imm   = 0;
-		//siginfo.si_flags = __ISR_VALID;
-		//siginfo.si_isr   = isr;
-		//force_sig_info(SIGTRAP, &siginfo, current);
-		//return;
-
-	      case 32: /* fp fault */
-	      case 33: /* fp trap */
-		//result = handle_fpu_swa((vector == 32) ? 1 : 0, regs, isr);
-		//if ((result < 0) || (current->thread.flags & IA64_THREAD_FPEMU_SIGFPE)) {
-			//siginfo.si_signo = SIGFPE;
-			//siginfo.si_errno = 0;
-			//siginfo.si_code = FPE_FLTINV;
-			//siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
-			//siginfo.si_flags = __ISR_VALID;
-			//siginfo.si_isr = isr;
-			//siginfo.si_imm = 0;
-			//force_sig_info(SIGFPE, &siginfo, current);
-		//}
-		//return;
-		sprintf(buf, "FP fault/trap");
+	    case 30:
+		printk("Unaligned Reference.\n");
 		break;
 
-	      case 34:
-		if (isr & 0x2) {
-			/* Lower-Privilege Transfer Trap */
-			/*
-			 * Just clear PSR.lp and then return immediately: all the
-			 * interesting work (e.g., signal delivery is done in the kernel
-			 * exit path).
-			 */
-			//ia64_psr(regs)->lp = 0;
-			//return;
-			sprintf(buf, "Lower-Privilege Transfer trap");
-		} else {
-			/* Unimplemented Instr. Address Trap */
-			if (user_mode(regs)) {
-				//siginfo.si_signo = SIGILL;
-				//siginfo.si_code = ILL_BADIADDR;
-				//siginfo.si_errno = 0;
-				//siginfo.si_flags = 0;
-				//siginfo.si_isr = 0;
-				//siginfo.si_imm = 0;
-				//siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
-				//force_sig_info(SIGILL, &siginfo, current);
-				//return;
-			}
-			sprintf(buf, "Unimplemented Instruction Address fault");
-		}
+	    case 31:
+		printk("Unsupported data reference.\n");
 		break;
 
-	      case 45:
-		printk(KERN_ERR "Unexpected IA-32 exception (Trap 45)\n");
-		printk(KERN_ERR "  iip - 0x%lx, ifa - 0x%lx, isr - 0x%lx\n",
-		       regs->cr_iip, ifa, isr);
-		//force_sig(SIGSEGV, current);
+	    case 32:
+		printk("Floating-Point Fault.\n");
 		break;
 
-	      case 46:
-		printk(KERN_ERR "Unexpected IA-32 intercept trap (Trap 46)\n");
-		printk(KERN_ERR "  iip - 0x%lx, ifa - 0x%lx, isr - 0x%lx, iim - 0x%lx\n",
-		       regs->cr_iip, ifa, isr, iim);
-		//force_sig(SIGSEGV, current);
-		return;
-
-	      case 47:
-		sprintf(buf, "IA-32 Interruption Fault (int 0x%lx)", isr >> 16);
+	    case 33:
+		printk("Floating-Point Trap.\n");
 		break;
 
-	      default:
-		sprintf(buf, "Fault %lu", vector);
+	    case 34:
+		printk("Lower Privilege Transfer Trap.\n");
+		break;
+
+	    case 35:
+		printk("Taken Branch Trap.\n");
+		break;
+
+	    case 36:
+		printk("Single Step Trap.\n");
+		break;
+    
+	    case 45:
+		printk("IA-32 Exception.\n");
+		break;
+
+	    case 46:
+		printk("IA-32 Intercept.\n");
+		break;
+
+	    case 47:
+		printk("IA-32 Interrupt.\n");
+		break;
+
+	    default:
+		printk("Fault %lu\n", vector);
 		break;
 	}
-	//die_if_kernel(buf, regs, error);
-printk("ia64_fault: %s: reflecting\n",buf);
-PSCB(current,itir) = vcpu_get_itir_on_fault(current,ifa);
-PSCB(current,ifa) = ifa;
-reflect_interruption(isr,regs,IA64_GENEX_VECTOR);
-//while(1);
-	//force_sig(SIGILL, current);
+
+	show_registers(regs);
+	panic("Fault in Xen.\n");
 }
 
 unsigned long running_on_sim = 0;
