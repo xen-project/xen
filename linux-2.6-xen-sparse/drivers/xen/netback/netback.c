@@ -170,9 +170,10 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		ret = skb_copy_bits(skb, -hlen, nskb->data - hlen,
 				     skb->len + hlen);
 		BUG_ON(ret);
+		/* Copy only the header fields we use in this driver. */
 		nskb->dev = skb->dev;
+		nskb->ip_summed = skb->ip_summed;
 		nskb->proto_data_valid = skb->proto_data_valid;
-		nskb->proto_csum_blank = skb->proto_csum_blank;
 		dev_kfree_skb(skb);
 		skb = nskb;
 	}

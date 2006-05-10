@@ -665,7 +665,10 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			goto drop;
 		skb_put(nskb, skb->len);
 		memcpy(nskb->data, skb->data, skb->len);
+		/* Copy only the header fields we use in this driver. */
 		nskb->dev = skb->dev;
+		nskb->ip_summed = skb->ip_summed;
+		nskb->proto_data_valid = skb->proto_data_valid;
 		dev_kfree_skb(skb);
 		skb = nskb;
 	}
@@ -898,8 +901,11 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 				skb_reserve(nskb, 2);
 				skb_put(nskb, skb->len);
 				memcpy(nskb->data, skb->data, skb->len);
+				/* Copy any other fields we already set up. */
 				nskb->dev = skb->dev;
 				nskb->ip_summed = skb->ip_summed;
+				nskb->proto_data_valid = skb->proto_data_valid;
+				nskb->proto_csum_blank = skb->proto_csum_blank;
 			}
 
 			/* Reinitialise and then destroy the old skbuff. */
