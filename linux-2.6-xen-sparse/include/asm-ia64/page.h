@@ -234,6 +234,8 @@ get_order (unsigned long size)
 
 #include <linux/kernel.h>
 #include <asm/hypervisor.h>
+#include <xen/features.h>	// to compile netback, netfront
+typedef unsigned long maddr_t;	// to compile netback, netfront
 
 // XXX hack!
 //     Linux/IA64 uses PG_arch_1.
