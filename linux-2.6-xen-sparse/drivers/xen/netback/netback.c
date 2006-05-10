@@ -172,6 +172,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		BUG_ON(ret);
 		nskb->dev = skb->dev;
 		nskb->proto_data_valid = skb->proto_data_valid;
+		nskb->proto_csum_blank = skb->proto_csum_blank;
 		dev_kfree_skb(skb);
 		skb = nskb;
 	}
