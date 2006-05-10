@@ -408,7 +408,7 @@ class XendDomain:
             raise XendError("Cannot migrate privileged domain %i" % domid)
 
         """ The following call may raise a XendError exception """
-        dominfo.testMigrateDevices(live, dst)
+        dominfo.testMigrateDevices(True, dst)
 
         if port == 0:
             port = xroot.get_xend_relocation_port()
@@ -420,7 +420,7 @@ class XendDomain:
 
         sock.send("receive\n")
         sock.recv(80)
-        XendCheckpoint.save(sock.fileno(), dominfo, live, dst)
+        XendCheckpoint.save(sock.fileno(), dominfo, True, live, dst)
 
 
     def domain_save(self, domid, dst):
@@ -440,7 +440,7 @@ class XendDomain:
             fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
             try:
                 # For now we don't support 'live checkpoint' 
-                return XendCheckpoint.save(fd, dominfo, False, dst)
+                return XendCheckpoint.save(fd, dominfo, False, False, dst)
             finally:
                 os.close(fd)
         except OSError, ex:

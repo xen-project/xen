@@ -54,7 +54,7 @@ def read_exact(fd, size, errmsg):
 
 
 
-def save(fd, dominfo, live, dst):
+def save(fd, dominfo, network, live, dst):
     write_exact(fd, SIGNATURE, "could not write guest state file: signature")
 
     config = sxp.to_string(dominfo.sxpr())
@@ -66,7 +66,7 @@ def save(fd, dominfo, live, dst):
     dominfo.setName('migrating-' + domain_name)
 
     try:
-        dominfo.migrateDevices(live, dst, DEV_MIGRATE_STEP1, domain_name)
+        dominfo.migrateDevices(network, dst, DEV_MIGRATE_STEP1, domain_name)
 
         write_exact(fd, pack("!i", len(config)),
                     "could not write guest state file: config len")
@@ -88,10 +88,10 @@ def save(fd, dominfo, live, dst):
                 log.debug("Suspending %d ...", dominfo.getDomid())
                 dominfo.shutdown('suspend')
                 dominfo.waitForShutdown()
-                dominfo.migrateDevices(live, dst, DEV_MIGRATE_STEP2,
+                dominfo.migrateDevices(network, dst, DEV_MIGRATE_STEP2,
                                        domain_name)
                 log.info("Domain %d suspended.", dominfo.getDomid())
-                dominfo.migrateDevices(live, dst, DEV_MIGRATE_STEP3,
+                dominfo.migrateDevices(network, dst, DEV_MIGRATE_STEP3,
                                        domain_name)
                 tochild.write("done\n")
                 tochild.flush()

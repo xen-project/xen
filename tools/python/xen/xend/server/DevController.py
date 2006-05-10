@@ -267,9 +267,9 @@ class DevController:
 
         raise NotImplementedError()
 
-    def migrate(self, deviceConfig, live, dst, step, domName):
-        """ Migration of a device. The 'live' parameter indicates
-            whether the device is live-migrated (live=1). 'dst' then gives
+    def migrate(self, deviceConfig, network, dst, step, domName):
+        """ Migration of a device. The 'network' parameter indicates
+            whether the device is network-migrated (True). 'dst' then gives
             the hostname of the machine to migrate to.
         This function is called for 4 steps:
         If step == 0: Check whether the device is ready to be migrated
@@ -296,7 +296,7 @@ class DevController:
         return 0
 
 
-    def recover_migrate(self, deviceConfig, list, dst, step, domName):
+    def recover_migrate(self, deviceConfig, network, dst, step, domName):
         """ Recover from device migration. The given step was the
             last one that was successfully executed.
         """
