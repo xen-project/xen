@@ -172,6 +172,19 @@ xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	if (running_on_xen)
 		__xen_destroy_contiguous_region(vstart, order);
 }
+
+// for netfront.c, netback.c
+#define MULTI_UVMFLAGS_INDEX 0 //XXX any value
+
+static inline void
+MULTI_update_va_mapping(
+	multicall_entry_t *mcl, unsigned long va,
+	pte_t new_val, unsigned long flags)
+{
+	mcl->op = __HYPERVISOR_update_va_mapping;
+	mcl->result = 0;
+}
+
 #else
 #define xen_create_contiguous_region(vstart, order, address_bits)	(0)
 #define xen_destroy_contiguous_region(vstart, order)	do {} while (0)
