@@ -63,32 +63,6 @@ config ARCH_XEN
 	help
 	  TEMP ONLY. Needs to be on for drivers/xen to build.
 
-config XEN_PRIVILEGED_GUEST
-	bool "Privileged Guest"
-	default n
-	help
-	  Used in drivers/xen/privcmd.c.  Should go away?
-
-config XEN_BLKDEV_GRANT
-	depends on XEN
-	bool
-	default y
-
-config XEN_BLKDEV_FRONTEND
-	depends on XEN
-	bool
-	default y
-
-config XEN_BACKEND
-	depends on XEN
-	bool
-	default y
-
-config XEN_BLKDEV_BACKEND
-	depends on XEN && XEN_BACKEND
-	bool
-	default y
-
 config XEN_IA64_DOM0_VP
 	bool "dom0 vp model"
 	depends on XEN
@@ -102,18 +76,6 @@ config XEN_IA64_DOM0_NON_VP
 	default y
 	help
 	  dom0 P=M model
-
-config XEN_SYSFS
-	bool "Export Xen attributes in sysfs"
-	depends on XEN && SYSFS
-	default y
-	help
-		Xen hypervisor attributes will show up under /sys/hypervisor/.
-
-config XEN_INTERFACE_VERSION
-	hex
-	depends on XEN
-	default 0x00030202
 
 config SCHED_NO_NO_OMIT_FRAME_POINTER
 	bool
@@ -532,3 +494,16 @@ source "arch/ia64/Kconfig.debug"
 source "security/Kconfig"
 
 source "crypto/Kconfig"
+
+# override default values of drivers/xen/Kconfig
+if !XEN_IA64_DOM0_VP
+config HAVE_ARCH_ALLOC_SKB
+        bool
+        default n
+
+config HAVE_ARCH_DEV_ALLOC_SKB
+        bool
+        default n
+endif
+
+source "drivers/xen/Kconfig"
