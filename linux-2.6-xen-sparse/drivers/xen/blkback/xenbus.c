@@ -108,7 +108,7 @@ static int blkback_remove(struct xenbus_device *dev)
 	if (be->blkif) {
 		if (be->blkif->xenblkd)
 			kthread_stop(be->blkif->xenblkd);
-		blkif_put(be->blkif);
+		blkif_free(be->blkif);
 		be->blkif = NULL;
 	}
 
@@ -140,7 +140,7 @@ static int blkback_probe(struct xenbus_device *dev,
 	be->dev = dev;
 	dev->data = be;
 
-	be->blkif = alloc_blkif(dev->otherend_id);
+	be->blkif = blkif_alloc(dev->otherend_id);
 	if (IS_ERR(be->blkif)) {
 		err = PTR_ERR(be->blkif);
 		be->blkif = NULL;

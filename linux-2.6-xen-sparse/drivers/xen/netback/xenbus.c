@@ -172,7 +172,7 @@ static void backend_changed(struct xenbus_watch *watch,
 	if (be->netif == NULL) {
 		u8 be_mac[ETH_ALEN] = { 0, 0, 0, 0, 0, 0 };
 
-		be->netif = alloc_netif(dev->otherend_id, handle, be_mac);
+		be->netif = netif_alloc(dev->otherend_id, handle, be_mac);
 		if (IS_ERR(be->netif)) {
 			err = PTR_ERR(be->netif);
 			be->netif = NULL;

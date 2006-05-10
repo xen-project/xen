@@ -38,6 +38,7 @@
 #include <linux/in.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/wait.h>
 #include <xen/evtchn.h>
 #include <xen/interface/io/netif.h>
 #include <asm/io.h>
@@ -91,7 +92,7 @@ typedef struct netif_st {
 	struct net_device *dev;
 	struct net_device_stats stats;
 
-	struct work_struct free_work;
+	wait_queue_head_t waiting_to_free;
 } netif_t;
 
 #define NET_TX_RING_SIZE __RING_SIZE((netif_tx_sring_t *)0, PAGE_SIZE)
@@ -99,8 +100,7 @@ typedef struct netif_st {
 
 void netif_disconnect(netif_t *netif);
 
-netif_t *alloc_netif(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN]);
-void free_netif(netif_t *netif);
+netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN]);
 int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	      unsigned long rx_ring_ref, unsigned int evtchn);
 
@@ -108,7 +108,7 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 #define netif_put(_b)						\
 	do {							\
 		if ( atomic_dec_and_test(&(_b)->refcnt) )	\
-			free_netif(_b);				\
+			wake_up(&(_b)->waiting_to_free);	\
 	} while (0)
 
 void netif_xenbus_init(void);
