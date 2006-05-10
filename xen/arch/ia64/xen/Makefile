@@ -2,6 +2,7 @@ obj-y += acpi.o
 obj-y += dom0_ops.o
 obj-y += domain.o
 obj-y += dom_fw.o
+obj-y += efi_emul.o
 obj-y += hpsimserial.o
 obj-y += hypercall.o
 obj-y += hyperprivop.o

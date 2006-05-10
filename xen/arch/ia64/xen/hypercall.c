@@ -26,7 +26,6 @@
 #include <public/physdev.h>
 #include <xen/domain.h>
 
-extern unsigned long translate_domain_mpaddr(unsigned long);
 static long do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop);
 static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg);
 /* FIXME: where these declarations should be there ? */
@@ -103,7 +102,7 @@ hypercall_t ia64_hypercall_table[] =
 uint32_t nr_hypercalls =
 	sizeof(ia64_hypercall_table) / sizeof(hypercall_t);
 
-static int
+static IA64FAULT
 xen_hypercall (struct pt_regs *regs)
 {
 	uint32_t cmd = (uint32_t)regs->r2;
@@ -119,7 +118,7 @@ xen_hypercall (struct pt_regs *regs)
 	else
 		regs->r8 = -ENOSYS;
 
-	return 1;
+	return IA64_NO_FAULT;
 }
 
 
@@ -182,14 +181,16 @@ fw_hypercall_ipi (struct pt_regs *regs)
 	return;
 }
 
-static int
+static IA64FAULT
 fw_hypercall (struct pt_regs *regs)
 {
 	struct vcpu *v = current;
 	struct sal_ret_values x;
-	unsigned long *tv, *tc;
+	efi_status_t efi_ret_value;
+	IA64FAULT fault; 
+	unsigned long index = regs->r2 & FW_HYPERCALL_NUM_MASK_HIGH;
 
-	switch (regs->r2) {
+	switch (index) {
 	    case FW_HYPERCALL_PAL_CALL:
 		//printf("*** PAL hypercall: index=%d\n",regs->r28);
 		//FIXME: This should call a C routine
@@ -247,40 +248,10 @@ fw_hypercall (struct pt_regs *regs)
 		regs->r8 = x.r8; regs->r9 = x.r9;
 		regs->r10 = x.r10; regs->r11 = x.r11;
 		break;
-	    case FW_HYPERCALL_EFI_RESET_SYSTEM:
-		printf("efi.reset_system called ");
-		if (current->domain == dom0) {
-			printf("(by dom0)\n ");
-			(*efi.reset_system)(EFI_RESET_WARM,0,0,NULL);
-		}
-		else
-			domain_shutdown (current->domain, SHUTDOWN_reboot);
-		regs->r8 = EFI_UNSUPPORTED;
-		break;
-	    case FW_HYPERCALL_EFI_GET_TIME:
-		tv = (unsigned long *) vcpu_get_gr(v,32);
-		tc = (unsigned long *) vcpu_get_gr(v,33);
-		//printf("efi_get_time(%p,%p) called...",tv,tc);
-		tv = (unsigned long *) __va(translate_domain_mpaddr((unsigned long) tv));
-		if (tc) tc = (unsigned long *) __va(translate_domain_mpaddr((unsigned long) tc));
-		regs->r8 = (*efi.get_time)((efi_time_t *) tv, (efi_time_cap_t *) tc);
-		//printf("and returns %lx\n",regs->r8);
-		break;
-	    case FW_HYPERCALL_EFI_SET_TIME:
-	    case FW_HYPERCALL_EFI_GET_WAKEUP_TIME:
-	    case FW_HYPERCALL_EFI_SET_WAKEUP_TIME:
-		// FIXME: need fixes in efi.h from 2.6.9
-	    case FW_HYPERCALL_EFI_SET_VIRTUAL_ADDRESS_MAP:
-		// FIXME: WARNING!! IF THIS EVER GETS IMPLEMENTED
-		// SOME OF THE OTHER EFI EMULATIONS WILL CHANGE AS 
-		// POINTER ARGUMENTS WILL BE VIRTUAL!!
-	    case FW_HYPERCALL_EFI_GET_VARIABLE:
-		// FIXME: need fixes in efi.h from 2.6.9
-	    case FW_HYPERCALL_EFI_GET_NEXT_VARIABLE:
-	    case FW_HYPERCALL_EFI_SET_VARIABLE:
-	    case FW_HYPERCALL_EFI_GET_NEXT_HIGH_MONO_COUNT:
-		// FIXME: need fixes in efi.h from 2.6.9
-		regs->r8 = EFI_UNSUPPORTED;
+	    case FW_HYPERCALL_EFI_CALL:
+		efi_ret_value = efi_emulator (regs, &fault);
+		if (fault != IA64_NO_FAULT) return fault;
+		regs->r8 = efi_ret_value;
 		break;
 	    case FW_HYPERCALL_IPI:
 		fw_hypercall_ipi (regs);
@@ -289,7 +260,7 @@ fw_hypercall (struct pt_regs *regs)
 		printf("unknown ia64 fw hypercall %lx\n", regs->r2);
 		regs->r8 = do_ni_hypercall();
 	}
-	return 1;
+	return IA64_NO_FAULT;
 }
 
 /* opt_unsafe_hypercall: If true, unsafe debugging hypercalls are allowed.
@@ -297,7 +268,7 @@ fw_hypercall (struct pt_regs *regs)
 static int opt_unsafe_hypercall = 0;
 boolean_param("unsafe_hypercall", opt_unsafe_hypercall);
 
-int
+IA64FAULT
 ia64_hypercall (struct pt_regs *regs)
 {
 	struct vcpu *v = current;
@@ -327,7 +298,7 @@ ia64_hypercall (struct pt_regs *regs)
 			printf("unknown user xen/ia64 hypercall %lx\n", index);
 			regs->r8 = do_ni_hypercall();
 	    }
-	    return 1;
+	    return IA64_NO_FAULT;
 	}
 
 	/* Hypercalls are only allowed by kernel.
@@ -336,7 +307,7 @@ ia64_hypercall (struct pt_regs *regs)
 	    /* FIXME: Return a better error value ?
 	       Reflection ? Illegal operation ?  */
 	    regs->r8 = -1;
-	    return 1;
+	    return IA64_NO_FAULT;
 	}
 
 	if (index >= FW_HYPERCALL_FIRST_ARCH)

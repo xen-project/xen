@@ -54,6 +54,8 @@ struct arch_domain {
     unsigned long initrd_start;
     unsigned long initrd_len;
     char *cmdline;
+    int efi_virt_mode;		/* phys : 0 , virt : 1 */
+    void *efi_runtime;
 };
 #define xen_vastart arch.xen_vastart
 #define xen_vaend arch.xen_vaend

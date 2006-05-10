@@ -345,7 +345,7 @@ END(xen_set_eflag)
 GLOBAL_ENTRY(xen_send_ipi)
         mov r14=r32
         mov r15=r33
-        mov r2=0x380
+        mov r2=0x400
         break 0x1000
         ;;
         br.ret.sptk.many rp

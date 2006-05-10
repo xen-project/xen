@@ -15,7 +15,6 @@
 #include <asm/ptrace.h>
 #include <xen/delay.h>
 
-#include <linux/efi.h>	/* FOR EFI_UNIMPLEMENTED */
 #include <asm/sal.h>	/* FOR struct ia64_sal_retval */
 
 #include <asm/system.h>
@@ -40,7 +39,7 @@ extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 extern void panic_domain(struct pt_regs *, const char *, ...);
 extern long platform_is_hp_ski(void);
 extern int ia64_hyperprivop(unsigned long, REGS *);
-extern int ia64_hypercall(struct pt_regs *regs);
+extern IA64FAULT ia64_hypercall(struct pt_regs *regs);
 extern void vmx_do_launch(struct vcpu *);
 extern unsigned long lookup_domain_mpa(struct domain *,unsigned long);
 
@@ -680,6 +679,7 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 {
 	struct domain *d = current->domain;
 	struct vcpu *v = current;
+	IA64FAULT vector;
 
 	if (first_break) {
 		if (platform_is_hp_ski()) running_on_sim = 1;
@@ -700,9 +700,11 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 		/* by default, do not continue */
 		v->arch.hypercall_continuation = 0;
 
-		if (ia64_hypercall(regs) &&
-		    !PSCBX(v, hypercall_continuation))
-			vcpu_increment_iip(current);
+		if ((vector = ia64_hypercall(regs)) == IA64_NO_FAULT) {
+			if (!PSCBX(v, hypercall_continuation))
+				vcpu_increment_iip(current);
+		}
+		else reflect_interruption(isr, regs, vector);
 	}
 	else if (!PSCB(v,interrupt_collection_enabled)) {
 		if (ia64_hyperprivop(iim,regs))

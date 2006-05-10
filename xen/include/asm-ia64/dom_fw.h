@@ -5,7 +5,7 @@
  *	Dan Magenheimer (dan.magenheimer@hp.com)
  */
 
-extern unsigned long dom_fw_setup(struct domain *, const char *, int);
+#include <linux/efi.h>
 
 #ifndef MB
 #define MB (1024*1024)
@@ -55,7 +55,7 @@ extern unsigned long dom_fw_setup(struct domain *, const char *, int);
 
 #define FW_HYPERCALL_SAL_CALL_INDEX	0x82UL
 #define FW_HYPERCALL_SAL_CALL_PADDR	FW_HYPERCALL_PADDR(FW_HYPERCALL_SAL_CALL_INDEX)
-#define FW_HYPERCALL_SAL_CALL		0x1001UL
+#define FW_HYPERCALL_SAL_CALL		0x1100UL
 
 /*
  * EFI is accessed via the EFI system table, which contains:
@@ -94,6 +94,7 @@ extern unsigned long dom_fw_setup(struct domain *, const char *, int);
 #define FW_HYPERCALL_EFI_RESET_SYSTEM_INDEX		9UL
 
 /* these are hypercall numbers */
+#define FW_HYPERCALL_EFI_CALL				0x300UL
 #define FW_HYPERCALL_EFI_GET_TIME			0x300UL
 #define FW_HYPERCALL_EFI_SET_TIME			0x301UL
 #define FW_HYPERCALL_EFI_GET_WAKEUP_TIME		0x302UL
@@ -125,7 +126,7 @@ extern unsigned long dom_fw_setup(struct domain *, const char *, int);
 */
 #define FW_HYPERCALL_FIRST_ARCH		0x300UL
 
-#define FW_HYPERCALL_IPI		0x380UL
+#define FW_HYPERCALL_IPI		0x400UL
 
 /* Xen/ia64 user hypercalls.  Only used for debugging.  */
 #define FW_HYPERCALL_FIRST_USER		0xff00UL
@@ -133,9 +134,16 @@ extern unsigned long dom_fw_setup(struct domain *, const char *, int);
 /* Interrupt vector used for os boot rendez vous.  */
 #define XEN_SAL_BOOT_RENDEZ_VEC	0xF3
 
+#define FW_HYPERCALL_NUM_MASK_HIGH	~0xffUL
+#define FW_HYPERCALL_NUM_MASK_LOW	 0xffUL
+
+#define EFI_MEMDESC_VERSION		1
+
 extern struct ia64_pal_retval xen_pal_emulator(UINT64, u64, u64, u64);
 extern struct sal_ret_values sal_emulator (long index, unsigned long in1, unsigned long in2, unsigned long in3, unsigned long in4, unsigned long in5, unsigned long in6, unsigned long in7);
 extern struct ia64_pal_retval pal_emulator_static (unsigned long);
+extern unsigned long dom_fw_setup (struct domain *, const char *, int);
+extern efi_status_t efi_emulator (struct pt_regs *regs, unsigned long *fault);
 
 extern void build_pal_hypercall_bundles(unsigned long *imva, unsigned long brkimm, unsigned long hypnum);
 extern void build_hypercall_bundle(UINT64 *imva, UINT64 brkimm, UINT64 hypnum, UINT64 ret);

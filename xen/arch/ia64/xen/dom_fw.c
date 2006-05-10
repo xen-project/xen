@@ -798,6 +798,9 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	pfn         = (void *) cp; cp += NFUNCPTRS * 2 * sizeof(pfn);
 	cmd_line    = (void *) cp;
 
+	/* Initialise for EFI_SET_VIRTUAL_ADDRESS_MAP emulation */
+	d->arch.efi_runtime = efi_runtime;
+
 	if (args) {
 		if (arglen >= 1024)
 			arglen = 1023;
@@ -959,7 +962,7 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 		MAKE_MD(EFI_LOADER_DATA,EFI_MEMORY_WB,0*MB,1*MB, 0);//XXX
 #endif
 		/* hypercall patches live here, masquerade as reserved PAL memory */
-		MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB,HYPERCALL_START,HYPERCALL_END, 0);
+		MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB|EFI_MEMORY_RUNTIME,HYPERCALL_START,HYPERCALL_END, 0);
  		MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,HYPERCALL_END,maxmem-IA64_GRANULE_SIZE, 0);//XXX make sure this doesn't overlap on i/o, runtime area.
 #ifndef CONFIG_XEN_IA64_DOM0_VP
 /* hack */	MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,last_start,last_end,1);
@@ -993,7 +996,7 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 		MAKE_MD(EFI_LOADER_DATA,EFI_MEMORY_WB,0*MB,1*MB, 1);
 #endif
 		/* hypercall patches live here, masquerade as reserved PAL memory */
-		MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB,HYPERCALL_START,HYPERCALL_END, 1);
+		MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB|EFI_MEMORY_RUNTIME,HYPERCALL_START,HYPERCALL_END, 1);
 		MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,HYPERCALL_END,maxmem, 1);
 		/* Create a dummy entry for IO ports, so that IO accesses are
 		   trapped by Xen.  */
@@ -1009,7 +1012,7 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	BUG_ON(i > NUM_MEM_DESCS);
 	bp->efi_memmap_size = i * sizeof(efi_memory_desc_t);
 	bp->efi_memdesc_size = sizeof(efi_memory_desc_t);
-	bp->efi_memdesc_version = 1;
+	bp->efi_memdesc_version = EFI_MEMDESC_VERSION;
 	bp->command_line = dom_pa((unsigned long) cmd_line);
 	bp->console_info.num_cols = 80;
 	bp->console_info.num_rows = 25;
