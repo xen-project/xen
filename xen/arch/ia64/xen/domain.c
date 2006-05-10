@@ -239,7 +239,8 @@ int arch_domain_create(struct domain *d)
 	// the following will eventually need to be negotiated dynamically
 	d->xen_vastart = XEN_START_ADDR;
 	d->xen_vaend = XEN_END_ADDR;
-	d->shared_info_va = SHAREDINFO_ADDR;
+	d->arch.shared_info_va = SHAREDINFO_ADDR;
+	d->arch.breakimm = 0x1000;
 
 	if (is_idle_domain(d))
 	    return 0;
@@ -255,7 +256,6 @@ int arch_domain_create(struct domain *d)
 	 */
 	if (!allocate_rid_range(d,0))
 		goto fail_nomem;
-	d->arch.breakimm = 0x1000;
 	d->arch.sys_pgnr = 0;
 
 	if ((d->arch.mm = xmalloc(struct mm_struct)) == NULL)

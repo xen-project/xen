@@ -11,242 +11,160 @@
 #include <asm/pgtable.h>
 #include <asm/vhpt.h>
 
-#if 0
-// FIXME: there's gotta be a better way...
-// ski and spaski are different... moved to xenmisc.c
-#define RunningOnHpSki(rx,ry,pn) 			\
-	addl rx = 2, r0; 				\
-	addl ry = 3, r0; 				\
-	;; 						\
-	mov rx = cpuid[rx]; 				\
-	mov ry = cpuid[ry]; 				\
-	;; 						\
-	cmp.eq pn,p0 = 0, rx; 				\
-	;; 						\
-	(pn) movl rx = 0x7000004 ; 			\
-	;; 						\
-	(pn) cmp.ge pn,p0 = ry, rx; 			\
-	;;
-
-//int platform_is_hp_ski(void)
-GLOBAL_ENTRY(platform_is_hp_ski)
-	mov r8 = 0
-	RunningOnHpSki(r3,r9,p8)
-(p8)	mov r8 = 1
-	br.ret.sptk.many b0
-END(platform_is_hp_ski)
-#endif
-
 // Change rr7 to the passed value while ensuring
 // Xen is mapped into the new region.
-//   in0: new rr7 value
-//   in1: Xen virtual address of shared info (to be pinned)
 #define PSR_BITS_TO_CLEAR						\
 	(IA64_PSR_I | IA64_PSR_IT | IA64_PSR_DT | IA64_PSR_RT |		\
 	 IA64_PSR_DD | IA64_PSR_SS | IA64_PSR_RI | IA64_PSR_ED |	\
-	 IA64_PSR_DFL | IA64_PSR_DFH)
+	 IA64_PSR_DFL | IA64_PSR_DFH | IA64_PSR_IC)
 // FIXME? Note that this turns off the DB bit (debug)
 #define PSR_BITS_TO_SET	IA64_PSR_BN
 
-//extern void ia64_new_rr7(unsigned long rid,void *shared_info, void *shared_arch_info, unsigned long p_vhpt, unsigned long v_pal);
+//extern void ia64_new_rr7(unsigned long rid,      	 /* in0 */
+//                         void *shared_info,      	 /* in1 */
+//                         void *shared_arch_info, 	 /* in2 */
+//                         unsigned long shared_info_va, /* in3 */
+//                         unsigned long p_vhpt)   	 /* in4 */
+//Local usage:
+//  loc0=rp, loc1=ar.pfs, loc2=percpu_paddr, loc3=psr, loc4=ar.rse
+//  loc5=pal_vaddr, loc6=xen_paddr, loc7=shared_archinfo_paddr,
 GLOBAL_ENTRY(ia64_new_rr7)
 	// not sure this unwind statement is correct...
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(1)
-	alloc loc1 = ar.pfs, 5, 9, 0, 0
+	alloc loc1 = ar.pfs, 5, 8, 0, 0
+	movl loc2=PERCPU_ADDR
 1:	{
-	  mov r28  = in0		// copy procedure index
-	  mov r8   = ip			// save ip to compute branch
+	  mov loc3 = psr		// save psr	
 	  mov loc0 = rp			// save rp
+	  mov r8   = ip			// save ip to compute branch
 	};;
 	.body
-	movl loc2=PERCPU_ADDR
-	;;
 	tpa loc2=loc2			// grab this BEFORE changing rr7
+	tpa in1=in1			// grab shared_info BEFORE changing rr7
+	adds r8 = 1f-1b,r8		// calculate return address for call
 	;;
-	dep loc8=0,in4,60,4
-	;;
-#if VHPT_ENABLED
-	mov loc6=in3
-	;;
-	//tpa loc6=loc6			// grab this BEFORE changing rr7
-	;;
-#endif
-	mov loc5=in1
-	;;
-	tpa loc5=loc5			// grab this BEFORE changing rr7
-	;;
-	mov loc7=in2			// arch_vcpu_info_t
-	;;
-	tpa loc7=loc7			// grab this BEFORE changing rr7
-	;;
-	mov loc3 = psr			// save psr
-	adds r8  = 1f-1b,r8		// calculate return address for call
-	;;
-	tpa r8=r8			// convert rp to physical
-	;;
-	mov loc4=ar.rsc			// save RSE configuration
-	;;
-	mov ar.rsc=0			// put RSE in enforced lazy, LE mode
-	movl r16=PSR_BITS_TO_CLEAR
+	tpa loc7=in2			// grab arch_vcpu_info BEFORE chg rr7
 	movl r17=PSR_BITS_TO_SET
-	;;
+	mov loc4=ar.rsc			// save RSE configuration
+	movl r16=PSR_BITS_TO_CLEAR
+	;; 
+	tpa r8=r8			// convert rp to physical
+	mov ar.rsc=0			// put RSE in enforced lazy, LE mode
 	or loc3=loc3,r17		// add in psr the bits to set
 	;;
 	andcm r16=loc3,r16		// removes bits to clear from psr
+	dep loc6=0,r8,0,KERNEL_TR_PAGE_SHIFT // Xen code paddr
 	br.call.sptk.many rp=ia64_switch_mode_phys
 1:
 	// now in physical mode with psr.i/ic off so do rr7 switch
-	dep	r16=-1,r0,61,3
-	;;
+	movl r16=pal_vaddr		// Note: belong to region 7!
+	;; 
 	mov	rr[r16]=in0
+	;; 
 	srlz.d
+	dep	r16=0,r16,60,4		// Get physical address.
 	;;
+	ld8 loc5=[r16]			// read pal_vaddr
+	movl	r26=PAGE_KERNEL
+	;; 
 
 	// re-pin mappings for kernel text and data
-	mov r18=KERNEL_TR_PAGE_SHIFT<<2
+	mov r24=KERNEL_TR_PAGE_SHIFT<<2
 	movl r17=KERNEL_START
 	;;
-	rsm psr.i | psr.ic
-	;;
-	srlz.i
-	;;
-	ptr.i	r17,r18
-	ptr.d	r17,r18
-	;;
-	mov cr.itir=r18
-	mov cr.ifa=r17
+	ptr.i	r17,r24
+	ptr.d	r17,r24
 	mov r16=IA64_TR_KERNEL
-	//mov r3=ip
-	movl r18=PAGE_KERNEL
-	;;
-	dep r2=0,r3,0,KERNEL_TR_PAGE_SHIFT
-	;;
-	or r18=r2,r18
-	;;
-	srlz.i
+	mov cr.itir=r24
+	mov cr.ifa=r17
+	or r18=loc6,r26
 	;;
 	itr.i itr[r16]=r18
-	;;
+	;; 
 	itr.d dtr[r16]=r18
-	;;
 
-	// re-pin mappings for stack (current), per-cpu, vhpt, and shared info
+	// re-pin mappings for stack (current)
 
 	// unless overlaps with KERNEL_TR
 	dep r18=0,r13,0,KERNEL_TR_PAGE_SHIFT
 	;;
 	cmp.eq p7,p0=r17,r18
 (p7)	br.cond.sptk	.stack_overlaps
-	;;
-	movl r25=PAGE_KERNEL
+	mov r25=IA64_GRANULE_SHIFT<<2
 	dep r21=0,r13,60,4		// physical address of "current"
 	;;
-	or r23=r25,r21			// construct PA | page properties
-	mov r25=IA64_GRANULE_SHIFT<<2
-	;;
 	ptr.d	r13,r25
-	;;
+	or r23=r21,r26			// construct PA | page properties
 	mov cr.itir=r25
 	mov cr.ifa=r13			// VA of next task...
+	mov r21=IA64_TR_CURRENT_STACK
 	;;
-	mov r25=IA64_TR_CURRENT_STACK
-	;;
-	itr.d dtr[r25]=r23		// wire in new mapping...
-	;;
-.stack_overlaps:
+	itr.d dtr[r21]=r23		// wire in new mapping...
 
+	//  Per-cpu	
+.stack_overlaps:
+	mov r24=PERCPU_PAGE_SHIFT<<2
 	movl r22=PERCPU_ADDR
 	;;
-	movl r25=PAGE_KERNEL
-	;;
-	mov r21=loc2			// saved percpu physical address
-	;;
-	or r23=r25,r21			// construct PA | page properties
-	mov r24=PERCPU_PAGE_SHIFT<<2
-	;;
 	ptr.d	r22,r24
-	;;
+	or r23=loc2,r26			// construct PA | page properties
 	mov cr.itir=r24
 	mov cr.ifa=r22
-	;;
 	mov r25=IA64_TR_PERCPU_DATA
 	;;
 	itr.d dtr[r25]=r23		// wire in new mapping...
-	;;
 
+	// VHPT
 #if VHPT_ENABLED
-	movl r22=VHPT_ADDR
-	;;
-	movl r25=PAGE_KERNEL
-	;;
-	mov r21=loc6			// saved vhpt physical address
-	;;
-	or r23=r25,r21			// construct PA | page properties
 	mov r24=VHPT_SIZE_LOG2<<2
+	movl r22=VHPT_ADDR
+	mov r21=IA64_TR_VHPT
 	;;
 	ptr.d	r22,r24
-	;;
+	or r23=in4,r26			// construct PA | page properties
 	mov cr.itir=r24
 	mov cr.ifa=r22
 	;;
-	mov r25=IA64_TR_VHPT
-	;;
-	itr.d dtr[r25]=r23		// wire in new mapping...
-	;;
+	itr.d dtr[r21]=r23		// wire in new mapping...
 #endif
 
-	movl r22=SHAREDINFO_ADDR
-	;;
+	//  Shared info
+	mov r24=PAGE_SHIFT<<2
 	movl r25=__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RW)
 	;;
-	mov r21=loc5			// saved sharedinfo physical address
-	;;
-	or r23=r25,r21			// construct PA | page properties
-	mov r24=PAGE_SHIFT<<2
-	;;
-	ptr.d	r22,r24
-	;;
+	ptr.d	in3,r24
+	or r23=in1,r25			// construct PA | page properties
 	mov cr.itir=r24
-	mov cr.ifa=r22
+	mov cr.ifa=in3
+	mov r21=IA64_TR_SHARED_INFO
 	;;
-	mov r25=IA64_TR_SHARED_INFO
-	;;
-	itr.d dtr[r25]=r23		// wire in new mapping...
-	;;
+	itr.d dtr[r21]=r23		// wire in new mapping...
+	
 	// Map for arch_vcpu_info_t
-	movl r22=SHARED_ARCHINFO_ADDR
-	;;
-	movl r25=__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RW)
-	;;
-	mov r21=loc7			// saved sharedinfo physical address
-	;;
-	or r23=r25,r21			// construct PA | page properties
+	movl r22=XSI_OFS
 	mov r24=PAGE_SHIFT<<2
+	;; 
+	add r22=r22,in3
 	;;
 	ptr.d	r22,r24
-	;;
+	or r23=loc7,r25			// construct PA | page properties
 	mov cr.itir=r24
 	mov cr.ifa=r22
+	mov r21=IA64_TR_ARCH_INFO
 	;;
-	mov r25=IA64_TR_ARCH_INFO
-	;;
-	itr.d dtr[r25]=r23		// wire in new mapping...
-	;;
+	itr.d dtr[r21]=r23		// wire in new mapping...
 
-	//Purge/insert PAL TR
+	// Purge/insert PAL TR
 	mov r24=IA64_TR_PALCODE
-	movl r25=PAGE_KERNEL
-	;;
-	or loc8=r25,loc8
 	mov r23=IA64_GRANULE_SHIFT<<2
+	dep r25=0,loc5,60,4		// convert pal vaddr to paddr
 	;;
-	ptr.i	in4,r23
-	;;
+	ptr.i	loc5,r23
+	or r25=r25,r26		// construct PA | page properties
 	mov cr.itir=r23
-	mov cr.ifa=in4
+	mov cr.ifa=loc5
 	;;
-	itr.i itr[r24]=loc8
-	;;
+	itr.i itr[r24]=r25
 
 	// done, switch back to virtual and return
 	mov r16=loc3			// r16= original psr
@@ -261,6 +179,7 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	br.ret.sptk.many rp
 END(ia64_new_rr7)
 
+#if 0 /* Not used */
 #include "minstate.h"
 
 GLOBAL_ENTRY(ia64_prepare_handle_privop)
@@ -301,6 +220,7 @@ GLOBAL_ENTRY(ia64_prepare_handle_reflection)
 	DO_LOAD_SWITCH_STACK
 	br.cond.sptk.many rp			// goes to ia64_leave_kernel
 END(ia64_prepare_handle_reflection)
+#endif
 
 GLOBAL_ENTRY(__get_domain_bundle)
 	EX(.failure_in_get_bundle,ld8 r8=[r32],8)
@@ -331,80 +251,9 @@ GLOBAL_ENTRY(dorfirfi)
         mov cr.ipsr=r17
         mov cr.ifs=r18
 	;;
-        // fall through
-END(dorfirfi)
-
-GLOBAL_ENTRY(dorfi)
         rfi
 	;;
-END(dorfi)
-
-//
-// Long's Peak UART Offsets
-//
-#define COM_TOP 0xff5e0000
-#define COM_BOT 0xff5e2000
-
-// UART offsets	
-#define UART_TX		0	/* Out: Transmit buffer (DLAB=0) */
-#define UART_INT_ENB	1	/* interrupt enable (DLAB=0) */	
-#define UART_INT_ID	2	/* Interrupt ID register */
-#define UART_LINE_CTL	3	/* Line control register */
-#define UART_MODEM_CTL	4	/* Modem Control Register */
-#define UART_LSR	5	/* In:  Line Status Register */
-#define UART_MSR	6	/* Modem status register */	
-#define UART_DLATCH_LOW UART_TX
-#define UART_DLATCH_HIGH UART_INT_ENB
-#define COM1   0x3f8
-#define COM2   0x2F8
-#define COM3   0x3E8
-
-/* interrupt enable bits (offset 1) */
-#define DATA_AVAIL_INT 1
-#define XMIT_HOLD_EMPTY_INT 2
-#define LINE_STAT_INT 4
-#define MODEM_STAT_INT 8
-
-/* line status bits (offset 5) */
-#define REC_DATA_READY 1
-#define OVERRUN 2
-#define PARITY_ERROR 4
-#define FRAMING_ERROR 8
-#define BREAK_INTERRUPT 0x10
-#define XMIT_HOLD_EMPTY 0x20
-#define XMIT_SHIFT_EMPTY 0x40
-
-// Write a single character
-// input: r32 = character to be written
-// output: none
-GLOBAL_ENTRY(longs_peak_putc)	
-	rsm psr.dt
-        movl r16 = 0x8000000000000000 + COM_TOP + UART_LSR
-	;;
-	srlz.i
-	;;
-
-.Chk_THRE_p:
-        ld1.acq r18=[r16]
-        ;;
-	
-	and r18 = XMIT_HOLD_EMPTY, r18
-	;;
-	cmp4.eq p6,p0=0,r18
-	;;
-	
-(p6)    br .Chk_THRE_p
-	;;
-        movl r16 = 0x8000000000000000 + COM_TOP + UART_TX
-	;;
-	st1.rel [r16]=r32
-	;;
-	ssm psr.dt
-	;;
-	srlz.i
-	;;
-	br.ret.sptk.many b0
-END(longs_peak_putc)	
+END(dorfirfi)
 
 /* derived from linux/arch/ia64/hp/sim/boot/boot_head.S */
 GLOBAL_ENTRY(pal_emulator_static)
