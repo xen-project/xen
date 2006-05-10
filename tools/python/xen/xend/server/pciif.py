@@ -31,6 +31,7 @@ import xen.lowlevel.xc
 
 from xen.util.pci import PciDevice
 import resource
+import re
 
 xc = xen.lowlevel.xc.xc()
 
@@ -105,6 +106,30 @@ class PciController(DevController):
             back['num_devs']=str(1)
 
         return (0, back, {})
+
+    def configuration(self, devid):
+        """@see DevController.configuration"""
+
+        result = DevController.configuration(self, devid)
+
+        (num_devs) = self.readBackend(devid, 'num_devs')
+
+        for i in range(int(num_devs)):
+            (dev_config) = self.readBackend(devid, 'dev-%d'%(i))
+
+            pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
+                    r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
+                    r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
+                    r"(?P<func>[0-9a-fA-F]{1,2})", dev_config)
+            if pci_match!=None:
+                pci_dev_info = pci_match.groupdict('0')
+                result.append( ['dev', \
+                        ['domain', '0x'+pci_dev_info['domain']], \
+                        ['bus', '0x'+pci_dev_info['bus']], \
+                        ['slot', '0x'+pci_dev_info['slot']], \
+                        ['func', '0x'+pci_dev_info['func']]])
+
+        return result
 
     def setupDevice(self, domain, bus, slot, func):
         """ Attach I/O resources for device to frontend domain
