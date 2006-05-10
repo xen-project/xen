@@ -745,9 +745,9 @@ failexit:
 
 static void __exit tpmif_exit(void)
 {
+	exit_tpm_xenbus();
 	cleanup_vtpm();
 	tpm_private_put();
-	exit_tpm_xenbus();
 	gnttab_free_grant_references(gref_head);
 }
 

@@ -179,7 +179,7 @@ void __init tpmif_interface_init(void)
 					 0, 0, NULL, NULL);
 }
 
-void __init tpmif_interface_exit(void)
+void __exit tpmif_interface_exit(void)
 {
 	kmem_cache_destroy(tpmif_cachep);
 }
