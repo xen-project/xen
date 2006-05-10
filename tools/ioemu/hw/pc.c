@@ -381,6 +381,7 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
              const char *kernel_filename, const char *kernel_cmdline,
              const char *initrd_filename)
 {
+    SerialState *sp;
     char buf[1024];
     int ret, linux_boot, initrd_size, i, nb_nics1;
     PCIBus *pci_bus;
@@ -533,7 +534,9 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
 
     for(i = 0; i < MAX_SERIAL_PORTS; i++) {
         if (serial_hds[i]) {
-            serial_init(serial_io[i], serial_irq[i], serial_hds[i]);
+            sp = serial_init(serial_io[i], serial_irq[i], serial_hds[i]);
+            if (i == SUMMA_PORT)
+		summa_init(sp, serial_hds[i]);
         }
     }
 

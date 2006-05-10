@@ -223,6 +223,7 @@ void console_select(unsigned int index);
 /* serial ports */
 
 #define MAX_SERIAL_PORTS 4
+#define SUMMA_PORT	1
 
 extern CharDriverState *serial_hds[MAX_SERIAL_PORTS];
 
@@ -618,12 +619,6 @@ void kbd_init(void);
 extern const char* keyboard_layout;
 extern int repeat_key;
 
-/* Mice */
-
-void summa_init(void *cookie, CharDriverState *chr);
-
-extern int summa_ok;
-
 /* mc146818rtc.c */
 
 typedef struct RTCState RTCState;
@@ -637,6 +632,12 @@ void rtc_set_date(RTCState *s, const struct tm *tm);
 typedef struct SerialState SerialState;
 SerialState *serial_init(int base, int irq, CharDriverState *chr);
 void ser_queue(SerialState *s, unsigned char c);
+
+/* Mice */
+
+void summa_init(SerialState *serial, CharDriverState *chr);
+
+extern int summa_ok;
 
 /* i8259.c */
 

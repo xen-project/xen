@@ -156,10 +156,23 @@ typedef struct KBDState {
     int mouse_dz;
     uint8_t mouse_buttons;
     CharDriverState *chr;
-    void *cookie;
+    SerialState *serial;
 } KBDState;
 
 KBDState kbd_state;
+
+#define MODE_STREAM_SWITCH	0
+#define MODE_STREAM		1
+#define MODE_REMOTE		2
+#define MODE_POINT		3
+
+#define ORIGIN_LOWER_LEFT	0
+#define ORIGIN_UPPER_LEFT	1
+
+struct SummaState {
+	int report_mode;
+	int origin;
+} SummaState;
 
 int summa_ok;		/* Allow Summagraphics emulation if true */
 
@@ -420,15 +433,19 @@ static int kbd_mouse_send_packet(KBDState *s)
     switch(s->mouse_type) {
   
     case TABLET:        /* Summagraphics pen tablet */
-	dx1 = s->mouse_x;
-	dy1 = s->mouse_y;
-	dx1 = ((dx1 * SUMMA_MAXX) / mouse_maxx) + SUMMA_BORDER;
-	dy1 = ((dy1 * SUMMA_MAXY) / mouse_maxy) + SUMMA_BORDER;
-	ser_queue(s->cookie, 0x80 | (s->mouse_buttons & 7));
-	ser_queue(s->cookie, dx1 & 0x7f);
-	ser_queue(s->cookie, dx1 >> 7);
-	ser_queue(s->cookie, dy1 & 0x7f);
-	ser_queue(s->cookie, dy1 >> 7);
+	if (SummaState.report_mode == MODE_STREAM) {
+	    dx1 = s->mouse_x;
+	    dy1 = s->mouse_y;
+	    if (SummaState.origin == ORIGIN_LOWER_LEFT)
+		dy1 = mouse_maxy - dy1;
+	    dx1 = ((dx1 * SUMMA_MAXX) / mouse_maxx) + SUMMA_BORDER;
+	    dy1 = ((dy1 * SUMMA_MAXY) / mouse_maxy) + SUMMA_BORDER;
+	    ser_queue(s->serial, 0x80 | (s->mouse_buttons & 7));
+	    ser_queue(s->serial, dx1 & 0x7f);
+	    ser_queue(s->serial, dx1 >> 7);
+	    ser_queue(s->serial, dy1 & 0x7f);
+	    ser_queue(s->serial, dy1 >> 7);
+	}
 	s->mouse_dx = 0; 
 	s->mouse_dy = 0;
 	s->mouse_dz = 0;
@@ -509,43 +526,101 @@ static void pc_kbd_mouse_event(void *opaque,
     }
 }
 
-static void summa(KBDState *s, int val)
+static void summa(KBDState *s, uint8_t val)
 {
-    static int summa = 0;
+    static int zflg = 0;
 
-    if (s->mouse_type == TABLET) {
+    if (zflg) {
+	zflg = 0;
 	switch (val) {
 
-	case '?':	/* read firmware ID */
-	    ser_queue(s->cookie, '0');
+	case 'b':	/* binary report mode */
 	    break;
 
-	case 'a':	/* read config */
-	    /*
-	     *  Config looks like a movement packet but, because of scaling
-	     *    issues we can't use `kbd_send_packet' to do this.
-	     */
-	    ser_queue(s->cookie, 0);
-	    ser_queue(s->cookie, (SUMMA_MAXX & 0x7f));
-	    ser_queue(s->cookie, (SUMMA_MAXX >> 7));
-	    ser_queue(s->cookie, (SUMMA_MAXY & 0x7f));
-	    ser_queue(s->cookie, (SUMMA_MAXY >> 7));
-	    break;
-
-	default:	/* ignore all others */
+	case 't':	/* stylus type - we do 4 button cursor */
+	    ser_queue(s->serial, 'C');
+	    ser_queue(s->serial, 'S');
+	    ser_queue(s->serial, 'R');
+	    ser_queue(s->serial, '4');
+	    ser_queue(s->serial, '\r');
 	    break;
 
 	}
 	return;
     }
-    if (val == 'B') {
-	summa++;
-	return;
-    } else if (summa && val == 'z') {
+    zflg = 0;
+
+    switch (val) {
+
+    case 'B':	/* point mode */
+	/* This is supposed to be `set to point mode' but the Linux driver
+	 *   is broken and incorrectly sends a reset command (somebody
+	 *   needs to learn that the address 0 does not necessarily contain
+	 *   a zero).  This is the first valid command that Linux sends
+	 *   out so we'll treat it as a reset
+	 */
+    case '\0':	/* reset */
 	s->mouse_type = TABLET;
-	return;
+	s->mouse_status |= MOUSE_STATUS_ENABLED;
+	SummaState.origin = ORIGIN_LOWER_LEFT;
+	SummaState.report_mode = (val == 'B') ? MODE_POINT : MODE_STREAM_SWITCH;
+	break;
+
+    case 'z':	/* start of 2 byte command */
+	zflg++;
+	break;
+
+    case 'x':	/* code check */
+	/*
+	 *  Return checksum
+	 */
+	ser_queue(s->serial, '.');
+	ser_queue(s->serial, '#');
+	ser_queue(s->serial, '1');
+	ser_queue(s->serial, '2');
+	ser_queue(s->serial, '3');
+	ser_queue(s->serial, '4');
+	break;
+
+    case '?':	/* read firmware ID */
+	ser_queue(s->serial, '0');
+	break;
+
+    case 'a':	/* read config */
+	/*
+	 *  Config looks like a movement packet but, because of scaling
+	 *    issues we can't use `kbd_send_packet' to do this.
+	 */
+	ser_queue(s->serial, 0x94);
+	ser_queue(s->serial, (SUMMA_MAXX & 0x7f));
+	ser_queue(s->serial, (SUMMA_MAXX >> 7));
+	ser_queue(s->serial, (SUMMA_MAXY & 0x7f));
+	ser_queue(s->serial, (SUMMA_MAXY >> 7));
+	break;
+
+    case 'b':	/* origin at upper left */
+	SummaState.origin = ORIGIN_UPPER_LEFT;
+	break;
+
+    case 'c':	/* origin at lower left */
+	SummaState.origin = ORIGIN_LOWER_LEFT;
+	break;
+
+    case '@':	/* stream mode */
+	SummaState.report_mode = MODE_STREAM;
+	break;
+
+    case 'D':	/* remote request mode */
+	SummaState.report_mode = MODE_REMOTE;
+	break;
+
+    case 'P':	/* trigger, e.g. send report now */
+    case 'R':	/* report rate = max/2 */
+    default:	/* ignore all others */
+	break;
+
     }
-    summa = 0;
+
     return;
 }
 
@@ -560,13 +635,13 @@ int summa_write(CharDriverState *chr, const uint8_t *buf, int len)
     return len;
 }
 
-void summa_init(void *cookie, CharDriverState *chr)
+void summa_init(SerialState *serial, CharDriverState *chr)
 {
 
     if (summa_ok == 0)
 	return;
     kbd_state.chr = chr;
-    kbd_state.cookie = (void *)cookie;
+    kbd_state.serial = serial;
     chr->chr_write = summa_write;
     chr->opaque = (void *)&kbd_state;
     return;

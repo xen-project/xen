@@ -2707,7 +2707,8 @@ int main(int argc, char **argv)
     pstrcpy(monitor_device, sizeof(monitor_device), "vc");
 
     pstrcpy(serial_devices[0], sizeof(serial_devices[0]), "vc");
-    for(i = 1; i < MAX_SERIAL_PORTS; i++)
+    pstrcpy(serial_devices[1], sizeof(serial_devices[1]), "null");
+    for(i = 2; i < MAX_SERIAL_PORTS; i++)
         serial_devices[i][0] = '\0';
     serial_device_index = 0;
 
