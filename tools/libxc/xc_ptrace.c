@@ -518,7 +518,7 @@ xc_ptrace(
 
     case PTRACE_SETREGS:
         if (current_isfile)
-                goto out_unspported; /* XXX not yet supported */
+                goto out_unsupported; /* XXX not yet supported */
         SET_XC_REGS(((struct gdb_regs *)data), ctxt[cpu].user_regs);
         if ((retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu,
                                 &ctxt[cpu])))
@@ -526,8 +526,8 @@ xc_ptrace(
         break;
 
     case PTRACE_SINGLESTEP:
-        if (!current_isfile)
-              goto out_unspported; /* XXX not yet supported */
+        if (current_isfile)
+              goto out_unsupported; /* XXX not yet supported */
         /*  XXX we can still have problems if the user switches threads
          *  during single-stepping - but that just seems retarded
          */
@@ -540,7 +540,7 @@ xc_ptrace(
     case PTRACE_CONT:
     case PTRACE_DETACH:
         if (current_isfile)
-            goto out_unspported; /* XXX not yet supported */
+            goto out_unsupported; /* XXX not yet supported */
         if ( request != PTRACE_SINGLESTEP )
         {
             FOREACH_CPU(cpumap, index) {
@@ -603,7 +603,7 @@ xc_ptrace(
     case PTRACE_POKEUSER:
     case PTRACE_SYSCALL:
     case PTRACE_KILL:
-        goto out_unspported; /* XXX not yet supported */
+        goto out_unsupported; /* XXX not yet supported */
 
     case PTRACE_TRACEME:
         printf("PTRACE_TRACEME is an invalid request under Xen\n");
@@ -618,7 +618,7 @@ xc_ptrace(
     errno = EINVAL;
     return retval;
 
- out_unspported:
+ out_unsupported:
 #ifdef DEBUG
     printf("unsupported xc_ptrace request %s\n", ptrace_names[request]);
 #endif
