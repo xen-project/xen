@@ -1811,6 +1811,21 @@ int main(int argc, char *argv[])
 
 	reopen_log();
 
+	/* make sure xenstored directory exists */
+	if (mkdir(xs_daemon_rundir(), 0755)) {
+		if (errno != EEXIST) {
+			perror("error: mkdir daemon rundir");
+			exit(-1);
+		}
+	}
+
+	if (mkdir(xs_daemon_rootdir(), 0755)) {
+		if (errno != EEXIST) {
+			perror("error: mkdir daemon rootdir");
+			exit(-1);
+		}
+	}
+
 	if (dofork) {
 		openlog("xenstored", 0, LOG_DAEMON);
 		daemonize();
