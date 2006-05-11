@@ -6,7 +6,7 @@
 # Positive Test: create domain with virtual TPM attached at build time,
 #                check list of pcrs; locally migrate the domain and
 #                check list of pcrs again
-#                This test does local live migration.
+#                This test does local (non-live) migration.
 
 from XmTestLib import *
 from vtpm_utils import *
@@ -54,7 +54,7 @@ old_domid = domid(domName)
 loop = 0
 while loop < 3:
     try:
-        status, ouptut = traceCommand("xm migrate -l %s localhost" %
+        status, ouptut = traceCommand("xm migrate %s localhost" %
                                       domName,
                                       timeout=90)
     except TimeoutError, e:
