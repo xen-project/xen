@@ -752,7 +752,6 @@ static void __exit tpmif_exit(void)
 }
 
 module_init(tpmif_init);
-module_exit(tpmif_exit);
 
 MODULE_LICENSE("Dual BSD/GPL");
 

@@ -1071,8 +1071,6 @@ static void __exit tpmback_exit(void)
 	misc_deregister(&vtpms_miscdevice);
 }
 
-module_exit(tpmback_exit);
-
 MODULE_LICENSE("Dual BSD/GPL");
 
 /*
