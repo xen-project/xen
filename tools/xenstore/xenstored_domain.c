@@ -250,6 +250,11 @@ bool domain_can_read(struct connection *conn)
 	return (intf->req_cons != intf->req_prod);
 }
 
+bool domain_is_unprivileged(struct connection *conn)
+{
+	return (conn && conn->domain && conn->domain->domid != 0);
+}
+
 bool domain_can_write(struct connection *conn)
 {
 	struct xenstore_domain_interface *intf = conn->domain->interface;
@@ -587,7 +592,7 @@ void domain_entry_dec(struct connection *conn)
 
 int domain_entry(struct connection *conn)
 {
-	return (conn && conn->domain && conn->domain->domid)
+	return (domain_is_unprivileged(conn))
 		? conn->domain->nbentry
 		: 0;
 }
@@ -609,7 +614,7 @@ void domain_watch_dec(struct connection *conn)
 
 int domain_watch(struct connection *conn)
 {
-	return (conn && conn->domain && conn->domain->domid)
+	return (domain_is_unprivileged(conn))
 		? conn->domain->nbwatch
 		: 0;
 }

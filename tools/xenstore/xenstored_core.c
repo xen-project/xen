@@ -461,7 +461,7 @@ static bool write_node(struct connection *conn, const struct node *node)
 		+ node->num_perms*sizeof(node->perms[0])
 		+ node->datalen + node->childlen;
 
-	if (data.dsize >= quota_max_entry_size)
+	if (domain_is_unprivileged(conn) && data.dsize >= quota_max_entry_size)
 		goto error;
 
 	data.dptr = talloc_size(node, data.dsize);
