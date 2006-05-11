@@ -388,7 +388,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		break;
 	  
 	    case 4:
-		printk("Alt ITLB.\n");
+		printk("Alt DTLB.\n");
 		break;
 	  
 	    case 6:
