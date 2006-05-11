@@ -198,6 +198,22 @@ config XEN_SYSFS
 	help
 		Xen hypervisor attributes will show up under /sys/hypervisor/.
 
+choice
+	prompt "Xen version compatibility"
+	default XEN_COMPAT_030002_AND_LATER
+
+	config XEN_COMPAT_030002_AND_LATER
+		bool "3.0.2 and later"
+
+	config XEN_COMPAT_LATEST_ONLY
+		bool "no compatibility code"
+
+endchoice
+
+config XEN_COMPAT_030002
+	bool
+	default XEN_COMPAT_030002_AND_LATER
+
 endmenu
 
 config HAVE_ARCH_ALLOC_SKB

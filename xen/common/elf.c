@@ -23,7 +23,7 @@ int parseelfimage(struct domain_setup_info *dsi)
     Elf_Ehdr *ehdr = (Elf_Ehdr *)dsi->image_addr;
     Elf_Phdr *phdr;
     Elf_Shdr *shdr;
-    unsigned long kernstart = ~0UL, kernend=0UL;
+    unsigned long kernstart = ~0UL, kernend=0UL, vaddr, virt_base;
     char *shstrtab, *guestinfo=NULL, *p;
     char *elfbase = (char *)dsi->image_addr;
     int h;
@@ -81,39 +81,50 @@ int parseelfimage(struct domain_setup_info *dsi)
 
     dsi->xen_section_string = guestinfo;
 
-    for ( h = 0; h < ehdr->e_phnum; h++ ) 
+    if ( guestinfo == NULL )
+        guestinfo = "";
+
+    virt_base = 0;
+    if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
+        virt_base = simple_strtoul(p+10, &p, 0);
+    dsi->elf_paddr_offset = virt_base;
+    if ( (p = strstr(guestinfo, "ELF_PADDR_OFFSET=")) != NULL )
+        dsi->elf_paddr_offset = simple_strtoul(p+17, &p, 0);
+
+    for ( h = 0; h < ehdr->e_phnum; h++ )
     {
         phdr = (Elf_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
             continue;
-        if ( phdr->p_paddr < kernstart )
-            kernstart = phdr->p_paddr;
-        if ( (phdr->p_paddr + phdr->p_memsz) > kernend )
-            kernend = phdr->p_paddr + phdr->p_memsz;
+        vaddr = phdr->p_paddr - dsi->elf_paddr_offset + virt_base;
+        if ( vaddr < kernstart )
+            kernstart = vaddr;
+        if ( (vaddr + phdr->p_memsz) > kernend )
+            kernend = vaddr + phdr->p_memsz;
     }
 
+    if ( virt_base )
+        dsi->v_start = virt_base;
+    else
+        dsi->v_start = kernstart;
+
+    dsi->v_kernentry = ehdr->e_entry;
+    if ( (p = strstr(guestinfo, "VIRT_ENTRY=")) != NULL )
+        dsi->v_kernentry = simple_strtoul(p+11, &p, 0);
+
     if ( (kernstart > kernend) || 
-         (ehdr->e_entry < kernstart) || 
-         (ehdr->e_entry > kernend) )
+         (dsi->v_kernentry < kernstart) ||
+         (dsi->v_kernentry > kernend) )
     {
         printk("Malformed ELF image.\n");
         return -EINVAL;
     }
 
-    dsi->v_start = kernstart;
-
-    if ( guestinfo != NULL )
-    {
-        if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
-            dsi->v_start = simple_strtoul(p+10, &p, 0);
-
-        if ( (p = strstr(guestinfo, "BSD_SYMTAB")) != NULL )
+    if ( (p = strstr(guestinfo, "BSD_SYMTAB")) != NULL )
             dsi->load_symtab = 1;
-    }
 
     dsi->v_kernstart = kernstart;
     dsi->v_kernend   = kernend;
-    dsi->v_kernentry = ehdr->e_entry;
     dsi->v_end       = dsi->v_kernend;
 
     loadelfsymtab(dsi, 0);
@@ -126,18 +137,19 @@ int loadelfimage(struct domain_setup_info *dsi)
     char *elfbase = (char *)dsi->image_addr;
     Elf_Ehdr *ehdr = (Elf_Ehdr *)dsi->image_addr;
     Elf_Phdr *phdr;
+    unsigned long vaddr;
     int h;
   
-    for ( h = 0; h < ehdr->e_phnum; h++ ) 
+    for ( h = 0; h < ehdr->e_phnum; h++ )
     {
         phdr = (Elf_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
             continue;
+        vaddr = phdr->p_paddr - dsi->elf_paddr_offset + dsi->v_start;
         if ( phdr->p_filesz != 0 )
-            memcpy((char *)phdr->p_paddr, elfbase + phdr->p_offset, 
-                   phdr->p_filesz);
+            memcpy((char *)vaddr, elfbase + phdr->p_offset, phdr->p_filesz);
         if ( phdr->p_memsz > phdr->p_filesz )
-            memset((char *)phdr->p_paddr + phdr->p_filesz, 0, 
+            memset((char *)vaddr + phdr->p_filesz, 0,
                    phdr->p_memsz - phdr->p_filesz);
     }
 

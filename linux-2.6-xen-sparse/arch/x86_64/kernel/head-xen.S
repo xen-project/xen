@@ -24,6 +24,8 @@
 
 	.text
 	.code64
+#define VIRT_ENTRY_OFFSET 0x0
+.org VIRT_ENTRY_OFFSET
 	.globl startup_64
 startup_64:
 ENTRY(_start)
@@ -146,8 +148,18 @@ gdt_end:
 .section __xen_guest
 	.ascii	"GUEST_OS=linux,GUEST_VER=2.6"
 	.ascii	",XEN_VER=xen-3.0"
-	.ascii	",VIRT_BASE=0x"; utoh __START_KERNEL_map
-	.ascii	",HYPERCALL_PAGE=0x"; utoh (phys_hypercall_page >> PAGE_SHIFT)
+	.ascii	",VIRT_BASE=0x"
+		utoh __START_KERNEL_map
+#ifdef CONFIG_XEN_COMPAT_030002
+	.ascii	",ELF_PADDR_OFFSET=0x"
+		utoh __START_KERNEL_map
+#else
+	.ascii	",ELF_PADDR_OFFSET=0x0"
+#endif /* !CONFIG_XEN_COMPAT_030002 */
+	.ascii	",VIRT_ENTRY=0x"
+		utoh (__START_KERNEL_map + __PHYSICAL_START + VIRT_ENTRY_OFFSET)
+	.ascii	",HYPERCALL_PAGE=0x"
+		utoh (phys_hypercall_page >> PAGE_SHIFT)
 	.ascii  ",FEATURES=writable_page_tables"
 	.ascii		 "|writable_descriptor_tables"
 	.ascii		 "|auto_translated_physmap"

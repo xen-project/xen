@@ -260,8 +260,10 @@ static inline pgd_t __pgd(unsigned long x)
 #define __PAGE_OFFSET           0xffff880000000000
 #endif /* !__ASSEMBLY__ */
 
+#ifdef CONFIG_XEN_COMPAT_030002
 #undef LOAD_OFFSET
 #define LOAD_OFFSET		0
+#endif /* CONFIG_XEN_COMPAT_030002 */
 
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)
