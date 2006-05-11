@@ -368,7 +368,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		"Unknown fault 13", "Unknown fault 14", "Unknown fault 15"
 	};
 
-	printf("ia64_fault, vector=0x%p, ifa=%p, iip=%p, ipsr=%p, isr=%p\n",
+	printf("ia64_fault, vector=0x%lx, ifa=0x%016lx, iip=0x%016lx, ipsr=0x%016lx, isr=0x%016lx\n",
 	       vector, ifa, regs->cr_iip, regs->cr_ipsr, isr);
 
 
