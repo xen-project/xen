@@ -274,36 +274,36 @@ thash_data_t * vhpt_lookup(u64 va)
 static void vtlb_purge(thash_cb_t *hcb, u64 va, u64 ps)
 {
     thash_data_t *hash_table, *prev, *next;
-    u64 start, end, size, tag, rid;
+    u64 start, end, size, tag, rid, def_size;
     ia64_rr vrr;
     vcpu_get_rr(current, va, &vrr.rrval);
     rid = vrr.rid;
     size = PSIZE(ps);
     start = va & (-size);
     end = start + size;
+    def_size = PSIZE(vrr.ps);
     while(start < end){
         hash_table = vsa_thash(hcb->pta, start, vrr.rrval, &tag);
-//	    tag = ia64_ttag(start);
         if(!INVALID_TLB(hash_table)){
-    	if(hash_table->etag == tag){
-            __rem_hash_head(hcb, hash_table);
-    	}
-	    else{
-    	    prev=hash_table;
-	        next=prev->next;
-	        while(next){
-        		if(next->etag == tag){
-	        	    prev->next=next->next;
-		            cch_free(hcb,next);
-		            hash_table->len--;
-        		    break;
-	        	}
-		        prev=next;
-    		    next=next->next;
-    	    }
-    	}
+            if(hash_table->etag == tag){
+                __rem_hash_head(hcb, hash_table);
+            }
+            else{
+                prev=hash_table;
+                next=prev->next;
+                while(next){
+                    if(next->etag == tag){
+                        prev->next=next->next;
+                        cch_free(hcb,next);
+                        hash_table->len--;
+                        break;
+                    }
+                    prev=next;
+                    next=next->next;
+                }
+            }
         }
-	    start += PAGE_SIZE;
+        start += def_size;
     }
 //    machine_tlb_purge(va, ps);
 }
@@ -319,26 +319,26 @@ static void vhpt_purge(thash_cb_t *hcb, u64 va, u64 ps)
     start = va & (-size);
     end = start + size;
     while(start < end){
-    	hash_table = (thash_data_t *)ia64_thash(start);
-	    tag = ia64_ttag(start);
-    	if(hash_table->etag == tag ){
+        hash_table = (thash_data_t *)ia64_thash(start);
+        tag = ia64_ttag(start);
+        if(hash_table->etag == tag ){
             __rem_hash_head(hcb, hash_table);
-    	}
-	    else{
-    	    prev=hash_table;
-	        next=prev->next;
-	        while(next){
-        		if(next->etag == tag){
-	        	    prev->next=next->next;
-		            cch_free(hcb,next);
-		            hash_table->len--;
-        		    break;
-	        	}
-		        prev=next;
-    		    next=next->next;
-    	    }
-    	}
-	    start += PAGE_SIZE;
+        }
+        else{
+            prev=hash_table;
+            next=prev->next;
+            while(next){
+                if(next->etag == tag){
+                    prev->next=next->next;
+                    cch_free(hcb,next);
+                    hash_table->len--;
+                    break;
+                }
+                prev=next;
+                next=next->next;
+            }
+        }
+        start += PAGE_SIZE;
     }
     machine_tlb_purge(va, ps);
 }
