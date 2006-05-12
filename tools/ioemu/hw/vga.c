@@ -1946,11 +1946,11 @@ void vga_bios_init(VGAState *s)
 
 }
 
+/* when used on xen environment, the vga_ram_base is not used */
 void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base, 
                      unsigned long vga_ram_offset, int vga_ram_size)
 {
     int i, j, v, b;
-    extern void* shared_vram;
 
     for(i = 0;i < 256; i++) {
         v = 0;
@@ -1979,11 +1979,7 @@ void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
 
     /* qemu's vga mem is not detached from phys_ram_base and can cause DM abort
      * when guest write vga mem, so allocate a new one */
-#if defined(__i386__) || defined(__x86_64__)
-    s->vram_ptr = shared_vram;
-#else
     s->vram_ptr = qemu_malloc(vga_ram_size);
-#endif
     check_sse2();
     s->vram_shadow = qemu_malloc(vga_ram_size+TARGET_PAGE_SIZE+1);
     if (s->vram_shadow == NULL)
@@ -2090,12 +2086,14 @@ int vga_initialize(PCIBus *bus, DisplayState *ds, uint8_t *vga_ram_base,
     return 0;
 }
 
-int vga_update_vram(VGAState *s, void *vga_ram_base, int vga_ram_size)
+void *vga_update_vram(VGAState *s, void *vga_ram_base, int vga_ram_size)
 {
+    uint8_t *old_pointer;
+
     if (s->vram_size != vga_ram_size)
     {
         fprintf(stderr, "No support to change vga_ram_size\n");
-        return -1;
+        return NULL;
     }
 
     if ( !vga_ram_base )
@@ -2104,15 +2102,16 @@ int vga_update_vram(VGAState *s, void *vga_ram_base, int vga_ram_size)
         if (!vga_ram_base)
         {
             fprintf(stderr, "reallocate error\n");
-            return -1;
+            return NULL;
         }
     }
 
     /* XXX lock needed? */
     memcpy(vga_ram_base, s->vram_ptr, vga_ram_size);
+    old_pointer = s->vram_ptr;
     s->vram_ptr = vga_ram_base;
 
-    return 0;
+    return old_pointer;
 }
 
 /********************************************************/

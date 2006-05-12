@@ -385,7 +385,6 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
     char buf[1024];
     int ret, linux_boot, initrd_size, i, nb_nics1;
     PCIBus *pci_bus;
-    extern void * shared_vram;
     
     linux_boot = (kernel_filename != NULL);
 
@@ -512,14 +511,14 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
     if (cirrus_vga_enabled) {
         if (pci_enabled) {
             pci_cirrus_vga_init(pci_bus, 
-                                ds, shared_vram, ram_size, 
+                                ds, NULL, ram_size, 
                                 vga_ram_size);
         } else {
-            isa_cirrus_vga_init(ds, shared_vram, ram_size, 
+            isa_cirrus_vga_init(ds, NULL, ram_size, 
                                 vga_ram_size);
         }
     } else {
-        vga_initialize(pci_bus, ds, shared_vram, ram_size, 
+        vga_initialize(pci_bus, ds, NULL, ram_size, 
                        vga_ram_size);
     }
 
