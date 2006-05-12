@@ -74,13 +74,18 @@ void free_vm_area(struct vm_struct *area)
 	// This area is used for foreign page mappping.
 	// So underlying machine page may not be assigned.
 	for (i = 0; i < (1 << order); i++) {
-		unsigned long error;
-		error = HYPERVISOR_populate_physmap(
-			(area->phys_addr >> PAGE_SHIFT) + i, 0, 0);
-		if (error) {
-			BUG();//XXX
-			return;
-		}
+		unsigned long ret;
+		unsigned long gpfn = (area->phys_addr >> PAGE_SHIFT) + i;
+		struct xen_memory_reservation reservation = {
+			.nr_extents   = 1,
+			.address_bits = 0,
+			.extent_order = 0,
+			.domid        = DOMID_SELF
+		};
+		set_xen_guest_handle(reservation.extent_start, &gpfn);
+		ret = HYPERVISOR_memory_op(XENMEM_populate_physmap,
+					   &reservation);
+		BUG_ON(ret != 1);
 	}
 	free_pages((unsigned long)area->addr, order);
 	kfree(area);

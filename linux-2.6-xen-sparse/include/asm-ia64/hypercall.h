@@ -458,27 +458,6 @@ HYPERVISOR_machtophys(unsigned long mfn)
 }
 
 static inline unsigned long
-__HYPERVISOR_populate_physmap(unsigned long gpfn, unsigned int extent_order,
-			      unsigned int address_bits)
-{
-	return _hypercall_imm3(unsigned long, ia64_dom0vp_op,
-			       IA64_DOM0VP_populate_physmap, gpfn, 
-			       extent_order, address_bits);
-}
-
-static inline unsigned long
-HYPERVISOR_populate_physmap(unsigned long gpfn, unsigned int extent_order,
-			    unsigned int address_bits)
-{
-	unsigned long ret = 0;
-	if (running_on_xen) {
-		ret = __HYPERVISOR_populate_physmap(gpfn, extent_order,
-						    address_bits);
-	}
-	return ret;
-}
-
-static inline unsigned long
 __HYPERVISOR_zap_physmap(unsigned long gpfn, unsigned int extent_order)
 {
 	return _hypercall_imm2(unsigned long, ia64_dom0vp_op,
@@ -503,6 +482,7 @@ __HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
 			       IA64_DOM0VP_add_physmap, gpfn, mfn, flags,
 			       domid);
 }
+
 static inline unsigned long
 HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
 		       unsigned int flags, domid_t domid)
@@ -522,8 +502,6 @@ HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
 #define HYPERVISOR_ioremap(ioaddr, size)		(ioaddr)
 #define HYPERVISOR_phystomach(gpfn)			(gpfn)
 #define HYPERVISOR_machtophys(mfn)			(mfn)
-#define HYPERVISOR_populate_physmap(gpfn, extent_order, address_bits) \
-							(0)
 #define HYPERVISOR_zap_physmap(gpfn, extent_order)	(0)
 #define HYPERVISOR_add_physmap(gpfn, mfn, flags)	(0)
 #endif

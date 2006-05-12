@@ -8,7 +8,7 @@ obj-y	+= core/
 #obj-y	+= char/
 obj-y	+= console/
 obj-y	+= evtchn/
-#obj-y	+= balloon/
+obj-$(CONFIG_XEN_IA64_DOM0_VP)	+= balloon/
 obj-y	+= privcmd/
 obj-y	+= xenbus/
 

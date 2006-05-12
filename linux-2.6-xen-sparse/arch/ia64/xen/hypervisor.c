@@ -26,14 +26,8 @@
 #include <asm/page.h>
 #include <asm/hypervisor.h>
 #include <asm/hypercall.h>
-
-#define XEN_IA64_BALLOON_IS_NOT_YET
-#ifndef XEN_IA64_BALLOON_IS_NOT_YET
+#include <xen/interface/memory.h>
 #include <xen/balloon.h>
-#else
-#define balloon_lock(flags)	((void)flags)
-#define balloon_unlock(flags)	((void)flags)
-#endif
 
 //XXX xen/ia64 copy_from_guest() is broken.
 //    This is a temporal work around until it is fixed.
@@ -148,6 +142,39 @@ static void contiguous_bitmap_clear(
 	}
 }
 
+static unsigned long
+HYPERVISOR_populate_physmap(unsigned long gpfn, unsigned int extent_order,
+			    unsigned int address_bits)
+{
+	unsigned long ret;
+        struct xen_memory_reservation reservation = {
+		.nr_extents   = 1,
+                .address_bits = address_bits,
+                .extent_order = extent_order,
+                .domid        = DOMID_SELF
+        };
+	set_xen_guest_handle(reservation.extent_start, &gpfn);
+	ret = HYPERVISOR_memory_op(XENMEM_populate_physmap, &reservation);
+	BUG_ON(ret != 1);
+	return 0;
+}
+
+static unsigned long
+HYPERVISOR_remove_physmap(unsigned long gpfn, unsigned int extent_order)
+{
+	unsigned long ret;
+	struct xen_memory_reservation reservation = {
+		.nr_extents   = 1,
+		.address_bits = 0,
+		.extent_order = extent_order,
+		.domid        = DOMID_SELF
+	};
+	set_xen_guest_handle(reservation.extent_start, &gpfn);
+	ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
+	BUG_ON(ret != 1);
+	return 0;
+}
+
 /* Ensure multi-page extents are contiguous in machine memory. */
 int
 __xen_create_contiguous_region(unsigned long vstart,
@@ -156,29 +183,29 @@ __xen_create_contiguous_region(unsigned long vstart,
 	unsigned long error = 0;
 	unsigned long gphys = __pa(vstart);
 	unsigned long start_gpfn = gphys >> PAGE_SHIFT;
-	unsigned long num_pfn = 1 << order;
+	unsigned long num_gpfn = 1 << order;
 	unsigned long i;
 	unsigned long flags;
 
-	scrub_pages(vstart, 1 << order);
+	scrub_pages(vstart, num_gpfn);
 
 	balloon_lock(flags);
 
-	//XXX order
-	for (i = 0; i < num_pfn; i++) {
-		error = HYPERVISOR_zap_physmap(start_gpfn + i, 0);
-		if (error) {
-			goto out;
-		}
+	error = HYPERVISOR_remove_physmap(start_gpfn, order);
+	if (error) {
+		goto fail;
 	}
 
 	error = HYPERVISOR_populate_physmap(start_gpfn, order, address_bits);
-	contiguous_bitmap_set(start_gpfn, 1UL << order);
+	if (error) {
+		goto fail;
+	}
+	contiguous_bitmap_set(start_gpfn, num_gpfn);
 #if 0
 	{
 	unsigned long mfn;
 	unsigned long mfn_prev = ~0UL;
-	for (i = 0; i < 1 << order; i++) {
+	for (i = 0; i < num_gpfn; i++) {
 		mfn = pfn_to_mfn_for_dma(start_gpfn + i);
 		if (mfn_prev != ~0UL && mfn != mfn_prev + 1) {
 			xprintk("\n");
@@ -188,7 +215,7 @@ __xen_create_contiguous_region(unsigned long vstart,
 				vstart, virt_to_bus((void*)vstart),
 				phys_to_machine_for_dma(gphys));
 			xprintk("mfn: ");
-			for (i = 0; i < 1 << order; i++) {
+			for (i = 0; i < num_gpfn; i++) {
 				mfn = pfn_to_mfn_for_dma(start_gpfn + i);
 				xprintk("0x%lx ", mfn);
 			}
@@ -202,44 +229,73 @@ __xen_create_contiguous_region(unsigned long vstart,
 out:
 	balloon_unlock(flags);
 	return error;
+
+fail:
+	for (i = 0; i < num_gpfn; i++) {
+		error = HYPERVISOR_populate_physmap(start_gpfn + i, 0, 0);
+		if (error) {
+			BUG();//XXX
+		}
+	}
+	goto out;
 }
 
 void
 __xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 {
-	unsigned long error = 0;
-	unsigned long gphys = __pa(vstart);
-	unsigned long start_gpfn = gphys >> PAGE_SHIFT;
-	unsigned long num_pfn = 1 << order;
-	unsigned long i;
 	unsigned long flags;
+	unsigned long error = 0;
+	unsigned long start_gpfn = __pa(vstart) >> PAGE_SHIFT;
+	unsigned long num_gpfn = 1UL << order;
+	unsigned long* gpfns;
+	struct xen_memory_reservation reservation;
+	unsigned long i;
 
-	scrub_pages(vstart, 1 << order);
+	gpfns = kmalloc(sizeof(gpfns[0]) * num_gpfn,
+			GFP_KERNEL | __GFP_NOFAIL);
+	for (i = 0; i < num_gpfn; i++) {
+		gpfns[i] = start_gpfn + i;
+	}
+
+	scrub_pages(vstart, num_gpfn);
 
 	balloon_lock(flags);
 
-	contiguous_bitmap_clear(start_gpfn, 1UL << order);
-
-	//XXX order
-	for (i = 0; i < num_pfn; i++) {
-		error = HYPERVISOR_zap_physmap(start_gpfn + i, 0);
-		if (error) {
-			goto out;
-		}
+	contiguous_bitmap_clear(start_gpfn, num_gpfn);
+	error = HYPERVISOR_remove_physmap(start_gpfn, order);
+	if (error) {
+		goto fail;
 	}
 
-	for (i = 0; i < num_pfn; i++) {
-		error = HYPERVISOR_populate_physmap(start_gpfn + i, 0, 0);
-		if (error) {
-			goto out;
-		}
+	set_xen_guest_handle(reservation.extent_start, gpfns);
+	reservation.nr_extents   = num_gpfn;
+	reservation.address_bits = 0;
+	reservation.extent_order = 0;
+	reservation.domid        = DOMID_SELF;
+	error = HYPERVISOR_memory_op(XENMEM_populate_physmap, &reservation);
+	if (error != num_gpfn) {
+		error = -EFAULT;//XXX
+		goto fail;
 	}
-
+	error = 0;
 out:
 	balloon_unlock(flags);
+	kfree(gpfns);
 	if (error) {
-		//XXX
+		// error can't be returned.
+		BUG();//XXX
 	}
+	return;
+
+fail:
+	for (i = 0; i < num_gpfn; i++) {
+		int tmp_error;// don't overwrite error.
+		tmp_error = HYPERVISOR_populate_physmap(start_gpfn + i, 0, 0);
+		if (tmp_error) {
+			BUG();//XXX
+		}
+	}
+	goto out;
 }
 
 
@@ -294,38 +350,6 @@ HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count)
 
 	return ____HYPERVISOR_grant_table_op(cmd, uop, count);
 }
-
-
-///////////////////////////////////////////////////////////////////////////
-//XXX taken from balloon.c
-//    temporal hack until balloon driver support.
-#include <linux/module.h>
-
-struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
-{
-	unsigned long vstart;
-	unsigned int  order = get_order(nr_pages * PAGE_SIZE);
-
-	vstart = __get_free_pages(GFP_KERNEL, order);
-	if (vstart == 0)
-		return NULL;
-
-	return virt_to_page(vstart);
-}
-
-void balloon_dealloc_empty_page_range(
-	struct page *page, unsigned long nr_pages)
-{
-	__free_pages(page, get_order(nr_pages * PAGE_SIZE));
-}
-
-void balloon_update_driver_allowance(long delta)
-{
-}
-
-EXPORT_SYMBOL(balloon_alloc_empty_page_range);
-EXPORT_SYMBOL(balloon_dealloc_empty_page_range);
-EXPORT_SYMBOL(balloon_update_driver_allowance);
 
 
 ///////////////////////////////////////////////////////////////////////////
