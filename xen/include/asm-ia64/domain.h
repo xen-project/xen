@@ -112,7 +112,6 @@ struct arch_vcpu {
 struct mm_struct {
 	pgd_t * pgd;
     //	atomic_t mm_users;			/* How many users with user space? */
-	struct list_head pt_list;		/* List of pagetable */
 };
 
 extern struct mm_struct init_mm;

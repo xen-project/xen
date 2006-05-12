@@ -83,22 +83,7 @@ static void try_to_clear_PGC_allocate(struct domain* d,
 /* this belongs in include/asm, but there doesn't seem to be a suitable place */
 void arch_domain_destroy(struct domain *d)
 {
-	struct page_info *page;
-	struct list_head *ent, *prev;
-
 	BUG_ON(d->arch.mm->pgd != NULL);
-	if (d->arch.mm->pgd != NULL)
-	{
-		list_for_each ( ent, &d->arch.mm->pt_list )
-		{
-			page = list_entry(ent, struct page_info, list);
-			prev = ent->prev;
-			list_del(ent);
-			free_xenheap_page(page_to_virt(page));
-			ent = prev;
-		}
-		pgd_free(d->arch.mm->pgd);
-	}
 	if (d->arch.mm != NULL)
 		xfree(d->arch.mm);
 	if (d->shared_info != NULL)
@@ -265,7 +250,6 @@ int arch_domain_create(struct domain *d)
 	if ((d->arch.mm = xmalloc(struct mm_struct)) == NULL)
 	    goto fail_nomem;
 	memset(d->arch.mm, 0, sizeof(*d->arch.mm));
-	INIT_LIST_HEAD(&d->arch.mm->pt_list);
 
 	d->arch.physmap_built = 0;
 	if ((d->arch.mm->pgd = pgd_alloc(d->arch.mm)) == NULL)
@@ -648,7 +632,6 @@ share_xen_page_with_guest(struct page_info *page,
 static pte_t*
 lookup_alloc_domain_pte(struct domain* d, unsigned long mpaddr)
 {
-    struct page_info *pt;
     struct mm_struct *mm = d->arch.mm;
     pgd_t *pgd;
     pud_t *pud;
@@ -658,22 +641,16 @@ lookup_alloc_domain_pte(struct domain* d, unsigned long mpaddr)
     pgd = pgd_offset(mm, mpaddr);
     if (pgd_none(*pgd)) {
         pgd_populate(mm, pgd, pud_alloc_one(mm,mpaddr));
-        pt = maddr_to_page(pgd_val(*pgd));
-        list_add_tail(&pt->list, &d->arch.mm->pt_list);
     }
 
     pud = pud_offset(pgd, mpaddr);
     if (pud_none(*pud)) {
         pud_populate(mm, pud, pmd_alloc_one(mm,mpaddr));
-        pt = maddr_to_page(pud_val(*pud));
-        list_add_tail(&pt->list, &d->arch.mm->pt_list);
     }
 
     pmd = pmd_offset(pud, mpaddr);
     if (pmd_none(*pmd)) {
         pmd_populate_kernel(mm, pmd, pte_alloc_one_kernel(mm, mpaddr));
-        pt = maddr_to_page(pmd_val(*pmd));
-        list_add_tail(&pt->list, &d->arch.mm->pt_list);
     }
 
     return pte_offset_map(pmd, mpaddr);
