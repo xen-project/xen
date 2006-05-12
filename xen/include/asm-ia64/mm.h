@@ -128,8 +128,10 @@ static inline u32 pickle_domptr(struct domain *_d)
 #define page_get_owner(_p)	(unpickle_domptr((_p)->u.inuse._domain))
 #define page_set_owner(_p, _d)	((_p)->u.inuse._domain = pickle_domptr(_d))
 
-/* Dummy now */
-#define share_xen_page_with_guest(p, d, r) do { } while (0)
+#define XENSHARE_writable 0
+#define XENSHARE_readonly 1
+void share_xen_page_with_guest(struct page_info *page,
+                               struct domain *d, int readonly);
 #define share_xen_page_with_privileged_guests(p, r) do { } while (0)
 
 extern struct page_info *frame_table;
@@ -471,6 +473,4 @@ extern unsigned long ____lookup_domain_mpa(struct domain *d, unsigned long mpadd
 /* Arch-specific portion of memory_op hypercall. */
 #define arch_memory_op(op, arg) (-ENOSYS)
 
-extern void assign_domain_page(struct domain *d, unsigned long mpaddr,
-			       unsigned long physaddr);
 #endif /* __ASM_IA64_MM_H__ */

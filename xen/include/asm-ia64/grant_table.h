@@ -14,6 +14,7 @@
 
 // for grant transfer
 #define steal_page_for_grant_transfer(d, p)  0
+
 #else
 // for grant map/unmap
 int create_grant_host_mapping(unsigned long gpaddr, unsigned long mfn, unsigned int flags);
@@ -22,9 +23,17 @@ int destroy_grant_host_mapping(unsigned long gpaddr, unsigned long mfn, unsigned
 // for grant transfer
 int steal_page_for_grant_transfer(struct domain *d, struct page_info *page);
 void guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long mfn);
+
 #endif
 
-#define gnttab_create_shared_page(d, t, i) ((void)0)
+// for grant table shared page
+#define gnttab_create_shared_page(d, t, i)                              \
+    do {                                                                \
+        share_xen_page_with_guest(                                      \
+            virt_to_page((char *)(t)->shared + ((i) << PAGE_SHIFT)),    \
+            (d), XENSHARE_writable);                                    \
+    } while (0)
+
 
 /* Guest physical address of the grant table.  */
 #define IA64_GRANT_TABLE_PADDR (1UL << 40)
