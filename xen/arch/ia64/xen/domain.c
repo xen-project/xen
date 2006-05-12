@@ -77,12 +77,16 @@ extern void serial_input_init(void);
 static void init_switch_stack(struct vcpu *v);
 void build_physmap_table(struct domain *d);
 
+static void try_to_clear_PGC_allocate(struct domain* d,
+                                      struct page_info* page);
+
 /* this belongs in include/asm, but there doesn't seem to be a suitable place */
 void arch_domain_destroy(struct domain *d)
 {
 	struct page_info *page;
 	struct list_head *ent, *prev;
 
+	BUG_ON(d->arch.mm->pgd != NULL);
 	if (d->arch.mm->pgd != NULL)
 	{
 		list_for_each ( ent, &d->arch.mm->pt_list )
@@ -395,10 +399,13 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
         /* Follow the list chain and /then/ potentially free the page. */
         ent = ent->next;
 #ifdef CONFIG_XEN_IA64_DOM0_VP
+#if 1
+        BUG_ON(get_gpfn_from_mfn(page_to_mfn(page)) != INVALID_M2P_ENTRY);
+#else
         //XXX this should be done at traversing the P2M table.
-        //BUG_ON(get_gpfn_from_mfn(mfn) != INVALID_M2P_ENTRY);
         if (page_get_owner(page) == d)
             set_gpfn_from_mfn(page_to_mfn(page), INVALID_M2P_ENTRY);
+#endif
 #endif
         put_page(page);
     }
@@ -406,11 +413,112 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
     spin_unlock_recursive(&d->page_alloc_lock);
 }
 
+static void
+relinquish_pte(struct domain* d, pte_t* pte)
+{
+    unsigned long mfn = pte_pfn(*pte);
+    struct page_info* page;
+
+    // vmx domain use bit[58:56] to distinguish io region from memory.
+    // see vmx_build_physmap_table() in vmx_init.c
+    if (((mfn << PAGE_SHIFT) & GPFN_IO_MASK) != GPFN_MEM)
+        return;
+
+    // domain might map IO space or acpi table pages. check it.
+    if (!mfn_valid(mfn))
+        return;
+    page = mfn_to_page(mfn);
+    // struct page_info corresponding to mfn may exist or not depending
+    // on CONFIG_VIRTUAL_FRAME_TABLE.
+    // This check is too easy.
+    // The right way is to check whether this page is of io area or acpi pages
+    if (page_get_owner(page) == NULL) {
+        BUG_ON(page->count_info != 0);
+        return;
+    }
+
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+    if (page_get_owner(page) == d) {
+        BUG_ON(get_gpfn_from_mfn(mfn) == INVALID_M2P_ENTRY);
+        set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
+    }
+#endif
+    try_to_clear_PGC_allocate(d, page);
+    put_page(page);
+}
+
+static void
+relinquish_pmd(struct domain* d, pmd_t* pmd, unsigned long offset)
+{
+    unsigned long i;
+    pte_t* pte = pte_offset_map(pmd, offset);
+
+    for (i = 0; i < PTRS_PER_PTE; i++, pte++) {
+        if (!pte_present(*pte))
+            continue;
+        
+        relinquish_pte(d, pte);
+    }
+    pte_free_kernel(pte_offset_map(pmd, offset));
+}
+
+static void
+relinquish_pud(struct domain* d, pud_t *pud, unsigned long offset)
+{
+    unsigned long i;
+    pmd_t *pmd = pmd_offset(pud, offset);
+    
+    for (i = 0; i < PTRS_PER_PMD; i++, pmd++) {
+        if (!pmd_present(*pmd))
+            continue;
+        
+        relinquish_pmd(d, pmd, offset + (i << PMD_SHIFT));
+    }
+    pmd_free(pmd_offset(pud, offset));
+}
+
+static void
+relinquish_pgd(struct domain* d, pgd_t *pgd, unsigned long offset)
+{
+    unsigned long i;
+    pud_t *pud = pud_offset(pgd, offset);
+
+    for (i = 0; i < PTRS_PER_PUD; i++, pud++) {
+        if (!pud_present(*pud))
+            continue;
+
+        relinquish_pud(d, pud, offset + (i << PUD_SHIFT));
+    }
+    pud_free(pud_offset(pgd, offset));
+}
+
+static void
+relinquish_mm(struct domain* d)
+{
+    struct mm_struct* mm = d->arch.mm;
+    unsigned long i;
+    pgd_t* pgd;
+
+    if (mm->pgd == NULL)
+        return;
+
+    pgd = pgd_offset(mm, 0);
+    for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
+        if (!pgd_present(*pgd))
+            continue;
+
+        relinquish_pgd(d, pgd, i << PGDIR_SHIFT);
+    }
+    pgd_free(mm->pgd);
+    mm->pgd = NULL;
+}
+
 void domain_relinquish_resources(struct domain *d)
 {
     /* Relinquish every page of memory. */
 
-    //XXX relase page traversing d->arch.mm.
+    // relase page traversing d->arch.mm.
+    relinquish_mm(d);
 
     relinquish_memory(d, &d->xenpage_list);
     relinquish_memory(d, &d->page_list);
@@ -746,14 +854,14 @@ assign_domain_page(struct domain *d,
     struct page_info* page = mfn_to_page(physaddr >> PAGE_SHIFT);
     int ret;
 
+    BUG_ON((physaddr & GPFN_IO_MASK) != GPFN_MEM);
     ret = get_page(page, d);
     BUG_ON(ret == 0);
     __assign_domain_page(d, mpaddr, physaddr);
 
     //XXX CONFIG_XEN_IA64_DOM0_VP
     //    TODO racy
-    if ((physaddr & GPFN_IO_MASK) == GPFN_MEM)
-        set_gpfn_from_mfn(physaddr >> PAGE_SHIFT, mpaddr >> PAGE_SHIFT);
+    set_gpfn_from_mfn(physaddr >> PAGE_SHIFT, mpaddr >> PAGE_SHIFT);
 }
 
 #ifdef CONFIG_XEN_IA64_DOM0_VP

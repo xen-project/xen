@@ -139,12 +139,14 @@ static inline void pte_free(struct page *pte)
 {
 	pgtable_quicklist_free(page_address(pte));
 }
+#endif
 
 static inline void pte_free_kernel(pte_t * pte)
 {
 	pgtable_quicklist_free(pte);
 }
 
+#ifndef XEN
 #define __pte_free_tlb(tlb, pte)	pte_free(pte)
 #endif
 
