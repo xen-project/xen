@@ -286,6 +286,11 @@ int arch_set_info_guest(
         v->arch.flags |= TF_kernel_mode;
 
     memcpy(&v->arch.guest_context, c, sizeof(*c));
+
+    /* Only CR0.TS is modifiable by guest or admin. */
+    v->arch.guest_context.ctrlreg[0] &= X86_CR0_TS;
+    v->arch.guest_context.ctrlreg[0] |= read_cr0() & ~X86_CR0_TS;
+
     init_int80_direct_trap(v);
 
     if ( !(c->flags & VGCF_HVM_GUEST) )

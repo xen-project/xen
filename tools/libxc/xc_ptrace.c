@@ -157,6 +157,27 @@ online_vcpus_changed(cpumap_t cpumap)
 static long                     nr_pages = 0;
 static unsigned long           *page_array = NULL;
 
+
+/*
+ * Translates physical addresses to machine addresses for HVM
+ * guests. For paravirtual domains the function will just return the
+ * given address.
+ *
+ * This function should be used when reading page directories/page
+ * tables.
+ *
+ */
+static unsigned long
+to_ma(int cpu,
+      unsigned long in_addr)
+{
+    unsigned long maddr = in_addr;
+
+    if ( (ctxt[cpu].flags & VGCF_HVM_GUEST) && paging_enabled(&ctxt[cpu]) )
+        maddr = page_array[maddr >> PAGE_SHIFT] << PAGE_SHIFT;
+    return maddr;
+}
+
 static void *
 map_domain_va_32(
     int xc_handle,
@@ -188,10 +209,7 @@ map_domain_va_32(
         if ( cr3_virt[cpu] == NULL )
             return NULL;
     }
-    if ( (pde = cr3_virt[cpu][vtopdi(va)]) == 0 )
-        return NULL;
-    if ( (ctxt[cpu].flags & VGCF_HVM_GUEST) && paging_enabled(&ctxt[cpu]) )
-        pde = page_array[pde >> PAGE_SHIFT] << PAGE_SHIFT;
+    pde = to_ma(cpu, cr3_virt[cpu][vtopdi(va)]);
     if ( pde != pde_phys[cpu] )
     {
         pde_phys[cpu] = pde;
@@ -203,10 +221,8 @@ map_domain_va_32(
         if ( pde_virt[cpu] == NULL )
             return NULL;
     }
-    if ( (page = pde_virt[cpu][vtopti(va)]) == 0 )
-        return NULL;
-    if (ctxt[cpu].flags & VGCF_HVM_GUEST)
-        page = page_array[page >> PAGE_SHIFT] << PAGE_SHIFT;
+    page = to_ma(cpu, pde_virt[cpu][vtopti(va)]);
+
     if ( (page != page_phys[cpu]) || (perm != prev_perm[cpu]) )
     {
         page_phys[cpu] = page;
@@ -243,25 +259,22 @@ map_domain_va_pae(
     if ( l3 == NULL )
         return NULL;
 
-    l2p = l3[l3_table_offset_pae(va)] >> PAGE_SHIFT;
-    l2p = page_array[l2p];
-    l2 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, PROT_READ, l2p);
+    l2p = to_ma(cpu, l3[l3_table_offset_pae(va)]);
+    l2 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, PROT_READ, l2p >> PAGE_SHIFT);
     munmap(l3, PAGE_SIZE);
     if ( l2 == NULL )
         return NULL;
 
-    l1p = l2[l2_table_offset_pae(va)] >> PAGE_SHIFT;
-    l1p = page_array[l1p];
-    l1 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, l1p);
+    l1p = to_ma(cpu, l2[l2_table_offset_pae(va)]);
+    l1 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, l1p >> PAGE_SHIFT);
     munmap(l2, PAGE_SIZE);
     if ( l1 == NULL )
         return NULL;
 
-    p = l1[l1_table_offset_pae(va)] >> PAGE_SHIFT;
-    p = page_array[p];
+    p = to_ma(cpu, l1[l1_table_offset_pae(va)]);
     if ( v != NULL )
         munmap(v, PAGE_SIZE);
-    v = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, p);
+    v = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, p >> PAGE_SHIFT);
     munmap(l1, PAGE_SIZE);
     if ( v == NULL )
         return NULL;
@@ -289,38 +302,35 @@ map_domain_va_64(
     if ( l4 == NULL )
         return NULL;
 
-    l3p = l4[l4_table_offset(va)] >> PAGE_SHIFT;
-    l3p = page_array[l3p];
-    l3 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, PROT_READ, l3p);
+    l3p = to_ma(cpu, l4[l4_table_offset(va)]);
+    l3 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, PROT_READ, l3p >> PAGE_SHIFT);
     munmap(l4, PAGE_SIZE);
     if ( l3 == NULL )
         return NULL;
 
-    l2p = l3[l3_table_offset(va)] >> PAGE_SHIFT;
-    l2p = page_array[l2p];
-    l2 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, PROT_READ, l2p);
+    l2p = to_ma(cpu, l3[l3_table_offset(va)]);
+    l2 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, PROT_READ, l2p >> PAGE_SHIFT);
     munmap(l3, PAGE_SIZE);
     if ( l2 == NULL )
         return NULL;
 
     l1 = NULL;
-    l1e = l2[l2_table_offset(va)];
+    l1e = to_ma(cpu, l2[l2_table_offset(va)]);
     l1p = l1e >> PAGE_SHIFT;
     if (l1e & 0x80)  { /* 2M pages */
-        p = (l1p + l1_table_offset(va));
+        p = to_ma(cpu, (l1p + l1_table_offset(va)) << PAGE_SHIFT);
     } else { /* 4K pages */
-        l1p = page_array[l1p];
-        l1 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, l1p);
+        l1p = to_ma(cpu, l1e[l1_table_offset(va)]);
+        l1 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, l1p >> PAGE_SHIFT);
         munmap(l2, PAGE_SIZE);
         if ( l1 == NULL )
             return NULL;
 
-        p = l1[l1_table_offset(va)] >> PAGE_SHIFT;
+        p = to_ma(cpu, l1[l1_table_offset(va)]);
     }
-    p = page_array[p];
     if ( v != NULL )
         munmap(v, PAGE_SIZE);
-    v = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, p);
+    v = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, p >> PAGE_SHIFT);
     if (l1)
         munmap(l1, PAGE_SIZE);
     if ( v == NULL )
@@ -381,7 +391,7 @@ map_domain_va(
         if ( v != NULL )
             munmap(v, PAGE_SIZE);
 
-        page = page_array[va >> PAGE_SHIFT] << PAGE_SHIFT;
+        page = to_ma(cpu, page_array[va >> PAGE_SHIFT]);
 
         v = xc_map_foreign_range( xc_handle, current_domid, PAGE_SIZE,
                 perm, page >> PAGE_SHIFT);
