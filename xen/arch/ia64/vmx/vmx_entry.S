@@ -290,10 +290,59 @@ GLOBAL_ENTRY(ia64_leave_hypervisor)
     mov ar.ccv=r18
     ;;
 //rbs_switch
-    // loadrs has already been shifted
-    alloc r16=ar.pfs,0,0,0,0    // drop current register frame
+    
+    shr.u r18=r20,16
     ;;
-    mov ar.rsc=r20
+    movl r19= THIS_CPU(ia64_phys_stacked_size_p8)
+    ;;
+    ld4 r19=[r19]
+     
+vmx_dont_preserve_current_frame:
+/*
+    * To prevent leaking bits between the hypervisor and guest domain,
+    * we must clear the stacked registers in the "invalid" partition here.
+    * 5 registers/cycle on McKinley).
+    */
+#   define pRecurse	p6
+#   define pReturn	p7
+#   define Nregs	14
+    
+    alloc loc0=ar.pfs,2,Nregs-2,2,0
+    shr.u loc1=r18,9		// RNaTslots <= floor(dirtySize / (64*8))
+    sub r19=r19,r18			// r19 = (physStackedSize + 8) - dirtySize
+    ;;
+    mov ar.rsc=r20			// load ar.rsc to be used for "loadrs"
+    shladd in0=loc1,3,r19
+    mov in1=0
+    ;;
+    TEXT_ALIGN(32)
+vmx_rse_clear_invalid:
+    alloc loc0=ar.pfs,2,Nregs-2,2,0
+    cmp.lt pRecurse,p0=Nregs*8,in0	// if more than Nregs regs left to clear, (re)curse
+    add out0=-Nregs*8,in0
+    add out1=1,in1			// increment recursion count
+    mov loc1=0
+    mov loc2=0
+    ;;
+    mov loc3=0
+    mov loc4=0
+    mov loc5=0
+    mov loc6=0
+    mov loc7=0
+(pRecurse) br.call.dptk.few b0=vmx_rse_clear_invalid
+    ;;
+    mov loc8=0
+    mov loc9=0
+    cmp.ne pReturn,p0=r0,in1	// if recursion count != 0, we need to do a br.ret
+    mov loc10=0
+    mov loc11=0
+(pReturn) br.ret.dptk.many b0
+
+#	undef pRecurse
+#	undef pReturn
+
+// loadrs has already been shifted
+    alloc r16=ar.pfs,0,0,0,0    // drop current register frame
     ;;
     loadrs
     ;;
