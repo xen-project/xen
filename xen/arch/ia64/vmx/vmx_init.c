@@ -353,6 +353,9 @@ int vmx_build_physmap_table(struct domain *d)
 	end = VMX_CONFIG_PAGES(d) << PAGE_SHIFT;
 	tmp = end < MMIO_START ? end : MMIO_START;
 	for (i = 0; (i < tmp) && (list_ent != &d->page_list); i += PAGE_SIZE) {
+        if (VGA_IO_START <= i && i < VGA_IO_START + VGA_IO_SIZE)
+            continue;
+
 	    mfn = page_to_mfn(list_entry(
 		list_ent, struct page_info, list));
 	    assign_domain_page(d, i, mfn << PAGE_SHIFT);
