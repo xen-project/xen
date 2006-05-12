@@ -264,10 +264,6 @@ do_dom0vp_op(unsigned long cmd,
         }
         ret = get_gpfn_from_mfn(arg0);
         break;
-    case IA64_DOM0VP_populate_physmap:
-        ret = dom0vp_populate_physmap(d, arg0,
-                                      (unsigned int)arg1, (unsigned int)arg2);
-        break;
     case IA64_DOM0VP_zap_physmap:
         ret = dom0vp_zap_physmap(d, arg0, (unsigned int)arg1);
         break;

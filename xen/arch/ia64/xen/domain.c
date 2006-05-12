@@ -984,66 +984,6 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 #ifdef CONFIG_XEN_IA64_DOM0_VP
 //XXX SMP
 unsigned long
-dom0vp_populate_physmap(struct domain *d, unsigned long gpfn,
-                        unsigned int extent_order, unsigned int address_bits)
-{
-    unsigned long ret = 0;
-    int flags = 0;
-    unsigned long mpaddr = gpfn << PAGE_SHIFT;
-    unsigned long extent_size = 1UL << extent_order;
-    unsigned long offset;
-    struct page_info* page;
-    unsigned long physaddr;
-
-    if (extent_order > 0 && !multipage_allocation_permitted(d)) {
-        ret = -EINVAL;
-        goto out;
-    }
-
-    if (gpfn + (1 << extent_order) < gpfn) {
-        ret = -EINVAL;
-        goto out;
-    }
-    if (gpfn > d->max_pages || gpfn + (1 << extent_order) > d->max_pages) {
-        ret = -EINVAL;
-        goto out;
-    }
-    if ((extent_size << PAGE_SHIFT) < extent_size) {
-        ret = -EINVAL;
-        goto out;
-    }
-
-    //XXX check address_bits and set flags = ALLOC_DOM_DMA if needed
-
-    // check the rage is not populated yet.
-    //XXX loop optimization
-    for (offset = 0; offset < extent_size << PAGE_SHIFT; offset += PAGE_SIZE) {
-        if (____lookup_domain_mpa(d, mpaddr + offset) != INVALID_MFN) {
-            ret = -EBUSY;
-            goto out;
-        }
-    }
-
-    page = alloc_domheap_pages(d, extent_order, flags);
-    if (page == NULL) {
-        ret = -ENOMEM;
-        DPRINTK("Could not allocate order=%d extent: id=%d flags=%x\n",
-                extent_order, d->domain_id, flags);
-        goto out;
-    }
-
-    //XXX loop optimization
-    physaddr = page_to_maddr(page);
-    for (offset = 0; offset < extent_size << PAGE_SHIFT; offset += PAGE_SIZE) {
-        assign_domain_page(d, mpaddr + offset, physaddr + offset);
-    }
-
-out:
-    return ret;
-}
-
-//XXX SMP
-unsigned long
 dom0vp_zap_physmap(struct domain *d, unsigned long gpfn,
                    unsigned int extent_order)
 {

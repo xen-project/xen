@@ -349,10 +349,6 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
                                                 // to the corresponding
                                                 // pseudo physical page frame
                                                 // number of the caller domain
-#define IA64_DOM0VP_populate_physmap    16      // allocate machine-contigusous
-                                                // memory region and
-                                                // map it to pseudo physical
-                                                // address
 #define IA64_DOM0VP_zap_physmap         17      // unmap and free pages
                                                 // contained in the specified
                                                 // pseudo physical region
