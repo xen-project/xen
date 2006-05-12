@@ -520,6 +520,11 @@ xc_ptrace(
         break;
 
     case PTRACE_GETFPREGS:
+        if (!current_isfile && fetch_regs(xc_handle, cpu, NULL)) 
+                goto out_error;
+        memcpy(data, &ctxt[cpu].fpu_ctxt, sizeof (elf_fpregset_t));
+        break;
+
     case PTRACE_GETFPXREGS:
         if (!current_isfile && fetch_regs(xc_handle, cpu, NULL))
                 goto out_error;
