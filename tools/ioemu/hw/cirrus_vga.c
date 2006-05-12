@@ -28,6 +28,9 @@
  */
 #include "vl.h"
 #include "vga_int.h"
+#ifndef _WIN32
+#include <sys/mman.h>
+#endif
 
 /*
  * TODO:
@@ -2455,13 +2458,96 @@ static CPUWriteMemoryFunc *cirrus_linear_bitblt_write[3] = {
     cirrus_linear_bitblt_writel,
 };
 
+extern FILE *logfile;
+#if defined(__i386__) || defined (__x86_64__)
+static void * set_vram_mapping(unsigned long begin, unsigned long end)
+{
+    unsigned long * extent_start = NULL;
+    unsigned long nr_extents;
+    void *vram_pointer = NULL;
+    int i;
+
+    /* align begin and end address */
+    begin = begin & TARGET_PAGE_MASK;
+    end = begin + VGA_RAM_SIZE;
+    end = (end + TARGET_PAGE_SIZE -1 ) & TARGET_PAGE_MASK;
+    nr_extents = (end - begin) >> TARGET_PAGE_BITS;
+
+    extent_start = malloc(sizeof(unsigned long) * nr_extents );
+    if (extent_start == NULL)
+    {
+        fprintf(stderr, "Failed malloc on set_vram_mapping\n");
+        return NULL;
+    }
+
+    memset(extent_start, 0, sizeof(unsigned long) * nr_extents);
+
+    for (i = 0; i < nr_extents; i++)
+    {
+        extent_start[i] = (begin + i * TARGET_PAGE_SIZE) >> TARGET_PAGE_BITS;
+    }
+
+    set_mm_mapping(xc_handle, domid, nr_extents, 0, extent_start);
+
+    if ( (vram_pointer =  xc_map_foreign_batch(xc_handle, domid,
+                                               PROT_READ|PROT_WRITE,
+                                               extent_start,
+                                               nr_extents)) == NULL)
+    {
+        fprintf(logfile,
+          "xc_map_foreign_batch vgaram returned error %d\n", errno);
+        return NULL;
+    }
+
+    memset(vram_pointer, 0, nr_extents * TARGET_PAGE_SIZE);
+
+    free(extent_start);
+
+    return vram_pointer;
+}
+
+static int unset_vram_mapping(unsigned long begin, unsigned long end)
+{
+    unsigned long * extent_start = NULL;
+    unsigned long nr_extents;
+    int i;
+
+    /* align begin and end address */
+
+    end = begin + VGA_RAM_SIZE;
+    begin = begin & TARGET_PAGE_MASK;
+    end = (end + TARGET_PAGE_SIZE -1 ) & TARGET_PAGE_MASK;
+    nr_extents = (end - begin) >> TARGET_PAGE_BITS;
+
+    extent_start = malloc(sizeof(unsigned long) * nr_extents );
+
+    if (extent_start == NULL)
+    {
+        fprintf(stderr, "Failed malloc on set_mm_mapping\n");
+        return -1;
+    }
+
+    memset(extent_start, 0, sizeof(unsigned long) * nr_extents);
+
+    for (i = 0; i < nr_extents; i++)
+        extent_start[i] = (begin + (i * TARGET_PAGE_SIZE)) >> TARGET_PAGE_BITS;
+
+    unset_mm_mapping(xc_handle, domid, nr_extents, 0, extent_start);
+
+    free(extent_start);
+
+    return 0;
+}
+
+#elif defined(__ia64__)
+static void * set_vram_mapping(unsigned long addr, unsigned long end) {}
+static int unset_vram_mapping(unsigned long addr, unsigned long end) {}
+#endif
+
 /* Compute the memory access functions */
 static void cirrus_update_memory_access(CirrusVGAState *s)
 {
     unsigned mode;
-    extern void * set_vram_mapping(unsigned long addr, unsigned long end);
-
-    extern int unset_vram_mapping(unsigned long addr, unsigned long end);
     extern int vga_accelerate;
 
     if ((s->sr[0x17] & 0x44) == 0x44) {

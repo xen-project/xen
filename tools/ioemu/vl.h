@@ -38,6 +38,8 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include "audio/audio.h"
+#include "xenctrl.h"
+#include "xs.h"
 
 #ifndef O_LARGEFILE
 #define O_LARGEFILE 0
@@ -113,6 +115,19 @@ void qemu_system_shutdown_request(void);
 
 void main_loop_wait(int timeout);
 
+int unset_mm_mapping(int xc_handle,
+                     uint32_t domid,
+                     unsigned long nr_pages,
+                     unsigned int address_bits,
+                     unsigned long *extent_start);
+int set_mm_mapping(int xc_handle,
+                    uint32_t domid,
+                    unsigned long nr_pages,
+                    unsigned int address_bits,
+                    unsigned long *extent_start);
+
+extern int xc_handle;
+extern int domid;
 extern int audio_enabled;
 extern int sb16_enabled;
 extern int adlib_enabled;
