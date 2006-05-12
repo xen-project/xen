@@ -258,7 +258,7 @@ int set_one_rr(unsigned long rr, unsigned long val)
 		if (!PSCB(v,metaphysical_mode))
 			set_rr(rr,newrrv.rrval);
 	} else if (rreg == 7) {
-		ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info,
+		ia64_new_rr7(vmMangleRID(newrrv.rrval),v->domain->shared_info,
 			     v->arch.privregs, v->domain->arch.shared_info_va,
 			     __get_cpu_var(vhpt_paddr));
 	} else {

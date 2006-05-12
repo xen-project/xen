@@ -168,7 +168,6 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 	    	memset(&d->shared_info->evtchn_mask[0], 0xff,
 		    sizeof(d->shared_info->evtchn_mask));
 
-	    v->vcpu_info = &(d->shared_info->vcpu_info[0]);
 	    v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
 	    v->arch.metaphysical_rr4 = d->arch.metaphysical_rr4;
 	    v->arch.metaphysical_saved_rr0 = d->arch.metaphysical_rr0;
