@@ -143,32 +143,58 @@ ENTRY(vmx_itlb_miss)
     thash r17 = r16
     ;;
     ttag r20 = r16
+    mov r18 = r17	
     ;;
 vmx_itlb_loop:
     cmp.eq p6,p0 = r0, r17
-(p6) br vmx_itlb_out
+(p6)br vmx_itlb_out
     ;;
-    adds r22 = VLE_TITAG_OFFSET, r17
-    adds r23 = VLE_CCHAIN_OFFSET, r17
+    adds r16 = VLE_TITAG_OFFSET, r17
+    adds r19 = VLE_CCHAIN_OFFSET, r17
     ;;
-    ld8 r24 = [r22]
-    ld8 r25 = [r23]
+    ld8 r22 = [r16]
+    ld8 r23 = [r19]
     ;;
-    lfetch [r25]
-    cmp.eq  p6,p7 = r20, r24
+    lfetch [r23]
+    cmp.eq  p6,p7 = r20, r22
     ;;
-(p7)    mov r17 = r25;
-(p7)    br.sptk vmx_itlb_loop
+(p7)mov r17 = r23;
+(p7)br.sptk vmx_itlb_loop
     ;;
     adds r23 = VLE_PGFLAGS_OFFSET, r17
     adds r24 = VLE_ITIR_OFFSET, r17
     ;;
-    ld8 r26 = [r23]
-    ld8 r25 = [r24]
+    ld8 r25 = [r23]
+    ld8 r26 = [r24]
     ;;
-    mov cr.itir = r25
+    cmp.eq p6,p7=r18,r17
+(p6) br vmx_itlb_loop1
     ;;
-    itc.i r26
+    ld8 r27 = [r18]
+    ;;
+    extr.u r19 = r27, 56, 8
+    extr.u r20 = r25, 56, 8
+    ;;
+    dep r27 = r20, r27, 56, 8
+    dep r25 = r19, r25, 56, 8
+    ;;
+    st8 [r18] = r25,8
+    st8 [r23] = r27
+    ;;
+    ld8 r28 = [r18]
+    ;;
+    st8 [r18] = r26,8
+    st8 [r24] = r28
+    ;;
+    ld8 r30 = [r18]
+    ;;
+    st8 [r18] = r22
+    st8 [r16] = r30 
+    ;;
+vmx_itlb_loop1:
+    mov cr.itir = r26
+    ;;
+    itc.i r25
     ;;
     srlz.i
     ;;
@@ -202,39 +228,64 @@ ENTRY(vmx_dtlb_miss)
     mov r29=cr.ipsr;
     ;;
     tbit.z p6,p7=r29,IA64_PSR_VM_BIT;
-    (p6)br.sptk vmx_alt_dtlb_miss_1
-//(p6)br.sptk vmx_fault_2
+(p6)br.sptk vmx_alt_dtlb_miss_1
     mov r16 = cr.ifa
     ;;
     thash r17 = r16
     ;;
     ttag r20 = r16
+    mov r18 = r17	
     ;;
 vmx_dtlb_loop:
     cmp.eq p6,p0 = r0, r17
 (p6)br vmx_dtlb_out
     ;;
-    adds r22 = VLE_TITAG_OFFSET, r17
-    adds r23 = VLE_CCHAIN_OFFSET, r17
+    adds r16 = VLE_TITAG_OFFSET, r17
+    adds r19 = VLE_CCHAIN_OFFSET, r17
     ;;
-    ld8 r24 = [r22]
-    ld8 r25 = [r23]
+    ld8 r22 = [r16]
+    ld8 r23 = [r19]
     ;;
-    lfetch [r25]
-    cmp.eq  p6,p7 = r20, r24
+    lfetch [r23]
+    cmp.eq  p6,p7 = r20, r22
     ;;
-(p7)mov r17 = r25;
+(p7)mov r17 = r23;
 (p7)br.sptk vmx_dtlb_loop
     ;;
     adds r23 = VLE_PGFLAGS_OFFSET, r17
     adds r24 = VLE_ITIR_OFFSET, r17
     ;;
-    ld8 r26 = [r23]
-    ld8 r25 = [r24]
+    ld8 r25 = [r23]
+    ld8 r26 = [r24]
     ;;
-    mov cr.itir = r25
+    cmp.eq p6,p7=r18,r17
+(p6) br vmx_dtlb_loop1
     ;;
-    itc.d r26
+    ld8 r27 = [r18]
+    ;;
+    extr.u r19 = r27, 56, 8
+    extr.u r20 = r25, 56, 8
+    ;;
+    dep r27 = r20, r27, 56, 8
+    dep r25 = r19, r25, 56, 8
+    ;;
+    st8 [r18] = r25,8
+    st8 [r23] = r27
+    ;;
+    ld8 r28 = [r18]
+    ;;
+    st8 [r18] = r26,8
+    st8 [r24] = r28
+    ;;
+    ld8 r30 = [r18]
+    ;;
+    st8 [r18] = r22
+    st8 [r16] = r30 
+    ;;
+vmx_dtlb_loop1:
+    mov cr.itir = r26
+    ;;
+    itc.d r25
     ;;
     srlz.d;
     ;;
