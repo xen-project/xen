@@ -320,7 +320,7 @@ map_domain_va_64(
     if (l1e & 0x80)  { /* 2M pages */
         p = to_ma(cpu, (l1p + l1_table_offset(va)) << PAGE_SHIFT);
     } else { /* 4K pages */
-        l1p = to_ma(cpu, l1e[l1_table_offset(va)]);
+        //l1p = to_ma(cpu, l1e[l1_table_offset(va)]);
         l1 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, l1p >> PAGE_SHIFT);
         munmap(l2, PAGE_SIZE);
         if ( l1 == NULL )
