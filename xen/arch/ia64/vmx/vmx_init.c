@@ -351,6 +351,8 @@ int vmx_build_physmap_table(struct domain *d)
 
 	/* Map normal memory below 3G */
 	end = VMX_CONFIG_PAGES(d) << PAGE_SHIFT;
+	if (end > VGA_IO_START)
+	    end += VGA_IO_SIZE;
 	tmp = end < MMIO_START ? end : MMIO_START;
 	for (i = 0; (i < tmp) && (list_ent != &d->page_list); i += PAGE_SIZE) {
         if (VGA_IO_START <= i && i < VGA_IO_START + VGA_IO_SIZE)
