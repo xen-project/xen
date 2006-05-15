@@ -50,7 +50,7 @@ xc_plan9_build(int xc_handle,
 }
 /*  
     VMM uses put_user to copy pfn_list to guest buffer, this maybe fail,
-    VMM don't handle this now.
+    VMM doesn't handle this now.
     This method will touch guest buffer to make sure the buffer's mapping
     is tracked by VMM,
  */
@@ -66,6 +66,7 @@ int xc_ia64_get_pfn_list(int xc_handle,
     unsigned int __start_page, __nr_pages;
     unsigned long max_pfns;
     unsigned long *__pfn_buf;
+
     __start_page = start_page;
     __nr_pages = nr_pages;
     __pfn_buf = pfn_buf;
@@ -75,6 +76,7 @@ int xc_ia64_get_pfn_list(int xc_handle,
         op.cmd = DOM0_GETMEMLIST;
         op.u.getmemlist.domain   = (domid_t)domid;
         op.u.getmemlist.max_pfns = max_pfns;
+        op.u.getmemlist.num_pfns = 0;
         set_xen_guest_handle(op.u.getmemlist.buffer, __pfn_buf);
 
         if ( (max_pfns != -1UL)

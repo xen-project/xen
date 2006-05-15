@@ -151,10 +151,7 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         put_domain(d);
     }
     break;
-    /*
-     * NOTE: DOM0_GETMEMLIST has somewhat different semantics on IA64 -
-     * it actually allocates and maps pages.
-     */
+
     case DOM0_GETMEMLIST:
     {
         unsigned long i = 0;
@@ -198,7 +195,8 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
                 ret = -ENOMEM;
 
             op->u.getmemlist.num_pfns = i - start_page;
-            copy_to_guest(u_dom0_op, op, 1);
+            if (copy_to_guest(u_dom0_op, op, 1))
+                ret = -EFAULT;
             
             put_domain(d);
         }
