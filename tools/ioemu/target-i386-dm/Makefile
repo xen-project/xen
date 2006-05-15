@@ -278,7 +278,7 @@ endif
 # Hardware support
 VL_OBJS+= ide.o ne2000.o pckbd.o vga.o dma.o
 VL_OBJS+= fdc.o mc146818rtc.o serial.o i8259_stub.o pc.o port-e9.o
-VL_OBJS+= cirrus_vga.o pcnet.o
+VL_OBJS+= cirrus_vga.o pcnet.o acpi.o
 VL_OBJS+= $(SOUND_HW) $(AUDIODRV) mixeng.o
 
 ifeq ($(TARGET_ARCH), ppc)
@@ -318,7 +318,7 @@ endif
 endif
 
 $(QEMU_SYSTEM): $(VL_OBJS) libqemu.a
-	$(CC) $(CFLAGS) $(VL_LDFLAGS) -o $@ $^ $(LIBS) $(SDL_LIBS) $(VNC_LIBS) $(VL_LIBS) -lpthread
+	$(CC) $(CFLAGS) $(VL_LDFLAGS) -o $@ $^ $(LIBS) $(SDL_LIBS) $(VNC_LIBS) $(VL_LIBS) -lpthread  -Wl,-Map,qemu-dm.map -Wl,--cref
 
 vnc.o: vnc.c keyboard_rdesktop.c
 	$(CC) $(CFLAGS) $(DEFINES) $(VNC_CFLAGS) -c -o $@ $<

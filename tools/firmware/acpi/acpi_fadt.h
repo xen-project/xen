@@ -59,7 +59,7 @@
 #define ACPI_PM1A_EVT_BLK_ADDRESS_SPACE_ID  ACPI_SYSTEM_IO
 #define ACPI_PM1A_EVT_BLK_BIT_WIDTH         0x00
 #define ACPI_PM1A_EVT_BLK_BIT_OFFSET        0x00
-#define ACPI_PM1A_EVT_BLK_ADDRESS           0x0000000000000000
+#define ACPI_PM1A_EVT_BLK_ADDRESS           0x0000000000008000
 
 //
 // PM1B Event Register Block Generic Address Information
@@ -73,7 +73,7 @@
 // PM1A Control Register Block Generic Address Information
 //
 #define ACPI_PM1A_CNT_BLK_ADDRESS_SPACE_ID  ACPI_SYSTEM_IO
-#define ACPI_PM1A_CNT_BLK_BIT_WIDTH         0x10
+#define ACPI_PM1A_CNT_BLK_BIT_WIDTH         0x08
 #define ACPI_PM1A_CNT_BLK_BIT_OFFSET        0x00
 #define ACPI_PM1A_CNT_BLK_ADDRESS           (ACPI_PM1A_EVT_BLK_ADDRESS + 0x04)
 

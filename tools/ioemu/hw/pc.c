@@ -373,6 +373,8 @@ static int ne2000_irq[NE2000_NB_MAX] = { 9, 10, 11, 3, 4, 5 };
 static int serial_io[MAX_SERIAL_PORTS] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8 };
 static int serial_irq[MAX_SERIAL_PORTS] = { 4, 3, 4, 3 };
 
+extern int acpi_init(unsigned int base);
+
 #define NOBIOS 1
 
 /* PC hardware initialisation */
@@ -576,6 +578,7 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
     floppy_controller = fdctrl_init(6, 2, 0, 0x3f0, fd_table);
 
     cmos_init(ram_size, boot_device, bs_table);
+    acpi_init(0x8000);
 
     /* must be done after all PCI devices are instanciated */
     /* XXX: should be done in the Bochs BIOS */
