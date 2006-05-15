@@ -246,25 +246,14 @@ static struct irqaction evtchn_irqaction = {
 	.name =		"xen-event-channel"
 };
 
-int evtchn_irq = 0xe9;
+static int evtchn_irq = 0xe9;
 void __init evtchn_init(void)
 {
     shared_info_t *s = HYPERVISOR_shared_info;
-    vcpu_info_t   *vcpu_info = &s->vcpu_info[smp_processor_id()];
 
-#if 0
-    int ret;
-    irq = assign_irq_vector(AUTO_ASSIGN);
-    ret = request_irq(irq, evtchn_interrupt, 0, "xen-event-channel", NULL);
-    if (ret < 0)
-    {
-	printk("xen-event-channel unable to get irq %d (%d)\n", irq, ret);
-	return;
-    }
-#endif
     register_percpu_irq(evtchn_irq, &evtchn_irqaction);
 
-    vcpu_info->arch.evtchn_vector = evtchn_irq;
+    s->arch.evtchn_vector = evtchn_irq;
     printk("xen-event-channel using irq %d\n", evtchn_irq);
 
     spin_lock_init(&irq_mapping_update_lock);

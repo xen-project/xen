@@ -682,9 +682,9 @@ UINT64 vcpu_check_pending_interrupts(VCPU *vcpu)
 	 */
 check_start:
 	if (event_pending(vcpu) && 
-		!test_bit(vcpu->vcpu_info->arch.evtchn_vector,
+		!test_bit(vcpu->domain->shared_info->arch.evtchn_vector,
 			&PSCBX(vcpu, insvc[0])))
-		vcpu_pend_interrupt(vcpu, vcpu->vcpu_info->arch.evtchn_vector);
+		vcpu_pend_interrupt(vcpu, vcpu->domain->shared_info->arch.evtchn_vector);
 
 	p = &PSCBX(vcpu,irr[3]);
 	r = &PSCBX(vcpu,insvc[3]);

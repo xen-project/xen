@@ -723,7 +723,7 @@ int xc_hvm_build(int xc_handle,
 
     ctxt->flags = VGCF_VMX_GUEST;
     ctxt->regs.cr_iip = 0x80000000ffffffb0UL;
-    ctxt->vcpu.privregs = 0;
+    ctxt->privregs = 0;
 
     memset( &launch_op, 0, sizeof(launch_op) );
 

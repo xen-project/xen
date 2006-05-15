@@ -1114,7 +1114,7 @@ static int xc_linux_build_internal(int xc_handle,
     ctxt->regs.ar_fpsr = xc_ia64_fpsr_default();
     /* currently done by hypervisor, should move here */
     /* ctxt->regs.r28 = dom_fw_setup(); */
-    ctxt->vcpu.privregs = 0;
+    ctxt->privregs = 0;
     ctxt->sys_pgnr = 3;
     i = 0; /* silence unused variable warning */
 #else /* x86 */

@@ -269,11 +269,7 @@ fail_nomem:
 
 void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
 {
-	struct pt_regs *regs = vcpu_regs (v);
-
-	c->regs = *regs;
-	c->vcpu.evtchn_vector = v->vcpu_info->arch.evtchn_vector;
-
+	c->regs = *vcpu_regs (v);
 	c->shared = v->domain->shared_info->arch;
 }
 
@@ -312,11 +308,10 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	}
 	new_thread(v, regs->cr_iip, 0, 0);
 
- 	v->vcpu_info->arch.evtchn_vector = c->vcpu.evtchn_vector;
-	if ( c->vcpu.privregs && copy_from_user(v->arch.privregs,
-			   c->vcpu.privregs, sizeof(mapped_regs_t))) {
+	if ( c->privregs && copy_from_user(v->arch.privregs,
+			   c->privregs, sizeof(mapped_regs_t))) {
 	    printk("Bad ctxt address in arch_set_info_guest: %p\n",
-		   c->vcpu.privregs);
+		   c->privregs);
 	    return -EFAULT;
 	}
 

@@ -153,9 +153,6 @@ fw_hypercall_ipi (struct pt_regs *regs)
 		c.regs.cr_iip = targ_regs->cr_iip;
 		c.regs.r1 = targ_regs->r1;
 		
-		/* Copy from vcpu 0.  */
-		c.vcpu.evtchn_vector =
-			current->domain->vcpu[0]->vcpu_info->arch.evtchn_vector;
 		if (arch_set_info_guest (targ, &c) != 0) {
 			printf ("arch_boot_vcpu: failure\n");
 			return;

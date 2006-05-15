@@ -293,8 +293,6 @@ typedef struct {
 } mapped_regs_t;
 
 typedef struct {
-    mapped_regs_t *privregs;
-    int evtchn_vector;
 } arch_vcpu_info_t;
 
 typedef mapped_regs_t vpd_t;
@@ -302,6 +300,9 @@ typedef mapped_regs_t vpd_t;
 typedef struct {
     unsigned int flags;
     unsigned long start_info_pfn;
+
+    /* Interrupt vector for event channel.  */
+    int evtchn_vector;
 } arch_shared_info_t;
 
 typedef struct {
@@ -321,7 +322,7 @@ typedef struct vcpu_guest_context {
     unsigned long vm_assist;   /* VMASST_TYPE_* bitmap, now none on IPF */
 
     cpu_user_regs_t regs;
-    arch_vcpu_info_t vcpu;
+    mapped_regs_t *privregs;
     arch_shared_info_t shared;
     arch_initrd_info_t initrd;
     char cmdline[IA64_COMMAND_LINE_SIZE];

@@ -247,7 +247,7 @@ GLOBAL_ENTRY(xen_set_kr)
 	XEN_RESTORE_PSR_IC
 	;;
 	br.ret.sptk.many rp
-END(xen_set_rr)
+END(xen_set_kr)
 
 GLOBAL_ENTRY(xen_fc)
 	movl r8=running_on_xen;;
