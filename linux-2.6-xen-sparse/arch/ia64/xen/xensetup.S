@@ -18,12 +18,13 @@ running_on_xen:
 
 	.text
 GLOBAL_ENTRY(early_xen_setup)
-	mov r8=cr.dcr
+	mov r8=ar.rsc		// Initialized in head.S
 (isBP)	movl r9=running_on_xen;;
-	extr.u r8=r8,63,1;;
-	cmp.ne p7,p0=r8,r0;;
-(isBP)	st4 [r9]=r8
+	extr.u r8=r8,2,2;;	// Extract pl fields
+	cmp.ne p7,p0=r8,r0;;	// p7: running on xen 
+(p7)	mov r8=1		// booleanize.
 (p7)	movl r10=xen_ivt;;
+(isBP)	st4 [r9]=r8
 (p7)	mov cr.iva=r10
 	br.ret.sptk.many rp;;
 END(early_xen_setup)
