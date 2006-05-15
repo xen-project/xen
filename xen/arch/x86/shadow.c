@@ -347,6 +347,13 @@ alloc_shadow_page(struct domain *d,
         d->arch.shadow_page_count++;
         if ( PGT_l4_page_table == PGT_root_page_table )
             pin = 1;
+#if CONFIG_PAGING_LEVELS == 3 & defined (GUEST_PGENTRY_32)
+        /*
+         * We use PGT_l4_shadow for 2-level paging guests on PAE
+         */
+        if ( d->arch.ops->guest_paging_levels == PAGING_L2 )
+            pin = 1;
+#endif
         break;
 
 #if CONFIG_PAGING_LEVELS >= 4
@@ -2425,6 +2432,17 @@ static void shadow_update_pagetables(struct vcpu *v)
     /*
      *  arch.shadow_table
      */
+#if CONFIG_PAGING_LEVELS == 3 & defined (GUEST_PGENTRY_32)
+    /*
+     * We use PGT_l4_shadow for 2-level paging guests on PAE
+     */
+    if ( d->arch.ops->guest_paging_levels == PAGING_L2 )
+    { 
+        if ( unlikely(!(smfn = __shadow_status(d, gpfn, PGT_l4_shadow))) )
+            smfn = shadow_l3_table(v, gpfn, gmfn);
+    } 
+    else
+#endif
     if ( unlikely(!(smfn = __shadow_status(d, gpfn, PGT_base_page_table))) ) 
     {
 #if CONFIG_PAGING_LEVELS == 2
