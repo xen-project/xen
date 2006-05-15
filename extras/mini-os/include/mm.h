@@ -130,6 +130,7 @@
 #define PAGE_ALIGN(addr)        (((addr)+PAGE_SIZE-1)&PAGE_MASK)
 
 extern unsigned long *phys_to_machine_mapping;
+extern char _text, _etext, _edata, _end;
 #define pfn_to_mfn(_pfn) (phys_to_machine_mapping[(_pfn)])
 static __inline__ unsigned long phys_to_machine(unsigned long phys)
 {
@@ -147,11 +148,7 @@ static __inline__ unsigned long machine_to_phys(unsigned long machine)
     return phys;
 }
 
-#if defined(__x86_64__)
-#define VIRT_START              0xFFFFFFFF80000000UL
-#elif defined(__i386__)
-#define VIRT_START              0xC0000000UL
-#endif
+#define VIRT_START                 ((unsigned long)&_text)
 
 #define to_phys(x)                 ((unsigned long)(x)-VIRT_START)
 #define to_virt(x)                 ((void *)((unsigned long)(x)+VIRT_START))

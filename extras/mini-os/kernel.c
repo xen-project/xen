@@ -106,6 +106,12 @@ void setup_xen_features(void)
     }
 }
 
+/* This should be overridden by the application we are linked against. */
+__attribute__((weak)) int app_main(start_info_t *si)
+{
+    printk("Dummy main: start_info=%p\n", si);
+    return 0;
+}
 
 /*
  * INITIAL C ENTRY POINT.
@@ -165,11 +171,14 @@ void start_kernel(start_info_t *si)
     /* Init the console driver. */
     init_console();
  
-   /* Init scheduler. */
+    /* Init scheduler. */
     init_sched();
  
     /* Init XenBus from a separate thread */
     create_thread("init_xs", init_xs, NULL);
+
+    /* Call (possibly overridden) app_main() */
+    app_main(&start_info);
 
     /* Everything initialised, start idle thread */
     run_idle_thread();

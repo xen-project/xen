@@ -50,7 +50,6 @@
 
 unsigned long *phys_to_machine_mapping;
 extern char *stack;
-extern char _text, _etext, _edata, _end;
 extern void page_walk(unsigned long virt_addr);
 
 /*********************
