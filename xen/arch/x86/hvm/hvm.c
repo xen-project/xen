@@ -240,15 +240,18 @@ int cpu_get_interrupt(struct vcpu *v, int *type)
 {
     int intno;
     struct hvm_virpic *s = &v->domain->arch.hvm_domain.vpic;
+    unsigned long flags;
 
     if ( (intno = cpu_get_apic_interrupt(v, type)) != -1 ) {
         /* set irq request if a PIC irq is still pending */
         /* XXX: improve that */
+        spin_lock_irqsave(&s->lock, flags);
         pic_update_irq(s);
+        spin_unlock_irqrestore(&s->lock, flags);
         return intno;
     }
     /* read the irq from the PIC */
-    if ( (intno = cpu_get_pic_interrupt(v, type)) != -1 )
+    if ( v->vcpu_id == 0 && (intno = cpu_get_pic_interrupt(v, type)) != -1 )
         return intno;
 
     return -1;

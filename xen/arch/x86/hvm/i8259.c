@@ -35,9 +35,13 @@
 #include <asm/current.h>
 
 /* set irq level. If an edge is detected, then the IRR is set to 1 */
+/* Caller must hold vpic lock */
 static inline void pic_set_irq1(PicState *s, int irq, int level)
 {
     int mask;
+
+    BUG_ON(!spin_is_locked(&s->pics_state->lock));
+
     mask = 1 << irq;
     if (s->elcr & mask) {
         /* level triggered */
@@ -63,9 +67,13 @@ static inline void pic_set_irq1(PicState *s, int irq, int level)
 
 /* return the highest priority found in mask (highest = smallest
    number). Return 8 if no irq */
+/* Caller must hold vpic lock */
 static inline int get_priority(PicState *s, int mask)
 {
     int priority;
+
+    BUG_ON(!spin_is_locked(&s->pics_state->lock));
+
     if (mask == 0)
         return 8;
     priority = 0;
@@ -75,9 +83,12 @@ static inline int get_priority(PicState *s, int mask)
 }
 
 /* return the pic wanted interrupt. return -1 if none */
+/* Caller must hold vpic lock */
 static int pic_get_irq(PicState *s)
 {
     int mask, cur_priority, priority;
+
+    BUG_ON(!spin_is_locked(&s->pics_state->lock));
 
     mask = s->irr & ~s->imr;
     priority = get_priority(s, mask);
@@ -101,9 +112,12 @@ static int pic_get_irq(PicState *s)
 /* raise irq to CPU if necessary. must be called every time the active
    irq may change */
 /* XXX: should not export it, but it is needed for an APIC kludge */
+/* Caller must hold vpic lock */
 void pic_update_irq(struct hvm_virpic *s)
 {
     int irq2, irq;
+
+    BUG_ON(!spin_is_locked(&s->lock));
 
     /* first look at slave pic */
     irq2 = pic_get_irq(&s->pics[1]);
@@ -122,29 +136,40 @@ void pic_update_irq(struct hvm_virpic *s)
 void pic_set_irq_new(void *opaque, int irq, int level)
 {
     struct hvm_virpic *s = opaque;
+    unsigned long flags;
 
+    spin_lock_irqsave(&s->lock, flags);
     hvm_vioapic_set_irq(current->domain, irq, level);
     pic_set_irq1(&s->pics[irq >> 3], irq & 7, level);
     /* used for IOAPIC irqs */
     if (s->alt_irq_func)
         s->alt_irq_func(s->alt_irq_opaque, irq, level);
     pic_update_irq(s);
+    spin_unlock_irqrestore(&s->lock, flags);
 }
 
 void do_pic_irqs (struct hvm_virpic *s, uint16_t irqs)
 {
+    unsigned long flags;
+
+    spin_lock_irqsave(&s->lock, flags);
     s->pics[1].irr |= (uint8_t)(irqs >> 8);
     s->pics[0].irr |= (uint8_t) irqs;
     hvm_vioapic_do_irqs(current->domain, irqs);
     pic_update_irq(s);
+    spin_unlock_irqrestore(&s->lock, flags);
 }
 
 void do_pic_irqs_clear (struct hvm_virpic *s, uint16_t irqs)
 {
+    unsigned long flags;
+
+    spin_lock_irqsave(&s->lock, flags);
     s->pics[1].irr &= ~(uint8_t)(irqs >> 8);
     s->pics[0].irr &= ~(uint8_t) irqs;
     hvm_vioapic_do_irqs_clear(current->domain, irqs);
     pic_update_irq(s);
+    spin_unlock_irqrestore(&s->lock, flags);
 }
 
 /* obsolete function */
@@ -154,8 +179,11 @@ void pic_set_irq(struct hvm_virpic *isa_pic, int irq, int level)
 }
 
 /* acknowledge interrupt 'irq' */
+/* Caller must hold vpic lock */
 static inline void pic_intack(PicState *s, int irq)
 {
+    BUG_ON(!spin_is_locked(&s->pics_state->lock));
+
     if (s->auto_eoi) {
         if (s->rotate_on_auto_eoi)
             s->priority_add = (irq + 1) & 7;
@@ -170,7 +198,9 @@ static inline void pic_intack(PicState *s, int irq)
 int pic_read_irq(struct hvm_virpic *s)
 {
     int irq, irq2, intno;
+    unsigned long flags;
 
+    spin_lock_irqsave(&s->lock, flags);
     irq = pic_get_irq(&s->pics[0]);
     if (irq >= 0) {
         pic_intack(&s->pics[0], irq);
@@ -194,13 +224,17 @@ int pic_read_irq(struct hvm_virpic *s)
         intno = s->pics[0].irq_base + irq;
     }
     pic_update_irq(s);
+    spin_unlock_irqrestore(&s->lock, flags);
         
     return intno;
 }
 
+/* Caller must hold vpic lock */
 static void update_shared_irr(struct hvm_virpic *s, PicState *c)
 {
     uint8_t *pl, *pe;
+
+    BUG_ON(!spin_is_locked(&s->lock));
 
     get_sp(current->domain)->sp_global.pic_elcr = 
 		s->pics[0].elcr | ((u16)s->pics[1].elcr << 8);
@@ -216,9 +250,12 @@ static void update_shared_irr(struct hvm_virpic *s, PicState *c)
     }
 }
 
+/* Caller must hold vpic lock */
 static void pic_reset(void *opaque)
 {
     PicState *s = opaque;
+
+    BUG_ON(!spin_is_locked(&s->pics_state->lock));
 
     s->last_irr = 0;
     s->irr = 0;
@@ -237,10 +274,13 @@ static void pic_reset(void *opaque)
     s->elcr = 0;
 }
 
+/* Caller must hold vpic lock */
 static void pic_ioport_write(void *opaque, uint32_t addr, uint32_t val)
 {
     PicState *s = opaque;
     int priority, cmd, irq;
+
+    BUG_ON(!spin_is_locked(&s->pics_state->lock));
 
     addr &= 1;
     if (addr == 0) {
@@ -328,9 +368,12 @@ static void pic_ioport_write(void *opaque, uint32_t addr, uint32_t val)
     }
 }
 
+/* Caller must hold vpic lock */
 static uint32_t pic_poll_read (PicState *s, uint32_t addr1)
 {
     int ret;
+
+    BUG_ON(!spin_is_locked(&s->pics_state->lock));
 
     ret = pic_get_irq(s);
     if (ret >= 0) {
@@ -350,11 +393,14 @@ static uint32_t pic_poll_read (PicState *s, uint32_t addr1)
     return ret;
 }
 
+/* Caller must hold vpic lock */
 static uint32_t pic_ioport_read(void *opaque, uint32_t addr1)
 {
     PicState *s = opaque;
     unsigned int addr;
     int ret;
+
+    BUG_ON(!spin_is_locked(&s->pics_state->lock));
 
     addr = addr1;
     addr &= 1;
@@ -375,23 +421,30 @@ static uint32_t pic_ioport_read(void *opaque, uint32_t addr1)
 }
 
 /* memory mapped interrupt status */
-/* XXX: may be the same than pic_read_irq() */
+/* XXX: may be the same than pic_read_rq() */
 uint32_t pic_intack_read(struct hvm_virpic *s)
 {
     int ret;
+    unsigned long flags;
 
+    spin_lock_irqsave(&s->lock, flags);
     ret = pic_poll_read(&s->pics[0], 0x00);
     if (ret == 2)
         ret = pic_poll_read(&s->pics[1], 0x80) + 8;
     /* Prepare for ISR read */
     s->pics[0].read_reg_select = 1;
+    spin_unlock_irqrestore(&s->lock, flags);
     
     return ret;
 }
 
 static void elcr_ioport_write(void *opaque, uint32_t addr, uint32_t val)
+/* Caller must hold vpic lock */
 {
     PicState *s = opaque;
+
+    BUG_ON(!spin_is_locked(&s->pics_state->lock));
+
     s->elcr = val & s->elcr_mask;
 }
 
@@ -402,23 +455,31 @@ static uint32_t elcr_ioport_read(void *opaque, uint32_t addr1)
 }
 
 /* XXX: add generic master/slave system */
+/* Caller must hold vpic lock */
 static void pic_init1(int io_addr, int elcr_addr, PicState *s)
 {
+    BUG_ON(!spin_is_locked(&s->pics_state->lock));
+
     pic_reset(s);
 }
 
 void pic_init(struct hvm_virpic *s, void (*irq_request)(void *, int),
               void *irq_request_opaque)
 {
+    unsigned long flags;
+
     memset(s, 0, sizeof(*s));
+    spin_lock_init(&s->lock);
+    s->pics[0].pics_state = s;
+    s->pics[1].pics_state = s;
+    spin_lock_irqsave(&s->lock, flags);
     pic_init1(0x20, 0x4d0, &s->pics[0]);
     pic_init1(0xa0, 0x4d1, &s->pics[1]);
+    spin_unlock_irqrestore(&s->lock, flags);
     s->pics[0].elcr_mask = 0xf8;
     s->pics[1].elcr_mask = 0xde;
     s->irq_request = irq_request;
     s->irq_request_opaque = irq_request_opaque;
-    s->pics[0].pics_state = s;
-    s->pics[1].pics_state = s;
     return; 
 }
 
@@ -426,8 +487,12 @@ void pic_set_alt_irq_func(struct hvm_virpic *s,
                           void (*alt_irq_func)(void *, int, int),
                           void *alt_irq_opaque)
 {
+    unsigned long flags;
+
+    spin_lock_irqsave(&s->lock, flags);
     s->alt_irq_func = alt_irq_func;
     s->alt_irq_opaque = alt_irq_opaque;
+    spin_unlock_irqrestore(&s->lock, flags);
 }
 
 static int intercept_pic_io(ioreq_t *p)
@@ -435,6 +500,7 @@ static int intercept_pic_io(ioreq_t *p)
     struct hvm_virpic  *pic;
     struct vcpu *v = current;
     uint32_t data;
+    unsigned long flags;
     
     if ( p->size != 1 || p->count != 1) {
         printk("PIC_IO wrong access size %d!\n", (int)p->size);
@@ -446,12 +512,16 @@ static int intercept_pic_io(ioreq_t *p)
             hvm_copy(&data, (unsigned long)p->u.pdata, p->size, HVM_COPY_IN);
         else
             data = p->u.data;
+        spin_lock_irqsave(&pic->lock, flags);
         pic_ioport_write((void*)&pic->pics[p->addr>>7],
                 (uint32_t) p->addr, (uint32_t) (data & 0xff));
+        spin_unlock_irqrestore(&pic->lock, flags);
     }
     else {
+        spin_lock_irqsave(&pic->lock, flags);
         data = pic_ioport_read(
             (void*)&pic->pics[p->addr>>7], (uint32_t) p->addr);
+        spin_unlock_irqrestore(&pic->lock, flags);
         if(p->pdata_valid) 
             hvm_copy(&data, (unsigned long)p->u.pdata, p->size, HVM_COPY_OUT);
         else 
@@ -465,6 +535,7 @@ static int intercept_elcr_io(ioreq_t *p)
     struct hvm_virpic  *s;
     struct vcpu *v = current;
     uint32_t data;
+    unsigned long flags;
     
     if ( p->size != 1 || p->count != 1 ) {
         printk("PIC_IO wrong access size %d!\n", (int)p->size);
@@ -477,10 +548,12 @@ static int intercept_elcr_io(ioreq_t *p)
             hvm_copy(&data, (unsigned long)p->u.pdata, p->size, HVM_COPY_IN);
         else
             data = p->u.data;
+        spin_lock_irqsave(&s->lock, flags);
         elcr_ioport_write((void*)&s->pics[p->addr&1],
                 (uint32_t) p->addr, (uint32_t)( data & 0xff));
     	get_sp(current->domain)->sp_global.pic_elcr = 
             s->pics[0].elcr | ((u16)s->pics[1].elcr << 8);
+        spin_unlock_irqrestore(&s->lock, flags);
     }
     else {
         data = (u64) elcr_ioport_read(
@@ -512,10 +585,9 @@ int cpu_get_pic_interrupt(struct vcpu *v, int *type)
     if ( !vlapic_accept_pic_intr(v) )
         return -1;
 
-    if ( !plat->interrupt_request )
+    if (cmpxchg(&plat->interrupt_request, 1, 0) != 1)
         return -1;
 
-    plat->interrupt_request = 0;
     /* read the irq from the PIC */
     intno = pic_read_irq(s);
     *type = VLAPIC_DELIV_MODE_EXT;
