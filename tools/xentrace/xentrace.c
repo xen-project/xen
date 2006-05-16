@@ -28,8 +28,6 @@
 
 #include <xenctrl.h>
 
-#include "xc_private.h"
-
 #define PERROR(_m, _a...)                                       \
 do {                                                            \
     int __saved_errno = errno;                                  \
@@ -103,67 +101,25 @@ void write_rec(unsigned int cpu, struct t_rec *rec, FILE *out)
     }
 }
 
-void enable_tracing_or_die(int xc_handle) 
+static void get_tbufs(unsigned long *mfn, unsigned long *size)
 {
-  int enable = 1;
-  int tbsize = DEFAULT_TBUF_SIZE;
-  
-  if (xc_tbuf_enable(xc_handle, enable) != 0) {
-    if (xc_tbuf_set_size(xc_handle, tbsize) != 0) {
-      perror("set_size Hypercall failure");
-      exit(1);
-    }
-    printf("Set default trace buffer allocation (%d pages)\n", tbsize);
-    if (xc_tbuf_enable(xc_handle, enable) != 0) {
-      perror("Could not enable trace buffers\n");
-      exit(1);
-    }
-  }
-  else
-    printf("Tracing enabled\n");
-}
-
-/**
- * get_tbufs - get pointer to and size of the trace buffers
- * @mfn:  location to store mfn of the trace buffers to
- * @size: location to store the size of a trace buffer to
- *
- * Gets the machine address of the trace pointer area and the size of the
- * per CPU buffers.
- */
-void get_tbufs(unsigned long *mfn, unsigned long *size)
-{
+    int xc_handle = xc_interface_open();
     int ret;
-    dom0_op_t op;                        /* dom0 op we'll build             */
-    int xc_handle = xc_interface_open(); /* for accessing control interface */
-    unsigned int tbsize;
 
-    enable_tracing_or_die(xc_handle);
-
-    if (xc_tbuf_get_size(xc_handle, &tbsize) != 0) {
-      perror("Failure to get tbuf info from Xen. Guess size is 0?");
-      exit(1);
-    }
-    else
-      printf("Current tbuf size: 0x%x\n", tbsize);
-    
-
-    op.cmd = DOM0_TBUFCONTROL;
-    op.interface_version = DOM0_INTERFACE_VERSION;
-    op.u.tbufcontrol.op  = DOM0_TBUF_GET_INFO;
-
-    ret = do_dom0_op(xc_handle, &op);
-
-    xc_interface_close(xc_handle);
-
-    if ( ret != 0 )
+    if ( xc_handle < 0 ) 
     {
-        PERROR("Failure to get trace buffer pointer from Xen");
         exit(EXIT_FAILURE);
     }
 
-    *mfn  = op.u.tbufcontrol.buffer_mfn;
-    *size = op.u.tbufcontrol.size;
+    ret = xc_tbuf_enable(xc_handle, DEFAULT_TBUF_SIZE, mfn, size);
+
+    if ( ret != 0 )
+    {
+        perror("Couldn't enable trace buffers");
+        exit(1);
+    }
+
+    xc_interface_close(xc_handle);
 }
 
 /**
