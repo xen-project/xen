@@ -9,6 +9,7 @@
 #ifndef XENCTRL_H
 #define XENCTRL_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <sys/ptrace.h>
 #include <xen/xen.h>
