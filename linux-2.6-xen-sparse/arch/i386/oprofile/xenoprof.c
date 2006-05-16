@@ -289,9 +289,13 @@ static int xenoprof_set_active(int * active_domains,
 
 	for (i=0; i<adomains; i++) {
 		domid = active_domains[i];
+		if (domid != active_domains[i]) {
+			ret = -EINVAL;
+			goto out;
+		}
 		ret = HYPERVISOR_xenoprof_op(XENOPROF_set_active, &domid);
 		if (ret)
-			return (ret);
+			goto out;
 		if (active_domains[i] == 0)
 			set_dom0 = 1;
 	}
@@ -300,8 +304,11 @@ static int xenoprof_set_active(int * active_domains,
 		domid = 0;
 		ret = HYPERVISOR_xenoprof_op(XENOPROF_set_active, &domid);
 	}
-	
-	active_defined = 1;
+
+out:
+	if (ret)
+		HYPERVISOR_xenoprof_op(XENOPROF_reset_active_list, NULL);
+	active_defined = !ret;
 	return ret;
 }
 

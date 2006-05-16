@@ -225,19 +225,21 @@ diff -pruN ../pristine-linux-2.6.16.13/drivers/oprofile/oprof.c ./drivers/oprofi
  struct oprofile_operations oprofile_ops;
  
  unsigned long oprofile_started;
-@@ -33,6 +37,17 @@ static DECLARE_MUTEX(start_sem);
+@@ -33,6 +37,19 @@ static DECLARE_MUTEX(start_sem);
   */
  static int timer = 0;
  
-+extern unsigned int adomains;
-+extern int active_domains[MAX_OPROF_DOMAINS];
-+
-+int oprofile_set_active(void)
++int oprofile_set_active(int active_domains[], unsigned int adomains)
 +{
-+	if (oprofile_ops.set_active)
-+		return oprofile_ops.set_active(active_domains, adomains);
++	int err;
 +
-+	return -EINVAL;
++	if (!oprofile_ops.set_active)
++		return -EINVAL;
++
++	down(&start_sem);
++	err = oprofile_ops.set_active(active_domains, adomains);
++	up(&start_sem);
++	return err;
 +}
 +
  int oprofile_setup(void)
@@ -251,7 +253,7 @@ diff -pruN ../pristine-linux-2.6.16.13/drivers/oprofile/oprof.h ./drivers/oprofi
  
  int oprofile_set_backtrace(unsigned long depth);
 +
-+int oprofile_set_active(void);
++int oprofile_set_active(int active_domains[], unsigned int adomains);
   
  #endif /* OPROF_H */
 diff -pruN ../pristine-linux-2.6.16.13/drivers/oprofile/oprofile_files.c ./drivers/oprofile/oprofile_files.c
@@ -280,7 +282,7 @@ diff -pruN ../pristine-linux-2.6.16.13/drivers/oprofile/oprofile_files.c ./drive
  unsigned long fs_buffer_size = 131072;
  unsigned long fs_cpu_buffer_size = 8192;
  unsigned long fs_buffer_watershed = 32768; /* FIXME: tune */
-@@ -117,11 +123,79 @@ static ssize_t dump_write(struct file * 
+@@ -117,11 +123,108 @@ static ssize_t dump_write(struct file * 
  static struct file_operations dump_fops = {
  	.write		= dump_write,
  };
@@ -288,63 +290,92 @@ diff -pruN ../pristine-linux-2.6.16.13/drivers/oprofile/oprofile_files.c ./drive
 +
 +#define TMPBUFSIZE 512
 +
-+unsigned int adomains = 0;
-+long active_domains[MAX_OPROF_DOMAINS];
++static unsigned int adomains = 0;
++static int active_domains[MAX_OPROF_DOMAINS + 1];
++static DEFINE_MUTEX(adom_mutex);
 +
 +static ssize_t adomain_write(struct file * file, char const __user * buf, 
 +			     size_t count, loff_t * offset)
 +{
-+	char tmpbuf[TMPBUFSIZE];
-+	char * startp = tmpbuf;
-+	char * endp = tmpbuf;
++	char *tmpbuf;
++	char *startp, *endp;
 +	int i;
 +	unsigned long val;
++	ssize_t retval = count;
 +	
 +	if (*offset)
 +		return -EINVAL;	
-+	if (!count)
-+		return 0;
 +	if (count > TMPBUFSIZE - 1)
 +		return -EINVAL;
 +
-+	memset(tmpbuf, 0x0, TMPBUFSIZE);
++	if (!(tmpbuf = kmalloc(TMPBUFSIZE, GFP_KERNEL)))
++		return -ENOMEM;
 +
-+	if (copy_from_user(tmpbuf, buf, count))
++	if (copy_from_user(tmpbuf, buf, count)) {
++		kfree(tmpbuf);
 +		return -EFAULT;
-+	
-+	for (i = 0; i < MAX_OPROF_DOMAINS; i++)
-+		active_domains[i] = -1;
-+	adomains = 0;
++	}
++	tmpbuf[count] = 0;
 +
-+	while (1) {
-+		val = simple_strtol(startp, &endp, 0);
++	mutex_lock(&adom_mutex);
++
++	startp = tmpbuf;
++	/* Parse one more than MAX_OPROF_DOMAINS, for easy error checking */
++	for (i = 0; i <= MAX_OPROF_DOMAINS; i++) {
++		val = simple_strtoul(startp, &endp, 0);
 +		if (endp == startp)
 +			break;
-+		while (ispunct(*endp))
++		while (ispunct(*endp) || isspace(*endp))
 +			endp++;
-+		active_domains[adomains++] = val;
-+		if (adomains >= MAX_OPROF_DOMAINS)
-+			break;
++		active_domains[i] = val;
++		if (active_domains[i] != val)
++			/* Overflow, force error below */
++			i = MAX_OPROF_DOMAINS + 1;
 +		startp = endp;
 +	}
-+	if (oprofile_set_active())
-+		return -EINVAL; 
-+	return count;
++	/* Force error on trailing junk */
++	adomains = *startp ? MAX_OPROF_DOMAINS + 1 : i;
++
++	kfree(tmpbuf);
++
++	if (adomains > MAX_OPROF_DOMAINS
++	    || oprofile_set_active(active_domains, adomains)) {
++		adomains = 0;
++		retval = -EINVAL;
++	}
++
++	mutex_unlock(&adom_mutex);
++	return retval;
 +}
 +
 +static ssize_t adomain_read(struct file * file, char __user * buf, 
 +			    size_t count, loff_t * offset)
 +{
-+	char tmpbuf[TMPBUFSIZE];
-+	size_t len = 0;
++	char * tmpbuf;
++	size_t len;
 +	int i;
-+	/* This is all screwed up if we run out of space */
-+	for (i = 0; i < adomains; i++) 
-+		len += snprintf(tmpbuf + len, TMPBUFSIZE - len, 
-+				"%u ", (unsigned int)active_domains[i]);
-+	len += snprintf(tmpbuf + len, TMPBUFSIZE - len, "\n");
-+	return simple_read_from_buffer((void __user *)buf, count, 
-+				       offset, tmpbuf, len);
++	ssize_t retval;
++
++	if (!(tmpbuf = kmalloc(TMPBUFSIZE, GFP_KERNEL)))
++		return -ENOMEM;
++
++	mutex_lock(&adom_mutex);
++
++	len = 0;
++	for (i = 0; i < adomains; i++)
++		len += snprintf(tmpbuf + len,
++				len < TMPBUFSIZE ? TMPBUFSIZE - len : 0,
++				"%u ", active_domains[i]);
++	WARN_ON(len > TMPBUFSIZE);
++	if (len != 0 && len <= TMPBUFSIZE)
++		tmpbuf[len-1] = '\n';
++
++	mutex_unlock(&adom_mutex);
++
++	retval = simple_read_from_buffer(buf, count, offset, tmpbuf, len);
++
++	kfree(tmpbuf);
++	return retval;
 +}
 +
 +
