@@ -865,7 +865,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
          * copy ourself. After this copy succeeds, "rep movs" is executed
          * again.
          */
-        if ((addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK)) {
+        if ((addr & PAGE_MASK) != ((addr + sign * (size - 1)) & PAGE_MASK)) {
             unsigned long value = 0;
 
             mmio_opp->flags |= OVERLAP;
@@ -876,7 +876,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
                 hvm_copy(&value, addr, size, HVM_COPY_IN);
             send_mmio_req(IOREQ_TYPE_COPY, gpa, 1, size, value, dir, 0);
         } else {
-            if ((addr & PAGE_MASK) != ((addr + count * size - 1) & PAGE_MASK)) {
+            if ((addr & PAGE_MASK) != ((addr + sign * (count * size - 1)) & PAGE_MASK)) {
                 regs->eip -= inst_len; /* do not advance %eip */
 
                 if (sign > 0)
