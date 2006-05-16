@@ -141,56 +141,40 @@ xenoprof_ovf_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 }
 
 
-static void unbind_virq_cpu(void * info)
-{
-	int cpu = smp_processor_id();
-	if (ovf_irq[cpu] >= 0) {
-		unbind_from_irqhandler(ovf_irq[cpu], NULL);
-		ovf_irq[cpu] = -1;
-	}
-}
-
-
 static void unbind_virq(void)
 {
-	on_each_cpu(unbind_virq_cpu, NULL, 0, 1);
-}
+	int i;
 
-
-int bind_virq_error;
-
-static void bind_virq_cpu(void * info)
-{
-	int result;
-	int cpu = smp_processor_id();
-
-	result = bind_virq_to_irqhandler(VIRQ_XENOPROF,
-					 cpu,
-					 xenoprof_ovf_interrupt,
-					 SA_INTERRUPT,
-					 "xenoprof",
-					 NULL);
-
-	if (result<0) {
-		bind_virq_error = result;
-		printk("xenoprof.c: binding VIRQ_XENOPROF to IRQ failed on CPU "
-		       "%d\n", cpu);
-	} else {
-		ovf_irq[cpu] = result;
+	for_each_cpu(i) {
+		if (ovf_irq[i] >= 0) {
+			unbind_from_irqhandler(ovf_irq[i], NULL);
+			ovf_irq[i] = -1;
+		}
 	}
 }
 
 
 static int bind_virq(void)
 {
-	bind_virq_error = 0;
-	on_each_cpu(bind_virq_cpu, NULL, 0, 1);
-	if (bind_virq_error) {
-		unbind_virq();
-		return bind_virq_error;
-	} else {
-		return 0;
+	int i, result;
+
+	for_each_cpu(i) {
+		result = bind_virq_to_irqhandler(VIRQ_XENOPROF,
+						 i,
+						 xenoprof_ovf_interrupt,
+						 SA_INTERRUPT,
+						 "xenoprof",
+						 NULL);
+
+		if (result < 0) {
+			unbind_virq();
+			return result;
+		}
+
+		ovf_irq[i] = result;
 	}
+		
+	return 0;
 }
 
 
