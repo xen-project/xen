@@ -1,9 +1,9 @@
 ################################
- __  __            _____  ___  
- \ \/ /___ _ __   |___ / / _ \ 
+ __  __            _____  ___
+ \ \/ /___ _ __   |___ / / _ \
   \  // _ \ '_ \    |_ \| | | |
   /  \  __/ | | |  ___) | |_| |
- /_/\_\___|_| |_| |____(_)___/ 
+ /_/\_\___|_| |_| |____(_)___/
 
 ################################
 
@@ -66,14 +66,14 @@ performed with root privileges.]
 
    The linux command line takes all the usual options, such as
    root=<root-dev> to specify your usual root partition (e.g.,
-   /dev/hda1).  
+   /dev/hda1).
 
    The Xen command line takes a number of optional arguments described
    in the manual. The most common is 'dom0_mem=xxxM' which sets the
    amount of memory to allocate for use by your initial virtual
    machine (known as domain 0). Note that Xen itself reserves about
    32MB memory for internal use, which is not available for allocation
-   to virtual machines.  
+   to virtual machines.
 
 3. Reboot your system and select the "Xen 3.0 / XenLinux 2.6" menu
    option. After booting Xen, Linux will start and your initialisation
@@ -86,7 +86,7 @@ First, there are a number of prerequisites for building a Xen source
 release. Make sure you have all the following installed, either by
 visiting the project webpage or installing a pre-built package
 provided by your Linux distributor:
-    * GCC (preferably v3.2.x or v3.3.x; older versions are unsupported) 
+    * GCC (preferably v3.2.x or v3.3.x; older versions are unsupported)
     * GNU Make
     * GNU Binutils
     * Development install of zlib (e.g., zlib-dev)
@@ -122,19 +122,19 @@ On Linux:
     # make world
     # make install
 
-   This will create and install onto the local machine. It will build 
+   This will create and install onto the local machine. It will build
    the xen binary (xen.gz), and a linux kernel and modules that can be
    used in both dom0 and an unprivileged guest kernel (vmlinuz-2.6.x-xen),
    the tools and the documentation.
 
-   You can override the destination for make install by setting DESTDIR 
+   You can override the destination for make install by setting DESTDIR
    to some value.
 
-   The make command line defaults to building the kernel vmlinuz-2.6.x-xen. 
-   You can override this default by specifying KERNELS=kernelname. For 
-   example, you can make two kernels - linux-2.6-xen0 
-   and linux-2.6-xenU - which are smaller builds containing only selected 
-   modules, intended primarily for developers that don't like to wait 
+   The make command line defaults to building the kernel vmlinuz-2.6.x-xen.
+   You can override this default by specifying KERNELS=kernelname. For
+   example, you can make two kernels - linux-2.6-xen0
+   and linux-2.6-xenU - which are smaller builds containing only selected
+   modules, intended primarily for developers that don't like to wait
    for a full -xen kernel to build. The -xenU kernel is particularly small,
    as it does not contain any physical device drivers, and hence is
    only useful for guest domains.
@@ -153,15 +153,15 @@ On Linux:
     # make dist
 
    This will build and install xen, kernels, tools, and
-   docs into the local dist/ directory. 
+   docs into the local dist/ directory.
 
-   You can override the destination for make install by setting DISTDIR 
+   You can override the destination for make install by setting DISTDIR
    to some value.
 
-   make install and make dist differ in that make install does the 
-   right things for your local machine (installing the appropriate 
-   version of hotplug or udev scripts, for example), but make dist 
-   includes all versions of those scripts, so that you can copy the dist 
+   make install and make dist differ in that make install does the
+   right things for your local machine (installing the appropriate
+   version of hotplug or udev scripts, for example), but make dist
+   includes all versions of those scripts, so that you can copy the dist
    directory to another machine and install from that distribution.
 
 5. To rebuild a kernel with a modified config:
@@ -171,6 +171,6 @@ On Linux:
     # make linux-2.6-xen-install
 
    Depending on your config, you may need to use 'mkinitrd' to create
-   an initial ram disk, just like a native system e.g. 
+   an initial ram disk, just like a native system e.g.
     # depmod 2.6.16-xen
     # mkinitrd -v -f --with=aacraid --with=sd_mod --with=scsi_mod initrd-2.6.16-xen.img 2.6.16-xen
