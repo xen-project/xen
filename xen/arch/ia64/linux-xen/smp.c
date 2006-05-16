@@ -53,28 +53,6 @@
 #endif
 
 #ifdef XEN
-// FIXME: MOVE ELSEWHERE
-//Huh? This seems to be used on ia64 even if !CONFIG_SMP
-void flush_tlb_mask(cpumask_t mask)
-{
-    int cpu;
-
-    cpu = smp_processor_id();
-    if (cpu_isset (cpu, mask)) {
-        cpu_clear(cpu, mask);
-	local_flush_tlb_all ();
-    }
-
-#ifdef CONFIG_SMP
-    if (cpus_empty(mask))
-        return;
-
-    for (cpu = 0; cpu < NR_CPUS; ++cpu)
-        if (cpu_isset(cpu, mask))
-	   smp_call_function_single
-	     (cpu, (void (*)(void *))local_flush_tlb_all, NULL, 1, 1);
-#endif
-}
 //#if CONFIG_SMP || IA64
 #if CONFIG_SMP
 //Huh? This seems to be used on ia64 even if !CONFIG_SMP
@@ -276,7 +254,6 @@ smp_send_reschedule (int cpu)
 {
 	platform_send_ipi(cpu, IA64_IPI_RESCHEDULE, IA64_IPI_DM_INT, 0);
 }
-#endif
 
 void
 smp_flush_tlb_all (void)
@@ -284,15 +261,6 @@ smp_flush_tlb_all (void)
 	on_each_cpu((void (*)(void *))local_flush_tlb_all, NULL, 1, 1);
 }
 
-#ifdef XEN
-void
-smp_vhpt_flush_all(void)
-{
-	on_each_cpu((void (*)(void *))vhpt_flush, NULL, 1, 1);
-}
-#endif
-
-#ifndef XEN
 void
 smp_flush_tlb_mm (struct mm_struct *mm)
 {

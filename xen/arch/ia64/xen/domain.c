@@ -89,13 +89,9 @@ void arch_domain_destroy(struct domain *d)
 	if (d->shared_info != NULL)
 		free_xenheap_page(d->shared_info);
 
+	domain_flush_destroy (d);
+
 	deallocate_rid_range(d);
-
-	/* It is really good in this? */
-	flush_tlb_all();
-
-	/* It is really good in this? */
-	vhpt_flush_all();
 }
 
 static void default_idle(void)
@@ -873,17 +869,7 @@ void
 domain_page_flush(struct domain* d, unsigned long mpaddr,
                   unsigned long old_mfn, unsigned long new_mfn)
 {
-    struct vcpu* v;
-    //XXX SMP
-    for_each_vcpu(d, v) {
-        vcpu_purge_tr_entry(&v->arch.dtlb);
-        vcpu_purge_tr_entry(&v->arch.itlb);
-    }
-
-    // flush vhpt
-    vhpt_flush();
-    // flush tlb
-    flush_tlb_all();
+    domain_flush_vtlb_all (d);
 }
 #endif
 

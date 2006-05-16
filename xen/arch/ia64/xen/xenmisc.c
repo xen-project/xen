@@ -267,6 +267,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 	    vmx_load_state(next);
     /*ia64_psr(ia64_task_regs(next))->dfh = !ia64_is_local_fpu_owner(next);*/
     prev = ia64_switch_to(next);
+
+    //cpu_set(smp_processor_id(), current->domain->domain_dirty_cpumask);
+
     if (!VMX_DOMAIN(current)){
 	    vcpu_set_next_timer(current);
     }

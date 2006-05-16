@@ -12,32 +12,31 @@
 #include <asm/system.h>
 #include <asm/pgalloc.h>
 #include <asm/page.h>
-#include <asm/dma.h>
 #include <asm/vhpt.h>
+#include <asm/vcpu.h>
+
+/* Defined in tlb.c  */
+extern void ia64_global_tlb_purge(UINT64 start, UINT64 end, UINT64 nbits);
 
 extern long running_on_sim;
 
 DEFINE_PER_CPU (unsigned long, vhpt_paddr);
 DEFINE_PER_CPU (unsigned long, vhpt_pend);
 
-void vhpt_flush(void)
+static void vhpt_flush(void)
 {
-	struct vhpt_lf_entry *v =__va(__ia64_per_cpu_var(vhpt_paddr));
+	struct vhpt_lf_entry *v = (struct vhpt_lf_entry *)VHPT_ADDR;
 	int i;
-#if 0
-static int firsttime = 2;
 
-if (firsttime) firsttime--;
-else {
-printf("vhpt_flush: *********************************************\n");
-printf("vhpt_flush: *********************************************\n");
-printf("vhpt_flush: *********************************************\n");
-printf("vhpt_flush: flushing vhpt (seems to crash at rid wrap?)...\n");
-printf("vhpt_flush: *********************************************\n");
-printf("vhpt_flush: *********************************************\n");
-printf("vhpt_flush: *********************************************\n");
+	for (i = 0; i < VHPT_NUM_ENTRIES; i++, v++)
+		v->ti_tag = INVALID_TI_TAG;
 }
-#endif
+
+static void vhpt_erase(void)
+{
+	struct vhpt_lf_entry *v = (struct vhpt_lf_entry *)VHPT_ADDR;
+	int i;
+
 	for (i = 0; i < VHPT_NUM_ENTRIES; i++, v++) {
 		v->itir = 0;
 		v->CChain = 0;
@@ -47,51 +46,6 @@ printf("vhpt_flush: *********************************************\n");
 	// initialize cache too???
 }
 
-#ifdef VHPT_GLOBAL
-void vhpt_flush_address(unsigned long vadr, unsigned long addr_range)
-{
-	struct vhpt_lf_entry *vlfe;
-
-	if ((vadr >> 61) == 7) {
-		// no vhpt for region 7 yet, see vcpu_itc_no_srlz
-		printf("vhpt_flush_address: region 7, spinning...\n");
-		while(1);
-	}
-#if 0
-	// this only seems to occur at shutdown, but it does occur
-	if ((!addr_range) || addr_range & (addr_range - 1)) {
-		printf("vhpt_flush_address: weird range, spinning...\n");
-		while(1);
-	}
-//printf("************** vhpt_flush_address(%p,%p)\n",vadr,addr_range);
-#endif
-	while ((long)addr_range > 0) {
-		vlfe = (struct vhpt_lf_entry *)ia64_thash(vadr);
-		// FIXME: for now, just blow it away even if it belongs to
-		// another domain.  Later, use ttag to check for match
-//if (!(vlfe->ti_tag & INVALID_TI_TAG)) {
-//printf("vhpt_flush_address: blowing away valid tag for vadr=%p\n",vadr);
-//}
-		vlfe->ti_tag |= INVALID_TI_TAG;
-		addr_range -= PAGE_SIZE;
-		vadr += PAGE_SIZE;
-	}
-}
-
-void vhpt_flush_address_remote(int cpu,
-			       unsigned long vadr, unsigned long addr_range)
-{
-	while ((long)addr_range > 0) {
-		/* Get the VHPT entry.  */
-		unsigned int off = ia64_thash(vadr) - VHPT_ADDR;
-		volatile struct vhpt_lf_entry *v;
-		v =__va(per_cpu(vhpt_paddr, cpu) + off);
-		v->ti_tag = INVALID_TI_TAG;
-		addr_range -= PAGE_SIZE;
-		vadr += PAGE_SIZE;
-	}
-}
-#endif
 
 static void vhpt_map(unsigned long pte)
 {
@@ -147,17 +101,11 @@ void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte, unsigned long 
 
 void vhpt_init(void)
 {
-	unsigned long vhpt_total_size, vhpt_alignment;
 	unsigned long paddr, pte;
 	struct page_info *page;
 #if !VHPT_ENABLED
 	return;
 #endif
-	// allocate a huge chunk of physical memory.... how???
-	vhpt_total_size = 1 << VHPT_SIZE_LOG2;	// 4MB, 16MB, 64MB, or 256MB
-	vhpt_alignment = 1 << VHPT_SIZE_LOG2;	// 4MB, 16MB, 64MB, or 256MB
-	printf("vhpt_init: vhpt size=0x%lx, align=0x%lx\n",
-		vhpt_total_size, vhpt_alignment);
 	/* This allocation only holds true if vhpt table is unique for
 	 * all domains. Or else later new vhpt table should be allocated
 	 * from domain heap when each domain is created. Assume xen buddy
@@ -167,17 +115,135 @@ void vhpt_init(void)
 	if (!page)
 		panic("vhpt_init: can't allocate VHPT!\n");
 	paddr = page_to_maddr(page);
+	if (paddr & ((1 << VHPT_SIZE_LOG2) - 1))
+		panic("vhpt_init: bad VHPT alignment!\n");
 	__get_cpu_var(vhpt_paddr) = paddr;
-	__get_cpu_var(vhpt_pend) = paddr + vhpt_total_size - 1;
+	__get_cpu_var(vhpt_pend) = paddr + (1 << VHPT_SIZE_LOG2) - 1;
 	printf("vhpt_init: vhpt paddr=0x%lx, end=0x%lx\n",
 		paddr, __get_cpu_var(vhpt_pend));
 	pte = pte_val(pfn_pte(paddr >> PAGE_SHIFT, PAGE_KERNEL));
 	vhpt_map(pte);
 	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
 		VHPT_ENABLED);
-	vhpt_flush();
+	vhpt_erase();
 }
 
+
+void vcpu_flush_vtlb_all (void)
+{
+	struct vcpu *v = current;
+
+	/* First VCPU tlb.  */
+	vcpu_purge_tr_entry(&PSCBX(v,dtlb));
+	vcpu_purge_tr_entry(&PSCBX(v,itlb));
+
+	/* Then VHPT.  */
+	vhpt_flush ();
+
+	/* Then mTLB.  */
+	local_flush_tlb_all ();
+
+	/* We could clear bit in d->domain_dirty_cpumask only if domain d in
+	   not running on this processor.  There is currently no easy way to
+	   check this.  */
+}
+
+void domain_flush_vtlb_all (void)
+{
+	int cpu = smp_processor_id ();
+	struct vcpu *v;
+
+	for_each_vcpu (current->domain, v)
+		if (v->processor == cpu)
+			vcpu_flush_vtlb_all ();
+		else
+			smp_call_function_single
+				(v->processor,
+				 (void(*)(void *))vcpu_flush_vtlb_all,
+				 NULL,1,1);
+}
+
+static void cpu_flush_vhpt_range (int cpu, u64 vadr, u64 addr_range)
+{
+	void *vhpt_base = __va(per_cpu(vhpt_paddr, cpu));
+
+	while ((long)addr_range > 0) {
+		/* Get the VHPT entry.  */
+		unsigned int off = ia64_thash(vadr) - VHPT_ADDR;
+		volatile struct vhpt_lf_entry *v;
+		v = vhpt_base + off;
+		v->ti_tag = INVALID_TI_TAG;
+		addr_range -= PAGE_SIZE;
+		vadr += PAGE_SIZE;
+	}
+}
+
+void vcpu_flush_tlb_vhpt_range (u64 vadr, u64 log_range)
+{
+	cpu_flush_vhpt_range (current->processor, vadr, 1UL << log_range);
+	ia64_ptcl(vadr, log_range << 2);
+	ia64_srlz_i();
+}
+
+void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
+{
+	struct vcpu *v;
+
+#if 0
+	// this only seems to occur at shutdown, but it does occur
+	if ((!addr_range) || addr_range & (addr_range - 1)) {
+		printf("vhpt_flush_address: weird range, spinning...\n");
+		while(1);
+	}
+#endif
+
+	for_each_vcpu (d, v) {
+		/* Purge TC entries.
+		   FIXME: clear only if match.  */
+		vcpu_purge_tr_entry(&PSCBX(v,dtlb));
+		vcpu_purge_tr_entry(&PSCBX(v,itlb));
+
+		/* Invalidate VHPT entries.  */
+		cpu_flush_vhpt_range (v->processor, vadr, addr_range);
+	}
+
+	/* ptc.ga  */
+	ia64_global_tlb_purge(vadr,vadr+addr_range,PAGE_SHIFT);
+}
+
+static void flush_tlb_vhpt_all (struct domain *d)
+{
+	/* First VHPT.  */
+	vhpt_flush ();
+
+	/* Then mTLB.  */
+	local_flush_tlb_all ();
+}
+
+void domain_flush_destroy (struct domain *d)
+{
+	/* Very heavy...  */
+	on_each_cpu ((void (*)(void *))flush_tlb_vhpt_all, d, 1, 1);
+	cpus_clear (d->domain_dirty_cpumask);
+}
+
+void flush_tlb_mask(cpumask_t mask)
+{
+    int cpu;
+
+    cpu = smp_processor_id();
+    if (cpu_isset (cpu, mask)) {
+        cpu_clear(cpu, mask);
+        flush_tlb_vhpt_all (NULL);
+    }
+
+    if (cpus_empty(mask))
+        return;
+
+    for_each_cpu_mask (cpu, mask)
+        smp_call_function_single
+            (cpu, (void (*)(void *))flush_tlb_vhpt_all, NULL, 1, 1);
+}
 
 void zero_vhpt_stats(void)
 {

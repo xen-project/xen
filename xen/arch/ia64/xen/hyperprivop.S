@@ -47,7 +47,7 @@
 #endif
 
 #ifdef CONFIG_SMP
-#warning "FIXME: ptc.ga instruction requires spinlock for SMP"
+//#warning "FIXME: ptc.ga instruction requires spinlock for SMP"
 #undef FAST_PTC_GA
 #endif
 

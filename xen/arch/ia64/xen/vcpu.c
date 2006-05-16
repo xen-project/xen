@@ -28,8 +28,6 @@ extern void setfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_
 
 extern void panic_domain(struct pt_regs *, const char *, ...);
 extern unsigned long translate_domain_mpaddr(unsigned long);
-extern void ia64_global_tlb_purge(UINT64 start, UINT64 end, UINT64 nbits);
-
 
 typedef	union {
 	struct ia64_psr ia64_psr;
@@ -1702,11 +1700,6 @@ IA64FAULT vcpu_set_pkr(VCPU *vcpu, UINT64 reg, UINT64 val)
  VCPU translation register access routines
 **************************************************************************/
 
-void vcpu_purge_tr_entry(TR_ENTRY *trp)
-{
-	trp->pte.val = 0;
-}
-
 static void vcpu_set_tr_entry(TR_ENTRY *trp, UINT64 pte, UINT64 itir, UINT64 ifa)
 {
 	UINT64 ps;
@@ -1867,21 +1860,13 @@ IA64FAULT vcpu_fc(VCPU *vcpu, UINT64 vadr)
 	return fault;
 }
 
-int ptce_count = 0;
 IA64FAULT vcpu_ptc_e(VCPU *vcpu, UINT64 vadr)
 {
 	// Note that this only needs to be called once, i.e. the
 	// architected loop to purge the entire TLB, should use
 	//  base = stride1 = stride2 = 0, count0 = count 1 = 1
 
-	// just invalidate the "whole" tlb
-	vcpu_purge_tr_entry(&PSCBX(vcpu,dtlb));
-	vcpu_purge_tr_entry(&PSCBX(vcpu,itlb));
-
-#ifdef VHPT_GLOBAL
-	vhpt_flush();	// FIXME: This is overdoing it
-#endif
-	local_flush_tlb_all();
+	vcpu_flush_vtlb_all ();
 
 	return IA64_NO_FAULT;
 }
@@ -1899,33 +1884,8 @@ IA64FAULT vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 	// FIXME: ??breaks if domain PAGE_SIZE < Xen PAGE_SIZE
 //printf("######## vcpu_ptc_ga(%p,%p) ##############\n",vadr,addr_range);
 
-#ifdef CONFIG_XEN_SMP
-	struct domain *d = vcpu->domain;
-	struct vcpu *v;
+	domain_flush_vtlb_range (vcpu->domain, vadr, addr_range);
 
-	for_each_vcpu (d, v) {
-		if (v == vcpu)
-			continue;
-
-		/* Purge TC entries.
-		   FIXME: clear only if match.  */
-		vcpu_purge_tr_entry(&PSCBX(v,dtlb));
-		vcpu_purge_tr_entry(&PSCBX(v,itlb));
-
-#ifdef VHPT_GLOBAL
-		/* Invalidate VHPT entries.  */
-		vhpt_flush_address_remote (v->processor, vadr, addr_range);
-#endif
-	}
-#endif
-
-#ifdef VHPT_GLOBAL
-	vhpt_flush_address(vadr,addr_range);
-#endif
-	ia64_global_tlb_purge(vadr,vadr+addr_range,PAGE_SHIFT);
-	/* Purge tc.  */
-	vcpu_purge_tr_entry(&PSCBX(vcpu,dtlb));
-	vcpu_purge_tr_entry(&PSCBX(vcpu,itlb));
 	return IA64_NO_FAULT;
 }
 

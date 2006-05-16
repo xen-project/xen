@@ -307,11 +307,7 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 		if (fault == IA64_USE_TLB && !current->arch.dtlb.pte.p) {
 			/* dtlb has been purged in-between.  This dtlb was
 			   matching.  Undo the work.  */
-#ifdef VHPT_GLOBAL
-			vhpt_flush_address (address, 1);
-#endif
-			ia64_ptcl(address, 1<<2);
-			ia64_srlz_i();
+			vcpu_flush_tlb_vhpt_range (address, 1);
 			goto again;
 		}
 		return;
