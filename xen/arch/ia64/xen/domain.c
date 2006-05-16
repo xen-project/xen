@@ -869,7 +869,7 @@ void
 domain_page_flush(struct domain* d, unsigned long mpaddr,
                   unsigned long old_mfn, unsigned long new_mfn)
 {
-    domain_flush_vtlb_all (d);
+    domain_flush_vtlb_all();
 }
 #endif
 
