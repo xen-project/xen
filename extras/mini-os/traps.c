@@ -120,9 +120,21 @@ void page_walk(unsigned long virt_address)
 #define read_cr2() \
         (HYPERVISOR_shared_info->vcpu_info[smp_processor_id()].arch.cr2)
 
+static int handling_pg_fault = 0;
+
 void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 {
     unsigned long addr = read_cr2();
+    /* If we are already handling a page fault, and got another one
+       that means we faulted in pagetable walk. Continuing here would cause
+       a recursive fault */       
+    if(handling_pg_fault) 
+    {
+        printk("Page fault in pagetable walk (access to invalid memory?).\n"); 
+        do_exit();
+    }
+    handling_pg_fault = 1;
+
 #if defined(__x86_64__)
     printk("Page fault at linear address %p, rip %p, code %lx\n",
            addr, regs->rip, error_code);
@@ -130,9 +142,12 @@ void do_page_fault(struct pt_regs *regs, unsigned long error_code)
     printk("Page fault at linear address %p, eip %p, code %lx\n",
            addr, regs->eip, error_code);
 #endif
+
     dump_regs(regs);
     page_walk(addr);
     do_exit();
+    /* We should never get here ... but still */
+    handling_pg_fault = 0;
 }
 
 void do_general_protection(struct pt_regs *regs, long error_code)

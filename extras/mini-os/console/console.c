@@ -45,6 +45,10 @@
 #include <xen/io/console.h>
 
 
+/* Copies all print output to the Xen emergency console apart
+   of standard dom0 handled console */
+#define USE_XEN_CONSOLE
+
 /* Low level functions defined in xencons_ring.c */
 extern int xencons_ring_init(void);
 extern int xencons_ring_send(const char *data, unsigned len);
@@ -117,7 +121,9 @@ void print(int direct, const char *fmt, va_list args)
         (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(buf), buf);
         return;
     } else {
-        if(!console_initialised)
+#ifndef USE_XEN_CONSOLE
+    if(!console_initialised)
+#endif    
             (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(buf), buf);
         
         console_print(buf, strlen(buf));
@@ -128,7 +134,7 @@ void printk(const char *fmt, ...)
 {
     va_list       args;
     va_start(args, fmt);
-    print(1, fmt, args);
+    print(0, fmt, args);
     va_end(args);        
 }
 
