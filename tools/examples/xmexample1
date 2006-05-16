@@ -26,6 +26,10 @@ memory = 64
 # A name for your domain. All domains must have different names.
 name = "ExampleDomain"
 
+# 128-bit UUID for the domain.  The default behavior is to generate a new UUID
+# on each call to 'xm create'.
+#uuid = "06ed00fe-1162-4fc4-b5d8-11993ee4a8b9"
+
 # List of which CPUS this domain is allowed to use, default Xen picks
 #cpus = ""         # leave to Xen to pick
 #cpus = "0"        # all vcpus run on CPU0
