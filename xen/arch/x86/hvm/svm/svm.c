@@ -82,9 +82,11 @@ void svm_dump_regs(const char *from, struct cpu_user_regs *regs);
 
 static void svm_relinquish_guest_resources(struct domain *d);
 
-/* Host save area */
-struct host_save_area *host_save_area[ NR_CPUS ] = {0};
-static struct asid_pool ASIDpool[NR_CPUS];
+
+extern void set_hsa_to_guest( struct arch_svm_struct *arch_svm );
+
+/* Host save area and ASID glogal data */
+struct svm_percore_globals svm_globals[NR_CPUS];
 
 /*
  * Initializes the POOL of ASID used by the guests per core.
@@ -92,15 +94,15 @@ static struct asid_pool ASIDpool[NR_CPUS];
 void asidpool_init( int core )
 {
     int i;
-    ASIDpool[core].asid_lock = SPIN_LOCK_UNLOCKED;
-    spin_lock(&ASIDpool[core].asid_lock);
+    svm_globals[core].ASIDpool.asid_lock = SPIN_LOCK_UNLOCKED;
+    spin_lock(&svm_globals[core].ASIDpool.asid_lock);
     /* Host ASID is always in use */
-    ASIDpool[core].asid[INITIAL_ASID] = ASID_INUSE;
+    svm_globals[core].ASIDpool.asid[INITIAL_ASID] = ASID_INUSE;
     for( i=1; i<ASID_MAX; i++ )
     {
-       ASIDpool[core].asid[i] = ASID_AVAILABLE;
+       svm_globals[core].ASIDpool.asid[i] = ASID_AVAILABLE;
     }
-    spin_unlock(&ASIDpool[core].asid_lock);
+    spin_unlock(&svm_globals[core].ASIDpool.asid_lock);
 }
 
 
@@ -110,10 +112,10 @@ static int asidpool_fetch_next( struct vmcb_struct *vmcb, int core )
     int i;   
     for( i = 1; i < ASID_MAX; i++ )
     {
-        if( ASIDpool[core].asid[i] == ASID_AVAILABLE )
+        if( svm_globals[core].ASIDpool.asid[i] == ASID_AVAILABLE )
         {
             vmcb->guest_asid = i;
-            ASIDpool[core].asid[i] = ASID_INUSE;
+            svm_globals[core].ASIDpool.asid[i] = ASID_INUSE;
             return i;
         }
     }
@@ -138,36 +140,36 @@ int asidpool_assign_next( struct vmcb_struct *vmcb, int retire_current,
     int res = 1;
     static unsigned long cnt=0;
 
-    spin_lock(&ASIDpool[oldcore].asid_lock);
+    spin_lock(&svm_globals[oldcore].ASIDpool.asid_lock);
     if( retire_current && vmcb->guest_asid ) {
-       ASIDpool[oldcore].asid[ vmcb->guest_asid & (ASID_MAX-1) ] = ASID_RETIRED;
+       svm_globals[oldcore].ASIDpool.asid[ vmcb->guest_asid & (ASID_MAX-1) ] = ASID_RETIRED;
     }
-    spin_unlock(&ASIDpool[oldcore].asid_lock);
-    spin_lock(&ASIDpool[newcore].asid_lock);
+    spin_unlock(&svm_globals[oldcore].ASIDpool.asid_lock);
+    spin_lock(&svm_globals[newcore].ASIDpool.asid_lock);
     if( asidpool_fetch_next( vmcb, newcore ) < 0 ) {
         if (svm_dbg_on)
             printk( "SVM: tlb(%ld)\n", cnt++ );
         /* FLUSH the TLB and all retired slots are made available */ 
         vmcb->tlb_control = 1;
         for( i = 1; i < ASID_MAX; i++ ) {
-            if( ASIDpool[newcore].asid[i] == ASID_RETIRED ) {
-                ASIDpool[newcore].asid[i] = ASID_AVAILABLE;
+            if( svm_globals[newcore].ASIDpool.asid[i] == ASID_RETIRED ) {
+                svm_globals[newcore].ASIDpool.asid[i] = ASID_AVAILABLE;
             }
         }
         /* Get the First slot available */ 
         res = asidpool_fetch_next( vmcb, newcore ) > 0;
     }
-    spin_unlock(&ASIDpool[newcore].asid_lock);
+    spin_unlock(&svm_globals[newcore].ASIDpool.asid_lock);
     return res;
 }
 
 void asidpool_retire( struct vmcb_struct *vmcb, int core )
 {
-   spin_lock(&ASIDpool[core].asid_lock);
+   spin_lock(&svm_globals[core].ASIDpool.asid_lock);
    if( vmcb->guest_asid ) {
-       ASIDpool[core].asid[ vmcb->guest_asid & (ASID_MAX-1) ] = ASID_RETIRED;
+       svm_globals[core].ASIDpool.asid[ vmcb->guest_asid & (ASID_MAX-1) ] = ASID_RETIRED;
    }
-   spin_unlock(&ASIDpool[core].asid_lock);
+   spin_unlock(&svm_globals[core].ASIDpool.asid_lock);
 }
 
 static inline void svm_inject_exception(struct vcpu *v, int trap, int ev, int error_code)
@@ -198,8 +200,13 @@ void stop_svm(void)
     wrmsr(MSR_EFER, eax, edx);
  
     /* release the HSA */
-    free_host_save_area( host_save_area[ cpu ] );
-    host_save_area[ cpu ] = NULL;
+    free_host_save_area( svm_globals[cpu].hsa );
+    free_host_save_area( svm_globals[cpu].scratch_hsa );
+    svm_globals[cpu].hsa    = NULL;
+    svm_globals[cpu].hsa_pa = 0;
+    svm_globals[cpu].scratch_hsa    = NULL;
+    svm_globals[cpu].scratch_hsa_pa = 0;
+    wrmsr(MSR_K8_VM_HSAVE_PA, 0, 0 );
 
     printk("AMD SVM Extension is disabled.\n");
 }
@@ -455,16 +462,20 @@ int start_svm(void)
     rdmsr(MSR_EFER, eax, edx);
     eax |= EFER_SVME;
     wrmsr(MSR_EFER, eax, edx);
-    asidpool_init(smp_processor_id());    
+    asidpool_init( cpu );    
     printk("AMD SVM Extension is enabled for cpu %d.\n", cpu );
 
     /* Initialize the HSA for this core */
-    host_save_area[ cpu ] = alloc_host_save_area();
-    phys_hsa = (u64) virt_to_maddr( host_save_area[ cpu ] ); 
+    svm_globals[cpu].hsa = alloc_host_save_area();
+    phys_hsa = (u64) virt_to_maddr( svm_globals[cpu].hsa ); 
     phys_hsa_lo = (u32) phys_hsa;
     phys_hsa_hi = (u32) (phys_hsa >> 32);    
     wrmsr(MSR_K8_VM_HSAVE_PA, phys_hsa_lo, phys_hsa_hi);
-    
+    svm_globals[cpu].hsa_pa = phys_hsa;
+  
+    svm_globals[cpu].scratch_hsa    = alloc_host_save_area();
+    svm_globals[cpu].scratch_hsa_pa = (u64)virt_to_maddr( svm_globals[cpu].scratch_hsa );
+
     /* Setup HVM interfaces */
     hvm_funcs.disable = stop_svm;
 
@@ -888,8 +899,7 @@ static void svm_do_general_protection_fault(struct vcpu *v,
             (unsigned long)regs->eax, (unsigned long)regs->ebx,
             (unsigned long)regs->ecx, (unsigned long)regs->edx,
             (unsigned long)regs->esi, (unsigned long)regs->edi);
-
-    
+      
     /* Reflect it back into the guest */
     svm_inject_exception(v, TRAP_gp_fault, 1, error_code);
 }
@@ -2903,6 +2913,9 @@ asmlinkage void svm_asid(void)
         v->arch.hvm_svm.asid_core = v->arch.hvm_svm.launch_core;
         clear_bit( ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags );
     }
+
+    /* make sure the HSA is set for the current core */
+    set_hsa_to_guest( &v->arch.hvm_svm );
 }
 
 /*

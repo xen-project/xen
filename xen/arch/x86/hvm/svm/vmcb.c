@@ -36,7 +36,7 @@
 #include <xen/kernel.h>
 #include <xen/domain_page.h>
 
-extern struct host_save_area *host_save_area[];
+extern struct svm_percore_globals svm_globals[];
 extern int svm_dbg_on;
 extern int asidpool_assign_next( struct vmcb_struct *vmcb, int retire_current,
                                   int oldcore, int newcore);
@@ -430,8 +430,7 @@ void svm_do_launch(struct vcpu *v)
 
 void set_hsa_to_guest( struct arch_svm_struct *arch_svm ) 
 {
-    arch_svm->host_save_area = host_save_area[ smp_processor_id() ];
-    arch_svm->host_save_pa   = (u64)virt_to_maddr( arch_svm->host_save_area );
+  arch_svm->host_save_pa = svm_globals[ smp_processor_id() ].scratch_hsa_pa;
 }
 
 /* 
@@ -445,9 +444,6 @@ void svm_do_resume(struct vcpu *v)
 
     svm_stts(v);
 
-    /* make sure the HSA is set for the current core */
-    set_hsa_to_guest( &v->arch.hvm_svm );
-    
     /* pick up the elapsed PIT ticks and re-enable pit_timer */
     if ( time_info->first_injected ) {
         if ( v->domain->arch.hvm_domain.guest_time ) {

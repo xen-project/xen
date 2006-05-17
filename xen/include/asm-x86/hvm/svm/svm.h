@@ -70,6 +70,14 @@ struct asid_pool {
     u32 asid[ASID_MAX];
 };
 
+struct svm_percore_globals {
+  void *hsa;
+  u64  hsa_pa;
+  void *scratch_hsa;
+  u64  scratch_hsa_pa;
+  struct asid_pool ASIDpool;
+};
+
 #define SVM_REG_EAX (0) 
 #define SVM_REG_ECX (1) 
 #define SVM_REG_EDX (2) 
