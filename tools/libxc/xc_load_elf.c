@@ -148,15 +148,13 @@ static int parseelfimage(const char *image,
 
     dsi->xen_guest_string = guestinfo;
 
-    virt_base = 0;
-    if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
-        virt_base = strtoul(p+10, &p, 0);
-
-    if ( virt_base == 0 )
+    if ( (p = strstr(guestinfo, "VIRT_BASE=")) == NULL )
     {
-        ERROR("Malformed ELF image. VIRT_BASE in '__xen_guest' section set incorrectly");
+        ERROR("Malformed ELF image. No VIRT_BASE specified");
         return -EINVAL;
     }
+
+    virt_base = strtoul(p+10, &p, 0);
 
     dsi->elf_paddr_offset = virt_base;
     if ( (p = strstr(guestinfo, "ELF_PADDR_OFFSET=")) != NULL )
