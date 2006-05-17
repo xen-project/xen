@@ -1118,19 +1118,17 @@ static void svm_dr_access (struct vcpu *v, unsigned int reg, unsigned int type,
 }
 
 
-static unsigned int check_for_null_selector(struct vmcb_struct *vmcb, 
-        unsigned int dir, unsigned long *base, unsigned int real)
-
+static void svm_get_prefix_info(struct vmcb_struct *vmcb, 
+		unsigned int dir, segment_selector_t **seg, unsigned int *asize)
 {
     unsigned char inst[MAX_INST_LEN];
-    segment_selector_t seg;
     int i;
 
     memset(inst, 0, MAX_INST_LEN);
     if (inst_copy_from_guest(inst, svm_rip2pointer(vmcb), sizeof(inst)) 
             != MAX_INST_LEN) 
     {
-        printk("check_for_null_selector: get guest instruction failed\n");
+        printk("%s: get guest instruction failed\n", __func__);
         domain_crash_synchronous();
     }
 
@@ -1142,7 +1140,6 @@ static unsigned int check_for_null_selector(struct vmcb_struct *vmcb,
         case 0xf2: /* REPNZ */
         case 0xf0: /* LOCK */
         case 0x66: /* data32 */
-        case 0x67: /* addr32 */
 #if __x86_64__
             /* REX prefixes */
         case 0x40:
@@ -1164,89 +1161,133 @@ static unsigned int check_for_null_selector(struct vmcb_struct *vmcb,
         case 0x4f:
 #endif
             continue;
+        case 0x67: /* addr32 */
+            *asize ^= 48;        /* Switch 16/32 bits */
+            continue;
         case 0x2e: /* CS */
-            seg = vmcb->cs;
-            break;
+            *seg = &vmcb->cs;
+            continue;
         case 0x36: /* SS */
-            seg = vmcb->ss;
-            break;
+            *seg = &vmcb->ss;
+            continue;
         case 0x26: /* ES */
-            seg = vmcb->es;
-            break;
+            *seg = &vmcb->es;
+            continue;
         case 0x64: /* FS */
-            seg = vmcb->fs;
-            break;
+            *seg = &vmcb->fs;
+            continue;
         case 0x65: /* GS */
-            seg = vmcb->gs;
-            break;
+            *seg = &vmcb->gs;
+            continue;
         case 0x3e: /* DS */
-            /* FALLTHROUGH */
-            seg = vmcb->ds;
-            break;
+            *seg = &vmcb->ds;
+            continue;
         default:
-            if (dir == IOREQ_READ) /* IN/INS instruction? */
-                seg = vmcb->es;
-            else
-                seg = vmcb->ds;
+            break;
         }
-        
-        if (base)
-            *base = seg.base;
-
-        return seg.attributes.fields.p;
+        return;
     }
-
-    ASSERT(0);
-    return 0;
 }
 
 
 /* Get the address of INS/OUTS instruction */
-static inline unsigned long svm_get_io_address(struct vmcb_struct *vmcb, 
-        struct cpu_user_regs *regs, unsigned int dir, unsigned int real)
+static inline int svm_get_io_address(struct vmcb_struct *vmcb, 
+		struct cpu_user_regs *regs, unsigned int dir, 
+        unsigned long *count, unsigned long *addr)
 {
-    unsigned long addr = 0;
-    unsigned long base = 0;
+    unsigned long        reg;
+    unsigned int         asize = 0;
+    unsigned int         isize;
+    int                  long_mode;
+    ioio_info_t          info;
+    segment_selector_t  *seg = NULL;
 
-    check_for_null_selector(vmcb, dir, &base, real);
+    info.bytes = vmcb->exitinfo1;
+
+    /* If we're in long mode, we shouldn't check the segment presence and limit */
+    long_mode = vmcb->cs.attributes.fields.l && vmcb->efer & EFER_LMA;
+
+    /* d field of cs.attributes is 1 for 32-bit, 0 for 16 or 64 bit. 
+     * l field combined with EFER_LMA -> longmode says whether it's 16 or 64 bit. 
+     */
+    asize = (long_mode)?64:((vmcb->cs.attributes.fields.db)?32:16);
+
+
+    /* The ins/outs instructions are single byte, so if we have got more 
+     * than one byte (+ maybe rep-prefix), we have some prefix so we need 
+     * to figure out what it is...
+     */
+    isize = vmcb->exitinfo2 - vmcb->rip;
+
+    if (info.fields.rep)
+        isize --;
+
+    if (isize > 1) 
+    {
+        svm_get_prefix_info(vmcb, dir, &seg, &asize);
+    }
+
+    ASSERT(dir == IOREQ_READ || dir == IOREQ_WRITE);
 
     if (dir == IOREQ_WRITE)
     {
-        if (real)
-            addr = (regs->esi & 0xFFFF) + base;
-        else
-            addr = regs->esi + base;
+        reg = regs->esi;
+        if (!seg)               /* If no prefix, used DS. */
+            seg = &vmcb->ds;
     }
     else
     {
-        if (real)
-            addr = (regs->edi & 0xFFFF) + base;
-        else
-            addr = regs->edi + base;
+        reg = regs->edi;
+        seg = &vmcb->es;        /* Note: This is ALWAYS ES. */
     }
 
-    return addr;
+    /* If the segment isn't present, give GP fault! */
+    if (!long_mode && !seg->attributes.fields.p) 
+    {
+        svm_inject_exception(vmcb, TRAP_gp_fault, 1, seg->sel);
+        return 0;
+    }
+
+    if (asize == 16) 
+    {
+        *addr = (reg & 0xFFFF);
+        *count = regs->ecx & 0xffff;
+    }
+    else
+    {
+        *addr = reg;
+        *count = regs->ecx;
+    }
+
+    if (!long_mode) {
+        if (*addr > seg->limit) 
+        {
+            svm_inject_exception(vmcb, TRAP_gp_fault, 1, seg->sel);
+            return 0;
+        } 
+        else 
+        {
+            *addr += seg->base;
+        }
+    }
+    
+
+    return 1;
 }
 
 
 static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs) 
 {
     struct mmio_op *mmio_opp;
-    unsigned long eip, cs, eflags, cr0;
-    unsigned long port;
-    unsigned int real, size, dir;
+    unsigned int port;
+    unsigned int size, dir;
     ioio_info_t info;
-
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     ASSERT(vmcb);
     mmio_opp = &current->arch.hvm_vcpu.mmio_op;
     mmio_opp->instr = INSTR_PIO;
     mmio_opp->flags = 0;
-
-    eip = vmcb->rip;
-    cs =  vmcb->cs.sel;
-    eflags = vmcb->rflags;
 
     info.bytes = vmcb->exitinfo1;
 
@@ -1259,27 +1300,33 @@ static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs)
     else 
         size = 1;
 
-    cr0 = vmcb->cr0;
-    real = (eflags & X86_EFLAGS_VM) || !(cr0 & X86_CR0_PE);
-
     HVM_DBG_LOG(DBG_LEVEL_IO, 
-                "svm_io_instruction: port 0x%lx real %d, eip=%lx:%lx, "
+                "svm_io_instruction: port 0x%x eip=%lx:%lx, "
                 "exit_qualification = %lx",
-                (unsigned long) port, real, cs, eip, (unsigned long)info.bytes);
+                port, vmcb->cs.sel, vmcb->rip, (unsigned long)info.bytes);
     /* string instruction */
     if (info.fields.str)
     { 
-        unsigned long addr, count = 1;
+        unsigned long addr, count;
         int sign = regs->eflags & EF_DF ? -1 : 1;
 
-        /* Need the original rip, here. */
-        addr = svm_get_io_address(vmcb, regs, dir, real);
+        if (!svm_get_io_address(vmcb, regs, dir, &count, &addr)) 
+        {
+            /* We failed to get a valid address, so don't do the IO operation - 
+             * it would just get worse if we do! Hopefully the guest is handing
+             * gp-faults... 
+             */
+            return;
+        }
 
         /* "rep" prefix */
         if (info.fields.rep) 
         {
             mmio_opp->flags |= REPZ;
-            count = real ? regs->ecx & 0xFFFF : regs->ecx;
+        }
+        else 
+        {
+            count = 1;
         }
 
         /*
