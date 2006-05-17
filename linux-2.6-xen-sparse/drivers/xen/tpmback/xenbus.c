@@ -150,7 +150,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		xenbus_switch_state(dev, XenbusStateClosing);
+		be->tpmif->tpm_instance = -1;
 		break;
 
 	case XenbusStateClosed:

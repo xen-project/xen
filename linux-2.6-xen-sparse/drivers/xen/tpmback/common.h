@@ -45,8 +45,6 @@ typedef struct tpmif_st {
 	long int tpm_instance;
 	unsigned long mmap_vstart;
 
-	struct work_struct work;
-
 	grant_handle_t shmem_handle;
 	grant_ref_t shmem_ref;
 	struct page *pagerange;

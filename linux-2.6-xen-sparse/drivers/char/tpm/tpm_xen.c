@@ -416,7 +416,7 @@ static int tpmfront_suspend(struct xenbus_device *dev)
 		 */
 		interruptible_sleep_on_timeout(&tp->wait_q, 100);
 	}
-	xenbus_switch_state(dev, XenbusStateClosed);
+	xenbus_switch_state(dev, XenbusStateClosing);
 
 	if (atomic_read(&tp->tx_busy)) {
 		/*

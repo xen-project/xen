@@ -1063,7 +1063,7 @@ static int __init tpmback_init(void)
 
 module_init(tpmback_init);
 
-static void __exit tpmback_exit(void)
+void __exit tpmback_exit(void)
 {
 	vtpm_release_packets(NULL, 0);
 	tpmif_xenbus_exit();

@@ -152,10 +152,8 @@ int tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 	return 0;
 }
 
-static void __tpmif_disconnect_complete(void *arg)
+void tpmif_disconnect_complete(tpmif_t *tpmif)
 {
-	tpmif_t *tpmif = (tpmif_t *) arg;
-
 	if (tpmif->irq)
 		unbind_from_irqhandler(tpmif->irq, tpmif);
 
@@ -165,12 +163,6 @@ static void __tpmif_disconnect_complete(void *arg)
 	}
 
 	free_tpmif(tpmif);
-}
-
-void tpmif_disconnect_complete(tpmif_t * tpmif)
-{
-	INIT_WORK(&tpmif->work, __tpmif_disconnect_complete, (void *)tpmif);
-	schedule_work(&tpmif->work);
 }
 
 void __init tpmif_interface_init(void)
