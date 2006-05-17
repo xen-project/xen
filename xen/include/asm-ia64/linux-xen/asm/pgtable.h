@@ -397,6 +397,18 @@ ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 #endif
 }
 
+static inline pte_t
+ptep_xchg(struct mm_struct *mm, unsigned long addr, pte_t *ptep, pte_t npte)
+{
+#ifdef CONFIG_SMP
+	return __pte(xchg((long *) ptep, pte_val(npte)));
+#else
+	pte_t pte = *ptep;
+	set_pte (ptep, npte);
+	return pte;
+#endif
+}
+
 #ifndef XEN
 static inline void
 ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, pte_t *ptep)

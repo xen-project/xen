@@ -746,6 +746,7 @@ __assign_new_domain_page(struct domain *d, unsigned long mpaddr, pte_t* pte)
     set_pte(pte, pfn_pte(maddr >> PAGE_SHIFT,
                          __pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
 
+    mb ();
     //XXX CONFIG_XEN_IA64_DOM0_VP
     //    TODO racy
     set_gpfn_from_mfn(page_to_mfn(p), mpaddr >> PAGE_SHIFT);
@@ -803,6 +804,7 @@ __assign_domain_page(struct domain *d,
         set_pte(pte,
                 pfn_pte(physaddr >> PAGE_SHIFT,
                         __pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
+        mb ();
     } else
         printk("%s: mpaddr %lx already mapped!\n", __func__, mpaddr);
 }
@@ -1123,13 +1125,13 @@ assign_domain_page_replace(struct domain *d, unsigned long mpaddr,
     struct mm_struct *mm = &d->arch.mm;
     pte_t* pte;
     pte_t old_pte;
+    pte_t npte;
 
     pte = lookup_alloc_domain_pte(d, mpaddr);
 
     // update pte
-    old_pte = ptep_get_and_clear(mm, mpaddr, pte);
-    set_pte(pte, pfn_pte(mfn,
-                         __pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
+    npte = pfn_pte(mfn, __pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX));
+    old_pte = ptep_xchg(mm, mpaddr, pte, npte);
     if (!pte_none(old_pte)) {
         unsigned long old_mfn;
         struct page_info* old_page;
