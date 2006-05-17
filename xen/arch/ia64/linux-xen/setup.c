@@ -800,8 +800,7 @@ cpu_init (void)
 	cpu_data = per_cpu_init();
 
 #ifdef XEN
-	printf ("cpu_init: current=%p, current->domain->arch.mm=%p\n",
-		current, current->domain->arch.mm);
+	printf ("cpu_init: current=%p\n", current);
 #endif
 
 	/*
@@ -871,12 +870,11 @@ cpu_init (void)
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
 #endif
-#ifdef XEN
-	if (current->domain->arch.mm)
-#else
+#ifndef XEN
 	if (current->mm)
-#endif
 		BUG();
+#endif
+
 
 #ifdef XEN
 	ia64_fph_enable();

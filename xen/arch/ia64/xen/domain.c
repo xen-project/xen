@@ -83,9 +83,7 @@ static void try_to_clear_PGC_allocate(struct domain* d,
 /* this belongs in include/asm, but there doesn't seem to be a suitable place */
 void arch_domain_destroy(struct domain *d)
 {
-	BUG_ON(d->arch.mm->pgd != NULL);
-	if (d->arch.mm != NULL)
-		xfree(d->arch.mm);
+	BUG_ON(d->arch.mm.pgd != NULL);
 	if (d->shared_info != NULL)
 		free_xenheap_page(d->shared_info);
 
@@ -242,22 +240,18 @@ int arch_domain_create(struct domain *d)
 		goto fail_nomem;
 	d->arch.sys_pgnr = 0;
 
-	if ((d->arch.mm = xmalloc(struct mm_struct)) == NULL)
-	    goto fail_nomem;
-	memset(d->arch.mm, 0, sizeof(*d->arch.mm));
+	memset(&d->arch.mm, 0, sizeof(d->arch.mm));
 
 	d->arch.physmap_built = 0;
-	if ((d->arch.mm->pgd = pgd_alloc(d->arch.mm)) == NULL)
+	if ((d->arch.mm.pgd = pgd_alloc(&d->arch.mm)) == NULL)
 	    goto fail_nomem;
 
 	printf ("arch_domain_create: domain=%p\n", d);
 	return 0;
 
 fail_nomem:
-	if (d->arch.mm->pgd != NULL)
-	    pgd_free(d->arch.mm->pgd);
-	if (d->arch.mm != NULL)
-	    xfree(d->arch.mm);
+	if (d->arch.mm.pgd != NULL)
+	    pgd_free(d->arch.mm.pgd);
 	if (d->shared_info != NULL)
 	    free_xenheap_page(d->shared_info);
 	return -ENOMEM;
@@ -469,7 +463,7 @@ relinquish_pgd(struct domain* d, pgd_t *pgd, unsigned long offset)
 static void
 relinquish_mm(struct domain* d)
 {
-    struct mm_struct* mm = d->arch.mm;
+    struct mm_struct* mm = &d->arch.mm;
     unsigned long i;
     pgd_t* pgd;
 
@@ -622,7 +616,7 @@ share_xen_page_with_guest(struct page_info *page,
 static pte_t*
 lookup_alloc_domain_pte(struct domain* d, unsigned long mpaddr)
 {
-    struct mm_struct *mm = d->arch.mm;
+    struct mm_struct *mm = &d->arch.mm;
     pgd_t *pgd;
     pud_t *pud;
     pmd_t *pmd;
@@ -650,7 +644,7 @@ lookup_alloc_domain_pte(struct domain* d, unsigned long mpaddr)
 static pte_t*
 lookup_noalloc_domain_pte(struct domain* d, unsigned long mpaddr)
 {
-    struct mm_struct *mm = d->arch.mm;
+    struct mm_struct *mm = &d->arch.mm;
     pgd_t *pgd;
     pud_t *pud;
     pmd_t *pmd;
@@ -678,7 +672,7 @@ not_present:
 static pte_t*
 lookup_noalloc_domain_pte_none(struct domain* d, unsigned long mpaddr)
 {
-    struct mm_struct *mm = d->arch.mm;
+    struct mm_struct *mm = &d->arch.mm;
     pgd_t *pgd;
     pud_t *pud;
     pmd_t *pmd;
@@ -917,7 +911,7 @@ try_to_clear_PGC_allocate(struct domain* d, struct page_info* page)
 static void
 zap_domain_page_one(struct domain *d, unsigned long mpaddr, int do_put_page)
 {
-    struct mm_struct *mm = d->arch.mm;
+    struct mm_struct *mm = &d->arch.mm;
     pte_t *pte;
     pte_t old_pte;
     unsigned long mfn;
@@ -1071,7 +1065,7 @@ static void
 assign_domain_page_replace(struct domain *d, unsigned long mpaddr,
                            unsigned long mfn, unsigned int flags)
 {
-    struct mm_struct *mm = d->arch.mm;
+    struct mm_struct *mm = &d->arch.mm;
     pte_t* pte;
     pte_t old_pte;
 
@@ -1195,7 +1189,7 @@ destroy_grant_host_mapping(unsigned long gpaddr,
         return GNTST_general_error;//XXX GNTST_bad_pseudo_phys_addr
 
     // update pte
-    old_pte = ptep_get_and_clear(d->arch.mm, gpaddr, pte);
+    old_pte = ptep_get_and_clear(&d->arch.mm, gpaddr, pte);
     if (pte_present(old_pte)) {
         old_mfn = pte_pfn(old_pte);//XXX
     }
@@ -1316,7 +1310,7 @@ guest_physmap_remove_page(struct domain *d, unsigned long gpfn,
 /* Flush cache of domain d.  */
 void domain_cache_flush (struct domain *d, int sync_only)
 {
-	struct mm_struct *mm = d->arch.mm;
+	struct mm_struct *mm = &d->arch.mm;
 	pgd_t *pgd = mm->pgd;
 	unsigned long maddr;
 	int i,j,k, l;

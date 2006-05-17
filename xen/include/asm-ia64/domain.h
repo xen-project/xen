@@ -22,8 +22,13 @@ extern void domain_cache_flush (struct domain *d, int sync_only);
 extern void panic_domain(struct pt_regs *, const char *, ...)
      __attribute__ ((noreturn, format (printf, 2, 3)));
 
+struct mm_struct {
+	pgd_t * pgd;
+    //	atomic_t mm_users;			/* How many users with user space? */
+};
+
 struct arch_domain {
-    struct mm_struct *mm;
+    struct mm_struct mm;
     unsigned long metaphysical_rr0;
     unsigned long metaphysical_rr4;
 
@@ -104,17 +109,6 @@ struct arch_vcpu {
     int mode_flags;
     struct arch_vmx_struct arch_vmx; /* Virtual Machine Extensions */
 };
-
-//#define thread arch._thread
-
-// FOLLOWING FROM linux-2.6.7/include/sched.h
-
-struct mm_struct {
-	pgd_t * pgd;
-    //	atomic_t mm_users;			/* How many users with user space? */
-};
-
-extern struct mm_struct init_mm;
 
 struct page_info * assign_new_domain_page(struct domain *d, unsigned long mpaddr);
 void assign_new_domain0_page(struct domain *d, unsigned long mpaddr);
