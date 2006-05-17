@@ -1852,7 +1852,8 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
         break;
 
     case INSTR_SMSW:
-        svm_dump_inst(svm_rip2pointer(vmcb));
+        if (svm_dbg_on)
+            svm_dump_inst(svm_rip2pointer(vmcb));
         value = v->arch.hvm_svm.cpu_shadow_cr0;
         gpreg = decode_src_reg(prefix, buffer[index+2]);
         set_reg(gpreg, value, regs, vmcb);
@@ -1989,9 +1990,25 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
 }
 
 
-static inline void svm_vmexit_do_mwait(void)
+static void svm_vmexit_do_invd(struct vmcb_struct *vmcb)
 {
-}
+    int  inst_len;
+    
+    /* Invalidate the cache - we can't really do that safely - maybe we should 
+     * WBINVD, but I think it's just fine to completely ignore it - we should 
+     * have cache-snooping that solves it anyways. -- Mats P. 
+     */
+
+    /* Tell the user that we did this - just in case someone runs some really weird 
+     * operating system and wants to know why it's not working as it should...
+     */
+    printk("INVD instruction intercepted - ignored\n");
+    
+    inst_len = __get_instruction_length(vmcb, INSTR_INVD, NULL);
+    __update_guest_eip(vmcb, inst_len);
+}    
+        
+
 
 
 #ifdef XEN_DEBUGGER
@@ -2053,7 +2070,7 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
         __update_guest_eip(vmcb, inst_len);
 
         /* 
-         * The address is implicit on this instruction At the moment, we don't
+         * The address is implicit on this instruction. At the moment, we don't
          * use ecx (ASID) to identify individual guests pages 
          */
         g_vaddr = regs->eax;
@@ -2701,6 +2718,11 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 
     case VMEXIT_INTR:
         raise_softirq(SCHEDULE_SOFTIRQ);
+        break;
+
+
+    case VMEXIT_INVD:
+        svm_vmexit_do_invd(vmcb);
         break;
 
     case VMEXIT_GDTR_WRITE:

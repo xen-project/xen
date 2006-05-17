@@ -117,16 +117,12 @@ static int construct_vmcb_controls(struct arch_svm_struct *arch_svm)
 
     /* mask off all general 1 intercepts except those listed here */
     vmcb->general1_intercepts = 
-        ~(GENERAL1_INTERCEPT_CR0_SEL_WRITE | GENERAL1_INTERCEPT_VINTR      | 
-          GENERAL1_INTERCEPT_IDTR_READ     | GENERAL1_INTERCEPT_IDTR_WRITE | 
-          GENERAL1_INTERCEPT_GDTR_READ     | GENERAL1_INTERCEPT_GDTR_WRITE |
-          GENERAL1_INTERCEPT_LDTR_READ     | GENERAL1_INTERCEPT_LDTR_WRITE | 
-          GENERAL1_INTERCEPT_TR_READ       | GENERAL1_INTERCEPT_TR_WRITE   |
-          GENERAL1_INTERCEPT_RDTSC         | GENERAL1_INTERCEPT_PUSHF      |
-          GENERAL1_INTERCEPT_SWINT         | GENERAL1_INTERCEPT_POPF       | 
-          GENERAL1_INTERCEPT_IRET          | GENERAL1_INTERCEPT_PAUSE      |
-          GENERAL1_INTERCEPT_TASK_SWITCH
-        );
+        GENERAL1_INTERCEPT_INTR         | GENERAL1_INTERCEPT_NMI         |
+        GENERAL1_INTERCEPT_SMI          | GENERAL1_INTERCEPT_INIT        |
+        GENERAL1_INTERCEPT_CPUID        | GENERAL1_INTERCEPT_INVD        |
+        GENERAL1_INTERCEPT_HLT          | GENERAL1_INTERCEPT_INVLPG      | 
+        GENERAL1_INTERCEPT_INVLPGA      | GENERAL1_INTERCEPT_IOIO_PROT   |
+        GENERAL1_INTERCEPT_MSR_PROT     | GENERAL1_INTERCEPT_SHUTDOWN_EVT;
 
     /* turn on the general 2 intercepts */
     vmcb->general2_intercepts = 
