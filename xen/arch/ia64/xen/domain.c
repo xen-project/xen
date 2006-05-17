@@ -837,6 +837,56 @@ assign_domain_same_page(struct domain *d,
     }
 }
 
+static int
+efi_mmio(unsigned long physaddr, unsigned long size)
+{
+    void *efi_map_start, *efi_map_end;
+    u64 efi_desc_size;
+    void* p;
+
+    efi_map_start = __va(ia64_boot_param->efi_memmap);
+    efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
+    efi_desc_size = ia64_boot_param->efi_memdesc_size;
+
+    for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
+        efi_memory_desc_t* md = (efi_memory_desc_t *)p;
+        unsigned long start = md->phys_addr;
+        unsigned long end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
+        
+        if (start <= physaddr && physaddr < end) {
+            if ((physaddr + size) > end) {
+                DPRINTK("%s:%d physaddr 0x%lx size = 0x%lx\n",
+                        __func__, __LINE__, physaddr, size);
+                return 0;
+            }
+
+            // for io space
+            if (md->type == EFI_MEMORY_MAPPED_IO ||
+                md->type == EFI_MEMORY_MAPPED_IO_PORT_SPACE) {
+                return 1;
+            }
+
+            // for runtime
+            // see efi_enter_virtual_mode(void)
+            // in linux/arch/ia64/kernel/efi.c
+            if ((md->attribute & EFI_MEMORY_RUNTIME) &&
+                !(md->attribute & EFI_MEMORY_WB)) {
+                return 1;
+            }
+
+            DPRINTK("%s:%d physaddr 0x%lx size = 0x%lx\n",
+                    __func__, __LINE__, physaddr, size);
+            return 0;
+        }
+
+        if (physaddr < start) {
+            break;
+        }
+    }
+
+    return 1;
+}
+
 unsigned long
 assign_domain_mmio_page(struct domain *d,
                         unsigned long mpaddr, unsigned long size)
@@ -844,6 +894,11 @@ assign_domain_mmio_page(struct domain *d,
     if (size == 0) {
         DPRINTK("%s: domain %p mpaddr 0x%lx size = 0x%lx\n",
                 __func__, d, mpaddr, size);
+    }
+    if (!efi_mmio(mpaddr, size)) {
+        DPRINTK("%s:%d domain %p mpaddr 0x%lx size = 0x%lx\n",
+                __func__, __LINE__, d, mpaddr, size);
+        return -EINVAL;
     }
     assign_domain_same_page(d, mpaddr, size);
     return mpaddr;
