@@ -151,6 +151,13 @@ static int parseelfimage(const char *image,
     virt_base = 0;
     if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
         virt_base = strtoul(p+10, &p, 0);
+
+    if ( virt_base == 0 )
+    {
+        ERROR("Malformed ELF image. VIRT_BASE in '__xen_guest' section set incorrectly");
+        return -EINVAL;
+    }
+
     dsi->elf_paddr_offset = virt_base;
     if ( (p = strstr(guestinfo, "ELF_PADDR_OFFSET=")) != NULL )
         dsi->elf_paddr_offset = strtoul(p+17, &p, 0);
@@ -219,6 +226,8 @@ loadelfimage(
             pa = (phdr->p_paddr + done) - dsi->elf_paddr_offset;
             va = xc_map_foreign_range(
                 xch, dom, PAGE_SIZE, PROT_WRITE, parray[pa>>PAGE_SHIFT]);
+            if ( va == NULL )
+                return -1;
             chunksz = phdr->p_filesz - done;
             if ( chunksz > (PAGE_SIZE - (pa & (PAGE_SIZE-1))) )
                 chunksz = PAGE_SIZE - (pa & (PAGE_SIZE-1));
@@ -232,6 +241,8 @@ loadelfimage(
             pa = (phdr->p_paddr + done) - dsi->elf_paddr_offset;
             va = xc_map_foreign_range(
                 xch, dom, PAGE_SIZE, PROT_WRITE, parray[pa>>PAGE_SHIFT]);
+            if ( va == NULL )
+                return -1;
             chunksz = phdr->p_memsz - done;
             if ( chunksz > (PAGE_SIZE - (pa & (PAGE_SIZE-1))) )
                 chunksz = PAGE_SIZE - (pa & (PAGE_SIZE-1));

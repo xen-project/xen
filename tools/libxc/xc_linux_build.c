@@ -794,9 +794,11 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    (load_funcs.loadimage)(image, image_size,
+    rc = (load_funcs.loadimage)(image, image_size,
                            xc_handle, dom, page_array,
                            &dsi);
+    if ( rc != 0 )
+        goto error_out;
 
     if ( load_initrd(xc_handle, dom, initrd,
                      vinitrd_start - dsi.v_start, page_array) )
