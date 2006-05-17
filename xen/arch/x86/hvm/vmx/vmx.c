@@ -2082,7 +2082,10 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         HVM_DBG_LOG(DBG_LEVEL_0, "exit reason = %x", exit_reason);
 
     if (exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) {
-        printk("Failed vm entry\n");
+        printk("Failed vm entry (reason 0x%x)\n", exit_reason);
+        printk("*********** VMCS Area **************\n");
+        vmcs_dump_vcpu();
+        printk("**************************************\n");
         domain_crash_synchronous();
         return;
     }
