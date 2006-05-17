@@ -546,7 +546,6 @@ static inline int svm_do_debugout(unsigned long exit_code)
     return 1;
 }
 
-
 void save_svm_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *ctxt)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -577,8 +576,6 @@ void svm_store_cpu_user_regs(struct cpu_user_regs *regs, struct vcpu *v)
     regs->ds     = vmcb->ds.sel;
     regs->es     = vmcb->es.sel;
     regs->ss     = vmcb->ss.sel;
-    regs->fs     = vmcb->fs.sel;
-    regs->gs     = vmcb->gs.sel;
 }
 
 /* XXX Use svm_load_cpu_guest_regs instead */
@@ -594,12 +591,6 @@ void svm_load_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *regs)
     vmcb->rflags   = regs->eflags;
     vmcb->cs.sel   = regs->cs;
     vmcb->rip      = regs->eip;
-
-    vmcb->ds.sel   = regs->ds;
-    vmcb->es.sel   = regs->es;
-    vmcb->fs.sel   = regs->fs;
-    vmcb->gs.sel   = regs->gs;
-
     if (regs->eflags & EF_TF)
         *intercepts |= EXCEPTION_BITMAP_DB;
     else
