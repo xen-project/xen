@@ -541,7 +541,7 @@ struct fake_acpi_tables {
 	struct fadt_descriptor_rev2 fadt;
 	struct facs_descriptor_rev2 facs;
 	struct acpi_table_header dsdt;
-	u8 aml[16];
+	u8 aml[8 + 11 * MAX_VIRT_CPUS];
 	struct acpi_table_madt madt;
 	struct acpi_table_lsapic lsapic[MAX_VIRT_CPUS];
 	u8 pm1a_evt_blk[4];
@@ -561,6 +561,7 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	struct acpi_table_madt *madt = &tables->madt;
 	struct acpi_table_lsapic *lsapic = tables->lsapic;
 	int i;
+	int aml_len;
 
 	memset(tables, 0, sizeof(struct fake_acpi_tables));
 
@@ -629,7 +630,6 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	/* setup DSDT with trivial namespace. */ 
 	strncpy(dsdt->signature, DSDT_SIG, 4);
 	dsdt->revision = 1;
-	dsdt->length = sizeof(struct acpi_table_header) + sizeof(tables->aml);
 	strcpy(dsdt->oem_id, "XEN");
 	strcpy(dsdt->oem_table_id, "Xen/ia64");
 	strcpy(dsdt->asl_compiler_id, "XEN");
@@ -637,15 +637,33 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 
 	/* Trivial namespace, avoids ACPI CA complaints */
 	tables->aml[0] = 0x10; /* Scope */
-	tables->aml[1] = 0x12; /* length/offset to next object */
-	strncpy((char *)&tables->aml[2], "_SB_", 4);
+	tables->aml[1] = 0x40; /* length/offset to next object (patched) */
+	tables->aml[2] = 0x00;
+	strncpy((char *)&tables->aml[3], "_SB_", 4);
 
 	/* The processor object isn't absolutely necessary, revist for SMP */
-	tables->aml[6] = 0x5b; /* processor object */
-	tables->aml[7] = 0x83;
-	tables->aml[8] = 0x0b; /* next */
-	strncpy((char *)&tables->aml[9], "CPU0", 4);
-
+	aml_len = 7;
+	for (i = 0; i < 3; i++) {
+		unsigned char *p = tables->aml + aml_len;
+		p[0] = 0x5b; /* processor object */
+		p[1] = 0x83;
+		p[2] = 0x0b; /* next */
+		p[3] = 'C';
+		p[4] = 'P';
+		snprintf ((char *)p + 5, 3, "%02x", i);
+		if (i < 16)
+			p[5] = 'U';
+		p[7] = i;	/* acpi_id */
+		p[8] = 0;	/* pblk_addr */
+		p[9] = 0;
+		p[10] = 0;
+		p[11] = 0;
+		p[12] = 0;	/* pblk_len */
+		aml_len += 13;
+	}
+	tables->aml[1] = 0x40 + ((aml_len - 1) & 0x0f);
+	tables->aml[2] = (aml_len - 1) >> 4;
+	dsdt->length = sizeof(struct acpi_table_header) + aml_len;
 	dsdt->checksum = generate_acpi_checksum(dsdt, dsdt->length);
 
 	/* setup MADT */
@@ -662,6 +680,7 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 	for (i = 0; i < MAX_VIRT_CPUS; i++) {
 		lsapic[i].header.type = ACPI_MADT_LSAPIC;
 		lsapic[i].header.length = sizeof(struct acpi_table_lsapic);
+		lsapic[i].acpi_id = i;
 		lsapic[i].id = i;
 		lsapic[i].eid = 0;
 		lsapic[i].flags.enabled = (d->vcpu[i] != NULL);
