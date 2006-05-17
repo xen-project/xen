@@ -118,7 +118,7 @@ static void cmos_init_hd(int type_ofs, int info_ofs, BlockDriverState *hd)
 }
 
 /* hd_table must contain 4 block drivers */
-static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_table)
+static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_table, time_t timeoffset)
 {
     RTCState *s = rtc_state;
     int val;
@@ -129,6 +129,7 @@ static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_
 
     /* set the CMOS date */
     time(&ti);
+    ti += timeoffset;
     if (rtc_utc)
         tm = gmtime(&ti);
     else
@@ -381,7 +382,7 @@ extern int acpi_init(unsigned int base);
 void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
              DisplayState *ds, const char **fd_filename, int snapshot,
              const char *kernel_filename, const char *kernel_cmdline,
-             const char *initrd_filename)
+             const char *initrd_filename, time_t timeoffset)
 {
     SerialState *sp;
     char buf[1024];
@@ -577,7 +578,7 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
 
     floppy_controller = fdctrl_init(6, 2, 0, 0x3f0, fd_table);
 
-    cmos_init(ram_size, boot_device, bs_table);
+    cmos_init(ram_size, boot_device, bs_table, timeoffset);
     acpi_init(0x8000);
 
     /* must be done after all PCI devices are instanciated */

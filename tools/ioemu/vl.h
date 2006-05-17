@@ -679,7 +679,7 @@ int pit_get_out(PITState *pit, int channel, int64_t current_time);
 void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
              DisplayState *ds, const char **fd_filename, int snapshot,
              const char *kernel_filename, const char *kernel_cmdline,
-             const char *initrd_filename);
+             const char *initrd_filename, time_t timeoffset);
 
 /* ppc.c */
 void ppc_init (int ram_size, int vga_ram_size, int boot_device,
