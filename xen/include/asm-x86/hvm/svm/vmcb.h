@@ -440,7 +440,6 @@ struct arch_svm_struct {
     u32                 *iopm;
     u32                 *msrpm;
     u64                 vmexit_tsc; /* tsc read at #VMEXIT. for TSC_OFFSET */
-    int                 injecting_event;
     int                 saved_irq_vector;
     u32                 launch_core;
     u32                 asid_core;

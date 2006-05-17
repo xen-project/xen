@@ -417,7 +417,6 @@ void svm_do_launch(struct vcpu *v)
 
     v->arch.schedule_tail = arch_svm_do_resume;
 
-    v->arch.hvm_svm.injecting_event  = 0;
     v->arch.hvm_svm.saved_irq_vector = -1;
 
     svm_set_guest_time(v, 0);

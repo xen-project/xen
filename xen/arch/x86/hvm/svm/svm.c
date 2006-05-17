@@ -170,10 +170,10 @@ void asidpool_retire( struct vmcb_struct *vmcb, int core )
    spin_unlock(&ASIDpool[core].asid_lock);
 }
 
-static inline void svm_inject_exception(struct vmcb_struct *vmcb, 
-                                        int trap, int ev, int error_code)
+static inline void svm_inject_exception(struct vcpu *v, int trap, int ev, int error_code)
 {
     eventinj_t event;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     event.bytes = 0;            
     event.fields.v = 1;
@@ -329,7 +329,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
         {
             printk("trying to set reserved bit in EFER\n");
-            svm_inject_exception(vmcb, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(vc, TRAP_gp_fault, 1, 0);
             return 0;
         }
 
@@ -343,7 +343,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
             {
                 printk("trying to set LME bit when "
                        "in paging mode or PAE bit is not set\n");
-                svm_inject_exception(vmcb, TRAP_gp_fault, 1, 0);
+                svm_inject_exception(vc, TRAP_gp_fault, 1, 0);
                 return 0;
             }
             set_bit(SVM_CPU_STATE_LME_ENABLED, &vc->arch.hvm_svm.cpu_state);
@@ -367,7 +367,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         if (!IS_CANO_ADDRESS(msr_content))
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "Not cano address of msr write\n");
-            svm_inject_exception(vmcb, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(vc, TRAP_gp_fault, 1, 0);
         }
 
         if (regs->ecx == MSR_FS_BASE)
@@ -900,7 +900,7 @@ static void svm_do_general_protection_fault(struct vcpu *v,
 
     
     /* Reflect it back into the guest */
-    svm_inject_exception(vmcb, TRAP_gp_fault, 1, error_code);
+    svm_inject_exception(v, TRAP_gp_fault, 1, error_code);
 }
 
 /* Reserved bits: [31:14], [12:1] */
@@ -1191,7 +1191,7 @@ static void svm_get_prefix_info(struct vmcb_struct *vmcb,
 
 
 /* Get the address of INS/OUTS instruction */
-static inline int svm_get_io_address(struct vmcb_struct *vmcb, 
+static inline int svm_get_io_address(struct vcpu *v, 
 		struct cpu_user_regs *regs, unsigned int dir, 
         unsigned long *count, unsigned long *addr)
 {
@@ -1201,6 +1201,7 @@ static inline int svm_get_io_address(struct vmcb_struct *vmcb,
     int                  long_mode;
     ioio_info_t          info;
     segment_selector_t  *seg = NULL;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     info.bytes = vmcb->exitinfo1;
 
@@ -1244,7 +1245,7 @@ static inline int svm_get_io_address(struct vmcb_struct *vmcb,
     /* If the segment isn't present, give GP fault! */
     if (!long_mode && !seg->attributes.fields.p) 
     {
-        svm_inject_exception(vmcb, TRAP_gp_fault, 1, seg->sel);
+        svm_inject_exception(v, TRAP_gp_fault, 1, seg->sel);
         return 0;
     }
 
@@ -1262,7 +1263,7 @@ static inline int svm_get_io_address(struct vmcb_struct *vmcb,
     if (!long_mode) {
         if (*addr > seg->limit) 
         {
-            svm_inject_exception(vmcb, TRAP_gp_fault, 1, seg->sel);
+            svm_inject_exception(v, TRAP_gp_fault, 1, seg->sel);
             return 0;
         } 
         else 
@@ -1310,7 +1311,7 @@ static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs)
         unsigned long addr, count;
         int sign = regs->eflags & EF_DF ? -1 : 1;
 
-        if (!svm_get_io_address(vmcb, regs, dir, &count, &addr)) 
+        if (!svm_get_io_address(v, regs, dir, &count, &addr)) 
         {
             /* We failed to get a valid address, so don't do the IO operation - 
              * it would just get worse if we do! Hopefully the guest is handing
@@ -1415,7 +1416,7 @@ static int svm_set_cr0(unsigned long value)
                     &v->arch.hvm_svm.cpu_state))
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enable\n");
-            svm_inject_exception(vmcb, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
         }
 
         if (test_bit(SVM_CPU_STATE_LME_ENABLED, &v->arch.hvm_svm.cpu_state))
@@ -1489,7 +1490,7 @@ static int svm_set_cr0(unsigned long value)
      */
     if ((value & X86_CR0_PE) == 0) {
     	if (value & X86_CR0_PG) {
-            svm_inject_exception(vmcb, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             return 0;
         }
 
@@ -1736,7 +1737,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         } else {
             if (test_bit(SVM_CPU_STATE_LMA_ENABLED,
                          &v->arch.hvm_svm.cpu_state)) {
-                svm_inject_exception(vmcb, TRAP_gp_fault, 1, 0);
+                svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             }
             clear_bit(SVM_CPU_STATE_PAE_ENABLED, &v->arch.hvm_svm.cpu_state);
         }
@@ -2504,7 +2505,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 
     exit_reason = vmcb->exitcode;
     save_svm_cpu_user_regs(v, &regs);
-    v->arch.hvm_svm.injecting_event = 0;
 
     vmcb->tlb_control = 1;
 
@@ -2668,7 +2668,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
         if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
             domain_pause_for_debugger();
         else 
-            svm_inject_exception(vmcb, TRAP_int3, 0, 0);
+            svm_inject_exception(v, TRAP_int3, 0, 0);
 #endif
         break;
 
@@ -2679,7 +2679,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
     case VMEXIT_EXCEPTION_GP:
         /* This should probably not be trapped in the future */
         regs.error_code = vmcb->exitinfo1;
-        v->arch.hvm_svm.injecting_event = 1;
         svm_do_general_protection_fault(v, &regs);
         break;  
 
@@ -2699,9 +2698,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 //printk("PF1\n");
         if (!(error = svm_do_page_fault(va, &regs))) 
         {
-            v->arch.hvm_svm.injecting_event = 1;
             /* Inject #PG using Interruption-Information Fields */
-            svm_inject_exception(vmcb, TRAP_page_fault, 1, regs.error_code);
+            svm_inject_exception(v, TRAP_page_fault, 1, regs.error_code);
 
             v->arch.hvm_svm.cpu_cr2 = va;
             vmcb->cr2 = va;
