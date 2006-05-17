@@ -44,42 +44,24 @@
 #include "tcs.h"
 #include "buffer.h"
 #include "crypto.h"
+#include "vtpm_ipc.h"
 
 #define STATE_FILE    "/var/vtpm/VTPM"
 #define DMI_NVM_FILE  "/var/vtpm/vtpm_dm_%d.data"
-#define VTPM_BE_DEV   "/dev/vtpm"
 #define VTPM_CTL_DM   0
-
-#ifndef VTPM_MUTLI_VM
- #include <sys/types.h>
- #define GUEST_TX_FIFO "/var/vtpm/fifos/guest-to-%d.fifo"
- #define GUEST_RX_FIFO "/var/vtpm/fifos/guest-from-all.fifo"
-
- #define VTPM_TX_FIFO  "/var/vtpm/fifos/vtpm-to-%d.fifo"
- #define VTPM_RX_FIFO  "/var/vtpm/fifos/vtpm-from-all.fifo"
-
- #define BE_LISTENER_THREAD 1
- #define DMI_LISTENER_THREAD 2
-
- // Seconds until DMI timeout. Timeouts result in DMI being out
- // of sync, which may require a reboot of DMI and guest to recover
- // from. Don't set this to low. Also note that DMI may issue a TPM
- // call so we should expect time to process at DMI + TPM processing.
- #define DMI_TIMEOUT 90 
-#endif
-
 
 // ------------------------ Private Structures -----------------------
 typedef struct VTPM_DMI_RESOURCE_T {
-  // I/O info for Manager to talk to DMI's over FIFOs
-#ifndef VTPM_MUTLI_VM
-  int                   guest_tx_fh;          // open GUEST_TX_FIFO
-  int                   vtpm_tx_fh;           // open VTPM_TX_FIFO
-  char                  *guest_tx_fname;      // open GUEST_TX_FIFO
-  char                  *vtpm_tx_fname;       // open VTPM_TX_FIFO
-  
+  // I/O info for Manager to talk to DMI's and controllers
+  vtpm_ipc_handle_t      *tx_vtpm_ipc_h;    // TX VTPM Results to DMI
+  vtpm_ipc_handle_t      *rx_vtpm_ipc_h;    // RX VTPM Commands from DMI
+  vtpm_ipc_handle_t      *tx_tpm_ipc_h;     // TX TPM Commands to DMI
+  vtpm_ipc_handle_t      *rx_tpm_ipc_h;     // RX TPM Results from DMI
+ 
+#ifndef VTPM_MULTI_VM 
   pid_t                 dmi_pid;
 #endif
+
   // Non-persistent Information
   bool                  connected;
   UINT32                dmi_domain_id;
@@ -94,26 +76,19 @@ typedef struct VTPM_DMI_RESOURCE_T {
 
 typedef struct tdVTPM_GLOBALS {
   // Non-persistent data
-  int                 be_fh;                  // File handle to ipc used to communicate with backend
 #ifndef VTPM_MULTI_VM
-  int                 vtpm_rx_fh;
-  int                 guest_rx_fh;
-  int                 connected_dmis;     // Used to close guest_rx when no dmis are connected
-  
   pid_t               master_pid;
 #endif
+
+  int                 connected_dmis;     // To close guest_rx when no dmis are connected
+
   struct hashtable    *dmi_map;               // Table of all DMI's known indexed by persistent instance #
-#ifndef VTPM_MULTI_VM
-  pthread_mutex_t     dmi_map_mutex;          // 
-#endif
+
   TCS_CONTEXT_HANDLE  manager_tcs_handle;     // TCS Handle used by manager
   TPM_HANDLE          storageKeyHandle;       // Key used by persistent store
   CRYPTO_INFO         storageKey;             // For software encryption
   CRYPTO_INFO         bootKey;                // For saving table
   TCS_AUTH            keyAuth;                // OIAP session for storageKey 
-  BOOL                DMI_table_dirty;        // Indicates that a command
-                                              // has updated the DMI table
-
     
   // Persistent Data
   TPM_AUTHDATA        owner_usage_auth;       // OwnerAuth of real TPM
@@ -130,6 +105,18 @@ extern VTPM_GLOBALS *vtpm_globals;   // Key info and DMI states
 extern const TPM_AUTHDATA SRK_AUTH;  // SRK Well Known Auth Value
 
 // ********************** Command Handler Prototypes ***********************
+
+// ********************** VTPM Functions *************************
+TPM_RESULT VTPM_Init_Manager(); // Start VTPM Service
+void VTPM_Stop_Manager();  // Stop VTPM Service
+TPM_RESULT VTPM_Manager_Handler(vtpm_ipc_handle_t *tx_ipc_h,
+                                vtpm_ipc_handle_t *rx_ipc_h,
+                                BOOL fw_tpm,   // Should forward TPM cmds
+                                vtpm_ipc_handle_t *fw_tx_ipc_h,
+                                vtpm_ipc_handle_t *fw_rx_ipc_h,
+                                BOOL is_priv,
+                                char *client_name);
+
 TPM_RESULT VTPM_Handle_Load_NVM(       VTPM_DMI_RESOURCE *myDMI, 
                                         const buffer_t *inbuf, 
                                         buffer_t *outbuf);
@@ -148,8 +135,12 @@ TPM_RESULT VTPM_Handle_Close_DMI(const buffer_t *param_buf);
                                    
 TPM_RESULT VTPM_Handle_Delete_DMI(const buffer_t *param_buf);
 
-TPM_RESULT VTPM_SaveService(void);
-TPM_RESULT VTPM_LoadService(void);
+TPM_RESULT VTPM_SaveManagerData(void);
+TPM_RESULT VTPM_LoadManagerData(void);
 
-TPM_RESULT close_dmi( VTPM_DMI_RESOURCE *dmi_res);
+TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res);
+
+TPM_RESULT VTPM_Close_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res);
+
+TPM_RESULT close_dmi(VTPM_DMI_RESOURCE *dmi_res);
 #endif // __VTPMPRIV_H__

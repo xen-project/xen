@@ -40,6 +40,9 @@ $(OBJS): $(SRCS)
 # Project-specific definitions
 #
 
+# Need UNIX98 spec for pthread rwlocks
+CFLAGS += -D_GNU_SOURCE
+
 # Logging Level. See utils/tools.h for usage
 CFLAGS += -DLOGGING_MODULES="(BITMASK(VTPM_LOG_TCS)|BITMASK(VTPM_LOG_VTSP)|BITMASK(VTPM_LOG_VTPM)|BITMASK(VTPM_LOG_VTPM_DEEP))"
 
@@ -50,7 +53,7 @@ CFLAGS += -DLOGGING_MODULES="(BITMASK(VTPM_LOG_TCS)|BITMASK(VTPM_LOG_VTSP)|BITMA
 # Use frontend/backend pairs between manager & DMs?
 #CFLAGS += -DVTPM_MULTI_VM
 
-# vtpm_manager listens on /tmp/in.fifo and /tmp/out.fifo rather than backend
+# vtpm_manager listens on fifo's rather than backend
 #CFLAGS += -DDUMMY_BACKEND
 
 # Do not have manager launch DMs.
@@ -58,9 +61,6 @@ CFLAGS += -DLOGGING_MODULES="(BITMASK(VTPM_LOG_TCS)|BITMASK(VTPM_LOG_VTSP)|BITMA
 
 # Fixed OwnerAuth
 #CFLAGS += -DWELL_KNOWN_OWNER_AUTH
-
-# TPM Hardware Device or TPM Simulator
-#CFLAGS += -DTPM_HWDEV
 
 # Include
 CFLAGS += -I$(XEN_ROOT)/tools/vtpm_manager/crypto

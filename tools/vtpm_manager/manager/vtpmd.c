@@ -38,21 +38,67 @@
 // ===================================================================
 
 #include <stdio.h>
-#include <signal.h>
-#include <sys/types.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <string.h>
+#include <pthread.h>
 #include "vtpm_manager.h"
 #include "vtpmpriv.h"
 #include "tcg.h"
 #include "log.h"
+#include "vtpm_ipc.h"
 
-#ifndef VTPM_MULTI_VM
- #include <pthread.h>
-#endif
+
+#define TPM_EMULATOR_PATH "/usr/bin/vtpmd"
+
+#define VTPM_BE_FNAME          "/dev/vtpm"
+#define VTPM_DUMMY_TX_BE_FNAME "/var/vtpm/fifos/dummy_out.fifo"
+#define VTPM_DUMMY_RX_BE_FNAME "/var/vtpm/fifos/dummy_in.fifo"
+#define VTPM_TX_TPM_FNAME      "/var/vtpm/fifos/tpm_cmd_to_%d.fifo"
+#define VTPM_RX_TPM_FNAME      "/var/vtpm/fifos/tpm_rsp_from_all.fifo"
+#define VTPM_TX_VTPM_FNAME     "/var/vtpm/fifos/vtpm_rsp_to_%d.fifo"
+#define VTPM_RX_VTPM_FNAME     "/var/vtpm/fifos/vtpm_cmd_from_all.fifo"
+#define VTPM_TX_HP_FNAME       "/var/vtpm/fifos/to_console.fifo"
+#define VTPM_RX_HP_FNAME       "/var/vtpm/fifos/from_console.fifo"
+
+
+#define GUEST_TX_FIFO "/var/vtpm/fifos/guest-to-%d.fifo"
+#define GUEST_RX_FIFO "/var/vtpm/fifos/guest-from-all.fifo"
+
+#define VTPM_TX_FIFO  "/var/vtpm/fifos/vtpm-to-%d.fifo"
+#define VTPM_RX_FIFO  "/var/vtpm/fifos/vtpm-from-all.fifo"
+
+
+struct vtpm_thread_params_s {
+  vtpm_ipc_handle_t *tx_ipc_h;
+  vtpm_ipc_handle_t *rx_ipc_h;
+  BOOL fw_tpm;
+  vtpm_ipc_handle_t *fw_tx_ipc_h;
+  vtpm_ipc_handle_t *fw_rx_ipc_h;
+  BOOL is_priv;
+  char *thread_name;
+};
+
+// This is needed to all extra_close_dmi to close this to prevent a
+// broken pipe when no DMIs are left.
+static vtpm_ipc_handle_t *g_rx_tpm_ipc_h;
+
+void *vtpm_manager_thread(void *arg_void) {
+  TPM_RESULT *status = (TPM_RESULT *) malloc(sizeof(TPM_RESULT) );
+  struct vtpm_thread_params_s *arg = (struct vtpm_thread_params_s *) arg_void;
+
+  *status = VTPM_Manager_Handler(arg->tx_ipc_h, arg->rx_ipc_h,
+                                 arg->fw_tpm, arg->fw_tx_ipc_h, arg->fw_rx_ipc_h,
+                                 arg->is_priv, arg->thread_name);
+
+  return (status);
+}
+
 
 void signal_handler(int reason) {
-#ifndef VTPM_MULTI_VM
-
   if (pthread_equal(pthread_self(), vtpm_globals->master_pid)) {
     vtpmloginfo(VTPM_LOG_VTPM, "VTPM Manager shutting down for signal %d.\n", reason);
   } else {
@@ -60,71 +106,258 @@ void signal_handler(int reason) {
     vtpmloginfo(VTPM_LOG_VTPM, "Child shutting down\n");
     pthread_exit(NULL);
   }
-#endif
-  VTPM_Stop_Service();
+
+  VTPM_Stop_Manager();
   exit(-1);
 }
 
 struct sigaction ctl_c_handler;
 
+TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res) {
+
+  TPM_RESULT status = TPM_SUCCESS;
+  int fh;
+  char dmi_id_str[11]; // UINT32s are up to 10 digits + NULL
+  char *tx_vtpm_name, *tx_tpm_name;
+  struct stat file_info;
+
+  if (dmi_res->dmi_id == VTPM_CTL_DM) {
+    dmi_res->tx_tpm_ipc_h = NULL;
+    dmi_res->rx_tpm_ipc_h = NULL;
+    dmi_res->tx_vtpm_ipc_h = NULL;
+    dmi_res->rx_vtpm_ipc_h = NULL;
+  } else {
+    // Create a pair of fifo pipes
+    dmi_res->rx_tpm_ipc_h = NULL;
+    dmi_res->rx_vtpm_ipc_h = NULL;
+
+    if ( ((dmi_res->tx_tpm_ipc_h = (vtpm_ipc_handle_t *) malloc (sizeof(vtpm_ipc_handle_t))) == NULL ) ||
+         ((dmi_res->tx_vtpm_ipc_h =(vtpm_ipc_handle_t *) malloc (sizeof(vtpm_ipc_handle_t))) == NULL ) ||
+         ((tx_tpm_name = (char *) malloc(11 + strlen(VTPM_TX_TPM_FNAME))) == NULL ) ||
+         ((tx_vtpm_name =(char *) malloc(11 + strlen(VTPM_TX_VTPM_FNAME))) == NULL) ) {
+      status =TPM_RESOURCES;
+      goto abort_egress;
+    }
+
+    sprintf(tx_tpm_name, VTPM_TX_TPM_FNAME, (uint32_t) dmi_res->dmi_id);
+    sprintf(tx_vtpm_name, VTPM_TX_VTPM_FNAME, (uint32_t) dmi_res->dmi_id);
+
+    if ( (vtpm_ipc_init(dmi_res->tx_tpm_ipc_h, tx_tpm_name, O_WRONLY | O_NONBLOCK, TRUE) != 0) ||
+         (vtpm_ipc_init(dmi_res->tx_vtpm_ipc_h, tx_vtpm_name, O_WRONLY, TRUE) != 0) ) { //FIXME: O_NONBLOCK?
+      status = TPM_IOERROR;
+      goto abort_egress;
+    }
+
+    // Measure DMI
+    // FIXME: This will measure DMI. Until then use a fixed DMI_Measurement value
+    // Also, this mechanism is specific to 1 VM.
+    /*
+    fh = open(TPM_EMULATOR_PATH, O_RDONLY);
+    stat_ret = fstat(fh, &file_stat);
+    if (stat_ret == 0)
+      dmi_size = file_stat.st_size;
+    else {
+      vtpmlogerror(VTPM_LOG_VTPM, "Could not open tpm_emulator!!\n");
+      status = TPM_IOERROR;
+      goto abort_egress;
+    }
+    dmi_buffer
+    */
+    memset(&dmi_res->DMI_measurement, 0xcc, sizeof(TPM_DIGEST));
+
+
+    // Launch DMI
+    sprintf(dmi_id_str, "%d", (int) dmi_res->dmi_id);
+#ifdef MANUAL_DM_LAUNCH
+    vtpmlogerror(VTPM_LOG_VTPM, "Manually start VTPM with dmi=%s now.\n", dmi_id_str);
+    dmi_res->dmi_pid = 0;
+#else
+    pid_t pid = fork();
+
+    if (pid == -1) {
+      vtpmlogerror(VTPM_LOG_VTPM, "Could not fork to launch vtpm\n");
+      status = TPM_RESOURCES;
+      goto abort_egress;
+    } else if (pid == 0) {
+      if ( stat(dmi_res->NVMLocation, &file_info) == -1)
+        execl (TPM_EMULATOR_PATH, "vtmpd", "clear", dmi_id_str, NULL);
+      else
+        execl (TPM_EMULATOR_PATH, "vtpmd", "save", dmi_id_str, NULL);
+
+      // Returning from these at all is an error.
+      vtpmlogerror(VTPM_LOG_VTPM, "Could not exec to launch vtpm\n");
+    } else {
+      dmi_res->dmi_pid = pid;
+      vtpmloginfo(VTPM_LOG_VTPM, "Launching DMI on PID = %d\n", pid);
+    }
+#endif // MANUAL_DM_LAUNCH
+
+  } // If DMI = VTPM_CTL_DM
+    status = TPM_SUCCESS;
+
+abort_egress:
+  return (status);
+}
+
+TPM_RESULT VTPM_Close_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res) {
+  TPM_RESULT status = TPM_SUCCESS;
+
+  if (vtpm_globals->connected_dmis == 0) {
+    // No more DMI's connected. Close fifo to prevent a broken pipe.
+    // This is hackish. Need to think of another way.
+    vtpm_ipc_close(g_rx_tpm_ipc_h);
+  }
+
+  
+  if (dmi_res->dmi_id != VTPM_CTL_DM) {
+    vtpm_ipc_close(dmi_res->tx_tpm_ipc_h);
+    vtpm_ipc_close(dmi_res->tx_vtpm_ipc_h);
+
+    free(dmi_res->tx_tpm_ipc_h->name);
+    free(dmi_res->tx_vtpm_ipc_h->name);
+
+#ifndef MANUAL_DM_LAUNCH
+    if (dmi_res->dmi_id != VTPM_CTL_DM) {
+      if (dmi_res->dmi_pid != 0) {
+        vtpmloginfo(VTPM_LOG_VTPM, "Killing dmi on pid %d.\n", dmi_res->dmi_pid);
+        if (kill(dmi_res->dmi_pid, SIGKILL) !=0) {
+          vtpmloginfo(VTPM_LOG_VTPM, "DMI on pid %d is already dead.\n", dmi_res->dmi_pid);
+        } else if (waitpid(dmi_res->dmi_pid, NULL, 0) != dmi_res->dmi_pid) {
+          vtpmlogerror(VTPM_LOG_VTPM, "DMI on pid %d failed to stop.\n", dmi_res->dmi_pid);
+          status = TPM_FAIL;
+        }
+      } else {
+        vtpmlogerror(VTPM_LOG_VTPM, "Could not kill dmi because it's pid was 0.\n");
+        status = TPM_FAIL;
+      }
+    }
+#endif
+
+  } //endif ! dom0
+  return status;
+}
+
+
 int main(int argc, char **argv) {
+  vtpm_ipc_handle_t *tx_be_ipc_h, *rx_be_ipc_h, rx_tpm_ipc_h, rx_vtpm_ipc_h, tx_hp_ipc_h, rx_hp_ipc_h; 
+  struct vtpm_thread_params_s be_thread_params, dmi_thread_params, hp_thread_params;
+  pthread_t be_thread, dmi_thread, hp_thread;
+
+#ifdef DUMMY_BACKEND
+  vtpm_ipc_handle_t tx_dummy_ipc_h, rx_dummy_ipc_h;
+#else
+  vtpm_ipc_handle_t real_be_ipc_h;
+#endif
 
   vtpmloginfo(VTPM_LOG_VTPM, "Starting VTPM.\n");
-  
-  if (VTPM_Init_Service() != TPM_SUCCESS) {
+ 
+  // -------------------- Initialize Manager ----------------- 
+  if (VTPM_Init_Manager() != TPM_SUCCESS) {
     vtpmlogerror(VTPM_LOG_VTPM, "Closing vtpmd due to error during startup.\n");
     return -1;
   }
   
+  // -------------------- Setup Ctrl+C Handlers --------------
   ctl_c_handler.sa_handler = signal_handler;
   sigemptyset(&ctl_c_handler.sa_mask);
   ctl_c_handler.sa_flags = 0;    
   
   if (sigaction(SIGINT, &ctl_c_handler, NULL) == -1) 
-    vtpmlogerror(VTPM_LOG_VTPM, "Could not install SIGINT handler. Ctl+break will not stop service gently.\n");
+    vtpmlogerror(VTPM_LOG_VTPM, "Could not install SIGINT handler. Ctl+break will not stop manager gently.\n");
   
   // For easier debuggin with gdb
   if (sigaction(SIGHUP, &ctl_c_handler, NULL) == -1) 
-    vtpmlogerror(VTPM_LOG_VTPM, "Could not install SIGHUP handler. Ctl+break will not stop service gently.\n");    
+    vtpmlogerror(VTPM_LOG_VTPM, "Could not install SIGHUP handler. Ctl+break will not stop manager gently.\n");    
   
-#ifdef VTPM_MULTI_VM
-  TPM_RESULT status = VTPM_Service_Handler();
-    
-  if (status != TPM_SUCCESS) 
-    vtpmlogerror(VTPM_LOG_VTPM, "VTPM Manager exited with status %s. It never should exit.\n", tpm_get_error_name(status));
-  
-  return -1;
-#else
   sigset_t sig_mask;
-      
   sigemptyset(&sig_mask);
   sigaddset(&sig_mask, SIGPIPE);
   sigprocmask(SIG_BLOCK, &sig_mask, NULL);
-  //pthread_mutex_init(&vtpm_globals->dmi_mutex, NULL);
-  pthread_t be_thread, dmi_thread;
-  int betype_be, dmitype_dmi;
   
+  // ------------------- Set up file ipc structures ----------
+#ifdef DUMMY_BACKEND
+  if ( (vtpm_ipc_init(&tx_dummy_ipc_h, VTPM_DUMMY_TX_BE_FNAME, O_RDWR, TRUE) != 0) ||
+       (vtpm_ipc_init(&rx_dummy_ipc_h, VTPM_DUMMY_RX_BE_FNAME, O_RDWR, TRUE) != 0) ) {
+
+    vtpmlogerror(VTPM_LOG_VTPM, "Unable to create Dummy BE FIFOs.\n");
+    exit(-1);
+  }
+
+  tx_be_ipc_h = &tx_dummy_ipc_h;
+  rx_be_ipc_h = &rx_dummy_ipc_h;
+#else
+  vtpm_ipc_init(&real_be_ipc_h, VTPM_BE_FNAME, O_RDWR, FALSE);
+
+  tx_be_ipc_h = &real_be_ipc_h;
+  rx_be_ipc_h = &real_be_ipc_h;
+#endif
+
+  if ( (vtpm_ipc_init(&rx_tpm_ipc_h, VTPM_RX_TPM_FNAME, O_RDONLY, TRUE) != 0) ||
+       (vtpm_ipc_init(&rx_vtpm_ipc_h, VTPM_RX_VTPM_FNAME, O_RDWR, TRUE) != 0) || //FIXME: O_RDONLY?
+       (vtpm_ipc_init(&tx_hp_ipc_h,  VTPM_TX_HP_FNAME, O_RDWR, TRUE) != 0)    ||
+       (vtpm_ipc_init(&rx_hp_ipc_h,  VTPM_RX_HP_FNAME, O_RDWR, TRUE) != 0) ) {
+    vtpmlogerror(VTPM_LOG_VTPM, "Unable to create initial FIFOs.\n");
+    exit(-1);
+  }
+
+  g_rx_tpm_ipc_h = &rx_tpm_ipc_h;
+
+  // -------------------- Set up thread params ------------- 
+
+  be_thread_params.tx_ipc_h = tx_be_ipc_h;
+  be_thread_params.rx_ipc_h = rx_be_ipc_h;
+  be_thread_params.fw_tpm = TRUE;
+  be_thread_params.fw_tx_ipc_h = NULL;
+  be_thread_params.fw_rx_ipc_h = &rx_tpm_ipc_h;
+  be_thread_params.is_priv = TRUE;                   //FIXME: Change when HP is up
+  be_thread_params.thread_name = "Backend Listener";
+
+  dmi_thread_params.tx_ipc_h = NULL;
+  dmi_thread_params.rx_ipc_h = &rx_vtpm_ipc_h;
+  dmi_thread_params.fw_tpm = FALSE; 
+  dmi_thread_params.fw_tx_ipc_h = NULL;
+  dmi_thread_params.fw_rx_ipc_h = NULL;
+  dmi_thread_params.is_priv = FALSE; 
+  dmi_thread_params.thread_name = "VTPM Listeners";
+
+  hp_thread_params.tx_ipc_h = &tx_hp_ipc_h;
+  hp_thread_params.rx_ipc_h = &rx_hp_ipc_h;
+  hp_thread_params.fw_tpm = FALSE;
+  hp_thread_params.fw_tx_ipc_h = NULL;
+  hp_thread_params.fw_rx_ipc_h = NULL;
+  hp_thread_params.is_priv = TRUE;
+  hp_thread_params.thread_name = "Hotplug Listener";
+
+  // --------------------- Launch Threads -----------------
+
+  vtpm_lock_init();
+
   vtpm_globals->master_pid = pthread_self();
   
-  betype_be = BE_LISTENER_THREAD;
-  if (pthread_create(&be_thread, NULL, VTPM_Service_Handler, &betype_be) != 0) {
+  if (pthread_create(&be_thread, NULL, vtpm_manager_thread, &be_thread_params) != 0) {
     vtpmlogerror(VTPM_LOG_VTPM, "Failed to launch BE Thread.\n");
     exit(-1);
   }
   
-  dmitype_dmi = DMI_LISTENER_THREAD;
-  if (pthread_create(&dmi_thread, NULL, VTPM_Service_Handler, &dmitype_dmi) != 0) {
+  if (pthread_create(&dmi_thread, NULL, vtpm_manager_thread, &dmi_thread_params) != 0) {
     vtpmlogerror(VTPM_LOG_VTPM, "Failed to launch DMI Thread.\n");
     exit(-1);
   }
-  
+
+ 
+//  if (pthread_create(&hp_thread, NULL, vtpm_manager_thread, &hp_thread_params) != 0) {
+//    vtpmlogerror(VTPM_LOG_VTPM, "Failed to launch HP Thread.\n");
+//    exit(-1);
+//  }
+ 
   //Join the other threads until exit time.
   pthread_join(be_thread, NULL);
   pthread_join(dmi_thread, NULL);
-#endif
+  pthread_join(hp_thread, NULL);
  
   vtpmlogerror(VTPM_LOG_VTPM, "VTPM Manager shut down unexpectedly.\n");
  
-  VTPM_Stop_Service();
+  VTPM_Stop_Manager();
+  vtpm_lock_destroy();
   return 0;
 }
