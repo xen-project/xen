@@ -1303,9 +1303,10 @@ static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs)
         size = 1;
 
     HVM_DBG_LOG(DBG_LEVEL_IO, 
-                "svm_io_instruction: port 0x%x eip=%lx:%lx, "
-                "exit_qualification = %lx",
-                port, vmcb->cs.sel, vmcb->rip, (unsigned long)info.bytes);
+                "svm_io_instruction: port 0x%x eip=%x:%"PRIx64", "
+                "exit_qualification = %"PRIx64,
+                port, vmcb->cs.sel, vmcb->rip, info.bytes);
+
     /* string instruction */
     if (info.fields.str)
     { 
@@ -1314,7 +1315,7 @@ static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs)
 
         if (!svm_get_io_address(v, regs, dir, &count, &addr)) 
         {
-            /* We failed to get a valid address, so don't do the IO operation - 
+            /* We failed to get a valid address, so don't do the IO operation -
              * it would just get worse if we do! Hopefully the guest is handing
              * gp-faults... 
              */
