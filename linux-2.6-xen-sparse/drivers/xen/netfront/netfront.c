@@ -97,11 +97,6 @@ struct netfront_info
 #define BEST_CONNECTED    2
 	unsigned int backend_state;
 
-	/* Is this interface open or closed (down or up)? */
-#define UST_CLOSED        0
-#define UST_OPEN          1
-	unsigned int user_state;
-
 	/* Receive-ring batched refills. */
 #define RX_MIN_TARGET 8
 #define RX_DFL_MIN_TARGET 64
@@ -446,8 +441,6 @@ static int network_open(struct net_device *dev)
 
 	memset(&np->stats, 0, sizeof(np->stats));
 
-	np->user_state = UST_OPEN;
-
 	network_alloc_rx_buffers(dev);
 	np->rx.sring->rsp_event = np->rx.rsp_cons + 1;
 
@@ -508,7 +501,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 	if (unlikely(netif_queue_stopped(dev)) &&
 	    ((np->tx.sring->req_prod - prod) < NET_TX_RING_SIZE) &&
 	    !gnttab_empty_grant_references(&np->gref_tx_head)) {
-		if (np->user_state == UST_OPEN)
+		if (likely(netif_running(dev)))
 			netif_wake_queue(dev);
 	}
 }
@@ -730,7 +723,7 @@ static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	spin_unlock_irqrestore(&np->tx_lock, flags);
 
 	if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx) &&
-	    (np->user_state == UST_OPEN))
+	    likely(netif_running(dev)))
 		netif_rx_schedule(dev);
 
 	return IRQ_HANDLED;
@@ -952,7 +945,6 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 static int network_close(struct net_device *dev)
 {
 	struct netfront_info *np = netdev_priv(dev);
-	np->user_state = UST_CLOSED;
 	netif_stop_queue(np->netdev);
 	return 0;
 }
@@ -1051,7 +1043,7 @@ static void network_connect(struct net_device *dev)
 	notify_remote_via_irq(np->irq);
 	network_tx_buf_gc(dev);
 
-	if (np->user_state == UST_OPEN)
+	if (netif_running(dev))
 		netif_start_queue(dev);
 
 	spin_unlock(&np->rx_lock);
@@ -1065,7 +1057,7 @@ static void show_device(struct netfront_info *np)
 		IPRINTK("<vif handle=%u %s(%s) evtchn=%u tx=%p rx=%p>\n",
 			np->handle,
 			be_state_name[np->backend_state],
-			np->user_state ? "open" : "closed",
+			netif_running(np->netdev) ? "open" : "closed",
 			np->evtchn,
 			np->tx,
 			np->rx);
@@ -1116,7 +1108,6 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 
 	np                = netdev_priv(netdev);
 	np->backend_state = BEST_CLOSED;
-	np->user_state    = UST_CLOSED;
 	np->handle        = handle;
 	np->xbdev         = dev;
 
