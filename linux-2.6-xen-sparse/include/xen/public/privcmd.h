@@ -75,13 +75,3 @@ typedef struct privcmd_mmapbatch {
 	_IOC(_IOC_NONE, 'P', 3, sizeof(privcmd_mmapbatch_t))
 
 #endif /* __LINUX_PUBLIC_PRIVCMD_H__ */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

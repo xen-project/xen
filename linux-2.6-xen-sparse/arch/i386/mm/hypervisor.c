@@ -412,13 +412,3 @@ int write_ldt_entry(void *ldt, int entry, __u32 entry_a, __u32 entry_b)
 		mach_lp, (u64)entry_a | ((u64)entry_b<<32));
 }
 #endif
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

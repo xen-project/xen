@@ -662,13 +662,3 @@ EXPORT_SYMBOL(swiotlb_map_page);
 EXPORT_SYMBOL(swiotlb_unmap_page);
 EXPORT_SYMBOL(swiotlb_dma_mapping_error);
 EXPORT_SYMBOL(swiotlb_dma_supported);
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

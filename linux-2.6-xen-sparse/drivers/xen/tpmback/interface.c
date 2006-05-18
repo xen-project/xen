@@ -175,13 +175,3 @@ void __exit tpmif_interface_exit(void)
 {
 	kmem_cache_destroy(tpmif_cachep);
 }
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

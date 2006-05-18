@@ -294,13 +294,3 @@ void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
 
 
 #endif /* _XEN_XENBUS_H */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

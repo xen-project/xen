@@ -342,13 +342,3 @@ dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t siz
 		swiotlb_sync_single_for_device(dev, dma_handle, size, direction);
 }
 EXPORT_SYMBOL(dma_sync_single_for_device);
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

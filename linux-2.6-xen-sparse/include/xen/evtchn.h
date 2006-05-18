@@ -112,13 +112,3 @@ static inline void notify_remote_via_evtchn(int port)
 extern void notify_remote_via_irq(int irq);
 
 #endif /* __ASM_EVTCHN_H__ */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

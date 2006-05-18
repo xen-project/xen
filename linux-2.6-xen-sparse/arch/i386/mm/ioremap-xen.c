@@ -478,13 +478,3 @@ void __init bt_iounmap(void *addr, unsigned long size)
 }
 
 #endif /* __i386__ */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

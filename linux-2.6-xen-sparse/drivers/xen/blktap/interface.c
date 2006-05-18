@@ -132,13 +132,3 @@ void __init blkif_interface_init(void)
 	blkif_cachep = kmem_cache_create(
 		"blkif_cache", sizeof(blkif_t), 0, 0, NULL, NULL);
 }
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

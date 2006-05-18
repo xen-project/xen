@@ -121,13 +121,3 @@ struct net_device_stats *netif_be_get_stats(struct net_device *dev);
 irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs);
 
 #endif /* __NETIF__BACKEND__COMMON_H__ */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

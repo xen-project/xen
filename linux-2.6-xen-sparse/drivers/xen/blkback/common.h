@@ -134,13 +134,3 @@ irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs);
 int blkif_schedule(void *arg);
 
 #endif /* __BLKIF__BACKEND__COMMON_H__ */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */
