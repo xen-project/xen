@@ -449,9 +449,20 @@ static int network_open(struct net_device *dev)
 	return 0;
 }
 
+static inline void network_maybe_wake_tx(struct net_device *dev)
+{
+	struct netfront_info *np = netdev_priv(dev);
+
+	if (unlikely(netif_queue_stopped(dev)) &&
+	    !RING_FULL(&np->tx) &&
+	    !gnttab_empty_grant_references(&np->gref_tx_head) &&
+	    likely(netif_running(dev)))
+		netif_wake_queue(dev);
+}
+
 static void network_tx_buf_gc(struct net_device *dev)
 {
-	RING_IDX i, prod;
+	RING_IDX cons, prod;
 	unsigned short id;
 	struct netfront_info *np = netdev_priv(dev);
 	struct sk_buff *skb;
@@ -463,15 +474,15 @@ static void network_tx_buf_gc(struct net_device *dev)
 		prod = np->tx.sring->rsp_prod;
 		rmb(); /* Ensure we see responses up to 'rp'. */
 
-		for (i = np->tx.rsp_cons; i != prod; i++) {
-			id  = RING_GET_RESPONSE(&np->tx, i)->id;
+		for (cons = np->tx.rsp_cons; cons != prod; cons++) {
+			id  = RING_GET_RESPONSE(&np->tx, cons)->id;
 			skb = np->tx_skbs[id];
 			if (unlikely(gnttab_query_foreign_access(
 				np->grant_tx_ref[id]) != 0)) {
 				printk(KERN_ALERT "network_tx_buf_gc: warning "
 				       "-- grant still in use by backend "
 				       "domain.\n");
-				goto out;
+				break; /* bail immediately */
 			}
 			gnttab_end_foreign_access_ref(
 				np->grant_tx_ref[id], GNTMAP_readonly);
@@ -495,15 +506,9 @@ static void network_tx_buf_gc(struct net_device *dev)
 		np->tx.sring->rsp_event =
 			prod + ((np->tx.sring->req_prod - prod) >> 1) + 1;
 		mb();
-	} while (prod != np->tx.sring->rsp_prod);
+	} while ((cons == prod) && (prod != np->tx.sring->rsp_prod));
 
- out:
-	if (unlikely(netif_queue_stopped(dev)) &&
-	    ((np->tx.sring->req_prod - prod) < NET_TX_RING_SIZE) &&
-	    !gnttab_empty_grant_references(&np->gref_tx_head)) {
-		if (likely(netif_running(dev)))
-			netif_wake_queue(dev);
-	}
+	network_maybe_wake_tx(dev);
 }
 
 
@@ -695,9 +700,8 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	network_tx_buf_gc(dev);
 
 	if (RING_FULL(&np->tx) ||
-	    gnttab_empty_grant_references(&np->gref_tx_head)) {
+	    gnttab_empty_grant_references(&np->gref_tx_head))
 		netif_stop_queue(dev);
-	}
 
 	spin_unlock_irq(&np->tx_lock);
 
@@ -1043,8 +1047,7 @@ static void network_connect(struct net_device *dev)
 	notify_remote_via_irq(np->irq);
 	network_tx_buf_gc(dev);
 
-	if (netif_running(dev))
-		netif_start_queue(dev);
+	network_maybe_wake_tx(dev);
 
 	spin_unlock(&np->rx_lock);
 	spin_unlock_irq(&np->tx_lock);
