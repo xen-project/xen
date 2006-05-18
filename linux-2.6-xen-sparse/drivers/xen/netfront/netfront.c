@@ -100,7 +100,7 @@ struct netfront_info {
 #define RX_MIN_TARGET 8
 #define RX_DFL_MIN_TARGET 64
 #define RX_MAX_TARGET min_t(int, NET_RX_RING_SIZE, 256)
-	int rx_min_target, rx_max_target, rx_target;
+	unsigned rx_min_target, rx_max_target, rx_target;
 	struct sk_buff_head rx_batch;
 
 	struct timer_list rx_refill_timer;
