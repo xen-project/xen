@@ -1072,6 +1072,146 @@ static struct ethtool_ops network_ethtool_ops =
 	.set_tx_csum = ethtool_op_set_tx_csum,
 };
 
+#ifdef CONFIG_SYSFS
+static ssize_t show_rxbuf_min(struct class_device *cd, char *buf)
+{
+	struct net_device *netdev = container_of(cd, struct net_device,
+						 class_dev);
+	struct netfront_info *info = netdev_priv(netdev);
+
+	return sprintf(buf, "%u\n", info->rx_min_target);
+}
+
+static ssize_t store_rxbuf_min(struct class_device *cd,
+			       const char *buf, size_t len)
+{
+	struct net_device *netdev = container_of(cd, struct net_device,
+						 class_dev);
+	struct netfront_info *np = netdev_priv(netdev);
+	char *endp;
+	unsigned long target;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	target = simple_strtoul(buf, &endp, 0);
+	if (endp == buf)
+		return -EBADMSG;
+
+	if (target < RX_MIN_TARGET)
+		target = RX_MIN_TARGET;
+	if (target > RX_MAX_TARGET)
+		target = RX_MAX_TARGET;
+
+	spin_lock(&np->rx_lock);
+	if (target > np->rx_max_target)
+		np->rx_max_target = target;
+	np->rx_min_target = target;
+	if (target > np->rx_target)
+		np->rx_target = target;
+
+	network_alloc_rx_buffers(netdev);
+
+	spin_unlock(&np->rx_lock);
+	return len;
+}
+
+static ssize_t show_rxbuf_max(struct class_device *cd, char *buf)
+{
+	struct net_device *netdev = container_of(cd, struct net_device,
+						 class_dev);
+	struct netfront_info *info = netdev_priv(netdev);
+
+	return sprintf(buf, "%u\n", info->rx_max_target);
+}
+
+static ssize_t store_rxbuf_max(struct class_device *cd,
+			       const char *buf, size_t len)
+{
+	struct net_device *netdev = container_of(cd, struct net_device,
+						 class_dev);
+	struct netfront_info *np = netdev_priv(netdev);
+	char *endp;
+	unsigned long target;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	target = simple_strtoul(buf, &endp, 0);
+	if (endp == buf)
+		return -EBADMSG;
+
+	if (target < RX_MIN_TARGET)
+		target = RX_MIN_TARGET;
+	if (target > RX_MAX_TARGET)
+		target = RX_MAX_TARGET;
+
+	spin_lock(&np->rx_lock);
+	if (target < np->rx_min_target)
+		np->rx_min_target = target;
+	np->rx_max_target = target;
+	if (target < np->rx_target)
+		np->rx_target = target;
+
+	network_alloc_rx_buffers(netdev);
+
+	spin_unlock(&np->rx_lock);
+	return len;
+}
+
+static ssize_t show_rxbuf_cur(struct class_device *cd, char *buf)
+{
+	struct net_device *netdev = container_of(cd, struct net_device,
+						 class_dev);
+	struct netfront_info *info = netdev_priv(netdev);
+
+	return sprintf(buf, "%u\n", info->rx_target);
+}
+
+static const struct class_device_attribute xennet_attrs[] = {
+	__ATTR(rxbuf_min, S_IRUGO|S_IWUSR, show_rxbuf_min, store_rxbuf_min),
+	__ATTR(rxbuf_max, S_IRUGO|S_IWUSR, show_rxbuf_max, store_rxbuf_max),
+	__ATTR(rxbuf_cur, S_IRUGO, show_rxbuf_cur, NULL),
+};
+
+static int xennet_sysfs_addif(struct net_device *netdev)
+{
+	int i;
+	int error = 0;
+
+	for (i = 0; i < ARRAY_SIZE(xennet_attrs); i++) {
+		error = class_device_create_file(&netdev->class_dev, 
+						 &xennet_attrs[i]);
+		if (error)
+			goto fail;
+	}
+	return 0;
+
+ fail:
+	while (--i >= 0)
+		class_device_remove_file(&netdev->class_dev,
+					 &xennet_attrs[i]);
+	return error;
+}
+
+static void xennet_sysfs_delif(struct net_device *netdev)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(xennet_attrs); i++) {
+		class_device_remove_file(&netdev->class_dev,
+					 &xennet_attrs[i]);
+	}
+}
+
+#else /* !CONFIG_SYSFS */
+
+#define xennet_sysfs_addif(dev) (0)
+#define xennet_sysfs_delif(dev) do { } while(0)
+
+#endif
+
+
 /*
  * Nothing to do here. Virtual interface is point-to-point and the
  * physical interface is probably promiscuous anyway.
@@ -1157,10 +1297,18 @@ static int __devinit create_netdev(int handle, struct xenbus_device *dev,
 	SET_MODULE_OWNER(netdev);
 	SET_NETDEV_DEV(netdev, &dev->dev);
 
-	if ((err = register_netdev(netdev)) != 0) {
+	err = register_netdev(netdev);
+	if (err) {
 		printk(KERN_WARNING "%s> register_netdev err=%d\n",
 		       __FUNCTION__, err);
 		goto exit_free_rx;
+	}
+
+	err = xennet_sysfs_addif(netdev);
+	if (err) {
+		/* This can be non-fatal: it only means no tuning parameters */
+		printk(KERN_WARNING "%s> add sysfs failed err=%d\n",
+		       __FUNCTION__, err);
 	}
 
 	np->netdev = netdev;
@@ -1235,6 +1383,7 @@ static void close_netdev(struct netfront_info *info)
 {
 	del_timer_sync(&info->rx_refill_timer);
 
+	xennet_sysfs_delif(info->netdev);
 	unregister_netdev(info->netdev);
 }
 
@@ -1304,8 +1453,6 @@ static struct notifier_block notifier_inetdev = {
 
 static int __init netif_init(void)
 {
-	int err = 0;
-
 	if (xen_start_info->flags & SIF_INITDOMAIN)
 		return 0;
 
