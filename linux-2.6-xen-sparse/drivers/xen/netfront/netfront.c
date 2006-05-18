@@ -223,7 +223,8 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 
 	err = talk_to_backend(dev, info);
 	if (err) {
-		kfree(info);
+		unregister_netdev(netdev);
+		free_netdev(netdev);
 		dev->data = NULL;
 		return err;
 	}
@@ -1101,11 +1102,11 @@ static int __devinit create_netdev(int handle, struct xenbus_device *dev,
 	struct net_device *netdev = NULL;
 	struct netfront_info *np = NULL;
 
-	if ((netdev = alloc_etherdev(sizeof(struct netfront_info))) == NULL) {
+	netdev = alloc_etherdev(sizeof(struct netfront_info));
+	if (!netdev) {
 		printk(KERN_WARNING "%s> alloc_etherdev failed.\n",
 		       __FUNCTION__);
-		err = -ENOMEM;
-		goto exit;
+		return -ENOMEM;
 	}
 
 	np                = netdev_priv(netdev);
@@ -1149,7 +1150,7 @@ static int __devinit create_netdev(int handle, struct xenbus_device *dev,
 		printk(KERN_ALERT "#### netfront can't alloc rx grant refs\n");
 		gnttab_free_grant_references(np->gref_tx_head);
 		err = -ENOMEM;
-		goto exit;
+		goto exit_free_tx;
 	}
 
 	netdev->open            = network_open;
@@ -1169,27 +1170,28 @@ static int __devinit create_netdev(int handle, struct xenbus_device *dev,
 	if ((err = register_netdev(netdev)) != 0) {
 		printk(KERN_WARNING "%s> register_netdev err=%d\n",
 		       __FUNCTION__, err);
-		goto exit_free_grefs;
+		goto exit_free_rx;
 	}
 
 	if ((err = xennet_proc_addif(netdev)) != 0) {
 		unregister_netdev(netdev);
-		goto exit_free_grefs;
+		goto exit_free_rx;
 	}
 
 	np->netdev = netdev;
-
- exit:
-	if (err != 0)
-		kfree(netdev);
-	else if (val != NULL)
+	if (val)
 		*val = netdev;
-	return err;
 
- exit_free_grefs:
-	gnttab_free_grant_references(np->gref_tx_head);
+	return 0;
+
+
+ exit_free_rx:
 	gnttab_free_grant_references(np->gref_rx_head);
-	goto exit;
+ exit_free_tx:
+	gnttab_free_grant_references(np->gref_tx_head);
+ exit:
+	free_netdev(netdev);
+	return err;
 }
 
 /*
