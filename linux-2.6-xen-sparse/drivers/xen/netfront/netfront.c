@@ -163,7 +163,7 @@ static const char *be_state_name[] = {
 
 static int talk_to_backend(struct xenbus_device *, struct netfront_info *);
 static int setup_device(struct xenbus_device *, struct netfront_info *);
-static int create_netdev(int, struct xenbus_device *, struct net_device **);
+static struct net_device *create_netdev(int, struct xenbus_device *);
 
 static void netfront_closing(struct xenbus_device *);
 
@@ -181,6 +181,13 @@ static int send_fake_arp(struct net_device *);
 
 static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs);
 
+#ifdef CONFIG_SYSFS
+static int xennet_sysfs_addif(struct net_device *netdev);
+static void xennet_sysfs_delif(struct net_device *netdev);
+#else /* !CONFIG_SYSFS */
+#define xennet_sysfs_addif(dev) (0)
+#define xennet_sysfs_delif(dev) do { } while(0)
+#endif
 
 /**
  * Entry point to this code when a new device is created.  Allocate the basic
@@ -202,8 +209,9 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 		return err;
 	}
 
-	err = create_netdev(handle, dev, &netdev);
-	if (err) {
+	netdev = create_netdev(handle, dev);
+	if (IS_ERR(netdev)) {
+		err = PTR_ERR(netdev);
 		xenbus_dev_fatal(dev, err, "creating netdev");
 		return err;
 	}
@@ -213,6 +221,7 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 
 	err = talk_to_backend(dev, info);
 	if (err) {
+		xennet_sysfs_delif(info->netdev);
 		unregister_netdev(netdev);
 		free_netdev(netdev);
 		dev->data = NULL;
@@ -1204,12 +1213,7 @@ static void xennet_sysfs_delif(struct net_device *netdev)
 	}
 }
 
-#else /* !CONFIG_SYSFS */
-
-#define xennet_sysfs_addif(dev) (0)
-#define xennet_sysfs_delif(dev) do { } while(0)
-
-#endif
+#endif /* CONFIG_SYSFS */
 
 
 /*
@@ -1225,8 +1229,8 @@ static void network_set_multicast_list(struct net_device *dev)
  * @param val return parameter for created device
  * @return 0 on success, error code otherwise
  */
-static int __devinit create_netdev(int handle, struct xenbus_device *dev,
-				   struct net_device **val)
+static struct net_device * __devinit create_netdev(int handle,
+						   struct xenbus_device *dev)
 {
 	int i, err = 0;
 	struct net_device *netdev = NULL;
@@ -1236,7 +1240,7 @@ static int __devinit create_netdev(int handle, struct xenbus_device *dev,
 	if (!netdev) {
 		printk(KERN_WARNING "%s> alloc_etherdev failed.\n",
 		       __FUNCTION__);
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	np                = netdev_priv(netdev);
@@ -1312,10 +1316,8 @@ static int __devinit create_netdev(int handle, struct xenbus_device *dev,
 	}
 
 	np->netdev = netdev;
-	if (val)
-		*val = netdev;
 
-	return 0;
+	return netdev;
 
 
  exit_free_rx:
@@ -1324,7 +1326,7 @@ static int __devinit create_netdev(int handle, struct xenbus_device *dev,
 	gnttab_free_grant_references(np->gref_tx_head);
  exit:
 	free_netdev(netdev);
-	return err;
+	return ERR_PTR(err);
 }
 
 /*
