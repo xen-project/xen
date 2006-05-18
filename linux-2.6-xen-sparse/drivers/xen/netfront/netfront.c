@@ -146,7 +146,7 @@ static inline unsigned short get_id_from_freelist(struct sk_buff **list)
 }
 
 #ifdef DEBUG
-static char *be_state_name[] = {
+static const char *be_state_name[] = {
 	[BEST_CLOSED]       = "closed",
 	[BEST_DISCONNECTED] = "disconnected",
 	[BEST_CONNECTED]    = "connected",
@@ -198,8 +198,8 @@ static void xennet_proc_delif(struct net_device *dev);
  * inform the backend of the appropriate details for those.  Switch to
  * Connected state.
  */
-static int netfront_probe(struct xenbus_device *dev,
-			  const struct xenbus_device_id *id)
+static int __devinit netfront_probe(struct xenbus_device *dev,
+				    const struct xenbus_device_id *id)
 {
 	int err;
 	struct net_device *netdev;
@@ -1094,8 +1094,8 @@ static void network_set_multicast_list(struct net_device *dev)
  * @param val return parameter for created device
  * @return 0 on success, error code otherwise
  */
-static int create_netdev(int handle, struct xenbus_device *dev,
-			 struct net_device **val)
+static int __devinit create_netdev(int handle, struct xenbus_device *dev,
+				   struct net_device **val)
 {
 	int i, err = 0;
 	struct net_device *netdev = NULL;
@@ -1231,7 +1231,7 @@ static void netfront_closing(struct xenbus_device *dev)
 }
 
 
-static int netfront_remove(struct xenbus_device *dev)
+static int __devexit netfront_remove(struct xenbus_device *dev)
 {
 	struct netfront_info *info = dev->data;
 
@@ -1307,7 +1307,7 @@ static struct xenbus_driver netfront = {
 	.owner = THIS_MODULE,
 	.ids = netfront_ids,
 	.probe = netfront_probe,
-	.remove = netfront_remove,
+	.remove = __devexit_p(netfront_remove),
 	.resume = netfront_resume,
 	.otherend_changed = backend_changed,
 };
@@ -1338,7 +1338,7 @@ static int __init netif_init(void)
 module_init(netif_init);
 
 
-static void netif_exit(void)
+static void __exit netif_exit(void)
 {
 	unregister_inetaddr_notifier(&notifier_inetdev);
 
