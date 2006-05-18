@@ -81,7 +81,6 @@ struct netfront_info
 	struct net_device *netdev;
 
 	struct net_device_stats stats;
-	unsigned int tx_full;
 
 	netif_tx_front_ring_t tx;
 	netif_rx_front_ring_t rx;
@@ -506,10 +505,9 @@ static void network_tx_buf_gc(struct net_device *dev)
 	} while (prod != np->tx.sring->rsp_prod);
 
  out:
-	if ((np->tx_full) &&
+	if (unlikely(netif_queue_stopped(dev)) &&
 	    ((np->tx.sring->req_prod - prod) < NET_TX_RING_SIZE) &&
 	    !gnttab_empty_grant_references(&np->gref_tx_head)) {
-		np->tx_full = 0;
 		if (np->user_state == UST_OPEN)
 			netif_wake_queue(dev);
 	}
@@ -650,13 +648,6 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	unsigned long mfn;
 	int notify;
 
-	if (unlikely(np->tx_full)) {
-		printk(KERN_ALERT "%s: full queue wasn't stopped!\n",
-		       dev->name);
-		netif_stop_queue(dev);
-		goto drop;
-	}
-
 	if (unlikely((((unsigned long)skb->data & ~PAGE_MASK) + skb->len) >=
 		     PAGE_SIZE)) {
 		struct sk_buff *nskb;
@@ -712,7 +703,6 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	if (RING_FULL(&np->tx) ||
 	    gnttab_empty_grant_references(&np->gref_tx_head)) {
-		np->tx_full = 1;
 		netif_stop_queue(dev);
 	}
 
@@ -987,11 +977,8 @@ static void network_connect(struct net_device *dev)
 
 	/* Recovery procedure: */
 
-	/* Step 1: Reinitialise variables. */
-	np->tx_full = 0;
-
 	/*
-	 * Step 2: Rebuild the RX and TX ring contents.
+	 * Step 1: Rebuild the RX and TX ring contents.
 	 * NB. We could just free the queued TX packets now but we hope
 	 * that sending them out might do some good.  We have to rebuild
 	 * the RX ring because some of our pages are currently flipped out
@@ -1055,7 +1042,7 @@ static void network_connect(struct net_device *dev)
 	RING_PUSH_REQUESTS(&np->rx);
 
 	/*
-	 * Step 3: All public and private state should now be sane.  Get
+	 * Step 2: All public and private state should now be sane.  Get
 	 * ready to start sending and receiving packets and give the driver
 	 * domain a kick because we've probably just requeued some
 	 * packets.
@@ -1266,10 +1253,6 @@ static int netfront_remove(struct xenbus_device *dev)
 
 static void close_netdev(struct netfront_info *info)
 {
-	spin_lock_irq(&info->netdev->xmit_lock);
-	netif_stop_queue(info->netdev);
-	spin_unlock_irq(&info->netdev->xmit_lock);
-
 #ifdef CONFIG_PROC_FS
 	xennet_proc_delif(info->netdev);
 #endif
