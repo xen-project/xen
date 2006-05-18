@@ -318,6 +318,7 @@ static inline void exit_idle(void) {}
 #define do_IRQ(irq, regs) __do_IRQ((irq), (regs))
 
 #ifdef CONFIG_XEN_IA64_DOM0_VP
+#include <linux/err.h>
 #include <asm/xen/privop.h>
 
 #define _hypercall_imm1(type, name, imm, a1)			\
@@ -419,6 +420,10 @@ HYPERVISOR_ioremap(unsigned long ioaddr, unsigned long size)
 	unsigned long ret = ioaddr;
 	if (running_on_xen) {
 		ret = __HYPERVISOR_ioremap(ioaddr, size);
+		if (unlikely(IS_ERR_VALUE(ret)))
+			panic("hypercall %s failed with %ld. "
+			      "Please check Xen and Linux config mismatch\n",
+			      __func__, -ret);
 	}
 	return ret;
 }
