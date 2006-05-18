@@ -6,7 +6,7 @@
  * Copyright (c) 2005 Keir Fraser
  */
 
-#ifdef __TEST_HARNESS__
+#ifndef __XEN__
 #include <stdio.h>
 #include <stdint.h>
 #include <public/xen.h>
@@ -1127,7 +1127,7 @@ x86_emulate_memop(
     return -1;
 }
 
-#ifndef __TEST_HARNESS__
+#ifdef __XEN__
 
 #include <asm/mm.h>
 #include <asm/uaccess.h>
