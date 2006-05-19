@@ -430,7 +430,8 @@ no_shadow_page:
            perfc_value(shadow_l2_pages),
            perfc_value(hl2_table_pages),
            perfc_value(snapshot_pages));
-    BUG(); /* XXX FIXME: try a shadow flush to free up some memory. */
+    /* XXX FIXME: try a shadow flush to free up some memory. */
+    domain_crash_synchronous();
 
     return 0;
 }
@@ -3064,7 +3065,8 @@ static inline unsigned long init_bl2(
     if ( unlikely(!(smfn = alloc_shadow_page(d, gpfn, gmfn, PGT_l4_shadow))) )
     {
         printk("Couldn't alloc an L4 shadow for pfn=%lx mfn=%lx\n", gpfn, gmfn);
-        BUG(); /* XXX Deal gracefully with failure. */
+        /* XXX Deal gracefully with failure. */
+        domain_crash_synchronous();
     }
 
     spl4e = (l4_pgentry_t *)map_domain_page(smfn);

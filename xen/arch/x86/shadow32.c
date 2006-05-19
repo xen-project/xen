@@ -246,7 +246,8 @@ alloc_shadow_page(struct domain *d,
                perfc_value(shadow_l2_pages),
                perfc_value(hl2_table_pages),
                perfc_value(snapshot_pages));
-        BUG(); /* XXX FIXME: try a shadow flush to free up some memory. */
+        /* XXX FIXME: try a shadow flush to free up some memory. */
+        domain_crash_synchronous();
     }
 
     smfn = page_to_mfn(page);
@@ -983,6 +984,11 @@ alloc_p2m_table(struct domain *d)
     else
     {
         page = alloc_domheap_page(NULL);
+        if (!page)
+        {
+            printk("Alloc p2m table fail\n");
+            domain_crash(d);
+        }
 
         l1tab = map_domain_page(page_to_mfn(page));
         memset(l1tab, 0, PAGE_SIZE);
