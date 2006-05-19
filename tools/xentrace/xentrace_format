@@ -89,7 +89,7 @@ defs = read_defs(arg[0])
 CPUREC = "I"
 TRCREC = "QLLLLLL"
 
-last_tsc = [0,0,0,0,0,0,0,0]
+last_tsc = [0]
 
 i=0
 
@@ -111,7 +111,9 @@ while not interrupted:
 
 	#print i, tsc
 
-	if tsc < last_tsc[cpu]:
+        if cpu >= len(last_tsc):
+            last_tsc += [0] * (cpu - len(last_tsc) + 1)
+	elif tsc < last_tsc[cpu]:
 	    print "TSC stepped backward cpu %d !  %d %d" % (cpu,tsc,last_tsc[cpu])
 
 	last_tsc[cpu] = tsc
