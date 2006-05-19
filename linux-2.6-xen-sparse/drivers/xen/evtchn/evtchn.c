@@ -429,6 +429,9 @@ static int __init evtchn_init(void)
 {
 	int err;
 
+	if (!is_running_on_xen())
+		return -ENODEV;
+
 	spin_lock_init(&port_user_lock);
 	memset(port_user, 0, sizeof(port_user));
 

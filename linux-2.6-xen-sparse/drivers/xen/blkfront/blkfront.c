@@ -792,7 +792,7 @@ static struct xenbus_driver blkfront = {
 
 static int __init xlblk_init(void)
 {
-	if (xen_init() < 0)
+	if (!is_running_on_xen())
 		return -ENODEV;
 
 	return xenbus_register_frontend(&blkfront);

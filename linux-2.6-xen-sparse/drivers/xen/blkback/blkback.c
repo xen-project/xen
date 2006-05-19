@@ -526,7 +526,7 @@ static int __init blkif_init(void)
 	struct page *page;
 	int i;
 
-	if (xen_init() < 0)
+	if (!is_running_on_xen())
 		return -ENODEV;
 
 	mmap_pages            = blkif_reqs * BLKIF_MAX_SEGMENTS_PER_REQUEST;

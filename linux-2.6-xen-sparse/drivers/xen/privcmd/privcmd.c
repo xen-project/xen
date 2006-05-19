@@ -271,6 +271,9 @@ static int capabilities_read(char *page, char **start, off_t off,
 
 static int __init privcmd_init(void)
 {
+	if (!is_running_on_xen())
+		return -ENODEV;
+
 	/* Set of hypercalls that privileged applications may execute. */
 	set_bit(__HYPERVISOR_acm_op,           hypercall_permission_map);
 	set_bit(__HYPERVISOR_dom0_op,          hypercall_permission_map);

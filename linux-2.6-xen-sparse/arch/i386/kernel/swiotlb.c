@@ -191,6 +191,7 @@ swiotlb_init(void)
 	if (swiotlb_force == 1) {
 		swiotlb = 1;
 	} else if ((swiotlb_force != -1) &&
+		   is_running_on_xen() &&
 		   (xen_start_info->flags & SIF_INITDOMAIN)) {
 		/* Domain 0 always has a swiotlb. */
 		ram_end = HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL);

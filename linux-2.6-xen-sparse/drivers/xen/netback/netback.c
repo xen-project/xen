@@ -810,6 +810,9 @@ static int __init netback_init(void)
 	int i;
 	struct page *page;
 
+	if (!is_running_on_xen())
+		return -ENODEV;
+
 	/* We can increase reservation by this much in net_rx_action(). */
 	balloon_update_driver_allowance(NET_RX_RING_SIZE);
 

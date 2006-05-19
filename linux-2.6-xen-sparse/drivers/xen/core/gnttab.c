@@ -443,7 +443,7 @@ gnttab_init(void)
 {
 	int i;
 
-	if (xen_init() < 0)
+	if (!is_running_on_xen())
 		return -ENODEV;
 
 	if (gnttab_resume() < 0)

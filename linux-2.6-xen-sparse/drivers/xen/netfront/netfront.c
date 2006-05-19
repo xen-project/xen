@@ -1454,6 +1454,9 @@ static struct notifier_block notifier_inetdev = {
 
 static int __init netif_init(void)
 {
+	if (!is_running_on_xen())
+		return -ENODEV;
+
 	if (xen_start_info->flags & SIF_INITDOMAIN)
 		return 0;
 

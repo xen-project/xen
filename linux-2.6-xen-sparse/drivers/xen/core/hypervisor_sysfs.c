@@ -49,6 +49,9 @@ static struct kobj_type hyp_sysfs_kobj_type = {
 
 static int __init hypervisor_subsys_init(void)
 {
+	if (!is_running_on_xen())
+		return -ENODEV;
+
 	hypervisor_subsys.kset.kobj.ktype = &hyp_sysfs_kobj_type;
 	return subsystem_register(&hypervisor_subsys);
 }
