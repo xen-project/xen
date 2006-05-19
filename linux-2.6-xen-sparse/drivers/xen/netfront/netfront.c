@@ -1045,8 +1045,6 @@ static void network_connect(struct net_device *dev)
 	notify_remote_via_irq(np->irq);
 	network_tx_buf_gc(dev);
 
-	network_maybe_wake_tx(dev);
-
 	spin_unlock(&np->rx_lock);
 	spin_unlock_irq(&np->tx_lock);
 }
