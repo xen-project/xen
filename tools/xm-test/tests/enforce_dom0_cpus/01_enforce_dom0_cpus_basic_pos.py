@@ -65,13 +65,24 @@ if check_status and status != 0:
         FAIL("\"%s\" returned invalid %i != 0" %(cmd,status))
 
 # 5) check /proc/cpuinfo for cpu count
-cmd = "grep \"^processor\" /proc/cpuinfo | wc -l"
-status, output = traceCommand(cmd)
-if check_status and status != 0:
-    os.unsetenv("XEND_CONFIG")
-    restartXend()
-    FAIL("\"%s\" returned invalid %i != 0" %(cmd,status))
 
+# It takes some time for the CPU count to change, on multi-proc systems, so check the number of procs in a loop for 20 seconds. 
+#Sleep inside the loop for a second each time.
+timeout = 20
+starttime = time.time()
+while timeout + starttime > time.time():
+# Check /proc/cpuinfo
+    cmd = "grep \"^processor\" /proc/cpuinfo | wc -l"
+    status, output = traceCommand(cmd)
+    if check_status and status != 0:
+        os.unsetenv("XEND_CONFIG")
+        restartXend()
+        FAIL("\"%s\" returned invalid %i != 0" %(cmd,status))
+# Has it succeeded? If so, we can leave the loop
+    if output == str(enforce_dom0_cpus):
+        break
+# Sleep for 1 second before trying again
+    time.sleep(1)
 if output != str(enforce_dom0_cpus):
     os.unsetenv("XEND_CONFIG")
     restartXend()
@@ -94,7 +105,14 @@ if check_status and status != 0:
     FAIL("\"%s\" returned invalid %i != 0" %(cmd,status))
 
 # check restore worked
-num_online = int(getDomInfo("Domain-0", "VCPUs"))
+# Since this also takes time, we will do it in a loop with a 20 second timeout.
+timeout=20
+starttime=time.time()
+while timeout + starttime > time.time(): 
+    num_online = int(getDomInfo("Domain-0", "VCPUs"))
+    if num_online == dom0_online_vcpus:
+        break
+    time.sleep(1)
 if num_online != dom0_online_vcpus:
     os.unsetenv("XEND_CONFIG")
     restartXend()
