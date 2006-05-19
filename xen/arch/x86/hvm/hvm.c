@@ -189,7 +189,11 @@ void hvm_setup_platform(struct domain* d)
     if ( !hvm_guest(current) || (current->vcpu_id != 0) )
         return;
 
-    shadow_direct_map_init(d);
+    if ( shadow_direct_map_init(d) == 0 )
+    {
+        printk("Can not allocate shadow direct map for HVM domain.\n");
+        domain_crash_synchronous();
+    }
 
     hvm_map_io_shared_page(d);
     hvm_get_info(d);

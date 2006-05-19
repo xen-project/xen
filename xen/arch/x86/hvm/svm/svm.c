@@ -458,6 +458,9 @@ int start_svm(void)
     
     if (!(test_bit(X86_FEATURE_SVME, &boot_cpu_data.x86_capability)))
         return 0;
+    svm_globals[cpu].hsa = alloc_host_save_area();
+    if (! svm_globals[cpu].hsa)
+        return 0;
     
     rdmsr(MSR_EFER, eax, edx);
     eax |= EFER_SVME;
@@ -466,7 +469,6 @@ int start_svm(void)
     printk("AMD SVM Extension is enabled for cpu %d.\n", cpu );
 
     /* Initialize the HSA for this core */
-    svm_globals[cpu].hsa = alloc_host_save_area();
     phys_hsa = (u64) virt_to_maddr( svm_globals[cpu].hsa ); 
     phys_hsa_lo = (u32) phys_hsa;
     phys_hsa_hi = (u32) (phys_hsa >> 32);    

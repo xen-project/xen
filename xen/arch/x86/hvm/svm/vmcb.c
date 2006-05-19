@@ -139,17 +139,20 @@ static int construct_vmcb_controls(struct arch_svm_struct *arch_svm)
 
     /* The following is for I/O and MSR permision map */
     iopm = alloc_xenheap_pages(get_order_from_bytes(IOPM_SIZE));
-
-    ASSERT(iopm);
-    memset(iopm, 0xff, IOPM_SIZE);
-    clear_bit(PC_DEBUG_PORT, iopm);
+    if (iopm)
+    {
+        memset(iopm, 0xff, IOPM_SIZE);
+        clear_bit(PC_DEBUG_PORT, iopm);
+    }
     msrpm = alloc_xenheap_pages(get_order_from_bytes(MSRPM_SIZE));
-
-    ASSERT(msrpm);
-    memset(msrpm, 0xff, MSRPM_SIZE);
+    if (msrpm)
+        memset(msrpm, 0xff, MSRPM_SIZE);
 
     arch_svm->iopm = iopm;
     arch_svm->msrpm = msrpm;
+
+    if (! iopm || ! msrpm)
+        return 1;
 
     vmcb->iopm_base_pa = (u64) virt_to_maddr(iopm);
     vmcb->msrpm_base_pa = (u64) virt_to_maddr(msrpm);
