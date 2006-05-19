@@ -99,6 +99,7 @@ AC_CONFIG_FILES([
     tests/block-list/Makefile
     tests/block-create/Makefile
     tests/block-destroy/Makefile
+    tests/block-integrity/Makefile
     tests/console/Makefile
     tests/create/Makefile
     tests/destroy/Makefile
