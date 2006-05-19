@@ -193,7 +193,7 @@
 #define MMUEXT_NEW_USER_BASEPTR 15
 
 #ifndef __ASSEMBLY__
-typedef struct mmuext_op {
+struct mmuext_op {
     unsigned int cmd;
     union {
         /* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR */
@@ -207,7 +207,8 @@ typedef struct mmuext_op {
         /* TLB_FLUSH_MULTI, INVLPG_MULTI */
         void *vcpumask;
     } arg2;
-} mmuext_op_t;
+};
+typedef struct mmuext_op mmuext_op_t;
 DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 #endif
 
@@ -271,20 +272,22 @@ typedef uint16_t domid_t;
  * Send an array of these to HYPERVISOR_mmu_update().
  * NB. The fields are natural pointer/address size for this architecture.
  */
-typedef struct mmu_update {
+struct mmu_update {
     uint64_t ptr;       /* Machine address of PTE. */
     uint64_t val;       /* New contents of PTE.    */
-} mmu_update_t;
+};
+typedef struct mmu_update mmu_update_t;
 DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
 
 /*
  * Send an array of these to HYPERVISOR_multicall().
  * NB. The fields are natural register size for this architecture.
  */
-typedef struct multicall_entry {
+struct multicall_entry {
     unsigned long op, result;
     unsigned long args[6];
-} multicall_entry_t;
+};
+typedef struct multicall_entry multicall_entry_t;
 DEFINE_XEN_GUEST_HANDLE(multicall_entry_t);
 
 /*
@@ -293,7 +296,7 @@ DEFINE_XEN_GUEST_HANDLE(multicall_entry_t);
  */
 #define NR_EVENT_CHANNELS (sizeof(unsigned long) * sizeof(unsigned long) * 64)
 
-typedef struct vcpu_time_info {
+struct vcpu_time_info {
     /*
      * Updates to the following values are preceded and followed by an
      * increment of 'version'. The guest can therefore detect updates by
@@ -317,9 +320,10 @@ typedef struct vcpu_time_info {
     uint32_t tsc_to_system_mul;
     int8_t   tsc_shift;
     int8_t   pad1[3];
-} vcpu_time_info_t; /* 32 bytes */
+}; /* 32 bytes */
+typedef struct vcpu_time_info vcpu_time_info_t;
 
-typedef struct vcpu_info {
+struct vcpu_info {
     /*
      * 'evtchn_upcall_pending' is written non-zero by Xen to indicate
      * a pending notification for a particular VCPU. It is then cleared 
@@ -348,16 +352,17 @@ typedef struct vcpu_info {
     uint8_t evtchn_upcall_pending;
     uint8_t evtchn_upcall_mask;
     unsigned long evtchn_pending_sel;
-    arch_vcpu_info_t arch;
-    vcpu_time_info_t time;
-} vcpu_info_t; /* 64 bytes (x86) */
+    struct arch_vcpu_info arch;
+    struct vcpu_time_info time;
+}; /* 64 bytes (x86) */
+typedef struct vcpu_info vcpu_info_t;
 
 /*
  * Xen/kernel shared data -- pointer provided in start_info.
  * NB. We expect that this struct is smaller than a page.
  */
-typedef struct shared_info {
-    vcpu_info_t vcpu_info[MAX_VIRT_CPUS];
+struct shared_info {
+    struct vcpu_info vcpu_info[MAX_VIRT_CPUS];
 
     /*
      * A domain can create "event channels" on which it can send and receive
@@ -401,9 +406,10 @@ typedef struct shared_info {
     uint32_t wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
     uint32_t wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
 
-    arch_shared_info_t arch;
+    struct arch_shared_info arch;
 
-} shared_info_t;
+};
+typedef struct shared_info shared_info_t;
 
 /*
  * Start-of-day memory layout for the initial domain (DOM0):
@@ -431,7 +437,7 @@ typedef struct shared_info {
  */
 
 #define MAX_GUEST_CMDLINE 1024
-typedef struct start_info {
+struct start_info {
     /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.    */
     char magic[32];             /* "xen-<version>-<platform>".            */
     unsigned long nr_pages;     /* Total pages allocated to this domain.  */
@@ -448,7 +454,8 @@ typedef struct start_info {
     unsigned long mod_start;    /* VIRTUAL address of pre-loaded module.  */
     unsigned long mod_len;      /* Size (bytes) of pre-loaded module.     */
     int8_t cmd_line[MAX_GUEST_CMDLINE];
-} start_info_t;
+};
+typedef struct start_info start_info_t;
 
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */

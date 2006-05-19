@@ -95,15 +95,16 @@ DEFINE_XEN_GUEST_HANDLE(void);
 #define TI_GET_IF(_ti)       ((_ti)->flags & 4)
 #define TI_SET_DPL(_ti,_dpl) ((_ti)->flags |= (_dpl))
 #define TI_SET_IF(_ti,_if)   ((_ti)->flags |= ((!!(_if))<<2))
-typedef struct trap_info {
+struct trap_info {
     uint8_t       vector;  /* exception vector                              */
     uint8_t       flags;   /* 0-3: privilege level; 4: clear event enable?  */
     uint16_t      cs;      /* code selector                                 */
     unsigned long address; /* code offset                                   */
-} trap_info_t;
+};
+typedef struct trap_info trap_info_t;
 DEFINE_XEN_GUEST_HANDLE(trap_info_t);
 
-typedef struct cpu_user_regs {
+struct cpu_user_regs {
     uint32_t ebx;
     uint32_t ecx;
     uint32_t edx;
@@ -124,7 +125,8 @@ typedef struct cpu_user_regs {
     uint16_t ds, _pad3;
     uint16_t fs, _pad4;
     uint16_t gs, _pad5;
-} cpu_user_regs_t;
+};
+typedef struct cpu_user_regs cpu_user_regs_t;
 DEFINE_XEN_GUEST_HANDLE(cpu_user_regs_t);
 
 typedef uint64_t tsc_timestamp_t; /* RDTSC timestamp */
@@ -133,14 +135,14 @@ typedef uint64_t tsc_timestamp_t; /* RDTSC timestamp */
  * The following is all CPU context. Note that the fpu_ctxt block is filled 
  * in by FXSAVE if the CPU has feature FXSR; otherwise FSAVE is used.
  */
-typedef struct vcpu_guest_context {
+struct vcpu_guest_context {
     /* FPU registers come first so they can be aligned for FXSAVE/FXRSTOR. */
     struct { char x[512]; } fpu_ctxt;       /* User-level FPU registers     */
 #define VGCF_I387_VALID (1<<0)
 #define VGCF_HVM_GUEST  (1<<1)
 #define VGCF_IN_KERNEL  (1<<2)
     unsigned long flags;                    /* VGCF_* flags                 */
-    cpu_user_regs_t user_regs;              /* User-level CPU registers     */
+    struct cpu_user_regs user_regs;         /* User-level CPU registers     */
     struct trap_info trap_ctxt[256];        /* Virtual IDT                  */
     unsigned long ldt_base, ldt_ents;       /* LDT (linear address, # ents) */
     unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */
@@ -152,25 +154,29 @@ typedef struct vcpu_guest_context {
     unsigned long failsafe_callback_cs;     /* CS:EIP of failsafe callback  */
     unsigned long failsafe_callback_eip;
     unsigned long vm_assist;                /* VMASST_TYPE_* bitmap */
-} vcpu_guest_context_t;
+};
+typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
-typedef struct arch_shared_info {
+struct arch_shared_info {
     unsigned long max_pfn;                  /* max pfn that appears in table */
     /* Frame containing list of mfns containing list of mfns containing p2m. */
     unsigned long pfn_to_mfn_frame_list_list;
     unsigned long nmi_reason;
-} arch_shared_info_t;
+};
+typedef struct arch_shared_info arch_shared_info_t;
 
-typedef struct {
+struct arch_vcpu_info {
     unsigned long cr2;
     unsigned long pad[5]; /* sizeof(vcpu_info_t) == 64 */
-} arch_vcpu_info_t;
+};
+typedef struct arch_vcpu_info arch_vcpu_info_t;
 
-typedef struct {
+struct xen_callback {
     unsigned long cs;
     unsigned long eip;
-} xen_callback_t;
+};
+typedef struct xen_callback xen_callback_t;
 
 #endif /* !__ASSEMBLY__ */
 
