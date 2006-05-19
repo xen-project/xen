@@ -1,4 +1,5 @@
 debug ?= y
+pae ?= n
 
 include $(CURDIR)/../../Config.mk
 
@@ -17,6 +18,11 @@ LDFLAGS := -N -T minios-$(TARGET_ARCH).lds
 ifeq ($(TARGET_ARCH),x86_32)
 CFLAGS += -m32 -march=i686
 LDFLAGS += -m elf_i386
+endif
+
+ifeq ($(TARGET_ARCH)$(pae),x86_32y)
+CFLAGS  += -DCONFIG_X86_PAE=1
+ASFLAGS += -DCONFIG_X86_PAE=1
 endif
 
 ifeq ($(TARGET_ARCH),x86_64)

@@ -95,25 +95,26 @@ DO_ERROR(18, "machine check", machine_check)
 
 void page_walk(unsigned long virt_address)
 {
-        unsigned long *tab = (unsigned long *)start_info.pt_base;
-        unsigned long addr = virt_address, page;
+        pgentry_t *tab = (pgentry_t *)start_info.pt_base, page;
+        unsigned long addr = virt_address;
         printk("Pagetable walk from virt %lx, base %lx:\n", virt_address, start_info.pt_base);
     
 #if defined(__x86_64__)
         page = tab[l4_table_offset(addr)];
-        tab = to_virt(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
-        printk(" L4 = %p (%p)  [offset = %lx]\n", page, tab, l4_table_offset(addr));
-
+        tab = pte_to_virt(page);
+        printk(" L4 = %"PRIpte" (%p)  [offset = %lx]\n", page, tab, l4_table_offset(addr));
+#endif
+#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
         page = tab[l3_table_offset(addr)];
-        tab = to_virt(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
-        printk("  L3 = %p (%p)  [offset = %lx]\n", page, tab, l3_table_offset(addr));
+        tab = pte_to_virt(page);
+        printk("  L3 = %"PRIpte" (%p)  [offset = %lx]\n", page, tab, l3_table_offset(addr));
 #endif
         page = tab[l2_table_offset(addr)];
-        tab =  to_virt(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
-        printk("   L2 = %p (%p)  [offset = %lx]\n", page, tab, l2_table_offset(addr));
+        tab = pte_to_virt(page);
+        printk("   L2 = %"PRIpte" (%p)  [offset = %lx]\n", page, tab, l2_table_offset(addr));
         
         page = tab[l1_table_offset(addr)];
-        printk("    L1 = %p (%p)  [offset = %lx]\n", page, tab, l1_table_offset(addr));
+        printk("    L1 = %"PRIpte" (%p)  [offset = %lx]\n", page, tab, l1_table_offset(addr));
 
 }
 
