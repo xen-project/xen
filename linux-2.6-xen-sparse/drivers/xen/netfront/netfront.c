@@ -64,8 +64,8 @@
 
 #define GRANT_INVALID_REF	0
 
-#define NET_TX_RING_SIZE __RING_SIZE((netif_tx_sring_t *)0, PAGE_SIZE)
-#define NET_RX_RING_SIZE __RING_SIZE((netif_rx_sring_t *)0, PAGE_SIZE)
+#define NET_TX_RING_SIZE __RING_SIZE((struct netif_tx_sring *)0, PAGE_SIZE)
+#define NET_RX_RING_SIZE __RING_SIZE((struct netif_rx_sring *)0, PAGE_SIZE)
 
 static inline void init_skb_shinfo(struct sk_buff *skb)
 {
@@ -80,8 +80,8 @@ struct netfront_info {
 
 	struct net_device_stats stats;
 
-	netif_tx_front_ring_t tx;
-	netif_rx_front_ring_t rx;
+	struct netif_tx_front_ring tx;
+	struct netif_rx_front_ring rx;
 
 	spinlock_t   tx_lock;
 	spinlock_t   rx_lock;
@@ -123,8 +123,8 @@ struct netfront_info {
 	u8 mac[ETH_ALEN];
 
 	unsigned long rx_pfn_array[NET_RX_RING_SIZE];
-	multicall_entry_t rx_mcl[NET_RX_RING_SIZE+1];
-	mmu_update_t rx_mmu[NET_RX_RING_SIZE];
+	struct multicall_entry rx_mcl[NET_RX_RING_SIZE+1];
+	struct mmu_update rx_mmu[NET_RX_RING_SIZE];
 };
 
 /*
@@ -317,8 +317,8 @@ again:
 
 static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 {
-	netif_tx_sring_t *txs;
-	netif_rx_sring_t *rxs;
+	struct netif_tx_sring *txs;
+	struct netif_rx_sring *rxs;
 	int err;
 	struct net_device *netdev = info->netdev;
 
@@ -328,13 +328,13 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	info->tx.sring = NULL;
 	info->irq = 0;
 
-	txs = (netif_tx_sring_t *)__get_free_page(GFP_KERNEL);
+	txs = (struct netif_tx_sring *)__get_free_page(GFP_KERNEL);
 	if (!txs) {
 		err = -ENOMEM;
 		xenbus_dev_fatal(dev, err, "allocating tx ring page");
 		goto fail;
 	}
-	rxs = (netif_rx_sring_t *)__get_free_page(GFP_KERNEL);
+	rxs = (struct netif_rx_sring *)__get_free_page(GFP_KERNEL);
 	if (!rxs) {
 		err = -ENOMEM;
 		xenbus_dev_fatal(dev, err, "allocating rx ring page");
@@ -638,7 +638,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	unsigned short id;
 	struct netfront_info *np = netdev_priv(dev);
-	netif_tx_request_t *tx;
+	struct netif_tx_request *tx;
 	RING_IDX i;
 	grant_ref_t ref;
 	unsigned long mfn;
@@ -736,10 +736,10 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 {
 	struct netfront_info *np = netdev_priv(dev);
 	struct sk_buff *skb, *nskb;
-	netif_rx_response_t *rx;
+	struct netif_rx_response *rx;
 	RING_IDX i, rp;
-	mmu_update_t *mmu = np->rx_mmu;
-	multicall_entry_t *mcl = np->rx_mcl;
+	struct mmu_update *mmu = np->rx_mmu;
+	struct multicall_entry *mcl = np->rx_mcl;
 	int work_done, budget, more_to_do = 1;
 	struct sk_buff_head rxq;
 	unsigned long flags;
@@ -962,7 +962,7 @@ static void network_connect(struct net_device *dev)
 {
 	struct netfront_info *np;
 	int i, requeue_idx;
-	netif_tx_request_t *tx;
+	struct netif_tx_request *tx;
 	struct sk_buff *skb;
 
 	np = netdev_priv(dev);
