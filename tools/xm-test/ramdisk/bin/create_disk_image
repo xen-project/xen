@@ -208,6 +208,13 @@ function dd_rootfs_to_image()
 	if [ $? -ne 0 ]; then
 		die "Failed to dd $ROOTFS to $LOOPP."
 	fi
+
+	# Resize fs to use full partition
+	e2fsck -f $LOOPP 
+	resize2fs $LOOPP
+	if [ $? -ne 0 ]; then
+		die "Failed to resize rootfs on $LOOPP."
+	fi
 }
 
 function get_kernel()
