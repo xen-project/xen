@@ -368,7 +368,7 @@ void free_pages(void *pointer, int order)
 void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn, 
                                 unsigned long offset, unsigned long level)
 {   
-    unsigned long *tab = (unsigned long *)start_info.pt_base;
+    pgentry_t *tab = (pgentry_t *)start_info.pt_base;
     unsigned long pt_page = (unsigned long)pfn_to_virt(*pt_pfn); 
     unsigned long prot_e, prot_t, pincmd;
     mmu_update_t mmu_updates[1];
@@ -382,40 +382,45 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
        as a page table page */
     memset((unsigned long*)pfn_to_virt(*pt_pfn), 0, PAGE_SIZE);  
  
-    if (level == L1_FRAME)
+    switch ( level )
     {
+    case L1_FRAME:
          prot_e = L1_PROT;
          prot_t = L2_PROT;
          pincmd = MMUEXT_PIN_L1_TABLE;
-    }
-#if (defined __x86_64__)
-    else if (level == L2_FRAME)
-    {
+         break;
+#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
+    case L2_FRAME:
          prot_e = L2_PROT;
          prot_t = L3_PROT;
          pincmd = MMUEXT_PIN_L2_TABLE;
-    }
-    else if (level == L3_FRAME)
-    {
+         break;
+#endif
+#if defined(__x86_64__)
+    case L3_FRAME:
          prot_e = L3_PROT;
          prot_t = L4_PROT;
          pincmd = MMUEXT_PIN_L3_TABLE;
-    }
+         break;
 #endif
-    else
-    {
+    default:
          printk("new_pt_frame() called with invalid level number %d\n", level);
          do_exit();
-    }    
+         break;
+    }
 
     /* Update the entry */
-#if (defined __x86_64__)
+#if defined(__x86_64__)
     tab = pte_to_virt(tab[l4_table_offset(pt_page)]);
     tab = pte_to_virt(tab[l3_table_offset(pt_page)]);
 #endif
-    mmu_updates[0].ptr = (tab[l2_table_offset(pt_page)] & PAGE_MASK) + 
-                         sizeof(void *)* l1_table_offset(pt_page);
-    mmu_updates[0].val = pfn_to_mfn(*pt_pfn) << PAGE_SHIFT | 
+#if defined(CONFIG_X86_PAE)
+    tab = pte_to_virt(tab[l3_table_offset(pt_page)]);
+#endif
+
+    mmu_updates[0].ptr = ((pgentry_t)tab[l2_table_offset(pt_page)] & PAGE_MASK) + 
+                         sizeof(pgentry_t) * l1_table_offset(pt_page);
+    mmu_updates[0].val = (pgentry_t)pfn_to_mfn(*pt_pfn) << PAGE_SHIFT | 
                          (prot_e & ~_PAGE_RW);
     if(HYPERVISOR_mmu_update(mmu_updates, 1, NULL, DOMID_SELF) < 0)
     {
@@ -434,8 +439,8 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
 
     /* Now fill the new page table page with entries.
        Update the page directory as well. */
-    mmu_updates[0].ptr = (prev_l_mfn << PAGE_SHIFT) + sizeof(void *) * offset;
-    mmu_updates[0].val = pfn_to_mfn(*pt_pfn) << PAGE_SHIFT | prot_t;
+    mmu_updates[0].ptr = ((pgentry_t)prev_l_mfn << PAGE_SHIFT) + sizeof(pgentry_t) * offset;
+    mmu_updates[0].val = (pgentry_t)pfn_to_mfn(*pt_pfn) << PAGE_SHIFT | prot_t;
     if(HYPERVISOR_mmu_update(mmu_updates, 1, NULL, DOMID_SELF) < 0) 
     {            
        printk("ERROR: mmu_update failed\n");
@@ -450,16 +455,13 @@ void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
     unsigned long start_address, end_address;
     unsigned long pfn_to_map, pt_pfn = *start_pfn;
     static mmu_update_t mmu_updates[L1_PAGETABLE_ENTRIES + 1];
-    unsigned long *tab = (unsigned long *)start_info.pt_base;
+    pgentry_t *tab = (pgentry_t *)start_info.pt_base, page;
     unsigned long mfn = pfn_to_mfn(virt_to_pfn(start_info.pt_base));
-    unsigned long page, offset;
+    unsigned long offset;
     int count = 0;
 
-#if defined(__x86_64__)
-    pfn_to_map = (start_info.nr_pt_frames - 3) * L1_PAGETABLE_ENTRIES;
-#else
-    pfn_to_map = (start_info.nr_pt_frames - 1) * L1_PAGETABLE_ENTRIES;
-#endif
+    pfn_to_map = (start_info.nr_pt_frames - UNMAPPED_PT_FRAMES) * L1_PAGETABLE_ENTRIES;
+
     start_address = (unsigned long)pfn_to_virt(pfn_to_map);
     end_address = (unsigned long)pfn_to_virt(*max_pfn);
     
@@ -468,7 +470,7 @@ void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
 
     while(start_address < end_address)
     {
-        tab = (unsigned long *)start_info.pt_base;
+        tab = (pgentry_t *)start_info.pt_base;
         mfn = pfn_to_mfn(virt_to_pfn(start_info.pt_base));
 
 #if defined(__x86_64__)
@@ -480,6 +482,8 @@ void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
         page = tab[offset];
         mfn = pte_to_mfn(page);
         tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
+#endif
+#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
         offset = l3_table_offset(start_address);
         /* Need new L2 pt frame */
         if(!(start_address & L2_MASK)) 
@@ -498,9 +502,9 @@ void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
         mfn = pte_to_mfn(page);
         offset = l1_table_offset(start_address);
 
-        mmu_updates[count].ptr = (mfn << PAGE_SHIFT) + sizeof(void *) * offset;
+        mmu_updates[count].ptr = ((pgentry_t)mfn << PAGE_SHIFT) + sizeof(pgentry_t) * offset;
         mmu_updates[count].val = 
-            pfn_to_mfn(pfn_to_map++) << PAGE_SHIFT | L1_PROT;
+            (pgentry_t)pfn_to_mfn(pfn_to_map++) << PAGE_SHIFT | L1_PROT;
         count++;
         if (count == L1_PAGETABLE_ENTRIES || pfn_to_map == *max_pfn)
         {
@@ -557,9 +561,6 @@ void init_mm(void)
     printk("  stack start:  %p\n", &stack);
     printk("  _end:         %p\n", &_end);
 
-    /* set up minimal memory infos */
-    phys_to_machine_mapping = (unsigned long *)start_info.mfn_list;
-   
     /* First page follows page table pages and 3 more pages (store page etc) */
     start_pfn = PFN_UP(to_phys(start_info.pt_base)) + 
                 start_info.nr_pt_frames + 3;
@@ -569,7 +570,7 @@ void init_mm(void)
     printk("  max_pfn:      %lx\n", max_pfn);
 
     build_pagetable(&start_pfn, &max_pfn);
-    
+
     /*
      * now we can initialise the page allocator
      */
