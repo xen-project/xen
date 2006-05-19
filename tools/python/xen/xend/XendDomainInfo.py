@@ -1264,7 +1264,7 @@ class XendDomainInfo:
             m = self.image.getDomainMemory(self.info['memory'] * 1024)
             balloon.free(m)
             xc.domain_setmaxmem(self.domid, m)
-            xc.domain_memory_increase_reservation(self.domid, m, 0, 0)
+            xc.domain_memory_increase_reservation(self.domid, self.info['memory'] * 1024, 0, 0)
 
             self.createChannels()
 

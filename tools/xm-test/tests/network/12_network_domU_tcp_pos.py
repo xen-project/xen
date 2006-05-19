@@ -50,7 +50,7 @@ try:
     ip2 = dst_netdev.getNetDevIP()
     for size in pingsizes:
         out = src_console.runCmd("hping2 " + ip2 + " -E /dev/urandom -q -c 20 "
-              + "--fast -d " + str(size))
+              + "--fast -d " + str(size) + " -N " + str(size))
         if out["return"]:
             fails += " " + str(size) 
             print out["output"]
