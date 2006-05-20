@@ -329,6 +329,13 @@ static int setup_pg_tables_pae(int xc_handle, uint32_t dom,
         vl1e++;
     }
 
+    /* Xen requires a mid-level pgdir mapping 0xC0000000 region. */
+    if ( (vl3tab[3] & _PAGE_PRESENT) == 0 )
+    {
+        alloc_pt(l2tab, vl2tab, pl2tab);
+        vl3tab[3] = l2tab | L3_PROT;
+    }
+
     munmap(vl1tab, PAGE_SIZE);
     munmap(vl2tab, PAGE_SIZE);
     munmap(vl3tab, PAGE_SIZE);
@@ -727,25 +734,28 @@ static int setup_guest(int xc_handle,
         v_end            = (vstack_end + (1UL<<22)-1) & ~((1UL<<22)-1);
         if ( (v_end - vstack_end) < (512UL << 10) )
             v_end += 1UL << 22; /* Add extra 4MB to get >= 512kB padding. */
+#define NR(_l,_h,_s) \
+    (((((_h) + ((1UL<<(_s))-1)) & ~((1UL<<(_s))-1)) - \
+    ((_l) & ~((1UL<<(_s))-1))) >> (_s))
 #if defined(__i386__)
         if ( dsi.pae_kernel )
         {
-            /* FIXME: assumes one L2 pgtable @ 0xc0000000 */
-            if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT_PAE)-1)) >>
-                   L2_PAGETABLE_SHIFT_PAE) + 2) <= nr_pt_pages )
+            if ( (1 + /* # L3 */
+                  NR(dsi.v_start, v_end, L3_PAGETABLE_SHIFT_PAE) + /* # L2 */
+                  NR(dsi.v_start, v_end, L2_PAGETABLE_SHIFT_PAE) + /* # L1 */
+                  /* Include a fourth mid-level page directory for Xen. */
+                  (v_end <= (3 << L3_PAGETABLE_SHIFT_PAE)))
+                  <= nr_pt_pages )
                 break;
         }
         else
         {
-            if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT)-1)) >>
-                   L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
+            if ( (1 + /* # L2 */
+                  NR(dsi.v_start, v_end, L2_PAGETABLE_SHIFT)) /* # L1 */
+                 <= nr_pt_pages )
                 break;
         }
-#endif
-#if defined(__x86_64__)
-#define NR(_l,_h,_s) \
-    (((((_h) + ((1UL<<(_s))-1)) & ~((1UL<<(_s))-1)) - \
-    ((_l) & ~((1UL<<(_s))-1))) >> (_s))
+#elif defined(__x86_64__)
         if ( (1 + /* # L4 */
               NR(dsi.v_start, v_end, L4_PAGETABLE_SHIFT) + /* # L3 */
               NR(dsi.v_start, v_end, L3_PAGETABLE_SHIFT) + /* # L2 */
