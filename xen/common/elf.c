@@ -94,12 +94,17 @@ int parseelfimage(struct domain_setup_info *dsi)
     elf_pa_off_defined = (p != NULL);
     elf_pa_off = elf_pa_off_defined ? simple_strtoul(p+17, &p, 0) : virt_base;
 
+    if ( elf_pa_off_defined && !virt_base_defined )
+        goto bad_image;
+
     for ( h = 0; h < ehdr->e_phnum; h++ )
     {
         phdr = (Elf_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
             continue;
         vaddr = phdr->p_paddr - elf_pa_off + virt_base;
+        if ( (vaddr + phdr->p_memsz) < vaddr )
+            goto bad_image;
         if ( vaddr < kernstart )
             kernstart = vaddr;
         if ( (vaddr + phdr->p_memsz) > kernend )
@@ -120,11 +125,9 @@ int parseelfimage(struct domain_setup_info *dsi)
 
     if ( (kernstart > kernend) || 
          (dsi->v_kernentry < kernstart) ||
-         (dsi->v_kernentry > kernend) )
-    {
-        printk("Malformed ELF image.\n");
-        return -EINVAL;
-    }
+         (dsi->v_kernentry > kernend) ||
+         (dsi->v_start > kernstart) )
+        goto bad_image;
 
     if ( (p = strstr(guestinfo, "BSD_SYMTAB")) != NULL )
             dsi->load_symtab = 1;
@@ -136,6 +139,10 @@ int parseelfimage(struct domain_setup_info *dsi)
     loadelfsymtab(dsi, 0);
 
     return 0;
+
+ bad_image:
+    printk("Malformed ELF image.\n");
+    return -EINVAL;
 }
 
 int loadelfimage(struct domain_setup_info *dsi)
