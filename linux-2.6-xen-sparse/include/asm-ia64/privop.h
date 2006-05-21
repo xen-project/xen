@@ -44,13 +44,14 @@
 #define ia64_ptcl			__ia64_ptcl
 #define ia64_ptri			__ia64_ptri
 #define ia64_ptrd			__ia64_ptrd
-#define	ia64_get_psr_i			__ia64_get_psr_i
+#define ia64_get_psr_i			__ia64_get_psr_i
 #define ia64_intrin_local_irq_restore	__ia64_intrin_local_irq_restore
 #define ia64_pal_halt_light		__ia64_pal_halt_light
-#define	ia64_leave_kernel		__ia64_leave_kernel
-#define	ia64_leave_syscall		__ia64_leave_syscall
-#define	ia64_switch_to			__ia64_switch_to
-#define	ia64_pal_call_static		__ia64_pal_call_static
+#define ia64_leave_kernel		__ia64_leave_kernel
+#define ia64_leave_syscall		__ia64_leave_syscall
+#define ia64_trace_syscall		__ia64_trace_syscall
+#define ia64_switch_to			__ia64_switch_to
+#define ia64_pal_call_static		__ia64_pal_call_static
 
 #endif /* !IA64_PARAVIRTUALIZED */
 
