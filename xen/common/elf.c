@@ -103,10 +103,18 @@ int parseelfimage(struct domain_setup_info *dsi)
             kernend = vaddr + phdr->p_memsz;
     }
 
-    if ( virt_base )
-        dsi->v_start = virt_base;
-    else
+    dsi->v_start = virt_base;
+    if ( dsi->v_start == 0 )
+    {
+        /*
+         * Legacy compatibility and images with no __xen_guest section:
+         * assume header addresses are virtual addresses, and that 
+         * guest memory should be mapped starting at kernel load address.
+         */
         dsi->v_start = kernstart;
+        if ( dsi->elf_paddr_offset == 0 )
+            dsi->elf_paddr_offset = dsi->v_start;
+    }
 
     dsi->v_kernentry = ehdr->e_entry;
     if ( (p = strstr(guestinfo, "VIRT_ENTRY=")) != NULL )

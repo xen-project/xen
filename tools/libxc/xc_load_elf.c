@@ -148,14 +148,9 @@ static int parseelfimage(const char *image,
 
     dsi->xen_guest_string = guestinfo;
 
-    if ( (p = strstr(guestinfo, "VIRT_BASE=")) == NULL )
-    {
-        ERROR("Malformed ELF image. No VIRT_BASE specified");
-        return -EINVAL;
-    }
-
-    virt_base = strtoul(p+10, &p, 0);
-
+    virt_base = 0;
+    if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
+        virt_base = strtoul(p+10, &p, 0);
     dsi->elf_paddr_offset = virt_base;
     if ( (p = strstr(guestinfo, "ELF_PADDR_OFFSET=")) != NULL )
         dsi->elf_paddr_offset = strtoul(p+17, &p, 0);
@@ -172,10 +167,18 @@ static int parseelfimage(const char *image,
             kernend = vaddr + phdr->p_memsz;
     }
 
-    if ( virt_base )
-        dsi->v_start = virt_base;
-    else
+    dsi->v_start = virt_base;
+    if ( dsi->v_start == 0 )
+    {
+        /*
+         * Legacy compatibility and images with no __xen_guest section:
+         * assume header addresses are virtual addresses, and that 
+         * guest memory should be mapped starting at kernel load address.
+         */
         dsi->v_start = kernstart;
+        if ( dsi->elf_paddr_offset == 0 )
+            dsi->elf_paddr_offset = dsi->v_start;
+    }
 
     dsi->v_kernentry = ehdr->e_entry;
     if ( (p = strstr(guestinfo, "VIRT_ENTRY=")) != NULL )
