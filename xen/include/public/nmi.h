@@ -34,10 +34,11 @@
  * arg == pointer to xennmi_callback structure.
  */
 #define XENNMI_register_callback   0
-typedef struct xennmi_callback {
+struct xennmi_callback {
     unsigned long handler_address;
     unsigned long pad;
-} xennmi_callback_t;
+};
+typedef struct xennmi_callback xennmi_callback_t;
 DEFINE_XEN_GUEST_HANDLE(xennmi_callback_t);
 
 /*

@@ -46,9 +46,10 @@
  * @arg == pointer to sched_shutdown structure.
  */
 #define SCHEDOP_shutdown    2
-typedef struct sched_shutdown {
+struct sched_shutdown {
     unsigned int reason; /* SHUTDOWN_* */
-} sched_shutdown_t;
+};
+typedef struct sched_shutdown sched_shutdown_t;
 DEFINE_XEN_GUEST_HANDLE(sched_shutdown_t);
 
 /*
@@ -57,11 +58,12 @@ DEFINE_XEN_GUEST_HANDLE(sched_shutdown_t);
  * @arg == pointer to sched_poll structure.
  */
 #define SCHEDOP_poll        3
-typedef struct sched_poll {
+struct sched_poll {
     XEN_GUEST_HANDLE(evtchn_port_t) ports;
     unsigned int nr_ports;
     uint64_t timeout;
-} sched_poll_t;
+};
+typedef struct sched_poll sched_poll_t;
 DEFINE_XEN_GUEST_HANDLE(sched_poll_t);
 
 /*
@@ -71,10 +73,11 @@ DEFINE_XEN_GUEST_HANDLE(sched_poll_t);
  * @arg == pointer to sched_remote_shutdown structure.
  */
 #define SCHEDOP_remote_shutdown        4
-typedef struct sched_remote_shutdown {
+struct sched_remote_shutdown {
     domid_t domain_id;         /* Remote domain ID */
     unsigned int reason;       /* SHUTDOWN_xxx reason */
-} sched_remote_shutdown_t;
+};
+typedef struct sched_remote_shutdown sched_remote_shutdown_t;
 DEFINE_XEN_GUEST_HANDLE(sched_remote_shutdown_t);
 
 /*

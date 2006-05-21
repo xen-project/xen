@@ -56,7 +56,7 @@
  * @extra_arg == pointer to vcpu_runstate_info structure.
  */
 #define VCPUOP_get_runstate_info    4
-typedef struct vcpu_runstate_info {
+struct vcpu_runstate_info {
     /* VCPU's current state (RUNSTATE_*). */
     int      state;
     /* When was current state entered (system time, ns)? */
@@ -66,7 +66,8 @@ typedef struct vcpu_runstate_info {
      * guaranteed not to drift from system time.
      */
     uint64_t time[4];
-} vcpu_runstate_info_t;
+};
+typedef struct vcpu_runstate_info vcpu_runstate_info_t;
 
 /* VCPU is currently running on a physical CPU. */
 #define RUNSTATE_running  0
@@ -99,12 +100,13 @@ typedef struct vcpu_runstate_info {
  * @extra_arg == pointer to vcpu_register_runstate_memory_area structure.
  */
 #define VCPUOP_register_runstate_memory_area 5
-typedef struct vcpu_register_runstate_memory_area {
+struct vcpu_register_runstate_memory_area {
     union {
         struct vcpu_runstate_info *v;
         uint64_t p;
     } addr;
-} vcpu_register_runstate_memory_area_t;
+};
+typedef struct vcpu_register_runstate_memory_area vcpu_register_runstate_memory_area_t;
 
 #endif /* __XEN_PUBLIC_VCPU_H__ */
 

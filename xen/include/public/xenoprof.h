@@ -41,7 +41,7 @@ struct event_log {
 };
 
 /* Xenoprof buffer shared between Xen and domain - 1 per VCPU */
-typedef struct xenoprof_buf {
+struct xenoprof_buf {
     uint32_t event_head;
     uint32_t event_tail;
     uint32_t event_size;
@@ -51,10 +51,11 @@ typedef struct xenoprof_buf {
     uint64_t user_samples;
     uint64_t lost_samples;
     struct event_log event_log[1];
-} xenoprof_buf_t;
+};
+typedef struct xenoprof_buf xenoprof_buf_t;
 DEFINE_XEN_GUEST_HANDLE(xenoprof_buf_t);
 
-typedef struct xenoprof_init {
+struct xenoprof_init {
     int32_t  max_samples;
     int32_t  num_events;
     int32_t  is_primary;
@@ -62,10 +63,11 @@ typedef struct xenoprof_init {
     int32_t  bufsize;
     uint64_t buf_maddr;
     char cpu_type[XENOPROF_CPU_TYPE_SIZE];
-} xenoprof_init_t;
+};
+typedef struct xenoprof_init xenoprof_init_t;
 DEFINE_XEN_GUEST_HANDLE(xenoprof_init_t);
 
-typedef struct xenoprof_counter {
+struct xenoprof_counter {
     uint32_t ind;
     uint64_t count;
     uint32_t enabled;
@@ -74,7 +76,8 @@ typedef struct xenoprof_counter {
     uint32_t kernel;
     uint32_t user;
     uint64_t unit_mask;
-} xenoprof_counter_t;
+};
+typedef struct xenoprof_counter xenoprof_counter_t;
 DEFINE_XEN_GUEST_HANDLE(xenoprof_counter_t);
 
 

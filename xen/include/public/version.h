@@ -22,12 +22,13 @@ typedef char xen_extraversion_t[16];
 
 /* arg == xen_compile_info_t. */
 #define XENVER_compile_info 2
-typedef struct xen_compile_info {
+struct xen_compile_info {
     char compiler[64];
     char compile_by[16];
     char compile_domain[32];
     char compile_date[32];
-} xen_compile_info_t;
+};
+typedef struct xen_compile_info xen_compile_info_t;
 
 #define XENVER_capabilities 3
 typedef char xen_capabilities_info_t[1024];
@@ -38,15 +39,17 @@ typedef char xen_changeset_info_t[64];
 #define XEN_CHANGESET_INFO_LEN (sizeof(xen_changeset_info_t))
 
 #define XENVER_platform_parameters 5
-typedef struct xen_platform_parameters {
+struct xen_platform_parameters {
     unsigned long virt_start;
-} xen_platform_parameters_t;
+};
+typedef struct xen_platform_parameters xen_platform_parameters_t;
 
 #define XENVER_get_features 6
-typedef struct xen_feature_info {
+struct xen_feature_info {
     unsigned int submap_idx;    /* IN: which 32-bit submap to return */
     uint32_t     submap;        /* OUT: 32-bit submap */
-} xen_feature_info_t;
+};
+typedef struct xen_feature_info xen_feature_info_t;
 
 /* Declares the features reported by XENVER_get_features. */
 #include "features.h"

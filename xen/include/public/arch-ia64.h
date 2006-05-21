@@ -38,15 +38,17 @@ DEFINE_XEN_GUEST_HANDLE(void);
 #ifndef __ASSEMBLY__
 
 #define MAX_NR_SECTION  32  /* at most 32 memory holes */
-typedef struct {
+struct mm_section {
     unsigned long start;  /* start of memory hole */
     unsigned long end;    /* end of memory hole */
-} mm_section_t;
+};
+typedef struct mm_section mm_section_t;
 
-typedef struct {
+struct pmt_entry {
     unsigned long mfn : 56;
     unsigned long type: 8;
-} pmt_entry_t;
+};
+typedef struct pmt_entry pmt_entry_t;
 
 #define GPFN_MEM          (0UL << 56) /* Guest pfn is normal mem */
 #define GPFN_FRAME_BUFFER (1UL << 56) /* VGA framebuffer */
@@ -93,10 +95,11 @@ typedef struct {
  * NB. This may become a 64-bit count with no shift. If this happens then the 
  * structure size will still be 8 bytes, so no other alignments will change.
  */
-typedef struct {
+struct tsc_timestamp {
     unsigned int  tsc_bits;      /* 0: 32 bits read from the CPU's TSC. */
     unsigned int  tsc_bitshift;  /* 4: 'tsc_bits' uses N:N+31 of TSC.   */
-} tsc_timestamp_t; /* 8 bytes */
+}; /* 8 bytes */
+typedef struct tsc_timestamp tsc_timestamp_t;
 
 struct pt_fpreg {
     union {
@@ -105,7 +108,7 @@ struct pt_fpreg {
     } u;
 };
 
-typedef struct cpu_user_regs{
+struct cpu_user_regs {
     /* The following registers are saved by SAVE_MIN: */
     unsigned long b6;  /* scratch */
     unsigned long b7;  /* scratch */
@@ -179,9 +182,10 @@ typedef struct cpu_user_regs{
     unsigned long eml_unat;    /* used for emulating instruction */
     unsigned long rfi_pfs;     /* used for elulating rfi */
 
-}cpu_user_regs_t;
+};
+typedef struct cpu_user_regs cpu_user_regs_t;
 
-typedef union {
+union vac {
     unsigned long value;
     struct {
         int a_int:1;
@@ -193,9 +197,10 @@ typedef union {
         int a_bsw:1;
         long reserved:57;
     };
-} vac_t;
+};
+typedef union vac vac_t;
 
-typedef union {
+union vdc {
     unsigned long value;
     struct {
         int d_vmsw:1;
@@ -206,11 +211,12 @@ typedef union {
         int d_itm:1;
         long reserved:58;
     };
-} vdc_t;
+};
+typedef union vdc vdc_t;
 
-typedef struct {
-    vac_t   vac;
-    vdc_t   vdc;
+struct mapped_regs {
+    union vac   vac;
+    union vdc   vdc;
     unsigned long  virt_env_vaddr;
     unsigned long  reserved1[29];
     unsigned long  vhpi;
@@ -290,27 +296,31 @@ typedef struct {
     unsigned long  reserved6[3456];
     unsigned long  vmm_avail[128];
     unsigned long  reserved7[4096];
-} mapped_regs_t;
+};
+typedef struct mapped_regs mapped_regs_t;
 
-typedef struct {
-    mapped_regs_t *privregs;
+struct arch_vcpu_info {
+    struct mapped_regs *privregs;
     int evtchn_vector;
-} arch_vcpu_info_t;
+};
+typedef struct arch_vcpu_info arch_vcpu_info_t;
 
 typedef mapped_regs_t vpd_t;
 
-typedef struct {
+struct arch_shared_info {
     unsigned int flags;
     unsigned long start_info_pfn;
-} arch_shared_info_t;
+};
+typedef struct arch_shared_info arch_shared_info_t;
 
-typedef struct {
+struct arch_initrd_info {
     unsigned long start;
     unsigned long size;
-} arch_initrd_info_t;
+};
+typedef struct arch_initrd_info arch_initrd_info_t;
 
 #define IA64_COMMAND_LINE_SIZE 512
-typedef struct vcpu_guest_context {
+struct vcpu_guest_context {
 #define VGCF_FPU_VALID (1<<0)
 #define VGCF_VMX_GUEST (1<<1)
 #define VGCF_IN_KERNEL (1<<2)
@@ -320,12 +330,13 @@ typedef struct vcpu_guest_context {
     unsigned long sys_pgnr;    /* System pages out of domain memory */
     unsigned long vm_assist;   /* VMASST_TYPE_* bitmap, now none on IPF */
 
-    cpu_user_regs_t regs;
-    arch_vcpu_info_t vcpu;
-    arch_shared_info_t shared;
-    arch_initrd_info_t initrd;
+    struct cpu_user_regs regs;
+    struct arch_vcpu_info vcpu;
+    struct arch_shared_info shared;
+    struct arch_initrd_info initrd;
     char cmdline[IA64_COMMAND_LINE_SIZE];
-} vcpu_guest_context_t;
+};
+typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
 // dom0 vp op

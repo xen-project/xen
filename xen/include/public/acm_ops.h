@@ -72,7 +72,7 @@ struct acm_getdecision {
     int acm_decision;           /* out */
 };
 
-typedef struct acm_op {
+struct acm_op {
     uint32_t cmd;
     uint32_t interface_version;      /* ACM_INTERFACE_VERSION */
     union {
@@ -82,7 +82,8 @@ typedef struct acm_op {
         struct acm_getssid getssid;
         struct acm_getdecision getdecision;
     } u;
-} acm_op_t;
+};
+typedef struct acm_op acm_op_t;
 DEFINE_XEN_GUEST_HANDLE(acm_op_t);
 
 #endif                          /* __XEN_PUBLIC_ACM_OPS_H__ */
