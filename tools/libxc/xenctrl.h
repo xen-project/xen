@@ -594,6 +594,6 @@ int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu,
                    unsigned long long ptr, unsigned long long val);
 int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu);
 
-int xc_acm_op(int xc_handle, struct acm_op *op);
+int xc_acm_op(int xc_handle, int cmd, void *arg, size_t arg_size);
 
 #endif

@@ -231,14 +231,16 @@ void acm_dump_policy_buffer(void *buf, int buflen)
 uint8_t pull_buffer[PULL_CACHE_SIZE];
 int acm_domain_getpolicy(int xc_handle)
 {
-    struct acm_op op;
+    struct acm_getpolicy getpolicy;
     int ret;
 
     memset(pull_buffer, 0x00, sizeof(pull_buffer));
-    op.cmd = ACM_GETPOLICY;
-    op.u.getpolicy.pullcache = (void *) pull_buffer;
-    op.u.getpolicy.pullcache_size = sizeof(pull_buffer);
-    if ((ret = xc_acm_op(xc_handle, &op)) < 0) {
+    getpolicy.interface_version = ACM_INTERFACE_VERSION;
+    getpolicy.pullcache = (void *) pull_buffer;
+    getpolicy.pullcache_size = sizeof(pull_buffer);
+    ret = xc_acm_op(xc_handle, ACMOP_getpolicy, &getpolicy, sizeof(getpolicy));
+
+    if (ret < 0) {
         printf("ACM operation failed: errno=%d\n", errno);
         if (errno == EACCES)
             fprintf(stderr, "ACM operation failed -- need to"
@@ -275,13 +277,13 @@ int acm_domain_loadpolicy(int xc_handle, const char *filename)
         goto free_out;
     }
     if (len == read(fd, buffer, len)) {
-        struct acm_op op;
+        struct acm_setpolicy setpolicy;
         /* dump it and then push it down into xen/acm */
         acm_dump_policy_buffer(buffer, len);
-        op.cmd = ACM_SETPOLICY;
-        op.u.setpolicy.pushcache = (void *) buffer;
-        op.u.setpolicy.pushcache_size = len;
-        ret = xc_acm_op(xc_handle, &op);
+        setpolicy.interface_version = ACM_INTERFACE_VERSION;
+        setpolicy.pushcache = (void *) buffer;
+        setpolicy.pushcache_size = len;
+        ret = xc_acm_op(xc_handle, ACMOP_setpolicy, &setpolicy, sizeof(setpolicy));
 
         if (ret)
             printf
@@ -322,15 +324,15 @@ void dump_ste_stats(struct acm_ste_stats_buffer *ste_stats)
 int acm_domain_dumpstats(int xc_handle)
 {
     uint8_t stats_buffer[PULL_STATS_SIZE];
-    struct acm_op op;
+    struct acm_dumpstats dumpstats;
     int ret;
     struct acm_stats_buffer *stats;
 
     memset(stats_buffer, 0x00, sizeof(stats_buffer));
-    op.cmd = ACM_DUMPSTATS;
-    op.u.dumpstats.pullcache = (void *) stats_buffer;
-    op.u.dumpstats.pullcache_size = sizeof(stats_buffer);
-    ret = xc_acm_op(xc_handle, &op);
+    dumpstats.interface_version = ACM_INTERFACE_VERSION;
+    dumpstats.pullcache = (void *) stats_buffer;
+    dumpstats.pullcache_size = sizeof(stats_buffer);
+    ret = xc_acm_op(xc_handle, ACMOP_dumpstats, &dumpstats, sizeof(dumpstats));
 
     if (ret < 0) {
         printf

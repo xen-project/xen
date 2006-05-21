@@ -1,13 +1,10 @@
 /******************************************************************************
+ * xc_acm.c
  *
- * Copyright (C) 2005 IBM Corporation
+ * Copyright (C) 2005, 2006 IBM Corporation, R Sailer
  *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * Authors:
- * Reiner Sailer <sailer@watson.ibm.com>
- * Stefan Berger <stefanb@watson.ibm.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -17,29 +14,23 @@
 
 #include "xc_private.h"
 
-int xc_acm_op(int xc_handle, struct acm_op *op)
+
+int xc_acm_op(int xc_handle, int cmd, void *arg, size_t arg_size)
 {
     int ret = -1;
     DECLARE_HYPERCALL;
 
-    op->interface_version = ACM_INTERFACE_VERSION;
-
     hypercall.op = __HYPERVISOR_acm_op;
-    hypercall.arg[0] = (unsigned long) op;
+    hypercall.arg[0] = cmd;
+    hypercall.arg[1] = (unsigned long) arg;
 
-    if (mlock(op, sizeof(*op)) != 0) {
-        PERROR("Could not lock memory for Xen policy hypercall");
-        goto out1;
+    if (mlock(arg, arg_size) != 0) {
+        PERROR("xc_acm_op: arg mlock failed");
+        goto out;
     }
-
     ret = do_xen_hypercall(xc_handle, &hypercall);
-    ret = ioctl(xc_handle, IOCTL_PRIVCMD_HYPERCALL, &hypercall);
-    if (ret < 0) {
-        goto out2;
-    }
- out2:
-    safe_munlock(op, sizeof(*op));
- out1:
+    safe_munlock(arg, arg_size);
+ out:
     return ret;
 }
 
