@@ -3,7 +3,7 @@
 
 HAS_ACPI := y
 VALIDATE_VT	?= n
-xen_ia64_dom0_virtual_physical	?= n
+xen_ia64_dom0_virtual_physical	?= y
 no_warns ?= n
 
 ifneq ($(COMPILE_ARCH),$(TARGET_ARCH))
