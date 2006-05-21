@@ -10,6 +10,8 @@
 # Tag of new upstream base to go to
 : ${NEWTAG:=v$(wget -O- -o/dev/null http://kernel.org/kdist/finger_banner \
     | awk '/latest stable/{print $NF}')}
+# Restrict merge to specific arch (set to . for all)
+: ${ARCH:=ia64}
 
 SPARSEDIR=linux-2.6-xen-sparse
 
@@ -35,7 +37,7 @@ for t in $OLDTAG $NEWTAG; do
 done
 hg up -C $OLDTAG || exit 1
 cd $WD
-for i in $(hg manifest | awk '{print($3)}' | grep $SPARSEDIR | grep ia64); do
+for i in $(hg manifest | awk '{print($3)}' | grep $SPARSEDIR | grep "$ARCH"); do
 	cd $WD
 
 	FILENAME=$(basename $i)
@@ -133,5 +135,5 @@ for i in $(hg manifest | awk '{print($3)}' | grep $SPARSEDIR | grep ia64); do
 	fi
 done
 cd $LINUXPATH
-hg up $OLDCSET
+hg up -C $OLDCSET
 cd $WD
