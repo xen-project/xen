@@ -51,7 +51,7 @@ config GENERIC_IOMAP
 	default y
 
 config XEN
-	bool
+	bool "Xen hypervisor support"
 	default y
 	help
 	  Enable Xen hypervisor support.  Resulting kernel runs
@@ -60,6 +60,7 @@ config XEN
 config ARCH_XEN
 	bool
 	default y
+	depends on XEN
 	help
 	  TEMP ONLY. Needs to be on for drivers/xen to build.
 
