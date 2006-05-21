@@ -23,10 +23,10 @@ int parseelfimage(struct domain_setup_info *dsi)
     Elf_Ehdr *ehdr = (Elf_Ehdr *)dsi->image_addr;
     Elf_Phdr *phdr;
     Elf_Shdr *shdr;
-    unsigned long kernstart = ~0UL, kernend=0UL, vaddr, virt_base;
+    unsigned long kernstart = ~0UL, kernend=0UL, vaddr, virt_base, elf_pa_off;
     char *shstrtab, *guestinfo=NULL, *p;
     char *elfbase = (char *)dsi->image_addr;
-    int h;
+    int h, virt_base_defined, elf_pa_off_defined;
 
     if ( !elf_sanity_check(ehdr) )
         return -EINVAL;
@@ -84,37 +84,35 @@ int parseelfimage(struct domain_setup_info *dsi)
     if ( guestinfo == NULL )
         guestinfo = "";
 
-    virt_base = 0;
-    if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
-        virt_base = simple_strtoul(p+10, &p, 0);
-    dsi->elf_paddr_offset = virt_base;
-    if ( (p = strstr(guestinfo, "ELF_PADDR_OFFSET=")) != NULL )
-        dsi->elf_paddr_offset = simple_strtoul(p+17, &p, 0);
+    /* Initial guess for virt_base is 0 if it is not explicitly defined. */
+    p = strstr(guestinfo, "VIRT_BASE=");
+    virt_base_defined = (p != NULL);
+    virt_base = virt_base_defined ? simple_strtoul(p+10, &p, 0) : 0;
+
+    /* Initial guess for elf_pa_off is virt_base if not explicitly defined. */
+    p = strstr(guestinfo, "ELF_PADDR_OFFSET=");
+    elf_pa_off_defined = (p != NULL);
+    elf_pa_off = elf_pa_off_defined ? simple_strtoul(p+17, &p, 0) : virt_base;
 
     for ( h = 0; h < ehdr->e_phnum; h++ )
     {
         phdr = (Elf_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
             continue;
-        vaddr = phdr->p_paddr - dsi->elf_paddr_offset + virt_base;
+        vaddr = phdr->p_paddr - elf_pa_off + virt_base;
         if ( vaddr < kernstart )
             kernstart = vaddr;
         if ( (vaddr + phdr->p_memsz) > kernend )
             kernend = vaddr + phdr->p_memsz;
     }
 
-    dsi->v_start = virt_base;
-    if ( dsi->v_start == 0 )
-    {
-        /*
-         * Legacy compatibility and images with no __xen_guest section:
-         * assume header addresses are virtual addresses, and that 
-         * guest memory should be mapped starting at kernel load address.
-         */
-        dsi->v_start = kernstart;
-        if ( dsi->elf_paddr_offset == 0 )
-            dsi->elf_paddr_offset = dsi->v_start;
-    }
+    /*
+     * Legacy compatibility and images with no __xen_guest section: assume
+     * header addresses are virtual addresses, and that guest memory should be
+     * mapped starting at kernel load address.
+     */
+    dsi->v_start          = virt_base_defined  ? virt_base  : kernstart;
+    dsi->elf_paddr_offset = elf_pa_off_defined ? elf_pa_off : dsi->v_start;
 
     dsi->v_kernentry = ehdr->e_entry;
     if ( (p = strstr(guestinfo, "VIRT_ENTRY=")) != NULL )
