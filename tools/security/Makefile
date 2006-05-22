@@ -3,7 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 CFLAGS   += -Werror
 CFLAGS   += -fno-strict-aliasing
-CFLAGS   += -I.
+CFLAGS   += -I. -I $(XEN_LIBXC)
 
 CPPFLAGS += -MMD -MF .$*.d
 PROG_DEPS = .*.d
@@ -89,7 +89,7 @@ build: mk-symlinks $(ACM_INST_TOOLS) $(ACM_NOINST_TOOLS)
 	chmod 700 $(ACM_SCRIPTS)
 
 xensec_tool: $(OBJS_TOOL)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -L$(XEN_LIBXC) -lxenctrl
 
 xensec_xml2bin: $(OBJS_XML2BIN)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^

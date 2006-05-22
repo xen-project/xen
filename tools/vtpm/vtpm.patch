@@ -1,12 +1,12 @@
 diff -uprN orig/tpm_emulator-0.2-x86_64/AUTHORS vtpm/AUTHORS
 --- orig/tpm_emulator-0.2-x86_64/AUTHORS	2005-08-15 00:58:57.000000000 -0700
-+++ vtpm/AUTHORS	2005-09-14 20:27:22.000000000 -0700
++++ vtpm/AUTHORS	2006-05-17 09:31:11.000000000 -0700
 @@ -1 +1,2 @@
  Mario Strasser <mast@gmx.net>
 +INTEL Corp <>
 diff -uprN orig/tpm_emulator-0.2-x86_64/ChangeLog vtpm/ChangeLog
 --- orig/tpm_emulator-0.2-x86_64/ChangeLog	2005-08-15 00:58:57.000000000 -0700
-+++ vtpm/ChangeLog	2005-09-14 20:27:22.000000000 -0700
++++ vtpm/ChangeLog	2006-05-17 09:31:11.000000000 -0700
 @@ -1,3 +1,7 @@
 +2005-08-16 Intel Corp
 +	Moved module out of kernel to run as a ring 3 app
@@ -16,8 +16,8 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/ChangeLog vtpm/ChangeLog
  	* all: some typos corrected
  	* tpm_integrity.c: bug in TPM_Extend fixed
 diff -uprN orig/tpm_emulator-0.2-x86_64/crypto/gmp_kernel_wrapper.c vtpm/crypto/gmp_kernel_wrapper.c
---- orig/tpm_emulator-0.2-x86_64/crypto/gmp_kernel_wrapper.c	2005-09-15 19:21:42.508873032 -0700
-+++ vtpm/crypto/gmp_kernel_wrapper.c	2005-09-15 19:25:37.319176440 -0700
+--- orig/tpm_emulator-0.2-x86_64/crypto/gmp_kernel_wrapper.c	2006-05-17 09:34:13.000000000 -0700
++++ vtpm/crypto/gmp_kernel_wrapper.c	2006-05-17 09:31:11.000000000 -0700
 @@ -1,5 +1,6 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -59,10 +59,9 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/crypto/gmp_kernel_wrapper.c vtpm/crypto/
  {
 -  void *ret = (void*)kmalloc(new_size, GFP_KERNEL);
 -  if (!ret) panic(KERN_CRIT TPM_MODULE_NAME "GMP: Cannot reallocate memory "
--    "(old_size=%Zu new_size=%Zu)\n", old_size, new_size);
 +  void *ret = (void*)malloc(new_size);
 +  if (!ret) error("GMP: Cannot reallocate memory "
-+    "(old_size=%Zu new_size=%Zu)\n", old_size, new_size);
+     "(old_size=%Zu new_size=%Zu)\n", old_size, new_size);
    memcpy(ret, oldptr, old_size);
 -  kfree(oldptr);
 +  free(oldptr);
@@ -80,7 +79,7 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/crypto/gmp_kernel_wrapper.c vtpm/crypto/
  
 diff -uprN orig/tpm_emulator-0.2-x86_64/crypto/rsa.c vtpm/crypto/rsa.c
 --- orig/tpm_emulator-0.2-x86_64/crypto/rsa.c	2005-08-15 00:58:57.000000000 -0700
-+++ vtpm/crypto/rsa.c	2005-09-14 20:27:22.000000000 -0700
++++ vtpm/crypto/rsa.c	2006-05-17 09:31:11.000000000 -0700
 @@ -1,5 +1,6 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -107,7 +106,7 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/crypto/rsa.c vtpm/crypto/rsa.c
        if (memcmp(&msg[1], &msg[1 + SHA1_DIGEST_LENGTH], 
            SHA1_DIGEST_LENGTH) != 0) return -1;
 diff -uprN orig/tpm_emulator-0.2-x86_64/linux_module.c vtpm/linux_module.c
---- orig/tpm_emulator-0.2-x86_64/linux_module.c	2005-09-15 19:22:40.343080896 -0700
+--- orig/tpm_emulator-0.2-x86_64/linux_module.c	2006-05-17 09:34:13.000000000 -0700
 +++ vtpm/linux_module.c	1969-12-31 16:00:00.000000000 -0800
 @@ -1,163 +0,0 @@
 -/* Software-Based Trusted Platform Module (TPM) Emulator for Linux 
@@ -274,8 +273,8 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/linux_module.c vtpm/linux_module.c
 -}
 -
 diff -uprN orig/tpm_emulator-0.2-x86_64/linux_module.h vtpm/linux_module.h
---- orig/tpm_emulator-0.2-x86_64/linux_module.h	2005-09-15 19:21:14.844078720 -0700
-+++ vtpm/linux_module.h	2005-09-14 20:27:22.000000000 -0700
+--- orig/tpm_emulator-0.2-x86_64/linux_module.h	2006-05-17 09:34:13.000000000 -0700
++++ vtpm/linux_module.h	2006-05-17 09:31:11.000000000 -0700
 @@ -1,5 +1,6 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -376,8 +375,8 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/linux_module.h vtpm/linux_module.h
  #define LE16_TO_CPU(x) __le16_to_cpu(x)
  
 diff -uprN orig/tpm_emulator-0.2-x86_64/Makefile vtpm/Makefile
---- orig/tpm_emulator-0.2-x86_64/Makefile	2005-09-15 19:21:14.845078568 -0700
-+++ vtpm/Makefile	2005-09-14 20:27:22.000000000 -0700
+--- orig/tpm_emulator-0.2-x86_64/Makefile	2006-05-17 09:34:13.000000000 -0700
++++ vtpm/Makefile	2006-05-17 09:31:11.000000000 -0700
 @@ -1,22 +1,31 @@
  # Software-Based Trusted Platform Module (TPM) Emulator for Linux
  # Copyright (C) 2004 Mario Strasser <mast@gmx.net>
@@ -410,7 +409,7 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/Makefile vtpm/Makefile
 +
 +CC      := gcc
 +CFLAGS  += -g -Wall $(INCLUDE) -DDEBUG
-+CFLAGS  += -I. -Itpm
++CFLAGS  += -I. -Itpm -I../../vtpm_manager/manager
 +
 +# Is the simulator running in it's own vm?
 +#CFLAGS += -DVTPM_MULTI_VM
@@ -470,8 +469,8 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/Makefile vtpm/Makefile
  $(src)/crypto/libgmp.a:
  	test -f $(src)/crypto/libgmp.a || ln -s $(GMP_LIB) $(src)/crypto/libgmp.a
 diff -uprN orig/tpm_emulator-0.2-x86_64/README vtpm/README
---- orig/tpm_emulator-0.2-x86_64/README	2005-08-15 00:58:57.000000000 -0700
-+++ vtpm/README	2005-09-14 20:27:22.000000000 -0700
+--- orig/tpm_emulator-0.2-x86_64/README	2006-05-17 09:34:13.000000000 -0700
++++ vtpm/README	2006-05-17 09:31:11.000000000 -0700
 @@ -13,7 +13,8 @@ $Id: README 8 2005-01-25 21:11:45Z jmoli
  Copyright
  --------------------------------------------------------------------------
@@ -484,7 +483,7 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/README vtpm/README
  it under the terms of the GNU General Public License as published by
 diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_audit.c vtpm/tpm/tpm_audit.c
 --- orig/tpm_emulator-0.2-x86_64/tpm/tpm_audit.c	2005-08-15 00:58:57.000000000 -0700
-+++ vtpm/tpm/tpm_audit.c	2005-09-14 20:27:22.000000000 -0700
++++ vtpm/tpm/tpm_audit.c	2006-05-17 09:31:11.000000000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -549,7 +548,7 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_audit.c vtpm/tpm/tpm_audit.c
 -
 diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_authorization.c vtpm/tpm/tpm_authorization.c
 --- orig/tpm_emulator-0.2-x86_64/tpm/tpm_authorization.c	2005-08-15 00:58:57.000000000 -0700
-+++ vtpm/tpm/tpm_authorization.c	2005-09-14 20:27:22.000000000 -0700
++++ vtpm/tpm/tpm_authorization.c	2006-05-17 09:31:11.000000000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -575,7 +574,7 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_authorization.c vtpm/tpm/tpm_aut
 -
 diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_capability.c vtpm/tpm/tpm_capability.c
 --- orig/tpm_emulator-0.2-x86_64/tpm/tpm_capability.c	2005-08-15 00:58:57.000000000 -0700
-+++ vtpm/tpm/tpm_capability.c	2005-09-14 20:27:22.000000000 -0700
++++ vtpm/tpm/tpm_capability.c	2006-05-17 09:31:11.000000000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -600,7 +599,7 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_capability.c vtpm/tpm/tpm_capabi
 -
 diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_cmd_handler.c vtpm/tpm/tpm_cmd_handler.c
 --- orig/tpm_emulator-0.2-x86_64/tpm/tpm_cmd_handler.c	2005-08-15 00:58:57.000000000 -0700
-+++ vtpm/tpm/tpm_cmd_handler.c	2005-09-14 20:27:22.000000000 -0700
++++ vtpm/tpm/tpm_cmd_handler.c	2006-05-17 09:31:11.000000000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -664,8 +663,8 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_cmd_handler.c vtpm/tpm/tpm_cmd_h
  }
 -
 diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_crypto.c vtpm/tpm/tpm_crypto.c
---- orig/tpm_emulator-0.2-x86_64/tpm/tpm_crypto.c	2005-09-15 19:21:14.846078416 -0700
-+++ vtpm/tpm/tpm_crypto.c	2005-09-14 20:27:22.000000000 -0700
+--- orig/tpm_emulator-0.2-x86_64/tpm/tpm_crypto.c	2006-05-17 09:34:13.000000000 -0700
++++ vtpm/tpm/tpm_crypto.c	2006-05-17 09:31:11.000000000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -689,8 +688,8 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_crypto.c vtpm/tpm/tpm_crypto.c
  }
 -
 diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_data.c vtpm/tpm/tpm_data.c
---- orig/tpm_emulator-0.2-x86_64/tpm/tpm_data.c	2005-09-15 19:21:14.847078264 -0700
-+++ vtpm/tpm/tpm_data.c	2005-09-14 20:27:22.000000000 -0700
+--- orig/tpm_emulator-0.2-x86_64/tpm/tpm_data.c	2006-05-17 09:34:13.000000000 -0700
++++ vtpm/tpm/tpm_data.c	2006-05-17 09:31:11.000000000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -760,8 +759,8 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_data.c vtpm/tpm/tpm_data.c
 +#ifdef VTPM_MUTLI_VM
 + #define DEV_FE "/dev/tpm"
 +#else
-+ #define VTPM_RX_FIFO_D  "/var/vtpm/fifos/vtpm-to-%d.fifo"
-+ #define VTPM_TX_FIFO  "/var/vtpm/fifos/vtpm-from-all.fifo"
++ #define VTPM_RX_FIFO_D  "/var/vtpm/fifos/vtpm_rsp_to_%d.fifo"
++ #define VTPM_TX_FIFO  "/var/vtpm/fifos/vtpm_cmd_from_all.fifo"
 +
 + extern int dmi_id;
 + static char *vtpm_rx_name=NULL; 
@@ -1021,7 +1020,7 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_data.c vtpm/tpm/tpm_data.c
 -
 diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_deprecated.c vtpm/tpm/tpm_deprecated.c
 --- orig/tpm_emulator-0.2-x86_64/tpm/tpm_deprecated.c	2005-08-15 00:58:57.000000000 -0700
-+++ vtpm/tpm/tpm_deprecated.c	2005-09-14 20:27:22.000000000 -0700
++++ vtpm/tpm/tpm_deprecated.c	2006-05-17 09:31:11.000000000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1050,7 +1049,7 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_deprecated.c vtpm/tpm/tpm_deprec
    len = *authContextSize;
 diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_emulator.h vtpm/tpm/tpm_emulator.h
 --- orig/tpm_emulator-0.2-x86_64/tpm/tpm_emulator.h	2005-08-15 00:58:57.000000000 -0700
-+++ vtpm/tpm/tpm_emulator.h	2005-09-14 20:27:22.000000000 -0700
++++ vtpm/tpm/tpm_emulator.h	2006-05-17 09:31:11.000000000 -0700
 @@ -1,5 +1,6 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1070,7 +1069,7 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_emulator.h vtpm/tpm/tpm_emulator
   * tpm_emulator_init - initialises and starts the TPM emulator
 diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_integrity.c vtpm/tpm/tpm_integrity.c
 --- orig/tpm_emulator-0.2-x86_64/tpm/tpm_integrity.c	2005-08-15 00:58:57.000000000 -0700
-+++ vtpm/tpm/tpm_integrity.c	2005-09-14 20:27:22.000000000 -0700
++++ vtpm/tpm/tpm_integrity.c	2006-05-17 09:31:11.000000000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1086,7 +1085,7 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_integrity.c vtpm/tpm/tpm_integri
 -
 diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_structures.h vtpm/tpm/tpm_structures.h
 --- orig/tpm_emulator-0.2-x86_64/tpm/tpm_structures.h	2005-08-15 00:58:57.000000000 -0700
-+++ vtpm/tpm/tpm_structures.h	2005-09-14 20:27:22.000000000 -0700
++++ vtpm/tpm/tpm_structures.h	2006-05-17 09:31:11.000000000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1106,7 +1105,7 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_structures.h vtpm/tpm/tpm_struct
  /*
 diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_testing.c vtpm/tpm/tpm_testing.c
 --- orig/tpm_emulator-0.2-x86_64/tpm/tpm_testing.c	2005-08-15 00:58:57.000000000 -0700
-+++ vtpm/tpm/tpm_testing.c	2005-09-14 20:27:22.000000000 -0700
++++ vtpm/tpm/tpm_testing.c	2006-05-17 09:31:11.000000000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1224,7 +1223,7 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_testing.c vtpm/tpm/tpm_testing.c
  
 diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_ticks.c vtpm/tpm/tpm_ticks.c
 --- orig/tpm_emulator-0.2-x86_64/tpm/tpm_ticks.c	2005-08-15 00:58:57.000000000 -0700
-+++ vtpm/tpm/tpm_ticks.c	2005-09-14 20:27:22.000000000 -0700
++++ vtpm/tpm/tpm_ticks.c	2006-05-17 09:31:11.000000000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1307,139 +1306,9 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_ticks.c vtpm/tpm/tpm_ticks.c
  }
    
  
-diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/vtpm_manager.h vtpm/tpm/vtpm_manager.h
---- orig/tpm_emulator-0.2-x86_64/tpm/vtpm_manager.h	1969-12-31 16:00:00.000000000 -0800
-+++ vtpm/tpm/vtpm_manager.h	2005-09-14 20:27:22.000000000 -0700
-@@ -0,0 +1,126 @@
-+// ===================================================================
-+// 
-+// Copyright (c) 2005, Intel Corp.
-+// All rights reserved.
-+//
-+// Redistribution and use in source and binary forms, with or without 
-+// modification, are permitted provided that the following conditions 
-+// are met:
-+//
-+//   * Redistributions of source code must retain the above copyright 
-+//     notice, this list of conditions and the following disclaimer.
-+//   * Redistributions in binary form must reproduce the above 
-+//     copyright notice, this list of conditions and the following 
-+//     disclaimer in the documentation and/or other materials provided 
-+//     with the distribution.
-+//   * Neither the name of Intel Corporation nor the names of its 
-+//     contributors may be used to endorse or promote products derived
-+//     from this software without specific prior written permission.
-+//
-+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
-+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
-+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS 
-+// FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE 
-+// COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-+// INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-+// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR 
-+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-+// HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
-+// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
-+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
-+// OF THE POSSIBILITY OF SUCH DAMAGE.
-+// ===================================================================
-+// 
-+// vtpm_manager.h
-+// 
-+//  Public Interface header for VTPM Manager
-+//
-+// ==================================================================
-+
-+#ifndef __VTPM_MANAGER_H__
-+#define __VTPM_MANAGER_H__
-+
-+#define VTPM_TAG_REQ 0x01c1
-+#define VTPM_TAG_RSP 0x01c4
-+#define COMMAND_BUFFER_SIZE 4096
-+
-+// Header sizes. Note Header MAY include the DMI
-+#define VTPM_COMMAND_HEADER_SIZE_SRV ( sizeof(UINT32) + sizeof(TPM_TAG) + sizeof(UINT32) + sizeof(TPM_COMMAND_CODE))
-+#define VTPM_COMMAND_HEADER_SIZE_CLT (                  sizeof(TPM_TAG) + sizeof(UINT32) + sizeof(TPM_COMMAND_CODE))
-+
-+//************************ Command Codes ****************************
-+#define VTPM_ORD_OPEN              1   // ULM Creates New DMI
-+#define VTPM_ORD_CLOSE             2   // ULM Closes a DMI
-+#define VTPM_ORD_DELETE            3   // ULM Permemently Deletes DMI
-+#define VTPM_ORD_SAVENVM          4   // DMI requests Secrets Unseal
-+#define VTPM_ORD_LOADNVM          5   // DMI requests Secrets Saved
-+#define VTPM_ORD_TPMCOMMAND       6   // DMI issues HW TPM Command
-+
-+//************************ Return Codes ****************************
-+#define VTPM_SUCCESS               0
-+#define VTPM_FAIL                  1
-+#define VTPM_UNSUPPORTED           2
-+#define VTPM_FORBIDDEN             3
-+#define VTPM_RESTORE_CONTEXT_FAILED    4
-+#define VTPM_INVALID_REQUEST       5
-+
-+/******************* Command Parameter API *************************
-+
-+VTPM Command Format
-+  dmi: 4 bytes                  // Source of message. 
-+                                // WARNING: This is prepended by the channel. 
-+                                // Thus it is received by VTPM Manager, 
-+                                // but not sent by DMI
-+  tpm tag: 2 bytes
-+  command size: 4 bytes         // Size of command including header but not DMI
-+  ord: 4 bytes                  // Command ordinal above
-+  parameters: size - 10 bytes   // Command Parameter
-+
-+VTPM Response Format
-+  tpm tag: 2 bytes
-+  response_size: 4 bytes
-+  status: 4 bytes         
-+  parameters: size - 10 bytes
-+
-+
-+VTPM_Open:
-+  Input Parameters:
-+    Domain_type: 1 byte
-+    domain_id: 4 bytes
-+    instance_id: 4 bytes
-+  Output Parameters:
-+    None
-+    
-+VTPM_Close
-+  Input Parameters:
-+    instance_id: 4 bytes
-+  Output Parameters:
-+    None
-+
-+VTPM_Delete
-+  Input Parameters:
-+    instance_id: 4 bytes
-+  Output Parameters:
-+    None
-+
-+VTPM_SaveNVM
-+  Input Parameters:
-+    data: n bytes (Header indicates size of data)
-+  Output Parameters:
-+    None
-+
-+VTPM_LoadNVM
-+  Input Parameters:
-+    None
-+  Output Parameters:
-+    data: n bytes (Header indicates size of data)
-+
-+VTPM_TPMCommand
-+  Input Parameters:
-+    TPM Command Byte Stream: n bytes 
-+  Output Parameters:
-+    TPM Reponse Byte Stream: n bytes 
-+
-+*********************************************************************/
-+
-+#endif //_VTPM_MANAGER_H_
 diff -uprN orig/tpm_emulator-0.2-x86_64/tpmd.c vtpm/tpmd.c
 --- orig/tpm_emulator-0.2-x86_64/tpmd.c	1969-12-31 16:00:00.000000000 -0800
-+++ vtpm/tpmd.c	2005-09-15 19:28:55.783005352 -0700
++++ vtpm/tpmd.c	2006-05-17 09:31:11.000000000 -0700
 @@ -0,0 +1,207 @@
 +/* Software-Based Trusted Platform Module (TPM) Emulator for Linux
 + * Copyright (C) 2005 INTEL Corp
@@ -1471,8 +1340,8 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/tpmd.c vtpm/tpmd.c
 +#ifdef VTPM_MULTI_VM
 + #define DEV_BE "/dev/vtpm"
 +#else
-+ #define GUEST_RX_FIFO_D "/var/vtpm/fifos/guest-to-%d.fifo"
-+ #define GUEST_TX_FIFO "/var/vtpm/fifos/guest-from-all.fifo"
++ #define GUEST_RX_FIFO_D "/var/vtpm/fifos/tpm_cmd_to_%d.fifo"
++ #define GUEST_TX_FIFO "/var/vtpm/fifos/tpm_rsp_from_all.fifo"
 +#endif
 +
 + int dmi_id;

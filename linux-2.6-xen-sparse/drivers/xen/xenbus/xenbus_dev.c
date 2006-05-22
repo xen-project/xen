@@ -243,13 +243,3 @@ xenbus_dev_init(void)
 }
 
 __initcall(xenbus_dev_init);
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

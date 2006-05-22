@@ -1063,7 +1063,7 @@ static int __init tpmback_init(void)
 
 module_init(tpmback_init);
 
-static void __exit tpmback_exit(void)
+void __exit tpmback_exit(void)
 {
 	vtpm_release_packets(NULL, 0);
 	tpmif_xenbus_exit();
@@ -1071,16 +1071,4 @@ static void __exit tpmback_exit(void)
 	misc_deregister(&vtpms_miscdevice);
 }
 
-module_exit(tpmback_exit);
-
 MODULE_LICENSE("Dual BSD/GPL");
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

@@ -132,17 +132,13 @@ asmlinkage void svm_intr_assist(void)
     ASSERT(vmcb);
 
     /* Check if an Injection is active */
-    if (v->arch.hvm_svm.injecting_event) {
        /* Previous Interrupt delivery caused this Intercept? */
        if (vmcb->exitintinfo.fields.v && (vmcb->exitintinfo.fields.type == 0)) {
            v->arch.hvm_svm.saved_irq_vector = vmcb->exitintinfo.fields.vector;
 //           printk("Injecting PF#: saving IRQ from ExitInfo\n");
            vmcb->exitintinfo.bytes = 0;
-
-           /* bail out, we won't be injecting an interrupt this time */
-           return;
+           re_injecting = 1;
        }
-    }
 
     /* Guest's interrputs masked? */
     rflags = vmcb->rflags;
@@ -151,16 +147,9 @@ asmlinkage void svm_intr_assist(void)
        /* bail out, we won't be injecting an interrupt this time */
        return;
     }
-
-    /* Interrupt delivery caused an Intercept? */
-    if (vmcb->exitintinfo.fields.v && (vmcb->exitintinfo.fields.type == 0)) {
-//        printk("Re-injecting IRQ from ExitInfo\n");
-        intr_vector = vmcb->exitintinfo.fields.vector;
-        vmcb->exitintinfo.bytes = 0;
-        re_injecting = 1;
-    }
+  
     /* Previous interrupt still pending? */
-    else if (vmcb->vintr.fields.irq) {
+    if (vmcb->vintr.fields.irq) {
 //        printk("Re-injecting IRQ from Vintr\n");
         intr_vector = vmcb->vintr.fields.vector;
         vmcb->vintr.bytes = 0;

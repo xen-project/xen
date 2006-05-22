@@ -36,7 +36,7 @@
 #include <xen/kernel.h>
 #include <xen/domain_page.h>
 
-extern struct host_save_area *host_save_area[];
+extern struct svm_percore_globals svm_globals[];
 extern int svm_dbg_on;
 extern int asidpool_assign_next( struct vmcb_struct *vmcb, int retire_current,
                                   int oldcore, int newcore);
@@ -117,16 +117,12 @@ static int construct_vmcb_controls(struct arch_svm_struct *arch_svm)
 
     /* mask off all general 1 intercepts except those listed here */
     vmcb->general1_intercepts = 
-        ~(GENERAL1_INTERCEPT_CR0_SEL_WRITE | GENERAL1_INTERCEPT_VINTR      | 
-          GENERAL1_INTERCEPT_IDTR_READ     | GENERAL1_INTERCEPT_IDTR_WRITE | 
-          GENERAL1_INTERCEPT_GDTR_READ     | GENERAL1_INTERCEPT_GDTR_WRITE |
-          GENERAL1_INTERCEPT_LDTR_READ     | GENERAL1_INTERCEPT_LDTR_WRITE | 
-          GENERAL1_INTERCEPT_TR_READ       | GENERAL1_INTERCEPT_TR_WRITE   |
-          GENERAL1_INTERCEPT_RDTSC         | GENERAL1_INTERCEPT_PUSHF      |
-          GENERAL1_INTERCEPT_SWINT         | GENERAL1_INTERCEPT_POPF       | 
-          GENERAL1_INTERCEPT_IRET          | GENERAL1_INTERCEPT_PAUSE      |
-          GENERAL1_INTERCEPT_TASK_SWITCH
-        );
+        GENERAL1_INTERCEPT_INTR         | GENERAL1_INTERCEPT_NMI         |
+        GENERAL1_INTERCEPT_SMI          | GENERAL1_INTERCEPT_INIT        |
+        GENERAL1_INTERCEPT_CPUID        | GENERAL1_INTERCEPT_INVD        |
+        GENERAL1_INTERCEPT_HLT          | GENERAL1_INTERCEPT_INVLPG      | 
+        GENERAL1_INTERCEPT_INVLPGA      | GENERAL1_INTERCEPT_IOIO_PROT   |
+        GENERAL1_INTERCEPT_MSR_PROT     | GENERAL1_INTERCEPT_SHUTDOWN_EVT;
 
     /* turn on the general 2 intercepts */
     vmcb->general2_intercepts = 
@@ -143,17 +139,20 @@ static int construct_vmcb_controls(struct arch_svm_struct *arch_svm)
 
     /* The following is for I/O and MSR permision map */
     iopm = alloc_xenheap_pages(get_order_from_bytes(IOPM_SIZE));
-
-    ASSERT(iopm);
-    memset(iopm, 0xff, IOPM_SIZE);
-    clear_bit(PC_DEBUG_PORT, iopm);
+    if (iopm)
+    {
+        memset(iopm, 0xff, IOPM_SIZE);
+        clear_bit(PC_DEBUG_PORT, iopm);
+    }
     msrpm = alloc_xenheap_pages(get_order_from_bytes(MSRPM_SIZE));
-
-    ASSERT(msrpm);
-    memset(msrpm, 0xff, MSRPM_SIZE);
+    if (msrpm)
+        memset(msrpm, 0xff, MSRPM_SIZE);
 
     arch_svm->iopm = iopm;
     arch_svm->msrpm = msrpm;
+
+    if (! iopm || ! msrpm)
+        return 1;
 
     vmcb->iopm_base_pa = (u64) virt_to_maddr(iopm);
     vmcb->msrpm_base_pa = (u64) virt_to_maddr(msrpm);
@@ -421,7 +420,6 @@ void svm_do_launch(struct vcpu *v)
 
     v->arch.schedule_tail = arch_svm_do_resume;
 
-    v->arch.hvm_svm.injecting_event  = 0;
     v->arch.hvm_svm.saved_irq_vector = -1;
 
     svm_set_guest_time(v, 0);
@@ -435,8 +433,7 @@ void svm_do_launch(struct vcpu *v)
 
 void set_hsa_to_guest( struct arch_svm_struct *arch_svm ) 
 {
-    arch_svm->host_save_area = host_save_area[ smp_processor_id() ];
-    arch_svm->host_save_pa   = (u64)virt_to_maddr( arch_svm->host_save_area );
+  arch_svm->host_save_pa = svm_globals[ smp_processor_id() ].scratch_hsa_pa;
 }
 
 /* 
@@ -450,9 +447,6 @@ void svm_do_resume(struct vcpu *v)
 
     svm_stts(v);
 
-    /* make sure the HSA is set for the current core */
-    set_hsa_to_guest( &v->arch.hvm_svm );
-    
     /* pick up the elapsed PIT ticks and re-enable pit_timer */
     if ( time_info->first_injected ) {
         if ( v->domain->arch.hvm_domain.guest_time ) {

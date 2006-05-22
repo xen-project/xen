@@ -46,13 +46,3 @@ int xen_net_read_mac(struct xenbus_device *dev, u8 mac[]);
 
 
 #endif /* _ASM_XEN_NET_DRIVER_UTIL_H */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

@@ -75,8 +75,6 @@
 #endif
 #endif /* CONFIG_SDL */
 
-#include "xenctrl.h"
-#include "xs.h"
 #include "exec-all.h"
 
 //#define DO_TB_FLUSH
@@ -149,12 +147,7 @@ int repeat_key = 1;
 TextConsole *vga_console;
 CharDriverState *serial_hds[MAX_SERIAL_PORTS];
 int xc_handle;
-unsigned long *vgapage_array;
-unsigned long *freepage_array;
-unsigned long free_pages;
-void *vtop_table;
-unsigned long toptab;
-unsigned long vgaram_pages;
+time_t timeoffset = 0;
 
 /***********************************************************/
 /* x86 ISA bus support */
@@ -2255,9 +2248,10 @@ void help(void)
            "-s              wait gdb connection to port %d\n"
            "-p port         ioreq port for xen\n"
            "-d domain       domain that we're serving\n"
-           "-domain-namn    domain name that we're serving\n"
+           "-domain-name    domain name that we're serving\n"
            "-hdachs c,h,s   force hard disk 0 geometry (usually qemu can guess it)\n"
            "-L path         set the directory for the BIOS and VGA BIOS\n"
+	   "-timeoffset     time offset (in seconds) from local time (Xen)\n"
 #ifdef USE_CODE_COPY
            "-no-code-copy   disable code copy acceleration\n"
 #endif
@@ -2355,6 +2349,7 @@ enum {
     QEMU_OPTION_monitor,
     QEMU_OPTION_domainname,
     QEMU_OPTION_serial,
+    QEMU_OPTION_timeoffset,
     QEMU_OPTION_loadvm,
     QEMU_OPTION_full_screen,
     QEMU_OPTION_vgaacc,
@@ -2428,6 +2423,7 @@ const QEMUOption qemu_options[] = {
     { "std-vga", 0, QEMU_OPTION_std_vga },
     { "monitor", 1, QEMU_OPTION_monitor },
     { "domain-name", 1, QEMU_OPTION_domainname },
+    { "timeoffset", HAS_ARG, QEMU_OPTION_timeoffset },
     { "serial", 1, QEMU_OPTION_serial },
     { "loadvm", HAS_ARG, QEMU_OPTION_loadvm },
     { "full-screen", 0, QEMU_OPTION_full_screen },
@@ -2456,35 +2452,8 @@ static uint8_t *signal_stack;
 
 #include <xg_private.h>
 
-#if defined(__i386__) || defined (__x86_64__)
-#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
-#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
-
-#ifdef __i386__
-#define _LEVEL_3_ 0
-#else
-#define _LEVEL_3_ 1
-#endif
-
-#if _LEVEL_3_
-#define L3_PROT (_PAGE_PRESENT)
-#define L1_PAGETABLE_ENTRIES    512
-#else
-#define L1_PAGETABLE_ENTRIES    1024
-#endif
-
-inline int
-get_vl2_table(unsigned long count, unsigned long start)
-{
-#if _LEVEL_3_
-    return ((start + (count << PAGE_SHIFT)) >> L3_PAGETABLE_SHIFT) & 0x3;
-#else
-    return 0;
-#endif
-}
-
 /* FIXME Flush the shadow page */
-static int unset_mm_mapping(int xc_handle,
+int unset_mm_mapping(int xc_handle,
                      uint32_t domid,
                      unsigned long nr_pages,
                      unsigned int address_bits,
@@ -2517,13 +2486,12 @@ static int unset_mm_mapping(int xc_handle,
     return err;
 }
 
-static int set_mm_mapping(int xc_handle,
+int set_mm_mapping(int xc_handle,
                     uint32_t domid,
                     unsigned long nr_pages,
                     unsigned int address_bits,
                     unsigned long *extent_start)
 {
-    int i;
     xc_dominfo_t info;
     int err = 0;
 
@@ -2564,91 +2532,6 @@ static int set_mm_mapping(int xc_handle,
     return 0;
 }
 
-
-void * set_vram_mapping(unsigned long begin, unsigned long end)
-{
-    unsigned long * extent_start = NULL;
-    unsigned long nr_extents;
-    void *vram_pointer = NULL;
-    int i;
-
-    /* align begin and end address */
-    begin = begin & PAGE_MASK;
-    end = begin + VGA_RAM_SIZE;
-    end = (end + PAGE_SIZE -1 )& PAGE_MASK;
-    nr_extents = (end - begin) >> PAGE_SHIFT;
-
-    extent_start = malloc(sizeof(unsigned long) * nr_extents );
-    if (extent_start == NULL)
-    {
-        fprintf(stderr, "Failed malloc on set_vram_mapping\n");
-        return NULL;
-    }
-
-    memset(extent_start, 0, sizeof(unsigned long) * nr_extents);
-
-    for (i = 0; i < nr_extents; i++)
-    {
-        extent_start[i] = (begin + i * PAGE_SIZE) >> PAGE_SHIFT;
-    }
-
-    set_mm_mapping(xc_handle, domid, nr_extents, 0, extent_start);
-
-    if ( (vram_pointer =  xc_map_foreign_batch(xc_handle, domid,
-                                               PROT_READ|PROT_WRITE,
-                                               extent_start,
-                                               nr_extents)) == NULL)
-    {
-        fprintf(logfile,
-          "xc_map_foreign_batch vgaram returned error %d\n", errno);
-        return NULL;
-    }
-
-    memset(vram_pointer, 0, nr_extents * PAGE_SIZE);
-
-    free(extent_start);
-
-    return vram_pointer;
-}
-
-int unset_vram_mapping(unsigned long begin, unsigned long end)
-{
-    unsigned long * extent_start = NULL;
-    unsigned long nr_extents;
-    int i;
-
-    /* align begin and end address */
-
-    end = begin + VGA_RAM_SIZE;
-    begin = begin & PAGE_MASK;
-    end = (end + PAGE_SIZE -1 ) & PAGE_MASK;
-    nr_extents = (end - begin) >> PAGE_SHIFT;
-
-    extent_start = malloc(sizeof(unsigned long) * nr_extents );
-
-    if (extent_start == NULL)
-    {
-        fprintf(stderr, "Failed malloc on set_mm_mapping\n");
-        return -1;
-    }
-
-    memset(extent_start, 0, sizeof(unsigned long) * nr_extents);
-
-    for (i = 0; i < nr_extents; i++)
-        extent_start[i] = (begin + (i * PAGE_SIZE)) >> PAGE_SHIFT;
-
-    unset_mm_mapping(xc_handle, domid, nr_extents, 0, extent_start);
-
-    free(extent_start);
-
-    return 0;
-}
-
-#elif defined(__ia64__)
-void set_vram_mapping(unsigned long addr, unsigned long end) {}
-void unset_vram_mapping(unsigned long addr, unsigned long end) {}
-#endif
-
 int main(int argc, char **argv)
 {
 #ifdef CONFIG_GDBSTUB
@@ -2673,10 +2556,8 @@ int main(int argc, char **argv)
     int serial_device_index;
     char qemu_dm_logfilename[64];
     const char *loadvm = NULL;
-    unsigned long nr_pages, extra_pages, ram_pages, *page_array;
-    xc_dominfo_t info;
+    unsigned long nr_pages, *page_array;
     extern void *shared_page;
-    extern void *shared_vram;
 
 #if !defined(CONFIG_SOFTMMU)
     /* we never want that malloc() uses mmap() */
@@ -2707,7 +2588,8 @@ int main(int argc, char **argv)
     pstrcpy(monitor_device, sizeof(monitor_device), "vc");
 
     pstrcpy(serial_devices[0], sizeof(serial_devices[0]), "vc");
-    for(i = 1; i < MAX_SERIAL_PORTS; i++)
+    pstrcpy(serial_devices[1], sizeof(serial_devices[1]), "null");
+    for(i = 2; i < MAX_SERIAL_PORTS; i++)
         serial_devices[i][0] = '\0';
     serial_device_index = 0;
 
@@ -3058,7 +2940,10 @@ int main(int argc, char **argv)
             case QEMU_OPTION_domainname:
                 strncat(domain_name, optarg, sizeof(domain_name) - 20);
                 break;
-
+	    case QEMU_OPTION_timeoffset:
+                timeoffset = strtol(optarg, NULL, 0);
+	    	break;
+ 
             }
         }
     }
@@ -3133,40 +3018,14 @@ int main(int argc, char **argv)
     /* init the memory */
     phys_ram_size = ram_size + vga_ram_size + bios_size;
 
-    ram_pages = ram_size/PAGE_SIZE;
-#if defined(__i386__) || defined(__x86_64__)
-    vgaram_pages =  (vga_ram_size -1) / PAGE_SIZE + 1;
-    free_pages = vgaram_pages / L1_PAGETABLE_ENTRIES;
-    extra_pages = vgaram_pages + free_pages;
-#else
-    /* Test vga acceleration later */
-    extra_pages = 0;
-#endif
+    nr_pages = ram_size/PAGE_SIZE;
 
     xc_handle = xc_interface_open();
-
-    xc_domain_getinfo(xc_handle, domid, 1, &info);
-
-    nr_pages = info.nr_pages + extra_pages;
-
-    if ( xc_domain_setmaxmem(xc_handle, domid,
-                             (nr_pages) * PAGE_SIZE/1024 ) != 0)
-    {
-        fprintf(logfile, "set maxmem returned error %d\n", errno);
-        exit(-1);
-    }
 
     if ( (page_array = (unsigned long *)
                         malloc(nr_pages * sizeof(unsigned long))) == NULL)
     {
         fprintf(logfile, "malloc returned error %d\n", errno);
-        exit(-1);
-    }
-
-    if (xc_domain_memory_increase_reservation(xc_handle, domid,
-                                              extra_pages , 0, 0, NULL) != 0)
-    {
-        fprintf(logfile, "increase reservation returned error %d\n", errno);
         exit(-1);
     }
 
@@ -3176,11 +3035,10 @@ int main(int argc, char **argv)
         fprintf(logfile, "xc_get_pfn_list returned error %d\n", errno);
         exit(-1);
     }
-
     if ( (phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
                           PROT_READ|PROT_WRITE,
                           page_array,
-                          ram_pages - 1)) == 0 )
+                          nr_pages - 1)) == 0 )
     {
         fprintf(logfile, "xc_map_foreign_batch returned error %d\n", errno);
         exit(-1);
@@ -3188,31 +3046,11 @@ int main(int argc, char **argv)
 
     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
                                        PROT_READ|PROT_WRITE,
-                                       page_array[ram_pages - 1]);
+                                       page_array[nr_pages - 1]);
 
-    vgapage_array = &page_array[nr_pages - vgaram_pages];
-
-    if ( (shared_vram =  xc_map_foreign_batch(xc_handle, domid,
-                                              PROT_READ|PROT_WRITE,
-                                              vgapage_array,
-                                              vgaram_pages)) == 0)
-    {
-        fprintf(logfile,
-                "xc_map_foreign_batch vgaram returned error %d\n", errno);
-        exit(-1);
-    }
-
-    memset(shared_vram, 0, vgaram_pages * PAGE_SIZE);
-    toptab = page_array[ram_pages] << PAGE_SHIFT;
-
-    vtop_table = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
-                                      PROT_READ|PROT_WRITE,
-                                      page_array[ram_pages]);
-
-    freepage_array = &page_array[nr_pages - extra_pages];
 #elif defined(__ia64__)
-    if ( xc_ia64_get_pfn_list(xc_handle, domid, page_array, 0, ram_pages)
-         != ram_pages )
+    if ( xc_ia64_get_pfn_list(xc_handle, domid, page_array, 0, nr_pages)
+         != nr_pages)
     {
         fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
         exit(-1);
@@ -3221,7 +3059,7 @@ int main(int argc, char **argv)
     if ( (phys_ram_base = xc_map_foreign_batch(xc_handle, domid,
                           PROT_READ|PROT_WRITE,
                           page_array,
-                          ram_pages)) == 0 )
+                          nr_pages)) == 0 )
     {
         fprintf(logfile, "xc_map_foreign_batch returned error %d\n", errno);
         exit(-1);
@@ -3229,7 +3067,7 @@ int main(int argc, char **argv)
 
     if ( xc_ia64_get_pfn_list(xc_handle, domid,
                               page_array,
-                              ram_pages + (GFW_SIZE >> PAGE_SHIFT), 1) != 1 )
+                              nr_pages + (GFW_SIZE >> PAGE_SHIFT), 1) != 1 )
     {
         fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
         exit(-1);
@@ -3396,7 +3234,7 @@ int main(int argc, char **argv)
 #if defined(TARGET_I386)
     pc_init(ram_size, vga_ram_size, boot_device,
             ds, fd_filename, snapshot,
-            kernel_filename, kernel_cmdline, initrd_filename);
+            kernel_filename, kernel_cmdline, initrd_filename, timeoffset);
 #elif defined(TARGET_PPC)
     ppc_init(ram_size, vga_ram_size, boot_device,
             ds, fd_filename, snapshot,

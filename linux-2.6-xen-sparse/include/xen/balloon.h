@@ -61,13 +61,3 @@ extern spinlock_t balloon_lock;
 #define balloon_unlock(__flags) spin_unlock_irqrestore(&balloon_lock, __flags)
 
 #endif /* __ASM_BALLOON_H__ */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

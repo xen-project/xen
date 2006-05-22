@@ -52,7 +52,7 @@ diff -uprN orig/tpm_emulator-0.2-x86_64/Makefile tpm_emulator/Makefile
 -KERNEL_BUILD   := /lib/modules/$(KERNEL_RELEASE)/build
 +CUR_DIR        := $(shell pwd)
 +LINUX_VERSION  := $(shell cat $(CUR_DIR)/$(XEN_ROOT)/buildconfigs/mk.linux-2.6-xen | grep "LINUX_VER" | grep "2.6" | gawk '{ print $$3 }' )
-+KERNEL_BUILD   := $(XEN_ROOT)/linux-$(LINUX_VERSION)-xen0
++KERNEL_BUILD   := $(XEN_ROOT)/linux-$(LINUX_VERSION)-xen
  MOD_SUBDIR     := misc
  COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
  

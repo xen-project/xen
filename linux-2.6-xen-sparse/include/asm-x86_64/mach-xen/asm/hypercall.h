@@ -355,19 +355,9 @@ HYPERVISOR_callback_op(
 
 static inline int
 HYPERVISOR_xenoprof_op(
-	int op, unsigned long arg1, unsigned long arg2)
+	int op, void *arg)
 {
-	return _hypercall3(int, xenoprof_op, op, arg1, arg2);
+	return _hypercall2(int, xenoprof_op, op, arg);
 }
 
 #endif /* __HYPERCALL_H__ */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

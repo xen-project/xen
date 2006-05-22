@@ -324,6 +324,11 @@ static void alloc_monitor_pagetable(struct vcpu *v)
 
     mmfn_info = alloc_domheap_page(NULL);
     ASSERT( mmfn_info );
+    if (!mmfn_info)
+    {
+        printk("Fail to allocate monitor pagetable\n");
+        domain_crash(v->domain);
+    }
 
     mmfn = page_to_mfn(mmfn_info);
     mpl4e = (l4_pgentry_t *) map_domain_page_global(mmfn);

@@ -6,6 +6,7 @@
 # Positive Test: create domain with virtual TPM attached at build time,
 #                check list of pcrs; locally migrate the domain and
 #                check list of pcrs again
+#                This test does local live migration.
 
 from XmTestLib import *
 from vtpm_utils import *
@@ -50,40 +51,44 @@ domain.closeConsole()
 
 old_domid = domid(domName)
 
-try:
-    status, ouptut = traceCommand("xm migrate -l %s localhost" %
-                                  domName,
-                                  timeout=90)
-except TimeoutError, e:
-    saveLog(consoleHistory)
-    vtpm_cleanup(domName)
-    FAIL(str(e))
+loop = 0
+while loop < 3:
+    try:
+        status, ouptut = traceCommand("xm migrate -l %s localhost" %
+                                      domName,
+                                      timeout=90)
+    except TimeoutError, e:
+        saveLog(consoleHistory)
+        vtpm_cleanup(domName)
+        FAIL(str(e))
 
-if status != 0:
-    saveLog(consoleHistory)
-    vtpm_cleanup(domName)
-    FAIL("xm migrate did not succeed. External device migration activated?")
+    if status != 0:
+        saveLog(consoleHistory)
+        vtpm_cleanup(domName)
+        FAIL("xm migrate did not succeed. External device migration activated?")
 
 
-domName = domain.getName()
-new_domid = domid(domName)
+    domName = domain.getName()
+    new_domid = domid(domName)
 
-if (old_domid == new_domid):
-    vtpm_cleanup(domName)
-    FAIL("xm migrate failed, domain id is still %s" % old_domid)
+    if (old_domid == new_domid):
+        vtpm_cleanup(domName)
+        FAIL("xm migrate failed, domain id is still %s (loop=%d)" %
+             (old_domid,loop))
 
-try:
-    console = domain.getConsole()
-except ConsoleError, e:
-    vtpm_cleanup(domName)
-    FAIL(str(e))
+    try:
+        console = domain.getConsole()
+    except ConsoleError, e:
+        vtpm_cleanup(domName)
+        FAIL(str(e))
 
-try:
-    run = console.runCmd("cat /sys/devices/platform/tpm_vtpm/pcrs")
-except ConsoleError, e:
-    saveLog(console.getHistory())
-    vtpm_cleanup(domName)
-    FAIL(str(e))
+    try:
+        run = console.runCmd("cat /sys/devices/platform/tpm_vtpm/pcrs")
+    except ConsoleError, e:
+        saveLog(console.getHistory())
+        vtpm_cleanup(domName)
+        FAIL(str(e))
+    loop += 1
 
 domain.closeConsole()
 

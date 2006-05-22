@@ -43,6 +43,8 @@
 
 #if defined(__i386__)
 
+#if !defined(CONFIG_X86_PAE)
+
 #define L2_PAGETABLE_SHIFT      22
 
 #define L1_PAGETABLE_ENTRIES    1024
@@ -50,6 +52,30 @@
 
 #define PADDR_BITS              32
 #define PADDR_MASK              (~0UL)
+
+#define UNMAPPED_PT_FRAMES        1
+#define PRIpte "08lx"
+typedef unsigned long pgentry_t;
+
+#else /* defined(CONFIG_X86_PAE) */
+
+#define L2_PAGETABLE_SHIFT      21
+#define L3_PAGETABLE_SHIFT      30
+
+#define L1_PAGETABLE_ENTRIES    512
+#define L2_PAGETABLE_ENTRIES    512
+#define L3_PAGETABLE_ENTRIES    4
+
+#define PADDR_BITS              44
+#define PADDR_MASK              ((1ULL << PADDR_BITS)-1)
+
+#define L2_MASK  ((1UL << L3_PAGETABLE_SHIFT) - 1)
+
+#define UNMAPPED_PT_FRAMES        2
+#define PRIpte "016llx"
+typedef uint64_t pgentry_t;
+
+#endif /* !defined(CONFIG_X86_PAE) */
 
 #elif defined(__x86_64__)
 
@@ -81,6 +107,10 @@
 #define L2_MASK  ((1UL << L3_PAGETABLE_SHIFT) - 1)
 #define L3_MASK  ((1UL << L4_PAGETABLE_SHIFT) - 1)
 
+#define UNMAPPED_PT_FRAMES        3
+#define PRIpte "016lx"
+typedef unsigned long pgentry_t;
+
 #endif
 
 #define L1_MASK  ((1UL << L2_PAGETABLE_SHIFT) - 1)
@@ -90,9 +120,11 @@
   (((_a) >> L1_PAGETABLE_SHIFT) & (L1_PAGETABLE_ENTRIES - 1))
 #define l2_table_offset(_a) \
   (((_a) >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES - 1))
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
 #define l3_table_offset(_a) \
   (((_a) >> L3_PAGETABLE_SHIFT) & (L3_PAGETABLE_ENTRIES - 1))
+#endif
+#if defined(__x86_64__)
 #define l4_table_offset(_a) \
   (((_a) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1))
 #endif
@@ -111,14 +143,21 @@
 #if defined(__i386__)
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY |_PAGE_USER)
+#if defined(CONFIG_X86_PAE)
+#define L3_PROT (_PAGE_PRESENT)
+#endif /* CONFIG_X86_PAE */
 #elif defined(__x86_64__)
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #define L3_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
-#endif
+#endif /* __i386__ || __x86_64__ */
 
+#ifndef CONFIG_X86_PAE
 #define PAGE_SIZE       (1UL << L1_PAGETABLE_SHIFT)
+#else
+#define PAGE_SIZE       (1ULL << L1_PAGETABLE_SHIFT)
+#endif
 #define PAGE_SHIFT      L1_PAGETABLE_SHIFT
 #define PAGE_MASK       (~(PAGE_SIZE-1))
 
@@ -129,36 +168,41 @@
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)        (((addr)+PAGE_SIZE-1)&PAGE_MASK)
 
-extern unsigned long *phys_to_machine_mapping;
-#define pfn_to_mfn(_pfn) (phys_to_machine_mapping[(_pfn)])
-static __inline__ unsigned long phys_to_machine(unsigned long phys)
-{
-    unsigned long machine = pfn_to_mfn(phys >> L1_PAGETABLE_SHIFT);
-    machine = (machine << L1_PAGETABLE_SHIFT) | (phys & ~PAGE_MASK);
-    return machine;
-}
+/* Definitions for machine and pseudophysical addresses. */
+#ifdef CONFIG_X86_PAE
+typedef unsigned long long paddr_t;
+typedef unsigned long long maddr_t;
+#else
+typedef unsigned long paddr_t;
+typedef unsigned long maddr_t;
+#endif
 
+extern unsigned long *phys_to_machine_mapping;
+extern char _text, _etext, _edata, _end;
+#define pfn_to_mfn(_pfn) (phys_to_machine_mapping[(_pfn)])
+static __inline__ maddr_t phys_to_machine(paddr_t phys)
+{
+	maddr_t machine = pfn_to_mfn(phys >> PAGE_SHIFT);
+	machine = (machine << PAGE_SHIFT) | (phys & ~PAGE_MASK);
+	return machine;
+}
 
 #define mfn_to_pfn(_mfn) (machine_to_phys_mapping[(_mfn)])
-static __inline__ unsigned long machine_to_phys(unsigned long machine)
+static __inline__ paddr_t machine_to_phys(maddr_t machine)
 {
-    unsigned long phys = mfn_to_pfn(machine >> L1_PAGETABLE_SHIFT);
-    phys = (phys << L1_PAGETABLE_SHIFT) | (machine & ~PAGE_MASK);
-    return phys;
+	paddr_t phys = mfn_to_pfn(machine >> PAGE_SHIFT);
+	phys = (phys << PAGE_SHIFT) | (machine & ~PAGE_MASK);
+	return phys;
 }
 
-#if defined(__x86_64__)
-#define VIRT_START              0xFFFFFFFF80000000UL
-#elif defined(__i386__)
-#define VIRT_START              0xC0000000UL
-#endif
+#define VIRT_START                 ((unsigned long)&_text)
 
 #define to_phys(x)                 ((unsigned long)(x)-VIRT_START)
 #define to_virt(x)                 ((void *)((unsigned long)(x)+VIRT_START))
 
 #define virt_to_pfn(_virt)         (PFN_DOWN(to_phys(_virt)))
 #define mach_to_virt(_mach)        (to_virt(machine_to_phys(_mach)))
-#define mfn_to_virt(_mfn)          (mach_to_virt(_mfn << PAGE_SHIFT))
+#define mfn_to_virt(_mfn)          (to_virt(mfn_to_pfn(_mfn) << PAGE_SHIFT))
 #define pfn_to_virt(_pfn)          (to_virt(_pfn << PAGE_SHIFT))
 
 /* Pagetable walking. */

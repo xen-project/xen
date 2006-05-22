@@ -197,9 +197,6 @@ TPM_RESULT VTPM_Handle_Save_NVM(VTPM_DMI_RESOURCE *myDMI,
                                  &vtpm_globals->storageKey,
                                  &sealed_NVM) );
 				  
-  // Mark DMI Table so new save state info will get pushed to disk on return.
-  vtpm_globals->DMI_table_dirty = TRUE;
-  
   // Write sealed blob off disk from NVMLocation
   // TODO: How to properly return from these. Do we care if we return failure
   //       after writing the file? We can't get the old one back.
@@ -303,7 +300,7 @@ TPM_RESULT VTPM_Handle_Load_NVM(VTPM_DMI_RESOURCE *myDMI,
 }
 
 
-TPM_RESULT VTPM_SaveService(void) {
+TPM_RESULT VTPM_SaveManagerData(void) {
   TPM_RESULT status=TPM_SUCCESS;
   int fh, dmis=-1;
 
@@ -317,7 +314,7 @@ TPM_RESULT VTPM_SaveService(void) {
   struct hashtable_itr *dmi_itr;
   VTPM_DMI_RESOURCE *dmi_res;
 
-  UINT32 boot_key_size, flat_dmis_size;
+  UINT32 boot_key_size = 0, flat_dmis_size = 0;
 
   // Initially fill these with buffer sizes for each data type. Later fill
   // in actual size, once flattened.
@@ -347,11 +344,11 @@ TPM_RESULT VTPM_SaveService(void) {
   BSG_PackConst(buffer_len(&enc_flat_global), 4, flat_enc);
 
   // Per DMI values to be saved (if any exit)
-  if (hashtable_count(vtpm_globals->dmi_map) > 0) {
+  if (hashtable_count(vtpm_globals->dmi_map) > 1) {
 
-    flat_dmis_size = (hashtable_count(vtpm_globals->dmi_map) - 1) * // num DMIS (-1 for Dom0)
-                     (sizeof(UINT32) + 2*sizeof(TPM_DIGEST)); // Per DMI info
-    flat_dmis = (BYTE *) malloc( flat_dmis_size );
+    flat_dmis = (BYTE *) malloc( 
+                     (hashtable_count(vtpm_globals->dmi_map) - 1) * // num DMIS (-1 for Dom0)
+                     (sizeof(UINT32) + 2*sizeof(TPM_DIGEST)) ); // Per DMI info
 
     dmi_itr = hashtable_iterator(vtpm_globals->dmi_map);
     do {
@@ -387,8 +384,6 @@ TPM_RESULT VTPM_SaveService(void) {
     goto abort_egress;
  }
 
-  vtpm_globals->DMI_table_dirty = FALSE;
-
   goto egress;
 
  abort_egress:
@@ -400,11 +395,11 @@ TPM_RESULT VTPM_SaveService(void) {
   free(flat_dmis);
   close(fh);
 
-  vtpmloginfo(VTPM_LOG_VTPM, "Saved VTPM Service state (status = %d, dmis = %d)\n", (int) status, dmis);
+  vtpmloginfo(VTPM_LOG_VTPM, "Saved VTPM Manager state (status = %d, dmis = %d)\n", (int) status, dmis);
   return status;
 }
 
-TPM_RESULT VTPM_LoadService(void) {
+TPM_RESULT VTPM_LoadManagerData(void) {
 
   TPM_RESULT status=TPM_SUCCESS;
   int fh, stat_ret, dmis=0;

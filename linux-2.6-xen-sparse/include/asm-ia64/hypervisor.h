@@ -53,7 +53,7 @@ extern start_info_t *xen_start_info;
 
 void force_evtchn_callback(void);
 
-int xen_init(void);
+#define is_running_on_xen() running_on_xen
 
 /* Turn jiffies into Xen system time. XXX Implement me. */
 #define jiffies_to_st(j)	0
@@ -158,7 +158,7 @@ xen_create_contiguous_region(unsigned long vstart,
                              unsigned int order, unsigned int address_bits)
 {
 	int ret = 0;
-	if (running_on_xen) {
+	if (is_running_on_xen()) {
 		ret = __xen_create_contiguous_region(vstart, order,
 		                                     address_bits);
 	}
@@ -169,7 +169,7 @@ void __xen_destroy_contiguous_region(unsigned long vstart, unsigned int order);
 static inline void
 xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 {
-	if (running_on_xen)
+	if (is_running_on_xen())
 		__xen_destroy_contiguous_region(vstart, order);
 }
 

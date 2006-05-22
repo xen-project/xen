@@ -183,7 +183,7 @@ static struct console kcons_info = {
 #define __RETCODE 0
 static int __init xen_console_init(void)
 {
-	if (xen_init() < 0)
+	if (!is_running_on_xen())
 		return __RETCODE;
 
 	if (xen_start_info->flags & SIF_INITDOMAIN) {
@@ -566,7 +566,7 @@ static int __init xencons_init(void)
 {
 	int rc;
 
-	if (xen_init() < 0)
+	if (!is_running_on_xen())
 		return -ENODEV;
 
 	if (xc_mode == XC_OFF)
@@ -636,13 +636,3 @@ static int __init xencons_init(void)
 module_init(xencons_init);
 
 MODULE_LICENSE("Dual BSD/GPL");
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

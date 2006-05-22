@@ -34,6 +34,7 @@
 #include <linux/slab.h>
 #include <linux/blkdev.h>
 #include <linux/vmalloc.h>
+#include <linux/wait.h>
 #include <asm/io.h>
 #include <asm/setup.h>
 #include <asm/pgalloc.h>
@@ -90,21 +91,21 @@ typedef struct blkif_st {
 	int                 st_wr_req;
 	int                 st_oo_req;
 
-	struct work_struct free_work;
+	wait_queue_head_t waiting_to_free;
 
 	grant_handle_t shmem_handle;
 	grant_ref_t    shmem_ref;
 } blkif_t;
 
-blkif_t *alloc_blkif(domid_t domid);
-void free_blkif_callback(blkif_t *blkif);
+blkif_t *blkif_alloc(domid_t domid);
+void blkif_free(blkif_t *blkif);
 int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn);
 
 #define blkif_get(_b) (atomic_inc(&(_b)->refcnt))
 #define blkif_put(_b)					\
 	do {						\
 		if (atomic_dec_and_test(&(_b)->refcnt))	\
-			free_blkif_callback(_b);	\
+			wake_up(&(_b)->waiting_to_free);\
 	} while (0)
 
 /* Create a vbd. */
@@ -133,13 +134,3 @@ irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs);
 int blkif_schedule(void *arg);
 
 #endif /* __BLKIF__BACKEND__COMMON_H__ */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

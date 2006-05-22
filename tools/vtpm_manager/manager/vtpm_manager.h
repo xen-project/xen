@@ -40,32 +40,30 @@
 #ifndef __VTPM_MANAGER_H__
 #define __VTPM_MANAGER_H__
 
-#include "tcg.h"
-
 #define VTPM_TAG_REQ 0x01c1
 #define VTPM_TAG_RSP 0x01c4
 #define COMMAND_BUFFER_SIZE 4096
 
 // Header sizes. Note Header MAY include the DMI
-#define VTPM_COMMAND_HEADER_SIZE_SRV ( sizeof(UINT32) + sizeof(TPM_TAG) + sizeof(UINT32) + sizeof(TPM_COMMAND_CODE))
-#define VTPM_COMMAND_HEADER_SIZE_CLT (                  sizeof(TPM_TAG) + sizeof(UINT32) + sizeof(TPM_COMMAND_CODE))
-
-// ********************** Public Functions *************************
-TPM_RESULT VTPM_Init_Service(); // Start VTPM Service
-void VTPM_Stop_Service();  // Stop VTPM Service
-#ifdef VTPM_MULTI_VM
-int VTPM_Service_Handler();
-#else
-void *VTPM_Service_Handler(void *threadTypePtr);
-#endif
+#define VTPM_COMMAND_HEADER_SIZE_CLT ( 2 + 4 + 4)
+//                    sizeof(TPM_TAG + UINT32 + TPM_COMMAND_CODE)
+#define VTPM_COMMAND_HEADER_SIZE_SRV ( 4 + VTPM_COMMAND_HEADER_SIZE_CLT )
+//                    sizeof( UINT32 + VTPM_COMMAND_HEADER_SIZE_CLT)
 
 //************************ Command Codes ****************************
-#define VTPM_ORD_OPEN              1   // ULM Creates New DMI
-#define VTPM_ORD_CLOSE             2   // ULM Closes a DMI
-#define VTPM_ORD_DELETE            3   // ULM Permemently Deletes DMI
-#define VTPM_ORD_SAVENVM          4   // DMI requests Secrets Unseal
-#define VTPM_ORD_LOADNVM          5   // DMI requests Secrets Saved
-#define VTPM_ORD_TPMCOMMAND       6   // DMI issues HW TPM Command
+#define VTPM_ORD_BASE       0x0000
+#define VTPM_PRIV_MASK      0x01000000 // Priviledged VTPM Command
+#define VTPM_PRIV_BASE      (VTPM_ORD_BASE | VTPM_PRIV_MASK)
+
+// Non-priviledged VTPM Commands (From DMI's)
+#define VTPM_ORD_SAVENVM    (VTPM_ORD_BASE + 1) // DMI Saves Secrets
+#define VTPM_ORD_LOADNVM    (VTPM_ORD_BASE + 2) // DMI Loads Secrets
+#define VTPM_ORD_TPMCOMMAND (VTPM_ORD_BASE + 3) // DMI issues HW TPM Command
+
+// Priviledged VTPM Commands (From management console)
+#define VTPM_ORD_OPEN     (VTPM_PRIV_BASE + 1) // Creates/reopens DMI
+#define VTPM_ORD_CLOSE    (VTPM_PRIV_BASE + 2) // Closes a DMI
+#define VTPM_ORD_DELETE   (VTPM_PRIV_BASE + 3) // Permemently Deletes DMI
 
 //************************ Return Codes ****************************
 #define VTPM_SUCCESS               0

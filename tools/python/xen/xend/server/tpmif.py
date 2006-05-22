@@ -71,12 +71,12 @@ class TPMifController(DevController):
 
         return result
 
-    def migrate(self, deviceConfig, live, dst, step, domName):
+    def migrate(self, deviceConfig, network, dst, step, domName):
         """@see DevContoller.migrate"""
-        if live:
+        if network:
             tool = xroot.get_external_migration_tool()
             if tool != '':
-                log.info("Request to live-migrate device to %s. step=%d.",
+                log.info("Request to network-migrate device to %s. step=%d.",
                          dst, step)
 
                 if step == DEV_MIGRATE_TEST:
@@ -99,12 +99,12 @@ class TPMifController(DevController):
                 return -1
         return 0
 
-    def recover_migrate(self, deviceConfig, live, dst, step, domName):
+    def recover_migrate(self, deviceConfig, network, dst, step, domName):
         """@see DevContoller.recover_migrate"""
-        if live:
+        if network:
             tool = xroot.get_external_migration_tool()
             if tool != '':
-                log.info("Request to recover live-migrated device. last good step=%d.",
+                log.info("Request to recover network-migrated device. last good step=%d.",
                          step)
                 fd = os.popen("%s -type vtpm -step %d -host %s -domname %s -recover" %
                               (tool, step, dst, domName),

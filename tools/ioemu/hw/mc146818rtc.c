@@ -178,10 +178,27 @@ static inline int from_bcd(RTCState *s, int a)
     }
 }
 
+static void send_timeoffset_msg(time_t delta)
+{
+
+/* This routine is used to inform another entity that the
+   base time offset has changed. For instance, if you
+   were using xenstore, you might want to write to the store
+   at this point.  Or, you might use some other method.
+   Whatever you might choose, here's a hook point to implement it.
+
+   One item of note is that this delta is in addition to
+   any existing offset you might be already using. */
+
+    return;
+}
+
 static void rtc_set_time(RTCState *s)
 {
     struct tm *tm = &s->current_tm;
-
+    time_t before, after;
+    
+    before = mktime(tm);
     tm->tm_sec = from_bcd(s, s->cmos_data[RTC_SECONDS]);
     tm->tm_min = from_bcd(s, s->cmos_data[RTC_MINUTES]);
     tm->tm_hour = from_bcd(s, s->cmos_data[RTC_HOURS] & 0x7f);
@@ -193,6 +210,12 @@ static void rtc_set_time(RTCState *s)
     tm->tm_mday = from_bcd(s, s->cmos_data[RTC_DAY_OF_MONTH]);
     tm->tm_mon = from_bcd(s, s->cmos_data[RTC_MONTH]) - 1;
     tm->tm_year = from_bcd(s, s->cmos_data[RTC_YEAR]) + 100;
+
+    /* Compute, and send, the additional time delta
+       We could compute the total time delta, but this is
+       sufficient, and simple. */
+    after = mktime(tm);
+    send_timeoffset_msg(after-before);
 }
 
 static void rtc_copy_date(RTCState *s)

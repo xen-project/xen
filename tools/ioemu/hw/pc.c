@@ -118,7 +118,7 @@ static void cmos_init_hd(int type_ofs, int info_ofs, BlockDriverState *hd)
 }
 
 /* hd_table must contain 4 block drivers */
-static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_table)
+static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_table, time_t timeoffset)
 {
     RTCState *s = rtc_state;
     int val;
@@ -129,6 +129,7 @@ static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_
 
     /* set the CMOS date */
     time(&ti);
+    ti += timeoffset;
     if (rtc_utc)
         tm = gmtime(&ti);
     else
@@ -373,18 +374,20 @@ static int ne2000_irq[NE2000_NB_MAX] = { 9, 10, 11, 3, 4, 5 };
 static int serial_io[MAX_SERIAL_PORTS] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8 };
 static int serial_irq[MAX_SERIAL_PORTS] = { 4, 3, 4, 3 };
 
+extern int acpi_init(unsigned int base);
+
 #define NOBIOS 1
 
 /* PC hardware initialisation */
 void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
              DisplayState *ds, const char **fd_filename, int snapshot,
              const char *kernel_filename, const char *kernel_cmdline,
-             const char *initrd_filename)
+             const char *initrd_filename, time_t timeoffset)
 {
+    SerialState *sp;
     char buf[1024];
     int ret, linux_boot, initrd_size, i, nb_nics1;
     PCIBus *pci_bus;
-    extern void * shared_vram;
     
     linux_boot = (kernel_filename != NULL);
 
@@ -511,14 +514,14 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
     if (cirrus_vga_enabled) {
         if (pci_enabled) {
             pci_cirrus_vga_init(pci_bus, 
-                                ds, shared_vram, ram_size, 
+                                ds, NULL, ram_size, 
                                 vga_ram_size);
         } else {
-            isa_cirrus_vga_init(ds, shared_vram, ram_size, 
+            isa_cirrus_vga_init(ds, NULL, ram_size, 
                                 vga_ram_size);
         }
     } else {
-        vga_initialize(pci_bus, ds, shared_vram, ram_size, 
+        vga_initialize(pci_bus, ds, NULL, ram_size, 
                        vga_ram_size);
     }
 
@@ -533,7 +536,9 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
 
     for(i = 0; i < MAX_SERIAL_PORTS; i++) {
         if (serial_hds[i]) {
-            serial_init(serial_io[i], serial_irq[i], serial_hds[i]);
+            sp = serial_init(serial_io[i], serial_irq[i], serial_hds[i]);
+            if (i == SUMMA_PORT)
+		summa_init(sp, serial_hds[i]);
         }
     }
 
@@ -573,7 +578,8 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
 
     floppy_controller = fdctrl_init(6, 2, 0, 0x3f0, fd_table);
 
-    cmos_init(ram_size, boot_device, bs_table);
+    cmos_init(ram_size, boot_device, bs_table, timeoffset);
+    acpi_init(0x8000);
 
     /* must be done after all PCI devices are instanciated */
     /* XXX: should be done in the Bochs BIOS */

@@ -43,7 +43,7 @@ try:
     dom0ip = netdev.getDom0AliasIP()
     for size in trysizes:
         out = console.runCmd("hping2 " + dom0ip + " -E /dev/urandom -2 -q -c 20"
-             + " --fast -d " + str(size))
+             + " --fast -d " + str(size) + " -N " + str(size))
         if out["return"]:
             fails += " " + str(size) 
             print out["output"]

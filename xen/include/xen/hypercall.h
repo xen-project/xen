@@ -80,7 +80,7 @@ do_vcpu_op(
 
 extern long
 do_acm_op(
-    XEN_GUEST_HANDLE(acm_op_t) u_acm_op);
+    int cmd, XEN_GUEST_HANDLE(void) arg);
 
 extern long
 do_nmi_op(

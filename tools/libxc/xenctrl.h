@@ -9,6 +9,7 @@
 #ifndef XENCTRL_H
 #define XENCTRL_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <sys/ptrace.h>
 #include <xen/xen.h>
@@ -529,15 +530,23 @@ long xc_get_tot_pages(int xc_handle, uint32_t domid);
  */
 
 /**
- * This function enables or disables tracing. Trace buffer memory must
- * be already allocated by setting the size to a non-zero value, otherwise
- * tracing cannot be enabled.
+ * xc_tbuf_enable - enable tracing buffers
  *
  * @parm xc_handle a handle to an open hypervisor interface
- * @parm enable the desired action, 1 for enable, 0 for disable
- * @return 0 on success, -1 on failure.
+ * @parm cnt size of tracing buffers to create (in pages)
+ * @parm mfn location to store mfn of the trace buffers to
+ * @parm size location to store the size (in bytes) of a trace buffer to
+ *
+ * Gets the machine address of the trace pointer area and the size of the
+ * per CPU buffers.
  */
-int xc_tbuf_enable(int xc_handle, int enable);
+int xc_tbuf_enable(int xc_handle, size_t cnt, unsigned long *mfn,
+    unsigned long *size);
+
+/*
+ * Disable tracing buffers.
+ */
+int xc_tbuf_disable(int xc_handle);
 
 /**
  * This function sets the size of the trace buffers. Setting the size
@@ -549,7 +558,7 @@ int xc_tbuf_enable(int xc_handle, int enable);
  * @parm size the size in pages per cpu for the trace buffers
  * @return 0 on success, -1 on failure.
  */
-int xc_tbuf_set_size(int xc_handle, uint32_t size);
+int xc_tbuf_set_size(int xc_handle, unsigned long size);
 
 /**
  * This function retrieves the current size of the trace buffers.
@@ -559,16 +568,7 @@ int xc_tbuf_set_size(int xc_handle, uint32_t size);
  * @parm size will contain the size in bytes for the trace buffers
  * @return 0 on success, -1 on failure.
  */
-int xc_tbuf_get_size(int xc_handle, uint32_t *size);
-
-/**
- * This function retrieves the machine frame of the trace buffer.
-
- * @parm xc_handle a handle to an open hypervisor interface
- * @parm mfn will contain the machine frame of the buffer.
- * @return 0 on success, -1 on failure.
- */
-int xc_tbuf_get_mfn(int xc_handle, unsigned long *mfn);
+int xc_tbuf_get_size(int xc_handle, unsigned long *size);
 
 int xc_tbuf_set_cpu_mask(int xc_handle, uint32_t mask);
 
@@ -594,6 +594,6 @@ int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu,
                    unsigned long long ptr, unsigned long long val);
 int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu);
 
-int xc_acm_op(int xc_handle, struct acm_op *op);
+int xc_acm_op(int xc_handle, int cmd, void *arg, size_t arg_size);
 
 #endif

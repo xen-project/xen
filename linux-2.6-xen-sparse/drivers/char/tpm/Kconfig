@@ -53,10 +53,9 @@ config TCG_XEN
 	tristate "XEN TPM Interface"
 	depends on TCG_TPM && XEN
 	---help---
-	  If you want to make TPM support available to a Xen
-	  user domain, say Yes and it will
-          be accessible from within Linux. To compile this driver
-          as a module, choose M here; the module will be called
-          tpm_xen.
+	  If you want to make TPM support available to a Xen user domain,
+	  say Yes and it will be accessible from within Linux.
+	  To compile this driver as a module, choose M here; the module
+	  will be called tpm_xenu.
 
 endmenu

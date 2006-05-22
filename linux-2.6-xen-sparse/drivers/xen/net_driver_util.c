@@ -56,13 +56,3 @@ int xen_net_read_mac(struct xenbus_device *dev, u8 mac[])
 	return 0;
 }
 EXPORT_SYMBOL_GPL(xen_net_read_mac);
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

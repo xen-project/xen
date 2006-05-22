@@ -46,6 +46,8 @@ struct xs_permissions
 #define MAX_STRLEN(x) ((sizeof(x) * CHAR_BIT + CHAR_BIT-1) / 10 * 3 + 2)
 
 /* Path for various daemon things: env vars can override. */
+const char *xs_daemon_rootdir(void);
+const char *xs_daemon_rundir(void);
 const char *xs_daemon_socket(void);
 const char *xs_daemon_socket_ro(void);
 const char *xs_domain_dev(void);

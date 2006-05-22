@@ -8,12 +8,6 @@
 #include <asm/processor.h>
 #include <asm/asmmacro.h>
 
-	.data
-	.align 8
-	.globl running_on_xen
-running_on_xen:
-	data4 0
-
 #define isBP	p3	// are we the Bootstrap Processor?
 
 	.text
@@ -28,9 +22,3 @@ GLOBAL_ENTRY(early_xen_setup)
 (p7)	mov cr.iva=r10
 	br.ret.sptk.many rp;;
 END(early_xen_setup)
-
-GLOBAL_ENTRY(is_running_on_xen)
-	movl r9=running_on_xen;;
-	ld4 r8=[r9]
-	br.ret.sptk.many rp;;
-END(is_running_on_xen)

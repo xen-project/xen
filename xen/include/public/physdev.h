@@ -14,10 +14,11 @@
  * @arg == pointer to physdev_eoi structure.
  */
 #define PHYSDEVOP_eoi                   12
-typedef struct physdev_eoi {
+struct physdev_eoi {
     /* IN */
     uint32_t irq;
-} physdev_eoi_t;
+};
+typedef struct physdev_eoi physdev_eoi_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_eoi_t);
 
 /*
@@ -25,12 +26,13 @@ DEFINE_XEN_GUEST_HANDLE(physdev_eoi_t);
  * @arg == pointer to physdev_irq_status_query structure.
  */
 #define PHYSDEVOP_irq_status_query       5
-typedef struct physdev_irq_status_query {
+struct physdev_irq_status_query {
     /* IN */
     uint32_t irq;
     /* OUT */
     uint32_t flags; /* XENIRQSTAT_* */
-} physdev_irq_status_query_t;
+};
+typedef struct physdev_irq_status_query physdev_irq_status_query_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_irq_status_query_t);
 
 /* Need to call PHYSDEVOP_eoi when the IRQ has been serviced? */
@@ -42,10 +44,11 @@ DEFINE_XEN_GUEST_HANDLE(physdev_irq_status_query_t);
  * @arg == pointer to physdev_set_iopl structure.
  */
 #define PHYSDEVOP_set_iopl               6
-typedef struct physdev_set_iopl {
+struct physdev_set_iopl {
     /* IN */
     uint32_t iopl;
-} physdev_set_iopl_t;
+};
+typedef struct physdev_set_iopl physdev_set_iopl_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_set_iopl_t);
 
 /*
@@ -53,11 +56,12 @@ DEFINE_XEN_GUEST_HANDLE(physdev_set_iopl_t);
  * @arg == pointer to physdev_set_iobitmap structure.
  */
 #define PHYSDEVOP_set_iobitmap           7
-typedef struct physdev_set_iobitmap {
+struct physdev_set_iobitmap {
     /* IN */
     uint8_t *bitmap;
     uint32_t nr_ports;
-} physdev_set_iobitmap_t;
+};
+typedef struct physdev_set_iobitmap physdev_set_iobitmap_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_set_iobitmap_t);
 
 /*
@@ -66,13 +70,14 @@ DEFINE_XEN_GUEST_HANDLE(physdev_set_iobitmap_t);
  */
 #define PHYSDEVOP_apic_read              8
 #define PHYSDEVOP_apic_write             9
-typedef struct physdev_apic {
+struct physdev_apic {
     /* IN */
     unsigned long apic_physbase;
     uint32_t reg;
     /* IN or OUT */
     uint32_t value;
-} physdev_apic_t;
+};
+typedef struct physdev_apic physdev_apic_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_apic_t);
 
 /*
@@ -81,28 +86,30 @@ DEFINE_XEN_GUEST_HANDLE(physdev_apic_t);
  */
 #define PHYSDEVOP_alloc_irq_vector      10
 #define PHYSDEVOP_free_irq_vector       11
-typedef struct physdev_irq {
+struct physdev_irq {
     /* IN */
     uint32_t irq;
     /* IN or OUT */
     uint32_t vector;
-} physdev_irq_t;
+};
+typedef struct physdev_irq physdev_irq_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_irq_t);
 
 /*
  * Argument to physdev_op_compat() hypercall. Superceded by new physdev_op()
  * hypercall since 0x00030202.
  */
-typedef struct physdev_op {
+struct physdev_op {
     uint32_t cmd;
     union {
-        physdev_irq_status_query_t      irq_status_query;
-        physdev_set_iopl_t              set_iopl;
-        physdev_set_iobitmap_t          set_iobitmap;
-        physdev_apic_t                  apic_op;
-        physdev_irq_t                   irq_op;
+        struct physdev_irq_status_query      irq_status_query;
+        struct physdev_set_iopl              set_iopl;
+        struct physdev_set_iobitmap          set_iobitmap;
+        struct physdev_apic                  apic_op;
+        struct physdev_irq                   irq_op;
     } u;
-} physdev_op_t;
+};
+typedef struct physdev_op physdev_op_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_op_t);
 
 /*

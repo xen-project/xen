@@ -468,8 +468,8 @@ static int __init balloon_init(void)
 
 	IPRINTK("Initialising balloon driver.\n");
 
-	if (xen_init() < 0)
-		return -1;
+	if (!is_running_on_xen())
+		return -ENODEV;
 
 	current_pages = min(xen_start_info->nr_pages, max_pfn);
 	totalram_pages = current_pages;
@@ -603,13 +603,3 @@ EXPORT_SYMBOL_GPL(balloon_alloc_empty_page_range);
 EXPORT_SYMBOL_GPL(balloon_dealloc_empty_page_range);
 
 MODULE_LICENSE("Dual BSD/GPL");
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

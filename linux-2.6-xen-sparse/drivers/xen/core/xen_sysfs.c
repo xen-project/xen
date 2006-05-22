@@ -276,7 +276,12 @@ static void xen_properties_destroy(void)
 
 static int __init hyper_sysfs_init(void)
 {
-	int ret = xen_sysfs_type_init();
+	int ret;
+
+	if (!is_running_on_xen())
+		return -ENODEV;
+
+	ret = xen_sysfs_type_init();
 	if (ret)
 		goto out;
 	ret = xen_sysfs_version_init();

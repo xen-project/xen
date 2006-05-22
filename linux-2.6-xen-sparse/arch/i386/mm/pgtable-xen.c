@@ -640,13 +640,3 @@ void _arch_exit_mmap(struct mm_struct *mm)
 	    (atomic_read(&mm->mm_count) == 1))
 		mm_unpin(mm);
 }
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

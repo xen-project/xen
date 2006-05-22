@@ -35,6 +35,7 @@
 #include <xen/event.h>
 #include <xen/kernel.h>
 #include <asm/shadow.h>
+#include <xen/keyhandler.h>
 #if CONFIG_PAGING_LEVELS >= 3
 #include <asm/shadow_64.h>
 #endif
@@ -541,6 +542,101 @@ void arch_vmx_do_launch(struct vcpu *v)
     vmx_do_launch(v);
     reset_stack_and_jump(vmx_asm_do_launch);
 }
+
+
+/* Dump a section of VMCS */
+static void print_section(char *header, uint32_t start, 
+                          uint32_t end, int incr)
+{
+    uint32_t addr, j;
+    unsigned long val;
+    int code;
+    char *fmt[4] = {"0x%04lx ", "0x%016lx ", "0x%08lx ", "0x%016lx "};
+    char *err[4] = {"------ ", "------------------ ", 
+                    "---------- ", "------------------ "};
+
+    /* Find width of the field (encoded in bits 14:13 of address) */
+    code = (start>>13)&3;
+
+    if (header)
+        printk("\t %s", header);
+
+    for (addr=start, j=0; addr<=end; addr+=incr, j++) {
+
+        if (!(j&3))
+            printk("\n\t\t0x%08x: ", addr);
+
+        if (!__vmread(addr, &val))
+            printk(fmt[code], val);
+        else
+            printk("%s", err[code]);
+    }
+
+    printk("\n");
+}
+
+/* Dump current VMCS */
+void vmcs_dump_vcpu(void)
+{
+    print_section("16-bit Guest-State Fields", 0x800, 0x80e, 2);
+    print_section("16-bit Host-State Fields", 0xc00, 0xc0c, 2);
+    print_section("64-bit Control Fields", 0x2000, 0x2013, 1);
+    print_section("64-bit Guest-State Fields", 0x2800, 0x2803, 1);
+    print_section("32-bit Control Fields", 0x4000, 0x401c, 2);
+    print_section("32-bit RO Data Fields", 0x4400, 0x440e, 2);
+    print_section("32-bit Guest-State Fields", 0x4800, 0x482a, 2);
+    print_section("32-bit Host-State Fields", 0x4c00, 0x4c00, 2);
+    print_section("Natural 64-bit Control Fields", 0x6000, 0x600e, 2);
+    print_section("64-bit RO Data Fields", 0x6400, 0x640A, 2);
+    print_section("Natural 64-bit Guest-State Fields", 0x6800, 0x6826, 2);
+    print_section("Natural 64-bit Host-State Fields", 0x6c00, 0x6c16, 2);
+}
+
+
+static void vmcs_dump(unsigned char ch)
+{
+    struct domain *d;
+    struct vcpu *v;
+    
+    printk("*********** VMCS Areas **************\n");
+    for_each_domain(d) {
+        printk("\n>>> Domain %d <<<\n", d->domain_id);
+        for_each_vcpu(d, v) {
+
+            /* 
+             * Presumably, if a domain is not an HVM guest,
+             * the very first CPU will not pass this test
+             */
+            if (!hvm_guest(v)) {
+                printk("\t\tNot HVM guest\n");
+                break;
+            }
+            printk("\tVCPU %d\n", v->vcpu_id);
+
+            if (v != current) {
+                vcpu_pause(v);
+                __vmptrld(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+            }
+
+            vmcs_dump_vcpu();
+
+            if (v != current) {
+                __vmptrld(virt_to_maddr(current->arch.hvm_vmx.vmcs));
+                vcpu_unpause(v);
+            }
+        }
+    }
+
+    printk("**************************************\n");
+}
+
+static int __init setup_vmcs_dump(void)
+{
+    register_keyhandler('v', vmcs_dump, "dump Intel's VMCS");
+    return 0;
+}
+
+__initcall(setup_vmcs_dump);
 
 /*
  * Local variables:

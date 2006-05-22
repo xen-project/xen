@@ -38,7 +38,7 @@ fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a ,    \
 /* generic shared function */
 void * __getssid(int domid, uint32_t *buflen)
 {
-    struct acm_op op;
+    struct acm_getssid getssid;
     int xc_handle;
     #define SSID_BUFFER_SIZE    4096
     void *buf = NULL;
@@ -51,14 +51,13 @@ void * __getssid(int domid, uint32_t *buflen)
         goto out2;
     }
     memset(buf, 0, SSID_BUFFER_SIZE);
-    op.cmd = ACM_GETSSID;
-    op.interface_version = ACM_INTERFACE_VERSION;
-    op.u.getssid.ssidbuf = buf;
-    op.u.getssid.ssidbuf_size = SSID_BUFFER_SIZE;
-    op.u.getssid.get_ssid_by = DOMAINID;
-    op.u.getssid.id.domainid = domid;
+    getssid.interface_version = ACM_INTERFACE_VERSION;
+    getssid.ssidbuf = buf;
+    getssid.ssidbuf_size = SSID_BUFFER_SIZE;
+    getssid.get_ssid_by = DOMAINID;
+    getssid.id.domainid = domid;
 
-    if (xc_acm_op(xc_handle, &op) < 0) {
+    if (xc_acm_op(xc_handle, ACMOP_getssid, &getssid, sizeof(getssid)) < 0) {
         if (errno == EACCES)
             PERROR("ACM operation failed.");
         free(buf);
@@ -147,7 +146,7 @@ static PyObject *getssid(PyObject * self, PyObject * args)
 static PyObject *getdecision(PyObject * self, PyObject * args)
 {
     char *arg1_name, *arg1, *arg2_name, *arg2, *decision = NULL;
-    struct acm_op op;
+    struct acm_getdecision getdecision;
     int xc_handle;
 
     if (!PyArg_ParseTuple(args, "ssss", &arg1_name, &arg1, &arg2_name, &arg2)) {
@@ -163,34 +162,33 @@ static PyObject *getdecision(PyObject * self, PyObject * args)
     (strcmp(arg2_name, "domid") && strcmp(arg2_name, "ssidref")))
         return NULL;
 
-    op.cmd = ACM_GETDECISION;
-    op.interface_version = ACM_INTERFACE_VERSION;
-    op.u.getdecision.hook = SHARING;
+    getdecision.interface_version = ACM_INTERFACE_VERSION;
+    getdecision.hook = SHARING;
     if (!strcmp(arg1_name, "domid")) {
-        op.u.getdecision.get_decision_by1 = DOMAINID;
-        op.u.getdecision.id1.domainid = atoi(arg1);
+        getdecision.get_decision_by1 = DOMAINID;
+        getdecision.id1.domainid = atoi(arg1);
     } else {
-        op.u.getdecision.get_decision_by1 = SSIDREF;
-        op.u.getdecision.id1.ssidref = atol(arg1);
+        getdecision.get_decision_by1 = SSIDREF;
+        getdecision.id1.ssidref = atol(arg1);
     }
     if (!strcmp(arg2_name, "domid")) {
-        op.u.getdecision.get_decision_by2 = DOMAINID;
-        op.u.getdecision.id2.domainid = atoi(arg2);
+        getdecision.get_decision_by2 = DOMAINID;
+        getdecision.id2.domainid = atoi(arg2);
     } else {
-        op.u.getdecision.get_decision_by2 = SSIDREF;
-        op.u.getdecision.id2.ssidref = atol(arg2);
+        getdecision.get_decision_by2 = SSIDREF;
+        getdecision.id2.ssidref = atol(arg2);
     }
 
-    if (xc_acm_op(xc_handle, &op) < 0) {
+    if (xc_acm_op(xc_handle, ACMOP_getdecision, &getdecision, sizeof(getdecision)) < 0) {
         if (errno == EACCES)
             PERROR("ACM operation failed.");
     }
 
     xc_interface_close(xc_handle);
 
-    if (op.u.getdecision.acm_decision == ACM_ACCESS_PERMITTED)
+    if (getdecision.acm_decision == ACM_ACCESS_PERMITTED)
         decision = "PERMITTED";
-    else if (op.u.getdecision.acm_decision == ACM_ACCESS_DENIED)
+    else if (getdecision.acm_decision == ACM_ACCESS_DENIED)
         decision = "DENIED";
 
     return Py_BuildValue("s", decision);

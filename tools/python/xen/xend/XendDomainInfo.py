@@ -29,6 +29,7 @@ import logging
 import string
 import time
 import threading
+import os
 
 import xen.lowlevel.xc
 from xen.util import asserts
@@ -1264,7 +1265,14 @@ class XendDomainInfo:
             m = self.image.getDomainMemory(self.info['memory'] * 1024)
             balloon.free(m)
             xc.domain_setmaxmem(self.domid, m)
-            xc.domain_memory_increase_reservation(self.domid, m, 0, 0)
+
+            init_reservation = self.info['memory'] * 1024
+            if os.uname()[4] == 'ia64':
+                # Workaround until ia64 properly supports ballooning.
+                init_reservation = m
+
+            xc.domain_memory_increase_reservation(self.domid, init_reservation,
+                                                  0, 0)
 
             self.createChannels()
 
@@ -1443,36 +1451,40 @@ class XendDomainInfo:
 
     ## public:
 
-    def testMigrateDevices(self, live, dst):
+    def testMigrateDevices(self, network, dst):
         """ Notify all device about intention of migration
         @raise: XendError for a device that cannot be migrated
         """
         for (n, c) in self.info['device']:
-            rc = self.migrateDevice(n, c, live, dst, DEV_MIGRATE_TEST)
+            rc = self.migrateDevice(n, c, network, dst, DEV_MIGRATE_TEST)
             if rc != 0:
                 raise XendError("Device of type '%s' refuses migration." % n)
 
-    def migrateDevices(self, live, dst, step, domName=''):
+    def migrateDevices(self, network, dst, step, domName=''):
         """Notify the devices about migration
         """
         ctr = 0
         try:
             for (n, c) in self.info['device']:
-                self.migrateDevice(n, c, live, dst, step, domName)
+                self.migrateDevice(n, c, network, dst, step, domName)
                 ctr = ctr + 1
         except:
             for (n, c) in self.info['device']:
                 if ctr == 0:
                     step = step - 1
                 ctr = ctr - 1
-                self.recoverMigrateDevice(n, c, live, dst, step, domName)
+                self.recoverMigrateDevice(n, c, network, dst, step, domName)
             raise
 
-    def migrateDevice(self, deviceClass, deviceConfig, live, dst, step, domName=''):
-        return self.getDeviceController(deviceClass).migrate(deviceConfig, live, dst, step, domName)
+    def migrateDevice(self, deviceClass, deviceConfig, network, dst,
+                      step, domName=''):
+        return self.getDeviceController(deviceClass).migrate(deviceConfig,
+                                        network, dst, step, domName)
 
-    def recoverMigrateDevice(self, deviceClass, deviceConfig, live, dst, step, domName=''):
-        return self.getDeviceController(deviceClass).recover_migrate(deviceConfig, live, dst, step, domName)
+    def recoverMigrateDevice(self, deviceClass, deviceConfig, network,
+                             dst, step, domName=''):
+        return self.getDeviceController(deviceClass).recover_migrate(
+                     deviceConfig, network, dst, step, domName)
 
     def waitForDevices(self):
         """Wait for this domain's configured devices to connect.

@@ -461,7 +461,7 @@ static bool write_node(struct connection *conn, const struct node *node)
 		+ node->num_perms*sizeof(node->perms[0])
 		+ node->datalen + node->childlen;
 
-	if (data.dsize >= quota_max_entry_size)
+	if (domain_is_unprivileged(conn) && data.dsize >= quota_max_entry_size)
 		goto error;
 
 	data.dptr = talloc_size(node, data.dsize);
@@ -1810,6 +1810,21 @@ int main(int argc, char *argv[])
 		barf("%s: No arguments desired", argv[0]);
 
 	reopen_log();
+
+	/* make sure xenstored directory exists */
+	if (mkdir(xs_daemon_rundir(), 0755)) {
+		if (errno != EEXIST) {
+			perror("error: mkdir daemon rundir");
+			exit(-1);
+		}
+	}
+
+	if (mkdir(xs_daemon_rootdir(), 0755)) {
+		if (errno != EEXIST) {
+			perror("error: mkdir daemon rootdir");
+			exit(-1);
+		}
+	}
 
 	if (dofork) {
 		openlog("xenstored", 0, LOG_DAEMON);

@@ -38,6 +38,8 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include "audio/audio.h"
+#include "xenctrl.h"
+#include "xs.h"
 
 #ifndef O_LARGEFILE
 #define O_LARGEFILE 0
@@ -113,6 +115,19 @@ void qemu_system_shutdown_request(void);
 
 void main_loop_wait(int timeout);
 
+int unset_mm_mapping(int xc_handle,
+                     uint32_t domid,
+                     unsigned long nr_pages,
+                     unsigned int address_bits,
+                     unsigned long *extent_start);
+int set_mm_mapping(int xc_handle,
+                    uint32_t domid,
+                    unsigned long nr_pages,
+                    unsigned int address_bits,
+                    unsigned long *extent_start);
+
+extern int xc_handle;
+extern int domid;
 extern int audio_enabled;
 extern int sb16_enabled;
 extern int adlib_enabled;
@@ -223,6 +238,7 @@ void console_select(unsigned int index);
 /* serial ports */
 
 #define MAX_SERIAL_PORTS 4
+#define SUMMA_PORT	1
 
 extern CharDriverState *serial_hds[MAX_SERIAL_PORTS];
 
@@ -618,12 +634,6 @@ void kbd_init(void);
 extern const char* keyboard_layout;
 extern int repeat_key;
 
-/* Mice */
-
-void summa_init(void *cookie, CharDriverState *chr);
-
-extern int summa_ok;
-
 /* mc146818rtc.c */
 
 typedef struct RTCState RTCState;
@@ -637,6 +647,12 @@ void rtc_set_date(RTCState *s, const struct tm *tm);
 typedef struct SerialState SerialState;
 SerialState *serial_init(int base, int irq, CharDriverState *chr);
 void ser_queue(SerialState *s, unsigned char c);
+
+/* Mice */
+
+void summa_init(SerialState *serial, CharDriverState *chr);
+
+extern int summa_ok;
 
 /* i8259.c */
 
@@ -663,7 +679,7 @@ int pit_get_out(PITState *pit, int channel, int64_t current_time);
 void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
              DisplayState *ds, const char **fd_filename, int snapshot,
              const char *kernel_filename, const char *kernel_cmdline,
-             const char *initrd_filename);
+             const char *initrd_filename, time_t timeoffset);
 
 /* ppc.c */
 void ppc_init (int ram_size, int vga_ram_size, int boot_device,

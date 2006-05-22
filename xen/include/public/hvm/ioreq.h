@@ -41,7 +41,7 @@
  * prepare this structure and notify service OS and DM by sending
  * virq
  */
-typedef struct {
+struct ioreq {
     uint64_t addr;          /*  physical address            */
     uint64_t size;          /*  size in bytes               */
     uint64_t count;         /*  for rep prefixes            */
@@ -55,31 +55,35 @@ typedef struct {
     uint8_t df:1;
     uint8_t type;           /* I/O type                     */
     uint64_t io_count;      /* How many IO done on a vcpu   */
-} ioreq_t;
+};
+typedef struct ioreq ioreq_t;
 
 #define MAX_VECTOR      256
 #define BITS_PER_BYTE   8
 #define INTR_LEN        (MAX_VECTOR/(BITS_PER_BYTE * sizeof(uint64_t)))
 #define INTR_LEN_32     (MAX_VECTOR/(BITS_PER_BYTE * sizeof(uint32_t)))
 
-typedef struct {
+struct global_iodata {
     uint16_t    pic_elcr;
     uint16_t    pic_irr;
     uint16_t    pic_last_irr;
     uint16_t    pic_clear_irr;
-} global_iodata_t;
+};
+typedef struct global_iodata global_iodata_t;
 
-typedef struct {
-    ioreq_t         vp_ioreq;
+struct vcpu_iodata {
+    struct ioreq         vp_ioreq;
     /* Event channel port */
     unsigned int    vp_eport;   /* VMX vcpu uses this to notify DM */
     unsigned int    dm_eport;   /* DM uses this to notify VMX vcpu */
-} vcpu_iodata_t;
+};
+typedef struct vcpu_iodata vcpu_iodata_t;
 
-typedef struct {
-    global_iodata_t sp_global;
-    vcpu_iodata_t   vcpu_iodata[1];
-} shared_iopage_t;
+struct shared_iopage {
+    struct global_iodata sp_global;
+    struct vcpu_iodata   vcpu_iodata[1];
+};
+typedef struct shared_iopage shared_iopage_t;
 
 #endif /* _IOREQ_H_ */
 

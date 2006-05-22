@@ -148,13 +148,3 @@ gnttab_set_unmap_op(struct gnttab_unmap_grant_ref *unmap, unsigned long addr,
 }
 
 #endif /* __ASM_GNTTAB_H__ */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

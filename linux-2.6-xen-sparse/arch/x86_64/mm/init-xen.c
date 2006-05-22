@@ -370,7 +370,7 @@ void __set_fixmap_user (enum fixed_addresses idx, unsigned long phys, pgprot_t p
 	set_pte_phys(address, phys, prot, SET_FIXMAP_USER); 
 }
 
-unsigned long __initdata table_start, tables_space; 
+unsigned long __initdata table_start, table_end; 
 
 unsigned long get_machine_pfn(unsigned long addr)
 {
@@ -409,11 +409,17 @@ static inline int make_readonly(unsigned long paddr)
 {
 	int readonly = 0;
 
-	/* Make old and new page tables read-only. */
+	/* Make new page tables read-only. */
+	if (!xen_feature(XENFEAT_writable_page_tables)
+	    && (paddr >= (table_start << PAGE_SHIFT))
+	    && (paddr < (table_end << PAGE_SHIFT)))
+		readonly = 1;
+	/* Make old page tables read-only. */
 	if (!xen_feature(XENFEAT_writable_page_tables)
 	    && (paddr >= (xen_start_info->pt_base - __START_KERNEL_map))
-	    && (paddr < ((table_start << PAGE_SHIFT) + tables_space)))
+	    && (paddr < (start_pfn << PAGE_SHIFT)))
 		readonly = 1;
+
 	/*
 	 * No need for writable mapping of kernel image. This also ensures that
 	 * page and descriptor tables embedded inside don't have writable
@@ -544,7 +550,7 @@ void __init xen_init_pt(void)
 		mk_kernel_pgd(__pa_symbol(level3_user_pgt)));
 }
 
-void __init extend_init_mapping(void) 
+void __init extend_init_mapping(unsigned long tables_space)
 {
 	unsigned long va = __START_KERNEL_map;
 	unsigned long phys, addr, *pte_page;
@@ -599,23 +605,23 @@ void __init extend_init_mapping(void)
 
 static void __init find_early_table_space(unsigned long end)
 {
-	unsigned long puds, pmds, ptes; 
+	unsigned long puds, pmds, ptes, tables; 
 
 	puds = (end + PUD_SIZE - 1) >> PUD_SHIFT;
 	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT;
 	ptes = (end + PTE_SIZE - 1) >> PAGE_SHIFT;
 
-	tables_space =
-		round_up(puds * 8, PAGE_SIZE) + 
+	tables = round_up(puds * 8, PAGE_SIZE) + 
 		round_up(pmds * 8, PAGE_SIZE) + 
 		round_up(ptes * 8, PAGE_SIZE); 
 
-	extend_init_mapping();
+	extend_init_mapping(tables);
 
 	table_start = start_pfn;
+	table_end = table_start + (tables>>PAGE_SHIFT);
 
 	early_printk("kernel direct mapping tables up to %lx @ %lx-%lx\n",
-		end, table_start << PAGE_SHIFT, start_pfn << PAGE_SHIFT);
+		end, table_start << PAGE_SHIFT, table_end << PAGE_SHIFT);
 }
 
 /* Setup the direct mapping of the physical memory at PAGE_OFFSET.
@@ -660,7 +666,7 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 			set_pgd(pgd_offset_k(start), mk_kernel_pgd(pud_phys));
 	}
 
-	BUG_ON(!after_bootmem && start_pfn != table_start + (tables_space >> PAGE_SHIFT));
+	BUG_ON(!after_bootmem && start_pfn != table_end);
 
 	__flush_tlb_all();
 }
@@ -1089,13 +1095,3 @@ int in_gate_area_no_task(unsigned long addr)
 {
 	return (addr >= VSYSCALL_START) && (addr < VSYSCALL_END);
 }
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

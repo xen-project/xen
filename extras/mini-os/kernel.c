@@ -63,7 +63,12 @@ void failsafe_callback(void);
 
 extern char shared_info[PAGE_SIZE];
 
+#if !defined(CONFIG_X86_PAE)
 #define __pte(x) ((pte_t) { (x) } )
+#else
+#define __pte(x) ({ unsigned long long _x = (x);        \
+    ((pte_t) {(unsigned long)(_x), (unsigned long)(_x>>32)}); })
+#endif
 
 static shared_info_t *map_shared_info(unsigned long pa)
 {
@@ -71,7 +76,7 @@ static shared_info_t *map_shared_info(unsigned long pa)
         (unsigned long)shared_info, __pte(pa | 7), UVMF_INVLPG) )
     {
         printk("Failed to map shared_info!!\n");
-        *(int*)0=0;
+        do_exit();
     }
     return (shared_info_t *)shared_info;
 }
@@ -106,6 +111,12 @@ void setup_xen_features(void)
     }
 }
 
+/* This should be overridden by the application we are linked against. */
+__attribute__((weak)) int app_main(start_info_t *si)
+{
+    printk("Dummy main: start_info=%p\n", si);
+    return 0;
+}
 
 /*
  * INITIAL C ENTRY POINT.
@@ -120,6 +131,10 @@ void start_kernel(start_info_t *si)
     /* WARN: don't do printk before here, it uses information from
        shared_info. Use xprintk instead. */
     memcpy(&start_info, si, sizeof(*si));
+    
+    /* set up minimal memory infos */
+    phys_to_machine_mapping = (unsigned long *)start_info.mfn_list;
+
     /* Grab the shared_info pointer and put it in a safe place. */
     HYPERVISOR_shared_info = map_shared_info(start_info.shared_info);
 
@@ -165,11 +180,14 @@ void start_kernel(start_info_t *si)
     /* Init the console driver. */
     init_console();
  
-   /* Init scheduler. */
+    /* Init scheduler. */
     init_sched();
  
     /* Init XenBus from a separate thread */
     create_thread("init_xs", init_xs, NULL);
+
+    /* Call (possibly overridden) app_main() */
+    app_main(&start_info);
 
     /* Everything initialised, start idle thread */
     run_idle_thread();

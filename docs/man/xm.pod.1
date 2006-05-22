@@ -27,12 +27,12 @@ each of those sub commands.
 
 =head1 NOTES
 
-All B<xm> opperations rely upon the Xen control daemon, aka B<xend>.
+All B<xm> operations rely upon the Xen control daemon, aka B<xend>.
 For any xm commands to run xend must also be running.  For this reason
 you should start xend as a service when your system first boots using
 xen.
 
-Most B<xm> commands require root privledges to run due to the
+Most B<xm> commands require root privileges to run due to the
 communications channels used to talk to the hypervisor.  Running as
 non root will return an error.
 
@@ -169,7 +169,7 @@ The domain is currently running on a CPU
 
 =item B<b - blocked>
 
-The domain is blocked, and not running or runable.  This can be caused
+The domain is blocked, and not running or runnable.  This can be caused
 because the domain is waiting on IO (a traditional wait state) or has
 gone to sleep because there was nothing else for it to do.
 
@@ -260,7 +260,7 @@ careful when using this command on running domains.
 
 Migrate a domain to another Host machine. B<Xend> must be running on
 other host machine, it must be running the same version of xen, it
-must have the migration tcp port open and accepting connections from
+must have the migration TCP port open and accepting connections from
 the source host, and there must be sufficient resources for the domain
 to run (memory, disk, etc).
 
@@ -337,7 +337,7 @@ severed upon restore, as TCP timeouts may have expired.
 =item B<shutdown> I<[options]> I<domain-id>
 
 Gracefully shuts down a domain.  This coordinates with the domain OS
-to perform graceful shutdown, so there is no guaruntee that it will
+to perform graceful shutdown, so there is no guarantee that it will
 succeed, and may take a variable length of time depending on what
 services must be shutdown in the domain.  The command returns
 immediately after signally the domain unless that I<-w> flag is used.
@@ -573,11 +573,11 @@ B<PARAMETERS>
 
 =item I<period>
 
-The normal EDF scheduling usage in nanosecs
+The normal EDF scheduling usage in nanoseconds
 
 =item I<slice>
 
-The normal EDF scheduling usage in nanosecs
+The normal EDF scheduling usage in nanoseconds
 
 FIXME: these are lame, should explain more.
 
@@ -726,7 +726,7 @@ circumstances this should actually work.
 
 =item I<mac=macaddr>
 
-The MAC address that the domain will see on its ethernet device.  If
+The MAC address that the domain will see on its Ethernet device.  If
 the device is not specified it will be randomly generated with the
 00:16:3e vendor id prefix.
 
@@ -768,7 +768,7 @@ formatted as a list or as an S-Expression if the '--long' option was given.
 
 The Virtual Network interfaces for Xen.
 
-FIXME: This needs a lot more explaination, or it needs to be ripped
+FIXME: This needs a lot more explanation, or it needs to be ripped
 out entirely.
 
 =over 4

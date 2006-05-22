@@ -28,6 +28,9 @@
  */
 #include "vl.h"
 #include "vga_int.h"
+#ifndef _WIN32
+#include <sys/mman.h>
+#endif
 
 /*
  * TODO:
@@ -269,7 +272,8 @@ typedef struct CirrusVGAState {
     int last_hw_cursor_y_end;
     int real_vram_size; /* XXX: suppress that */
     CPUWriteMemoryFunc **cirrus_linear_write;
-    int set_mapping;
+    unsigned long map_addr;
+    unsigned long map_end;
 } CirrusVGAState;
 
 typedef struct PCICirrusVGAState {
@@ -1187,6 +1191,17 @@ cirrus_hook_write_sr(CirrusVGAState * s, unsigned reg_index, int reg_value)
 	s->hw_cursor_y = (reg_value << 3) | (reg_index >> 5);
 	break;
     case 0x07:			// Extended Sequencer Mode
+	/* Win2K seems to assume that the VRAM is set to 0xff
+	 *   whenever VGA/SVGA mode changes 
+	 */
+	if ((s->sr[0x07] ^ reg_value) & CIRRUS_SR7_BPP_SVGA)
+	    memset(s->vram_ptr, 0xff, s->real_vram_size);
+	s->sr[0x07] = reg_value;
+#ifdef DEBUG_CIRRUS 
+	printf("cirrus: handled outport sr_index %02x, sr_value %02x\n",
+	       reg_index, reg_value);
+#endif
+	break;
     case 0x08:			// EEPROM Control
     case 0x09:			// Scratch Register 0
     case 0x0a:			// Scratch Register 1
@@ -2444,14 +2459,97 @@ static CPUWriteMemoryFunc *cirrus_linear_bitblt_write[3] = {
     cirrus_linear_bitblt_writel,
 };
 
+extern FILE *logfile;
+#if defined(__i386__) || defined (__x86_64__)
+static void * set_vram_mapping(unsigned long begin, unsigned long end)
+{
+    unsigned long * extent_start = NULL;
+    unsigned long nr_extents;
+    void *vram_pointer = NULL;
+    int i;
+
+    /* align begin and end address */
+    begin = begin & TARGET_PAGE_MASK;
+    end = begin + VGA_RAM_SIZE;
+    end = (end + TARGET_PAGE_SIZE -1 ) & TARGET_PAGE_MASK;
+    nr_extents = (end - begin) >> TARGET_PAGE_BITS;
+
+    extent_start = malloc(sizeof(unsigned long) * nr_extents );
+    if (extent_start == NULL)
+    {
+        fprintf(stderr, "Failed malloc on set_vram_mapping\n");
+        return NULL;
+    }
+
+    memset(extent_start, 0, sizeof(unsigned long) * nr_extents);
+
+    for (i = 0; i < nr_extents; i++)
+    {
+        extent_start[i] = (begin + i * TARGET_PAGE_SIZE) >> TARGET_PAGE_BITS;
+    }
+
+    set_mm_mapping(xc_handle, domid, nr_extents, 0, extent_start);
+
+    if ( (vram_pointer =  xc_map_foreign_batch(xc_handle, domid,
+                                               PROT_READ|PROT_WRITE,
+                                               extent_start,
+                                               nr_extents)) == NULL)
+    {
+        fprintf(logfile,
+          "xc_map_foreign_batch vgaram returned error %d\n", errno);
+        return NULL;
+    }
+
+    memset(vram_pointer, 0, nr_extents * TARGET_PAGE_SIZE);
+
+    free(extent_start);
+
+    return vram_pointer;
+}
+
+static int unset_vram_mapping(unsigned long begin, unsigned long end)
+{
+    unsigned long * extent_start = NULL;
+    unsigned long nr_extents;
+    int i;
+
+    /* align begin and end address */
+
+    end = begin + VGA_RAM_SIZE;
+    begin = begin & TARGET_PAGE_MASK;
+    end = (end + TARGET_PAGE_SIZE -1 ) & TARGET_PAGE_MASK;
+    nr_extents = (end - begin) >> TARGET_PAGE_BITS;
+
+    extent_start = malloc(sizeof(unsigned long) * nr_extents );
+
+    if (extent_start == NULL)
+    {
+        fprintf(stderr, "Failed malloc on set_mm_mapping\n");
+        return -1;
+    }
+
+    memset(extent_start, 0, sizeof(unsigned long) * nr_extents);
+
+    for (i = 0; i < nr_extents; i++)
+        extent_start[i] = (begin + (i * TARGET_PAGE_SIZE)) >> TARGET_PAGE_BITS;
+
+    unset_mm_mapping(xc_handle, domid, nr_extents, 0, extent_start);
+
+    free(extent_start);
+
+    return 0;
+}
+
+#elif defined(__ia64__)
+static void * set_vram_mapping(unsigned long addr, unsigned long end) {}
+static int unset_vram_mapping(unsigned long addr, unsigned long end) {}
+#endif
+extern int vga_accelerate;
+
 /* Compute the memory access functions */
 static void cirrus_update_memory_access(CirrusVGAState *s)
 {
     unsigned mode;
-    extern void * set_vram_mapping(unsigned long addr, unsigned long end);
-
-    extern int unset_vram_mapping(unsigned long addr, unsigned long end);
-    extern int vga_accelerate;
 
     if ((s->sr[0x17] & 0x44) == 0x44) {
         goto generic_io;
@@ -2466,18 +2564,21 @@ static void cirrus_update_memory_access(CirrusVGAState *s)
 
     mode = s->gr[0x05] & 0x7;
     if (mode < 4 || mode > 5 || ((s->gr[0x0B] & 0x4) == 0)) {
-            if (vga_accelerate && s->cirrus_lfb_addr && s->cirrus_lfb_end) {
-                if (!s->set_mapping) {
-                    void * vram_pointer;
-                    s->set_mapping = 1;
-                    vram_pointer = set_vram_mapping(s->cirrus_lfb_addr ,s->cirrus_lfb_end);
-                    if (!vram_pointer){
+            if ( vga_accelerate && s->cirrus_lfb_addr && s->cirrus_lfb_end ) {
+                if (!s->map_addr) {
+                    void *vram_pointer, *old_vram;
+
+                    vram_pointer =
+                      set_vram_mapping(s->cirrus_lfb_addr ,s->cirrus_lfb_end);
+                    if (!vram_pointer) {
                         fprintf(stderr, "NULL vram_pointer\n");
-                    } else
-                    {
-                        vga_update_vram((VGAState *)s, vram_pointer,
+                    } else {
+                        old_vram = vga_update_vram((VGAState *)s, vram_pointer,
                                         VGA_RAM_SIZE);
+                        qemu_free(old_vram);
                     }
+                    s->map_addr = s->cirrus_lfb_addr;
+                    s->map_end = s->cirrus_lfb_end;
                 }
             }
             s->cirrus_linear_write[0] = cirrus_linear_mem_writeb;
@@ -2486,13 +2587,19 @@ static void cirrus_update_memory_access(CirrusVGAState *s)
         } else {
         generic_io:
             if (vga_accelerate && s->cirrus_lfb_addr && s->cirrus_lfb_end) {
-                if(s->set_mapping) {
+                if(s->map_addr) {
                     int error;
-                    s->set_mapping = 0;
+                    void *old_vram = NULL;
+
                     error = unset_vram_mapping(s->cirrus_lfb_addr,
                                            s->cirrus_lfb_end);
                     if (!error)
-                        vga_update_vram((VGAState *)s, NULL, VGA_RAM_SIZE);
+                        old_vram =
+                          vga_update_vram((VGAState *)s, NULL, VGA_RAM_SIZE);
+
+                    if (old_vram)
+                        munmap(old_vram, s->map_addr - s->map_end);
+                    s->map_addr = s->map_end = 0;
                 }
             }
 
@@ -3021,10 +3128,6 @@ static void cirrus_init_common(CirrusVGAState * s, int device_id, int is_pci)
     }
     s->cr[0x27] = device_id;
 
-    /* Win2K seems to assume that the pattern buffer is at 0xff
-       initially ! */
-    memset(s->vram_ptr, 0xff, s->real_vram_size);
-
     s->cirrus_hidden_dac_lockindex = 5;
     s->cirrus_hidden_dac_data = 0;
 
@@ -3091,6 +3194,12 @@ static void cirrus_pci_lfb_map(PCIDevice *d, int region_num,
 				 s->cirrus_linear_io_addr);
     s->cirrus_lfb_addr = addr;
     s->cirrus_lfb_end = addr + VGA_RAM_SIZE;
+
+    if ( vga_accelerate && s->map_addr &&
+         (s->cirrus_lfb_addr != s->map_addr) &&
+         (s->cirrus_lfb_end != s->map_end))
+        fprintf(logfile, "cirrus vga map change while on lfb mode\n");
+
     cpu_register_physical_memory(addr + 0x1000000, 0x400000,
 				 s->cirrus_linear_bitblt_io_addr);
 }

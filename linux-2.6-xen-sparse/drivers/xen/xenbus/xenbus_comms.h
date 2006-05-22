@@ -41,13 +41,3 @@ int xs_input_avail(void);
 extern wait_queue_head_t xb_waitq;
 
 #endif /* _XENBUS_COMMS_H */
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

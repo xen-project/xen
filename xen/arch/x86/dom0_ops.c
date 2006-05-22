@@ -404,27 +404,6 @@ long arch_do_dom0_op(struct dom0_op *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     }
     break;
 
-    case DOM0_PHYSICAL_MEMORY_MAP:
-    {
-        struct dom0_memory_map_entry entry;
-        int i;
-
-        for ( i = 0; i < e820.nr_map; i++ )
-        {
-            if ( i >= op->u.physical_memory_map.max_map_entries )
-                break;
-            entry.start  = e820.map[i].addr;
-            entry.end    = e820.map[i].addr + e820.map[i].size;
-            entry.is_ram = (e820.map[i].type == E820_RAM);
-            (void)copy_to_guest_offset(
-                op->u.physical_memory_map.memory_map, i, &entry, 1);
-        }
-
-        op->u.physical_memory_map.nr_map_entries = i;
-        (void)copy_to_guest(u_dom0_op, op, 1);
-    }
-    break;
-
     case DOM0_HYPERCALL_INIT:
     {
         struct domain *d; 

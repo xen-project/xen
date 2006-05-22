@@ -4,8 +4,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 TARGET := test_x86_emulator
 
-HOSTCFLAGS += -D__TEST_HARNESS__
-
 .PHONY: all
 all: $(TARGET)
 

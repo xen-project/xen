@@ -82,9 +82,11 @@ void svm_dump_regs(const char *from, struct cpu_user_regs *regs);
 
 static void svm_relinquish_guest_resources(struct domain *d);
 
-/* Host save area */
-struct host_save_area *host_save_area[ NR_CPUS ] = {0};
-static struct asid_pool ASIDpool[NR_CPUS];
+
+extern void set_hsa_to_guest( struct arch_svm_struct *arch_svm );
+
+/* Host save area and ASID glogal data */
+struct svm_percore_globals svm_globals[NR_CPUS];
 
 /*
  * Initializes the POOL of ASID used by the guests per core.
@@ -92,15 +94,15 @@ static struct asid_pool ASIDpool[NR_CPUS];
 void asidpool_init( int core )
 {
     int i;
-    ASIDpool[core].asid_lock = SPIN_LOCK_UNLOCKED;
-    spin_lock(&ASIDpool[core].asid_lock);
+    svm_globals[core].ASIDpool.asid_lock = SPIN_LOCK_UNLOCKED;
+    spin_lock(&svm_globals[core].ASIDpool.asid_lock);
     /* Host ASID is always in use */
-    ASIDpool[core].asid[INITIAL_ASID] = ASID_INUSE;
+    svm_globals[core].ASIDpool.asid[INITIAL_ASID] = ASID_INUSE;
     for( i=1; i<ASID_MAX; i++ )
     {
-       ASIDpool[core].asid[i] = ASID_AVAILABLE;
+       svm_globals[core].ASIDpool.asid[i] = ASID_AVAILABLE;
     }
-    spin_unlock(&ASIDpool[core].asid_lock);
+    spin_unlock(&svm_globals[core].ASIDpool.asid_lock);
 }
 
 
@@ -110,10 +112,10 @@ static int asidpool_fetch_next( struct vmcb_struct *vmcb, int core )
     int i;   
     for( i = 1; i < ASID_MAX; i++ )
     {
-        if( ASIDpool[core].asid[i] == ASID_AVAILABLE )
+        if( svm_globals[core].ASIDpool.asid[i] == ASID_AVAILABLE )
         {
             vmcb->guest_asid = i;
-            ASIDpool[core].asid[i] = ASID_INUSE;
+            svm_globals[core].ASIDpool.asid[i] = ASID_INUSE;
             return i;
         }
     }
@@ -138,42 +140,42 @@ int asidpool_assign_next( struct vmcb_struct *vmcb, int retire_current,
     int res = 1;
     static unsigned long cnt=0;
 
-    spin_lock(&ASIDpool[oldcore].asid_lock);
+    spin_lock(&svm_globals[oldcore].ASIDpool.asid_lock);
     if( retire_current && vmcb->guest_asid ) {
-       ASIDpool[oldcore].asid[ vmcb->guest_asid & (ASID_MAX-1) ] = ASID_RETIRED;
+       svm_globals[oldcore].ASIDpool.asid[ vmcb->guest_asid & (ASID_MAX-1) ] = ASID_RETIRED;
     }
-    spin_unlock(&ASIDpool[oldcore].asid_lock);
-    spin_lock(&ASIDpool[newcore].asid_lock);
+    spin_unlock(&svm_globals[oldcore].ASIDpool.asid_lock);
+    spin_lock(&svm_globals[newcore].ASIDpool.asid_lock);
     if( asidpool_fetch_next( vmcb, newcore ) < 0 ) {
         if (svm_dbg_on)
             printk( "SVM: tlb(%ld)\n", cnt++ );
         /* FLUSH the TLB and all retired slots are made available */ 
         vmcb->tlb_control = 1;
         for( i = 1; i < ASID_MAX; i++ ) {
-            if( ASIDpool[newcore].asid[i] == ASID_RETIRED ) {
-                ASIDpool[newcore].asid[i] = ASID_AVAILABLE;
+            if( svm_globals[newcore].ASIDpool.asid[i] == ASID_RETIRED ) {
+                svm_globals[newcore].ASIDpool.asid[i] = ASID_AVAILABLE;
             }
         }
         /* Get the First slot available */ 
         res = asidpool_fetch_next( vmcb, newcore ) > 0;
     }
-    spin_unlock(&ASIDpool[newcore].asid_lock);
+    spin_unlock(&svm_globals[newcore].ASIDpool.asid_lock);
     return res;
 }
 
 void asidpool_retire( struct vmcb_struct *vmcb, int core )
 {
-   spin_lock(&ASIDpool[core].asid_lock);
+   spin_lock(&svm_globals[core].ASIDpool.asid_lock);
    if( vmcb->guest_asid ) {
-       ASIDpool[core].asid[ vmcb->guest_asid & (ASID_MAX-1) ] = ASID_RETIRED;
+       svm_globals[core].ASIDpool.asid[ vmcb->guest_asid & (ASID_MAX-1) ] = ASID_RETIRED;
    }
-   spin_unlock(&ASIDpool[core].asid_lock);
+   spin_unlock(&svm_globals[core].ASIDpool.asid_lock);
 }
 
-static inline void svm_inject_exception(struct vmcb_struct *vmcb, 
-                                        int trap, int ev, int error_code)
+static inline void svm_inject_exception(struct vcpu *v, int trap, int ev, int error_code)
 {
     eventinj_t event;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     event.bytes = 0;            
     event.fields.v = 1;
@@ -198,8 +200,13 @@ void stop_svm(void)
     wrmsr(MSR_EFER, eax, edx);
  
     /* release the HSA */
-    free_host_save_area( host_save_area[ cpu ] );
-    host_save_area[ cpu ] = NULL;
+    free_host_save_area( svm_globals[cpu].hsa );
+    free_host_save_area( svm_globals[cpu].scratch_hsa );
+    svm_globals[cpu].hsa    = NULL;
+    svm_globals[cpu].hsa_pa = 0;
+    svm_globals[cpu].scratch_hsa    = NULL;
+    svm_globals[cpu].scratch_hsa_pa = 0;
+    wrmsr(MSR_K8_VM_HSAVE_PA, 0, 0 );
 
     printk("AMD SVM Extension is disabled.\n");
 }
@@ -329,7 +336,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         if ( msr_content & ~(EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
         {
             printk("trying to set reserved bit in EFER\n");
-            svm_inject_exception(vmcb, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(vc, TRAP_gp_fault, 1, 0);
             return 0;
         }
 
@@ -343,7 +350,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
             {
                 printk("trying to set LME bit when "
                        "in paging mode or PAE bit is not set\n");
-                svm_inject_exception(vmcb, TRAP_gp_fault, 1, 0);
+                svm_inject_exception(vc, TRAP_gp_fault, 1, 0);
                 return 0;
             }
             set_bit(SVM_CPU_STATE_LME_ENABLED, &vc->arch.hvm_svm.cpu_state);
@@ -367,7 +374,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
         if (!IS_CANO_ADDRESS(msr_content))
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "Not cano address of msr write\n");
-            svm_inject_exception(vmcb, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(vc, TRAP_gp_fault, 1, 0);
         }
 
         if (regs->ecx == MSR_FS_BASE)
@@ -451,20 +458,26 @@ int start_svm(void)
     
     if (!(test_bit(X86_FEATURE_SVME, &boot_cpu_data.x86_capability)))
         return 0;
+    svm_globals[cpu].hsa = alloc_host_save_area();
+    if (! svm_globals[cpu].hsa)
+        return 0;
     
     rdmsr(MSR_EFER, eax, edx);
     eax |= EFER_SVME;
     wrmsr(MSR_EFER, eax, edx);
-    asidpool_init(smp_processor_id());    
+    asidpool_init( cpu );    
     printk("AMD SVM Extension is enabled for cpu %d.\n", cpu );
 
     /* Initialize the HSA for this core */
-    host_save_area[ cpu ] = alloc_host_save_area();
-    phys_hsa = (u64) virt_to_maddr( host_save_area[ cpu ] ); 
+    phys_hsa = (u64) virt_to_maddr( svm_globals[cpu].hsa ); 
     phys_hsa_lo = (u32) phys_hsa;
     phys_hsa_hi = (u32) (phys_hsa >> 32);    
     wrmsr(MSR_K8_VM_HSAVE_PA, phys_hsa_lo, phys_hsa_hi);
-    
+    svm_globals[cpu].hsa_pa = phys_hsa;
+  
+    svm_globals[cpu].scratch_hsa    = alloc_host_save_area();
+    svm_globals[cpu].scratch_hsa_pa = (u64)virt_to_maddr( svm_globals[cpu].scratch_hsa );
+
     /* Setup HVM interfaces */
     hvm_funcs.disable = stop_svm;
 
@@ -546,7 +559,6 @@ static inline int svm_do_debugout(unsigned long exit_code)
     return 1;
 }
 
-
 void save_svm_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *ctxt)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -577,8 +589,6 @@ void svm_store_cpu_user_regs(struct cpu_user_regs *regs, struct vcpu *v)
     regs->ds     = vmcb->ds.sel;
     regs->es     = vmcb->es.sel;
     regs->ss     = vmcb->ss.sel;
-    regs->fs     = vmcb->fs.sel;
-    regs->gs     = vmcb->gs.sel;
 }
 
 /* XXX Use svm_load_cpu_guest_regs instead */
@@ -594,12 +604,6 @@ void svm_load_cpu_user_regs(struct vcpu *v, struct cpu_user_regs *regs)
     vmcb->rflags   = regs->eflags;
     vmcb->cs.sel   = regs->cs;
     vmcb->rip      = regs->eip;
-
-    vmcb->ds.sel   = regs->ds;
-    vmcb->es.sel   = regs->es;
-    vmcb->fs.sel   = regs->fs;
-    vmcb->gs.sel   = regs->gs;
-
     if (regs->eflags & EF_TF)
         *intercepts |= EXCEPTION_BITMAP_DB;
     else
@@ -897,10 +901,9 @@ static void svm_do_general_protection_fault(struct vcpu *v,
             (unsigned long)regs->eax, (unsigned long)regs->ebx,
             (unsigned long)regs->ecx, (unsigned long)regs->edx,
             (unsigned long)regs->esi, (unsigned long)regs->edi);
-
-    
+      
     /* Reflect it back into the guest */
-    svm_inject_exception(vmcb, TRAP_gp_fault, 1, error_code);
+    svm_inject_exception(v, TRAP_gp_fault, 1, error_code);
 }
 
 /* Reserved bits: [31:14], [12:1] */
@@ -1118,19 +1121,17 @@ static void svm_dr_access (struct vcpu *v, unsigned int reg, unsigned int type,
 }
 
 
-static unsigned int check_for_null_selector(struct vmcb_struct *vmcb, 
-        unsigned int dir, unsigned long *base, unsigned int real)
-
+static void svm_get_prefix_info(struct vmcb_struct *vmcb, 
+		unsigned int dir, segment_selector_t **seg, unsigned int *asize)
 {
     unsigned char inst[MAX_INST_LEN];
-    segment_selector_t seg;
     int i;
 
     memset(inst, 0, MAX_INST_LEN);
     if (inst_copy_from_guest(inst, svm_rip2pointer(vmcb), sizeof(inst)) 
             != MAX_INST_LEN) 
     {
-        printk("check_for_null_selector: get guest instruction failed\n");
+        printk("%s: get guest instruction failed\n", __func__);
         domain_crash_synchronous();
     }
 
@@ -1142,7 +1143,6 @@ static unsigned int check_for_null_selector(struct vmcb_struct *vmcb,
         case 0xf2: /* REPNZ */
         case 0xf0: /* LOCK */
         case 0x66: /* data32 */
-        case 0x67: /* addr32 */
 #if __x86_64__
             /* REX prefixes */
         case 0x40:
@@ -1164,89 +1164,134 @@ static unsigned int check_for_null_selector(struct vmcb_struct *vmcb,
         case 0x4f:
 #endif
             continue;
+        case 0x67: /* addr32 */
+            *asize ^= 48;        /* Switch 16/32 bits */
+            continue;
         case 0x2e: /* CS */
-            seg = vmcb->cs;
-            break;
+            *seg = &vmcb->cs;
+            continue;
         case 0x36: /* SS */
-            seg = vmcb->ss;
-            break;
+            *seg = &vmcb->ss;
+            continue;
         case 0x26: /* ES */
-            seg = vmcb->es;
-            break;
+            *seg = &vmcb->es;
+            continue;
         case 0x64: /* FS */
-            seg = vmcb->fs;
-            break;
+            *seg = &vmcb->fs;
+            continue;
         case 0x65: /* GS */
-            seg = vmcb->gs;
-            break;
+            *seg = &vmcb->gs;
+            continue;
         case 0x3e: /* DS */
-            /* FALLTHROUGH */
-            seg = vmcb->ds;
-            break;
+            *seg = &vmcb->ds;
+            continue;
         default:
-            if (dir == IOREQ_READ) /* IN/INS instruction? */
-                seg = vmcb->es;
-            else
-                seg = vmcb->ds;
+            break;
         }
-        
-        if (base)
-            *base = seg.base;
-
-        return seg.attributes.fields.p;
+        return;
     }
-
-    ASSERT(0);
-    return 0;
 }
 
 
 /* Get the address of INS/OUTS instruction */
-static inline unsigned long svm_get_io_address(struct vmcb_struct *vmcb, 
-        struct cpu_user_regs *regs, unsigned int dir, unsigned int real)
+static inline int svm_get_io_address(struct vcpu *v, 
+		struct cpu_user_regs *regs, unsigned int dir, 
+        unsigned long *count, unsigned long *addr)
 {
-    unsigned long addr = 0;
-    unsigned long base = 0;
+    unsigned long        reg;
+    unsigned int         asize = 0;
+    unsigned int         isize;
+    int                  long_mode;
+    ioio_info_t          info;
+    segment_selector_t  *seg = NULL;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    check_for_null_selector(vmcb, dir, &base, real);
+    info.bytes = vmcb->exitinfo1;
+
+    /* If we're in long mode, we shouldn't check the segment presence and limit */
+    long_mode = vmcb->cs.attributes.fields.l && vmcb->efer & EFER_LMA;
+
+    /* d field of cs.attributes is 1 for 32-bit, 0 for 16 or 64 bit. 
+     * l field combined with EFER_LMA -> longmode says whether it's 16 or 64 bit. 
+     */
+    asize = (long_mode)?64:((vmcb->cs.attributes.fields.db)?32:16);
+
+
+    /* The ins/outs instructions are single byte, so if we have got more 
+     * than one byte (+ maybe rep-prefix), we have some prefix so we need 
+     * to figure out what it is...
+     */
+    isize = vmcb->exitinfo2 - vmcb->rip;
+
+    if (info.fields.rep)
+        isize --;
+
+    if (isize > 1) 
+    {
+        svm_get_prefix_info(vmcb, dir, &seg, &asize);
+    }
+
+    ASSERT(dir == IOREQ_READ || dir == IOREQ_WRITE);
 
     if (dir == IOREQ_WRITE)
     {
-        if (real)
-            addr = (regs->esi & 0xFFFF) + base;
-        else
-            addr = regs->esi + base;
+        reg = regs->esi;
+        if (!seg)               /* If no prefix, used DS. */
+            seg = &vmcb->ds;
     }
     else
     {
-        if (real)
-            addr = (regs->edi & 0xFFFF) + base;
-        else
-            addr = regs->edi + base;
+        reg = regs->edi;
+        seg = &vmcb->es;        /* Note: This is ALWAYS ES. */
     }
 
-    return addr;
+    /* If the segment isn't present, give GP fault! */
+    if (!long_mode && !seg->attributes.fields.p) 
+    {
+        svm_inject_exception(v, TRAP_gp_fault, 1, seg->sel);
+        return 0;
+    }
+
+    if (asize == 16) 
+    {
+        *addr = (reg & 0xFFFF);
+        *count = regs->ecx & 0xffff;
+    }
+    else
+    {
+        *addr = reg;
+        *count = regs->ecx;
+    }
+
+    if (!long_mode) {
+        if (*addr > seg->limit) 
+        {
+            svm_inject_exception(v, TRAP_gp_fault, 1, seg->sel);
+            return 0;
+        } 
+        else 
+        {
+            *addr += seg->base;
+        }
+    }
+    
+
+    return 1;
 }
 
 
 static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs) 
 {
     struct mmio_op *mmio_opp;
-    unsigned long eip, cs, eflags, cr0;
-    unsigned long port;
-    unsigned int real, size, dir;
+    unsigned int port;
+    unsigned int size, dir;
     ioio_info_t info;
-
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     ASSERT(vmcb);
     mmio_opp = &current->arch.hvm_vcpu.mmio_op;
     mmio_opp->instr = INSTR_PIO;
     mmio_opp->flags = 0;
-
-    eip = vmcb->rip;
-    cs =  vmcb->cs.sel;
-    eflags = vmcb->rflags;
 
     info.bytes = vmcb->exitinfo1;
 
@@ -1259,27 +1304,34 @@ static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs)
     else 
         size = 1;
 
-    cr0 = vmcb->cr0;
-    real = (eflags & X86_EFLAGS_VM) || !(cr0 & X86_CR0_PE);
-
     HVM_DBG_LOG(DBG_LEVEL_IO, 
-                "svm_io_instruction: port 0x%lx real %d, eip=%lx:%lx, "
-                "exit_qualification = %lx",
-                (unsigned long) port, real, cs, eip, (unsigned long)info.bytes);
+                "svm_io_instruction: port 0x%x eip=%x:%"PRIx64", "
+                "exit_qualification = %"PRIx64,
+                port, vmcb->cs.sel, vmcb->rip, info.bytes);
+
     /* string instruction */
     if (info.fields.str)
     { 
-        unsigned long addr, count = 1;
+        unsigned long addr, count;
         int sign = regs->eflags & EF_DF ? -1 : 1;
 
-        /* Need the original rip, here. */
-        addr = svm_get_io_address(vmcb, regs, dir, real);
+        if (!svm_get_io_address(v, regs, dir, &count, &addr)) 
+        {
+            /* We failed to get a valid address, so don't do the IO operation -
+             * it would just get worse if we do! Hopefully the guest is handing
+             * gp-faults... 
+             */
+            return;
+        }
 
         /* "rep" prefix */
         if (info.fields.rep) 
         {
             mmio_opp->flags |= REPZ;
-            count = real ? regs->ecx & 0xFFFF : regs->ecx;
+        }
+        else 
+        {
+            count = 1;
         }
 
         /*
@@ -1368,7 +1420,7 @@ static int svm_set_cr0(unsigned long value)
                     &v->arch.hvm_svm.cpu_state))
         {
             HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enable\n");
-            svm_inject_exception(vmcb, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
         }
 
         if (test_bit(SVM_CPU_STATE_LME_ENABLED, &v->arch.hvm_svm.cpu_state))
@@ -1442,7 +1494,7 @@ static int svm_set_cr0(unsigned long value)
      */
     if ((value & X86_CR0_PE) == 0) {
     	if (value & X86_CR0_PG) {
-            svm_inject_exception(vmcb, TRAP_gp_fault, 1, 0);
+            svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             return 0;
         }
 
@@ -1689,7 +1741,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
         } else {
             if (test_bit(SVM_CPU_STATE_LMA_ENABLED,
                          &v->arch.hvm_svm.cpu_state)) {
-                svm_inject_exception(vmcb, TRAP_gp_fault, 1, 0);
+                svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             }
             clear_bit(SVM_CPU_STATE_PAE_ENABLED, &v->arch.hvm_svm.cpu_state);
         }
@@ -1805,7 +1857,8 @@ static int svm_cr_access(struct vcpu *v, unsigned int cr, unsigned int type,
         break;
 
     case INSTR_SMSW:
-        svm_dump_inst(svm_rip2pointer(vmcb));
+        if (svm_dbg_on)
+            svm_dump_inst(svm_rip2pointer(vmcb));
         value = v->arch.hvm_svm.cpu_shadow_cr0;
         gpreg = decode_src_reg(prefix, buffer[index+2]);
         set_reg(gpreg, value, regs, vmcb);
@@ -1942,9 +1995,25 @@ static inline void svm_vmexit_do_hlt(struct vmcb_struct *vmcb)
 }
 
 
-static inline void svm_vmexit_do_mwait(void)
+static void svm_vmexit_do_invd(struct vmcb_struct *vmcb)
 {
-}
+    int  inst_len;
+    
+    /* Invalidate the cache - we can't really do that safely - maybe we should 
+     * WBINVD, but I think it's just fine to completely ignore it - we should 
+     * have cache-snooping that solves it anyways. -- Mats P. 
+     */
+
+    /* Tell the user that we did this - just in case someone runs some really weird 
+     * operating system and wants to know why it's not working as it should...
+     */
+    printk("INVD instruction intercepted - ignored\n");
+    
+    inst_len = __get_instruction_length(vmcb, INSTR_INVD, NULL);
+    __update_guest_eip(vmcb, inst_len);
+}    
+        
+
 
 
 #ifdef XEN_DEBUGGER
@@ -2006,7 +2075,7 @@ void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
         __update_guest_eip(vmcb, inst_len);
 
         /* 
-         * The address is implicit on this instruction At the moment, we don't
+         * The address is implicit on this instruction. At the moment, we don't
          * use ecx (ASID) to identify individual guests pages 
          */
         g_vaddr = regs->eax;
@@ -2440,7 +2509,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 
     exit_reason = vmcb->exitcode;
     save_svm_cpu_user_regs(v, &regs);
-    v->arch.hvm_svm.injecting_event = 0;
 
     vmcb->tlb_control = 1;
 
@@ -2604,7 +2672,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
         if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
             domain_pause_for_debugger();
         else 
-            svm_inject_exception(vmcb, TRAP_int3, 0, 0);
+            svm_inject_exception(v, TRAP_int3, 0, 0);
 #endif
         break;
 
@@ -2615,7 +2683,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
     case VMEXIT_EXCEPTION_GP:
         /* This should probably not be trapped in the future */
         regs.error_code = vmcb->exitinfo1;
-        v->arch.hvm_svm.injecting_event = 1;
         svm_do_general_protection_fault(v, &regs);
         break;  
 
@@ -2635,9 +2702,8 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 //printk("PF1\n");
         if (!(error = svm_do_page_fault(va, &regs))) 
         {
-            v->arch.hvm_svm.injecting_event = 1;
             /* Inject #PG using Interruption-Information Fields */
-            svm_inject_exception(vmcb, TRAP_page_fault, 1, regs.error_code);
+            svm_inject_exception(v, TRAP_page_fault, 1, regs.error_code);
 
             v->arch.hvm_svm.cpu_cr2 = va;
             vmcb->cr2 = va;
@@ -2654,6 +2720,11 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 
     case VMEXIT_INTR:
         raise_softirq(SCHEDULE_SOFTIRQ);
+        break;
+
+
+    case VMEXIT_INVD:
+        svm_vmexit_do_invd(vmcb);
         break;
 
     case VMEXIT_GDTR_WRITE:
@@ -2845,6 +2916,9 @@ asmlinkage void svm_asid(void)
         v->arch.hvm_svm.asid_core = v->arch.hvm_svm.launch_core;
         clear_bit( ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags );
     }
+
+    /* make sure the HSA is set for the current core */
+    set_hsa_to_guest( &v->arch.hvm_svm );
 }
 
 /*

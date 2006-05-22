@@ -189,7 +189,11 @@ void hvm_setup_platform(struct domain* d)
     if ( !hvm_guest(current) || (current->vcpu_id != 0) )
         return;
 
-    shadow_direct_map_init(d);
+    if ( shadow_direct_map_init(d) == 0 )
+    {
+        printk("Can not allocate shadow direct map for HVM domain.\n");
+        domain_crash_synchronous();
+    }
 
     hvm_map_io_shared_page(d);
     hvm_get_info(d);
@@ -240,15 +244,18 @@ int cpu_get_interrupt(struct vcpu *v, int *type)
 {
     int intno;
     struct hvm_virpic *s = &v->domain->arch.hvm_domain.vpic;
+    unsigned long flags;
 
     if ( (intno = cpu_get_apic_interrupt(v, type)) != -1 ) {
         /* set irq request if a PIC irq is still pending */
         /* XXX: improve that */
+        spin_lock_irqsave(&s->lock, flags);
         pic_update_irq(s);
+        spin_unlock_irqrestore(&s->lock, flags);
         return intno;
     }
     /* read the irq from the PIC */
-    if ( (intno = cpu_get_pic_interrupt(v, type)) != -1 )
+    if ( v->vcpu_id == 0 && (intno = cpu_get_pic_interrupt(v, type)) != -1 )
         return intno;
 
     return -1;

@@ -95,34 +95,47 @@ DO_ERROR(18, "machine check", machine_check)
 
 void page_walk(unsigned long virt_address)
 {
-        unsigned long *tab = (unsigned long *)start_info.pt_base;
-        unsigned long addr = virt_address, page;
+        pgentry_t *tab = (pgentry_t *)start_info.pt_base, page;
+        unsigned long addr = virt_address;
         printk("Pagetable walk from virt %lx, base %lx:\n", virt_address, start_info.pt_base);
     
 #if defined(__x86_64__)
         page = tab[l4_table_offset(addr)];
-        tab = to_virt(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
-        printk(" L4 = %p (%p)  [offset = %lx]\n", page, tab, l4_table_offset(addr));
-
+        tab = pte_to_virt(page);
+        printk(" L4 = %"PRIpte" (%p)  [offset = %lx]\n", page, tab, l4_table_offset(addr));
+#endif
+#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
         page = tab[l3_table_offset(addr)];
-        tab = to_virt(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
-        printk("  L3 = %p (%p)  [offset = %lx]\n", page, tab, l3_table_offset(addr));
+        tab = pte_to_virt(page);
+        printk("  L3 = %"PRIpte" (%p)  [offset = %lx]\n", page, tab, l3_table_offset(addr));
 #endif
         page = tab[l2_table_offset(addr)];
-        tab =  to_virt(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
-        printk("   L2 = %p (%p)  [offset = %lx]\n", page, tab, l2_table_offset(addr));
+        tab = pte_to_virt(page);
+        printk("   L2 = %"PRIpte" (%p)  [offset = %lx]\n", page, tab, l2_table_offset(addr));
         
         page = tab[l1_table_offset(addr)];
-        printk("    L1 = %p (%p)  [offset = %lx]\n", page, tab, l1_table_offset(addr));
+        printk("    L1 = %"PRIpte" (%p)  [offset = %lx]\n", page, tab, l1_table_offset(addr));
 
 }
 
 #define read_cr2() \
         (HYPERVISOR_shared_info->vcpu_info[smp_processor_id()].arch.cr2)
 
+static int handling_pg_fault = 0;
+
 void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 {
     unsigned long addr = read_cr2();
+    /* If we are already handling a page fault, and got another one
+       that means we faulted in pagetable walk. Continuing here would cause
+       a recursive fault */       
+    if(handling_pg_fault) 
+    {
+        printk("Page fault in pagetable walk (access to invalid memory?).\n"); 
+        do_exit();
+    }
+    handling_pg_fault = 1;
+
 #if defined(__x86_64__)
     printk("Page fault at linear address %p, rip %p, code %lx\n",
            addr, regs->rip, error_code);
@@ -130,9 +143,12 @@ void do_page_fault(struct pt_regs *regs, unsigned long error_code)
     printk("Page fault at linear address %p, eip %p, code %lx\n",
            addr, regs->eip, error_code);
 #endif
+
     dump_regs(regs);
     page_walk(addr);
     do_exit();
+    /* We should never get here ... but still */
+    handling_pg_fault = 0;
 }
 
 void do_general_protection(struct pt_regs *regs, long error_code)

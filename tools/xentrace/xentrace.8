@@ -35,6 +35,81 @@ all new records to the output
 .B -s, --poll-sleep=p
 set the time, p, (in milliseconds) to sleep between polling the buffers
 for new data.
+.TP
+.B -c, --cpu-mask=c
+set cpu-mask
+.TP
+.B -e, --evt-mask=e
+set evt-mask
+.TP
+.B -?, --help
+Give this help list
+.TP
+.B --usage
+Give a short usage message
+.TP
+.B -V, --version
+Print program version
+
+.SS Event Classes (Masks)
+The following event classes (masks) can be used to filter the events being
+gathered by xentrace:
+.PP
+        \fIID\fP                  \fIDescription\fP
+.PP
+        0x0001f000          TRC_GEN
+        0x0002f000          TRC_SCHED
+        0x0004f000          TRC_DOM0OP          
+        0x0008f000          TRC_VMX
+        0x000af000          TRC_MEM
+        0xfffff000          TRC_ALL 
+
+
+.SS Event Subclasses (More Masks)
+The following event subclasses (masks) can also be used to filter the events being
+gathered by xentrace:
+.PP
+        \fIID\fP                  \fIDescription\fP
+.PP
+        0x00081000          TRC_VMXEXIT
+        0x00082000          TRC_VMXTIMER
+        0x00084000          TRC_VMXINT
+        0x00088000          TRC_VMXIO
+
+
+.SS Events
+.B xentrace
+collects the following events from the trace buffer:
+.PP
+        \fIID\fP                \fIDescription\fP
+.PP	
+        0x0002f001         TRC_SCHED_DOM_ADD
+        0x0002f002         TRC_SCHED_DOM_REM
+        0x0002f003         TRC_SCHED_SLEEP
+        0x0002f004         TRC_SCHED_WAKE
+        0x0002f005         TRC_SCHED_YIELD
+        0x0002f006         TRC_SCHED_BLOCK
+        0x0002f007         TRC_SCHED_SHUTDOWN
+        0x0002f008         TRC_SCHED_CTL
+        0x0002f009         TRC_SCHED_ADJDOM
+        0x0002f010         TRC_SCHED_SWITCH
+        0x0002f011         TRC_SCHED_S_TIMER_FN
+        0x0002f012         TRC_SCHED_T_TIMER_FN
+        0x0002f013         TRC_SCHED_DOM_TIMER_FN
+        0x0002f014         TRC_SCHED_SWITCH_INFPREV
+        0x0002f015         TRC_SCHED_SWITCH_INFNEXT
+
+        0x000af001         TRC_MEM_PAGE_GRANT_MAP
+        0x000af002         TRC_MEM_PAGE_GRANT_UNMAP
+        0x000af003         TRC_MEM_PAGE_GRANT_TRANSFER
+
+        0x00081001         TRC_VMX_VMEXIT
+        0x00081002         TRC_VMX_VMENTRY
+        
+        0x00082001         TRC_VMX_TIMER_INTR
+        
+        0x00084001         TRC_VMX_INT
+.PP
 
 .SH AUTHOR
 Mark A. Williamson <mark.a.williamson@intel.com>

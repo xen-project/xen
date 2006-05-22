@@ -19,6 +19,7 @@
 
 import os, string
 import re
+import math
 
 import xen.lowlevel.xc
 from xen.xend import sxp
@@ -141,11 +142,16 @@ class ImageHandler:
                           % (self.ostype, self.vm.getDomid(), str(result)))
 
 
-    def getDomainMemory(self, mem):
+    def getDomainMemory(self, mem_kb):
         """@return The memory required, in KiB, by the domain to store the
-        given amount, also in KiB.  This is normally just mem, but HVM domains
-        have overheads to account for."""
-        return mem
+        given amount, also in KiB."""
+        if os.uname()[4] != 'ia64':
+            # A little extra because auto-ballooning is broken w.r.t. HVM
+            # guests. Also, slack is necessary for live migration since that
+            # uses shadow page tables.
+            if 'hvm' in xc.xeninfo()['xen_caps']:
+                mem_kb += 4*1024;
+        return mem_kb
 
     def buildDomain(self):
         """Build the domain. Define in subclass."""
@@ -377,15 +383,20 @@ class HVMImageHandler(ImageHandler):
         os.waitpid(self.pid, 0)
         self.pid = 0
 
-    def getDomainMemory(self, mem):
+    def getDomainMemory(self, mem_kb):
         """@see ImageHandler.getDomainMemory"""
-        page_kb = 4
-        extra_pages = 0
         if os.uname()[4] == 'ia64':
             page_kb = 16
             # ROM size for guest firmware, ioreq page and xenstore page
             extra_pages = 1024 + 2
-        return mem + extra_pages * page_kb
+        else:
+            page_kb = 4
+            # This was derived emperically:
+            #   2.4 MB overhead per 1024 MB RAM + 8 MB constant
+            #   + 4 to avoid low-memory condition
+            extra_mb = (2.4/1024) * (mem_kb/1024.0) + 12;
+            extra_pages = int( math.ceil( extra_mb*1024 / page_kb ))
+        return mem_kb + extra_pages * page_kb
 
     def register_shutdown_watch(self):
         """ add xen store watch on control/shutdown """

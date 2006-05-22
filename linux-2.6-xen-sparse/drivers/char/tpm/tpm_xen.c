@@ -416,7 +416,7 @@ static int tpmfront_suspend(struct xenbus_device *dev)
 		 */
 		interruptible_sleep_on_timeout(&tp->wait_q, 100);
 	}
-	xenbus_switch_state(dev, XenbusStateClosed);
+	xenbus_switch_state(dev, XenbusStateClosing);
 
 	if (atomic_read(&tp->tx_busy)) {
 		/*
@@ -745,23 +745,12 @@ failexit:
 
 static void __exit tpmif_exit(void)
 {
+	exit_tpm_xenbus();
 	cleanup_vtpm();
 	tpm_private_put();
-	exit_tpm_xenbus();
 	gnttab_free_grant_references(gref_head);
 }
 
 module_init(tpmif_init);
-module_exit(tpmif_exit);
 
 MODULE_LICENSE("Dual BSD/GPL");
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

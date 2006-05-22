@@ -514,6 +514,9 @@ setup_arch (char **cmdline_p)
 #ifdef CONFIG_XEN
 	if (running_on_xen) {
 		extern shared_info_t *HYPERVISOR_shared_info;
+		extern int xen_init (void);
+
+		xen_init ();
 
 		/* xen_start_info isn't setup yet, get the flags manually */
 		if (HYPERVISOR_shared_info->arch.flags & SIF_INITDOMAIN) {

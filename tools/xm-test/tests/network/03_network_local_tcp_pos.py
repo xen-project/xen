@@ -44,7 +44,7 @@ try:
     lofails=""
     for size in trysizes:
         out = console.runCmd("hping2 127.0.0.1 -E /dev/urandom -q -c 20 " 
-              + "--fast -d " + str(size))
+              + "--fast -d " + str(size) + " -N " + str(size))
         if out["return"]:
             lofails += " " + str(size)
 
@@ -54,7 +54,7 @@ try:
     ip = netdev.getNetDevIP()
     for size in trysizes:
         out = console.runCmd("hping2 " + ip + " -E /dev/urandom -q -c 20 "
-              + "--fast -d "+ str(size))
+              + "--fast -d "+ str(size) + " -N " + str(size))
         if out["return"]:
             eth0fails += " " + str(size) 
 except ConsoleError, e:

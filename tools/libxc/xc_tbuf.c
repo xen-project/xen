@@ -16,7 +16,7 @@
 
 #include "xc_private.h"
 
-int xc_tbuf_enable(int xc_handle, int enable)
+static int tbuf_enable(int xc_handle, int enable)
 {
   DECLARE_DOM0_OP;
 
@@ -30,7 +30,7 @@ int xc_tbuf_enable(int xc_handle, int enable)
   return xc_dom0_op(xc_handle, &op);
 }
 
-int xc_tbuf_set_size(int xc_handle, uint32_t size)
+int xc_tbuf_set_size(int xc_handle, unsigned long size)
 {
   DECLARE_DOM0_OP;
 
@@ -42,7 +42,7 @@ int xc_tbuf_set_size(int xc_handle, uint32_t size)
   return xc_dom0_op(xc_handle, &op);
 }
 
-int xc_tbuf_get_size(int xc_handle, uint32_t *size)
+int xc_tbuf_get_size(int xc_handle, unsigned long *size)
 {
   int rc;
   DECLARE_DOM0_OP;
@@ -57,10 +57,17 @@ int xc_tbuf_get_size(int xc_handle, uint32_t *size)
   return rc;
 }
 
-int xc_tbuf_get_mfn(int xc_handle, unsigned long *mfn)
+int xc_tbuf_enable(int xc_handle, size_t cnt, unsigned long *mfn,
+    unsigned long *size)
 {
-    int rc;
     DECLARE_DOM0_OP;
+    int rc;
+
+    if ( xc_tbuf_set_size(xc_handle, cnt) != 0 )
+        return -1;
+
+    if ( tbuf_enable(xc_handle, 1) != 0 )
+        return -1;
 
     op.cmd = DOM0_TBUFCONTROL;
     op.interface_version = DOM0_INTERFACE_VERSION;
@@ -68,8 +75,17 @@ int xc_tbuf_get_mfn(int xc_handle, unsigned long *mfn)
 
     rc = xc_dom0_op(xc_handle, &op);
     if ( rc == 0 )
-      *mfn = op.u.tbufcontrol.buffer_mfn;
-    return rc;
+    {
+        *size = op.u.tbufcontrol.size;
+        *mfn = op.u.tbufcontrol.buffer_mfn;
+    }
+
+    return 0;
+}
+
+int xc_tbuf_disable(int xc_handle)
+{
+    return tbuf_enable(xc_handle, 0);
 }
 
 int xc_tbuf_set_cpu_mask(int xc_handle, uint32_t mask)
@@ -95,3 +111,4 @@ int xc_tbuf_set_evt_mask(int xc_handle, uint32_t mask)
 
     return do_dom0_op(xc_handle, &op);
 }
+

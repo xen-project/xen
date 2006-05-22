@@ -17,7 +17,7 @@
 #define XENMEM_increase_reservation 0
 #define XENMEM_decrease_reservation 1
 #define XENMEM_populate_physmap     6
-typedef struct xen_memory_reservation {
+struct xen_memory_reservation {
 
     /*
      * XENMEM_increase_reservation:
@@ -49,7 +49,8 @@ typedef struct xen_memory_reservation {
      */
     domid_t        domid;
 
-} xen_memory_reservation_t;
+};
+typedef struct xen_memory_reservation xen_memory_reservation_t;
 DEFINE_XEN_GUEST_HANDLE(xen_memory_reservation_t);
 
 /*
@@ -74,7 +75,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_memory_reservation_t);
  * arg == addr of xen_machphys_mfn_list_t.
  */
 #define XENMEM_machphys_mfn_list    5
-typedef struct xen_machphys_mfn_list {
+struct xen_machphys_mfn_list {
     /*
      * Size of the 'extent_start' array. Fewer entries will be filled if the
      * machphys table is smaller than max_extents * 2MB.
@@ -93,7 +94,8 @@ typedef struct xen_machphys_mfn_list {
      * than 'max_extents' if the machphys table is smaller than max_e * 2MB.
      */
     unsigned int nr_extents;
-} xen_machphys_mfn_list_t;
+};
+typedef struct xen_machphys_mfn_list xen_machphys_mfn_list_t;
 DEFINE_XEN_GUEST_HANDLE(xen_machphys_mfn_list_t);
 
 /*
@@ -102,7 +104,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_machphys_mfn_list_t);
  * arg == addr of xen_add_to_physmap_t.
  */
 #define XENMEM_add_to_physmap      7
-typedef struct xen_add_to_physmap {
+struct xen_add_to_physmap {
     /* Which domain to change the mapping for. */
     domid_t domid;
 
@@ -116,7 +118,8 @@ typedef struct xen_add_to_physmap {
 
     /* GPFN where the source mapping page should appear. */
     unsigned long gpfn;
-} xen_add_to_physmap_t;
+};
+typedef struct xen_add_to_physmap xen_add_to_physmap_t;
 DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_t);
 
 /*
@@ -124,7 +127,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_t);
  * code on failure. This call only works for auto-translated guests.
  */
 #define XENMEM_translate_gpfn_list  8
-typedef struct xen_translate_gpfn_list {
+struct xen_translate_gpfn_list {
     /* Which domain to translate for? */
     domid_t domid;
 
@@ -139,8 +142,37 @@ typedef struct xen_translate_gpfn_list {
      * list (in which case each input GPFN is overwritten with the output MFN).
      */
     XEN_GUEST_HANDLE(ulong) mfn_list;
-} xen_translate_gpfn_list_t;
+};
+typedef struct xen_translate_gpfn_list xen_translate_gpfn_list_t;
 DEFINE_XEN_GUEST_HANDLE(xen_translate_gpfn_list_t);
+
+/*
+ * Returns the pseudo-physical memory map as it was when the domain
+ * was started.
+ */
+#define XENMEM_memory_map           9
+struct xen_memory_map {
+    /*
+     * On call the number of entries which can be stored in buffer. On
+     * return the number of entries which have been stored in
+     * buffer.
+     */
+    unsigned int nr_entries;
+
+    /*
+     * Entries in the buffer are in the same format as returned by the
+     * BIOS INT 0x15 EAX=0xE820 call.
+     */
+    XEN_GUEST_HANDLE(void) buffer;
+};
+typedef struct xen_memory_map xen_memory_map_t;
+DEFINE_XEN_GUEST_HANDLE(xen_memory_map_t);
+
+/*
+ * Returns the real physical memory map. Passes the same structure as
+ * XENMEM_memory_map.
+ */
+#define XENMEM_machine_memory_map	10
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 

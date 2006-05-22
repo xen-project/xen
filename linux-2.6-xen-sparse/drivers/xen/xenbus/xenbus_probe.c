@@ -966,10 +966,8 @@ static int __init xenbus_probe_init(void)
 
 	DPRINTK("");
 
-	if (xen_init() < 0) {
-		DPRINTK("failed");
+	if (!is_running_on_xen())
 		return -ENODEV;
-	}
 
 	/* Register ourselves with the kernel bus subsystem */
 	bus_register(&xenbus_frontend.bus);
@@ -1069,10 +1067,8 @@ static int __init wait_for_devices(void)
 {
 	unsigned long timeout = jiffies + 10*HZ;
 
-	if (xen_init() < 0) {
-		DPRINTK("failed");
+	if (!is_running_on_xen())
 		return -ENODEV;
-	}
 
 	while (time_before(jiffies, timeout)) {
 		if (all_devices_ready())
@@ -1085,14 +1081,3 @@ static int __init wait_for_devices(void)
 }
 
 late_initcall(wait_for_devices);
-
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

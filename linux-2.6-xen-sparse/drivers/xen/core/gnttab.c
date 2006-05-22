@@ -443,7 +443,7 @@ gnttab_init(void)
 {
 	int i;
 
-	if (xen_init() < 0)
+	if (!is_running_on_xen())
 		return -ENODEV;
 
 	if (gnttab_resume() < 0)
@@ -459,13 +459,3 @@ gnttab_init(void)
 }
 
 core_initcall(gnttab_init);
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

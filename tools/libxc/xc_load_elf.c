@@ -58,10 +58,10 @@ static int parseelfimage(const char *image,
     Elf_Ehdr *ehdr = (Elf_Ehdr *)image;
     Elf_Phdr *phdr;
     Elf_Shdr *shdr;
-    unsigned long kernstart = ~0UL, kernend=0UL;
+    unsigned long kernstart = ~0UL, kernend=0UL, vaddr, virt_base, elf_pa_off;
     const char *shstrtab;
     char *guestinfo=NULL, *p;
-    int h;
+    int h, virt_base_defined, elf_pa_off_defined;
 
     if ( !IS_ELF(*ehdr) )
     {
@@ -148,40 +148,65 @@ static int parseelfimage(const char *image,
 
     dsi->xen_guest_string = guestinfo;
 
+    /* Initial guess for virt_base is 0 if it is not explicitly defined. */
+    p = strstr(guestinfo, "VIRT_BASE=");
+    virt_base_defined = (p != NULL);
+    virt_base = virt_base_defined ? strtoul(p+10, &p, 0) : 0;
+
+    /* Initial guess for elf_pa_off is virt_base if not explicitly defined. */
+    p = strstr(guestinfo, "ELF_PADDR_OFFSET=");
+    elf_pa_off_defined = (p != NULL);
+    elf_pa_off = elf_pa_off_defined ? strtoul(p+17, &p, 0) : virt_base;
+
+    if ( elf_pa_off_defined && !virt_base_defined )
+        goto bad_image;
+
     for ( h = 0; h < ehdr->e_phnum; h++ )
     {
         phdr = (Elf_Phdr *)(image + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
             continue;
-        if ( phdr->p_paddr < kernstart )
-            kernstart = phdr->p_paddr;
-        if ( (phdr->p_paddr + phdr->p_memsz) > kernend )
-            kernend = phdr->p_paddr + phdr->p_memsz;
+        vaddr = phdr->p_paddr - elf_pa_off + virt_base;
+        if ( (vaddr + phdr->p_memsz) < vaddr )
+            goto bad_image;
+        if ( vaddr < kernstart )
+            kernstart = vaddr;
+        if ( (vaddr + phdr->p_memsz) > kernend )
+            kernend = vaddr + phdr->p_memsz;
     }
+
+    /*
+     * Legacy compatibility and images with no __xen_guest section: assume
+     * header addresses are virtual addresses, and that guest memory should be
+     * mapped starting at kernel load address.
+     */
+    dsi->v_start          = virt_base_defined  ? virt_base  : kernstart;
+    dsi->elf_paddr_offset = elf_pa_off_defined ? elf_pa_off : dsi->v_start;
+
+    dsi->v_kernentry = ehdr->e_entry;
+    if ( (p = strstr(guestinfo, "VIRT_ENTRY=")) != NULL )
+        dsi->v_kernentry = strtoul(p+11, &p, 0);
 
     if ( (kernstart > kernend) ||
-         (ehdr->e_entry < kernstart) ||
-         (ehdr->e_entry > kernend) )
-    {
-        ERROR("Malformed ELF image.");
-        return -EINVAL;
-    }
-
-    dsi->v_start = kernstart;
-    if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
-        dsi->v_start = strtoul(p+10, &p, 0);
+         (dsi->v_kernentry < kernstart) ||
+         (dsi->v_kernentry > kernend) ||
+         (dsi->v_start > kernstart) )
+        goto bad_image;
 
     if ( (p = strstr(guestinfo, "BSD_SYMTAB")) != NULL )
         dsi->load_symtab = 1;
 
     dsi->v_kernstart = kernstart;
     dsi->v_kernend   = kernend;
-    dsi->v_kernentry = ehdr->e_entry;
     dsi->v_end       = dsi->v_kernend;
 
     loadelfsymtab(image, 0, 0, NULL, dsi);
 
     return 0;
+
+ bad_image:
+    ERROR("Malformed ELF image.");
+    return -EINVAL;
 }
 
 static int
@@ -204,9 +229,11 @@ loadelfimage(
 
         for ( done = 0; done < phdr->p_filesz; done += chunksz )
         {
-            pa = (phdr->p_paddr + done) - dsi->v_start;
+            pa = (phdr->p_paddr + done) - dsi->elf_paddr_offset;
             va = xc_map_foreign_range(
                 xch, dom, PAGE_SIZE, PROT_WRITE, parray[pa>>PAGE_SHIFT]);
+            if ( va == NULL )
+                return -1;
             chunksz = phdr->p_filesz - done;
             if ( chunksz > (PAGE_SIZE - (pa & (PAGE_SIZE-1))) )
                 chunksz = PAGE_SIZE - (pa & (PAGE_SIZE-1));
@@ -217,9 +244,11 @@ loadelfimage(
 
         for ( ; done < phdr->p_memsz; done += chunksz )
         {
-            pa = (phdr->p_paddr + done) - dsi->v_start;
+            pa = (phdr->p_paddr + done) - dsi->elf_paddr_offset;
             va = xc_map_foreign_range(
                 xch, dom, PAGE_SIZE, PROT_WRITE, parray[pa>>PAGE_SHIFT]);
+            if ( va == NULL )
+                return -1;
             chunksz = phdr->p_memsz - done;
             if ( chunksz > (PAGE_SIZE - (pa & (PAGE_SIZE-1))) )
                 chunksz = PAGE_SIZE - (pa & (PAGE_SIZE-1));

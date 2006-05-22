@@ -39,7 +39,7 @@
  */
 #define BLKIF_MAX_SEGMENTS_PER_REQUEST 11
 
-typedef struct blkif_request {
+struct blkif_request {
     uint8_t        operation;    /* BLKIF_OP_???                         */
     uint8_t        nr_segments;  /* number of segments                   */
     blkif_vdev_t   handle;       /* only for read/write requests         */
@@ -51,13 +51,15 @@ typedef struct blkif_request {
         /* @last_sect: last sector in frame to transfer (inclusive).     */
         uint8_t     first_sect, last_sect;
     } seg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
-} blkif_request_t;
+};
+typedef struct blkif_request blkif_request_t;
 
-typedef struct blkif_response {
+struct blkif_response {
     uint64_t        id;              /* copied from request */
     uint8_t         operation;       /* copied from request */
     int16_t         status;          /* BLKIF_RSP_???       */
-} blkif_response_t;
+};
+typedef struct blkif_response blkif_response_t;
 
 #define BLKIF_RSP_ERROR  -1 /* non-specific 'error' */
 #define BLKIF_RSP_OKAY    0 /* non-specific 'okay'  */
@@ -66,7 +68,7 @@ typedef struct blkif_response {
  * Generate blkif ring structures and types.
  */
 
-DEFINE_RING_TYPES(blkif, blkif_request_t, blkif_response_t);
+DEFINE_RING_TYPES(blkif, struct blkif_request, struct blkif_response);
 
 #define VDISK_CDROM        0x1
 #define VDISK_REMOVABLE    0x2

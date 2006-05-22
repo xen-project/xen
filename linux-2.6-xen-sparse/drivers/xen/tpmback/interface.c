@@ -152,10 +152,8 @@ int tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 	return 0;
 }
 
-static void __tpmif_disconnect_complete(void *arg)
+void tpmif_disconnect_complete(tpmif_t *tpmif)
 {
-	tpmif_t *tpmif = (tpmif_t *) arg;
-
 	if (tpmif->irq)
 		unbind_from_irqhandler(tpmif->irq, tpmif);
 
@@ -167,29 +165,13 @@ static void __tpmif_disconnect_complete(void *arg)
 	free_tpmif(tpmif);
 }
 
-void tpmif_disconnect_complete(tpmif_t * tpmif)
-{
-	INIT_WORK(&tpmif->work, __tpmif_disconnect_complete, (void *)tpmif);
-	schedule_work(&tpmif->work);
-}
-
 void __init tpmif_interface_init(void)
 {
 	tpmif_cachep = kmem_cache_create("tpmif_cache", sizeof (tpmif_t),
 					 0, 0, NULL, NULL);
 }
 
-void __init tpmif_interface_exit(void)
+void __exit tpmif_interface_exit(void)
 {
 	kmem_cache_destroy(tpmif_cachep);
 }
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

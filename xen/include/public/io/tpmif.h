@@ -18,12 +18,13 @@
 
 #include "../grant_table.h"
 
-typedef struct {
+struct tpmif_tx_request {
     unsigned long addr;   /* Machine address of packet.   */
     grant_ref_t ref;      /* grant table access reference */
     uint16_t unused;
     uint16_t size;        /* Packet size in bytes.        */
-} tpmif_tx_request_t;
+};
+typedef struct tpmif_tx_request tpmif_tx_request_t;
 
 /*
  * The TPMIF_TX_RING_SIZE defines the number of pages the
@@ -35,13 +36,15 @@ typedef uint32_t TPMIF_RING_IDX;
 
 /* This structure must fit in a memory page. */
 
-typedef struct {
-    tpmif_tx_request_t req;
-} tpmif_ring_t;
+struct tpmif_ring {
+    struct tpmif_tx_request req;
+};
+typedef struct tpmif_ring tpmif_ring_t;
 
-typedef struct {
-    tpmif_ring_t ring[TPMIF_TX_RING_SIZE];
-} tpmif_tx_interface_t;
+struct tpmif_tx_interface {
+    struct tpmif_ring ring[TPMIF_TX_RING_SIZE];
+};
+typedef struct tpmif_tx_interface tpmif_tx_interface_t;
 
 #endif
 

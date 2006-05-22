@@ -60,6 +60,7 @@ struct hvm_virpic {
     /* IOAPIC callback support */
     void (*alt_irq_func)(void *opaque, int irq_num, int level);
     void *alt_irq_opaque;
+    spinlock_t lock;
 };
 
 
@@ -72,7 +73,7 @@ void pic_set_alt_irq_func(struct hvm_virpic *s,
                           void (*alt_irq_func)(void *, int, int),
                           void *alt_irq_opaque);
 int pic_read_irq(struct hvm_virpic *s);
-void pic_update_irq(struct hvm_virpic *s);
+void pic_update_irq(struct hvm_virpic *s); /* Caller must hold s->lock */
 uint32_t pic_intack_read(struct hvm_virpic *s);
 void register_pic_io_hook (void);
 int cpu_get_pic_interrupt(struct vcpu *v, int *type);

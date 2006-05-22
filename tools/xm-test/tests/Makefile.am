@@ -1,14 +1,15 @@
 SUBDIRS = 	               	\
 		block-create	\
-	  	block-list	\
-                block-destroy   \
+		block-list	\
+		block-destroy   \
+		block-integrity \
 		console		\
 		create 		\
 		destroy		\
 		dmesg		\
 		domid		\
 		domname		\
-	 	help		\
+		help		\
 		info		\
 		list		\
 		memmax		\

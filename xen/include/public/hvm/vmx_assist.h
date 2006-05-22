@@ -37,7 +37,7 @@ union vmcs_arbytes {
 /*
  * World switch state
  */
-typedef struct vmx_assist_context {
+struct vmx_assist_context {
     uint32_t  eip;        /* execution pointer */
     uint32_t  esp;        /* stack pointer */
     uint32_t  eflags;     /* flags register */
@@ -80,7 +80,8 @@ typedef struct vmx_assist_context {
     uint32_t  ldtr_limit;
     uint32_t  ldtr_base;
     union vmcs_arbytes ldtr_arbytes;
-} vmx_assist_context_t;
+};
+typedef struct vmx_assist_context vmx_assist_context_t;
 
 #endif /* __ASSEMBLY__ */
 

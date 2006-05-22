@@ -150,7 +150,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		xenbus_switch_state(dev, XenbusStateClosing);
+		be->tpmif->tpm_instance = -1;
 		break;
 
 	case XenbusStateClosed:
@@ -304,13 +304,3 @@ void tpmif_xenbus_exit(void)
 {
 	xenbus_unregister_driver(&tpmback);
 }
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

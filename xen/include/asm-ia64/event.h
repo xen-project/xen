@@ -37,4 +37,21 @@ static inline void evtchn_notify(struct vcpu *v)
     (!!(v)->vcpu_info->evtchn_upcall_pending &  \
       !(v)->vcpu_info->evtchn_upcall_mask)
 
+static inline int arch_virq_is_global(int virq)
+{
+    int rc;
+
+    switch ( virq )
+    {
+    case VIRQ_ITC:
+        rc = 0;
+        break;
+    default:
+        rc = 1;
+        break;
+    }
+
+    return rc;
+}
+
 #endif

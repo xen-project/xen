@@ -310,7 +310,6 @@ SerialState *serial_init(int base, int irq, CharDriverState *chr)
     register_ioport_write(base, 8, 1, serial_ioport_write, s);
     register_ioport_read(base, 8, 1, serial_ioport_read, s);
     s->chr = chr;
-    summa_init(s, chr);
     qemu_chr_add_read_handler(chr, serial_can_receive1, serial_receive1, s);
     qemu_chr_add_event_handler(chr, serial_event);
     return s;

@@ -118,7 +118,7 @@ u64 jiffies_to_st(unsigned long jiffies);
 #define MULTI_UVMDOMID_INDEX 4
 #endif
 
-#define xen_init()	(0)
+#define is_running_on_xen() 1
 
 static inline int
 HYPERVISOR_yield(

@@ -60,6 +60,9 @@ static int virq_is_global(int virq)
     case VIRQ_XENOPROF:
         rc = 0;
         break;
+    case VIRQ_ARCH_0 ... VIRQ_ARCH_7:
+        rc = arch_virq_is_global(virq);
+        break;
     default:
         rc = 1;
         break;

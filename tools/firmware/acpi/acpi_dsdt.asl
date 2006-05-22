@@ -37,6 +37,16 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL ", "XEN     ", 2)
         Processor (CPU3, 0x03, 0x00000000, 0x00) {}
     }
 
+/* Poweroff support - ties in with qemu emulation */
+
+    Name (\_S5, Package (0x04)
+    {
+        0x07, 
+        0x07, 
+        0x00, 
+        0x00
+    })
+
     Scope (\_SB)
     {
         Device (PCI0)

@@ -1172,7 +1172,7 @@ static int
 PyXc_init(XcObject *self, PyObject *args, PyObject *kwds)
 {
     if ((self->xc_handle = xc_interface_open()) == -1) {
-        PyErr_SetFromErrno(PyExc_RuntimeError);
+        PyErr_SetFromErrno(xc_error);
         return -1;
     }
 
@@ -1245,7 +1245,7 @@ PyMODINIT_FUNC initxc(void)
     if (m == NULL)
       return;
 
-    xc_error = PyErr_NewException(PKG ".error", NULL, NULL);
+    xc_error = PyErr_NewException(PKG ".Error", PyExc_RuntimeError, NULL);
     zero = PyInt_FromLong(0);
 
     /* KAF: This ensures that we get debug output in a timely manner. */
@@ -1254,6 +1254,9 @@ PyMODINIT_FUNC initxc(void)
 
     Py_INCREF(&PyXcType);
     PyModule_AddObject(m, CLS, (PyObject *)&PyXcType);
+
+    Py_INCREF(xc_error);
+    PyModule_AddObject(m, "Error", xc_error);
 }
 
 

@@ -41,10 +41,10 @@
 #include <asm/system.h>
 #include <asm/ptrace.h>
 #include <asm/synch_bitops.h>
+#include <xen/evtchn.h>
 #include <xen/interface/event_channel.h>
 #include <xen/interface/physdev.h>
 #include <asm/hypervisor.h>
-#include <xen/evtchn.h>
 #include <linux/mc146818rtc.h> /* RTC_IRQ */
 
 /*
@@ -163,6 +163,12 @@ static inline unsigned int cpu_from_evtchn(unsigned int evtchn)
 /* Upcall to generic IRQ layer. */
 #ifdef CONFIG_X86
 extern fastcall unsigned int do_IRQ(struct pt_regs *regs);
+void __init xen_init_IRQ(void);
+void __init init_IRQ(void)
+{
+	irq_ctx_init(0);
+	xen_init_IRQ();
+}
 #if defined (__i386__)
 static inline void exit_idle(void) {}
 #define IRQ_REG orig_eax
@@ -804,12 +810,10 @@ void irq_resume(void)
 	}
 }
 
-void __init init_IRQ(void)
+void __init xen_init_IRQ(void)
 {
 	int i;
 	int cpu;
-
-	irq_ctx_init(0);
 
 	spin_lock_init(&irq_mapping_update_lock);
 
@@ -860,13 +864,3 @@ void __init init_IRQ(void)
 		irq_desc[pirq_to_irq(i)].handler = &pirq_type;
 	}
 }
-
-/*
- * Local variables:
- *  c-file-style: "linux"
- *  indent-tabs-mode: t
- *  c-indent-level: 8
- *  c-basic-offset: 8
- *  tab-width: 8
- * End:
- */

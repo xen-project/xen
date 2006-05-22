@@ -11,17 +11,20 @@
 shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)XSI_BASE;
 EXPORT_SYMBOL(HYPERVISOR_shared_info);
 
-static int initialized;
 start_info_t *xen_start_info;
+
+int running_on_xen;
+EXPORT_SYMBOL(running_on_xen);
 
 int xen_init(void)
 {
+	static int initialized;
 	shared_info_t *s = HYPERVISOR_shared_info;
 
 	if (initialized)
 		return running_on_xen ? 0 : -1;
 
-	if (!running_on_xen)
+	if (!is_running_on_xen())
 		return -1;
 
 	xen_start_info = __va(s->arch.start_info_pfn << PAGE_SHIFT);
