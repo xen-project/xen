@@ -626,10 +626,12 @@ void __init setup_arch(char **cmdline_p)
 {
 	unsigned long kernel_end;
 
-#ifdef CONFIG_XEN
+#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
 	struct e820entry *machine_e820;
 	struct xen_memory_map memmap;
+#endif
 
+#ifdef CONFIG_XEN
 	/* Register a call for panic conditions. */
 	notifier_chain_register(&panic_notifier_list, &xen_panic_block);
 
@@ -741,7 +743,7 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_XEN
 	/* reserve physmap, start info and initial page tables */
-	reserve_bootmem(kernel_end, table_start<<PAGE_SHIFT);
+	reserve_bootmem(kernel_end, (table_start<<PAGE_SHIFT)-kernel_end);
 #else
 	/*
 	 * reserve physical page 0 - it's a special BIOS page on many boxes,
