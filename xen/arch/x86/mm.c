@@ -2811,6 +2811,8 @@ long do_update_descriptor(u64 pa, u64 desc)
     return ret;
 }
 
+typedef struct e820entry e820entry_t;
+DEFINE_XEN_GUEST_HANDLE(e820entry_t);
 
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 {
@@ -2867,6 +2869,39 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         put_domain(d);
 
         break;
+    }
+
+    case XENMEM_memory_map:
+    {
+        return -ENOSYS;
+    }
+
+    case XENMEM_machine_memory_map:
+    {
+        struct xen_memory_map memmap;
+        XEN_GUEST_HANDLE(e820entry_t) buffer;
+        int count;
+
+        if ( !IS_PRIV(current->domain) )
+            return -EINVAL;
+
+        if ( copy_from_guest(&memmap, arg, 1) )
+            return -EFAULT;
+        if ( memmap.nr_entries < e820.nr_map + 1 )
+            return -EINVAL;
+
+        buffer = guest_handle_cast(memmap.buffer, e820entry_t);
+
+        count = min((unsigned int)e820.nr_map, memmap.nr_entries);
+        if ( copy_to_guest(buffer, &e820.map[0], count) < 0 )
+            return -EFAULT;
+
+        memmap.nr_entries = count;
+
+        if ( copy_to_guest(arg, &memmap, 1) )
+            return -EFAULT;
+
+        return 0;
     }
 
     default:

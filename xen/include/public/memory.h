@@ -146,6 +146,34 @@ struct xen_translate_gpfn_list {
 typedef struct xen_translate_gpfn_list xen_translate_gpfn_list_t;
 DEFINE_XEN_GUEST_HANDLE(xen_translate_gpfn_list_t);
 
+/*
+ * Returns the pseudo-physical memory map as it was when the domain
+ * was started.
+ */
+#define XENMEM_memory_map           9
+struct xen_memory_map {
+    /*
+     * On call the number of entries which can be stored in buffer. On
+     * return the number of entries which have been stored in
+     * buffer.
+     */
+    unsigned int nr_entries;
+
+    /*
+     * Entries in the buffer are in the same format as returned by the
+     * BIOS INT 0x15 EAX=0xE820 call.
+     */
+    XEN_GUEST_HANDLE(void) buffer;
+};
+typedef struct xen_memory_map xen_memory_map_t;
+DEFINE_XEN_GUEST_HANDLE(xen_memory_map_t);
+
+/*
+ * Returns the real physical memory map. Passes the same structure as
+ * XENMEM_memory_map.
+ */
+#define XENMEM_machine_memory_map	10
+
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 
 /*
