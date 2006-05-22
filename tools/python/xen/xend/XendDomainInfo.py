@@ -29,6 +29,7 @@ import logging
 import string
 import time
 import threading
+import os
 
 import xen.lowlevel.xc
 from xen.util import asserts
@@ -1264,7 +1265,14 @@ class XendDomainInfo:
             m = self.image.getDomainMemory(self.info['memory'] * 1024)
             balloon.free(m)
             xc.domain_setmaxmem(self.domid, m)
-            xc.domain_memory_increase_reservation(self.domid, self.info['memory'] * 1024, 0, 0)
+
+            init_reservation = self.info['memory'] * 1024
+            if os.uname()[4] == 'ia64':
+                # Workaround until ia64 properly supports ballooning.
+                init_reservation = m
+
+            xc.domain_memory_increase_reservation(self.domid, init_reservation,
+                                                  0, 0)
 
             self.createChannels()
 

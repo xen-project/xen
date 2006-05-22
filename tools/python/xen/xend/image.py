@@ -144,10 +144,13 @@ class ImageHandler:
 
     def getDomainMemory(self, mem_kb):
         """@return The memory required, in KiB, by the domain to store the
-        given amount, also in KiB.  This is normally just mem, but if HVM is
-        supported, keep a little extra free."""
-        if 'hvm' in xc.xeninfo()['xen_caps']:
-            mem_kb += 4*1024;
+        given amount, also in KiB."""
+        if os.uname()[4] != 'ia64':
+            # A little extra because auto-ballooning is broken w.r.t. HVM
+            # guests. Also, slack is necessary for live migration since that
+            # uses shadow page tables.
+            if 'hvm' in xc.xeninfo()['xen_caps']:
+                mem_kb += 4*1024;
         return mem_kb
 
     def buildDomain(self):
