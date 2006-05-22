@@ -399,6 +399,26 @@ EXPORT_SYMBOL(phys_to_machine_mapping);
 start_info_t *xen_start_info;
 EXPORT_SYMBOL(xen_start_info);
 
+static void __init add_memory_region(unsigned long long start,
+                                  unsigned long long size, int type)
+{
+	int x;
+
+	if (!efi_enabled) {
+       		x = e820.nr_map;
+
+		if (x == E820MAX) {
+		    printk(KERN_ERR "Ooops! Too many entries in the memory map!\n");
+		    return;
+		}
+
+		e820.map[x].addr = start;
+		e820.map[x].size = size;
+		e820.map[x].type = type;
+		e820.nr_map++;
+	}
+} /* add_memory_region */
+
 static void __init limit_regions(unsigned long long size)
 {
 	unsigned long long current_addr = 0;
@@ -443,26 +463,6 @@ static void __init limit_regions(unsigned long long size)
 		return;
 	}
 }
-
-static void __init add_memory_region(unsigned long long start,
-                                  unsigned long long size, int type)
-{
-	int x;
-
-	if (!efi_enabled) {
-       		x = e820.nr_map;
-
-		if (x == E820MAX) {
-		    printk(KERN_ERR "Ooops! Too many entries in the memory map!\n");
-		    return;
-		}
-
-		e820.map[x].addr = start;
-		e820.map[x].size = size;
-		e820.map[x].type = type;
-		e820.nr_map++;
-	}
-} /* add_memory_region */
 
 #define E820_DEBUG	1
 

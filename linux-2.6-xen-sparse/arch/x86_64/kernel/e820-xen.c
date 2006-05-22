@@ -33,38 +33,21 @@ unsigned long pci_mem_start = 0xaeedbabe;
  */
 unsigned long end_pfn; 
 EXPORT_SYMBOL(end_pfn);
-unsigned long end_user_pfn = MAXMEM>>PAGE_SHIFT;  
-unsigned long end_pfn_map; 
-
-/* 
- * Add a memory region to the kernel e820 map.
- */ 
-void __init add_memory_region(unsigned long start, unsigned long size, int type)
-{
-	int x = e820.nr_map;
-
-	if (x == E820MAX) {
-		printk(KERN_ERR "Ooops! Too many entries in the memory map!\n");
-		return;
-	}
-
-	e820.map[x].addr = start;
-	e820.map[x].size = size;
-	e820.map[x].type = type;
-	e820.nr_map++;
-}
-
-#ifndef CONFIG_XEN
 
 /* 
  * end_pfn only includes RAM, while end_pfn_map includes all e820 entries.
  * The direct mapping extends to end_pfn_map, so that we can directly access
  * apertures, ACPI and other tables without having to play with fixmaps.
  */ 
+unsigned long end_pfn_map; 
 
 /* 
  * Last pfn which the user wants to use.
  */
+unsigned long end_user_pfn = MAXMEM>>PAGE_SHIFT;  
+
+#ifndef CONFIG_XEN
+
 
 extern struct resource code_resource, data_resource;
 
@@ -276,7 +259,90 @@ void __init e820_reserve_resources(void)
 		}
 	}
 }
+#else
+void __init e820_reserve_resources(void) 
+{
+	dom0_op_t op;
+	struct dom0_memory_map_entry *map;
+	unsigned long gapstart, gapsize, round, last;
+	int i, found = 0;
+
+	if (!(xen_start_info->flags & SIF_INITDOMAIN))
+		return;
+
+	map = alloc_bootmem_low_pages(PAGE_SIZE);
+	op.cmd = DOM0_PHYSICAL_MEMORY_MAP;
+	set_xen_guest_handle(op.u.physical_memory_map.memory_map, map);
+	op.u.physical_memory_map.max_map_entries =
+		PAGE_SIZE / sizeof(struct dom0_memory_map_entry);
+	BUG_ON(HYPERVISOR_dom0_op(&op));
+
+	last = 0x100000000ULL;
+	gapstart = 0x10000000;
+	gapsize = 0x400000;
+
+	for (i = op.u.physical_memory_map.nr_map_entries - 1; i >= 0; i--) {
+		struct resource *res;
+
+		if ((last > map[i].end) && ((last - map[i].end) > gapsize)) {
+			gapsize = last - map[i].end;
+			gapstart = map[i].end;
+			found = 1;
+		}
+		if (map[i].start < last)
+			last = map[i].start;
+
+		if (map[i].end > 0x100000000ULL)
+			continue;
+		res = alloc_bootmem_low(sizeof(struct resource));
+		res->name = map[i].is_ram ? "System RAM" : "reserved";
+		res->start = map[i].start;
+		res->end = map[i].end - 1;
+		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+		request_resource(&iomem_resource, res);
+	}
+
+	free_bootmem(__pa(map), PAGE_SIZE);
+
+	if (!found) {
+		gapstart = HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL);
+		gapstart = (gapstart << PAGE_SHIFT) + 1024*1024;
+		printk(KERN_ERR "PCI: Warning: Cannot find a gap in the 32bit address range\n"
+		       KERN_ERR "PCI: Unassigned devices with 32bit resource registers may break!\n");
+	}
+
+	/*
+	 * See how much we want to round up: start off with
+	 * rounding to the next 1MB area.
+	 */
+	round = 0x100000;
+	while ((gapsize >> 4) > round)
+		round += round;
+	/* Fun with two's complement */
+	pci_mem_start = (gapstart + round) & -round;
+
+	printk(KERN_INFO "Allocating PCI resources starting at %lx (gap: %lx:%lx)\n",
+		pci_mem_start, gapstart, gapsize);
+}
 #endif /* CONFIG_XEN */
+
+/* 
+ * Add a memory region to the kernel e820 map.
+ */ 
+void __init add_memory_region(unsigned long start, unsigned long size, int type)
+{
+	int x = e820.nr_map;
+
+	if (x == E820MAX) {
+		printk(KERN_ERR "Ooops! Too many entries in the memory map!\n");
+		return;
+	}
+
+	e820.map[x].addr = start;
+	e820.map[x].size = size;
+	e820.map[x].type = type;
+	e820.nr_map++;
+}
 
 void __init e820_print_map(char *who)
 {
@@ -586,71 +652,6 @@ unsigned long __init
 e820_hole_size(unsigned long start_pfn, unsigned long end_pfn)
 {
 	return 0;
-}
-
-void __init e820_reserve_resources(void) 
-{
-	dom0_op_t op;
-	struct dom0_memory_map_entry *map;
-	unsigned long gapstart, gapsize, round, last;
-	int i, found = 0;
-
-	if (!(xen_start_info->flags & SIF_INITDOMAIN))
-		return;
-
-	map = alloc_bootmem_low_pages(PAGE_SIZE);
-	op.cmd = DOM0_PHYSICAL_MEMORY_MAP;
-	set_xen_guest_handle(op.u.physical_memory_map.memory_map, map);
-	op.u.physical_memory_map.max_map_entries =
-		PAGE_SIZE / sizeof(struct dom0_memory_map_entry);
-	BUG_ON(HYPERVISOR_dom0_op(&op));
-
-	last = 0x100000000ULL;
-	gapstart = 0x10000000;
-	gapsize = 0x400000;
-
-	for (i = op.u.physical_memory_map.nr_map_entries - 1; i >= 0; i--) {
-		struct resource *res;
-
-		if ((last > map[i].end) && ((last - map[i].end) > gapsize)) {
-			gapsize = last - map[i].end;
-			gapstart = map[i].end;
-			found = 1;
-		}
-		if (map[i].start < last)
-			last = map[i].start;
-
-		if (map[i].end > 0x100000000ULL)
-			continue;
-		res = alloc_bootmem_low(sizeof(struct resource));
-		res->name = map[i].is_ram ? "System RAM" : "reserved";
-		res->start = map[i].start;
-		res->end = map[i].end - 1;
-		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-		request_resource(&iomem_resource, res);
-	}
-
-	free_bootmem(__pa(map), PAGE_SIZE);
-
-	if (!found) {
-		gapstart = HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL);
-		gapstart = (gapstart << PAGE_SHIFT) + 1024*1024;
-		printk(KERN_ERR "PCI: Warning: Cannot find a gap in the 32bit address range\n"
-		       KERN_ERR "PCI: Unassigned devices with 32bit resource registers may break!\n");
-	}
-
-	/*
-	 * See how much we want to round up: start off with
-	 * rounding to the next 1MB area.
-	 */
-	round = 0x100000;
-	while ((gapsize >> 4) > round)
-		round += round;
-	/* Fun with two's complement */
-	pci_mem_start = (gapstart + round) & -round;
-
-	printk(KERN_INFO "Allocating PCI resources starting at %lx (gap: %lx:%lx)\n",
-		pci_mem_start, gapstart, gapsize);
 }
 
 #endif
