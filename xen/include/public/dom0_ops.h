@@ -444,7 +444,7 @@ struct dom0_platform_quirk {
 typedef struct dom0_platform_quirk dom0_platform_quirk_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_platform_quirk_t);
 
-#define DOM0_PHYSICAL_MEMORY_MAP 40
+#define DOM0_PHYSICAL_MEMORY_MAP 40   /* Unimplemented from 3.0.3 onwards */
 struct dom0_memory_map_entry {
     uint64_t start, end;
     uint32_t flags; /* reserved */
