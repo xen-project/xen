@@ -931,8 +931,8 @@ void __init setup_arch(char **cmdline_p)
 	 * Request address space for all standard RAM and ROM resources
 	 * and also for regions reported as reserved by the e820.
 	 */
-	probe_roms();
 #if defined(CONFIG_XEN_PRIVILEGED_GUEST)
+	probe_roms();
 	if (xen_start_info->flags & SIF_INITDOMAIN) {
 		machine_e820 = alloc_bootmem_low_pages(PAGE_SIZE);
 
@@ -944,6 +944,7 @@ void __init setup_arch(char **cmdline_p)
 		e820_reserve_resources(machine_e820, memmap.nr_entries);
 	}
 #elif !defined(CONFIG_XEN)
+	probe_roms();
 	e820_reserve_resources(e820.map, e820.nr_map);
 #endif
 
