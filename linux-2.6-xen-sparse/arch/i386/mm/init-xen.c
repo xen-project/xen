@@ -228,6 +228,12 @@ static inline int page_kills_ppro(unsigned long pagenr)
 	return 0;
 }
 
+#else
+
+#define page_kills_ppro(p)	0
+
+#endif
+
 extern int is_available_memory(efi_memory_desc_t *);
 
 int page_is_ram(unsigned long pagenr)
@@ -268,13 +274,6 @@ int page_is_ram(unsigned long pagenr)
 	}
 	return 0;
 }
-
-#else /* CONFIG_XEN */
-
-#define page_kills_ppro(p)	0
-#define page_is_ram(p)		1
-
-#endif
 
 #ifdef CONFIG_HIGHMEM
 pte_t *kmap_pte;

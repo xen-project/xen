@@ -10,10 +10,32 @@
 
 static char * __init machine_specific_memory_setup(void)
 {
-	unsigned long max_pfn = xen_start_info->nr_pages;
+	int rc;
+	struct xen_memory_map memmap;
+	/*
+	 * This is rather large for a stack variable but this early in
+	 * the boot process we know we have plenty slack space.
+	 */
+	struct e820entry map[E820MAX];
 
-	e820.nr_map = 0;
-	add_memory_region(0, PFN_PHYS(max_pfn), E820_RAM);
+	memmap.nr_entries = E820MAX;
+	set_xen_guest_handle(memmap.buffer, map);
+
+	rc = HYPERVISOR_memory_op(XENMEM_memory_map, &memmap);
+	if ( rc == -ENOSYS ) {
+		memmap.nr_entries = 1;
+		map[0].addr = 0ULL;
+		map[0].size = xen_start_info->nr_pages << PAGE_SHIFT;
+		/* 8MB slack (to balance backend allocations). */
+		map[0].size += 8 << 20;
+		map[0].type = E820_RAM;
+		rc = 0;
+	}
+	BUG_ON(rc);
+
+	sanitize_e820_map(map, (char *)&memmap.nr_entries);
+
+	BUG_ON(copy_e820_map(map, (char)memmap.nr_entries) < 0);
 
 	return "Xen";
 }
