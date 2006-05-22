@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.16.13-xen0
-# Sun May 21 07:42:37 2006
+# Mon May 22 14:46:31 2006
 #
 
 #
@@ -1540,4 +1540,7 @@ CONFIG_XEN_NETDEV_FRONTEND=y
 # CONFIG_XEN_SCRUB_PAGES is not set
 # CONFIG_XEN_DISABLE_SERIAL is not set
 CONFIG_XEN_SYSFS=y
+CONFIG_XEN_COMPAT_030002_AND_LATER=y
+# CONFIG_XEN_COMPAT_LATEST_ONLY is not set
+CONFIG_XEN_COMPAT_030002=y
 CONFIG_NO_IDLE_HZ=y
