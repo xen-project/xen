@@ -76,8 +76,8 @@
 #include <xen/features.h>
 #define PFN_UP(x)       (((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 #define PFN_PHYS(x)     ((x) << PAGE_SHIFT)
-#define end_pfn_map end_pfn
 #include <asm/mach-xen/setup_arch_post.h>
+#include <xen/interface/memory.h>
 
 extern unsigned long start_pfn;
 extern struct edid_info edid_info;
@@ -490,19 +490,6 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 }
 
 #ifndef CONFIG_NUMA
-#ifdef CONFIG_XEN
-static void __init
-contig_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
-{
-        unsigned long bootmap_size;
-
-        bootmap_size = init_bootmem(start_pfn, end_pfn);
-        free_bootmem(0, xen_start_info->nr_pages << PAGE_SHIFT);   
-        reserve_bootmem(HIGH_MEMORY,
-                        (PFN_PHYS(start_pfn) + bootmap_size + PAGE_SIZE-1)
-                        - HIGH_MEMORY);
-}
-#else
 static void __init
 contig_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 {
@@ -513,10 +500,13 @@ contig_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 	if (bootmap == -1L)
 		panic("Cannot find bootmem map of size %ld\n",bootmap_size);
 	bootmap_size = init_bootmem(bootmap >> PAGE_SHIFT, end_pfn);
+#ifdef CONFIG_XEN
+	e820_bootmem_free(NODE_DATA(0), 0, xen_start_info->nr_pages<<PAGE_SHIFT);
+#else
 	e820_bootmem_free(NODE_DATA(0), 0, end_pfn << PAGE_SHIFT);
+#endif
 	reserve_bootmem(bootmap, bootmap_size);
 } 
-#endif	/* !CONFIG_XEN */
 #endif
 
 /* Use inline assembly to define this because the nops are defined 
@@ -637,6 +627,9 @@ void __init setup_arch(char **cmdline_p)
 	unsigned long kernel_end;
 
 #ifdef CONFIG_XEN
+	struct e820entry *machine_e820;
+	struct xen_memory_map memmap;
+
 	/* Register a call for panic conditions. */
 	notifier_chain_register(&panic_notifier_list, &xen_panic_block);
 
@@ -693,20 +686,18 @@ void __init setup_arch(char **cmdline_p)
 	rd_prompt = ((RAMDISK_FLAGS & RAMDISK_PROMPT_FLAG) != 0);
 	rd_doload = ((RAMDISK_FLAGS & RAMDISK_LOAD_FLAG) != 0);
 #endif
+#endif	/* !CONFIG_XEN */
 	setup_memory_region();
 	copy_edd();
-#endif	/* !CONFIG_XEN */
 
 	if (!MOUNT_ROOT_RDONLY)
 		root_mountflags &= ~MS_RDONLY;
 	init_mm.start_code = (unsigned long) &_text;
 	init_mm.end_code = (unsigned long) &_etext;
 	init_mm.end_data = (unsigned long) &_edata;
-#ifdef CONFIG_XEN
-	init_mm.brk = start_pfn << PAGE_SHIFT;
-#else
-	init_mm.brk = (unsigned long) &_end;	
+	init_mm.brk = (unsigned long) &_end;
 
+#ifndef CONFIG_XEN
 	code_resource.start = virt_to_phys(&_text);
 	code_resource.end = virt_to_phys(&_etext)-1;
 	data_resource.start = virt_to_phys(&_etext);
@@ -735,12 +726,11 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 #ifdef CONFIG_NUMA
-	numa_initmem_init(start_pfn, end_pfn); 
+	numa_initmem_init(0, end_pfn); 
 #else
-	contig_initmem_init(start_pfn, end_pfn);
+	contig_initmem_init(0, end_pfn);
 #endif
 
-#ifndef CONFIG_XEN
 	/* Reserve direct mapping */
 	reserve_bootmem_generic(table_start << PAGE_SHIFT, 
 				(table_end - table_start) << PAGE_SHIFT);
@@ -749,6 +739,10 @@ void __init setup_arch(char **cmdline_p)
 	kernel_end = round_up(__pa_symbol(&_end),PAGE_SIZE);
 	reserve_bootmem_generic(HIGH_MEMORY, kernel_end - HIGH_MEMORY);
 
+#ifdef CONFIG_XEN
+	/* reserve physmap, start info and initial page tables */
+	reserve_bootmem(kernel_end, table_start<<PAGE_SHIFT);
+#else
 	/*
 	 * reserve physical page 0 - it's a special BIOS page on many boxes,
 	 * enabling clean reboots, SMP operation, laptop functions.
@@ -933,13 +927,24 @@ void __init setup_arch(char **cmdline_p)
 	prefill_possible_map();
 #endif
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 	/*
 	 * Request address space for all standard RAM and ROM resources
 	 * and also for regions reported as reserved by the e820.
 	 */
 	probe_roms();
-	e820_reserve_resources(); 
+#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
+	if (xen_start_info->flags & SIF_INITDOMAIN) {
+		machine_e820 = alloc_bootmem_low_pages(PAGE_SIZE);
+
+		memmap.nr_entries = E820MAX;
+		set_xen_guest_handle(memmap.buffer, machine_e820);
+
+		BUG_ON(HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap));
+
+		e820_reserve_resources(machine_e820, memmap.nr_entries);
+	}
+#elif !defined(CONFIG_XEN)
+	e820_reserve_resources(e820.map, e820.nr_map);
 #endif
 
 	request_resource(&iomem_resource, &video_ram_resource);
@@ -951,7 +956,14 @@ void __init setup_arch(char **cmdline_p)
 		request_resource(&ioport_resource, &standard_io_resources[i]);
 	}
 
-	e820_setup_gap();
+#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
+	if (xen_start_info->flags & SIF_INITDOMAIN) {
+		e820_setup_gap(machine_e820, memmap.nr_entries);
+		free_bootmem(__pa(machine_e820), PAGE_SIZE);
+	}
+#elif !defined(CONFIG_XEN)
+	e820_setup_gap(e820.map, e820.nr_map);
+#endif
 
 #ifdef CONFIG_GART_IOMMU
 	iommu_hole_init();

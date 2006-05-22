@@ -45,12 +45,12 @@ extern void add_memory_region(unsigned long start, unsigned long size,
 extern void setup_memory_region(void);
 extern void contig_e820_setup(void); 
 extern unsigned long e820_end_of_ram(void);
-extern void e820_reserve_resources(void);
+extern void e820_reserve_resources(struct e820entry *e820, int nr_map);
 extern void e820_print_map(char *who);
 extern int e820_mapped(unsigned long start, unsigned long end, unsigned type);
 
 extern void e820_bootmem_free(pg_data_t *pgdat, unsigned long start,unsigned long end);
-extern void e820_setup_gap(void);
+extern void e820_setup_gap(struct e820entry *e820, int nr_map);
 extern unsigned long e820_hole_size(unsigned long start_pfn,
 				    unsigned long end_pfn);
 
