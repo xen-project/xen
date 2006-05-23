@@ -392,6 +392,9 @@ typedef struct {
     u8 nr_guests;
     u8 in_flight;
     u8 shareable;
+    u8 ack_type;
+#define ACKTYPE_NONE   0     /* No final acknowledgement is required */
+#define ACKTYPE_UNMASK 1     /* Unmask notification is required */
     struct domain *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
 
@@ -405,10 +408,24 @@ void __do_IRQ_guest(int irq)
     for ( i = 0; i < action->nr_guests; i++ )
     {
         d = action->guest[i];
-        if ( !test_and_set_bit(irq, &d->pirq_mask) )
+        if ( (action->ack_type != ACKTYPE_NONE) &&
+             !test_and_set_bit(irq, &d->pirq_mask) )
             action->in_flight++;
         send_guest_pirq(d, irq);
     }
+}
+
+int pirq_acktype(int irq)
+{
+    irq_desc_t *desc = &irq_desc[irq];
+
+    if (!strcmp(desc->handler->typename, "IO-SAPIC-level"))
+        return ACKTYPE_UNMASK;
+
+    if (!strcmp(desc->handler->typename, "IO-SAPIC-edge"))
+        return ACKTYPE_NONE;
+
+    return ACKTYPE_NONE;
 }
 
 int pirq_guest_eoi(struct domain *d, int irq)
@@ -422,7 +439,10 @@ int pirq_guest_eoi(struct domain *d, int irq)
     spin_lock_irq(&desc->lock);
     if ( test_and_clear_bit(irq, &d->pirq_mask) &&
          (--((irq_guest_action_t *)desc->action)->in_flight == 0) )
+    {
+        ASSERT(action->ack_type == ACKTYPE_UNMASK);
         desc->handler->end(irq);
+    }
     spin_unlock_irq(&desc->lock);
 
     return 0;
@@ -431,7 +451,6 @@ int pirq_guest_eoi(struct domain *d, int irq)
 
 int pirq_guest_unmask(struct domain *d)
 {
-    irq_desc_t    *desc;
     int            irq;
     shared_info_t *s = d->shared_info;
 
@@ -439,13 +458,9 @@ int pirq_guest_unmask(struct domain *d)
           irq < NR_IRQS;
           irq = find_next_bit(d->pirq_mask, NR_IRQS, irq+1) )
     {
-        desc = &irq_desc[irq];
-        spin_lock_irq(&desc->lock);
-        if ( !test_bit(d->pirq_to_evtchn[irq], &s->evtchn_mask[0]) &&
-             test_and_clear_bit(irq, &d->pirq_mask) &&
-             (--((irq_guest_action_t *)desc->action)->in_flight == 0) )
-            desc->handler->end(irq);
-        spin_unlock_irq(&desc->lock);
+        if ( !test_bit(d->pirq_to_evtchn[irq], &s->evtchn_mask[0]) )
+            pirq_guest_eoi(d, irq);
+
     }
 
     return 0;
@@ -459,6 +474,11 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     int                 rc = 0;
 
     spin_lock_irqsave(&desc->lock, flags);
+
+    if (desc->handler == &no_irq_type) {
+        spin_unlock_irqrestore(&desc->lock, flags);
+        return -ENOSYS;
+    }
 
     action = (irq_guest_action_t *)desc->action;
 
@@ -483,6 +503,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
         action->nr_guests = 0;
         action->in_flight = 0;
         action->shareable = will_share;
+        action->ack_type  = pirq_acktype(irq);
         
         desc->depth = 0;
         desc->status |= IRQ_GUEST;
@@ -529,26 +550,26 @@ int pirq_guest_unbind(struct domain *d, int irq)
 
     action = (irq_guest_action_t *)desc->action;
 
-    if ( test_and_clear_bit(irq, &d->pirq_mask) &&
-         (--action->in_flight == 0) )
-        desc->handler->end(irq);
+    i = 0;
+    while ( action->guest[i] && (action->guest[i] != d) )
+        i++;
+    memmove(&action->guest[i], &action->guest[i+1], IRQ_MAX_GUESTS-i-1);
+    action->nr_guests--;
 
-    if ( action->nr_guests == 1 )
+    if ( action->ack_type == ACKTYPE_UNMASK )
+        if ( test_and_clear_bit(irq, &d->pirq_mask) &&
+             (--action->in_flight == 0) )
+            desc->handler->end(irq);
+
+    if ( !action->nr_guests )
     {
+        BUG_ON(action->in_flight != 0);
         desc->action = NULL;
         xfree(action);
         desc->depth   = 1;
         desc->status |= IRQ_DISABLED;
         desc->status &= ~IRQ_GUEST;
         desc->handler->shutdown(irq);
-    }
-    else
-    {
-        i = 0;
-        while ( action->guest[i] != d )
-            i++;
-        memmove(&action->guest[i], &action->guest[i+1], IRQ_MAX_GUESTS-i-1);
-        action->nr_guests--;
     }
 
     spin_unlock_irqrestore(&desc->lock, flags);    
