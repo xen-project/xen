@@ -701,6 +701,16 @@ class XendDomainInfo:
         log.debug("Storing VM details: %s", to_store)
 
         self.writeVm(to_store)
+        self.setVmPermissions()
+
+
+    def setVmPermissions(self):
+        """Allow the guest domain to read its UUID.  We don't allow it to
+        access any other entry, for security."""
+        xstransact.SetPermissions('%s/uuid' % self.vmpath,
+                                  { 'dom' : self.domid,
+                                    'read' : True,
+                                    'write' : False })
 
 
     def storeDomDetails(self):
