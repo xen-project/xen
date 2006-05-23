@@ -246,6 +246,40 @@ printf("*#*#*#* about to deliver early timer to domain %d!!!\n",v->domain->domai
 	reflect_interruption(isr,regs,IA64_EXTINT_VECTOR);
 }
 
+void reflect_event(struct pt_regs *regs)
+{
+	unsigned long isr = regs->cr_ipsr & IA64_PSR_RI;
+	struct vcpu *v = current;
+
+	/* Sanity check */
+	if (is_idle_vcpu(v) || !user_mode(regs)) {
+		//printk("WARN: invocation to reflect_event in nested xen\n");
+		return;
+	}
+
+	if (!event_pending(v))
+		return;
+
+	if (!PSCB(v,interrupt_collection_enabled))
+		printf("psr.ic off, delivering event, ipsr=%lx,iip=%lx,isr=%lx,viip=0x%lx\n",
+		       regs->cr_ipsr, regs->cr_iip, isr, PSCB(v, iip));
+	PSCB(v,unat) = regs->ar_unat;  // not sure if this is really needed?
+	PSCB(v,precover_ifs) = regs->cr_ifs;
+	vcpu_bsw0(v);
+	PSCB(v,ipsr) = vcpu_get_ipsr_int_state(v,regs->cr_ipsr);
+	PSCB(v,isr) = isr;
+	PSCB(v,iip) = regs->cr_iip;
+	PSCB(v,ifs) = 0;
+	PSCB(v,incomplete_regframe) = 0;
+
+	regs->cr_iip = v->arch.event_callback_ip;
+	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
+	regs->r31 = XSI_IPSR;
+
+	v->vcpu_info->evtchn_upcall_mask = 1;
+	PSCB(v,interrupt_collection_enabled) = 0;
+}
+
 // ONLY gets called from ia64_leave_kernel
 // ONLY call with interrupts disabled?? (else might miss one?)
 // NEVER successful if already reflecting a trap/fault because psr.i==0
@@ -255,7 +289,6 @@ void deliver_pending_interrupt(struct pt_regs *regs)
 	struct vcpu *v = current;
 	// FIXME: Will this work properly if doing an RFI???
 	if (!is_idle_domain(d) && user_mode(regs)) {
-		//vcpu_poke_timer(v);
 		if (vcpu_deliverable_interrupts(v))
 			reflect_extint(regs);
 		else if (PSCB(v,pending_interruption))

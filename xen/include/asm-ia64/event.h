@@ -28,8 +28,8 @@ static inline void evtchn_notify(struct vcpu *v)
     if ( running )
         smp_send_event_check_cpu(v->processor);
 
-    if(!VMX_DOMAIN(v))
-	vcpu_pend_interrupt(v, v->domain->shared_info->arch.evtchn_vector);
+    if(!VMX_DOMAIN(v) && !v->arch.event_callback_ip)
+        vcpu_pend_interrupt(v, v->domain->shared_info->arch.evtchn_vector);
 }
 
 /* Note: Bitwise operations result in fast code with no branches. */

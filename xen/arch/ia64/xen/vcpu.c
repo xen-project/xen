@@ -649,16 +649,18 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 		printf("vcpu_pend_interrupt: bad vector\n");
 		return;
 	}
-    if ( VMX_DOMAIN(vcpu) ) {
-	    set_bit(vector,VCPU(vcpu,irr));
-    } else
-    {
-	if (test_bit(vector,PSCBX(vcpu,irr))) {
-//printf("vcpu_pend_interrupt: overrun\n");
+
+	if (vcpu->arch.event_callback_ip) {
+		printf("Deprecated interface. Move to new event based solution\n");
+		return;
 	}
-	set_bit(vector,PSCBX(vcpu,irr));
-	PSCB(vcpu,pending_interruption) = 1;
-    }
+		
+	if ( VMX_DOMAIN(vcpu) ) {
+		set_bit(vector,VCPU(vcpu,irr));
+	} else {
+		set_bit(vector,PSCBX(vcpu,irr));
+		PSCB(vcpu,pending_interruption) = 1;
+	}
 }
 
 #define	IA64_TPR_MMI	0x10000
@@ -673,6 +675,9 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 UINT64 vcpu_check_pending_interrupts(VCPU *vcpu)
 {
 	UINT64 *p, *r, bits, bitnum, mask, i, vector;
+
+	if (vcpu->arch.event_callback_ip)
+		return SPURIOUS_VECTOR;
 
 	/* Always check pending event, since guest may just ack the
 	 * event injection without handle. Later guest may throw out
@@ -1151,7 +1156,16 @@ void vcpu_pend_timer(VCPU *vcpu)
 		// don't deliver another
 		return;
 	}
-	vcpu_pend_interrupt(vcpu, itv);
+	if (vcpu->arch.event_callback_ip) {
+		/* A small window may occur when injecting vIRQ while related
+		 * handler has not been registered. Don't fire in such case.
+		 */
+		if (vcpu->virq_to_evtchn[VIRQ_ITC]) {
+			send_guest_vcpu_virq(vcpu, VIRQ_ITC);
+			PSCBX(vcpu, domain_itm_last) = PSCBX(vcpu, domain_itm);
+		}
+	} else
+		vcpu_pend_interrupt(vcpu, itv);
 }
 
 // returns true if ready to deliver a timer interrupt too early
