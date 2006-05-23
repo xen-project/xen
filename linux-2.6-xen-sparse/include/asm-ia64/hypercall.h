@@ -313,9 +313,20 @@ HYPERVISOR_suspend(
 	return rc;
 }
 
+static inline int
+HYPERVISOR_callback_op(
+	int cmd, void *arg)
+{
+	return _hypercall2(int, callback_op, cmd, arg);
+}
+
 extern fastcall unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs);
 static inline void exit_idle(void) {}
-#define do_IRQ(irq, regs) __do_IRQ((irq), (regs))
+#define do_IRQ(irq, regs) ({			\
+	irq_enter();				\
+	__do_IRQ((irq), (regs));		\
+	irq_exit();				\
+})
 
 #ifdef CONFIG_XEN_IA64_DOM0_VP
 #include <linux/err.h>

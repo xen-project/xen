@@ -25,9 +25,12 @@
 #include <asm/hw_irq.h>
 #include <public/physdev.h>
 #include <xen/domain.h>
+#include <public/callback.h>
+#include <xen/event.h>
 
 static long do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop);
 static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg);
+static long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg);
 /* FIXME: where these declarations should be there ? */
 extern int dump_privop_counts_to_user(char *, int);
 extern int zero_privop_counts_to_user(char *, int);
@@ -67,7 +70,7 @@ hypercall_t ia64_hypercall_table[] =
 	(hypercall_t)do_ni_hypercall,		/* do_acm_op */
 	(hypercall_t)do_ni_hypercall,		/* do_nmi_op */
 	(hypercall_t)do_sched_op,
-	(hypercall_t)do_ni_hypercall,		/*  */				/* 30 */
+	(hypercall_t)do_callback_op,		/*  */			/* 30 */
 	(hypercall_t)do_ni_hypercall,		/*  */
 	(hypercall_t)do_event_channel_op,
 	(hypercall_t)do_physdev_op,
@@ -200,11 +203,8 @@ fw_hypercall (struct pt_regs *regs)
 		VCPU(v,pending_interruption) = 1;
 #endif
 		if (regs->r28 == PAL_HALT_LIGHT) {
-			int pi;
-#define SPURIOUS_VECTOR 15
-			pi = vcpu_check_pending_interrupts(v);
-			if (pi != SPURIOUS_VECTOR) {
-				if (!VCPU(v,pending_interruption))
+			if (vcpu_deliverable_interrupts(v) ||
+				event_pending(v)) {
 					idle_when_pending++;
 				vcpu_pend_unspecified_interrupt(v);
 //printf("idle w/int#%d pending!\n",pi);
@@ -434,4 +434,76 @@ long do_event_channel_op_compat(XEN_GUEST_HANDLE(evtchn_op_t) uop)
         return -EFAULT;
 
     return do_event_channel_op(op.cmd, guest_handle_from_ptr(&uop.p->u, void));
+}
+
+static long register_guest_callback(struct callback_register *reg)
+{
+    long ret = 0;
+    struct vcpu *v = current;
+
+    if (IS_VMM_ADDRESS(reg->address))
+        return -EINVAL;
+
+    switch ( reg->type )
+    {
+    case CALLBACKTYPE_event:
+        v->arch.event_callback_ip    = reg->address;
+        break;
+
+    case CALLBACKTYPE_failsafe:
+        v->arch.failsafe_callback_ip = reg->address;
+        break;
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+    return ret;
+}
+
+static long unregister_guest_callback(struct callback_unregister *unreg)
+{
+    return -EINVAL ;
+}
+
+/* First time to add callback to xen/ia64, so let's just stick to
+ * the newer callback interface.
+ */
+static long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+{
+    long ret;
+
+    switch ( cmd )
+    {
+    case CALLBACKOP_register:
+    {
+        struct callback_register reg;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&reg, arg, 1) )
+            break;
+
+        ret = register_guest_callback(&reg);
+    }
+    break;
+
+    case CALLBACKOP_unregister:
+    {
+        struct callback_unregister unreg;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&unreg, arg, 1) )
+            break;
+
+        ret = unregister_guest_callback(&unreg);
+    }
+    break;
+
+    default:
+        ret = -EINVAL;
+        break;
+    }
+
+    return ret;
 }

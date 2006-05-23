@@ -86,6 +86,8 @@ struct arch_vcpu {
 	unsigned long xen_itm;
 
     mapped_regs_t *privregs; /* save the state of vcpu */
+    unsigned long event_callback_ip;		// event callback handler
+    unsigned long failsafe_callback_ip; 	// Do we need it?
 
     /* These fields are copied from arch_domain to make access easier/faster
        in assembly code.  */

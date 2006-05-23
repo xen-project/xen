@@ -320,6 +320,8 @@ struct arch_initrd_info {
 };
 typedef struct arch_initrd_info arch_initrd_info_t;
 
+typedef unsigned long xen_callback_t;
+
 #define IA64_COMMAND_LINE_SIZE 512
 struct vcpu_guest_context {
 #define VGCF_FPU_VALID (1<<0)
