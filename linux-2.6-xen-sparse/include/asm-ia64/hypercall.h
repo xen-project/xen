@@ -431,10 +431,12 @@ HYPERVISOR_ioremap(unsigned long ioaddr, unsigned long size)
 	unsigned long ret = ioaddr;
 	if (running_on_xen) {
 		ret = __HYPERVISOR_ioremap(ioaddr, size);
-		if (unlikely(IS_ERR_VALUE(ret)))
+		if (unlikely(ret == -ENOSYS))
 			panic("hypercall %s failed with %ld. "
 			      "Please check Xen and Linux config mismatch\n",
 			      __func__, -ret);
+		else if (unlikely(IS_ERR_VALUE(ret)))
+			ret = ioaddr;
 	}
 	return ret;
 }
