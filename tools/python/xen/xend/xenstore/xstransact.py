@@ -221,6 +221,34 @@ class xstransact:
                 xshandle().mkdir(self.transaction, self.prependPath(key))
 
 
+    def get_permissions(self, *args):
+        """If no arguments are given, return the permissions at this
+        transaction's path.  If one argument is given, treat that argument as
+        a subpath to this transaction's path, and return the permissions at
+        that path.  Otherwise, treat each argument as a subpath to this
+        transaction's path, and return a list composed of the permissions at
+        each of those instead.
+        """
+        if len(args) == 0:
+            return xshandle().get_permissions(self.transaction, self.path)
+        if len(args) == 1:
+            return self._get_permissions(args[0])
+        ret = []
+        for key in args:
+            ret.append(self._get_permissions(key))
+        return ret
+
+
+    def _get_permissions(self, key):
+        path = self.prependPath(key)
+        try:
+            return xshandle().get_permissions(self.transaction, path)
+        except RuntimeError, ex:
+            raise RuntimeError(ex.args[0],
+                               '%s, while getting permissions from %s' %
+                               (ex.args[1], path))
+
+
     def set_permissions(self, *args):
         if len(args) == 0:
             raise TypeError
