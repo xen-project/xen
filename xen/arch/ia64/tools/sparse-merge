@@ -33,9 +33,17 @@ fi
 cd $LINUXPATH || exit 1
 OLDCSET=$(hg parents | awk '/^changeset:/{print($2)}' | cut -f 1 -d :)
 for t in $OLDTAG $NEWTAG; do
+    [[ $t == *.* ]] || continue
     if ! hg tags | cut -f1 -d' ' | grep -Fx $t; then
 	echo "Tag $t not found, ketching up"
-	hg up -C ${t%.*} || exit 1
+	if [[ $t == *-* ]]; then
+	    # rc/pre/git versions start at the previous stable release
+	    micro=${t%%-*}; micro=${micro##*.}
+	    stable=${t%%-*}; stable=${stable%.*}.$((micro-1))
+	    hg up -C $stable
+	else
+	    hg up -C ${t%.*} || exit 1
+	fi
 	ketchup ${t#v} || exit 1
 	hg addremove
 	hg ci -m $t
