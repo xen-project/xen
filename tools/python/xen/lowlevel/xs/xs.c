@@ -272,11 +272,12 @@ static PyObject *xspy_get_permissions(XsHandle *self, PyObject *args)
 
     if (perms) {
         PyObject *val = PyList_New(perms_n);
-        for (i = 0; i < perms_n; i++, perms++) {
-            PyObject *p = Py_BuildValue("{s:i,s:i,s:i}",
-                                        "dom",  perms->id,
-                                        "read", perms->perms & XS_PERM_READ,
-                                        "write",perms->perms & XS_PERM_WRITE);
+        for (i = 0; i < perms_n; i++) {
+            PyObject *p =
+                Py_BuildValue("{s:i,s:i,s:i}",
+                              "dom",   perms[i].id,
+                              "read",  perms[i].perms & XS_PERM_READ,
+                              "write", perms[i].perms & XS_PERM_WRITE);
             PyList_SetItem(val, i, p);
         }
 
