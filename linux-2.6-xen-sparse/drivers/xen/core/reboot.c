@@ -17,6 +17,7 @@
 #include <linux/kthread.h>
 #include <xen/gnttab.h>
 #include <xen/xencons.h>
+#include <xen/cpu_hotplug.h>
 
 #if defined(__i386__) || defined(__x86_64__)
 /*
@@ -80,14 +81,6 @@ EXPORT_SYMBOL(machine_power_off);
 static int shutting_down = SHUTDOWN_INVALID;
 static void __shutdown_handler(void *unused);
 static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
-
-#ifdef CONFIG_SMP
-int  smp_suspend(void);
-void smp_resume(void);
-#else
-#define smp_suspend()	(0)
-#define smp_resume()	((void)0)
-#endif
 
 /* Ensure we run on the idle task page tables so that we will
    switch page tables before running user space. This is needed
