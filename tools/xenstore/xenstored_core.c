@@ -451,6 +451,11 @@ static struct node *read_node(struct connection *conn, const char *name)
 
 static bool write_node(struct connection *conn, const struct node *node)
 {
+	/*
+	 * conn will be null when this is called from manual_node.
+	 * tdb_context copes with this.
+	 */
+
 	TDB_DATA key, data;
 	void *p;
 
@@ -478,7 +483,7 @@ static bool write_node(struct connection *conn, const struct node *node)
 
 	/* TDB should set errno, but doesn't even set ecode AFAICT. */
 	if (tdb_store(tdb_context(conn), key, data, TDB_REPLACE) != 0) {
-		corrupt(conn, "Write of %s = %s failed", key, data);
+		corrupt(conn, "Write of %s failed", key.dptr);
 		goto error;
 	}
 	return true;
