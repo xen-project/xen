@@ -360,116 +360,132 @@ struct address_space xen_ia64_foreign_dummy_mapping;
 
 ///////////////////////////////////////////////////////////////////////////
 // foreign mapping
+#include <linux/efi.h>
+#include <asm/meminit.h> // for IA64_GRANULE_SIZE, GRANULEROUND{UP,DOWN}()
 
-struct xen_ia64_privcmd_entry {
-	atomic_t	map_count;
-	struct page*	page;
-};
+static unsigned long privcmd_resource_min = 0;
+// Xen/ia64 currently can handle pseudo physical address bits up to
+// (PAGE_SHIFT * 3)
+static unsigned long privcmd_resource_max = GRANULEROUNDDOWN((1UL << (PAGE_SHIFT * 3)) - 1);
+static unsigned long privcmd_resource_align = IA64_GRANULE_SIZE;
 
-static void
-xen_ia64_privcmd_init_entry(struct xen_ia64_privcmd_entry* entry)
+static unsigned long
+md_end_addr(const efi_memory_desc_t *md)
 {
-	atomic_set(&entry->map_count, 0);
-	entry->page = NULL;
+	return md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
 }
 
-//TODO alloc_page() to allocate pseudo physical address space is 
-//     waste of memory.
-//     When vti domain is created, qemu maps all of vti domain pages which 
-//     reaches to several hundred megabytes at least.
-//     remove alloc_page().
+#define XEN_IA64_PRIVCMD_LEAST_GAP_SIZE	(1024 * 1024 * 1024UL)
 static int
-xen_ia64_privcmd_entry_mmap(struct vm_area_struct* vma,
-			    unsigned long addr,
-			    struct xen_ia64_privcmd_entry* entry,
-			    unsigned long mfn,
-			    pgprot_t prot,
-			    domid_t domid)
+xen_ia64_privcmd_check_size(unsigned long start, unsigned long end)
 {
-	int error = 0;
-	struct page* page;
-	unsigned long gpfn;
+	return (start < end &&
+		(end - start) > XEN_IA64_PRIVCMD_LEAST_GAP_SIZE);
+}
 
-	BUG_ON((addr & ~PAGE_MASK) != 0);
-	BUG_ON(mfn == INVALID_MFN);
+static int __init
+xen_ia64_privcmd_init(void)
+{
+	void *efi_map_start, *efi_map_end, *p;
+	u64 efi_desc_size;
+	efi_memory_desc_t *md;
+	unsigned long tmp_min;
+	unsigned long tmp_max;
+	unsigned long gap_size;
+	unsigned long prev_end;
 
-	if (entry->page != NULL) {
-		error = -EBUSY;
+	if (!is_running_on_xen())
+		return -1;
+
+	efi_map_start = __va(ia64_boot_param->efi_memmap);
+	efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
+	efi_desc_size = ia64_boot_param->efi_memdesc_size;
+
+	// at first check the used highest address
+	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
+		// nothing
+	}
+	md = p - efi_desc_size;
+	privcmd_resource_min = GRANULEROUNDUP(md_end_addr(md));
+	if (xen_ia64_privcmd_check_size(privcmd_resource_min,
+					privcmd_resource_max)) {
 		goto out;
 	}
-	page = alloc_page(GFP_KERNEL);
-	if (page == NULL) {
-		error = -ENOMEM;
-		goto out;
-	}
-	gpfn = page_to_pfn(page);
 
-	error = HYPERVISOR_add_physmap(gpfn, mfn, 0/* prot:XXX */,
-				       domid);
-	if (error != 0) {
-		goto out;
-	}
+	// the used highest address is too large. try to find the largest gap.
+	tmp_min = privcmd_resource_max;
+	tmp_max = 0;
+	gap_size = 0;
+	prev_end = 0;
+	for (p = efi_map_start;
+	     p < efi_map_end - efi_desc_size;
+	     p += efi_desc_size) {
+		unsigned long end;
+		efi_memory_desc_t* next;
+		unsigned long next_start;
 
-	prot = vma->vm_page_prot;
-	error = remap_pfn_range(vma, addr, gpfn, 1 << PAGE_SHIFT, prot);
-	if (error != 0) {
-		(void)HYPERVISOR_zap_physmap(gpfn, 0);
-		error = HYPERVISOR_populate_physmap(gpfn, 0, 0);
-		if (error) {
-			BUG();//XXX
+		md = p;
+		end = md_end_addr(md);
+		if (end > privcmd_resource_max) {
+			break;
 		}
-		__free_page(page);
-	} else {
-		atomic_inc(&entry->map_count);
-		entry->page = page;
+		if (end < prev_end) {
+			// work around. 
+			// Xen may pass incompletely sorted memory
+			// descriptors like
+			// [x, x + length]
+			// [x, x]
+			// this order should be reversed.
+			continue;
+		}
+		next = p + efi_desc_size;
+		next_start = next->phys_addr;
+		if (next_start > privcmd_resource_max) {
+			next_start = privcmd_resource_max;
+		}
+		if (end < next_start && gap_size < (next_start - end)) {
+			tmp_min = end;
+			tmp_max = next_start;
+			gap_size = tmp_max - tmp_min;
+		}
+		prev_end = end;
+	}
+
+	privcmd_resource_min = GRANULEROUNDUP(tmp_min);
+	if (xen_ia64_privcmd_check_size(privcmd_resource_min, tmp_max)) {
+		privcmd_resource_max = tmp_max;
+		goto out;
+	}
+
+	privcmd_resource_min = tmp_min;
+	privcmd_resource_max = tmp_max;
+	if (!xen_ia64_privcmd_check_size(privcmd_resource_min,
+					 privcmd_resource_max)) {
+		// Any large enough gap isn't found.
+		// go ahead anyway with the warning hoping that large region
+		// won't be requested.
+		printk(KERN_WARNING "xen privcmd: large enough region for privcmd mmap is not found.\n");
 	}
 
 out:
-	return error;
+	printk(KERN_INFO "xen privcmd uses pseudo physical addr range [0x%lx, 0x%lx] (%ldMB)\n",
+	       privcmd_resource_min, privcmd_resource_max, 
+	       (privcmd_resource_max - privcmd_resource_min) >> 20);
+	BUG_ON(privcmd_resource_min >= privcmd_resource_max);
+	return 0;
 }
+late_initcall(xen_ia64_privcmd_init);
 
-static void
-xen_ia64_privcmd_entry_munmap(struct xen_ia64_privcmd_entry* entry)
-{
-	struct page* page = entry->page;
-	unsigned long gpfn = page_to_pfn(page);
-	int error;
-
-	error = HYPERVISOR_zap_physmap(gpfn, 0);
-	if (error) {
-		BUG();//XXX
-	}
-
-	error = HYPERVISOR_populate_physmap(gpfn, 0, 0);
-	if (error) {
-		BUG();//XXX
-	}
-
-	entry->page = NULL;
-	__free_page(page);
-}
-
-static int
-xen_ia64_privcmd_entry_open(struct xen_ia64_privcmd_entry* entry)
-{
-	if (entry->page != NULL) {
-		atomic_inc(&entry->map_count);
-	} else {
-		BUG_ON(atomic_read(&entry->map_count) != 0);
-	}
-}
-
-static int
-xen_ia64_privcmd_entry_close(struct xen_ia64_privcmd_entry* entry)
-{
-	if (entry->page != NULL && atomic_dec_and_test(&entry->map_count)) {
-		xen_ia64_privcmd_entry_munmap(entry);
-	}
-}
+struct xen_ia64_privcmd_entry {
+	atomic_t	map_count;
+#define INVALID_GPFN	(~0UL)
+	unsigned long	gpfn;
+};
 
 struct xen_ia64_privcmd_range {
 	atomic_t			ref_count;
 	unsigned long			pgoff; // in PAGE_SIZE
+	struct resource*		res;
 
 	unsigned long			num_entries;
 	struct xen_ia64_privcmd_entry	entries[0];
@@ -481,6 +497,97 @@ struct xen_ia64_privcmd_vma {
 	unsigned long			num_entries;
 	struct xen_ia64_privcmd_entry*	entries;
 };
+
+static void
+xen_ia64_privcmd_init_entry(struct xen_ia64_privcmd_entry* entry)
+{
+	atomic_set(&entry->map_count, 0);
+	entry->gpfn = INVALID_GPFN;
+}
+
+static int
+xen_ia64_privcmd_entry_mmap(struct vm_area_struct* vma,
+			    unsigned long addr,
+			    struct xen_ia64_privcmd_range* privcmd_range,
+			    int i,
+			    unsigned long mfn,
+			    pgprot_t prot,
+			    domid_t domid)
+{
+	int error = 0;
+	struct xen_ia64_privcmd_entry* entry = &privcmd_range->entries[i];
+	unsigned long gpfn;
+
+	BUG_ON((addr & ~PAGE_MASK) != 0);
+	BUG_ON(mfn == INVALID_MFN);
+
+	if (entry->gpfn != INVALID_GPFN) {
+		error = -EBUSY;
+		goto out;
+	}
+	gpfn = (privcmd_range->res->start >> PAGE_SHIFT) + i;
+
+	error = HYPERVISOR_add_physmap(gpfn, mfn, 0/* prot:XXX */,
+				       domid);
+	if (error != 0) {
+		goto out;
+	}
+
+	prot = vma->vm_page_prot;
+	error = remap_pfn_range(vma, addr, gpfn, 1 << PAGE_SHIFT, prot);
+	if (error != 0) {
+		error = HYPERVISOR_zap_physmap(gpfn, 0);
+		if (error) {
+			BUG();//XXX
+		}
+	} else {
+		atomic_inc(&entry->map_count);
+		entry->gpfn = gpfn;
+	}
+
+out:
+	return error;
+}
+
+static void
+xen_ia64_privcmd_entry_munmap(struct xen_ia64_privcmd_range* privcmd_range,
+			      int i)
+{
+	struct xen_ia64_privcmd_entry* entry = &privcmd_range->entries[i];
+	unsigned long gpfn = entry->gpfn;
+	//gpfn = (privcmd_range->res->start >> PAGE_SHIFT) +
+	//	(vma->vm_pgoff - privcmd_range->pgoff);
+	int error;
+
+	error = HYPERVISOR_zap_physmap(gpfn, 0);
+	if (error) {
+		BUG();//XXX
+	}
+	entry->gpfn = INVALID_GPFN;
+}
+
+static int
+xen_ia64_privcmd_entry_open(struct xen_ia64_privcmd_range* privcmd_range,
+			    int i)
+{
+	struct xen_ia64_privcmd_entry* entry = &privcmd_range->entries[i];
+	if (entry->gpfn != INVALID_GPFN) {
+		atomic_inc(&entry->map_count);
+	} else {
+		BUG_ON(atomic_read(&entry->map_count) != 0);
+	}
+}
+
+static int
+xen_ia64_privcmd_entry_close(struct xen_ia64_privcmd_range* privcmd_range,
+			     int i)
+{
+	struct xen_ia64_privcmd_entry* entry = &privcmd_range->entries[i];
+	if (entry->gpfn != INVALID_GPFN &&
+	    atomic_dec_and_test(&entry->map_count)) {
+		xen_ia64_privcmd_entry_munmap(privcmd_range, i);
+	}
+}
 
 static void xen_ia64_privcmd_vma_open(struct vm_area_struct* vma);
 static void xen_ia64_privcmd_vma_close(struct vm_area_struct* vma);
@@ -507,7 +614,7 @@ __xen_ia64_privcmd_vma_open(struct vm_area_struct* vma,
 	privcmd_vma->entries = &privcmd_range->entries[entry_offset];
 	vma->vm_private_data = privcmd_vma;
 	for (i = 0; i < privcmd_vma->num_entries; i++) {
-		xen_ia64_privcmd_entry_open(&privcmd_vma->entries[i]);
+		xen_ia64_privcmd_entry_open(privcmd_range, entry_offset + i);
 	}
 
 	vma->vm_private_data = privcmd_vma;
@@ -533,10 +640,11 @@ xen_ia64_privcmd_vma_close(struct vm_area_struct* vma)
 	struct xen_ia64_privcmd_vma* privcmd_vma =
 		(struct xen_ia64_privcmd_vma*)vma->vm_private_data;
 	struct xen_ia64_privcmd_range* privcmd_range = privcmd_vma->range;
+	unsigned long entry_offset = vma->vm_pgoff - privcmd_range->pgoff;
 	unsigned long i;
 
 	for (i = 0; i < privcmd_vma->num_entries; i++) {
-		xen_ia64_privcmd_entry_close(&privcmd_vma->entries[i]);
+		xen_ia64_privcmd_entry_close(privcmd_range, entry_offset + i);
 	}
 	vma->vm_private_data = NULL;
 	kfree(privcmd_vma);
@@ -547,9 +655,11 @@ xen_ia64_privcmd_vma_close(struct vm_area_struct* vma)
 			struct xen_ia64_privcmd_entry* entry =
 				&privcmd_range->entries[i];
 			BUG_ON(atomic_read(&entry->map_count) != 0);
-			BUG_ON(entry->page != NULL);
+			BUG_ON(entry->gpfn != INVALID_GPFN);
 		}
 #endif
+		release_resource(privcmd_range->res);
+		kfree(privcmd_range->res);
 		vfree(privcmd_range);
 	}
 }
@@ -557,13 +667,18 @@ xen_ia64_privcmd_vma_close(struct vm_area_struct* vma)
 int
 privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 {
-	unsigned long num_entries = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-	struct xen_ia64_privcmd_range* privcmd_range;
-	struct xen_ia64_privcmd_vma* privcmd_vma;
+	int error;
+	unsigned long size = vma->vm_end - vma->vm_start;
+	unsigned long num_entries = size >> PAGE_SHIFT;
+	struct xen_ia64_privcmd_range* privcmd_range = NULL;
+	struct xen_ia64_privcmd_vma* privcmd_vma = NULL;
+	struct resource* res = NULL;
 	unsigned long i;
 	BUG_ON(!running_on_xen);
 
 	BUG_ON(file->private_data != NULL);
+
+	error = -ENOMEM;
 	privcmd_range =
 		vmalloc(sizeof(*privcmd_range) +
 			sizeof(privcmd_range->entries[0]) * num_entries);
@@ -574,6 +689,18 @@ privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 	if (privcmd_vma == NULL) {
 		goto out_enomem1;
 	}
+	res = kzalloc(sizeof(*res), GFP_KERNEL);
+	if (res == NULL) {
+		goto out_enomem1;
+	}
+	res->name = "Xen privcmd mmap";
+	error = allocate_resource(&iomem_resource, res, size,
+				  privcmd_resource_min, privcmd_resource_max,
+				  privcmd_resource_align, NULL, NULL);
+	if (error) {
+		goto out_enomem1;
+	}
+	privcmd_range->res = res;
 
 	/* DONTCOPY is essential for Xen as copy_page_range is broken. */
 	vma->vm_flags |= VM_RESERVED | VM_IO | VM_DONTCOPY | VM_PFNMAP;
@@ -589,10 +716,11 @@ privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 	return 0;
 
 out_enomem1:
+	kfree(res);
 	kfree(privcmd_vma);
 out_enomem0:
 	vfree(privcmd_range);
-	return -ENOMEM;
+	return error;
 }
 
 int
@@ -605,6 +733,9 @@ direct_remap_pfn_range(struct vm_area_struct *vma,
 {
 	struct xen_ia64_privcmd_vma* privcmd_vma =
 		(struct xen_ia64_privcmd_vma*)vma->vm_private_data;
+	struct xen_ia64_privcmd_range* privcmd_range = privcmd_vma->range;
+	unsigned long entry_offset = vma->vm_pgoff - privcmd_range->pgoff;
+
 	unsigned long i;
 	unsigned long offset;
 	int error = 0;
@@ -618,9 +749,7 @@ direct_remap_pfn_range(struct vm_area_struct *vma,
 
 	i = (address - vma->vm_start) >> PAGE_SHIFT;
 	for (offset = 0; offset < size; offset += PAGE_SIZE) {
-		struct xen_ia64_privcmd_entry* entry =
-			&privcmd_vma->entries[i];
-		error = xen_ia64_privcmd_entry_mmap(vma, (address + offset) & PAGE_MASK, entry, mfn, prot, domid);
+		error = xen_ia64_privcmd_entry_mmap(vma, (address + offset) & PAGE_MASK, privcmd_range, entry_offset + i, mfn, prot, domid);
 		if (error != 0) {
 			break;
 		}
