@@ -2130,5 +2130,32 @@ non_ia32_syscall:
 	mov rp=r15
 	br.ret.sptk.many rp
 END(dispatch_to_ia32_handler)
-
 #endif /* CONFIG_IA32_SUPPORT */
+
+#ifdef CONFIG_XEN
+	.section .text,"ax"
+GLOBAL_ENTRY(xen_event_callback)
+	mov r31=pr		// prepare to save predicates
+	;;
+	SAVE_MIN_WITH_COVER	// uses r31; defines r2 and r3
+	;;
+	movl r3=XSI_PSR_IC
+	mov r14=1
+	;;
+	st4 [r3]=r14
+	;;
+	adds r3=8,r2		// set up second base pointer for SAVE_REST
+	srlz.i			// ensure everybody knows psr.ic is back on
+	;;
+	SAVE_REST
+	;;
+	alloc r14=ar.pfs,0,0,1,0 // must be first in an insn group
+	add out0=16,sp		// pass pointer to pt_regs as first arg
+	;;
+	srlz.d			// make sure we see the effect of cr.ivr
+	movl r14=ia64_leave_kernel
+	;;
+	mov rp=r14
+	br.call.sptk.many b6=evtchn_do_upcall
+END(xen_event_callback)
+#endif

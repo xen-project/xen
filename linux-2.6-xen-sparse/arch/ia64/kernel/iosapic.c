@@ -670,6 +670,7 @@ register_intr (unsigned int gsi, int vector, unsigned char delivery,
 	iosapic_intr_info[vector].dmode    = delivery;
 	iosapic_intr_info[vector].trigger  = trigger;
 
+#ifndef CONFIG_XEN
 	if (trigger == IOSAPIC_EDGE)
 		irq_type = &irq_type_iosapic_edge;
 	else
@@ -682,6 +683,7 @@ register_intr (unsigned int gsi, int vector, unsigned char delivery,
 			       __FUNCTION__, vector, idesc->handler->typename, irq_type->typename);
 		idesc->handler = irq_type;
 	}
+#endif
 	return 0;
 }
 

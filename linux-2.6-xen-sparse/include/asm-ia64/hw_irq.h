@@ -15,7 +15,11 @@
 #include <asm/ptrace.h>
 #include <asm/smp.h>
 
+#ifndef CONFIG_XEN
 typedef u8 ia64_vector;
+#else
+typedef u16 ia64_vector;
+#endif
 
 /*
  * 0 special
@@ -86,11 +90,15 @@ extern void free_irq_vector (int vector);
 extern void ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect);
 extern void register_percpu_irq (ia64_vector vec, struct irqaction *action);
 
+#ifndef CONFIG_XEN
 static inline void
 hw_resend_irq (struct hw_interrupt_type *h, unsigned int vector)
 {
 	platform_send_ipi(smp_processor_id(), vector, IA64_IPI_DM_INT, 0);
 }
+#else
+extern void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i);
+#endif /* CONFIG_XEN */
 
 /*
  * Default implementations for the irq-descriptor API:

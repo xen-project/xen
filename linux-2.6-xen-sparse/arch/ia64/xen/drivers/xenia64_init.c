@@ -33,7 +33,6 @@ int xen_init(void)
 		s->arch.start_info_pfn, xen_start_info->nr_pages,
 		xen_start_info->flags);
 
-	evtchn_init();
 	initialized = 1;
 	return 0;
 }

@@ -106,6 +106,11 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	or r23=r23,r24; or r21=r21,r22;;
 	or r20=r23,r21;;
 1:	// when we get to here r20=~=interrupts pending
+	// Check pending event indication
+(p7)	adds r20=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18;;
+(p7)	ld8 r20=[r20];;
+(p7)	adds r20=-1,r20;;
+(p7)	ld1 r20=[r20];;
 
 	// HYPERPRIVOP_RFI?
 	cmp.eq p7,p6=HYPERPRIVOP_RFI,r17

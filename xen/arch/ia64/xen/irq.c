@@ -70,11 +70,13 @@
  */
 irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
 	[0 ... NR_IRQS-1] = {
-		.status = IRQ_DISABLED | IRQ_GUEST,
+		.status = IRQ_DISABLED,
 		.handler = &no_irq_type,
 		.lock = SPIN_LOCK_UNLOCKED
 	}
 };
+
+void __do_IRQ_guest(int irq);
 
 /*
  * Special irq handlers.
@@ -167,9 +169,7 @@ fastcall unsigned int __do_IRQ(unsigned int irq, struct pt_regs *regs)
 	spin_lock(&desc->lock);
 
 	if (desc->status & IRQ_GUEST) {
-		/* __do_IRQ_guest(irq); */
-		vcpu_pend_interrupt(dom0->vcpu[0],irq);
-		vcpu_wake(dom0->vcpu[0]);
+		__do_IRQ_guest(irq);
 		spin_unlock(&desc->lock);
 		return 1;
 	}

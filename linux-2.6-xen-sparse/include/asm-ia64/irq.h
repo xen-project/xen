@@ -11,8 +11,39 @@
  * 02/29/00     D.Mosberger	moved most things into hw_irq.h
  */
 
+#ifndef CONFIG_XEN
 #define NR_IRQS		256
 #define NR_IRQ_VECTORS	NR_IRQS
+#else
+/*
+ * The flat IRQ space is divided into two regions:
+ *  1. A one-to-one mapping of real physical IRQs. This space is only used
+ *     if we have physical device-access privilege. This region is at the 
+ *     start of the IRQ space so that existing device drivers do not need
+ *     to be modified to translate physical IRQ numbers into our IRQ space.
+ *  3. A dynamic mapping of inter-domain and Xen-sourced virtual IRQs. These
+ *     are bound using the provided bind/unbind functions.
+ */
+
+#define PIRQ_BASE		0
+#define NR_PIRQS		256
+
+#define DYNIRQ_BASE		(PIRQ_BASE + NR_PIRQS)
+#define NR_DYNIRQS		256
+
+#define NR_IRQS			(NR_PIRQS + NR_DYNIRQS)
+#define NR_IRQ_VECTORS		NR_IRQS
+
+#define pirq_to_irq(_x)		((_x) + PIRQ_BASE)
+#define irq_to_pirq(_x)		((_x) - PIRQ_BASE)
+
+#define dynirq_to_irq(_x)	((_x) + DYNIRQ_BASE)
+#define irq_to_dynirq(_x)	((_x) - DYNIRQ_BASE)
+
+#define RESCHEDULE_VECTOR	0
+#define IPI_VECTOR		1
+#define NR_IPIS			2
+#endif /* CONFIG_XEN */
 
 /*
  * IRQ line status macro IRQ_PER_CPU is used
