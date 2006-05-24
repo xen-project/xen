@@ -124,7 +124,7 @@ static int __init xencons_bufsz_setup(char *str)
 __setup("xencons_bufsz=", xencons_bufsz_setup);
 
 /* This lock protects accesses to the common transmit buffer. */
-static spinlock_t xencons_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(xencons_lock);
 
 /* Common transmit-kick routine. */
 static void __xencons_tx_flush(void);

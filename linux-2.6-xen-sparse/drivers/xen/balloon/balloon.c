@@ -67,7 +67,7 @@ static DECLARE_MUTEX(balloon_mutex);
  * Also protects non-atomic updates of current_pages and driver_pages, and
  * balloon lists.
  */
-spinlock_t balloon_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(balloon_lock);
 
 /* We aim for 'current allocation' == 'target allocation'. */
 static unsigned long current_pages;

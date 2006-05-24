@@ -51,7 +51,7 @@
  * This lock protects updates to the following mapping and reference-count
  * arrays. The lock does not need to be acquired to read the mapping tables.
  */
-static spinlock_t irq_mapping_update_lock;
+static DEFINE_SPINLOCK(irq_mapping_update_lock);
 
 /* IRQ <-> event-channel mappings. */
 static int evtchn_to_irq[NR_EVENT_CHANNELS];
@@ -814,8 +814,6 @@ void __init xen_init_IRQ(void)
 {
 	int i;
 	int cpu;
-
-	spin_lock_init(&irq_mapping_update_lock);
 
 	init_evtchn_cpu_bindings();
 

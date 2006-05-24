@@ -82,7 +82,7 @@ typedef struct {
 
 static pending_req_t *pending_reqs;
 static struct list_head pending_free;
-static spinlock_t pending_free_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(pending_free_lock);
 static DECLARE_WAIT_QUEUE_HEAD(pending_free_wq);
 
 #define BLKBACK_INVALID_HANDLE (~0)

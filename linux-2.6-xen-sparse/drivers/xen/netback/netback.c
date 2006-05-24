@@ -99,7 +99,7 @@ static spinlock_t net_schedule_list_lock;
 #define MAX_MFN_ALLOC 64
 static unsigned long mfn_list[MAX_MFN_ALLOC];
 static unsigned int alloc_index = 0;
-static spinlock_t mfn_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(mfn_lock);
 
 static unsigned long alloc_mfn(void)
 {
@@ -691,7 +691,7 @@ static void net_tx_action(unsigned long unused)
 
 static void netif_idx_release(u16 pending_idx)
 {
-	static spinlock_t _lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(_lock);
 	unsigned long flags;
 
 	spin_lock_irqsave(&_lock, flags);
