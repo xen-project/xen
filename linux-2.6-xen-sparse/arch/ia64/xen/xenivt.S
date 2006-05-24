@@ -206,9 +206,9 @@ ENTRY(vhpt_miss)
 	mov r24=r8
 	mov r8=r18
 	;;
-(p10)	XEN_HYPER_ITC_D
+(p10)	XEN_HYPER_ITC_I
 	;;
-(p11)	XEN_HYPER_ITC_I
+(p11)	XEN_HYPER_ITC_D
 	;;
 	mov r8=r24
 	;;
