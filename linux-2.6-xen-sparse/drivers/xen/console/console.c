@@ -117,8 +117,11 @@ static int __init xencons_bufsz_setup(char *str)
 {
 	unsigned int goal;
 	goal = simple_strtoul(str, NULL, 0);
-	while (wbuf_size < goal)
-		wbuf_size <<= 1;
+	if (goal) {
+		goal = roundup_pow_of_two(goal);
+		if (wbuf_size < goal)
+			wbuf_size = goal;
+	}
 	return 1;
 }
 __setup("xencons_bufsz=", xencons_bufsz_setup);
@@ -133,8 +136,7 @@ static struct tty_driver *xencons_driver;
 
 /******************** Kernel console driver ********************************/
 
-static void kcons_write(
-	struct console *c, const char *s, unsigned int count)
+static void kcons_write(struct console *c, const char *s, unsigned int count)
 {
 	int           i = 0;
 	unsigned long flags;
@@ -155,14 +157,14 @@ static void kcons_write(
 	spin_unlock_irqrestore(&xencons_lock, flags);
 }
 
-static void kcons_write_dom0(
-	struct console *c, const char *s, unsigned int count)
+static void kcons_write_dom0(struct console *c, const char *s, unsigned int count)
 {
-	int rc;
 
-	while ((count > 0) &&
-	       ((rc = HYPERVISOR_console_io(
-			CONSOLEIO_write, count, (char *)s)) > 0)) {
+	while (count > 0) {
+		int rc;
+		rc = HYPERVISOR_console_io( CONSOLEIO_write, count, (char *)s);
+		if (rc <= 0)
+			break;
 		count -= rc;
 		s += rc;
 	}
