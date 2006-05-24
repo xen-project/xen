@@ -11,25 +11,25 @@ CROSS_COMPILE ?= /usr/local/sp_env/v2.2.5/i686/bin/ia64-unknown-linux-
 endif
 
 # Used only by linux/Makefile.
-AFLAGS_KERNEL  += -mconstant-gp
+AFLAGS_KERNEL  += -mconstant-gp -nostdinc $(CPPFLAGS)
 
 # Note: .S -> .o rule uses AFLAGS and CFLAGS.
 
-CFLAGS  += -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
-CFLAGS  += -mconstant-gp
+CFLAGS	+= -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
+CFLAGS	+= -mconstant-gp
 #CFLAGS  += -O3		# -O3 over-inlines making debugging tough!
-CFLAGS  += -O2		# but no optimization causes compile errors!
-CFLAGS  += -fomit-frame-pointer -D__KERNEL__
-CFLAGS  += -iwithprefix include
-CPPFLAGS+= -I$(BASEDIR)/include                                         \
-           -I$(BASEDIR)/include/asm-ia64                                \
-           -I$(BASEDIR)/include/asm-ia64/linux 				\
-           -I$(BASEDIR)/include/asm-ia64/linux-xen 			\
+CFLAGS	+= -O2		# but no optimization causes compile errors!
+CFLAGS	+= -fomit-frame-pointer -D__KERNEL__
+CFLAGS	+= -iwithprefix include
+CPPFLAGS+= -I$(BASEDIR)/include						\
+	   -I$(BASEDIR)/include/asm-ia64				\
+	   -I$(BASEDIR)/include/asm-ia64/linux 				\
+	   -I$(BASEDIR)/include/asm-ia64/linux-xen 			\
 	   -I$(BASEDIR)/include/asm-ia64/linux-null 			\
-           -I$(BASEDIR)/arch/ia64/linux -I$(BASEDIR)/arch/ia64/linux-xen
-CFLAGS += $(CPPFLAGS)
+	   -I$(BASEDIR)/arch/ia64/linux -I$(BASEDIR)/arch/ia64/linux-xen
+CFLAGS	+= $(CPPFLAGS)
 #CFLAGS  += -Wno-pointer-arith -Wredundant-decls
-CFLAGS  += -DIA64 -DXEN -DLINUX_2_6 -DV_IOSAPIC_READY
+CFLAGS	+= -DIA64 -DXEN -DLINUX_2_6 -DV_IOSAPIC_READY
 CFLAGS	+= -ffixed-r13 -mfixed-range=f2-f5,f12-f127
 CFLAGS	+= -g
 #CFLAGS  += -DVTI_DEBUG
