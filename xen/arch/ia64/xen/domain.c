@@ -80,6 +80,41 @@ void build_physmap_table(struct domain *d);
 static void try_to_clear_PGC_allocate(struct domain* d,
                                       struct page_info* page);
 
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+static struct domain *dom_xen, *dom_io;
+
+// followings are stolen from arch_init_memory() @ xen/arch/x86/mm.c
+void
+alloc_dom_xen_and_dom_io(void)
+{
+    /*
+     * Initialise our DOMID_XEN domain.
+     * Any Xen-heap pages that we will allow to be mapped will have
+     * their domain field set to dom_xen.
+     */
+    dom_xen = alloc_domain();
+    BUG_ON(dom_xen == NULL);
+    spin_lock_init(&dom_xen->page_alloc_lock);
+    INIT_LIST_HEAD(&dom_xen->page_list);
+    INIT_LIST_HEAD(&dom_xen->xenpage_list);
+    atomic_set(&dom_xen->refcnt, 1);
+    dom_xen->domain_id = DOMID_XEN;
+
+    /*
+     * Initialise our DOMID_IO domain.
+     * This domain owns I/O pages that are within the range of the page_info
+     * array. Mappings occur at the priv of the caller.
+     */
+    dom_io = alloc_domain();
+    BUG_ON(dom_io == NULL);
+    spin_lock_init(&dom_io->page_alloc_lock);
+    INIT_LIST_HEAD(&dom_io->page_list);
+    INIT_LIST_HEAD(&dom_io->xenpage_list);
+    atomic_set(&dom_io->refcnt, 1);
+    dom_io->domain_id = DOMID_IO;
+}
+#endif
+
 /* this belongs in include/asm, but there doesn't seem to be a suitable place */
 void arch_domain_destroy(struct domain *d)
 {
@@ -610,6 +645,12 @@ share_xen_page_with_guest(struct page_info *page,
     list_add_tail(&page->list, &d->xenpage_list);
 
     spin_unlock(&d->page_alloc_lock);
+}
+
+void
+share_xen_page_with_privileged_guests(struct page_info *page, int readonly)
+{
+    share_xen_page_with_guest(page, dom_xen, readonly);
 }
 
 //XXX !xxx_present() should be used instread of !xxx_none()?
@@ -1166,9 +1207,24 @@ dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn,
     struct domain* rd;
     rd = find_domain_by_id(domid);
     if (unlikely(rd == NULL)) {
-        error = -EINVAL;
-        goto out0;
+        switch (domid) {
+        case DOMID_XEN:
+            rd = dom_xen;
+            break;
+        case DOMID_IO:
+            rd = dom_io;
+            break;
+        default:
+            DPRINTK("d 0x%p domid %d "
+                    "pgfn 0x%lx mfn 0x%lx flags 0x%lx domid %d\n",
+                    d, d->domain_id, gpfn, mfn, flags, domid);
+            error = -ESRCH;
+            goto out0;
+        }
+        BUG_ON(rd == NULL);
+        get_knownalive_domain(rd);
     }
+
     if (unlikely(rd == d)) {
         error = -EINVAL;
         goto out1;

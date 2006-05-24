@@ -337,6 +337,7 @@ printk("About to call scheduler_init()\n");
     BUG_ON(idle_domain == NULL);
 
     late_setup_arch((char **) &cmdline);
+    alloc_dom_xen_and_dom_io();
     setup_per_cpu_areas();
     mem_init();
 

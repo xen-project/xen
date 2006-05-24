@@ -132,7 +132,8 @@ static inline u32 pickle_domptr(struct domain *_d)
 #define XENSHARE_readonly 1
 void share_xen_page_with_guest(struct page_info *page,
                                struct domain *d, int readonly);
-#define share_xen_page_with_privileged_guests(p, r) do { } while (0)
+void share_xen_page_with_privileged_guests(struct page_info *page,
+                                           int readonly);
 
 extern struct page_info *frame_table;
 extern unsigned long frame_table_size;
