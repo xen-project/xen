@@ -369,6 +369,10 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 #define IA64_DOM0VP_add_physmap         18      // assigne machine page frane
                                                 // to dom0's pseudo physical
                                                 // address space.
+// flags for page assignement to pseudo physical address space
+#define _ASSIGN_readonly                0
+#define ASSIGN_readonly                 (1UL << _ASSIGN_readonly)
+#define ASSIGN_writable                 (0UL << _ASSIGN_readonly) // dummy flag
 
 #endif /* !__ASSEMBLY__ */
 

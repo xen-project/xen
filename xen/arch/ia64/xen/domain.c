@@ -834,17 +834,19 @@ assign_new_domain0_page(struct domain *d, unsigned long mpaddr)
 }
 
 /* map a physical address to the specified metaphysical addr */
+// flags: currently only ASSIGN_readonly
 void
 __assign_domain_page(struct domain *d,
-                     unsigned long mpaddr, unsigned long physaddr)
+                     unsigned long mpaddr, unsigned long physaddr,
+                     unsigned long flags)
 {
     pte_t *pte;
+    unsigned long arflags = (flags & ASSIGN_readonly)? _PAGE_AR_R: _PAGE_AR_RWX;
 
     pte = lookup_alloc_domain_pte(d, mpaddr);
     if (pte_none(*pte)) {
-        set_pte(pte,
-                pfn_pte(physaddr >> PAGE_SHIFT,
-                        __pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
+        set_pte(pte, pfn_pte(physaddr >> PAGE_SHIFT,
+                             __pgprot(__DIRTY_BITS | _PAGE_PL_2 | arflags)));
         mb ();
     } else
         printk("%s: mpaddr %lx already mapped!\n", __func__, mpaddr);
@@ -861,7 +863,7 @@ assign_domain_page(struct domain *d,
     BUG_ON((physaddr & GPFN_IO_MASK) != GPFN_MEM);
     ret = get_page(page, d);
     BUG_ON(ret == 0);
-    __assign_domain_page(d, mpaddr, physaddr);
+    __assign_domain_page(d, mpaddr, physaddr, ASSIGN_writable);
 
     //XXX CONFIG_XEN_IA64_DOM0_VP
     //    TODO racy
@@ -871,12 +873,12 @@ assign_domain_page(struct domain *d,
 #ifdef CONFIG_XEN_IA64_DOM0_VP
 static void
 assign_domain_same_page(struct domain *d,
-                          unsigned long mpaddr, unsigned long size)
+                        unsigned long mpaddr, unsigned long size)
 {
     //XXX optimization
     unsigned long end = mpaddr + size;
     for (; mpaddr < end; mpaddr += PAGE_SIZE) {
-        __assign_domain_page(d, mpaddr, mpaddr);
+        __assign_domain_page(d, mpaddr, mpaddr, ASSIGN_writable);
     }
 }
 
@@ -1113,15 +1115,14 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 		}
 		pteval = pfn_pte(mpaddr >> PAGE_SHIFT,
 			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX));
-		pte = &pteval;
-		return *(unsigned long *)pte;
+		return pte_val(pteval);
 	}
 #endif
 	pte = lookup_noalloc_domain_pte(d, mpaddr);
 	if (pte != NULL) {
 		if (pte_present(*pte)) {
 //printk("lookup_domain_page: found mapping for %lx, pte=%lx\n",mpaddr,pte_val(*pte));
-			return *(unsigned long *)pte;
+			return pte_val(*pte);
 		} else if (VMX_DOMAIN(d->vcpu[0]))
 			return GPFN_INV_MASK;
 	}
@@ -1135,7 +1136,10 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 		printk("%s: bad mpa 0x%lx (=> 0x%lx)\n", __func__,
 		       mpaddr, (unsigned long)d->max_pages << PAGE_SHIFT);
 	mpafoo(mpaddr);
-	return 0;
+
+	//XXX This is a work around until the emulation memory access to a region
+	//    where memory or device are attached is implemented.
+	return pte_val(pfn_pte(0, __pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
 }
 
 #ifdef CONFIG_XEN_IA64_DOM0_VP
@@ -1159,19 +1163,21 @@ out:
 
 // caller must get_page(mfn_to_page(mfn)) before
 // caller must call set_gpfn_from_mfn().
+// flags: currently only ASSIGN_readonly
 static void
 assign_domain_page_replace(struct domain *d, unsigned long mpaddr,
-                           unsigned long mfn, unsigned int flags)
+                           unsigned long mfn, unsigned long flags)
 {
     struct mm_struct *mm = &d->arch.mm;
     pte_t* pte;
     pte_t old_pte;
     pte_t npte;
+    unsigned long arflags = (flags & ASSIGN_readonly)? _PAGE_AR_R: _PAGE_AR_RWX;
 
     pte = lookup_alloc_domain_pte(d, mpaddr);
 
     // update pte
-    npte = pfn_pte(mfn, __pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX));
+    npte = pfn_pte(mfn, __pgprot(__DIRTY_BITS | _PAGE_PL_2 | arflags));
     old_pte = ptep_xchg(mm, mpaddr, pte, npte);
     if (!pte_none(old_pte)) {
         unsigned long old_mfn;
@@ -1200,11 +1206,11 @@ assign_domain_page_replace(struct domain *d, unsigned long mpaddr,
 
 unsigned long
 dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn,
-                   unsigned int flags, domid_t domid)
+                   unsigned long flags, domid_t domid)
 {
     int error = 0;
-
     struct domain* rd;
+
     rd = find_domain_by_id(domid);
     if (unlikely(rd == NULL)) {
         switch (domid) {
@@ -1234,7 +1240,7 @@ dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn,
         goto out1;
     }
 
-    assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn, 0/* flags:XXX */);
+    assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn, flags);
     //don't update p2m table because this page belongs to rd, not d.
 out1:
     put_domain(rd);
@@ -1254,23 +1260,18 @@ create_grant_host_mapping(unsigned long gpaddr,
     struct page_info* page;
     int ret;
 
-    if (flags & (GNTMAP_application_map | GNTMAP_contains_pte)) {
+    if (flags & (GNTMAP_device_map | 
+                 GNTMAP_application_map | GNTMAP_contains_pte)) {
         DPRINTK("%s: flags 0x%x\n", __func__, flags);
         return GNTST_general_error;
-    }
-    if (flags & GNTMAP_readonly) {
-#if 0
-        DPRINTK("%s: GNTMAP_readonly is not implemented yet. flags %x\n",
-                __func__, flags);
-#endif
-        flags &= ~GNTMAP_readonly;
     }
 
     page = mfn_to_page(mfn);
     ret = get_page(page, page_get_owner(page));
     BUG_ON(ret == 0);
-    assign_domain_page_replace(d, gpaddr, mfn, flags);
 
+    assign_domain_page_replace(d, gpaddr, mfn, (flags & GNTMAP_readonly)?
+                                              ASSIGN_readonly: ASSIGN_writable);
     return GNTST_okay;
 }
 
@@ -1289,22 +1290,17 @@ destroy_grant_host_mapping(unsigned long gpaddr,
         DPRINTK("%s: flags 0x%x\n", __func__, flags);
         return GNTST_general_error;
     }
-    if (flags & GNTMAP_readonly) {
-#if 0
-        DPRINTK("%s: GNTMAP_readonly is not implemented yet. flags %x\n",
-                __func__, flags);
-#endif
-        flags &= ~GNTMAP_readonly;
-    }
 
     pte = lookup_noalloc_domain_pte(d, gpaddr);
     if (pte == NULL || !pte_present(*pte) || pte_pfn(*pte) != mfn)
-        return GNTST_general_error;//XXX GNTST_bad_pseudo_phys_addr
+        return GNTST_general_error;
 
     // update pte
     old_pte = ptep_get_and_clear(&d->arch.mm, gpaddr, pte);
     if (pte_present(old_pte)) {
-        old_mfn = pte_pfn(old_pte);//XXX
+        old_mfn = pte_pfn(old_pte);
+    } else {
+        return GNTST_general_error;
     }
     domain_page_flush(d, gpaddr, old_mfn, INVALID_MFN);
 
@@ -1405,7 +1401,7 @@ guest_physmap_add_page(struct domain *d, unsigned long gpfn,
 
     ret = get_page(mfn_to_page(mfn), d);
     BUG_ON(ret == 0);
-    assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn, 0/* XXX */);
+    assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn, ASSIGN_writable);
     set_gpfn_from_mfn(mfn, gpfn);//XXX SMP
 
     //BUG_ON(mfn != ((lookup_domain_mpa(d, gpfn << PAGE_SHIFT) & _PFN_MASK) >> PAGE_SHIFT));

@@ -346,7 +346,7 @@ int vmx_build_physmap_table(struct domain *d)
 	    for (j = io_ranges[i].start;
 		 j < io_ranges[i].start + io_ranges[i].size;
 		 j += PAGE_SIZE)
-		__assign_domain_page(d, j, io_ranges[i].type);
+		__assign_domain_page(d, j, io_ranges[i].type, ASSIGN_writable);
 	}
 
 	/* Map normal memory below 3G */

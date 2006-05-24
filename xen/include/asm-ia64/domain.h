@@ -114,7 +114,7 @@ struct arch_vcpu {
 
 struct page_info * assign_new_domain_page(struct domain *d, unsigned long mpaddr);
 void assign_new_domain0_page(struct domain *d, unsigned long mpaddr);
-void __assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr);
+void __assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr, unsigned long flags);
 void assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr);
 void assign_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long flags);
 #ifdef CONFIG_XEN_IA64_DOM0_VP
@@ -123,7 +123,7 @@ unsigned long assign_domain_mmio_page(struct domain *d, unsigned long mpaddr, un
 unsigned long assign_domain_mach_page(struct domain *d, unsigned long mpaddr, unsigned long size);
 unsigned long do_dom0vp_op(unsigned long cmd, unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3);
 unsigned long dom0vp_zap_physmap(struct domain *d, unsigned long gpfn, unsigned int extent_order);
-unsigned long dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn, unsigned int flags, domid_t domid);
+unsigned long dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn, unsigned long flags, domid_t domid);
 #else
 #define alloc_dom_xen_and_dom_io()      do { } while (0)
 #endif

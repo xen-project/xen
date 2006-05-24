@@ -85,6 +85,8 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
 	struct domain *d = current->domain;
 	ia64_itir_t itir = {.itir = itir__};
 	u64 mask, mpaddr, pteval2;
+	u64 arflags;
+	u64 arflags2;
 
 	pteval &= ((1UL << 53) - 1);// ignore [63:53] bits
 
@@ -123,6 +125,20 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
 	}
 #endif
 	pteval2 = lookup_domain_mpa(d,mpaddr);
+	arflags  = pteval  & _PAGE_AR_MASK;
+	arflags2 = pteval2 & _PAGE_AR_MASK;
+	if (arflags != _PAGE_AR_R && arflags2 == _PAGE_AR_R) {
+#if 0
+		DPRINTK("%s:%d "
+		        "pteval 0x%lx arflag 0x%lx address 0x%lx itir 0x%lx "
+		        "pteval2 0x%lx arflags2 0x%lx mpaddr 0x%lx\n",
+		        __func__, __LINE__,
+		        pteval, arflags, address, itir__,
+		        pteval2, arflags2, mpaddr);
+#endif
+		pteval = (pteval & ~_PAGE_AR_MASK) | _PAGE_AR_R;
+}
+
 	pteval2 &= _PAGE_PPN_MASK; // ignore non-addr bits
 	pteval2 |= (pteval & _PAGE_ED);
 	pteval2 |= _PAGE_PL_2; // force PL0->2 (PL3 is unaffected)
