@@ -799,7 +799,16 @@ ENTRY(dirty_bit)
 	;;
 (p6)	cmp.eq p6,p7=r26,r18			// Only compare if page is present
 	;;
+#ifdef CONFIG_XEN
+(p6)	mov r18=r8
+(p6)	mov r8=r25
+	;;
+(p6)	XEN_HYPER_ITC_D
+	;;
+(p6)	mov r8=r18
+#else
 (p6)	itc.d r25				// install updated PTE
+#endif	
 	;;
 	/*
 	 * Tell the assemblers dependency-violation checker that the above "itc" instructions
