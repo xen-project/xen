@@ -7,7 +7,6 @@
 #define X86_CR0_PE              0x00000001 /* Enable Protected Mode    (RW) */
 #define X86_CR0_PG              0x80000000 /* Paging                   (RW) */
 #define BSD_PAGE_MASK (PAGE_SIZE-1)
-#define PDRSHIFT        22
 #define PSL_T  0x00000100 /* trace enable bit */
 
 #ifdef __x86_64__
@@ -162,8 +161,6 @@ struct gdb_regs {
 #endif
 
 #define printval(x) printf("%s = %lx\n", #x, (long)x);
-#define vtopdi(va) ((va) >> PDRSHIFT)
-#define vtopti(va) (((va) >> PAGE_SHIFT) & 0x3ff)
 #endif
 
 typedef void (*thr_ev_handler_t)(long);
