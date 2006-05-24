@@ -33,12 +33,11 @@
 #include "talloc.h"
 #include "xenstored_core.h"
 #include "xenstored_domain.h"
-#include "xenstored_proc.h"
 #include "xenstored_watch.h"
 #include "xenstored_test.h"
 
 #include <xenctrl.h>
-#include <xen/linux/evtchn.h>
+#include <xen/sys/evtchn.h>
 
 static int *xc_handle;
 static evtchn_port_t virq_port;
@@ -476,44 +475,24 @@ void restore_existing_connections(void)
 
 static int dom0_init(void) 
 { 
-	int rc, fd;
-	evtchn_port_t port; 
-	char str[20]; 
-	struct domain *dom0; 
+	evtchn_port_t port;
+	struct domain *dom0;
 
-	fd = open(XENSTORED_PROC_PORT, O_RDONLY); 
-	if (fd == -1)
+	port = xenbus_evtchn();
+	if (port == -1)
 		return -1;
-
-	rc = read(fd, str, sizeof(str)); 
-	if (rc == -1)
-		goto outfd;
-	str[rc] = '\0'; 
-	port = strtoul(str, NULL, 0); 
-
-	close(fd); 
 
 	dom0 = new_domain(NULL, 0, port); 
 
-	fd = open(XENSTORED_PROC_KVA, O_RDWR);
-	if (fd == -1)
+	dom0->interface = xenbus_map();
+	if (dom0->interface == NULL)
 		return -1;
-
-	dom0->interface = mmap(NULL, getpagesize(), PROT_READ|PROT_WRITE,
-			       MAP_SHARED, fd, 0);
-	if (dom0->interface == MAP_FAILED)
-		goto outfd;
-
-	close(fd);
 
 	talloc_steal(dom0->conn, dom0); 
 
 	evtchn_notify(dom0->port); 
 
 	return 0; 
-outfd:
-	close(fd);
-	return -1;
 }
 
 

@@ -27,6 +27,12 @@ CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm
 CLIENTS += xenstore-write
 CLIENTS_OBJS := $(patsubst xenstore-%,xenstore_%.o,$(CLIENTS))
 
+XENSTORED_OBJS = xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o tdb.o hashtable.o
+
+XENSTORED_Linux = xenstored_linux.o
+
+XENSTORED_OBJS += $(XENSTORED_$(OS))
+
 .PHONY: all
 all: libxenstore.so xenstored $(CLIENTS) xs_tdb_dump xenstore-control xenstore-ls
 
@@ -36,7 +42,7 @@ test_interleaved_transactions: test_interleaved_transactions.o
 .PHONY: testcode
 testcode: xs_test xenstored_test xs_random
 
-xenstored: xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o tdb.o hashtable.o
+xenstored: $(XENSTORED_OBJS)
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -o $@
 
 $(CLIENTS): xenstore-%: xenstore_%.o libxenstore.so
