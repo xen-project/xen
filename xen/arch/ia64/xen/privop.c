@@ -129,10 +129,10 @@ IA64FAULT priv_cover(VCPU *vcpu, INST64 inst)
 IA64FAULT priv_ptc_l(VCPU *vcpu, INST64 inst)
 {
 	UINT64 vadr = vcpu_get_gr(vcpu,inst.M45.r3);
-	UINT64 addr_range;
+	UINT64 log_range;
 
-	addr_range = 1 << ((vcpu_get_gr(vcpu,inst.M45.r2) & 0xfc) >> 2);
-	return vcpu_ptc_l(vcpu,vadr,addr_range);
+	log_range = ((vcpu_get_gr(vcpu,inst.M45.r2) & 0xfc) >> 2);
+	return vcpu_ptc_l(vcpu,vadr,log_range);
 }
 
 IA64FAULT priv_ptc_e(VCPU *vcpu, INST64 inst)

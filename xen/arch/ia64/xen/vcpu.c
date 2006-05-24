@@ -1848,12 +1848,17 @@ IA64FAULT vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 	return IA64_NO_FAULT;
 }
 
-IA64FAULT vcpu_ptc_l(VCPU *vcpu, UINT64 vadr, UINT64 addr_range)
+IA64FAULT vcpu_ptc_l(VCPU *vcpu, UINT64 vadr, UINT64 log_range)
 {
-	printk("vcpu_ptc_l: called, not implemented yet\n");
-	return IA64_ILLOP_FAULT;
-}
+	/* Purge TC  */
+	vcpu_purge_tr_entry(&PSCBX(vcpu,dtlb));
+	vcpu_purge_tr_entry(&PSCBX(vcpu,itlb));
+	
+	/*Purge all tlb and vhpt*/
+	vcpu_flush_tlb_vhpt_range (vadr, log_range);
 
+	return IA64_NO_FAULT;
+}
 // At privlvl=0, fc performs no access rights or protection key checks, while
 // at privlvl!=0, fc performs access rights checks as if it were a 1-byte
 // read but no protection key check.  Thus in order to avoid an unexpected

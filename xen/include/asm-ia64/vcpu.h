@@ -145,7 +145,7 @@ extern IA64FAULT vcpu_itr_i(VCPU *vcpu, UINT64 slot, UINT64 padr,
 		UINT64 itir, UINT64 ifa);
 extern IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 padr, UINT64 itir, UINT64 ifa);
 extern IA64FAULT vcpu_itc_i(VCPU *vcpu, UINT64 padr, UINT64 itir, UINT64 ifa);
-extern IA64FAULT vcpu_ptc_l(VCPU *vcpu, UINT64 vadr, UINT64 addr_range);
+extern IA64FAULT vcpu_ptc_l(VCPU *vcpu, UINT64 vadr, UINT64 log_range);
 extern IA64FAULT vcpu_ptc_e(VCPU *vcpu, UINT64 vadr);
 extern IA64FAULT vcpu_ptc_g(VCPU *vcpu, UINT64 vadr, UINT64 addr_range);
 extern IA64FAULT vcpu_ptc_ga(VCPU *vcpu, UINT64 vadr, UINT64 addr_range);
