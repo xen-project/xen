@@ -314,12 +314,6 @@ gnttab_map_grant_ref_pre(struct gnttab_map_grant_ref *uop)
 	uint32_t flags;
 
 	flags = uop->flags;
-	if (flags & GNTMAP_readonly) {
-#if 0
-		xprintd("GNTMAP_readonly is not supported yet\n");
-#endif
-		flags &= ~GNTMAP_readonly;
-	}
 
 	if (flags & GNTMAP_host_map) {
 		if (flags & GNTMAP_application_map) {
@@ -517,6 +511,7 @@ xen_ia64_privcmd_entry_mmap(struct vm_area_struct* vma,
 	int error = 0;
 	struct xen_ia64_privcmd_entry* entry = &privcmd_range->entries[i];
 	unsigned long gpfn;
+	unsigned long flags;
 
 	BUG_ON((addr & ~PAGE_MASK) != 0);
 	BUG_ON(mfn == INVALID_MFN);
@@ -527,8 +522,11 @@ xen_ia64_privcmd_entry_mmap(struct vm_area_struct* vma,
 	}
 	gpfn = (privcmd_range->res->start >> PAGE_SHIFT) + i;
 
-	error = HYPERVISOR_add_physmap(gpfn, mfn, 0/* prot:XXX */,
-				       domid);
+	flags = ASSIGN_writable;
+	if (pgprot_val(prot) == PROT_READ) {
+		flags = ASSIGN_readonly;
+	}
+	error = HYPERVISOR_add_physmap(gpfn, mfn, flags, domid);
 	if (error != 0) {
 		goto out;
 	}
