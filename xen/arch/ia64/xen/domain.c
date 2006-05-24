@@ -873,12 +873,13 @@ assign_domain_page(struct domain *d,
 #ifdef CONFIG_XEN_IA64_DOM0_VP
 static void
 assign_domain_same_page(struct domain *d,
-                        unsigned long mpaddr, unsigned long size)
+                        unsigned long mpaddr, unsigned long size,
+                        unsigned long flags)
 {
     //XXX optimization
     unsigned long end = mpaddr + size;
     for (; mpaddr < end; mpaddr += PAGE_SIZE) {
-        __assign_domain_page(d, mpaddr, mpaddr, ASSIGN_writable);
+        __assign_domain_page(d, mpaddr, mpaddr, flags);
     }
 }
 
@@ -945,15 +946,16 @@ assign_domain_mmio_page(struct domain *d,
                 __func__, __LINE__, d, mpaddr, size);
         return -EINVAL;
     }
-    assign_domain_same_page(d, mpaddr, size);
+    assign_domain_same_page(d, mpaddr, size, ASSIGN_writable);
     return mpaddr;
 }
 
 unsigned long
 assign_domain_mach_page(struct domain *d,
-                        unsigned long mpaddr, unsigned long size)
+                        unsigned long mpaddr, unsigned long size,
+                        unsigned long flags)
 {
-    assign_domain_same_page(d, mpaddr, size);
+    assign_domain_same_page(d, mpaddr, size, flags);
     return mpaddr;
 }
 

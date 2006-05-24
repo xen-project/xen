@@ -697,6 +697,7 @@ dom_fw_fake_acpi(struct domain *d, struct fake_acpi_tables *tables)
 struct dom0_passthrough_arg {
 #ifdef CONFIG_XEN_IA64_DOM0_VP
     struct domain*      d;
+    int                 flags;
 #endif
     efi_memory_desc_t *md;
     int*                i;
@@ -711,7 +712,7 @@ dom_fw_dom0_passthrough(efi_memory_desc_t *md, void *arg__)
 #ifdef CONFIG_XEN_IA64_DOM0_VP
     struct domain* d = arg->d;
     u64 start = md->phys_addr;
-    u64 end = start + (md->num_pages << EFI_PAGE_SHIFT);
+    u64 size = md->num_pages << EFI_PAGE_SHIFT;
 
     if (md->type == EFI_MEMORY_MAPPED_IO ||
         md->type == EFI_MEMORY_MAPPED_IO_PORT_SPACE) {
@@ -720,13 +721,12 @@ dom_fw_dom0_passthrough(efi_memory_desc_t *md, void *arg__)
         //    It requires impractical memory to map such a huge region
         //    to a domain.
         //    For now we don't map it, but later we must fix this.
-        if (md->type == EFI_MEMORY_MAPPED_IO &&
-            ((md->num_pages << EFI_PAGE_SHIFT) > 0x100000000UL))
+        if (md->type == EFI_MEMORY_MAPPED_IO && (size > 0x100000000UL))
             return 0;
 
-        paddr = assign_domain_mmio_page(d, start, end - start);
+        paddr = assign_domain_mmio_page(d, start, size);
     } else
-        paddr = assign_domain_mach_page(d, start, end - start);
+        paddr = assign_domain_mach_page(d, start, size, arg->flags);
 #else
     paddr = md->phys_addr;
 #endif
@@ -874,9 +874,10 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	}
 	if (d == dom0) {
 #ifdef CONFIG_XEN_IA64_DOM0_VP
-# define ASSIGN_DOMAIN_MACH_PAGE(d, p) assign_domain_mach_page(d, p, PAGE_SIZE)
+# define ASSIGN_DOMAIN_MACH_PAGE(d, p) \
+        assign_domain_mach_page((d), (p), PAGE_SIZE, ASSIGN_readonly)
 #else
-# define ASSIGN_DOMAIN_MACH_PAGE(d, p) ({p;})
+# define ASSIGN_DOMAIN_MACH_PAGE(d, p) (p)
 #endif
 
 		printf("Domain0 EFI passthrough:");
@@ -990,17 +991,24 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 		/* pass through the I/O port space */
 		if (!running_on_sim) {
 			struct dom0_passthrough_arg arg;
-#ifdef CONFIG_XEN_IA64_DOM0_VP
-			arg.d = d;
-#endif
 			arg.md = &efi_memmap[i];
 			arg.i = &i;
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+			arg.d = d;
+			arg.flags = ASSIGN_writable;
+#endif
 			//XXX Is this needed?
 			efi_memmap_walk_type(EFI_RUNTIME_SERVICES_CODE,
 			                     dom_fw_dom0_passthrough, &arg);
 			// for ACPI table.
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+			arg.flags = ASSIGN_readonly;
+#endif
 			efi_memmap_walk_type(EFI_RUNTIME_SERVICES_DATA,
 			                     dom_fw_dom0_passthrough, &arg);
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+			arg.flags = ASSIGN_writable;
+#endif
 			efi_memmap_walk_type(EFI_ACPI_RECLAIM_MEMORY,
 			                     dom_fw_dom0_passthrough, &arg);
 			efi_memmap_walk_type(EFI_MEMORY_MAPPED_IO,
