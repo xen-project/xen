@@ -3220,15 +3220,16 @@ static int ptwr_emulated_update(
     /* Turn a sub-word access into a full-word access. */
     if ( bytes != sizeof(paddr_t) )
     {
-        int           rc;
-        paddr_t    full;
-        unsigned int  offset = addr & (sizeof(paddr_t)-1);
+        paddr_t      full;
+        unsigned int offset = addr & (sizeof(paddr_t)-1);
 
         /* Align address; read full word. */
         addr &= ~(sizeof(paddr_t)-1);
-        if ( (rc = x86_emulate_read_std(addr, (unsigned long *)&full,
-                                        sizeof(paddr_t))) )
-            return rc; 
+        if ( copy_from_user(&full, (void *)addr, sizeof(paddr_t)) )
+        {
+            propagate_page_fault(addr, 4); /* user mode, read fault */
+            return X86EMUL_PROPAGATE_FAULT;
+        }
         /* Mask out bits provided by caller. */
         full &= ~((((paddr_t)1 << (bytes*8)) - 1) << (offset*8));
         /* Shift the caller value and OR in the missing bits. */
@@ -3306,7 +3307,8 @@ static int ptwr_emulated_update(
 static int ptwr_emulated_write(
     unsigned long addr,
     unsigned long val,
-    unsigned int bytes)
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
 {
     return ptwr_emulated_update(addr, 0, val, bytes, 0);
 }
@@ -3315,7 +3317,8 @@ static int ptwr_emulated_cmpxchg(
     unsigned long addr,
     unsigned long old,
     unsigned long new,
-    unsigned int bytes)
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
 {
     return ptwr_emulated_update(addr, old, new, bytes, 1);
 }
@@ -3325,7 +3328,8 @@ static int ptwr_emulated_cmpxchg8b(
     unsigned long old,
     unsigned long old_hi,
     unsigned long new,
-    unsigned long new_hi)
+    unsigned long new_hi,
+    struct x86_emulate_ctxt *ctxt)
 {
     if ( CONFIG_PAGING_LEVELS == 2 )
         return X86EMUL_UNHANDLEABLE;
@@ -3334,7 +3338,7 @@ static int ptwr_emulated_cmpxchg8b(
             addr, ((u64)old_hi << 32) | old, ((u64)new_hi << 32) | new, 8, 1);
 }
 
-static struct x86_mem_emulator ptwr_mem_emulator = {
+static struct x86_emulate_ops ptwr_emulate_ops = {
     .read_std           = x86_emulate_read_std,
     .write_std          = x86_emulate_write_std,
     .read_emulated      = x86_emulate_read_std,
@@ -3353,6 +3357,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     l2_pgentry_t    *pl2e, l2e;
     int              which, flags;
     unsigned long    l2_idx;
+    struct x86_emulate_ctxt emul_ctxt;
 
     if ( unlikely(shadow_mode_enabled(d)) )
         return 0;
@@ -3507,8 +3512,10 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     return EXCRET_fault_fixed;
 
  emulate:
-    if ( x86_emulate_memop(guest_cpu_user_regs(), addr,
-                           &ptwr_mem_emulator, X86EMUL_MODE_HOST) )
+    emul_ctxt.regs = guest_cpu_user_regs();
+    emul_ctxt.cr2  = addr;
+    emul_ctxt.mode = X86EMUL_MODE_HOST;
+    if ( x86_emulate_memop(&emul_ctxt, &ptwr_emulate_ops) )
         return 0;
     perfc_incrc(ptwr_emulations);
     return EXCRET_fault_fixed;

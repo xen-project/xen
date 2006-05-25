@@ -9,8 +9,10 @@
 #ifndef __X86_EMULATE_H__
 #define __X86_EMULATE_H__
 
+struct x86_emulate_ctxt;
+
 /*
- * x86_mem_emulator:
+ * x86_emulate_ops:
  * 
  * These operations represent the instruction emulator's interface to memory.
  * There are two categories of operation: those that act on ordinary memory
@@ -47,7 +49,7 @@
 #define X86EMUL_PROPAGATE_FAULT 2 /* propagate a generated fault to guest */
 #define X86EMUL_RETRY_INSTR     2 /* retry the instruction for some reason */
 #define X86EMUL_CMPXCHG_FAILED  2 /* cmpxchg did not see expected value */
-struct x86_mem_emulator
+struct x86_emulate_ops
 {
     /*
      * read_std: Read bytes of standard (non-emulated/special) memory.
@@ -59,7 +61,8 @@ struct x86_mem_emulator
     int (*read_std)(
         unsigned long addr,
         unsigned long *val,
-        unsigned int bytes);
+        unsigned int bytes,
+        struct x86_emulate_ctxt *ctxt);
 
     /*
      * write_std: Write bytes of standard (non-emulated/special) memory.
@@ -71,7 +74,8 @@ struct x86_mem_emulator
     int (*write_std)(
         unsigned long addr,
         unsigned long val,
-        unsigned int bytes);
+        unsigned int bytes,
+        struct x86_emulate_ctxt *ctxt);
 
     /*
      * read_emulated: Read bytes from emulated/special memory area.
@@ -82,7 +86,8 @@ struct x86_mem_emulator
     int (*read_emulated)(
         unsigned long addr,
         unsigned long *val,
-        unsigned int bytes);
+        unsigned int bytes,
+        struct x86_emulate_ctxt *ctxt);
 
     /*
      * write_emulated: Read bytes from emulated/special memory area.
@@ -93,7 +98,8 @@ struct x86_mem_emulator
     int (*write_emulated)(
         unsigned long addr,
         unsigned long val,
-        unsigned int bytes);
+        unsigned int bytes,
+        struct x86_emulate_ctxt *ctxt);
 
     /*
      * cmpxchg_emulated: Emulate an atomic (LOCKed) CMPXCHG operation on an
@@ -107,11 +113,12 @@ struct x86_mem_emulator
         unsigned long addr,
         unsigned long old,
         unsigned long new,
-        unsigned int bytes);
+        unsigned int bytes,
+        struct x86_emulate_ctxt *ctxt);
 
     /*
-     * cmpxchg_emulated: Emulate an atomic (LOCKed) CMPXCHG8B operation on an
-     *                   emulated/special memory area.
+     * cmpxchg8b_emulated: Emulate an atomic (LOCKed) CMPXCHG8B operation on an
+     *                     emulated/special memory area.
      *  @addr:  [IN ] Linear address to access.
      *  @old:   [IN ] Value expected to be current at @addr.
      *  @new:   [IN ] Value to write to @addr.
@@ -126,7 +133,8 @@ struct x86_mem_emulator
         unsigned long old_lo,
         unsigned long old_hi,
         unsigned long new_lo,
-        unsigned long new_hi);
+        unsigned long new_hi,
+        struct x86_emulate_ctxt *ctxt);
 };
 
 /* Standard reader/writer functions that callers may wish to use. */
@@ -134,14 +142,28 @@ extern int
 x86_emulate_read_std(
     unsigned long addr,
     unsigned long *val,
-    unsigned int bytes);
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt);
 extern int
 x86_emulate_write_std(
     unsigned long addr,
     unsigned long val,
-    unsigned int bytes);
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt);
 
 struct cpu_user_regs;
+
+struct x86_emulate_ctxt
+{
+    /* Register state before/after emulation. */
+    struct cpu_user_regs   *regs;
+
+    /* Linear faulting address (if emulating a page-faulting instruction). */
+    unsigned long           cr2;
+
+    /* Emulated execution mode, represented by an X86EMUL_MODE value. */
+    int                     mode;
+};
 
 /* Execution mode, passed to the emulator. */
 #define X86EMUL_MODE_REAL     0 /* Real mode.             */
@@ -159,25 +181,19 @@ struct cpu_user_regs;
 /*
  * x86_emulate_memop: Emulate an instruction that faulted attempting to
  *                    read/write a 'special' memory area.
- *  @regs: Register state at time of fault.
- *  @cr2:  Linear faulting address within an emulated/special memory area.
- *  @ops:  Interface to access special memory.
- *  @mode: Emulated execution mode, represented by an X86EMUL_MODE value.
  * Returns -1 on failure, 0 on success.
  */
-extern int
+int
 x86_emulate_memop(
-    struct cpu_user_regs *regs,
-    unsigned long cr2,
-    struct x86_mem_emulator *ops,
-    int mode);
+    struct x86_emulate_ctxt *ctxt,
+    struct x86_emulate_ops  *ops);
 
 /*
  * Given the 'reg' portion of a ModRM byte, and a register block, return a
  * pointer into the block that addresses the relevant register.
  * @highbyte_regs specifies whether to decode AH,CH,DH,BH.
  */
-extern void *
+void *
 decode_register(
     uint8_t modrm_reg, struct cpu_user_regs *regs, int highbyte_regs);
 

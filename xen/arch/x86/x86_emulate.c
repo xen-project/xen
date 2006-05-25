@@ -363,12 +363,13 @@ do{ __asm__ __volatile__ (                                              \
 #endif /* __i386__ */
 
 /* Fetch next part of the instruction being emulated. */
-#define insn_fetch(_type, _size, _eip) \
-({ unsigned long _x; \
-   if ( (rc = ops->read_std((unsigned long)(_eip), &_x, (_size))) != 0 ) \
-       goto done; \
-   (_eip) += (_size); \
-   (_type)_x; \
+#define insn_fetch(_type, _size, _eip)                                  \
+({ unsigned long _x;                                                    \
+   rc = ops->read_std((unsigned long)(_eip), &_x, (_size), ctxt);       \
+   if ( rc != 0 )                                                       \
+       goto done;                                                       \
+   (_eip) += (_size);                                                   \
+   (_type)_x;                                                           \
 })
 
 /* Access/update address held in a register, based on addressing mode. */
@@ -426,12 +427,10 @@ decode_register(
     return p;
 }
 
-int 
+int
 x86_emulate_memop(
-    struct cpu_user_regs *regs,
-    unsigned long cr2,
-    struct x86_mem_emulator *ops,
-    int mode)
+    struct x86_emulate_ctxt *ctxt,
+    struct x86_emulate_ops  *ops)
 {
     uint8_t b, d, sib, twobyte = 0, rex_prefix = 0;
     uint8_t modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
@@ -439,9 +438,11 @@ x86_emulate_memop(
     unsigned int op_bytes, ad_bytes, lock_prefix = 0, rep_prefix = 0, i;
     int rc = 0;
     struct operand src, dst;
+    unsigned long cr2 = ctxt->cr2;
+    int mode = ctxt->mode;
 
     /* Shadow copy of register state. Committed on successful emulation. */
-    struct cpu_user_regs _regs = *regs;
+    struct cpu_user_regs _regs = *ctxt->regs;
 
     switch ( mode )
     {
@@ -628,7 +629,7 @@ x86_emulate_memop(
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         if ( !(d & Mov) && /* optimisation - avoid slow emulated read */
              ((rc = ops->read_emulated((unsigned long)dst.ptr,
-                                       &dst.val, dst.bytes)) != 0) )
+                                       &dst.val, dst.bytes, ctxt)) != 0) )
              goto done;
         break;
     }
@@ -670,7 +671,7 @@ x86_emulate_memop(
         src.type  = OP_MEM;
         src.ptr   = (unsigned long *)cr2;
         if ( (rc = ops->read_emulated((unsigned long)src.ptr, 
-                                      &src.val, src.bytes)) != 0 )
+                                      &src.val, src.bytes, ctxt)) != 0 )
             goto done;
         src.orig_val = src.val;
         break;
@@ -776,7 +777,7 @@ x86_emulate_memop(
         if ( mode == X86EMUL_MODE_PROT64 )
             dst.bytes = 8;
         if ( (rc = ops->read_std(register_address(_regs.ss, _regs.esp),
-                                 &dst.val, dst.bytes)) != 0 )
+                                 &dst.val, dst.bytes, ctxt)) != 0 )
             goto done;
         register_address_increment(_regs.esp, dst.bytes);
         break;
@@ -854,12 +855,12 @@ x86_emulate_memop(
             {
                 dst.bytes = 8;
                 if ( (rc = ops->read_std((unsigned long)dst.ptr,
-                                         &dst.val, 8)) != 0 )
+                                         &dst.val, 8, ctxt)) != 0 )
                     goto done;
             }
             register_address_increment(_regs.esp, -dst.bytes);
             if ( (rc = ops->write_std(register_address(_regs.ss, _regs.esp),
-                                      dst.val, dst.bytes)) != 0 )
+                                      dst.val, dst.bytes, ctxt)) != 0 )
                 goto done;
             dst.val = dst.orig_val; /* skanky: disable writeback */
             break;
@@ -887,10 +888,11 @@ x86_emulate_memop(
         case OP_MEM:
             if ( lock_prefix )
                 rc = ops->cmpxchg_emulated(
-                    (unsigned long)dst.ptr, dst.orig_val, dst.val, dst.bytes);
+                    (unsigned long)dst.ptr, dst.orig_val,
+                    dst.val, dst.bytes, ctxt);
             else
                 rc = ops->write_emulated(
-                    (unsigned long)dst.ptr, dst.val, dst.bytes);
+                    (unsigned long)dst.ptr, dst.val, dst.bytes, ctxt);
             if ( rc != 0 )
                 goto done;
         default:
@@ -899,7 +901,7 @@ x86_emulate_memop(
     }
 
     /* Commit shadow register state. */
-    *regs = _regs;
+    *ctxt->regs = _regs;
 
  done:
     return (rc == X86EMUL_UNHANDLEABLE) ? -1 : 0;
@@ -911,11 +913,11 @@ x86_emulate_memop(
     {
         if ( _regs.ecx == 0 )
         {
-            regs->eip = _regs.eip;
+            ctxt->regs->eip = _regs.eip;
             goto done;
         }
         _regs.ecx--;
-        _regs.eip = regs->eip;
+        _regs.eip = ctxt->regs->eip;
     }
     switch ( b )
     {
@@ -928,14 +930,15 @@ x86_emulate_memop(
             dst.ptr = (unsigned long *)cr2;
             if ( (rc = ops->read_std(register_address(seg ? *seg : _regs.ds,
                                                       _regs.esi),
-                                     &dst.val, dst.bytes)) != 0 )
+                                     &dst.val, dst.bytes, ctxt)) != 0 )
                 goto done;
         }
         else
         {
             /* Read fault: source is special memory. */
             dst.ptr = (unsigned long *)register_address(_regs.es, _regs.edi);
-            if ( (rc = ops->read_emulated(cr2, &dst.val, dst.bytes)) != 0 )
+            if ( (rc = ops->read_emulated(cr2, &dst.val,
+                                          dst.bytes, ctxt)) != 0 )
                 goto done;
         }
         register_address_increment(
@@ -958,7 +961,7 @@ x86_emulate_memop(
         dst.type  = OP_REG;
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.ptr   = (unsigned long *)&_regs.eax;
-        if ( (rc = ops->read_emulated(cr2, &dst.val, dst.bytes)) != 0 )
+        if ( (rc = ops->read_emulated(cr2, &dst.val, dst.bytes, ctxt)) != 0 )
             goto done;
         register_address_increment(
             _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
@@ -1074,8 +1077,8 @@ x86_emulate_memop(
 #if defined(__i386__)
     {
         unsigned long old_lo, old_hi;
-        if ( ((rc = ops->read_emulated(cr2+0, &old_lo, 4)) != 0) ||
-             ((rc = ops->read_emulated(cr2+4, &old_hi, 4)) != 0) )
+        if ( ((rc = ops->read_emulated(cr2+0, &old_lo, 4, ctxt)) != 0) ||
+             ((rc = ops->read_emulated(cr2+4, &old_hi, 4, ctxt)) != 0) )
             goto done;
         if ( (old_lo != _regs.eax) || (old_hi != _regs.edx) )
         {
@@ -1090,8 +1093,8 @@ x86_emulate_memop(
         }
         else
         {
-            if ( (rc = ops->cmpxchg8b_emulated(cr2, old_lo, old_hi,
-                                               _regs.ebx, _regs.ecx)) != 0 )
+            if ( (rc = ops->cmpxchg8b_emulated(cr2, old_lo, old_hi, _regs.ebx,
+                                               _regs.ecx, ctxt)) != 0 )
                 goto done;
             _regs.eflags |= EFLG_ZF;
         }
@@ -1136,7 +1139,8 @@ int
 x86_emulate_read_std(
     unsigned long addr,
     unsigned long *val,
-    unsigned int bytes)
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
 {
     *val = 0;
     if ( copy_from_user((void *)val, (void *)addr, bytes) )
@@ -1151,7 +1155,8 @@ int
 x86_emulate_write_std(
     unsigned long addr,
     unsigned long val,
-    unsigned int bytes)
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
 {
     if ( copy_to_user((void *)addr, (void *)&val, bytes) )
     {
