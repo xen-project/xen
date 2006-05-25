@@ -1546,6 +1546,10 @@ class XendDomainInfo:
         self.configure_bootloader()
         config = self.sxpr()
 
+        if self.infoIsSet('cpus') and len(self.info['cpus']) != 0:
+            config.append(['cpus', reduce(lambda x, y: str(x) + "," + str(y),
+                                          self.info['cpus'])])
+
         if self.readVm(RESTART_IN_PROGRESS):
             log.error('Xend failed during restart of domain %d.  '
                       'Refusing to restart to avoid loops.',
