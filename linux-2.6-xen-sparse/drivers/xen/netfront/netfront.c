@@ -384,7 +384,7 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
  * Callback received when the backend's state changes.
  */
 static void backend_changed(struct xenbus_device *dev,
-			    XenbusState backend_state)
+			    enum xenbus_state backend_state)
 {
 	DPRINTK("\n");
 
