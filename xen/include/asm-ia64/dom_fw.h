@@ -119,14 +119,29 @@
 #define FW_HYPERCALL_EFI_GET_NEXT_HIGH_MONO_COUNT_PADDR	FW_HYPERCALL_PADDR(FW_HYPERCALL_EFI_GET_NEXT_HIGH_MONO_COUNT_INDEX)
 #define FW_HYPERCALL_EFI_RESET_SYSTEM_PADDR		FW_HYPERCALL_PADDR(FW_HYPERCALL_EFI_RESET_SYSTEM_INDEX)
 
+/*
+ * This is a hypercall number for IPI.
+ * A pseudo-entry-point is not presented to IPI hypercall. This hypercall number 
+ * is used in xen_send_ipi of linux-2.6-xen-sparse/arch/ia64/xen/hypercall.S.
+ */
+#define FW_HYPERCALL_IPI				0x400UL
+
+/*
+ * This is a hypercall number for FPSWA.
+ * FPSWA hypercall uses 2 bundles for a pseudo-entry-point and a hypercall-patch.
+ */
+#define FW_HYPERCALL_FPSWA_ENTRY_INDEX			0x83UL
+#define FW_HYPERCALL_FPSWA_PATCH_INDEX			0x84UL
+#define FW_HYPERCALL_FPSWA_ENTRY_PADDR			FW_HYPERCALL_PADDR(FW_HYPERCALL_FPSWA_ENTRY_INDEX)
+#define FW_HYPERCALL_FPSWA_PATCH_PADDR			FW_HYPERCALL_PADDR(FW_HYPERCALL_FPSWA_PATCH_INDEX)
+#define FW_HYPERCALL_FPSWA				0x500UL
+
 /* Hypercalls index bellow _FIRST_ARCH are reserved by Xen, while those above
    are for the architecture.
    Note: this limit was defined by Xen/ia64 (and not by Xen).²
      This can be renumbered safely.
 */
 #define FW_HYPERCALL_FIRST_ARCH		0x300UL
-
-#define FW_HYPERCALL_IPI		0x400UL
 
 /* Xen/ia64 user hypercalls.  Only used for debugging.  */
 #define FW_HYPERCALL_FIRST_USER		0xff00UL

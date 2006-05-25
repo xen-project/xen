@@ -14,6 +14,7 @@
 
 #include <linux/efi.h>	/* FOR EFI_UNIMPLEMENTED */
 #include <asm/sal.h>	/* FOR struct ia64_sal_retval */
+#include <asm/fpswa.h>	/* FOR struct fpswa_ret_t */
 
 #include <asm/vcpu.h>
 #include <asm/dom_fw.h>
@@ -181,12 +182,19 @@ fw_hypercall_ipi (struct pt_regs *regs)
 	return;
 }
 
+static fpswa_ret_t
+fw_hypercall_fpswa (struct vcpu *v)
+{
+	return PSCBX(v, fpswa_ret);
+}
+
 static IA64FAULT
 fw_hypercall (struct pt_regs *regs)
 {
 	struct vcpu *v = current;
 	struct sal_ret_values x;
 	efi_status_t efi_ret_value;
+	fpswa_ret_t fpswa_ret;
 	IA64FAULT fault; 
 	unsigned long index = regs->r2 & FW_HYPERCALL_NUM_MASK_HIGH;
 
@@ -252,6 +260,13 @@ fw_hypercall (struct pt_regs *regs)
 		break;
 	    case FW_HYPERCALL_IPI:
 		fw_hypercall_ipi (regs);
+		break;
+	    case FW_HYPERCALL_FPSWA:
+		fpswa_ret = fw_hypercall_fpswa (v);
+		regs->r8  = fpswa_ret.status;
+		regs->r9  = fpswa_ret.err0;
+		regs->r10 = fpswa_ret.err1;
+		regs->r11 = fpswa_ret.err2;
 		break;
 	    default:
 		printf("unknown ia64 fw hypercall %lx\n", regs->r2);

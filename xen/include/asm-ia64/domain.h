@@ -10,6 +10,7 @@
 #include <asm/vmx_platform.h>
 #include <xen/list.h>
 #include <xen/cpumask.h>
+#include <asm/fpswa.h>
 
 extern void domain_relinquish_resources(struct domain *);
 
@@ -59,8 +60,12 @@ struct arch_domain {
     unsigned long initrd_start;
     unsigned long initrd_len;
     char *cmdline;
+    /* There are these for EFI_SET_VIRTUAL_ADDRESS_MAP emulation. */
     int efi_virt_mode;		/* phys : 0 , virt : 1 */
+    /* Metaphysical address to efi_runtime_services_t in domain firmware memory is set. */
     void *efi_runtime;
+    /* Metaphysical address to fpswa_interface_t in domain firmware memory is set. */
+    void *fpswa_inf;
 };
 #define xen_vastart arch.xen_vastart
 #define xen_vaend arch.xen_vaend
@@ -109,6 +114,7 @@ struct arch_vcpu {
     //for phycial  emulation
     unsigned long old_rsc;
     int mode_flags;
+    fpswa_ret_t fpswa_ret;	/* save return values of FPSWA emulation */
     struct arch_vmx_struct arch_vmx; /* Virtual Machine Extensions */
 };
 

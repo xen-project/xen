@@ -15,6 +15,7 @@
 #include <asm/pal.h>
 #include <asm/sal.h>
 #include <asm/meminit.h>
+#include <asm/fpswa.h>
 #include <xen/compile.h>
 #include <xen/acpi.h>
 
@@ -60,6 +61,29 @@ dom_pa(unsigned long imva)
     } while (0)
 
 // builds a hypercall bundle at domain physical address
+static void dom_fpswa_hypercall_patch(struct domain *d)
+{
+	unsigned long *entry_imva, *patch_imva;
+	unsigned long entry_paddr = FW_HYPERCALL_FPSWA_ENTRY_PADDR;
+	unsigned long patch_paddr = FW_HYPERCALL_FPSWA_PATCH_PADDR;
+
+#ifndef CONFIG_XEN_IA64_DOM0_VP
+	if (d == dom0) {
+		entry_paddr += dom0_start;
+		patch_paddr += dom0_start;
+	}
+#endif
+	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, entry_paddr);
+	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, patch_paddr);
+	entry_imva = (unsigned long *) domain_mpa_to_imva(d, entry_paddr);
+	patch_imva = (unsigned long *) domain_mpa_to_imva(d, patch_paddr);
+
+	*entry_imva++ = patch_paddr;
+	*entry_imva   = 0;
+	build_hypercall_bundle(patch_imva, d->arch.breakimm, FW_HYPERCALL_FPSWA, 1);
+}
+
+// builds a hypercall bundle at domain physical address
 static void dom_efi_hypercall_patch(struct domain *d, unsigned long paddr, unsigned long hypercall)
 {
 	unsigned long *imva;
@@ -71,7 +95,6 @@ static void dom_efi_hypercall_patch(struct domain *d, unsigned long paddr, unsig
 	imva = (unsigned long *) domain_mpa_to_imva(d, paddr);
 	build_hypercall_bundle(imva, d->arch.breakimm, hypercall, 1);
 }
-
 
 // builds a hypercall bundle at domain physical address
 static void dom_fw_hypercall_patch(struct domain *d, unsigned long paddr, unsigned long hypercall,unsigned long ret)
@@ -771,6 +794,7 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	struct ia64_sal_systab *sal_systab;
 	struct ia64_sal_desc_entry_point *sal_ed;
 	struct ia64_sal_desc_ap_wakeup *sal_wakeup;
+	fpswa_interface_t *fpswa_inf;
 	efi_memory_desc_t *efi_memmap, *md;
 	struct ia64_boot_param *bp;
 	unsigned long *pfn;
@@ -812,6 +836,7 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	sal_systab  = (void *) cp; cp += sizeof(*sal_systab);
 	sal_ed      = (void *) cp; cp += sizeof(*sal_ed);
 	sal_wakeup  = (void *) cp; cp += sizeof(*sal_wakeup);
+	fpswa_inf   = (void *) cp; cp += sizeof(*fpswa_inf);
 	efi_memmap  = (void *) cp; cp += NUM_MEM_DESCS*sizeof(*efi_memmap);
 	bp	    = (void *) cp; cp += sizeof(*bp);
 	pfn         = (void *) cp; cp += NFUNCPTRS * 2 * sizeof(pfn);
@@ -819,6 +844,7 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 
 	/* Initialise for EFI_SET_VIRTUAL_ADDRESS_MAP emulation */
 	d->arch.efi_runtime = efi_runtime;
+	d->arch.fpswa_inf   = fpswa_inf;
 
 	if (args) {
 		if (arglen >= 1024)
@@ -962,6 +988,11 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 
 	sal_systab->checksum = -checksum;
 
+	/* Fill in the FPSWA interface: */
+	fpswa_inf->revision = fpswa_interface->revision;
+	dom_fpswa_hypercall_patch(d);
+	fpswa_inf->fpswa = (void *) FW_HYPERCALL_FPSWA_ENTRY_PADDR + start_mpaddr;
+
 	i = 0;
 	if (d == dom0) {
 #ifndef CONFIG_XEN_IA64_DOM0_VP
@@ -1045,7 +1076,7 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	bp->console_info.num_rows = 25;
 	bp->console_info.orig_x = 0;
 	bp->console_info.orig_y = 24;
-	bp->fpswa = 0;
+	bp->fpswa = dom_pa((unsigned long) fpswa_inf);
 	if (d == dom0) {
 		// XXX CONFIG_XEN_IA64_DOM0_VP
 		// initrd_start address is hard coded in start_kernel()

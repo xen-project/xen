@@ -21,6 +21,7 @@
 #include <asm/pgalloc.h>
 #include <asm/vcpu.h>
 #include <asm/dom_fw.h>
+#include <asm/fpswa.h>
 #include <public/sched.h>
 
 extern unsigned long translate_domain_mpaddr(unsigned long);
@@ -75,6 +76,7 @@ efi_emulate_set_virtual_address_map(
 	unsigned long *vfn;
 	struct domain *d = current->domain;
 	efi_runtime_services_t *efi_runtime = d->arch.efi_runtime;
+	fpswa_interface_t *fpswa_inf = d->arch.fpswa_inf;
 
 	if (descriptor_version != EFI_MEMDESC_VERSION) {
 		printf ("efi_emulate_set_virtual_address_map: memory descriptor version unmatched\n");
@@ -119,6 +121,12 @@ efi_emulate_set_virtual_address_map(
 		EFI_HYPERCALL_PATCH_TO_VIRT(efi_runtime->set_variable,EFI_SET_VARIABLE);
 		EFI_HYPERCALL_PATCH_TO_VIRT(efi_runtime->get_next_high_mono_count,EFI_GET_NEXT_HIGH_MONO_COUNT);
 		EFI_HYPERCALL_PATCH_TO_VIRT(efi_runtime->reset_system,EFI_RESET_SYSTEM);
+
+		vfn = (unsigned long *) domain_mpa_to_imva(d, (unsigned long) fpswa_inf->fpswa);
+		*vfn++ = FW_HYPERCALL_FPSWA_PATCH_INDEX * 16UL + md->virt_addr;
+		*vfn   = 0;
+		fpswa_inf->fpswa = (void *) (FW_HYPERCALL_FPSWA_ENTRY_INDEX * 16UL + md->virt_addr);
+		break;
 	}
 
 	/* The virtual address map has been applied. */
