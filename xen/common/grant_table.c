@@ -505,15 +505,12 @@ gnttab_setup_table(
         goto out;
     }
 
-    if ( op.nr_frames <= NR_GRANT_FRAMES )
+    ASSERT(d->grant_table != NULL);
+    op.status = GNTST_okay;
+    for ( i = 0; i < op.nr_frames; i++ )
     {
-        ASSERT(d->grant_table != NULL);
-        op.status = GNTST_okay;
-        for ( i = 0; i < op.nr_frames; i++ )
-        {
-            gmfn = gnttab_shared_gmfn(d, d->grant_table, i);
-            (void)copy_to_guest_offset(op.frame_list, i, &gmfn, 1);
-        }
+        gmfn = gnttab_shared_gmfn(d, d->grant_table, i);
+        (void)copy_to_guest_offset(op.frame_list, i, &gmfn, 1);
     }
 
     put_domain(d);
