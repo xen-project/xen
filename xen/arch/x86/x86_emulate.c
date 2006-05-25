@@ -1103,7 +1103,7 @@ x86_emulate_memop(
 #elif defined(__x86_64__)
     {
         unsigned long old, new;
-        if ( (rc = ops->read_emulated(cr2, &old, 8)) != 0 )
+        if ( (rc = ops->read_emulated(cr2, &old, 8, ctxt)) != 0 )
             goto done;
         if ( ((uint32_t)(old>>0) != (uint32_t)_regs.eax) ||
              ((uint32_t)(old>>32) != (uint32_t)_regs.edx) )
@@ -1115,7 +1115,7 @@ x86_emulate_memop(
         else
         {
             new = (_regs.ecx<<32)|(uint32_t)_regs.ebx;
-            if ( (rc = ops->cmpxchg_emulated(cr2, old, new, 8)) != 0 )
+            if ( (rc = ops->cmpxchg_emulated(cr2, old, new, 8, ctxt)) != 0 )
                 goto done;
             _regs.eflags |= EFLG_ZF;
         }
