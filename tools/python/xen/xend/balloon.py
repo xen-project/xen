@@ -32,6 +32,7 @@ PROC_XEN_BALLOON = '/proc/xen/balloon'
 BALLOON_OUT_SLACK = 1 # MiB.  We need this because the physinfo details are
                       # rounded.
 RETRY_LIMIT = 10
+RETRY_LIMIT_INCR = 5
 ##
 # The time to sleep between retries grows linearly, using this value (in
 # seconds).  When the system is lightly loaded, memory should be scrubbed and
@@ -118,7 +119,8 @@ def free(required):
         retries = 0
         sleep_time = SLEEP_TIME_GROWTH
         last_new_alloc = None
-        while retries < RETRY_LIMIT:
+        rlimit = RETRY_LIMIT
+        while retries < rlimit:
             free_mem = xc.physinfo()['free_memory']
 
             if free_mem >= need_mem:
@@ -127,7 +129,9 @@ def free(required):
                 return
 
             if retries == 0:
-                log.debug("Balloon: free %d; need %d.", free_mem, need_mem)
+                rlimit += ((need_mem - free_mem)/1024) * RETRY_LIMIT_INCR
+                log.debug("Balloon: free %d; need %d; retries: %d.", 
+                          free_mem, need_mem, rlimit)
 
             if dom0_min_mem > 0:
                 dom0_alloc = get_dom0_current_alloc()
@@ -143,8 +147,9 @@ def free(required):
                     # Continue to retry, waiting for ballooning.
 
             time.sleep(sleep_time)
+            if retries < 2 * RETRY_LIMIT:
+                sleep_time += SLEEP_TIME_GROWTH
             retries += 1
-            sleep_time += SLEEP_TIME_GROWTH
 
         # Not enough memory; diagnose the problem.
         if dom0_min_mem == 0:
