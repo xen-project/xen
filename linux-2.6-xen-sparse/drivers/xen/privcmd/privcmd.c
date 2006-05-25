@@ -267,6 +267,9 @@ static int __init privcmd_init(void)
 	set_bit(__HYPERVISOR_mmuext_op,        hypercall_permission_map);
 	set_bit(__HYPERVISOR_xen_version,      hypercall_permission_map);
 	set_bit(__HYPERVISOR_sched_op,         hypercall_permission_map);
+	set_bit(__HYPERVISOR_sched_op_compat,  hypercall_permission_map);
+	set_bit(__HYPERVISOR_event_channel_op_compat,
+		hypercall_permission_map);
 
 	privcmd_intf = create_xen_proc_entry("privcmd", 0400);
 	if (privcmd_intf != NULL)
