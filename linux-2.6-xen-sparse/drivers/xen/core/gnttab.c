@@ -38,7 +38,6 @@
 #include <linux/vmalloc.h>
 #include <asm/pgtable.h>
 #include <xen/interface/xen.h>
-#include <asm/fixmap.h>
 #include <asm/uaccess.h>
 #include <xen/gnttab.h>
 #include <asm/synch_bitops.h>
