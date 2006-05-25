@@ -34,7 +34,6 @@ extern void vmx_migrate_timers(struct vcpu *v);
 extern void arch_vmx_do_launch(struct vcpu *);
 extern void arch_vmx_do_resume(struct vcpu *);
 extern void set_guest_time(struct vcpu *v, u64 gtime);
-extern u64  get_guest_time(struct vcpu *v);
 
 extern unsigned int cpu_rev;
 

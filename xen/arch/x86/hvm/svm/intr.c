@@ -44,45 +44,33 @@
  */
 #define BSP_CPU(v)    (!(v->vcpu_id))
 
-u64 svm_get_guest_time(struct vcpu *v)
-{
-    struct hvm_time_info *time_info = &(v->domain->arch.hvm_domain.vpit.time_info);
-    u64    host_tsc;
-    
-    rdtscll(host_tsc);
-    return host_tsc + time_info->cache_tsc_offset;
-}
-
 void svm_set_guest_time(struct vcpu *v, u64 gtime)
 {
-    struct hvm_time_info *time_info = &(v->domain->arch.hvm_domain.vpit.time_info);
     u64    host_tsc;
    
     rdtscll(host_tsc);
     
-    time_info->cache_tsc_offset = gtime - host_tsc;
-    v->arch.hvm_svm.vmcb->tsc_offset = time_info->cache_tsc_offset;
+    v->arch.hvm_vcpu.cache_tsc_offset = gtime - host_tsc;
+    v->arch.hvm_svm.vmcb->tsc_offset = v->arch.hvm_vcpu.cache_tsc_offset;
 }
 
 static inline void
 interrupt_post_injection(struct vcpu * v, int vector, int type)
 {
-    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
-    struct hvm_time_info *time_info = &vpit->time_info;
+    struct  periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
 
     if ( is_pit_irq(v, vector, type) ) {
-        if ( !time_info->first_injected ) {
-            time_info->pending_intr_nr = 0;
-            time_info->last_pit_gtime = svm_get_guest_time(v);
-            time_info->first_injected = 1;
+        if ( !pt->first_injected ) {
+            pt->pending_intr_nr = 0;
+            pt->last_plt_gtime = hvm_get_guest_time(v);
+            pt->scheduled = NOW() + pt->period;
+            set_timer(&pt->timer, pt->scheduled);
+            pt->first_injected = 1;
         } else {
-            time_info->pending_intr_nr--;
+            pt->pending_intr_nr--;
+            pt->last_plt_gtime += pt->period_cycles;
+            svm_set_guest_time(v, pt->last_plt_gtime);
         }
-        time_info->count_advance = 0;
-        time_info->count_point = NOW();
-
-        time_info->last_pit_gtime += time_info->period_cycles;
-        svm_set_guest_time(v, time_info->last_pit_gtime);
     }
 
     switch(type)
@@ -121,8 +109,7 @@ asmlinkage void svm_intr_assist(void)
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     struct hvm_domain *plat=&v->domain->arch.hvm_domain; 
-    struct hvm_virpit *vpit = &plat->vpit;
-    struct hvm_time_info *time_info = &vpit->time_info;
+    struct periodic_time *pt = &plat->pl_time.periodic_tm;
     struct hvm_virpic *pic= &plat->vpic;
     int intr_type = VLAPIC_DELIV_MODE_EXT;
     int intr_vector = -1;
@@ -174,9 +161,9 @@ asmlinkage void svm_intr_assist(void)
       if ( cpu_has_pending_irq(v) ) {
            intr_vector = cpu_get_interrupt(v, &intr_type);
       }
-      else  if ( (v->vcpu_id == 0) && time_info->pending_intr_nr ) {
-          pic_set_irq(pic, 0, 0);
-          pic_set_irq(pic, 0, 1);
+      else  if ( (v->vcpu_id == 0) && pt->enabled && pt->pending_intr_nr ) {
+          pic_set_irq(pic, pt->irq, 0);
+          pic_set_irq(pic, pt->irq, 1);
           intr_vector = cpu_get_interrupt(v, &intr_type);
       }
     }
@@ -190,7 +177,7 @@ asmlinkage void svm_intr_assist(void)
             /* Re-injecting a PIT interruptt? */
             if (re_injecting && 
                 is_pit_irq(v, intr_vector, intr_type)) {
-                    ++time_info->pending_intr_nr;
+                    ++pt->pending_intr_nr;
             }
             /* let's inject this interrupt */
             TRACE_3D(TRC_VMX_INT, v->domain->domain_id, intr_vector, 0);

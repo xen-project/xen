@@ -102,7 +102,7 @@ static void vmx_relinquish_guest_resources(struct domain *d)
         }
     }
 
-    kill_timer(&d->arch.hvm_domain.vpit.time_info.pit_timer);
+    kill_timer(&d->arch.hvm_domain.pl_time.periodic_tm.timer);
 
     if ( d->arch.hvm_domain.shared_page_va )
         unmap_domain_page_global(
@@ -358,12 +358,11 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
 static void vmx_freeze_time(struct vcpu *v)
 {
-    struct hvm_time_info *time_info = &(v->domain->arch.hvm_domain.vpit.time_info);
+    struct periodic_time *pt=&v->domain->arch.hvm_domain.pl_time.periodic_tm;
     
-    if ( time_info->first_injected && !v->domain->arch.hvm_domain.guest_time ) {
-        v->domain->arch.hvm_domain.guest_time = get_guest_time(v);
-        time_info->count_advance += (NOW() - time_info->count_point);
-        stop_timer(&(time_info->pit_timer));
+    if ( pt->enabled && pt->first_injected && !v->arch.hvm_vcpu.guest_time ) {
+        v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
+        stop_timer(&(pt->timer));
     }
 }
 
@@ -393,10 +392,12 @@ int vmx_initialize_guest_resources(struct vcpu *v)
 
 void vmx_migrate_timers(struct vcpu *v)
 {
-    struct hvm_time_info *time_info = &v->domain->arch.hvm_domain.vpit.time_info;
+    struct periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
 
-    migrate_timer(&time_info->pit_timer, v->processor);
-    migrate_timer(&v->arch.hvm_vmx.hlt_timer, v->processor);
+    if ( pt->enabled ) {
+        migrate_timer(&pt->timer, v->processor);
+        migrate_timer(&v->arch.hvm_vmx.hlt_timer, v->processor);
+    }
     if ( hvm_apic_support(v->domain) && VLAPIC(v))
         migrate_timer(&(VLAPIC(v)->vlapic_timer), v->processor);
 }
@@ -1861,14 +1862,8 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
                 (unsigned long)regs->edx);
     switch (regs->ecx) {
     case MSR_IA32_TIME_STAMP_COUNTER:
-    {
-        struct hvm_time_info *time_info;
-
-        rdtscll(msr_content);
-        time_info = &(v->domain->arch.hvm_domain.vpit.time_info);
-        msr_content += time_info->cache_tsc_offset;
+        msr_content = hvm_get_guest_time(v);
         break;
-    }
     case MSR_IA32_SYSENTER_CS:
         __vmread(GUEST_SYSENTER_CS, (u32 *)&msr_content);
         break;
@@ -1941,11 +1936,11 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
 void vmx_vmexit_do_hlt(void)
 {
     struct vcpu *v=current;
-    struct hvm_virpit *vpit = &(v->domain->arch.hvm_domain.vpit);
+    struct periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
     s_time_t   next_pit=-1,next_wakeup;
 
     if ( !v->vcpu_id )
-        next_pit = get_pit_scheduled(v,vpit);
+        next_pit = get_scheduled(v, pt->irq, pt);
     next_wakeup = get_apictime_scheduled(v);
     if ( (next_pit != -1 && next_pit < next_wakeup) || next_wakeup == -1 )
         next_wakeup = next_pit;
