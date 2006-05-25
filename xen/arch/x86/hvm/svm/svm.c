@@ -51,13 +51,6 @@
 
 #define SVM_EXTRA_DEBUG
 
-#ifdef TRACE_BUFFER
-static unsigned long trace_values[NR_CPUS][4];
-#define TRACE_VMEXIT(index,value) trace_values[current->processor][index]=value
-#else
-#define TRACE_VMEXIT(index,value) ((void)0)
-#endif
-
 /* Useful define */
 #define MAX_INST_SIZE  15
 
@@ -817,7 +810,6 @@ static int svm_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
             return 1;
 
         handle_mmio(va, va);
-        TRACE_VMEXIT(2,2);
         return 1;
     }
 
@@ -843,7 +835,6 @@ static int svm_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
             return 1;
         }
 
-        TRACE_VMEXIT (2,2);
         handle_mmio(va, gpa);
 
         return 1;
@@ -855,8 +846,6 @@ static int svm_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
         /* Let's make sure that the Guest TLB is flushed */
         set_bit(ARCH_SVM_VMCB_ASSIGN_ASID, &v->arch.hvm_svm.flags);
     }
-
-    TRACE_VMEXIT (2,result);
 
     return result;
 }

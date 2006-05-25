@@ -47,7 +47,7 @@
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vlapic.h>
 
-static unsigned long trace_values[NR_CPUS][4];
+static unsigned long trace_values[NR_CPUS][5];
 #define TRACE_VMEXIT(index,value) trace_values[smp_processor_id()][index]=value
 
 static void vmx_ctxt_switch_from(struct vcpu *v);
