@@ -2,7 +2,6 @@
 ifneq ($(CONFIG_XEN_IA64_DOM0_VP),y)
 obj-y   += util.o
 endif
-obj-$(CONFIG_XEN_IA64_DOM0_VP)	+= net_driver_util.o
 
 obj-y	+= core/
 #obj-y	+= char/
