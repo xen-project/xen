@@ -33,6 +33,7 @@
 #include "hpsim_ssc.h"
 #include <xen/multicall.h>
 #include <asm/debugger.h>
+#include <asm/fpswa.h>
 
 extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 /* FIXME: where these declarations shold be there ? */
@@ -392,6 +393,99 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 	PSCB(current,iha) = iha;
 	PSCB(current,ifa) = address;
 	reflect_interruption(isr, regs, fault);
+}
+
+fpswa_interface_t *fpswa_interface = 0;
+
+void trap_init (void)
+{
+	if (ia64_boot_param->fpswa)
+		/* FPSWA fixup: make the interface pointer a virtual address: */
+		fpswa_interface = __va(ia64_boot_param->fpswa);
+	else
+		printk("No FPSWA supported.\n");
+}
+
+static fpswa_ret_t
+fp_emulate (int fp_fault, void *bundle, long *ipsr, long *fpsr, long *isr, long *pr, long *ifs,
+            struct pt_regs *regs)
+{
+	fp_state_t fp_state;
+	fpswa_ret_t ret;
+
+	if (!fpswa_interface)
+		return ((fpswa_ret_t) {-1, 0, 0, 0});
+
+	memset(&fp_state, 0, sizeof(fp_state_t));
+
+	/*
+	 * compute fp_state.  only FP registers f6 - f11 are used by the
+	 * kernel, so set those bits in the mask and set the low volatile
+	 * pointer to point to these registers.
+	 */
+	fp_state.bitmask_low64 = 0xfc0;  /* bit6..bit11 */
+
+	fp_state.fp_state_low_volatile = (fp_state_low_volatile_t *) &regs->f6;
+	/*
+	 * unsigned long (*EFI_FPSWA) (
+	 *      unsigned long    trap_type,
+	 *      void             *Bundle,
+	 *      unsigned long    *pipsr,
+	 *      unsigned long    *pfsr,
+	 *      unsigned long    *pisr,
+	 *      unsigned long    *ppreds,
+	 *      unsigned long    *pifs,
+	 *      void             *fp_state);
+	 */
+	ret = (*fpswa_interface->fpswa)((unsigned long) fp_fault, bundle,
+					(unsigned long *) ipsr, (unsigned long *) fpsr,
+					(unsigned long *) isr, (unsigned long *) pr,
+					(unsigned long *) ifs, &fp_state);
+
+	return ret;
+}
+
+/*
+ * Handle floating-point assist faults and traps for domain.
+ */
+static unsigned long
+handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
+{
+	struct vcpu *v = current;
+	IA64_BUNDLE bundle;
+	IA64_BUNDLE __get_domain_bundle(UINT64);
+	unsigned long fault_ip;
+	fpswa_ret_t ret;
+
+	fault_ip = regs->cr_iip;
+	/*
+	 * When the FP trap occurs, the trapping instruction is completed.
+	 * If ipsr.ri == 0, there is the trapping instruction in previous bundle.
+	 */
+	if (!fp_fault && (ia64_psr(regs)->ri == 0))
+		fault_ip -= 16;
+	bundle = __get_domain_bundle(fault_ip);
+	if (!bundle.i64[0] && !bundle.i64[1]) {
+		printk("%s: floating-point bundle at 0x%lx not mapped\n",
+		       __FUNCTION__, fault_ip);
+		return -1;
+	}
+
+	ret = fp_emulate(fp_fault, &bundle, &regs->cr_ipsr, &regs->ar_fpsr,
+	                 &isr, &regs->pr, &regs->cr_ifs, regs);
+
+	if (ret.status) {
+		PSCBX(v, fpswa_ret) = ret;
+		printk("%s(%s): fp_emulate() returned %ld\n",
+		       __FUNCTION__, fp_fault?"fault":"trap", ret.status);
+	} else {
+		if (fp_fault) {
+			/* emulation was successful */
+			vcpu_increment_iip(v);
+		}
+	}
+
+	return ret.status;
 }
 
 void
@@ -758,29 +852,31 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 			vector = IA64_NAT_CONSUMPTION_VECTOR; break;
 		}
 #endif
-printf("*** NaT fault... attempting to handle as privop\n");
-printf("isr=%016lx, ifa=%016lx, iip=%016lx, ipsr=%016lx\n",
-       isr, ifa, regs->cr_iip, psr);
+		printf("*** NaT fault... attempting to handle as privop\n");
+		printf("isr=%016lx, ifa=%016lx, iip=%016lx, ipsr=%016lx\n",
+		       isr, ifa, regs->cr_iip, psr);
 		//regs->eml_unat = 0;  FIXME: DO WE NEED THIS???
 		// certain NaT faults are higher priority than privop faults
 		vector = priv_emulate(v,regs,isr);
 		if (vector == IA64_NO_FAULT) {
-printf("*** Handled privop masquerading as NaT fault\n");
+			printf("*** Handled privop masquerading as NaT fault\n");
 			return;
 		}
 		vector = IA64_NAT_CONSUMPTION_VECTOR; break;
 	    case 27:
-//printf("*** Handled speculation vector, itc=%lx!\n",ia64_get_itc());
+		//printf("*** Handled speculation vector, itc=%lx!\n",ia64_get_itc());
 		PSCB(current,iim) = iim;
 		vector = IA64_SPECULATION_VECTOR; break;
 	    case 30:
 		// FIXME: Should we handle unaligned refs in Xen??
 		vector = IA64_UNALIGNED_REF_VECTOR; break;
 	    case 32:
-		printf("ia64_handle_reflection: handling FP fault");
+		if (!(handle_fpu_swa(1, regs, isr))) return;
+		printf("ia64_handle_reflection: handling FP fault\n");
 		vector = IA64_FP_FAULT_VECTOR; break;
 	    case 33:
-		printf("ia64_handle_reflection: handling FP trap");
+		if (!(handle_fpu_swa(0, regs, isr))) return;
+		printf("ia64_handle_reflection: handling FP trap\n");
 		vector = IA64_FP_TRAP_VECTOR; break;
 	    case 34:
 		printf("ia64_handle_reflection: handling lowerpriv trap");

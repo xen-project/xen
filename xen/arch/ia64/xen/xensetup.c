@@ -53,6 +53,7 @@ extern void alloc_dom0(void);
 extern void setup_per_cpu_areas(void);
 extern void mem_init(void);
 extern void init_IRQ(void);
+extern void trap_init(void);
 
 /* opt_nosmp: If true, secondary processors are ignored. */
 static int opt_nosmp = 0;
@@ -320,6 +321,8 @@ void start_kernel(void)
     total_pages = nr_pages;
 
     init_frametable();
+
+    trap_init();
 
     alloc_dom0();
 
