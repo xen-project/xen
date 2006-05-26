@@ -67,7 +67,7 @@ static DECLARE_MUTEX(balloon_mutex);
  * Also protects non-atomic updates of current_pages and driver_pages, and
  * balloon lists.
  */
-spinlock_t balloon_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(balloon_lock);
 
 /* We aim for 'current allocation' == 'target allocation'. */
 static unsigned long current_pages;
@@ -360,6 +360,12 @@ static void balloon_process(void *unused)
 /* Resets the Xen limit, sets new target, and kicks off processing. */
 static void set_new_target(unsigned long target)
 {
+	unsigned long min_target;
+
+	/* Do not allow target to reduce below 2% of maximum memory size. */
+	min_target = max_pfn / 50;
+	target = max(target, min_target);
+
 	/* No need for lock. Not read-modify-write updates. */
 	hard_limit   = ~0UL;
 	target_pages = target;

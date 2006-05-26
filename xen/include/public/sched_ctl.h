@@ -10,6 +10,7 @@
 /* Scheduler types. */
 #define SCHED_BVT      0
 #define SCHED_SEDF     4
+#define SCHED_CREDIT   5
 
 /* Set or get info? */
 #define SCHED_INFO_PUT 0
@@ -48,6 +49,10 @@ struct sched_adjdom_cmd {
             uint32_t extratime;
             uint32_t weight;
         } sedf;
+        struct csched_domain {
+            uint16_t weight;
+            uint16_t cap;
+        } credit;
     } u;
 };
 

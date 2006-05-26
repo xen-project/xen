@@ -48,6 +48,8 @@ unsigned long csum_page (void * page);
 #define L2_PAGETABLE_SHIFT_PAE   21
 #define L3_PAGETABLE_SHIFT_PAE   30
 
+#define L2_PAGETABLE_SHIFT_I386  22
+
 #if defined(__i386__)
 #define L1_PAGETABLE_SHIFT       12
 #define L2_PAGETABLE_SHIFT       22
@@ -61,6 +63,9 @@ unsigned long csum_page (void * page);
 #define L1_PAGETABLE_ENTRIES_PAE  512
 #define L2_PAGETABLE_ENTRIES_PAE  512
 #define L3_PAGETABLE_ENTRIES_PAE    4
+
+#define L1_PAGETABLE_ENTRIES_I386 1024
+#define L2_PAGETABLE_ENTRIES_I386 1024
 
 #if defined(__i386__)
 #define L1_PAGETABLE_ENTRIES   1024
@@ -94,6 +99,11 @@ typedef unsigned long l4_pgentry_t;
   (((_a) >> L2_PAGETABLE_SHIFT_PAE) & (L2_PAGETABLE_ENTRIES_PAE - 1))
 #define l3_table_offset_pae(_a) \
   (((_a) >> L3_PAGETABLE_SHIFT_PAE) & (L3_PAGETABLE_ENTRIES_PAE - 1))
+
+#define l1_table_offset_i386(_a) \
+  (((_a) >> L1_PAGETABLE_SHIFT) & (L1_PAGETABLE_ENTRIES_I386 - 1))
+#define l2_table_offset_i386(_a) \
+  (((_a) >> L2_PAGETABLE_SHIFT_I386) & (L2_PAGETABLE_ENTRIES_I386 - 1))
 
 #if defined(__i386__)
 #define l1_table_offset(_a) \

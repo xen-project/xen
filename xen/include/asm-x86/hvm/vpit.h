@@ -29,9 +29,7 @@
 #include <asm/hvm/vpic.h>
 
 #define PIT_FREQ 1193181
-
-#define PIT_BASE 0x40
-#define HVM_PIT_ACCEL_MODE 2
+#define PIT_BASE        0x40
 
 typedef struct PITChannelState {
     int count; /* can be 65536 */
@@ -48,47 +46,56 @@ typedef struct PITChannelState {
     u8 gate; /* timer start */
     s64 count_load_time;
     /* irq handling */
-    s64 next_transition_time;
-    int irq;
-    struct hvm_time_info *hvm_time;
-    u32 period; /* period(ns) based on count */
+    struct vcpu      *vcpu;
+    struct periodic_time *pt;
 } PITChannelState;
-
-struct hvm_time_info {
-    /* extra info for the mode 2 channel */
-    struct timer pit_timer;
-    struct vcpu *vcpu;          /* which vcpu the ac_timer bound to */
-    u64 period_cycles;          /* pit frequency in cpu cycles */
-    s_time_t count_advance;     /* accumulated count advance since last fire */
-    s_time_t count_point;        /* last point accumulating count advance */
-    unsigned int pending_intr_nr; /* the couner for pending timer interrupts */
-    int first_injected;         /* flag to prevent shadow window */
-    s64 cache_tsc_offset;       /* cache of VMCS TSC_OFFSET offset */
-    u64 last_pit_gtime;         /* guest time when last pit is injected */
+   
+/*
+ * Abstract layer of periodic time, one short time.
+ */
+struct periodic_time {
+    char enabled;               /* enabled */
+    char one_shot;              /* one shot time */
+    char irq;
+    char first_injected;        /* flag to prevent shadow window */
+    u32 pending_intr_nr;        /* the couner for pending timer interrupts */
+    u32 period;                 /* frequency in ns */
+    u64 period_cycles;          /* frequency in cpu cycles */
+    s_time_t scheduled;         /* scheduled timer interrupt */
+    u64 last_plt_gtime;         /* platform time when last IRQ is injected */
+    struct timer timer;         /* ac_timer */
 };
 
-typedef struct hvm_virpit {
+typedef struct PITState {
     PITChannelState channels[3];
-    struct hvm_time_info time_info;
     int speaker_data_on;
     int dummy_refresh_clock;
-}hvm_virpit;
+} PITState;
 
+struct pl_time {    /* platform time */
+    struct periodic_time periodic_tm;
+    struct PITState      vpit;
+    /* TODO: RTC/ACPI time */
+};
 
-static __inline__ s_time_t get_pit_scheduled(
-    struct vcpu *v,
-    struct hvm_virpit *vpit)
+static __inline__ s_time_t get_scheduled(
+    struct vcpu *v, int irq,
+    struct periodic_time *pt)
 {
-    struct PITChannelState *s = &(vpit->channels[0]);
-    if ( is_irq_enabled(v, 0) ) {
-        return s->next_transition_time;
+    if ( is_irq_enabled(v, irq) ) {
+        return pt->scheduled;
     }
     else
         return -1;
 }
 
 /* to hook the ioreq packet to get the PIT initialization info */
-extern void pit_init(struct hvm_virpit *pit, struct vcpu *v);
-extern void pickup_deactive_ticks(struct hvm_virpit *vpit);
+extern void hvm_hooks_assist(struct vcpu *v);
+extern void pickup_deactive_ticks(struct periodic_time *vpit);
+extern u64 hvm_get_guest_time(struct vcpu *v);
+extern struct periodic_time *create_periodic_time(struct vcpu *v, u32 period, char irq, char one_shot);
+extern void destroy_periodic_time(struct periodic_time *pt);
+void pit_init(struct vcpu *v, unsigned long cpu_khz);
+void pt_timer_fn(void *data);
 
 #endif /* __ASM_X86_HVM_VPIT_H__ */

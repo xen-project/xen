@@ -196,7 +196,7 @@ static int pcifront_try_connect(struct pcifront_device *pdev)
 static int pcifront_try_disconnect(struct pcifront_device *pdev)
 {
 	int err = 0;
-	XenbusState prev_state;
+	enum xenbus_state prev_state;
 
 	spin_lock(&pdev->dev_lock);
 
@@ -214,7 +214,7 @@ static int pcifront_try_disconnect(struct pcifront_device *pdev)
 }
 
 static void pcifront_backend_changed(struct xenbus_device *xdev,
-				     XenbusState be_state)
+				     enum xenbus_state be_state)
 {
 	struct pcifront_device *pdev = xdev->data;
 

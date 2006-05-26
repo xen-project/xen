@@ -32,6 +32,9 @@ struct hvm_vcpu {
     unsigned long   ioflags;
     struct mmio_op  mmio_op;
     struct vlapic   *vlapic;
+    s64             cache_tsc_offset;
+    u64             guest_time;
+
     /* For AP startup */
     unsigned long   init_sipi_sipi_state;
 

@@ -329,7 +329,7 @@ out:
  * Callback received when the backend's state changes.
  */
 static void backend_changed(struct xenbus_device *dev,
-			    XenbusState backend_state)
+			    enum xenbus_state backend_state)
 {
 	struct tpm_private *tp = dev->data;
 	DPRINTK("\n");

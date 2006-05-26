@@ -20,6 +20,8 @@
 #ifndef _XENSTORED_CORE_H
 #define _XENSTORED_CORE_H
 
+#include <xenctrl.h>
+
 #include <sys/types.h>
 #include <dirent.h>
 #include <stdbool.h>
@@ -162,6 +164,12 @@ void trace_watch_timeout(const struct connection *conn, const char *node, const 
 void trace(const char *fmt, ...);
 
 extern int event_fd;
+
+/* Map the kernel's xenstore page. */
+void *xenbus_map(void);
+
+/* Return the event channel used by xenbus. */
+evtchn_port_t xenbus_evtchn(void);
 
 #endif /* _XENSTORED_CORE_H */
 

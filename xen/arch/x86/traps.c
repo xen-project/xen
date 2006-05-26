@@ -876,7 +876,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                     PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
                 break;
             }
-            regs->edi += (regs->eflags & EF_DF) ? -op_bytes : op_bytes;
+            regs->edi += (regs->eflags & EF_DF) ? -(int)op_bytes : op_bytes;
             break;
 
         case 0x6e: /* OUTSB */
@@ -902,7 +902,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 outl_user((u32)data, (u16)regs->edx, v, regs);
                 break;
             }
-            regs->esi += (regs->eflags & EF_DF) ? -op_bytes : op_bytes;
+            regs->esi += (regs->eflags & EF_DF) ? -(int)op_bytes : op_bytes;
             break;
         }
 

@@ -13,6 +13,7 @@ CFLAGS += -Wstrict-prototypes -Wnested-externs -Wpointer-arith -Winline
 override CPPFLAGS := -Iinclude $(CPPFLAGS)
 ASFLAGS = -D__ASSEMBLY__
 
+LDLIBS =  -L. -lminios
 LDFLAGS := -N -T minios-$(TARGET_ARCH).lds
 
 ifeq ($(TARGET_ARCH),x86_32)
@@ -55,11 +56,11 @@ default: $(TARGET)
 links:
 	[ -e include/xen ] || ln -sf ../../../xen/include/public include/xen
 
-libminios.a: $(OBJS) $(HEAD)
-	ar r libminios.a $(HEAD) $(OBJS)
+libminios.a: links $(OBJS) $(HEAD)
+	$(AR) r libminios.a $(HEAD) $(OBJS)
 
-$(TARGET): links libminios.a $(HEAD)
-	$(LD) $(LDFLAGS) $(HEAD) -L. -lminios -o $@.elf
+$(TARGET): libminios.a $(HEAD)
+	$(LD) $(LDFLAGS) $(HEAD) $(LDLIBS) -o $@.elf
 	gzip -f -9 -c $@.elf >$@.gz
 
 .PHONY: clean

@@ -21,7 +21,6 @@
 #ifndef __ASM_X86_HVM_SVM_INTR_H__
 #define __ASM_X86_HVM_SVM_INTR_H__
 
-extern void svm_set_tsc_shift(struct vcpu *v, struct hvm_virpit *vpit);
 extern void svm_intr_assist(void);
 extern void svm_intr_assist_update(struct vcpu *v, int highest_vector);
 extern void svm_intr_assist_test_valid(struct vcpu *v, 

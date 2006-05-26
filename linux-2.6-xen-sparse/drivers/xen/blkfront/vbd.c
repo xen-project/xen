@@ -93,7 +93,7 @@ static struct block_device_operations xlvbd_block_fops =
 	.ioctl  = blkif_ioctl,
 };
 
-spinlock_t blkif_io_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(blkif_io_lock);
 
 static struct xlbd_major_info *
 xlbd_alloc_major_info(int major, int minor, int index)

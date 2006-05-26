@@ -354,6 +354,14 @@ int xc_sedf_domain_get(int xc_handle,
                        uint64_t *latency, uint16_t *extratime,
                        uint16_t *weight);
 
+int xc_csched_domain_set(int xc_handle,
+                         uint32_t domid,
+                         struct csched_domain *sdom);
+
+int xc_csched_domain_get(int xc_handle,
+                         uint32_t domid,
+                         struct csched_domain *sdom);
+
 typedef evtchn_status_t xc_evtchn_status_t;
 
 /*
@@ -444,9 +452,6 @@ int xc_domain_iomem_permission(int xc_handle,
                                unsigned long first_mfn,
                                unsigned long nr_mfns,
                                uint8_t allow_access);
-
-unsigned long xc_make_page_below_4G(int xc_handle, uint32_t domid,
-                                    unsigned long mfn);
 
 typedef dom0_perfc_desc_t xc_perfc_desc_t;
 /* IMPORTANT: The caller is responsible for mlock()'ing the @desc array. */

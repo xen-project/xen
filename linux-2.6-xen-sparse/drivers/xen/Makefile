@@ -1,5 +1,4 @@
 
-obj-y	+= net_driver_util.o
 obj-y	+= util.o
 
 obj-y	+= core/

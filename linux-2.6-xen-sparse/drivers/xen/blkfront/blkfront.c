@@ -247,7 +247,7 @@ fail:
  * Callback received when the backend's state changes.
  */
 static void backend_changed(struct xenbus_device *dev,
-			    XenbusState backend_state)
+			    enum xenbus_state backend_state)
 {
 	struct blkfront_info *info = dev->data;
 	struct block_device *bd;
@@ -434,7 +434,7 @@ int blkif_release(struct inode *inode, struct file *filep)
 		   have ignored this request initially, as the device was
 		   still mounted. */
 		struct xenbus_device * dev = info->xbdev;
-		XenbusState state = xenbus_read_driver_state(dev->otherend);
+		enum xenbus_state state = xenbus_read_driver_state(dev->otherend);
 
 		if (state == XenbusStateClosing)
 			blkfront_closing(dev);

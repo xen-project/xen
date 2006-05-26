@@ -84,7 +84,7 @@ int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
 EXPORT_SYMBOL_GPL(xenbus_watch_path2);
 
 
-int xenbus_switch_state(struct xenbus_device *dev, XenbusState state)
+int xenbus_switch_state(struct xenbus_device *dev, enum xenbus_state state)
 {
 	/* We check whether the state is currently set to the given value, and
 	   if not, then the state is set.  We don't want to unconditionally
@@ -269,9 +269,9 @@ int xenbus_free_evtchn(struct xenbus_device *dev, int port)
 }
 
 
-XenbusState xenbus_read_driver_state(const char *path)
+enum xenbus_state xenbus_read_driver_state(const char *path)
 {
-	XenbusState result;
+	enum xenbus_state result;
 	int err = xenbus_gather(XBT_NULL, path, "state", "%d", &result, NULL);
 	if (err)
 		result = XenbusStateClosed;

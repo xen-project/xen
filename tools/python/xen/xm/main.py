@@ -99,6 +99,7 @@ sched_sedf_help = "sched-sedf [DOM] [OPTIONS]       Show|Set simple EDF paramete
                                     specifies another way of setting a domain's\n\
                                     cpu period/slice."
 
+csched_help = "csched                           Set or get credit scheduler parameters"
 block_attach_help = """block-attach <DomId> <BackDev> <FrontDev> <Mode>
                 [BackDomId]         Create a new virtual block device"""
 block_detach_help = """block-detach  <DomId> <DevId>    Destroy a domain's virtual block device,
@@ -174,6 +175,7 @@ host_commands = [
     ]
 
 scheduler_commands = [
+    "csched",
     "sched-bvt",
     "sched-bvt-ctxallow",
     "sched-sedf",
@@ -735,6 +737,48 @@ def xm_sched_sedf(args):
         else:
             print_sedf(sedf_info)
 
+def xm_csched(args):
+    usage_msg = """Csched:     Set or get credit scheduler parameters
+ Usage:
+
+        csched -d domain [-w weight] [-c cap]
+    """
+    try:
+        opts, args = getopt.getopt(args[0:], "d:w:c:",
+            ["domain=", "weight=", "cap="])
+    except getopt.GetoptError:
+        # print help information and exit:
+        print usage_msg
+        sys.exit(1)
+
+    domain = None
+    weight = None
+    cap = None
+
+    for o, a in opts:
+        if o == "-d":
+            domain = a
+        elif o == "-w":
+            weight = int(a)
+        elif o == "-c":
+            cap = int(a);
+
+    if domain is None:
+        # place holder for system-wide scheduler parameters
+        print usage_msg
+        sys.exit(1)
+
+    if weight is None and cap is None:
+        print server.xend.domain.csched_get(domain)
+    else:
+        if weight is None:
+            weight = int(0)
+        if cap is None:
+            cap = int(~0)
+
+        err = server.xend.domain.csched_set(domain, weight, cap)
+        if err != 0:
+            print err
 
 def xm_info(args):
     arg_check(args, "info", 0)
@@ -1032,6 +1076,7 @@ commands = {
     "sched-bvt": xm_sched_bvt,
     "sched-bvt-ctxallow": xm_sched_bvt_ctxallow,
     "sched-sedf": xm_sched_sedf,
+    "csched": xm_csched,
     # block
     "block-attach": xm_block_attach,
     "block-detach": xm_block_detach,

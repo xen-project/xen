@@ -442,19 +442,17 @@ void set_hsa_to_guest( struct arch_svm_struct *arch_svm )
 void svm_do_resume(struct vcpu *v) 
 {
     struct domain *d = v->domain;
-    struct hvm_virpit *vpit = &d->arch.hvm_domain.vpit;
-    struct hvm_time_info *time_info = &vpit->time_info;
+    struct periodic_time *pt = &d->arch.hvm_domain.pl_time.periodic_tm;
 
     svm_stts(v);
 
     /* pick up the elapsed PIT ticks and re-enable pit_timer */
-    if ( time_info->first_injected ) {
-        if ( v->domain->arch.hvm_domain.guest_time ) {
-            svm_set_guest_time(v, v->domain->arch.hvm_domain.guest_time);
-            time_info->count_point = NOW();
-            v->domain->arch.hvm_domain.guest_time = 0;
+    if ( pt->enabled && pt->first_injected ) {
+        if ( v->arch.hvm_vcpu.guest_time ) {
+            svm_set_guest_time(v, v->arch.hvm_vcpu.guest_time);
+            v->arch.hvm_vcpu.guest_time = 0;
         }
-        pickup_deactive_ticks(vpit);
+        pickup_deactive_ticks(pt);
     }
 
     if ( test_bit(iopacket_port(v), &d->shared_info->evtchn_pending[0]) ||

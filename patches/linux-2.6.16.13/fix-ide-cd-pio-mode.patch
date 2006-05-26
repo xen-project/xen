@@ -1,0 +1,18 @@
+diff -ru ../pristine-linux-2.6.16.13/drivers/ide/ide-lib.c ./drivers/ide/ide-lib.c
+--- ../pristine-linux-2.6.16.13/drivers/ide/ide-lib.c	2006-05-02 22:38:44.000000000 +0100
++++ ./drivers/ide/ide-lib.c	2006-05-24 18:37:05.000000000 +0100
+@@ -410,10 +410,10 @@
+ {
+ 	u64 addr = BLK_BOUNCE_HIGH;	/* dma64_addr_t */
+ 
+-	if (!PCI_DMA_BUS_IS_PHYS) {
+-		addr = BLK_BOUNCE_ANY;
+-	} else if (on && drive->media == ide_disk) {
+-		if (HWIF(drive)->pci_dev)
++	if (on && drive->media == ide_disk) {
++		if (!PCI_DMA_BUS_IS_PHYS)
++			addr = BLK_BOUNCE_ANY;
++		else if (HWIF(drive)->pci_dev)
+ 			addr = HWIF(drive)->pci_dev->dma_mask;
+ 	}
+ 

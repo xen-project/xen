@@ -284,7 +284,7 @@ static void otherend_changed(struct xenbus_watch *watch,
 	struct xenbus_device *dev =
 		container_of(watch, struct xenbus_device, otherend_watch);
 	struct xenbus_driver *drv = to_xenbus_driver(dev->dev.driver);
-	XenbusState state;
+	enum xenbus_state state;
 
 	/* Protect us against watches firing on old details when the otherend
 	   details change, say immediately after a resume. */
@@ -539,7 +539,7 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 	size_t stringlen;
 	char *tmpstring;
 
-	XenbusState state = xenbus_read_driver_state(nodename);
+	enum xenbus_state state = xenbus_read_driver_state(nodename);
 
 	if (state != XenbusStateInitialising) {
 		/* Device is not new, so ignore it.  This can happen if a

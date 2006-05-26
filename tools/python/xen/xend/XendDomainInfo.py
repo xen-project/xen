@@ -701,6 +701,16 @@ class XendDomainInfo:
         log.debug("Storing VM details: %s", to_store)
 
         self.writeVm(to_store)
+        self.setVmPermissions()
+
+
+    def setVmPermissions(self):
+        """Allow the guest domain to read its UUID.  We don't allow it to
+        access any other entry, for security."""
+        xstransact.SetPermissions('%s/uuid' % self.vmpath,
+                                  { 'dom' : self.domid,
+                                    'read' : True,
+                                    'write' : False })
 
 
     def storeDomDetails(self):
@@ -1535,6 +1545,10 @@ class XendDomainInfo:
 
         self.configure_bootloader()
         config = self.sxpr()
+
+        if self.infoIsSet('cpus') and len(self.info['cpus']) != 0:
+            config.append(['cpus', reduce(lambda x, y: str(x) + "," + str(y),
+                                          self.info['cpus'])])
 
         if self.readVm(RESTART_IN_PROGRESS):
             log.error('Xend failed during restart of domain %d.  '

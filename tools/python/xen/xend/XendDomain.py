@@ -522,6 +522,28 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
 
+    def domain_csched_get(self, domid):
+        """Get credit scheduler parameters for a domain.
+        """
+        dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
+        try:
+            return xc.csched_domain_get(dominfo.getDomid())
+        except Exception, ex:
+            raise XendError(str(ex))
+    
+    def domain_csched_set(self, domid, weight, cap):
+        """Set credit scheduler parameters for a domain.
+        """
+        dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
+        try:
+            return xc.csched_domain_set(dominfo.getDomid(), weight, cap)
+        except Exception, ex:
+            raise XendError(str(ex))
+
     def domain_maxmem_set(self, domid, mem):
         """Set the memory limit for a domain.
 

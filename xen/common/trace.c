@@ -91,6 +91,7 @@ static int alloc_trace_bufs(void)
     if ( (rawbuf = alloc_xenheap_pages(order)) == NULL )
     {
         printk("Xen trace buffers: memory allocation failed\n");
+        opt_tbuf_size = 0;
         return -EINVAL;
     }
 
@@ -135,10 +136,7 @@ static int tb_set_size(int size)
 
     opt_tbuf_size = size;
     if ( alloc_trace_bufs() != 0 )
-    {
-        opt_tbuf_size = 0;
         return -EINVAL;
-    }
 
     printk("Xen trace buffers: initialized\n");
     return 0;

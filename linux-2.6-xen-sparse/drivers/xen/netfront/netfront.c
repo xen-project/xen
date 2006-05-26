@@ -60,7 +60,6 @@
 #include <asm/uaccess.h>
 #include <xen/interface/grant_table.h>
 #include <xen/gnttab.h>
-#include <xen/net_driver_util.h>
 
 #define GRANT_INVALID_REF	0
 
@@ -88,12 +87,6 @@ struct netfront_info {
 
 	unsigned int handle;
 	unsigned int evtchn, irq;
-
-	/* What is the status of our connection to the remote backend? */
-#define BEST_CLOSED       0
-#define BEST_DISCONNECTED 1
-#define BEST_CONNECTED    2
-	unsigned int backend_state;
 
 	/* Receive-ring batched refills. */
 #define RX_MIN_TARGET 8
@@ -143,14 +136,6 @@ static inline unsigned short get_id_from_freelist(struct sk_buff **list)
 	list[0] = list[id];
 	return id;
 }
-
-#ifdef DEBUG
-static const char *be_state_name[] = {
-	[BEST_CLOSED]       = "closed",
-	[BEST_DISCONNECTED] = "disconnected",
-	[BEST_CONNECTED]    = "connected",
-};
-#endif
 
 #define DPRINTK(fmt, args...) pr_debug("netfront (%s:%d) " fmt, \
                                        __FUNCTION__, __LINE__, ##args)
@@ -247,6 +232,27 @@ static int netfront_resume(struct xenbus_device *dev)
 	return talk_to_backend(dev, info);
 }
 
+static int xen_net_read_mac(struct xenbus_device *dev, u8 mac[])
+{
+	char *s, *e, *macstr;
+	int i;
+
+	macstr = s = xenbus_read(XBT_NULL, dev->nodename, "mac", NULL);
+	if (IS_ERR(macstr))
+		return PTR_ERR(macstr);
+
+	for (i = 0; i < ETH_ALEN; i++) {
+		mac[i] = simple_strtoul(s, &e, 16);
+		if ((s == e) || (*e != ((i == ETH_ALEN-1) ? '\0' : ':'))) {
+			kfree(macstr);
+			return -ENOENT;
+		}
+		s = e+1;
+	}
+
+	kfree(macstr);
+	return 0;
+}
 
 /* Common code used when first setting up, and when resuming. */
 static int talk_to_backend(struct xenbus_device *dev,
@@ -342,7 +348,6 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	}
 	memset(txs, 0, PAGE_SIZE);
 	memset(rxs, 0, PAGE_SIZE);
-	info->backend_state = BEST_DISCONNECTED;
 
 	SHARED_RING_INIT(txs);
 	FRONT_RING_INIT(&info->tx, txs, PAGE_SIZE);
@@ -384,7 +389,7 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
  * Callback received when the backend's state changes.
  */
 static void backend_changed(struct xenbus_device *dev,
-			    XenbusState backend_state)
+			    enum xenbus_state backend_state)
 {
 	DPRINTK("\n");
 
@@ -465,7 +470,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 	struct netfront_info *np = netdev_priv(dev);
 	struct sk_buff *skb;
 
-	if (np->backend_state != BEST_CONNECTED)
+	if (unlikely(!netif_carrier_ok(dev)))
 		return;
 
 	do {
@@ -527,7 +532,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	struct xen_memory_reservation reservation;
 	grant_ref_t ref;
 
-	if (unlikely(np->backend_state != BEST_CONNECTED))
+	if (unlikely(!netif_carrier_ok(dev)))
 		return;
 
 	/*
@@ -662,7 +667,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	spin_lock_irq(&np->tx_lock);
 
-	if (np->backend_state != BEST_CONNECTED) {
+	if (unlikely(!netif_carrier_ok(dev))) {
 		spin_unlock_irq(&np->tx_lock);
 		goto drop;
 	}
@@ -748,7 +753,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 
 	spin_lock(&np->rx_lock);
 
-	if (np->backend_state != BEST_CONNECTED) {
+	if (unlikely(!netif_carrier_ok(dev))) {
 		spin_unlock(&np->rx_lock);
 		return 0;
 	}
@@ -1041,7 +1046,7 @@ static void network_connect(struct net_device *dev)
 	 * domain a kick because we've probably just requeued some
 	 * packets.
 	 */
-	np->backend_state = BEST_CONNECTED;
+	netif_carrier_on(dev);
 	notify_remote_via_irq(np->irq);
 	network_tx_buf_gc(dev);
 
@@ -1055,7 +1060,7 @@ static void show_device(struct netfront_info *np)
 	if (np) {
 		IPRINTK("<vif handle=%u %s(%s) evtchn=%u tx=%p rx=%p>\n",
 			np->handle,
-			be_state_name[np->backend_state],
+			netif_carrier_ok(np->netdev) ? "on" : "off",
 			netif_running(np->netdev) ? "open" : "closed",
 			np->evtchn,
 			np->tx,
@@ -1241,9 +1246,10 @@ static struct net_device * __devinit create_netdev(int handle,
 	}
 
 	np                = netdev_priv(netdev);
-	np->backend_state = BEST_CLOSED;
 	np->handle        = handle;
 	np->xbdev         = dev;
+
+	netif_carrier_off(netdev);
 
 	spin_lock_init(&np->tx_lock);
 	spin_lock_init(&np->rx_lock);
@@ -1392,7 +1398,7 @@ static void netif_disconnect_backend(struct netfront_info *info)
 	/* Stop old i/f to prevent errors whilst we rebuild the state. */
 	spin_lock_irq(&info->tx_lock);
 	spin_lock(&info->rx_lock);
-	info->backend_state = BEST_DISCONNECTED;
+	netif_carrier_off(info->netdev);
 	spin_unlock(&info->rx_lock);
 	spin_unlock_irq(&info->tx_lock);
 

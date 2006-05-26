@@ -185,8 +185,9 @@ static void hvm_get_info(struct domain *d)
 void hvm_setup_platform(struct domain* d)
 {
     struct hvm_domain *platform;
+    struct vcpu *v=current;
 
-    if ( !hvm_guest(current) || (current->vcpu_id != 0) )
+    if ( !hvm_guest(v) || (v->vcpu_id != 0) )
         return;
 
     if ( shadow_direct_map_init(d) == 0 )
@@ -208,7 +209,8 @@ void hvm_setup_platform(struct domain* d)
         hvm_vioapic_init(d);
     }
 
-    pit_init(&platform->vpit, current);
+    init_timer(&platform->pl_time.periodic_tm.timer, pt_timer_fn, v, v->processor);
+    pit_init(v, cpu_khz);
 }
 
 void pic_irq_request(void *data, int level)
@@ -238,6 +240,14 @@ void hvm_pic_assist(struct vcpu *v)
         } while ( (u16)cmpxchg(virq_line,irqs, 0) != irqs );
         do_pic_irqs(pic, irqs);
     }
+}
+
+u64 hvm_get_guest_time(struct vcpu *v)
+{
+    u64    host_tsc;
+    
+    rdtscll(host_tsc);
+    return host_tsc + v->arch.hvm_vcpu.cache_tsc_offset;
 }
 
 int cpu_get_interrupt(struct vcpu *v, int *type)

@@ -38,7 +38,6 @@
 #include <linux/vmalloc.h>
 #include <asm/pgtable.h>
 #include <xen/interface/xen.h>
-#include <asm/fixmap.h>
 #include <asm/uaccess.h>
 #include <xen/gnttab.h>
 #include <asm/synch_bitops.h>
@@ -81,7 +80,7 @@ EXPORT_SYMBOL_GPL(gnttab_grant_foreign_transfer_ref);
 static grant_ref_t gnttab_list[NR_GRANT_ENTRIES];
 static int gnttab_free_count;
 static grant_ref_t gnttab_free_head;
-static spinlock_t gnttab_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(gnttab_list_lock);
 
 static grant_entry_t *shared = NULL;
 

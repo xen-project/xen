@@ -260,9 +260,42 @@ void share_xen_page_with_privileged_guests(
     share_xen_page_with_guest(page, dom_xen, readonly);
 }
 
+static void __write_ptbase(unsigned long mfn)
+{
+#ifdef CONFIG_X86_PAE
+    if ( mfn >= 0x100000 )
+    {
+        l3_pgentry_t *highmem_l3tab, *lowmem_l3tab;
+        struct vcpu *v = current;
+        unsigned long flags;
+
+        /* Protects against re-entry and against __pae_flush_pgd(). */
+        local_irq_save(flags);
+
+        /* Pick an unused low-memory L3 cache slot. */
+        v->arch.lowmem_l3tab_inuse ^= 1;
+        lowmem_l3tab = v->arch.lowmem_l3tab[v->arch.lowmem_l3tab_inuse];
+        v->arch.lowmem_l3tab_high_mfn[v->arch.lowmem_l3tab_inuse] = mfn;
+
+        /* Map the guest L3 table and copy to the chosen low-memory cache. */
+        highmem_l3tab = map_domain_page(mfn);
+        memcpy(lowmem_l3tab, highmem_l3tab, sizeof(v->arch.lowmem_l3tab));
+        unmap_domain_page(highmem_l3tab);
+
+        /* Install the low-memory L3 table in CR3. */
+        write_cr3(__pa(lowmem_l3tab));
+
+        local_irq_restore(flags);
+        return;
+    }
+#endif
+
+    write_cr3(mfn << PAGE_SHIFT);
+}
+
 void write_ptbase(struct vcpu *v)
 {
-    write_cr3(pagetable_get_paddr(v->arch.monitor_table));
+    __write_ptbase(pagetable_get_pfn(v->arch.monitor_table));
 }
 
 void invalidate_shadow_ldt(struct vcpu *v)
@@ -401,6 +434,7 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
     return 1;
 }
 
+#ifndef CONFIG_X86_PAE /* We do not support guest linear mappings on PAE. */
 /*
  * We allow root tables to map each other (a.k.a. linear page tables). It
  * needs some special care with reference counts and access permissions:
@@ -456,6 +490,7 @@ get_linear_pagetable(
 
     return 1;
 }
+#endif /* !CONFIG_X86_PAE */
 
 int
 get_page_from_l1e(
@@ -564,10 +599,6 @@ get_page_from_l3e(
     rc = get_page_and_type_from_pagenr(
         l3e_get_pfn(l3e),
         PGT_l2_page_table | vaddr, d);
-#if CONFIG_PAGING_LEVELS == 3
-    if ( unlikely(!rc) )
-        rc = get_linear_pagetable(l3e, pfn, d);
-#endif
     return rc;
 }
 #endif /* 3 level */
@@ -773,6 +804,50 @@ static int create_pae_xen_mappings(l3_pgentry_t *pl3e)
     return 1;
 }
 
+struct pae_flush_pgd {
+    unsigned long l3tab_mfn;
+    unsigned int  l3tab_idx;
+    l3_pgentry_t  nl3e;
+};
+
+static void __pae_flush_pgd(void *data)
+{
+    struct pae_flush_pgd *args = data;
+    struct vcpu *v = this_cpu(curr_vcpu);
+    int i = v->arch.lowmem_l3tab_inuse;
+    intpte_t _ol3e, _nl3e, _pl3e;
+    l3_pgentry_t *l3tab_ptr;
+
+    ASSERT(!local_irq_is_enabled());
+
+    if ( v->arch.lowmem_l3tab_high_mfn[i] != args->l3tab_mfn )
+        return;
+
+    l3tab_ptr = &v->arch.lowmem_l3tab[i][args->l3tab_idx];
+
+    _ol3e = l3e_get_intpte(*l3tab_ptr);
+    _nl3e = l3e_get_intpte(args->nl3e);
+    _pl3e = cmpxchg((intpte_t *)l3tab_ptr, _ol3e, _nl3e);
+    BUG_ON(_pl3e != _ol3e);
+}
+
+/* Flush a pgdir update into low-memory caches. */
+static void pae_flush_pgd(
+    unsigned long mfn, unsigned int idx, l3_pgentry_t nl3e)
+{
+    struct domain *d = page_get_owner(mfn_to_page(mfn));
+    struct pae_flush_pgd args = {
+        .l3tab_mfn = mfn,
+        .l3tab_idx = idx,
+        .nl3e      = nl3e };
+
+    /* If below 4GB then the pgdir is not shadowed in low memory. */
+    if ( mfn < 0x100000 )
+        return;
+
+    on_selected_cpus(d->domain_dirty_cpumask, __pae_flush_pgd, &args, 1, 1);
+}
+
 static inline int l1_backptr(
     unsigned long *backptr, unsigned long offset_in_l2, unsigned long l2_type)
 {
@@ -787,6 +862,7 @@ static inline int l1_backptr(
 
 #elif CONFIG_X86_64
 # define create_pae_xen_mappings(pl3e) (1)
+# define pae_flush_pgd(mfn, idx, nl3e) ((void)0)
 
 static inline int l1_backptr(
     unsigned long *backptr, unsigned long offset_in_l2, unsigned long l2_type)
@@ -885,14 +961,6 @@ static int alloc_l3_table(struct page_info *page, unsigned long type)
     int            i;
 
     ASSERT(!shadow_mode_refcounts(d));
-
-#ifdef CONFIG_X86_PAE
-    if ( pfn >= 0x100000 )
-    {
-        MEM_LOG("PAE pgd must be below 4GB (0x%lx >= 0x100000)", pfn);
-        return 0;
-    }
-#endif
 
     pl3e = map_domain_page(pfn);
     for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
@@ -1240,6 +1308,8 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
 
     okay = create_pae_xen_mappings(pl3e);
     BUG_ON(!okay);
+
+    pae_flush_pgd(pfn, pgentry_ptr_to_slot(pl3e), nl3e);
 
     put_page_from_l3e(ol3e, pfn);
     return 1;
@@ -3109,7 +3179,7 @@ void ptwr_flush(struct domain *d, const int which)
 
     if ( unlikely(d->arch.ptwr[which].vcpu != current) )
         /* Don't use write_ptbase: it may switch to guest_user on x86/64! */
-        write_cr3(pagetable_get_paddr(
+        __write_ptbase(pagetable_get_pfn(
             d->arch.ptwr[which].vcpu->arch.guest_table));
     else
         TOGGLE_MODE();
@@ -3220,15 +3290,16 @@ static int ptwr_emulated_update(
     /* Turn a sub-word access into a full-word access. */
     if ( bytes != sizeof(paddr_t) )
     {
-        int           rc;
-        paddr_t    full;
-        unsigned int  offset = addr & (sizeof(paddr_t)-1);
+        paddr_t      full;
+        unsigned int offset = addr & (sizeof(paddr_t)-1);
 
         /* Align address; read full word. */
         addr &= ~(sizeof(paddr_t)-1);
-        if ( (rc = x86_emulate_read_std(addr, (unsigned long *)&full,
-                                        sizeof(paddr_t))) )
-            return rc; 
+        if ( copy_from_user(&full, (void *)addr, sizeof(paddr_t)) )
+        {
+            propagate_page_fault(addr, 4); /* user mode, read fault */
+            return X86EMUL_PROPAGATE_FAULT;
+        }
         /* Mask out bits provided by caller. */
         full &= ~((((paddr_t)1 << (bytes*8)) - 1) << (offset*8));
         /* Shift the caller value and OR in the missing bits. */
@@ -3306,7 +3377,8 @@ static int ptwr_emulated_update(
 static int ptwr_emulated_write(
     unsigned long addr,
     unsigned long val,
-    unsigned int bytes)
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
 {
     return ptwr_emulated_update(addr, 0, val, bytes, 0);
 }
@@ -3315,7 +3387,8 @@ static int ptwr_emulated_cmpxchg(
     unsigned long addr,
     unsigned long old,
     unsigned long new,
-    unsigned int bytes)
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
 {
     return ptwr_emulated_update(addr, old, new, bytes, 1);
 }
@@ -3325,7 +3398,8 @@ static int ptwr_emulated_cmpxchg8b(
     unsigned long old,
     unsigned long old_hi,
     unsigned long new,
-    unsigned long new_hi)
+    unsigned long new_hi,
+    struct x86_emulate_ctxt *ctxt)
 {
     if ( CONFIG_PAGING_LEVELS == 2 )
         return X86EMUL_UNHANDLEABLE;
@@ -3334,7 +3408,7 @@ static int ptwr_emulated_cmpxchg8b(
             addr, ((u64)old_hi << 32) | old, ((u64)new_hi << 32) | new, 8, 1);
 }
 
-static struct x86_mem_emulator ptwr_mem_emulator = {
+static struct x86_emulate_ops ptwr_emulate_ops = {
     .read_std           = x86_emulate_read_std,
     .write_std          = x86_emulate_write_std,
     .read_emulated      = x86_emulate_read_std,
@@ -3353,6 +3427,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     l2_pgentry_t    *pl2e, l2e;
     int              which, flags;
     unsigned long    l2_idx;
+    struct x86_emulate_ctxt emul_ctxt;
 
     if ( unlikely(shadow_mode_enabled(d)) )
         return 0;
@@ -3507,8 +3582,10 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     return EXCRET_fault_fixed;
 
  emulate:
-    if ( x86_emulate_memop(guest_cpu_user_regs(), addr,
-                           &ptwr_mem_emulator, X86EMUL_MODE_HOST) )
+    emul_ctxt.regs = guest_cpu_user_regs();
+    emul_ctxt.cr2  = addr;
+    emul_ctxt.mode = X86EMUL_MODE_HOST;
+    if ( x86_emulate_memop(&emul_ctxt, &ptwr_emulate_ops) )
         return 0;
     perfc_incrc(ptwr_emulations);
     return EXCRET_fault_fixed;

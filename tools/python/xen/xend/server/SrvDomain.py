@@ -131,6 +131,20 @@ class SrvDomain(SrvDir):
 		     ['weight', 'int']])
         val = fn(req.args, {'dom': self.dom.domid})
         return val
+    
+    def op_domain_csched_get(self, _, req):
+        fn = FormFn(self.xd.domain_csched_get,
+                    [['dom', 'int']])
+        val = fn(req.args, {'dom': self.dom.domid})
+        return val
+
+
+    def op_domain_csched_set(self, _, req):
+        fn = FormFn(self.xd.domain_csched_set,
+                    [['dom', 'int'],
+                     ['weight', 'int']])
+        val = fn(req.args, {'dom': self.dom.domid})
+        return val
 
     def op_maxmem_set(self, _, req):
         fn = FormFn(self.xd.domain_maxmem_set,

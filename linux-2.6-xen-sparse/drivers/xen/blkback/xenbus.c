@@ -247,7 +247,7 @@ static void backend_changed(struct xenbus_watch *watch,
  * Callback received when the frontend's state changes.
  */
 static void frontend_changed(struct xenbus_device *dev,
-			     XenbusState frontend_state)
+			     enum xenbus_state frontend_state)
 {
 	struct backend_info *be = dev->data;
 	int err;

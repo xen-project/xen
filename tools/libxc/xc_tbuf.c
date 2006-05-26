@@ -18,53 +18,57 @@
 
 static int tbuf_enable(int xc_handle, int enable)
 {
-  DECLARE_DOM0_OP;
+    DECLARE_DOM0_OP;
 
-  op.cmd = DOM0_TBUFCONTROL;
-  op.interface_version = DOM0_INTERFACE_VERSION;
-  if (enable)
-    op.u.tbufcontrol.op  = DOM0_TBUF_ENABLE;
-  else
-    op.u.tbufcontrol.op  = DOM0_TBUF_DISABLE;
+    op.cmd = DOM0_TBUFCONTROL;
+    op.interface_version = DOM0_INTERFACE_VERSION;
+    if (enable)
+        op.u.tbufcontrol.op  = DOM0_TBUF_ENABLE;
+    else
+        op.u.tbufcontrol.op  = DOM0_TBUF_DISABLE;
 
-  return xc_dom0_op(xc_handle, &op);
+    return xc_dom0_op(xc_handle, &op);
 }
 
 int xc_tbuf_set_size(int xc_handle, unsigned long size)
 {
-  DECLARE_DOM0_OP;
+    DECLARE_DOM0_OP;
 
-  op.cmd = DOM0_TBUFCONTROL;
-  op.interface_version = DOM0_INTERFACE_VERSION;
-  op.u.tbufcontrol.op  = DOM0_TBUF_SET_SIZE;
-  op.u.tbufcontrol.size = size;
+    op.cmd = DOM0_TBUFCONTROL;
+    op.interface_version = DOM0_INTERFACE_VERSION;
+    op.u.tbufcontrol.op  = DOM0_TBUF_SET_SIZE;
+    op.u.tbufcontrol.size = size;
 
-  return xc_dom0_op(xc_handle, &op);
+    return xc_dom0_op(xc_handle, &op);
 }
 
 int xc_tbuf_get_size(int xc_handle, unsigned long *size)
 {
-  int rc;
-  DECLARE_DOM0_OP;
+    int rc;
+    DECLARE_DOM0_OP;
 
-  op.cmd = DOM0_TBUFCONTROL;
-  op.interface_version = DOM0_INTERFACE_VERSION;
-  op.u.tbufcontrol.op  = DOM0_TBUF_GET_INFO;
+    op.cmd = DOM0_TBUFCONTROL;
+    op.interface_version = DOM0_INTERFACE_VERSION;
+    op.u.tbufcontrol.op  = DOM0_TBUF_GET_INFO;
 
-  rc = xc_dom0_op(xc_handle, &op);
-  if (rc == 0)
-    *size = op.u.tbufcontrol.size;
-  return rc;
+    rc = xc_dom0_op(xc_handle, &op);
+    if (rc == 0)
+        *size = op.u.tbufcontrol.size;
+    return rc;
 }
 
 int xc_tbuf_enable(int xc_handle, size_t cnt, unsigned long *mfn,
-    unsigned long *size)
+                   unsigned long *size)
 {
     DECLARE_DOM0_OP;
     int rc;
 
-    if ( xc_tbuf_set_size(xc_handle, cnt) != 0 )
-        return -1;
+    /*
+     * Ignore errors (at least for now) as we get an error if size is already
+     * set (since trace buffers cannot be reallocated). If we really have no
+     * buffers at all then tbuf_enable() will fail, so this is safe.
+     */
+    (void)xc_tbuf_set_size(xc_handle, cnt);
 
     if ( tbuf_enable(xc_handle, 1) != 0 )
         return -1;

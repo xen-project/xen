@@ -185,7 +185,7 @@ map_domain_va_32(
     void *guest_va,
     int perm)
 {
-    unsigned long l1p, p, va = (unsigned long)guest_va;
+    unsigned long l2e, l1e, l1p, p, va = (unsigned long)guest_va;
     uint32_t *l2, *l1;
     static void *v[MAX_VIRT_CPUS];
 
@@ -194,18 +194,20 @@ map_domain_va_32(
     if ( l2 == NULL )
         return NULL;
 
-    l1p = to_ma(cpu, l2[l2_table_offset(va)]);
+    l2e = l2[l2_table_offset_i386(va)];
     munmap(l2, PAGE_SIZE);
-    if ( !(l1p & _PAGE_PRESENT) )
+    if ( !(l2e & _PAGE_PRESENT) )
         return NULL;
+    l1p = to_ma(cpu, l2e);
     l1 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, PROT_READ, l1p >> PAGE_SHIFT);
     if ( l1 == NULL )
         return NULL;
 
-    p = to_ma(cpu, l1[l1_table_offset(va)]);
+    l1e = l1[l1_table_offset_i386(va)];
     munmap(l1, PAGE_SIZE);
-    if ( !(p & _PAGE_PRESENT) )
+    if ( !(l1e & _PAGE_PRESENT) )
         return NULL;
+    p = to_ma(cpu, l1e);
     if ( v[cpu] != NULL )
         munmap(v[cpu], PAGE_SIZE);
     v[cpu] = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, p >> PAGE_SHIFT);
@@ -223,7 +225,7 @@ map_domain_va_pae(
     void *guest_va,
     int perm)
 {
-    unsigned long l2p, l1p, p, va = (unsigned long)guest_va;
+    unsigned long l3e, l2e, l1e, l2p, l1p, p, va = (unsigned long)guest_va;
     uint64_t *l3, *l2, *l1;
     static void *v[MAX_VIRT_CPUS];
 
@@ -232,26 +234,29 @@ map_domain_va_pae(
     if ( l3 == NULL )
         return NULL;
 
-    l2p = to_ma(cpu, l3[l3_table_offset_pae(va)]);
+    l3e = l3[l3_table_offset_pae(va)];
     munmap(l3, PAGE_SIZE);
-    if ( !(l2p & _PAGE_PRESENT) )
+    if ( !(l3e & _PAGE_PRESENT) )
         return NULL;
+    l2p = to_ma(cpu, l3e);
     l2 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, PROT_READ, l2p >> PAGE_SHIFT);
     if ( l2 == NULL )
         return NULL;
 
-    l1p = to_ma(cpu, l2[l2_table_offset_pae(va)]);
+    l2e = l2[l2_table_offset_pae(va)];
     munmap(l2, PAGE_SIZE);
-    if ( !(l1p & _PAGE_PRESENT) )
+    if ( !(l2e & _PAGE_PRESENT) )
         return NULL;
+    l1p = to_ma(cpu, l2e);
     l1 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, l1p >> PAGE_SHIFT);
     if ( l1 == NULL )
         return NULL;
 
-    p = to_ma(cpu, l1[l1_table_offset_pae(va)]);
+    l1e = l1[l1_table_offset_pae(va)];
     munmap(l1, PAGE_SIZE);
-    if ( !(p & _PAGE_PRESENT) )
+    if ( !(l1e & _PAGE_PRESENT) )
         return NULL;
+    p = to_ma(cpu, l1e);
     if ( v[cpu] != NULL )
         munmap(v[cpu], PAGE_SIZE);
     v[cpu] = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, p >> PAGE_SHIFT);
@@ -269,9 +274,10 @@ map_domain_va_64(
     void *guest_va,
     int perm)
 {
-    unsigned long l3p, l2p, l1p, l1e, p, va = (unsigned long)guest_va;
+    unsigned long l4e, l3e, l2e, l1e, l3p, l2p, l1p, p, va = (unsigned long)guest_va;
     uint64_t *l4, *l3, *l2, *l1;
     static void *v[MAX_VIRT_CPUS];
+
 
     if ((ctxt[cpu].ctrlreg[4] & 0x20) == 0 ) /* legacy ia32 mode */
         return map_domain_va_32(xc_handle, cpu, guest_va, perm);
@@ -281,40 +287,41 @@ map_domain_va_64(
     if ( l4 == NULL )
         return NULL;
 
-    l3p = to_ma(cpu, l4[l4_table_offset(va)]);
+    l4e = l4[l4_table_offset(va)];
     munmap(l4, PAGE_SIZE);
-    if ( !(l3p & _PAGE_PRESENT) )
+    if ( !(l4e & _PAGE_PRESENT) )
         return NULL;
+    l3p = to_ma(cpu, l4e);
     l3 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, PROT_READ, l3p >> PAGE_SHIFT);
     if ( l3 == NULL )
         return NULL;
 
-    l2p = to_ma(cpu, l3[l3_table_offset(va)]);
+    l3e = l3[l3_table_offset(va)];
     munmap(l3, PAGE_SIZE);
-    if ( !(l2p & _PAGE_PRESENT) )
+    if ( !(l3e & _PAGE_PRESENT) )
         return NULL;
+    l2p = to_ma(cpu, l3e);
     l2 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, PROT_READ, l2p >> PAGE_SHIFT);
     if ( l2 == NULL )
         return NULL;
 
     l1 = NULL;
-    l1e = to_ma(cpu, l2[l2_table_offset(va)]);
-    if ( !(l1e & _PAGE_PRESENT) )
-    {
-        munmap(l2, PAGE_SIZE);
+    l2e = l2[l2_table_offset(va)];
+    munmap(l2, PAGE_SIZE);
+    if ( !(l2e & _PAGE_PRESENT) )
         return NULL;
-    }
-    l1p = l1e >> PAGE_SHIFT;
-    if (l1e & 0x80)  { /* 2M pages */
+    l1p = to_ma(cpu, l2e);
+    if (l2e & 0x80)  { /* 2M pages */
         p = to_ma(cpu, (l1p + l1_table_offset(va)) << PAGE_SHIFT);
     } else { /* 4K pages */
-        l1p = to_ma(cpu, l1p);
         l1 = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, perm, l1p >> PAGE_SHIFT);
-        munmap(l2, PAGE_SIZE);
         if ( l1 == NULL )
             return NULL;
 
-        p = to_ma(cpu, l1[l1_table_offset(va)]);
+        l1e = l1[l1_table_offset(va)];
+        if ( !(l1e & _PAGE_PRESENT) )
+            return NULL;
+        p = to_ma(cpu, l1e);
     }
     if ( v[cpu] != NULL )
         munmap(v[cpu], PAGE_SIZE);

@@ -51,10 +51,10 @@
  * This lock protects updates to the following mapping and reference-count
  * arrays. The lock does not need to be acquired to read the mapping tables.
  */
-static spinlock_t irq_mapping_update_lock;
+static DEFINE_SPINLOCK(irq_mapping_update_lock);
 
 /* IRQ <-> event-channel mappings. */
-static int evtchn_to_irq[NR_EVENT_CHANNELS];
+static int evtchn_to_irq[NR_EVENT_CHANNELS] = {[0 ...  NR_EVENT_CHANNELS-1] = -1};
 
 /* Packed IRQ information: binding type, sub-type index, and event channel. */
 static u32 irq_info[NR_IRQS];
@@ -91,13 +91,13 @@ static inline unsigned int type_from_irq(int irq)
 }
 
 /* IRQ <-> VIRQ mapping. */
-DEFINE_PER_CPU(int, virq_to_irq[NR_VIRQS]);
+DEFINE_PER_CPU(int, virq_to_irq[NR_VIRQS]) = {[0 ... NR_VIRQS-1] = -1};
 
 /* IRQ <-> IPI mapping. */
 #ifndef NR_IPIS
 #define NR_IPIS 1
 #endif
-DEFINE_PER_CPU(int, ipi_to_irq[NR_IPIS]);
+DEFINE_PER_CPU(int, ipi_to_irq[NR_IPIS]) = {[0 ... NR_IPIS-1] = -1};
 
 /* Reference counts for bindings to IRQs. */
 static int irq_bindcount[NR_IRQS];
@@ -751,7 +751,9 @@ void irq_resume(void)
 		BUG_ON(irq_info[pirq_to_irq(pirq)] != IRQ_UNBOUND);
 
 	/* Secondary CPUs must have no VIRQ or IPI bindings. */
-	for (cpu = 1; cpu < NR_CPUS; cpu++) {
+	for_each_possible_cpu(cpu) {
+		if (cpu == 0)
+			continue;
 		for (virq = 0; virq < NR_VIRQS; virq++)
 			BUG_ON(per_cpu(virq_to_irq, cpu)[virq] != -1);
 		for (ipi = 0; ipi < NR_IPIS; ipi++)
@@ -813,25 +815,12 @@ void irq_resume(void)
 void __init xen_init_IRQ(void)
 {
 	int i;
-	int cpu;
-
-	spin_lock_init(&irq_mapping_update_lock);
 
 	init_evtchn_cpu_bindings();
 
-	/* No VIRQ or IPI bindings. */
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		for (i = 0; i < NR_VIRQS; i++)
-			per_cpu(virq_to_irq, cpu)[i] = -1;
-		for (i = 0; i < NR_IPIS; i++)
-			per_cpu(ipi_to_irq, cpu)[i] = -1;
-	}
-
-	/* No event-channel -> IRQ mappings. */
-	for (i = 0; i < NR_EVENT_CHANNELS; i++) {
-		evtchn_to_irq[i] = -1;
-		mask_evtchn(i); /* No event channels are 'live' right now. */
-	}
+	/* No event channels are 'live' right now. */
+	for (i = 0; i < NR_EVENT_CHANNELS; i++)
+		mask_evtchn(i);
 
 	/* No IRQ -> event-channel mappings. */
 	for (i = 0; i < NR_IRQS; i++)

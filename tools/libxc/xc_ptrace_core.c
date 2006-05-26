@@ -3,6 +3,7 @@
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 #include "xc_private.h"
+#include "xg_private.h"
 #include "xc_ptrace.h"
 #include <time.h>
 
@@ -54,7 +55,7 @@ map_domain_va_core(unsigned long domfd, int cpu, void * guest_va,
         }
         cr3_virt[cpu] = v;
     }
-    if ((pde = cr3_virt[cpu][vtopdi(va)]) == 0) /* logical address */
+    if ((pde = cr3_virt[cpu][l2_table_offset_i386(va)]) == 0) /* logical address */
         return NULL;
     if (ctxt[cpu].flags & VGCF_HVM_GUEST)
         pde = p2m_array[pde >> PAGE_SHIFT] << PAGE_SHIFT;
@@ -70,7 +71,7 @@ map_domain_va_core(unsigned long domfd, int cpu, void * guest_va,
             return NULL;
         pde_virt[cpu] = v;
     }
-    if ((page = pde_virt[cpu][vtopti(va)]) == 0) /* logical address */
+    if ((page = pde_virt[cpu][l1_table_offset_i386(va)]) == 0) /* logical address */
         return NULL;
     if (ctxt[cpu].flags & VGCF_HVM_GUEST)
         page = p2m_array[page >> PAGE_SHIFT] << PAGE_SHIFT;
@@ -84,7 +85,7 @@ map_domain_va_core(unsigned long domfd, int cpu, void * guest_va,
             map_mtop_offset(page_phys[cpu]));
         if (v == MAP_FAILED)
         {
-            printf("cr3 %lx pde %lx page %lx pti %lx\n", cr3[cpu], pde, page, vtopti(va));
+            printf("cr3 %lx pde %lx page %lx pti %lx\n", cr3[cpu], pde, page, l1_table_offset_i386(va));
             page_phys[cpu] = 0;
             return NULL;
         }

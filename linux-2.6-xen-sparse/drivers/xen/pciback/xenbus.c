@@ -166,7 +166,7 @@ static int pciback_attach(struct pciback_device *pdev)
 }
 
 static void pciback_frontend_changed(struct xenbus_device *xdev,
-				     XenbusState fe_state)
+				     enum xenbus_state fe_state)
 {
 	struct pciback_device *pdev = xdev->data;
 

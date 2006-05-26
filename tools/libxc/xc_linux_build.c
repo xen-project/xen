@@ -268,21 +268,10 @@ static int setup_pg_tables_pae(int xc_handle, uint32_t dom,
     l2_pgentry_64_t *vl2tab = NULL, *vl2e = NULL;
     l3_pgentry_64_t *vl3tab = NULL, *vl3e = NULL;
     uint64_t l1tab, l2tab, l3tab, pl1tab, pl2tab, pl3tab;
-    unsigned long ppt_alloc, count, nmfn;
+    unsigned long ppt_alloc, count;
 
     /* First allocate page for page dir. */
     ppt_alloc = (vpt_start - dsi_v_start) >> PAGE_SHIFT;
-
-    if ( page_array[ppt_alloc] > 0xfffff )
-    {
-        nmfn = xc_make_page_below_4G(xc_handle, dom, page_array[ppt_alloc]);
-        if ( nmfn == 0 )
-        {
-            fprintf(stderr, "Couldn't get a page below 4GB :-(\n");
-            goto error_out;
-        }
-        page_array[ppt_alloc] = nmfn;
-    }
 
     alloc_pt(l3tab, vl3tab, pl3tab);
     vl3e = &vl3tab[l3_table_offset_pae(dsi_v_start)];

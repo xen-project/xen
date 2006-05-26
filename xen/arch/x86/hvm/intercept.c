@@ -214,6 +214,88 @@ void hlt_timer_fn(void *data)
     evtchn_set_pending(v, iopacket_port(v));
 }
 
+static __inline__ void missed_ticks(struct periodic_time *pt)
+{
+    int missed_ticks;
+
+    missed_ticks = (NOW() - pt->scheduled)/(s_time_t) pt->period;
+    if ( missed_ticks++ >= 0 ) {
+        if ( missed_ticks > 1000 ) {
+            /* TODO: Adjust guest time togther */
+            pt->pending_intr_nr ++;
+        }
+        else {
+            pt->pending_intr_nr += missed_ticks;
+        }
+        pt->scheduled += missed_ticks * pt->period;
+    }
+}
+
+/* hook function for the platform periodic time */
+void pt_timer_fn(void *data)
+{
+    struct vcpu *v = data;
+    struct periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
+
+    /* pick up missed timer tick */
+    missed_ticks(pt);
+    if ( test_bit(_VCPUF_running, &v->vcpu_flags) ) {
+        set_timer(&pt->timer, pt->scheduled);
+    }
+}
+
+/* pick up missed timer ticks at deactive time */
+void pickup_deactive_ticks(struct periodic_time *pt)
+{
+    if ( !active_timer(&(pt->timer)) ) {
+        missed_ticks(pt);
+        set_timer(&pt->timer, pt->scheduled);
+    }
+}
+
+/*
+ * period: fire frequency in ns.
+ */
+struct periodic_time * create_periodic_time(
+        struct vcpu *v, 
+        u32 period, 
+        char irq,
+        char one_shot)
+{
+    struct periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
+    if ( pt->enabled ) {
+        if ( v->vcpu_id != 0 ) {
+            printk("HVM_PIT: start 2nd periodic time on non BSP!\n");
+        }
+        stop_timer (&pt->timer);
+        pt->enabled = 0;
+    }
+    pt->pending_intr_nr = 0;
+    pt->first_injected = 0;
+    if (period < 900000) { /* < 0.9 ms */
+        printk("HVM_PlatformTime: program too small period %u\n",period);
+        period = 900000;   /* force to 0.9ms */
+    }
+    pt->period = period;
+    pt->irq = irq;
+    pt->period_cycles = (u64)period * cpu_khz / 1000000L;
+    pt->one_shot = one_shot;
+    if ( one_shot ) {
+        printk("HVM_PL: No support for one shot platform time yet\n");
+    }
+    pt->scheduled = NOW() + period;
+    set_timer (&pt->timer,pt->scheduled);
+    pt->enabled = 1;
+    return pt;
+}
+
+void destroy_periodic_time(struct periodic_time *pt)
+{
+    if ( pt->enabled ) {
+        stop_timer(&pt->timer);
+        pt->enabled = 0;
+    }
+}
 
 /*
  * Local variables:

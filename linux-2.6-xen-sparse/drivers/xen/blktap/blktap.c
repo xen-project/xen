@@ -138,7 +138,7 @@ typedef struct {
  */
 static pending_req_t pending_reqs[MAX_PENDING_REQS];
 static unsigned char pending_ring[MAX_PENDING_REQS];
-static spinlock_t pend_prod_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(pend_prod_lock);
 /* NB. We use a different index type to differentiate from shared blk rings. */
 typedef unsigned int PEND_RING_IDX;
 #define MASK_PEND_IDX(_i) ((_i)&(MAX_PENDING_REQS-1))

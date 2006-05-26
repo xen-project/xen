@@ -54,6 +54,8 @@
  * $FreeBSD: src/sys/libkern/divdi3.c,v 1.6 1999/08/28 00:46:31 peter Exp $
  */
 
+#if !defined HAVE_LIBC
+
 #include <os.h>
 #include <types.h>
 #include <hypervisor.h>
@@ -789,4 +791,4 @@ int sscanf(const char * buf, const char * fmt, ...)
 	return i;
 }
 
-
+#endif

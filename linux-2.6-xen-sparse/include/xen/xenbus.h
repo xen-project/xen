@@ -75,7 +75,7 @@ struct xenbus_device {
 	int otherend_id;
 	struct xenbus_watch otherend_watch;
 	struct device dev;
-	XenbusState state;
+	enum xenbus_state state;
 	void *data;
 };
 
@@ -98,7 +98,7 @@ struct xenbus_driver {
 	int (*probe)(struct xenbus_device *dev,
 		     const struct xenbus_device_id *id);
 	void (*otherend_changed)(struct xenbus_device *dev,
-				 XenbusState backend_state);
+				 enum xenbus_state backend_state);
 	int (*remove)(struct xenbus_device *dev);
 	int (*suspend)(struct xenbus_device *dev);
 	int (*resume)(struct xenbus_device *dev);
@@ -207,7 +207,7 @@ int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
  * Return 0 on success, or -errno on error.  On error, the device will switch
  * to XenbusStateClosing, and the error will be saved in the store.
  */
-int xenbus_switch_state(struct xenbus_device *dev, XenbusState new_state);
+int xenbus_switch_state(struct xenbus_device *dev, enum xenbus_state new_state);
 
 
 /**
@@ -273,7 +273,7 @@ int xenbus_free_evtchn(struct xenbus_device *dev, int port);
  * Return the state of the driver rooted at the given store path, or
  * XenbusStateClosed if no state can be read.
  */
-XenbusState xenbus_read_driver_state(const char *path);
+enum xenbus_state xenbus_read_driver_state(const char *path);
 
 
 /***

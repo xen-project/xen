@@ -34,7 +34,7 @@ struct backend_info
 
 	/* watch front end for changes */
 	struct xenbus_watch backend_watch;
-	XenbusState frontend_state;
+	enum xenbus_state frontend_state;
 };
 
 static void maybe_connect(struct backend_info *be);
@@ -43,7 +43,7 @@ static int connect_ring(struct backend_info *be);
 static void backend_changed(struct xenbus_watch *watch,
                             const char **vec, unsigned int len);
 static void frontend_changed(struct xenbus_device *dev,
-                             XenbusState frontend_state);
+                             enum xenbus_state frontend_state);
 
 static int tpmback_remove(struct xenbus_device *dev)
 {
@@ -129,7 +129,7 @@ static void backend_changed(struct xenbus_watch *watch,
 
 
 static void frontend_changed(struct xenbus_device *dev,
-                             XenbusState frontend_state)
+                             enum xenbus_state frontend_state)
 {
 	struct backend_info *be = dev->data;
 	int err;

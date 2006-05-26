@@ -58,6 +58,8 @@ struct scheduler {
     char *opt_name;         /* option name for this scheduler    */
     unsigned int sched_id;  /* ID for this scheduler             */
 
+    void         (*init)           (void);
+    void         (*tick)           (unsigned int cpu);
     int          (*alloc_task)     (struct vcpu *);
     void         (*add_task)       (struct vcpu *);
     void         (*free_task)      (struct domain *);

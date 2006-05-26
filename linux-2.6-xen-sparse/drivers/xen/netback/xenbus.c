@@ -17,13 +17,10 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-
 #include <stdarg.h>
 #include <linux/module.h>
 #include <xen/xenbus.h>
-#include <xen/net_driver_util.h>
 #include "common.h"
-
 
 #if 0
 #undef DPRINTK
@@ -31,22 +28,19 @@
     printk("netback/xenbus (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 #endif
 
-
 struct backend_info
 {
 	struct xenbus_device *dev;
 	netif_t *netif;
 	struct xenbus_watch backend_watch;
-	XenbusState frontend_state;
+	enum xenbus_state frontend_state;
 };
-
 
 static int connect_rings(struct backend_info *);
 static void connect(struct backend_info *);
 static void maybe_connect(struct backend_info *);
 static void backend_changed(struct xenbus_watch *, const char **,
 			    unsigned int);
-
 
 static int netback_remove(struct xenbus_device *dev)
 {
@@ -191,7 +185,7 @@ static void backend_changed(struct xenbus_watch *watch,
  * Callback received when the frontend's state changes.
  */
 static void frontend_changed(struct xenbus_device *dev,
-			     XenbusState frontend_state)
+			     enum xenbus_state frontend_state)
 {
 	struct backend_info *be = dev->data;
 
@@ -273,6 +267,27 @@ static void xen_net_read_rate(struct xenbus_device *dev,
 	kfree(ratestr);
 }
 
+static int xen_net_read_mac(struct xenbus_device *dev, u8 mac[])
+{
+	char *s, *e, *macstr;
+	int i;
+
+	macstr = s = xenbus_read(XBT_NULL, dev->nodename, "mac", NULL);
+	if (IS_ERR(macstr))
+		return PTR_ERR(macstr);
+
+	for (i = 0; i < ETH_ALEN; i++) {
+		mac[i] = simple_strtoul(s, &e, 16);
+		if ((s == e) || (*e != ((i == ETH_ALEN-1) ? '\0' : ':'))) {
+			kfree(macstr);
+			return -ENOENT;
+		}
+		s = e+1;
+	}
+
+	kfree(macstr);
+	return 0;
+}
 
 static void connect(struct backend_info *be)
 {
