@@ -18,6 +18,8 @@
  ****************************************************************************
  */
 
+#if !defined HAVE_LIBC
+
 #include <os.h>
 #include <types.h>
 #include <lib.h>
@@ -153,3 +155,5 @@ char * strstr(const char * s1,const char * s2)
         }
         return NULL;
 }
+
+#endif
