@@ -331,25 +331,17 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 ** A page table page - need to 'uncanonicalize' it, i.e.
                 ** replace all the references to pfns with the corresponding
                 ** mfns for the new domain.
-                **
-                ** On PAE we need to ensure that PGDs are in MFNs < 4G, and
-                ** so we may need to update the p2m after the main loop.
-                ** Hence we defer canonicalization of L1s until then.
                 */
-                if(pt_levels != 3 || pagetype != L1TAB) {
-
-                    if(!uncanonicalize_pagetable(pagetype, page)) {
-                        /*
-                        ** Failing to uncanonicalize a page table can be ok
-                        ** under live migration since the pages type may have
-                        ** changed by now (and we'll get an update later).
-                        */
-                        DPRINTF("PT L%ld race on pfn=%08lx mfn=%08lx\n",
-                                pagetype >> 28, pfn, mfn);
-                        nraces++;
-                        continue;
-                    }
-
+                if(!uncanonicalize_pagetable(pagetype, page)) {
+                    /*
+                    ** Failing to uncanonicalize a page table can be ok
+                    ** under live migration since the pages type may have
+                    ** changed by now (and we'll get an update later).
+                    */
+                    DPRINTF("PT L%ld race on pfn=%08lx mfn=%08lx\n",
+                            pagetype >> 28, pfn, mfn);
+                    nraces++;
+                    continue;
                 }
 
             } else if(pagetype != NOTAB) {
@@ -397,100 +389,6 @@ int xc_linux_restore(int xc_handle, int io_fd,
     }
 
     DPRINTF("Received all pages (%d races)\n", nraces);
-
-    if(pt_levels == 3) {
-
-        /*
-        ** XXX SMH on PAE we need to ensure PGDs are in MFNs < 4G. This
-        ** is a little awkward and involves (a) finding all such PGDs and
-        ** replacing them with 'lowmem' versions; (b) upating the p2m[]
-        ** with the new info; and (c) canonicalizing all the L1s using the
-        ** (potentially updated) p2m[].
-        **
-        ** This is relatively slow (and currently involves two passes through
-        ** the pfn_type[] array), but at least seems to be correct. May wish
-        ** to consider more complex approaches to optimize this later.
-        */
-
-        int j, k;
-
-        /* First pass: find all L3TABs current in > 4G mfns and get new mfns */
-        for (i = 0; i < max_pfn; i++) {
-
-            if (((pfn_type[i] & LTABTYPE_MASK)==L3TAB) && (p2m[i]>0xfffffUL)) {
-
-                unsigned long new_mfn;
-                uint64_t l3ptes[4];
-                uint64_t *l3tab;
-
-                l3tab = (uint64_t *)
-                    xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                         PROT_READ, p2m[i]);
-
-                for(j = 0; j < 4; j++)
-                    l3ptes[j] = l3tab[j];
-
-                munmap(l3tab, PAGE_SIZE);
-
-                if (!(new_mfn=xc_make_page_below_4G(xc_handle, dom, p2m[i]))) {
-                    ERR("Couldn't get a page below 4GB :-(");
-                    goto out;
-                }
-
-                p2m[i] = new_mfn;
-                if (xc_add_mmu_update(xc_handle, mmu,
-                                      (((unsigned long long)new_mfn)
-                                       << PAGE_SHIFT) |
-                                      MMU_MACHPHYS_UPDATE, i)) {
-                    ERR("Couldn't m2p on PAE root pgdir");
-                    goto out;
-                }
-
-                l3tab = (uint64_t *)
-                    xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                         PROT_READ | PROT_WRITE, p2m[i]);
-
-                for(j = 0; j < 4; j++)
-                    l3tab[j] = l3ptes[j];
-
-                munmap(l3tab, PAGE_SIZE);
-
-            }
-        }
-
-        /* Second pass: find all L1TABs and uncanonicalize them */
-        j = 0;
-
-        for(i = 0; i < max_pfn; i++) {
-
-            if (((pfn_type[i] & LTABTYPE_MASK)==L1TAB)) {
-                region_mfn[j] = p2m[i];
-                j++;
-            }
-
-            if(i == (max_pfn-1) || j == MAX_BATCH_SIZE) {
-
-                if (!(region_base = xc_map_foreign_batch(
-                          xc_handle, dom, PROT_READ | PROT_WRITE,
-                          region_mfn, j))) {
-                    ERR("map batch failed");
-                    goto out;
-                }
-
-                for(k = 0; k < j; k++) {
-                    if(!uncanonicalize_pagetable(L1TAB,
-                                                 region_base + k*PAGE_SIZE)) {
-                        ERR("failed uncanonicalize pt!");
-                        goto out;
-                    }
-                }
-
-                munmap(region_base, j*PAGE_SIZE);
-                j = 0;
-            }
-        }
-
-    }
 
 
     if (xc_finish_mmu_updates(xc_handle, mmu)) {

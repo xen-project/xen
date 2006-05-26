@@ -453,9 +453,6 @@ int xc_domain_iomem_permission(int xc_handle,
                                unsigned long nr_mfns,
                                uint8_t allow_access);
 
-unsigned long xc_make_page_below_4G(int xc_handle, uint32_t domid,
-                                    unsigned long mfn);
-
 typedef dom0_perfc_desc_t xc_perfc_desc_t;
 /* IMPORTANT: The caller is responsible for mlock()'ing the @desc array. */
 int xc_perfc_control(int xc_handle,

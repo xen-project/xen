@@ -191,12 +191,11 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE(void) arg)
         switch ( fi.submap_idx )
         {
         case 0:
-            fi.submap = 0;
+            fi.submap = (1U << XENFEAT_pae_pgdir_above_4gb);
             if ( shadow_mode_translate(current->domain) )
                 fi.submap |= 
                     (1U << XENFEAT_writable_page_tables) |
-                    (1U << XENFEAT_auto_translated_physmap) |
-                    (1U << XENFEAT_pae_pgdir_above_4gb);
+                    (1U << XENFEAT_auto_translated_physmap);
             if ( supervisor_mode_kernel )
                 fi.submap |= 1U << XENFEAT_supervisor_mode_kernel;
             break;

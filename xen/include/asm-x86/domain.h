@@ -120,6 +120,18 @@ struct arch_vcpu
     struct vcpu_guest_context guest_context
     __attribute__((__aligned__(16)));
 
+#ifdef CONFIG_X86_PAE
+    /*
+     * Two low-memory (<4GB) PAE L3 tables, used as fallback when the guest
+     * supplies a >=4GB PAE L3 table. We need two because we cannot set up
+     * an L3 table while we are currently running on it (without using
+     * expensive atomic 64-bit operations).
+     */
+    l3_pgentry_t  lowmem_l3tab[2][4] __attribute__((__aligned__(32)));
+    unsigned long lowmem_l3tab_high_mfn[2]; /* The >=4GB MFN being shadowed. */
+    unsigned int  lowmem_l3tab_inuse;       /* Which lowmem_l3tab is in use? */
+#endif
+
     unsigned long      flags; /* TF_ */
 
     void (*schedule_tail) (struct vcpu *);
