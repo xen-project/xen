@@ -716,6 +716,49 @@ static PyObject *pyxc_sedf_domain_get(XcObject *self, PyObject *args)
                          "weight",    weight);
 }
 
+static PyObject *pyxc_csched_domain_set(XcObject *self,
+                                        PyObject *args,
+                                        PyObject *kwds)
+{
+    uint32_t domid;
+    uint16_t weight;
+    uint16_t cap;
+    static char *kwd_list[] = { "dom", "weight", "cap", NULL };
+    static char kwd_type[] = "I|HH";
+    struct csched_domain sdom;
+    
+    weight = 0;
+    cap = (uint16_t)~0U;
+    if( !PyArg_ParseTupleAndKeywords(args, kwds, kwd_type, kwd_list, 
+                                     &domid, &weight, &cap) )
+        return NULL;
+
+    sdom.weight = weight;
+    sdom.cap = cap;
+
+    if ( xc_csched_domain_set(self->xc_handle, domid, &sdom) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    Py_INCREF(zero);
+    return zero;
+}
+
+static PyObject *pyxc_csched_domain_get(XcObject *self, PyObject *args)
+{
+    uint32_t domid;
+    struct csched_domain sdom;
+    
+    if( !PyArg_ParseTuple(args, "I", &domid) )
+        return NULL;
+    
+    if ( xc_csched_domain_get(self->xc_handle, domid, &sdom) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    return Py_BuildValue("{s:H,s:H}",
+                         "weight",  sdom.weight,
+                         "cap",     sdom.cap);
+}
+
 static PyObject *pyxc_domain_setmaxmem(XcObject *self, PyObject *args)
 {
     uint32_t dom;
@@ -1040,6 +1083,24 @@ static PyMethodDef pyxc_methods[] = {
       " slice     [long]: CPU reservation per period\n"
       " latency   [long]: domain's wakeup latency hint\n"
       " extratime [int]:  domain aware of extratime?\n"},
+    
+    { "csched_domain_set",
+      (PyCFunction)pyxc_csched_domain_set,
+      METH_KEYWORDS, "\n"
+      "Set the scheduling parameters for a domain when running with the\n"
+      "SMP credit scheduler.\n"
+      " domid     [int]:   domain id to set\n"
+      " weight    [short]: domain's scheduling weight\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "csched_domain_get",
+      (PyCFunction)pyxc_csched_domain_get,
+      METH_VARARGS, "\n"
+      "Get the scheduling parameters for a domain when running with the\n"
+      "SMP credit scheduler.\n"
+      " domid     [int]:   domain id to get\n"
+      "Returns:   [dict]\n"
+      " weight    [short]: domain's scheduling weight\n"},
 
     { "evtchn_alloc_unbound", 
       (PyCFunction)pyxc_evtchn_alloc_unbound,

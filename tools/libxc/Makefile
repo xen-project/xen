@@ -20,6 +20,7 @@ SRCS       += xc_acm.c
 SRCS       += xc_physdev.c
 SRCS       += xc_private.c
 SRCS       += xc_sedf.c
+SRCS       += xc_csched.c
 SRCS       += xc_tbuf.c
 
 ifeq ($(patsubst x86%,x86,$(XEN_TARGET_ARCH)),x86)

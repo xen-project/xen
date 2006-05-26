@@ -50,9 +50,11 @@ struct schedule_data schedule_data[NR_CPUS];
 
 extern struct scheduler sched_bvt_def;
 extern struct scheduler sched_sedf_def;
+extern struct scheduler sched_credit_def;
 static struct scheduler *schedulers[] = { 
     &sched_bvt_def,
     &sched_sedf_def,
+    &sched_credit_def,
     NULL
 };
 
@@ -639,6 +641,8 @@ static void t_timer_fn(void *unused)
 
     page_scrub_schedule_work();
 
+    SCHED_OP(tick, cpu);
+
     set_timer(&t_timer[cpu], NOW() + MILLISECS(10));
 }
 
@@ -681,6 +685,7 @@ void __init scheduler_init(void)
         printk("Could not find scheduler: %s\n", opt_sched);
 
     printk("Using scheduler: %s (%s)\n", ops.name, ops.opt_name);
+    SCHED_OP(init);
 
     if ( idle_vcpu[0] != NULL )
     {

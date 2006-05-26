@@ -26,6 +26,19 @@ typedef void (*softirq_handler)(void);
 asmlinkage void do_softirq(void);
 extern void open_softirq(int nr, softirq_handler handler);
 
+static inline void cpumask_raise_softirq(cpumask_t mask, unsigned int nr)
+{
+    int cpu;
+
+    for_each_cpu_mask(cpu, mask)
+    {
+        if ( test_and_set_bit(nr, &softirq_pending(cpu)) )
+            cpu_clear(cpu, mask);
+    }
+
+    smp_send_event_check_mask(mask);
+}
+
 static inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
 {
     if ( !test_and_set_bit(nr, &softirq_pending(cpu)) )
