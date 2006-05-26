@@ -858,7 +858,7 @@ x86_emulate_memop(
                                          &dst.val, 8, ctxt)) != 0 )
                     goto done;
             }
-            register_address_increment(_regs.esp, -dst.bytes);
+            register_address_increment(_regs.esp, -(int)dst.bytes);
             if ( (rc = ops->write_std(register_address(_regs.ss, _regs.esp),
                                       dst.val, dst.bytes, ctxt)) != 0 )
                 goto done;
@@ -942,9 +942,9 @@ x86_emulate_memop(
                 goto done;
         }
         register_address_increment(
-            _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+            _regs.esi, (_regs.eflags & EFLG_DF) ? -(int)dst.bytes : dst.bytes);
         register_address_increment(
-            _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+            _regs.edi, (_regs.eflags & EFLG_DF) ? -(int)dst.bytes : dst.bytes);
         break;
     case 0xa6 ... 0xa7: /* cmps */
         DPRINTF("Urk! I don't handle CMPS.\n");
@@ -955,7 +955,7 @@ x86_emulate_memop(
         dst.ptr   = (unsigned long *)cr2;
         dst.val   = _regs.eax;
         register_address_increment(
-            _regs.edi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+            _regs.edi, (_regs.eflags & EFLG_DF) ? -(int)dst.bytes : dst.bytes);
         break;
     case 0xac ... 0xad: /* lods */
         dst.type  = OP_REG;
@@ -964,7 +964,7 @@ x86_emulate_memop(
         if ( (rc = ops->read_emulated(cr2, &dst.val, dst.bytes, ctxt)) != 0 )
             goto done;
         register_address_increment(
-            _regs.esi, (_regs.eflags & EFLG_DF) ? -dst.bytes : dst.bytes);
+            _regs.esi, (_regs.eflags & EFLG_DF) ? -(int)dst.bytes : dst.bytes);
         break;
     case 0xae ... 0xaf: /* scas */
         DPRINTF("Urk! I don't handle SCAS.\n");
