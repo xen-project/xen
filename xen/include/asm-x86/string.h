@@ -112,22 +112,6 @@ extern void *memmove(void *dest, const void *src, size_t n);
 #define __HAVE_ARCH_MEMCMP
 #define memcmp __builtin_memcmp
 
-#define __HAVE_ARCH_MEMCHR
-static inline void *memchr(const void *cs, int c, size_t count)
-{
-    long d0;
-    register void *__res;
-    if ( count == 0 )
-        return NULL;
-    __asm__ __volatile__ (
-        "   repne ; scasb\n"
-        "   je   1f      \n"
-        "   mov  $1,%0   \n"
-        "1: dec  %0      \n"
-        : "=D" (__res), "=&c" (d0) : "a" (c), "0" (cs), "1" (count) );
-    return __res;
-}
-
 static inline void *__memset_generic(void *s, char c, size_t count)
 {
     long d0, d1;
