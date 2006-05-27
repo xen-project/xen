@@ -354,13 +354,13 @@ int xc_sedf_domain_get(int xc_handle,
                        uint64_t *latency, uint16_t *extratime,
                        uint16_t *weight);
 
-int xc_csched_domain_set(int xc_handle,
-                         uint32_t domid,
-                         struct csched_domain *sdom);
+int xc_sched_credit_domain_set(int xc_handle,
+                               uint32_t domid,
+                               struct sched_credit_adjdom *sdom);
 
-int xc_csched_domain_get(int xc_handle,
-                         uint32_t domid,
-                         struct csched_domain *sdom);
+int xc_sched_credit_domain_get(int xc_handle,
+                               uint32_t domid,
+                               struct sched_credit_adjdom *sdom);
 
 typedef evtchn_status_t xc_evtchn_status_t;
 
