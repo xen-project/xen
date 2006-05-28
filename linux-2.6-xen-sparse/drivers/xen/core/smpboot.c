@@ -400,7 +400,7 @@ int __devinit __cpu_up(unsigned int cpu)
 {
 	int rc;
 
-	rc = cpu_up_is_allowed(cpu);
+	rc = cpu_up_check(cpu);
 	if (rc)
 		return rc;
 
