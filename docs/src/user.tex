@@ -1094,6 +1094,36 @@ running domains in \xend's SXP configuration format.
 You can get access to the console of a particular domain using 
 the \verb_# xm console_ command  (e.g.\ \verb_# xm console myVM_). 
 
+\subsection{Domain Scheduling Management Commands}
+
+The credit CPU scheduler automatically load balances guest VCPUs
+across all available physical CPUs on an SMP host. The user need
+not manually pin VCPUs to load balance the system. However, she
+can restrict which CPUs a particular VCPU may run on using
+the \path{xm vcpu-pin} command.
+
+Each guest domain is assigned a \path{weight} and a \path{cap}.
+
+A domain with a weight of 512 will get twice as much CPU as a
+domain with a weight of 256 on a contended host. Legal weights
+range from 1 to 65535 and the default is 256.
+
+The cap optionally fixes the maximum amount of CPU a guest will
+be able to consume, even if the host system has idle CPU cycles.
+The cap is expressed in percentage of one physical CPU: 100 is
+1 physical CPU, 50 is half a CPU, 400 is 4 CPUs, etc... The
+default, 0, means there is no upper cap.
+
+When you are running with the credit scheduler, you can check and
+modify your domains' weights and caps using the \path{xm sched-credit}
+command:
+
+\begin{tabular}{ll}
+\verb!xm sched-credit -d <domain>! & lists weight and cap \\
+\verb!xm sched-credit -d <domain> -w <weight>! & sets the weight \\
+\verb!xm sched-credit -d <domain> -c <cap>! & sets the cap
+\end{tabular}
+
 
 
 %% Chapter Domain Configuration
@@ -1985,7 +2015,7 @@ editing \path{grub.conf}.
 \item [ tbuf\_size=xxx ] Set the size of the per-cpu trace buffers, in
   pages (default 0).  
 \item [ sched=xxx ] Select the CPU scheduler Xen should use.  The
-  current possibilities are `sedf' (default) and `bvt'.
+  current possibilities are `sedf' (default), `credit', and `bvt'.
 \item [ apic\_verbosity=debug,verbose ] Print more detailed
   information about local APIC and IOAPIC configuration.
 \item [ lapic ] Force use of local APIC even when left disabled by
