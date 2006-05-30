@@ -429,7 +429,7 @@ static inline unsigned long
 HYPERVISOR_ioremap(unsigned long ioaddr, unsigned long size)
 {
 	unsigned long ret = ioaddr;
-	if (running_on_xen) {
+	if (is_running_on_xen()) {
 		ret = __HYPERVISOR_ioremap(ioaddr, size);
 		if (unlikely(ret == -ENOSYS))
 			panic("hypercall %s failed with %ld. "
@@ -452,7 +452,7 @@ static inline unsigned long
 HYPERVISOR_phystomach(unsigned long gpfn)
 {
 	unsigned long ret = gpfn;
-	if (running_on_xen) {
+	if (is_running_on_xen()) {
 		ret = __HYPERVISOR_phystomach(gpfn);
 	}
 	return ret;
@@ -469,7 +469,7 @@ static inline unsigned long
 HYPERVISOR_machtophys(unsigned long mfn)
 {
 	unsigned long ret = mfn;
-	if (running_on_xen) {
+	if (is_running_on_xen()) {
 		ret = __HYPERVISOR_machtophys(mfn);
 	}
 	return ret;
@@ -486,7 +486,7 @@ static inline unsigned long
 HYPERVISOR_zap_physmap(unsigned long gpfn, unsigned int extent_order)
 {
 	unsigned long ret = 0;
-	if (running_on_xen) {
+	if (is_running_on_xen()) {
 		ret = __HYPERVISOR_zap_physmap(gpfn, extent_order);
 	}
 	return ret;
@@ -506,8 +506,8 @@ HYPERVISOR_add_physmap(unsigned long gpfn, unsigned long mfn,
 		       unsigned long flags, domid_t domid)
 {
 	unsigned long ret = 0;
-	BUG_ON(!running_on_xen);//XXX
-	if (running_on_xen) {
+	BUG_ON(!is_running_on_xen());//XXX
+	if (is_running_on_xen()) {
 		ret = __HYPERVISOR_add_physmap(gpfn, mfn, flags, domid);
 	}
 	return ret;

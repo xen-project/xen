@@ -672,7 +672,7 @@ privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 	struct xen_ia64_privcmd_vma* privcmd_vma = NULL;
 	struct resource* res = NULL;
 	unsigned long i;
-	BUG_ON(!running_on_xen);
+	BUG_ON(!is_running_on_xen());
 
 	BUG_ON(file->private_data != NULL);
 
@@ -737,7 +737,7 @@ direct_remap_pfn_range(struct vm_area_struct *vma,
 	unsigned long i;
 	unsigned long offset;
 	int error = 0;
-	BUG_ON(!running_on_xen);
+	BUG_ON(!is_running_on_xen());
 
 #if 0
 	if (prot != vm->vm_page_prot) {

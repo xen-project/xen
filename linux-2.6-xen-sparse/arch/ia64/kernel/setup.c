@@ -248,7 +248,7 @@ reserve_memory (void)
 	n++;
 
 #ifdef CONFIG_XEN
-	if (running_on_xen) {
+	if (is_running_on_xen()) {
 		rsvd_region[n].start = (unsigned long)__va((HYPERVISOR_shared_info->arch.start_info_pfn << PAGE_SHIFT));
 		rsvd_region[n].end   = rsvd_region[n].start + PAGE_SIZE;
 		n++;
@@ -411,7 +411,7 @@ setup_arch (char **cmdline_p)
 {
 	unw_init();
 #ifdef CONFIG_XEN
-	if (running_on_xen)
+	if (is_running_on_xen())
 		setup_xen_features();
 #endif
 
@@ -512,7 +512,7 @@ setup_arch (char **cmdline_p)
 # endif
 	}
 #ifdef CONFIG_XEN
-	if (running_on_xen) {
+	if (is_running_on_xen()) {
 		extern shared_info_t *HYPERVISOR_shared_info;
 		extern int xen_init (void);
 

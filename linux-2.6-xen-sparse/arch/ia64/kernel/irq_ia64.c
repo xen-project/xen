@@ -68,7 +68,7 @@ assign_irq_vector (int irq)
 	int pos, vector;
 #ifdef CONFIG_XEN
 	extern int xen_assign_irq_vector(int);
-	if (running_on_xen)
+	if (is_running_on_xen())
 		return xen_assign_irq_vector(irq);
 #endif /* CONFIG_XEN */
  again:
@@ -382,7 +382,7 @@ register_percpu_irq (ia64_vector vec, struct irqaction *action)
 	for (irq = 0; irq < NR_IRQS; ++irq)
 		if (irq_to_vector(irq) == vec) {
 #ifdef CONFIG_XEN
-			if (running_on_xen)
+			if (is_running_on_xen())
 				return xen_register_percpu_irq(vec, action, 1);
 #endif
 			desc = irq_descp(irq);
@@ -428,7 +428,7 @@ ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect)
 	unsigned long phys_cpu_id;
 
 #ifdef CONFIG_XEN
-        if (running_on_xen) {
+        if (is_running_on_xen()) {
 		int irq = -1;
 
 		/* TODO: we need to call vcpu_up here */

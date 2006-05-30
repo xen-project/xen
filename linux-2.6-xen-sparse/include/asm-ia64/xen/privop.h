@@ -43,6 +43,7 @@
 
 #ifndef __ASSEMBLY__
 extern int running_on_xen;
+#define is_running_on_xen() running_on_xen
 
 #define	XEN_HYPER_SSM_I		asm("break %0" : : "i" (HYPERPRIVOP_SSM_I))
 #define	XEN_HYPER_GET_IVR	asm("break %0" : : "i" (HYPERPRIVOP_GET_IVR))
@@ -122,7 +123,7 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
 
 #define xen_ia64_intrin_local_irq_restore(x)				\
 {									\
-     if (running_on_xen) {						\
+     if (is_running_on_xen()) {						\
 	if ((x) & IA64_PSR_I) { xen_ssm_i(); }				\
 	else { xen_rsm_i(); }						\
     }									\
@@ -131,7 +132,7 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
 
 #define	xen_get_psr_i()							\
 (									\
-	(running_on_xen) ?						\
+	(is_running_on_xen()) ?						\
 		(xen_get_virtual_psr_i() ? IA64_PSR_I : 0)		\
 		: __ia64_get_psr_i()					\
 )
@@ -139,7 +140,7 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
 #define xen_ia64_ssm(mask)						\
 {									\
 	if ((mask)==IA64_PSR_I) {					\
-		if (running_on_xen) { xen_ssm_i(); }			\
+		if (is_running_on_xen()) { xen_ssm_i(); }			\
 		else { __ia64_ssm(mask); }				\
 	}								\
 	else { __ia64_ssm(mask); }					\
@@ -148,7 +149,7 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
 #define xen_ia64_rsm(mask)						\
 {									\
 	if ((mask)==IA64_PSR_I) {					\
-		if (running_on_xen) { xen_rsm_i(); }			\
+		if (is_running_on_xen()) { xen_rsm_i(); }			\
 		else { __ia64_rsm(mask); }				\
 	}								\
 	else { __ia64_rsm(mask); }					\
@@ -168,9 +169,9 @@ extern void xen_set_rr(unsigned long index, unsigned long val);
 extern unsigned long xen_get_rr(unsigned long index);
 extern void xen_set_kr(unsigned long index, unsigned long val);
 
-/* Note: It may look wrong to test for running_on_xen in each case.
+/* Note: It may look wrong to test for is_running_on_xen() in each case.
  * However regnum is always a constant so, as written, the compiler
- * eliminates the switch statement, whereas running_on_xen must be
+ * eliminates the switch statement, whereas is_running_on_xen() must be
  * tested dynamically. */
 #define xen_ia64_getreg(regnum)						\
 ({									\
@@ -178,17 +179,17 @@ extern void xen_set_kr(unsigned long index, unsigned long val);
 									\
 	switch(regnum) {						\
 	case _IA64_REG_CR_IVR:						\
-		ia64_intri_res = (running_on_xen) ?			\
+		ia64_intri_res = (is_running_on_xen()) ?			\
 			xen_get_ivr() :					\
 			__ia64_getreg(regnum);				\
 		break;							\
 	case _IA64_REG_CR_TPR:						\
-		ia64_intri_res = (running_on_xen) ?			\
+		ia64_intri_res = (is_running_on_xen()) ?			\
 			xen_get_tpr() :					\
 			__ia64_getreg(regnum);				\
 		break;							\
 	case _IA64_REG_AR_EFLAG:					\
-		ia64_intri_res = (running_on_xen) ?			\
+		ia64_intri_res = (is_running_on_xen()) ?			\
 			xen_get_eflag() :				\
 			__ia64_getreg(regnum);				\
 		break;							\
@@ -203,27 +204,27 @@ extern void xen_set_kr(unsigned long index, unsigned long val);
 ({									\
 	switch(regnum) {						\
 	case _IA64_REG_AR_KR0 ... _IA64_REG_AR_KR7:			\
-		(running_on_xen) ?					\
+		(is_running_on_xen()) ?					\
 			xen_set_kr((regnum-_IA64_REG_AR_KR0), val) :	\
 			__ia64_setreg(regnum,val);			\
 		break;							\
 	case _IA64_REG_CR_ITM:						\
-		(running_on_xen) ?					\
+		(is_running_on_xen()) ?					\
 			xen_set_itm(val) :				\
 			__ia64_setreg(regnum,val);			\
 		break;							\
 	case _IA64_REG_CR_TPR:						\
-		(running_on_xen) ?					\
+		(is_running_on_xen()) ?					\
 			xen_set_tpr(val) :				\
 			__ia64_setreg(regnum,val);			\
 		break;							\
 	case _IA64_REG_CR_EOI:						\
-		(running_on_xen) ?					\
+		(is_running_on_xen()) ?					\
 			xen_eoi() :					\
 			__ia64_setreg(regnum,val);			\
 		break;							\
 	case _IA64_REG_AR_EFLAG:					\
-		(running_on_xen) ?					\
+		(is_running_on_xen()) ?					\
 			xen_set_eflag(val) :				\
 			__ia64_setreg(regnum,val);			\
 		break;							\

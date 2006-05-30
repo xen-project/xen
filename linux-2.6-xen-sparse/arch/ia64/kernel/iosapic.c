@@ -171,7 +171,7 @@ static inline void xen_iosapic_write(char __iomem *iosapic, unsigned int reg, u3
 
 static inline unsigned int iosapic_read(char __iomem *iosapic, unsigned int reg)
 {
-	if (!running_on_xen) {
+	if (!is_running_on_xen()) {
 		writel(reg, iosapic + IOSAPIC_REG_SELECT);
 		return readl(iosapic + IOSAPIC_WINDOW);
 	} else
@@ -180,7 +180,7 @@ static inline unsigned int iosapic_read(char __iomem *iosapic, unsigned int reg)
 
 static inline void iosapic_write(char __iomem *iosapic, unsigned int reg, u32 val)
 {
-	if (!running_on_xen) {
+	if (!is_running_on_xen()) {
 		writel(reg, iosapic + IOSAPIC_REG_SELECT);
 		writel(val, iosapic + IOSAPIC_WINDOW);
 	} else
@@ -1015,7 +1015,7 @@ iosapic_system_init (int system_pcat_compat)
 
 	pcat_compat = system_pcat_compat;
 #ifdef CONFIG_XEN
-	if (running_on_xen)
+	if (is_running_on_xen())
 		return;
 #endif
 	if (pcat_compat) {

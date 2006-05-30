@@ -46,14 +46,12 @@
 #include <asm/hypercall.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
-#include <asm/xen/privop.h> // for running_on_xen
+#include <asm/xen/privop.h> // for is_running_on_xen()
 
 extern shared_info_t *HYPERVISOR_shared_info;
 extern start_info_t *xen_start_info;
 
 void force_evtchn_callback(void);
-
-#define is_running_on_xen() running_on_xen
 
 /* Turn jiffies into Xen system time. XXX Implement me. */
 #define jiffies_to_st(j)	0
