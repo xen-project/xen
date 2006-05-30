@@ -58,7 +58,7 @@ check_clean:
 ifndef XEN_NO_IOEMU
 ioemu ioemuinstall ioemuclean:
 	[ -f ioemu/config-host.h ] || \
-	(cd ioemu; ./configure --prefix=usr)
+	(cd ioemu; sh ./configure --prefix=usr)
 	$(MAKE) -C ioemu $(patsubst ioemu%,%,$@)
 else
 ioemu ioemuinstall ioemuclean:
