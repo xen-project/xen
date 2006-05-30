@@ -2047,6 +2047,7 @@ GLOBAL_ENTRY(xen_bsw1)
 	ld8 r28=[r30],16; ld8 r29=[r31],16;;
 	ld8 r30=[r30]; ld8 r31=[r31];;
 	br.ret.sptk.many b0
+END(xen_bsw1)
 #endif
 
 	.org ia64_ivt+0x7f00
