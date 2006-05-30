@@ -1598,12 +1598,18 @@ int get_page_type(struct page_info *page, unsigned long type)
             {
                 if ( unlikely((x & PGT_type_mask) != (type & PGT_type_mask) ) )
                 {
-                    if ( current->domain == page_get_owner(page) )
+                    if ( (current->domain == page_get_owner(page)) &&
+                         ((x & PGT_type_mask) == PGT_writable_page) )
                     {
                         /*
                          * This ensures functions like set_gdt() see up-to-date
                          * type info without needing to clean up writable p.t.
-                         * state on the fast path.
+                         * state on the fast path. We take this path only
+                         * when the current type is writable because:
+                         *  1. It's the only type that this path can decrement.
+                         *  2. If we take this path more liberally then we can
+                         *     enter a recursive loop via get_page_from_l1e()
+                         *     during pagetable revalidation.
                          */
                         LOCK_BIGLOCK(current->domain);
                         cleanup_writable_pagetable(current->domain);
