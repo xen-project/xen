@@ -18,6 +18,8 @@ void init_xenbus_allowed_cpumask(void);
 int smp_suspend(void);
 void smp_resume(void);
 
+void cpu_bringup(void);
+
 #else /* !defined(CONFIG_HOTPLUG_CPU) */
 
 #define cpu_up_check(cpu)		(0)

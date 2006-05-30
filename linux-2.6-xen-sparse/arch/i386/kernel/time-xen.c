@@ -973,7 +973,7 @@ EXPORT_SYMBOL(jiffies_to_st);
  * stop_hz_timer / start_hz_timer - enter/exit 'tickless mode' on an idle cpu
  * These functions are based on implementations from arch/s390/kernel/time.c
  */
-void stop_hz_timer(void)
+static void stop_hz_timer(void)
 {
 	unsigned int cpu = smp_processor_id();
 	unsigned long j;
@@ -993,10 +993,26 @@ void stop_hz_timer(void)
 	BUG_ON(HYPERVISOR_set_timer_op(jiffies_to_st(j)) != 0);
 }
 
-void start_hz_timer(void)
+static void start_hz_timer(void)
 {
 	cpu_clear(smp_processor_id(), nohz_cpu_mask);
 }
+
+void safe_halt(void)
+{
+	stop_hz_timer();
+	/* Blocking includes an implicit local_irq_enable(). */
+	HYPERVISOR_block();
+	start_hz_timer();
+}
+EXPORT_SYMBOL(safe_halt);
+
+void halt(void)
+{
+	if (irqs_disabled())
+		HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL);
+}
+EXPORT_SYMBOL(halt);
 
 /* No locking required. We are only CPU running, and interrupts are off. */
 void time_resume(void)

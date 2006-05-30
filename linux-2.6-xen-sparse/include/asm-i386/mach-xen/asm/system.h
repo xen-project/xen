@@ -625,8 +625,8 @@ do {									\
 		preempt_enable_no_resched();				\
 } while (0)
 
-#define safe_halt()		((void)0)
-#define halt()			((void)0)
+void safe_halt(void);
+void halt(void);
 
 #define __save_and_cli(x)						\
 do {									\
