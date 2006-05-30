@@ -18,7 +18,6 @@ ln -sf ../../../arch/ia64/xen/drivers/coreMakefile drivers/xen/core/Makefile
 
 #not sure where these ia64-specific files will end up in the future
 ln -sf ../../../arch/ia64/xen/drivers/xenia64_init.c drivers/xen/core
-ln -sf ../../../arch/ia64/xen/drivers/evtchn_ia64.c drivers/xen/core
 
 #still a few x86-ism's in various drivers/xen files, patch them
 #cd drivers/xen
