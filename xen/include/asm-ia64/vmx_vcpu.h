@@ -44,7 +44,6 @@
 #define VRN7    0x7UL
 // for vlsapic
 #define  VLSAPIC_INSVC(vcpu, i) ((vcpu)->arch.insvc[i])
-//#define	VMX_VPD(x,y)	((x)->arch.arch_vmx.vpd->y)
 
 #define VMX(x,y)  ((x)->arch.arch_vmx.y)
 
@@ -228,7 +227,8 @@ IA64FAULT vmx_vcpu_get_lrr0(VCPU *vcpu, UINT64 *pval)
 }
 static inline
 IA64FAULT vmx_vcpu_get_lrr1(VCPU *vcpu, UINT64 *pval)
-{    *pval = VCPU(vcpu,lrr1);
+{
+    *pval = VCPU(vcpu,lrr1);
     return (IA64_NO_FAULT);
 }
 static inline

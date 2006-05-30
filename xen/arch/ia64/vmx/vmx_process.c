@@ -183,12 +183,12 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
     struct vcpu *v = current;
 
 #ifdef CRASH_DEBUG
-	if ((iim == 0 || iim == CDB_BREAK_NUM) && !user_mode(regs) &&
+    if ((iim == 0 || iim == CDB_BREAK_NUM) && !user_mode(regs) &&
         IS_VMM_ADDRESS(regs->cr_iip)) {
-		if (iim == 0)
-			show_registers(regs);
-		debugger_trap_fatal(0 /* don't care */, regs);
-	} else
+        if (iim == 0)
+            show_registers(regs);
+        debugger_trap_fatal(0 /* don't care */, regs);
+    } else
 #endif
     {
         if (iim == 0) 
@@ -247,45 +247,45 @@ void save_banked_regs_to_vpd(VCPU *v, REGS *regs)
 // NEVER successful if already reflecting a trap/fault because psr.i==0
 void leave_hypervisor_tail(struct pt_regs *regs)
 {
-	struct domain *d = current->domain;
-	struct vcpu *v = current;
-	// FIXME: Will this work properly if doing an RFI???
-	if (!is_idle_domain(d) ) {	// always comes from guest
-	        extern void vmx_dorfirfi(void);
-		struct pt_regs *user_regs = vcpu_regs(current);
- 		if (local_softirq_pending())
- 			do_softirq();
-		local_irq_disable();
- 
-		if (user_regs != regs)
-			printk("WARNING: checking pending interrupt in nested interrupt!!!\n");
+    struct domain *d = current->domain;
+    struct vcpu *v = current;
+    // FIXME: Will this work properly if doing an RFI???
+    if (!is_idle_domain(d) ) {	// always comes from guest
+        extern void vmx_dorfirfi(void);
+        struct pt_regs *user_regs = vcpu_regs(current);
+        if (local_softirq_pending())
+            do_softirq();
+        local_irq_disable();
 
-		/* VMX Domain N has other interrupt source, saying DM  */
-                if (test_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags))
+        if (user_regs != regs)
+            printk("WARNING: checking pending interrupt in nested interrupt!!!\n");
+
+        /* VMX Domain N has other interrupt source, saying DM  */
+        if (test_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags))
                       vmx_intr_assist(v);
 
- 		/* FIXME: Check event pending indicator, and set
- 		 * pending bit if necessary to inject back to guest.
- 		 * Should be careful about window between this check
- 		 * and above assist, since IOPACKET_PORT shouldn't be
- 		 * injected into vmx domain.
- 		 *
- 		 * Now hardcode the vector as 0x10 temporarily
- 		 */
-// 		if (event_pending(v)&&(!(VLSAPIC_INSVC(v,0)&(1UL<<0x10)))) {
-// 			VCPU(v, irr[0]) |= 1UL << 0x10;
-// 			v->arch.irq_new_pending = 1;
-// 		}
+        /* FIXME: Check event pending indicator, and set
+         * pending bit if necessary to inject back to guest.
+         * Should be careful about window between this check
+         * and above assist, since IOPACKET_PORT shouldn't be
+         * injected into vmx domain.
+         *
+         * Now hardcode the vector as 0x10 temporarily
+         */
+//       if (event_pending(v)&&(!(VLSAPIC_INSVC(v,0)&(1UL<<0x10)))) {
+//           VCPU(v, irr[0]) |= 1UL << 0x10;
+//           v->arch.irq_new_pending = 1;
+//       }
 
- 		if ( v->arch.irq_new_pending ) {
- 			v->arch.irq_new_pending = 0;
- 			vmx_check_pending_irq(v);
- 		}
+        if ( v->arch.irq_new_pending ) {
+            v->arch.irq_new_pending = 0;
+            vmx_check_pending_irq(v);
+        }
 //        if (VCPU(v,vac).a_bsw){
 //            save_banked_regs_to_vpd(v,regs);
 //        }
 
-	}
+    }
 }
 
 extern ia64_rr vmx_vcpu_rr(VCPU *vcpu,UINT64 vadr);

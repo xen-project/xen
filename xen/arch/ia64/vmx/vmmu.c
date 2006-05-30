@@ -319,17 +319,17 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code1, u64 *code2)
 //        if( tlb == NULL )
 //             tlb = vtlb_lookup(vcpu, gip, DSIDE_TLB );
         if (tlb)
-	        gpip = (tlb->ppn >>(tlb->ps-12)<<tlb->ps) | ( gip & (PSIZE(tlb->ps)-1) );
+            gpip = (tlb->ppn >>(tlb->ps-12)<<tlb->ps) | ( gip & (PSIZE(tlb->ps)-1) );
     }
     if( gpip){
-	 mfn = gmfn_to_mfn(vcpu->domain, gpip >>PAGE_SHIFT);
-    	if( mfn == INVALID_MFN )  panic_domain(vcpu_regs(vcpu),"fetch_code: invalid memory\n");
-    	vpa =(u64 *)__va( (gip & (PAGE_SIZE-1)) | (mfn<<PAGE_SHIFT));
+        mfn = gmfn_to_mfn(vcpu->domain, gpip >>PAGE_SHIFT);
+        if( mfn == INVALID_MFN )  panic_domain(vcpu_regs(vcpu),"fetch_code: invalid memory\n");
+        vpa =(u64 *)__va( (gip & (PAGE_SIZE-1)) | (mfn<<PAGE_SHIFT));
     }else{
-	tlb = vhpt_lookup(gip);
-	if( tlb == NULL)
-	    panic_domain(vcpu_regs(vcpu),"No entry found in ITLB and DTLB\n");
-	vpa =(u64 *)__va((tlb->ppn>>(PAGE_SHIFT-ARCH_PAGE_SHIFT)<<PAGE_SHIFT)|(gip&(PAGE_SIZE-1)));
+        tlb = vhpt_lookup(gip);
+        if( tlb == NULL)
+            panic_domain(vcpu_regs(vcpu),"No entry found in ITLB and DTLB\n");
+        vpa =(u64 *)__va((tlb->ppn>>(PAGE_SHIFT-ARCH_PAGE_SHIFT)<<PAGE_SHIFT)|(gip&(PAGE_SIZE-1)));
     }
     *code1 = *vpa++;
     *code2 = *vpa;
@@ -530,7 +530,7 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
     visr.ir=pt_isr.ir;
     vpsr.val = vmx_vcpu_get_psr(vcpu);
     if(vpsr.ic==0){
-         visr.ni=1;
+        visr.ni=1;
     }
     visr.na=1;
     data = vtlb_lookup(vcpu, vadr, DSIDE_TLB);
@@ -648,14 +648,14 @@ IA64FAULT vmx_vcpu_tak(VCPU *vcpu, UINT64 vadr, UINT64 *key)
 long
 __domain_va_to_ma(unsigned long va, unsigned long* ma, unsigned long *len)
 {
-    unsigned long 	mpfn, gpfn, m, n = *len;
-    unsigned long	end;	/* end of the area mapped by current entry */
-    thash_data_t	*entry;
+    unsigned long  mpfn, gpfn, m, n = *len;
+    unsigned long  end;   /* end of the area mapped by current entry */
+    thash_data_t   *entry;
     struct vcpu *v = current;
 
     entry = vtlb_lookup(v, va, DSIDE_TLB);
     if (entry == NULL)
-	return -EFAULT;
+        return -EFAULT;
 
     gpfn =(entry->ppn>>(PAGE_SHIFT-12));
     gpfn =PAGEALIGN(gpfn,(entry->ps-PAGE_SHIFT));
@@ -668,7 +668,7 @@ __domain_va_to_ma(unsigned long va, unsigned long* ma, unsigned long *len)
     /*end = PAGEALIGN(m, entry->ps) + PSIZE(entry->ps);*/
     /* Current entry can't map all requested area */
     if ((m + n) > end)
-	n = end - m;
+        n = end - m;
 
     *ma = m;
     *len = n;

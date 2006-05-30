@@ -2,10 +2,10 @@
  * arch/ia64/kernel/vmx_ivt.S
  *
  * Copyright (C) 1998-2001, 2003 Hewlett-Packard Co
- *	Stephane Eranian <eranian@hpl.hp.com>
- *	David Mosberger <davidm@hpl.hp.com>
+ *      Stephane Eranian <eranian@hpl.hp.com>
+ *      David Mosberger <davidm@hpl.hp.com>
  * Copyright (C) 2000, 2002-2003 Intel Co
- *	Asit Mallick <asit.k.mallick@intel.com>
+ *      Asit Mallick <asit.k.mallick@intel.com>
  *      Suresh Siddha <suresh.b.siddha@intel.com>
  *      Kenneth Chen <kenneth.w.chen@intel.com>
  *      Fenghua Yu <fenghua.yu@intel.com>
@@ -31,7 +31,7 @@
  *
  *  For each entry, the comment is as follows:
  *
- *		// 0x1c00 Entry 7 (size 64 bundles) Data Key Miss (12,51)
+ *              // 0x1c00 Entry 7 (size 64 bundles) Data Key Miss (12,51)
  *  entry offset ----/     /         /                  /          /
  *  entry number ---------/         /                  /          /
  *  size of the entry -------------/                  /          /
@@ -96,13 +96,13 @@ vmx_fault_##n:;          \
     ;;                  \
 
 
-#define VMX_REFLECT(n)				\
-	mov r31=pr;									\
-	mov r19=n;			/* prepare to save predicates */		\
-    mov r29=cr.ipsr;        \
+#define VMX_REFLECT(n)    \
+    mov r31=pr;           \
+    mov r19=n;       /* prepare to save predicates */ \
+    mov r29=cr.ipsr;      \
     ;;      \
     tbit.z p6,p7=r29,IA64_PSR_VM_BIT;       \
-(p7) br.sptk.many vmx_dispatch_reflection;        \
+(p7)br.sptk.many vmx_dispatch_reflection;        \
     VMX_FAULT(n);            \
 
 
@@ -115,10 +115,10 @@ END(vmx_panic)
 
 
 
-	.section .text.ivt,"ax"
+    .section .text.ivt,"ax"
 
-	.align 32768	// align on 32KB boundary
-	.global vmx_ia64_ivt
+    .align 32768    // align on 32KB boundary
+    .global vmx_ia64_ivt
 vmx_ia64_ivt:
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x0000 Entry 0 (size 64 bundles) VHPT Translation (8,20,47)
@@ -127,7 +127,7 @@ ENTRY(vmx_vhpt_miss)
     VMX_FAULT(0)
 END(vmx_vhpt_miss)
 
-	.org vmx_ia64_ivt+0x400
+    .org vmx_ia64_ivt+0x400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x0400 Entry 1 (size 64 bundles) ITLB (21)
 ENTRY(vmx_itlb_miss)
@@ -410,52 +410,52 @@ ENTRY(vmx_nested_dtlb_miss)
     VMX_FAULT(5)
 END(vmx_nested_dtlb_miss)
 
-	.org vmx_ia64_ivt+0x1800
+    .org vmx_ia64_ivt+0x1800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1800 Entry 6 (size 64 bundles) Instruction Key Miss (24)
 ENTRY(vmx_ikey_miss)
     VMX_DBG_FAULT(6)
-	VMX_REFLECT(6)
+    VMX_REFLECT(6)
 END(vmx_ikey_miss)
 
-	.org vmx_ia64_ivt+0x1c00
+    .org vmx_ia64_ivt+0x1c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1c00 Entry 7 (size 64 bundles) Data Key Miss (12,51)
 ENTRY(vmx_dkey_miss)
     VMX_DBG_FAULT(7)
-	VMX_REFLECT(7)
+    VMX_REFLECT(7)
 END(vmx_dkey_miss)
 
-	.org vmx_ia64_ivt+0x2000
+    .org vmx_ia64_ivt+0x2000
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2000 Entry 8 (size 64 bundles) Dirty-bit (54)
 ENTRY(vmx_dirty_bit)
     VMX_DBG_FAULT(8)
-	VMX_REFLECT(8)
+    VMX_REFLECT(8)
 END(vmx_dirty_bit)
 
-	.org vmx_ia64_ivt+0x2400
+    .org vmx_ia64_ivt+0x2400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2400 Entry 9 (size 64 bundles) Instruction Access-bit (27)
 ENTRY(vmx_iaccess_bit)
     VMX_DBG_FAULT(9)
-	VMX_REFLECT(9)
+    VMX_REFLECT(9)
 END(vmx_iaccess_bit)
 
-	.org vmx_ia64_ivt+0x2800
+    .org vmx_ia64_ivt+0x2800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2800 Entry 10 (size 64 bundles) Data Access-bit (15,55)
 ENTRY(vmx_daccess_bit)
     VMX_DBG_FAULT(10)
-	VMX_REFLECT(10)
+    VMX_REFLECT(10)
 END(vmx_daccess_bit)
 
-	.org vmx_ia64_ivt+0x2c00
+    .org vmx_ia64_ivt+0x2c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2c00 Entry 11 (size 64 bundles) Break instruction (33)
 ENTRY(vmx_break_fault)
     VMX_DBG_FAULT(11)
-	mov r31=pr
+    mov r31=pr
     mov r19=11
     mov r30=cr.iim
     movl r29=0x1100
@@ -473,12 +473,12 @@ ENTRY(vmx_break_fault)
     VMX_FAULT(11);
 END(vmx_break_fault)
 
-	.org vmx_ia64_ivt+0x3000
+    .org vmx_ia64_ivt+0x3000
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3000 Entry 12 (size 64 bundles) External Interrupt (4)
 ENTRY(vmx_interrupt)
 //    VMX_DBG_FAULT(12)
-	mov r31=pr		// prepare to save predicates
+    mov r31=pr		// prepare to save predicates
     mov r19=12
     mov r29=cr.ipsr
     ;;
@@ -487,58 +487,58 @@ ENTRY(vmx_interrupt)
     ;;
 (p7) br.sptk vmx_dispatch_interrupt
     ;;
-	mov r27=ar.rsc			/* M */
-	mov r20=r1			/* A */
-	mov r25=ar.unat		/* M */
-	mov r26=ar.pfs			/* I */
-	mov r28=cr.iip			/* M */
-	cover               /* B (or nothing) */
-	;;
-	mov r1=sp
-	;;
-	invala				/* M */
-	mov r30=cr.ifs
-	;;
+    mov r27=ar.rsc		/* M */
+    mov r20=r1			/* A */
+    mov r25=ar.unat		/* M */
+    mov r26=ar.pfs		/* I */
+    mov r28=cr.iip		/* M */
+    cover			/* B (or nothing) */
+    ;;
+    mov r1=sp
+    ;;
+    invala			/* M */
+    mov r30=cr.ifs
+    ;;
     addl r1=-IA64_PT_REGS_SIZE,r1
     ;;
-	adds r17=2*L1_CACHE_BYTES,r1		/* really: biggest cache-line size */
-	adds r16=PT(CR_IPSR),r1
-	;;
-	lfetch.fault.excl.nt1 [r17],L1_CACHE_BYTES
-	st8 [r16]=r29		/* save cr.ipsr */
-	;;
-	lfetch.fault.excl.nt1 [r17]
-	mov r29=b0
-	;;
-	adds r16=PT(R8),r1  	/* initialize first base pointer */
-	adds r17=PT(R9),r1  	/* initialize second base pointer */
-	mov r18=r0      		/* make sure r18 isn't NaT */
-	;;
+    adds r17=2*L1_CACHE_BYTES,r1	/* really: biggest cache-line size */
+    adds r16=PT(CR_IPSR),r1
+    ;;
+    lfetch.fault.excl.nt1 [r17],L1_CACHE_BYTES
+    st8 [r16]=r29			/* save cr.ipsr */
+    ;;
+    lfetch.fault.excl.nt1 [r17]
+    mov r29=b0
+    ;;
+    adds r16=PT(R8),r1  	/* initialize first base pointer */
+    adds r17=PT(R9),r1  	/* initialize second base pointer */
+    mov r18=r0      		/* make sure r18 isn't NaT */
+    ;;
 .mem.offset 0,0; st8.spill [r16]=r8,16
 .mem.offset 8,0; st8.spill [r17]=r9,16
         ;;
 .mem.offset 0,0; st8.spill [r16]=r10,24
 .mem.offset 8,0; st8.spill [r17]=r11,24
         ;;
-	st8 [r16]=r28,16	/* save cr.iip */
-	st8 [r17]=r30,16	/* save cr.ifs */
-	mov r8=ar.fpsr		/* M */
-	mov r9=ar.csd
-	mov r10=ar.ssd
-	movl r11=FPSR_DEFAULT   /* L-unit */
-	;;
-	st8 [r16]=r25,16	/* save ar.unat */
-	st8 [r17]=r26,16	/* save ar.pfs */
-	shl r18=r18,16		/* compute ar.rsc to be used for "loadrs" */
-	;;
-    st8 [r16]=r27,16   /* save ar.rsc */
-    adds r17=16,r17    /* skip over ar_rnat field */
-    ;;          /* avoid RAW on r16 & r17 */
-    st8 [r17]=r31,16   /* save predicates */
-    adds r16=16,r16    /* skip over ar_bspstore field */
+    st8 [r16]=r28,16		/* save cr.iip */
+    st8 [r17]=r30,16		/* save cr.ifs */
+    mov r8=ar.fpsr		/* M */
+    mov r9=ar.csd
+    mov r10=ar.ssd
+    movl r11=FPSR_DEFAULT	/* L-unit */
     ;;
-    st8 [r16]=r29,16   /* save b0 */
-    st8 [r17]=r18,16   /* save ar.rsc value for "loadrs" */
+    st8 [r16]=r25,16		/* save ar.unat */
+    st8 [r17]=r26,16		/* save ar.pfs */
+    shl r18=r18,16		/* compute ar.rsc to be used for "loadrs" */
+    ;;
+    st8 [r16]=r27,16		/* save ar.rsc */
+    adds r17=16,r17		/* skip over ar_rnat field */
+    ;;
+    st8 [r17]=r31,16		/* save predicates */
+    adds r16=16,r16		/* skip over ar_bspstore field */
+    ;;
+    st8 [r16]=r29,16		/* save b0 */
+    st8 [r17]=r18,16		/* save ar.rsc value for "loadrs" */
     ;;
 .mem.offset 0,0; st8.spill [r16]=r20,16    /* save original r1 */
 .mem.offset 8,0; st8.spill [r17]=r12,16
@@ -561,18 +561,18 @@ ENTRY(vmx_interrupt)
     ;;                                          \
     bsw.1
     ;;
-	alloc r14=ar.pfs,0,0,2,0 // must be first in an insn group
-	mov out0=cr.ivr		// pass cr.ivr as first arg
-	add out1=16,sp		// pass pointer to pt_regs as second arg
+    alloc r14=ar.pfs,0,0,2,0	// must be first in an insn group
+    mov out0=cr.ivr		// pass cr.ivr as first arg
+    add out1=16,sp		// pass pointer to pt_regs as second arg
 
-	ssm psr.ic
+    ssm psr.ic
     ;;
     srlz.i
-	;;
+    ;;
     (p15) ssm psr.i
-	adds r3=8,r2		// set up second base pointer for SAVE_REST
-	srlz.i			// ensure everybody knows psr.ic is back on
-	;;
+    adds r3=8,r2		// set up second base pointer for SAVE_REST
+    srlz.i			// ensure everybody knows psr.ic is back on
+    ;;
 .mem.offset 0,0; st8.spill [r2]=r16,16
 .mem.offset 8,0; st8.spill [r3]=r17,16
     ;;
@@ -599,8 +599,8 @@ ENTRY(vmx_interrupt)
 .mem.offset 0,0; st8.spill [r2]=r30,16
 .mem.offset 8,0; st8.spill [r3]=r31,32
     ;;
-    mov ar.fpsr=r11     /* M-unit */
-    st8 [r2]=r8,8      /* ar.ccv */
+    mov ar.fpsr=r11       /* M-unit */
+    st8 [r2]=r8,8         /* ar.ccv */
     adds r24=PT(B6)-PT(F7),r3
     ;;
     stf.spill [r2]=f6,32
@@ -619,95 +619,95 @@ ENTRY(vmx_interrupt)
     st8 [r24]=r9           /* ar.csd */
     st8 [r25]=r10          /* ar.ssd */
     ;;
-	srlz.d			// make sure we see the effect of cr.ivr
-	movl r14=ia64_leave_nested
-	;;
-	mov rp=r14
-	br.call.sptk.many b6=ia64_handle_irq
-	;;
+    srlz.d		// make sure we see the effect of cr.ivr
+    movl r14=ia64_leave_nested
+    ;;
+    mov rp=r14
+    br.call.sptk.many b6=ia64_handle_irq
+    ;;
 END(vmx_interrupt)
 
-	.org vmx_ia64_ivt+0x3400
+    .org vmx_ia64_ivt+0x3400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3400 Entry 13 (size 64 bundles) Reserved
 ENTRY(vmx_virtual_exirq)
-	VMX_DBG_FAULT(13)
-	mov r31=pr
-        mov r19=13
-        br.sptk vmx_dispatch_vexirq
+    VMX_DBG_FAULT(13)
+    mov r31=pr
+    mov r19=13
+    br.sptk vmx_dispatch_vexirq
 END(vmx_virtual_exirq)
 
-	.org vmx_ia64_ivt+0x3800
+    .org vmx_ia64_ivt+0x3800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3800 Entry 14 (size 64 bundles) Reserved
     VMX_DBG_FAULT(14)
-	VMX_FAULT(14)
+    VMX_FAULT(14)
 
 
-	.org vmx_ia64_ivt+0x3c00
+    .org vmx_ia64_ivt+0x3c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3c00 Entry 15 (size 64 bundles) Reserved
     VMX_DBG_FAULT(15)
-	VMX_FAULT(15)
+    VMX_FAULT(15)
 
 
-	.org vmx_ia64_ivt+0x4000
+    .org vmx_ia64_ivt+0x4000
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x4000 Entry 16 (size 64 bundles) Reserved
     VMX_DBG_FAULT(16)
-	VMX_FAULT(16)
+    VMX_FAULT(16)
 
-	.org vmx_ia64_ivt+0x4400
+    .org vmx_ia64_ivt+0x4400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x4400 Entry 17 (size 64 bundles) Reserved
     VMX_DBG_FAULT(17)
-	VMX_FAULT(17)
+    VMX_FAULT(17)
 
-	.org vmx_ia64_ivt+0x4800
+    .org vmx_ia64_ivt+0x4800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x4800 Entry 18 (size 64 bundles) Reserved
     VMX_DBG_FAULT(18)
-	VMX_FAULT(18)
+    VMX_FAULT(18)
 
-	.org vmx_ia64_ivt+0x4c00
+    .org vmx_ia64_ivt+0x4c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x4c00 Entry 19 (size 64 bundles) Reserved
     VMX_DBG_FAULT(19)
-	VMX_FAULT(19)
+    VMX_FAULT(19)
 
     .org vmx_ia64_ivt+0x5000
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5000 Entry 20 (size 16 bundles) Page Not Present
 ENTRY(vmx_page_not_present)
-	VMX_DBG_FAULT(20)
-	VMX_REFLECT(20)
+    VMX_DBG_FAULT(20)
+    VMX_REFLECT(20)
 END(vmx_page_not_present)
 
     .org vmx_ia64_ivt+0x5100
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5100 Entry 21 (size 16 bundles) Key Permission vector
 ENTRY(vmx_key_permission)
-	VMX_DBG_FAULT(21)
-	VMX_REFLECT(21)
+    VMX_DBG_FAULT(21)
+    VMX_REFLECT(21)
 END(vmx_key_permission)
 
     .org vmx_ia64_ivt+0x5200
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5200 Entry 22 (size 16 bundles) Instruction Access Rights (26)
 ENTRY(vmx_iaccess_rights)
-	VMX_DBG_FAULT(22)
-	VMX_REFLECT(22)
+    VMX_DBG_FAULT(22)
+    VMX_REFLECT(22)
 END(vmx_iaccess_rights)
 
-	.org vmx_ia64_ivt+0x5300
+    .org vmx_ia64_ivt+0x5300
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5300 Entry 23 (size 16 bundles) Data Access Rights (14,53)
 ENTRY(vmx_daccess_rights)
-	VMX_DBG_FAULT(23)
-	VMX_REFLECT(23)
+    VMX_DBG_FAULT(23)
+    VMX_REFLECT(23)
 END(vmx_daccess_rights)
 
-	.org vmx_ia64_ivt+0x5400
+    .org vmx_ia64_ivt+0x5400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5400 Entry 24 (size 16 bundles) General Exception (5,32,34,36,38,39)
 ENTRY(vmx_general_exception)
@@ -716,106 +716,106 @@ ENTRY(vmx_general_exception)
 //    VMX_FAULT(24)
 END(vmx_general_exception)
 
-	.org vmx_ia64_ivt+0x5500
+    .org vmx_ia64_ivt+0x5500
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5500 Entry 25 (size 16 bundles) Disabled FP-Register (35)
 ENTRY(vmx_disabled_fp_reg)
-	VMX_DBG_FAULT(25)
-	VMX_REFLECT(25)
+    VMX_DBG_FAULT(25)
+    VMX_REFLECT(25)
 END(vmx_disabled_fp_reg)
 
-	.org vmx_ia64_ivt+0x5600
+    .org vmx_ia64_ivt+0x5600
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5600 Entry 26 (size 16 bundles) Nat Consumption (11,23,37,50)
 ENTRY(vmx_nat_consumption)
-	VMX_DBG_FAULT(26)
-	VMX_REFLECT(26)
+    VMX_DBG_FAULT(26)
+    VMX_REFLECT(26)
 END(vmx_nat_consumption)
 
-	.org vmx_ia64_ivt+0x5700
+    .org vmx_ia64_ivt+0x5700
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5700 Entry 27 (size 16 bundles) Speculation (40)
 ENTRY(vmx_speculation_vector)
-	VMX_DBG_FAULT(27)
-	VMX_REFLECT(27)
+    VMX_DBG_FAULT(27)
+    VMX_REFLECT(27)
 END(vmx_speculation_vector)
 
-	.org vmx_ia64_ivt+0x5800
+    .org vmx_ia64_ivt+0x5800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5800 Entry 28 (size 16 bundles) Reserved
     VMX_DBG_FAULT(28)
-	VMX_FAULT(28)
+    VMX_FAULT(28)
 
-	.org vmx_ia64_ivt+0x5900
+    .org vmx_ia64_ivt+0x5900
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5900 Entry 29 (size 16 bundles) Debug (16,28,56)
 ENTRY(vmx_debug_vector)
     VMX_DBG_FAULT(29)
-	VMX_FAULT(29)
+    VMX_FAULT(29)
 END(vmx_debug_vector)
 
-	.org vmx_ia64_ivt+0x5a00
+    .org vmx_ia64_ivt+0x5a00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5a00 Entry 30 (size 16 bundles) Unaligned Reference (57)
 ENTRY(vmx_unaligned_access)
-	VMX_DBG_FAULT(30)
-	VMX_REFLECT(30)
+    VMX_DBG_FAULT(30)
+    VMX_REFLECT(30)
 END(vmx_unaligned_access)
 
-	.org vmx_ia64_ivt+0x5b00
+    .org vmx_ia64_ivt+0x5b00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5b00 Entry 31 (size 16 bundles) Unsupported Data Reference (57)
 ENTRY(vmx_unsupported_data_reference)
-	VMX_DBG_FAULT(31)
-	VMX_REFLECT(31)
+    VMX_DBG_FAULT(31)
+    VMX_REFLECT(31)
 END(vmx_unsupported_data_reference)
 
-	.org vmx_ia64_ivt+0x5c00
+    .org vmx_ia64_ivt+0x5c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5c00 Entry 32 (size 16 bundles) Floating-Point Fault (64)
 ENTRY(vmx_floating_point_fault)
-	VMX_DBG_FAULT(32)
-	VMX_REFLECT(32)
+    VMX_DBG_FAULT(32)
+    VMX_REFLECT(32)
 END(vmx_floating_point_fault)
 
-	.org vmx_ia64_ivt+0x5d00
+    .org vmx_ia64_ivt+0x5d00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5d00 Entry 33 (size 16 bundles) Floating Point Trap (66)
 ENTRY(vmx_floating_point_trap)
-	VMX_DBG_FAULT(33)
-	VMX_REFLECT(33)
+    VMX_DBG_FAULT(33)
+    VMX_REFLECT(33)
 END(vmx_floating_point_trap)
 
-	.org vmx_ia64_ivt+0x5e00
+    .org vmx_ia64_ivt+0x5e00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5e00 Entry 34 (size 16 bundles) Lower Privilege Transfer Trap (66)
 ENTRY(vmx_lower_privilege_trap)
-	VMX_DBG_FAULT(34)
-	VMX_REFLECT(34)
+    VMX_DBG_FAULT(34)
+    VMX_REFLECT(34)
 END(vmx_lower_privilege_trap)
 
-	.org vmx_ia64_ivt+0x5f00
+    .org vmx_ia64_ivt+0x5f00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5f00 Entry 35 (size 16 bundles) Taken Branch Trap (68)
 ENTRY(vmx_taken_branch_trap)
-	VMX_DBG_FAULT(35)
-	VMX_REFLECT(35)
+    VMX_DBG_FAULT(35)
+    VMX_REFLECT(35)
 END(vmx_taken_branch_trap)
 
-	.org vmx_ia64_ivt+0x6000
+    .org vmx_ia64_ivt+0x6000
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6000 Entry 36 (size 16 bundles) Single Step Trap (69)
 ENTRY(vmx_single_step_trap)
-	VMX_DBG_FAULT(36)
-	VMX_REFLECT(36)
+    VMX_DBG_FAULT(36)
+    VMX_REFLECT(36)
 END(vmx_single_step_trap)
 
-	.org vmx_ia64_ivt+0x6100
+    .org vmx_ia64_ivt+0x6100
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6100 Entry 37 (size 16 bundles) Virtualization Fault
 ENTRY(vmx_virtualization_fault)
 //    VMX_DBG_FAULT(37)
-	mov r31=pr
+    mov r31=pr
     mov r19=37
     adds r16 = IA64_VCPU_CAUSE_OFFSET,r21
     adds r17 = IA64_VCPU_OPCODE_OFFSET,r21
@@ -826,197 +826,197 @@ ENTRY(vmx_virtualization_fault)
     br.sptk vmx_dispatch_virtualization_fault
 END(vmx_virtualization_fault)
 
-	.org vmx_ia64_ivt+0x6200
+    .org vmx_ia64_ivt+0x6200
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6200 Entry 38 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(38)
-	VMX_FAULT(38)
+    VMX_DBG_FAULT(38)
+    VMX_FAULT(38)
 
-	.org vmx_ia64_ivt+0x6300
+    .org vmx_ia64_ivt+0x6300
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6300 Entry 39 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(39)
-	VMX_FAULT(39)
+    VMX_DBG_FAULT(39)
+    VMX_FAULT(39)
 
-	.org vmx_ia64_ivt+0x6400
+    .org vmx_ia64_ivt+0x6400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6400 Entry 40 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(40)
-	VMX_FAULT(40)
+    VMX_DBG_FAULT(40)
+    VMX_FAULT(40)
 
-	.org vmx_ia64_ivt+0x6500
+    .org vmx_ia64_ivt+0x6500
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6500 Entry 41 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(41)
-	VMX_FAULT(41)
+    VMX_DBG_FAULT(41)
+    VMX_FAULT(41)
 
-	.org vmx_ia64_ivt+0x6600
+    .org vmx_ia64_ivt+0x6600
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6600 Entry 42 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(42)
-	VMX_FAULT(42)
+    VMX_DBG_FAULT(42)
+    VMX_FAULT(42)
 
-	.org vmx_ia64_ivt+0x6700
+    .org vmx_ia64_ivt+0x6700
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6700 Entry 43 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(43)
-	VMX_FAULT(43)
+    VMX_DBG_FAULT(43)
+    VMX_FAULT(43)
 
-	.org vmx_ia64_ivt+0x6800
+    .org vmx_ia64_ivt+0x6800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6800 Entry 44 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(44)
-	VMX_FAULT(44)
+    VMX_DBG_FAULT(44)
+    VMX_FAULT(44)
 
-	.org vmx_ia64_ivt+0x6900
+    .org vmx_ia64_ivt+0x6900
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6900 Entry 45 (size 16 bundles) IA-32 Exeception (17,18,29,41,42,43,44,58,60,61,62,72,73,75,76,77)
 ENTRY(vmx_ia32_exception)
-	VMX_DBG_FAULT(45)
-	VMX_FAULT(45)
+    VMX_DBG_FAULT(45)
+    VMX_FAULT(45)
 END(vmx_ia32_exception)
 
-	.org vmx_ia64_ivt+0x6a00
+    .org vmx_ia64_ivt+0x6a00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6a00 Entry 46 (size 16 bundles) IA-32 Intercept  (30,31,59,70,71)
 ENTRY(vmx_ia32_intercept)
-	VMX_DBG_FAULT(46)
-	VMX_FAULT(46)
+    VMX_DBG_FAULT(46)
+    VMX_FAULT(46)
 END(vmx_ia32_intercept)
 
-	.org vmx_ia64_ivt+0x6b00
+    .org vmx_ia64_ivt+0x6b00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6b00 Entry 47 (size 16 bundles) IA-32 Interrupt  (74)
 ENTRY(vmx_ia32_interrupt)
-	VMX_DBG_FAULT(47)
-	VMX_FAULT(47)
+    VMX_DBG_FAULT(47)
+    VMX_FAULT(47)
 END(vmx_ia32_interrupt)
 
-	.org vmx_ia64_ivt+0x6c00
+    .org vmx_ia64_ivt+0x6c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6c00 Entry 48 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(48)
-	VMX_FAULT(48)
+    VMX_DBG_FAULT(48)
+    VMX_FAULT(48)
 
-	.org vmx_ia64_ivt+0x6d00
+    .org vmx_ia64_ivt+0x6d00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6d00 Entry 49 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(49)
-	VMX_FAULT(49)
+    VMX_DBG_FAULT(49)
+    VMX_FAULT(49)
 
-	.org vmx_ia64_ivt+0x6e00
+    .org vmx_ia64_ivt+0x6e00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6e00 Entry 50 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(50)
-	VMX_FAULT(50)
+    VMX_DBG_FAULT(50)
+    VMX_FAULT(50)
 
-	.org vmx_ia64_ivt+0x6f00
+    .org vmx_ia64_ivt+0x6f00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6f00 Entry 51 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(51)
-	VMX_FAULT(51)
+    VMX_DBG_FAULT(51)
+    VMX_FAULT(51)
 
-	.org vmx_ia64_ivt+0x7000
+    .org vmx_ia64_ivt+0x7000
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7000 Entry 52 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(52)
-	VMX_FAULT(52)
+    VMX_DBG_FAULT(52)
+    VMX_FAULT(52)
 
-	.org vmx_ia64_ivt+0x7100
+    .org vmx_ia64_ivt+0x7100
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7100 Entry 53 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(53)
-	VMX_FAULT(53)
+    VMX_DBG_FAULT(53)
+    VMX_FAULT(53)
 
-	.org vmx_ia64_ivt+0x7200
+    .org vmx_ia64_ivt+0x7200
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7200 Entry 54 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(54)
-	VMX_FAULT(54)
+    VMX_DBG_FAULT(54)
+    VMX_FAULT(54)
 
-	.org vmx_ia64_ivt+0x7300
+    .org vmx_ia64_ivt+0x7300
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7300 Entry 55 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(55)
-	VMX_FAULT(55)
+    VMX_DBG_FAULT(55)
+    VMX_FAULT(55)
 
-	.org vmx_ia64_ivt+0x7400
+    .org vmx_ia64_ivt+0x7400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7400 Entry 56 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(56)
-	VMX_FAULT(56)
+    VMX_DBG_FAULT(56)
+    VMX_FAULT(56)
 
-	.org vmx_ia64_ivt+0x7500
+    .org vmx_ia64_ivt+0x7500
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7500 Entry 57 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(57)
-	VMX_FAULT(57)
+    VMX_DBG_FAULT(57)
+    VMX_FAULT(57)
 
-	.org vmx_ia64_ivt+0x7600
+    .org vmx_ia64_ivt+0x7600
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7600 Entry 58 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(58)
-	VMX_FAULT(58)
+    VMX_DBG_FAULT(58)
+    VMX_FAULT(58)
 
-	.org vmx_ia64_ivt+0x7700
+    .org vmx_ia64_ivt+0x7700
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7700 Entry 59 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(59)
-	VMX_FAULT(59)
+    VMX_DBG_FAULT(59)
+    VMX_FAULT(59)
 
-	.org vmx_ia64_ivt+0x7800
+    .org vmx_ia64_ivt+0x7800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7800 Entry 60 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(60)
-	VMX_FAULT(60)
+    VMX_DBG_FAULT(60)
+    VMX_FAULT(60)
 
-	.org vmx_ia64_ivt+0x7900
+    .org vmx_ia64_ivt+0x7900
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7900 Entry 61 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(61)
-	VMX_FAULT(61)
+    VMX_DBG_FAULT(61)
+    VMX_FAULT(61)
 
-	.org vmx_ia64_ivt+0x7a00
+    .org vmx_ia64_ivt+0x7a00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7a00 Entry 62 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(62)
-	VMX_FAULT(62)
+    VMX_DBG_FAULT(62)
+    VMX_FAULT(62)
 
-	.org vmx_ia64_ivt+0x7b00
+    .org vmx_ia64_ivt+0x7b00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7b00 Entry 63 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(63)
-	VMX_FAULT(63)
+    VMX_DBG_FAULT(63)
+    VMX_FAULT(63)
 
-	.org vmx_ia64_ivt+0x7c00
+    .org vmx_ia64_ivt+0x7c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7c00 Entry 64 (size 16 bundles) Reserved
     VMX_DBG_FAULT(64)
-	VMX_FAULT(64)
+    VMX_FAULT(64)
 
-	.org vmx_ia64_ivt+0x7d00
+    .org vmx_ia64_ivt+0x7d00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7d00 Entry 65 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(65)
-	VMX_FAULT(65)
+    VMX_DBG_FAULT(65)
+    VMX_FAULT(65)
 
-	.org vmx_ia64_ivt+0x7e00
+    .org vmx_ia64_ivt+0x7e00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7e00 Entry 66 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(66)
-	VMX_FAULT(66)
+    VMX_DBG_FAULT(66)
+    VMX_FAULT(66)
 
-	.org vmx_ia64_ivt+0x7f00
+    .org vmx_ia64_ivt+0x7f00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7f00 Entry 67 (size 16 bundles) Reserved
-	VMX_DBG_FAULT(67)
-	VMX_FAULT(67)
+    VMX_DBG_FAULT(67)
+    VMX_FAULT(67)
 
-	.org vmx_ia64_ivt+0x8000
-    // There is no particular reason for this code to be here, other than that
-    // there happens to be space here that would go unused otherwise.  If this
-    // fault ever gets "unreserved", simply moved the following code to a more
-    // suitable spot...
+    .org vmx_ia64_ivt+0x8000
+// There is no particular reason for this code to be here, other than that
+// there happens to be space here that would go unused otherwise.  If this
+// fault ever gets "unreserved", simply moved the following code to a more
+// suitable spot...
 
 
 ENTRY(vmx_dispatch_reflection)
@@ -1165,24 +1165,24 @@ END(vmx_hypercall_dispatch)
 
 
 ENTRY(vmx_dispatch_interrupt)
-	VMX_SAVE_MIN_WITH_COVER_R19	// uses r31; defines r2 and r3
-	;;
-	alloc r14=ar.pfs,0,0,2,0 // must be first in an insn group
-	mov out0=cr.ivr		// pass cr.ivr as first arg
-	adds r3=8,r2		// set up second base pointer for SAVE_REST
+    VMX_SAVE_MIN_WITH_COVER_R19	// uses r31; defines r2 and r3
     ;;
-	ssm psr.ic
-	;;
+    alloc r14=ar.pfs,0,0,2,0 // must be first in an insn group
+    mov out0=cr.ivr		// pass cr.ivr as first arg
+    adds r3=8,r2		// set up second base pointer for SAVE_REST
+    ;;
+    ssm psr.ic
+    ;;
     srlz.i
     ;;
     (p15) ssm psr.i
-	movl r14=ia64_leave_hypervisor
-	;;
-	VMX_SAVE_REST
-	mov rp=r14
-	;;
-	add out1=16,sp		// pass pointer to pt_regs as second arg
-	br.call.sptk.many b6=ia64_handle_irq
+    movl r14=ia64_leave_hypervisor
+    ;;
+    VMX_SAVE_REST
+    mov rp=r14
+    ;;
+    add out1=16,sp		// pass pointer to pt_regs as second arg
+    br.call.sptk.many b6=ia64_handle_irq
 END(vmx_dispatch_interrupt)
 
 

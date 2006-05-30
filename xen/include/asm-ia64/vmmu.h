@@ -23,15 +23,15 @@
 #ifndef XEN_TLBthash_H
 #define XEN_TLBthash_H
 
-#define         MAX_CCN_DEPTH           15       // collision chain depth
-#define         VCPU_VTLB_SHIFT          (20)    // 1M for VTLB
-#define         VCPU_VTLB_SIZE           (1UL<<VCPU_VTLB_SHIFT)
-#define         VCPU_VTLB_ORDER          (VCPU_VTLB_SHIFT - PAGE_SHIFT)
-#define         VCPU_VHPT_SHIFT          (24)    // 16M for VTLB
-#define         VCPU_VHPT_SIZE           (1UL<<VCPU_VHPT_SHIFT)
-#define         VCPU_VHPT_ORDER          (VCPU_VHPT_SHIFT - PAGE_SHIFT)
-#define		VTLB(v,_x)		(v->arch.vtlb._x)
-#define		VHPT(v,_x)		(v->arch.vhpt._x)
+#define     MAX_CCN_DEPTH       (15)       // collision chain depth
+#define     VCPU_VTLB_SHIFT     (20)    // 1M for VTLB
+#define     VCPU_VTLB_SIZE      (1UL<<VCPU_VTLB_SHIFT)
+#define     VCPU_VTLB_ORDER     (VCPU_VTLB_SHIFT - PAGE_SHIFT)
+#define     VCPU_VHPT_SHIFT     (24)    // 16M for VTLB
+#define     VCPU_VHPT_SIZE      (1UL<<VCPU_VHPT_SHIFT)
+#define     VCPU_VHPT_ORDER     (VCPU_VHPT_SHIFT - PAGE_SHIFT)
+#define     VTLB(v,_x)          (v->arch.vtlb._x)
+#define     VHPT(v,_x)          (v->arch.vhpt._x)
 #ifndef __ASSEMBLY__
 
 #include <xen/config.h>
@@ -60,18 +60,18 @@
 #define LOW_32BITS(x)   bits(x,0,31)
 
 typedef union search_section {
-        struct {
-                u32 tr : 1;
-                u32 tc : 1;
-                u32 rsv: 30;
-        };
-        u32     v;
+    struct {
+        u32 tr : 1;
+        u32 tc : 1;
+        u32 rsv: 30;
+    };
+    u32     v;
 } search_section_t;
 
 
 enum {
-        ISIDE_TLB=0,
-        DSIDE_TLB=1
+    ISIDE_TLB=0,
+    DSIDE_TLB=1
 };
 #define VTLB_PTE_P_BIT      0
 #define VTLB_PTE_IO_BIT     60
@@ -93,16 +93,15 @@ typedef struct thash_data {
             u64 ig1  :  3; // 53-63
         };
         struct {
-            u64 __rv1 : 53;	// 0-52
+            u64 __rv1 : 53;     // 0-52
             u64 contiguous : 1; //53
-            u64 tc : 1;     // 54 TR or TC
-            u64 cl : 1; // 55 I side or D side cache line
-            // next extension to ig1, only for TLB instance
-            u64 len  :  4; // 56-59
+            u64 tc : 1;         // 54 TR or TC
+            u64 cl : 1;         // 55 I side or D side cache line
+            u64 len  :  4;      // 56-59
             u64 io  : 1;	// 60 entry is for io or not
-            u64 nomap : 1;   // 61 entry cann't be inserted into machine TLB.
-            u64 checked : 1; // 62 for VTLB/VHPT sanity check
-            u64 invalid : 1; // 63 invalid entry
+            u64 nomap : 1;      // 61 entry cann't be inserted into machine TLB.
+            u64 checked : 1;    // 62 for VTLB/VHPT sanity check
+            u64 invalid : 1;    // 63 invalid entry
         };
         u64 page_flags;
     };                  // same for VHPT and TLB
@@ -114,12 +113,6 @@ typedef struct thash_data {
             u64 key  : 24; // 8-31
             u64 rv4  : 32; // 32-63
         };
-//        struct {
-//            u64 __rv3  : 32; // 0-31
-            // next extension to rv4
-//            u64 rid  : 24;  // 32-55
-//            u64 __rv4  : 8; // 56-63
-//        };
         u64 itir;
     };
     union {
@@ -176,8 +169,8 @@ static inline u64 xen_to_arch_ppn(u64 xppn)
 }
 
 typedef enum {
-        THASH_TLB=0,
-        THASH_VHPT
+    THASH_TLB=0,
+    THASH_VHPT
 } THASH_TYPE;
 
 struct thash_cb;
