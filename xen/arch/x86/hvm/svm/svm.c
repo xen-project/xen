@@ -74,6 +74,9 @@ void svm_manual_event_injection32(struct vcpu *v, struct cpu_user_regs *regs,
 void svm_dump_regs(const char *from, struct cpu_user_regs *regs);
 
 static void svm_relinquish_guest_resources(struct domain *d);
+static int svm_do_vmmcall_reset_to_realmode(struct vcpu *v,
+        struct cpu_user_regs *regs);
+
 
 
 extern void set_hsa_to_guest( struct arch_svm_struct *arch_svm );
@@ -438,6 +441,42 @@ unsigned long svm_get_ctrl_reg(struct vcpu *v, unsigned int num)
     return 0;                   /* dummy */
 }
 
+
+/* SVM-specific intitialization code for VCPU application processors */
+void svm_init_ap_context(struct vcpu_guest_context *ctxt, 
+        int vcpuid, int trampoline_vector)
+{
+    int i;
+    struct vcpu *v, *bsp = current;
+    struct domain *d = bsp->domain;
+    cpu_user_regs_t *regs;;
+
+  
+    if ((v = d->vcpu[vcpuid]) == NULL)
+    {
+        printk("vcpuid %d is invalid!  good-bye.\n", vcpuid);
+        domain_crash_synchronous();
+    }
+    regs = &v->arch.guest_context.user_regs;
+
+    memset(ctxt, 0, sizeof(*ctxt));
+    for (i = 0; i < 256; ++i)
+    {
+        ctxt->trap_ctxt[i].vector = i;
+        ctxt->trap_ctxt[i].cs = FLAT_KERNEL_CS;
+    }
+
+
+    /*
+     * We execute the trampoline code in real mode. The trampoline vector
+     * passed to us is page alligned and is the physicall frame number for
+     * the code. We will execute this code in real mode. 
+     */
+    ctxt->user_regs.eip = 0x0;
+    ctxt->user_regs.cs = (trampoline_vector << 8); 
+    ctxt->flags = VGCF_HVM_GUEST;
+}
+
 int start_svm(void)
 {
     u32 eax, ecx, edx;
@@ -484,6 +523,7 @@ int start_svm(void)
     hvm_funcs.paging_enabled = svm_paging_enabled;
     hvm_funcs.instruction_length = svm_instruction_length;
     hvm_funcs.get_guest_ctrl_reg = svm_get_ctrl_reg;
+    hvm_funcs.init_ap_context = svm_init_ap_context;
 
     hvm_enabled = 1;    
 
@@ -660,6 +700,20 @@ static void arch_svm_do_launch(struct vcpu *v)
     if (svm_dbg_on)
         svm_dump_host_regs(__func__);
 #endif
+    if (v->vcpu_id != 0) 
+    {
+    	u16	cs_sel = regs->cs;
+    	/*
+	 * This is the launch of an AP; set state so that we begin executing
+    	 * the trampoline code in real-mode.
+	 */
+    	svm_do_vmmcall_reset_to_realmode(v, regs); 	
+    	/* Adjust the state to execute the trampoline code.*/
+    	v->arch.hvm_svm.vmcb->rip = 0;
+    	v->arch.hvm_svm.vmcb->cs.sel= cs_sel;
+    	v->arch.hvm_svm.vmcb->cs.base = (cs_sel << 4);
+    }
+     	
     reset_stack_and_jump(svm_asm_do_launch);
 }
 
