@@ -260,38 +260,78 @@ void share_xen_page_with_privileged_guests(
     share_xen_page_with_guest(page, dom_xen, readonly);
 }
 
-static void __write_ptbase(unsigned long mfn)
-{
-#ifdef CONFIG_X86_PAE
-    if ( mfn >= 0x100000 )
-    {
-        l3_pgentry_t *highmem_l3tab, *lowmem_l3tab;
-        struct vcpu *v = current;
-        unsigned long flags;
+#if defined(CONFIG_X86_PAE)
 
-        /* Protects against re-entry and against __pae_flush_pgd(). */
-        local_irq_save(flags);
-
-        /* Pick an unused low-memory L3 cache slot. */
-        v->arch.lowmem_l3tab_inuse ^= 1;
-        lowmem_l3tab = v->arch.lowmem_l3tab[v->arch.lowmem_l3tab_inuse];
-        v->arch.lowmem_l3tab_high_mfn[v->arch.lowmem_l3tab_inuse] = mfn;
-
-        /* Map the guest L3 table and copy to the chosen low-memory cache. */
-        highmem_l3tab = map_domain_page(mfn);
-        memcpy(lowmem_l3tab, highmem_l3tab, sizeof(v->arch.lowmem_l3tab));
-        unmap_domain_page(highmem_l3tab);
-
-        /* Install the low-memory L3 table in CR3. */
-        write_cr3(__pa(lowmem_l3tab));
-
-        local_irq_restore(flags);
-        return;
-    }
+#ifdef NDEBUG
+/* Only PDPTs above 4GB boundary need to be shadowed in low memory. */
+#define l3tab_needs_shadow(mfn) (mfn >= 0x100000)
+#else
+/* In debug builds we aggressively shadow PDPTs to exercise code paths. */
+#define l3tab_needs_shadow(mfn) ((mfn << PAGE_SHIFT) != __pa(idle_pg_table))
 #endif
 
+static l1_pgentry_t *fix_pae_highmem_pl1e;
+
+/* Cache the address of PAE high-memory fixmap page tables. */
+static int __init cache_pae_fixmap_address(void)
+{
+    unsigned long fixmap_base = fix_to_virt(FIX_PAE_HIGHMEM_0);
+    l2_pgentry_t *pl2e = virt_to_xen_l2e(fixmap_base);
+    fix_pae_highmem_pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(fixmap_base);
+    return 0;
+}
+__initcall(cache_pae_fixmap_address);
+
+static void __write_ptbase(unsigned long mfn)
+{
+    l3_pgentry_t *highmem_l3tab, *lowmem_l3tab;
+    struct pae_l3_cache *cache = &current->arch.pae_l3_cache;
+    unsigned int cpu = smp_processor_id();
+
+    /* Fast path 1: does this mfn need a shadow at all? */
+    if ( !l3tab_needs_shadow(mfn) )
+    {
+        write_cr3(mfn << PAGE_SHIFT);
+        return;
+    }
+
+    /* Caching logic is not interrupt safe. */
+    ASSERT(!in_irq());
+
+    /* Fast path 2: is this mfn already cached? */
+    if ( cache->high_mfn == mfn )
+    {
+        write_cr3(__pa(cache->table[cache->inuse_idx]));
+        return;
+    }
+
+    /* Protects against pae_flush_pgd(). */
+    spin_lock(&cache->lock);
+
+    cache->inuse_idx ^= 1;
+    cache->high_mfn   = mfn;
+
+    /* Map the guest L3 table and copy to the chosen low-memory cache. */
+    *(fix_pae_highmem_pl1e - cpu) = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
+    highmem_l3tab = (l3_pgentry_t *)fix_to_virt(FIX_PAE_HIGHMEM_0 + cpu);
+    lowmem_l3tab  = cache->table[cache->inuse_idx];
+    memcpy(lowmem_l3tab, highmem_l3tab, sizeof(cache->table[0]));
+    *(fix_pae_highmem_pl1e - cpu) = l1e_empty();
+
+    /* Install the low-memory L3 table in CR3. */
+    write_cr3(__pa(lowmem_l3tab));
+
+    spin_unlock(&cache->lock);
+}
+
+#else /* !CONFIG_X86_PAE */
+
+static void __write_ptbase(unsigned long mfn)
+{
     write_cr3(mfn << PAGE_SHIFT);
 }
+
+#endif /* !CONFIG_X86_PAE */
 
 void write_ptbase(struct vcpu *v)
 {
@@ -804,48 +844,39 @@ static int create_pae_xen_mappings(l3_pgentry_t *pl3e)
     return 1;
 }
 
-struct pae_flush_pgd {
-    unsigned long l3tab_mfn;
-    unsigned int  l3tab_idx;
-    l3_pgentry_t  nl3e;
-};
-
-static void __pae_flush_pgd(void *data)
-{
-    struct pae_flush_pgd *args = data;
-    struct vcpu *v = this_cpu(curr_vcpu);
-    int i = v->arch.lowmem_l3tab_inuse;
-    intpte_t _ol3e, _nl3e, _pl3e;
-    l3_pgentry_t *l3tab_ptr;
-
-    ASSERT(!local_irq_is_enabled());
-
-    if ( v->arch.lowmem_l3tab_high_mfn[i] != args->l3tab_mfn )
-        return;
-
-    l3tab_ptr = &v->arch.lowmem_l3tab[i][args->l3tab_idx];
-
-    _ol3e = l3e_get_intpte(*l3tab_ptr);
-    _nl3e = l3e_get_intpte(args->nl3e);
-    _pl3e = cmpxchg((intpte_t *)l3tab_ptr, _ol3e, _nl3e);
-    BUG_ON(_pl3e != _ol3e);
-}
-
 /* Flush a pgdir update into low-memory caches. */
 static void pae_flush_pgd(
     unsigned long mfn, unsigned int idx, l3_pgentry_t nl3e)
 {
     struct domain *d = page_get_owner(mfn_to_page(mfn));
-    struct pae_flush_pgd args = {
-        .l3tab_mfn = mfn,
-        .l3tab_idx = idx,
-        .nl3e      = nl3e };
+    struct vcpu   *v;
+    intpte_t       _ol3e, _nl3e, _pl3e;
+    l3_pgentry_t  *l3tab_ptr;
+    struct pae_l3_cache *cache;
 
     /* If below 4GB then the pgdir is not shadowed in low memory. */
-    if ( mfn < 0x100000 )
+    if ( !l3tab_needs_shadow(mfn) )
         return;
 
-    on_selected_cpus(d->domain_dirty_cpumask, __pae_flush_pgd, &args, 1, 1);
+    for_each_vcpu ( d, v )
+    {
+        cache = &v->arch.pae_l3_cache;
+
+        spin_lock(&cache->lock);
+
+        if ( cache->high_mfn == mfn )
+        {
+            l3tab_ptr = &cache->table[cache->inuse_idx][idx];
+            _ol3e = l3e_get_intpte(*l3tab_ptr);
+            _nl3e = l3e_get_intpte(nl3e);
+            _pl3e = cmpxchg((intpte_t *)l3tab_ptr, _ol3e, _nl3e);
+            BUG_ON(_pl3e != _ol3e);
+        }
+
+        spin_unlock(&cache->lock);
+    }
+
+    flush_tlb_mask(d->domain_dirty_cpumask);
 }
 
 static inline int l1_backptr(
@@ -3708,11 +3739,10 @@ int map_pages_to_xen(
 }
 
 void __set_fixmap(
-    enum fixed_addresses idx, unsigned long p, unsigned long flags)
+    enum fixed_addresses idx, unsigned long mfn, unsigned long flags)
 {
-    if ( unlikely(idx >= __end_of_fixed_addresses) )
-        BUG();
-    map_pages_to_xen(fix_to_virt(idx), p >> PAGE_SHIFT, 1, flags);
+    BUG_ON(idx >= __end_of_fixed_addresses);
+    map_pages_to_xen(fix_to_virt(idx), mfn, 1, flags);
 }
 
 #ifdef MEMORY_GUARD
