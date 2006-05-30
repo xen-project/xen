@@ -302,7 +302,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
 {
     IA64_PSR vpsr;
     int type=ISIDE_TLB;
-    u64 vhpt_adr, gppa;
+    u64 vhpt_adr, gppa, pteval, rr, itir;
     ISR misr;
 //    REGS *regs;
     thash_data_t *data;
@@ -314,18 +314,6 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
     vpsr.val = vmx_vcpu_get_psr(v);
     misr.val=VMX(v,cr_isr);
 
-/*  TODO
-    if(v->domain->id && vec == 2 &&
-       vpsr.dt == 0 && is_gpa_io(MASK_PMA(vaddr))){
-        emulate_ins(&v);
-        return;
-    }
-*/
-/*    if(vadr == 0x1ea18c00 ){
-        ia64_clear_ic();
-        while(1);
-    }
- */
     if(is_physical_mode(v)&&(!(vadr<<1>>62))){
         if(vec==2){
             if(v->domain!=dom0&&__gpfn_is_io(v->domain,(vadr<<1)>>(PAGE_SHIFT+1))){
@@ -338,31 +326,24 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
     }
     if(vec == 1) type = ISIDE_TLB;
     else if(vec == 2) type = DSIDE_TLB;
-    else panic_domain(regs,"wrong vec:%0xlx\n",vec);
+    else panic_domain(regs,"wrong vec:%lx\n",vec);
 
 //    prepare_if_physical_mode(v);
 
     if((data=vtlb_lookup(v, vadr,type))!=0){
-//	gppa = (vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
-//        if(v->domain!=dom0&&type==DSIDE_TLB && __gpfn_is_io(v->domain,gppa>>PAGE_SHIFT)){
+//       gppa = (vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
+//       if(v->domain!=dom0&&type==DSIDE_TLB && __gpfn_is_io(v->domain,gppa>>PAGE_SHIFT)){
         if(v->domain!=dom0 && data->io && type==DSIDE_TLB ){
-        	gppa = (vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
-            emulate_io_inst(v, gppa, data->ma);
+            if(data->pl >= ((regs->cr_ipsr>>IA64_PSR_CPL0_BIT)&3)){
+                gppa = (vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
+                emulate_io_inst(v, gppa, data->ma);
+            }else{
+                data_access_rights(v, vadr);
+            }
             return IA64_FAULT;
         }
 
-//    	if ( data->ps != vrr.ps ) {
-//    		machine_tlb_insert(v, data);
-//    	}
-//    	else {
-/*        if ( data->contiguous&&(!data->tc)){
-    		machine_tlb_insert(v, data);
-        }
-        else{
- */
-            thash_vhpt_insert(&v->arch.vhpt,data->page_flags, data->itir ,vadr);
-//        }
-//	    }
+        thash_vhpt_insert(v,data->page_flags, data->itir ,vadr);
     }else if(type == DSIDE_TLB){
         if(!vhpt_enabled(v, vadr, misr.rs?RSE_REF:DATA_REF)){
             if(vpsr.ic){
@@ -381,7 +362,13 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
             }
         } else{
             vmx_vcpu_thash(v, vadr, &vhpt_adr);
-            if(vhpt_lookup(vhpt_adr) ||  vtlb_lookup(v, vhpt_adr, DSIDE_TLB)){
+            if(!guest_vhpt_lookup(vhpt_adr, &pteval)){
+                if (pteval & _PAGE_P){
+                    vcpu_get_rr(v, vadr, &rr);
+                    itir = rr&(RR_RID_MASK | RR_PS_MASK);
+                    thash_purge_and_insert(v, pteval, itir , vadr);
+                    return IA64_NO_FAULT;
+                }
                 if(vpsr.ic){
                     vcpu_set_isr(v, misr.val);
                     dtlb_fault(v, vadr);
@@ -423,7 +410,13 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
             return IA64_FAULT;
         } else{
             vmx_vcpu_thash(v, vadr, &vhpt_adr);
-            if(vhpt_lookup(vhpt_adr) || vtlb_lookup(v, vhpt_adr, DSIDE_TLB)){
+            if(!guest_vhpt_lookup(vhpt_adr, &pteval)){
+                if (pteval & _PAGE_P){
+                    vcpu_get_rr(v, vadr, &rr);
+                    itir = rr&(RR_RID_MASK | RR_PS_MASK);
+                    thash_purge_and_insert(v, pteval, itir , vadr);
+                    return IA64_NO_FAULT;
+                }
                 if(!vpsr.ic){
                     misr.ni=1;
                 }

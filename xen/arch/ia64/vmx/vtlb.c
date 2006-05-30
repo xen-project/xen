@@ -36,27 +36,26 @@ thash_data_t *__alloc_chain(thash_cb_t *);
 
 static void cch_mem_init(thash_cb_t *hcb)
 {
-    thash_data_t *p, *q;
+    int num;
+    thash_data_t *p;
 
     hcb->cch_freelist = p = hcb->cch_buf;
-
-    for ( q=p+1; (u64)(q + 1) <= (u64)hcb->cch_buf + hcb->cch_sz;
-        p++, q++ ) {
-        p->next = q;
-    }
+    num = (hcb->cch_sz/sizeof(thash_data_t))-1;
+    do{
+        p->next =p+1;
+        p++;
+        num--;
+    }while(num);
     p->next = NULL;
 }
 
 static thash_data_t *cch_alloc(thash_cb_t *hcb)
 {
     thash_data_t *p;
-
     if ( (p = hcb->cch_freelist) != NULL ) {
         hcb->cch_freelist = p->next;
-        return p;
-    }else{
-        return NULL;
     }
+    return p;
 }
 
 static void cch_free(thash_cb_t *hcb, thash_data_t *cch)
@@ -101,17 +100,13 @@ __is_tr_overlap(thash_data_t *trp, u64 rid, u64 sva, u64 eva)
 static void __rem_hash_head(thash_cb_t *hcb, thash_data_t *hash)
 {
     thash_data_t *next=hash->next;
-
-/*    if ( hcb->remove_notifier ) {
-        (hcb->remove_notifier)(hcb,hash);
-    } */
-    if ( next != NULL ) {
+    if ( next) {
         next->len=hash->len-1;
         *hash = *next;
         cch_free (hcb, next);
     }
     else {
-        INVALIDATE_HASH_HEADER(hcb, hash);
+        hash->ti=1;
     }
 }
 
@@ -145,125 +140,109 @@ thash_data_t *__vtr_lookup(VCPU *vcpu, u64 va, int is_data)
 }
 
 
-/*
- * Get the machine format of VHPT entry.
- *    PARAS:
- *  1: tlb: means the tlb format hash entry converting to VHPT.
- *  2: va means the guest virtual address that must be coverd by
- *     the translated machine VHPT.
- *  3: vhpt: means the machine format VHPT converting from tlb.
- *    NOTES:
- *  1: In case of the machine address is discontiguous,
- *     "tlb" needs to be covered by several machine VHPT. va
- *     is used to choice one of them.
- *  2: Foreign map is supported in this API.
- *    RETURN:
- *  0/1: means successful or fail.
- *
- */
-int __tlb_to_vhpt(thash_cb_t *hcb, thash_data_t *vhpt, u64 va)
-{
-    u64 padr,pte;
-    ASSERT ( hcb->ht == THASH_VHPT );
-    padr = vhpt->ppn >>(vhpt->ps-ARCH_PAGE_SHIFT)<<vhpt->ps;
-    padr += va&((1UL<<vhpt->ps)-1);
-    pte=lookup_domain_mpa(current->domain,padr);
-    if((pte>>56))
-        return 0;
-    vhpt->etag = ia64_ttag(va);
-    vhpt->ps = PAGE_SHIFT;
-    vhpt->ppn = (pte&((1UL<<IA64_MAX_PHYS_BITS)-(1UL<<PAGE_SHIFT)))>>ARCH_PAGE_SHIFT;
-    vhpt->next = 0;
-    return 1;
-}
-
-static void thash_remove_cch(thash_cb_t *hcb, thash_data_t *hash)
+static void thash_recycle_cch(thash_cb_t *hcb, thash_data_t *hash)
 {
     thash_data_t *p;
-    if(hash->next){
-        p=hash->next;
-        while(p->next)
-            p=p->next;
-        p->next=hcb->cch_freelist;
-        hcb->cch_freelist=hash->next;
-        hash->next=0;
-        hash->len=0;
+    int i=0;
+    
+    p=hash;
+    for(i=0; i < MAX_CCN_DEPTH; i++){
+        p=p->next;
     }
+    p->next=hcb->cch_freelist;
+    hcb->cch_freelist=hash->next;
+    hash->len=0;
+    hash->next=0;
 }
 
-/*  vhpt only has entries with PAGE_SIZE page size */
 
-void thash_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
+
+
+static void vmx_vhpt_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 ifa)
 {
-    thash_data_t   vhpt_entry, *hash_table, *cch;
-    vhpt_entry.page_flags = pte & ~PAGE_FLAGS_RV_MASK;
-    vhpt_entry.itir=itir;
+    u64 tag;
+    thash_data_t *head, *cch;
+    pte = pte & ~PAGE_FLAGS_RV_MASK;
 
-    if ( !__tlb_to_vhpt(hcb, &vhpt_entry, ifa) ) {
+    head = (thash_data_t *)ia64_thash(ifa);
+    tag = ia64_ttag(ifa);
+    if( INVALID_VHPT(head) ) {
+        head->page_flags = pte;
+        head->etag = tag;
         return;
-    //panic("Can't convert to machine VHPT entry\n");
     }
 
-    hash_table = (thash_data_t *)ia64_thash(ifa);
-    if( INVALID_VHPT(hash_table) ) {
-        *hash_table = vhpt_entry;
-        hash_table->next = 0;
-	return;
+    if(head->len>=MAX_CCN_DEPTH){
+        thash_recycle_cch(hcb, head);
+        cch = cch_alloc(hcb);
     }
-
-    cch = hash_table;
-    while(cch){
-        if(cch->etag == vhpt_entry.etag){
-            if(cch->ppn == vhpt_entry.ppn)
-                return;
-            else
-                while(1);
-        }
-        cch = cch->next;
+    else{
+        cch = __alloc_chain(hcb);
     }
-
-    if(hash_table->len>=MAX_CCN_DEPTH){
-    	thash_remove_cch(hcb, hash_table);
-    	cch = cch_alloc(hcb);
-    	*cch = *hash_table;
-        *hash_table = vhpt_entry;
-    	hash_table->len = 1;
-        hash_table->next = cch;
-    	return;
-    }
-
-    // TODO: Add collision chain length limitation.
-     cch = __alloc_chain(hcb);
-     if(cch == NULL){
-           *hash_table = vhpt_entry;
-            hash_table->next = 0;
-     }else{
-            *cch = *hash_table;
-            *hash_table = vhpt_entry;
-            hash_table->next = cch;
-    	    hash_table->len = cch->len + 1;
-    	    cch->len = 0;
-
-    }
-    return /*hash_table*/;
+    cch->page_flags=head->page_flags;
+    cch->etag=head->etag;
+    cch->next=head->next;
+    head->page_flags=pte;
+    head->etag=tag;
+    head->next = cch;
+    head->len = cch->len+1;
+    cch->len = 0;
+    return;
 }
 
+void thash_vhpt_insert(VCPU *v, u64 pte, u64 itir, u64 va)
+{
+    u64 phy_pte;
+    phy_pte=translate_phy_pte(v, &pte, itir, va);
+    vmx_vhpt_insert(vcpu_get_vhpt(v), phy_pte, itir, va);
+}
 /*
  *   vhpt lookup
  */
 
 thash_data_t * vhpt_lookup(u64 va)
 {
-    thash_data_t *hash;
-    u64 tag;
-    hash = (thash_data_t *)ia64_thash(va);
+    thash_data_t *hash, *head;
+    u64 tag, pte;
+    head = (thash_data_t *)ia64_thash(va);
+    hash=head;
     tag = ia64_ttag(va);
-    while(hash){
-    	if(hash->etag == tag)
-	        return hash;
+    do{
+        if(hash->etag == tag)
+            break;
         hash=hash->next;
+    }while(hash);
+    if(hash && hash!=head){
+        pte = hash->page_flags;
+        hash->page_flags = head->page_flags;
+        head->page_flags = pte;
+        tag = hash->etag;
+        hash->etag = head->etag;
+        head->etag = tag;
+        head->len = hash->len;
+        hash->len=0;
+        return head;
     }
-    return NULL;
+    return hash;
+}
+
+u64 guest_vhpt_lookup(u64 iha, u64 *pte)
+{
+    u64 ret;
+    vhpt_lookup(iha);
+    asm volatile ("rsm psr.ic|psr.i;;"
+                  "srlz.d;;"
+                  "ld8.s r9=[%1];;"
+                  "tnat.nz p6,p7=r9;;"
+                  "(p6) mov %0=1;"
+                  "(p6) mov r9=r0;"
+                  "(p7) mov %0=r0;"
+                  "(p7) st8 [%2]=r9;;"
+                  "ssm psr.ic;;"
+                  "srlz.d;;"
+                  "ssm psr.i;;"
+             : "=r"(ret) : "r"(iha), "r"(pte):"memory");
+    return ret;
 }
 
 
@@ -310,7 +289,6 @@ static void vtlb_purge(thash_cb_t *hcb, u64 va, u64 ps)
 /*
  *  purge VHPT and machine TLB
  */
-
 static void vhpt_purge(thash_cb_t *hcb, u64 va, u64 ps)
 {
     thash_data_t *hash_table, *prev, *next;
@@ -332,7 +310,7 @@ static void vhpt_purge(thash_cb_t *hcb, u64 va, u64 ps)
                     prev->next=next->next;
                     cch_free(hcb,next);
                     hash_table->len--;
-                    break;
+                    break; 
                 }
                 prev=next;
                 next=next->next;
@@ -347,16 +325,21 @@ static void vhpt_purge(thash_cb_t *hcb, u64 va, u64 ps)
  * Recycle all collisions chain in VTLB or VHPT.
  *
  */
-
-void thash_recycle_cch(thash_cb_t *hcb)
+void thash_recycle_cch_all(thash_cb_t *hcb)
 {
-    thash_data_t    *hash_table;
-
-    hash_table = (thash_data_t*)((u64)hcb->hash + hcb->hash_sz);
-    for (--hash_table;(u64)hash_table >= (u64)hcb->hash;hash_table--) {
-        thash_remove_cch(hcb,hash_table);
-    }
+    int num;
+    thash_data_t *head;
+    head=hcb->hash;
+    num = (hcb->hash_sz/sizeof(thash_data_t));
+    do{
+        head->len = 0;
+        head->next = 0;
+        head++;
+        num--;
+    }while(num);
+    cch_mem_init(hcb);
 }
+
 
 thash_data_t *__alloc_chain(thash_cb_t *hcb)
 {
@@ -364,7 +347,7 @@ thash_data_t *__alloc_chain(thash_cb_t *hcb)
 
     cch = cch_alloc(hcb);
     if(cch == NULL){
-        thash_recycle_cch(hcb);
+        thash_recycle_cch_all(hcb);
         cch = cch_alloc(hcb);
     }
     return cch;
@@ -385,51 +368,38 @@ void vtlb_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 va)
     /* int flag; */
     ia64_rr vrr;
     /* u64 gppn, ppns, ppne; */
-    u64 tag, ps;
-    ps = itir_ps(itir);
+    u64 tag;
     vcpu_get_rr(current, va, &vrr.rrval);
-    if (vrr.ps != ps) {
+#ifdef VTLB_DEBUG    
+    if (vrr.ps != itir_ps(itir)) {
 //        machine_tlb_insert(hcb->vcpu, entry);
         panic_domain(NULL, "not preferred ps with va: 0x%lx vrr.ps=%d ps=%ld\n",
-                     va, vrr.ps, ps);
+             va, vrr.ps, itir_ps(itir));
         return;
     }
+#endif
     hash_table = vsa_thash(hcb->pta, va, vrr.rrval, &tag);
     if( INVALID_TLB(hash_table) ) {
         hash_table->page_flags = pte;
         hash_table->itir=itir;
         hash_table->etag=tag;
         hash_table->next = 0;
+        return;
     }
-    else if (hash_table->len>=MAX_CCN_DEPTH){
-        thash_remove_cch(hcb, hash_table);
+    if (hash_table->len>=MAX_CCN_DEPTH){
+        thash_recycle_cch(hcb, hash_table);
         cch = cch_alloc(hcb);
-        *cch = *hash_table;
-        hash_table->page_flags = pte;
-        hash_table->itir=itir;
-        hash_table->etag=tag;
-        hash_table->len = 1;
-        hash_table->next = cch;
     }
-
     else {
-        // TODO: Add collision chain length limitation.
         cch = __alloc_chain(hcb);
-        if(cch == NULL){
-            hash_table->page_flags = pte;
-            hash_table->itir=itir;
-            hash_table->etag=tag;
-            hash_table->next = 0;
-        }else{
-            *cch = *hash_table;
-            hash_table->page_flags = pte;
-            hash_table->itir=itir;
-            hash_table->etag=tag;
-            hash_table->next = cch;
-            hash_table->len = cch->len + 1;
-            cch->len = 0;
-        }
     }
+    *cch = *hash_table;
+    hash_table->page_flags = pte;
+    hash_table->itir=itir;
+    hash_table->etag=tag;
+    hash_table->next = cch;
+    hash_table->len = cch->len + 1;
+    cch->len = 0;
     return ;
 }
 
@@ -473,6 +443,23 @@ void thash_purge_entries(VCPU *v, u64 va, u64 ps)
     vhpt_purge(&v->arch.vhpt, va, ps);
 }
 
+u64 translate_phy_pte(VCPU *v, u64 *pte, u64 itir, u64 va)
+{
+    u64 ps, addr;
+    union pte_flags phy_pte;
+    ps = itir_ps(itir);
+    phy_pte.val = *pte;
+    addr = *pte;
+    addr = ((addr & _PAGE_PPN_MASK)>>ps<<ps)|(va&((1UL<<ps)-1));
+    addr = lookup_domain_mpa(v->domain, addr);
+    if(addr & GPFN_IO_MASK){
+        *pte |= VTLB_PTE_IO;
+        return -1;
+    }
+    phy_pte.ppn = addr >> ARCH_PAGE_SHIFT;
+    return phy_pte.val;
+}
+
 
 /*
  * Purge overlap TCs and then insert the new entry to emulate itc ops.
@@ -480,59 +467,79 @@ void thash_purge_entries(VCPU *v, u64 va, u64 ps)
  */
 void thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa)
 {
-    u64 ps, va;
+    u64 ps;//, va;
+    u64 phy_pte;
     ps = itir_ps(itir);
-    va = PAGEALIGN(ifa,ps);
-    if(vcpu_quick_region_check(v->arch.tc_regions,va))
-        vtlb_purge(&v->arch.vtlb, va, ps);
-    vhpt_purge(&v->arch.vhpt, va, ps);
-    if((ps!=PAGE_SHIFT)||(pte&VTLB_PTE_IO)){
-        vtlb_insert(&v->arch.vtlb, pte, itir, va);
-	vcpu_quick_region_set(PSCBX(v,tc_regions),va);
-    }	
-    if(!(pte&VTLB_PTE_IO)){
-        va = PAGEALIGN(ifa,PAGE_SHIFT);
-        thash_vhpt_insert(&v->arch.vhpt, pte, itir, va);
+
+    if(VMX_DOMAIN(v)){
+        phy_pte = translate_phy_pte(v, &pte, itir, ifa);
+        if(ps==PAGE_SHIFT){
+            if(!(pte&VTLB_PTE_IO)){
+                vhpt_purge(&v->arch.vhpt, ifa, ps);
+                vmx_vhpt_insert(&v->arch.vhpt, phy_pte, itir, ifa);
+            }
+            else{
+                vhpt_purge(&v->arch.vhpt, ifa, ps);
+                vtlb_insert(&v->arch.vtlb, pte, itir, ifa);
+                vcpu_quick_region_set(PSCBX(v,tc_regions),ifa);
+            }
+        }
+        else{
+            vhpt_purge(&v->arch.vhpt, ifa, ps);
+            vtlb_insert(&v->arch.vtlb, pte, itir, ifa);
+            vcpu_quick_region_set(PSCBX(v,tc_regions),ifa);
+            if(!(pte&VTLB_PTE_IO)){
+                vmx_vhpt_insert(&v->arch.vhpt, phy_pte, itir, ifa);
+            }
+        }
+    }
+    else{
+        phy_pte = translate_phy_pte(v, &pte, itir, ifa);
+        if(ps!=PAGE_SHIFT){
+            vtlb_insert(&v->arch.vtlb, pte, itir, ifa);
+            vcpu_quick_region_set(PSCBX(v,tc_regions),ifa);
+        }
+        machine_tlb_purge(ifa, ps);
+        vmx_vhpt_insert(&v->arch.vhpt, phy_pte, itir, ifa);
     }
 }
-
-
 
 /*
  * Purge all TCs or VHPT entries including those in Hash table.
  *
  */
 
-// TODO: add sections.
+//TODO: add sections.
 void thash_purge_all(VCPU *v)
 {
-    thash_data_t    *hash_table;
-    /* thash_data_t    *entry; */
-    thash_cb_t  *hcb,*vhpt;
-    /* u64 i, start, end; */
-    hcb =&v->arch.vtlb;
+    int num;
+    thash_data_t *head;
+    thash_cb_t  *vtlb,*vhpt;
+    vtlb =&v->arch.vtlb;
     vhpt =&v->arch.vhpt;
-#ifdef  VTLB_DEBUG
-	extern u64  sanity_check;
-    static u64 statistics_before_purge_all=0;
-    if ( statistics_before_purge_all ) {
-    	sanity_check = 1;
-        check_vtlb_sanity(hcb);
-    }
-#endif
-    ASSERT ( hcb->ht == THASH_TLB );
 
-    hash_table = (thash_data_t*)((u64)hcb->hash + hcb->hash_sz);
-    for (--hash_table;(u64)hash_table >= (u64)hcb->hash;hash_table--) {
-        INVALIDATE_TLB_HEADER(hash_table);
-    }
-    cch_mem_init (hcb);
+    head=vtlb->hash;
+    num = (vtlb->hash_sz/sizeof(thash_data_t));
+    do{
+        head->page_flags = 0;
+        head->etag = 1UL<<63;
+        head->next = 0;
+        head++;
+        num--;
+    }while(num);
+    cch_mem_init(vtlb);
+    
+    head=vhpt->hash;
+    num = (vhpt->hash_sz/sizeof(thash_data_t));
+    do{
+        head->page_flags = 0;
+        head->etag = 1UL<<63;
+        head->next = 0;
+        head++;
+        num--;
+    }while(num);
+    cch_mem_init(vhpt);
 
-    hash_table = (thash_data_t*)((u64)vhpt->hash + vhpt->hash_sz);
-    for (--hash_table;(u64)hash_table >= (u64)vhpt->hash;hash_table--) {
-        INVALIDATE_VHPT_HEADER(hash_table);
-    }
-    cch_mem_init (vhpt);
     local_flush_tlb_all();
 }
 
@@ -547,7 +554,7 @@ void thash_purge_all(VCPU *v)
 
 thash_data_t *vtlb_lookup(VCPU *v, u64 va,int is_data)
 {
-    thash_data_t    *hash_table, *cch;
+    thash_data_t  *cch;
     u64     tag;
     ia64_rr vrr;
     thash_cb_t * hcb= &v->arch.vtlb;
@@ -559,18 +566,14 @@ thash_data_t *vtlb_lookup(VCPU *v, u64 va,int is_data)
     if(vcpu_quick_region_check(v->arch.tc_regions,va)==0)
         return NULL;
     
-
     vcpu_get_rr(v,va,&vrr.rrval);
-    hash_table = vsa_thash( hcb->pta, va, vrr.rrval, &tag);
+    cch = vsa_thash( hcb->pta, va, vrr.rrval, &tag);
 
-    if ( INVALID_ENTRY(hcb, hash_table ) )
-        return NULL;
-
-
-    for (cch=hash_table; cch; cch = cch->next) {
+    do{
         if(cch->etag == tag)
             return cch;
-    }
+        cch = cch->next;
+    }while(cch);
     return NULL;
 }
 
@@ -580,198 +583,32 @@ thash_data_t *vtlb_lookup(VCPU *v, u64 va,int is_data)
  */
 void thash_init(thash_cb_t *hcb, u64 sz)
 {
-    thash_data_t    *hash_table;
+    int num;
+    thash_data_t *head, *p;
 
-    cch_mem_init (hcb);
     hcb->pta.val = (unsigned long)hcb->hash;
     hcb->pta.vf = 1;
     hcb->pta.ve = 1;
     hcb->pta.size = sz;
-//    hcb->get_rr_fn = vmmu_get_rr;
-    ASSERT ( hcb->hash_sz % sizeof(thash_data_t) == 0 );
-    hash_table = (thash_data_t*)((u64)hcb->hash + hcb->hash_sz);
-
-    for (--hash_table;(u64)hash_table >= (u64)hcb->hash;hash_table--) {
-        INVALIDATE_HASH_HEADER(hcb,hash_table);
-    }
+    hcb->cch_rec_head = hcb->hash;
+    
+    head=hcb->hash;
+    num = (hcb->hash_sz/sizeof(thash_data_t));
+    do{
+        head->itir = PAGE_SHIFT<<2;
+        head->next = 0;
+        head++;
+        num--;
+    }while(num);
+    
+    hcb->cch_freelist = p = hcb->cch_buf;
+    num = (hcb->cch_sz/sizeof(thash_data_t))-1;
+    do{
+        p->itir = PAGE_SHIFT<<2;
+        p->next =p+1;
+        p++;
+        num--;
+    }while(num);
+    p->itir = PAGE_SHIFT<<2;
+    p->next = NULL;
 }
-
-#ifdef  VTLB_DEBUG
-/*
-static  u64 cch_length_statistics[MAX_CCH_LENGTH+1];
-u64  sanity_check=0;
-u64 vtlb_chain_sanity(thash_cb_t *vtlb, thash_cb_t *vhpt, thash_data_t *hash)
-{
-    thash_data_t *cch;
-    thash_data_t    *ovl;
-    search_section_t s_sect;
-    u64     num=0;
-
-    s_sect.v = 0;
-    for (cch=hash; cch; cch=cch->next) {
-        ovl = thash_find_overlap(vhpt, cch, s_sect);
-        while ( ovl != NULL ) {
-            ovl->checked = 1;
-            ovl = (vhpt->next_overlap)(vhpt);
-        };
-        num ++;
-    }
-    if ( num >= MAX_CCH_LENGTH ) {
-    	cch_length_statistics[MAX_CCH_LENGTH] ++;
-    }
-    else {
-    	cch_length_statistics[num] ++;
-    }
-    return num;
-}
-
-void check_vtlb_sanity(thash_cb_t *vtlb)
-{
-//    struct page_info *page;
-    u64  hash_num, i, psr;
-    static u64 check_ok_num, check_fail_num,check_invalid;
-//  void *vb1, *vb2;
-    thash_data_t  *hash, *cch;
-    thash_data_t    *ovl;
-    search_section_t s_sect;
-    thash_cb_t *vhpt = vtlb->vhpt;
-    u64   invalid_ratio;
- 
-    if ( sanity_check == 0 ) return;
-    sanity_check --;
-    s_sect.v = 0;
-//    page = alloc_domheap_pages (NULL, VCPU_TLB_ORDER, 0);
-//    if ( page == NULL ) {
-//        panic("No enough contiguous memory for init_domain_mm\n");
-//    };
-//    vb1 = page_to_virt(page);
-//    printf("Allocated page=%lp vbase=%lp\n", page, vb1);
-//    vb2 = vb1 + vtlb->hash_sz;
-    hash_num = vhpt->hash_sz / sizeof(thash_data_t);
-//    printf("vb2=%lp, size=%lx hash_num=%lx\n", vb2, vhpt->hash_sz, hash_num);
-    printf("vtlb=%p, hash=%p size=0x%lx; vhpt=%p, hash=%p size=0x%lx\n", 
-                vtlb, vtlb->hash,vtlb->hash_sz,
-                vhpt, vhpt->hash, vhpt->hash_sz);
-    //memcpy(vb1, vtlb->hash, vtlb->hash_sz);
-    //memcpy(vb2, vhpt->hash, vhpt->hash_sz);
-    for ( i=0; i < sizeof(cch_length_statistics)/sizeof(cch_length_statistics[0]); i++ ) {
-    	cch_length_statistics[i] = 0;
-    }
-
-    local_irq_save(psr);
-
-    hash = vhpt->hash;
-    for (i=0; i < hash_num; i++) {
-        if ( !INVALID_ENTRY(vhpt, hash) ) {
-            for ( cch= hash; cch; cch=cch->next) {
-                cch->checked = 0;
-            }
-        }
-        hash ++;
-    }
-    printf("Done vhpt clear checked flag, hash_num=0x%lx\n", hash_num);
-    check_invalid = 0;
-    check_ok_num=0;
-    hash = vtlb->hash;
-    for ( i=0; i< hash_num; i++ ) {
-        if ( !INVALID_ENTRY(vtlb, hash) ) {
-            check_ok_num += vtlb_chain_sanity(vtlb, vhpt, hash);
-        }
-        else {
-            check_invalid++;
-        }
-        hash ++;
-    }
-    printf("Done vtlb entry check, hash=%p\n", hash);
-    printf("check_ok_num = 0x%lx check_invalid=0x%lx\n", check_ok_num,check_invalid);
-    invalid_ratio = 1000*check_invalid / hash_num;
-    printf("%02ld.%01ld%% entries are invalid\n", 
-		invalid_ratio/10, invalid_ratio % 10 );
-    for (i=0; i<NDTRS; i++) {
-        ovl = thash_find_overlap(vhpt, &vtlb->ts->dtr[i], s_sect);
-        while ( ovl != NULL ) {
-            ovl->checked = 1;
-            ovl = (vhpt->next_overlap)(vhpt);
-        };
-    }
-    printf("Done dTR\n");
-    for (i=0; i<NITRS; i++) {
-        ovl = thash_find_overlap(vhpt, &vtlb->ts->itr[i], s_sect);
-        while ( ovl != NULL ) {
-            ovl->checked = 1;
-            ovl = (vhpt->next_overlap)(vhpt);
-        };
-    }
-    printf("Done iTR\n");
-    check_fail_num = 0;
-    check_invalid = 0;
-    check_ok_num=0;
-    hash = vhpt->hash;
-    for (i=0; i < hash_num; i++) {
-        if ( !INVALID_ENTRY(vhpt, hash) ) {
-            for ( cch= hash; cch; cch=cch->next) {
-                if ( !cch->checked ) {
-                    printf ("!!!Hash=%p cch=%p not within vtlb\n", hash, cch);
-                    check_fail_num ++;
-                }
-                else {
-                    check_ok_num++;
-                }
-            }
-        }
-        else {
-            check_invalid ++;
-        }
-        hash ++;
-    }
-    local_irq_restore(psr);
-    printf("check_ok_num=0x%lx check_fail_num=0x%lx check_invalid=0x%lx\n", 
-            check_ok_num, check_fail_num, check_invalid);
-    //memcpy(vtlb->hash, vb1, vtlb->hash_sz);
-    //memcpy(vhpt->hash, vb2, vhpt->hash_sz);
-    printf("The statistics of collision chain length is listed\n");
-    for ( i=0; i < sizeof(cch_length_statistics)/sizeof(cch_length_statistics[0]); i++ ) {
-    	printf("CCH length=%02ld, chain number=%ld\n", i, cch_length_statistics[i]);
-    }
-//    free_domheap_pages(page, VCPU_TLB_ORDER);
-    printf("Done check_vtlb\n");
-}
-
-void dump_vtlb(thash_cb_t *vtlb)
-{
-    static u64  dump_vtlb=0;
-    thash_data_t  *hash, *cch, *tr;
-    u64     hash_num,i;
-
-    if ( dump_vtlb == 0 ) return;
-    dump_vtlb --;
-    hash_num = vtlb->hash_sz / sizeof(thash_data_t);
-    hash = vtlb->hash;
-
-    printf("Dump vTC\n");
-    for ( i = 0; i < hash_num; i++ ) {
-        if ( !INVALID_ENTRY(vtlb, hash) ) {
-            printf("VTLB at hash=%p\n", hash);
-            for (cch=hash; cch; cch=cch->next) {
-                printf("Entry %p va=%lx ps=%d rid=%d\n",
-                    cch, cch->vadr, cch->ps, cch->rid);
-            }
-        }
-        hash ++;
-    }
-    printf("Dump vDTR\n");
-    for (i=0; i<NDTRS; i++) {
-        tr = &DTR(vtlb,i);
-        printf("Entry %p va=%lx ps=%d rid=%d\n",
-                    tr, tr->vadr, tr->ps, tr->rid);
-    }
-    printf("Dump vITR\n");
-    for (i=0; i<NITRS; i++) {
-        tr = &ITR(vtlb,i);
-        printf("Entry %p va=%lx ps=%d rid=%d\n",
-                    tr, tr->vadr, tr->ps, tr->rid);
-    }
-    printf("End of vTLB dump\n");
-}
-*/
-#endif

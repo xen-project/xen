@@ -141,9 +141,13 @@ ENTRY(vmx_itlb_miss)
     mov r16 = cr.ifa
     ;;
     thash r17 = r16
-    ;;
     ttag r20 = r16
-    mov r18 = r17	
+    ;;
+    mov r18 = r17
+    adds r28 = VLE_TITAG_OFFSET,r17
+    adds r19 = VLE_CCHAIN_OFFSET, r17
+    ;;
+    ld8 r17 = [r19]
     ;;
 vmx_itlb_loop:
     cmp.eq p6,p0 = r0, r17
@@ -161,43 +165,21 @@ vmx_itlb_loop:
 (p7)mov r17 = r23;
 (p7)br.sptk vmx_itlb_loop
     ;;
-    adds r23 = VLE_PGFLAGS_OFFSET, r17
-    adds r24 = VLE_ITIR_OFFSET, r17
-    ;;
-    ld8 r25 = [r23]
-    ld8 r26 = [r24]
-    ;;
-    cmp.eq p6,p7=r18,r17
-(p6) br vmx_itlb_loop1
-    ;;
+    ld8 r25 = [r17]
     ld8 r27 = [r18]
+    ld8 r29 = [r28]
     ;;
-    extr.u r19 = r27, 56, 8
-    extr.u r20 = r25, 56, 8
+    st8 [r16] = r29
+    st8 [r28] = r22
+    extr.u r19 = r27, 56, 4
     ;;
-    dep r27 = r20, r27, 56, 8
-    dep r25 = r19, r25, 56, 8
+    dep r27 = r0, r27, 56, 4
+    dep r25 = r19, r25, 56, 4
     ;;
-    st8 [r18] = r25,8
-    st8 [r23] = r27
-    ;;
-    ld8 r28 = [r18]
-    ;;
-    st8 [r18] = r26,8
-    st8 [r24] = r28
-    ;;
-    ld8 r30 = [r18]
-    ;;
-    st8 [r18] = r22
-    st8 [r16] = r30 
-    ;;
-vmx_itlb_loop1:
-    mov cr.itir = r26
+    st8 [r18] = r25
+    st8 [r17] = r27
     ;;
     itc.i r25
-    ;;
-    srlz.i
-    ;;
     mov r17=cr.isr
     mov r23=r31
     mov r22=b0
@@ -219,7 +201,7 @@ vmx_itlb_out:
     VMX_FAULT(1);
 END(vmx_itlb_miss)
 
-	.org vmx_ia64_ivt+0x0800
+    .org vmx_ia64_ivt+0x0800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x0800 Entry 2 (size 64 bundles) DTLB (9,48)
 ENTRY(vmx_dtlb_miss)
@@ -232,9 +214,13 @@ ENTRY(vmx_dtlb_miss)
     mov r16 = cr.ifa
     ;;
     thash r17 = r16
-    ;;
     ttag r20 = r16
-    mov r18 = r17	
+    ;;
+    mov r18 = r17
+    adds r28 = VLE_TITAG_OFFSET,r17
+    adds r19 = VLE_CCHAIN_OFFSET, r17
+    ;;
+    ld8 r17 = [r19]
     ;;
 vmx_dtlb_loop:
     cmp.eq p6,p0 = r0, r17
@@ -252,43 +238,21 @@ vmx_dtlb_loop:
 (p7)mov r17 = r23;
 (p7)br.sptk vmx_dtlb_loop
     ;;
-    adds r23 = VLE_PGFLAGS_OFFSET, r17
-    adds r24 = VLE_ITIR_OFFSET, r17
-    ;;
-    ld8 r25 = [r23]
-    ld8 r26 = [r24]
-    ;;
-    cmp.eq p6,p7=r18,r17
-(p6) br vmx_dtlb_loop1
-    ;;
+    ld8 r25 = [r17]
     ld8 r27 = [r18]
+    ld8 r29 = [r28]
     ;;
-    extr.u r19 = r27, 56, 8
-    extr.u r20 = r25, 56, 8
+    st8 [r16] = r29
+    st8 [r28] = r22
+    extr.u r19 = r27, 56, 4
     ;;
-    dep r27 = r20, r27, 56, 8
-    dep r25 = r19, r25, 56, 8
+    dep r27 = r0, r27, 56, 4
+    dep r25 = r19, r25, 56, 4
     ;;
-    st8 [r18] = r25,8
-    st8 [r23] = r27
-    ;;
-    ld8 r28 = [r18]
-    ;;
-    st8 [r18] = r26,8
-    st8 [r24] = r28
-    ;;
-    ld8 r30 = [r18]
-    ;;
-    st8 [r18] = r22
-    st8 [r16] = r30 
-    ;;
-vmx_dtlb_loop1:
-    mov cr.itir = r26
-    ;;
+    st8 [r18] = r25
+    st8 [r17] = r27
+    ;;    
     itc.d r25
-    ;;
-    srlz.d;
-    ;;
     mov r17=cr.isr
     mov r23=r31
     mov r22=b0
@@ -310,7 +274,7 @@ vmx_dtlb_out:
     VMX_FAULT(2);
 END(vmx_dtlb_miss)
 
-	.org vmx_ia64_ivt+0x0c00
+    .org vmx_ia64_ivt+0x0c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x0c00 Entry 3 (size 64 bundles) Alt ITLB (19)
 ENTRY(vmx_alt_itlb_miss)
@@ -321,88 +285,84 @@ ENTRY(vmx_alt_itlb_miss)
     tbit.z p6,p7=r29,IA64_PSR_VM_BIT;
 (p7)br.spnt vmx_fault_3
 vmx_alt_itlb_miss_1:
-	mov r16=cr.ifa		// get address that caused the TLB miss
+    mov r16=cr.ifa    // get address that caused the TLB miss
     ;;
     tbit.z p6,p7=r16,63
 (p6)br.spnt vmx_fault_3
     ;;
-	movl r17=PAGE_KERNEL
-	mov r24=cr.ipsr
-	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
-	;;
-	and r19=r19,r16		// clear ed, reserved bits, and PTE control bits
-	shr.u r18=r16,55	// move address bit 59 to bit 4
-	;;
-	and r18=0x10,r18	// bit 4=address-bit(61)
-	or r19=r17,r19		// insert PTE control bits into r19
-	;;
-	movl r20=IA64_GRANULE_SHIFT<<2
-	or r19=r19,r18		// set bit 4 (uncached) if the access was to region 6
-	;;
-	mov cr.itir=r20
-	;;
-	srlz.i
-	;;
-	itc.i r19		// insert the TLB entry
-	mov pr=r31,-1
-	rfi
+    movl r17=PAGE_KERNEL
+    mov r24=cr.ipsr
+    movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
+    ;;
+    and r19=r19,r16     // clear ed, reserved bits, and PTE control bits
+    shr.u r18=r16,55    // move address bit 59 to bit 4
+    ;;
+    and r18=0x10,r18    // bit 4=address-bit(61)
+    or r19=r17,r19      // insert PTE control bits into r19
+    ;;
+    movl r20=IA64_GRANULE_SHIFT<<2
+    or r19=r19,r18	// set bit 4 (uncached) if the access was to region 6
+    ;;
+    mov cr.itir=r20
+    ;;
+    itc.i r19		// insert the TLB entry
+    mov pr=r31,-1
+    rfi
     VMX_FAULT(3);
 END(vmx_alt_itlb_miss)
 
 
-	.org vmx_ia64_ivt+0x1000
+    .org vmx_ia64_ivt+0x1000
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1000 Entry 4 (size 64 bundles) Alt DTLB (7,46)
 ENTRY(vmx_alt_dtlb_miss)
     VMX_DBG_FAULT(4)
-	mov r31=pr
+    mov r31=pr
     mov r29=cr.ipsr;
     ;;
     tbit.z p6,p7=r29,IA64_PSR_VM_BIT;
 (p7)br.spnt vmx_fault_4
 vmx_alt_dtlb_miss_1:
-	mov r16=cr.ifa		// get address that caused the TLB miss
+    mov r16=cr.ifa		// get address that caused the TLB miss
     ;;
 #ifdef CONFIG_VIRTUAL_FRAME_TABLE
-	// Test for the address of virtual frame_table
-	shr r22=r16,56;;
-	cmp.eq p8,p0=((VIRT_FRAME_TABLE_ADDR>>56)&0xff)-0x100,r22
-(p8)	br.cond.sptk frametable_miss ;;
+    // Test for the address of virtual frame_table
+    shr r22=r16,56;;
+    cmp.eq p8,p0=((VIRT_FRAME_TABLE_ADDR>>56)&0xff)-0x100,r22
+(p8)br.cond.sptk frametable_miss ;;
 #endif
     tbit.z p6,p7=r16,63
 (p6)br.spnt vmx_fault_4
     ;;
-	movl r17=PAGE_KERNEL
-	mov r20=cr.isr
-	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
-	mov r24=cr.ipsr
-	;;
-	and r22=IA64_ISR_CODE_MASK,r20		// get the isr.code field
-	tbit.nz p6,p7=r20,IA64_ISR_SP_BIT	// is speculation bit on?
-	shr.u r18=r16,55			// move address bit 59 to bit 4
-	and r19=r19,r16				// clear ed, reserved bits, and PTE control bits
-	tbit.nz p9,p0=r20,IA64_ISR_NA_BIT	// is non-access bit on?
-	;;
-	and r18=0x10,r18	// bit 4=address-bit(61)
-(p9) cmp.eq.or.andcm p6,p7=IA64_ISR_CODE_LFETCH,r22	// check isr.code field
-	dep r24=-1,r24,IA64_PSR_ED_BIT,1
-	or r19=r19,r17		// insert PTE control bits into r19
-	;;
-	or r19=r19,r18		// set bit 4 (uncached) if the access was to region 6
-(p6) mov cr.ipsr=r24
-	movl r20=IA64_GRANULE_SHIFT<<2
-	;;
-	mov cr.itir=r20
-	;;
-	srlz.i
-	;;
-(p7) itc.d r19		// insert the TLB entry
-	mov pr=r31,-1
-	rfi
+    movl r17=PAGE_KERNEL
+    mov r20=cr.isr
+    movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
+    mov r24=cr.ipsr
+    ;;
+    and r22=IA64_ISR_CODE_MASK,r20		// get the isr.code field
+    tbit.nz p6,p7=r20,IA64_ISR_SP_BIT		// is speculation bit on?
+    shr.u r18=r16,55				// move address bit 59 to bit 4
+    and r19=r19,r16				// clear ed, reserved bits, and PTE control bits
+    tbit.nz p9,p0=r20,IA64_ISR_NA_BIT		// is non-access bit on?
+    ;;
+    and r18=0x10,r18				// bit 4=address-bit(61)
+(p9)cmp.eq.or.andcm p6,p7=IA64_ISR_CODE_LFETCH,r22	// check isr.code field
+    dep r24=-1,r24,IA64_PSR_ED_BIT,1
+    or r19=r19,r17				// insert PTE control bits into r19
+    ;;
+    or r19=r19,r18				// set bit 4 (uncached) if the access was to region 6
+(p6)mov cr.ipsr=r24
+    movl r20=IA64_GRANULE_SHIFT<<2
+    ;;
+    mov cr.itir=r20
+    ;;
+(p7)itc.d r19		// insert the TLB entry
+    mov pr=r31,-1
+    rfi
     VMX_FAULT(4);
 END(vmx_alt_dtlb_miss)
 
-	.org vmx_ia64_ivt+0x1400
+    .org vmx_ia64_ivt+0x1400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1400 Entry 5 (size 64 bundles) Data nested TLB (6,45)
 ENTRY(vmx_nested_dtlb_miss)

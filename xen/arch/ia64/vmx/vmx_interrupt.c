@@ -390,3 +390,14 @@ page_not_present(VCPU *vcpu, u64 vadr)
     inject_guest_interruption(vcpu, IA64_PAGE_NOT_PRESENT_VECTOR);
 }
 
+/* Deal with
+ *  Data access rights vector
+ */
+void
+data_access_rights(VCPU *vcpu, u64 vadr)
+{
+    /* If vPSR.ic, IFA, ITIR */
+    set_ifa_itir_iha (vcpu, vadr, 1, 1, 0);
+    inject_guest_interruption(vcpu, IA64_DATA_ACCESS_RIGHTS_VECTOR);
+}
+

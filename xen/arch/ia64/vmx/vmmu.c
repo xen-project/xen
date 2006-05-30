@@ -338,6 +338,7 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code1, u64 *code2)
 
 IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 {
+#ifdef VTLB_DEBUG
     int slot;
     u64 ps, va;
     ps = itir_ps(itir);
@@ -348,14 +349,16 @@ IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
         panic_domain(vcpu_regs(vcpu),"Tlb conflict!!");
         return IA64_FAULT;
     }
+#endif //VTLB_DEBUG    
     thash_purge_and_insert(vcpu, pte, itir, ifa);
     return IA64_NO_FAULT;
 }
 
 IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 {
+#ifdef VTLB_DEBUG    
     int slot;
-    u64 ps, va, gpfn;
+    u64 ps, va;
     ps = itir_ps(itir);
     va = PAGEALIGN(ifa, ps);
     slot = vtr_find_overlap(vcpu, va, ps, DSIDE_TLB);
@@ -364,9 +367,7 @@ IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
         panic_domain(vcpu_regs(vcpu),"Tlb conflict!!");
         return IA64_FAULT;
     }
-    gpfn = (pte & _PAGE_PPN_MASK)>> PAGE_SHIFT;
-    if(VMX_DOMAIN(vcpu) && __gpfn_is_io(vcpu->domain,gpfn))
-        pte |= VTLB_PTE_IO;
+#endif //VTLB_DEBUG
     thash_purge_and_insert(vcpu, pte, itir, ifa);
     return IA64_NO_FAULT;
 
@@ -377,11 +378,14 @@ IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 
 IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
 {
+#ifdef VTLB_DEBUG
     int index;
+#endif    
     u64 ps, va, rid;
-
+    thash_data_t * p_itr;
     ps = itir_ps(itir);
     va = PAGEALIGN(ifa, ps);
+#ifdef VTLB_DEBUG    
     index = vtr_find_overlap(vcpu, va, ps, ISIDE_TLB);
     if (index >=0) {
         // generate MCA.
@@ -389,9 +393,11 @@ IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
         return IA64_FAULT;
     }
     thash_purge_entries(vcpu, va, ps);
+#endif    
     vcpu_get_rr(vcpu, va, &rid);
     rid = rid& RR_RID_MASK;
-    vmx_vcpu_set_tr((thash_data_t *)&vcpu->arch.itrs[slot], pte, itir, va, rid);
+    p_itr = (thash_data_t *)&vcpu->arch.itrs[slot];
+    vmx_vcpu_set_tr(p_itr, pte, itir, va, rid);
     vcpu_quick_region_set(PSCBX(vcpu,itr_regions),va);
     return IA64_NO_FAULT;
 }
@@ -399,11 +405,15 @@ IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
 
 IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
 {
+#ifdef VTLB_DEBUG
     int index;
-    u64 ps, va, gpfn, rid;
-
+    u64 gpfn;
+#endif    
+    u64 ps, va, rid;
+    thash_data_t * p_dtr;
     ps = itir_ps(itir);
     va = PAGEALIGN(ifa, ps);
+#ifdef VTLB_DEBUG    
     index = vtr_find_overlap(vcpu, va, ps, DSIDE_TLB);
     if (index>=0) {
         // generate MCA.
@@ -412,10 +422,12 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
     }
     thash_purge_entries(vcpu, va, ps);
     gpfn = (pte & _PAGE_PPN_MASK)>> PAGE_SHIFT;
-    if(__gpfn_is_io(vcpu->domain,gpfn))
+    if(VMX_DOMAIN(vcpu) && _gpfn_is_io(vcpu->domain,gpfn))
         pte |= VTLB_PTE_IO;
+#endif    
     vcpu_get_rr(vcpu, va, &rid);
     rid = rid& RR_RID_MASK;
+    p_dtr = (thash_data_t *)&vcpu->arch.dtrs[slot];
     vmx_vcpu_set_tr((thash_data_t *)&vcpu->arch.dtrs[slot], pte, itir, va, rid);
     vcpu_quick_region_set(PSCBX(vcpu,dtr_regions),va);
     return IA64_NO_FAULT;
@@ -432,7 +444,6 @@ IA64FAULT vmx_vcpu_ptr_d(VCPU *vcpu,UINT64 ifa,UINT64 ps)
     index = vtr_find_overlap(vcpu, va, ps, DSIDE_TLB);
     if (index>=0) {
         vcpu->arch.dtrs[index].pte.p=0;
-        index = vtr_find_overlap(vcpu, va, ps, DSIDE_TLB);
     }
     thash_purge_entries(vcpu, va, ps);
     return IA64_NO_FAULT;
@@ -447,7 +458,6 @@ IA64FAULT vmx_vcpu_ptr_i(VCPU *vcpu,UINT64 ifa,UINT64 ps)
     index = vtr_find_overlap(vcpu, va, ps, ISIDE_TLB);
     if (index>=0) {
         vcpu->arch.itrs[index].pte.p=0;
-        index = vtr_find_overlap(vcpu, va, ps, ISIDE_TLB);
     }
     thash_purge_entries(vcpu, va, ps);
     return IA64_NO_FAULT;
