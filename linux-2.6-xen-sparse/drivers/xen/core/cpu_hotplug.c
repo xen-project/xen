@@ -160,7 +160,7 @@ void smp_resume(void)
 		vcpu_hotplug(cpu);
 }
 
-int cpu_up_is_allowed(unsigned int cpu)
+int cpu_up_check(unsigned int cpu)
 {
 	int rc = 0;
 

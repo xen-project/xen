@@ -954,10 +954,26 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         mmio_opp->instr = mmio_inst.instr;
         mmio_opp->operand[0] = mmio_inst.operand[0]; /* source */
         mmio_opp->operand[1] = mmio_inst.operand[1]; /* destination */
-
-        /* send the request and wait for the value */
-        send_mmio_req(IOREQ_TYPE_XCHG, gpa, 1,
-                      mmio_inst.op_size, 0, IOREQ_WRITE, 0);
+	if (mmio_inst.operand[0] & REGISTER) {
+		long value;
+		unsigned long operand = mmio_inst.operand[0];
+		value = get_reg_value(operand_size(operand), 
+				      operand_index(operand), 0,
+                    		      mmio_opp->inst_decoder_regs);
+        	/* send the request and wait for the value */
+        	send_mmio_req(IOREQ_TYPE_XCHG, gpa, 1,
+                      mmio_inst.op_size, value, IOREQ_WRITE, 0);
+	} else {
+		/* the destination is a register */
+		long value;
+		unsigned long operand = mmio_inst.operand[1];
+		value = get_reg_value(operand_size(operand), 
+				      operand_index(operand), 0,
+                    		      mmio_opp->inst_decoder_regs);
+        	/* send the request and wait for the value */
+        	send_mmio_req(IOREQ_TYPE_XCHG, gpa, 1,
+                      mmio_inst.op_size, value, IOREQ_WRITE, 0);
+	}
         break;
 
     default:

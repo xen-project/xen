@@ -60,6 +60,8 @@
 #include <asm/ia32.h>
 #include <asm/idle.h>
 
+#include <xen/cpu_hotplug.h>
+
 asmlinkage extern void ret_from_fork(void);
 
 unsigned long kernel_thread_flags = CLONE_VM | CLONE_UNTRACED;
@@ -118,8 +120,6 @@ void exit_idle(void)
 }
 
 /* XXX XEN doesn't use default_idle(), poll_idle(). Use xen_idle() instead. */
-extern void stop_hz_timer(void);
-extern void start_hz_timer(void);
 void xen_idle(void)
 {
 	local_irq_disable();
@@ -129,10 +129,7 @@ void xen_idle(void)
 	else {
 		clear_thread_flag(TIF_POLLING_NRFLAG);
 		smp_mb__after_clear_bit();
-		stop_hz_timer();
-		/* Blocking includes an implicit local_irq_enable(). */
-		HYPERVISOR_block();
-		start_hz_timer();
+		safe_halt();
 		set_thread_flag(TIF_POLLING_NRFLAG);
 	}
 }
@@ -145,11 +142,7 @@ static inline void play_dead(void)
 	cpu_clear(smp_processor_id(), cpu_initialized);
 	preempt_enable_no_resched();
 	HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL);
-	/* Same as drivers/xen/core/smpboot.c:cpu_bringup(). */
-	cpu_init();
-	touch_softlockup_watchdog();
-	preempt_disable();
-	local_irq_enable();
+	cpu_bringup();
 }
 #else
 static inline void play_dead(void)

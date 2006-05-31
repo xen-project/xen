@@ -51,9 +51,6 @@
 
 #define SVM_EXTRA_DEBUG
 
-/* Useful define */
-#define MAX_INST_SIZE  15
-
 #define set_segment_register(name, value)  \
        __asm__ __volatile__ ( "movw %%ax ,%%" STR(name) "" : : "a" (value) )
 
@@ -74,6 +71,9 @@ void svm_manual_event_injection32(struct vcpu *v, struct cpu_user_regs *regs,
 void svm_dump_regs(const char *from, struct cpu_user_regs *regs);
 
 static void svm_relinquish_guest_resources(struct domain *d);
+static int svm_do_vmmcall_reset_to_realmode(struct vcpu *v,
+        struct cpu_user_regs *regs);
+
 
 
 extern void set_hsa_to_guest( struct arch_svm_struct *arch_svm );
@@ -438,6 +438,42 @@ unsigned long svm_get_ctrl_reg(struct vcpu *v, unsigned int num)
     return 0;                   /* dummy */
 }
 
+
+/* SVM-specific intitialization code for VCPU application processors */
+void svm_init_ap_context(struct vcpu_guest_context *ctxt, 
+        int vcpuid, int trampoline_vector)
+{
+    int i;
+    struct vcpu *v, *bsp = current;
+    struct domain *d = bsp->domain;
+    cpu_user_regs_t *regs;;
+
+  
+    if ((v = d->vcpu[vcpuid]) == NULL)
+    {
+        printk("vcpuid %d is invalid!  good-bye.\n", vcpuid);
+        domain_crash_synchronous();
+    }
+    regs = &v->arch.guest_context.user_regs;
+
+    memset(ctxt, 0, sizeof(*ctxt));
+    for (i = 0; i < 256; ++i)
+    {
+        ctxt->trap_ctxt[i].vector = i;
+        ctxt->trap_ctxt[i].cs = FLAT_KERNEL_CS;
+    }
+
+
+    /*
+     * We execute the trampoline code in real mode. The trampoline vector
+     * passed to us is page alligned and is the physicall frame number for
+     * the code. We will execute this code in real mode. 
+     */
+    ctxt->user_regs.eip = 0x0;
+    ctxt->user_regs.cs = (trampoline_vector << 8); 
+    ctxt->flags = VGCF_HVM_GUEST;
+}
+
 int start_svm(void)
 {
     u32 eax, ecx, edx;
@@ -484,6 +520,7 @@ int start_svm(void)
     hvm_funcs.paging_enabled = svm_paging_enabled;
     hvm_funcs.instruction_length = svm_instruction_length;
     hvm_funcs.get_guest_ctrl_reg = svm_get_ctrl_reg;
+    hvm_funcs.init_ap_context = svm_init_ap_context;
 
     hvm_enabled = 1;    
 
@@ -660,6 +697,20 @@ static void arch_svm_do_launch(struct vcpu *v)
     if (svm_dbg_on)
         svm_dump_host_regs(__func__);
 #endif
+    if (v->vcpu_id != 0) 
+    {
+    	u16	cs_sel = regs->cs;
+    	/*
+	 * This is the launch of an AP; set state so that we begin executing
+    	 * the trampoline code in real-mode.
+	 */
+    	svm_do_vmmcall_reset_to_realmode(v, regs); 	
+    	/* Adjust the state to execute the trampoline code.*/
+    	v->arch.hvm_svm.vmcb->rip = 0;
+    	v->arch.hvm_svm.vmcb->cs.sel= cs_sel;
+    	v->arch.hvm_svm.vmcb->cs.base = (cs_sel << 4);
+    }
+     	
     reset_stack_and_jump(svm_asm_do_launch);
 }
 
@@ -896,8 +947,10 @@ static void svm_do_general_protection_fault(struct vcpu *v,
     svm_inject_exception(v, TRAP_gp_fault, 1, error_code);
 }
 
-/* Reserved bits: [31:14], [12:1] */
-#define SVM_VCPU_CPUID_L1_RESERVED 0xffffdffe
+/* Reserved bits ECX: [31:14], [12:4], [2:1]*/
+#define SVM_VCPU_CPUID_L1_ECX_RESERVED 0xffffdff6
+/* Reserved bits EDX: [31:29], [27], [22:20], [18], [10] */
+#define SVM_VCPU_CPUID_L1_EDX_RESERVED 0xe8740400
 
 static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input, 
         struct cpu_user_regs *regs) 
@@ -920,20 +973,17 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
 
     cpuid(input, &eax, &ebx, &ecx, &edx);
 
-    if (input == 1)
+    if (input == 0x00000001)
     {
         if ( !hvm_apic_support(v->domain) ||
                 !vlapic_global_enabled((VLAPIC(v))) )
         {
-            clear_bit(X86_FEATURE_APIC, &edx);
-            /* Since the apic is disabled, avoid any confusion about SMP cpus being available */
-            clear_bit(X86_FEATURE_HT, &edx);  /* clear the hyperthread bit */
-            ebx &= 0xFF00FFFF;  /* set the logical processor count to 1 */
-            ebx |= 0x00010000;
+            /* Since the apic is disabled, avoid any confusion 
+	       about SMP cpus being available */
+	    clear_bit(X86_FEATURE_APIC, &edx);
         }
-	    
+
 #if CONFIG_PAGING_LEVELS < 3
-        clear_bit(X86_FEATURE_NX, &edx);
         clear_bit(X86_FEATURE_PAE, &edx);
         clear_bit(X86_FEATURE_PSE, &edx);
         clear_bit(X86_FEATURE_PSE36, &edx);
@@ -942,24 +992,90 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
         {
             if ( !v->domain->arch.hvm_domain.pae_enabled )
             {
-               clear_bit(X86_FEATURE_PAE, &edx);
-               clear_bit(X86_FEATURE_NX, &edx);
+		clear_bit(X86_FEATURE_PAE, &edx);
             }
             clear_bit(X86_FEATURE_PSE, &edx);
             clear_bit(X86_FEATURE_PSE36, &edx);
         }
 #endif	
         /* Clear out reserved bits. */
-        ecx &= ~SVM_VCPU_CPUID_L1_RESERVED; /* mask off reserved bits */
+        ecx &= ~SVM_VCPU_CPUID_L1_ECX_RESERVED;
+        edx &= ~SVM_VCPU_CPUID_L1_EDX_RESERVED;
+
         clear_bit(X86_FEATURE_MWAIT & 31, &ecx);
+
+	/* Guest should only see one logical processor.
+	 * See details on page 23 of AMD CPUID Specification. 
+	*/
+	clear_bit(X86_FEATURE_HT, &edx);  /* clear the hyperthread bit */
+	ebx &= 0xFF00FFFF;  /* clear the logical processor count when HTT=0 */
+	ebx |= 0x00010000;  /* set to 1 just for precaution */
     }
-#ifdef __i386__
+    else if ( ( input > 0x00000005 ) && ( input < 0x80000000 ) )
+    {
+	eax = ebx = ecx = edx = 0x0;
+    }
     else if ( input == 0x80000001 )
     {
+	/* We duplicate some CPUID_00000001 code because many bits of 
+	   CPUID_80000001_EDX overlaps with CPUID_00000001_EDX. */
+
+        if ( !hvm_apic_support(v->domain) ||
+	     !vlapic_global_enabled((VLAPIC(v))) )
+        {
+            /* Since the apic is disabled, avoid any confusion 
+	       about SMP cpus being available */
+	    clear_bit(X86_FEATURE_APIC, &edx);
+        }
+
+	/* Clear the Cmp_Legacy bit 
+	 * This bit is supposed to be zero when HTT = 0.
+	 * See details on page 23 of AMD CPUID Specification. 
+	*/
+	clear_bit(X86_FEATURE_CMP_LEGACY & 31, &ecx);
+
+#ifdef __i386__
         /* Mask feature for Intel ia32e or AMD long mode. */
+        clear_bit(X86_FEATURE_LAHF_LM & 31, &ecx);
+
         clear_bit(X86_FEATURE_LM & 31, &edx);
-    }
+        clear_bit(X86_FEATURE_SYSCALL & 31, &edx);
 #endif
+
+#if CONFIG_PAGING_LEVELS < 3
+	clear_bit(X86_FEATURE_NX & 31, &edx);
+        clear_bit(X86_FEATURE_PAE, &edx);
+        clear_bit(X86_FEATURE_PSE, &edx);
+        clear_bit(X86_FEATURE_PSE36, &edx);
+#else
+        if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
+        {
+            if ( !v->domain->arch.hvm_domain.pae_enabled )
+            {
+		clear_bit(X86_FEATURE_NX & 31, &edx);
+		clear_bit(X86_FEATURE_PAE, &edx);
+            }
+            clear_bit(X86_FEATURE_PSE, &edx);
+            clear_bit(X86_FEATURE_PSE36, &edx);
+        }
+#endif	
+
+        /* Make SVM feature invisible to the guest. */
+        clear_bit(X86_FEATURE_SVME & 31, &ecx);
+	
+	/* So far, we do not support 3DNow for the guest. */
+	clear_bit(X86_FEATURE_3DNOW & 31, &edx);
+	clear_bit(X86_FEATURE_3DNOWEXT & 31, &edx);
+    }
+    else if ( ( input == 0x80000007 ) || ( input == 0x8000000A  ) )
+    {
+	/* Mask out features of power management and SVM extension. */
+	eax = ebx = ecx = edx = 0;
+    }
+    else if ( input == 0x80000008 )
+    {
+	ecx &= 0xFFFFFF00; /* Make sure Number of CPU core is 1 when HTT=0 */
+    }
 
     regs->eax = (unsigned long)eax;
     regs->ebx = (unsigned long)ebx;
@@ -2036,7 +2152,7 @@ static void svm_debug_restore_cpu_user_regs(struct cpu_user_regs *regs)
 void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
-    u8 opcode[MAX_INST_SIZE], prefix, length = MAX_INST_SIZE;
+    u8 opcode[MAX_INST_LEN], prefix, length = MAX_INST_LEN;
     unsigned long g_vaddr;
     int inst_len;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;

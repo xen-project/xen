@@ -360,12 +360,6 @@ static void balloon_process(void *unused)
 /* Resets the Xen limit, sets new target, and kicks off processing. */
 static void set_new_target(unsigned long target)
 {
-	unsigned long min_target;
-
-	/* Do not allow target to reduce below 2% of maximum memory size. */
-	min_target = max_pfn / 50;
-	target = max(target, min_target);
-
 	/* No need for lock. Not read-modify-write updates. */
 	hard_limit   = ~0UL;
 	target_pages = target;

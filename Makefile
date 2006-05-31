@@ -17,7 +17,7 @@ endif
 .PHONY: all
 all: dist
 
-XEN_ROOT=$(CURDIR)
+export XEN_ROOT=$(CURDIR)
 include Config.mk
 include buildconfigs/Rules.mk
 

@@ -375,7 +375,7 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
     struct mmuext_op pin_request;
     
     DEBUG("Allocating new L%d pt frame for pt_pfn=%lx, "
-           "prev_l_mfn=%lx, offset=%lx\n", 
+           "prev_l_mfn=%lx, offset=%lx", 
            level, *pt_pfn, prev_l_mfn, offset);
 
     /* We need to clear the page, otherwise we might fail to map it
@@ -442,12 +442,64 @@ void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
     mmu_updates[0].ptr = ((pgentry_t)prev_l_mfn << PAGE_SHIFT) + sizeof(pgentry_t) * offset;
     mmu_updates[0].val = (pgentry_t)pfn_to_mfn(*pt_pfn) << PAGE_SHIFT | prot_t;
     if(HYPERVISOR_mmu_update(mmu_updates, 1, NULL, DOMID_SELF) < 0) 
-    {            
+    {
        printk("ERROR: mmu_update failed\n");
        do_exit();
     }
 
     *pt_pfn += 1;
+}
+
+/* Checks if a pagetable frame is needed (if weren't allocated by Xen) */
+static int need_pt_frame(unsigned long virt_address, int level)
+{
+    unsigned long hyp_virt_start = HYPERVISOR_VIRT_START;
+#if defined(__x86_64__)
+    unsigned long hyp_virt_end = HYPERVISOR_VIRT_END;
+#else
+    unsigned long hyp_virt_end = 0xffffffff;
+#endif
+
+    /* In general frames will _not_ be needed if they were already
+       allocated to map the hypervisor into our VA space */
+#if defined(__x86_64__)
+    if(level == L3_FRAME)
+    {
+        if(l4_table_offset(virt_address) >= 
+           l4_table_offset(hyp_virt_start) &&
+           l4_table_offset(virt_address) <= 
+           l4_table_offset(hyp_virt_end))
+            return 0;
+        return 1;
+    } else
+#endif
+
+#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
+    if(level == L2_FRAME)
+    {
+#if defined(__x86_64__)
+        if(l4_table_offset(virt_address) >= 
+           l4_table_offset(hyp_virt_start) &&
+           l4_table_offset(virt_address) <= 
+           l4_table_offset(hyp_virt_end))
+#endif
+            if(l3_table_offset(virt_address) >= 
+               l3_table_offset(hyp_virt_start) &&
+               l3_table_offset(virt_address) <= 
+               l3_table_offset(hyp_virt_end))
+                return 0;
+
+        return 1;
+    } else 
+#endif /* defined(__x86_64__) || defined(CONFIG_X86_PAE) */
+
+    /* Always need l1 frames */
+    if(level == L1_FRAME)
+        return 1;
+
+    printk("ERROR: Unknown frame level %d, hypervisor %llx,%llx\n", 
+        level, hyp_virt_start, hyp_virt_end);
+    return -1;
 }
 
 void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
@@ -460,11 +512,21 @@ void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
     unsigned long offset;
     int count = 0;
 
-    pfn_to_map = (start_info.nr_pt_frames - UNMAPPED_PT_FRAMES) * L1_PAGETABLE_ENTRIES;
+    pfn_to_map = (start_info.nr_pt_frames - NOT_L1_FRAMES) * L1_PAGETABLE_ENTRIES;
+
+    if (*max_pfn >= virt_to_pfn(HYPERVISOR_VIRT_START))
+    {
+        printk("WARNING: Mini-OS trying to use Xen virtual space. "
+               "Truncating memory from %dMB to ",
+               ((unsigned long)pfn_to_virt(*max_pfn) - (unsigned long)&_text)>>20);
+        *max_pfn = virt_to_pfn(HYPERVISOR_VIRT_START - PAGE_SIZE);
+        printk("%dMB\n",
+               ((unsigned long)pfn_to_virt(*max_pfn) - (unsigned long)&_text)>>20);
+    }
 
     start_address = (unsigned long)pfn_to_virt(pfn_to_map);
     end_address = (unsigned long)pfn_to_virt(*max_pfn);
-    
+
     /* We worked out the virtual memory range to map, now mapping loop */
     printk("Mapping memory range 0x%lx - 0x%lx\n", start_address, end_address);
 
@@ -477,8 +539,9 @@ void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
         offset = l4_table_offset(start_address);
         /* Need new L3 pt frame */
         if(!(start_address & L3_MASK)) 
-            new_pt_frame(&pt_pfn, mfn, offset, L3_FRAME);
-        
+            if(need_pt_frame(start_address, L3_FRAME)) 
+                new_pt_frame(&pt_pfn, mfn, offset, L3_FRAME);
+
         page = tab[offset];
         mfn = pte_to_mfn(page);
         tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
@@ -486,8 +549,9 @@ void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
 #if defined(__x86_64__) || defined(CONFIG_X86_PAE)
         offset = l3_table_offset(start_address);
         /* Need new L2 pt frame */
-        if(!(start_address & L2_MASK)) 
-            new_pt_frame(&pt_pfn, mfn, offset, L2_FRAME);
+        if(!(start_address & L2_MASK))
+            if(need_pt_frame(start_address, L2_FRAME))
+                new_pt_frame(&pt_pfn, mfn, offset, L2_FRAME);
 
         page = tab[offset];
         mfn = pte_to_mfn(page);
@@ -495,16 +559,16 @@ void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
 #endif
         offset = l2_table_offset(start_address);        
         /* Need new L1 pt frame */
-        if(!(start_address & L1_MASK)) 
-            new_pt_frame(&pt_pfn, mfn, offset, L1_FRAME);
-       
+        if(!(start_address & L1_MASK))
+            if(need_pt_frame(start_address, L1_FRAME)) 
+                new_pt_frame(&pt_pfn, mfn, offset, L1_FRAME);
+
         page = tab[offset];
         mfn = pte_to_mfn(page);
         offset = l1_table_offset(start_address);
 
         mmu_updates[count].ptr = ((pgentry_t)mfn << PAGE_SHIFT) + sizeof(pgentry_t) * offset;
-        mmu_updates[count].val = 
-            (pgentry_t)pfn_to_mfn(pfn_to_map++) << PAGE_SHIFT | L1_PROT;
+        mmu_updates[count].val = (pgentry_t)pfn_to_mfn(pfn_to_map++) << PAGE_SHIFT | L1_PROT;
         count++;
         if (count == L1_PAGETABLE_ENTRIES || pfn_to_map == *max_pfn)
         {

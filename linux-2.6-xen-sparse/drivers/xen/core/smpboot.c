@@ -150,12 +150,17 @@ static void xen_smp_intr_exit(unsigned int cpu)
 }
 #endif
 
-static void cpu_bringup(void)
+void cpu_bringup(void)
 {
 	cpu_init();
 	touch_softlockup_watchdog();
 	preempt_disable();
 	local_irq_enable();
+}
+
+static void cpu_bringup_and_idle(void)
+{
+	cpu_bringup();
 	cpu_idle();
 }
 
@@ -180,7 +185,7 @@ void cpu_initialize_context(unsigned int cpu)
 	ctxt.user_regs.fs = 0;
 	ctxt.user_regs.gs = 0;
 	ctxt.user_regs.ss = __KERNEL_DS;
-	ctxt.user_regs.eip = (unsigned long)cpu_bringup;
+	ctxt.user_regs.eip = (unsigned long)cpu_bringup_and_idle;
 	ctxt.user_regs.eflags = X86_EFLAGS_IF | 0x1000; /* IOPL_RING1 */
 
 	memset(&ctxt.fpu_ctxt, 0, sizeof(ctxt.fpu_ctxt));
@@ -400,7 +405,7 @@ int __devinit __cpu_up(unsigned int cpu)
 {
 	int rc;
 
-	rc = cpu_up_is_allowed(cpu);
+	rc = cpu_up_check(cpu);
 	if (rc)
 		return rc;
 

@@ -1,6 +1,4 @@
 #include "xg_private.h"
-#define ELFSIZE 32
-#include "xc_elf.h"
 #include <stdlib.h>
 #include <unistd.h>
 

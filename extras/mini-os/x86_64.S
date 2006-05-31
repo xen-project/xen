@@ -4,8 +4,8 @@
 .section __xen_guest
 	.ascii	"GUEST_OS=Mini-OS"
 	.ascii	",XEN_VER=xen-3.0"
-	.ascii	",VIRT_BASE=0xffffffff80000000" /* &_text from minios_x86_64.lds */
-	.ascii	",ELF_PADDR_OFFSET=0xffffffff80000000"
+	.ascii	",VIRT_BASE=0x0" /* &_text from minios_x86_64.lds */
+	.ascii	",ELF_PADDR_OFFSET=0x0"
 	.ascii	",HYPERCALL_PAGE=0x2"
 	.ascii	",LOADER=generic"
 	.byte	0

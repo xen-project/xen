@@ -648,6 +648,16 @@ static void hvm_mmio_assist(struct vcpu *v, struct cpu_user_regs *regs,
             regs->eflags &= ~X86_EFLAGS_CF;
 
         break;
+
+    case INSTR_XCHG:
+	if (src & REGISTER) {
+		index = operand_index(src);
+		set_reg_value(size, index, 0, regs, p->u.data);
+	} else {
+		index = operand_index(dst);
+		set_reg_value(size, index, 0, regs, p->u.data);
+	}
+	break;
     }
 
     hvm_load_cpu_guest_regs(v, regs);

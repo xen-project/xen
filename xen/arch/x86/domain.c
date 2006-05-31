@@ -146,6 +146,8 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
     v->arch.guest_vl4table = __linear_l4_table;
 #endif
 
+    pae_l3_cache_init(&v->arch.pae_l3_cache);
+
     return v;
 }
 

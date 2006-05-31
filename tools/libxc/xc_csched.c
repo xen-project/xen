@@ -12,10 +12,10 @@
 
 
 int
-xc_csched_domain_set(
+xc_sched_credit_domain_set(
     int xc_handle,
     uint32_t domid,
-    struct csched_domain *sdom)
+    struct sched_credit_adjdom *sdom)
 {
     DECLARE_DOM0_OP;
 
@@ -29,10 +29,10 @@ xc_csched_domain_set(
 }
 
 int
-xc_csched_domain_get(
+xc_sched_credit_domain_get(
     int xc_handle,
     uint32_t domid,
-    struct csched_domain *sdom)
+    struct sched_credit_adjdom *sdom)
 {
     DECLARE_DOM0_OP;
     int err;

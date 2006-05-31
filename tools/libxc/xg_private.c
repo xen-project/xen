@@ -145,3 +145,18 @@ unsigned long csum_page(void *page)
 
     return sum ^ (sum>>32);
 }
+
+__attribute__((weak)) int xc_hvm_build(
+    int xc_handle,
+    uint32_t domid,
+    int memsize,
+    const char *image_name,
+    unsigned int vcpus,
+    unsigned int pae,
+    unsigned int acpi,
+    unsigned int apic,
+    unsigned int store_evtchn,
+    unsigned long *store_mfn)
+{
+    return -ENOSYS;
+}

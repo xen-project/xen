@@ -3,14 +3,6 @@
  */
 
 #include "xg_private.h"
-
-#if defined(__i386__)
-#define ELFSIZE 32
-#endif
-#if defined(__x86_64__) || defined(__ia64__)
-#define ELFSIZE 64
-#endif
-
 #include "xc_elf.h"
 #include <stdlib.h>
 

@@ -1,39 +1,38 @@
 XEN_ROOT = ../
 include $(XEN_ROOT)/tools/Rules.mk
 
-SUBDIRS :=
-SUBDIRS += libxc
-SUBDIRS += xenstore
-SUBDIRS += misc
-SUBDIRS += examples
-SUBDIRS += xentrace
-SUBDIRS += xcutils
-SUBDIRS += firmware
-SUBDIRS += security
-SUBDIRS += console
-SUBDIRS += xenmon
-SUBDIRS += guest-headers
-ifeq ($(VTPM_TOOLS),y)
-SUBDIRS += vtpm_manager
-SUBDIRS += vtpm
-endif
-SUBDIRS += xenstat
+SUBDIRS-y :=
+SUBDIRS-y += libxc
+SUBDIRS-y += xenstore
+SUBDIRS-y += misc
+SUBDIRS-y += examples
+SUBDIRS-y += xentrace
+SUBDIRS-$(CONFIG_X86) += xcutils
+SUBDIRS-y += firmware
+SUBDIRS-y += security
+SUBDIRS-y += console
+SUBDIRS-y += xenmon
+SUBDIRS-y += guest-headers
+SUBDIRS-$(VTPM_TOOLS) += vtpm_manager
+SUBDIRS-$(VTPM_TOOLS) += vtpm
+SUBDIRS-y += xenstat
+
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
-SUBDIRS += python
-SUBDIRS += pygrub
+SUBDIRS-y += python
+SUBDIRS-y += pygrub
 endif
 
 .PHONY: all
 all: check
-	@set -e; for subdir in $(SUBDIRS); do \
+	@set -e; for subdir in $(SUBDIRS-y); do \
 		$(MAKE) -C $$subdir $@; \
 	done
 	$(MAKE) ioemu
 
 .PHONY: install
 install: check
-	@set -e; for subdir in $(SUBDIRS); do \
+	@set -e; for subdir in $(SUBDIRS-y); do \
 		$(MAKE) -C $$subdir $@; \
 	done
 	$(MAKE) ioemuinstall
@@ -41,7 +40,7 @@ install: check
 
 .PHONY: clean
 clean: check_clean
-	@set -e; for subdir in $(SUBDIRS); do \
+	@set -e; for subdir in $(SUBDIRS-y); do \
 		$(MAKE) -C $$subdir $@; \
 	done
 	$(MAKE) ioemuclean
@@ -55,10 +54,10 @@ check_clean:
 	$(MAKE) -C check clean
 
 .PHONY: ioemu ioemuinstall ioemuclean
-ifndef XEN_NO_IOEMU
+ifdef CONFIG_IOEMU
 ioemu ioemuinstall ioemuclean:
 	[ -f ioemu/config-host.h ] || \
-	(cd ioemu; ./configure --prefix=usr)
+	(cd ioemu; sh ./configure --prefix=usr)
 	$(MAKE) -C ioemu $(patsubst ioemu%,%,$@)
 else
 ioemu ioemuinstall ioemuclean:

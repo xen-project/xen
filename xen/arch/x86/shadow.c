@@ -1724,7 +1724,8 @@ static int resync_all(struct domain *d, u32 stype)
                         unshadow_l1 = 1;
                     else {
                         need_flush |= error;
-                        set_guest_back_ptr(d, *sl1e_p, smfn, i);
+                        if ( l1e_get_flags(*sl1e_p) & _PAGE_PRESENT )
+                            set_guest_back_ptr(d, *sl1e_p, smfn, i);
                     }
                     // can't update snapshots of linear page tables -- they
                     // are used multiple times...

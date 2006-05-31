@@ -49,7 +49,7 @@ struct sched_adjdom_cmd {
             uint32_t extratime;
             uint32_t weight;
         } sedf;
-        struct csched_domain {
+        struct sched_credit_adjdom {
             uint16_t weight;
             uint16_t cap;
         } credit;

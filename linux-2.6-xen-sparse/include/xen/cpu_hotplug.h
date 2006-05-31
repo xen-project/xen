@@ -13,14 +13,16 @@ void cpu_initialize_context(unsigned int cpu);
 #define cpu_initialize_context(cpu)	((void)0)
 #endif
 
-int cpu_up_is_allowed(unsigned int cpu);
+int cpu_up_check(unsigned int cpu);
 void init_xenbus_allowed_cpumask(void);
 int smp_suspend(void);
 void smp_resume(void);
 
+void cpu_bringup(void);
+
 #else /* !defined(CONFIG_HOTPLUG_CPU) */
 
-#define cpu_up_is_allowed(cpu)		(1)
+#define cpu_up_check(cpu)		(0)
 #define init_xenbus_allowed_cpumask()	((void)0)
 
 static inline int smp_suspend(void)

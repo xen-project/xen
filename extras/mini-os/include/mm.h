@@ -53,7 +53,7 @@
 #define PADDR_BITS              32
 #define PADDR_MASK              (~0UL)
 
-#define UNMAPPED_PT_FRAMES        1
+#define NOT_L1_FRAMES           1
 #define PRIpte "08lx"
 typedef unsigned long pgentry_t;
 
@@ -71,7 +71,12 @@ typedef unsigned long pgentry_t;
 
 #define L2_MASK  ((1UL << L3_PAGETABLE_SHIFT) - 1)
 
-#define UNMAPPED_PT_FRAMES        2
+/*
+ * If starting from virtual address greater than 0xc0000000,
+ * this value will be 2 to account for final mid-level page
+ * directory which is always mapped in at this location.
+ */
+#define NOT_L1_FRAMES           3
 #define PRIpte "016llx"
 typedef uint64_t pgentry_t;
 
@@ -94,20 +99,10 @@ typedef uint64_t pgentry_t;
 #define PADDR_MASK              ((1UL << PADDR_BITS)-1)
 #define VADDR_MASK              ((1UL << VADDR_BITS)-1)
 
-/* Get physical address of page mapped by pte (paddr_t). */
-#define l1e_get_paddr(x)           \
-    ((unsigned long)(((x) & (PADDR_MASK&PAGE_MASK))))
-#define l2e_get_paddr(x)           \
-    ((unsigned long)(((x) & (PADDR_MASK&PAGE_MASK))))
-#define l3e_get_paddr(x)           \
-    ((unsigned long)(((x) & (PADDR_MASK&PAGE_MASK))))
-#define l4e_get_paddr(x)           \
-    ((unsigned long)(((x) & (PADDR_MASK&PAGE_MASK))))
-
 #define L2_MASK  ((1UL << L3_PAGETABLE_SHIFT) - 1)
 #define L3_MASK  ((1UL << L4_PAGETABLE_SHIFT) - 1)
 
-#define UNMAPPED_PT_FRAMES        3
+#define NOT_L1_FRAMES           3
 #define PRIpte "016lx"
 typedef unsigned long pgentry_t;
 

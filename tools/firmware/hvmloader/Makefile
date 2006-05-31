@@ -51,12 +51,12 @@ hvmloader: roms.h hvmloader.c acpi_madt.c
 	$(OBJCOPY) hvmloader.tmp hvmloader
 	rm -f hvmloader.tmp
 
-roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabios/VGABIOS-lgpl-latest.cirrus.bin ../vmxassist/vmxassist.bin
-	./mkhex rombios ../rombios/BIOS-bochs-latest > roms.h
-	./mkhex vgabios_stdvga ../vgabios/VGABIOS-lgpl-latest.bin >> roms.h
-	./mkhex vgabios_cirrusvga ../vgabios/VGABIOS-lgpl-latest.cirrus.bin >> roms.h
-	./mkhex vmxassist ../vmxassist/vmxassist.bin >> roms.h
-	./mkhex acpi ../acpi/acpi.bin >> roms.h
+roms.h:	../rombios/BIOS-bochs-8-processors ../vgabios/VGABIOS-lgpl-latest.bin ../vgabios/VGABIOS-lgpl-latest.cirrus.bin ../vmxassist/vmxassist.bin
+	sh ./mkhex rombios ../rombios/BIOS-bochs-8-processors > roms.h
+	sh ./mkhex vgabios_stdvga ../vgabios/VGABIOS-lgpl-latest.bin >> roms.h
+	sh ./mkhex vgabios_cirrusvga ../vgabios/VGABIOS-lgpl-latest.cirrus.bin >> roms.h
+	sh ./mkhex vmxassist ../vmxassist/vmxassist.bin >> roms.h
+	sh ./mkhex acpi ../acpi/acpi.bin >> roms.h
 
 .PHONY: clean
 clean:

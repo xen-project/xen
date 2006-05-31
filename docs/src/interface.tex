@@ -205,30 +205,23 @@ event sent at a specified system time by using the {\bf
 implement timeout values when they block.
 
 
-
-%% % akw: demoting this to a section -- not sure if there is any point
-%% % though, maybe just remove it.
-
-% KAF: Remove these random sections!
-\begin{comment}
 \section{Xen CPU Scheduling}
 
 Xen offers a uniform API for CPU schedulers.  It is possible to choose
 from a number of schedulers at boot and it should be easy to add more.
-The BVT, Atropos and Round Robin schedulers are part of the normal Xen
-distribution.  BVT provides proportional fair shares of the CPU to the
-running domains.  Atropos can be used to reserve absolute shares of
-the CPU for each domain.  Round-robin is provided as an example of
-Xen's internal scheduler API.
+The SEDF, BVT, and Credit schedulers are part of the normal Xen
+distribution.  BVT and SEDF will be going away and their use should be
+avoided once the credit scheduler has stabilized and become the default.
+The Credit scheduler provides proportional fair shares of the
+host's CPUs to the running domains. It does this while transparently
+load balancing runnable VCPUs across the whole system.
 
 \paragraph*{Note: SMP host support}
-Xen has always supported SMP host systems.  Domains are statically
-assigned to CPUs, either at creation time or when manually pinning to
-a particular CPU.  The current schedulers then run locally on each CPU
-to decide which of the assigned domains should be run there. The
-user-level control software can be used to perform coarse-grain
-load-balancing between CPUs.
-\end{comment}
+Xen has always supported SMP host systems. When using the credit scheduler,
+a domain's VCPUs will be dynamically moved across physical CPUs to maximise
+domain and system throughput. VCPUs can also be manually restricted to be
+mapped only on a subset of the host's physical CPUs, using the pinning
+mechanism.
 
 
 %% More information on the characteristics and use of these schedulers

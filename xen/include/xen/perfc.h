@@ -56,10 +56,8 @@ extern struct perfcounter perfcounters;
 #define perfc_value(x)    atomic_read(&perfcounters.x[0])
 #define perfc_valuec(x)   atomic_read(&perfcounters.x[smp_processor_id()])
 #define perfc_valuea(x,y)                                               \
-    do {                                                                \
-        if ( (y) < (sizeof(perfcounters.x) / sizeof(*perfcounters.x)) ) \
-            atomic_read(&perfcounters.x[y]);                            \
-    } while ( 0 )
+    ( (y) < (sizeof(perfcounters.x) / sizeof(*perfcounters.x)) ?	\
+	atomic_read(&perfcounters.x[y]) : 0 )
 #define perfc_set(x,v)    atomic_set(&perfcounters.x[0], v)
 #define perfc_setc(x,v)   atomic_set(&perfcounters.x[smp_processor_id()], v)
 #define perfc_seta(x,y,v)                                               \

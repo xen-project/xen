@@ -114,23 +114,32 @@ struct arch_domain
     unsigned long first_reserved_pfn;
 } __cacheline_aligned;
 
-struct arch_vcpu
-{
-    /* Needs 16-byte aligment for FXSAVE/FXRSTOR. */
-    struct vcpu_guest_context guest_context
-    __attribute__((__aligned__(16)));
-
 #ifdef CONFIG_X86_PAE
+struct pae_l3_cache {
     /*
      * Two low-memory (<4GB) PAE L3 tables, used as fallback when the guest
      * supplies a >=4GB PAE L3 table. We need two because we cannot set up
      * an L3 table while we are currently running on it (without using
      * expensive atomic 64-bit operations).
      */
-    l3_pgentry_t  lowmem_l3tab[2][4] __attribute__((__aligned__(32)));
-    unsigned long lowmem_l3tab_high_mfn[2]; /* The >=4GB MFN being shadowed. */
-    unsigned int  lowmem_l3tab_inuse;       /* Which lowmem_l3tab is in use? */
+    l3_pgentry_t  table[2][4] __attribute__((__aligned__(32)));
+    unsigned long high_mfn;  /* The >=4GB MFN being shadowed. */
+    unsigned int  inuse_idx; /* Which of the two cache slots is in use? */
+    spinlock_t    lock;
+};
+#define pae_l3_cache_init(c) spin_lock_init(&(c)->lock)
+#else /* !CONFIG_X86_PAE */
+struct pae_l3_cache { };
+#define pae_l3_cache_init(c) ((void)0)
 #endif
+
+struct arch_vcpu
+{
+    /* Needs 16-byte aligment for FXSAVE/FXRSTOR. */
+    struct vcpu_guest_context guest_context
+    __attribute__((__aligned__(16)));
+
+    struct pae_l3_cache pae_l3_cache;
 
     unsigned long      flags; /* TF_ */
 
