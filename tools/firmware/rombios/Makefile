@@ -1,7 +1,7 @@
-BIOS_BUILDS = BIOS-bochs-latest
+#BIOS_BUILDS = BIOS-bochs-latest
 #BIOS_BUILDS += BIOS-bochs-2-processors
 #BIOS_BUILDS += BIOS-bochs-4-processors
-#BIOS_BUILDS += BIOS-bochs-8-processors
+BIOS_BUILDS += BIOS-bochs-8-processors
 
 .PHONY: all
 all: bios
