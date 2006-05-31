@@ -931,8 +931,10 @@ cpu_init (void)
 	platform_cpu_init();
 #ifdef CONFIG_XEN
 	/* Need to be moved into platform_cpu_init later */
-	if (is_running_on_xen())
+	if (is_running_on_xen()) {
+		extern void xen_smp_intr_init(void);
 		xen_smp_intr_init();
+	}
 #endif
 	pm_idle = default_idle;
 }

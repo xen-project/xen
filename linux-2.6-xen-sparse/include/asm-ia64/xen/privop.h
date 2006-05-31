@@ -168,6 +168,7 @@ extern void xen_eoi(void);
 extern void xen_set_rr(unsigned long index, unsigned long val);
 extern unsigned long xen_get_rr(unsigned long index);
 extern void xen_set_kr(unsigned long index, unsigned long val);
+extern void xen_ptcga(unsigned long addr, unsigned long size);
 
 /* Note: It may look wrong to test for is_running_on_xen() in each case.
  * However regnum is always a constant so, as written, the compiler
