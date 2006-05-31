@@ -247,6 +247,13 @@ HYPERVISOR_event_channel_op(
 }
 
 static inline int
+HYPERVISOR_acm_op(
+	unsigned int cmd, void *arg)
+{
+	return = _hypercall2(int, acm_op, cmd, arg);
+}
+
+static inline int
 HYPERVISOR_xen_version(
     int cmd, void *arg)
 {
