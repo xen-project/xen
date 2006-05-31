@@ -204,6 +204,10 @@ pal_debug_info(VCPU *vcpu){
 
 static struct ia64_pal_retval
 pal_fixed_addr(VCPU *vcpu){
+	struct ia64_pal_retval result;
+
+	result.status= -1; //unimplemented
+	return result;
 }
 
 static struct ia64_pal_retval

@@ -40,7 +40,7 @@ ifeq ($(xen_ia64_dom0_virtual_physical),y)
 CFLAGS	+= -DCONFIG_XEN_IA64_DOM0_VP
 endif
 ifeq ($(no_warns),y)
-CFLAGS	+= -Wa,--fatal-warnings
+CFLAGS	+= -Wa,--fatal-warnings -Werror -Wno-uninitialized
 endif
 
 LDFLAGS := -g

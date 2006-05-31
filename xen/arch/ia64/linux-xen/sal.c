@@ -229,7 +229,12 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 		return;
 	}
 
+#ifdef XEN /* warning cleanup */
+	if (strncmp((char *)systab->signature, "SST_", 4) != 0)
+#else
 	if (strncmp(systab->signature, "SST_", 4) != 0)
+#endif
+		
 		printk(KERN_ERR "bad signature in system table!");
 
 	check_versions(systab);

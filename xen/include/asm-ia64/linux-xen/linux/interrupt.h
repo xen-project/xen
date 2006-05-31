@@ -27,7 +27,11 @@
  * IRQ_HANDLED means that we did have a valid interrupt and handled it.
  * IRQ_RETVAL(x) selects on the two depending on x being non-zero (for handled)
  */
+#ifdef XEN
+typedef void irqreturn_t;
+#else
 typedef int irqreturn_t;
+#endif
 
 #define IRQ_NONE	(0)
 #define IRQ_HANDLED	(1)

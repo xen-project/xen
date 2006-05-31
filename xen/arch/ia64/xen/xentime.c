@@ -105,7 +105,7 @@ void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
     return;
 }
 
-irqreturn_t
+void
 xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long new_itm, old_itc;
@@ -134,7 +134,7 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	new_itm = local_cpu_data->itm_next;
 
 	if (!VMX_DOMAIN(current) && !time_after(ia64_get_itc(), new_itm))
-		return IRQ_HANDLED;
+		return;
 
 	while (1) {
 		new_itm += local_cpu_data->itm_delta;
@@ -185,8 +185,6 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 		/* double check, in case we got hit by a (slow) PMI: */
 	} while (time_after_eq(ia64_get_itc(), new_itm));
 	raise_softirq(TIMER_SOFTIRQ);
-
-	return IRQ_HANDLED;
 }
 
 static struct irqaction xen_timer_irqaction = {

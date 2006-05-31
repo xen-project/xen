@@ -1112,12 +1112,14 @@ map_iosapic_to_node(unsigned int gsi_base, int node)
 }
 #endif
 
+#ifndef XEN
 static int __init iosapic_enable_kmalloc (void)
 {
 	iosapic_kmalloc_ok = 1;
 	return 0;
 }
 core_initcall (iosapic_enable_kmalloc);
+#endif
 
 #ifdef XEN
 /* nop for now */

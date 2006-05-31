@@ -18,6 +18,7 @@
 #include <asm/vhpt.h>
 #include <asm/tlbflush.h>
 #include <xen/event.h>
+#include <asm/vmx_phy_mode.h>
 
 /* FIXME: where these declarations should be there ? */
 extern void getreg(unsigned long regnum, unsigned long *val, int *nat, struct pt_regs *regs);

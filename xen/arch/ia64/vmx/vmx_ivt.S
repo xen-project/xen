@@ -180,6 +180,7 @@ vmx_itlb_loop:
     st8 [r17] = r27
     ;;
     itc.i r25
+    dv_serialize_data
     mov r17=cr.isr
     mov r23=r31
     mov r22=b0
@@ -253,6 +254,7 @@ vmx_dtlb_loop:
     st8 [r17] = r27
     ;;    
     itc.d r25
+    dv_serialize_data
     mov r17=cr.isr
     mov r23=r31
     mov r22=b0

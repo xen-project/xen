@@ -197,7 +197,11 @@ sync_master (void *arg)
  * negative that it is behind.
  */
 static inline long
+#ifdef XEN /* warning cleanup */
+get_delta (unsigned long *rt, unsigned long *master)
+#else
 get_delta (long *rt, long *master)
+#endif
 {
 	unsigned long best_t0 = 0, best_t1 = ~0UL, best_tm = 0;
 	unsigned long tcenter, t0, t1, tm;

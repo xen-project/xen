@@ -407,8 +407,9 @@ void trap_init (void)
 }
 
 static fpswa_ret_t
-fp_emulate (int fp_fault, void *bundle, long *ipsr, long *fpsr, long *isr, long *pr, long *ifs,
-            struct pt_regs *regs)
+fp_emulate (int fp_fault, void *bundle, unsigned long *ipsr,
+	    unsigned long *fpsr, unsigned long *isr, unsigned long *pr,
+	    unsigned long *ifs, struct pt_regs *regs)
 {
 	fp_state_t fp_state;
 	fpswa_ret_t ret;
@@ -437,10 +438,8 @@ fp_emulate (int fp_fault, void *bundle, long *ipsr, long *fpsr, long *isr, long 
 	 *      unsigned long    *pifs,
 	 *      void             *fp_state);
 	 */
-	ret = (*fpswa_interface->fpswa)((unsigned long) fp_fault, bundle,
-					(unsigned long *) ipsr, (unsigned long *) fpsr,
-					(unsigned long *) isr, (unsigned long *) pr,
-					(unsigned long *) ifs, &fp_state);
+	ret = (*fpswa_interface->fpswa)(fp_fault, bundle,
+					ipsr, fpsr, isr, pr, ifs, &fp_state);
 
 	return ret;
 }

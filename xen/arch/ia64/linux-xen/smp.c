@@ -196,7 +196,9 @@ handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 		mb();	/* Order data access and bit testing. */
 	}
 	put_cpu();
+#ifndef XEN
 	return IRQ_HANDLED;
+#endif
 }
 
 /*

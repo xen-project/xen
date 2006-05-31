@@ -158,7 +158,11 @@ ia64_init_itm (void)
 {
 	unsigned long platform_base_freq, itc_freq;
 	struct pal_freq_ratio itc_ratio, proc_ratio;
+#ifdef XEN /* warning cleanup */
+	unsigned long status, platform_base_drift, itc_drift;
+#else
 	long status, platform_base_drift, itc_drift;
+#endif
 
 	/*
 	 * According to SAL v2.6, we need to use a SAL call to determine the platform base
@@ -197,7 +201,11 @@ ia64_init_itm (void)
 	itc_freq = (platform_base_freq*itc_ratio.num)/itc_ratio.den;
 
 	local_cpu_data->itm_delta = (itc_freq + HZ/2) / HZ;
+#ifdef XEN /* warning cleanup */
+	printk(KERN_DEBUG "CPU %d: base freq=%lu.%03luMHz, ITC ratio=%u/%u, "
+#else
 	printk(KERN_DEBUG "CPU %d: base freq=%lu.%03luMHz, ITC ratio=%lu/%lu, "
+#endif
 	       "ITC freq=%lu.%03luMHz", smp_processor_id(),
 	       platform_base_freq / 1000000, (platform_base_freq / 1000) % 1000,
 	       itc_ratio.num, itc_ratio.den, itc_freq / 1000000, (itc_freq / 1000) % 1000);

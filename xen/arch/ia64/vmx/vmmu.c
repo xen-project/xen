@@ -199,8 +199,11 @@ void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb)
     mtlb.page_flags = tlb->page_flags & ~PAGE_FLAGS_RV_MASK;
     mtlb.ppn = get_mfn(d->domain,tlb->ppn);
     mtlb_ppn=mtlb.ppn;
+
+#if 0
     if (mtlb_ppn == INVALID_MFN)
         panic_domain(vcpu_regs(d),"Machine tlb insert with invalid mfn number.\n");
+#endif
 
     psr = ia64_clear_ic();
     if ( cl == ISIDE_TLB ) {

@@ -619,10 +619,9 @@ void process_soft_irq(void)
 
 // this is a temporary hack until real console input is implemented
 extern void domain_pend_keyboard_interrupt(int irq);
-irqreturn_t guest_forward_keyboard_input(int irq, void *nada, struct pt_regs *regs)
+void guest_forward_keyboard_input(int irq, void *nada, struct pt_regs *regs)
 {
 	domain_pend_keyboard_interrupt(irq);
-	return 0;
 }
 
 void serial_input_init(void)
