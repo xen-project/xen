@@ -596,6 +596,7 @@ void thash_init(thash_cb_t *hcb, u64 sz)
     num = (hcb->hash_sz/sizeof(thash_data_t));
     do{
         head->itir = PAGE_SHIFT<<2;
+        head->etag = 1UL<<63;
         head->next = 0;
         head++;
         num--;
