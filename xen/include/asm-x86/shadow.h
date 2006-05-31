@@ -762,10 +762,16 @@ static inline void set_guest_back_ptr(
         unsigned long gmfn;
 
         ASSERT(shadow_lock_is_acquired(d));
+        ASSERT( smfn );
         gmfn = l1e_get_pfn(spte);
-        mfn_to_page(gmfn)->tlbflush_timestamp = smfn;
-        mfn_to_page(gmfn)->u.inuse.type_info &= ~PGT_va_mask;
-        mfn_to_page(gmfn)->u.inuse.type_info |= (unsigned long) index << PGT_va_shift;
+        ASSERT( gmfn );
+        if ( l1e_get_flags(spte) & _PAGE_RW )
+        {
+            mfn_to_page(gmfn)->tlbflush_timestamp = smfn;
+            mfn_to_page(gmfn)->u.inuse.type_info &= ~PGT_va_mask;
+            mfn_to_page(gmfn)->u.inuse.type_info |= 
+                (unsigned long) index << PGT_va_shift;
+        }
     }
 }
 
