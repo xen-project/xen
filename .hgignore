@@ -113,9 +113,9 @@
 ^tools/firmware/acpi/acpigen$
 ^tools/firmware/hvmloader/hvmloader$
 ^tools/firmware/hvmloader/roms\.h$
-^tools/firmware/rombios/BIOS-bochs-latest$
-^tools/firmware/rombios/_rombios_\.c$
-^tools/firmware/rombios/rombios\.s$
+^tools/firmware/rombios/BIOS-bochs-[^/]*$
+^tools/firmware/rombios/_rombios[^/]*_\.c$
+^tools/firmware/rombios/rombios[^/]*\.s$
 ^tools/firmware/vmxassist/acpi\.h$
 ^tools/firmware/vmxassist/gen$
 ^tools/firmware/vmxassist/offsets\.h$
