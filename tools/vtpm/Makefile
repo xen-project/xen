@@ -9,7 +9,7 @@ TPM_EMULATOR_DIR = tpm_emulator
 VTPM_DIR = vtpm
 
 # Emulator tarball name
-TPM_EMULATOR_TARFILE = tpm_emulator-0.2b.tar.gz
+TPM_EMULATOR_TARFILE = tpm_emulator-0.3.tar.gz
 
 GMP_HEADER = /usr/include/gmp.h
 
@@ -47,23 +47,23 @@ $(TPM_EMULATOR_TARFILE):
 
 # Create vtpm and TPM emulator dirs
 # apply patches for 1) used as dom0 tpm driver 2) used as vtpm device instance
-$(TPM_EMULATOR_DIR): $(TPM_EMULATOR_TARFILE) tpm_emulator.patch tpm_emulator-0.2b-x86_64.patch
+$(TPM_EMULATOR_DIR): $(TPM_EMULATOR_TARFILE) tpm_emulator.patch tpm_emulator-0.3-x86_64.patch
 	if [ "$(BUILD_EMULATOR)" = "y" ]; then \
 		tar -xzf $(TPM_EMULATOR_TARFILE); \
 		rm -rf $(TPM_EMULATOR_DIR); \
-		mv tpm_emulator-0.2 $(TPM_EMULATOR_DIR); \
+		mv tpm_emulator-0.3 $(TPM_EMULATOR_DIR); \
 		cd $(TPM_EMULATOR_DIR); \
-		patch -p1 < ../tpm_emulator-0.2b-x86_64.patch; \
+		patch -p1 < ../tpm_emulator-0.3-x86_64.patch; \
 		patch -p1 <../tpm_emulator.patch; \
 	fi
 
-$(VTPM_DIR): $(TPM_EMULATOR_TARFILE) tpm_emulator-0.2b-x86_64.patch vtpm.patch
+$(VTPM_DIR): $(TPM_EMULATOR_TARFILE) tpm_emulator-0.3-x86_64.patch vtpm.patch
 	tar -xzf $(TPM_EMULATOR_TARFILE);  
 	rm -rf $(VTPM_DIR)
-	mv tpm_emulator-0.2 $(VTPM_DIR); 
+	mv tpm_emulator-0.3 $(VTPM_DIR); 
 
 	cd $(VTPM_DIR); \
-	patch -p1 < ../tpm_emulator-0.2b-x86_64.patch; \
+	patch -p1 < ../tpm_emulator-0.3-x86_64.patch; \
 	patch -p1 <../vtpm.patch
 
 .PHONY: build_sub
