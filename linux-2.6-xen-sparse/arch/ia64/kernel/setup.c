@@ -347,8 +347,14 @@ early_console_setup (char *cmdline)
 	int earlycons = 0;
 
 #ifdef CONFIG_XEN
-	if (!early_xen_console_setup(cmdline))
+#ifndef CONFIG_IA64_HP_SIM
+	if (is_running_on_xen()) {
+		extern struct console hpsim_cons;
+		hpsim_cons.flags |= CON_BOOT;
+		register_console(&hpsim_cons);
 		earlycons++;
+	}
+#endif
 #endif
 #ifdef CONFIG_SERIAL_SGI_L1_CONSOLE
 	{
