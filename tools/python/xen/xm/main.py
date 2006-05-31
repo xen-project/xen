@@ -806,7 +806,7 @@ def xm_top(args):
     os.execvp('xentop', ['xentop'])
 
 def xm_dmesg(args):
-    arg_check(args, "dmesg", 0)
+    arg_check(args, "dmesg", 0, 1)
     
     gopts = Opts(use="""[-c|--clear]
 
