@@ -250,7 +250,7 @@ static inline int
 HYPERVISOR_acm_op(
 	unsigned int cmd, void *arg)
 {
-	return = _hypercall2(int, acm_op, cmd, arg);
+    return _hypercall2(int, acm_op, cmd, arg);
 }
 
 static inline int
