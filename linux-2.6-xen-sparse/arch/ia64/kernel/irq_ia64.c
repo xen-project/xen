@@ -254,7 +254,8 @@ static int xen_slab_ready = 0;
  * it ends up to issue several memory accesses upon percpu data and
  * thus adds unnecessary traffic to other paths.
  */
-irqreturn_t handle_reschedule(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+handle_reschedule(int irq, void *dev_id, struct pt_regs *regs)
 {
 
 	return IRQ_HANDLED;
@@ -328,7 +329,7 @@ xen_register_percpu_irq (unsigned int irq, struct irqaction *action, int save)
 	}
 }
 
-void
+static void
 xen_bind_early_percpu_irq (void)
 {
 	int i;
@@ -398,19 +399,20 @@ init_IRQ (void)
 {
 #ifdef CONFIG_XEN
 	/* Maybe put into platform_irq_init later */
-	struct callback_register event = {
-		.type = CALLBACKTYPE_event,
-		.address = (unsigned long)&xen_event_callback,
-	};
-	xen_init_IRQ();
-	BUG_ON(HYPERVISOR_callback_op(CALLBACKOP_register, &event));
-	late_time_init = xen_bind_early_percpu_irq;
+	if (is_running_on_xen()) {
+		struct callback_register event = {
+			.type = CALLBACKTYPE_event,
+			.address = (unsigned long)&xen_event_callback,
+		};
+		xen_init_IRQ();
+		BUG_ON(HYPERVISOR_callback_op(CALLBACKOP_register, &event));
+		late_time_init = xen_bind_early_percpu_irq;
 #ifdef CONFIG_SMP
-	register_percpu_irq(IA64_IPI_RESCHEDULE, &resched_irqaction);
-#endif
-#else /* CONFIG_XEN */
-	register_percpu_irq(IA64_SPURIOUS_INT_VECTOR, NULL);
+		register_percpu_irq(IA64_IPI_RESCHEDULE, &resched_irqaction);
+#endif /* CONFIG_SMP */
+	}
 #endif /* CONFIG_XEN */
+	register_percpu_irq(IA64_SPURIOUS_INT_VECTOR, NULL);
 #ifdef CONFIG_SMP
 	register_percpu_irq(IA64_IPI_VECTOR, &ipi_irqaction);
 #endif
