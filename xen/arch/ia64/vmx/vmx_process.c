@@ -338,6 +338,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
                 gppa = (vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
                 emulate_io_inst(v, gppa, data->ma);
             }else{
+                vcpu_set_isr(v,misr.val);
                 data_access_rights(v, vadr);
             }
             return IA64_FAULT;
