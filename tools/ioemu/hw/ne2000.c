@@ -147,9 +147,33 @@ static void ne2000_reset(NE2000State *s)
     }
 }
 
+static int ne2000_buffer_full(NE2000State *s)
+{
+    int avail, index, boundary;
+
+    index = s->curpag << 8;
+    boundary = s->boundary << 8;
+    if (index <= boundary)
+        /* when index == boundary, we should assume the
+         * buffer is full instead of empty!
+         */
+        avail = boundary - index;
+    else
+        avail = (s->stop - s->start) - (index - boundary);
+
+    return (avail < (MAX_ETH_FRAME_SIZE + 4));
+}
+
 static void ne2000_update_irq(NE2000State *s)
 {
     int isr;
+
+    if (ne2000_buffer_full(s)) {
+        /* The freeing space is not enough, tell the ne2k driver
+         * to fetch these packets!
+         */
+        s->isr |= ENISR_RX;
+    }
     isr = s->isr & s->imr;
 #if defined(DEBUG_NE2000)
     printf("NE2000: Set IRQ line %d to %d (%02x %02x)\n",
@@ -168,19 +192,11 @@ static void ne2000_update_irq(NE2000State *s)
 static int ne2000_can_receive(void *opaque)
 {
     NE2000State *s = opaque;
-    int avail, index, boundary;
     
     if (s->cmd & E8390_STOP)
         return 0;
-    index = s->curpag << 8;
-    boundary = s->boundary << 8;
-    if (index < boundary)
-        avail = boundary - index;
-    else
-        avail = (s->stop - s->start) - (index - boundary);
-    if (avail < (MAX_ETH_FRAME_SIZE + 4))
-        return 0;
-    return MAX_ETH_FRAME_SIZE;
+
+    return (ne2000_buffer_full(s) ? 0 : MAX_ETH_FRAME_SIZE);
 }
 
 #define MIN_BUF_SIZE 60
