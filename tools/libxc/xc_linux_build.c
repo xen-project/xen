@@ -6,14 +6,6 @@
 #include "xc_private.h"
 #include <xenctrl.h>
 
-#if defined(__i386__)
-#define ELFSIZE 32
-#endif
-
-#if defined(__x86_64__) || defined(__ia64__)
-#define ELFSIZE 64
-#endif
-
 #include "xc_elf.h"
 #include "xc_aout9.h"
 #include <stdlib.h>

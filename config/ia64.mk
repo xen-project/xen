@@ -1,0 +1,4 @@
+CONFIG_IA64 := y
+CONFIG_IOEMU := y
+
+LIBDIR := lib

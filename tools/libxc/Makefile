@@ -10,43 +10,30 @@ MINOR    = 0
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-SRCS       :=
-SRCS       += xc_bvtsched.c
-SRCS       += xc_core.c
-SRCS       += xc_domain.c
-SRCS       += xc_evtchn.c
-SRCS       += xc_misc.c
-SRCS       += xc_acm.c   
-SRCS       += xc_physdev.c
-SRCS       += xc_private.c
-SRCS       += xc_sedf.c
-SRCS       += xc_csched.c
-SRCS       += xc_tbuf.c
+CTRL_SRCS-y       :=
+CTRL_SRCS-y       += xc_bvtsched.c
+CTRL_SRCS-y       += xc_core.c
+CTRL_SRCS-y       += xc_domain.c
+CTRL_SRCS-y       += xc_evtchn.c
+CTRL_SRCS-y       += xc_misc.c
+CTRL_SRCS-y       += xc_acm.c   
+CTRL_SRCS-y       += xc_physdev.c
+CTRL_SRCS-y       += xc_private.c
+CTRL_SRCS-y       += xc_sedf.c
+CTRL_SRCS-y       += xc_csched.c
+CTRL_SRCS-y       += xc_tbuf.c
+CTRL_SRCS-$(CONFIG_X86) += xc_ptrace.c xc_ptrace_core.c xc_pagetab.c
+CTRL_SRCS-$(CONFIG_Linux) += xc_linux.c
 
-ifeq ($(patsubst x86%,x86,$(XEN_TARGET_ARCH)),x86)
-SRCS       += xc_ptrace.c
-SRCS       += xc_ptrace_core.c
-SRCS       += xc_pagetab.c
-endif
-
-SRCS_Linux += xc_linux.c
-
-SRCS       += $(SRCS_Linux)
-
-BUILD_SRCS :=
-BUILD_SRCS += xc_linux_build.c
-BUILD_SRCS += xc_load_bin.c
-BUILD_SRCS += xc_load_elf.c
-BUILD_SRCS += xg_private.c
-
-ifeq ($(XEN_TARGET_ARCH),ia64)
-BUILD_SRCS += xc_ia64_stubs.c
-else
-BUILD_SRCS += xc_load_aout9.c
-BUILD_SRCS += xc_linux_restore.c
-BUILD_SRCS += xc_linux_save.c
-BUILD_SRCS += xc_hvm_build.c
-endif
+GUEST_SRCS-y :=
+GUEST_SRCS-y += xc_linux_build.c
+GUEST_SRCS-y += xc_load_bin.c
+GUEST_SRCS-y += xc_load_elf.c
+GUEST_SRCS-y += xg_private.c
+GUEST_SRCS-$(CONFIG_IA64) += xc_ia64_stubs.c
+GUEST_SRCS-$(CONFIG_PLAN9) += xc_load_aout9.c
+GUEST_SRCS-$(CONFIG_MIGRATE) += xc_linux_restore.c xc_linux_save.c
+GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c
 
 CFLAGS   += -Werror
 CFLAGS   += -fno-strict-aliasing
@@ -61,11 +48,11 @@ CFLAGS   += -Wp,-MD,.$(@F).d
 LDFLAGS  += -L.
 DEPS     = .*.d
 
-LIB_OBJS := $(patsubst %.c,%.o,$(SRCS))
-PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS))
+CTRL_LIB_OBJS := $(patsubst %.c,%.o,$(CTRL_SRCS-y))
+CTRL_PIC_OBJS := $(patsubst %.c,%.opic,$(CTRL_SRCS-y))
 
-LIB_BUILD_OBJS := $(patsubst %.c,%.o,$(BUILD_SRCS))
-PIC_BUILD_OBJS := $(patsubst %.c,%.opic,$(BUILD_SRCS))
+GUEST_LIB_OBJS := $(patsubst %.c,%.o,$(GUEST_SRCS-y))
+GUEST_PIC_OBJS := $(patsubst %.c,%.opic,$(GUEST_SRCS-y))
 
 LIB := libxenctrl.a
 LIB += libxenctrl.so libxenctrl.so.$(MAJOR) libxenctrl.so.$(MAJOR).$(MINOR)
@@ -125,7 +112,7 @@ rpm: build
 
 # libxenctrl
 
-libxenctrl.a: $(LIB_OBJS)
+libxenctrl.a: $(CTRL_LIB_OBJS)
 	$(AR) rc $@ $^
 
 libxenctrl.so: libxenctrl.so.$(MAJOR)
@@ -133,12 +120,12 @@ libxenctrl.so: libxenctrl.so.$(MAJOR)
 libxenctrl.so.$(MAJOR): libxenctrl.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
-libxenctrl.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
+libxenctrl.so.$(MAJOR).$(MINOR): $(CTRL_PIC_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenctrl.so.$(MAJOR) -shared -o $@ $^
 
 # libxenguest
 
-libxenguest.a: $(LIB_BUILD_OBJS)
+libxenguest.a: $(GUEST_LIB_OBJS)
 	$(AR) rc $@ $^
 
 libxenguest.so: libxenguest.so.$(MAJOR)
@@ -146,7 +133,7 @@ libxenguest.so: libxenguest.so.$(MAJOR)
 libxenguest.so.$(MAJOR): libxenguest.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
-libxenguest.so.$(MAJOR).$(MINOR): $(PIC_BUILD_OBJS) libxenctrl.so
+libxenguest.so.$(MAJOR).$(MINOR): $(GUEST_PIC_OBJS) libxenctrl.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenguest.so.$(MAJOR) -shared -o $@ $^ -lz -lxenctrl
 
 -include $(DEPS)

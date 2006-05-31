@@ -39,19 +39,7 @@ else
 CFLAGS    += -g
 endif
 
-ifeq ($(XEN_TARGET_ARCH),x86_32)
-CFLAGS  += -m32 -march=i686
-endif
-
-ifeq ($(XEN_TARGET_ARCH),x86_64)
-CFLAGS  += -m64
-endif
-
-ifeq ($(XEN_TARGET_ARCH),x86_64)
-LIBDIR = lib64
-else
-LIBDIR = lib
-endif
+include $(XEN_ROOT)/config/$(XEN_TARGET_ARCH).mk
 
 ifneq ($(EXTRA_PREFIX),)
 EXTRA_INCLUDES += $(EXTRA_PREFIX)/include

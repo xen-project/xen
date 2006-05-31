@@ -5,6 +5,8 @@ all:
 
 include $(XEN_ROOT)/Config.mk
 
+CONFIG_$(shell uname -s) := y
+
 XEN_XC             = $(XEN_ROOT)/tools/python/xen/lowlevel/xc
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore

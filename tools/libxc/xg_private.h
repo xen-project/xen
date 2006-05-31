@@ -25,6 +25,14 @@
 #define DECLARE_DOM0_OP dom0_op_t op
 #endif
 
+#ifndef ELFSIZE
+#include <limits.h>
+#if UINT_MAX == ULONG_MAX
+#define ELFSIZE 32
+#else
+#define ELFSIZE 64
+#endif
+#endif
 
 char *xc_read_image(const char *filename, unsigned long *size);
 char *xc_inflate_buffer(const char *in_buf,

@@ -1,7 +1,8 @@
 debug ?= y
 pae ?= n
 
-include $(CURDIR)/../../Config.mk
+XEN_ROOT = ../..
+include $(XEN_ROOT)/Config.mk
 
 # Set TARGET_ARCH
 override TARGET_ARCH     := $(XEN_TARGET_ARCH)

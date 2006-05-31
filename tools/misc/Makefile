@@ -25,7 +25,7 @@ all: build
 build: $(TARGETS)
 	$(MAKE) -C miniterm
 	$(MAKE) -C cpuperf
-ifneq ($(XEN_TARGET_ARCH),ia64)
+ifeq ($(CONFIG_MBOOTPACK),y)
 	$(MAKE) -C mbootpack
 endif
 	$(MAKE) -C lomount
