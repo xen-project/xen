@@ -37,9 +37,11 @@
 
 #define shadow_mode_translate(d)              (1)
 
-// for granttab transfer. XENMEM_populate_physmap
+/*
+ * Utilities to change relationship of gpfn->mfn for designated domain,
+ * which is required by gnttab transfer, balloon, device model and etc.
+ */
 void guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long mfn);
-// for balloon driver. XENMEM_decrease_reservation
 void guest_physmap_remove_page(struct domain *d, unsigned long gpfn, unsigned long mfn);
 #endif
 

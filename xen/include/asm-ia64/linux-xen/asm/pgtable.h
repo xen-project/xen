@@ -277,6 +277,10 @@ ia64_phys_addr_valid (unsigned long addr)
 #define pte_dirty(pte)		((pte_val(pte) & _PAGE_D) != 0)
 #define pte_young(pte)		((pte_val(pte) & _PAGE_A) != 0)
 #define pte_file(pte)		((pte_val(pte) & _PAGE_FILE) != 0)
+#ifdef XEN
+#define pte_mem(pte) \
+	(!(pte_val(pte) & (GPFN_IO_MASK | GPFN_INV_MASK)) && !pte_none(pte))
+#endif
 /*
  * Note: we convert AR_RWX to AR_RX and AR_RW to AR_R by clearing the 2nd bit in the
  * access rights:

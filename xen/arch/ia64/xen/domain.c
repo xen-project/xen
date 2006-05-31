@@ -1181,7 +1181,7 @@ assign_domain_page_replace(struct domain *d, unsigned long mpaddr,
     // update pte
     npte = pfn_pte(mfn, __pgprot(__DIRTY_BITS | _PAGE_PL_2 | arflags));
     old_pte = ptep_xchg(mm, mpaddr, pte, npte);
-    if (!pte_none(old_pte)) {
+    if (pte_mem(old_pte)) {
         unsigned long old_mfn;
         struct page_info* old_page;
 
