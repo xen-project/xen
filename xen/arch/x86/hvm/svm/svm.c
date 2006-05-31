@@ -51,9 +51,6 @@
 
 #define SVM_EXTRA_DEBUG
 
-/* Useful define */
-#define MAX_INST_SIZE  15
-
 #define set_segment_register(name, value)  \
        __asm__ __volatile__ ( "movw %%ax ,%%" STR(name) "" : : "a" (value) )
 
@@ -2155,7 +2152,7 @@ static void svm_debug_restore_cpu_user_regs(struct cpu_user_regs *regs)
 void svm_handle_invlpg(const short invlpga, struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
-    u8 opcode[MAX_INST_SIZE], prefix, length = MAX_INST_SIZE;
+    u8 opcode[MAX_INST_LEN], prefix, length = MAX_INST_LEN;
     unsigned long g_vaddr;
     int inst_len;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
