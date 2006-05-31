@@ -21,6 +21,7 @@
 #include <asm/vmx_vcpu.h>
 #include <asm/pal.h>
 #include <asm/sal.h>
+#include <asm/dom_fw.h>
 #include <asm/tlb.h>
 #include <asm/vmx_mm_def.h>
 
@@ -42,7 +43,14 @@ set_pal_result (VCPU *vcpu,struct ia64_pal_retval result) {
 	vcpu_set_gr(vcpu,11, result.v2,0);
 }
 
+static void
+set_sal_result (VCPU *vcpu,struct sal_ret_values result) {
 
+	vcpu_set_gr(vcpu,8, result.r8,0);
+	vcpu_set_gr(vcpu,9, result.r9,0);
+	vcpu_set_gr(vcpu,10, result.r10,0);
+	vcpu_set_gr(vcpu,11, result.r11,0);
+}
 static struct ia64_pal_retval
 pal_cache_flush (VCPU *vcpu) {
 	UINT64 gr28,gr29, gr30, gr31;
@@ -450,4 +458,12 @@ pal_emul( VCPU *vcpu) {
 		set_pal_result (vcpu, result);
 }
 
-
+void
+sal_emul(VCPU *v) {
+	struct sal_ret_values result;
+	result = sal_emulator(vcpu_get_gr(v,32),vcpu_get_gr(v,33),
+	                      vcpu_get_gr(v,34),vcpu_get_gr(v,35),
+	                      vcpu_get_gr(v,36),vcpu_get_gr(v,37),
+	                      vcpu_get_gr(v,38),vcpu_get_gr(v,39));
+	set_sal_result(v, result);	
+}

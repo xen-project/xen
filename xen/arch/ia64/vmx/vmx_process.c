@@ -64,6 +64,7 @@ extern void itlb_fault (VCPU *vcpu, u64 vadr);
 extern void ivhpt_fault (VCPU *vcpu, u64 vadr);
 
 #define DOMN_PAL_REQUEST    0x110000
+#define DOMN_SAL_REQUEST    0x110001
 
 static UINT64 vec2off[68] = {0x0,0x400,0x800,0xc00,0x1000, 0x1400,0x1800,
     0x1c00,0x2000,0x2400,0x2800,0x2c00,0x3000,0x3400,0x3800,0x3c00,0x4000,
@@ -96,85 +97,6 @@ void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
     inject_guest_interruption(vcpu, vector);
 }
 
-static void
-vmx_handle_hypercall (VCPU *v, REGS *regs)
-{
-    struct ia64_pal_retval y;
-    struct sal_ret_values x;
-    unsigned long i, sal_param[8];
-
-    switch (regs->r2) {
-        case FW_HYPERCALL_PAL_CALL:
-            //printf("*** PAL hypercall: index=%d\n",regs->r28);
-            //FIXME: This should call a C routine
-            y = pal_emulator_static(VCPU(v, vgr[12]));
-            regs->r8 = y.status; regs->r9 = y.v0;
-            regs->r10 = y.v1; regs->r11 = y.v2;
-#if 0
-            if (regs->r8)
-                printk("Failed vpal emulation, with index:0x%lx\n",
-                       VCPU(v, vgr[12]));
-#endif
-            break;
-        case FW_HYPERCALL_SAL_CALL:
-            for (i = 0; i < 8; i++)
-                vcpu_get_gr_nat(v, 32+i, &sal_param[i]);
-            x = sal_emulator(sal_param[0], sal_param[1],
-                             sal_param[2], sal_param[3],
-                             sal_param[4], sal_param[5],
-                             sal_param[6], sal_param[7]);
-            regs->r8 = x.r8; regs->r9 = x.r9;
-            regs->r10 = x.r10; regs->r11 = x.r11;
-#if 0
-            if (regs->r8)
-                printk("Failed vsal emulation, with index:0x%lx\n",
-                       sal_param[0]);
-#endif
-            break;
-        case FW_HYPERCALL_EFI_RESET_SYSTEM:
-            printf("efi.reset_system called ");
-            if (current->domain == dom0) {
-                printf("(by dom0)\n ");
-                (*efi.reset_system)(EFI_RESET_WARM,0,0,NULL);
-            }
-            printf("(not supported for non-0 domain)\n");
-            regs->r8 = EFI_UNSUPPORTED;
-            break;
-        case FW_HYPERCALL_EFI_GET_TIME:
-            {
-                unsigned long *tv, *tc;
-                vcpu_get_gr_nat(v, 32, (u64 *)&tv);
-                vcpu_get_gr_nat(v, 33, (u64 *)&tc);
-                printf("efi_get_time(%p,%p) called...",tv,tc);
-                tv = __va(translate_domain_mpaddr((unsigned long)tv));
-                if (tc) tc = __va(translate_domain_mpaddr((unsigned long)tc));
-                regs->r8 = (*efi.get_time)((efi_time_t *)tv,(efi_time_cap_t *)tc);
-                printf("and returns %lx\n",regs->r8);
-            }
-            break;
-        case FW_HYPERCALL_EFI_SET_TIME:
-        case FW_HYPERCALL_EFI_GET_WAKEUP_TIME:
-        case FW_HYPERCALL_EFI_SET_WAKEUP_TIME:
-            // FIXME: need fixes in efi.h from 2.6.9
-        case FW_HYPERCALL_EFI_SET_VIRTUAL_ADDRESS_MAP:
-            // FIXME: WARNING!! IF THIS EVER GETS IMPLEMENTED
-            // SOME OF THE OTHER EFI EMULATIONS WILL CHANGE AS
-            // POINTER ARGUMENTS WILL BE VIRTUAL!!
-        case FW_HYPERCALL_EFI_GET_VARIABLE:
-            // FIXME: need fixes in efi.h from 2.6.9
-        case FW_HYPERCALL_EFI_GET_NEXT_VARIABLE:
-        case FW_HYPERCALL_EFI_SET_VARIABLE:
-        case FW_HYPERCALL_EFI_GET_NEXT_HIGH_MONO_COUNT:
-            // FIXME: need fixes in efi.h from 2.6.9
-            regs->r8 = EFI_UNSUPPORTED;
-            break;
-    }
-#if 0
-    if (regs->r8)
-        printk("Failed vgfw emulation, with index:0x%lx\n",
-               regs->r2);
-#endif
-}
 
 IA64FAULT
 vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim)
@@ -197,13 +119,17 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
         if (!user_mode(regs)) {
             /* Allow hypercalls only when cpl = 0.  */
             if (iim == d->arch.breakimm) {
-                vmx_handle_hypercall (v ,regs);
-                vmx_vcpu_increment_iip(current);
+                ia64_hypercall(regs);
+                vmx_vcpu_increment_iip(v);
                 return IA64_NO_FAULT;
             }
             else if(iim == DOMN_PAL_REQUEST){
-                pal_emul(current);
-                vmx_vcpu_increment_iip(current);
+                pal_emul(v);
+                vmx_vcpu_increment_iip(v);
+                return IA64_NO_FAULT;
+            }else if(iim == DOMN_SAL_REQUEST){
+                sal_emul(v);
+                vmx_vcpu_increment_iip(v);
                 return IA64_NO_FAULT;
             }
         }

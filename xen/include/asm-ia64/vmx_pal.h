@@ -115,6 +115,7 @@ ia64_pal_vp_save (u64 *vpd, u64 pal_proc_vector)
 	return iprv.status;
 }
 extern void pal_emul(struct vcpu *vcpu);
+extern void sal_emul(struct vcpu *vcpu);
 #define PAL_PROC_VM_BIT		(1UL << 40)
 #define PAL_PROC_VMSW_BIT	(1UL << 54)
 #endif /* _ASM_IA64_VT_PAL_H */
