@@ -128,8 +128,6 @@ dma_get_cache_alignment(void)
 	 * maximum possible, to be safe */
 	return (1 << INTERNODE_CACHE_SHIFT);
 }
-#else
-extern int dma_get_cache_alignment(void);
 #endif
 
 #define dma_is_consistent(d)	(1)
