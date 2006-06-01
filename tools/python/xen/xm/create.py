@@ -903,10 +903,15 @@ def make_domain(opts, config):
         else:
             err("%s" % ex.faultString)
     except Exception, ex:
+        # main.py has good error messages that let the user know what failed.
+        # unless the error is a create.py specific thing, it should be handled
+        # at main. The purpose of this general-case 'Exception' handler is to
+        # clean up create.py specific processes/data but since create.py does
+        # not know what to do with the error, it should pass it up.
         import signal
         if vncpid:
             os.kill(vncpid, signal.SIGKILL)
-        err(str(ex))
+        raise ex
 
     dom = sxp.child_value(dominfo, 'name')
 
