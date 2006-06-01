@@ -2472,7 +2472,7 @@ static void shadow_update_pagetables(struct vcpu *v)
     if ( !get_shadow_ref(smfn) )
         BUG();
     old_smfn = pagetable_get_pfn(v->arch.shadow_table);
-    v->arch.shadow_table = mk_pagetable((u64)smfn << PAGE_SHIFT);
+    v->arch.shadow_table = pagetable_from_pfn(smfn);
     if ( old_smfn )
         put_shadow_ref(old_smfn);
 

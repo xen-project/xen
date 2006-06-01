@@ -1714,7 +1714,7 @@ int new_guest_cr3(unsigned long mfn)
         {
             /* Switch to idle pagetable: this VCPU has no active p.t. now. */
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-            v->arch.guest_table = mk_pagetable(0);
+            v->arch.guest_table = pagetable_null();
             update_pagetables(v);
             write_cr3(__pa(idle_pg_table));
             if ( old_base_mfn != 0 )
@@ -1736,7 +1736,7 @@ int new_guest_cr3(unsigned long mfn)
     invalidate_shadow_ldt(v);
 
     old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-    v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+    v->arch.guest_table = pagetable_from_pfn(mfn);
     update_pagetables(v); /* update shadow_table and monitor_table */
 
     write_ptbase(v);
@@ -2003,7 +2003,7 @@ int do_mmuext_op(
             {
                 unsigned long old_mfn =
                     pagetable_get_pfn(v->arch.guest_table_user);
-                v->arch.guest_table_user = mk_pagetable(mfn << PAGE_SHIFT);
+                v->arch.guest_table_user = pagetable_from_pfn(mfn);
                 if ( old_mfn != 0 )
                     put_page_and_type(mfn_to_page(old_mfn));
             }

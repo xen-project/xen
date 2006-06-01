@@ -195,7 +195,7 @@ unsigned long do_iret(void)
     /* Returning to user mode? */
     if ( (iret_saved.cs & 3) == 3 )
     {
-        if ( unlikely(pagetable_get_paddr(v->arch.guest_table_user) == 0) )
+        if ( unlikely(pagetable_is_null(v->arch.guest_table_user)) )
         {
             DPRINTK("Guest switching to user mode with no user page tables\n");
             domain_crash_synchronous();

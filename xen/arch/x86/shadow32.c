@@ -583,7 +583,7 @@ static void free_shadow_pages(struct domain *d)
         if ( pagetable_get_paddr(v->arch.shadow_table) )
         {
             put_shadow_ref(pagetable_get_pfn(v->arch.shadow_table));
-            v->arch.shadow_table = mk_pagetable(0);
+            v->arch.shadow_table = pagetable_null();
 
             if ( shadow_mode_external(d) )
             {
@@ -765,7 +765,7 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     mpl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)] = l2e_empty();
     mpl2e[l2_table_offset(RO_MPT_VIRT_START)] = l2e_empty();
 
-    v->arch.monitor_table = mk_pagetable(mmfn << PAGE_SHIFT);
+    v->arch.monitor_table = pagetable_from_pfn(mmfn);
     v->arch.monitor_vtable = mpl2e;
 
     if ( v->vcpu_id == 0 )
@@ -830,7 +830,7 @@ void free_monitor_pagetable(struct vcpu *v)
     unmap_domain_page_global(v->arch.monitor_vtable);
     free_domheap_page(mfn_to_page(mfn));
 
-    v->arch.monitor_table = mk_pagetable(0);
+    v->arch.monitor_table = pagetable_null();
     v->arch.monitor_vtable = 0;
 }
 
@@ -992,7 +992,7 @@ alloc_p2m_table(struct domain *d)
 
         l1tab = map_domain_page(page_to_mfn(page));
         memset(l1tab, 0, PAGE_SIZE);
-        d->arch.phys_table = mk_pagetable(page_to_maddr(page));
+        d->arch.phys_table = pagetable_from_page(page);
     }
 
     list_ent = d->page_list.next;
@@ -1126,7 +1126,7 @@ int shadow_direct_map_init(struct domain *d)
     memset(root, 0, PAGE_SIZE);
     unmap_domain_page(root);
 
-    d->arch.phys_table = mk_pagetable(page_to_maddr(page));
+    d->arch.phys_table = pagetable_from_page(page);
 
     return 1;
 }
@@ -1156,7 +1156,7 @@ void shadow_direct_map_clean(struct domain *d)
 
     unmap_domain_page(l2e);
 
-    d->arch.phys_table = mk_pagetable(0);
+    d->arch.phys_table = pagetable_null();
 }
 
 int __shadow_mode_enable(struct domain *d, unsigned int mode)
@@ -3231,7 +3231,7 @@ void __update_pagetables(struct vcpu *v)
     if ( !get_shadow_ref(smfn) )
         BUG();
     old_smfn = pagetable_get_pfn(v->arch.shadow_table);
-    v->arch.shadow_table = mk_pagetable(smfn << PAGE_SHIFT);
+    v->arch.shadow_table = pagetable_from_pfn(smfn);
     if ( old_smfn )
         put_shadow_ref(old_smfn);
 

@@ -327,7 +327,7 @@ int arch_set_info_guest(
             (gmfn_to_mfn(d, phys_basetab >> PAGE_SHIFT) << PAGE_SHIFT) |
             (phys_basetab & ~PAGE_MASK);
 
-        v->arch.guest_table = mk_pagetable(phys_basetab);
+        v->arch.guest_table = pagetable_from_paddr(phys_basetab);
     }
 
     if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
@@ -335,7 +335,7 @@ int arch_set_info_guest(
 
     if ( c->flags & VGCF_HVM_GUEST )
     {
-        v->arch.guest_table = mk_pagetable(0);
+        v->arch.guest_table = pagetable_null();
 
         if ( !hvm_initialize_guest_resources(v) )
             return -EINVAL;
@@ -935,7 +935,7 @@ void domain_relinquish_resources(struct domain *d)
                 put_page_type(mfn_to_page(pfn));
             put_page(mfn_to_page(pfn));
 
-            v->arch.guest_table = mk_pagetable(0);
+            v->arch.guest_table = pagetable_null();
         }
 
         if ( (pfn = pagetable_get_pfn(v->arch.guest_table_user)) != 0 )
@@ -944,7 +944,7 @@ void domain_relinquish_resources(struct domain *d)
                 put_page_type(mfn_to_page(pfn));
             put_page(mfn_to_page(pfn));
 
-            v->arch.guest_table_user = mk_pagetable(0);
+            v->arch.guest_table_user = pagetable_null();
         }
     }
 

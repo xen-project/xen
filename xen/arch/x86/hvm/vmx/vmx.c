@@ -66,7 +66,7 @@ void vmx_final_setup_guest(struct vcpu *v)
 
         /* Initialize monitor page table */
         for_each_vcpu(d, vc)
-            vc->arch.monitor_table = mk_pagetable(0);
+            vc->arch.monitor_table = pagetable_null();
 
         /*
          * Required to do this once per domain
@@ -1223,7 +1223,7 @@ vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
         if(!get_page(mfn_to_page(mfn), v->domain))
                 return 0;
         old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-        v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
+        v->arch.guest_table = pagetable_from_pfn(mfn);
         if (old_base_mfn)
              put_page(mfn_to_page(old_base_mfn));
         /*
@@ -1459,7 +1459,7 @@ static int vmx_set_cr0(unsigned long value)
         /*
          * Now arch.guest_table points to machine physical.
          */
-        v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
+        v->arch.guest_table = pagetable_from_pfn(mfn);
         update_pagetables(v);
 
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
@@ -1477,7 +1477,7 @@ static int vmx_set_cr0(unsigned long value)
         if ( v->arch.hvm_vmx.cpu_cr3 ) {
             put_page(mfn_to_page(get_mfn_from_gpfn(
                       v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT)));
-            v->arch.guest_table = mk_pagetable(0);
+            v->arch.guest_table = pagetable_null();
         }
 
     /*
@@ -1635,7 +1635,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
                 domain_crash_synchronous(); /* need to take a clean path */
             }
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-            v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
+            v->arch.guest_table = pagetable_from_pfn(mfn);
             if (old_base_mfn)
                 put_page(mfn_to_page(old_base_mfn));
             /*
@@ -1690,7 +1690,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
                  * Now arch.guest_table points to machine physical.
                  */
 
-                v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
+                v->arch.guest_table = pagetable_from_pfn(mfn);
                 update_pagetables(v);
 
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
