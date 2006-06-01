@@ -3698,7 +3698,7 @@ int map_pages_to_xen(
             {
                 local_flush_tlb_pge();
                 if ( !(l2e_get_flags(ol2e) & _PAGE_PSE) )
-                    free_xen_pagetable(l2e_get_page(*pl2e));
+                    free_xen_pagetable(l2e_get_page(ol2e));
             }
 
             virt    += 1UL << L2_PAGETABLE_SHIFT;
