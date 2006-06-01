@@ -537,8 +537,11 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
     for(i = 0; i < MAX_SERIAL_PORTS; i++) {
         if (serial_hds[i]) {
             sp = serial_init(serial_io[i], serial_irq[i], serial_hds[i]);
-            if (i == SUMMA_PORT)
+            if (i == serial_summa_port) {
 		summa_init(sp, serial_hds[i]);
+		fprintf(stderr, "Serial port %d (COM%d) initialized for Summagraphics\n",
+			i, i+1);
+	    }
         }
     }
 

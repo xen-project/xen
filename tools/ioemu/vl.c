@@ -146,6 +146,7 @@ int full_screen = 0;
 int repeat_key = 1;
 TextConsole *vga_console;
 CharDriverState *serial_hds[MAX_SERIAL_PORTS];
+int serial_summa_port = -1;
 int xc_handle;
 time_t timeoffset = 0;
 
@@ -2588,8 +2589,8 @@ int main(int argc, char **argv)
     pstrcpy(monitor_device, sizeof(monitor_device), "vc");
 
     pstrcpy(serial_devices[0], sizeof(serial_devices[0]), "vc");
-    pstrcpy(serial_devices[1], sizeof(serial_devices[1]), "null");
-    for(i = 2; i < MAX_SERIAL_PORTS; i++)
+    serial_summa_port = -1;
+    for(i = 1; i < MAX_SERIAL_PORTS; i++)
         serial_devices[i][0] = '\0';
     serial_device_index = 0;
 
@@ -3172,6 +3173,20 @@ int main(int argc, char **argv)
         exit(1);
     }
     monitor_init(monitor_hd, !nographic);
+
+    /* Find which port should be the Summagraphics port */
+    /* It's the first unspecified serial line. Note that COM1 is set */
+    /* by default, so the Summagraphics port would be COM2 or higher */
+
+    for(i = 0; i < MAX_SERIAL_PORTS; i++) {
+      if (serial_devices[i][0] != '\0')
+	continue;
+      serial_summa_port = i;
+      pstrcpy(serial_devices[serial_summa_port], sizeof(serial_devices[0]), "null");
+      break;
+    }
+
+    /* Now, open the ports */
 
     for(i = 0; i < MAX_SERIAL_PORTS; i++) {
         if (serial_devices[i][0] != '\0') {
