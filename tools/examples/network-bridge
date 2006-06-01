@@ -60,7 +60,7 @@ findCommand "$@"
 evalVariables "$@"
 
 vifnum=${vifnum:-$(ip route list | awk '/^default / { print $NF }' | sed 's/^[^0-9]*//')}
-vifnum={$vifnum:-0}
+vifnum=${vifnum:-0}
 bridge=${bridge:-xenbr${vifnum}}
 netdev=${netdev:-eth${vifnum}}
 antispoof=${antispoof:-no}
