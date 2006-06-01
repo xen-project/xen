@@ -32,22 +32,13 @@ struct domain *domain_list;
 
 struct domain *dom0;
 
-struct domain *domain_create(domid_t dom_id, unsigned int cpu)
+struct domain *domain_create(domid_t domid, unsigned int cpu)
 {
     struct domain *d, **pd;
     struct vcpu *v;
 
-    if ( (d = alloc_domain()) == NULL )
+    if ( (d = alloc_domain(domid)) == NULL )
         return NULL;
-
-    d->domain_id = dom_id;
-
-    atomic_set(&d->refcnt, 1);
-
-    spin_lock_init(&d->big_lock);
-    spin_lock_init(&d->page_alloc_lock);
-    INIT_LIST_HEAD(&d->page_list);
-    INIT_LIST_HEAD(&d->xenpage_list);
 
     rangeset_domain_initialise(d);
 
@@ -74,14 +65,14 @@ struct domain *domain_create(domid_t dom_id, unsigned int cpu)
     if ( !is_idle_domain(d) )
     {
         write_lock(&domlist_lock);
-        pd = &domain_list; /* NB. domain_list maintained in order of dom_id. */
+        pd = &domain_list; /* NB. domain_list maintained in order of domid. */
         for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_in_list )
             if ( (*pd)->domain_id > d->domain_id )
                 break;
         d->next_in_list = *pd;
         *pd = d;
-        d->next_in_hashbucket = domain_hash[DOMAIN_HASH(dom_id)];
-        domain_hash[DOMAIN_HASH(dom_id)] = d;
+        d->next_in_hashbucket = domain_hash[DOMAIN_HASH(domid)];
+        domain_hash[DOMAIN_HASH(domid)] = d;
         write_unlock(&domlist_lock);
     }
 

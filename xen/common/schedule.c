@@ -99,12 +99,20 @@ void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate)
     }
 }
 
-struct domain *alloc_domain(void)
+struct domain *alloc_domain(domid_t domid)
 {
     struct domain *d;
 
-    if ( (d = xmalloc(struct domain)) != NULL )
-        memset(d, 0, sizeof(*d));
+    if ( (d = xmalloc(struct domain)) == NULL )
+        return NULL;
+
+    memset(d, 0, sizeof(*d));
+    d->domain_id = domid;
+    atomic_set(&d->refcnt, 1);
+    spin_lock_init(&d->big_lock);
+    spin_lock_init(&d->page_alloc_lock);
+    INIT_LIST_HEAD(&d->page_list);
+    INIT_LIST_HEAD(&d->xenpage_list);
 
     return d;
 }

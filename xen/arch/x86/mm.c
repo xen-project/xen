@@ -187,20 +187,16 @@ void arch_init_memory(void)
      * Any Xen-heap pages that we will allow to be mapped will have
      * their domain field set to dom_xen.
      */
-    dom_xen = alloc_domain();
-    spin_lock_init(&dom_xen->page_alloc_lock);
-    atomic_set(&dom_xen->refcnt, 1);
-    dom_xen->domain_id = DOMID_XEN;
+    dom_xen = alloc_domain(DOMID_XEN);
+    BUG_ON(dom_xen == NULL);
 
     /*
      * Initialise our DOMID_IO domain.
      * This domain owns I/O pages that are within the range of the page_info
      * array. Mappings occur at the priv of the caller.
      */
-    dom_io = alloc_domain();
-    spin_lock_init(&dom_io->page_alloc_lock);
-    atomic_set(&dom_io->refcnt, 1);
-    dom_io->domain_id = DOMID_IO;
+    dom_io = alloc_domain(DOMID_IO);
+    BUG_ON(dom_io == NULL);
 
     /* First 1MB of RAM is historically marked as I/O. */
     for ( i = 0; i < 0x100; i++ )

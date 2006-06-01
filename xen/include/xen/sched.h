@@ -189,7 +189,7 @@ extern struct vcpu *idle_vcpu[NR_CPUS];
 struct vcpu *alloc_vcpu(
     struct domain *d, unsigned int vcpu_id, unsigned int cpu_id);
 
-struct domain *alloc_domain(void);
+struct domain *alloc_domain(domid_t domid);
 void free_domain(struct domain *d);
 
 #define DOMAIN_DESTROYED (1<<31) /* assumes atomic_t is >= 32 bits */
@@ -226,7 +226,7 @@ static inline void get_knownalive_domain(struct domain *d)
 }
 
 extern struct domain *domain_create(
-    domid_t dom_id, unsigned int cpu);
+    domid_t domid, unsigned int cpu);
 extern int construct_dom0(
     struct domain *d,
     unsigned long image_start, unsigned long image_len, 
