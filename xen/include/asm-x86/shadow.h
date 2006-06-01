@@ -756,23 +756,26 @@ shadow_unpin(unsigned long smfn)
  * when working on finer-gained locks for shadow.
  */
 static inline void set_guest_back_ptr(
-    struct domain *d, l1_pgentry_t spte, unsigned long smfn, unsigned int index)
+    struct domain *d, l1_pgentry_t spte,
+    unsigned long smfn, unsigned int index)
 {
-    if ( shadow_mode_external(d) ) {
-        unsigned long gmfn;
+    struct page_info *gpage;
 
-        ASSERT(shadow_lock_is_acquired(d));
-        ASSERT( smfn );
-        gmfn = l1e_get_pfn(spte);
-        ASSERT( gmfn );
-        if ( l1e_get_flags(spte) & _PAGE_RW )
-        {
-            mfn_to_page(gmfn)->tlbflush_timestamp = smfn;
-            mfn_to_page(gmfn)->u.inuse.type_info &= ~PGT_va_mask;
-            mfn_to_page(gmfn)->u.inuse.type_info |= 
-                (unsigned long) index << PGT_va_shift;
-        }
-    }
+    ASSERT(shadow_lock_is_acquired(d));
+
+    if ( !shadow_mode_external(d) || 
+         ((l1e_get_flags(spte) & (_PAGE_PRESENT|_PAGE_RW)) !=
+          (_PAGE_PRESENT|_PAGE_RW)) )
+        return;
+
+    gpage = l1e_get_page(spte);
+
+    ASSERT(smfn != 0);
+    ASSERT(page_to_mfn(gpage) != 0);
+
+    gpage->tlbflush_timestamp = smfn;
+    gpage->u.inuse.type_info &= ~PGT_va_mask;
+    gpage->u.inuse.type_info |= (unsigned long)index << PGT_va_shift;
 }
 
 /************************************************************************/
