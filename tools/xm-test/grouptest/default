@@ -1,6 +1,7 @@
 block-create
 block-destroy
 block-list
+block-integrity
 console
 create
 destroy
