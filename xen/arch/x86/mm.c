@@ -2213,99 +2213,88 @@ int do_mmu_update(
 
             switch ( (type_info = page->u.inuse.type_info) & PGT_type_mask )
             {
-            case PGT_l1_page_table: 
-                ASSERT( !shadow_mode_refcounts(d) );
-                if ( likely(get_page_type(
+            case PGT_l1_page_table:
+            case PGT_l2_page_table:
+            case PGT_l3_page_table:
+            case PGT_l4_page_table:
+            {
+                ASSERT(!shadow_mode_refcounts(d));
+                if ( unlikely(!get_page_type(
                     page, type_info & (PGT_type_mask|PGT_va_mask))) )
-                {
-                    l1_pgentry_t l1e;
+                    goto not_a_pt;
 
-                    /* FIXME: doesn't work with PAE */
-                    l1e = l1e_from_intpte(req.val);
+                switch ( type_info & PGT_type_mask )
+                {
+                case PGT_l1_page_table:
+                {
+                    l1_pgentry_t l1e = l1e_from_intpte(req.val);
                     okay = mod_l1_entry(va, l1e);
                     if ( okay && unlikely(shadow_mode_enabled(d)) )
                         shadow_l1_normal_pt_update(
                             d, req.ptr, l1e, &sh_mapcache);
-                    put_page_type(page);
                 }
                 break;
-            case PGT_l2_page_table:
-                ASSERT( !shadow_mode_refcounts(d) );
-                if ( likely(get_page_type(
-                    page, type_info & (PGT_type_mask|PGT_va_mask))) )
+                case PGT_l2_page_table:
                 {
-                    l2_pgentry_t l2e;
-
-                    /* FIXME: doesn't work with PAE */
-                    l2e = l2e_from_intpte(req.val);
+                    l2_pgentry_t l2e = l2e_from_intpte(req.val);
                     okay = mod_l2_entry(
                         (l2_pgentry_t *)va, l2e, mfn, type_info);
                     if ( okay && unlikely(shadow_mode_enabled(d)) )
                         shadow_l2_normal_pt_update(
                             d, req.ptr, l2e, &sh_mapcache);
-                    put_page_type(page);
                 }
                 break;
 #if CONFIG_PAGING_LEVELS >= 3
-            case PGT_l3_page_table:
-                ASSERT( !shadow_mode_refcounts(d) );
-                if ( likely(get_page_type(
-                    page, type_info & (PGT_type_mask|PGT_va_mask))) )
+                case PGT_l3_page_table:
                 {
-                    l3_pgentry_t l3e;
-
-                    /* FIXME: doesn't work with PAE */
-                    l3e = l3e_from_intpte(req.val);
+                    l3_pgentry_t l3e = l3e_from_intpte(req.val);
                     okay = mod_l3_entry(va, l3e, mfn, type_info);
                     if ( okay && unlikely(shadow_mode_enabled(d)) )
                         shadow_l3_normal_pt_update(
                             d, req.ptr, l3e, &sh_mapcache);
-                    put_page_type(page);
                 }
                 break;
 #endif
 #if CONFIG_PAGING_LEVELS >= 4
-            case PGT_l4_page_table:
-                ASSERT( !shadow_mode_refcounts(d) );
-                if ( likely(get_page_type(
-                    page, type_info & (PGT_type_mask|PGT_va_mask))) )
+                case PGT_l4_page_table:
                 {
-                    l4_pgentry_t l4e;
-
-                    l4e = l4e_from_intpte(req.val);
+                    l4_pgentry_t l4e = l4e_from_intpte(req.val);
                     okay = mod_l4_entry(va, l4e, mfn, type_info);
                     if ( okay && unlikely(shadow_mode_enabled(d)) )
                         shadow_l4_normal_pt_update(
                             d, req.ptr, l4e, &sh_mapcache);
-                    put_page_type(page);
                 }
                 break;
 #endif
-            default:
-                if ( likely(get_page_type(page, PGT_writable_page)) )
-                {
-                    if ( shadow_mode_enabled(d) )
-                    {
-                        shadow_lock(d);
-
-                        __mark_dirty(d, mfn);
-
-                        if ( page_is_page_table(page) &&
-                             !page_out_of_sync(page) )
-                        {
-                            shadow_mark_mfn_out_of_sync(v, gmfn, mfn);
-                        }
-                    }
-
-                    *(intpte_t *)va = req.val;
-                    okay = 1;
-
-                    if ( shadow_mode_enabled(d) )
-                        shadow_unlock(d);
-
-                    put_page_type(page);
                 }
-                break;
+
+                put_page_type(page);
+            }
+            break;
+
+            default:
+            not_a_pt:
+            {
+                if ( unlikely(!get_page_type(page, PGT_writable_page)) )
+                    break;
+
+                if ( shadow_mode_enabled(d) )
+                {
+                    shadow_lock(d);
+                    __mark_dirty(d, mfn);
+                    if ( page_is_page_table(page) && !page_out_of_sync(page) )
+                        shadow_mark_mfn_out_of_sync(v, gmfn, mfn);
+                }
+
+                *(intpte_t *)va = req.val;
+                okay = 1;
+
+                if ( shadow_mode_enabled(d) )
+                    shadow_unlock(d);
+
+                put_page_type(page);
+            }
+            break;
             }
 
             unmap_domain_page_with_cache(va, &mapcache);
