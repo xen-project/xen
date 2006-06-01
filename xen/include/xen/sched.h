@@ -186,12 +186,6 @@ extern struct vcpu *idle_vcpu[NR_CPUS];
 #define is_idle_domain(d) ((d)->domain_id == IDLE_DOMAIN_ID)
 #define is_idle_vcpu(v)   (is_idle_domain((v)->domain))
 
-struct vcpu *alloc_vcpu(
-    struct domain *d, unsigned int vcpu_id, unsigned int cpu_id);
-
-struct domain *alloc_domain(domid_t domid);
-void free_domain(struct domain *d);
-
 #define DOMAIN_DESTROYED (1<<31) /* assumes atomic_t is >= 32 bits */
 #define put_domain(_d) \
   if ( atomic_dec_and_test(&(_d)->refcnt) ) domain_destroy(_d)
@@ -269,8 +263,8 @@ void new_thread(struct vcpu *d,
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
 void schedulers_start(void);
-void sched_add_domain(struct vcpu *);
-void sched_rem_domain(struct vcpu *);
+int  sched_init_vcpu(struct vcpu *);
+void sched_destroy_domain(struct domain *);
 long sched_ctl(struct sched_ctl_cmd *);
 long sched_adjdom(struct sched_adjdom_cmd *);
 int  sched_id(void);

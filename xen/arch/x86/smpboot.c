@@ -37,6 +37,7 @@
 #include <xen/init.h>
 #include <xen/kernel.h>
 #include <xen/mm.h>
+#include <xen/domain.h>
 #include <xen/sched.h>
 #include <xen/irq.h>
 #include <xen/delay.h>

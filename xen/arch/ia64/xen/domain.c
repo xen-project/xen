@@ -14,6 +14,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
+#include <xen/domain.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <xen/delay.h>

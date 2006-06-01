@@ -60,14 +60,17 @@ struct scheduler {
 
     void         (*init)           (void);
     void         (*tick)           (unsigned int cpu);
-    int          (*alloc_task)     (struct vcpu *);
-    void         (*add_task)       (struct vcpu *);
-    void         (*free_task)      (struct domain *);
-    void         (*rem_task)       (struct vcpu *);
+
+    int          (*init_vcpu)      (struct vcpu *);
+    void         (*destroy_domain) (struct domain *);
+
     void         (*sleep)          (struct vcpu *);
     void         (*wake)           (struct vcpu *);
+
     int          (*set_affinity)   (struct vcpu *, cpumask_t *);
+
     struct task_slice (*do_schedule) (s_time_t);
+
     int          (*control)        (struct sched_ctl_cmd *);
     int          (*adjdom)         (struct domain *,
                                     struct sched_adjdom_cmd *);

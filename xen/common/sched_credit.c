@@ -75,14 +75,13 @@
     } while ( 0 );
 
 #define CSCHED_STATS_EXPAND_SCHED(_MACRO)   \
-    _MACRO(vcpu_alloc)                      \
-    _MACRO(vcpu_add)                        \
+    _MACRO(vcpu_init)                       \
     _MACRO(vcpu_sleep)                      \
     _MACRO(vcpu_wake_running)               \
     _MACRO(vcpu_wake_onrunq)                \
     _MACRO(vcpu_wake_runnable)              \
     _MACRO(vcpu_wake_not_runnable)          \
-    _MACRO(dom_free)                        \
+    _MACRO(dom_destroy)                     \
     _MACRO(schedule)                        \
     _MACRO(tickle_local_idler)              \
     _MACRO(tickle_local_over)               \
@@ -429,14 +428,14 @@ __csched_vcpu_acct_idle_locked(struct csched_vcpu *svc)
 }
 
 static int
-csched_vcpu_alloc(struct vcpu *vc)
+csched_vcpu_init(struct vcpu *vc)
 {
     struct domain * const dom = vc->domain;
     struct csched_dom *sdom;
     struct csched_vcpu *svc;
     int16_t pri;
 
-    CSCHED_STAT_CRANK(vcpu_alloc);
+    CSCHED_STAT_CRANK(vcpu_init);
 
     /* Allocate, if appropriate, per-domain info */
     if ( is_idle_vcpu(vc) )
@@ -489,19 +488,13 @@ csched_vcpu_alloc(struct vcpu *vc)
     if ( likely(sdom != NULL) )
         csched_vcpu_acct(svc, 0);
 
-    return 0;
-}
-
-static void
-csched_vcpu_add(struct vcpu *vc) 
-{
-    CSCHED_STAT_CRANK(vcpu_add);
-
     /* Allocate per-PCPU info */
     if ( unlikely(!CSCHED_PCPU(vc->processor)) )
         csched_pcpu_init(vc->processor);
 
     CSCHED_VCPU_CHECK(vc);
+
+    return 0;
 }
 
 static void
@@ -644,12 +637,12 @@ csched_dom_cntl(
 }
 
 static void
-csched_dom_free(struct domain *dom)
+csched_dom_destroy(struct domain *dom)
 {
     struct csched_dom * const sdom = CSCHED_DOM(dom);
     int i;
 
-    CSCHED_STAT_CRANK(dom_free);
+    CSCHED_STAT_CRANK(dom_destroy);
 
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
     {
@@ -1215,14 +1208,15 @@ struct scheduler sched_credit_def = {
     .opt_name       = "credit",
     .sched_id       = SCHED_CREDIT,
 
-    .alloc_task     = csched_vcpu_alloc,
-    .add_task       = csched_vcpu_add,
+    .init_vcpu      = csched_vcpu_init,
+    .destroy_domain = csched_dom_destroy,
+
     .sleep          = csched_vcpu_sleep,
     .wake           = csched_vcpu_wake,
+
     .set_affinity   = csched_vcpu_set_affinity,
 
     .adjdom         = csched_dom_cntl,
-    .free_task      = csched_dom_free,
 
     .tick           = csched_tick,
     .do_schedule    = csched_schedule,

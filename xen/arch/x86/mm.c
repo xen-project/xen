@@ -89,6 +89,7 @@
 #include <xen/kernel.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/domain.h>
 #include <xen/sched.h>
 #include <xen/errno.h>
 #include <xen/perfc.h>
