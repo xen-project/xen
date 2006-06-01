@@ -95,7 +95,7 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     long ret = 0;
     struct dom0_op curop, *op = &curop;
     void *ssid = NULL; /* save security ptr between pre and post/fail hooks */
-    static spinlock_t dom0_lock = SPIN_LOCK_UNLOCKED;
+    static DEFINE_SPINLOCK(dom0_lock);
 
     if ( !IS_PRIV(current->domain) )
         return -EPERM;

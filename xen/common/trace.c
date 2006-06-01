@@ -173,7 +173,7 @@ void init_trace_bufs(void)
  */
 int tb_control(dom0_tbufcontrol_t *tbc)
 {
-    static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+    static DEFINE_SPINLOCK(lock);
     int rc = 0;
 
     spin_lock(&lock);

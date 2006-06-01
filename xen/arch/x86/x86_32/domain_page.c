@@ -183,7 +183,7 @@ void mapcache_init(struct domain *d)
 static unsigned long inuse[BITS_TO_LONGS(GLOBALMAP_BITS)];
 static unsigned long garbage[BITS_TO_LONGS(GLOBALMAP_BITS)];
 static unsigned int inuse_cursor;
-static spinlock_t globalmap_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(globalmap_lock);
 
 void *map_domain_page_global(unsigned long pfn)
 {

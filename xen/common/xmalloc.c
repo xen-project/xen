@@ -35,7 +35,7 @@
 #include <xen/prefetch.h>
 
 static LIST_HEAD(freelist);
-static spinlock_t freelist_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(freelist_lock);
 
 struct xmalloc_hdr
 {

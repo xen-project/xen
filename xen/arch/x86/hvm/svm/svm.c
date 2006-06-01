@@ -84,28 +84,26 @@ struct svm_percore_globals svm_globals[NR_CPUS];
 /*
  * Initializes the POOL of ASID used by the guests per core.
  */
-void asidpool_init( int core )
+void asidpool_init(int core)
 {
     int i;
-    svm_globals[core].ASIDpool.asid_lock = SPIN_LOCK_UNLOCKED;
-    spin_lock(&svm_globals[core].ASIDpool.asid_lock);
+
+    spin_lock_init(&svm_globals[core].ASIDpool.asid_lock);
+
     /* Host ASID is always in use */
     svm_globals[core].ASIDpool.asid[INITIAL_ASID] = ASID_INUSE;
-    for( i=1; i<ASID_MAX; i++ )
-    {
+    for ( i = 1; i < ASID_MAX; i++ )
        svm_globals[core].ASIDpool.asid[i] = ASID_AVAILABLE;
-    }
-    spin_unlock(&svm_globals[core].ASIDpool.asid_lock);
 }
 
 
 /* internal function to get the next available ASID */
-static int asidpool_fetch_next( struct vmcb_struct *vmcb, int core )
+static int asidpool_fetch_next(struct vmcb_struct *vmcb, int core)
 {
     int i;   
-    for( i = 1; i < ASID_MAX; i++ )
+    for ( i = 1; i < ASID_MAX; i++ )
     {
-        if( svm_globals[core].ASIDpool.asid[i] == ASID_AVAILABLE )
+        if ( svm_globals[core].ASIDpool.asid[i] == ASID_AVAILABLE )
         {
             vmcb->guest_asid = i;
             svm_globals[core].ASIDpool.asid[i] = ASID_INUSE;
