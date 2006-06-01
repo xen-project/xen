@@ -89,9 +89,8 @@ void __init prefill_possible_map(void)
 
 	for (i = 0; i < NR_CPUS; i++) {
 		rc = HYPERVISOR_vcpu_op(VCPUOP_is_up, i, NULL);
-		if (rc == -ENOENT)
-			break;
-		cpu_set(i, cpu_possible_map);
+		if (rc >= 0)
+			cpu_set(i, cpu_possible_map);
 	}
 }
 
