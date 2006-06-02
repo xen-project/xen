@@ -140,6 +140,7 @@ extern int blkif_open(struct inode *inode, struct file *filep);
 extern int blkif_release(struct inode *inode, struct file *filep);
 extern int blkif_ioctl(struct inode *inode, struct file *filep,
                        unsigned command, unsigned long argument);
+extern int blkif_getgeo(struct block_device *, struct hd_geometry *);
 extern int blkif_check(dev_t dev);
 extern int blkif_revalidate(dev_t dev);
 extern void do_blkif_request (request_queue_t *rq);
