@@ -35,8 +35,6 @@ unsigned long xenheap_phys_end, total_pages;
 char saved_command_line[COMMAND_LINE_SIZE];
 char dom0_command_line[COMMAND_LINE_SIZE];
 
-struct vcpu *idle_vcpu[NR_CPUS];
-
 cpumask_t cpu_present_map;
 
 extern unsigned long domain0_ready;

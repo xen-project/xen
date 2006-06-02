@@ -6,6 +6,7 @@ struct vcpu *alloc_vcpu(
     struct domain *d, unsigned int vcpu_id, unsigned int cpu_id);
 int boot_vcpu(
     struct domain *d, int vcpuid, struct vcpu_guest_context *ctxt);
+struct vcpu *alloc_idle_vcpu(unsigned int cpu_id);
 
 struct domain *alloc_domain(domid_t domid);
 void free_domain(struct domain *d);
