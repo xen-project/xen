@@ -666,7 +666,18 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 			set_pgd(pgd_offset_k(start), mk_kernel_pgd(pud_phys));
 	}
 
-	BUG_ON(!after_bootmem && start_pfn != table_end);
+	if (!after_bootmem) {
+		BUG_ON(start_pfn != table_end);
+		/*
+		 * Destroy the temporary mappings created above. Prevents
+		 * overlap with modules area (if init mapping is very big).
+		 */
+		start = __START_KERNEL_map + (table_start << PAGE_SHIFT);
+		end   = __START_KERNEL_map + (table_end   << PAGE_SHIFT);
+		for (; start < end; start += PAGE_SIZE)
+			WARN_ON(HYPERVISOR_update_va_mapping(
+				start, __pte_ma(0), 0));
+	}
 
 	__flush_tlb_all();
 }
