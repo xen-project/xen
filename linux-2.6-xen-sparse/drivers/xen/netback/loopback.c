@@ -146,11 +146,13 @@ static void loopback_construct(struct net_device *dev, struct net_device *lo)
 	dev->hard_start_xmit = loopback_start_xmit;
 	dev->get_stats       = loopback_get_stats;
 	dev->set_multicast_list = loopback_set_multicast_list;
+	dev->change_mtu	     = NULL; /* allow arbitrary mtu */
 
 	dev->tx_queue_len    = 0;
 
 	dev->features        = (NETIF_F_HIGHDMA |
 				NETIF_F_LLTX |
+				NETIF_F_SG |
 				NETIF_F_IP_CSUM);
 
 	SET_ETHTOOL_OPS(dev, &network_ethtool_ops);
