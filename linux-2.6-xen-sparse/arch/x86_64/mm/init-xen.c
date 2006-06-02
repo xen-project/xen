@@ -56,8 +56,6 @@
 struct dma_mapping_ops* dma_ops;
 EXPORT_SYMBOL(dma_ops);
 
-int after_bootmem;
-
 extern unsigned long *contiguous_bitmap;
 
 static unsigned long dma_reserve __initdata;
@@ -76,7 +74,7 @@ extern unsigned long start_pfn;
 	(((mfn_to_pfn((addr) >> PAGE_SHIFT)) << PAGE_SHIFT) +	\
 	__START_KERNEL_map)))
 
-static void __meminit early_make_page_readonly(void *va, unsigned int feature)
+static void early_make_page_readonly(void *va, unsigned int feature)
 {
 	unsigned long addr, _va = (unsigned long)va;
 	pte_t pte, *ptep;
@@ -84,11 +82,6 @@ static void __meminit early_make_page_readonly(void *va, unsigned int feature)
 
 	if (xen_feature(feature))
 		return;
-
-	if (after_bootmem) {
-		make_page_readonly(va, feature);
-		return;
-	}
 
 	addr = (unsigned long) page[pgd_index(_va)];
 	addr_to_page(addr, page);
@@ -204,6 +197,10 @@ void show_mem(void)
 	printk(KERN_INFO "%lu pages shared\n",shared);
 	printk(KERN_INFO "%lu pages swap cached\n",cached);
 }
+
+/* References to section boundaries */
+
+int after_bootmem;
 
 static void *spp_getpage(void)
 { 
@@ -451,9 +448,9 @@ phys_pmd_init(pmd_t *pmd, unsigned long address, unsigned long end)
 		pte = alloc_static_page(&pte_phys);
 		pte_save = pte;
 		for (k = 0; k < PTRS_PER_PTE; pte++, k++, address += PTE_SIZE) {
-			if (address >= (after_bootmem
-			                ? end
-			                : xen_start_info->nr_pages << PAGE_SHIFT)) {
+			if ((address >= end) ||
+			    ((address >> PAGE_SHIFT) >=
+			     xen_start_info->nr_pages)) { 
 				__set_pte(pte, __pte(0)); 
 				continue;
 			}
@@ -553,7 +550,7 @@ void __init xen_init_pt(void)
 		mk_kernel_pgd(__pa_symbol(level3_user_pgt)));
 }
 
-static void __init extend_init_mapping(unsigned long tables_space)
+void __init extend_init_mapping(unsigned long tables_space)
 {
 	unsigned long va = __START_KERNEL_map;
 	unsigned long phys, addr, *pte_page;
@@ -669,18 +666,7 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 			set_pgd(pgd_offset_k(start), mk_kernel_pgd(pud_phys));
 	}
 
-	if (!after_bootmem) {
-		BUG_ON(start_pfn != table_end);
-
-		/* Destroy the temporary mappings created above. */
-		start = __START_KERNEL_map + (table_start << PAGE_SHIFT);
-		end = start + tables_space;
-		for (; start < end; start += PAGE_SIZE) {
-			/* Should also clear out and reclaim any page table
-			   pages no longer needed... */
-			WARN_ON(HYPERVISOR_update_va_mapping(start, __pte_ma(0), 0));
-		}
-	}
+	BUG_ON(!after_bootmem && start_pfn != table_end);
 
 	__flush_tlb_all();
 }
