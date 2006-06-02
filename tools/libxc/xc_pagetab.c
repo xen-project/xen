@@ -78,7 +78,7 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
         fprintf(stderr, "failed to retreive vcpu context\n");
         goto out;
     }
-    cr3 = ctx.ctrlreg[3];
+    cr3 = ((unsigned long long)xen_cr3_to_pfn(ctx.ctrlreg[3])) << PAGE_SHIFT;
 
     /* Page Map Level 4 */
 

@@ -1129,12 +1129,12 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     /* Canonicalise the page table base pointer. */
-    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(ctxt.ctrlreg[3] >> PAGE_SHIFT) ) {
+    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(xen_cr3_to_pfn(ctxt.ctrlreg[3])) ) {
         ERR("PT base is not in range of pseudophys map");
         goto out;
     }
-    ctxt.ctrlreg[3] = mfn_to_pfn(ctxt.ctrlreg[3] >> PAGE_SHIFT) <<
-        PAGE_SHIFT;
+    ctxt.ctrlreg[3] = 
+        xen_pfn_to_cr3(mfn_to_pfn(xen_cr3_to_pfn(ctxt.ctrlreg[3])));
 
     if (!write_exact(io_fd, &ctxt, sizeof(ctxt)) ||
         !write_exact(io_fd, live_shinfo, PAGE_SIZE)) {

@@ -12,8 +12,8 @@
 static long   nr_pages = 0;
 static unsigned long  *p2m_array = NULL;
 static unsigned long  *m2p_array = NULL;
-static unsigned long            pages_offset;
-static unsigned long            cr3[MAX_VIRT_CPUS];
+static unsigned long   pages_offset;
+static unsigned long   cr3[MAX_VIRT_CPUS];
 
 /* --------------------- */
 
@@ -47,7 +47,7 @@ map_domain_va_core(unsigned long domfd, int cpu, void * guest_va,
             munmap(cr3_virt[cpu], PAGE_SIZE);
         v = mmap(
             NULL, PAGE_SIZE, PROT_READ, MAP_PRIVATE, domfd,
-            map_mtop_offset(cr3_phys[cpu]));
+            map_mtop_offset(xen_cr3_to_pfn(cr3_phys[cpu])));
         if (v == MAP_FAILED)
         {
             perror("mmap failed");
@@ -127,14 +127,15 @@ xc_waitdomain_core(
             sizeof(vcpu_guest_context_t)*nr_vcpus)
             return -1;
 
-        for (i = 0; i < nr_vcpus; i++) {
+        for (i = 0; i < nr_vcpus; i++)
             cr3[i] = ctxt[i].ctrlreg[3];
-        }
+
         if ((p2m_array = malloc(nr_pages * sizeof(unsigned long))) == NULL)
         {
             printf("Could not allocate p2m_array\n");
             return -1;
         }
+
         if (read(domfd, p2m_array, sizeof(unsigned long)*nr_pages) !=
             sizeof(unsigned long)*nr_pages)
             return -1;
@@ -146,10 +147,8 @@ xc_waitdomain_core(
         }
         bzero(m2p_array, sizeof(unsigned long)* 1 << 20);
 
-        for (i = 0; i < nr_pages; i++) {
+        for (i = 0; i < nr_pages; i++)
             m2p_array[p2m_array[i]] = i;
-        }
-
     }
     return 0;
 }

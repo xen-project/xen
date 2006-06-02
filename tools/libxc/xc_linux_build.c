@@ -205,9 +205,9 @@ static int setup_pg_tables(int xc_handle, uint32_t dom,
     alloc_pt(l2tab, vl2tab, pl2tab);
     vl2e = &vl2tab[l2_table_offset(dsi_v_start)];
     if (shadow_mode_enabled)
-        ctxt->ctrlreg[3] = pl2tab;
+        ctxt->ctrlreg[3] = xen_pfn_to_cr3(pl2tab >> PAGE_SHIFT);
     else
-        ctxt->ctrlreg[3] = l2tab;
+        ctxt->ctrlreg[3] = xen_pfn_to_cr3(l2tab >> PAGE_SHIFT);
 
     for ( count = 0; count < ((v_end - dsi_v_start) >> PAGE_SHIFT); count++ )
     {
@@ -268,9 +268,9 @@ static int setup_pg_tables_pae(int xc_handle, uint32_t dom,
     alloc_pt(l3tab, vl3tab, pl3tab);
     vl3e = &vl3tab[l3_table_offset_pae(dsi_v_start)];
     if (shadow_mode_enabled)
-        ctxt->ctrlreg[3] = pl3tab;
+        ctxt->ctrlreg[3] = xen_pfn_to_cr3(pl3tab >> PAGE_SHIFT);
     else
-        ctxt->ctrlreg[3] = l3tab;
+        ctxt->ctrlreg[3] = xen_pfn_to_cr3(l3tab >> PAGE_SHIFT);
 
     for ( count = 0; count < ((v_end - dsi_v_start) >> PAGE_SHIFT); count++)
     {
@@ -361,9 +361,9 @@ static int setup_pg_tables_64(int xc_handle, uint32_t dom,
     alloc_pt(l4tab, vl4tab, pl4tab);
     vl4e = &vl4tab[l4_table_offset(dsi_v_start)];
     if (shadow_mode_enabled)
-        ctxt->ctrlreg[3] = pl4tab;
+        ctxt->ctrlreg[3] = xen_pfn_to_cr3(pl4tab >> PAGE_SHIFT);
     else
-        ctxt->ctrlreg[3] = l4tab;
+        ctxt->ctrlreg[3] = xen_pfn_to_cr3(l4tab >> PAGE_SHIFT);
 
     for ( count = 0; count < ((v_end-dsi_v_start)>>PAGE_SHIFT); count++)
     {
@@ -827,13 +827,13 @@ static int setup_guest(int xc_handle,
         if ( dsi.pae_kernel )
         {
             if ( pin_table(xc_handle, MMUEXT_PIN_L3_TABLE,
-                           ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
+                           xen_cr3_to_pfn(ctxt->ctrlreg[3]), dom) )
                 goto error_out;
         }
         else
         {
             if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE,
-                           ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
+                           xen_cr3_to_pfn(ctxt->ctrlreg[3]), dom) )
                 goto error_out;
         }
     }
@@ -845,7 +845,7 @@ static int setup_guest(int xc_handle,
      * correct protection for the page
      */
     if ( pin_table(xc_handle, MMUEXT_PIN_L4_TABLE,
-                   ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
+                   xen_cr3_to_pfn(ctxt->ctrlreg[3]), dom) )
         goto error_out;
 #endif
 

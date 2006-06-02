@@ -536,7 +536,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     }
 
     /* Uncanonicalise the page table base pointer. */
-    pfn = ctxt.ctrlreg[3] >> PAGE_SHIFT;
+    pfn = xen_cr3_to_pfn(ctxt.ctrlreg[3]);
 
     if (pfn >= max_pfn) {
         ERR("PT base is bad: pfn=%lu max_pfn=%lu type=%08lx",
@@ -552,7 +552,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
         goto out;
     }
 
-    ctxt.ctrlreg[3] = p2m[pfn] << PAGE_SHIFT;
+    ctxt.ctrlreg[3] = xen_pfn_to_cr3(p2m[pfn]);
 
     /* clear any pending events and the selector */
     memset(&(shared_info->evtchn_pending[0]), 0,
