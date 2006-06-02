@@ -259,7 +259,7 @@ int arch_set_info_guest(
     struct vcpu *v, struct vcpu_guest_context *c)
 {
     struct domain *d = v->domain;
-    unsigned long cr3_pfn;
+    unsigned long cr3_pfn = INVALID_MFN;
     int i, rc;
 
     if ( !(c->flags & VGCF_HVM_GUEST) )
