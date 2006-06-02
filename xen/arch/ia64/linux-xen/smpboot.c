@@ -62,6 +62,7 @@
 #include <asm/unistd.h>
 
 #ifdef XEN
+#include <xen/domain.h>
 #include <asm/hw_irq.h>
 int ht_per_core = 1;
 #ifndef CONFIG_SMP

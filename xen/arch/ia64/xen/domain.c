@@ -14,7 +14,6 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
-#include <xen/domain.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <xen/delay.h>
@@ -43,6 +42,7 @@
 
 #include <asm/vcpu.h>   /* for function declarations */
 #include <public/arch-ia64.h>
+#include <xen/domain.h>
 #include <asm/vmx.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx_vpd.h>
