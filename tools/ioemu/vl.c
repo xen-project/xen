@@ -2499,7 +2499,7 @@ int set_mm_mapping(int xc_handle,
     xc_domain_getinfo(xc_handle, domid, 1, &info);
 
     if ( xc_domain_setmaxmem(xc_handle, domid,
-                             (info.nr_pages + nr_pages) * PAGE_SIZE/1024) != 0)
+                             info.max_memkb + nr_pages * PAGE_SIZE/1024) !=0)
     {
         fprintf(logfile, "set maxmem returned error %d\n", errno);
         return -1;

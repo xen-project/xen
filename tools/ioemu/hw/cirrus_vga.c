@@ -2460,7 +2460,6 @@ static CPUWriteMemoryFunc *cirrus_linear_bitblt_write[3] = {
 };
 
 extern FILE *logfile;
-#if defined(__i386__) || defined (__x86_64__)
 static void * set_vram_mapping(unsigned long begin, unsigned long end)
 {
     unsigned long * extent_start = NULL;
@@ -2540,10 +2539,6 @@ static int unset_vram_mapping(unsigned long begin, unsigned long end)
     return 0;
 }
 
-#elif defined(__ia64__)
-static void * set_vram_mapping(unsigned long addr, unsigned long end) {}
-static int unset_vram_mapping(unsigned long addr, unsigned long end) {}
-#endif
 extern int vga_accelerate;
 
 /* Compute the memory access functions */
