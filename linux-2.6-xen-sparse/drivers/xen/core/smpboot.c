@@ -208,7 +208,7 @@ void cpu_initialize_context(unsigned int cpu)
 	ctxt.failsafe_callback_cs  = __KERNEL_CS;
 	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
 
-	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
+	ctxt.ctrlreg[3] = xen_pfn_to_cr3(virt_to_mfn(swapper_pg_dir));
 #else /* __x86_64__ */
 	ctxt.user_regs.cs = __KERNEL_CS;
 	ctxt.user_regs.esp = idle->thread.rsp0 - sizeof(struct pt_regs);
@@ -220,7 +220,7 @@ void cpu_initialize_context(unsigned int cpu)
 	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
 	ctxt.syscall_callback_eip  = (unsigned long)system_call;
 
-	ctxt.ctrlreg[3] = virt_to_mfn(init_level4_pgt) << PAGE_SHIFT;
+	ctxt.ctrlreg[3] = xen_pfn_to_cr3(virt_to_mfn(init_level4_pgt));
 
 	ctxt.gs_base_kernel = (unsigned long)(cpu_pda(cpu));
 #endif

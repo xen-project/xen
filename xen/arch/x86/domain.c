@@ -259,7 +259,7 @@ int arch_set_info_guest(
     struct vcpu *v, struct vcpu_guest_context *c)
 {
     struct domain *d = v->domain;
-    unsigned long phys_basetab = INVALID_MFN;
+    unsigned long cr3_pfn;
     int i, rc;
 
     if ( !(c->flags & VGCF_HVM_GUEST) )
@@ -322,12 +322,8 @@ int arch_set_info_guest(
 
     if ( !(c->flags & VGCF_HVM_GUEST) )
     {
-        phys_basetab = c->ctrlreg[3];
-        phys_basetab =
-            (gmfn_to_mfn(d, phys_basetab >> PAGE_SHIFT) << PAGE_SHIFT) |
-            (phys_basetab & ~PAGE_MASK);
-
-        v->arch.guest_table = pagetable_from_paddr(phys_basetab);
+        cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c->ctrlreg[3]));
+        v->arch.guest_table = pagetable_from_pfn(cr3_pfn);
     }
 
     if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
@@ -342,7 +338,7 @@ int arch_set_info_guest(
     }
     else if ( shadow_mode_refcounts(d) )
     {
-        if ( !get_page(mfn_to_page(phys_basetab>>PAGE_SHIFT), d) )
+        if ( !get_page(mfn_to_page(cr3_pfn), d) )
         {
             destroy_gdt(v);
             return -EINVAL;
@@ -350,7 +346,7 @@ int arch_set_info_guest(
     }
     else
     {
-        if ( !get_page_and_type(mfn_to_page(phys_basetab>>PAGE_SHIFT), d,
+        if ( !get_page_and_type(mfn_to_page(cr3_pfn), d,
                                 PGT_base_page_table) )
         {
             destroy_gdt(v);

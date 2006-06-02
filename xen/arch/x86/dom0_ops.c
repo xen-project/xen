@@ -467,7 +467,7 @@ void arch_getdomaininfo_ctxt(
     if ( hvm_guest(v) )
         c->flags |= VGCF_HVM_GUEST;
 
-    c->ctrlreg[3] = pagetable_get_paddr(v->arch.guest_table);
+    c->ctrlreg[3] = xen_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table));
 
     c->vm_assist = v->domain->vm_assist;
 }

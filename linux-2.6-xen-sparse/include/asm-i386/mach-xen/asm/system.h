@@ -116,10 +116,12 @@ __asm__ __volatile__ ("movw %%dx,%1\n\t" \
 	__asm__ ( \
 		"movl %%cr3,%0\n\t" \
 		:"=r" (__dummy)); \
-	machine_to_phys(__dummy); \
+	__dummy = xen_cr3_to_pfn(__dummy); \
+	mfn_to_pfn(__dummy) << PAGE_SHIFT; \
 })
 #define write_cr3(x) ({						\
-	maddr_t __dummy = phys_to_machine(x);			\
+	unsigned int __dummy = pfn_to_mfn((x) >> PAGE_SHIFT);	\
+	__dummy = xen_pfn_to_cr3(__dummy);			\
 	__asm__ __volatile__("movl %0,%%cr3": :"r" (__dummy));	\
 })
 
