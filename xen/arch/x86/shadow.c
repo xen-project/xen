@@ -3481,15 +3481,16 @@ static void shadow_set_l2e_64(unsigned long va, l2_pgentry_t sl2e,
 
     __shadow_get_l3e(v, va, &sl3e);
     if (!(l3e_get_flags(sl3e) & _PAGE_PRESENT)) {
-         if (create_l2_shadow) {
+        if (create_l2_shadow) {
             perfc_incrc(shadow_set_l2e_force_map);
             shadow_map_into_current(v, va, PAGING_L2, PAGING_L3);
             __shadow_get_l3e(v, va, &sl3e);
         } else {
             printk("For non HVM shadow, create_l1_shadow:%d\n", create_l2_shadow);
         }
-         shadow_update_min_max(l4e_get_pfn(sl4e), l3_table_offset(va));
 
+        if ( v->domain->arch.ops->guest_paging_levels == PAGING_L4 )
+            shadow_update_min_max(l4e_get_pfn(sl4e), l3_table_offset(va));
     }
 
     if ( put_ref_check ) {
