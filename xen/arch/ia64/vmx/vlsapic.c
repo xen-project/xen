@@ -39,6 +39,7 @@
 #include <asm/kregs.h>
 #include <asm/vmx_platform.h>
 #include <asm/hvm/vioapic.h>
+#include <asm/linux/jiffies.h>
 
 //u64  fire_itc;
 //u64  fire_itc2;
@@ -171,6 +172,8 @@ void vtm_set_itm(VCPU *vcpu, uint64_t val)
     clear_bit(ITV_VECTOR(vitv), &VCPU(vcpu, irr[0]));
     VCPU(vcpu,itm)=val;
     cur_itc =now_itc(vtm);
+    if(time_before(val, cur_itc))
+        val = cur_itc;
     if(val >  vtm->last_itc){
         expires = NOW() + cycle_to_ns(val-cur_itc) + TIMER_SLOP;
         set_timer(&vtm->vtm_timer, expires);
