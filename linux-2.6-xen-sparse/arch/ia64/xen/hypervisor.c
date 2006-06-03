@@ -564,7 +564,7 @@ xen_ia64_privcmd_entry_munmap(struct xen_ia64_privcmd_range* privcmd_range,
 	entry->gpfn = INVALID_GPFN;
 }
 
-static int
+static void
 xen_ia64_privcmd_entry_open(struct xen_ia64_privcmd_range* privcmd_range,
 			    int i)
 {
@@ -576,7 +576,7 @@ xen_ia64_privcmd_entry_open(struct xen_ia64_privcmd_range* privcmd_range,
 	}
 }
 
-static int
+static void
 xen_ia64_privcmd_entry_close(struct xen_ia64_privcmd_range* privcmd_range,
 			     int i)
 {
