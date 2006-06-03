@@ -447,7 +447,7 @@ fp_emulate (int fp_fault, void *bundle, unsigned long *ipsr,
 /*
  * Handle floating-point assist faults and traps for domain.
  */
-static unsigned long
+unsigned long
 handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 {
 	struct vcpu *v = current;
@@ -477,11 +477,6 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 		PSCBX(v, fpswa_ret) = ret;
 		printk("%s(%s): fp_emulate() returned %ld\n",
 		       __FUNCTION__, fp_fault?"fault":"trap", ret.status);
-	} else {
-		if (fp_fault) {
-			/* emulation was successful */
-			vcpu_increment_iip(v);
-		}
 	}
 
 	return ret.status;
@@ -869,7 +864,10 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		// FIXME: Should we handle unaligned refs in Xen??
 		vector = IA64_UNALIGNED_REF_VECTOR; break;
 	    case 32:
-		if (!(handle_fpu_swa(1, regs, isr))) return;
+		if (!(handle_fpu_swa(1, regs, isr))) {
+		    vcpu_increment_iip(v);
+		    return;
+		}
 		printf("ia64_handle_reflection: handling FP fault\n");
 		vector = IA64_FP_FAULT_VECTOR; break;
 	    case 33:

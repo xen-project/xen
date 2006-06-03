@@ -62,6 +62,7 @@ extern unsigned long translate_domain_mpaddr(unsigned long mpaddr);
 extern void alt_itlb (VCPU *vcpu, u64 vadr);
 extern void itlb_fault (VCPU *vcpu, u64 vadr);
 extern void ivhpt_fault (VCPU *vcpu, u64 vadr);
+extern unsigned long handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr);
 
 #define DOMN_PAL_REQUEST    0x110000
 #define DOMN_SAL_REQUEST    0x110001
@@ -84,8 +85,19 @@ void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
     VCPU *vcpu = current;
     UINT64 vpsr = vmx_vcpu_get_psr(vcpu);
     vector=vec2off[vector];
-    if(!(vpsr&IA64_PSR_IC)&&(vector!=0x1400)){
+    if(!(vpsr&IA64_PSR_IC)&&(vector!=IA64_DATA_NESTED_TLB_VECTOR)){
         panic_domain(regs, "Guest nested fault vector=%lx!\n", vector);
+    }
+    else{ // handle fpswa emulation
+        // fp fault
+        if(vector == IA64_FP_FAULT_VECTOR && !handle_fpu_swa(1, regs, isr)){
+            vmx_vcpu_increment_iip(vcpu);
+            return;
+        }
+        //fp trap
+        else if(vector == IA64_FP_TRAP_VECTOR && !handle_fpu_swa(0, regs, isr)){
+            return; 
+        }
     }
     VCPU(vcpu,isr)=isr;
     VCPU(vcpu,iipa) = regs->cr_iip;
