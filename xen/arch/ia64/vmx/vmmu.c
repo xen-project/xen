@@ -456,8 +456,7 @@ IA64FAULT vmx_vcpu_ptr_d(VCPU *vcpu,UINT64 ifa,UINT64 ps)
     u64 va;
 
     va = PAGEALIGN(ifa, ps);
-    index = vtr_find_overlap(vcpu, va, ps, DSIDE_TLB);
-    if (index>=0) {
+    while ((index = vtr_find_overlap(vcpu, va, ps, DSIDE_TLB)) >= 0) {
         vcpu->arch.dtrs[index].pte.p=0;
     }
     thash_purge_entries(vcpu, va, ps);
@@ -470,8 +469,7 @@ IA64FAULT vmx_vcpu_ptr_i(VCPU *vcpu,UINT64 ifa,UINT64 ps)
     u64 va;
 
     va = PAGEALIGN(ifa, ps);
-    index = vtr_find_overlap(vcpu, va, ps, ISIDE_TLB);
-    if (index>=0) {
+    while ((index = vtr_find_overlap(vcpu, va, ps, ISIDE_TLB)) >= 0) {
         vcpu->arch.itrs[index].pte.p=0;
     }
     thash_purge_entries(vcpu, va, ps);
