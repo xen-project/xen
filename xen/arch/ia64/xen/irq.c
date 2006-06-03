@@ -440,7 +440,7 @@ int pirq_guest_eoi(struct domain *d, int irq)
     if ( test_and_clear_bit(irq, &d->pirq_mask) &&
          (--((irq_guest_action_t *)desc->action)->in_flight == 0) )
     {
-        ASSERT(action->ack_type == ACKTYPE_UNMASK);
+        ASSERT(((irq_guest_action_t*)desc->action)->ack_type == ACKTYPE_UNMASK);
         desc->handler->end(irq);
     }
     spin_unlock_irq(&desc->lock);
