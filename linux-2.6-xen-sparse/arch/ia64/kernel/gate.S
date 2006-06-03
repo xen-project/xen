@@ -14,6 +14,9 @@
 #include <asm/sigcontext.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
+#ifdef CONFIG_XEN
+# include <asm/privop.h>
+#endif
 
 /*
  * We can't easily refer to symbols inside the kernel.  To avoid full runtime relocation,
@@ -32,6 +35,15 @@
 #define BRL_COND_FSYS_BUBBLE_DOWN(pr)			\
 [1:](pr)brl.cond.sptk 0;				\
 	.xdata4 ".data.patch.brl_fsys_bubble_down", 1b-.
+
+	// Currently is_running_on_xen() is defined as running_on_xen.
+	// If is_running_on_xen() is a real function, we must update 
+	// according to it.
+.section ".data.patch.running_on_xen", "a"
+	.previous
+#define LOAD_RUNNING_ON_XEN(reg)			\
+[1:]	movl reg=0;					\
+	.xdata4 ".data.patch.running_on_xen", 1b-.
 
 GLOBAL_ENTRY(__kernel_syscall_via_break)
 	.prologue
@@ -77,7 +89,42 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 	epc					// B	causes split-issue
 }
 	;;
+#ifdef CONFIG_XEN
+	// r20 = 1
+	// r22 = &vcpu->evtchn_mask
+	// r23 = &vpsr.ic
+	// r24 = vcpu->pending_interruption
+	// r25 = tmp
+	// r28 = &running_on_xen
+	// r30 = running_on_xen
+	// r31 = tmp
+	// p11 = tmp
+	// p12 = running_on_xen
+	// p13 = !running_on_xen
+	// p14 = tmp
+	// p15 = tmp
+#define isXen	p12
+#define isRaw	p13	
+	LOAD_RUNNING_ON_XEN(r28)
+	movl r22=XSI_PSR_I_ADDR
+	movl r23=XSI_PSR_IC
+	movl r24=XSI_PEND
+	mov r20=1
+	;;
+	ld4 r30=[r28]
+	;; 
+	cmp.ne p12,p13=r0,r30
+	;; 
+(isXen)	ld8 r22=[r22]
+(isRaw)	rsm psr.be | psr.i
+	;; 
+(isXen)	st1 [r22]=r20
+(isXen)	st4 [r23]=r0
+(isXen)	XEN_HYPER_RSM_BE
+(isXen)	st4 [r23]=r20
+#else	
 	rsm psr.be | psr.i			// M2 (5 cyc to srlz.d)
+#endif
 	LOAD_FSYSCALL_TABLE(r14)		// X
 	;;
 	mov r16=IA64_KR(CURRENT)		// M2 (12 cyc)
@@ -85,7 +132,19 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 	mov r19=NR_syscalls-1			// A
 	;;
 	lfetch [r18]				// M0|1
+#ifdef CONFIG_XEN
+(isXen)	mov r31=r8
+(isXen)	mov r25=IA64_PSR_IC
+(isXen)	st4 [r23]=r0
+(isXen)	XEN_HYPER_GET_PSR
+(isRaw)	mov r29=psr
+	;; 
+(isXen)	st4 [r23]=r20
+(isXen)	or r29=r8,r25 // vpsr.ic was cleared for hyperprivop
+(isXen)	mov r8=r31
+#else
 	mov r29=psr				// M2 (12 cyc)
+#endif
 	// If r17 is a NaT, p6 will be zero
 	cmp.geu p6,p7=r19,r17			// A    (sysnr > 0 && sysnr < 1024+NR_syscalls)?
 	;;
@@ -99,9 +158,26 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 	;;
 	nop.m 0
 (p6)	tbit.z.unc p8,p0=r18,0			// I0 (dual-issues with "mov b7=r18"!)
+#ifdef CONFIG_XEN
+	;; 
+	// p14 = running_on_xen && p8
+	// p15 = !running_on_xen && p8
+(p8)	cmp.ne.unc p14,p15=r0,r30
+	;; 
+(p14)	st4 [r22]=r20
+(p14)	ld4 r25=[r24]
+(p15)	ssm psr.i
+	;;
+(p14)   cmp.ne.unc p11,p0=r0, r25
+	;; 
+(p11)	st4 [r22]=r0
+(p11)	st4 [r23]=r0
+(p11)	XEN_HYPER_SSM_I
+#else
 	nop.i 0
 	;;
 (p8)	ssm psr.i
+#endif
 (p6)	mov b7=r18				// I0
 (p8)	br.dptk.many b7				// B
 
@@ -122,7 +198,20 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 #else
 	BRL_COND_FSYS_BUBBLE_DOWN(p6)
 #endif
+#ifdef CONFIG_XEN
+(isXen)	st4 [r22]=r20
+(isXen)	ld4 r25=[r24]
+(isRaw)	ssm psr.i
+	;; 
+(isXen)	cmp.ne.unc p11,p0=r0, r25
+	;; 
+(p11)	st4 [r22]=r0
+(p11)	st4 [r23]=r0
+(p11)	XEN_HYPER_SSM_I
+	;; 
+#else
 	ssm psr.i
+#endif	
 	mov r10=-1
 (p10)	mov r8=EINVAL
 (p9)	mov r8=ENOSYS
