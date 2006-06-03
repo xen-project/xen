@@ -166,19 +166,19 @@ IA64FAULT priv_ptc_ga(VCPU *vcpu, INST64 inst)
 IA64FAULT priv_ptr_d(VCPU *vcpu, INST64 inst)
 {
 	UINT64 vadr = vcpu_get_gr(vcpu,inst.M45.r3);
-	UINT64 addr_range;
+	UINT64 log_range;
 
-	addr_range = 1 << ((vcpu_get_gr(vcpu,inst.M45.r2) & 0xfc) >> 2);
-	return vcpu_ptr_d(vcpu,vadr,addr_range);
+	log_range = (vcpu_get_gr(vcpu,inst.M45.r2) & 0xfc) >> 2;
+	return vcpu_ptr_d(vcpu,vadr,log_range);
 }
 
 IA64FAULT priv_ptr_i(VCPU *vcpu, INST64 inst)
 {
 	UINT64 vadr = vcpu_get_gr(vcpu,inst.M45.r3);
-	UINT64 addr_range;
+	UINT64 log_range;
 
-	addr_range = 1 << ((vcpu_get_gr(vcpu,inst.M45.r2) & 0xfc) >> 2);
-	return vcpu_ptr_i(vcpu,vadr,addr_range);
+	log_range = (vcpu_get_gr(vcpu,inst.M45.r2) & 0xfc) >> 2;
+	return vcpu_ptr_i(vcpu,vadr,log_range);
 }
 
 IA64FAULT priv_tpa(VCPU *vcpu, INST64 inst)

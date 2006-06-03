@@ -73,6 +73,8 @@ integer_param("dom0_max_vcpus", dom0_max_vcpus);
 unsigned long initrd_start = 0, initrd_end = 0;
 extern unsigned long running_on_sim;
 
+extern char dom0_command_line[];
+
 #define IS_XEN_ADDRESS(d,a) ((a >= d->xen_vastart) && (a <= d->xen_vaend))
 
 /* FIXME: where these declarations should be there ? */
@@ -211,8 +213,7 @@ static void init_switch_stack(struct vcpu *v)
 	sw->ar_fpsr = FPSR_DEFAULT;
 	v->arch._thread.ksp = (unsigned long) sw - 16;
 	// stay on kernel stack because may get interrupts!
-	// ia64_ret_from_clone (which b0 gets in new_thread) switches
-	// to user stack
+	// ia64_ret_from_clone switches to user stack
 	v->arch._thread.on_ustack = 0;
 	memset(v->arch._thread.fph,0,sizeof(struct ia64_fpreg)*96);
 }
@@ -268,6 +269,7 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 {
 	struct pt_regs *regs = vcpu_regs (v);
 	struct domain *d = v->domain;
+	unsigned long cmdline_addr;
 
 	if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
             return 0;
@@ -285,6 +287,7 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	    build_physmap_table(d);
 
 	*regs = c->regs;
+	cmdline_addr = 0;
 	if (v == d->vcpu[0]) {
 	    /* Only for first vcpu.  */
 	    d->arch.sys_pgnr = c->sys_pgnr;
@@ -293,11 +296,28 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	    d->arch.cmdline      = c->cmdline;
 	    d->shared_info->arch = c->shared;
 
+	    if (!VMX_DOMAIN(v)) {
+		    const char *cmdline = d->arch.cmdline;
+		    int len;
+
+		    if (*cmdline == 0) {
+#define DEFAULT_CMDLINE "nomca nosmp xencons=tty0 console=tty0 root=/dev/hda1"
+			    cmdline = DEFAULT_CMDLINE;
+			    len = sizeof (DEFAULT_CMDLINE);
+			    printf("domU command line defaulted to"
+				   DEFAULT_CMDLINE "\n");
+		    }
+		    else
+			    len = IA64_COMMAND_LINE_SIZE;
+		    cmdline_addr = dom_fw_setup (d, cmdline, len);
+	    }
+
 	    /* Cache synchronization seems to be done by the linux kernel
 	       during mmap/unmap operation.  However be conservative.  */
 	    domain_cache_flush (d, 1);
 	}
-	new_thread(v, regs->cr_iip, 0, 0);
+	vcpu_init_regs (v);
+	regs->r28 = cmdline_addr;
 
 	if ( c->privregs && copy_from_user(v->arch.privregs,
 			   c->privregs, sizeof(mapped_regs_t))) {
@@ -305,8 +325,6 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 		   c->privregs);
 	    return -EFAULT;
 	}
-
-	v->arch.domain_itm_last = -1L;
 
 	/* Don't redo final setup */
 	set_bit(_VCPUF_initialised, &v->vcpu_flags);
@@ -391,79 +409,6 @@ void domain_relinquish_resources(struct domain *d)
 
     relinquish_memory(d, &d->xenpage_list);
     relinquish_memory(d, &d->page_list);
-}
-
-// heavily leveraged from linux/arch/ia64/kernel/process.c:copy_thread()
-// and linux/arch/ia64/kernel/process.c:kernel_thread()
-void new_thread(struct vcpu *v,
-                unsigned long start_pc,
-                unsigned long start_stack,
-                unsigned long start_info)
-{
-	struct domain *d = v->domain;
-	struct pt_regs *regs;
-	extern char dom0_command_line[];
-
-#ifdef CONFIG_DOMAIN0_CONTIGUOUS
-	if (d == dom0 && v->vcpu_id == 0) start_pc += dom0_start;
-#endif
-
-	regs = vcpu_regs (v);
-	if (VMX_DOMAIN(v)) {
-		/* dt/rt/it:1;i/ic:1, si:1, vm/bn:1, ac:1 */
-		regs->cr_ipsr = 0x501008826008; /* Need to be expanded as macro */
-	} else {
-		regs->cr_ipsr = ia64_getreg(_IA64_REG_PSR)
-		  | IA64_PSR_BITS_TO_SET | IA64_PSR_BN;
-		regs->cr_ipsr &= ~(IA64_PSR_BITS_TO_CLEAR
-				   | IA64_PSR_RI | IA64_PSR_IS);
-		regs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT; // domain runs at PL2
-	}
-	regs->cr_iip = start_pc;
-	regs->cr_ifs = 1UL << 63; /* or clear? */
-	regs->ar_fpsr = FPSR_DEFAULT;
-
-	if (VMX_DOMAIN(v)) {
-		vmx_init_all_rr(v);
-		if (d == dom0)
-		    regs->r28 = dom_fw_setup(d,dom0_command_line,
-					     COMMAND_LINE_SIZE);
-		/* Virtual processor context setup */
-		VCPU(v, vpsr) = IA64_PSR_BN;
-		VCPU(v, dcr) = 0;
-	} else {
-		init_all_rr(v);
-		if (v->vcpu_id == 0) {
-			/* Build the firmware.  */
-			if (d == dom0) 
-				regs->r28 = dom_fw_setup(d,dom0_command_line,
-							 COMMAND_LINE_SIZE);
-			else {
-				const char *cmdline = d->arch.cmdline;
-				int len;
-
-				if (*cmdline == 0) {
-#define DEFAULT_CMDLINE "nomca nosmp xencons=tty0 console=tty0 root=/dev/hda1"
-					cmdline = DEFAULT_CMDLINE;
-					len = sizeof (DEFAULT_CMDLINE);
-					printf("domU command line defaulted to"
-					       DEFAULT_CMDLINE "\n");
-				}
-				else
-					len = IA64_COMMAND_LINE_SIZE;
-
-				regs->r28 = dom_fw_setup (d, cmdline, len);
-			}
-			d->shared_info->arch.flags = (d == dom0) ?
-				(SIF_INITDOMAIN|SIF_PRIVILEGED) : 0;
-		}
-		regs->ar_rsc |= (2 << 2); /* force PL2/3 */
-		VCPU(v, banknum) = 1;
-		VCPU(v, metaphysical_mode) = 1;
-		VCPU(v, interrupt_mask_addr) =
-		    (uint64_t)SHAREDINFO_ADDR + INT_ENABLE_OFFSET(v);
-		VCPU(v, itv) = (1 << 16); /* timer vector masked */
-	}
 }
 
 void build_physmap_table(struct domain *d)
@@ -658,6 +603,7 @@ int construct_dom0(struct domain *d,
 	unsigned long pkern_end;
 	unsigned long pinitrd_start = 0;
 	unsigned long pstart_info;
+	unsigned long cmdline_addr;
 	struct page_info *start_info_page;
 
 #ifdef VALIDATE_VT
@@ -807,6 +753,7 @@ int construct_dom0(struct domain *d,
 	//if ( initrd_len != 0 )
 	//    memcpy((void *)vinitrd_start, initrd_start, initrd_len);
 
+	d->shared_info->arch.flags = SIF_INITDOMAIN|SIF_PRIVILEGED;
 
 	/* Set up start info area. */
 	d->shared_info->arch.start_info_pfn = pstart_info >> PAGE_SHIFT;
@@ -831,7 +778,16 @@ int construct_dom0(struct domain *d,
 
 	set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
-	new_thread(v, pkern_entry, 0, 0);
+	cmdline_addr = dom_fw_setup(d, dom0_command_line, COMMAND_LINE_SIZE);
+
+	vcpu_init_regs (v);
+
+#ifdef CONFIG_DOMAIN0_CONTIGUOUS
+	pkern_entry += dom0_start;
+#endif
+	vcpu_regs (v)->cr_iip = pkern_entry;
+	vcpu_regs (v)->r28 = cmdline_addr;
+
 	physdev_init_dom0(d);
 
 	// dom0 doesn't need build_physmap_table()

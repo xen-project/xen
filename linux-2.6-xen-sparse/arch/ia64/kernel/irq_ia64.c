@@ -279,7 +279,7 @@ static struct irqaction resched_irqaction = {
  * FIXME: MCA is not supported by far, and thus "nomca" boot param is
  * required.
  */
-void
+static void
 xen_register_percpu_irq (unsigned int irq, struct irqaction *action, int save)
 {
 	char name[15];
@@ -360,6 +360,7 @@ void xen_smp_intr_init(void)
 		.type = CALLBACKTYPE_event,
 		.address = (unsigned long)&xen_event_callback,
 	};
+	static cpumask_t registered_cpumask;
 
 	if (!cpu)
 		return;
@@ -367,9 +368,13 @@ void xen_smp_intr_init(void)
 	/* This should be piggyback when setup vcpu guest context */
 	BUG_ON(HYPERVISOR_callback_op(CALLBACKOP_register, &event));
 
-	for (i = 0; i < saved_irq_cnt; i++)
-		xen_register_percpu_irq(saved_percpu_irqs[i].irq,
-			saved_percpu_irqs[i].action, 0);
+	if (!cpu_isset(cpu, registered_cpumask)) {
+		cpu_set(cpu, registered_cpumask);
+		for (i = 0; i < saved_irq_cnt; i++)
+			xen_register_percpu_irq(saved_percpu_irqs[i].irq,
+						saved_percpu_irqs[i].action,
+						0);
+	}
 #endif /* CONFIG_SMP */
 }
 #endif /* CONFIG_XEN */

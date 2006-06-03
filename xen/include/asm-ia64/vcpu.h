@@ -149,8 +149,8 @@ extern IA64FAULT vcpu_ptc_l(VCPU *vcpu, UINT64 vadr, UINT64 log_range);
 extern IA64FAULT vcpu_ptc_e(VCPU *vcpu, UINT64 vadr);
 extern IA64FAULT vcpu_ptc_g(VCPU *vcpu, UINT64 vadr, UINT64 addr_range);
 extern IA64FAULT vcpu_ptc_ga(VCPU *vcpu, UINT64 vadr, UINT64 addr_range);
-extern IA64FAULT vcpu_ptr_d(VCPU *vcpu,UINT64 vadr, UINT64 addr_range);
-extern IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr, UINT64 addr_range);
+extern IA64FAULT vcpu_ptr_d(VCPU *vcpu,UINT64 vadr, UINT64 log_range);
+extern IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr, UINT64 log_range);
 union U_IA64_BUNDLE;
 extern int vcpu_get_domain_bundle(VCPU *vcpu, REGS *regs, UINT64 gip, union U_IA64_BUNDLE *bundle);
 extern IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data,
@@ -175,6 +175,9 @@ extern UINT64 vcpu_deliverable_interrupts(VCPU *vcpu);
 extern void vcpu_itc_no_srlz(VCPU *vcpu, UINT64, UINT64, UINT64, UINT64, UINT64);
 extern UINT64 vcpu_get_tmp(VCPU *, UINT64);
 extern void vcpu_set_tmp(VCPU *, UINT64, UINT64);
+
+/* Initialize vcpu regs.  */
+extern void vcpu_init_regs (struct vcpu *v);
 
 static inline UINT64
 itir_ps(UINT64 itir)

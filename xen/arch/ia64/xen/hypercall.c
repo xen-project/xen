@@ -132,40 +132,42 @@ fw_hypercall_ipi (struct pt_regs *regs)
 	int cpu = regs->r14;
 	int vector = regs->r15;
 	struct vcpu *targ;
-		    
-	if (0 && vector == 254)
-		printf ("send_ipi from %d to %d vector=%d\n",
-			current->vcpu_id, cpu, vector);
+	struct domain *d = current->domain;
 
+	/* Be sure the target exists.  */
 	if (cpu > MAX_VIRT_CPUS)
 		return;
-
-	targ = current->domain->vcpu[cpu];
+	targ = d->vcpu[cpu];
 	if (targ == NULL)
 		return;
 
-	if (vector == XEN_SAL_BOOT_RENDEZ_VEC
-	    && !test_bit(_VCPUF_initialised, &targ->vcpu_flags)) {
-		struct pt_regs *targ_regs = vcpu_regs (targ);
-		struct vcpu_guest_context c;
+  	if (vector == XEN_SAL_BOOT_RENDEZ_VEC
+	    && (!test_bit(_VCPUF_initialised, &targ->vcpu_flags)
+		|| test_bit(_VCPUF_down, &targ->vcpu_flags))) {
+
+		/* First start: initialize vpcu.  */
+		if (!test_bit(_VCPUF_initialised, &targ->vcpu_flags)) {
+			struct vcpu_guest_context c;
 		
-		printf ("arch_boot_vcpu: %p %p\n",
-			(void *)targ_regs->cr_iip,
-			(void *)targ_regs->r1);
-		memset (&c, 0, sizeof (c));
-		/* Copy regs.  */
-		c.regs.cr_iip = targ_regs->cr_iip;
-		c.regs.r1 = targ_regs->r1;
-		
-		if (arch_set_info_guest (targ, &c) != 0) {
-			printf ("arch_boot_vcpu: failure\n");
-			return;
+			memset (&c, 0, sizeof (c));
+
+			if (arch_set_info_guest (targ, &c) != 0) {
+				printf ("arch_boot_vcpu: failure\n");
+				return;
+			}
 		}
+			
+		/* First or next rendez-vous: set registers.  */
+		vcpu_init_regs (targ);
+		vcpu_regs (targ)->cr_iip = d->arch.boot_rdv_ip;
+		vcpu_regs (targ)->r1 = d->arch.boot_rdv_r1;
+		vcpu_regs (targ)->b0 = d->arch.sal_return_addr;
+
 		if (test_and_clear_bit(_VCPUF_down,
 				       &targ->vcpu_flags)) {
 			vcpu_wake(targ);
-			printf ("arch_boot_vcpu: vcpu %d awaken %016lx!\n",
-				targ->vcpu_id, targ_regs->cr_iip);
+			printf ("arch_boot_vcpu: vcpu %d awaken\n",
+				targ->vcpu_id);
 		}
 		else
 			printf ("arch_boot_vcpu: huu, already awaken!\n");
@@ -252,6 +254,10 @@ fw_hypercall (struct pt_regs *regs)
 			vcpu_get_gr(v,38),vcpu_get_gr(v,39));
 		regs->r8 = x.r8; regs->r9 = x.r9;
 		regs->r10 = x.r10; regs->r11 = x.r11;
+		break;
+ 	    case FW_HYPERCALL_SAL_RETURN:
+	        if ( !test_and_set_bit(_VCPUF_down, &v->vcpu_flags) )
+			vcpu_sleep_nosync(v);
 		break;
 	    case FW_HYPERCALL_EFI_CALL:
 		efi_ret_value = efi_emulator (regs, &fault);

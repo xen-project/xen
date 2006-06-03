@@ -143,6 +143,45 @@ vcpu_set_gr(VCPU *vcpu, unsigned long reg, UINT64 value)
 }
 
 #endif
+
+void vcpu_init_regs (struct vcpu *v)
+{
+	struct pt_regs *regs;
+
+	regs = vcpu_regs (v);
+	if (VMX_DOMAIN(v)) {
+		/* dt/rt/it:1;i/ic:1, si:1, vm/bn:1, ac:1 */
+		/* Need to be expanded as macro */
+		regs->cr_ipsr = 0x501008826008;
+	} else {
+		regs->cr_ipsr = ia64_getreg(_IA64_REG_PSR)
+		  | IA64_PSR_BITS_TO_SET | IA64_PSR_BN;
+		regs->cr_ipsr &= ~(IA64_PSR_BITS_TO_CLEAR
+				   | IA64_PSR_RI | IA64_PSR_IS);
+		// domain runs at PL2
+		regs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT;
+	}
+	regs->cr_ifs = 1UL << 63; /* or clear? */
+	regs->ar_fpsr = FPSR_DEFAULT;
+
+	if (VMX_DOMAIN(v)) {
+		vmx_init_all_rr(v);
+		/* Virtual processor context setup */
+		VCPU(v, vpsr) = IA64_PSR_BN;
+		VCPU(v, dcr) = 0;
+	} else {
+		init_all_rr(v);
+		regs->ar_rsc |= (2 << 2); /* force PL2/3 */
+		VCPU(v, banknum) = 1;
+		VCPU(v, metaphysical_mode) = 1;
+		VCPU(v, interrupt_mask_addr) =
+		    (uint64_t)SHAREDINFO_ADDR + INT_ENABLE_OFFSET(v);
+		VCPU(v, itv) = (1 << 16); /* timer vector masked */
+	}
+
+	v->arch.domain_itm_last = -1L;
+}
+
 /**************************************************************************
  VCPU privileged application register access routines
 **************************************************************************/
@@ -1303,6 +1342,12 @@ unsigned long recover_to_break_fault_count = 0;
 
 int warn_region0_address = 0; // FIXME later: tie to a boot parameter?
 
+/* Return TRUE iff [b1,e1] and [b2,e2] partially or fully overlaps.  */
+static inline int range_overlap (u64 b1, u64 e1, u64 b2, u64 e2)
+{
+	return (b1 <= e2) && (e1 >= b2);
+}
+
 // FIXME: also need to check && (!trp->key || vcpu_pkr_match(trp->key))
 static inline int vcpu_match_tr_entry_no_p(TR_ENTRY *trp, UINT64 ifa, UINT64 rid)
 {
@@ -1314,6 +1359,16 @@ static inline int vcpu_match_tr_entry_no_p(TR_ENTRY *trp, UINT64 ifa, UINT64 rid
 static inline int vcpu_match_tr_entry(TR_ENTRY *trp, UINT64 ifa, UINT64 rid)
 {
 	return trp->pte.p && vcpu_match_tr_entry_no_p(trp, ifa, rid);
+}
+
+static inline int
+vcpu_match_tr_entry_range(TR_ENTRY *trp, UINT64 rid, u64 b, u64 e)
+{
+	return trp->rid == rid
+		&& trp->pte.p
+		&& range_overlap (b, e,
+				  trp->vadr, trp->vadr + (1L << trp->ps) - 1);
+
 }
 
 static TR_ENTRY*
@@ -1443,8 +1498,8 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 			 * region=5,VMM need to handle this tlb miss as if
 			 * PSCB(vcpu,metaphysical_mode)=0
 			 */           
-			printk("vcpu_translate: bad physical address: 0x%lx\n",
-			       address);
+			printk("vcpu_translate: bad physical address: 0x%lx at %lx\n",
+			       address, vcpu_regs (vcpu)->cr_iip);
 
 		} else {
 			*pteval = (address & _PAGE_PPN_MASK) | __DIRTY_BITS |
@@ -1877,8 +1932,6 @@ IA64FAULT vcpu_itr_i(VCPU *vcpu, UINT64 slot, UINT64 pte,
  VCPU translation cache access routines
 **************************************************************************/
 
-void foobar(void) { /*vcpu_verbose = 1;*/ }
-
 void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 mp_pte, UINT64 logps)
 {
 	unsigned long psr;
@@ -1967,11 +2020,12 @@ IA64FAULT vcpu_ptc_l(VCPU *vcpu, UINT64 vadr, UINT64 log_range)
 	vcpu_purge_tr_entry(&PSCBX(vcpu,dtlb));
 	vcpu_purge_tr_entry(&PSCBX(vcpu,itlb));
 	
-	/*Purge all tlb and vhpt*/
+	/* Purge all tlb and vhpt */
 	vcpu_flush_tlb_vhpt_range (vadr, log_range);
 
 	return IA64_NO_FAULT;
 }
+
 // At privlvl=0, fc performs no access rights or protection key checks, while
 // at privlvl!=0, fc performs access rights checks as if it were a 1-byte
 // read but no protection key check.  Thus in order to avoid an unexpected
@@ -2021,16 +2075,59 @@ IA64FAULT vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 	return IA64_NO_FAULT;
 }
 
-IA64FAULT vcpu_ptr_d(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
+IA64FAULT vcpu_ptr_d(VCPU *vcpu,UINT64 vadr,UINT64 log_range)
 {
-	printf("vcpu_ptr_d: Purging TLB is unsupported\n");
-	// don't forget to recompute dtr_regions
-	return (IA64_ILLOP_FAULT);
+	unsigned long region = vadr >> 61;
+	u64 addr_range = 1UL << log_range;
+	unsigned long rid, rr;
+	int i;
+	TR_ENTRY *trp;
+
+	rr = PSCB(vcpu,rrs)[region];
+	rid = rr & RR_RID_MASK;
+
+	/* Purge TC  */
+	vcpu_purge_tr_entry(&PSCBX(vcpu,dtlb));
+
+	/* Purge tr and recompute dtr_regions.  */
+	vcpu->arch.dtr_regions = 0;
+	for (trp = vcpu->arch.dtrs, i = NDTRS; i; i--, trp++)
+		if (vcpu_match_tr_entry_range (trp,rid, vadr, vadr+addr_range))
+			vcpu_purge_tr_entry(trp);
+		else if (trp->pte.p)
+			vcpu_quick_region_set(vcpu->arch.dtr_regions,
+					      trp->vadr);
+
+	vcpu_flush_tlb_vhpt_range (vadr, log_range);
+
+	return IA64_NO_FAULT;
 }
 
-IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
+IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr,UINT64 log_range)
 {
-	printf("vcpu_ptr_i: Purging TLB is unsupported\n");
-	// don't forget to recompute itr_regions
-	return (IA64_ILLOP_FAULT);
+	unsigned long region = vadr >> 61;
+	u64 addr_range = 1UL << log_range;
+	unsigned long rid, rr;
+	int i;
+	TR_ENTRY *trp;
+
+	rr = PSCB(vcpu,rrs)[region];
+	rid = rr & RR_RID_MASK;
+
+	/* Purge TC  */
+	vcpu_purge_tr_entry(&PSCBX(vcpu,itlb));
+
+	/* Purge tr and recompute itr_regions.  */
+	vcpu->arch.itr_regions = 0;
+	for (trp = vcpu->arch.itrs, i = NITRS; i; i--, trp++)
+		if (vcpu_match_tr_entry_range (trp,rid, vadr, vadr+addr_range))
+			vcpu_purge_tr_entry(trp);
+		else if (trp->pte.p)
+			vcpu_quick_region_set(vcpu->arch.itr_regions,
+					      trp->vadr);
+
+
+	vcpu_flush_tlb_vhpt_range (vadr, log_range);
+
+	return IA64_NO_FAULT;
 }

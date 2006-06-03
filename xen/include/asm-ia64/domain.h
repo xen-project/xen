@@ -54,6 +54,13 @@ struct arch_domain {
     struct virtual_platform_def     vmx_platform;
 #define	hvm_domain vmx_platform /* platform defs are not vmx specific */
 
+    /* OS boot rendez vous.  */
+    unsigned long boot_rdv_ip;
+    unsigned long boot_rdv_r1;
+
+    /* SAL return point.  */
+    unsigned long sal_return_addr;
+
     u64 xen_vastart;
     u64 xen_vaend;
     u64 shared_info_va;

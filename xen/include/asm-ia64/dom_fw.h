@@ -21,6 +21,11 @@
 #define	FW_HYPERCALL_END_PADDR HYPERCALL_END
 #define	FW_HYPERCALL_PADDR(index) (FW_HYPERCALL_BASE_PADDR + (16UL * index))
 
+/* Hypercalls number have a low part and a high part.
+   The high part is the class (xen/pal/sal/efi).  */
+#define FW_HYPERCALL_NUM_MASK_HIGH	~0xffUL
+#define FW_HYPERCALL_NUM_MASK_LOW	 0xffUL
+
 /*
  * PAL can be called in physical or virtual mode simply by
  * branching to pal_entry_point, which is found in one of the
@@ -57,6 +62,11 @@
 #define FW_HYPERCALL_SAL_CALL_PADDR	FW_HYPERCALL_PADDR(FW_HYPERCALL_SAL_CALL_INDEX)
 #define FW_HYPERCALL_SAL_CALL		0x1100UL
 
+/* SAL return point.  */
+#define FW_HYPERCALL_SAL_RETURN_INDEX	0x84UL
+#define FW_HYPERCALL_SAL_RETURN_PADDR	FW_HYPERCALL_PADDR(FW_HYPERCALL_SAL_RETURN_INDEX)
+#define FW_HYPERCALL_SAL_RETURN		0x1200UL
+
 /*
  * EFI is accessed via the EFI system table, which contains:
  * - a header which contains version info
@@ -81,7 +91,6 @@
  */
 
 /* these are indexes into the runtime services table */
-#define	FW_HYPERCALL_EFI_BASE
 #define FW_HYPERCALL_EFI_GET_TIME_INDEX			0UL
 #define FW_HYPERCALL_EFI_SET_TIME_INDEX			1UL
 #define FW_HYPERCALL_EFI_GET_WAKEUP_TIME_INDEX		2UL
@@ -130,8 +139,8 @@
  * This is a hypercall number for FPSWA.
  * FPSWA hypercall uses 2 bundles for a pseudo-entry-point and a hypercall-patch.
  */
-#define FW_HYPERCALL_FPSWA_ENTRY_INDEX			0x83UL
-#define FW_HYPERCALL_FPSWA_PATCH_INDEX			0x84UL
+#define FW_HYPERCALL_FPSWA_ENTRY_INDEX			0x90UL
+#define FW_HYPERCALL_FPSWA_PATCH_INDEX			0x91UL
 #define FW_HYPERCALL_FPSWA_ENTRY_PADDR			FW_HYPERCALL_PADDR(FW_HYPERCALL_FPSWA_ENTRY_INDEX)
 #define FW_HYPERCALL_FPSWA_PATCH_PADDR			FW_HYPERCALL_PADDR(FW_HYPERCALL_FPSWA_PATCH_INDEX)
 #define FW_HYPERCALL_FPSWA				0x500UL
@@ -148,9 +157,6 @@
 
 /* Interrupt vector used for os boot rendez vous.  */
 #define XEN_SAL_BOOT_RENDEZ_VEC	0xF3
-
-#define FW_HYPERCALL_NUM_MASK_HIGH	~0xffUL
-#define FW_HYPERCALL_NUM_MASK_LOW	 0xffUL
 
 #define EFI_MEMDESC_VERSION		1
 

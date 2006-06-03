@@ -136,25 +136,6 @@ unsigned long dom_fw_setup(struct domain *d, const char *args, int arglen)
 
 /* the following heavily leveraged from linux/arch/ia64/hp/sim/fw-emu.c */
 
-/* Set IP and GR1 of not yet initialized vcpu.  */
-static void
-set_os_boot_rendez (struct domain *d, unsigned long pc, unsigned long gr1)
-{
-	struct vcpu *v;
-	int i;
-
-	printf ("set_os_boot_rendez: %lx %lx\n", pc, gr1);
-	for (i = 1; i < MAX_VIRT_CPUS; i++) {
-		v = d->vcpu[i];
-		if (v != NULL
-		    && !test_bit(_VCPUF_initialised, &v->vcpu_flags)) {
-			struct pt_regs *regs = vcpu_regs (v);
-			regs->cr_iip = pc;
-			regs->r1 = gr1;
-		}
-	}
-}
-
 struct sal_ret_values
 sal_emulator (long index, unsigned long in1, unsigned long in2,
 	      unsigned long in3, unsigned long in4, unsigned long in5,
@@ -218,8 +199,11 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
  				   second vector is reserved.  */
  				status = -2;
  			}
- 			else
- 				set_os_boot_rendez (current->domain, in2, in3);
+ 			else {
+				struct domain *d = current->domain;
+				d->arch.boot_rdv_ip = in2;
+				d->arch.boot_rdv_r1 = in3;
+			}
  		}
  		else
  			printf("*** CALLED SAL_SET_VECTORS %lu.  IGNORED...\n",
@@ -979,6 +963,11 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	sal_ed->sal_proc = FW_HYPERCALL_SAL_CALL_PADDR + start_mpaddr;
 	dom_fw_hypercall_patch (d, sal_ed->sal_proc, FW_HYPERCALL_SAL_CALL, 1);
 	sal_ed->gp = 0;  // will be ignored
+
+	/* SAL return point.  */
+	d->arch.sal_return_addr = FW_HYPERCALL_SAL_RETURN_PADDR + start_mpaddr;
+	dom_fw_hypercall_patch (d, d->arch.sal_return_addr,
+				FW_HYPERCALL_SAL_RETURN, 0);
 
 	/* Fill an AP wakeup descriptor.  */
 	sal_wakeup->type = SAL_DESC_AP_WAKEUP;
