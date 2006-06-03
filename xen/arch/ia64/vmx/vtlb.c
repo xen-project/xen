@@ -558,7 +558,6 @@ thash_data_t *vtlb_lookup(VCPU *v, u64 va,int is_data)
     u64     tag;
     ia64_rr vrr;
     thash_cb_t * hcb= &v->arch.vtlb;
-    ASSERT ( hcb->ht == THASH_TLB );
 
     cch = __vtr_lookup(v, va, is_data);;
     if ( cch ) return cch;
