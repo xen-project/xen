@@ -168,7 +168,7 @@ fw_hypercall_ipi (struct pt_regs *regs)
 				targ->vcpu_id, targ_regs->cr_iip);
 		}
 		else
-			printf ("arch_boot_vcpu: huu, already awaken!");
+			printf ("arch_boot_vcpu: huu, already awaken!\n");
 	}
 	else {
 		int running = test_bit(_VCPUF_running,

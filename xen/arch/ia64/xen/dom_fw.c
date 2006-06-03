@@ -943,6 +943,7 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 		}
 		printf("\n");
 	} else {
+		printf("DomainU EFI build up:");
 		i = 1;
 
 		if ((unsigned long)fw_mem + fw_mem_size - (unsigned long)cp >=
@@ -958,6 +959,7 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 			printf(" ACPI 2.0=0x%lx",efi_tables[i].table);
 			i++;
 		}
+		printf("\n");
 	}
 
 	/* fill in the SAL system table: */

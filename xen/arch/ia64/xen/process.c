@@ -494,7 +494,6 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 {
 	struct pt_regs *regs = (struct pt_regs *) &stack;
 	unsigned long code;
-	char buf[128];
 	static const char *reason[] = {
 		"IA-64 Illegal Operation fault",
 		"IA-64 Privileged Operation fault",
@@ -555,7 +554,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 
 	    case 24: /* General Exception */
 		code = (isr >> 4) & 0xf;
-		sprintf(buf, "General Exception: %s%s", reason[code],
+		printk("General Exception: %s%s.\n", reason[code],
 		        (code == 3) ? ((isr & (1UL << 37)) ? " (RSE access)" :
 		                       " (data access)") : "");
 		if (code == 8) {
@@ -841,7 +840,7 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 	    case 26:
 		if (((isr >> 4L) & 0xfL) == 1) {
 			//regs->eml_unat = 0;  FIXME: DO WE NEED THIS??
-			printf("ia64_handle_reflection: handling regNaT fault");
+			printf("ia64_handle_reflection: handling regNaT fault\n");
 			vector = IA64_NAT_CONSUMPTION_VECTOR; break;
 		}
 #if 1
@@ -878,13 +877,13 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		printf("ia64_handle_reflection: handling FP trap\n");
 		vector = IA64_FP_TRAP_VECTOR; break;
 	    case 34:
-		printf("ia64_handle_reflection: handling lowerpriv trap");
+		printf("ia64_handle_reflection: handling lowerpriv trap\n");
 		vector = IA64_LOWERPRIV_TRANSFER_TRAP_VECTOR; break;
 	    case 35:
-		printf("ia64_handle_reflection: handling taken branch trap");
+		printf("ia64_handle_reflection: handling taken branch trap\n");
 		vector = IA64_TAKEN_BRANCH_TRAP_VECTOR; break;
 	    case 36:
-		printf("ia64_handle_reflection: handling single step trap");
+		printf("ia64_handle_reflection: handling single step trap\n");
 		vector = IA64_SINGLE_STEP_TRAP_VECTOR; break;
 
 	    default:

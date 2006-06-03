@@ -629,7 +629,7 @@ acpi_boot_init (void)
 #ifdef CONFIG_SMP
 	if (available_cpus == 0) {
 		printk(KERN_INFO "ACPI: Found 0 CPUS; assuming 1\n");
-		printk(KERN_INFO "CPU 0 (0x%04x)", hard_smp_processor_id());
+		printk(KERN_INFO "CPU 0 (0x%04x)\n", hard_smp_processor_id());
 		smp_boot_data.cpu_phys_id[available_cpus] = hard_smp_processor_id();
 		available_cpus = 1; /* We've got at least one of these, no? */
 	}

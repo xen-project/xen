@@ -149,9 +149,10 @@ efi_emulator (struct pt_regs *regs, IA64FAULT *fault)
 		if (current->domain == dom0) {
 			printf("(by dom0)\n ");
 			(*efi.reset_system)(EFI_RESET_WARM,0,0,NULL);
-		}
-		else
+		} else {
+			printf("\n");
 			domain_shutdown (current->domain, SHUTDOWN_reboot);
+		}
 		status = EFI_UNSUPPORTED;
 		break;
 	    case FW_HYPERCALL_EFI_GET_TIME:

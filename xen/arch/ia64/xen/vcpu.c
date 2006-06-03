@@ -284,7 +284,7 @@ IA64FAULT vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm24)
 	if (imm.sp) { ipsr->sp = 1; psr.sp = 1; }
 	if (imm.i) {
 		if (vcpu->vcpu_info->evtchn_upcall_mask) {
-//printf("vcpu_set_psr_sm: psr.ic 0->1 ");
+//printf("vcpu_set_psr_sm: psr.ic 0->1\n");
 			enabling_interrupts = 1;
 		}
 		vcpu->vcpu_info->evtchn_upcall_mask = 0;
@@ -390,7 +390,7 @@ UINT64 vcpu_get_ipsr_int_state(VCPU *vcpu,UINT64 prevpsr)
 	UINT64 dcr = PSCBX(vcpu,dcr);
 	PSR psr;
 
-	//printf("*** vcpu_get_ipsr_int_state (0x%016lx)...",prevpsr);
+	//printf("*** vcpu_get_ipsr_int_state (0x%016lx)...\n",prevpsr);
 	psr.i64 = prevpsr;
 	psr.ia64_psr.be = 0; if (dcr & IA64_DCR_BE) psr.ia64_psr.be = 1;
 	psr.ia64_psr.pp = 0; if (dcr & IA64_DCR_PP) psr.ia64_psr.pp = 1;
@@ -400,7 +400,7 @@ UINT64 vcpu_get_ipsr_int_state(VCPU *vcpu,UINT64 prevpsr)
 	psr.ia64_psr.dt = 1; psr.ia64_psr.it = 1; psr.ia64_psr.rt = 1;
 	if (psr.ia64_psr.cpl == 2) psr.ia64_psr.cpl = 0; // !!!! fool domain
 	// psr.pk = 1;
-	//printf("returns 0x%016lx...",psr.i64);
+	//printf("returns 0x%016lx...\n",psr.i64);
 	return psr.i64;
 }
 
@@ -709,7 +709,7 @@ check_start:
 	}
 	// have a pending,deliverable interrupt... see if it is masked
 	bitnum = ia64_fls(bits);
-//printf("XXXXXXX vcpu_check_pending_interrupts: got bitnum=%p...",bitnum);
+//printf("XXXXXXX vcpu_check_pending_interrupts: got bitnum=%p...\n",bitnum);
 	vector = bitnum+(i*64);
 	mask = 1L << bitnum;
 	/* sanity check for guest timer interrupt */
@@ -721,7 +721,7 @@ check_start:
 			goto check_start;
 		}
 	}
-//printf("XXXXXXX vcpu_check_pending_interrupts: got vector=%p...",vector);
+//printf("XXXXXXX vcpu_check_pending_interrupts: got vector=%p...\n",vector);
 	if (*r >= mask) {
 		// masked by equal inservice
 //printf("but masked by equal inservice\n");
