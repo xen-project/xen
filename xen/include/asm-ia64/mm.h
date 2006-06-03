@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2006 Isaku Yamahata <yamahata at valinux co jp>
+ *                    VA Linux Systems Japan K.K.
+ *                    dom0 vp model support
+ */
 #ifndef __ASM_IA64_MM_H__
 #define __ASM_IA64_MM_H__
 
@@ -416,14 +421,28 @@ extern unsigned long num_physpages;
 extern unsigned long totalram_pages;
 extern int nr_swap_pages;
 
+extern void alloc_dom_xen_and_dom_io(void);
+extern void relinquish_mm(struct domain* d);
+extern struct page_info * assign_new_domain_page(struct domain *d, unsigned long mpaddr);
+extern void assign_new_domain0_page(struct domain *d, unsigned long mpaddr);
+extern void __assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr, unsigned long flags);
+extern void assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr);
+extern void assign_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long flags);
+extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
+
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+extern unsigned long assign_domain_mmio_page(struct domain *d, unsigned long mpaddr, unsigned long size);
+extern unsigned long assign_domain_mach_page(struct domain *d, unsigned long mpaddr, unsigned long size, unsigned long flags);
+extern unsigned long __lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
+extern unsigned long ____lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
+extern unsigned long do_dom0vp_op(unsigned long cmd, unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3);
+extern unsigned long dom0vp_zap_physmap(struct domain *d, unsigned long gpfn, unsigned int extent_order);
+extern unsigned long dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn, unsigned long flags, domid_t domid);
+#endif
+
 extern unsigned long *mpt_table;
 extern unsigned long gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
 extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps);
-extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
-#ifdef CONFIG_XEN_IA64_DOM0_VP
-extern unsigned long __lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
-extern unsigned long ____lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
-#endif
 #define machine_to_phys_mapping	mpt_table
 
 #define INVALID_M2P_ENTRY        (~0UL)

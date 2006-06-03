@@ -9,6 +9,7 @@ obj-y += hyperprivop.o
 obj-y += idle0_task.o
 obj-y += irq.o
 obj-y += ivt.o
+obj-y += mm.o
 obj-y += mm_init.o
 obj-y += pcdp.o
 obj-y += privop.o
