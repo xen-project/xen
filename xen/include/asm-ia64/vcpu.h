@@ -151,9 +151,12 @@ extern IA64FAULT vcpu_ptc_g(VCPU *vcpu, UINT64 vadr, UINT64 addr_range);
 extern IA64FAULT vcpu_ptc_ga(VCPU *vcpu, UINT64 vadr, UINT64 addr_range);
 extern IA64FAULT vcpu_ptr_d(VCPU *vcpu,UINT64 vadr, UINT64 addr_range);
 extern IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr, UINT64 addr_range);
+union U_IA64_BUNDLE;
+extern int vcpu_get_domain_bundle(VCPU *vcpu, REGS *regs, UINT64 gip, union U_IA64_BUNDLE *bundle);
 extern IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data,
 				UINT64 *pteval, UINT64 *itir, UINT64 *iha);
 extern IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr);
+extern IA64FAULT vcpu_force_inst_miss(VCPU *vcpu, UINT64 ifa);
 extern IA64FAULT vcpu_force_data_miss(VCPU *vcpu, UINT64 ifa);
 extern IA64FAULT vcpu_fc(VCPU *vcpu, UINT64 vadr);
 /* misc */

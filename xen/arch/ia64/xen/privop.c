@@ -615,16 +615,11 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 	int x6;
 	
 	// make a local copy of the bundle containing the privop
-#if 1
-	bundle = __get_domain_bundle(iip);
-	if (!bundle.i64[0] && !bundle.i64[1])
-#else
-	if (__copy_from_user(&bundle,iip,sizeof(bundle)))
-#endif
-	{
-//printf("*** priv_handle_op: privop bundle at 0x%lx not mapped, retrying\n",iip);
-		return vcpu_force_data_miss(vcpu,regs->cr_iip);
+	if (!vcpu_get_domain_bundle(vcpu, regs, iip, &bundle)) {
+		//return vcpu_force_data_miss(vcpu, regs->cr_iip);
+		return vcpu_force_inst_miss(vcpu, regs->cr_iip);
 	}
+
 #if 0
 	if (iip==0xa000000100001820) {
 		static int firstpagefault = 1;

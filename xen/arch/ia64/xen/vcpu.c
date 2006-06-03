@@ -17,6 +17,7 @@
 #include <asm/vmx_vcpu.h>
 #include <asm/vhpt.h>
 #include <asm/tlbflush.h>
+#include <asm/privop.h>
 #include <xen/event.h>
 #include <asm/vmx_phy_mode.h>
 
@@ -29,6 +30,7 @@ extern void setfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_
 
 extern void panic_domain(struct pt_regs *, const char *, ...);
 extern unsigned long translate_domain_mpaddr(unsigned long);
+extern IA64_BUNDLE __get_domain_bundle(UINT64);
 
 typedef	union {
 	struct ia64_psr ia64_psr;
@@ -1184,14 +1186,25 @@ UINT64 vcpu_timer_pending_early(VCPU *vcpu)
 Privileged operation emulation routines
 **************************************************************************/
 
-IA64FAULT vcpu_force_data_miss(VCPU *vcpu, UINT64 ifa)
+static void
+vcpu_force_tlb_miss(VCPU* vcpu, UINT64 ifa)
 {
-	PSCB(vcpu,ifa) = ifa;
-	PSCB(vcpu,itir) = vcpu_get_itir_on_fault(vcpu,ifa);
-	vcpu_thash(current, ifa, &PSCB(current,iha));
-	return (vcpu_get_rr_ve(vcpu,ifa) ? IA64_DATA_TLB_VECTOR : IA64_ALT_DATA_TLB_VECTOR);
+	PSCB(vcpu, ifa) = ifa;
+	PSCB(vcpu, itir) = vcpu_get_itir_on_fault(vcpu, ifa);
+	vcpu_thash(current, ifa, &PSCB(current, iha));
 }
 
+IA64FAULT vcpu_force_inst_miss(VCPU *vcpu, UINT64 ifa)
+{
+	vcpu_force_tlb_miss(vcpu, ifa);
+	return (vcpu_get_rr_ve(vcpu, ifa)? IA64_INST_TLB_VECTOR: IA64_ALT_INST_TLB_VECTOR);
+}
+
+IA64FAULT vcpu_force_data_miss(VCPU *vcpu, UINT64 ifa)
+{
+	vcpu_force_tlb_miss(vcpu, ifa);
+	return (vcpu_get_rr_ve(vcpu, ifa)? IA64_DATA_TLB_VECTOR: IA64_ALT_DATA_TLB_VECTOR);
+}
 
 IA64FAULT vcpu_rfi(VCPU *vcpu)
 {
@@ -1303,12 +1316,117 @@ static inline int vcpu_match_tr_entry(TR_ENTRY *trp, UINT64 ifa, UINT64 rid)
 	return trp->pte.p && vcpu_match_tr_entry_no_p(trp, ifa, rid);
 }
 
+static TR_ENTRY*
+vcpu_tr_lookup(VCPU* vcpu, unsigned long va, UINT64 rid, BOOLEAN is_data)
+{
+	unsigned int* regions;
+	TR_ENTRY *trp;
+	int tr_max;
+	int i;
+
+	if (is_data) {
+		// data
+		regions = &vcpu->arch.dtr_regions;
+		trp = vcpu->arch.dtrs;
+		tr_max = sizeof(vcpu->arch.dtrs)/sizeof(vcpu->arch.dtrs[0]);
+	} else {
+		// instruction
+		regions = &vcpu->arch.itr_regions;
+		trp = vcpu->arch.itrs;
+		tr_max = sizeof(vcpu->arch.itrs)/sizeof(vcpu->arch.itrs[0]);
+	}
+
+	if (!vcpu_quick_region_check(*regions, va)) {
+		return NULL;
+	}
+	for (i = 0; i < tr_max; i++, trp++) {
+		if (vcpu_match_tr_entry(trp, va, rid)) {
+			return trp;
+		}
+	}
+	return NULL;
+}
+
+// return value
+// 0: failure
+// 1: success
+int
+vcpu_get_domain_bundle(VCPU* vcpu, REGS* regs, UINT64 gip, IA64_BUNDLE* bundle)
+{
+	UINT64 gpip;// guest pseudo phyiscal ip
+
+#if 0
+	// Currently xen doesn't track psr.it bits.
+	// it assumes always psr.it = 1.
+	if (!(VCPU(vcpu, vpsr) & IA64_PSR_IT)) {
+		gpip = gip;
+	} else
+#endif
+	{
+		unsigned long region = REGION_NUMBER(gip);
+		unsigned long rr = PSCB(vcpu, rrs)[region];
+		unsigned long rid = rr & RR_RID_MASK;
+		BOOLEAN swap_rr0;
+		TR_ENTRY* trp;
+
+		// vcpu->arch.{i, d}tlb are volatile,
+		// copy its value to the variable, tr, before use.
+		TR_ENTRY tr;
+
+		trp = vcpu_tr_lookup(vcpu, gip, rid, 0);
+		if (trp != NULL) {
+			tr = *trp;
+			goto found;
+		}
+		// When it failed to get a bundle, itlb miss is reflected.
+		// Last itc.i value is cached to PSCBX(vcpu, itlb).
+		tr = PSCBX(vcpu, itlb);
+		if (vcpu_match_tr_entry(&tr, gip, rid)) {
+			//DPRINTK("%s gip 0x%lx gpip 0x%lx\n", __func__, gip, gpip);
+			goto found;
+		}
+		trp = vcpu_tr_lookup(vcpu, gip, rid, 1);
+		if (trp != NULL) {
+			tr = *trp;
+			goto found;
+		}
+#if 0
+		tr = PSCBX(vcpu, dtlb);
+		if (vcpu_match_tr_entry(&tr, gip, rid)) {
+			goto found;
+		}
+#endif
+
+		// try to access gip with guest virtual address
+		// This may cause tlb miss. see vcpu_translate(). Be careful!
+		swap_rr0 = (!region && PSCB(vcpu, metaphysical_mode));
+		if (swap_rr0) {
+			set_one_rr(0x0, PSCB(vcpu, rrs[0]));
+		}
+		*bundle = __get_domain_bundle(gip);
+		if (swap_rr0) {
+			set_metaphysical_rr0();
+		}
+		if (bundle->i64[0] == 0 && bundle->i64[1] == 0) {
+			DPRINTK("%s gip 0x%lx\n", __func__, gip);
+			return 0;
+		}
+		return 1;
+        
+	found:
+		gpip = ((tr.pte.ppn >> (tr.ps - 12)) << tr.ps) |
+			(gip & ((1 << tr.ps) - 1));
+	}
+
+	*bundle = *((IA64_BUNDLE*)__va(__gpa_to_mpa(vcpu->domain, gpip)));
+	return 1;
+}
+
 IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
 {
 	unsigned long region = address >> 61;
 	unsigned long pta, rid, rr;
 	union pte_flags pte;
-	int i;
 	TR_ENTRY *trp;
 
 	if (PSCB(vcpu,metaphysical_mode) && !(!is_data && region)) {
@@ -1349,28 +1467,22 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 	rr = PSCB(vcpu,rrs)[region];
 	rid = rr & RR_RID_MASK;
 	if (is_data) {
-		if (vcpu_quick_region_check(vcpu->arch.dtr_regions,address)) {
-			for (trp = vcpu->arch.dtrs, i = NDTRS; i; i--, trp++) {
-				if (vcpu_match_tr_entry(trp,address,rid)) {
-					*pteval = trp->pte.val;
-					*itir = trp->itir;
-					tr_translate_count++;
-					return IA64_NO_FAULT;
-				}
-			}
+		trp = vcpu_tr_lookup(vcpu, address, rid, 1);
+		if (trp != NULL) {
+			*pteval = trp->pte.val;
+			*itir = trp->itir;
+			tr_translate_count++;
+			return IA64_NO_FAULT;
 		}
 	}
 	// FIXME?: check itr's for data accesses too, else bad things happen?
 	/* else */ {
-		if (vcpu_quick_region_check(vcpu->arch.itr_regions,address)) {
-			for (trp = vcpu->arch.itrs, i = NITRS; i; i--, trp++) {
-				if (vcpu_match_tr_entry(trp,address,rid)) {
-					*pteval = trp->pte.val;
-					*itir = trp->itir;
-					tr_translate_count++;
-					return IA64_NO_FAULT;
-				}
-			}
+		trp = vcpu_tr_lookup(vcpu, address, rid, 0);
+		if (trp != NULL) {
+			*pteval = trp->pte.val;
+			*itir = trp->itir;
+			tr_translate_count++;
+			return IA64_NO_FAULT;
 		}
 	}
 
