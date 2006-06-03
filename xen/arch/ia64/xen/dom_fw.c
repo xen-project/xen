@@ -3,6 +3,9 @@
  *  Copyright (C) 2004 Hewlett-Packard Co.
  *       Dan Magenheimer (dan.magenheimer@hp.com)
  *
+ * Copyright (c) 2006 Isaku Yamahata <yamahata at valinux co jp>
+ *                    VA Linux Systems Japan K.K.
+ *                    dom0 vp model support
  */
 
 #include <xen/config.h>
@@ -766,6 +769,13 @@ efi_mdt_cmp(const void *a, const void *b)
 		return 1;
 	if (x->phys_addr < y->phys_addr)
 		return -1;
+
+	// num_pages == 0 is allowed.
+	if (x->num_pages > y->num_pages)
+		return 1;
+	if (x->num_pages < y->num_pages)
+		return -1;
+
 	return 0;
 }
 
@@ -1002,11 +1012,15 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 
 		/* simulate 1MB free memory at physical address zero */
 		MAKE_MD(EFI_LOADER_DATA,EFI_MEMORY_WB,0*MB,1*MB, 0);//XXX
+#else
+		int num_mds;
+		int j;
 #endif
 		/* hypercall patches live here, masquerade as reserved PAL memory */
 		MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB|EFI_MEMORY_RUNTIME,HYPERCALL_START,HYPERCALL_END, 0);
- 		MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,HYPERCALL_END,maxmem-IA64_GRANULE_SIZE, 0);//XXX make sure this doesn't overlap on i/o, runtime area.
+
 #ifndef CONFIG_XEN_IA64_DOM0_VP
+ 		MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,HYPERCALL_END,maxmem-IA64_GRANULE_SIZE, 0);//XXX make sure this doesn't overlap on i/o, runtime area.
 /* hack */	MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,last_start,last_end,1);
 #endif
 
@@ -1039,6 +1053,51 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 			                     dom_fw_dom0_passthrough, &arg);
 		}
 		else MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
+
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+		// simple
+		// MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
+		//         HYPERCALL_END, maxmem, 0);
+		// is not good. Check overlap.
+		sort(efi_memmap, i, sizeof(efi_memory_desc_t),
+		     efi_mdt_cmp, NULL);
+
+		// find gap and fill it with conventional memory
+		num_mds = i;
+		for (j = 0; j < num_mds; j++) {
+			unsigned long end;
+			unsigned long next_start;
+
+			md = &efi_memmap[j];
+			end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
+
+			next_start = maxmem;
+			if (j + 1 < num_mds) {
+				efi_memory_desc_t* next_md = &efi_memmap[j + 1];
+				next_start = next_md->phys_addr;
+				BUG_ON(end > next_start);
+				if (end == next_md->phys_addr)
+					continue;
+			}
+
+			// clip the range and align to PAGE_SIZE
+			// Avoid "legacy" low memory addresses and the
+			// HYPERCALL patch area.      
+			if (end < HYPERCALL_END)
+				end = HYPERCALL_END;
+			if (next_start > maxmem)
+				next_start = maxmem;
+			end = PAGE_ALIGN(end);
+			next_start = next_start & PAGE_MASK;
+			if (end >= next_start)
+				continue;
+
+			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
+			        end, next_start, 0);
+			if (next_start >= maxmem)
+				break;
+		}
+#endif        
 	}
 	else {
 #ifndef CONFIG_XEN_IA64_DOM0_VP
@@ -1069,11 +1128,47 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	bp->console_info.orig_y = 24;
 	bp->fpswa = dom_pa((unsigned long) fpswa_inf);
 	if (d == dom0) {
+		int j;
+		u64 addr;
+
 		// XXX CONFIG_XEN_IA64_DOM0_VP
-		// initrd_start address is hard coded in start_kernel()
+		// initrd_start address is hard coded in construct_dom0()
 		bp->initrd_start = (dom0_start+dom0_size) -
 		  (PAGE_ALIGN(ia64_boot_param->initrd_size) + 4*1024*1024);
 		bp->initrd_size = ia64_boot_param->initrd_size;
+
+		// dom0 doesn't need build_physmap_table()
+		// see arch_set_info_guest()
+		// instead we allocate pages manually.
+		for (j = 0; j < i; j++) {
+			md = &efi_memmap[j];
+			if (md->phys_addr > maxmem)
+				break;
+
+			if (md->type == EFI_LOADER_DATA ||
+			    md->type == EFI_PAL_CODE ||
+			    md->type == EFI_CONVENTIONAL_MEMORY) {
+				unsigned long start = md->phys_addr & PAGE_MASK;
+				unsigned long end = md->phys_addr +
+				              (md->num_pages << EFI_PAGE_SHIFT);
+
+				if (end == start) {
+					// md->num_pages = 0 is allowed.
+					end += PAGE_SIZE;
+				}
+				if (end > (max_page << PAGE_SHIFT))
+					end = (max_page << PAGE_SHIFT);
+
+				for (addr = start; addr < end; addr += PAGE_SIZE) {
+					assign_new_domain0_page(d, addr);
+				}
+			}
+		}
+		// work around for legacy device driver.
+		for (addr = 0; addr < 1 * MB; addr += PAGE_SIZE) {
+			assign_new_domain0_page(d, addr);
+		}
+		d->arch.physmap_built = 1;
 	}
 	else {
 		bp->initrd_start = d->arch.initrd_start;

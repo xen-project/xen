@@ -790,14 +790,6 @@ int construct_dom0(struct domain *d,
 
 	physdev_init_dom0(d);
 
-	// dom0 doesn't need build_physmap_table()
-	// see arch_set_info_guest()
-	// instead we allocate pages manually.
-	for (i = 0; i < max_pages; i++) {
-		assign_new_domain0_page(d, i << PAGE_SHIFT);
-	}
-	d->arch.physmap_built = 1;
-
 	// FIXME: Hack for keyboard input
 	//serial_input_init();
 
