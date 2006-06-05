@@ -130,7 +130,10 @@ failsafe_callback:
         movl  VCPU_failsafe_sel(%ebx),%eax
         movw  %ax,TRAPBOUNCE_cs(%edx)
         movw  $TBF_FAILSAFE,TRAPBOUNCE_flags(%edx)
-        call  create_bounce_frame
+        bt    $_VGCF_failsafe_disables_events,VCPU_guest_context_flags(%ebx)
+        jnc   1f
+        orw   $TBF_INTERRUPT,TRAPBOUNCE_flags(%edx)
+1:      call  create_bounce_frame
         xorl  %eax,%eax
         movl  %eax,UREGS_ds(%esp)
         movl  %eax,UREGS_es(%esp)

@@ -346,6 +346,12 @@ static long register_guest_callback(struct callback_register *reg)
     case CALLBACKTYPE_failsafe:
         v->arch.guest_context.failsafe_callback_cs  = reg->address.cs;
         v->arch.guest_context.failsafe_callback_eip = reg->address.eip;
+        if ( reg->flags & CALLBACKF_mask_events )
+            set_bit(_VGCF_failsafe_disables_events,
+                    &v->arch.guest_context.flags);
+        else
+            clear_bit(_VGCF_failsafe_disables_events,
+                      &v->arch.guest_context.flags);
         break;
 
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL

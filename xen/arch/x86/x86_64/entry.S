@@ -30,7 +30,10 @@ switch_to_kernel:
         movq  VCPU_syscall_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
         movw  $0,TRAPBOUNCE_flags(%rdx)
-        call  create_bounce_frame
+        bt    $_VGCF_syscall_disables_events,VCPU_guest_context_flags(%rbx)
+        jnc   1f
+        orw   $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
+1:      call  create_bounce_frame
         jmp   test_all_events
 
 /* %rbx: struct vcpu, interrupts disabled */
@@ -77,7 +80,10 @@ failsafe_callback:
         movq  VCPU_failsafe_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
         movw  $TBF_FAILSAFE,TRAPBOUNCE_flags(%rdx)
-        call  create_bounce_frame
+        bt    $_VGCF_failsafe_disables_events,VCPU_guest_context_flags(%rbx)
+        jnc   1f
+        orw   $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
+1:      call  create_bounce_frame
         jmp   test_all_events
 .previous
 .section __pre_ex_table,"a"

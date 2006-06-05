@@ -524,20 +524,29 @@ static void load_segments(struct vcpu *n)
     if ( unlikely(!all_segs_okay) )
     {
         struct cpu_user_regs *regs = guest_cpu_user_regs();
-        unsigned long   *rsp =
+        unsigned long *rsp =
             (n->arch.flags & TF_kernel_mode) ?
             (unsigned long *)regs->rsp :
             (unsigned long *)nctxt->kernel_sp;
+        unsigned long cs_and_mask, rflags;
 
         if ( !(n->arch.flags & TF_kernel_mode) )
             toggle_guest_mode(n);
         else
             regs->cs &= ~3;
 
+        /* CS longword also contains full evtchn_upcall_mask. */
+        cs_and_mask = (unsigned long)regs->cs |
+            ((unsigned long)n->vcpu_info->evtchn_upcall_mask << 32);
+
+        /* Fold upcall mask into RFLAGS.IF. */
+        rflags  = regs->rflags & ~X86_EFLAGS_IF;
+        rflags |= !n->vcpu_info->evtchn_upcall_mask << 9;
+
         if ( put_user(regs->ss,            rsp- 1) |
              put_user(regs->rsp,           rsp- 2) |
-             put_user(regs->rflags,        rsp- 3) |
-             put_user(regs->cs,            rsp- 4) |
+             put_user(rflags,              rsp- 3) |
+             put_user(cs_and_mask,         rsp- 4) |
              put_user(regs->rip,           rsp- 5) |
              put_user(nctxt->user_regs.gs, rsp- 6) |
              put_user(nctxt->user_regs.fs, rsp- 7) |
@@ -549,6 +558,10 @@ static void load_segments(struct vcpu *n)
             DPRINTK("Error while creating failsafe callback frame.\n");
             domain_crash(n->domain);
         }
+
+        if ( test_bit(_VGCF_failsafe_disables_events,
+                      &n->arch.guest_context.flags) )
+            n->vcpu_info->evtchn_upcall_mask = 1;
 
         regs->entry_vector  = TRAP_syscall;
         regs->rflags       &= 0xFFFCBEFFUL;

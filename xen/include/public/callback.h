@@ -29,12 +29,20 @@
 #define CALLBACKTYPE_nmi                   4
 
 /*
+ * Disable event deliver during callback? This flag is ignored for event and
+ * NMI callbacks: event delivery is unconditionally disabled.
+ */
+#define _CALLBACKF_mask_events             0
+#define CALLBACKF_mask_events              (1U << _CALLBACKF_mask_events)
+
+/*
  * Register a callback.
  */
 #define CALLBACKOP_register                0
 struct callback_register {
-     int type;
-     xen_callback_t address;
+    uint16_t type;
+    uint16_t flags;
+    xen_callback_t address;
 };
 typedef struct callback_register callback_register_t;
 DEFINE_XEN_GUEST_HANDLE(callback_register_t);
@@ -47,7 +55,8 @@ DEFINE_XEN_GUEST_HANDLE(callback_register_t);
  */
 #define CALLBACKOP_unregister              1
 struct callback_unregister {
-     int type;
+    uint16_t type;
+    uint16_t _unused;
 };
 typedef struct callback_unregister callback_unregister_t;
 DEFINE_XEN_GUEST_HANDLE(callback_unregister_t);

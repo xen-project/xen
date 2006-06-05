@@ -334,10 +334,22 @@ static long register_guest_callback(struct callback_register *reg)
 
     case CALLBACKTYPE_failsafe:
         v->arch.guest_context.failsafe_callback_eip = reg->address;
+        if ( reg->flags & CALLBACKF_mask_events )
+            set_bit(_VGCF_failsafe_disables_events,
+                    &v->arch.guest_context.flags);
+        else
+            clear_bit(_VGCF_failsafe_disables_events,
+                      &v->arch.guest_context.flags);
         break;
 
     case CALLBACKTYPE_syscall:
         v->arch.guest_context.syscall_callback_eip  = reg->address;
+        if ( reg->flags & CALLBACKF_mask_events )
+            set_bit(_VGCF_syscall_disables_events,
+                    &v->arch.guest_context.flags);
+        else
+            clear_bit(_VGCF_syscall_disables_events,
+                      &v->arch.guest_context.flags);
         break;
 
     case CALLBACKTYPE_nmi:
