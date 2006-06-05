@@ -45,6 +45,7 @@
 #include <linux/bitops.h>
 #include <linux/ethtool.h>
 #include <linux/in.h>
+#include <linux/if_ether.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 #include <net/arp.h>
@@ -172,6 +173,11 @@ static void xennet_sysfs_delif(struct net_device *netdev);
 #define xennet_sysfs_addif(dev) (0)
 #define xennet_sysfs_delif(dev) do { } while(0)
 #endif
+
+static inline int xennet_can_sg(struct net_device *dev)
+{
+	return dev->features & NETIF_F_SG;
+}
 
 /**
  * Entry point to this code when a new device is created.  Allocate the basic
@@ -307,8 +313,6 @@ again:
 		goto destroy_ring;
 	}
 
-	xenbus_switch_state(dev, XenbusStateConnected);
-
 	return 0;
 
  abort_transaction:
@@ -370,12 +374,9 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 		goto fail;
 
 	memcpy(netdev->dev_addr, info->mac, ETH_ALEN);
-	network_connect(netdev);
 	info->irq = bind_evtchn_to_irqhandler(
 		info->evtchn, netif_int, SA_SAMPLE_RANDOM, netdev->name,
 		netdev);
-	(void)send_fake_arp(netdev);
-	show_device(info);
 
 	return 0;
 
@@ -391,15 +392,24 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 static void backend_changed(struct xenbus_device *dev,
 			    enum xenbus_state backend_state)
 {
+	struct netfront_info *np = dev->data;
+	struct net_device *netdev = np->netdev;
+
 	DPRINTK("\n");
 
 	switch (backend_state) {
 	case XenbusStateInitialising:
-	case XenbusStateInitWait:
 	case XenbusStateInitialised:
 	case XenbusStateConnected:
 	case XenbusStateUnknown:
 	case XenbusStateClosed:
+		break;
+
+	case XenbusStateInitWait:
+		network_connect(netdev);
+		xenbus_switch_state(dev, XenbusStateConnected);
+		(void)send_fake_arp(netdev);
+		show_device(np);
 		break;
 
 	case XenbusStateClosing:
@@ -452,13 +462,17 @@ static int network_open(struct net_device *dev)
 	return 0;
 }
 
+static inline int netfront_tx_slot_available(struct netfront_info *np)
+{
+	return RING_FREE_REQUESTS(&np->tx) >= MAX_SKB_FRAGS + 1;
+}
+
 static inline void network_maybe_wake_tx(struct net_device *dev)
 {
 	struct netfront_info *np = netdev_priv(dev);
 
 	if (unlikely(netif_queue_stopped(dev)) &&
-	    !RING_FULL(&np->tx) &&
-	    !gnttab_empty_grant_references(&np->gref_tx_head) &&
+	    netfront_tx_slot_available(np) &&
 	    likely(netif_running(dev)))
 		netif_wake_queue(dev);
 }
@@ -638,36 +652,95 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	RING_PUSH_REQUESTS(&np->rx);
 }
 
+static void xennet_make_frags(struct sk_buff *skb, struct net_device *dev,
+			      struct netif_tx_request *tx)
+{
+	struct netfront_info *np = netdev_priv(dev);
+	char *data = skb->data;
+	unsigned long mfn;
+	RING_IDX prod = np->tx.req_prod_pvt;
+	int frags = skb_shinfo(skb)->nr_frags;
+	unsigned int offset = offset_in_page(data);
+	unsigned int len = skb_headlen(skb);
+	unsigned int id;
+	grant_ref_t ref;
+	int i;
+
+	while (len > PAGE_SIZE - offset) {
+		tx->size = PAGE_SIZE - offset;
+		tx->flags |= NETTXF_more_data;
+		len -= tx->size;
+		data += tx->size;
+		offset = 0;
+
+		id = get_id_from_freelist(np->tx_skbs);
+		np->tx_skbs[id] = skb_get(skb);
+		tx = RING_GET_REQUEST(&np->tx, prod++);
+		tx->id = id;
+		ref = gnttab_claim_grant_reference(&np->gref_tx_head);
+		BUG_ON((signed short)ref < 0);
+
+		mfn = virt_to_mfn(data);
+		gnttab_grant_foreign_access_ref(ref, np->xbdev->otherend_id,
+						mfn, GNTMAP_readonly);
+
+		tx->gref = np->grant_tx_ref[id] = ref;
+		tx->offset = offset;
+		tx->size = len;
+		tx->flags = 0;
+	}
+
+	for (i = 0; i < frags; i++) {
+		skb_frag_t *frag = skb_shinfo(skb)->frags + i;
+
+		tx->flags |= NETTXF_more_data;
+
+		id = get_id_from_freelist(np->tx_skbs);
+		np->tx_skbs[id] = skb_get(skb);
+		tx = RING_GET_REQUEST(&np->tx, prod++);
+		tx->id = id;
+		ref = gnttab_claim_grant_reference(&np->gref_tx_head);
+		BUG_ON((signed short)ref < 0);
+
+		mfn = pfn_to_mfn(page_to_pfn(frag->page));
+		gnttab_grant_foreign_access_ref(ref, np->xbdev->otherend_id,
+						mfn, GNTMAP_readonly);
+
+		tx->gref = np->grant_tx_ref[id] = ref;
+		tx->offset = frag->page_offset;
+		tx->size = frag->size;
+		tx->flags = 0;
+	}
+
+	np->tx.req_prod_pvt = prod;
+}
 
 static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	unsigned short id;
 	struct netfront_info *np = netdev_priv(dev);
 	struct netif_tx_request *tx;
+	char *data = skb->data;
 	RING_IDX i;
 	grant_ref_t ref;
 	unsigned long mfn;
 	int notify;
+	int frags = skb_shinfo(skb)->nr_frags;
+	unsigned int offset = offset_in_page(data);
+	unsigned int len = skb_headlen(skb);
 
-	if (unlikely((((unsigned long)skb->data & ~PAGE_MASK) + skb->len) >=
-		     PAGE_SIZE)) {
-		struct sk_buff *nskb;
-		nskb = __dev_alloc_skb(skb->len, GFP_ATOMIC|__GFP_NOWARN);
-		if (unlikely(nskb == NULL))
-			goto drop;
-		skb_put(nskb, skb->len);
-		memcpy(nskb->data, skb->data, skb->len);
-		/* Copy only the header fields we use in this driver. */
-		nskb->dev = skb->dev;
-		nskb->ip_summed = skb->ip_summed;
-		nskb->proto_data_valid = skb->proto_data_valid;
-		dev_kfree_skb(skb);
-		skb = nskb;
+	frags += (offset + len + PAGE_SIZE - 1) / PAGE_SIZE;
+	if (unlikely(frags > MAX_SKB_FRAGS + 1)) {
+		printk(KERN_ALERT "xennet: skb rides the rocket: %d frags\n",
+		       frags);
+		dump_stack();
+		goto drop;
 	}
 
 	spin_lock_irq(&np->tx_lock);
 
-	if (unlikely(!netif_carrier_ok(dev))) {
+	if (unlikely(!netif_carrier_ok(dev) ||
+		     (frags > 1 && !xennet_can_sg(dev)))) {
 		spin_unlock_irq(&np->tx_lock);
 		goto drop;
 	}
@@ -682,12 +755,12 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	tx->id   = id;
 	ref = gnttab_claim_grant_reference(&np->gref_tx_head);
 	BUG_ON((signed short)ref < 0);
-	mfn = virt_to_mfn(skb->data);
+	mfn = virt_to_mfn(data);
 	gnttab_grant_foreign_access_ref(
 		ref, np->xbdev->otherend_id, mfn, GNTMAP_readonly);
 	tx->gref = np->grant_tx_ref[id] = ref;
-	tx->offset = (unsigned long)skb->data & ~PAGE_MASK;
-	tx->size = skb->len;
+	tx->offset = offset;
+	tx->size = len;
 
 	tx->flags = 0;
 	if (skb->ip_summed == CHECKSUM_HW) /* local packet? */
@@ -696,14 +769,17 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		tx->flags |= NETTXF_data_validated;
 
 	np->tx.req_prod_pvt = i + 1;
+
+	xennet_make_frags(skb, dev, tx);
+	tx->size = skb->len;
+
 	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&np->tx, notify);
 	if (notify)
 		notify_remote_via_irq(np->irq);
 
 	network_tx_buf_gc(dev);
 
-	if (RING_FULL(&np->tx) ||
-	    gnttab_empty_grant_references(&np->gref_tx_head))
+	if (!netfront_tx_slot_available(np))
 		netif_stop_queue(dev);
 
 	spin_unlock_irq(&np->tx_lock);
@@ -963,12 +1039,46 @@ static struct net_device_stats *network_get_stats(struct net_device *dev)
 	return &np->stats;
 }
 
+static int xennet_change_mtu(struct net_device *dev, int mtu)
+{
+	int max = xennet_can_sg(dev) ? 65535 - ETH_HLEN : ETH_DATA_LEN;
+
+	if (mtu > max)
+		return -EINVAL;
+	dev->mtu = mtu;
+	return 0;
+}
+
+static int xennet_set_sg(struct net_device *dev, u32 data)
+{
+	if (data) {
+		struct netfront_info *np = netdev_priv(dev);
+		int val;
+
+		if (xenbus_scanf(XBT_NULL, np->xbdev->otherend, "feature-sg",
+				 "%d", &val) < 0)
+			val = 0;
+		if (!val)
+			return -ENOSYS;
+	} else if (dev->mtu > ETH_DATA_LEN)
+		dev->mtu = ETH_DATA_LEN;
+
+	return ethtool_op_set_sg(dev, data);
+}
+
+static void xennet_set_features(struct net_device *dev)
+{
+	xennet_set_sg(dev, 1);
+}
+
 static void network_connect(struct net_device *dev)
 {
 	struct netfront_info *np;
 	int i, requeue_idx;
 	struct netif_tx_request *tx;
 	struct sk_buff *skb;
+
+	xennet_set_features(dev);
 
 	np = netdev_priv(dev);
 	spin_lock_irq(&np->tx_lock);
@@ -1081,6 +1191,8 @@ static struct ethtool_ops network_ethtool_ops =
 {
 	.get_tx_csum = ethtool_op_get_tx_csum,
 	.set_tx_csum = ethtool_op_set_tx_csum,
+	.get_sg = ethtool_op_get_sg,
+	.set_sg = xennet_set_sg,
 };
 
 #ifdef CONFIG_SYSFS
@@ -1297,6 +1409,7 @@ static struct net_device * __devinit create_netdev(int handle,
 	netdev->poll            = netif_poll;
 	netdev->set_multicast_list = network_set_multicast_list;
 	netdev->uninit          = netif_uninit;
+	netdev->change_mtu	= xennet_change_mtu;
 	netdev->weight          = 64;
 	netdev->features        = NETIF_F_IP_CSUM;
 
