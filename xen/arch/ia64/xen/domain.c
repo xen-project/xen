@@ -78,21 +78,96 @@ extern char dom0_command_line[];
 #define IS_XEN_ADDRESS(d,a) ((a >= d->xen_vastart) && (a <= d->xen_vaend))
 
 /* FIXME: where these declarations should be there ? */
-extern long platform_is_hp_ski(void);
 extern void serial_input_init(void);
 static void init_switch_stack(struct vcpu *v);
+extern void vmx_do_launch(struct vcpu *);
 void build_physmap_table(struct domain *d);
 
 /* this belongs in include/asm, but there doesn't seem to be a suitable place */
-void arch_domain_destroy(struct domain *d)
+unsigned long context_switch_count = 0;
+
+extern struct vcpu *ia64_switch_to (struct vcpu *next_task);
+
+#include <xen/sched-if.h>
+
+void schedule_tail(struct vcpu *prev)
 {
-	BUG_ON(d->arch.mm.pgd != NULL);
-	if (d->shared_info != NULL)
-		free_xenheap_page(d->shared_info);
+	extern char ia64_ivt;
+	context_saved(prev);
 
-	domain_flush_destroy (d);
+	if (VMX_DOMAIN(current)) {
+		vmx_do_launch(current);
+	} else {
+		ia64_set_iva(&ia64_ivt);
+        	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
+		        VHPT_ENABLED);
+		load_region_regs(current);
+		vcpu_load_kernel_regs(current);
+	}
+}
 
-	deallocate_rid_range(d);
+void context_switch(struct vcpu *prev, struct vcpu *next)
+{
+    uint64_t spsr;
+    uint64_t pta;
+
+    local_irq_save(spsr);
+    context_switch_count++;
+
+    __ia64_save_fpu(prev->arch._thread.fph);
+    __ia64_load_fpu(next->arch._thread.fph);
+    if (VMX_DOMAIN(prev))
+	    vmx_save_state(prev);
+    if (VMX_DOMAIN(next))
+	    vmx_load_state(next);
+    /*ia64_psr(ia64_task_regs(next))->dfh = !ia64_is_local_fpu_owner(next);*/
+    prev = ia64_switch_to(next);
+
+    //cpu_set(smp_processor_id(), current->domain->domain_dirty_cpumask);
+
+    if (!VMX_DOMAIN(current)){
+	    vcpu_set_next_timer(current);
+    }
+
+
+// leave this debug for now: it acts as a heartbeat when more than
+// one domain is active
+{
+static long cnt[16] = { 50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50};
+static int i = 100;
+int id = ((struct vcpu *)current)->domain->domain_id & 0xf;
+if (!cnt[id]--) { cnt[id] = 500000; printk("%x",id); }
+if (!i--) { i = 1000000; printk("+"); }
+}
+
+    if (VMX_DOMAIN(current)){
+		vmx_load_all_rr(current);
+    }else{
+    	extern char ia64_ivt;
+    	ia64_set_iva(&ia64_ivt);
+    	if (!is_idle_domain(current->domain)) {
+        	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
+			     VHPT_ENABLED);
+	    	load_region_regs(current);
+	    	vcpu_load_kernel_regs(current);
+		if (vcpu_timer_expired(current))
+			vcpu_pend_timer(current);
+    	}else {
+		/* When switching to idle domain, only need to disable vhpt
+		 * walker. Then all accesses happen within idle context will
+		 * be handled by TR mapping and identity mapping.
+		 */
+		pta = ia64_get_pta();
+		ia64_set_pta(pta & ~VHPT_ENABLED);
+        }
+    }
+    local_irq_restore(spsr);
+    context_saved(prev);
+}
+
+void continue_running(struct vcpu *same)
+{
+	/* nothing to do */
 }
 
 static void default_idle(void)
@@ -257,6 +332,17 @@ fail_nomem:
 	if (d->shared_info != NULL)
 	    free_xenheap_page(d->shared_info);
 	return -ENOMEM;
+}
+
+void arch_domain_destroy(struct domain *d)
+{
+	BUG_ON(d->arch.mm.pgd != NULL);
+	if (d->shared_info != NULL)
+		free_xenheap_page(d->shared_info);
+
+	domain_flush_destroy (d);
+
+	deallocate_rid_range(d);
 }
 
 void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
@@ -543,7 +629,7 @@ static void loaddomainelfimage(struct domain *d, unsigned long image_start)
 
 void alloc_dom0(void)
 {
-	if (platform_is_hp_ski()) {
+	if (running_on_sim) {
 		dom0_size = 128*1024*1024; //FIXME: Should be configurable
 	}
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
@@ -798,21 +884,21 @@ int construct_dom0(struct domain *d,
 
 void machine_restart(char * __unused)
 {
-	if (platform_is_hp_ski()) dummy();
+	if (running_on_sim) dummy();
 	printf("machine_restart called: spinning....\n");
 	while(1);
 }
 
 void machine_halt(void)
 {
-	if (platform_is_hp_ski()) dummy();
+	if (running_on_sim) dummy();
 	printf("machine_halt called: spinning....\n");
 	while(1);
 }
 
 void dummy_called(char *function)
 {
-	if (platform_is_hp_ski()) asm("break 0;;");
+	if (running_on_sim) asm("break 0;;");
 	printf("dummy called in %s: spinning....\n", function);
 	while(1);
 }

@@ -14,6 +14,7 @@
 #include <asm/mm.h>
 #include <asm/pgalloc.h>
 #include <asm/vhpt.h>
+#include <asm/vcpu.h>
 #include <linux/efi.h>
 
 #ifndef CONFIG_XEN_IA64_DOM0_VP
@@ -246,6 +247,110 @@ void
 share_xen_page_with_privileged_guests(struct page_info *page, int readonly)
 {
     share_xen_page_with_guest(page, dom_xen, readonly);
+}
+
+unsigned long
+gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
+{
+	unsigned long pte;
+
+#ifndef CONFIG_XEN_IA64_DOM0_VP
+	if (d == dom0)
+		return(gpfn);
+#endif
+	pte = lookup_domain_mpa(d,gpfn << PAGE_SHIFT);
+	if (!pte) {
+		panic("gmfn_to_mfn_foreign: bad gpfn. spinning...\n");
+	}
+	return ((pte & _PFN_MASK) >> PAGE_SHIFT);
+}
+
+// given a domain virtual address, pte and pagesize, extract the metaphysical
+// address, convert the pte for a physical address for (possibly different)
+// Xen PAGE_SIZE and return modified pte.  (NOTE: TLB insert should use
+// PAGE_SIZE!)
+u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
+{
+	struct domain *d = current->domain;
+	ia64_itir_t itir = {.itir = itir__};
+	u64 mask, mpaddr, pteval2;
+	u64 arflags;
+	u64 arflags2;
+
+	pteval &= ((1UL << 53) - 1);// ignore [63:53] bits
+
+	// FIXME address had better be pre-validated on insert
+	mask = ~itir_mask(itir.itir);
+	mpaddr = (((pteval & ~_PAGE_ED) & _PAGE_PPN_MASK) & ~mask) |
+	         (address & mask);
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+	if (itir.ps > PAGE_SHIFT) {
+		itir.ps = PAGE_SHIFT;
+	}
+#endif
+	*logps = itir.ps;
+#ifndef CONFIG_XEN_IA64_DOM0_VP
+	if (d == dom0) {
+		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
+			/*
+			printk("translate_domain_pte: out-of-bounds dom0 mpaddr 0x%lx! itc=%lx...\n",
+				mpaddr, ia64_get_itc());
+			*/
+			tdpfoo();
+		}
+	}
+	else if ((mpaddr >> PAGE_SHIFT) > d->max_pages) {
+		/* Address beyond the limit.  However the grant table is
+		   also beyond the limit.  Display a message if not in the
+		   grant table.  */
+		if (mpaddr >= IA64_GRANT_TABLE_PADDR
+		    && mpaddr < (IA64_GRANT_TABLE_PADDR 
+				 + (ORDER_GRANT_FRAMES << PAGE_SHIFT)))
+			printf("translate_domain_pte: bad mpa=0x%lx (> 0x%lx),"
+			       "vadr=0x%lx,pteval=0x%lx,itir=0x%lx\n",
+			       mpaddr, (unsigned long)d->max_pages<<PAGE_SHIFT,
+			       address, pteval, itir.itir);
+		tdpfoo();
+	}
+#endif
+	pteval2 = lookup_domain_mpa(d,mpaddr);
+	arflags  = pteval  & _PAGE_AR_MASK;
+	arflags2 = pteval2 & _PAGE_AR_MASK;
+	if (arflags != _PAGE_AR_R && arflags2 == _PAGE_AR_R) {
+#if 0
+		DPRINTK("%s:%d "
+		        "pteval 0x%lx arflag 0x%lx address 0x%lx itir 0x%lx "
+		        "pteval2 0x%lx arflags2 0x%lx mpaddr 0x%lx\n",
+		        __func__, __LINE__,
+		        pteval, arflags, address, itir__,
+		        pteval2, arflags2, mpaddr);
+#endif
+		pteval = (pteval & ~_PAGE_AR_MASK) | _PAGE_AR_R;
+}
+
+	pteval2 &= _PAGE_PPN_MASK; // ignore non-addr bits
+	pteval2 |= (pteval & _PAGE_ED);
+	pteval2 |= _PAGE_PL_2; // force PL0->2 (PL3 is unaffected)
+	pteval2 = (pteval & ~_PAGE_PPN_MASK) | pteval2;
+	return pteval2;
+}
+
+// given a current domain metaphysical address, return the physical address
+unsigned long translate_domain_mpaddr(unsigned long mpaddr)
+{
+	unsigned long pteval;
+
+#ifndef CONFIG_XEN_IA64_DOM0_VP
+	if (current->domain == dom0) {
+		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
+			printk("translate_domain_mpaddr: out-of-bounds dom0 mpaddr 0x%lx! continuing...\n",
+				mpaddr);
+			tdpfoo();
+		}
+	}
+#endif
+	pteval = lookup_domain_mpa(current->domain,mpaddr);
+	return ((pteval & _PAGE_PPN_MASK) | (mpaddr & ~PAGE_MASK));
 }
 
 //XXX !xxx_present() should be used instread of !xxx_none()?
@@ -1034,6 +1139,238 @@ void domain_cache_flush (struct domain *d, int sync_only)
         }
     }
     //printf ("domain_cache_flush: %d %d pages\n", d->domain_id, nbr_page);
+}
+
+#ifdef VERBOSE
+#define MEM_LOG(_f, _a...)                           \
+  printk("DOM%u: (file=mm.c, line=%d) " _f "\n", \
+         current->domain->domain_id , __LINE__ , ## _a )
+#else
+#define MEM_LOG(_f, _a...) ((void)0)
+#endif
+
+static void free_page_type(struct page_info *page, u32 type)
+{
+}
+
+static int alloc_page_type(struct page_info *page, u32 type)
+{
+	return 1;
+}
+
+unsigned long __get_free_pages(unsigned int mask, unsigned int order)
+{
+	void *p = alloc_xenheap_pages(order);
+
+	memset(p,0,PAGE_SIZE<<order);
+	return (unsigned long)p;
+}
+
+void __free_pages(struct page_info *page, unsigned int order)
+{
+	if (order) BUG();
+	free_xenheap_page(page);
+}
+
+void *pgtable_quicklist_alloc(void)
+{
+    void *p;
+    p = alloc_xenheap_pages(0);
+    if (p)
+        clear_page(p);
+    return p;
+}
+
+void pgtable_quicklist_free(void *pgtable_entry)
+{
+	free_xenheap_page(pgtable_entry);
+}
+
+void cleanup_writable_pagetable(struct domain *d)
+{
+  return;
+}
+
+void put_page_type(struct page_info *page)
+{
+    u32 nx, x, y = page->u.inuse.type_info;
+
+ again:
+    do {
+        x  = y;
+        nx = x - 1;
+
+        ASSERT((x & PGT_count_mask) != 0);
+
+        /*
+         * The page should always be validated while a reference is held. The
+         * exception is during domain destruction, when we forcibly invalidate
+         * page-table pages if we detect a referential loop.
+         * See domain.c:relinquish_list().
+         */
+        ASSERT((x & PGT_validated) ||
+               test_bit(_DOMF_dying, &page_get_owner(page)->domain_flags));
+
+        if ( unlikely((nx & PGT_count_mask) == 0) )
+        {
+            /* Record TLB information for flush later. Races are harmless. */
+            page->tlbflush_timestamp = tlbflush_current_time();
+
+            if ( unlikely((nx & PGT_type_mask) <= PGT_l4_page_table) &&
+                 likely(nx & PGT_validated) )
+            {
+                /*
+                 * Page-table pages must be unvalidated when count is zero. The
+                 * 'free' is safe because the refcnt is non-zero and validated
+                 * bit is clear => other ops will spin or fail.
+                 */
+                if ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x,
+                                           x & ~PGT_validated)) != x) )
+                    goto again;
+                /* We cleared the 'valid bit' so we do the clean up. */
+                free_page_type(page, x);
+                /* Carry on, but with the 'valid bit' now clear. */
+                x  &= ~PGT_validated;
+                nx &= ~PGT_validated;
+            }
+        }
+        else if ( unlikely(((nx & (PGT_pinned | PGT_count_mask)) ==
+                            (PGT_pinned | 1)) &&
+                           ((nx & PGT_type_mask) != PGT_writable_page)) )
+        {
+            /* Page is now only pinned. Make the back pointer mutable again. */
+            nx |= PGT_va_mutable;
+        }
+    }
+    while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
+}
+
+
+int get_page_type(struct page_info *page, u32 type)
+{
+    u32 nx, x, y = page->u.inuse.type_info;
+
+ again:
+    do {
+        x  = y;
+        nx = x + 1;
+        if ( unlikely((nx & PGT_count_mask) == 0) )
+        {
+            MEM_LOG("Type count overflow on pfn %lx", page_to_mfn(page));
+            return 0;
+        }
+        else if ( unlikely((x & PGT_count_mask) == 0) )
+        {
+            if ( (x & (PGT_type_mask|PGT_va_mask)) != type )
+            {
+                if ( (x & PGT_type_mask) != (type & PGT_type_mask) )
+                {
+                    /*
+                     * On type change we check to flush stale TLB
+                     * entries. This may be unnecessary (e.g., page
+                     * was GDT/LDT) but those circumstances should be
+                     * very rare.
+                     */
+                    cpumask_t mask =
+                        page_get_owner(page)->domain_dirty_cpumask;
+                    tlbflush_filter(mask, page->tlbflush_timestamp);
+
+                    if ( unlikely(!cpus_empty(mask)) )
+                    {
+                        perfc_incrc(need_flush_tlb_flush);
+                        flush_tlb_mask(mask);
+                    }
+                }
+
+                /* We lose existing type, back pointer, and validity. */
+                nx &= ~(PGT_type_mask | PGT_va_mask | PGT_validated);
+                nx |= type;
+
+                /* No special validation needed for writable pages. */
+                /* Page tables and GDT/LDT need to be scanned for validity. */
+                if ( type == PGT_writable_page )
+                    nx |= PGT_validated;
+            }
+        }
+        else
+        {
+            if ( unlikely((x & (PGT_type_mask|PGT_va_mask)) != type) )
+            {
+                if ( unlikely((x & PGT_type_mask) != (type & PGT_type_mask) ) )
+                {
+                    if ( current->domain == page_get_owner(page) )
+                    {
+                        /*
+                         * This ensures functions like set_gdt() see up-to-date
+                         * type info without needing to clean up writable p.t.
+                         * state on the fast path.
+                         */
+                        LOCK_BIGLOCK(current->domain);
+                        cleanup_writable_pagetable(current->domain);
+                        y = page->u.inuse.type_info;
+                        UNLOCK_BIGLOCK(current->domain);
+                        /* Can we make progress now? */
+                        if ( ((y & PGT_type_mask) == (type & PGT_type_mask)) ||
+                             ((y & PGT_count_mask) == 0) )
+                            goto again;
+                    }
+                    if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
+                         ((type & PGT_type_mask) != PGT_l1_page_table) )
+                        MEM_LOG("Bad type (saw %08x != exp %08x) "
+                                "for mfn %016lx (pfn %016lx)",
+                                x, type, page_to_mfn(page),
+                                get_gpfn_from_mfn(page_to_mfn(page)));
+                    return 0;
+                }
+                else if ( (x & PGT_va_mask) == PGT_va_mutable )
+                {
+                    /* The va backpointer is mutable, hence we update it. */
+                    nx &= ~PGT_va_mask;
+                    nx |= type; /* we know the actual type is correct */
+                }
+                else if ( ((type & PGT_va_mask) != PGT_va_mutable) &&
+                          ((type & PGT_va_mask) != (x & PGT_va_mask)) )
+                {
+#ifdef CONFIG_X86_PAE
+                    /* We use backptr as extra typing. Cannot be unknown. */
+                    if ( (type & PGT_type_mask) == PGT_l2_page_table )
+                        return 0;
+#endif
+                    /* This table is possibly mapped at multiple locations. */
+                    nx &= ~PGT_va_mask;
+                    nx |= PGT_va_unknown;
+                }
+            }
+            if ( unlikely(!(x & PGT_validated)) )
+            {
+                /* Someone else is updating validation of this page. Wait... */
+                while ( (y = page->u.inuse.type_info) == x )
+                    cpu_relax();
+                goto again;
+            }
+        }
+    }
+    while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
+
+    if ( unlikely(!(nx & PGT_validated)) )
+    {
+        /* Try to validate page type; drop the new reference on failure. */
+        if ( unlikely(!alloc_page_type(page, type)) )
+        {
+            MEM_LOG("Error while validating mfn %lx (pfn %lx) for type %08x"
+                    ": caf=%08x taf=%" PRtype_info,
+                    page_to_mfn(page), get_gpfn_from_mfn(page_to_mfn(page)),
+                    type, page->count_info, page->u.inuse.type_info);
+            /* Noone else can get a reference. We hold the only ref. */
+            page->u.inuse.type_info = 0;
+            return 0;
+        }
+
+        /* Noone else is updating simultaneously. */
+        __set_bit(_PGT_validated, &page->u.inuse.type_info);
+    }
+
+    return 1;
 }
 
 /*

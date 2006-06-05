@@ -14,6 +14,9 @@
 
 extern void domain_relinquish_resources(struct domain *);
 
+/* given a current domain metaphysical address, return the physical address */
+extern unsigned long translate_domain_mpaddr(unsigned long mpaddr);
+
 /* Flush cache of domain d.
    If sync_only is true, only synchronize I&D caches,
    if false, flush and invalidate caches.  */

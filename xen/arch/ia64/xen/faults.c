@@ -15,34 +15,22 @@
 #include <asm/ptrace.h>
 #include <xen/delay.h>
 
-#include <asm/sal.h>	/* FOR struct ia64_sal_retval */
-
 #include <asm/system.h>
-#include <asm/io.h>
 #include <asm/processor.h>
-#include <asm/desc.h>
-//#include <asm/ldt.h>
 #include <xen/irq.h>
 #include <xen/event.h>
-#include <asm/regionreg.h>
 #include <asm/privop.h>
 #include <asm/vcpu.h>
 #include <asm/ia64_int.h>
 #include <asm/dom_fw.h>
 #include <asm/vhpt.h>
-#include "hpsim_ssc.h"
-#include <xen/multicall.h>
 #include <asm/debugger.h>
 #include <asm/fpswa.h>
 
 extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 /* FIXME: where these declarations shold be there ? */
-extern void panic_domain(struct pt_regs *, const char *, ...);
-extern long platform_is_hp_ski(void);
 extern int ia64_hyperprivop(unsigned long, REGS *);
 extern IA64FAULT ia64_hypercall(struct pt_regs *regs);
-extern void vmx_do_launch(struct vcpu *);
-extern unsigned long lookup_domain_mpa(struct domain *,unsigned long);
 
 #define IA64_PSR_CPL1	(__IA64_UL(1) << IA64_PSR_CPL1_BIT)
 // note IA64_PSR_PK removed from following, why is this necessary?
@@ -57,113 +45,8 @@ extern unsigned long lookup_domain_mpa(struct domain *,unsigned long);
 			IA64_PSR_ID | IA64_PSR_DA | IA64_PSR_DD | \
 			IA64_PSR_SS | IA64_PSR_RI | IA64_PSR_ED | IA64_PSR_IA)
 
-#include <xen/sched-if.h>
 
-void schedule_tail(struct vcpu *prev)
-{
-	extern char ia64_ivt;
-	context_saved(prev);
-
-	if (VMX_DOMAIN(current)) {
-		vmx_do_launch(current);
-	} else {
-		ia64_set_iva(&ia64_ivt);
-        	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
-		        VHPT_ENABLED);
-		load_region_regs(current);
-		vcpu_load_kernel_regs(current);
-	}
-}
-
-void tdpfoo(void) { }
-
-// given a domain virtual address, pte and pagesize, extract the metaphysical
-// address, convert the pte for a physical address for (possibly different)
-// Xen PAGE_SIZE and return modified pte.  (NOTE: TLB insert should use
-// PAGE_SIZE!)
-u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
-{
-	struct domain *d = current->domain;
-	ia64_itir_t itir = {.itir = itir__};
-	u64 mask, mpaddr, pteval2;
-	u64 arflags;
-	u64 arflags2;
-
-	pteval &= ((1UL << 53) - 1);// ignore [63:53] bits
-
-	// FIXME address had better be pre-validated on insert
-	mask = ~itir_mask(itir.itir);
-	mpaddr = (((pteval & ~_PAGE_ED) & _PAGE_PPN_MASK) & ~mask) |
-	         (address & mask);
-#ifdef CONFIG_XEN_IA64_DOM0_VP
-	if (itir.ps > PAGE_SHIFT) {
-		itir.ps = PAGE_SHIFT;
-	}
-#endif
-	*logps = itir.ps;
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-	if (d == dom0) {
-		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
-			/*
-			printk("translate_domain_pte: out-of-bounds dom0 mpaddr 0x%lx! itc=%lx...\n",
-				mpaddr, ia64_get_itc());
-			*/
-			tdpfoo();
-		}
-	}
-	else if ((mpaddr >> PAGE_SHIFT) > d->max_pages) {
-		/* Address beyond the limit.  However the grant table is
-		   also beyond the limit.  Display a message if not in the
-		   grant table.  */
-		if (mpaddr >= IA64_GRANT_TABLE_PADDR
-		    && mpaddr < (IA64_GRANT_TABLE_PADDR 
-				 + (ORDER_GRANT_FRAMES << PAGE_SHIFT)))
-			printf("translate_domain_pte: bad mpa=0x%lx (> 0x%lx),"
-			       "vadr=0x%lx,pteval=0x%lx,itir=0x%lx\n",
-			       mpaddr, (unsigned long)d->max_pages<<PAGE_SHIFT,
-			       address, pteval, itir.itir);
-		tdpfoo();
-	}
-#endif
-	pteval2 = lookup_domain_mpa(d,mpaddr);
-	arflags  = pteval  & _PAGE_AR_MASK;
-	arflags2 = pteval2 & _PAGE_AR_MASK;
-	if (arflags != _PAGE_AR_R && arflags2 == _PAGE_AR_R) {
-#if 0
-		DPRINTK("%s:%d "
-		        "pteval 0x%lx arflag 0x%lx address 0x%lx itir 0x%lx "
-		        "pteval2 0x%lx arflags2 0x%lx mpaddr 0x%lx\n",
-		        __func__, __LINE__,
-		        pteval, arflags, address, itir__,
-		        pteval2, arflags2, mpaddr);
-#endif
-		pteval = (pteval & ~_PAGE_AR_MASK) | _PAGE_AR_R;
-}
-
-	pteval2 &= _PAGE_PPN_MASK; // ignore non-addr bits
-	pteval2 |= (pteval & _PAGE_ED);
-	pteval2 |= _PAGE_PL_2; // force PL0->2 (PL3 is unaffected)
-	pteval2 = (pteval & ~_PAGE_PPN_MASK) | pteval2;
-	return pteval2;
-}
-
-// given a current domain metaphysical address, return the physical address
-unsigned long translate_domain_mpaddr(unsigned long mpaddr)
-{
-	unsigned long pteval;
-
-#ifndef CONFIG_XEN_IA64_DOM0_VP
-	if (current->domain == dom0) {
-		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
-			printk("translate_domain_mpaddr: out-of-bounds dom0 mpaddr 0x%lx! continuing...\n",
-				mpaddr);
-			tdpfoo();
-		}
-	}
-#endif
-	pteval = lookup_domain_mpa(current->domain,mpaddr);
-	return ((pteval & _PAGE_PPN_MASK) | (mpaddr & ~PAGE_MASK));
-}
+extern void do_ssc(unsigned long ssc, struct pt_regs *regs);
 
 unsigned long slow_reflect_count[0x80] = { 0 };
 unsigned long fast_reflect_count[0x80] = { 0 };
@@ -242,8 +125,6 @@ void reflect_interruption(unsigned long isr, struct pt_regs *regs, unsigned long
 
 	inc_slow_reflect_count(vector);
 }
-
-void foodpi(void) {}
 
 static unsigned long pending_false_positive = 0;
 
@@ -627,120 +508,9 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 
 unsigned long running_on_sim = 0;
 
-void
-do_ssc(unsigned long ssc, struct pt_regs *regs)
-{
-	unsigned long arg0, arg1, arg2, arg3, retval;
-	char buf[2];
-/**/	static int last_fd, last_count;	// FIXME FIXME FIXME
-/**/					// BROKEN FOR MULTIPLE DOMAINS & SMP
-/**/	struct ssc_disk_stat { int fd; unsigned count;} *stat, last_stat;
-
-	arg0 = vcpu_get_gr(current,32);
-	switch(ssc) {
-	    case SSC_PUTCHAR:
-		buf[0] = arg0;
-		buf[1] = '\0';
-		printf(buf);
-		break;
-	    case SSC_GETCHAR:
-		retval = ia64_ssc(0,0,0,0,ssc);
-		vcpu_set_gr(current,8,retval,0);
-		break;
-	    case SSC_WAIT_COMPLETION:
-		if (arg0) {	// metaphysical address
-
-			arg0 = translate_domain_mpaddr(arg0);
-/**/			stat = (struct ssc_disk_stat *)__va(arg0);
-///**/			if (stat->fd == last_fd) stat->count = last_count;
-/**/			stat->count = last_count;
-//if (last_count >= PAGE_SIZE) printf("ssc_wait: stat->fd=%d,last_fd=%d,last_count=%d\n",stat->fd,last_fd,last_count);
-///**/			retval = ia64_ssc(arg0,0,0,0,ssc);
-/**/			retval = 0;
-		}
-		else retval = -1L;
-		vcpu_set_gr(current,8,retval,0);
-		break;
-	    case SSC_OPEN:
-		arg1 = vcpu_get_gr(current,33);	// access rights
-if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring...)\n"); arg0 = 0; }
-		if (arg0) {	// metaphysical address
-			arg0 = translate_domain_mpaddr(arg0);
-			retval = ia64_ssc(arg0,arg1,0,0,ssc);
-		}
-		else retval = -1L;
-		vcpu_set_gr(current,8,retval,0);
-		break;
-	    case SSC_WRITE:
-	    case SSC_READ:
-//if (ssc == SSC_WRITE) printf("DOING AN SSC_WRITE\n");
-		arg1 = vcpu_get_gr(current,33);
-		arg2 = vcpu_get_gr(current,34);
-		arg3 = vcpu_get_gr(current,35);
-		if (arg2) {	// metaphysical address of descriptor
-			struct ssc_disk_req *req;
-			unsigned long mpaddr;
-			long len;
-
-			arg2 = translate_domain_mpaddr(arg2);
-			req = (struct ssc_disk_req *) __va(arg2);
-			req->len &= 0xffffffffL;	// avoid strange bug
-			len = req->len;
-/**/			last_fd = arg1;
-/**/			last_count = len;
-			mpaddr = req->addr;
-//if (last_count >= PAGE_SIZE) printf("do_ssc: read fd=%d, addr=%p, len=%lx ",last_fd,mpaddr,len);
-			retval = 0;
-			if ((mpaddr & PAGE_MASK) != ((mpaddr+len-1) & PAGE_MASK)) {
-				// do partial page first
-				req->addr = translate_domain_mpaddr(mpaddr);
-				req->len = PAGE_SIZE - (req->addr & ~PAGE_MASK);
-				len -= req->len; mpaddr += req->len;
-				retval = ia64_ssc(arg0,arg1,arg2,arg3,ssc);
-				arg3 += req->len; // file offset
-/**/				last_stat.fd = last_fd;
-/**/				(void)ia64_ssc(__pa(&last_stat),0,0,0,SSC_WAIT_COMPLETION);
-//if (last_count >= PAGE_SIZE) printf("ssc(%p,%lx)[part]=%x ",req->addr,req->len,retval);
-			}
-			if (retval >= 0) while (len > 0) {
-				req->addr = translate_domain_mpaddr(mpaddr);
-				req->len = (len > PAGE_SIZE) ? PAGE_SIZE : len;
-				len -= PAGE_SIZE; mpaddr += PAGE_SIZE;
-				retval = ia64_ssc(arg0,arg1,arg2,arg3,ssc);
-				arg3 += req->len; // file offset
-// TEMP REMOVED AGAIN				arg3 += req->len; // file offset
-/**/				last_stat.fd = last_fd;
-/**/				(void)ia64_ssc(__pa(&last_stat),0,0,0,SSC_WAIT_COMPLETION);
-//if (last_count >= PAGE_SIZE) printf("ssc(%p,%lx)=%x ",req->addr,req->len,retval);
-			}
-			// set it back to the original value
-			req->len = last_count;
-		}
-		else retval = -1L;
-		vcpu_set_gr(current,8,retval,0);
-//if (last_count >= PAGE_SIZE) printf("retval=%x\n",retval);
-		break;
-	    case SSC_CONNECT_INTERRUPT:
-		arg1 = vcpu_get_gr(current,33);
-		arg2 = vcpu_get_gr(current,34);
-		arg3 = vcpu_get_gr(current,35);
-		if (!running_on_sim) { printf("SSC_CONNECT_INTERRUPT, not implemented on hardware.  (ignoring...)\n"); break; }
-		(void)ia64_ssc(arg0,arg1,arg2,arg3,ssc);
-		break;
-	    case SSC_NETDEV_PROBE:
-		vcpu_set_gr(current,8,-1L,0);
-		break;
-	    default:
-		printf("ia64_handle_break: bad ssc code %lx, iip=0x%lx, b0=0x%lx... spinning\n",
-			ssc, regs->cr_iip, regs->b0);
-		while(1);
-		break;
-	}
-	vcpu_increment_iip(current);
-}
 
 /* Also read in hyperprivop.S  */
-int first_break = 1;
+int first_break = 0;
 
 void
 ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim)
@@ -749,11 +519,6 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 	struct vcpu *v = current;
 	IA64FAULT vector;
 
-	if (first_break) {
-		if (platform_is_hp_ski()) running_on_sim = 1;
-		else running_on_sim = 0;
-		first_break = 0;
-	}
 	if (iim == 0x80001 || iim == 0x80002) {	//FIXME: don't hardcode constant
 		do_ssc(vcpu_get_gr(current,36), regs);
 	} 
@@ -893,57 +658,5 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 	PSCB(current,ifa) = ifa;
 	PSCB(current,itir) = vcpu_get_itir_on_fault(v,ifa);
 	reflect_interruption(isr,regs,vector);
-}
-
-unsigned long hypercall_create_continuation(
-	unsigned int op, const char *format, ...)
-{
-    struct mc_state *mcs = &mc_state[smp_processor_id()];
-    struct vcpu *v = current;
-    const char *p = format;
-    unsigned long arg;
-    unsigned int i;
-    va_list args;
-
-    va_start(args, format);
-    if ( test_bit(_MCSF_in_multicall, &mcs->flags) ) {
-	panic("PREEMPT happen in multicall\n");	// Not support yet
-    } else {
-	vcpu_set_gr(v, 2, op, 0);
-	for ( i = 0; *p != '\0'; i++) {
-            switch ( *p++ )
-            {
-            case 'i':
-                arg = (unsigned long)va_arg(args, unsigned int);
-                break;
-            case 'l':
-                arg = (unsigned long)va_arg(args, unsigned long);
-                break;
-            case 'h':
-                arg = (unsigned long)va_arg(args, void *);
-                break;
-            default:
-                arg = 0;
-                BUG();
-            }
-	    switch (i) {
-	    case 0: vcpu_set_gr(v, 14, arg, 0);
-		    break;
-	    case 1: vcpu_set_gr(v, 15, arg, 0);
-		    break;
-	    case 2: vcpu_set_gr(v, 16, arg, 0);
-		    break;
-	    case 3: vcpu_set_gr(v, 17, arg, 0);
-		    break;
-	    case 4: vcpu_set_gr(v, 18, arg, 0);
-		    break;
-	    default: panic("Too many args for hypercall continuation\n");
-		    break;
-	    }
-	}
-    }
-    v->arch.hypercall_continuation = 1;
-    va_end(args);
-    return op;
 }
 
