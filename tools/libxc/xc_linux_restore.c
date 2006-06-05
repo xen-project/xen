@@ -108,7 +108,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
                      unsigned int console_evtchn, unsigned long *console_mfn)
 {
     DECLARE_DOM0_OP;
-    int rc = 1, i, n;
+    int rc = 1, i, n, pae_extended_cr3 = 0;
     unsigned long mfn, pfn;
     unsigned int prev_pc, this_pc;
     int verify = 0;
@@ -162,25 +162,83 @@ int xc_linux_restore(int xc_handle, int io_fd,
         return 1;
     }
 
-
     if (mlock(&ctxt, sizeof(ctxt))) {
         /* needed for build dom0 op, but might as well do early */
         ERR("Unable to mlock ctxt");
         return 1;
     }
 
-
-    /* Read the saved P2M frame list */
-    if(!(p2m_frame_list = malloc(P2M_FL_SIZE))) {
+    if (!(p2m_frame_list = malloc(P2M_FL_SIZE))) {
         ERR("Couldn't allocate p2m_frame_list array");
         goto out;
     }
 
-    if (!read_exact(io_fd, p2m_frame_list, P2M_FL_SIZE)) {
-        ERR("read p2m_frame_list failed");
+    /* Read first entry of P2M list, or extended-info signature (~0UL). */
+    if (!read_exact(io_fd, p2m_frame_list, sizeof(long))) {
+        ERR("read extended-info signature failed");
         goto out;
     }
 
+    if (p2m_frame_list[0] == ~0UL) {
+        uint32_t tot_bytes;
+
+        /* Next 4 bytes: total size of following extended info. */
+        if (!read_exact(io_fd, &tot_bytes, sizeof(tot_bytes))) {
+            ERR("read extended-info size failed");
+            goto out;
+        }
+
+        while (tot_bytes) {
+            uint32_t chunk_bytes;
+            char     chunk_sig[4];
+
+            /* 4-character chunk signature + 4-byte remaining chunk size. */
+            if (!read_exact(io_fd, chunk_sig, sizeof(chunk_sig)) ||
+                !read_exact(io_fd, &chunk_bytes, sizeof(chunk_bytes))) {
+                ERR("read extended-info chunk signature failed");
+                goto out;
+            }
+            tot_bytes -= 8;
+
+            /* VCPU context structure? */
+            if (!strncmp(chunk_sig, "vcpu", 4)) {
+                if (!read_exact(io_fd, &ctxt, sizeof(ctxt))) {
+                    ERR("read extended-info vcpu context failed");
+                    goto out;
+                }
+                tot_bytes   -= sizeof(struct vcpu_guest_context);
+                chunk_bytes -= sizeof(struct vcpu_guest_context);
+
+                if (ctxt.vm_assist & (1UL << VMASST_TYPE_pae_extended_cr3))
+                    pae_extended_cr3 = 1;
+            }
+
+            /* Any remaining bytes of this chunk: read and discard. */
+            while (chunk_bytes) {
+                unsigned long sz = chunk_bytes;
+                if ( sz > P2M_FL_SIZE )
+                    sz = P2M_FL_SIZE;
+                if (!read_exact(io_fd, p2m_frame_list, sz)) {
+                    ERR("read-and-discard extended-info chunk bytes failed");
+                    goto out;
+                }
+                chunk_bytes -= sz;
+                tot_bytes   -= sz;
+            }
+        }
+
+        /* Now read the real first entry of P2M list. */
+        if (!read_exact(io_fd, p2m_frame_list, sizeof(long))) {
+            ERR("read first entry of p2m_frame_list failed");
+            goto out;
+        }
+    }
+
+    /* First entry is already read into the p2m array. */
+    if (!read_exact(io_fd, &p2m_frame_list[1], P2M_FL_SIZE - sizeof(long))) {
+        ERR("read p2m_frame_list failed");
+        goto out;
+    }
 
     /* We want zeroed memory so use calloc rather than malloc. */
     p2m        = calloc(max_pfn, sizeof(unsigned long));
@@ -331,17 +389,27 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 ** A page table page - need to 'uncanonicalize' it, i.e.
                 ** replace all the references to pfns with the corresponding
                 ** mfns for the new domain.
+                **
+                ** On PAE we need to ensure that PGDs are in MFNs < 4G, and
+                ** so we may need to update the p2m after the main loop.
+                ** Hence we defer canonicalization of L1s until then.
                 */
-                if(!uncanonicalize_pagetable(pagetype, page)) {
-                    /*
-                    ** Failing to uncanonicalize a page table can be ok
-                    ** under live migration since the pages type may have
-                    ** changed by now (and we'll get an update later).
-                    */
-                    DPRINTF("PT L%ld race on pfn=%08lx mfn=%08lx\n",
-                            pagetype >> 28, pfn, mfn);
-                    nraces++;
-                    continue;
+                if ((pt_levels != 3) ||
+                    pae_extended_cr3 ||
+                    (pagetype != L1TAB)) {
+
+                    if (!uncanonicalize_pagetable(pagetype, page)) {
+                        /*
+                        ** Failing to uncanonicalize a page table can be ok
+                        ** under live migration since the pages type may have
+                        ** changed by now (and we'll get an update later).
+                        */
+                        DPRINTF("PT L%ld race on pfn=%08lx mfn=%08lx\n",
+                                pagetype >> 28, pfn, mfn);
+                        nraces++;
+                        continue;
+                    }
+
                 }
 
             } else if(pagetype != NOTAB) {
@@ -389,6 +457,100 @@ int xc_linux_restore(int xc_handle, int io_fd,
     }
 
     DPRINTF("Received all pages (%d races)\n", nraces);
+
+    if ((pt_levels == 3) && !pae_extended_cr3) {
+
+        /*
+        ** XXX SMH on PAE we need to ensure PGDs are in MFNs < 4G. This
+        ** is a little awkward and involves (a) finding all such PGDs and
+        ** replacing them with 'lowmem' versions; (b) upating the p2m[]
+        ** with the new info; and (c) canonicalizing all the L1s using the
+        ** (potentially updated) p2m[].
+        **
+        ** This is relatively slow (and currently involves two passes through
+        ** the pfn_type[] array), but at least seems to be correct. May wish
+        ** to consider more complex approaches to optimize this later.
+        */
+
+        int j, k;
+
+        /* First pass: find all L3TABs current in > 4G mfns and get new mfns */
+        for (i = 0; i < max_pfn; i++) {
+
+            if (((pfn_type[i] & LTABTYPE_MASK)==L3TAB) && (p2m[i]>0xfffffUL)) {
+
+                unsigned long new_mfn;
+                uint64_t l3ptes[4];
+                uint64_t *l3tab;
+
+                l3tab = (uint64_t *)
+                    xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                         PROT_READ, p2m[i]);
+
+                for(j = 0; j < 4; j++)
+                    l3ptes[j] = l3tab[j];
+
+                munmap(l3tab, PAGE_SIZE);
+
+                if (!(new_mfn=xc_make_page_below_4G(xc_handle, dom, p2m[i]))) {
+                    ERR("Couldn't get a page below 4GB :-(");
+                    goto out;
+                }
+
+                p2m[i] = new_mfn;
+                if (xc_add_mmu_update(xc_handle, mmu,
+                                      (((unsigned long long)new_mfn)
+                                       << PAGE_SHIFT) |
+                                      MMU_MACHPHYS_UPDATE, i)) {
+                    ERR("Couldn't m2p on PAE root pgdir");
+                    goto out;
+                }
+
+                l3tab = (uint64_t *)
+                    xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                         PROT_READ | PROT_WRITE, p2m[i]);
+
+                for(j = 0; j < 4; j++)
+                    l3tab[j] = l3ptes[j];
+
+                munmap(l3tab, PAGE_SIZE);
+
+            }
+        }
+
+        /* Second pass: find all L1TABs and uncanonicalize them */
+        j = 0;
+
+        for(i = 0; i < max_pfn; i++) {
+
+            if (((pfn_type[i] & LTABTYPE_MASK)==L1TAB)) {
+                region_mfn[j] = p2m[i];
+                j++;
+            }
+
+            if(i == (max_pfn-1) || j == MAX_BATCH_SIZE) {
+
+                if (!(region_base = xc_map_foreign_batch(
+                          xc_handle, dom, PROT_READ | PROT_WRITE,
+                          region_mfn, j))) {
+                    ERR("map batch failed");
+                    goto out;
+                }
+
+                for(k = 0; k < j; k++) {
+                    if(!uncanonicalize_pagetable(L1TAB,
+                                                 region_base + k*PAGE_SIZE)) {
+                        ERR("failed uncanonicalize pt!");
+                        goto out;
+                    }
+                }
+
+                munmap(region_base, j*PAGE_SIZE);
+                j = 0;
+            }
+        }
+
+    }
 
 
     if (xc_finish_mmu_updates(xc_handle, mmu)) {

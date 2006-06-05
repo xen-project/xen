@@ -302,6 +302,9 @@ int construct_dom0(struct domain *d,
         return -EINVAL;
     }
 
+    if ( xen_pae && !!strstr(dsi.xen_section_string, "PAE=yes[extended-cr3]") )
+        set_bit(VMASST_TYPE_pae_extended_cr3, &d->vm_assist);
+
     if ( (p = strstr(dsi.xen_section_string, "FEATURES=")) != NULL )
     {
         parse_features(

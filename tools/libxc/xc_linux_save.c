@@ -818,12 +818,33 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     /* Start writing out the saved-domain record. */
 
-    if(!write_exact(io_fd, &max_pfn, sizeof(unsigned long))) {
+    if (!write_exact(io_fd, &max_pfn, sizeof(unsigned long))) {
         ERR("write: max_pfn");
         goto out;
     }
 
-    if(!write_exact(io_fd, p2m_frame_list, P2M_FL_SIZE)) {
+    /*
+     * Write an extended-info structure to inform the restore code that
+     * a PAE guest understands extended CR3 (PDPTs above 4GB). Turns off
+     * slow paths in the restore code.
+     */
+    if ((pt_levels == 3) &&
+        (ctxt.vm_assist & (1UL << VMASST_TYPE_pae_extended_cr3))) {
+        unsigned long signature = ~0UL;
+        uint32_t tot_sz   = sizeof(struct vcpu_guest_context) + 8;
+        uint32_t chunk_sz = sizeof(struct vcpu_guest_context);
+        char chunk_sig[]  = "vcpu";
+        if (!write_exact(io_fd, &signature, sizeof(signature)) ||
+            !write_exact(io_fd, &tot_sz,    sizeof(tot_sz)) ||
+            !write_exact(io_fd, &chunk_sig, 4) ||
+            !write_exact(io_fd, &chunk_sz,  sizeof(chunk_sz)) ||
+            !write_exact(io_fd, &ctxt,      sizeof(ctxt))) {
+            ERR("write: extended info");
+            goto out;
+        }
+    }
+
+    if (!write_exact(io_fd, p2m_frame_list, P2M_FL_SIZE)) {
         ERR("write: p2m_frame_list");
         goto out;
     }

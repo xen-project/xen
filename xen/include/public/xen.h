@@ -234,10 +234,24 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
  */
 #define VMASST_CMD_enable                0
 #define VMASST_CMD_disable               1
+
+/* x86/32 guests: simulate full 4GB segment limits. */
 #define VMASST_TYPE_4gb_segments         0
+
+/* x86/32 guests: trap (vector 15) whenever above vmassist is used. */
 #define VMASST_TYPE_4gb_segments_notify  1
+
+/*
+ * x86 guests: support writes to bottom-level PTEs.
+ * NB1. Page-directory entries cannot be written.
+ * NB2. Guest must continue to remove all writable mappings of PTEs.
+ */
 #define VMASST_TYPE_writable_pagetables  2
-#define MAX_VMASST_TYPE 2
+
+/* x86/PAE guests: support PDPTs above 4GB. */
+#define VMASST_TYPE_pae_extended_cr3     3
+
+#define MAX_VMASST_TYPE                  3
 
 #ifndef __ASSEMBLY__
 

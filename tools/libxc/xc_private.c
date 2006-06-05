@@ -430,6 +430,28 @@ int xc_version(int xc_handle, int cmd, void *arg)
     return rc;
 }
 
+unsigned long xc_make_page_below_4G(
+    int xc_handle, uint32_t domid, unsigned long mfn)
+{
+    unsigned long new_mfn;
+
+    if ( xc_domain_memory_decrease_reservation(
+        xc_handle, domid, 1, 0, &mfn) != 0 )
+    {
+        fprintf(stderr,"xc_make_page_below_4G decrease failed. mfn=%lx\n",mfn);
+        return 0;
+    }
+
+    if ( xc_domain_memory_increase_reservation(
+        xc_handle, domid, 1, 0, 32, &new_mfn) != 0 )
+    {
+        fprintf(stderr,"xc_make_page_below_4G increase failed. mfn=%lx\n",mfn);
+        return 0;
+    }
+
+    return new_mfn;
+}
+
 /*
  * Local variables:
  * mode: C

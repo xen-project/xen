@@ -997,6 +997,21 @@ static int alloc_l3_table(struct page_info *page, unsigned long type)
 
     ASSERT(!shadow_mode_refcounts(d));
 
+#ifdef CONFIG_X86_PAE
+    /*
+     * PAE pgdirs above 4GB are unacceptable if the guest does not understand
+     * the weird 'extended cr3' format for dealing with high-order address
+     * bits. We cut some slack for control tools (before vcpu0 is initialised).
+     */
+    if ( (pfn >= 0x100000) &&
+         unlikely(!VM_ASSIST(d, VMASST_TYPE_pae_extended_cr3)) &&
+         d->vcpu[0] && test_bit(_VCPUF_initialised, &d->vcpu[0]->vcpu_flags) )
+    {
+        MEM_LOG("PAE pgd must be below 4GB (0x%lx >= 0x100000)", pfn);
+        return 0;
+    }
+#endif
+
     pl3e = map_domain_page(pfn);
     for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
     {

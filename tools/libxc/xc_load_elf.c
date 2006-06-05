@@ -122,8 +122,15 @@ static int parseelfimage(const char *image,
             ERROR("Actually saw: '%s'", guestinfo);
             return -EINVAL;
         }
-        if ( (strstr(guestinfo, "PAE=yes") != NULL) )
-            dsi->pae_kernel = 1;
+
+        dsi->pae_kernel = PAEKERN_no;
+        p = strstr(guestinfo, "PAE=yes");
+        if ( p != NULL )
+        {
+            dsi->pae_kernel = PAEKERN_yes;
+            if ( !strncmp(p+7, "[extended-cr3]", 14) )
+                dsi->pae_kernel = PAEKERN_extended_cr3;
+        }
 
         break;
     }

@@ -254,16 +254,32 @@ static int setup_pg_tables_pae(int xc_handle, uint32_t dom,
                                unsigned long *page_array,
                                unsigned long vpt_start,
                                unsigned long vpt_end,
-                               unsigned shadow_mode_enabled)
+                               unsigned shadow_mode_enabled,
+                               unsigned pae_mode)
 {
     l1_pgentry_64_t *vl1tab = NULL, *vl1e = NULL;
     l2_pgentry_64_t *vl2tab = NULL, *vl2e = NULL;
     l3_pgentry_64_t *vl3tab = NULL, *vl3e = NULL;
     uint64_t l1tab, l2tab, l3tab, pl1tab, pl2tab, pl3tab;
-    unsigned long ppt_alloc, count;
+    unsigned long ppt_alloc, count, nmfn;
 
     /* First allocate page for page dir. */
     ppt_alloc = (vpt_start - dsi_v_start) >> PAGE_SHIFT;
+
+    if ( pae_mode == PAEKERN_extended_cr3 )
+    {
+        ctxt->vm_assist |= (1UL << VMASST_TYPE_pae_extended_cr3);
+    }
+    else if ( page_array[ppt_alloc] > 0xfffff )
+    {
+        nmfn = xc_make_page_below_4G(xc_handle, dom, page_array[ppt_alloc]);
+        if ( nmfn == 0 )
+        {
+            fprintf(stderr, "Couldn't get a page below 4GB :-(\n");
+            goto error_out;
+        }
+        page_array[ppt_alloc] = nmfn;
+    }
 
     alloc_pt(l3tab, vl3tab, pl3tab);
     vl3e = &vl3tab[l3_table_offset_pae(dsi_v_start)];
@@ -579,11 +595,11 @@ static int compat_check(int xc_handle, struct domain_setup_info *dsi)
     }
 
     if (strstr(xen_caps, "xen-3.0-x86_32p")) {
-        if (!dsi->pae_kernel) {
+        if (dsi->pae_kernel == PAEKERN_no) {
             ERROR("Non PAE-kernel on PAE host.");
             return 0;
         }
-    } else if (dsi->pae_kernel) {
+    } else if (dsi->pae_kernel != PAEKERN_no) {
         ERROR("PAE-kernel on non-PAE host.");
         return 0;
     }
@@ -673,7 +689,8 @@ static int setup_guest(int xc_handle,
 
     for ( i = 0; i < XENFEAT_NR_SUBMAPS; i++ )
     {
-        if ( (supported_features[i]&required_features[i]) != required_features[i] )
+        if ( (supported_features[i] & required_features[i]) !=
+             required_features[i] )
         {
             ERROR("Guest kernel does not support a required feature.");
             goto error_out;
@@ -719,7 +736,7 @@ static int setup_guest(int xc_handle,
     (((((_h) + ((1UL<<(_s))-1)) & ~((1UL<<(_s))-1)) - \
     ((_l) & ~((1UL<<(_s))-1))) >> (_s))
 #if defined(__i386__)
-        if ( dsi.pae_kernel )
+        if ( dsi.pae_kernel != PAEKERN_no )
         {
             if ( (1 + /* # L3 */
                   NR(dsi.v_start, v_end, L3_PAGETABLE_SHIFT_PAE) + /* # L2 */
@@ -797,11 +814,11 @@ static int setup_guest(int xc_handle,
 
     /* setup page tables */
 #if defined(__i386__)
-    if (dsi.pae_kernel)
+    if (dsi.pae_kernel != PAEKERN_no)
         rc = setup_pg_tables_pae(xc_handle, dom, ctxt,
                                  dsi.v_start, v_end,
                                  page_array, vpt_start, vpt_end,
-                                 shadow_mode_enabled);
+                                 shadow_mode_enabled, dsi.pae_kernel);
     else
         rc = setup_pg_tables(xc_handle, dom, ctxt,
                              dsi.v_start, v_end,
@@ -824,7 +841,7 @@ static int setup_guest(int xc_handle,
      */
     if ( !shadow_mode_enabled )
     {
-        if ( dsi.pae_kernel )
+        if ( dsi.pae_kernel != PAEKERN_no )
         {
             if ( pin_table(xc_handle, MMUEXT_PIN_L3_TABLE,
                            xen_cr3_to_pfn(ctxt->ctrlreg[3]), dom) )
@@ -958,7 +975,7 @@ static int setup_guest(int xc_handle,
     rc = xc_version(xc_handle, XENVER_version, NULL);
     sprintf(start_info->magic, "xen-%i.%i-x86_%d%s",
             rc >> 16, rc & (0xFFFF), (unsigned int)sizeof(long)*8,
-            dsi.pae_kernel ? "p" : "");
+            (dsi.pae_kernel != PAEKERN_no) ? "p" : "");
     start_info->nr_pages     = nr_pages;
     start_info->shared_info  = guest_shared_info_mfn << PAGE_SHIFT;
     start_info->flags        = flags;
