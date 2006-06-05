@@ -543,17 +543,14 @@ static gnttab_map_grant_ref_t *netbk_get_requests(netif_t *netif,
 	skb_frag_t *frags = shinfo->frags;
 	netif_tx_request_t *txp;
 	unsigned long pending_idx = *((u16 *)skb->data);
-	int nr_frags = shinfo->nr_frags;
 	RING_IDX cons = netif->tx.req_cons + 1;
-	int i;
+	int i, start;
 
-	if ((unsigned long)shinfo->frags[0].page == pending_idx) {
-		frags++;
-		nr_frags--;
-	}
+	/* Skip first skb fragment if it is on same page as header fragment. */
+	start = ((unsigned long)shinfo->frags[0].page == pending_idx);
 
-	for (i = 0; i < nr_frags; i++) {
-		txp = RING_GET_REQUEST(&netif->tx, cons + i);
+	for (i = start; i < shinfo->nr_frags; i++) {
+		txp = RING_GET_REQUEST(&netif->tx, cons++);
 		pending_idx = pending_ring[MASK_PEND_IDX(pending_cons++)];
 
 		gnttab_set_map_op(mop++, MMAP_VADDR(pending_idx),
@@ -578,10 +575,9 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 	netif_tx_request_t *txp;
 	struct skb_shared_info *shinfo = skb_shinfo(skb);
 	int nr_frags = shinfo->nr_frags;
-	int start;
-	int err;
-	int i;
+	int i, err, start;
 
+	/* Check status of header. */
 	err = mop->status;
 	if (unlikely(err)) {
 		txp = &pending_tx_info[pending_idx].req;
@@ -595,44 +591,47 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 		grant_tx_handle[pending_idx] = mop->handle;
 	}
 
-	start = 0;
-	if ((unsigned long)shinfo->frags[0].page == pending_idx)
-		start++;
+	/* Skip first skb fragment if it is on same page as header fragment. */
+	start = ((unsigned long)shinfo->frags[0].page == pending_idx);
 
 	for (i = start; i < nr_frags; i++) {
-		int newerr;
-		int j;
+		int j, newerr;
 
 		pending_idx = (unsigned long)shinfo->frags[i].page;
 
+		/* Check error status: if okay then remember grant handle. */
 		newerr = (++mop)->status;
 		if (likely(!newerr)) {
 			set_phys_to_machine(
-				__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT,
-				FOREIGN_FRAME(mop->dev_bus_addr >> PAGE_SHIFT));
+				__pa(MMAP_VADDR(pending_idx))>>PAGE_SHIFT,
+				FOREIGN_FRAME(mop->dev_bus_addr>>PAGE_SHIFT));
 			grant_tx_handle[pending_idx] = mop->handle;
-
+			/* Had a previous error? Invalidate this fragment. */
 			if (unlikely(err))
 				netif_idx_release(pending_idx);
 			continue;
 		}
 
+		/* Error on this fragment: respond to client with an error. */
 		txp = &pending_tx_info[pending_idx].req;
 		make_tx_response(netif, txp->id, NETIF_RSP_ERROR);
 		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
 		netif_put(netif);
 
+		/* Not the first error? Preceding frags already invalidated. */
 		if (err)
 			continue;
 
+		/* First error: invalidate header and preceding fragments. */
 		pending_idx = *((u16 *)skb->data);
 		netif_idx_release(pending_idx);
-
 		for (j = start; j < i; j++) {
 			pending_idx = (unsigned long)shinfo->frags[i].page;
 			netif_idx_release(pending_idx);
 		}
-		err |= newerr;
+
+		/* Remember the error: invalidate all subsequent fragments. */
+		err = newerr;
 	}
 
 	*mopp = mop + 1;
