@@ -433,6 +433,8 @@ extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
 #ifdef CONFIG_XEN_IA64_DOM0_VP
 extern unsigned long assign_domain_mmio_page(struct domain *d, unsigned long mpaddr, unsigned long size);
 extern unsigned long assign_domain_mach_page(struct domain *d, unsigned long mpaddr, unsigned long size, unsigned long flags);
+int domain_page_mapped(struct domain *d, unsigned long mpaddr);
+int efi_mmio(unsigned long physaddr, unsigned long size);
 extern unsigned long __lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
 extern unsigned long ____lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
 extern unsigned long do_dom0vp_op(unsigned long cmd, unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3);

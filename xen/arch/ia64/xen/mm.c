@@ -579,7 +579,7 @@ assign_domain_same_page(struct domain *d,
     }
 }
 
-static int
+int
 efi_mmio(unsigned long physaddr, unsigned long size)
 {
     void *efi_map_start, *efi_map_end;
@@ -967,6 +967,17 @@ domain_page_flush(struct domain* d, unsigned long mpaddr,
                   unsigned long old_mfn, unsigned long new_mfn)
 {
     domain_flush_vtlb_all();
+}
+
+int
+domain_page_mapped(struct domain* d, unsigned long mpaddr)
+{
+    pte_t * pte;
+
+    pte=lookup_noalloc_domain_pte(d, mpaddr);
+    if(!pte_none(*pte))
+       return 1;
+    return 0;
 }
 #endif
 

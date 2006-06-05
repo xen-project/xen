@@ -760,6 +760,38 @@ dom_fw_dom0_passthrough(efi_memory_desc_t *md, void *arg__)
     return 0;
 }
 
+/*
+ * Create dom0 MDT entries for conventional memory below 1MB.  Without
+ * this Linux will assume VGA is present because 0xA0000 will always
+ * be either a hole in the MDT or an I/O region via the passthrough.
+ */
+static int
+dom_fw_dom0_lowmem(efi_memory_desc_t *md, void *arg__)
+{
+    struct dom0_passthrough_arg* arg = (struct dom0_passthrough_arg*)arg__;
+    u64 end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
+
+    BUG_ON(md->type != EFI_CONVENTIONAL_MEMORY);
+
+    if (md->phys_addr >= 1*MB)
+        return 0;
+
+    if (end > 1*MB)
+        end = 1*MB;
+
+    arg->md->type = md->type;
+    arg->md->pad = 0;
+    arg->md->phys_addr = md->phys_addr;
+    arg->md->virt_addr = 0;
+    arg->md->num_pages = (end - md->phys_addr) >> EFI_PAGE_SHIFT;
+    arg->md->attribute = md->attribute;
+    print_md(arg->md);
+
+    (*arg->i)++;
+    arg->md++;
+    return 0;
+}
+
 static int
 efi_mdt_cmp(const void *a, const void *b)
 {
@@ -1051,6 +1083,8 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 			                     dom_fw_dom0_passthrough, &arg);
 			efi_memmap_walk_type(EFI_MEMORY_MAPPED_IO_PORT_SPACE,
 			                     dom_fw_dom0_passthrough, &arg);
+			efi_memmap_walk_type(EFI_CONVENTIONAL_MEMORY,
+			                     dom_fw_dom0_lowmem, &arg);
 		}
 		else MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
 
@@ -1164,9 +1198,13 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 				}
 			}
 		}
-		// work around for legacy device driver.
-		for (addr = 0; addr < 1 * MB; addr += PAGE_SIZE) {
-			assign_new_domain0_page(d, addr);
+		// Map low-memory holes & unmapped MMIO for legacy drivers
+		for (addr = 0; addr < 1*MB; addr += PAGE_SIZE) {
+			if (domain_page_mapped(d, addr))
+				continue;
+					
+			if (efi_mmio(addr, PAGE_SIZE))
+				assign_domain_mmio_page(d, addr, PAGE_SIZE);
 		}
 		d->arch.physmap_built = 1;
 	}
