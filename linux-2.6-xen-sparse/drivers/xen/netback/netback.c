@@ -458,6 +458,9 @@ inline static void net_tx_action_dealloc(void)
 	dc = dealloc_cons;
 	dp = dealloc_prod;
 
+	/* Ensure we see all indexes enqueued by netif_idx_release(). */
+	smp_rmb();
+
 	/*
 	 * Free up any grants we have finished using
 	 */
@@ -695,7 +698,10 @@ static void netif_idx_release(u16 pending_idx)
 	unsigned long flags;
 
 	spin_lock_irqsave(&_lock, flags);
-	dealloc_ring[MASK_PEND_IDX(dealloc_prod++)] = pending_idx;
+	dealloc_ring[MASK_PEND_IDX(dealloc_prod)] = pending_idx;
+	/* Sync with net_tx_action_dealloc: insert idx /then/ incr producer. */
+	smp_wmb();
+	dealloc_prod++;
 	spin_unlock_irqrestore(&_lock, flags);
 
 	tasklet_schedule(&net_tx_tasklet);
