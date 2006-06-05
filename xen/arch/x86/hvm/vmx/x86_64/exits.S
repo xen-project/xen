@@ -51,45 +51,42 @@
  * (2/1)  u32 entry_vector;
  * (1/1)  u32 error_code;
  */
-#define HVM_MONITOR_RFLAGS	0x202 /* IF on */
 #define NR_SKIPPED_REGS	6	/* See the above explanation */
-#define HVM_SAVE_ALL_NOSEGREGS \
-        pushq $HVM_MONITOR_RFLAGS; \
-        popfq; \
-        subq $(NR_SKIPPED_REGS*8), %rsp; \
-        pushq %rdi; \
-        pushq %rsi; \
-        pushq %rdx; \
-        pushq %rcx; \
-        pushq %rax; \
-        pushq %r8;  \
-        pushq %r9;  \
-        pushq %r10; \
-        pushq %r11; \
-        pushq %rbx; \
-        pushq %rbp; \
-        pushq %r12; \
-        pushq %r13; \
-        pushq %r14; \
-        pushq %r15; \
+#define HVM_SAVE_ALL_NOSEGREGS                  \
+        subq $(NR_SKIPPED_REGS*8), %rsp;        \
+        pushq %rdi;                             \
+        pushq %rsi;                             \
+        pushq %rdx;                             \
+        pushq %rcx;                             \
+        pushq %rax;                             \
+        pushq %r8;                              \
+        pushq %r9;                              \
+        pushq %r10;                             \
+        pushq %r11;                             \
+        pushq %rbx;                             \
+        pushq %rbp;                             \
+        pushq %r12;                             \
+        pushq %r13;                             \
+        pushq %r14;                             \
+        pushq %r15;
 
-#define HVM_RESTORE_ALL_NOSEGREGS \
-        popq %r15; \
-        popq %r14; \
-        popq %r13; \
-        popq %r12; \
-        popq %rbp; \
-        popq %rbx; \
-        popq %r11; \
-        popq %r10; \
-        popq %r9;  \
-        popq %r8;  \
-        popq %rax; \
-        popq %rcx; \
-        popq %rdx; \
-        popq %rsi; \
-        popq %rdi; \
-        addq $(NR_SKIPPED_REGS*8), %rsp; \
+#define HVM_RESTORE_ALL_NOSEGREGS               \
+        popq %r15;                              \
+        popq %r14;                              \
+        popq %r13;                              \
+        popq %r12;                              \
+        popq %rbp;                              \
+        popq %rbx;                              \
+        popq %r11;                              \
+        popq %r10;                              \
+        popq %r9;                               \
+        popq %r8;                               \
+        popq %rax;                              \
+        popq %rcx;                              \
+        popq %rdx;                              \
+        popq %rsi;                              \
+        popq %rdi;                              \
+        addq $(NR_SKIPPED_REGS*8), %rsp;
 
 ENTRY(vmx_asm_vmexit_handler)
         /* selectors are restored/saved by VMX */

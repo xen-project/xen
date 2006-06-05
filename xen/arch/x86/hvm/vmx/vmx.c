@@ -1970,7 +1970,6 @@ static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
         __hvm_bug(regs);
 
     vector &= INTR_INFO_VECTOR_MASK;
-    local_irq_disable();
     TRACE_VMEXIT(1,vector);
 
     switch(vector) {
@@ -2065,30 +2064,33 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     struct vcpu *v = current;
     int error;
 
-    if ((error = __vmread(VM_EXIT_REASON, &exit_reason)))
-        __hvm_bug(&regs);
+    error = __vmread(VM_EXIT_REASON, &exit_reason);
+    BUG_ON(error);
 
     perfc_incra(vmexits, exit_reason);
 
-    /* don't bother H/W interrutps */
-    if (exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT &&
-        exit_reason != EXIT_REASON_VMCALL &&
-        exit_reason != EXIT_REASON_IO_INSTRUCTION) 
+    if ( (exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT) &&
+         (exit_reason != EXIT_REASON_VMCALL) &&
+         (exit_reason != EXIT_REASON_IO_INSTRUCTION) )
         HVM_DBG_LOG(DBG_LEVEL_0, "exit reason = %x", exit_reason);
 
-    if (exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) {
+    if ( exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT )
+        local_irq_enable();
+
+    if ( unlikely(exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) )
+    {
         printk("Failed vm entry (reason 0x%x)\n", exit_reason);
         printk("*********** VMCS Area **************\n");
         vmcs_dump_vcpu();
         printk("**************************************\n");
         domain_crash_synchronous();
-        return;
     }
 
     __vmread(GUEST_RIP, &eip);
     TRACE_VMEXIT(0,exit_reason);
 
-    switch (exit_reason) {
+    switch ( exit_reason )
+    {
     case EXIT_REASON_EXCEPTION_NMI:
     {
         /*
