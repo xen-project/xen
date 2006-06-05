@@ -159,11 +159,15 @@ typedef struct __name##_back_ring __name##_back_ring_t
 
 /* Test if there are outstanding messages to be processed on a ring. */
 #define RING_HAS_UNCONSUMED_RESPONSES(_r)                               \
-    ((_r)->rsp_cons != (_r)->sring->rsp_prod)
+    ((_r)->sring->rsp_prod - (_r)->rsp_cons)
 
 #define RING_HAS_UNCONSUMED_REQUESTS(_r)                                \
-    (((_r)->req_cons != (_r)->sring->req_prod) &&                       \
-     (((_r)->req_cons - (_r)->rsp_prod_pvt) != RING_SIZE(_r)))
+    ({									\
+	unsigned int req = (_r)->sring->req_prod - (_r)->req_cons;	\
+	unsigned int rsp = RING_SIZE(_r) -				\
+			   ((_r)->req_cons - (_r)->rsp_prod_pvt);	\
+	req < rsp ? req : rsp;						\
+    })
 
 /* Direct access to individual ring elements, by index. */
 #define RING_GET_REQUEST(_r, _idx)                                      \

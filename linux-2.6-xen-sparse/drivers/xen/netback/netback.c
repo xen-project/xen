@@ -490,6 +490,178 @@ inline static void net_tx_action_dealloc(void)
 	}
 }
 
+static void netbk_tx_err(netif_t *netif, RING_IDX end)
+{
+	RING_IDX cons = netif->tx.req_cons;
+
+	do {
+		netif_tx_request_t *txp = RING_GET_REQUEST(&netif->tx, cons);
+		make_tx_response(netif, txp->id, NETIF_RSP_ERROR);
+	} while (++cons < end);
+	netif->tx.req_cons = cons;
+	netif_schedule_work(netif);
+	netif_put(netif);
+}
+
+static int netbk_count_requests(netif_t *netif, netif_tx_request_t *txp,
+				int work_to_do)
+{
+	netif_tx_request_t *first = txp;
+	RING_IDX cons = netif->tx.req_cons;
+	int frags = 1;
+
+	while (txp->flags & NETTXF_more_data) {
+		if (frags >= work_to_do) {
+			DPRINTK("Need more frags\n");
+			return -frags;
+		}
+
+		txp = RING_GET_REQUEST(&netif->tx, cons + frags);
+		if (txp->size > first->size) {
+			DPRINTK("Frags galore\n");
+			return -frags;
+		}
+
+		first->size -= txp->size;
+		frags++;
+
+		if (unlikely((txp->offset + txp->size) > PAGE_SIZE)) {
+			DPRINTK("txp->offset: %x, size: %u\n",
+				txp->offset, txp->size);
+			return -frags;
+		}
+	}
+
+	return frags;
+}
+
+static gnttab_map_grant_ref_t *netbk_get_requests(netif_t *netif,
+						  struct sk_buff *skb,
+						  gnttab_map_grant_ref_t *mop)
+{
+	struct skb_shared_info *shinfo = skb_shinfo(skb);
+	skb_frag_t *frags = shinfo->frags;
+	netif_tx_request_t *txp;
+	unsigned long pending_idx = *((u16 *)skb->data);
+	int nr_frags = shinfo->nr_frags;
+	RING_IDX cons = netif->tx.req_cons + 1;
+	int i;
+
+	if ((unsigned long)shinfo->frags[0].page == pending_idx) {
+		frags++;
+		nr_frags--;
+	}
+
+	for (i = 0; i < nr_frags; i++) {
+		txp = RING_GET_REQUEST(&netif->tx, cons + i);
+		pending_idx = pending_ring[MASK_PEND_IDX(pending_cons++)];
+
+		gnttab_set_map_op(mop++, MMAP_VADDR(pending_idx),
+				  GNTMAP_host_map | GNTMAP_readonly,
+				  txp->gref, netif->domid);
+
+		memcpy(&pending_tx_info[pending_idx].req, txp, sizeof(*txp));
+		netif_get(netif);
+		pending_tx_info[pending_idx].netif = netif;
+		frags[i].page = (void *)pending_idx;
+	}
+
+	return mop;
+}
+
+static int netbk_tx_check_mop(struct sk_buff *skb,
+			       gnttab_map_grant_ref_t **mopp)
+{
+	gnttab_map_grant_ref_t *mop = *mopp;
+	int pending_idx = *((u16 *)skb->data);
+	netif_t *netif = pending_tx_info[pending_idx].netif;
+	netif_tx_request_t *txp;
+	struct skb_shared_info *shinfo = skb_shinfo(skb);
+	int nr_frags = shinfo->nr_frags;
+	int start;
+	int err;
+	int i;
+
+	err = mop->status;
+	if (unlikely(err)) {
+		txp = &pending_tx_info[pending_idx].req;
+		make_tx_response(netif, txp->id, NETIF_RSP_ERROR);
+		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
+		netif_put(netif);
+	} else {
+		set_phys_to_machine(
+			__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT,
+			FOREIGN_FRAME(mop->dev_bus_addr >> PAGE_SHIFT));
+		grant_tx_handle[pending_idx] = mop->handle;
+	}
+
+	start = 0;
+	if ((unsigned long)shinfo->frags[0].page == pending_idx)
+		start++;
+
+	for (i = start; i < nr_frags; i++) {
+		int newerr;
+		int j;
+
+		pending_idx = (unsigned long)shinfo->frags[i].page;
+
+		newerr = (++mop)->status;
+		if (likely(!newerr)) {
+			set_phys_to_machine(
+				__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT,
+				FOREIGN_FRAME(mop->dev_bus_addr >> PAGE_SHIFT));
+			grant_tx_handle[pending_idx] = mop->handle;
+
+			if (unlikely(err))
+				netif_idx_release(pending_idx);
+			continue;
+		}
+
+		txp = &pending_tx_info[pending_idx].req;
+		make_tx_response(netif, txp->id, NETIF_RSP_ERROR);
+		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
+		netif_put(netif);
+
+		if (err)
+			continue;
+
+		pending_idx = *((u16 *)skb->data);
+		netif_idx_release(pending_idx);
+
+		for (j = start; j < i; j++) {
+			pending_idx = (unsigned long)shinfo->frags[i].page;
+			netif_idx_release(pending_idx);
+		}
+		err |= newerr;
+	}
+
+	*mopp = mop + 1;
+	return err;
+}
+
+static void netbk_fill_frags(struct sk_buff *skb)
+{
+	struct skb_shared_info *shinfo = skb_shinfo(skb);
+	int nr_frags = shinfo->nr_frags;
+	int i;
+
+	for (i = 0; i < nr_frags; i++) {
+		skb_frag_t *frag = shinfo->frags + i;
+		netif_tx_request_t *txp;
+		unsigned long pending_idx;
+
+		pending_idx = (unsigned long)frag->page;
+		txp = &pending_tx_info[pending_idx].req;
+		frag->page = virt_to_page(MMAP_VADDR(pending_idx));
+		frag->size = txp->size;
+		frag->page_offset = txp->offset;
+
+		skb->len += txp->size;
+		skb->data_len += txp->size;
+		skb->truesize += txp->size;
+	}
+}
+
 /* Called after netfront has transmitted */
 static void net_tx_action(unsigned long unused)
 {
@@ -507,7 +679,7 @@ static void net_tx_action(unsigned long unused)
 		net_tx_action_dealloc();
 
 	mop = tx_map_ops;
-	while ((NR_PENDING_REQS < MAX_PENDING_REQS) &&
+	while (((NR_PENDING_REQS + MAX_SKB_FRAGS) < MAX_PENDING_REQS) &&
 		!list_empty(&net_schedule_list)) {
 		/* Get a netif from the list with work to do. */
 		ent = net_schedule_list.next;
@@ -555,38 +727,44 @@ static void net_tx_action(unsigned long unused)
 		}
 		netif->remaining_credit -= txreq.size;
 
-		netif->tx.req_cons++;
+		ret = netbk_count_requests(netif, &txreq, work_to_do);
+		if (unlikely(ret < 0)) {
+			netbk_tx_err(netif, i - ret);
+			continue;
+		}
+		i += ret;
 
-		netif_schedule_work(netif);
+		if (unlikely(ret > MAX_SKB_FRAGS + 1)) {
+			DPRINTK("Too many frags\n");
+			netbk_tx_err(netif, i);
+			continue;
+		}
 
-		if (unlikely(txreq.size < ETH_HLEN) || 
-		    unlikely(txreq.size > ETH_FRAME_LEN)) {
+		if (unlikely(txreq.size < ETH_HLEN)) {
 			DPRINTK("Bad packet size: %d\n", txreq.size);
-			make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
-			netif_put(netif);
+			netbk_tx_err(netif, i);
 			continue; 
 		}
 
 		/* No crossing a page as the payload mustn't fragment. */
-		if (unlikely((txreq.offset + txreq.size) >= PAGE_SIZE)) {
+		if (unlikely((txreq.offset + txreq.size) > PAGE_SIZE)) {
 			DPRINTK("txreq.offset: %x, size: %u, end: %lu\n", 
 				txreq.offset, txreq.size, 
 				(txreq.offset &~PAGE_MASK) + txreq.size);
-			make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
-			netif_put(netif);
+			netbk_tx_err(netif, i);
 			continue;
 		}
 
 		pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
 
-		data_len = (txreq.size > PKT_PROT_LEN) ?
+		data_len = (txreq.size > PKT_PROT_LEN &&
+			    ret < MAX_SKB_FRAGS + 1) ?
 			PKT_PROT_LEN : txreq.size;
 
 		skb = alloc_skb(data_len+16, GFP_ATOMIC);
 		if (unlikely(skb == NULL)) {
 			DPRINTK("Can't allocate a skb in start_xmit.\n");
-			make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
-			netif_put(netif);
+			netbk_tx_err(netif, i);
 			break;
 		}
 
@@ -603,9 +781,23 @@ static void net_tx_action(unsigned long unused)
 		pending_tx_info[pending_idx].netif = netif;
 		*((u16 *)skb->data) = pending_idx;
 
+		__skb_put(skb, data_len);
+
+		skb_shinfo(skb)->nr_frags = ret - 1;
+		if (data_len < txreq.size) {
+			skb_shinfo(skb)->nr_frags++;
+			skb_shinfo(skb)->frags[0].page =
+				(void *)(unsigned long)pending_idx;
+		}
+
 		__skb_queue_tail(&tx_queue, skb);
 
 		pending_cons++;
+
+		mop = netbk_get_requests(netif, skb, mop);
+
+		netif->tx.req_cons = i;
+		netif_schedule_work(netif);
 
 		if ((mop - tx_map_ops) >= ARRAY_SIZE(tx_map_ops))
 			break;
@@ -620,75 +812,56 @@ static void net_tx_action(unsigned long unused)
 
 	mop = tx_map_ops;
 	while ((skb = __skb_dequeue(&tx_queue)) != NULL) {
+		netif_tx_request_t *txp;
+
 		pending_idx = *((u16 *)skb->data);
 		netif       = pending_tx_info[pending_idx].netif;
-		memcpy(&txreq, &pending_tx_info[pending_idx].req,
-		       sizeof(txreq));
+		txp         = &pending_tx_info[pending_idx].req;
 
 		/* Check the remap error code. */
-		if (unlikely(mop->status)) {
+		if (unlikely(netbk_tx_check_mop(skb, &mop))) {
 			printk(KERN_ALERT "#### netback grant fails\n");
-			make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
-			netif_put(netif);
+			skb_shinfo(skb)->nr_frags = 0;
 			kfree_skb(skb);
-			mop++;
-			pending_ring[MASK_PEND_IDX(pending_prod++)] =
-				pending_idx;
 			continue;
 		}
-		set_phys_to_machine(
-			__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT,
-			FOREIGN_FRAME(mop->dev_bus_addr >> PAGE_SHIFT));
-		grant_tx_handle[pending_idx] = mop->handle;
 
-		data_len = (txreq.size > PKT_PROT_LEN) ?
-			PKT_PROT_LEN : txreq.size;
-
-		__skb_put(skb, data_len);
+		data_len = skb->len;
 		memcpy(skb->data, 
-		       (void *)(MMAP_VADDR(pending_idx)|txreq.offset),
+		       (void *)(MMAP_VADDR(pending_idx)|txp->offset),
 		       data_len);
-		if (data_len < txreq.size) {
+		if (data_len < txp->size) {
 			/* Append the packet payload as a fragment. */
-			skb_shinfo(skb)->frags[0].page        = 
-				virt_to_page(MMAP_VADDR(pending_idx));
-			skb_shinfo(skb)->frags[0].size        =
-				txreq.size - data_len;
-			skb_shinfo(skb)->frags[0].page_offset = 
-				txreq.offset + data_len;
-			skb_shinfo(skb)->nr_frags = 1;
+			txp->offset += data_len;
+			txp->size -= data_len;
 		} else {
 			/* Schedule a response immediately. */
 			netif_idx_release(pending_idx);
 		}
 
-		skb->data_len  = txreq.size - data_len;
-		skb->len      += skb->data_len;
-		skb->truesize += skb->data_len;
-
-		skb->dev      = netif->dev;
-		skb->protocol = eth_type_trans(skb, skb->dev);
-
 		/*
 		 * Old frontends do not assert data_validated but we
 		 * can infer it from csum_blank so test both flags.
 		 */
-		if (txreq.flags & (NETTXF_data_validated|NETTXF_csum_blank)) {
+		if (txp->flags & (NETTXF_data_validated|NETTXF_csum_blank)) {
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
 			skb->proto_data_valid = 1;
 		} else {
 			skb->ip_summed = CHECKSUM_NONE;
 			skb->proto_data_valid = 0;
 		}
-		skb->proto_csum_blank = !!(txreq.flags & NETTXF_csum_blank);
+		skb->proto_csum_blank = !!(txp->flags & NETTXF_csum_blank);
 
-		netif->stats.rx_bytes += txreq.size;
+		netbk_fill_frags(skb);
+
+		skb->dev      = netif->dev;
+		skb->protocol = eth_type_trans(skb, skb->dev);
+
+		netif->stats.rx_bytes += skb->len;
 		netif->stats.rx_packets++;
 
 		netif_rx(skb);
 		netif->dev->last_rx = jiffies;
-
-		mop++;
 	}
 }
 
