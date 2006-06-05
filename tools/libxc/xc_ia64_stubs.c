@@ -207,18 +207,21 @@ typedef enum {
     HOB_TYPE_PAL_VM_SUMMARY,
     HOB_TYPE_PAL_VM_INFO,
     HOB_TYPE_PAL_VM_PAGE_SIZE,
+    HOB_TYPE_NR_VCPU,
     HOB_TYPE_MAX
 }hob_type_t;
 
 static int hob_init( void  *buffer ,unsigned long buf_size);
 static int add_pal_hob(void* hob_buf);
 static int add_mem_hob(void* hob_buf, unsigned long dom_mem_size);
+static int add_vcpus_hob(void* hob_buf, unsigned long nr_vcpu);
 static int build_hob (void* hob_buf, unsigned long hob_buf_size,
-                  unsigned long dom_mem_size);
+                  unsigned long dom_mem_size, unsigned long vcpus);
 static int load_hob(int xc_handle,uint32_t dom, void *hob_buf,
 		unsigned long dom_mem_size);
 
-int xc_ia64_build_hob(int xc_handle, uint32_t dom, unsigned long memsize){
+int xc_ia64_build_hob(int xc_handle, uint32_t dom, unsigned long memsize, 
+                      unsigned long vcpus){
 
     char   *hob_buf;
 
@@ -228,7 +231,7 @@ int xc_ia64_build_hob(int xc_handle, uint32_t dom, unsigned long memsize){
         return -1;
     }
 
-    if ( build_hob( hob_buf, GFW_HOB_SIZE, memsize) < 0){
+    if ( build_hob( hob_buf, GFW_HOB_SIZE, memsize, vcpus) < 0){
         free (hob_buf);
         PERROR("Could not build hob");
         return -1;
@@ -329,7 +332,7 @@ int get_hob_size(void* hob_buf){
 }
 
 int build_hob (void* hob_buf, unsigned long hob_buf_size,
-                  unsigned long dom_mem_size)
+                  unsigned long dom_mem_size, unsigned long vcpus)
 {
     //Init HOB List
     if (hob_init (hob_buf, hob_buf_size)<0){
@@ -339,6 +342,11 @@ int build_hob (void* hob_buf, unsigned long hob_buf_size,
 
     if ( add_mem_hob( hob_buf,dom_mem_size) < 0){
         PERROR("Add memory hob failed, buffer too small");
+        goto err_out;
+    }
+
+    if ( add_vcpus_hob(hob_buf, vcpus)<0){
+        PERROR("Add NR_VCPU hob failed, buffer too small");
         goto err_out;
     }
 
@@ -398,6 +406,12 @@ add_mem_hob(void* hob_buf, unsigned long dom_mem_size){
             return -1;
     }
     return 0;
+}
+
+static int 
+add_vcpus_hob(void* hob_buf, unsigned long vcpus)
+{
+    return hob_add(hob_buf, HOB_TYPE_NR_VCPU, &vcpus, sizeof(vcpus));
 }
 
 unsigned char config_pal_bus_get_features_data[24] = {
@@ -630,7 +644,7 @@ static int setup_guest(  int xc_handle,
     }
 
     /* Hand-off state passed to guest firmware */
-    if (xc_ia64_build_hob(xc_handle, dom, dom_memsize) < 0){
+    if (xc_ia64_build_hob(xc_handle, dom, dom_memsize, (unsigned long)vcpus) < 0){
         PERROR("Could not build hob\n");
        goto error_out;
     }
