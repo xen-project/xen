@@ -415,26 +415,26 @@ int xc_domain_memory_increase_reservation(int xc_handle,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
                                           unsigned int address_bits,
-                                          unsigned long *extent_start);
+                                          xen_pfn_t *extent_start);
 
 int xc_domain_memory_decrease_reservation(int xc_handle,
                                           uint32_t domid,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
-                                          unsigned long *extent_start);
+                                          xen_pfn_t *extent_start);
 
 int xc_domain_memory_populate_physmap(int xc_handle,
                                       uint32_t domid,
                                       unsigned long nr_extents,
                                       unsigned int extent_order,
                                       unsigned int address_bits,
-                                      unsigned long *extent_start);
+                                      xen_pfn_t *extent_start);
 
 int xc_domain_translate_gpfn_list(int xc_handle,
                                   uint32_t domid,
                                   unsigned long nr_gpfns,
-                                  unsigned long *gpfn_list,
-                                  unsigned long *mfn_list);
+                                  xen_pfn_t *gpfn_list,
+                                  xen_pfn_t *mfn_list);
 
 int xc_domain_ioport_permission(int xc_handle,
                                 uint32_t domid,
@@ -487,7 +487,7 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
                             unsigned long mfn );
 
 void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
-                           unsigned long *arr, int num );
+                           xen_pfn_t *arr, int num );
 
 /**
  * Translates a virtual address in the context of a given domain and
@@ -502,11 +502,11 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
 unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
                                            int vcpu, unsigned long long virt);
 
-int xc_get_pfn_list(int xc_handle, uint32_t domid, unsigned long *pfn_buf,
+int xc_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
                     unsigned long max_pfns);
 
 int xc_ia64_get_pfn_list(int xc_handle, uint32_t domid,
-                         unsigned long *pfn_buf,
+                         xen_pfn_t *pfn_buf,
                          unsigned int start_page, unsigned int nr_pages);
 
 int xc_copy_to_domain_page(int xc_handle, uint32_t domid,

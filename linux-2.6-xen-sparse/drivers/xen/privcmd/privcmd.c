@@ -161,7 +161,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	case IOCTL_PRIVCMD_MMAPBATCH: {
 		privcmd_mmapbatch_t m;
 		struct vm_area_struct *vma = NULL;
-		unsigned long __user *p;
+		xen_pfn_t __user *p;
 		unsigned long addr, mfn; 
 		int i;
 

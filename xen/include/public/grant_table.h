@@ -240,7 +240,7 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_dump_table_t);
 #define GNTTABOP_transfer                4
 struct gnttab_transfer {
     /* IN parameters. */
-    unsigned long mfn;
+    xen_pfn_t     mfn;
     domid_t       domid;
     grant_ref_t   ref;
     /* OUT parameters. */

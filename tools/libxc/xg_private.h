@@ -173,7 +173,7 @@ typedef int (*parseimagefunc)(const char *image, unsigned long image_size,
                               struct domain_setup_info *dsi);
 typedef int (*loadimagefunc)(const char *image, unsigned long image_size,
                              int xch,
-                             uint32_t dom, unsigned long *parray,
+                             uint32_t dom, xen_pfn_t *parray,
                              struct domain_setup_info *dsi);
 
 struct load_funcs
@@ -201,7 +201,7 @@ int xc_copy_to_domain_page(int xc_handle, uint32_t domid,
 unsigned long xc_get_filesz(int fd);
 
 void xc_map_memcpy(unsigned long dst, const char *src, unsigned long size,
-                   int xch, uint32_t dom, unsigned long *parray,
+                   int xch, uint32_t dom, xen_pfn_t *parray,
                    unsigned long vstart);
 
 int pin_table(int xc_handle, unsigned int type, unsigned long mfn,

@@ -59,7 +59,7 @@ typedef struct privcmd_mmapbatch {
 	int num;     /* number of pages to populate */
 	domid_t dom; /* target domain */
 	unsigned long addr;  /* virtual address */
-	unsigned long __user *arr; /* array of mfns - top nibble set on err */
+	xen_pfn_t __user *arr; /* array of mfns - top nibble set on err */
 } privcmd_mmapbatch_t; 
 
 /*

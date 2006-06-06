@@ -57,7 +57,7 @@ typedef struct domain_context                 /* local cache of domain state */
     vcpu_guest_context_t context[MAX_VIRT_CPUS];
 
     long            total_pages;
-    unsigned long  *page_array;
+    xen_pfn_t      *page_array;
 
     unsigned long   cr3_phys[MAX_VIRT_CPUS];
     unsigned long  *cr3_virt[MAX_VIRT_CPUS];

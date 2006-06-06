@@ -28,7 +28,7 @@ struct dom0_getmemlist {
     /* IN variables. */
     domid_t       domain;
     unsigned long max_pfns;
-    XEN_GUEST_HANDLE(ulong) buffer;
+    XEN_GUEST_HANDLE(xen_pfn_t) buffer;
     /* OUT variables. */
     unsigned long num_pfns;
 };
@@ -98,7 +98,7 @@ struct dom0_getdomaininfo {
     uint32_t flags;
     unsigned long tot_pages;
     unsigned long max_pages;
-    unsigned long shared_info_frame;       /* MFN of shared_info struct */
+    xen_pfn_t shared_info_frame;  /* MFN of shared_info struct */
     uint64_t cpu_time;
     uint32_t nr_online_vcpus;     /* Number of VCPUs currently online. */
     uint32_t max_vcpu_id;         /* Maximum VCPUID in use by this domain. */
@@ -162,7 +162,7 @@ DEFINE_XEN_GUEST_HANDLE(dom0_settime_t);
 
 struct dom0_getpageframeinfo {
     /* IN variables. */
-    unsigned long mfn;     /* Machine page frame number to query.       */
+    xen_pfn_t mfn;         /* Machine page frame number to query.       */
     domid_t domain;        /* To which domain does the frame belong?    */
     /* OUT variables. */
     /* Is the page PINNED to a type? */
@@ -213,7 +213,7 @@ struct dom0_tbufcontrol {
     cpumap_t      cpu_mask;
     uint32_t      evt_mask;
     /* OUT variables */
-    unsigned long buffer_mfn;
+    xen_pfn_t buffer_mfn;
     uint32_t size;
 };
 typedef struct dom0_tbufcontrol dom0_tbufcontrol_t;
@@ -313,7 +313,7 @@ DEFINE_XEN_GUEST_HANDLE(dom0_getpageframeinfo2_t);
 #define DOM0_ADD_MEMTYPE         31
 struct dom0_add_memtype {
     /* IN variables. */
-    unsigned long mfn;
+    xen_pfn_t mfn;
     unsigned long nr_mfns;
     uint32_t      type;
     /* OUT variables. */
@@ -345,7 +345,7 @@ struct dom0_read_memtype {
     /* IN variables. */
     uint32_t reg;
     /* OUT variables. */
-    unsigned long mfn;
+    xen_pfn_t mfn;
     unsigned long nr_mfns;
     uint32_t type;
 };
@@ -499,7 +499,7 @@ DEFINE_XEN_GUEST_HANDLE(dom0_irq_permission_t);
 #define DOM0_IOMEM_PERMISSION 47
 struct dom0_iomem_permission {
     domid_t  domain;          /* domain to be affected */
-    unsigned long first_mfn;  /* first page (physical page number) in range */
+    xen_pfn_t first_mfn;      /* first page (physical page number) in range */
     unsigned long nr_mfns;    /* number of pages in range (>0) */
     uint8_t allow_access;     /* allow (!0) or deny (0) access to range? */
 };
@@ -509,7 +509,7 @@ DEFINE_XEN_GUEST_HANDLE(dom0_iomem_permission_t);
 #define DOM0_HYPERCALL_INIT   48
 struct dom0_hypercall_init {
     domid_t  domain;          /* domain to be affected */
-    unsigned long mfn;        /* machine frame to be initialised */
+    xen_pfn_t mfn;            /* machine frame to be initialised */
 };
 typedef struct dom0_hypercall_init dom0_hypercall_init_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_hypercall_init_t);

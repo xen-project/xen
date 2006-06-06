@@ -107,7 +107,7 @@ parsebinimage(
 static int
 loadbinimage(
     const char *image, unsigned long image_size, int xch, uint32_t dom,
-    unsigned long *parray, struct domain_setup_info *dsi);
+    xen_pfn_t *parray, struct domain_setup_info *dsi);
 
 int probe_bin(const char *image,
               unsigned long image_size,
@@ -235,7 +235,7 @@ static int parsebinimage(const char *image,
 static int
 loadbinimage(
     const char *image, unsigned long image_size, int xch, uint32_t dom,
-    unsigned long *parray, struct domain_setup_info *dsi)
+    xen_pfn_t *parray, struct domain_setup_info *dsi)
 {
     unsigned long size;
     char         *va;

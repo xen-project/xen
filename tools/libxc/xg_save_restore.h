@@ -105,23 +105,23 @@ static int get_platform_info(int xc_handle, uint32_t dom,
 */
 #define M2P_SHIFT       L2_PAGETABLE_SHIFT_PAE
 #define M2P_CHUNK_SIZE  (1 << M2P_SHIFT)
-#define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(unsigned long)), M2P_SHIFT)
+#define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(xen_pfn_t)), M2P_SHIFT)
 #define M2P_CHUNKS(_m)  (M2P_SIZE((_m)) >> M2P_SHIFT)
 
 /* Size in bytes of the P2M (rounded up to the nearest PAGE_SIZE bytes) */
-#define P2M_SIZE        ROUNDUP((max_pfn * sizeof(unsigned long)), PAGE_SHIFT)
+#define P2M_SIZE        ROUNDUP((max_pfn * sizeof(xen_pfn_t)), PAGE_SHIFT)
 
-/* Number of unsigned longs in a page */
-#define ulpp            (PAGE_SIZE/sizeof(unsigned long))
+/* Number of xen_pfn_t in a page */
+#define fpp             (PAGE_SIZE/sizeof(xen_pfn_t))
 
 /* Number of entries in the pfn_to_mfn_frame_list */
-#define P2M_FL_ENTRIES  (((max_pfn)+ulpp-1)/ulpp)
+#define P2M_FL_ENTRIES  (((max_pfn)+fpp-1)/fpp)
 
 /* Size in bytes of the pfn_to_mfn_frame_list     */
 #define P2M_FL_SIZE     ((P2M_FL_ENTRIES)*sizeof(unsigned long))
 
 /* Number of entries in the pfn_to_mfn_frame_list_list */
-#define P2M_FLL_ENTRIES (((max_pfn)+(ulpp*ulpp)-1)/(ulpp*ulpp))
+#define P2M_FLL_ENTRIES (((max_pfn)+(fpp*fpp)-1)/(fpp*fpp))
 
 /* Current guests allow 8MB 'slack' in their P2M */
 #define NR_SLACK_ENTRIES   ((8 * 1024 * 1024) / PAGE_SIZE)

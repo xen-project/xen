@@ -2458,7 +2458,7 @@ int unset_mm_mapping(int xc_handle,
                      uint32_t domid,
                      unsigned long nr_pages,
                      unsigned int address_bits,
-                     unsigned long *extent_start)
+                     xen_pfn_t *extent_start)
 {
     int err = 0;
     xc_dominfo_t info;
@@ -2491,7 +2491,7 @@ int set_mm_mapping(int xc_handle,
                     uint32_t domid,
                     unsigned long nr_pages,
                     unsigned int address_bits,
-                    unsigned long *extent_start)
+                    xen_pfn_t *extent_start)
 {
     xc_dominfo_t info;
     int err = 0;
@@ -2557,7 +2557,8 @@ int main(int argc, char **argv)
     int serial_device_index;
     char qemu_dm_logfilename[64];
     const char *loadvm = NULL;
-    unsigned long nr_pages, *page_array;
+    unsigned long nr_pages;
+    xen_pfn_t *page_array;
     extern void *shared_page;
 
 #if !defined(CONFIG_SOFTMMU)
@@ -3023,8 +3024,8 @@ int main(int argc, char **argv)
 
     xc_handle = xc_interface_open();
 
-    if ( (page_array = (unsigned long *)
-                        malloc(nr_pages * sizeof(unsigned long))) == NULL)
+    if ( (page_array = (xen_pfn_t *)
+                        malloc(nr_pages * sizeof(xen_pfn_t))) == NULL)
     {
         fprintf(logfile, "malloc returned error %d\n", errno);
         exit(-1);
@@ -3079,8 +3080,8 @@ int main(int argc, char **argv)
                                        page_array[0]);
 #endif
 
-    fprintf(logfile, "shared page at pfn:%lx, mfn: %lx\n", (nr_pages-1),
-           (page_array[nr_pages - 1]));
+    fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n", (nr_pages-1),
+           (uint64_t)(page_array[nr_pages - 1]));
 
     /* we always create the cdrom drive, even if no disk is there */
     bdrv_init();

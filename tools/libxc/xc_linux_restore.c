@@ -25,10 +25,10 @@ static unsigned int pt_levels;
 static unsigned long max_pfn;
 
 /* Live mapping of the table mapping each PFN to its current MFN. */
-static unsigned long *live_p2m = NULL;
+static xen_pfn_t *live_p2m = NULL;
 
 /* A table mapping each PFN to its new MFN. */
-static unsigned long *p2m = NULL;
+static xen_pfn_t *p2m = NULL;
 
 
 static ssize_t
@@ -126,7 +126,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     unsigned long *pfn_type = NULL;
 
     /* A table of MFNs to map in the current region */
-    unsigned long *region_mfn = NULL;
+    xen_pfn_t *region_mfn = NULL;
 
     /* Types of the pfns in the current region */
     unsigned long region_pfn_type[MAX_BATCH_SIZE];
@@ -135,7 +135,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     unsigned long *page = NULL;
 
     /* A copy of the pfn-to-mfn table frame list. */
-    unsigned long *p2m_frame_list = NULL;
+    xen_pfn_t *p2m_frame_list = NULL;
 
     /* A temporary mapping of the guest's start_info page. */
     start_info_t *start_info;
@@ -241,9 +241,9 @@ int xc_linux_restore(int xc_handle, int io_fd,
     }
 
     /* We want zeroed memory so use calloc rather than malloc. */
-    p2m        = calloc(max_pfn, sizeof(unsigned long));
+    p2m        = calloc(max_pfn, sizeof(xen_pfn_t));
     pfn_type   = calloc(max_pfn, sizeof(unsigned long));
-    region_mfn = calloc(MAX_BATCH_SIZE, sizeof(unsigned long));
+    region_mfn = calloc(MAX_BATCH_SIZE, sizeof(xen_pfn_t));
 
     if ((p2m == NULL) || (pfn_type == NULL) || (region_mfn == NULL)) {
         ERR("memory alloc failed");
@@ -251,7 +251,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
         goto out;
     }
 
-    if (mlock(region_mfn, sizeof(unsigned long) * MAX_BATCH_SIZE)) {
+    if (mlock(region_mfn, sizeof(xen_pfn_t) * MAX_BATCH_SIZE)) {
         ERR("Could not mlock region_mfn");
         goto out;
     }
