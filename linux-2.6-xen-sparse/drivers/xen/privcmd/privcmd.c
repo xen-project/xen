@@ -61,11 +61,11 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		__asm__ __volatile__ (
 			"pushl %%ebx; pushl %%ecx; pushl %%edx; "
 			"pushl %%esi; pushl %%edi; "
-			"movl  4(%%eax),%%ebx ;"
-			"movl  8(%%eax),%%ecx ;"
-			"movl 12(%%eax),%%edx ;"
-			"movl 16(%%eax),%%esi ;"
-			"movl 20(%%eax),%%edi ;"
+			"movl  8(%%eax),%%ebx ;"
+			"movl 16(%%eax),%%ecx ;"
+			"movl 24(%%eax),%%edx ;"
+			"movl 32(%%eax),%%esi ;"
+			"movl 40(%%eax),%%edi ;"
 			"movl   (%%eax),%%eax ;"
 			"shll $5,%%eax ;"
 			"addl $hypercall_page,%%eax ;"
@@ -210,7 +210,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	batch_err:
 		printk("batch_err ret=%d vma=%p addr=%lx "
 		       "num=%d arr=%p %lx-%lx\n", 
-		       ret, vma, m.addr, m.num, m.arr,
+		       ret, vma, (unsigned long)m.addr, m.num, m.arr,
 		       vma ? vma->vm_start : 0, vma ? vma->vm_end : 0);
 		break;
 	}
