@@ -32,7 +32,8 @@
  * when emulation code is waiting for I/O completion by blocking,
  * other events like DM interrupt, VBD, etc. may come and unblock
  * current exection flow. So we have to prepare for re-block if unblocked
- * by non I/O completion event.
+ * by non I/O completion event. After io emulation is done, re-enable
+ * pending indicaion if other ports are pending
  */
 void vmx_wait_io(void)
 {
@@ -40,39 +41,25 @@ void vmx_wait_io(void)
     struct domain *d = v->domain;
     int port = iopacket_port(v);
 
-    do {
-	if (!test_bit(port,
-		&d->shared_info->evtchn_pending[0]))
-            do_sched_op_compat(SCHEDOP_block, 0);
+    for (;;) {
+        if (test_and_clear_bit(0, &v->vcpu_info->evtchn_upcall_pending) &&
+            test_and_clear_bit(port / BITS_PER_LONG,
+                                     &v->vcpu_info->evtchn_pending_sel) &&
+            test_and_clear_bit(port, &d->shared_info->evtchn_pending[0]))
+            vmx_io_assist(v);
 
-	/* Unblocked when some event is coming. Clear pending indication
-	 * immediately if deciding to go for io assist
-	  */
-	if (test_and_clear_bit(port,
-		&d->shared_info->evtchn_pending[0])) {
-	    clear_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
-	    clear_bit(0, &v->vcpu_info->evtchn_upcall_pending);
-	    vmx_io_assist(v);
-	}
+        if (!test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags))
+            break;
 
+        do_sched_op_compat(SCHEDOP_block, 0);
+    }
 
-	if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags)) {
-	    /*
-	     * Latest event is not I/O completion, so clear corresponding
-	     * selector and pending indication, to allow real event coming
-	     */
-	    clear_bit(0, &v->vcpu_info->evtchn_upcall_pending);
+    /* re-enable indication if other pending events */
+    if (d->shared_info->evtchn_pending[port / BITS_PER_LONG])
+        set_bit(port / BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
 
-	    /* Here atually one window is leaved before selector is cleared.
-	     * However this window only delay the indication to coming event,
-	     * nothing losed. Next loop will check I/O channel to fix this
-	     * window.
-	     */
-	    clear_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
-	}
-	else
-	    break;
-    } while (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags));
+    if (&v->vcpu_info->evtchn_pending_sel)
+        set_bit(0, &v->vcpu_info->evtchn_upcall_pending);
 }
 
 /*
@@ -110,8 +97,7 @@ void vmx_io_assist(struct vcpu *v)
 	    p->state = STATE_INVALID;
 
 	clear_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
-    } else
-	return; /* Spurous event? */
+    }
 }
 
 /*
@@ -131,21 +117,15 @@ void vmx_intr_assist(struct vcpu *v)
 					unsigned long *pend_irr);
     int port = iopacket_port(v);
 
+    if (test_bit(port, &d->shared_info->evtchn_pending[0]) ||
+	test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags))
+	vmx_wait_io();
+
     /* I/O emulation is atomic, so it's impossible to see execution flow
      * out of vmx_wait_io, when guest is still waiting for response.
      */
     if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags))
 	panic_domain(vcpu_regs(v),"!!!Bad resume to guest before I/O emulation is done.\n");
-
-    /* Clear indicator specific to interrupt delivered from DM */
-    if (test_and_clear_bit(port,
-		&d->shared_info->evtchn_pending[0])) {
-	if (!d->shared_info->evtchn_pending[port/BITS_PER_LONG])
-	    clear_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
-
-	if (!v->vcpu_info->evtchn_pending_sel)
-	    clear_bit(0, &v->vcpu_info->evtchn_upcall_pending);
-    }
 
     /* Even without event pending, we still need to sync pending bits
      * between DM and vlsapic. The reason is that interrupt delivery
