@@ -499,7 +499,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 				printk(KERN_ALERT "network_tx_buf_gc: warning "
 				       "-- grant still in use by backend "
 				       "domain.\n");
-				break; /* bail immediately */
+				BUG();
 			}
 			gnttab_end_foreign_access_ref(
 				np->grant_tx_ref[id], GNTMAP_readonly);
