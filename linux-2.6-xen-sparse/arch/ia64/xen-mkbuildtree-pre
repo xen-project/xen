@@ -16,9 +16,6 @@ ln -sf ../../../../xen/include/asm-ia64/asm-xsi-offsets.h include/asm-ia64/xen/
 ln -sf ../../arch/ia64/xen/drivers/Makefile drivers/xen/Makefile
 ln -sf ../../../arch/ia64/xen/drivers/coreMakefile drivers/xen/core/Makefile
 
-#not sure where these ia64-specific files will end up in the future
-ln -sf ../../../arch/ia64/xen/drivers/xenia64_init.c drivers/xen/core
-
 #still a few x86-ism's in various drivers/xen files, patch them
 #cd drivers/xen
 #if [ ! -e ia64.patch.semaphore ]

@@ -23,12 +23,21 @@
 //#include <linux/kernel.h>
 #include <linux/spinlock.h>
 #include <linux/bootmem.h>
+#include <linux/module.h>
 #include <linux/vmalloc.h>
 #include <asm/page.h>
 #include <asm/hypervisor.h>
 #include <asm/hypercall.h>
 #include <xen/interface/memory.h>
 #include <xen/balloon.h>
+
+shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)XSI_BASE;
+EXPORT_SYMBOL(HYPERVISOR_shared_info);
+
+start_info_t *xen_start_info;
+
+int running_on_xen;
+EXPORT_SYMBOL(running_on_xen);
 
 //XXX xen/ia64 copy_from_guest() is broken.
 //    This is a temporal work around until it is fixed.

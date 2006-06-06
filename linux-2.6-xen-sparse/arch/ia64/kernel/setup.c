@@ -519,14 +519,18 @@ setup_arch (char **cmdline_p)
 	}
 #ifdef CONFIG_XEN
 	if (is_running_on_xen()) {
-		extern shared_info_t *HYPERVISOR_shared_info;
-		extern int xen_init (void);
+		shared_info_t *s = HYPERVISOR_shared_info;
 
-		xen_init ();
+		xen_start_info = __va(s->arch.start_info_pfn << PAGE_SHIFT);
+		xen_start_info->flags = s->arch.flags;
+
+		printk("Running on Xen! start_info_pfn=0x%lx nr_pages=%ld "
+		       "flags=0x%x\n", s->arch.start_info_pfn,
+		       xen_start_info->nr_pages, xen_start_info->flags);
 
 		/* xen_start_info isn't setup yet, get the flags manually */
-		if (HYPERVISOR_shared_info->arch.flags & SIF_INITDOMAIN) {
-			if (!(HYPERVISOR_shared_info->arch.flags & SIF_PRIVILEGED))
+		if (s->arch.flags & SIF_INITDOMAIN) {
+			if (!(s->arch.flags & SIF_PRIVILEGED))
 				panic("Xen granted us console access "
 				      "but not privileged status");
 		} else {

@@ -7,7 +7,6 @@ obj-$(CONFIG_PROC_FS) += xen_proc.o
 
 ifeq ($(ARCH),ia64)
 obj-y   += evtchn.o
-obj-y   += xenia64_init.o
 ifeq ($(CONFIG_XEN_IA64_DOM0_VP),y)
 obj-$(CONFIG_NET)     += skbuff.o
 endif
