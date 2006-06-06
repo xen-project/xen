@@ -296,7 +296,6 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
 			printk("translate_domain_pte: out-of-bounds dom0 mpaddr 0x%lx! itc=%lx...\n",
 				mpaddr, ia64_get_itc());
 			*/
-			tdpfoo();
 		}
 	}
 	else if ((mpaddr >> PAGE_SHIFT) > d->max_pages) {
@@ -310,7 +309,6 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
 			       "vadr=0x%lx,pteval=0x%lx,itir=0x%lx\n",
 			       mpaddr, (unsigned long)d->max_pages<<PAGE_SHIFT,
 			       address, pteval, itir.itir);
-		tdpfoo();
 	}
 #endif
 	pteval2 = lookup_domain_mpa(d,mpaddr);
@@ -345,7 +343,6 @@ unsigned long translate_domain_mpaddr(unsigned long mpaddr)
 		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
 			printk("translate_domain_mpaddr: out-of-bounds dom0 mpaddr 0x%lx! continuing...\n",
 				mpaddr);
-			tdpfoo();
 		}
 	}
 #endif
@@ -393,20 +390,17 @@ lookup_noalloc_domain_pte(struct domain* d, unsigned long mpaddr)
     BUG_ON(mm->pgd == NULL);
     pgd = pgd_offset(mm, mpaddr);
     if (!pgd_present(*pgd))
-        goto not_present;
+        return NULL;
 
     pud = pud_offset(pgd, mpaddr);
     if (!pud_present(*pud))
-        goto not_present;
+        return NULL;
 
     pmd = pmd_offset(pud, mpaddr);
     if (!pmd_present(*pmd))
-        goto not_present;
+        return NULL;
 
     return pte_offset_map(pmd, mpaddr);
-
-not_present:
-    return NULL;
 }
 
 #ifdef CONFIG_XEN_IA64_DOM0_VP
@@ -421,20 +415,17 @@ lookup_noalloc_domain_pte_none(struct domain* d, unsigned long mpaddr)
     BUG_ON(mm->pgd == NULL);
     pgd = pgd_offset(mm, mpaddr);
     if (pgd_none(*pgd))
-        goto not_present;
+        return NULL;
 
     pud = pud_offset(pgd, mpaddr);
     if (pud_none(*pud))
-        goto not_present;
+        return NULL;
 
     pmd = pmd_offset(pud, mpaddr);
     if (pmd_none(*pmd))
-        goto not_present;
+        return NULL;
 
     return pte_offset_map(pmd, mpaddr);
-
-not_present:
-    return NULL;
 }
 
 unsigned long
@@ -444,14 +435,12 @@ ____lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 
     pte = lookup_noalloc_domain_pte(d, mpaddr);
     if (pte == NULL)
-        goto not_present;
+        return INVALID_MFN;
 
     if (pte_present(*pte))
         return (pte->pte & _PFN_MASK);
     else if (VMX_DOMAIN(d->vcpu[0]))
         return GPFN_INV_MASK;
-
-not_present:
     return INVALID_MFN;
 }
 
@@ -470,13 +459,6 @@ __lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 }
 #endif
 
-void mpafoo(unsigned long mpaddr)
-{
-    extern unsigned long privop_trace;
-    if (mpaddr == 0x3800)
-        privop_trace = 1;
-}
-
 unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 {
     pte_t *pte;
@@ -487,7 +469,6 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
         if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
             //printk("lookup_domain_mpa: bad dom0 mpaddr 0x%lx!\n",mpaddr);
             //printk("lookup_domain_mpa: start=0x%lx,end=0x%lx!\n",dom0_start,dom0_start+dom0_size);
-            mpafoo(mpaddr);
         }
         pteval = pfn_pte(mpaddr >> PAGE_SHIFT,
             __pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX));
@@ -511,7 +492,6 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
     else
         printk("%s: bad mpa 0x%lx (=> 0x%lx)\n", __func__,
                mpaddr, (unsigned long)d->max_pages << PAGE_SHIFT);
-    mpafoo(mpaddr);
 
     //XXX This is a work around until the emulation memory access to a region
     //    where memory or device are attached is implemented.
@@ -520,7 +500,7 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 
 // FIXME: ONLY USE FOR DOMAIN PAGE_SIZE == PAGE_SIZE
 #if 1
-unsigned long domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
+void *domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
 {
     unsigned long pte = lookup_domain_mpa(d,mpaddr);
     unsigned long imva;
@@ -528,14 +508,14 @@ unsigned long domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
     pte &= _PAGE_PPN_MASK;
     imva = (unsigned long) __va(pte);
     imva |= mpaddr & ~PAGE_MASK;
-    return(imva);
+    return (void*)imva;
 }
 #else
-unsigned long domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
+void *domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
 {
     unsigned long imva = __gpa_to_mpa(d, mpaddr);
 
-    return __va(imva);
+    return (void *)__va(imva);
 }
 #endif
 
@@ -842,17 +822,13 @@ unsigned long
 dom0vp_zap_physmap(struct domain *d, unsigned long gpfn,
                    unsigned int extent_order)
 {
-    unsigned long ret = 0;
     if (extent_order != 0) {
         //XXX
-        ret = -ENOSYS;
-        goto out;
+        return -ENOSYS;
     }
 
     zap_domain_page_one(d, gpfn << PAGE_SHIFT, 1);
-
-out:
-    return ret;
+    return 0;
 }
 
 unsigned long
@@ -875,8 +851,7 @@ dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn,
             DPRINTK("d 0x%p domid %d "
                     "pgfn 0x%lx mfn 0x%lx flags 0x%lx domid %d\n",
                     d, d->domain_id, gpfn, mfn, flags, domid);
-            error = -ESRCH;
-            goto out0;
+            return -ESRCH;
         }
         BUG_ON(rd == NULL);
         get_knownalive_domain(rd);
@@ -895,7 +870,6 @@ dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn,
     //don't update p2m table because this page belongs to rd, not d.
 out1:
     put_domain(rd);
-out0:
     return error;
 }
 

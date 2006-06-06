@@ -36,7 +36,6 @@
 #include <xen/domain.h>
 
 extern long do_sched_op_compat(int cmd, unsigned long arg);
-extern unsigned long domain_mpa_to_imva(struct domain *,unsigned long mpaddr);
 
 void hyper_not_support(void)
 {

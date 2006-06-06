@@ -25,7 +25,6 @@
 #include <asm/dom_fw.h>
 
 static struct ia64_boot_param *dom_fw_init(struct domain *, const char *,int,char *,int);
-extern unsigned long domain_mpa_to_imva(struct domain *,unsigned long mpaddr);
 extern struct domain *dom0;
 extern unsigned long dom0_start;
 
@@ -77,8 +76,8 @@ static void dom_fpswa_hypercall_patch(struct domain *d)
 #endif
 	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, entry_paddr);
 	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, patch_paddr);
-	entry_imva = (unsigned long *) domain_mpa_to_imva(d, entry_paddr);
-	patch_imva = (unsigned long *) domain_mpa_to_imva(d, patch_paddr);
+	entry_imva = domain_mpa_to_imva(d, entry_paddr);
+	patch_imva = domain_mpa_to_imva(d, patch_paddr);
 
 	*entry_imva++ = patch_paddr;
 	*entry_imva   = 0;
@@ -94,7 +93,7 @@ static void dom_efi_hypercall_patch(struct domain *d, unsigned long paddr, unsig
 	if (d == dom0) paddr += dom0_start;
 #endif
 	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, paddr);
-	imva = (unsigned long *) domain_mpa_to_imva(d, paddr);
+	imva = domain_mpa_to_imva(d, paddr);
 	build_hypercall_bundle(imva, d->arch.breakimm, hypercall, 1);
 }
 
@@ -104,7 +103,7 @@ static void dom_fw_hypercall_patch(struct domain *d, unsigned long paddr, unsign
 	unsigned long *imva;
 
 	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, paddr);
-	imva = (unsigned long *) domain_mpa_to_imva(d, paddr);
+	imva = domain_mpa_to_imva(d, paddr);
 	build_hypercall_bundle(imva, d->arch.breakimm, hypercall, ret);
 }
 
@@ -113,7 +112,7 @@ static void dom_fw_pal_hypercall_patch(struct domain *d, unsigned long paddr)
 	unsigned long *imva;
 
 	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, paddr);
-	imva = (unsigned long *) domain_mpa_to_imva(d, paddr);
+	imva = domain_mpa_to_imva(d, paddr);
 	build_pal_hypercall_bundles(imva, d->arch.breakimm, FW_HYPERCALL_PAL_CALL);
 }
 
@@ -130,7 +129,7 @@ unsigned long dom_fw_setup(struct domain *d, const char *args, int arglen)
 	if (d == dom0) dom_fw_base_mpa += dom0_start;
 #endif
 	ASSIGN_NEW_DOMAIN_PAGE_IF_DOM0(d, dom_fw_base_mpa);
-	imva_fw_base = domain_mpa_to_imva(d, dom_fw_base_mpa);
+	imva_fw_base = (unsigned long) domain_mpa_to_imva(d, dom_fw_base_mpa);
 	bp = dom_fw_init(d, args, arglen, (char *) imva_fw_base, PAGE_SIZE);
 	return dom_pa((unsigned long) bp);
 }
