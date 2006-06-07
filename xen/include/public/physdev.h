@@ -39,7 +39,7 @@ DEFINE_XEN_GUEST_HANDLE(physdev_irq_status_query_t);
 #define _XENIRQSTAT_needs_eoi   (0)
 #define  XENIRQSTAT_needs_eoi   (1U<<_XENIRQSTAT_needs_eoi)
 
-/* Need to call PHYSDEVOP_eoi when the IRQ has been serviced? */
+/* IRQ shared by multiple guests? */
 #define _XENIRQSTAT_shared      (1)
 #define  XENIRQSTAT_shared      (1U<<_XENIRQSTAT_shared)
 
