@@ -655,7 +655,7 @@ static int setup_guest(  int xc_handle,
 
         vp_eport = xc_evtchn_alloc_unbound(xc_handle, dom, 0);
         if (vp_eport < 0) {
-            fprintf(stderr, "Couldn't get unbound port from VMX guest.\n");
+            DPRINTF("Couldn't get unbound port from VMX guest.\n");
             goto error_out;
         }
         sp->vcpu_iodata[i].vp_eport = vp_eport;

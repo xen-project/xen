@@ -85,7 +85,7 @@ map_domain_va_core(unsigned long domfd, int cpu, void * guest_va,
             map_mtop_offset(page_phys[cpu]));
         if (v == MAP_FAILED)
         {
-            printf("cr3 %lx pde %lx page %lx pti %lx\n", cr3[cpu], pde, page, l1_table_offset_i386(va));
+            IPRINTF("cr3 %lx pde %lx page %lx pti %lx\n", cr3[cpu], pde, page, l1_table_offset_i386(va));
             page_phys[cpu] = 0;
             return NULL;
         }
@@ -113,7 +113,7 @@ xc_waitdomain_core(
             return -1;
 
         if (header.xch_magic != XC_CORE_MAGIC) {
-                printf("Magic number missmatch: 0x%08x (file) != "
+                IPRINTF("Magic number missmatch: 0x%08x (file) != "
                                         " 0x%08x (code)\n", header.xch_magic,
                                         XC_CORE_MAGIC);
                 return -1;
@@ -132,7 +132,7 @@ xc_waitdomain_core(
 
         if ((p2m_array = malloc(nr_pages * sizeof(unsigned long))) == NULL)
         {
-            printf("Could not allocate p2m_array\n");
+            IPRINTF("Could not allocate p2m_array\n");
             return -1;
         }
 
@@ -142,7 +142,7 @@ xc_waitdomain_core(
 
         if ((m2p_array = malloc((1<<20) * sizeof(unsigned long))) == NULL)
         {
-            printf("Could not allocate m2p array\n");
+            IPRINTF("Could not allocate m2p array\n");
             return -1;
         }
         bzero(m2p_array, sizeof(unsigned long)* 1 << 20);

@@ -288,7 +288,7 @@ static int print_stats(int xc_handle, uint32_t domid, int pages_sent,
     d1_cpu_now = xc_domain_get_cpu_usage(xc_handle, domid, /* FIXME */ 0)/1000;
 
     if ( (d0_cpu_now == -1) || (d1_cpu_now == -1) )
-        fprintf(stderr, "ARRHHH!!\n");
+        DPRINTF("ARRHHH!!\n");
 
     wall_delta = tv_delta(&wall_now,&wall_last)/1000;
 
@@ -298,7 +298,7 @@ static int print_stats(int xc_handle, uint32_t domid, int pages_sent,
     d1_cpu_delta = (d1_cpu_now - d1_cpu_last)/1000;
 
     if (print)
-        fprintf(stderr,
+        DPRINTF(
                 "delta %lldms, dom0 %d%%, target %d%%, sent %dMb/s, "
                 "dirtied %dMb/s %" PRId32 " pages\n",
                 wall_delta,
@@ -339,14 +339,14 @@ static int analysis_phase(int xc_handle, uint32_t domid, int max_pfn,
 
         xc_shadow_control(xc_handle, domid, DOM0_SHADOW_CONTROL_OP_CLEAN,
                           arr, max_pfn, NULL);
-        fprintf(stderr, "#Flush\n");
+        DPRINTF("#Flush\n");
         for ( i = 0; i < 40; i++ ) {
             usleep(50000);
             now = llgettimeofday();
             xc_shadow_control(xc_handle, domid, DOM0_SHADOW_CONTROL_OP_PEEK,
                               NULL, 0, &stats);
 
-            fprintf(stderr, "now= %lld faults= %" PRId32 " dirty= %" PRId32
+            DPRINTF("now= %lld faults= %" PRId32 " dirty= %" PRId32
                     " dirty_net= %" PRId32 " dirty_block= %" PRId32"\n",
                     ((now-start)+500)/1000,
                     stats.fault_count, stats.dirty_count,
@@ -961,7 +961,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 }
 
                 if (debug)
-                    fprintf(stderr, "%d pfn= %08lx mfn= %08lx [mfn]= %08lx"
+                    DPRINTF("%d pfn= %08lx mfn= %08lx [mfn]= %08lx"
                             " sum= %08lx\n",
                             iter,
                             (pfn_type[j] & LTAB_MASK) | pfn_batch[j],
@@ -1042,7 +1042,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             int minusone = -1;
             memset(to_send, 0xff, BITMAP_SIZE);
             debug = 0;
-            fprintf(stderr, "Entering debug resend-all mode\n");
+            DPRINTF("Entering debug resend-all mode\n");
 
             /* send "-1" to put receiver into debug mode */
             if(!write_exact(io_fd, &minusone, sizeof(int))) {

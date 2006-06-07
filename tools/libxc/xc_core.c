@@ -83,12 +83,12 @@ xc_domain_dumpcore_via_callback(int xc_handle,
 
     if ( (page_array = malloc(nr_pages * sizeof(xen_pfn_t))) == NULL )
     {
-        printf("Could not allocate memory\n");
+        IPRINTF("Could not allocate memory\n");
         goto error_out;
     }
     if ( xc_get_pfn_list(xc_handle, domid, page_array, nr_pages) != nr_pages )
     {
-        printf("Could not get the page frame list\n");
+        IPRINTF("Could not get the page frame list\n");
         goto error_out;
     }
     sts = dump_rtn(args, (char *)page_array, nr_pages * sizeof(xen_pfn_t));

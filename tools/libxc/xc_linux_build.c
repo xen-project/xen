@@ -276,7 +276,7 @@ static int setup_pg_tables_pae(int xc_handle, uint32_t dom,
         nmfn = xc_make_page_below_4G(xc_handle, dom, page_array[ppt_alloc]);
         if ( nmfn == 0 )
         {
-            fprintf(stderr, "Couldn't get a page below 4GB :-(\n");
+            DPRINTF("Couldn't get a page below 4GB :-(\n");
             goto error_out;
         }
         page_array[ppt_alloc] = nmfn;
@@ -510,14 +510,14 @@ static int setup_guest(int xc_handle,
 
 #define _p(a) ((void *) (a))
 
-    printf("VIRTUAL MEMORY ARRANGEMENT:\n"
+    IPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n"
            " Loaded kernel: %p->%p\n"
            " Init. ramdisk: %p->%p\n"
            " TOTAL:         %p->%p\n",
            _p(dsi.v_kernstart), _p(dsi.v_kernend),
            _p(vinitrd_start),   _p(vinitrd_end),
            _p(dsi.v_start),     _p(v_end));
-    printf(" ENTRY ADDRESS: %p\n", _p(dsi.v_kernentry));
+    IPRINTF(" ENTRY ADDRESS: %p\n", _p(dsi.v_kernentry));
 
     (load_funcs.loadimage)(image, image_size, xc_handle, dom, page_array,
                            &dsi);
@@ -541,7 +541,7 @@ static int setup_guest(int xc_handle,
 
     *store_mfn = page_array[1];
     *console_mfn = page_array[2];
-    printf("start_info: 0x%lx at 0x%lx, "
+    IPRINTF("start_info: 0x%lx at 0x%lx, "
            "store_mfn: 0x%lx at 0x%lx, "
            "console_mfn: 0x%lx at 0x%lx\n",
            page_array[0], nr_pages,
@@ -684,8 +684,8 @@ static int setup_guest(int xc_handle,
             goto error_out;
         }
 
-        printf("Supported features  = { %08x }.\n", supported_features[0]);
-        printf("Required features   = { %08x }.\n", required_features[0]);
+        IPRINTF("Supported features  = { %08x }.\n", supported_features[0]);
+        IPRINTF("Required features   = { %08x }.\n", required_features[0]);
     }
 
     for ( i = 0; i < XENFEAT_NR_SUBMAPS; i++ )
@@ -766,22 +766,22 @@ static int setup_guest(int xc_handle,
 
 #define _p(a) ((void *) (a))
 
-    printf("VIRTUAL MEMORY ARRANGEMENT:\n");
-    printf(" Loaded kernel:    %p->%p\n", _p(dsi.v_kernstart),
+    IPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n");
+    IPRINTF(" Loaded kernel:    %p->%p\n", _p(dsi.v_kernstart),
            _p(dsi.v_kernend));
     if ( initrd->len )
-        printf(" Initial ramdisk:  %p->%p\n", _p(vinitrd_start),
+        IPRINTF(" Initial ramdisk:  %p->%p\n", _p(vinitrd_start),
                _p(vinitrd_start + initrd->len));
-    printf(" Phys-Mach map:    %p\n", _p(vphysmap_start));
-    printf(" Start info:       %p\n", _p(vstartinfo_start));
-    printf(" Store page:       %p\n", _p(vstoreinfo_start));
-    printf(" Console page:     %p\n", _p(vconsole_start));
+    IPRINTF(" Phys-Mach map:    %p\n", _p(vphysmap_start));
+    IPRINTF(" Start info:       %p\n", _p(vstartinfo_start));
+    IPRINTF(" Store page:       %p\n", _p(vstoreinfo_start));
+    IPRINTF(" Console page:     %p\n", _p(vconsole_start));
     if ( shadow_mode_enabled )
-        printf(" Shared Info page: %p\n", _p(vsharedinfo_start));
-    printf(" Page tables:      %p\n", _p(vpt_start));
-    printf(" Boot stack:       %p\n", _p(vstack_start));
-    printf(" TOTAL:            %p->%p\n", _p(dsi.v_start), _p(v_end));
-    printf(" ENTRY ADDRESS:    %p\n", _p(dsi.v_kernentry));
+        IPRINTF(" Shared Info page: %p\n", _p(vsharedinfo_start));
+    IPRINTF(" Page tables:      %p\n", _p(vpt_start));
+    IPRINTF(" Boot stack:       %p\n", _p(vstack_start));
+    IPRINTF(" TOTAL:            %p->%p\n", _p(dsi.v_start), _p(v_end));
+    IPRINTF(" ENTRY ADDRESS:    %p\n", _p(dsi.v_kernentry));
 
     if ( ((v_end - dsi.v_start)>>PAGE_SHIFT) > nr_pages )
     {
@@ -883,7 +883,7 @@ static int setup_guest(int xc_handle,
             ((uint64_t)page_array[count] << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE,
             count) )
         {
-            fprintf(stderr,"m2p update failure p=%lx m=%"PRIx64"\n",
+            DPRINTF("m2p update failure p=%lx m=%"PRIx64"\n",
                     count, (uint64_t)page_array[count]);
             munmap(physmap, PAGE_SIZE);
             goto error_out;

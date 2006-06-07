@@ -12,6 +12,7 @@
 
 #include "xenctrl.h"
 #include "xenguest.h"
+#include "xc_private.h"
 
 #include <xen/sys/privcmd.h>
 #include <xen/memory.h>
@@ -128,23 +129,6 @@ typedef unsigned long l4_pgentry_t;
 #define l4_table_offset(_a) \
   (((_a) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1))
 #endif
-
-#define ERROR(_m, _a...)                                \
-do {                                                    \
-    int __saved_errno = errno;                          \
-    fprintf(stderr, "ERROR: " _m "\n" , ## _a );        \
-    errno = __saved_errno;                              \
-} while (0)
-
-
-#define PERROR(_m, _a...)                                       \
-do {                                                            \
-    int __saved_errno = errno;                                  \
-    fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a ,       \
-            __saved_errno, strerror(__saved_errno));            \
-    errno = __saved_errno;                                      \
-} while (0)
-
 
 struct domain_setup_info
 {

@@ -28,25 +28,50 @@
 #define DECLARE_DOM0_OP dom0_op_t op
 #endif
 
-
 #define PAGE_SHIFT              XC_PAGE_SHIFT
 #define PAGE_SIZE               (1UL << PAGE_SHIFT)
 #define PAGE_MASK               (~(PAGE_SIZE-1))
 
-#define ERROR(_m, _a...)                                \
-do {                                                    \
-    int __saved_errno = errno;                          \
-    fprintf(stderr, "ERROR: " _m "\n" , ## _a );        \
-    errno = __saved_errno;                              \
+#define DEBUG    1
+#define INFO     1
+#define PROGRESS 0
+
+#if INFO
+#define IPRINTF(_f, _a...) printf(_f , ## _a)
+#else
+#define IPRINTF(_f, _a...) ((void)0)
+#endif
+
+#if DEBUG
+#define DPRINTF(_f, _a...) fprintf(stderr, _f , ## _a)
+#else
+#define DPRINTF(_f, _a...) ((void)0)
+#endif
+
+#if PROGRESS
+#define PPRINTF(_f, _a...) fprintf(stderr, _f , ## _a)
+#else
+#define PPRINTF(_f, _a...)
+#endif
+
+#define ERR(_f, _a...) do {                     \
+    DPRINTF(_f ": %d\n" , ## _a, errno);        \
+    fflush(stderr); }                           \
+while (0)
+
+#define ERROR(_m, _a...)                        \
+do {                                            \
+    int __saved_errno = errno;                  \
+    DPRINTF("ERROR: " _m "\n" , ## _a );        \
+    errno = __saved_errno;                      \
 } while (0)
 
-
-#define PERROR(_m, _a...)                                       \
-do {                                                            \
-    int __saved_errno = errno;                                  \
-    fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a ,       \
-            __saved_errno, strerror(__saved_errno));            \
-    errno = __saved_errno;                                      \
+#define PERROR(_m, _a...)                               \
+do {                                                    \
+    int __saved_errno = errno;                          \
+    DPRINTF("ERROR: " _m " (%d = %s)\n" , ## _a ,       \
+            __saved_errno, strerror(__saved_errno));    \
+    errno = __saved_errno;                              \
 } while (0)
 
 static inline void safe_munlock(const void *addr, size_t len)
@@ -88,7 +113,7 @@ static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
     if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
     {
         if ( errno == EACCES )
-            fprintf(stderr, "Dom0 operation failed -- need to"
+            DPRINTF("Dom0 operation failed -- need to"
                     " rebuild the user-space tool set?\n");
     }
 

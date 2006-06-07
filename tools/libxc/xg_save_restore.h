@@ -6,28 +6,6 @@
 
 #include "xc_private.h"
 
-#define DEBUG    1
-#define PROGRESS 0
-
-#define ERR(_f, _a...) do {                     \
-    fprintf(stderr, _f ": %d\n" , ## _a, errno);\
-    fflush(stderr); }                           \
-while (0)
-
-#if DEBUG
-#define DPRINTF(_f, _a...) fprintf(stderr, _f , ## _a)
-#else
-#define DPRINTF(_f, _a...) ((void)0)
-#endif
-
-
-#if PROGRESS
-#define PPRINTF(_f, _a...) fprintf(stderr, _f , ## _a)
-#else
-#define PPRINTF(_f, _a...)
-#endif
-
-
 /*
 ** We process save/restore/migrate in batches of pages; the below
 ** determines how many pages we (at maximum) deal with in each batch.

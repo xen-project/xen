@@ -294,10 +294,10 @@ int xc_get_pfn_list(int xc_handle,
     if (ret >= 0) {
         int i, j;
         for (i = 0; i < op.u.getmemlist.num_pfns; i += 16) {
-            fprintf(stderr, "0x%x: ", i);
+            DPRINTF("0x%x: ", i);
             for (j = 0; j < 16; j++)
-                fprintf(stderr, "0x%lx ", pfn_buf[i + j]);
-            fprintf(stderr, "\n");
+                DPRINTF("0x%lx ", pfn_buf[i + j]);
+            DPRINTF("\n");
         }
     }
 #endif
@@ -440,14 +440,14 @@ unsigned long xc_make_page_below_4G(
     if ( xc_domain_memory_decrease_reservation(
         xc_handle, domid, 1, 0, &old_mfn) != 0 )
     {
-        fprintf(stderr,"xc_make_page_below_4G decrease failed. mfn=%lx\n",mfn);
+        DPRINTF("xc_make_page_below_4G decrease failed. mfn=%lx\n",mfn);
         return 0;
     }
 
     if ( xc_domain_memory_increase_reservation(
         xc_handle, domid, 1, 0, 32, &new_mfn) != 0 )
     {
-        fprintf(stderr,"xc_make_page_below_4G increase failed. mfn=%lx\n",mfn);
+        DPRINTF("xc_make_page_below_4G increase failed. mfn=%lx\n",mfn);
         return 0;
     }
 

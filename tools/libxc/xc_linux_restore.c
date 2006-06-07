@@ -320,7 +320,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
         if (j == -1) {
             verify = 1;
-            fprintf(stderr, "Entering page verify mode\n");
+            DPRINTF("Entering page verify mode\n");
             continue;
         }
 
