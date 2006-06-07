@@ -426,19 +426,30 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
 
     case 0x80:
     case 0x81:
+    case 0x83:
         {
             unsigned char ins_subtype = (opcode[1] >> 3) & 7;
 
             if (opcode[0] == 0x80) {
                 GET_OP_SIZE_FOR_BYTE(size_reg);
                 instr->op_size = BYTE;
-            } else {
+            } else if (opcode[0] == 0x81) {
                 GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
                 size_reg = instr->op_size;
+            } else if (opcode[0] == 0x83) {
+                GET_OP_SIZE_FOR_NONEBYTE(size_reg);
+                instr->op_size = size_reg;
             }
+           
+            /* opcode 0x83 always has a single byte operand */
+            if (opcode[0] == 0x83)
+                instr->immediate = 
+                    (signed char)get_immediate(realmode, opcode+1, BYTE);
+            else
+                instr->immediate = 
+                    get_immediate(realmode, opcode+1, instr->op_size);
 
             instr->operand[0] = mk_operand(size_reg, 0, 0, IMMEDIATE);
-            instr->immediate = get_immediate(realmode, opcode+1, instr->op_size);
             instr->operand[1] = mk_operand(size_reg, 0, 0, MEMORY);
 
             switch (ins_subtype) {
