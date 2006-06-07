@@ -132,7 +132,11 @@ __asm__( \
 	"push $" #nr "-256 ; " \
 	"jmp common_interrupt");
 
-extern void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i);
+extern void resend_irq_on_evtchn(struct hw_interrupt_type *h, unsigned int i);
+static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
+{
+	resend_irq_on_evtchn(h, i);
+}
 
 #define platform_legacy_irq(irq)	((irq) < 16)
 

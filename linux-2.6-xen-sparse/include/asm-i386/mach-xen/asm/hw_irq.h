@@ -68,6 +68,10 @@ extern atomic_t irq_mis_count;
 
 #define IO_APIC_IRQ(x) (((x) >= 16) || ((1<<(x)) & io_apic_irqs))
 
-extern void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i);
+extern void resend_irq_on_evtchn(struct hw_interrupt_type *h, unsigned int i);
+static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
+{
+	resend_irq_on_evtchn(h, i);
+}
 
 #endif /* _ASM_HW_IRQ_H */

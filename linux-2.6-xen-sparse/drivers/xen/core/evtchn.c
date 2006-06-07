@@ -678,7 +678,7 @@ static struct hw_interrupt_type pirq_type = {
 	set_affinity_irq
 };
 
-void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
+void resend_irq_on_evtchn(struct hw_interrupt_type *h, unsigned int i)
 {
 	int evtchn = evtchn_from_irq(i);
 	shared_info_t *s = HYPERVISOR_shared_info;
