@@ -364,6 +364,12 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
     }
 
     switch (*opcode) {
+    case 0x0A: /* or r8, m8 */
+        instr->instr = INSTR_OR;
+        instr->op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return mem_reg(size_reg, opcode, instr, rex);
+
     case 0x0B: /* or m32/16, r32/16 */
         instr->instr = INSTR_OR;
         GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
@@ -380,6 +386,12 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
         GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
         return reg_mem(instr->op_size, opcode, instr, rex);
 
+    case 0x22: /* and m8, r8 */
+        instr->instr = INSTR_AND;
+        instr->op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return mem_reg(size_reg, opcode, instr, rex);
+
     case 0x23: /* and m32/16, r32/16 */
         instr->instr = INSTR_AND;
         GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
@@ -395,6 +407,12 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
         instr->instr = INSTR_XOR;
         GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
         return reg_mem(instr->op_size, opcode, instr, rex);
+
+    case 0x32: /* xor m8, r8*/
+        instr->instr = INSTR_XOR;
+        instr->op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return mem_reg(size_reg, opcode, instr, rex);
 
     case 0x39: /* cmp r32/16, m32/16 */
         instr->instr = INSTR_CMP;
@@ -513,6 +531,16 @@ static int hvm_decode(int realmode, unsigned char *opcode, struct instruction *i
 
     case 0xAB: /* stosw/stosl */
         instr->instr = INSTR_STOS;
+        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+        return DECODE_success;
+
+    case 0xAC: /* lodsb */
+        instr->instr = INSTR_LODS;
+        instr->op_size = BYTE;
+        return DECODE_success;
+
+    case 0xAD: /* lodsw/lodsl */
+        instr->instr = INSTR_LODS;
         GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
         return DECODE_success;
 
@@ -906,6 +934,17 @@ void handle_mmio(unsigned long va, unsigned long gpa)
                       GET_REPEAT_COUNT(), mmio_inst.op_size, regs->eax, IOREQ_WRITE, 0);
         break;
 
+    case INSTR_LODS:
+        /*
+         * Since the source is always in (contiguous) mmio space we don't
+         * need to break it up into pages.
+         */
+        mmio_opp->flags = mmio_inst.flags;
+        mmio_opp->instr = mmio_inst.instr;
+        send_mmio_req(IOREQ_TYPE_COPY, gpa,
+                      GET_REPEAT_COUNT(), mmio_inst.op_size, 0, IOREQ_READ, 0);
+        break;
+
     case INSTR_OR:
         mmio_operands(IOREQ_TYPE_OR, gpa, &mmio_inst, mmio_opp, regs);
         break;
@@ -954,26 +993,26 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         mmio_opp->instr = mmio_inst.instr;
         mmio_opp->operand[0] = mmio_inst.operand[0]; /* source */
         mmio_opp->operand[1] = mmio_inst.operand[1]; /* destination */
-	if (mmio_inst.operand[0] & REGISTER) {
-		long value;
-		unsigned long operand = mmio_inst.operand[0];
-		value = get_reg_value(operand_size(operand), 
-				      operand_index(operand), 0,
-                    		      mmio_opp->inst_decoder_regs);
-        	/* send the request and wait for the value */
-        	send_mmio_req(IOREQ_TYPE_XCHG, gpa, 1,
-                      mmio_inst.op_size, value, IOREQ_WRITE, 0);
-	} else {
-		/* the destination is a register */
-		long value;
-		unsigned long operand = mmio_inst.operand[1];
-		value = get_reg_value(operand_size(operand), 
-				      operand_index(operand), 0,
-                    		      mmio_opp->inst_decoder_regs);
-        	/* send the request and wait for the value */
-        	send_mmio_req(IOREQ_TYPE_XCHG, gpa, 1,
-                      mmio_inst.op_size, value, IOREQ_WRITE, 0);
-	}
+        if ( mmio_inst.operand[0] & REGISTER ) {
+            long value;
+            unsigned long operand = mmio_inst.operand[0];
+            value = get_reg_value(operand_size(operand),
+                                  operand_index(operand), 0,
+                                  mmio_opp->inst_decoder_regs);
+            /* send the request and wait for the value */
+            send_mmio_req(IOREQ_TYPE_XCHG, gpa, 1,
+                          mmio_inst.op_size, value, IOREQ_WRITE, 0);
+        } else {
+            /* the destination is a register */
+            long value;
+            unsigned long operand = mmio_inst.operand[1];
+            value = get_reg_value(operand_size(operand),
+                                  operand_index(operand), 0,
+                                  mmio_opp->inst_decoder_regs);
+            /* send the request and wait for the value */
+            send_mmio_req(IOREQ_TYPE_XCHG, gpa, 1,
+                          mmio_inst.op_size, value, IOREQ_WRITE, 0);
+        }
         break;
 
     default:
