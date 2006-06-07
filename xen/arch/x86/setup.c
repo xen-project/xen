@@ -85,8 +85,6 @@ extern void early_cpu_init(void);
 
 struct tss_struct init_tss[NR_CPUS];
 
-struct vcpu *idle_vcpu[NR_CPUS];
-
 extern unsigned long cpu0_stack[];
 
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };

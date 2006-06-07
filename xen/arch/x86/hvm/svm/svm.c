@@ -84,28 +84,26 @@ struct svm_percore_globals svm_globals[NR_CPUS];
 /*
  * Initializes the POOL of ASID used by the guests per core.
  */
-void asidpool_init( int core )
+void asidpool_init(int core)
 {
     int i;
-    svm_globals[core].ASIDpool.asid_lock = SPIN_LOCK_UNLOCKED;
-    spin_lock(&svm_globals[core].ASIDpool.asid_lock);
+
+    spin_lock_init(&svm_globals[core].ASIDpool.asid_lock);
+
     /* Host ASID is always in use */
     svm_globals[core].ASIDpool.asid[INITIAL_ASID] = ASID_INUSE;
-    for( i=1; i<ASID_MAX; i++ )
-    {
+    for ( i = 1; i < ASID_MAX; i++ )
        svm_globals[core].ASIDpool.asid[i] = ASID_AVAILABLE;
-    }
-    spin_unlock(&svm_globals[core].ASIDpool.asid_lock);
 }
 
 
 /* internal function to get the next available ASID */
-static int asidpool_fetch_next( struct vmcb_struct *vmcb, int core )
+static int asidpool_fetch_next(struct vmcb_struct *vmcb, int core)
 {
     int i;   
-    for( i = 1; i < ASID_MAX; i++ )
+    for ( i = 1; i < ASID_MAX; i++ )
     {
-        if( svm_globals[core].ASIDpool.asid[i] == ASID_AVAILABLE )
+        if ( svm_globals[core].ASIDpool.asid[i] == ASID_AVAILABLE )
         {
             vmcb->guest_asid = i;
             svm_globals[core].ASIDpool.asid[i] = ASID_INUSE;
@@ -746,34 +744,34 @@ static void svm_ctxt_switch_to(struct vcpu *v)
 
 void svm_final_setup_guest(struct vcpu *v)
 {
+    struct domain *d = v->domain;
+    struct vcpu *vc;
+
     v->arch.schedule_tail    = arch_svm_do_launch;
     v->arch.ctxt_switch_from = svm_ctxt_switch_from;
     v->arch.ctxt_switch_to   = svm_ctxt_switch_to;
 
-    if (v == v->domain->vcpu[0]) 
-    {
-	struct domain *d = v->domain;
-	struct vcpu *vc;
+    if ( v != d->vcpu[0] )
+        return;
 
-	/* Initialize monitor page table */
-	for_each_vcpu(d, vc)
-	    vc->arch.monitor_table = mk_pagetable(0);
+    /* Initialize monitor page table */
+    for_each_vcpu( d, vc )
+        vc->arch.monitor_table = pagetable_null();
 
-        /* 
-         * Required to do this once per domain
-         * TODO: add a seperate function to do these.
-         */
-        memset(&d->shared_info->evtchn_mask[0], 0xff, 
-               sizeof(d->shared_info->evtchn_mask));       
+    /* 
+     * Required to do this once per domain
+     * TODO: add a seperate function to do these.
+     */
+    memset(&d->shared_info->evtchn_mask[0], 0xff, 
+           sizeof(d->shared_info->evtchn_mask));       
 
-        /* 
-         * Put the domain in shadow mode even though we're going to be using
-         * the shared 1:1 page table initially. It shouldn't hurt 
-         */
-        shadow_mode_enable(d, 
-                SHM_enable|SHM_refcounts|
-		SHM_translate|SHM_external|SHM_wr_pt_pte);
-    }
+    /* 
+     * Put the domain in shadow mode even though we're going to be using
+     * the shared 1:1 page table initially. It shouldn't hurt 
+     */
+    shadow_mode_enable(d,
+                       SHM_enable|SHM_refcounts|
+                       SHM_translate|SHM_external|SHM_wr_pt_pte);
 }
 
 
@@ -870,7 +868,7 @@ static int svm_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
     /* Use 1:1 page table to identify MMIO address space */
     if (mmio_space(gpa))
     {
-	/* No support for APIC */
+        /* No support for APIC */
         if (!hvm_apic_support(v->domain) && gpa >= 0xFEC00000)
         { 
             int inst_len;
@@ -1570,7 +1568,7 @@ static int svm_set_cr0(unsigned long value)
         }
 
         /* Now arch.guest_table points to machine physical. */
-        v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
+        v->arch.guest_table = pagetable_from_pfn(mfn);
         update_pagetables(v);
 
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
@@ -1590,7 +1588,7 @@ static int svm_set_cr0(unsigned long value)
         if ( v->arch.hvm_svm.cpu_cr3 ) {
             put_page(mfn_to_page(get_mfn_from_gpfn(
                       v->arch.hvm_svm.cpu_cr3 >> PAGE_SHIFT)));
-            v->arch.guest_table = mk_pagetable(0);
+            v->arch.guest_table = pagetable_null();
         }
 
     /*
@@ -1599,7 +1597,7 @@ static int svm_set_cr0(unsigned long value)
      * created.
      */
     if ((value & X86_CR0_PE) == 0) {
-    	if (value & X86_CR0_PG) {
+        if (value & X86_CR0_PG) {
             svm_inject_exception(v, TRAP_gp_fault, 1, 0);
             return 0;
         }
@@ -1740,7 +1738,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
             }
 
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-            v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
+            v->arch.guest_table = pagetable_from_pfn(mfn);
 
             if (old_base_mfn)
                 put_page(mfn_to_page(old_base_mfn));
@@ -1797,7 +1795,7 @@ static int mov_to_cr(int gpreg, int cr, struct cpu_user_regs *regs)
                  * Now arch.guest_table points to machine physical.
                  */
 
-                v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
+                v->arch.guest_table = pagetable_from_pfn(mfn);
                 update_pagetables(v);
 
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",

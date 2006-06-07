@@ -161,7 +161,7 @@ void send_IPI_mask_phys(cpumask_t mask, int vector)
     local_irq_restore(flags);
 }
 
-static spinlock_t flush_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(flush_lock);
 static cpumask_t flush_cpumask;
 static unsigned long flush_va;
 

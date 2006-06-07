@@ -190,7 +190,8 @@ map_domain_va_32(
     static void *v[MAX_VIRT_CPUS];
 
     l2 = xc_map_foreign_range(
-         xc_handle, current_domid, PAGE_SIZE, PROT_READ, ctxt[cpu].ctrlreg[3] >> PAGE_SHIFT);
+         xc_handle, current_domid, PAGE_SIZE, PROT_READ,
+         xen_cr3_to_pfn(ctxt[cpu].ctrlreg[3]));
     if ( l2 == NULL )
         return NULL;
 
@@ -230,7 +231,8 @@ map_domain_va_pae(
     static void *v[MAX_VIRT_CPUS];
 
     l3 = xc_map_foreign_range(
-        xc_handle, current_domid, PAGE_SIZE, PROT_READ, ctxt[cpu].ctrlreg[3] >> PAGE_SHIFT);
+        xc_handle, current_domid, PAGE_SIZE, PROT_READ,
+        xen_cr3_to_pfn(ctxt[cpu].ctrlreg[3]));
     if ( l3 == NULL )
         return NULL;
 
@@ -282,8 +284,9 @@ map_domain_va_64(
     if ((ctxt[cpu].ctrlreg[4] & 0x20) == 0 ) /* legacy ia32 mode */
         return map_domain_va_32(xc_handle, cpu, guest_va, perm);
 
-    l4 = xc_map_foreign_range( xc_handle, current_domid, PAGE_SIZE,
-            PROT_READ, ctxt[cpu].ctrlreg[3] >> PAGE_SHIFT);
+    l4 = xc_map_foreign_range(
+        xc_handle, current_domid, PAGE_SIZE, PROT_READ,
+        xen_cr3_to_pfn(ctxt[cpu].ctrlreg[3]));
     if ( l4 == NULL )
         return NULL;
 

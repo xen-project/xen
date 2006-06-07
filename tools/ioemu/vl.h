@@ -238,9 +238,9 @@ void console_select(unsigned int index);
 /* serial ports */
 
 #define MAX_SERIAL_PORTS 4
-#define SUMMA_PORT	1
 
 extern CharDriverState *serial_hds[MAX_SERIAL_PORTS];
+extern int serial_summa_port;
 
 /* network redirectors support */
 

@@ -160,15 +160,14 @@ static inline u32 calc_evt(struct vcpu *d, u32 avt)
 }
 
 /**
- * bvt_alloc_task - allocate BVT private structures for a task
- * @p:              task to allocate private structures for
- *
+ * bvt_init_vcpu - allocate BVT private structures for a VCPU.
  * Returns non-zero on failure.
  */
-static int bvt_alloc_task(struct vcpu *v)
+static int bvt_init_vcpu(struct vcpu *v)
 {
     struct domain *d = v->domain;
     struct bvt_dom_info *inf;
+    struct bvt_vcpu_info *einf;
 
     if ( (d->sched_priv == NULL) )
     {
@@ -199,15 +198,7 @@ static int bvt_alloc_task(struct vcpu *v)
         init_timer(&inf->unwarp_timer, unwarp_timer_fn, inf, v->processor);
     }
 
-    return 0;
-}
-
-/*
- * Add and remove a domain
- */
-static void bvt_add_task(struct vcpu *v) 
-{
-    struct bvt_vcpu_info *einf = EBVT_INFO(v);
+    einf = EBVT_INFO(v);
 
     /* Allocate per-CPU context if this is the first domain to be added. */
     if ( CPU_INFO(v->processor) == NULL )
@@ -223,13 +214,15 @@ static void bvt_add_task(struct vcpu *v)
         einf->avt = einf->evt = ~0U;
         BUG_ON(__task_on_runqueue(v));
         __add_to_runqueue_head(v);
-    } 
+    }
     else 
     {
         /* Set avt and evt to system virtual time. */
         einf->avt = CPU_SVT(v->processor);
         einf->evt = CPU_SVT(v->processor);
     }
+
+    return 0;
 }
 
 static void bvt_wake(struct vcpu *v)
@@ -298,10 +291,9 @@ static int bvt_set_affinity(struct vcpu *v, cpumask_t *affinity)
 
 
 /**
- * bvt_free_task - free BVT private structures for a task
- * @d:             task
+ * bvt_destroy_domain - free BVT private structures for a domain.
  */
-static void bvt_free_task(struct domain *d)
+static void bvt_destroy_domain(struct domain *d)
 {
     struct bvt_dom_info *inf = BVT_INFO(d);
 
@@ -568,10 +560,10 @@ struct scheduler sched_bvt_def = {
     .name     = "Borrowed Virtual Time",
     .opt_name = "bvt",
     .sched_id = SCHED_BVT,
-    
-    .alloc_task     = bvt_alloc_task,
-    .add_task       = bvt_add_task,
-    .free_task      = bvt_free_task,
+
+    .init_vcpu      = bvt_init_vcpu,
+    .destroy_domain = bvt_destroy_domain,
+
     .do_schedule    = bvt_do_schedule,
     .control        = bvt_ctl,
     .adjdom         = bvt_adjdom,

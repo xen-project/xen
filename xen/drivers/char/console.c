@@ -53,7 +53,7 @@ static char printk_prefix[16] = "";
 static int sercon_handle = -1;
 static int vgacon_enabled = 0;
 
-spinlock_t console_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(console_lock);
 
 /*
  * *******************************************************
@@ -563,7 +563,7 @@ static char        *debugtrace_buf; /* Debug-trace buffer */
 static unsigned int debugtrace_prd; /* Producer index     */
 static unsigned int debugtrace_kilobytes = 128, debugtrace_bytes;
 static unsigned int debugtrace_used;
-static spinlock_t   debugtrace_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(debugtrace_lock);
 integer_param("debugtrace", debugtrace_kilobytes);
 
 void debugtrace_dump(void)
@@ -675,7 +675,7 @@ void panic(const char *fmt, ...)
     va_list args;
     char buf[128];
     unsigned long flags;
-    static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+    static DEFINE_SPINLOCK(lock);
     extern void machine_restart(char *);
     
     debugtrace_dump();

@@ -102,7 +102,7 @@ BUILD_SMP_INTERRUPT(thermal_interrupt,THERMAL_APIC_VECTOR)
  * moves to arch independent land
  */
 
-spinlock_t i8259A_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(i8259A_lock);
 
 static void disable_8259A_vector(unsigned int vector)
 {

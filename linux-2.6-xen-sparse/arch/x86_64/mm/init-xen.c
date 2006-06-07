@@ -666,7 +666,18 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 			set_pgd(pgd_offset_k(start), mk_kernel_pgd(pud_phys));
 	}
 
-	BUG_ON(!after_bootmem && start_pfn != table_end);
+	if (!after_bootmem) {
+		BUG_ON(start_pfn != table_end);
+		/*
+		 * Destroy the temporary mappings created above. Prevents
+		 * overlap with modules area (if init mapping is very big).
+		 */
+		start = __START_KERNEL_map + (table_start << PAGE_SHIFT);
+		end   = __START_KERNEL_map + (table_end   << PAGE_SHIFT);
+		for (; start < end; start += PAGE_SIZE)
+			WARN_ON(HYPERVISOR_update_va_mapping(
+				start, __pte_ma(0), 0));
+	}
 
 	__flush_tlb_all();
 }
@@ -752,15 +763,11 @@ void __init paging_init(void)
 	free_area_init_node(0, NODE_DATA(0), zones,
 			    __pa(PAGE_OFFSET) >> PAGE_SHIFT, holes);
 
-	if (!xen_feature(XENFEAT_auto_translated_physmap) ||
-	    xen_start_info->shared_info >= xen_start_info->nr_pages) {
-		/* Switch to the real shared_info page, and clear the
-		 * dummy page. */
-		set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
-		HYPERVISOR_shared_info =
-			(shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
-		memset(empty_zero_page, 0, sizeof(empty_zero_page));
-	}
+	/* Switch to the real shared_info page, and clear the
+	 * dummy page. */
+	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
+	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
 	init_mm.context.pinned = 1;
 

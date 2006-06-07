@@ -55,29 +55,26 @@
  * domain pointer, DS, ES, FS, GS. Therefore, we effectively skip 6 registers.
  */
 
-#define HVM_MONITOR_EFLAGS	0x202 /* IF on */
 #define NR_SKIPPED_REGS	6	/* See the above explanation */
-#define HVM_SAVE_ALL_NOSEGREGS \
-        pushl $HVM_MONITOR_EFLAGS; \
-        popf; \
-        subl $(NR_SKIPPED_REGS*4), %esp; \
+#define HVM_SAVE_ALL_NOSEGREGS                                              \
+        subl $(NR_SKIPPED_REGS*4), %esp;                                    \
         movl $0, 0xc(%esp);  /* XXX why do we need to force eflags==0 ?? */ \
-        pushl %eax; \
-        pushl %ebp; \
-        pushl %edi; \
-        pushl %esi; \
-        pushl %edx; \
-        pushl %ecx; \
+        pushl %eax;                                                         \
+        pushl %ebp;                                                         \
+        pushl %edi;                                                         \
+        pushl %esi;                                                         \
+        pushl %edx;                                                         \
+        pushl %ecx;                                                         \
         pushl %ebx;
 
-#define HVM_RESTORE_ALL_NOSEGREGS   \
-        popl %ebx;  \
-        popl %ecx;  \
-        popl %edx;  \
-        popl %esi;  \
-        popl %edi;  \
-        popl %ebp;  \
-        popl %eax;  \
+#define HVM_RESTORE_ALL_NOSEGREGS               \
+        popl %ebx;                              \
+        popl %ecx;                              \
+        popl %edx;                              \
+        popl %esi;                              \
+        popl %edi;                              \
+        popl %ebp;                              \
+        popl %eax;                              \
         addl $(NR_SKIPPED_REGS*4), %esp
 
         ALIGN

@@ -876,7 +876,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                     PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
                 break;
             }
-            regs->edi += (regs->eflags & EF_DF) ? -(int)op_bytes : op_bytes;
+            regs->edi += (int)((regs->eflags & EF_DF) ? -op_bytes : op_bytes);
             break;
 
         case 0x6e: /* OUTSB */
@@ -902,7 +902,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 outl_user((u32)data, (u16)regs->edx, v, regs);
                 break;
             }
-            regs->esi += (regs->eflags & EF_DF) ? -(int)op_bytes : op_bytes;
+            regs->esi += (int)((regs->eflags & EF_DF) ? -op_bytes : op_bytes);
             break;
         }
 
@@ -1034,8 +1034,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
             
         case 3: /* Read CR3 */
-            *reg = pfn_to_paddr(mfn_to_gmfn(v->domain,
-                                    pagetable_get_pfn(v->arch.guest_table)));
+            *reg = xen_pfn_to_cr3(mfn_to_gmfn(
+                v->domain, pagetable_get_pfn(v->arch.guest_table)));
             break;
 
         case 4: /* Read CR4 */
@@ -1085,7 +1085,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 3: /* Write CR3 */
             LOCK_BIGLOCK(v->domain);
             cleanup_writable_pagetable(v->domain);
-            (void)new_guest_cr3(gmfn_to_mfn(v->domain, paddr_to_pfn(*reg)));
+            (void)new_guest_cr3(gmfn_to_mfn(v->domain, xen_cr3_to_pfn(*reg)));
             UNLOCK_BIGLOCK(v->domain);
             break;
 

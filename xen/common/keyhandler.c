@@ -128,11 +128,12 @@ static void dump_domains(unsigned char key)
                d->domain_flags, atomic_read(&d->refcnt),
                d->tot_pages, d->xenheap_pages, cpuset);
         printk("    handle=%02x%02x%02x%02x-%02x%02x-%02x%02x-"
-               "%02x%02x-%02x%02x%02x%02x%02x%02x\n",
+               "%02x%02x-%02x%02x%02x%02x%02x%02x vm_assist=%08lx\n",
                d->handle[ 0], d->handle[ 1], d->handle[ 2], d->handle[ 3],
                d->handle[ 4], d->handle[ 5], d->handle[ 6], d->handle[ 7],
                d->handle[ 8], d->handle[ 9], d->handle[10], d->handle[11],
-               d->handle[12], d->handle[13], d->handle[14], d->handle[15]);
+               d->handle[12], d->handle[13], d->handle[14], d->handle[15],
+               d->vm_assist);
 
         arch_dump_domain_info(d);
 

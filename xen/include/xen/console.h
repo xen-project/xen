@@ -10,8 +10,6 @@
 #include <xen/spinlock.h>
 #include <xen/guest_access.h>
 
-extern spinlock_t console_lock;
-
 void set_printk_prefix(const char *prefix);
 
 long read_console_ring(XEN_GUEST_HANDLE(char), u32 *, int);

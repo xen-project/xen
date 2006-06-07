@@ -66,7 +66,7 @@ void vmx_final_setup_guest(struct vcpu *v)
 
         /* Initialize monitor page table */
         for_each_vcpu(d, vc)
-            vc->arch.monitor_table = mk_pagetable(0);
+            vc->arch.monitor_table = pagetable_null();
 
         /*
          * Required to do this once per domain
@@ -1223,7 +1223,7 @@ vmx_world_restore(struct vcpu *v, struct vmx_assist_context *c)
         if(!get_page(mfn_to_page(mfn), v->domain))
                 return 0;
         old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-        v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
+        v->arch.guest_table = pagetable_from_pfn(mfn);
         if (old_base_mfn)
              put_page(mfn_to_page(old_base_mfn));
         /*
@@ -1459,7 +1459,7 @@ static int vmx_set_cr0(unsigned long value)
         /*
          * Now arch.guest_table points to machine physical.
          */
-        v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
+        v->arch.guest_table = pagetable_from_pfn(mfn);
         update_pagetables(v);
 
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
@@ -1477,7 +1477,7 @@ static int vmx_set_cr0(unsigned long value)
         if ( v->arch.hvm_vmx.cpu_cr3 ) {
             put_page(mfn_to_page(get_mfn_from_gpfn(
                       v->arch.hvm_vmx.cpu_cr3 >> PAGE_SHIFT)));
-            v->arch.guest_table = mk_pagetable(0);
+            v->arch.guest_table = pagetable_null();
         }
 
     /*
@@ -1635,7 +1635,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
                 domain_crash_synchronous(); /* need to take a clean path */
             }
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-            v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
+            v->arch.guest_table = pagetable_from_pfn(mfn);
             if (old_base_mfn)
                 put_page(mfn_to_page(old_base_mfn));
             /*
@@ -1690,7 +1690,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
                  * Now arch.guest_table points to machine physical.
                  */
 
-                v->arch.guest_table = mk_pagetable((u64)mfn << PAGE_SHIFT);
+                v->arch.guest_table = pagetable_from_pfn(mfn);
                 update_pagetables(v);
 
                 HVM_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx",
@@ -1970,7 +1970,6 @@ static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
         __hvm_bug(regs);
 
     vector &= INTR_INFO_VECTOR_MASK;
-    local_irq_disable();
     TRACE_VMEXIT(1,vector);
 
     switch(vector) {
@@ -2065,30 +2064,33 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     struct vcpu *v = current;
     int error;
 
-    if ((error = __vmread(VM_EXIT_REASON, &exit_reason)))
-        __hvm_bug(&regs);
+    error = __vmread(VM_EXIT_REASON, &exit_reason);
+    BUG_ON(error);
 
     perfc_incra(vmexits, exit_reason);
 
-    /* don't bother H/W interrutps */
-    if (exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT &&
-        exit_reason != EXIT_REASON_VMCALL &&
-        exit_reason != EXIT_REASON_IO_INSTRUCTION) 
+    if ( (exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT) &&
+         (exit_reason != EXIT_REASON_VMCALL) &&
+         (exit_reason != EXIT_REASON_IO_INSTRUCTION) )
         HVM_DBG_LOG(DBG_LEVEL_0, "exit reason = %x", exit_reason);
 
-    if (exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) {
+    if ( exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT )
+        local_irq_enable();
+
+    if ( unlikely(exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) )
+    {
         printk("Failed vm entry (reason 0x%x)\n", exit_reason);
         printk("*********** VMCS Area **************\n");
         vmcs_dump_vcpu();
         printk("**************************************\n");
         domain_crash_synchronous();
-        return;
     }
 
     __vmread(GUEST_RIP, &eip);
     TRACE_VMEXIT(0,exit_reason);
 
-    switch (exit_reason) {
+    switch ( exit_reason )
+    {
     case EXIT_REASON_EXCEPTION_NMI:
     {
         /*

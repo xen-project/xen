@@ -40,10 +40,10 @@ static unsigned int pt_levels;
 static unsigned long max_pfn;
 
 /* Live mapping of the table mapping each PFN to its current MFN. */
-static unsigned long *live_p2m = NULL;
+static xen_pfn_t *live_p2m = NULL;
 
 /* Live mapping of system MFN to PFN table. */
-static unsigned long *live_m2p = NULL;
+static xen_pfn_t *live_m2p = NULL;
 
 /* grep fodder: machine_to_phys */
 
@@ -501,22 +501,22 @@ void canonicalize_pagetable(unsigned long type, unsigned long pfn,
 
 
 
-static unsigned long *xc_map_m2p(int xc_handle,
+static xen_pfn_t *xc_map_m2p(int xc_handle,
                                  unsigned long max_mfn,
                                  int prot)
 {
     struct xen_machphys_mfn_list xmml;
     privcmd_mmap_entry_t *entries;
     unsigned long m2p_chunks, m2p_size;
-    unsigned long *m2p;
-    unsigned long *extent_start;
+    xen_pfn_t *m2p;
+    xen_pfn_t *extent_start;
     int i, rc;
 
     m2p_size   = M2P_SIZE(max_mfn);
     m2p_chunks = M2P_CHUNKS(max_mfn);
 
     xmml.max_extents = m2p_chunks;
-    if (!(extent_start = malloc(m2p_chunks * sizeof(unsigned long)))) {
+    if (!(extent_start = malloc(m2p_chunks * sizeof(xen_pfn_t)))) {
         ERR("failed to allocate space for m2p mfns");
         return NULL;
     }
@@ -583,11 +583,11 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     char page[PAGE_SIZE];
 
     /* Double and single indirect references to the live P2M table */
-    unsigned long *live_p2m_frame_list_list = NULL;
-    unsigned long *live_p2m_frame_list = NULL;
+    xen_pfn_t *live_p2m_frame_list_list = NULL;
+    xen_pfn_t *live_p2m_frame_list = NULL;
 
     /* A copy of the pfn-to-mfn table frame list. */
-    unsigned long *p2m_frame_list = NULL;
+    xen_pfn_t *p2m_frame_list = NULL;
 
     /* Live mapping of shared info structure */
     shared_info_t *live_shinfo = NULL;
@@ -712,11 +712,11 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     memcpy(p2m_frame_list, live_p2m_frame_list, P2M_FL_SIZE);
 
     /* Canonicalise the pfn-to-mfn table frame-number list. */
-    for (i = 0; i < max_pfn; i += ulpp) {
-        if (!translate_mfn_to_pfn(&p2m_frame_list[i/ulpp])) {
+    for (i = 0; i < max_pfn; i += fpp) {
+        if (!translate_mfn_to_pfn(&p2m_frame_list[i/fpp])) {
             ERR("Frame# in pfn-to-mfn frame list is not in pseudophys");
-            ERR("entry %d: p2m_frame_list[%ld] is 0x%lx", i, i/ulpp,
-                p2m_frame_list[i/ulpp]);
+            ERR("entry %d: p2m_frame_list[%ld] is 0x%"PRIx64, i, i/fpp,
+                (uint64_t)p2m_frame_list[i/fpp]);
             goto out;
         }
     }
@@ -818,12 +818,33 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     /* Start writing out the saved-domain record. */
 
-    if(!write_exact(io_fd, &max_pfn, sizeof(unsigned long))) {
+    if (!write_exact(io_fd, &max_pfn, sizeof(unsigned long))) {
         ERR("write: max_pfn");
         goto out;
     }
 
-    if(!write_exact(io_fd, p2m_frame_list, P2M_FL_SIZE)) {
+    /*
+     * Write an extended-info structure to inform the restore code that
+     * a PAE guest understands extended CR3 (PDPTs above 4GB). Turns off
+     * slow paths in the restore code.
+     */
+    if ((pt_levels == 3) &&
+        (ctxt.vm_assist & (1UL << VMASST_TYPE_pae_extended_cr3))) {
+        unsigned long signature = ~0UL;
+        uint32_t tot_sz   = sizeof(struct vcpu_guest_context) + 8;
+        uint32_t chunk_sz = sizeof(struct vcpu_guest_context);
+        char chunk_sig[]  = "vcpu";
+        if (!write_exact(io_fd, &signature, sizeof(signature)) ||
+            !write_exact(io_fd, &tot_sz,    sizeof(tot_sz)) ||
+            !write_exact(io_fd, &chunk_sig, 4) ||
+            !write_exact(io_fd, &chunk_sz,  sizeof(chunk_sz)) ||
+            !write_exact(io_fd, &ctxt,      sizeof(ctxt))) {
+            ERR("write: extended info");
+            goto out;
+        }
+    }
+
+    if (!write_exact(io_fd, p2m_frame_list, P2M_FL_SIZE)) {
         ERR("write: p2m_frame_list");
         goto out;
     }
@@ -1129,12 +1150,12 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     /* Canonicalise the page table base pointer. */
-    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(ctxt.ctrlreg[3] >> PAGE_SHIFT) ) {
+    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(xen_cr3_to_pfn(ctxt.ctrlreg[3])) ) {
         ERR("PT base is not in range of pseudophys map");
         goto out;
     }
-    ctxt.ctrlreg[3] = mfn_to_pfn(ctxt.ctrlreg[3] >> PAGE_SHIFT) <<
-        PAGE_SHIFT;
+    ctxt.ctrlreg[3] = 
+        xen_pfn_to_cr3(mfn_to_pfn(xen_cr3_to_pfn(ctxt.ctrlreg[3])));
 
     if (!write_exact(io_fd, &ctxt, sizeof(ctxt)) ||
         !write_exact(io_fd, live_shinfo, PAGE_SIZE)) {

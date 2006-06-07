@@ -99,74 +99,7 @@ void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate)
     }
 }
 
-struct domain *alloc_domain(void)
-{
-    struct domain *d;
-
-    if ( (d = xmalloc(struct domain)) != NULL )
-        memset(d, 0, sizeof(*d));
-
-    return d;
-}
-
-void free_domain(struct domain *d)
-{
-    struct vcpu *v;
-    int i;
-
-    for_each_vcpu ( d, v )
-        sched_rem_domain(v);
-
-    SCHED_OP(free_task, d);
-
-    for ( i = MAX_VIRT_CPUS-1; i >= 0; i-- )
-        if ( (v = d->vcpu[i]) != NULL )
-            free_vcpu_struct(v);
-
-    xfree(d);
-}
-
-struct vcpu *alloc_vcpu(
-    struct domain *d, unsigned int vcpu_id, unsigned int cpu_id)
-{
-    struct vcpu *v;
-
-    BUG_ON(d->vcpu[vcpu_id] != NULL);
-
-    if ( (v = alloc_vcpu_struct(d, vcpu_id)) == NULL )
-        return NULL;
-
-    v->domain = d;
-    v->vcpu_id = vcpu_id;
-    v->processor = cpu_id;
-    atomic_set(&v->pausecnt, 0);
-    v->vcpu_info = &d->shared_info->vcpu_info[vcpu_id];
-
-    v->cpu_affinity = is_idle_domain(d) ?
-        cpumask_of_cpu(cpu_id) : CPU_MASK_ALL;
-
-    v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
-    v->runstate.state_entry_time = NOW();
-
-    if ( (vcpu_id != 0) && !is_idle_domain(d) )
-        set_bit(_VCPUF_down, &v->vcpu_flags);
-
-    if ( SCHED_OP(alloc_task, v) < 0 )
-    {
-        free_vcpu_struct(v);
-        return NULL;
-    }
-
-    d->vcpu[vcpu_id] = v;
-    if ( vcpu_id != 0 )
-        d->vcpu[v->vcpu_id-1]->next_in_list = v;
-
-    sched_add_domain(v);
-
-    return v;
-}
-
-void sched_add_domain(struct vcpu *v) 
+int sched_init_vcpu(struct vcpu *v) 
 {
     /* Initialise the per-domain timers. */
     init_timer(&v->timer, vcpu_timer_fn, v, v->processor);
@@ -179,17 +112,23 @@ void sched_add_domain(struct vcpu *v)
         set_bit(_VCPUF_running, &v->vcpu_flags);
     }
 
-    SCHED_OP(add_task, v);
     TRACE_2D(TRC_SCHED_DOM_ADD, v->domain->domain_id, v->vcpu_id);
+
+    return SCHED_OP(init_vcpu, v);
 }
 
-void sched_rem_domain(struct vcpu *v) 
+void sched_destroy_domain(struct domain *d)
 {
-    kill_timer(&v->timer);
-    kill_timer(&v->poll_timer);
+    struct vcpu *v;
 
-    SCHED_OP(rem_task, v);
-    TRACE_2D(TRC_SCHED_DOM_REM, v->domain->domain_id, v->vcpu_id);
+    for_each_vcpu ( d, v )
+    {
+        kill_timer(&v->timer);
+        kill_timer(&v->poll_timer);
+        TRACE_2D(TRC_SCHED_DOM_REM, v->domain->domain_id, v->vcpu_id);
+    }
+
+    SCHED_OP(destroy_domain, d);
 }
 
 void vcpu_sleep_nosync(struct vcpu *v)
@@ -663,7 +602,7 @@ static void poll_timer_fn(void *data)
 /* Initialise the data structures. */
 void __init scheduler_init(void)
 {
-    int i, rc;
+    int i;
 
     open_softirq(SCHEDULE_SOFTIRQ, __enter_scheduler);
 
@@ -686,17 +625,6 @@ void __init scheduler_init(void)
 
     printk("Using scheduler: %s (%s)\n", ops.name, ops.opt_name);
     SCHED_OP(init);
-
-    if ( idle_vcpu[0] != NULL )
-    {
-        schedule_data[0].curr = idle_vcpu[0];
-        schedule_data[0].idle = idle_vcpu[0];
-
-        rc = SCHED_OP(alloc_task, idle_vcpu[0]);
-        BUG_ON(rc < 0);
-
-        sched_add_domain(idle_vcpu[0]);
-    }
 }
 
 /*

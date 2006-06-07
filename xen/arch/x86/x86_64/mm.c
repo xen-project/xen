@@ -81,7 +81,8 @@ void __init paging_init(void)
     l2_pgentry_t *l2_ro_mpt;
     struct page_info *pg;
 
-    idle_vcpu[0]->arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
+    idle_vcpu[0]->arch.monitor_table =
+        pagetable_from_paddr(__pa(idle_pg_table));
 
     /* Create user-accessible L2 directory to map the MPT for guests. */
     l3_ro_mpt = alloc_xenheap_page();

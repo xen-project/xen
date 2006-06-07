@@ -19,7 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0x03000000
+#define DOM0_INTERFACE_VERSION   0x03000001
 
 /************************************************************************/
 
@@ -27,10 +27,10 @@
 struct dom0_getmemlist {
     /* IN variables. */
     domid_t       domain;
-    unsigned long max_pfns;
-    XEN_GUEST_HANDLE(ulong) buffer;
+    uint64_t max_pfns;
+    XEN_GUEST_HANDLE(xen_pfn_t) buffer;
     /* OUT variables. */
-    unsigned long num_pfns;
+    uint64_t num_pfns;
 };
 typedef struct dom0_getmemlist dom0_getmemlist_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_getmemlist_t);
@@ -96,9 +96,9 @@ struct dom0_getdomaininfo {
 #define DOMFLAGS_SHUTDOWNMASK 255 /* DOMFLAGS_SHUTDOWN guest-supplied code.  */
 #define DOMFLAGS_SHUTDOWNSHIFT 16
     uint32_t flags;
-    unsigned long tot_pages;
-    unsigned long max_pages;
-    unsigned long shared_info_frame;       /* MFN of shared_info struct */
+    uint64_t tot_pages;
+    uint64_t max_pages;
+    xen_pfn_t shared_info_frame;  /* MFN of shared_info struct */
     uint64_t cpu_time;
     uint32_t nr_online_vcpus;     /* Number of VCPUs currently online. */
     uint32_t max_vcpu_id;         /* Maximum VCPUID in use by this domain. */
@@ -162,7 +162,7 @@ DEFINE_XEN_GUEST_HANDLE(dom0_settime_t);
 
 struct dom0_getpageframeinfo {
     /* IN variables. */
-    unsigned long mfn;     /* Machine page frame number to query.       */
+    xen_pfn_t mfn;         /* Machine page frame number to query.       */
     domid_t domain;        /* To which domain does the frame belong?    */
     /* OUT variables. */
     /* Is the page PINNED to a type? */
@@ -213,7 +213,7 @@ struct dom0_tbufcontrol {
     cpumap_t      cpu_mask;
     uint32_t      evt_mask;
     /* OUT variables */
-    unsigned long buffer_mfn;
+    xen_pfn_t buffer_mfn;
     uint32_t size;
 };
 typedef struct dom0_tbufcontrol dom0_tbufcontrol_t;
@@ -229,8 +229,8 @@ struct dom0_physinfo {
     uint32_t sockets_per_node;
     uint32_t nr_nodes;
     uint32_t cpu_khz;
-    unsigned long total_pages;
-    unsigned long free_pages;
+    uint64_t total_pages;
+    uint64_t free_pages;
     uint32_t hw_cap[8];
 };
 typedef struct dom0_physinfo dom0_physinfo_t;
@@ -276,7 +276,7 @@ struct dom0_shadow_control {
     uint32_t       op;
     XEN_GUEST_HANDLE(ulong) dirty_bitmap;
     /* IN/OUT variables. */
-    unsigned long  pages;        /* size of buffer, updated with actual size */
+    uint64_t       pages;        /* size of buffer, updated with actual size */
     /* OUT variables. */
     struct dom0_shadow_control_stats stats;
 };
@@ -286,8 +286,8 @@ DEFINE_XEN_GUEST_HANDLE(dom0_shadow_control_t);
 #define DOM0_SETDOMAINMAXMEM   28
 struct dom0_setdomainmaxmem {
     /* IN variables. */
-    domid_t       domain;
-    unsigned long max_memkb;
+    domid_t  domain;
+    uint64_t max_memkb;
 };
 typedef struct dom0_setdomainmaxmem dom0_setdomainmaxmem_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_setdomainmaxmem_t);
@@ -295,8 +295,8 @@ DEFINE_XEN_GUEST_HANDLE(dom0_setdomainmaxmem_t);
 #define DOM0_GETPAGEFRAMEINFO2 29   /* batched interface */
 struct dom0_getpageframeinfo2 {
     /* IN variables. */
-    domid_t        domain;
-    unsigned long  num;
+    domid_t  domain;
+    uint64_t num;
     /* IN/OUT variables. */
     XEN_GUEST_HANDLE(ulong) array;
 };
@@ -313,12 +313,12 @@ DEFINE_XEN_GUEST_HANDLE(dom0_getpageframeinfo2_t);
 #define DOM0_ADD_MEMTYPE         31
 struct dom0_add_memtype {
     /* IN variables. */
-    unsigned long mfn;
-    unsigned long nr_mfns;
-    uint32_t      type;
+    xen_pfn_t mfn;
+    uint64_t nr_mfns;
+    uint32_t type;
     /* OUT variables. */
-    uint32_t      handle;
-    uint32_t      reg;
+    uint32_t handle;
+    uint32_t reg;
 };
 typedef struct dom0_add_memtype dom0_add_memtype_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_add_memtype_t);
@@ -345,8 +345,8 @@ struct dom0_read_memtype {
     /* IN variables. */
     uint32_t reg;
     /* OUT variables. */
-    unsigned long mfn;
-    unsigned long nr_mfns;
+    xen_pfn_t mfn;
+    uint64_t nr_mfns;
     uint32_t type;
 };
 typedef struct dom0_read_memtype dom0_read_memtype_t;
@@ -499,8 +499,8 @@ DEFINE_XEN_GUEST_HANDLE(dom0_irq_permission_t);
 #define DOM0_IOMEM_PERMISSION 47
 struct dom0_iomem_permission {
     domid_t  domain;          /* domain to be affected */
-    unsigned long first_mfn;  /* first page (physical page number) in range */
-    unsigned long nr_mfns;    /* number of pages in range (>0) */
+    xen_pfn_t first_mfn;      /* first page (physical page number) in range */
+    uint64_t nr_mfns;         /* number of pages in range (>0) */
     uint8_t allow_access;     /* allow (!0) or deny (0) access to range? */
 };
 typedef struct dom0_iomem_permission dom0_iomem_permission_t;
@@ -509,7 +509,7 @@ DEFINE_XEN_GUEST_HANDLE(dom0_iomem_permission_t);
 #define DOM0_HYPERCALL_INIT   48
 struct dom0_hypercall_init {
     domid_t  domain;          /* domain to be affected */
-    unsigned long mfn;        /* machine frame to be initialised */
+    xen_pfn_t mfn;            /* machine frame to be initialised */
 };
 typedef struct dom0_hypercall_init dom0_hypercall_init_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_hypercall_init_t);

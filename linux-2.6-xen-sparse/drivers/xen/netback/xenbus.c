@@ -69,6 +69,8 @@ static int netback_remove(struct xenbus_device *dev)
 static int netback_probe(struct xenbus_device *dev,
 			 const struct xenbus_device_id *id)
 {
+	const char *message;
+	xenbus_transaction_t xbt;
 	int err;
 	struct backend_info *be = kzalloc(sizeof(struct backend_info),
 					  GFP_KERNEL);
@@ -86,6 +88,27 @@ static int netback_probe(struct xenbus_device *dev,
 	if (err)
 		goto fail;
 
+	do {
+		err = xenbus_transaction_start(&xbt);
+		if (err) {
+			xenbus_dev_fatal(dev, err, "starting transaction");
+			goto fail;
+		}
+
+		err = xenbus_printf(xbt, dev->nodename, "feature-sg", "%d", 1);
+		if (err) {
+			message = "writing feature-sg";
+			goto abort_transaction;
+		}
+
+		err = xenbus_transaction_end(xbt, 0);
+	} while (err == -EAGAIN);
+
+	if (err) {
+		xenbus_dev_fatal(dev, err, "completing transaction");
+		goto fail;
+	}
+
 	err = xenbus_switch_state(dev, XenbusStateInitWait);
 	if (err) {
 		goto fail;
@@ -93,6 +116,9 @@ static int netback_probe(struct xenbus_device *dev,
 
 	return 0;
 
+abort_transaction:
+	xenbus_transaction_end(xbt, 1);
+	xenbus_dev_fatal(dev, err, "%s", message);
 fail:
 	DPRINTK("failed");
 	netback_remove(dev);

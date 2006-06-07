@@ -135,7 +135,7 @@ static void set_hvm_info_checksum(struct hvm_info_table *t)
  * hvmloader will use this info to set BIOS accordingly
  */
 static int set_hvm_info(int xc_handle, uint32_t dom,
-                        unsigned long *pfn_list, unsigned int vcpus,
+                        xen_pfn_t *pfn_list, unsigned int vcpus,
                         unsigned int pae, unsigned int acpi, unsigned int apic)
 {
     char *va_map;
@@ -178,7 +178,7 @@ static int setup_guest(int xc_handle,
                        unsigned int store_evtchn,
                        unsigned long *store_mfn)
 {
-    unsigned long *page_array = NULL;
+    xen_pfn_t *page_array = NULL;
     unsigned long count, i;
     unsigned long long ptr;
     xc_mmu_t *mmu = NULL;
@@ -223,7 +223,7 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
+    if ( (page_array = malloc(nr_pages * sizeof(xen_pfn_t))) == NULL )
     {
         PERROR("Could not allocate memory.\n");
         goto error_out;

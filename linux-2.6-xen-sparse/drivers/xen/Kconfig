@@ -228,4 +228,30 @@ config NO_IDLE_HZ
 	bool
 	default y
 
+config XEN_UTIL
+	bool
+	default y
+
+config XEN_BALLOON
+	bool
+	default y
+
+config XEN_DEVMEM
+	bool
+	default y
+
+config XEN_SKBUFF
+	bool
+	default y
+	depends on NET
+
+config XEN_REBOOT
+	bool
+	default y
+
+config XEN_SMPBOOT
+	bool
+	default y
+	depends on SMP
+
 endif

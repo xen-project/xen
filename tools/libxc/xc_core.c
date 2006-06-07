@@ -28,7 +28,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
                                 dumpcore_rtn_t dump_rtn)
 {
     unsigned long nr_pages;
-    unsigned long *page_array = NULL;
+    xen_pfn_t *page_array = NULL;
     xc_dominfo_t info;
     int i, nr_vcpus = 0;
     char *dump_mem, *dump_mem_start = NULL;
@@ -70,7 +70,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
         sizeof(vcpu_guest_context_t)*nr_vcpus;
     dummy_len = (sizeof(struct xc_core_header) +
                  (sizeof(vcpu_guest_context_t) * nr_vcpus) +
-                 (nr_pages * sizeof(unsigned long)));
+                 (nr_pages * sizeof(xen_pfn_t)));
     header.xch_pages_offset = round_pgup(dummy_len);
 
     sts = dump_rtn(args, (char *)&header, sizeof(struct xc_core_header));
@@ -81,7 +81,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     if ( sts != 0 )
         goto error_out;
 
-    if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
+    if ( (page_array = malloc(nr_pages * sizeof(xen_pfn_t))) == NULL )
     {
         printf("Could not allocate memory\n");
         goto error_out;
@@ -91,7 +91,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
         printf("Could not get the page frame list\n");
         goto error_out;
     }
-    sts = dump_rtn(args, (char *)page_array, nr_pages * sizeof(unsigned long));
+    sts = dump_rtn(args, (char *)page_array, nr_pages * sizeof(xen_pfn_t));
     if ( sts != 0 )
         goto error_out;
 

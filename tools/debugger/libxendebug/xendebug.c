@@ -57,7 +57,7 @@ typedef struct domain_context                 /* local cache of domain state */
     vcpu_guest_context_t context[MAX_VIRT_CPUS];
 
     long            total_pages;
-    unsigned long  *page_array;
+    xen_pfn_t      *page_array;
 
     unsigned long   cr3_phys[MAX_VIRT_CPUS];
     unsigned long  *cr3_virt[MAX_VIRT_CPUS];
@@ -346,8 +346,9 @@ xendebug_memory_page (domain_context_p ctxt, int xc_handle, uint32_t vcpu,
         ctxt->cr3_phys[vcpu] = vcpu_ctxt->ctrlreg[3];
         if ( ctxt->cr3_virt[vcpu] )
             munmap(ctxt->cr3_virt[vcpu], PAGE_SIZE);
-        ctxt->cr3_virt[vcpu] = xc_map_foreign_range(xc_handle, ctxt->domid,
-                    PAGE_SIZE, PROT_READ, ctxt->cr3_phys[vcpu] >> PAGE_SHIFT);
+        ctxt->cr3_virt[vcpu] = xc_map_foreign_range(
+            xc_handle, ctxt->domid, PAGE_SIZE, PROT_READ,
+            xen_cr3_to_pfn(ctxt->cr3_phys[vcpu]));
         if ( ctxt->cr3_virt[vcpu] == NULL )
             return 0;
     } 

@@ -40,10 +40,10 @@ boolean_param("hpet_force", opt_hpet_force);
 
 unsigned long cpu_khz;  /* CPU clock frequency in kHz. */
 unsigned long hpet_address;
-spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(rtc_lock);
 unsigned long volatile jiffies;
 static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
-static spinlock_t wc_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(wc_lock);
 
 struct time_scale {
     int shift;
@@ -67,7 +67,7 @@ static struct cpu_time cpu_time[NR_CPUS];
 static s_time_t stime_platform_stamp;
 static u64 platform_timer_stamp;
 static struct time_scale platform_timer_scale;
-static spinlock_t platform_timer_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(platform_timer_lock);
 static u64 (*read_platform_count)(void);
 
 /*

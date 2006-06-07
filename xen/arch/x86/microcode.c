@@ -83,7 +83,7 @@
 #include <asm/processor.h>
 
 #define pr_debug(x...) ((void)0)
-#define DECLARE_MUTEX(_m) spinlock_t _m = SPIN_LOCK_UNLOCKED
+#define DECLARE_MUTEX(_m) DEFINE_SPINLOCK(_m)
 #define down(_m) spin_lock(_m)
 #define up(_m) spin_unlock(_m)
 #define vmalloc(_s) xmalloc_bytes(_s)

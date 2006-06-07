@@ -146,6 +146,7 @@ int full_screen = 0;
 int repeat_key = 1;
 TextConsole *vga_console;
 CharDriverState *serial_hds[MAX_SERIAL_PORTS];
+int serial_summa_port = -1;
 int xc_handle;
 time_t timeoffset = 0;
 
@@ -2457,7 +2458,7 @@ int unset_mm_mapping(int xc_handle,
                      uint32_t domid,
                      unsigned long nr_pages,
                      unsigned int address_bits,
-                     unsigned long *extent_start)
+                     xen_pfn_t *extent_start)
 {
     int err = 0;
     xc_dominfo_t info;
@@ -2490,7 +2491,7 @@ int set_mm_mapping(int xc_handle,
                     uint32_t domid,
                     unsigned long nr_pages,
                     unsigned int address_bits,
-                    unsigned long *extent_start)
+                    xen_pfn_t *extent_start)
 {
     xc_dominfo_t info;
     int err = 0;
@@ -2498,7 +2499,7 @@ int set_mm_mapping(int xc_handle,
     xc_domain_getinfo(xc_handle, domid, 1, &info);
 
     if ( xc_domain_setmaxmem(xc_handle, domid,
-                             (info.nr_pages + nr_pages) * PAGE_SIZE/1024) != 0)
+                             info.max_memkb + nr_pages * PAGE_SIZE/1024) !=0)
     {
         fprintf(logfile, "set maxmem returned error %d\n", errno);
         return -1;
@@ -2556,7 +2557,8 @@ int main(int argc, char **argv)
     int serial_device_index;
     char qemu_dm_logfilename[64];
     const char *loadvm = NULL;
-    unsigned long nr_pages, *page_array;
+    unsigned long nr_pages;
+    xen_pfn_t *page_array;
     extern void *shared_page;
 
 #if !defined(CONFIG_SOFTMMU)
@@ -2588,8 +2590,8 @@ int main(int argc, char **argv)
     pstrcpy(monitor_device, sizeof(monitor_device), "vc");
 
     pstrcpy(serial_devices[0], sizeof(serial_devices[0]), "vc");
-    pstrcpy(serial_devices[1], sizeof(serial_devices[1]), "null");
-    for(i = 2; i < MAX_SERIAL_PORTS; i++)
+    serial_summa_port = -1;
+    for(i = 1; i < MAX_SERIAL_PORTS; i++)
         serial_devices[i][0] = '\0';
     serial_device_index = 0;
 
@@ -3022,8 +3024,8 @@ int main(int argc, char **argv)
 
     xc_handle = xc_interface_open();
 
-    if ( (page_array = (unsigned long *)
-                        malloc(nr_pages * sizeof(unsigned long))) == NULL)
+    if ( (page_array = (xen_pfn_t *)
+                        malloc(nr_pages * sizeof(xen_pfn_t))) == NULL)
     {
         fprintf(logfile, "malloc returned error %d\n", errno);
         exit(-1);
@@ -3078,8 +3080,8 @@ int main(int argc, char **argv)
                                        page_array[0]);
 #endif
 
-    fprintf(logfile, "shared page at pfn:%lx, mfn: %lx\n", (nr_pages-1),
-           (page_array[nr_pages - 1]));
+    fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n", (nr_pages-1),
+           (uint64_t)(page_array[nr_pages - 1]));
 
     /* we always create the cdrom drive, even if no disk is there */
     bdrv_init();
@@ -3172,6 +3174,20 @@ int main(int argc, char **argv)
         exit(1);
     }
     monitor_init(monitor_hd, !nographic);
+
+    /* Find which port should be the Summagraphics port */
+    /* It's the first unspecified serial line. Note that COM1 is set */
+    /* by default, so the Summagraphics port would be COM2 or higher */
+
+    for(i = 0; i < MAX_SERIAL_PORTS; i++) {
+      if (serial_devices[i][0] != '\0')
+	continue;
+      serial_summa_port = i;
+      pstrcpy(serial_devices[serial_summa_port], sizeof(serial_devices[0]), "null");
+      break;
+    }
+
+    /* Now, open the ports */
 
     for(i = 0; i < MAX_SERIAL_PORTS; i++) {
         if (serial_devices[i][0] != '\0') {

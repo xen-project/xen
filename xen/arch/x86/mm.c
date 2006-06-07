@@ -89,6 +89,7 @@
 #include <xen/kernel.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/domain.h>
 #include <xen/sched.h>
 #include <xen/errno.h>
 #include <xen/perfc.h>
@@ -187,20 +188,16 @@ void arch_init_memory(void)
      * Any Xen-heap pages that we will allow to be mapped will have
      * their domain field set to dom_xen.
      */
-    dom_xen = alloc_domain();
-    spin_lock_init(&dom_xen->page_alloc_lock);
-    atomic_set(&dom_xen->refcnt, 1);
-    dom_xen->domain_id = DOMID_XEN;
+    dom_xen = alloc_domain(DOMID_XEN);
+    BUG_ON(dom_xen == NULL);
 
     /*
      * Initialise our DOMID_IO domain.
      * This domain owns I/O pages that are within the range of the page_info
      * array. Mappings occur at the priv of the caller.
      */
-    dom_io = alloc_domain();
-    spin_lock_init(&dom_io->page_alloc_lock);
-    atomic_set(&dom_io->refcnt, 1);
-    dom_io->domain_id = DOMID_IO;
+    dom_io = alloc_domain(DOMID_IO);
+    BUG_ON(dom_io == NULL);
 
     /* First 1MB of RAM is historically marked as I/O. */
     for ( i = 0; i < 0x100; i++ )
@@ -1000,6 +997,21 @@ static int alloc_l3_table(struct page_info *page, unsigned long type)
 
     ASSERT(!shadow_mode_refcounts(d));
 
+#ifdef CONFIG_X86_PAE
+    /*
+     * PAE pgdirs above 4GB are unacceptable if the guest does not understand
+     * the weird 'extended cr3' format for dealing with high-order address
+     * bits. We cut some slack for control tools (before vcpu0 is initialised).
+     */
+    if ( (pfn >= 0x100000) &&
+         unlikely(!VM_ASSIST(d, VMASST_TYPE_pae_extended_cr3)) &&
+         d->vcpu[0] && test_bit(_VCPUF_initialised, &d->vcpu[0]->vcpu_flags) )
+    {
+        MEM_LOG("PAE pgd must be below 4GB (0x%lx >= 0x100000)", pfn);
+        return 0;
+    }
+#endif
+
     pl3e = map_domain_page(pfn);
     for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
     {
@@ -1717,7 +1729,7 @@ int new_guest_cr3(unsigned long mfn)
         {
             /* Switch to idle pagetable: this VCPU has no active p.t. now. */
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-            v->arch.guest_table = mk_pagetable(0);
+            v->arch.guest_table = pagetable_null();
             update_pagetables(v);
             write_cr3(__pa(idle_pg_table));
             if ( old_base_mfn != 0 )
@@ -1739,7 +1751,7 @@ int new_guest_cr3(unsigned long mfn)
     invalidate_shadow_ldt(v);
 
     old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-    v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+    v->arch.guest_table = pagetable_from_pfn(mfn);
     update_pagetables(v); /* update shadow_table and monitor_table */
 
     write_ptbase(v);
@@ -2006,7 +2018,7 @@ int do_mmuext_op(
             {
                 unsigned long old_mfn =
                     pagetable_get_pfn(v->arch.guest_table_user);
-                v->arch.guest_table_user = mk_pagetable(mfn << PAGE_SHIFT);
+                v->arch.guest_table_user = pagetable_from_pfn(mfn);
                 if ( old_mfn != 0 )
                     put_page_and_type(mfn_to_page(old_mfn));
             }

@@ -2460,10 +2460,9 @@ static CPUWriteMemoryFunc *cirrus_linear_bitblt_write[3] = {
 };
 
 extern FILE *logfile;
-#if defined(__i386__) || defined (__x86_64__)
 static void * set_vram_mapping(unsigned long begin, unsigned long end)
 {
-    unsigned long * extent_start = NULL;
+    xen_pfn_t *extent_start = NULL;
     unsigned long nr_extents;
     void *vram_pointer = NULL;
     int i;
@@ -2474,14 +2473,14 @@ static void * set_vram_mapping(unsigned long begin, unsigned long end)
     end = (end + TARGET_PAGE_SIZE -1 ) & TARGET_PAGE_MASK;
     nr_extents = (end - begin) >> TARGET_PAGE_BITS;
 
-    extent_start = malloc(sizeof(unsigned long) * nr_extents );
+    extent_start = malloc(sizeof(xen_pfn_t) * nr_extents );
     if (extent_start == NULL)
     {
         fprintf(stderr, "Failed malloc on set_vram_mapping\n");
         return NULL;
     }
 
-    memset(extent_start, 0, sizeof(unsigned long) * nr_extents);
+    memset(extent_start, 0, sizeof(xen_pfn_t) * nr_extents);
 
     for (i = 0; i < nr_extents; i++)
     {
@@ -2509,7 +2508,7 @@ static void * set_vram_mapping(unsigned long begin, unsigned long end)
 
 static int unset_vram_mapping(unsigned long begin, unsigned long end)
 {
-    unsigned long * extent_start = NULL;
+    xen_pfn_t *extent_start = NULL;
     unsigned long nr_extents;
     int i;
 
@@ -2520,7 +2519,7 @@ static int unset_vram_mapping(unsigned long begin, unsigned long end)
     end = (end + TARGET_PAGE_SIZE -1 ) & TARGET_PAGE_MASK;
     nr_extents = (end - begin) >> TARGET_PAGE_BITS;
 
-    extent_start = malloc(sizeof(unsigned long) * nr_extents );
+    extent_start = malloc(sizeof(xen_pfn_t) * nr_extents );
 
     if (extent_start == NULL)
     {
@@ -2528,7 +2527,7 @@ static int unset_vram_mapping(unsigned long begin, unsigned long end)
         return -1;
     }
 
-    memset(extent_start, 0, sizeof(unsigned long) * nr_extents);
+    memset(extent_start, 0, sizeof(xen_pfn_t) * nr_extents);
 
     for (i = 0; i < nr_extents; i++)
         extent_start[i] = (begin + (i * TARGET_PAGE_SIZE)) >> TARGET_PAGE_BITS;
@@ -2540,10 +2539,6 @@ static int unset_vram_mapping(unsigned long begin, unsigned long end)
     return 0;
 }
 
-#elif defined(__ia64__)
-static void * set_vram_mapping(unsigned long addr, unsigned long end) {}
-static int unset_vram_mapping(unsigned long addr, unsigned long end) {}
-#endif
 extern int vga_accelerate;
 
 /* Compute the memory access functions */

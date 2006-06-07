@@ -1995,6 +1995,7 @@ void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
     s->get_resolution = vga_get_resolution;
     /* XXX: currently needed for display */
     vga_state = s;
+    vga_bios_init(s);
 }
 
 
@@ -2082,7 +2083,6 @@ int vga_initialize(PCIBus *bus, DisplayState *ds, uint8_t *vga_ram_base,
 #endif
     }
 
-    vga_bios_init(s);
     return 0;
 }
 

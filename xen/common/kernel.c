@@ -184,6 +184,7 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE(void) arg)
     case XENVER_get_features:
     {
         xen_feature_info_t fi;
+        struct domain *d = current->domain;
 
         if ( copy_from_guest(&fi, arg, 1) )
             return -EFAULT;
@@ -191,7 +192,9 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE(void) arg)
         switch ( fi.submap_idx )
         {
         case 0:
-            fi.submap = (1U << XENFEAT_pae_pgdir_above_4gb);
+            fi.submap = 0;
+            if ( VM_ASSIST(d, VMASST_TYPE_pae_extended_cr3) )
+                fi.submap |= (1U << XENFEAT_pae_pgdir_above_4gb);
             if ( shadow_mode_translate(current->domain) )
                 fi.submap |= 
                     (1U << XENFEAT_writable_page_tables) |
