@@ -46,4 +46,7 @@ extern unsigned long io_apic_irqs;
 extern atomic_t irq_err_count;
 extern atomic_t irq_mis_count;
 
+int pirq_acktype(int irq);
+int pirq_shared(int irq);
+
 #endif /* _ASM_HW_IRQ_H */
