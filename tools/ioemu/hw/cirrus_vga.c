@@ -1191,17 +1191,6 @@ cirrus_hook_write_sr(CirrusVGAState * s, unsigned reg_index, int reg_value)
 	s->hw_cursor_y = (reg_value << 3) | (reg_index >> 5);
 	break;
     case 0x07:			// Extended Sequencer Mode
-	/* Win2K seems to assume that the VRAM is set to 0xff
-	 *   whenever VGA/SVGA mode changes 
-	 */
-	if ((s->sr[0x07] ^ reg_value) & CIRRUS_SR7_BPP_SVGA)
-	    memset(s->vram_ptr, 0xff, s->real_vram_size);
-	s->sr[0x07] = reg_value;
-#ifdef DEBUG_CIRRUS 
-	printf("cirrus: handled outport sr_index %02x, sr_value %02x\n",
-	       reg_index, reg_value);
-#endif
-	break;
     case 0x08:			// EEPROM Control
     case 0x09:			// Scratch Register 0
     case 0x0a:			// Scratch Register 1
