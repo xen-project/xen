@@ -216,13 +216,14 @@ void hlt_timer_fn(void *data)
 
 static __inline__ void missed_ticks(struct periodic_time *pt)
 {
-    int missed_ticks;
+    s_time_t missed_ticks;
 
-    missed_ticks = (NOW() - pt->scheduled)/(s_time_t) pt->period;
-    if ( missed_ticks++ >= 0 ) {
+    missed_ticks = NOW() - pt->scheduled;
+    if ( missed_ticks > 0 ) {
+	missed_ticks = missed_ticks / (s_time_t) pt->period + 1;
         if ( missed_ticks > 1000 ) {
             /* TODO: Adjust guest time togther */
-            pt->pending_intr_nr ++;
+            pt->pending_intr_nr++;
         }
         else {
             pt->pending_intr_nr += missed_ticks;
@@ -236,6 +237,9 @@ void pt_timer_fn(void *data)
 {
     struct vcpu *v = data;
     struct periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
+
+    pt->pending_intr_nr++;
+    pt->scheduled += pt->period;
 
     /* pick up missed timer tick */
     missed_ticks(pt);
