@@ -18,7 +18,7 @@ This initrd was built using the infrastructure provided by xm-test.  It is a
 full guest operating system and filesystem, and as such includes a large
 number of pieces of software.  The source code for the majority of these are
 included in full inside the file
-http://xm-test.xensource.com/ramdisks/initrd.0.8.img-buildroot.tar.bz2, or
+http://xm-test.xensource.com/ramdisks/initrd-0.8.img-buildroot.tar.bz2, or
 alongside this file.  Copyright statements and licences are contained therein.
 The remaining source code is included in the Xen distribution, at
 http://www.xensource.com/xen/downloads/archives.html.  The configurations used
