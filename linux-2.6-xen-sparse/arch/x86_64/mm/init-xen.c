@@ -668,12 +668,28 @@ void __meminit init_memory_mapping(unsigned long start, unsigned long end)
 
 	if (!after_bootmem) {
 		BUG_ON(start_pfn != table_end);
-		/*
-		 * Destroy the temporary mappings created above. Prevents
+
+		/* Re-vector virtual addresses pointing into the initial
+		   mapping to the just-established permanent ones. */
+		xen_start_info = __va(__pa(xen_start_info));
+		xen_start_info->pt_base = (unsigned long)
+			__va(__pa(xen_start_info->pt_base));
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			phys_to_machine_mapping =
+				__va(__pa(xen_start_info->mfn_list));
+			xen_start_info->mfn_list = (unsigned long)
+				phys_to_machine_mapping;
+		}
+		if (xen_start_info->mod_start)
+			xen_start_info->mod_start = (unsigned long)
+				__va(__pa(xen_start_info->mod_start));
+
+		/* Destroy the Xen-created mappings beyond the kernel image as
+		 * well as the temporary mappings created above. Prevents
 		 * overlap with modules area (if init mapping is very big).
 		 */
-		start = __START_KERNEL_map + (table_start << PAGE_SHIFT);
-		end   = __START_KERNEL_map + (table_end   << PAGE_SHIFT);
+		start = PAGE_ALIGN((unsigned long)_end);
+		end   = __START_KERNEL_map + (table_end << PAGE_SHIFT);
 		for (; start < end; start += PAGE_SIZE)
 			WARN_ON(HYPERVISOR_update_va_mapping(
 				start, __pte_ma(0), 0));
