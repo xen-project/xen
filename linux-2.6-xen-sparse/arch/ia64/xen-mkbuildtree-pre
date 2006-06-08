@@ -15,12 +15,3 @@ ln -sf ../../../../xen/include/asm-ia64/asm-xsi-offsets.h include/asm-ia64/xen/
 #(warning: there be dragons here if these files diverge)
 ln -sf ../../arch/ia64/xen/drivers/Makefile drivers/xen/Makefile
 ln -sf ../../../arch/ia64/xen/drivers/coreMakefile drivers/xen/core/Makefile
-
-#still a few x86-ism's in various drivers/xen files, patch them
-#cd drivers/xen
-#if [ ! -e ia64.patch.semaphore ]
-#then
-#	cat ../../arch/ia64/xen/drivers/patches/* | patch -p1 -b
-#fi
-#touch ia64.patch.semaphore
-#cd ../..
