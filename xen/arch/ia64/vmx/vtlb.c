@@ -58,12 +58,6 @@ static thash_data_t *cch_alloc(thash_cb_t *hcb)
     return p;
 }
 
-static void cch_free(thash_cb_t *hcb, thash_data_t *cch)
-{
-    cch->next = hcb->cch_freelist;
-    hcb->cch_freelist = cch;
-}
-
 /*
  * Check to see if the address rid:va is translated by the TLB
  */
@@ -92,22 +86,6 @@ __is_tr_overlap(thash_data_t *trp, u64 rid, u64 sva, u64 eva)
     else
         return 1;
 
-}
-
-/*
- * Delete an thash entry leading collision chain.
- */
-static void __rem_hash_head(thash_cb_t *hcb, thash_data_t *hash)
-{
-    thash_data_t *next=hash->next;
-    if ( next) {
-        next->len=hash->len-1;
-        *hash = *next;
-        cch_free (hcb, next);
-    }
-    else {
-        hash->ti=1;
-    }
 }
 
 thash_data_t *__vtr_lookup(VCPU *vcpu, u64 va, int is_data)
@@ -142,17 +120,18 @@ thash_data_t *__vtr_lookup(VCPU *vcpu, u64 va, int is_data)
 
 static void thash_recycle_cch(thash_cb_t *hcb, thash_data_t *hash)
 {
-    thash_data_t *p;
+    thash_data_t *p, *q;
     int i=0;
     
     p=hash;
     for(i=0; i < MAX_CCN_DEPTH; i++){
         p=p->next;
     }
-    p->next=hcb->cch_freelist;
-    hcb->cch_freelist=hash->next;
+    q=hash->next;
     hash->len=0;
     hash->next=0;
+    p->next=hcb->cch_freelist;
+    hcb->cch_freelist=q;
 }
 
 
@@ -265,16 +244,14 @@ static void vtlb_purge(thash_cb_t *hcb, u64 va, u64 ps)
         hash_table = vsa_thash(hcb->pta, start, vrr.rrval, &tag);
         if(!INVALID_TLB(hash_table)){
             if(hash_table->etag == tag){
-                __rem_hash_head(hcb, hash_table);
+                 hash_table->etag = 1UL<<63;
             }
             else{
                 prev=hash_table;
                 next=prev->next;
                 while(next){
                     if(next->etag == tag){
-                        prev->next=next->next;
-                        cch_free(hcb,next);
-                        hash_table->len--;
+                        next->etag = 1UL<<63;
                         break;
                     }
                     prev=next;
@@ -300,16 +277,14 @@ static void vhpt_purge(thash_cb_t *hcb, u64 va, u64 ps)
         hash_table = (thash_data_t *)ia64_thash(start);
         tag = ia64_ttag(start);
         if(hash_table->etag == tag ){
-            __rem_hash_head(hcb, hash_table);
+            hash_table->etag = 1UL<<63; 
         }
         else{
             prev=hash_table;
             next=prev->next;
             while(next){
                 if(next->etag == tag){
-                    prev->next=next->next;
-                    cch_free(hcb,next);
-                    hash_table->len--;
+                    next->etag = 1UL<<63;
                     break; 
                 }
                 prev=next;
@@ -383,7 +358,6 @@ void vtlb_insert(thash_cb_t *hcb, u64 pte, u64 itir, u64 va)
         hash_table->page_flags = pte;
         hash_table->itir=itir;
         hash_table->etag=tag;
-        hash_table->next = 0;
         return;
     }
     if (hash_table->len>=MAX_CCN_DEPTH){
@@ -539,7 +513,6 @@ void thash_purge_all(VCPU *v)
         num--;
     }while(num);
     cch_mem_init(vhpt);
-
     local_flush_tlb_all();
 }
 

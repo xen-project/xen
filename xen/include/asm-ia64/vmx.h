@@ -25,6 +25,8 @@
 #define RR7_SWITCH_SHIFT	12	/* 4k enough */
 #include <public/hvm/ioreq.h>
 
+#define VCPU_LID(v) (((u64)(v)->vcpu_id)<<24)
+
 extern void identify_vmx_feature(void);
 extern unsigned int vmx_enabled;
 extern void vmx_init_env(void);

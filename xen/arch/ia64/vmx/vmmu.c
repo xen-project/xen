@@ -492,13 +492,64 @@ IA64FAULT vmx_vcpu_ptc_e(VCPU *vcpu, UINT64 va)
 
 IA64FAULT vmx_vcpu_ptc_g(VCPU *vcpu, UINT64 va, UINT64 ps)
 {
-    vmx_vcpu_ptc_l(vcpu, va, ps);
+    vmx_vcpu_ptc_ga(vcpu, va, ps);
     return IA64_ILLOP_FAULT;
 }
-
+/*
 IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu,UINT64 va,UINT64 ps)
 {
     vmx_vcpu_ptc_l(vcpu, va, ps);
+    return IA64_NO_FAULT;
+}
+ */
+struct ptc_ga_args {
+    unsigned long vadr;
+    unsigned long rid;
+    unsigned long ps;
+    struct vcpu *vcpu;
+};
+
+static void ptc_ga_remote_func (void *varg)
+{
+    u64 oldrid, moldrid;
+    VCPU *v;
+    struct ptc_ga_args *args = (struct ptc_ga_args *)varg;
+    v = args->vcpu;
+    oldrid = VMX(v, vrr[0]);
+    VMX(v, vrr[0]) = args->rid;
+    moldrid = ia64_get_rr(0x0);
+    ia64_set_rr(0x0,vrrtomrr(v,args->rid));
+    vmx_vcpu_ptc_l(v, args->vadr, args->ps);
+    VMX(v, vrr[0]) = oldrid; 
+    ia64_set_rr(0x0,moldrid);
+}
+
+
+IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu,UINT64 va,UINT64 ps)
+{
+
+    struct domain *d = vcpu->domain;
+    struct vcpu *v;
+    struct ptc_ga_args args;
+
+    args.vadr = va<<3>>3;
+    vcpu_get_rr(vcpu, va, &args.rid);
+    args.ps = ps;
+    for_each_vcpu (d, v) {
+        args.vcpu = v;
+        if (v->processor != vcpu->processor) {
+            int proc;
+            /* Flush VHPT on remote processors.  */
+            do {
+                proc = v->processor;
+                smp_call_function_single(v->processor, 
+                    &ptc_ga_remote_func, &args, 0, 1);
+                /* Try again if VCPU has migrated.  */
+            } while (proc != v->processor);
+        }
+        else
+            ptc_ga_remote_func(&args);
+    }
     return IA64_NO_FAULT;
 }
 

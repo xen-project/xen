@@ -33,8 +33,9 @@
 #include <asm/mm.h>
 #include <asm/vmx.h>
 #include <public/event_channel.h>
+#include <public/arch-ia64.h>
 #include <linux/event.h>
-
+#include <xen/domain.h>
 /*
 struct mmio_list *lookup_mmio(u64 gpa, struct mmio_list *mio_base)
 {
@@ -51,7 +52,7 @@ struct mmio_list *lookup_mmio(u64 gpa, struct mmio_list *mio_base)
 #define PIB_OFST_INTA           0x1E0000
 #define PIB_OFST_XTP            0x1E0008
 
-static int write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value);
+static void write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value);
 
 static void pib_write(VCPU *vcpu, void *src, uint64_t pib_off, size_t s, int ma)
 {
@@ -356,42 +357,67 @@ static void deliver_ipi (VCPU *vcpu, uint64_t dm, uint64_t vector)
  */
 static inline VCPU *lid_2_vcpu (struct domain *d, u64 id, u64 eid)
 {
-	int   i;
-	VCPU  *vcpu;
-	LID	  lid;
-	for (i=0; i<MAX_VIRT_CPUS; i++) {
-		vcpu = d->vcpu[i];
- 		if (!vcpu)
- 			continue;
-		lid.val = VCPU(vcpu, lid);
-		if ( lid.id == id && lid.eid == eid ) {
-		    return vcpu;
-		}
-	}
-	return NULL;
+    int   i;
+    VCPU  *vcpu;
+    LID   lid;
+    for (i=0; i<MAX_VIRT_CPUS; i++) {
+        vcpu = d->vcpu[i];
+        if (!vcpu)
+            continue;
+        lid.val = VCPU_LID(vcpu);
+        if ( lid.id == id && lid.eid == eid )
+            return vcpu;
+    }
+    return NULL;
 }
 
 /*
  * execute write IPI op.
  */
-static int write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value)
+static void write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value)
 {
-    VCPU   *target_cpu;
- 
-    target_cpu = lid_2_vcpu(vcpu->domain, 
-    				((ipi_a_t)addr).id, ((ipi_a_t)addr).eid);
-    if ( target_cpu == NULL ) panic_domain (NULL,"Unknown IPI cpu\n");
-    if ( target_cpu == vcpu ) {
-    	// IPI to self
-        deliver_ipi (vcpu, ((ipi_d_t)value).dm, 
-                ((ipi_d_t)value).vector);
-        return 1;
+    VCPU   *targ;
+    struct domain *d=vcpu->domain; 
+    targ = lid_2_vcpu(vcpu->domain, 
+           ((ipi_a_t)addr).id, ((ipi_a_t)addr).eid);
+    if ( targ == NULL ) panic_domain (NULL,"Unknown IPI cpu\n");
+
+    if (!test_bit(_VCPUF_initialised, &targ->vcpu_flags)) {
+        struct pt_regs *targ_regs = vcpu_regs (targ);
+        struct vcpu_guest_context c;
+
+        printf ("arch_boot_vcpu: %p %p\n",
+                (void *)d->arch.boot_rdv_ip,
+                (void *)d->arch.boot_rdv_r1);
+        memset (&c, 0, sizeof (c));
+
+        c.flags = VGCF_VMX_GUEST;
+        if (arch_set_info_guest (targ, &c) != 0) {
+            printf ("arch_boot_vcpu: failure\n");
+            return;
+        }
+        /* First or next rendez-vous: set registers.  */
+        vcpu_init_regs (targ);
+        targ_regs->cr_iip = d->arch.boot_rdv_ip;
+        targ_regs->r1 = d->arch.boot_rdv_r1;
+
+        if (test_and_clear_bit(_VCPUF_down,&targ->vcpu_flags)) {
+            vcpu_wake(targ);
+            printf ("arch_boot_vcpu: vcpu %d awaken %016lx!\n",
+                    targ->vcpu_id, targ_regs->cr_iip);
+        }
+        else
+            printf ("arch_boot_vcpu: huu, already awaken!");
     }
     else {
-    	// TODO: send Host IPI to inject guest SMP IPI interruption
-        panic_domain (NULL, "No SM-VP supported!\n");
-        return 0;
+        int running = test_bit(_VCPUF_running,&targ->vcpu_flags);
+        deliver_ipi (targ, ((ipi_d_t)value).dm, 
+                    ((ipi_d_t)value).vector);
+        vcpu_unblock(targ);
+        if (running)
+            smp_send_event_check_cpu(targ->processor);
     }
+    return;
 }
 
 

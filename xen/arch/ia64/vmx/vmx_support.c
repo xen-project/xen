@@ -138,7 +138,8 @@ void vmx_intr_assist(struct vcpu *v)
 
 #ifdef V_IOSAPIC_READY
     /* Confirm virtual interrupt line signals, and set pending bits in vpd */
-    vmx_virq_line_assist(v);
+    if(v->vcpu_id==0)
+        vmx_virq_line_assist(v);
 #endif
     return;
 }

@@ -124,7 +124,7 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 #endif
 #endif
 
-	if (!is_idle_domain(current->domain))
+	if (!is_idle_domain(current->domain)&&!VMX_DOMAIN(current))
 		if (vcpu_timer_expired(current)) {
 			vcpu_pend_timer(current);
 			// ensure another timer interrupt happens even if domain doesn't

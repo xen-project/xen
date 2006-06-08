@@ -362,7 +362,7 @@ void vlsapic_reset(VCPU *vcpu)
 {
     int     i;
 
-    VCPU(vcpu, lid) = ia64_getreg(_IA64_REG_CR_LID);
+    VCPU(vcpu, lid) = VCPU_LID(vcpu);
     VCPU(vcpu, ivr) = 0;
     VCPU(vcpu,tpr) = 0x10000;
     VCPU(vcpu, eoi) = 0;
