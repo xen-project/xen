@@ -33,6 +33,15 @@
 #ifndef __HYPERVISOR_H__
 #define __HYPERVISOR_H__
 
+#ifndef CONFIG_XEN
+#define is_running_on_xen()			(0)
+#define HYPERVISOR_ioremap(offset, size)	(offset)
+#else
+extern int running_on_xen;
+#define is_running_on_xen()			(running_on_xen)
+#endif
+
+#ifdef CONFIG_XEN
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -46,7 +55,6 @@
 #include <asm/hypercall.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
-#include <asm/xen/privop.h> // for is_running_on_xen()
 
 extern shared_info_t *HYPERVISOR_shared_info;
 extern start_info_t *xen_start_info;
@@ -192,5 +200,6 @@ MULTI_update_va_mapping(
 asmlinkage int xprintk(const char *fmt, ...);
 #define xprintd(fmt, ...)	xprintk("%s:%d " fmt, __func__, __LINE__, \
 					##__VA_ARGS__)
+#endif /* CONFIG_XEN */
 
 #endif /* __HYPERVISOR_H__ */

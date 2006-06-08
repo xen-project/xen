@@ -66,11 +66,13 @@ int
 assign_irq_vector (int irq)
 {
 	int pos, vector;
+
 #ifdef CONFIG_XEN
-	extern int xen_assign_irq_vector(int);
-	if (is_running_on_xen())
+	if (is_running_on_xen()) {
+		extern int xen_assign_irq_vector(int);
 		return xen_assign_irq_vector(irq);
-#endif /* CONFIG_XEN */
+	}
+#endif
  again:
 	pos = find_first_zero_bit(ia64_vector_mask, IA64_NUM_DEVICE_VECTORS);
 	vector = IA64_FIRST_DEVICE_VECTOR + pos;

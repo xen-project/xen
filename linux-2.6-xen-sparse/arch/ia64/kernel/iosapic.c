@@ -670,10 +670,8 @@ register_intr (unsigned int gsi, int vector, unsigned char delivery,
 	iosapic_intr_info[vector].dmode    = delivery;
 	iosapic_intr_info[vector].trigger  = trigger;
 
-#ifdef CONFIG_XEN
 	if (is_running_on_xen())
 		return 0;
-#endif
 
 	if (trigger == IOSAPIC_EDGE)
 		irq_type = &irq_type_iosapic_edge;
@@ -1017,10 +1015,9 @@ iosapic_system_init (int system_pcat_compat)
 	}
 
 	pcat_compat = system_pcat_compat;
-#ifdef CONFIG_XEN
 	if (is_running_on_xen())
 		return;
-#endif
+
 	if (pcat_compat) {
 		/*
 		 * Disable the compatibility mode interrupts (8259 style), needs IN/OUT support

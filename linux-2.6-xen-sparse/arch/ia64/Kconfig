@@ -57,13 +57,6 @@ config XEN
 	  Enable Xen hypervisor support.  Resulting kernel runs
 	  both as a guest OS on Xen and natively on hardware.
 
-config ARCH_XEN
-	bool
-	default y
-	depends on XEN
-	help
-	  TEMP ONLY. Needs to be on for drivers/xen to build.
-
 config XEN_IA64_DOM0_VP
 	bool "dom0 vp model"
 	depends on XEN

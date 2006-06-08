@@ -8,9 +8,10 @@
 #include <linux/config.h>
 #include <asm/machvec.h>
 #ifdef CONFIG_XEN_IA64_DOM0_VP
-#include <asm/hypervisor.h> //XXX to compile arch/i386/kernel/swiotlb.c
-                            //    and arch/i386/kernel/pci-dma-xen.c
-#include <asm-i386/mach-xen/asm/swiotlb.h> //XXX to compile arch/i386/kernel/swiotlb.c
+/* Needed for arch/i386/kernel/swiotlb.c and arch/i386/kernel/pci-dma-xen.c */
+#include <asm/hypervisor.h>
+/* Needed for arch/i386/kernel/swiotlb.c */
+#include <asm-i386/mach-xen/asm/swiotlb.h>
 #endif
 
 #ifndef CONFIG_XEN_IA64_DOM0_VP
@@ -109,7 +110,7 @@ dma_cache_sync (void *vaddr, size_t size, enum dma_data_direction dir)
 #define dma_is_consistent(dma_handle)	(1)	/* all we do is coherent memory... */
 
 #ifdef CONFIG_XEN_IA64_DOM0_VP
-// arch/i386/kernel/swiotlb.o requires
+/* arch/i386/kernel/swiotlb.o requires */
 void contiguous_bitmap_init(unsigned long end_pfn);
 
 static inline int

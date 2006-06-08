@@ -7,7 +7,6 @@
  *
  */
 
-#include <linux/config.h>
 #ifdef CONFIG_XEN
 #include <asm/xen/privop.h>
 #endif

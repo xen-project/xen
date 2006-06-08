@@ -416,6 +416,7 @@ void __init
 setup_arch (char **cmdline_p)
 {
 	unw_init();
+
 #ifdef CONFIG_XEN
 	if (is_running_on_xen())
 		setup_xen_features();
@@ -933,6 +934,7 @@ cpu_init (void)
 	/* size of physical stacked register partition plus 8 bytes: */
 	__get_cpu_var(ia64_phys_stacked_size_p8) = num_phys_stacked*8 + 8;
 	platform_cpu_init();
+
 #ifdef CONFIG_XEN
 	/* Need to be moved into platform_cpu_init later */
 	if (is_running_on_xen()) {
@@ -940,6 +942,7 @@ cpu_init (void)
 		xen_smp_intr_init();
 	}
 #endif
+
 	pm_idle = default_idle;
 }
 

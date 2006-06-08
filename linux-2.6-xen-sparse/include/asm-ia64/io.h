@@ -66,15 +66,13 @@ extern unsigned int num_io_spaces;
 #define PIO_RESERVED		__IA64_UNCACHED_OFFSET
 #define HAVE_ARCH_PIO_SIZE
 
+#include <asm/hypervisor.h>
 #include <asm/intrinsics.h>
 #include <asm/machvec.h>
 #include <asm/page.h>
+#include <asm/privop.h>
 #include <asm/system.h>
 #include <asm-generic/iomap.h>
-#ifdef CONFIG_XEN
-#include <asm/privop.h>
-#include <asm/hypervisor.h>
-#endif
 
 /*
  * Change virtual addresses to physical addresses and vv.
@@ -115,11 +113,13 @@ extern int valid_mmap_phys_addr_range (unsigned long addr, size_t *count);
 
 #define page_to_pseudophys(page) \
 	((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
-// XXX
-// the following drivers are broken because they use page_to_phys() to
-// get bus address. fix them.
-// drivers/ide/cris/ide-cris.c
-// drivers/scsi/dec_esp.c
+
+/*
+ * Drivers that use page_to_phys() for bus addresses are broken.
+ * This includes:
+ * drivers/ide/cris/ide-cris.c
+ * drivers/scsi/dec_esp.c
+ */
 #define page_to_phys(page)	(page_to_pseudophys(page))
 #define bvec_to_bus(bv)		(page_to_bus((bv)->bv_page) + \
 				(unsigned long) (bv)->bv_offset)
@@ -459,9 +459,7 @@ __writeq (unsigned long val, volatile void __iomem *addr)
 static inline void __iomem *
 ioremap (unsigned long offset, unsigned long size)
 {
-#ifdef CONFIG_XEN
 	offset = HYPERVISOR_ioremap(offset, size);
-#endif
 	return (void __iomem *) (__IA64_UNCACHED_OFFSET | (offset));
 }
 
