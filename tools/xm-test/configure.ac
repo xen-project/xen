@@ -118,6 +118,7 @@ AC_CONFIG_FILES([
     tests/reboot/Makefile
     tests/restore/Makefile
     tests/save/Makefile
+    tests/sched-credit/Makefile
     tests/sedf/Makefile
     tests/shutdown/Makefile
     tests/sysrq/Makefile

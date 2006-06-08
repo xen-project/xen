@@ -18,6 +18,7 @@ SUBDIRS = 	               	\
 		network-attach	\
 		pause		\
 		reboot 		\
+		sched-credit	\
 		sedf		\
 		shutdown	\
 		sysrq		\
