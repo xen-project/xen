@@ -608,6 +608,16 @@ static int compat_check(int xc_handle, struct domain_setup_info *dsi)
     return 1;
 }
 
+static inline int increment_ulong(unsigned long *pval, unsigned long inc)
+{
+    if ( inc >= -*pval )
+    {
+        ERROR("Value wrapped to zero: image too large?");
+        return 0;
+    }
+    *pval += inc;
+    return 1;
+}
 
 static int setup_guest(int xc_handle,
                        uint32_t dom,
@@ -709,30 +719,59 @@ static int setup_guest(int xc_handle,
      * which we solve by exhaustive search.
      */
     v_end = round_pgup(dsi.v_end);
+    if ( v_end == 0 )
+    {
+        ERROR("End of mapped kernel image too close to end of memory");
+        goto error_out;
+    }
     vinitrd_start = v_end;
-    v_end += round_pgup(initrd->len);
+    if ( !increment_ulong(&v_end, round_pgup(initrd->len)) )
+        goto error_out;
     vphysmap_start = v_end;
-    v_end += round_pgup(nr_pages * sizeof(unsigned long));
+    if ( !increment_ulong(&v_end, round_pgup(nr_pages * sizeof(long))) )
+        goto error_out;
     vstartinfo_start = v_end;
-    v_end += PAGE_SIZE;
+    if ( !increment_ulong(&v_end, PAGE_SIZE) )
+        goto error_out;
     vstoreinfo_start = v_end;
-    v_end += PAGE_SIZE;
+    if ( !increment_ulong(&v_end, PAGE_SIZE) )
+        goto error_out;
     vconsole_start = v_end;
-    v_end += PAGE_SIZE;
+    if ( !increment_ulong(&v_end, PAGE_SIZE) )
+        goto error_out;
     if ( shadow_mode_enabled ) {
         vsharedinfo_start = v_end;
-        v_end += PAGE_SIZE;
+        if ( !increment_ulong(&v_end, PAGE_SIZE) )
+            goto error_out;
     }
     vpt_start = v_end;
 
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
-        vpt_end          = vpt_start + (nr_pt_pages * PAGE_SIZE);
-        vstack_start     = vpt_end;
-        vstack_end       = vstack_start + PAGE_SIZE;
-        v_end            = (vstack_end + (1UL<<22)-1) & ~((1UL<<22)-1);
+        /* vpt_end = vpt_staret + (nr_pt_pages * PAGE_SIZE); */
+        vpt_end = vpt_start;
+        if ( !increment_ulong(&vpt_end, nr_pt_pages * PAGE_SIZE) )
+            goto error_out;
+
+        vstack_start = vpt_end;
+        /* vstack_end = vstack_start + PAGE_SIZE; */
+        vstack_end = vstack_start;
+        if ( !increment_ulong(&vstack_end, PAGE_SIZE) )
+            goto error_out;
+
+        /* v_end = (vstack_end + (1UL<<22)-1) & ~((1UL<<22)-1); */
+        v_end = vstack_end;
+        if ( !increment_ulong(&v_end, (1UL<<22)-1) )
+            goto error_out;
+        v_end &= ~((1UL<<22)-1);
+
         if ( (v_end - vstack_end) < (512UL << 10) )
-            v_end += 1UL << 22; /* Add extra 4MB to get >= 512kB padding. */
+        {
+            /* Add extra 4MB to get >= 512kB padding. */
+            if ( !increment_ulong(&v_end, 1UL << 22) )
+                goto error_out;
+        }
+
 #define NR(_l,_h,_s) \
     (((((_h) + ((1UL<<(_s))-1)) & ~((1UL<<(_s))-1)) - \
     ((_l) & ~((1UL<<(_s))-1))) >> (_s))
