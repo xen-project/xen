@@ -105,54 +105,19 @@ physical_mode_init(VCPU *vcpu)
 }
 
 extern void vmx_switch_rr7(unsigned long ,shared_info_t*,void *,void *,void *);
-/*void
-physical_itlb_miss(VCPU *vcpu, u64 vadr)
-{
-    u64 psr;
-    IA64_PSR vpsr;
-    u64 xen_mppn,xen_gppn;
-    vpsr.val=vmx_vcpu_get_psr(vcpu);
-    xen_gppn=(vadr<<1)>>(PAGE_SHIFT+1);
-    xen_mppn = gmfn_to_mfn(vcpu->domain, xen_gppn);
-    xen_mppn=(xen_mppn<<PAGE_SHIFT)|(vpsr.cpl<<7);
-    if(vadr>>63)
-        xen_mppn |= PHY_PAGE_UC;
-    else
-        xen_mppn |= PHY_PAGE_WB;
 
-    psr=ia64_clear_ic();
-    ia64_itc(1,vadr&PAGE_MASK,xen_mppn,PAGE_SHIFT);
-    ia64_set_psr(psr);
-    ia64_srlz_i();
-    return;
-}
-
-*/
-/* 
- *      vec=1, itlb miss
- *      vec=2, dtlb miss
- */
 void
-physical_tlb_miss(VCPU *vcpu, u64 vadr, u64 vec)
+physical_tlb_miss(VCPU *vcpu, u64 vadr)
 {
-    u64 psr;
+    u64 pte;
     IA64_PSR vpsr;
-    u64 xen_mppn,xen_gppn;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
-    xen_gppn=(vadr<<1)>>(PAGE_SHIFT+1);
-    xen_mppn = gmfn_to_mfn(vcpu->domain, xen_gppn);
-    xen_mppn=(xen_mppn<<PAGE_SHIFT)|(vpsr.cpl<<7);
-    if(vadr>>63)
-        xen_mppn |= PHY_PAGE_UC;
-    else
-        xen_mppn |= PHY_PAGE_WB;
-
-    psr=ia64_clear_ic();
-    ia64_itc(vec,vadr&PAGE_MASK,xen_mppn,PAGE_SHIFT);
-    ia64_set_psr(psr);
-    ia64_srlz_i();
+    pte =  vadr& _PAGE_PPN_MASK;
+    pte = pte|(vpsr.cpl<<7)|PHY_PAGE_WB;
+    thash_purge_and_insert(vcpu, pte, (PAGE_SHIFT<<2), vadr);
     return;
 }
+
 
 void
 vmx_init_all_rr(VCPU *vcpu)

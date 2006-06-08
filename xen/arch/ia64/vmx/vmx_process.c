@@ -259,7 +259,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
                 return IA64_FAULT;
             }
         }
-        physical_tlb_miss(v, vadr, vec);
+        physical_tlb_miss(v, vadr);
         return IA64_FAULT;
     }
     if(vec == 1) type = ISIDE_TLB;
