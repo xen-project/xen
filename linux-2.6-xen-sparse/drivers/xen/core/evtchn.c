@@ -678,6 +678,13 @@ static struct hw_interrupt_type pirq_type = {
 	set_affinity_irq
 };
 
+int irq_ignore_unhandled(unsigned int irq)
+{
+	struct physdev_irq_status_query irq_status = { .irq = irq };
+	(void)HYPERVISOR_physdev_op(PHYSDEVOP_irq_status_query, &irq_status);
+	return !!(irq_status.flags & XENIRQSTAT_shared);
+}
+
 void resend_irq_on_evtchn(struct hw_interrupt_type *h, unsigned int i)
 {
 	int evtchn = evtchn_from_irq(i);
