@@ -692,12 +692,10 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.end_data = (unsigned long) &_edata;
 	init_mm.brk = (unsigned long) &_end;
 
-#ifndef CONFIG_XEN
 	code_resource.start = virt_to_phys(&_text);
 	code_resource.end = virt_to_phys(&_etext)-1;
 	data_resource.start = virt_to_phys(&_etext);
 	data_resource.end = virt_to_phys(&_edata)-1;
-#endif
 
 	parse_cmdline_early(cmdline_p);
 
@@ -921,6 +919,13 @@ void __init setup_arch(char **cmdline_p)
 		BUG_ON(HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap));
 
 		e820_reserve_resources(machine_e820, memmap.nr_entries);
+	} else {
+		struct e820entry domU_e820 = {
+			.addr = 0,
+			.size = max_pfn << PAGE_SHIFT,
+			.type = E820_RAM,
+		};
+		e820_reserve_resources(&domU_e820, 1);
 	}
 #elif !defined(CONFIG_XEN)
 	probe_roms();

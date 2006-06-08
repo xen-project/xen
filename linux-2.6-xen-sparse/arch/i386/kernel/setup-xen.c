@@ -1378,7 +1378,6 @@ legacy_init_iomem_resources(struct e820entry *e820, int nr_map,
 		res->end = res->start + e820[i].size - 1;
 		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
 		request_resource(&iomem_resource, res);
-#ifndef CONFIG_XEN
 		if (e820[i].type == E820_RAM) {
 			/*
 			 *  We don't know which RAM region contains kernel data,
@@ -1391,7 +1390,6 @@ legacy_init_iomem_resources(struct e820entry *e820, int nr_map,
 			request_resource(res, &crashk_res);
 #endif
 		}
-#endif
 	}
 }
 
@@ -1460,8 +1458,16 @@ static void __init register_memory(void)
 	int	      i;
 
 	/* Nothing to do if not running in dom0. */
-	if (!(xen_start_info->flags & SIF_INITDOMAIN))
+	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
+		struct e820entry domU_e820 = {
+			.addr = 0,
+			.size = max_pfn << PAGE_SHIFT,
+			.type = E820_RAM,
+		};
+		legacy_init_iomem_resources(&domU_e820, 1,
+					    &code_resource, &data_resource);
 		return;
+	}
 
 #ifdef CONFIG_XEN
 	machine_e820 = alloc_bootmem_low_pages(PAGE_SIZE);
@@ -1698,11 +1704,10 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.brk = (PFN_UP(__pa(xen_start_info->pt_base)) +
 		       xen_start_info->nr_pt_frames) << PAGE_SHIFT;
 
-	/* XEN: This is nonsense: kernel may not even be contiguous in RAM. */
-	/*code_resource.start = virt_to_phys(_text);*/
-	/*code_resource.end = virt_to_phys(_etext)-1;*/
-	/*data_resource.start = virt_to_phys(_etext);*/
-	/*data_resource.end = virt_to_phys(_edata)-1;*/
+	code_resource.start = virt_to_phys(_text);
+	code_resource.end = virt_to_phys(_etext)-1;
+	data_resource.start = virt_to_phys(_etext);
+	data_resource.end = virt_to_phys(_edata)-1;
 
 	parse_cmdline_early(cmdline_p);
 
