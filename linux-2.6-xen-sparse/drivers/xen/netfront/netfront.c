@@ -338,35 +338,36 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	info->tx.sring = NULL;
 	info->irq = 0;
 
-	txs = (struct netif_tx_sring *)__get_free_page(GFP_KERNEL);
+	txs = (struct netif_tx_sring *)get_zeroed_page(GFP_KERNEL);
 	if (!txs) {
 		err = -ENOMEM;
 		xenbus_dev_fatal(dev, err, "allocating tx ring page");
 		goto fail;
 	}
-	rxs = (struct netif_rx_sring *)__get_free_page(GFP_KERNEL);
+	SHARED_RING_INIT(txs);
+	FRONT_RING_INIT(&info->tx, txs, PAGE_SIZE);
+
+	err = xenbus_grant_ring(dev, virt_to_mfn(txs));
+	if (err < 0) {
+		free_page((unsigned long)txs);
+		goto fail;
+	}
+	info->tx_ring_ref = err;
+
+	rxs = (struct netif_rx_sring *)get_zeroed_page(GFP_KERNEL);
 	if (!rxs) {
 		err = -ENOMEM;
 		xenbus_dev_fatal(dev, err, "allocating rx ring page");
 		goto fail;
 	}
-	memset(txs, 0, PAGE_SIZE);
-	memset(rxs, 0, PAGE_SIZE);
-
-	SHARED_RING_INIT(txs);
-	FRONT_RING_INIT(&info->tx, txs, PAGE_SIZE);
-
 	SHARED_RING_INIT(rxs);
 	FRONT_RING_INIT(&info->rx, rxs, PAGE_SIZE);
 
-	err = xenbus_grant_ring(dev, virt_to_mfn(txs));
-	if (err < 0)
-		goto fail;
-	info->tx_ring_ref = err;
-
 	err = xenbus_grant_ring(dev, virt_to_mfn(rxs));
-	if (err < 0)
+	if (err < 0) {
+		free_page((unsigned long)rxs);
 		goto fail;
+	}
 	info->rx_ring_ref = err;
 
 	err = xenbus_alloc_evtchn(dev, &info->evtchn);
@@ -374,10 +375,11 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 		goto fail;
 
 	memcpy(netdev->dev_addr, info->mac, ETH_ALEN);
-	info->irq = bind_evtchn_to_irqhandler(
-		info->evtchn, netif_int, SA_SAMPLE_RANDOM, netdev->name,
-		netdev);
-
+	err = bind_evtchn_to_irqhandler(info->evtchn, netif_int,
+					SA_SAMPLE_RANDOM, netdev->name, netdev);
+	if (err < 0)
+		goto fail;
+	info->irq = err;
 	return 0;
 
  fail:
@@ -1397,7 +1399,6 @@ static struct net_device * __devinit create_netdev(int handle,
 	if (gnttab_alloc_grant_references(RX_MAX_TARGET,
 					  &np->gref_rx_head) < 0) {
 		printk(KERN_ALERT "#### netfront can't alloc rx grant refs\n");
-		gnttab_free_grant_references(np->gref_tx_head);
 		err = -ENOMEM;
 		goto exit_free_tx;
 	}
