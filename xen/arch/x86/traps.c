@@ -748,7 +748,8 @@ static inline int guest_io_okay(
 #define TOGGLE_MODE() ((void)0)
 #endif
 
-    if ( v->arch.iopl >= (guest_kernel_mode(v, regs) ? 1 : 3) )
+    if ( !vm86_mode(regs) &&
+         (v->arch.iopl >= (guest_kernel_mode(v, regs) ? 1 : 3)) )
         return 1;
 
     if ( v->arch.iobmp_limit > (port + bytes) )
