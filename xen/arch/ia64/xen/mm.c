@@ -1053,8 +1053,8 @@ domain_page_mapped(struct domain* d, unsigned long mpaddr)
 {
     pte_t * pte;
 
-    pte=lookup_noalloc_domain_pte(d, mpaddr);
-    if(!pte_none(*pte))
+    pte = lookup_noalloc_domain_pte(d, mpaddr);
+    if(pte != NULL && !pte_none(*pte))
        return 1;
     return 0;
 }
