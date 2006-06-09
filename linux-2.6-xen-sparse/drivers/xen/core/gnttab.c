@@ -1,27 +1,27 @@
 /******************************************************************************
  * gnttab.c
- * 
+ *
  * Granting foreign access to our memory reservation.
- * 
+ *
  * Copyright (c) 2005, Christopher Clark
  * Copyright (c) 2004-2005, K A Fraser
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -36,45 +36,17 @@
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
-#include <asm/pgtable.h>
 #include <xen/interface/xen.h>
-#include <asm/uaccess.h>
 #include <xen/gnttab.h>
+#include <asm/pgtable.h>
+#include <asm/uaccess.h>
 #include <asm/synch_bitops.h>
-
-#if 1
-#define ASSERT(_p)							      \
-	if (!(_p)) { printk(KERN_ALERT"Assertion '%s': line %d, file %s\n",   \
-	#_p , __LINE__, __FILE__); *(int*)0=0; }
-#else
-#define ASSERT(_p) ((void)0)
-#endif
-
-#define WPRINTK(fmt, args...)				\
-	printk(KERN_WARNING "xen_grant: " fmt, ##args)
-
-
-EXPORT_SYMBOL_GPL(gnttab_grant_foreign_access);
-EXPORT_SYMBOL_GPL(gnttab_end_foreign_access_ref);
-EXPORT_SYMBOL_GPL(gnttab_end_foreign_access);
-EXPORT_SYMBOL_GPL(gnttab_query_foreign_access);
-EXPORT_SYMBOL_GPL(gnttab_grant_foreign_transfer);
-EXPORT_SYMBOL_GPL(gnttab_end_foreign_transfer_ref);
-EXPORT_SYMBOL_GPL(gnttab_end_foreign_transfer);
-EXPORT_SYMBOL_GPL(gnttab_alloc_grant_references);
-EXPORT_SYMBOL_GPL(gnttab_free_grant_references);
-EXPORT_SYMBOL_GPL(gnttab_free_grant_reference);
-EXPORT_SYMBOL_GPL(gnttab_empty_grant_references);
-EXPORT_SYMBOL_GPL(gnttab_claim_grant_reference);
-EXPORT_SYMBOL_GPL(gnttab_release_grant_reference);
-EXPORT_SYMBOL_GPL(gnttab_request_free_callback);
-EXPORT_SYMBOL_GPL(gnttab_grant_foreign_access_ref);
-EXPORT_SYMBOL_GPL(gnttab_grant_foreign_transfer_ref);
 
 /* External tools reserve first few grant table entries. */
 #define NR_RESERVED_ENTRIES 8
 
-#define NR_GRANT_ENTRIES (NR_GRANT_FRAMES * PAGE_SIZE / sizeof(grant_entry_t))
+#define NR_GRANT_ENTRIES \
+	(NR_GRANT_FRAMES * PAGE_SIZE / sizeof(struct grant_entry))
 #define GNTTAB_LIST_END (NR_GRANT_ENTRIES + 1)
 
 static grant_ref_t gnttab_list[NR_GRANT_ENTRIES];
@@ -82,12 +54,11 @@ static int gnttab_free_count;
 static grant_ref_t gnttab_free_head;
 static DEFINE_SPINLOCK(gnttab_list_lock);
 
-static grant_entry_t *shared = NULL;
+static struct grant_entry *shared;
 
-static struct gnttab_free_callback *gnttab_free_callback_list = NULL;
+static struct gnttab_free_callback *gnttab_free_callback_list;
 
-static int
-get_free_entries(int count)
+static int get_free_entries(int count)
 {
 	unsigned long flags;
 	int ref;
@@ -109,8 +80,7 @@ get_free_entries(int count)
 
 #define get_free_entry() get_free_entries(1)
 
-static void
-do_free_callbacks(void)
+static void do_free_callbacks(void)
 {
 	struct gnttab_free_callback *callback, *next;
 
@@ -130,15 +100,13 @@ do_free_callbacks(void)
 	}
 }
 
-static inline void
-check_free_callbacks(void)
+static inline void check_free_callbacks(void)
 {
 	if (unlikely(gnttab_free_callback_list))
 		do_free_callbacks();
 }
 
-static void
-put_free_entry(grant_ref_t ref)
+static void put_free_entry(grant_ref_t ref)
 {
 	unsigned long flags;
 	spin_lock_irqsave(&gnttab_list_lock, flags);
@@ -153,8 +121,8 @@ put_free_entry(grant_ref_t ref)
  * Public grant-issuing interface functions
  */
 
-int
-gnttab_grant_foreign_access(domid_t domid, unsigned long frame, int readonly)
+int gnttab_grant_foreign_access(domid_t domid, unsigned long frame,
+				int readonly)
 {
 	int ref;
 
@@ -168,20 +136,20 @@ gnttab_grant_foreign_access(domid_t domid, unsigned long frame, int readonly)
 
 	return ref;
 }
+EXPORT_SYMBOL_GPL(gnttab_grant_foreign_access);
 
-void
-gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
-				unsigned long frame, int readonly)
+void gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
+				     unsigned long frame, int readonly)
 {
 	shared[ref].frame = frame;
 	shared[ref].domid = domid;
 	wmb();
 	shared[ref].flags = GTF_permit_access | (readonly ? GTF_readonly : 0);
 }
+EXPORT_SYMBOL_GPL(gnttab_grant_foreign_access_ref);
 
 
-int
-gnttab_query_foreign_access(grant_ref_t ref)
+int gnttab_query_foreign_access(grant_ref_t ref)
 {
 	u16 nflags;
 
@@ -189,9 +157,9 @@ gnttab_query_foreign_access(grant_ref_t ref)
 
 	return (nflags & (GTF_reading|GTF_writing));
 }
+EXPORT_SYMBOL_GPL(gnttab_query_foreign_access);
 
-int
-gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly)
+int gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly)
 {
 	u16 flags, nflags;
 
@@ -206,15 +174,15 @@ gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly)
 
 	return 1;
 }
+EXPORT_SYMBOL_GPL(gnttab_end_foreign_access_ref);
 
-void
-gnttab_end_foreign_access(grant_ref_t ref, int readonly, unsigned long page)
+void gnttab_end_foreign_access(grant_ref_t ref, int readonly,
+			       unsigned long page)
 {
 	if (gnttab_end_foreign_access_ref(ref, readonly)) {
 		put_free_entry(ref);
-		if (page != 0) {
+		if (page != 0)
 			free_page(page);
-		}
 	} else {
 		/* XXX This needs to be fixed so that the ref and page are
 		   placed on a list to be freed up later. */
@@ -222,9 +190,9 @@ gnttab_end_foreign_access(grant_ref_t ref, int readonly, unsigned long page)
 		       "WARNING: leaking g.e. and page still in use!\n");
 	}
 }
+EXPORT_SYMBOL_GPL(gnttab_end_foreign_access);
 
-int
-gnttab_grant_foreign_transfer(domid_t domid, unsigned long pfn)
+int gnttab_grant_foreign_transfer(domid_t domid, unsigned long pfn)
 {
 	int ref;
 
@@ -234,19 +202,19 @@ gnttab_grant_foreign_transfer(domid_t domid, unsigned long pfn)
 
 	return ref;
 }
+EXPORT_SYMBOL_GPL(gnttab_grant_foreign_transfer);
 
-void
-gnttab_grant_foreign_transfer_ref(grant_ref_t ref, domid_t domid,
-				  unsigned long pfn)
+void gnttab_grant_foreign_transfer_ref(grant_ref_t ref, domid_t domid,
+				       unsigned long pfn)
 {
 	shared[ref].frame = pfn;
 	shared[ref].domid = domid;
 	wmb();
 	shared[ref].flags = GTF_accept_transfer;
 }
+EXPORT_SYMBOL_GPL(gnttab_grant_foreign_transfer_ref);
 
-unsigned long
-gnttab_end_foreign_transfer_ref(grant_ref_t ref)
+unsigned long gnttab_end_foreign_transfer_ref(grant_ref_t ref)
 {
 	unsigned long frame;
 	u16           flags;
@@ -274,24 +242,23 @@ gnttab_end_foreign_transfer_ref(grant_ref_t ref)
 
 	return frame;
 }
+EXPORT_SYMBOL_GPL(gnttab_end_foreign_transfer_ref);
 
-unsigned long
-gnttab_end_foreign_transfer(grant_ref_t ref)
+unsigned long gnttab_end_foreign_transfer(grant_ref_t ref)
 {
 	unsigned long frame = gnttab_end_foreign_transfer_ref(ref);
 	put_free_entry(ref);
 	return frame;
 }
+EXPORT_SYMBOL_GPL(gnttab_end_foreign_transfer);
 
-void
-gnttab_free_grant_reference(grant_ref_t ref)
+void gnttab_free_grant_reference(grant_ref_t ref)
 {
-
 	put_free_entry(ref);
 }
+EXPORT_SYMBOL_GPL(gnttab_free_grant_reference);
 
-void
-gnttab_free_grant_references(grant_ref_t head)
+void gnttab_free_grant_references(grant_ref_t head)
 {
 	grant_ref_t ref;
 	unsigned long flags;
@@ -310,9 +277,9 @@ gnttab_free_grant_references(grant_ref_t head)
 	check_free_callbacks();
 	spin_unlock_irqrestore(&gnttab_list_lock, flags);
 }
+EXPORT_SYMBOL_GPL(gnttab_free_grant_references);
 
-int
-gnttab_alloc_grant_references(u16 count, grant_ref_t *head)
+int gnttab_alloc_grant_references(u16 count, grant_ref_t *head)
 {
 	int h = get_free_entries(count);
 
@@ -323,15 +290,15 @@ gnttab_alloc_grant_references(u16 count, grant_ref_t *head)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(gnttab_alloc_grant_references);
 
-int
-gnttab_empty_grant_references(const grant_ref_t *private_head)
+int gnttab_empty_grant_references(const grant_ref_t *private_head)
 {
 	return (*private_head == GNTTAB_LIST_END);
 }
+EXPORT_SYMBOL_GPL(gnttab_empty_grant_references);
 
-int
-gnttab_claim_grant_reference(grant_ref_t *private_head)
+int gnttab_claim_grant_reference(grant_ref_t *private_head)
 {
 	grant_ref_t g = *private_head;
 	if (unlikely(g == GNTTAB_LIST_END))
@@ -339,17 +306,18 @@ gnttab_claim_grant_reference(grant_ref_t *private_head)
 	*private_head = gnttab_list[g];
 	return g;
 }
+EXPORT_SYMBOL_GPL(gnttab_claim_grant_reference);
 
-void
-gnttab_release_grant_reference(grant_ref_t *private_head, grant_ref_t  release)
+void gnttab_release_grant_reference(grant_ref_t *private_head,
+				    grant_ref_t release)
 {
 	gnttab_list[release] = *private_head;
 	*private_head = release;
 }
+EXPORT_SYMBOL_GPL(gnttab_release_grant_reference);
 
-void
-gnttab_request_free_callback(struct gnttab_free_callback *callback,
-			     void (*fn)(void *), void *arg, u16 count)
+void gnttab_request_free_callback(struct gnttab_free_callback *callback,
+				  void (*fn)(void *), void *arg, u16 count)
 {
 	unsigned long flags;
 	spin_lock_irqsave(&gnttab_list_lock, flags);
@@ -361,9 +329,10 @@ gnttab_request_free_callback(struct gnttab_free_callback *callback,
 	callback->next = gnttab_free_callback_list;
 	gnttab_free_callback_list = callback;
 	check_free_callbacks();
- out:
+out:
 	spin_unlock_irqrestore(&gnttab_list_lock, flags);
 }
+EXPORT_SYMBOL_GPL(gnttab_request_free_callback);
 
 #ifndef __ia64__
 static int map_pte_fn(pte_t *pte, struct page *pmd_page,
@@ -377,7 +346,7 @@ static int map_pte_fn(pte_t *pte, struct page *pmd_page,
 }
 
 static int unmap_pte_fn(pte_t *pte, struct page *pmd_page,
-		      unsigned long addr, void *data)
+			unsigned long addr, void *data)
 {
 
 	set_pte_at(&init_mm, addr, pte, __pte(0));
@@ -385,10 +354,9 @@ static int unmap_pte_fn(pte_t *pte, struct page *pmd_page,
 }
 #endif
 
-int
-gnttab_resume(void)
+int gnttab_resume(void)
 {
-	gnttab_setup_table_t setup;
+	struct gnttab_setup_table setup;
 	unsigned long frames[NR_GRANT_FRAMES];
 	int rc;
 #ifndef __ia64__
@@ -424,8 +392,7 @@ gnttab_resume(void)
 	return 0;
 }
 
-int
-gnttab_suspend(void)
+int gnttab_suspend(void)
 {
 
 #ifndef __ia64__
@@ -437,8 +404,7 @@ gnttab_suspend(void)
 	return 0;
 }
 
-static int __init
-gnttab_init(void)
+static int __init gnttab_init(void)
 {
 	int i;
 
