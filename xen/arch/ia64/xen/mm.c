@@ -104,7 +104,7 @@ relinquish_pte(struct domain* d, pte_t* pte)
 
     // vmx domain use bit[58:56] to distinguish io region from memory.
     // see vmx_build_physmap_table() in vmx_init.c
-    if (((mfn << PAGE_SHIFT) & GPFN_IO_MASK) != GPFN_MEM)
+    if (!pte_mem(*pte))
         return;
 
     // domain might map IO space or acpi table pages. check it.
