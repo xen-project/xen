@@ -472,13 +472,7 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
         /* Follow the list chain and /then/ potentially free the page. */
         ent = ent->next;
 #ifdef CONFIG_XEN_IA64_DOM0_VP
-#if 1
         BUG_ON(get_gpfn_from_mfn(page_to_mfn(page)) != INVALID_M2P_ENTRY);
-#else
-        //XXX this should be done at traversing the P2M table.
-        if (page_get_owner(page) == d)
-            set_gpfn_from_mfn(page_to_mfn(page), INVALID_M2P_ENTRY);
-#endif
 #endif
         put_page(page);
     }

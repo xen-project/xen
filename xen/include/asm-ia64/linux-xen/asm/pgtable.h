@@ -208,6 +208,19 @@ ia64_phys_addr_valid (unsigned long addr)
  */
 #define set_pte(ptep, pteval)	(*(ptep) = (pteval))
 #define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
+#ifdef XEN
+static inline void
+set_pte_rel(pte_t* ptep, pte_t pteval)
+{
+#if CONFIG_SMP
+	asm volatile ("st8.rel [%0]=%1" ::
+		      "r"(&pte_val(*ptep)), "r"(pte_val(pteval)) :
+		      "memory");
+#else
+	set_pte(ptep, pteval);
+#endif
+}
+#endif
 
 #define RGN_SIZE	(1UL << 61)
 #define RGN_KERNEL	7
@@ -401,6 +414,7 @@ ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 #endif
 }
 
+#ifdef XEN
 static inline pte_t
 ptep_xchg(struct mm_struct *mm, unsigned long addr, pte_t *ptep, pte_t npte)
 {
@@ -412,6 +426,23 @@ ptep_xchg(struct mm_struct *mm, unsigned long addr, pte_t *ptep, pte_t npte)
 	return pte;
 #endif
 }
+
+static inline pte_t
+ptep_cmpxchg_rel(struct mm_struct *mm, unsigned long addr, pte_t *ptep,
+		 pte_t old_pte, pte_t new_pte)
+{
+#ifdef CONFIG_SMP
+	return __pte(cmpxchg_rel(&pte_val(*ptep),
+				 pte_val(old_pte), pte_val(new_pte)));
+#else
+	pte_t pte = *ptep;
+	if (pte_val(pte) == pte_val(old_pte)) {
+		set_pte(ptep, npte);
+	}
+	return pte;
+#endif
+}
+#endif
 
 #ifndef XEN
 static inline void

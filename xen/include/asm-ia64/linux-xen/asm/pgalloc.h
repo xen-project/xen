@@ -78,6 +78,15 @@ static inline void pgtable_quicklist_free(void *pgtable_entry)
 }
 #endif
 
+#ifdef XEN
+#include <asm/pgtable.h>
+#ifdef __PAGETABLE_PUD_FOLDED
+# define pgd_cmpxchg_rel(mm, pgd, old_pud, new_pud)	({(void)old_pud;1;})
+#else
+# error "implement pgd_cmpxchg_rel()!"
+#endif
+#endif
+
 static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	return pgtable_quicklist_alloc();
@@ -93,6 +102,25 @@ pud_populate(struct mm_struct *mm, pud_t * pud_entry, pmd_t * pmd)
 {
 	pud_val(*pud_entry) = __pa(pmd);
 }
+
+#ifdef XEN
+static inline int
+pud_cmpxchg_rel(struct mm_struct *mm, pud_t * pud_entry,
+		pmd_t * old_pmd, pmd_t * new_pmd)
+{
+#ifdef CONFIG_SMP
+	unsigned long r;
+	r = cmpxchg_rel(&pud_val(*pud_entry), __pa(old_pmd), __pa(new_pmd));
+	return (r == __pa(old_pmd));
+#else
+	if (pud_val(*pud_entry) == __pa(old_pmd)) {
+		pud_val(*pud_entry) = __pa(new_pmd);
+		return 1;
+	}
+	return 0;
+#endif
+}
+#endif
 
 static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
@@ -119,6 +147,25 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t * pmd_entry, pte_t * pte)
 {
 	pmd_val(*pmd_entry) = __pa(pte);
 }
+
+#ifdef XEN
+static inline int
+pmd_cmpxchg_kernel_rel(struct mm_struct *mm, pmd_t * pmd_entry,
+		       pte_t * old_pte, pte_t * new_pte)
+{
+#ifdef CONFIG_SMP
+	unsigned long r;
+	r = cmpxchg_rel(&pmd_val(*pmd_entry), __pa(old_pte), __pa(new_pte));
+	return (r == __pa(old_pte));
+#else
+	if (pmd_val(*pmd_entry) == __pa(old_pte)) {
+		pmd_val(*pmd_entry) = __pa(new_pte);
+		return 1;
+	}
+	return 0;
+#endif
+}
+#endif
 
 #ifndef XEN
 static inline struct page *pte_alloc_one(struct mm_struct *mm,

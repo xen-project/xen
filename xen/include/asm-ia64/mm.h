@@ -160,7 +160,7 @@ static inline void put_page(struct page_info *page)
 	x = y;
 	nx = x - 1;
     }
-    while (unlikely((y = cmpxchg(&page->count_info, x, nx)) != x));
+    while (unlikely((y = cmpxchg_rel(&page->count_info, x, nx)) != x));
 
     if (unlikely((nx & PGC_count_mask) == 0))
 	free_domheap_page(page);
@@ -186,7 +186,7 @@ static inline int get_page(struct page_info *page,
 	    return 0;
 	}
     }
-    while(unlikely((y = cmpxchg((u64*)&page->count_info, x, nx)) != x));
+    while(unlikely((y = cmpxchg_acq((u64*)&page->count_info, x, nx)) != x));
     return 1;
 }
 
