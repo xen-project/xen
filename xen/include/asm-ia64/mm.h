@@ -460,7 +460,7 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
 */
 
 #define mfn_to_gmfn(_d, mfn)			\
-    machine_to_phys_mapping[(mfn)]
+    get_gpfn_from_mfn(mfn)
 
 #define gmfn_to_mfn(_d, gpfn)			\
     gmfn_to_mfn_foreign((_d), (gpfn))

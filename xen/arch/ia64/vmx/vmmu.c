@@ -637,7 +637,7 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
             dnat_page_consumption(vcpu, vadr);
             return IA64_FAULT;
         }else{
-            *padr = ((*(mpt_table+arch_to_xen_ppn(data->ppn)))<<PAGE_SHIFT) | (vadr&(PAGE_SIZE-1));
+            *padr = (get_gpfn_from_mfn(arch_to_xen_ppn(data->ppn)) << PAGE_SHIFT) | (vadr & (PAGE_SIZE - 1));
             return IA64_NO_FAULT;
         }
     }
