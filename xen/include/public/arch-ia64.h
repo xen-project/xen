@@ -86,7 +86,7 @@ typedef struct pmt_entry pmt_entry_t;
 #define IO_SAPIC_SIZE    0x100000
 
 #define PIB_START 0xfee00000UL
-#define PIB_SIZE 0x100000
+#define PIB_SIZE 0x200000
 
 #define GFW_START        (4*MEM_G -16*MEM_M)
 #define GFW_SIZE         (16*MEM_M)
