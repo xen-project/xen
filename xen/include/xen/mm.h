@@ -71,7 +71,7 @@ unsigned long avail_domheap_pages(void);
 #ifdef CONFIG_PAGEALLOC_MAX_ORDER
 #define MAX_ORDER CONFIG_PAGEALLOC_MAX_ORDER
 #else
-#define MAX_ORDER 11 /* 2^11 contiguous pages */
+#define MAX_ORDER 20 /* 2^20 contiguous pages */
 #endif
 
 /* Automatic page scrubbing for dead domains. */
