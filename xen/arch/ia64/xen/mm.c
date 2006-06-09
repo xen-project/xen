@@ -658,8 +658,8 @@ assign_domain_same_page(struct domain *d,
                         unsigned long flags)
 {
     //XXX optimization
-    unsigned long end = mpaddr + size;
-    for (; mpaddr < end; mpaddr += PAGE_SIZE) {
+    unsigned long end = PAGE_ALIGN(mpaddr + size);
+    for (mpaddr &= PAGE_MASK; mpaddr < end; mpaddr += PAGE_SIZE) {
         __assign_domain_page(d, mpaddr, mpaddr, flags);
     }
 }
