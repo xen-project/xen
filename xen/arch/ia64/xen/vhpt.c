@@ -202,10 +202,14 @@ void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
 		   FIXME: clear only if match.  */
 		vcpu_purge_tr_entry(&PSCBX(v,dtlb));
 		vcpu_purge_tr_entry(&PSCBX(v,itlb));
+	}
+	smp_mb();
 
+	for_each_vcpu (d, v) {
 		/* Invalidate VHPT entries.  */
 		cpu_flush_vhpt_range (v->processor, vadr, addr_range);
 	}
+	// ptc.ga has release semantics.
 
 	/* ptc.ga  */
 	ia64_global_tlb_purge(vadr,vadr+addr_range,PAGE_SHIFT);

@@ -2016,6 +2016,8 @@ IA64FAULT vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 
 IA64FAULT vcpu_ptc_l(VCPU *vcpu, UINT64 vadr, UINT64 log_range)
 {
+	BUG_ON(vcpu != current);
+
 	/* Purge TC  */
 	vcpu_purge_tr_entry(&PSCBX(vcpu,dtlb));
 	vcpu_purge_tr_entry(&PSCBX(vcpu,itlb));
@@ -2082,6 +2084,7 @@ IA64FAULT vcpu_ptr_d(VCPU *vcpu,UINT64 vadr,UINT64 log_range)
 	unsigned long rid, rr;
 	int i;
 	TR_ENTRY *trp;
+	BUG_ON(vcpu != current);
 
 	rr = PSCB(vcpu,rrs)[region];
 	rid = rr & RR_RID_MASK;
@@ -2110,6 +2113,7 @@ IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr,UINT64 log_range)
 	unsigned long rid, rr;
 	int i;
 	TR_ENTRY *trp;
+	BUG_ON(vcpu != current);
 
 	rr = PSCB(vcpu,rrs)[region];
 	rid = rr & RR_RID_MASK;
