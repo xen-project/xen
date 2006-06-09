@@ -287,14 +287,13 @@ acm_get_ssid(ssidref_t ssidref, XEN_GUEST_HANDLE(void) buf, u16 buf_size)
 }
 
 int
-acm_get_decision(ssidref_t ssidref1, ssidref_t ssidref2,
-                 enum acm_hook_type hook)
+acm_get_decision(ssidref_t ssidref1, ssidref_t ssidref2, u32 hook)
 {
     int ret = ACM_ACCESS_DENIED;
     switch (hook) {
 
-    case SHARING:
-        /* SHARING Hook restricts access in STE policy only */
+    case ACMHOOK_sharing:
+        /* Sharing hook restricts access in STE policy only */
         ret = acm_sharing(ssidref1, ssidref2);
         break;
 

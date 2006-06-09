@@ -316,7 +316,7 @@ acm_init_domain_ssid(domid_t id, ssidref_t ssidref)
         return ACM_INIT_SSID_ERROR;
     }
 
-    ssid->datatype       = DOMAIN;
+    ssid->datatype       = ACM_DATATYPE_domain;
     ssid->subject        = subj;
     ssid->domainid      = subj->domain_id;
     ssid->primary_ssid   = NULL;

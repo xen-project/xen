@@ -69,7 +69,8 @@
 typedef uint32_t ssidref_t;
 
 /* hooks that are known to domains */
-enum acm_hook_type {NONE=0, SHARING};
+#define ACMHOOK_none    0
+#define ACMHOOK_sharing 1
 
 /* -------security policy relevant type definitions-------- */
 

@@ -54,7 +54,7 @@ void * __getssid(int domid, uint32_t *buflen)
     getssid.interface_version = ACM_INTERFACE_VERSION;
     set_xen_guest_handle(getssid.ssidbuf, buf);
     getssid.ssidbuf_size = SSID_BUFFER_SIZE;
-    getssid.get_ssid_by = DOMAINID;
+    getssid.get_ssid_by = ACM_GETBY_domainid;
     getssid.id.domainid = domid;
 
     if (xc_acm_op(xc_handle, ACMOP_getssid, &getssid, sizeof(getssid)) < 0) {
@@ -163,19 +163,19 @@ static PyObject *getdecision(PyObject * self, PyObject * args)
         return NULL;
 
     getdecision.interface_version = ACM_INTERFACE_VERSION;
-    getdecision.hook = SHARING;
+    getdecision.hook = ACMHOOK_sharing;
     if (!strcmp(arg1_name, "domid")) {
-        getdecision.get_decision_by1 = DOMAINID;
+        getdecision.get_decision_by1 = ACM_GETBY_domainid;
         getdecision.id1.domainid = atoi(arg1);
     } else {
-        getdecision.get_decision_by1 = SSIDREF;
+        getdecision.get_decision_by1 = ACM_GETBY_ssidref;
         getdecision.id1.ssidref = atol(arg1);
     }
     if (!strcmp(arg2_name, "domid")) {
-        getdecision.get_decision_by2 = DOMAINID;
+        getdecision.get_decision_by2 = ACM_GETBY_domainid;
         getdecision.id2.domainid = atoi(arg2);
     } else {
-        getdecision.get_decision_by2 = SSIDREF;
+        getdecision.get_decision_by2 = ACM_GETBY_ssidref;
         getdecision.id2.ssidref = atol(arg2);
     }
 

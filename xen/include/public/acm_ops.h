@@ -57,11 +57,12 @@ struct acm_dumpstats {
 
 
 #define ACMOP_getssid           4
-enum get_type {UNSET=0, SSIDREF, DOMAINID};
+#define ACM_GETBY_ssidref  1
+#define ACM_GETBY_domainid 2
 struct acm_getssid {
     /* IN */
     uint32_t interface_version;
-    uint32_t get_ssid_by;
+    uint32_t get_ssid_by; /* ACM_GETBY_* */
     union {
         domaintype_t domainid;
         ssidref_t    ssidref;
@@ -74,8 +75,8 @@ struct acm_getssid {
 struct acm_getdecision {
     /* IN */
     uint32_t interface_version;
-    uint32_t get_decision_by1;
-    uint32_t get_decision_by2;
+    uint32_t get_decision_by1; /* ACM_GETBY_* */
+    uint32_t get_decision_by2; /* ACM_GETBY_* */
     union {
         domaintype_t domainid;
         ssidref_t    ssidref;
