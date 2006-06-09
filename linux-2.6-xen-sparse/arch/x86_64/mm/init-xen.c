@@ -882,6 +882,7 @@ static struct kcore_list kcore_mem, kcore_vmalloc, kcore_kernel, kcore_modules,
 void __init mem_init(void)
 {
 	long codesize, reservedpages, datasize, initsize;
+	unsigned long pfn;
 
 	contiguous_bitmap = alloc_bootmem_low_pages(
 		(end_pfn + 2*BITS_PER_LONG) >> 3);
@@ -910,6 +911,12 @@ void __init mem_init(void)
 #else
 	totalram_pages = free_all_bootmem();
 #endif
+	/* XEN: init and count pages outside initial allocation. */
+	for (pfn = xen_start_info->nr_pages; pfn < max_pfn; pfn++) {
+		ClearPageReserved(&mem_map[pfn]);
+		set_page_count(&mem_map[pfn], 1);
+		totalram_pages++;
+	}
 	reservedpages = end_pfn - totalram_pages - e820_hole_size(0, end_pfn);
 
 	after_bootmem = 1;
