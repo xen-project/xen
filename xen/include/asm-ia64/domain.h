@@ -76,6 +76,9 @@ struct arch_domain {
     void *efi_runtime;
     /* Metaphysical address to fpswa_interface_t in domain firmware memory is set. */
     void *fpswa_inf;
+
+    // protect v->itlb, v->dtlb and vhpt
+    seqlock_t   vtlb_lock ____cacheline_aligned_in_smp;
 };
 #define xen_vastart arch.xen_vastart
 #define xen_vaend arch.xen_vaend

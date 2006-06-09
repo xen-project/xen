@@ -152,7 +152,9 @@ void domain_flush_vtlb_all (void)
 {
 	int cpu = smp_processor_id ();
 	struct vcpu *v;
+	seqlock_t* vtlb_lock = &current->domain->arch.vtlb_lock;
 
+	write_seqlock(vtlb_lock);
 	for_each_vcpu (current->domain, v)
 		if (v->processor == cpu)
 			vcpu_flush_vtlb_all ();
@@ -161,6 +163,7 @@ void domain_flush_vtlb_all (void)
 				(v->processor,
 				 (void(*)(void *))vcpu_flush_vtlb_all,
 				 NULL,1,1);
+	write_sequnlock(vtlb_lock);
 }
 
 static void cpu_flush_vhpt_range (int cpu, u64 vadr, u64 addr_range)
@@ -187,6 +190,7 @@ void vcpu_flush_tlb_vhpt_range (u64 vadr, u64 log_range)
 
 void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
 {
+	seqlock_t* vtlb_lock = &d->arch.vtlb_lock;
 	struct vcpu *v;
 
 #if 0
@@ -197,6 +201,7 @@ void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
 	}
 #endif
 
+	write_seqlock(vtlb_lock);
 	for_each_vcpu (d, v) {
 		/* Purge TC entries.
 		   FIXME: clear only if match.  */
@@ -213,6 +218,7 @@ void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
 
 	/* ptc.ga  */
 	ia64_global_tlb_purge(vadr,vadr+addr_range,PAGE_SHIFT);
+	write_sequnlock(vtlb_lock);
 }
 
 static void flush_tlb_vhpt_all (struct domain *d)
@@ -224,6 +230,8 @@ static void flush_tlb_vhpt_all (struct domain *d)
 	local_flush_tlb_all ();
 }
 
+// this is called when a domain is destroyed
+// so that there is no race.
 void domain_flush_destroy (struct domain *d)
 {
 	/* Very heavy...  */
@@ -233,8 +241,10 @@ void domain_flush_destroy (struct domain *d)
 
 void flush_tlb_mask(cpumask_t mask)
 {
+    seqlock_t* vtlb_lock = &current->domain->arch.vtlb_lock;
     int cpu;
 
+    write_seqlock(vtlb_lock);
     cpu = smp_processor_id();
     if (cpu_isset (cpu, mask)) {
         cpu_clear(cpu, mask);
@@ -242,11 +252,13 @@ void flush_tlb_mask(cpumask_t mask)
     }
 
     if (cpus_empty(mask))
-        return;
+        goto out;
 
     for_each_cpu_mask (cpu, mask)
         smp_call_function_single
             (cpu, (void (*)(void *))flush_tlb_vhpt_all, NULL, 1, 1);
+out:
+    write_sequnlock(vtlb_lock);
 }
 
 void zero_vhpt_stats(void)

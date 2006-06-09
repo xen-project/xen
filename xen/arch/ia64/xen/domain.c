@@ -300,6 +300,7 @@ int arch_domain_create(struct domain *d)
 	d->xen_vaend = XEN_END_ADDR;
 	d->arch.shared_info_va = SHAREDINFO_ADDR;
 	d->arch.breakimm = 0x1000;
+	seqlock_init(&d->arch.vtlb_lock);
 
 	if (is_idle_domain(d))
 	    return 0;
