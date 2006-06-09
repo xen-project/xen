@@ -1459,12 +1459,7 @@ static void __init register_memory(void)
 
 	/* Nothing to do if not running in dom0. */
 	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
-		struct e820entry domU_e820 = {
-			.addr = 0,
-			.size = max_pfn << PAGE_SHIFT,
-			.type = E820_RAM,
-		};
-		legacy_init_iomem_resources(&domU_e820, 1,
+		legacy_init_iomem_resources(e820.map, e820.nr_map,
 					    &code_resource, &data_resource);
 		return;
 	}

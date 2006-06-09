@@ -919,15 +919,11 @@ void __init setup_arch(char **cmdline_p)
 		BUG_ON(HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap));
 
 		e820_reserve_resources(machine_e820, memmap.nr_entries);
-	} else {
-		struct e820entry domU_e820 = {
-			.addr = 0,
-			.size = max_pfn << PAGE_SHIFT,
-			.type = E820_RAM,
-		};
-		e820_reserve_resources(&domU_e820, 1);
-	}
-#elif !defined(CONFIG_XEN)
+	} else if (!(xen_start_info->flags & SIF_INITDOMAIN))
+		e820_reserve_resources(e820.map, e820.nr_map);
+#elif defined(CONFIG_XEN)
+	e820_reserve_resources(e820.map, e820.nr_map);
+#else
 	probe_roms();
 	e820_reserve_resources(e820.map, e820.nr_map);
 #endif
