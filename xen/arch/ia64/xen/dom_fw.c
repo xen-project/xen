@@ -413,6 +413,8 @@ dom_fw_dom0_passthrough(efi_memory_desc_t *md, void *arg__)
     BUG_ON(md->type != EFI_RUNTIME_SERVICES_CODE &&
            md->type != EFI_RUNTIME_SERVICES_DATA &&
            md->type != EFI_ACPI_RECLAIM_MEMORY &&
+           md->type != EFI_ACPI_MEMORY_NVS &&
+           md->type != EFI_RESERVED_TYPE &&
            md->type != EFI_MEMORY_MAPPED_IO &&
            md->type != EFI_MEMORY_MAPPED_IO_PORT_SPACE);
 
@@ -747,6 +749,10 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 			arg.flags = ASSIGN_writable;
 #endif
 			efi_memmap_walk_type(EFI_ACPI_RECLAIM_MEMORY,
+			                     dom_fw_dom0_passthrough, &arg);
+			efi_memmap_walk_type(EFI_ACPI_MEMORY_NVS,
+			                     dom_fw_dom0_passthrough, &arg);
+			efi_memmap_walk_type(EFI_RESERVED_TYPE,
 			                     dom_fw_dom0_passthrough, &arg);
 			efi_memmap_walk_type(EFI_MEMORY_MAPPED_IO,
 			                     dom_fw_dom0_passthrough, &arg);
