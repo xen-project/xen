@@ -186,7 +186,7 @@ static void backend_changed(struct xenbus_watch *watch,
 
 	DPRINTK("");
 
-	err = xenbus_scanf(XBT_NULL, dev->nodename, "physical-device", "%x:%x",
+	err = xenbus_scanf(XBT_NIL, dev->nodename, "physical-device", "%x:%x",
 			   &major, &minor);
 	if (XENBUS_EXIST_ERR(err)) {
 		/* Since this watch will fire once immediately after it is
@@ -208,7 +208,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		return;
 	}
 
-	be->mode = xenbus_read(XBT_NULL, dev->nodename, "mode", NULL);
+	be->mode = xenbus_read(XBT_NIL, dev->nodename, "mode", NULL);
 	if (IS_ERR(be->mode)) {
 		err = PTR_ERR(be->mode);
 		be->mode = NULL;
@@ -299,7 +299,7 @@ static void frontend_changed(struct xenbus_device *dev,
  */
 static void connect(struct backend_info *be)
 {
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 	int err;
 	struct xenbus_device *dev = be->dev;
 
@@ -364,7 +364,7 @@ static int connect_ring(struct backend_info *be)
 
 	DPRINTK("%s", dev->otherend);
 
-	err = xenbus_gather(XBT_NULL, dev->otherend, "ring-ref", "%lu", &ring_ref,
+	err = xenbus_gather(XBT_NIL, dev->otherend, "ring-ref", "%lu", &ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {
 		xenbus_dev_fatal(dev, err,

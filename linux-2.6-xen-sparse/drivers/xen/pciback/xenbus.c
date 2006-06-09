@@ -125,7 +125,7 @@ static int pciback_attach(struct pciback_device *pdev)
 
 	dev_dbg(&pdev->xdev->dev, "Reading frontend config\n");
 
-	err = xenbus_gather(XBT_NULL, pdev->xdev->otherend,
+	err = xenbus_gather(XBT_NIL, pdev->xdev->otherend,
 			    "pci-op-ref", "%u", &gnt_ref,
 			    "event-channel", "%u", &remote_evtchn,
 			    "magic", NULL, &magic, NULL);
@@ -200,7 +200,7 @@ static int pciback_publish_pci_root(struct pciback_device *pdev,
 
 	dev_dbg(&pdev->xdev->dev, "Publishing pci roots\n");
 
-	err = xenbus_scanf(XBT_NULL, pdev->xdev->nodename,
+	err = xenbus_scanf(XBT_NIL, pdev->xdev->nodename,
 			   "root_num", "%d", &root_num);
 	if (err == 0 || err == -ENOENT)
 		root_num = 0;
@@ -215,7 +215,7 @@ static int pciback_publish_pci_root(struct pciback_device *pdev,
 			goto out;
 		}
 
-		err = xenbus_scanf(XBT_NULL, pdev->xdev->nodename,
+		err = xenbus_scanf(XBT_NIL, pdev->xdev->nodename,
 				   str, "%x:%x", &d, &b);
 		if (err < 0)
 			goto out;
@@ -239,12 +239,12 @@ static int pciback_publish_pci_root(struct pciback_device *pdev,
 	dev_dbg(&pdev->xdev->dev, "writing root %d at %04x:%02x\n",
 		root_num, domain, bus);
 
-	err = xenbus_printf(XBT_NULL, pdev->xdev->nodename, str,
+	err = xenbus_printf(XBT_NIL, pdev->xdev->nodename, str,
 			    "%04x:%02x", domain, bus);
 	if (err)
 		goto out;
 
-	err = xenbus_printf(XBT_NULL, pdev->xdev->nodename,
+	err = xenbus_printf(XBT_NIL, pdev->xdev->nodename,
 			    "root_num", "%d", (root_num + 1));
 
       out:
@@ -306,7 +306,7 @@ static int pciback_setup_backend(struct pciback_device *pdev)
 
 	dev_dbg(&pdev->xdev->dev, "getting be setup\n");
 
-	err = xenbus_scanf(XBT_NULL, pdev->xdev->nodename, "num_devs", "%d",
+	err = xenbus_scanf(XBT_NIL, pdev->xdev->nodename, "num_devs", "%d",
 			   &num_devs);
 	if (err != 1) {
 		if (err >= 0)
@@ -326,7 +326,7 @@ static int pciback_setup_backend(struct pciback_device *pdev)
 			goto out;
 		}
 
-		err = xenbus_scanf(XBT_NULL, pdev->xdev->nodename, dev_str,
+		err = xenbus_scanf(XBT_NIL, pdev->xdev->nodename, dev_str,
 				   "%x:%x:%x.%x", &domain, &bus, &slot, &func);
 		if (err < 0) {
 			xenbus_dev_fatal(pdev->xdev, err,

@@ -110,7 +110,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
 
-	err = xenbus_scanf(XBT_NULL, dev->nodename,
+	err = xenbus_scanf(XBT_NIL, dev->nodename,
 	                   "instance","%li", &instance);
 	if (XENBUS_EXIST_ERR(err)) {
 		return;
@@ -204,7 +204,7 @@ static void maybe_connect(struct backend_info *be)
 
 static void connect(struct backend_info *be)
 {
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 	int err;
 	struct xenbus_device *dev = be->dev;
 	unsigned long ready = 1;
@@ -245,7 +245,7 @@ static int connect_ring(struct backend_info *be)
 	unsigned int evtchn;
 	int err;
 
-	err = xenbus_gather(XBT_NULL, dev->otherend,
+	err = xenbus_gather(XBT_NIL, dev->otherend,
 	                    "ring-ref", "%lu", &ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {

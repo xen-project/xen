@@ -83,7 +83,7 @@ static int blkfront_probe(struct xenbus_device *dev,
 	struct blkfront_info *info;
 
 	/* FIXME: Use dynamic device id if this is not set. */
-	err = xenbus_scanf(XBT_NULL, dev->nodename,
+	err = xenbus_scanf(XBT_NIL, dev->nodename,
 			   "virtual-device", "%i", &vdevice);
 	if (err != 1) {
 		xenbus_dev_fatal(dev, err, "reading virtual-device");
@@ -148,7 +148,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 			   struct blkfront_info *info)
 {
 	const char *message = NULL;
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 	int err;
 
 	/* Create shared ring, alloc event channel. */
@@ -303,7 +303,7 @@ static void connect(struct blkfront_info *info)
 
 	DPRINTK("blkfront.c:connect:%s.\n", info->xbdev->otherend);
 
-	err = xenbus_gather(XBT_NULL, info->xbdev->otherend,
+	err = xenbus_gather(XBT_NIL, info->xbdev->otherend,
 			    "sectors", "%lu", &sectors,
 			    "info", "%u", &binfo,
 			    "sector-size", "%lu", &sector_size,

@@ -193,7 +193,7 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 	struct netfront_info *info;
 	unsigned int handle;
 
-	err = xenbus_scanf(XBT_NULL, dev->nodename, "handle", "%u", &handle);
+	err = xenbus_scanf(XBT_NIL, dev->nodename, "handle", "%u", &handle);
 	if (err != 1) {
 		xenbus_dev_fatal(dev, err, "reading handle");
 		return err;
@@ -243,7 +243,7 @@ static int xen_net_read_mac(struct xenbus_device *dev, u8 mac[])
 	char *s, *e, *macstr;
 	int i;
 
-	macstr = s = xenbus_read(XBT_NULL, dev->nodename, "mac", NULL);
+	macstr = s = xenbus_read(XBT_NIL, dev->nodename, "mac", NULL);
 	if (IS_ERR(macstr))
 		return PTR_ERR(macstr);
 
@@ -265,7 +265,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 			   struct netfront_info *info)
 {
 	const char *message;
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 	int err;
 
 	err = xen_net_read_mac(dev, info->mac);
@@ -1057,7 +1057,7 @@ static int xennet_set_sg(struct net_device *dev, u32 data)
 		struct netfront_info *np = netdev_priv(dev);
 		int val;
 
-		if (xenbus_scanf(XBT_NULL, np->xbdev->otherend, "feature-sg",
+		if (xenbus_scanf(XBT_NIL, np->xbdev->otherend, "feature-sg",
 				 "%d", &val) < 0)
 			val = 0;
 		if (!val)

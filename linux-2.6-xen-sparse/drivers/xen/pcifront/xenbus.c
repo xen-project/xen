@@ -67,7 +67,7 @@ static void free_pdev(struct pcifront_device *pdev)
 static int pcifront_publish_info(struct pcifront_device *pdev)
 {
 	int err = 0;
-	xenbus_transaction_t trans;
+	struct xenbus_transaction trans;
 
 	err = xenbus_grant_ring(pdev->xdev, virt_to_mfn(pdev->sh_info));
 	if (err < 0)
@@ -143,7 +143,7 @@ static int pcifront_try_connect(struct pcifront_device *pdev)
 		goto out;
 	}
 
-	err = xenbus_scanf(XBT_NULL, pdev->xdev->otherend,
+	err = xenbus_scanf(XBT_NIL, pdev->xdev->otherend,
 			   "root_num", "%d", &num_roots);
 	if (err == -ENOENT) {
 		xenbus_dev_error(pdev->xdev, err,
@@ -165,7 +165,7 @@ static int pcifront_try_connect(struct pcifront_device *pdev)
 			goto out;
 		}
 
-		err = xenbus_scanf(XBT_NULL, pdev->xdev->otherend, str,
+		err = xenbus_scanf(XBT_NIL, pdev->xdev->otherend, str,
 				   "%x:%x", &domain, &bus);
 		if (err != 2) {
 			if (err >= 0)

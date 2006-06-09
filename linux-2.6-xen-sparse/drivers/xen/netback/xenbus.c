@@ -70,7 +70,7 @@ static int netback_probe(struct xenbus_device *dev,
 			 const struct xenbus_device_id *id)
 {
 	const char *message;
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 	int err;
 	struct backend_info *be = kzalloc(sizeof(struct backend_info),
 					  GFP_KERNEL);
@@ -141,7 +141,7 @@ static int netback_uevent(struct xenbus_device *xdev, char **envp,
 
 	DPRINTK("netback_uevent");
 
-	val = xenbus_read(XBT_NULL, xdev->nodename, "script", NULL);
+	val = xenbus_read(XBT_NIL, xdev->nodename, "script", NULL);
 	if (IS_ERR(val)) {
 		int err = PTR_ERR(val);
 		xenbus_dev_fatal(xdev, err, "reading script");
@@ -177,7 +177,7 @@ static void backend_changed(struct xenbus_watch *watch,
 
 	DPRINTK("");
 
-	err = xenbus_scanf(XBT_NULL, dev->nodename, "handle", "%li", &handle);
+	err = xenbus_scanf(XBT_NIL, dev->nodename, "handle", "%li", &handle);
 	if (XENBUS_EXIST_ERR(err)) {
 		/* Since this watch will fire once immediately after it is
 		   registered, we expect this.  Ignore it, and wait for the
@@ -268,7 +268,7 @@ static void xen_net_read_rate(struct xenbus_device *dev,
 	*bytes = ~0UL;
 	*usec = 0;
 
-	ratestr = xenbus_read(XBT_NULL, dev->nodename, "rate", NULL);
+	ratestr = xenbus_read(XBT_NIL, dev->nodename, "rate", NULL);
 	if (IS_ERR(ratestr))
 		return;
 
@@ -298,7 +298,7 @@ static int xen_net_read_mac(struct xenbus_device *dev, u8 mac[])
 	char *s, *e, *macstr;
 	int i;
 
-	macstr = s = xenbus_read(XBT_NULL, dev->nodename, "mac", NULL);
+	macstr = s = xenbus_read(XBT_NIL, dev->nodename, "mac", NULL);
 	if (IS_ERR(macstr))
 		return PTR_ERR(macstr);
 
@@ -347,7 +347,7 @@ static int connect_rings(struct backend_info *be)
 
 	DPRINTK("");
 
-	err = xenbus_gather(XBT_NULL, dev->otherend,
+	err = xenbus_gather(XBT_NIL, dev->otherend,
 			    "tx-ring-ref", "%lu", &tx_ring_ref,
 			    "rx-ring-ref", "%lu", &rx_ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);

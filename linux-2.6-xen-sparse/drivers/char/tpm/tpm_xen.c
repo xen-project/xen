@@ -274,7 +274,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 {
 	const char *message = NULL;
 	int err;
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 
 	err = setup_tpmring(dev, tp);
 	if (err) {
@@ -369,7 +369,7 @@ static int tpmfront_probe(struct xenbus_device *dev,
 	if (!tp)
 		return -ENOMEM;
 
-	err = xenbus_scanf(XBT_NULL, dev->nodename,
+	err = xenbus_scanf(XBT_NIL, dev->nodename,
 	                   "handle", "%i", &handle);
 	if (XENBUS_EXIST_ERR(err))
 		return err;
