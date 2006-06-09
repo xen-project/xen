@@ -32,7 +32,7 @@
 #include <acm/acm_endian.h>
 
 int
-acm_set_policy(void *buf, u32 buf_size, int isuserbuffer)
+acm_set_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size, int isuserbuffer)
 {
     u8 *policy_buffer = NULL;
     struct acm_policy_buffer *pol;
@@ -45,7 +45,7 @@ acm_set_policy(void *buf, u32 buf_size, int isuserbuffer)
         return -ENOMEM;
 
     if (isuserbuffer) {
-        if (copy_from_user(policy_buffer, buf, buf_size))
+        if (copy_from_guest(policy_buffer, buf, buf_size))
         {
             printk("%s: Error copying!\n",__func__);
             goto error_free;
@@ -116,7 +116,7 @@ acm_set_policy(void *buf, u32 buf_size, int isuserbuffer)
 }
 
 int
-acm_get_policy(void *buf, u32 buf_size)
+acm_get_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size)
 { 
     u8 *policy_buffer;
     int ret;
@@ -162,7 +162,7 @@ acm_get_policy(void *buf, u32 buf_size)
         goto error_free_unlock;
 
     bin_pol->len = htonl(ntohl(bin_pol->len) + ret);
-    if (copy_to_user(buf, policy_buffer, ntohl(bin_pol->len)))
+    if (copy_to_guest(buf, policy_buffer, ntohl(bin_pol->len)))
         goto error_free_unlock;
 
     read_unlock(&acm_bin_pol_rwlock);
@@ -177,7 +177,7 @@ acm_get_policy(void *buf, u32 buf_size)
 }
 
 int
-acm_dump_statistics(void *buf, u16 buf_size)
+acm_dump_statistics(XEN_GUEST_HANDLE(void) buf, u16 buf_size)
 { 
     /* send stats to user space */
     u8 *stats_buffer;
@@ -208,7 +208,7 @@ acm_dump_statistics(void *buf, u16 buf_size)
 
     memcpy(stats_buffer, &acm_stats, sizeof(struct acm_stats_buffer));
 
-    if (copy_to_user(buf, stats_buffer, sizeof(struct acm_stats_buffer) + len1 + len2))
+    if (copy_to_guest(buf, stats_buffer, sizeof(struct acm_stats_buffer) + len1 + len2))
         goto error_lock_free;
 
     read_unlock(&acm_bin_pol_rwlock);
@@ -223,7 +223,7 @@ acm_dump_statistics(void *buf, u16 buf_size)
 
 
 int
-acm_get_ssid(ssidref_t ssidref, u8 *buf, u16 buf_size)
+acm_get_ssid(ssidref_t ssidref, XEN_GUEST_HANDLE(void) buf, u16 buf_size)
 {
     /* send stats to user space */
     u8 *ssid_buffer;
@@ -272,7 +272,7 @@ acm_get_ssid(ssidref_t ssidref, u8 *buf, u16 buf_size)
     acm_ssid->len += ret;
     acm_ssid->secondary_max_types = ret;
 
-    if (copy_to_user(buf, ssid_buffer, acm_ssid->len))
+    if (copy_to_guest(buf, ssid_buffer, acm_ssid->len))
         goto error_free_unlock;
 
     read_unlock(&acm_bin_pol_rwlock);

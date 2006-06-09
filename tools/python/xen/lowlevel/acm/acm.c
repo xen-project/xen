@@ -52,7 +52,7 @@ void * __getssid(int domid, uint32_t *buflen)
     }
     memset(buf, 0, SSID_BUFFER_SIZE);
     getssid.interface_version = ACM_INTERFACE_VERSION;
-    getssid.ssidbuf = buf;
+    set_xen_guest_handle(getssid.ssidbuf, buf);
     getssid.ssidbuf_size = SSID_BUFFER_SIZE;
     getssid.get_ssid_by = DOMAINID;
     getssid.id.domainid = domid;

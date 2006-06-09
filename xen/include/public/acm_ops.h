@@ -17,7 +17,7 @@
  * This makes sure that old versions of acm tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define ACM_INTERFACE_VERSION   0xAAAA0007
+#define ACM_INTERFACE_VERSION   0xAAAA0008
 
 /************************************************************************/
 
@@ -33,7 +33,7 @@
 struct acm_setpolicy {
     /* IN */
     uint32_t interface_version;
-    void *pushcache;
+    XEN_GUEST_HANDLE(void) pushcache;
     uint32_t pushcache_size;
 };
 
@@ -42,7 +42,7 @@ struct acm_setpolicy {
 struct acm_getpolicy {
     /* IN */
     uint32_t interface_version;
-    void *pullcache;
+    XEN_GUEST_HANDLE(void) pullcache;
     uint32_t pullcache_size;
 };
 
@@ -51,7 +51,7 @@ struct acm_getpolicy {
 struct acm_dumpstats {
     /* IN */
     uint32_t interface_version;
-    void *pullcache;
+    XEN_GUEST_HANDLE(void) pullcache;
     uint32_t pullcache_size;
 };
 
@@ -61,12 +61,12 @@ enum get_type {UNSET=0, SSIDREF, DOMAINID};
 struct acm_getssid {
     /* IN */
     uint32_t interface_version;
-    enum get_type get_ssid_by;
+    uint32_t get_ssid_by;
     union {
         domaintype_t domainid;
         ssidref_t    ssidref;
     } id;
-    void *ssidbuf;
+    XEN_GUEST_HANDLE(void) ssidbuf;
     uint32_t ssidbuf_size;
 };
 
@@ -74,8 +74,8 @@ struct acm_getssid {
 struct acm_getdecision {
     /* IN */
     uint32_t interface_version;
-    enum get_type get_decision_by1;
-    enum get_type get_decision_by2;
+    uint32_t get_decision_by1;
+    uint32_t get_decision_by2;
     union {
         domaintype_t domainid;
         ssidref_t    ssidref;
@@ -84,9 +84,9 @@ struct acm_getdecision {
         domaintype_t domainid;
         ssidref_t    ssidref;
     } id2;
-    enum acm_hook_type hook;
+    uint32_t hook;
     /* OUT */
-    int acm_decision;
+    uint32_t acm_decision;
 };
 
 #endif /* __XEN_PUBLIC_ACM_OPS_H__ */
