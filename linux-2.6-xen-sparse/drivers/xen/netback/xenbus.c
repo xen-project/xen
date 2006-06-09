@@ -44,7 +44,7 @@ static void backend_changed(struct xenbus_watch *, const char **,
 
 static int netback_remove(struct xenbus_device *dev)
 {
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 
 	if (be->backend_watch.node) {
 		unregister_xenbus_watch(&be->backend_watch);
@@ -56,7 +56,7 @@ static int netback_remove(struct xenbus_device *dev)
 		be->netif = NULL;
 	}
 	kfree(be);
-	dev->data = NULL;
+	dev->dev.driver_data = NULL;
 	return 0;
 }
 
@@ -81,7 +81,7 @@ static int netback_probe(struct xenbus_device *dev,
 	}
 
 	be->dev = dev;
-	dev->data = be;
+	dev->dev.driver_data = be;
 
 	err = xenbus_watch_path2(dev, dev->nodename, "handle",
 				 &be->backend_watch, backend_changed);
@@ -134,7 +134,7 @@ fail:
 static int netback_uevent(struct xenbus_device *xdev, char **envp,
 			  int num_envp, char *buffer, int buffer_size)
 {
-	struct backend_info *be = xdev->data;
+	struct backend_info *be = xdev->dev.driver_data;
 	netif_t *netif = be->netif;
 	int i = 0, length = 0;
 	char *val;
@@ -213,7 +213,7 @@ static void backend_changed(struct xenbus_watch *watch,
 static void frontend_changed(struct xenbus_device *dev,
 			     enum xenbus_state frontend_state)
 {
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 
 	DPRINTK("");
 

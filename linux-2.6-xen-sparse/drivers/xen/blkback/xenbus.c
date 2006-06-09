@@ -77,7 +77,7 @@ static ssize_t show_physical_device(struct device *_dev,
 				    struct device_attribute *attr, char *buf)
 {
 	struct xenbus_device *dev = to_xenbus_device(_dev);
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 	return sprintf(buf, "%x:%x\n", be->major, be->minor);
 }
 DEVICE_ATTR(physical_device, S_IRUSR | S_IRGRP | S_IROTH,
@@ -88,7 +88,7 @@ static ssize_t show_mode(struct device *_dev, struct device_attribute *attr,
 			 char *buf)
 {
 	struct xenbus_device *dev = to_xenbus_device(_dev);
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 	return sprintf(buf, "%s\n", be->mode);
 }
 DEVICE_ATTR(mode, S_IRUSR | S_IRGRP | S_IROTH, show_mode, NULL);
@@ -96,7 +96,7 @@ DEVICE_ATTR(mode, S_IRUSR | S_IRGRP | S_IROTH, show_mode, NULL);
 
 static int blkback_remove(struct xenbus_device *dev)
 {
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 
 	DPRINTK("");
 
@@ -116,7 +116,7 @@ static int blkback_remove(struct xenbus_device *dev)
 	device_remove_file(&dev->dev, &dev_attr_mode);
 
 	kfree(be);
-	dev->data = NULL;
+	dev->dev.driver_data = NULL;
 	return 0;
 }
 
@@ -138,7 +138,7 @@ static int blkback_probe(struct xenbus_device *dev,
 		return -ENOMEM;
 	}
 	be->dev = dev;
-	dev->data = be;
+	dev->dev.driver_data = be;
 
 	be->blkif = blkif_alloc(dev->otherend_id);
 	if (IS_ERR(be->blkif)) {
@@ -249,7 +249,7 @@ static void backend_changed(struct xenbus_watch *watch,
 static void frontend_changed(struct xenbus_device *dev,
 			     enum xenbus_state frontend_state)
 {
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 	int err;
 
 	DPRINTK("");

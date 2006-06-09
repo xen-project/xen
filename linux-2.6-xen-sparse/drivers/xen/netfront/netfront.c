@@ -207,14 +207,14 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 	}
 
 	info = netdev_priv(netdev);
-	dev->data = info;
+	dev->dev.driver_data = info;
 
 	err = talk_to_backend(dev, info);
 	if (err) {
 		xennet_sysfs_delif(info->netdev);
 		unregister_netdev(netdev);
 		free_netdev(netdev);
-		dev->data = NULL;
+		dev->dev.driver_data = NULL;
 		return err;
 	}
 
@@ -230,7 +230,7 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
  */
 static int netfront_resume(struct xenbus_device *dev)
 {
-	struct netfront_info *info = dev->data;
+	struct netfront_info *info = dev->dev.driver_data;
 
 	DPRINTK("%s\n", dev->nodename);
 
@@ -394,7 +394,7 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 static void backend_changed(struct xenbus_device *dev,
 			    enum xenbus_state backend_state)
 {
-	struct netfront_info *np = dev->data;
+	struct netfront_info *np = dev->dev.driver_data;
 	struct net_device *netdev = np->netdev;
 
 	DPRINTK("\n");
@@ -1475,7 +1475,7 @@ inetdev_notify(struct notifier_block *this, unsigned long event, void *ptr)
  */
 static void netfront_closing(struct xenbus_device *dev)
 {
-	struct netfront_info *info = dev->data;
+	struct netfront_info *info = dev->dev.driver_data;
 
 	DPRINTK("netfront_closing: %s removed\n", dev->nodename);
 
@@ -1487,7 +1487,7 @@ static void netfront_closing(struct xenbus_device *dev)
 
 static int __devexit netfront_remove(struct xenbus_device *dev)
 {
-	struct netfront_info *info = dev->data;
+	struct netfront_info *info = dev->dev.driver_data;
 
 	DPRINTK("%s\n", dev->nodename);
 

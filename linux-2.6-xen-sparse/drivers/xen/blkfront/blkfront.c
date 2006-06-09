@@ -107,12 +107,12 @@ static int blkfront_probe(struct xenbus_device *dev,
 
 	/* Front end dir is a number, which is used as the id. */
 	info->handle = simple_strtoul(strrchr(dev->nodename,'/')+1, NULL, 0);
-	dev->data = info;
+	dev->dev.driver_data = info;
 
 	err = talk_to_backend(dev, info);
 	if (err) {
 		kfree(info);
-		dev->data = NULL;
+		dev->dev.driver_data = NULL;
 		return err;
 	}
 
@@ -128,7 +128,7 @@ static int blkfront_probe(struct xenbus_device *dev,
  */
 static int blkfront_resume(struct xenbus_device *dev)
 {
-	struct blkfront_info *info = dev->data;
+	struct blkfront_info *info = dev->dev.driver_data;
 	int err;
 
 	DPRINTK("blkfront_resume: %s\n", dev->nodename);
@@ -249,7 +249,7 @@ fail:
 static void backend_changed(struct xenbus_device *dev,
 			    enum xenbus_state backend_state)
 {
-	struct blkfront_info *info = dev->data;
+	struct blkfront_info *info = dev->dev.driver_data;
 	struct block_device *bd;
 
 	DPRINTK("blkfront:backend_changed.\n");
@@ -341,7 +341,7 @@ static void connect(struct blkfront_info *info)
  */
 static void blkfront_closing(struct xenbus_device *dev)
 {
-	struct blkfront_info *info = dev->data;
+	struct blkfront_info *info = dev->dev.driver_data;
 
 	DPRINTK("blkfront_closing: %s removed\n", dev->nodename);
 
@@ -353,7 +353,7 @@ static void blkfront_closing(struct xenbus_device *dev)
 
 static int blkfront_remove(struct xenbus_device *dev)
 {
-	struct blkfront_info *info = dev->data;
+	struct blkfront_info *info = dev->dev.driver_data;
 
 	DPRINTK("blkfront_remove: %s removed\n", dev->nodename);
 

@@ -76,7 +76,6 @@ struct xenbus_device {
 	struct xenbus_watch otherend_watch;
 	struct device dev;
 	enum xenbus_state state;
-	void *data;
 };
 
 static inline struct xenbus_device *to_xenbus_device(struct device *dev)
