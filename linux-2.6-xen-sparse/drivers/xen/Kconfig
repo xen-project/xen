@@ -84,19 +84,6 @@ config XEN_BLKDEV_BACKEND
 	  block devices to other guests via a high-performance shared-memory
 	  interface.
 
-config XEN_BLKDEV_TAP_BE
-        tristate "Block Tap support for backend driver (DANGEROUS)"
-        depends on XEN_BLKDEV_BACKEND
-        default n
-        help
-          If you intend to use the block tap driver, the backend domain will
-          not know the domain id of the real frontend, and so will not be able
-          to map its data pages.  This modifies the backend to attempt to map
-          from both the tap domain and the real frontend.  This presents a
-          security risk, and so should ONLY be used for development
-          with the blktap.  This option will be removed as the block drivers are
-          modified to use grant tables.
-
 config XEN_NETDEV_BACKEND
 	tristate "Network-device backend driver"
         depends on XEN_BACKEND && NET
@@ -162,16 +149,6 @@ config XEN_NETDEV_FRONTEND
 	  network interfaces within another guest OS. Unless you are building a
 	  dedicated device-driver domain, or your master control domain
 	  (domain 0), then you almost certainly want to say Y here.
-
-config XEN_BLKDEV_TAP
-	tristate "Block device tap driver"
-        depends on XEN_BACKEND
-	default n
-	help
-	  This driver allows a VM to interact on block device channels
-	  to other VMs.  Block messages may be passed through or redirected
-	  to a character device, allowing device prototyping in application
-	  space.  Odds are that you want to say N here.
 
 config XEN_SCRUB_PAGES
 	bool "Scrub memory before freeing it to Xen"

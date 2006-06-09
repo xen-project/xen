@@ -73,10 +73,6 @@ typedef struct blkif_st {
 	/* Back pointer to the backend_info. */
 	struct backend_info *be; 
 	/* Private fields. */
-#ifdef CONFIG_XEN_BLKDEV_TAP_BE
-	/* Is this a blktap frontend */
-	unsigned int     is_blktap;
-#endif
 	spinlock_t       blk_ring_lock;
 	atomic_t         refcnt;
 
