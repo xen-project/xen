@@ -717,6 +717,8 @@ void unmask_evtchn(int port)
 	unsigned int cpu = smp_processor_id();
 	vcpu_info_t *vcpu_info = &s->vcpu_info[cpu];
 
+	BUG_ON(!irqs_disabled());
+
 	/* Slow path (hypercall) if this is a non-local port. */
 	if (unlikely(cpu != cpu_from_evtchn(port))) {
 		struct evtchn_unmask unmask = { .port = port };
@@ -733,11 +735,8 @@ void unmask_evtchn(int port)
 	 */
 	if (synch_test_bit(port, &s->evtchn_pending[0]) &&
 	    !synch_test_and_set_bit(port / BITS_PER_LONG,
-				    &vcpu_info->evtchn_pending_sel)) {
+				    &vcpu_info->evtchn_pending_sel))
 		vcpu_info->evtchn_upcall_pending = 1;
-		if (!vcpu_info->evtchn_upcall_mask)
-			force_evtchn_callback();
-	}
 }
 EXPORT_SYMBOL_GPL(unmask_evtchn);
 
