@@ -318,7 +318,7 @@ unsigned long hypercall_create_continuation(
 
 #define hypercall_preempt_check() (unlikely(    \
         softirq_pending(smp_processor_id()) |   \
-        event_pending(current)                  \
+        local_events_need_delivery()            \
     ))
 
 /* This domain_hash and domain_list are protected by the domlist_lock. */

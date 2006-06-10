@@ -499,7 +499,7 @@ void evtchn_set_pending(struct vcpu *v, int port)
         evtchn_notify(v);
     }
     else if ( unlikely(test_bit(_VCPUF_blocked, &v->vcpu_flags) &&
-                       v->vcpu_info->evtchn_upcall_mask) )
+                       !local_event_delivery_is_enabled()) )
     {
         /*
          * Blocked and masked will usually mean that the VCPU executed 

@@ -199,11 +199,11 @@ static long do_block(void)
 {
     struct vcpu *v = current;
 
-    v->vcpu_info->evtchn_upcall_mask = 0;
+    local_event_delivery_enable();
     set_bit(_VCPUF_blocked, &v->vcpu_flags);
 
     /* Check for events /after/ blocking: avoids wakeup waiting race. */
-    if ( event_pending(v) )
+    if ( local_events_need_delivery() )
     {
         clear_bit(_VCPUF_blocked, &v->vcpu_flags);
     }
@@ -230,8 +230,8 @@ static long do_poll(struct sched_poll *sched_poll)
     if ( !guest_handle_okay(sched_poll->ports, sched_poll->nr_ports) )
         return -EFAULT;
 
-    /* Ensure that upcalls are disabled: tested by evtchn_set_pending(). */
-    if ( !v->vcpu_info->evtchn_upcall_mask )
+    /* Ensure that events are disabled: tested by evtchn_set_pending(). */
+    if ( local_event_delivery_is_enabled() )
         return -EINVAL;
 
     set_bit(_VCPUF_blocked, &v->vcpu_flags);
@@ -248,7 +248,7 @@ static long do_poll(struct sched_poll *sched_poll)
             goto out;
 
         rc = 0;
-        if ( evtchn_pending(v->domain, port) )
+        if ( test_bit(port, v->domain->shared_info->evtchn_pending) )
             goto out;
     }
 

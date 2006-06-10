@@ -38,9 +38,6 @@ extern void send_guest_global_virq(struct domain *d, int virq);
  */
 extern void send_guest_pirq(struct domain *d, int pirq);
 
-#define evtchn_pending(d, p)                    \
-    (test_bit((p), &(d)->shared_info->evtchn_pending[0]))
-
 /* Send a notification from a local event-channel port. */
 extern long evtchn_send(unsigned int lport);
 
