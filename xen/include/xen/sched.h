@@ -355,7 +355,7 @@ extern struct domain *domain_list;
  /* Initialization completed. */
 #define _VCPUF_initialised     4
 #define VCPUF_initialised      (1UL<<_VCPUF_initialised)
- /* VCPU is not-runnable */
+ /* VCPU is offline. */
 #define _VCPUF_down            5
 #define VCPUF_down             (1UL<<_VCPUF_down)
  /* NMI callback pending for this VCPU? */
@@ -364,6 +364,9 @@ extern struct domain *domain_list;
  /* Avoid NMI reentry by allowing NMIs to be masked for short periods. */
 #define _VCPUF_nmi_masked      9
 #define VCPUF_nmi_masked       (1UL<<_VCPUF_nmi_masked)
+ /* VCPU is polling a set of event channels (SCHEDOP_poll). */
+#define _VCPUF_polling         10
+#define VCPUF_polling          (1UL<<_VCPUF_polling)
 
 /*
  * Per-domain flags (domain_flags).
@@ -383,6 +386,9 @@ extern struct domain *domain_list;
  /* Domain is being debugged by controller software. */
 #define _DOMF_debugging        4
 #define DOMF_debugging         (1UL<<_DOMF_debugging)
+ /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
+#define _DOMF_polling          5
+#define DOMF_polling           (1UL<<_DOMF_polling)
 
 static inline int vcpu_runnable(struct vcpu *v)
 {

@@ -498,14 +498,14 @@ void evtchn_set_pending(struct vcpu *v, int port)
     {
         evtchn_notify(v);
     }
-    else if ( unlikely(test_bit(_VCPUF_blocked, &v->vcpu_flags) &&
-                       !local_event_delivery_is_enabled()) )
+    
+    /* Check if some VCPU might be polling for this event. */
+    if ( unlikely(test_bit(_DOMF_polling, &d->domain_flags)) &&
+         likely(test_and_clear_bit(_DOMF_polling, &d->domain_flags)) )
     {
-        /*
-         * Blocked and masked will usually mean that the VCPU executed 
-         * SCHEDOP_poll. Kick the VCPU in case this port is in its poll list.
-         */
-        vcpu_unblock(v);
+        for_each_vcpu ( d, v )
+            if ( test_and_clear_bit(_VCPUF_polling, &v->vcpu_flags) )
+                vcpu_unblock(v);
     }
 }
 
@@ -798,13 +798,6 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     }
 
     return rc;
-}
-
-
-void evtchn_notify_reserved_port(struct domain *d, int port)
-{
-    struct evtchn *chn = evtchn_from_port(d, port);
-    evtchn_set_pending(d->vcpu[chn->notify_vcpu_id], port);
 }
 
 

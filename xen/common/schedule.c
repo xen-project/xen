@@ -230,13 +230,12 @@ static long do_poll(struct sched_poll *sched_poll)
     if ( !guest_handle_okay(sched_poll->ports, sched_poll->nr_ports) )
         return -EFAULT;
 
-    /* Ensure that events are disabled: tested by evtchn_set_pending(). */
-    if ( local_event_delivery_is_enabled() )
-        return -EINVAL;
-
+    /* These operations must occur in order. */
     set_bit(_VCPUF_blocked, &v->vcpu_flags);
+    set_bit(_VCPUF_polling, &v->vcpu_flags);
+    set_bit(_DOMF_polling, &v->domain->domain_flags);
 
-    /* Check for events /after/ blocking: avoids wakeup waiting race. */
+    /* Check for events /after/ setting flags: avoids wakeup waiting race. */
     for ( i = 0; i < sched_poll->nr_ports; i++ )
     {
         rc = -EFAULT;
@@ -261,6 +260,7 @@ static long do_poll(struct sched_poll *sched_poll)
     stop_timer(&v->poll_timer);
 
  out:
+    clear_bit(_VCPUF_polling, &v->vcpu_flags);
     clear_bit(_VCPUF_blocked, &v->vcpu_flags);
     return rc;
 }
@@ -596,7 +596,8 @@ static void vcpu_timer_fn(void *data)
 static void poll_timer_fn(void *data)
 {
     struct vcpu *v = data;
-    vcpu_unblock(v);
+    if ( test_and_clear_bit(_VCPUF_polling, &v->vcpu_flags) )
+        vcpu_unblock(v);
 }
 
 /* Initialise the data structures. */
