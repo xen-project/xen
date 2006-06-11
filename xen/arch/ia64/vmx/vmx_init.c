@@ -288,9 +288,6 @@ vmx_final_setup_guest(struct vcpu *v)
 	/* v->arch.schedule_tail = arch_vmx_do_launch; */
 	vmx_create_vp(v);
 
-	/* Set this ed to be vmx */
-	set_bit(ARCH_VMX_VMCS_LOADED, &v->arch.arch_vmx.flags);
-
 	/* Physical mode emulation initialization, including
 	* emulation ID allcation and related memory request
 	*/

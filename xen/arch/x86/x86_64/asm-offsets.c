@@ -80,6 +80,9 @@ void __dummy__(void)
     OFFSET(VCPU_svm_vmexit_tsc, struct vcpu, arch.hvm_svm.vmexit_tsc);
     BLANK();
 
+    OFFSET(VCPU_vmx_launched, struct vcpu, arch.hvm_vmx.launched);
+    BLANK();
+
     OFFSET(VMCB_rax, struct vmcb_struct, rax);
     OFFSET(VMCB_tsc_offset, struct vmcb_struct, tsc_offset);
     BLANK();

@@ -91,8 +91,7 @@ static void vmx_relinquish_guest_resources(struct domain *d)
     {
         if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
             continue;
-        vmx_request_clear_vmcs(v);
-        destroy_vmcs(&v->arch.hvm_vmx);
+        vmx_destroy_vmcs(v);
         free_monitor_pagetable(v);
         kill_timer(&v->arch.hvm_vmx.hlt_timer);
         if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) )
@@ -402,54 +401,10 @@ void vmx_migrate_timers(struct vcpu *v)
         migrate_timer(&(VLAPIC(v)->vlapic_timer), v->processor);
 }
 
-struct vmx_cpu_guest_regs_callback_info {
-    struct vcpu *v;
-    struct cpu_user_regs *regs;
-    unsigned long *crs;
-};
-
-static void vmx_store_cpu_guest_regs(
-    struct vcpu *v, struct cpu_user_regs *regs, unsigned long *crs);
-
-static void vmx_load_cpu_guest_regs(
-    struct vcpu *v, struct cpu_user_regs *regs);
-
-static void vmx_store_cpu_guest_regs_callback(void *data)
-{
-    struct vmx_cpu_guest_regs_callback_info *info = data;
-    vmx_store_cpu_guest_regs(info->v, info->regs, info->crs);
-}
-
-static void vmx_load_cpu_guest_regs_callback(void *data)
-{
-    struct vmx_cpu_guest_regs_callback_info *info = data;
-    vmx_load_cpu_guest_regs(info->v, info->regs);
-}
-
 static void vmx_store_cpu_guest_regs(
     struct vcpu *v, struct cpu_user_regs *regs, unsigned long *crs)
 {
-    if ( v != current )
-    {
-        /* Non-current VCPUs must be paused to get a register snapshot. */
-        ASSERT(atomic_read(&v->pausecnt) != 0);
-
-        if ( v->arch.hvm_vmx.launch_cpu != smp_processor_id() )
-        {
-            /* Get register details from remote CPU. */
-            struct vmx_cpu_guest_regs_callback_info info = {
-                .v = v, .regs = regs, .crs = crs };
-            cpumask_t cpumask = cpumask_of_cpu(v->arch.hvm_vmx.launch_cpu);
-            on_selected_cpus(cpumask, vmx_store_cpu_guest_regs_callback,
-                             &info, 1, 1);
-            return;
-        }
-
-        /* Register details are on this CPU. Load the correct VMCS. */
-        __vmptrld(virt_to_maddr(v->arch.hvm_vmx.vmcs));
-    }
-
-    ASSERT(v->arch.hvm_vmx.launch_cpu == smp_processor_id());
+    vmx_vmcs_enter(v);
 
     if ( regs != NULL )
     {
@@ -471,9 +426,7 @@ static void vmx_store_cpu_guest_regs(
         __vmread(CR4_READ_SHADOW, &crs[4]);
     }
 
-    /* Reload current VCPU's VMCS if it was temporarily unloaded. */
-    if ( (v != current) && hvm_guest(current) )
-        __vmptrld(virt_to_maddr(current->arch.hvm_vmx.vmcs));
+    vmx_vmcs_exit(v);
 }
 
 /*
@@ -517,26 +470,7 @@ static void fixup_vm86_seg_bases(struct cpu_user_regs *regs)
 
 void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
 {
-    if ( v != current )
-    {
-        /* Non-current VCPUs must be paused to set the register snapshot. */
-        ASSERT(atomic_read(&v->pausecnt) != 0);
-
-        if ( v->arch.hvm_vmx.launch_cpu != smp_processor_id() )
-        {
-            struct vmx_cpu_guest_regs_callback_info info = {
-                .v = v, .regs = regs };
-            cpumask_t cpumask = cpumask_of_cpu(v->arch.hvm_vmx.launch_cpu);
-            on_selected_cpus(cpumask, vmx_load_cpu_guest_regs_callback,
-                             &info, 1, 1);
-            return;
-        }
-
-        /* Register details are on this CPU. Load the correct VMCS. */
-        __vmptrld(virt_to_maddr(v->arch.hvm_vmx.vmcs));
-    }
-
-    ASSERT(v->arch.hvm_vmx.launch_cpu == smp_processor_id());
+    vmx_vmcs_enter(v);
 
     __vmwrite(GUEST_SS_SELECTOR, regs->ss);
     __vmwrite(GUEST_DS_SELECTOR, regs->ds);
@@ -557,9 +491,7 @@ void vmx_load_cpu_guest_regs(struct vcpu *v, struct cpu_user_regs *regs)
     __vmwrite(GUEST_CS_SELECTOR, regs->cs);
     __vmwrite(GUEST_RIP, regs->eip);
 
-    /* Reload current VCPU's VMCS if it was temporarily unloaded. */
-    if ( (v != current) && hvm_guest(current) )
-        __vmptrld(virt_to_maddr(current->arch.hvm_vmx.vmcs));
+    vmx_vmcs_exit(v);
 }
 
 int vmx_realmode(struct vcpu *v)
@@ -688,16 +620,19 @@ int start_vmx(void)
 
     set_in_cr4(X86_CR4_VMXE);   /* Enable VMXE */
 
-    if (!(vmcs = alloc_vmcs())) {
+    if (!(vmcs = vmx_alloc_vmcs())) {
         printk("Failed to allocate VMCS\n");
         return 0;
     }
 
     phys_vmcs = (u64) virt_to_maddr(vmcs);
 
-    if (!(__vmxon(phys_vmcs))) {
-        printk("VMXON is done\n");
+    if (__vmxon(phys_vmcs)) {
+        printk("VMXON failed\n");
+        return 0;
     }
+
+    printk("VMXON is done\n");
 
     vmx_save_init_msrs();
 

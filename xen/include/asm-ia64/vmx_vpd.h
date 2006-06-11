@@ -104,9 +104,6 @@ struct arch_vmx_struct {
 
 #define VMX_DOMAIN(d)   d->arch.arch_vmx.flags
 
-#define ARCH_VMX_VMCS_LOADED    0       /* VMCS has been loaded and active */
-#define ARCH_VMX_VMCS_LAUNCH    1       /* Needs VMCS launch */
-#define ARCH_VMX_VMCS_RESUME    2       /* Needs VMCS resume */
 #define ARCH_VMX_IO_WAIT        3       /* Waiting for I/O completion */
 #define ARCH_VMX_INTR_ASSIST    4       /* Need DM's assist to issue intr */
 #define ARCH_VMX_CONTIG_MEM 	5	/* Need contiguous machine pages */

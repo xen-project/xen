@@ -27,8 +27,7 @@
 #include <asm/i387.h>
 
 extern void vmx_asm_vmexit_handler(struct cpu_user_regs);
-extern void vmx_asm_do_resume(void);
-extern void vmx_asm_do_launch(void);
+extern void vmx_asm_do_vmentry(void);
 extern void vmx_intr_assist(void);
 extern void vmx_migrate_timers(struct vcpu *v);
 extern void arch_vmx_do_launch(struct vcpu *);
@@ -200,22 +199,18 @@ extern unsigned int cpu_rev;
 #define MODRM_EAX_07    ".byte 0x38\n" /* [EAX], with reg/opcode: /7 */
 #define MODRM_EAX_ECX   ".byte 0xc1\n" /* [EAX], [ECX] */
 
-static inline int __vmptrld (u64 addr)
+static inline void __vmptrld(u64 addr)
 {
-    unsigned long eflags;
     __asm__ __volatile__ ( VMPTRLD_OPCODE
                            MODRM_EAX_06
+                           /* CF==1 or ZF==1 --> crash (ud2) */
+                           "ja 1f ; ud2 ; 1:\n"
                            :
                            : "a" (&addr) 
                            : "memory");
-
-    __save_flags(eflags);
-    if (eflags & X86_EFLAGS_ZF || eflags & X86_EFLAGS_CF)
-        return -1;
-    return 0;
 }
 
-static inline void __vmptrst (u64 addr)
+static inline void __vmptrst(u64 addr)
 {
     __asm__ __volatile__ ( VMPTRST_OPCODE
                            MODRM_EAX_07
@@ -224,31 +219,30 @@ static inline void __vmptrst (u64 addr)
                            : "memory");
 }
 
-static inline int __vmpclear (u64 addr)
+static inline void __vmpclear(u64 addr)
 {
-    unsigned long eflags;
-
     __asm__ __volatile__ ( VMCLEAR_OPCODE
                            MODRM_EAX_06
+                           /* CF==1 or ZF==1 --> crash (ud2) */
+                           "ja 1f ; ud2 ; 1:\n"
                            :
                            : "a" (&addr) 
                            : "memory");
-    __save_flags(eflags);
-    if (eflags & X86_EFLAGS_ZF || eflags & X86_EFLAGS_CF)
-        return -1;
-    return 0;
 }
 
 #define __vmread(x, ptr) ___vmread((x), (ptr), sizeof(*(ptr)))
 
-static always_inline int ___vmread (const unsigned long field,  void *ptr, const int size)
+static always_inline int ___vmread(
+    const unsigned long field, void *ptr, const int size)
 {
-    unsigned long eflags;
     unsigned long ecx = 0;
+    int rc;
 
     __asm__ __volatile__ ( VMREAD_OPCODE
-                           MODRM_EAX_ECX       
-                           : "=c" (ecx)
+                           MODRM_EAX_ECX
+                           /* CF==1 or ZF==1 --> rc = -1 */
+                           "setna %b0 ; neg %0"
+                           : "=r" (rc), "=c" (ecx)
                            : "a" (field)
                            : "memory");
 
@@ -270,10 +264,7 @@ static always_inline int ___vmread (const unsigned long field,  void *ptr, const
         break;
     }
 
-    __save_flags(eflags);
-    if (eflags & X86_EFLAGS_ZF || eflags & X86_EFLAGS_CF)
-        return -1;
-    return 0;
+    return rc;
 }
 
 
@@ -315,17 +306,16 @@ static always_inline void __vmread_vcpu(struct vcpu *v, unsigned long field, uns
 
 static inline int __vmwrite (unsigned long field, unsigned long value)
 {
-    unsigned long eflags;
     struct vcpu *v = current;
+    int rc;
 
     __asm__ __volatile__ ( VMWRITE_OPCODE
                            MODRM_EAX_ECX
-                           :
+                           /* CF==1 or ZF==1 --> rc = -1 */
+                           "setna %b0 ; neg %0"
+                           : "=r" (rc)
                            : "a" (field) , "c" (value)
                            : "memory");
-    __save_flags(eflags);
-    if (eflags & X86_EFLAGS_ZF || eflags & X86_EFLAGS_CF)
-        return -1;
 
     switch(field) {
     case CR0_READ_SHADOW:
@@ -335,7 +325,7 @@ static inline int __vmwrite (unsigned long field, unsigned long value)
 	break;
     }
 
-    return 0;
+    return rc;
 }
 
 static inline int __vm_set_bit(unsigned long field, unsigned long mask)
@@ -370,17 +360,17 @@ static inline void __vmxoff (void)
 
 static inline int __vmxon (u64 addr)
 {
-    unsigned long eflags;
+    int rc;
 
     __asm__ __volatile__ ( VMXON_OPCODE
                            MODRM_EAX_06
-                           :
+                           /* CF==1 or ZF==1 --> rc = -1 */
+                           "setna %b0 ; neg %0"
+                           : "=r" (rc)
                            : "a" (&addr) 
                            : "memory");
-    __save_flags(eflags);
-    if (eflags & X86_EFLAGS_ZF || eflags & X86_EFLAGS_CF)
-        return -1;
-    return 0;
+
+    return rc;
 }
 
 /* Make sure that xen intercepts any FP accesses from current */

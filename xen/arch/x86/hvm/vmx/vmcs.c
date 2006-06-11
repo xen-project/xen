@@ -42,7 +42,7 @@
 
 int vmcs_size;
 
-struct vmcs_struct *alloc_vmcs(void)
+struct vmcs_struct *vmx_alloc_vmcs(void)
 {
     struct vmcs_struct *vmcs;
     u32 vmx_msr_low, vmx_msr_high;
@@ -64,47 +64,63 @@ static void free_vmcs(struct vmcs_struct *vmcs)
     free_xenheap_pages(vmcs, order);
 }
 
-static int load_vmcs(struct arch_vmx_struct *arch_vmx, u64 phys_ptr)
+static void __vmx_clear_vmcs(void *info)
 {
-    int error;
-
-    if ((error = __vmptrld(phys_ptr))) {
-        clear_bit(ARCH_VMX_VMCS_LOADED, &arch_vmx->flags);
-        return error;
-    }
-    set_bit(ARCH_VMX_VMCS_LOADED, &arch_vmx->flags);
-    return 0;
+    struct vcpu *v = info;
+    __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+    v->arch.hvm_vmx.active_cpu = -1;
+    v->arch.hvm_vmx.launched   = 0;
 }
 
-static void vmx_smp_clear_vmcs(void *info)
+static void vmx_clear_vmcs(struct vcpu *v)
 {
-    struct vcpu *v = (struct vcpu *)info;
+    unsigned int cpu = v->arch.hvm_vmx.active_cpu;
 
-    ASSERT(hvm_guest(v));
-
-    if (v->arch.hvm_vmx.launch_cpu == smp_processor_id())
-        __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));
-}
-
-void vmx_request_clear_vmcs(struct vcpu *v)
-{
-    ASSERT(hvm_guest(v));
-
-    if (v->arch.hvm_vmx.launch_cpu == smp_processor_id())
-        __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+    if ( (cpu == -1) || (cpu == smp_processor_id()) )
+        __vmx_clear_vmcs(v);
     else
-        smp_call_function(vmx_smp_clear_vmcs, v, 1, 1);
+        on_selected_cpus(cpumask_of_cpu(cpu), __vmx_clear_vmcs, v, 1, 1);
 }
 
-#if 0
-static int store_vmcs(struct arch_vmx_struct *arch_vmx, u64 phys_ptr)
+static void vmx_load_vmcs(struct vcpu *v)
 {
-    /* take the current VMCS */
-    __vmptrst(phys_ptr);
-    clear_bit(ARCH_VMX_VMCS_LOADED, &arch_vmx->flags);
-    return 0;
+    __vmptrld(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+    v->arch.hvm_vmx.active_cpu = smp_processor_id();
 }
-#endif
+
+void vmx_vmcs_enter(struct vcpu *v)
+{
+    /*
+     * NB. We must *always* run an HVM VCPU on its own VMCS, except for
+     * vmx_vmcs_enter/exit critical regions. This leads to some XXX TODOs XXX:
+     *  1. Move construct_vmcs() much earlier, to domain creation or
+     *     context initialisation.
+     *  2. VMPTRLD as soon as we context-switch to a HVM VCPU.
+     *  3. VMCS destruction needs to happen later (from domain_destroy()).
+     */
+    if ( v == current )
+        return;
+
+    vcpu_pause(v);
+    spin_lock(&v->arch.hvm_vmx.vmcs_lock);
+
+    vmx_clear_vmcs(v);
+    vmx_load_vmcs(v);
+}
+
+void vmx_vmcs_exit(struct vcpu *v)
+{
+    if ( v == current )
+        return;
+
+    /* Don't confuse arch_vmx_do_resume (for @v or @current!) */
+    vmx_clear_vmcs(v);
+    if ( hvm_guest(current) )
+        vmx_load_vmcs(current);
+
+    spin_unlock(&v->arch.hvm_vmx.vmcs_lock);
+    vcpu_unpause(v);
+}
 
 static inline int construct_vmcs_controls(struct arch_vmx_struct *arch_vmx)
 {
@@ -247,7 +263,6 @@ static void vmx_do_launch(struct vcpu *v)
     __vmwrite(HOST_CR3, pagetable_get_paddr(v->arch.monitor_table));
 
     v->arch.schedule_tail = arch_vmx_do_resume;
-    v->arch.hvm_vmx.launch_cpu = smp_processor_id();
 
     /* init guest tsc to start from 0 */
     set_guest_time(v, 0);
@@ -410,53 +425,49 @@ static inline int construct_vmcs_host(void)
 /*
  * Need to extend to support full virtualization.
  */
-static int construct_vmcs(struct arch_vmx_struct *arch_vmx,
+static int construct_vmcs(struct vcpu *v,
                           cpu_user_regs_t *regs)
 {
+    struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
     int error;
     long rc;
-    u64 vmcs_phys_ptr;
 
     memset(arch_vmx, 0, sizeof(struct arch_vmx_struct));
+
+    spin_lock_init(&arch_vmx->vmcs_lock);
+    arch_vmx->active_cpu = -1;
 
     /*
      * Create a new VMCS
      */
-    if (!(arch_vmx->vmcs = alloc_vmcs())) {
+    if (!(arch_vmx->vmcs = vmx_alloc_vmcs())) {
         printk("Failed to create a new VMCS\n");
-        rc = -ENOMEM;
-        goto err_out;
+        return -ENOMEM;
     }
-    vmcs_phys_ptr = (u64) virt_to_maddr(arch_vmx->vmcs);
 
-    if ((error = __vmpclear(vmcs_phys_ptr))) {
-        printk("construct_vmcs: VMCLEAR failed\n");
-        rc = -EINVAL;
-        goto err_out;
-    }
-    if ((error = load_vmcs(arch_vmx, vmcs_phys_ptr))) {
-        printk("construct_vmcs: load_vmcs failed: VMCS = %lx\n",
-               (unsigned long) vmcs_phys_ptr);
-        rc = -EINVAL;
-        goto err_out;
-    }
+    vmx_clear_vmcs(v);
+    vmx_load_vmcs(v);
+
     if ((error = construct_vmcs_controls(arch_vmx))) {
         printk("construct_vmcs: construct_vmcs_controls failed\n");
         rc = -EINVAL;
         goto err_out;
     }
+
     /* host selectors */
     if ((error = construct_vmcs_host())) {
         printk("construct_vmcs: construct_vmcs_host failed\n");
         rc = -EINVAL;
         goto err_out;
     }
+
     /* guest selectors */
     if ((error = construct_init_vmcs_guest(regs))) {
         printk("construct_vmcs: construct_vmcs_guest failed\n");
         rc = -EINVAL;
         goto err_out;
     }
+
     if ((error |= __vmwrite(EXCEPTION_BITMAP,
                             MONITOR_DEFAULT_EXCEPTION_BITMAP))) {
         printk("construct_vmcs: setting Exception bitmap failed\n");
@@ -472,12 +483,16 @@ static int construct_vmcs(struct arch_vmx_struct *arch_vmx,
     return 0;
 
 err_out:
-    destroy_vmcs(arch_vmx);
+    vmx_destroy_vmcs(v);
     return rc;
 }
 
-void destroy_vmcs(struct arch_vmx_struct *arch_vmx)
+void vmx_destroy_vmcs(struct vcpu *v)
 {
+    struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
+
+    vmx_clear_vmcs(v);
+
     free_vmcs(arch_vmx->vmcs);
     arch_vmx->vmcs = NULL;
 
@@ -506,22 +521,20 @@ void vm_resume_fail(unsigned long eflags)
 
 void arch_vmx_do_resume(struct vcpu *v)
 {
-    if ( v->arch.hvm_vmx.launch_cpu == smp_processor_id() )
+    if ( v->arch.hvm_vmx.active_cpu == smp_processor_id() )
     {
-        load_vmcs(&v->arch.hvm_vmx, virt_to_maddr(v->arch.hvm_vmx.vmcs));
-        vmx_do_resume(v);
-        reset_stack_and_jump(vmx_asm_do_resume);
+        vmx_load_vmcs(v);
     }
     else
     {
-        vmx_request_clear_vmcs(v);
-        load_vmcs(&v->arch.hvm_vmx, virt_to_maddr(v->arch.hvm_vmx.vmcs));
+        vmx_clear_vmcs(v);
+        vmx_load_vmcs(v);
         vmx_migrate_timers(v);
         vmx_set_host_env(v);
-        vmx_do_resume(v);
-        v->arch.hvm_vmx.launch_cpu = smp_processor_id();
-        reset_stack_and_jump(vmx_asm_do_relaunch);
     }
+
+    vmx_do_resume(v);
+    reset_stack_and_jump(vmx_asm_do_vmentry);
 }
 
 void arch_vmx_do_launch(struct vcpu *v)
@@ -529,7 +542,7 @@ void arch_vmx_do_launch(struct vcpu *v)
     int error;
     cpu_user_regs_t *regs = &current->arch.guest_context.user_regs;
 
-    error = construct_vmcs(&v->arch.hvm_vmx, regs);
+    error = construct_vmcs(v, regs);
     if ( error < 0 )
     {
         if (v->vcpu_id == 0) {
@@ -540,7 +553,7 @@ void arch_vmx_do_launch(struct vcpu *v)
         domain_crash_synchronous();
     }
     vmx_do_launch(v);
-    reset_stack_and_jump(vmx_asm_do_launch);
+    reset_stack_and_jump(vmx_asm_do_vmentry);
 }
 
 
@@ -613,17 +626,9 @@ static void vmcs_dump(unsigned char ch)
             }
             printk("\tVCPU %d\n", v->vcpu_id);
 
-            if (v != current) {
-                vcpu_pause(v);
-                __vmptrld(virt_to_maddr(v->arch.hvm_vmx.vmcs));
-            }
-
+            vmx_vmcs_enter(v);
             vmcs_dump_vcpu();
-
-            if (v != current) {
-                __vmptrld(virt_to_maddr(current->arch.hvm_vmx.vmcs));
-                vcpu_unpause(v);
-            }
+            vmx_vmcs_exit(v);
         }
     }
 

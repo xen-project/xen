@@ -65,34 +65,46 @@ struct vmx_msr_state {
 };
 
 struct arch_vmx_struct {
-    struct vmcs_struct      *vmcs;  /* VMCS pointer in virtual. */
-    unsigned int            launch_cpu; /* VMCS is valid on this CPU. */
-    u32                     exec_control; /* cache of cpu execution control */
-    u32                     vector_injected; /* if there is vector installed in the INTR_INFO_FIELD */
-    unsigned long           flags;  /* VMCS flags */
-    unsigned long           cpu_cr0; /* copy of guest CR0 */
-    unsigned long           cpu_shadow_cr0; /* copy of guest read shadow CR0 */
-    unsigned long           cpu_cr2; /* save CR2 */
-    unsigned long           cpu_cr3;
-    unsigned long           cpu_state;
-    unsigned long           cpu_based_exec_control;
-    struct vmx_msr_state    msr_content;
-    void                    *io_bitmap_a, *io_bitmap_b;
-    struct timer            hlt_timer;  /* hlt ins emulation wakeup timer */
+    /* Virtual address of VMCS. */
+    struct vmcs_struct  *vmcs;
+
+    /* Protects remote usage of VMCS (VMPTRLD/VMCLEAR). */
+    spinlock_t           vmcs_lock;
+
+    /*
+     * Activation and launch status of this VMCS.
+     *  - Activated on a CPU by VMPTRLD. Deactivated by VMCLEAR.
+     *  - Launched on active CPU by VMLAUNCH when current VMCS.
+     */
+    int                  active_cpu;
+    int                  launched;
+
+    /* Cache of cpu execution control. */
+    u32                  exec_control;
+
+    /* If there is vector installed in the INTR_INFO_FIELD. */
+    u32                  vector_injected;
+
+    unsigned long        cpu_cr0; /* copy of guest CR0 */
+    unsigned long        cpu_shadow_cr0; /* copy of guest read shadow CR0 */
+    unsigned long        cpu_cr2; /* save CR2 */
+    unsigned long        cpu_cr3;
+    unsigned long        cpu_state;
+    unsigned long        cpu_based_exec_control;
+    struct vmx_msr_state msr_content;
+    void                *io_bitmap_a, *io_bitmap_b;
+    struct timer         hlt_timer;  /* hlt ins emulation wakeup timer */
 };
 
 #define vmx_schedule_tail(next)         \
     (next)->thread.arch_vmx.arch_vmx_schedule_tail((next))
 
-#define ARCH_VMX_VMCS_LOADED    0       /* VMCS has been loaded and active */
-#define ARCH_VMX_VMCS_LAUNCH    1       /* Needs VMCS launch */
-#define ARCH_VMX_VMCS_RESUME    2       /* Needs VMCS resume */
-
 void vmx_do_resume(struct vcpu *);
-struct vmcs_struct *alloc_vmcs(void);
-void destroy_vmcs(struct arch_vmx_struct *arch_vmx);
 
-extern void vmx_request_clear_vmcs(struct vcpu *v);
+struct vmcs_struct *vmx_alloc_vmcs(void);
+void vmx_destroy_vmcs(struct vcpu *v);
+void vmx_vmcs_enter(struct vcpu *v);
+void vmx_vmcs_exit(struct vcpu *v);
 
 #define VMCS_USE_HOST_ENV       1
 #define VMCS_USE_SEPARATE_ENV   0

@@ -88,68 +88,51 @@
         popq %rdi;                              \
         addq $(NR_SKIPPED_REGS*8), %rsp;
 
+        ALIGN
 ENTRY(vmx_asm_vmexit_handler)
         /* selectors are restored/saved by VMX */
         HVM_SAVE_ALL_NOSEGREGS
         call vmx_trace_vmexit
         call vmx_vmexit_handler
-        jmp vmx_asm_do_resume
+        jmp vmx_asm_do_vmentry
 
-.macro vmx_asm_common launch, initialized 
-1:
-        .if \initialized
-/* vmx_test_all_events */
+        ALIGN
+vmx_process_softirqs:
+        sti       
+        call do_softirq
+        jmp vmx_asm_do_vmentry
+
+        ALIGN
+ENTRY(vmx_asm_do_vmentry)
         GET_CURRENT(%rbx)
-/* test_all_events: */
         cli                             # tests must not race interrupts
-/*test_softirqs:*/  
+
         movl  VCPU_processor(%rbx),%eax
         shl   $IRQSTAT_shift,%rax
-        leaq  irq_stat(%rip), %rdx
-        testl $~0,(%rdx,%rax,1)
-        jnz  2f 
+        leaq  irq_stat(%rip),%rdx
+        cmpl  $0,(%rdx,%rax,1)
+        jnz   vmx_process_softirqs
 
-/* vmx_restore_all_guest */
         call vmx_intr_assist
         call vmx_load_cr2
         call vmx_trace_vmentry
-        .endif
-        /* 
-         * Check if we are going back to VMX-based VM
-         * By this time, all the setups in the VMCS must be complete.
-         */
+
+        cmpl $0,VCPU_vmx_launched(%rbx)
+        je   vmx_launch
+
+/*vmx_resume:*/
         HVM_RESTORE_ALL_NOSEGREGS
-        .if \launch
-        /* VMLAUNCH */
-        .byte 0x0f,0x01,0xc2
-        pushfq
-        call vm_launch_fail
-        .else
         /* VMRESUME */
         .byte 0x0f,0x01,0xc3
         pushfq
         call vm_resume_fail
-        .endif
-        /* Should never reach here */
-        hlt
+        ud2
 
-        ALIGN
-
-        .if \initialized
-2:
-/* vmx_process_softirqs */
-        sti       
-        call do_softirq
-        jmp 1b
-        ALIGN
-        .endif
-.endm
-
-ENTRY(vmx_asm_do_launch)
-      vmx_asm_common 1, 0
-
-ENTRY(vmx_asm_do_resume)
-      vmx_asm_common 0, 1
-
-ENTRY(vmx_asm_do_relaunch)
-      vmx_asm_common 1, 1
+vmx_launch:
+        movl $1,VCPU_vmx_launched(%rbx)
+        HVM_RESTORE_ALL_NOSEGREGS
+        /* VMLAUNCH */
+        .byte 0x0f,0x01,0xc2
+        pushfq
+        call vm_launch_fail
+        ud2
