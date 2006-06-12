@@ -243,7 +243,7 @@ static always_inline int ___vmread(
                            /* CF==1 or ZF==1 --> rc = -1 */
                            "setna %b0 ; neg %0"
                            : "=q" (rc), "=c" (ecx)
-                           : "a" (field)
+                           : "0" (0), "a" (field)
                            : "memory");
 
     switch (size) {
@@ -314,7 +314,7 @@ static inline int __vmwrite (unsigned long field, unsigned long value)
                            /* CF==1 or ZF==1 --> rc = -1 */
                            "setna %b0 ; neg %0"
                            : "=q" (rc)
-                           : "a" (field) , "c" (value)
+                           : "0" (0), "a" (field) , "c" (value)
                            : "memory");
 
     switch(field) {
@@ -367,7 +367,7 @@ static inline int __vmxon (u64 addr)
                            /* CF==1 or ZF==1 --> rc = -1 */
                            "setna %b0 ; neg %0"
                            : "=q" (rc)
-                           : "a" (&addr) 
+                           : "0" (0), "a" (&addr) 
                            : "memory");
 
     return rc;
