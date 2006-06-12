@@ -264,7 +264,7 @@ gopts.var('irq', val='IRQ',
          For example 'irq=7'.
          This option may be repeated to add more than one IRQ.""")
 
-gopts.var('usb', val='PATH',
+gopts.var('usbport', val='PATH',
           fn=append_value, default=[],
           use="""Add a physical USB port to a domain, as specified by the path
           to that port.  This option may be repeated to add more than one port.""")
@@ -371,6 +371,14 @@ gopts.var('serial', val='FILE',
 gopts.var('localtime', val='no|yes',
           fn=set_bool, default=0,
           use="Is RTC set to localtime?")
+
+gopts.var('usb', val='no|yes',
+          fn=set_bool, default=0,
+          use="Emulate USB devices?")
+
+gopts.var('usbdevice', val='NAME',
+          fn=set_value, default='',
+          use="Name of USB device to add?")
 
 gopts.var('stdvga', val='no|yes',
           fn=set_bool, default=0,
@@ -508,8 +516,8 @@ def configure_irq(config_devs, vals):
         config_devs.append(['device', config_irq])
 
 def configure_usb(config_devs, vals):
-    for path in vals.usb:
-        config_usb = ['usb', ['path', path]]
+    for path in vals.usbport:
+        config_usb = ['usbport', ['path', path]]
         config_devs.append(['device', config_usb])
 
 
@@ -614,7 +622,7 @@ def configure_hvm(config_image, vals):
     args = [ 'device_model', 'pae', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'audio',
              'vnc', 'vncviewer', 'sdl', 'display', 'ne2000', 'acpi', 'apic',
-             'xauthority' ]
+             'xauthority', 'usb', 'usbdevice' ]
     for a in args:
         if (vals.__dict__[a]):
             config_image.append([a, vals.__dict__[a]])

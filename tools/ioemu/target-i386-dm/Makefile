@@ -275,6 +275,9 @@ audio.o fmodaudio.o: DEFINES := -I$(CONFIG_FMOD_INC) $(DEFINES)
 LIBS += $(CONFIG_FMOD_LIB)
 endif
 
+# USB layer
+VL_OBJS+= usb.o usb-hub.o usb-uhci.o usb-linux.o usb-hid.o
+
 # Hardware support
 VL_OBJS+= ide.o ne2000.o pckbd.o vga.o dma.o
 VL_OBJS+= fdc.o mc146818rtc.o serial.o i8259_stub.o pc.o port-e9.o
