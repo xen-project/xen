@@ -54,7 +54,7 @@ static inline void local_event_delivery_disable(void)
 
 static inline void local_event_delivery_enable(void)
 {
-    current->vcpu_info->evtchn_upcall_mask = 1;
+    current->vcpu_info->evtchn_upcall_mask = 0;
 }
 
 static inline int arch_virq_is_global(int virq)
