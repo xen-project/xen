@@ -30,8 +30,9 @@
  * IN THE SOFTWARE.
  */
 
-#define DPRINTK(fmt, args...) \
-    pr_debug("xenbus_probe (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
+#define DPRINTK(fmt, args...)				\
+	pr_debug("xenbus_probe (%s:%d) " fmt ".\n",	\
+		 __FUNCTION__, __LINE__, ##args)
 
 #include <linux/kernel.h>
 #include <linux/err.h>
@@ -817,18 +818,18 @@ static int resume_dev(struct device *dev, void *data)
 		       dev->bus_id, err);
 		return err;
 	}
-        
+
 	xdev->state = XenbusStateInitialising;
-        
+
 	if (drv->resume) {
 		err = drv->resume(xdev);
-                if (err) { 
-                        printk(KERN_WARNING
-                               "xenbus: resume %s failed: %i\n", 
-                               dev->bus_id, err);
-                        return err; 
-                }
-        }
+		if (err) { 
+			printk(KERN_WARNING
+			       "xenbus: resume %s failed: %i\n", 
+			       dev->bus_id, err);
+			return err; 
+		}
+	}
 
 	err = watch_otherend(xdev);
 	if (err) {
@@ -945,7 +946,7 @@ static int xsd_kva_mmap(struct file *file, struct vm_area_struct *vma)
 }
 
 static int xsd_kva_read(char *page, char **start, off_t off,
-                        int count, int *eof, void *data)
+			int count, int *eof, void *data)
 {
 	int len;
 
@@ -1044,10 +1045,10 @@ static int __init xenbus_probe_init(void)
 		free_page(page);
 
 	/*
-         * Do not unregister the xenbus front/backend buses here. The
-         * buses must exist because front/backend drivers will use
-         * them when they are registered.
-         */
+	 * Do not unregister the xenbus front/backend buses here. The buses
+	 * must exist because front/backend drivers will use them when they are
+	 * registered.
+	 */
 
 	return err;
 }

@@ -43,14 +43,14 @@
 static void netif_idx_release(u16 pending_idx);
 static void netif_page_release(struct page *page);
 static void make_tx_response(netif_t *netif, 
-                             u16      id,
-                             s8       st);
+			     u16      id,
+			     s8       st);
 static int  make_rx_response(netif_t *netif, 
-                             u16      id, 
-                             s8       st,
-                             u16      offset,
-                             u16      size,
-                             u16      flags);
+			     u16      id, 
+			     s8       st,
+			     u16      offset,
+			     u16      size,
+			     u16      flags);
 
 static void net_tx_action(unsigned long unused);
 static DECLARE_TASKLET(net_tx_tasklet, net_tx_action, 0);
@@ -329,9 +329,9 @@ static void net_rx_action(unsigned long unused)
 			DPRINTK("Bad status %d from grant transfer to DOM%u\n",
 				gop->status, netif->domid);
 			/*
-                         * Page no longer belongs to us unless GNTST_bad_page,
-                         * but that should be a fatal error anyway.
-                         */
+			 * Page no longer belongs to us unless GNTST_bad_page,
+			 * but that should be a fatal error anyway.
+			 */
 			BUG_ON(gop->status == GNTST_bad_page);
 			status = NETIF_RSP_ERROR; 
 		}
@@ -483,7 +483,7 @@ inline static void net_tx_action_dealloc(void)
 
 		make_tx_response(netif, pending_tx_info[pending_idx].req.id, 
 				 NETIF_RSP_OKAY);
-        
+
 		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
 
 		netif_put(netif);
@@ -898,8 +898,8 @@ irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static void make_tx_response(netif_t *netif, 
-                             u16      id,
-                             s8       st)
+			     u16      id,
+			     s8       st)
 {
 	RING_IDX i = netif->tx.rsp_prod_pvt;
 	netif_tx_response_t *resp;
@@ -925,11 +925,11 @@ static void make_tx_response(netif_t *netif,
 }
 
 static int make_rx_response(netif_t *netif, 
-                            u16      id, 
-                            s8       st,
-                            u16      offset,
-                            u16      size,
-                            u16      flags)
+			    u16      id, 
+			    s8       st,
+			    u16      offset,
+			    u16      size,
+			    u16      flags)
 {
 	RING_IDX i = netif->rx.rsp_prod_pvt;
 	netif_rx_response_t *resp;

@@ -17,8 +17,9 @@
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 
-#define DPRINTK(_f, _a...) pr_debug("(file=%s, line=%d) " _f, \
-                                    __FILE__ , __LINE__ , ## _a )
+#define DPRINTK(_f, _a...)			\
+	pr_debug("(file=%s, line=%d) " _f,	\
+		 __FILE__ , __LINE__ , ## _a )
 
 typedef struct tpmif_st {
 	struct list_head tpmif_list;
@@ -68,12 +69,11 @@ int tpmif_vtpm_close(u32 instance);
 int vtpm_release_packets(tpmif_t * tpmif, int send_msgs);
 
 #define tpmif_get(_b) (atomic_inc(&(_b)->refcnt))
-#define tpmif_put(_b)                             \
-    do {                                          \
-        if ( atomic_dec_and_test(&(_b)->refcnt) ) \
-            tpmif_disconnect_complete(_b);        \
-    } while (0)
-
+#define tpmif_put(_b)					\
+	do {						\
+		if (atomic_dec_and_test(&(_b)->refcnt))	\
+			tpmif_disconnect_complete(_b);	\
+	} while (0)
 
 extern int num_frontends;
 

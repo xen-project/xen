@@ -124,7 +124,7 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 		 * Initialise a dummy MAC address. We choose the numerically
 		 * largest non-broadcast address to prevent the address getting
 		 * stolen by an Ethernet bridge for STP purposes.
-                 * (FE:FF:FF:FF:FF:FF) 
+		 * (FE:FF:FF:FF:FF:FF)
 		 */ 
 		memset(dev->dev_addr, 0xFF, ETH_ALEN);
 		dev->dev_addr[0] &= ~0x01;

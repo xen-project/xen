@@ -45,8 +45,9 @@
 #include <xen/gnttab.h>
 #include <xen/driver_util.h>
 
-#define DPRINTK(_f, _a...) pr_debug("(file=%s, line=%d) " _f, \
-                                    __FILE__ , __LINE__ , ## _a )
+#define DPRINTK(_f, _a...)			\
+	pr_debug("(file=%s, line=%d) " _f,	\
+		 __FILE__ , __LINE__ , ## _a )
 
 struct vbd {
 	blkif_vdev_t   handle;      /* what the domain refers to this vbd as */

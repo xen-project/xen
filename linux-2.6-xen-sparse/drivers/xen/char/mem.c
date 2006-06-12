@@ -30,10 +30,10 @@
 
 static inline int uncached_access(struct file *file)
 {
-        if (file->f_flags & O_SYNC)
-                return 1;
-        /* Xen sets correct MTRR type on non-RAM for us. */
-        return 0;
+	if (file->f_flags & O_SYNC)
+		return 1;
+	/* Xen sets correct MTRR type on non-RAM for us. */
+	return 0;
 }
 
 /*

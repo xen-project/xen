@@ -364,7 +364,7 @@ void xencons_tx(void)
 
 /* Privileged receive callback and transmit kicker. */
 static irqreturn_t xencons_priv_interrupt(int irq, void *dev_id,
-                                          struct pt_regs *regs)
+					  struct pt_regs *regs)
 {
 	static char rbuf[16];
 	int         l;

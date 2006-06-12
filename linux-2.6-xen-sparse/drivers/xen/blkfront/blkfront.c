@@ -318,7 +318,7 @@ static void connect(struct blkfront_info *info)
 	err = xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
 	if (err) {
 		xenbus_dev_fatal(info->xbdev, err, "xlvbd_add at %s",
-		                 info->xbdev->otherend);
+				 info->xbdev->otherend);
 		return;
 	}
 
@@ -444,7 +444,7 @@ int blkif_release(struct inode *inode, struct file *filep)
 
 
 int blkif_ioctl(struct inode *inode, struct file *filep,
-                unsigned command, unsigned long argument)
+		unsigned command, unsigned long argument)
 {
 	int i;
 

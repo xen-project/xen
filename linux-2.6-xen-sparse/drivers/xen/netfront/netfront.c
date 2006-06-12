@@ -138,13 +138,13 @@ static inline unsigned short get_id_from_freelist(struct sk_buff **list)
 	return id;
 }
 
-#define DPRINTK(fmt, args...) pr_debug("netfront (%s:%d) " fmt, \
-                                       __FUNCTION__, __LINE__, ##args)
+#define DPRINTK(fmt, args...)				\
+	pr_debug("netfront (%s:%d) " fmt,		\
+		 __FUNCTION__, __LINE__, ##args)
 #define IPRINTK(fmt, args...)				\
 	printk(KERN_INFO "netfront: " fmt, ##args)
 #define WPRINTK(fmt, args...)				\
 	printk(KERN_WARNING "netfront: " fmt, ##args)
-
 
 static int talk_to_backend(struct xenbus_device *, struct netfront_info *);
 static int setup_device(struct xenbus_device *, struct netfront_info *);
@@ -846,10 +846,10 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		rx = RING_GET_RESPONSE(&np->rx, i);
 
 		/*
-                 * This definitely indicates a bug, either in this driver or
-                 * in the backend driver. In future this should flag the bad
-                 * situation to the system controller to reboot the backed.
-                 */
+		 * This definitely indicates a bug, either in this driver or in
+		 * the backend driver. In future this should flag the bad
+		 * situation to the system controller to reboot the backed.
+		 */
 		if ((ref = np->grant_rx_ref[rx->id]) == GRANT_INVALID_REF) {
 			WPRINTK("Bad rx response id %d.\n", rx->id);
 			work_done--;

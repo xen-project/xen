@@ -39,7 +39,7 @@ static struct proc_dir_entry *capabilities_intf;
 static DECLARE_BITMAP(hypercall_permission_map, NR_HYPERCALLS);
 
 static int privcmd_ioctl(struct inode *inode, struct file *file,
-                         unsigned int cmd, unsigned long data)
+			 unsigned int cmd, unsigned long data)
 {
 	int ret = -ENOSYS;
 	void __user *udata = (void __user *) data;
@@ -241,7 +241,7 @@ static struct file_operations privcmd_file_ops = {
 };
 
 static int capabilities_read(char *page, char **start, off_t off,
-                        int count, int *eof, void *data)
+			     int count, int *eof, void *data)
 {
 	int len = 0;
 	*page = 0;

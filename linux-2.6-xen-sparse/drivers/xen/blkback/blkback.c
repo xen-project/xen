@@ -110,7 +110,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 				 blkif_request_t *req,
 				 pending_req_t *pending_req);
 static void make_response(blkif_t *blkif, unsigned long id, 
-                          unsigned short op, int st);
+			  unsigned short op, int st);
 
 /******************************************************************
  * misc small helpers
@@ -434,7 +434,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 			bio = biolist[nbio++] = bio_alloc(GFP_KERNEL, nseg-i);
 			if (unlikely(bio == NULL))
 				goto fail_put_bio;
-                
+
 			bio->bi_bdev    = preq.bdev;
 			bio->bi_private = pending_req;
 			bio->bi_end_io  = end_block_io_op;
@@ -471,7 +471,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 
 static void make_response(blkif_t *blkif, unsigned long id, 
-                          unsigned short op, int st)
+			  unsigned short op, int st)
 {
 	blkif_response_t *resp;
 	unsigned long     flags;

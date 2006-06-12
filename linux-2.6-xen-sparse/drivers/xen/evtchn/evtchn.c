@@ -93,7 +93,7 @@ void evtchn_device_upcall(int port)
 }
 
 static ssize_t evtchn_read(struct file *file, char __user *buf,
-                           size_t count, loff_t *ppos)
+			   size_t count, loff_t *ppos)
 {
 	int rc;
 	unsigned int c, p, bytes1 = 0, bytes2 = 0;
@@ -153,7 +153,7 @@ static ssize_t evtchn_read(struct file *file, char __user *buf,
 }
 
 static ssize_t evtchn_write(struct file *file, const char __user *buf,
-                            size_t count, loff_t *ppos)
+			    size_t count, loff_t *ppos)
 {
 	int  rc, i;
 	evtchn_port_t *kbuf = (evtchn_port_t *)__get_free_page(GFP_KERNEL);
@@ -201,7 +201,7 @@ static void evtchn_bind_to_user(struct per_user_data *u, int port)
 }
 
 static int evtchn_ioctl(struct inode *inode, struct file *file,
-                        unsigned int cmd, unsigned long arg)
+			unsigned int cmd, unsigned long arg)
 {
 	int rc;
 	struct per_user_data *u = file->private_data;

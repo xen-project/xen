@@ -220,9 +220,9 @@ unsigned long gnttab_end_foreign_transfer_ref(grant_ref_t ref)
 	u16           flags;
 
 	/*
-         * If a transfer is not even yet started, try to reclaim the grant
-         * reference and return failure (== 0).
-         */
+	 * If a transfer is not even yet started, try to reclaim the grant
+	 * reference and return failure (== 0).
+	 */
 	while (!((flags = shared[ref].flags) & GTF_transfer_committed)) {
 		if (synch_cmpxchg(&shared[ref].flags, flags, 0) == flags)
 			return 0;

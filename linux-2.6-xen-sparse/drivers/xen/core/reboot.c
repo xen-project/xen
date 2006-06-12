@@ -336,8 +336,8 @@ static struct xenbus_watch sysrq_watch = {
 };
 
 static int setup_shutdown_watcher(struct notifier_block *notifier,
-                                  unsigned long event,
-                                  void *data)
+				  unsigned long event,
+				  void *data)
 {
 	int err;
 
