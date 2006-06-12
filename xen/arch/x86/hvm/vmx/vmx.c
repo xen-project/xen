@@ -38,6 +38,7 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vmcs.h>
+#include <asm/hvm/vmx/cpu.h>
 #include <asm/shadow.h>
 #if CONFIG_PAGING_LEVELS >= 3
 #include <asm/shadow_64.h>
@@ -749,9 +750,7 @@ static void vmx_do_no_device_fault(void)
     }
 }
 
-/* Reserved bits: [31:15], [12:11], [9], [6], [2:1] */
-#define VMX_VCPU_CPUID_L1_RESERVED 0xffff9a46
-
+#define bitmaskof(idx) (1U << ((idx)&31))
 static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
 {
     unsigned int input = (unsigned int)regs->eax;
@@ -768,50 +767,74 @@ static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
                 (unsigned long)regs->ecx, (unsigned long)regs->edx,
                 (unsigned long)regs->esi, (unsigned long)regs->edi);
 
-    if ( input == 4 )
+    if ( input == CPUID_LEAF_0x4 )
+    {
         cpuid_count(input, count, &eax, &ebx, &ecx, &edx);
+        eax &= NUM_CORES_RESET_MASK;  
+    }
     else
+    {
         cpuid(input, &eax, &ebx, &ecx, &edx);
 
-    if ( input == 1 )
-    {
-        if ( !hvm_apic_support(v->domain) ||
-             !vlapic_global_enabled((VLAPIC(v))) )
+        if ( input == CPUID_LEAF_0x1 )
         {
-            clear_bit(X86_FEATURE_APIC, &edx);
-            /* Since the apic is disabled, avoid any confusion about SMP cpus being available */
-            clear_bit(X86_FEATURE_HT, &edx);  /* clear the hyperthread bit */
-            ebx &= 0xFF00FFFF;  /* set the logical processor count to 1 */
-            ebx |= 0x00010000;
-        }
+            /* mask off reserved bits */
+            ecx &= ~VMX_VCPU_CPUID_L1_ECX_RESERVED; 
 
+            if ( !hvm_apic_support(v->domain) ||
+                 !vlapic_global_enabled((VLAPIC(v))) )
+            {
+                /* Since the apic is disabled, avoid any 
+                confusion about SMP cpus being available */
 
+                clear_bit(X86_FEATURE_APIC, &edx);
+            }
+    
 #if CONFIG_PAGING_LEVELS < 3
-        clear_bit(X86_FEATURE_PAE, &edx);
-        clear_bit(X86_FEATURE_PSE, &edx);
-        clear_bit(X86_FEATURE_PSE36, &edx);
+            edx &= ~(bitmaskof(X86_FEATURE_PAE)  |
+                     bitmaskof(X86_FEATURE_PSE)  |
+                     bitmaskof(X86_FEATURE_PSE36)); 
 #else
-        if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
-        {
-            if ( !v->domain->arch.hvm_domain.pae_enabled )
-                clear_bit(X86_FEATURE_PAE, &edx);
-            clear_bit(X86_FEATURE_PSE, &edx);
-            clear_bit(X86_FEATURE_PSE36, &edx);
-        }
+            if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
+            {
+                if ( !v->domain->arch.hvm_domain.pae_enabled )
+                    clear_bit(X86_FEATURE_PAE, &edx);
+                clear_bit(X86_FEATURE_PSE, &edx);
+                clear_bit(X86_FEATURE_PSE36, &edx);
+            }
 #endif
 
-        /* Unsupportable for virtualised CPUs. */
-        ecx &= ~VMX_VCPU_CPUID_L1_RESERVED; /* mask off reserved bits */
-        clear_bit(X86_FEATURE_VMXE & 31, &ecx);
-        clear_bit(X86_FEATURE_MWAIT & 31, &ecx);
-    }
+            ebx &= NUM_THREADS_RESET_MASK;  
+
+            /* Unsupportable for virtualised CPUs. */
+            ecx &= ~(bitmaskof(X86_FEATURE_VMXE)  |
+                     bitmaskof(X86_FEATURE_EST)   |
+                     bitmaskof(X86_FEATURE_TM2)   |
+                     bitmaskof(X86_FEATURE_CID)   |
+                     bitmaskof(X86_FEATURE_MWAIT) );
+
+            edx &= ~( bitmaskof(X86_FEATURE_HT)   |
+                     bitmaskof(X86_FEATURE_MCA)   |
+                     bitmaskof(X86_FEATURE_MCE)   |
+                     bitmaskof(X86_FEATURE_ACPI)  |
+                     bitmaskof(X86_FEATURE_ACC) );
+        }
+        else if (  ( input == CPUID_LEAF_0x6 ) 
+                || ( input == CPUID_LEAF_0x9 )
+                || ( input == CPUID_LEAF_0xA ))
+        {
+            eax = ebx = ecx = edx = 0x0;
+        }
 #ifdef __i386__
-    else if ( input == 0x80000001 )
-    {
-        /* Mask feature for Intel ia32e or AMD long mode. */
-        clear_bit(X86_FEATURE_LM & 31, &edx);
-    }
+        else if ( input == CPUID_LEAF_0x80000001 )
+        {
+            clear_bit(X86_FEATURE_LAHF_LM & 31, &ecx);
+
+            clear_bit(X86_FEATURE_LM & 31, &edx);
+            clear_bit(X86_FEATURE_SYSCALL & 31, &edx);
+        }
 #endif
+    }
 
     regs->eax = (unsigned long) eax;
     regs->ebx = (unsigned long) ebx;
