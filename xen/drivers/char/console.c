@@ -230,7 +230,7 @@ long read_console_ring(XEN_GUEST_HANDLE(char) str, u32 *pcount, int clear)
     sofar = 0;
 
     c = conringc;
-    while ( c != conringp )
+    while ( (c != conringp) && (sofar < max) )
     {
         idx = CONRING_IDX_MASK(c);
         len = conringp - c;
@@ -247,7 +247,10 @@ long read_console_ring(XEN_GUEST_HANDLE(char) str, u32 *pcount, int clear)
     if ( clear )
     {
         spin_lock_irqsave(&console_lock, flags);
-        conringc = conringp;
+        if ( (conringp - c) > CONRING_SIZE )
+            conringc = conringp - CONRING_SIZE;
+        else
+            conringc = c;
         spin_unlock_irqrestore(&console_lock, flags);
     }
 
