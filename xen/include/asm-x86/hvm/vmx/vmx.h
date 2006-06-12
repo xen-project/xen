@@ -242,7 +242,7 @@ static always_inline int ___vmread(
                            MODRM_EAX_ECX
                            /* CF==1 or ZF==1 --> rc = -1 */
                            "setna %b0 ; neg %0"
-                           : "=r" (rc), "=c" (ecx)
+                           : "=q" (rc), "=c" (ecx)
                            : "a" (field)
                            : "memory");
 
@@ -313,7 +313,7 @@ static inline int __vmwrite (unsigned long field, unsigned long value)
                            MODRM_EAX_ECX
                            /* CF==1 or ZF==1 --> rc = -1 */
                            "setna %b0 ; neg %0"
-                           : "=r" (rc)
+                           : "=q" (rc)
                            : "a" (field) , "c" (value)
                            : "memory");
 
@@ -366,7 +366,7 @@ static inline int __vmxon (u64 addr)
                            MODRM_EAX_06
                            /* CF==1 or ZF==1 --> rc = -1 */
                            "setna %b0 ; neg %0"
-                           : "=r" (rc)
+                           : "=q" (rc)
                            : "a" (&addr) 
                            : "memory");
 
