@@ -460,7 +460,7 @@ static void hypercall_page_initialise_ring0_kernel(void *hypercall_page)
 
     /* Fill in all the transfer points with template machine code. */
 
-    for ( i = 0; i < NR_hypercalls; i++ )
+    for ( i = 0; i < (PAGE_SIZE / 32); i++ )
     {
         p = (char *)(hypercall_page + (i * 32));
 
