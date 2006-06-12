@@ -806,6 +806,7 @@ static int resume_dev(struct device *dev, void *data)
 
 	if (dev->driver == NULL)
 		return 0;
+
 	drv = to_xenbus_driver(dev->driver);
 	xdev = container_of(dev, struct xenbus_device, dev);
 
@@ -816,6 +817,18 @@ static int resume_dev(struct device *dev, void *data)
 		       dev->bus_id, err);
 		return err;
 	}
+        
+	xdev->state = XenbusStateInitialising;
+        
+	if (drv->resume) {
+		err = drv->resume(xdev);
+                if (err) { 
+                        printk(KERN_WARNING
+                               "xenbus: resume %s failed: %i\n", 
+                               dev->bus_id, err);
+                        return err; 
+                }
+        }
 
 	err = watch_otherend(xdev);
 	if (err) {
@@ -825,14 +838,7 @@ static int resume_dev(struct device *dev, void *data)
 		return err;
 	}
 
-	xdev->state = XenbusStateInitialising;
-
-	if (drv->resume)
-		err = drv->resume(xdev);
-	if (err)
-		printk(KERN_WARNING
-		       "xenbus: resume %s failed: %i\n", dev->bus_id, err);
-	return err;
+	return 0; 
 }
 
 void xenbus_suspend(void)

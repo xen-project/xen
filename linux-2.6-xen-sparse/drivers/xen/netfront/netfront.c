@@ -157,8 +157,6 @@ static void netif_disconnect_backend(struct netfront_info *);
 static void close_netdev(struct netfront_info *);
 static void netif_free(struct netfront_info *);
 
-static void show_device(struct netfront_info *);
-
 static void network_connect(struct net_device *);
 static void network_tx_buf_gc(struct net_device *);
 static void network_alloc_rx_buffers(struct net_device *);
@@ -411,7 +409,6 @@ static void backend_changed(struct xenbus_device *dev,
 		network_connect(netdev);
 		xenbus_switch_state(dev, XenbusStateConnected);
 		(void)send_fake_arp(netdev);
-		show_device(np);
 		break;
 
 	case XenbusStateClosing:
@@ -605,7 +602,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 		np->grant_rx_ref[id] = ref;
 		gnttab_grant_foreign_transfer_ref(ref,
 						  np->xbdev->otherend_id,
-						  __pa(skb->head) >> PAGE_SHIFT);
+						  __pa(skb->head)>>PAGE_SHIFT);
 		RING_GET_REQUEST(&np->rx, req_prod + i)->gref = ref;
 		np->rx_pfn_array[i] = virt_to_mfn(skb->head);
 
@@ -1164,22 +1161,6 @@ static void network_connect(struct net_device *dev)
 
 	spin_unlock(&np->rx_lock);
 	spin_unlock_irq(&np->tx_lock);
-}
-
-static void show_device(struct netfront_info *np)
-{
-#ifdef DEBUG
-	if (np) {
-		IPRINTK("<vif handle=%u %s(%s) evtchn=%u tx=%p rx=%p>\n",
-			np->handle,
-			netif_carrier_ok(np->netdev) ? "on" : "off",
-			netif_running(np->netdev) ? "open" : "closed",
-			np->evtchn,
-			np->tx,
-			np->rx);
-	} else
-		IPRINTK("<vif NULL>\n");
-#endif
 }
 
 static void netif_uninit(struct net_device *dev)
