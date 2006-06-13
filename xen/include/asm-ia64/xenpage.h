@@ -28,6 +28,10 @@ extern int ia64_mfn_valid (unsigned long pfn);
 #define page_to_virt(_page)	maddr_to_virt(page_to_maddr(_page))
 #define maddr_to_page(kaddr)	mfn_to_page(((kaddr) >> PAGE_SHIFT))
 
+/* Convert between Xen-heap virtual addresses and machine frame numbers. */
+#define virt_to_mfn(va)		(virt_to_maddr(va) >> PAGE_SHIFT)
+#define mfn_to_virt(mfn)	maddr_to_virt(mfn << PAGE_SHIFT)
+
 #ifndef __ASSEMBLY__
 typedef union xen_va {
 	struct {
