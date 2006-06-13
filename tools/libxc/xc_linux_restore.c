@@ -456,6 +456,15 @@ int xc_linux_restore(int xc_handle, int io_fd,
         n+= j; /* crude stats */
     }
 
+    /*
+     * Ensure we flush all machphys updates before potential PAE-specific
+     * reallocations below.
+     */
+    if (xc_finish_mmu_updates(xc_handle, mmu)) {
+        ERR("Error doing finish_mmu_updates()");
+        goto out;
+    }
+
     DPRINTF("Received all pages (%d races)\n", nraces);
 
     if ((pt_levels == 3) && !pae_extended_cr3) {
@@ -550,14 +559,11 @@ int xc_linux_restore(int xc_handle, int io_fd,
             }
         }
 
+        if (xc_finish_mmu_updates(xc_handle, mmu)) {
+            ERR("Error doing finish_mmu_updates()");
+            goto out;
+        }
     }
-
-
-    if (xc_finish_mmu_updates(xc_handle, mmu)) {
-        ERR("Error doing finish_mmu_updates()");
-        goto out;
-    }
-
 
     /*
      * Pin page tables. Do this after writing to them as otherwise Xen
