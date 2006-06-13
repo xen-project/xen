@@ -253,6 +253,7 @@ HYPERVISOR_event_channel_op(
 		op.cmd = cmd;
 		memcpy(&op.u, arg, sizeof(op.u));
 		rc = _hypercall1(int, event_channel_op_compat, &op);
+		memcpy(arg, &op.u, sizeof(op.u));
 	}
 	return rc;
 }
@@ -288,6 +289,7 @@ HYPERVISOR_physdev_op(
 		op.cmd = cmd;
 		memcpy(&op.u, arg, sizeof(op.u));
 		rc = _hypercall1(int, physdev_op_compat, &op);
+		memcpy(arg, &op.u, sizeof(op.u));
 	}
 	return rc;
 }
