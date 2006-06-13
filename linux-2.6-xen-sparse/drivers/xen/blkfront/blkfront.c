@@ -596,8 +596,7 @@ void do_blkif_request(request_queue_t *rq)
 			continue;
 		}
 
-		if (unlikely(info->connected != BLKIF_STATE_CONNECTED) ||
-		    RING_FULL(&info->ring))
+		if (RING_FULL(&info->ring))
 			goto wait;
 
 		DPRINTK("do_blk_req %p: cmd %p, sec %lx, "
@@ -697,6 +696,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
 	spin_lock_irq(&blkif_io_lock);
 	info->connected = suspend ?
 		BLKIF_STATE_SUSPENDED : BLKIF_STATE_DISCONNECTED;
+	blk_stop_queue(info->rq); /* no more blkif_request() */
 	spin_unlock_irq(&blkif_io_lock);
 
 	/* Free resources associated with old device channel. */
