@@ -77,7 +77,7 @@ static ssize_t show_physical_device(struct device *_dev,
 				    struct device_attribute *attr, char *buf)
 {
 	struct xenbus_device *dev = to_xenbus_device(_dev);
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 	return sprintf(buf, "%x:%x\n", be->major, be->minor);
 }
 DEVICE_ATTR(physical_device, S_IRUSR | S_IRGRP | S_IROTH,
@@ -88,7 +88,7 @@ static ssize_t show_mode(struct device *_dev, struct device_attribute *attr,
 			 char *buf)
 {
 	struct xenbus_device *dev = to_xenbus_device(_dev);
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 	return sprintf(buf, "%s\n", be->mode);
 }
 DEVICE_ATTR(mode, S_IRUSR | S_IRGRP | S_IROTH, show_mode, NULL);
@@ -96,7 +96,7 @@ DEVICE_ATTR(mode, S_IRUSR | S_IRGRP | S_IROTH, show_mode, NULL);
 
 static int blkback_remove(struct xenbus_device *dev)
 {
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 
 	DPRINTK("");
 
@@ -116,7 +116,7 @@ static int blkback_remove(struct xenbus_device *dev)
 	device_remove_file(&dev->dev, &dev_attr_mode);
 
 	kfree(be);
-	dev->data = NULL;
+	dev->dev.driver_data = NULL;
 	return 0;
 }
 
@@ -138,7 +138,7 @@ static int blkback_probe(struct xenbus_device *dev,
 		return -ENOMEM;
 	}
 	be->dev = dev;
-	dev->data = be;
+	dev->dev.driver_data = be;
 
 	be->blkif = blkif_alloc(dev->otherend_id);
 	if (IS_ERR(be->blkif)) {
@@ -186,7 +186,7 @@ static void backend_changed(struct xenbus_watch *watch,
 
 	DPRINTK("");
 
-	err = xenbus_scanf(XBT_NULL, dev->nodename, "physical-device", "%x:%x",
+	err = xenbus_scanf(XBT_NIL, dev->nodename, "physical-device", "%x:%x",
 			   &major, &minor);
 	if (XENBUS_EXIST_ERR(err)) {
 		/* Since this watch will fire once immediately after it is
@@ -208,7 +208,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		return;
 	}
 
-	be->mode = xenbus_read(XBT_NULL, dev->nodename, "mode", NULL);
+	be->mode = xenbus_read(XBT_NIL, dev->nodename, "mode", NULL);
 	if (IS_ERR(be->mode)) {
 		err = PTR_ERR(be->mode);
 		be->mode = NULL;
@@ -249,7 +249,7 @@ static void backend_changed(struct xenbus_watch *watch,
 static void frontend_changed(struct xenbus_device *dev,
 			     enum xenbus_state frontend_state)
 {
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 	int err;
 
 	DPRINTK("");
@@ -299,7 +299,7 @@ static void frontend_changed(struct xenbus_device *dev,
  */
 static void connect(struct backend_info *be)
 {
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 	int err;
 	struct xenbus_device *dev = be->dev;
 
@@ -364,7 +364,7 @@ static int connect_ring(struct backend_info *be)
 
 	DPRINTK("%s", dev->otherend);
 
-	err = xenbus_gather(XBT_NULL, dev->otherend, "ring-ref", "%lu", &ring_ref,
+	err = xenbus_gather(XBT_NIL, dev->otherend, "ring-ref", "%lu", &ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {
 		xenbus_dev_fatal(dev, err,

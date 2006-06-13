@@ -37,6 +37,26 @@ static inline void evtchn_notify(struct vcpu *v)
     (!!(v)->vcpu_info->evtchn_upcall_pending &  \
       !(v)->vcpu_info->evtchn_upcall_mask)
 
+static inline int local_events_need_delivery(void)
+{
+    return event_pending(current);
+}
+
+static inline int local_event_delivery_is_enabled(void)
+{
+    return !current->vcpu_info->evtchn_upcall_mask;
+}
+
+static inline void local_event_delivery_disable(void)
+{
+    current->vcpu_info->evtchn_upcall_mask = 1;
+}
+
+static inline void local_event_delivery_enable(void)
+{
+    current->vcpu_info->evtchn_upcall_mask = 0;
+}
+
 static inline int arch_virq_is_global(int virq)
 {
     int rc;

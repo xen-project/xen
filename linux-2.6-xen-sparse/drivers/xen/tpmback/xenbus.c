@@ -41,13 +41,13 @@ static void maybe_connect(struct backend_info *be);
 static void connect(struct backend_info *be);
 static int connect_ring(struct backend_info *be);
 static void backend_changed(struct xenbus_watch *watch,
-                            const char **vec, unsigned int len);
+			    const char **vec, unsigned int len);
 static void frontend_changed(struct xenbus_device *dev,
-                             enum xenbus_state frontend_state);
+			     enum xenbus_state frontend_state);
 
 static int tpmback_remove(struct xenbus_device *dev)
 {
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 
 	if (!be) return 0;
 
@@ -62,30 +62,30 @@ static int tpmback_remove(struct xenbus_device *dev)
 		be->tpmif = NULL;
 	}
 	kfree(be);
-	dev->data = NULL;
+	dev->dev.driver_data = NULL;
 	return 0;
 }
 
 static int tpmback_probe(struct xenbus_device *dev,
-                         const struct xenbus_device_id *id)
+			 const struct xenbus_device_id *id)
 {
 	int err;
 	struct backend_info *be = kzalloc(sizeof(struct backend_info),
-	                                  GFP_KERNEL);
+					  GFP_KERNEL);
 
 	if (!be) {
 		xenbus_dev_fatal(dev, -ENOMEM,
-		                 "allocating backend structure");
+				 "allocating backend structure");
 		return -ENOMEM;
 	}
 
 	be->is_instance_set = 0;
 	be->dev = dev;
-	dev->data = be;
+	dev->dev.driver_data = be;
 
 	err = xenbus_watch_path2(dev, dev->nodename,
-	                        "instance", &be->backend_watch,
-	                        backend_changed);
+				 "instance", &be->backend_watch,
+				 backend_changed);
 	if (err) {
 		goto fail;
 	}
@@ -102,7 +102,7 @@ fail:
 
 
 static void backend_changed(struct xenbus_watch *watch,
-                            const char **vec, unsigned int len)
+			    const char **vec, unsigned int len)
 {
 	int err;
 	long instance;
@@ -110,8 +110,8 @@ static void backend_changed(struct xenbus_watch *watch,
 		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
 
-	err = xenbus_scanf(XBT_NULL, dev->nodename,
-	                   "instance","%li", &instance);
+	err = xenbus_scanf(XBT_NIL, dev->nodename,
+			   "instance","%li", &instance);
 	if (XENBUS_EXIST_ERR(err)) {
 		return;
 	}
@@ -129,9 +129,9 @@ static void backend_changed(struct xenbus_watch *watch,
 
 
 static void frontend_changed(struct xenbus_device *dev,
-                             enum xenbus_state frontend_state)
+			     enum xenbus_state frontend_state)
 {
-	struct backend_info *be = dev->data;
+	struct backend_info *be = dev->dev.driver_data;
 	int err;
 
 	be->frontend_state = frontend_state;
@@ -167,8 +167,8 @@ static void frontend_changed(struct xenbus_device *dev,
 	case XenbusStateInitWait:
 	default:
 		xenbus_dev_fatal(dev, -EINVAL,
-		                 "saw state %d at frontend",
-		                 frontend_state);
+				 "saw state %d at frontend",
+				 frontend_state);
 		break;
 	}
 }
@@ -188,11 +188,11 @@ static void maybe_connect(struct backend_info *be)
 	 * Notify the vTPM manager about a new front-end.
 	 */
 	err = tpmif_vtpm_open(be->tpmif,
-	                      be->frontend_id,
-	                      be->instance);
+			      be->frontend_id,
+			      be->instance);
 	if (err) {
 		xenbus_dev_error(be->dev, err,
-		                 "queueing vtpm open packet");
+				 "queueing vtpm open packet");
 		/*
 		 * Should close down this device and notify FE
 		 * about closure.
@@ -204,7 +204,7 @@ static void maybe_connect(struct backend_info *be)
 
 static void connect(struct backend_info *be)
 {
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 	int err;
 	struct xenbus_device *dev = be->dev;
 	unsigned long ready = 1;
@@ -217,7 +217,7 @@ again:
 	}
 
 	err = xenbus_printf(xbt, be->dev->nodename,
-	                    "ready", "%lu", ready);
+			    "ready", "%lu", ready);
 	if (err) {
 		xenbus_dev_fatal(be->dev, err, "writing 'ready'");
 		goto abort;
@@ -245,8 +245,8 @@ static int connect_ring(struct backend_info *be)
 	unsigned int evtchn;
 	int err;
 
-	err = xenbus_gather(XBT_NULL, dev->otherend,
-	                    "ring-ref", "%lu", &ring_ref,
+	err = xenbus_gather(XBT_NIL, dev->otherend,
+			    "ring-ref", "%lu", &ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {
 		xenbus_dev_error(dev, err,
@@ -257,7 +257,7 @@ static int connect_ring(struct backend_info *be)
 
 	if (!be->tpmif) {
 		be->tpmif = tpmif_find(dev->otherend_id,
-		                       be->instance);
+				       be->instance);
 		if (IS_ERR(be->tpmif)) {
 			err = PTR_ERR(be->tpmif);
 			be->tpmif = NULL;
@@ -270,8 +270,8 @@ static int connect_ring(struct backend_info *be)
 		err = tpmif_map(be->tpmif, ring_ref, evtchn);
 		if (err) {
 			xenbus_dev_error(dev, err,
-			    	         "mapping shared-frame %lu port %u",
-				         ring_ref, evtchn);
+					 "mapping shared-frame %lu port %u",
+					 ring_ref, evtchn);
 			return err;
 		}
 	}

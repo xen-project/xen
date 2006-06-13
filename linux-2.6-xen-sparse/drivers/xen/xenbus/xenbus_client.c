@@ -106,12 +106,12 @@ int xenbus_switch_state(struct xenbus_device *dev, enum xenbus_state state)
 	if (state == dev->state)
 		return 0;
 
-	err = xenbus_scanf(XBT_NULL, dev->nodename, "state", "%d",
+	err = xenbus_scanf(XBT_NIL, dev->nodename, "state", "%d",
 			   &current_state);
 	if (err != 1)
 		return 0;
 
-	err = xenbus_printf(XBT_NULL, dev->nodename, "state", "%d", state);
+	err = xenbus_printf(XBT_NIL, dev->nodename, "state", "%d", state);
 	if (err) {
 		if (state != XenbusStateClosing) /* Avoid looping */
 			xenbus_dev_fatal(dev, err, "writing new state");
@@ -162,7 +162,7 @@ void _dev_error(struct xenbus_device *dev, int err, const char *fmt,
 		goto fail;
 	}
 
-	if (xenbus_write(XBT_NULL, path_buffer, "error", printf_buffer) != 0) {
+	if (xenbus_write(XBT_NIL, path_buffer, "error", printf_buffer) != 0) {
 		printk("xenbus: failed to write error node for %s (%s)\n",
 		       dev->nodename, printf_buffer);
 		goto fail;
@@ -272,7 +272,7 @@ int xenbus_free_evtchn(struct xenbus_device *dev, int port)
 enum xenbus_state xenbus_read_driver_state(const char *path)
 {
 	enum xenbus_state result;
-	int err = xenbus_gather(XBT_NULL, path, "state", "%d", &result, NULL);
+	int err = xenbus_gather(XBT_NIL, path, "state", "%d", &result, NULL);
 	if (err)
 		result = XenbusStateClosed;
 

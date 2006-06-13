@@ -10,8 +10,3 @@
 #eventually asm-xsi-offsets needs to be part of hypervisor.h/hypercall.h
 ln -sf ../../../../xen/include/asm-ia64/asm-xsi-offsets.h include/asm-ia64/xen/
 
-#ia64 drivers/xen isn't fully functional yet, workaround...
-#also ignore core/evtchn.c which uses a different irq mechanism than ia64
-#(warning: there be dragons here if these files diverge)
-ln -sf ../../arch/ia64/xen/drivers/Makefile drivers/xen/Makefile
-ln -sf ../../../arch/ia64/xen/drivers/coreMakefile drivers/xen/core/Makefile

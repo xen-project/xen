@@ -665,13 +665,6 @@ void __init setup_arch(char **cmdline_p)
 
 	setup_xen_features();
 
-	if (xen_feature(XENFEAT_auto_translated_physmap) &&
-	    xen_start_info->shared_info < xen_start_info->nr_pages) {
-		HYPERVISOR_shared_info =
-			(shared_info_t *)__va(xen_start_info->shared_info);
-		memset(empty_zero_page, 0, sizeof(empty_zero_page));
-	}
-
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_writable_pagetables);
 
@@ -699,12 +692,10 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.end_data = (unsigned long) &_edata;
 	init_mm.brk = (unsigned long) &_end;
 
-#ifndef CONFIG_XEN
 	code_resource.start = virt_to_phys(&_text);
 	code_resource.end = virt_to_phys(&_etext)-1;
 	data_resource.start = virt_to_phys(&_etext);
 	data_resource.end = virt_to_phys(&_edata)-1;
-#endif
 
 	parse_cmdline_early(cmdline_p);
 
@@ -826,14 +817,6 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_XEN
 	{
 		int i, j, k, fpp;
-		unsigned long va;
-
-		/* 'Initial mapping' of initrd must be destroyed. */
-		for (va = xen_start_info->mod_start;
-		     va < (xen_start_info->mod_start+xen_start_info->mod_len);
-		     va += PAGE_SIZE) {
-			HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0);
-		}
 
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 			/* Make sure we have a large enough P->M table. */
@@ -848,14 +831,6 @@ void __init setup_arch(char **cmdline_p)
 				__pa(xen_start_info->mfn_list),
 				PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
 						sizeof(unsigned long))));
-
-			/* Destroyed 'initial mapping' of old p2m table. */
-			for (va = xen_start_info->mfn_list;
-			     va < (xen_start_info->mfn_list +
-				   (xen_start_info->nr_pages*sizeof(unsigned long)));
-			     va += PAGE_SIZE) {
-				HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0);
-			}
 
 			/*
 			 * Initialise the list of the frames that specify the
@@ -944,8 +919,11 @@ void __init setup_arch(char **cmdline_p)
 		BUG_ON(HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap));
 
 		e820_reserve_resources(machine_e820, memmap.nr_entries);
-	}
-#elif !defined(CONFIG_XEN)
+	} else if (!(xen_start_info->flags & SIF_INITDOMAIN))
+		e820_reserve_resources(e820.map, e820.nr_map);
+#elif defined(CONFIG_XEN)
+	e820_reserve_resources(e820.map, e820.nr_map);
+#else
 	probe_roms();
 	e820_reserve_resources(e820.map, e820.nr_map);
 #endif

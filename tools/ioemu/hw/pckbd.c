@@ -118,6 +118,9 @@
 #define SUMMA_MAXX	(16000 - 1)
 #define SUMMA_MAXY	(16000 - 1)
 
+#define MAX_ABSX	0x7fff
+#define MAX_ABSY	0x7fff
+
 typedef struct {
     uint8_t aux[KBD_QUEUE_SIZE];
     uint8_t data[KBD_QUEUE_SIZE];
@@ -149,8 +152,6 @@ typedef struct KBDState {
     uint8_t mouse_wrap;
     uint8_t mouse_type; /* 0 = PS2, 3 = IMPS/2, 4 = IMEX */
     uint8_t mouse_detect_state;
-    int mouse_x;  /* absolute coordinates (for mousepad) */
-    int mouse_y;
     int mouse_dx; /* current values, needed for 'poll' mode */
     int mouse_dy;
     int mouse_dz;
@@ -422,7 +423,7 @@ static void kbd_write_keyboard(KBDState *s, int val)
 
 int mouse_maxx, mouse_maxy;
 
-static int kbd_mouse_send_packet(KBDState *s)
+static void kbd_mouse_send_packet(KBDState *s)
 {
     unsigned int b;
     int dx1, dy1, dz1;
@@ -430,100 +431,63 @@ static int kbd_mouse_send_packet(KBDState *s)
     dx1 = s->mouse_dx;
     dy1 = s->mouse_dy;
     dz1 = s->mouse_dz;
+    /* XXX: increase range to 8 bits ? */
+    if (dx1 > 127)
+        dx1 = 127;
+    else if (dx1 < -127)
+        dx1 = -127;
+    if (dy1 > 127)
+        dy1 = 127;
+    else if (dy1 < -127)
+        dy1 = -127;
+    b = 0x08 | ((dx1 < 0) << 4) | ((dy1 < 0) << 5) | (s->mouse_buttons & 0x07);
+    kbd_queue(s, b, 1);
+    kbd_queue(s, dx1 & 0xff, 1);
+    kbd_queue(s, dy1 & 0xff, 1);
+    /* extra byte for IMPS/2 or IMEX */
     switch(s->mouse_type) {
-  
-    case TABLET:        /* Summagraphics pen tablet */
-	if (SummaState.report_mode == MODE_STREAM) {
-	    dx1 = s->mouse_x;
-	    dy1 = s->mouse_y;
-	    if (SummaState.origin == ORIGIN_LOWER_LEFT)
-		dy1 = mouse_maxy - dy1;
-	    dx1 = ((dx1 * SUMMA_MAXX) / mouse_maxx) + SUMMA_BORDER;
-	    dy1 = ((dy1 * SUMMA_MAXY) / mouse_maxy) + SUMMA_BORDER;
-	    ser_queue(s->serial, 0x80 | (s->mouse_buttons & 7));
-	    ser_queue(s->serial, dx1 & 0x7f);
-	    ser_queue(s->serial, dx1 >> 7);
-	    ser_queue(s->serial, dy1 & 0x7f);
-	    ser_queue(s->serial, dy1 >> 7);
-	}
-	s->mouse_dx = 0; 
-	s->mouse_dy = 0;
-	s->mouse_dz = 0;
-	return 0;
-
-    default:	/* PS/2 style mice */
-	/* XXX: increase range to 8 bits ? */
-	if (dx1 > 127)
-	    dx1 = 127;
-	else if (dx1 < -127)
-	    dx1 = -127;
-	if (dy1 > 127)
-	    dy1 = 127;
-	else if (dy1 < -127)
-	    dy1 = -127;
-	b = 0x08 | ((dx1 < 0) << 4) | ((dy1 < 0) << 5) | (s->mouse_buttons & 0x07);
-	kbd_queue(s, b, 1);
-	kbd_queue(s, dx1 & 0xff, 1);
-	kbd_queue(s, dy1 & 0xff, 1);
-	/* extra byte for IMPS/2 or IMEX */
-	switch(s->mouse_type) {
-
-	default:
-	    break;
-
-	case IMPS2:
-	    if (dz1 > 127)
-		dz1 = 127;
-	    else if (dz1 < -127)
-		dz1 = -127;
-	    kbd_queue(s, dz1 & 0xff, 1);
-	    break;
-
-	case IMEX:
-	    if (dz1 > 7)
-		dz1 = 7;
-	    else if (dz1 < -7)
-		dz1 = -7;
-	    b = (dz1 & 0x0f) | ((s->mouse_buttons & 0x18) << 1);
-	    kbd_queue(s, b, 1);
-	    break;
-	}
-
-	/* update deltas */
-	s->mouse_dx -= dx1;
-	s->mouse_dy -= dy1;
-	s->mouse_dz -= dz1;
-	return s->mouse_dx || s->mouse_dy || s->mouse_dz;
-
+    default:
+        break;
+    case IMPS2:
+        if (dz1 > 127)
+            dz1 = 127;
+        else if (dz1 < -127)
+                dz1 = -127;
+        kbd_queue(s, dz1 & 0xff, 1);
+        break;
+    case IMEX:
+        if (dz1 > 7)
+            dz1 = 7;
+        else if (dz1 < -7)
+            dz1 = -7;
+        b = (dz1 & 0x0f) | ((s->mouse_buttons & 0x18) << 1);
+        kbd_queue(s, b, 1);
+        break;
     }
+
+    /* update deltas */
+    s->mouse_dx -= dx1;
+    s->mouse_dy -= dy1;
+    s->mouse_dz -= dz1;
 }
 
-static void pc_kbd_mouse_event(void *opaque, 
-                               int dx, int dy, int dz, int buttons_state,
-			       int x, int y)
+static void summa_mouse_event(void *opaque, int x, int y, int z, int buttons_state)
 {
     KBDState *s = opaque;
 
-    /* check if deltas are recorded when disabled */
-    if (!(s->mouse_status & MOUSE_STATUS_ENABLED))
-        return;
-
-    s->mouse_x = x;
-    s->mouse_y = y;
-    s->mouse_dx += dx;
-    s->mouse_dy -= dy;
-    s->mouse_dz += dz;
-    /* XXX: SDL sometimes generates nul events: we delete them */
-    if (s->mouse_dx == 0 && s->mouse_dy == 0 && s->mouse_dz == 0 &&
-        s->mouse_buttons == buttons_state)
-	return;
-    s->mouse_buttons = buttons_state;
-    
-    if (!(s->mouse_status & MOUSE_STATUS_REMOTE) &&
-        (s->queue.count < (KBD_QUEUE_SIZE - 16))) {
-		while (kbd_mouse_send_packet(s))
-		    ;
+    if (SummaState.report_mode == MODE_STREAM) {
+	if (SummaState.origin == ORIGIN_LOWER_LEFT)
+	    y = mouse_maxy - y;
+	x = ((x * SUMMA_MAXX) / MAX_ABSX) + SUMMA_BORDER;
+	y = ((y * SUMMA_MAXY) / MAX_ABSY) + SUMMA_BORDER;
+fprintf(stderr, "summa_mouse_event: x, y - %d, %d\n", x, y);
+	ser_queue(s->serial, 0x80 | (buttons_state & 7));
+	ser_queue(s->serial, x & 0x7f);
+	ser_queue(s->serial, x >> 7);
+	ser_queue(s->serial, y & 0x7f);
+	ser_queue(s->serial, y >> 7);
     }
+    return;
 }
 
 static void summa(KBDState *s, uint8_t val)
@@ -564,6 +528,7 @@ static void summa(KBDState *s, uint8_t val)
 	s->mouse_status |= MOUSE_STATUS_ENABLED;
 	SummaState.origin = ORIGIN_LOWER_LEFT;
 	SummaState.report_mode = (val == 'B') ? MODE_POINT : MODE_STREAM_SWITCH;
+	qemu_add_mouse_event_handler(summa_mouse_event, s, 1);
 	break;
 
     case 'z':	/* start of 2 byte command */
@@ -645,6 +610,36 @@ void summa_init(SerialState *serial, CharDriverState *chr)
     chr->chr_write = summa_write;
     chr->opaque = (void *)&kbd_state;
     return;
+}
+
+static void pc_kbd_mouse_event(void *opaque, 
+                               int dx, int dy, int dz, int buttons_state)
+{
+    KBDState *s = opaque;
+
+    /* check if deltas are recorded when disabled */
+    if (!(s->mouse_status & MOUSE_STATUS_ENABLED))
+        return;
+
+    s->mouse_dx += dx;
+    s->mouse_dy -= dy;
+    s->mouse_dz += dz;
+    /* XXX: SDL sometimes generates nul events: we delete them */
+    if (s->mouse_dx == 0 && s->mouse_dy == 0 && s->mouse_dz == 0 &&
+        s->mouse_buttons == buttons_state)
+	return;
+    s->mouse_buttons = buttons_state;
+    
+    if (!(s->mouse_status & MOUSE_STATUS_REMOTE) &&
+        (s->queue.count < (KBD_QUEUE_SIZE - 16))) {
+	for(;;) {
+	    /* if not remote, send event. Multiple events are sent if
+	       too big deltas */
+	    kbd_mouse_send_packet(s);
+	    if (s->mouse_dx == 0 && s->mouse_dy == 0 && s->mouse_dz == 0)
+		break;
+	}
+    }
 }
 
 static void kbd_write_mouse(KBDState *s, int val)
@@ -890,6 +885,6 @@ void kbd_init(void)
     register_ioport_write(0x64, 1, 1, kbd_write_command, s);
 
     qemu_add_kbd_event_handler(pc_kbd_put_keycode, s);
-    qemu_add_mouse_event_handler(pc_kbd_mouse_event, s);
+    qemu_add_mouse_event_handler(pc_kbd_mouse_event, s, 0);
     qemu_register_reset(kbd_reset, s);
 }

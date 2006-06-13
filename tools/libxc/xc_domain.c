@@ -291,7 +291,7 @@ int xc_domain_memory_increase_reservation(int xc_handle,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
                                           unsigned int address_bits,
-                                          unsigned long *extent_start)
+                                          xen_pfn_t *extent_start)
 {
     int err;
     struct xen_memory_reservation reservation = {
@@ -310,7 +310,7 @@ int xc_domain_memory_increase_reservation(int xc_handle,
 
     if ( err > 0 )
     {
-        fprintf(stderr, "Failed allocation for dom %d: "
+        DPRINTF("Failed allocation for dom %d: "
                 "%ld pages order %d addr_bits %d\n",
                 domid, nr_extents, extent_order, address_bits);
         errno = ENOMEM;
@@ -324,7 +324,7 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
                                           uint32_t domid,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
-                                          unsigned long *extent_start)
+                                          xen_pfn_t *extent_start)
 {
     int err;
     struct xen_memory_reservation reservation = {
@@ -338,7 +338,7 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
 
     if ( extent_start == NULL )
     {
-        fprintf(stderr,"decrease_reservation extent_start is NULL!\n");
+        DPRINTF("decrease_reservation extent_start is NULL!\n");
         errno = EINVAL;
         return -1;
     }
@@ -349,7 +349,7 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
 
     if ( err > 0 )
     {
-        fprintf(stderr,"Failed deallocation for dom %d: %ld pages order %d\n",
+        DPRINTF("Failed deallocation for dom %d: %ld pages order %d\n",
                 domid, nr_extents, extent_order);
         errno = EBUSY;
         err = -1;
@@ -363,7 +363,7 @@ int xc_domain_memory_populate_physmap(int xc_handle,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
                                           unsigned int address_bits,
-                                          unsigned long *extent_start)
+                                          xen_pfn_t *extent_start)
 {
     int err;
     struct xen_memory_reservation reservation = {
@@ -380,7 +380,7 @@ int xc_domain_memory_populate_physmap(int xc_handle,
 
     if ( err > 0 )
     {
-        fprintf(stderr,"Failed deallocation for dom %d: %ld pages order %d\n",
+        DPRINTF("Failed deallocation for dom %d: %ld pages order %d\n",
                 domid, nr_extents, extent_order);
         errno = EBUSY;
         err = -1;
@@ -392,8 +392,8 @@ int xc_domain_memory_populate_physmap(int xc_handle,
 int xc_domain_translate_gpfn_list(int xc_handle,
                                   uint32_t domid,
                                   unsigned long nr_gpfns,
-                                  unsigned long *gpfn_list,
-                                  unsigned long *mfn_list)
+                                  xen_pfn_t *gpfn_list,
+                                  xen_pfn_t *mfn_list)
 {
     struct xen_translate_gpfn_list op = {
         .domid        = domid,

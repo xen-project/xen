@@ -186,12 +186,6 @@ extern struct vcpu *idle_vcpu[NR_CPUS];
 #define is_idle_domain(d) ((d)->domain_id == IDLE_DOMAIN_ID)
 #define is_idle_vcpu(v)   (is_idle_domain((v)->domain))
 
-struct vcpu *alloc_vcpu(
-    struct domain *d, unsigned int vcpu_id, unsigned int cpu_id);
-
-struct domain *alloc_domain(void);
-void free_domain(struct domain *d);
-
 #define DOMAIN_DESTROYED (1<<31) /* assumes atomic_t is >= 32 bits */
 #define put_domain(_d) \
   if ( atomic_dec_and_test(&(_d)->refcnt) ) domain_destroy(_d)
@@ -226,7 +220,7 @@ static inline void get_knownalive_domain(struct domain *d)
 }
 
 extern struct domain *domain_create(
-    domid_t dom_id, unsigned int cpu);
+    domid_t domid, unsigned int cpu);
 extern int construct_dom0(
     struct domain *d,
     unsigned long image_start, unsigned long image_len, 
@@ -269,8 +263,8 @@ void new_thread(struct vcpu *d,
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
 void schedulers_start(void);
-void sched_add_domain(struct vcpu *);
-void sched_rem_domain(struct vcpu *);
+int  sched_init_vcpu(struct vcpu *);
+void sched_destroy_domain(struct domain *);
 long sched_ctl(struct sched_ctl_cmd *);
 long sched_adjdom(struct sched_adjdom_cmd *);
 int  sched_id(void);
@@ -324,7 +318,7 @@ unsigned long hypercall_create_continuation(
 
 #define hypercall_preempt_check() (unlikely(    \
         softirq_pending(smp_processor_id()) |   \
-        event_pending(current)                  \
+        local_events_need_delivery()            \
     ))
 
 /* This domain_hash and domain_list are protected by the domlist_lock. */
@@ -361,7 +355,7 @@ extern struct domain *domain_list;
  /* Initialization completed. */
 #define _VCPUF_initialised     4
 #define VCPUF_initialised      (1UL<<_VCPUF_initialised)
- /* VCPU is not-runnable */
+ /* VCPU is offline. */
 #define _VCPUF_down            5
 #define VCPUF_down             (1UL<<_VCPUF_down)
  /* NMI callback pending for this VCPU? */
@@ -370,6 +364,9 @@ extern struct domain *domain_list;
  /* Avoid NMI reentry by allowing NMIs to be masked for short periods. */
 #define _VCPUF_nmi_masked      9
 #define VCPUF_nmi_masked       (1UL<<_VCPUF_nmi_masked)
+ /* VCPU is polling a set of event channels (SCHEDOP_poll). */
+#define _VCPUF_polling         10
+#define VCPUF_polling          (1UL<<_VCPUF_polling)
 
 /*
  * Per-domain flags (domain_flags).
@@ -389,6 +386,9 @@ extern struct domain *domain_list;
  /* Domain is being debugged by controller software. */
 #define _DOMF_debugging        4
 #define DOMF_debugging         (1UL<<_DOMF_debugging)
+ /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
+#define _DOMF_polling          5
+#define DOMF_polling           (1UL<<_DOMF_polling)
 
 static inline int vcpu_runnable(struct vcpu *v)
 {

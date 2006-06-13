@@ -26,6 +26,9 @@ DEFINE_XEN_GUEST_HANDLE(char);
 DEFINE_XEN_GUEST_HANDLE(int);
 DEFINE_XEN_GUEST_HANDLE(long);
 DEFINE_XEN_GUEST_HANDLE(void);
+
+typedef unsigned long xen_pfn_t;
+DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #endif
 
 /* Arch specific VIRQs definition */

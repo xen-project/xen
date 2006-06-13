@@ -30,8 +30,9 @@
  * IN THE SOFTWARE.
  */
 
-#define DPRINTK(fmt, args...) \
-    pr_debug("xenbus_probe (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
+#define DPRINTK(fmt, args...)				\
+	pr_debug("xenbus_probe (%s:%d) " fmt ".\n",	\
+		 __FUNCTION__, __LINE__, ##args)
 
 #include <linux/kernel.h>
 #include <linux/err.h>
@@ -128,7 +129,7 @@ static void free_otherend_watch(struct xenbus_device *dev)
 static int read_otherend_details(struct xenbus_device *xendev,
 				 char *id_node, char *path_node)
 {
-	int err = xenbus_gather(XBT_NULL, xendev->nodename,
+	int err = xenbus_gather(XBT_NIL, xendev->nodename,
 				id_node, "%i", &xendev->otherend_id,
 				path_node, NULL, &xendev->otherend,
 				NULL);
@@ -139,7 +140,7 @@ static int read_otherend_details(struct xenbus_device *xendev,
 		return err;
 	}
 	if (strlen(xendev->otherend) == 0 ||
-	    !xenbus_exists(XBT_NULL, xendev->otherend, "")) {
+	    !xenbus_exists(XBT_NIL, xendev->otherend, "")) {
 		xenbus_dev_fatal(xendev, -ENOENT, "missing other end from %s",
 				 xendev->nodename);
 		free_otherend_details(xendev);
@@ -195,14 +196,14 @@ static int backend_bus_id(char bus_id[BUS_ID_SIZE], const char *nodename)
 
 	devid = strrchr(nodename, '/') + 1;
 
-	err = xenbus_gather(XBT_NULL, nodename, "frontend-id", "%i", &domid,
+	err = xenbus_gather(XBT_NIL, nodename, "frontend-id", "%i", &domid,
 			    "frontend", NULL, &frontend,
 			    NULL);
 	if (err)
 		return err;
 	if (strlen(frontend) == 0)
 		err = -ERANGE;
-	if (!err && !xenbus_exists(XBT_NULL, frontend, ""))
+	if (!err && !xenbus_exists(XBT_NIL, frontend, ""))
 		err = -ENOENT;
 
 	kfree(frontend);
@@ -634,7 +635,7 @@ static int xenbus_probe_backend(const char *type, const char *domid)
 	if (!nodename)
 		return -ENOMEM;
 
-	dir = xenbus_directory(XBT_NULL, nodename, "", &dir_n);
+	dir = xenbus_directory(XBT_NIL, nodename, "", &dir_n);
 	if (IS_ERR(dir)) {
 		kfree(nodename);
 		return PTR_ERR(dir);
@@ -657,7 +658,7 @@ static int xenbus_probe_device_type(struct xen_bus_type *bus, const char *type)
 	unsigned int dir_n = 0;
 	int i;
 
-	dir = xenbus_directory(XBT_NULL, bus->root, type, &dir_n);
+	dir = xenbus_directory(XBT_NIL, bus->root, type, &dir_n);
 	if (IS_ERR(dir))
 		return PTR_ERR(dir);
 
@@ -676,7 +677,7 @@ static int xenbus_probe_devices(struct xen_bus_type *bus)
 	char **dir;
 	unsigned int i, dir_n;
 
-	dir = xenbus_directory(XBT_NULL, bus->root, "", &dir_n);
+	dir = xenbus_directory(XBT_NIL, bus->root, "", &dir_n);
 	if (IS_ERR(dir))
 		return PTR_ERR(dir);
 
@@ -722,7 +723,7 @@ static void dev_changed(const char *node, struct xen_bus_type *bus)
 	if (char_count(node, '/') < 2)
  		return;
 
-	exists = xenbus_exists(XBT_NULL, node, "");
+	exists = xenbus_exists(XBT_NIL, node, "");
 	if (!exists) {
 		xenbus_cleanup_devices(node, &bus->bus);
 		return;
@@ -806,6 +807,7 @@ static int resume_dev(struct device *dev, void *data)
 
 	if (dev->driver == NULL)
 		return 0;
+
 	drv = to_xenbus_driver(dev->driver);
 	xdev = container_of(dev, struct xenbus_device, dev);
 
@@ -817,6 +819,18 @@ static int resume_dev(struct device *dev, void *data)
 		return err;
 	}
 
+	xdev->state = XenbusStateInitialising;
+
+	if (drv->resume) {
+		err = drv->resume(xdev);
+		if (err) { 
+			printk(KERN_WARNING
+			       "xenbus: resume %s failed: %i\n", 
+			       dev->bus_id, err);
+			return err; 
+		}
+	}
+
 	err = watch_otherend(xdev);
 	if (err) {
 		printk(KERN_WARNING
@@ -825,14 +839,7 @@ static int resume_dev(struct device *dev, void *data)
 		return err;
 	}
 
-	xdev->state = XenbusStateInitialising;
-
-	if (drv->resume)
-		err = drv->resume(xdev);
-	if (err)
-		printk(KERN_WARNING
-		       "xenbus: resume %s failed: %i\n", dev->bus_id, err);
-	return err;
+	return 0; 
 }
 
 void xenbus_suspend(void)
@@ -939,7 +946,7 @@ static int xsd_kva_mmap(struct file *file, struct vm_area_struct *vma)
 }
 
 static int xsd_kva_read(char *page, char **start, off_t off,
-                        int count, int *eof, void *data)
+			int count, int *eof, void *data)
 {
 	int len;
 
@@ -1038,10 +1045,10 @@ static int __init xenbus_probe_init(void)
 		free_page(page);
 
 	/*
-         * Do not unregister the xenbus front/backend buses here. The
-         * buses must exist because front/backend drivers will use
-         * them when they are registered.
-         */
+	 * Do not unregister the xenbus front/backend buses here. The buses
+	 * must exist because front/backend drivers will use them when they are
+	 * registered.
+	 */
 
 	return err;
 }

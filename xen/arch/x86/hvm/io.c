@@ -507,6 +507,13 @@ static void hvm_mmio_assist(struct vcpu *v, struct cpu_user_regs *regs,
             regs->ecx -= p->count;
         break;
 
+    case INSTR_LODS:
+        sign = p->df ? -1 : 1;
+        regs->esi += sign * p->count * p->size;
+        if (mmio_opp->flags & REPZ)
+            regs->ecx -= p->count;
+        break;
+
     case INSTR_AND:
         if (src & REGISTER) {
             index = operand_index(src);

@@ -1,7 +1,8 @@
 
 SUBDIRS =
 
-TESTS = 01_block_device_read_verify.test
+TESTS = 01_block_device_read_verify.test \
+        02_block_device_write_verify.test
 
 XFAIL_TESTS = 
 

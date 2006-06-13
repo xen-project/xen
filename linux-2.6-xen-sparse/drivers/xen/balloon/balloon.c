@@ -222,7 +222,7 @@ static int increase_reservation(unsigned long nr_pages)
 		/* Update P->M and M->P tables. */
 		set_phys_to_machine(pfn, frame_list[i]);
 		xen_machphys_update(frame_list[i], pfn);
-            
+
 		/* Link back into the page tables if not highmem. */
 		if (pfn < max_low_pfn) {
 			int ret;
@@ -378,22 +378,21 @@ static void watch_target(struct xenbus_watch *watch,
 	unsigned long long new_target;
 	int err;
 
-	err = xenbus_scanf(XBT_NULL, "memory", "target", "%llu", &new_target);
+	err = xenbus_scanf(XBT_NIL, "memory", "target", "%llu", &new_target);
 	if (err != 1) {
 		/* This is ok (for domain0 at least) - so just return */
 		return;
-	} 
-        
+	}
+
 	/* The given memory/target value is in KiB, so it needs converting to
-	   pages.  PAGE_SHIFT converts bytes to pages, hence PAGE_SHIFT - 10.
-	*/
+	 * pages. PAGE_SHIFT converts bytes to pages, hence PAGE_SHIFT - 10.
+	 */
 	set_new_target(new_target >> (PAGE_SHIFT - 10));
-    
 }
 
 static int balloon_init_watcher(struct notifier_block *notifier,
-                                unsigned long event,
-                                void *data)
+				unsigned long event,
+				void *data)
 {
 	int err;
 
@@ -402,11 +401,10 @@ static int balloon_init_watcher(struct notifier_block *notifier,
 		printk(KERN_ERR "Failed to set balloon watcher\n");
 
 	return NOTIFY_DONE;
-    
 }
 
 static int balloon_write(struct file *file, const char __user *buffer,
-                         unsigned long count, void *data)
+			 unsigned long count, void *data)
 {
 	char memstring[64], *endchar;
 	unsigned long long target_bytes;
@@ -430,7 +428,7 @@ static int balloon_write(struct file *file, const char __user *buffer,
 }
 
 static int balloon_read(char *page, char **start, off_t off,
-                        int count, int *eof, void *data)
+			int count, int *eof, void *data)
 {
 	int len;
 

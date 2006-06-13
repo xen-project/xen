@@ -249,7 +249,8 @@ class HVMImageHandler(ImageHandler):
     # xm config file
     def parseDeviceModelArgs(self, imageConfig, deviceConfig):
         dmargs = [ 'cdrom', 'boot', 'fda', 'fdb', 'ne2000', 'audio',
-                   'localtime', 'serial', 'stdvga', 'isa', 'vcpus']
+                   'localtime', 'serial', 'stdvga', 'isa', 'vcpus',
+		   'usb', 'usbdevice']
         ret = []
         for a in dmargs:
             v = sxp.child_value(imageConfig, a)
@@ -260,7 +261,7 @@ class HVMImageHandler(ImageHandler):
             if a == 'audio': a = 'enable-audio'
 
             # Handle booleans gracefully
-            if a in ['localtime', 'std-vga', 'isa', 'nic-ne2000', 'enable-audio']:
+            if a in ['localtime', 'std-vga', 'isa', 'nic-ne2000', 'enable-audio', 'usb']:
                 if v != None: v = int(v)
                 if v: ret.append("-%s" % a)
             else:

@@ -209,7 +209,7 @@ static int perfc_copy_info(XEN_GUEST_HANDLE(dom0_perfc_desc_t) desc)
 /* Dom0 control of perf counters */
 int perfc_control(dom0_perfccontrol_t *pc)
 {
-    static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+    static DEFINE_SPINLOCK(lock);
     u32 op = pc->op;
     int rc;
 

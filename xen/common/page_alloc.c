@@ -59,7 +59,7 @@ custom_param("lowmem_emergency_pool", parse_lowmem_emergency_pool);
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 
-static spinlock_t page_scrub_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(page_scrub_lock);
 LIST_HEAD(page_scrub_list);
 
 /*********************
@@ -250,7 +250,7 @@ static struct list_head heap[NR_ZONES][MAX_ORDER+1];
 
 static unsigned long avail[NR_ZONES];
 
-static spinlock_t heap_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(heap_lock);
 
 void end_boot_allocator(void)
 {

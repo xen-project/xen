@@ -274,7 +274,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 {
 	const char *message = NULL;
 	int err;
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 
 	err = setup_tpmring(dev, tp);
 	if (err) {
@@ -331,7 +331,7 @@ out:
 static void backend_changed(struct xenbus_device *dev,
 			    enum xenbus_state backend_state)
 {
-	struct tpm_private *tp = dev->data;
+	struct tpm_private *tp = dev->dev.driver_data;
 	DPRINTK("\n");
 
 	switch (backend_state) {
@@ -369,7 +369,7 @@ static int tpmfront_probe(struct xenbus_device *dev,
 	if (!tp)
 		return -ENOMEM;
 
-	err = xenbus_scanf(XBT_NULL, dev->nodename,
+	err = xenbus_scanf(XBT_NIL, dev->nodename,
 	                   "handle", "%i", &handle);
 	if (XENBUS_EXIST_ERR(err))
 		return err;
@@ -380,12 +380,12 @@ static int tpmfront_probe(struct xenbus_device *dev,
 	}
 
 	tp->dev = dev;
-	dev->data = tp;
+	dev->dev.driver_data = tp;
 
 	err = talk_to_backend(dev, tp);
 	if (err) {
 		tpm_private_put();
-		dev->data = NULL;
+		dev->dev.driver_data = NULL;
 		return err;
 	}
 	return 0;
@@ -394,14 +394,14 @@ static int tpmfront_probe(struct xenbus_device *dev,
 
 static int tpmfront_remove(struct xenbus_device *dev)
 {
-	struct tpm_private *tp = (struct tpm_private *)dev->data;
+	struct tpm_private *tp = (struct tpm_private *)dev->dev.driver_data;
 	destroy_tpmring(tp);
 	return 0;
 }
 
 static int tpmfront_suspend(struct xenbus_device *dev)
 {
-	struct tpm_private *tp = (struct tpm_private *)dev->data;
+	struct tpm_private *tp = (struct tpm_private *)dev->dev.driver_data;
 	u32 ctr;
 
 	/* lock, so no app can send */
@@ -431,7 +431,7 @@ static int tpmfront_suspend(struct xenbus_device *dev)
 
 static int tpmfront_resume(struct xenbus_device *dev)
 {
-	struct tpm_private *tp = (struct tpm_private *)dev->data;
+	struct tpm_private *tp = (struct tpm_private *)dev->dev.driver_data;
 	destroy_tpmring(tp);
 	return talk_to_backend(dev, tp);
 }

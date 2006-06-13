@@ -28,6 +28,12 @@ from XmTestLib import *
 check_status = 1
 max_tries = 10
 
+def reset_vcpu_count():
+    status, output = traceCommand("xm vcpu-set 0 %s"%(dom0_online_vcpus))
+    if status != 0:
+        print "WARNING!!! Unable to set vcpus back to %s, please set manually"\
+            %(dom0_online_vcpus)
+
 # 1) Make sure we have a multi cpu system and dom0 has at least 2 vcpus online.
 
 if smpConcurrencyLevel() <= 1:
@@ -57,6 +63,7 @@ if check_status and status != 0:
 # 4) restart xend with new config
 os.putenv("XEND_CONFIG", "/tmp/xend-config.sxp")
 status = restartXend()
+os.unsetenv("XEND_CONFIG")
 if check_status and status != 0:
     ns, no = restartXend()
     if ns != 0:
@@ -75,7 +82,7 @@ while timeout + starttime > time.time():
     cmd = "grep \"^processor\" /proc/cpuinfo | wc -l"
     status, output = traceCommand(cmd)
     if check_status and status != 0:
-        os.unsetenv("XEND_CONFIG")
+        reset_vcpu_count()
         restartXend()
         FAIL("\"%s\" returned invalid %i != 0" %(cmd,status))
 # Has it succeeded? If so, we can leave the loop
@@ -84,7 +91,7 @@ while timeout + starttime > time.time():
 # Sleep for 1 second before trying again
     time.sleep(1)
 if output != str(enforce_dom0_cpus):
-    os.unsetenv("XEND_CONFIG")
+    reset_vcpu_count()
     restartXend()
     FAIL("/proc/cpuinfo says xend didn't enforce dom0_cpus (%s != %s)"%(output, 
                                                              enforce_dom0_cpus))
@@ -92,17 +99,13 @@ if output != str(enforce_dom0_cpus):
 # 6) count number of online cpus and see that it matches enforce value
 num_online = int(getDomInfo("Domain-0", "VCPUs"))
 if num_online != enforce_dom0_cpus:
-    os.unsetenv("XEND_CONFIG")
+    reset_vcpu_count()
     restartXend()
     FAIL("xm says xend didn't enforce dom0_cpus (%s != %s)" %(num_online, 
                                                              enforce_dom0_cpus))
 
 # 7) restore dead processors 
-status, output = traceCommand("xm vcpu-set 0 %s"%(dom0_online_vcpus))
-if check_status and status != 0:
-    os.unsetenv("XEND_CONFIG")
-    restartXend()
-    FAIL("\"%s\" returned invalid %i != 0" %(cmd,status))
+reset_vcpu_count()
 
 # check restore worked
 # Since this also takes time, we will do it in a loop with a 20 second timeout.
@@ -114,12 +117,10 @@ while timeout + starttime > time.time():
         break
     time.sleep(1)
 if num_online != dom0_online_vcpus:
-    os.unsetenv("XEND_CONFIG")
     restartXend()
     FAIL("failed to restore dom0's VCPUs")
 
 
 # 8) Restart xend with default config
-os.unsetenv("XEND_CONFIG")
 restartXend()
 

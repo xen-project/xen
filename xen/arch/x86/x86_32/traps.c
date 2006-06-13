@@ -346,6 +346,12 @@ static long register_guest_callback(struct callback_register *reg)
     case CALLBACKTYPE_failsafe:
         v->arch.guest_context.failsafe_callback_cs  = reg->address.cs;
         v->arch.guest_context.failsafe_callback_eip = reg->address.eip;
+        if ( reg->flags & CALLBACKF_mask_events )
+            set_bit(_VGCF_failsafe_disables_events,
+                    &v->arch.guest_context.flags);
+        else
+            clear_bit(_VGCF_failsafe_disables_events,
+                      &v->arch.guest_context.flags);
         break;
 
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
@@ -454,7 +460,7 @@ static void hypercall_page_initialise_ring0_kernel(void *hypercall_page)
 
     /* Fill in all the transfer points with template machine code. */
 
-    for ( i = 0; i < NR_hypercalls; i++ )
+    for ( i = 0; i < (PAGE_SIZE / 32); i++ )
     {
         p = (char *)(hypercall_page + (i * 32));
 

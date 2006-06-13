@@ -44,9 +44,7 @@ unsigned long end_pfn_map;
  */
 unsigned long end_user_pfn = MAXMEM>>PAGE_SHIFT;  
 
-#ifndef CONFIG_XEN
 extern struct resource code_resource, data_resource;
-#endif
 
 /* Check for some hardcoded bad areas that early boot is not allowed to touch */ 
 static inline int bad_addr(unsigned long *addrp, unsigned long size)
@@ -251,8 +249,7 @@ void __init e820_reserve_resources(struct e820entry *e820, int nr_map)
 		res->end = res->start + e820[i].size - 1;
 		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
 		request_resource(&iomem_resource, res);
-#ifndef CONFIG_XEN
-		if (e820.map[i].type == E820_RAM) {
+		if (e820[i].type == E820_RAM) {
 			/*
 			 *  We don't know which RAM region contains kernel data,
 			 *  so we try it repeatedly and let the resource manager
@@ -264,7 +261,6 @@ void __init e820_reserve_resources(struct e820entry *e820, int nr_map)
 			request_resource(res, &crashk_res);
 #endif
 		}
-#endif
 	}
 }
 

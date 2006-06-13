@@ -138,9 +138,16 @@ static void init_mouse(int max_x,int max_y) {
 }
 
 static void mouse_refresh() {
+	static int last_x = -1;
+	static int last_y = -1;
+	static int last_z = -1;
+	static int last_b = -1;
 	int dx=0,dy=0,dz=new_mouse_z;
 	static int counter=1;
 
+	if (new_mouse_x == last_x && new_mouse_y == last_y &&
+	    new_mouse_z == last_z && new_mouse_buttons == last_b)
+		return;
 	/*
 	 *  Simulate lifting the mouse by pressing left <ctl><alt> together
 	 *  e.g. don't send mouse events.
@@ -148,27 +155,40 @@ static void mouse_refresh() {
 	if (ctl_keys == 3) {
 		mouse_x = new_mouse_x;
 		mouse_y = new_mouse_y;
+		last_x = new_mouse_x;
+		last_y = new_mouse_y;
+		last_z = new_mouse_z;
+		last_b = new_mouse_buttons;
 		return;
 	}
 	counter++;
-	if(!mouse_magic->calibration && counter>=2) { counter=0; return; }
-
-	dx=new_mouse_x-mouse_x;
-	dy=new_mouse_y-mouse_y;
-
-	if(mouse_magic->sonic_wall_is_orthogonal) {
-		if(abs(dx)>=mouse_magic->sonic_wall_x) { dx/=2; mouse_x+=dx; }
-		if(abs(dy)>=mouse_magic->sonic_wall_y) { dy/=2; mouse_y+=dy; }
-	} else {
-		if(abs(dx)>=mouse_magic->sonic_wall_x || abs(dy)>=mouse_magic->sonic_wall_y) {
-			dx/=2; mouse_x+=dx;
-			dy/=2; mouse_y+=dy;
-		}
-	}
 	//fprintf(stderr,"sending mouse event %d,%d\n",dx,dy);
-	kbd_mouse_event(dx,dy,dz,new_mouse_buttons,new_mouse_x,new_mouse_y);
-	mouse_x+=dx;
-	mouse_y+=dy;
+	if (kbd_mouse_is_absolute()) {
+		kbd_mouse_event(new_mouse_x * 0x7FFF / screen->width,
+				new_mouse_y * 0x7FFF / screen->height, dz, new_mouse_buttons);
+	} else {
+		if(!mouse_magic->calibration && counter>=2) { counter=0; return; }
+
+		dx=new_mouse_x-last_x;
+		dy=new_mouse_y-last_y;
+
+		if(mouse_magic->sonic_wall_is_orthogonal) {
+			if(abs(dx)>=mouse_magic->sonic_wall_x) { dx/=2; mouse_x+=dx; }
+			if(abs(dy)>=mouse_magic->sonic_wall_y) { dy/=2; mouse_y+=dy; }
+		} else {
+			if(abs(dx)>=mouse_magic->sonic_wall_x || abs(dy)>=mouse_magic->sonic_wall_y) {
+				dx/=2; mouse_x+=dx;
+				dy/=2; mouse_y+=dy;
+			}
+		}
+		if (last_x != -1)
+			kbd_mouse_event(dx,dy,dz,new_mouse_buttons);
+
+	}
+	last_x = new_mouse_x;
+	last_y = new_mouse_y;
+	last_z = new_mouse_z;
+	last_b = new_mouse_buttons;
 		
 	updates_since_mouse=0;
 }
@@ -250,7 +270,7 @@ static void mouse_calibration_refresh() {
 	
 	if(calibration_step==0) {
 		x=0; y=1;
-		kbd_mouse_event(0,-1,0,0,x,y);
+		kbd_mouse_event(0,-1,0,0);
 		calibration_step++;
 	} else if(calibration_step==1) {
 		// find out the initial position of the cursor
@@ -282,7 +302,7 @@ static void mouse_calibration_refresh() {
 		} else {
 			y++;
 move_calibrate:
-			kbd_mouse_event(-x,-y,0,0,x,y);
+			kbd_mouse_event(-x,-y,0,0);
 			before_update=last_update;
 		}
 	} else if(calibration_step==3) {

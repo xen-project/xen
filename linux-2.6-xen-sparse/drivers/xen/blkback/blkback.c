@@ -105,24 +105,12 @@ static inline unsigned long vaddr(pending_req_t *req, int seg)
 	(pending_grant_handles[vaddr_pagenr(_req, _seg)])
 
 
-#ifdef CONFIG_XEN_BLKDEV_TAP_BE
-/*
- * If the tap driver is used, we may get pages belonging to either the tap
- * or (more likely) the real frontend.  The backend must specify which domain
- * a given page belongs to in update_va_mapping though.  For the moment, 
- * the tap rewrites the ID field of the request to contain the request index
- * and the id of the real front end domain.
- */
-#define BLKTAP_COOKIE 0xbeadfeed
-static inline domid_t ID_TO_DOM(unsigned long id) { return (id >> 16); }
-#endif
-
 static int do_block_io_op(blkif_t *blkif);
 static void dispatch_rw_block_io(blkif_t *blkif,
 				 blkif_request_t *req,
 				 pending_req_t *pending_req);
 static void make_response(blkif_t *blkif, unsigned long id, 
-                          unsigned short op, int st);
+			  unsigned short op, int st);
 
 /******************************************************************
  * misc small helpers
@@ -446,7 +434,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 			bio = biolist[nbio++] = bio_alloc(GFP_KERNEL, nseg-i);
 			if (unlikely(bio == NULL))
 				goto fail_put_bio;
-                
+
 			bio->bi_bdev    = preq.bdev;
 			bio->bi_private = pending_req;
 			bio->bi_end_io  = end_block_io_op;
@@ -483,7 +471,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 
 static void make_response(blkif_t *blkif, unsigned long id, 
-                          unsigned short op, int st)
+			  unsigned short op, int st)
 {
 	blkif_response_t *resp;
 	unsigned long     flags;

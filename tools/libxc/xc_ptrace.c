@@ -143,7 +143,7 @@ online_vcpus_changed(cpumap_t cpumap)
         {
             if (handlers.td_create) handlers.td_create(index - 1);
         } else {
-            printf("thread death: %d\n", index - 1);
+            IPRINTF("thread death: %d\n", index - 1);
             if (handlers.td_death) handlers.td_death(index - 1);
         }
         changed_cpumap &= ~(1 << (index - 1));
@@ -190,7 +190,8 @@ map_domain_va_32(
     static void *v[MAX_VIRT_CPUS];
 
     l2 = xc_map_foreign_range(
-         xc_handle, current_domid, PAGE_SIZE, PROT_READ, ctxt[cpu].ctrlreg[3] >> PAGE_SHIFT);
+         xc_handle, current_domid, PAGE_SIZE, PROT_READ,
+         xen_cr3_to_pfn(ctxt[cpu].ctrlreg[3]));
     if ( l2 == NULL )
         return NULL;
 
@@ -230,7 +231,8 @@ map_domain_va_pae(
     static void *v[MAX_VIRT_CPUS];
 
     l3 = xc_map_foreign_range(
-        xc_handle, current_domid, PAGE_SIZE, PROT_READ, ctxt[cpu].ctrlreg[3] >> PAGE_SHIFT);
+        xc_handle, current_domid, PAGE_SIZE, PROT_READ,
+        xen_cr3_to_pfn(ctxt[cpu].ctrlreg[3]));
     if ( l3 == NULL )
         return NULL;
 
@@ -282,8 +284,9 @@ map_domain_va_64(
     if ((ctxt[cpu].ctrlreg[4] & 0x20) == 0 ) /* legacy ia32 mode */
         return map_domain_va_32(xc_handle, cpu, guest_va, perm);
 
-    l4 = xc_map_foreign_range( xc_handle, current_domid, PAGE_SIZE,
-            PROT_READ, ctxt[cpu].ctrlreg[3] >> PAGE_SHIFT);
+    l4 = xc_map_foreign_range(
+        xc_handle, current_domid, PAGE_SIZE, PROT_READ,
+        xen_cr3_to_pfn(ctxt[cpu].ctrlreg[3]));
     if ( l4 == NULL )
         return NULL;
 
@@ -365,13 +368,13 @@ map_domain_va(
         nr_pages = npgs;
         if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
         {
-            printf("Could not allocate memory\n");
+            IPRINTF("Could not allocate memory\n");
             return NULL;
         }
         if ( xc_get_pfn_list(xc_handle, current_domid,
                              page_array, nr_pages) != nr_pages )
         {
-            printf("Could not get the page frame list\n");
+            IPRINTF("Could not get the page frame list\n");
             return NULL;
         }
     }
@@ -430,7 +433,7 @@ __xc_waitdomain(
     retval = do_dom0_op(xc_handle, &op);
     if ( retval || (op.u.getdomaininfo.domain != domain) )
     {
-        printf("getdomaininfo failed\n");
+        IPRINTF("getdomaininfo failed\n");
         goto done;
     }
     *status = op.u.getdomaininfo.flags;
@@ -451,7 +454,7 @@ __xc_waitdomain(
     }
  done:
     if (get_online_cpumap(xc_handle, &op.u.getdomaininfo, &cpumap))
-        printf("get_online_cpumap failed\n");
+        IPRINTF("get_online_cpumap failed\n");
     if (online_cpumap != cpumap)
         online_vcpus_changed(cpumap);
     return retval;
@@ -592,7 +595,7 @@ xc_ptrace(
         if ( retval || (op.u.getdomaininfo.domain != current_domid) )
             goto out_error_dom0;
         if ( op.u.getdomaininfo.flags & DOMFLAGS_PAUSED )
-            printf("domain currently paused\n");
+            IPRINTF("domain currently paused\n");
         else if ((retval = xc_domain_pause(xc_handle, current_domid)))
             goto out_error_dom0;
         op.cmd = DOM0_SETDEBUGGING;
@@ -602,7 +605,7 @@ xc_ptrace(
             goto out_error_dom0;
 
         if (get_online_cpumap(xc_handle, &op.u.getdomaininfo, &cpumap))
-            printf("get_online_cpumap failed\n");
+            IPRINTF("get_online_cpumap failed\n");
         if (online_cpumap != cpumap)
             online_vcpus_changed(cpumap);
         break;
@@ -616,7 +619,7 @@ xc_ptrace(
         goto out_unsupported; /* XXX not yet supported */
 
     case PTRACE_TRACEME:
-        printf("PTRACE_TRACEME is an invalid request under Xen\n");
+        IPRINTF("PTRACE_TRACEME is an invalid request under Xen\n");
         goto out_error;
     }
 
@@ -630,7 +633,7 @@ xc_ptrace(
 
  out_unsupported:
 #ifdef DEBUG
-    printf("unsupported xc_ptrace request %s\n", ptrace_names[request]);
+    IPRINTF("unsupported xc_ptrace request %s\n", ptrace_names[request]);
 #endif
     errno = ENOSYS;
     return -1;

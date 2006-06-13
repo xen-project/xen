@@ -66,7 +66,7 @@ config XEN_IA64_DOM0_VP
 
 config XEN_IA64_DOM0_NON_VP
 	bool
-	depends on !(XEN && XEN_IA64_DOM0_VP)
+	depends on XEN && !XEN_IA64_DOM0_VP
 	default y
 	help
 	  dom0 P=M model
@@ -489,15 +489,39 @@ source "security/Kconfig"
 
 source "crypto/Kconfig"
 
+#
 # override default values of drivers/xen/Kconfig
-if !XEN_IA64_DOM0_VP
+#
+if XEN
+config XEN_UTIL
+	default n if XEN_IA64_DOM0_VP
+
 config HAVE_ARCH_ALLOC_SKB
-        bool
-        default n
+	default n if !XEN_IA64_DOM0_VP
 
 config HAVE_ARCH_DEV_ALLOC_SKB
-        bool
-        default n
+	default n if !XEN_IA64_DOM0_VP
+
+config XEN_BALLOON
+	default n if !XEN_IA64_DOM0_VP
+
+config XEN_SKBUFF
+	default n if !XEN_IA64_DOM0_VP
+
+config XEN_NETDEV_BACKEND
+	default n if !XEN_IA64_DOM0_VP
+
+config XEN_NETDEV_FRONTEND
+	default n if !XEN_IA64_DOM0_VP
+
+config XEN_DEVMEM
+	default n
+
+config XEN_REBOOT
+	default n
+
+config XEN_SMPBOOT
+	default n
 endif
 
 source "drivers/xen/Kconfig"

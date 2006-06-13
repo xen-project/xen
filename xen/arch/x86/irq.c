@@ -402,6 +402,28 @@ int pirq_acktype(int irq)
     return 0;
 }
 
+int pirq_shared(int irq)
+{
+    unsigned int        vector;
+    irq_desc_t         *desc;
+    irq_guest_action_t *action;
+    unsigned long       flags;
+    int                 shared;
+
+    vector = irq_to_vector(irq);
+    if ( vector == 0 )
+        return 0;
+
+    desc = &irq_desc[vector];
+
+    spin_lock_irqsave(&desc->lock, flags);
+    action = (irq_guest_action_t *)desc->action;
+    shared = ((desc->status & IRQ_GUEST) && (action->nr_guests > 1));
+    spin_unlock_irqrestore(&desc->lock, flags);
+
+    return shared;
+}
+
 int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
 {
     unsigned int        vector;

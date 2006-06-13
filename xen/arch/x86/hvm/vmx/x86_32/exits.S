@@ -55,95 +55,72 @@
  * domain pointer, DS, ES, FS, GS. Therefore, we effectively skip 6 registers.
  */
 
-#define HVM_MONITOR_EFLAGS	0x202 /* IF on */
 #define NR_SKIPPED_REGS	6	/* See the above explanation */
-#define HVM_SAVE_ALL_NOSEGREGS \
-        pushl $HVM_MONITOR_EFLAGS; \
-        popf; \
-        subl $(NR_SKIPPED_REGS*4), %esp; \
+#define HVM_SAVE_ALL_NOSEGREGS                                              \
+        subl $(NR_SKIPPED_REGS*4), %esp;                                    \
         movl $0, 0xc(%esp);  /* XXX why do we need to force eflags==0 ?? */ \
-        pushl %eax; \
-        pushl %ebp; \
-        pushl %edi; \
-        pushl %esi; \
-        pushl %edx; \
-        pushl %ecx; \
+        pushl %eax;                                                         \
+        pushl %ebp;                                                         \
+        pushl %edi;                                                         \
+        pushl %esi;                                                         \
+        pushl %edx;                                                         \
+        pushl %ecx;                                                         \
         pushl %ebx;
 
-#define HVM_RESTORE_ALL_NOSEGREGS   \
-        popl %ebx;  \
-        popl %ecx;  \
-        popl %edx;  \
-        popl %esi;  \
-        popl %edi;  \
-        popl %ebp;  \
-        popl %eax;  \
+#define HVM_RESTORE_ALL_NOSEGREGS               \
+        popl %ebx;                              \
+        popl %ecx;                              \
+        popl %edx;                              \
+        popl %esi;                              \
+        popl %edi;                              \
+        popl %ebp;                              \
+        popl %eax;                              \
         addl $(NR_SKIPPED_REGS*4), %esp
 
         ALIGN
-
 ENTRY(vmx_asm_vmexit_handler)
         /* selectors are restored/saved by VMX */
         HVM_SAVE_ALL_NOSEGREGS
         call vmx_trace_vmexit
         call vmx_vmexit_handler
-        jmp vmx_asm_do_resume
+        jmp vmx_asm_do_vmentry
 
-.macro vmx_asm_common launch, initialized
-1:
-/* vmx_test_all_events */
-        .if \initialized
+        ALIGN
+vmx_process_softirqs:
+        sti       
+        call do_softirq
+        jmp vmx_asm_do_vmentry
+
+        ALIGN
+ENTRY(vmx_asm_do_vmentry)
         GET_CURRENT(%ebx)
-/*test_all_events:*/
-        xorl %ecx,%ecx
-        notl %ecx
         cli                             # tests must not race interrupts
-/*test_softirqs:*/  
+
         movl VCPU_processor(%ebx),%eax
         shl  $IRQSTAT_shift,%eax
-        test %ecx,irq_stat(%eax,1)
-        jnz 2f
+        cmpl $0,irq_stat(%eax,1)
+        jnz  vmx_process_softirqs
 
-/* vmx_restore_all_guest */
         call vmx_intr_assist
         call vmx_load_cr2
         call vmx_trace_vmentry
-        .endif
+
+        cmpl $0,VCPU_vmx_launched(%ebx)
+        je   vmx_launch
+
+/*vmx_resume:*/
         HVM_RESTORE_ALL_NOSEGREGS
-        /* 
-         * Check if we are going back to VMX-based VM
-         * By this time, all the setups in the VMCS must be complete.
-         */
-        .if \launch
-        /* VMLAUNCH */
-        .byte 0x0f,0x01,0xc2
-        pushf
-        call vm_launch_fail
-        .else
         /* VMRESUME */
         .byte 0x0f,0x01,0xc3
         pushf
         call vm_resume_fail
-        .endif
-        /* Should never reach here */
-        hlt
+        ud2
 
-        ALIGN
-        .if \initialized
-2:
-/* vmx_process_softirqs */
-        sti       
-        call do_softirq
-        jmp 1b
-        ALIGN
-        .endif
-.endm
-
-ENTRY(vmx_asm_do_launch)
-    vmx_asm_common 1, 0
-
-ENTRY(vmx_asm_do_resume)
-    vmx_asm_common 0, 1
-
-ENTRY(vmx_asm_do_relaunch)
-    vmx_asm_common 1, 1
+vmx_launch:
+        movl $1,VCPU_vmx_launched(%ebx)
+        HVM_RESTORE_ALL_NOSEGREGS
+        /* VMLAUNCH */
+        .byte 0x0f,0x01,0xc2
+        pushf
+        call vm_launch_fail
+        ud2

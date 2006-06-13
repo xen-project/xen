@@ -328,11 +328,9 @@ static inline void __add_to_runqueue_sort(struct vcpu *v)
 }
 
 
-/* Allocates memory for per domain private scheduling data*/
-static int sedf_alloc_task(struct vcpu *v)
+static int sedf_init_vcpu(struct vcpu *v)
 {
-    PRINT(2, "sedf_alloc_task was called, domain-id %i.%i\n",
-          v->domain->domain_id, v->vcpu_id);
+    struct sedf_vcpu_info *inf;
 
     if ( v->domain->sched_priv == NULL )
     {
@@ -344,23 +342,11 @@ static int sedf_alloc_task(struct vcpu *v)
 
     if ( (v->sched_priv = xmalloc(struct sedf_vcpu_info)) == NULL )
         return -1;
-
     memset(v->sched_priv, 0, sizeof(struct sedf_vcpu_info));
 
-    return 0;
-}
-
-
-/* Setup the sedf_dom_info */
-static void sedf_add_task(struct vcpu *v)
-{
-    struct sedf_vcpu_info *inf = EDOM_INFO(v);
-
+    inf = EDOM_INFO(v);
     inf->vcpu = v;
  
-    PRINT(2,"sedf_add_task was called, domain-id %i.%i\n",
-          v->domain->domain_id, v->vcpu_id);
-
     /* Allocate per-CPU context if this is the first domain to be added. */
     if ( unlikely(schedule_data[v->processor].sched_priv == NULL) )
     {
@@ -408,14 +394,13 @@ static void sedf_add_task(struct vcpu *v)
         EDOM_INFO(v)->deadl_abs = 0;
         EDOM_INFO(v)->status &= ~SEDF_ASLEEP;
     }
+
+    return 0;
 }
 
-/* Frees memory used by domain info */
-static void sedf_free_task(struct domain *d)
+static void sedf_destroy_domain(struct domain *d)
 {
     int i;
-
-    PRINT(2,"sedf_free_task was called, domain-id %i\n",d->domain_id);
 
     xfree(d->sched_priv);
  
@@ -1452,9 +1437,9 @@ struct scheduler sched_sedf_def = {
     .opt_name = "sedf",
     .sched_id = SCHED_SEDF,
     
-    .alloc_task     = sedf_alloc_task,
-    .add_task       = sedf_add_task,
-    .free_task      = sedf_free_task,
+    .init_vcpu      = sedf_init_vcpu,
+    .destroy_domain = sedf_destroy_domain,
+
     .do_schedule    = sedf_do_schedule,
     .dump_cpu_state = sedf_dump_cpu_state,
     .sleep          = sedf_sleep,

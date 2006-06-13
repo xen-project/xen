@@ -89,6 +89,7 @@
 #include <xen/kernel.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
+#include <xen/domain.h>
 #include <xen/sched.h>
 #include <xen/errno.h>
 #include <xen/perfc.h>
@@ -187,20 +188,16 @@ void arch_init_memory(void)
      * Any Xen-heap pages that we will allow to be mapped will have
      * their domain field set to dom_xen.
      */
-    dom_xen = alloc_domain();
-    spin_lock_init(&dom_xen->page_alloc_lock);
-    atomic_set(&dom_xen->refcnt, 1);
-    dom_xen->domain_id = DOMID_XEN;
+    dom_xen = alloc_domain(DOMID_XEN);
+    BUG_ON(dom_xen == NULL);
 
     /*
      * Initialise our DOMID_IO domain.
      * This domain owns I/O pages that are within the range of the page_info
      * array. Mappings occur at the priv of the caller.
      */
-    dom_io = alloc_domain();
-    spin_lock_init(&dom_io->page_alloc_lock);
-    atomic_set(&dom_io->refcnt, 1);
-    dom_io->domain_id = DOMID_IO;
+    dom_io = alloc_domain(DOMID_IO);
+    BUG_ON(dom_io == NULL);
 
     /* First 1MB of RAM is historically marked as I/O. */
     for ( i = 0; i < 0x100; i++ )
@@ -1000,6 +997,21 @@ static int alloc_l3_table(struct page_info *page, unsigned long type)
 
     ASSERT(!shadow_mode_refcounts(d));
 
+#ifdef CONFIG_X86_PAE
+    /*
+     * PAE pgdirs above 4GB are unacceptable if the guest does not understand
+     * the weird 'extended cr3' format for dealing with high-order address
+     * bits. We cut some slack for control tools (before vcpu0 is initialised).
+     */
+    if ( (pfn >= 0x100000) &&
+         unlikely(!VM_ASSIST(d, VMASST_TYPE_pae_extended_cr3)) &&
+         d->vcpu[0] && test_bit(_VCPUF_initialised, &d->vcpu[0]->vcpu_flags) )
+    {
+        MEM_LOG("PAE pgd must be below 4GB (0x%lx >= 0x100000)", pfn);
+        return 0;
+    }
+#endif
+
     pl3e = map_domain_page(pfn);
     for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
     {
@@ -1717,7 +1729,7 @@ int new_guest_cr3(unsigned long mfn)
         {
             /* Switch to idle pagetable: this VCPU has no active p.t. now. */
             old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-            v->arch.guest_table = mk_pagetable(0);
+            v->arch.guest_table = pagetable_null();
             update_pagetables(v);
             write_cr3(__pa(idle_pg_table));
             if ( old_base_mfn != 0 )
@@ -1739,7 +1751,7 @@ int new_guest_cr3(unsigned long mfn)
     invalidate_shadow_ldt(v);
 
     old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
-    v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+    v->arch.guest_table = pagetable_from_pfn(mfn);
     update_pagetables(v); /* update shadow_table and monitor_table */
 
     write_ptbase(v);
@@ -2006,7 +2018,7 @@ int do_mmuext_op(
             {
                 unsigned long old_mfn =
                     pagetable_get_pfn(v->arch.guest_table_user);
-                v->arch.guest_table_user = mk_pagetable(mfn << PAGE_SHIFT);
+                v->arch.guest_table_user = pagetable_from_pfn(mfn);
                 if ( old_mfn != 0 )
                     put_page_and_type(mfn_to_page(old_mfn));
             }
@@ -2213,99 +2225,88 @@ int do_mmu_update(
 
             switch ( (type_info = page->u.inuse.type_info) & PGT_type_mask )
             {
-            case PGT_l1_page_table: 
-                ASSERT( !shadow_mode_refcounts(d) );
-                if ( likely(get_page_type(
+            case PGT_l1_page_table:
+            case PGT_l2_page_table:
+            case PGT_l3_page_table:
+            case PGT_l4_page_table:
+            {
+                ASSERT(!shadow_mode_refcounts(d));
+                if ( unlikely(!get_page_type(
                     page, type_info & (PGT_type_mask|PGT_va_mask))) )
-                {
-                    l1_pgentry_t l1e;
+                    goto not_a_pt;
 
-                    /* FIXME: doesn't work with PAE */
-                    l1e = l1e_from_intpte(req.val);
+                switch ( type_info & PGT_type_mask )
+                {
+                case PGT_l1_page_table:
+                {
+                    l1_pgentry_t l1e = l1e_from_intpte(req.val);
                     okay = mod_l1_entry(va, l1e);
                     if ( okay && unlikely(shadow_mode_enabled(d)) )
                         shadow_l1_normal_pt_update(
                             d, req.ptr, l1e, &sh_mapcache);
-                    put_page_type(page);
                 }
                 break;
-            case PGT_l2_page_table:
-                ASSERT( !shadow_mode_refcounts(d) );
-                if ( likely(get_page_type(
-                    page, type_info & (PGT_type_mask|PGT_va_mask))) )
+                case PGT_l2_page_table:
                 {
-                    l2_pgentry_t l2e;
-
-                    /* FIXME: doesn't work with PAE */
-                    l2e = l2e_from_intpte(req.val);
+                    l2_pgentry_t l2e = l2e_from_intpte(req.val);
                     okay = mod_l2_entry(
                         (l2_pgentry_t *)va, l2e, mfn, type_info);
                     if ( okay && unlikely(shadow_mode_enabled(d)) )
                         shadow_l2_normal_pt_update(
                             d, req.ptr, l2e, &sh_mapcache);
-                    put_page_type(page);
                 }
                 break;
 #if CONFIG_PAGING_LEVELS >= 3
-            case PGT_l3_page_table:
-                ASSERT( !shadow_mode_refcounts(d) );
-                if ( likely(get_page_type(
-                    page, type_info & (PGT_type_mask|PGT_va_mask))) )
+                case PGT_l3_page_table:
                 {
-                    l3_pgentry_t l3e;
-
-                    /* FIXME: doesn't work with PAE */
-                    l3e = l3e_from_intpte(req.val);
+                    l3_pgentry_t l3e = l3e_from_intpte(req.val);
                     okay = mod_l3_entry(va, l3e, mfn, type_info);
                     if ( okay && unlikely(shadow_mode_enabled(d)) )
                         shadow_l3_normal_pt_update(
                             d, req.ptr, l3e, &sh_mapcache);
-                    put_page_type(page);
                 }
                 break;
 #endif
 #if CONFIG_PAGING_LEVELS >= 4
-            case PGT_l4_page_table:
-                ASSERT( !shadow_mode_refcounts(d) );
-                if ( likely(get_page_type(
-                    page, type_info & (PGT_type_mask|PGT_va_mask))) )
+                case PGT_l4_page_table:
                 {
-                    l4_pgentry_t l4e;
-
-                    l4e = l4e_from_intpte(req.val);
+                    l4_pgentry_t l4e = l4e_from_intpte(req.val);
                     okay = mod_l4_entry(va, l4e, mfn, type_info);
                     if ( okay && unlikely(shadow_mode_enabled(d)) )
                         shadow_l4_normal_pt_update(
                             d, req.ptr, l4e, &sh_mapcache);
-                    put_page_type(page);
                 }
                 break;
 #endif
-            default:
-                if ( likely(get_page_type(page, PGT_writable_page)) )
-                {
-                    if ( shadow_mode_enabled(d) )
-                    {
-                        shadow_lock(d);
-
-                        __mark_dirty(d, mfn);
-
-                        if ( page_is_page_table(page) &&
-                             !page_out_of_sync(page) )
-                        {
-                            shadow_mark_mfn_out_of_sync(v, gmfn, mfn);
-                        }
-                    }
-
-                    *(intpte_t *)va = req.val;
-                    okay = 1;
-
-                    if ( shadow_mode_enabled(d) )
-                        shadow_unlock(d);
-
-                    put_page_type(page);
                 }
-                break;
+
+                put_page_type(page);
+            }
+            break;
+
+            default:
+            not_a_pt:
+            {
+                if ( unlikely(!get_page_type(page, PGT_writable_page)) )
+                    break;
+
+                if ( shadow_mode_enabled(d) )
+                {
+                    shadow_lock(d);
+                    __mark_dirty(d, mfn);
+                    if ( page_is_page_table(page) && !page_out_of_sync(page) )
+                        shadow_mark_mfn_out_of_sync(v, gmfn, mfn);
+                }
+
+                *(intpte_t *)va = req.val;
+                okay = 1;
+
+                if ( shadow_mode_enabled(d) )
+                    shadow_unlock(d);
+
+                put_page_type(page);
+            }
+            break;
             }
 
             unmap_domain_page_with_cache(va, &mapcache);
@@ -3709,7 +3710,7 @@ int map_pages_to_xen(
             {
                 local_flush_tlb_pge();
                 if ( !(l2e_get_flags(ol2e) & _PAGE_PSE) )
-                    free_xen_pagetable(l2e_get_page(*pl2e));
+                    free_xen_pagetable(l2e_get_page(ol2e));
             }
 
             virt    += 1UL << L2_PAGETABLE_SHIFT;

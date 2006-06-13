@@ -12,15 +12,12 @@
 #include <public/xen.h>
 #include <public/physdev.h>
 
-extern int
+int
 ioapic_guest_read(
     unsigned long physbase, unsigned int reg, u32 *pval);
-extern int
+int
 ioapic_guest_write(
     unsigned long physbase, unsigned int reg, u32 pval);
-extern int
-pirq_acktype(
-    int irq);
 
 long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
@@ -56,6 +53,8 @@ long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         irq_status_query.flags = 0;
         if ( pirq_acktype(irq) != 0 )
             irq_status_query.flags |= XENIRQSTAT_needs_eoi;
+        if ( pirq_shared(irq) )
+            irq_status_query.flags |= XENIRQSTAT_shared;
         ret = copy_to_guest(arg, &irq_status_query, 1) ? -EFAULT : 0;
         break;
     }

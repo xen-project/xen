@@ -1,7 +1,7 @@
 # xm-test configure.ac input script
 
 # Basic header information
-AC_INIT([xm-test], [0.7.1])
+AC_INIT([xm-test], [0.8.0])
 AM_INIT_AUTOMAKE([1.7 foreign])
 
 # Check for dependencies
@@ -118,6 +118,7 @@ AC_CONFIG_FILES([
     tests/reboot/Makefile
     tests/restore/Makefile
     tests/save/Makefile
+    tests/sched-credit/Makefile
     tests/sedf/Makefile
     tests/shutdown/Makefile
     tests/sysrq/Makefile

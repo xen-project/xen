@@ -259,7 +259,7 @@ int arch_set_info_guest(
     struct vcpu *v, struct vcpu_guest_context *c)
 {
     struct domain *d = v->domain;
-    unsigned long phys_basetab = INVALID_MFN;
+    unsigned long cr3_pfn = INVALID_MFN;
     int i, rc;
 
     if ( !(c->flags & VGCF_HVM_GUEST) )
@@ -322,12 +322,8 @@ int arch_set_info_guest(
 
     if ( !(c->flags & VGCF_HVM_GUEST) )
     {
-        phys_basetab = c->ctrlreg[3];
-        phys_basetab =
-            (gmfn_to_mfn(d, phys_basetab >> PAGE_SHIFT) << PAGE_SHIFT) |
-            (phys_basetab & ~PAGE_MASK);
-
-        v->arch.guest_table = mk_pagetable(phys_basetab);
+        cr3_pfn = gmfn_to_mfn(d, xen_cr3_to_pfn(c->ctrlreg[3]));
+        v->arch.guest_table = pagetable_from_pfn(cr3_pfn);
     }
 
     if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
@@ -335,14 +331,14 @@ int arch_set_info_guest(
 
     if ( c->flags & VGCF_HVM_GUEST )
     {
-        v->arch.guest_table = mk_pagetable(0);
+        v->arch.guest_table = pagetable_null();
 
         if ( !hvm_initialize_guest_resources(v) )
             return -EINVAL;
     }
     else if ( shadow_mode_refcounts(d) )
     {
-        if ( !get_page(mfn_to_page(phys_basetab>>PAGE_SHIFT), d) )
+        if ( !get_page(mfn_to_page(cr3_pfn), d) )
         {
             destroy_gdt(v);
             return -EINVAL;
@@ -350,7 +346,7 @@ int arch_set_info_guest(
     }
     else
     {
-        if ( !get_page_and_type(mfn_to_page(phys_basetab>>PAGE_SHIFT), d,
+        if ( !get_page_and_type(mfn_to_page(cr3_pfn), d,
                                 PGT_base_page_table) )
         {
             destroy_gdt(v);
@@ -381,10 +377,6 @@ arch_do_vcpu_op(
     {
         struct vcpu_register_runstate_memory_area area;
 
-        rc = -EINVAL;
-        if ( v != current )
-            break;
-
         rc = -EFAULT;
         if ( copy_from_guest(&area, arg, 1) )
             break;
@@ -394,7 +386,10 @@ arch_do_vcpu_op(
 
         rc = 0;
         v->runstate_guest = area.addr.v;
-        __copy_to_user(v->runstate_guest, &v->runstate, sizeof(v->runstate));
+
+        if ( v == current )
+            __copy_to_user(v->runstate_guest, &v->runstate,
+                           sizeof(v->runstate));
 
         break;
     }
@@ -528,20 +523,29 @@ static void load_segments(struct vcpu *n)
     if ( unlikely(!all_segs_okay) )
     {
         struct cpu_user_regs *regs = guest_cpu_user_regs();
-        unsigned long   *rsp =
+        unsigned long *rsp =
             (n->arch.flags & TF_kernel_mode) ?
             (unsigned long *)regs->rsp :
             (unsigned long *)nctxt->kernel_sp;
+        unsigned long cs_and_mask, rflags;
 
         if ( !(n->arch.flags & TF_kernel_mode) )
             toggle_guest_mode(n);
         else
             regs->cs &= ~3;
 
+        /* CS longword also contains full evtchn_upcall_mask. */
+        cs_and_mask = (unsigned long)regs->cs |
+            ((unsigned long)n->vcpu_info->evtchn_upcall_mask << 32);
+
+        /* Fold upcall mask into RFLAGS.IF. */
+        rflags  = regs->rflags & ~X86_EFLAGS_IF;
+        rflags |= !n->vcpu_info->evtchn_upcall_mask << 9;
+
         if ( put_user(regs->ss,            rsp- 1) |
              put_user(regs->rsp,           rsp- 2) |
-             put_user(regs->rflags,        rsp- 3) |
-             put_user(regs->cs,            rsp- 4) |
+             put_user(rflags,              rsp- 3) |
+             put_user(cs_and_mask,         rsp- 4) |
              put_user(regs->rip,           rsp- 5) |
              put_user(nctxt->user_regs.gs, rsp- 6) |
              put_user(nctxt->user_regs.fs, rsp- 7) |
@@ -553,6 +557,10 @@ static void load_segments(struct vcpu *n)
             DPRINTK("Error while creating failsafe callback frame.\n");
             domain_crash(n->domain);
         }
+
+        if ( test_bit(_VGCF_failsafe_disables_events,
+                      &n->arch.guest_context.flags) )
+            n->vcpu_info->evtchn_upcall_mask = 1;
 
         regs->entry_vector  = TRAP_syscall;
         regs->rflags       &= 0xFFFCBEFFUL;
@@ -935,7 +943,7 @@ void domain_relinquish_resources(struct domain *d)
                 put_page_type(mfn_to_page(pfn));
             put_page(mfn_to_page(pfn));
 
-            v->arch.guest_table = mk_pagetable(0);
+            v->arch.guest_table = pagetable_null();
         }
 
         if ( (pfn = pagetable_get_pfn(v->arch.guest_table_user)) != 0 )
@@ -944,7 +952,7 @@ void domain_relinquish_resources(struct domain *d)
                 put_page_type(mfn_to_page(pfn));
             put_page(mfn_to_page(pfn));
 
-            v->arch.guest_table_user = mk_pagetable(0);
+            v->arch.guest_table_user = pagetable_null();
         }
     }
 

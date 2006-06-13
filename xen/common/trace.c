@@ -173,25 +173,17 @@ void init_trace_bufs(void)
  */
 int tb_control(dom0_tbufcontrol_t *tbc)
 {
-    static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+    static DEFINE_SPINLOCK(lock);
     int rc = 0;
 
     spin_lock(&lock);
-
-    if ( !tb_init_done &&
-         (tbc->op != DOM0_TBUF_SET_SIZE) &&
-         (tbc->op != DOM0_TBUF_ENABLE) )
-    {
-        spin_unlock(&lock);
-        return -EINVAL;
-    }
 
     switch ( tbc->op )
     {
     case DOM0_TBUF_GET_INFO:
         tbc->cpu_mask   = tb_cpu_mask;
         tbc->evt_mask   = tb_event_mask;
-        tbc->buffer_mfn = __pa(t_bufs[0]) >> PAGE_SHIFT;
+        tbc->buffer_mfn = opt_tbuf_size ? virt_to_mfn(t_bufs[0]) : 0UL;
         tbc->size       = opt_tbuf_size * PAGE_SIZE;
         break;
     case DOM0_TBUF_SET_CPU_MASK:

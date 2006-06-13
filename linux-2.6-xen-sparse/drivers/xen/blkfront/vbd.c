@@ -91,6 +91,7 @@ static struct block_device_operations xlvbd_block_fops =
 	.open = blkif_open,
 	.release = blkif_release,
 	.ioctl  = blkif_ioctl,
+	.getgeo = blkif_getgeo
 };
 
 DEFINE_SPINLOCK(blkif_io_lock);

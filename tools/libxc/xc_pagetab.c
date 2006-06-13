@@ -75,10 +75,10 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
 #endif
 
     if (xc_vcpu_getcontext(xc_handle, dom, vcpu, &ctx) != 0) {
-        fprintf(stderr, "failed to retreive vcpu context\n");
+        DPRINTF("failed to retreive vcpu context\n");
         goto out;
     }
-    cr3 = ctx.ctrlreg[3];
+    cr3 = ((unsigned long long)xen_cr3_to_pfn(ctx.ctrlreg[3])) << PAGE_SHIFT;
 
     /* Page Map Level 4 */
 
@@ -87,12 +87,12 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
 #elif defined(__x86_64__)
     pml = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, PROT_READ, cr3 >> PAGE_SHIFT);
     if (pml == NULL) {
-        fprintf(stderr, "failed to map PML4\n");
+        DPRINTF("failed to map PML4\n");
         goto out;
     }
     pmle = *(unsigned long long *)(pml + 8 * ((virt >> L4_PAGETABLE_SHIFT_PAE) & L4_PAGETABLE_MASK_PAE));
     if((pmle & 1) == 0) {
-        fprintf(stderr, "page entry not present in PML4\n");
+        DPRINTF("page entry not present in PML4\n");
         goto out_unmap_pml;
     }
 #endif
@@ -102,7 +102,7 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
     if (pt_levels >= 3) {
         pdppage = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, PROT_READ, pmle >> PAGE_SHIFT);
         if (pdppage == NULL) {
-            fprintf(stderr, "failed to map PDP\n");
+            DPRINTF("failed to map PDP\n");
             goto out_unmap_pml;
         }
         if (pt_levels >= 4)
@@ -114,7 +114,7 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
         pdpe = *(unsigned long long *)(pdp + 8 * ((virt >> L3_PAGETABLE_SHIFT_PAE) & L3_PAGETABLE_MASK_PAE));
 
         if((pdpe & 1) == 0) {
-            fprintf(stderr, "page entry not present in PDP\n");
+            DPRINTF("page entry not present in PDP\n");
             goto out_unmap_pdp;
         }
     } else {
@@ -125,7 +125,7 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
 
     pd = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, PROT_READ, pdpe >> PAGE_SHIFT);
     if (pd == NULL) {
-        fprintf(stderr, "failed to map PD\n");
+        DPRINTF("failed to map PD\n");
         goto out_unmap_pdp;
     }
 
@@ -135,21 +135,21 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
         pde = *(unsigned long long *)(pd + 4 * ((virt >> L2_PAGETABLE_SHIFT) & L2_PAGETABLE_MASK));
 
     if ((pde & 1) == 0) {
-        fprintf(stderr, "page entry not present in PD\n");
+        DPRINTF("page entry not present in PD\n");
         goto out_unmap_pd;
     }
 
     /* Page Table */
 
     if (pde & 0x00000008) { /* 4M page (or 2M in PAE mode) */
-        fprintf(stderr, "Cannot currently cope with 2/4M pages\n");
+        DPRINTF("Cannot currently cope with 2/4M pages\n");
         exit(-1);
     } else { /* 4k page */
         pt = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, PROT_READ,
                                   pde >> PAGE_SHIFT);
 
         if (pt == NULL) {
-            fprintf(stderr, "failed to map PT\n");
+            DPRINTF("failed to map PT\n");
             goto out_unmap_pd;
         }
 
@@ -159,7 +159,7 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
             pte = *(unsigned long long *)(pt + 4 * ((virt >> L1_PAGETABLE_SHIFT) & L1_PAGETABLE_MASK));
 
         if ((pte & 0x00000001) == 0) {
-            fprintf(stderr, "page entry not present in PT\n");
+            DPRINTF("page entry not present in PT\n");
             goto out_unmap_pt;
         }
 

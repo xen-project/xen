@@ -61,13 +61,6 @@ static void __init machine_specific_arch_setup(void)
 		.address = { __KERNEL_CS, (unsigned long)nmi },
 	};
 
-	if (xen_feature(XENFEAT_auto_translated_physmap) &&
-	    xen_start_info->shared_info < xen_start_info->nr_pages) {
-		HYPERVISOR_shared_info =
-			(shared_info_t *)__va(xen_start_info->shared_info);
-		memset(empty_zero_page, 0, sizeof(empty_zero_page));
-	}
-
 	ret = HYPERVISOR_callback_op(CALLBACKOP_register, &event);
 	if (ret == 0)
 		ret = HYPERVISOR_callback_op(CALLBACKOP_register, &failsafe);

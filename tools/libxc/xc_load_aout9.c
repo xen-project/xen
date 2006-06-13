@@ -17,7 +17,7 @@
 #define KOFFSET(_p)       ((_p)&~KZERO)
 
 static int parseaout9image(const char *, unsigned long, struct domain_setup_info *);
-static int loadaout9image(const char *, unsigned long, int, uint32_t, unsigned long *, struct domain_setup_info *);
+static int loadaout9image(const char *, unsigned long, int, uint32_t, xen_pfn_t *, struct domain_setup_info *);
 static void copyout(int, uint32_t, unsigned long *, unsigned long, const char *, int);
 struct Exec *get_header(const char *, unsigned long, struct Exec *);
 
@@ -79,7 +79,7 @@ loadaout9image(
     const char *image,
     unsigned long image_size,
     int xch, uint32_t dom,
-    unsigned long *parray,
+    xen_pfn_t *parray,
     struct domain_setup_info *dsi)
 {
     struct Exec ehdr;

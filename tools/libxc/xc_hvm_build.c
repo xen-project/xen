@@ -135,7 +135,7 @@ static void set_hvm_info_checksum(struct hvm_info_table *t)
  * hvmloader will use this info to set BIOS accordingly
  */
 static int set_hvm_info(int xc_handle, uint32_t dom,
-                        unsigned long *pfn_list, unsigned int vcpus,
+                        xen_pfn_t *pfn_list, unsigned int vcpus,
                         unsigned int pae, unsigned int acpi, unsigned int apic)
 {
     char *va_map;
@@ -178,7 +178,7 @@ static int setup_guest(int xc_handle,
                        unsigned int store_evtchn,
                        unsigned long *store_mfn)
 {
-    unsigned long *page_array = NULL;
+    xen_pfn_t *page_array = NULL;
     unsigned long count, i;
     unsigned long long ptr;
     xc_mmu_t *mmu = NULL;
@@ -207,12 +207,12 @@ static int setup_guest(int xc_handle,
     /* memsize is in megabytes */
     v_end = (unsigned long long)memsize << 20;
 
-    printf("VIRTUAL MEMORY ARRANGEMENT:\n"
+    IPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n"
            "  Loaded HVM loader:    %08lx->%08lx\n"
            "  TOTAL:                %08lx->%016llx\n",
            dsi.v_kernstart, dsi.v_kernend,
            dsi.v_start, v_end);
-    printf("  ENTRY ADDRESS:        %08lx\n", dsi.v_kernentry);
+    IPRINTF("  ENTRY ADDRESS:        %08lx\n", dsi.v_kernentry);
 
     if ( (v_end - dsi.v_start) > ((unsigned long long)nr_pages << PAGE_SHIFT) )
     {
@@ -223,7 +223,7 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
+    if ( (page_array = malloc(nr_pages * sizeof(xen_pfn_t))) == NULL )
     {
         PERROR("Could not allocate memory.\n");
         goto error_out;

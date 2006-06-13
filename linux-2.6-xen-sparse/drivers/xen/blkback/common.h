@@ -45,8 +45,9 @@
 #include <xen/gnttab.h>
 #include <xen/driver_util.h>
 
-#define DPRINTK(_f, _a...) pr_debug("(file=%s, line=%d) " _f, \
-                                    __FILE__ , __LINE__ , ## _a )
+#define DPRINTK(_f, _a...)			\
+	pr_debug("(file=%s, line=%d) " _f,	\
+		 __FILE__ , __LINE__ , ## _a )
 
 struct vbd {
 	blkif_vdev_t   handle;      /* what the domain refers to this vbd as */
@@ -73,10 +74,6 @@ typedef struct blkif_st {
 	/* Back pointer to the backend_info. */
 	struct backend_info *be; 
 	/* Private fields. */
-#ifdef CONFIG_XEN_BLKDEV_TAP_BE
-	/* Is this a blktap frontend */
-	unsigned int     is_blktap;
-#endif
 	spinlock_t       blk_ring_lock;
 	atomic_t         refcnt;
 

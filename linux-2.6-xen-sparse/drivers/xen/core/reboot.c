@@ -250,7 +250,7 @@ static void shutdown_handler(struct xenbus_watch *watch,
 			     const char **vec, unsigned int len)
 {
 	char *str;
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 	int err;
 
 	if (shutting_down != SHUTDOWN_INVALID)
@@ -298,7 +298,7 @@ static void sysrq_handler(struct xenbus_watch *watch, const char **vec,
 			  unsigned int len)
 {
 	char sysrq_key = '\0';
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 	int err;
 
  again:
@@ -336,8 +336,8 @@ static struct xenbus_watch sysrq_watch = {
 };
 
 static int setup_shutdown_watcher(struct notifier_block *notifier,
-                                  unsigned long event,
-                                  void *data)
+				  unsigned long event,
+				  void *data)
 {
 	int err;
 

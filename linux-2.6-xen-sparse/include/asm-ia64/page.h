@@ -327,6 +327,16 @@ machine_to_phys_for_dma(unsigned long machine)
 #define virt_to_mfn(virt)		(__pa(virt) >> PAGE_SHIFT)
 #define virt_to_machine(virt)		__pa(virt) // for tpmfront.c
 
+static inline unsigned long
+mfn_to_local_pfn(unsigned long mfn)
+{
+	extern unsigned long max_mapnr;
+	unsigned long pfn = mfn_to_pfn(mfn);
+	if (!pfn_valid(pfn))
+		return INVALID_P2M_ENTRY;
+	return pfn;
+}
+
 #endif /* CONFIG_XEN_IA64_DOM0_VP */
 #endif /* CONFIG_XEN */
 #endif /* __ASSEMBLY__ */

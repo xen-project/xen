@@ -154,13 +154,14 @@ extern int graphic_depth;
 #define MOUSE_EVENT_MBUTTON 0x04
 
 typedef void QEMUPutKBDEvent(void *opaque, int keycode);
-typedef void QEMUPutMouseEvent(void *opaque, int dx, int dy, int dz, int buttons_state, int x, int y);
+typedef void QEMUPutMouseEvent(void *opaque, int dx, int dy, int dz, int buttons_state);
 
 void qemu_add_kbd_event_handler(QEMUPutKBDEvent *func, void *opaque);
-void qemu_add_mouse_event_handler(QEMUPutMouseEvent *func, void *opaque);
+void qemu_add_mouse_event_handler(QEMUPutMouseEvent *func, void *opaque, int absolute);
 
 void kbd_put_keycode(int keycode);
-void kbd_mouse_event(int dx, int dy, int dz, int buttons_state, int x, int y);
+void kbd_mouse_event(int dx, int dy, int dz, int buttons_state);
+int kbd_mouse_is_absolute(void);
 
 /* keysym is a unicode code except for special keys (see QEMU_KEY_xxx
    constants) */
@@ -238,9 +239,9 @@ void console_select(unsigned int index);
 /* serial ports */
 
 #define MAX_SERIAL_PORTS 4
-#define SUMMA_PORT	1
 
 extern CharDriverState *serial_hds[MAX_SERIAL_PORTS];
+extern int serial_summa_port;
 
 /* network redirectors support */
 
@@ -633,6 +634,7 @@ void pci_pcnet_init(PCIBus *bus, NetDriverState *nd);
 void kbd_init(void);
 extern const char* keyboard_layout;
 extern int repeat_key;
+extern int usb_enabled;
 
 /* mc146818rtc.c */
 
@@ -791,6 +793,19 @@ void adb_kbd_init(ADBBusState *bus);
 void adb_mouse_init(ADBBusState *bus);
 
 /* cuda.c */
+
+#include "hw/usb.h"
+
+/* usb ports of the VM */
+
+#define MAX_VM_USB_PORTS 8
+
+extern USBPort *vm_usb_ports[MAX_VM_USB_PORTS];
+extern USBDevice *vm_usb_hub;
+
+void do_usb_add(const char *devname);
+void do_usb_del(const char *devname);
+void usb_info(void);
 
 extern ADBBusState adb_bus;
 int cuda_init(openpic_t *openpic, int irq);

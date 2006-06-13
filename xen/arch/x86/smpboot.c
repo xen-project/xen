@@ -37,6 +37,7 @@
 #include <xen/init.h>
 #include <xen/kernel.h>
 #include <xen/mm.h>
+#include <xen/domain.h>
 #include <xen/sched.h>
 #include <xen/irq.h>
 #include <xen/delay.h>
@@ -886,28 +887,16 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	int timeout;
 	unsigned long start_eip;
 	unsigned short nmi_high = 0, nmi_low = 0;
-	struct domain *d;
 	struct vcpu *v;
-	int vcpu_id;
 
 	++cpucount;
 
 	booting_cpu = cpu;
 
-	if ((vcpu_id = cpu % MAX_VIRT_CPUS) == 0) {
-		d = domain_create(IDLE_DOMAIN_ID, cpu);
-		BUG_ON(d == NULL);
-		v = d->vcpu[0];
-	} else {
-		d = idle_vcpu[cpu - vcpu_id]->domain;
-		BUG_ON(d == NULL);
-		v = alloc_vcpu(d, vcpu_id, cpu);
-	}
-
-	idle_vcpu[cpu] = v;
+	v = alloc_idle_vcpu(cpu);
 	BUG_ON(v == NULL);
 
-	v->arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
+	v->arch.monitor_table = pagetable_from_paddr(__pa(idle_pg_table));
 
 	/* start_eip had better be page-aligned! */
 	start_eip = setup_trampoline();

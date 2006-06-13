@@ -64,11 +64,13 @@ void __dummy__(void)
            arch.guest_context.kernel_ss);
     OFFSET(VCPU_kernel_sp, struct vcpu,
            arch.guest_context.kernel_sp);
+    OFFSET(VCPU_guest_context_flags, struct vcpu, arch.guest_context.flags);
     OFFSET(VCPU_arch_guest_fpu_ctxt, struct vcpu, arch.guest_context.fpu_ctxt);
     OFFSET(VCPU_flags, struct vcpu, vcpu_flags);
     OFFSET(VCPU_nmi_addr, struct vcpu, nmi_addr);
     DEFINE(_VCPUF_nmi_pending, _VCPUF_nmi_pending);
     DEFINE(_VCPUF_nmi_masked, _VCPUF_nmi_masked);
+    DEFINE(_VGCF_failsafe_disables_events, _VGCF_failsafe_disables_events);
     BLANK();
 
     OFFSET(TSS_ss0, struct tss_struct, ss0);
@@ -82,6 +84,9 @@ void __dummy__(void)
     OFFSET(VCPU_svm_hsa_pa,  struct vcpu, arch.hvm_svm.host_save_pa);
     OFFSET(VCPU_svm_vmcb, struct vcpu, arch.hvm_svm.vmcb);
     OFFSET(VCPU_svm_vmexit_tsc, struct vcpu, arch.hvm_svm.vmexit_tsc);
+    BLANK();
+
+    OFFSET(VCPU_vmx_launched, struct vcpu, arch.hvm_vmx.launched);
     BLANK();
 
     OFFSET(VMCB_rax, struct vmcb_struct, rax);

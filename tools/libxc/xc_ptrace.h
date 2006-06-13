@@ -160,7 +160,6 @@ struct gdb_regs {
 }
 #endif
 
-#define printval(x) printf("%s = %lx\n", #x, (long)x);
 #endif
 
 typedef void (*thr_ev_handler_t)(long);

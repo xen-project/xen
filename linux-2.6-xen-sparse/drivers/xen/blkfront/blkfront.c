@@ -83,7 +83,7 @@ static int blkfront_probe(struct xenbus_device *dev,
 	struct blkfront_info *info;
 
 	/* FIXME: Use dynamic device id if this is not set. */
-	err = xenbus_scanf(XBT_NULL, dev->nodename,
+	err = xenbus_scanf(XBT_NIL, dev->nodename,
 			   "virtual-device", "%i", &vdevice);
 	if (err != 1) {
 		xenbus_dev_fatal(dev, err, "reading virtual-device");
@@ -107,12 +107,12 @@ static int blkfront_probe(struct xenbus_device *dev,
 
 	/* Front end dir is a number, which is used as the id. */
 	info->handle = simple_strtoul(strrchr(dev->nodename,'/')+1, NULL, 0);
-	dev->data = info;
+	dev->dev.driver_data = info;
 
 	err = talk_to_backend(dev, info);
 	if (err) {
 		kfree(info);
-		dev->data = NULL;
+		dev->dev.driver_data = NULL;
 		return err;
 	}
 
@@ -128,7 +128,7 @@ static int blkfront_probe(struct xenbus_device *dev,
  */
 static int blkfront_resume(struct xenbus_device *dev)
 {
-	struct blkfront_info *info = dev->data;
+	struct blkfront_info *info = dev->dev.driver_data;
 	int err;
 
 	DPRINTK("blkfront_resume: %s\n", dev->nodename);
@@ -148,7 +148,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 			   struct blkfront_info *info)
 {
 	const char *message = NULL;
-	xenbus_transaction_t xbt;
+	struct xenbus_transaction xbt;
 	int err;
 
 	/* Create shared ring, alloc event channel. */
@@ -249,7 +249,7 @@ fail:
 static void backend_changed(struct xenbus_device *dev,
 			    enum xenbus_state backend_state)
 {
-	struct blkfront_info *info = dev->data;
+	struct blkfront_info *info = dev->dev.driver_data;
 	struct block_device *bd;
 
 	DPRINTK("blkfront:backend_changed.\n");
@@ -303,7 +303,7 @@ static void connect(struct blkfront_info *info)
 
 	DPRINTK("blkfront.c:connect:%s.\n", info->xbdev->otherend);
 
-	err = xenbus_gather(XBT_NULL, info->xbdev->otherend,
+	err = xenbus_gather(XBT_NIL, info->xbdev->otherend,
 			    "sectors", "%lu", &sectors,
 			    "info", "%u", &binfo,
 			    "sector-size", "%lu", &sector_size,
@@ -318,7 +318,7 @@ static void connect(struct blkfront_info *info)
 	err = xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
 	if (err) {
 		xenbus_dev_fatal(info->xbdev, err, "xlvbd_add at %s",
-		                 info->xbdev->otherend);
+				 info->xbdev->otherend);
 		return;
 	}
 
@@ -341,7 +341,7 @@ static void connect(struct blkfront_info *info)
  */
 static void blkfront_closing(struct xenbus_device *dev)
 {
-	struct blkfront_info *info = dev->data;
+	struct blkfront_info *info = dev->dev.driver_data;
 
 	DPRINTK("blkfront_closing: %s removed\n", dev->nodename);
 
@@ -353,7 +353,7 @@ static void blkfront_closing(struct xenbus_device *dev)
 
 static int blkfront_remove(struct xenbus_device *dev)
 {
-	struct blkfront_info *info = dev->data;
+	struct blkfront_info *info = dev->dev.driver_data;
 
 	DPRINTK("blkfront_remove: %s removed\n", dev->nodename);
 
@@ -444,7 +444,7 @@ int blkif_release(struct inode *inode, struct file *filep)
 
 
 int blkif_ioctl(struct inode *inode, struct file *filep,
-                unsigned command, unsigned long argument)
+		unsigned command, unsigned long argument)
 {
 	int i;
 
@@ -452,10 +452,6 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
 		      command, (long)argument, inode->i_rdev);
 
 	switch (command) {
-	case HDIO_GETGEO:
-		/* return ENOSYS to use defaults */
-		return -ENOSYS;
-
 	case CDROMMULTISESSION:
 		DPRINTK("FIXME: support multisession CDs later\n");
 		for (i = 0; i < sizeof(struct cdrom_multisession); i++)
@@ -469,6 +465,23 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
 		return -EINVAL; /* same return as native Linux */
 	}
 
+	return 0;
+}
+
+
+int blkif_getgeo(struct block_device *bd, struct hd_geometry *hg)
+{
+	/* We don't have real geometry info, but let's at least return
+	   values consistent with the size of the device */
+	sector_t nsect = get_capacity(bd->bd_disk);
+	sector_t cylinders = nsect;
+
+	hg->heads = 0xff;
+	hg->sectors = 0x3f;
+	sector_div(cylinders, hg->heads * hg->sectors);
+	hg->cylinders = cylinders;
+	if ((sector_t)(hg->cylinders + 1) * hg->heads * hg->sectors < nsect)
+		hg->cylinders = 0xffff;
 	return 0;
 }
 

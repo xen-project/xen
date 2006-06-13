@@ -4,6 +4,7 @@
  * Helper functions for the rest of the library.
  */
 
+#include <inttypes.h>
 #include "xc_private.h"
 
 /* NB: arr must be mlock'ed */
@@ -134,9 +135,9 @@ int xc_memory_op(int xc_handle,
     struct xen_memory_reservation *reservation = arg;
     struct xen_machphys_mfn_list *xmml = arg;
     struct xen_translate_gpfn_list *trans = arg;
-    unsigned long *extent_start;
-    unsigned long *gpfn_list;
-    unsigned long *mfn_list;
+    xen_pfn_t *extent_start;
+    xen_pfn_t *gpfn_list;
+    xen_pfn_t *mfn_list;
     long ret = -EINVAL;
 
     hypercall.op     = __HYPERVISOR_memory_op;
@@ -156,7 +157,7 @@ int xc_memory_op(int xc_handle,
         get_xen_guest_handle(extent_start, reservation->extent_start);
         if ( (extent_start != NULL) &&
              (mlock(extent_start,
-                    reservation->nr_extents * sizeof(unsigned long)) != 0) )
+                    reservation->nr_extents * sizeof(xen_pfn_t)) != 0) )
         {
             PERROR("Could not mlock");
             safe_munlock(reservation, sizeof(*reservation));
@@ -171,7 +172,7 @@ int xc_memory_op(int xc_handle,
         }
         get_xen_guest_handle(extent_start, xmml->extent_start);
         if ( mlock(extent_start,
-                   xmml->max_extents * sizeof(unsigned long)) != 0 )
+                   xmml->max_extents * sizeof(xen_pfn_t)) != 0 )
         {
             PERROR("Could not mlock");
             safe_munlock(xmml, sizeof(*xmml));
@@ -192,17 +193,17 @@ int xc_memory_op(int xc_handle,
             goto out1;
         }
         get_xen_guest_handle(gpfn_list, trans->gpfn_list);
-        if ( mlock(gpfn_list, trans->nr_gpfns * sizeof(long)) != 0 )
+        if ( mlock(gpfn_list, trans->nr_gpfns * sizeof(xen_pfn_t)) != 0 )
         {
             PERROR("Could not mlock");
             safe_munlock(trans, sizeof(*trans));
             goto out1;
         }
         get_xen_guest_handle(mfn_list, trans->mfn_list);
-        if ( mlock(mfn_list, trans->nr_gpfns * sizeof(long)) != 0 )
+        if ( mlock(mfn_list, trans->nr_gpfns * sizeof(xen_pfn_t)) != 0 )
         {
             PERROR("Could not mlock");
-            safe_munlock(gpfn_list, trans->nr_gpfns * sizeof(long));
+            safe_munlock(gpfn_list, trans->nr_gpfns * sizeof(xen_pfn_t));
             safe_munlock(trans, sizeof(*trans));
             goto out1;
         }
@@ -220,22 +221,22 @@ int xc_memory_op(int xc_handle,
         get_xen_guest_handle(extent_start, reservation->extent_start);
         if ( extent_start != NULL )
             safe_munlock(extent_start,
-                         reservation->nr_extents * sizeof(unsigned long));
+                         reservation->nr_extents * sizeof(xen_pfn_t));
         break;
     case XENMEM_machphys_mfn_list:
         safe_munlock(xmml, sizeof(*xmml));
         get_xen_guest_handle(extent_start, xmml->extent_start);
         safe_munlock(extent_start,
-                     xmml->max_extents * sizeof(unsigned long));
+                     xmml->max_extents * sizeof(xen_pfn_t));
         break;
     case XENMEM_add_to_physmap:
         safe_munlock(arg, sizeof(struct xen_add_to_physmap));
         break;
     case XENMEM_translate_gpfn_list:
             get_xen_guest_handle(mfn_list, trans->mfn_list);
-            safe_munlock(mfn_list, trans->nr_gpfns * sizeof(long));
+            safe_munlock(mfn_list, trans->nr_gpfns * sizeof(xen_pfn_t));
             get_xen_guest_handle(gpfn_list, trans->gpfn_list);
-            safe_munlock(gpfn_list, trans->nr_gpfns * sizeof(long));
+            safe_munlock(gpfn_list, trans->nr_gpfns * sizeof(xen_pfn_t));
             safe_munlock(trans, sizeof(*trans));
         break;
     }
@@ -263,7 +264,7 @@ long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
 
 int xc_get_pfn_list(int xc_handle,
                     uint32_t domid,
-                    unsigned long *pfn_buf,
+                    xen_pfn_t *pfn_buf,
                     unsigned long max_pfns)
 {
     DECLARE_DOM0_OP;
@@ -274,10 +275,10 @@ int xc_get_pfn_list(int xc_handle,
     set_xen_guest_handle(op.u.getmemlist.buffer, pfn_buf);
 
 #ifdef VALGRIND
-    memset(pfn_buf, 0, max_pfns * sizeof(unsigned long));
+    memset(pfn_buf, 0, max_pfns * sizeof(xen_pfn_t));
 #endif
 
-    if ( mlock(pfn_buf, max_pfns * sizeof(unsigned long)) != 0 )
+    if ( mlock(pfn_buf, max_pfns * sizeof(xen_pfn_t)) != 0 )
     {
         PERROR("xc_get_pfn_list: pfn_buf mlock failed");
         return -1;
@@ -285,7 +286,7 @@ int xc_get_pfn_list(int xc_handle,
 
     ret = do_dom0_op(xc_handle, &op);
 
-    safe_munlock(pfn_buf, max_pfns * sizeof(unsigned long));
+    safe_munlock(pfn_buf, max_pfns * sizeof(xen_pfn_t));
 
 #if 0
 #ifdef DEBUG
@@ -293,10 +294,10 @@ int xc_get_pfn_list(int xc_handle,
     if (ret >= 0) {
         int i, j;
         for (i = 0; i < op.u.getmemlist.num_pfns; i += 16) {
-            fprintf(stderr, "0x%x: ", i);
+            DPRINTF("0x%x: ", i);
             for (j = 0; j < 16; j++)
-                fprintf(stderr, "0x%lx ", pfn_buf[i + j]);
-            fprintf(stderr, "\n");
+                DPRINTF("0x%lx ", pfn_buf[i + j]);
+            DPRINTF("\n");
         }
     }
 #endif
@@ -364,7 +365,7 @@ unsigned long xc_get_filesz(int fd)
 }
 
 void xc_map_memcpy(unsigned long dst, const char *src, unsigned long size,
-                   int xch, uint32_t dom, unsigned long *parray,
+                   int xch, uint32_t dom, xen_pfn_t *parray,
                    unsigned long vstart)
 {
     char *va;
@@ -428,6 +429,29 @@ int xc_version(int xc_handle, int cmd, void *arg)
         safe_munlock(arg, argsize);
 
     return rc;
+}
+
+unsigned long xc_make_page_below_4G(
+    int xc_handle, uint32_t domid, unsigned long mfn)
+{
+    xen_pfn_t old_mfn = mfn;
+    xen_pfn_t new_mfn;
+
+    if ( xc_domain_memory_decrease_reservation(
+        xc_handle, domid, 1, 0, &old_mfn) != 0 )
+    {
+        DPRINTF("xc_make_page_below_4G decrease failed. mfn=%lx\n",mfn);
+        return 0;
+    }
+
+    if ( xc_domain_memory_increase_reservation(
+        xc_handle, domid, 1, 0, 32, &new_mfn) != 0 )
+    {
+        DPRINTF("xc_make_page_below_4G increase failed. mfn=%lx\n",mfn);
+        return 0;
+    }
+
+    return new_mfn;
 }
 
 /*

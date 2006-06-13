@@ -525,6 +525,13 @@ cirrus_debug_dump:
 cirrus_set_video_mode_extended:
   call cirrus_switch_mode
   pop ax ;; mode
+  test al, #0x80
+  jnz cirrus_set_video_mode_extended_1
+  push ax
+  mov ax, #0xffff ; set to 0xff to keep win 2K happy
+  call cirrus_clear_vram
+  pop ax
+cirrus_set_video_mode_extended_1:
   and al, #0x7f
 
   push ds
@@ -992,6 +999,13 @@ cirrus_vesa_02h_1:
   jnz cirrus_vesa_02h_3
   call cirrus_enable_16k_granularity
 cirrus_vesa_02h_3:
+  test bx, #0x8000 ;; no clear
+  jnz cirrus_vesa_02h_4
+  push ax
+  xor ax,ax
+  call cirrus_clear_vram
+  pop ax
+cirrus_vesa_02h_4:
   pop ax
   push ds
 #ifdef CIRRUS_VESA3_PMINFO
@@ -1458,6 +1472,38 @@ cirrus_get_start_addr:
   xor  dh, dh
   pop  ax
   pop  bx
+  ret
+
+cirrus_clear_vram:
+  pusha
+  push es
+  mov si, ax
+
+  call cirrus_enable_16k_granularity
+  call cirrus_extbios_85h
+  shl al, #2
+  mov bl, al
+  xor ah,ah
+cirrus_clear_vram_1:
+  mov al, #0x09
+  mov dx, #0x3ce
+  out dx, ax
+  push ax
+  mov cx, #0xa000
+  mov es, cx
+  xor di, di
+  mov ax, si
+  mov cx, #8192
+  cld
+  rep
+      stosw
+  pop ax
+  inc ah
+  cmp ah, bl
+  jne cirrus_clear_vram_1
+
+  pop es
+  popa
   ret
 
 cirrus_extbios_handlers:

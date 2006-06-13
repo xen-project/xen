@@ -50,7 +50,7 @@ int shadow_direct_map_init(struct domain *d)
     memset(root, 0, PAGE_SIZE);
     root[PAE_SHADOW_SELF_ENTRY] = l3e_from_page(page, __PAGE_HYPERVISOR);
 
-    d->arch.phys_table = mk_pagetable(page_to_maddr(page));
+    d->arch.phys_table = pagetable_from_page(page);
 
     unmap_domain_page(root);
     return 1;
@@ -92,7 +92,7 @@ void shadow_direct_map_clean(struct domain *d)
 
     unmap_domain_page(l3e);
 
-    d->arch.phys_table = mk_pagetable(0);
+    d->arch.phys_table = pagetable_null();
 }
 
 /****************************************************************************/
@@ -338,7 +338,7 @@ static void alloc_monitor_pagetable(struct vcpu *v)
 
     /* map the phys_to_machine map into the per domain Read-Only MPT space */
 
-    v->arch.monitor_table = mk_pagetable(mmfn << PAGE_SHIFT);
+    v->arch.monitor_table = pagetable_from_pfn(mmfn);
     v->arch.monitor_vtable = (l2_pgentry_t *) mpl4e;
     mpl4e[l4_table_offset(RO_MPT_VIRT_START)] = l4e_empty();
 
@@ -380,7 +380,7 @@ void free_monitor_pagetable(struct vcpu *v)
     unmap_domain_page_global(v->arch.monitor_vtable);
     free_domheap_page(mfn_to_page(mfn));
 
-    v->arch.monitor_table = mk_pagetable(0);
+    v->arch.monitor_table = pagetable_null();
     v->arch.monitor_vtable = 0;
 }
 #elif CONFIG_PAGING_LEVELS == 3
@@ -431,7 +431,7 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     for ( i = 0; i < (MACHPHYS_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
         mpl2e[l2_table_offset(RO_MPT_VIRT_START) + i] = l2e_empty();
 
-    v->arch.monitor_table = mk_pagetable(m3mfn << PAGE_SHIFT); /* < 4GB */
+    v->arch.monitor_table = pagetable_from_pfn(m3mfn);
     v->arch.monitor_vtable = (l2_pgentry_t *) mpl3e;
 
     if ( v->vcpu_id == 0 )
@@ -492,7 +492,7 @@ void free_monitor_pagetable(struct vcpu *v)
     unmap_domain_page_global(v->arch.monitor_vtable);
     free_domheap_page(mfn_to_page(m3mfn));
 
-    v->arch.monitor_table = mk_pagetable(0);
+    v->arch.monitor_table = pagetable_null();
     v->arch.monitor_vtable = 0;
 }
 #endif
@@ -924,7 +924,7 @@ void free_shadow_pages(struct domain *d)
         if ( pagetable_get_paddr(v->arch.shadow_table) )
         {
             put_shadow_ref(pagetable_get_pfn(v->arch.shadow_table));
-            v->arch.shadow_table = mk_pagetable(0);
+            v->arch.shadow_table = pagetable_null();
 
             if ( shadow_mode_external(d) )
             {

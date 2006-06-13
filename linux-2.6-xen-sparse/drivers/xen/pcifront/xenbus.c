@@ -29,7 +29,7 @@ static struct pcifront_device *alloc_pdev(struct xenbus_device *xdev)
 	}
 	pdev->sh_info->flags = 0;
 
-	xdev->data = pdev;
+	xdev->dev.driver_data = pdev;
 	pdev->xdev = xdev;
 
 	INIT_LIST_HEAD(&pdev->root_buses);
@@ -59,7 +59,7 @@ static void free_pdev(struct pcifront_device *pdev)
 		gnttab_end_foreign_access(pdev->gnt_ref, 0,
 					  (unsigned long)pdev->sh_info);
 
-	pdev->xdev->data = NULL;
+	pdev->xdev->dev.driver_data = NULL;
 
 	kfree(pdev);
 }
@@ -67,7 +67,7 @@ static void free_pdev(struct pcifront_device *pdev)
 static int pcifront_publish_info(struct pcifront_device *pdev)
 {
 	int err = 0;
-	xenbus_transaction_t trans;
+	struct xenbus_transaction trans;
 
 	err = xenbus_grant_ring(pdev->xdev, virt_to_mfn(pdev->sh_info));
 	if (err < 0)
@@ -143,7 +143,7 @@ static int pcifront_try_connect(struct pcifront_device *pdev)
 		goto out;
 	}
 
-	err = xenbus_scanf(XBT_NULL, pdev->xdev->otherend,
+	err = xenbus_scanf(XBT_NIL, pdev->xdev->otherend,
 			   "root_num", "%d", &num_roots);
 	if (err == -ENOENT) {
 		xenbus_dev_error(pdev->xdev, err,
@@ -165,7 +165,7 @@ static int pcifront_try_connect(struct pcifront_device *pdev)
 			goto out;
 		}
 
-		err = xenbus_scanf(XBT_NULL, pdev->xdev->otherend, str,
+		err = xenbus_scanf(XBT_NIL, pdev->xdev->otherend, str,
 				   "%x:%x", &domain, &bus);
 		if (err != 2) {
 			if (err >= 0)
@@ -216,7 +216,7 @@ static int pcifront_try_disconnect(struct pcifront_device *pdev)
 static void pcifront_backend_changed(struct xenbus_device *xdev,
 				     enum xenbus_state be_state)
 {
-	struct pcifront_device *pdev = xdev->data;
+	struct pcifront_device *pdev = xdev->dev.driver_data;
 
 	switch (be_state) {
 	case XenbusStateClosing:
@@ -261,8 +261,8 @@ static int pcifront_xenbus_probe(struct xenbus_device *xdev,
 
 static int pcifront_xenbus_remove(struct xenbus_device *xdev)
 {
-	if (xdev->data)
-		free_pdev(xdev->data);
+	if (xdev->dev.driver_data)
+		free_pdev(xdev->dev.driver_data);
 
 	return 0;
 }

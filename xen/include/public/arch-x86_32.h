@@ -28,6 +28,9 @@ DEFINE_XEN_GUEST_HANDLE(char);
 DEFINE_XEN_GUEST_HANDLE(int);
 DEFINE_XEN_GUEST_HANDLE(long);
 DEFINE_XEN_GUEST_HANDLE(void);
+
+typedef unsigned long xen_pfn_t;
+DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #endif
 
 /*
@@ -138,9 +141,17 @@ typedef uint64_t tsc_timestamp_t; /* RDTSC timestamp */
 struct vcpu_guest_context {
     /* FPU registers come first so they can be aligned for FXSAVE/FXRSTOR. */
     struct { char x[512]; } fpu_ctxt;       /* User-level FPU registers     */
-#define VGCF_I387_VALID (1<<0)
-#define VGCF_HVM_GUEST  (1<<1)
-#define VGCF_IN_KERNEL  (1<<2)
+#define VGCF_I387_VALID                (1<<0)
+#define VGCF_HVM_GUEST                 (1<<1)
+#define VGCF_IN_KERNEL                 (1<<2)
+#define _VGCF_i387_valid               0
+#define VGCF_i387_valid                (1<<_VGCF_i387_valid)
+#define _VGCF_hvm_guest                1
+#define VGCF_hvm_guest                 (1<<_VGCF_hvm_guest)
+#define _VGCF_in_kernel                2
+#define VGCF_in_kernel                 (1<<_VGCF_in_kernel)
+#define _VGCF_failsafe_disables_events 3
+#define VGCF_failsafe_disables_events  (1<<_VGCF_failsafe_disables_events)
     unsigned long flags;                    /* VGCF_* flags                 */
     struct cpu_user_regs user_regs;         /* User-level CPU registers     */
     struct trap_info trap_ctxt[256];        /* Virtual IDT                  */
@@ -158,10 +169,18 @@ struct vcpu_guest_context {
 typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
+/*
+ * Page-directory addresses above 4GB do not fit into architectural %cr3.
+ * When accessing %cr3, or equivalent field in vcpu_guest_context, guests
+ * must use the following accessor macros to pack/unpack valid MFNs.
+ */
+#define xen_pfn_to_cr3(pfn) (((unsigned)(pfn) << 12) | ((unsigned)(pfn) >> 20))
+#define xen_cr3_to_pfn(cr3) (((unsigned)(cr3) >> 12) | ((unsigned)(cr3) << 20))
+
 struct arch_shared_info {
     unsigned long max_pfn;                  /* max pfn that appears in table */
     /* Frame containing list of mfns containing list of mfns containing p2m. */
-    unsigned long pfn_to_mfn_frame_list_list;
+    xen_pfn_t     pfn_to_mfn_frame_list_list;
     unsigned long nmi_reason;
 };
 typedef struct arch_shared_info arch_shared_info_t;

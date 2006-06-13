@@ -26,10 +26,28 @@ static inline void evtchn_notify(struct vcpu *v)
         smp_send_event_check_cpu(v->processor);
 }
 
-/* Note: Bitwise operations result in fast code with no branches. */
-#define event_pending(v)                        \
-    (!!(v)->vcpu_info->evtchn_upcall_pending &  \
-      !(v)->vcpu_info->evtchn_upcall_mask)
+static inline int local_events_need_delivery(void)
+{
+    struct vcpu *v = current;
+    /* Note: Bitwise operations result in fast code with no branches. */
+    return (!!v->vcpu_info->evtchn_upcall_pending &
+             !v->vcpu_info->evtchn_upcall_mask);
+}
+
+static inline int local_event_delivery_is_enabled(void)
+{
+    return !current->vcpu_info->evtchn_upcall_mask;
+}
+
+static inline void local_event_delivery_disable(void)
+{
+    current->vcpu_info->evtchn_upcall_mask = 1;
+}
+
+static inline void local_event_delivery_enable(void)
+{
+    current->vcpu_info->evtchn_upcall_mask = 0;
+}
 
 /* No arch specific virq definition now. Default to global. */
 static inline int arch_virq_is_global(int virq)

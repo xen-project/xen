@@ -172,10 +172,13 @@ typedef struct { u32 pfn; } pagetable_t;
 /* x86_64 */
 typedef struct { u64 pfn; } pagetable_t;
 #endif
-#define pagetable_get_paddr(x) ((paddr_t)(x).pfn << PAGE_SHIFT)
-#define pagetable_get_pfn(x)   ((x).pfn)
-#define mk_pagetable(pa)       \
-    ({ pagetable_t __p; __p.pfn = (pa) >> PAGE_SHIFT; __p; })
+#define pagetable_get_paddr(x)  ((paddr_t)(x).pfn << PAGE_SHIFT)
+#define pagetable_get_pfn(x)    ((x).pfn)
+#define pagetable_is_null(x)    ((x).pfn == 0)
+#define pagetable_from_pfn(pfn) ((pagetable_t) { (pfn) })
+#define pagetable_from_page(pg) pagetable_from_pfn(page_to_mfn(pg))
+#define pagetable_from_paddr(p) pagetable_from_pfn((p)>>PAGE_SHIFT)
+#define pagetable_null()        pagetable_from_pfn(0)
 #endif
 
 #define clear_page(_p)      memset((void *)(_p), 0, PAGE_SIZE)

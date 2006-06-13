@@ -28,7 +28,7 @@ int xc_interface_close(int xc_handle)
 }
 
 void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
-                           unsigned long *arr, int num)
+                           xen_pfn_t *arr, int num)
 {
     privcmd_mmapbatch_t ioctlx;
     void *addr;

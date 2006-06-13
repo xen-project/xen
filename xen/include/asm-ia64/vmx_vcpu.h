@@ -488,6 +488,4 @@ vcpu_get_vhpt(VCPU *vcpu)
     return &vcpu->arch.vhpt;
 }
 
-#define check_work_pending(v)	\
-    (event_pending((v)) || ((v)->arch.irq_new_pending))
 #endif

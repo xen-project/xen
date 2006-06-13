@@ -117,7 +117,7 @@ ste_init_domain_ssid(void **ste_ssid, ssidref_t ssidref)
     }
     /* clean ste cache */
     for (i=0; i<ACM_TE_CACHE_SIZE; i++)
-        ste_ssidp->ste_cache[i].valid = FREE;
+        ste_ssidp->ste_cache[i].valid = ACM_STE_free;
 
     (*ste_ssid) = ste_ssidp;
     printkd("%s: determined ste_ssidref to %x.\n", 
@@ -329,7 +329,7 @@ ste_set_policy(u8 *buf, u32 buf_size)
         ste_ssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
                              (struct acm_ssid_domain *)(*pd)->ssid);
         for (i=0; i<ACM_TE_CACHE_SIZE; i++)
-            ste_ssid->ste_cache[i].valid = FREE;
+            ste_ssid->ste_cache[i].valid = ACM_STE_free;
     }
     read_unlock(&domlist_lock);
     return ACM_OK;
@@ -397,7 +397,7 @@ check_cache(struct domain *dom, domid_t rdom) {
                          (struct acm_ssid_domain *)(dom->ssid));
 
     for(i=0; i< ACM_TE_CACHE_SIZE; i++) {
-        if ((ste_ssid->ste_cache[i].valid == VALID) &&
+        if ((ste_ssid->ste_cache[i].valid == ACM_STE_valid) &&
             (ste_ssid->ste_cache[i].id == rdom)) {
             printkd("cache hit (entry %x, id= %x!\n", i, ste_ssid->ste_cache[i].id);
             return 1;
@@ -418,10 +418,10 @@ cache_result(struct domain *subj, struct domain *obj) {
     ste_ssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
                          (struct acm_ssid_domain *)(subj)->ssid);
     for(i=0; i< ACM_TE_CACHE_SIZE; i++)
-        if (ste_ssid->ste_cache[i].valid == FREE)
+        if (ste_ssid->ste_cache[i].valid == ACM_STE_free)
             break;
     if (i< ACM_TE_CACHE_SIZE) {
-        ste_ssid->ste_cache[i].valid = VALID;
+        ste_ssid->ste_cache[i].valid = ACM_STE_valid;
         ste_ssid->ste_cache[i].id = obj->domain_id;
     } else
         printk ("Cache of dom %x is full!\n", subj->domain_id);
@@ -451,9 +451,9 @@ clean_id_from_cache(domid_t id)
             goto out;
         }
         for (i=0; i<ACM_TE_CACHE_SIZE; i++)
-            if ((ste_ssid->ste_cache[i].valid == VALID) &&
+            if ((ste_ssid->ste_cache[i].valid == ACM_STE_valid) &&
                 (ste_ssid->ste_cache[i].id == id))
-                ste_ssid->ste_cache[i].valid = FREE;
+                ste_ssid->ste_cache[i].valid = ACM_STE_free;
     }
  out:
     read_unlock(&domlist_lock);

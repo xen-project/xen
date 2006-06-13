@@ -132,7 +132,9 @@ struct pt_regs * fastcall save_v86_state(struct kernel_vm86_regs * regs)
 	current->thread.sysenter_cs = __KERNEL_CS;
 	load_esp0(tss, &current->thread);
 	current->thread.saved_esp0 = 0;
+#ifndef CONFIG_X86_NO_TSS
 	put_cpu();
+#endif
 
 	loadsegment(fs, current->thread.saved_fs);
 	loadsegment(gs, current->thread.saved_gs);
@@ -310,7 +312,9 @@ static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk
 	if (cpu_has_sep)
 		tsk->thread.sysenter_cs = 0;
 	load_esp0(tss, &tsk->thread);
+#ifndef CONFIG_X86_NO_TSS
 	put_cpu();
+#endif
 
 	tsk->thread.screen_bitmap = info->screen_bitmap;
 	if (info->flags & VM86_SCREEN_BITMAP)

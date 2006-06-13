@@ -32,22 +32,111 @@ struct domain *domain_list;
 
 struct domain *dom0;
 
-struct domain *domain_create(domid_t dom_id, unsigned int cpu)
-{
-    struct domain *d, **pd;
-    struct vcpu *v;
+struct vcpu *idle_vcpu[NR_CPUS];
 
-    if ( (d = alloc_domain()) == NULL )
+struct domain *alloc_domain(domid_t domid)
+{
+    struct domain *d;
+
+    if ( (d = xmalloc(struct domain)) == NULL )
         return NULL;
 
-    d->domain_id = dom_id;
-
+    memset(d, 0, sizeof(*d));
+    d->domain_id = domid;
     atomic_set(&d->refcnt, 1);
-
     spin_lock_init(&d->big_lock);
     spin_lock_init(&d->page_alloc_lock);
     INIT_LIST_HEAD(&d->page_list);
     INIT_LIST_HEAD(&d->xenpage_list);
+
+    return d;
+}
+
+
+void free_domain(struct domain *d)
+{
+    struct vcpu *v;
+    int i;
+
+    sched_destroy_domain(d);
+
+    for ( i = MAX_VIRT_CPUS-1; i >= 0; i-- )
+        if ( (v = d->vcpu[i]) != NULL )
+            free_vcpu_struct(v);
+
+    xfree(d);
+}
+
+
+struct vcpu *alloc_vcpu(
+    struct domain *d, unsigned int vcpu_id, unsigned int cpu_id)
+{
+    struct vcpu *v;
+
+    BUG_ON(d->vcpu[vcpu_id] != NULL);
+
+    if ( (v = alloc_vcpu_struct(d, vcpu_id)) == NULL )
+        return NULL;
+
+    v->domain = d;
+    v->vcpu_id = vcpu_id;
+    v->processor = cpu_id;
+    atomic_set(&v->pausecnt, 0);
+    v->vcpu_info = &d->shared_info->vcpu_info[vcpu_id];
+
+    v->cpu_affinity = is_idle_domain(d) ?
+        cpumask_of_cpu(cpu_id) : CPU_MASK_ALL;
+
+    v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
+    v->runstate.state_entry_time = NOW();
+
+    if ( (vcpu_id != 0) && !is_idle_domain(d) )
+        set_bit(_VCPUF_down, &v->vcpu_flags);
+
+    if ( sched_init_vcpu(v) < 0 )
+    {
+        free_vcpu_struct(v);
+        return NULL;
+    }
+
+    d->vcpu[vcpu_id] = v;
+    if ( vcpu_id != 0 )
+        d->vcpu[v->vcpu_id-1]->next_in_list = v;
+
+    return v;
+}
+
+struct vcpu *alloc_idle_vcpu(unsigned int cpu_id)
+{
+    struct domain *d;
+    struct vcpu *v;
+    unsigned int vcpu_id;
+
+    if ((vcpu_id = cpu_id % MAX_VIRT_CPUS) == 0)
+    {
+        d = domain_create(IDLE_DOMAIN_ID, cpu_id);
+        BUG_ON(d == NULL);
+        v = d->vcpu[0];
+    }
+    else
+    {
+        d = idle_vcpu[cpu_id - vcpu_id]->domain;
+        BUG_ON(d == NULL);
+        v = alloc_vcpu(d, vcpu_id, cpu_id);
+    }
+
+    idle_vcpu[cpu_id] = v;
+
+    return v;
+}
+
+struct domain *domain_create(domid_t domid, unsigned int cpu)
+{
+    struct domain *d, **pd;
+    struct vcpu *v;
+
+    if ( (d = alloc_domain(domid)) == NULL )
+        return NULL;
 
     rangeset_domain_initialise(d);
 
@@ -74,14 +163,14 @@ struct domain *domain_create(domid_t dom_id, unsigned int cpu)
     if ( !is_idle_domain(d) )
     {
         write_lock(&domlist_lock);
-        pd = &domain_list; /* NB. domain_list maintained in order of dom_id. */
+        pd = &domain_list; /* NB. domain_list maintained in order of domid. */
         for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_in_list )
             if ( (*pd)->domain_id > d->domain_id )
                 break;
         d->next_in_list = *pd;
         *pd = d;
-        d->next_in_hashbucket = domain_hash[DOMAIN_HASH(dom_id)];
-        domain_hash[DOMAIN_HASH(dom_id)] = d;
+        d->next_in_hashbucket = domain_hash[DOMAIN_HASH(domid)];
+        domain_hash[DOMAIN_HASH(domid)] = d;
         write_unlock(&domlist_lock);
     }
 
@@ -126,19 +215,16 @@ struct domain *find_domain_by_id(domid_t dom)
 
 void domain_kill(struct domain *d)
 {
-    struct vcpu *v;
-
     domain_pause(d);
-    if ( !test_and_set_bit(_DOMF_dying, &d->domain_flags) )
-    {
-        for_each_vcpu(d, v)
-            sched_rem_domain(v);
-        gnttab_release_mappings(d);
-        domain_relinquish_resources(d);
-        put_domain(d);
 
-        send_guest_global_virq(dom0, VIRQ_DOM_EXC);
-    }
+    if ( test_and_set_bit(_DOMF_dying, &d->domain_flags) )
+        return;
+
+    gnttab_release_mappings(d);
+    domain_relinquish_resources(d);
+    put_domain(d);
+
+    send_guest_global_virq(dom0, VIRQ_DOM_EXC);
 }
 
 

@@ -37,7 +37,11 @@ DEFINE_XEN_GUEST_HANDLE(physdev_irq_status_query_t);
 
 /* Need to call PHYSDEVOP_eoi when the IRQ has been serviced? */
 #define _XENIRQSTAT_needs_eoi   (0)
-#define  XENIRQSTAT_needs_eoi   (1<<_XENIRQSTAT_needs_eoi)
+#define  XENIRQSTAT_needs_eoi   (1U<<_XENIRQSTAT_needs_eoi)
+
+/* IRQ shared by multiple guests? */
+#define _XENIRQSTAT_shared      (1)
+#define  XENIRQSTAT_shared      (1U<<_XENIRQSTAT_shared)
 
 /*
  * Set the current VCPU's I/O privilege level.
@@ -130,6 +134,7 @@ DEFINE_XEN_GUEST_HANDLE(physdev_op_t);
 #define PHYSDEVOP_APIC_WRITE             PHYSDEVOP_apic_write
 #define PHYSDEVOP_ASSIGN_VECTOR          PHYSDEVOP_alloc_irq_vector
 #define PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY XENIRQSTAT_needs_eoi
+#define PHYSDEVOP_IRQ_SHARED             XENIRQSTAT_shared
 
 #endif /* __XEN_PUBLIC_PHYSDEV_H__ */
 

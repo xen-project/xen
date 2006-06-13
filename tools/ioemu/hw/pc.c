@@ -40,6 +40,7 @@ int speaker_data_on;
 int dummy_refresh_clock;
 static fdctrl_t *floppy_controller;
 static RTCState *rtc_state;
+static USBPort *usb_root_ports[2];
 
 static void ioport80_write(void *opaque, uint32_t addr, uint32_t data)
 {
@@ -537,8 +538,11 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
     for(i = 0; i < MAX_SERIAL_PORTS; i++) {
         if (serial_hds[i]) {
             sp = serial_init(serial_io[i], serial_irq[i], serial_hds[i]);
-            if (i == SUMMA_PORT)
+            if (i == serial_summa_port) {
 		summa_init(sp, serial_hds[i]);
+		fprintf(stderr, "Serial port %d (COM%d) initialized for Summagraphics\n",
+			i, i+1);
+	    }
         }
     }
 
@@ -580,6 +584,11 @@ void pc_init(uint64_t ram_size, int vga_ram_size, int boot_device,
 
     cmos_init(ram_size, boot_device, bs_table, timeoffset);
     acpi_init(0x8000);
+
+    if (pci_enabled && usb_enabled) {
+	usb_uhci_init(pci_bus, usb_root_ports);
+	usb_attach(usb_root_ports[0], vm_usb_hub);
+    }
 
     /* must be done after all PCI devices are instanciated */
     /* XXX: should be done in the Bochs BIOS */

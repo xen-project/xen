@@ -27,6 +27,10 @@
 #define _NETTXF_data_validated (1)
 #define  NETTXF_data_validated (1U<<_NETTXF_data_validated)
 
+/* Packet continues in the request. */
+#define _NETTXF_more_data      (2)
+#define  NETTXF_more_data      (1U<<_NETTXF_more_data)
+
 struct netif_tx_request {
     grant_ref_t gref;      /* Reference to buffer page */
     uint16_t offset;       /* Offset within buffer page */

@@ -49,8 +49,12 @@ static void* kbd_layout=0;
 static int gui_fullscreen_initial_grab;
 static int gui_grab_code = KMOD_LALT | KMOD_LCTRL;
 static uint8_t modifiers_state[256];
+static int width, height;
+static SDL_Cursor *sdl_cursor_normal;
+static SDL_Cursor *sdl_cursor_hidden;
+static int absolute_enabled = 0;
 
-SDL_PixelFormat* sdl_get_format() {
+SDL_PixelFormat* sdl_get_format(void) {
 	return screen->format;
 }
 
@@ -69,6 +73,8 @@ static void sdl_resize(DisplayState *ds, int w, int h)
     flags |= SDL_RESIZABLE;
     if (gui_fullscreen)
         flags |= SDL_FULLSCREEN;
+    width = w;
+    height = h;
     screen = SDL_SetVideoMode(w, h, 0, flags);
     if (!screen) {
         fprintf(stderr, "Could not open SDL display\n");
@@ -368,9 +374,21 @@ static void sdl_update_caption(void)
     SDL_WM_SetCaption(buf, domain_name);
 }
 
+static void sdl_hide_cursor(void)
+{
+    SDL_SetCursor(sdl_cursor_hidden);
+}
+
+static void sdl_show_cursor(void)
+{
+    if (!kbd_mouse_is_absolute()) {
+	SDL_SetCursor(sdl_cursor_normal);
+    }
+}
+
 static void sdl_grab_start(void)
 {
-    SDL_ShowCursor(0);
+    sdl_hide_cursor();
     SDL_WM_GrabInput(SDL_GRAB_ON);
     /* dummy read to avoid moving the mouse */
     SDL_GetRelativeMouseState(NULL, NULL);
@@ -381,6 +399,7 @@ static void sdl_grab_start(void)
 static void sdl_grab_end(void)
 {
     SDL_WM_GrabInput(SDL_GRAB_OFF);
+    sdl_show_cursor();
     SDL_ShowCursor(1);
     gui_grab = 0;
     sdl_update_caption();
@@ -397,6 +416,21 @@ static void sdl_send_mouse_event(void)
         buttons |= MOUSE_EVENT_RBUTTON;
     if (state & SDL_BUTTON(SDL_BUTTON_MIDDLE))
         buttons |= MOUSE_EVENT_MBUTTON;
+
+    if (kbd_mouse_is_absolute()) {
+	if (!absolute_enabled) {
+	    sdl_hide_cursor();
+	    if (gui_grab) {
+		sdl_grab_end();
+	    }
+	    absolute_enabled = 1;
+	}
+
+	SDL_GetMouseState(&dx, &dy);
+	dx = dx * 0x7FFF / width;
+	dy = dy * 0x7FFF / height;
+    }
+
     /* XXX: test wheel */
     dz = 0;
 #ifdef SDL_BUTTON_WHEELUP
@@ -405,7 +439,7 @@ static void sdl_send_mouse_event(void)
     if (state & SDL_BUTTON(SDL_BUTTON_WHEELDOWN))
         dz++;
 #endif
-    kbd_mouse_event(dx, dy, dz, buttons, 0, 0);
+    kbd_mouse_event(dx, dy, dz, buttons);
 }
 
 static void toggle_full_screen(DisplayState *ds)
@@ -571,6 +605,7 @@ static void sdl_cleanup(void)
 void sdl_display_init(DisplayState *ds, int full_screen)
 {
     int flags;
+    uint8_t data = 0;
 
     if(keyboard_layout)
 	    kbd_layout=init_keyboard_layout(keyboard_layout);
@@ -596,6 +631,9 @@ void sdl_display_init(DisplayState *ds, int full_screen)
         SDL_EnableKeyRepeat(250, 50);
     SDL_EnableUNICODE(1);
     gui_grab = 0;
+
+    sdl_cursor_hidden = SDL_CreateCursor(&data, &data, 8, 1, 0, 0);
+    sdl_cursor_normal = SDL_GetCursor();
 
     atexit(sdl_cleanup);
     if (full_screen) {

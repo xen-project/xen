@@ -57,7 +57,7 @@ xc_plan9_build(int xc_handle,
 
 int xc_ia64_get_pfn_list(int xc_handle,
                          uint32_t domid,
-                         unsigned long *pfn_buf,
+                         xen_pfn_t *pfn_buf,
                          unsigned int start_page,
                          unsigned int nr_pages)
 {
@@ -65,7 +65,7 @@ int xc_ia64_get_pfn_list(int xc_handle,
     int num_pfns,ret;
     unsigned int __start_page, __nr_pages;
     unsigned long max_pfns;
-    unsigned long *__pfn_buf;
+    xen_pfn_t *__pfn_buf;
 
     __start_page = start_page;
     __nr_pages = nr_pages;
@@ -80,7 +80,7 @@ int xc_ia64_get_pfn_list(int xc_handle,
         set_xen_guest_handle(op.u.getmemlist.buffer, __pfn_buf);
 
         if ( (max_pfns != -1UL)
-            && mlock(__pfn_buf, __nr_pages * sizeof(unsigned long)) != 0 )
+            && mlock(__pfn_buf, __nr_pages * sizeof(xen_pfn_t)) != 0 )
         {
             PERROR("Could not lock pfn list buffer");
             return -1;
@@ -89,7 +89,7 @@ int xc_ia64_get_pfn_list(int xc_handle,
         ret = do_dom0_op(xc_handle, &op);
 
         if (max_pfns != -1UL)
-            (void)munlock(__pfn_buf, __nr_pages * sizeof(unsigned long));
+            (void)munlock(__pfn_buf, __nr_pages * sizeof(xen_pfn_t));
 
         if (max_pfns == -1UL)
             return 0;
@@ -122,10 +122,10 @@ int xc_ia64_copy_to_domain_pages(int xc_handle, uint32_t domid,
 {
     // N.B. gva should be page aligned
 
-    unsigned long *page_array = NULL;
+    xen_pfn_t *page_array = NULL;
     int i;
 
-    if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL ){
+    if ( (page_array = malloc(nr_pages * sizeof(xen_pfn_t))) == NULL ){
         PERROR("Could not allocate memory");
         goto error_out;
     }
@@ -669,7 +669,7 @@ static int setup_guest(  int xc_handle,
 
         vp_eport = xc_evtchn_alloc_unbound(xc_handle, dom, 0);
         if (vp_eport < 0) {
-            fprintf(stderr, "Couldn't get unbound port from VMX guest.\n");
+            DPRINTF("Couldn't get unbound port from VMX guest.\n");
             goto error_out;
         }
         sp->vcpu_iodata[i].vp_eport = vp_eport;

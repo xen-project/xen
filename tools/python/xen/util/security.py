@@ -426,6 +426,15 @@ def get_decision(arg1, arg2):
             err("Argument type not supported.")
         ssidref = label2ssidref(arg2[2][1], arg2[1][1])
         arg2 = ['ssidref', str(ssidref)]
+
+    # accept only int or string types for domid and ssidref
+    if isinstance(arg1[1], int):
+        arg1[1] = str(arg1[1])
+    if isinstance(arg2[1], int):
+        arg2[1] = str(arg2[1])
+    if not isinstance(arg1[1], str) or not isinstance(arg2[1], str):
+        err("Invalid id or ssidref type, string or int required")
+
     try:
         decision = acm.getdecision(arg1[0], arg1[1], arg2[0], arg2[1])
     except:

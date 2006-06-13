@@ -492,6 +492,10 @@ static term_cmd_t term_cmds[] = {
       "", "quit the emulator" },
     { "sendkey", "s", do_send_key, 
       "keys", "send keys to the VM (e.g. 'sendkey ctrl-alt-f1')" },
+    { "usb_add", "s", do_usb_add,
+      "device", "add USB device (e.g. 'host:bus.addr' or 'host:vendor_id:product_id')" },
+    { "usb_del", "s", do_usb_del,
+      "device", "remove USB device 'bus.addr'" },
     { NULL, NULL, }, 
 };
 
@@ -510,6 +514,10 @@ static term_cmd_t info_cmds[] = {
       "", "show i8259 (PIC) state", },
     { "pci", "", pci_info,
       "", "show PCI info", },
+    { "usb", "", usb_info,
+      "", "show guest USB devices", },
+    { "usbhost", "", usb_host_info,
+      "", "show host USB devices", },
     { "hvmiopage", "", sp_info,
       "", "show HVM device model shared page info", },
     { NULL, NULL, },

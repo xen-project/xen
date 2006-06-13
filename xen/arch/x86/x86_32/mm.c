@@ -75,7 +75,8 @@ void __init paging_init(void)
     printk("PAE disabled.\n");
 #endif
 
-    idle_vcpu[0]->arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
+    idle_vcpu[0]->arch.monitor_table =
+        pagetable_from_paddr(__pa(idle_pg_table));
 
     if ( cpu_has_pge )
     {

@@ -46,6 +46,7 @@
 
 #include <asm/vcpu.h>   /* for function declarations */
 #include <public/arch-ia64.h>
+#include <xen/domain.h>
 #include <asm/vmx.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx_vpd.h>

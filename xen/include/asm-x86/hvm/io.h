@@ -64,9 +64,10 @@
 #define INSTR_MOVZX 8
 #define INSTR_MOVSX 9
 #define INSTR_STOS  10
-#define INSTR_TEST  11
-#define INSTR_BT    12
-#define INSTR_XCHG  13
+#define INSTR_LODS  11
+#define INSTR_TEST  12
+#define INSTR_BT    13
+#define INSTR_XCHG  14
 
 struct instruction {
     __s8    instr;        /* instruction type */

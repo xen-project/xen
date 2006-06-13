@@ -59,26 +59,27 @@ extern struct ste_binary_policy ste_bin_pol;
 extern rwlock_t acm_bin_pol_rwlock;
 
 /* subject and object type definitions */
-enum acm_datatype { DOMAIN };
+#define ACM_DATATYPE_domain 1
 
 /* defines number of access decisions to other domains can be cached
  * one entry per domain, TE does not distinguish evtchn or grant_table */
 #define ACM_TE_CACHE_SIZE 8
-enum acm_ste_flag { VALID, FREE };
+#define ACM_STE_valid 0
+#define ACM_STE_free  1
 
 /* cache line:
- * if cache_line.valid==VALID, then
+ * if cache_line.valid==ACM_STE_valid, then
  *    STE decision is cached as "permitted" 
  *                 on domain cache_line.id
  */
 struct acm_ste_cache_line {
-    enum acm_ste_flag valid;
+    int valid; /* ACM_STE_* */
     domid_t id;
 };
 
 /* general definition of a subject security id */
 struct acm_ssid_domain {
-    enum acm_datatype datatype; /* type of subject (e.g., partition) */
+    int datatype; /* type of subject (e.g., partition): ACM_DATATYPE_* */
     ssidref_t ssidref;   /* combined security reference */
     void *primary_ssid;   /* primary policy ssid part (e.g. chinese wall) */
     void *secondary_ssid;    /* secondary policy ssid part (e.g. type enforcement) */
@@ -124,7 +125,7 @@ int acm_set_policy(void *buf, u32 buf_size, int isuserbuffer);
 int acm_get_policy(void *buf, u32 buf_size);
 int acm_dump_statistics(void *buf, u16 buf_size);
 int acm_get_ssid(ssidref_t ssidref, u8 *buf, u16 buf_size);
-int acm_get_decision(ssidref_t ssidref1, ssidref_t ssidref2, enum acm_hook_type hook);
+int acm_get_decision(ssidref_t ssidref1, ssidref_t ssidref2, u32 hook);
 int acm_set_policy_reference(u8 * buf, u32 buf_size);
 int acm_dump_policy_reference(u8 *buf, u32 buf_size);
 #endif

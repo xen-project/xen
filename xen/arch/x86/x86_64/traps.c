@@ -195,7 +195,7 @@ unsigned long do_iret(void)
     /* Returning to user mode? */
     if ( (iret_saved.cs & 3) == 3 )
     {
-        if ( unlikely(pagetable_get_paddr(v->arch.guest_table_user) == 0) )
+        if ( unlikely(pagetable_is_null(v->arch.guest_table_user)) )
         {
             DPRINTK("Guest switching to user mode with no user page tables\n");
             domain_crash_synchronous();
@@ -334,10 +334,22 @@ static long register_guest_callback(struct callback_register *reg)
 
     case CALLBACKTYPE_failsafe:
         v->arch.guest_context.failsafe_callback_eip = reg->address;
+        if ( reg->flags & CALLBACKF_mask_events )
+            set_bit(_VGCF_failsafe_disables_events,
+                    &v->arch.guest_context.flags);
+        else
+            clear_bit(_VGCF_failsafe_disables_events,
+                      &v->arch.guest_context.flags);
         break;
 
     case CALLBACKTYPE_syscall:
         v->arch.guest_context.syscall_callback_eip  = reg->address;
+        if ( reg->flags & CALLBACKF_mask_events )
+            set_bit(_VGCF_syscall_disables_events,
+                    &v->arch.guest_context.flags);
+        else
+            clear_bit(_VGCF_syscall_disables_events,
+                      &v->arch.guest_context.flags);
         break;
 
     case CALLBACKTYPE_nmi:

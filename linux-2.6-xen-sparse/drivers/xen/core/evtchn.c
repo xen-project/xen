@@ -54,7 +54,8 @@
 static DEFINE_SPINLOCK(irq_mapping_update_lock);
 
 /* IRQ <-> event-channel mappings. */
-static int evtchn_to_irq[NR_EVENT_CHANNELS] = {[0 ...  NR_EVENT_CHANNELS-1] = -1};
+static int evtchn_to_irq[NR_EVENT_CHANNELS] = {
+	[0 ...  NR_EVENT_CHANNELS-1] = -1 };
 
 /* Packed IRQ information: binding type, sub-type index, and event channel. */
 static u32 irq_info[NR_IRQS];
@@ -120,6 +121,11 @@ static inline unsigned long active_evtchns(unsigned int cpu, shared_info_t *sh,
 
 static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
 {
+	int irq = evtchn_to_irq[chn];
+
+	BUG_ON(irq == -1);
+	set_native_irq_info(irq, cpumask_of_cpu(cpu));
+
 	clear_bit(chn, (unsigned long *)cpu_evtchn_mask[cpu_evtchn[chn]]);
 	set_bit(chn, (unsigned long *)cpu_evtchn_mask[cpu]);
 	cpu_evtchn[chn] = cpu;
@@ -127,7 +133,12 @@ static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
 
 static void init_evtchn_cpu_bindings(void)
 {
+	int i;
+
 	/* By default all event channels notify CPU#0. */
+	for (i = 0; i < NR_IRQS; i++)
+		set_native_irq_info(i, cpumask_of_cpu(0));
+
 	memset(cpu_evtchn, 0, sizeof(cpu_evtchn));
 	memset(cpu_evtchn_mask[0], ~0, sizeof(cpu_evtchn_mask[0]));
 }
@@ -430,25 +441,14 @@ void unbind_from_irqhandler(unsigned int irq, void *dev_id)
 }
 EXPORT_SYMBOL_GPL(unbind_from_irqhandler);
 
-#ifdef CONFIG_SMP
-static void do_nothing_function(void *ign)
-{
-}
-#endif
-
 /* Rebind an evtchn so that it gets delivered to a specific cpu */
 static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
 {
 	struct evtchn_bind_vcpu bind_vcpu;
-	int evtchn;
+	int evtchn = evtchn_from_irq(irq);
 
-	spin_lock(&irq_mapping_update_lock);
-
-	evtchn = evtchn_from_irq(irq);
-	if (!VALID_EVTCHN(evtchn)) {
-		spin_unlock(&irq_mapping_update_lock);
+	if (!VALID_EVTCHN(evtchn))
 		return;
-	}
 
 	/* Send future instances of this interrupt to other vcpu. */
 	bind_vcpu.port = evtchn;
@@ -461,21 +461,6 @@ static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
 	 */
 	if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_vcpu, &bind_vcpu) >= 0)
 		bind_evtchn_to_cpu(evtchn, tcpu);
-
-	spin_unlock(&irq_mapping_update_lock);
-
-	/*
-	 * Now send the new target processor a NOP IPI. When this returns, it
-	 * will check for any pending interrupts, and so service any that got 
-	 * delivered to the wrong processor by mistake.
-	 * 
-	 * XXX: The only time this is called with interrupts disabled is from
-	 * the hotplug/hotunplug path. In that case, all cpus are stopped with 
-	 * interrupts disabled, and the missed interrupts will be picked up
-	 * when they start again. This is kind of a hack.
-	 */
-	if (!irqs_disabled())
-		smp_call_function(do_nothing_function, NULL, 0, 0);
 }
 
 
@@ -597,8 +582,8 @@ static unsigned int startup_pirq(unsigned int irq)
 
 	pirq_query_unmask(irq_to_pirq(irq));
 
-	bind_evtchn_to_cpu(evtchn, 0);
 	evtchn_to_irq[evtchn] = irq;
+	bind_evtchn_to_cpu(evtchn, 0);
 	irq_info[irq] = mk_irq_info(IRQT_PIRQ, irq, evtchn);
 
  out:
@@ -678,7 +663,14 @@ static struct hw_interrupt_type pirq_type = {
 	set_affinity_irq
 };
 
-void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
+int irq_ignore_unhandled(unsigned int irq)
+{
+	struct physdev_irq_status_query irq_status = { .irq = irq };
+	(void)HYPERVISOR_physdev_op(PHYSDEVOP_irq_status_query, &irq_status);
+	return !!(irq_status.flags & XENIRQSTAT_shared);
+}
+
+void resend_irq_on_evtchn(struct hw_interrupt_type *h, unsigned int i)
 {
 	int evtchn = evtchn_from_irq(i);
 	shared_info_t *s = HYPERVISOR_shared_info;
@@ -710,6 +702,8 @@ void unmask_evtchn(int port)
 	unsigned int cpu = smp_processor_id();
 	vcpu_info_t *vcpu_info = &s->vcpu_info[cpu];
 
+	BUG_ON(!irqs_disabled());
+
 	/* Slow path (hypercall) if this is a non-local port. */
 	if (unlikely(cpu != cpu_from_evtchn(port))) {
 		struct evtchn_unmask unmask = { .port = port };
@@ -726,11 +720,8 @@ void unmask_evtchn(int port)
 	 */
 	if (synch_test_bit(port, &s->evtchn_pending[0]) &&
 	    !synch_test_and_set_bit(port / BITS_PER_LONG,
-				    &vcpu_info->evtchn_pending_sel)) {
+				    &vcpu_info->evtchn_pending_sel))
 		vcpu_info->evtchn_upcall_pending = 1;
-		if (!vcpu_info->evtchn_upcall_mask)
-			force_evtchn_callback();
-	}
 }
 EXPORT_SYMBOL_GPL(unmask_evtchn);
 

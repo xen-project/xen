@@ -30,7 +30,10 @@ switch_to_kernel:
         movq  VCPU_syscall_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
         movw  $0,TRAPBOUNCE_flags(%rdx)
-        call  create_bounce_frame
+        bt    $_VGCF_syscall_disables_events,VCPU_guest_context_flags(%rbx)
+        jnc   1f
+        orw   $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
+1:      call  create_bounce_frame
         jmp   test_all_events
 
 /* %rbx: struct vcpu, interrupts disabled */
@@ -77,7 +80,10 @@ failsafe_callback:
         movq  VCPU_failsafe_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
         movw  $TBF_FAILSAFE,TRAPBOUNCE_flags(%rdx)
-        call  create_bounce_frame
+        bt    $_VGCF_failsafe_disables_events,VCPU_guest_context_flags(%rbx)
+        jnc   1f
+        orw   $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
+1:      call  create_bounce_frame
         jmp   test_all_events
 .previous
 .section __pre_ex_table,"a"
@@ -124,7 +130,8 @@ ENTRY(syscall_enter)
 
 /*hypercall:*/
         movq  %r10,%rcx
-        andq  $(NR_hypercalls-1),%rax
+        cmpq  $NR_hypercalls,%rax
+        jae   bad_hypercall
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs not used by this hypercall. */
         pushq %rdi; pushq %rsi; pushq %rdx; pushq %rcx; pushq %r8 ; pushq %r9 
@@ -136,7 +143,6 @@ ENTRY(syscall_enter)
         rep   stosq
         popq  %r9 ; popq  %r8 ; popq  %rcx; popq  %rdx; popq  %rsi; popq  %rdi
         movq  UREGS_rax(%rsp),%rax
-        andq  $(NR_hypercalls-1),%rax
         pushq %rax
         pushq UREGS_rip+8(%rsp)
 #endif
@@ -211,7 +217,11 @@ process_nmi:
         jmp  test_all_events
 1:      bts  $_VCPUF_nmi_pending,VCPU_flags(%rbx)
         jmp  test_guest_events
-	
+
+bad_hypercall:
+        movq $-ENOSYS,UREGS_rax(%rsp)
+        jmp  test_all_events
+
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS STACK:                     */
 /*   { RCX, R11, [DS-GS,] [CR2,] [ERRCODE,] RIP, CS, RFLAGS, RSP, SS }   */
 /* %rdx: trap_bounce, %rbx: struct vcpu                           */

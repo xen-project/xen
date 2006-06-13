@@ -90,15 +90,18 @@ extern void free_irq_vector (int vector);
 extern void ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect);
 extern void register_percpu_irq (ia64_vector vec, struct irqaction *action);
 
-#ifndef CONFIG_XEN
 static inline void
 hw_resend_irq (struct hw_interrupt_type *h, unsigned int vector)
 {
+#ifdef CONFIG_XEN
+	extern void resend_irq_on_evtchn(struct hw_interrupt_type *h,
+					 unsigned int i);
+	if (is_running_on_xen())
+		resend_irq_on_evtchn(h, vector);
+	else
+#endif /* CONFIG_XEN */
 	platform_send_ipi(smp_processor_id(), vector, IA64_IPI_DM_INT, 0);
 }
-#else
-extern void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i);
-#endif /* CONFIG_XEN */
 
 /*
  * Default implementations for the irq-descriptor API:

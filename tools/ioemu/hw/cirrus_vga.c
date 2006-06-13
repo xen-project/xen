@@ -1191,17 +1191,6 @@ cirrus_hook_write_sr(CirrusVGAState * s, unsigned reg_index, int reg_value)
 	s->hw_cursor_y = (reg_value << 3) | (reg_index >> 5);
 	break;
     case 0x07:			// Extended Sequencer Mode
-	/* Win2K seems to assume that the VRAM is set to 0xff
-	 *   whenever VGA/SVGA mode changes 
-	 */
-	if ((s->sr[0x07] ^ reg_value) & CIRRUS_SR7_BPP_SVGA)
-	    memset(s->vram_ptr, 0xff, s->real_vram_size);
-	s->sr[0x07] = reg_value;
-#ifdef DEBUG_CIRRUS 
-	printf("cirrus: handled outport sr_index %02x, sr_value %02x\n",
-	       reg_index, reg_value);
-#endif
-	break;
     case 0x08:			// EEPROM Control
     case 0x09:			// Scratch Register 0
     case 0x0a:			// Scratch Register 1
@@ -2460,10 +2449,9 @@ static CPUWriteMemoryFunc *cirrus_linear_bitblt_write[3] = {
 };
 
 extern FILE *logfile;
-#if defined(__i386__) || defined (__x86_64__)
 static void * set_vram_mapping(unsigned long begin, unsigned long end)
 {
-    unsigned long * extent_start = NULL;
+    xen_pfn_t *extent_start = NULL;
     unsigned long nr_extents;
     void *vram_pointer = NULL;
     int i;
@@ -2474,14 +2462,14 @@ static void * set_vram_mapping(unsigned long begin, unsigned long end)
     end = (end + TARGET_PAGE_SIZE -1 ) & TARGET_PAGE_MASK;
     nr_extents = (end - begin) >> TARGET_PAGE_BITS;
 
-    extent_start = malloc(sizeof(unsigned long) * nr_extents );
+    extent_start = malloc(sizeof(xen_pfn_t) * nr_extents );
     if (extent_start == NULL)
     {
         fprintf(stderr, "Failed malloc on set_vram_mapping\n");
         return NULL;
     }
 
-    memset(extent_start, 0, sizeof(unsigned long) * nr_extents);
+    memset(extent_start, 0, sizeof(xen_pfn_t) * nr_extents);
 
     for (i = 0; i < nr_extents; i++)
     {
@@ -2509,7 +2497,7 @@ static void * set_vram_mapping(unsigned long begin, unsigned long end)
 
 static int unset_vram_mapping(unsigned long begin, unsigned long end)
 {
-    unsigned long * extent_start = NULL;
+    xen_pfn_t *extent_start = NULL;
     unsigned long nr_extents;
     int i;
 
@@ -2520,7 +2508,7 @@ static int unset_vram_mapping(unsigned long begin, unsigned long end)
     end = (end + TARGET_PAGE_SIZE -1 ) & TARGET_PAGE_MASK;
     nr_extents = (end - begin) >> TARGET_PAGE_BITS;
 
-    extent_start = malloc(sizeof(unsigned long) * nr_extents );
+    extent_start = malloc(sizeof(xen_pfn_t) * nr_extents );
 
     if (extent_start == NULL)
     {
@@ -2528,7 +2516,7 @@ static int unset_vram_mapping(unsigned long begin, unsigned long end)
         return -1;
     }
 
-    memset(extent_start, 0, sizeof(unsigned long) * nr_extents);
+    memset(extent_start, 0, sizeof(xen_pfn_t) * nr_extents);
 
     for (i = 0; i < nr_extents; i++)
         extent_start[i] = (begin + (i * TARGET_PAGE_SIZE)) >> TARGET_PAGE_BITS;
@@ -2540,10 +2528,6 @@ static int unset_vram_mapping(unsigned long begin, unsigned long end)
     return 0;
 }
 
-#elif defined(__ia64__)
-static void * set_vram_mapping(unsigned long addr, unsigned long end) {}
-static int unset_vram_mapping(unsigned long addr, unsigned long end) {}
-#endif
 extern int vga_accelerate;
 
 /* Compute the memory access functions */

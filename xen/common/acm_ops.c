@@ -106,9 +106,9 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if (getssid.interface_version != ACM_INTERFACE_VERSION)
             return -EACCES;
 
-        if (getssid.get_ssid_by == SSIDREF)
+        if (getssid.get_ssid_by == ACM_GETBY_ssidref)
             ssidref = getssid.id.ssidref;
-        else if (getssid.get_ssid_by == DOMAINID)
+        else if (getssid.get_ssid_by == ACM_GETBY_domainid)
         {
             struct domain *subj = find_domain_by_id(getssid.id.domainid);
             if (!subj)
@@ -143,9 +143,9 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if (getdecision.interface_version != ACM_INTERFACE_VERSION)
             return -EACCES;
 
-        if (getdecision.get_decision_by1 == SSIDREF)
+        if (getdecision.get_decision_by1 == ACM_GETBY_ssidref)
             ssidref1 = getdecision.id1.ssidref;
-        else if (getdecision.get_decision_by1 == DOMAINID)
+        else if (getdecision.get_decision_by1 == ACM_GETBY_domainid)
         {
             struct domain *subj = find_domain_by_id(getdecision.id1.domainid);
             if (!subj)
@@ -167,9 +167,9 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             rc = -ESRCH;
             break;
         }
-        if (getdecision.get_decision_by2 == SSIDREF)
+        if (getdecision.get_decision_by2 == ACM_GETBY_ssidref)
             ssidref2 = getdecision.id2.ssidref;
-        else if (getdecision.get_decision_by2 == DOMAINID)
+        else if (getdecision.get_decision_by2 == ACM_GETBY_domainid)
         {
             struct domain *subj = find_domain_by_id(getdecision.id2.domainid);
             if (!subj)
