@@ -22,13 +22,14 @@
  * 	- dom0 code & data
  * 	- initrd (optional)
 #endif
+ * 	- Kernel memory map built from EFI memory map
  *
  * More could be added if necessary
  */
 #ifndef XEN
-#define IA64_MAX_RSVD_REGIONS 5
-#else
 #define IA64_MAX_RSVD_REGIONS 6
+#else
+#define IA64_MAX_RSVD_REGIONS 7
 #endif
 
 struct rsvd_region {
@@ -43,6 +44,7 @@ extern void find_memory (void);
 extern void reserve_memory (void);
 extern void find_initrd (void);
 extern int filter_rsvd_memory (unsigned long start, unsigned long end, void *arg);
+extern void efi_memmap_init(unsigned long *, unsigned long *);
 
 /*
  * For rounding an address to the next IA64_GRANULE_SIZE or order

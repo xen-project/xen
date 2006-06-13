@@ -90,20 +90,6 @@ xen_count_pages(u64 start, u64 end, void *arg)
     return 0;
 }
 
-/* Find first hole after trunk for xen image */
-static int
-xen_find_first_hole(u64 start, u64 end, void *arg)
-{
-    unsigned long *first_hole = arg;
-
-    if ((*first_hole) == 0) {
-	if ((start <= KERNEL_START) && (KERNEL_START < end))
-	    *first_hole = __pa(end);
-    }
-
-    return 0;
-}
-
 static void __init do_initcalls(void)
 {
     initcall_t *call;
@@ -197,15 +183,64 @@ efi_print(void)
     }
 }
 
+/*
+ * These functions are utility functions for getting and
+ * testing memory descriptors for allocating the xenheap area.
+ */
+static efi_memory_desc_t *
+efi_get_md (unsigned long phys_addr)
+{
+    void *efi_map_start, *efi_map_end, *p;
+    efi_memory_desc_t *md;
+    u64 efi_desc_size;
+
+    efi_map_start = __va(ia64_boot_param->efi_memmap);
+    efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
+    efi_desc_size = ia64_boot_param->efi_memdesc_size;
+
+    for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
+        md = p;
+        if (phys_addr - md->phys_addr < (md->num_pages << EFI_PAGE_SHIFT))
+            return md;
+    }
+    return 0;
+}
+
+static int
+is_xenheap_usable_memory(efi_memory_desc_t *md)
+{
+    if (!(md->attribute & EFI_MEMORY_WB))
+        return 0;
+
+    switch (md->type) {
+        case EFI_LOADER_CODE:
+        case EFI_LOADER_DATA:
+        case EFI_BOOT_SERVICES_CODE:
+        case EFI_BOOT_SERVICES_DATA:
+        case EFI_CONVENTIONAL_MEMORY:
+            return 1;
+    }
+    return 0;
+}
+
+static inline int
+md_overlaps(efi_memory_desc_t *md, unsigned long phys_addr)
+{
+    return (phys_addr - md->phys_addr < (md->num_pages << EFI_PAGE_SHIFT));
+}
+
+#define MD_SIZE(md) (md->num_pages << EFI_PAGE_SHIFT)
+
 void start_kernel(void)
 {
     unsigned char *cmdline;
     void *heap_start;
-    unsigned long nr_pages, firsthole_start;
+    unsigned long nr_pages;
     unsigned long dom0_memory_start, dom0_memory_size;
     unsigned long dom0_initrd_start, dom0_initrd_size;
-    unsigned long initial_images_start, initial_images_end;
+    unsigned long md_end, relo_start, relo_end, relo_size = 0;
     struct domain *idle_domain;
+    efi_memory_desc_t *kern_md, *last_md, *md;
 #ifdef CONFIG_SMP
     int i;
 #endif
@@ -230,67 +265,111 @@ void start_kernel(void)
     init_console();
     set_printk_prefix("(XEN) ");
 
+    if (running_on_sim || ia64_boot_param->domain_start == 0 ||
+                          ia64_boot_param->domain_size == 0) {
+        /* This is possible only with the old elilo, which does not support
+           a vmm.  Fix now, and continue without initrd.  */
+        printk ("Your elilo is not Xen-aware.  Bootparams fixed\n");
+        ia64_boot_param->domain_start = ia64_boot_param->initrd_start;
+        ia64_boot_param->domain_size = ia64_boot_param->initrd_size;
+        ia64_boot_param->initrd_start = 0;
+        ia64_boot_param->initrd_size = 0;
+    }
+
     /* xenheap should be in same TR-covered range with xen image */
     xenheap_phys_end = xen_pstart + xenheap_size;
     printk("xen image pstart: 0x%lx, xenheap pend: 0x%lx\n",
-	    xen_pstart, xenheap_phys_end);
+           xen_pstart, xenheap_phys_end);
 
-    /* Find next hole */
-    firsthole_start = 0;
-    efi_memmap_walk(xen_find_first_hole, &firsthole_start);
+    kern_md = md = efi_get_md(xen_pstart);
+    md_end = __pa(ia64_imva(&_end));
+    relo_start = xenheap_phys_end;
 
-    if (running_on_sim || ia64_boot_param->domain_start == 0
-	|| ia64_boot_param->domain_size == 0) {
-	    /* This is possible only with the old elilo, which does not support
-	       a vmm.  Fix now, and continue without initrd.  */
-	    printk ("Your elilo is not Xen-aware.  Bootparams fixed\n");
-	    ia64_boot_param->domain_start = ia64_boot_param->initrd_start;
-	    ia64_boot_param->domain_size = ia64_boot_param->initrd_size;
-	    ia64_boot_param->initrd_start = 0;
-	    ia64_boot_param->initrd_size = 0;
+    /*
+     * Scan through the memory descriptors after the kernel
+     * image to make sure we have enough room for the xenheap
+     * area, pushing out whatever may already be there.
+     */
+    while (relo_start + relo_size >= md_end) {
+        md = efi_get_md(md_end);
+
+        BUG_ON(!md);
+        BUG_ON(!is_xenheap_usable_memory(md));
+
+        md_end = md->phys_addr + MD_SIZE(md);
+        /*
+         * The dom0 kernel or initrd could overlap, reserve space
+         * at the end to relocate them later.
+         */
+        if (md->type == EFI_LOADER_DATA) {
+            /* Test for ranges we're not prepared to move */
+            BUG_ON(md_overlaps(md, __pa(ia64_boot_param)) ||
+                   md_overlaps(md, ia64_boot_param->efi_memmap) ||
+                   md_overlaps(md, ia64_boot_param->command_line));
+
+            relo_size += MD_SIZE(md);
+            /* If range overlaps the end, push out the relocation start */
+            if (md_end > relo_start)
+                relo_start = md_end;
+        }
+    }
+    last_md = md;
+    relo_end = relo_start + relo_size;
+
+    md_end = __pa(ia64_imva(&_end));
+ 
+    /*
+     * Move any relocated data out into the previously found relocation
+     * area.  Any extra memory descriptrs are moved out to the end
+     * and set to zero pages.
+     */
+    for (md = efi_get_md(md_end) ;; md = efi_get_md(md_end)) {
+        md_end = md->phys_addr + MD_SIZE(md);
+
+        if (md->type == EFI_LOADER_DATA) {
+            unsigned long relo_offset;
+
+            if (md_overlaps(md, ia64_boot_param->domain_start)) {
+                relo_offset = ia64_boot_param->domain_start - md->phys_addr;
+                printk("Moving Dom0 kernel image: 0x%lx -> 0x%lx (%ld KiB)\n",
+                       ia64_boot_param->domain_start, relo_start + relo_offset,
+                       ia64_boot_param->domain_size >> 10);
+                ia64_boot_param->domain_start = relo_start + relo_offset;
+            }
+            if (ia64_boot_param->initrd_size &&
+                md_overlaps(md, ia64_boot_param->initrd_start)) {
+                relo_offset = ia64_boot_param->initrd_start - md->phys_addr;
+                printk("Moving Dom0 initrd image: 0x%lx -> 0x%lx (%ld KiB)\n",
+                       ia64_boot_param->initrd_start, relo_start + relo_offset,
+                       ia64_boot_param->initrd_size >> 10);
+                ia64_boot_param->initrd_start = relo_start + relo_offset;
+            }
+            memcpy(__va(relo_start), __va(md->phys_addr), MD_SIZE(md));
+            relo_start += MD_SIZE(md);
+        }
+
+        if (md == kern_md)
+            continue;
+        if (md == last_md)
+            break;
+
+        md->phys_addr = relo_end;
+        md->num_pages = 0;
     }
 
-    initial_images_start = xenheap_phys_end;
-    initial_images_end = initial_images_start +
-       PAGE_ALIGN(ia64_boot_param->domain_size);
+    /* Trim the last entry */
+    md->phys_addr = relo_end;
+    md->num_pages = (md_end - relo_end) >> EFI_PAGE_SHIFT;
 
-    /* also reserve space for initrd */
-    if (ia64_boot_param->initrd_start && ia64_boot_param->initrd_size)
-       initial_images_end += PAGE_ALIGN(ia64_boot_param->initrd_size);
-    else {
-       /* sanity cleanup */
-       ia64_boot_param->initrd_size = 0;
-       ia64_boot_param->initrd_start = 0;
-    }
+    /*
+     * Expand the new kernel/xenheap (and maybe dom0/initrd) out to
+     * the full size.  This range will already be type EFI_LOADER_DATA,
+     * therefore the xenheap area is now protected being allocated for
+     * use by find_memmap_space() in efi.c
+     */
+    kern_md->num_pages = (relo_end - kern_md->phys_addr) >> EFI_PAGE_SHIFT;
 
-
-    /* Later may find another memory trunk, even away from xen image... */
-    if (initial_images_end > firsthole_start) {
-	printk("Not enough memory to stash the DOM0 kernel image.\n");
-	printk("First hole:0x%lx, relocation end: 0x%lx\n",
-		firsthole_start, initial_images_end);
-	for ( ; ; );
-    }
-
-    /* This copy is time consuming, but elilo may load Dom0 image
-     * within xenheap range */
-    printk("ready to move Dom0 to 0x%lx with len %lx...", initial_images_start,
-          ia64_boot_param->domain_size);
-
-    memmove(__va(initial_images_start),
-          __va(ia64_boot_param->domain_start),
-          ia64_boot_param->domain_size);
-    ia64_boot_param->domain_start = initial_images_start;
-
-    printk("ready to move initrd to 0x%lx with len %lx...",
-          initial_images_start+PAGE_ALIGN(ia64_boot_param->domain_size),
-          ia64_boot_param->initrd_size);
-    memmove(__va(initial_images_start+PAGE_ALIGN(ia64_boot_param->domain_size)),
-	   __va(ia64_boot_param->initrd_start),
-	   ia64_boot_param->initrd_size);
-    printk("Done\n");
-    ia64_boot_param->initrd_start = initial_images_start +
-	PAGE_ALIGN(ia64_boot_param->domain_size);
+    reserve_memory();
 
     /* first find highest page frame number */
     max_page = 0;
@@ -309,8 +388,6 @@ void start_kernel(void)
     printf("Before heap_start: %p\n", heap_start);
     heap_start = __va(init_boot_allocator(__pa(heap_start)));
     printf("After heap_start: %p\n", heap_start);
-
-    reserve_memory();
 
     efi_memmap_walk(filter_rsvd_memory, init_boot_pages);
     efi_memmap_walk(xen_count_pages, &nr_pages);
@@ -417,7 +494,7 @@ printk("About to call domain_create()\n");
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
     printk("About to call construct_dom0()\n");
-    dom0_memory_start = (unsigned long) __va(initial_images_start);
+    dom0_memory_start = (unsigned long) __va(ia64_boot_param->domain_start);
     dom0_memory_size = ia64_boot_param->domain_size;
     dom0_initrd_start = (unsigned long) __va(ia64_boot_param->initrd_start);
     dom0_initrd_size = ia64_boot_param->initrd_size;
