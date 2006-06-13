@@ -37,7 +37,7 @@ try:
 except ConsoleError, e:
     FAIL(str(e))
 
-domU_md5sum_match = re.search(r"^[\dA-Fa-f]{32}", run["output"])
+domU_md5sum_match = re.search(r"^[\dA-Fa-f]{32}", run["output"], re.M)
 
 domain.closeConsole()
 
@@ -45,7 +45,7 @@ domain.stop()
 
 s, o = traceCommand("md5sum /dev/ram1")
 
-dom0_md5sum_match = re.search(r"^[\dA-Fa-f]{32}", o)
+dom0_md5sum_match = re.search(r"^[\dA-Fa-f]{32}", o, re.M)
 
 if domU_md5sum_match == None:
     FAIL("Failed to get md5sum of data written in domU.")
