@@ -82,17 +82,6 @@ static shared_info_t *map_shared_info(unsigned long pa)
 }
 
 
-void test_xenbus(void);
-
-/* Do initialisation from a thread once the scheduler's available */
-static void init_xs(void *ign)
-{
-    init_xenbus();
-
-    test_xenbus();
-}
-
-
 u8 xen_features[XENFEAT_NR_SUBMAPS * 32];
 
 void setup_xen_features(void)
@@ -111,10 +100,18 @@ void setup_xen_features(void)
     }
 }
 
+void test_xenbus(void);
+
+void xenbus_tester(void *p)
+{
+    test_xenbus();
+}
+
 /* This should be overridden by the application we are linked against. */
 __attribute__((weak)) int app_main(start_info_t *si)
 {
     printk("Dummy main: start_info=%p\n", si);
+    create_thread("xenbus_tester", xenbus_tester, si);
     return 0;
 }
 
@@ -183,8 +180,8 @@ void start_kernel(start_info_t *si)
     /* Init scheduler. */
     init_sched();
  
-    /* Init XenBus from a separate thread */
-    create_thread("init_xs", init_xs, NULL);
+    /* Init XenBus */
+    init_xenbus();
 
     /* Call (possibly overridden) app_main() */
     app_main(&start_info);
