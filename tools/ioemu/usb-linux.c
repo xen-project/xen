@@ -26,6 +26,7 @@
 #if defined(__linux__)
 #include <dirent.h>
 #include <sys/ioctl.h>
+#define __user /* new versions of usbdevice_fs.h use this private attribute */
 #include <linux/usbdevice_fs.h>
 #include <linux/version.h>
 
