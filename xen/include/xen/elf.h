@@ -178,9 +178,9 @@ typedef struct {
 #define EM_ALPHA	41		/* DEC ALPHA */
 #define EM_SPARCV9	43		/* SPARC version 9 */
 #define EM_ALPHA_EXP	0x9026		/* DEC ALPHA */
+#define EM_IA_64	50		/* Intel Merced */
 #define EM_X86_64	62		/* AMD x86-64 architecture */
 #define EM_VAX		75		/* DEC VAX */
-#define EM_NUM		15		/* number of machine types */
 
 /* Version */
 #define EV_NONE		0		/* Invalid */
