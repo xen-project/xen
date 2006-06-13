@@ -130,7 +130,8 @@ ENTRY(syscall_enter)
 
 /*hypercall:*/
         movq  %r10,%rcx
-        andq  $(NR_hypercalls-1),%rax
+        cmpq  $NR_hypercalls,%rax
+        jae   bad_hypercall
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs not used by this hypercall. */
         pushq %rdi; pushq %rsi; pushq %rdx; pushq %rcx; pushq %r8 ; pushq %r9 
@@ -142,7 +143,6 @@ ENTRY(syscall_enter)
         rep   stosq
         popq  %r9 ; popq  %r8 ; popq  %rcx; popq  %rdx; popq  %rsi; popq  %rdi
         movq  UREGS_rax(%rsp),%rax
-        andq  $(NR_hypercalls-1),%rax
         pushq %rax
         pushq UREGS_rip+8(%rsp)
 #endif
@@ -217,7 +217,11 @@ process_nmi:
         jmp  test_all_events
 1:      bts  $_VCPUF_nmi_pending,VCPU_flags(%rbx)
         jmp  test_guest_events
-	
+
+bad_hypercall:
+        movq $-ENOSYS,UREGS_rax(%rsp)
+        jmp  test_all_events
+
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS STACK:                     */
 /*   { RCX, R11, [DS-GS,] [CR2,] [ERRCODE,] RIP, CS, RFLAGS, RSP, SS }   */
 /* %rdx: trap_bounce, %rbx: struct vcpu                           */

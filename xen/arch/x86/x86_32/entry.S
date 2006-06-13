@@ -171,7 +171,8 @@ ENTRY(hypercall)
 	SAVE_ALL(b)
         sti
         GET_CURRENT(%ebx)
-        andl $(NR_hypercalls-1),%eax
+        cmpl  $NR_hypercalls,%eax
+        jae   bad_hypercall
         PERFC_INCR(PERFC_hypercalls, %eax)
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs not used by this hypercall. */
@@ -260,6 +261,10 @@ process_nmi:
         jmp  test_all_events
 1:      bts  $_VCPUF_nmi_pending,VCPU_flags(%ebx)
         jmp  test_guest_events
+
+bad_hypercall:
+        movl $-ENOSYS,UREGS_eax(%esp)
+        jmp  test_all_events
 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:            */
 /*   {EIP, CS, EFLAGS, [ESP, SS]}                                        */
