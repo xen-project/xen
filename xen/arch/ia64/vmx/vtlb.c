@@ -446,6 +446,13 @@ void thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa)
     ps = itir_ps(itir);
 
     if(VMX_DOMAIN(v)){
+        /* Ensure WB attribute if pte is related to a normal mem page,
+         * which is required by vga acceleration since qemu maps shared
+         * vram buffer with WB.
+         */
+        if (!(pte & VTLB_PTE_IO) && ((pte & _PAGE_MA_MASK) != _PAGE_MA_NAT))
+            pte &= ~_PAGE_MA_MASK;
+
         phy_pte = translate_phy_pte(v, &pte, itir, ifa);
         if(ps==PAGE_SHIFT){
             if(!(pte&VTLB_PTE_IO)){

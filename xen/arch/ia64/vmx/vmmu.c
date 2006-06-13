@@ -373,18 +373,8 @@ IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
     }
 #endif //VTLB_DEBUG
     gpfn = (pte & _PAGE_PPN_MASK)>> PAGE_SHIFT;
-    if (VMX_DOMAIN(vcpu)) {
-        if (__gpfn_is_io(vcpu->domain, gpfn))
-            pte |= VTLB_PTE_IO;
-        else{
-	    if ((pte & _PAGE_MA_MASK)!=_PAGE_MA_NAT)
-            /* Ensure WB attribute if pte is related to a normal mem page,
-             * which is required by vga acceleration since qemu maps shared
-             * vram buffer with WB.
-             */
-                pte &= ~_PAGE_MA_MASK;
-	}
-    }
+    if (VMX_DOMAIN(vcpu) && __gpfn_is_io(vcpu->domain, gpfn))
+        pte |= VTLB_PTE_IO;
     thash_purge_and_insert(vcpu, pte, itir, ifa);
     return IA64_NO_FAULT;
 
