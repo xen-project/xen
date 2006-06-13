@@ -614,6 +614,12 @@ void mm_pin_all(void)
 	}
 }
 
+void _arch_dup_mmap(struct mm_struct *mm)
+{
+	if (!test_bit(PG_pinned, &virt_to_page(mm->pgd)->flags))
+		mm_pin(mm);
+}
+
 void _arch_exit_mmap(struct mm_struct *mm)
 {
 	struct task_struct *tsk = current;
