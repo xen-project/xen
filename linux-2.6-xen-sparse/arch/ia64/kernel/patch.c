@@ -184,29 +184,6 @@ patch_brl_fsys_bubble_down (unsigned long start, unsigned long end)
 	ia64_srlz_i();
 }
 
-#ifdef CONFIG_XEN
-extern char __start_gate_running_on_xen_patchlist[];
-extern char __end_gate_running_on_xen_patchlist[];
-void
-patch_running_on_xen(unsigned long start, unsigned long end)
-{
-	extern int running_on_xen;
-	s32 *offp = (s32 *) start;
-	u64 ip;
-
-	while (offp < (s32 *) end) {
-		ip = (u64) ia64_imva((char *) offp + *offp);
-		ia64_patch_imm64(ip, (u64) &running_on_xen);
-		ia64_fc((void *) ip);
-		++offp;
-	}
-	ia64_sync_i();
-	ia64_srlz_i();
-}
-#else
-#define patch_running_on_xen(start, end)	do { } while (0)
-#endif
-
 void
 ia64_patch_gate (void)
 {
@@ -215,7 +192,6 @@ ia64_patch_gate (void)
 
 	patch_fsyscall_table(START(fsyscall), END(fsyscall));
 	patch_brl_fsys_bubble_down(START(brl_fsys_bubble_down), END(brl_fsys_bubble_down));
-	patch_running_on_xen(START(running_on_xen), END(running_on_xen));
 	ia64_patch_vtop(START(vtop), END(vtop));
 	ia64_patch_mckinley_e9(START(mckinley_e9), END(mckinley_e9));
 }

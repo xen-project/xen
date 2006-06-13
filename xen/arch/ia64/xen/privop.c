@@ -897,13 +897,6 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 	    case HYPERPRIVOP_SET_EFLAG:
 		(void)vcpu_set_ar(v,24,regs->r8);
 		return 1;
-	    case HYPERPRIVOP_RSM_BE:
-		(void)vcpu_reset_psr_sm(v, IA64_PSR_BE);
-		return 1;
-	    case HYPERPRIVOP_GET_PSR:
-		(void)vcpu_get_psr(v, &val);
-		regs->r8 = val;
-		return 1;
 	}
 	return 0;
 }

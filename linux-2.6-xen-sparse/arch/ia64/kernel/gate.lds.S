@@ -43,10 +43,6 @@ SECTIONS
 				    __start_gate_brl_fsys_bubble_down_patchlist = .;
 				    *(.data.patch.brl_fsys_bubble_down)
 				    __end_gate_brl_fsys_bubble_down_patchlist = .;
-
-				    __start_gate_running_on_xen_patchlist = .;
-				    *(.data.patch.running_on_xen)
-				    __end_gate_running_on_xen_patchlist = .;
   }									:readable
   .IA_64.unwind_info		: { *(.IA_64.unwind_info*) }
   .IA_64.unwind			: { *(.IA_64.unwind*) }			:readable :unwind
