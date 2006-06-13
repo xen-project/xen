@@ -22,6 +22,24 @@ loadelfsymtab(
     const char *image, int xch, uint32_t dom, xen_pfn_t *parray,
     struct domain_setup_info *dsi);
 
+/*
+ * Elf header attributes we require for each supported host platform.
+ * These are checked in parseelfimage().
+ */
+#if defined(__ia64__)
+#define ELFCLASS   ELFCLASS64
+#define ELFDATA    ELFDATA2LSB
+#define ELFMACHINE EM_IA_64
+#elif defined(__i386__)
+#define ELFCLASS   ELFCLASS32
+#define ELFDATA    ELFDATA2LSB
+#define ELFMACHINE EM_386
+#elif defined(__x86_64__)
+#define ELFCLASS   ELFCLASS64
+#define ELFDATA    ELFDATA2LSB
+#define ELFMACHINE EM_X86_64
+#endif
+
 int probe_elf(const char *image,
               unsigned long image_size,
               struct load_funcs *load_funcs)
@@ -61,16 +79,10 @@ static int parseelfimage(const char *image,
         return -EINVAL;
     }
 
-    if (
-#if defined(__i386__)
-        (ehdr->e_ident[EI_CLASS] != ELFCLASS32) ||
-        (ehdr->e_machine != EM_386) ||
-#elif defined(__x86_64__)
-        (ehdr->e_ident[EI_CLASS] != ELFCLASS64) ||
-        (ehdr->e_machine != EM_X86_64) ||
-#endif
-        (ehdr->e_ident[EI_DATA] != ELFDATA2LSB) ||
-        (ehdr->e_type != ET_EXEC) )
+    if ( (ehdr->e_ident[EI_CLASS] != ELFCLASS) ||
+         (ehdr->e_machine != ELFMACHINE) ||
+         (ehdr->e_ident[EI_DATA] != ELFDATA) ||
+         (ehdr->e_type != ET_EXEC) )
     {
         ERROR("Kernel not a Xen-compatible Elf image.");
         return -EINVAL;

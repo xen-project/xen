@@ -407,7 +407,8 @@ static void blkif_restart_queue(void *arg)
 {
 	struct blkfront_info *info = (struct blkfront_info *)arg;
 	spin_lock_irq(&blkif_io_lock);
-	kick_pending_request_queues(info);
+	if (info->connected == BLKIF_STATE_CONNECTED)
+		kick_pending_request_queues(info);
 	spin_unlock_irq(&blkif_io_lock);
 }
 
@@ -595,7 +596,8 @@ void do_blkif_request(request_queue_t *rq)
 			continue;
 		}
 
-		if (RING_FULL(&info->ring))
+		if (unlikely(info->connected != BLKIF_STATE_CONNECTED) ||
+		    RING_FULL(&info->ring))
 			goto wait;
 
 		DPRINTK("do_blk_req %p: cmd %p, sec %lx, "
@@ -768,17 +770,17 @@ static void blkif_recover(struct blkfront_info *info)
 
 	(void)xenbus_switch_state(info->xbdev, XenbusStateConnected);
 
-	/* Now safe for us to use the shared ring */
 	spin_lock_irq(&blkif_io_lock);
+
+	/* Now safe for us to use the shared ring */
 	info->connected = BLKIF_STATE_CONNECTED;
-	spin_unlock_irq(&blkif_io_lock);
 
 	/* Send off requeued requests */
 	flush_requests(info);
 
 	/* Kick any other new requests queued since we resumed */
-	spin_lock_irq(&blkif_io_lock);
 	kick_pending_request_queues(info);
+
 	spin_unlock_irq(&blkif_io_lock);
 }
 
