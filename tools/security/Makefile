@@ -33,7 +33,7 @@ OBJS_XML2BIN := $(patsubst %.c,%.o,$(filter %.c,$(SRCS_XML2BIN)))
 
 ACM_INST_TOOLS    = xensec_tool xensec_xml2bin xensec_gen
 ACM_OBJS          = $(OBJS_TOOL) $(OBJS_XML2BIN) $(OBJS_GETD)
-ACM_SCRIPTS       = python/xensec_tools/acm_getlabel python/xensec_tools/acm_getdecision
+ACM_SCRIPTS       = python/xensec_tools/acm_getlabel
 
 ACM_CONFIG_DIR    = /etc/xen/acm-security
 ACM_POLICY_DIR    = $(ACM_CONFIG_DIR)/policies

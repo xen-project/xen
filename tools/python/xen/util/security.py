@@ -52,7 +52,8 @@ empty_line_re = re.compile("^\s*$")
 binary_name_re = re.compile(".*[chwall|ste|chwall_ste].*\.bin", re.IGNORECASE)
 policy_name_re = re.compile(".*[chwall|ste|chwall_ste].*", re.IGNORECASE)
 
-
+#other global variables
+NULL_SSIDREF = 0
 
 log = logging.getLogger("xend.util.security")
 
@@ -255,6 +256,8 @@ def ssidref2label(ssidref_var):
     #2. get labelnames for both ssidref parts
     pri_ssid = ssidref & 0xffff
     sec_ssid = ssidref >> 16
+    pri_null_ssid = NULL_SSIDREF & 0xffff
+    sec_null_ssid = NULL_SSIDREF >> 16
     pri_labels = []
     sec_labels = []
     labels = []
@@ -270,7 +273,11 @@ def ssidref2label(ssidref_var):
     f.close()
 
     #3. get the label that is in both lists (combination must be a single label)
-    if secondary == "NULL":
+    if (primary == "CHWALL") and (pri_ssid == pri_null_ssid) and (sec_ssid != sec_null_ssid):
+        labels = sec_labels
+    elif (secondary == "CHWALL") and (pri_ssid != pri_null_ssid) and (sec_ssid == sec_null_ssid):
+        labels = pri_labels
+    elif secondary == "NULL":
         labels = pri_labels
     else:
         for i in pri_labels:
@@ -285,7 +292,7 @@ def ssidref2label(ssidref_var):
 
 
 
-def label2ssidref(labelname, policyname):
+def label2ssidref(labelname, policyname, type):
     """
     returns ssidref corresponding to labelname;
     maps current policy to default directory
@@ -293,6 +300,14 @@ def label2ssidref(labelname, policyname):
 
     if policyname in ['NULL', 'INACTIVE', 'DEFAULT']:
         err("Cannot translate labels for \'" + policyname + "\' policy.")
+
+    allowed_types = ['ANY']
+    if type == 'dom':
+        allowed_types.append('VM')
+    elif type == 'res':
+        allowed_types.append('RES')
+    else:
+        err("Invalid type.  Must specify 'dom' or 'res'.")
 
     (primary, secondary, f, pol_exists) = getmapfile(policyname)
 
@@ -303,11 +318,15 @@ def label2ssidref(labelname, policyname):
         l = line.split()
         if (len(l) < 5) or (l[0] != "LABEL->SSID"):
             continue
-        if primary and (l[2] == primary) and (l[3] == labelname):
+        if primary and (l[1] in allowed_types) and (l[2] == primary) and (l[3] == labelname):
             pri_ssid.append(int(l[4], 16))
-        if secondary and (l[2] == secondary) and (l[3] == labelname):
+        if secondary and (l[1] in allowed_types) and (l[2] == secondary) and (l[3] == labelname):
             sec_ssid.append(int(l[4], 16))
     f.close()
+    if (type == 'res') and (primary == "CHWALL") and (len(pri_ssid) == 0):
+        pri_ssid.append(NULL_SSIDREF)
+    elif (type == 'res') and (secondary == "CHWALL") and (len(sec_ssid) == 0):
+        sec_ssid.append(NULL_SSIDREF)
 
     #3. sanity check and composition of ssidref
     if (len(pri_ssid) == 0) or ((len(sec_ssid) == 0) and (secondary != "NULL")):
@@ -360,7 +379,7 @@ def refresh_ssidref(config):
         err("Policy \'" + policyname + "\' in label does not match active policy \'"
             + active_policy +"\'!")
 
-    new_ssidref = label2ssidref(labelname, policyname)
+    new_ssidref = label2ssidref(labelname, policyname, 'dom')
     if not new_ssidref:
         err("SSIDREF refresh failed!")
 
@@ -409,7 +428,7 @@ def get_decision(arg1, arg2):
     enables domains to retrieve access control decisions from
     the hypervisor Access Control Module.
     IN: args format = ['domid', id] or ['ssidref', ssidref]
-    or ['access_control', ['policy', policy], ['label', label]]
+    or ['access_control', ['policy', policy], ['label', label], ['type', type]]
     """
 
     if not on():
@@ -417,14 +436,14 @@ def get_decision(arg1, arg2):
 
     #translate labels before calling low-level function
     if arg1[0] == 'access_control':
-        if (arg1[1][0] != 'policy') or (arg1[2][0] != 'label') :
+        if (arg1[1][0] != 'policy') or (arg1[2][0] != 'label') or (arg1[3][0] != 'type'):
             err("Argument type not supported.")
-        ssidref = label2ssidref(arg1[2][1], arg1[1][1])
+        ssidref = label2ssidref(arg1[2][1], arg1[1][1], arg1[3][1])
         arg1 = ['ssidref', str(ssidref)]
     if arg2[0] == 'access_control':
-        if (arg2[1][0] != 'policy') or (arg2[2][0] != 'label') :
+        if (arg2[1][0] != 'policy') or (arg2[2][0] != 'label') or (arg2[3][0] != 'type'):
             err("Argument type not supported.")
-        ssidref = label2ssidref(arg2[2][1], arg2[1][1])
+        ssidref = label2ssidref(arg2[2][1], arg2[1][1], arg2[3][1])
         arg2 = ['ssidref', str(ssidref)]
 
     # accept only int or string types for domid and ssidref

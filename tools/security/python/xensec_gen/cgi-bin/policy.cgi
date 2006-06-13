@@ -406,7 +406,7 @@ def parsePolicyXml( ):
 					msg = msg + 'Please validate the Policy file used.'
 					formatXmlError( msg )
 
-					allCSMTypes[csName][1] = csMemberList
+				allCSMTypes[csName][1] = csMemberList
 
 	if pOrder != '':
 		formPolicyOrder[1] = pOrder

@@ -541,7 +541,7 @@ def configure_security(config, vals):
         if sxp.child_value(config, 'ssidref'):
             err("ERROR: SSIDREF and access_control are mutually exclusive but both specified!")
         #else calculate ssidre from label
-        ssidref = security.label2ssidref(label, policy)
+        ssidref = security.label2ssidref(label, policy, 'dom')
         if not ssidref :
             err("ERROR calculating ssidref from access_control.")
         security_label = ['security', [ config_access_control, ['ssidref' , ssidref ] ] ]
