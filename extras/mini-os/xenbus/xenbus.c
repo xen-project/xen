@@ -468,6 +468,30 @@ static void do_read_test(const char *path)
     free(res);
 }
 
+static void do_write_test(const char *path, const char *val)
+{
+    DEBUG("Write %s to %s...\n", val, path);
+    char *msg = xenbus_write(path, val);
+    if (msg) {
+	DEBUG("Result %s\n", msg);
+	free(msg);
+    } else {
+	DEBUG("Success.\n");
+    }
+}
+
+static void do_rm_test(const char *path)
+{
+    DEBUG("rm %s...\n", path);
+    char *msg = xenbus_rm(path);
+    if (msg) {
+	DEBUG("Result %s\n", msg);
+	free(msg);
+    } else {
+	DEBUG("Success.\n");
+    }
+}
+
 /* Simple testing thing */
 void test_xenbus(void)
 {
@@ -482,6 +506,17 @@ void test_xenbus(void)
     DEBUG("Doing read test.\n");
     do_read_test("device/vif/0/mac");
     do_read_test("device/vif/0/backend");
+
+    DEBUG("Doing write test.\n");
+    do_write_test("device/vif/0/flibble", "flobble");
+    do_read_test("device/vif/0/flibble");
+    do_write_test("device/vif/0/flibble", "widget");
+    do_read_test("device/vif/0/flibble");
+
+    DEBUG("Doing rm test.\n");
+    do_rm_test("device/vif/0/flibble");
+    do_read_test("device/vif/0/flibble");
+    DEBUG("(Should have said ENOENT)\n");
 }
 
 /*
