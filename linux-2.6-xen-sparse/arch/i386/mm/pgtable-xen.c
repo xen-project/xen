@@ -300,11 +300,6 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	unsigned long flags;
 
 	if (PTRS_PER_PMD > 1) {
-		if (!xen_feature(XENFEAT_pae_pgdir_above_4gb)) {
-			int rc = xen_create_contiguous_region(
-				(unsigned long)pgd, 0, 32);
-			BUG_ON(rc);
-		}
 		if (HAVE_SHARED_KERNEL_PMD)
 			clone_pgd_range((pgd_t *)pgd + USER_PTRS_PER_PGD,
 					swapper_pg_dir + USER_PTRS_PER_PGD,
@@ -320,26 +315,22 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	}
 }
 
+/* never called when PTRS_PER_PMD > 1 */
 void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 {
 	unsigned long flags; /* can be called from interrupt context */
 
-	if (PTRS_PER_PMD > 1) {
-		if (!xen_feature(XENFEAT_pae_pgdir_above_4gb))
-			xen_destroy_contiguous_region((unsigned long)pgd, 0);
-	} else {
-		spin_lock_irqsave(&pgd_lock, flags);
-		pgd_list_del(pgd);
-		spin_unlock_irqrestore(&pgd_lock, flags);
+	spin_lock_irqsave(&pgd_lock, flags);
+	pgd_list_del(pgd);
+	spin_unlock_irqrestore(&pgd_lock, flags);
 
-		pgd_test_and_unpin(pgd);
-	}
+	pgd_test_and_unpin(pgd);
 }
 
 pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	int i;
-	pgd_t *pgd = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
+	pgd_t *pgd_tmp = NULL, *pgd = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
 
 	pgd_test_and_unpin(pgd);
 
@@ -363,7 +354,26 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 			set_pgd(&pgd[i], __pgd(1 + __pa(pmd)));
 		}
 
+		/* create_contig_region() loses page data. Make a temp copy. */
+		if (!xen_feature(XENFEAT_pae_pgdir_above_4gb)) {
+			pgd_tmp = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
+			if (!pgd_tmp)
+				goto out_oom;
+			memcpy(pgd_tmp, pgd, PAGE_SIZE);
+		}
+
 		spin_lock_irqsave(&pgd_lock, flags);
+
+		/* Protect against save/restore: move below 4GB with lock. */
+		if (!xen_feature(XENFEAT_pae_pgdir_above_4gb)) {
+			int rc = xen_create_contiguous_region(
+				(unsigned long)pgd, 0, 32);
+			memcpy(pgd, pgd_tmp, PAGE_SIZE);
+			kmem_cache_free(pgd_cache, pgd_tmp);
+			if (rc)
+				goto out_oom;
+		}
+
 		for (i = USER_PTRS_PER_PGD; i < PTRS_PER_PGD; i++) {
 			unsigned long v = (unsigned long)i << PGDIR_SHIFT;
 			pgd_t *kpgd = pgd_offset_k(v);
@@ -374,7 +384,9 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 			make_lowmem_page_readonly(
 				pmd, XENFEAT_writable_page_tables);
 		}
+
 		pgd_list_add(pgd);
+
 		spin_unlock_irqrestore(&pgd_lock, flags);
 	}
 
@@ -399,11 +411,15 @@ void pgd_free(pgd_t *pgd)
 			pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
 			kmem_cache_free(pmd_cache, pmd);
 		}
+
 		if (!HAVE_SHARED_KERNEL_PMD) {
 			unsigned long flags;
 			spin_lock_irqsave(&pgd_lock, flags);
 			pgd_list_del(pgd);
 			spin_unlock_irqrestore(&pgd_lock, flags);
+
+			pgd_test_and_unpin(pgd);
+
 			for (i = USER_PTRS_PER_PGD; i < PTRS_PER_PGD; i++) {
 				pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
 				make_lowmem_page_writable(
@@ -411,8 +427,13 @@ void pgd_free(pgd_t *pgd)
 				memset(pmd, 0, PTRS_PER_PMD*sizeof(pmd_t));
 				kmem_cache_free(pmd_cache, pmd);
 			}
+
+			if (!xen_feature(XENFEAT_pae_pgdir_above_4gb))
+				xen_destroy_contiguous_region(
+					(unsigned long)pgd, 0);
 		}
 	}
+
 	/* in the non-PAE case, free_pgtables() clears user pgd entries */
 	kmem_cache_free(pgd_cache, pgd);
 }
