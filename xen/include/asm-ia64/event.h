@@ -12,7 +12,7 @@
 #include <public/arch-ia64.h>
 #include <asm/vcpu.h>
 
-static inline void evtchn_notify(struct vcpu *v)
+static inline void vcpu_kick(struct vcpu *v)
 {
     /*
      * NB1. 'vcpu_flags' and 'processor' must be checked /after/ update of
@@ -30,6 +30,12 @@ static inline void evtchn_notify(struct vcpu *v)
 
     if(!VMX_DOMAIN(v) && !v->arch.event_callback_ip)
         vcpu_pend_interrupt(v, v->domain->shared_info->arch.evtchn_vector);
+}
+
+static inline void vcpu_mark_events_pending(struct vcpu *v)
+{
+    if ( !test_and_set_bit(0, &v->vcpu_info->evtchn_upcall_pending) )
+        vcpu_kick(v);
 }
 
 /* Note: Bitwise operations result in fast code with no branches. */

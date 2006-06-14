@@ -9,7 +9,7 @@
 #ifndef __ASM_EVENT_H__
 #define __ASM_EVENT_H__
 
-static inline void evtchn_notify(struct vcpu *v)
+static inline void vcpu_kick(struct vcpu *v)
 {
     /*
      * NB1. 'vcpu_flags' and 'processor' must be checked /after/ update of
@@ -24,6 +24,12 @@ static inline void evtchn_notify(struct vcpu *v)
     vcpu_unblock(v);
     if ( running )
         smp_send_event_check_cpu(v->processor);
+}
+
+static inline void vcpu_mark_events_pending(struct vcpu *v)
+{
+    if ( !test_and_set_bit(0, &v->vcpu_info->evtchn_upcall_pending) )
+        vcpu_kick(v);
 }
 
 static inline int local_events_need_delivery(void)
