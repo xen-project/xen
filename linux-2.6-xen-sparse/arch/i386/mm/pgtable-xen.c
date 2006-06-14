@@ -330,71 +330,90 @@ void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	int i;
-	pgd_t *pgd_tmp = NULL, *pgd = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
+	pgd_t *pgd = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
+	pmd_t **pmd;
+	unsigned long flags;
 
 	pgd_test_and_unpin(pgd);
 
 	if (PTRS_PER_PMD == 1 || !pgd)
 		return pgd;
 
-	for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
-		pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
-		if (!pmd)
-			goto out_oom;
-		set_pgd(&pgd[i], __pgd(1 + __pa(pmd)));
-	}
-
-	if (!HAVE_SHARED_KERNEL_PMD) {
-		unsigned long flags;
-
-		for (i = USER_PTRS_PER_PGD; i < PTRS_PER_PGD; i++) {
+	if (HAVE_SHARED_KERNEL_PMD) {
+		for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
 			pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
 			if (!pmd)
 				goto out_oom;
 			set_pgd(&pgd[i], __pgd(1 + __pa(pmd)));
 		}
-
-		/* create_contig_region() loses page data. Make a temp copy. */
-		if (!xen_feature(XENFEAT_pae_pgdir_above_4gb)) {
-			pgd_tmp = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
-			if (!pgd_tmp)
-				goto out_oom;
-			memcpy(pgd_tmp, pgd, PAGE_SIZE);
-		}
-
-		spin_lock_irqsave(&pgd_lock, flags);
-
-		/* Protect against save/restore: move below 4GB with lock. */
-		if (!xen_feature(XENFEAT_pae_pgdir_above_4gb)) {
-			int rc = xen_create_contiguous_region(
-				(unsigned long)pgd, 0, 32);
-			memcpy(pgd, pgd_tmp, PAGE_SIZE);
-			kmem_cache_free(pgd_cache, pgd_tmp);
-			if (rc)
-				goto out_oom;
-		}
-
-		for (i = USER_PTRS_PER_PGD; i < PTRS_PER_PGD; i++) {
-			unsigned long v = (unsigned long)i << PGDIR_SHIFT;
-			pgd_t *kpgd = pgd_offset_k(v);
-			pud_t *kpud = pud_offset(kpgd, v);
-			pmd_t *kpmd = pmd_offset(kpud, v);
-			pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
-			memcpy(pmd, kpmd, PAGE_SIZE);
-			make_lowmem_page_readonly(
-				pmd, XENFEAT_writable_page_tables);
-		}
-
-		pgd_list_add(pgd);
-
-		spin_unlock_irqrestore(&pgd_lock, flags);
+		return pgd;
 	}
+
+	/*
+	 * We can race save/restore (if we sleep during a GFP_KERNEL memory
+	 * allocation). We therefore store virtual addresses of pmds as they
+	 * do not change across save/restore, and poke the machine addresses
+	 * into the pgdir under the pgd_lock.
+	 */
+	pmd = kmalloc(PTRS_PER_PGD * sizeof(pmd_t *), GFP_KERNEL);
+	if (!pmd) {
+		kmem_cache_free(pgd_cache, pgd);
+		return NULL;
+	}
+
+	/* Allocate pmds, remember virtual addresses. */
+	for (i = 0; i < PTRS_PER_PGD; ++i) {
+		pmd[i] = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
+		if (!pmd[i])
+			goto out_oom;
+	}
+
+	spin_lock_irqsave(&pgd_lock, flags);
+
+	/* Protect against save/restore: move below 4GB under pgd_lock. */
+	if (!xen_feature(XENFEAT_pae_pgdir_above_4gb)) {
+		int rc = xen_create_contiguous_region(
+			(unsigned long)pgd, 0, 32);
+		if (rc) {
+			spin_unlock_irqrestore(&pgd_lock, flags);
+			goto out_oom;
+		}
+	}
+
+	/* Copy kernel pmd contents and write-protect the new pmds. */
+	for (i = USER_PTRS_PER_PGD; i < PTRS_PER_PGD; i++) {
+		unsigned long v = (unsigned long)i << PGDIR_SHIFT;
+		pgd_t *kpgd = pgd_offset_k(v);
+		pud_t *kpud = pud_offset(kpgd, v);
+		pmd_t *kpmd = pmd_offset(kpud, v);
+		memcpy(pmd[i], kpmd, PAGE_SIZE);
+		make_lowmem_page_readonly(
+			pmd[i], XENFEAT_writable_page_tables);
+	}
+
+	/* It is safe to poke machine addresses of pmds under the pmd_lock. */
+	for (i = 0; i < PTRS_PER_PGD; i++)
+		set_pgd(&pgd[i], __pgd(1 + __pa(pmd[i])));
+
+	/* Ensure this pgd gets picked up and pinned on save/restore. */
+	pgd_list_add(pgd);
+
+	spin_unlock_irqrestore(&pgd_lock, flags);
+
+	kfree(pmd);
 
 	return pgd;
 
 out_oom:
-	for (i--; i >= 0; i--)
-		kmem_cache_free(pmd_cache, (void *)__va(pgd_val(pgd[i])-1));
+	if (HAVE_SHARED_KERNEL_PMD) {
+		for (i--; i >= 0; i--)
+			kmem_cache_free(pmd_cache,
+					(void *)__va(pgd_val(pgd[i])-1));
+	} else {
+		for (i--; i >= 0; i--)
+			kmem_cache_free(pmd_cache, pmd[i]);
+		kfree(pmd);
+	}
 	kmem_cache_free(pgd_cache, pgd);
 	return NULL;
 }
@@ -403,6 +422,14 @@ void pgd_free(pgd_t *pgd)
 {
 	int i;
 
+	/*
+	 * After this the pgd should not be pinned for the duration of this
+	 * function's execution. We should never sleep and thus never race:
+	 *  1. User pmds will not become write-protected under our feet due
+	 *     to a concurrent mm_pin_all().
+	 *  2. The machine addresses in PGD entries will not become invalid
+	 *     due to a concurrent save/restore.
+	 */
 	pgd_test_and_unpin(pgd);
 
 	/* in the PAE case user pgd entries are overwritten before usage */
@@ -417,8 +444,6 @@ void pgd_free(pgd_t *pgd)
 			spin_lock_irqsave(&pgd_lock, flags);
 			pgd_list_del(pgd);
 			spin_unlock_irqrestore(&pgd_lock, flags);
-
-			pgd_test_and_unpin(pgd);
 
 			for (i = USER_PTRS_PER_PGD; i < PTRS_PER_PGD; i++) {
 				pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
@@ -609,7 +634,7 @@ static void pgd_test_and_unpin(pgd_t *pgd)
 void mm_pin(struct mm_struct *mm)
 {
 	if (xen_feature(XENFEAT_writable_page_tables))
-	    return;
+		return;
 	spin_lock(&mm->page_table_lock);
 	__pgd_pin(mm->pgd);
 	spin_unlock(&mm->page_table_lock);
@@ -618,7 +643,7 @@ void mm_pin(struct mm_struct *mm)
 void mm_unpin(struct mm_struct *mm)
 {
 	if (xen_feature(XENFEAT_writable_page_tables))
-	    return;
+		return;
 	spin_lock(&mm->page_table_lock);
 	__pgd_unpin(mm->pgd);
 	spin_unlock(&mm->page_table_lock);
@@ -628,7 +653,7 @@ void mm_pin_all(void)
 {
 	struct page *page;
 	if (xen_feature(XENFEAT_writable_page_tables))
-	    return;
+		return;
 	for (page = pgd_list; page; page = (struct page *)page->index) {
 		if (!test_bit(PG_pinned, &page->flags))
 			__pgd_pin((pgd_t *)page_address(page));
