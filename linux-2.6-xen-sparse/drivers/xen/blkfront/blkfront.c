@@ -342,8 +342,20 @@ static void connect(struct blkfront_info *info)
 static void blkfront_closing(struct xenbus_device *dev)
 {
 	struct blkfront_info *info = dev->dev.driver_data;
+	unsigned long flags;
 
 	DPRINTK("blkfront_closing: %s removed\n", dev->nodename);
+
+	if (info->rq == NULL)
+		return;
+
+	spin_lock_irqsave(&blkif_io_lock, flags);
+	/* No more blkif_request(). */
+	blk_stop_queue(info->rq);
+	/* No more gnttab callback work. */
+	gnttab_cancel_free_callback(&info->callback);
+	flush_scheduled_work();
+	spin_unlock_irqrestore(&blkif_io_lock, flags);
 
 	xlvbd_del(info);
 
@@ -696,7 +708,12 @@ static void blkif_free(struct blkfront_info *info, int suspend)
 	spin_lock_irq(&blkif_io_lock);
 	info->connected = suspend ?
 		BLKIF_STATE_SUSPENDED : BLKIF_STATE_DISCONNECTED;
-	blk_stop_queue(info->rq); /* no more blkif_request() */
+	/* No more blkif_request(). */
+	if (info->rq)
+		blk_stop_queue(info->rq);
+	/* No more gnttab callback work. */
+	gnttab_cancel_free_callback(&info->callback);
+	flush_scheduled_work();
 	spin_unlock_irq(&blkif_io_lock);
 
 	/* Free resources associated with old device channel. */
