@@ -140,8 +140,6 @@ uint64_t vtm_get_itc(VCPU *vcpu)
 }
 
 
-
-
 void vtm_set_itc(VCPU *vcpu, uint64_t new_itc)
 {
     uint64_t    vitm, vitv;
@@ -149,8 +147,15 @@ void vtm_set_itc(VCPU *vcpu, uint64_t new_itc)
     vitm = VCPU(vcpu,itm);
     vitv = VCPU(vcpu,itv);
     vtm=&(vcpu->arch.arch_vmx.vtm);
-    vtm->vtm_offset = new_itc - ia64_get_itc();
-    vtm->last_itc = new_itc;
+    if(vcpu->vcpu_id == 0){
+        vtm->vtm_offset = new_itc - ia64_get_itc();
+        vtm->last_itc = new_itc;
+    }
+    else{
+        vtm->vtm_offset = vcpu->domain->vcpu[0]->arch.arch_vmx.vtm.vtm_offset;
+        new_itc=vtm->vtm_offset + ia64_get_itc();
+        vtm->last_itc = new_itc;
+    }
     if(vitm < new_itc){
         clear_bit(ITV_VECTOR(vitv), &VCPU(vcpu, irr[0]));
         stop_timer(&vtm->vtm_timer);
