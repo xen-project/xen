@@ -10,6 +10,8 @@
  */
 
 #include <xen/config.h>
+#include <xen/sched.h>
+#include <xen/domain.h>
 #include <asm/xentypes.h>
 #include <asm/mm.h>
 #include <asm/pgalloc.h>
