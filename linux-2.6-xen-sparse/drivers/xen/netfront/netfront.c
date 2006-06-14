@@ -1072,68 +1072,39 @@ static void xennet_set_features(struct net_device *dev)
 
 static void network_connect(struct net_device *dev)
 {
-	struct netfront_info *np;
+	struct netfront_info *np = netdev_priv(dev);
 	int i, requeue_idx;
-	struct netif_tx_request *tx;
 	struct sk_buff *skb;
 
 	xennet_set_features(dev);
 
-	np = netdev_priv(dev);
 	spin_lock_irq(&np->tx_lock);
 	spin_lock(&np->rx_lock);
 
-	/* Recovery procedure: */
-
 	/*
-	 * Step 1: Rebuild the RX and TX ring contents.
-	 * NB. We could just free the queued TX packets now but we hope
-	 * that sending them out might do some good.  We have to rebuild
-	 * the RX ring because some of our pages are currently flipped out
-	 * so we can't just free the RX skbs.
-	 * NB2. Freelist index entries are always going to be less than
+         * Recovery procedure:
+	 *  NB. Freelist index entries are always going to be less than
 	 *  PAGE_OFFSET, whereas pointers to skbs will always be equal or
-	 * greater than PAGE_OFFSET: we use this property to distinguish
-	 * them.
-	 */
+	 *  greater than PAGE_OFFSET: we use this property to distinguish
+	 *  them.
+         */
 
-	/*
-	 * Rebuild the TX buffer freelist and the TX ring itself.
-	 * NB. This reorders packets.  We could keep more private state
-	 * to avoid this but maybe it doesn't matter so much given the
-	 * interface has been down.
-	 */
+	/* Step 1: Discard all pending TX packet fragments. */
 	for (requeue_idx = 0, i = 1; i <= NET_TX_RING_SIZE; i++) {
 		if ((unsigned long)np->tx_skbs[i] < PAGE_OFFSET)
 			continue;
 
 		skb = np->tx_skbs[i];
-
-		tx = RING_GET_REQUEST(&np->tx, requeue_idx);
-		requeue_idx++;
-
-		tx->id = i;
-		gnttab_grant_foreign_access_ref(
-			np->grant_tx_ref[i], np->xbdev->otherend_id,
-			virt_to_mfn(np->tx_skbs[i]->data),
-			GNTMAP_readonly);
-		tx->gref = np->grant_tx_ref[i];
-		tx->offset = (unsigned long)skb->data & ~PAGE_MASK;
-		tx->size = skb->len;
-		tx->flags = 0;
-		if (skb->ip_summed == CHECKSUM_HW) /* local packet? */
-			tx->flags |= NETTXF_csum_blank | NETTXF_data_validated;
-		if (skb->proto_data_valid) /* remote but checksummed? */
-			tx->flags |= NETTXF_data_validated;
-
-		np->stats.tx_bytes += skb->len;
-		np->stats.tx_packets++;
+		gnttab_end_foreign_access_ref(
+			np->grant_tx_ref[i], GNTMAP_readonly);
+		gnttab_release_grant_reference(
+			&np->gref_tx_head, np->grant_tx_ref[i]);
+		np->grant_tx_ref[i] = GRANT_INVALID_REF;
+		add_id_to_freelist(np->tx_skbs, i);
+		dev_kfree_skb_irq(skb);
 	}
 
-	np->tx.req_prod_pvt = requeue_idx;
-	RING_PUSH_REQUESTS(&np->tx);
-
-	/* Rebuild the RX buffer freelist and the RX ring itself. */
+	/* Step 2: Rebuild the RX buffer freelist and the RX ring itself. */
 	for (requeue_idx = 0, i = 1; i <= NET_RX_RING_SIZE; i++) {
 		if ((unsigned long)np->rx_skbs[i] < PAGE_OFFSET)
 			continue;
@@ -1150,7 +1121,7 @@ static void network_connect(struct net_device *dev)
 	RING_PUSH_REQUESTS(&np->rx);
 
 	/*
-	 * Step 2: All public and private state should now be sane.  Get
+	 * Step 3: All public and private state should now be sane.  Get
 	 * ready to start sending and receiving packets and give the driver
 	 * domain a kick because we've probably just requeued some
 	 * packets.
@@ -1158,6 +1129,7 @@ static void network_connect(struct net_device *dev)
 	netif_carrier_on(dev);
 	notify_remote_via_irq(np->irq);
 	network_tx_buf_gc(dev);
+	network_alloc_rx_buffers(dev);
 
 	spin_unlock(&np->rx_lock);
 	spin_unlock_irq(&np->tx_lock);
