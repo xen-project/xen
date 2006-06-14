@@ -596,18 +596,11 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 		efi_tables[i].table = 0;
 	}
 	if (d == dom0) {
-#ifdef CONFIG_XEN_IA64_DOM0_VP
-# define ASSIGN_DOMAIN_MACH_PAGE(d, p) \
-        assign_domain_mach_page((d), (p), PAGE_SIZE, ASSIGN_readonly)
-#else
-# define ASSIGN_DOMAIN_MACH_PAGE(d, p) (p)
-#endif
-
 		printf("Domain0 EFI passthrough:");
 		i = 1;
 		if (efi.mps) {
 			efi_tables[i].guid = MPS_TABLE_GUID;
-			efi_tables[i].table = ASSIGN_DOMAIN_MACH_PAGE(d, __pa(efi.mps));
+			efi_tables[i].table = __pa(efi.mps);
 			printf(" MPS=0x%lx",efi_tables[i].table);
 			i++;
 		}
@@ -616,25 +609,25 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 
 		if (efi.acpi20) {
 			efi_tables[i].guid = ACPI_20_TABLE_GUID;
-			efi_tables[i].table = ASSIGN_DOMAIN_MACH_PAGE(d, __pa(efi.acpi20));
+			efi_tables[i].table = __pa(efi.acpi20);
 			printf(" ACPI 2.0=0x%lx",efi_tables[i].table);
 			i++;
 		}
 		if (efi.acpi) {
 			efi_tables[i].guid = ACPI_TABLE_GUID;
-			efi_tables[i].table = ASSIGN_DOMAIN_MACH_PAGE(d, __pa(efi.acpi));
+			efi_tables[i].table = __pa(efi.acpi);
 			printf(" ACPI=0x%lx",efi_tables[i].table);
 			i++;
 		}
 		if (efi.smbios) {
 			efi_tables[i].guid = SMBIOS_TABLE_GUID;
-			efi_tables[i].table = ASSIGN_DOMAIN_MACH_PAGE(d, __pa(efi.smbios));
+			efi_tables[i].table = __pa(efi.smbios);
 			printf(" SMBIOS=0x%lx",efi_tables[i].table);
 			i++;
 		}
 		if (efi.hcdp) {
 			efi_tables[i].guid = HCDP_TABLE_GUID;
-			efi_tables[i].table = ASSIGN_DOMAIN_MACH_PAGE(d, __pa(efi.hcdp));
+			efi_tables[i].table = __pa(efi.hcdp);
 			printf(" HCDP=0x%lx",efi_tables[i].table);
 			i++;
 		}
