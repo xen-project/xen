@@ -1010,6 +1010,7 @@ GLOBAL_ENTRY(ia64_delay_loop)
 	br.ret.sptk.many rp
 END(ia64_delay_loop)
 
+#ifndef XEN
 /*
  * Return a CPU-local timestamp in nano-seconds.  This timestamp is
  * NOT synchronized across CPUs its return value must never be
@@ -1062,6 +1063,7 @@ GLOBAL_ENTRY(start_kernel_thread)
 	br.call.sptk.many rp = sys_exit;;
 1:	br.sptk.few 1b				// not reached
 END(start_kernel_thread)
+#endif /* XEN */
 
 #ifdef CONFIG_IA64_BRL_EMU
 

@@ -475,13 +475,21 @@ efi_emulator (struct pt_regs *regs, IA64FAULT *fault)
 
 	switch (regs->r2) {
 	    case FW_HYPERCALL_EFI_RESET_SYSTEM:
-		printf("efi.reset_system called ");
-		if (current->domain == dom0) {
-			printf("(by dom0)\n ");
-			(*efi.reset_system)(EFI_RESET_WARM,0,0,NULL);
-		} else {
-			printf("\n");
-			domain_shutdown (current->domain, SHUTDOWN_reboot);
+	        {
+		    u8 reason;
+		    unsigned long val = vcpu_get_gr(v,32);
+		    switch (val)
+		    {
+		    case EFI_RESET_SHUTDOWN:
+			    reason = SHUTDOWN_poweroff;
+			    break;
+		    case EFI_RESET_COLD:
+		    case EFI_RESET_WARM:
+		    default:
+			    reason = SHUTDOWN_reboot;
+			    break;
+		    }
+		    domain_shutdown (current->domain, reason);
 		}
 		status = EFI_UNSUPPORTED;
 		break;

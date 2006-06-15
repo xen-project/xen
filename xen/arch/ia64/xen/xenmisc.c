@@ -94,18 +94,6 @@ void console_print(char *msg)
 	printk("console_print called, how did start_kernel return???\n");
 }
 
-void kernel_thread_helper(void)
-{
-	printk("kernel_thread_helper not implemented\n");
-	dummy();
-}
-
-void sys_exit(void)
-{
-	printk("sys_exit not implemented\n");
-	dummy();
-}
-
 ////////////////////////////////////
 // called from unaligned.c
 ////////////////////////////////////

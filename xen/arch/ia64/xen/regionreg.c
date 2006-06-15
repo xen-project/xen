@@ -287,7 +287,7 @@ void init_all_rr(struct vcpu *v)
 	//rrv.rrval = v->domain->arch.metaphysical_rr0;
 	rrv.ps = PAGE_SHIFT;
 	rrv.ve = 1;
-if (!v->vcpu_info) { printf("Stopping in init_all_rr\n"); dummy(); }
+if (!v->vcpu_info) { panic("Stopping in init_all_rr\n"); }
 	VCPU(v,rrs[0]) = -1;
 	VCPU(v,rrs[1]) = rrv.rrval;
 	VCPU(v,rrs[2]) = rrv.rrval;

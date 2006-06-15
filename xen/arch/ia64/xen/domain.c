@@ -891,22 +891,19 @@ int construct_dom0(struct domain *d,
 
 void machine_restart(char * __unused)
 {
-	if (running_on_sim) dummy();
-	printf("machine_restart called: spinning....\n");
+	if (running_on_sim)
+		printf ("machine_restart called.  spinning...\n");
+	else
+		(*efi.reset_system)(EFI_RESET_WARM,0,0,NULL);
 	while(1);
 }
 
 void machine_halt(void)
 {
-	if (running_on_sim) dummy();
-	printf("machine_halt called: spinning....\n");
-	while(1);
-}
-
-void dummy_called(char *function)
-{
-	if (running_on_sim) asm("break 0;;");
-	printf("dummy called in %s: spinning....\n", function);
+	if (running_on_sim)
+		printf ("machine_halt called.  spinning...\n");
+	else
+		(*efi.reset_system)(EFI_RESET_SHUTDOWN,0,0,NULL);
 	while(1);
 }
 

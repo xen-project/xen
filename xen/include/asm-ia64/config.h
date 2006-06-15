@@ -235,12 +235,6 @@ struct screen_info { };
 #define seq_printf(a,b...) printf(b)
 //#define CONFIG_BLK_DEV_INITRD // needed to reserve memory for domain0
 
-void dummy_called(char *function);
-#define dummy()	dummy_called((char *) __FUNCTION__)
-
-// these declarations got moved at some point, find a better place for them
-extern int ht_per_core;
-
 #ifdef CONFIG_XEN_IA64_DOM0_VP
 #define CONFIG_SHADOW	1
 #endif
