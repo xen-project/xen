@@ -76,6 +76,15 @@ ia64_xenmem_reservation_op(unsigned long op,
 			}
 			break;
 		}
+		if (tmp_ret == 0) {
+			//XXX dirty work around for skbuff_ctor()
+			//    of a non-privileged domain, 
+			if ((op == XENMEM_increase_reservation ||
+			     op == XENMEM_populate_physmap) &&
+			    !(xen_start_info->flags & SIF_PRIVILEGED) &&
+			    reservation.extent_order > 0)
+				return ret;
+		}
 		frame_list += tmp_ret;
 		nr_extents -= tmp_ret;
 		ret += tmp_ret;
@@ -165,7 +174,12 @@ HYPERVISOR_populate_physmap(unsigned long gpfn, unsigned int extent_order,
         };
 	set_xen_guest_handle(reservation.extent_start, &gpfn);
 	ret = HYPERVISOR_memory_op(XENMEM_populate_physmap, &reservation);
-	BUG_ON(ret != 1);
+	// it may fail on non-privileged domain with extent_order > 0.
+	BUG_ON(ret != 1 &&
+	       !(ret == 0 && !(xen_start_info->flags & SIF_PRIVILEGED) &&
+		 extent_order > 0));
+	if (ret != 1)
+		return -EINVAL;//XXX
 	return 0;
 }
 
