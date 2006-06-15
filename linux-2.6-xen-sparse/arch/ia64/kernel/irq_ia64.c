@@ -284,7 +284,6 @@ static struct irqaction resched_irqaction = {
 static void
 xen_register_percpu_irq (unsigned int irq, struct irqaction *action, int save)
 {
-	char name[15];
 	unsigned int cpu = smp_processor_id();
 	int ret = 0;
 
@@ -295,21 +294,23 @@ xen_register_percpu_irq (unsigned int irq, struct irqaction *action, int save)
 			ret = bind_virq_to_irqhandler(VIRQ_ITC, cpu,
 				action->handler, action->flags,
 				timer_name[cpu], action->dev_id);
-			printk(KERN_INFO "register VIRQ_ITC (%s) to xen irq (%d)\n", name, ret);
+			printk(KERN_INFO "register VIRQ_ITC (%s) to xen irq (%d)\n", timer_name[cpu], ret);
 			break;
 		case IA64_IPI_RESCHEDULE:
 			sprintf(resched_name[cpu], "%s%d", action->name, cpu);
 			ret = bind_ipi_to_irqhandler(RESCHEDULE_VECTOR, cpu,
 				action->handler, action->flags,
 				resched_name[cpu], action->dev_id);
-			printk(KERN_INFO "register RESCHEDULE_VECTOR (%s) to xen irq (%d)\n", name, ret);
+			printk(KERN_INFO "register RESCHEDULE_VECTOR (%s) to xen irq (%d)\n", resched_name[cpu], ret);
 			break;
 		case IA64_IPI_VECTOR:
 			sprintf(ipi_name[cpu], "%s%d", action->name, cpu);
 			ret = bind_ipi_to_irqhandler(IPI_VECTOR, cpu,
 				action->handler, action->flags,
 				ipi_name[cpu], action->dev_id);
-			printk(KERN_INFO "register IPI_VECTOR (%s) to xen irq (%d)\n", name, ret);
+			printk(KERN_INFO "register IPI_VECTOR (%s) to xen irq (%d)\n", ipi_name[cpu], ret);
+			break;
+		case IA64_SPURIOUS_INT_VECTOR:
 			break;
 		default:
 			printk(KERN_WARNING "Percpu irq %d is unsupported by xen!\n", irq);
