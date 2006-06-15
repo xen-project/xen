@@ -365,7 +365,8 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	};
 	set_xen_guest_handle(reservation.extent_start, &frame);
 
-	if (xen_feature(XENFEAT_auto_translated_physmap))
+	if (xen_feature(XENFEAT_auto_translated_physmap) ||
+	    !test_bit(__pa(vstart) >> PAGE_SHIFT, contiguous_bitmap))
 		return;
 
 	scrub_pages(vstart, 1 << order);
