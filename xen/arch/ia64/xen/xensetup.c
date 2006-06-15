@@ -521,7 +521,7 @@ printk("About to call init_trace_bufs()\n");
     local_irq_enable();
 
     printf("About to call schedulers_start dom0=%p, idle_dom=%p\n",
-	   dom0, &idle_domain);
+	   dom0, idle_domain);
     schedulers_start();
 
     domain_unpause_by_systemcontroller(dom0);

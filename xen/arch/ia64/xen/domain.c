@@ -89,6 +89,10 @@ unsigned long context_switch_count = 0;
 
 extern struct vcpu *ia64_switch_to (struct vcpu *next_task);
 
+/* Address of vpsr.i (in fact evtchn_upcall_mask) of current vcpu.
+   This is a Xen virtual address.  */
+DEFINE_PER_CPU(uint8_t *, current_psr_i_addr);
+
 #include <xen/sched-if.h>
 
 void schedule_tail(struct vcpu *prev)
@@ -104,6 +108,8 @@ void schedule_tail(struct vcpu *prev)
 		        VHPT_ENABLED);
 		load_region_regs(current);
 		vcpu_load_kernel_regs(current);
+		__ia64_per_cpu_var(current_psr_i_addr) = &current->domain->
+		  shared_info->vcpu_info[current->vcpu_id].evtchn_upcall_mask;
 	}
 }
 
@@ -124,12 +130,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     /*ia64_psr(ia64_task_regs(next))->dfh = !ia64_is_local_fpu_owner(next);*/
     prev = ia64_switch_to(next);
 
+    /* Note: ia64_switch_to does not return here at vcpu initialization.  */
+
     //cpu_set(smp_processor_id(), current->domain->domain_dirty_cpumask);
-
-    if (!VMX_DOMAIN(current)){
-	    vcpu_set_next_timer(current);
-    }
-
 
 // leave this debug for now: it acts as a heartbeat when more than
 // one domain is active
@@ -140,26 +143,34 @@ int id = ((struct vcpu *)current)->domain->domain_id & 0xf;
 if (!cnt[id]--) { cnt[id] = 500000; printk("%x",id); }
 if (!i--) { i = 1000000; printk("+"); }
 }
-
+ 
     if (VMX_DOMAIN(current)){
-		vmx_load_all_rr(current);
-    }else{
+	vmx_load_all_rr(current);
+    } else {
+	struct domain *nd;
     	extern char ia64_ivt;
+
     	ia64_set_iva(&ia64_ivt);
-    	if (!is_idle_domain(current->domain)) {
+
+	nd = current->domain;
+    	if (!is_idle_domain(nd)) {
         	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
 			     VHPT_ENABLED);
 	    	load_region_regs(current);
 	    	vcpu_load_kernel_regs(current);
+		vcpu_set_next_timer(current);
 		if (vcpu_timer_expired(current))
 			vcpu_pend_timer(current);
-    	}else {
+		__ia64_per_cpu_var(current_psr_i_addr) = &nd->shared_info->
+		  vcpu_info[current->vcpu_id].evtchn_upcall_mask;
+    	} else {
 		/* When switching to idle domain, only need to disable vhpt
 		 * walker. Then all accesses happen within idle context will
 		 * be handled by TR mapping and identity mapping.
 		 */
 		pta = ia64_get_pta();
 		ia64_set_pta(pta & ~VHPT_ENABLED);
+		__ia64_per_cpu_var(current_psr_i_addr) = NULL;
         }
     }
     local_irq_restore(spsr);

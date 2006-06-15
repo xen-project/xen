@@ -107,9 +107,9 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	or r20=r23,r21;;
 1:	// when we get to here r20=~=interrupts pending
 	// Check pending event indication
-(p7)	adds r20=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18;;
+(p7)	movl r20=THIS_CPU(current_psr_i_addr);;
 (p7)	ld8 r20=[r20];;
-(p7)	adds r20=-1,r20;;
+(p7)	adds r20=-1,r20;;	/* evtchn_upcall_pending */
 (p7)	ld1 r20=[r20];;
 
 	// HYPERPRIVOP_RFI?
@@ -276,14 +276,14 @@ ENTRY(hyper_ssm_i)
 	or r30=r30,r28;;
 	and r30=r30,r27;;
 	mov r20=1
-	adds r22=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18
+	movl r22=THIS_CPU(current_psr_i_addr)
 	adds r21=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r22=[r22]
-	st8 [r21]=r30 ;;
+	st8 [r21]=r30;;
 	// set shared_mem interrupt_delivery_enabled to 0
 	// set shared_mem interrupt_collection_enabled to 0
-	st1 [r22]=r20;;
-	st4 [r18]=r0;;
+	st1 [r22]=r20
+	st4 [r18]=r0
 	// cover and set shared_mem precover_ifs to cr.ifs
 	// set shared_mem ifs and incomplete_regframe to 0
 	cover ;;
@@ -407,7 +407,7 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	cmp.eq p6,p0=r16,r0;;
 (p6)	br.cond.spnt.few fast_tick_reflect_done;;
 	// if guest vpsr.i is off, we're done
-	adds r21=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	movl r21=THIS_CPU(current_psr_i_addr);;
 	ld8 r21=[r21];;
 	ld1 r21=[r21];;
 	cmp.eq p0,p6=r21,r0
@@ -448,17 +448,16 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	dep r21=-1,r21,IA64_PSR_CPL1_BIT,1 ;;
 	or r17=r17,r28;;
 	and r17=r17,r27;;
-	ld4 r16=[r18],XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS;;
+	ld4 r16=[r18];;
 	cmp.ne p6,p0=r16,r0;;
-	ld8 r16=[r18],XSI_PSR_IC_OFS-XSI_PSR_I_ADDR_OFS
+	movl r22=THIS_CPU(current_psr_i_addr);;
+	ld8 r22=[r22]
 (p6)	dep r17=-1,r17,IA64_PSR_IC_BIT,1 ;;
-	ld1 r16=[r16];;
+	ld1 r16=[r22];;
 	cmp.eq p6,p0=r16,r0;;
 (p6)	dep r17=-1,r17,IA64_PSR_I_BIT,1 ;;
 	mov r20=1
-	adds r22=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18
 	adds r21=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	ld8 r22=[r22]
 	st8 [r21]=r17 ;;
 	// set shared_mem interrupt_delivery_enabled to 0
 	// set shared_mem interrupt_collection_enabled to 0
@@ -606,7 +605,7 @@ ENTRY(fast_reflect)
 	// set shared_mem isr
 	st8 [r21]=r16 ;;
 	// set cr.ipsr
-	adds r21=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18
+	movl r21=THIS_CPU(current_psr_i_addr)
 	mov r29=r30 ;;
 	ld8 r21=[r21]
 	movl r28=DELIVER_PSR_SET;;
@@ -1077,7 +1076,7 @@ just_do_rfi:
 	dep r20=0,r20,38,25;; // ensure ifs has no reserved bits set
 	mov cr.ifs=r20 ;;
 	// ipsr.cpl == (vcr.ipsr.cpl == 0) 2 : 3;
-	adds r20=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r18
+	movl r20=THIS_CPU(current_psr_i_addr)
 	dep r21=-1,r21,IA64_PSR_CPL1_BIT,1 ;;
 	// vpsr.i = vcr.ipsr.i; vpsr.ic = vcr.ipsr.ic
 	ld8 r20=[r20]
@@ -1229,13 +1228,14 @@ ENTRY(rfi_with_interrupt)
 	extr.u r20=r21,41,2 ;;	// get v(!)psr.ri
 	dep r16=r20,r16,41,2 ;; // deposit cr.isr.ei
 	adds r22=XSI_ISR_OFS-XSI_PSR_IC_OFS,r18 ;; 
-	st8 [r22]=r16,XSI_PSR_I_ADDR_OFS-XSI_ISR_OFS ;;
+	st8 [r22]=r16;;
+	movl r22=THIS_CPU(current_psr_i_addr)
 	// set cr.ipsr (make sure cpl==2!)
-	mov r29=r17 ;;
+	mov r29=r17
 	movl r28=DELIVER_PSR_SET;;
-	mov r20=1
+	mov r20=1;;
 	ld8 r22=[r22]
-	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0);;
+	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0)
 	or r29=r29,r28;;
 	and r29=r29,r27;;
 	mov cr.ipsr=r29;;
