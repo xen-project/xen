@@ -596,12 +596,8 @@ assign_new_domain_page(struct domain *d, unsigned long mpaddr)
     pte_t *pte;
 
     pte = lookup_alloc_domain_pte(d, mpaddr);
-    if (pte_none(*pte)) {
+    if (pte_none(*pte))
         p = __assign_new_domain_page(d, mpaddr, pte);
-    } else {
-        DPRINTK("%s: d 0x%p mpaddr %lx already mapped!\n",
-                __func__, d, mpaddr);
-    }
 
     return p;
 #endif
@@ -640,8 +636,7 @@ __assign_domain_page(struct domain *d,
                     pfn_pte(physaddr >> PAGE_SHIFT,
                             __pgprot(__DIRTY_BITS | _PAGE_PL_2 | arflags)));
         smp_mb();
-    } else
-        printk("%s: mpaddr %lx already mapped!\n", __func__, mpaddr);
+    }
 }
 
 /* get_page() and map a physical address to the specified metaphysical addr */
