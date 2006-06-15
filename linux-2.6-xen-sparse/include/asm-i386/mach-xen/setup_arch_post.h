@@ -25,9 +25,9 @@ static char * __init machine_specific_memory_setup(void)
 	if ( rc == -ENOSYS ) {
 		memmap.nr_entries = 1;
 		map[0].addr = 0ULL;
-		map[0].size = xen_start_info->nr_pages << PAGE_SHIFT;
+		map[0].size = PFN_PHYS(xen_start_info->nr_pages);
 		/* 8MB slack (to balance backend allocations). */
-		map[0].size += 8 << 20;
+		map[0].size += 8ULL << 20;
 		map[0].type = E820_RAM;
 		rc = 0;
 	}
