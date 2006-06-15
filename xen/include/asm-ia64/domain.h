@@ -64,8 +64,6 @@ struct arch_domain {
     /* SAL return point.  */
     unsigned long sal_return_addr;
 
-    u64 xen_vastart;
-    u64 xen_vaend;
     u64 shared_info_va;
     unsigned long initrd_start;
     unsigned long initrd_len;
@@ -80,8 +78,6 @@ struct arch_domain {
     // protect v->itlb, v->dtlb and vhpt
     seqlock_t   vtlb_lock ____cacheline_aligned_in_smp;
 };
-#define xen_vastart arch.xen_vastart
-#define xen_vaend arch.xen_vaend
 #define INT_ENABLE_OFFSET(v) 		  \
     (sizeof(vcpu_info_t) * (v)->vcpu_id + \
     offsetof(vcpu_info_t, evtchn_upcall_mask))

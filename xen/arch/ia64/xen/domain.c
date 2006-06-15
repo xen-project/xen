@@ -70,13 +70,9 @@ unsigned long dom0_align = 64*1024*1024;
 static unsigned int dom0_max_vcpus = 1;
 integer_param("dom0_max_vcpus", dom0_max_vcpus); 
 
-// initialized by arch/ia64/setup.c:find_initrd()
-unsigned long initrd_start = 0, initrd_end = 0;
 extern unsigned long running_on_sim;
 
 extern char dom0_command_line[];
-
-#define IS_XEN_ADDRESS(d,a) ((a >= d->xen_vastart) && (a <= d->xen_vaend))
 
 /* FIXME: where these declarations should be there ? */
 extern void serial_input_init(void);
@@ -308,8 +304,6 @@ static void init_switch_stack(struct vcpu *v)
 int arch_domain_create(struct domain *d)
 {
 	// the following will eventually need to be negotiated dynamically
-	d->xen_vastart = XEN_START_ADDR;
-	d->xen_vaend = XEN_END_ADDR;
 	d->arch.shared_info_va = SHAREDINFO_ADDR;
 	d->arch.breakimm = 0x1000;
 	seqlock_init(&d->arch.vtlb_lock);
@@ -538,40 +532,20 @@ int elf_sanity_check(Elf_Ehdr *ehdr)
 	return 1;
 }
 
-static void copy_memory(void *dst, void *src, int size)
-{
-	int remain;
-
-	if (IS_XEN_ADDRESS(dom0,(unsigned long) src)) {
-		memcpy(dst,src,size);
-	}
-	else {
-		printf("About to call __copy_from_user(%p,%p,%d)\n",
-			dst,src,size);
-		while ((remain = __copy_from_user(dst,src,size)) != 0) {
-			printf("incomplete user copy, %d remain of %d\n",
-				remain,size);
-			dst += size - remain; src += size - remain;
-			size -= remain;
-		}
-	}
-}
-
 static void loaddomainelfimage(struct domain *d, unsigned long image_start)
 {
 	char *elfbase = (char *) image_start;
-	//Elf_Ehdr *ehdr = (Elf_Ehdr *)image_start;
 	Elf_Ehdr ehdr;
 	Elf_Phdr phdr;
 	int h, filesz, memsz;
 	unsigned long elfaddr, dom_mpaddr, dom_imva;
 	struct page_info *p;
   
-	copy_memory(&ehdr, (void *) image_start, sizeof(Elf_Ehdr));
+	memcpy(&ehdr, (void *) image_start, sizeof(Elf_Ehdr));
 	for ( h = 0; h < ehdr.e_phnum; h++ ) {
-		copy_memory(&phdr,
-			    elfbase + ehdr.e_phoff + (h*ehdr.e_phentsize),
-			    sizeof(Elf_Phdr));
+		memcpy(&phdr,
+		       elfbase + ehdr.e_phoff + (h*ehdr.e_phentsize),
+		       sizeof(Elf_Phdr));
 		if ((phdr.p_type != PT_LOAD))
 		    continue;
 
@@ -586,7 +560,7 @@ static void loaddomainelfimage(struct domain *d, unsigned long image_start)
 			if (dom_mpaddr+memsz>dom0_size)
 				panic("Dom0 doesn't fit in memory space!\n");
 			dom_imva = __va_ul(dom_mpaddr + dom0_start);
-			copy_memory((void *)dom_imva, (void *)elfaddr, filesz);
+			memcpy((void *)dom_imva, (void *)elfaddr, filesz);
 			if (memsz > filesz)
 				memset((void *)dom_imva+filesz, 0,
 				       memsz-filesz);
@@ -604,13 +578,13 @@ static void loaddomainelfimage(struct domain *d, unsigned long image_start)
 			dom_imva = __va_ul(page_to_maddr(p));
 			if (filesz > 0) {
 				if (filesz >= PAGE_SIZE)
-					copy_memory((void *) dom_imva,
-						    (void *) elfaddr,
-						    PAGE_SIZE);
+					memcpy((void *) dom_imva,
+					       (void *) elfaddr,
+					       PAGE_SIZE);
 				else {
 					// copy partial page
-					copy_memory((void *) dom_imva,
-						    (void *) elfaddr, filesz);
+					memcpy((void *) dom_imva,
+					       (void *) elfaddr, filesz);
 					// zero the rest of page
 					memset((void *) dom_imva+filesz, 0,
 					       PAGE_SIZE-filesz);
@@ -636,6 +610,29 @@ static void loaddomainelfimage(struct domain *d, unsigned long image_start)
 
 void alloc_dom0(void)
 {
+	/* Check dom0 size.  */
+	if (dom0_size < 4 * 1024 * 1024) {
+		panic("dom0_mem is too small, boot aborted"
+			" (try e.g. dom0_mem=256M or dom0_mem=65536K)\n");
+	}
+
+	/* Check dom0 align.  */
+	if ((dom0_align - 1) & dom0_align) { /* not a power of two */
+		panic("dom0_align (%lx) must be power of two, boot aborted"
+		      " (try e.g. dom0_align=256M or dom0_align=65536K)\n",
+		      dom0_align);
+	}
+	if (dom0_align < PAGE_SIZE) {
+		panic("dom0_align must be >= %ld, boot aborted"
+		      " (try e.g. dom0_align=256M or dom0_align=65536K)\n",
+		      PAGE_SIZE);
+	}
+	if (dom0_size % dom0_align) {
+		dom0_size = (dom0_size / dom0_align + 1) * dom0_align;
+		printf("dom0_size rounded up to %ld, due to dom0_align=%lx\n",
+		     dom0_size,dom0_align);
+	}
+
 	if (running_on_sim) {
 		dom0_size = 128*1024*1024; //FIXME: Should be configurable
 	}
@@ -677,7 +674,6 @@ static void physdev_init_dom0(struct domain *d)
 		BUG();
 }
 
-static unsigned int vmx_dom0 = 0;
 int construct_dom0(struct domain *d, 
 	               unsigned long image_start, unsigned long image_len, 
 	               unsigned long initrd_start, unsigned long initrd_len,
@@ -700,6 +696,7 @@ int construct_dom0(struct domain *d,
 	struct page_info *start_info_page;
 
 #ifdef VALIDATE_VT
+	unsigned int vmx_dom0 = 0;
 	unsigned long mfn;
 	struct page_info *page = NULL;
 #endif
@@ -862,12 +859,15 @@ int construct_dom0(struct domain *d,
 	if (cmdline != NULL)
 	    console_endboot(strstr(cmdline, "tty0") != NULL);
 
+	printk("Dom0: 0x%lx\n", (u64)dom0);
+
+#ifdef VALIDATE_VT
 	/* VMX specific construction for Dom0, if hardware supports VMX
 	 * and Dom0 is unmodified image
 	 */
-	printk("Dom0: 0x%lx, domain: 0x%lx\n", (u64)dom0, (u64)d);
 	if (vmx_dom0)
 	    vmx_final_setup_guest(v);
+#endif
 
 	set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
@@ -910,11 +910,6 @@ void dummy_called(char *function)
 	while(1);
 }
 
-void domain_pend_keyboard_interrupt(int irq)
-{
-	vcpu_pend_interrupt(dom0->vcpu[0],irq);
-}
-
 void sync_vcpu_execstate(struct vcpu *v)
 {
 //	__ia64_save_fpu(v->arch._thread.fph);
@@ -923,53 +918,15 @@ void sync_vcpu_execstate(struct vcpu *v)
 	// FIXME SMP: Anything else needed here for SMP?
 }
 
-// FIXME: It would be nice to print out a nice error message for bad
-//  values of these boot-time parameters, but it seems we are too early
-//  in the boot and attempts to print freeze the system?
-#define abort(x...) do {} while(0)
-#define warn(x...) do {} while(0)
-
 static void parse_dom0_mem(char *s)
 {
-	unsigned long bytes = parse_size_and_unit(s);
-
-	if (dom0_size < 4 * 1024 * 1024) {
-		abort("parse_dom0_mem: too small, boot aborted"
-			" (try e.g. dom0_mem=256M or dom0_mem=65536K)\n");
-	}
-	if (dom0_size % dom0_align) {
-		dom0_size = ((dom0_size / dom0_align) + 1) * dom0_align;
-		warn("parse_dom0_mem: dom0_size rounded up from"
-			" %lx to %lx bytes, due to dom0_align=%lx\n",
-			bytes,dom0_size,dom0_align);
-	}
-	else dom0_size = bytes;
+	dom0_size = parse_size_and_unit(s);
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
 
 static void parse_dom0_align(char *s)
 {
-	unsigned long bytes = parse_size_and_unit(s);
-
-	if ((bytes - 1) ^ bytes) { /* not a power of two */
-		abort("parse_dom0_align: dom0_align must be power of two, "
-			"boot aborted"
-			" (try e.g. dom0_align=256M or dom0_align=65536K)\n");
-	}
-	else if (bytes < PAGE_SIZE) {
-		abort("parse_dom0_align: dom0_align must be >= %ld, "
-			"boot aborted"
-			" (try e.g. dom0_align=256M or dom0_align=65536K)\n",
-			PAGE_SIZE);
-	}
-	else dom0_align = bytes;
-	if (dom0_size % dom0_align) {
-		dom0_size = (dom0_size / dom0_align + 1) * dom0_align;
-		warn("parse_dom0_align: dom0_size rounded up from"
-			" %ld to %ld bytes, due to dom0_align=%lx\n",
-			bytes,dom0_size,dom0_align);
-	}
+	dom0_align = parse_size_and_unit(s);
 }
 custom_param("dom0_align", parse_dom0_align);
-
