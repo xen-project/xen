@@ -33,9 +33,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/ioctl.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -45,7 +42,6 @@
 #include <xen/xen.h>
 #include <string.h>
 #include <sys/select.h>
-#include <xen/linux/evtchn.h>
 
 #define PERROR(_m, _a...)                                       \
 do {                                                            \
@@ -256,51 +252,29 @@ void log_event(int event_id)
         stat_map[0].event_count++;	// other
 }
 
-#define EVTCHN_DEV_NAME  "/dev/xen/evtchn"
-#define EVTCHN_DEV_MAJOR 10
-#define EVTCHN_DEV_MINOR 201
-
 int virq_port;
-int eventchn_fd = -1;
+int xce_handle = -1;
 
 /* Returns the event channel handle. */
 /* Stolen from xenstore code */
 int eventchn_init(void)
 {
-  struct stat st;
-  struct ioctl_evtchn_bind_virq bind;
   int rc;
   
   // to revert to old way:
   if (0)
     return -1;
   
-  /* Make sure any existing device file links to correct device. */
-  if ((lstat(EVTCHN_DEV_NAME, &st) != 0) || !S_ISCHR(st.st_mode) ||
-      (st.st_rdev != makedev(EVTCHN_DEV_MAJOR, EVTCHN_DEV_MINOR)))
-    (void)unlink(EVTCHN_DEV_NAME);
-  
- reopen:
-  eventchn_fd = open(EVTCHN_DEV_NAME, O_NONBLOCK|O_RDWR);
-  if (eventchn_fd == -1) {
-    if ((errno == ENOENT) &&
-	((mkdir("/dev/xen", 0755) == 0) || (errno == EEXIST)) &&
-	(mknod(EVTCHN_DEV_NAME, S_IFCHR|0600,
-	       makedev(EVTCHN_DEV_MAJOR, EVTCHN_DEV_MINOR)) == 0))
-      goto reopen;
-    return -errno;
-  }
-  
-  if (eventchn_fd < 0)
+  xce_handle = xc_evtchn_open();
+
+  if (xce_handle < 0)
     perror("Failed to open evtchn device");
   
-  bind.virq = VIRQ_TBUF;
-  rc = ioctl(eventchn_fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
-  if (rc == -1)
+  if ((rc = xc_evtchn_bind_virq(xce_handle, VIRQ_TBUF)) == -1)
     perror("Failed to bind to domain exception virq port");
   virq_port = rc;
   
-  return eventchn_fd;
+  return xce_handle;
 }
 
 void wait_for_event(void)
@@ -309,27 +283,30 @@ void wait_for_event(void)
   fd_set inset;
   evtchn_port_t port;
   struct timeval tv;
+  int evtchn_fd;
   
-  if (eventchn_fd < 0) {
+  if (xce_handle < 0) {
     nanosleep(&opts.poll_sleep, NULL);
     return;
   }
 
+  evtchn_fd = xc_evtchn_fd(xce_handle);
+
   FD_ZERO(&inset);
-  FD_SET(eventchn_fd, &inset);
+  FD_SET(evtchn_fd, &inset);
   tv.tv_sec = 1;
   tv.tv_usec = 0;
   // tv = millis_to_timespec(&opts.poll_sleep);
-  ret = select(eventchn_fd+1, &inset, NULL, NULL, &tv);
+  ret = select(evtchn_fd+1, &inset, NULL, NULL, &tv);
   
-  if ( (ret == 1) && FD_ISSET(eventchn_fd, &inset)) {
-    if (read(eventchn_fd, &port, sizeof(port)) != sizeof(port))
+  if ( (ret == 1) && FD_ISSET(evtchn_fd, &inset)) {
+    if ((port = xc_evtchn_pending(xce_handle)) == -1)
       perror("Failed to read from event fd");
     
     //    if (port == virq_port)
     //      printf("got the event I was looking for\r\n");
-    
-    if (write(eventchn_fd, &port, sizeof(port)) != sizeof(port))
+
+    if (xc_evtchn_unmask(xce_handle, port) == -1)
       perror("Failed to write to event fd");
   }
 }

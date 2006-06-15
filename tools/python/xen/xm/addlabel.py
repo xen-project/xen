@@ -50,7 +50,7 @@ def main(argv):
             err("No active policy. Policy must be specified in command line.")
 
         #sanity checks: make sure this label can be instantiated later on
-        ssidref = label2ssidref(label, policyref)
+        ssidref = label2ssidref(label, policyref, 'dom')
 
         new_label = "access_control = ['policy=%s,label=%s']\n" % (policyref, label)
         if not os.path.isfile(configfile):

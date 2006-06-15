@@ -54,7 +54,7 @@
 #include "hashtable.h"
 
 
-extern int eventchn_fd; /* in xenstored_domain.c */
+extern int xce_handle; /* in xenstored_domain.c */
 
 static bool verbose = false;
 LIST_HEAD(connections);
@@ -353,8 +353,11 @@ static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock)
 
 	set_fd(sock,               inset, &max);
 	set_fd(ro_sock,            inset, &max);
-	set_fd(eventchn_fd,        inset, &max);
 	set_fd(reopen_log_pipe[0], inset, &max);
+
+	if (xce_handle != -1)
+		set_fd(xc_evtchn_fd(xce_handle), inset, &max);
+
 	list_for_each_entry(i, &connections, list) {
 		if (i->domain)
 			continue;
@@ -1769,6 +1772,7 @@ int main(int argc, char *argv[])
 	bool outputpid = false;
 	bool no_domain_init = false;
 	const char *pidfile = NULL;
+	int evtchn_fd = -1;
 
 	while ((opt = getopt_long(argc, argv, "DE:F:HNPS:T:RLVW:", options,
 				  NULL)) != -1) {
@@ -1907,6 +1911,9 @@ int main(int argc, char *argv[])
 	signal(SIGUSR1, stop_failtest);
 #endif
 
+	if (xce_handle != -1)
+		evtchn_fd = xc_evtchn_fd(xce_handle);
+
 	/* Get ready to listen to the tools. */
 	max = initialize_set(&inset, &outset, *sock, *ro_sock);
 
@@ -1934,7 +1941,7 @@ int main(int argc, char *argv[])
 		if (FD_ISSET(*ro_sock, &inset))
 			accept_connection(*ro_sock, false);
 
-		if (eventchn_fd > 0 && FD_ISSET(eventchn_fd, &inset))
+		if (evtchn_fd != -1 && FD_ISSET(evtchn_fd, &inset))
 			handle_event();
 
 		list_for_each_entry(i, &connections, list) {

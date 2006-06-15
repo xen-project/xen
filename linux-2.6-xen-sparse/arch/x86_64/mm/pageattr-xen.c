@@ -130,6 +130,12 @@ void mm_pin_all(void)
 				  context.unpinned));
 }
 
+void _arch_dup_mmap(struct mm_struct *mm)
+{
+    if (!mm->context.pinned)
+        mm_pin(mm);
+}
+
 void _arch_exit_mmap(struct mm_struct *mm)
 {
     struct task_struct *tsk = current;

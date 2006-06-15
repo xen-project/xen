@@ -223,18 +223,20 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 
 	num_domains = 0;
 	do {
-		xenstat_domain *domain;
+		xenstat_domain *domain, *tmp;
 
 		new_domains = xc_domain_getinfolist(handle->xc_handle,
 			num_domains, DOMAIN_CHUNK_SIZE, domaininfo);
 
-		node->domains = realloc(node->domains,
-					(num_domains + new_domains)
-					* sizeof(xenstat_domain));
-		if (node->domains == NULL) {
+		tmp = realloc(node->domains,
+			      (num_domains + new_domains)
+			      * sizeof(xenstat_domain));
+		if (tmp == NULL) {
+			free(node->domains);
 			free(node);
 			return NULL;
 		}
+		node->domains = tmp;
 
 		domain = node->domains + num_domains;
 
@@ -582,11 +584,14 @@ static int xenstat_collect_networks(xenstat_node * node)
 			domain->num_networks = 1;
 			domain->networks = malloc(sizeof(xenstat_network));
 		} else {
+			struct xenstat_network *tmp;
 			domain->num_networks++;
-			domain->networks =
-			    realloc(domain->networks,
-				    domain->num_networks *
-				    sizeof(xenstat_network));
+			tmp = realloc(domain->networks,
+				      domain->num_networks *
+				      sizeof(xenstat_network));
+			if (tmp == NULL)
+				free(domain->networks);
+			domain->networks = tmp;
 		}
 		if (domain->networks == NULL)
 			return 0;

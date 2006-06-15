@@ -1279,7 +1279,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
 static void nmi_softirq(void)
 {
     /* Only used to defer wakeup of dom0,vcpu0 to a safe (non-NMI) context. */
-    evtchn_notify(dom0->vcpu[0]);
+    vcpu_kick(dom0->vcpu[0]);
 }
 
 static void nmi_dom0_report(unsigned int reason_idx)

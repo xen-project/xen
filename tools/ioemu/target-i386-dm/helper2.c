@@ -47,11 +47,9 @@
 
 #include <limits.h>
 #include <fcntl.h>
-#include <sys/ioctl.h>
 
 #include <xenctrl.h>
 #include <xen/hvm/ioreq.h>
-#include <xen/linux/evtchn.h>
 
 #include "cpu.h"
 #include "exec-all.h"
@@ -123,7 +121,7 @@ target_ulong cpu_get_phys_page_debug(CPUState *env, target_ulong addr)
 }
 
 //the evtchn fd for polling
-int evtchn_fd = -1;
+int xce_handle = -1;
 
 //which vcpu we are serving
 int send_vcpu = 0;
@@ -170,11 +168,10 @@ static ioreq_t* __cpu_get_ioreq(int vcpu)
 //retval--the number of ioreq packet
 static ioreq_t* cpu_get_ioreq(void)
 {
-    int i, rc;
+    int i;
     evtchn_port_t port;
 
-    rc = read(evtchn_fd, &port, sizeof(port));
-    if ( rc == sizeof(port) ) {
+    if ( (port = xc_evtchn_pending(xce_handle)) != -1 ) {
         for ( i = 0; i < vcpus; i++ )
             if ( shared_page->vcpu_iodata[i].dm_eport == port )
                 break;
@@ -184,8 +181,7 @@ static ioreq_t* cpu_get_ioreq(void)
             exit(1);
         }
 
-        // unmask the wanted port again
-        write(evtchn_fd, &port, sizeof(port));
+	xc_evtchn_unmask(xce_handle, port);
 
         //get the io packet from shared memory
         send_vcpu = i;
@@ -436,6 +432,7 @@ int main_loop(void)
     extern int shutdown_requested;
     CPUState *env = global_env;
     int retval;
+    int evtchn_fd = xc_evtchn_fd(xce_handle);
     extern void main_loop_wait(int);
 
     /* Watch stdin (fd 0) to see when it has input. */
@@ -475,11 +472,9 @@ int main_loop(void)
         main_loop_wait(0);
 
         if (env->send_event) {
-            struct ioctl_evtchn_notify notify;
-
             env->send_event = 0;
-            notify.port = shared_page->vcpu_iodata[send_vcpu].dm_eport;
-            (void)ioctl(evtchn_fd, IOCTL_EVTCHN_NOTIFY, &notify);
+            (void)xc_evtchn_notify(xce_handle,
+                 shared_page->vcpu_iodata[send_vcpu].dm_eport);
         }
     }
     destroy_hvm_domain();
@@ -511,7 +506,6 @@ static void qemu_hvm_reset(void *unused)
 CPUState * cpu_init()
 {
     CPUX86State *env;
-    struct ioctl_evtchn_bind_interdomain bind;
     int i, rc;
 
     cpu_exec_init();
@@ -523,21 +517,19 @@ CPUState * cpu_init()
 
     cpu_single_env = env;
 
-    if (evtchn_fd != -1)//the evtchn has been opened by another cpu object
+    if (xce_handle != -1)//the evtchn has been opened by another cpu object
         return NULL;
 
-    //use nonblock reading not polling, may change in future.
-    evtchn_fd = open("/dev/xen/evtchn", O_RDWR|O_NONBLOCK);
-    if (evtchn_fd == -1) {
+    xce_handle = xc_evtchn_open();
+    if (xce_handle == -1) {
         fprintf(logfile, "open evtchn device error %d\n", errno);
         return NULL;
     }
 
     /* FIXME: how about if we overflow the page here? */
-    bind.remote_domain = domid;
     for ( i = 0; i < vcpus; i++ ) {
-        bind.remote_port = shared_page->vcpu_iodata[i].vp_eport;
-        rc = ioctl(evtchn_fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
+        rc = xc_evtchn_bind_interdomain(xce_handle, domid,
+            shared_page->vcpu_iodata[i].vp_eport);
         if ( rc == -1 ) {
             fprintf(logfile, "bind interdomain ioctl error %d\n", errno);
             return NULL;

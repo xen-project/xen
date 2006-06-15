@@ -103,6 +103,124 @@ int do_xen_hypercall(int xc_handle, privcmd_hypercall_t *hypercall)
                       (unsigned long)hypercall);
 }
 
+#define EVTCHN_DEV_NAME  "/dev/xen/evtchn"
+#define EVTCHN_DEV_MAJOR 10
+#define EVTCHN_DEV_MINOR 201
+
+int xc_evtchn_open(void)
+{
+    struct stat st;
+    int fd;
+
+    /* Make sure any existing device file links to correct device. */
+    if ((lstat(EVTCHN_DEV_NAME, &st) != 0) || !S_ISCHR(st.st_mode) ||
+        (st.st_rdev != makedev(EVTCHN_DEV_MAJOR, EVTCHN_DEV_MINOR)))
+        (void)unlink(EVTCHN_DEV_NAME);
+
+reopen:
+    if ( (fd = open(EVTCHN_DEV_NAME, O_RDWR)) == -1 )
+    {
+        if ( (errno == ENOENT) &&
+            ((mkdir("/dev/xen", 0755) == 0) || (errno == EEXIST)) &&
+            (mknod(EVTCHN_DEV_NAME, S_IFCHR|0600,
+            makedev(EVTCHN_DEV_MAJOR, EVTCHN_DEV_MINOR)) == 0) )
+            goto reopen;
+
+        PERROR("Could not open event channel interface");
+        return -1;
+    }
+
+    return fd;
+}
+
+int xc_evtchn_close(int xce_handle)
+{
+    return close(xce_handle);
+}
+
+int xc_evtchn_fd(int xce_handle)
+{
+    return xce_handle;
+}
+
+int xc_evtchn_notify(int xce_handle, evtchn_port_t port)
+{
+    struct ioctl_evtchn_notify notify;
+
+    notify.port = port;
+
+    return ioctl(xce_handle, IOCTL_EVTCHN_NOTIFY, &notify);
+}
+
+evtchn_port_t xc_evtchn_bind_interdomain(int xce_handle, int domid,
+    evtchn_port_t remote_port)
+{
+    struct ioctl_evtchn_bind_interdomain bind;
+
+    bind.remote_domain = domid;
+    bind.remote_port = remote_port;
+
+    return ioctl(xce_handle, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
+}
+
+int xc_evtchn_unbind(int xce_handle, evtchn_port_t port)
+{
+    struct ioctl_evtchn_unbind unbind;
+
+    unbind.port = port;
+
+    return ioctl(xce_handle, IOCTL_EVTCHN_UNBIND, &unbind);
+}
+
+evtchn_port_t xc_evtchn_bind_virq(int xce_handle, unsigned int virq)
+{
+    struct ioctl_evtchn_bind_virq bind;
+
+    bind.virq = virq;
+
+    return ioctl(xce_handle, IOCTL_EVTCHN_BIND_VIRQ, &bind);
+}
+
+static int dorw(int fd, char *data, size_t size, int do_write)
+{
+    size_t offset = 0;
+    ssize_t len;
+
+    while ( offset < size )
+    {
+        if (do_write)
+            len = write(fd, data + offset, size - offset);
+        else
+            len = read(fd, data + offset, size - offset);
+
+        if ( len == -1 )
+        {
+             if ( errno == EINTR )
+                 continue;
+             return -1;
+        }
+
+        offset += len;
+    }
+
+    return 0;
+}
+
+evtchn_port_t xc_evtchn_pending(int xce_handle)
+{
+    evtchn_port_t port;
+
+    if ( dorw(xce_handle, (char *)&port, sizeof(port), 0) == -1 )
+        return -1;
+
+    return port;
+}
+
+int xc_evtchn_unmask(int xce_handle, evtchn_port_t port)
+{
+    return dorw(xce_handle, (char *)&port, sizeof(port), 1);
+}
+
 /*
  * Local variables:
  * mode: C

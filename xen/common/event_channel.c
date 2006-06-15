@@ -493,10 +493,9 @@ void evtchn_set_pending(struct vcpu *v, int port)
 
     if ( !test_bit        (port, s->evtchn_mask) &&
          !test_and_set_bit(port / BITS_PER_LONG,
-                           &v->vcpu_info->evtchn_pending_sel) &&
-         !test_and_set_bit(0, &v->vcpu_info->evtchn_upcall_pending) )
+                           &v->vcpu_info->evtchn_pending_sel) )
     {
-        evtchn_notify(v);
+        vcpu_mark_events_pending(v);
     }
     
     /* Check if some VCPU might be polling for this event. */
@@ -682,10 +681,9 @@ static long evtchn_unmask(evtchn_unmask_t *unmask)
     if ( test_and_clear_bit(port, s->evtchn_mask) &&
          test_bit          (port, s->evtchn_pending) &&
          !test_and_set_bit (port / BITS_PER_LONG,
-                            &v->vcpu_info->evtchn_pending_sel) &&
-         !test_and_set_bit (0, &v->vcpu_info->evtchn_upcall_pending) )
+                            &v->vcpu_info->evtchn_pending_sel) )
     {
-        evtchn_notify(v);
+        vcpu_mark_events_pending(v);
     }
 
     spin_unlock(&d->evtchn_lock);

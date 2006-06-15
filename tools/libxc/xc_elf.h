@@ -170,13 +170,14 @@ typedef struct {
 #define EM_PARISC	15		/* HPPA */
 #define EM_SPARC32PLUS	18		/* Enhanced instruction set SPARC */
 #define EM_PPC		20		/* PowerPC */
+#define EM_PPC64	21		/* PowerPC 64-bit */
 #define EM_ARM		40		/* Advanced RISC Machines ARM */
 #define EM_ALPHA	41		/* DEC ALPHA */
 #define EM_SPARCV9	43		/* SPARC version 9 */
 #define EM_ALPHA_EXP	0x9026		/* DEC ALPHA */
+#define EM_IA_64	50		/* Intel Merced */
 #define EM_X86_64	62		/* AMD x86-64 architecture */
 #define EM_VAX		75		/* DEC VAX */
-#define EM_NUM		15		/* number of machine types */
 
 /* Version */
 #define EV_NONE		0		/* Invalid */

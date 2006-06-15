@@ -35,24 +35,29 @@ int do_event(u32 port, struct pt_regs *regs)
     ev_action_t  *action;
     if (port >= NR_EVS) {
         printk("Port number too large: %d\n", port);
-        return 0;
+        goto out;
     }
 
     action = &ev_actions[port];
     action->count++;
 
     if (!action->handler)
+    {
+        printk("Spurious event on port %d\n", port);
         goto out;
+    }
     
     if (action->status & EVS_DISABLED)
+    {
+        printk("Event on port %d disabled\n", port);
         goto out;
+    }
     
     /* call the handler */
     action->handler(port, regs);
-
-	clear_evtchn(port);
     
  out:
+	clear_evtchn(port);
     return 1;
 
 }
@@ -135,6 +140,7 @@ void init_events(void)
     {
         ev_actions[i].status  = EVS_DISABLED;
         ev_actions[i].handler = default_handler;
+        mask_evtchn(i);
     }
 }
 

@@ -3,11 +3,12 @@
  * (C) 2006 - Cambridge University
  ****************************************************************************
  *
- *        File: mm.c
+ *        File: xenbus.c
  *      Author: Steven Smith (sos22@cam.ac.uk) 
  *     Changes: Grzegorz Milos (gm281@cam.ac.uk)
+ *     Changes: John D. Ramsdell
  *              
- *        Date: Mar 2006, chages Aug 2005
+ *        Date: Jun 2006, chages Aug 2005
  * 
  * Environment: Xen Minimal OS
  * Description: Minimal implementation of xenbus
@@ -167,6 +168,7 @@ static int allocate_xenbus_id(void)
 void init_xenbus(void)
 {
     int err;
+    printk("Initialising xenbus\n");
     DEBUG("init_xenbus called.\n");
     xenstore_buf = mfn_to_virt(start_info.store_mfn);
     create_thread("xenstore", xenbus_thread_func, NULL);
@@ -262,15 +264,15 @@ static void xb_write(int type, int req_id, int trans_id,
 /* Send a mesasge to xenbus, in the same fashion as xb_write, and
    block waiting for a reply.  The reply is malloced and should be
    freed by the caller. */
-static void *xenbus_msg_reply(int type,
+static struct xsd_sockmsg *
+xenbus_msg_reply(int type,
         int trans,
         struct write_req *io,
         int nr_reqs)
 {
     int id;
     DEFINE_WAIT(w);
-    void *rep;
-    struct xsd_sockmsg *repmsg;
+    struct xsd_sockmsg *rep;
 
     id = allocate_xenbus_id();
     add_waiter(w, req_info[id].waitq);
@@ -281,12 +283,26 @@ static void *xenbus_msg_reply(int type,
     wake(current);
 
     rep = req_info[id].reply;
-    repmsg = rep;
-    BUG_ON(repmsg->req_id != id);
+    BUG_ON(rep->req_id != id);
     release_xenbus_id(id);
-
     return rep;
 }
+
+static char *errmsg(struct xsd_sockmsg *rep)
+{
+    if (!rep) {
+	char msg[] = "No reply";
+	size_t len = strlen(msg) + 1;
+	return memcpy(malloc(len), msg, len);
+    }
+    if (rep->type != XS_ERROR)
+	return NULL;
+    char *res = malloc(rep->len + 1);
+    memcpy(res, rep + 1, rep->len);
+    res[rep->len] = 0;
+    free(rep);
+    return res;
+}	
 
 /* Send a debug message to xenbus.  Can block. */
 static void xenbus_debug_msg(const char *msg)
@@ -296,27 +312,29 @@ static void xenbus_debug_msg(const char *msg)
         { "print", sizeof("print") },
         { msg, len },
         { "", 1 }};
-    void *reply;
-    struct xsd_sockmsg *repmsg;
+    struct xsd_sockmsg *reply;
 
-    reply = xenbus_msg_reply(XS_DEBUG, 0, req, 3);
-    repmsg = reply;
+    reply = xenbus_msg_reply(XS_DEBUG, 0, req, ARRAY_SIZE(req));
     DEBUG("Got a reply, type %d, id %d, len %d.\n",
-            repmsg->type, repmsg->req_id, repmsg->len);
+            reply->type, reply->req_id, reply->len);
 }
 
 /* List the contents of a directory.  Returns a malloc()ed array of
    pointers to malloc()ed strings.  The array is NULL terminated.  May
    block. */
-static char **xenbus_ls(const char *pre)
+char *xenbus_ls(const char *pre, char ***contents)
 {
-    void *reply;
-    struct xsd_sockmsg *repmsg;
+    struct xsd_sockmsg *reply, *repmsg;
     struct write_req req[] = { { pre, strlen(pre)+1 } };
     int nr_elems, x, i;
     char **res;
 
-    repmsg = xenbus_msg_reply(XS_DIRECTORY, 0, req, 1);
+    repmsg = xenbus_msg_reply(XS_DIRECTORY, 0, req, ARRAY_SIZE(req));
+    char *msg = errmsg(repmsg);
+    if (msg) {
+	*contents = NULL;
+	return msg;
+    }
     reply = repmsg + 1;
     for (x = nr_elems = 0; x < repmsg->len; x++)
         nr_elems += (((char *)reply)[x] == 0);
@@ -329,20 +347,91 @@ static char **xenbus_ls(const char *pre)
     }
     res[i] = NULL;
     free(repmsg);
-    return res;
+    *contents = res;
+    return NULL;
 }
 
-static char *xenbus_read(const char *path)
+char *xenbus_read(const char *path, char **value)
 {
-    struct write_req req[] = { {path, strlen(path) + 1}};
+    struct write_req req[] = { {path, strlen(path) + 1} };
     struct xsd_sockmsg *rep;
     char *res;
-    rep = xenbus_msg_reply(XS_READ, 0, req, 1);
+    rep = xenbus_msg_reply(XS_READ, 0, req, ARRAY_SIZE(req));
+    char *msg = errmsg(rep);
+    if (msg) {
+	*value = NULL;
+	return msg;
+    }
     res = malloc(rep->len + 1);
     memcpy(res, rep + 1, rep->len);
     res[rep->len] = 0;
     free(rep);
-    return res;
+    *value = res;
+    return NULL;
+}
+
+char *xenbus_write(const char *path, const char *value)
+{
+    struct write_req req[] = { 
+	{path, strlen(path) + 1},
+	{value, strlen(value) + 1},
+    };
+    struct xsd_sockmsg *rep;
+    rep = xenbus_msg_reply(XS_WRITE, 0, req, ARRAY_SIZE(req));
+    char *msg = errmsg(rep);
+    if (msg)
+	return msg;
+    free(rep);
+    return NULL;
+}
+
+char *xenbus_rm(const char *path)
+{
+    struct write_req req[] = { {path, strlen(path) + 1} };
+    struct xsd_sockmsg *rep;
+    rep = xenbus_msg_reply(XS_RM, 0, req, ARRAY_SIZE(req));
+    char *msg = errmsg(rep);
+    if (msg)
+	return msg;
+    free(rep);
+    return NULL;
+}
+
+char *xenbus_get_perms(const char *path, char **value)
+{
+    struct write_req req[] = { {path, strlen(path) + 1} };
+    struct xsd_sockmsg *rep;
+    char *res;
+    rep = xenbus_msg_reply(XS_GET_PERMS, 0, req, ARRAY_SIZE(req));
+    char *msg = errmsg(rep);
+    if (msg) {
+	*value = NULL;
+	return msg;
+    }
+    res = malloc(rep->len + 1);
+    memcpy(res, rep + 1, rep->len);
+    res[rep->len] = 0;
+    free(rep);
+    *value = res;
+    return NULL;
+}
+
+#define PERM_MAX_SIZE 32
+char *xenbus_set_perms(const char *path, domid_t dom, char perm)
+{
+    char value[PERM_MAX_SIZE];
+    snprintf(value, PERM_MAX_SIZE, "%c%hu", perm, dom);
+    struct write_req req[] = { 
+	{path, strlen(path) + 1},
+	{value, strlen(value) + 1},
+    };
+    struct xsd_sockmsg *rep;
+    rep = xenbus_msg_reply(XS_SET_PERMS, 0, req, ARRAY_SIZE(req));
+    char *msg = errmsg(rep);
+    if (msg)
+	return msg;
+    free(rep);
+    return NULL;
 }
 
 static void do_ls_test(const char *pre)
@@ -351,7 +440,12 @@ static void do_ls_test(const char *pre)
     int x;
 
     DEBUG("ls %s...\n", pre);
-    dirs = xenbus_ls(pre);
+    char *msg = xenbus_ls(pre, &dirs);
+    if (msg) {
+	DEBUG("Error in xenbus ls: %s\n", msg);
+	free(msg);
+	return;
+    }
     for (x = 0; dirs[x]; x++) 
     {
         DEBUG("ls %s[%d] -> %s\n", pre, x, dirs[x]);
@@ -364,9 +458,38 @@ static void do_read_test(const char *path)
 {
     char *res;
     DEBUG("Read %s...\n", path);
-    res = xenbus_read(path);
+    char *msg = xenbus_read(path, &res);
+    if (msg) {
+	DEBUG("Error in xenbus read: %s\n", msg);
+	free(msg);
+	return;
+    }
     DEBUG("Read %s -> %s.\n", path, res);
     free(res);
+}
+
+static void do_write_test(const char *path, const char *val)
+{
+    DEBUG("Write %s to %s...\n", val, path);
+    char *msg = xenbus_write(path, val);
+    if (msg) {
+	DEBUG("Result %s\n", msg);
+	free(msg);
+    } else {
+	DEBUG("Success.\n");
+    }
+}
+
+static void do_rm_test(const char *path)
+{
+    DEBUG("rm %s...\n", path);
+    char *msg = xenbus_rm(path);
+    if (msg) {
+	DEBUG("Result %s\n", msg);
+	free(msg);
+    } else {
+	DEBUG("Success.\n");
+    }
 }
 
 /* Simple testing thing */
@@ -383,5 +506,22 @@ void test_xenbus(void)
     DEBUG("Doing read test.\n");
     do_read_test("device/vif/0/mac");
     do_read_test("device/vif/0/backend");
-    printk("Xenbus initialised.\n");
+
+    DEBUG("Doing write test.\n");
+    do_write_test("device/vif/0/flibble", "flobble");
+    do_read_test("device/vif/0/flibble");
+    do_write_test("device/vif/0/flibble", "widget");
+    do_read_test("device/vif/0/flibble");
+
+    DEBUG("Doing rm test.\n");
+    do_rm_test("device/vif/0/flibble");
+    do_read_test("device/vif/0/flibble");
+    DEBUG("(Should have said ENOENT)\n");
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-basic-offset: 4
+ * End:
+ */

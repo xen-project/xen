@@ -1193,6 +1193,9 @@ def main(argv=sys.argv):
             else:
                 print  >>sys.stderr, "Error: %s" % ex.faultString
             sys.exit(1)
+        except (ValueError, OverflowError):
+            err("Invalid argument.")
+            usage(argv[1])
         except:
             print "Unexpected error:", sys.exc_info()[0]
             print

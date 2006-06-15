@@ -133,6 +133,7 @@ void xen_tlb_flush(void)
 	op.cmd = MMUEXT_TLB_FLUSH_LOCAL;
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
+EXPORT_SYMBOL(xen_tlb_flush);
 
 void xen_invlpg(unsigned long ptr)
 {
@@ -141,6 +142,7 @@ void xen_invlpg(unsigned long ptr)
 	op.arg1.linear_addr = ptr & PAGE_MASK;
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
+EXPORT_SYMBOL(xen_invlpg);
 
 #ifdef CONFIG_SMP
 
@@ -363,7 +365,8 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	};
 	set_xen_guest_handle(reservation.extent_start, &frame);
 
-	if (xen_feature(XENFEAT_auto_translated_physmap))
+	if (xen_feature(XENFEAT_auto_translated_physmap) ||
+	    !test_bit(__pa(vstart) >> PAGE_SHIFT, contiguous_bitmap))
 		return;
 
 	scrub_pages(vstart, 1 << order);

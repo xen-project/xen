@@ -31,7 +31,7 @@ traceCommand("cat /dev/urandom > /dev/ram1")
 
 s, o = traceCommand("md5sum /dev/ram1")
 
-dom0_md5sum_match = re.search(r"^[\dA-Fa-f]{32}", o)
+dom0_md5sum_match = re.search(r"^[\dA-Fa-f]{32}", o, re.M)
 
 block_attach(domain, "phy:ram1", "hda1")
 
@@ -40,7 +40,7 @@ try:
 except ConsoleError, e:
     FAIL(str(e))
 
-domU_md5sum_match = re.search(r"^[\dA-Fa-f]{32}", run["output"])
+domU_md5sum_match = re.search(r"^[\dA-Fa-f]{32}", run["output"], re.M)
 
 domain.closeConsole()
 

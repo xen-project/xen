@@ -342,8 +342,20 @@ static void connect(struct blkfront_info *info)
 static void blkfront_closing(struct xenbus_device *dev)
 {
 	struct blkfront_info *info = dev->dev.driver_data;
+	unsigned long flags;
 
 	DPRINTK("blkfront_closing: %s removed\n", dev->nodename);
+
+	if (info->rq == NULL)
+		return;
+
+	spin_lock_irqsave(&blkif_io_lock, flags);
+	/* No more blkif_request(). */
+	blk_stop_queue(info->rq);
+	/* No more gnttab callback work. */
+	gnttab_cancel_free_callback(&info->callback);
+	flush_scheduled_work();
+	spin_unlock_irqrestore(&blkif_io_lock, flags);
 
 	xlvbd_del(info);
 
@@ -407,7 +419,8 @@ static void blkif_restart_queue(void *arg)
 {
 	struct blkfront_info *info = (struct blkfront_info *)arg;
 	spin_lock_irq(&blkif_io_lock);
-	kick_pending_request_queues(info);
+	if (info->connected == BLKIF_STATE_CONNECTED)
+		kick_pending_request_queues(info);
 	spin_unlock_irq(&blkif_io_lock);
 }
 
@@ -695,6 +708,12 @@ static void blkif_free(struct blkfront_info *info, int suspend)
 	spin_lock_irq(&blkif_io_lock);
 	info->connected = suspend ?
 		BLKIF_STATE_SUSPENDED : BLKIF_STATE_DISCONNECTED;
+	/* No more blkif_request(). */
+	if (info->rq)
+		blk_stop_queue(info->rq);
+	/* No more gnttab callback work. */
+	gnttab_cancel_free_callback(&info->callback);
+	flush_scheduled_work();
 	spin_unlock_irq(&blkif_io_lock);
 
 	/* Free resources associated with old device channel. */
@@ -768,17 +787,17 @@ static void blkif_recover(struct blkfront_info *info)
 
 	(void)xenbus_switch_state(info->xbdev, XenbusStateConnected);
 
-	/* Now safe for us to use the shared ring */
 	spin_lock_irq(&blkif_io_lock);
+
+	/* Now safe for us to use the shared ring */
 	info->connected = BLKIF_STATE_CONNECTED;
-	spin_unlock_irq(&blkif_io_lock);
 
 	/* Send off requeued requests */
 	flush_requests(info);
 
 	/* Kick any other new requests queued since we resumed */
-	spin_lock_irq(&blkif_io_lock);
 	kick_pending_request_queues(info);
+
 	spin_unlock_irq(&blkif_io_lock);
 }
 

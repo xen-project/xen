@@ -44,6 +44,8 @@
 
 #define DEBUG    0
 
+#define NULL_LABEL_NAME "__NULL_LABEL__"
+
 /* primary / secondary policy component setting */
 enum policycomponent { CHWALL, STE, NULLPOLICY }
     primary = NULLPOLICY, secondary = NULLPOLICY;
@@ -467,7 +469,7 @@ int init_ssid_queues(void)
         return -ENOMEM;
 
     /* default chwall ssid */
-    default_ssid_chwall->name = "DEFAULT";
+    default_ssid_chwall->name = NULL_LABEL_NAME;
     default_ssid_chwall->num = max_chwall_ssids++;
     default_ssid_chwall->is_ref = 0;
     default_ssid_chwall->type = ANY;
@@ -484,7 +486,7 @@ int init_ssid_queues(void)
     max_chwall_labels++;
 
     /* default ste ssid */
-    default_ssid_ste->name = "DEFAULT";
+    default_ssid_ste->name = NULL_LABEL_NAME;
     default_ssid_ste->num = max_ste_ssids++;
     default_ssid_ste->is_ref = 0;
     default_ssid_ste->type = ANY;
