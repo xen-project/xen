@@ -102,7 +102,7 @@ struct arch_vmx_struct {
 #define vmx_schedule_tail(next)         \
     (next)->thread.arch_vmx.arch_vmx_schedule_tail((next))
 
-#define VMX_DOMAIN(d)   d->arch.arch_vmx.flags
+#define VMX_DOMAIN(v)   v->arch.arch_vmx.flags
 
 #define ARCH_VMX_IO_WAIT        3       /* Waiting for I/O completion */
 #define ARCH_VMX_INTR_ASSIST    4       /* Need DM's assist to issue intr */
@@ -111,29 +111,9 @@ struct arch_vmx_struct {
 
 #define VMX_DEBUG 1
 #if VMX_DEBUG
-#define DBG_LEVEL_0     (1 << 0)
-#define DBG_LEVEL_1     (1 << 1)
-#define DBG_LEVEL_2     (1 << 2)
-#define DBG_LEVEL_3     (1 << 3)
-#define DBG_LEVEL_IO    (1 << 4)
-#define DBG_LEVEL_VMMU  (1 << 5)
-#define DBG_LEVEL_IOAPIC 	(1 << 6)
 
 extern unsigned int opt_vmx_debug_level;
-#define VMX_DBG_LOG(level, _f, _a...)           \
-    if ((level) & opt_vmx_debug_level)          \
-        printk("[VMX]" _f "\n", ## _a )
-#else
-#define VMX_DBG_LOG(level, _f, _a...)
 #endif
-
-#define  __vmx_bug(regs)                                        \
-    do {                                                        \
-        printk("__vmx_bug at %s:%d\n", __FILE__, __LINE__);     \
-        show_registers(regs);                                   \
-        domain_crash(current->domain);                          \
-    } while (0)
-
 #endif //__ASSEMBLY__
 
 // VPD field offset

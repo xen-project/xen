@@ -388,7 +388,7 @@ void vlsapic_reset(VCPU *vcpu)
     vcpu->arch.arch_vmx.vlapic.vcpu = vcpu;
     hvm_vioapic_add_lapic(&vcpu->arch.arch_vmx.vlapic, vcpu);
 #endif
-    DPRINTK("VLSAPIC inservice base=%lp\n", &VLSAPIC_INSVC(vcpu,0) );
+    DPRINTK("VLSAPIC inservice base=%p\n", &VLSAPIC_INSVC(vcpu,0) );
 }
 
 /*

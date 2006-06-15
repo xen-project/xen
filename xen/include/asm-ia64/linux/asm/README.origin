@@ -18,7 +18,6 @@ div64.h			-> linux/include/asm-ia64/div64.h
 dma.h			-> linux/include/asm-ia64/dma.h
 fpswa.h			-> linux/include/asm-ia64/fpswa.h
 fpu.h			-> linux/include/asm-ia64/fpu.h
-hardirq.h		-> linux/include/asm-ia64/hardirq.h
 hdreg.h			-> linux/include/asm-ia64/hdreg.h
 hw_irq.h		-> linux/include/asm-ia64/hw_irq.h
 intrinsics.h		-> linux/include/asm-ia64/intrinsics.h

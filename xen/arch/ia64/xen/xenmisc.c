@@ -155,6 +155,10 @@ void arch_dump_domain_info(struct domain *d)
 {
 }
 
+void audit_domains_key(unsigned char key)
+{
+}
+
 void panic_domain(struct pt_regs *regs, const char *fmt, ...)
 {
 	va_list args;
