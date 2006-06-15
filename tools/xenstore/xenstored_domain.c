@@ -18,15 +18,10 @@
 */
 
 #include <stdio.h>
-#include <linux/ioctl.h>
-#include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 
 //#define DEBUG
 #include "utils.h"
@@ -37,12 +32,11 @@
 #include "xenstored_test.h"
 
 #include <xenctrl.h>
-#include <xen/sys/evtchn.h>
 
 static int *xc_handle;
 static evtchn_port_t virq_port;
 
-int eventchn_fd = -1; 
+int xce_handle = -1; 
 
 struct domain
 {
@@ -82,19 +76,6 @@ struct domain
 };
 
 static LIST_HEAD(domains);
-
-#ifndef TESTING
-static void evtchn_notify(int port)
-{
-	int rc; 
-
-	struct ioctl_evtchn_notify notify;
-	notify.port = port;
-	rc = ioctl(eventchn_fd, IOCTL_EVTCHN_NOTIFY, &notify);
-}
-#else
-extern void evtchn_notify(int port);
-#endif
 
 /* FIXME: Mark connection as broken (close it?) when this happens. */
 static bool check_indexes(XENSTORE_RING_IDX cons, XENSTORE_RING_IDX prod)
@@ -146,7 +127,7 @@ static int writechn(struct connection *conn, const void *data, unsigned int len)
 	mb();
 	intf->rsp_prod += len;
 
-	evtchn_notify(conn->domain->port);
+	xc_evtchn_notify(xce_handle, conn->domain->port);
 
 	return len;
 }
@@ -176,7 +157,7 @@ static int readchn(struct connection *conn, void *data, unsigned int len)
 	mb();
 	intf->req_cons += len;
 
-	evtchn_notify(conn->domain->port);
+	xc_evtchn_notify(xce_handle, conn->domain->port);
 
 	return len;
 }
@@ -184,13 +165,11 @@ static int readchn(struct connection *conn, void *data, unsigned int len)
 static int destroy_domain(void *_domain)
 {
 	struct domain *domain = _domain;
-	struct ioctl_evtchn_unbind unbind;
 
 	list_del(&domain->list);
 
 	if (domain->port) {
-		unbind.port = domain->port;
-		if (ioctl(eventchn_fd, IOCTL_EVTCHN_UNBIND, &unbind) == -1)
+		if (xc_evtchn_unbind(xce_handle, domain->port) == -1)
 			eprintf("> Unbinding port %i failed!\n", domain->port);
 	}
 
@@ -231,14 +210,14 @@ void handle_event(void)
 {
 	evtchn_port_t port;
 
-	if (read(eventchn_fd, &port, sizeof(port)) != sizeof(port))
+	if ((port = xc_evtchn_pending(xce_handle)) == -1)
 		barf_perror("Failed to read from event fd");
 
 	if (port == virq_port)
 		domain_cleanup();
 
 #ifndef TESTING
-	if (write(eventchn_fd, &port, sizeof(port)) != sizeof(port))
+	if (xc_evtchn_unmask(xce_handle, port) == -1)
 		barf_perror("Failed to write to event fd");
 #endif
 }
@@ -269,7 +248,6 @@ static struct domain *new_domain(void *context, unsigned int domid,
 				 int port)
 {
 	struct domain *domain;
-	struct ioctl_evtchn_bind_interdomain bind;
 	int rc;
 
 
@@ -283,9 +261,7 @@ static struct domain *new_domain(void *context, unsigned int domid,
 	talloc_set_destructor(domain, destroy_domain);
 
 	/* Tell kernel we're interested in this event. */
-	bind.remote_domain = domid;
-	bind.remote_port   = port;
-	rc = ioctl(eventchn_fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
+	rc = xc_evtchn_bind_interdomain(xce_handle, domid, port);
 	if (rc == -1)
 	    return NULL;
 	domain->port = rc;
@@ -490,23 +466,14 @@ static int dom0_init(void)
 
 	talloc_steal(dom0->conn, dom0); 
 
-	evtchn_notify(dom0->port); 
+	xc_evtchn_notify(xce_handle, dom0->port); 
 
 	return 0; 
 }
 
-
-
-#define EVTCHN_DEV_NAME  "/dev/xen/evtchn"
-#define EVTCHN_DEV_MAJOR 10
-#define EVTCHN_DEV_MINOR 201
-
-
 /* Returns the event channel handle. */
 int domain_init(void)
 {
-	struct stat st;
-	struct ioctl_evtchn_bind_virq bind;
 	int rc;
 
 	xc_handle = talloc(talloc_autofree_context(), int);
@@ -519,39 +486,19 @@ int domain_init(void)
 
 	talloc_set_destructor(xc_handle, close_xc_handle);
 
-#ifdef TESTING
-	eventchn_fd = fake_open_eventchn();
-	(void)&st;
-#else
-	/* Make sure any existing device file links to correct device. */
-	if ((lstat(EVTCHN_DEV_NAME, &st) != 0) || !S_ISCHR(st.st_mode) ||
-	    (st.st_rdev != makedev(EVTCHN_DEV_MAJOR, EVTCHN_DEV_MINOR)))
-		(void)unlink(EVTCHN_DEV_NAME);
+	xce_handle = xc_evtchn_open();
 
- reopen:
-	eventchn_fd = open(EVTCHN_DEV_NAME, O_NONBLOCK|O_RDWR);
-	if (eventchn_fd == -1) {
-		if ((errno == ENOENT) &&
-		    ((mkdir("/dev/xen", 0755) == 0) || (errno == EEXIST)) &&
-		    (mknod(EVTCHN_DEV_NAME, S_IFCHR|0600,
-			   makedev(EVTCHN_DEV_MAJOR, EVTCHN_DEV_MINOR)) == 0))
-			goto reopen;
-		return -errno;
-	}
-#endif
-	if (eventchn_fd < 0)
+	if (xce_handle < 0)
 		barf_perror("Failed to open evtchn device");
 
 	if (dom0_init() != 0) 
 		barf_perror("Failed to initialize dom0 state"); 
 
-	bind.virq = VIRQ_DOM_EXC;
-	rc = ioctl(eventchn_fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
-	if (rc == -1)
+	if ((rc = xc_evtchn_bind_virq(xce_handle, VIRQ_DOM_EXC)) == -1)
 		barf_perror("Failed to bind to domain exception virq port");
 	virq_port = rc;
 
-	return eventchn_fd;
+	return xce_handle;
 }
 
 void domain_entry_inc(struct connection *conn)

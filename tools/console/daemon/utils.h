@@ -29,9 +29,6 @@
 
 void daemonize(const char *pidfile);
 bool xen_setup(void);
-#define read_sync(fd, buffer, size) _read_write_sync(fd, buffer, size, true)
-#define write_sync(fd, buffer, size) _read_write_sync(fd, buffer, size, false)
-bool _read_write_sync(int fd, void *data, size_t size, bool do_read);
 
 extern struct xs_handle *xs;
 extern int xc;

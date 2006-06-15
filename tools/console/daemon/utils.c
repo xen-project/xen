@@ -39,32 +39,6 @@
 struct xs_handle *xs;
 int xc;
 
-bool _read_write_sync(int fd, void *data, size_t size, bool do_read)
-{
-	size_t offset = 0;
-	ssize_t len;
-
-	while (offset < size) {
-		if (do_read) {
-			len = read(fd, data + offset, size - offset);
-		} else {
-			len = write(fd, data + offset, size - offset);
-		}
-
-		if (len < 1) {
-			if (len == -1 && (errno == EAGAIN || errno == EINTR)) {
-				continue;
-			} else {
-				return false;
-			}
-		} else {
-			offset += len;
-		}
-	}
-
-	return true;
-}
-
 static void child_exit(int sig)
 {
 	while (waitpid(-1, NULL, WNOHANG) > 0);

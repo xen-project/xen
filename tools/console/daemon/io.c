@@ -24,8 +24,8 @@
 #include "io.h"
 #include <xenctrl.h>
 #include <xs.h>
-#include <xen/linux/evtchn.h>
 #include <xen/io/console.h>
+#include <xenctrl.h>
 
 #include <malloc.h>
 #include <stdlib.h>
@@ -36,7 +36,6 @@
 #include <unistd.h>
 #include <termios.h>
 #include <stdarg.h>
-#include <sys/ioctl.h>
 #include <sys/mman.h>
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
@@ -64,18 +63,11 @@ struct domain
 	char *conspath;
 	int ring_ref;
 	evtchn_port_t local_port;
-	int evtchn_fd;
+	int xce_handle;
 	struct xencons_interface *interface;
 };
 
 static struct domain *dom_head;
-
-static void evtchn_notify(struct domain *dom)
-{
-	struct ioctl_evtchn_notify notify;
-	notify.port = dom->local_port;
-	(void)ioctl(dom->evtchn_fd, IOCTL_EVTCHN_NOTIFY, &notify);
-}
 
 static void buffer_append(struct domain *dom)
 {
@@ -106,7 +98,7 @@ static void buffer_append(struct domain *dom)
 
 	mb();
 	intf->out_cons = cons;
-	evtchn_notify(dom);
+	xc_evtchn_notify(dom->xce_handle, dom->local_port);
 
 	if (buffer->max_capacity &&
 	    buffer->size > buffer->max_capacity) {
@@ -234,7 +226,6 @@ int xs_gather(struct xs_handle *xs, const char *dir, ...)
 static int domain_create_ring(struct domain *dom)
 {
 	int err, remote_port, ring_ref, rc;
-	struct ioctl_evtchn_bind_interdomain bind;
 
 	err = xs_gather(xs, dom->conspath,
 			"ring-ref", "%u", &ring_ref,
@@ -258,24 +249,24 @@ static int domain_create_ring(struct domain *dom)
 	}
 
 	dom->local_port = -1;
-	if (dom->evtchn_fd != -1)
-		close(dom->evtchn_fd);
+	if (dom->xce_handle != -1)
+		xc_evtchn_close(dom->xce_handle);
 
 	/* Opening evtchn independently for each console is a bit
 	 * wasteful, but that's how the code is structured... */
-	dom->evtchn_fd = open("/dev/xen/evtchn", O_RDWR);
-	if (dom->evtchn_fd == -1) {
+	dom->xce_handle = xc_evtchn_open();
+	if (dom->xce_handle == -1) {
 		err = errno;
 		goto out;
 	}
  
-	bind.remote_domain = dom->domid;
-	bind.remote_port   = remote_port;
-	rc = ioctl(dom->evtchn_fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
+	rc = xc_evtchn_bind_interdomain(dom->xce_handle,
+		dom->domid, remote_port);
+
 	if (rc == -1) {
 		err = errno;
-		close(dom->evtchn_fd);
-		dom->evtchn_fd = -1;
+		xc_evtchn_close(dom->xce_handle);
+		dom->xce_handle = -1;
 		goto out;
 	}
 	dom->local_port = rc;
@@ -285,8 +276,8 @@ static int domain_create_ring(struct domain *dom)
 
 		if (dom->tty_fd == -1) {
 			err = errno;
-			close(dom->evtchn_fd);
-			dom->evtchn_fd = -1;
+			xc_evtchn_close(dom->xce_handle);
+			dom->xce_handle = -1;
 			dom->local_port = -1;
 			goto out;
 		}
@@ -344,7 +335,7 @@ static struct domain *create_domain(int domid)
 	dom->ring_ref = -1;
 	dom->local_port = -1;
 	dom->interface = NULL;
-	dom->evtchn_fd = -1;
+	dom->xce_handle = -1;
 
 	if (!watch_domain(dom, true))
 		goto out;
@@ -409,9 +400,9 @@ static void shutdown_domain(struct domain *d)
 	if (d->interface != NULL)
 		munmap(d->interface, getpagesize());
 	d->interface = NULL;
-	if (d->evtchn_fd != -1)
-		close(d->evtchn_fd);
-	d->evtchn_fd = -1;
+	if (d->xce_handle != -1)
+		xc_evtchn_close(d->xce_handle);
+	d->xce_handle = -1;
 	cleanup_domain(d);
 }
 
@@ -483,7 +474,7 @@ static void handle_tty_read(struct domain *dom)
 		}
 		wmb();
 		intf->in_prod = prod;
-		evtchn_notify(dom);
+		xc_evtchn_notify(dom->xce_handle, dom->local_port);
 	} else {
 		close(dom->tty_fd);
 		dom->tty_fd = -1;
@@ -516,14 +507,14 @@ static void handle_tty_write(struct domain *dom)
 
 static void handle_ring_read(struct domain *dom)
 {
-	evtchn_port_t v;
+	evtchn_port_t port;
 
-	if (!read_sync(dom->evtchn_fd, &v, sizeof(v)))
+	if ((port = xc_evtchn_pending(dom->xce_handle)) == -1)
 		return;
 
 	buffer_append(dom);
 
-	(void)write_sync(dom->evtchn_fd, &v, sizeof(v));
+	(void)xc_evtchn_unmask(dom->xce_handle, port);
 }
 
 static void handle_xs(void)
@@ -566,9 +557,10 @@ void handle_io(void)
 		max_fd = MAX(xs_fileno(xs), max_fd);
 
 		for (d = dom_head; d; d = d->next) {
-			if (d->evtchn_fd != -1) {
-				FD_SET(d->evtchn_fd, &readfds);
-				max_fd = MAX(d->evtchn_fd, max_fd);
+			if (d->xce_handle != -1) {
+				int evtchn_fd = xc_evtchn_fd(d->xce_handle);
+				FD_SET(evtchn_fd, &readfds);
+				max_fd = MAX(evtchn_fd, max_fd);
 			}
 
 			if (d->tty_fd != -1) {
@@ -588,8 +580,8 @@ void handle_io(void)
 
 		for (d = dom_head; d; d = n) {
 			n = d->next;
-			if (d->evtchn_fd != -1 &&
-			    FD_ISSET(d->evtchn_fd, &readfds))
+			if (d->xce_handle != -1 &&
+			    FD_ISSET(xc_evtchn_fd(d->xce_handle), &readfds))
 				handle_ring_read(d);
 
 			if (d->tty_fd != -1) {

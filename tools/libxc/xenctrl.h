@@ -604,4 +604,58 @@ int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu);
 
 int xc_acm_op(int xc_handle, int cmd, void *arg, size_t arg_size);
 
+/*
+ * Return a handle to the event channel driver, or -1 on failure, in which case
+ * errno will be set appropriately.
+ */
+int xc_evtchn_open(void);
+
+/*
+ * Close a handle previously allocated with xc_evtchn_open().
+ */
+int xc_evtchn_close(int xce_handle);
+
+/*
+ * Return an fd that can be select()ed on for further calls to
+ * xc_evtchn_pending().
+ */
+int xc_evtchn_fd(int xce_handle);
+
+/*
+ * Notify the given event channel. Returns -1 on failure, in which case
+ * errno will be set appropriately.
+ */
+int xc_evtchn_notify(int xce_handle, evtchn_port_t port);
+
+/*
+ * Returns a new event port bound to the remote port for the given domain ID,
+ * or -1 on failure, in which case errno will be set appropriately.
+ */
+evtchn_port_t xc_evtchn_bind_interdomain(int xce_handle, int domid,
+    evtchn_port_t remote_port);
+
+/*
+ * Unbind the given event channel. Returns -1 on failure, in which case errno
+ * will be set appropriately.
+ */
+int xc_evtchn_unbind(int xce_handle, evtchn_port_t port);
+
+/*
+ * Bind an event channel to the given VIRQ. Returns the event channel bound to
+ * the VIRQ, or -1 on failure, in which case errno will be set appropriately.
+ */
+evtchn_port_t xc_evtchn_bind_virq(int xce_handle, unsigned int virq);
+
+/*
+ * Return the next event channel to become pending, or -1 on failure, in which
+ * case errno will be set appropriately.  
+ */
+evtchn_port_t xc_evtchn_pending(int xce_handle);
+
+/*
+ * Unmask the given event channel. Returns -1 on failure, in which case errno
+ * will be set appropriately.
+ */
+int xc_evtchn_unmask(int xce_handle, evtchn_port_t port);
+
 #endif

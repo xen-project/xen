@@ -37,7 +37,7 @@ static int xs_test_pid;
 static evtchn_port_t port;
 
 /* The event channel maps to a signal, shared page to an mmapped file. */
-void evtchn_notify(int local_port)
+void xc_evtchn_notify(int xce_handle, int local_port)
 {
 	assert(local_port == port);
 	if (kill(xs_test_pid, SIGUSR2) != 0)
@@ -124,7 +124,7 @@ void fake_ack_event(void)
 	signal(SIGUSR2, send_to_fd);
 }
 
-int fake_open_eventchn(void)
+int xc_evtchn_open(void)
 {
 	int fds[2];
 
