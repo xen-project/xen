@@ -2419,13 +2419,9 @@ static int create_grant_pte_mapping(
     ol1e = *(l1_pgentry_t *)va;
     if ( !update_l1e(va, ol1e, _nl1e) )
     {
-#ifndef PTE_UPDATE_WITH_CMPXCHG
-        BUG();
-#else
         put_page_type(page);
         rc = GNTST_general_error;
         goto failed;
-#endif
     } 
 
     put_page_from_l1e(ol1e, d);
@@ -2543,13 +2539,7 @@ static int create_grant_va_mapping(
 
     if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) ||
          !update_l1e(pl1e, ol1e, _nl1e) )
-    {
-#ifndef PTE_UPDATE_WITH_CMPXCHG
-        BUG();
-#else
         return GNTST_general_error;
-#endif
-    }
 
     put_page_from_l1e(ol1e, d);
 
