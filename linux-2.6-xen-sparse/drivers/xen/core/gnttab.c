@@ -348,6 +348,7 @@ void gnttab_cancel_free_callback(struct gnttab_free_callback *callback)
 	}
 	spin_unlock_irqrestore(&gnttab_list_lock, flags);
 }
+EXPORT_SYMBOL_GPL(gnttab_cancel_free_callback);
 
 #ifndef __ia64__
 static int map_pte_fn(pte_t *pte, struct page *pmd_page,
