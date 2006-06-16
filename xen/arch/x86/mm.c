@@ -1167,6 +1167,9 @@ static inline int update_l1e(l1_pgentry_t *pl1e,
                              l1_pgentry_t  ol1e, 
                              l1_pgentry_t  nl1e)
 {
+#ifndef PTE_UPDATE_WITH_CMPXCHG
+    return !__copy_to_user(pl1e, &nl1e, sizeof(nl1e));
+#else
     intpte_t o = l1e_get_intpte(ol1e);
     intpte_t n = l1e_get_intpte(nl1e);
 
@@ -1181,6 +1184,7 @@ static inline int update_l1e(l1_pgentry_t *pl1e,
         return 0;
     }
     return 1;
+#endif
 }
 
 
@@ -1228,6 +1232,9 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
     return 1;
 }
 
+#ifndef PTE_UPDATE_WITH_CMPXCHG
+#define UPDATE_ENTRY(_t,_p,_o,_n) ({ (*(_p) = (_n)); 1; })
+#else
 #define UPDATE_ENTRY(_t,_p,_o,_n) ({                                    \
     intpte_t __o = cmpxchg((intpte_t *)(_p),                            \
                            _t ## e_get_intpte(_o),                      \
@@ -1239,6 +1246,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
                 (_t ## e_get_intpte(_n)),                               \
                 (__o));                                                 \
     (__o == _t ## e_get_intpte(_o)); })
+#endif
 
 /* Update the L2 entry at pl2e to new value nl2e. pl2e is within frame pfn. */
 static int mod_l2_entry(l2_pgentry_t *pl2e, 
@@ -2408,12 +2416,16 @@ static int create_grant_pte_mapping(
         goto failed;
     }
 
-    if ( __copy_from_user(&ol1e, (l1_pgentry_t *)va, sizeof(ol1e)) ||
-         !update_l1e(va, ol1e, _nl1e) )
+    ol1e = *(l1_pgentry_t *)va;
+    if ( !update_l1e(va, ol1e, _nl1e) )
     {
+#ifndef PTE_UPDATE_WITH_CMPXCHG
+        BUG();
+#else
         put_page_type(page);
         rc = GNTST_general_error;
         goto failed;
+#endif
     } 
 
     put_page_from_l1e(ol1e, d);
@@ -2531,7 +2543,13 @@ static int create_grant_va_mapping(
 
     if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) ||
          !update_l1e(pl1e, ol1e, _nl1e) )
+    {
+#ifndef PTE_UPDATE_WITH_CMPXCHG
+        BUG();
+#else
         return GNTST_general_error;
+#endif
+    }
 
     put_page_from_l1e(ol1e, d);
 
