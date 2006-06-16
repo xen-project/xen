@@ -389,4 +389,7 @@ int __sync_lazy_execstate(void);
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
 long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
 
+int steal_page(
+    struct domain *d, struct page_info *page, unsigned int memflags);
+
 #endif /* __ASM_X86_MM_H__ */

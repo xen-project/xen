@@ -60,13 +60,23 @@ void free_xenheap_pages(void *v, unsigned int order);
 /* Domain suballocator. These functions are *not* interrupt-safe.*/
 void init_domheap_pages(paddr_t ps, paddr_t pe);
 struct page_info *alloc_domheap_pages(
-    struct domain *d, unsigned int order, unsigned int flags);
+    struct domain *d, unsigned int order, unsigned int memflags);
 void free_domheap_pages(struct page_info *pg, unsigned int order);
 unsigned long avail_domheap_pages(void);
 #define alloc_domheap_page(d) (alloc_domheap_pages(d,0,0))
 #define free_domheap_page(p)  (free_domheap_pages(p,0))
 
-#define ALLOC_DOM_DMA 1
+int assign_pages(
+    struct domain *d,
+    struct page_info *pg,
+    unsigned int order,
+    unsigned int memflags);
+
+/* memflags: */
+#define _MEMF_dma         0
+#define  MEMF_dma         (1U<<_MEMF_dma)
+#define _MEMF_no_refcount 1
+#define  MEMF_no_refcount (1U<<_MEMF_no_refcount)
 
 #ifdef CONFIG_PAGEALLOC_MAX_ORDER
 #define MAX_ORDER CONFIG_PAGEALLOC_MAX_ORDER

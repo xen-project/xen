@@ -496,4 +496,11 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
 /* Arch-specific portion of memory_op hypercall. */
 #define arch_memory_op(op, arg) (-ENOSYS)
 
+#ifndef CONFIG_XEN_IA64_DOM0_VP
+#define steal_page(d, p, f)  0
+#else
+int steal_page(
+    struct domain *d, struct page_info *page, unsigned int memflags);
+#endif
+
 #endif /* __ASM_IA64_MM_H__ */

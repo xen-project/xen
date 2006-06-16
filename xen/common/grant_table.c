@@ -634,7 +634,7 @@ gnttab_transfer(
             goto copyback;
         }
 
-        if ( steal_page_for_grant_transfer(d, page) < 0 )
+        if ( steal_page(d, page, 0) < 0 )
         {
             gop.status = GNTST_bad_page;
             goto copyback;

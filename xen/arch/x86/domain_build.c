@@ -374,7 +374,7 @@ int construct_dom0(struct domain *d,
      * Allocate from DMA pool: on i386 this ensures that our low-memory 1:1
      * mapping covers the allocation.
      */
-    if ( (page = alloc_domheap_pages(d, order, ALLOC_DOM_DMA)) == NULL )
+    if ( (page = alloc_domheap_pages(d, order, MEMF_dma)) == NULL )
         panic("Not enough RAM for domain 0 allocation.\n");
     alloc_spfn = page_to_mfn(page);
     alloc_epfn = alloc_spfn + d->tot_pages;

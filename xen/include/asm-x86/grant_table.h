@@ -18,9 +18,6 @@ int create_grant_host_mapping(
 int destroy_grant_host_mapping(
     unsigned long addr, unsigned long frame, unsigned int flags);
 
-int steal_page_for_grant_transfer(
-    struct domain *d, struct page_info *page);
-
 #define gnttab_create_shared_page(d, t, i)                               \
     do {                                                                 \
         share_xen_page_with_guest(                                       \
