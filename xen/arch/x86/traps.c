@@ -511,9 +511,9 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     v->vcpu_info->arch.cr2           = addr;
 
     /* Re-set error_code.user flag appropriately for the guest. */
-    error_code &= ~4;
+    error_code &= ~PGERR_user_mode;
     if ( !guest_kernel_mode(v, guest_cpu_user_regs()) )
-        error_code |= 4;
+        error_code |= PGERR_user_mode;
 
     ti = &v->arch.guest_context.trap_ctxt[TRAP_page_fault];
     tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
@@ -578,10 +578,125 @@ static int handle_gdt_ldt_mapping_fault(
     (((va) >= HYPERVISOR_VIRT_START))
 #endif
 
+static int __spurious_page_fault(
+    unsigned long addr, struct cpu_user_regs *regs)
+{
+    unsigned long mfn = read_cr3() >> PAGE_SHIFT;
+#if CONFIG_PAGING_LEVELS >= 4
+    l4_pgentry_t l4e, *l4t;
+#endif
+#if CONFIG_PAGING_LEVELS >= 3
+    l3_pgentry_t l3e, *l3t;
+#endif
+    l2_pgentry_t l2e, *l2t;
+    l1_pgentry_t l1e, *l1t;
+    unsigned int required_flags, disallowed_flags;
+
+    required_flags  = _PAGE_PRESENT;
+    if ( regs->error_code & PGERR_write_access )
+        required_flags |= _PAGE_RW;
+    if ( regs->error_code & PGERR_user_mode )
+        required_flags |= _PAGE_USER;
+
+    disallowed_flags = 0;
+    if ( regs->error_code & PGERR_instr_fetch )
+        disallowed_flags |= _PAGE_NX;
+
+#if CONFIG_PAGING_LEVELS >= 4
+    l4t = map_domain_page(mfn);
+    l4e = l4t[l4_table_offset(addr)];
+    mfn = l4e_get_pfn(l4e);
+    unmap_domain_page(l4t);
+    if ( !(l4e_get_flags(l4e) & required_flags) ||
+         (l4e_get_flags(l4e) & disallowed_flags) )
+        return 0;
+#endif
+
+#if CONFIG_PAGING_LEVELS >= 3
+    l3t = map_domain_page(mfn);
+    l3e = l3t[l3_table_offset(addr)];
+    mfn = l3e_get_pfn(l3e);
+    unmap_domain_page(l3t);
+#ifdef CONFIG_X86_PAE
+    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+        return 0;
+#else
+    if ( !(l3e_get_flags(l3e) & required_flags) ||
+         (l3e_get_flags(l3e) & disallowed_flags) )
+        return 0;
+#endif
+#endif
+
+    l2t = map_domain_page(mfn);
+    l2e = l2t[l2_table_offset(addr)];
+    mfn = l2e_get_pfn(l2e);
+    unmap_domain_page(l2t);
+    if ( !(l2e_get_flags(l2e) & required_flags) ||
+         (l2e_get_flags(l2e) & disallowed_flags) )
+        return 0;
+    if ( l2e_get_flags(l2e) & _PAGE_PSE )
+        return 1;
+
+    l1t = map_domain_page(mfn);
+    l1e = l1t[l1_table_offset(addr)];
+    mfn = l1e_get_pfn(l1e);
+    unmap_domain_page(l1t);
+    if ( !(l1e_get_flags(l1e) & required_flags) ||
+         (l1e_get_flags(l1e) & disallowed_flags) )
+        return 0;
+    return 1;
+}
+
+static int spurious_page_fault(
+    unsigned long addr, struct cpu_user_regs *regs)
+{
+    struct vcpu   *v = current;
+    struct domain *d = v->domain;
+    int            is_spurious;
+
+    /* Reserved bit violations are never spurious faults. */
+    if ( regs->error_code & PGERR_reserved_bit )
+        return 0;
+
+    LOCK_BIGLOCK(d);
+
+    is_spurious = __spurious_page_fault(addr, regs);
+    if ( is_spurious )
+        goto out;
+
+    /*
+     * The only possible reason for a spurious page fault not to be picked
+     * up already is that a page directory was unhooked by writable page table
+     * logic and then reattached before the faulting VCPU could detect it.
+     */
+    if ( is_idle_domain(d) ||               /* no ptwr in idle domain       */
+         IN_HYPERVISOR_RANGE(addr) ||       /* no ptwr on hypervisor addrs  */
+         shadow_mode_enabled(d) ||          /* no ptwr logic in shadow mode */
+         (regs->error_code & PGERR_page_present) ) /* not-present fault?    */
+        goto out;
+
+    /*
+     * The page directory could have been detached again while we weren't
+     * holding the per-domain lock. Detect that and fix up if it's the case.
+     */
+    if ( unlikely(d->arch.ptwr[PTWR_PT_ACTIVE].l1va) &&
+         unlikely(l2_linear_offset(addr) ==
+                  d->arch.ptwr[PTWR_PT_ACTIVE].l2_idx) )
+    {
+        ptwr_flush(d, PTWR_PT_ACTIVE);
+        is_spurious = 1;
+    }
+
+ out:
+    UNLOCK_BIGLOCK(d);
+    return is_spurious;
+}
+
 static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
 {
     struct vcpu   *v = current;
     struct domain *d = v->domain;
+    int            rc;
 
     if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
     {
@@ -590,12 +705,20 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
         if ( (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
             return handle_gdt_ldt_mapping_fault(
                 addr - GDT_LDT_VIRT_START, regs);
+        /*
+         * Do not propagate spurious faults in the hypervisor area to the
+         * guest. It cannot fix them up.
+         */
+        LOCK_BIGLOCK(d);
+        rc = __spurious_page_fault(addr, regs);
+        UNLOCK_BIGLOCK(d);
+        return rc;
     }
-    else if ( unlikely(shadow_mode_enabled(d)) )
-    {
+
+    if ( unlikely(shadow_mode_enabled(d)) )
         return shadow_fault(addr, regs);
-    }
-    else if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
+
+    if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
     {
         LOCK_BIGLOCK(d);
         if ( unlikely(d->arch.ptwr[PTWR_PT_ACTIVE].l1va) &&
@@ -609,7 +732,10 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
 
         if ( guest_kernel_mode(v, regs) &&
              /* Protection violation on write? No reserved-bit violation? */
-             ((regs->error_code & 0xb) == 0x3) &&
+             ((regs->error_code & (PGERR_page_present |
+                                   PGERR_write_access |
+                                   PGERR_reserved_bit)) ==
+              (PGERR_page_present | PGERR_write_access)) &&
              ptwr_do_page_fault(d, addr, regs) )
         {
             UNLOCK_BIGLOCK(d);
@@ -619,46 +745,6 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     }
 
     return 0;
-}
-
-static int spurious_page_fault(unsigned long addr, struct cpu_user_regs *regs)
-{
-    struct vcpu   *v = current;
-    struct domain *d = v->domain;
-    int            rc;
-
-    /*
-     * The only possible reason for a spurious page fault not to be picked
-     * up already is that a page directory was unhooked by writable page table
-     * logic and then reattached before the faulting VCPU could detect it.
-     */
-    if ( is_idle_domain(d) ||               /* no ptwr in idle domain       */
-         IN_HYPERVISOR_RANGE(addr) ||       /* no ptwr on hypervisor addrs  */
-         shadow_mode_enabled(d) ||          /* no ptwr logic in shadow mode */
-         ((regs->error_code & 0x1d) != 0) ) /* simple not-present fault?    */
-        return 0;
-
-    LOCK_BIGLOCK(d);
-
-    /*
-     * The page directory could have been detached again while we weren't
-     * holding the per-domain lock. Detect that and fix up if it's the case.
-     */
-    if ( unlikely(d->arch.ptwr[PTWR_PT_ACTIVE].l1va) &&
-         unlikely(l2_linear_offset(addr) ==
-                  d->arch.ptwr[PTWR_PT_ACTIVE].l2_idx) )
-    {
-        ptwr_flush(d, PTWR_PT_ACTIVE);
-        rc = 1;
-    }
-    else
-    {
-        /* Okay, walk the page tables. Only check for not-present faults.*/
-        rc = __spurious_page_fault(addr);
-    }
-
-    UNLOCK_BIGLOCK(d);
-    return rc;
 }
 
 /*
@@ -784,8 +870,8 @@ static inline int admin_io_okay(
     (admin_io_okay(_p, 4, _d, _r) ? outl(_v, _p) : ((void)0))
 
 /* Propagate a fault back to the guest kernel. */
-#define USER_READ_FAULT  4 /* user mode, read fault */
-#define USER_WRITE_FAULT 6 /* user mode, write fault */
+#define USER_READ_FAULT  (PGERR_user_mode)
+#define USER_WRITE_FAULT (PGERR_user_mode | PGERR_write_access)
 #define PAGE_FAULT(_faultaddr, _errcode)        \
 ({  propagate_page_fault(_faultaddr, _errcode); \
     return EXCRET_fault_fixed;                  \

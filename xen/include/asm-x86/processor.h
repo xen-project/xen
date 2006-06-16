@@ -129,6 +129,13 @@
 #define _TF_kernel_mode        0
 #define TF_kernel_mode         (1<<_TF_kernel_mode)
 
+/* #PF error code values. */
+#define PGERR_page_present   (1U<<0)
+#define PGERR_write_access   (1U<<1)
+#define PGERR_user_mode      (1U<<2)
+#define PGERR_reserved_bit   (1U<<3)
+#define PGERR_instr_fetch    (1U<<4)
+
 #ifndef __ASSEMBLY__
 
 struct domain;
@@ -524,7 +531,6 @@ extern always_inline void prefetchw(const void *x)
 void show_stack(struct cpu_user_regs *regs);
 void show_registers(struct cpu_user_regs *regs);
 void show_page_walk(unsigned long addr);
-int __spurious_page_fault(unsigned long addr);
 asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs);
 
 extern void mtrr_ap_init(void);

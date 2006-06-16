@@ -113,40 +113,6 @@ void show_page_walk(unsigned long addr)
     unmap_domain_page(l1t);
 }
 
-int __spurious_page_fault(unsigned long addr)
-{
-    unsigned long mfn = read_cr3() >> PAGE_SHIFT;
-#ifdef CONFIG_X86_PAE
-    l3_pgentry_t l3e, *l3t;
-#endif
-    l2_pgentry_t l2e, *l2t;
-    l1_pgentry_t l1e, *l1t;
-
-#ifdef CONFIG_X86_PAE
-    l3t = map_domain_page(mfn);
-    l3e = l3t[l3_table_offset(addr)];
-    mfn = l3e_get_pfn(l3e);
-    unmap_domain_page(l3t);
-    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
-        return 0;
-#endif
-
-    l2t = map_domain_page(mfn);
-    l2e = l2t[l2_table_offset(addr)];
-    mfn = l2e_get_pfn(l2e);
-    unmap_domain_page(l2t);
-    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
-        return 0;
-    if ( l2e_get_flags(l2e) & _PAGE_PSE )
-        return 1;
-
-    l1t = map_domain_page(mfn);
-    l1e = l1t[l1_table_offset(addr)];
-    mfn = l1e_get_pfn(l1e);
-    unmap_domain_page(l1t);
-    return !!(l1e_get_flags(l1e) & _PAGE_PRESENT);
-}
-
 #define DOUBLEFAULT_STACK_SIZE 1024
 static struct tss_struct doublefault_tss;
 static unsigned char doublefault_stack[DOUBLEFAULT_STACK_SIZE];
