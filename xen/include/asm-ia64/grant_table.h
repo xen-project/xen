@@ -12,16 +12,12 @@
 #define create_grant_host_mapping(a, f, fl)  0
 #define destroy_grant_host_mapping(a, f, fl) 0
 
-// for grant transfer
-#define steal_page_for_grant_transfer(d, p)  0
-
 #else
 // for grant map/unmap
 int create_grant_host_mapping(unsigned long gpaddr, unsigned long mfn, unsigned int flags);
 int destroy_grant_host_mapping(unsigned long gpaddr, unsigned long mfn, unsigned int flags);
 
 // for grant transfer
-int steal_page_for_grant_transfer(struct domain *d, struct page_info *page);
 void guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long mfn);
 
 #endif

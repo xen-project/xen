@@ -43,7 +43,7 @@ int shadow_direct_map_init(struct domain *d)
     struct page_info *page;
     l3_pgentry_t *root;
 
-    if ( !(page = alloc_domheap_pages(NULL, 0, ALLOC_DOM_DMA)) )
+    if ( !(page = alloc_domheap_pages(NULL, 0, MEMF_dma)) )
         return 0;
 
     root = map_domain_page(page_to_mfn(page));
@@ -395,7 +395,7 @@ static void alloc_monitor_pagetable(struct vcpu *v)
 
     ASSERT(!pagetable_get_paddr(v->arch.monitor_table)); /* we should only get called once */
 
-    m3mfn_info = alloc_domheap_pages(NULL, 0, ALLOC_DOM_DMA);
+    m3mfn_info = alloc_domheap_pages(NULL, 0, MEMF_dma);
     ASSERT( m3mfn_info );
 
     m3mfn = page_to_mfn(m3mfn_info);

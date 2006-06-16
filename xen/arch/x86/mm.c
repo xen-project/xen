@@ -2598,8 +2598,8 @@ int destroy_grant_host_mapping(
     return destroy_grant_va_mapping(addr, frame);
 }
 
-int steal_page_for_grant_transfer(
-    struct domain *d, struct page_info *page)
+int steal_page(
+    struct domain *d, struct page_info *page, unsigned int memflags)
 {
     u32 _d, _nd, x, y;
 
@@ -2636,7 +2636,8 @@ int steal_page_for_grant_transfer(
      * Unlink from 'd'. At least one reference remains (now anonymous), so 
      * noone else is spinning to try to delete this page from 'd'.
      */
-    d->tot_pages--;
+    if ( !(memflags & MEMF_no_refcount) )
+        d->tot_pages--;
     list_del(&page->list);
 
     spin_unlock(&d->page_alloc_lock);

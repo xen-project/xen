@@ -34,7 +34,7 @@ increase_reservation(
     XEN_GUEST_HANDLE(xen_pfn_t) extent_list,
     unsigned int   nr_extents,
     unsigned int   extent_order,
-    unsigned int   flags,
+    unsigned int   memflags,
     int           *preempted)
 {
     struct page_info *page;
@@ -58,11 +58,11 @@ increase_reservation(
         }
 
         if ( unlikely((page = alloc_domheap_pages(
-            d, extent_order, flags)) == NULL) )
+            d, extent_order, memflags)) == NULL) )
         {
             DPRINTK("Could not allocate order=%d extent: "
-                    "id=%d flags=%x (%ld of %d)\n",
-                    extent_order, d->domain_id, flags, i, nr_extents);
+                    "id=%d memflags=%x (%ld of %d)\n",
+                    extent_order, d->domain_id, memflags, i, nr_extents);
             return i;
         }
 
@@ -84,7 +84,7 @@ populate_physmap(
     XEN_GUEST_HANDLE(xen_pfn_t) extent_list,
     unsigned int  nr_extents,
     unsigned int  extent_order,
-    unsigned int  flags,
+    unsigned int  memflags,
     int          *preempted)
 {
     struct page_info *page;
@@ -111,11 +111,11 @@ populate_physmap(
             goto out;
 
         if ( unlikely((page = alloc_domheap_pages(
-            d, extent_order, flags)) == NULL) )
+            d, extent_order, memflags)) == NULL) )
         {
             DPRINTK("Could not allocate order=%d extent: "
-                    "id=%d flags=%x (%ld of %d)\n",
-                    extent_order, d->domain_id, flags, i, nr_extents);
+                    "id=%d memflags=%x (%ld of %d)\n",
+                    extent_order, d->domain_id, memflags, i, nr_extents);
             goto out;
         }
 
@@ -183,7 +183,6 @@ decrease_reservation(
     XEN_GUEST_HANDLE(xen_pfn_t) extent_list,
     unsigned int   nr_extents,
     unsigned int   extent_order,
-    unsigned int   flags,
     int           *preempted)
 {
     unsigned long i, j;
@@ -276,10 +275,234 @@ translate_gpfn_list(
     return 0;
 }
 
+static long
+memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
+{
+    struct xen_memory_exchange exch;
+    LIST_HEAD(in_chunk_list);
+    LIST_HEAD(out_chunk_list);
+    unsigned long in_chunk_order, out_chunk_order;
+    unsigned long gpfn, gmfn, mfn;
+    unsigned long i, j, k;
+    unsigned int  memflags = 0;
+    long          rc = 0;
+    struct domain *d;
+    struct page_info *page;
+
+    if ( copy_from_guest(&exch, arg, 1) )
+        return -EFAULT;
+
+    /* Various sanity checks. */
+    if ( (exch.nr_exchanged > exch.in.nr_extents) ||
+         /* Input and output domain identifiers match? */
+         (exch.in.domid != exch.out.domid) ||
+         /* Sizes of input and output lists do not overflow a long? */
+         ((~0UL >> exch.in.extent_order) < exch.in.nr_extents) ||
+         ((~0UL >> exch.out.extent_order) < exch.out.nr_extents) ||
+         /* Sizes of input and output lists match? */
+         ((exch.in.nr_extents << exch.in.extent_order) !=
+          (exch.out.nr_extents << exch.out.extent_order)) )
+    {
+        rc = -EINVAL;
+        goto fail_early;
+    }
+
+    /* Only privileged guests can allocate multi-page contiguous extents. */
+    if ( ((exch.in.extent_order != 0) || (exch.out.extent_order != 0)) &&
+         !multipage_allocation_permitted(current->domain) )
+    {
+        rc = -EPERM;
+        goto fail_early;
+    }
+
+    if ( (exch.out.address_bits != 0) &&
+         (exch.out.address_bits <
+          (get_order_from_pages(max_page) + PAGE_SHIFT)) )
+    {
+        if ( exch.out.address_bits < 31 )
+        {
+            rc = -ENOMEM;
+            goto fail_early;
+        }
+        memflags = MEMF_dma;
+    }
+
+    guest_handle_add_offset(exch.in.extent_start, exch.nr_exchanged);
+    exch.in.nr_extents -= exch.nr_exchanged;
+
+    if ( exch.in.extent_order <= exch.out.extent_order )
+    {
+        in_chunk_order  = exch.out.extent_order - exch.in.extent_order;
+        out_chunk_order = 0;
+        guest_handle_add_offset(
+            exch.out.extent_start, exch.nr_exchanged >> in_chunk_order);
+        exch.out.nr_extents -= exch.nr_exchanged >> in_chunk_order;
+    }
+    else
+    {
+        in_chunk_order  = 0;
+        out_chunk_order = exch.in.extent_order - exch.out.extent_order;
+        guest_handle_add_offset(
+            exch.out.extent_start, exch.nr_exchanged << out_chunk_order);
+        exch.out.nr_extents -= exch.nr_exchanged << out_chunk_order;
+    }
+
+    /*
+     * Only support exchange on calling domain right now. Otherwise there are
+     * tricky corner cases to consider (e.g., DOMF_dying domain).
+     */
+    if ( unlikely(exch.in.domid != DOMID_SELF) )
+    {
+        rc = IS_PRIV(current->domain) ? -EINVAL : -EPERM;
+        goto fail_early;
+    }
+    d = current->domain;
+
+    for ( i = 0; i < (exch.in.nr_extents >> in_chunk_order); i++ )
+    {
+        if ( hypercall_preempt_check() )
+        {
+            exch.nr_exchanged += i << in_chunk_order;
+            if ( copy_field_to_guest(arg, &exch, nr_exchanged) )
+                return -EFAULT;
+            return hypercall_create_continuation(
+                __HYPERVISOR_memory_op, "lh", XENMEM_exchange, arg);
+        }
+
+        /* Steal a chunk's worth of input pages from the domain. */
+        for ( j = 0; j < (1UL << in_chunk_order); j++ )
+        {
+            if ( unlikely(__copy_from_guest_offset(
+                &gmfn, exch.in.extent_start, (i<<in_chunk_order)+j, 1)) )
+            {
+                rc = -EFAULT;
+                goto fail;
+            }
+
+            for ( k = 0; k < (1UL << exch.in.extent_order); k++ )
+            {
+                mfn = gmfn_to_mfn(d, gmfn + k);
+                if ( unlikely(!mfn_valid(mfn)) )
+                {
+                    rc = -EINVAL;
+                    goto fail;
+                }
+
+                page = mfn_to_page(mfn);
+
+                if ( unlikely(steal_page(d, page, MEMF_no_refcount)) )
+                {
+                    rc = -EINVAL;
+                    goto fail;
+                }
+
+                list_add(&page->list, &in_chunk_list);
+            }
+        }
+
+        /* Allocate a chunk's worth of anonymous output pages. */
+        for ( j = 0; j < (1UL << out_chunk_order); j++ )
+        {
+            page = alloc_domheap_pages(
+                NULL, exch.out.extent_order, memflags);
+            if ( unlikely(page == NULL) )
+            {
+                rc = -ENOMEM;
+                goto fail;
+            }
+
+            list_add(&page->list, &out_chunk_list);
+        }
+
+        /*
+         * Success! Beyond this point we cannot fail for this chunk.
+         */
+
+        /* Destroy final reference to each input page. */
+        while ( !list_empty(&in_chunk_list) )
+        {
+            page = list_entry(in_chunk_list.next, struct page_info, list);
+            list_del(&page->list);
+            if ( !test_and_clear_bit(_PGC_allocated, &page->count_info) )
+                BUG();
+            mfn = page_to_mfn(page);
+            guest_physmap_remove_page(d, mfn_to_gmfn(d, mfn), mfn);
+            put_page(page);
+        }
+
+        /* Assign each output page to the domain. */
+        j = 0;
+        while ( !list_empty(&out_chunk_list) )
+        {
+            page = list_entry(out_chunk_list.next, struct page_info, list);
+            list_del(&page->list);
+            if ( assign_pages(d, page, exch.out.extent_order,
+                              MEMF_no_refcount) )
+                BUG();
+
+            /* Note that we ignore errors accessing the output extent list. */
+            (void)__copy_from_guest_offset(
+                &gpfn, exch.out.extent_start, (i<<out_chunk_order)+j, 1);
+
+            mfn = page_to_mfn(page);
+            if ( unlikely(shadow_mode_translate(d)) )
+            {
+                for ( k = 0; k < (1UL << exch.out.extent_order); k++ )
+                    guest_physmap_add_page(d, gpfn + k, mfn + k);
+            }
+            else
+            {
+                for ( k = 0; k < (1UL << exch.out.extent_order); k++ )
+                    set_gpfn_from_mfn(mfn + k, gpfn + k);
+                (void)__copy_to_guest_offset(
+                    exch.out.extent_start, (i<<out_chunk_order)+j, &mfn, 1);
+            }
+
+            j++;
+        }
+        BUG_ON(j != (1UL << out_chunk_order));
+    }
+
+    exch.nr_exchanged += exch.in.nr_extents;
+    if ( copy_field_to_guest(arg, &exch, nr_exchanged) )
+        rc = -EFAULT;
+    return rc;
+
+    /*
+     * Failed a chunk! Free any partial chunk work. Tell caller how many
+     * chunks succeeded.
+     */
+ fail:
+    /* Reassign any input pages we managed to steal. */
+    while ( !list_empty(&in_chunk_list) )
+    {
+        page = list_entry(in_chunk_list.next, struct page_info, list);
+        list_del(&page->list);
+        if ( assign_pages(d, page, 0, MEMF_no_refcount) )
+            BUG();
+    }
+
+    /* Free any output pages we managed to allocate. */
+    while ( !list_empty(&out_chunk_list) )
+    {
+        page = list_entry(out_chunk_list.next, struct page_info, list);
+        list_del(&page->list);
+        free_domheap_pages(page, exch.out.extent_order);
+    }
+
+    exch.nr_exchanged += i << in_chunk_order;
+
+ fail_early:
+    if ( copy_field_to_guest(arg, &exch, nr_exchanged) )
+        rc = -EFAULT;
+    return rc;
+}
+
 long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
 {
     struct domain *d;
-    int rc, op, flags = 0, preempted = 0;
+    int rc, op, preempted = 0;
+    unsigned int memflags = 0;
     unsigned long start_extent, progress;
     struct xen_memory_reservation reservation;
     domid_t domid;
@@ -291,16 +514,17 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
     case XENMEM_increase_reservation:
     case XENMEM_decrease_reservation:
     case XENMEM_populate_physmap:
+        start_extent = cmd >> START_EXTENT_SHIFT;
+
         if ( copy_from_guest(&reservation, arg, 1) )
-            return -EFAULT;
+            return start_extent;
 
         /* Is size too large for us to encode a continuation? */
         if ( reservation.nr_extents > (ULONG_MAX >> START_EXTENT_SHIFT) )
-            return -EINVAL;
+            return start_extent;
 
-        start_extent = cmd >> START_EXTENT_SHIFT;
         if ( unlikely(start_extent > reservation.nr_extents) )
-            return -EINVAL;
+            return start_extent;
 
         if ( !guest_handle_is_null(reservation.extent_start) )
             guest_handle_add_offset(reservation.extent_start, start_extent);
@@ -311,16 +535,15 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
               (get_order_from_pages(max_page) + PAGE_SHIFT)) )
         {
             if ( reservation.address_bits < 31 )
-                return -ENOMEM;
-            flags = ALLOC_DOM_DMA;
+                return start_extent;
+            memflags = MEMF_dma;
         }
 
         if ( likely(reservation.domid == DOMID_SELF) )
             d = current->domain;
-        else if ( !IS_PRIV(current->domain) )
-            return -EPERM;
-        else if ( (d = find_domain_by_id(reservation.domid)) == NULL )
-            return -ESRCH;
+        else if ( !IS_PRIV(current->domain) ||
+                  ((d = find_domain_by_id(reservation.domid)) == NULL) )
+            return start_extent;
 
         switch ( op )
         {
@@ -330,7 +553,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
                 reservation.extent_start,
                 reservation.nr_extents,
                 reservation.extent_order,
-                flags,
+                memflags,
                 &preempted);
             break;
         case XENMEM_decrease_reservation:
@@ -339,7 +562,6 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
                 reservation.extent_start,
                 reservation.nr_extents,
                 reservation.extent_order,
-                flags,
                 &preempted);
             break;
         case XENMEM_populate_physmap:
@@ -349,7 +571,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
                 reservation.extent_start,
                 reservation.nr_extents,
                 reservation.extent_order,
-                flags,
+                memflags,
                 &preempted);
             break;
         }
@@ -364,6 +586,10 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
                 __HYPERVISOR_memory_op, "lh",
                 op | (rc << START_EXTENT_SHIFT), arg);
 
+        break;
+
+    case XENMEM_exchange:
+        rc = memory_exchange(guest_handle_cast(arg, xen_memory_exchange_t));
         break;
 
     case XENMEM_maximum_ram_page:

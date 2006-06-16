@@ -292,10 +292,10 @@ alloc_shadow_page(struct domain *d,
 #elif CONFIG_PAGING_LEVELS >= 3
         if ( d->arch.ops->guest_paging_levels == PAGING_L2 &&
              psh_type == PGT_l4_shadow )      /* allocated for PAE PDP page */
-            page = alloc_domheap_pages(NULL, 0, ALLOC_DOM_DMA);
+            page = alloc_domheap_pages(NULL, 0, MEMF_dma);
         else if ( d->arch.ops->guest_paging_levels == PAGING_L3 &&
                   (psh_type == PGT_l3_shadow || psh_type == PGT_l4_shadow) )
-            page = alloc_domheap_pages(NULL, 0, ALLOC_DOM_DMA); /* allocated for PAE PDP page */
+            page = alloc_domheap_pages(NULL, 0, MEMF_dma); /* allocated for PAE PDP page */
         else
             page = alloc_domheap_page(NULL);
 #endif

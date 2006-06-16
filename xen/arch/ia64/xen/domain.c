@@ -1308,10 +1308,10 @@ destroy_grant_host_mapping(unsigned long gpaddr,
 //XXX heavily depends on the struct page layout.
 //XXX SMP
 int
-steal_page_for_grant_transfer(struct domain *d, struct page_info *page)
+steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
 {
 #if 0 /* if big endian */
-# error "implement big endian version of steal_page_for_grant_transfer()"
+# error "implement big endian version of steal_page()"
 #endif
     u32 _d, _nd;
     u64 x, nx, y;
@@ -1371,7 +1371,8 @@ steal_page_for_grant_transfer(struct domain *d, struct page_info *page)
      * Unlink from 'd'. At least one reference remains (now anonymous), so
      * noone else is spinning to try to delete this page from 'd'.
      */
-    d->tot_pages--;
+    if ( !(memflags & MEMF_no_refcount) )
+        d->tot_pages--;
     list_del(&page->list);
 
     spin_unlock(&d->page_alloc_lock);

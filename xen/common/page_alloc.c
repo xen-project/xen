@@ -531,16 +531,66 @@ void init_domheap_pages(paddr_t ps, paddr_t pe)
 }
 
 
+int assign_pages(
+    struct domain *d,
+    struct page_info *pg,
+    unsigned int order,
+    unsigned int memflags)
+{
+    unsigned long i;
+
+    spin_lock(&d->page_alloc_lock);
+
+    if ( unlikely(test_bit(_DOMF_dying, &d->domain_flags)) )
+    {
+        DPRINTK("Cannot assign page to domain%d -- dying.\n", d->domain_id);
+        goto fail;
+    }
+
+    if ( !(memflags & MEMF_no_refcount) )
+    {
+        if ( unlikely((d->tot_pages + (1 << order)) > d->max_pages) )
+        {
+            DPRINTK("Over-allocation for domain %u: %u > %u\n",
+                    d->domain_id, d->tot_pages + (1 << order), d->max_pages);
+            goto fail;
+        }
+
+        if ( unlikely(d->tot_pages == 0) )
+            get_knownalive_domain(d);
+
+        d->tot_pages += 1 << order;
+    }
+
+    for ( i = 0; i < (1 << order); i++ )
+    {
+        ASSERT(page_get_owner(&pg[i]) == NULL);
+        ASSERT((pg[i].count_info & ~(PGC_allocated | 1)) == 0);
+        page_set_owner(&pg[i], d);
+        wmb(); /* Domain pointer must be visible before updating refcnt. */
+        pg[i].count_info = PGC_allocated | 1;
+        list_add_tail(&pg[i].list, &d->page_list);
+    }
+
+    spin_unlock(&d->page_alloc_lock);
+    return 0;
+
+ fail:
+    spin_unlock(&d->page_alloc_lock);
+    return -1;
+}
+
+
 struct page_info *alloc_domheap_pages(
-    struct domain *d, unsigned int order, unsigned int flags)
+    struct domain *d, unsigned int order, unsigned int memflags)
 {
     struct page_info *pg = NULL;
     cpumask_t mask;
-    int i;
+    unsigned long i;
 
     ASSERT(!in_irq());
 
-    if ( !(flags & ALLOC_DOM_DMA) )
+    if ( !(memflags & MEMF_dma) )
     {
         pg = alloc_heap_pages(MEMZONE_DOM, order);
         /* Failure? Then check if we can fall back to the DMA pool. */
@@ -582,37 +632,11 @@ struct page_info *alloc_domheap_pages(
         flush_tlb_mask(mask);
     }
 
-    if ( d == NULL )
-        return pg;
-
-    spin_lock(&d->page_alloc_lock);
-
-    if ( unlikely(test_bit(_DOMF_dying, &d->domain_flags)) ||
-         unlikely((d->tot_pages + (1 << order)) > d->max_pages) )
+    if ( (d != NULL) && assign_pages(d, pg, order, memflags) )
     {
-        DPRINTK("Over-allocation for domain %u: %u > %u\n",
-                d->domain_id, d->tot_pages + (1 << order), d->max_pages);
-        DPRINTK("...or the domain is dying (%d)\n", 
-                !!test_bit(_DOMF_dying, &d->domain_flags));
-        spin_unlock(&d->page_alloc_lock);
         free_heap_pages(pfn_dom_zone_type(page_to_mfn(pg)), pg, order);
         return NULL;
     }
-
-    if ( unlikely(d->tot_pages == 0) )
-        get_knownalive_domain(d);
-
-    d->tot_pages += 1 << order;
-
-    for ( i = 0; i < (1 << order); i++ )
-    {
-        page_set_owner(&pg[i], d);
-        wmb(); /* Domain pointer must be visible before updating refcnt. */
-        pg[i].count_info |= PGC_allocated | 1;
-        list_add_tail(&pg[i].list, &d->page_list);
-    }
-
-    spin_unlock(&d->page_alloc_lock);
     
     return pg;
 }
