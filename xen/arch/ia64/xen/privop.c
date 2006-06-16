@@ -12,7 +12,6 @@
 #include <asm/delay.h>	// Debug only
 #include <asm/dom_fw.h>
 #include <asm/vhpt.h>
-//#include <debug.h>
 
 /* FIXME: where these declarations should be there ? */
 extern int dump_reflect_counts(char *);
@@ -21,12 +20,15 @@ extern void zero_reflect_counts(void);
 long priv_verbose=0;
 
 /* Set to 1 to handle privified instructions from the privify tool. */
+#ifndef CONFIG_PRIVIFY
 static const int privify_en = 0;
+#else
+static const int privify_en = 1;
+#endif
 
 /**************************************************************************
 Hypercall bundle creation
 **************************************************************************/
-
 
 void build_hypercall_bundle(UINT64 *imva, UINT64 brkimm, UINT64 hypnum, UINT64 ret)
 {
@@ -106,27 +108,27 @@ void build_pal_hypercall_bundles(UINT64 *imva, UINT64 brkimm, UINT64 hypnum)
 Privileged operation emulation routines
 **************************************************************************/
 
-IA64FAULT priv_rfi(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_rfi(VCPU *vcpu, INST64 inst)
 {
 	return vcpu_rfi(vcpu);
 }
 
-IA64FAULT priv_bsw0(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_bsw0(VCPU *vcpu, INST64 inst)
 {
 	return vcpu_bsw0(vcpu);
 }
 
-IA64FAULT priv_bsw1(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_bsw1(VCPU *vcpu, INST64 inst)
 {
 	return vcpu_bsw1(vcpu);
 }
 
-IA64FAULT priv_cover(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_cover(VCPU *vcpu, INST64 inst)
 {
 	return vcpu_cover(vcpu);
 }
 
-IA64FAULT priv_ptc_l(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_ptc_l(VCPU *vcpu, INST64 inst)
 {
 	UINT64 vadr = vcpu_get_gr(vcpu,inst.M45.r3);
 	UINT64 log_range;
@@ -135,7 +137,7 @@ IA64FAULT priv_ptc_l(VCPU *vcpu, INST64 inst)
 	return vcpu_ptc_l(vcpu,vadr,log_range);
 }
 
-IA64FAULT priv_ptc_e(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_ptc_e(VCPU *vcpu, INST64 inst)
 {
 	UINT src = inst.M28.r3;
 
@@ -145,7 +147,7 @@ IA64FAULT priv_ptc_e(VCPU *vcpu, INST64 inst)
 	return vcpu_ptc_e(vcpu,vcpu_get_gr(vcpu,src));
 }
 
-IA64FAULT priv_ptc_g(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_ptc_g(VCPU *vcpu, INST64 inst)
 {
 	UINT64 vadr = vcpu_get_gr(vcpu,inst.M45.r3);
 	UINT64 addr_range;
@@ -154,7 +156,7 @@ IA64FAULT priv_ptc_g(VCPU *vcpu, INST64 inst)
 	return vcpu_ptc_g(vcpu,vadr,addr_range);
 }
 
-IA64FAULT priv_ptc_ga(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_ptc_ga(VCPU *vcpu, INST64 inst)
 {
 	UINT64 vadr = vcpu_get_gr(vcpu,inst.M45.r3);
 	UINT64 addr_range;
@@ -163,7 +165,7 @@ IA64FAULT priv_ptc_ga(VCPU *vcpu, INST64 inst)
 	return vcpu_ptc_ga(vcpu,vadr,addr_range);
 }
 
-IA64FAULT priv_ptr_d(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_ptr_d(VCPU *vcpu, INST64 inst)
 {
 	UINT64 vadr = vcpu_get_gr(vcpu,inst.M45.r3);
 	UINT64 log_range;
@@ -172,7 +174,7 @@ IA64FAULT priv_ptr_d(VCPU *vcpu, INST64 inst)
 	return vcpu_ptr_d(vcpu,vadr,log_range);
 }
 
-IA64FAULT priv_ptr_i(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_ptr_i(VCPU *vcpu, INST64 inst)
 {
 	UINT64 vadr = vcpu_get_gr(vcpu,inst.M45.r3);
 	UINT64 log_range;
@@ -181,7 +183,7 @@ IA64FAULT priv_ptr_i(VCPU *vcpu, INST64 inst)
 	return vcpu_ptr_i(vcpu,vadr,log_range);
 }
 
-IA64FAULT priv_tpa(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_tpa(VCPU *vcpu, INST64 inst)
 {
 	UINT64 padr;
 	UINT fault;
@@ -196,7 +198,7 @@ IA64FAULT priv_tpa(VCPU *vcpu, INST64 inst)
 	else return fault;
 }
 
-IA64FAULT priv_tak(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_tak(VCPU *vcpu, INST64 inst)
 {
 	UINT64 key;
 	UINT fault;
@@ -215,7 +217,7 @@ IA64FAULT priv_tak(VCPU *vcpu, INST64 inst)
  * Insert translation register/cache
 ************************************/
 
-IA64FAULT priv_itr_d(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_itr_d(VCPU *vcpu, INST64 inst)
 {
 	UINT64 fault, itir, ifa, pte, slot;
 
@@ -230,7 +232,7 @@ IA64FAULT priv_itr_d(VCPU *vcpu, INST64 inst)
 	return (vcpu_itr_d(vcpu,slot,pte,itir,ifa));
 }
 
-IA64FAULT priv_itr_i(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_itr_i(VCPU *vcpu, INST64 inst)
 {
 	UINT64 fault, itir, ifa, pte, slot;
 
@@ -245,7 +247,7 @@ IA64FAULT priv_itr_i(VCPU *vcpu, INST64 inst)
 	return (vcpu_itr_i(vcpu,slot,pte,itir,ifa));
 }
 
-IA64FAULT priv_itc_d(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_itc_d(VCPU *vcpu, INST64 inst)
 {
 	UINT64 fault, itir, ifa, pte;
 
@@ -259,7 +261,7 @@ IA64FAULT priv_itc_d(VCPU *vcpu, INST64 inst)
 	return (vcpu_itc_d(vcpu,pte,itir,ifa));
 }
 
-IA64FAULT priv_itc_i(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_itc_i(VCPU *vcpu, INST64 inst)
 {
 	UINT64 fault, itir, ifa, pte;
 
@@ -277,7 +279,7 @@ IA64FAULT priv_itc_i(VCPU *vcpu, INST64 inst)
  * Moves to semi-privileged registers
 *************************************/
 
-IA64FAULT priv_mov_to_ar_imm(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_to_ar_imm(VCPU *vcpu, INST64 inst)
 {
 	// I27 and M30 are identical for these fields
 	UINT64 ar3 = inst.M30.ar3;
@@ -285,7 +287,7 @@ IA64FAULT priv_mov_to_ar_imm(VCPU *vcpu, INST64 inst)
 	return (vcpu_set_ar(vcpu,ar3,imm));
 }
 
-IA64FAULT priv_mov_to_ar_reg(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_to_ar_reg(VCPU *vcpu, INST64 inst)
 {
 	// I26 and M29 are identical for these fields
 	UINT64 ar3 = inst.M29.ar3;
@@ -307,42 +309,42 @@ IA64FAULT priv_mov_to_ar_reg(VCPU *vcpu, INST64 inst)
  * Moves to privileged registers
 ********************************/
 
-IA64FAULT priv_mov_to_pkr(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_to_pkr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 r3 = vcpu_get_gr(vcpu,inst.M42.r3);
 	UINT64 r2 = vcpu_get_gr(vcpu,inst.M42.r2);
 	return (vcpu_set_pkr(vcpu,r3,r2));
 }
 
-IA64FAULT priv_mov_to_rr(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_to_rr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 r3 = vcpu_get_gr(vcpu,inst.M42.r3);
 	UINT64 r2 = vcpu_get_gr(vcpu,inst.M42.r2);
 	return (vcpu_set_rr(vcpu,r3,r2));
 }
 
-IA64FAULT priv_mov_to_dbr(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_to_dbr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 r3 = vcpu_get_gr(vcpu,inst.M42.r3);
 	UINT64 r2 = vcpu_get_gr(vcpu,inst.M42.r2);
 	return (vcpu_set_dbr(vcpu,r3,r2));
 }
 
-IA64FAULT priv_mov_to_ibr(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_to_ibr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 r3 = vcpu_get_gr(vcpu,inst.M42.r3);
 	UINT64 r2 = vcpu_get_gr(vcpu,inst.M42.r2);
 	return (vcpu_set_ibr(vcpu,r3,r2));
 }
 
-IA64FAULT priv_mov_to_pmc(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_to_pmc(VCPU *vcpu, INST64 inst)
 {
 	UINT64 r3 = vcpu_get_gr(vcpu,inst.M42.r3);
 	UINT64 r2 = vcpu_get_gr(vcpu,inst.M42.r2);
 	return (vcpu_set_pmc(vcpu,r3,r2));
 }
 
-IA64FAULT priv_mov_to_pmd(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_to_pmd(VCPU *vcpu, INST64 inst)
 {
 	UINT64 r3 = vcpu_get_gr(vcpu,inst.M42.r3);
 	UINT64 r2 = vcpu_get_gr(vcpu,inst.M42.r2);
@@ -351,7 +353,7 @@ IA64FAULT priv_mov_to_pmd(VCPU *vcpu, INST64 inst)
 
 unsigned long to_cr_cnt[128] = { 0 };
 
-IA64FAULT priv_mov_to_cr(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_to_cr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 val = vcpu_get_gr(vcpu, inst.M32.r2);
 	to_cr_cnt[inst.M32.cr3]++;
@@ -386,13 +388,13 @@ IA64FAULT priv_mov_to_cr(VCPU *vcpu, INST64 inst)
 	}
 }
 
-IA64FAULT priv_rsm(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_rsm(VCPU *vcpu, INST64 inst)
 {
 	UINT64 imm24 = (inst.M44.i<<23)|(inst.M44.i2<<21)|inst.M44.imm;
 	return vcpu_reset_psr_sm(vcpu,imm24);
 }
 
-IA64FAULT priv_ssm(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_ssm(VCPU *vcpu, INST64 inst)
 {
 	UINT64 imm24 = (inst.M44.i<<23)|(inst.M44.i2<<21)|inst.M44.imm;
 	return vcpu_set_psr_sm(vcpu,imm24);
@@ -401,7 +403,7 @@ IA64FAULT priv_ssm(VCPU *vcpu, INST64 inst)
 /**
  * @todo Check for reserved bits and return IA64_RSVDREG_FAULT.
  */
-IA64FAULT priv_mov_to_psr(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_to_psr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 val = vcpu_get_gr(vcpu, inst.M35.r2);
 	return vcpu_set_psr_l(vcpu,val);
@@ -411,7 +413,7 @@ IA64FAULT priv_mov_to_psr(VCPU *vcpu, INST64 inst)
  * Moves from privileged registers
  **********************************/
 
-IA64FAULT priv_mov_from_rr(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_from_rr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 val;
 	IA64FAULT fault;
@@ -432,7 +434,7 @@ IA64FAULT priv_mov_from_rr(VCPU *vcpu, INST64 inst)
 	return fault;
 }
 
-IA64FAULT priv_mov_from_pkr(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_from_pkr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 val;
 	IA64FAULT fault;
@@ -443,7 +445,7 @@ IA64FAULT priv_mov_from_pkr(VCPU *vcpu, INST64 inst)
 	else return fault;
 }
 
-IA64FAULT priv_mov_from_dbr(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_from_dbr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 val;
 	IA64FAULT fault;
@@ -454,7 +456,7 @@ IA64FAULT priv_mov_from_dbr(VCPU *vcpu, INST64 inst)
 	else return fault;
 }
 
-IA64FAULT priv_mov_from_ibr(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_from_ibr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 val;
 	IA64FAULT fault;
@@ -465,7 +467,7 @@ IA64FAULT priv_mov_from_ibr(VCPU *vcpu, INST64 inst)
 	else return fault;
 }
 
-IA64FAULT priv_mov_from_pmc(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_from_pmc(VCPU *vcpu, INST64 inst)
 {
 	UINT64 val;
 	IA64FAULT fault;
@@ -492,7 +494,7 @@ unsigned long from_cr_cnt[128] = { 0 };
 	((fault = vcpu_get_##cr(vcpu,&val)) == IA64_NO_FAULT) ? \
 		vcpu_set_gr(vcpu, tgt, val, 0) : fault;
 	
-IA64FAULT priv_mov_from_cr(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_from_cr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 tgt = inst.M33.r1;
 	UINT64 val;
@@ -531,7 +533,7 @@ IA64FAULT priv_mov_from_cr(VCPU *vcpu, INST64 inst)
 	return IA64_ILLOP_FAULT;
 }
 
-IA64FAULT priv_mov_from_psr(VCPU *vcpu, INST64 inst)
+static IA64FAULT priv_mov_from_psr(VCPU *vcpu, INST64 inst)
 {
 	UINT64 tgt = inst.M33.r1;
 	UINT64 val;
@@ -601,7 +603,7 @@ struct {
 
 unsigned long privop_trace = 0;
 
-IA64FAULT
+static IA64FAULT
 priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 {
 	IA64_BUNDLE bundle;

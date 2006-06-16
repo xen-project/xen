@@ -372,14 +372,16 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 {
 	struct pt_regs *regs = (struct pt_regs *) &stack;
 	unsigned long code;
-	static const char *reason[] = {
+	static const char * const reason[] = {
 		"IA-64 Illegal Operation fault",
 		"IA-64 Privileged Operation fault",
 		"IA-64 Privileged Register fault",
 		"IA-64 Reserved Register/Field fault",
 		"Disabled Instruction Set Transition fault",
-		"Unknown fault 5", "Unknown fault 6", "Unknown fault 7", "Illegal Hazard fault",
-		"Unknown fault 9", "Unknown fault 10", "Unknown fault 11", "Unknown fault 12",
+		"Unknown fault 5", "Unknown fault 6",
+		"Unknown fault 7", "Illegal Hazard fault",
+		"Unknown fault 9", "Unknown fault 10",
+		"Unknown fault 11", "Unknown fault 12",
 		"Unknown fault 13", "Unknown fault 14", "Unknown fault 15"
 	};
 
@@ -566,10 +568,6 @@ ia64_handle_privop (unsigned long ifa, struct pt_regs *regs, unsigned long isr, 
 	}
 }
 
-/* Used in vhpt.h.  */
-#define INTR_TYPE_MAX	10
-UINT64 int_counts[INTR_TYPE_MAX];
-
 void
 ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim, unsigned long vector)
 {
@@ -578,7 +576,7 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 	unsigned long psr = regs->cr_ipsr;
 
 	/* Following faults shouldn'g be seen from Xen itself */
-	if (!(psr & IA64_PSR_CPL)) BUG();
+	BUG_ON (!(psr & IA64_PSR_CPL));
 
 	switch(vector) {
 	    case 8:
@@ -601,6 +599,7 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		break;
 	    case 26:
 		if (((isr >> 4L) & 0xfL) == 1) {
+			/* Fault is due to a register NaT consumption fault. */
 			//regs->eml_unat = 0;  FIXME: DO WE NEED THIS??
 			printf("ia64_handle_reflection: handling regNaT fault\n");
 			vector = IA64_NAT_CONSUMPTION_VECTOR; break;
@@ -612,6 +611,9 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 			vector = IA64_NAT_CONSUMPTION_VECTOR; break;
 		}
 #endif
+#ifdef CONFIG_PRIVIFY
+		/* Some privified operations are coded using reg+64 instead
+		   of reg.  */
 		printf("*** NaT fault... attempting to handle as privop\n");
 		printf("isr=%016lx, ifa=%016lx, iip=%016lx, ipsr=%016lx\n",
 		       isr, ifa, regs->cr_iip, psr);
@@ -622,6 +624,7 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 			printf("*** Handled privop masquerading as NaT fault\n");
 			return;
 		}
+#endif
 		vector = IA64_NAT_CONSUMPTION_VECTOR; break;
 	    case 27:
 		//printf("*** Handled speculation vector, itc=%lx!\n",ia64_get_itc());

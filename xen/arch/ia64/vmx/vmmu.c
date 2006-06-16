@@ -504,16 +504,18 @@ struct ptc_ga_args {
 static void ptc_ga_remote_func (void *varg)
 {
     u64 oldrid, moldrid;
-    VCPU *v;
     struct ptc_ga_args *args = (struct ptc_ga_args *)varg;
-    v = args->vcpu;
+    VCPU *v = args->vcpu;
+
     oldrid = VMX(v, vrr[0]);
     VMX(v, vrr[0]) = args->rid;
     moldrid = ia64_get_rr(0x0);
     ia64_set_rr(0x0,vrrtomrr(v,args->rid));
+    ia64_srlz_d();
     vmx_vcpu_ptc_l(v, args->vadr, args->ps);
     VMX(v, vrr[0]) = oldrid; 
     ia64_set_rr(0x0,moldrid);
+    ia64_dv_serialize_data();
 }
 
 

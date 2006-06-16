@@ -204,7 +204,12 @@ ia64_init_itm (void)
 	printk(KERN_DEBUG "CPU %d: base freq=%lu.%03luMHz, ITC ratio=%lu/%lu, "
 	       "ITC freq=%lu.%03luMHz", smp_processor_id(),
 	       platform_base_freq / 1000000, (platform_base_freq / 1000) % 1000,
+#ifdef XEN
+	       (u64)itc_ratio.num, (u64)itc_ratio.den,
+	       itc_freq / 1000000, (itc_freq / 1000) % 1000);
+#else
 	       itc_ratio.num, itc_ratio.den, itc_freq / 1000000, (itc_freq / 1000) % 1000);
+#endif
 
 	if (platform_base_drift != -1) {
 		itc_drift = platform_base_drift*itc_ratio.num/itc_ratio.den;
