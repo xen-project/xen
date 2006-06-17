@@ -360,24 +360,23 @@ static int sedf_init_vcpu(struct vcpu *v)
         INIT_LIST_HEAD(EXTRAQ(v->processor,EXTRA_UTIL_Q));
     }
        
+    /* Every VCPU gets an equal share of extratime by default. */
+    inf->deadl_abs   = 0;
+    inf->latency     = 0;
+    inf->status      = EXTRA_AWARE | SEDF_ASLEEP;
+    inf->extraweight = 1;
+
     if ( v->domain->domain_id == 0 )
     {
-        /*set dom0 to something useful to boot the machine*/
+        /* Domain0 gets 75% guaranteed (15ms every 20ms). */
         inf->period    = MILLISECS(20);
         inf->slice     = MILLISECS(15);
-        inf->latency   = 0;
-        inf->deadl_abs = 0;
-        inf->status     = EXTRA_AWARE | SEDF_ASLEEP;
     }
     else
     {
-        /*other domains run in best effort mode*/
+        /* Best-effort extratime only. */
         inf->period    = WEIGHT_PERIOD;
         inf->slice     = 0;
-        inf->deadl_abs = 0;
-        inf->latency   = 0;
-        inf->status     = EXTRA_AWARE | SEDF_ASLEEP;
-        inf->extraweight = 1;
     }
 
     inf->period_orig = inf->period; inf->slice_orig = inf->slice;
@@ -609,7 +608,16 @@ static void desched_extra_dom(s_time_t now, struct vcpu *d)
         PRINT(3,"Domain %i.%i: Short_block_loss: %"PRIi64"\n", 
               inf->vcpu->domain->domain_id, inf->vcpu->vcpu_id,
               inf->short_block_lost_tot);
+#if 0
+        /*
+         * KAF: If we don't exit short-blocking state at this point
+         * domain0 can steal all CPU for up to 10 seconds before
+         * scheduling settles down (when competing against another
+         * CPU-bound domain). Doing this seems to make things behave
+         * nicely. Noone gets starved by default.
+         */
         if ( inf->short_block_lost_tot <= 0 )
+#endif
         {
             PRINT(4,"Domain %i.%i compensated short block loss!\n",
                   inf->vcpu->domain->domain_id, inf->vcpu->vcpu_id);
