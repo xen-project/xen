@@ -58,7 +58,9 @@
 
 #define PAGES2KB(_p) ((_p)<<(PAGE_SHIFT-10))
 
+#ifdef CONFIG_PROC_FS
 static struct proc_dir_entry *balloon_pde;
+#endif
 
 static DECLARE_MUTEX(balloon_mutex);
 
@@ -403,6 +405,7 @@ static int balloon_init_watcher(struct notifier_block *notifier,
 	return NOTIFY_DONE;
 }
 
+#ifdef CONFIG_PROC_FS
 static int balloon_write(struct file *file, const char __user *buffer,
 			 unsigned long count, void *data)
 {
@@ -456,6 +459,7 @@ static int balloon_read(char *page, char **start, off_t off,
 	*eof = 1;
 	return len;
 }
+#endif
 
 static struct notifier_block xenstore_notifier;
 
@@ -481,6 +485,7 @@ static int __init balloon_init(void)
 	balloon_timer.data = 0;
 	balloon_timer.function = balloon_alarm;
     
+#ifdef CONFIG_PROC_FS
 	if ((balloon_pde = create_xen_proc_entry("balloon", 0644)) == NULL) {
 		WPRINTK("Unable to create /proc/xen/balloon.\n");
 		return -1;
@@ -488,6 +493,7 @@ static int __init balloon_init(void)
 
 	balloon_pde->read_proc  = balloon_read;
 	balloon_pde->write_proc = balloon_write;
+#endif
     
 	/* Initialise the balloon with excess memory space. */
 	for (pfn = xen_start_info->nr_pages; pfn < max_pfn; pfn++) {

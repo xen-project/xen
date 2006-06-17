@@ -28,6 +28,11 @@ config XEN_UNPRIVILEGED_GUEST
 	bool
 	default !XEN_PRIVILEGED_GUEST
 
+config XEN_PRIVCMD
+	bool
+	depends on PROC_FS
+	default y
+
 config XEN_BACKEND
         tristate "Backend driver support"
         default y
@@ -83,6 +88,11 @@ config XEN_BLKDEV_BACKEND
 	  The block-device backend driver allows the kernel to export its
 	  block devices to other guests via a high-performance shared-memory
 	  interface.
+
+config XEN_XENBUS_DEV
+	bool
+	depends on PROC_FS
+	default y
 
 config XEN_NETDEV_BACKEND
 	tristate "Network-device backend driver"

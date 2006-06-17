@@ -926,6 +926,7 @@ void xenbus_probe(void *unused)
 }
 
 
+#ifdef CONFIG_PROC_FS
 static struct file_operations xsd_kva_fops;
 static struct proc_dir_entry *xsd_kva_intf;
 static struct proc_dir_entry *xsd_port_intf;
@@ -964,6 +965,7 @@ static int xsd_port_read(char *page, char **start, off_t off,
 	*eof = 1;
 	return len;
 }
+#endif
 
 
 static int __init xenbus_probe_init(void)
@@ -1008,6 +1010,7 @@ static int __init xenbus_probe_init(void)
 		BUG_ON(err);
 		xen_start_info->store_evtchn = alloc_unbound.port;
 
+#ifdef CONFIG_PROC_FS
 		/* And finally publish the above info in /proc/xen */
 		xsd_kva_intf = create_xen_proc_entry("xsd_kva", 0600);
 		if (xsd_kva_intf) {
@@ -1020,6 +1023,7 @@ static int __init xenbus_probe_init(void)
 		xsd_port_intf = create_xen_proc_entry("xsd_port", 0400);
 		if (xsd_port_intf)
 			xsd_port_intf->read_proc = xsd_port_read;
+#endif
 	} else
 		xenstored_ready = 1;
 
