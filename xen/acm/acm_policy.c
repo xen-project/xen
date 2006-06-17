@@ -26,36 +26,43 @@
 #include <xen/lib.h>
 #include <xen/delay.h>
 #include <xen/sched.h>
+#include <xen/guest_access.h>
 #include <acm/acm_core.h>
 #include <public/acm_ops.h>
 #include <acm/acm_hooks.h>
 #include <acm/acm_endian.h>
 
 int
-acm_set_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size, int isuserbuffer)
+acm_set_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size)
 {
     u8 *policy_buffer = NULL;
-    struct acm_policy_buffer *pol;
+    int ret = -EFAULT;
  
     if (buf_size < sizeof(struct acm_policy_buffer))
         return -EFAULT;
 
-    /* 1. copy buffer from domain */
+    /* copy buffer from guest domain */
     if ((policy_buffer = xmalloc_array(u8, buf_size)) == NULL)
         return -ENOMEM;
 
-    if (isuserbuffer) {
-        if (copy_from_guest(policy_buffer, buf, buf_size))
-        {
-            printk("%s: Error copying!\n",__func__);
-            goto error_free;
-        }
-    } else
-        memcpy(policy_buffer, buf, buf_size);
+    if (copy_from_guest(policy_buffer, buf, buf_size))
+    {
+        printk("%s: Error copying!\n",__func__);
+        goto error_free;
+    }
+    ret = do_acm_set_policy(policy_buffer, buf_size);
 
-    /* 2. some sanity checking */
-    pol = (struct acm_policy_buffer *)policy_buffer;
+ error_free:
+    xfree(policy_buffer);
+    return ret;
+}
 
+
+int
+do_acm_set_policy(void *buf, u32 buf_size)
+{
+    struct acm_policy_buffer *pol = (struct acm_policy_buffer *)buf;
+    /* some sanity checking */
     if ((ntohl(pol->magic) != ACM_MAGIC) ||
         (buf_size != ntohl(pol->len)) ||
         (ntohl(pol->policy_version) != ACM_POLICY_VERSION))
@@ -85,33 +92,31 @@ acm_set_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size, int isuserbuffer)
     /* get bin_policy lock and rewrite policy (release old one) */
     write_lock(&acm_bin_pol_rwlock);
 
-    /* 3. set label reference name */
+    /* set label reference name */
     if (acm_set_policy_reference(buf + ntohl(pol->policy_reference_offset),
                                  ntohl(pol->primary_buffer_offset) -
                                  ntohl(pol->policy_reference_offset)))
         goto error_lock_free;
 
-    /* 4. set primary policy data */
+    /* set primary policy data */
     if (acm_primary_ops->set_binary_policy(buf + ntohl(pol->primary_buffer_offset),
                                            ntohl(pol->secondary_buffer_offset) -
                                            ntohl(pol->primary_buffer_offset)))
         goto error_lock_free;
 
-    /* 5. set secondary policy data */
+    /* set secondary policy data */
     if (acm_secondary_ops->set_binary_policy(buf + ntohl(pol->secondary_buffer_offset),
                                              ntohl(pol->len) - 
                                              ntohl(pol->secondary_buffer_offset)))
         goto error_lock_free;
 
     write_unlock(&acm_bin_pol_rwlock);
-    xfree(policy_buffer);
     return ACM_OK;
 
  error_lock_free:
     write_unlock(&acm_bin_pol_rwlock);
  error_free:
     printk("%s: Error setting policy.\n", __func__);
-    xfree(policy_buffer);
     return -EFAULT;
 }
 

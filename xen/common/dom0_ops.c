@@ -701,9 +701,9 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     spin_unlock(&dom0_lock);
 
     if (!ret)
-        acm_post_dom0_op(op, ssid);
+        acm_post_dom0_op(op, &ssid);
     else
-        acm_fail_dom0_op(op, ssid);
+        acm_fail_dom0_op(op, &ssid);
 
     return ret;
 }

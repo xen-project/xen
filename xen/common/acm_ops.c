@@ -69,7 +69,7 @@ long do_acm_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             return -EACCES;
 
         rc = acm_set_policy(setpolicy.pushcache,
-                            setpolicy.pushcache_size, 1);
+                            setpolicy.pushcache_size);
         break;
     }
 

@@ -222,9 +222,8 @@ acm_setup(unsigned int *initrdidx,
         pol = (struct acm_policy_buffer *)_policy_start;
         if (ntohl(pol->magic) == ACM_MAGIC)
         {
-            rc = acm_set_policy((void *)_policy_start,
-                                (u32)_policy_len,
-                                0);
+            rc = do_acm_set_policy((void *)_policy_start,
+                                   (u32)_policy_len);
             if (rc == ACM_OK)
             {
                 printkd("Policy len  0x%lx, start at %p.\n",_policy_len,_policy_start);

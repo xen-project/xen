@@ -229,6 +229,7 @@ void acm_dump_policy_buffer(void *buf, int buflen)
 
 #define PULL_CACHE_SIZE		8192
 uint8_t pull_buffer[PULL_CACHE_SIZE];
+
 int acm_domain_getpolicy(int xc_handle)
 {
     struct acm_getpolicy getpolicy;
@@ -236,7 +237,7 @@ int acm_domain_getpolicy(int xc_handle)
 
     memset(pull_buffer, 0x00, sizeof(pull_buffer));
     getpolicy.interface_version = ACM_INTERFACE_VERSION;
-    getpolicy.pullcache = (void *) pull_buffer;
+    set_xen_guest_handle(getpolicy.pullcache, pull_buffer);
     getpolicy.pullcache_size = sizeof(pull_buffer);
     ret = xc_acm_op(xc_handle, ACMOP_getpolicy, &getpolicy, sizeof(getpolicy));
 
@@ -281,7 +282,7 @@ int acm_domain_loadpolicy(int xc_handle, const char *filename)
         /* dump it and then push it down into xen/acm */
         acm_dump_policy_buffer(buffer, len);
         setpolicy.interface_version = ACM_INTERFACE_VERSION;
-        setpolicy.pushcache = (void *) buffer;
+        set_xen_guest_handle(setpolicy.pushcache, buffer);
         setpolicy.pushcache_size = len;
         ret = xc_acm_op(xc_handle, ACMOP_setpolicy, &setpolicy, sizeof(setpolicy));
 
@@ -330,7 +331,7 @@ int acm_domain_dumpstats(int xc_handle)
 
     memset(stats_buffer, 0x00, sizeof(stats_buffer));
     dumpstats.interface_version = ACM_INTERFACE_VERSION;
-    dumpstats.pullcache = (void *) stats_buffer;
+    set_xen_guest_handle(dumpstats.pullcache, stats_buffer);
     dumpstats.pullcache_size = sizeof(stats_buffer);
     ret = xc_acm_op(xc_handle, ACMOP_dumpstats, &dumpstats, sizeof(dumpstats));
 
