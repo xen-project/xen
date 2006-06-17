@@ -20,7 +20,7 @@
 //**
 //**
 
-DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL ", "XEN     ", 2)
+DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL","int-xen", 2006)
 {
     Name (\PMBS, 0x0C00)
     Name (\PMLN, 0x08)
@@ -29,23 +29,16 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL ", "XEN     ", 2)
     Name (\APCB, 0xFEC00000)
     Name (\APCL, 0x00010000)
     Name (\PUID, 0x00)
+
     Scope (\_PR)
     {
         Processor (CPU0, 0x00, 0x00000000, 0x00) {}
         Processor (CPU1, 0x01, 0x00000000, 0x00) {}
         Processor (CPU2, 0x02, 0x00000000, 0x00) {}
         Processor (CPU3, 0x03, 0x00000000, 0x00) {}
+
     }
 
-/* Poweroff support - ties in with qemu emulation */
-
-    Name (\_S5, Package (0x04)
-    {
-        0x07, 
-        0x07, 
-        0x00, 
-        0x00
-    })
 
     Scope (\_SB)
     {
@@ -55,9 +48,11 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL ", "XEN     ", 2)
             Name (_UID, 0x00)
             Name (_ADR, 0x00)
             Name (_BBN, 0x00)
+ 
             Method (_CRS, 0, NotSerialized)
             {
-                Name (PRT0, ResourceTemplate ()
+          
+               Name (PRT0, ResourceTemplate ()
                 {
 					/* bus number is from 0 - 255*/
                     WordBusNumber (ResourceConsumer, MinFixed, MaxFixed, SubDecode,
@@ -79,75 +74,67 @@ DefinitionBlock ("DSDT.aml", "DSDT", 1, "INTEL ", "XEN     ", 2)
                         0x0FFF,
                         0x0000,
                         0x0300)
+
+                 /* reserve what device model consumed for IDE and acpi pci device            */
+                     WordIO (ResourceConsumer, MinFixed, MaxFixed, PosDecode, EntireRange,
+                        0x0000,
+                        0xc000,
+                        0xc01f,
+                        0x0000,
+                        0x0020)
+                 /* reserve what device model consumed for Ethernet controller pci device        */
+                     WordIO (ResourceConsumer, MinFixed, MaxFixed, PosDecode, EntireRange,
+                        0x0000,
+                        0xc020,
+                        0xc03f,
+                        0x0000,
+                        0x0010)
+
                     DWordMemory (ResourceProducer, PosDecode, MinFixed, MaxFixed, Cacheable, ReadOnly,
                         0x00000000,
-                        0x000A0000,
+                        0x000c0000,
                         0x000FFFFF,
                         0x00000000,
-                        0x00060000)
+                        0x00030000)
+
+                 /* reserve what device model consumed for PCI VGA device        */
+
+                    DWordMemory (ResourceConsumer, PosDecode, MinFixed, MaxFixed, Cacheable, ReadWrite,
+                        0x00000000,
+                        0xF0000000,
+                        0xF1FFFFFF,
+                        0x00000000,
+                        0x02000000)
+                    DWordMemory (ResourceConsumer, PosDecode, MinFixed, MaxFixed, Cacheable, ReadWrite,
+                        0x00000000,
+                        0xF2000000,
+                        0xF2000FFF,
+                        0x00000000,
+                        0x00001000)
+                 /* reserve what device model consumed for Ethernet controller pci device        */
+                      DWordMemory (ResourceConsumer, PosDecode, MinFixed, MaxFixed, Cacheable, ReadWrite,
+                        0x00000000,
+                        0xF2001000,
+                        0xF200101F,
+                        0x00000000,
+                        0x00000020) 
                 })
                 Return (PRT0)
             }
-
-            Name (AIR0, Package (0x06)
-            {
-               Package (0x04)
-                {
-                    0x001FFFFF, 
-                    0x02, 
-                    0x00, 
-                    0x17
-                }, 
-
-                Package (0x04)
-                {
-                    0x001FFFFF, 
-                    0x03, 
-                    0x00, 
-                    0x13
-                }, 
-
-                Package (0x04)
-                {
-                    0x001DFFFF, 
-                    0x01, 
-                    0x00, 
-                    0x13
-                }, 
-
-                Package (0x04)
-                {
-                    0x001DFFFF, 
-                    0x00, 
-                    0x00, 
-                    0x10
-                }, 
-
-                Package (0x04)
-                {
-                    0x001DFFFF, 
-                    0x02, 
-                    0x00, 
-                    0x12
-                }, 
-
-                Package (0x04)
-                {
-                    0x001DFFFF, 
-                    0x03, 
-                    0x00, 
-                    0x17
-                }
-            })
-            Method (_PRT, 0, NotSerialized)
-            {
-                Return (AIR0)
-            }
-
+   
             Device (ISA)
             {
-                Name (_ADR, 0x00010000) /*TODO, device id, PCI bus num, ...*/
-
+                Name (_ADR, 0x00000000) /* device id, PCI bus num, ... */
+ 
+		OperationRegion(PIRQ, PCI_Config, 0x60, 0x4)
+                        Scope(\) {
+                                Field (\_SB.PCI0.ISA.PIRQ, ByteAcc, NoLock, Preserve) {
+                                        PIRA, 8,
+                                        PIRB, 8,
+                                        PIRC, 8,
+                                        PIRD, 8
+                                        }
+                                }
                 Device (SYSR)
                 {
                     Name (_HID, EisaId ("PNP0C02"))
