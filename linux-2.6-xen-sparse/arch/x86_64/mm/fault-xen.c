@@ -324,7 +324,7 @@ static int spurious_fault(struct pt_regs *regs,
 #endif
 
 	/* Reserved-bit violation or user access to kernel space? */
-	if (error_code & PF_RSVD|PF_USER)
+	if (error_code & (PF_RSVD|PF_USER))
 		return 0;
 
 	pgd = init_mm.pgd + pgd_index(address);

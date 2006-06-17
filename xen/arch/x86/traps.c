@@ -592,6 +592,10 @@ static int __spurious_page_fault(
     l1_pgentry_t l1e, *l1t;
     unsigned int required_flags, disallowed_flags;
 
+    /* Reserved bit violations are never spurious faults. */
+    if ( regs->error_code & PGERR_reserved_bit )
+        return 0;
+
     required_flags  = _PAGE_PRESENT;
     if ( regs->error_code & PGERR_write_access )
         required_flags |= _PAGE_RW;
@@ -653,10 +657,6 @@ static int spurious_page_fault(
     struct vcpu   *v = current;
     struct domain *d = v->domain;
     int            is_spurious;
-
-    /* Reserved bit violations are never spurious faults. */
-    if ( regs->error_code & PGERR_reserved_bit )
-        return 0;
 
     LOCK_BIGLOCK(d);
 
