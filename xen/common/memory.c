@@ -282,7 +282,7 @@ memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
     LIST_HEAD(in_chunk_list);
     LIST_HEAD(out_chunk_list);
     unsigned long in_chunk_order, out_chunk_order;
-    unsigned long gpfn, gmfn, mfn;
+    xen_pfn_t     gpfn, gmfn, mfn;
     unsigned long i, j, k;
     unsigned int  memflags = 0;
     long          rc = 0;
