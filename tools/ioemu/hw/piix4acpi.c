@@ -44,6 +44,10 @@
 #define GBL_RLS           (1 << 2)
 #define SLP_EN   	  (1 << 13)
 
+/* Bits of PM1a register define here  */ 
+#define SLP_TYP_MASK    0x1C00
+#define SLP_VAL         0x1C00
+
 typedef struct AcpiDeviceState AcpiDeviceState;
 AcpiDeviceState *acpi_device_table;
 
@@ -94,7 +98,7 @@ static int pmtimer_load(QEMUFile *f, void *opaque, int version_id)
          qemu_get_be64s(f, &s->next_pm_time);
          qemu_get_timer(f, s->pm_timer);
          return 0;
-           
+        
 }
 
 static inline void acpi_set_irq(PCIAcpiState *s)
@@ -277,6 +281,13 @@ static void acpiPm1ControlP1_writeb(void *opaque, uint32_t addr, uint32_t val)
     s->pm1_control = (val<<8)||(s->pm1_control); 
 /*    printf("acpiPm1ControlP1_writeb \n addr %x val:%x\n", addr, val); */
 
+    // Check for power off request
+
+    if ( ( (val & SLP_EN) != 0) &&
+         ( (val & SLP_TYP_MASK) == SLP_VAL) ) {
+         s->pm1_timer=0x0; //clear ACPI timer
+         qemu_system_shutdown_request();
+      }
 } 
 
 static uint32_t acpiPm1ControlP1_readb(void *opaque, uint32_t addr)
@@ -303,7 +314,6 @@ static void acpiPm1Status_writew(void *opaque, uint32_t addr, uint32_t val)
     s->pm1_status = s->pm1_status&!GBL_STS;     
     
 /*    printf("acpiPm1Status_writew \n addr %x val:%x pm1_status:%x \n", addr, val,s->pm1_status); */
-
 
 } 
 
@@ -344,6 +354,13 @@ static void acpiPm1Control_writew(void *opaque, uint32_t addr, uint32_t val)
     
     s->pm1_control = val; 
 /*    printf("acpiPm1Control_writew \n addr %x val:%x\n", addr, val); */
+
+    // Check for power off request
+
+    if ( ( (val & SLP_EN) != 0) &&
+        ( (val & SLP_TYP_MASK) == SLP_VAL) ) {
+         qemu_system_shutdown_request();
+      }
 
 } 
 
@@ -403,9 +420,9 @@ static uint32_t acpiPm1Timer_readl(void *opaque, uint32_t addr)
 static void acpi_map(PCIDevice *pci_dev, int region_num, 
                     uint32_t addr, uint32_t size, int type)
 {
-      PCIAcpiState *d = (PCIAcpiState *)pci_dev;
-      printf("register acpi io \n ");
-   /*Byte access		*/
+       PCIAcpiState *d = (PCIAcpiState *)pci_dev;
+       printf("register acpi io \n ");
+       /*Byte access		*/
        register_ioport_write(addr, 1, 1, acpiPm1Status_writeb, d);
        register_ioport_read(addr, 1, 1, acpiPm1Status_readb, d);
        register_ioport_write(addr+1, 1, 1, acpiPm1StatusP1_writeb, d);
@@ -431,7 +448,7 @@ static void acpi_map(PCIDevice *pci_dev, int region_num,
         register_ioport_write(addr + 4, 2, 2, acpiPm1Control_writew, d);
         register_ioport_read(addr + 4, 2, 2, acpiPm1Control_readw, d);
 
-   /* dword access */
+       /* dword access */
         register_ioport_write(addr, 4, 4, acpiPm1Event_writel, d);
         register_ioport_read(addr, 4, 4, acpiPm1Event_readl, d);
 		
