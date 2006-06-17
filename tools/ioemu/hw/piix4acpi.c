@@ -48,6 +48,13 @@ typedef struct AcpiDeviceState AcpiDeviceState;
 AcpiDeviceState *acpi_device_table;
 
 /* Bits of PM1a register define here  */											
+typedef struct PMTState {    	  
+    uint32_t count;
+    int irq;
+    uint64_t next_pm_time;
+    QEMUTimer *pm_timer;
+}PMTState;
+
 typedef struct PM1Event_BLK {
     uint16_t pm1_status; /* pm1a_EVT_BLK */
     uint16_t pm1_enable; /* pm1a_EVT_BLK+2 */
@@ -62,7 +69,33 @@ typedef struct PCIAcpiState {
     uint32_t pm1_timer; /* pmtmr_BLK */
 } PCIAcpiState;
 
+static PMTState *pmtimer_state;
 static PCIAcpiState *acpi_state;
+ 
+static void pmtimer_save(QEMUFile *f, void *opaque)       
+{
+	 PMTState *s = opaque; 
+	 
+	 qemu_put_be32s(f, &s->count);
+	 qemu_put_be32s(f, &s->irq);
+         qemu_put_be64s(f, &s->next_pm_time);
+	 qemu_put_timer(f, s->pm_timer);
+
+}
+
+static int pmtimer_load(QEMUFile *f, void *opaque, int version_id)
+{
+    PMTState *s = opaque;
+
+         if (version_id != 1)
+         return -EINVAL;
+         qemu_get_be32s(f, &s->count);
+         qemu_get_be32s(f, &s->irq);
+         qemu_get_be64s(f, &s->next_pm_time);
+         qemu_get_timer(f, s->pm_timer);
+         return 0;
+           
+}
 
 static inline void acpi_set_irq(PCIAcpiState *s)
 {
@@ -70,6 +103,52 @@ static inline void acpi_set_irq(PCIAcpiState *s)
 /* no real SCI event need for now, so comment the following line out */
 /*        pic_set_irq(s->irq, 1);	*/
          printf("acpi_set_irq: s->irq %x \n",s->irq);
+
+}
+
+static void pm_timer_update(void *opaque)
+{
+        PMTState *s = opaque;            
+        s->next_pm_time += muldiv64(1, ticks_per_sec,FREQUENCE_PMTIMER);
+        qemu_mod_timer(s->pm_timer, s->next_pm_time);
+        acpi_state->pm1_timer ++;
+           
+        
+    /* if pm timer is zero    reset it to zero;  */
+        if (acpi_state->pm1_timer >= 0x1000000) 
+        {
+/*	    printf("pm_timerupdate: timer overflow: %x \n", acpi_state->pm1_timer); */
+
+              acpi_state->pm1_timer = 0;
+              acpi_state->pm1_status =   acpi_state->pm1_status | TMROF_STS;
+                      	//if  TMROF_EN is set send the irq
+              if  ((acpi_state->pm1_enable & TMROF_EN) ==  TMROF_EN)
+              {
+               acpi_set_irq(acpi_state);
+               acpi_state->pm1_enable = 0x00; /* only need one time...*/
+              }
+        }
+        s->count = acpi_state->pm1_timer;
+}
+
+static PMTState *pmtimer_init(void)
+{
+    PMTState *s;
+
+    s = qemu_mallocz(sizeof(PMTState));
+    if (!s)
+        return NULL;        
+
+    /* s->irq = irq;    */
+         
+    s->pm_timer = qemu_new_timer(vm_clock, pm_timer_update, s);
+ 
+    s->count = 0;
+    s->next_pm_time = qemu_get_clock(vm_clock) + muldiv64(1, ticks_per_sec,FREQUENCE_PMTIMER) + 1;
+    qemu_mod_timer(s->pm_timer, s->next_pm_time);
+ 
+    register_savevm("pm timer", 1, 1, pmtimer_save, pmtimer_load, s);
+    return s;
 }
 
 static void acpi_reset(PCIAcpiState *s)
@@ -224,6 +303,8 @@ static void acpiPm1Status_writew(void *opaque, uint32_t addr, uint32_t val)
     s->pm1_status = s->pm1_status&!GBL_STS;     
     
 /*    printf("acpiPm1Status_writew \n addr %x val:%x pm1_status:%x \n", addr, val,s->pm1_status); */
+
+
 } 
 
 static uint32_t acpiPm1Status_readw(void *opaque, uint32_t addr)
@@ -289,13 +370,15 @@ static void acpiPm1Event_writel(void *opaque, uint32_t addr, uint32_t val)
       
 } 
 
-static void acpiPm1Event_readl(void *opaque, uint32_t addr)
+static uint32_t acpiPm1Event_readl(void *opaque, uint32_t addr)
 {
     PCIAcpiState *s = opaque;
     uint32_t val;
     
-    val=s->pm1_status|(s->pm1_enable<<16);
+    val = s->pm1_status|(s->pm1_enable<<16);
 /*    printf("acpiPm1Event_readl \n addr %x val:%x\n", addr, val);    */
+
+    return val;
 }
 
 static void acpiPm1Timer_writel(void *opaque, uint32_t addr, uint32_t val)
@@ -383,7 +466,7 @@ void pci_piix4_acpi_init(PCIBus *bus)
 								  
     pci_register_io_region((PCIDevice *)d, 4, 0x10, 
                            PCI_ADDRESS_SPACE_IO, acpi_map);
-
+    pmtimer_state = pmtimer_init();
     acpi_reset (d);  
 
 }
