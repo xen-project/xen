@@ -151,30 +151,6 @@ link_exists()
     fi
 }
 
-
-# Usage: create_bridge bridge
-create_bridge () {
-    local bridge=$1
-
-    # Don't create the bridge if it already exists.
-    if ! brctl show | grep -q ${bridge} ; then
-	brctl addbr ${bridge}
-	brctl stp ${bridge} off
-	brctl setfd ${bridge} 0
-    fi
-    ip link set ${bridge} up
-}
-
-# Usage: add_to_bridge bridge dev
-add_to_bridge () {
-    local bridge=$1
-    local dev=$2
-    # Don't add $dev to $bridge if it's already on a bridge.
-    if ! brctl show | grep -q ${dev} ; then
-	brctl addif ${bridge} ${dev}
-    fi
-}
-
 # Set the default forwarding policy for $dev to drop.
 # Allow forwarding to the bridge.
 antispoofing () {
@@ -238,14 +214,13 @@ using loopback.nloopbacks=<N> on the domain 0 kernel command line.
 	fi
 	ip link set ${netdev} name ${pdev}
 	ip link set ${vdev} name ${netdev}
-	ip link set ${pdev} down arp off
-	ip link set ${pdev} addr fe:ff:ff:ff:ff:ff
-	ip addr flush ${pdev}
+
+	setup_bridge_port ${pdev}
+	setup_bridge_port ${vif0}
 	ip link set ${netdev} addr ${mac} arp on
-	add_to_bridge ${bridge} ${vif0}
+
 	ip link set ${bridge} up
-	ip link set ${vif0} up
-	ip link set ${pdev} up
+	add_to_bridge  ${bridge} ${vif0}
 	add_to_bridge2 ${bridge} ${pdev}
 	do_ifup ${netdev}
     else
@@ -301,6 +276,7 @@ add_to_bridge2() {
     local maxtries=10
 
     echo -n "Waiting for ${dev} to negotiate link."
+    ip link set ${dev} up
     for i in `seq ${maxtries}` ; do
 	if ifconfig ${dev} | grep -q RUNNING ; then
 	    break
