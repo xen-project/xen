@@ -164,3 +164,15 @@ ne2000=0
 #-----------------------------------------------------------------------------
 #    start in full screen
 #full-screen=1   
+
+
+#-----------------------------------------------------------------------------
+#   Enable USB support (specific devices specified at runtime through the
+#			monitor window)
+#usb=1
+
+#   Enable USB mouse support (only enable one of the following, `mouse' for
+#			      PS/2 protocol relative mouse, `tablet' for
+#			      absolute mouse)
+#usbdevice='mouse'
+#usbdevice='tablet'
