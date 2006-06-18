@@ -3351,7 +3351,7 @@ static int ptwr_emulated_update(
         addr &= ~(sizeof(paddr_t)-1);
         if ( copy_from_user(&full, (void *)addr, sizeof(paddr_t)) )
         {
-            propagate_page_fault(addr, 4); /* user mode, read fault */
+            propagate_page_fault(addr, 0); /* read fault */
             return X86EMUL_PROPAGATE_FAULT;
         }
         /* Mask out bits provided by caller. */
@@ -3483,12 +3483,12 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     unsigned long    l2_idx;
     struct x86_emulate_ctxt emul_ctxt;
 
-    if ( unlikely(shadow_mode_enabled(d)) )
-        return 0;
+    ASSERT(!shadow_mode_enabled(d));
 
     /*
      * Attempt to read the PTE that maps the VA being accessed. By checking for
      * PDE validity in the L2 we avoid many expensive fixups in __get_user().
+     * NB. The L2 entry cannot be detached as the caller already checked that.
      */
     if ( !(l2e_get_flags(__linear_l2_table[l2_linear_offset(addr)]) &
            _PAGE_PRESENT) ||
@@ -3579,7 +3579,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     }
 
     /*
-     * We only allow one ACTIVE and one INACTIVE p.t. to be updated at at 
+     * We only allow one ACTIVE and one INACTIVE p.t. to be updated at a
      * time. If there is already one, we must flush it out.
      */
     if ( d->arch.ptwr[which].l1va )

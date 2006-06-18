@@ -464,7 +464,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     return 0;
 
  page_fault:
-    propagate_page_fault((unsigned long)pb, 4);
+    propagate_page_fault((unsigned long)pb, 0); /* read fault */
     return EXCRET_fault_fixed;
 }
 

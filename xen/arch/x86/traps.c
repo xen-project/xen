@@ -547,6 +547,7 @@ static int handle_gdt_ldt_mapping_fault(
     {
         /* LDT fault: Copy a mapping from the guest's LDT, if it is valid. */
         LOCK_BIGLOCK(d);
+        cleanup_writable_pagetable(d);
         ret = map_ldt_shadow_page(offset >> PAGE_SHIFT);
         UNLOCK_BIGLOCK(d);
 
@@ -654,41 +655,14 @@ static int __spurious_page_fault(
 static int spurious_page_fault(
     unsigned long addr, struct cpu_user_regs *regs)
 {
-    struct vcpu   *v = current;
-    struct domain *d = v->domain;
+    struct domain *d = current->domain;
     int            is_spurious;
 
     LOCK_BIGLOCK(d);
-
+    cleanup_writable_pagetable(d);
     is_spurious = __spurious_page_fault(addr, regs);
-    if ( is_spurious )
-        goto out;
-
-    /*
-     * The only possible reason for a spurious page fault not to be picked
-     * up already is that a page directory was unhooked by writable page table
-     * logic and then reattached before the faulting VCPU could detect it.
-     */
-    if ( is_idle_domain(d) ||               /* no ptwr in idle domain       */
-         IN_HYPERVISOR_RANGE(addr) ||       /* no ptwr on hypervisor addrs  */
-         shadow_mode_enabled(d) ||          /* no ptwr logic in shadow mode */
-         (regs->error_code & PGERR_page_present) ) /* not-present fault?    */
-        goto out;
-
-    /*
-     * The page directory could have been detached again while we weren't
-     * holding the per-domain lock. Detect that and fix up if it's the case.
-     */
-    if ( unlikely(d->arch.ptwr[PTWR_PT_ACTIVE].l1va) &&
-         unlikely(l2_linear_offset(addr) ==
-                  d->arch.ptwr[PTWR_PT_ACTIVE].l2_idx) )
-    {
-        ptwr_flush(d, PTWR_PT_ACTIVE);
-        is_spurious = 1;
-    }
-
- out:
     UNLOCK_BIGLOCK(d);
+
     return is_spurious;
 }
 
@@ -696,7 +670,6 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
 {
     struct vcpu   *v = current;
     struct domain *d = v->domain;
-    int            rc;
 
     if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
     {
@@ -709,10 +682,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
          * Do not propagate spurious faults in the hypervisor area to the
          * guest. It cannot fix them up.
          */
-        LOCK_BIGLOCK(d);
-        rc = __spurious_page_fault(addr, regs);
-        UNLOCK_BIGLOCK(d);
-        return rc;
+        return (spurious_page_fault(addr, regs) ? EXCRET_not_a_fault : 0);
     }
 
     if ( unlikely(shadow_mode_enabled(d)) )
@@ -730,12 +700,14 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
             return EXCRET_fault_fixed;
         }
 
+        /*
+         * Note it is *not* safe to check PGERR_page_present here. It can be
+         * clear, due to unhooked page table, when we would otherwise expect
+         * it to be set. We have an aversion to trusting that flag in Xen, and
+         * guests ought to be leery too.
+         */
         if ( guest_kernel_mode(v, regs) &&
-             /* Protection violation on write? No reserved-bit violation? */
-             ((regs->error_code & (PGERR_page_present |
-                                   PGERR_write_access |
-                                   PGERR_reserved_bit)) ==
-              (PGERR_page_present | PGERR_write_access)) &&
+             (regs->error_code & PGERR_write_access) &&
              ptwr_do_page_fault(d, addr, regs) )
         {
             UNLOCK_BIGLOCK(d);
@@ -870,8 +842,6 @@ static inline int admin_io_okay(
     (admin_io_okay(_p, 4, _d, _r) ? outl(_v, _p) : ((void)0))
 
 /* Propagate a fault back to the guest kernel. */
-#define USER_READ_FAULT  (PGERR_user_mode)
-#define USER_WRITE_FAULT (PGERR_user_mode | PGERR_write_access)
 #define PAGE_FAULT(_faultaddr, _errcode)        \
 ({  propagate_page_fault(_faultaddr, _errcode); \
     return EXCRET_fault_fixed;                  \
@@ -881,7 +851,7 @@ static inline int admin_io_okay(
 #define insn_fetch(_type, _size, _ptr)          \
 ({  unsigned long _x;                           \
     if ( get_user(_x, (_type *)eip) )           \
-        PAGE_FAULT(eip, USER_READ_FAULT);       \
+        PAGE_FAULT(eip, 0); /* read fault */    \
     eip += _size; (_type)_x; })
 
 static int emulate_privileged_op(struct cpu_user_regs *regs)
@@ -950,17 +920,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             case 1:
                 data = (u8)inb_user((u16)regs->edx, v, regs);
                 if ( put_user((u8)data, (u8 *)regs->edi) )
-                    PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
+                    PAGE_FAULT(regs->edi, PGERR_write_access);
                 break;
             case 2:
                 data = (u16)inw_user((u16)regs->edx, v, regs);
                 if ( put_user((u16)data, (u16 *)regs->edi) )
-                    PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
+                    PAGE_FAULT(regs->edi, PGERR_write_access);
                 break;
             case 4:
                 data = (u32)inl_user((u16)regs->edx, v, regs);
                 if ( put_user((u32)data, (u32 *)regs->edi) )
-                    PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
+                    PAGE_FAULT(regs->edi, PGERR_write_access);
                 break;
             }
             regs->edi += (int)((regs->eflags & EF_DF) ? -op_bytes : op_bytes);
@@ -975,17 +945,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             {
             case 1:
                 if ( get_user(data, (u8 *)regs->esi) )
-                    PAGE_FAULT(regs->esi, USER_READ_FAULT);
+                    PAGE_FAULT(regs->esi, 0); /* read fault */
                 outb_user((u8)data, (u16)regs->edx, v, regs);
                 break;
             case 2:
                 if ( get_user(data, (u16 *)regs->esi) )
-                    PAGE_FAULT(regs->esi, USER_READ_FAULT);
+                    PAGE_FAULT(regs->esi, 0); /* read fault */
                 outw_user((u16)data, (u16)regs->edx, v, regs);
                 break;
             case 4:
                 if ( get_user(data, (u32 *)regs->esi) )
-                    PAGE_FAULT(regs->esi, USER_READ_FAULT);
+                    PAGE_FAULT(regs->esi, 0); /* read fault */
                 outl_user((u32)data, (u16)regs->edx, v, regs);
                 break;
             }
@@ -1168,7 +1138,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             v->arch.guest_context.ctrlreg[2] = *reg;
             v->vcpu_info->arch.cr2           = *reg;
             break;
-            
+
         case 3: /* Write CR3 */
             LOCK_BIGLOCK(v->domain);
             cleanup_writable_pagetable(v->domain);
