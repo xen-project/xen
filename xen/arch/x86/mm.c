@@ -3366,6 +3366,7 @@ static int ptwr_emulated_update(
         old  |= full;
     }
 
+#if 0 /* XXX KAF: I don't think this can happen. */
     /*
      * We must not emulate an update to a PTE that is temporarily marked
      * writable by the batched ptwr logic, else we can corrupt page refcnts! 
@@ -3376,6 +3377,12 @@ static int ptwr_emulated_update(
     if ( ((l1va = d->arch.ptwr[PTWR_PT_INACTIVE].l1va) != 0) &&
          (l1_linear_offset(l1va) == l1_linear_offset(addr)) )
         ptwr_flush(d, PTWR_PT_INACTIVE);
+#else
+    ASSERT(((l1va = d->arch.ptwr[PTWR_PT_ACTIVE].l1va) == 0) ||
+           (l1_linear_offset(l1va) != l1_linear_offset(addr)));
+    ASSERT(((l1va = d->arch.ptwr[PTWR_PT_INACTIVE].l1va) == 0) ||
+           (l1_linear_offset(l1va) != l1_linear_offset(addr)));
+#endif
 
     /* Read the PTE that maps the page being updated. */
     if ( __copy_from_user(&pte, &linear_pg_table[l1_linear_offset(addr)],
