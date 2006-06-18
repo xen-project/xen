@@ -3565,17 +3565,27 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     }
 
     /*
-     * If this is a multi-processor guest then ensure that the page is hooked
-     * into at most one L2 table, which must be the one running on this VCPU.
+     * Multi-processor guest? Then ensure that the page table is hooked into
+     * at most one L2, and also ensure that there is only one mapping of the
+     * page table itself (or there can be conflicting writable mappings from
+     * other VCPUs).
      */
-    if ( (d->vcpu[0]->next_in_list != NULL) &&
-         ((page->u.inuse.type_info & PGT_count_mask) != 
-          (!!(page->u.inuse.type_info & PGT_pinned) +
-           (which == PTWR_PT_ACTIVE))) )
+    if ( d->vcpu[0]->next_in_list != NULL )
     {
-        /* Could be conflicting writable mappings from other VCPUs. */
-        cleanup_writable_pagetable(d);
-        goto emulate;
+        if ( /* Hooked into at most one L2 table (which this VCPU maps)? */
+             ((page->u.inuse.type_info & PGT_count_mask) != 
+              (!!(page->u.inuse.type_info & PGT_pinned) +
+               (which == PTWR_PT_ACTIVE))) ||
+             /* PTEs are mapped read-only in only one place? */
+             ((page->count_info & PGC_count_mask) !=
+              (!!(page->count_info & PGC_allocated) +       /* alloc count */
+               (page->u.inuse.type_info & PGT_count_mask) + /* type count  */
+               1)) )                                        /* map count   */
+        {
+            /* Could be conflicting writable mappings from other VCPUs. */
+            cleanup_writable_pagetable(d);
+            goto emulate;
+        }
     }
 
     /*
