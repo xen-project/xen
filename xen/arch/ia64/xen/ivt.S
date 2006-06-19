@@ -1493,7 +1493,7 @@ END(dispatch_unaligned_handler)
 	 * suitable spot...
 	 */
 
-ENTRY(dispatch_to_fault_handler)
+GLOBAL_ENTRY(dispatch_to_fault_handler)
 	/*
 	 * Input:
 	 *	psr.ic:	off

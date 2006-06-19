@@ -19,6 +19,7 @@
 #include <public/sched.h>
 #include <asm/vhpt.h>
 #include <asm/debugger.h>
+#include <asm/vmx.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/vcpu.h>
 
@@ -101,6 +102,17 @@ void console_print(char *msg)
 void die_if_kernel(char *str, struct pt_regs *regs, long err) /* __attribute__ ((noreturn)) */
 {
 	if (user_mode(regs))
+		return;
+
+	printk("%s: %s %ld\n", __func__, str, err);
+	debugtrace_dump();
+	show_registers(regs);
+	domain_crash_synchronous();
+}
+
+void vmx_die_if_kernel(char *str, struct pt_regs *regs, long err) /* __attribute__ ((noreturn)) */
+{
+	if (vmx_user_mode(regs))
 		return;
 
 	printk("%s: %s %ld\n", __func__, str, err);

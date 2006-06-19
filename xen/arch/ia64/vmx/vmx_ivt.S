@@ -88,11 +88,13 @@
 
 #include "vmx_minstate.h"
 
+#define MINSTATE_VIRT	/* needed by minstate.h */
+#include "minstate.h"
 
 
 #define VMX_FAULT(n)    \
 vmx_fault_##n:;          \
-    br.sptk vmx_fault_##n;         \
+    br.sptk.many dispatch_to_fault_handler;         \
     ;;                  \
 
 
@@ -508,7 +510,7 @@ ENTRY(vmx_interrupt)
     ;;
 .mem.offset 0,0; st8.spill [r16]=r13,16
 .mem.offset 8,0; st8.spill [r17]=r8,16 /* save ar.fpsr */
-    mov r13=r21    /* establish `current' */
+    MINSTATE_GET_CURRENT(r13)
     ;;
 .mem.offset 0,0; st8.spill [r16]=r15,16
 .mem.offset 8,0; st8.spill [r17]=r14,16
