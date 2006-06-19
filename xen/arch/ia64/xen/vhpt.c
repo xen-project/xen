@@ -153,7 +153,10 @@ void domain_flush_vtlb_all (void)
 	int cpu = smp_processor_id ();
 	struct vcpu *v;
 
-	for_each_vcpu (current->domain, v)
+	for_each_vcpu (current->domain, v) {
+		if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
+			continue;
+
 		if (v->processor == cpu)
 			vcpu_flush_vtlb_all ();
 		else
@@ -161,6 +164,7 @@ void domain_flush_vtlb_all (void)
 				(v->processor,
 				 (void(*)(void *))vcpu_flush_vtlb_all,
 				 NULL,1,1);
+	}
 }
 
 static void cpu_flush_vhpt_range (int cpu, u64 vadr, u64 addr_range)
@@ -198,6 +202,9 @@ void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
 #endif
 
 	for_each_vcpu (d, v) {
+		if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
+			continue;
+
 		/* Purge TC entries.
 		   FIXME: clear only if match.  */
 		vcpu_purge_tr_entry(&PSCBX(v,dtlb));
@@ -206,6 +213,9 @@ void domain_flush_vtlb_range (struct domain *d, u64 vadr, u64 addr_range)
 	smp_mb();
 
 	for_each_vcpu (d, v) {
+		if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
+			continue;
+
 		/* Invalidate VHPT entries.  */
 		cpu_flush_vhpt_range (v->processor, vadr, addr_range);
 	}

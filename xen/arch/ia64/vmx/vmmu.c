@@ -544,6 +544,9 @@ IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu,UINT64 va,UINT64 ps)
     vcpu_get_rr(vcpu, va, &args.rid);
     args.ps = ps;
     for_each_vcpu (d, v) {
+        if (!test_bit(_VCPUF_initialised, &v->vcpu_flags))
+            continue;
+
         args.vcpu = v;
         if (v->processor != vcpu->processor) {
             int proc;

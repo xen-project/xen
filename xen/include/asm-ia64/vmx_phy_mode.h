@@ -96,6 +96,7 @@ extern void prepare_if_physical_mode(VCPU *vcpu);
 extern void recover_if_physical_mode(VCPU *vcpu);
 extern void vmx_init_all_rr(VCPU *vcpu);
 extern void vmx_load_all_rr(VCPU *vcpu);
+extern void vmx_load_rr7_and_pta(VCPU *vcpu);
 extern void physical_tlb_miss(VCPU *vcpu, u64 vadr);
 /*
  * No sanity check here, since all psr changes have been

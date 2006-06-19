@@ -28,8 +28,10 @@
 #include <asm/gcc_intrin.h>
 #include <linux/interrupt.h>
 #include <asm/vmx_vcpu.h>
+#include <asm/vmx_phy_mode.h>
 #include <asm/vmmu.h>
 #include <asm/tlbflush.h>
+#include <asm/regionreg.h>
 #define  MAX_CCH_LENGTH     40
 
 thash_data_t *__alloc_chain(thash_cb_t *);
@@ -229,12 +231,13 @@ u64 guest_vhpt_lookup(u64 iha, u64 *pte)
  *  purge software guest tlb
  */
 
-static void vtlb_purge(thash_cb_t *hcb, u64 va, u64 ps)
+static void vtlb_purge(VCPU *v, u64 va, u64 ps)
 {
+    thash_cb_t *hcb = &v->arch.vtlb;
     thash_data_t *hash_table, *prev, *next;
     u64 start, end, size, tag, rid, def_size;
     ia64_rr vrr;
-    vcpu_get_rr(current, va, &vrr.rrval);
+    vcpu_get_rr(v, va, &vrr.rrval);
     rid = vrr.rid;
     size = PSIZE(ps);
     start = va & (-size);
@@ -263,16 +266,29 @@ static void vtlb_purge(thash_cb_t *hcb, u64 va, u64 ps)
     }
 //    machine_tlb_purge(va, ps);
 }
+
+static void
+switch_rr7_and_pta(VCPU* v)
+{
+    if (VMX_DOMAIN(v))
+        vmx_load_rr7_and_pta(v);
+    else
+        load_region_reg7_and_pta(v);
+}
+
 /*
  *  purge VHPT and machine TLB
  */
-static void vhpt_purge(thash_cb_t *hcb, u64 va, u64 ps)
+static void vhpt_purge(VCPU *v, u64 va, u64 ps)
 {
+    //thash_cb_t *hcb = &v->arch.vhpt;
     thash_data_t *hash_table, *prev, *next;
     u64 start, end, size, tag;
     size = PSIZE(ps);
     start = va & (-size);
     end = start + size;
+    if (current != v)
+        switch_rr7_and_pta(v);
     while(start < end){
         hash_table = (thash_data_t *)ia64_thash(start);
         tag = ia64_ttag(start);
@@ -294,6 +310,8 @@ static void vhpt_purge(thash_cb_t *hcb, u64 va, u64 ps)
         start += PAGE_SIZE;
     }
     machine_tlb_purge(va, ps);
+    if (current != v)
+        switch_rr7_and_pta(current);
 }
 
 /*
@@ -413,8 +431,8 @@ int vtr_find_overlap(VCPU *vcpu, u64 va, u64 ps, int is_data)
 void thash_purge_entries(VCPU *v, u64 va, u64 ps)
 {
     if(vcpu_quick_region_check(v->arch.tc_regions,va))
-        vtlb_purge(&v->arch.vtlb, va, ps);
-    vhpt_purge(&v->arch.vhpt, va, ps);
+        vtlb_purge(v, va, ps);
+    vhpt_purge(v, va, ps);
 }
 
 u64 translate_phy_pte(VCPU *v, u64 *pte, u64 itir, u64 va)
@@ -456,17 +474,17 @@ void thash_purge_and_insert(VCPU *v, u64 pte, u64 itir, u64 ifa)
         phy_pte = translate_phy_pte(v, &pte, itir, ifa);
         if(ps==PAGE_SHIFT){
             if(!(pte&VTLB_PTE_IO)){
-                vhpt_purge(&v->arch.vhpt, ifa, ps);
+                vhpt_purge(v, ifa, ps);
                 vmx_vhpt_insert(&v->arch.vhpt, phy_pte, itir, ifa);
             }
             else{
-                vhpt_purge(&v->arch.vhpt, ifa, ps);
+                vhpt_purge(v, ifa, ps);
                 vtlb_insert(&v->arch.vtlb, pte, itir, ifa);
                 vcpu_quick_region_set(PSCBX(v,tc_regions),ifa);
             }
         }
         else{
-            vhpt_purge(&v->arch.vhpt, ifa, ps);
+            vhpt_purge(v, ifa, ps);
             vtlb_insert(&v->arch.vtlb, pte, itir, ifa);
             vcpu_quick_region_set(PSCBX(v,tc_regions),ifa);
             if(!(pte&VTLB_PTE_IO)){

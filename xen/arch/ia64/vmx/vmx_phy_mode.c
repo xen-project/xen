@@ -137,13 +137,14 @@ vmx_init_all_rr(VCPU *vcpu)
 #endif
 }
 
+extern void * pal_vaddr;
+
 void
 vmx_load_all_rr(VCPU *vcpu)
 {
 	unsigned long psr;
 	ia64_rr phy_rr;
 
-	extern void * pal_vaddr;
 	local_irq_save(psr);
 
 
@@ -200,6 +201,24 @@ vmx_load_all_rr(VCPU *vcpu)
 
 	ia64_srlz_d();
 	ia64_set_psr(psr);
+	ia64_srlz_i();
+}
+
+void
+vmx_load_rr7_and_pta(VCPU *vcpu)
+{
+	unsigned long psr;
+
+	local_irq_save(psr);
+
+	vmx_switch_rr7(vrrtomrr(vcpu,VMX(vcpu, vrr[VRN7])),
+			(void *)vcpu->domain->shared_info,
+			(void *)vcpu->arch.privregs,
+			(void *)vcpu->arch.vhpt.hash, pal_vaddr );
+	ia64_set_pta(vcpu->arch.arch_vmx.mpta);
+
+	ia64_srlz_d();
+	local_irq_restore(psr);
 	ia64_srlz_i();
 }
 
