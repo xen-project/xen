@@ -428,6 +428,8 @@ void print_stack(vcpu_guest_context_t *ctx, int vcpu)
         }
     }
 }
+#else
+#define print_stack(ctx, vcpu)
 #endif
 
 void dump_ctx(int vcpu)
@@ -451,10 +453,8 @@ void dump_ctx(int vcpu)
     }
 
     print_ctx(&ctx);
-#ifndef NO_TRANSLATION
     if (is_kernel_text(INSTR_POINTER((&ctx.user_regs))))
         print_stack(&ctx, vcpu);
-#endif
 
     ret = xc_domain_unpause(xc_handle, domid);
     if (ret < 0) {
