@@ -1408,7 +1408,10 @@ int
 vcpu_get_domain_bundle(VCPU* vcpu, REGS* regs, UINT64 gip, IA64_BUNDLE* bundle)
 {
 	UINT64 gpip;// guest pseudo phyiscal ip
+	unsigned long vaddr;
+	struct page_info* page;
 
+again:
 #if 0
 	// Currently xen doesn't track psr.it bits.
 	// it assumes always psr.it = 1.
@@ -1471,8 +1474,22 @@ vcpu_get_domain_bundle(VCPU* vcpu, REGS* regs, UINT64 gip, IA64_BUNDLE* bundle)
 		gpip = ((tr.pte.ppn >> (tr.ps - 12)) << tr.ps) |
 			(gip & ((1 << tr.ps) - 1));
 	}
-
-	*bundle = *((IA64_BUNDLE*)__va(__gpa_to_mpa(vcpu->domain, gpip)));
+	
+	vaddr = domain_mpa_to_imva(vcpu->domain, gpip);
+	page = virt_to_page(vaddr);
+	if (get_page(page, vcpu->domain) == 0) {
+		if (page_get_owner(page) != vcpu->domain) {
+			// This page might be a page granted by another
+			// domain.
+			panic_domain(regs,
+				     "domain tries to execute foreign domain "
+				     "page which might be mapped by grant "
+				     "table.\n");
+		}
+		goto again;
+	}
+	*bundle = *((IA64_BUNDLE*)vaddr);
+	put_page(page);
 	return 1;
 }
 

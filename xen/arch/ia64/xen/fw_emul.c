@@ -359,18 +359,32 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 
 // given a current domain (virtual or metaphysical) address, return the virtual address
 static unsigned long
-efi_translate_domain_addr(unsigned long domain_addr, IA64FAULT *fault)
+efi_translate_domain_addr(unsigned long domain_addr, IA64FAULT *fault,
+			  struct page_info** page)
 {
 	struct vcpu *v = current;
 	unsigned long mpaddr = domain_addr;
+	unsigned long virt;
 	*fault = IA64_NO_FAULT;
 
+again:
 	if (v->domain->arch.efi_virt_mode) {
 		*fault = vcpu_tpa(v, domain_addr, &mpaddr);
 		if (*fault != IA64_NO_FAULT) return 0;
 	}
 
-	return ((unsigned long) __va(translate_domain_mpaddr(mpaddr, NULL)));
+	virt = domain_mpa_to_imva(v->domain, mpaddr);
+	*page = virt_to_page(virt);
+	if (get_page(*page, current->domain) == 0) {
+		if (page_get_owner(*page) != current->domain) {
+			// which code is appropriate?
+			*fault = IA64_FAULT;
+			return 0;
+		}
+		goto again;
+	}
+
+	return virt;
 }
 
 static efi_status_t
@@ -379,18 +393,27 @@ efi_emulate_get_time(
 	IA64FAULT *fault)
 {
 	unsigned long tv = 0, tc = 0;
+	struct page_info *tv_page = NULL;
+	struct page_info *tc_page = NULL;
 	efi_status_t status;
 
 	//printf("efi_get_time(%016lx,%016lx) called\n", tv_addr, tc_addr);
-	tv = efi_translate_domain_addr(tv_addr, fault);
-	if (*fault != IA64_NO_FAULT) return 0;
+	tv = efi_translate_domain_addr(tv_addr, fault, &tv_page);
+	if (*fault != IA64_NO_FAULT)
+		return 0;
 	if (tc_addr) {
-		tc = efi_translate_domain_addr(tc_addr, fault);
-		if (*fault != IA64_NO_FAULT) return 0;
+		tc = efi_translate_domain_addr(tc_addr, fault, &tc_page);
+		if (*fault != IA64_NO_FAULT) {
+			put_page(tv_page);
+			return 0;
+		}
 	}
 	//printf("efi_get_time(%016lx,%016lx) translated to xen virtual address\n", tv, tc);
 	status = (*efi.get_time)((efi_time_t *) tv, (efi_time_cap_t *) tc);
 	//printf("efi_get_time returns %lx\n", status);
+	if (tc_page != NULL)
+		put_page(tc_page);
+	put_page(tv_page);
 	return status;
 }
 

@@ -160,10 +160,15 @@ static int do_set_shared_page(VCPU *vcpu, u64 gpa)
     u64 o_info;
     struct domain *d = vcpu->domain;
     struct vcpu *v;
+    struct page_info *page;
     if(vcpu->domain!=dom0)
         return -EPERM;
     o_info = (u64)vcpu->domain->shared_info;
+ again:
     d->shared_info= (shared_info_t *)domain_mpa_to_imva(vcpu->domain, gpa);
+    page = virt_to_page(d->shared_info);
+    if (get_page(page, d) == 0)
+        goto again;
 
     /* Copy existing shared info into new page */
     if (o_info) {
@@ -178,6 +183,7 @@ static int do_set_shared_page(VCPU *vcpu, u64 gpa)
 	    	free_xenheap_page((void *)o_info);
     } else
         memset(d->shared_info, 0, PAGE_SIZE);
+    put_page(page);
     return 0;
 }
 

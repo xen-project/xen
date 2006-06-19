@@ -313,7 +313,9 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code1, u64 *code2)
     u64     *vpa;
     thash_data_t    *tlb;
     u64     mfn;
+    struct page_info* page;
 
+ again:
     if ( !(VCPU(vcpu, vpsr) & IA64_PSR_IT) ) {   // I-side physical mode
         gpip = gip;
     }
@@ -327,15 +329,27 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code1, u64 *code2)
     if( gpip){
         mfn = gmfn_to_mfn(vcpu->domain, gpip >>PAGE_SHIFT);
         if( mfn == INVALID_MFN )  panic_domain(vcpu_regs(vcpu),"fetch_code: invalid memory\n");
-        vpa =(u64 *)__va( (gip & (PAGE_SIZE-1)) | (mfn<<PAGE_SHIFT));
     }else{
         tlb = vhpt_lookup(gip);
         if( tlb == NULL)
             panic_domain(vcpu_regs(vcpu),"No entry found in ITLB and DTLB\n");
-        vpa =(u64 *)__va((tlb->ppn>>(PAGE_SHIFT-ARCH_PAGE_SHIFT)<<PAGE_SHIFT)|(gip&(PAGE_SIZE-1)));
+        mfn = tlb->ppn >> (PAGE_SHIFT - ARCH_PAGE_SHIFT);
     }
+
+    page = mfn_to_page(mfn);
+    if (get_page(page, vcpu->domain) == 0) {
+        if (page_get_owner(page) != vcpu->domain) {
+            // This page might be a page granted by another domain.
+            panic_domain(NULL, "domain tries to execute foreign domain "
+                         "page which might be mapped by grant table.\n");
+        }
+        goto again;
+    }
+    vpa = (u64 *)__va((mfn << PAGE_SHIFT) | (gip & (PAGE_SIZE - 1)));
+
     *code1 = *vpa++;
     *code2 = *vpa;
+    put_page(page);
     return 1;
 }
 
