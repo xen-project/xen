@@ -336,7 +336,7 @@ struct vcpu_guest_context {
     unsigned long sys_pgnr;    /* System pages out of domain memory */
     unsigned long vm_assist;   /* VMASST_TYPE_* bitmap, now none on IPF */
 
-    struct cpu_user_regs regs;
+    struct cpu_user_regs user_regs;
     struct mapped_regs *privregs;
     struct arch_shared_info shared;
     struct arch_initrd_info initrd;

@@ -1158,10 +1158,10 @@ static int xc_linux_build_internal(int xc_handle,
     ctxt->flags = 0;
     ctxt->shared.flags = flags;
     ctxt->shared.start_info_pfn = nr_pages - 3; /* metaphysical */
-    ctxt->regs.cr_ipsr = 0; /* all necessary bits filled by hypervisor */
-    ctxt->regs.cr_iip = vkern_entry;
-    ctxt->regs.cr_ifs = 1UL << 63;
-    ctxt->regs.ar_fpsr = xc_ia64_fpsr_default();
+    ctxt->user_regs.cr_ipsr = 0; /* all necessary bits filled by hypervisor */
+    ctxt->user_regs.cr_iip = vkern_entry;
+    ctxt->user_regs.cr_ifs = 1UL << 63;
+    ctxt->user_regs.ar_fpsr = xc_ia64_fpsr_default();
     /* currently done by hypervisor, should move here */
     /* ctxt->regs.r28 = dom_fw_setup(); */
     ctxt->privregs = 0;

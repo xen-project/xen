@@ -353,7 +353,7 @@ void arch_domain_destroy(struct domain *d)
 
 void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
 {
-	c->regs = *vcpu_regs (v);
+	c->user_regs = *vcpu_regs (v);
 	c->shared = v->domain->shared_info->arch;
 }
 
@@ -378,7 +378,7 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	} else if (!d->arch.physmap_built)
 	    build_physmap_table(d);
 
-	*regs = c->regs;
+	*regs = c->user_regs;
 	cmdline_addr = 0;
 	if (v == d->vcpu[0]) {
 	    /* Only for first vcpu.  */

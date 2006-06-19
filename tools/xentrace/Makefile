@@ -28,6 +28,10 @@ ifeq ($(XEN_TARGET_ARCH),x86_64)
 LIBBIN  += xenctx
 endif
 
+ifeq ($(XEN_TARGET_ARCH),ia64)
+LIBBIN  += xenctx
+endif
+
 .PHONY: all
 all: build
 

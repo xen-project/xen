@@ -44,6 +44,15 @@ int stack_trace = 0;
 #define INSTR_POINTER(regs)	(regs->rip)
 #define STACK_ROWS		4
 #define STACK_COLS		4
+#elif defined (__ia64__)
+#define FMT_SIZE_T		"%016lx"
+#define STACK_POINTER(regs)	(regs->r12)
+#define FRAME_POINTER(regs)	0
+#define INSTR_POINTER(regs)	(regs->cr_iip)
+#define STACK_ROWS		4
+#define STACK_COLS		4
+/* On ia64, we can't translate virtual address to physical address.  */
+#define NO_TRANSLATION
 #endif
 
 struct symbol {
@@ -255,8 +264,33 @@ void print_ctx(vcpu_guest_context_t *ctx1)
     printf(" gs: %08x\n", regs->gs);
 
 }
+#elif defined(__ia64__)
+void print_ctx(vcpu_guest_context_t *ctx1)
+{
+    struct cpu_user_regs *regs = &ctx1->user_regs;
+
+    printf("iip: %016lx ", regs->cr_iip);
+    print_symbol(regs->cr_iip);
+    printf("\n");
+    printf(" sp: %016lx  ", regs->r12);
+    printf(" b0: %016lx\n", regs->b0);
+    printf(" tp: %016lx  ", regs->r13);
+    printf(" r1: %016lx\n", regs->r1);
+
+
+    printf(" r2: %016lx  ", regs->r2);
+    printf(" r3: %016lx\n", regs->r3);
+    printf(" r4: %016lx  ", regs->r4);
+    printf(" r5: %016lx\n", regs->r5);
+
+    printf(" r6: %016lx  ", regs->r6);
+    printf(" r7: %016lx\n", regs->r7);
+    printf(" r8: %016lx  ", regs->r8);
+    printf(" r9: %016lx\n", regs->r9);
+}
 #endif
 
+#ifndef NO_TRANSLATION
 void *map_page(vcpu_guest_context_t *ctx, int vcpu, size_t virt)
 {
     static unsigned long previous_mfn = 0;
@@ -371,6 +405,7 @@ void print_stack(vcpu_guest_context_t *ctx, int vcpu)
         }
     }
 }
+#endif
 
 void dump_ctx(int vcpu)
 {
@@ -393,8 +428,10 @@ void dump_ctx(int vcpu)
     }
 
     print_ctx(&ctx);
-    if (is_kernel_text(ctx.user_regs.eip))
+#ifndef NO_TRANSLATION
+    if (is_kernel_text(INSTR_POINTER((&ctx.user_regs))))
         print_stack(&ctx, vcpu);
+#endif
 
     ret = xc_domain_unpause(xc_handle, domid);
     if (ret < 0) {
