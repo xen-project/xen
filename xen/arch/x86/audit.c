@@ -923,8 +923,8 @@ void _audit_domain(struct domain *d, int flags)
                                d->domain_id, page_to_mfn(page),
                                page->u.inuse.type_info,
                                page->count_info);
-                        printk("a->gpfn_and_flags=%p\n",
-                               (void *)a->gpfn_and_flags);
+                        printk("a->gpfn_and_flags=%"PRIx64"\n",
+                               (u64)a->gpfn_and_flags);
                         errors++;
                     }
                     break;

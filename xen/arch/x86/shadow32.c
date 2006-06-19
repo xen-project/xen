@@ -306,7 +306,7 @@ alloc_shadow_page(struct domain *d,
     //
     ASSERT( (psh_type == PGT_snapshot) || !mfn_out_of_sync(gmfn) );
 
-    set_shadow_status(d, gpfn, gmfn, smfn, psh_type);
+    set_shadow_status(d, gpfn, gmfn, smfn, psh_type, 0);
 
     if ( pin )
         shadow_pin(smfn);
@@ -395,7 +395,7 @@ void free_shadow_page(unsigned long smfn)
 
     ASSERT( ! IS_INVALID_M2P_ENTRY(gpfn) );
 
-    delete_shadow_status(d, gpfn, gmfn, type);
+    delete_shadow_status(d, gpfn, gmfn, type, 0);
 
     switch ( type )
     {
@@ -2319,7 +2319,7 @@ increase_writable_pte_prediction(struct domain *d, unsigned long gpfn, unsigned 
     prediction = (prediction & PGT_mfn_mask) | score;
 
     //printk("increase gpfn=%lx pred=%lx create=%d\n", gpfn, prediction, create);
-    set_shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), 0, prediction, PGT_writable_pred);
+    set_shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), 0, prediction, PGT_writable_pred, 0);
 
     if ( create )
         perfc_incr(writable_pte_predictions);
@@ -2340,10 +2340,10 @@ decrease_writable_pte_prediction(struct domain *d, unsigned long gpfn, unsigned 
     //printk("decrease gpfn=%lx pred=%lx score=%lx\n", gpfn, prediction, score);
 
     if ( score )
-        set_shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), 0, prediction, PGT_writable_pred);
+        set_shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), 0, prediction, PGT_writable_pred, 0);
     else
     {
-        delete_shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), 0, PGT_writable_pred);
+        delete_shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), 0, PGT_writable_pred, 0);
         perfc_decr(writable_pte_predictions);
     }
 }
@@ -2381,7 +2381,7 @@ free_writable_pte_predictions(struct domain *d)
              * keep an accurate count of writable_pte_predictions to keep it
              * happy.
              */
-            delete_shadow_status(d, gpfn_list[count], 0, PGT_writable_pred);
+            delete_shadow_status(d, gpfn_list[count], 0, PGT_writable_pred, 0);
             perfc_decr(writable_pte_predictions);
         }
 

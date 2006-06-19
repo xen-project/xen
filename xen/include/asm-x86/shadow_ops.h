@@ -22,6 +22,14 @@
 #ifndef _XEN_SHADOW_OPS_H
 #define _XEN_SHADOW_OPS_H
 
+#define PAGING_L4      4UL
+#define PAGING_L3      3UL
+#define PAGING_L2      2UL
+#define PAGING_L1      1UL
+
+#define PAE_CR3_ALIGN       5
+#define PAE_CR3_IDX_MASK    0x7f
+
 #if defined( GUEST_PGENTRY_32 )
 
 #define GUEST_L1_PAGETABLE_ENTRIES     L1_PAGETABLE_ENTRIES_32

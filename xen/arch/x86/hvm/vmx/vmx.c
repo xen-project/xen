@@ -1623,7 +1623,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             if ( vmx_pgbit_test(v) )
             {
                 /* The guest is a 32-bit PAE guest. */
-#if CONFIG_PAGING_LEVELS >= 4
+#if CONFIG_PAGING_LEVELS >= 3
                 unsigned long mfn, old_base_mfn;
 
                 if( !shadow_set_guest_paging_levels(v->domain, PAGING_L3) )
@@ -1667,7 +1667,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
             else
             {
                 /*  The guest is a 64 bit or 32-bit PAE guest. */
-#if CONFIG_PAGING_LEVELS >= 4
+#if CONFIG_PAGING_LEVELS >= 3
                 if ( (v->domain->arch.ops != NULL) &&
                         v->domain->arch.ops->guest_paging_levels == PAGING_L2)
                 {
@@ -1680,15 +1680,6 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
                     {
                         printk("Unsupported guest paging levels\n");
                         /* need to take a clean path */
-                        domain_crash_synchronous();
-                    }
-                }
-                else
-                {
-                    if ( !shadow_set_guest_paging_levels(v->domain,
-                                                            PAGING_L4) )
-                    {
-                        printk("Unsupported guest paging levels\n");
                         domain_crash_synchronous();
                     }
                 }

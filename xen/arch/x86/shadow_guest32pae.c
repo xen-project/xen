@@ -1,5 +1,4 @@
 #define GUEST_32PAE
-#if defined (__x86_64__)
 
 #include "shadow.c"
 struct shadow_ops MODE_64_PAE_HANDLER = {
@@ -15,4 +14,3 @@ struct shadow_ops MODE_64_PAE_HANDLER = {
     .gva_to_gpa                 = gva_to_gpa_64,
 };
 
-#endif

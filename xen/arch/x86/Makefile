@@ -41,7 +41,7 @@ obj-y += usercopy.o
 obj-y += x86_emulate.o
 
 ifneq ($(pae),n)
-obj-$(x86_32) += shadow.o shadow_public.o shadow_guest32.o
+obj-$(x86_32) += shadow.o shadow_public.o shadow_guest32.o shadow_guest32pae.o
 else
 obj-$(x86_32) += shadow32.o
 endif
