@@ -268,9 +268,9 @@ void share_xen_page_with_privileged_guests(
 
 #if defined(CONFIG_X86_PAE)
 
-#ifdef NDEBUG
+#if 1 /*def NDEBUG*/ /* KAF: Non-debug case is suspect: let's always use it. */
 /* Only PDPTs above 4GB boundary need to be shadowed in low memory. */
-#define l3tab_needs_shadow(mfn) (mfn >= 0x100000)
+#define l3tab_needs_shadow(mfn) ((mfn) >= 0x100000)
 #else
 /*
  * In debug builds we aggressively shadow PDPTs to exercise code paths.
@@ -278,9 +278,9 @@ void share_xen_page_with_privileged_guests(
  * (detected by lack of an owning domain). Always shadow PDPTs above 4GB.
  */
 #define l3tab_needs_shadow(mfn)                         \
-    ((((mfn << PAGE_SHIFT) != __pa(idle_pg_table)) &&   \
+    (((((mfn) << PAGE_SHIFT) != __pa(idle_pg_table)) && \
       (page_get_owner(mfn_to_page(mfn)) != NULL)) ||    \
-     (mfn >= 0x100000))
+     ((mfn) >= 0x100000))
 #endif
 
 static l1_pgentry_t *fix_pae_highmem_pl1e;
