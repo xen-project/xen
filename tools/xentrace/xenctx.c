@@ -72,6 +72,9 @@ int is_kernel_text(size_t addr)
 #elif defined (__x86_64__)
     if (symbol_table == NULL)
         return (addr > 0xffffffff80000000UL);
+#elif defined (__ia64__)
+    if (symbol_table == NULL)
+        return (addr > 0xa000000000000000UL);
 #endif
 
     if (addr >= kernel_stext &&
@@ -269,24 +272,44 @@ void print_ctx(vcpu_guest_context_t *ctx1)
 {
     struct cpu_user_regs *regs = &ctx1->user_regs;
 
-    printf("iip: %016lx ", regs->cr_iip);
+    printf("iip:  %016lx  ", regs->cr_iip);
     print_symbol(regs->cr_iip);
     printf("\n");
-    printf(" sp: %016lx  ", regs->r12);
-    printf(" b0: %016lx\n", regs->b0);
-    printf(" tp: %016lx  ", regs->r13);
-    printf(" r1: %016lx\n", regs->r1);
+    printf("psr:  %016lu  ", regs->cr_ipsr);
+    printf(" b0:  %016lx\n", regs->b0);
 
-
-    printf(" r2: %016lx  ", regs->r2);
-    printf(" r3: %016lx\n", regs->r3);
-    printf(" r4: %016lx  ", regs->r4);
-    printf(" r5: %016lx\n", regs->r5);
-
-    printf(" r6: %016lx  ", regs->r6);
-    printf(" r7: %016lx\n", regs->r7);
-    printf(" r8: %016lx  ", regs->r8);
-    printf(" r9: %016lx\n", regs->r9);
+    printf(" r1:  %016lx\n", regs->r1);
+    printf(" r2:  %016lx  ", regs->r2);
+    printf(" r3:  %016lx\n", regs->r3);
+    printf(" r4:  %016lx  ", regs->r4);
+    printf(" r5:  %016lx\n", regs->r5);
+    printf(" r6:  %016lx  ", regs->r6);
+    printf(" r7:  %016lx\n", regs->r7);
+    printf(" r8:  %016lx  ", regs->r8);
+    printf(" r9:  %016lx\n", regs->r9);
+    printf(" r10: %016lx  ", regs->r10);
+    printf(" r11: %016lx\n", regs->r11);
+    printf(" sp:  %016lx  ", regs->r12);
+    printf(" tp:  %016lx\n", regs->r13);
+    printf(" r14: %016lx  ", regs->r14);
+    printf(" r15: %016lx\n", regs->r15);
+    printf(" r16: %016lx  ", regs->r16);
+    printf(" r17: %016lx\n", regs->r17);
+    printf(" r18: %016lx  ", regs->r18);
+    printf(" r19: %016lx\n", regs->r19);
+    printf(" r20: %016lx  ", regs->r20);
+    printf(" r21: %016lx\n", regs->r21);
+    printf(" r22: %016lx  ", regs->r22);
+    printf(" r23: %016lx\n", regs->r23);
+    printf(" r24: %016lx  ", regs->r24);
+    printf(" r25: %016lx\n", regs->r25);
+    printf(" r26: %016lx  ", regs->r26);
+    printf(" r27: %016lx\n", regs->r27);
+    printf(" r28: %016lx  ", regs->r28);
+    printf(" r29: %016lx\n", regs->r29);
+    printf(" r30: %016lx  ", regs->r30);
+    printf(" r31: %016lx\n", regs->r31);
+    
 }
 #endif
 
