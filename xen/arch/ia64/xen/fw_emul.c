@@ -370,7 +370,7 @@ efi_translate_domain_addr(unsigned long domain_addr, IA64FAULT *fault)
 		if (*fault != IA64_NO_FAULT) return 0;
 	}
 
-	return ((unsigned long) __va(translate_domain_mpaddr(mpaddr)));
+	return ((unsigned long) __va(translate_domain_mpaddr(mpaddr, NULL)));
 }
 
 static efi_status_t
@@ -549,7 +549,7 @@ do_ssc(unsigned long ssc, struct pt_regs *regs)
 	    case SSC_WAIT_COMPLETION:
 		if (arg0) {	// metaphysical address
 
-			arg0 = translate_domain_mpaddr(arg0);
+			arg0 = translate_domain_mpaddr(arg0, NULL);
 /**/			stat = (struct ssc_disk_stat *)__va(arg0);
 ///**/			if (stat->fd == last_fd) stat->count = last_count;
 /**/			stat->count = last_count;
@@ -564,7 +564,7 @@ do_ssc(unsigned long ssc, struct pt_regs *regs)
 		arg1 = vcpu_get_gr(current,33);	// access rights
 if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring...)\n"); arg0 = 0; }
 		if (arg0) {	// metaphysical address
-			arg0 = translate_domain_mpaddr(arg0);
+			arg0 = translate_domain_mpaddr(arg0, NULL);
 			retval = ia64_ssc(arg0,arg1,0,0,ssc);
 		}
 		else retval = -1L;
@@ -581,7 +581,7 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 			unsigned long mpaddr;
 			long len;
 
-			arg2 = translate_domain_mpaddr(arg2);
+			arg2 = translate_domain_mpaddr(arg2, NULL);
 			req = (struct ssc_disk_req *) __va(arg2);
 			req->len &= 0xffffffffL;	// avoid strange bug
 			len = req->len;
@@ -592,7 +592,7 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 			retval = 0;
 			if ((mpaddr & PAGE_MASK) != ((mpaddr+len-1) & PAGE_MASK)) {
 				// do partial page first
-				req->addr = translate_domain_mpaddr(mpaddr);
+				req->addr = translate_domain_mpaddr(mpaddr, NULL);
 				req->len = PAGE_SIZE - (req->addr & ~PAGE_MASK);
 				len -= req->len; mpaddr += req->len;
 				retval = ia64_ssc(arg0,arg1,arg2,arg3,ssc);
@@ -602,7 +602,7 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 //if (last_count >= PAGE_SIZE) printf("ssc(%p,%lx)[part]=%x ",req->addr,req->len,retval);
 			}
 			if (retval >= 0) while (len > 0) {
-				req->addr = translate_domain_mpaddr(mpaddr);
+				req->addr = translate_domain_mpaddr(mpaddr, NULL);
 				req->len = (len > PAGE_SIZE) ? PAGE_SIZE : len;
 				len -= PAGE_SIZE; mpaddr += PAGE_SIZE;
 				retval = ia64_ssc(arg0,arg1,arg2,arg3,ssc);

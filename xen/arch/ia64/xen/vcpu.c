@@ -29,7 +29,6 @@ extern void getfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_
 extern void setfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_regs *regs);
 
 extern void panic_domain(struct pt_regs *, const char *, ...);
-extern unsigned long translate_domain_mpaddr(unsigned long);
 extern IA64_BUNDLE __get_domain_bundle(UINT64);
 
 typedef	union {
@@ -1978,18 +1977,24 @@ IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 {
 	unsigned long pteval, logps = itir_ps(itir);
 	BOOLEAN swap_rr0 = (!(ifa>>61) && PSCB(vcpu,metaphysical_mode));
+	struct p2m_entry entry;
 
 	if (logps < PAGE_SHIFT) {
 		printf("vcpu_itc_d: domain trying to use smaller page size!\n");
 		//FIXME: kill domain here
 		while(1);
 	}
+again:
 	//itir = (itir & ~0xfc) | (PAGE_SHIFT<<2); // ignore domain's pagesize
-	pteval = translate_domain_pte(pte, ifa, itir, &logps);
+	pteval = translate_domain_pte(pte, ifa, itir, &logps, &entry);
 	if (!pteval) return IA64_ILLOP_FAULT;
 	if (swap_rr0) set_one_rr(0x0,PSCB(vcpu,rrs[0]));
 	vcpu_itc_no_srlz(vcpu,2,ifa,pteval,pte,logps);
 	if (swap_rr0) set_metaphysical_rr0();
+	if (p2m_entry_retry(&entry)) {
+		vcpu_flush_tlb_vhpt_range(ifa & ((1 << logps) - 1), logps);
+		goto again;
+	}
 	return IA64_NO_FAULT;
 }
 
@@ -1997,6 +2002,7 @@ IA64FAULT vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 {
 	unsigned long pteval, logps = itir_ps(itir);
 	BOOLEAN swap_rr0 = (!(ifa>>61) && PSCB(vcpu,metaphysical_mode));
+	struct p2m_entry entry;
 
 	// FIXME: validate ifa here (not in Xen space), COULD MACHINE CHECK!
 	if (logps < PAGE_SHIFT) {
@@ -2004,13 +2010,18 @@ IA64FAULT vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 		//FIXME: kill domain here
 		while(1);
 	}
+again:
 	//itir = (itir & ~0xfc) | (PAGE_SHIFT<<2); // ignore domain's pagesize
-	pteval = translate_domain_pte(pte, ifa, itir, &logps);
+	pteval = translate_domain_pte(pte, ifa, itir, &logps, &entry);
 	// FIXME: what to do if bad physical address? (machine check?)
 	if (!pteval) return IA64_ILLOP_FAULT;
 	if (swap_rr0) set_one_rr(0x0,PSCB(vcpu,rrs[0]));
 	vcpu_itc_no_srlz(vcpu, 1,ifa,pteval,pte,logps);
 	if (swap_rr0) set_metaphysical_rr0();
+	if (p2m_entry_retry(&entry)) {
+		vcpu_flush_tlb_vhpt_range(ifa & ((1 << logps) - 1), logps);
+		goto again;
+	}
 	return IA64_NO_FAULT;
 }
 
@@ -2040,10 +2051,14 @@ IA64FAULT vcpu_fc(VCPU *vcpu, UINT64 vadr)
 	UINT64 mpaddr, paddr;
 	IA64FAULT fault;
 
+again:
 	fault = vcpu_tpa(vcpu, vadr, &mpaddr);
 	if (fault == IA64_NO_FAULT) {
-		paddr = translate_domain_mpaddr(mpaddr);
+		struct p2m_entry entry;
+		paddr = translate_domain_mpaddr(mpaddr, &entry);
 		ia64_fc(__va(paddr));
+		if (p2m_entry_retry(&entry))
+			goto again;
 	}
 	return fault;
 }

@@ -245,7 +245,7 @@ gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 	if (d == dom0)
 		return(gpfn);
 #endif
-	pte = lookup_domain_mpa(d,gpfn << PAGE_SHIFT);
+	pte = lookup_domain_mpa(d,gpfn << PAGE_SHIFT, NULL);
 	if (!pte) {
 		panic("gmfn_to_mfn_foreign: bad gpfn. spinning...\n");
 	}
@@ -256,7 +256,8 @@ gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 // address, convert the pte for a physical address for (possibly different)
 // Xen PAGE_SIZE and return modified pte.  (NOTE: TLB insert should use
 // PAGE_SIZE!)
-u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
+u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
+                         struct p2m_entry* entry)
 {
 	struct domain *d = current->domain;
 	ia64_itir_t itir = {.itir = itir__};
@@ -298,7 +299,7 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
 			       address, pteval, itir.itir);
 	}
 #endif
-	pteval2 = lookup_domain_mpa(d,mpaddr);
+	pteval2 = lookup_domain_mpa(d, mpaddr, entry);
 	arflags  = pteval  & _PAGE_AR_MASK;
 	arflags2 = pteval2 & _PAGE_AR_MASK;
 	if (arflags != _PAGE_AR_R && arflags2 == _PAGE_AR_R) {
@@ -311,7 +312,7 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
 		        pteval2, arflags2, mpaddr);
 #endif
 		pteval = (pteval & ~_PAGE_AR_MASK) | _PAGE_AR_R;
-}
+    }
 
 	pteval2 &= _PAGE_PPN_MASK; // ignore non-addr bits
 	pteval2 |= (pteval & _PAGE_ED);
@@ -321,7 +322,8 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
 }
 
 // given a current domain metaphysical address, return the physical address
-unsigned long translate_domain_mpaddr(unsigned long mpaddr)
+unsigned long translate_domain_mpaddr(unsigned long mpaddr,
+                                      struct p2m_entry* entry)
 {
 	unsigned long pteval;
 
@@ -333,7 +335,7 @@ unsigned long translate_domain_mpaddr(unsigned long mpaddr)
 		}
 	}
 #endif
-	pteval = lookup_domain_mpa(current->domain,mpaddr);
+	pteval = lookup_domain_mpa(current->domain, mpaddr, entry);
 	return ((pteval & _PAGE_PPN_MASK) | (mpaddr & ~PAGE_MASK));
 }
 
@@ -484,23 +486,10 @@ ____lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
         return GPFN_INV_MASK;
     return INVALID_MFN;
 }
-
-unsigned long
-__lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
-{
-    unsigned long machine = ____lookup_domain_mpa(d, mpaddr);
-    if (machine != INVALID_MFN)
-        return machine;
-
-    printk("%s: d 0x%p id %d current 0x%p id %d\n",
-           __func__, d, d->domain_id, current, current->vcpu_id);
-    printk("%s: bad mpa 0x%lx (max_pages 0x%lx)\n",
-           __func__, mpaddr, (unsigned long)d->max_pages << PAGE_SHIFT);
-    return INVALID_MFN;
-}
 #endif
 
-unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
+unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr,
+                                struct p2m_entry* entry)
 {
     volatile pte_t *pte;
 
@@ -521,6 +510,8 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
         pte_t tmp_pte = *pte;// pte is volatile. copy the value.
         if (pte_present(tmp_pte)) {
 //printk("lookup_domain_page: found mapping for %lx, pte=%lx\n",mpaddr,pte_val(*pte));
+            if (entry != NULL)
+                p2m_entry_set(entry, pte, tmp_pte);
             return pte_val(tmp_pte);
         } else if (VMX_DOMAIN(d->vcpu[0]))
             return GPFN_INV_MASK;
@@ -535,6 +526,8 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
         printk("%s: bad mpa 0x%lx (=> 0x%lx)\n", __func__,
                mpaddr, (unsigned long)d->max_pages << PAGE_SHIFT);
 
+    if (entry != NULL)
+        p2m_entry_set(entry, NULL, __pte(0));
     //XXX This is a work around until the emulation memory access to a region
     //    where memory or device are attached is implemented.
     return pte_val(pfn_pte(0, __pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
@@ -544,7 +537,7 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 #if 1
 void *domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
 {
-    unsigned long pte = lookup_domain_mpa(d,mpaddr);
+    unsigned long pte = lookup_domain_mpa(d, mpaddr, NULL);
     unsigned long imva;
 
     pte &= _PAGE_PPN_MASK;

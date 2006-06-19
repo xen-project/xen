@@ -236,9 +236,10 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 	fault = vcpu_translate(current,address,is_data,&pteval,&itir,&iha);
 	if (fault == IA64_NO_FAULT || fault == IA64_USE_TLB) {
 		u64 logps;
-		pteval = translate_domain_pte(pteval, address, itir, &logps);
+		struct p2m_entry entry;
+		pteval = translate_domain_pte(pteval, address, itir, &logps, &entry);
 		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,logps);
-		if (read_seqretry(vtlb_lock, seq)) {
+		if (read_seqretry(vtlb_lock, seq) || p2m_entry_retry(&entry)) {
 			vcpu_flush_tlb_vhpt_range(address & ((1 << logps) - 1),
 			                          logps);
 			goto again;

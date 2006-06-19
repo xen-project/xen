@@ -12,10 +12,34 @@
 #include <xen/cpumask.h>
 #include <asm/fpswa.h>
 
+struct p2m_entry {
+    volatile pte_t*     pte;
+    pte_t               used;
+};
+
+static inline void
+p2m_entry_set(struct p2m_entry* entry, volatile pte_t* pte, pte_t used)
+{
+    entry->pte  = pte;
+    entry->used = used;
+}
+
+static inline int
+p2m_entry_retry(struct p2m_entry* entry)
+{
+    //XXX see lookup_domian_pte().
+    //    NULL is set for invalid gpaddr for the time being.
+    if (entry->pte == NULL)
+        return 0;
+
+    return (pte_val(*entry->pte) != pte_val(entry->used));
+}
+
 extern void domain_relinquish_resources(struct domain *);
 
 /* given a current domain metaphysical address, return the physical address */
-extern unsigned long translate_domain_mpaddr(unsigned long mpaddr);
+extern unsigned long translate_domain_mpaddr(unsigned long mpaddr,
+                                             struct p2m_entry* entry);
 
 /* Flush cache of domain d.
    If sync_only is true, only synchronize I&D caches,

@@ -58,7 +58,6 @@
 
 extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 extern void rnat_consumption (VCPU *vcpu);
-extern unsigned long translate_domain_mpaddr(unsigned long mpaddr);
 extern void alt_itlb (VCPU *vcpu, u64 vadr);
 extern void itlb_fault (VCPU *vcpu, u64 vadr);
 extern void ivhpt_fault (VCPU *vcpu, u64 vadr);

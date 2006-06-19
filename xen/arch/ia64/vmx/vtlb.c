@@ -425,7 +425,7 @@ u64 translate_phy_pte(VCPU *v, u64 *pte, u64 itir, u64 va)
     phy_pte.val = *pte;
     addr = *pte;
     addr = ((addr & _PAGE_PPN_MASK)>>ps<<ps)|(va&((1UL<<ps)-1));
-    addr = lookup_domain_mpa(v->domain, addr);
+    addr = lookup_domain_mpa(v->domain, addr, NULL);
     if(addr & GPFN_IO_MASK){
         *pte |= VTLB_PTE_IO;
         return -1;

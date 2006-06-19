@@ -150,8 +150,6 @@ extern unsigned long max_page;
 extern void __init init_frametable(void);
 void add_to_domain_alloc_list(unsigned long ps, unsigned long pe);
 
-extern unsigned long gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
-
 static inline void put_page(struct page_info *page)
 {
     u32 nx, x, y = page->count_info;
@@ -428,7 +426,8 @@ extern void assign_new_domain0_page(struct domain *d, unsigned long mpaddr);
 extern void __assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr, unsigned long flags);
 extern void assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr);
 extern void assign_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long flags);
-extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
+struct p2m_entry;
+extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr, struct p2m_entry* entry);
 extern void *domain_mpa_to_imva(struct domain *d, unsigned long mpaddr);
 
 #ifdef CONFIG_XEN_IA64_DOM0_VP
@@ -436,7 +435,6 @@ extern unsigned long assign_domain_mmio_page(struct domain *d, unsigned long mpa
 extern unsigned long assign_domain_mach_page(struct domain *d, unsigned long mpaddr, unsigned long size, unsigned long flags);
 int domain_page_mapped(struct domain *d, unsigned long mpaddr);
 int efi_mmio(unsigned long physaddr, unsigned long size);
-extern unsigned long __lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
 extern unsigned long ____lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
 extern unsigned long do_dom0vp_op(unsigned long cmd, unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3);
 extern unsigned long dom0vp_zap_physmap(struct domain *d, unsigned long gpfn, unsigned int extent_order);
@@ -445,7 +443,7 @@ extern unsigned long dom0vp_add_physmap(struct domain* d, unsigned long gpfn, un
 
 extern volatile unsigned long *mpt_table;
 extern unsigned long gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
-extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps);
+extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps, struct p2m_entry* entry);
 #define machine_to_phys_mapping	mpt_table
 
 #define INVALID_M2P_ENTRY        (~0UL)
@@ -466,7 +464,7 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
     gmfn_to_mfn_foreign((_d), (gpfn))
 
 #define __gpfn_invalid(_d, gpfn)			\
-	(lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT)) & GPFN_INV_MASK)
+	(lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT), NULL) & GPFN_INV_MASK)
 
 #define __gmfn_valid(_d, gpfn)	!__gpfn_invalid(_d, gpfn)
 
@@ -474,7 +472,7 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
 #define __gpfn_is_io(_d, gpfn)				\
 ({                                          \
     u64 pte, ret=0;                                \
-    pte=lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT));      \
+    pte = lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT), NULL);	\
     if(!(pte&GPFN_INV_MASK))        \
         ret = pte & GPFN_IO_MASK;        \
     ret;                \
@@ -483,7 +481,7 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps)
 #define __gpfn_is_mem(_d, gpfn)				\
 ({                                          \
     u64 pte, ret=0;                                \
-    pte=lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT));      \
+    pte = lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT), NULL);		   \
     if((!(pte&GPFN_INV_MASK))&&((pte & GPFN_IO_MASK)==GPFN_MEM))   \
         ret = 1;             \
     ret;                \
