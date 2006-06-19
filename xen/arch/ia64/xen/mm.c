@@ -891,12 +891,11 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
 }
 
 static void
-zap_domain_page_one(struct domain *d, unsigned long mpaddr)
+zap_domain_page_one(struct domain *d, unsigned long mpaddr, unsigned long mfn)
 {
     struct mm_struct *mm = &d->arch.mm;
     volatile pte_t *pte;
     pte_t old_pte;
-    unsigned long mfn;
     struct page_info *page;
 
     pte = lookup_noalloc_domain_pte_none(d, mpaddr);
@@ -905,9 +904,38 @@ zap_domain_page_one(struct domain *d, unsigned long mpaddr)
     if (pte_none(*pte))
         return;
 
-    // update pte
-    old_pte = ptep_get_and_clear(mm, mpaddr, pte);
-    mfn = pte_pfn(old_pte);
+    if (mfn == INVALID_MFN) {
+        // clear pte
+        old_pte = ptep_get_and_clear(mm, mpaddr, pte);
+        mfn = pte_pfn(old_pte);
+    } else {
+        unsigned long old_arflags;
+        pte_t new_pte;
+        pte_t ret_pte;
+
+    again:
+        BUG_ON(page_get_owner(mfn_to_page(mfn)) != d);
+        old_arflags = pte_val(*pte) & ~_PAGE_PPN_MASK;
+        old_pte = pfn_pte(mfn, __pgprot(old_arflags));
+        new_pte = __pte(0);
+        
+        // update pte
+        ret_pte = ptep_cmpxchg_rel(mm, mpaddr, pte, old_pte, new_pte);
+        if (unlikely(pte_val(old_pte) != pte_val(ret_pte))) {
+            if (pte_pfn(old_pte) == pte_pfn(ret_pte)) {
+                goto again;
+            }
+
+            DPRINTK("%s: old_pte 0x%lx old_arflags 0x%lx mfn 0x%lx "
+                    "ret_pte 0x%lx ret_mfn 0x%lx\n",
+                    __func__,
+                    pte_val(old_pte), old_arflags, mfn,
+                    pte_val(ret_pte), pte_pfn(ret_pte));
+            return;
+        }
+        BUG_ON(mfn != pte_pfn(ret_pte));
+    }
+
     page = mfn_to_page(mfn);
     BUG_ON((page->count_info & PGC_count_mask) == 0);
 
@@ -931,7 +959,7 @@ dom0vp_zap_physmap(struct domain *d, unsigned long gpfn,
         return -ENOSYS;
     }
 
-    zap_domain_page_one(d, gpfn << PAGE_SHIFT);
+    zap_domain_page_one(d, gpfn << PAGE_SHIFT, INVALID_MFN);
     return 0;
 }
 
@@ -1193,7 +1221,7 @@ guest_physmap_remove_page(struct domain *d, unsigned long gpfn,
                           unsigned long mfn)
 {
     BUG_ON(mfn == 0);//XXX
-    zap_domain_page_one(d, gpfn << PAGE_SHIFT);
+    zap_domain_page_one(d, gpfn << PAGE_SHIFT, mfn);
 }
 
 //XXX sledgehammer.
