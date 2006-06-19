@@ -108,11 +108,20 @@
 #include <public/memory.h>
 
 #ifdef VERBOSE
-#define MEM_LOG(_f, _a...)                           \
-  printk("DOM%u: (file=mm.c, line=%d) " _f "\n", \
+#define MEM_LOG(_f, _a...)                                  \
+  printk("DOM%u: (file=mm.c, line=%d) " _f "\n",            \
          current->domain->domain_id , __LINE__ , ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
+#endif
+
+/*
+ * PTE updates can be done with ordinary writes except:
+ *  1. Debug builds get extra checking by using CMPXCHG[8B].
+ *  2. PAE builds perform an atomic 8-byte store with CMPXCHG8B.
+ */
+#if !defined(NDEBUG) || defined(CONFIG_X86_PAE)
+#define PTE_UPDATE_WITH_CMPXCHG
 #endif
 
 /*
@@ -1173,16 +1182,27 @@ static inline int update_l1e(l1_pgentry_t *pl1e,
     intpte_t o = l1e_get_intpte(ol1e);
     intpte_t n = l1e_get_intpte(nl1e);
 
-    if ( unlikely(cmpxchg_user(pl1e, o, n) != 0) ||
-         unlikely(o != l1e_get_intpte(ol1e)) )
+    for ( ; ; )
     {
-        MEM_LOG("Failed to update %" PRIpte " -> %" PRIpte
-                ": saw %" PRIpte,
-                l1e_get_intpte(ol1e),
-                l1e_get_intpte(nl1e),
-                o);
-        return 0;
+        if ( unlikely(cmpxchg_user(pl1e, o, n) != 0) )
+        {
+            MEM_LOG("Failed to update %" PRIpte " -> %" PRIpte
+                    ": saw %" PRIpte,
+                    l1e_get_intpte(ol1e),
+                    l1e_get_intpte(nl1e),
+                    o);
+            return 0;
+        }
+
+        if ( o == l1e_get_intpte(ol1e) )
+            break;
+
+        /* Allowed to change in Accessed/Dirty flags only. */
+        BUG_ON((o ^ l1e_get_intpte(ol1e)) &
+               ~(int)(_PAGE_ACCESSED|_PAGE_DIRTY));
+        ol1e = l1e_from_intpte(o);
     }
+
     return 1;
 #endif
 }
@@ -1235,17 +1255,20 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
 #ifndef PTE_UPDATE_WITH_CMPXCHG
 #define UPDATE_ENTRY(_t,_p,_o,_n) ({ (*(_p) = (_n)); 1; })
 #else
-#define UPDATE_ENTRY(_t,_p,_o,_n) ({                                    \
-    intpte_t __o = cmpxchg((intpte_t *)(_p),                            \
-                           _t ## e_get_intpte(_o),                      \
-                           _t ## e_get_intpte(_n));                     \
-    if ( __o != _t ## e_get_intpte(_o) )                                \
-        MEM_LOG("Failed to update %" PRIpte " -> %" PRIpte              \
-                ": saw %" PRIpte "",                                    \
-                (_t ## e_get_intpte(_o)),                               \
-                (_t ## e_get_intpte(_n)),                               \
-                (__o));                                                 \
-    (__o == _t ## e_get_intpte(_o)); })
+#define UPDATE_ENTRY(_t,_p,_o,_n) ({                            \
+    for ( ; ; )                                                 \
+    {                                                           \
+        intpte_t __o = cmpxchg((intpte_t *)(_p),                \
+                               _t ## e_get_intpte(_o),          \
+                               _t ## e_get_intpte(_n));         \
+        if ( __o == _t ## e_get_intpte(_o) )                    \
+            break;                                              \
+        /* Allowed to change in Accessed/Dirty flags only. */   \
+        BUG_ON((__o ^ _t ## e_get_intpte(_o)) &                 \
+               ~(int)(_PAGE_ACCESSED|_PAGE_DIRTY));             \
+        _o = _t ## e_from_intpte(__o);                          \
+    }                                                           \
+    1; })
 #endif
 
 /* Update the L2 entry at pl2e to new value nl2e. pl2e is within frame pfn. */
@@ -2494,7 +2517,7 @@ static int destroy_grant_pte_mapping(
     }
 
     /* Delete pagetable entry. */
-    if ( unlikely(__put_user(0, (intpte_t *)va)))
+    if ( unlikely(!update_l1e((l1_pgentry_t *)va, ol1e, l1e_empty())) )
     {
         MEM_LOG("Cannot delete PTE entry at %p", va);
         put_page_type(page);
@@ -2574,7 +2597,7 @@ static int destroy_grant_va_mapping(
     }
 
     /* Delete pagetable entry. */
-    if ( unlikely(__put_user(0, &pl1e->l1)) )
+    if ( unlikely(!update_l1e(pl1e, ol1e, l1e_empty())) )
     {
         MEM_LOG("Cannot delete PTE entry at %p", (unsigned long *)pl1e);
         return GNTST_general_error;
@@ -3424,8 +3447,9 @@ static int ptwr_emulated_update(
     }
     else
     {
-        ol1e  = *pl1e;
-        *pl1e = nl1e;
+        ol1e = *pl1e;
+        if ( !update_l1e(pl1e, ol1e, nl1e) )
+            BUG();
     }
     unmap_domain_page(pl1e);
 
