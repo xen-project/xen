@@ -276,6 +276,36 @@ void show_stack(struct cpu_user_regs *regs)
     show_trace(regs);
 }
 
+void show_stack_overflow(unsigned long esp)
+{
+#ifdef MEMORY_GUARD
+    unsigned long esp_top = get_stack_bottom() & PAGE_MASK;
+    unsigned long *stack, addr;
+
+    /* Trigger overflow trace if %esp is within 100 bytes of the guard page. */
+    if ( ((esp - esp_top) > 100) && ((esp_top - esp) > 100) )
+        return;
+
+    if ( esp < esp_top )
+        esp = esp_top;
+
+    printk("Xen stack overflow:\n   ");
+
+    stack = (unsigned long *)esp;
+    while ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) != 0 )
+    {
+        addr = *stack++;
+        if ( is_kernel_text(addr) )
+        {
+            printk("%p: [<%p>]", stack, _p(addr));
+            print_symbol(" %s\n   ", addr);
+        }
+    }
+
+    printk("\n");
+#endif
+}
+
 /*
  * This is called for faults at very unexpected times (e.g., when interrupts
  * are disabled). In such situations we can't do much that is safe. We try to
