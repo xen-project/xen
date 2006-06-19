@@ -35,7 +35,7 @@ unsigned long max_page;
 /*
  * Set up the page tables.
  */
-unsigned long *mpt_table;
+volatile unsigned long *mpt_table;
 
 void
 paging_init (void)
@@ -139,18 +139,18 @@ create_frametable_page_table (u64 start, u64 end, void *arg)
 static int
 create_mpttable_page_table (u64 start, u64 end, void *arg)
 {
+	unsigned long map_start, map_end;
 	unsigned long address, start_page, end_page;
-	unsigned long *map_start, *map_end;
 	pgd_t *pgd;
 	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 
-	map_start = mpt_table + (__pa(start) >> PAGE_SHIFT);
-	map_end   = mpt_table + (__pa(end) >> PAGE_SHIFT);
+	map_start = (unsigned long)(mpt_table + (__pa(start) >> PAGE_SHIFT));
+	map_end   = (unsigned long)(mpt_table + (__pa(end) >> PAGE_SHIFT));
 
-	start_page = (unsigned long) map_start & PAGE_MASK;
-	end_page = PAGE_ALIGN((unsigned long) map_end);
+	start_page = map_start & PAGE_MASK;
+	end_page = PAGE_ALIGN(map_end);
 
 	for (address = start_page; address < end_page; address += PAGE_SIZE) {
 		pgd = frametable_pgd_offset(address);

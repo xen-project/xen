@@ -443,7 +443,7 @@ extern unsigned long dom0vp_zap_physmap(struct domain *d, unsigned long gpfn, un
 extern unsigned long dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn, unsigned long flags, domid_t domid);
 #endif
 
-extern unsigned long *mpt_table;
+extern volatile unsigned long *mpt_table;
 extern unsigned long gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
 extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps);
 #define machine_to_phys_mapping	mpt_table
