@@ -9,6 +9,159 @@
  *                    dom0 vp model support
  */
 
+/*
+ * NOTES on SMP
+ * 
+ * * shared structures
+ * There are some structures which are accessed by CPUs concurrently.
+ * Here is the list of shared structures and operations on them which
+ * read/write the structures.
+ * 
+ * - struct page_info
+ *   This is a xen global resource. This structure is accessed by
+ *   any CPUs.
+ * 
+ *   operations on this structure:
+ *   - get_page() and its variant
+ *   - put_page() and its variant
+ * 
+ * - vTLB
+ *   vcpu->arch.{d, i}tlb: Software tlb cache. These are per VCPU data.
+ *   DEFINE_PER_CPU (unsigned long, vhpt_paddr): VHPT table per physical CPU.
+ * 
+ *   domain_flush_vtlb_range() and domain_flush_vtlb_all()
+ *   write vcpu->arch.{d, i}tlb and VHPT table of vcpu which isn't current.
+ *   So there are potential races to read/write VHPT and vcpu->arch.{d, i}tlb.
+ *   Please note that reading VHPT is done by hardware page table walker.
+ * 
+ *   operations on this structure:
+ *   - global tlb purge
+ *     vcpu_ptc_g(), vcpu_ptc_ga() and domain_page_flush()
+ *     I.e. callers of domain_flush_vtlb_range() and domain_flush_vtlb_all()
+ *     These functions invalidate VHPT entry and vcpu->arch.{i, d}tlb
+ * 
+ *   - tlb insert and fc
+ *     vcpu_itc_i()
+ *     vcpu_itc_d()
+ *     ia64_do_page_fault()
+ *     vcpu_fc()
+ *     These functions set VHPT entry and vcpu->arch.{i, d}tlb.
+ *     Actually vcpu_itc_no_srlz() does.
+ * 
+ * - the P2M table
+ *   domain->mm and pgd, pud, pmd, pte table page.
+ *   This structure is used to convert domain pseudo physical address
+ *   to machine address. This is per domain resource.
+ * 
+ *   operations on this structure:
+ *   - populate the P2M table tree
+ *     lookup_alloc_domain_pte() and its variants.
+ *   - set p2m entry
+ *     assign_new_domain_page() and its variants.
+ *     assign_domain_page() and its variants.
+ *   - xchg p2m entry
+ *     assign_domain_page_replace()
+ *   - cmpxchg p2m entry
+ *     assign_domain_page_cmpxchg_rel()
+ *     destroy_grant_host_mapping()
+ *     steal_page_for_grant_transfer()
+ *     zap_domain_page_one()
+ *   - read p2m entry
+ *     lookup_alloc_domain_pte() and its variants.
+ *     
+ * - the M2P table
+ *   mpt_table (or machine_to_phys_mapping)
+ *   This is a table which converts from machine address to pseudo physical
+ *   address. This is a global structure.
+ * 
+ *   operations on this structure:
+ *   - set m2p entry
+ *     set_gpfn_from_mfn()
+ *   - zap m2p entry
+ *     set_gpfn_from_mfn(INVALID_P2M_ENTRY)
+ *   - get m2p entry
+ *     get_gpfn_from_mfn()
+ * 
+ * 
+ * * avoiding races
+ * The resources which are shared by CPUs must be accessed carefully
+ * to avoid race.
+ * IA64 has weak memory ordering so that attention must be paid
+ * to access shared structures. [SDM vol2 PartII chap. 2]
+ * 
+ * - struct page_info memory ordering
+ *   get_page() has acquire semantics.
+ *   put_page() has release semantics.
+ * 
+ * - populating the p2m table
+ *   pgd, pud, pmd are append only.
+ * 
+ * - races when updating the P2M tables and the M2P table
+ *   The P2M entry are shared by more than one vcpu.
+ *   So they are accessed atomic operations.
+ *   I.e. xchg or cmpxchg must be used to update the p2m entry.
+ *   NOTE: When creating/destructing a domain, we don't need to take care of
+ *         this race.
+ * 
+ *   The M2P table is inverse of the P2M table.
+ *   I.e. P2M(M2P(p)) = p and M2P(P2M(m)) = m
+ *   The M2P table and P2M table must be updated consistently.
+ *   Here is the update sequence
+ * 
+ *   xchg or cmpxchg case
+ *   - set_gpfn_from_mfn(new_mfn, gpfn)
+ *   - memory barrier
+ *   - atomic update of the p2m entry (xchg or cmpxchg the p2m entry)
+ *     get old_mfn entry as a result.
+ *   - memory barrier
+ *   - set_gpfn_from_mfn(old_mfn, INVALID_P2M_ENTRY)
+ * 
+ *   Here memory barrier can be achieved by release semantics.
+ * 
+ * - races between global tlb purge and tlb insert
+ *   This is a race between reading/writing vcpu->arch.{d, i}tlb or VHPT entry.
+ *   When a vcpu is about to insert tlb, another vcpu may purge tlb
+ *   cache globally. Inserting tlb (vcpu_itc_no_srlz()) or global tlb purge
+ *   (domain_flush_vtlb_range() and domain_flush_vtlb_all()) can't update
+ *   cpu->arch.{d, i}tlb, VHPT and mTLB. So there is a race here.
+ * 
+ *   Here check vcpu->arch.{d, i}tlb.p bit
+ *   After inserting tlb entry, check the p bit and retry to insert.
+ *   This means that when global tlb purge and tlb insert are issued
+ *   simultaneously, always global tlb purge happens after tlb insert.
+ * 
+ * - races between p2m entry update and tlb insert
+ *   This is a race between reading/writing the p2m entry.
+ *   reader: vcpu_itc_i(), vcpu_itc_d(), ia64_do_page_fault(), vcpu_fc()
+ *   writer: assign_domain_page_cmpxchg_rel(), destroy_grant_host_mapping(), 
+ *           steal_page_for_grant_transfer(), zap_domain_page_one()
+ * 
+ *   For example, vcpu_itc_i() is about to insert tlb by calling
+ *   vcpu_itc_no_srlz() after reading the p2m entry.
+ *   At the same time, the p2m entry is replaced by xchg or cmpxchg and
+ *   tlb cache of the page is flushed.
+ *   There is a possibility that the p2m entry doesn't already point to the
+ *   old page, but tlb cache still points to the old page.
+ *   This can be detected similar to sequence lock using the p2m entry itself.
+ *   reader remember the read value of the p2m entry, and insert tlb.
+ *   Then read the p2m entry again. If the new p2m entry value is different
+ *   from the used p2m entry value, the retry.
+ * 
+ * - races between referencing page and p2m entry update
+ *   This is a race between reading/writing the p2m entry.
+ *   reader: vcpu_get_domain_bundle(), vmx_get_domain_bundle(),
+ *           efi_emulate_get_time()
+ *   writer: assign_domain_page_cmpxchg_rel(), destroy_grant_host_mapping(), 
+ *           steal_page_for_grant_transfer(), zap_domain_page_one()
+ * 
+ *   A page which assigned to a domain can be de-assigned by another vcpu.
+ *   So before read/write to a domain page, the page's reference count 
+ *   must be incremented.
+ *   vcpu_get_domain_bundle(), vmx_get_domain_bundle() and
+ *   efi_emulate_get_time()
+ * 
+ */
+
 #include <xen/config.h>
 #include <xen/sched.h>
 #include <xen/domain.h>
