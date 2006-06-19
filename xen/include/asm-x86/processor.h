@@ -535,6 +535,11 @@ void show_execution_state(struct cpu_user_regs *regs);
 void show_page_walk(unsigned long addr);
 asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs);
 
+/* Dumps current register and stack state. */
+#define dump_execution_state()                                              \
+    /* NB. Needs interrupts enabled else we end up in fatal_trap(). */      \
+    __asm__ __volatile__ ( "pushf ; sti ; ud2 ; .ascii \"dbg\" ; popf" )
+
 extern void mtrr_ap_init(void);
 extern void mtrr_bp_init(void);
 

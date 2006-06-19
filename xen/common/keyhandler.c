@@ -87,10 +87,28 @@ static void show_handlers(unsigned char key)
                    key_table[i].desc);
 }
 
+static void __dump_execstate(void *unused)
+{
+    dump_execution_state();
+}
+
 static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
 {
+    unsigned int cpu;
+
     printk("'%c' pressed -> dumping registers\n", key); 
-    show_execution_state(regs); 
+
+    /* Get local execution state out immediately, in case we get stuck. */
+    printk("\n*** Dumping CPU%d state: ***\n", smp_processor_id());
+    show_execution_state(regs);
+
+    for_each_online_cpu ( cpu )
+    {
+        if ( cpu == smp_processor_id() )
+            continue;
+        printk("\n*** Dumping CPU%d state: ***\n", cpu);
+        on_selected_cpus(cpumask_of_cpu(cpu), __dump_execstate, NULL, 1, 1);
+    }
 }
 
 static void halt_machine(unsigned char key, struct cpu_user_regs *regs)
