@@ -306,6 +306,12 @@ void show_stack_overflow(unsigned long esp)
 #endif
 }
 
+void show_execution_state(struct cpu_user_regs *regs)
+{
+    show_registers(regs);
+    show_stack(regs);
+}
+
 /*
  * This is called for faults at very unexpected times (e.g., when interrupts
  * are disabled). In such situations we can't do much that is safe. We try to
@@ -327,7 +333,7 @@ asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
     watchdog_disable();
     console_start_sync();
 
-    show_registers(regs);
+    show_execution_state(regs);
 
     if ( trapnr == TRAP_page_fault )
     {
@@ -390,7 +396,7 @@ static inline int do_trap(int trapnr, char *str,
 
     DEBUGGER_trap_fatal(trapnr, regs);
 
-    show_registers(regs);
+    show_execution_state(regs);
     panic("CPU%d FATAL TRAP: vector = %d (%s)\n"
           "[error_code=%04x]\n",
           smp_processor_id(), trapnr, str, regs->error_code);
@@ -482,7 +488,7 @@ asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
     if ( unlikely(!guest_mode(regs)) )
     {
         DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
-        show_registers(regs);
+        show_execution_state(regs);
         panic("CPU%d FATAL TRAP: vector = %d (invalid opcode)\n",
               smp_processor_id(), TRAP_invalid_op);
     }
@@ -511,7 +517,7 @@ asmlinkage int do_int3(struct cpu_user_regs *regs)
     if ( !guest_mode(regs) )
     {
         DEBUGGER_trap_fatal(TRAP_int3, regs);
-        show_registers(regs);
+        show_execution_state(regs);
         panic("CPU%d FATAL TRAP: vector = 3 (Int3)\n", smp_processor_id());
     } 
 
@@ -791,7 +797,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
         DEBUGGER_trap_fatal(TRAP_page_fault, regs);
 
-        show_registers(regs);
+        show_execution_state(regs);
         show_page_walk(addr);
         panic("CPU%d FATAL PAGE FAULT\n"
               "[error_code=%04x]\n"
@@ -1356,7 +1362,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
     DEBUGGER_trap_fatal(TRAP_gp_fault, regs);
 
  hardware_gp:
-    show_registers(regs);
+    show_execution_state(regs);
     panic("CPU%d GENERAL PROTECTION FAULT\n[error_code=%04x]\n",
           smp_processor_id(), regs->error_code);
     return 0;

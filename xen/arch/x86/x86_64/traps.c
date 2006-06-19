@@ -21,7 +21,7 @@
 
 #include <public/callback.h>
 
-static void __show_registers(struct cpu_user_regs *regs)
+void show_registers(struct cpu_user_regs *regs)
 {
     struct cpu_user_regs fault_regs = *regs;
     unsigned long fault_crs[8];
@@ -68,12 +68,6 @@ static void __show_registers(struct cpu_user_regs *regs)
            "ss: %04x   cs: %04x\n",
            fault_regs.ds, fault_regs.es, fault_regs.fs,
            fault_regs.gs, fault_regs.ss, fault_regs.cs);
-}
-
-void show_registers(struct cpu_user_regs *regs)
-{
-    __show_registers(regs);
-    show_stack(regs);
 }
 
 void show_page_walk(unsigned long addr)
@@ -128,7 +122,7 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
 
     /* Find information saved during fault and dump it to the console. */
     printk("************************************\n");
-    __show_registers(regs);
+    show_registers(regs);
     show_stack_overflow(regs->rsp);
     printk("************************************\n");
     printk("CPU%d DOUBLE FAULT -- system shutdown\n", smp_processor_id());

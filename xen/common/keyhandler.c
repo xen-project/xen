@@ -90,7 +90,7 @@ static void show_handlers(unsigned char key)
 static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
 {
     printk("'%c' pressed -> dumping registers\n", key); 
-    show_registers(regs); 
+    show_execution_state(regs); 
 }
 
 static void halt_machine(unsigned char key, struct cpu_user_regs *regs)

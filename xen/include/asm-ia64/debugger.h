@@ -41,6 +41,7 @@
 #include <xen/gdbstub.h>
 
 void show_registers(struct cpu_user_regs *regs);
+#define show_execution_state show_registers
 
 // NOTE: on xen struct pt_regs = struct cpu_user_regs
 //       see include/asm-ia64/linux-xen/asm/ptrace.h

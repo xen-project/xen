@@ -42,6 +42,7 @@ extern int ia64_hypercall (struct pt_regs *regs);
 extern void vmx_save_state(struct vcpu *v);
 extern void vmx_load_state(struct vcpu *v);
 extern void show_registers(struct pt_regs *regs);
+#define show_execution_state show_registers
 extern int vmx_build_physmap_table(struct domain *d);
 extern unsigned long __gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
 extern void sync_split_caches(void);

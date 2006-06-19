@@ -68,8 +68,6 @@ void show_registers(struct cpu_user_regs *regs)
            "ss: %04x   cs: %04x\n",
            fault_regs.ds, fault_regs.es, fault_regs.fs,
            fault_regs.gs, fault_regs.ss, fault_regs.cs);
-
-    show_stack(regs);
 }
 
 void show_page_walk(unsigned long addr)
