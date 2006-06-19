@@ -3495,11 +3495,13 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     /*
      * Attempt to read the PTE that maps the VA being accessed. By checking for
      * PDE validity in the L2 we avoid many expensive fixups in __get_user().
-     * NB. The L2 entry cannot be detached as the caller already checked that.
+     * NB. The L2 entry cannot be detached due to existing ptwr work: the
+     * caller already checked that.
      */
-    if ( !(l2e_get_flags(__linear_l2_table[l2_linear_offset(addr)]) &
-           _PAGE_PRESENT) ||
-         __copy_from_user(&pte,&linear_pg_table[l1_linear_offset(addr)],
+    pl2e = &__linear_l2_table[l2_linear_offset(addr)];
+    if ( __copy_from_user(&l2e, pl2e, sizeof(l2e)) ||
+        !(l2e_get_flags(l2e) & _PAGE_PRESENT) ||
+         __copy_from_user(&pte, &linear_pg_table[l1_linear_offset(addr)],
                           sizeof(pte)) )
     {
         return 0;
@@ -3617,18 +3619,16 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
                 "pfn %lx\n", PTWR_PRINT_WHICH, addr,
                 l2_idx << L2_PAGETABLE_SHIFT, pfn);
 
-    d->arch.ptwr[which].l1va   = addr | 1;
-    d->arch.ptwr[which].l2_idx = l2_idx;
-    d->arch.ptwr[which].vcpu   = current;
-
-#ifdef PERF_ARRAYS
-    d->arch.ptwr[which].eip    = regs->eip;
-#endif
-
     /* For safety, disconnect the L1 p.t. page from current space. */
     if ( which == PTWR_PT_ACTIVE )
     {
-        l2e_remove_flags(*pl2e, _PAGE_PRESENT);
+        l2e_remove_flags(l2e, _PAGE_PRESENT);
+        if ( unlikely(__copy_to_user(pl2e, &l2e, sizeof(l2e))) )
+        {
+            MEM_LOG("ptwr: Could not unhook l2e at %p", pl2e);
+            domain_crash(d);
+            return 0;
+        }
         flush_tlb_mask(d->domain_dirty_cpumask);
     }
     
@@ -3642,14 +3642,24 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     if ( unlikely(__put_user(pte.l1,
                              &linear_pg_table[l1_linear_offset(addr)].l1)) )
     {
-        MEM_LOG("ptwr: Could not update pte at %p", (unsigned long *)
+        MEM_LOG("ptwr: Could not update pte at %p",
                 &linear_pg_table[l1_linear_offset(addr)]);
-        /* Toss the writable pagetable state and crash. */
-        d->arch.ptwr[which].l1va = 0;
         domain_crash(d);
         return 0;
     }
     
+    /*
+     * Now record the writable pagetable state *after* any accesses that can
+     * cause a recursive page fault (i.e., those via the *_user() accessors).
+     * Otherwise we can enter ptwr_flush() with half-done ptwr state.
+     */
+    d->arch.ptwr[which].l1va   = addr | 1;
+    d->arch.ptwr[which].l2_idx = l2_idx;
+    d->arch.ptwr[which].vcpu   = current;
+#ifdef PERF_ARRAYS
+    d->arch.ptwr[which].eip    = regs->eip;
+#endif
+
     return EXCRET_fault_fixed;
 
  emulate:
