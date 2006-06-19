@@ -72,7 +72,7 @@ void show_registers(struct cpu_user_regs *regs)
 
 void show_page_walk(unsigned long addr)
 {
-    unsigned long pfn, mfn = read_cr3() >> PAGE_SHIFT;
+    unsigned long pfn, mfn, cr3 = read_cr3();
 #ifdef CONFIG_X86_PAE
     l3_pgentry_t l3e, *l3t;
 #endif
@@ -81,8 +81,11 @@ void show_page_walk(unsigned long addr)
 
     printk("Pagetable walk from %08lx:\n", addr);
 
+    mfn = cr3 >> PAGE_SHIFT;
+
 #ifdef CONFIG_X86_PAE
-    l3t = map_domain_page(mfn);
+    l3t  = map_domain_page(mfn);
+    l3t += (cr3 & 0xFE0UL) >> 3;
     l3e = l3t[l3_table_offset(addr)];
     mfn = l3e_get_pfn(l3e);
     pfn = get_gpfn_from_mfn(mfn);

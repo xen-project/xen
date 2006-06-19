@@ -633,7 +633,7 @@ static int handle_gdt_ldt_mapping_fault(
 static int __spurious_page_fault(
     unsigned long addr, struct cpu_user_regs *regs)
 {
-    unsigned long mfn = read_cr3() >> PAGE_SHIFT;
+    unsigned long mfn, cr3 = read_cr3();
 #if CONFIG_PAGING_LEVELS >= 4
     l4_pgentry_t l4e, *l4t;
 #endif
@@ -658,6 +658,8 @@ static int __spurious_page_fault(
     if ( regs->error_code & PGERR_instr_fetch )
         disallowed_flags |= _PAGE_NX;
 
+    mfn = cr3 >> PAGE_SHIFT;
+
 #if CONFIG_PAGING_LEVELS >= 4
     l4t = map_domain_page(mfn);
     l4e = l4t[l4_table_offset(addr)];
@@ -669,7 +671,10 @@ static int __spurious_page_fault(
 #endif
 
 #if CONFIG_PAGING_LEVELS >= 3
-    l3t = map_domain_page(mfn);
+    l3t  = map_domain_page(mfn); 
+#ifdef CONFIG_X86_PAE
+    l3t += (cr3 & 0xFE0UL) >> 3;
+#endif
     l3e = l3t[l3_table_offset(addr)];
     mfn = l3e_get_pfn(l3e);
     unmap_domain_page(l3t);
