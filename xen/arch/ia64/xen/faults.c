@@ -214,8 +214,6 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 	// FIXME should validate address here
 	unsigned long pteval;
 	unsigned long is_data = !((isr >> IA64_ISR_X_BIT) & 1UL);
-	seqlock_t* vtlb_lock = &current->domain->arch.vtlb_lock;
-	unsigned long seq;
 	IA64FAULT fault;
 
 	if ((isr & IA64_ISR_IR) && handle_lazy_cover(current, regs)) return;
@@ -232,14 +230,16 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 	}
 
  again:
-	seq = read_seqbegin(vtlb_lock);
 	fault = vcpu_translate(current,address,is_data,&pteval,&itir,&iha);
 	if (fault == IA64_NO_FAULT || fault == IA64_USE_TLB) {
 		u64 logps;
 		struct p2m_entry entry;
 		pteval = translate_domain_pte(pteval, address, itir, &logps, &entry);
 		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,logps);
-		if (read_seqretry(vtlb_lock, seq) || p2m_entry_retry(&entry)) {
+		if ((fault == IA64_USE_TLB && !current->arch.dtlb.pte.p) ||
+		    p2m_entry_retry(&entry)) {
+			/* dtlb has been purged in-between.  This dtlb was
+			   matching.  Undo the work.  */
 			vcpu_flush_tlb_vhpt_range(address & ((1 << logps) - 1),
 			                          logps);
 			goto again;

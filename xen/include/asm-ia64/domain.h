@@ -98,9 +98,6 @@ struct arch_domain {
     void *efi_runtime;
     /* Metaphysical address to fpswa_interface_t in domain firmware memory is set. */
     void *fpswa_inf;
-
-    // protect v->itlb, v->dtlb and vhpt
-    seqlock_t   vtlb_lock ____cacheline_aligned_in_smp;
 };
 #define INT_ENABLE_OFFSET(v) 		  \
     (sizeof(vcpu_info_t) * (v)->vcpu_id + \

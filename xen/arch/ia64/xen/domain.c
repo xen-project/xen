@@ -306,7 +306,6 @@ int arch_domain_create(struct domain *d)
 	// the following will eventually need to be negotiated dynamically
 	d->arch.shared_info_va = SHAREDINFO_ADDR;
 	d->arch.breakimm = 0x1000;
-	seqlock_init(&d->arch.vtlb_lock);
 
 	if (is_idle_domain(d))
 	    return 0;
