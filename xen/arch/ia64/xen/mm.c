@@ -338,10 +338,42 @@ unsigned long translate_domain_mpaddr(unsigned long mpaddr)
 }
 
 //XXX !xxx_present() should be used instread of !xxx_none()?
+// __assign_new_domain_page(), assign_new_domain_page() and
+// assign_new_domain0_page() are used only when domain creation.
+// their accesses aren't racy so that returned pte_t doesn't need
+// volatile qualifier
+static pte_t*
+__lookup_alloc_domain_pte(struct domain* d, unsigned long mpaddr)
+{
+    struct mm_struct *mm = &d->arch.mm;
+    pgd_t *pgd;
+    pud_t *pud;
+    pmd_t *pmd;
+
+    BUG_ON(mm->pgd == NULL);
+    pgd = pgd_offset(mm, mpaddr);
+    if (pgd_none(*pgd)) {
+        pgd_populate(mm, pgd, pud_alloc_one(mm,mpaddr));
+    }
+
+    pud = pud_offset(pgd, mpaddr);
+    if (pud_none(*pud)) {
+        pud_populate(mm, pud, pmd_alloc_one(mm,mpaddr));
+    }
+
+    pmd = pmd_offset(pud, mpaddr);
+    if (pmd_none(*pmd)) {
+        pmd_populate_kernel(mm, pmd, pte_alloc_one_kernel(mm, mpaddr));
+    }
+
+    return pte_offset_map(pmd, mpaddr);
+}
+
+//XXX !xxx_present() should be used instread of !xxx_none()?
 // pud, pmd, pte page is zero cleared when they are allocated.
 // Their area must be visible before population so that
 // cmpxchg must have release semantics.
-static pte_t*
+static volatile pte_t*
 lookup_alloc_domain_pte(struct domain* d, unsigned long mpaddr)
 {
     struct mm_struct *mm = &d->arch.mm;
@@ -384,11 +416,11 @@ lookup_alloc_domain_pte(struct domain* d, unsigned long mpaddr)
         }
     }
 
-    return pte_offset_map(pmd, mpaddr);
+    return (volatile pte_t*)pte_offset_map(pmd, mpaddr);
 }
 
 //XXX xxx_none() should be used instread of !xxx_present()?
-static pte_t*
+static volatile pte_t*
 lookup_noalloc_domain_pte(struct domain* d, unsigned long mpaddr)
 {
     struct mm_struct *mm = &d->arch.mm;
@@ -409,11 +441,11 @@ lookup_noalloc_domain_pte(struct domain* d, unsigned long mpaddr)
     if (unlikely(!pmd_present(*pmd)))
         return NULL;
 
-    return pte_offset_map(pmd, mpaddr);
+    return (volatile pte_t*)pte_offset_map(pmd, mpaddr);
 }
 
 #ifdef CONFIG_XEN_IA64_DOM0_VP
-static pte_t*
+static volatile pte_t*
 lookup_noalloc_domain_pte_none(struct domain* d, unsigned long mpaddr)
 {
     struct mm_struct *mm = &d->arch.mm;
@@ -434,13 +466,13 @@ lookup_noalloc_domain_pte_none(struct domain* d, unsigned long mpaddr)
     if (unlikely(pmd_none(*pmd)))
         return NULL;
 
-    return pte_offset_map(pmd, mpaddr);
+    return (volatile pte_t*)pte_offset_map(pmd, mpaddr);
 }
 
 unsigned long
 ____lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 {
-    pte_t *pte;
+    volatile pte_t *pte;
 
     pte = lookup_noalloc_domain_pte(d, mpaddr);
     if (pte == NULL)
@@ -470,7 +502,7 @@ __lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 
 unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 {
-    pte_t *pte;
+    volatile pte_t *pte;
 
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
     if (d == dom0) {
@@ -486,9 +518,10 @@ unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr)
 #endif
     pte = lookup_noalloc_domain_pte(d, mpaddr);
     if (pte != NULL) {
-        if (pte_present(*pte)) {
+        pte_t tmp_pte = *pte;// pte is volatile. copy the value.
+        if (pte_present(tmp_pte)) {
 //printk("lookup_domain_page: found mapping for %lx, pte=%lx\n",mpaddr,pte_val(*pte));
-            return pte_val(*pte);
+            return pte_val(tmp_pte);
         } else if (VMX_DOMAIN(d->vcpu[0]))
             return GPFN_INV_MASK;
     }
@@ -530,7 +563,7 @@ void *domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
 
 /* Allocate a new page for domain and map it to the specified metaphysical
    address.  */
-struct page_info *
+static struct page_info *
 __assign_new_domain_page(struct domain *d, unsigned long mpaddr, pte_t* pte)
 {
     struct page_info *p = NULL;
@@ -595,7 +628,7 @@ assign_new_domain_page(struct domain *d, unsigned long mpaddr)
     struct page_info *p = NULL;
     pte_t *pte;
 
-    pte = lookup_alloc_domain_pte(d, mpaddr);
+    pte = __lookup_alloc_domain_pte(d, mpaddr);
     if (pte_none(*pte))
         p = __assign_new_domain_page(d, mpaddr, pte);
 
@@ -610,7 +643,7 @@ assign_new_domain0_page(struct domain *d, unsigned long mpaddr)
     pte_t *pte;
 
     BUG_ON(d != dom0);
-    pte = lookup_alloc_domain_pte(d, mpaddr);
+    pte = __lookup_alloc_domain_pte(d, mpaddr);
     if (pte_none(*pte)) {
         struct page_info *p = __assign_new_domain_page(d, mpaddr, pte);
         if (p == NULL) {
@@ -622,21 +655,27 @@ assign_new_domain0_page(struct domain *d, unsigned long mpaddr)
 
 /* map a physical address to the specified metaphysical addr */
 // flags: currently only ASSIGN_readonly
+// This is called by assign_domain_mmio_page().
+// So accessing to pte is racy.
 void
 __assign_domain_page(struct domain *d,
                      unsigned long mpaddr, unsigned long physaddr,
                      unsigned long flags)
 {
-    pte_t *pte;
+    volatile pte_t *pte;
+    pte_t old_pte;
+    pte_t new_pte;
+    pte_t ret_pte;
     unsigned long arflags = (flags & ASSIGN_readonly)? _PAGE_AR_R: _PAGE_AR_RWX;
 
     pte = lookup_alloc_domain_pte(d, mpaddr);
-    if (pte_none(*pte)) {
-        set_pte_rel(pte,
-                    pfn_pte(physaddr >> PAGE_SHIFT,
-                            __pgprot(__DIRTY_BITS | _PAGE_PL_2 | arflags)));
+
+    old_pte = __pte(0);
+    new_pte = pfn_pte(physaddr >> PAGE_SHIFT,
+                      __pgprot(__DIRTY_BITS | _PAGE_PL_2 | arflags));
+    ret_pte = ptep_cmpxchg_rel(&d->arch.mm, mpaddr, pte, old_pte, new_pte);
+    if (pte_val(ret_pte) == pte_val(old_pte))
         smp_mb();
-    }
 }
 
 /* get_page() and map a physical address to the specified metaphysical addr */
@@ -755,7 +794,7 @@ assign_domain_page_replace(struct domain *d, unsigned long mpaddr,
                            unsigned long mfn, unsigned long flags)
 {
     struct mm_struct *mm = &d->arch.mm;
-    pte_t* pte;
+    volatile pte_t* pte;
     pte_t old_pte;
     pte_t npte;
     unsigned long arflags = (flags & ASSIGN_readonly)? _PAGE_AR_R: _PAGE_AR_RWX;
@@ -798,7 +837,7 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
                                unsigned long flags)
 {
     struct mm_struct *mm = &d->arch.mm;
-    pte_t* pte;
+    volatile pte_t* pte;
     unsigned long old_mfn;
     unsigned long old_arflags;
     pte_t old_pte;
@@ -810,9 +849,14 @@ assign_domain_page_cmpxchg_rel(struct domain* d, unsigned long mpaddr,
     pte = lookup_alloc_domain_pte(d, mpaddr);
 
  again:
-    old_arflags = pte_val(*pte) & ~_PAGE_PPN_MASK;//XXX
+    old_arflags = pte_val(*pte) & ~_PAGE_PPN_MASK;
     old_mfn = page_to_mfn(old_page);
     old_pte = pfn_pte(old_mfn, __pgprot(old_arflags));
+    if (!pte_present(old_pte)) {
+        DPRINTK("%s: old_pte 0x%lx old_arflags 0x%lx old_mfn 0x%lx\n",
+                __func__, pte_val(old_pte), old_arflags, old_mfn);
+        return -EINVAL;
+    }
 
     new_arflags = (flags & ASSIGN_readonly)? _PAGE_AR_R: _PAGE_AR_RWX;
     new_mfn = page_to_mfn(new_page);
@@ -850,7 +894,7 @@ static void
 zap_domain_page_one(struct domain *d, unsigned long mpaddr)
 {
     struct mm_struct *mm = &d->arch.mm;
-    pte_t *pte;
+    volatile pte_t *pte;
     pte_t old_pte;
     unsigned long mfn;
     struct page_info *page;
@@ -970,10 +1014,12 @@ destroy_grant_host_mapping(unsigned long gpaddr,
                unsigned long mfn, unsigned int flags)
 {
     struct domain* d = current->domain;
-    pte_t* pte;
+    volatile pte_t* pte;
+    unsigned long cur_arflags;
+    pte_t cur_pte;
+    pte_t new_pte;
     pte_t old_pte;
-    unsigned long old_mfn = INVALID_MFN;
-    struct page_info* old_page;
+    struct page_info* page;
 
     if (flags & (GNTMAP_application_map | GNTMAP_contains_pte)) {
         DPRINTK("%s: flags 0x%x\n", __func__, flags);
@@ -981,21 +1027,42 @@ destroy_grant_host_mapping(unsigned long gpaddr,
     }
 
     pte = lookup_noalloc_domain_pte(d, gpaddr);
-    if (pte == NULL || !pte_present(*pte) || pte_pfn(*pte) != mfn)
-        return GNTST_general_error;
-
-    // update pte
-    old_pte = ptep_get_and_clear(&d->arch.mm, gpaddr, pte);
-    if (pte_present(old_pte)) {
-        old_mfn = pte_pfn(old_pte);
-    } else {
+    if (pte == NULL) {
+        DPRINTK("%s: gpaddr 0x%lx mfn 0x%lx\n", __func__, gpaddr, mfn);
         return GNTST_general_error;
     }
-    domain_page_flush(d, gpaddr, old_mfn, INVALID_MFN);
 
-    old_page = mfn_to_page(old_mfn);
-    BUG_ON(page_get_owner(old_page) == d);//try_to_clear_PGC_allocate(d, page) is not needed.
-    put_page(old_page);
+ again:
+    cur_arflags = pte_val(*pte) & ~_PAGE_PPN_MASK;
+    cur_pte = pfn_pte(mfn, __pgprot(cur_arflags));
+    if (!pte_present(cur_pte)) {
+        DPRINTK("%s: gpaddr 0x%lx mfn 0x%lx cur_pte 0x%lx\n",
+                __func__, gpaddr, mfn, pte_val(cur_pte));
+        return GNTST_general_error;
+    }
+    new_pte = __pte(0);
+
+    old_pte = ptep_cmpxchg_rel(&d->arch.mm, gpaddr, pte, cur_pte, new_pte);
+    if (unlikely(!pte_present(old_pte))) {
+        DPRINTK("%s: gpaddr 0x%lx mfn 0x%lx cur_pte 0x%lx old_pte 0x%lx\n",
+                __func__, gpaddr, mfn, pte_val(cur_pte), pte_val(old_pte));
+        return GNTST_general_error;
+    }
+    if (unlikely(pte_val(cur_pte) != pte_val(old_pte))) {
+        if (pte_pfn(old_pte) == mfn) {
+            goto again;
+        }
+        DPRINTK("%s gpaddr 0x%lx mfn 0x%lx cur_pte 0x%lx old_pte 0x%lx\n",
+                __func__, gpaddr, mfn, pte_val(cur_pte), pte_val(old_pte));
+        return GNTST_general_error;
+    }
+    BUG_ON(pte_pfn(old_pte) != mfn);
+
+    domain_page_flush(d, gpaddr, mfn, INVALID_MFN);
+
+    page = mfn_to_page(mfn);
+    BUG_ON(page_get_owner(page) == d);//try_to_clear_PGC_allocate(d, page) is not needed.
+    put_page(page);
 
     return GNTST_okay;
 }
@@ -1141,7 +1208,7 @@ domain_page_flush(struct domain* d, unsigned long mpaddr,
 int
 domain_page_mapped(struct domain* d, unsigned long mpaddr)
 {
-    pte_t * pte;
+    volatile pte_t * pte;
 
     pte = lookup_noalloc_domain_pte(d, mpaddr);
     if(pte != NULL && !pte_none(*pte))

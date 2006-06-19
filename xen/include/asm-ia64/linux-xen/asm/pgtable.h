@@ -210,7 +210,7 @@ ia64_phys_addr_valid (unsigned long addr)
 #define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
 #ifdef XEN
 static inline void
-set_pte_rel(pte_t* ptep, pte_t pteval)
+set_pte_rel(volatile pte_t* ptep, pte_t pteval)
 {
 #if CONFIG_SMP
 	asm volatile ("st8.rel [%0]=%1" ::
@@ -402,8 +402,14 @@ ptep_test_and_clear_dirty (struct vm_area_struct *vma, unsigned long addr, pte_t
 }
 #endif
 
+#ifdef XEN
+static inline pte_t
+ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
+		   volatile pte_t *ptep)
+#else
 static inline pte_t
 ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
+#endif
 {
 #ifdef CONFIG_SMP
 	return __pte(xchg((long *) ptep, 0));
@@ -416,7 +422,8 @@ ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 
 #ifdef XEN
 static inline pte_t
-ptep_xchg(struct mm_struct *mm, unsigned long addr, pte_t *ptep, pte_t npte)
+ptep_xchg(struct mm_struct *mm, unsigned long addr,
+	  volatile pte_t *ptep, pte_t npte)
 {
 #ifdef CONFIG_SMP
 	return __pte(xchg((long *) ptep, pte_val(npte)));
@@ -428,8 +435,8 @@ ptep_xchg(struct mm_struct *mm, unsigned long addr, pte_t *ptep, pte_t npte)
 }
 
 static inline pte_t
-ptep_cmpxchg_rel(struct mm_struct *mm, unsigned long addr, pte_t *ptep,
-		 pte_t old_pte, pte_t new_pte)
+ptep_cmpxchg_rel(struct mm_struct *mm, unsigned long addr,
+		 volatile pte_t *ptep, pte_t old_pte, pte_t new_pte)
 {
 #ifdef CONFIG_SMP
 	return __pte(cmpxchg_rel(&pte_val(*ptep),
