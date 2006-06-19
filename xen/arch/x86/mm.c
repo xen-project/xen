@@ -3378,10 +3378,10 @@ static int ptwr_emulated_update(
          (l1_linear_offset(l1va) == l1_linear_offset(addr)) )
         ptwr_flush(d, PTWR_PT_INACTIVE);
 #else
-    ASSERT(((l1va = d->arch.ptwr[PTWR_PT_ACTIVE].l1va) == 0) ||
-           (l1_linear_offset(l1va) != l1_linear_offset(addr)));
-    ASSERT(((l1va = d->arch.ptwr[PTWR_PT_INACTIVE].l1va) == 0) ||
-           (l1_linear_offset(l1va) != l1_linear_offset(addr)));
+    BUG_ON(((l1va = d->arch.ptwr[PTWR_PT_ACTIVE].l1va) != 0) &&
+           (l1_linear_offset(l1va) == l1_linear_offset(addr)));
+    BUG_ON(((l1va = d->arch.ptwr[PTWR_PT_INACTIVE].l1va) != 0) &&
+           (l1_linear_offset(l1va) == l1_linear_offset(addr)));
 #endif
 
     /* Read the PTE that maps the page being updated. */
