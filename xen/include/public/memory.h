@@ -141,6 +141,20 @@ typedef struct xen_machphys_mfn_list xen_machphys_mfn_list_t;
 DEFINE_XEN_GUEST_HANDLE(xen_machphys_mfn_list_t);
 
 /*
+ * Returns the location in virtual address space of the machine_to_phys
+ * mapping table. Architectures which do not have a m2p table, or which do not
+ * map it by default into guest address space, do not implement this command.
+ * arg == addr of xen_machphys_mapping_t.
+ */
+#define XENMEM_machphys_mapping     12
+struct xen_machphys_mapping {
+    unsigned long v_start, v_end; /* Start and end virtual addresses.   */
+    unsigned long max_mfn;        /* Maximum MFN that can be looked up. */
+};
+typedef struct xen_machphys_mapping xen_machphys_mapping_t;
+DEFINE_XEN_GUEST_HANDLE(xen_machphys_mapping_t);
+
+/*
  * Sets the GPFN at which a particular page appears in the specified guest's
  * pseudophysical address space.
  * arg == addr of xen_add_to_physmap_t.

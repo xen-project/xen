@@ -85,6 +85,10 @@ void copy_page(void *, void *);
 
 extern unsigned long *phys_to_machine_mapping;
 
+#undef machine_to_phys_mapping
+extern unsigned long *machine_to_phys_mapping;
+extern unsigned int   machine_to_phys_order;
+
 static inline unsigned long pfn_to_mfn(unsigned long pfn)
 {
 	if (xen_feature(XENFEAT_auto_translated_physmap))
@@ -107,7 +111,7 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
 	if (xen_feature(XENFEAT_auto_translated_physmap))
 		return mfn;
 
-	if (mfn >= MACH2PHYS_NR_ENTRIES)
+	if (unlikely((mfn >> machine_to_phys_order) != 0))
 		return end_pfn;
 
 	/* The array access can fail (e.g., device space beyond end of RAM). */
@@ -123,7 +127,7 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
 		"	.quad 1b,3b\n"
 		".previous"
 		: "=r" (pfn)
-		: "m" (machine_to_phys_mapping[mfn]), "ir" (end_pfn) );
+		: "m" (machine_to_phys_mapping[mfn]), "m" (end_pfn) );
 
 	return pfn;
 }
