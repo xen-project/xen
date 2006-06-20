@@ -84,6 +84,7 @@ static inline int phys_to_machine_mapping_valid(unsigned long pfn)
 
 static inline unsigned long mfn_to_pfn(unsigned long mfn)
 {
+	extern unsigned long max_mapnr;
 	unsigned long pfn;
 
 	if (xen_feature(XENFEAT_auto_translated_physmap))
