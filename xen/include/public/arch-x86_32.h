@@ -74,16 +74,23 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
  */
 #ifdef CONFIG_X86_PAE
 #define __HYPERVISOR_VIRT_START 0xF5800000
+#define __MACH2PHYS_VIRT_START  0xF5800000
+#define __MACH2PHYS_VIRT_END    0xF6800000
 #else
 #define __HYPERVISOR_VIRT_START 0xFC000000
+#define __MACH2PHYS_VIRT_START  0xFC000000
+#define __MACH2PHYS_VIRT_END    0xFC400000
 #endif
 
 #ifndef HYPERVISOR_VIRT_START
 #define HYPERVISOR_VIRT_START mk_unsigned_long(__HYPERVISOR_VIRT_START)
 #endif
 
+#define MACH2PHYS_VIRT_START  mk_unsigned_long(__MACH2PHYS_VIRT_START)
+#define MACH2PHYS_VIRT_END    mk_unsigned_long(__MACH2PHYS_VIRT_END)
+#define MACH2PHYS_NR_ENTRIES  ((MACH2PHYS_VIRT_END-MACH2PHYS_VIRT_START)>>2)
 #ifndef machine_to_phys_mapping
-#define machine_to_phys_mapping ((unsigned long *)HYPERVISOR_VIRT_START)
+#define machine_to_phys_mapping ((unsigned long *)MACH2PHYS_VIRT_START)
 #endif
 
 /* Maximum number of virtual CPUs in multi-processor guests. */

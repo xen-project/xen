@@ -396,11 +396,13 @@ void __init __start_xen(multiboot_info_t *mbi)
     BUILD_BUG_ON(sizeof(shared_info_t) > PAGE_SIZE);
     BUILD_BUG_ON(sizeof(vcpu_info_t) != 64);
 
-    /* __foo are defined in public headers. Check they match internal defs. */
+    /* Check definitions in public headers match internal defs. */
     BUILD_BUG_ON(__HYPERVISOR_VIRT_START != HYPERVISOR_VIRT_START);
 #ifdef HYPERVISOR_VIRT_END
     BUILD_BUG_ON(__HYPERVISOR_VIRT_END   != HYPERVISOR_VIRT_END);
 #endif
+    BUILD_BUG_ON(MACH2PHYS_VIRT_START != RO_MPT_VIRT_START);
+    BUILD_BUG_ON(MACH2PHYS_VIRT_END   != RO_MPT_VIRT_END);
 
     init_frametable();
 
