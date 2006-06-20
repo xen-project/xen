@@ -106,7 +106,7 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
 		"	.long 1b,3b\n"
 		".previous"
 		: "=r" (pfn)
-		: "m" (machine_to_phys_mapping[mfn]), "i" (max_mapnr) );
+		: "m" (machine_to_phys_mapping[mfn]), "ir" (max_mapnr) );
 
 	return pfn;
 }
