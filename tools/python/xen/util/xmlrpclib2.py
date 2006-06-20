@@ -40,6 +40,31 @@ from xen.xend.XendLogging import log
 #
 # It assumes that the RPC handler is /RPC2.  This probably needs to be improved
 
+# We're forced to subclass the RequestHandler class so that we can work around
+# some bugs in Keep-Alive handling and also enabled it by default
+class XMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    # this is inspired by SimpleXMLRPCRequestHandler's do_POST but differs
+    # in a few non-trivial ways
+    # 1) we never generate internal server errors.  We let the exception
+    #    propagate so that it shows up in the Xend debug logs
+    # 2) we don't bother checking for a _dispatch function since we don't
+    #    use one
+    # 3) we never shutdown the connection.  This appears to be a bug in
+    #    SimpleXMLRPCServer.py as it breaks HTTP Keep-Alive
+    def do_POST(self):
+        data = self.rfile.read(int(self.headers["content-length"]))
+        rsp = self.server._marshaled_dispatch(data)
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/xml")
+        self.send_header("Content-Length", str(len(rsp)))
+        self.end_headers()
+
+        self.wfile.write(rsp)
+        self.wfile.flush()
+
 class HTTPUnixConnection(HTTPConnection):
     def connect(self):
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -94,6 +119,10 @@ class ServerProxy(xmlrpclib.ServerProxy):
 class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
     allow_reuse_address = True
 
+    def __init__(self, addr, requestHandler=XMLRPCRequestHandler,
+                 logRequests=1):
+        SimpleXMLRPCServer.__init__(self, addr, requestHandler, logRequests)
+
     def _marshaled_dispatch(self, data, dispatch_method = None):
         params, method = xmlrpclib.loads(data)
         try:
@@ -131,10 +160,10 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
 # It implements proper support for allow_reuse_address by
 # unlink()'ing an existing socket.
 
-class UnixXMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
+class UnixXMLRPCRequestHandler(XMLRPCRequestHandler):
     def address_string(self):
         try:
-            return SimpleXMLRPCRequestHandler.address_string(self)
+            return XMLRPCRequestHandler.address_string(self)
         except ValueError, e:
             return self.client_address[:2]
 
