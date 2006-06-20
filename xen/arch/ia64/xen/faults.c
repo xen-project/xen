@@ -215,6 +215,8 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 	unsigned long pteval;
 	unsigned long is_data = !((isr >> IA64_ISR_X_BIT) & 1UL);
 	IA64FAULT fault;
+	int is_ptc_l_needed = 0;
+	u64 logps;
 
 	if ((isr & IA64_ISR_IR) && handle_lazy_cover(current, regs)) return;
 	if ((isr & IA64_ISR_SP)
@@ -232,7 +234,6 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
  again:
 	fault = vcpu_translate(current,address,is_data,&pteval,&itir,&iha);
 	if (fault == IA64_NO_FAULT || fault == IA64_USE_TLB) {
-		u64 logps;
 		struct p2m_entry entry;
 		pteval = translate_domain_pte(pteval, address, itir, &logps, &entry);
 		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,logps);
@@ -242,11 +243,18 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 			   matching.  Undo the work.  */
 			vcpu_flush_tlb_vhpt_range(address & ((1 << logps) - 1),
 			                          logps);
+
+			// the stale entry which we inserted above
+			// may remains in tlb cache.
+			// we don't purge it now hoping next itc purges it.
+			is_ptc_l_needed = 1;
 			goto again;
 		}
 		return;
 	}
 
+	if (is_ptc_l_needed)
+		vcpu_ptc_l(current, address, logps);
 	if (!user_mode (regs)) {
 		/* The fault occurs inside Xen.  */
 		if (!ia64_done_with_exception(regs)) {
