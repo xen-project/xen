@@ -476,7 +476,11 @@ void init_console(void)
         if ( strncmp(p, "com", 3) == 0 )
             sercon_handle = serial_parse_handle(p);
         else if ( strncmp(p, "vga", 3) == 0 )
+        {
             vgacon_enabled = 1;
+            if ( strncmp(p+3, "[keep]", 6) == 0 )
+                vgacon_enabled++;
+        }
     }
 
     init_vga();
@@ -502,7 +506,7 @@ void init_console(void)
     }
 }
 
-void console_endboot(int disable_vga)
+void console_endboot(void)
 {
     int i, j;
 
@@ -532,8 +536,12 @@ void console_endboot(int disable_vga)
         printk("\n");
     }
 
-    if ( disable_vga )
-        vgacon_enabled = 0;
+    if ( vgacon_enabled )
+    {
+        vgacon_enabled--;
+        printk("Xen is %s VGA console.\n",
+               vgacon_enabled ? "keeping" : "relinquishing");
+    }
 
     /*
      * If user specifies so, we fool the switch routine to redirect input

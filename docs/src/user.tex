@@ -1972,7 +1972,8 @@ editing \path{grub.conf}.
 \item [ console=$<$specifier list$>$ ] Specify the destination for Xen
   console I/O.  This is a comma-separated list of, for example:
   \begin{description}
-  \item[ vga ] Use VGA console and allow keyboard input.
+  \item[ vga ] Use VGA console (only until domain 0 boots, unless {\bf
+  vga[keep] } is specified).
   \item[ com1 ] Use serial port com1.
   \item[ com2H ] Use serial port com2. Transmitted chars will have the
     MSB set. Received chars must have MSB set.

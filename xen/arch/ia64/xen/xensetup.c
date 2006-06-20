@@ -511,9 +511,8 @@ printk("About to call domain_create()\n");
 printk("About to call init_trace_bufs()\n");
     init_trace_bufs();
 
-    /* Give up the VGA console if DOM0 is configured to grab it. */
 #ifdef CONFIG_XEN_CONSOLE_INPUT	/* CONFIG_SERIAL_8250_CONSOLE=n in dom0! */
-    console_endboot(cmdline && strstr(cmdline, "tty0"));
+    console_endboot();
 #endif
 
     domain0_ready = 1;

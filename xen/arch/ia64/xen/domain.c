@@ -855,9 +855,7 @@ int construct_dom0(struct domain *d,
 	sprintf(si->magic, "xen-%i.%i-ia64", XEN_VERSION, XEN_SUBVERSION);
 	si->nr_pages     = max_pages;
 
-	/* Give up the VGA console if DOM0 is configured to grab it. */
-	if (cmdline != NULL)
-	    console_endboot(strstr(cmdline, "tty0") != NULL);
+	console_endboot();
 
 	printk("Dom0: 0x%lx\n", (u64)dom0);
 

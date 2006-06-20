@@ -598,8 +598,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     init_trace_bufs();
 
-    /* Give up the VGA console if DOM0 is configured to grab it. */
-    console_endboot(cmdline && strstr(cmdline, "tty0"));
+    console_endboot();
 
     /* Hide UART from DOM0 if we're using it */
     serial_endboot();
