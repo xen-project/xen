@@ -967,9 +967,6 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
         if ( peer_cpu == cpu )
             break;
 
-        BUG_ON( peer_cpu >= csched_priv.ncpus );
-        BUG_ON( peer_cpu == cpu );
-
         /*
          * Get ahold of the scheduler lock for this peer CPU.
          *
@@ -1072,7 +1069,6 @@ csched_schedule(s_time_t now)
     ret.task = snext->vcpu;
 
     CSCHED_VCPU_CHECK(ret.task);
-    BUG_ON( !vcpu_runnable(ret.task) );
 
     return ret;
 }
