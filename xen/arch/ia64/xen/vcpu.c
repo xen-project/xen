@@ -271,8 +271,7 @@ IA64FAULT vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24)
 	if (imm.pp) {
 		ipsr->pp = 1;
 		psr.pp = 1;	// priv perf ctrs always enabled
-// FIXME: need new field in mapped_regs_t for virtual psr.pp (psr.be too?)
-		PSCB(vcpu,tmp[8]) = 0;	// but fool the domain if it gets psr
+		PSCB(vcpu,vpsr_pp) = 0;	// but fool the domain if it gets psr
 	}
 	if (imm.up) { ipsr->up = 0; psr.up = 0; }
 	if (imm.sp) { ipsr->sp = 0; psr.sp = 0; }
@@ -315,9 +314,9 @@ IA64FAULT vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm24)
 	if (imm.dfh) ipsr->dfh = 1;
 	if (imm.dfl) ipsr->dfl = 1;
 	if (imm.pp) {
-		ipsr->pp = 1; psr.pp = 1;
-// FIXME: need new field in mapped_regs_t for virtual psr.pp (psr.be too?)
-		PSCB(vcpu,tmp[8]) = 1;
+		ipsr->pp = 1;
+		psr.pp = 1;
+		PSCB(vcpu,vpsr_pp) = 1;
 	}
 	if (imm.sp) { ipsr->sp = 1; psr.sp = 1; }
 	if (imm.i) {
@@ -362,12 +361,11 @@ IA64FAULT vcpu_set_psr_l(VCPU *vcpu, UINT64 val)
 	if (newpsr.dfl) ipsr->dfl = 1;
 	if (newpsr.pp) {
 		ipsr->pp = 1; psr.pp = 1;
-// FIXME: need new field in mapped_regs_t for virtual psr.pp (psr.be too?)
-		PSCB(vcpu,tmp[8]) = 1;
+		PSCB(vcpu,vpsr_pp) = 1;
 	}
 	else {
 		ipsr->pp = 1; psr.pp = 1;
-		PSCB(vcpu,tmp[8]) = 0;
+		PSCB(vcpu,vpsr_pp) = 0;
 	}
 	if (newpsr.up) { ipsr->up = 1; psr.up = 1; }
 	if (newpsr.sp) { ipsr->sp = 1; psr.sp = 1; }
@@ -406,8 +404,7 @@ IA64FAULT vcpu_get_psr(VCPU *vcpu, UINT64 *pval)
 	else newpsr.ic = 0;
 	if (PSCB(vcpu,metaphysical_mode)) newpsr.dt = 0;
 	else newpsr.dt = 1;
-// FIXME: need new field in mapped_regs_t for virtual psr.pp (psr.be too?)
-	if (PSCB(vcpu,tmp[8])) newpsr.pp = 1;
+	if (PSCB(vcpu,vpsr_pp)) newpsr.pp = 1;
 	else newpsr.pp = 0;
 	*pval = *(unsigned long *)&newpsr;
 	return IA64_NO_FAULT;

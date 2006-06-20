@@ -286,14 +286,15 @@ struct mapped_regs {
             unsigned long interrupt_mask_addr;
             int pending_interruption;
             int incomplete_regframe; // see SDM vol2 6.8
-            unsigned long reserved5_1[4];
+            unsigned char vpsr_pp;
+            unsigned char reserved5_2[7];
+            unsigned long reserved5_1[3];
             int metaphysical_mode; // 1 = use metaphys mapping, 0 = use virtual
             int banknum; // 0 or 1, which virtual register bank is active
             unsigned long rrs[8]; // region registers
             unsigned long krs[8]; // kernel registers
             unsigned long pkrs[8]; // protection key registers
             unsigned long tmp[8]; // temp registers (e.g. for hyperprivops)
-            // FIXME: tmp[8] temp'ly being used for virtual psr.pp
         };
     };
     unsigned long  reserved6[3456];
