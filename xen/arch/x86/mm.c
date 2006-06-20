@@ -268,18 +268,20 @@ void share_xen_page_with_privileged_guests(
 
 #if defined(CONFIG_X86_PAE)
 
-#if 1 /*def NDEBUG*/ /* KAF: Non-debug case is suspect: let's always use it. */
+#ifdef NDEBUG
 /* Only PDPTs above 4GB boundary need to be shadowed in low memory. */
 #define l3tab_needs_shadow(mfn) ((mfn) >= 0x100000)
 #else
 /*
- * In debug builds we aggressively shadow PDPTs to exercise code paths.
+ * In debug builds we shadow a selection of <4GB PDPTs to exercise code paths.
  * We cannot safely shadow the idle page table, nor shadow-mode page tables
- * (detected by lack of an owning domain). Always shadow PDPTs above 4GB.
+ * (detected by lack of an owning domain). As required for correctness, we
+ * always shadow PDPTs aboive 4GB.
  */
 #define l3tab_needs_shadow(mfn)                         \
     (((((mfn) << PAGE_SHIFT) != __pa(idle_pg_table)) && \
-      (page_get_owner(mfn_to_page(mfn)) != NULL)) ||    \
+      (page_get_owner(mfn_to_page(mfn)) != NULL) &&     \
+      ((mfn) & 1)) || /* odd MFNs are shadowed */       \
      ((mfn) >= 0x100000))
 #endif
 
@@ -305,6 +307,8 @@ static void __write_ptbase(unsigned long mfn)
     if ( !l3tab_needs_shadow(mfn) )
     {
         write_cr3(mfn << PAGE_SHIFT);
+        /* Cache is no longer in use or valid (/after/ write to %cr3). */
+        cache->high_mfn = 0;
         return;
     }
 
