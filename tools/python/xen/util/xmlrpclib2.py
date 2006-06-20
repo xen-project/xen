@@ -13,7 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2006 Anthony Liguori <aliguori@us.ibm.com>
-# Copyright (C) 2006 XenSource Ltd.
+# Copyright (C) 2006 XenSource Inc.
 #============================================================================
 
 """
@@ -24,67 +24,20 @@ import string
 import types
 
 from httplib import HTTPConnection, HTTP
-from xmlrpclib import Transport, getparser, Fault
+from xmlrpclib import Transport
 from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
-from subprocess import Popen, PIPE
-from getpass import getuser
-from fcntl import ioctl
-import xmlrpclib, socket, os, stat, termios, errno
 import SocketServer
+import xmlrpclib, socket, os, stat
 
 from xen.xend.XendLogging import log
 
-class SSHTransport(object):
-    def __init__(self, host, user, askpass=None):
-        self.host = host
-        self.user = user
-        self.askpass = askpass
-        self.ssh = None
-
-    def getssh(self):
-        if self.ssh == None:
-            if self.askpass:
-                f = open('/dev/tty', 'w')
-                try:
-                    os.environ['SSH_ASKPASS'] = self.askpass
-                    ioctl(f.fileno(), termios.TIOCNOTTY)
-                finally:
-                    f.close()
-
-            cmd = ['ssh', '%s@%s' % (self.user, self.host), 'xm serve']
-            try:
-                self.ssh = Popen(cmd, bufsize=0, stdin=PIPE, stdout=PIPE)
-            except OSError, (err, msg):
-                if err == errno.ENOENT:
-                    raise Fault(0, "ssh executable not found!")
-                raise
-        return self.ssh
-
-    def request(self, host, handler, request_body, verbose=0):
-        p, u = getparser()
-        ssh = self.getssh()
-        ssh.stdin.write("""POST /%s HTTP/1.1
-User-Agent: Xen
-Host: %s
-Content-Type: text/xml
-Content-Length: %d
-
-%s""" % (handler, host, len(request_body), request_body))
-        ssh.stdin.flush()
-
-        content_length = 0
-        line = ssh.stdout.readline()
-        if line.split()[1] != '200':
-            raise Fault(0, 'Server returned %s' % (' '.join(line[1:])))
-        
-        while line not in ['', '\r\n', '\n']:
-            if line.lower().startswith('content-length:'):
-                content_length = int(line[15:].strip())
-            line = ssh.stdout.readline()
-        content = ssh.stdout.read(content_length)
-        p.feed(content)
-        p.close()
-        return u.close()
+try:
+    import SSHTransport
+    ssh_enabled = True
+except ImportError:
+    # SSHTransport is disabled on Python <2.4, because it uses the subprocess
+    # package.
+    ssh_enabled = False
 
 
 # A new ServerProxy that also supports httpu urls.  An http URL comes in the
@@ -155,21 +108,12 @@ class ServerProxy(xmlrpclib.ServerProxy):
                 uri = 'http:' + rest
                 transport = UnixTransport()
             elif protocol == 'ssh':
-                if not rest.startswith('//'):
-                    raise ValueError("Invalid ssh URL '%s'" % uri)
-                rest = rest[2:]
-                user = getuser()
-                path = 'RPC2'
-                if rest.find('@') != -1:
-                    (user, rest) = rest.split('@', 1)
-                if rest.find('/') != -1:
-                    (host, rest) = rest.split('/', 1)
-                    if len(rest) > 0:
-                        path = rest
+                global ssh_enabled
+                if ssh_enabled:
+                    (transport, uri) = SSHTransport.getHTTPURI(uri)
                 else:
-                    host = rest
-                transport = SSHTransport(host, user)
-                uri = 'http://%s/%s' % (host, path)
+                    raise ValueError(
+                        "SSH transport not supported on Python <2.4.")
         xmlrpclib.ServerProxy.__init__(self, uri, transport, encoding,
                                        verbose, allow_none)
 

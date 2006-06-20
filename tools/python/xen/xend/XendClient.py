@@ -19,6 +19,7 @@
 
 from xen.util.xmlrpclib2 import ServerProxy
 import os
+import sys
 
 XML_RPC_SOCKET = "/var/run/xend/xmlrpc.sock"
 
@@ -30,4 +31,9 @@ uri = 'httpu:///var/run/xend/xmlrpc.sock'
 if os.environ.has_key('XM_SERVER'):
     uri = os.environ['XM_SERVER']
 
-server = ServerProxy(uri)
+try:
+    server = ServerProxy(uri)
+except ValueError, exn:
+    print >>sys.stderr, exn
+    sys.exit(1)
+
