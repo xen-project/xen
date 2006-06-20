@@ -24,13 +24,67 @@ import string
 import types
 
 from httplib import HTTPConnection, HTTP
-from xmlrpclib import Transport
+from xmlrpclib import Transport, getparser, Fault
 from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
-import xmlrpclib, socket, os, stat
+from subprocess import Popen, PIPE
+from getpass import getuser
+from fcntl import ioctl
+import xmlrpclib, socket, os, stat, termios, errno
 import SocketServer
 
-import xen.xend.XendClient
 from xen.xend.XendLogging import log
+
+class SSHTransport(object):
+    def __init__(self, host, user, askpass=None):
+        self.host = host
+        self.user = user
+        self.askpass = askpass
+        self.ssh = None
+
+    def getssh(self):
+        if self.ssh == None:
+            if self.askpass:
+                f = open('/dev/tty', 'w')
+                try:
+                    os.environ['SSH_ASKPASS'] = self.askpass
+                    ioctl(f.fileno(), termios.TIOCNOTTY)
+                finally:
+                    f.close()
+
+            cmd = ['ssh', '%s@%s' % (self.user, self.host), 'xm serve']
+            try:
+                self.ssh = Popen(cmd, bufsize=0, stdin=PIPE, stdout=PIPE)
+            except OSError, (err, msg):
+                if err == errno.ENOENT:
+                    raise Fault(0, "ssh executable not found!")
+                raise
+        return self.ssh
+
+    def request(self, host, handler, request_body, verbose=0):
+        p, u = getparser()
+        ssh = self.getssh()
+        ssh.stdin.write("""POST /%s HTTP/1.1
+User-Agent: Xen
+Host: %s
+Content-Type: text/xml
+Content-Length: %d
+
+%s""" % (handler, host, len(request_body), request_body))
+        ssh.stdin.flush()
+
+        content_length = 0
+        line = ssh.stdout.readline()
+        if line.split()[1] != '200':
+            raise Fault(0, 'Server returned %s' % (' '.join(line[1:])))
+        
+        while line not in ['', '\r\n', '\n']:
+            if line.lower().startswith('content-length:'):
+                content_length = int(line[15:].strip())
+            line = ssh.stdout.readline()
+        content = ssh.stdout.read(content_length)
+        p.feed(content)
+        p.close()
+        return u.close()
 
 
 # A new ServerProxy that also supports httpu urls.  An http URL comes in the
@@ -100,9 +154,24 @@ class ServerProxy(xmlrpclib.ServerProxy):
             if protocol == 'httpu':
                 uri = 'http:' + rest
                 transport = UnixTransport()
+            elif protocol == 'ssh':
+                if not rest.startswith('//'):
+                    raise ValueError("Invalid ssh URL '%s'" % uri)
+                rest = rest[2:]
+                user = getuser()
+                path = 'RPC2'
+                if rest.find('@') != -1:
+                    (user, rest) = rest.split('@', 1)
+                if rest.find('/') != -1:
+                    (host, rest) = rest.split('/', 1)
+                    if len(rest) > 0:
+                        path = rest
+                else:
+                    host = rest
+                transport = SSHTransport(host, user)
+                uri = 'http://%s/%s' % (host, path)
         xmlrpclib.ServerProxy.__init__(self, uri, transport, encoding,
                                        verbose, allow_none)
-
 
     def __request(self, methodname, params):
         response = xmlrpclib.ServerProxy.__request(self, methodname, params)
@@ -150,6 +219,7 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
         except xmlrpclib.Fault, fault:
             response = xmlrpclib.dumps(fault)
         except Exception, exn:
+            import xen.xend.XendClient
             log.exception(exn)
             response = xmlrpclib.dumps(
                 xmlrpclib.Fault(xen.xend.XendClient.ERROR_INTERNAL, str(exn)))
