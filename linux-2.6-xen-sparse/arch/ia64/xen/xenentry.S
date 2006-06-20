@@ -765,7 +765,7 @@ skip_rbs_switch:
 #ifdef CONFIG_XEN
 	movl r25=XSI_IPSR
 	;;
-	st8[r25]=r29,XSI_IFS-XSI_IPSR
+	st8[r25]=r29,XSI_IFS_OFS-XSI_IPSR_OFS
 	;;
 #else
 	mov cr.ipsr=r29		// M2
@@ -776,7 +776,7 @@ skip_rbs_switch:
 #ifdef CONFIG_XEN
 (p9)	st8 [r25]=r30
 	;;
-	adds r25=XSI_IIP-XSI_IFS,r25
+	adds r25=XSI_IIP_OFS-XSI_IFS_OFS,r25
 	;;
 #else
 (p9)	mov cr.ifs=r30		// M2

@@ -283,7 +283,7 @@ struct mapped_regs {
              * shared info area now. interrupt_mask_addr is the address
              * of evtchn_upcall_mask for current vcpu
              */
-            unsigned long interrupt_mask_addr;
+            unsigned char *interrupt_mask_addr;
             int pending_interruption;
             int incomplete_regframe; // see SDM vol2 6.8
             unsigned char vpsr_pp;
@@ -379,6 +379,14 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 #define ASSIGN_writable                 (0UL << _ASSIGN_readonly) // dummy flag
 
 #endif /* !__ASSEMBLY__ */
+
+/* Address of shared_info in domain virtual space.  */
+#define XSI_BASE	0xf100000000000000
+/* Size of the shared_info area (this is not related to page size).  */
+#define XSI_LOG_SIZE	14
+#define XSI_SIZE	(1 << XSI_LOG_SIZE)
+/* Log size of mapped_regs area (64 KB - only 4KB is used).  */
+#define XASI_LOG_SIZE	16
 
 /* Hyperprivops.  */
 #define HYPERPRIVOP_RFI			0x1

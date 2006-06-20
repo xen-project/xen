@@ -45,7 +45,7 @@ GLOBAL_ENTRY(xen_pal_call_static)
 	;;
 (p6)	st4 [r31]=r0
 	;;
-(p7)	adds r31=XSI_PSR_I_ADDR-XSI_PSR_IC,r31
+(p7)	adds r31=XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS,r31
 (p7)	mov r22=1
 	;;
 (p7)	ld8 r31=[r31]

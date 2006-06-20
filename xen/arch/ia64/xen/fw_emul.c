@@ -373,7 +373,7 @@ again:
 		if (*fault != IA64_NO_FAULT) return 0;
 	}
 
-	virt = domain_mpa_to_imva(v->domain, mpaddr);
+	virt = (unsigned long)domain_mpa_to_imva(v->domain, mpaddr);
 	*page = virt_to_page(virt);
 	if (get_page(*page, current->domain) == 0) {
 		if (page_get_owner(*page) != current->domain) {

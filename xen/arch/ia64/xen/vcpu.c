@@ -174,7 +174,8 @@ void vcpu_init_regs (struct vcpu *v)
 		VCPU(v, banknum) = 1;
 		VCPU(v, metaphysical_mode) = 1;
 		VCPU(v, interrupt_mask_addr) =
-		    v->domain->arch.shared_info_va + INT_ENABLE_OFFSET(v);
+		             (unsigned char *)v->domain->arch.shared_info_va +
+		             INT_ENABLE_OFFSET(v);
 		VCPU(v, itv) = (1 << 16); /* timer vector masked */
 	}
 

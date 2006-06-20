@@ -10,10 +10,12 @@
  */
 
 
-#include <asm/xen/asm-xsi-offsets.h>
 #include <xen/interface/arch-ia64.h>
 
 #define IA64_PARAVIRTUALIZED
+
+#define XSI_OFS		XSI_SIZE
+#define XPRIVREG_BASE	(XSI_BASE + XSI_SIZE)
 
 #ifdef __ASSEMBLY__
 #define	XEN_HYPER_RFI			break HYPERPRIVOP_RFI
@@ -39,6 +41,21 @@
 #define	XEN_HYPER_GET_PMD		break HYPERPRIVOP_GET_PMD
 #define	XEN_HYPER_GET_EFLAG		break HYPERPRIVOP_GET_EFLAG
 #define	XEN_HYPER_SET_EFLAG		break HYPERPRIVOP_SET_EFLAG
+
+#define XSI_IFS			(XSI_BASE + XSI_IFS_OFS)
+#define XSI_PRECOVER_IFS	(XSI_BASE + XSI_PRECOVER_IFS_OFS)
+#define XSI_INCOMPL_REGFR	(XSI_BASE + XSI_INCOMPL_REGFR_OFS)
+#define XSI_IFA			(XSI_BASE + XSI_IFA_OFS)
+#define XSI_ISR			(XSI_BASE + XSI_ISR_OFS)
+#define XSI_IIM			(XSI_BASE + XSI_IIM_OFS)
+#define XSI_ITIR		(XSI_BASE + XSI_ITIR_OFS)
+#define XSI_PSR_I_ADDR		(XSI_BASE + XSI_PSR_I_ADDR_OFS)
+#define XSI_PSR_IC		(XSI_BASE + XSI_PSR_IC_OFS)
+#define XSI_IPSR		(XSI_BASE + XSI_IPSR_OFS)
+#define XSI_IIP			(XSI_BASE + XSI_IIP_OFS)
+#define XSI_BANK1_R16		(XSI_BASE + XSI_BANK1_R16_OFS)
+#define XSI_BANKNUM		(XSI_BASE + XSI_BANKNUM_OFS)
+#define XSI_IHA			(XSI_BASE + XSI_IHA_OFS)
 #endif
 
 #ifndef __ASSEMBLY__
@@ -81,15 +98,16 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
  * Others, like "pend", are abstractions based on privileged registers.
  * "Pend" is guaranteed to be set if reading cr.ivr would return a
  * (non-spurious) interrupt. */
+#define XEN_PRIVREGS ((struct mapped_regs *)XPRIVREG_BASE)
 #define XSI_PSR_I			\
-	(*(uint64_t *)(XSI_PSR_I_ADDR))
+	(*XEN_PRIVREGS->interrupt_mask_addr)
 #define xen_get_virtual_psr_i()		\
-	(!(*(uint8_t *)(XSI_PSR_I)))
+	(!XSI_PSR_I)
 #define xen_set_virtual_psr_i(_val)	\
-	({ *(uint8_t *)(XSI_PSR_I) = (uint8_t)(_val) ? 0:1; })
+	({ XSI_PSR_I = (uint8_t)(_val) ? 0 : 1; })
 #define xen_set_virtual_psr_ic(_val)	\
-	({ *(int *)(XSI_PSR_IC) = _val ? 1:0; })
-#define xen_get_virtual_pend()		(*(int *)(XSI_PEND))
+	({ XEN_PRIVREGS->interrupt_collection_enabled = _val ? 1 : 0; })
+#define xen_get_virtual_pend()		(XEN_PRIVREGS->pending_interruption)
 
 /* Hyperprivops are "break" instructions with a well-defined API.
  * In particular, the virtual psr.ic bit must be off; in this way

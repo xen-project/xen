@@ -446,7 +446,7 @@ ENTRY(alt_itlb_miss)
 #ifdef CONFIG_XEN
 	movl r31=XSI_IPSR
 	;;
-	ld8 r21=[r31],XSI_IFA-XSI_IPSR	// get ipsr, point to ifa
+	ld8 r21=[r31],XSI_IFA_OFS-XSI_IPSR_OFS	// get ipsr, point to ifa
 	movl r17=PAGE_KERNEL
 	;;
 	ld8 r16=[r31]		// get ifa
@@ -508,10 +508,10 @@ ENTRY(alt_dtlb_miss)
 #ifdef CONFIG_XEN
 	movl r31=XSI_IPSR
 	;;
-	ld8 r21=[r31],XSI_ISR-XSI_IPSR	// get ipsr, point to isr
+	ld8 r21=[r31],XSI_ISR_OFS-XSI_IPSR_OFS	// get ipsr, point to isr
 	movl r17=PAGE_KERNEL
 	;;
-	ld8 r20=[r31],XSI_IFA-XSI_ISR	// get isr, point to ifa
+	ld8 r20=[r31],XSI_IFA_OFS-XSI_ISR_OFS	// get isr, point to ifa
 	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	;;
 	ld8 r16=[r31]		// get ifa
@@ -688,12 +688,12 @@ ENTRY(page_fault)
 #ifdef CONFIG_XEN
 	movl r3=XSI_ISR
 	;;
-	ld8 out1=[r3],XSI_IFA-XSI_ISR		// get vcr.isr, point to ifa
+	ld8 out1=[r3],XSI_IFA_OFS-XSI_ISR_OFS	// get vcr.isr, point to ifa
 	;;
 	ld8 out0=[r3]				// get vcr.ifa
 	mov r14=1
 	;;
-	add r3=XSI_PSR_IC-XSI_IFA, r3		// point to vpsr.ic
+	add r3=XSI_PSR_IC_OFS-XSI_IFA_OFS, r3	// point to vpsr.ic
 	;;
 	st4 [r3]=r14				// vpsr.ic = 1
 	adds r3=8,r2				// set up second base pointer
@@ -737,7 +737,7 @@ xen_page_fault:
 	;;
 (p15)	ld8 r3=[r3]
 	;;
-(p15)	st1 [r3]=r0,XSI_PEND-XSI_PSR_I_ADDR	// if (p15) vpsr.i = 1
+(p15)	st1 [r3]=r0,XSI_PEND_OFS-XSI_PSR_I_ADDR_OFS	// if (p15) vpsr.i = 1
 	mov r14=r0
 	;;
 (p15)	ld4 r14=[r3]				// if (pending_interrupts)
@@ -1047,7 +1047,7 @@ ENTRY(break_fault)
 #ifdef CONFIG_XEN
 	movl r22=XSI_IPSR
 	;;
-	ld8 r29=[r22],XSI_IIM-XSI_IPSR		// get ipsr, point to iip
+	ld8 r29=[r22],XSI_IIM_OFS-XSI_IPSR_OFS	// get ipsr, point to iip
 #else
 	mov r29=cr.ipsr				// M2 (12 cyc)
 #endif
@@ -1055,7 +1055,7 @@ ENTRY(break_fault)
 
 #ifdef CONFIG_XEN
 	;;
-	ld8 r17=[r22],XSI_IIP-XSI_IIM
+	ld8 r17=[r22],XSI_IIP_OFS-XSI_IIM_OFS
 #else
 	mov r17=cr.iim				// M2 (2 cyc)
 #endif
@@ -1156,7 +1156,7 @@ ENTRY(break_fault)
 	movl r16=XSI_PSR_IC
 	mov r3=1
 	;;
-	st4 [r16]=r3,XSI_PSR_I_ADDR-XSI_PSR_IC	// vpsr.ic = 1
+	st4 [r16]=r3,XSI_PSR_I_ADDR_OFS-XSI_PSR_IC_OFS	// vpsr.ic = 1
 #else
 	ssm psr.ic | PSR_DEFAULT_BITS		// M2	now it's safe to re-enable intr.-collection
 #endif
@@ -1170,7 +1170,7 @@ ENTRY(break_fault)
 #ifdef CONFIG_XEN
 (p15)	ld8 r16=[r16]				// vpsr.i
 	;;
-(p15)	st1 [r16]=r0,XSI_PEND-XSI_PSR_I_ADDR	// if (p15) vpsr.i = 1
+(p15)	st1 [r16]=r0,XSI_PEND_OFS-XSI_PSR_I_ADDR_OFS	// if (p15) vpsr.i = 1
 	mov r2=r0
 	;;
 (p15)	ld4 r2=[r16]				// if (pending_interrupts)

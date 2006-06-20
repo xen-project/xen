@@ -55,6 +55,7 @@ extern void vmx_intr_assist(struct vcpu *v);
 extern void set_illegal_op_isr (struct vcpu *vcpu);
 extern void illegal_op (struct vcpu *vcpu);
 extern void vmx_relinquish_vcpu_resources(struct vcpu *v);
+extern void vmx_die_if_kernel(char *str, struct pt_regs *regs, long err);
 
 static inline vcpu_iodata_t *get_vio(struct domain *d, unsigned long cpu)
 {

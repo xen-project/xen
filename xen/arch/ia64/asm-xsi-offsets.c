@@ -48,7 +48,7 @@
 void foo(void)
 {
 	/* First is shared info page, and then arch specific vcpu context */
-	DEFINE(XSI_BASE, SHAREDINFO_ADDR);
+	//DEFINE(XSI_BASE, SHAREDINFO_ADDR);
 
 	DEFINE(XSI_PSR_I_ADDR_OFS, (XSI_OFS + offsetof(mapped_regs_t, interrupt_mask_addr)));
 	DEFINE(XSI_PSR_I_ADDR, (SHARED_ARCHINFO_ADDR+offsetof(mapped_regs_t, interrupt_mask_addr)));
