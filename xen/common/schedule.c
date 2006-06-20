@@ -33,8 +33,8 @@
 
 extern void arch_getdomaininfo_ctxt(struct vcpu *,
                                     struct vcpu_guest_context *);
-/* opt_sched: scheduler - default to SEDF */
-static char opt_sched[10] = "sedf";
+/* opt_sched: scheduler - default to credit */
+static char opt_sched[10] = "credit";
 string_param("sched", opt_sched);
 
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
