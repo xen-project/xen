@@ -174,7 +174,7 @@ void vcpu_init_regs (struct vcpu *v)
 		VCPU(v, banknum) = 1;
 		VCPU(v, metaphysical_mode) = 1;
 		VCPU(v, interrupt_mask_addr) =
-		    (uint64_t)SHAREDINFO_ADDR + INT_ENABLE_OFFSET(v);
+		    v->domain->arch.shared_info_va + INT_ENABLE_OFFSET(v);
 		VCPU(v, itv) = (1 << 16); /* timer vector masked */
 	}
 
@@ -1344,6 +1344,21 @@ static inline int range_overlap (u64 b1, u64 e1, u64 b2, u64 e2)
 	return (b1 <= e2) && (e1 >= b2);
 }
 
+/* Crash domain if [base, base + page_size] and Xen virtual space overlaps.
+   Note: LSBs of base inside page_size are ignored.  */
+static inline void
+check_xen_space_overlap (const char *func, u64 base, u64 page_size)
+{
+	/* Mask LSBs of base.  */
+	base &= ~(page_size - 1);
+
+	/* FIXME: ideally an MCA should be generated...  */
+	if (range_overlap (XEN_VIRT_SPACE_LOW, XEN_VIRT_SPACE_HIGH,
+			   base, base + page_size))
+		panic_domain (NULL, "%s on Xen virtual space (%lx)\n",
+			      func, base);
+}
+
 // FIXME: also need to check && (!trp->key || vcpu_pkr_match(trp->key))
 static inline int vcpu_match_tr_entry_no_p(TR_ENTRY *trp, UINT64 ifa, UINT64 rid)
 {
@@ -1472,7 +1487,7 @@ again:
 			(gip & ((1 << tr.ps) - 1));
 	}
 	
-	vaddr = domain_mpa_to_imva(vcpu->domain, gpip);
+	vaddr = (unsigned long)domain_mpa_to_imva(vcpu->domain, gpip);
 	page = virt_to_page(vaddr);
 	if (get_page(page, vcpu->domain) == 0) {
 		if (page_get_owner(page) != vcpu->domain) {
@@ -1950,13 +1965,13 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 	unsigned long psr;
 	unsigned long ps = (vcpu->domain==dom0) ? logps : PAGE_SHIFT;
 
-	// FIXME: validate ifa here (not in Xen space), COULD MACHINE CHECK!
+	check_xen_space_overlap ("itc", vaddr, 1UL << logps);
+
 	// FIXME, must be inlined or potential for nested fault here!
-	if ((vcpu->domain==dom0) && (logps < PAGE_SHIFT)) {
-		printf("vcpu_itc_no_srlz: domain0 use of smaller page size!\n");
-		//FIXME: kill domain here
-		while(1);
-	}
+	if ((vcpu->domain==dom0) && (logps < PAGE_SHIFT))
+		panic_domain (NULL, "vcpu_itc_no_srlz: domain trying to use "
+ 			      "smaller page size!\n");
+
 #ifdef CONFIG_XEN_IA64_DOM0_VP
 	BUG_ON(logps > PAGE_SHIFT);
 #endif
@@ -1993,11 +2008,10 @@ IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 	BOOLEAN swap_rr0 = (!(ifa>>61) && PSCB(vcpu,metaphysical_mode));
 	struct p2m_entry entry;
 
-	if (logps < PAGE_SHIFT) {
-		printf("vcpu_itc_d: domain trying to use smaller page size!\n");
-		//FIXME: kill domain here
-		while(1);
-	}
+	if (logps < PAGE_SHIFT)
+		panic_domain (NULL, "vcpu_itc_d: domain trying to use "
+ 			      "smaller page size!\n");
+
 again:
 	//itir = (itir & ~0xfc) | (PAGE_SHIFT<<2); // ignore domain's pagesize
 	pteval = translate_domain_pte(pte, ifa, itir, &logps, &entry);
@@ -2018,16 +2032,12 @@ IA64FAULT vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 	BOOLEAN swap_rr0 = (!(ifa>>61) && PSCB(vcpu,metaphysical_mode));
 	struct p2m_entry entry;
 
-	// FIXME: validate ifa here (not in Xen space), COULD MACHINE CHECK!
-	if (logps < PAGE_SHIFT) {
-		printf("vcpu_itc_i: domain trying to use smaller page size!\n");
-		//FIXME: kill domain here
-		while(1);
-	}
+	if (logps < PAGE_SHIFT)
+		panic_domain (NULL, "vcpu_itc_i: domain trying to use "
+ 			      "smaller page size!\n");
 again:
 	//itir = (itir & ~0xfc) | (PAGE_SHIFT<<2); // ignore domain's pagesize
 	pteval = translate_domain_pte(pte, ifa, itir, &logps, &entry);
-	// FIXME: what to do if bad physical address? (machine check?)
 	if (!pteval) return IA64_ILLOP_FAULT;
 	if (swap_rr0) set_one_rr(0x0,PSCB(vcpu,rrs[0]));
 	vcpu_itc_no_srlz(vcpu, 1,ifa,pteval,pte,logps);
@@ -2042,6 +2052,8 @@ again:
 IA64FAULT vcpu_ptc_l(VCPU *vcpu, UINT64 vadr, UINT64 log_range)
 {
 	BUG_ON(vcpu != current);
+
+	check_xen_space_overlap ("ptc_l", vadr, 1UL << log_range);
 
 	/* Purge TC  */
 	vcpu_purge_tr_entry(&PSCBX(vcpu,dtlb));
@@ -2101,6 +2113,8 @@ IA64FAULT vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 	// FIXME: ??breaks if domain PAGE_SIZE < Xen PAGE_SIZE
 //printf("######## vcpu_ptc_ga(%p,%p) ##############\n",vadr,addr_range);
 
+	check_xen_space_overlap ("ptc_ga", vadr, addr_range);
+
 	domain_flush_vtlb_range (vcpu->domain, vadr, addr_range);
 
 	return IA64_NO_FAULT;
@@ -2113,7 +2127,9 @@ IA64FAULT vcpu_ptr_d(VCPU *vcpu,UINT64 vadr,UINT64 log_range)
 	unsigned long rid, rr;
 	int i;
 	TR_ENTRY *trp;
+
 	BUG_ON(vcpu != current);
+	check_xen_space_overlap ("ptr_d", vadr, 1UL << log_range);
 
 	rr = PSCB(vcpu,rrs)[region];
 	rid = rr & RR_RID_MASK;
@@ -2142,7 +2158,9 @@ IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr,UINT64 log_range)
 	unsigned long rid, rr;
 	int i;
 	TR_ENTRY *trp;
+
 	BUG_ON(vcpu != current);
+	check_xen_space_overlap ("ptr_i", vadr, 1UL << log_range);
 
 	rr = PSCB(vcpu,rrs)[region];
 	rid = rr & RR_RID_MASK;
