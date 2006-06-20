@@ -504,7 +504,7 @@ void init_console(void)
 
 void console_endboot(int disable_vga)
 {
-    int i;
+    int i, j;
 
     if ( opt_sync_console )
     {
@@ -522,7 +522,12 @@ void console_endboot(int disable_vga)
         for ( i = 0; i < 3; i++ )
         {
             printk("%d... ", 3-i);
-            mdelay(1000);
+            for ( j = 0; j < 100; j++ )
+            {
+                if ( softirq_pending(smp_processor_id()) )
+                    do_softirq();
+                mdelay(10);
+            }
         }
         printk("\n");
     }
