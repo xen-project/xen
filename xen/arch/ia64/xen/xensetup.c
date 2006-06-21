@@ -40,9 +40,9 @@ cpumask_t cpu_present_map;
 extern unsigned long domain0_ready;
 
 int find_max_pfn (unsigned long, unsigned long, void *);
-void start_of_day(void);
 
 /* FIXME: which header these declarations should be there ? */
+extern void initialize_keytable(void);
 extern long is_platform_hp_ski(void);
 extern void early_setup_arch(char **);
 extern void late_setup_arch(char **);
@@ -60,6 +60,12 @@ boolean_param("nosmp", opt_nosmp);
 /* maxcpus: maximum number of CPUs to activate. */
 static unsigned int max_cpus = NR_CPUS;
 integer_param("maxcpus", max_cpus); 
+
+/* xencons: if true enable xenconsole input (and irq).
+   Note: you have to disable 8250 serials in domains (to avoid use of the
+   same resource).  */
+static int opt_xencons = 0;
+boolean_param("xencons", opt_xencons);
 
 /*
  * opt_xenheap_megabytes: Size of Xen heap in megabytes, including:
@@ -231,7 +237,7 @@ md_overlaps(efi_memory_desc_t *md, unsigned long phys_addr)
 
 void start_kernel(void)
 {
-    unsigned char *cmdline;
+    char *cmdline;
     void *heap_start;
     unsigned long nr_pages;
     unsigned long dom0_memory_start, dom0_memory_size;
@@ -247,7 +253,7 @@ void start_kernel(void)
     /* Kernel may be relocated by EFI loader */
     xen_pstart = ia64_tpa(KERNEL_START);
 
-    early_setup_arch((char **) &cmdline);
+    early_setup_arch(&cmdline);
 
     /* We initialise the serial devices very early so we can get debugging. */
     if (running_on_sim) hpsim_serial_init();
@@ -414,22 +420,15 @@ printk("About to call scheduler_init()\n");
     idle_domain = domain_create(IDLE_DOMAIN_ID, 0);
     BUG_ON(idle_domain == NULL);
 
-    late_setup_arch((char **) &cmdline);
+    late_setup_arch(&cmdline);
     alloc_dom_xen_and_dom_io();
     setup_per_cpu_areas();
     mem_init();
 
     local_irq_disable();
     init_IRQ ();
-printk("About to call init_xen_time()\n");
     init_xen_time(); /* initialise the time */
-printk("About to call timer_init()\n");
     timer_init();
-
-#ifdef CONFIG_XEN_CONSOLE_INPUT	/* CONFIG_SERIAL_8250_CONSOLE=n in dom0! */
-    initialize_keytable();
-    serial_init_postirq();
-#endif
 
 #ifdef CONFIG_SMP
     if ( opt_nosmp )
@@ -475,8 +474,14 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
 printk("About to call sort_main_extable()\n");
     sort_main_extable();
 
-
     init_rid_allocator ();
+
+    local_irq_enable();
+
+    if (opt_xencons) {
+	    initialize_keytable();
+	    serial_init_postirq();
+    }
 
     /* Create initial domain 0. */
 printk("About to call domain_create()\n");
@@ -512,13 +517,10 @@ printk("About to call init_trace_bufs()\n");
     init_trace_bufs();
 
     /* Give up the VGA console if DOM0 is configured to grab it. */
-#ifdef CONFIG_XEN_CONSOLE_INPUT	/* CONFIG_SERIAL_8250_CONSOLE=n in dom0! */
-    console_endboot(cmdline && strstr(cmdline, "tty0"));
-#endif
+    if (opt_xencons)
+	console_endboot(cmdline && strstr(cmdline, "tty0"));
 
     domain0_ready = 1;
-
-    local_irq_enable();
 
     printf("About to call schedulers_start dom0=%p, idle_dom=%p\n",
 	   dom0, idle_domain);

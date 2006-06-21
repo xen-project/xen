@@ -125,17 +125,6 @@ inline void synchronize_irq(unsigned int irq) {}
 EXPORT_SYMBOL(synchronize_irq);
 #endif
 
-static int noirqdebug;
-
-static int __init noirqdebug_setup(char *str)
-{
-	noirqdebug = 1;
-	printk("IRQ lockup detection disabled\n");
-	return 1;
-}
-
-__setup("noirqdebug", noirqdebug_setup);
-
 /*
  * Generic enable/disable code: this just calls
  * down into the PIC-specific version for the actual
@@ -232,122 +221,6 @@ out:
 	return 1;
 }
 
-/**
- *	request_irq - allocate an interrupt line
- *	@irq: Interrupt line to allocate
- *	@handler: Function to be called when the IRQ occurs
- *	@irqflags: Interrupt type flags
- *	@devname: An ascii name for the claiming device
- *	@dev_id: A cookie passed back to the handler function
- *
- *	This call allocates interrupt resources and enables the
- *	interrupt line and IRQ handling. From the point this
- *	call is made your handler function may be invoked. Since
- *	your handler function must clear any interrupt the board 
- *	raises, you must take care both to initialise your hardware
- *	and to set up the interrupt handler in the right order.
- *
- *	Dev_id must be globally unique. Normally the address of the
- *	device data structure is used as the cookie. Since the handler
- *	receives this value it makes sense to use it.
- *
- *	If your interrupt is shared you must pass a non NULL dev_id
- *	as this is required when freeing the interrupt.
- *
- *	Flags:
- *
- *	SA_SHIRQ		Interrupt is shared
- *
- *	SA_INTERRUPT		Disable local interrupts while processing
- *
- *	SA_SAMPLE_RANDOM	The interrupt can be used for entropy
- *
- */
-
-int request_irq(unsigned int irq,
-		irqreturn_t (*handler)(int, void *, struct pt_regs *),
-		unsigned long irqflags,
-		const char * devname,
-		void *dev_id)
-{
-	int retval;
-	struct irqaction * action;
-
-	/*
-	 * Sanity-check: shared interrupts should REALLY pass in
-	 * a real dev-ID, otherwise we'll have trouble later trying
-	 * to figure out which interrupt is which (messes up the
-	 * interrupt freeing logic etc).
-	 */
-	if (irqflags & SA_SHIRQ) {
-		if (!dev_id)
-			printk(KERN_ERR "Bad boy: %s called us without a dev_id!\n", devname);
-	}
-
-	if (irq >= NR_IRQS)
-		return -EINVAL;
-	if (!handler)
-		return -EINVAL;
-
-	action = xmalloc(struct irqaction);
-	if (!action)
-		return -ENOMEM;
-
-	action->handler = (void *) handler;
-	action->name = devname;
-	action->dev_id = dev_id;
-
-	retval = setup_irq(irq, action);
-	if (retval)
-		xfree(action);
-	return retval;
-}
-
-EXPORT_SYMBOL(request_irq);
-
-/**
- *	free_irq - free an interrupt
- *	@irq: Interrupt line to free
- *	@dev_id: Device identity to free
- *
- *	Remove an interrupt handler. The handler is removed and if the
- *	interrupt line is no longer in use by any driver it is disabled.
- *	On a shared IRQ the caller must ensure the interrupt is disabled
- *	on the card it drives before calling this function. The function
- *	does not return until any executing interrupts for this IRQ
- *	have completed.
- *
- *	This function must not be called from interrupt context.
- */
-
-void free_irq(unsigned int irq)
-{
-	irq_desc_t *desc;
-	unsigned long flags;
-
-	if (irq >= NR_IRQS)
-		return;
-
-	desc = irq_descp(irq);
-	spin_lock_irqsave(&desc->lock,flags);
-	if (desc->action) {
-		struct irqaction * action = desc->action;
-		desc->action = NULL;
-				desc->status |= IRQ_DISABLED;
-				desc->handler->shutdown(irq);
-			spin_unlock_irqrestore(&desc->lock,flags);
-
-			/* Wait to make sure it's not being used on another CPU */
-			synchronize_irq(irq);
-			xfree(action);
-			return;
-		}
-		printk(KERN_ERR "Trying to free free IRQ%d\n",irq);
-		spin_unlock_irqrestore(&desc->lock,flags);
-}
-
-EXPORT_SYMBOL(free_irq);
-
 /*
  * IRQ autodetection code..
  *
@@ -357,11 +230,14 @@ EXPORT_SYMBOL(free_irq);
  * disabled.
  */
 
-int setup_irq(unsigned int irq, struct irqaction * new)
+int setup_vector(unsigned int irq, struct irqaction * new)
 {
 	unsigned long flags;
 	struct irqaction *old, **p;
 	irq_desc_t *desc = irq_descp(irq);
+
+	printf ("setup_vector(%d): handler=%p, flags=%x\n",
+		irq, desc->handler, desc->status);
 
 	/*
 	 * The following block of code has to be executed atomically
@@ -378,9 +254,28 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 	desc->depth = 0;
 	desc->status &= ~(IRQ_DISABLED | IRQ_INPROGRESS | IRQ_GUEST);
 	desc->handler->startup(irq);
+	desc->handler->enable(irq);
 	spin_unlock_irqrestore(&desc->lock,flags);
 
 	return 0;
+}
+
+/* Vectors reserved by xen (and thus not sharable with domains).  */
+unsigned long ia64_xen_vector[BITS_TO_LONGS(NR_IRQS)];
+
+int setup_irq(unsigned int irq, struct irqaction * new)
+{
+	unsigned int vec;
+	int res;
+
+	/* Get vector for IRQ.  */
+	if (acpi_gsi_to_irq (irq, &vec) < 0)
+		return -ENOSYS;
+	/* Reserve the vector (and thus the irq).  */
+	if (test_and_set_bit(vec, ia64_xen_vector))
+		return -EBUSY;
+	res = setup_vector (vec, new);
+	return res;
 }
 
 /*
@@ -621,16 +516,4 @@ void process_soft_irq(void)
 void guest_forward_keyboard_input(int irq, void *nada, struct pt_regs *regs)
 {
 	vcpu_pend_interrupt(dom0->vcpu[0],irq);
-}
-
-void serial_input_init(void)
-{
-	int retval;
-	int irq = 0x30;	// FIXME
-
-	retval = request_irq(irq,guest_forward_keyboard_input,SA_INTERRUPT,"siminput",NULL);
-	if (retval) {
-		printk("serial_input_init: broken request_irq call\n");
-		while(1);
-	}
 }

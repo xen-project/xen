@@ -158,6 +158,7 @@ struct rte_entry {
 
 #define IOSAPIC_RTEINDEX(reg)	(((reg) - 0x10) >> 1)
 extern unsigned long ia64_vector_mask[];
+extern unsigned long ia64_xen_vector[];
 #endif /* XEN */
 
 # endif /* !__ASSEMBLY__ */

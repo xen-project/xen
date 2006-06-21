@@ -1185,6 +1185,7 @@ int iosapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 
 	/* Sanity check. Vector should be allocated before this update */
 	if ((rte_index > ios->num_rte) ||
+	    test_bit(vec, ia64_xen_vector) ||
 	    ((vec > IA64_FIRST_DEVICE_VECTOR) &&
 	     (vec < IA64_LAST_DEVICE_VECTOR) &&
 	     (!test_bit(vec - IA64_FIRST_DEVICE_VECTOR, ia64_vector_mask))))

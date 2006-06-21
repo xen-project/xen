@@ -233,6 +233,10 @@ static struct irqaction ipi_irqaction = {
 };
 #endif
 
+#ifdef XEN
+extern void setup_vector (unsigned int vec, struct irqaction *action);
+#endif
+
 void
 register_percpu_irq (ia64_vector vec, struct irqaction *action)
 {
@@ -245,7 +249,11 @@ register_percpu_irq (ia64_vector vec, struct irqaction *action)
 			desc->status |= IRQ_PER_CPU;
 			desc->handler = &irq_type_ia64_lsapic;
 			if (action)
+#ifdef XEN
+				setup_vector(irq, action);
+#else
 				setup_irq(irq, action);
+#endif
 		}
 }
 

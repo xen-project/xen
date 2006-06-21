@@ -50,7 +50,7 @@
 #include <asm/system.h>
 #include <asm/numa.h>
 #include <asm/sal.h>
-//#include <asm/cyclone.h>
+#include <asm/hw_irq.h>
 
 #define BAD_MADT_ENTRY(entry, end) (                                        \
 		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
@@ -650,7 +650,7 @@ acpi_boot_init (void)
 	printk(KERN_INFO "%d CPUs available, %d CPUs total\n", available_cpus, total_cpus);
 	return 0;
 }
-#if 0
+
 int
 acpi_gsi_to_irq (u32 gsi, unsigned int *irq)
 {
@@ -667,7 +667,7 @@ acpi_gsi_to_irq (u32 gsi, unsigned int *irq)
 	}
 	return 0;
 }
-
+#if 0
 int
 acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
 {
