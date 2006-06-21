@@ -421,6 +421,42 @@ smp_call_function (void (*func) (void *info), void *info, int nonatomic, int wai
 }
 EXPORT_SYMBOL(smp_call_function);
 
+#ifdef XEN
+int
+on_selected_cpus(cpumask_t selected, void (*func) (void *info), void *info,
+                 int retry, int wait)
+{
+	struct call_data_struct data;
+	unsigned int cpu, nr_cpus = cpus_weight(selected);
+
+	ASSERT(local_irq_is_enabled());
+
+	if (!nr_cpus)
+		return 0;
+
+	data.func = func;
+	data.info = info;
+	data.wait = wait;
+	atomic_set(&data.started, 0);
+	atomic_set(&data.finished, 0);
+
+	spin_lock(&call_lock);
+
+	call_data = &data;
+	wmb();
+
+	for_each_cpu_mask(cpu, selected)
+		send_IPI_single(cpu, IPI_CALL_FUNC);
+
+	while (atomic_read(wait ? &data.finished : &data.started) != nr_cpus)
+		cpu_relax();
+
+	spin_unlock(&call_lock);
+
+	return 0;
+}
+#endif
+
 /*
  * this function calls the 'stop' function on all other CPUs in the system.
  */
