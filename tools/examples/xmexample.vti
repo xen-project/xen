@@ -27,6 +27,9 @@ memory = 256
 # A name for your domain. All domains must have different names.
 name = "ExampleVTIDomain"
 
+# the number of cpus guest platform has, default=1
+#vcpus=1
+
 # List of which CPUS this domain is allowed to use, default Xen picks
 #cpus = ""         # leave to Xen to pick
 #cpus = "0"        # all vcpus run on CPU0
@@ -81,7 +84,6 @@ memmap = '/usr/lib/xen/boot/mem-map.sxp'
 # enable SDL library for graphics, default = 0
 sdl=1
 
-stdvga=1
 #----------------------------------------------------------------------------
 # enable VNC library for graphics, default = 1
 vnc=0
@@ -94,6 +96,14 @@ vncviewer=0
 # no graphics, use serial port
 #nographic=0
 
+#----------------------------------------------------------------------------
+# enable stdvga, default = 0 (use cirrus logic device model)
+stdvga=0
+
+#-----------------------------------------------------------------------------
+#   serial port re-direct to pty deivce, /dev/pts/n
+#   then xm console or minicom can connect
+serial='pty'
 
 #-----------------------------------------------------------------------------
 #   enable audio support
@@ -108,3 +118,14 @@ vncviewer=0
 #-----------------------------------------------------------------------------
 #    start in full screen
 #full-screen=1   diff -r 42cab8724273 tools/libxc/xc_ia64_stubs.c
+
+#-----------------------------------------------------------------------------
+#   Enable USB support (specific devices specified at runtime through the
+#           monitor window)
+#usb=1
+
+#   Enable USB mouse support (only enable one of the following, `mouse' for
+#                 PS/2 protocol relative mouse, `tablet' for
+#                 absolute mouse)
+#usbdevice='mouse'
+#usbdevice='tablet'
