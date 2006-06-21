@@ -666,6 +666,10 @@ static struct hw_interrupt_type pirq_type = {
 int irq_ignore_unhandled(unsigned int irq)
 {
 	struct physdev_irq_status_query irq_status = { .irq = irq };
+
+	if (!is_running_on_xen())
+		return 0;
+
 	(void)HYPERVISOR_physdev_op(PHYSDEVOP_irq_status_query, &irq_status);
 	return !!(irq_status.flags & XENIRQSTAT_shared);
 }

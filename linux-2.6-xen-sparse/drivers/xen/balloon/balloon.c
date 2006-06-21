@@ -468,10 +468,10 @@ static int __init balloon_init(void)
 	unsigned long pfn;
 	struct page *page;
 
-	IPRINTK("Initialising balloon driver.\n");
-
 	if (!is_running_on_xen())
 		return -ENODEV;
+
+	IPRINTK("Initialising balloon driver.\n");
 
 	current_pages = min(xen_start_info->nr_pages, max_pfn);
 	totalram_pages = current_pages;
