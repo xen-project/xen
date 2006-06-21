@@ -266,16 +266,21 @@ void zero_vhpt_stats(void)
 
 int dump_vhpt_stats(char *buf)
 {
-	int i;
+	int i, cpu;
 	char *s = buf;
-	struct vhpt_lf_entry *v = (void *)VHPT_ADDR;
-	unsigned long vhpt_valid = 0, vhpt_chains = 0;
 
-	for (i = 0; i < VHPT_NUM_ENTRIES; i++, v++) {
-		if (!(v->ti_tag & INVALID_TI_TAG)) vhpt_valid++;
-		if (v->CChain) vhpt_chains++;
+	s += sprintf(s,"VHPT usage (%ld entries):\n",
+		     (unsigned long) VHPT_NUM_ENTRIES);
+
+	for_each_present_cpu (cpu) {
+		struct vhpt_lf_entry *v = __va(per_cpu(vhpt_paddr, cpu));
+		unsigned long vhpt_valid = 0;
+
+		for (i = 0; i < VHPT_NUM_ENTRIES; i++, v++)
+			if (!(v->ti_tag & INVALID_TI_TAG))
+				vhpt_valid++;
+		s += sprintf(s,"  cpu %d: %ld\n", cpu, vhpt_valid);
 	}
-	s += sprintf(s,"VHPT usage: %ld/%ld (%ld collision chains)\n",
-		vhpt_valid, (unsigned long) VHPT_NUM_ENTRIES, vhpt_chains);
+
 	return s - buf;
 }
