@@ -159,6 +159,7 @@ struct domain
 
     /* OProfile support. */
     struct xenoprof *xenoprof;
+    int32_t time_offset_seconds;
 };
 
 struct domain_setup_info

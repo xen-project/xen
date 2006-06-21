@@ -693,6 +693,21 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     break;
 #endif
 
+    case DOM0_SETTIMEOFFSET:
+    {
+        struct domain *d;
+
+        ret = -ESRCH;
+        d = find_domain_by_id(op->u.settimeoffset.domain);
+        if ( d != NULL )
+        {
+            d->time_offset_seconds = op->u.settimeoffset.time_offset_seconds;
+            put_domain(d);
+            ret = 0;
+        }
+    }
+    break;
+
     default:
         ret = arch_do_dom0_op(op, u_dom0_op);
         break;

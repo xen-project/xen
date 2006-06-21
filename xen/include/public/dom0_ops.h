@@ -527,6 +527,14 @@ typedef struct dom0_domain_setup {
 } dom0_domain_setup_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_domain_setup_t);
 
+#define DOM0_SETTIMEOFFSET    50
+struct dom0_settimeoffset {
+    domid_t  domain;
+    int32_t  time_offset_seconds; /* applied to domain wallclock time */
+};
+typedef struct dom0_settimeoffset dom0_settimeoffset_t;
+DEFINE_XEN_GUEST_HANDLE(dom0_settimeoffset_t);
+
 struct dom0_op {
     uint32_t cmd;
     uint32_t interface_version; /* DOM0_INTERFACE_VERSION */
@@ -569,6 +577,7 @@ struct dom0_op {
         struct dom0_iomem_permission  iomem_permission;
         struct dom0_hypercall_init    hypercall_init;
         struct dom0_domain_setup      domain_setup;
+        struct dom0_settimeoffset     settimeoffset;
         uint8_t                       pad[128];
     } u;
 };
