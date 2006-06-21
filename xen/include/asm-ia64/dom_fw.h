@@ -14,8 +14,8 @@
 /* This is used to determined the portion of a domain's metaphysical memory
    space reserved for the hypercall patch table. */
 //FIXME: experiment with smaller sizes
-#define HYPERCALL_START	1*MB
-#define HYPERCALL_END	2*MB
+#define HYPERCALL_START	1UL*MB
+#define HYPERCALL_END	2UL*MB
 
 #define FW_HYPERCALL_BASE_PADDR HYPERCALL_START
 #define	FW_HYPERCALL_END_PADDR HYPERCALL_END

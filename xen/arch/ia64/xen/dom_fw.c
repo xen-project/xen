@@ -30,9 +30,30 @@ extern unsigned long dom0_start;
 
 extern unsigned long running_on_sim;
 
-
 unsigned long dom_fw_base_mpa = -1;
 unsigned long imva_fw_base = -1;
+
+#define FW_VENDOR "X\0e\0n\0/\0i\0a\0\066\0\064\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+
+#define MAKE_MD(typ, attr, start, end, abs) 				\
+	do {								\
+		md = efi_memmap + i++;					\
+		md->type = typ;						\
+		md->pad = 0;						\
+		md->phys_addr = abs ? start : start_mpaddr + start;	\
+		md->virt_addr = 0;					\
+		md->num_pages = (end - start) >> EFI_PAGE_SHIFT;	\
+		md->attribute = attr;					\
+	} while (0)
+
+#define EFI_HYPERCALL_PATCH(tgt, call)					\
+	do {								\
+		dom_efi_hypercall_patch(d, FW_HYPERCALL_##call##_PADDR,	\
+		                        FW_HYPERCALL_##call);		\
+		tgt = dom_pa((unsigned long) pfn);			\
+		*pfn++ = FW_HYPERCALL_##call##_PADDR + start_mpaddr;	\
+		*pfn++ = 0;						\
+	} while (0)
 
 // return domain (meta)physical address for a given imva
 // this function is a call-back from dom_fw_init
@@ -139,14 +160,13 @@ unsigned long dom_fw_setup(struct domain *d, const char *args, int arglen)
 
 #define NFUNCPTRS 20
 
-static void print_md(efi_memory_desc_t *md)
+static inline void
+print_md(efi_memory_desc_t *md)
 {
-#if 1
 	printk("domain mem: type=%2u, attr=0x%016lx, range=[0x%016lx-0x%016lx) (%luMB)\n",
 		md->type, md->attribute, md->phys_addr,
 		md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT),
 		md->num_pages >> (20 - EFI_PAGE_SHIFT));
-#endif
 }
 
 static u32 lsapic_nbr;
@@ -424,7 +444,6 @@ dom_fw_dom0_passthrough(efi_memory_desc_t *md, void *arg__)
     arg->md->virt_addr = 0;
     arg->md->num_pages = md->num_pages;
     arg->md->attribute = md->attribute;
-    print_md(arg->md);
 
     (*arg->i)++;
     arg->md++;
@@ -440,15 +459,23 @@ static int
 dom_fw_dom0_lowmem(efi_memory_desc_t *md, void *arg__)
 {
     struct dom0_passthrough_arg* arg = (struct dom0_passthrough_arg*)arg__;
-    u64 end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
+    u64 end = min(HYPERCALL_START,
+                  md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT));
 
     BUG_ON(md->type != EFI_CONVENTIONAL_MEMORY);
 
-    if (md->phys_addr >= 1*MB)
+    /* avoid hypercall area */
+    if (md->phys_addr >= HYPERCALL_START)
         return 0;
 
-    if (end > 1*MB)
-        end = 1*MB;
+    /* avoid firmware base area */
+    if (md->phys_addr < dom_pa(imva_fw_base))
+        end = min(end, dom_pa(imva_fw_base));
+    else if (md->phys_addr < dom_pa(imva_fw_base + PAGE_SIZE)) {
+        if (end < dom_pa(imva_fw_base + PAGE_SIZE))
+            return 0;
+        md->phys_addr = dom_pa(imva_fw_base + PAGE_SIZE);
+    }
 
     arg->md->type = md->type;
     arg->md->pad = 0;
@@ -456,10 +483,26 @@ dom_fw_dom0_lowmem(efi_memory_desc_t *md, void *arg__)
     arg->md->virt_addr = 0;
     arg->md->num_pages = (end - md->phys_addr) >> EFI_PAGE_SHIFT;
     arg->md->attribute = md->attribute;
-    print_md(arg->md);
 
     (*arg->i)++;
     arg->md++;
+
+    /* if firmware area spliced the md, add the upper part here */
+    if (end == dom_pa(imva_fw_base)) {
+        end = min(HYPERCALL_START,
+                  md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT));
+	if (end > dom_pa(imva_fw_base + PAGE_SIZE)) {
+            arg->md->type = md->type;
+            arg->md->pad = 0;
+            arg->md->phys_addr = dom_pa(imva_fw_base + PAGE_SIZE);
+            arg->md->virt_addr = 0;
+            arg->md->num_pages = (end - arg->md->phys_addr) >> EFI_PAGE_SHIFT;
+            arg->md->attribute = md->attribute;
+
+            (*arg->i)++;
+            arg->md++;
+        }
+    }
     return 0;
 }
 
@@ -497,25 +540,13 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	unsigned long *pfn;
 	unsigned char checksum = 0;
 	char *cp, *cmd_line, *fw_vendor;
-	int i = 0;
+	int num_mds, j, i = 0;
 	unsigned long maxmem = (d->max_pages - d->arch.sys_pgnr) * PAGE_SIZE;
 #ifdef CONFIG_XEN_IA64_DOM0_VP
 	const unsigned long start_mpaddr = 0;
 #else
 	const unsigned long start_mpaddr = ((d==dom0)?dom0_start:0);
 #endif
-
-#	define MAKE_MD(typ, attr, start, end, abs) 	\
-	do {						\
-		md = efi_memmap + i++;			\
-		md->type = typ;				\
-		md->pad = 0;				\
-		md->phys_addr = abs ? start : start_mpaddr + start;	\
-		md->virt_addr = 0;			\
-		md->num_pages = (end - start) >> 12;	\
-		md->attribute = attr;			\
-		print_md(md);				\
-	} while (0)
 
 /* FIXME: should check size but for now we have a whole MB to play with.
    And if stealing code from fw-emu.c, watch out for new fw_vendor on the end!
@@ -557,7 +588,6 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	efi_systab->hdr.revision  = EFI_SYSTEM_TABLE_REVISION;
 	efi_systab->hdr.headersize = sizeof(efi_systab->hdr);
 	cp = fw_vendor = &cmd_line[arglen] + (2-(arglen&1)); // round to 16-bit boundary
-#define FW_VENDOR "X\0e\0n\0/\0i\0a\0\066\0\064\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 	cp += sizeof(FW_VENDOR) + (8-((unsigned long)cp & 7)); // round to 64-bit boundary
 
 	memcpy(fw_vendor,FW_VENDOR,sizeof(FW_VENDOR));
@@ -571,12 +601,6 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	efi_runtime->hdr.signature = EFI_RUNTIME_SERVICES_SIGNATURE;
 	efi_runtime->hdr.revision = EFI_RUNTIME_SERVICES_REVISION;
 	efi_runtime->hdr.headersize = sizeof(efi_runtime->hdr);
-#define EFI_HYPERCALL_PATCH(tgt,call) do { \
-    dom_efi_hypercall_patch(d,FW_HYPERCALL_##call##_PADDR,FW_HYPERCALL_##call); \
-    tgt = dom_pa((unsigned long) pfn); \
-    *pfn++ = FW_HYPERCALL_##call##_PADDR + start_mpaddr; \
-    *pfn++ = 0; \
-    } while (0)
 
 	EFI_HYPERCALL_PATCH(efi_runtime->get_time,EFI_GET_TIME);
 	EFI_HYPERCALL_PATCH(efi_runtime->set_time,EFI_SET_TIME);
@@ -690,7 +714,13 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	dom_fpswa_hypercall_patch(d);
 	fpswa_inf->fpswa = (void *) FW_HYPERCALL_FPSWA_ENTRY_PADDR + start_mpaddr;
 
-	i = 0;
+	i = 0; /* Used by MAKE_MD */
+
+	/* Create dom0/domu md entry for fw_mem area */
+	MAKE_MD(EFI_ACPI_RECLAIM_MEMORY, EFI_MEMORY_WB | EFI_MEMORY_RUNTIME,
+	        dom_pa((unsigned long)fw_mem),
+	        dom_pa((unsigned long)fw_mem + fw_mem_size), 1);
+
 	if (d == dom0) {
 #ifndef CONFIG_XEN_IA64_DOM0_VP
 		/*
@@ -708,9 +738,6 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 
 		/* simulate 1MB free memory at physical address zero */
 		MAKE_MD(EFI_LOADER_DATA,EFI_MEMORY_WB,0*MB,1*MB, 0);//XXX
-#else
-		int num_mds;
-		int j;
 #endif
 		/* hypercall patches live here, masquerade as reserved PAL memory */
 		MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB|EFI_MEMORY_RUNTIME,HYPERCALL_START,HYPERCALL_END, 0);
@@ -755,59 +782,13 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 			                     dom_fw_dom0_lowmem, &arg);
 		}
 		else MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
-
-#ifdef CONFIG_XEN_IA64_DOM0_VP
-		// simple
-		// MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
-		//         HYPERCALL_END, maxmem, 0);
-		// is not good. Check overlap.
-		sort(efi_memmap, i, sizeof(efi_memory_desc_t),
-		     efi_mdt_cmp, NULL);
-
-		// find gap and fill it with conventional memory
-		num_mds = i;
-		for (j = 0; j < num_mds; j++) {
-			unsigned long end;
-			unsigned long next_start;
-
-			md = &efi_memmap[j];
-			end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
-
-			next_start = maxmem;
-			if (j + 1 < num_mds) {
-				efi_memory_desc_t* next_md = &efi_memmap[j + 1];
-				next_start = next_md->phys_addr;
-				BUG_ON(end > next_start);
-				if (end == next_md->phys_addr)
-					continue;
-			}
-
-			// clip the range and align to PAGE_SIZE
-			// Avoid "legacy" low memory addresses and the
-			// HYPERCALL patch area.      
-			if (end < HYPERCALL_END)
-				end = HYPERCALL_END;
-			if (next_start > maxmem)
-				next_start = maxmem;
-			end = PAGE_ALIGN(end);
-			next_start = next_start & PAGE_MASK;
-			if (end >= next_start)
-				continue;
-
-			MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
-			        end, next_start, 0);
-			if (next_start >= maxmem)
-				break;
-		}
-#endif        
-	}
-	else {
+	} else {
 #ifndef CONFIG_XEN_IA64_DOM0_VP
 		MAKE_MD(EFI_LOADER_DATA,EFI_MEMORY_WB,0*MB,1*MB, 1);
+		MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,HYPERCALL_END,maxmem, 1);
 #endif
 		/* hypercall patches live here, masquerade as reserved PAL memory */
 		MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB|EFI_MEMORY_RUNTIME,HYPERCALL_START,HYPERCALL_END, 1);
-		MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,HYPERCALL_END,maxmem, 1);
 		/* Create a dummy entry for IO ports, so that IO accesses are
 		   trapped by Xen.  */
 		MAKE_MD(EFI_MEMORY_MAPPED_IO_PORT_SPACE,EFI_MEMORY_UC,
@@ -815,6 +796,50 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 		MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
 	}
 
+#ifdef CONFIG_XEN_IA64_DOM0_VP
+	// simple
+	// MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
+	//         HYPERCALL_END, maxmem, 0);
+	// is not good. Check overlap.
+	sort(efi_memmap, i, sizeof(efi_memory_desc_t),
+	     efi_mdt_cmp, NULL);
+
+	// find gap and fill it with conventional memory
+	num_mds = i;
+	for (j = 0; j < num_mds; j++) {
+		unsigned long end;
+		unsigned long next_start;
+
+		md = &efi_memmap[j];
+		end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
+
+		next_start = maxmem;
+		if (j + 1 < num_mds) {
+			efi_memory_desc_t* next_md = &efi_memmap[j + 1];
+			next_start = next_md->phys_addr;
+			BUG_ON(end > next_start);
+			if (end == next_md->phys_addr)
+				continue;
+		}
+
+		// clip the range and align to PAGE_SIZE
+		// Avoid "legacy" low memory addresses and the
+		// HYPERCALL patch area.      
+		if (end < HYPERCALL_END)
+			end = HYPERCALL_END;
+		if (next_start > maxmem)
+			next_start = maxmem;
+		end = PAGE_ALIGN(end);
+		next_start = next_start & PAGE_MASK;
+		if (end >= next_start)
+			continue;
+
+		MAKE_MD(EFI_CONVENTIONAL_MEMORY, EFI_MEMORY_WB,
+		        end, next_start, 0);
+		if (next_start >= maxmem)
+			break;
+	}
+#endif        
 	sort(efi_memmap, i, sizeof(efi_memory_desc_t), efi_mdt_cmp, NULL);
 
 	bp->efi_systab = dom_pa((unsigned long) fw_mem);
@@ -879,6 +904,10 @@ dom_fw_init (struct domain *d, const char *args, int arglen, char *fw_mem, int f
 	else {
 		bp->initrd_start = d->arch.initrd_start;
 		bp->initrd_size  = d->arch.initrd_len;
+	}
+	for (i = 0 ; i < bp->efi_memmap_size/sizeof(efi_memory_desc_t) ; i++) {
+		md = efi_memmap + i;
+		print_md(md);
 	}
 	printf(" initrd start 0x%lx", bp->initrd_start);
 	printf(" initrd size 0x%lx\n", bp->initrd_size);
