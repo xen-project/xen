@@ -58,8 +58,6 @@ class XMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
     #    propagate so that it shows up in the Xend debug logs
     # 2) we don't bother checking for a _dispatch function since we don't
     #    use one
-    # 3) we never shutdown the connection.  This appears to be a bug in
-    #    SimpleXMLRPCServer.py as it breaks HTTP Keep-Alive
     def do_POST(self):
         data = self.rfile.read(int(self.headers["content-length"]))
         rsp = self.server._marshaled_dispatch(data)
@@ -71,6 +69,8 @@ class XMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
 
         self.wfile.write(rsp)
         self.wfile.flush()
+        if self.close_connection == 1:
+            self.connection.shutdown(1)
 
 class HTTPUnixConnection(HTTPConnection):
     def connect(self):
