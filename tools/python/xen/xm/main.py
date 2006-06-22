@@ -276,7 +276,7 @@ for command in all_commands:
 ####################################################################
 
 def arg_check(args, name, lo, hi = -1):
-    n = len(args)
+    n = len([i for i in args if i != '--'])
     
     if hi == -1:
         if n != lo:
