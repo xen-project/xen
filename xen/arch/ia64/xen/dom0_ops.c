@@ -256,7 +256,7 @@ do_dom0vp_op(unsigned long cmd,
         }
         break;
     case IA64_DOM0VP_machtophys:
-        if (max_page <= arg0) {
+        if (!mfn_valid(arg0)) {
             ret = INVALID_M2P_ENTRY;
             break;
         }
