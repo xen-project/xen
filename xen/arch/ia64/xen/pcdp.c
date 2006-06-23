@@ -16,21 +16,142 @@
 #include <linux/efi.h>
 #include <linux/serial.h>
 #ifdef XEN
+#include <linux/efi.h>
 #include <linux/errno.h>
+#include <asm/iosapic.h>
+#include <asm/system.h>
+#include <acpi/acpi.h>
 #endif
 #include "pcdp.h"
 
-static int __init
-setup_serial_console(struct pcdp_uart *uart)
-{
 #ifdef XEN
-	extern struct ns16550_defaults ns16550_com1;
+extern struct ns16550_defaults ns16550_com1;
+extern unsigned int ns16550_com1_gsi;
+extern unsigned int ns16550_com1_polarity;
+extern unsigned int ns16550_com1_trigger;
+
+/*
+ * This is kind of ugly, but older rev HCDP tables don't provide interrupt
+ * polarity and trigger information.  Linux/ia64 discovers these properties
+ * later via ACPI names, but we don't have that luxury in Xen/ia64.  Since
+ * all future platforms should have newer PCDP tables, this should be a
+ * fixed list of boxes in the field, so we can hardcode based on the model.
+ */
+static void __init
+pcdp_hp_irq_fixup(struct pcdp *pcdp, struct pcdp_uart *uart)
+{
+	efi_system_table_t *systab;
+	efi_config_table_t *tables;
+	struct acpi20_table_rsdp *rsdp = NULL;
+	struct acpi_table_xsdt *xsdt;
+	struct acpi_table_header *hdr;
+	int i;
+
+	if (pcdp->rev >= 3 || strcmp(pcdp->oemid, "HP"))
+		return;
+
+	/*
+	 * Manually walk firmware provided tables to get to the XSDT.
+	 * The OEM table ID on the XSDT is the platform model string.
+	 * We only care about ACPI 2.0 tables as that's all HP provides.
+	 */
+	systab = __va(ia64_boot_param->efi_systab);
+
+	if (!systab || systab->hdr.signature != EFI_SYSTEM_TABLE_SIGNATURE)
+		return;
+
+	tables = __va(systab->tables);
+
+	for (i = 0 ; i < (int)systab->nr_tables && !rsdp ; i++) {
+		if (efi_guidcmp(tables[i].guid, ACPI_20_TABLE_GUID) == 0)
+			rsdp =
+			     (struct acpi20_table_rsdp *)__va(tables[i].table);
+	}
+
+	if (!rsdp || strncmp(rsdp->signature, RSDP_SIG, sizeof(RSDP_SIG) - 1))
+		return;
+
+	xsdt = (struct acpi_table_xsdt *)__va(rsdp->xsdt_address);
+	hdr = &xsdt->header;
+
+	if (strncmp(hdr->signature, XSDT_SIG, sizeof(XSDT_SIG) - 1))
+		return;
+
+	/* Sanity check; are we still looking at HP firmware tables? */
+	if (strcmp(hdr->oem_id, "HP"))
+		return;
+
+	if (!strcmp(hdr->oem_table_id, "zx2000") ||
+	    !strcmp(hdr->oem_table_id, "zx6000") ||
+	    !strcmp(hdr->oem_table_id, "rx2600") ||
+	    !strcmp(hdr->oem_table_id, "cx2600")) {
+
+		ns16550_com1.irq = ns16550_com1_gsi = uart->gsi;
+		ns16550_com1_polarity = IOSAPIC_POL_HIGH;
+		ns16550_com1_trigger = IOSAPIC_EDGE;
+
+	} else if (!strcmp(hdr->oem_table_id, "rx2620") ||
+	           !strcmp(hdr->oem_table_id, "cx2620") ||
+	           !strcmp(hdr->oem_table_id, "rx1600") ||
+	           !strcmp(hdr->oem_table_id, "rx1620")) {
+
+		ns16550_com1.irq = ns16550_com1_gsi = uart->gsi;
+		ns16550_com1_polarity = IOSAPIC_POL_LOW;
+		ns16550_com1_trigger = IOSAPIC_LEVEL;
+	}
+}
+
+static void __init
+setup_pcdp_irq(struct pcdp *pcdp, struct pcdp_uart *uart)
+{
+	/* PCDP provides full interrupt info */
+	if (pcdp->rev >= 3) {
+		if (uart->flags & PCDP_UART_IRQ) {
+			ns16550_com1.irq = ns16550_com1_gsi = uart->gsi,
+			ns16550_com1_polarity =
+			               uart->flags & PCDP_UART_ACTIVE_LOW ?
+		                       IOSAPIC_POL_LOW : IOSAPIC_POL_HIGH;
+			ns16550_com1_trigger =
+			               uart->flags & PCDP_UART_EDGE_SENSITIVE ?
+		                       IOSAPIC_EDGE : IOSAPIC_LEVEL;
+		}
+		return;
+	}
+
+	/* HCDP support */
+	if (uart->pci_func & PCDP_UART_IRQ) {
+		/*
+		 * HCDP tables don't provide interrupt polarity/trigger
+		 * info.  If the UART is a PCI device, we know to program
+		 * it as low/level.  Otherwise rely on platform hacks or
+		 * default to polling (irq = 0).
+		 */
+		if (uart->pci_func & PCDP_UART_PCI) {
+			ns16550_com1.irq = ns16550_com1_gsi = uart->gsi;
+			ns16550_com1_polarity = IOSAPIC_POL_LOW;
+			ns16550_com1_trigger = IOSAPIC_LEVEL;
+		} else if (!strcmp(pcdp->oemid, "HP"))
+			pcdp_hp_irq_fixup(pcdp, uart);
+	}
+}
+
+static int __init
+setup_serial_console(struct pcdp *pcdp, struct pcdp_uart *uart)
+{
+
 	ns16550_com1.baud = uart->baud;
 	ns16550_com1.io_base = uart->addr.address;
 	if (uart->bits)
 		ns16550_com1.data_bits = uart->bits;
+
+	setup_pcdp_irq(pcdp, uart);
+
 	return 0;
+}
 #else
+static int __init
+setup_serial_console(struct pcdp_uart *uart)
+{
 #ifdef CONFIG_SERIAL_8250_CONSOLE
 	int mmio;
 	static char options[64];
@@ -44,10 +165,8 @@ setup_serial_console(struct pcdp_uart *uart)
 #else
 	return -ENODEV;
 #endif
-#endif
 }
 
-#ifndef XEN
 static int __init
 setup_vga_console(struct pcdp_vga *vga)
 {
@@ -100,7 +219,12 @@ efi_setup_pcdp_console(char *cmdline)
 	for (i = 0, uart = pcdp->uart; i < pcdp->num_uarts; i++, uart++) {
 		if (uart->flags & PCDP_UART_PRIMARY_CONSOLE || serial) {
 			if (uart->type == PCDP_CONSOLE_UART) {
+#ifndef XEN
 				return setup_serial_console(uart);
+#else
+				return setup_serial_console(pcdp, uart);
+#endif
+				
 			}
 		}
 	}

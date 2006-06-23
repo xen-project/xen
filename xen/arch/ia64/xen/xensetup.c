@@ -23,6 +23,7 @@
 #include <xen/string.h>
 #include <asm/vmx.h>
 #include <linux/efi.h>
+#include <asm/iosapic.h>
 
 /* Be sure the struct shared_info fits on a page because it is mapped in
    domain. */
@@ -66,6 +67,10 @@ integer_param("maxcpus", max_cpus);
    same resource).  */
 static int opt_xencons = 0;
 boolean_param("xencons", opt_xencons);
+
+/* Toggle to allow non-legacy xencons UARTs to run in polling mode */
+static int opt_xencons_poll = 0;
+boolean_param("xencons_poll", opt_xencons_poll);
 
 /*
  * opt_xenheap_megabytes: Size of Xen heap in megabytes, including:
@@ -148,6 +153,10 @@ struct ns16550_defaults ns16550_com1 = {
     .parity    = 'n',
     .stop_bits = 1
 };
+
+unsigned int ns16550_com1_gsi;
+unsigned int ns16550_com1_polarity;
+unsigned int ns16550_com1_trigger;
 
 struct ns16550_defaults ns16550_com2 = {
     .baud      = BAUD_AUTO,
@@ -414,7 +423,6 @@ void start_kernel(void)
 	(xenheap_phys_end-__pa(heap_start)) >> 20,
 	(xenheap_phys_end-__pa(heap_start)) >> 10);
 
-printk("About to call scheduler_init()\n");
     scheduler_init();
     idle_vcpu[0] = (struct vcpu*) ia64_r13;
     idle_domain = domain_create(IDLE_DOMAIN_ID, 0);
@@ -471,7 +479,6 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
     initialise_gdb(); /* could be moved earlier */
 
     do_initcalls();
-printk("About to call sort_main_extable()\n");
     sort_main_extable();
 
     init_rid_allocator ();
@@ -479,12 +486,23 @@ printk("About to call sort_main_extable()\n");
     local_irq_enable();
 
     if (opt_xencons) {
-	    initialize_keytable();
-	    serial_init_postirq();
+        initialize_keytable();
+        if (ns16550_com1_gsi) {
+            if (opt_xencons_poll ||
+                iosapic_register_intr(ns16550_com1_gsi,
+                                      ns16550_com1_polarity,
+                                      ns16550_com1_trigger) < 0) {
+                ns16550_com1.irq = 0;
+                ns16550_init(0, &ns16550_com1);
+            }
+        }
+        serial_init_postirq();
+
+        /* Hide the HCDP table from dom0 */
+        efi.hcdp = NULL;
     }
 
     /* Create initial domain 0. */
-printk("About to call domain_create()\n");
     dom0 = domain_create(0, 0);
 
     if ( dom0 == NULL )
@@ -496,7 +514,6 @@ printk("About to call domain_create()\n");
      * We're going to setup domain0 using the module(s) that we stashed safely
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
-    printk("About to call construct_dom0()\n");
     dom0_memory_start = (unsigned long) __va(ia64_boot_param->domain_start);
     dom0_memory_size = ia64_boot_param->domain_size;
     dom0_initrd_start = (unsigned long) __va(ia64_boot_param->initrd_start);
@@ -513,7 +530,6 @@ printk("About to call domain_create()\n");
     if (!running_on_sim)  // slow on ski and pages are pre-initialized to zero
 	scrub_heap_pages();
 
-printk("About to call init_trace_bufs()\n");
     init_trace_bufs();
 
     /* Give up the VGA console if DOM0 is configured to grab it. */
@@ -522,13 +538,10 @@ printk("About to call init_trace_bufs()\n");
 
     domain0_ready = 1;
 
-    printf("About to call schedulers_start dom0=%p, idle_dom=%p\n",
-	   dom0, idle_domain);
     schedulers_start();
 
     domain_unpause_by_systemcontroller(dom0);
 
-printk("About to call startup_cpu_idle_loop()\n");
     startup_cpu_idle_loop();
 }
 
