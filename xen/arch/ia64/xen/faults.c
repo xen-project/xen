@@ -218,7 +218,6 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 	int is_ptc_l_needed = 0;
 	u64 logps;
 
-	if ((isr & IA64_ISR_IR) && handle_lazy_cover(current, regs)) return;
 	if ((isr & IA64_ISR_SP)
 	    || ((isr & IA64_ISR_NA) && (isr & IA64_ISR_CODE_MASK) == IA64_ISR_CODE_LFETCH))
 	{
@@ -269,6 +268,10 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 		}
 		return;
 	}
+
+	if ((isr & IA64_ISR_IR) && handle_lazy_cover(current, regs))
+		return;
+
 	if (!PSCB(current,interrupt_collection_enabled)) {
 		check_bad_nested_interruption(isr,regs,fault);
 		//printf("Delivering NESTED DATA TLB fault\n");
