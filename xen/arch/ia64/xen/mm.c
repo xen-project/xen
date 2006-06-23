@@ -64,7 +64,7 @@
  *   - cmpxchg p2m entry
  *     assign_domain_page_cmpxchg_rel()
  *     destroy_grant_host_mapping()
- *     steal_page_for_grant_transfer()
+ *     steal_page()
  *     zap_domain_page_one()
  *   - read p2m entry
  *     lookup_alloc_domain_pte() and its variants.
@@ -134,7 +134,7 @@
  *   This is a race between reading/writing the p2m entry.
  *   reader: vcpu_itc_i(), vcpu_itc_d(), ia64_do_page_fault(), vcpu_fc()
  *   writer: assign_domain_page_cmpxchg_rel(), destroy_grant_host_mapping(), 
- *           steal_page_for_grant_transfer(), zap_domain_page_one()
+ *           steal_page(), zap_domain_page_one()
  * 
  *   For example, vcpu_itc_i() is about to insert tlb by calling
  *   vcpu_itc_no_srlz() after reading the p2m entry.
@@ -152,7 +152,7 @@
  *   reader: vcpu_get_domain_bundle(), vmx_get_domain_bundle(),
  *           efi_emulate_get_time()
  *   writer: assign_domain_page_cmpxchg_rel(), destroy_grant_host_mapping(), 
- *           steal_page_for_grant_transfer(), zap_domain_page_one()
+ *           steal_page(), zap_domain_page_one()
  * 
  *   A page which assigned to a domain can be de-assigned by another vcpu.
  *   So before read/write to a domain page, the page's reference count 
