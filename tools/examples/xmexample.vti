@@ -12,7 +12,7 @@ arch_libdir = 'lib'
 
 #----------------------------------------------------------------------------
 # Kernel image file.
-kernel = "/boot/Flash.fd"
+kernel = "/usr/lib/xen/boot/guest_firmware.bin"
 
 # The domain build function. VTI domain uses 'hvm'.
 builder='hvm'
