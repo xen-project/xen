@@ -675,39 +675,6 @@ GLOBAL_ENTRY(vmx_switch_rr7)
    itr.d dtr[r24]=loc2     // wire in new mapping...
    ;;
 
-
-#if    0
-   // re-pin mappings for shared_info
-
-   mov r24=IA64_TR_SHARED_INFO
-   movl r25=__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RW)
-   ;;
-   or loc3 = r25,loc3          // construct PA | page properties
-   mov r23 = PAGE_SHIFT<<2
-   ;;
-   ptr.d   in1,r23
-   ;;
-   mov cr.itir=r23
-   mov cr.ifa=in1
-   ;;
-   itr.d dtr[r24]=loc3     // wire in new mapping...
-   ;;
-   // re-pin mappings for shared_arch_info
-
-   mov r24=IA64_TR_ARCH_INFO
-   or loc4 = r25,loc4          // construct PA | page properties
-   mov r23 = PAGE_SHIFT<<2
-   ;;
-   ptr.d   in2,r23
-   ;;
-   mov cr.itir=r23
-   mov cr.ifa=in2
-   ;;
-   itr.d dtr[r24]=loc4     // wire in new mapping...
-   ;;
-#endif
-
-
    // re-pin mappings for guest_vhpt
 
    mov r24=IA64_TR_PERVP_VHPT

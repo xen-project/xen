@@ -265,34 +265,25 @@ void foo(void)
 #ifdef CONFIG_XEN
 	BLANK();
 
-	DEFINE(XSI_PSR_I_ADDR_OFS, (XSI_OFS + offsetof(mapped_regs_t, interrupt_mask_addr)));
-	DEFINE(XSI_IPSR_OFS, (XSI_OFS + offsetof(mapped_regs_t, ipsr)));
-	DEFINE(XSI_IIP_OFS, (XSI_OFS + offsetof(mapped_regs_t, iip)));
-	DEFINE(XSI_IFS_OFS, (XSI_OFS + offsetof(mapped_regs_t, ifs)));
-	DEFINE(XSI_PRECOVER_IFS_OFS, (XSI_OFS + offsetof(mapped_regs_t, precover_ifs)));
-	DEFINE(XSI_ISR_OFS, (XSI_OFS + offsetof(mapped_regs_t, isr)));
-	DEFINE(XSI_IFA_OFS, (XSI_OFS + offsetof(mapped_regs_t, ifa)));
-	DEFINE(XSI_IIPA_OFS, (XSI_OFS + offsetof(mapped_regs_t, iipa)));
-	DEFINE(XSI_IIM_OFS, (XSI_OFS + offsetof(mapped_regs_t, iim)));
-	DEFINE(XSI_TPR_OFS, (XSI_OFS + offsetof(mapped_regs_t, tpr)));
-	DEFINE(XSI_IHA_OFS, (XSI_OFS + offsetof(mapped_regs_t, iha)));
-	DEFINE(XSI_ITIR_OFS, (XSI_OFS + offsetof(mapped_regs_t, itir)));
-	DEFINE(XSI_ITV_OFS, (XSI_OFS + offsetof(mapped_regs_t, itv)));
-	DEFINE(XSI_PTA_OFS, (XSI_OFS + offsetof(mapped_regs_t, pta)));
-	DEFINE(XSI_PSR_IC_OFS, (XSI_OFS + offsetof(mapped_regs_t, interrupt_collection_enabled)));
-	DEFINE(XSI_PEND_OFS, (XSI_OFS + offsetof(mapped_regs_t, pending_interruption)));
-	DEFINE(XSI_INCOMPL_REGFR_OFS, (XSI_OFS + offsetof(mapped_regs_t, incomplete_regframe)));
-	DEFINE(XSI_METAPHYS_OFS, (XSI_OFS + offsetof(mapped_regs_t, metaphysical_mode)));
+#define DEFINE_MAPPED_REG_OFS(sym, field) \
+	DEFINE(sym, (XMAPPEDREGS_OFS + offsetof(mapped_regs_t, field)))
 
-	DEFINE(XSI_BANKNUM_OFS, (XSI_OFS + offsetof(mapped_regs_t, banknum)));
-
-	DEFINE(XSI_BANK0_R16_OFS, (XSI_OFS + offsetof(mapped_regs_t, bank0_regs[0])));
-	DEFINE(XSI_BANK1_R16_OFS, (XSI_OFS + offsetof(mapped_regs_t, bank1_regs[0])));
-	DEFINE(XSI_B0NATS_OFS, (XSI_OFS + offsetof(mapped_regs_t, vbnat)));
-	DEFINE(XSI_B1NATS_OFS, (XSI_OFS + offsetof(mapped_regs_t, vnat)));
-	DEFINE(XSI_RR0_OFS, (XSI_OFS + offsetof(mapped_regs_t, rrs[0])));
-	DEFINE(XSI_KR0_OFS, (XSI_OFS + offsetof(mapped_regs_t, krs[0])));
-	DEFINE(XSI_PKR0_OFS, (XSI_OFS + offsetof(mapped_regs_t, pkrs[0])));
-	DEFINE(XSI_TMP0_OFS, (XSI_OFS + offsetof(mapped_regs_t, tmp[0])));
+	DEFINE_MAPPED_REG_OFS(XSI_PSR_I_ADDR_OFS, interrupt_mask_addr);
+	DEFINE_MAPPED_REG_OFS(XSI_IPSR_OFS, ipsr);
+	DEFINE_MAPPED_REG_OFS(XSI_IIP_OFS, iip);
+	DEFINE_MAPPED_REG_OFS(XSI_IFS_OFS, ifs);
+	DEFINE_MAPPED_REG_OFS(XSI_PRECOVER_IFS_OFS, precover_ifs);
+	DEFINE_MAPPED_REG_OFS(XSI_ISR_OFS, isr);
+	DEFINE_MAPPED_REG_OFS(XSI_IFA_OFS, ifa);
+	DEFINE_MAPPED_REG_OFS(XSI_IIPA_OFS, iipa);
+	DEFINE_MAPPED_REG_OFS(XSI_IIM_OFS, iim);
+	DEFINE_MAPPED_REG_OFS(XSI_IHA_OFS, iha);
+	DEFINE_MAPPED_REG_OFS(XSI_ITIR_OFS, itir);
+	DEFINE_MAPPED_REG_OFS(XSI_PSR_IC_OFS, interrupt_collection_enabled);
+	DEFINE_MAPPED_REG_OFS(XSI_PEND_OFS, pending_interruption);
+	DEFINE_MAPPED_REG_OFS(XSI_INCOMPL_REGFR_OFS, incomplete_regframe);
+	DEFINE_MAPPED_REG_OFS(XSI_BANKNUM_OFS, banknum);
+	DEFINE_MAPPED_REG_OFS(XSI_BANK0_R16_OFS, bank0_regs[0]);
+	DEFINE_MAPPED_REG_OFS(XSI_BANK1_R16_OFS, bank1_regs[0]);
 #endif /* CONFIG_XEN */
 }

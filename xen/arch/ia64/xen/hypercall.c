@@ -267,6 +267,9 @@ fw_hypercall (struct pt_regs *regs)
 	    case FW_HYPERCALL_IPI:
 		fw_hypercall_ipi (regs);
 		break;
+	    case FW_HYPERCALL_SET_SHARED_INFO_VA:
+	        regs->r8 = domain_set_shared_info_va (regs->r28);
+		break;
 	    case FW_HYPERCALL_FPSWA:
 		fpswa_ret = fw_hypercall_fpswa (v);
 		regs->r8  = fpswa_ret.status;

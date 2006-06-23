@@ -145,6 +145,9 @@
 #define FW_HYPERCALL_FPSWA_PATCH_PADDR			FW_HYPERCALL_PADDR(FW_HYPERCALL_FPSWA_PATCH_INDEX)
 #define FW_HYPERCALL_FPSWA				0x500UL
 
+/* Set the shared_info base virtual address.  */
+#define FW_HYPERCALL_SET_SHARED_INFO_VA			0x600UL
+
 /* Hypercalls index bellow _FIRST_ARCH are reserved by Xen, while those above
    are for the architecture.
    Note: this limit was defined by Xen/ia64 (and not by Xen).²

@@ -14,8 +14,15 @@
 
 #define IA64_PARAVIRTUALIZED
 
-#define XSI_OFS		XSI_SIZE
-#define XPRIVREG_BASE	(XSI_BASE + XSI_SIZE)
+#if 0
+#undef XSI_BASE
+/* At 1 MB, before per-cpu space but still addressable using addl instead
+   of movl. */
+#define XSI_BASE				0xfffffffffff00000
+#endif
+
+/* Address of mapped regs.  */
+#define XMAPPEDREGS_BASE		(XSI_BASE + XSI_SIZE)
 
 #ifdef __ASSEMBLY__
 #define	XEN_HYPER_RFI			break HYPERPRIVOP_RFI
@@ -98,16 +105,16 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
  * Others, like "pend", are abstractions based on privileged registers.
  * "Pend" is guaranteed to be set if reading cr.ivr would return a
  * (non-spurious) interrupt. */
-#define XEN_PRIVREGS ((struct mapped_regs *)XPRIVREG_BASE)
+#define XEN_MAPPEDREGS ((struct mapped_regs *)XMAPPEDREGS_BASE)
 #define XSI_PSR_I			\
-	(*XEN_PRIVREGS->interrupt_mask_addr)
+	(*XEN_MAPPEDREGS->interrupt_mask_addr)
 #define xen_get_virtual_psr_i()		\
 	(!XSI_PSR_I)
 #define xen_set_virtual_psr_i(_val)	\
 	({ XSI_PSR_I = (uint8_t)(_val) ? 0 : 1; })
 #define xen_set_virtual_psr_ic(_val)	\
-	({ XEN_PRIVREGS->interrupt_collection_enabled = _val ? 1 : 0; })
-#define xen_get_virtual_pend()		(XEN_PRIVREGS->pending_interruption)
+	({ XEN_MAPPEDREGS->interrupt_collection_enabled = _val ? 1 : 0; })
+#define xen_get_virtual_pend()		(XEN_MAPPEDREGS->pending_interruption)
 
 /* Hyperprivops are "break" instructions with a well-defined API.
  * In particular, the virtual psr.ic bit must be off; in this way

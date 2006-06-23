@@ -380,13 +380,17 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
 #endif /* !__ASSEMBLY__ */
 
-/* Address of shared_info in domain virtual space.  */
-#define XSI_BASE	0xf100000000000000
+/* Address of shared_info in domain virtual space.
+   This is the default address, for compatibility only.  */
+#define XSI_BASE				0xf100000000000000
+
 /* Size of the shared_info area (this is not related to page size).  */
-#define XSI_LOG_SIZE	14
-#define XSI_SIZE	(1 << XSI_LOG_SIZE)
+#define XSI_LOG_SIZE			14
+#define XSI_SIZE				(1 << XSI_LOG_SIZE)
 /* Log size of mapped_regs area (64 KB - only 4KB is used).  */
-#define XASI_LOG_SIZE	16
+#define XMAPPEDREGS_LOG_SIZE	16
+/* Offset of XASI (Xen arch shared info) wrt XSI_BASE.  */
+#define XMAPPEDREGS_OFS			XSI_SIZE
 
 /* Hyperprivops.  */
 #define HYPERPRIVOP_RFI			0x1

@@ -10,7 +10,8 @@
 #include <asm/processor.h>
 #include <asm/pgtable.h>
 #include <asm/vhpt.h>
-
+#include <public/arch-ia64.h>
+	
 // Change rr7 to the passed value while ensuring
 // Xen is mapped into the new region.
 #define PSR_BITS_TO_CLEAR						\
@@ -140,8 +141,8 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	;;
 	itr.d dtr[r21]=r23		// wire in new mapping...
 	
-	// Map for arch_vcpu_info_t
-	movl r22=XSI_OFS
+	// Map mapped_regs
+	mov r22=XMAPPEDREGS_OFS
 	mov r24=PAGE_SHIFT<<2
 	;; 
 	add r22=r22,in3
@@ -150,7 +151,7 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	or r23=loc7,r25			// construct PA | page properties
 	mov cr.itir=r24
 	mov cr.ifa=r22
-	mov r21=IA64_TR_ARCH_INFO
+	mov r21=IA64_TR_MAPPED_REGS
 	;;
 	itr.d dtr[r21]=r23		// wire in new mapping...
 
@@ -239,19 +240,24 @@ GLOBAL_ENTRY(__get_domain_bundle)
 END(__get_domain_bundle)
 
 GLOBAL_ENTRY(dorfirfi)
-        movl r16 = XSI_IIP
-        movl r17 = XSI_IPSR
-        movl r18 = XSI_IFS
+	// Read current vcpu shared info
+	movl r16=THIS_CPU(current_psr_ic_addr)
+	;;
+	ld8 r19 = [r16]
+	;;
+	add r16 = XSI_IIP_OFS - XSI_PSR_IC_OFS, r19
+	add r17 = XSI_IPSR_OFS - XSI_PSR_IC_OFS, r19
+	add r18 = XSI_IFS_OFS - XSI_PSR_IC_OFS, r19
 	;;
 	ld8 r16 = [r16]
 	ld8 r17 = [r17]
 	ld8 r18 = [r18]
 	;;
-        mov cr.iip=r16
-        mov cr.ipsr=r17
-        mov cr.ifs=r18
+	mov cr.iip=r16
+	mov cr.ipsr=r17
+	mov cr.ifs=r18
 	;;
-        rfi
+	rfi
 	;;
 END(dorfirfi)
 

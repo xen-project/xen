@@ -118,7 +118,7 @@ void reflect_interruption(unsigned long isr, struct pt_regs *regs, unsigned long
 
 	regs->cr_iip = ((unsigned long) PSCBX(v,iva) + vector) & ~0xffUL;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
-	regs->r31 = XSI_IPSR;
+	regs->r31 = current->domain->arch.shared_info_va + XSI_IPSR_OFS;
 
 	v->vcpu_info->evtchn_upcall_mask = 1;
 	PSCB(v,interrupt_collection_enabled) = 0;
@@ -172,7 +172,7 @@ void reflect_event(struct pt_regs *regs)
 
 	regs->cr_iip = v->arch.event_callback_ip;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
-	regs->r31 = XSI_IPSR;
+	regs->r31 = current->domain->arch.shared_info_va + XSI_IPSR_OFS;
 
 	v->vcpu_info->evtchn_upcall_mask = 1;
 	PSCB(v,interrupt_collection_enabled) = 0;

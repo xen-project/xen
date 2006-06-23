@@ -6,7 +6,7 @@
  */
 #define IA64_TR_SHARED_INFO	3	/* dtr3: page shared with domain */
 #define	IA64_TR_VHPT		4	/* dtr4: vhpt */
-#define IA64_TR_ARCH_INFO	5
+#define IA64_TR_MAPPED_REGS	5	/* dtr5: vcpu mapped regs */
 #define IA64_TR_PERVP_VHPT	6
 #define IA64_DTR_GUEST_KERNEL   7
 #define IA64_ITR_GUEST_KERNEL   2

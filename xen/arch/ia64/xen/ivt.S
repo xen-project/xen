@@ -508,10 +508,9 @@ late_alt_dtlb_miss:
 	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	mov r21=cr.ipsr
 	;;
-#else
 #endif
 #ifdef CONFIG_DISABLE_VHPT
-	shr.u r22=r16,61			// get the region number into r21
+	shr.u r22=r16,61			// get the region into r22
 	;;
 	cmp.gt p8,p0=6,r22			// access to region 0-5
 	;;
@@ -992,7 +991,9 @@ ENTRY(break_fault)
         cmp.eq p7,p0=r17,r18 ;; 
 (p7)    br.spnt.few dispatch_break_fault ;;
 #endif
-	movl r18=XSI_PSR_IC
+	movl r18=THIS_CPU(current_psr_ic_addr)
+	;;
+	ld8 r18=[r18]
 	;;
 	ld4 r19=[r18]
 	;;

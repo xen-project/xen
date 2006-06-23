@@ -1354,7 +1354,7 @@ check_xen_space_overlap (const char *func, u64 base, u64 page_size)
 	base &= ~(page_size - 1);
 
 	/* FIXME: ideally an MCA should be generated...  */
-	if (range_overlap (XEN_VIRT_SPACE_LOW, XEN_VIRT_SPACE_HIGH,
+	if (range_overlap (HYPERVISOR_VIRT_START, HYPERVISOR_VIRT_END,
 			   base, base + page_size))
 		panic_domain (NULL, "%s on Xen virtual space (%lx)\n",
 			      func, base);

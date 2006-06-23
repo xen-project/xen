@@ -15,10 +15,21 @@ GLOBAL_ENTRY(early_xen_setup)
 	mov r8=ar.rsc		// Initialized in head.S
 (isBP)	movl r9=running_on_xen;;
 	extr.u r8=r8,2,2;;	// Extract pl fields
-	cmp.ne p7,p0=r8,r0;;	// p7: running on xen 
-(p7)	mov r8=1		// booleanize.
-(p7)	movl r10=xen_ivt;;
+	cmp.eq p7,p0=r8,r0	// p7: !running on xen
+	mov r8=1		// booleanize.
+(p7)	br.ret.sptk.many rp;;
 (isBP)	st4 [r9]=r8
-(p7)	mov cr.iva=r10
-	br.ret.sptk.many rp;;
+	movl r10=xen_ivt;;
+	
+	mov cr.iva=r10
+
+#if XSI_BASE != 0xf100000000000000UL
+	/* Backward compatibility.  */
+(isBP)	mov r2=0x600
+(isBP)	movl r28=XSI_BASE;;
+(isBP)	break 0x1000;;
+#endif
+
+	br.ret.sptk.many rp
+	;;
 END(early_xen_setup)

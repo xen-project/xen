@@ -304,9 +304,13 @@ ENTRY(hyper_ssm_i)
 	add r24=r24,r23;;
 	mov cr.iip=r24;;
 	// OK, now all set to go except for switch to virtual bank0
-	mov r30=r2; mov r29=r3;;
+	mov r30=r2
+	mov r29=r3
+	mov r28=r4
+	;;
 	adds r2=XSI_BANK1_R16_OFS-XSI_PSR_IC_OFS,r18;
 	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18;;
+	adds r4=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18
 	bsw.1;;
 	// FIXME?: ar.unat is not really handled correctly,
 	// but may not matter if the OS is NaT-clean
@@ -326,9 +330,11 @@ ENTRY(hyper_ssm_i)
 	.mem.offset 8,0; st8.spill [r3]=r29,16 ;;
 	.mem.offset 0,0; st8.spill [r2]=r30,16;
 	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
-	movl r31=XSI_IPSR;;
+	mov r31=r4
 	bsw.0 ;;
-	mov r2=r30; mov r3=r29;;
+	mov r2=r30
+	mov r3=r29
+	mov r4=r28
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st4 [r20]=r0 ;;
 	mov pr=r31,-1 ;;
@@ -372,7 +378,10 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	st8 [r20]=r21;;
 #endif
 	// vcpu_pend_timer(current)
-	movl r18=XSI_PSR_IC;;
+	movl r18=THIS_CPU(current_psr_ic_addr)
+	;;
+	ld8 r18=[r18]
+	;;
 	adds r20=XSI_ITV_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r20=[r20];;
 	cmp.eq p6,p0=r20,r0	// if cr.itv==0 done
@@ -481,12 +490,17 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	add r24=r24,r23;;
 	mov cr.iip=r24;;
 	// OK, now all set to go except for switch to virtual bank0
-	mov r30=r2; mov r29=r3;;
+	mov r30=r2
+	mov r29=r3
+	mov r27=r4
 #ifdef HANDLE_AR_UNAT
 	mov r28=ar.unat;
 #endif
-	adds r2=XSI_BANK1_R16_OFS-XSI_PSR_IC_OFS,r18;
-	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18;;
+	;;
+	adds r2=XSI_BANK1_R16_OFS-XSI_PSR_IC_OFS,r18
+	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18
+	adds r4=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18
+	;;
 	bsw.1;;
 	.mem.offset 0,0; st8.spill [r2]=r16,16;
 	.mem.offset 8,0; st8.spill [r3]=r17,16 ;;
@@ -506,28 +520,32 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
 #ifdef HANDLE_AR_UNAT
  	// r16~r23 are preserved regsin bank0 regs, we need to restore them,
-    // r24~r31 are scratch regs, we don't need to handle NaT bit,
-    // because OS handler must assign it before access it
-    ld8 r16=[r2],16;
-    ld8 r17=[r3],16;;
-    ld8 r18=[r2],16;
-    ld8 r19=[r3],16;;
-    ld8 r20=[r2],16;
-    ld8 r21=[r3],16;;
-    ld8 r22=[r2],16;
-    ld8 r23=[r3],16;;
+	// r24~r31 are scratch regs, we don't need to handle NaT bit,
+	// because OS handler must assign it before access it
+	ld8 r16=[r2],16;
+	ld8 r17=[r3],16;;
+	ld8 r18=[r2],16;
+	ld8 r19=[r3],16;;
+	ld8 r20=[r2],16;
+	ld8 r21=[r3],16;;
+	ld8 r22=[r2],16;
+	ld8 r23=[r3],16;;
 #endif
-    movl r31=XSI_IPSR;;
-    bsw.0 ;;
-    mov r24=ar.unat;
-    mov r2=r30; mov r3=r29;;
+	mov r31=r4
+	;;
+	bsw.0 ;;
+	mov r24=ar.unat;
+	mov r2=r30
+	mov r3=r29
+	mov r4=r27
 #ifdef HANDLE_AR_UNAT
-    mov ar.unat=r28;
+	mov ar.unat=r28;
 #endif
-    adds r25=XSI_B1NATS_OFS-XSI_PSR_IC_OFS,r18 ;
-    adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
-    st8 [r25]=r24;
-    st4 [r20]=r0 ;;
+	;;
+	adds r25=XSI_B1NATS_OFS-XSI_PSR_IC_OFS,r18 ;
+	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r25]=r24;
+	st4 [r20]=r0 ;;
 fast_tick_reflect_done:
 	mov pr=r31,-1 ;;
 	rfi
@@ -659,12 +677,16 @@ ENTRY(fast_reflect)
 	add r20=r20,r23;;
 	mov cr.iip=r20;;
 	// OK, now all set to go except for switch to virtual bank0
-	mov r30=r2; mov r29=r3;;
+	mov r30=r2
+	mov r29=r3
 #ifdef HANDLE_AR_UNAT
 	mov r28=ar.unat;
 #endif
+	mov r27=r4
 	adds r2=XSI_BANK1_R16_OFS-XSI_PSR_IC_OFS,r18;
-	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18;;
+	adds r3=(XSI_BANK1_R16_OFS+8)-XSI_PSR_IC_OFS,r18
+	adds r4=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18
+	;;
 	bsw.1;;
 	.mem.offset 0,0; st8.spill [r2]=r16,16;
 	.mem.offset 8,0; st8.spill [r3]=r17,16 ;;
@@ -687,24 +709,28 @@ ENTRY(fast_reflect)
     // r24~r31 are scratch regs, we don't need to handle NaT bit,
     // because OS handler must assign it before access it
 	ld8 r16=[r2],16;
-    ld8 r17=[r3],16;;
-    ld8 r18=[r2],16;
-    ld8 r19=[r3],16;;
+	ld8 r17=[r3],16;;
+	ld8 r18=[r2],16;
+	ld8 r19=[r3],16;;
 	ld8 r20=[r2],16;
-    ld8 r21=[r3],16;;
-    ld8 r22=[r2],16;
-    ld8 r23=[r3],16;;
+	ld8 r21=[r3],16;;
+	ld8 r22=[r2],16;
+	ld8 r23=[r3],16;;
 #endif
-	movl r31=XSI_IPSR;;
+	mov r31=r4
+	;;
 	bsw.0 ;;
-    mov r24=ar.unat;
-	mov r2=r30; mov r3=r29;;
+	mov r24=ar.unat;
+	mov r2=r30
+	mov r3=r29
 #ifdef HANDLE_AR_UNAT
 	mov ar.unat=r28;
 #endif
-    adds r25=XSI_B1NATS_OFS-XSI_PSR_IC_OFS,r18 ;
+	mov r4=r27
+	;;
+	adds r25=XSI_B1NATS_OFS-XSI_PSR_IC_OFS,r18 ;
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
-    st8 [r25]=r24;
+	st8 [r25]=r24;
 	st4 [r20]=r0 ;;
 	mov pr=r31,-1 ;;
 	rfi
@@ -732,7 +758,8 @@ GLOBAL_ENTRY(fast_access_reflect)
 	extr.u r21=r30,IA64_PSR_CPL0_BIT,2 ;;
 	cmp.eq p7,p0=r21,r0
 (p7)	br.spnt.few dispatch_reflection ;;
-	movl r18=XSI_PSR_IC;;
+	movl r18=THIS_CPU(current_psr_ic_addr);;
+	ld8 r18=[r18];;
 	ld4 r21=[r18];;
 	cmp.eq p7,p0=r0,r21
 (p7)	br.spnt.few dispatch_reflection ;;
@@ -1043,8 +1070,8 @@ ENTRY(hyper_rfi)
 	// validate vcr.iip, if in Xen range, do it the slow way
 	adds r20=XSI_IIP_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r22=[r20];;
-	movl r23=XEN_VIRT_SPACE_LOW
-	movl r24=XEN_VIRT_SPACE_HIGH ;;
+	movl r23=HYPERVISOR_VIRT_START
+	movl r24=HYPERVISOR_VIRT_END;;
 	cmp.ltu p0,p7=r22,r23 ;;	// if !(iip<low) &&
 (p7)	cmp.geu p0,p7=r22,r24 ;;	//    !(iip>=high)
 (p7)	br.spnt.few dispatch_break_fault ;;

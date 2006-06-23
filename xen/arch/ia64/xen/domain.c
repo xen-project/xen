@@ -88,6 +88,7 @@ extern struct vcpu *ia64_switch_to (struct vcpu *next_task);
 /* Address of vpsr.i (in fact evtchn_upcall_mask) of current vcpu.
    This is a Xen virtual address.  */
 DEFINE_PER_CPU(uint8_t *, current_psr_i_addr);
+DEFINE_PER_CPU(int *, current_psr_ic_addr);
 
 #include <xen/sched-if.h>
 
@@ -106,6 +107,8 @@ void schedule_tail(struct vcpu *prev)
 		vcpu_load_kernel_regs(current);
 		__ia64_per_cpu_var(current_psr_i_addr) = &current->domain->
 		  shared_info->vcpu_info[current->vcpu_id].evtchn_upcall_mask;
+		__ia64_per_cpu_var(current_psr_ic_addr) = (int *)
+		  (current->domain->arch.shared_info_va + XSI_PSR_IC_OFS);
 	}
 }
 
@@ -159,6 +162,8 @@ if (!i--) { i = 1000000; printk("+"); }
 			vcpu_pend_timer(current);
 		__ia64_per_cpu_var(current_psr_i_addr) = &nd->shared_info->
 		  vcpu_info[current->vcpu_id].evtchn_upcall_mask;
+		__ia64_per_cpu_var(current_psr_ic_addr) =
+		  (int *)(nd->arch.shared_info_va + XSI_PSR_IC_OFS);
     	} else {
 		/* When switching to idle domain, only need to disable vhpt
 		 * walker. Then all accesses happen within idle context will
@@ -167,6 +172,7 @@ if (!i--) { i = 1000000; printk("+"); }
 		pta = ia64_get_pta();
 		ia64_set_pta(pta & ~VHPT_ENABLED);
 		__ia64_per_cpu_var(current_psr_i_addr) = NULL;
+		__ia64_per_cpu_var(current_psr_ic_addr) = NULL;
         }
     }
     local_irq_restore(spsr);
@@ -304,7 +310,7 @@ static void init_switch_stack(struct vcpu *v)
 int arch_domain_create(struct domain *d)
 {
 	// the following will eventually need to be negotiated dynamically
-	d->arch.shared_info_va = SHAREDINFO_ADDR;
+	d->arch.shared_info_va = DEFAULT_SHAREDINFO_ADDR;
 	d->arch.breakimm = 0x1000;
 
 	if (is_idle_domain(d))
@@ -513,6 +519,41 @@ void build_physmap_table(struct domain *d)
 	}
 	d->arch.physmap_built = 1;
 }
+
+unsigned long
+domain_set_shared_info_va (unsigned long va)
+{
+	struct vcpu *v = current;
+	struct domain *d = v->domain;
+	struct vcpu *v1;
+
+	/* Check virtual address:
+	   must belong to region 7,
+	   must be 64Kb aligned,
+	   must not be within Xen virtual space.  */
+	if ((va >> 61) != 7
+	    || (va & 0xffffUL) != 0
+	    || (va >= HYPERVISOR_VIRT_START && va < HYPERVISOR_VIRT_END))
+		panic_domain (NULL, "%s: bad va (0x%016lx)\n", __func__, va);
+
+	/* Note: this doesn't work well if other cpus are already running.
+	   However this is part of the spec :-)  */
+	printf ("Domain set shared_info_va to 0x%016lx\n", va);
+	d->arch.shared_info_va = va;
+
+	for_each_vcpu (d, v1) {
+		VCPU(v1, interrupt_mask_addr) = 
+			(unsigned char *)va + INT_ENABLE_OFFSET(v1);
+	}
+
+	__ia64_per_cpu_var(current_psr_ic_addr) = (int *)(va + XSI_PSR_IC_OFS);
+
+	/* Remap the shared pages.  */
+	set_one_rr (7UL << 61, PSCB(v,rrs[7]));
+
+	return 0;
+}
+
 
 // remove following line if not privifying in memory
 //#define HAVE_PRIVIFY_MEMORY
