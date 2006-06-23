@@ -161,43 +161,13 @@ static void contiguous_bitmap_clear(
 	}
 }
 
-static unsigned long
-HYPERVISOR_populate_physmap(unsigned long gpfn, unsigned int extent_order,
-			    unsigned int address_bits)
-{
-	unsigned long ret;
-        struct xen_memory_reservation reservation = {
-		.nr_extents   = 1,
-                .address_bits = address_bits,
-                .extent_order = extent_order,
-                .domid        = DOMID_SELF
-        };
-	set_xen_guest_handle(reservation.extent_start, &gpfn);
-	ret = HYPERVISOR_memory_op(XENMEM_populate_physmap, &reservation);
-	// it may fail on non-privileged domain with extent_order > 0.
-	BUG_ON(ret != 1 &&
-	       !(ret == 0 && !(xen_start_info->flags & SIF_PRIVILEGED) &&
-		 extent_order > 0));
-	if (ret != 1)
-		return -EINVAL;//XXX
-	return 0;
-}
+// __xen_create_contiguous_region(), __xen_destroy_contiguous_region()
+// are based on i386 xen_create_contiguous_region(),
+// xen_destroy_contiguous_region()
 
-static unsigned long
-HYPERVISOR_remove_physmap(unsigned long gpfn, unsigned int extent_order)
-{
-	unsigned long ret;
-	struct xen_memory_reservation reservation = {
-		.nr_extents   = 1,
-		.address_bits = 0,
-		.extent_order = extent_order,
-		.domid        = DOMID_SELF
-	};
-	set_xen_guest_handle(reservation.extent_start, &gpfn);
-	ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
-	BUG_ON(ret != 1);
-	return 0;
-}
+/* Protected by balloon_lock. */
+#define MAX_CONTIG_ORDER 7
+static unsigned long discontig_frames[1<<MAX_CONTIG_ORDER];
 
 /* Ensure multi-page extents are contiguous in machine memory. */
 int
@@ -211,57 +181,92 @@ __xen_create_contiguous_region(unsigned long vstart,
 	unsigned long i;
 	unsigned long flags;
 
+	unsigned long *in_frames = discontig_frames, out_frame;
+	int success;
+	struct xen_memory_exchange exchange = {
+		.in = {
+			.nr_extents   = num_gpfn,
+			.extent_order = 0,
+			.domid        = DOMID_SELF
+		},
+		.out = {
+			 .nr_extents   = 1,
+			 .extent_order = order,
+			 .address_bits = address_bits,
+			 .domid        = DOMID_SELF
+		 },
+		.nr_exchanged = 0
+	};
+
+	if (order > MAX_CONTIG_ORDER)
+		return -ENOMEM;
+	
+	set_xen_guest_handle(exchange.in.extent_start, in_frames);
+	set_xen_guest_handle(exchange.out.extent_start, &out_frame);
+
 	scrub_pages(vstart, num_gpfn);
 
 	balloon_lock(flags);
 
-	error = HYPERVISOR_remove_physmap(start_gpfn, order);
-	if (error) {
-		goto fail;
-	}
-
-	error = HYPERVISOR_populate_physmap(start_gpfn, order, address_bits);
-	if (error) {
-		goto fail;
-	}
-	contiguous_bitmap_set(start_gpfn, num_gpfn);
-#if 0
-	{
-	unsigned long mfn;
-	unsigned long mfn_prev = ~0UL;
+	/* Get a new contiguous memory extent. */
 	for (i = 0; i < num_gpfn; i++) {
-		mfn = pfn_to_mfn_for_dma(start_gpfn + i);
-		if (mfn_prev != ~0UL && mfn != mfn_prev + 1) {
-			xprintk("\n");
-			xprintk("%s:%d order %d "
-				"start 0x%lx bus 0x%lx machine 0x%lx\n",
-				__func__, __LINE__, order,
-				vstart, virt_to_bus((void*)vstart),
-				phys_to_machine_for_dma(gphys));
-			xprintk("mfn: ");
-			for (i = 0; i < num_gpfn; i++) {
-				mfn = pfn_to_mfn_for_dma(start_gpfn + i);
-				xprintk("0x%lx ", mfn);
-			}
-			xprintk("\n");
-			goto out;
-		}
-		mfn_prev = mfn;
+		in_frames[i] = start_gpfn + i;
 	}
+	out_frame = start_gpfn;
+	error = HYPERVISOR_memory_op(XENMEM_exchange, &exchange);
+	success = (exchange.nr_exchanged == num_gpfn);
+	BUG_ON(!success && ((exchange.nr_exchanged != 0) || (error == 0)));
+	BUG_ON(success && (error != 0));
+	if (unlikely(error == -ENOSYS)) {
+		/* Compatibility when XENMEM_exchange is unsupported. */
+		error = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
+					     &exchange.in);
+		BUG_ON(error != num_gpfn);
+		error = HYPERVISOR_memory_op(XENMEM_populate_physmap,
+					     &exchange.out);
+		if (error != 1) {
+			/* Couldn't get special memory: fall back to normal. */
+			for (i = 0; i < num_gpfn; i++) {
+				in_frames[i] = start_gpfn + i;
+			}
+			error = HYPERVISOR_memory_op(XENMEM_populate_physmap,
+						     &exchange.in);
+			BUG_ON(error != num_gpfn);
+			success = 0;
+		} else
+			success = 1;
+	}
+	if (success)
+		contiguous_bitmap_set(start_gpfn, num_gpfn);
+#if 0
+	if (success) {
+		unsigned long mfn;
+		unsigned long mfn_prev = ~0UL;
+		for (i = 0; i < num_gpfn; i++) {
+			mfn = pfn_to_mfn_for_dma(start_gpfn + i);
+			if (mfn_prev != ~0UL && mfn != mfn_prev + 1) {
+				xprintk("\n");
+				xprintk("%s:%d order %d "
+					"start 0x%lx bus 0x%lx "
+					"machine 0x%lx\n",
+					__func__, __LINE__, order,
+					vstart, virt_to_bus((void*)vstart),
+					phys_to_machine_for_dma(gphys));
+				xprintk("mfn: ");
+				for (i = 0; i < num_gpfn; i++) {
+					mfn = pfn_to_mfn_for_dma(
+						start_gpfn + i);
+					xprintk("0x%lx ", mfn);
+				}
+				xprintk("\n");
+				break;
+			}
+			mfn_prev = mfn;
+		}
 	}
 #endif
-out:
 	balloon_unlock(flags);
-	return error;
-
-fail:
-	for (i = 0; i < num_gpfn; i++) {
-		error = HYPERVISOR_populate_physmap(start_gpfn + i, 0, 0);
-		if (error) {
-			BUG();//XXX
-		}
-	}
-	goto out;
+	return success? 0: -ENOMEM;
 }
 
 void
@@ -271,58 +276,61 @@ __xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	unsigned long error = 0;
 	unsigned long start_gpfn = __pa(vstart) >> PAGE_SHIFT;
 	unsigned long num_gpfn = 1UL << order;
-	unsigned long* gpfns;
-	struct xen_memory_reservation reservation;
 	unsigned long i;
+
+	unsigned long *out_frames = discontig_frames, in_frame;
+	int            success;
+	struct xen_memory_exchange exchange = {
+		.in = {
+			.nr_extents   = 1,
+			.extent_order = order,
+			.domid        = DOMID_SELF
+		},
+		.out = {
+			 .nr_extents   = num_gpfn,
+			 .extent_order = 0,
+			 .address_bits = 0,
+			 .domid        = DOMID_SELF
+		 },
+		.nr_exchanged = 0
+        };
+	
 
 	if (!test_bit(start_gpfn, contiguous_bitmap))
 		return;
 
-	gpfns = kmalloc(sizeof(gpfns[0]) * num_gpfn,
-			GFP_KERNEL | __GFP_NOFAIL);
-	for (i = 0; i < num_gpfn; i++) {
-		gpfns[i] = start_gpfn + i;
-	}
+	if (order > MAX_CONTIG_ORDER)
+		return;
+
+	set_xen_guest_handle(exchange.in.extent_start, &in_frame);
+	set_xen_guest_handle(exchange.out.extent_start, out_frames);
 
 	scrub_pages(vstart, num_gpfn);
 
 	balloon_lock(flags);
 
 	contiguous_bitmap_clear(start_gpfn, num_gpfn);
-	error = HYPERVISOR_remove_physmap(start_gpfn, order);
-	if (error) {
-		goto fail;
-	}
 
-	set_xen_guest_handle(reservation.extent_start, gpfns);
-	reservation.nr_extents   = num_gpfn;
-	reservation.address_bits = 0;
-	reservation.extent_order = 0;
-	reservation.domid        = DOMID_SELF;
-	error = HYPERVISOR_memory_op(XENMEM_populate_physmap, &reservation);
-	if (error != num_gpfn) {
-		error = -EFAULT;//XXX
-		goto fail;
-	}
-	error = 0;
-out:
-	balloon_unlock(flags);
-	kfree(gpfns);
-	if (error) {
-		// error can't be returned.
-		BUG();//XXX
-	}
-	return;
-
-fail:
+        /* Do the exchange for non-contiguous MFNs. */
+	in_frame = start_gpfn;
 	for (i = 0; i < num_gpfn; i++) {
-		int tmp_error;// don't overwrite error.
-		tmp_error = HYPERVISOR_populate_physmap(start_gpfn + i, 0, 0);
-		if (tmp_error) {
-			BUG();//XXX
-		}
+		out_frames[i] = start_gpfn + i;
 	}
-	goto out;
+	error = HYPERVISOR_memory_op(XENMEM_exchange, &exchange);
+	success = (exchange.nr_exchanged == 1);
+	BUG_ON(!success && ((exchange.nr_exchanged != 0) || (error == 0)));
+	BUG_ON(success && (error != 0));
+	if (unlikely(error == -ENOSYS)) {
+                /* Compatibility when XENMEM_exchange is unsupported. */
+		error = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
+					     &exchange.in);
+		BUG_ON(error != 1);
+
+		error = HYPERVISOR_memory_op(XENMEM_populate_physmap,
+					     &exchange.out);
+		BUG_ON(error != num_gpfn);
+	}
+	balloon_unlock(flags);
 }
 
 
