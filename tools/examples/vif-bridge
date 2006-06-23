@@ -48,16 +48,8 @@ fi
 
 case "$command" in
     online)
-        if brctl show | grep -q "$vif"
-        then
-          log debug "$vif already attached to a bridge"
-          exit 0
-        fi
-
-        brctl addif "$bridge" "$vif" ||
-          fatal "brctl addif $bridge $vif failed"
-
-        ifconfig "$vif" up || fatal "ifconfig $vif up failed"
+	setup_bridge_port "$vif"
+	add_to_bridge "$bridge" "$vif"
         ;;
 
     offline)

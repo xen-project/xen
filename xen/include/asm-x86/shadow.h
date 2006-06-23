@@ -112,6 +112,30 @@ do {                                            \
 } while (0)
 #endif
 
+#if CONFIG_PAGING_LEVELS >= 3
+static inline u64 get_cr3_idxval(struct vcpu *v)
+{
+    u64 pae_cr3;
+
+    if ( v->domain->arch.ops->guest_paging_levels == PAGING_L3 &&
+            !shadow_mode_log_dirty(v->domain) )
+    {
+        pae_cr3 = hvm_get_guest_ctrl_reg(v, 3); /* get CR3 */
+        return (pae_cr3 >> PAE_CR3_ALIGN) & PAE_CR3_IDX_MASK;
+    }
+    else
+        return 0;
+}
+
+#define shadow_key_t u64
+#define index_to_key(x) ((x) << 32)
+#else
+#define get_cr3_idxval(v) (0)
+#define shadow_key_t unsigned long
+#define index_to_key(x)  (0)
+#endif
+
+
 #define SHADOW_ENCODE_MIN_MAX(_min, _max) ((((GUEST_L1_PAGETABLE_ENTRIES - 1) - (_max)) << 16) | (_min))
 #define SHADOW_MIN(_encoded) ((_encoded) & ((1u<<16) - 1))
 #define SHADOW_MAX(_encoded) ((GUEST_L1_PAGETABLE_ENTRIES - 1) - ((_encoded) >> 16))
@@ -309,7 +333,7 @@ extern unsigned long get_mfn_from_gpfn_foreign(
 
 struct shadow_status {
     struct shadow_status *next;   /* Pull-to-front list per hash bucket. */
-    unsigned long gpfn_and_flags; /* Guest pfn plus flags. */
+    shadow_key_t  gpfn_and_flags; /* Guest pfn plus flags. */
     unsigned long smfn;           /* Shadow mfn.           */
 };
 
@@ -1180,7 +1204,13 @@ static inline unsigned long __shadow_status(
     struct domain *d, unsigned long gpfn, unsigned long stype)
 {
     struct shadow_status *p, *x, *head;
-    unsigned long key = gpfn | stype;
+    shadow_key_t key;
+#if CONFIG_PAGING_LEVELS >= 3
+    if ( d->arch.ops->guest_paging_levels == PAGING_L3 && stype == PGT_l4_shadow )
+        key = gpfn | stype | index_to_key(get_cr3_idxval(current));
+    else
+#endif
+        key = gpfn | stype;
 
     ASSERT(shadow_lock_is_acquired(d));
     ASSERT(gpfn == (gpfn & PGT_mfn_mask));
@@ -1295,10 +1325,11 @@ shadow_max_pgtable_type(struct domain *d, unsigned long gpfn,
 }
 
 static inline void delete_shadow_status(
-    struct domain *d, unsigned long gpfn, unsigned long gmfn, unsigned int stype)
+    struct domain *d, unsigned long gpfn, unsigned long gmfn, unsigned int stype, u64 index)
 {
     struct shadow_status *p, *x, *n, *head;
-    unsigned long key = gpfn | stype;
+
+    shadow_key_t key = gpfn | stype | index_to_key(index);
 
     ASSERT(shadow_lock_is_acquired(d));
     ASSERT(!(gpfn & ~PGT_mfn_mask));
@@ -1374,11 +1405,12 @@ static inline void delete_shadow_status(
 
 static inline void set_shadow_status(
     struct domain *d, unsigned long gpfn, unsigned long gmfn,
-    unsigned long smfn, unsigned long stype)
+    unsigned long smfn, unsigned long stype, u64 index)
 {
     struct shadow_status *x, *head, *extra;
     int i;
-    unsigned long key = gpfn | stype;
+
+    shadow_key_t key = gpfn | stype | index_to_key(index);
 
     SH_VVLOG("set gpfn=%lx gmfn=%lx smfn=%lx t=%lx", gpfn, gmfn, smfn, stype);
 

@@ -672,6 +672,8 @@ def make_config(vals):
         config.append(['backend', ['netif']])
     if vals.tpmif:
         config.append(['backend', ['tpmif']])
+    if vals.localtime:
+        config.append(['localtime', vals.localtime])
 
     config_image = configure_image(vals)
     if vals.bootloader:

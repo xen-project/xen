@@ -286,6 +286,17 @@ int xc_domain_setmaxmem(int xc_handle,
     return do_dom0_op(xc_handle, &op);
 }
 
+int xc_domain_set_time_offset(int xc_handle,
+                              uint32_t domid,
+                              int32_t time_offset_seconds)
+{
+    DECLARE_DOM0_OP;
+    op.cmd = DOM0_SETTIMEOFFSET;
+    op.u.settimeoffset.domain = (domid_t)domid;
+    op.u.settimeoffset.time_offset_seconds = time_offset_seconds;
+    return do_dom0_op(xc_handle, &op);
+}
+
 int xc_domain_memory_increase_reservation(int xc_handle,
                                           uint32_t domid,
                                           unsigned long nr_extents,

@@ -96,10 +96,11 @@ char *print_tainted(char *str)
 {
     if ( tainted )
     {
-        snprintf(str, TAINT_STRING_MAX_LEN, "Tainted: %c%c%c",
+        snprintf(str, TAINT_STRING_MAX_LEN, "Tainted: %c%c%c%c",
                  tainted & TAINT_UNSAFE_SMP ? 'S' : ' ',
                  tainted & TAINT_MACHINE_CHECK ? 'M' : ' ',
-                 tainted & TAINT_BAD_PAGE ? 'B' : ' ');
+                 tainted & TAINT_BAD_PAGE ? 'B' : ' ',
+                 tainted & TAINT_SYNC_CONSOLE ? 'C' : ' ');
     }
     else
     {

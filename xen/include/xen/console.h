@@ -15,7 +15,7 @@ void set_printk_prefix(const char *prefix);
 long read_console_ring(XEN_GUEST_HANDLE(char), u32 *, int);
 
 void init_console(void);
-void console_endboot(int disable_vga);
+void console_endboot(void);
 
 void console_force_unlock(void);
 void console_force_lock(void);

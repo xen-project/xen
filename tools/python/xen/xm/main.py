@@ -41,6 +41,7 @@ import console
 import xen.xend.XendClient
 from xen.xend.XendClient import server
 from xen.util import security
+from select import select
 
 # getopt.gnu_getopt is better, but only exists in Python 2.3+.  Use
 # getopt.getopt if gnu_getopt is not available.  This will mean that options
@@ -124,6 +125,7 @@ dumppolicy_help = "dumppolicy                       Print hypervisor ACM state i
 loadpolicy_help = "loadpolicy <policy>              Load binary policy into hypervisor"
 makepolicy_help = "makepolicy <policy>              Build policy and create .bin/.map files"
 labels_help     = "labels [policy] [type=DOM|..]    List <type> labels for (active) policy."
+serve_help      = "serve                            Proxy Xend XML-RPC over stdio"
 
 short_command_list = [
     "console",
@@ -171,7 +173,8 @@ domain_commands = [
 host_commands = [
     "dmesg",
     "info",
-    "log"
+    "log",
+    "serve",
     ]
 
 scheduler_commands = [
@@ -273,7 +276,7 @@ for command in all_commands:
 ####################################################################
 
 def arg_check(args, name, lo, hi = -1):
-    n = len(args)
+    n = len([i for i in args if i != '--'])
     
     if hi == -1:
         if n != lo:
@@ -834,6 +837,32 @@ def xm_log(args):
     
     print server.xend.node.log()
 
+def xm_serve(args):
+    arg_check(args, "serve", 0)
+
+    from fcntl import fcntl, F_SETFL
+    
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.connect(xen.xend.XendClient.XML_RPC_SOCKET)
+    fcntl(sys.stdin, F_SETFL, os.O_NONBLOCK)
+
+    while True:
+        iwtd, owtd, ewtd = select([sys.stdin, s], [], [])
+        if s in iwtd:
+            data = s.recv(4096)
+            if len(data) > 0:
+                sys.stdout.write(data)
+                sys.stdout.flush()
+            else:
+                break
+        if sys.stdin in iwtd:
+            data = sys.stdin.read(4096)
+            if len(data) > 0:
+                s.sendall(data)
+            else:
+                break
+    s.close()
+
 def parse_dev_info(info):
     def get_info(n, t, d):
         i = 0
@@ -1072,6 +1101,7 @@ commands = {
     "dmesg": xm_dmesg,
     "info": xm_info,
     "log": xm_log,
+    "serve": xm_serve,
     # scheduler
     "sched-bvt": xm_sched_bvt,
     "sched-bvt-ctxallow": xm_sched_bvt_ctxallow,

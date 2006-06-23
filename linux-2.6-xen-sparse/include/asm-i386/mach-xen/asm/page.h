@@ -67,6 +67,10 @@
 
 extern unsigned long *phys_to_machine_mapping;
 
+#undef machine_to_phys_mapping
+extern unsigned long *machine_to_phys_mapping;
+extern unsigned int   machine_to_phys_order;
+
 static inline unsigned long pfn_to_mfn(unsigned long pfn)
 {
 	if (xen_feature(XENFEAT_auto_translated_physmap))
@@ -84,24 +88,29 @@ static inline int phys_to_machine_mapping_valid(unsigned long pfn)
 
 static inline unsigned long mfn_to_pfn(unsigned long mfn)
 {
+	extern unsigned long max_mapnr;
 	unsigned long pfn;
 
 	if (xen_feature(XENFEAT_auto_translated_physmap))
 		return mfn;
 
-	/*
-	 * The array access can fail (e.g., device space beyond end of RAM).
-	 * In such cases it doesn't matter what we return (we return garbage),
-	 * but we must handle the fault without crashing!
-	 */
+	if (unlikely((mfn >> machine_to_phys_order) != 0))
+		return max_mapnr;
+
+	/* The array access can fail (e.g., device space beyond end of RAM). */
 	asm (
 		"1:	movl %1,%0\n"
 		"2:\n"
+		".section .fixup,\"ax\"\n"
+		"3:	movl %2,%0\n"
+		"	jmp  2b\n"
+		".previous\n"
 		".section __ex_table,\"a\"\n"
 		"	.align 4\n"
-		"	.long 1b,2b\n"
+		"	.long 1b,3b\n"
 		".previous"
-		: "=r" (pfn) : "m" (machine_to_phys_mapping[mfn]) );
+		: "=r" (pfn)
+		: "m" (machine_to_phys_mapping[mfn]), "m" (max_mapnr) );
 
 	return pfn;
 }

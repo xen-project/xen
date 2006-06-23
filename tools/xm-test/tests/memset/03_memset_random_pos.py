@@ -24,12 +24,6 @@ except DomainError, e:
 times = random.randint(10,50)
 
 try:
-    console = XmConsole(domain.getName())
-    console.sendInput("input")
-except ConsoleError, e:
-    FAIL(str(e))
-
-try:
     run = console.runCmd("cat /proc/xen/balloon | grep Current");
 except ConsoleError, e:
     FAIL(str(e))

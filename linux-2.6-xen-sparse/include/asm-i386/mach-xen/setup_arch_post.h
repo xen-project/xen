@@ -7,6 +7,7 @@
  **/
 
 #include <xen/interface/callback.h>
+#include <xen/interface/memory.h>
 
 static char * __init machine_specific_memory_setup(void)
 {
@@ -44,9 +45,16 @@ extern void hypervisor_callback(void);
 extern void failsafe_callback(void);
 extern void nmi(void);
 
+unsigned long *machine_to_phys_mapping;
+EXPORT_SYMBOL(machine_to_phys_mapping);
+unsigned int machine_to_phys_order;
+EXPORT_SYMBOL(machine_to_phys_order);
+
 static void __init machine_specific_arch_setup(void)
 {
 	int ret;
+	struct xen_machphys_mapping mapping;
+	unsigned long machine_to_phys_nr_ents;
 	struct xen_platform_parameters pp;
 	struct callback_register event = {
 		.type = CALLBACKTYPE_event,
@@ -81,4 +89,13 @@ static void __init machine_specific_arch_setup(void)
 	if (HYPERVISOR_xen_version(XENVER_platform_parameters,
 				   &pp) == 0)
 		set_fixaddr_top(pp.virt_start - PAGE_SIZE);
+
+	machine_to_phys_mapping = (unsigned long *)MACH2PHYS_VIRT_START;
+	machine_to_phys_nr_ents = MACH2PHYS_NR_ENTRIES;
+	if (HYPERVISOR_memory_op(XENMEM_machphys_mapping, &mapping) == 0) {
+		machine_to_phys_mapping = (unsigned long *)mapping.v_start;
+		machine_to_phys_nr_ents = mapping.max_mfn + 1;
+	}
+	while ((1UL << machine_to_phys_order) < machine_to_phys_nr_ents )
+		machine_to_phys_order++;
 }

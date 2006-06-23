@@ -1,2 +1,2 @@
 
-obj-y	:= privcmd.o
+obj-$(CONFIG_XEN_PRIVCMD)	:= privcmd.o

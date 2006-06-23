@@ -273,6 +273,49 @@ static void dump_fault_path(unsigned long address)
 }
 #endif
 
+static int spurious_fault(struct pt_regs *regs,
+			  unsigned long address,
+			  unsigned long error_code)
+{
+	pgd_t *pgd;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+
+#ifdef CONFIG_XEN
+	/* Faults in hypervisor area are never spurious. */
+	if (address >= HYPERVISOR_VIRT_START)
+		return 0;
+#endif
+
+	/* Reserved-bit violation or user access to kernel space? */
+	if (error_code & 0x0c)
+		return 0;
+
+	pgd = init_mm.pgd + pgd_index(address);
+	if (!pgd_present(*pgd))
+		return 0;
+
+	pud = pud_offset(pgd, address);
+	if (!pud_present(*pud))
+		return 0;
+
+	pmd = pmd_offset(pud, address);
+	if (!pmd_present(*pmd))
+		return 0;
+
+	pte = pte_offset_kernel(pmd, address);
+	if (!pte_present(*pte))
+		return 0;
+	if ((error_code & 0x02) && !pte_write(*pte))
+		return 0;
+#ifdef CONFIG_X86_PAE
+	if ((error_code & 0x10) && (pte_val(*pte) & _PAGE_NX))
+		return 0;
+#endif
+
+	return 1;
+}
 
 /*
  * This routine handles page faults.  It determines the address,
@@ -327,8 +370,16 @@ fastcall void __kprobes do_page_fault(struct pt_regs *regs,
 	 * protection error (error_code & 1) == 0.
 	 */
 	if (unlikely(address >= TASK_SIZE)) { 
+#ifdef CONFIG_XEN
+		/* Faults in hypervisor area can never be patched up. */
+		if (address >= HYPERVISOR_VIRT_START)
+			goto bad_area_nosemaphore;
+#endif
 		if (!(error_code & 5))
 			goto vmalloc_fault;
+		/* Can take a spurious fault if mapping changes R/O -> R/W. */
+		if (spurious_fault(regs, address, error_code))
+			return;
 		/* 
 		 * Don't take the mm semaphore here. If we fixup a prefetch
 		 * fault we could otherwise deadlock.

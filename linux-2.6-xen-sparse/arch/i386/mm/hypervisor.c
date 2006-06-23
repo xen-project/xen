@@ -263,6 +263,10 @@ static void contiguous_bitmap_clear(
 	}
 }
 
+/* Protected by balloon_lock. */
+#define MAX_CONTIG_ORDER 7
+static unsigned long discontig_frames[1<<MAX_CONTIG_ORDER];
+
 /* Ensure multi-page extents are contiguous in machine memory. */
 int xen_create_contiguous_region(
 	unsigned long vstart, unsigned int order, unsigned int address_bits)
@@ -271,13 +275,23 @@ int xen_create_contiguous_region(
 	pud_t         *pud; 
 	pmd_t         *pmd;
 	pte_t         *pte;
+	unsigned long *in_frames = discontig_frames, out_frame;
 	unsigned long  frame, i, flags;
-	struct xen_memory_reservation reservation = {
-		.nr_extents   = 1,
-		.extent_order = 0,
-		.domid        = DOMID_SELF
+	long           rc;
+	int            success;
+	struct xen_memory_exchange exchange = {
+		.in = {
+			.nr_extents   = 1UL << order,
+			.extent_order = 0,
+			.domid        = DOMID_SELF
+		},
+		.out = {
+			.nr_extents   = 1,
+			.extent_order = order,
+			.address_bits = address_bits,
+			.domid        = DOMID_SELF
+		}
 	};
-	set_xen_guest_handle(reservation.extent_start, &frame);
 
 	/*
 	 * Currently an auto-translated guest will not perform I/O, nor will
@@ -287,68 +301,73 @@ int xen_create_contiguous_region(
 	if (xen_feature(XENFEAT_auto_translated_physmap))
 		return 0;
 
+	if (order > MAX_CONTIG_ORDER)
+		return -ENOMEM;
+
+	set_xen_guest_handle(exchange.in.extent_start, in_frames);
+	set_xen_guest_handle(exchange.out.extent_start, &out_frame);
+
 	scrub_pages(vstart, 1 << order);
 
 	balloon_lock(flags);
 
-	/* 1. Zap current PTEs, giving away the underlying pages. */
-	for (i = 0; i < (1<<order); i++) {
+	/* 1. Zap current PTEs, remembering MFNs. */
+	for (i = 0; i < (1UL<<order); i++) {
 		pgd = pgd_offset_k(vstart + (i*PAGE_SIZE));
 		pud = pud_offset(pgd, (vstart + (i*PAGE_SIZE)));
 		pmd = pmd_offset(pud, (vstart + (i*PAGE_SIZE)));
 		pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE)));
-		frame = pte_mfn(*pte);
-		BUG_ON(HYPERVISOR_update_va_mapping(
-			vstart + (i*PAGE_SIZE), __pte_ma(0), 0));
+		in_frames[i] = pte_mfn(*pte);
+		if (HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE),
+						 __pte_ma(0), 0))
+			BUG();
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i,
 			INVALID_P2M_ENTRY);
-		BUG_ON(HYPERVISOR_memory_op(
-			XENMEM_decrease_reservation, &reservation) != 1);
 	}
 
 	/* 2. Get a new contiguous memory extent. */
-	reservation.extent_order = order;
-	reservation.address_bits = address_bits;
-	frame = __pa(vstart) >> PAGE_SHIFT;
-	if (HYPERVISOR_memory_op(XENMEM_populate_physmap,
-				 &reservation) != 1)
-		goto fail;
-
-	/* 3. Map the new extent in place of old pages. */
-	for (i = 0; i < (1<<order); i++) {
-		BUG_ON(HYPERVISOR_update_va_mapping(
-			vstart + (i*PAGE_SIZE),
-			pfn_pte_ma(frame+i, PAGE_KERNEL), 0));
-		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, frame+i);
+	out_frame = __pa(vstart) >> PAGE_SHIFT;
+	rc = HYPERVISOR_memory_op(XENMEM_exchange, &exchange);
+	success = (exchange.nr_exchanged == (1UL << order));
+	BUG_ON(!success && ((exchange.nr_exchanged != 0) || (rc == 0)));
+	BUG_ON(success && (rc != 0));
+	if (unlikely(rc == -ENOSYS)) {
+		/* Compatibility when XENMEM_exchange is unsupported. */
+		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
+					 &exchange.in) != (1UL << order))
+			BUG();
+		success = (HYPERVISOR_memory_op(XENMEM_populate_physmap,
+						&exchange.out) == 1);
+		if (!success) {
+			/* Couldn't get special memory: fall back to normal. */
+			for (i = 0; i < (1UL<<order); i++)
+				in_frames[i] = (__pa(vstart)>>PAGE_SHIFT) + i;
+			if (HYPERVISOR_memory_op(XENMEM_populate_physmap,
+						 &exchange.in) != (1UL<<order))
+				BUG();
+		}
 	}
 
-	flush_tlb_all();
-
-	contiguous_bitmap_set(__pa(vstart) >> PAGE_SHIFT, 1UL << order);
-
-	balloon_unlock(flags);
-
-	return 0;
-
- fail:
-	reservation.extent_order = 0;
-	reservation.address_bits = 0;
-
-	for (i = 0; i < (1<<order); i++) {
-		frame = (__pa(vstart) >> PAGE_SHIFT) + i;
-		BUG_ON(HYPERVISOR_memory_op(
-			XENMEM_populate_physmap, &reservation) != 1);
-		BUG_ON(HYPERVISOR_update_va_mapping(
-			vstart + (i*PAGE_SIZE),
-			pfn_pte_ma(frame, PAGE_KERNEL), 0));
+	/* 3. Map the new extent in place of old pages. */
+	for (i = 0; i < (1UL<<order); i++) {
+		frame = success ? (out_frame + i) : in_frames[i];
+		if (HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE),
+						 pfn_pte_ma(frame,
+							    PAGE_KERNEL),
+						 0))
+			BUG();
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, frame);
 	}
 
 	flush_tlb_all();
 
+	if (success)
+		contiguous_bitmap_set(__pa(vstart) >> PAGE_SHIFT,
+				      1UL << order);
+
 	balloon_unlock(flags);
 
-	return -ENOMEM;
+	return success ? 0 : -ENOMEM;
 }
 
 void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
@@ -357,17 +376,32 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	pud_t         *pud; 
 	pmd_t         *pmd;
 	pte_t         *pte;
+	unsigned long *out_frames = discontig_frames, in_frame;
 	unsigned long  frame, i, flags;
-	struct xen_memory_reservation reservation = {
-		.nr_extents   = 1,
-		.extent_order = 0,
-		.domid        = DOMID_SELF
+	long           rc;
+	int            success;
+	struct xen_memory_exchange exchange = {
+		.in = {
+			.nr_extents   = 1,
+			.extent_order = order,
+			.domid        = DOMID_SELF
+		},
+		.out = {
+			.nr_extents   = 1UL << order,
+			.extent_order = 0,
+			.domid        = DOMID_SELF
+		}
 	};
-	set_xen_guest_handle(reservation.extent_start, &frame);
 
 	if (xen_feature(XENFEAT_auto_translated_physmap) ||
 	    !test_bit(__pa(vstart) >> PAGE_SHIFT, contiguous_bitmap))
 		return;
+
+	if (order > MAX_CONTIG_ORDER)
+		return;
+
+	set_xen_guest_handle(exchange.in.extent_start, &in_frame);
+	set_xen_guest_handle(exchange.out.extent_start, out_frames);
 
 	scrub_pages(vstart, 1 << order);
 
@@ -375,29 +409,46 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 
 	contiguous_bitmap_clear(__pa(vstart) >> PAGE_SHIFT, 1UL << order);
 
-	/* 1. Zap current PTEs, giving away the underlying pages. */
-	for (i = 0; i < (1<<order); i++) {
-		pgd = pgd_offset_k(vstart + (i*PAGE_SIZE));
-		pud = pud_offset(pgd, (vstart + (i*PAGE_SIZE)));
-		pmd = pmd_offset(pud, (vstart + (i*PAGE_SIZE)));
-		pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE)));
-		frame = pte_mfn(*pte);
-		BUG_ON(HYPERVISOR_update_va_mapping(
-			vstart + (i*PAGE_SIZE), __pte_ma(0), 0));
+	/* 1. Find start MFN of contiguous extent. */
+	pgd = pgd_offset_k(vstart);
+	pud = pud_offset(pgd, vstart);
+	pmd = pmd_offset(pud, vstart);
+	pte = pte_offset_kernel(pmd, vstart);
+	in_frame = pte_mfn(*pte);
+
+	/* 2. Zap current PTEs. */
+	for (i = 0; i < (1UL<<order); i++) {
+		if (HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE),
+						 __pte_ma(0), 0));
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i,
 			INVALID_P2M_ENTRY);
-		BUG_ON(HYPERVISOR_memory_op(
-			XENMEM_decrease_reservation, &reservation) != 1);
+		out_frames[i] = (__pa(vstart) >> PAGE_SHIFT) + i;
 	}
 
-	/* 2. Map new pages in place of old pages. */
-	for (i = 0; i < (1<<order); i++) {
-		frame = (__pa(vstart) >> PAGE_SHIFT) + i;
-		BUG_ON(HYPERVISOR_memory_op(
-			XENMEM_populate_physmap, &reservation) != 1);
-		BUG_ON(HYPERVISOR_update_va_mapping(
-			vstart + (i*PAGE_SIZE),
-			pfn_pte_ma(frame, PAGE_KERNEL), 0));
+	/* 3. Do the exchange for non-contiguous MFNs. */
+	rc = HYPERVISOR_memory_op(XENMEM_exchange, &exchange);
+	success = (exchange.nr_exchanged == 1);
+	BUG_ON(!success && ((exchange.nr_exchanged != 0) || (rc == 0)));
+	BUG_ON(success && (rc != 0));
+	if (rc == -ENOSYS) {
+		/* Compatibility when XENMEM_exchange is unsupported. */
+		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
+					 &exchange.in) != 1)
+			BUG();
+		if (HYPERVISOR_memory_op(XENMEM_populate_physmap,
+					 &exchange.out) != (1UL << order))
+			BUG();
+		success = 1;
+	}
+
+	/* 4. Map new pages in place of old pages. */
+	for (i = 0; i < (1UL<<order); i++) {
+		frame = success ? out_frames[i] : (in_frame + i);
+		if (HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE),
+						 pfn_pte_ma(frame,
+							    PAGE_KERNEL),
+						 0))
+			BUG();
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, frame);
 	}
 

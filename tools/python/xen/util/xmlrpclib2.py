@@ -13,7 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2006 Anthony Liguori <aliguori@us.ibm.com>
-# Copyright (C) 2006 XenSource Ltd.
+# Copyright (C) 2006 XenSource Inc.
 #============================================================================
 
 """
@@ -26,11 +26,18 @@ import types
 from httplib import HTTPConnection, HTTP
 from xmlrpclib import Transport
 from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
-import xmlrpclib, socket, os, stat
 import SocketServer
+import xmlrpclib, socket, os, stat
 
-import xen.xend.XendClient
 from xen.xend.XendLogging import log
+
+try:
+    import SSHTransport
+    ssh_enabled = True
+except ImportError:
+    # SSHTransport is disabled on Python <2.4, because it uses the subprocess
+    # package.
+    ssh_enabled = False
 
 
 # A new ServerProxy that also supports httpu urls.  An http URL comes in the
@@ -39,6 +46,31 @@ from xen.xend.XendLogging import log
 # httpu:///absolute/path/to/socket.sock
 #
 # It assumes that the RPC handler is /RPC2.  This probably needs to be improved
+
+# We're forced to subclass the RequestHandler class so that we can work around
+# some bugs in Keep-Alive handling and also enabled it by default
+class XMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    # this is inspired by SimpleXMLRPCRequestHandler's do_POST but differs
+    # in a few non-trivial ways
+    # 1) we never generate internal server errors.  We let the exception
+    #    propagate so that it shows up in the Xend debug logs
+    # 2) we don't bother checking for a _dispatch function since we don't
+    #    use one
+    def do_POST(self):
+        data = self.rfile.read(int(self.headers["content-length"]))
+        rsp = self.server._marshaled_dispatch(data)
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/xml")
+        self.send_header("Content-Length", str(len(rsp)))
+        self.end_headers()
+
+        self.wfile.write(rsp)
+        self.wfile.flush()
+        if self.close_connection == 1:
+            self.connection.shutdown(1)
 
 class HTTPUnixConnection(HTTPConnection):
     def connect(self):
@@ -75,9 +107,15 @@ class ServerProxy(xmlrpclib.ServerProxy):
             if protocol == 'httpu':
                 uri = 'http:' + rest
                 transport = UnixTransport()
+            elif protocol == 'ssh':
+                global ssh_enabled
+                if ssh_enabled:
+                    (transport, uri) = SSHTransport.getHTTPURI(uri)
+                else:
+                    raise ValueError(
+                        "SSH transport not supported on Python <2.4.")
         xmlrpclib.ServerProxy.__init__(self, uri, transport, encoding,
                                        verbose, allow_none)
-
 
     def __request(self, methodname, params):
         response = xmlrpclib.ServerProxy.__request(self, methodname, params)
@@ -93,6 +131,10 @@ class ServerProxy(xmlrpclib.ServerProxy):
 
 class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
     allow_reuse_address = True
+
+    def __init__(self, addr, requestHandler=XMLRPCRequestHandler,
+                 logRequests=1):
+        SimpleXMLRPCServer.__init__(self, addr, requestHandler, logRequests)
 
     def _marshaled_dispatch(self, data, dispatch_method = None):
         params, method = xmlrpclib.loads(data)
@@ -121,6 +163,7 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
         except xmlrpclib.Fault, fault:
             response = xmlrpclib.dumps(fault)
         except Exception, exn:
+            import xen.xend.XendClient
             log.exception(exn)
             response = xmlrpclib.dumps(
                 xmlrpclib.Fault(xen.xend.XendClient.ERROR_INTERNAL, str(exn)))
@@ -131,10 +174,10 @@ class TCPXMLRPCServer(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
 # It implements proper support for allow_reuse_address by
 # unlink()'ing an existing socket.
 
-class UnixXMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
+class UnixXMLRPCRequestHandler(XMLRPCRequestHandler):
     def address_string(self):
         try:
-            return SimpleXMLRPCRequestHandler.address_string(self)
+            return XMLRPCRequestHandler.address_string(self)
         except ValueError, e:
             return self.client_address[:2]
 

@@ -71,8 +71,6 @@ static int packet_read_shmem(struct packet *pak,
 			     char *buffer, int isuserbuffer, u32 left);
 static int vtpm_queue_packet(struct packet *pak);
 
-#define MIN(x,y)  (x) < (y) ? (x) : (y)
-
 /***************************************************************
  Buffer copying fo user and kernel space buffes.
 ***************************************************************/
@@ -309,7 +307,7 @@ int _packet_write(struct packet *pak,
 			return 0;
 		}
 
-		tocopy = MIN(size - offset, PAGE_SIZE);
+		tocopy = min_t(size_t, size - offset, PAGE_SIZE);
 
 		if (copy_from_buffer((void *)(MMAP_VADDR(tpmif, i) |
 					      (tx->addr & ~PAGE_MASK)),
@@ -365,7 +363,7 @@ static int packet_read(struct packet *pak, size_t numbytes,
 		u32 instance_no = htonl(pak->tpm_instance);
 		u32 last_read = pak->last_read;
 
-		to_copy = MIN(4 - last_read, numbytes);
+		to_copy = min_t(size_t, 4 - last_read, numbytes);
 
 		if (copy_to_buffer(&buffer[0],
 				   &(((u8 *) & instance_no)[last_read]),
@@ -384,7 +382,7 @@ static int packet_read(struct packet *pak, size_t numbytes,
 
 	if (room_left > 0) {
 		if (pak->data_buffer) {
-			u32 to_copy = MIN(pak->data_len - offset, room_left);
+			u32 to_copy = min_t(u32, pak->data_len - offset, room_left);
 			u32 last_read = pak->last_read - 4;
 
 			if (copy_to_buffer(&buffer[offset],
@@ -424,7 +422,7 @@ static int packet_read_shmem(struct packet *pak,
 	 * and within that page at offset 'offset'.
 	 * Copy a maximum of 'room_left' bytes.
 	 */
-	to_copy = MIN(PAGE_SIZE - pg_offset, room_left);
+	to_copy = min_t(u32, PAGE_SIZE - pg_offset, room_left);
 	while (to_copy > 0) {
 		void *src;
 		struct gnttab_map_grant_ref map_op;
@@ -451,7 +449,7 @@ static int packet_read_shmem(struct packet *pak,
 			/*
 			 * User requests more than what's available
 			 */
-			to_copy = MIN(tx->size, to_copy);
+			to_copy = min_t(u32, tx->size, to_copy);
 		}
 
 		DPRINTK("Copying from mapped memory at %08lx\n",
@@ -483,7 +481,7 @@ static int packet_read_shmem(struct packet *pak,
 		last_read += to_copy;
 		room_left -= to_copy;
 
-		to_copy = MIN(PAGE_SIZE, room_left);
+		to_copy = min_t(u32, PAGE_SIZE, room_left);
 		i++;
 	}			/* while (to_copy > 0) */
 	/*
@@ -545,7 +543,7 @@ static ssize_t vtpm_op_read(struct file *file,
 
 		DPRINTK("size given by app: %d, available: %d\n", size, left);
 
-		ret_size = MIN(size, left);
+		ret_size = min_t(size_t, size, left);
 
 		ret_size = packet_read(pak, ret_size, data, size, 1);
 

@@ -222,6 +222,7 @@ alloc_shadow_page(struct domain *d,
     unsigned long smfn, real_gpfn;
     int pin = 0;
     void *l1, *lp;
+    u64 index = 0;
 
     // Currently, we only keep pre-zero'ed pages around for use as L1's...
     // This will change.  Soon.
@@ -354,9 +355,19 @@ alloc_shadow_page(struct domain *d,
         if ( d->arch.ops->guest_paging_levels == PAGING_L2 )
             pin = 1;
 #endif
+
+#if CONFIG_PAGING_LEVELS == 3 & defined ( GUEST_32PAE )
+        /*
+         * We use PGT_l4_shadow for 2-level paging guests on PAE
+         */
+        if ( d->arch.ops->guest_paging_levels == PAGING_L3 )
+            pin = 1;
+#endif
+        if ( d->arch.ops->guest_paging_levels == PAGING_L3 )
+            index = get_cr3_idxval(current);
         break;
 
-#if CONFIG_PAGING_LEVELS >= 4
+#if CONFIG_PAGING_LEVELS >= 3
     case PGT_fl1_shadow:
         perfc_incr(shadow_l1_pages);
         d->arch.shadow_page_count++;
@@ -393,7 +404,7 @@ alloc_shadow_page(struct domain *d,
     //
     ASSERT( (psh_type == PGT_snapshot) || !mfn_out_of_sync(gmfn) );
 
-    set_shadow_status(d, gpfn, gmfn, smfn, psh_type);
+    set_shadow_status(d, gpfn, gmfn, smfn, psh_type, index);
 
     if ( pin )
         shadow_pin(smfn);
@@ -1324,7 +1335,7 @@ increase_writable_pte_prediction(struct domain *d, unsigned long gpfn, unsigned 
     prediction = (prediction & PGT_mfn_mask) | score;
 
     //printk("increase gpfn=%lx pred=%lx create=%d\n", gpfn, prediction, create);
-    set_shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), 0, prediction, PGT_writable_pred);
+    set_shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), 0, prediction, PGT_writable_pred, 0);
 
     if ( create )
         perfc_incr(writable_pte_predictions);
@@ -1345,10 +1356,10 @@ decrease_writable_pte_prediction(struct domain *d, unsigned long gpfn, unsigned 
     //printk("decrease gpfn=%lx pred=%lx score=%lx\n", gpfn, prediction, score);
 
     if ( score )
-        set_shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), 0, prediction, PGT_writable_pred);
+        set_shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), 0, prediction, PGT_writable_pred, 0);
     else
     {
-        delete_shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), 0, PGT_writable_pred);
+        delete_shadow_status(d, GPFN_TO_GPTEPAGE(gpfn), 0, PGT_writable_pred, 0);
         perfc_decr(writable_pte_predictions);
     }
 }
@@ -1385,7 +1396,7 @@ static u32 remove_all_write_access_in_ptpage(
     int is_l1_shadow =
         ((mfn_to_page(pt_mfn)->u.inuse.type_info & PGT_type_mask) ==
          PGT_l1_shadow);
-#if CONFIG_PAGING_LEVELS == 4
+#if CONFIG_PAGING_LEVELS >= 3
     is_l1_shadow |=
       ((mfn_to_page(pt_mfn)->u.inuse.type_info & PGT_type_mask) ==
                 PGT_fl1_shadow);
@@ -1494,7 +1505,7 @@ static int remove_all_write_access(
         while ( a && a->gpfn_and_flags )
         {
             if ( (a->gpfn_and_flags & PGT_type_mask) == PGT_l1_shadow
-#if CONFIG_PAGING_LEVELS >= 4
+#if CONFIG_PAGING_LEVELS >= 3
               || (a->gpfn_and_flags & PGT_type_mask) == PGT_fl1_shadow
 #endif
               )
@@ -1538,8 +1549,8 @@ static void resync_pae_guest_l3(struct domain *d)
             continue;
 
         idx = get_cr3_idxval(v);
-        smfn = __shadow_status(
-            d, ((unsigned long)(idx << PGT_pae_idx_shift) | entry->gpfn), PGT_l4_shadow);
+
+        smfn = __shadow_status(d, entry->gpfn, PGT_l4_shadow);
 
         if ( !smfn ) 
             continue;
@@ -1706,7 +1717,7 @@ static int resync_all(struct domain *d, u32 stype)
                 {
                     int error;
 
-#if CONFIG_PAGING_LEVELS == 4
+#if CONFIG_PAGING_LEVELS >= 3
                     unsigned long gpfn;
 
                     gpfn = guest_l1e_get_paddr(guest1[i]) >> PAGE_SHIFT;
@@ -2420,17 +2431,6 @@ static void shadow_update_pagetables(struct vcpu *v)
         v->arch.guest_vtable = map_domain_page_global(gmfn);
     }
 
-#if CONFIG_PAGING_LEVELS >= 3
-    /*
-     * Handle 32-bit PAE enabled guest
-     */
-    if ( SH_GUEST_32PAE && d->arch.ops->guest_paging_levels == PAGING_L3 ) 
-    {
-        u32 index = get_cr3_idxval(v);
-        gpfn = ((unsigned long)index << PGT_pae_idx_shift) | gpfn;
-    }
-#endif
-
     /*
      *  arch.shadow_table
      */
@@ -2443,6 +2443,23 @@ static void shadow_update_pagetables(struct vcpu *v)
         if ( unlikely(!(smfn = __shadow_status(d, gpfn, PGT_l4_shadow))) )
             smfn = shadow_l3_table(v, gpfn, gmfn);
     } 
+    else
+#endif
+
+#if CONFIG_PAGING_LEVELS == 3 & defined ( GUEST_32PAE )
+    /*
+     * We use PGT_l4_shadow for 2-level paging guests on PAE
+     */
+    if ( d->arch.ops->guest_paging_levels == PAGING_L3 )
+    {
+        if ( unlikely(!(smfn = __shadow_status(d, gpfn, PGT_l4_shadow))) )
+            smfn = shadow_l3_table(v, gpfn, gmfn);
+        else
+        {
+            update_top_level_shadow(v, smfn);
+            need_sync = 1;
+        }
+    }
     else
 #endif
     if ( unlikely(!(smfn = __shadow_status(d, gpfn, PGT_base_page_table))) ) 
@@ -3093,6 +3110,36 @@ static inline unsigned long init_bl2(
 
     return smfn;
 }
+
+static inline unsigned long init_l3(
+    struct vcpu *v, unsigned long gpfn, unsigned long gmfn)
+{
+    unsigned long smfn;
+    l4_pgentry_t *spl4e;
+    unsigned long index;
+
+    if ( unlikely(!(smfn = alloc_shadow_page(v->domain, gpfn, gmfn, PGT_l4_shadow))) )
+    {
+        printk("Couldn't alloc an L4 shadow for pfn= %lx mfn= %lx\n", gpfn, gmfn);
+        BUG(); /* XXX Deal gracefully wiht failure. */
+    }
+
+    /* Map the self entry, L4&L3 share the same page */
+    spl4e = (l4_pgentry_t *)map_domain_page(smfn);
+
+    /*
+     * Shadow L4's pfn_info->tlbflush_timestamp
+     * should also save it's own index.
+     */
+
+    index = get_cr3_idxval(v);
+    frame_table[smfn].tlbflush_timestamp = index;
+
+    memset(spl4e, 0, L4_PAGETABLE_ENTRIES*sizeof(l4_pgentry_t));
+    spl4e[PAE_SHADOW_SELF_ENTRY] = l4e_from_pfn(smfn, __PAGE_HYPERVISOR);
+    unmap_domain_page(spl4e);
+    return smfn;
+}
 #endif
 
 #if CONFIG_PAGING_LEVELS == 3
@@ -3111,6 +3158,12 @@ static unsigned long shadow_l3_table(
          d->arch.ops->guest_paging_levels == PAGING_L2 )
     {
         return init_bl2(d, gpfn, gmfn);
+    }
+
+    if ( SH_GUEST_32PAE &&
+         d->arch.ops->guest_paging_levels == PAGING_L3 )
+    {
+        return init_l3(v, gpfn, gmfn);
     }
 
     if ( unlikely(!(smfn = alloc_shadow_page(d, gpfn, gmfn, PGT_l3_shadow))) )
@@ -3223,6 +3276,11 @@ static unsigned long shadow_l4_table(
         return init_bl2(d, gpfn, gmfn);
     }
 
+    if ( SH_GUEST_32PAE && d->arch.ops->guest_paging_levels == PAGING_L3 )
+    {
+        return init_l3(v, gpfn, gmfn);
+    }
+
     if ( unlikely(!(smfn = alloc_shadow_page(d, gpfn, gmfn, PGT_l4_shadow))) )
     {
         printk("Couldn't alloc an L4 shadow for pfn=%lx mfn=%lx\n", gpfn, gmfn);
@@ -3230,24 +3288,6 @@ static unsigned long shadow_l4_table(
     }
 
     spl4e = (l4_pgentry_t *)map_domain_page(smfn);
-
-    /* For 32-bit PAE guest on 64-bit host */
-    if ( SH_GUEST_32PAE && d->arch.ops->guest_paging_levels == PAGING_L3 ) 
-    {
-        unsigned long index;
-        /*
-         * Shadow L4's pfn_info->tlbflush_timestamp
-         * should also save it's own index.
-         */
-        index = get_cr3_idxval(v);
-        frame_table[smfn].tlbflush_timestamp = index;
-
-        memset(spl4e, 0, L4_PAGETABLE_ENTRIES*sizeof(l4_pgentry_t));
-        /* Map the self entry */
-        spl4e[PAE_SHADOW_SELF_ENTRY] = l4e_from_pfn(smfn, __PAGE_HYPERVISOR);
-        unmap_domain_page(spl4e);
-        return smfn;
-    }
 
     /* Install hypervisor and 4x linear p.t. mapings. */
     if ( (PGT_base_page_table == PGT_l4_page_table) &&
@@ -3378,7 +3418,7 @@ validate_bl2e_change(
  * This shadow_mark_va_out_of_sync() is for 2M page shadow
  */
 static void shadow_mark_va_out_of_sync_2mp(
-  struct vcpu *v, unsigned long gpfn, unsigned long mfn, unsigned long writable_pl1e)
+  struct vcpu *v, unsigned long gpfn, unsigned long mfn, paddr_t writable_pl1e)
 {
     struct out_of_sync_entry *entry =
       shadow_mark_mfn_out_of_sync(v, gpfn, mfn);
@@ -3647,6 +3687,7 @@ static inline int l2e_rw_fault(
     }
 
     unmap_domain_page(l1_p);
+    *gl2e_p = gl2e;
     return 1;
 
 }
@@ -3720,7 +3761,7 @@ static inline int guest_page_fault(
 
     ASSERT( d->arch.ops->guest_paging_levels >= PAGING_L3 );
 
-#if CONFIG_PAGING_LEVELS >= 4
+#if CONFIG_PAGING_LEVELS >= 3
     if ( (error_code & (ERROR_I | ERROR_P)) == (ERROR_I | ERROR_P) )
         return 1;
 #endif
@@ -4056,7 +4097,7 @@ struct shadow_ops MODE_32_2_HANDLER = {
 };
 #endif
 
-#if ( CONFIG_PAGING_LEVELS == 3 && !defined (GUEST_PGENTRY_32) ) ||  \
+#if ( CONFIG_PAGING_LEVELS == 3 && !defined (GUEST_PGENTRY_32) && !defined (GUEST_32PAE) ) ||  \
     ( CONFIG_PAGING_LEVELS == 4 && defined (GUEST_PGENTRY_32) ) 
 
 

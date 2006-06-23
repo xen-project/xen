@@ -68,8 +68,6 @@ void show_registers(struct cpu_user_regs *regs)
            "ss: %04x   cs: %04x\n",
            fault_regs.ds, fault_regs.es, fault_regs.fs,
            fault_regs.gs, fault_regs.ss, fault_regs.cs);
-
-    show_stack(regs);
 }
 
 void show_page_walk(unsigned long addr)
@@ -115,40 +113,6 @@ void show_page_walk(unsigned long addr)
     printk("    L1 = %"PRIpte" %016lx\n", l1e_get_intpte(l1e), pfn);
 }
 
-int __spurious_page_fault(unsigned long addr)
-{
-    unsigned long mfn = read_cr3() >> PAGE_SHIFT;
-    l4_pgentry_t l4e, *l4t;
-    l3_pgentry_t l3e, *l3t;
-    l2_pgentry_t l2e, *l2t;
-    l1_pgentry_t l1e, *l1t;
-
-    l4t = mfn_to_virt(mfn);
-    l4e = l4t[l4_table_offset(addr)];
-    mfn = l4e_get_pfn(l4e);
-    if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) )
-        return 0;
-
-    l3t = mfn_to_virt(mfn);
-    l3e = l3t[l3_table_offset(addr)];
-    mfn = l3e_get_pfn(l3e);
-    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
-        return 0;
-
-    l2t = mfn_to_virt(mfn);
-    l2e = l2t[l2_table_offset(addr)];
-    mfn = l2e_get_pfn(l2e);
-    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
-        return 0;
-    if ( l2e_get_flags(l2e) & _PAGE_PSE )
-        return 1;
-
-    l1t = mfn_to_virt(mfn);
-    l1e = l1t[l1_table_offset(addr)];
-    mfn = l1e_get_pfn(l1e);
-    return !!(l1e_get_flags(l1e) & _PAGE_PRESENT);
-}
-
 asmlinkage void double_fault(void);
 asmlinkage void do_double_fault(struct cpu_user_regs *regs)
 {
@@ -159,6 +123,7 @@ asmlinkage void do_double_fault(struct cpu_user_regs *regs)
     /* Find information saved during fault and dump it to the console. */
     printk("************************************\n");
     show_registers(regs);
+    show_stack_overflow(regs->rsp);
     printk("************************************\n");
     printk("CPU%d DOUBLE FAULT -- system shutdown\n", smp_processor_id());
     printk("System needs manual reset.\n");

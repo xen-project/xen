@@ -1394,7 +1394,7 @@ static uint32_t pci_config_readb(PCIDevice *d, uint32_t addr)
 static uint32_t pci_bios_io_addr;
 static uint32_t pci_bios_mem_addr;
 /* host irqs corresponding to PCI irqs A-D */
-static uint8_t pci_irqs[4] = { 11, 9, 11, 9 };
+static uint8_t pci_irqs[4] = { 10, 11, 10, 11 };
 
 static void pci_set_io_region_addr(PCIDevice *d, int region_num, uint32_t addr)
 {
@@ -1447,12 +1447,22 @@ static void pci_bios_init_device(PCIDevice *d)
             pci_set_io_region_addr(d, 3, 0x374);
         }
         break;
+       case 0x0680:
+       if (vendor_id == 0x8086 && device_id == 0x7113) {
+          // PIIX4 ACPI PM 
+        pci_config_writew(d, 0x20, 0x0000); // NO smb bus IO enable in PIIX4
+        pci_config_writew(d, 0x22, 0x0000); 
+        goto default_map;
+ 	}
+         break;
+
     case 0x0300:
         if (vendor_id != 0x1234)
             goto default_map;
         /* VGA: map frame buffer to default Bochs VBE address */
         pci_set_io_region_addr(d, 0, 0xE0000000);
         break;
+
     case 0x0800:
         /* PIC */
         vendor_id = pci_config_readw(d, PCI_VENDOR_ID);
@@ -1496,6 +1506,13 @@ static void pci_bios_init_device(PCIDevice *d)
         pin = pci_slot_get_pirq(d, pin - 1);
         pic_irq = pci_irqs[pin];
         pci_config_writeb(d, PCI_INTERRUPT_LINE, pic_irq);
+    }
+    if (class== 0x0680&& vendor_id == 0x8086 && device_id == 0x7113) {
+         // PIIX4 ACPI PM
+       pci_config_writew(d, 0x20, 0x0000); // NO smb bus IO enable in PIIX4
+       pci_config_writew(d, 0x22, 0x0000);
+       pci_config_writew(d, 0x3c, 0x0009); // Hardcodeed IRQ9
+       pci_config_writew(d, 0x3d, 0x0001);
     }
 }
 

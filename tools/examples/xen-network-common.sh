@@ -104,3 +104,48 @@ find_dhcpd_init_file()
 {
   first_file -x /etc/init.d/{dhcp3-server,dhcp,dhcpd}
 }
+
+# configure interfaces which act as pure bridge ports:
+#  - make quiet: no arp, no multicast (ipv6 autoconf)
+#  - set mac address to fe:ff:ff:ff:ff:ff
+setup_bridge_port() {
+    local dev="$1"
+
+    # take interface down ...
+    ip link set ${dev} down
+
+    # ... and configure it
+    ip link set ${dev} arp off
+    ip link set ${dev} multicast off
+    ip link set ${dev} addr fe:ff:ff:ff:ff:ff
+    ip addr flush ${dev}
+}
+
+# Usage: create_bridge bridge
+create_bridge () {
+    local bridge=$1
+
+    # Don't create the bridge if it already exists.
+    if [ ! -e "/sys/class/net/${bridge}/bridge" ]; then
+	brctl addbr ${bridge}
+	brctl stp ${bridge} off
+	brctl setfd ${bridge} 0
+        ip link set ${bridge} arp off
+        ip link set ${bridge} multicast off
+    fi
+    ip link set ${bridge} up
+}
+
+# Usage: add_to_bridge bridge dev
+add_to_bridge () {
+    local bridge=$1
+    local dev=$2
+
+    # Don't add $dev to $bridge if it's already on a bridge.
+    if [ -e "/sys/class/net/${bridge}/brif/${dev}" ]; then
+	return
+    fi
+    brctl addif ${bridge} ${dev}
+    ip link set ${dev} up
+}
+

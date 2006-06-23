@@ -323,7 +323,7 @@ typedef struct {
 // The physical that acpi table reside in the guest BIOS
 //#define ACPI_PHYSICAL_ADDRESS 0xE2000
 #define ACPI_PHYSICAL_ADDRESS 0xEA000
-#define ACPI_TABLE_SIZE (2*1024)  //Currently 2K is enough
+#define ACPI_TABLE_SIZE (4*1024)  //Currently 4K is enough
 
 void
 AcpiBuildTable(uint8_t* buf);

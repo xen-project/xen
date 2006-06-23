@@ -532,9 +532,8 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
 
     init_trace_bufs();
 
-    /* Give up the VGA console if DOM0 is configured to grab it. */
     if (opt_xencons)
-	console_endboot(cmdline && strstr(cmdline, "tty0"));
+        console_endboot();
 
     domain0_ready = 1;
 

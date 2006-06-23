@@ -21,7 +21,7 @@ pause
 reboot
 restore
 save
-sedf
+sched-credit
 shutdown
 sysrq
 unpause

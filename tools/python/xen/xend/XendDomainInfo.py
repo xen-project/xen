@@ -135,6 +135,7 @@ ROUNDTRIPPING_CONFIG_ENTRIES = [
     ('bootloader', str),
     ('bootloader_args', str),
     ('features', str),
+    ('localtime', int),
     ]
 
 ROUNDTRIPPING_CONFIG_ENTRIES += VM_CONFIG_PARAMS
@@ -1259,6 +1260,10 @@ class XendDomainInfo:
             self.image = image.create(self,
                                       self.info['image'],
                                       self.info['device'])
+
+            localtime = self.info['localtime']
+            if localtime is not None and localtime == 1:
+                xc.domain_set_time_offset(self.domid)
 
             xc.domain_setcpuweight(self.domid, self.info['cpu_weight'])
 

@@ -1146,7 +1146,7 @@ x86_emulate_read_std(
     *val = 0;
     if ( copy_from_user((void *)val, (void *)addr, bytes) )
     {
-        propagate_page_fault(addr, 4); /* user mode, read fault */
+        propagate_page_fault(addr, 0); /* read fault */
         return X86EMUL_PROPAGATE_FAULT;
     }
     return X86EMUL_CONTINUE;
@@ -1161,7 +1161,7 @@ x86_emulate_write_std(
 {
     if ( copy_to_user((void *)addr, (void *)&val, bytes) )
     {
-        propagate_page_fault(addr, 6); /* user mode, write fault */
+        propagate_page_fault(addr, PGERR_write_access); /* write fault */
         return X86EMUL_PROPAGATE_FAULT;
     }
     return X86EMUL_CONTINUE;

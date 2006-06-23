@@ -869,6 +869,30 @@ static PyObject *pyxc_domain_iomem_permission(PyObject *self,
     return zero;
 }
 
+static PyObject *pyxc_domain_set_time_offset(XcObject *self, PyObject *args)
+{
+    uint32_t dom;
+    int32_t time_offset_seconds;
+    time_t calendar_time;
+    struct tm local_time;
+    struct tm utc_time;
+
+    if (!PyArg_ParseTuple(args, "i", &dom))
+        return NULL;
+
+    calendar_time = time(NULL);
+    localtime_r(&calendar_time, &local_time);
+    gmtime_r(&calendar_time, &utc_time);
+    /* set up to get calendar time based on utc_time, with local dst setting */
+    utc_time.tm_isdst = local_time.tm_isdst;
+    time_offset_seconds = (int32_t)difftime(calendar_time, mktime(&utc_time));
+
+    if (xc_domain_set_time_offset(self->xc_handle, dom, time_offset_seconds) != 0)
+        return NULL;
+
+    Py_INCREF(zero);
+    return zero;
+}
 
 static PyObject *dom_op(XcObject *self, PyObject *args,
                         int (*fn)(int, uint32_t))
@@ -1207,6 +1231,13 @@ static PyMethodDef pyxc_methods[] = {
       METH_VARARGS, "\n"
       "Returns: [int]: The size in KiB of memory spanning the given number "
       "of pages.\n" },
+
+    { "domain_set_time_offset",
+      (PyCFunction)pyxc_domain_set_time_offset,
+      METH_VARARGS, "\n"
+      "Set a domain's time offset to Dom0's localtime\n"
+      " dom        [int]: Domain whose time offset is being set.\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
 
     { NULL, NULL, 0, NULL }
 };

@@ -16,7 +16,7 @@ network-attach 03_network_attach_detach_multiple_pos.test
 reboot
 restore 02_restore_badparm_neg.test 03_restore_badfilename_neg.test 04_restore_withdevices_pos.test
 save
-sedf
+sched-credit
 shutdown
 sysrq 01_sysrq_basic_neg.test 02_sysrq_sync_pos.test
 unpause

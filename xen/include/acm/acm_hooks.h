@@ -273,7 +273,12 @@ static inline void acm_post_dom0_op(struct dom0_op *op, void **ssid)
             op->u.createdomain.domain, op->u.createdomain.ssidref);
         break;
     case DOM0_DESTROYDOMAIN:
-        acm_post_domain_destroy(ssid, op->u.destroydomain.domain);
+        if (*ssid == NULL) {
+            printkd("%s: ERROR. SSID unset.\n",
+                    __func__);
+            break;
+        }
+        acm_post_domain_destroy(*ssid, op->u.destroydomain.domain);
         /* free security ssid for the destroyed domain (also if null policy */
         acm_free_domain_ssid((struct acm_ssid_domain *)(*ssid));
         *ssid = NULL;
@@ -281,13 +286,22 @@ static inline void acm_post_dom0_op(struct dom0_op *op, void **ssid)
     }
 }
 
-static inline void acm_fail_dom0_op(struct dom0_op *op, void *ssid) 
+static inline void acm_fail_dom0_op(struct dom0_op *op, void **ssid)
 {
     switch(op->cmd) {
     case DOM0_CREATEDOMAIN:
         acm_fail_domain_create(
             current->domain->ssid, op->u.createdomain.ssidref);
         break;
+    case DOM0_DESTROYDOMAIN:
+        /*  we don't handle domain destroy failure but at least free the ssid */
+        if (*ssid == NULL) {
+            printkd("%s: ERROR. SSID unset.\n",
+                    __func__);
+            break;
+        }
+        acm_free_domain_ssid((struct acm_ssid_domain *)(*ssid));
+        *ssid = NULL;
     }
 }
 

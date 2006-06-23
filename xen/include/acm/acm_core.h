@@ -121,10 +121,11 @@ struct ste_ssid {
 int acm_init_domain_ssid(domid_t id, ssidref_t ssidref);
 void acm_free_domain_ssid(struct acm_ssid_domain *ssid);
 int acm_init_binary_policy(u32 policy_code);
-int acm_set_policy(void *buf, u32 buf_size, int isuserbuffer);
-int acm_get_policy(void *buf, u32 buf_size);
-int acm_dump_statistics(void *buf, u16 buf_size);
-int acm_get_ssid(ssidref_t ssidref, u8 *buf, u16 buf_size);
+int acm_set_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size);
+int do_acm_set_policy(void *buf, u32 buf_size);
+int acm_get_policy(XEN_GUEST_HANDLE(void) buf, u32 buf_size);
+int acm_dump_statistics(XEN_GUEST_HANDLE(void) buf, u16 buf_size);
+int acm_get_ssid(ssidref_t ssidref, XEN_GUEST_HANDLE(void) buf, u16 buf_size);
 int acm_get_decision(ssidref_t ssidref1, ssidref_t ssidref2, u32 hook);
 int acm_set_policy_reference(u8 * buf, u32 buf_size);
 int acm_dump_policy_reference(u8 *buf, u32 buf_size);

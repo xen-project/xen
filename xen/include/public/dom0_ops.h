@@ -514,6 +514,27 @@ struct dom0_hypercall_init {
 typedef struct dom0_hypercall_init dom0_hypercall_init_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_hypercall_init_t);
 
+#define DOM0_DOMAIN_SETUP     49
+#define _XEN_DOMAINSETUP_hvm_guest 0
+#define XEN_DOMAINSETUP_hvm_guest  (1UL<<_XEN_DOMAINSETUP_hvm_guest)
+typedef struct dom0_domain_setup {
+    domid_t  domain;          /* domain to be affected */
+    unsigned long flags;      /* XEN_DOMAINSETUP_* */
+#ifdef __ia64__
+    unsigned long bp;         /* mpaddr of boot param area */
+    unsigned long maxmem;	  /* Highest memory address for MDT.  */
+#endif
+} dom0_domain_setup_t;
+DEFINE_XEN_GUEST_HANDLE(dom0_domain_setup_t);
+
+#define DOM0_SETTIMEOFFSET    50
+struct dom0_settimeoffset {
+    domid_t  domain;
+    int32_t  time_offset_seconds; /* applied to domain wallclock time */
+};
+typedef struct dom0_settimeoffset dom0_settimeoffset_t;
+DEFINE_XEN_GUEST_HANDLE(dom0_settimeoffset_t);
+
 struct dom0_op {
     uint32_t cmd;
     uint32_t interface_version; /* DOM0_INTERFACE_VERSION */
@@ -555,6 +576,8 @@ struct dom0_op {
         struct dom0_irq_permission    irq_permission;
         struct dom0_iomem_permission  iomem_permission;
         struct dom0_hypercall_init    hypercall_init;
+        struct dom0_domain_setup      domain_setup;
+        struct dom0_settimeoffset     settimeoffset;
         uint8_t                       pad[128];
     } u;
 };

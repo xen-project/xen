@@ -476,7 +476,11 @@ void init_console(void)
         if ( strncmp(p, "com", 3) == 0 )
             sercon_handle = serial_parse_handle(p);
         else if ( strncmp(p, "vga", 3) == 0 )
+        {
             vgacon_enabled = 1;
+            if ( strncmp(p+3, "[keep]", 6) == 0 )
+                vgacon_enabled++;
+        }
     }
 
     init_vga();
@@ -497,14 +501,47 @@ void init_console(void)
     if ( opt_sync_console )
     {
         serial_start_sync(sercon_handle);
+        add_taint(TAINT_SYNC_CONSOLE);
         printk("Console output is synchronous.\n");
     }
 }
 
-void console_endboot(int disable_vga)
+void console_endboot(void)
 {
-    if ( disable_vga )
-        vgacon_enabled = 0;
+    int i, j;
+
+    if ( opt_sync_console )
+    {
+        printk("**********************************************\n");
+        printk("******* WARNING: CONSOLE OUTPUT IS SYCHRONOUS\n");
+        printk("******* This option is intended to aid debugging "
+               "of Xen by ensuring\n");
+        printk("******* that all output is synchronously delivered "
+               "on the serial line.\n");
+        printk("******* However it can introduce SIGNIFICANT latencies "
+               "and affect\n");
+        printk("******* timekeeping. It is NOT recommended for "
+               "production use!\n");
+        printk("**********************************************\n");
+        for ( i = 0; i < 3; i++ )
+        {
+            printk("%d... ", 3-i);
+            for ( j = 0; j < 100; j++ )
+            {
+                if ( softirq_pending(smp_processor_id()) )
+                    do_softirq();
+                mdelay(10);
+            }
+        }
+        printk("\n");
+    }
+
+    if ( vgacon_enabled )
+    {
+        vgacon_enabled--;
+        printk("Xen is %s VGA console.\n",
+               vgacon_enabled ? "keeping" : "relinquishing");
+    }
 
     /*
      * If user specifies so, we fool the switch routine to redirect input

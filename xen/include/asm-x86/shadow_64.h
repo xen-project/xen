@@ -36,9 +36,9 @@
  */
 extern struct shadow_ops MODE_64_2_HANDLER;
 extern struct shadow_ops MODE_64_3_HANDLER;
+extern struct shadow_ops MODE_64_PAE_HANDLER;
 #if CONFIG_PAGING_LEVELS == 4
 extern struct shadow_ops MODE_64_4_HANDLER;
-extern struct shadow_ops MODE_64_PAE_HANDLER;
 #endif
 
 #if CONFIG_PAGING_LEVELS == 3
@@ -65,10 +65,6 @@ typedef struct { intpte_t l4; } l4_pgentry_t;
 #define ESH_LOG(_f, _a...) ((void)0)
 #endif
 
-#define PAGING_L4      4UL
-#define PAGING_L3      3UL
-#define PAGING_L2      2UL
-#define PAGING_L1      1UL
 #define L_MASK  0xff
 
 #define PAE_PAGING_LEVELS   3
@@ -108,18 +104,14 @@ typedef struct { intpte_t lo; } pgentry_64_t;
 #define entry_has_changed(x,y,flags) \
         ( !!(((x).lo ^ (y).lo) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )
 
-#define PAE_SHADOW_SELF_ENTRY   259
-#define PAE_L3_PAGETABLE_ENTRIES   4
-
 /******************************************************************************/
 /*
- * The macro and inlines are for 32-bit PAE guest on 64-bit host
+ * The macro and inlines are for 32-bit PAE guest 
  */
-#define PAE_CR3_ALIGN       5
-#define PAE_CR3_IDX_MASK    0x7f
-#define PAE_CR3_IDX_NO      128
-
 #define PAE_PDPT_RESERVED   0x1e6 /* [8:5], [2,1] */
+
+#define PAE_SHADOW_SELF_ENTRY   259
+#define PAE_L3_PAGETABLE_ENTRIES   4
 
 /******************************************************************************/
 static inline int  table_offset_64(unsigned long va, int level)
@@ -186,19 +178,10 @@ static inline int guest_table_offset_64(unsigned long va, int level, unsigned in
     }
 }
 
-static inline unsigned long get_cr3_idxval(struct vcpu *v)
-{
-    unsigned long pae_cr3 = hvm_get_guest_ctrl_reg(v, 3); /* get CR3 */
-
-    return (pae_cr3 >> PAE_CR3_ALIGN) & PAE_CR3_IDX_MASK;
-}
-
-
 #define SH_GUEST_32PAE 1
 #else 
 #define guest_table_offset_64(va, level, index) \
             table_offset_64((va),(level))
-#define get_cr3_idxval(v) 0
 #define SH_GUEST_32PAE 0
 #endif
 
@@ -514,7 +497,10 @@ static inline void entry_general(
 
                 l1_p =(pgentry_64_t *)map_domain_page(smfn);
                 for (i = 0; i < L1_PAGETABLE_ENTRIES; i++)
-                    entry_remove_flags(l1_p[i], _PAGE_RW);
+                {
+                    if ( mfn_is_page_table(entry_get_pfn(l1_p[i])) )
+                        entry_remove_flags(l1_p[i], _PAGE_RW);
+                }
 
                 unmap_domain_page(l1_p);
             }

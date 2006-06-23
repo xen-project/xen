@@ -109,6 +109,9 @@ static int __init setup_vcpu_hotplug_event(void)
 	static struct notifier_block xsn_cpu = {
 		.notifier_call = setup_cpu_watcher };
 
+	if (!is_running_on_xen())
+		return -ENODEV;
+
 	register_cpu_notifier(&hotplug_cpu);
 	register_xenstore_notifier(&xsn_cpu);
 

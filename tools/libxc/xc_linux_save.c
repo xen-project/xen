@@ -91,12 +91,12 @@ static inline int test_bit (int nr, volatile void * addr)
 
 static inline void clear_bit (int nr, volatile void * addr)
 {
-    BITMAP_ENTRY(nr, addr) &= ~(1 << BITMAP_SHIFT(nr));
+    BITMAP_ENTRY(nr, addr) &= ~(1UL << BITMAP_SHIFT(nr));
 }
 
 static inline void set_bit ( int nr, volatile void * addr)
 {
-    BITMAP_ENTRY(nr, addr) |= (1 << BITMAP_SHIFT(nr));
+    BITMAP_ENTRY(nr, addr) |= (1UL << BITMAP_SHIFT(nr));
 }
 
 /* Returns the hamming weight (i.e. the number of bits set) in a N-bit word */

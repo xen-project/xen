@@ -123,8 +123,19 @@ int shadow_set_guest_paging_levels(struct domain *d, int levels)
 #endif
 #if CONFIG_PAGING_LEVELS == 3
     case 3:
-        if ( d->arch.ops != &MODE_64_3_HANDLER )
-            d->arch.ops = &MODE_64_3_HANDLER;
+        if ( d->arch.ops == NULL ||
+                    shadow_mode_log_dirty(d) )
+        {
+            if ( d->arch.ops != &MODE_64_3_HANDLER )
+                d->arch.ops = &MODE_64_3_HANDLER;
+        }
+        else
+        {
+            if ( d->arch.ops == &MODE_64_2_HANDLER )
+                free_shadow_pages(d);
+            if ( d->arch.ops != &MODE_64_PAE_HANDLER )
+                d->arch.ops = &MODE_64_PAE_HANDLER;
+        }
         shadow_unlock(d);
         return 1;
 #endif
@@ -268,10 +279,8 @@ free_shadow_tables(struct domain *d, unsigned long smfn, u32 level)
                     put_shadow_ref(entry_get_pfn(ple[i]));
                 if (d->arch.ops->guest_paging_levels == PAGING_L3)
                 {
-#if CONFIG_PAGING_LEVELS == 4
+#if CONFIG_PAGING_LEVELS >= 3
                     if ( i == PAE_L3_PAGETABLE_ENTRIES && level == PAGING_L4 )
-#elif CONFIG_PAGING_LEVELS == 3
-                    if ( i == PAE_L3_PAGETABLE_ENTRIES && level == PAGING_L3 )
 #endif
                         break;
                 }
@@ -710,6 +719,7 @@ void free_shadow_page(unsigned long smfn)
     struct domain *d = page_get_owner(mfn_to_page(gmfn));
     unsigned long gpfn = mfn_to_gmfn(d, gmfn);
     unsigned long type = page->u.inuse.type_info & PGT_type_mask;
+    u64 index = 0;
 
     SH_VVLOG("%s: free'ing smfn=%lx", __func__, smfn);
 
@@ -722,12 +732,16 @@ void free_shadow_page(unsigned long smfn)
         if ( !mfn )
             gpfn |= (1UL << 63);
     }
+#endif
+#if CONFIG_PAGING_LEVELS >= 3
     if ( d->arch.ops->guest_paging_levels == PAGING_L3 )
-        if ( type == PGT_l4_shadow ) 
-            gpfn = ((unsigned long)page->tlbflush_timestamp << PGT_pae_idx_shift) | gpfn;
+    {
+        if ( type == PGT_l4_shadow )
+            index = page->tlbflush_timestamp;
+    }
 #endif
 
-    delete_shadow_status(d, gpfn, gmfn, type);
+    delete_shadow_status(d, gpfn, gmfn, type, index);
 
     switch ( type )
     {
@@ -835,7 +849,7 @@ free_writable_pte_predictions(struct domain *d)
         while ( count )
         {
             count--;
-            delete_shadow_status(d, gpfn_list[count], 0, PGT_writable_pred);
+            delete_shadow_status(d, gpfn_list[count], 0, PGT_writable_pred, 0);
         }
 
         xfree(gpfn_list);
@@ -1050,8 +1064,8 @@ void __shadow_mode_disable(struct domain *d)
     {
         if ( d->arch.shadow_ht[i].gpfn_and_flags != 0 )
         {
-            printk("%s: d->arch.shadow_ht[%x].gpfn_and_flags=%lx\n",
-                   __FILE__, i, d->arch.shadow_ht[i].gpfn_and_flags);
+            printk("%s: d->arch.shadow_ht[%x].gpfn_and_flags=%"PRIx64"\n",
+                   __FILE__, i, (u64)d->arch.shadow_ht[i].gpfn_and_flags);
             BUG();
         }
     }

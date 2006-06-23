@@ -74,12 +74,15 @@ static void __vmx_clear_vmcs(void *info)
 
 static void vmx_clear_vmcs(struct vcpu *v)
 {
-    unsigned int cpu = v->arch.hvm_vmx.active_cpu;
+    int cpu = v->arch.hvm_vmx.active_cpu;
 
-    if ( (cpu == -1) || (cpu == smp_processor_id()) )
-        __vmx_clear_vmcs(v);
-    else
-        on_selected_cpus(cpumask_of_cpu(cpu), __vmx_clear_vmcs, v, 1, 1);
+    if ( cpu == -1 )
+        return;
+
+    if ( cpu == smp_processor_id() )
+        return __vmx_clear_vmcs(v);
+
+    on_selected_cpus(cpumask_of_cpu(cpu), __vmx_clear_vmcs, v, 1, 1);
 }
 
 static void vmx_load_vmcs(struct vcpu *v)
@@ -97,6 +100,8 @@ void vmx_vmcs_enter(struct vcpu *v)
      *     context initialisation.
      *  2. VMPTRLD as soon as we context-switch to a HVM VCPU.
      *  3. VMCS destruction needs to happen later (from domain_destroy()).
+     * We can relax this a bit if a paused VCPU always commits its
+     * architectural state to a software structure.
      */
     if ( v == current )
         return;

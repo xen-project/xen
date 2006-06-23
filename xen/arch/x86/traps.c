@@ -276,6 +276,42 @@ void show_stack(struct cpu_user_regs *regs)
     show_trace(regs);
 }
 
+void show_stack_overflow(unsigned long esp)
+{
+#ifdef MEMORY_GUARD
+    unsigned long esp_top = get_stack_bottom() & PAGE_MASK;
+    unsigned long *stack, addr;
+
+    /* Trigger overflow trace if %esp is within 100 bytes of the guard page. */
+    if ( ((esp - esp_top) > 100) && ((esp_top - esp) > 100) )
+        return;
+
+    if ( esp < esp_top )
+        esp = esp_top;
+
+    printk("Xen stack overflow:\n   ");
+
+    stack = (unsigned long *)esp;
+    while ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) != 0 )
+    {
+        addr = *stack++;
+        if ( is_kernel_text(addr) )
+        {
+            printk("%p: [<%p>]", stack, _p(addr));
+            print_symbol(" %s\n   ", addr);
+        }
+    }
+
+    printk("\n");
+#endif
+}
+
+void show_execution_state(struct cpu_user_regs *regs)
+{
+    show_registers(regs);
+    show_stack(regs);
+}
+
 /*
  * This is called for faults at very unexpected times (e.g., when interrupts
  * are disabled). In such situations we can't do much that is safe. We try to
@@ -297,7 +333,7 @@ asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
     watchdog_disable();
     console_start_sync();
 
-    show_registers(regs);
+    show_execution_state(regs);
 
     if ( trapnr == TRAP_page_fault )
     {
@@ -360,7 +396,7 @@ static inline int do_trap(int trapnr, char *str,
 
     DEBUGGER_trap_fatal(trapnr, regs);
 
-    show_registers(regs);
+    show_execution_state(regs);
     panic("CPU%d FATAL TRAP: vector = %d (%s)\n"
           "[error_code=%04x]\n",
           smp_processor_id(), trapnr, str, regs->error_code);
@@ -451,8 +487,23 @@ asmlinkage int do_invalid_op(struct cpu_user_regs *regs)
 
     if ( unlikely(!guest_mode(regs)) )
     {
+        char sig[5];
+        /* Signature (ud2; .ascii "dbg") indicates dump state and continue. */
+        if ( (__copy_from_user(sig, (char *)regs->eip, sizeof(sig)) == 0) &&
+             (memcmp(sig, "\xf\xb""dbg", sizeof(sig)) == 0) )
+        {
+            show_execution_state(regs);
+            regs->eip += sizeof(sig);
+            return EXCRET_fault_fixed;
+        }
+        printk("%02x %02x %02x %02x %02x\n",
+               (unsigned char)sig[0],
+               (unsigned char)sig[1],
+               (unsigned char)sig[2],
+               (unsigned char)sig[3],
+               (unsigned char)sig[4]);
         DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
-        show_registers(regs);
+        show_execution_state(regs);
         panic("CPU%d FATAL TRAP: vector = %d (invalid opcode)\n",
               smp_processor_id(), TRAP_invalid_op);
     }
@@ -481,7 +532,7 @@ asmlinkage int do_int3(struct cpu_user_regs *regs)
     if ( !guest_mode(regs) )
     {
         DEBUGGER_trap_fatal(TRAP_int3, regs);
-        show_registers(regs);
+        show_execution_state(regs);
         panic("CPU%d FATAL TRAP: vector = 3 (Int3)\n", smp_processor_id());
     } 
 
@@ -511,9 +562,9 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     v->vcpu_info->arch.cr2           = addr;
 
     /* Re-set error_code.user flag appropriately for the guest. */
-    error_code &= ~4;
+    error_code &= ~PGERR_user_mode;
     if ( !guest_kernel_mode(v, guest_cpu_user_regs()) )
-        error_code |= 4;
+        error_code |= PGERR_user_mode;
 
     ti = &v->arch.guest_context.trap_ctxt[TRAP_page_fault];
     tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
@@ -547,6 +598,7 @@ static int handle_gdt_ldt_mapping_fault(
     {
         /* LDT fault: Copy a mapping from the guest's LDT, if it is valid. */
         LOCK_BIGLOCK(d);
+        cleanup_writable_pagetable(d);
         ret = map_ldt_shadow_page(offset >> PAGE_SHIFT);
         UNLOCK_BIGLOCK(d);
 
@@ -578,6 +630,98 @@ static int handle_gdt_ldt_mapping_fault(
     (((va) >= HYPERVISOR_VIRT_START))
 #endif
 
+static int __spurious_page_fault(
+    unsigned long addr, struct cpu_user_regs *regs)
+{
+    unsigned long mfn, cr3 = read_cr3();
+#if CONFIG_PAGING_LEVELS >= 4
+    l4_pgentry_t l4e, *l4t;
+#endif
+#if CONFIG_PAGING_LEVELS >= 3
+    l3_pgentry_t l3e, *l3t;
+#endif
+    l2_pgentry_t l2e, *l2t;
+    l1_pgentry_t l1e, *l1t;
+    unsigned int required_flags, disallowed_flags;
+
+    /* Reserved bit violations are never spurious faults. */
+    if ( regs->error_code & PGERR_reserved_bit )
+        return 0;
+
+    required_flags  = _PAGE_PRESENT;
+    if ( regs->error_code & PGERR_write_access )
+        required_flags |= _PAGE_RW;
+    if ( regs->error_code & PGERR_user_mode )
+        required_flags |= _PAGE_USER;
+
+    disallowed_flags = 0;
+    if ( regs->error_code & PGERR_instr_fetch )
+        disallowed_flags |= _PAGE_NX;
+
+    mfn = cr3 >> PAGE_SHIFT;
+
+#if CONFIG_PAGING_LEVELS >= 4
+    l4t = map_domain_page(mfn);
+    l4e = l4t[l4_table_offset(addr)];
+    mfn = l4e_get_pfn(l4e);
+    unmap_domain_page(l4t);
+    if ( !(l4e_get_flags(l4e) & required_flags) ||
+         (l4e_get_flags(l4e) & disallowed_flags) )
+        return 0;
+#endif
+
+#if CONFIG_PAGING_LEVELS >= 3
+    l3t  = map_domain_page(mfn); 
+#ifdef CONFIG_X86_PAE
+    l3t += (cr3 & 0xFE0UL) >> 3;
+#endif
+    l3e = l3t[l3_table_offset(addr)];
+    mfn = l3e_get_pfn(l3e);
+    unmap_domain_page(l3t);
+#ifdef CONFIG_X86_PAE
+    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+        return 0;
+#else
+    if ( !(l3e_get_flags(l3e) & required_flags) ||
+         (l3e_get_flags(l3e) & disallowed_flags) )
+        return 0;
+#endif
+#endif
+
+    l2t = map_domain_page(mfn);
+    l2e = l2t[l2_table_offset(addr)];
+    mfn = l2e_get_pfn(l2e);
+    unmap_domain_page(l2t);
+    if ( !(l2e_get_flags(l2e) & required_flags) ||
+         (l2e_get_flags(l2e) & disallowed_flags) )
+        return 0;
+    if ( l2e_get_flags(l2e) & _PAGE_PSE )
+        return 1;
+
+    l1t = map_domain_page(mfn);
+    l1e = l1t[l1_table_offset(addr)];
+    mfn = l1e_get_pfn(l1e);
+    unmap_domain_page(l1t);
+    if ( !(l1e_get_flags(l1e) & required_flags) ||
+         (l1e_get_flags(l1e) & disallowed_flags) )
+        return 0;
+    return 1;
+}
+
+static int spurious_page_fault(
+    unsigned long addr, struct cpu_user_regs *regs)
+{
+    struct domain *d = current->domain;
+    int            is_spurious;
+
+    LOCK_BIGLOCK(d);
+    cleanup_writable_pagetable(d);
+    is_spurious = __spurious_page_fault(addr, regs);
+    UNLOCK_BIGLOCK(d);
+
+    return is_spurious;
+}
+
 static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
 {
     struct vcpu   *v = current;
@@ -590,12 +734,17 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
         if ( (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
             return handle_gdt_ldt_mapping_fault(
                 addr - GDT_LDT_VIRT_START, regs);
+        /*
+         * Do not propagate spurious faults in the hypervisor area to the
+         * guest. It cannot fix them up.
+         */
+        return (spurious_page_fault(addr, regs) ? EXCRET_not_a_fault : 0);
     }
-    else if ( unlikely(shadow_mode_enabled(d)) )
-    {
+
+    if ( unlikely(shadow_mode_enabled(d)) )
         return shadow_fault(addr, regs);
-    }
-    else if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
+
+    if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
     {
         LOCK_BIGLOCK(d);
         if ( unlikely(d->arch.ptwr[PTWR_PT_ACTIVE].l1va) &&
@@ -607,9 +756,14 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
             return EXCRET_fault_fixed;
         }
 
+        /*
+         * Note it is *not* safe to check PGERR_page_present here. It can be
+         * clear, due to unhooked page table, when we would otherwise expect
+         * it to be set. We have an aversion to trusting that flag in Xen, and
+         * guests ought to be leery too.
+         */
         if ( guest_kernel_mode(v, regs) &&
-             /* Protection violation on write? No reserved-bit violation? */
-             ((regs->error_code & 0xb) == 0x3) &&
+             (regs->error_code & PGERR_write_access) &&
              ptwr_do_page_fault(d, addr, regs) )
         {
             UNLOCK_BIGLOCK(d);
@@ -619,46 +773,6 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     }
 
     return 0;
-}
-
-static int spurious_page_fault(unsigned long addr, struct cpu_user_regs *regs)
-{
-    struct vcpu   *v = current;
-    struct domain *d = v->domain;
-    int            rc;
-
-    /*
-     * The only possible reason for a spurious page fault not to be picked
-     * up already is that a page directory was unhooked by writable page table
-     * logic and then reattached before the faulting VCPU could detect it.
-     */
-    if ( is_idle_domain(d) ||               /* no ptwr in idle domain       */
-         IN_HYPERVISOR_RANGE(addr) ||       /* no ptwr on hypervisor addrs  */
-         shadow_mode_enabled(d) ||          /* no ptwr logic in shadow mode */
-         ((regs->error_code & 0x1d) != 0) ) /* simple not-present fault?    */
-        return 0;
-
-    LOCK_BIGLOCK(d);
-
-    /*
-     * The page directory could have been detached again while we weren't
-     * holding the per-domain lock. Detect that and fix up if it's the case.
-     */
-    if ( unlikely(d->arch.ptwr[PTWR_PT_ACTIVE].l1va) &&
-         unlikely(l2_linear_offset(addr) ==
-                  d->arch.ptwr[PTWR_PT_ACTIVE].l2_idx) )
-    {
-        ptwr_flush(d, PTWR_PT_ACTIVE);
-        rc = 1;
-    }
-    else
-    {
-        /* Okay, walk the page tables. Only check for not-present faults.*/
-        rc = __spurious_page_fault(addr);
-    }
-
-    UNLOCK_BIGLOCK(d);
-    return rc;
 }
 
 /*
@@ -703,7 +817,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
         DEBUGGER_trap_fatal(TRAP_page_fault, regs);
 
-        show_registers(regs);
+        show_execution_state(regs);
         show_page_walk(addr);
         panic("CPU%d FATAL PAGE FAULT\n"
               "[error_code=%04x]\n"
@@ -784,8 +898,6 @@ static inline int admin_io_okay(
     (admin_io_okay(_p, 4, _d, _r) ? outl(_v, _p) : ((void)0))
 
 /* Propagate a fault back to the guest kernel. */
-#define USER_READ_FAULT  4 /* user mode, read fault */
-#define USER_WRITE_FAULT 6 /* user mode, write fault */
 #define PAGE_FAULT(_faultaddr, _errcode)        \
 ({  propagate_page_fault(_faultaddr, _errcode); \
     return EXCRET_fault_fixed;                  \
@@ -795,7 +907,7 @@ static inline int admin_io_okay(
 #define insn_fetch(_type, _size, _ptr)          \
 ({  unsigned long _x;                           \
     if ( get_user(_x, (_type *)eip) )           \
-        PAGE_FAULT(eip, USER_READ_FAULT);       \
+        PAGE_FAULT(eip, 0); /* read fault */    \
     eip += _size; (_type)_x; })
 
 static int emulate_privileged_op(struct cpu_user_regs *regs)
@@ -864,17 +976,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             case 1:
                 data = (u8)inb_user((u16)regs->edx, v, regs);
                 if ( put_user((u8)data, (u8 *)regs->edi) )
-                    PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
+                    PAGE_FAULT(regs->edi, PGERR_write_access);
                 break;
             case 2:
                 data = (u16)inw_user((u16)regs->edx, v, regs);
                 if ( put_user((u16)data, (u16 *)regs->edi) )
-                    PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
+                    PAGE_FAULT(regs->edi, PGERR_write_access);
                 break;
             case 4:
                 data = (u32)inl_user((u16)regs->edx, v, regs);
                 if ( put_user((u32)data, (u32 *)regs->edi) )
-                    PAGE_FAULT(regs->edi, USER_WRITE_FAULT);
+                    PAGE_FAULT(regs->edi, PGERR_write_access);
                 break;
             }
             regs->edi += (int)((regs->eflags & EF_DF) ? -op_bytes : op_bytes);
@@ -889,17 +1001,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             {
             case 1:
                 if ( get_user(data, (u8 *)regs->esi) )
-                    PAGE_FAULT(regs->esi, USER_READ_FAULT);
+                    PAGE_FAULT(regs->esi, 0); /* read fault */
                 outb_user((u8)data, (u16)regs->edx, v, regs);
                 break;
             case 2:
                 if ( get_user(data, (u16 *)regs->esi) )
-                    PAGE_FAULT(regs->esi, USER_READ_FAULT);
+                    PAGE_FAULT(regs->esi, 0); /* read fault */
                 outw_user((u16)data, (u16)regs->edx, v, regs);
                 break;
             case 4:
                 if ( get_user(data, (u32 *)regs->esi) )
-                    PAGE_FAULT(regs->esi, USER_READ_FAULT);
+                    PAGE_FAULT(regs->esi, 0); /* read fault */
                 outl_user((u32)data, (u16)regs->edx, v, regs);
                 break;
             }
@@ -1082,7 +1194,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             v->arch.guest_context.ctrlreg[2] = *reg;
             v->vcpu_info->arch.cr2           = *reg;
             break;
-            
+
         case 3: /* Write CR3 */
             LOCK_BIGLOCK(v->domain);
             cleanup_writable_pagetable(v->domain);
@@ -1270,7 +1382,7 @@ asmlinkage int do_general_protection(struct cpu_user_regs *regs)
     DEBUGGER_trap_fatal(TRAP_gp_fault, regs);
 
  hardware_gp:
-    show_registers(regs);
+    show_execution_state(regs);
     panic("CPU%d GENERAL PROTECTION FAULT\n[error_code=%04x]\n",
           smp_processor_id(), regs->error_code);
     return 0;

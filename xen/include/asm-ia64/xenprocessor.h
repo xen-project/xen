@@ -237,4 +237,6 @@ typedef union {
     u64 itir;
 } ia64_itir_t;
 
+#define dump_execution_state() printk("FIXME: implement ia64 dump_execution_state()\n");
+
 #endif // _ASM_IA64_XENPROCESSOR_H

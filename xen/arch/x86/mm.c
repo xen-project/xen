@@ -108,11 +108,20 @@
 #include <public/memory.h>
 
 #ifdef VERBOSE
-#define MEM_LOG(_f, _a...)                           \
-  printk("DOM%u: (file=mm.c, line=%d) " _f "\n", \
+#define MEM_LOG(_f, _a...)                                  \
+  printk("DOM%u: (file=mm.c, line=%d) " _f "\n",            \
          current->domain->domain_id , __LINE__ , ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
+#endif
+
+/*
+ * PTE updates can be done with ordinary writes except:
+ *  1. Debug builds get extra checking by using CMPXCHG[8B].
+ *  2. PAE builds perform an atomic 8-byte store with CMPXCHG8B.
+ */
+#if !defined(NDEBUG) || defined(CONFIG_X86_PAE)
+#define PTE_UPDATE_WITH_CMPXCHG
 #endif
 
 /*
@@ -261,17 +270,19 @@ void share_xen_page_with_privileged_guests(
 
 #ifdef NDEBUG
 /* Only PDPTs above 4GB boundary need to be shadowed in low memory. */
-#define l3tab_needs_shadow(mfn) (mfn >= 0x100000)
+#define l3tab_needs_shadow(mfn) ((mfn) >= 0x100000)
 #else
 /*
- * In debug builds we aggressively shadow PDPTs to exercise code paths.
+ * In debug builds we shadow a selection of <4GB PDPTs to exercise code paths.
  * We cannot safely shadow the idle page table, nor shadow-mode page tables
- * (detected by lack of an owning domain). Always shadow PDPTs above 4GB.
+ * (detected by lack of an owning domain). As required for correctness, we
+ * always shadow PDPTs aboive 4GB.
  */
 #define l3tab_needs_shadow(mfn)                         \
-    ((((mfn << PAGE_SHIFT) != __pa(idle_pg_table)) &&   \
-      (page_get_owner(mfn_to_page(mfn)) != NULL)) ||    \
-     (mfn >= 0x100000))
+    (((((mfn) << PAGE_SHIFT) != __pa(idle_pg_table)) && \
+      (page_get_owner(mfn_to_page(mfn)) != NULL) &&     \
+      ((mfn) & 1)) || /* odd MFNs are shadowed */       \
+     ((mfn) >= 0x100000))
 #endif
 
 static l1_pgentry_t *fix_pae_highmem_pl1e;
@@ -296,6 +307,8 @@ static void __write_ptbase(unsigned long mfn)
     if ( !l3tab_needs_shadow(mfn) )
     {
         write_cr3(mfn << PAGE_SHIFT);
+        /* Cache is no longer in use or valid (/after/ write to %cr3). */
+        cache->high_mfn = 0;
         return;
     }
 
@@ -1167,20 +1180,35 @@ static inline int update_l1e(l1_pgentry_t *pl1e,
                              l1_pgentry_t  ol1e, 
                              l1_pgentry_t  nl1e)
 {
+#ifndef PTE_UPDATE_WITH_CMPXCHG
+    return !__copy_to_user(pl1e, &nl1e, sizeof(nl1e));
+#else
     intpte_t o = l1e_get_intpte(ol1e);
     intpte_t n = l1e_get_intpte(nl1e);
 
-    if ( unlikely(cmpxchg_user(pl1e, o, n) != 0) ||
-         unlikely(o != l1e_get_intpte(ol1e)) )
+    for ( ; ; )
     {
-        MEM_LOG("Failed to update %" PRIpte " -> %" PRIpte
-                ": saw %" PRIpte,
-                l1e_get_intpte(ol1e),
-                l1e_get_intpte(nl1e),
-                o);
-        return 0;
+        if ( unlikely(cmpxchg_user(pl1e, o, n) != 0) )
+        {
+            MEM_LOG("Failed to update %" PRIpte " -> %" PRIpte
+                    ": saw %" PRIpte,
+                    l1e_get_intpte(ol1e),
+                    l1e_get_intpte(nl1e),
+                    o);
+            return 0;
+        }
+
+        if ( o == l1e_get_intpte(ol1e) )
+            break;
+
+        /* Allowed to change in Accessed/Dirty flags only. */
+        BUG_ON((o ^ l1e_get_intpte(ol1e)) &
+               ~(int)(_PAGE_ACCESSED|_PAGE_DIRTY));
+        ol1e = l1e_from_intpte(o);
     }
+
     return 1;
+#endif
 }
 
 
@@ -1228,17 +1256,24 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
     return 1;
 }
 
-#define UPDATE_ENTRY(_t,_p,_o,_n) ({                                    \
-    intpte_t __o = cmpxchg((intpte_t *)(_p),                            \
-                           _t ## e_get_intpte(_o),                      \
-                           _t ## e_get_intpte(_n));                     \
-    if ( __o != _t ## e_get_intpte(_o) )                                \
-        MEM_LOG("Failed to update %" PRIpte " -> %" PRIpte              \
-                ": saw %" PRIpte "",                                    \
-                (_t ## e_get_intpte(_o)),                               \
-                (_t ## e_get_intpte(_n)),                               \
-                (__o));                                                 \
-    (__o == _t ## e_get_intpte(_o)); })
+#ifndef PTE_UPDATE_WITH_CMPXCHG
+#define UPDATE_ENTRY(_t,_p,_o,_n) ({ (*(_p) = (_n)); 1; })
+#else
+#define UPDATE_ENTRY(_t,_p,_o,_n) ({                            \
+    for ( ; ; )                                                 \
+    {                                                           \
+        intpte_t __o = cmpxchg((intpte_t *)(_p),                \
+                               _t ## e_get_intpte(_o),          \
+                               _t ## e_get_intpte(_n));         \
+        if ( __o == _t ## e_get_intpte(_o) )                    \
+            break;                                              \
+        /* Allowed to change in Accessed/Dirty flags only. */   \
+        BUG_ON((__o ^ _t ## e_get_intpte(_o)) &                 \
+               ~(int)(_PAGE_ACCESSED|_PAGE_DIRTY));             \
+        _o = _t ## e_from_intpte(__o);                          \
+    }                                                           \
+    1; })
+#endif
 
 /* Update the L2 entry at pl2e to new value nl2e. pl2e is within frame pfn. */
 static int mod_l2_entry(l2_pgentry_t *pl2e, 
@@ -2408,8 +2443,8 @@ static int create_grant_pte_mapping(
         goto failed;
     }
 
-    if ( __copy_from_user(&ol1e, (l1_pgentry_t *)va, sizeof(ol1e)) ||
-         !update_l1e(va, ol1e, _nl1e) )
+    ol1e = *(l1_pgentry_t *)va;
+    if ( !update_l1e(va, ol1e, _nl1e) )
     {
         put_page_type(page);
         rc = GNTST_general_error;
@@ -2486,7 +2521,7 @@ static int destroy_grant_pte_mapping(
     }
 
     /* Delete pagetable entry. */
-    if ( unlikely(__put_user(0, (intpte_t *)va)))
+    if ( unlikely(!update_l1e((l1_pgentry_t *)va, ol1e, l1e_empty())) )
     {
         MEM_LOG("Cannot delete PTE entry at %p", va);
         put_page_type(page);
@@ -2566,7 +2601,7 @@ static int destroy_grant_va_mapping(
     }
 
     /* Delete pagetable entry. */
-    if ( unlikely(__put_user(0, &pl1e->l1)) )
+    if ( unlikely(!update_l1e(pl1e, ol1e, l1e_empty())) )
     {
         MEM_LOG("Cannot delete PTE entry at %p", (unsigned long *)pl1e);
         return GNTST_general_error;
@@ -3020,6 +3055,20 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         return 0;
     }
 
+    case XENMEM_machphys_mapping:
+    {
+        struct xen_machphys_mapping mapping = {
+            .v_start = MACH2PHYS_VIRT_START,
+            .v_end   = MACH2PHYS_VIRT_END,
+            .max_mfn = MACH2PHYS_NR_ENTRIES - 1
+        };
+
+        if ( copy_to_guest(arg, &mapping, 1) )
+            return -EFAULT;
+
+        return 0;
+    }
+
     default:
         return subarch_memory_op(op, arg);
     }
@@ -3343,7 +3392,7 @@ static int ptwr_emulated_update(
         addr &= ~(sizeof(paddr_t)-1);
         if ( copy_from_user(&full, (void *)addr, sizeof(paddr_t)) )
         {
-            propagate_page_fault(addr, 4); /* user mode, read fault */
+            propagate_page_fault(addr, 0); /* read fault */
             return X86EMUL_PROPAGATE_FAULT;
         }
         /* Mask out bits provided by caller. */
@@ -3358,6 +3407,7 @@ static int ptwr_emulated_update(
         old  |= full;
     }
 
+#if 0 /* XXX KAF: I don't think this can happen. */
     /*
      * We must not emulate an update to a PTE that is temporarily marked
      * writable by the batched ptwr logic, else we can corrupt page refcnts! 
@@ -3368,6 +3418,12 @@ static int ptwr_emulated_update(
     if ( ((l1va = d->arch.ptwr[PTWR_PT_INACTIVE].l1va) != 0) &&
          (l1_linear_offset(l1va) == l1_linear_offset(addr)) )
         ptwr_flush(d, PTWR_PT_INACTIVE);
+#else
+    BUG_ON(((l1va = d->arch.ptwr[PTWR_PT_ACTIVE].l1va) != 0) &&
+           (l1_linear_offset(l1va) == l1_linear_offset(addr)));
+    BUG_ON(((l1va = d->arch.ptwr[PTWR_PT_INACTIVE].l1va) != 0) &&
+           (l1_linear_offset(l1va) == l1_linear_offset(addr)));
+#endif
 
     /* Read the PTE that maps the page being updated. */
     if ( __copy_from_user(&pte, &linear_pg_table[l1_linear_offset(addr)],
@@ -3409,8 +3465,9 @@ static int ptwr_emulated_update(
     }
     else
     {
-        ol1e  = *pl1e;
-        *pl1e = nl1e;
+        ol1e = *pl1e;
+        if ( !update_l1e(pl1e, ol1e, nl1e) )
+            BUG();
     }
     unmap_domain_page(pl1e);
 
@@ -3475,16 +3532,18 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     unsigned long    l2_idx;
     struct x86_emulate_ctxt emul_ctxt;
 
-    if ( unlikely(shadow_mode_enabled(d)) )
-        return 0;
+    ASSERT(!shadow_mode_enabled(d));
 
     /*
      * Attempt to read the PTE that maps the VA being accessed. By checking for
      * PDE validity in the L2 we avoid many expensive fixups in __get_user().
+     * NB. The L2 entry cannot be detached due to existing ptwr work: the
+     * caller already checked that.
      */
-    if ( !(l2e_get_flags(__linear_l2_table[l2_linear_offset(addr)]) &
-           _PAGE_PRESENT) ||
-         __copy_from_user(&pte,&linear_pg_table[l1_linear_offset(addr)],
+    pl2e = &__linear_l2_table[l2_linear_offset(addr)];
+    if ( __copy_from_user(&l2e, pl2e, sizeof(l2e)) ||
+        !(l2e_get_flags(l2e) & _PAGE_PRESENT) ||
+         __copy_from_user(&pte, &linear_pg_table[l1_linear_offset(addr)],
                           sizeof(pte)) )
     {
         return 0;
@@ -3557,21 +3616,31 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     }
 
     /*
-     * If this is a multi-processor guest then ensure that the page is hooked
-     * into at most one L2 table, which must be the one running on this VCPU.
+     * Multi-processor guest? Then ensure that the page table is hooked into
+     * at most one L2, and also ensure that there is only one mapping of the
+     * page table itself (or there can be conflicting writable mappings from
+     * other VCPUs).
      */
-    if ( (d->vcpu[0]->next_in_list != NULL) &&
-         ((page->u.inuse.type_info & PGT_count_mask) != 
-          (!!(page->u.inuse.type_info & PGT_pinned) +
-           (which == PTWR_PT_ACTIVE))) )
+    if ( d->vcpu[0]->next_in_list != NULL )
     {
-        /* Could be conflicting writable mappings from other VCPUs. */
-        cleanup_writable_pagetable(d);
-        goto emulate;
+        if ( /* Hooked into at most one L2 table (which this VCPU maps)? */
+             ((page->u.inuse.type_info & PGT_count_mask) != 
+              (!!(page->u.inuse.type_info & PGT_pinned) +
+               (which == PTWR_PT_ACTIVE))) ||
+             /* PTEs are mapped read-only in only one place? */
+             ((page->count_info & PGC_count_mask) !=
+              (!!(page->count_info & PGC_allocated) +       /* alloc count */
+               (page->u.inuse.type_info & PGT_count_mask) + /* type count  */
+               1)) )                                        /* map count   */
+        {
+            /* Could be conflicting writable mappings from other VCPUs. */
+            cleanup_writable_pagetable(d);
+            goto emulate;
+        }
     }
 
     /*
-     * We only allow one ACTIVE and one INACTIVE p.t. to be updated at at 
+     * We only allow one ACTIVE and one INACTIVE p.t. to be updated at a
      * time. If there is already one, we must flush it out.
      */
     if ( d->arch.ptwr[which].l1va )
@@ -3592,18 +3661,16 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
                 "pfn %lx\n", PTWR_PRINT_WHICH, addr,
                 l2_idx << L2_PAGETABLE_SHIFT, pfn);
 
-    d->arch.ptwr[which].l1va   = addr | 1;
-    d->arch.ptwr[which].l2_idx = l2_idx;
-    d->arch.ptwr[which].vcpu   = current;
-
-#ifdef PERF_ARRAYS
-    d->arch.ptwr[which].eip    = regs->eip;
-#endif
-
     /* For safety, disconnect the L1 p.t. page from current space. */
     if ( which == PTWR_PT_ACTIVE )
     {
-        l2e_remove_flags(*pl2e, _PAGE_PRESENT);
+        l2e_remove_flags(l2e, _PAGE_PRESENT);
+        if ( unlikely(__copy_to_user(pl2e, &l2e, sizeof(l2e))) )
+        {
+            MEM_LOG("ptwr: Could not unhook l2e at %p", pl2e);
+            domain_crash(d);
+            return 0;
+        }
         flush_tlb_mask(d->domain_dirty_cpumask);
     }
     
@@ -3617,14 +3684,24 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     if ( unlikely(__put_user(pte.l1,
                              &linear_pg_table[l1_linear_offset(addr)].l1)) )
     {
-        MEM_LOG("ptwr: Could not update pte at %p", (unsigned long *)
+        MEM_LOG("ptwr: Could not update pte at %p",
                 &linear_pg_table[l1_linear_offset(addr)]);
-        /* Toss the writable pagetable state and crash. */
-        d->arch.ptwr[which].l1va = 0;
         domain_crash(d);
         return 0;
     }
     
+    /*
+     * Now record the writable pagetable state *after* any accesses that can
+     * cause a recursive page fault (i.e., those via the *_user() accessors).
+     * Otherwise we can enter ptwr_flush() with half-done ptwr state.
+     */
+    d->arch.ptwr[which].l1va   = addr | 1;
+    d->arch.ptwr[which].l2_idx = l2_idx;
+    d->arch.ptwr[which].vcpu   = current;
+#ifdef PERF_ARRAYS
+    d->arch.ptwr[which].eip    = regs->eip;
+#endif
+
     return EXCRET_fault_fixed;
 
  emulate:

@@ -82,9 +82,6 @@ class XmConsole:
 
         tty.setraw(self.consoleFd, termios.TCSANOW)
 
-        self.__chewall(self.consoleFd)
-
-
     def __addToHistory(self, line):
         self.historyBuffer.append(line)
         self.historyLines += 1
@@ -120,34 +117,47 @@ class XmConsole:
         output"""
         self.PROMPT = prompt
 
-
-    def __chewall(self, fd):
+    def __getprompt(self, fd):
         timeout = 0
-        bytes   = 0
-        
-        while timeout < 3:
-            i, o, e = select.select([fd], [], [], 1)
-            if fd in i:
-                try:
-                    foo = os.read(fd, 1)
-                    if self.debugMe:
-                        sys.stdout.write(foo)
-                    bytes += 1
-                except Exception, exn:
-                    raise ConsoleError(str(exn))
-
+        bytes = 0
+        while timeout < 180:
+            # eat anything while total bytes less than limit else raise RUNAWAY
+            while (not self.limit) or (bytes < self.limit):
+                i, o, e = select.select([fd], [], [], 1)
+                if fd in i:
+                    try:
+                        foo = os.read(fd, 1)
+                        if self.debugMe:
+                            sys.stdout.write(foo)
+                        bytes += 1
+                    except Exception, exn:
+                        raise ConsoleError(str(exn))
+                else:
+                    break
             else:
-                timeout += 1
-
-            if self.limit and bytes >= self.limit:
                 raise ConsoleError("Console run-away (exceeded %i bytes)"
                                    % self.limit, RUNAWAY)
-
-        if self.debugMe:
-            print "Ignored %i bytes of miscellaneous console output" % bytes
-        
-        return bytes
-
+            # press enter
+            os.write(self.consoleFd, "\n")
+            # look for prompt
+            for prompt_char in "\r\n" + self.PROMPT:
+                i, o, e = select.select([fd], [], [], 1)
+                if fd in i:
+                    try:
+                        foo = os.read(fd, 1)
+                        if self.debugMe:
+                            sys.stdout.write(foo)
+                        if foo != prompt_char:
+                            break
+                    except Exception, exn:
+                        raise ConsoleError(str(exn))
+                else:
+                    timeout += 1
+                    break
+            else:
+                break
+        else:
+            raise ConsoleError("Timed out waiting for console prompt")
 
     def __runCmd(self, command, saveHistory=True):
         output = ""
@@ -155,7 +165,7 @@ class XmConsole:
         lines  = 0
         bytes  = 0
 
-        self.__chewall(self.consoleFd)
+        self.__getprompt(self.consoleFd)
 
         if verbose:
             print "[%s] Sending `%s'" % (self.domain, command)
@@ -176,7 +186,7 @@ class XmConsole:
                         "Failed to read from console (fd=%i): %s" %
                         (self.consoleFd, exn))
             else:
-                raise ConsoleError("Timed out waiting for console")
+                raise ConsoleError("Timed out waiting for console command")
 
             if self.limit and bytes >= self.limit:
                 raise ConsoleError("Console run-away (exceeded %i bytes)"
