@@ -969,7 +969,8 @@ assign_domain_page_replace(struct domain *d, unsigned long mpaddr,
         if (mfn != old_mfn) {
             struct page_info* old_page = mfn_to_page(old_mfn);
 
-            if (page_get_owner(old_page) == d) {
+            if (page_get_owner(old_page) == d ||
+                page_get_owner(old_page) == NULL) {
                 BUG_ON(get_gpfn_from_mfn(old_mfn) != (mpaddr >> PAGE_SHIFT));
                 set_gpfn_from_mfn(old_mfn, INVALID_M2P_ENTRY);
             }
@@ -1068,7 +1069,10 @@ zap_domain_page_one(struct domain *d, unsigned long mpaddr, unsigned long mfn)
         pte_t ret_pte;
 
     again:
-        BUG_ON(page_get_owner(mfn_to_page(mfn)) != d);
+        // memory_exchange() calls guest_physmap_remove_page() with
+        // a stealed page. i.e. page owner = NULL.
+        BUG_ON(page_get_owner(mfn_to_page(mfn)) != d &&
+               page_get_owner(mfn_to_page(mfn)) != NULL);
         old_arflags = pte_val(*pte) & ~_PAGE_PPN_MASK;
         old_pte = pfn_pte(mfn, __pgprot(old_arflags));
         new_pte = __pte(0);
@@ -1093,14 +1097,22 @@ zap_domain_page_one(struct domain *d, unsigned long mpaddr, unsigned long mfn)
     page = mfn_to_page(mfn);
     BUG_ON((page->count_info & PGC_count_mask) == 0);
 
-    if (page_get_owner(page) == d) {
+    if (page_get_owner(page) == d ||
+        page_get_owner(page) == NULL) {
+        // exchange_memory() calls
+        //   steal_page()
+        //     page owner is set to NULL
+        //   guest_physmap_remove_page()
+        //     zap_domain_page_one()
         BUG_ON(get_gpfn_from_mfn(mfn) != (mpaddr >> PAGE_SHIFT));
         set_gpfn_from_mfn(mfn, INVALID_M2P_ENTRY);
     }
 
     domain_page_flush(d, mpaddr, mfn, INVALID_MFN);
 
-    try_to_clear_PGC_allocate(d, page);
+    if (page_get_owner(page) != NULL) {
+        try_to_clear_PGC_allocate(d, page);
+    }
     put_page(page);
 }
 
@@ -1250,6 +1262,11 @@ destroy_grant_host_mapping(unsigned long gpaddr,
 }
 
 // heavily depends on the struct page layout.
+// gnttab_transfer() calls steal_page() with memflags = 0
+//   For grant table transfer, we must fill the page.
+// memory_exchange() calls steal_page() with memflags = MEMF_no_refcount
+//   For memory exchange, we don't have to fill the page because
+//   memory_exchange() does it.
 int
 steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
 {
@@ -1258,40 +1275,49 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
 #endif
     u32 _d, _nd;
     u64 x, nx, y;
-    unsigned long gpfn;
-    struct page_info *new;
-    unsigned long new_mfn;
-    int ret;
-    new = alloc_domheap_page(d);
-    if (new == NULL) {
-        DPRINTK("alloc_domheap_page() failed\n");
+
+    if (page_get_owner(page) != d) {
+        DPRINTK("%s d 0x%p owner 0x%p\n", __func__, d, page_get_owner(page));
         return -1;
     }
-    // zero out pages for security reasons
-    clear_page(page_to_virt(new));
-    // assign_domain_page_cmpxchg_rel() has release semantics
-    // so smp_mb() isn't needed.
+    
+    if (!(memflags & MEMF_no_refcount)) {
+        unsigned long gpfn;
+        struct page_info *new;
+        unsigned long new_mfn;
+        int ret;
 
-    ret = get_page(new, d);
-    BUG_ON(ret == 0);
+        new = alloc_domheap_page(d);
+        if (new == NULL) {
+            DPRINTK("alloc_domheap_page() failed\n");
+            return -1;
+        }
+        // zero out pages for security reasons
+        clear_page(page_to_virt(new));
+        // assign_domain_page_cmpxchg_rel() has release semantics
+        // so smp_mb() isn't needed.
 
-    gpfn = get_gpfn_from_mfn(page_to_mfn(page));
-    if (gpfn == INVALID_M2P_ENTRY) {
-        free_domheap_page(new);
-        return -1;
-    }
-    new_mfn = page_to_mfn(new);
-    set_gpfn_from_mfn(new_mfn, gpfn);
-    // smp_mb() isn't needed because assign_domain_pge_cmpxchg_rel()
-    // has release semantics.
+        ret = get_page(new, d);
+        BUG_ON(ret == 0);
 
-    ret = assign_domain_page_cmpxchg_rel(d, gpfn << PAGE_SHIFT, page, new,
-                                         ASSIGN_writable);
-    if (ret < 0) {
-        DPRINTK("assign_domain_page_cmpxchg_rel failed %d\n", ret);
-        set_gpfn_from_mfn(new_mfn, INVALID_M2P_ENTRY);
-        free_domheap_page(new);
-        return -1;
+        gpfn = get_gpfn_from_mfn(page_to_mfn(page));
+        if (gpfn == INVALID_M2P_ENTRY) {
+            free_domheap_page(new);
+            return -1;
+        }
+        new_mfn = page_to_mfn(new);
+        set_gpfn_from_mfn(new_mfn, gpfn);
+        // smp_mb() isn't needed because assign_domain_pge_cmpxchg_rel()
+        // has release semantics.
+
+        ret = assign_domain_page_cmpxchg_rel(d, gpfn << PAGE_SHIFT, page, new,
+                                             ASSIGN_writable);
+        if (ret < 0) {
+            DPRINTK("assign_domain_page_cmpxchg_rel failed %d\n", ret);
+            set_gpfn_from_mfn(new_mfn, INVALID_M2P_ENTRY);
+            free_domheap_page(new);
+            return -1;
+        }
     }
 
     spin_lock(&d->page_alloc_lock);
@@ -1310,28 +1336,40 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
         // page->u.inused._domain = 0;
         _nd = x >> 32;
 
-        if (unlikely((x & (PGC_count_mask | PGC_allocated)) !=
-                     (1 | PGC_allocated)) ||
+        if (unlikely(!(memflags & MEMF_no_refcount) &&
+                     ((x & (PGC_count_mask | PGC_allocated)) !=
+                      (1 | PGC_allocated))) ||
+
+            // when MEMF_no_refcount, page isn't de-assigned from
+            // this domain yet. So count_info = 2
+            unlikely((memflags & MEMF_no_refcount) &&
+                     ((x & (PGC_count_mask | PGC_allocated)) !=
+                      (2 | PGC_allocated))) ||
+
             unlikely(_nd != _d)) {
             struct domain* nd = unpickle_domptr(_nd);
             if (nd == NULL) {
                 DPRINTK("gnttab_transfer: Bad page %p: ed=%p(%u) 0x%x, "
                         "sd=%p 0x%x,"
-                        " caf=%016lx, taf=%" PRtype_info "\n",
+                        " caf=%016lx, taf=%" PRtype_info
+                        " memflags 0x%x\n",
                         (void *) page_to_mfn(page),
                         d, d->domain_id, _d,
                         nd, _nd,
                         x,
-                        page->u.inuse.type_info);
+                        page->u.inuse.type_info,
+                        memflags);
             } else {
                 DPRINTK("gnttab_transfer: Bad page %p: ed=%p(%u) 0x%x, "
                         "sd=%p(%u) 0x%x,"
-                        " caf=%016lx, taf=%" PRtype_info "\n",
+                        " caf=%016lx, taf=%" PRtype_info
+                        " memflags 0x%x\n",
                         (void *) page_to_mfn(page),
                         d, d->domain_id, _d,
                         nd, nd->domain_id, _nd,
                         x,
-                        page->u.inuse.type_info);
+                        page->u.inuse.type_info,
+                        memflags);
             }
             spin_unlock(&d->page_alloc_lock);
             return -1;
@@ -1361,8 +1399,6 @@ guest_physmap_add_page(struct domain *d, unsigned long gpfn,
     BUG_ON(!mfn_valid(mfn));
     ret = get_page(mfn_to_page(mfn), d);
     BUG_ON(ret == 0);
-    BUG_ON(page_get_owner(mfn_to_page(mfn)) == d &&
-           get_gpfn_from_mfn(mfn) != INVALID_M2P_ENTRY);
     set_gpfn_from_mfn(mfn, gpfn);
     smp_mb();
     assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn, ASSIGN_writable);
