@@ -275,6 +275,9 @@ __xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	struct xen_memory_reservation reservation;
 	unsigned long i;
 
+	if (!test_bit(start_gpfn, contiguous_bitmap))
+		return;
+
 	gpfns = kmalloc(sizeof(gpfns[0]) * num_gpfn,
 			GFP_KERNEL | __GFP_NOFAIL);
 	for (i = 0; i < num_gpfn; i++) {
