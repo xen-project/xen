@@ -23,7 +23,7 @@ dir=$(dirname "$0")
 VTPMDB="/etc/xen/vtpm.db"
 
 #In the vtpm-impl file some commands should be defined:
-#      vtpm_create, vtpm_setup, vtpm_reset, etc. (see below)
+#      vtpm_create, vtpm_setup, vtpm_start, etc. (see below)
 #This should be indicated by setting VTPM_IMPL_DEFINED.
 if [ -r "$dir/vtpm-impl" ]; then
 	. "$dir/vtpm-impl"
@@ -36,7 +36,7 @@ if [ -z "$VTPM_IMPL_DEFINED" ]; then
 	function vtpm_setup() {
 		true
 	}
-	function vtpm_reset() {
+	function vtpm_start() {
 		true
 	}
 	function vtpm_suspend() {
@@ -256,22 +256,22 @@ function vtpm_create_instance () {
 		else
 			instance=$(vtpmdb_get_free_instancenum)
 		fi
-		if [ "$reason" == "create" ]; then
-			vtpm_create $instance
-		else
-			vtpm_resume $instance $domname
-		fi
+
+		vtpm_create $instance
+
 		if [ $vtpm_fatal_error -eq 0 ]; then
 			vtpmdb_add_instance $domname $instance
+		fi
+	else
+		if [ "$reason" == "resume" ]; then
+			vtpm_resume $instance
+		else
+			vtpm_start $instance
 		fi
 	fi
 
 	release_lock vtpmdb
 
-	if [ $vtpm_fatal_error -eq 0 -a \
-	     "$reason" == "create" ]; then
-		vtpm_reset $instance
-	fi
 	xenstore_write $XENBUS_PATH/instance $instance
 }
 
@@ -283,19 +283,17 @@ function vtpm_remove_instance () {
 	local instance reason domname
 	domname=$(xenstore_read "$XENBUS_PATH"/domain)
 
-	if [ "$doname" != "" ]; then
+	if [ "$domname" != "" ]; then
 		claim_lock vtpmdb
 
 		instance=$(vtpmdb_find_instance $domname)
 
 		if [ "$instance" != "0" ]; then
-			if [ "$reason" == "suspend" ]; then
-				vtpm_suspend $instance
-			fi
+			vtpm_suspend $instance
 		fi
-	fi
 
-	release_lock vtpmdb
+		release_lock vtpmdb
+	fi
 }
 
 
