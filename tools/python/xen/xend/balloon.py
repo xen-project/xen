@@ -31,7 +31,7 @@ PROC_XEN_BALLOON = '/proc/xen/balloon'
 
 BALLOON_OUT_SLACK = 1 # MiB.  We need this because the physinfo details are
                       # rounded.
-RETRY_LIMIT = 10
+RETRY_LIMIT = 20
 RETRY_LIMIT_INCR = 5
 ##
 # The time to sleep between retries grows linearly, using this value (in
