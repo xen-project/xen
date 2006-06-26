@@ -517,7 +517,7 @@ struct ptc_ga_args {
 
 static void ptc_ga_remote_func (void *varg)
 {
-    u64 oldrid, moldrid;
+    u64 oldrid, moldrid, mpta;
     struct ptc_ga_args *args = (struct ptc_ga_args *)varg;
     VCPU *v = args->vcpu;
 
@@ -525,10 +525,13 @@ static void ptc_ga_remote_func (void *varg)
     VMX(v, vrr[0]) = args->rid;
     moldrid = ia64_get_rr(0x0);
     ia64_set_rr(0x0,vrrtomrr(v,args->rid));
+    mpta = ia64_get_pta();
+    ia64_set_pta(v->arch.arch_vmx.mpta);
     ia64_srlz_d();
     vmx_vcpu_ptc_l(v, args->vadr, args->ps);
     VMX(v, vrr[0]) = oldrid; 
     ia64_set_rr(0x0,moldrid);
+    ia64_set_pta(mpta);
     ia64_dv_serialize_data();
 }
 

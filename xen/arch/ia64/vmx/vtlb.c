@@ -267,14 +267,6 @@ static void vtlb_purge(VCPU *v, u64 va, u64 ps)
 //    machine_tlb_purge(va, ps);
 }
 
-static void
-switch_rr7_and_pta(VCPU* v)
-{
-    if (VMX_DOMAIN(v))
-        vmx_load_rr7_and_pta(v);
-    else
-        load_region_reg7_and_pta(v);
-}
 
 /*
  *  purge VHPT and machine TLB
@@ -287,8 +279,6 @@ static void vhpt_purge(VCPU *v, u64 va, u64 ps)
     size = PSIZE(ps);
     start = va & (-size);
     end = start + size;
-    if (current != v)
-        switch_rr7_and_pta(v);
     while(start < end){
         hash_table = (thash_data_t *)ia64_thash(start);
         tag = ia64_ttag(start);
@@ -310,8 +300,6 @@ static void vhpt_purge(VCPU *v, u64 va, u64 ps)
         start += PAGE_SIZE;
     }
     machine_tlb_purge(va, ps);
-    if (current != v)
-        switch_rr7_and_pta(current);
 }
 
 /*
