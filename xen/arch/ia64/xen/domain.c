@@ -929,6 +929,7 @@ int construct_dom0(struct domain *d,
 
 void machine_restart(char * __unused)
 {
+	console_start_sync();
 	if (running_on_sim)
 		printf ("machine_restart called.  spinning...\n");
 	else
@@ -938,6 +939,7 @@ void machine_restart(char * __unused)
 
 void machine_halt(void)
 {
+	console_start_sync();
 	if (running_on_sim)
 		printf ("machine_halt called.  spinning...\n");
 	else
