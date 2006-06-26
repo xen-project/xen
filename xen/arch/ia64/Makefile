@@ -21,9 +21,12 @@ $(TARGET): $(TARGET)-syms
 	$(NM) -n $(TARGET)-syms | grep -v '\( [aUw] \)\|\(__crc_\)\|\( \$[adt]\)'\
 		 > $(BASEDIR)/System.map
 
+# Headers do not depend on auto-generated header, but object files do.
 HDRS    := $(subst $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h,,$(HDRS))
-asm-offsets.s: asm-offsets.c $(BASEDIR)/include/asm-ia64/.offsets.h.stamp $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
-	$(CC) $(CFLAGS) -S -o $@ $<
+$(ALL_OBJS): $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
+
+asm-offsets.s: asm-offsets.c $(BASEDIR)/include/asm-ia64/.offsets.h.stamp
+	$(CC) $(CFLAGS) -DGENERATE_ASM_OFFSETS -DIA64_TASK_SIZE=0 -S -o $@ $<
 
 asm-xsi-offsets.s: asm-xsi-offsets.c $(HDRS)
 	$(CC) $(CFLAGS) -S -o $@ $<
@@ -63,14 +66,6 @@ $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 	 || ln -s ../../../include/asm-x86/hvm/vioapic.h $(BASEDIR)/include/asm-ia64/hvm/vioapic.h
 	[ -e $(BASEDIR)/arch/ia64/vmx/hvm_vioapic.c ] \
 	 || ln -s ../../../arch/x86/hvm/vioapic.c $(BASEDIR)/arch/ia64/vmx/hvm_vioapic.c
-# Solve circular reference on asm-offsets.h
-	[ -f $(BASEDIR)/include/asm-ia64/asm-offsets.h ] \
-	 || echo "#define IA64_TASK_SIZE 0" > $(BASEDIR)/include/asm-ia64/asm-offsets.h
-	[ -f $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h ] \
-	 || touch $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
-#Bad hack. Force asm-offsets.h out-of-date
-	 sleep 1
-	 touch $@
 
 # I'm sure a Makefile wizard would know a better way to do this
 xen.lds.s: xen/xen.lds.S

@@ -13,6 +13,7 @@
 #include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/debugger.h>
+#include <asm/asm-xsi-offsets.h>
 #include <public/arch-ia64.h>
 
 

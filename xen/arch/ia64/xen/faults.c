@@ -26,6 +26,7 @@
 #include <asm/vhpt.h>
 #include <asm/debugger.h>
 #include <asm/fpswa.h>
+#include <asm/asm-xsi-offsets.h>
 
 extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
 /* FIXME: where these declarations shold be there ? */

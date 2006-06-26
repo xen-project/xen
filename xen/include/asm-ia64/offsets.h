@@ -2,7 +2,8 @@
 #ifndef __IA64_OFFSETS_H
 #define __IA64_OFFSETS_H
 
+#ifndef GENERATE_ASM_OFFSETS
 #include <asm/asm-offsets.h>
-#include <asm/asm-xsi-offsets.h>
+#endif
 
 #endif /* __IA64_OFFSETS_H */

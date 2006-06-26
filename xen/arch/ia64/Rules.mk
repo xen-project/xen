@@ -44,3 +44,16 @@ CFLAGS	+= -Wa,--fatal-warnings -Werror -Wno-uninitialized
 endif
 
 LDFLAGS := -g
+
+# Additionnal IA64 include dirs.
+HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux-null/asm/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux-null/asm/sn/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux-null/linux/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux-xen/asm/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux-xen/asm/sn/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux-xen/linux/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux/asm-generic/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux/asm/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux/byteorder/*.h)
+HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/hvm/*.h)
