@@ -526,7 +526,7 @@ static void ptc_ga_remote_func (void *varg)
     moldrid = ia64_get_rr(0x0);
     ia64_set_rr(0x0,vrrtomrr(v,args->rid));
     mpta = ia64_get_pta();
-    ia64_set_pta(v->arch.arch_vmx.mpta);
+    ia64_set_pta(v->arch.arch_vmx.mpta&(~1));
     ia64_srlz_d();
     vmx_vcpu_ptc_l(v, args->vadr, args->ps);
     VMX(v, vrr[0]) = oldrid; 
@@ -561,6 +561,8 @@ IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu,UINT64 va,UINT64 ps)
                 /* Try again if VCPU has migrated.  */
             } while (proc != v->processor);
         }
+        else if(v == vcpu)
+            vmx_vcpu_ptc_l(v, va, ps);
         else
             ptc_ga_remote_func(&args);
     }
