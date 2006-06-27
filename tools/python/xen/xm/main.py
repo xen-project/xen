@@ -887,7 +887,7 @@ def parse_dev_info(info):
         'ring-ref'   : get_info('ring-ref',     int,   -1),
         }
 
-def has_long_option(args):
+def arg_check_for_resource_list(args, name):
     use_long = 0
     try:
         (options, params) = getopt.gnu_getopt(args, 'l', ['long'])
@@ -898,16 +898,19 @@ def has_long_option(args):
     for (k, v) in options:
         if k in ['-l', '--long']:
             use_long = 1
-    return (use_long, params)
-
-def xm_network_list(args):
-    arg_check(args, "network-list", 1, 2)
-
-    (use_long, params) = has_long_option(args)
 
     if len(params) == 0:
         print 'No domain parameter given'
-        sys.exit(1)
+        usage(name)
+    if len(params) > 1:
+        print 'No multiple domain parameters allowed'
+        usage(name)
+    
+    return (use_long, params)
+
+def xm_network_list(args):
+    (use_long, params) = arg_check_for_resource_list(args, "network-list")
+
     dom = params[0]
     if use_long:
         devs = server.xend.domain.getDeviceSxprs(dom, 'vif')
@@ -931,13 +934,8 @@ def xm_network_list(args):
                    % ni)
 
 def xm_block_list(args):
-    arg_check(args, "block-list", 1, 2)
+    (use_long, params) = arg_check_for_resource_list(args, "block-list")
 
-    (use_long, params) = has_long_option(args)
-
-    if len(params) == 0:
-        print 'No domain parameter given'
-        sys.exit(1)
     dom = params[0]
     if use_long:
         devs = server.xend.domain.getDeviceSxprs(dom, 'vbd')
@@ -960,13 +958,8 @@ def xm_block_list(args):
                    % ni)
 
 def xm_vtpm_list(args):
-    arg_check(args, "vtpm-list", 1, 2)
+    (use_long, params) = arg_check_for_resource_list(args, "vtpm-list")
 
-    (use_long, params) = has_long_option(args)
-
-    if len(params) == 0:
-        print 'No domain parameter given'
-        sys.exit(1)
     dom = params[0]
     if use_long:
         devs = server.xend.domain.getDeviceSxprs(dom, 'vtpm')
