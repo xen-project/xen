@@ -83,9 +83,9 @@
 #include <asm/processor.h>
 
 #define pr_debug(x...) ((void)0)
-#define DECLARE_MUTEX(_m) DEFINE_SPINLOCK(_m)
-#define down(_m) spin_lock(_m)
-#define up(_m) spin_unlock(_m)
+#define DEFINE_MUTEX(_m) DEFINE_SPINLOCK(_m)
+#define mutex_lock(_m) spin_lock(_m)
+#define mutex_unlock(_m) spin_unlock(_m)
 #define vmalloc(_s) xmalloc_bytes(_s)
 #define vfree(_p) xfree(_p)
 
@@ -95,7 +95,10 @@ MODULE_AUTHOR("Tigran Aivazian <tigran@veritas.com>");
 MODULE_LICENSE("GPL");
 #endif
 
-#define MICROCODE_VERSION 	"1.14"
+static int verbose;
+boolean_param("microcode.verbose", verbose);
+
+#define MICROCODE_VERSION 	"1.14a"
 
 #define DEFAULT_UCODE_DATASIZE 	(2000) 	  /* 2000 bytes */
 #define MC_HEADER_SIZE		(sizeof (microcode_header_t))  	  /* 48 bytes */
@@ -119,21 +122,22 @@ MODULE_LICENSE("GPL");
 static DEFINE_SPINLOCK(microcode_update_lock);
 
 /* no concurrent ->write()s are allowed on /dev/cpu/microcode */
-static DECLARE_MUTEX(microcode_sem);
+static DEFINE_MUTEX(microcode_mutex);
 
 static void __user *user_buffer;	/* user area microcode data buffer */
 static unsigned int user_buffer_size;	/* it's size */
 
 typedef enum mc_error_code {
 	MC_SUCCESS 	= 0,
-	MC_NOTFOUND 	= 1,
-	MC_MARKED 	= 2,
-	MC_ALLOCATED 	= 3,
+	MC_IGNORED 	= 1,
+	MC_NOTFOUND 	= 2,
+	MC_MARKED 	= 3,
+	MC_ALLOCATED 	= 4,
 } mc_error_code_t;
 
 static struct ucode_cpu_info {
 	unsigned int sig;
-	unsigned int pf;
+	unsigned int pf, orig_pf;
 	unsigned int rev;
 	unsigned int cksum;
 	mc_error_code_t err;
@@ -163,6 +167,7 @@ static void collect_cpu_info (void *unused)
 			rdmsr(MSR_IA32_PLATFORM_ID, val[0], val[1]);
 			uci->pf = 1 << ((val[1] >> 18) & 7);
 		}
+		uci->orig_pf = uci->pf;
 	}
 
 	wrmsr(MSR_IA32_UCODE_REV, 0, 0);
@@ -196,23 +201,34 @@ static inline void mark_microcode_update (int cpu_num, microcode_header_t *mc_he
 	pr_debug("   Checksum 0x%x\n", cksum);
 
 	if (mc_header->rev < uci->rev) {
-		printk(KERN_ERR "microcode: CPU%d not 'upgrading' to earlier revision"
-		       " 0x%x (current=0x%x)\n", cpu_num, mc_header->rev, uci->rev);
-		goto out;
+		if (uci->err == MC_NOTFOUND) {
+			uci->err = MC_IGNORED;
+			uci->cksum = mc_header->rev;
+		} else if (uci->err == MC_IGNORED && uci->cksum < mc_header->rev)
+			uci->cksum = mc_header->rev;
 	} else if (mc_header->rev == uci->rev) {
-		/* notify the caller of success on this cpu */
-		uci->err = MC_SUCCESS;
-		printk(KERN_ERR "microcode: CPU%d already at revision"
-			" 0x%x (current=0x%x)\n", cpu_num, mc_header->rev, uci->rev);
-		goto out;
+		if (uci->err < MC_MARKED) {
+			/* notify the caller of success on this cpu */
+			uci->err = MC_SUCCESS;
+		}
+	} else if (uci->err != MC_ALLOCATED || mc_header->rev > uci->mc->hdr.rev) {
+		pr_debug("microcode: CPU%d found a matching microcode update with "
+			" revision 0x%x (current=0x%x)\n", cpu_num, mc_header->rev, uci->rev);
+		uci->cksum = cksum;
+		uci->pf = pf; /* keep the original mc pf for cksum calculation */
+		uci->err = MC_MARKED; /* found the match */
+		for_each_online_cpu(cpu_num) {
+			if (ucode_cpu_info + cpu_num != uci
+			    && ucode_cpu_info[cpu_num].mc == uci->mc) {
+				uci->mc = NULL;
+				break;
+			}
+		}
+		if (uci->mc != NULL) {
+			vfree(uci->mc);
+			uci->mc = NULL;
+		}
 	}
-
-	pr_debug("microcode: CPU%d found a matching microcode update with "
-		" revision 0x%x (current=0x%x)\n", cpu_num, mc_header->rev, uci->rev);
-	uci->cksum = cksum;
-	uci->pf = pf; /* keep the original mc pf for cksum calculation */
-	uci->err = MC_MARKED; /* found the match */
-out:
 	return;
 }
 
@@ -251,13 +267,11 @@ static int find_matching_ucodes (void)
 			error = -EINVAL;
 			goto out;
 		}
-		
-		for (cpu_num = 0; cpu_num < num_online_cpus(); cpu_num++) {
-			struct ucode_cpu_info *uci = ucode_cpu_info + cpu_num;
-			if (uci->err != MC_NOTFOUND) /* already found a match or not an online cpu*/
-				continue;
 
-			if (sigmatch(mc_header.sig, uci->sig, mc_header.pf, uci->pf))
+		for_each_online_cpu(cpu_num) {
+			struct ucode_cpu_info *uci = ucode_cpu_info + cpu_num;
+
+			if (sigmatch(mc_header.sig, uci->sig, mc_header.pf, uci->orig_pf))
 				mark_microcode_update(cpu_num, &mc_header, mc_header.sig, mc_header.pf, mc_header.cksum);
 		}
 
@@ -294,18 +308,19 @@ static int find_matching_ucodes (void)
 					error = -EFAULT;
 					goto out;
 				}
-				for (cpu_num = 0; cpu_num < num_online_cpus(); cpu_num++) {
+				for_each_online_cpu(cpu_num) {
 					struct ucode_cpu_info *uci = ucode_cpu_info + cpu_num;
-					if (uci->err != MC_NOTFOUND) /* already found a match or not an online cpu*/
-						continue;
-					if (sigmatch(ext_sig.sig, uci->sig, ext_sig.pf, uci->pf)) {
+
+					if (sigmatch(ext_sig.sig, uci->sig, ext_sig.pf, uci->orig_pf)) {
 						mark_microcode_update(cpu_num, &mc_header, ext_sig.sig, ext_sig.pf, ext_sig.cksum);
 					}
 				}
 			}
 		}
 		/* now check if any cpu has matched */
-		for (cpu_num = 0, allocated_flag = 0, sum = 0; cpu_num < num_online_cpus(); cpu_num++) {
+		allocated_flag = 0;
+		sum = 0;
+		for_each_online_cpu(cpu_num) {
 			if (ucode_cpu_info[cpu_num].err == MC_MARKED) { 
 				struct ucode_cpu_info *uci = ucode_cpu_info + cpu_num;
 				if (!allocated_flag) {
@@ -367,7 +382,13 @@ static void do_update_one (void * unused)
 	struct ucode_cpu_info *uci = ucode_cpu_info + cpu_num;
 
 	if (uci->mc == NULL) {
-		printk(KERN_INFO "microcode: No new microcode data for CPU%d\n", cpu_num);
+		if (verbose) {
+			if (uci->err == MC_SUCCESS)
+				printk(KERN_INFO "microcode: CPU%d already at revision 0x%x\n",
+					cpu_num, uci->rev);
+			else
+				printk(KERN_INFO "microcode: No new microcode data for CPU%d\n", cpu_num);
+		}
 		return;
 	}
 
@@ -416,16 +437,19 @@ static int do_microcode_update (void)
 	}
 
 out_free:
-	for (i = 0; i < num_online_cpus(); i++) {
+	for_each_online_cpu(i) {
 		if (ucode_cpu_info[i].mc) {
 			int j;
 			void *tmp = ucode_cpu_info[i].mc;
 			vfree(tmp);
-			for (j = i; j < num_online_cpus(); j++) {
+			for_each_online_cpu(j) {
 				if (ucode_cpu_info[j].mc == tmp)
 					ucode_cpu_info[j].mc = NULL;
 			}
 		}
+		if (ucode_cpu_info[i].err == MC_IGNORED && verbose)
+			printk(KERN_WARNING "microcode: CPU%d not 'upgrading' to earlier revision"
+			       " 0x%x (current=0x%x)\n", i, ucode_cpu_info[i].cksum, ucode_cpu_info[i].rev);
 	}
 out:
 	return error;
@@ -433,21 +457,21 @@ out:
 
 int microcode_update(void *buf, unsigned long len)
 {
-    int ret;
+	int ret;
 
-    if (len < DEFAULT_UCODE_TOTALSIZE) {
-        printk(KERN_ERR "microcode: not enough data\n"); 
-        return -EINVAL;
-    }
+	if (len < DEFAULT_UCODE_TOTALSIZE) {
+		printk(KERN_ERR "microcode: not enough data\n"); 
+		return -EINVAL;
+	}
 
-    down(&microcode_sem);
-    
-    user_buffer = (void __user *) buf;
-    user_buffer_size = (int) len;
-    
-    ret = do_microcode_update();
-    
-    up(&microcode_sem);
-    
-    return ret;
+	mutex_lock(&microcode_mutex);
+
+	user_buffer = (void __user *) buf;
+	user_buffer_size = (int) len;
+
+	ret = do_microcode_update();
+
+	mutex_unlock(&microcode_mutex);
+
+	return ret;
 }
