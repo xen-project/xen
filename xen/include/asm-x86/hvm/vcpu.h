@@ -38,6 +38,9 @@ struct hvm_vcpu {
     /* For AP startup */
     unsigned long   init_sipi_sipi_state;
 
+    /* Flags */
+    int   flag_dr_dirty;
+
     union {
         struct arch_vmx_struct vmx;
         struct arch_svm_struct svm;

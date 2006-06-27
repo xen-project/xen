@@ -359,6 +359,26 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
 #define loaddebug(_v,_reg) \
     __asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
+#define savedebug(_v,_reg) \
+    __asm__ __volatile__ ("mov %%db" #_reg ",%0" : : "r" ((_v)->debugreg[_reg]))
+
+static inline void vmx_save_dr(struct vcpu *v)
+{
+    if ( v->arch.hvm_vcpu.flag_dr_dirty )
+    {
+        savedebug(&v->arch.guest_context, 0);
+        savedebug(&v->arch.guest_context, 1);
+        savedebug(&v->arch.guest_context, 2);
+        savedebug(&v->arch.guest_context, 3);
+        savedebug(&v->arch.guest_context, 6);
+        
+        v->arch.hvm_vcpu.flag_dr_dirty = 0;
+
+        v->arch.hvm_vcpu.u.vmx.exec_control |= CPU_BASED_MOV_DR_EXITING;
+        __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
+                  v->arch.hvm_vcpu.u.vmx.exec_control);
+    }
+}
 
 static inline void __restore_debug_registers(struct vcpu *v)
 {
@@ -409,6 +429,7 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
     vmx_freeze_time(v);
     vmx_save_segments(v);
     vmx_load_msrs();
+    vmx_save_dr(v);
 }
 
 static void vmx_ctxt_switch_to(struct vcpu *v)
