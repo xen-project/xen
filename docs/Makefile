@@ -80,6 +80,9 @@ clean:
 	rm -rf man5
 	rm -rf man1
 
+.PHONY: distclean
+distclean: clean
+
 .PHONY: install
 install: all
 	rm -rf $(DESTDIR)$(pkgdocdir)

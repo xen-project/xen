@@ -45,6 +45,9 @@ clean: check_clean
 	done
 	$(MAKE) ioemuclean
 
+.PHONY: distclean
+distclean: clean
+
 .PHONY: check
 check:
 	$(MAKE) -C check

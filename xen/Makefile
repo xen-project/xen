@@ -14,8 +14,8 @@ default: build
 .PHONY: dist
 dist: install
 
-.PHONY: build install clean cscope TAGS tags
-build install debug clean cscope TAGS tags::
+.PHONY: build install clean distclean cscope TAGS tags
+build install debug clean distclean cscope TAGS tags::
 	make -f Rules.mk _$@
 
 .PHONY: _build
@@ -49,6 +49,10 @@ _clean: delete-unfresh-files
 	rm -f include/asm *.o $(TARGET)* *~ core
 	rm -f include/asm-*/asm-offsets.h
 	rm -f include/xen/acm_policy.h
+
+.PHONY: _distclean
+_distclean: clean
+	rm -f tags TAGS cscope.files cscope.in.out cscope.out cscope.po.out
 
 $(TARGET).gz: $(TARGET)
 	gzip -f -9 < $< > $@.new
