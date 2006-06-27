@@ -43,7 +43,17 @@
 
 // flag to track whether TDDL has been opened
 static int g_TDDL_open = 0;
-static int g_fd = -1;              // the fd to the TPM
+static int g_tx_fd = -1;              // the fd to the TPM
+
+#ifndef DUMMY_TPM
+ #define TPM_TX_FNAME "/dev/tpm0"
+ static int *g_rx_fdp = &g_tx_fd;
+#else
+ #define TPM_TX_FNAME "/tmp/tpm_in.fifo"
+ #define TPM_RX_FNAME "/tmp/tpm_out.fifo"
+ static int g_rx_fd = -1;
+ static int *g_rx_fdp = &g_rx_fd;              // the fd to the TPM
+#endif
 
 TPM_RESULT
 TDDL_TransmitData( TDDL_BYTE* in,
@@ -60,10 +70,9 @@ TDDL_TransmitData( TDDL_BYTE* in,
   vtpmloginfomore(VTPM_LOG_TXDATA, "\n");
   
   ssize_t size = 0;
-  int fd = g_fd;
   
   // send the request
-  size = write (fd, in, insize);
+  size = write (g_tx_fd, in, insize);
   if (size < 0) {
     vtpmlogerror(VTPM_LOG_TXDATA, "write() failed");
     ERRORDIE (TPM_IOERROR);
@@ -74,7 +83,7 @@ TDDL_TransmitData( TDDL_BYTE* in,
   }
 
   // read the response
-  size = read (fd, out, TCPA_MAX_BUFFER_LENGTH);
+  size = read (*g_rx_fdp, out, TCPA_MAX_BUFFER_LENGTH);
   if (size < 0) {
     vtpmlogerror(VTPM_LOG_TXDATA, "read() failed");
     ERRORDIE (TPM_IOERROR);
@@ -98,18 +107,20 @@ TDDL_TransmitData( TDDL_BYTE* in,
 TPM_RESULT TDDL_Open() {
   
   TDDL_RESULT status = TDDL_SUCCESS;
-  int fd = -1;
   
   if (g_TDDL_open)
     return TPM_FAIL;
-  
-  fd = open ("/dev/tpm0", O_RDWR);
-  if (fd < 0) {
+
+#ifdef DUMMY_TPM  
+  *g_rx_fdp = open (TPM_RX_FNAME, O_RDWR);
+#endif
+
+  g_tx_fd = open (TPM_TX_FNAME, O_RDWR);
+  if (g_tx_fd < 0) {
     vtpmlogerror(VTPM_LOG_TXDATA, "TPM open failed");
     return TPM_IOERROR;
   }
   
-  g_fd = fd;
   g_TDDL_open = 1;
   
   return status;
@@ -119,13 +130,18 @@ void TDDL_Close() {
   if (! g_TDDL_open)
         return;
 
-  if (g_fd>= 0) {
-    if (close(g_fd) < 0) 
+  if (g_tx_fd>= 0) {
+    if (close(g_tx_fd) < 0) 
       vtpmlogerror(VTPM_LOG_TXDATA, "closeing tpm failed");
-    
-    g_fd = -1;
+    g_tx_fd = -1;
   }
     
+  if (*g_rx_fdp>= 0) {
+    if (close(*g_rx_fdp) < 0) 
+      vtpmlogerror(VTPM_LOG_TXDATA, "closeing tpm failed");
+    *g_rx_fdp = -1;
+  }
+
   g_TDDL_open = 0;
   
 }
