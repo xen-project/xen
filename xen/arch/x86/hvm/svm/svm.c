@@ -813,7 +813,8 @@ void arch_svm_do_resume(struct vcpu *v)
         reset_stack_and_jump( svm_asm_do_resume );
     }
     else {
-        printk("VCPU core pinned: %d to %d\n", 
+        if (svm_dbg_on)
+            printk("VCPU core pinned: %d to %d\n", 
                 v->arch.hvm_svm.launch_core, smp_processor_id() );
         v->arch.hvm_svm.launch_core = smp_processor_id();
         svm_migrate_timers( v );
