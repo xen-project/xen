@@ -2148,9 +2148,17 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         vmx_vmexit_do_extint(&regs);
         break;
     case EXIT_REASON_PENDING_INTERRUPT:
+        /*
+         * Not sure exactly what the purpose of this is.  The only bits set
+         * and cleared at this point are CPU_BASED_VIRTUAL_INTR_PENDING.
+         * (in io.c:{enable,disable}_irq_window().  So presumably we want to
+         * set it to the original value...
+         */
+        v->arch.hvm_vcpu.u.vmx.exec_control &= ~CPU_BASED_VIRTUAL_INTR_PENDING;
+        v->arch.hvm_vcpu.u.vmx.exec_control |=
+            (MONITOR_CPU_BASED_EXEC_CONTROLS & CPU_BASED_VIRTUAL_INTR_PENDING);
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
-                  MONITOR_CPU_BASED_EXEC_CONTROLS);
-        v->arch.hvm_vcpu.u.vmx.exec_control = MONITOR_CPU_BASED_EXEC_CONTROLS;
+                  v->arch.hvm_vcpu.u.vmx.exec_control);
         break;
     case EXIT_REASON_TASK_SWITCH:
         __hvm_bug(&regs);
