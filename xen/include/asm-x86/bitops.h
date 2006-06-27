@@ -335,8 +335,6 @@ static inline unsigned long ffz(unsigned long word)
 	return word;
 }
 
-#define fls64(x)   generic_fls64(x)
-
 /**
  * ffs - find first bit set
  * @x: the word to search
@@ -345,15 +343,15 @@ static inline unsigned long ffz(unsigned long word)
  * the libc and compiler builtin ffs routines, therefore
  * differs in spirit from the above ffz (man ffs).
  */
-static inline int ffs(int x)
+static inline int ffs(unsigned long x)
 {
-	int r;
+	long r;
 
-	__asm__("bsfl %1,%0\n\t"
+	__asm__("bsf %1,%0\n\t"
 		"jnz 1f\n\t"
-		"movl $-1,%0\n"
+		"mov $-1,%0\n"
 		"1:" : "=r" (r) : "rm" (x));
-	return r+1;
+	return (int)r+1;
 }
 
 /**
@@ -362,15 +360,15 @@ static inline int ffs(int x)
  *
  * This is defined the same way as ffs.
  */
-static inline int fls(int x)
+static inline int fls(unsigned long x)
 {
-	int r;
+	long r;
 
-	__asm__("bsrl %1,%0\n\t"
+	__asm__("bsr %1,%0\n\t"
 		"jnz 1f\n\t"
-		"movl $-1,%0\n"
+		"mov $-1,%0\n"
 		"1:" : "=r" (r) : "rm" (x));
-	return r+1;
+	return (int)r+1;
 }
 
 /**

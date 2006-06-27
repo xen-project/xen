@@ -50,7 +50,7 @@ int vlapic_find_highest_irr(struct vlapic *vlapic)
 {
     int result;
 
-    result = find_highest_bit((uint32_t *)&vlapic->irr[0], INTR_LEN_32);
+    result = find_highest_bit(vlapic->irr, MAX_VECTOR);
 
     if ( result != -1 && result < 16 )
     {
@@ -79,14 +79,14 @@ int vlapic_find_highest_isr(struct vlapic *vlapic)
 {
     int result;
 
-    result = find_highest_bit((uint32_t *)&vlapic->isr[0], INTR_LEN_32);
+    result = find_highest_bit(vlapic->isr, MAX_VECTOR);
 
     if ( result != -1 && result < 16 )
     {
         int i = 0;
         printk("VLAPIC: isr on reserved bits %d, isr is\n ", result);
-        for ( i = 0; i < INTR_LEN_32; i += 2 )
-            printk("%d: 0x%08x%08x\n", i, vlapic->isr[i], vlapic->isr[i+1]);
+        for ( i = 0; i < ARRAY_SIZE(vlapic->isr); i++ )
+            printk("%d: %p\n", i, (void *)vlapic->isr[i]);
         return -1;
     }
 
@@ -896,7 +896,7 @@ vlapic_check_direct_intr(struct vcpu *v, int * mode)
     struct vlapic *vlapic = VLAPIC(v);
     int type;
 
-    type = __fls(vlapic->direct_intr.deliver_mode);
+    type = fls(vlapic->direct_intr.deliver_mode) - 1;
     if ( type == -1 )
         return -1;
 

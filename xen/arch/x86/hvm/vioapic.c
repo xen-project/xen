@@ -450,14 +450,9 @@ static void ioapic_deliver(hvm_vioapic_t *s, int irqno)
 
 static int ioapic_get_highest_irq(hvm_vioapic_t *s)
 {
-    uint32_t irqs;
-
-    ASSERT(s);
-
-    irqs = s->irr & ~s->isr & ~s->imr;
-    return __fls(irqs);
+    uint32_t irqs = s->irr & ~s->isr & ~s->imr;
+    return fls(irqs) - 1;
 }
-
 
 static void service_ioapic(hvm_vioapic_t *s)
 {
