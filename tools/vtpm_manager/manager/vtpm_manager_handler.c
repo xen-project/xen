@@ -78,13 +78,14 @@ TPM_RESULT VTPM_Manager_Handler( vtpm_ipc_handle_t *tx_ipc_h,
                                  BOOL is_priv,
                                  char *thread_name) {
   TPM_RESULT      status =  TPM_FAIL; // Should never return
-  UINT32          dmi, in_param_size, cmd_size, out_param_size, out_message_size, out_message_size_full;
-  BYTE            *cmd_header, *in_param, *out_message;
+  UINT32          dmi, in_param_size, cmd_size, out_param_size, out_message_size, reply_size;
+  BYTE            *cmd_header=NULL, *in_param=NULL, *out_message=NULL, *reply;
   buffer_t        *command_buf=NULL, *result_buf=NULL;
   TPM_TAG         tag;
   TPM_COMMAND_CODE ord;
   VTPM_DMI_RESOURCE *dmi_res;
   int  size_read, size_write, i;
+  BOOL add_header=TRUE; // This indicates to prepend a header on result_buf before sending
   
   cmd_header = (BYTE *) malloc(VTPM_COMMAND_HEADER_SIZE_SRV);
   command_buf = (buffer_t *) malloc(sizeof(buffer_t));
@@ -100,7 +101,7 @@ TPM_RESULT VTPM_Manager_Handler( vtpm_ipc_handle_t *tx_ipc_h,
     // Read command header 
     size_read = vtpm_ipc_read(rx_ipc_h, NULL, cmd_header, VTPM_COMMAND_HEADER_SIZE_SRV);
     if (size_read > 0) {
-      vtpmhandlerloginfo(VTPM_LOG_VTPM_DEEP, "RECV[%d}: 0x", size_read);
+      vtpmhandlerloginfo(VTPM_LOG_VTPM_DEEP, "RECV[%d]: 0x", size_read);
       for (i=0; i<size_read; i++) 
 	vtpmhandlerloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", cmd_header[i]);
     } else {
@@ -165,6 +166,7 @@ TPM_RESULT VTPM_Manager_Handler( vtpm_ipc_handle_t *tx_ipc_h,
          (!dmi_res->connected) ) {
       vtpmhandlerlogerror(VTPM_LOG_VTPM, "Attempted access to non-existent or disconnected DMI %d. Aborting...\n", dmi);
       status = TPM_BAD_PARAMETER;
+      goto abort_with_error;
     }
 
     if (tag == VTPM_TAG_REQ) { 
@@ -176,9 +178,14 @@ TPM_RESULT VTPM_Manager_Handler( vtpm_ipc_handle_t *tx_ipc_h,
         status = vtpm_manager_handle_tpm_cmd(fw_tx_ipc_h, fw_rx_ipc_h, dmi_res, cmd_header, command_buf, result_buf, thread_name);
 
         // This means calling the DMI failed, not that the cmd failed in the DMI
+        // Since the return will be interpretted by a TPM app, all errors are IO_ERRORs to the app
         if (status != TPM_SUCCESS) { 
+          status = TPM_IOERROR;
 	  goto abort_with_error;
         }
+        // Unlike all other commands, forwarded commands yield a result_buf that includes the DMI's status. This
+        // should be forwarded to the caller VM
+        add_header = FALSE;
       } else {
         // We are not supposed to forward TPM commands at all.
         int i;
@@ -205,38 +212,43 @@ TPM_RESULT VTPM_Manager_Handler( vtpm_ipc_handle_t *tx_ipc_h,
 #ifndef VTPM_MULTI_VM
  abort_with_error:
 #endif
+   
+    if (add_header) { 
+      // Prepend VTPM header with destination DM stamped
+      out_param_size = buffer_len(result_buf);
+      out_message_size = VTPM_COMMAND_HEADER_SIZE_CLT + out_param_size;
+      reply_size = VTPM_COMMAND_HEADER_SIZE_SRV + out_param_size;
+      out_message = (BYTE *) malloc (reply_size);
+      reply = out_message;
     
-    // Prepend VTPM header with destination DM stamped
-    out_param_size = buffer_len(result_buf);
-    out_message_size = VTPM_COMMAND_HEADER_SIZE_CLT + out_param_size;
-    out_message_size_full = VTPM_COMMAND_HEADER_SIZE_SRV + out_param_size;
-    out_message = (BYTE *) malloc (out_message_size_full);
+      BSG_PackList(out_message, 4,
+		   BSG_TYPE_UINT32, (BYTE *) &dmi,
+		   BSG_TPM_TAG, (BYTE *) &tag,
+		   BSG_TYPE_UINT32, (BYTE *) &out_message_size,
+		   BSG_TPM_RESULT, (BYTE *) &status);
     
-    BSG_PackList(out_message, 4,
-		 BSG_TYPE_UINT32, (BYTE *) &dmi,
-		 BSG_TPM_TAG, (BYTE *) &tag,
-		 BSG_TYPE_UINT32, (BYTE *) &out_message_size,
-		 BSG_TPM_RESULT, (BYTE *) &status);
-    
-    if (buffer_len(result_buf) > 0) 
-      memcpy(out_message + VTPM_COMMAND_HEADER_SIZE_SRV, result_buf->bytes, out_param_size);
-
-    //Note: Send message + dmi_id
-    size_write = vtpm_ipc_write(tx_ipc_h, dmi_res->tx_vtpm_ipc_h, out_message, out_message_size_full );
+      if (buffer_len(result_buf) > 0) 
+        memcpy(out_message + VTPM_COMMAND_HEADER_SIZE_SRV, result_buf->bytes, out_param_size);
+      //Note: Send message + dmi_id
+    } else {
+      reply = result_buf->bytes;
+      reply_size = buffer_len(result_buf);
+    }  
+    size_write = vtpm_ipc_write(tx_ipc_h, (dmi_res ? dmi_res->tx_vtpm_ipc_h : NULL), reply, reply_size );
     if (size_write > 0) {
       vtpmhandlerloginfo(VTPM_LOG_VTPM_DEEP, "SENT: 0x");
-      for (i=0; i < out_message_size_full; i++) 
-	vtpmhandlerloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", out_message[i]);
+      for (i=0; i < reply_size; i++) 
+	vtpmhandlerloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", reply[i]);
       
       vtpmhandlerloginfomore(VTPM_LOG_VTPM_DEEP, "\n");            
     } else {
       vtpmhandlerlogerror(VTPM_LOG_VTPM, "%s had error writing to ipc. Aborting... \n", thread_name);
       goto abort_command;
     }
-    free(out_message);
+    free(out_message); out_message=NULL;
     
-    if (size_write < (int)out_message_size_full) {
-      vtpmhandlerlogerror(VTPM_LOG_VTPM, "%s unable to write full command to ipc (%d/%d)\n", thread_name, size_write, out_message_size_full);
+    if (size_write < (int)reply_size) {
+      vtpmhandlerlogerror(VTPM_LOG_VTPM, "%s unable to write full command to ipc (%d/%d)\n", thread_name, size_write, reply_size);
       goto abort_command;
     }
     
@@ -246,9 +258,7 @@ TPM_RESULT VTPM_Manager_Handler( vtpm_ipc_handle_t *tx_ipc_h,
     //free buffers
     bzero(cmd_header, VTPM_COMMAND_HEADER_SIZE_SRV);
     //free(in_param); // This was converted to command_buf. No need to free 
-    if (command_buf != result_buf) 
-      buffer_free(result_buf);
-    
+    buffer_free(result_buf);
     buffer_free(command_buf);
 
     // If we have a write lock, save the manager table
@@ -258,6 +268,7 @@ TPM_RESULT VTPM_Manager_Handler( vtpm_ipc_handle_t *tx_ipc_h,
     }
 
     vtpm_lock_unlock();
+    add_header = TRUE; // Reset to the default
   } // End while(1)
   
 }
@@ -369,6 +380,7 @@ TPM_RESULT vtpm_manager_handle_tpm_cmd(vtpm_ipc_handle_t *tx_ipc_h,
     dmi_cmd_size = VTPM_COMMAND_HEADER_SIZE_SRV;
     size_write = vtpm_ipc_write(tx_ipc_h, dmi_res->tx_tpm_ipc_h, cmd_header, VTPM_COMMAND_HEADER_SIZE_SRV );
     if (size_write > 0) {
+      vtpmhandlerloginfo(VTPM_LOG_VTPM_DEEP, "SENT (DMI): 0x");
       for (i=0; i<VTPM_COMMAND_HEADER_SIZE_SRV; i++) 
         vtpmhandlerloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", cmd_header[i]);
 
@@ -438,7 +450,8 @@ TPM_RESULT vtpm_manager_handle_tpm_cmd(vtpm_ipc_handle_t *tx_ipc_h,
     vtpmhandlerloginfomore(VTPM_LOG_VTPM, "\n");
   }
    
-  if (buffer_init_convert(result_buf, adj_param_size, in_param) != TPM_SUCCESS) {
+  if ( (buffer_init(result_buf, VTPM_COMMAND_HEADER_SIZE_SRV, cmd_header) != TPM_SUCCESS) || 
+       (buffer_append_raw(result_buf, adj_param_size, in_param) != TPM_SUCCESS) ) {
     vtpmhandlerlogerror(VTPM_LOG_VTPM, "Failed to setup buffers. Aborting...\n");
     status = TPM_FAIL;
     goto abort_with_error;

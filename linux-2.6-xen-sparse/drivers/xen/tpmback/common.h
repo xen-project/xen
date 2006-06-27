@@ -63,8 +63,6 @@ void tpmif_xenbus_init(void);
 void tpmif_xenbus_exit(void);
 int tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn);
 irqreturn_t tpmif_be_int(int irq, void *dev_id, struct pt_regs *regs);
-int tpmif_vtpm_open(tpmif_t *tpmif, domid_t domain, u32 instance);
-int tpmif_vtpm_close(u32 instance);
 
 int vtpm_release_packets(tpmif_t * tpmif, int send_msgs);
 

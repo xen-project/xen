@@ -154,11 +154,6 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosed:
-		/*
-		 * Notify the vTPM manager about the front-end
-		 * having left.
-		 */
-		tpmif_vtpm_close(be->instance);
 		device_unregister(&be->dev->dev);
 		tpmback_remove(dev);
 		break;
@@ -177,28 +172,10 @@ static void frontend_changed(struct xenbus_device *dev,
 
 static void maybe_connect(struct backend_info *be)
 {
-	int err;
-
 	if (be->tpmif == NULL || be->tpmif->status == CONNECTED)
 		return;
 
 	connect(be);
-
-	/*
-	 * Notify the vTPM manager about a new front-end.
-	 */
-	err = tpmif_vtpm_open(be->tpmif,
-			      be->frontend_id,
-			      be->instance);
-	if (err) {
-		xenbus_dev_error(be->dev, err,
-				 "queueing vtpm open packet");
-		/*
-		 * Should close down this device and notify FE
-		 * about closure.
-		 */
-		return;
-	}
 }
 
 

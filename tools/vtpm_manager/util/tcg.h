@@ -389,6 +389,11 @@ typedef struct pack_constbuf_t {
 #define TPM_DELEGATE_ADMIN      TPM_BASE + 77 // Delegation table management not enabled
 #define TPM_TRANSPORT_EXCLUSIVE    TPM_BASE + 78 // There was a command executed outside of an exclusive transport session
 
+// TPM_STARTUP_TYPE values
+#define TPM_ST_CLEAR 0x0001
+#define TPM_ST_STATE 0x0002
+#define TPM_ST_DEACTIVATED 0x003
+
 // TPM_TAG values
 #define TPM_TAG_RQU_COMMAND 0x00c1
 #define TPM_TAG_RQU_AUTH1_COMMAND 0x00c2

@@ -64,14 +64,6 @@
 #define VTPM_TX_HP_FNAME       "/var/vtpm/fifos/to_console.fifo"
 #define VTPM_RX_HP_FNAME       "/var/vtpm/fifos/from_console.fifo"
 
-
-#define GUEST_TX_FIFO "/var/vtpm/fifos/guest-to-%d.fifo"
-#define GUEST_RX_FIFO "/var/vtpm/fifos/guest-from-all.fifo"
-
-#define VTPM_TX_FIFO  "/var/vtpm/fifos/vtpm-to-%d.fifo"
-#define VTPM_RX_FIFO  "/var/vtpm/fifos/vtpm-from-all.fifo"
-
-
 struct vtpm_thread_params_s {
   vtpm_ipc_handle_t *tx_ipc_h;
   vtpm_ipc_handle_t *rx_ipc_h;
@@ -113,7 +105,7 @@ void signal_handler(int reason) {
 
 struct sigaction ctl_c_handler;
 
-TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res) {
+TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res, BYTE startup_mode) {
 
   TPM_RESULT status = TPM_SUCCESS;
   int fh;
@@ -150,14 +142,14 @@ TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res) {
 
     // Measure DMI
     // FIXME: This will measure DMI. Until then use a fixed DMI_Measurement value
-    // Also, this mechanism is specific to 1 VM.
+    // Also, this mechanism is specific to 1 VM architecture.
     /*
     fh = open(TPM_EMULATOR_PATH, O_RDONLY);
     stat_ret = fstat(fh, &file_stat);
     if (stat_ret == 0)
       dmi_size = file_stat.st_size;
     else {
-      vtpmlogerror(VTPM_LOG_VTPM, "Could not open tpm_emulator!!\n");
+      vtpmlogerror(VTPM_LOG_VTPM, "Could not open vtpmd!!\n");
       status = TPM_IOERROR;
       goto abort_egress;
     }
@@ -179,10 +171,20 @@ TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res) {
       status = TPM_RESOURCES;
       goto abort_egress;
     } else if (pid == 0) {
-      if ( stat(dmi_res->NVMLocation, &file_info) == -1)
+      switch (startup_mode) {
+      case TPM_ST_CLEAR:
         execl (TPM_EMULATOR_PATH, "vtmpd", "clear", dmi_id_str, NULL);
-      else
+        break;
+      case TPM_ST_STATE:
         execl (TPM_EMULATOR_PATH, "vtpmd", "save", dmi_id_str, NULL);
+        break;
+      case TPM_ST_DEACTIVATED:
+        execl (TPM_EMULATOR_PATH, "vtpmd", "deactivated", dmi_id_str, NULL);
+        break;
+      default:
+        status = TPM_BAD_PARAMETER;
+        goto abort_egress;
+      }
 
       // Returning from these at all is an error.
       vtpmlogerror(VTPM_LOG_VTPM, "Could not exec to launch vtpm\n");
@@ -309,7 +311,7 @@ int main(int argc, char **argv) {
   be_thread_params.fw_tpm = TRUE;
   be_thread_params.fw_tx_ipc_h = NULL;
   be_thread_params.fw_rx_ipc_h = &rx_tpm_ipc_h;
-  be_thread_params.is_priv = TRUE;                   //FIXME: Change when HP is up
+  be_thread_params.is_priv = FALSE;
   be_thread_params.thread_name = "Backend Listener";
 
   dmi_thread_params.tx_ipc_h = NULL;
@@ -318,7 +320,7 @@ int main(int argc, char **argv) {
   dmi_thread_params.fw_tx_ipc_h = NULL;
   dmi_thread_params.fw_rx_ipc_h = NULL;
   dmi_thread_params.is_priv = FALSE; 
-  dmi_thread_params.thread_name = "VTPM Listeners";
+  dmi_thread_params.thread_name = "VTPM Listener";
 
   hp_thread_params.tx_ipc_h = &tx_hp_ipc_h;
   hp_thread_params.rx_ipc_h = &rx_hp_ipc_h;
@@ -345,10 +347,10 @@ int main(int argc, char **argv) {
   }
 
  
-//  if (pthread_create(&hp_thread, NULL, vtpm_manager_thread, &hp_thread_params) != 0) {
-//    vtpmlogerror(VTPM_LOG_VTPM, "Failed to launch HP Thread.\n");
-//    exit(-1);
-//  }
+  if (pthread_create(&hp_thread, NULL, vtpm_manager_thread, &hp_thread_params) != 0) {
+    vtpmlogerror(VTPM_LOG_VTPM, "Failed to launch HP Thread.\n");
+    exit(-1);
+  }
  
   //Join the other threads until exit time.
   pthread_join(be_thread, NULL);

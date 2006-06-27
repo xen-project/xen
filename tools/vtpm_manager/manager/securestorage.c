@@ -190,8 +190,7 @@ TPM_RESULT VTPM_Handle_Save_NVM(VTPM_DMI_RESOURCE *myDMI,
   long bytes_written;
   buffer_t sealed_NVM;
   
-  
-  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Save_NVMing[%d]: 0x\n", buffer_len(inbuf));
+  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Saving %d bytes of NVM.\n", buffer_len(inbuf));
 
   TPMTRYRETURN( envelope_encrypt(inbuf,
                                  &vtpm_globals->storageKey,
@@ -310,6 +309,7 @@ TPM_RESULT VTPM_SaveManagerData(void) {
   UINT32 bootKeySize = buffer_len(&vtpm_globals->bootKeyWrap);
   struct pack_buf_t storage_key_pack = {storageKeySize, vtpm_globals->storageKeyWrap.bytes};
   struct pack_buf_t boot_key_pack = {bootKeySize, vtpm_globals->bootKeyWrap.bytes};
+  BYTE vtpm_manager_gen = VTPM_MANAGER_GEN;
 
   struct hashtable_itr *dmi_itr;
   VTPM_DMI_RESOURCE *dmi_res;
@@ -321,7 +321,8 @@ TPM_RESULT VTPM_SaveManagerData(void) {
   boot_key_size =  sizeof(UINT32) +       // bootkeysize
                    bootKeySize;           // boot key
 
-  TPMTRYRETURN(buffer_init(&clear_flat_global, 3*sizeof(TPM_DIGEST) + // Auths
+  TPMTRYRETURN(buffer_init(&clear_flat_global,sizeof(BYTE) + // manager version
+                                              3*sizeof(TPM_DIGEST) + // Auths
                                               sizeof(UINT32) +// storagekeysize
                                               storageKeySize, NULL) ); // storage key
 
@@ -332,7 +333,8 @@ TPM_RESULT VTPM_SaveManagerData(void) {
   boot_key_size = BSG_PackList(flat_boot_key, 1,
                                BSG_TPM_SIZE32_DATA, &boot_key_pack);
 
-  BSG_PackList(clear_flat_global.bytes, 3,
+  BSG_PackList(clear_flat_global.bytes, 4,
+                BSG_TYPE_BYTE,    &vtpm_manager_gen,
                 BSG_TPM_AUTHDATA, &vtpm_globals->owner_usage_auth,
                 BSG_TPM_SECRET,   &vtpm_globals->storage_key_usage_auth,
                 BSG_TPM_SIZE32_DATA, &storage_key_pack);
@@ -348,7 +350,7 @@ TPM_RESULT VTPM_SaveManagerData(void) {
 
     flat_dmis = (BYTE *) malloc( 
                      (hashtable_count(vtpm_globals->dmi_map) - 1) * // num DMIS (-1 for Dom0)
-                     (sizeof(UINT32) + 2*sizeof(TPM_DIGEST)) ); // Per DMI info
+                     (sizeof(UINT32) +sizeof(BYTE) + 2*sizeof(TPM_DIGEST)) ); // Per DMI info
 
     dmi_itr = hashtable_iterator(vtpm_globals->dmi_map);
     do {
@@ -360,8 +362,9 @@ TPM_RESULT VTPM_SaveManagerData(void) {
         continue;
 
 
-      flat_dmis_size += BSG_PackList( flat_dmis + flat_dmis_size, 3,
+      flat_dmis_size += BSG_PackList( flat_dmis + flat_dmis_size, 4,
                                         BSG_TYPE_UINT32, &dmi_res->dmi_id,
+                                        BSG_TYPE_BYTE, &dmi_res->dmi_type,
                                         BSG_TPM_DIGEST, &dmi_res->NVM_measurement,
                                         BSG_TPM_DIGEST, &dmi_res->DMI_measurement);
 
@@ -408,6 +411,7 @@ TPM_RESULT VTPM_LoadManagerData(void) {
   buffer_t  unsealed_data;
   struct pack_buf_t storage_key_pack, boot_key_pack;
   UINT32 *dmi_id_key, enc_size;
+  BYTE vtpm_manager_gen;
 
   VTPM_DMI_RESOURCE *dmi_res;
   struct stat file_stat;
@@ -458,8 +462,14 @@ TPM_RESULT VTPM_LoadManagerData(void) {
                                  &unsealed_data) );
   step_size += enc_size;
 
+  if (*unsealed_data.bytes != VTPM_MANAGER_GEN) {
+      // Once there is more than one gen, this will include some compatability stuff
+      vtpmlogerror(VTPM_LOG_VTPM, "Warning: Manager Data file is gen %d, which this manager is gen %d.\n", vtpm_manager_gen, VTPM_MANAGER_GEN);
+  }
+
   // Global Values needing to be saved
-  BSG_UnpackList( unsealed_data.bytes, 3,
+  BSG_UnpackList( unsealed_data.bytes, 4,
+                  BSG_TYPE_BYTE,    &vtpm_manager_gen, 
                   BSG_TPM_AUTHDATA, &vtpm_globals->owner_usage_auth,
                   BSG_TPM_SECRET,   &vtpm_globals->storage_key_usage_auth,
                   BSG_TPM_SIZE32_DATA, &storage_key_pack);
@@ -469,7 +479,7 @@ TPM_RESULT VTPM_LoadManagerData(void) {
 
   // Per DMI values to be saved
   while ( step_size < fh_size ){
-    if (fh_size - step_size < (long) (sizeof(UINT32) + 2*sizeof(TPM_DIGEST))) {
+    if (fh_size - step_size < (long) (sizeof(UINT32) + sizeof(BYTE) + 2*sizeof(TPM_DIGEST))) {
       vtpmlogerror(VTPM_LOG_VTPM, "Encountered %ld extra bytes at end of manager state.\n", fh_size-step_size);
       step_size = fh_size;
     } else {
@@ -478,8 +488,9 @@ TPM_RESULT VTPM_LoadManagerData(void) {
 
       dmi_res->connected = FALSE;
 
-      step_size += BSG_UnpackList(flat_table + step_size, 3,
+      step_size += BSG_UnpackList(flat_table + step_size, 4,
                                  BSG_TYPE_UINT32, &dmi_res->dmi_id,
+                                 BSG_TYPE_BYTE, &dmi_res->dmi_type,
                                  BSG_TPM_DIGEST, &dmi_res->NVM_measurement,
                                  BSG_TPM_DIGEST, &dmi_res->DMI_measurement);
 

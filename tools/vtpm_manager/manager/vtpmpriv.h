@@ -40,15 +40,19 @@
 #ifndef __VTPMPRIV_H__
 #define __VTPMPRIV_H__
 
+#include "vtpm_manager.h"
 #include "tcg.h"
 #include "tcs.h"
 #include "buffer.h"
 #include "crypto.h"
 #include "vtpm_ipc.h"
 
-#define STATE_FILE    "/var/vtpm/VTPM"
-#define DMI_NVM_FILE  "/var/vtpm/vtpm_dm_%d.data"
-#define VTPM_CTL_DM   0
+#define VTPM_MANAGER_GEN   2     // This is incremented when the manager's table
+                                 // is changed. It's used for backwards compatability
+
+#define STATE_FILE         "/var/vtpm/VTPM"
+#define DMI_NVM_FILE       "/var/vtpm/vtpm_dm_%d.data"
+#define VTPM_CTL_DM        0
 
 // ------------------------ Private Structures -----------------------
 typedef struct VTPM_DMI_RESOURCE_T {
@@ -70,6 +74,7 @@ typedef struct VTPM_DMI_RESOURCE_T {
                                         // of NVM.
   // Persistent Information about DMI
   UINT32                dmi_id;
+  BYTE                  dmi_type;
   TPM_DIGEST            NVM_measurement;  // Equal to the SHA1 of the blob
   TPM_DIGEST            DMI_measurement;  // Correct measurement of the owning DMI
 } VTPM_DMI_RESOURCE;
@@ -138,7 +143,7 @@ TPM_RESULT VTPM_Handle_Delete_DMI(const buffer_t *param_buf);
 TPM_RESULT VTPM_SaveManagerData(void);
 TPM_RESULT VTPM_LoadManagerData(void);
 
-TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res);
+TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res, BYTE startup_mode);
 
 TPM_RESULT VTPM_Close_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res);
 

@@ -229,7 +229,10 @@ TPM_RESULT TCSP_ReadPubek (  TCS_CONTEXT_HANDLE hContext,    // in
 			     );
 
 
-// Non-Standard TCSP call to give direct access to TransmitData.
+// Non-Standard TCSP calls
+TPM_RESULT TCSP_SaveState(TCS_CONTEXT_HANDLE   hContext);  // in
+
+//Give direct access to TransmitData.
 // Key and Auth Management is done before transfering command to TDDL.
 TPM_RESULT TCSP_RawTransmitData(UINT32 inDataSize,  // in
 				BYTE *inData,       // in

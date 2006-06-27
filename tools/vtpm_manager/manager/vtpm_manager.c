@@ -168,6 +168,7 @@ TPM_RESULT VTPM_Create_Manager(){
                               &vtpm_globals->bootKey,
                               TRUE ) );
 
+  TPMTRYRETURN( VTSP_SaveState(vtpm_globals->manager_tcs_handle) );
   goto egress;
   
  abort_egress:
@@ -218,7 +219,7 @@ TPM_RESULT VTPM_Init_Manager() {
 			   &vtpm_globals->keyAuth) );
   vtpm_globals->keyAuth.fContinueAuthSession = TRUE;
 
-	// If failed, create new Manager.
+  // If failed, create new Manager.
   serviceStatus = VTPM_LoadManagerData();
   if (serviceStatus == TPM_IOERROR) {
     vtpmloginfo(VTPM_LOG_VTPM, "Failed to read manager file. Assuming first time initialization.\n");
