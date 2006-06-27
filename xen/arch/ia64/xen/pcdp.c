@@ -47,7 +47,7 @@ pcdp_hp_irq_fixup(struct pcdp *pcdp, struct pcdp_uart *uart)
 	struct acpi_table_header *hdr;
 	int i;
 
-	if (pcdp->rev >= 3 || strcmp(pcdp->oemid, "HP"))
+	if (pcdp->rev >= 3 || strcmp((char *)pcdp->oemid, "HP"))
 		return;
 
 	/*
@@ -130,7 +130,7 @@ setup_pcdp_irq(struct pcdp *pcdp, struct pcdp_uart *uart)
 			ns16550_com1.irq = ns16550_com1_gsi = uart->gsi;
 			ns16550_com1_polarity = IOSAPIC_POL_LOW;
 			ns16550_com1_trigger = IOSAPIC_LEVEL;
-		} else if (!strcmp(pcdp->oemid, "HP"))
+		} else if (!strcmp((char *)pcdp->oemid, "HP"))
 			pcdp_hp_irq_fixup(pcdp, uart);
 	}
 }
