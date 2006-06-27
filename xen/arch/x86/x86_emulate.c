@@ -374,9 +374,8 @@ do{ __asm__ __volatile__ (                                              \
 
 /* Access/update address held in a register, based on addressing mode. */
 #define register_address(sel, reg)                                      \
-    ((ad_bytes == sizeof(unsigned long)) ? (reg) :                      \
-     ((mode == X86EMUL_MODE_REAL) ? /* implies ad_bytes == 2 */         \
-      (((unsigned long)(sel) << 4) + ((reg) & 0xffff)) :                \
+    (((mode == X86EMUL_MODE_REAL) ? ((unsigned long)(sel) << 4) : 0) +  \
+     ((ad_bytes == sizeof(unsigned long)) ? (reg) :                     \
       ((reg) & ((1UL << (ad_bytes << 3)) - 1))))
 #define register_address_increment(reg, inc)                            \
 do {                                                                    \
@@ -509,10 +508,6 @@ x86_emulate_memop(
         }
     }
  done_prefixes:
-
-    /* Note quite the same as 80386 real mode, but hopefully good enough. */
-    if ( (mode == X86EMUL_MODE_REAL) && (ad_bytes != 2) )
-        goto cannot_emulate;
 
     /* REX prefix. */
     if ( (mode == X86EMUL_MODE_PROT64) && ((b & 0xf0) == 0x40) )
