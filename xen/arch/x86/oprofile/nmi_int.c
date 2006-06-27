@@ -269,7 +269,7 @@ static int __init p4_init(char * cpu_type)
 { 
 	__u8 cpu_model = current_cpu_data.x86_model;
 
-	if (cpu_model > 4)
+	if ((cpu_model > 6) || (cpu_model == 5))
 		return 0;
 
 #ifndef CONFIG_SMP

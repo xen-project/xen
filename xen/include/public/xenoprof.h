@@ -80,6 +80,15 @@ struct xenoprof_counter {
 typedef struct xenoprof_counter xenoprof_counter_t;
 DEFINE_XEN_GUEST_HANDLE(xenoprof_counter_t);
 
+typedef struct xenoprof_passive {
+    uint16_t domain_id;
+    int32_t  max_samples;
+    int32_t  nbuf;
+    int32_t  bufsize;
+    uint64_t buf_maddr;
+} xenoprof_passive_t;
+DEFINE_XEN_GUEST_HANDLE(xenoprof_passive_t);
+
 
 #endif /* __XEN_PUBLIC_XENOPROF_H__ */
 
