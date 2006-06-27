@@ -172,7 +172,7 @@ static unsigned long current_target(void)
 
 static int increase_reservation(unsigned long nr_pages)
 {
-	unsigned long *frame_list, pfn, i, flags;
+	unsigned long *frame_list, frame, pfn, i, flags;
 	struct page   *page;
 	long           rc;
 	struct xen_memory_reservation reservation = {
@@ -185,8 +185,11 @@ static int increase_reservation(unsigned long nr_pages)
 		nr_pages = PAGE_SIZE / sizeof(unsigned long);
 
 	frame_list = (unsigned long *)__get_free_page(GFP_KERNEL);
-	if (frame_list == NULL)
-		return -ENOMEM;
+	if (frame_list == NULL) {
+		frame_list = &frame;
+		if (nr_pages > 1)
+			nr_pages = 1;
+	}
 
 	balloon_lock(flags);
 
@@ -202,14 +205,17 @@ static int increase_reservation(unsigned long nr_pages)
 	rc = HYPERVISOR_memory_op(
 		XENMEM_populate_physmap, &reservation);
 	if (rc < nr_pages) {
-		int ret;
-		/* We hit the Xen hard limit: reprobe. */
-		set_xen_guest_handle(reservation.extent_start, frame_list);
-		reservation.nr_extents   = rc;
-		ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
-				&reservation);
-		BUG_ON(ret != rc);
-		hard_limit = current_pages + rc - driver_pages;
+		if (rc > 0) {
+			int ret;
+
+			/* We hit the Xen hard limit: reprobe. */
+			reservation.nr_extents = rc;
+			ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
+					&reservation);
+			BUG_ON(ret != rc);
+		}
+		if (rc >= 0)
+			hard_limit = current_pages + rc - driver_pages;
 		goto out;
 	}
 
@@ -247,14 +253,15 @@ static int increase_reservation(unsigned long nr_pages)
  out:
 	balloon_unlock(flags);
 
-	free_page((unsigned long)frame_list);
+	if (frame_list != &frame)
+		free_page((unsigned long)frame_list);
 
 	return 0;
 }
 
 static int decrease_reservation(unsigned long nr_pages)
 {
-	unsigned long *frame_list, pfn, i, flags;
+	unsigned long *frame_list, frame, pfn, i, flags;
 	struct page   *page;
 	void          *v;
 	int            need_sleep = 0;
@@ -269,8 +276,11 @@ static int decrease_reservation(unsigned long nr_pages)
 		nr_pages = PAGE_SIZE / sizeof(unsigned long);
 
 	frame_list = (unsigned long *)__get_free_page(GFP_KERNEL);
-	if (frame_list == NULL)
-		return -ENOMEM;
+	if (frame_list == NULL) {
+		frame_list = &frame;
+		if (nr_pages > 1)
+			nr_pages = 1;
+	}
 
 	for (i = 0; i < nr_pages; i++) {
 		if ((page = alloc_page(GFP_HIGHUSER)) == NULL) {
@@ -321,7 +331,8 @@ static int decrease_reservation(unsigned long nr_pages)
 
 	balloon_unlock(flags);
 
-	free_page((unsigned long)frame_list);
+	if (frame_list != &frame)
+		free_page((unsigned long)frame_list);
 
 	return need_sleep;
 }
