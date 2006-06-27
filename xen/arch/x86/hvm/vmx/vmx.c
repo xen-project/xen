@@ -2080,10 +2080,19 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         {
             void store_cpu_user_regs(struct cpu_user_regs *regs);
 
-            store_cpu_user_regs(&regs);
-            __vm_clear_bit(GUEST_PENDING_DBG_EXCEPTIONS, PENDING_DEBUG_EXC_BS);
-
-            domain_pause_for_debugger();
+            if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
+            {
+                store_cpu_user_regs(&regs);
+                domain_pause_for_debugger();
+                __vm_clear_bit(GUEST_PENDING_DBG_EXCEPTIONS,
+                               PENDING_DEBUG_EXC_BS);
+            }
+            else
+            {
+                vmx_reflect_exception(v);
+                __vm_clear_bit(GUEST_PENDING_DBG_EXCEPTIONS,
+                               PENDING_DEBUG_EXC_BS);
+            }
 
             break;
         }
