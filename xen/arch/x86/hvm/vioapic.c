@@ -40,6 +40,9 @@
 #include <asm/hvm/support.h>
 #include <asm/current.h>
 
+/* HACK: Route IRQ0 only to VCPU0 to prevent time jumps. */
+#define IRQ0_SPECIAL_ROUTING 1
+
 #if defined(__ia64__)
 #define	opt_hvm_debug_level	opt_vmx_debug_level
 #endif
@@ -392,12 +395,12 @@ static void ioapic_deliver(hvm_vioapic_t *s, int irqno)
     uint8_t trig_mode = s->redirtbl[irqno].RedirForm.trigmod;
     uint32_t deliver_bitmask;
 
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "IOAPIC deliver: "
+    HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
       "dest %x dest_mode %x delivery_mode %x vector %x trig_mode %x\n",
       dest, dest_mode, delivery_mode, vector, trig_mode);
 
-    deliver_bitmask =
-      ioapic_get_delivery_bitmask(s, dest, dest_mode, vector, delivery_mode);
+    deliver_bitmask = ioapic_get_delivery_bitmask(
+        s, dest, dest_mode, vector, delivery_mode);
 
     if (!deliver_bitmask) {
         HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic deliver "
@@ -411,15 +414,19 @@ static void ioapic_deliver(hvm_vioapic_t *s, int irqno)
     {
         struct vlapic* target;
 
-        target = apic_round_robin(
-                s->domain, dest_mode, vector, deliver_bitmask);
+#ifdef IRQ0_SPECIAL_ROUTING
+        if (irqno == 0)
+            target = s->lapic_info[0];
+        else
+#endif
+            target = apic_round_robin(s->domain, dest_mode,
+                                      vector, deliver_bitmask);
         if (target)
             ioapic_inj_irq(s, target, vector, trig_mode, delivery_mode);
-        else{ 
-            HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic deliver "
+        else
+            HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
               "null round robin mask %x vector %x delivery_mode %x\n",
               deliver_bitmask, vector, deliver_bitmask);
-        }
         break;
     }
 
@@ -429,6 +436,13 @@ static void ioapic_deliver(hvm_vioapic_t *s, int irqno)
         uint8_t bit;
         for (bit = 0; bit < s->lapic_count; bit++) {
             if (deliver_bitmask & (1 << bit)) {
+#ifdef IRQ0_SPECIAL_ROUTING
+                if ( (irqno == 0) && (bit !=0) )
+                {
+                    printk("PIT irq to bit %x\n", bit);
+                    domain_crash_synchronous();
+                }
+#endif
                 if (s->lapic_info[bit]) {
                     ioapic_inj_irq(s, s->lapic_info[bit],
                                 vector, trig_mode, delivery_mode);

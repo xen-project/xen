@@ -212,18 +212,19 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
 
         if ( test_and_set_bit(vector, &vlapic->irr[0]) )
         {
-            printk("<vlapic_accept_irq>"
-                   "level trig mode repeatedly for vector %d\n", vector);
+            HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
+              "level trig mode repeatedly for vector %d\n", vector);
             break;
         }
 
         if ( level )
         {
-            printk("<vlapic_accept_irq> level trig mode for vector %d\n",
-                   vector);
+            HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
+              "level trig mode for vector %d\n", vector);
             set_bit(vector, &vlapic->tmr[0]);
         }
         evtchn_set_pending(v, iopacket_port(v));
+
         result = 1;
         break;
 
@@ -308,8 +309,15 @@ struct vlapic* apic_round_robin(struct domain *d,
 
     old = next = d->arch.hvm_domain.round_info[vector];
 
-    do {
-        /* the vcpu array is arranged according to vcpu_id */
+    /* the vcpu array is arranged according to vcpu_id */
+    do
+    {
+        next++;
+        if ( !d->vcpu[next] ||
+             !test_bit(_VCPUF_initialised, &d->vcpu[next]->vcpu_flags) ||
+             next == MAX_VIRT_CPUS )
+            next = 0;
+
         if ( test_bit(next, &bitmap) )
         {
             target = d->vcpu[next]->arch.hvm_vcpu.vlapic;
@@ -321,12 +329,6 @@ struct vlapic* apic_round_robin(struct domain *d,
             }
             break;
         }
-
-        next ++;
-        if ( !d->vcpu[next] ||
-             !test_bit(_VCPUF_initialised, &d->vcpu[next]->vcpu_flags) ||
-             next == MAX_VIRT_CPUS )
-            next = 0;
     } while ( next != old );
 
     d->arch.hvm_domain.round_info[vector] = next;
@@ -956,7 +958,7 @@ int cpu_has_apic_interrupt(struct vcpu* v)
     }
     return 0;
 }
- 
+
 void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
 {
     struct vlapic *vlapic = VLAPIC(v);
