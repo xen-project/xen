@@ -29,8 +29,6 @@ from XendError import VmError
 
 PROC_XEN_BALLOON = '/proc/xen/balloon'
 
-BALLOON_OUT_SLACK = 1 # MiB.  We need this because the physinfo details are
-                      # rounded.
 RETRY_LIMIT = 20
 RETRY_LIMIT_INCR = 5
 ##
@@ -68,22 +66,22 @@ def _get_proc_balloon(label):
         f.close()
 
 def get_dom0_current_alloc():
-    """Returns the current memory allocation (in MiB) of dom0."""
+    """Returns the current memory allocation (in KiB) of dom0."""
 
     kb = _get_proc_balloon(labels['current'])
     if kb == None:
         raise VmError('Failed to query current memory allocation of dom0.')
-    return kb / 1024
+    return kb
 
 def get_dom0_target_alloc():
-    """Returns the target memory allocation (in MiB) of dom0."""
+    """Returns the target memory allocation (in KiB) of dom0."""
 
     kb = _get_proc_balloon(labels['target'])
     if kb == None:
         raise VmError('Failed to query target memory allocation of dom0.')
-    return kb / 1024
+    return kb
 
-def free(required):
+def free(need_mem):
     """Balloon out memory from the privileged domain so that there is the
     specified required amount (in KiB) free.
     """
@@ -92,9 +90,10 @@ def free(required):
     # to balloon out to free some up.  Memory freed by a destroyed domain may
     # not appear in the free_memory field immediately, because it needs to be
     # scrubbed before it can be released to the free list, which is done
-    # asynchronously by Xen; ballooning is asynchronous also.  No matter where
-    # we expect the free memory to come from, therefore, we need to wait for
-    # it to become available.
+    # asynchronously by Xen; ballooning is asynchronous also.  Such memory
+    # does, however, need to be accounted for when calculating how much dom0
+    # needs to balloon.  No matter where we expect the free memory to come
+    # from, we need to wait for it to become available.
     #
     # We are not allowed to balloon below dom0_min_mem, or if dom0_min_mem
     # is 0, we cannot balloon at all.  Memory can still become available
@@ -108,43 +107,49 @@ def free(required):
     # usage, so we recheck the required alloc each time around the loop, but
     # track the last used value so that we don't trigger too many watches.
 
-    need_mem = (required + 1023) / 1024 + BALLOON_OUT_SLACK
-
     xroot = XendRoot.instance()
     xc = xen.lowlevel.xc.xc()
 
     try:
-        dom0_min_mem = xroot.get_dom0_min_mem()
+        dom0_min_mem = xroot.get_dom0_min_mem() * 1024
 
         retries = 0
         sleep_time = SLEEP_TIME_GROWTH
         last_new_alloc = None
         rlimit = RETRY_LIMIT
         while retries < rlimit:
-            free_mem = xc.physinfo()['free_memory']
+            physinfo = xc.physinfo()
+            free_mem = physinfo['free_memory']
+            scrub_mem = physinfo['scrub_memory']
 
             if free_mem >= need_mem:
-                log.debug("Balloon: free %d; need %d; done.", free_mem,
-                          need_mem)
+                log.debug("Balloon: %d KiB free; need %d; done.",
+                          free_mem, need_mem)
                 return
 
             if retries == 0:
-                rlimit += ((need_mem - free_mem)/1024) * RETRY_LIMIT_INCR
-                log.debug("Balloon: free %d; need %d; retries: %d.", 
-                          free_mem, need_mem, rlimit)
+                rlimit += ((need_mem - free_mem)/1024/1024) * RETRY_LIMIT_INCR
+                log.debug("Balloon: %d KiB free; %d to scrub; need %d; retries: %d.",
+                          free_mem, scrub_mem, need_mem, rlimit)
 
             if dom0_min_mem > 0:
                 dom0_alloc = get_dom0_current_alloc()
-                new_alloc = dom0_alloc - (need_mem - free_mem)
+                new_alloc = dom0_alloc - (need_mem - free_mem - scrub_mem)
 
-                if (new_alloc >= dom0_min_mem and
-                    new_alloc != last_new_alloc):
-                    log.debug("Balloon: setting dom0 target to %d.",
-                              new_alloc)
-                    dom0 = XendDomain.instance().privilegedDomain()
-                    dom0.setMemoryTarget(new_alloc)
-                    last_new_alloc = new_alloc
-                    # Continue to retry, waiting for ballooning.
+                if free_mem + scrub_mem >= need_mem:
+                    if last_new_alloc == None:
+                        log.debug("Balloon: waiting on scrubbing")
+                        last_new_alloc = dom0_alloc
+                else:
+                    if (new_alloc >= dom0_min_mem and
+                        new_alloc != last_new_alloc):
+                        new_alloc_mb = new_alloc / 1024  # Round down
+                        log.debug("Balloon: setting dom0 target to %d MiB.",
+                                  new_alloc_mb)
+                        dom0 = XendDomain.instance().privilegedDomain()
+                        dom0.setMemoryTarget(new_alloc_mb)
+                        last_new_alloc = new_alloc
+                # Continue to retry, waiting for ballooning or scrubbing.
 
             time.sleep(sleep_time)
             if retries < 2 * RETRY_LIMIT:
@@ -154,15 +159,15 @@ def free(required):
         # Not enough memory; diagnose the problem.
         if dom0_min_mem == 0:
             raise VmError(('Not enough free memory and dom0_min_mem is 0, so '
-                           'I cannot release any more.  I need %d MiB but '
+                           'I cannot release any more.  I need %d KiB but '
                            'only have %d.') %
                           (need_mem, free_mem))
         elif new_alloc < dom0_min_mem:
             raise VmError(
-                ('I need %d MiB, but dom0_min_mem is %d and shrinking to '
-                 '%d MiB would leave only %d MiB free.') %
+                ('I need %d KiB, but dom0_min_mem is %d and shrinking to '
+                 '%d KiB would leave only %d KiB free.') %
                 (need_mem, dom0_min_mem, dom0_min_mem,
-                 free_mem + dom0_alloc - dom0_min_mem))
+                 free_mem + scrub_mem + dom0_alloc - dom0_min_mem))
         else:
             raise VmError('The privileged domain did not balloon!')
 

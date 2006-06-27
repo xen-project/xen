@@ -61,6 +61,7 @@ custom_param("lowmem_emergency_pool", parse_lowmem_emergency_pool);
 
 static DEFINE_SPINLOCK(page_scrub_lock);
 LIST_HEAD(page_scrub_list);
+static unsigned long scrub_pages;
 
 /*********************
  * ALLOCATION BITMAP
@@ -696,6 +697,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
             {
                 spin_lock(&page_scrub_lock);
                 list_add(&pg[i].list, &page_scrub_list);
+                scrub_pages++;
                 spin_unlock(&page_scrub_lock);
             }
         }
@@ -784,9 +786,10 @@ static void page_scrub_softirq(void)
         /* Remove peeled pages from the list. */
         ent->next->prev = &page_scrub_list;
         page_scrub_list.next = ent->next;
-        
+        scrub_pages -= (i+1);
+
         spin_unlock(&page_scrub_lock);
-        
+
         /* Working backwards, scrub each page in turn. */
         while ( ent != &page_scrub_list )
         {
@@ -798,6 +801,11 @@ static void page_scrub_softirq(void)
             free_heap_pages(pfn_dom_zone_type(page_to_mfn(pg)), pg, 0);
         }
     } while ( (NOW() - start) < MILLISECS(1) );
+}
+
+unsigned long avail_scrub_pages(void)
+{
+    return scrub_pages;
 }
 
 static __init int page_scrub_init(void)

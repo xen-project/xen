@@ -231,6 +231,7 @@ struct dom0_physinfo {
     uint32_t cpu_khz;
     uint64_t total_pages;
     uint64_t free_pages;
+    uint64_t scrub_pages;
     uint32_t hw_cap[8];
 };
 typedef struct dom0_physinfo dom0_physinfo_t;

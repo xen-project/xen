@@ -582,6 +582,12 @@ static PyObject *pyxc_readconsolering(XcObject *self,
 }
 
 
+static unsigned long pages_to_kib(unsigned long pages)
+{
+    return pages * (XC_PAGE_SIZE / 1024);
+}
+
+
 static PyObject *pyxc_pages_to_kib(XcObject *self, PyObject *args)
 {
     unsigned long pages;
@@ -589,13 +595,7 @@ static PyObject *pyxc_pages_to_kib(XcObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "l", &pages))
         return NULL;
 
-    return PyLong_FromUnsignedLong(pages * (XC_PAGE_SIZE / 1024));
-}
-
-
-static unsigned long pages_to_mb(unsigned long pages)
-{
-    return (pages * (XC_PAGE_SIZE / 1024) + 1023) / 1024;
+    return PyLong_FromUnsignedLong(pages_to_kib(pages));
 }
 
 
@@ -618,13 +618,14 @@ static PyObject *pyxc_physinfo(XcObject *self)
     if(q>cpu_cap)
         *(q-1)=0;
 
-    return Py_BuildValue("{s:i,s:i,s:i,s:i,s:l,s:l,s:i,s:s}",
+    return Py_BuildValue("{s:i,s:i,s:i,s:i,s:l,s:l,s:l,s:i,s:s}",
                          "threads_per_core", info.threads_per_core,
                          "cores_per_socket", info.cores_per_socket,
                          "sockets_per_node", info.sockets_per_node,
                          "nr_nodes",         info.nr_nodes,
-                         "total_memory",     pages_to_mb(info.total_pages),
-                         "free_memory",      pages_to_mb(info.free_pages),
+                         "total_memory",     pages_to_kib(info.total_pages),
+                         "free_memory",      pages_to_kib(info.free_pages),
+                         "scrub_memory",     pages_to_kib(info.scrub_pages),
                          "cpu_khz",          info.cpu_khz,
                          "hw_caps",          cpu_cap);
 }
