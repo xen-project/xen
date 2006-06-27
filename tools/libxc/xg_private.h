@@ -196,8 +196,5 @@ int probe_elf(const char *image, unsigned long image_size,
               struct load_funcs *funcs);
 int probe_bin(const char *image, unsigned long image_size,
               struct load_funcs *funcs);
-int probe_aout9(const char *image, unsigned long image_size,
-                struct load_funcs *funcs);
 
-#endif
-
+#endif /* XG_PRIVATE_H */

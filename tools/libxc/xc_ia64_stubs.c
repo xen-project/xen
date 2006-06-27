@@ -38,23 +38,12 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pf
     return -1;
 }
 
-int
-xc_plan9_build(int xc_handle,
-               uint32_t domid,
-               const char *image_name,
-               const char *cmdline,
-               unsigned int control_evtchn, unsigned long flags)
-{
-    PERROR("xc_plan9_build not implemented\n");
-    return -1;
-}
 /*  
     VMM uses put_user to copy pfn_list to guest buffer, this maybe fail,
     VMM doesn't handle this now.
     This method will touch guest buffer to make sure the buffer's mapping
     is tracked by VMM,
  */
-
 int xc_ia64_get_pfn_list(int xc_handle,
                          uint32_t domid,
                          xen_pfn_t *pfn_buf,
