@@ -161,7 +161,7 @@ static struct packet *packet_alloc(tpmif_t * tpmif,
 	if (NULL != pak) {
 		if (tpmif) {
 			pak->tpmif = tpmif;
-			pak->tpm_instance = tpmif->tpm_instance;
+			pak->tpm_instance = tpmback_get_instance(tpmif->bi);
 			tpmif_get(tpmif);
 		}
 		pak->data_len = size;

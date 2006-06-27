@@ -20,7 +20,7 @@ int num_frontends = 0;
 
 LIST_HEAD(tpmif_list);
 
-static tpmif_t *alloc_tpmif(domid_t domid, long int instance)
+static tpmif_t *alloc_tpmif(domid_t domid, struct backend_info *bi)
 {
 	tpmif_t *tpmif;
 
@@ -31,7 +31,7 @@ static tpmif_t *alloc_tpmif(domid_t domid, long int instance)
 	memset(tpmif, 0, sizeof (*tpmif));
 	tpmif->domid = domid;
 	tpmif->status = DISCONNECTED;
-	tpmif->tpm_instance = instance;
+	tpmif->bi = bi;
 	snprintf(tpmif->devname, sizeof(tpmif->devname), "tpmif%d", domid);
 	atomic_set(&tpmif->refcnt, 1);
 
@@ -54,12 +54,12 @@ static void free_tpmif(tpmif_t * tpmif)
 	kmem_cache_free(tpmif_cachep, tpmif);
 }
 
-tpmif_t *tpmif_find(domid_t domid, long int instance)
+tpmif_t *tpmif_find(domid_t domid, struct backend_info *bi)
 {
 	tpmif_t *tpmif;
 
 	list_for_each_entry(tpmif, &tpmif_list, tpmif_list) {
-		if (tpmif->tpm_instance == instance) {
+		if (tpmif->bi == bi) {
 			if (tpmif->domid == domid) {
 				tpmif_get(tpmif);
 				return tpmif;
@@ -69,7 +69,7 @@ tpmif_t *tpmif_find(domid_t domid, long int instance)
 		}
 	}
 
-	return alloc_tpmif(domid, instance);
+	return alloc_tpmif(domid, bi);
 }
 
 static int map_frontend_page(tpmif_t *tpmif, unsigned long shared_page)
