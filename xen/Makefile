@@ -132,11 +132,11 @@ endef
 
 .PHONY: _TAGS
 _TAGS: 
-	$(all_sources) | etags -
+	rm -f TAGS && $(all_sources) | xargs etags -a
 
 .PHONY: _tags
 _tags: 
-	$(all_sources) | xargs ctags
+	rm -f TAGS && $(all_sources) | xargs ctags -a
 
 .PHONY: _cscope
 _cscope:
