@@ -264,7 +264,7 @@ static void contiguous_bitmap_clear(
 }
 
 /* Protected by balloon_lock. */
-#define MAX_CONTIG_ORDER 7
+#define MAX_CONTIG_ORDER 9 /* 2MB */
 static unsigned long discontig_frames[1<<MAX_CONTIG_ORDER];
 
 /* Ensure multi-page extents are contiguous in machine memory. */
