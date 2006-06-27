@@ -33,7 +33,7 @@ $(OBJS): $(SRCS)
 
 -include $(DEP_FILES)
 
-BUILD_EMULATOR = n
+BUILD_EMULATOR = y
 
 # Make sure these are just rules
 .PHONY : all build install clean
