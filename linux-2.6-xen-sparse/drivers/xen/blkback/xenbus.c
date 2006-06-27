@@ -105,9 +105,10 @@ static int blkback_remove(struct xenbus_device *dev)
 		kfree(be->backend_watch.node);
 		be->backend_watch.node = NULL;
 	}
+
 	if (be->blkif) {
-		if (be->blkif->xenblkd)
-			kthread_stop(be->blkif->xenblkd);
+		blkif_disconnect(be->blkif);
+		vbd_free(&be->blkif->vbd);
 		blkif_free(be->blkif);
 		be->blkif = NULL;
 	}
@@ -273,6 +274,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
+		blkif_disconnect(be->blkif);
 		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 
