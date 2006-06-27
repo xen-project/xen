@@ -225,6 +225,18 @@ static ssize_t virtual_start_show(struct hyp_sysfs_attr *attr, char *buffer)
 
 HYPERVISOR_ATTR_RO(virtual_start);
 
+static ssize_t pagesize_show(struct hyp_sysfs_attr *attr, char *buffer)
+{
+	int ret;
+
+	ret = HYPERVISOR_xen_version(XENVER_pagesize, NULL);
+	if (ret > 0)
+		ret = sprintf(buffer, "%lx\n", ret);
+	return ret;
+}
+
+HYPERVISOR_ATTR_RO(pagesize);
+
 /* eventually there will be several more features to export */
 static ssize_t xen_feature_show(int index, char *buffer)
 {
@@ -254,6 +266,7 @@ static struct attribute *xen_properties_attrs[] = {
 	&capabilities_attr.attr,
 	&changeset_attr.attr,
 	&virtual_start_attr.attr,
+	&pagesize_attr.attr,
 	&writable_pt_attr.attr,
 	NULL
 };

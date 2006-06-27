@@ -86,6 +86,7 @@ class XendNode:
                       'xen_minor',
                       'xen_extra',
                       'xen_caps',
+                      'xen_pagesize',
                       'platform_params',
                       'xen_changeset',
                       'cc_compiler',

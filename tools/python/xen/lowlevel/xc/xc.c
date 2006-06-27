@@ -637,6 +637,7 @@ static PyObject *pyxc_xeninfo(XcObject *self)
     xen_capabilities_info_t xen_caps;
     xen_platform_parameters_t p_parms;
     long xen_version;
+    long xen_pagesize;
     char str[128];
 
     xen_version = xc_version(self->xc_handle, XENVER_version, NULL);
@@ -658,11 +659,16 @@ static PyObject *pyxc_xeninfo(XcObject *self)
 
     sprintf(str, "virt_start=0x%lx", p_parms.virt_start);
 
-    return Py_BuildValue("{s:i,s:i,s:s,s:s,s:s,s:s,s:s,s:s,s:s,s:s}",
+    xen_pagesize = xc_version(self->xc_handle, XENVER_pagesize, NULL);
+    if (xen_pagesize < 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    return Py_BuildValue("{s:i,s:i,s:s,s:s,s:i,s:s,s:s,s:s,s:s,s:s,s:s}",
                          "xen_major", xen_version >> 16,
                          "xen_minor", (xen_version & 0xffff),
                          "xen_extra", xen_extra,
                          "xen_caps",  xen_caps,
+                         "xen_pagesize", xen_pagesize,
                          "platform_params", str,
                          "xen_changeset", xen_chgset,
                          "cc_compiler", xen_cc.compiler,

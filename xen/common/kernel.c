@@ -212,6 +212,11 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE(void) arg)
         return 0;
     }
 
+    case XENVER_pagesize:
+    {
+        return (guest_handle_is_null(arg) ? -EINVAL : PAGE_SIZE);
+    }
+
     }
 
     return -ENOSYS;
