@@ -337,6 +337,7 @@ static void vmx_restore_msrs(struct vcpu *v)
         clear_bit(i, &guest_flags);
     }
 }
+
 #else  /* __i386__ */
 
 #define vmx_save_segments(v)      ((void)0)
@@ -355,6 +356,43 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 }
 
 #endif /* __i386__ */
+
+#define loaddebug(_v,_reg) \
+    __asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
+
+static inline void __restore_debug_registers(struct vcpu *v)
+{
+    loaddebug(&v->arch.guest_context, 0);
+    loaddebug(&v->arch.guest_context, 1);
+    loaddebug(&v->arch.guest_context, 2);
+    loaddebug(&v->arch.guest_context, 3);
+    /* No 4 and 5 */
+    loaddebug(&v->arch.guest_context, 6);
+    /* DR7 is loaded from the vmcs. */
+}
+
+/*
+ * DR7 is saved and restored on every vmexit.  Other debug registers only
+ * need to be restored if their value is going to affect execution -- i.e.,
+ * if one of the breakpoints is enabled.  So mask out all bits that don't
+ * enable some breakpoint functionality.
+ *
+ * This is in part necessary because bit 10 of DR7 is hardwired to 1, so a
+ * simple if( guest_dr7 ) will always return true.  As long as we're masking,
+ * we might as well do it right.
+ */
+#define DR7_ACTIVE_MASK 0xff
+
+static inline void vmx_restore_dr(struct vcpu *v)
+{
+    unsigned long guest_dr7;
+
+    __vmread(GUEST_DR7, &guest_dr7);
+
+    /* Assumes guest does not have DR access at time of context switch. */
+    if ( unlikely(guest_dr7 & DR7_ACTIVE_MASK) )
+        __restore_debug_registers(v);
+}
 
 static void vmx_freeze_time(struct vcpu *v)
 {
@@ -376,6 +414,7 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
 static void vmx_ctxt_switch_to(struct vcpu *v)
 {
     vmx_restore_msrs(v);
+    vmx_restore_dr(v);
 }
 
 void stop_vmx(void)
