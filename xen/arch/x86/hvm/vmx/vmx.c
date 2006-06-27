@@ -926,55 +926,20 @@ static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
     CASE_GET_REG_P(R15, r15)
 #endif
 
-static void vmx_dr_access (unsigned long exit_qualification, struct cpu_user_regs *regs)
+static void vmx_dr_access(unsigned long exit_qualification,
+                          struct cpu_user_regs *regs)
 {
-    unsigned int reg;
-    unsigned long *reg_p = 0;
     struct vcpu *v = current;
-    unsigned long eip;
 
-    __vmread(GUEST_RIP, &eip);
+    v->arch.hvm_vcpu.flag_dr_dirty = 1;
 
-    reg = exit_qualification & DEBUG_REG_ACCESS_NUM;
+    /* We could probably be smarter about this */
+    __restore_debug_registers(v);
 
-    HVM_DBG_LOG(DBG_LEVEL_1,
-                "vmx_dr_access : eip=%lx, reg=%d, exit_qualification = %lx",
-                eip, reg, exit_qualification);
-
-    switch ( exit_qualification & DEBUG_REG_ACCESS_REG ) {
-    CASE_GET_REG_P(EAX, eax);
-    CASE_GET_REG_P(ECX, ecx);
-    CASE_GET_REG_P(EDX, edx);
-    CASE_GET_REG_P(EBX, ebx);
-    CASE_GET_REG_P(EBP, ebp);
-    CASE_GET_REG_P(ESI, esi);
-    CASE_GET_REG_P(EDI, edi);
-    CASE_EXTEND_GET_REG_P;
-    case REG_ESP:
-        break;
-    default:
-        __hvm_bug(regs);
-    }
-
-    switch (exit_qualification & DEBUG_REG_ACCESS_TYPE) {
-    case TYPE_MOV_TO_DR:
-        /* don't need to check the range */
-        if (reg != REG_ESP)
-            v->arch.guest_context.debugreg[reg] = *reg_p;
-        else {
-            unsigned long value;
-            __vmread(GUEST_RSP, &value);
-            v->arch.guest_context.debugreg[reg] = value;
-        }
-        break;
-    case TYPE_MOV_FROM_DR:
-        if (reg != REG_ESP)
-            *reg_p = v->arch.guest_context.debugreg[reg];
-        else {
-            __vmwrite(GUEST_RSP, v->arch.guest_context.debugreg[reg]);
-        }
-        break;
-    }
+    /* Allow guest direct access to DR registers */
+    v->arch.hvm_vcpu.u.vmx.exec_control &= ~CPU_BASED_MOV_DR_EXITING;
+    __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
+              v->arch.hvm_vcpu.u.vmx.exec_control);
 }
 
 /*
