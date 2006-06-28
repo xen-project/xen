@@ -125,6 +125,10 @@ static struct ethtool_ops network_ethtool_ops =
 {
 	.get_tx_csum = ethtool_op_get_tx_csum,
 	.set_tx_csum = ethtool_op_set_tx_csum,
+	.get_sg = ethtool_op_get_sg,
+	.set_sg = ethtool_op_set_sg,
+	.get_tso = ethtool_op_get_tso,
+	.set_tso = ethtool_op_set_tso,
 };
 
 /*
@@ -152,6 +156,7 @@ static void loopback_construct(struct net_device *dev, struct net_device *lo)
 
 	dev->features        = (NETIF_F_HIGHDMA |
 				NETIF_F_LLTX |
+				NETIF_F_TSO |
 				NETIF_F_SG |
 				NETIF_F_IP_CSUM);
 
