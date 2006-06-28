@@ -123,7 +123,10 @@ clean::
 
 # clean, but blow away kernel build tree plus tarballs
 .PHONY: distclean
-distclean: clean
+distclean:
+	$(MAKE) -C xen distclean
+	$(MAKE) -C tools distclean
+	$(MAKE) -C docs distclean
 	rm -rf dist patches/tmp
 	for i in $(ALLKERNELS) ; do $(MAKE) $$i-delete ; done
 	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-mrproper ; done

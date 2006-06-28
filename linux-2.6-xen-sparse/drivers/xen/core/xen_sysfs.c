@@ -58,15 +58,17 @@ HYPERVISOR_ATTR_RO(minor);
 
 static ssize_t extra_show(struct hyp_sysfs_attr *attr, char *buffer)
 {
-	int ret;
-	char *extra = kmalloc(XEN_EXTRAVERSION_LEN, GFP_KERNEL);
+	int ret = -ENOMEM;
+	char *extra;
+
+	extra = kmalloc(XEN_EXTRAVERSION_LEN, GFP_KERNEL);
 	if (extra) {
 		ret = HYPERVISOR_xen_version(XENVER_extraversion, extra);
 		if (!ret)
-			return sprintf(buffer, "%s\n", extra);
+			ret = sprintf(buffer, "%s\n", extra);
 		kfree(extra);
-	} else
-		ret = -ENOMEM;
+	}
+
 	return ret;
 }
 
@@ -86,7 +88,8 @@ static struct attribute_group version_group = {
 
 static int __init xen_sysfs_version_init(void)
 {
-	return sysfs_create_group(&hypervisor_subsys.kset.kobj, &version_group);
+	return sysfs_create_group(&hypervisor_subsys.kset.kobj,
+				  &version_group);
 }
 
 static void xen_sysfs_version_destroy(void)
@@ -98,16 +101,16 @@ static void xen_sysfs_version_destroy(void)
 
 static ssize_t compiler_show(struct hyp_sysfs_attr *attr, char *buffer)
 {
-	int ret;
-	struct xen_compile_info *info =
-	    kmalloc(sizeof(struct xen_compile_info), GFP_KERNEL);
+	int ret = -ENOMEM;
+	struct xen_compile_info *info;
+
+	info = kmalloc(sizeof(struct xen_compile_info), GFP_KERNEL);
 	if (info) {
 		ret = HYPERVISOR_xen_version(XENVER_compile_info, info);
 		if (!ret)
 			ret = sprintf(buffer, "%s\n", info->compiler);
 		kfree(info);
-	} else
-		ret = -ENOMEM;
+	}
 
 	return ret;
 }
@@ -116,7 +119,7 @@ HYPERVISOR_ATTR_RO(compiler);
 
 static ssize_t compiled_by_show(struct hyp_sysfs_attr *attr, char *buffer)
 {
-	int ret;
+	int ret = -ENOMEM;
 	struct xen_compile_info *info;
 
 	info = kmalloc(sizeof(struct xen_compile_info), GFP_KERNEL);
@@ -125,8 +128,8 @@ static ssize_t compiled_by_show(struct hyp_sysfs_attr *attr, char *buffer)
 		if (!ret)
 			ret = sprintf(buffer, "%s\n", info->compile_by);
 		kfree(info);
-	} else
-		ret = -ENOMEM;
+	}
+
 	return ret;
 }
 
@@ -134,7 +137,7 @@ HYPERVISOR_ATTR_RO(compiled_by);
 
 static ssize_t compile_date_show(struct hyp_sysfs_attr *attr, char *buffer)
 {
-	int ret;
+	int ret = -ENOMEM;
 	struct xen_compile_info *info;
 
 	info = kmalloc(sizeof(struct xen_compile_info), GFP_KERNEL);
@@ -143,8 +146,8 @@ static ssize_t compile_date_show(struct hyp_sysfs_attr *attr, char *buffer)
 		if (!ret)
 			ret = sprintf(buffer, "%s\n", info->compile_date);
 		kfree(info);
-	} else
-		ret = -ENOMEM;
+	}
+
 	return ret;
 }
 
@@ -178,15 +181,17 @@ static void xen_compilation_destroy(void)
 
 static ssize_t capabilities_show(struct hyp_sysfs_attr *attr, char *buffer)
 {
-	int ret;
-	char *caps = kmalloc(XEN_CAPABILITIES_INFO_LEN, GFP_KERNEL);
+	int ret = -ENOMEM;
+	char *caps;
+
+	caps = kmalloc(XEN_CAPABILITIES_INFO_LEN, GFP_KERNEL);
 	if (caps) {
 		ret = HYPERVISOR_xen_version(XENVER_capabilities, caps);
 		if (!ret)
 			ret = sprintf(buffer, "%s\n", caps);
 		kfree(caps);
-	} else
-		ret = -ENOMEM;
+	}
+
 	return ret;
 }
 
@@ -194,15 +199,17 @@ HYPERVISOR_ATTR_RO(capabilities);
 
 static ssize_t changeset_show(struct hyp_sysfs_attr *attr, char *buffer)
 {
-	int ret;
-	char *cset = kmalloc(XEN_CHANGESET_INFO_LEN, GFP_KERNEL);
+	int ret = -ENOMEM;
+	char *cset;
+
+	cset = kmalloc(XEN_CHANGESET_INFO_LEN, GFP_KERNEL);
 	if (cset) {
 		ret = HYPERVISOR_xen_version(XENVER_changeset, cset);
 		if (!ret)
 			ret = sprintf(buffer, "%s\n", cset);
 		kfree(cset);
-	} else
-		ret = -ENOMEM;
+	}
+
 	return ret;
 }
 
@@ -210,36 +217,51 @@ HYPERVISOR_ATTR_RO(changeset);
 
 static ssize_t virtual_start_show(struct hyp_sysfs_attr *attr, char *buffer)
 {
-	int ret;
-	struct xen_platform_parameters *parms =
-	    kmalloc(sizeof(struct xen_platform_parameters), GFP_KERNEL);
+	int ret = -ENOMEM;
+	struct xen_platform_parameters *parms;
+
+	parms = kmalloc(sizeof(struct xen_platform_parameters), GFP_KERNEL);
 	if (parms) {
-		ret = HYPERVISOR_xen_version(XENVER_platform_parameters, parms);
+		ret = HYPERVISOR_xen_version(XENVER_platform_parameters,
+					     parms);
 		if (!ret)
 			ret = sprintf(buffer, "%lx\n", parms->virt_start);
 		kfree(parms);
-	} else
-		ret = -ENOMEM;
+	}
+
 	return ret;
 }
 
 HYPERVISOR_ATTR_RO(virtual_start);
 
-/* eventually there will be several more features to export */
-static ssize_t xen_feature_show(int index, char *buffer)
+static ssize_t pagesize_show(struct hyp_sysfs_attr *attr, char *buffer)
 {
 	int ret;
 
-	struct xen_feature_info *info =
-	    kmalloc(sizeof(struct xen_feature_info), GFP_KERNEL);
+	ret = HYPERVISOR_xen_version(XENVER_pagesize, NULL);
+	if (ret > 0)
+		ret = sprintf(buffer, "%x\n", ret);
+
+	return ret;
+}
+
+HYPERVISOR_ATTR_RO(pagesize);
+
+/* eventually there will be several more features to export */
+static ssize_t xen_feature_show(int index, char *buffer)
+{
+	int ret = -ENOMEM;
+	struct xen_feature_info *info;
+
+	info = kmalloc(sizeof(struct xen_feature_info), GFP_KERNEL);
 	if (info) {
 		info->submap_idx = index;
 		ret = HYPERVISOR_xen_version(XENVER_get_features, info);
 		if (!ret)
 			ret = sprintf(buffer, "%d\n", info->submap);
 		kfree(info);
-	} else
-		ret = -ENOMEM;
+	}
+
 	return ret;
 }
 
@@ -254,6 +276,7 @@ static struct attribute *xen_properties_attrs[] = {
 	&capabilities_attr.attr,
 	&changeset_attr.attr,
 	&virtual_start_attr.attr,
+	&pagesize_attr.attr,
 	&writable_pt_attr.attr,
 	NULL
 };
@@ -271,7 +294,8 @@ static int __init xen_properties_init(void)
 
 static void xen_properties_destroy(void)
 {
-	sysfs_remove_group(&hypervisor_subsys.kset.kobj, &xen_properties_group);
+	sysfs_remove_group(&hypervisor_subsys.kset.kobj,
+			   &xen_properties_group);
 }
 
 static int __init hyper_sysfs_init(void)

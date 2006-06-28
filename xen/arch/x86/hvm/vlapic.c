@@ -50,7 +50,7 @@ int vlapic_find_highest_irr(struct vlapic *vlapic)
 {
     int result;
 
-    result = find_highest_bit((uint32_t *)&vlapic->irr[0], INTR_LEN_32);
+    result = find_highest_bit(vlapic->irr, MAX_VECTOR);
 
     if ( result != -1 && result < 16 )
     {
@@ -79,14 +79,14 @@ int vlapic_find_highest_isr(struct vlapic *vlapic)
 {
     int result;
 
-    result = find_highest_bit((uint32_t *)&vlapic->isr[0], INTR_LEN_32);
+    result = find_highest_bit(vlapic->isr, MAX_VECTOR);
 
     if ( result != -1 && result < 16 )
     {
         int i = 0;
         printk("VLAPIC: isr on reserved bits %d, isr is\n ", result);
-        for ( i = 0; i < INTR_LEN_32; i += 2 )
-            printk("%d: 0x%08x%08x\n", i, vlapic->isr[i], vlapic->isr[i+1]);
+        for ( i = 0; i < ARRAY_SIZE(vlapic->isr); i++ )
+            printk("%d: %p\n", i, (void *)vlapic->isr[i]);
         return -1;
     }
 
@@ -212,18 +212,19 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
 
         if ( test_and_set_bit(vector, &vlapic->irr[0]) )
         {
-            printk("<vlapic_accept_irq>"
-                   "level trig mode repeatedly for vector %d\n", vector);
+            HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
+              "level trig mode repeatedly for vector %d\n", vector);
             break;
         }
 
         if ( level )
         {
-            printk("<vlapic_accept_irq> level trig mode for vector %d\n",
-                   vector);
+            HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
+              "level trig mode for vector %d\n", vector);
             set_bit(vector, &vlapic->tmr[0]);
         }
         evtchn_set_pending(v, iopacket_port(v));
+
         result = 1;
         break;
 
@@ -308,8 +309,15 @@ struct vlapic* apic_round_robin(struct domain *d,
 
     old = next = d->arch.hvm_domain.round_info[vector];
 
-    do {
-        /* the vcpu array is arranged according to vcpu_id */
+    /* the vcpu array is arranged according to vcpu_id */
+    do
+    {
+        next++;
+        if ( !d->vcpu[next] ||
+             !test_bit(_VCPUF_initialised, &d->vcpu[next]->vcpu_flags) ||
+             next == MAX_VIRT_CPUS )
+            next = 0;
+
         if ( test_bit(next, &bitmap) )
         {
             target = d->vcpu[next]->arch.hvm_vcpu.vlapic;
@@ -321,12 +329,6 @@ struct vlapic* apic_round_robin(struct domain *d,
             }
             break;
         }
-
-        next ++;
-        if ( !d->vcpu[next] ||
-             !test_bit(_VCPUF_initialised, &d->vcpu[next]->vcpu_flags) ||
-             next == MAX_VIRT_CPUS )
-            next = 0;
     } while ( next != old );
 
     d->arch.hvm_domain.round_info[vector] = next;
@@ -896,7 +898,7 @@ vlapic_check_direct_intr(struct vcpu *v, int * mode)
     struct vlapic *vlapic = VLAPIC(v);
     int type;
 
-    type = __fls(vlapic->direct_intr.deliver_mode);
+    type = fls(vlapic->direct_intr.deliver_mode) - 1;
     if ( type == -1 )
         return -1;
 
@@ -956,7 +958,7 @@ int cpu_has_apic_interrupt(struct vcpu* v)
     }
     return 0;
 }
- 
+
 void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode)
 {
     struct vlapic *vlapic = VLAPIC(v);

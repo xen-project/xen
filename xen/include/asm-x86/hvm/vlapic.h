@@ -23,52 +23,12 @@
 #include <asm/msr.h>
 #include <public/hvm/ioreq.h>
 
-#if defined(__i386__) || defined(__x86_64__)
-static inline int __fls(uint32_t word)
+static __inline__ int find_highest_bit(unsigned long *data, int nr_bits)
 {
-    int bit;
-
-    __asm__("bsrl %1,%0"
-      :"=r" (bit)
-      :"rm" (word));
-    return word ? bit : -1;
-}
-#else
-#define __fls(x)    generic_fls(x)
-static __inline__ int generic_fls(uint32_t x)
-{
-    int r = 31;
-
-    if (!x)
-        return -1;
-    if (!(x & 0xffff0000u)) {
-        x <<= 16;
-        r -= 16;
-    }
-    if (!(x & 0xff000000u)) {
-        x <<= 8;
-        r -= 8;
-    }
-    if (!(x & 0xf0000000u)) {
-        x <<= 4;
-        r -= 4;
-    }
-    if (!(x & 0xc0000000u)) {
-        x <<= 2;
-        r -= 2;
-    }
-    if (!(x & 0x80000000u)) {
-        x <<= 1;
-        r -= 1;
-    }
-    return r;
-}
-#endif
-
-static __inline__ int find_highest_bit(uint32_t *data, int length)
-{
-    while(length && !data[--length]);
-    return __fls(data[length]) +  32 * length;
+    int length = BITS_TO_LONGS(nr_bits);
+    while ( length && !data[--length] )
+        continue;
+    return (fls(data[length]) - 1) + (length * BITS_PER_LONG);
 }
 
 #define VLAPIC(v)                       (v->arch.hvm_vcpu.vlapic)
@@ -146,17 +106,17 @@ typedef struct direct_intr_info {
     int source[6];
 } direct_intr_info_t;
 
-struct vlapic
-{
-    //FIXME check what would be 64 bit on EM64T
+#define MAX_VECTOR      256
+
+struct vlapic {
     uint32_t           version;
     uint32_t           status;
     uint32_t           id;
     uint32_t           vcpu_id;
     unsigned long      base_address;
-    uint32_t           isr[8];
-    uint32_t           irr[INTR_LEN_32];
-    uint32_t           tmr[INTR_LEN_32];
+    unsigned long      isr[BITS_TO_LONGS(MAX_VECTOR)];
+    unsigned long      irr[BITS_TO_LONGS(MAX_VECTOR)];
+    unsigned long      tmr[BITS_TO_LONGS(MAX_VECTOR)];
     uint32_t           task_priority;
     uint32_t           processor_priority;
     uint32_t           logical_dest;

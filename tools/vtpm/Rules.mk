@@ -33,8 +33,7 @@ $(OBJS): $(SRCS)
 
 -include $(DEP_FILES)
 
-# Emulator does not work on 64-bit systems, and may be broken on 32 right now
-BUILD_EMULATOR = n
+BUILD_EMULATOR = y
 
 # Make sure these are just rules
 .PHONY : all build install clean

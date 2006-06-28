@@ -56,6 +56,9 @@ CFLAGS += -DLOGGING_MODULES="(BITMASK(VTPM_LOG_TCS)|BITMASK(VTPM_LOG_VTSP)|BITMA
 # vtpm_manager listens on fifo's rather than backend
 #CFLAGS += -DDUMMY_BACKEND
 
+# TCS talks to fifo's rather than /dev/tpm. TPM Emulator assumed on fifos
+#CFLAGS += -DDUMMY_TPM
+
 # Do not have manager launch DMs.
 #CFLAGS += -DMANUAL_DM_LAUNCH
 

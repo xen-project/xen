@@ -302,8 +302,9 @@ int on_selected_cpus(
 
 static void stop_this_cpu (void *dummy)
 {
-    clear_bit(smp_processor_id(), &cpu_online_map);
+    cpu_clear(smp_processor_id(), cpu_online_map);
 
+    local_irq_disable();
     disable_local_APIC();
 
     for ( ; ; )

@@ -95,6 +95,7 @@ typedef struct blkif_st {
 } blkif_t;
 
 blkif_t *blkif_alloc(domid_t domid);
+void blkif_disconnect(blkif_t *blkif);
 void blkif_free(blkif_t *blkif);
 int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn);
 

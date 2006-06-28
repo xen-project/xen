@@ -31,7 +31,6 @@ GUEST_SRCS-y += xc_load_bin.c
 GUEST_SRCS-y += xc_load_elf.c
 GUEST_SRCS-y += xg_private.c
 GUEST_SRCS-$(CONFIG_IA64) += xc_ia64_stubs.c
-GUEST_SRCS-$(CONFIG_PLAN9) += xc_load_aout9.c
 GUEST_SRCS-$(CONFIG_MIGRATE) += xc_linux_restore.c xc_linux_save.c
 GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c
 

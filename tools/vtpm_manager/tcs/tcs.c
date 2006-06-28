@@ -1126,6 +1126,49 @@ TPM_RESULT TCSP_ReadPubek(TCS_CONTEXT_HANDLE   hContext,               // in
   return(returnCode);
 }
 
+
+TPM_RESULT TCSP_SaveState(TCS_CONTEXT_HANDLE   hContext)  // in
+{
+  // setup input/output parameters block
+  TPM_TAG tag = TPM_TAG_RQU_COMMAND;
+  UINT32 paramSize = 0;
+  TPM_COMMAND_CODE ordinal = TPM_ORD_SaveState;
+  TPM_RESULT returnCode = TPM_SUCCESS;
+
+  // setup the TPM driver input and output buffers
+  TDDL_RESULT hRes = TDDL_E_FAIL;
+  TDDL_UINT32  InLength = TCPA_MAX_BUFFER_LENGTH;
+  TDDL_UINT32  OutLength = TCPA_MAX_BUFFER_LENGTH;
+
+  // Convert Byte Input parameter in the input byte stream InBuf
+  InLength = BSG_PackList(InBuf, 3,
+                          BSG_TPM_TAG, &tag,
+                          BSG_TYPE_UINT32, &paramSize,
+                          BSG_TPM_COMMAND_CODE, &ordinal);
+  // fill paramSize again as we now have the correct size
+  BSG_Pack(BSG_TYPE_UINT32, &InLength, InBuf+2);
+
+  vtpmloginfo(VTPM_LOG_TCS_DEEP, "Sending paramSize = %d\n", InLength);
+
+  // call the TPM driver
+  if ((hRes = TDDL_TransmitData(InBuf, InLength, OutBuf, &OutLength)) == TDDL_SUCCESS) {
+    // unpack OutBuf to get the tag, paramSize, & returnCode
+    BSG_UnpackList(OutBuf, 3,
+                           BSG_TPM_TAG, &tag,
+                           BSG_TYPE_UINT32, &paramSize,
+                           BSG_TPM_COMMAND_CODE, &returnCode);
+
+    if (returnCode == TPM_SUCCESS && tag == TPM_TAG_RSP_COMMAND) {
+      vtpmloginfo(VTPM_LOG_TCS_DEEP, "Received paramSize : %d\n", paramSize);
+    } else {
+      vtpmlogerror(VTPM_LOG_TCS, "TCSP_SaveState Failed with return code %s\n", tpm_get_error_name(returnCode));
+    }
+  }
+
+  return(returnCode);
+}
+
+
 TPM_RESULT TCSP_RawTransmitData(   UINT32 inDataSize,  // in
 				   BYTE *inData,       // in
 				   UINT32 *outDataSize,// in/out

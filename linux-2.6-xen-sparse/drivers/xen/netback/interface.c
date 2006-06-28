@@ -37,9 +37,9 @@
 static void __netif_up(netif_t *netif)
 {
 	struct net_device *dev = netif->dev;
-	spin_lock_bh(&dev->xmit_lock);
+	netif_tx_lock_bh(dev);
 	netif->active = 1;
-	spin_unlock_bh(&dev->xmit_lock);
+	netif_tx_unlock_bh(dev);
 	enable_irq(netif->irq);
 	netif_schedule_work(netif);
 }
@@ -48,9 +48,9 @@ static void __netif_down(netif_t *netif)
 {
 	struct net_device *dev = netif->dev;
 	disable_irq(netif->irq);
-	spin_lock_bh(&dev->xmit_lock);
+	netif_tx_lock_bh(dev);
 	netif->active = 0;
-	spin_unlock_bh(&dev->xmit_lock);
+	netif_tx_unlock_bh(dev);
 	netif_deschedule_work(netif);
 }
 

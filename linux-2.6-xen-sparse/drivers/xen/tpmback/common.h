@@ -21,6 +21,8 @@
 	pr_debug("(file=%s, line=%d) " _f,	\
 		 __FILE__ , __LINE__ , ## _a )
 
+struct backend_info;
+
 typedef struct tpmif_st {
 	struct list_head tpmif_list;
 	/* Unique identifier for this interface. */
@@ -43,7 +45,7 @@ typedef struct tpmif_st {
 	struct list_head list;	/* scheduling list */
 	atomic_t refcnt;
 
-	long int tpm_instance;
+	struct backend_info *bi;
 	unsigned long mmap_vstart;
 
 	grant_handle_t shmem_handle;
@@ -54,7 +56,7 @@ typedef struct tpmif_st {
 } tpmif_t;
 
 void tpmif_disconnect_complete(tpmif_t * tpmif);
-tpmif_t *tpmif_find(domid_t domid, long int instance);
+tpmif_t *tpmif_find(domid_t domid, struct backend_info *bi);
 void tpmif_interface_init(void);
 void tpmif_interface_exit(void);
 void tpmif_schedule_work(tpmif_t * tpmif);
@@ -63,10 +65,11 @@ void tpmif_xenbus_init(void);
 void tpmif_xenbus_exit(void);
 int tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn);
 irqreturn_t tpmif_be_int(int irq, void *dev_id, struct pt_regs *regs);
-int tpmif_vtpm_open(tpmif_t *tpmif, domid_t domain, u32 instance);
-int tpmif_vtpm_close(u32 instance);
+
+long int tpmback_get_instance(struct backend_info *bi);
 
 int vtpm_release_packets(tpmif_t * tpmif, int send_msgs);
+
 
 #define tpmif_get(_b) (atomic_inc(&(_b)->refcnt))
 #define tpmif_put(_b)					\

@@ -45,6 +45,14 @@ static void backend_changed(struct xenbus_watch *watch,
 static void frontend_changed(struct xenbus_device *dev,
 			     enum xenbus_state frontend_state);
 
+long int tpmback_get_instance(struct backend_info *bi)
+{
+	long int res = -1;
+	if (bi && bi->is_instance_set)
+		res = bi->instance;
+	return res;
+}
+
 static int tpmback_remove(struct xenbus_device *dev)
 {
 	struct backend_info *be = dev->dev.driver_data;
@@ -57,6 +65,7 @@ static int tpmback_remove(struct xenbus_device *dev)
 		be->backend_watch.node = NULL;
 	}
 	if (be->tpmif) {
+		be->tpmif->bi = NULL;
 		vtpm_release_packets(be->tpmif, 0);
 		tpmif_put(be->tpmif);
 		be->tpmif = NULL;
@@ -150,15 +159,10 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		be->tpmif->tpm_instance = -1;
+		be->instance = -1;
 		break;
 
 	case XenbusStateClosed:
-		/*
-		 * Notify the vTPM manager about the front-end
-		 * having left.
-		 */
-		tpmif_vtpm_close(be->instance);
 		device_unregister(&be->dev->dev);
 		tpmback_remove(dev);
 		break;
@@ -177,28 +181,10 @@ static void frontend_changed(struct xenbus_device *dev,
 
 static void maybe_connect(struct backend_info *be)
 {
-	int err;
-
 	if (be->tpmif == NULL || be->tpmif->status == CONNECTED)
 		return;
 
 	connect(be);
-
-	/*
-	 * Notify the vTPM manager about a new front-end.
-	 */
-	err = tpmif_vtpm_open(be->tpmif,
-			      be->frontend_id,
-			      be->instance);
-	if (err) {
-		xenbus_dev_error(be->dev, err,
-				 "queueing vtpm open packet");
-		/*
-		 * Should close down this device and notify FE
-		 * about closure.
-		 */
-		return;
-	}
 }
 
 
@@ -256,8 +242,7 @@ static int connect_ring(struct backend_info *be)
 	}
 
 	if (!be->tpmif) {
-		be->tpmif = tpmif_find(dev->otherend_id,
-				       be->instance);
+		be->tpmif = tpmif_find(dev->otherend_id, be);
 		if (IS_ERR(be->tpmif)) {
 			err = PTR_ERR(be->tpmif);
 			be->tpmif = NULL;

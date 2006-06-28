@@ -92,8 +92,9 @@ TPM_RESULT VTPM_Create_Manager(){
   status = VTSP_ReadPubek(vtpm_globals->manager_tcs_handle, &ek_cryptoInfo);
   
   // If we can read PubEK then there is no owner and we should take it.
+  // We use the abilty to read the pubEK to flag that the TPM is owned.
+  // FIXME: Change to just trying to take ownership and react to the status
   if (status == TPM_SUCCESS) { 
-    vtpmloginfo(VTPM_LOG_VTPM, "Failed to readEK meaning TPM has an owner. Creating Keys off existing SRK.\n");
     TPMTRYRETURN(VTSP_TakeOwnership(vtpm_globals->manager_tcs_handle,
 				    (const TPM_AUTHDATA*)&vtpm_globals->owner_usage_auth, 
 				    &SRK_AUTH,
@@ -103,6 +104,8 @@ TPM_RESULT VTPM_Create_Manager(){
     TPMTRYRETURN(VTSP_DisablePubekRead(vtpm_globals->manager_tcs_handle,
                                        (const TPM_AUTHDATA*)&vtpm_globals->owner_usage_auth,  
                                        &vtpm_globals->keyAuth));     
+  } else {
+    vtpmloginfo(VTPM_LOG_VTPM, "Failed to readEK meaning TPM has an owner. Creating Keys off existing SRK.\n");
   }
   
   // Generate storage key's auth
@@ -165,7 +168,7 @@ TPM_RESULT VTPM_Create_Manager(){
                               &vtpm_globals->bootKey,
                               TRUE ) );
 
-  printf("***************************** FIXME: SAVE NEW STATE *******\n");
+  TPMTRYRETURN( VTSP_SaveState(vtpm_globals->manager_tcs_handle) );
   goto egress;
   
  abort_egress:
@@ -181,7 +184,7 @@ TPM_RESULT VTPM_Create_Manager(){
 TPM_RESULT VTPM_Init_Manager() {
   TPM_RESULT status = TPM_FAIL, serviceStatus;   
   BYTE *randomsead;
-  UINT32 randomsize;
+  UINT32 randomsize=256;
 
   if ((vtpm_globals = (VTPM_GLOBALS *) malloc(sizeof(VTPM_GLOBALS))) == NULL){
     status = TPM_FAIL;
@@ -216,7 +219,7 @@ TPM_RESULT VTPM_Init_Manager() {
 			   &vtpm_globals->keyAuth) );
   vtpm_globals->keyAuth.fContinueAuthSession = TRUE;
 
-	// If failed, create new Manager.
+  // If failed, create new Manager.
   serviceStatus = VTPM_LoadManagerData();
   if (serviceStatus == TPM_IOERROR) {
     vtpmloginfo(VTPM_LOG_VTPM, "Failed to read manager file. Assuming first time initialization.\n");

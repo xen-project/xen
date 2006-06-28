@@ -64,6 +64,9 @@ class XendNode:
                            info['cores_per_socket'] *
                            info['threads_per_core'])
         info['cpu_mhz'] = info['cpu_khz'] / 1000
+        # physinfo is in KiB
+        info['total_memory'] = info['total_memory'] / 1024
+        info['free_memory']  = info['free_memory'] / 1024
 
         ITEM_ORDER = ['nr_cpus',
                       'nr_nodes',
@@ -86,6 +89,7 @@ class XendNode:
                       'xen_minor',
                       'xen_extra',
                       'xen_caps',
+                      'xen_pagesize',
                       'platform_params',
                       'xen_changeset',
                       'cc_compiler',

@@ -43,7 +43,7 @@
 static void netif_idx_release(u16 pending_idx);
 static void netif_page_release(struct page *page);
 static void make_tx_response(netif_t *netif, 
-			     u16      id,
+			     netif_tx_request_t *txp,
 			     s8       st);
 static int  make_rx_response(netif_t *netif, 
 			     u16      id, 
@@ -481,7 +481,7 @@ inline static void net_tx_action_dealloc(void)
 
 		netif = pending_tx_info[pending_idx].netif;
 
-		make_tx_response(netif, pending_tx_info[pending_idx].req.id, 
+		make_tx_response(netif, &pending_tx_info[pending_idx].req, 
 				 NETIF_RSP_OKAY);
 
 		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
@@ -490,14 +490,16 @@ inline static void net_tx_action_dealloc(void)
 	}
 }
 
-static void netbk_tx_err(netif_t *netif, RING_IDX end)
+static void netbk_tx_err(netif_t *netif, netif_tx_request_t *txp, RING_IDX end)
 {
 	RING_IDX cons = netif->tx.req_cons;
 
 	do {
-		netif_tx_request_t *txp = RING_GET_REQUEST(&netif->tx, cons);
-		make_tx_response(netif, txp->id, NETIF_RSP_ERROR);
-	} while (++cons < end);
+		make_tx_response(netif, txp, NETIF_RSP_ERROR);
+		if (++cons >= end)
+			break;
+		txp = RING_GET_REQUEST(&netif->tx, cons);
+	} while (1);
 	netif->tx.req_cons = cons;
 	netif_schedule_work(netif);
 	netif_put(netif);
@@ -508,7 +510,7 @@ static int netbk_count_requests(netif_t *netif, netif_tx_request_t *txp,
 {
 	netif_tx_request_t *first = txp;
 	RING_IDX cons = netif->tx.req_cons;
-	int frags = 1;
+	int frags = 0;
 
 	while (txp->flags & NETTXF_more_data) {
 		if (frags >= work_to_do) {
@@ -543,7 +545,7 @@ static gnttab_map_grant_ref_t *netbk_get_requests(netif_t *netif,
 	skb_frag_t *frags = shinfo->frags;
 	netif_tx_request_t *txp;
 	unsigned long pending_idx = *((u16 *)skb->data);
-	RING_IDX cons = netif->tx.req_cons + 1;
+	RING_IDX cons = netif->tx.req_cons;
 	int i, start;
 
 	/* Skip first skb fragment if it is on same page as header fragment. */
@@ -581,7 +583,7 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 	err = mop->status;
 	if (unlikely(err)) {
 		txp = &pending_tx_info[pending_idx].req;
-		make_tx_response(netif, txp->id, NETIF_RSP_ERROR);
+		make_tx_response(netif, txp, NETIF_RSP_ERROR);
 		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
 		netif_put(netif);
 	} else {
@@ -614,7 +616,7 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 
 		/* Error on this fragment: respond to client with an error. */
 		txp = &pending_tx_info[pending_idx].req;
-		make_tx_response(netif, txp->id, NETIF_RSP_ERROR);
+		make_tx_response(netif, txp, NETIF_RSP_ERROR);
 		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
 		netif_put(netif);
 
@@ -668,6 +670,7 @@ static void net_tx_action(unsigned long unused)
 	struct sk_buff *skb;
 	netif_t *netif;
 	netif_tx_request_t txreq;
+	struct netif_tx_extra txtra;
 	u16 pending_idx;
 	RING_IDX i;
 	gnttab_map_grant_ref_t *mop;
@@ -726,22 +729,37 @@ static void net_tx_action(unsigned long unused)
 		}
 		netif->remaining_credit -= txreq.size;
 
+		work_to_do--;
+		netif->tx.req_cons = ++i;
+
+		if (txreq.flags & NETTXF_extra_info) {
+			if (work_to_do-- <= 0) {
+				DPRINTK("Missing extra info\n");
+				netbk_tx_err(netif, &txreq, i);
+				continue;
+			}
+
+			memcpy(&txtra, RING_GET_REQUEST(&netif->tx, i),
+			       sizeof(txtra));
+			netif->tx.req_cons = ++i;
+		}
+
 		ret = netbk_count_requests(netif, &txreq, work_to_do);
 		if (unlikely(ret < 0)) {
-			netbk_tx_err(netif, i - ret);
+			netbk_tx_err(netif, &txreq, i - ret);
 			continue;
 		}
 		i += ret;
 
 		if (unlikely(ret > MAX_SKB_FRAGS + 1)) {
 			DPRINTK("Too many frags\n");
-			netbk_tx_err(netif, i);
+			netbk_tx_err(netif, &txreq, i);
 			continue;
 		}
 
 		if (unlikely(txreq.size < ETH_HLEN)) {
 			DPRINTK("Bad packet size: %d\n", txreq.size);
-			netbk_tx_err(netif, i);
+			netbk_tx_err(netif, &txreq, i);
 			continue; 
 		}
 
@@ -750,25 +768,31 @@ static void net_tx_action(unsigned long unused)
 			DPRINTK("txreq.offset: %x, size: %u, end: %lu\n", 
 				txreq.offset, txreq.size, 
 				(txreq.offset &~PAGE_MASK) + txreq.size);
-			netbk_tx_err(netif, i);
+			netbk_tx_err(netif, &txreq, i);
 			continue;
 		}
 
 		pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
 
 		data_len = (txreq.size > PKT_PROT_LEN &&
-			    ret < MAX_SKB_FRAGS + 1) ?
+			    ret < MAX_SKB_FRAGS) ?
 			PKT_PROT_LEN : txreq.size;
 
 		skb = alloc_skb(data_len+16, GFP_ATOMIC);
 		if (unlikely(skb == NULL)) {
 			DPRINTK("Can't allocate a skb in start_xmit.\n");
-			netbk_tx_err(netif, i);
+			netbk_tx_err(netif, &txreq, i);
 			break;
 		}
 
 		/* Packets passed to netif_rx() must have some headroom. */
 		skb_reserve(skb, 16);
+
+		if (txreq.flags & NETTXF_gso) {
+			skb_shinfo(skb)->gso_size = txtra.u.gso.size;
+			skb_shinfo(skb)->gso_segs = txtra.u.gso.segs;
+			skb_shinfo(skb)->gso_type = txtra.u.gso.type;
+		}
 
 		gnttab_set_map_op(mop, MMAP_VADDR(pending_idx),
 				  GNTMAP_host_map | GNTMAP_readonly,
@@ -782,7 +806,7 @@ static void net_tx_action(unsigned long unused)
 
 		__skb_put(skb, data_len);
 
-		skb_shinfo(skb)->nr_frags = ret - 1;
+		skb_shinfo(skb)->nr_frags = ret;
 		if (data_len < txreq.size) {
 			skb_shinfo(skb)->nr_frags++;
 			skb_shinfo(skb)->frags[0].page =
@@ -898,7 +922,7 @@ irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static void make_tx_response(netif_t *netif, 
-			     u16      id,
+			     netif_tx_request_t *txp,
 			     s8       st)
 {
 	RING_IDX i = netif->tx.rsp_prod_pvt;
@@ -906,8 +930,11 @@ static void make_tx_response(netif_t *netif,
 	int notify;
 
 	resp = RING_GET_RESPONSE(&netif->tx, i);
-	resp->id     = id;
+	resp->id     = txp->id;
 	resp->status = st;
+
+	if (txp->flags & NETTXF_extra_info)
+		RING_GET_RESPONSE(&netif->tx, ++i)->status = NETIF_RSP_NULL;
 
 	netif->tx.rsp_prod_pvt = ++i;
 	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&netif->tx, notify);

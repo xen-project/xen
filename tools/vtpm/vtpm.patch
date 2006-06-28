@@ -1,13 +1,13 @@
-diff -uprN orig/tpm_emulator-0.3-x86_64/AUTHORS vtpm/AUTHORS
---- orig/tpm_emulator-0.3-x86_64/AUTHORS	2006-01-10 04:21:45.000000000 -0800
-+++ vtpm/AUTHORS	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/AUTHORS vtpm/AUTHORS
+--- tpm_emulator-0.3-x86_64/AUTHORS	2006-08-29 15:07:21.618299064 -0700
++++ vtpm/AUTHORS	2006-08-29 15:12:07.184886344 -0700
 @@ -1,2 +1,3 @@
  Mario Strasser <mast@gmx.net>
  Heiko Stamer <stamer@gaos.org> [DAA]
 +INTEL Corp <> [VTPM Extensions]
-diff -uprN orig/tpm_emulator-0.3-x86_64/ChangeLog vtpm/ChangeLog
---- orig/tpm_emulator-0.3-x86_64/ChangeLog	2006-01-10 04:21:45.000000000 -0800
-+++ vtpm/ChangeLog	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/ChangeLog vtpm/ChangeLog
+--- tpm_emulator-0.3-x86_64/ChangeLog	2006-08-29 15:07:21.618299064 -0700
++++ vtpm/ChangeLog	2006-08-29 15:12:07.185886192 -0700
 @@ -1,3 +1,7 @@
 +2005-08-16 Intel Corp
 +	* Moved module out of kernel to run as a ring 3 app
@@ -16,9 +16,117 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/ChangeLog vtpm/ChangeLog
  2005-12-24  Mario Strasser <mast@gmx.net>
  	* tpm_transport.c, tpm_marshalling.c, tpm_structures.h:
  		Transport session functionality added
-diff -uprN orig/tpm_emulator-0.3-x86_64/crypto/gmp_kernel_wrapper.c vtpm/crypto/gmp_kernel_wrapper.c
---- orig/tpm_emulator-0.3-x86_64/crypto/gmp_kernel_wrapper.c	2006-05-30 12:28:02.000000000 -0700
-+++ vtpm/crypto/gmp_kernel_wrapper.c	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/Makefile vtpm/Makefile
+--- tpm_emulator-0.3-x86_64/Makefile	2006-08-29 15:08:20.532342768 -0700
++++ vtpm/Makefile	2006-08-29 15:13:53.023796384 -0700
+@@ -1,22 +1,31 @@
+ # Software-Based Trusted Platform Module (TPM) Emulator for Linux
+ # Copyright (C) 2004 Mario Strasser <mast@gmx.net>
++# Copyright (C) 2006 INTEL Corp.
+ #
+ # $Id: Makefile 69 2005-12-13 12:55:52Z mast $
+ 
+-# kernel settings
+-KERNEL_RELEASE := $(shell uname -r)
+-KERNEL_BUILD   := /lib/modules/$(KERNEL_RELEASE)/build
+-MOD_SUBDIR     := misc
+ COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
+ 
+ # module settings
+-MODULE_NAME    := tpm_emulator
++BIN            := vtpmd
+ VERSION_MAJOR  := 0
+ VERSION_MINOR  := 3
+ VERSION_BUILD  := $(shell date +"%s")
+ 
+-# enable/disable DEBUG messages
+-EXTRA_CFLAGS   += -Wall -DDEBUG -g  
++# Installation program and options
++INSTALL         = install
++INSTALL_PROG    = $(INSTALL) -m0755
++INSTALL_DIR     = $(INSTALL) -d -m0755
++
++# Xen tools installation directory
++TOOLS_INSTALL_DIR = $(DESTDIR)/usr/bin
++
++CC      := gcc
++CFLAGS  += -g -Wall $(INCLUDE) -DDEBUG
++CFLAGS  += -I. -Itpm -I../../vtpm_manager/manager
++
++# Is the simulator running in it's own vm?
++#CFLAGS += -DVTPM_MULTI_VM
+ 
+ ifeq ($(COMPILE_ARCH),x86_64)
+ LIBDIR = lib64
+@@ -34,38 +43,31 @@ DIRS           := . crypto tpm 
+ SRCS           := $(foreach dir, $(DIRS), $(wildcard $(src)/$(dir)/*.c))
+ OBJS           := $(patsubst %.c, %.o, $(SRCS))
+ SRCS           += $(foreach dir, $(DIRS), $(wildcard $(src)/$(dir)/*.h))
+-DISTSRC        := ./README ./AUTHORS ./ChangeLog ./Makefile $(SRCS)
+-DISTDIR        := tpm_emulator-$(VERSION_MAJOR).$(VERSION_MINOR)
+ 
+-obj-m               := $(MODULE_NAME).o
+-$(MODULE_NAME)-objs := $(patsubst $(src)/%.o, %.o, $(OBJS)) crypto/libgmp.a
++obj-m               := $(BIN)
++$(BIN)-objs := $(patsubst $(src)/%.o, %.o, $(OBJS)) crypto/libgmp.a
+ 
+ EXTRA_CFLAGS   += -I$(src) -I$(src)/crypto -I$(src)/tpm 
+ 
+ # do not print "Entering directory ..."
+ MAKEFLAGS      += --no-print-directory
+ 
+-all:	$(src)/crypto/gmp.h $(src)/crypto/libgmp.a version
+-	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) modules
++all: $(BIN)
++
++$(BIN):	$(src)/crypto/gmp.h $(src)/crypto/libgmp.a version $(SRCS) $(OBJS)
++	$(CC) $(CFLAGS) $(OBJS) $(src)/crypto/libgmp.a -o $(BIN)
++
++%.o: %.c
++	$(CC) $(CFLAGS) -c $< -o $@
+ 
+-install:
+-	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) modules_install
+-	test -d /var/tpm || mkdir /var/tpm
+-	test -c /dev/tpm || mknod /dev/tpm c 10 224
+-	chmod 666 /dev/tpm
+-	depmod -a
++install: $(BIN)
++	$(INSTALL_PROG) $(BIN) $(TOOLS_INSTALL_DIR)
+ 
+ clean:
+-	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) clean
+-	rm -f $(src)/crypto/gmp.h $(src)/crypto/libgmp.a
++	rm -f $(src)/crypto/gmp.h $(src)/crypto/libgmp.a $(OBJS)
+ 
+-dist:	$(DISTSRC)
+-	rm -rf $(DISTDIR)
+-	mkdir $(DISTDIR)
+-	cp --parents $(DISTSRC) $(DISTDIR)/
+-	rm -f $(DISTDIR)/crypto/gmp.h 
+-	tar -chzf $(DISTDIR).tar.gz $(DISTDIR)
+-	rm -rf $(DISTDIR)
++mrproper: clean
++	rm -f $(BIN) tpm_version.h
+ 
+ $(src)/crypto/libgmp.a:
+ 	test -f $(src)/crypto/libgmp.a || ln -s $(GMP_LIB) $(src)/crypto/libgmp.a
+diff -uprN tpm_emulator-0.3-x86_64/README vtpm/README
+--- tpm_emulator-0.3-x86_64/README	2006-08-29 15:07:43.530967832 -0700
++++ vtpm/README	2006-08-29 15:12:07.190885432 -0700
+@@ -13,7 +13,8 @@ $Id: README 78 2006-01-07 10:45:39Z mast
+ Copyright
+ --------------------------------------------------------------------------
+ Copyright (C) 2004 Mario Strasser <mast@gmx.net> and Swiss Federal 
+-Institute of Technology (ETH) Zurich.
++                   Institute of Technology (ETH) Zurich.
++Copyright (C) 2005 INTEL Corp 
+               
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+diff -uprN tpm_emulator-0.3-x86_64/crypto/gmp_kernel_wrapper.c vtpm/crypto/gmp_kernel_wrapper.c
+--- tpm_emulator-0.3-x86_64/crypto/gmp_kernel_wrapper.c	2006-08-29 15:07:43.525968592 -0700
++++ vtpm/crypto/gmp_kernel_wrapper.c	2006-08-29 15:12:07.186886040 -0700
 @@ -1,5 +1,6 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -78,9 +186,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/crypto/gmp_kernel_wrapper.c vtpm/crypto/
    }
  }
  
-diff -uprN orig/tpm_emulator-0.3-x86_64/crypto/rsa.c vtpm/crypto/rsa.c
---- orig/tpm_emulator-0.3-x86_64/crypto/rsa.c	2006-01-10 04:21:45.000000000 -0800
-+++ vtpm/crypto/rsa.c	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/crypto/rsa.c vtpm/crypto/rsa.c
+--- tpm_emulator-0.3-x86_64/crypto/rsa.c	2006-08-29 15:07:21.618299064 -0700
++++ vtpm/crypto/rsa.c	2006-08-29 15:12:07.187885888 -0700
 @@ -1,5 +1,6 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -106,8 +214,8 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/crypto/rsa.c vtpm/crypto/rsa.c
        sha1_final(&ctx, &msg[1]);
        if (memcmp(&msg[1], &msg[1 + SHA1_DIGEST_LENGTH], 
            SHA1_DIGEST_LENGTH) != 0) return -1;
-diff -uprN orig/tpm_emulator-0.3-x86_64/linux_module.c vtpm/linux_module.c
---- orig/tpm_emulator-0.3-x86_64/linux_module.c	2006-05-30 12:28:02.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/linux_module.c vtpm/linux_module.c
+--- tpm_emulator-0.3-x86_64/linux_module.c	2006-08-29 15:07:43.526968440 -0700
 +++ vtpm/linux_module.c	1969-12-31 16:00:00.000000000 -0800
 @@ -1,194 +0,0 @@
 -/* Software-Based Trusted Platform Module (TPM) Emulator for Linux 
@@ -304,9 +412,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/linux_module.c vtpm/linux_module.c
 -  return (ticks > 0) ? ticks : 1;
 -}
 -
-diff -uprN orig/tpm_emulator-0.3-x86_64/linux_module.h vtpm/linux_module.h
---- orig/tpm_emulator-0.3-x86_64/linux_module.h	2006-05-30 12:28:02.000000000 -0700
-+++ vtpm/linux_module.h	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/linux_module.h vtpm/linux_module.h
+--- tpm_emulator-0.3-x86_64/linux_module.h	2006-08-29 15:07:43.527968288 -0700
++++ vtpm/linux_module.h	2006-08-29 15:12:07.189885584 -0700
 @@ -1,5 +1,6 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -406,116 +514,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/linux_module.h vtpm/linux_module.h
  #define BE16_TO_CPU(x) __be16_to_cpu(x)
  #define LE16_TO_CPU(x) __le16_to_cpu(x)
  
-diff -uprN orig/tpm_emulator-0.3-x86_64/Makefile vtpm/Makefile
---- orig/tpm_emulator-0.3-x86_64/Makefile	2006-05-30 12:28:02.000000000 -0700
-+++ vtpm/Makefile	2006-05-30 12:23:26.000000000 -0700
-@@ -1,22 +1,31 @@
- # Software-Based Trusted Platform Module (TPM) Emulator for Linux
- # Copyright (C) 2004 Mario Strasser <mast@gmx.net>
-+# Copyright (C) 2006 INTEL Corp.
- #
- # $Id: Makefile 69 2005-12-13 12:55:52Z mast $
- 
--# kernel settings
--KERNEL_RELEASE := $(shell uname -r)
--KERNEL_BUILD   := /lib/modules/$(KERNEL_RELEASE)/build
--MOD_SUBDIR     := misc
- COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
- 
- # module settings
--MODULE_NAME    := tpm_emulator
-+BIN            := vtpmd
- VERSION_MAJOR  := 0
- VERSION_MINOR  := 3
- VERSION_BUILD  := $(shell date +"%s")
- 
--# enable/disable DEBUG messages
--EXTRA_CFLAGS   += -Wall -DDEBUG -g  
-+# Installation program and options
-+INSTALL         = install
-+INSTALL_PROG    = $(INSTALL) -m0755
-+INSTALL_DIR     = $(INSTALL) -d -m0755
-+
-+# Xen tools installation directory
-+TOOLS_INSTALL_DIR = $(DESTDIR)/usr/bin
-+
-+CC      := gcc
-+CFLAGS  += -g -Wall $(INCLUDE) -DDEBUG
-+CFLAGS  += -I. -Itpm -I../../vtpm_manager/manager
-+
-+# Is the simulator running in it's own vm?
-+#CFLAGS += -DVTPM_MULTI_VM
- 
- ifeq ($(COMPILE_ARCH),x86_64)
- LIBDIR = lib64
-@@ -34,38 +43,31 @@ DIRS           := . crypto tpm 
- SRCS           := $(foreach dir, $(DIRS), $(wildcard $(src)/$(dir)/*.c))
- OBJS           := $(patsubst %.c, %.o, $(SRCS))
- SRCS           += $(foreach dir, $(DIRS), $(wildcard $(src)/$(dir)/*.h))
--DISTSRC        := ./README ./AUTHORS ./ChangeLog ./Makefile $(SRCS)
--DISTDIR        := tpm_emulator-$(VERSION_MAJOR).$(VERSION_MINOR)
- 
--obj-m               := $(MODULE_NAME).o
--$(MODULE_NAME)-objs := $(patsubst $(src)/%.o, %.o, $(OBJS)) crypto/libgmp.a
-+obj-m               := $(BIN)
-+$(BIN)-objs := $(patsubst $(src)/%.o, %.o, $(OBJS)) crypto/libgmp.a
- 
- EXTRA_CFLAGS   += -I$(src) -I$(src)/crypto -I$(src)/tpm 
- 
- # do not print "Entering directory ..."
- MAKEFLAGS      += --no-print-directory
- 
--all:	$(src)/crypto/gmp.h $(src)/crypto/libgmp.a version
--	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) modules
-+all: $(BIN)
-+
-+$(BIN):	$(src)/crypto/gmp.h $(src)/crypto/libgmp.a version $(SRCS) $(OBJS)
-+	$(CC) $(CFLAGS) $(OBJS) $(src)/crypto/libgmp.a -o $(BIN)
-+
-+%.o: %.c
-+	$(CC) $(CFLAGS) -c $< -o $@
- 
- install:
--	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) modules_install
--	test -d /var/tpm || mkdir /var/tpm
--	test -c /dev/tpm || mknod /dev/tpm c 10 224
--	chmod 666 /dev/tpm
--	depmod -a
-+	$(INSTALL_PROG) $(BIN) $(TOOLS_INSTALL_DIR)
- 
- clean:
--	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) clean
--	rm -f $(src)/crypto/gmp.h $(src)/crypto/libgmp.a
-+	rm -f $(src)/crypto/gmp.h $(src)/crypto/libgmp.a $(OBJS)
- 
--dist:	$(DISTSRC)
--	rm -rf $(DISTDIR)
--	mkdir $(DISTDIR)
--	cp --parents $(DISTSRC) $(DISTDIR)/
--	rm -f $(DISTDIR)/crypto/gmp.h 
--	tar -chzf $(DISTDIR).tar.gz $(DISTDIR)
--	rm -rf $(DISTDIR)
-+mrproper: clean
-+	rm -f $(BIN) tpm_version.h
- 
- $(src)/crypto/libgmp.a:
- 	test -f $(src)/crypto/libgmp.a || ln -s $(GMP_LIB) $(src)/crypto/libgmp.a
-diff -uprN orig/tpm_emulator-0.3-x86_64/README vtpm/README
---- orig/tpm_emulator-0.3-x86_64/README	2006-05-30 12:28:02.000000000 -0700
-+++ vtpm/README	2006-05-30 12:23:26.000000000 -0700
-@@ -13,7 +13,8 @@ $Id: README 78 2006-01-07 10:45:39Z mast
- Copyright
- --------------------------------------------------------------------------
- Copyright (C) 2004 Mario Strasser <mast@gmx.net> and Swiss Federal 
--Institute of Technology (ETH) Zurich.
-+                   Institute of Technology (ETH) Zurich.
-+Copyright (C) 2005 INTEL Corp 
-               
- This program is free software; you can redistribute it and/or modify
- it under the terms of the GNU General Public License as published by
-diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_audit.c vtpm/tpm/tpm_audit.c
---- orig/tpm_emulator-0.3-x86_64/tpm/tpm_audit.c	2006-01-10 04:21:45.000000000 -0800
-+++ vtpm/tpm/tpm_audit.c	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_audit.c vtpm/tpm/tpm_audit.c
+--- tpm_emulator-0.3-x86_64/tpm/tpm_audit.c	2006-08-29 15:07:21.620298760 -0700
++++ vtpm/tpm/tpm_audit.c	2006-08-29 15:12:07.191885280 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -578,9 +579,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_audit.c vtpm/tpm/tpm_audit.c
    return TPM_SUCCESS;
  }
 -
-diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_authorization.c vtpm/tpm/tpm_authorization.c
---- orig/tpm_emulator-0.3-x86_64/tpm/tpm_authorization.c	2006-01-10 04:21:45.000000000 -0800
-+++ vtpm/tpm/tpm_authorization.c	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_authorization.c vtpm/tpm/tpm_authorization.c
+--- tpm_emulator-0.3-x86_64/tpm/tpm_authorization.c	2006-08-29 15:07:21.620298760 -0700
++++ vtpm/tpm/tpm_authorization.c	2006-08-29 15:12:07.192885128 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -598,9 +599,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_authorization.c vtpm/tpm/tpm_aut
    
    info("tpm_verify_auth(%08x)", auth->authHandle);
    /* get dedicated authorization or transport session */
-diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_capability.c vtpm/tpm/tpm_capability.c
---- orig/tpm_emulator-0.3-x86_64/tpm/tpm_capability.c	2006-01-10 04:21:45.000000000 -0800
-+++ vtpm/tpm/tpm_capability.c	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_capability.c vtpm/tpm/tpm_capability.c
+--- tpm_emulator-0.3-x86_64/tpm/tpm_capability.c	2006-08-29 15:07:21.620298760 -0700
++++ vtpm/tpm/tpm_capability.c	2006-08-29 15:12:07.193884976 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -623,9 +624,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_capability.c vtpm/tpm/tpm_capabi
    }
  }
 -
-diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_cmd_handler.c vtpm/tpm/tpm_cmd_handler.c
---- orig/tpm_emulator-0.3-x86_64/tpm/tpm_cmd_handler.c	2006-01-10 04:21:45.000000000 -0800
-+++ vtpm/tpm/tpm_cmd_handler.c	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_cmd_handler.c vtpm/tpm/tpm_cmd_handler.c
+--- tpm_emulator-0.3-x86_64/tpm/tpm_cmd_handler.c	2006-08-29 15:07:21.621298608 -0700
++++ vtpm/tpm/tpm_cmd_handler.c	2006-08-29 15:12:07.197884368 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -683,9 +684,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_cmd_handler.c vtpm/tpm/tpm_cmd_h
    /* setup authorisation as well as response tag and size */
    memset(rsp, 0, sizeof(*rsp));
    switch (req->tag) {
-diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_crypto.c vtpm/tpm/tpm_crypto.c
---- orig/tpm_emulator-0.3-x86_64/tpm/tpm_crypto.c	2006-05-30 12:28:02.000000000 -0700
-+++ vtpm/tpm/tpm_crypto.c	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_crypto.c vtpm/tpm/tpm_crypto.c
+--- tpm_emulator-0.3-x86_64/tpm/tpm_crypto.c	2006-08-29 15:07:43.531967680 -0700
++++ vtpm/tpm/tpm_crypto.c	2006-08-29 15:12:07.198884216 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -708,9 +709,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_crypto.c vtpm/tpm/tpm_crypto.c
    return TPM_SUCCESS;
  }
 -
-diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_daa.c vtpm/tpm/tpm_daa.c
---- orig/tpm_emulator-0.3-x86_64/tpm/tpm_daa.c	2006-01-10 04:21:45.000000000 -0800
-+++ vtpm/tpm/tpm_daa.c	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_daa.c vtpm/tpm/tpm_daa.c
+--- tpm_emulator-0.3-x86_64/tpm/tpm_daa.c	2006-08-29 15:07:21.622298456 -0700
++++ vtpm/tpm/tpm_daa.c	2006-08-29 15:12:07.203883456 -0700
 @@ -700,14 +700,14 @@ info("tested until here");
            sizeof(session->DAA_tpmSpecific.DAA_rekey));
        sha1_update(&sha1, (BYTE*) &session->DAA_tpmSpecific.DAA_count, 
@@ -865,9 +866,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_daa.c vtpm/tpm/tpm_daa.c
        sha1_final(&sha1, scratch + SHA1_DIGEST_LENGTH);
        mpz_init(f), mpz_init(q);
        mpz_import(f, 2 * SHA1_DIGEST_LENGTH, 1, 1, 0, 0, scratch);
-diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_data.c vtpm/tpm/tpm_data.c
---- orig/tpm_emulator-0.3-x86_64/tpm/tpm_data.c	2006-05-30 12:28:02.000000000 -0700
-+++ vtpm/tpm/tpm_data.c	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_data.c vtpm/tpm/tpm_data.c
+--- tpm_emulator-0.3-x86_64/tpm/tpm_data.c	2006-08-29 15:08:20.535342312 -0700
++++ vtpm/tpm/tpm_data.c	2006-08-29 15:12:07.206883000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1177,7 +1178,7 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_data.c vtpm/tpm/tpm_data.c
  }
  
  #else
-@@ -267,7 +462,6 @@ int tpm_restore_permanent_data(void)
+@@ -278,7 +473,6 @@ int tpm_restore_permanent_data(void)
  
  int tpm_erase_permanent_data(void)
  {
@@ -1186,9 +1187,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_data.c vtpm/tpm/tpm_data.c
    return res;
  }
 -
-diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_deprecated.c vtpm/tpm/tpm_deprecated.c
---- orig/tpm_emulator-0.3-x86_64/tpm/tpm_deprecated.c	2006-01-10 04:21:45.000000000 -0800
-+++ vtpm/tpm/tpm_deprecated.c	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_deprecated.c vtpm/tpm/tpm_deprecated.c
+--- tpm_emulator-0.3-x86_64/tpm/tpm_deprecated.c	2006-08-29 15:07:21.622298456 -0700
++++ vtpm/tpm/tpm_deprecated.c	2006-08-29 15:12:07.207882848 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1215,9 +1216,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_deprecated.c vtpm/tpm/tpm_deprec
                          authContextSize, &contextBlob);
    if (res != TPM_SUCCESS) return res;
    len = *authContextSize;
-diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_emulator.h vtpm/tpm/tpm_emulator.h
---- orig/tpm_emulator-0.3-x86_64/tpm/tpm_emulator.h	2006-01-10 04:21:45.000000000 -0800
-+++ vtpm/tpm/tpm_emulator.h	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_emulator.h vtpm/tpm/tpm_emulator.h
+--- tpm_emulator-0.3-x86_64/tpm/tpm_emulator.h	2006-08-29 15:07:21.648294504 -0700
++++ vtpm/tpm/tpm_emulator.h	2006-08-29 15:12:07.208882696 -0700
 @@ -1,5 +1,6 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1235,9 +1236,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_emulator.h vtpm/tpm/tpm_emulator
  #undef  TPM_GENERATE_SEED_DAA
  
  #define TPM_MANUFACTURER 0x4554485A /* 'ETHZ' */        
-diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_integrity.c vtpm/tpm/tpm_integrity.c
---- orig/tpm_emulator-0.3-x86_64/tpm/tpm_integrity.c	2006-01-10 04:21:45.000000000 -0800
-+++ vtpm/tpm/tpm_integrity.c	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_integrity.c vtpm/tpm/tpm_integrity.c
+--- tpm_emulator-0.3-x86_64/tpm/tpm_integrity.c	2006-08-29 15:07:21.645294960 -0700
++++ vtpm/tpm/tpm_integrity.c	2006-08-29 15:12:07.208882696 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1251,9 +1252,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_integrity.c vtpm/tpm/tpm_integri
    return TPM_SUCCESS;
  }
 -
-diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_structures.h vtpm/tpm/tpm_structures.h
---- orig/tpm_emulator-0.3-x86_64/tpm/tpm_structures.h	2006-01-10 04:21:45.000000000 -0800
-+++ vtpm/tpm/tpm_structures.h	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_structures.h vtpm/tpm/tpm_structures.h
+--- tpm_emulator-0.3-x86_64/tpm/tpm_structures.h	2006-08-29 15:08:20.545340792 -0700
++++ vtpm/tpm/tpm_structures.h	2006-08-29 15:12:07.211882240 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1271,9 +1272,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_structures.h vtpm/tpm/tpm_struct
  #include "crypto/rsa.h"
  
  /*
-diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_testing.c vtpm/tpm/tpm_testing.c
---- orig/tpm_emulator-0.3-x86_64/tpm/tpm_testing.c	2006-01-10 04:21:45.000000000 -0800
-+++ vtpm/tpm/tpm_testing.c	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_testing.c vtpm/tpm/tpm_testing.c
+--- tpm_emulator-0.3-x86_64/tpm/tpm_testing.c	2006-08-29 15:07:21.646294808 -0700
++++ vtpm/tpm/tpm_testing.c	2006-08-29 15:12:07.213881936 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1389,9 +1390,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_testing.c vtpm/tpm/tpm_testing.c
    rsa_private_key_t priv_key;
    rsa_public_key_t pub_key;
  
-diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_ticks.c vtpm/tpm/tpm_ticks.c
---- orig/tpm_emulator-0.3-x86_64/tpm/tpm_ticks.c	2006-01-10 04:21:45.000000000 -0800
-+++ vtpm/tpm/tpm_ticks.c	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_ticks.c vtpm/tpm/tpm_ticks.c
+--- tpm_emulator-0.3-x86_64/tpm/tpm_ticks.c	2006-08-29 15:07:21.646294808 -0700
++++ vtpm/tpm/tpm_ticks.c	2006-08-29 15:12:07.235878592 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -1474,9 +1475,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_ticks.c vtpm/tpm/tpm_ticks.c
  }
    
  
-diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_transport.c vtpm/tpm/tpm_transport.c
---- orig/tpm_emulator-0.3-x86_64/tpm/tpm_transport.c	2006-01-10 04:21:45.000000000 -0800
-+++ vtpm/tpm/tpm_transport.c	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/tpm/tpm_transport.c vtpm/tpm/tpm_transport.c
+--- tpm_emulator-0.3-x86_64/tpm/tpm_transport.c	2006-08-29 15:07:21.647294656 -0700
++++ vtpm/tpm/tpm_transport.c	2006-08-29 15:12:07.239877984 -0700
 @@ -59,7 +59,7 @@ static int decrypt_transport_auth(TPM_KE
  static void transport_log_in(TPM_COMMAND_CODE ordinal, BYTE parameters[20],
                               BYTE pubKeyHash[20], TPM_DIGEST *transDigest)
@@ -1534,9 +1535,9 @@ diff -uprN orig/tpm_emulator-0.3-x86_64/tpm/tpm_transport.c vtpm/tpm/tpm_transpo
    memcpy(&buf[30], session->transInternal.transDigest.digest, 20);
    /* sign info structure */ 
    res = tpm_sign(key, auth1, TRUE, buf, sizeof(buf), signature, signSize);
-diff -uprN orig/tpm_emulator-0.3-x86_64/tpmd.c vtpm/tpmd.c
---- orig/tpm_emulator-0.3-x86_64/tpmd.c	1969-12-31 16:00:00.000000000 -0800
-+++ vtpm/tpmd.c	2006-05-30 12:23:26.000000000 -0700
+diff -uprN tpm_emulator-0.3-x86_64/tpmd.c vtpm/tpmd.c
+--- tpm_emulator-0.3-x86_64/tpmd.c	1969-12-31 16:00:00.000000000 -0800
++++ vtpm/tpmd.c	2006-08-29 15:12:07.240877832 -0700
 @@ -0,0 +1,207 @@
 +/* Software-Based Trusted Platform Module (TPM) Emulator for Linux
 + * Copyright (C) 2005 INTEL Corp

@@ -971,6 +971,17 @@ TPM_RESULT VTSP_Unseal(const TCS_CONTEXT_HANDLE    hContext,
   return status;
 }
 
+TPM_RESULT VTSP_SaveState( const TCS_CONTEXT_HANDLE    hContext) {
+
+  vtpmloginfo(VTPM_LOG_VTSP, "Calling TPM_SaveState.\n");
+
+  TPM_RESULT status = TPM_SUCCESS;
+
+  // Call TCS
+  return ( TCSP_SaveState ( hContext ) );
+
+}
+
 
 // Function Reaches into unsupported TCS command, beware.
 TPM_RESULT VTSP_RawTransmit(const TCS_CONTEXT_HANDLE    hContext,

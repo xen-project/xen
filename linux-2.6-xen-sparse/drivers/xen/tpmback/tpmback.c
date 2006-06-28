@@ -161,7 +161,7 @@ static struct packet *packet_alloc(tpmif_t * tpmif,
 	if (NULL != pak) {
 		if (tpmif) {
 			pak->tpmif = tpmif;
-			pak->tpm_instance = tpmif->tpm_instance;
+			pak->tpm_instance = tpmback_get_instance(tpmif->bi);
 			tpmif_get(tpmif);
 		}
 		pak->data_len = size;
@@ -683,95 +683,6 @@ static struct miscdevice vtpms_miscdevice = {
 	.name = "vtpm",
 	.fops = &vtpm_ops,
 };
-
-/***************************************************************
- Virtual TPM functions and data stuctures
-***************************************************************/
-
-static u8 create_cmd[] = {
-	1, 193,			/* 0: TPM_TAG_RQU_COMMAMD */
-	0, 0, 0, 19,		/* 2: length */
-	0, 0, 0, 0x1,		/* 6: VTPM_ORD_OPEN */
-	0,			/* 10: VTPM type */
-	0, 0, 0, 0,		/* 11: domain id */
-	0, 0, 0, 0		/* 15: instance id */
-};
-
-int tpmif_vtpm_open(tpmif_t * tpmif, domid_t domid, u32 instance)
-{
-	int rc = 0;
-	struct packet *pak;
-
-	pak = packet_alloc(tpmif,
-			   sizeof (create_cmd),
-			   create_cmd[1],
-			   PACKET_FLAG_DISCARD_RESPONSE |
-			   PACKET_FLAG_CHECK_RESPONSESTATUS);
-	if (pak) {
-		u8 buf[sizeof (create_cmd)];
-		u32 domid_no = htonl((u32) domid);
-		u32 instance_no = htonl(instance);
-
-		memcpy(buf, create_cmd, sizeof (create_cmd));
-
-		memcpy(&buf[11], &domid_no, sizeof (u32));
-		memcpy(&buf[15], &instance_no, sizeof (u32));
-
-		/* copy the buffer into the packet */
-		rc = packet_set(pak, buf, sizeof (buf));
-
-		if (rc == 0) {
-			pak->tpm_instance = 0;
-			rc = vtpm_queue_packet(pak);
-		}
-		if (rc < 0) {
-			/* could not be queued or built */
-			packet_free(pak);
-		}
-	} else {
-		rc = -ENOMEM;
-	}
-	return rc;
-}
-
-static u8 destroy_cmd[] = {
-	1, 193,			/* 0: TPM_TAG_RQU_COMMAMD */
-	0, 0, 0, 14,		/* 2: length */
-	0, 0, 0, 0x2,		/* 6: VTPM_ORD_CLOSE */
-	0, 0, 0, 0		/* 10: instance id */
-};
-
-int tpmif_vtpm_close(u32 instid)
-{
-	int rc = 0;
-	struct packet *pak;
-
-	pak = packet_alloc(NULL,
-			   sizeof (destroy_cmd),
-			   destroy_cmd[1], PACKET_FLAG_DISCARD_RESPONSE);
-	if (pak) {
-		u8 buf[sizeof (destroy_cmd)];
-		u32 instid_no = htonl(instid);
-
-		memcpy(buf, destroy_cmd, sizeof (destroy_cmd));
-		memcpy(&buf[10], &instid_no, sizeof (u32));
-
-		/* copy the buffer into the packet */
-		rc = packet_set(pak, buf, sizeof (buf));
-
-		if (rc == 0) {
-			pak->tpm_instance = 0;
-			rc = vtpm_queue_packet(pak);
-		}
-		if (rc < 0) {
-			/* could not be queued or built */
-			packet_free(pak);
-		}
-	} else {
-		rc = -ENOMEM;
-	}
-	return rc;
-}
 
 /***************************************************************
  Utility functions

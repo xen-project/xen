@@ -58,11 +58,6 @@ struct ioreq {
 };
 typedef struct ioreq ioreq_t;
 
-#define MAX_VECTOR      256
-#define BITS_PER_BYTE   8
-#define INTR_LEN        (MAX_VECTOR/(BITS_PER_BYTE * sizeof(uint64_t)))
-#define INTR_LEN_32     (MAX_VECTOR/(BITS_PER_BYTE * sizeof(uint32_t)))
-
 struct global_iodata {
     uint16_t    pic_elcr;
     uint16_t    pic_irr;

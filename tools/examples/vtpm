@@ -9,13 +9,7 @@ case "$command" in
   add)
     vtpm_create_instance
   ;;
-  online)
-    vtpm_create_instance
-  ;;
   remove)
-    vtpm_remove_instance
-  ;;
-  offline)
     vtpm_remove_instance
   ;;
 esac

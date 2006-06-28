@@ -7,7 +7,6 @@
 #include <xenctrl.h>
 
 #include "xc_elf.h"
-#include "xc_aout9.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <inttypes.h>
@@ -34,10 +33,6 @@
 
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
-
-#ifdef __ia64__
-#define probe_aout9(image,image_size,load_funcs) 1
-#endif
 
 struct initrd_info {
     enum { INITRD_none, INITRD_file, INITRD_mem } type;
@@ -124,8 +119,7 @@ static int probeimageformat(const char *image,
                             struct load_funcs *load_funcs)
 {
     if ( probe_elf(image, image_size, load_funcs) &&
-         probe_bin(image, image_size, load_funcs) &&
-         probe_aout9(image, image_size, load_funcs) )
+         probe_bin(image, image_size, load_funcs) )
     {
         ERROR( "Unrecognized image format" );
         return -EINVAL;

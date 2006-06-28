@@ -10,7 +10,7 @@
 #ifndef __XEN_PUBLIC_VERSION_H__
 #define __XEN_PUBLIC_VERSION_H__
 
-/* NB. All ops return zero on success, except XENVER_version. */
+/* NB. All ops return zero on success, except XENVER_{version,pagesize} */
 
 /* arg == NULL; returns major:minor (16:16). */
 #define XENVER_version      0
@@ -53,6 +53,9 @@ typedef struct xen_feature_info xen_feature_info_t;
 
 /* Declares the features reported by XENVER_get_features. */
 #include "features.h"
+
+/* arg == NULL; returns host memory page size. */
+#define XENVER_pagesize 7
 
 #endif /* __XEN_PUBLIC_VERSION_H__ */
 

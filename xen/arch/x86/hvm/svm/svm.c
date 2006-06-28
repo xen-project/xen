@@ -47,7 +47,6 @@
 #include <asm/shadow_64.h>
 #endif
 #include <public/sched.h>
-#include <public/hvm/ioreq.h>
 
 #define SVM_EXTRA_DEBUG
 
@@ -66,8 +65,6 @@ extern void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
 extern int svm_instrlen(struct cpu_user_regs *regs, int mode);
 extern void svm_dump_inst(unsigned long eip);
 extern int svm_dbg_on;
-void svm_manual_event_injection32(struct vcpu *v, struct cpu_user_regs *regs, 
-        int vector, int has_code);
 void svm_dump_regs(const char *from, struct cpu_user_regs *regs);
 
 static void svm_relinquish_guest_resources(struct domain *d);
@@ -215,17 +212,6 @@ static void svm_store_cpu_guest_regs(
 
     if ( regs != NULL )
     {
-#if defined (__x86_64__)
-        regs->rip    = vmcb->rip;
-        regs->rsp    = vmcb->rsp;
-        regs->rflags = vmcb->rflags;
-        regs->cs     = vmcb->cs.sel;
-        regs->ds     = vmcb->ds.sel;
-        regs->es     = vmcb->es.sel;
-        regs->ss     = vmcb->ss.sel;
-        regs->gs     = vmcb->gs.sel;
-        regs->fs     = vmcb->fs.sel;
-#elif defined (__i386__)
         regs->eip    = vmcb->rip;
         regs->esp    = vmcb->rsp;
         regs->eflags = vmcb->rflags;
@@ -235,14 +221,14 @@ static void svm_store_cpu_guest_regs(
         regs->ss     = vmcb->ss.sel;
         regs->gs     = vmcb->gs.sel;
         regs->fs     = vmcb->fs.sel;
-#endif
     }
 
     if ( crs != NULL )
     {
-        crs[0] = vmcb->cr0;
-        crs[3] = vmcb->cr3;
-        crs[4] = vmcb->cr4;
+        /* Returning the guest's regs */
+        crs[0] = v->arch.hvm_svm.cpu_shadow_cr0;
+        crs[3] = v->arch.hvm_svm.cpu_cr3;
+        crs[4] = v->arch.hvm_svm.cpu_shadow_cr4;
     }
 }
 
@@ -258,13 +244,11 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
     struct vcpu *vc = current;
-    //    struct svm_msr_state *msr = &vc->arch.hvm_svm.msr_content;
     struct vmcb_struct *vmcb = vc->arch.hvm_svm.vmcb;
 
     switch (regs->ecx)
     {
     case MSR_EFER:
-        // msr_content = msr->msr_items[SVM_INDEX_MSR_EFER];
         msr_content = vmcb->efer;      
         msr_content &= ~EFER_SVME;
         break;
@@ -813,7 +797,8 @@ void arch_svm_do_resume(struct vcpu *v)
         reset_stack_and_jump( svm_asm_do_resume );
     }
     else {
-        printk("VCPU core pinned: %d to %d\n", 
+        if (svm_dbg_on)
+            printk("VCPU core pinned: %d to %d\n", 
                 v->arch.hvm_svm.launch_core, smp_processor_id() );
         v->arch.hvm_svm.launch_core = smp_processor_id();
         svm_migrate_timers( v );
@@ -1008,6 +993,10 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
 	clear_bit(X86_FEATURE_HT, &edx);  /* clear the hyperthread bit */
 	ebx &= 0xFF00FFFF;  /* clear the logical processor count when HTT=0 */
 	ebx |= 0x00010000;  /* set to 1 just for precaution */
+
+	/* Disable machine check architecture */
+	clear_bit(X86_FEATURE_MCA, &edx);
+	clear_bit(X86_FEATURE_MCE, &edx);
     }
     else if ( ( input > 0x00000005 ) && ( input < 0x80000000 ) )
     {
@@ -2582,7 +2571,7 @@ void walk_shadow_and_guest_pt(unsigned long gva)
 
     spte = l1e_empty();
 
-    // This is actually overkill - we only need to make sure the hl2 is in-sync.
+    /* This is actually overkill - we only need to make sure the hl2 is in-sync. */
     shadow_sync_va(v, gva);
 
     gpte.l1 = 0;
@@ -2812,8 +2801,11 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
     }
 
     case VMEXIT_EXCEPTION_DF:
-        printk("Guest double fault");
-        BUG();
+        /* Debug info to hopefully help debug WHY the guest double-faulted. */
+        svm_dump_vmcb(__func__, vmcb);
+        svm_dump_regs(__func__, &regs);
+        svm_dump_inst(svm_rip2pointer(vmcb));
+        svm_inject_exception(v, TRAP_double_fault, 1, 0);
         break;
 
     case VMEXIT_INTR:

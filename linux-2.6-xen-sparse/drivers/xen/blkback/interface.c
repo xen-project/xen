@@ -32,6 +32,7 @@
 
 #include "common.h"
 #include <xen/evtchn.h>
+#include <linux/kthread.h>
 
 static kmem_cache_t *blkif_cachep;
 
@@ -139,22 +140,33 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 	return 0;
 }
 
-void blkif_free(blkif_t *blkif)
+void blkif_disconnect(blkif_t *blkif)
 {
+	if (blkif->xenblkd) {
+		kthread_stop(blkif->xenblkd);
+		blkif->xenblkd = NULL;
+	}
+
 	atomic_dec(&blkif->refcnt);
 	wait_event(blkif->waiting_to_free, atomic_read(&blkif->refcnt) == 0);
+	atomic_inc(&blkif->refcnt);
 
-	/* Already disconnected? */
-	if (blkif->irq)
+	if (blkif->irq) {
 		unbind_from_irqhandler(blkif->irq, blkif);
-
-	vbd_free(&blkif->vbd);
+		blkif->irq = 0;
+	}
 
 	if (blkif->blk_ring.sring) {
 		unmap_frontend_page(blkif);
 		free_vm_area(blkif->blk_ring_area);
+		blkif->blk_ring.sring = NULL;
 	}
+}
 
+void blkif_free(blkif_t *blkif)
+{
+	if (!atomic_dec_and_test(&blkif->refcnt))
+		BUG();
 	kmem_cache_free(blkif_cachep, blkif);
 }
 

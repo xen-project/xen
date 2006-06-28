@@ -153,6 +153,9 @@ xenstat_node *cur_node = NULL;
 field_id sort_field = FIELD_DOMID;
 unsigned int first_domain_index = 0;
 unsigned int delay = 3;
+unsigned int batch = 0;
+unsigned int loop = 1;
+unsigned int iterations = 0;
 int show_vcpus = 0;
 int show_networks = 0;
 int repeat_header = 0;
@@ -179,6 +182,8 @@ static void usage(const char *program)
 	       "-n, --networks       output vif network data\n"
 	       "-r, --repeat-header  repeat table header before each domain\n"
 	       "-v, --vcpus          output vcpu data\n"
+	       "-b, --batch	     output in batch mode, no user input accepted\n"
+	       "-i, --iterations     number of iterations before exiting\n"
 	       "\n" XENTOP_BUGSTO,
 	       program);
 	return;
@@ -236,9 +241,15 @@ static void print(const char *fmt, ...)
 {
 	va_list args;
 
-	if(current_row() < lines()-1) {
+	if (!batch) {
+		if((current_row() < lines()-1)) {
+			va_start(args, fmt);
+			vw_printw(stdscr, fmt, args);
+			va_end(args);
+		}
+	} else {
 		va_start(args, fmt);
-		vw_printw(stdscr, fmt, args);
+		vprintf(fmt, args);
 		va_end(args);
 	}
 }
@@ -803,6 +814,7 @@ static void top(void)
 			do_network(domains[i]);
 	}
 
+	if(!batch)
 	do_bottom_line();
 }
 
@@ -818,9 +830,11 @@ int main(int argc, char **argv)
 		{ "repeat-header", no_argument,       NULL, 'r' },
 		{ "vcpus",         no_argument,       NULL, 'v' },
 		{ "delay",         required_argument, NULL, 'd' },
+		{ "batch",	   no_argument,	      NULL, 'b' },
+		{ "iterations",	   required_argument, NULL, 'i' },
 		{ 0, 0, 0, 0 },
 	};
-	const char *sopts = "hVbnvd:";
+	const char *sopts = "hVbnvd:bi:";
 
 	if (atexit(cleanup) != 0)
 		fail("Failed to install cleanup handler.\n");
@@ -847,6 +861,13 @@ int main(int argc, char **argv)
 		case 'd':
 			delay = atoi(optarg);
 			break;
+		case 'b':
+			batch = 1;
+			break;
+		case 'i':
+			iterations = atoi(optarg);
+			loop = 0;
+			break;
 		}
 	}
 
@@ -855,28 +876,41 @@ int main(int argc, char **argv)
 	if (xhandle == NULL)
 		fail("Failed to initialize xenstat library\n");
 
-	/* Begin curses stuff */
-	initscr();
-	start_color();
-	cbreak();
-	noecho();
-	nonl();
-	keypad(stdscr, TRUE);
-	halfdelay(5);
-	use_default_colors();
-	init_pair(1, -1, COLOR_YELLOW);
+	if (!batch) {
+		/* Begin curses stuff */
+		initscr();
+		start_color();
+		cbreak();
+		noecho();
+		nonl();
+		keypad(stdscr, TRUE);
+		halfdelay(5);
+		use_default_colors();
+		init_pair(1, -1, COLOR_YELLOW);
 
-	do {
-		gettimeofday(&curtime, NULL);
-		if(ch != ERR || (curtime.tv_sec - oldtime.tv_sec) >= delay) {
-			clear();
-			top();
-			oldtime = curtime;
-			refresh();
-		}
-		ch = getch();
-	} while (handle_key(ch));
-
+		do {
+			gettimeofday(&curtime, NULL);
+			if(ch != ERR || (curtime.tv_sec - oldtime.tv_sec) >= delay) {
+				clear();
+				top();
+				oldtime = curtime;
+				refresh();
+				if ((!loop) && !(--iterations))
+					break;
+			}
+			ch = getch();
+		} while (handle_key(ch));
+	} else {
+			do {
+				gettimeofday(&curtime, NULL);
+				top();
+				oldtime = curtime;
+				sleep(delay);
+				if ((!loop) && !(--iterations))
+					break;
+			} while (1);
+	}
+	
 	/* Cleanup occurs in cleanup(), so no work to do here. */
 
 	return 0;

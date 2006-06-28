@@ -118,4 +118,6 @@ TPM_RESULT VTSP_Unseal(const TCS_CONTEXT_HANDLE    hContext,
                        TCS_AUTH                    *auth,
                        TCS_AUTH                    *dataAuth);
 
+TPM_RESULT VTSP_SaveState( const TCS_CONTEXT_HANDLE    hContext);
+
 #endif //_VTSP_H_

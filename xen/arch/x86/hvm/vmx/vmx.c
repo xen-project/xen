@@ -337,6 +337,7 @@ static void vmx_restore_msrs(struct vcpu *v)
         clear_bit(i, &guest_flags);
     }
 }
+
 #else  /* __i386__ */
 
 #define vmx_save_segments(v)      ((void)0)
@@ -356,6 +357,63 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
 #endif /* __i386__ */
 
+#define loaddebug(_v,_reg) \
+    __asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
+#define savedebug(_v,_reg) \
+    __asm__ __volatile__ ("mov %%db" #_reg ",%0" : : "r" ((_v)->debugreg[_reg]))
+
+static inline void vmx_save_dr(struct vcpu *v)
+{
+    if ( v->arch.hvm_vcpu.flag_dr_dirty )
+    {
+        savedebug(&v->arch.guest_context, 0);
+        savedebug(&v->arch.guest_context, 1);
+        savedebug(&v->arch.guest_context, 2);
+        savedebug(&v->arch.guest_context, 3);
+        savedebug(&v->arch.guest_context, 6);
+        
+        v->arch.hvm_vcpu.flag_dr_dirty = 0;
+
+        v->arch.hvm_vcpu.u.vmx.exec_control |= CPU_BASED_MOV_DR_EXITING;
+        __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
+                  v->arch.hvm_vcpu.u.vmx.exec_control);
+    }
+}
+
+static inline void __restore_debug_registers(struct vcpu *v)
+{
+    loaddebug(&v->arch.guest_context, 0);
+    loaddebug(&v->arch.guest_context, 1);
+    loaddebug(&v->arch.guest_context, 2);
+    loaddebug(&v->arch.guest_context, 3);
+    /* No 4 and 5 */
+    loaddebug(&v->arch.guest_context, 6);
+    /* DR7 is loaded from the vmcs. */
+}
+
+/*
+ * DR7 is saved and restored on every vmexit.  Other debug registers only
+ * need to be restored if their value is going to affect execution -- i.e.,
+ * if one of the breakpoints is enabled.  So mask out all bits that don't
+ * enable some breakpoint functionality.
+ *
+ * This is in part necessary because bit 10 of DR7 is hardwired to 1, so a
+ * simple if( guest_dr7 ) will always return true.  As long as we're masking,
+ * we might as well do it right.
+ */
+#define DR7_ACTIVE_MASK 0xff
+
+static inline void vmx_restore_dr(struct vcpu *v)
+{
+    unsigned long guest_dr7;
+
+    __vmread(GUEST_DR7, &guest_dr7);
+
+    /* Assumes guest does not have DR access at time of context switch. */
+    if ( unlikely(guest_dr7 & DR7_ACTIVE_MASK) )
+        __restore_debug_registers(v);
+}
+
 static void vmx_freeze_time(struct vcpu *v)
 {
     struct periodic_time *pt=&v->domain->arch.hvm_domain.pl_time.periodic_tm;
@@ -371,11 +429,13 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
     vmx_freeze_time(v);
     vmx_save_segments(v);
     vmx_load_msrs();
+    vmx_save_dr(v);
 }
 
 static void vmx_ctxt_switch_to(struct vcpu *v)
 {
     vmx_restore_msrs(v);
+    vmx_restore_dr(v);
 }
 
 void stop_vmx(void)
@@ -866,55 +926,20 @@ static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
     CASE_GET_REG_P(R15, r15)
 #endif
 
-static void vmx_dr_access (unsigned long exit_qualification, struct cpu_user_regs *regs)
+static void vmx_dr_access(unsigned long exit_qualification,
+                          struct cpu_user_regs *regs)
 {
-    unsigned int reg;
-    unsigned long *reg_p = 0;
     struct vcpu *v = current;
-    unsigned long eip;
 
-    __vmread(GUEST_RIP, &eip);
+    v->arch.hvm_vcpu.flag_dr_dirty = 1;
 
-    reg = exit_qualification & DEBUG_REG_ACCESS_NUM;
+    /* We could probably be smarter about this */
+    __restore_debug_registers(v);
 
-    HVM_DBG_LOG(DBG_LEVEL_1,
-                "vmx_dr_access : eip=%lx, reg=%d, exit_qualification = %lx",
-                eip, reg, exit_qualification);
-
-    switch ( exit_qualification & DEBUG_REG_ACCESS_REG ) {
-    CASE_GET_REG_P(EAX, eax);
-    CASE_GET_REG_P(ECX, ecx);
-    CASE_GET_REG_P(EDX, edx);
-    CASE_GET_REG_P(EBX, ebx);
-    CASE_GET_REG_P(EBP, ebp);
-    CASE_GET_REG_P(ESI, esi);
-    CASE_GET_REG_P(EDI, edi);
-    CASE_EXTEND_GET_REG_P;
-    case REG_ESP:
-        break;
-    default:
-        __hvm_bug(regs);
-    }
-
-    switch (exit_qualification & DEBUG_REG_ACCESS_TYPE) {
-    case TYPE_MOV_TO_DR:
-        /* don't need to check the range */
-        if (reg != REG_ESP)
-            v->arch.guest_context.debugreg[reg] = *reg_p;
-        else {
-            unsigned long value;
-            __vmread(GUEST_RSP, &value);
-            v->arch.guest_context.debugreg[reg] = value;
-        }
-        break;
-    case TYPE_MOV_FROM_DR:
-        if (reg != REG_ESP)
-            *reg_p = v->arch.guest_context.debugreg[reg];
-        else {
-            __vmwrite(GUEST_RSP, v->arch.guest_context.debugreg[reg]);
-        }
-        break;
-    }
+    /* Allow guest direct access to DR registers */
+    v->arch.hvm_vcpu.u.vmx.exec_control &= ~CPU_BASED_MOV_DR_EXITING;
+    __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
+              v->arch.hvm_vcpu.u.vmx.exec_control);
 }
 
 /*
@@ -2080,10 +2105,19 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         {
             void store_cpu_user_regs(struct cpu_user_regs *regs);
 
-            store_cpu_user_regs(&regs);
-            __vm_clear_bit(GUEST_PENDING_DBG_EXCEPTIONS, PENDING_DEBUG_EXC_BS);
-
-            domain_pause_for_debugger();
+            if ( test_bit(_DOMF_debugging, &v->domain->domain_flags) )
+            {
+                store_cpu_user_regs(&regs);
+                domain_pause_for_debugger();
+                __vm_clear_bit(GUEST_PENDING_DBG_EXCEPTIONS,
+                               PENDING_DEBUG_EXC_BS);
+            }
+            else
+            {
+                vmx_reflect_exception(v);
+                __vm_clear_bit(GUEST_PENDING_DBG_EXCEPTIONS,
+                               PENDING_DEBUG_EXC_BS);
+            }
 
             break;
         }
@@ -2139,9 +2173,17 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         vmx_vmexit_do_extint(&regs);
         break;
     case EXIT_REASON_PENDING_INTERRUPT:
+        /*
+         * Not sure exactly what the purpose of this is.  The only bits set
+         * and cleared at this point are CPU_BASED_VIRTUAL_INTR_PENDING.
+         * (in io.c:{enable,disable}_irq_window().  So presumably we want to
+         * set it to the original value...
+         */
+        v->arch.hvm_vcpu.u.vmx.exec_control &= ~CPU_BASED_VIRTUAL_INTR_PENDING;
+        v->arch.hvm_vcpu.u.vmx.exec_control |=
+            (MONITOR_CPU_BASED_EXEC_CONTROLS & CPU_BASED_VIRTUAL_INTR_PENDING);
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
-                  MONITOR_CPU_BASED_EXEC_CONTROLS);
-        v->arch.hvm_vcpu.u.vmx.exec_control = MONITOR_CPU_BASED_EXEC_CONTROLS;
+                  v->arch.hvm_vcpu.u.vmx.exec_control);
         break;
     case EXIT_REASON_TASK_SWITCH:
         __hvm_bug(&regs);

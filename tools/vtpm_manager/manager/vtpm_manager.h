@@ -73,6 +73,12 @@
 #define VTPM_RESTORE_CONTEXT_FAILED    4
 #define VTPM_INVALID_REQUEST       5
 
+//*********************** Parameter Values *************************
+#define VTPM_TYPE_NON_MIGRATABLE  0x00
+#define VTPM_TYPE_MIGRATABLE      0x01
+#define VTPM_TYPE_MIGRATED        0xFF // VTPM has been migrated.
+                                       // VTPM can be recovered or deleted only
+
 /******************* Command Parameter API *************************
 
 VTPM Command Format
@@ -94,8 +100,8 @@ VTPM Response Format
 
 VTPM_Open:
   Input Parameters:
-    Domain_type: 1 byte
-    domain_id: 4 bytes
+    Domain_type: 1 byte 
+    startup_mode: 1 byte // Cold Boot = 1, resume = 2, deactive = 3
     instance_id: 4 bytes
   Output Parameters:
     None

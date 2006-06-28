@@ -25,6 +25,8 @@
 [\fB\-n\fR]
 [\fB\-r\fR]
 [\fB\-v\fR]
+[\fB\-b\fR]
+[\fB\-i\fRITERATIONS]
 
 .SH DESCRIPTION
 \fBxentop\fR displays information about the Xen system and domains, in a
@@ -50,6 +52,13 @@ repeat table header before each domain
 .TP
 \fB\-v\fR, \fB\-\-vcpus\fR
 output VCPU data
+.TP
+\fB\-b\fR, \fB\-\-batch\fR
+output data in batch mode (to stdout)
+.TP
+\fB\-i\fR, \fB\-\-iterations\fR=\fIITERATIONS\fR
+maximum number of iterations xentop should produce before ending
+
 
 .SH "INTERACTIVE COMMANDS"
 All interactive commands are case-insensitive.

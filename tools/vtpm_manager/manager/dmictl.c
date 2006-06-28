@@ -76,14 +76,13 @@ TPM_RESULT VTPM_Handle_New_DMI(const buffer_t *param_buf) {
   
   VTPM_DMI_RESOURCE *new_dmi=NULL;
   TPM_RESULT status=TPM_FAIL;
-  BYTE type;
-  UINT32 dmi_id, domain_id, *dmi_id_key; 
+  BYTE type, startup_mode;
+  UINT32 dmi_id, *dmi_id_key=NULL; 
 
   if (param_buf == NULL) { // Assume creation of Dom 0 control
-    type = 0;
-    domain_id = VTPM_CTL_DM;
+    type = VTPM_TYPE_NON_MIGRATABLE;
     dmi_id = VTPM_CTL_DM;
-  } else if (buffer_len(param_buf) != sizeof(BYTE) + sizeof(UINT32) *2) {
+  } else if (buffer_len(param_buf) != sizeof(BYTE) + sizeof(BYTE) + sizeof(UINT32)) {
     vtpmloginfo(VTPM_LOG_VTPM, "New DMI command wrong length: %d.\n", buffer_len(param_buf));
     status = TPM_BAD_PARAMETER;
     goto abort_egress;
@@ -91,13 +90,13 @@ TPM_RESULT VTPM_Handle_New_DMI(const buffer_t *param_buf) {
     vtpm_globals->connected_dmis++; // Put this here so we don't count Dom0
     BSG_UnpackList( param_buf->bytes, 3,
 		    BSG_TYPE_BYTE, &type,
-		    BSG_TYPE_UINT32, &domain_id,
+		    BSG_TYPE_BYTE, &startup_mode,
 		    BSG_TYPE_UINT32,  &dmi_id);
   }
-  
+
   new_dmi = (VTPM_DMI_RESOURCE *) hashtable_search(vtpm_globals->dmi_map, &dmi_id);
   if (new_dmi == NULL) { 
-    vtpmloginfo(VTPM_LOG_VTPM, "Creating new DMI instance %d attached on domain %d.\n", dmi_id, domain_id);
+    vtpmloginfo(VTPM_LOG_VTPM, "Creating new DMI instance %d attached.\n", dmi_id );
     // Brand New DMI. Initialize the persistent pieces
     if ((new_dmi = (VTPM_DMI_RESOURCE *) malloc (sizeof(VTPM_DMI_RESOURCE))) == NULL) {
       status = TPM_RESOURCES;
@@ -106,32 +105,44 @@ TPM_RESULT VTPM_Handle_New_DMI(const buffer_t *param_buf) {
     memset(new_dmi, 0, sizeof(VTPM_DMI_RESOURCE));
     new_dmi->dmi_id = dmi_id;
     new_dmi->connected = FALSE;
+
+    if (type != VTPM_TYPE_MIGRATED) {
+      new_dmi->dmi_type = type;
+    } else {
+      vtpmlogerror(VTPM_LOG_VTPM, "Creation of VTPM with illegal type.\n");
+      status = TPM_BAD_PARAMETER;
+      goto free_egress;
+    }
     
     if ((dmi_id_key = (UINT32 *) malloc (sizeof(UINT32))) == NULL) {
       status = TPM_RESOURCES;
-      goto abort_egress;
+      goto free_egress;
     }      
     *dmi_id_key = new_dmi->dmi_id;
     
     // install into map
     if (!hashtable_insert(vtpm_globals->dmi_map, dmi_id_key, new_dmi)){
-      free(new_dmi);
-      free(dmi_id_key);
+      vtpmlogerror(VTPM_LOG_VTPM, "Failed to insert instance into table. Aborting.\n", dmi_id);
       status = TPM_FAIL;
-      goto egress;
+      goto free_egress;
     }
    
   } else 
-    vtpmloginfo(VTPM_LOG_VTPM, "Re-attaching DMI instance %d on domain %d .\n", dmi_id, domain_id);
+    vtpmloginfo(VTPM_LOG_VTPM, "Re-attaching DMI instance %d.\n", dmi_id);
   
   if (new_dmi->connected) {
     vtpmlogerror(VTPM_LOG_VTPM, "Attempt to re-attach, currently attached instance %d. Ignoring\n", dmi_id);
     status = TPM_BAD_PARAMETER;
-    goto egress;
+    goto abort_egress;
   }
   
+  if (type == VTPM_TYPE_MIGRATED) {
+    vtpmlogerror(VTPM_LOG_VTPM, "Attempt to re-attach previously migrated instance %d without recovering first. Ignoring\n", dmi_id);
+    status = TPM_BAD_PARAMETER;
+    goto abort_egress;
+  }
+
   // Initialize the Non-persistent pieces
-  new_dmi->dmi_domain_id = domain_id;
   new_dmi->NVMLocation = NULL;
   
   new_dmi->TCSContext = 0;
@@ -144,9 +155,13 @@ TPM_RESULT VTPM_Handle_New_DMI(const buffer_t *param_buf) {
 
   // Design specific new DMI code. 
   // Includes: create IPCs, Measuring DMI, and maybe launching DMI
-  status = VTPM_New_DMI_Extra(new_dmi);
+  status = VTPM_New_DMI_Extra(new_dmi, startup_mode);
   goto egress;
   
+ free_egress:   // Error that requires freeing of newly allocated dmi 
+  free(new_dmi);
+  free(dmi_id_key);
+
  abort_egress:
   vtpmlogerror(VTPM_LOG_VTPM, "Failed to create DMI id=%d due to status=%s. Cleaning.\n", dmi_id, tpm_get_error_name(status));
   close_dmi(new_dmi );
@@ -221,7 +236,7 @@ TPM_RESULT VTPM_Handle_Delete_DMI( const buffer_t *param_buf) {
     goto abort_egress;
   }
   
-	//TODO: Automatically delete file dmi_res->NVMLocation
+  //vtpm scripts delete file dmi_res->NVMLocation for us
   
   // Close DMI first
   TPMTRYRETURN(close_dmi( dmi_res ));

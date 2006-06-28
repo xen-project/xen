@@ -28,6 +28,7 @@
 
 #include <xen/interface/xen.h>
 #include <xen/interface/xenoprof.h>
+#include <../../../drivers/oprofile/cpu_buffer.h>
 
 static int xenoprof_start(void);
 static void xenoprof_stop(void);
@@ -49,6 +50,11 @@ int nbuf;
 int ovf_irq[NR_CPUS];
 /* cpu model type string - copied from Xen memory space on XENOPROF_init command */
 char cpu_type[XENOPROF_CPU_TYPE_SIZE];
+
+/* Passive sample buffers shared with Xen */
+xenoprof_buf_t *p_xenoprof_buf[MAX_OPROF_DOMAINS][MAX_VIRT_CPUS];
+/* Passive shared buffer area */
+char *p_shared_buffer[MAX_OPROF_DOMAINS];
 
 #ifdef CONFIG_PM
 
@@ -102,16 +108,14 @@ static void __exit exit_driverfs(void)
 #endif /* CONFIG_PM */
 
 unsigned long long oprofile_samples = 0;
+unsigned long long p_oprofile_samples = 0;
 
-static irqreturn_t 
-xenoprof_ovf_interrupt(int irq, void * dev_id, struct pt_regs * regs)
+unsigned int pdomains;
+struct xenoprof_passive passive_domains[MAX_OPROF_DOMAINS];
+
+static void xenoprof_add_pc(xenoprof_buf_t *buf, int is_passive)
 {
 	int head, tail, size;
-	struct xenoprof_buf * buf;
-	int cpu;
-
-	cpu = smp_processor_id();
-	buf = xenoprof_buf[cpu];
 
 	head = buf->event_head;
 	tail = buf->event_tail;
@@ -122,7 +126,10 @@ xenoprof_ovf_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 			oprofile_add_pc(buf->event_log[tail].eip,
 					buf->event_log[tail].mode,
 					buf->event_log[tail].event);
-			oprofile_samples++;
+			if (!is_passive)
+				oprofile_samples++;
+			else
+				p_oprofile_samples++;
 			tail++;
 		}
 		tail = 0;
@@ -131,11 +138,47 @@ xenoprof_ovf_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 		oprofile_add_pc(buf->event_log[tail].eip,
 				buf->event_log[tail].mode,
 				buf->event_log[tail].event);
-		oprofile_samples++;
+		if (!is_passive)
+			oprofile_samples++;
+		else
+			p_oprofile_samples++;
 		tail++;
 	}
 
 	buf->event_tail = tail;
+}
+
+static void xenoprof_handle_passive(void)
+{
+	int i, j;
+
+	for (i = 0; i < pdomains; i++)
+		for (j = 0; j < passive_domains[i].nbuf; j++) {
+			xenoprof_buf_t *buf = p_xenoprof_buf[i][j];
+			if (buf->event_head == buf->event_tail)
+				continue;
+                        oprofile_add_pc(IGNORED_PC, CPU_MODE_PASSIVE_START, passive_domains[i].domain_id);
+			xenoprof_add_pc(buf, 1);
+                        oprofile_add_pc(IGNORED_PC, CPU_MODE_PASSIVE_STOP, passive_domains[i].domain_id);
+		}			
+}
+
+static irqreturn_t 
+xenoprof_ovf_interrupt(int irq, void * dev_id, struct pt_regs * regs)
+{
+	struct xenoprof_buf * buf;
+	int cpu;
+	static unsigned long flag;
+
+	cpu = smp_processor_id();
+	buf = xenoprof_buf[cpu];
+
+	xenoprof_add_pc(buf, 0);
+
+	if (is_primary && !test_and_set_bit(0, &flag)) {
+		xenoprof_handle_passive();
+		clear_bit(0, &flag);
+	}
 
 	return IRQ_HANDLED;
 }
@@ -312,6 +355,63 @@ out:
 	return ret;
 }
 
+static int xenoprof_set_passive(int * p_domains,
+                                unsigned int pdoms)
+{
+	int ret;
+	int i, j;
+	int vm_size;
+	int npages;
+	struct xenoprof_buf *buf;
+	pgprot_t prot = __pgprot(_KERNPG_TABLE);
+
+	if (!is_primary)
+        	return 0;
+
+	if (pdoms > MAX_OPROF_DOMAINS)
+		return -E2BIG;
+
+	ret = HYPERVISOR_xenoprof_op(XENOPROF_reset_passive_list, NULL);
+	if (ret)
+		return ret;
+
+	for (i = 0; i < pdoms; i++) {
+		passive_domains[i].domain_id = p_domains[i];
+		passive_domains[i].max_samples = 2048;
+		ret = HYPERVISOR_xenoprof_op(XENOPROF_set_passive, &passive_domains[i]);
+		if (ret)
+			return ret;
+
+		npages = (passive_domains[i].bufsize * passive_domains[i].nbuf - 1) / PAGE_SIZE + 1;
+		vm_size = npages * PAGE_SIZE;
+
+		p_shared_buffer[i] = (char *)vm_map_xen_pages(passive_domains[i].buf_maddr,
+							      vm_size, prot);
+		if (!p_shared_buffer[i]) {
+			ret = -ENOMEM;
+			goto out;
+		}
+
+		for (j = 0; j < passive_domains[i].nbuf; j++) {
+			buf = (struct xenoprof_buf *)
+				&p_shared_buffer[i][j * passive_domains[i].bufsize];
+			BUG_ON(buf->vcpu_id >= MAX_VIRT_CPUS);
+			p_xenoprof_buf[i][buf->vcpu_id] = buf;
+		}
+
+	}
+
+	pdomains = pdoms;
+	return 0;
+
+out:
+	for (j = 0; j < i; j++) {
+		vunmap(p_shared_buffer[j]);
+		p_shared_buffer[j] = NULL;
+	}
+
+ 	return ret;
+}
 
 struct op_counter_config counter_config[OP_MAX_COUNTER];
 
@@ -346,6 +446,7 @@ static int xenoprof_create_files(struct super_block * sb, struct dentry * root)
 struct oprofile_operations xenoprof_ops = {
 	.create_files 	= xenoprof_create_files,
 	.set_active	= xenoprof_set_active,
+	.set_passive    = xenoprof_set_passive,
 	.setup 		= xenoprof_setup,
 	.shutdown	= xenoprof_shutdown,
 	.start		= xenoprof_start,
@@ -420,6 +521,8 @@ int __init oprofile_arch_init(struct oprofile_operations * ops)
 
 void __exit oprofile_arch_exit(void)
 {
+	int i;
+
 	if (using_xenoprof)
 		exit_driverfs();
 
@@ -427,6 +530,13 @@ void __exit oprofile_arch_exit(void)
 		vunmap(shared_buffer);
 		shared_buffer = NULL;
 	}
-	if (is_primary)
+	if (is_primary) {
+		for (i = 0; i < pdomains; i++)
+			if (p_shared_buffer[i]) {
+		                vunmap(p_shared_buffer[i]);
+                		p_shared_buffer[i] = NULL;
+			}
 		HYPERVISOR_xenoprof_op(XENOPROF_shutdown, NULL);
+        }
+
 }

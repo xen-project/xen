@@ -194,6 +194,7 @@ long arch_do_dom0_op(struct dom0_op *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         pi->nr_nodes         = 1;
         pi->total_pages      = total_pages;
         pi->free_pages       = avail_domheap_pages();
+        pi->scrub_pages      = avail_scrub_pages();
         pi->cpu_khz          = cpu_khz;
         memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
         memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
