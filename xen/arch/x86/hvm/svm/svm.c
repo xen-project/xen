@@ -47,7 +47,6 @@
 #include <asm/shadow_64.h>
 #endif
 #include <public/sched.h>
-#include <public/hvm/ioreq.h>
 
 #define SVM_EXTRA_DEBUG
 
@@ -66,8 +65,6 @@ extern void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
 extern int svm_instrlen(struct cpu_user_regs *regs, int mode);
 extern void svm_dump_inst(unsigned long eip);
 extern int svm_dbg_on;
-void svm_manual_event_injection32(struct vcpu *v, struct cpu_user_regs *regs, 
-        int vector, int has_code);
 void svm_dump_regs(const char *from, struct cpu_user_regs *regs);
 
 static void svm_relinquish_guest_resources(struct domain *d);
@@ -2804,8 +2801,11 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
     }
 
     case VMEXIT_EXCEPTION_DF:
-        printk("Guest double fault");
-        BUG();
+        /* Debug info to hopefully help debug WHY the guest double-faulted. */
+        svm_dump_vmcb(__func__, vmcb);
+        svm_dump_regs(__func__, &regs);
+        svm_dump_inst(svm_rip2pointer(vmcb));
+        svm_inject_exception(v, TRAP_double_fault, 1, 0);
         break;
 
     case VMEXIT_INTR:
