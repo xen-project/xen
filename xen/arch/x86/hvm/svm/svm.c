@@ -215,17 +215,6 @@ static void svm_store_cpu_guest_regs(
 
     if ( regs != NULL )
     {
-#if defined (__x86_64__)
-        regs->rip    = vmcb->rip;
-        regs->rsp    = vmcb->rsp;
-        regs->rflags = vmcb->rflags;
-        regs->cs     = vmcb->cs.sel;
-        regs->ds     = vmcb->ds.sel;
-        regs->es     = vmcb->es.sel;
-        regs->ss     = vmcb->ss.sel;
-        regs->gs     = vmcb->gs.sel;
-        regs->fs     = vmcb->fs.sel;
-#elif defined (__i386__)
         regs->eip    = vmcb->rip;
         regs->esp    = vmcb->rsp;
         regs->eflags = vmcb->rflags;
@@ -235,14 +224,14 @@ static void svm_store_cpu_guest_regs(
         regs->ss     = vmcb->ss.sel;
         regs->gs     = vmcb->gs.sel;
         regs->fs     = vmcb->fs.sel;
-#endif
     }
 
     if ( crs != NULL )
     {
-        crs[0] = vmcb->cr0;
-        crs[3] = vmcb->cr3;
-        crs[4] = vmcb->cr4;
+        /* Returning the guest's regs */
+        crs[0] = v->arch.hvm_svm.cpu_shadow_cr0;
+        crs[3] = v->arch.hvm_svm.cpu_cr3;
+        crs[4] = v->arch.hvm_svm.cpu_shadow_cr4;
     }
 }
 
@@ -258,13 +247,11 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
     struct vcpu *vc = current;
-    //    struct svm_msr_state *msr = &vc->arch.hvm_svm.msr_content;
     struct vmcb_struct *vmcb = vc->arch.hvm_svm.vmcb;
 
     switch (regs->ecx)
     {
     case MSR_EFER:
-        // msr_content = msr->msr_items[SVM_INDEX_MSR_EFER];
         msr_content = vmcb->efer;      
         msr_content &= ~EFER_SVME;
         break;
@@ -2583,7 +2570,7 @@ void walk_shadow_and_guest_pt(unsigned long gva)
 
     spte = l1e_empty();
 
-    // This is actually overkill - we only need to make sure the hl2 is in-sync.
+    /* This is actually overkill - we only need to make sure the hl2 is in-sync. */
     shadow_sync_va(v, gva);
 
     gpte.l1 = 0;
