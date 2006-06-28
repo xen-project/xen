@@ -904,6 +904,7 @@ int main(int argc, char **argv)
 			do {
 				gettimeofday(&curtime, NULL);
 				top();
+				oldtime = curtime;
 				sleep(delay);
 				if ((!loop) && !(--iterations))
 					break;
