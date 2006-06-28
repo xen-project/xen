@@ -1,0 +1,22 @@
+diff -pruN ../pristine-linux-2.6.16.13/kernel/timer.c ./kernel/timer.c
+--- ../pristine-linux-2.6.16.13/kernel/timer.c	2006-05-02 14:38:44.000000000 -0700
++++ ./kernel/timer.c	2006-06-28 09:57:51.000000000 -0700
+@@ -555,7 +555,17 @@ found:
+ 	}
+ 	spin_unlock(&base->t_base.lock);
+ 
+-	if (time_before(hr_expires, expires))
++	/*
++	 * If timers are pending, "expires" will be in the recent past
++	 * of "jiffies". If there are no hr_timers registered, "hr_expires"
++	 * will be "jiffies + MAX_JIFFY_OFFSET"; this is *just* short of being
++	 * considered to be before "jiffies". This makes it very likely that
++	 * "hr_expires" *will* be considered to be before "expires".
++	 * So we must check when there are pending timers (expires <= jiffies)
++	 * to ensure that we don't accidently tell the caller that there is
++	 * nothing scheduled until half an epoch (MAX_JIFFY_OFFSET)!
++	 */
++	if (time_before(jiffies, expires) && time_before(hr_expires, expires))
+ 		return hr_expires;
+ 
+ 	return expires;
