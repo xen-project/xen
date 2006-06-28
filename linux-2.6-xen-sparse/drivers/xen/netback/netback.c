@@ -43,7 +43,7 @@
 static void netif_idx_release(u16 pending_idx);
 static void netif_page_release(struct page *page);
 static void make_tx_response(netif_t *netif, 
-			     u16      id,
+			     netif_tx_request_t *txp,
 			     s8       st);
 static int  make_rx_response(netif_t *netif, 
 			     u16      id, 
@@ -481,7 +481,7 @@ inline static void net_tx_action_dealloc(void)
 
 		netif = pending_tx_info[pending_idx].netif;
 
-		make_tx_response(netif, pending_tx_info[pending_idx].req.id, 
+		make_tx_response(netif, &pending_tx_info[pending_idx].req, 
 				 NETIF_RSP_OKAY);
 
 		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
@@ -496,7 +496,7 @@ static void netbk_tx_err(netif_t *netif, RING_IDX end)
 
 	do {
 		netif_tx_request_t *txp = RING_GET_REQUEST(&netif->tx, cons);
-		make_tx_response(netif, txp->id, NETIF_RSP_ERROR);
+		make_tx_response(netif, txp, NETIF_RSP_ERROR);
 	} while (++cons < end);
 	netif->tx.req_cons = cons;
 	netif_schedule_work(netif);
@@ -581,7 +581,7 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 	err = mop->status;
 	if (unlikely(err)) {
 		txp = &pending_tx_info[pending_idx].req;
-		make_tx_response(netif, txp->id, NETIF_RSP_ERROR);
+		make_tx_response(netif, txp, NETIF_RSP_ERROR);
 		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
 		netif_put(netif);
 	} else {
@@ -614,7 +614,7 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 
 		/* Error on this fragment: respond to client with an error. */
 		txp = &pending_tx_info[pending_idx].req;
-		make_tx_response(netif, txp->id, NETIF_RSP_ERROR);
+		make_tx_response(netif, txp, NETIF_RSP_ERROR);
 		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
 		netif_put(netif);
 
@@ -898,7 +898,7 @@ irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static void make_tx_response(netif_t *netif, 
-			     u16      id,
+			     netif_tx_request_t *txp,
 			     s8       st)
 {
 	RING_IDX i = netif->tx.rsp_prod_pvt;
@@ -906,7 +906,7 @@ static void make_tx_response(netif_t *netif,
 	int notify;
 
 	resp = RING_GET_RESPONSE(&netif->tx, i);
-	resp->id     = id;
+	resp->id     = txp->id;
 	resp->status = st;
 
 	netif->tx.rsp_prod_pvt = ++i;
