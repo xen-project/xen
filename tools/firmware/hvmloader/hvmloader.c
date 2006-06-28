@@ -23,6 +23,7 @@
  */
 #include "roms.h"
 #include "../acpi/acpi2_0.h"  /* for ACPI_PHYSICAL_ADDRESS */
+#include <xen/hvm/hvm_info_table.h>
 
 /* memory map */
 #define VGABIOS_PHYSICAL_ADDRESS	0x000C0000
@@ -71,6 +72,8 @@ asm(
 
 extern int get_acpi_enabled(void);
 extern int acpi_madt_update(unsigned char* acpi_start);
+extern void create_mp_tables(void);
+struct hvm_info_table *get_hvm_info_table(void);
 
 static inline void
 outw(unsigned short addr, unsigned short val)
@@ -162,10 +165,15 @@ check_amd(void)
 int
 main(void)
 {
+	struct hvm_info_table *t = get_hvm_info_table();
+
 	puts("HVM Loader\n");
 
 	puts("Loading ROMBIOS ...\n");
 	memcpy((void *)ROMBIOS_PHYSICAL_ADDRESS, rombios, sizeof(rombios));
+	if (t->apic_enabled)
+		create_mp_tables();
+	
 	if (cirrus_check()) {
 		puts("Loading Cirrus VGABIOS ...\n");
 		memcpy((void *)VGABIOS_PHYSICAL_ADDRESS,
