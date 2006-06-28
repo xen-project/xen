@@ -134,9 +134,10 @@ struct skb_frag_struct {
 struct skb_shared_info {
 	atomic_t	dataref;
 	unsigned short	nr_frags;
-	unsigned short	tso_size;
-	unsigned short	tso_segs;
-	unsigned short  ufo_size;
+	unsigned short	gso_size;
+	/* Warning: this field is not always filled in (UFO)! */
+	unsigned short	gso_segs;
+	unsigned short  gso_type;
 	unsigned int    ip6_frag_id;
 	struct sk_buff	*frag_list;
 	skb_frag_t	frags[MAX_SKB_FRAGS];
@@ -166,6 +167,14 @@ enum {
 	SKB_FCLONE_UNAVAILABLE,
 	SKB_FCLONE_ORIG,
 	SKB_FCLONE_CLONE,
+};
+
+enum {
+	SKB_GSO_TCPV4 = 1 << 0,
+	SKB_GSO_UDPV4 = 1 << 1,
+
+	/* This indicates the skb is from an untrusted source. */
+	SKB_GSO_DODGY = 1 << 2,
 };
 
 /** 
@@ -1157,18 +1166,34 @@ static inline int skb_can_coalesce(struct sk_buff *skb, int i,
 	return 0;
 }
 
+static inline int __skb_linearize(struct sk_buff *skb)
+{
+	return __pskb_pull_tail(skb, skb->data_len) ? 0 : -ENOMEM;
+}
+
 /**
  *	skb_linearize - convert paged skb to linear one
  *	@skb: buffer to linarize
- *	@gfp: allocation mode
  *
  *	If there is no free memory -ENOMEM is returned, otherwise zero
  *	is returned and the old skb data released.
  */
-extern int __skb_linearize(struct sk_buff *skb, gfp_t gfp);
-static inline int skb_linearize(struct sk_buff *skb, gfp_t gfp)
+static inline int skb_linearize(struct sk_buff *skb)
 {
-	return __skb_linearize(skb, gfp);
+	return skb_is_nonlinear(skb) ? __skb_linearize(skb) : 0;
+}
+
+/**
+ *	skb_linearize_cow - make sure skb is linear and writable
+ *	@skb: buffer to process
+ *
+ *	If there is no free memory -ENOMEM is returned, otherwise zero
+ *	is returned and the old skb data released.
+ */
+static inline int skb_linearize_cow(struct sk_buff *skb)
+{
+	return skb_is_nonlinear(skb) || skb_cloned(skb) ?
+	       __skb_linearize(skb) : 0;
 }
 
 /**
@@ -1263,6 +1288,7 @@ extern void	       skb_split(struct sk_buff *skb,
 				 struct sk_buff *skb1, const u32 len);
 
 extern void	       skb_release_data(struct sk_buff *skb);
+extern struct sk_buff *skb_segment(struct sk_buff *skb, int features);
 
 static inline void *skb_header_pointer(const struct sk_buff *skb, int offset,
 				       int len, void *buffer)
