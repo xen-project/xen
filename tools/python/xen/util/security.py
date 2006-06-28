@@ -22,7 +22,7 @@ import logging
 import sys, os, string, re
 import traceback
 import shutil
-from xml.marshal import generic
+#from xml.marshal import generic
 from xen.lowlevel import acm
 from xen.xend import sxp
 from xen.xend.XendLogging import log
@@ -555,13 +555,16 @@ def get_res_label(resource):
     if not os.path.isfile(configfile):
         log.info("Resource label file not found.")
         return default_res_label()
-    fd = open(configfile, "rb")
-    res_label_cache = generic.load(fd)
-    fd.close()
+#
+# Commented out pending replacement for xml.marshal.generic
+#
+#     fd = open(configfile, "rb")
+#     res_label_cache = generic.load(fd)
+#     fd.close()
 
-    # find the resource information
-    if res_label_cache.has_key(resource):
-        (policy, label) = res_label_cache[resource]
+#     # find the resource information
+#     if res_label_cache.has_key(resource):
+#         (policy, label) = res_label_cache[resource]
 
     return (label, policy)
 
