@@ -21,7 +21,7 @@
 import sys, os
 import string
 import traceback
-from xml.marshal import generic
+#from xml.marshal import generic
 from xen.util import security
 
 def usage():
@@ -48,7 +48,7 @@ def get_resource_data():
         security.err("Resource file not found.")
 
     fd = open(file, "rb")
-    access_control = generic.load(fd)
+#    access_control = generic.load(fd)
     fd.close()
     return access_control
 

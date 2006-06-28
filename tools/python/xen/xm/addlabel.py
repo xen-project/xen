@@ -22,7 +22,7 @@
 import sys, os
 import string
 import traceback
-from xml.marshal import generic
+#from xml.marshal import generic
 from xen.util import security
 
 def usage():
@@ -88,7 +88,7 @@ def add_resource_label(label, resource, policyref):
             access_control = {}
         else:
             fd = open(file, "rb")
-            access_control = generic.load(fd)
+#            access_control = generic.load(fd)
             fd.close()
 
         if access_control.has_key(resource):
@@ -98,7 +98,7 @@ def add_resource_label(label, resource, policyref):
         new_entry = { resource : tuple([policyref, label]) }
         access_control.update(new_entry)
         fd = open(file, "wb")
-        generic.dump(access_control, fd)
+#        generic.dump(access_control, fd)
         fd.close()
 
     except security.ACMError:

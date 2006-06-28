@@ -21,7 +21,7 @@
 import sys, os, re
 import string
 import traceback
-from xml.marshal import generic
+#from xml.marshal import generic
 from xen.util import security
 
 def usage():
@@ -41,7 +41,7 @@ def rm_resource_label(resource):
         file = security.res_label_filename
         if os.path.isfile(file):
             fd = open(file, "rb")
-            access_control = generic.load(fd)
+#            access_control = generic.load(fd)
             fd.close()
         else:
             security.err("Resource file not found, cannot remove label!")
@@ -50,7 +50,7 @@ def rm_resource_label(resource):
         if access_control.has_key(resource):
             del access_control[resource]
             fd = open(file, "wb")
-            generic.dump(access_control, fd)
+#            generic.dump(access_control, fd)
             fd.close()
         else:
             security.err("Label does not exist in resource label file.")
