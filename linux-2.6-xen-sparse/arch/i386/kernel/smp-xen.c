@@ -442,6 +442,7 @@ void flush_tlb_mm(struct mm_struct * mm)
 { xen_tlb_flush_mask(&mm->cpu_vm_mask); }
 void flush_tlb_page(struct vm_area_struct *vma, unsigned long va)
 { xen_invlpg_mask(&vma->vm_mm->cpu_vm_mask, va); }
+EXPORT_SYMBOL(flush_tlb_page);
 void flush_tlb_all(void)
 { xen_tlb_flush_all(); }
 
