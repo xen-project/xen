@@ -68,7 +68,7 @@ static int parseelfimage(const char *image,
     Elf_Ehdr *ehdr = (Elf_Ehdr *)image;
     Elf_Phdr *phdr;
     Elf_Shdr *shdr;
-    unsigned long kernstart = ~0UL, kernend=0UL, vaddr, virt_base, elf_pa_off;
+    Elf_Addr kernstart = ~0, kernend = 0, vaddr, virt_base, elf_pa_off;
     const char *shstrtab;
     char *guestinfo=NULL, *p;
     int h, virt_base_defined, elf_pa_off_defined;

@@ -23,7 +23,7 @@ int parseelfimage(struct domain_setup_info *dsi)
     Elf_Ehdr *ehdr = (Elf_Ehdr *)dsi->image_addr;
     Elf_Phdr *phdr;
     Elf_Shdr *shdr;
-    unsigned long kernstart = ~0UL, kernend=0UL, vaddr, virt_base, elf_pa_off;
+    Elf_Addr kernstart = ~0, kernend = 0, vaddr, virt_base, elf_pa_off;
     char *shstrtab, *guestinfo=NULL, *p;
     char *elfbase = (char *)dsi->image_addr;
     int h, virt_base_defined, elf_pa_off_defined;
