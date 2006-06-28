@@ -19,6 +19,16 @@
  * the appropriate req_event or rsp_event field in the shared ring.
  */
 
+/*
+ * This is the 'wire' format for packets:
+ *  Request 1: netif_tx_request -- NETTXF_* (any flags)
+ * [Request 2: netif_tx_extra]  (only if request 1 has NETTXF_extra_info)
+ *  Request 3: netif_tx_request -- NETTXF_more_data
+ *  Request 4: netif_tx_request -- NETTXF_more_data
+ *  ...
+ *  Request N: netif_tx_request -- 0
+ */
+
 /* Protocol checksum field is blank in the packet (hardware offload)? */
 #define _NETTXF_csum_blank     (0)
 #define  NETTXF_csum_blank     (1U<<_NETTXF_csum_blank)
@@ -27,9 +37,16 @@
 #define _NETTXF_data_validated (1)
 #define  NETTXF_data_validated (1U<<_NETTXF_data_validated)
 
-/* Packet continues in the request. */
+/* Packet continues in the next request descriptor. */
 #define _NETTXF_more_data      (2)
 #define  NETTXF_more_data      (1U<<_NETTXF_more_data)
+
+/* Packet has GSO fields in the following descriptor (netif_tx_extra.u.gso). */
+#define _NETTXF_gso            (3)
+#define  NETTXF_gso            (1U<<_NETTXF_gso)
+
+/* This descriptor is followed by an extra-info descriptor (netif_tx_extra). */
+#define  NETTXF_extra_info     (NETTXF_gso)
 
 struct netif_tx_request {
     grant_ref_t gref;      /* Reference to buffer page */
@@ -39,6 +56,18 @@ struct netif_tx_request {
     uint16_t size;         /* Packet size in bytes.       */
 };
 typedef struct netif_tx_request netif_tx_request_t;
+
+/* This structure needs to fit within netif_tx_request for compatibility. */
+struct netif_tx_extra {
+    union {
+        /* NETTXF_gso: Generic Segmentation Offload. */
+        struct netif_tx_gso {
+            uint16_t size;	   /* GSO MSS. */
+            uint16_t segs;	   /* GSO segment count. */
+            uint16_t type;	   /* GSO type. */
+        } gso;
+    } u;
+};
 
 struct netif_tx_response {
     uint16_t id;
@@ -78,6 +107,8 @@ DEFINE_RING_TYPES(netif_rx, struct netif_rx_request, struct netif_rx_response);
 #define NETIF_RSP_DROPPED         -2
 #define NETIF_RSP_ERROR           -1
 #define NETIF_RSP_OKAY             0
+/* No response: used for auxiliary requests (e.g., netif_tx_extra). */
+#define NETIF_RSP_NULL             1
 
 #endif
 
