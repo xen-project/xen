@@ -996,6 +996,10 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
 	clear_bit(X86_FEATURE_HT, &edx);  /* clear the hyperthread bit */
 	ebx &= 0xFF00FFFF;  /* clear the logical processor count when HTT=0 */
 	ebx |= 0x00010000;  /* set to 1 just for precaution */
+
+	/* Disable machine check architecture */
+	clear_bit(X86_FEATURE_MCA, &edx);
+	clear_bit(X86_FEATURE_MCE, &edx);
     }
     else if ( ( input > 0x00000005 ) && ( input < 0x80000000 ) )
     {
