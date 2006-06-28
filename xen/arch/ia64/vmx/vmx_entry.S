@@ -407,6 +407,7 @@ GLOBAL_ENTRY(ia64_vmm_entry)
     ;;
     (p1) add r29=PAL_VPS_RESUME_NORMAL,r20
     (p2) add r29=PAL_VPS_RESUME_HANDLER,r20
+    (p2) ld8 r26=[r25]
     ;;
 ia64_vmm_entry_out:    
     mov pr=r23,-2
