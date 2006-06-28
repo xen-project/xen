@@ -988,6 +988,56 @@ def parseCommandLine(argv):
     return (gopts, config)
 
 
+def config_security_check(config, verbose):
+    """Checks each resource listed in the config to see if the active
+       policy will permit creation of a new domain using the config.
+       Returns 1 if the config passes all tests, otherwise 0.
+    """
+    answer = 1
+
+    # get the domain acm_label
+    domain_label = None
+    domain_policy = None
+    for x in sxp.children(config):
+        if sxp.name(x) == 'security':
+            domain_label = sxp.child_value(sxp.name(sxp.child0(x)), 'label')
+            domain_policy = sxp.child_value(sxp.name(sxp.child0(x)), 'policy')
+
+    # if no domain label, use default
+    if not domain_label and security.on():
+        domain_label = security.ssidref2label(security.NULL_SSIDREF)
+        domain_policy = 'NULL'
+    elif not domain_label:
+        domain_label = ""
+        domain_policy = 'NULL'
+
+    if verbose:
+        print "Checking resources:"
+
+    # build a list of all resources in the config file
+    resources = []
+    for x in sxp.children(config):
+        if sxp.name(x) == 'device':
+            if sxp.name(sxp.child0(x)) == 'vbd':
+                resources.append(sxp.child_value(sxp.child0(x), 'uname'))
+
+    # perform a security check on each resource
+    for resource in resources:
+        try:
+            security.res_security_check(resource, domain_label)
+            if verbose:
+                print "   %s: PERMITTED" % (resource)
+
+        except security.ACMError:
+            print "   %s: DENIED" % (resource)
+            (res_label, res_policy) = security.get_res_label(resource)
+            print "   --> res:"+res_label+" ("+res_policy+")"
+            print "   --> dom:"+domain_label+" ("+domain_policy+")"
+            answer = 0
+
+    return answer
+
+
 def main(argv):
     try:
         (opts, config) = parseCommandLine(argv)
@@ -1000,9 +1050,12 @@ def main(argv):
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
     else:
-        dom = make_domain(opts, config)
-        if opts.vals.console_autoconnect:
-            console.execConsole(dom)
+        if not config_security_check(config, verbose=0):
+            err("Resource access violation")
+        else:
+            dom = make_domain(opts, config)
+            if opts.vals.console_autoconnect:
+                console.execConsole(dom)
         
 if __name__ == '__main__':
     main(sys.argv)
