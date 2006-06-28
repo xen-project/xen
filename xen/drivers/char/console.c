@@ -741,6 +741,15 @@ void panic(const char *fmt, ...)
     machine_restart(0);
 }
 
+void __bug(char *file, int line)
+{
+    console_start_sync();
+    debugtrace_dump();
+    printk("BUG at %s:%d\n", file, line);
+    FORCE_CRASH();
+    for ( ; ; ) ;
+}
+
 /*
  * Local variables:
  * mode: C

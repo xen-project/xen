@@ -8,19 +8,23 @@
 #include <xen/xmalloc.h>
 #include <xen/string.h>
 
-#define BUG() do {					\
-    debugtrace_dump();                                  \
-    printk("BUG at %s:%d\n", __FILE__, __LINE__);	\
-    FORCE_CRASH();                                      \
-} while ( 0 )
-
+extern void __bug(char *file, int line) __attribute__((noreturn));
+#define BUG() __bug(__FILE__, __LINE__)
 #define BUG_ON(_p) do { if (_p) BUG(); } while ( 0 )
 
 /* Force a compilation error if condition is true */
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2 * !!(condition)]))
 
 #ifndef NDEBUG
-#define ASSERT(_p) { if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s\n", #_p , __LINE__, __FILE__); BUG(); } }
+#define ASSERT(_p)                                                      \
+    do {                                                                \
+        if ( !(_p) )                                                    \
+        {                                                               \
+            printk("Assertion '%s' failed, line %d, file %s\n", #_p ,   \
+                   __LINE__, __FILE__);                                 \
+            BUG();                                                      \
+        }                                                               \
+    } while ( 0 )
 #else
 #define ASSERT(_p) ((void)0)
 #endif
