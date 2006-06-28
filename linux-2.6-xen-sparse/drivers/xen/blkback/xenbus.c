@@ -43,7 +43,6 @@ static int connect_ring(struct backend_info *);
 static void backend_changed(struct xenbus_watch *, const char **,
 			    unsigned int);
 
-
 static void update_blkif_status(blkif_t *blkif)
 { 
 	int err;
@@ -72,6 +71,70 @@ static void update_blkif_status(blkif_t *blkif)
 	}
 }
 
+
+/****************************************************************
+ *  sysfs interface for VBD I/O requests
+ */
+
+#ifdef CONFIG_SYSFS
+
+#define VBD_SHOW(name, format, args...)					\
+	static ssize_t show_##name(struct device *_dev,			\
+				   struct device_attribute *attr,	\
+				   char *buf)				\
+	{								\
+		struct xenbus_device *dev = to_xenbus_device(_dev);	\
+		struct backend_info *be = dev->dev.driver_data;		\
+									\
+		return sprintf(buf, format, ##args);			\
+	}								\
+	DEVICE_ATTR(name, S_IRUGO, show_##name, NULL)
+
+VBD_SHOW(oo_req, "%d\n", be->blkif->st_oo_req);
+VBD_SHOW(rd_req, "%d\n", be->blkif->st_rd_req);
+VBD_SHOW(wr_req, "%d\n", be->blkif->st_wr_req);
+
+static struct attribute *vbdstat_attrs[] = {
+	&dev_attr_oo_req.attr,
+	&dev_attr_rd_req.attr,
+	&dev_attr_wr_req.attr,
+	NULL
+};
+
+static struct attribute_group vbdstat_group = {
+	.name = "statistics",
+	.attrs = vbdstat_attrs,
+};
+
+int xenvbd_sysfs_addif(struct xenbus_device *dev)
+{
+	int error = 0;
+	
+	error = sysfs_create_group(&dev->dev.kobj,
+				   &vbdstat_group);
+	if (error)
+		goto fail;
+	
+	return 0;
+	
+fail:
+	sysfs_remove_group(&dev->dev.kobj,
+			   &vbdstat_group);
+	return error;
+}
+
+void xenvbd_sysfs_delif(struct xenbus_device *dev)
+{
+	sysfs_remove_group(&dev->dev.kobj,
+			   &vbdstat_group);
+}
+
+#else
+
+#define xenvbd_sysfs_addif(dev) (0)
+#define xenvbd_sysfs_delif(dev) ((void)0)
+
+#endif /* CONFIG_SYSFS */
 
 static ssize_t show_physical_device(struct device *_dev,
 				    struct device_attribute *attr, char *buf)
@@ -115,6 +178,7 @@ static int blkback_remove(struct xenbus_device *dev)
 
 	device_remove_file(&dev->dev, &dev_attr_physical_device);
 	device_remove_file(&dev->dev, &dev_attr_mode);
+	xenvbd_sysfs_delif(dev);
 
 	kfree(be);
 	dev->dev.driver_data = NULL;
@@ -237,6 +301,7 @@ static void backend_changed(struct xenbus_watch *watch,
 
 		device_create_file(&dev->dev, &dev_attr_physical_device);
 		device_create_file(&dev->dev, &dev_attr_mode);
+		xenvbd_sysfs_addif(dev);
 
 		/* We're potentially connected now */
 		update_blkif_status(be->blkif); 
