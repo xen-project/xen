@@ -32,7 +32,7 @@ struct xen_memory_reservation {
     XEN_GUEST_HANDLE(xen_pfn_t) extent_start;
 
     /* Number of extents, and size/alignment of each (2^extent_order pages). */
-    unsigned long  nr_extents;
+    xen_ulong_t    nr_extents;
     unsigned int   extent_order;
 
     /*
@@ -90,7 +90,7 @@ struct xen_memory_exchange {
      *     command will be non-zero.
      *  5. THIS FIELD MUST BE INITIALISED TO ZERO BY THE CALLER!
      */
-    unsigned long nr_exchanged;
+    xen_ulong_t nr_exchanged;
 };
 typedef struct xen_memory_exchange xen_memory_exchange_t;
 DEFINE_XEN_GUEST_HANDLE(xen_memory_exchange_t);
@@ -148,8 +148,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_machphys_mfn_list_t);
  */
 #define XENMEM_machphys_mapping     12
 struct xen_machphys_mapping {
-    unsigned long v_start, v_end; /* Start and end virtual addresses.   */
-    unsigned long max_mfn;        /* Maximum MFN that can be looked up. */
+    xen_ulong_t v_start, v_end; /* Start and end virtual addresses.   */
+    xen_ulong_t max_mfn;        /* Maximum MFN that can be looked up. */
 };
 typedef struct xen_machphys_mapping xen_machphys_mapping_t;
 DEFINE_XEN_GUEST_HANDLE(xen_machphys_mapping_t);
@@ -170,7 +170,7 @@ struct xen_add_to_physmap {
     unsigned int space;
 
     /* Index into source mapping space. */
-    unsigned long idx;
+    xen_ulong_t idx;
 
     /* GPFN where the source mapping page should appear. */
     xen_pfn_t     gpfn;
@@ -188,7 +188,7 @@ struct xen_translate_gpfn_list {
     domid_t domid;
 
     /* Length of list. */
-    unsigned long nr_gpfns;
+    xen_ulong_t nr_gpfns;
 
     /* List of GPFNs to translate. */
     XEN_GUEST_HANDLE(xen_pfn_t) gpfn_list;

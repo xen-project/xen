@@ -21,7 +21,7 @@
 import sys, os, re
 import string
 import traceback
-from xen.util import dictio
+#from xml.marshal import generic
 from xen.util import security
 
 def usage():
@@ -33,15 +33,17 @@ def usage():
 def get_resource_label(resource):
     """Gets the resource label
     """
-    # read in the resource file
-    file = security.res_label_filename
     try:
-        access_control = dictio.dict_read("resources", file)
-    except:
-        print "Resource label file not found"
-        return
+        # read in the resource file
+        file = security.res_label_filename
+        if os.path.isfile(file):
+            fd = open(file, "rb")
+#            access_control = generic.load(fd)
+            fd.close()
+        else:
+            print "Resource label file not found"
+            return
 
-    try:
         # get the entry and print label
         if access_control.has_key(resource):
             policy = access_control[resource][0]
@@ -98,6 +100,7 @@ def get_domain_label(configfile):
         data = data.strip()
         data = data.lstrip("[\'")
         data = data.rstrip("\']")
+        (p, l) = data.split(",")
         print data
 
     except security.ACMError:

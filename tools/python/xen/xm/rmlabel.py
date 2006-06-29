@@ -21,7 +21,7 @@
 import sys, os, re
 import string
 import traceback
-from xen.util import dictio
+#from xml.marshal import generic
 from xen.util import security
 
 def usage():
@@ -36,18 +36,22 @@ def usage():
 def rm_resource_label(resource):
     """Removes a resource label from the global resource label file.
     """
-    # read in the resource file
-    file = security.res_label_filename
     try:
-        access_control = dictio.dict_read("resources", file)
-    except:
-        security.err("Resource file not found, cannot remove label!")
+        # read in the resource file
+        file = security.res_label_filename
+        if os.path.isfile(file):
+            fd = open(file, "rb")
+#            access_control = generic.load(fd)
+            fd.close()
+        else:
+            security.err("Resource file not found, cannot remove label!")
 
-    try:
         # remove the entry and update file
         if access_control.has_key(resource):
             del access_control[resource]
-            dictio.dict_write(access_control, "resources", file)
+            fd = open(file, "wb")
+#            generic.dump(access_control, fd)
+            fd.close()
         else:
             security.err("Label does not exist in resource label file.")
 

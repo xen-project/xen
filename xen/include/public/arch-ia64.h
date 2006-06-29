@@ -40,6 +40,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 #ifndef __ASSEMBLY__
 
+typedef unsigned long xen_ulong_t;
+
 #define MAX_NR_SECTION  32  /* at most 32 memory holes */
 struct mm_section {
     unsigned long start;  /* start of memory hole */
