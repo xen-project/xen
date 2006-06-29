@@ -415,11 +415,11 @@ static int suspend_and_state(int (*suspend)(int), int xc_handle, int io_fd,
 ** which entries do not require canonicalization (in particular, those
 ** entries which map the virtual address reserved for the hypervisor).
 */
-void canonicalize_pagetable(unsigned long type, unsigned long pfn,
-                             const void *spage, void *dpage)
+int canonicalize_pagetable(unsigned long type, unsigned long pfn,
+                           const void *spage, void *dpage)
 {
 
-    int i, pte_last, xen_start, xen_end;
+    int i, pte_last, xen_start, xen_end, race = 0; 
     uint64_t pte;
 
     /*
@@ -481,7 +481,8 @@ void canonicalize_pagetable(unsigned long type, unsigned long pfn,
                    is quite feasible under live migration */
                 DPRINTF("PT Race: [%08lx,%d] pte=%llx, mfn=%08lx\n",
                         type, i, (unsigned long long)pte, mfn);
-                pfn = 0; /* zap it - we'll retransmit this page later */
+                pfn  = 0;  /* zap it - we'll retransmit this page later */
+                race = 1;  /* inform the caller of race; fatal if !live */ 
             } else
                 pfn = mfn_to_pfn(mfn);
 
@@ -496,7 +497,7 @@ void canonicalize_pagetable(unsigned long type, unsigned long pfn,
 
     }
 
-    return;
+    return race; 
 }
 
 
@@ -567,7 +568,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     int rc = 1, i, j, last_iter, iter = 0;
     int live  = (flags & XCFLAGS_LIVE);
     int debug = (flags & XCFLAGS_DEBUG);
-    int sent_last_iter, skip_this_iter;
+    int race = 0, sent_last_iter, skip_this_iter;
 
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
@@ -1000,7 +1001,11 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 if (pagetype >= L1TAB && pagetype <= L4TAB) {
 
                     /* We have a pagetable page: need to rewrite it. */
-                    canonicalize_pagetable(pagetype, pfn, spage, page);
+                    race = 
+                        canonicalize_pagetable(pagetype, pfn, spage, page); 
+
+                    if(race && !live) 
+                        goto out; 
 
                     if (ratewrite(io_fd, page, PAGE_SIZE) != PAGE_SIZE) {
                         ERR("Error when writing to state file (4)");
