@@ -60,7 +60,7 @@ void *kmap_atomic_pte(struct page *page, enum km_type type)
 
 void kunmap_atomic(void *kvaddr, enum km_type type)
 {
-#ifdef CONFIG_DEBUG_HIGHMEM
+#if defined(CONFIG_DEBUG_HIGHMEM) || defined(CONFIG_XEN)
 	unsigned long vaddr = (unsigned long) kvaddr & PAGE_MASK;
 	enum fixed_addresses idx = type + KM_TYPE_NR*smp_processor_id();
 
@@ -69,7 +69,9 @@ void kunmap_atomic(void *kvaddr, enum km_type type)
 		preempt_check_resched();
 		return;
 	}
+#endif
 
+#if defined(CONFIG_DEBUG_HIGHMEM)
 	if (vaddr != __fix_to_virt(FIX_KMAP_BEGIN+idx))
 		BUG();
 
@@ -86,8 +88,6 @@ void kunmap_atomic(void *kvaddr, enum km_type type)
 	 * XXX TODO: We could make this faster by only zapping when
 	 * kmap_flush_unused is called but that is trickier and more invasive.
 	 */
-	unsigned long vaddr = (unsigned long) kvaddr & PAGE_MASK;
-	enum fixed_addresses idx = type + KM_TYPE_NR*smp_processor_id();
 	pte_clear(&init_mm, vaddr, kmap_pte-idx);
 #endif
 
