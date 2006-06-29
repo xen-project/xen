@@ -62,7 +62,7 @@ typedef struct netif_tx_request netif_tx_request_t;
 
 /* netif_extra_info flags. */
 #define _XEN_NETIF_EXTRA_FLAG_MORE (0)
-#define XEN_NETIF_EXTRA_FLAG_MORE  (1U<<_XEN_NETIF_EXTRA_MORE)
+#define XEN_NETIF_EXTRA_FLAG_MORE  (1U<<_XEN_NETIF_EXTRA_FLAG_MORE)
 
 /* GSO types - only TCPv4 currently supported. */
 #define XEN_NETIF_GSO_TCPV4        (1)
