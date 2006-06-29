@@ -22,7 +22,7 @@
 import sys, os
 import string
 import traceback
-#from xml.marshal import generic
+from xen.util import dictio
 from xen.util import security
 
 def usage():
@@ -79,17 +79,13 @@ def add_resource_label(label, resource, policyref):
             return
 
         # see if this resource is already in the file
+        access_control = {}
         file = security.res_label_filename
-        if not os.path.isfile(file):
+        try:
+            access_control = dictio.dict_read("resources", file)
+        except:
             print "Resource file not found, creating new file at:"
             print "%s" % (file)
-            fd = open(file, "w")
-            fd.close();
-            access_control = {}
-        else:
-            fd = open(file, "rb")
-#            access_control = generic.load(fd)
-            fd.close()
 
         if access_control.has_key(resource):
             security.err("This resource is already labeled.")
@@ -97,9 +93,7 @@ def add_resource_label(label, resource, policyref):
         # write the data to file
         new_entry = { resource : tuple([policyref, label]) }
         access_control.update(new_entry)
-        fd = open(file, "wb")
-#        generic.dump(access_control, fd)
-        fd.close()
+        dictio.dict_write(access_control, "resources", file)
 
     except security.ACMError:
         pass
