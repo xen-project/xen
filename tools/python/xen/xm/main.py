@@ -565,7 +565,7 @@ def xm_vcpu_list(args):
 
 
 def xm_reboot(args):
-    arg_check(args, "reboot", 1, 4)
+    arg_check(args, "reboot", 1, 3)
     from xen.xm import shutdown
     shutdown.main(["shutdown", "-R"] + args)
 
