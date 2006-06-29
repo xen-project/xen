@@ -21,7 +21,7 @@
 import sys, os
 import string
 import traceback
-#from xml.marshal import generic
+from xen.util import dictio
 from xen.util import security
 
 def usage():
@@ -40,24 +40,15 @@ def print_resource_data(access_control):
         print "    label:  "+label
 
 
-def get_resource_data():
-    """Returns the resource dictionary.
-    """
-    file = security.res_label_filename
-    if not os.path.isfile(file):
-        security.err("Resource file not found.")
-
-    fd = open(file, "rb")
-#    access_control = generic.load(fd)
-    fd.close()
-    return access_control
-
-
 def main (argv):
     try:
-        access_control = get_resource_data()
-        print_resource_data(access_control)
+        file = security.res_label_filename
+        access_control = dictio.dict_read("resources", file)
+    except:
+        security.err("Resource file not found.")
 
+    try:
+        print_resource_data(access_control)
     except security.ACMError:
         pass
     except:

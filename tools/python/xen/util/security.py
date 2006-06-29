@@ -22,10 +22,10 @@ import logging
 import sys, os, string, re
 import traceback
 import shutil
-#from xml.marshal import generic
 from xen.lowlevel import acm
 from xen.xend import sxp
 from xen.xend.XendLogging import log
+from xen.util import dictio
 
 #global directories and tools for security management
 policy_dir_prefix = "/etc/xen/acm-security/policies"
@@ -551,20 +551,16 @@ def get_res_label(resource):
     (label, policy) = default_res_label()
 
     # load the resource label file
-    configfile = res_label_filename
-    if not os.path.isfile(configfile):
+    res_label_cache = {}
+    try:
+        res_label_cache = dictio.dict_read("resources", res_label_filename)
+    except:
         log.info("Resource label file not found.")
         return default_res_label()
-#
-# Commented out pending replacement for xml.marshal.generic
-#
-#     fd = open(configfile, "rb")
-#     res_label_cache = generic.load(fd)
-#     fd.close()
 
-#     # find the resource information
-#     if res_label_cache.has_key(resource):
-#         (policy, label) = res_label_cache[resource]
+    # find the resource information
+    if res_label_cache.has_key(resource):
+        (policy, label) = res_label_cache[resource]
 
     return (label, policy)
 
