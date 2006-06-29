@@ -75,6 +75,9 @@ DEFINE_SPINLOCK(balloon_lock);
 static unsigned long current_pages;
 static unsigned long target_pages;
 
+/* We increase/decrease in batches which fit in a page */
+static unsigned long frame_list[PAGE_SIZE / sizeof(unsigned long)]; 
+
 /* VM /proc information for memory */
 extern unsigned long totalram_pages;
 
@@ -172,7 +175,7 @@ static unsigned long current_target(void)
 
 static int increase_reservation(unsigned long nr_pages)
 {
-	unsigned long *frame_list, frame, pfn, i, flags;
+	unsigned long  pfn, i, flags;
 	struct page   *page;
 	long           rc;
 	struct xen_memory_reservation reservation = {
@@ -181,15 +184,8 @@ static int increase_reservation(unsigned long nr_pages)
 		.domid        = DOMID_SELF
 	};
 
-	if (nr_pages > (PAGE_SIZE / sizeof(unsigned long)))
-		nr_pages = PAGE_SIZE / sizeof(unsigned long);
-
-	frame_list = (unsigned long *)__get_free_page(GFP_KERNEL);
-	if (frame_list == NULL) {
-		frame_list = &frame;
-		if (nr_pages > 1)
-			nr_pages = 1;
-	}
+	if (nr_pages > ARRAY_SIZE(frame_list))
+		nr_pages = ARRAY_SIZE(frame_list);
 
 	balloon_lock(flags);
 
@@ -253,15 +249,12 @@ static int increase_reservation(unsigned long nr_pages)
  out:
 	balloon_unlock(flags);
 
-	if (frame_list != &frame)
-		free_page((unsigned long)frame_list);
-
 	return 0;
 }
 
 static int decrease_reservation(unsigned long nr_pages)
 {
-	unsigned long *frame_list, frame, pfn, i, flags;
+	unsigned long  pfn, i, flags;
 	struct page   *page;
 	void          *v;
 	int            need_sleep = 0;
@@ -272,15 +265,8 @@ static int decrease_reservation(unsigned long nr_pages)
 		.domid        = DOMID_SELF
 	};
 
-	if (nr_pages > (PAGE_SIZE / sizeof(unsigned long)))
-		nr_pages = PAGE_SIZE / sizeof(unsigned long);
-
-	frame_list = (unsigned long *)__get_free_page(GFP_KERNEL);
-	if (frame_list == NULL) {
-		frame_list = &frame;
-		if (nr_pages > 1)
-			nr_pages = 1;
-	}
+	if (nr_pages > ARRAY_SIZE(frame_list))
+		nr_pages = ARRAY_SIZE(frame_list);
 
 	for (i = 0; i < nr_pages; i++) {
 		if ((page = alloc_page(GFP_HIGHUSER)) == NULL) {
@@ -330,9 +316,6 @@ static int decrease_reservation(unsigned long nr_pages)
 	totalram_pages = current_pages;
 
 	balloon_unlock(flags);
-
-	if (frame_list != &frame)
-		free_page((unsigned long)frame_list);
 
 	return need_sleep;
 }
