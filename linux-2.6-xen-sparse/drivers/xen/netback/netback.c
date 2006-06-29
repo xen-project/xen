@@ -698,7 +698,7 @@ static void net_tx_action(unsigned long unused)
 	struct sk_buff *skb;
 	netif_t *netif;
 	netif_tx_request_t txreq;
-	struct netif_tx_extra extras[XEN_NETIF_EXTRA_TYPE_MAX - 1];
+	struct netif_extra_info extras[XEN_NETIF_EXTRA_TYPE_MAX - 1];
 	u16 pending_idx;
 	RING_IDX i;
 	gnttab_map_grant_ref_t *mop;
@@ -816,7 +816,7 @@ static void net_tx_action(unsigned long unused)
 		skb_reserve(skb, 16);
 
 		if (extras[XEN_NETIF_EXTRA_TYPE_GSO - 1].type) {
-			struct netif_tx_extra *gso;
+			struct netif_extra_info *gso;
 			gso = &extras[XEN_NETIF_EXTRA_TYPE_GSO - 1];
 
 			if (gso->u.gso.type != XEN_NETIF_GSO_TCPV4) {
@@ -829,7 +829,7 @@ static void net_tx_action(unsigned long unused)
 			skb_shinfo(skb)->gso_size = gso->u.gso.size;
 			skb_shinfo(skb)->gso_segs = gso->u.gso.segs;
 			skb_shinfo(skb)->gso_type =
-				SKB_GSP_TCPV4 | SKB_GSO_DOSGY;
+				SKB_GSO_TCPV4 | SKB_GSO_DODGY;
 		}
 
 		gnttab_set_map_op(mop, MMAP_VADDR(pending_idx),
