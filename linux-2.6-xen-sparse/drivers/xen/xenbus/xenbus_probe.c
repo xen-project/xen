@@ -886,28 +886,18 @@ void unregister_xenstore_notifier(struct notifier_block *nb)
 EXPORT_SYMBOL_GPL(unregister_xenstore_notifier);
 
 
-static int all_devices_ready_(struct device *dev, void *data)
+static int find_disconnected_device_(struct device *dev, void *data)
 {
 	struct xenbus_device *xendev = to_xenbus_device(dev);
-	int *result = data;
 
-	if (xendev->state != XenbusStateConnected) {
-		*result = 0;
-		return 1;
-	}
-
-	return 0;
+	return (xendev->state == XenbusStateConnected) ? 0 : 1;
 }
 
-
-static int all_devices_ready(void)
+static struct device *find_disconnected_device(struct device *start)
 {
-	int ready = 1;
-	bus_for_each_dev(&xenbus_frontend.bus, NULL, &ready,
-			 all_devices_ready_);
-	return ready;
+	return bus_find_device(&xenbus_frontend.bus, start, NULL,
+			       find_disconnected_device_);
 }
-
 
 void xenbus_probe(void *unused)
 {
@@ -1077,17 +1067,28 @@ postcore_initcall(xenbus_probe_init);
 static int __init wait_for_devices(void)
 {
 	unsigned long timeout = jiffies + 10*HZ;
+	struct device *dev = NULL;
+	struct xenbus_device *xendev;
 
 	if (!is_running_on_xen())
 		return -ENODEV;
 
 	while (time_before(jiffies, timeout)) {
-		if (all_devices_ready())
+		if ((dev = find_disconnected_device(NULL)) == NULL)
 			return 0;
+		put_device(dev);
 		schedule_timeout_interruptible(HZ/10);
 	}
 
-	printk(KERN_WARNING "XENBUS: Timeout connecting to devices!\n");
+	while (dev != NULL) {
+		xendev = to_xenbus_device(dev);
+
+		printk(KERN_WARNING "XENBUS: Timeout connecting to device: %s\n",
+		       xendev->nodename);
+
+		dev = find_disconnected_device(dev);
+	}
+
 	return 0;
 }
 
