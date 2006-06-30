@@ -109,7 +109,7 @@ VBD_SHOW(mode, "%s\n", be->mode);
 
 int xenvbd_sysfs_addif(struct xenbus_device *dev)
 {
-	int error = 0;
+	int error;
 	
 	error = device_create_file(&dev->dev, &dev_attr_physical_device);
  	if (error)
@@ -157,7 +157,8 @@ static int blkback_remove(struct xenbus_device *dev)
 		be->blkif = NULL;
 	}
 
-	xenvbd_sysfs_delif(dev);
+	if (be->major || be->minor)
+		xenvbd_sysfs_delif(dev);
 
 	kfree(be);
 	dev->dev.driver_data = NULL;
@@ -272,13 +273,18 @@ static void backend_changed(struct xenbus_watch *watch,
 		err = vbd_create(be->blkif, handle, major, minor,
 				 (NULL == strchr(be->mode, 'w')));
 		if (err) {
-			be->major = 0;
-			be->minor = 0;
+			be->major = be->minor = 0;
 			xenbus_dev_fatal(dev, err, "creating vbd structure");
 			return;
 		}
 
-		xenvbd_sysfs_addif(dev);
+		err = xenvbd_sysfs_addif(dev);
+		if (err) {
+			vbd_free(&be->blkif->vbd);
+			be->major = be->minor = 0;
+			xenbus_dev_fatal(dev, err, "creating sysfs entries");
+			return;
+		}
 
 		/* We're potentially connected now */
 		update_blkif_status(be->blkif); 
