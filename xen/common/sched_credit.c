@@ -622,9 +622,12 @@ csched_dom_cntl(
 
         if ( cmd->u.credit.weight != 0 )
         {
-            csched_priv.weight -= sdom->weight;
+            if ( !list_empty(&sdom->active_sdom_elem) )
+            {
+                csched_priv.weight -= sdom->weight;
+                csched_priv.weight += cmd->u.credit.weight;
+            }
             sdom->weight = cmd->u.credit.weight;
-            csched_priv.weight += sdom->weight;
         }
 
         if ( cmd->u.credit.cap != (uint16_t)~0U )
