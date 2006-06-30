@@ -162,12 +162,12 @@ static int parseelfimage(const char *image,
     /* Initial guess for virt_base is 0 if it is not explicitly defined. */
     p = strstr(guestinfo, "VIRT_BASE=");
     virt_base_defined = (p != NULL);
-    virt_base = virt_base_defined ? strtoul(p+10, &p, 0) : 0;
+    virt_base = virt_base_defined ? strtoull(p+10, &p, 0) : 0;
 
     /* Initial guess for elf_pa_off is virt_base if not explicitly defined. */
     p = strstr(guestinfo, "ELF_PADDR_OFFSET=");
     elf_pa_off_defined = (p != NULL);
-    elf_pa_off = elf_pa_off_defined ? strtoul(p+17, &p, 0) : virt_base;
+    elf_pa_off = elf_pa_off_defined ? strtoull(p+17, &p, 0) : virt_base;
 
     if ( elf_pa_off_defined && !virt_base_defined )
         goto bad_image;
@@ -196,7 +196,7 @@ static int parseelfimage(const char *image,
 
     dsi->v_kernentry = ehdr->e_entry;
     if ( (p = strstr(guestinfo, "VIRT_ENTRY=")) != NULL )
-        dsi->v_kernentry = strtoul(p+11, &p, 0);
+        dsi->v_kernentry = strtoull(p+11, &p, 0);
 
     if ( (kernstart > kernend) ||
          (dsi->v_kernentry < kernstart) ||

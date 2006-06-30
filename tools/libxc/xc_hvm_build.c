@@ -208,11 +208,11 @@ static int setup_guest(int xc_handle,
     v_end = (unsigned long long)memsize << 20;
 
     IPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n"
-           "  Loaded HVM loader:    %08lx->%08lx\n"
-           "  TOTAL:                %08lx->%016llx\n",
+           "  Loaded HVM loader:    %016llx->%016llx\n"
+           "  TOTAL:                %016llx->%016llx\n",
            dsi.v_kernstart, dsi.v_kernend,
            dsi.v_start, v_end);
-    IPRINTF("  ENTRY ADDRESS:        %08lx\n", dsi.v_kernentry);
+    IPRINTF("  ENTRY ADDRESS:        %016llx\n", dsi.v_kernentry);
 
     if ( (v_end - dsi.v_start) > ((unsigned long long)nr_pages << PAGE_SHIFT) )
     {
