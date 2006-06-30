@@ -301,7 +301,7 @@ int xen_create_contiguous_region(
 	if (xen_feature(XENFEAT_auto_translated_physmap))
 		return 0;
 
-	if (order > MAX_CONTIG_ORDER)
+	if (unlikely(order > MAX_CONTIG_ORDER))
 		return -ENOMEM;
 
 	set_xen_guest_handle(exchange.in.extent_start, in_frames);
@@ -397,7 +397,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	    !test_bit(__pa(vstart) >> PAGE_SHIFT, contiguous_bitmap))
 		return;
 
-	if (order > MAX_CONTIG_ORDER)
+	if (unlikely(order > MAX_CONTIG_ORDER))
 		return;
 
 	set_xen_guest_handle(exchange.in.extent_start, &in_frame);
@@ -419,7 +419,8 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	/* 2. Zap current PTEs. */
 	for (i = 0; i < (1UL<<order); i++) {
 		if (HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE),
-						 __pte_ma(0), 0));
+						 __pte_ma(0), 0))
+			BUG();
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i,
 			INVALID_P2M_ENTRY);
 		out_frames[i] = (__pa(vstart) >> PAGE_SHIFT) + i;
@@ -430,7 +431,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	success = (exchange.nr_exchanged == 1);
 	BUG_ON(!success && ((exchange.nr_exchanged != 0) || (rc == 0)));
 	BUG_ON(success && (rc != 0));
-	if (rc == -ENOSYS) {
+	if (unlikely(rc == -ENOSYS)) {
 		/* Compatibility when XENMEM_exchange is unsupported. */
 		if (HYPERVISOR_memory_op(XENMEM_decrease_reservation,
 					 &exchange.in) != 1)
