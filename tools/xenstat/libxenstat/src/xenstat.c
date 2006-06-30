@@ -760,10 +760,10 @@ static int read_attributes_vbd(const char *vbd_directory, const char *what, char
 
 	sprintf(file_name, "%s/%s/%s", SYSFS_VBD_PATH, vbd_directory, what);
 	fd = open(file_name, O_RDONLY, 0);
-	if (unlikely(fd==-1)) return -1;
+	if (fd==-1) return -1;
 	num_read = read(fd, ret, cap - 1);
 	close(fd);
-	if (unlikely(num_read<=0)) return -1;
+	if (num_read<=0) return -1;
 	ret[num_read] = '\0';
 	return num_read;
 }
