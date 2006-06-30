@@ -271,10 +271,6 @@ static unsigned long discontig_frames[1<<MAX_CONTIG_ORDER];
 int xen_create_contiguous_region(
 	unsigned long vstart, unsigned int order, unsigned int address_bits)
 {
-	pgd_t         *pgd; 
-	pud_t         *pud; 
-	pmd_t         *pmd;
-	pte_t         *pte;
 	unsigned long *in_frames = discontig_frames, out_frame;
 	unsigned long  frame, i, flags;
 	long           rc;
@@ -313,11 +309,7 @@ int xen_create_contiguous_region(
 
 	/* 1. Zap current PTEs, remembering MFNs. */
 	for (i = 0; i < (1UL<<order); i++) {
-		pgd = pgd_offset_k(vstart + (i*PAGE_SIZE));
-		pud = pud_offset(pgd, (vstart + (i*PAGE_SIZE)));
-		pmd = pmd_offset(pud, (vstart + (i*PAGE_SIZE)));
-		pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE)));
-		in_frames[i] = pte_mfn(*pte);
+		in_frames[i] = pfn_to_mfn((__pa(vstart) >> PAGE_SHIFT) + i);
 		if (HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE),
 						 __pte_ma(0), 0))
 			BUG();
@@ -372,10 +364,6 @@ int xen_create_contiguous_region(
 
 void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 {
-	pgd_t         *pgd; 
-	pud_t         *pud; 
-	pmd_t         *pmd;
-	pte_t         *pte;
 	unsigned long *out_frames = discontig_frames, in_frame;
 	unsigned long  frame, i, flags;
 	long           rc;
@@ -410,11 +398,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	contiguous_bitmap_clear(__pa(vstart) >> PAGE_SHIFT, 1UL << order);
 
 	/* 1. Find start MFN of contiguous extent. */
-	pgd = pgd_offset_k(vstart);
-	pud = pud_offset(pgd, vstart);
-	pmd = pmd_offset(pud, vstart);
-	pte = pte_offset_kernel(pmd, vstart);
-	in_frame = pte_mfn(*pte);
+	in_frame = pfn_to_mfn(__pa(vstart) >> PAGE_SHIFT);
 
 	/* 2. Zap current PTEs. */
 	for (i = 0; i < (1UL<<order); i++) {
