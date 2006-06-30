@@ -886,19 +886,6 @@ void unregister_xenstore_notifier(struct notifier_block *nb)
 EXPORT_SYMBOL_GPL(unregister_xenstore_notifier);
 
 
-static int find_disconnected_device_(struct device *dev, void *data)
-{
-	struct xenbus_device *xendev = to_xenbus_device(dev);
-
-	return (xendev->state == XenbusStateConnected) ? 0 : 1;
-}
-
-static struct device *find_disconnected_device(struct device *start)
-{
-	return bus_find_device(&xenbus_frontend.bus, start, NULL,
-			       find_disconnected_device_);
-}
-
 void xenbus_probe(void *unused)
 {
 	BUG_ON((xenstored_ready <= 0));
@@ -1050,6 +1037,37 @@ static int __init xenbus_probe_init(void)
 postcore_initcall(xenbus_probe_init);
 
 
+static int find_disconnected_device_(struct device *dev, void *data)
+{
+	struct xenbus_device *xendev = to_xenbus_device(dev);
+
+	/*
+	 * A device with no driver will never connect. We care only about
+	 * devices which should currently be in the process of connecting.
+	 */
+	if (!dev->driver)
+		return 0;
+
+	return (xendev->state != XenbusStateConnected);
+}
+
+static struct device *find_disconnected_device(struct device *start)
+{
+	return bus_find_device(&xenbus_frontend.bus, start, NULL,
+			       find_disconnected_device_);
+}
+
+static int find_driverless_device_(struct device *dev, void *data)
+{
+	return !dev->driver;
+}
+
+static struct device *find_driverless_device(struct device *start)
+{
+	return bus_find_device(&xenbus_frontend.bus, start, NULL,
+			       find_driverless_device_);
+}
+
 /*
  * On a 10 second timeout, wait for all devices currently configured.  We need
  * to do this to guarantee that the filesystems and / or network devices
@@ -1075,18 +1093,26 @@ static int __init wait_for_devices(void)
 
 	while (time_before(jiffies, timeout)) {
 		if ((dev = find_disconnected_device(NULL)) == NULL)
-			return 0;
+			break;
 		put_device(dev);
 		schedule_timeout_interruptible(HZ/10);
 	}
 
+	/* List devices which have drivers but are not yet connected. */
 	while (dev != NULL) {
 		xendev = to_xenbus_device(dev);
 
-		printk(KERN_WARNING "XENBUS: Timeout connecting to device: %s\n",
-		       xendev->nodename);
+		printk(KERN_WARNING "XENBUS: Timeout connecting "
+		       "to device: %s\n", xendev->nodename);
 
 		dev = find_disconnected_device(dev);
+	}
+
+	/* List devices with no driver (this is not necessarily an error). */
+	while ((dev = find_driverless_device(dev)) != NULL) {
+		xendev = to_xenbus_device(dev);
+		printk(KERN_INFO "XENBUS: Device with no driver: %s\n",
+		       xendev->nodename);
 	}
 
 	return 0;
