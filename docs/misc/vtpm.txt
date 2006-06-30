@@ -1,5 +1,5 @@
 Copyright: IBM Corporation (C), Intel Corporation
-17 August 2005
+29 June 2006
 Authors: Stefan Berger <stefanb@us.ibm.com> (IBM), 
          Employees of Intel Corp
 
@@ -9,23 +9,33 @@ instance and doing a short test to verify success. It is assumed
 that the user is fairly familiar with compiling and installing XEN
 and Linux on a machine. 
  
-Production Prerequisites: An x86-based machine machine with an ATMEL or
-National Semiconductor (NSC) TPM on the motherboard.
+Production Prerequisites: An x86-based machine machine with a
+Linux-supported TPM on the motherboard (NSC, Atmel, Infineon, TPM V1.2).
 Development Prerequisites: An emulator for TESTING ONLY is provided
 
 
-Compiling XEN tree:
--------------------
+Compiling the XEN tree:
+-----------------------
 
 Compile the XEN tree as usual after the following lines set in the
 linux-2.6.??-xen/.config file:
 
-CONFIG_XEN_TPMDEV_BACKEND=y
+CONFIG_XEN_TPMDEV_BACKEND=m
 
-CONFIG_TCG_TPM=y
+CONFIG_TCG_TPM=m
+CONFIG_TCG_TIS=m      (supported after 2.6.17-rc4)
 CONFIG_TCG_NSC=m
 CONFIG_TCG_ATMEL=m
+CONFIG_TCG_INFINEON=m
+CONFIG_TCG_XEN=m
+<possible other TPM drivers supported by Linux>
+
+If the frontend driver needs to be compiled into the user domain
+kernel, then the following two lines should be changed.
+
+CONFIG_TCG_TPM=y
 CONFIG_TCG_XEN=y
+
 
 You must also enable the virtual TPM to be built:
 
@@ -63,7 +73,7 @@ an example of how a user domain can be configured to have a TPM
 available. It works similar to making a network interface
 available to a domain.
 
-kernel = "/boot/vmlinuz-2.6.12-xenU"
+kernel = "/boot/vmlinuz-2.6.x"
 ramdisk = "/xen/initrd_domU/U1_ramdisk.img"
 memory = 32
 name = "TPMUserDomain0"
@@ -92,7 +102,7 @@ leave out the 'vtpm' line in the configuration file.
 Running the TPM:
 ----------------
 
-To run the vTPM, dev device /dev/vtpm must be available.
+To run the vTPM, the device /dev/vtpm must be available.
 Verify that 'ls -l /dev/vtpm' shows the following output:
 
 crw-------  1 root root 10, 225 Aug 11 06:58 /dev/vtpm
@@ -101,16 +111,26 @@ If it is not available, run the following command as 'root'.
 mknod /dev/vtpm c 10 225
 
 Make sure that the vTPM is running in domain 0. To do this run the
-following
+following:
+
+modprobe tpmbk
 
 /usr/bin/vtpm_managerd
 
 Start a user domain using the 'xm create' command. Once you are in the
-shell of the user domain, you should be able to do the following:
+shell of the user domain, you should be able to do the following as
+user 'root':
 
-> cd /sys/devices/vtpm
+Insert the TPM frontend into the kernel if it has been compiled as a
+kernel module.
+
+> modprobe tpm_xenu
+
+Check the status of the TPM
+
+> cd /sys/devices/xen/vtpm-0
 > ls
-cancel  caps   pcrs    pubek
+[...]  cancel  caps   pcrs    pubek   [...]
 > cat pcrs
 PCR-00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 PCR-01: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
