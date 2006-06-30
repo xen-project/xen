@@ -76,8 +76,6 @@ static void update_blkif_status(blkif_t *blkif)
  *  sysfs interface for VBD I/O requests
  */
 
-#ifdef CONFIG_SYSFS
-
 #define VBD_SHOW(name, format, args...)					\
 	static ssize_t show_##name(struct device *_dev,			\
 				   struct device_attribute *attr,	\
@@ -106,56 +104,39 @@ static struct attribute_group vbdstat_group = {
 	.attrs = vbdstat_attrs,
 };
 
+VBD_SHOW(physical_device, "%x:%x\n", be->major, be->minor);
+VBD_SHOW(mode, "%s\n", be->mode);
+
 int xenvbd_sysfs_addif(struct xenbus_device *dev)
 {
 	int error = 0;
 	
-	error = sysfs_create_group(&dev->dev.kobj,
-				   &vbdstat_group);
+	error = device_create_file(&dev->dev, &dev_attr_physical_device);
+ 	if (error)
+		goto fail1;
+
+	error = device_create_file(&dev->dev, &dev_attr_mode);
 	if (error)
-		goto fail;
-	
+		goto fail2;
+
+	error = sysfs_create_group(&dev->dev.kobj, &vbdstat_group);
+	if (error)
+		goto fail3;
+
 	return 0;
-	
-fail:
-	sysfs_remove_group(&dev->dev.kobj,
-			   &vbdstat_group);
+
+fail3:	sysfs_remove_group(&dev->dev.kobj, &vbdstat_group);
+fail2:	device_remove_file(&dev->dev, &dev_attr_mode);
+fail1:	device_remove_file(&dev->dev, &dev_attr_physical_device);
 	return error;
 }
 
 void xenvbd_sysfs_delif(struct xenbus_device *dev)
 {
-	sysfs_remove_group(&dev->dev.kobj,
-			   &vbdstat_group);
+	sysfs_remove_group(&dev->dev.kobj, &vbdstat_group);
+	device_remove_file(&dev->dev, &dev_attr_mode);
+	device_remove_file(&dev->dev, &dev_attr_physical_device);
 }
-
-#else
-
-#define xenvbd_sysfs_addif(dev) (0)
-#define xenvbd_sysfs_delif(dev) ((void)0)
-
-#endif /* CONFIG_SYSFS */
-
-static ssize_t show_physical_device(struct device *_dev,
-				    struct device_attribute *attr, char *buf)
-{
-	struct xenbus_device *dev = to_xenbus_device(_dev);
-	struct backend_info *be = dev->dev.driver_data;
-	return sprintf(buf, "%x:%x\n", be->major, be->minor);
-}
-DEVICE_ATTR(physical_device, S_IRUSR | S_IRGRP | S_IROTH,
-	    show_physical_device, NULL);
-
-
-static ssize_t show_mode(struct device *_dev, struct device_attribute *attr,
-			 char *buf)
-{
-	struct xenbus_device *dev = to_xenbus_device(_dev);
-	struct backend_info *be = dev->dev.driver_data;
-	return sprintf(buf, "%s\n", be->mode);
-}
-DEVICE_ATTR(mode, S_IRUSR | S_IRGRP | S_IROTH, show_mode, NULL);
-
 
 static int blkback_remove(struct xenbus_device *dev)
 {
@@ -176,8 +157,6 @@ static int blkback_remove(struct xenbus_device *dev)
 		be->blkif = NULL;
 	}
 
-	device_remove_file(&dev->dev, &dev_attr_physical_device);
-	device_remove_file(&dev->dev, &dev_attr_mode);
 	xenvbd_sysfs_delif(dev);
 
 	kfree(be);
@@ -299,8 +278,6 @@ static void backend_changed(struct xenbus_watch *watch,
 			return;
 		}
 
-		device_create_file(&dev->dev, &dev_attr_physical_device);
-		device_create_file(&dev->dev, &dev_attr_mode);
 		xenvbd_sysfs_addif(dev);
 
 		/* We're potentially connected now */
