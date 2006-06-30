@@ -1037,7 +1037,7 @@ static int __init xenbus_probe_init(void)
 postcore_initcall(xenbus_probe_init);
 
 
-static int find_disconnected_device_(struct device *dev, void *data)
+static int is_disconnected_device(struct device *dev, void *data)
 {
 	struct xenbus_device *xendev = to_xenbus_device(dev);
 
@@ -1051,10 +1051,10 @@ static int find_disconnected_device_(struct device *dev, void *data)
 	return (xendev->state != XenbusStateConnected);
 }
 
-static struct device *find_disconnected_device(struct device *start)
+static int exists_disconnected_device(void)
 {
-	return bus_find_device(&xenbus_frontend.bus, start, NULL,
-			       find_disconnected_device_);
+	return bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL,
+				is_disconnected_device);
 }
 
 static int print_device_status(struct device *dev, void *data)
@@ -1091,17 +1091,12 @@ static int print_device_status(struct device *dev, void *data)
 static int __init wait_for_devices(void)
 {
 	unsigned long timeout = jiffies + 10*HZ;
-	struct device *dev = NULL;
 
 	if (!is_running_on_xen())
 		return -ENODEV;
 
-	while (time_before(jiffies, timeout)) {
-		if ((dev = find_disconnected_device(NULL)) == NULL)
-			break;
-		put_device(dev);
+	while (time_before(jiffies, timeout) && exists_disconnected_device())
 		schedule_timeout_interruptible(HZ/10);
-	}
 
 	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL,
 			 print_device_status);
