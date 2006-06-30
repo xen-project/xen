@@ -1057,15 +1057,21 @@ static struct device *find_disconnected_device(struct device *start)
 			       find_disconnected_device_);
 }
 
-static int find_driverless_device_(struct device *dev, void *data)
+static int print_device_status(struct device *dev, void *data)
 {
-	return !dev->driver;
-}
+	struct xenbus_device *xendev = to_xenbus_device(dev);
 
-static struct device *find_driverless_device(struct device *start)
-{
-	return bus_find_device(&xenbus_frontend.bus, start, NULL,
-			       find_driverless_device_);
+	if (!dev->driver) {
+		/* Information only: is this too noisy? */
+		printk(KERN_INFO "XENBUS: Device with no driver: %s\n",
+		       xendev->nodename);
+	} else if (xendev->state != XenbusStateConnected) {
+		printk(KERN_WARNING "XENBUS: Timeout connecting "
+		       "to device: %s (state %d)\n",
+		       xendev->nodename, xendev->state);
+	}
+
+	return 0;
 }
 
 /*
@@ -1086,7 +1092,6 @@ static int __init wait_for_devices(void)
 {
 	unsigned long timeout = jiffies + 10*HZ;
 	struct device *dev = NULL;
-	struct xenbus_device *xendev;
 
 	if (!is_running_on_xen())
 		return -ENODEV;
@@ -1098,22 +1103,8 @@ static int __init wait_for_devices(void)
 		schedule_timeout_interruptible(HZ/10);
 	}
 
-	/* List devices which have drivers but are not yet connected. */
-	while (dev != NULL) {
-		xendev = to_xenbus_device(dev);
-
-		printk(KERN_WARNING "XENBUS: Timeout connecting "
-		       "to device: %s\n", xendev->nodename);
-
-		dev = find_disconnected_device(dev);
-	}
-
-	/* List devices with no driver (this is not necessarily an error). */
-	while ((dev = find_driverless_device(dev)) != NULL) {
-		xendev = to_xenbus_device(dev);
-		printk(KERN_INFO "XENBUS: Device with no driver: %s\n",
-		       xendev->nodename);
-	}
+	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL,
+			 print_device_status);
 
 	return 0;
 }
