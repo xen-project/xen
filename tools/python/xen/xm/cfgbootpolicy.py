@@ -22,8 +22,6 @@ import sys
 import traceback
 import tempfile
 import os, stat
-import re
-import commands
 import shutil
 import string
 from xen.util.security import ACMError, err

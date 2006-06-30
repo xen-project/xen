@@ -17,8 +17,6 @@
 
 """Domain shutdown.
 """
-import string
-import sys
 import time
 
 from xen.xend.XendClient import server
