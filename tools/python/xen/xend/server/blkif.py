@@ -21,7 +21,6 @@ import re
 import string
 
 from xen.util import blkif
-from xen.util import security
 from xen.xend import sxp
 from xen.xend.XendError import VmError
 
@@ -41,22 +40,15 @@ class BlkifController(DevController):
 
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
-        uname = sxp.child_value(config, 'uname')
 
         dev = sxp.child_value(config, 'dev')
 
-        (typ, params) = string.split(uname, ':', 1)
+        (typ, params) = string.split(sxp.child_value(config, 'uname'), ':', 1)
         back = { 'dev'    : dev,
                  'type'   : typ,
                  'params' : params,
                  'mode'   : sxp.child_value(config, 'mode', 'r')
-               }
-
-        if security.on():
-            (label, ssidref, policy) = security.get_res_security_details(uname)
-            back.update({'acm_label'  : label,
-                         'acm_ssidref': str(ssidref),
-                         'acm_policy' : policy})
+                 }
 
         if 'ioemu:' in dev:
             (dummy, dev1) = string.split(dev, ':', 1)
