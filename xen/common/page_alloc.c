@@ -388,7 +388,6 @@ void scrub_heap_pages(void)
 {
     void *p;
     unsigned long pfn;
-    int cpu = smp_processor_id();
 
     printk("Scrubbing Free RAM: ");
 
@@ -398,8 +397,7 @@ void scrub_heap_pages(void)
         if ( (pfn % ((100*1024*1024)/PAGE_SIZE)) == 0 )
             printk(".");
 
-        if ( unlikely(softirq_pending(cpu)) )
-            do_softirq();
+        process_pending_timers();
 
         /* Quick lock-free check. */
         if ( allocated_in_map(pfn) )

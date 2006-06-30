@@ -23,17 +23,23 @@ static softirq_handler softirq_handlers[NR_SOFTIRQS];
 
 asmlinkage void do_softirq(void)
 {
-    unsigned int i, cpu = smp_processor_id();
+    unsigned int i, cpu;
     unsigned long pending;
 
-    pending = softirq_pending(cpu);
-    ASSERT(pending != 0);
+    for ( ; ; )
+    {
+        /*
+         * Initialise @cpu on every iteration: SCHEDULE_SOFTIRQ may move
+         * us to another processor.
+         */
+        cpu = smp_processor_id();
+        if ( (pending = softirq_pending(cpu)) == 0 )
+            break;
 
-    do {
         i = find_first_set_bit(pending);
         clear_bit(i, &softirq_pending(cpu));
         (*softirq_handlers[i])();
-    } while ( (pending = softirq_pending(cpu)) != 0 );
+    }
 }
 
 void open_softirq(int nr, softirq_handler handler)

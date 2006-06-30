@@ -528,8 +528,7 @@ void console_endboot(void)
             printk("%d... ", 3-i);
             for ( j = 0; j < 100; j++ )
             {
-                if ( softirq_pending(smp_processor_id()) )
-                    do_softirq();
+                process_pending_timers();
                 mdelay(10);
             }
         }
