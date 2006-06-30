@@ -819,17 +819,20 @@ static void net_tx_action(unsigned long unused)
 			struct netif_extra_info *gso;
 			gso = &extras[XEN_NETIF_EXTRA_TYPE_GSO - 1];
 
+			/* Currently on TCPv4 S.O. is supported. */
 			if (gso->u.gso.type != XEN_NETIF_GSO_TCPV4) {
-				DPRINTK("Bad GSO type.\n");
+				DPRINTK("Bad GSO type %d.\n", gso->u.gso.type);
 				kfree_skb(skb);
 				netbk_tx_err(netif, &txreq, i);
 				break;
 			}
 
 			skb_shinfo(skb)->gso_size = gso->u.gso.size;
-			skb_shinfo(skb)->gso_segs = gso->u.gso.segs;
-			skb_shinfo(skb)->gso_type =
-				SKB_GSO_TCPV4 | SKB_GSO_DODGY;
+			skb_shinfo(skb)->gso_type = SKB_GSO_TCPV4;
+
+			/* Header must be checked, and gso_segs computed. */
+			skb_shinfo(skb)->gso_type |= SKB_GSO_DODGY;
+			skb_shinfo(skb)->gso_segs = 0;
 		}
 
 		gnttab_set_map_op(mop, MMAP_VADDR(pending_idx),

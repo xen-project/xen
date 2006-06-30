@@ -78,23 +78,19 @@ struct netif_extra_info {
     union {
         struct {
             /*
-             * Maximum payload size of each segment.  For example, for TCP this
+             * Maximum payload size of each segment. For example, for TCP this
              * is just the path MSS.
              */
             uint16_t size;
 
             /*
-             * Number of GSO segments.  This is the number of segments that
-             * have to be generated for this packet given the MSS.
-             */
-            uint16_t segs;
-
-            /*
-             * GSO type.  This determines the protocol of the packet and any
+             * GSO type. This determines the protocol of the packet and any
              * extra features required to segment the packet properly.
              */
             uint16_t type; /* XEN_NETIF_GSO_* */
         } gso;
+
+        uint16_t pad[3];
     } u;
 };
 

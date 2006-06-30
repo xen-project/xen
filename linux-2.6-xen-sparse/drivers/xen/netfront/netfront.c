@@ -787,7 +787,6 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			tx->flags |= NETTXF_extra_info;
 
 		gso->u.gso.size = skb_shinfo(skb)->gso_size;
-		gso->u.gso.segs = skb_shinfo(skb)->gso_segs;
 		gso->u.gso.type = XEN_NETIF_GSO_TCPV4;
 
 		gso->type = XEN_NETIF_EXTRA_TYPE_GSO;
