@@ -170,7 +170,11 @@ static int parseelfimage(const char *image,
     elf_pa_off = elf_pa_off_defined ? strtoull(p+17, &p, 0) : virt_base;
 
     if ( elf_pa_off_defined && !virt_base_defined )
-        goto bad_image;
+    {
+        ERROR("Neither ELF_PADDR_OFFSET nor VIRT_BASE found in __xen_guest"
+              " section.");
+        return -EINVAL;
+    }
 
     for ( h = 0; h < ehdr->e_phnum; h++ )
     {
@@ -179,7 +183,11 @@ static int parseelfimage(const char *image,
             continue;
         vaddr = phdr->p_paddr - elf_pa_off + virt_base;
         if ( (vaddr + phdr->p_memsz) < vaddr )
-            goto bad_image;
+        {
+            ERROR("ELF program header %d is too large.", h);
+            return -EINVAL;
+        }
+
         if ( vaddr < kernstart )
             kernstart = vaddr;
         if ( (vaddr + phdr->p_memsz) > kernend )
@@ -202,7 +210,10 @@ static int parseelfimage(const char *image,
          (dsi->v_kernentry < kernstart) ||
          (dsi->v_kernentry > kernend) ||
          (dsi->v_start > kernstart) )
-        goto bad_image;
+    {
+        ERROR("ELF start or entries are out of bounds.");
+        return -EINVAL;
+    }
 
     if ( (p = strstr(guestinfo, "BSD_SYMTAB")) != NULL )
         dsi->load_symtab = 1;
@@ -214,10 +225,6 @@ static int parseelfimage(const char *image,
     loadelfsymtab(image, 0, 0, NULL, dsi);
 
     return 0;
-
- bad_image:
-    ERROR("Malformed ELF image.");
-    return -EINVAL;
 }
 
 static int
