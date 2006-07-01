@@ -4,6 +4,7 @@
 
 #define ELFSIZE 32
 #include <stddef.h>
+#include <inttypes.h>
 #include "xg_private.h"
 #include "xc_elf.h"
 #include <stdlib.h>
@@ -188,7 +189,7 @@ static int setup_guest(int xc_handle,
     unsigned char e820_map_nr;
 
     struct domain_setup_info dsi;
-    unsigned long long v_end;
+    uint64_t v_end;
 
     unsigned long shared_page_frame = 0;
     shared_iopage_t *sp;
@@ -208,11 +209,11 @@ static int setup_guest(int xc_handle,
     v_end = (unsigned long long)memsize << 20;
 
     IPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n"
-           "  Loaded HVM loader:    %016llx->%016llx\n"
-           "  TOTAL:                %016llx->%016llx\n",
+           "  Loaded HVM loader:    %016"PRIx64"->%016"PRIx64"\n"
+           "  TOTAL:                %016"PRIx64"->%016"PRIx64"\n",
            dsi.v_kernstart, dsi.v_kernend,
            dsi.v_start, v_end);
-    IPRINTF("  ENTRY ADDRESS:        %016llx\n", dsi.v_kernentry);
+    IPRINTF("  ENTRY ADDRESS:        %016"PRIx64"\n", dsi.v_kernentry);
 
     if ( (v_end - dsi.v_start) > ((unsigned long long)nr_pages << PAGE_SHIFT) )
     {
