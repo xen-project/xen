@@ -103,6 +103,7 @@ static void vtm_timer_fn(void *data)
     vitv = VCPU(vcpu, itv);
     if ( !ITV_IRQ_MASK(vitv) ){
         vmx_vcpu_pend_interrupt(vcpu, vitv & 0xff);
+        vcpu_unblock(vcpu);
     }
     vtm=&(vcpu->arch.arch_vmx.vtm);
     cur_itc = now_itc(vtm);
@@ -551,8 +552,7 @@ void vmx_vcpu_pend_batch_interrupt(VCPU *vcpu, UINT64 *pend_irr)
  * it into the guest. Otherwise, we set the VHPI if vac.a_int=1 so that when 
  * the interrupt becomes unmasked, it gets injected.
  * RETURN:
- *  TRUE:   Interrupt is injected.
- *  FALSE:  Not injected but may be in VHPI when vac.a_int=1
+ *    the highest unmasked interrupt.
  *
  * Optimization: We defer setting the VHPI until the EOI time, if a higher 
  *               priority interrupt is in-service. The idea is to reduce the 
@@ -562,13 +562,15 @@ int vmx_check_pending_irq(VCPU *vcpu)
 {
     uint64_t  spsr, mask;
     int     h_pending, h_inservice;
-    int injected=0;
     uint64_t    isr;
     IA64_PSR    vpsr;
     REGS *regs=vcpu_regs(vcpu);
     local_irq_save(spsr);
     h_pending = highest_pending_irq(vcpu);
-    if ( h_pending == NULL_VECTOR ) goto chk_irq_exit;
+    if ( h_pending == NULL_VECTOR ) {
+        h_pending = SPURIOUS_VECTOR;
+        goto chk_irq_exit;
+    }
     h_inservice = highest_inservice_irq(vcpu);
 
     vpsr.val = vmx_vcpu_get_psr(vcpu);
@@ -578,7 +580,6 @@ int vmx_check_pending_irq(VCPU *vcpu)
         if ( !vpsr.ic )
             panic_domain(regs,"Interrupt when IC=0\n");
         vmx_reflect_interruption(0,isr,0, 12, regs ); // EXT IRQ
-        injected = 1;
     }
     else if ( mask == IRQ_MASKED_BY_INSVC ) {
         // cann't inject VHPI
@@ -591,7 +592,7 @@ int vmx_check_pending_irq(VCPU *vcpu)
 
 chk_irq_exit:
     local_irq_restore(spsr);
-    return injected;
+    return h_pending;
 }
 
 /*

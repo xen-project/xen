@@ -266,7 +266,6 @@ IA64FAULT vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24)
 	return IA64_NO_FAULT;
 }
 
-#define SPURIOUS_VECTOR 0xf
 
 IA64FAULT vcpu_set_psr_dt(VCPU *vcpu)
 {

@@ -20,6 +20,7 @@ typedef cpu_user_regs_t REGS;
 #define PSCB(_v,_x) VCPU(_v,_x)
 #define PSCBX(_v,_x) (_v->arch._x)
 
+#define SPURIOUS_VECTOR 0xf
 
 /* general registers */
 extern UINT64 vcpu_get_gr(VCPU *vcpu, unsigned long reg);

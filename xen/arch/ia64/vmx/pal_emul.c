@@ -24,6 +24,8 @@
 #include <asm/dom_fw.h>
 #include <asm/tlb.h>
 #include <asm/vmx_mm_def.h>
+#include <xen/hypercall.h>
+#include <public/sched.h>
 
 static void
 get_pal_parameters (VCPU *vcpu, UINT64 *gr29,
@@ -123,9 +125,11 @@ pal_halt (VCPU *vcpu) {
 static struct ia64_pal_retval
 pal_halt_light (VCPU *vcpu) {
 	struct ia64_pal_retval result;
-
-	result.status= -1; //unimplemented
-
+	
+	if(SPURIOUS_VECTOR==vmx_check_pending_irq(vcpu))
+		do_sched_op_compat(SCHEDOP_block,0);
+	    
+	result.status= 0;
 	return result;
 }
 
