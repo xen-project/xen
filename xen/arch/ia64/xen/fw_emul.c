@@ -16,6 +16,7 @@
  *
  */
 #include <xen/config.h>
+#include <xen/console.h>
 #include <asm/system.h>
 #include <asm/pgalloc.h>
 
