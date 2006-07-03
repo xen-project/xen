@@ -342,22 +342,3 @@ void load_region_regs(struct vcpu *v)
 		panic_domain(0,"load_region_regs: can't set! bad=%lx\n",bad);
 	}
 }
-
-void load_region_reg7_and_pta(struct vcpu *v)
-{
-	unsigned long rr7, pta;
-
-	if (!is_idle_domain(v->domain)) {  
-		ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
-		             VHPT_ENABLED);
-
-		// TODO: These probably should be validated
-		rr7 =  VCPU(v,rrs[7]);
-		if (!set_one_rr(0xe000000000000000L, rr7))
-			panic_domain(0, "%s: can't set!\n", __func__);
-	}
-	else {
-		pta = ia64_get_pta();
-		ia64_set_pta(pta & ~VHPT_ENABLED);
-	}
-}

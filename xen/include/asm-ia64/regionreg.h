@@ -79,6 +79,5 @@ extern void init_all_rr(struct vcpu *v);
 extern int set_metaphysical_rr0(void);
 
 extern void load_region_regs(struct vcpu *v);
-extern void load_region_reg7_and_pta(struct vcpu *v);
 
 #endif		/* !_REGIONREG_H_ */
