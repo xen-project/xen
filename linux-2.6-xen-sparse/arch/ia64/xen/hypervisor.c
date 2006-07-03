@@ -198,7 +198,7 @@ __xen_create_contiguous_region(unsigned long vstart,
 		.nr_exchanged = 0
 	};
 
-	if (order > MAX_CONTIG_ORDER)
+	if (unlikely(order > MAX_CONTIG_ORDER))
 		return -ENOMEM;
 	
 	set_xen_guest_handle(exchange.in.extent_start, in_frames);
@@ -299,7 +299,7 @@ __xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	if (!test_bit(start_gpfn, contiguous_bitmap))
 		return;
 
-	if (order > MAX_CONTIG_ORDER)
+	if (unlikely(order > MAX_CONTIG_ORDER))
 		return;
 
 	set_xen_guest_handle(exchange.in.extent_start, &in_frame);
