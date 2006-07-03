@@ -496,9 +496,9 @@ static void netbk_tx_err(netif_t *netif, netif_tx_request_t *txp, RING_IDX end)
 
 	do {
 		make_tx_response(netif, txp, NETIF_RSP_ERROR);
-		if (++cons >= end)
+		if (cons >= end)
 			break;
-		txp = RING_GET_REQUEST(&netif->tx, cons);
+		txp = RING_GET_REQUEST(&netif->tx, cons++);
 	} while (1);
 	netif->tx.req_cons = cons;
 	netif_schedule_work(netif);
@@ -764,11 +764,11 @@ static void net_tx_action(unsigned long unused)
 		if (txreq.flags & NETTXF_extra_info) {
 			work_to_do = netbk_get_extras(netif, extras,
 						      work_to_do);
+			i = netif->tx.req_cons;
 			if (unlikely(work_to_do < 0)) {
-				netbk_tx_err(netif, &txreq, 0);
+				netbk_tx_err(netif, &txreq, i);
 				continue;
 			}
-			i = netif->tx.req_cons;
 		}
 
 		ret = netbk_count_requests(netif, &txreq, work_to_do);
