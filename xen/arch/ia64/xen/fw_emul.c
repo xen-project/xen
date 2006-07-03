@@ -343,6 +343,7 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 	    case PAL_HALT:
 		    if (current->domain == dom0) {
 			    printf ("Domain0 halts the machine\n");
+			    console_start_sync();
 			    (*efi.reset_system)(EFI_RESET_SHUTDOWN,0,0,NULL);
 		    }
 		    else
