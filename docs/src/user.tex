@@ -2203,6 +2203,33 @@ ne2000 &        Enable ne2000, default = 0 (disabled; use pcnet)\\
 
 serial &        Enable redirection of VMX serial output to pty device\\
 
+\end{tabular}
+
+\begin{tabular}{lp{10cm}}
+
+usb &           Enable USB support without defining a specific USB device.
+This option defaults to 0 (disabled) unless the option usbdevice is
+specified in which case this option then defaults to 1 (enabled).\\
+
+usbdevice &     Enable USB support and also enable support for the given
+device.  Devices that can be specified are {\small {\tt mouse}} (a PS/2 style
+mouse), {\small {\tt tablet}} (an absolute pointing device) and
+{\small {\tt host:id1:id2}} (a physical USB device on the host machine whose
+ids are {\small {\tt id1}} and {\small {\tt id2}}).  The advantage
+of {\small {\tt tablet}} is that Windows guests will automatically recognize
+and support this device so specifying the config line
+
+{\small
+\begin{verbatim}
+    usbdevice='tablet'
+\end{verbatim}
+}
+
+will create a mouse that works transparently with Windows guests under VNC.
+Linux doesn't recognize the USB tablet yet so Linux guests under VNC will
+still need the Summagraphics emulation.
+Details about mouse emulation are provided in section \textbf{A.4.3}.\\
+
 localtime &     Set the real time clock to local time [default=0, that is, set to UTC].\\
 
 enable-audio &  Enable audio support. This is under development.\\
@@ -2317,29 +2344,458 @@ Simply follow the usual method of creating the guest, using the -f parameter and
 
 In the default configuration, VNC is on and SDL is off. Therefore VNC windows will open when VMX guests are created. If you want to use SDL to create VMX guests, set {\small {\tt sdl=1}} in your VMX configuration file. You can also turn off VNC by setting {\small {\tt vnc=0}}.
  
-\subsection{Use mouse in VNC window}
-The default PS/2 mouse will not work properly in VMX by a VNC window. Summagraphics mouse emulation does work in this environment. A Summagraphics mouse can be enabled by reconfiguring 2 services:
+\subsection{Mouse issues, especially under VNC}
+Mouse handling when using VNC is a little problematic.
+The problem is that the VNC viewer provides a virtual pointer which is
+located at an absolute location in the VNC window and only absolute
+coordinates are provided.
+The VMX device model converts these absolute mouse coordinates
+into the relative motion deltas that are expected by the PS/2
+mouse driver running in the guest.
+Unfortunately,
+it is impossible to keep these generated mouse deltas
+accurate enough for the guest cursor to exactly match
+the VNC pointer.
+This can lead to situations where the guest's cursor
+is in the center of the screen and there's no way to
+move that cursor to the left
+(it can happen that the VNC pointer is at the left
+edge of the screen and,
+therefore,
+there are no longer any left mouse deltas that
+can be provided by the device model emulation code.)
 
-{\small {\tt 1. General Purpose Mouse (GPM). The GPM daemon is configured in different ways in different Linux distributions. On a Redhat distribution, this is accomplished by changing the file `/etc/sysconfig/mouse' to have the following:\\
-MOUSETYPE="summa"\\
-XMOUSETYPE="SUMMA"\\
-DEVICE=/dev/ttyS0\\
-\\
-2. X11. For all Linux distributions, change the Mouse0 stanza in `/etc/X11/xorg.conf' to:\\
-Section "InputDevice"\\
-Identifier "Mouse0"\\
-Driver "summa"\\
-Option "Device" "/dev/ttyS0"\\
-Option "InputFashion" "Tablet"\\
-Option "Mode" "Absolute"\\
-Option "Name" "EasyPen"\\
-Option "Compatible" "True"\\
-Option "Protocol" "Auto"\\
-Option "SendCoreEvents" "on"\\
-Option "Vendor" "GENIUS"\\
-EndSection}}
+To deal with these mouse issues there are 4 different
+mouse emulations available from the VMX device model:
 
-If the Summagraphics mouse isn't the default mouse, you can manually kill 'gpm' and restart it with the command "gpm -m /dev/ttyS0 -t summa". Note that Summagraphics mouse makes no sense in an SDL window and is therefore not available in this environment.
+\begin{description}
+\item[PS/2 mouse over the PS/2 port.]
+This is the default mouse
+that works perfectly well under SDL.
+Under VNC the guest cursor will get
+out of sync with the VNC pointer.
+When this happens you can re-synchronize
+the guest cursor to the VNC pointer by
+holding down the
+\textbf{left-ctl}
+and
+\textbf{left-alt}
+keys together.
+While these keys are down VNC pointer motions
+will not be reported to the guest so
+that the VNC pointer can be moved
+to a place where it is possible
+to move the guest cursor again.
+
+\item[Summagraphics mouse over the serial port.]
+The device model also provides emulation
+for a Summagraphics tablet,
+an absolute pointer device.
+This emulation is provided over the second
+serial port,
+\textbf{/dev/ttyS1}
+for Linux guests and
+\textbf{COM2}
+for Windows guests.
+Unfortunately,
+neither Linux nor Windows provides
+default support for the Summagraphics
+tablet so the guest will have to be
+manually configured for this mouse.
+
+\textbf{Linux configuration.}
+
+First,
+configure the GPM service to use the Summagraphics tablet.
+This can vary between distributions but,
+typically,
+all that needs to be done is modify the file
+\path{/etc/sysconfig/mouse} to contain the lines:
+
+{\small
+\begin{verbatim}
+    MOUSETYPE="summa"
+    XMOUSETYPE="SUMMA"
+    DEVICE=/dev/ttyS1
+\end{verbatim}
+}
+
+and then restart the GPM daemon.
+
+Next,
+modify the X11 config
+\path{/etc/X11/xorg.conf}
+to support the Summgraphics tablet by replacing
+the input device stanza with the following:
+
+{\small
+\begin{verbatim}
+    Section "InputDevice"
+        Identifier "Mouse0"
+        Driver "summa"
+        Option "Device" "/dev/ttyS1"
+        Option "InputFashion" "Tablet"
+        Option "Mode" "Absolute"
+        Option "Name" "EasyPen"
+        Option "Compatible" "True"
+        Option "Protocol" "Auto"
+        Option "SendCoreEvents" "on"
+        Option "Vendor" "GENIUS"
+    EndSection
+\end{verbatim}
+}
+
+Restart X and the X cursor should now properly
+track the VNC pointer.
+
+
+\textbf{Windows configuration.}
+
+Get the file
+\path{http://www.cad-plan.de/files/download/tw2k.exe}
+and execute that file on the guest,
+answering the questions as follows:
+
+\begin{enumerate}
+\item When the program asks for \textbf{model},
+scroll down and selese \textbf{SummaSketch (MM Compatible)}.
+
+\item When the program asks for \textbf{COM Port} specify \textbf{com2}.
+
+\item When the programs asks for a \textbf{Cursor Type} specify
+\textbf{4 button cursor/puck}.
+
+\item The guest system will then reboot and,
+when it comes back up,
+the guest cursor will now properly track
+the VNC pointer.
+\end{enumerate}
+
+\item[PS/2 mouse over USB port.]
+This is just the same PS/2 emulation except it is
+provided over a USB port.
+This emulation is enabled by the configuration flag:
+{\small
+\begin{verbatim}
+    usbdevice='mouse'
+\end{verbatim}
+}
+
+\item[USB tablet over USB port.]
+The USB tablet is an absolute pointing device
+that has the advantage that it is automatically
+supported under Windows guests,
+although Linux guests still require some
+manual configuration.
+This mouse emulation is enabled by the
+configuration flag:
+{\small
+\begin{verbatim}
+    usbdevice='tablet'
+\end{verbatim}
+}
+
+\textbf{Linux configuration.}
+
+Unfortunately,
+there is no GPM support for the
+USB tablet at this point in time.
+If you intend to use a GPM pointing
+device under VNC you should
+configure the guest for Summagraphics
+emulation.
+
+Support for X11 is available by following
+the instructions at\\
+\verb+http://stz-softwaretechnik.com/~ke/touchscreen/evtouch.html+\\
+with one minor change.
+The
+\path{xorg.conf}
+given in those instructions
+uses the wrong values for the X \& Y minimums and maximums,
+use the following config stanza instead:
+
+{\small
+\begin{verbatim}
+    Section "InputDevice"
+        Identifier      "Tablet"
+        Driver          "evtouch"
+        Option          "Device" "/dev/input/event2"
+        Option          "DeviceName" "touchscreen"
+        Option          "MinX" "0"
+        Option          "MinY" "0"
+        Option          "MaxX" "32256"
+        Option          "MaxY" "32256"
+        Option          "ReportingMode" "Raw"
+        Option          "Emulate3Buttons"
+        Option          "Emulate3Timeout" "50"
+        Option          "SendCoreEvents" "On"
+    EndSection
+\end{verbatim}
+}
+
+\textbf{Windows configuration.}
+
+Just enabling the USB tablet in the
+guest's configuration file is sufficient,
+Windows will automatically recognize and
+configure device drivers for this
+pointing device.
+
+\end{description}
+
+\subsection{USB Support}
+There is support for an emulated USB mouse,
+an emulated USB tablet
+and physical low speed USB devices
+(support for high speed USB 2.0 devices is
+still under development).
+
+\begin{description}
+\item[USB PS/2 style mouse.]
+Details on the USB mouse emulation are
+given in sections
+\textbf{A.2}
+and
+\textbf{A.4.3}.
+Enabling USB PS/2 style mouse emulation
+is just a matter of adding the line
+
+{\small
+\begin{verbatim}
+    usbdevice='mouse'
+\end{verbatim}
+}
+
+to the configuration file.
+\item[USB tablet.]
+Details on the USB tablet emulation are
+given in sections
+\textbf{A.2}
+and
+\textbf{A.4.3}.
+Enabling USB tablet emulation
+is just a matter of adding the line
+
+{\small
+\begin{verbatim}
+    usbdevice='tablet'
+\end{verbatim}
+}
+
+to the configuration file.
+\item[USB physical devices.]
+Access to a physical (low speed) USB device
+is enabled by adding a line of the form
+
+{\small
+\begin{verbatim}
+    usbdevice='host:vid:pid'
+\end{verbatim}
+}
+
+into the the configuration file.\footnote{
+There is an alternate
+way of specifying a USB device that
+uses the syntax
+\textbf{host:bus.addr}
+but this syntax suffers from
+a major problem that makes
+it effectively useless.
+The problem is that the
+\textbf{addr}
+portion of this address
+changes every time the USB device
+is plugged into the system.
+For this reason this addressing
+scheme is not recommended and
+will not be documented further.
+}
+\textbf{vid}
+and
+\textbf{pid}
+are a
+product id and
+vendor id
+that uniquely identify
+the USB device.
+These ids can be identified
+in two ways:
+
+\begin{enumerate}
+\item Through the control window.
+As described in section
+\textbf{A.4.6}
+the control window
+is activated by pressing
+\textbf{ctl-alt-2}
+in the guest VGA window.
+As long as USB support is
+enabled in the guest by including
+the config file line
+{\small
+\begin{verbatim}
+    usb=1
+\end{verbatim}
+}
+then executing the command
+{\small
+\begin{verbatim}
+    info usbhost
+\end{verbatim}
+}
+in the control window
+will display a list of all
+usb devices and their ids.
+For example,
+this output:
+{\small
+\begin{verbatim}
+    Device 1.3, speed 1.5 Mb/s
+      Class 00: USB device 04b3:310b
+\end{verbatim}
+}
+was created from a USB mouse with
+vendor id
+\textbf{04b3}
+and product id
+\textbf{310b}.
+This device could be made available
+to the VMX guest by including the
+config file entry
+{\small
+\begin{verbatim}
+    usbdevice='host:04be:310b'
+\end{verbatim}
+}
+
+It is also possible to
+enable access to a USB
+device dynamically through
+the control window.
+The control window command
+{\small
+\begin{verbatim}
+    usb_add host:vid:pid
+\end{verbatim}
+}
+will also allow access to a
+USB device with vendor id
+\textbf{vid}
+and product id
+\textbf{pid}.
+\item Through the
+\path{/proc} file system.
+The contents of the pseudo file
+\path{/proc/bus/usb/devices}
+can also be used to identify
+vendor and product ids.
+Looking at this file,
+the line starting with
+\textbf{P:}
+has a field
+\textbf{Vendor}
+giving the vendor id and
+another field
+\textbf{ProdID}
+giving the product id.
+The contents of
+\path{/proc/bus/usb/devices}
+for the example mouse is as
+follows:
+{\small
+\begin{verbatim}
+T:  Bus=01 Lev=01 Prnt=01 Port=01 Cnt=02 Dev#=  3 Spd=1.5 MxCh= 0
+D:  Ver= 2.00 Cls=00(>ifc ) Sub=00 Prot=00 MxPS= 8 #Cfgs=  1
+P:  Vendor=04b3 ProdID=310b Rev= 1.60
+C:* #Ifs= 1 Cfg#= 1 Atr=a0 MxPwr=100mA
+I:  If#= 0 Alt= 0 #EPs= 1 Cls=03(HID  ) Sub=01 Prot=02 Driver=(none)
+E:  Ad=81(I) Atr=03(Int.) MxPS=   4 Ivl=10ms
+\end{verbatim}
+}
+Note that the
+\textbf{P:}
+line correctly identifies the
+vendor id and product id
+for this mouse as
+\textbf{04b3:310b}.
+\end{enumerate}
+There is one other issue to
+be aware of when accessing a
+physical USB device from the guest.
+The Dom0 kernel must not have
+a device driver loaded for
+the device that the guest wishes
+to access.
+This means that the Dom0
+kernel must not have that
+device driver compiled into
+the kernel or,
+if using modules,
+that driver module must
+not be loaded.
+Note that this is the device
+specific USB driver that must
+not be loaded,
+either the
+\textbf{UHCI}
+or
+\textbf{OHCI}
+USB controller driver must
+still be loaded.
+
+Going back to the USB mouse
+as an example,
+if \textbf{lsmod}
+gives the output:
+
+{\small
+\begin{verbatim}
+Module                  Size  Used by
+usbmouse                4128  0 
+usbhid                 28996  0
+uhci_hcd               35409  0
+\end{verbatim}
+}
+
+then the USB mouse is being
+used by the Dom0 kernel and is
+not available to the guest.
+Executing the command
+\textbf{rmmod usbhid}\footnote{
+Turns out the
+\textbf{usbhid}
+driver is the significant
+one for the USB mouse,
+the presence or absence of
+the module
+\textbf{usbmouse}
+has no effect on whether or
+not the guest can see a USB mouse.}
+will remove the USB mouse
+driver from the Dom0 kernel
+and the mouse will now be
+accessible by the VMX guest.
+
+Be aware the the Linux USB
+hotplug system will reload
+the drivers if a USB device
+is removed and plugged back
+in.
+This means that just unloading
+the driver module might not
+be sufficient if the USB device
+is removed and added back.
+A more reliable technique is
+to first
+\textbf{rmmod}
+the driver and then rename the
+driver file in the
+\path{/lib/modules}
+directory,
+just to make sure it doesn't get
+reloaded.
+\end{description}
 
 \subsection{Destroy VMX guests}
 VMX guests can be destroyed in the same way as can paravirtualized guests. We recommend that you type the command 
