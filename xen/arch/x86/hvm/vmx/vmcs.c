@@ -36,6 +36,7 @@
 #include <xen/kernel.h>
 #include <asm/shadow.h>
 #include <xen/keyhandler.h>
+
 #if CONFIG_PAGING_LEVELS >= 3
 #include <asm/shadow_64.h>
 #endif
@@ -440,7 +441,6 @@ static int construct_vmcs(struct vcpu *v,
     memset(arch_vmx, 0, sizeof(struct arch_vmx_struct));
 
     spin_lock_init(&arch_vmx->vmcs_lock);
-    arch_vmx->active_cpu = -1;
 
     /*
      * Create a new VMCS
@@ -450,7 +450,7 @@ static int construct_vmcs(struct vcpu *v,
         return -ENOMEM;
     }
 
-    vmx_clear_vmcs(v);
+    __vmx_clear_vmcs(v);
     vmx_load_vmcs(v);
 
     if ((error = construct_vmcs_controls(arch_vmx))) {
@@ -495,6 +495,9 @@ err_out:
 void vmx_destroy_vmcs(struct vcpu *v)
 {
     struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
+
+    if ( arch_vmx->vmcs == NULL )
+        return;
 
     vmx_clear_vmcs(v);
 
