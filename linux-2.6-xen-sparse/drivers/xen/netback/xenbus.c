@@ -102,9 +102,10 @@ static int netback_probe(struct xenbus_device *dev,
 		}
 
 #if 0 /* KAF: After the protocol is finalised. */
-		err = xenbus_printf(xbt, dev->nodename, "feature-tso", "%d", 1);
+		err = xenbus_printf(xbt, dev->nodename, "feature-gso-tcpv4",
+				    "%d", 1);
 		if (err) {
-			message = "writing feature-tso";
+			message = "writing feature-gso-tcpv4";
 			goto abort_transaction;
 		}
 #endif

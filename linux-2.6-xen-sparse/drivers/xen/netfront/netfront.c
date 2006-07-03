@@ -1098,8 +1098,8 @@ static int xennet_set_tso(struct net_device *dev, u32 data)
 		struct netfront_info *np = netdev_priv(dev);
 		int val;
 
-		if (xenbus_scanf(XBT_NIL, np->xbdev->otherend, "feature-tso",
-				 "%d", &val) < 0)
+		if (xenbus_scanf(XBT_NIL, np->xbdev->otherend,
+				 "feature-gso-tcpv4", "%d", &val) < 0)
 			val = 0;
 #if 0 /* KAF: After the protocol is finalised. */
 		if (!val)
