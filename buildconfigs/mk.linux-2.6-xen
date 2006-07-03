@@ -47,8 +47,14 @@ config: $(LINUX_DIR)/include/linux/autoconf.h
 
 .PHONY: clean
 clean::
-	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) clean
+	[ ! -d $(LINUX_DIR) ] || \
+		$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) clean
+
 
 .PHONY: delete
 delete: 
 	rm -rf tmp-linux-$(LINUX_VER) $(LINUX_DIR) 
+
+.PHONY: mrpropper
+mrpropper:
+	rm -f linux-$(LINUX_VER).tar.bz2

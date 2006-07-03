@@ -130,6 +130,7 @@ distclean:
 	rm -rf dist patches/tmp
 	for i in $(ALLKERNELS) ; do $(MAKE) $$i-delete ; done
 	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-mrproper ; done
+	rm -rf patches/*/.makedep
 
 # Linux name for GNU distclean
 .PHONY: mrproper
