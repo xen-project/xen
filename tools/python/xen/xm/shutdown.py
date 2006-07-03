@@ -17,8 +17,6 @@
 
 """Domain shutdown.
 """
-import string
-import sys
 import time
 
 from xen.xend.XendClient import server
@@ -92,7 +90,8 @@ def main_all(opts, args):
     shutdown(opts, None, mode, opts.vals.wait)
 
 def main_dom(opts, args):
-    if len(args) < 1: opts.err('Missing domain')
+    if len(args) == 0: opts.err('No domain parameter given')
+    if len(args) >  1: opts.err('No multiple domain parameters allowed')
     dom = args[0]
     mode = shutdown_mode(opts)  
     shutdown(opts, [ dom ], mode, opts.vals.wait)

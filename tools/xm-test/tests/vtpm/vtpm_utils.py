@@ -16,4 +16,4 @@ if output == "":
     FAIL("virtual TPM manager must be started to run this test")
 
 def vtpm_cleanup(domName):
-	traceCommand("/etc/xen/scripts/vtpm-delete %s" % domName)
+    traceCommand("/etc/xen/scripts/vtpm-delete %s" % domName)

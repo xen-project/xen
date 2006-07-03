@@ -67,16 +67,11 @@ static void default_idle(void)
 
 void idle_loop(void)
 {
-    int cpu = smp_processor_id();
-
     for ( ; ; )
     {
         page_scrub_schedule_work();
-
         default_idle();
-
-        if ( softirq_pending(cpu) )
-            do_softirq();
+        do_softirq();
     }
 }
 

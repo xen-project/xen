@@ -347,16 +347,9 @@ function isLocalAddress() {
 # 2nd: name of the domain to migrate
 # 3rd: the migration step to perform
 function vtpm_migration_step() {
-	local instance res
-	instance=$(vtpmdb_find_instance $2)
-	if [ "$instance" == "" ]; then
-		echo "Error: Translation of domain name ($2) to instance failed. Check /etc/xen/vtpm.db"
-		log err "Error during translation of domain name"
-	else
-		res=$(isLocalAddress $1)
-		if [ "$res" == "0" ]; then
-			vtpm_migrate $1 $2 $3
-		fi
+	local res=$(isLocalAddress $1)
+	if [ "$res" == "0" ]; then
+		vtpm_migrate $1 $2 $3
 	fi
 }
 

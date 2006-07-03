@@ -33,4 +33,9 @@ int destroy_grant_host_mapping(
 
 #define gnttab_log_dirty(d, f) mark_dirty((d), (f))
 
+static inline void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
+{
+	clear_bit(nr, addr);
+}
+
 #endif /* __ASM_GRANT_TABLE_H__ */

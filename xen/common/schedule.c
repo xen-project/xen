@@ -389,11 +389,32 @@ long do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 long do_set_timer_op(s_time_t timeout)
 {
     struct vcpu *v = current;
+    s_time_t offset = timeout - NOW();
 
     if ( timeout == 0 )
+    {
         stop_timer(&v->timer);
+    }
+    else if ( unlikely(timeout < 0) || /* overflow into 64th bit? */
+              unlikely((offset > 0) && ((uint32_t)(offset >> 50) != 0)) )
+    {
+        /*
+         * Linux workaround: occasionally we will see timeouts a long way in 
+         * the future due to wrapping in Linux's jiffy time handling. We check 
+         * for timeouts wrapped negative, and for positive timeouts more than 
+         * about 13 days in the future (2^50ns). The correct fix is to trigger 
+         * an interrupt immediately (since Linux in fact has pending work to 
+         * do in this situation).
+         */
+        DPRINTK("Warning: huge timeout set by domain %d (vcpu %d):"
+                " %"PRIx64"\n",
+                v->domain->domain_id, v->vcpu_id, (uint64_t)timeout);
+        send_timer_event(v);
+    }
     else
+    {
         set_timer(&v->timer, timeout);
+    }
 
     return 0;
 }

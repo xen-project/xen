@@ -118,7 +118,7 @@ static uint8_t opcode_table[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xC0 - 0xC7 */
     ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImmByte|ModRM, 0, 0,
-    0, 0, ByteOp|DstMem|SrcImm|ModRM, DstMem|SrcImm|ModRM,
+    0, 0, ByteOp|DstMem|SrcImm|ModRM|Mov, DstMem|SrcImm|ModRM|Mov,
     /* 0xC8 - 0xCF */
     0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xD0 - 0xD7 */

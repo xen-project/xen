@@ -989,12 +989,11 @@ static void stop_hz_timer(void)
 
 	smp_mb();
 
-	/* Leave ourselves in 'tick mode' if rcu or softirq pending. */
-	if (rcu_needs_cpu(cpu) || local_softirq_pending()) {
+	/* Leave ourselves in 'tick mode' if rcu or softirq or timer pending. */
+	if (rcu_needs_cpu(cpu) || local_softirq_pending() ||
+	    (j = next_timer_interrupt(), time_before_eq(j, jiffies))) {
 		cpu_clear(cpu, nohz_cpu_mask);
 		j = jiffies + 1;
-	} else {
-		j = next_timer_interrupt();
 	}
 
 	BUG_ON(HYPERVISOR_set_timer_op(jiffies_to_st(j)) != 0);

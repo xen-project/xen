@@ -12,6 +12,9 @@
 #include <inttypes.h>
 #include <zlib.h>
 
+/* Handy for printing out '0' prepended values at native pointer size */
+#define _p(a) ((void *) ((ulong)a))
+
 #if defined(__i386__)
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
@@ -502,8 +505,6 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-#define _p(a) ((void *) (a))
-
     IPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n"
            " Loaded kernel: %p->%p\n"
            " Init. ramdisk: %p->%p\n"
@@ -766,9 +767,9 @@ static int setup_guest(int xc_handle,
                 goto error_out;
         }
 
-#define NR(_l,_h,_s) \
-    (((((_h) + ((1UL<<(_s))-1)) & ~((1UL<<(_s))-1)) - \
-    ((_l) & ~((1UL<<(_s))-1))) >> (_s))
+#define NR(_l,_h,_s)                                                    \
+    (((((unsigned long)(_h) + ((1UL<<(_s))-1)) & ~((1UL<<(_s))-1)) -    \
+    ((unsigned long)(_l) & ~((1UL<<(_s))-1))) >> (_s))
 #if defined(__i386__)
         if ( dsi.pae_kernel != PAEKERN_no )
         {
@@ -797,8 +798,6 @@ static int setup_guest(int xc_handle,
 #endif
     }
 
-#define _p(a) ((void *) (a))
-
     IPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n");
     IPRINTF(" Loaded kernel:    %p->%p\n", _p(dsi.v_kernstart),
            _p(dsi.v_kernend));
@@ -819,8 +818,8 @@ static int setup_guest(int xc_handle,
     if ( ((v_end - dsi.v_start)>>PAGE_SHIFT) > nr_pages )
     {
         PERROR("Initial guest OS requires too much space\n"
-               "(%luMB is greater than %luMB limit)\n",
-               (v_end-dsi.v_start)>>20, nr_pages>>(20-PAGE_SHIFT));
+               "(%pMB is greater than %luMB limit)\n",
+               _p((v_end-dsi.v_start)>>20), nr_pages>>(20-PAGE_SHIFT));
         goto error_out;
     }
 

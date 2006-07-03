@@ -138,4 +138,6 @@ static __inline__ int synch_var_test_bit(int nr, volatile void * addr)
  synch_const_test_bit((nr),(addr)) : \
  synch_var_test_bit((nr),(addr)))
 
+#define synch_cmpxchg_subword synch_cmpxchg
+
 #endif /* __XEN_SYNCH_BITOPS_H__ */

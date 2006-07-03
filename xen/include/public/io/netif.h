@@ -23,8 +23,9 @@
  * This is the 'wire' format for packets:
  *  Request 1: netif_tx_request -- NETTXF_* (any flags)
  * [Request 2: netif_tx_extra]  (only if request 1 has NETTXF_extra_info)
- *  Request 3: netif_tx_request -- NETTXF_more_data
+ * [Request 3: netif_tx_extra]  (only if request 2 has XEN_NETIF_EXTRA_MORE)
  *  Request 4: netif_tx_request -- NETTXF_more_data
+ *  Request 5: netif_tx_request -- NETTXF_more_data
  *  ...
  *  Request N: netif_tx_request -- 0
  */
@@ -41,12 +42,9 @@
 #define _NETTXF_more_data      (2)
 #define  NETTXF_more_data      (1U<<_NETTXF_more_data)
 
-/* Packet has GSO fields in the following descriptor (netif_tx_extra.u.gso). */
-#define _NETTXF_gso            (3)
-#define  NETTXF_gso            (1U<<_NETTXF_gso)
-
-/* This descriptor is followed by an extra-info descriptor (netif_tx_extra). */
-#define  NETTXF_extra_info     (NETTXF_gso)
+/* Packet to be followed by extra descriptor(s). */
+#define _NETTXF_extra_info     (3)
+#define  NETTXF_extra_info     (1U<<_NETTXF_extra_info)
 
 struct netif_tx_request {
     grant_ref_t gref;      /* Reference to buffer page */
@@ -57,15 +55,42 @@ struct netif_tx_request {
 };
 typedef struct netif_tx_request netif_tx_request_t;
 
-/* This structure needs to fit within netif_tx_request for compatibility. */
-struct netif_tx_extra {
+/* Types of netif_extra_info descriptors. */
+#define XEN_NETIF_EXTRA_TYPE_NONE  (0)  /* Never used - invalid */
+#define XEN_NETIF_EXTRA_TYPE_GSO   (1)  /* u.gso */
+#define XEN_NETIF_EXTRA_TYPE_MAX   (2)
+
+/* netif_extra_info flags. */
+#define _XEN_NETIF_EXTRA_FLAG_MORE (0)
+#define XEN_NETIF_EXTRA_FLAG_MORE  (1U<<_XEN_NETIF_EXTRA_FLAG_MORE)
+
+/* GSO types - only TCPv4 currently supported. */
+#define XEN_NETIF_GSO_TCPV4        (1)
+
+/*
+ * This structure needs to fit within both netif_tx_request and
+ * netif_rx_response for compatibility.
+ */
+struct netif_extra_info {
+    uint8_t type;  /* XEN_NETIF_EXTRA_TYPE_* */
+    uint8_t flags; /* XEN_NETIF_EXTRA_FLAG_* */
+
     union {
-        /* NETTXF_gso: Generic Segmentation Offload. */
-        struct netif_tx_gso {
-            uint16_t size;	   /* GSO MSS. */
-            uint16_t segs;	   /* GSO segment count. */
-            uint16_t type;	   /* GSO type. */
+        struct {
+            /*
+             * Maximum payload size of each segment. For example, for TCP this
+             * is just the path MSS.
+             */
+            uint16_t size;
+
+            /*
+             * GSO type. This determines the protocol of the packet and any
+             * extra features required to segment the packet properly.
+             */
+            uint16_t type; /* XEN_NETIF_GSO_* */
         } gso;
+
+        uint16_t pad[3];
     } u;
 };
 

@@ -132,13 +132,13 @@ typedef unsigned long l4_pgentry_t;
 
 struct domain_setup_info
 {
-    unsigned long v_start;
-    unsigned long v_end;
-    unsigned long v_kernstart;
-    unsigned long v_kernend;
-    unsigned long v_kernentry;
+    uint64_t v_start;
+    uint64_t v_end;
+    uint64_t v_kernstart;
+    uint64_t v_kernend;
+    uint64_t v_kernentry;
 
-    unsigned long elf_paddr_offset;
+    uint64_t elf_paddr_offset;
 
 #define PAEKERN_no           0
 #define PAEKERN_yes          1

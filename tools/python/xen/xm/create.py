@@ -21,11 +21,8 @@
 """
 import os
 import os.path
-import string
 import sys
 import socket
-import commands
-import time
 import re
 import xmlrpclib
 

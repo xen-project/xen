@@ -45,9 +45,9 @@ LDFLAGS  = -m32 -nostdlib -Wl,-N -Wl,-Ttext -Wl,$(LOADADDR)
 .PHONY: all
 all: hvmloader
 
-hvmloader: roms.h hvmloader.c acpi_madt.c
-	$(CC) $(CFLAGS) -c hvmloader.c acpi_madt.c
-	$(CC) $(LDFLAGS) -o hvmloader.tmp hvmloader.o acpi_madt.o
+hvmloader: roms.h hvmloader.c acpi_madt.c mp_tables.c
+	$(CC) $(CFLAGS) -c hvmloader.c acpi_madt.c mp_tables.c
+	$(CC) $(LDFLAGS) -o hvmloader.tmp hvmloader.o acpi_madt.o mp_tables.o
 	$(OBJCOPY) hvmloader.tmp hvmloader
 	rm -f hvmloader.tmp
 

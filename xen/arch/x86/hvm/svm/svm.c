@@ -2697,9 +2697,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 
     if (exit_reason == -1)
     {
+        svm_dump_vmcb(__func__, vmcb);
         printk("%s: exit_reason == -1 - Did someone clobber the VMCB\n", 
                 __func__);
-        BUG();
         domain_crash_synchronous();
     }
 

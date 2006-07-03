@@ -663,6 +663,34 @@ static void netbk_fill_frags(struct sk_buff *skb)
 	}
 }
 
+int netbk_get_extras(netif_t *netif, struct netif_extra_info *extras,
+		     int work_to_do)
+{
+	struct netif_extra_info *extra;
+	RING_IDX cons = netif->tx.req_cons;
+
+	do {
+		if (unlikely(work_to_do-- <= 0)) {
+			DPRINTK("Missing extra info\n");
+			return -EBADR;
+		}
+
+		extra = (struct netif_extra_info *)
+			RING_GET_REQUEST(&netif->tx, cons);
+		if (unlikely(!extra->type ||
+			     extra->type >= XEN_NETIF_EXTRA_TYPE_MAX)) {
+			netif->tx.req_cons = ++cons;
+			DPRINTK("Invalid extra type: %d\n", extra->type);
+			return -EINVAL;
+		}
+
+		memcpy(&extras[extra->type - 1], extra, sizeof(*extra));
+		netif->tx.req_cons = ++cons;
+	} while (extra->flags & XEN_NETIF_EXTRA_FLAG_MORE);
+
+	return work_to_do;
+}
+
 /* Called after netfront has transmitted */
 static void net_tx_action(unsigned long unused)
 {
@@ -670,7 +698,7 @@ static void net_tx_action(unsigned long unused)
 	struct sk_buff *skb;
 	netif_t *netif;
 	netif_tx_request_t txreq;
-	struct netif_tx_extra txtra;
+	struct netif_extra_info extras[XEN_NETIF_EXTRA_TYPE_MAX - 1];
 	u16 pending_idx;
 	RING_IDX i;
 	gnttab_map_grant_ref_t *mop;
@@ -732,16 +760,15 @@ static void net_tx_action(unsigned long unused)
 		work_to_do--;
 		netif->tx.req_cons = ++i;
 
+		memset(extras, 0, sizeof(extras));
 		if (txreq.flags & NETTXF_extra_info) {
-			if (work_to_do-- <= 0) {
-				DPRINTK("Missing extra info\n");
-				netbk_tx_err(netif, &txreq, i);
+			work_to_do = netbk_get_extras(netif, extras,
+						      work_to_do);
+			if (unlikely(work_to_do < 0)) {
+				netbk_tx_err(netif, &txreq, 0);
 				continue;
 			}
-
-			memcpy(&txtra, RING_GET_REQUEST(&netif->tx, i),
-			       sizeof(txtra));
-			netif->tx.req_cons = ++i;
+			i = netif->tx.req_cons;
 		}
 
 		ret = netbk_count_requests(netif, &txreq, work_to_do);
@@ -751,7 +778,7 @@ static void net_tx_action(unsigned long unused)
 		}
 		i += ret;
 
-		if (unlikely(ret > MAX_SKB_FRAGS + 1)) {
+		if (unlikely(ret > MAX_SKB_FRAGS)) {
 			DPRINTK("Too many frags\n");
 			netbk_tx_err(netif, &txreq, i);
 			continue;
@@ -788,10 +815,24 @@ static void net_tx_action(unsigned long unused)
 		/* Packets passed to netif_rx() must have some headroom. */
 		skb_reserve(skb, 16);
 
-		if (txreq.flags & NETTXF_gso) {
-			skb_shinfo(skb)->gso_size = txtra.u.gso.size;
-			skb_shinfo(skb)->gso_segs = txtra.u.gso.segs;
-			skb_shinfo(skb)->gso_type = txtra.u.gso.type;
+		if (extras[XEN_NETIF_EXTRA_TYPE_GSO - 1].type) {
+			struct netif_extra_info *gso;
+			gso = &extras[XEN_NETIF_EXTRA_TYPE_GSO - 1];
+
+			/* Currently on TCPv4 S.O. is supported. */
+			if (gso->u.gso.type != XEN_NETIF_GSO_TCPV4) {
+				DPRINTK("Bad GSO type %d.\n", gso->u.gso.type);
+				kfree_skb(skb);
+				netbk_tx_err(netif, &txreq, i);
+				break;
+			}
+
+			skb_shinfo(skb)->gso_size = gso->u.gso.size;
+			skb_shinfo(skb)->gso_type = SKB_GSO_TCPV4;
+
+			/* Header must be checked, and gso_segs computed. */
+			skb_shinfo(skb)->gso_type |= SKB_GSO_DODGY;
+			skb_shinfo(skb)->gso_segs = 0;
 		}
 
 		gnttab_set_map_op(mop, MMAP_VADDR(pending_idx),

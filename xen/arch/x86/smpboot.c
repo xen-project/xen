@@ -1197,8 +1197,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	cpu_set(cpu, smp_commenced_mask);
 	while (!cpu_isset(cpu, cpu_online_map)) {
 		mb();
-		if (softirq_pending(0))
-			do_softirq();
+		process_pending_timers();
 	}
 	return 0;
 }

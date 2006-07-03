@@ -23,6 +23,7 @@ typedef struct xenstat_domain xenstat_domain;
 typedef struct xenstat_node xenstat_node;
 typedef struct xenstat_vcpu xenstat_vcpu;
 typedef struct xenstat_network xenstat_network;
+typedef struct xenstat_vbd xenstat_vbd;
 
 /* Initialize the xenstat library.  Returns a handle to be used with
  * subsequent calls to the xenstat library, or NULL if an error occurs. */
@@ -35,7 +36,8 @@ void xenstat_uninit(xenstat_handle * handle);
 #define XENSTAT_VCPU 0x1
 #define XENSTAT_NETWORK 0x2
 #define XENSTAT_XEN_VERSION 0x4
-#define XENSTAT_ALL (XENSTAT_VCPU|XENSTAT_NETWORK|XENSTAT_XEN_VERSION)
+#define XENSTAT_VBD 0x8
+#define XENSTAT_ALL (XENSTAT_VCPU|XENSTAT_NETWORK|XENSTAT_XEN_VERSION|XENSTAT_VBD)
 
 /* Get all available information about a node */
 xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags);
@@ -117,6 +119,13 @@ unsigned int xenstat_domain_num_networks(xenstat_domain *);
 xenstat_network *xenstat_domain_network(xenstat_domain * domain,
 					unsigned int network);
 
+/* Get the number of VBDs for a given domain */
+unsigned int xenstat_domain_num_vbds(xenstat_domain *);
+
+/* Get the VBD handle to obtain VBD stats */
+xenstat_vbd *xenstat_domain_vbd(xenstat_domain * domain,
+				    unsigned int vbd);
+
 /*
  * VCPU functions - extract information from a xenstat_vcpu
  */
@@ -156,3 +165,14 @@ unsigned long long xenstat_network_terrs(xenstat_network * network);
 
 /* Get the number of transmit drops for this network */
 unsigned long long xenstat_network_tdrop(xenstat_network * network);
+
+/*
+ * VBD functions - extract information from a xen_vbd
+ */
+/* Get the device number for Virtual Block Device */
+unsigned int xenstat_vbd_dev(xenstat_vbd * vbd);
+
+/* Get the number of OO/RD/WR requests for vbd */
+unsigned long long xenstat_vbd_oo_reqs(xenstat_vbd * vbd);
+unsigned long long xenstat_vbd_rd_reqs(xenstat_vbd * vbd);
+unsigned long long xenstat_vbd_wr_reqs(xenstat_vbd * vbd);

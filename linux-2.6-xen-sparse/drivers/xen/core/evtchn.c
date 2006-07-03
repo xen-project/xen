@@ -219,7 +219,10 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 
 	vcpu_info->evtchn_upcall_pending = 0;
 
-	/* NB. No need for a barrier here -- XCHG is a barrier on x86. */
+#ifndef CONFIG_X86 /* No need for a barrier -- XCHG is a barrier on x86. */
+	/* Clear master pending flag /before/ clearing selector flag. */
+	rmb();
+#endif
 	l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
 	while (l1 != 0) {
 		l1i = __ffs(l1);

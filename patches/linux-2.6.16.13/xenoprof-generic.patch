@@ -123,6 +123,21 @@ diff -pru ../pristine-linux-2.6.16.13/drivers/oprofile/buffer_sync.c ./drivers/o
  				}
  			}
  		}
+diff -pru ../pristine-linux-2.6.16.13/drivers/oprofile/buffer_sync.h ./drivers/oprofile/buffer_sync.h
+--- ../pristine-linux-2.6.16.13/drivers/oprofile/buffer_sync.h	2006-05-03 05:38:44.000000000 +0800
++++ ./drivers/oprofile/buffer_sync.h	2006-06-27 12:12:09.000000000 +0800
+@@ -9,6 +9,11 @@
+ 
+ #ifndef OPROFILE_BUFFER_SYNC_H
+ #define OPROFILE_BUFFER_SYNC_H
++
++#define NO_DOMAIN_SWITCH		-1
++#define DOMAIN_SWITCH_START_EVENT1	0
++#define DOMAIN_SWITCH_START_EVENT2	1
++#define DOMAIN_SWITCH_STOP_EVENT1	2
+  
+ /* add the necessary profiling hooks */
+ int sync_start(void);
 diff -pru ../pristine-linux-2.6.16.13/drivers/oprofile/cpu_buffer.c ./drivers/oprofile/cpu_buffer.c
 --- ../pristine-linux-2.6.16.13/drivers/oprofile/cpu_buffer.c	2006-05-03 05:38:44.000000000 +0800
 +++ ./drivers/oprofile/cpu_buffer.c	2006-06-19 22:43:53.000000000 +0800

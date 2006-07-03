@@ -20,10 +20,6 @@
 """
 import sys
 import traceback
-import os
-import commands
-import shutil
-import string
 from xen.util.security import ACMError, err, load_policy
 
 
