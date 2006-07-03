@@ -58,7 +58,7 @@ void vmx_wait_io(void)
     if (d->shared_info->evtchn_pending[port / BITS_PER_LONG])
         set_bit(port / BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
 
-    if (&v->vcpu_info->evtchn_pending_sel)
+    if (v->vcpu_info->evtchn_pending_sel)
         set_bit(0, &v->vcpu_info->evtchn_upcall_pending);
 }
 
