@@ -58,6 +58,11 @@ struct mm_struct {
     //	atomic_t mm_users;			/* How many users with user space? */
 };
 
+struct last_vcpu {
+#define INVALID_VCPU_ID INT_MAX
+    int vcpu_id;
+} ____cacheline_aligned_in_smp;
+
 struct arch_domain {
     struct mm_struct mm;
     unsigned long metaphysical_rr0;
@@ -101,6 +106,8 @@ struct arch_domain {
     void *efi_runtime;
     /* Metaphysical address to fpswa_interface_t in domain firmware memory is set. */
     void *fpswa_inf;
+
+    struct last_vcpu last_vcpu[NR_CPUS];
 };
 #define INT_ENABLE_OFFSET(v) 		  \
     (sizeof(vcpu_info_t) * (v)->vcpu_id + \

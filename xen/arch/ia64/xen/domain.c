@@ -92,6 +92,29 @@ DEFINE_PER_CPU(int *, current_psr_ic_addr);
 
 #include <xen/sched-if.h>
 
+static void flush_vtlb_for_context_switch(struct vcpu* vcpu)
+{
+	int last_vcpu_id =
+		vcpu->domain->arch.last_vcpu[smp_processor_id()].vcpu_id;
+
+	if (is_idle_domain(vcpu->domain) || last_vcpu_id == vcpu->vcpu_id)
+		return;
+	vcpu->domain->arch.last_vcpu[smp_processor_id()].vcpu_id =
+		vcpu->vcpu_id;
+	if (last_vcpu_id == INVALID_VCPU_ID) 
+		return;
+
+	// if the vTLB implementation was changed,
+	// the followings must be updated either.
+	if (VMX_DOMAIN(vcpu)) {
+		// currently vTLB for vt-i domian is per vcpu.
+		// so any flushing isn't needed.
+	} else {
+		vhpt_flush();
+	}
+	local_flush_tlb_all();
+}
+
 void schedule_tail(struct vcpu *prev)
 {
 	extern char ia64_ivt;
@@ -110,6 +133,7 @@ void schedule_tail(struct vcpu *prev)
 		__ia64_per_cpu_var(current_psr_ic_addr) = (int *)
 		  (current->domain->arch.shared_info_va + XSI_PSR_IC_OFS);
 	}
+	flush_vtlb_for_context_switch(current);
 }
 
 void context_switch(struct vcpu *prev, struct vcpu *next)
@@ -175,6 +199,7 @@ if (!i--) { i = 1000000; printk("+"); }
 		__ia64_per_cpu_var(current_psr_ic_addr) = NULL;
         }
     }
+    flush_vtlb_for_context_switch(current);
     local_irq_restore(spsr);
     context_saved(prev);
 }
@@ -309,9 +334,14 @@ static void init_switch_stack(struct vcpu *v)
 
 int arch_domain_create(struct domain *d)
 {
+	int i;
+	
 	// the following will eventually need to be negotiated dynamically
 	d->arch.shared_info_va = DEFAULT_SHAREDINFO_ADDR;
 	d->arch.breakimm = 0x1000;
+	for (i = 0; i < NR_CPUS; i++) {
+		d->arch.last_vcpu[i].vcpu_id = INVALID_VCPU_ID;
+	}
 
 	if (is_idle_domain(d))
 	    return 0;
