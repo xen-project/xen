@@ -65,7 +65,7 @@ typedef struct netif_tx_request netif_tx_request_t;
 #define XEN_NETIF_EXTRA_FLAG_MORE  (1U<<_XEN_NETIF_EXTRA_FLAG_MORE)
 
 /* GSO types - only TCPv4 currently supported. */
-#define XEN_NETIF_GSO_TCPV4        (1)
+#define XEN_NETIF_GSO_TYPE_TCPV4        (1)
 
 /*
  * This structure needs to fit within both netif_tx_request and
@@ -87,7 +87,16 @@ struct netif_extra_info {
              * GSO type. This determines the protocol of the packet and any
              * extra features required to segment the packet properly.
              */
-            uint16_t type; /* XEN_NETIF_GSO_* */
+            uint8_t type; /* XEN_NETIF_GSO_TYPE_* */
+
+            /* Future expansion. */
+            uint8_t pad;
+
+            /*
+             * GSO features. This specifies any extra GSO features required
+             * to process this packet, such as ECN support for TCPv4.
+             */
+            uint16_t features; /* XEN_NETIF_GSO_FEAT_* */
         } gso;
 
         uint16_t pad[3];

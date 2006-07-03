@@ -691,6 +691,29 @@ int netbk_get_extras(netif_t *netif, struct netif_extra_info *extras,
 	return work_to_do;
 }
 
+static int netbk_set_skb_gso(struct sk_buff *skb, struct netif_extra_info *gso)
+{
+	if (!gso->u.gso.size) {
+		DPRINTK("GSO size must not be zero.\n");
+		return -EINVAL;
+	}
+
+	/* Currently only TCPv4 S.O. is supported. */
+	if (gso->u.gso.type != XEN_NETIF_GSO_TYPE_TCPV4) {
+		DPRINTK("Bad GSO type %d.\n", gso->u.gso.type);
+		return -EINVAL;
+	}
+
+	skb_shinfo(skb)->gso_size = gso->u.gso.size;
+	skb_shinfo(skb)->gso_type = SKB_GSO_TCPV4;
+
+	/* Header must be checked, and gso_segs computed. */
+	skb_shinfo(skb)->gso_type |= SKB_GSO_DODGY;
+	skb_shinfo(skb)->gso_segs = 0;
+
+	return 0;
+}
+
 /* Called after netfront has transmitted */
 static void net_tx_action(unsigned long unused)
 {
@@ -819,20 +842,11 @@ static void net_tx_action(unsigned long unused)
 			struct netif_extra_info *gso;
 			gso = &extras[XEN_NETIF_EXTRA_TYPE_GSO - 1];
 
-			/* Currently on TCPv4 S.O. is supported. */
-			if (gso->u.gso.type != XEN_NETIF_GSO_TCPV4) {
-				DPRINTK("Bad GSO type %d.\n", gso->u.gso.type);
+			if (netbk_set_skb_gso(skb, gso)) {
 				kfree_skb(skb);
 				netbk_tx_err(netif, &txreq, i);
-				break;
+				continue;
 			}
-
-			skb_shinfo(skb)->gso_size = gso->u.gso.size;
-			skb_shinfo(skb)->gso_type = SKB_GSO_TCPV4;
-
-			/* Header must be checked, and gso_segs computed. */
-			skb_shinfo(skb)->gso_type |= SKB_GSO_DODGY;
-			skb_shinfo(skb)->gso_segs = 0;
 		}
 
 		gnttab_set_map_op(mop, MMAP_VADDR(pending_idx),
