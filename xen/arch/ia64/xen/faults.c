@@ -26,6 +26,8 @@
 #include <asm/vhpt.h>
 #include <asm/debugger.h>
 #include <asm/fpswa.h>
+#include <asm/bundle.h>
+#include <asm/privop_stat.h>
 #include <asm/asm-xsi-offsets.h>
 
 extern void die_if_kernel(char *str, struct pt_regs *regs, long err);
@@ -49,41 +51,7 @@ extern IA64FAULT ia64_hypercall(struct pt_regs *regs);
 
 extern void do_ssc(unsigned long ssc, struct pt_regs *regs);
 
-unsigned long slow_reflect_count[0x80] = { 0 };
-unsigned long fast_reflect_count[0x80] = { 0 };
-
 #define inc_slow_reflect_count(vec) slow_reflect_count[vec>>8]++;
-
-void zero_reflect_counts(void)
-{
-	int i;
-	for (i=0; i<0x80; i++) slow_reflect_count[i] = 0;
-	for (i=0; i<0x80; i++) fast_reflect_count[i] = 0;
-}
-
-int dump_reflect_counts(char *buf)
-{
-	int i,j,cnt;
-	char *s = buf;
-
-	s += sprintf(s,"Slow reflections by vector:\n");
-	for (i = 0, j = 0; i < 0x80; i++) {
-		if ( (cnt = slow_reflect_count[i]) != 0 ) {
-			s += sprintf(s,"0x%02x00:%10d, ",i,cnt);
-			if ((j++ & 3) == 3) s += sprintf(s,"\n");
-		}
-	}
-	if (j & 3) s += sprintf(s,"\n");
-	s += sprintf(s,"Fast reflections by vector:\n");
-	for (i = 0, j = 0; i < 0x80; i++) {
-		if ( (cnt = fast_reflect_count[i]) != 0 ) {
-			s += sprintf(s,"0x%02x00:%10d, ",i,cnt);
-			if ((j++ & 3) == 3) s += sprintf(s,"\n");
-		}
-	}
-	if (j & 3) s += sprintf(s,"\n");
-	return s - buf;
-}
 
 // should never panic domain... if it does, stack may have been overrun
 void check_bad_nested_interruption(unsigned long isr, struct pt_regs *regs, unsigned long vector)
@@ -194,7 +162,6 @@ void deliver_pending_interrupt(struct pt_regs *regs)
 			++pending_false_positive;
 	}
 }
-unsigned long lazy_cover_count = 0;
 
 static int
 handle_lazy_cover(struct vcpu *v, struct pt_regs *regs)

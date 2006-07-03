@@ -21,6 +21,8 @@
 #define	VLE_CCHAIN_OFFSET		24
 
 #ifndef __ASSEMBLY__
+#include <xen/percpu.h>
+
 //
 // VHPT Long Format Entry (as recognized by hw)
 //

@@ -20,10 +20,7 @@
  *  Shaofan Li (Susue Li) <susie.li@intel.com>
  *  Xuefei Xu (Anthony Xu) (Anthony.xu@intel.com)
  */
-
-
-
-#include <asm/privop.h>
+#include <asm/bundle.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/processor.h>
 #include <asm/delay.h>	// Debug only
@@ -33,7 +30,6 @@
 #include <asm/vmx.h>
 #include <asm/virt_event.h>
 #include <asm/vmx_phy_mode.h>
-extern UINT64 privop_trace;
 extern void vhpi_detection(VCPU *vcpu);//temporarily place here,need a header file.
 
 void
@@ -1381,15 +1377,6 @@ vmx_emulate(VCPU *vcpu, REGS *regs)
     cause = VMX(vcpu,cause);
     opcode = VMX(vcpu,opcode);
 
-/*
-    if (privop_trace) {
-        static long i = 400;
-        //if (i > 0) printf("privop @%p\n",iip);
-        if (i > 0) printf("priv_handle_op: @%p, itc=%lx, itm=%lx\n",
-            iip,ia64_get_itc(),ia64_get_itm());
-        i--;
-    }
-*/
 #ifdef  VTLB_DEBUG
     check_vtlb_sanity(vmx_vcpu_get_vtlb(vcpu));
     dump_vtlb(vmx_vcpu_get_vtlb(vcpu));

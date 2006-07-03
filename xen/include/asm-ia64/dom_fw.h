@@ -166,8 +166,6 @@
 extern struct ia64_pal_retval xen_pal_emulator(UINT64, u64, u64, u64);
 extern struct sal_ret_values sal_emulator (long index, unsigned long in1, unsigned long in2, unsigned long in3, unsigned long in4, unsigned long in5, unsigned long in6, unsigned long in7);
 extern struct ia64_pal_retval pal_emulator_static (unsigned long);
-extern unsigned long dom_fw_setup (struct domain *, const char *, int);
 extern efi_status_t efi_emulator (struct pt_regs *regs, unsigned long *fault);
 
-extern void build_pal_hypercall_bundles(unsigned long *imva, unsigned long brkimm, unsigned long hypnum);
-extern void build_hypercall_bundle(UINT64 *imva, UINT64 brkimm, UINT64 hypnum, UINT64 ret);
+extern unsigned long dom_fw_setup (struct domain *, const char *, int);

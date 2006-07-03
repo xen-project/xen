@@ -59,6 +59,7 @@
 #include <asm/tlbflush.h>
 #include <asm/regionreg.h>
 #include <asm/dom_fw.h>
+#include <asm/privop_stat.h>
 
 #ifndef CONFIG_XEN_IA64_DOM0_VP
 #define CONFIG_DOMAIN0_CONTIGUOUS
@@ -82,8 +83,6 @@ extern void vmx_do_launch(struct vcpu *);
 void build_physmap_table(struct domain *d);
 
 /* this belongs in include/asm, but there doesn't seem to be a suitable place */
-unsigned long context_switch_count = 0;
-
 extern struct vcpu *ia64_switch_to (struct vcpu *next_task);
 
 /* Address of vpsr.i (in fact evtchn_upcall_mask) of current vcpu.

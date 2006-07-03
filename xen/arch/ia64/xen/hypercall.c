@@ -28,16 +28,11 @@
 #include <xen/domain.h>
 #include <public/callback.h>
 #include <xen/event.h>
+#include <asm/privop_stat.h>
 
 static long do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop);
 static long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg);
 static long do_callback_op(int cmd, XEN_GUEST_HANDLE(void) arg);
-/* FIXME: where these declarations should be there ? */
-extern int dump_privop_counts_to_user(char *, int);
-extern int zero_privop_counts_to_user(char *, int);
-
-unsigned long idle_when_pending = 0;
-unsigned long pal_halt_light_count = 0;
 
 hypercall_t ia64_hypercall_table[] =
 	{

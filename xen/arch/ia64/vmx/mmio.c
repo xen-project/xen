@@ -27,7 +27,7 @@
 #include <asm/gcc_intrin.h>
 #include <linux/interrupt.h>
 #include <asm/vmx_vcpu.h>
-#include <asm/privop.h>
+#include <asm/bundle.h>
 #include <asm/types.h>
 #include <public/hvm/ioreq.h>
 #include <asm/mm.h>

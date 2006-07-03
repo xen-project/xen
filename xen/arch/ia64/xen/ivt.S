@@ -14,7 +14,6 @@
 #define ia64_trace_syscall 0
 #define sys_call_table 0
 #define sys_ni_syscall 0
-#include <asm/vhpt.h>
 #include <asm/debugger.h>
 #endif
 /*

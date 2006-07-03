@@ -23,6 +23,7 @@
 #include <xen/acpi.h>
 
 #include <asm/dom_fw.h>
+#include <asm/bundle.h>
 
 static struct ia64_boot_param *dom_fw_init(struct domain *, const char *,int,char *,int);
 extern struct domain *dom0;
@@ -81,6 +82,83 @@ dom_pa(unsigned long imva)
             assign_new_domain0_page((d), (mpaddr)); \
         }                                           \
     } while (0)
+
+/**************************************************************************
+Hypercall bundle creation
+**************************************************************************/
+
+static void build_hypercall_bundle(UINT64 *imva, UINT64 brkimm, UINT64 hypnum, UINT64 ret)
+{
+	INST64_A5 slot0;
+	INST64_I19 slot1;
+	INST64_B4 slot2;
+	IA64_BUNDLE bundle;
+
+	// slot1: mov r2 = hypnum (low 20 bits)
+	slot0.inst = 0;
+	slot0.qp = 0; slot0.r1 = 2; slot0.r3 = 0; slot0.major = 0x9;
+	slot0.imm7b = hypnum; slot0.imm9d = hypnum >> 7;
+	slot0.imm5c = hypnum >> 16; slot0.s = 0;
+	// slot1: break brkimm
+	slot1.inst = 0;
+	slot1.qp = 0; slot1.x6 = 0; slot1.x3 = 0; slot1.major = 0x0;
+	slot1.imm20 = brkimm; slot1.i = brkimm >> 20;
+	// if ret slot2: br.ret.sptk.many rp
+	// else slot2: br.cond.sptk.many rp
+	slot2.inst = 0; slot2.qp = 0; slot2.p = 1; slot2.b2 = 0;
+	slot2.wh = 0; slot2.d = 0; slot2.major = 0x0;
+	if (ret) {
+		slot2.btype = 4; slot2.x6 = 0x21;
+	}
+	else {
+		slot2.btype = 0; slot2.x6 = 0x20;
+	}
+	
+	bundle.i64[0] = 0; bundle.i64[1] = 0;
+	bundle.template = 0x11;
+	bundle.slot0 = slot0.inst; bundle.slot2 = slot2.inst;
+	bundle.slot1a = slot1.inst; bundle.slot1b = slot1.inst >> 18;
+	
+	imva[0] = bundle.i64[0]; imva[1] = bundle.i64[1];
+	ia64_fc(imva);
+	ia64_fc(imva + 1);
+}
+
+static void build_pal_hypercall_bundles(UINT64 *imva, UINT64 brkimm, UINT64 hypnum)
+{
+	extern unsigned long pal_call_stub[];
+	IA64_BUNDLE bundle;
+	INST64_A5 slot_a5;
+	INST64_M37 slot_m37;
+
+	/* The source of the hypercall stub is the pal_call_stub function
+	   defined in xenasm.S.  */
+
+	/* Copy the first bundle and patch the hypercall number.  */
+	bundle.i64[0] = pal_call_stub[0];
+	bundle.i64[1] = pal_call_stub[1];
+	slot_a5.inst = bundle.slot0;
+	slot_a5.imm7b = hypnum;
+	slot_a5.imm9d = hypnum >> 7;
+	slot_a5.imm5c = hypnum >> 16;
+	bundle.slot0 = slot_a5.inst;
+	imva[0] = bundle.i64[0];
+	imva[1] = bundle.i64[1];
+	ia64_fc(imva);
+	ia64_fc(imva + 1);
+	
+	/* Copy the second bundle and patch the hypercall vector.  */
+	bundle.i64[0] = pal_call_stub[2];
+	bundle.i64[1] = pal_call_stub[3];
+	slot_m37.inst = bundle.slot0;
+	slot_m37.imm20a = brkimm;
+	slot_m37.i = brkimm >> 20;
+	bundle.slot0 = slot_m37.inst;
+	imva[2] = bundle.i64[0];
+	imva[3] = bundle.i64[1];
+	ia64_fc(imva + 2);
+	ia64_fc(imva + 3);
+}
 
 // builds a hypercall bundle at domain physical address
 static void dom_fpswa_hypercall_patch(struct domain *d)

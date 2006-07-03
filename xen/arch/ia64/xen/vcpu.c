@@ -20,6 +20,8 @@
 #include <asm/privop.h>
 #include <xen/event.h>
 #include <asm/vmx_phy_mode.h>
+#include <asm/bundle.h>
+#include <asm/privop_stat.h>
 
 /* FIXME: where these declarations should be there ? */
 extern void getreg(unsigned long regnum, unsigned long *val, int *nat, struct pt_regs *regs);
@@ -46,24 +48,6 @@ typedef	union {
 #define	IA64_PTA_BASE_BIT	15
 #define	IA64_PTA_LFMT		(1UL << IA64_PTA_VF_BIT)
 #define	IA64_PTA_SZ(x)	(x##UL << IA64_PTA_SZ_BIT)
-
-#define STATIC
-
-#ifdef PRIVOP_ADDR_COUNT
-struct privop_addr_count privop_addr_counter[PRIVOP_COUNT_NINSTS+1] = {
-	{ "=ifa",  { 0 }, { 0 }, 0 },
-	{ "thash", { 0 }, { 0 }, 0 },
-	{ 0,       { 0 }, { 0 }, 0 }
-};
-extern void privop_count_addr(unsigned long addr, int inst);
-#define	PRIVOP_COUNT_ADDR(regs,inst) privop_count_addr(regs->cr_iip,inst)
-#else
-#define	PRIVOP_COUNT_ADDR(x,y) do {} while (0)
-#endif
-
-unsigned long dtlb_translate_count = 0;
-unsigned long tr_translate_count = 0;
-unsigned long phys_translate_count = 0;
 
 unsigned long vcpu_verbose = 0;
 
@@ -446,8 +430,6 @@ UINT64 vcpu_get_ipsr_int_state(VCPU *vcpu,UINT64 prevpsr)
 
 IA64FAULT vcpu_get_dcr(VCPU *vcpu, UINT64 *pval)
 {
-//extern unsigned long privop_trace;
-//privop_trace=0;
 //verbose("vcpu_get_dcr: called @%p\n",PSCB(vcpu,iip));
 	// Reads of cr.dcr on Xen always have the sign bit set, so
 	// a domain can differentiate whether it is running on SP or not
@@ -495,10 +477,8 @@ IA64FAULT vcpu_get_iip(VCPU *vcpu, UINT64 *pval)
 
 IA64FAULT vcpu_get_ifa(VCPU *vcpu, UINT64 *pval)
 {
-	UINT64 val = PSCB(vcpu,ifa);
-	REGS *regs = vcpu_regs(vcpu);
-	PRIVOP_COUNT_ADDR(regs,_GET_IFA);
-	*pval = val;
+	PRIVOP_COUNT_ADDR(vcpu_regs(vcpu),_GET_IFA);
+	*pval = PSCB(vcpu,ifa);
 	return (IA64_NO_FAULT);
 }
 
@@ -564,18 +544,13 @@ IA64FAULT vcpu_get_iim(VCPU *vcpu, UINT64 *pval)
 
 IA64FAULT vcpu_get_iha(VCPU *vcpu, UINT64 *pval)
 {
-	//return vcpu_thash(vcpu,PSCB(vcpu,ifa),pval);
-	UINT64 val = PSCB(vcpu,iha);
-	REGS *regs = vcpu_regs(vcpu);
-	PRIVOP_COUNT_ADDR(regs,_THASH);
-	*pval = val;
+	PRIVOP_COUNT_ADDR(vcpu_regs(vcpu),_THASH);
+	*pval = PSCB(vcpu,iha);
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_set_dcr(VCPU *vcpu, UINT64 val)
 {
-//extern unsigned long privop_trace;
-//privop_trace=1;
 	// Reads of cr.dcr on SP always have the sign bit set, so
 	// a domain can differentiate whether it is running on SP or not
 	// Thus, writes of DCR should ignore the sign bit
@@ -1331,11 +1306,6 @@ IA64FAULT vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 	printf("vcpu_ttag: ttag instruction unsupported\n");
 	return (IA64_ILLOP_FAULT);
 }
-
-unsigned long vhpt_translate_count = 0;
-unsigned long fast_vhpt_translate_count = 0;
-unsigned long recover_to_page_fault_count = 0;
-unsigned long recover_to_break_fault_count = 0;
 
 int warn_region0_address = 0; // FIXME later: tie to a boot parameter?
 
