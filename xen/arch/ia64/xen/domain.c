@@ -93,25 +93,32 @@ DEFINE_PER_CPU(int *, current_psr_ic_addr);
 
 static void flush_vtlb_for_context_switch(struct vcpu* vcpu)
 {
-	int last_vcpu_id =
-		vcpu->domain->arch.last_vcpu[smp_processor_id()].vcpu_id;
+	int cpu = smp_processor_id();
+	int last_vcpu_id = vcpu->domain->arch.last_vcpu[cpu].vcpu_id;
+	int last_processor = vcpu->arch.last_processor;
 
-	if (is_idle_domain(vcpu->domain) || last_vcpu_id == vcpu->vcpu_id)
+	if (is_idle_domain(vcpu->domain))
 		return;
-	vcpu->domain->arch.last_vcpu[smp_processor_id()].vcpu_id =
-		vcpu->vcpu_id;
-	if (last_vcpu_id == INVALID_VCPU_ID) 
-		return;
+	
+	vcpu->domain->arch.last_vcpu[cpu].vcpu_id = vcpu->vcpu_id;
+	vcpu->arch.last_processor = cpu;
 
-	// if the vTLB implementation was changed,
-	// the followings must be updated either.
-	if (VMX_DOMAIN(vcpu)) {
-		// currently vTLB for vt-i domian is per vcpu.
-		// so any flushing isn't needed.
-	} else {
-		vhpt_flush();
+	if ((last_vcpu_id != vcpu->vcpu_id &&
+	     last_vcpu_id != INVALID_VCPU_ID) ||
+	    (last_vcpu_id == vcpu->vcpu_id &&
+	     last_processor != cpu &&
+	     last_processor != INVALID_PROCESSOR)) {
+
+		// if the vTLB implementation was changed,
+		// the followings must be updated either.
+		if (VMX_DOMAIN(vcpu)) {
+			// currently vTLB for vt-i domian is per vcpu.
+			// so any flushing isn't needed.
+		} else {
+			vhpt_flush();
+		}
+		local_flush_tlb_all();
 	}
-	local_flush_tlb_all();
 }
 
 void schedule_tail(struct vcpu *prev)
@@ -298,6 +305,7 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 	    v->arch.starting_rid = d->arch.starting_rid;
 	    v->arch.ending_rid = d->arch.ending_rid;
 	    v->arch.breakimm = d->arch.breakimm;
+	    v->arch.last_processor = INVALID_PROCESSOR;
 	}
 
 	return v;

@@ -171,6 +171,9 @@ struct arch_vcpu {
     int mode_flags;
     fpswa_ret_t fpswa_ret;	/* save return values of FPSWA emulation */
     struct arch_vmx_struct arch_vmx; /* Virtual Machine Extensions */
+
+#define INVALID_PROCESSOR       INT_MAX
+    int last_processor;
 };
 
 #include <asm/uaccess.h> /* for KERNEL_DS */
