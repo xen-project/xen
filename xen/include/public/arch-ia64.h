@@ -40,19 +40,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 #ifndef __ASSEMBLY__
 
-#define MAX_NR_SECTION  32  /* at most 32 memory holes */
-struct mm_section {
-    unsigned long start;  /* start of memory hole */
-    unsigned long end;    /* end of memory hole */
-};
-typedef struct mm_section mm_section_t;
-
-struct pmt_entry {
-    unsigned long mfn : 56;
-    unsigned long type: 8;
-};
-typedef struct pmt_entry pmt_entry_t;
-
 #define GPFN_MEM          (0UL << 56) /* Guest pfn is normal mem */
 #define GPFN_FRAME_BUFFER (1UL << 56) /* VGA framebuffer */
 #define GPFN_LOW_MMIO     (2UL << 56) /* Low MMIO range */
@@ -93,16 +80,6 @@ typedef struct pmt_entry pmt_entry_t;
 
 #define GFW_START        (4*MEM_G -16*MEM_M)
 #define GFW_SIZE         (16*MEM_M)
-
-/*
- * NB. This may become a 64-bit count with no shift. If this happens then the 
- * structure size will still be 8 bytes, so no other alignments will change.
- */
-struct tsc_timestamp {
-    unsigned int  tsc_bits;      /* 0: 32 bits read from the CPU's TSC. */
-    unsigned int  tsc_bitshift;  /* 4: 'tsc_bits' uses N:N+31 of TSC.   */
-}; /* 8 bytes */
-typedef struct tsc_timestamp tsc_timestamp_t;
 
 struct pt_fpreg {
     union {
@@ -302,15 +279,14 @@ struct mapped_regs {
     unsigned long  reserved7[4096];
 };
 typedef struct mapped_regs mapped_regs_t;
+typedef mapped_regs_t vpd_t;
 
 struct arch_vcpu_info {
 };
 typedef struct arch_vcpu_info arch_vcpu_info_t;
 
-typedef mapped_regs_t vpd_t;
-
 struct arch_shared_info {
-    unsigned int flags;
+    /* PFN of the start_info page.  */
     unsigned long start_info_pfn;
 
     /* Interrupt vector for event channel.  */
@@ -318,30 +294,13 @@ struct arch_shared_info {
 };
 typedef struct arch_shared_info arch_shared_info_t;
 
-struct arch_initrd_info {
-    unsigned long start;
-    unsigned long size;
-};
-typedef struct arch_initrd_info arch_initrd_info_t;
-
 typedef unsigned long xen_callback_t;
 
-#define IA64_COMMAND_LINE_SIZE 512
 struct vcpu_guest_context {
-#define VGCF_FPU_VALID (1<<0)
-#define VGCF_VMX_GUEST (1<<1)
-#define VGCF_IN_KERNEL (1<<2)
     unsigned long flags;       /* VGCF_* flags */
-    unsigned long pt_base;     /* PMT table base */
-    unsigned long share_io_pg; /* Shared page for I/O emulation */
-    unsigned long sys_pgnr;    /* System pages out of domain memory */
-    unsigned long vm_assist;   /* VMASST_TYPE_* bitmap, now none on IPF */
 
     struct cpu_user_regs user_regs;
-    struct mapped_regs *privregs;
-    struct arch_shared_info shared;
-    struct arch_initrd_info initrd;
-    char cmdline[IA64_COMMAND_LINE_SIZE];
+    unsigned long privregs_pfn;
 };
 typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
@@ -377,6 +336,28 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 #define _ASSIGN_readonly                0
 #define ASSIGN_readonly                 (1UL << _ASSIGN_readonly)
 #define ASSIGN_writable                 (0UL << _ASSIGN_readonly) // dummy flag
+
+/* This structure has the same layout of struct ia64_boot_param, defined in
+   <asm/system.h>.  It is redefined here to ease use.  */
+struct xen_ia64_boot_param {
+	unsigned long command_line;	/* physical address of cmd line args */
+	unsigned long efi_systab;	/* physical address of EFI system table */
+	unsigned long efi_memmap;	/* physical address of EFI memory map */
+	unsigned long efi_memmap_size;	/* size of EFI memory map */
+	unsigned long efi_memdesc_size;	/* size of an EFI memory map descriptor */
+	unsigned int  efi_memdesc_version;	/* memory descriptor version */
+	struct {
+		unsigned short num_cols;	/* number of columns on console.  */
+		unsigned short num_rows;	/* number of rows on console.  */
+		unsigned short orig_x;	/* cursor's x position */
+		unsigned short orig_y;	/* cursor's y position */
+	} console_info;
+	unsigned long fpswa;		/* physical address of the fpswa interface */
+	unsigned long initrd_start;
+	unsigned long initrd_size;
+	unsigned long domain_start;	/* va where the boot time domain begins */
+	unsigned long domain_size;	/* how big is the boot domain */
+};
 
 #endif /* !__ASSEMBLY__ */
 

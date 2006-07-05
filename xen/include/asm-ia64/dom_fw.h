@@ -168,4 +168,4 @@ extern struct sal_ret_values sal_emulator (long index, unsigned long in1, unsign
 extern struct ia64_pal_retval pal_emulator_static (unsigned long);
 extern efi_status_t efi_emulator (struct pt_regs *regs, unsigned long *fault);
 
-extern unsigned long dom_fw_setup (struct domain *, const char *, int);
+extern void dom_fw_setup (struct domain *, unsigned long bp_mpa, unsigned long maxmem);

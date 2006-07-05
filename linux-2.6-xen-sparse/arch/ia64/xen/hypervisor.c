@@ -547,8 +547,10 @@ xen_ia64_privcmd_entry_mmap(struct vm_area_struct* vma,
 	unsigned long gpfn;
 	unsigned long flags;
 
-	BUG_ON((addr & ~PAGE_MASK) != 0);
-	BUG_ON(mfn == INVALID_MFN);
+	if ((addr & ~PAGE_MASK) != 0 || mfn == INVALID_MFN) {
+		error = -EINVAL;
+		goto out;
+	}
 
 	if (entry->gpfn != INVALID_GPFN) {
 		error = -EBUSY;

@@ -583,7 +583,7 @@ lookup_alloc_domain_pte(struct domain* d, unsigned long mpaddr)
 }
 
 //XXX xxx_none() should be used instread of !xxx_present()?
-static volatile pte_t*
+volatile pte_t*
 lookup_noalloc_domain_pte(struct domain* d, unsigned long mpaddr)
 {
     struct mm_struct *mm = &d->arch.mm;
@@ -1155,11 +1155,10 @@ dom0vp_add_physmap(struct domain* d, unsigned long gpfn, unsigned long mfn,
         get_knownalive_domain(rd);
     }
 
-    if (unlikely(rd == d)) {
+    if (unlikely(rd == d || !mfn_valid(mfn))) {
         error = -EINVAL;
         goto out1;
     }
-    BUG_ON(!mfn_valid(mfn));
     if (unlikely(get_page(mfn_to_page(mfn), rd) == 0)) {
         error = -EINVAL;
         goto out1;

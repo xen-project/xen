@@ -429,7 +429,7 @@ extern void assign_domain_io_page(struct domain *d, unsigned long mpaddr, unsign
 struct p2m_entry;
 extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr, struct p2m_entry* entry);
 extern void *domain_mpa_to_imva(struct domain *d, unsigned long mpaddr);
-
+extern volatile pte_t *lookup_noalloc_domain_pte(struct domain* d, unsigned long mpaddr);
 #ifdef CONFIG_XEN_IA64_DOM0_VP
 extern unsigned long assign_domain_mmio_page(struct domain *d, unsigned long mpaddr, unsigned long size);
 extern unsigned long assign_domain_mach_page(struct domain *d, unsigned long mpaddr, unsigned long size, unsigned long flags);

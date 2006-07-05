@@ -34,7 +34,7 @@ extern void vmx_init_env(void);
 extern void vmx_final_setup_guest(struct vcpu *v);
 extern void vmx_save_state(struct vcpu *v);
 extern void vmx_load_state(struct vcpu *v);
-extern void vmx_setup_platform(struct domain *d, struct vcpu_guest_context *c);
+extern void vmx_setup_platform(struct domain *d);
 extern void vmx_wait_io(void);
 extern void vmx_io_assist(struct vcpu *v);
 extern void panic_domain(struct pt_regs *regs, const char *fmt, ...);
@@ -43,7 +43,6 @@ extern void vmx_save_state(struct vcpu *v);
 extern void vmx_load_state(struct vcpu *v);
 extern void show_registers(struct pt_regs *regs);
 #define show_execution_state show_registers
-extern int vmx_build_physmap_table(struct domain *d);
 extern unsigned long __gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
 extern void sync_split_caches(void);
 extern void vmx_virq_line_assist(struct vcpu *v);

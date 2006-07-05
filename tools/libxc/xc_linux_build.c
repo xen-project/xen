@@ -2,6 +2,7 @@
  * xc_linux_build.c
  */
 
+#include <stddef.h>
 #include "xg_private.h"
 #include "xc_private.h"
 #include <xenctrl.h>
@@ -470,6 +471,11 @@ static int setup_guest(int xc_handle,
     unsigned long v_end;
     unsigned long start_page, pgnr;
     start_info_t *start_info;
+    unsigned long start_info_mpa;
+    struct xen_ia64_boot_param *bp;
+    shared_info_t *shared_info;
+    int i;
+    DECLARE_DOM0_OP;
     int rc;
 
     rc = probeimageformat(image, image_size, &load_funcs);
@@ -486,6 +492,17 @@ static int setup_guest(int xc_handle,
     vinitrd_start    = round_pgup(dsi.v_end);
     vinitrd_end      = vinitrd_start + initrd->len;
     v_end            = round_pgup(vinitrd_end);
+    start_info_mpa = (nr_pages - 3) << PAGE_SHIFT;
+
+    /* Build firmware.  */
+    op.u.domain_setup.flags = 0;
+    op.u.domain_setup.domain = (domid_t)dom;
+    op.u.domain_setup.bp = start_info_mpa + sizeof (start_info_t);
+    op.u.domain_setup.maxmem = (nr_pages - 3) << PAGE_SHIFT;
+    
+    op.cmd = DOM0_DOMAIN_SETUP;
+    if ( xc_dom0_op(xc_handle, &op) )
+        goto error_out;
 
     start_page = dsi.v_start >> PAGE_SHIFT;
     pgnr = (v_end - dsi.v_start) >> PAGE_SHIFT;
@@ -538,7 +555,7 @@ static int setup_guest(int xc_handle,
     IPRINTF("start_info: 0x%lx at 0x%lx, "
            "store_mfn: 0x%lx at 0x%lx, "
            "console_mfn: 0x%lx at 0x%lx\n",
-           page_array[0], nr_pages,
+           page_array[0], nr_pages - 3,
            *store_mfn,    nr_pages - 2,
            *console_mfn,  nr_pages - 1);
 
@@ -553,22 +570,34 @@ static int setup_guest(int xc_handle,
     start_info->console_mfn   = nr_pages - 1;
     start_info->console_evtchn = console_evtchn;
     start_info->nr_pages       = nr_pages; // FIXME?: nr_pages - 2 ????
-    if ( initrd->len != 0 )
-    {
-        ctxt->initrd.start    = vinitrd_start;
-        ctxt->initrd.size     = initrd->len;
-    }
-    else
-    {
-        ctxt->initrd.start    = 0;
-        ctxt->initrd.size     = 0;
-    }
+
+    bp = (struct xen_ia64_boot_param *)(start_info + 1);
+    bp->command_line = start_info_mpa + offsetof(start_info_t, cmd_line);
     if ( cmdline != NULL )
     {
-        strncpy((char *)ctxt->cmdline, cmdline, IA64_COMMAND_LINE_SIZE);
-        ctxt->cmdline[IA64_COMMAND_LINE_SIZE-1] = '\0';
+        strncpy((char *)start_info->cmd_line, cmdline, MAX_GUEST_CMDLINE);
+        start_info->cmd_line[MAX_GUEST_CMDLINE - 1] = 0;
     }
+    if ( initrd->len != 0 )
+    {
+        bp->initrd_start    = vinitrd_start;
+        bp->initrd_size     = initrd->len;
+    }
+    ctxt->user_regs.r28 = start_info_mpa + sizeof (start_info_t);
     munmap(start_info, PAGE_SIZE);
+
+    /* shared_info page starts its life empty. */
+    shared_info = xc_map_foreign_range(
+        xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, shared_info_frame);
+    printf("shared_info = %p, err=%s frame=%lx\n",
+           shared_info, strerror (errno), shared_info_frame);
+    //memset(shared_info, 0, sizeof(shared_info_t));
+    /* Mask all upcalls... */
+    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+        shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
+    shared_info->arch.start_info_pfn = nr_pages - 3;
+
+    munmap(shared_info, PAGE_SIZE);
 
     free(page_array);
     return 0;
@@ -1150,16 +1179,10 @@ static int xc_linux_build_internal(int xc_handle,
 #ifdef __ia64__
     /* based on new_thread in xen/arch/ia64/domain.c */
     ctxt->flags = 0;
-    ctxt->shared.flags = flags;
-    ctxt->shared.start_info_pfn = nr_pages - 3; /* metaphysical */
     ctxt->user_regs.cr_ipsr = 0; /* all necessary bits filled by hypervisor */
     ctxt->user_regs.cr_iip = vkern_entry;
     ctxt->user_regs.cr_ifs = 1UL << 63;
     ctxt->user_regs.ar_fpsr = xc_ia64_fpsr_default();
-    /* currently done by hypervisor, should move here */
-    /* ctxt->regs.r28 = dom_fw_setup(); */
-    ctxt->privregs = 0;
-    ctxt->sys_pgnr = 3;
     i = 0; /* silence unused variable warning */
 #else /* x86 */
     /*

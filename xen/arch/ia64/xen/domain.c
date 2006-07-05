@@ -80,7 +80,6 @@ extern char dom0_command_line[];
 extern void serial_input_init(void);
 static void init_switch_stack(struct vcpu *v);
 extern void vmx_do_launch(struct vcpu *);
-void build_physmap_table(struct domain *d);
 
 /* this belongs in include/asm, but there doesn't seem to be a suitable place */
 extern struct vcpu *ia64_switch_to (struct vcpu *next_task);
@@ -270,14 +269,15 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 	}
 
 	if (!is_idle_domain(d)) {
-	    v->arch.privregs = 
-		alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
-	    BUG_ON(v->arch.privregs == NULL);
-	    memset(v->arch.privregs, 0, PAGE_SIZE);
-
-	    if (!vcpu_id)
-	    	memset(&d->shared_info->evtchn_mask[0], 0xff,
-		    sizeof(d->shared_info->evtchn_mask));
+	    if (!d->arch.is_vti) {
+		/* Create privregs page only if not VTi.  */
+		v->arch.privregs = 
+		    alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
+		BUG_ON(v->arch.privregs == NULL);
+		memset(v->arch.privregs, 0, PAGE_SIZE);
+		share_xen_page_with_guest(virt_to_page(v->arch.privregs),
+		                          d, XENSHARE_writable);
+	    }
 
 	    v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
 	    v->arch.metaphysical_rr4 = d->arch.metaphysical_rr4;
@@ -349,6 +349,8 @@ int arch_domain_create(struct domain *d)
 	if ((d->shared_info = (void *)alloc_xenheap_page()) == NULL)
 	    goto fail_nomem;
 	memset(d->shared_info, 0, PAGE_SIZE);
+	share_xen_page_with_guest(virt_to_page(d->shared_info),
+	                          d, XENSHARE_writable);
 
 	d->max_pages = (128UL*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
 	/* We may also need emulation rid for region4, though it's unlikely
@@ -357,11 +359,9 @@ int arch_domain_create(struct domain *d)
 	 */
 	if (!allocate_rid_range(d,0))
 		goto fail_nomem;
-	d->arch.sys_pgnr = 0;
 
 	memset(&d->arch.mm, 0, sizeof(d->arch.mm));
 
-	d->arch.physmap_built = 0;
 	if ((d->arch.mm.pgd = pgd_alloc(&d->arch.mm)) == NULL)
 	    goto fail_nomem;
 
@@ -390,70 +390,30 @@ void arch_domain_destroy(struct domain *d)
 void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
 {
 	c->user_regs = *vcpu_regs (v);
-	c->shared = v->domain->shared_info->arch;
+ 	c->privregs_pfn = virt_to_maddr(v->arch.privregs) >> PAGE_SHIFT;
 }
 
 int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 {
 	struct pt_regs *regs = vcpu_regs (v);
 	struct domain *d = v->domain;
-	unsigned long cmdline_addr;
-
-	if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
-            return 0;
-	if (c->flags & VGCF_VMX_GUEST) {
-	    if (!vmx_enabled) {
-		printk("No VMX hardware feature for vmx domain.\n");
-		return -EINVAL;
-	    }
-
-	    if (v == d->vcpu[0])
-		vmx_setup_platform(d, c);
-
-	    vmx_final_setup_guest(v);
-	} else if (!d->arch.physmap_built)
-	    build_physmap_table(d);
-
+	
 	*regs = c->user_regs;
-	cmdline_addr = 0;
-	if (v == d->vcpu[0]) {
-	    /* Only for first vcpu.  */
-	    d->arch.sys_pgnr = c->sys_pgnr;
-	    d->arch.initrd_start = c->initrd.start;
-	    d->arch.initrd_len   = c->initrd.size;
-	    d->arch.cmdline      = c->cmdline;
-	    d->shared_info->arch = c->shared;
-
-	    if (!VMX_DOMAIN(v)) {
-		    const char *cmdline = d->arch.cmdline;
-		    int len;
-
-		    if (*cmdline == 0) {
-#define DEFAULT_CMDLINE "nomca nosmp xencons=tty0 console=tty0 root=/dev/hda1"
-			    cmdline = DEFAULT_CMDLINE;
-			    len = sizeof (DEFAULT_CMDLINE);
-			    printf("domU command line defaulted to"
-				   DEFAULT_CMDLINE "\n");
-		    }
-		    else
-			    len = IA64_COMMAND_LINE_SIZE;
-		    cmdline_addr = dom_fw_setup (d, cmdline, len);
-	    }
-
-	    /* Cache synchronization seems to be done by the linux kernel
-	       during mmap/unmap operation.  However be conservative.  */
-	    domain_cache_flush (d, 1);
-	}
-	vcpu_init_regs (v);
-	regs->r28 = cmdline_addr;
-
-	if ( c->privregs && copy_from_user(v->arch.privregs,
-			   c->privregs, sizeof(mapped_regs_t))) {
-	    printk("Bad ctxt address in arch_set_info_guest: %p\n",
-		   c->privregs);
-	    return -EFAULT;
-	}
-
+ 	
+ 	if (!d->arch.is_vti) {
+ 		/* domain runs at PL2/3 */
+ 		regs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT;
+ 		regs->ar_rsc |= (2 << 2); /* force PL2/3 */
+ 	}
+	
+  	if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+ 		return 0;
+ 	if (d->arch.is_vti)
+ 		vmx_final_setup_guest(v);
+	
+ 	/* This overrides some registers.  */
+  	vcpu_init_regs(v);
+  
 	/* Don't redo final setup */
 	set_bit(_VCPUF_initialised, &v->vcpu_flags);
 	return 0;
@@ -531,6 +491,9 @@ void domain_relinquish_resources(struct domain *d)
 
     relinquish_memory(d, &d->xenpage_list);
     relinquish_memory(d, &d->page_list);
+
+    if (d->arch.is_vti && d->arch.sal_data)
+	    xfree(d->arch.sal_data);
 }
 
 void build_physmap_table(struct domain *d)
@@ -538,7 +501,6 @@ void build_physmap_table(struct domain *d)
 	struct list_head *list_ent = d->page_list.next;
 	unsigned long mfn, i = 0;
 
-	ASSERT(!d->arch.physmap_built);
 	while(list_ent != &d->page_list) {
 	    mfn = page_to_mfn(list_entry(
 		list_ent, struct page_info, list));
@@ -547,7 +509,6 @@ void build_physmap_table(struct domain *d)
 	    i++;
 	    list_ent = mfn_to_page(mfn)->list.next;
 	}
-	d->arch.physmap_built = 1;
 }
 
 unsigned long
@@ -762,8 +723,9 @@ int construct_dom0(struct domain *d,
 	unsigned long pkern_end;
 	unsigned long pinitrd_start = 0;
 	unsigned long pstart_info;
-	unsigned long cmdline_addr;
 	struct page_info *start_info_page;
+	unsigned long bp_mpa;
+	struct ia64_boot_param *bp;
 
 #ifdef VALIDATE_VT
 	unsigned int vmx_dom0 = 0;
@@ -913,8 +875,6 @@ int construct_dom0(struct domain *d,
 	//if ( initrd_len != 0 )
 	//    memcpy((void *)vinitrd_start, initrd_start, initrd_len);
 
-	d->shared_info->arch.flags = SIF_INITDOMAIN|SIF_PRIVILEGED;
-
 	/* Set up start info area. */
 	d->shared_info->arch.start_info_pfn = pstart_info >> PAGE_SHIFT;
 	start_info_page = assign_new_domain_page(d, pstart_info);
@@ -924,6 +884,7 @@ int construct_dom0(struct domain *d,
 	memset(si, 0, PAGE_SIZE);
 	sprintf(si->magic, "xen-%i.%i-ia64", XEN_VERSION, XEN_SUBVERSION);
 	si->nr_pages     = max_pages;
+	si->flags = SIF_INITDOMAIN|SIF_PRIVILEGED;
 
 	console_endboot();
 
@@ -939,15 +900,38 @@ int construct_dom0(struct domain *d,
 
 	set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
-	cmdline_addr = dom_fw_setup(d, dom0_command_line, COMMAND_LINE_SIZE);
+	/* Build firmware.
+	   Note: Linux kernel reserve memory used by start_info, so there is
+	   no need to remove it from MDT.  */
+	bp_mpa = pstart_info + sizeof(struct start_info);
+	dom_fw_setup(d, bp_mpa, max_pages * PAGE_SIZE);
+
+	/* Fill boot param.  */
+	strncpy((char *)si->cmd_line, dom0_command_line, sizeof(si->cmd_line));
+	si->cmd_line[sizeof(si->cmd_line)-1] = 0;
+
+	bp = (struct ia64_boot_param *)(si + 1);
+	bp->command_line = pstart_info + offsetof (start_info_t, cmd_line);
+
+	/* We assume console has reached the last line!  */
+	bp->console_info.num_cols = ia64_boot_param->console_info.num_cols;
+	bp->console_info.num_rows = ia64_boot_param->console_info.num_rows;
+	bp->console_info.orig_x = 0;
+	bp->console_info.orig_y = bp->console_info.num_rows == 0 ?
+	                          0 : bp->console_info.num_rows - 1;
+
+	bp->initrd_start = (dom0_start+dom0_size) -
+	  (PAGE_ALIGN(ia64_boot_param->initrd_size) + 4*1024*1024);
+	bp->initrd_size = ia64_boot_param->initrd_size;
 
 	vcpu_init_regs (v);
+
+	vcpu_regs(v)->r28 = bp_mpa;
 
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
 	pkern_entry += dom0_start;
 #endif
 	vcpu_regs (v)->cr_iip = pkern_entry;
-	vcpu_regs (v)->r28 = cmdline_addr;
 
 	physdev_init_dom0(d);
 

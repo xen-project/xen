@@ -141,15 +141,6 @@ error_out:
 #define HOB_SIGNATURE         0x3436474953424f48        // "HOBSIG64"
 #define GFW_HOB_START         ((4UL<<30)-(14UL<<20))    // 4G - 14M
 #define GFW_HOB_SIZE          (1UL<<20)                 // 1M
-#define RAW_GFW_START_NR(s)   ((s) >> PAGE_SHIFT)
-#define RAW_GFW_HOB_START_NR(s)                \
-        (RAW_GFW_START_NR(s) + ((GFW_HOB_START - GFW_START) >> PAGE_SHIFT))
-#define RAW_GFW_IMAGE_START_NR(s,i)            \
-        (RAW_GFW_START_NR(s) + (((GFW_SIZE - (i))) >> PAGE_SHIFT))
-#define RAW_IO_PAGE_START_NR(s)                \
-        (RAW_GFW_START_NR(s) + (GFW_SIZE >> PAGE_SHIFT))
-#define RAW_STORE_PAGE_START_NR(s)             \
-        (RAW_IO_PAGE_START_NR(s) + (IO_PAGE_SIZE >> PAGE_SHFIT))
 
 typedef struct {
     unsigned long signature;
@@ -371,7 +362,7 @@ load_hob(int xc_handle, uint32_t dom, void *hob_buf,
     nr_pages = (hob_size + PAGE_SIZE -1) >> PAGE_SHIFT;
 
     return xc_ia64_copy_to_domain_pages(xc_handle, dom,
-            hob_buf, RAW_GFW_HOB_START_NR(dom_mem_size), nr_pages );
+            hob_buf, GFW_HOB_START>>PAGE_SHIFT, nr_pages );
 }
 
 #define MIN(x, y) ((x) < (y)) ? (x) : (y)
@@ -618,16 +609,26 @@ static int setup_guest(  int xc_handle,
     shared_iopage_t *sp;
     int i;
     unsigned long dom_memsize = (memsize << 20);
+    DECLARE_DOM0_OP;
 
     if ((image_size > 12 * MEM_M) || (image_size & (PAGE_SIZE - 1))) {
         PERROR("Guest firmware size is incorrect [%ld]?", image_size);
         return -1;
     }
 
+    /* This will creates the physmap.  */
+    op.u.domain_setup.flags = XEN_DOMAINSETUP_hvm_guest;
+    op.u.domain_setup.domain = (domid_t)dom;
+    op.u.domain_setup.bp = 0;
+    op.u.domain_setup.maxmem = 0;
+    
+    op.cmd = DOM0_DOMAIN_SETUP;
+    if ( xc_dom0_op(xc_handle, &op) )
+        goto error_out;
+
     /* Load guest firmware */
-    if( xc_ia64_copy_to_domain_pages( xc_handle, dom,
-            image, RAW_GFW_IMAGE_START_NR(dom_memsize, image_size),
-            image_size>>PAGE_SHIFT)) {
+    if( xc_ia64_copy_to_domain_pages(xc_handle, dom, image,
+        (GFW_START+GFW_SIZE-image_size)>>PAGE_SHIFT, image_size>>PAGE_SHIFT)) {
         PERROR("Could not load guest firmware into domain");
         goto error_out;
     }
@@ -640,7 +641,7 @@ static int setup_guest(  int xc_handle,
 
     /* Retrieve special pages like io, xenstore, etc. */
     if ( xc_ia64_get_pfn_list(xc_handle, dom, page_array,
-                              RAW_IO_PAGE_START_NR(dom_memsize), 2) != 2 )
+                              IO_PAGE_START>>PAGE_SHIFT, 2) != 2 )
     {
         PERROR("Could not get the page frame list");
         goto error_out;
@@ -726,9 +727,7 @@ int xc_hvm_build(int xc_handle,
 
     free(image);
 
-    ctxt->flags = VGCF_VMX_GUEST;
     ctxt->user_regs.cr_iip = 0x80000000ffffffb0UL;
-    ctxt->privregs = 0;
 
     memset( &launch_op, 0, sizeof(launch_op) );
 

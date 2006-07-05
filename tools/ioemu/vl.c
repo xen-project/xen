@@ -3198,6 +3198,9 @@ int main(int argc, char **argv)
                                        PROT_READ|PROT_WRITE,
                                        page_array[nr_pages - 1]);
 
+    fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n", (nr_pages-1),
+           (uint64_t)(page_array[nr_pages - 1]));
+
 #elif defined(__ia64__)
     if ( xc_ia64_get_pfn_list(xc_handle, domid, page_array, 0, nr_pages)
          != nr_pages)
@@ -3217,7 +3220,7 @@ int main(int argc, char **argv)
 
     if ( xc_ia64_get_pfn_list(xc_handle, domid,
                               page_array,
-                              nr_pages + (GFW_SIZE >> PAGE_SHIFT), 1) != 1 )
+                              IO_PAGE_START >> PAGE_SHIFT, 1) != 1 )
     {
         fprintf(logfile, "xc_ia64_get_pfn_list returned error %d\n", errno);
         exit(-1);
@@ -3226,10 +3229,10 @@ int main(int argc, char **argv)
     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
                                        PROT_READ|PROT_WRITE,
                                        page_array[0]);
-#endif
 
-    fprintf(logfile, "shared page at pfn:%lx, mfn: %"PRIx64"\n", (nr_pages-1),
-           (uint64_t)(page_array[nr_pages - 1]));
+    fprintf(logfile, "shared page at pfn:%lx, mfn: %l016x\n",
+	    IO_PAGE_START >> PAGE_SHIFT, page_array[0]);
+#endif
 
     /* we always create the cdrom drive, even if no disk is there */
     bdrv_init();

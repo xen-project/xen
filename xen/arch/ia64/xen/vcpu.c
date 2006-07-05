@@ -1355,7 +1355,7 @@ vcpu_match_tr_entry_range(TR_ENTRY *trp, UINT64 rid, u64 b, u64 e)
 static TR_ENTRY*
 vcpu_tr_lookup(VCPU* vcpu, unsigned long va, UINT64 rid, BOOLEAN is_data)
 {
-	unsigned int* regions;
+	unsigned char* regions;
 	TR_ENTRY *trp;
 	int tr_max;
 	int i;

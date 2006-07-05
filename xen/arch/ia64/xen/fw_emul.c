@@ -96,8 +96,8 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
  			}
  			else {
 				struct domain *d = current->domain;
-				d->arch.boot_rdv_ip = in2;
-				d->arch.boot_rdv_r1 = in3;
+				d->arch.sal_data->boot_rdv_ip = in2;
+				d->arch.sal_data->boot_rdv_r1 = in3;
 			}
  		}
  		else
@@ -370,7 +370,7 @@ efi_translate_domain_addr(unsigned long domain_addr, IA64FAULT *fault,
 	*fault = IA64_NO_FAULT;
 
 again:
-	if (v->domain->arch.efi_virt_mode) {
+ 	if (v->domain->arch.sal_data->efi_virt_mode) {
 		*fault = vcpu_tpa(v, domain_addr, &mpaddr);
 		if (*fault != IA64_NO_FAULT) return 0;
 	}
@@ -434,7 +434,9 @@ efi_emulate_set_virtual_address_map(
 	fpswa_interface_t *fpswa_inf = d->arch.fpswa_inf;
 
 	if (descriptor_version != EFI_MEMDESC_VERSION) {
-		printf ("efi_emulate_set_virtual_address_map: memory descriptor version unmatched\n");
+		printf ("efi_emulate_set_virtual_address_map: memory "
+		        "descriptor version unmatched (%d vs %d)\n",
+		        (int)descriptor_version, EFI_MEMDESC_VERSION);
 		return EFI_INVALID_PARAMETER;
 	}
 
@@ -443,7 +445,8 @@ efi_emulate_set_virtual_address_map(
 		return EFI_INVALID_PARAMETER;
 	}
 
-	if (d->arch.efi_virt_mode) return EFI_UNSUPPORTED;
+	if (d->arch.sal_data->efi_virt_mode)
+		return EFI_UNSUPPORTED;
 
 	efi_map_start = virtual_map;
 	efi_map_end   = efi_map_start + memory_map_size;
@@ -485,7 +488,7 @@ efi_emulate_set_virtual_address_map(
 	}
 
 	/* The virtual address map has been applied. */
-	d->arch.efi_virt_mode = 1;
+	d->arch.sal_data->efi_virt_mode = 1;
 
 	return EFI_SUCCESS;
 }

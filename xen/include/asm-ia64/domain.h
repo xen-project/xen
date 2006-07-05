@@ -63,10 +63,26 @@ struct last_vcpu {
     int vcpu_id;
 } ____cacheline_aligned_in_smp;
 
+/* These are data in domain memory for SAL emulator.  */
+struct xen_sal_data {
+    /* OS boot rendez vous.  */
+    unsigned long boot_rdv_ip;
+    unsigned long boot_rdv_r1;
+
+    /* There are these for EFI_SET_VIRTUAL_ADDRESS_MAP emulation. */
+    int efi_virt_mode;		/* phys : 0 , virt : 1 */
+};
+
 struct arch_domain {
     struct mm_struct mm;
-    unsigned long metaphysical_rr0;
-    unsigned long metaphysical_rr4;
+
+    /* Flags.  */
+    union {
+        unsigned long flags;
+        struct {
+            unsigned int is_vti : 1;
+        };
+    };
 
     /* There are two ranges of RID for a domain:
        one big range, used to virtualize domain RID,
@@ -74,37 +90,31 @@ struct arch_domain {
     /* Big range.  */
     int starting_rid;		/* first RID assigned to domain */
     int ending_rid;		/* one beyond highest RID assigned to domain */
-    int rid_bits;		/* number of virtual rid bits (default: 18) */
     /* Metaphysical range.  */
     int starting_mp_rid;
     int ending_mp_rid;
-
+    /* RID for metaphysical mode.  */
+    unsigned long metaphysical_rr0;
+    unsigned long metaphysical_rr4;
+    
+    int rid_bits;		/* number of virtual rid bits (default: 18) */
     int breakimm;     /* The imm value for hypercalls.  */
 
-    int physmap_built;		/* Whether is physmap built or not */
-    int imp_va_msb;
-    /* System pages out of guest memory, like for xenstore/console */
-    unsigned long sys_pgnr;
-    unsigned long max_pfn; /* Max pfn including I/O holes */
     struct virtual_platform_def     vmx_platform;
 #define	hvm_domain vmx_platform /* platform defs are not vmx specific */
 
-    /* OS boot rendez vous.  */
-    unsigned long boot_rdv_ip;
-    unsigned long boot_rdv_r1;
-
+    u64 xen_vastart;
+    u64 xen_vaend;
+    u64 shared_info_va;
+ 
+    /* Address of SAL emulator data  */
+    struct xen_sal_data *sal_data;
     /* SAL return point.  */
     unsigned long sal_return_addr;
 
-    u64 shared_info_va;
-    unsigned long initrd_start;
-    unsigned long initrd_len;
-    char *cmdline;
-    /* There are these for EFI_SET_VIRTUAL_ADDRESS_MAP emulation. */
-    int efi_virt_mode;		/* phys : 0 , virt : 1 */
-    /* Metaphysical address to efi_runtime_services_t in domain firmware memory is set. */
+    /* Address of efi_runtime_services_t (placed in domain memory)  */
     void *efi_runtime;
-    /* Metaphysical address to fpswa_interface_t in domain firmware memory is set. */
+    /* Address of fpswa_interface_t (placed in domain memory)  */
     void *fpswa_inf;
 
     struct last_vcpu last_vcpu[NR_CPUS];
@@ -114,23 +124,28 @@ struct arch_domain {
     offsetof(vcpu_info_t, evtchn_upcall_mask))
 
 struct arch_vcpu {
-	TR_ENTRY itrs[NITRS];
-	TR_ENTRY dtrs[NDTRS];
-	TR_ENTRY itlb;
-	TR_ENTRY dtlb;
-	unsigned int itr_regions;
-	unsigned int dtr_regions;
-	unsigned long irr[4];
-	unsigned long insvc[4];
-	unsigned long tc_regions;
-	unsigned long iva;
-	unsigned long dcr;
-	unsigned long itc;
-	unsigned long domain_itm;
-	unsigned long domain_itm_last;
-	unsigned long xen_itm;
+    /* Save the state of vcpu.
+       This is the first entry to speed up accesses.  */
+    mapped_regs_t *privregs;
 
-    mapped_regs_t *privregs; /* save the state of vcpu */
+    /* TR and TC.  */
+    TR_ENTRY itrs[NITRS];
+    TR_ENTRY dtrs[NDTRS];
+    TR_ENTRY itlb;
+    TR_ENTRY dtlb;
+
+    /* Bit is set if there is a tr/tc for the region.  */
+    unsigned char itr_regions;
+    unsigned char dtr_regions;
+    unsigned char tc_regions;
+
+    unsigned long irr[4];	    /* Interrupt request register.  */
+    unsigned long insvc[4];		/* Interrupt in service.  */
+    unsigned long iva;
+    unsigned long dcr;
+    unsigned long domain_itm;
+    unsigned long domain_itm_last;
+
     unsigned long event_callback_ip;		// event callback handler
     unsigned long failsafe_callback_ip; 	// Do we need it?
 

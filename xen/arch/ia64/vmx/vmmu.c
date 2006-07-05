@@ -290,6 +290,7 @@ int vhpt_enabled(VCPU *vcpu, uint64_t vadr, vhpt_ref_t ref)
 
 int unimplemented_gva(VCPU *vcpu,u64 vadr)
 {
+#if 0
     int bit=vcpu->domain->arch.imp_va_msb;
     u64 ladr =(vadr<<3)>>(3+bit);
     if(!ladr||ladr==(1U<<(61-bit))-1){
@@ -297,6 +298,9 @@ int unimplemented_gva(VCPU *vcpu,u64 vadr)
     }else{
         return 1;
     }
+#else
+    return 0;
+#endif
 }
 
 

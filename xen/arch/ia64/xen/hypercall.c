@@ -154,8 +154,8 @@ fw_hypercall_ipi (struct pt_regs *regs)
 			
 		/* First or next rendez-vous: set registers.  */
 		vcpu_init_regs (targ);
-		vcpu_regs (targ)->cr_iip = d->arch.boot_rdv_ip;
-		vcpu_regs (targ)->r1 = d->arch.boot_rdv_r1;
+		vcpu_regs (targ)->cr_iip = d->arch.sal_data->boot_rdv_ip;
+		vcpu_regs (targ)->r1 = d->arch.sal_data->boot_rdv_r1;
 		vcpu_regs (targ)->b0 = d->arch.sal_return_addr;
 
 		if (test_and_clear_bit(_VCPUF_down,
