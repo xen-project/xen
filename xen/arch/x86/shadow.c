@@ -3724,7 +3724,13 @@ static inline int guest_page_fault(
     }
 
     if ( guest_l2e_get_flags(*gpl2e) & _PAGE_PSE )
+    {
+        printk("None-PAE HVM guests can NOT use PSE, "
+               "because we don't support 4MBytes PSE pages.\n");
+        printk("remove pae=1 from your config file.\n");
+        domain_crash_synchronous();
         return 0;
+    }
 
     __guest_get_l1e(v, va, gpl1e);
 
