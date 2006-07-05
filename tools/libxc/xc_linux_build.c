@@ -1053,7 +1053,8 @@ static int setup_guest(int xc_handle,
         if ( hypercall_pfn >= nr_pages )
             goto error_out;
         op.u.hypercall_init.domain = (domid_t)dom;
-        op.u.hypercall_init.mfn    = page_array[hypercall_pfn];
+        op.u.hypercall_init.gmfn   = shadow_mode_enabled ?
+            hypercall_pfn : page_array[hypercall_pfn];
         op.cmd = DOM0_HYPERCALL_INIT;
         if ( xc_dom0_op(xc_handle, &op) )
             goto error_out;

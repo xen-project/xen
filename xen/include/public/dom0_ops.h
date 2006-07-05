@@ -509,8 +509,8 @@ DEFINE_XEN_GUEST_HANDLE(dom0_iomem_permission_t);
 
 #define DOM0_HYPERCALL_INIT   48
 struct dom0_hypercall_init {
-    domid_t  domain;          /* domain to be affected */
-    xen_pfn_t mfn;            /* machine frame to be initialised */
+    domid_t   domain;          /* domain to be affected */
+    xen_pfn_t gmfn;            /* GMFN to be initialised */
 };
 typedef struct dom0_hypercall_init dom0_hypercall_init_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_hypercall_init_t);
