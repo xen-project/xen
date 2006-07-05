@@ -104,7 +104,8 @@ void test_xenbus(void);
 
 void xenbus_tester(void *p)
 {
-    test_xenbus();
+    printk("Xenbus tests disabled, because of a Xend bug.\n");
+    /* test_xenbus(); */
 }
 
 /* This should be overridden by the application we are linked against. */
