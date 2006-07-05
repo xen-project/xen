@@ -2093,8 +2093,26 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
     if ( unlikely(exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) )
     {
-        printk("Failed vm entry (reason 0x%x)\n", exit_reason);
-        printk("*********** VMCS Area **************\n");
+        unsigned int failed_vmentry_reason = exit_reason & 0xFFFF;
+
+        __vmread(EXIT_QUALIFICATION, &exit_qualification);
+        printk("Failed vm entry (exit reason 0x%x) ", exit_reason);
+        switch ( failed_vmentry_reason ) {
+        case EXIT_REASON_INVALID_GUEST_STATE:
+            printk("caused by invalid guest state (%ld).\n", exit_qualification);
+            break;
+        case EXIT_REASON_MSR_LOADING:
+            printk("caused by MSR entry %ld loading.\n", exit_qualification);
+            break;
+        case EXIT_REASON_MACHINE_CHECK:
+            printk("caused by machine check.\n");
+            break;
+        default:
+            printk("reason not known yet!");
+            break;
+        }
+
+        printk("************* VMCS Area **************\n");
         vmcs_dump_vcpu();
         printk("**************************************\n");
         domain_crash_synchronous();

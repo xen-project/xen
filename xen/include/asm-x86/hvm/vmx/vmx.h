@@ -133,6 +133,11 @@ extern unsigned int cpu_rev;
 #define EXIT_REASON_MSR_WRITE           32
 #define EXIT_REASON_MWAIT_INSTRUCTION   36
 
+#define EXIT_REASON_INVALID_GUEST_STATE 33
+#define EXIT_REASON_MSR_LOADING         34
+#define EXIT_REASON_MACHINE_CHECK       41
+
+
 /*
  * Interruption-information format
  */
