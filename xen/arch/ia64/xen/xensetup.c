@@ -425,8 +425,9 @@ void start_kernel(void)
 
     scheduler_init();
     idle_vcpu[0] = (struct vcpu*) ia64_r13;
-    idle_domain = domain_create(IDLE_DOMAIN_ID, 0);
-    BUG_ON(idle_domain == NULL);
+    idle_domain = domain_create(IDLE_DOMAIN_ID);
+    if ( (idle_domain == NULL) || (alloc_vcpu(idle_domain, 0, 0) == NULL) )
+        BUG();
 
     late_setup_arch(&cmdline);
     alloc_dom_xen_and_dom_io();
@@ -503,9 +504,8 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
     }
 
     /* Create initial domain 0. */
-    dom0 = domain_create(0, 0);
-
-    if ( dom0 == NULL )
+    dom0 = domain_create(0);
+    if ( (dom0 == NULL) || (alloc_vcpu(dom0, 0, 0) == NULL) )
         panic("Error creating domain 0\n");
 
     set_bit(_DOMF_privileged, &dom0->domain_flags);

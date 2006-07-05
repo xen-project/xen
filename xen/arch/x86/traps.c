@@ -1397,13 +1397,14 @@ static void nmi_softirq(void)
 static void nmi_dom0_report(unsigned int reason_idx)
 {
     struct domain *d;
+    struct vcpu   *v;
 
-    if ( (d = dom0) == NULL )
+    if ( ((d = dom0) == NULL) || ((v = d->vcpu[0]) == NULL) )
         return;
 
     set_bit(reason_idx, &d->shared_info->arch.nmi_reason);
 
-    if ( test_and_set_bit(_VCPUF_nmi_pending, &d->vcpu[0]->vcpu_flags) )
+    if ( test_and_set_bit(_VCPUF_nmi_pending, &v->vcpu_flags) )
         raise_softirq(NMI_SOFTIRQ); /* not safe to wake up a vcpu here */
 }
 

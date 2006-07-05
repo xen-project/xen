@@ -1429,6 +1429,8 @@ static int sedf_adjdom(struct domain *p, struct sched_adjdom_cmd *cmd)
     }
     else if ( cmd->direction == SCHED_INFO_GET )
     {
+        if ( p->vcpu[0] == NULL )
+            return -EINVAL;
         cmd->u.sedf.period    = EDOM_INFO(p->vcpu[0])->period;
         cmd->u.sedf.slice     = EDOM_INFO(p->vcpu[0])->slice;
         cmd->u.sedf.extratime = EDOM_INFO(p->vcpu[0])->status & EXTRA_AWARE;

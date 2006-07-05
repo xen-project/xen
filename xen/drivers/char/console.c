@@ -279,7 +279,7 @@ static void switch_serial_input(void)
 {
     static char *input_str[2] = { "DOM0", "Xen" };
     xen_rx = !xen_rx;
-    if ( SWITCH_CODE != 0 )
+    if ( (SWITCH_CODE != 0) && (dom0 != NULL) )
     {
         printk("*** Serial input -> %s "
                "(type 'CTRL-%c' three times to switch input to %s).\n",
