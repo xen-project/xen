@@ -11,7 +11,7 @@
 */
 
 /* Local all flush of vTLB.  */
-void vcpu_flush_vtlb_all (void);
+void vcpu_flush_vtlb_all(struct vcpu *v);
 
 /* Local range flush of machine TLB only (not full VCPU virtual TLB!!!)  */
 void vcpu_flush_tlb_vhpt_range (u64 vadr, u64 log_range);

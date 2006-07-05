@@ -2065,7 +2065,7 @@ IA64FAULT vcpu_ptc_e(VCPU *vcpu, UINT64 vadr)
 	// architected loop to purge the entire TLB, should use
 	//  base = stride1 = stride2 = 0, count0 = count 1 = 1
 
-	vcpu_flush_vtlb_all ();
+	vcpu_flush_vtlb_all(current);
 
 	return IA64_NO_FAULT;
 }

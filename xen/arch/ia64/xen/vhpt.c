@@ -129,10 +129,8 @@ void vhpt_init(void)
 }
 
 
-void vcpu_flush_vtlb_all (void)
+void vcpu_flush_vtlb_all(struct vcpu *v)
 {
-	struct vcpu *v = current;
-
 	/* First VCPU tlb.  */
 	vcpu_purge_tr_entry(&PSCBX(v,dtlb));
 	vcpu_purge_tr_entry(&PSCBX(v,itlb));
@@ -148,6 +146,11 @@ void vcpu_flush_vtlb_all (void)
 	   check this.  */
 }
 
+static void __vcpu_flush_vtlb_all(void *vcpu)
+{
+	vcpu_flush_vtlb_all((struct vcpu*)vcpu);
+}
+
 void domain_flush_vtlb_all (void)
 {
 	int cpu = smp_processor_id ();
@@ -158,12 +161,11 @@ void domain_flush_vtlb_all (void)
 			continue;
 
 		if (v->processor == cpu)
-			vcpu_flush_vtlb_all ();
+			vcpu_flush_vtlb_all(v);
 		else
-			smp_call_function_single
-				(v->processor,
-				 (void(*)(void *))vcpu_flush_vtlb_all,
-				 NULL,1,1);
+			smp_call_function_single(v->processor,
+						 __vcpu_flush_vtlb_all,
+						 v, 1, 1);
 	}
 }
 
