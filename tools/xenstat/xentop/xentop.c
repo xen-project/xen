@@ -156,11 +156,11 @@ field fields[] = {
 	{ FIELD_NETS,    "NETS",       4, compare_nets,    print_nets    },
 	{ FIELD_NET_TX,  "NETTX(k)",   8, compare_net_tx,  print_net_tx  },
 	{ FIELD_NET_RX,  "NETRX(k)",   8, compare_net_rx,  print_net_rx  },
-	{ FIELD_NET_RX,  "VBDS",       8, compare_vbds,    print_vbds    },
-	{ FIELD_NET_RX,  "VBD_OO",     8, compare_vbd_oo,  print_vbd_oo  },
-	{ FIELD_NET_RX,  "VBD_RD",     8, compare_vbd_rd,  print_vbd_rd  },
-	{ FIELD_NET_RX,  "VBD_WR",     8, compare_vbd_wr,  print_vbd_wr  },
-       	{ FIELD_SSID,    "SSID",       4, compare_ssid,    print_ssid    }
+	{ FIELD_VBDS,    "VBDS",       4, compare_vbds,    print_vbds    },
+	{ FIELD_VBD_OO,  "VBD_OO",     8, compare_vbd_oo,  print_vbd_oo  },
+	{ FIELD_VBD_RD,  "VBD_RD",     8, compare_vbd_rd,  print_vbd_rd  },
+	{ FIELD_VBD_WR,  "VBD_WR",     8, compare_vbd_wr,  print_vbd_wr  },
+	{ FIELD_SSID,    "SSID",       4, compare_ssid,    print_ssid    }
 };
 
 const unsigned int NUM_FIELDS = sizeof(fields)/sizeof(field);
