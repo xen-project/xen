@@ -35,6 +35,7 @@
 #include <lib.h>
 #include <sched.h>
 #include <xenbus.h>
+#include <gnttab.h>
 #include <xen/features.h>
 #include <xen/version.h>
 
@@ -177,7 +178,10 @@ void start_kernel(start_info_t *si)
 
     /* Init the console driver. */
     init_console();
- 
+
+    /* Init grant tables */
+    init_gnttab();
+    
     /* Init scheduler. */
     init_sched();
  
