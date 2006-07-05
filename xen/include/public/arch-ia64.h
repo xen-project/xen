@@ -160,7 +160,7 @@ struct cpu_user_regs {
     unsigned long r6;  /* preserved */
     unsigned long r7;  /* preserved */
     unsigned long eml_unat;    /* used for emulating instruction */
-    unsigned long rfi_pfs;     /* used for elulating rfi */
+    unsigned long pad0;     /* alignment pad */
 
 };
 typedef struct cpu_user_regs cpu_user_regs_t;

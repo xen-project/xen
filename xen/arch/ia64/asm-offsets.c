@@ -123,7 +123,6 @@ void foo(void)
 	DEFINE(IA64_PT_REGS_R6_OFFSET, offsetof (struct pt_regs, r6));
 	DEFINE(IA64_PT_REGS_R7_OFFSET, offsetof (struct pt_regs, r7));
 	DEFINE(IA64_PT_REGS_EML_UNAT_OFFSET, offsetof (struct pt_regs, eml_unat));
-	DEFINE(IA64_PT_REGS_RFI_PFS_OFFSET, offsetof (struct pt_regs, rfi_pfs));
 	DEFINE(IA64_VCPU_IIPA_OFFSET, offsetof (struct vcpu, arch.arch_vmx.cr_iipa));
 	DEFINE(IA64_VCPU_ISR_OFFSET, offsetof (struct vcpu, arch.arch_vmx.cr_isr));
 	DEFINE(IA64_VCPU_CAUSE_OFFSET, offsetof (struct vcpu, arch.arch_vmx.cause));
@@ -180,6 +179,7 @@ void foo(void)
 	BLANK();
 
 	DEFINE(IA64_VPD_BASE_OFFSET, offsetof (struct vcpu, arch.privregs));
+	DEFINE(IA64_VPD_VIFS_OFFSET, offsetof (mapped_regs_t, ifs));
  	DEFINE(IA64_VLSAPIC_INSVC_BASE_OFFSET, offsetof (struct vcpu, arch.insvc[0]));
 	DEFINE(IA64_VPD_CR_VPTA_OFFSET, offsetof (cr_t, pta));
 	DEFINE(XXX_THASH_SIZE, sizeof (thash_data_t));

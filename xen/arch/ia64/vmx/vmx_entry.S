@@ -283,8 +283,8 @@ GLOBAL_ENTRY(ia64_leave_hypervisor)
     ld8 r19=[r16],PT(R3)-PT(AR_FPSR)    //load ar_fpsr
     ld8.fill r2=[r17],PT(AR_CCV)-PT(R2)    //load r2
     ;;
-    ld8.fill r3=[r16]    //load r3
-    ld8 r18=[r17],PT(RFI_PFS)-PT(AR_CCV)           //load ar_ccv
+    ld8.fill r3=[r16]	//load r3
+    ld8 r18=[r17]	//load ar_ccv
     ;;
     mov ar.fpsr=r19
     mov ar.ccv=r18
@@ -348,7 +348,6 @@ vmx_rse_clear_invalid:
     ;;
     mov ar.bspstore=r24
     ;;
-    ld8 r24=[r17]       //load rfi_pfs
     mov ar.unat=r28
     mov ar.rnat=r25
     mov ar.rsc=r26
@@ -356,10 +355,6 @@ vmx_rse_clear_invalid:
     mov cr.ipsr=r31
     mov cr.iip=r30
     mov cr.ifs=r29
-    cmp.ne p6,p0=r24,r0
-(p6)br.sptk vmx_dorfirfi
-    ;;
-vmx_dorfirfi_back:
     mov ar.pfs=r27
     adds r18=IA64_VPD_BASE_OFFSET,r21
     ;;
@@ -370,20 +365,19 @@ vmx_dorfirfi_back:
     adds r19=VPD(VPSR),r18
     ;;
     ld8 r19=[r19]        //vpsr
-//vsa_sync_write_start
     movl r20=__vsa_base
     ;;
+//vsa_sync_write_start
     ld8 r20=[r20]       // read entry point
     mov r25=r18
     ;;
+    movl r24=ia64_vmm_entry  // calculate return address
     add r16=PAL_VPS_SYNC_WRITE,r20
-    movl r24=switch_rr7  // calculate return address
     ;;
     mov b0=r16
     br.cond.sptk b0         // call the service
     ;;
 END(ia64_leave_hypervisor)
-switch_rr7:
 // fall through
 GLOBAL_ENTRY(ia64_vmm_entry)
 /*
@@ -416,23 +410,6 @@ ia64_vmm_entry_out:
     br.cond.sptk b0             // call pal service
 END(ia64_vmm_entry)
 
-//r24 rfi_pfs
-//r17 address of rfi_pfs
-GLOBAL_ENTRY(vmx_dorfirfi)
-    mov r16=ar.ec
-    movl r20 = vmx_dorfirfi_back
-	;;
-// clean rfi_pfs
-    st8 [r17]=r0
-    mov b0=r20
-// pfs.pec=ar.ec
-    dep r24 = r16, r24, 52, 6
-    ;;
-    mov ar.pfs=r24
-	;;
-    br.ret.sptk b0
-	;;
-END(vmx_dorfirfi)
 
 #ifdef XEN_DBL_MAPPING  /* will be removed */
 

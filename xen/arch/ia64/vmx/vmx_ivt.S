@@ -58,6 +58,7 @@
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
 #include <asm/vhpt.h>
+#include <asm/virt_event.h>
 
 #ifdef VTI_DEBUG
   /*
@@ -787,6 +788,22 @@ ENTRY(vmx_virtualization_fault)
     st8 [r16] = r24
     st8 [r17] = r25
     ;;
+    cmp.ne p6,p0=EVENT_RFI, r24
+    (p6) br.sptk vmx_dispatch_virtualization_fault
+    ;;
+    adds r18=IA64_VPD_BASE_OFFSET,r21
+    ;;
+    ld8 r18=[r18]
+    ;;
+    adds r18=IA64_VPD_VIFS_OFFSET,r18
+    ;;
+    ld8 r18=[r18]
+    ;;
+    tbit.z p6,p0=r18,63
+    (p6) br.sptk vmx_dispatch_virtualization_fault
+    ;;
+    //if vifs.v=1 desert current register frame
+    alloc r18=ar.pfs,0,0,0,0
     br.sptk vmx_dispatch_virtualization_fault
 END(vmx_virtualization_fault)
 

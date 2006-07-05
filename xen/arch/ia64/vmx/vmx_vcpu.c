@@ -280,11 +280,8 @@ IA64FAULT vmx_vcpu_rfi(VCPU *vcpu)
     vcpu_bsw1(vcpu);
     vmx_vcpu_set_psr(vcpu,psr);
     ifs=VCPU(vcpu,ifs);
-    if((ifs>>63)&&(ifs<<1)){
-        ifs=(regs->cr_ifs)&0x7f;
-        regs->rfi_pfs = (ifs<<7)|ifs;
-        regs->cr_ifs = VCPU(vcpu,ifs);
-    }
+    if(ifs>>63)
+        regs->cr_ifs = ifs;
     regs->cr_iip = VCPU(vcpu,iip);
     return (IA64_NO_FAULT);
 }
