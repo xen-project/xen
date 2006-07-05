@@ -868,7 +868,7 @@ static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
         cpuid_count(input, count, &eax, &ebx, &ecx, &edx);
         eax &= NUM_CORES_RESET_MASK;  
     }
-    else
+    else if ( !cpuid_hypervisor_leaves(input, &eax, &ebx, &ecx, &edx) )
     {
         cpuid(input, &eax, &ebx, &ecx, &edx);
 
