@@ -41,34 +41,52 @@
 #include <asm/shadow_64.h>
 #endif
 
-int vmcs_size;
+static int vmcs_size;
+static int vmcs_order;
+static u32 vmcs_revision_id;
 
-struct vmcs_struct *vmx_alloc_vmcs(void)
+void vmx_init_vmcs_config(void)
 {
-    struct vmcs_struct *vmcs;
     u32 vmx_msr_low, vmx_msr_high;
 
-    rdmsr(MSR_IA32_VMX_BASIC_MSR, vmx_msr_low, vmx_msr_high);
-    vmcs_size = vmx_msr_high & 0x1fff;
-    vmcs = alloc_xenheap_pages(get_order_from_bytes(vmcs_size));
-    memset((char *)vmcs, 0, vmcs_size); /* don't remove this */
+    if ( vmcs_size )
+        return;
 
-    vmcs->vmcs_revision_id = vmx_msr_low;
+    rdmsr(MSR_IA32_VMX_BASIC_MSR, vmx_msr_low, vmx_msr_high);
+
+    vmcs_revision_id = vmx_msr_low;
+
+    vmcs_size  = vmx_msr_high & 0x1fff;
+    vmcs_order = get_order_from_bytes(vmcs_size);
+}
+
+static struct vmcs_struct *vmx_alloc_vmcs(void)
+{
+    struct vmcs_struct *vmcs;
+
+    if ( (vmcs = alloc_xenheap_pages(vmcs_order)) == NULL )
+    {
+        DPRINTK("Failed to allocate VMCS.\n");
+        return NULL;
+    }
+
+    memset(vmcs, 0, vmcs_size); /* don't remove this */
+    vmcs->vmcs_revision_id = vmcs_revision_id;
+
     return vmcs;
 }
 
-static void free_vmcs(struct vmcs_struct *vmcs)
+static void vmx_free_vmcs(struct vmcs_struct *vmcs)
 {
-    int order;
-
-    order = get_order_from_bytes(vmcs_size);
-    free_xenheap_pages(vmcs, order);
+    free_xenheap_pages(vmcs, vmcs_order);
 }
 
 static void __vmx_clear_vmcs(void *info)
 {
     struct vcpu *v = info;
+
     __vmpclear(virt_to_maddr(v->arch.hvm_vmx.vmcs));
+
     v->arch.hvm_vmx.active_cpu = -1;
     v->arch.hvm_vmx.launched   = 0;
 }
@@ -128,11 +146,19 @@ void vmx_vmcs_exit(struct vcpu *v)
     vcpu_unpause(v);
 }
 
+struct vmcs_struct *vmx_alloc_host_vmcs(void)
+{
+    return vmx_alloc_vmcs();
+}
+
+void vmx_free_host_vmcs(struct vmcs_struct *vmcs)
+{
+    vmx_free_vmcs(vmcs);
+}
+
 static inline int construct_vmcs_controls(struct arch_vmx_struct *arch_vmx)
 {
     int error = 0;
-    void *io_bitmap_a;
-    void *io_bitmap_b;
 
     error |= __vmwrite(PIN_BASED_VM_EXEC_CONTROL,
                        MONITOR_PIN_BASED_EXEC_CONTROLS);
@@ -141,19 +167,8 @@ static inline int construct_vmcs_controls(struct arch_vmx_struct *arch_vmx)
 
     error |= __vmwrite(VM_ENTRY_CONTROLS, MONITOR_VM_ENTRY_CONTROLS);
 
-    /* need to use 0x1000 instead of PAGE_SIZE */
-    io_bitmap_a = (void*) alloc_xenheap_pages(get_order_from_bytes(0x1000));
-    io_bitmap_b = (void*) alloc_xenheap_pages(get_order_from_bytes(0x1000));
-    memset(io_bitmap_a, 0xff, 0x1000);
-    /* don't bother debug port access */
-    clear_bit(PC_DEBUG_PORT, io_bitmap_a);
-    memset(io_bitmap_b, 0xff, 0x1000);
-
-    error |= __vmwrite(IO_BITMAP_A, (u64) virt_to_maddr(io_bitmap_a));
-    error |= __vmwrite(IO_BITMAP_B, (u64) virt_to_maddr(io_bitmap_b));
-
-    arch_vmx->io_bitmap_a = io_bitmap_a;
-    arch_vmx->io_bitmap_b = io_bitmap_b;
+    error |= __vmwrite(IO_BITMAP_A, (u64)virt_to_maddr(arch_vmx->io_bitmap_a));
+    error |= __vmwrite(IO_BITMAP_B, (u64)virt_to_maddr(arch_vmx->io_bitmap_b));
 
     return error;
 }
@@ -429,67 +444,52 @@ static inline int construct_vmcs_host(void)
 }
 
 /*
- * Need to extend to support full virtualization.
+ * the working VMCS pointer has been set properly
+ * just before entering this function.
  */
 static int construct_vmcs(struct vcpu *v,
                           cpu_user_regs_t *regs)
 {
     struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
     int error;
-    long rc;
 
-    memset(arch_vmx, 0, sizeof(struct arch_vmx_struct));
-
-    spin_lock_init(&arch_vmx->vmcs_lock);
-
-    /*
-     * Create a new VMCS
-     */
-    if (!(arch_vmx->vmcs = vmx_alloc_vmcs())) {
-        printk("Failed to create a new VMCS\n");
-        return -ENOMEM;
-    }
-
-    __vmx_clear_vmcs(v);
-    vmx_load_vmcs(v);
-
-    if ((error = construct_vmcs_controls(arch_vmx))) {
-        printk("construct_vmcs: construct_vmcs_controls failed\n");
-        rc = -EINVAL;
-        goto err_out;
+    if ( (error = construct_vmcs_controls(arch_vmx)) ) {
+        printk("construct_vmcs: construct_vmcs_controls failed.\n");
+        return error;
     }
 
     /* host selectors */
-    if ((error = construct_vmcs_host())) {
-        printk("construct_vmcs: construct_vmcs_host failed\n");
-        rc = -EINVAL;
-        goto err_out;
+    if ( (error = construct_vmcs_host()) ) {
+        printk("construct_vmcs: construct_vmcs_host failed.\n");
+        return error;
     }
 
     /* guest selectors */
-    if ((error = construct_init_vmcs_guest(regs))) {
-        printk("construct_vmcs: construct_vmcs_guest failed\n");
-        rc = -EINVAL;
-        goto err_out;
+    if ( (error = construct_init_vmcs_guest(regs)) ) {
+        printk("construct_vmcs: construct_vmcs_guest failed.\n");
+        return error;
     }
 
-    if ((error |= __vmwrite(EXCEPTION_BITMAP,
-                            MONITOR_DEFAULT_EXCEPTION_BITMAP))) {
-        printk("construct_vmcs: setting Exception bitmap failed\n");
-        rc = -EINVAL;
-        goto err_out;
+    if ( (error = __vmwrite(EXCEPTION_BITMAP,
+                            MONITOR_DEFAULT_EXCEPTION_BITMAP)) ) {
+        printk("construct_vmcs: setting exception bitmap failed.\n");
+        return error;
     }
 
-    if (regs->eflags & EF_TF)
-        __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
+    if ( regs->eflags & EF_TF )
+        error = __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
     else
-        __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
+        error = __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
 
+    return error;
+}
+
+int vmx_create_vmcs(struct vcpu *v)
+{
+    if ( (v->arch.hvm_vmx.vmcs = vmx_alloc_vmcs()) == NULL )
+        return -ENOMEM;
+    __vmx_clear_vmcs(v);
     return 0;
-
-err_out:
-    vmx_destroy_vmcs(v);
-    return rc;
 }
 
 void vmx_destroy_vmcs(struct vcpu *v)
@@ -501,14 +501,14 @@ void vmx_destroy_vmcs(struct vcpu *v)
 
     vmx_clear_vmcs(v);
 
-    free_vmcs(arch_vmx->vmcs);
-    arch_vmx->vmcs = NULL;
+    free_xenheap_pages(arch_vmx->io_bitmap_a, IO_BITMAP_ORDER);
+    free_xenheap_pages(arch_vmx->io_bitmap_b, IO_BITMAP_ORDER);
 
-    free_xenheap_pages(arch_vmx->io_bitmap_a, get_order_from_bytes(0x1000));
     arch_vmx->io_bitmap_a = NULL;
-
-    free_xenheap_pages(arch_vmx->io_bitmap_b, get_order_from_bytes(0x1000));
     arch_vmx->io_bitmap_b = NULL;
+
+    vmx_free_vmcs(arch_vmx->vmcs);
+    arch_vmx->vmcs = NULL;
 }
 
 void vm_launch_fail(unsigned long eflags)
@@ -547,19 +547,20 @@ void arch_vmx_do_resume(struct vcpu *v)
 
 void arch_vmx_do_launch(struct vcpu *v)
 {
-    int error;
     cpu_user_regs_t *regs = &current->arch.guest_context.user_regs;
 
-    error = construct_vmcs(v, regs);
-    if ( error < 0 )
+    vmx_load_vmcs(v);
+
+    if ( construct_vmcs(v, regs) < 0 )
     {
-        if (v->vcpu_id == 0) {
-            printk("Failed to construct a new VMCS for BSP.\n");
+        if ( v->vcpu_id == 0 ) {
+            printk("Failed to construct VMCS for BSP.\n");
         } else {
-            printk("Failed to construct a new VMCS for AP %d\n", v->vcpu_id);
+            printk("Failed to construct VMCS for AP %d.\n", v->vcpu_id);
         }
         domain_crash_synchronous();
     }
+
     vmx_do_launch(v);
     reset_stack_and_jump(vmx_asm_do_vmentry);
 }
