@@ -1726,6 +1726,7 @@ static int resync_all(struct domain *d, u32 stype)
                     {
                         guest_l1_pgentry_t tmp_gl1e = guest_l1e_empty();
                         validate_pte_change(d, tmp_gl1e, sl1e_p);
+                        unshadow_l1 = 1;
                         continue;
                     }
 #endif
@@ -3676,20 +3677,19 @@ static inline int l2e_rw_fault(
                 put_page_from_l1e(old_sl1e, d);
         }
 
-        l1_p[gpfn - start_gpfn] = sl1e;
-
         if (rw) {
             /* shadow_mark_va_out_of_sync() need modificatin for 2M pages*/
             if ( mfn_is_page_table(mfn) )
                 shadow_mark_va_out_of_sync_2mp(v, gpfn, mfn,
                   l2e_get_paddr(sl2e) | (sizeof(l1_pgentry_t) * (gpfn - start_gpfn)));
         }
+
+        l1_p[gpfn - start_gpfn] = sl1e;
     }
 
     unmap_domain_page(l1_p);
     *gl2e_p = gl2e;
     return 1;
-
 }
 
 /*
