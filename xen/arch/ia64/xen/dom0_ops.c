@@ -32,7 +32,7 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     case DOM0_GETPAGEFRAMEINFO:
     {
         struct page_info *page;
-        unsigned long mfn = op->u.getpageframeinfo.mfn;
+        unsigned long mfn = op->u.getpageframeinfo.gmfn;
         domid_t dom = op->u.getpageframeinfo.domain;
         struct domain *d;
 
