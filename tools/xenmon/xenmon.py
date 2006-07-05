@@ -36,6 +36,7 @@ import sys
 # constants
 NSAMPLES = 100
 NDOMAINS = 32
+IDLE_DOMAIN = 31 # idle domain's ID
 
 # the struct strings for qos_info
 ST_DOM_INFO = "6Q4i32s"
@@ -253,6 +254,14 @@ def display(scr, row, col, str, attr=0):
         sys.exit(1)
 
 
+# diplay domain id
+def display_domain_id(scr, row, col, dom):
+    if dom == IDLE_DOMAIN:
+        display(scr, row, col-1, "Idle")
+    else:
+        display(scr, row, col, "%d" % dom)
+
+
 # the live monitoring code
 def show_livestats(cpu):
     ncpu = 1         # number of cpu's on this platform
@@ -361,7 +370,7 @@ def show_livestats(cpu):
                 # display gotten
                 row += 1 
                 col = 2
-                display(stdscr, row, col, "%d" % dom)
+                display_domain_id(stdscr, row, col, dom)
                 col += 4
                 display(stdscr, row, col, "%s" % time_scale(h2[dom][0][0]))
                 col += 12
@@ -386,7 +395,7 @@ def show_livestats(cpu):
                 if options.allocated:
                     row += 1
                     col = 2
-                    display(stdscr, row, col, "%d" % dom)
+                    display_domain_id(stdscr, row, col, dom)
                     col += 28
                     display(stdscr, row, col, "%s/ex" % time_scale(h2[dom][1]))
                     col += 42
@@ -398,7 +407,7 @@ def show_livestats(cpu):
                 if options.blocked:
                     row += 1
                     col = 2
-                    display(stdscr, row, col, "%d" % dom)
+                    display_domain_id(stdscr, row, col, dom)
                     col += 4
                     display(stdscr, row, col, "%s" % time_scale(h2[dom][2][0]))
                     col += 12
@@ -418,7 +427,7 @@ def show_livestats(cpu):
                 if options.waited:
                     row += 1
                     col = 2
-                    display(stdscr, row, col, "%d" % dom)
+                    display_domain_id(stdscr, row, col, dom)
                     col += 4
                     display(stdscr, row, col, "%s" % time_scale(h2[dom][3][0]))
                     col += 12
@@ -438,7 +447,7 @@ def show_livestats(cpu):
                 if options.excount:
                     row += 1
                     col = 2
-                    display(stdscr, row, col, "%d" % dom)
+                    display_domain_id(stdscr, row, col, dom)
                     
                     col += 28
                     display(stdscr, row, col, "%d/s" % h2[dom][4])
@@ -451,7 +460,7 @@ def show_livestats(cpu):
                 if options.iocount:
                     row += 1
                     col = 2
-                    display(stdscr, row, col, "%d" % dom)
+                    display_domain_id(stdscr, row, col, dom)
                     col += 4
                     display(stdscr, row, col, "%d/s" % h2[dom][5][0])
                     col += 24
@@ -558,7 +567,10 @@ def writelog():
     curr = last = time.time()
     outfiles = {}
     for dom in range(0, NDOMAINS):
-        outfiles[dom] = Delayed("%s-dom%d.log" % (options.prefix, dom), 'w')
+        if dom == IDLE_DOMAIN:
+            outfiles[dom] = Delayed("%s-idle.log" % options.prefix, 'w')
+        else:
+            outfiles[dom] = Delayed("%s-dom%d.log" % (options.prefix, dom), 'w')
         outfiles[dom].delayed_write("# passed cpu dom cpu(tot) cpu(%) cpu/ex allocated/ex blocked(tot) blocked(%) blocked/io waited(tot) waited(%) waited/ex ex/s io(tot) io/ex\n")
 
     while options.duration == 0 or interval < (options.duration * 1000):
