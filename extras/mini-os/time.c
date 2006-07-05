@@ -215,7 +215,7 @@ void block_domain(u32 millisecs)
 /*
  * Just a dummy 
  */
-static void timer_handler(int ev, struct pt_regs *regs)
+static void timer_handler(int ev, struct pt_regs *regs, void *ign)
 {
     static int i;
 
@@ -233,5 +233,5 @@ static void timer_handler(int ev, struct pt_regs *regs)
 void init_time(void)
 {
     printk("Initialising timer interface\n");
-    bind_virq(VIRQ_TIMER, &timer_handler);
+    bind_virq(VIRQ_TIMER, &timer_handler, NULL);
 }

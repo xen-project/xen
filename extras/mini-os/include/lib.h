@@ -89,6 +89,7 @@ size_t strlen(const char *s);
 char  *strchr(const char *s, int c);
 char  *strstr(const char *s1, const char *s2);
 char * strcat(char * dest, const char * src);
+char  *strdup(const char *s);
 
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -98,6 +99,18 @@ struct kvec {
     size_t iov_len;
 };
 
+#define ASSERT(x)                                              \
+do {                                                           \
+	if (!(x)) {                                                \
+		printk("ASSERTION FAILED: %s at %s:%d.\n",             \
+			   # x ,                                           \
+			   __FILE__,                                       \
+			   __LINE__);                                      \
+        BUG();                                                 \
+	}                                                          \
+} while(0)
 
+/* Consistency check as much as possible. */
+void sanity_check(void);
 
 #endif /* _LIB_H_ */

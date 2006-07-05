@@ -112,7 +112,7 @@ static void xenbus_thread_func(void *ign)
     }
 }
 
-static void xenbus_evtchn_handler(int port, struct pt_regs *regs)
+static void xenbus_evtchn_handler(int port, struct pt_regs *regs, void *ign)
 {
     wake_up(&xb_waitq);
 }
@@ -174,7 +174,8 @@ void init_xenbus(void)
     create_thread("xenstore", xenbus_thread_func, NULL);
     DEBUG("buf at %p.\n", xenstore_buf);
     err = bind_evtchn(start_info.store_evtchn,
-		      xenbus_evtchn_handler);
+		      xenbus_evtchn_handler,
+              NULL);
     DEBUG("xenbus on irq %d\n", err);
 }
 

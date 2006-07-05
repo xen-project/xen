@@ -53,7 +53,7 @@ int xencons_ring_send(const char *data, unsigned len)
 
 
 
-static void handle_input(int port, struct pt_regs *regs)
+static void handle_input(int port, struct pt_regs *regs, void *ign)
 {
 	struct xencons_interface *intf = xencons_interface();
 	XENCONS_RING_IDX cons, prod;
@@ -83,7 +83,8 @@ int xencons_ring_init(void)
 	if (!start_info.console_evtchn)
 		return 0;
 
-	err = bind_evtchn(start_info.console_evtchn, handle_input);
+	err = bind_evtchn(start_info.console_evtchn, handle_input,
+			  NULL);
 	if (err <= 0) {
 		printk("XEN console request chn bind failed %i\n", err);
 		return err;
