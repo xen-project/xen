@@ -11,6 +11,7 @@ entry.S			-> linux/arch/ia64/kernel/entry.S
 head.S			-> linux/arch/ia64/kernel/head.S
 hpsim_ssc.h		-> linux/arch/ia64/hp/sim/hpsim_ssc.h
 irq_ia64.c		-> linux/arch/ia64/kernel/irq_ia64.c
+mca.c			-> linux/arch/ia64/kernel/mca.c
 mca_asm.S		-> linux/arch/ia64/kernel/mca_asm.S
 minstate.h		-> linux/arch/ia64/kernel/minstate.h
 mm_contig.c		-> linux/arch/ia64/mm/contig.c
