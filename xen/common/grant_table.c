@@ -287,10 +287,10 @@ __gnttab_map_grant_ref(
 
     if ( !(op->flags & GNTMAP_readonly) &&
          !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
-        clear_bit(_GTF_writing, &sha->flags);
+        gnttab_clear_flag(_GTF_writing, &sha->flags);
 
     if ( !act->pin )
-        clear_bit(_GTF_reading, &sha->flags);
+        gnttab_clear_flag(_GTF_reading, &sha->flags);
 
  unlock_out:
     spin_unlock(&rd->grant_table->lock);
@@ -425,10 +425,10 @@ __gnttab_unmap_grant_ref(
 
     if ( ((act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0) &&
          !(flags & GNTMAP_readonly) )
-        clear_bit(_GTF_writing, &sha->flags);
+        gnttab_clear_flag(_GTF_writing, &sha->flags);
 
     if ( act->pin == 0 )
-        clear_bit(_GTF_reading, &sha->flags);
+        gnttab_clear_flag(_GTF_reading, &sha->flags);
 
  unmap_out:
     op->status = rc;
@@ -889,11 +889,11 @@ gnttab_release_mappings(
             }
 
             if ( (act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0 )
-                clear_bit(_GTF_writing, &sha->flags);
+                gnttab_clear_flag(_GTF_writing, &sha->flags);
         }
 
         if ( act->pin == 0 )
-            clear_bit(_GTF_reading, &sha->flags);
+            gnttab_clear_flag(_GTF_reading, &sha->flags);
 
         spin_unlock(&rd->grant_table->lock);
 

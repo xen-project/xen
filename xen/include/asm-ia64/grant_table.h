@@ -55,4 +55,9 @@ void guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long 
 
 #define gnttab_log_dirty(d, f) ((void)0)
 
+static inline void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
+{
+	clear_bit(nr, addr);
+}
+
 #endif /* __ASM_GRANT_TABLE_H__ */

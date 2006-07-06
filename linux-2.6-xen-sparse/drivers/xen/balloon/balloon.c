@@ -75,6 +75,9 @@ DEFINE_SPINLOCK(balloon_lock);
 static unsigned long current_pages;
 static unsigned long target_pages;
 
+/* We increase/decrease in batches which fit in a page */
+static unsigned long frame_list[PAGE_SIZE / sizeof(unsigned long)]; 
+
 /* VM /proc information for memory */
 extern unsigned long totalram_pages;
 
@@ -95,6 +98,11 @@ static unsigned long balloon_low, balloon_high;
 static void balloon_process(void *unused);
 static DECLARE_WORK(balloon_worker, balloon_process, NULL);
 static struct timer_list balloon_timer;
+
+/* When ballooning out (allocating memory to return to Xen) we don't really 
+   want the kernel to try too hard since that can trigger the oom killer. */
+#define GFP_BALLOON \
+	(GFP_HIGHUSER | __GFP_NOWARN | __GFP_NORETRY | __GFP_NOMEMALLOC)
 
 #define PAGE_TO_LIST(p) (&(p)->lru)
 #define LIST_TO_PAGE(l) list_entry((l), struct page, lru)
@@ -172,7 +180,7 @@ static unsigned long current_target(void)
 
 static int increase_reservation(unsigned long nr_pages)
 {
-	unsigned long *frame_list, frame, pfn, i, flags;
+	unsigned long  pfn, i, flags;
 	struct page   *page;
 	long           rc;
 	struct xen_memory_reservation reservation = {
@@ -181,15 +189,8 @@ static int increase_reservation(unsigned long nr_pages)
 		.domid        = DOMID_SELF
 	};
 
-	if (nr_pages > (PAGE_SIZE / sizeof(unsigned long)))
-		nr_pages = PAGE_SIZE / sizeof(unsigned long);
-
-	frame_list = (unsigned long *)__get_free_page(GFP_KERNEL);
-	if (frame_list == NULL) {
-		frame_list = &frame;
-		if (nr_pages > 1)
-			nr_pages = 1;
-	}
+	if (nr_pages > ARRAY_SIZE(frame_list))
+		nr_pages = ARRAY_SIZE(frame_list);
 
 	balloon_lock(flags);
 
@@ -253,15 +254,12 @@ static int increase_reservation(unsigned long nr_pages)
  out:
 	balloon_unlock(flags);
 
-	if (frame_list != &frame)
-		free_page((unsigned long)frame_list);
-
 	return 0;
 }
 
 static int decrease_reservation(unsigned long nr_pages)
 {
-	unsigned long *frame_list, frame, pfn, i, flags;
+	unsigned long  pfn, i, flags;
 	struct page   *page;
 	void          *v;
 	int            need_sleep = 0;
@@ -272,18 +270,11 @@ static int decrease_reservation(unsigned long nr_pages)
 		.domid        = DOMID_SELF
 	};
 
-	if (nr_pages > (PAGE_SIZE / sizeof(unsigned long)))
-		nr_pages = PAGE_SIZE / sizeof(unsigned long);
-
-	frame_list = (unsigned long *)__get_free_page(GFP_KERNEL);
-	if (frame_list == NULL) {
-		frame_list = &frame;
-		if (nr_pages > 1)
-			nr_pages = 1;
-	}
+	if (nr_pages > ARRAY_SIZE(frame_list))
+		nr_pages = ARRAY_SIZE(frame_list);
 
 	for (i = 0; i < nr_pages; i++) {
-		if ((page = alloc_page(GFP_HIGHUSER)) == NULL) {
+		if ((page = alloc_page(GFP_BALLOON)) == NULL) {
 			nr_pages = i;
 			need_sleep = 1;
 			break;
@@ -330,9 +321,6 @@ static int decrease_reservation(unsigned long nr_pages)
 	totalram_pages = current_pages;
 
 	balloon_unlock(flags);
-
-	if (frame_list != &frame)
-		free_page((unsigned long)frame_list);
 
 	return need_sleep;
 }

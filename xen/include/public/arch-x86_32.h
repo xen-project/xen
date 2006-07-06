@@ -98,6 +98,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 #ifndef __ASSEMBLY__
 
+typedef unsigned long xen_ulong_t;
+
 /*
  * Send an array of these to HYPERVISOR_set_trap_table()
  */

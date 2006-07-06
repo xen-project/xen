@@ -40,6 +40,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 #ifndef __ASSEMBLY__
 
+typedef unsigned long xen_ulong_t;
+
 #define GPFN_MEM          (0UL << 56) /* Guest pfn is normal mem */
 #define GPFN_FRAME_BUFFER (1UL << 56) /* VGA framebuffer */
 #define GPFN_LOW_MMIO     (2UL << 56) /* Low MMIO range */

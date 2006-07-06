@@ -15,6 +15,7 @@ import os.path
 
 config = {"vtpm":"instance=1,backend=0"}
 domain = XmTestDomain(extraConfig=config)
+domName = domain.getName()
 consoleHistory = ""
 
 try:
@@ -22,10 +23,8 @@ try:
 except DomainError, e:
     if verbose:
         print e.extra
-    vtpm_cleanup(domain.getName())
-    FAIL("Unable to create domain")
-
-domName = domain.getName()
+    vtpm_cleanup(domName)
+    FAIL("Unable to create domain (%s)" % domName)
 
 try:
     console.sendInput("input")
@@ -35,11 +34,11 @@ except ConsoleError, e:
     FAIL(str(e))
 
 try:
-    run = console.runCmd("cat /sys/devices/platform/tpm_vtpm/pcrs")
+    run = console.runCmd("cat /sys/devices/xen/vtpm-0/pcrs")
 except ConsoleError, e:
     saveLog(console.getHistory())
     vtpm_cleanup(domName)
-    FAIL(str(e))
+    FAIL("No result from dumping the PCRs")
 
 if re.search("No such file",run["output"]):
     vtpm_cleanup(domName)
@@ -48,50 +47,59 @@ if re.search("No such file",run["output"]):
 consoleHistory = console.getHistory()
 domain.closeConsole()
 
-try:
-    status, ouptut = traceCommand("xm save %s %s.save" %
-                                  (domName, domName),
-                                  timeout=30)
+loop = 0
+while loop < 3:
+    try:
+        status, ouptut = traceCommand("xm save %s %s.save" %
+                                      (domName, domName),
+                                      timeout=30)
 
-except TimeoutError, e:
-    saveLog(consoleHistory)
-    vtpm_cleanup(domName)
-    FAIL(str(e))
+    except TimeoutError, e:
+        saveLog(consoleHistory)
+        vtpm_cleanup(domName)
+        FAIL(str(e))
 
-if status != 0:
-    saveLog(consoleHistory)
-    vtpm_cleanup(domName)
-    FAIL("xm save did not succeed")
+    if status != 0:
+        saveLog(consoleHistory)
+        vtpm_cleanup(domName)
+        FAIL("xm save did not succeed")
 
-try:
-    status, ouptut = traceCommand("xm restore %s.save" %
-                                  (domName),
-                                  timeout=30)
-except TimeoutError, e:
+    try:
+        status, ouptut = traceCommand("xm restore %s.save" %
+                                      (domName),
+                                      timeout=30)
+    except TimeoutError, e:
+        os.remove("%s.save" % domName)
+        saveLog(consoleHistory)
+        vtpm_cleanup(domName)
+        FAIL(str(e))
+
     os.remove("%s.save" % domName)
-    saveLog(consoleHistory)
-    vtpm_cleanup(domName)
-    FAIL(str(e))
 
-os.remove("%s.save" % domName)
+    if status != 0:
+        saveLog(consoleHistory)
+        vtpm_cleanup(domName)
+        FAIL("xm restore did not succeed")
 
-if status != 0:
-    saveLog(consoleHistory)
-    vtpm_cleanup(domName)
-    FAIL("xm restore did not succeed")
+    try:
+        console = domain.getConsole()
+    except ConsoleError, e:
+        vtpm_cleanup(domName)
+        FAIL(str(e))
 
-try:
-    console = domain.getConsole()
-except ConsoleError, e:
-    vtpm_cleanup(domName)
-    FAIL(str(e))
+    try:
+        run = console.runCmd("cat /sys/devices/xen/vtpm-0/pcrs")
+    except ConsoleError, e:
+        saveLog(console.getHistory())
+        vtpm_cleanup(domName)
+        FAIL(str(e))
 
-try:
-    run = console.runCmd("cat /sys/devices/platform/tpm_vtpm/pcrs")
-except ConsoleError, e:
-    saveLog(console.getHistory())
-    vtpm_cleanup(domName)
-    FAIL(str(e))
+    if not re.search("PCR-00:",run["output"]):
+        saveLog(console.getHistory())
+        vtpm_cleanup(domName)
+	FAIL("Virtual TPM is not working correctly on /dev/vtpm on backend side")
+
+    loop += 1
 
 domain.closeConsole()
 
@@ -99,5 +107,3 @@ domain.stop()
 
 vtpm_cleanup(domName)
 
-if not re.search("PCR-00:",run["output"]):
-	FAIL("Virtual TPM is not working correctly on /dev/vtpm on backend side")

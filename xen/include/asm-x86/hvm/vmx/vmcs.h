@@ -27,9 +27,7 @@
 extern int start_vmx(void);
 extern void stop_vmx(void);
 extern void vmcs_dump_vcpu(void);
-void vmx_final_setup_guest(struct vcpu *v);
-
-void vmx_enter_scheduler(void);
+extern void vmx_init_vmcs_config(void);
 
 enum {
     VMX_CPU_STATE_PAE_ENABLED=0,
@@ -46,8 +44,6 @@ struct vmcs_struct {
     unsigned char data [0]; /* vmcs size is read from MSR */
 };
 
-extern int vmcs_size;
-
 enum {
     VMX_INDEX_MSR_LSTAR = 0,
     VMX_INDEX_MSR_STAR,
@@ -63,6 +59,10 @@ struct vmx_msr_state {
     unsigned long msr_items[VMX_MSR_COUNT];
     unsigned long shadow_gs;
 };
+
+/* io bitmap is 4KBytes in size */
+#define IO_BITMAP_SIZE      0x1000
+#define IO_BITMAP_ORDER     (get_order_from_bytes(IO_BITMAP_SIZE))
 
 struct arch_vmx_struct {
     /* Virtual address of VMCS. */
@@ -101,7 +101,10 @@ struct arch_vmx_struct {
 
 void vmx_do_resume(struct vcpu *);
 
-struct vmcs_struct *vmx_alloc_vmcs(void);
+struct vmcs_struct *vmx_alloc_host_vmcs(void);
+void vmx_free_host_vmcs(struct vmcs_struct *vmcs);
+
+int vmx_create_vmcs(struct vcpu *v);
 void vmx_destroy_vmcs(struct vcpu *v);
 void vmx_vmcs_enter(struct vcpu *v);
 void vmx_vmcs_exit(struct vcpu *v);

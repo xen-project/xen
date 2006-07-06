@@ -327,6 +327,15 @@ static void timer_softirq_action(void)
 }
 
 
+void process_pending_timers(void)
+{
+    unsigned int cpu = smp_processor_id();
+    ASSERT(!in_irq() && local_irq_is_enabled());
+    if ( test_and_clear_bit(TIMER_SOFTIRQ, &softirq_pending(cpu)) )
+        timer_softirq_action();
+}
+
+
 static void dump_timerq(unsigned char key)
 {
     struct timer *t;

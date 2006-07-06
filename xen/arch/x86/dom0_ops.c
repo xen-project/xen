@@ -207,7 +207,7 @@ long arch_do_dom0_op(struct dom0_op *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     case DOM0_GETPAGEFRAMEINFO:
     {
         struct page_info *page;
-        unsigned long mfn = op->u.getpageframeinfo.mfn;
+        unsigned long mfn = op->u.getpageframeinfo.gmfn;
         domid_t dom = op->u.getpageframeinfo.domain;
         struct domain *d;
 
@@ -407,14 +407,16 @@ long arch_do_dom0_op(struct dom0_op *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
 
     case DOM0_HYPERCALL_INIT:
     {
-        struct domain *d; 
-        unsigned long mfn = op->u.hypercall_init.mfn;
+        struct domain *d = find_domain_by_id(op->u.hypercall_init.domain);
+        unsigned long gmfn = op->u.hypercall_init.gmfn;
+        unsigned long mfn;
         void *hypercall_page;
 
         ret = -ESRCH;
-        if ( unlikely((d = find_domain_by_id(
-            op->u.hypercall_init.domain)) == NULL) )
+        if ( unlikely(d == NULL) )
             break;
+
+        mfn = gmfn_to_mfn(d, gmfn);
 
         ret = -EACCES;
         if ( !mfn_valid(mfn) ||

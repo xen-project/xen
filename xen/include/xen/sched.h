@@ -78,9 +78,10 @@ struct vcpu
 
     unsigned long    vcpu_flags;
 
-    u16              virq_to_evtchn[NR_VIRQS];
+    spinlock_t       pause_lock;
+    unsigned int     pause_count;
 
-    atomic_t         pausecnt;
+    u16              virq_to_evtchn[NR_VIRQS];
 
     /* Bitmask of CPUs on which this VCPU may run. */
     cpumask_t        cpu_affinity;
@@ -141,6 +142,10 @@ struct domain
     struct rangeset *irq_caps;
 
     unsigned long    domain_flags;
+
+    spinlock_t       pause_lock;
+    unsigned int     pause_count;
+
     unsigned long    vm_assist;
 
     atomic_t         refcnt;
@@ -220,8 +225,7 @@ static inline void get_knownalive_domain(struct domain *d)
     ASSERT(!(atomic_read(&d->refcnt) & DOMAIN_DESTROYED));
 }
 
-extern struct domain *domain_create(
-    domid_t domid, unsigned int cpu);
+extern struct domain *domain_create(domid_t domid);
 extern int construct_dom0(
     struct domain *d,
     unsigned long image_start, unsigned long image_len, 
@@ -368,6 +372,9 @@ extern struct domain *domain_list;
  /* VCPU is polling a set of event channels (SCHEDOP_poll). */
 #define _VCPUF_polling         10
 #define VCPUF_polling          (1UL<<_VCPUF_polling)
+ /* VCPU is paused by the hypervisor? */
+#define _VCPUF_paused          11
+#define VCPUF_paused           (1UL<<_VCPUF_paused)
 
 /*
  * Per-domain flags (domain_flags).
@@ -390,12 +397,16 @@ extern struct domain *domain_list;
  /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
 #define _DOMF_polling          5
 #define DOMF_polling           (1UL<<_DOMF_polling)
+ /* Domain is paused by the hypervisor? */
+#define _DOMF_paused           6
+#define DOMF_paused            (1UL<<_DOMF_paused)
 
 static inline int vcpu_runnable(struct vcpu *v)
 {
-    return ( (atomic_read(&v->pausecnt) == 0) &&
-             !(v->vcpu_flags & (VCPUF_blocked|VCPUF_down)) &&
-             !(v->domain->domain_flags & (DOMF_shutdown|DOMF_ctrl_pause)) );
+    return ( !(v->vcpu_flags &
+               (VCPUF_blocked|VCPUF_down|VCPUF_paused)) &&
+             !(v->domain->domain_flags &
+               (DOMF_shutdown|DOMF_ctrl_pause|DOMF_paused)) );
 }
 
 void vcpu_pause(struct vcpu *v);

@@ -545,6 +545,9 @@ extern void mtrr_bp_init(void);
 
 extern void mcheck_init(struct cpuinfo_x86 *c);
 
+int cpuid_hypervisor_leaves(
+    uint32_t idx, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx);
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_X86_PROCESSOR_H */

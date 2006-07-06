@@ -67,16 +67,11 @@ static void default_idle(void)
 
 void idle_loop(void)
 {
-    int cpu = smp_processor_id();
-
     for ( ; ; )
     {
         page_scrub_schedule_work();
-
         default_idle();
-
-        if ( softirq_pending(cpu) )
-            do_softirq();
+        do_softirq();
     }
 }
 
@@ -956,7 +951,7 @@ void domain_relinquish_resources(struct domain *d)
         }
     }
 
-    if ( hvm_guest(d->vcpu[0]) )
+    if ( d->vcpu[0] && hvm_guest(d->vcpu[0]) )
         hvm_relinquish_guest_resources(d);
 
     shadow_mode_disable(d);

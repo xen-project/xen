@@ -170,6 +170,15 @@ guest_remove_page(
     if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
         put_page(page);
 
+    if ( unlikely((page->count_info & PGC_count_mask) != 1) )
+    {
+        /* We'll make this a guest-visible error in future, so take heed! */
+        DPRINTK("Dom%d freeing in-use page %lx (pseudophys %lx):"
+                " count=%x type=%lx\n",
+                d->domain_id, mfn, get_gpfn_from_mfn(mfn),
+                page->count_info, page->u.inuse.type_info);
+    }
+
     guest_physmap_remove_page(d, gmfn, mfn);
 
     put_page(page);

@@ -875,13 +875,42 @@ defined in the I<policy>. Unless specified, the default I<policy> is
 the currently enforced access control policy. The default for I<type>
 is 'dom'. The labels are arranged in alphabetical order.
 
-=item B<addlabel> I<configfile> I<label> [I<policy>]
+=item B<addlabel> I<label> dom I<configfile> [I<policy>]
+
+=item B<addlabel> I<label> res I<resource> [I<policy>]
 
 Adds the security label with name I<label> to a domain
-I<configfile>. Unless specified, the default I<policy> is the
+I<configfile> (dom) or to the global resource label file for the
+given I<resource> (res). Unless specified, the default I<policy> is the
 currently enforced access control policy. This subcommand also
 verifies that the I<policy> definition supports the specified I<label>
 name.
+
+=item B<rmlabel> dom I<configfile>
+
+=item B<rmlabel> res I<resource>
+
+Works the same as the I<addlabel> command (above), except that this
+command will remove the label from the domain I<configfile> (dom) or
+the global resource label file (res).
+
+=item B<getlabel> dom I<configfile>
+
+=item B<getlabel> res I<resource>
+
+Shows the label for the given I<configfile> or I<resource>
+
+=item B<resources>
+
+Lists all resources in the global resource label file.  Each resource
+is listed with its associated label and policy name.
+
+=item B<dry-run> I<configfile>
+
+Determines if the specified I<configfile> describes a domain with a valid
+security configuration for type enforcement. The test shows the policy
+decision made for each resource label against the domain label as well as
+the overall decision.
 
 B<CONFIGURING SECURITY>
 
@@ -960,17 +989,18 @@ B<ATTACHING A SECURITY LABEL TO A DOMAIN>
 
 =over 4
 
-This subcommand attaches a security label to a domain configuration
-file, here a HomeBanking label. The example policy ensures that this
-domain does not share information with other non-hombanking user
-domains (i.e., domains labeled as dom_Fun or dom_Boinc) and that it
-will not run simultaneously with domains labeled as dom_Fun.
+The I<addlabel> subcommand can attach a security label to a domain
+configuration file, here a HomeBanking label. The example policy
+ensures that this domain does not share information with other
+non-hombanking user domains (i.e., domains labeled as dom_Fun or
+dom_Boinc) and that it will not run simultaneously with domains
+labeled as dom_Fun.
 
 We assume that the specified myconfig.xm configuration file actually
 instantiates a domain that runs workloads related to home-banking,
 probably just a browser environment for online-banking.
 
-    xm addlabel myconfig.xm dom_HomeBanking
+    xm addlabel dom_HomeBanking dom myconfig.xm
 
 The very simple configuration file might now look as printed
 below. The I<addlabel> subcommand added the B<access_control> entry at
@@ -997,6 +1027,38 @@ permitted".
 
 =back
 
+B<ATTACHING A SECURITY LABEL TO A RESOURCE>
+
+=over 4
+
+The I<addlabel> subcommand can also be used to attach a security
+label to a resource. Following the home banking example from above,
+we can label a disk resource (e.g., a physical partition or a file)
+to make it accessible to the home banking domain. The example policy
+provides a resource label, res_LogicalDiskPartition1(hda1), that is
+compatible with the HomeBanking domain label.
+
+    xm addlabel "res_LogicalDiskPartition1(hda1)" res phy:hda6
+
+After labeling this disk resource, it can be attached to the domain
+by adding a line to the domain configuration file. The line below
+attaches this disk to the domain at boot time.
+
+    disk = [ 'phy:hda6,sda2,w' ]
+
+Alternatively, the resource can be attached after booting the domain
+by using the I<block-attach> subcommand.
+
+    xm block-attach homebanking phy:hda6 sda2 w
+
+Note that labeled resources cannot be used when security is turned
+off.  Any attempt to use labeled resources with security turned off
+will result in a failure with a corresponding error message.  The
+solution is to enable security or, if security is no longer desired,
+to remove the resource label using the I<rmlabel> subcommand.
+
+=back
+
 B<STARTING AND LISTING LABELED DOMAINS>
 
 =over 4
@@ -1008,6 +1070,21 @@ B<STARTING AND LISTING LABELED DOMAINS>
       Name         ID ...  Time(s)  Label
       homebanking  23 ...      4.4  dom_HomeBanking
       Domain-0      0 ...   2658.8  dom_SystemManagement
+
+=back
+
+B<LISTING LABELED RESOURCES>
+
+=over 4
+
+    xm resources
+
+      phy:hda6
+          policy: example.chwall_ste.client_v1
+          label:  res_LogicalDiskPartition1(hda1)
+      file:/xen/disk_image/disk.img
+          policy: example.chwall_ste.client_v1
+          label:  res_LogicalDiskPartition2(hda2)
 
 =back
 

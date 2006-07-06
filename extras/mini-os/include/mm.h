@@ -196,9 +196,11 @@ static __inline__ paddr_t machine_to_phys(maddr_t machine)
 #define to_virt(x)                 ((void *)((unsigned long)(x)+VIRT_START))
 
 #define virt_to_pfn(_virt)         (PFN_DOWN(to_phys(_virt)))
+#define virt_to_mfn(_virt)         (pfn_to_mfn(virt_to_pfn(_virt)))
 #define mach_to_virt(_mach)        (to_virt(machine_to_phys(_mach)))
+#define virt_to_mach(_virt)        (phys_to_machine(to_phys(_virt)))
 #define mfn_to_virt(_mfn)          (to_virt(mfn_to_pfn(_mfn) << PAGE_SHIFT))
-#define pfn_to_virt(_pfn)          (to_virt(_pfn << PAGE_SHIFT))
+#define pfn_to_virt(_pfn)          (to_virt((_pfn) << PAGE_SHIFT))
 
 /* Pagetable walking. */
 #define pte_to_mfn(_pte)           (((_pte) & (PADDR_MASK&PAGE_MASK)) >> L1_PAGETABLE_SHIFT)
@@ -206,7 +208,7 @@ static __inline__ paddr_t machine_to_phys(maddr_t machine)
 
 void init_mm(void);
 unsigned long alloc_pages(int order);
-#define alloc_page()    alloc_pages(0);
+#define alloc_page()    alloc_pages(0)
 void free_pages(void *pointer, int order);
 
 static __inline__ int get_order(unsigned long size)
@@ -218,5 +220,7 @@ static __inline__ int get_order(unsigned long size)
     return order;
 }
 
+
+void *map_frames(unsigned long *f, unsigned long n);
 
 #endif /* _MM_H_ */

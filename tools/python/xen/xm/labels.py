@@ -20,9 +20,6 @@
 """
 import sys
 import traceback
-import os
-import commands
-import shutil
 import string
 from xen.util.security import ACMError, err, list_labels, active_policy
 from xen.util.security import vm_label_re, res_label_re, all_label_re

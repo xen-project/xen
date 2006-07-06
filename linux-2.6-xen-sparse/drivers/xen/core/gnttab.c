@@ -169,7 +169,7 @@ int gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly)
 			printk(KERN_ALERT "WARNING: g.e. still in use!\n");
 			return 0;
 		}
-	} while ((nflags = synch_cmpxchg(&shared[ref].flags, flags, 0)) !=
+	} while ((nflags = synch_cmpxchg_subword(&shared[ref].flags, flags, 0)) !=
 		 flags);
 
 	return 1;
@@ -224,7 +224,7 @@ unsigned long gnttab_end_foreign_transfer_ref(grant_ref_t ref)
 	 * reference and return failure (== 0).
 	 */
 	while (!((flags = shared[ref].flags) & GTF_transfer_committed)) {
-		if (synch_cmpxchg(&shared[ref].flags, flags, 0) == flags)
+		if (synch_cmpxchg_subword(&shared[ref].flags, flags, 0) == flags)
 			return 0;
 		cpu_relax();
 	}

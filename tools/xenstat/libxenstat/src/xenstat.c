@@ -20,6 +20,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <linux/compiler.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <xs.h>
 #include "xenstat.h"
 
@@ -36,6 +41,7 @@ struct xenstat_handle {
 	struct xs_handle *xshandle; /* xenstore handle */
 	int page_size;
 	FILE *procnetdev;
+	DIR *sysfsvbd;
 	char xen_version[VERSION_SIZE]; /* xen version running on this node */
 };
 
@@ -62,6 +68,8 @@ struct xenstat_domain {
 	unsigned int ssid;
 	unsigned int num_networks;
 	xenstat_network *networks;	/* Array of length num_networks */
+	unsigned int num_vbds;
+	xenstat_vbd *vbds;
 };
 
 struct xenstat_vcpu {
@@ -82,6 +90,15 @@ struct xenstat_network {
 	unsigned long long terrs;
 	unsigned long long tdrop;
 };
+
+struct xenstat_vbd {
+       unsigned int dev;
+       unsigned long long oo_reqs;
+       unsigned long long rd_reqs;
+       unsigned long long wr_reqs;
+};
+#define SYSFS_VBD_PATH "/sys/devices/xen-backend/"
+
 
 /*
  * Data-collection types
@@ -108,12 +125,15 @@ typedef struct xenstat_collector {
 static int  xenstat_collect_vcpus(xenstat_node * node);
 static int  xenstat_collect_networks(xenstat_node * node);
 static int  xenstat_collect_xen_version(xenstat_node * node);
+static int  xenstat_collect_vbds(xenstat_node * node);
 static void xenstat_free_vcpus(xenstat_node * node);
 static void xenstat_free_networks(xenstat_node * node);
 static void xenstat_free_xen_version(xenstat_node * node);
+static void xenstat_free_vbds(xenstat_node * node);
 static void xenstat_uninit_vcpus(xenstat_handle * handle);
 static void xenstat_uninit_networks(xenstat_handle * handle);
 static void xenstat_uninit_xen_version(xenstat_handle * handle);
+static void xenstat_uninit_vbds(xenstat_handle * handle);
 static char *xenstat_get_domain_name(xenstat_handle * handle, unsigned int domain_id);
 
 static xenstat_collector collectors[] = {
@@ -122,7 +142,9 @@ static xenstat_collector collectors[] = {
 	{ XENSTAT_NETWORK, xenstat_collect_networks,
 	  xenstat_free_networks, xenstat_uninit_networks },
 	{ XENSTAT_XEN_VERSION, xenstat_collect_xen_version,
-	  xenstat_free_xen_version, xenstat_uninit_xen_version }
+	  xenstat_free_xen_version, xenstat_uninit_xen_version },
+	{ XENSTAT_VBD, xenstat_collect_vbds,
+	  xenstat_free_vbds, xenstat_uninit_vbds }
 };
 
 #define NUM_COLLECTORS (sizeof(collectors)/sizeof(xenstat_collector))
@@ -259,6 +281,8 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 			domain->ssid = domaininfo[i].ssidref;
 			domain->num_networks = 0;
 			domain->networks = NULL;
+			domain->num_vbds = 0;
+			domain->vbds = NULL;
 
 			domain++;
 		}
@@ -448,6 +472,21 @@ xenstat_network *xenstat_domain_network(xenstat_domain * domain,
 {
 	if (domain->networks && 0 <= network && network < domain->num_networks)
 		return &(domain->networks[network]);
+	return NULL;
+}
+
+/* Get the number of VBDs for a given domain */
+unsigned int xenstat_domain_num_vbds(xenstat_domain * domain)
+{
+	return domain->num_vbds;
+}
+
+/* Get the VBD handle to obtain VBD stats */
+xenstat_vbd *xenstat_domain_vbd(xenstat_domain * domain,
+				unsigned int vbd)
+{
+	if (domain->vbds && 0 <= vbd && vbd < domain->num_vbds)
+		return &(domain->vbds[vbd]);
 	return NULL;
 }
 
@@ -708,6 +747,139 @@ static void xenstat_free_xen_version(xenstat_node * node)
 /* Free Xen version information in handle - nothing to do */
 static void xenstat_uninit_xen_version(xenstat_handle * handle)
 {
+}
+
+/*
+ * VBD functions
+ */
+
+static int read_attributes_vbd(const char *vbd_directory, const char *what, char *ret, int cap)
+{
+	static char file_name[80];
+	int fd, num_read;
+
+	sprintf(file_name, "%s/%s/%s", SYSFS_VBD_PATH, vbd_directory, what);
+	fd = open(file_name, O_RDONLY, 0);
+	if (fd==-1) return -1;
+	num_read = read(fd, ret, cap - 1);
+	close(fd);
+	if (num_read<=0) return -1;
+	ret[num_read] = '\0';
+	return num_read;
+}
+
+/* Collect information about VBDs */
+static int xenstat_collect_vbds(xenstat_node * node)
+{
+	struct dirent *dp;
+
+	if (node->handle->sysfsvbd == NULL) {
+		node->handle->sysfsvbd = opendir(SYSFS_VBD_PATH);
+		if (node->handle->sysfsvbd == NULL) {
+			perror("Error opening " SYSFS_VBD_PATH);
+			return 0;
+		}
+	}
+
+	rewinddir(node->handle->sysfsvbd);
+
+	for(dp = readdir(node->handle->sysfsvbd); dp != NULL ;
+	    dp = readdir(node->handle->sysfsvbd)) {
+		xenstat_domain *domain;
+		xenstat_vbd vbd;
+		unsigned int domid;
+		int ret;
+		char buf[256];
+
+
+		ret = sscanf(dp->d_name, "vbd-%u-%u", &domid, &vbd.dev);
+		if (ret != 2) {
+			continue;
+		}
+		printf("%s is VBD.\n",dp->d_name);
+
+		domain = xenstat_node_domain(node, domid);
+		if (domain == NULL) {
+			fprintf(stderr,
+				"Found interface vbd-%u-%u but domain %u"
+				" does not exist.\n",
+				domid, vbd.dev, domid);
+			continue;
+		}
+
+		if((read_attributes_vbd(dp->d_name, "statistics/oo_req", buf, 256)<=0)
+		   || ((ret = sscanf(buf, "%llu", &vbd.oo_reqs)) != 1))
+		{
+			continue;
+		}
+
+		if((read_attributes_vbd(dp->d_name, "statistics/rd_req", buf, 256)<=0)
+		   || ((ret = sscanf(buf, "%llu", &vbd.rd_reqs)) != 1))
+		{
+			continue;
+		}
+
+		if((read_attributes_vbd(dp->d_name, "statistics/wr_req", buf, 256)<=0)
+		   || ((ret = sscanf(buf, "%llu", &vbd.wr_reqs)) != 1))
+		{
+			continue;
+		}
+
+
+		if (domain->vbds == NULL) {
+			domain->num_vbds = 1;
+			domain->vbds = malloc(sizeof(xenstat_vbd));
+		} else {
+			domain->num_vbds++;
+			domain->vbds = realloc(domain->vbds,
+					       domain->num_vbds *
+					       sizeof(xenstat_vbd));
+		}
+		if (domain->vbds == NULL)
+			return 0;
+		domain->vbds[domain->num_vbds - 1] = vbd;
+	}
+
+	return 1;	
+}
+
+/* Free VBD information */
+static void xenstat_free_vbds(xenstat_node * node)
+{
+	unsigned int i;
+	for (i = 0; i < node->num_domains; i++)
+		free(node->domains[i].vbds);
+}
+
+/* Free VBD information in handle */
+static void xenstat_uninit_vbds(xenstat_handle * handle)
+{
+	if (handle->sysfsvbd)
+		closedir(handle->sysfsvbd);
+}
+
+/* Get the major number of VBD device */
+unsigned int xenstat_vbd_dev(xenstat_vbd * vbd)
+{
+	return vbd->dev;
+}
+
+/* Get the number of OO(Out of) requests */
+unsigned long long xenstat_vbd_oo_reqs(xenstat_vbd * vbd)
+{
+	return vbd->oo_reqs;
+}
+
+/* Get the number of READ requests */
+unsigned long long xenstat_vbd_rd_reqs(xenstat_vbd * vbd)
+{
+	return vbd->rd_reqs;
+}
+
+/* Get the number of WRITE requests */
+unsigned long long xenstat_vbd_wr_reqs(xenstat_vbd * vbd)
+{
+	return vbd->wr_reqs;
 }
 
 static char *xenstat_get_domain_name(xenstat_handle *handle, unsigned int domain_id)

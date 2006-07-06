@@ -426,10 +426,32 @@ DO_ERROR_NOCODE(16, "fpu error", coprocessor_error)
 DO_ERROR(17, "alignment check", alignment_check)
 DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
 
+int cpuid_hypervisor_leaves(
+    uint32_t idx, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
+{
+    if ( (idx < 0x40000000) || (idx > 0x40000000) )
+        return 0;
+
+    switch ( idx - 0x40000000 )
+    {
+    case 0:
+        *eax = 0x40000000;
+        *ebx = 0x006e6558; /* "Xen\0" */
+        *ecx = *edx = 0;
+        break;
+
+    default:
+        BUG();
+    }
+
+    return 1;
+}
+
 static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
 {
     char signature[5], instr[2];
-    unsigned long a, b, c, d, eip;
+    uint32_t a, b, c, d;
+    unsigned long eip;
 
     a = regs->eax;
     b = regs->ebx;
@@ -465,6 +487,10 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
             clear_bit(X86_FEATURE_SEP, &d);
         if ( !IS_PRIV(current->domain) )
             clear_bit(X86_FEATURE_MTRR, &d);
+    }
+    else
+    {
+        (void)cpuid_hypervisor_leaves(regs->eax, &a, &b, &c, &d);
     }
 
     regs->eax = a;
@@ -1397,13 +1423,14 @@ static void nmi_softirq(void)
 static void nmi_dom0_report(unsigned int reason_idx)
 {
     struct domain *d;
+    struct vcpu   *v;
 
-    if ( (d = dom0) == NULL )
+    if ( ((d = dom0) == NULL) || ((v = d->vcpu[0]) == NULL) )
         return;
 
     set_bit(reason_idx, &d->shared_info->arch.nmi_reason);
 
-    if ( test_and_set_bit(_VCPUF_nmi_pending, &d->vcpu[0]->vcpu_flags) )
+    if ( test_and_set_bit(_VCPUF_nmi_pending, &v->vcpu_flags) )
         raise_softirq(NMI_SOFTIRQ); /* not safe to wake up a vcpu here */
 }
 

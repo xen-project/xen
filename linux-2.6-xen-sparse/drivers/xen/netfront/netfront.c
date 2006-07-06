@@ -463,7 +463,7 @@ static int network_open(struct net_device *dev)
 
 static inline int netfront_tx_slot_available(struct netfront_info *np)
 {
-	return RING_FREE_REQUESTS(&np->tx) >= MAX_SKB_FRAGS + 1;
+	return RING_FREE_REQUESTS(&np->tx) >= MAX_SKB_FRAGS + 2;
 }
 
 static inline void network_maybe_wake_tx(struct net_device *dev)
@@ -491,7 +491,13 @@ static void network_tx_buf_gc(struct net_device *dev)
 		rmb(); /* Ensure we see responses up to 'rp'. */
 
 		for (cons = np->tx.rsp_cons; cons != prod; cons++) {
-			id  = RING_GET_RESPONSE(&np->tx, cons)->id;
+			struct netif_tx_response *txrsp;
+
+			txrsp = RING_GET_RESPONSE(&np->tx, cons);
+			if (txrsp->status == NETIF_RSP_NULL)
+				continue;
+
+			id  = txrsp->id;
 			skb = np->tx_skbs[id];
 			if (unlikely(gnttab_query_foreign_access(
 				np->grant_tx_ref[id]) != 0)) {
@@ -719,6 +725,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	unsigned short id;
 	struct netfront_info *np = netdev_priv(dev);
 	struct netif_tx_request *tx;
+	struct netif_extra_info *extra;
 	char *data = skb->data;
 	RING_IDX i;
 	grant_ref_t ref;
@@ -739,7 +746,8 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	spin_lock_irq(&np->tx_lock);
 
 	if (unlikely(!netif_carrier_ok(dev) ||
-		     (frags > 1 && !xennet_can_sg(dev)))) {
+		     (frags > 1 && !xennet_can_sg(dev)) ||
+		     netif_needs_gso(dev, skb))) {
 		spin_unlock_irq(&np->tx_lock);
 		goto drop;
 	}
@@ -762,10 +770,29 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	tx->size = len;
 
 	tx->flags = 0;
+	extra = NULL;
+
 	if (skb->ip_summed == CHECKSUM_HW) /* local packet? */
 		tx->flags |= NETTXF_csum_blank | NETTXF_data_validated;
 	if (skb->proto_data_valid) /* remote but checksummed? */
 		tx->flags |= NETTXF_data_validated;
+
+	if (skb_shinfo(skb)->gso_size) {
+		struct netif_extra_info *gso = (struct netif_extra_info *)
+			RING_GET_REQUEST(&np->tx, ++i);
+
+		if (extra)
+			extra->flags |= XEN_NETIF_EXTRA_FLAG_MORE;
+		else
+			tx->flags |= NETTXF_extra_info;
+
+		gso->u.gso.size = skb_shinfo(skb)->gso_size;
+		gso->u.gso.type = XEN_NETIF_GSO_TYPE_TCPV4;
+
+		gso->type = XEN_NETIF_EXTRA_TYPE_GSO;
+		gso->flags = 0;
+		extra = gso;
+	}
 
 	np->tx.req_prod_pvt = i + 1;
 
@@ -1065,9 +1092,33 @@ static int xennet_set_sg(struct net_device *dev, u32 data)
 	return ethtool_op_set_sg(dev, data);
 }
 
+static int xennet_set_tso(struct net_device *dev, u32 data)
+{
+	if (data) {
+		struct netfront_info *np = netdev_priv(dev);
+		int val;
+
+		if (xenbus_scanf(XBT_NIL, np->xbdev->otherend,
+				 "feature-gso-tcpv4", "%d", &val) < 0)
+			val = 0;
+#if 0 /* KAF: After the protocol is finalised. */
+		if (!val)
+#endif
+			return -ENOSYS;
+	}
+
+	return ethtool_op_set_tso(dev, data);
+}
+
 static void xennet_set_features(struct net_device *dev)
 {
-	xennet_set_sg(dev, 1);
+	/* Turn off all GSO bits except ROBUST. */
+	dev->features &= (1 << NETIF_F_GSO_SHIFT) - 1;
+	dev->features |= NETIF_F_GSO_ROBUST;
+	xennet_set_sg(dev, 0);
+
+	if (!xennet_set_sg(dev, 1))
+		xennet_set_tso(dev, 1);
 }
 
 static void network_connect(struct net_device *dev)
@@ -1148,6 +1199,8 @@ static struct ethtool_ops network_ethtool_ops =
 	.set_tx_csum = ethtool_op_set_tx_csum,
 	.get_sg = ethtool_op_get_sg,
 	.set_sg = xennet_set_sg,
+	.get_tso = ethtool_op_get_tso,
+	.set_tso = xennet_set_tso,
 };
 
 #ifdef CONFIG_SYSFS

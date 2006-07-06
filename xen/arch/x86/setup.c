@@ -439,8 +439,9 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     scheduler_init();
 
-    idle_domain = domain_create(IDLE_DOMAIN_ID, 0);
-    BUG_ON(idle_domain == NULL);
+    idle_domain = domain_create(IDLE_DOMAIN_ID);
+    if ( (idle_domain == NULL) || (alloc_vcpu(idle_domain, 0, 0) == NULL) )
+        BUG();
 
     set_current(idle_domain->vcpu[0]);
     this_cpu(curr_vcpu) = idle_domain->vcpu[0];
@@ -537,8 +538,8 @@ void __init __start_xen(multiboot_info_t *mbi)
     acm_init(&initrdidx, mbi, initial_images_start);
 
     /* Create initial domain 0. */
-    dom0 = domain_create(0, 0);
-    if ( dom0 == NULL )
+    dom0 = domain_create(0);
+    if ( (dom0 == NULL) || (alloc_vcpu(dom0, 0, 0) == NULL) )
         panic("Error creating domain 0\n");
 
     set_bit(_DOMF_privileged, &dom0->domain_flags);
@@ -624,7 +625,7 @@ void arch_get_xen_caps(xen_capabilities_info_t info)
     if ( hvm_enabled )
     {
         p += sprintf(p, "hvm-%d.%d-x86_32 ", XEN_VERSION, XEN_SUBVERSION);
-        //p += sprintf(p, "hvm-%d.%d-x86_32p ", XEN_VERSION, XEN_SUBVERSION);
+        p += sprintf(p, "hvm-%d.%d-x86_32p ", XEN_VERSION, XEN_SUBVERSION);
     }
 
 #elif defined(CONFIG_X86_64)

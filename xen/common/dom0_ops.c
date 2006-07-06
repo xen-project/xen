@@ -90,6 +90,44 @@ static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
     memcpy(info->handle, d->handle, sizeof(xen_domain_handle_t));
 }
 
+static unsigned int default_vcpu0_location(void)
+{
+    struct domain *d;
+    struct vcpu   *v;
+    unsigned int   i, cpu, cnt[NR_CPUS] = { 0 };
+    cpumask_t      cpu_exclude_map;
+
+    /* Do an initial CPU placement. Pick the least-populated CPU. */
+    read_lock(&domlist_lock);
+    for_each_domain ( d )
+        for_each_vcpu ( d, v )
+        if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
+            cnt[v->processor]++;
+    read_unlock(&domlist_lock);
+
+    /*
+     * If we're on a HT system, we only auto-allocate to a non-primary HT. We 
+     * favour high numbered CPUs in the event of a tie.
+     */
+    cpu = first_cpu(cpu_sibling_map[0]);
+    if ( cpus_weight(cpu_sibling_map[0]) > 1 )
+        cpu = next_cpu(cpu, cpu_sibling_map[0]);
+    cpu_exclude_map = cpu_sibling_map[0];
+    for_each_online_cpu ( i )
+    {
+        if ( cpu_isset(i, cpu_exclude_map) )
+            continue;
+        if ( (i == first_cpu(cpu_sibling_map[i])) &&
+             (cpus_weight(cpu_sibling_map[i]) > 1) )
+            continue;
+        cpus_or(cpu_exclude_map, cpu_exclude_map, cpu_sibling_map[i]);
+        if ( cnt[i] <= cnt[cpu] )
+            cpu = i;
+    }
+
+    return cpu;
+}
+
 long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
 {
     long ret = 0;
@@ -150,7 +188,7 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         if ( d != NULL )
         {
             ret = -EINVAL;
-            if ( (d != current->domain) && 
+            if ( (d != current->domain) && (d->vcpu[0] != NULL) &&
                  test_bit(_VCPUF_initialised, &d->vcpu[0]->vcpu_flags) )
             {
                 domain_unpause_by_systemcontroller(d);
@@ -164,11 +202,7 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
     case DOM0_CREATEDOMAIN:
     {
         struct domain *d;
-        unsigned int   pro;
         domid_t        dom;
-        struct vcpu   *v;
-        unsigned int   i, cnt[NR_CPUS] = { 0 };
-        cpumask_t      cpu_exclude_map;
         static domid_t rover = 0;
 
         /*
@@ -202,36 +236,8 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
             rover = dom;
         }
 
-        /* Do an initial CPU placement. Pick the least-populated CPU. */
-        read_lock(&domlist_lock);
-        for_each_domain ( d )
-            for_each_vcpu ( d, v )
-                if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
-                    cnt[v->processor]++;
-        read_unlock(&domlist_lock);
-        
-        /*
-         * If we're on a HT system, we only auto-allocate to a non-primary HT.
-         * We favour high numbered CPUs in the event of a tie.
-         */
-        pro = first_cpu(cpu_sibling_map[0]);
-        if ( cpus_weight(cpu_sibling_map[0]) > 1 )
-            pro = next_cpu(pro, cpu_sibling_map[0]);
-        cpu_exclude_map = cpu_sibling_map[0];
-        for_each_online_cpu ( i )
-        {
-            if ( cpu_isset(i, cpu_exclude_map) )
-                continue;
-            if ( (i == first_cpu(cpu_sibling_map[i])) &&
-                 (cpus_weight(cpu_sibling_map[i]) > 1) )
-                continue;
-            cpus_or(cpu_exclude_map, cpu_exclude_map, cpu_sibling_map[i]);
-            if ( cnt[i] <= cnt[pro] )
-                pro = i;
-        }
-
         ret = -ENOMEM;
-        if ( (d = domain_create(dom, pro)) == NULL )
+        if ( (d = domain_create(dom)) == NULL )
             break;
 
         memcpy(d->handle, op->u.createdomain.handle,
@@ -258,14 +264,8 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         if ( (d = find_domain_by_id(op->u.max_vcpus.domain)) == NULL )
             break;
 
-        /*
-         * Can only create new VCPUs while the domain is not fully constructed
-         * (and hence not runnable). Xen needs auditing for races before
-         * removing this check.
-         */
-        ret = -EINVAL;
-        if ( test_bit(_VCPUF_initialised, &d->vcpu[0]->vcpu_flags) )
-            goto maxvcpu_out;
+        /* Needed, for example, to ensure writable p.t. state is synced. */
+        domain_pause(d);
 
         /* We cannot reduce maximum VCPUs. */
         ret = -EINVAL;
@@ -275,17 +275,21 @@ long do_dom0_op(XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         ret = -ENOMEM;
         for ( i = 0; i < max; i++ )
         {
-            if ( d->vcpu[i] == NULL )
-            {
-                cpu = (d->vcpu[i-1]->processor + 1) % num_online_cpus();
-                if ( alloc_vcpu(d, i, cpu) == NULL )
-                    goto maxvcpu_out;
-            }
+            if ( d->vcpu[i] != NULL )
+                continue;
+
+            cpu = (i == 0) ?
+                default_vcpu0_location() :
+                (d->vcpu[i-1]->processor + 1) % num_online_cpus();
+
+            if ( alloc_vcpu(d, i, cpu) == NULL )
+                goto maxvcpu_out;
         }
 
         ret = 0;
 
     maxvcpu_out:
+        domain_unpause(d);
         put_domain(d);
     }
     break;

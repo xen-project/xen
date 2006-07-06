@@ -27,6 +27,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+#include <linux/kdev_t.h>
 
 #include <xenstat.h>
 
@@ -65,6 +66,7 @@ static int handle_key(int);
 static int compare(unsigned long long, unsigned long long);
 static int compare_domains(xenstat_domain **, xenstat_domain **);
 static unsigned long long tot_net_bytes( xenstat_domain *, int);
+static unsigned long long tot_vbd_reqs( xenstat_domain *, int);
 
 /* Field functions */
 static int compare_state(xenstat_domain *domain1, xenstat_domain *domain2);
@@ -91,6 +93,15 @@ static int compare_ssid(xenstat_domain *domain1, xenstat_domain *domain2);
 static void print_ssid(xenstat_domain *domain);
 static int compare_name(xenstat_domain *domain1, xenstat_domain *domain2);
 static void print_name(xenstat_domain *domain);
+static int compare_vbds(xenstat_domain *domain1, xenstat_domain *domain2);
+static void print_vbds(xenstat_domain *domain);
+static int compare_vbd_oo(xenstat_domain *domain1, xenstat_domain *domain2);
+static void print_vbd_oo(xenstat_domain *domain);
+static int compare_vbd_rd(xenstat_domain *domain1, xenstat_domain *domain2);
+static void print_vbd_rd(xenstat_domain *domain);
+static int compare_vbd_wr(xenstat_domain *domain1, xenstat_domain *domain2);
+static void print_vbd_wr(xenstat_domain *domain);
+
 
 /* Section printing functions */
 static void do_summary(void);
@@ -99,6 +110,7 @@ static void do_bottom_line(void);
 static void do_domain(xenstat_domain *);
 static void do_vcpu(xenstat_domain *);
 static void do_network(xenstat_domain *);
+static void do_vbd(xenstat_domain *);
 static void top(void);
 
 /* Field types */
@@ -116,6 +128,10 @@ typedef enum field_id {
 	FIELD_NETS,
 	FIELD_NET_TX,
 	FIELD_NET_RX,
+	FIELD_VBDS,
+	FIELD_VBD_OO,
+	FIELD_VBD_RD,
+	FIELD_VBD_WR,
 	FIELD_SSID
 } field_id;
 
@@ -140,6 +156,10 @@ field fields[] = {
 	{ FIELD_NETS,    "NETS",       4, compare_nets,    print_nets    },
 	{ FIELD_NET_TX,  "NETTX(k)",   8, compare_net_tx,  print_net_tx  },
 	{ FIELD_NET_RX,  "NETRX(k)",   8, compare_net_rx,  print_net_rx  },
+	{ FIELD_VBDS,    "VBDS",       4, compare_vbds,    print_vbds    },
+	{ FIELD_VBD_OO,  "VBD_OO",     8, compare_vbd_oo,  print_vbd_oo  },
+	{ FIELD_VBD_RD,  "VBD_RD",     8, compare_vbd_rd,  print_vbd_rd  },
+	{ FIELD_VBD_WR,  "VBD_WR",     8, compare_vbd_wr,  print_vbd_wr  },
 	{ FIELD_SSID,    "SSID",       4, compare_ssid,    print_ssid    }
 };
 
@@ -158,6 +178,7 @@ unsigned int loop = 1;
 unsigned int iterations = 0;
 int show_vcpus = 0;
 int show_networks = 0;
+int show_vbds = 0;
 int repeat_header = 0;
 #define PROMPT_VAL_LEN 80
 char *prompt = NULL;
@@ -180,6 +201,7 @@ static void usage(const char *program)
 	       "-V, --version        output version information and exit\n"
 	       "-d, --delay=SECONDS  seconds between updates (default 3)\n"
 	       "-n, --networks       output vif network data\n"
+	       "-b, --vbds           output vbd block device data\n"
 	       "-r, --repeat-header  repeat table header before each domain\n"
 	       "-v, --vcpus          output vcpu data\n"
 	       "-b, --batch	     output in batch mode, no user input accepted\n"
@@ -289,6 +311,9 @@ static int handle_key(int ch)
 		switch(ch) {
 		case 'n': case 'N':
 			show_networks ^= 1;
+			break;
+		case 'b': case 'B':
+			show_vbds ^= 1;
 			break;
 		case 'r': case 'R':
 			repeat_header ^= 1;
@@ -585,6 +610,96 @@ static unsigned long long tot_net_bytes(xenstat_domain *domain, int rx_flag)
 	return total;
 }
 
+/* Compares number of virtual block devices of two domains,
+   returning -1,0,1 for * <,=,> */
+static int compare_vbds(xenstat_domain *domain1, xenstat_domain *domain2)
+{
+	return -compare(xenstat_domain_num_vbds(domain1),
+	                xenstat_domain_num_vbds(domain2));
+}
+
+/* Prints number of virtual block devices statistic */
+static void print_vbds(xenstat_domain *domain)
+{
+	print("%4u", xenstat_domain_num_vbds(domain));
+}
+
+/* Compares number of total VBD OO requests of two domains,
+   returning -1,0,1 * for <,=,> */
+static int compare_vbd_oo(xenstat_domain *domain1, xenstat_domain *domain2)
+{
+  return -compare(tot_vbd_reqs(domain1, FIELD_VBD_OO),
+		  tot_vbd_reqs(domain2, FIELD_VBD_OO));
+}
+
+/* Prints number of total VBD OO requests statistic */
+static void print_vbd_oo(xenstat_domain *domain)
+{
+	print("%8llu", tot_vbd_reqs(domain, FIELD_VBD_OO));
+}
+
+/* Compares number of total VBD READ requests of two domains,
+   returning -1,0,1 * for <,=,> */
+static int compare_vbd_rd(xenstat_domain *domain1, xenstat_domain *domain2)
+{
+	return -compare(tot_vbd_reqs(domain1, FIELD_VBD_RD),
+			tot_vbd_reqs(domain2, FIELD_VBD_RD));
+}
+
+/* Prints number of total VBD READ requests statistic */
+static void print_vbd_rd(xenstat_domain *domain)
+{
+	print("%8llu", tot_vbd_reqs(domain, FIELD_VBD_RD));
+}
+
+/* Compares number of total VBD WRITE requests of two domains,
+   returning -1,0,1 * for <,=,> */
+static int compare_vbd_wr(xenstat_domain *domain1, xenstat_domain *domain2)
+{
+	return -compare(tot_vbd_reqs(domain1,FIELD_VBD_WR),
+			tot_vbd_reqs(domain2,FIELD_VBD_WR));
+}
+
+/* Prints number of total VBD WRITE requests statistic */
+static void print_vbd_wr(xenstat_domain *domain)
+{
+	print("%8llu", tot_vbd_reqs(domain,FIELD_VBD_WR));
+}
+
+/* Gets number of total VBD requests statistic, 
+ *   if flag is FIELD_VBD_OO, then OO requests,
+ *   if flag is FIELD_VBD_RD, then READ requests and
+ *   if flag is FIELD_VBD_WR, then WRITE requests.
+ */
+static unsigned long long tot_vbd_reqs(xenstat_domain *domain, int flag)
+{
+	int i = 0;
+	xenstat_vbd *vbd;
+	unsigned num_vbds = 0;
+	unsigned long long total = 0;
+	
+	num_vbds = xenstat_domain_num_vbds(domain);
+	
+	for ( i=0 ; i < num_vbds ; i++) {
+		vbd = xenstat_domain_vbd(domain,i);
+		switch(flag) {
+		case FIELD_VBD_OO:
+			total += xenstat_vbd_oo_reqs(vbd);
+			break;
+		case FIELD_VBD_RD:
+			total += xenstat_vbd_rd_reqs(vbd);
+			break;
+		case FIELD_VBD_WR:
+			total += xenstat_vbd_wr_reqs(vbd);
+			break;
+		default:
+			break;
+		}
+	}
+	
+	return total;
+}
+
 /* Compares security id (ssid) of two domains, returning -1,0,1 for <,=,> */
 static int compare_ssid(xenstat_domain *domain1, xenstat_domain *domain2)
 {
@@ -680,6 +795,13 @@ void do_bottom_line(void)
 		addch(A_REVERSE | 'N');
 		attr_addstr(show_networks ? COLOR_PAIR(1) : 0, "etworks");
 		addstr("  ");
+		
+		/* VBDs */
+		attr_addstr(show_vbds ? COLOR_PAIR(1) : 0, "v");
+		addch(A_REVERSE | 'B');
+		attr_addstr(show_vbds ? COLOR_PAIR(1) : 0, "ds");
+		addstr("  ");
+
 
 		/* vcpus */
 		addch(A_REVERSE | 'V');
@@ -769,6 +891,28 @@ void do_network(xenstat_domain *domain)
 	}
 }
 
+
+/* Output all VBD information */
+void do_vbd(xenstat_domain *domain)
+{
+	int i = 0;
+	xenstat_vbd *vbd;
+	unsigned num_vbds = 0;
+
+	num_vbds = xenstat_domain_num_vbds(domain);
+
+	for (i=0 ; i< num_vbds; i++) {
+		vbd = xenstat_domain_vbd(domain,i);
+				
+		print("VBD %4u [%2x:%2x]  OO: %8llu   RD: %8llu   WR: %8llu\n",
+		      xenstat_vbd_dev(vbd),
+		      MAJOR(xenstat_vbd_dev(vbd)), MINOR(xenstat_vbd_dev(vbd)),
+		      xenstat_vbd_oo_reqs(vbd),
+		      xenstat_vbd_rd_reqs(vbd),
+		      xenstat_vbd_wr_reqs(vbd));
+	}
+}
+
 static void top(void)
 {
 	xenstat_domain **domains;
@@ -812,6 +956,8 @@ static void top(void)
 			do_vcpu(domains[i]);
 		if (show_networks)
 			do_network(domains[i]);
+		if (show_vbds)
+			do_vbd(domains[i]);
 	}
 
 	if(!batch)
@@ -827,6 +973,7 @@ int main(int argc, char **argv)
 		{ "help",          no_argument,       NULL, 'h' },
 		{ "version",       no_argument,       NULL, 'V' },
 		{ "networks",      no_argument,       NULL, 'n' },
+ 		{ "vbds",          no_argument,       NULL, 'x' },
 		{ "repeat-header", no_argument,       NULL, 'r' },
 		{ "vcpus",         no_argument,       NULL, 'v' },
 		{ "delay",         required_argument, NULL, 'd' },
@@ -834,7 +981,7 @@ int main(int argc, char **argv)
 		{ "iterations",	   required_argument, NULL, 'i' },
 		{ 0, 0, 0, 0 },
 	};
-	const char *sopts = "hVbnvd:bi:";
+	const char *sopts = "hVnxrvd:bi:";
 
 	if (atexit(cleanup) != 0)
 		fail("Failed to install cleanup handler.\n");
@@ -851,6 +998,9 @@ int main(int argc, char **argv)
 			exit(0);
 		case 'n':
 			show_networks = 1;
+			break;
+		case 'x':
+			show_vbds = 1;
 			break;
 		case 'r':
 			repeat_header = 1;

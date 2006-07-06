@@ -267,7 +267,8 @@ void xencons_force_flush(void)
 /******************** User-space console driver (/dev/console) ************/
 
 #define DRV(_d)         (_d)
-#define TTY_INDEX(_tty) ((_tty)->index)
+#define DUMMY_TTY(_tty) ((xc_mode != XC_SERIAL) &&		\
+			 ((_tty)->index != (xc_num - 1)))
 
 static struct termios *xencons_termios[MAX_NR_CONSOLES];
 static struct termios *xencons_termios_locked[MAX_NR_CONSOLES];
@@ -391,7 +392,7 @@ static void xencons_send_xchar(struct tty_struct *tty, char ch)
 {
 	unsigned long flags;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
 	spin_lock_irqsave(&xencons_lock, flags);
@@ -402,7 +403,7 @@ static void xencons_send_xchar(struct tty_struct *tty, char ch)
 
 static void xencons_throttle(struct tty_struct *tty)
 {
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
 	if (I_IXOFF(tty))
@@ -411,7 +412,7 @@ static void xencons_throttle(struct tty_struct *tty)
 
 static void xencons_unthrottle(struct tty_struct *tty)
 {
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
 	if (I_IXOFF(tty)) {
@@ -426,7 +427,7 @@ static void xencons_flush_buffer(struct tty_struct *tty)
 {
 	unsigned long flags;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
 	spin_lock_irqsave(&xencons_lock, flags);
@@ -451,7 +452,7 @@ static int xencons_write(
 	int i;
 	unsigned long flags;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return count;
 
 	spin_lock_irqsave(&xencons_lock, flags);
@@ -472,7 +473,7 @@ static void xencons_put_char(struct tty_struct *tty, u_char ch)
 {
 	unsigned long flags;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
 	spin_lock_irqsave(&xencons_lock, flags);
@@ -484,7 +485,7 @@ static void xencons_flush_chars(struct tty_struct *tty)
 {
 	unsigned long flags;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
 	spin_lock_irqsave(&xencons_lock, flags);
@@ -496,7 +497,7 @@ static void xencons_wait_until_sent(struct tty_struct *tty, int timeout)
 {
 	unsigned long orig_jiffies = jiffies;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
 	while (DRV(tty->driver)->chars_in_buffer(tty)) {
@@ -515,7 +516,7 @@ static int xencons_open(struct tty_struct *tty, struct file *filp)
 {
 	unsigned long flags;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return 0;
 
 	spin_lock_irqsave(&xencons_lock, flags);
@@ -532,7 +533,7 @@ static void xencons_close(struct tty_struct *tty, struct file *filp)
 {
 	unsigned long flags;
 
-	if (TTY_INDEX(tty) != 0)
+	if (DUMMY_TTY(tty))
 		return;
 
 	if (tty->count == 1) {
@@ -588,8 +589,7 @@ static int __init xencons_init(void)
 	DRV(xencons_driver)->init_termios    = tty_std_termios;
 	DRV(xencons_driver)->flags           =
 		TTY_DRIVER_REAL_RAW |
-		TTY_DRIVER_RESET_TERMIOS |
-		TTY_DRIVER_NO_DEVFS;
+		TTY_DRIVER_RESET_TERMIOS;
 	DRV(xencons_driver)->termios         = xencons_termios;
 	DRV(xencons_driver)->termios_locked  = xencons_termios_locked;
 
@@ -599,8 +599,8 @@ static int __init xencons_init(void)
 		DRV(xencons_driver)->name_base   = 0 + xc_num;
 	} else {
 		DRV(xencons_driver)->name        = "tty";
-		DRV(xencons_driver)->minor_start = xc_num;
-		DRV(xencons_driver)->name_base   = xc_num;
+		DRV(xencons_driver)->minor_start = 1;
+		DRV(xencons_driver)->name_base   = 1;
 	}
 
 	tty_set_operations(xencons_driver, &xencons_ops);
@@ -615,8 +615,6 @@ static int __init xencons_init(void)
 		return rc;
 	}
 
-	tty_register_device(xencons_driver, 0, NULL);
-
 	if (xen_start_info->flags & SIF_INITDOMAIN) {
 		xencons_priv_irq = bind_virq_to_irqhandler(
 			VIRQ_CONSOLE,
@@ -629,8 +627,7 @@ static int __init xencons_init(void)
 	}
 
 	printk("Xen virtual console successfully installed as %s%d\n",
-	       DRV(xencons_driver)->name,
-	       DRV(xencons_driver)->name_base );
+	       DRV(xencons_driver)->name, xc_num);
 
 	return 0;
 }

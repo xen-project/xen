@@ -962,8 +962,8 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
                 !vlapic_global_enabled((VLAPIC(v))) )
         {
             /* Since the apic is disabled, avoid any confusion 
-	       about SMP cpus being available */
-	    clear_bit(X86_FEATURE_APIC, &edx);
+               about SMP cpus being available */
+            clear_bit(X86_FEATURE_APIC, &edx);
         }
 
 #if CONFIG_PAGING_LEVELS < 3
@@ -974,52 +974,51 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
         if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
         {
             if ( !v->domain->arch.hvm_domain.pae_enabled )
-            {
-		clear_bit(X86_FEATURE_PAE, &edx);
-            }
+                clear_bit(X86_FEATURE_PAE, &edx);
             clear_bit(X86_FEATURE_PSE, &edx);
             clear_bit(X86_FEATURE_PSE36, &edx);
         }
-#endif	
+#endif
         /* Clear out reserved bits. */
         ecx &= ~SVM_VCPU_CPUID_L1_ECX_RESERVED;
         edx &= ~SVM_VCPU_CPUID_L1_EDX_RESERVED;
 
         clear_bit(X86_FEATURE_MWAIT & 31, &ecx);
 
-	/* Guest should only see one logical processor.
-	 * See details on page 23 of AMD CPUID Specification. 
-	*/
-	clear_bit(X86_FEATURE_HT, &edx);  /* clear the hyperthread bit */
-	ebx &= 0xFF00FFFF;  /* clear the logical processor count when HTT=0 */
-	ebx |= 0x00010000;  /* set to 1 just for precaution */
+        /* Guest should only see one logical processor.
+         * See details on page 23 of AMD CPUID Specification. 
+         */
+        clear_bit(X86_FEATURE_HT, &edx);  /* clear the hyperthread bit */
+        ebx &= 0xFF00FFFF;  /* clear the logical processor count when HTT=0 */
+        ebx |= 0x00010000;  /* set to 1 just for precaution */
 
-	/* Disable machine check architecture */
-	clear_bit(X86_FEATURE_MCA, &edx);
-	clear_bit(X86_FEATURE_MCE, &edx);
+        /* Disable machine check architecture */
+        clear_bit(X86_FEATURE_MCA, &edx);
+        clear_bit(X86_FEATURE_MCE, &edx);
     }
-    else if ( ( input > 0x00000005 ) && ( input < 0x80000000 ) )
+    else if ( (input > 0x00000005) && (input < 0x80000000) )
     {
-	eax = ebx = ecx = edx = 0x0;
+        if ( !cpuid_hypervisor_leaves(input, &eax, &ebx, &ecx, &edx) )
+            eax = ebx = ecx = edx = 0;
     }
     else if ( input == 0x80000001 )
     {
-	/* We duplicate some CPUID_00000001 code because many bits of 
-	   CPUID_80000001_EDX overlaps with CPUID_00000001_EDX. */
+        /* We duplicate some CPUID_00000001 code because many bits of 
+           CPUID_80000001_EDX overlaps with CPUID_00000001_EDX. */
 
         if ( !hvm_apic_support(v->domain) ||
-	     !vlapic_global_enabled((VLAPIC(v))) )
+             !vlapic_global_enabled((VLAPIC(v))) )
         {
             /* Since the apic is disabled, avoid any confusion 
-	       about SMP cpus being available */
-	    clear_bit(X86_FEATURE_APIC, &edx);
+               about SMP cpus being available */
+            clear_bit(X86_FEATURE_APIC, &edx);
         }
 
-	/* Clear the Cmp_Legacy bit 
-	 * This bit is supposed to be zero when HTT = 0.
-	 * See details on page 23 of AMD CPUID Specification. 
-	*/
-	clear_bit(X86_FEATURE_CMP_LEGACY & 31, &ecx);
+        /* Clear the Cmp_Legacy bit 
+         * This bit is supposed to be zero when HTT = 0.
+         * See details on page 23 of AMD CPUID Specification. 
+         */
+        clear_bit(X86_FEATURE_CMP_LEGACY & 31, &ecx);
 
 #ifdef __i386__
         /* Mask feature for Intel ia32e or AMD long mode. */
@@ -1030,7 +1029,7 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
 #endif
 
 #if CONFIG_PAGING_LEVELS < 3
-	clear_bit(X86_FEATURE_NX & 31, &edx);
+        clear_bit(X86_FEATURE_NX & 31, &edx);
         clear_bit(X86_FEATURE_PAE, &edx);
         clear_bit(X86_FEATURE_PSE, &edx);
         clear_bit(X86_FEATURE_PSE36, &edx);
@@ -1039,29 +1038,29 @@ static void svm_vmexit_do_cpuid(struct vmcb_struct *vmcb, unsigned long input,
         {
             if ( !v->domain->arch.hvm_domain.pae_enabled )
             {
-		clear_bit(X86_FEATURE_NX & 31, &edx);
-		clear_bit(X86_FEATURE_PAE, &edx);
+                clear_bit(X86_FEATURE_NX & 31, &edx);
+                clear_bit(X86_FEATURE_PAE, &edx);
             }
             clear_bit(X86_FEATURE_PSE, &edx);
             clear_bit(X86_FEATURE_PSE36, &edx);
         }
-#endif	
+#endif
 
         /* Make SVM feature invisible to the guest. */
         clear_bit(X86_FEATURE_SVME & 31, &ecx);
-	
-	/* So far, we do not support 3DNow for the guest. */
-	clear_bit(X86_FEATURE_3DNOW & 31, &edx);
-	clear_bit(X86_FEATURE_3DNOWEXT & 31, &edx);
+
+        /* So far, we do not support 3DNow for the guest. */
+        clear_bit(X86_FEATURE_3DNOW & 31, &edx);
+        clear_bit(X86_FEATURE_3DNOWEXT & 31, &edx);
     }
     else if ( ( input == 0x80000007 ) || ( input == 0x8000000A  ) )
     {
-	/* Mask out features of power management and SVM extension. */
-	eax = ebx = ecx = edx = 0;
+        /* Mask out features of power management and SVM extension. */
+        eax = ebx = ecx = edx = 0;
     }
     else if ( input == 0x80000008 )
     {
-	ecx &= 0xFFFFFF00; /* Make sure Number of CPU core is 1 when HTT=0 */
+        ecx &= 0xFFFFFF00; /* Make sure Number of CPU core is 1 when HTT=0 */
     }
 
     regs->eax = (unsigned long)eax;
@@ -1214,8 +1213,9 @@ static void svm_dr_access (struct vcpu *v, unsigned int reg, unsigned int type,
 }
 
 
-static void svm_get_prefix_info(struct vmcb_struct *vmcb, 
-		unsigned int dir, segment_selector_t **seg, unsigned int *asize)
+static void svm_get_prefix_info(
+    struct vmcb_struct *vmcb, 
+    unsigned int dir, segment_selector_t **seg, unsigned int *asize)
 {
     unsigned char inst[MAX_INST_LEN];
     int i;
@@ -1287,9 +1287,10 @@ static void svm_get_prefix_info(struct vmcb_struct *vmcb,
 
 
 /* Get the address of INS/OUTS instruction */
-static inline int svm_get_io_address(struct vcpu *v, 
-		struct cpu_user_regs *regs, unsigned int dir, 
-        unsigned long *count, unsigned long *addr)
+static inline int svm_get_io_address(
+    struct vcpu *v, 
+    struct cpu_user_regs *regs, unsigned int dir, 
+    unsigned long *count, unsigned long *addr)
 {
     unsigned long        reg;
     unsigned int         asize = 0;
@@ -2697,9 +2698,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
 
     if (exit_reason == -1)
     {
+        svm_dump_vmcb(__func__, vmcb);
         printk("%s: exit_reason == -1 - Did someone clobber the VMCB\n", 
                 __func__);
-        BUG();
         domain_crash_synchronous();
     }
 

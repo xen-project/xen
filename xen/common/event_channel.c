@@ -525,11 +525,16 @@ void send_guest_vcpu_virq(struct vcpu *v, int virq)
 void send_guest_global_virq(struct domain *d, int virq)
 {
     int port;
+    struct vcpu *v;
     struct evtchn *chn;
 
     ASSERT(virq_is_global(virq));
 
-    port = d->vcpu[0]->virq_to_evtchn[virq];
+    v = d->vcpu[0];
+    if ( unlikely(v == NULL) )
+        return;
+
+    port = v->virq_to_evtchn[virq];
     if ( unlikely(port == 0) )
         return;
 

@@ -105,6 +105,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 #ifndef __ASSEMBLY__
 
+typedef unsigned long xen_ulong_t;
+
 /*
  * int HYPERVISOR_set_segment_base(unsigned int which, unsigned long base)
  *  @which == SEGBASE_*  ;  @base == 64-bit base address

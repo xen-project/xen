@@ -35,6 +35,7 @@
 #include <lib.h>
 #include <sched.h>
 #include <xenbus.h>
+#include <gnttab.h>
 #include <xen/features.h>
 #include <xen/version.h>
 
@@ -104,7 +105,8 @@ void test_xenbus(void);
 
 void xenbus_tester(void *p)
 {
-    test_xenbus();
+    printk("Xenbus tests disabled, because of a Xend bug.\n");
+    /* test_xenbus(); */
 }
 
 /* This should be overridden by the application we are linked against. */
@@ -176,7 +178,10 @@ void start_kernel(start_info_t *si)
 
     /* Init the console driver. */
     init_console();
- 
+
+    /* Init grant tables */
+    init_gnttab();
+    
     /* Init scheduler. */
     init_sched();
  

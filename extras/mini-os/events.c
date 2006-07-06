@@ -22,9 +22,18 @@
 #include <events.h>
 #include <lib.h>
 
+#define NR_EVS 1024
+
+/* this represents a event handler. Chaining or sharing is not allowed */
+typedef struct _ev_action_t {
+	void (*handler)(int, struct pt_regs *, void *);
+	void *data;
+    u32 count;
+} ev_action_t;
+
 
 static ev_action_t ev_actions[NR_EVS];
-void default_handler(int port, struct pt_regs *regs);
+void default_handler(int port, struct pt_regs *regs, void *data);
 
 
 /*
@@ -35,42 +44,33 @@ int do_event(u32 port, struct pt_regs *regs)
     ev_action_t  *action;
     if (port >= NR_EVS) {
         printk("Port number too large: %d\n", port);
-        goto out;
+		goto out;
     }
 
     action = &ev_actions[port];
     action->count++;
 
-    if (!action->handler)
-    {
-        printk("Spurious event on port %d\n", port);
-        goto out;
-    }
-    
-    if (action->status & EVS_DISABLED)
-    {
-        printk("Event on port %d disabled\n", port);
-        goto out;
-    }
-    
     /* call the handler */
-    action->handler(port, regs);
-    
+	action->handler(port, regs, action->data);
+
  out:
 	clear_evtchn(port);
+
     return 1;
 
 }
 
-int bind_evtchn( u32 port, void (*handler)(int, struct pt_regs *) )
+int bind_evtchn( u32 port, void (*handler)(int, struct pt_regs *, void *),
+				 void *data )
 {
  	if(ev_actions[port].handler != default_handler)
         printk("WARN: Handler for port %d already registered, replacing\n",
 				port);
 
+	ev_actions[port].data = data;
+	wmb();
 	ev_actions[port].handler = handler;
-	ev_actions[port].status &= ~EVS_DISABLED;	  
- 
+
 	/* Finally unmask the port */
 	unmask_evtchn(port);
 
@@ -82,13 +82,14 @@ void unbind_evtchn( u32 port )
 	if (ev_actions[port].handler == default_handler)
 		printk("WARN: No handler for port %d when unbinding\n", port);
 	ev_actions[port].handler = default_handler;
-	ev_actions[port].status |= EVS_DISABLED;
+	wmb();
+	ev_actions[port].data = NULL;
 }
 
-int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *) )
+int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *, void *data),
+			   void *data)
 {
 	evtchn_op_t op;
-	int ret = 0;
 
 	/* Try to bind the virq to a port */
 	op.cmd = EVTCHNOP_bind_virq;
@@ -97,13 +98,11 @@ int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *) )
 
 	if ( HYPERVISOR_event_channel_op(&op) != 0 )
 	{
-		ret = 1;
 		printk("Failed to bind virtual IRQ %d\n", virq);
-		goto out;
+		return 1;
     }
-    bind_evtchn(op.u.bind_virq.port, handler);	
-out:
-	return ret;
+    bind_evtchn(op.u.bind_virq.port, handler, data);
+	return 0;
 }
 
 void unbind_virq( u32 port )
@@ -137,13 +136,38 @@ void init_events(void)
 #endif
     /* inintialise event handler */
     for ( i = 0; i < NR_EVS; i++ )
-    {
-        ev_actions[i].status  = EVS_DISABLED;
+	{
         ev_actions[i].handler = default_handler;
         mask_evtchn(i);
     }
 }
 
-void default_handler(int port, struct pt_regs *regs) {
+void default_handler(int port, struct pt_regs *regs, void *ignore)
+{
     printk("[Port %d] - event received\n", port);
+}
+
+/* Unfortunate confusion of terminology: the port is unbound as far
+   as Xen is concerned, but we automatically bind a handler to it
+   from inside mini-os. */
+int evtchn_alloc_unbound(void (*handler)(int, struct pt_regs *regs,
+										 void *data),
+						 void *data)
+{
+	u32 port;
+	evtchn_op_t op;
+	int err;
+
+	op.cmd = EVTCHNOP_alloc_unbound;
+	op.u.alloc_unbound.dom = DOMID_SELF;
+	op.u.alloc_unbound.remote_dom = 0;
+
+	err = HYPERVISOR_event_channel_op(&op);
+	if (err) {
+		printk("Failed to alloc unbound evtchn: %d.\n", err);
+		return -1;
+	}
+	port = op.u.alloc_unbound.port;
+	bind_evtchn(port, handler, data);
+	return port;
 }

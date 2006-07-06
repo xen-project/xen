@@ -476,6 +476,6 @@ void pci_piix4_acpi_init(PCIBus *bus)
 
     pci_register_io_region((PCIDevice *)d, 4, 0x10,
                            PCI_ADDRESS_SPACE_IO, acpi_map);
-    pmtimer_state = pmtimer_init();
+    /*pmtimer_state = pmtimer_init();*/
     acpi_reset (d);
 }

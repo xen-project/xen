@@ -8,12 +8,14 @@
  */
 
 #include <linux/config.h>
+#include <linux/err.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <asm/hypervisor.h>
 #include <xen/features.h>
 #include <xen/hypervisor_sysfs.h>
+#include <xen/xenbus.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Mike D. Day <ncmike@us.ibm.com>");
@@ -95,6 +97,37 @@ static int __init xen_sysfs_version_init(void)
 static void xen_sysfs_version_destroy(void)
 {
 	sysfs_remove_group(&hypervisor_subsys.kset.kobj, &version_group);
+}
+
+/* UUID */
+
+static ssize_t uuid_show(struct hyp_sysfs_attr *attr, char *buffer)
+{
+	char *vm, *val;
+	int ret;
+
+	vm = xenbus_read(XBT_NIL, "vm", "", NULL);
+	if (IS_ERR(vm))
+		return PTR_ERR(vm);
+	val = xenbus_read(XBT_NIL, vm, "uuid", NULL);
+	kfree(vm);
+	if (IS_ERR(val))
+		return PTR_ERR(val);
+	ret = sprintf(buffer, "%s\n", val);
+	kfree(val);
+	return ret;
+}
+
+HYPERVISOR_ATTR_RO(uuid);
+
+static int __init xen_sysfs_uuid_init(void)
+{
+	return sysfs_create_file(&hypervisor_subsys.kset.kobj, &uuid_attr.attr);
+}
+
+static void xen_sysfs_uuid_destroy(void)
+{
+	sysfs_remove_file(&hypervisor_subsys.kset.kobj, &uuid_attr.attr);
 }
 
 /* xen compilation attributes */
@@ -314,10 +347,15 @@ static int __init hyper_sysfs_init(void)
 	ret = xen_compilation_init();
 	if (ret)
 		goto comp_out;
+	ret = xen_sysfs_uuid_init();
+	if (ret)
+		goto uuid_out;
 	ret = xen_properties_init();
 	if (!ret)
 		goto out;
 
+	xen_sysfs_uuid_destroy();
+uuid_out:
 	xen_compilation_destroy();
 comp_out:
 	xen_sysfs_version_destroy();
@@ -331,6 +369,7 @@ static void hyper_sysfs_exit(void)
 {
 	xen_properties_destroy();
 	xen_compilation_destroy();
+	xen_sysfs_uuid_destroy();
 	xen_sysfs_version_destroy();
 	xen_sysfs_type_destroy();
 

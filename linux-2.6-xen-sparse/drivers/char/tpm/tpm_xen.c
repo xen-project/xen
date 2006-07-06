@@ -34,6 +34,7 @@
  */
 
 #include <linux/errno.h>
+#include <linux/err.h>
 #include <linux/interrupt.h>
 #include <linux/mutex.h>
 #include <asm/uaccess.h>
@@ -41,12 +42,15 @@
 #include <xen/interface/grant_table.h>
 #include <xen/interface/io/tpmif.h>
 #include <xen/xenbus.h>
+#include "tpm.h"
 #include "tpm_vtpm.h"
 
 #undef DEBUG
 
 /* local structures */
 struct tpm_private {
+	struct tpm_chip *chip;
+
 	tpmif_tx_interface_t *tx;
 	atomic_t refcnt;
 	unsigned int evtchn;
@@ -60,6 +64,7 @@ struct tpm_private {
 
 	atomic_t tx_busy;
 	void *tx_remember;
+
 	domid_t backend_id;
 	wait_queue_head_t wait_q;
 
@@ -95,6 +100,7 @@ static int tpm_xmit(struct tpm_private *tp,
                     const u8 * buf, size_t count, int userbuffer,
                     void *remember);
 static void destroy_tpmring(struct tpm_private *tp);
+void __exit tpmif_exit(void);
 
 #define DPRINTK(fmt, args...) \
     pr_debug("xen_tpm_fr (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
@@ -199,8 +205,7 @@ static DEFINE_MUTEX(suspend_lock);
 /*
  * Send data via this module by calling this function
  */
-int vtpm_vd_send(struct tpm_chip *chip,
-                 struct tpm_private *tp,
+int vtpm_vd_send(struct tpm_private *tp,
                  const u8 * buf, size_t count, void *ptr)
 {
 	int sent;
@@ -331,7 +336,7 @@ out:
 static void backend_changed(struct xenbus_device *dev,
 			    enum xenbus_state backend_state)
 {
-	struct tpm_private *tp = dev->dev.driver_data;
+	struct tpm_private *tp = tpm_private_from_dev(&dev->dev);
 	DPRINTK("\n");
 
 	switch (backend_state) {
@@ -358,6 +363,9 @@ static void backend_changed(struct xenbus_device *dev,
 	}
 }
 
+struct tpm_virtual_device tvd = {
+	.max_tx_size = PAGE_SIZE * TPMIF_TX_RING_SIZE,
+};
 
 static int tpmfront_probe(struct xenbus_device *dev,
                           const struct xenbus_device_id *id)
@@ -368,6 +376,12 @@ static int tpmfront_probe(struct xenbus_device *dev,
 
 	if (!tp)
 		return -ENOMEM;
+
+	tp->chip = init_vtpm(&dev->dev, &tvd, tp);
+
+	if (IS_ERR(tp->chip)) {
+		return PTR_ERR(tp->chip);
+	}
 
 	err = xenbus_scanf(XBT_NIL, dev->nodename,
 	                   "handle", "%i", &handle);
@@ -380,12 +394,10 @@ static int tpmfront_probe(struct xenbus_device *dev,
 	}
 
 	tp->dev = dev;
-	dev->dev.driver_data = tp;
 
 	err = talk_to_backend(dev, tp);
 	if (err) {
 		tpm_private_put();
-		dev->dev.driver_data = NULL;
 		return err;
 	}
 	return 0;
@@ -394,16 +406,16 @@ static int tpmfront_probe(struct xenbus_device *dev,
 
 static int tpmfront_remove(struct xenbus_device *dev)
 {
-	struct tpm_private *tp = (struct tpm_private *)dev->dev.driver_data;
+	struct tpm_private *tp = tpm_private_from_dev(&dev->dev);
 	destroy_tpmring(tp);
+	cleanup_vtpm(&dev->dev);
 	return 0;
 }
 
 static int tpmfront_suspend(struct xenbus_device *dev)
 {
-	struct tpm_private *tp = (struct tpm_private *)dev->dev.driver_data;
+	struct tpm_private *tp = tpm_private_from_dev(&dev->dev);
 	u32 ctr;
-
 	/* lock, so no app can send */
 	mutex_lock(&suspend_lock);
 	tp->is_suspended = 1;
@@ -431,7 +443,7 @@ static int tpmfront_suspend(struct xenbus_device *dev)
 
 static int tpmfront_resume(struct xenbus_device *dev)
 {
-	struct tpm_private *tp = (struct tpm_private *)dev->dev.driver_data;
+	struct tpm_private *tp = tpm_private_from_dev(&dev->dev);
 	destroy_tpmring(tp);
 	return talk_to_backend(dev, tp);
 }
@@ -548,7 +560,7 @@ static void tpmif_rx_action(unsigned long priv)
 		offset += tocopy;
 	}
 
-	vtpm_vd_recv(buffer, received, tp->tx_remember);
+	vtpm_vd_recv(tp->chip, buffer, received, tp->tx_remember);
 	kfree(buffer);
 
 exit:
@@ -638,6 +650,7 @@ static int tpm_xmit(struct tpm_private *tp,
 
 	atomic_set(&tp->tx_busy, 1);
 	tp->tx_remember = remember;
+
 	mb();
 
 	DPRINTK("Notifying backend via event channel %d\n",
@@ -657,9 +670,9 @@ static void tpmif_notify_upperlayer(struct tpm_private *tp)
 	 * to the BE.
 	 */
 	if (tp->is_connected) {
-		vtpm_vd_status(TPM_VD_STATUS_CONNECTED);
+		vtpm_vd_status(tp->chip, TPM_VD_STATUS_CONNECTED);
 	} else {
-		vtpm_vd_status(TPM_VD_STATUS_DISCONNECTED);
+		vtpm_vd_status(tp->chip, TPM_VD_STATUS_DISCONNECTED);
 	}
 }
 
@@ -699,13 +712,10 @@ static void tpmif_set_connected_state(struct tpm_private *tp, u8 is_connected)
  * =================================================================
  */
 
-struct tpm_virtual_device tvd = {
-	.max_tx_size = PAGE_SIZE * TPMIF_TX_RING_SIZE,
-};
 
 static int __init tpmif_init(void)
 {
-	int rc;
+	long rc = 0;
 	struct tpm_private *tp;
 
 	if ((xen_start_info->flags & SIF_INITDOMAIN)) {
@@ -718,11 +728,6 @@ static int __init tpmif_init(void)
 		goto failexit;
 	}
 
-	tvd.tpm_private = tp;
-	rc = init_vtpm(&tvd);
-	if (rc)
-		goto init_vtpm_failed;
-
 	IPRINTK("Initialising the vTPM driver.\n");
 	if ( gnttab_alloc_grant_references ( TPMIF_TX_RING_SIZE,
 	                                     &gref_head ) < 0) {
@@ -734,19 +739,16 @@ static int __init tpmif_init(void)
 	return 0;
 
 gnttab_alloc_failed:
-	cleanup_vtpm();
-init_vtpm_failed:
 	tpm_private_put();
 failexit:
 
-	return rc;
+	return (int)rc;
 }
 
 
-static void __exit tpmif_exit(void)
+void __exit tpmif_exit(void)
 {
 	exit_tpm_xenbus();
-	cleanup_vtpm();
 	tpm_private_put();
 	gnttab_free_grant_references(gref_head);
 }

@@ -343,7 +343,7 @@ void free_pages(void *pointer, int order)
                 break;
             
             /* Merge with successor */
-            freed_ct = (chunk_tail_t *)((char *)to_merge_ch + mask);
+            freed_ct = (chunk_tail_t *)((char *)to_merge_ch + mask) - 1;
         }
         
         /* We are commited to merging, unlink the chunk */
@@ -612,6 +612,107 @@ void mem_test(unsigned long *start_add, unsigned long *end_add)
 
 }
 
+static pgentry_t *demand_map_pgt;
+static void *demand_map_area_start;
+
+static void init_demand_mapping_area(unsigned long max_pfn)
+{
+    unsigned long mfn;
+    pgentry_t *tab;
+    unsigned long start_addr;
+    unsigned long pt_pfn;
+    unsigned offset;
+
+    /* Round up to four megs.  + 1024 rather than + 1023 since we want
+       to be sure we don't end up in the same place we started. */
+    max_pfn = (max_pfn + L1_PAGETABLE_ENTRIES) & ~(L1_PAGETABLE_ENTRIES - 1);
+    if (max_pfn == 0 ||
+            (unsigned long)pfn_to_virt(max_pfn + L1_PAGETABLE_ENTRIES) >=
+            HYPERVISOR_VIRT_START) {
+        printk("Too much memory; no room for demand map hole.\n");
+        do_exit();
+    }
+
+    demand_map_area_start = pfn_to_virt(max_pfn);
+    printk("Demand map pfns start at %lx (%p).\n", max_pfn,
+            demand_map_area_start);
+    start_addr = (unsigned long)demand_map_area_start;
+
+    tab = (pgentry_t *)start_info.pt_base;
+    mfn = virt_to_mfn(start_info.pt_base);
+    pt_pfn = virt_to_pfn(alloc_page());
+
+#if defined(__x86_64__)
+    offset = l4_table_offset(start_addr);
+    if (!(tab[offset] & _PAGE_PRESENT)) {
+        new_pt_frame(&pt_pfn, mfn, offset, L3_FRAME);
+        pt_pfn = virt_to_pfn(alloc_page());
+    }
+    ASSERT(tab[offset] & _PAGE_PRESENT);
+    mfn = pte_to_mfn(tab[offset]);
+    tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
+#endif
+#if defined(__x86_64__) || defined(CONFIG_X86_PAE)
+    offset = l3_table_offset(start_addr);
+    if (!(tab[offset] & _PAGE_PRESENT)) {
+        new_pt_frame(&pt_pfn, mfn, offset, L2_FRAME);
+        pt_pfn = virt_to_pfn(alloc_page());
+    }
+    ASSERT(tab[offset] & _PAGE_PRESENT);
+    mfn = pte_to_mfn(tab[offset]);
+    tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
+#endif
+    offset = l2_table_offset(start_addr);
+    if (tab[offset] & _PAGE_PRESENT) {
+        printk("Demand map area already has a page table covering it?\n");
+        BUG();
+    }
+    demand_map_pgt = pfn_to_virt(pt_pfn);
+    new_pt_frame(&pt_pfn, mfn, offset, L1_FRAME);
+    ASSERT(tab[offset] & _PAGE_PRESENT);
+}
+
+void *map_frames(unsigned long *f, unsigned long n)
+{
+    unsigned long x;
+    unsigned long y = 0;
+    mmu_update_t mmu_updates[16];
+    int rc;
+
+    if (n > 16) {
+        printk("Tried to map too many (%ld) frames at once.\n", n);
+        return NULL;
+    }
+
+    /* Find a run of n contiguous frames */
+    for (x = 0; x <= 1024 - n; x += y + 1) {
+        for (y = 0; y < n; y++)
+            if (demand_map_pgt[y] & _PAGE_PRESENT)
+                break;
+        if (y == n)
+            break;
+    }
+    if (y != n) {
+        printk("Failed to map %ld frames!\n", n);
+        return NULL;
+    }
+
+    /* Found it at x.  Map it in. */
+    for (y = 0; y < n; y++) {
+        mmu_updates[y].ptr = virt_to_mach(&demand_map_pgt[x + y]);
+        mmu_updates[y].val = (f[y] << PAGE_SHIFT) | L1_PROT;
+    }
+
+    rc = HYPERVISOR_mmu_update(mmu_updates, n, NULL, DOMID_SELF);
+    if (rc < 0) {
+        printk("Map %ld failed: %d.\n", n, rc);
+        return NULL;
+    } else {
+        return (void *)(unsigned long)((unsigned long)demand_map_area_start +
+                x * PAGE_SIZE);
+    }
+}
+
 void init_mm(void)
 {
 
@@ -643,4 +744,24 @@ void init_mm(void)
            (u_long)to_virt(PFN_PHYS(max_pfn)), PFN_PHYS(max_pfn));
     init_page_allocator(PFN_PHYS(start_pfn), PFN_PHYS(max_pfn));
     printk("MM: done\n");
+
+    init_demand_mapping_area(max_pfn);
+    printk("Initialised demand area.\n");
+}
+
+void sanity_check(void)
+{
+    int x;
+    chunk_head_t *head;
+
+    for (x = 0; x < FREELIST_SIZE; x++) {
+        for (head = free_head[x]; !FREELIST_EMPTY(head); head = head->next) {
+            ASSERT(!allocated_in_map(virt_to_pfn(head)));
+            if (head->next)
+                ASSERT(head->next->pprev == &head->next);
+        }
+        if (free_head[x]) {
+            ASSERT(free_head[x]->pprev == &free_head[x]);
+        }
+    }
 }

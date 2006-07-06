@@ -2225,7 +2225,7 @@ index d64e2ec..7494823 100644
  	err = ipcomp_compress(x, skb);
  	iph = skb->nh.iph;
 diff --git a/net/ipv4/tcp.c b/net/ipv4/tcp.c
-index 00aa80e..84130c9 100644
+index 00aa80e..30c81a8 100644
 --- a/net/ipv4/tcp.c
 +++ b/net/ipv4/tcp.c
 @@ -257,6 +257,7 @@ #include <linux/smp_lock.h>
@@ -2281,7 +2281,7 @@ index 00aa80e..84130c9 100644
  
  			from += copy;
  			copied += copy;
-@@ -2026,6 +2021,71 @@ int tcp_getsockopt(struct sock *sk, int 
+@@ -2026,6 +2021,77 @@ int tcp_getsockopt(struct sock *sk, int 
  }
  
  
@@ -2306,12 +2306,18 @@ index 00aa80e..84130c9 100644
 +	if (!pskb_may_pull(skb, thlen))
 +		goto out;
 +
-+	segs = NULL;
-+	if (skb_gso_ok(skb, features | NETIF_F_GSO_ROBUST))
-+		goto out;
-+
 +	oldlen = (u16)~skb->len;
 +	__skb_pull(skb, thlen);
++
++	if (skb_gso_ok(skb, features | NETIF_F_GSO_ROBUST)) {
++		/* Packet is from an untrusted source, reset gso_segs. */
++		int mss = skb_shinfo(skb)->gso_size;
++
++		skb_shinfo(skb)->gso_segs = (skb->len + mss - 1) / mss;
++
++		segs = NULL;
++		goto out;
++	}
 +
 +	segs = skb_segment(skb, features);
 +	if (IS_ERR(segs))

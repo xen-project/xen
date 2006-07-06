@@ -59,10 +59,6 @@ ifneq ($(PATCHDIRS),)
 $(patsubst patches/%,patches/%/.makedep,$(PATCHDIRS)): patches/%/.makedep: 
 	@echo 'ref-$*/.valid-ref: $$(wildcard patches/$*/*.patch)' >$@
 
-.PHONY: clean
-clean::
-	rm -f patches/*/.makedep
-
 ref-%/.valid-ref: pristine-%/.valid-pristine
 	set -e
 	rm -rf $(@D)
@@ -111,7 +107,8 @@ linux-2.6-xen.patch: ref-linux-$(LINUX_VER)/.valid-ref
 	rm -rf tmp-$@
 
 %-mrproper:
-	rm -rf pristine-$(*)* ref-$(*)* $*.tar.bz2
+	$(MAKE) -f buildconfigs/mk.$*-xen mrpropper
+	rm -rf pristine-$(*)* ref-$(*)*
 	rm -rf $*-xen.patch
 
 .PHONY: config-update-pae

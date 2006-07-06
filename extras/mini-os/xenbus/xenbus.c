@@ -112,7 +112,7 @@ static void xenbus_thread_func(void *ign)
     }
 }
 
-static void xenbus_evtchn_handler(int port, struct pt_regs *regs)
+static void xenbus_evtchn_handler(int port, struct pt_regs *regs, void *ign)
 {
     wake_up(&xb_waitq);
 }
@@ -174,7 +174,8 @@ void init_xenbus(void)
     create_thread("xenstore", xenbus_thread_func, NULL);
     DEBUG("buf at %p.\n", xenstore_buf);
     err = bind_evtchn(start_info.store_evtchn,
-            xenbus_evtchn_handler);
+		      xenbus_evtchn_handler,
+              NULL);
     DEBUG("xenbus on irq %d\n", err);
 }
 
@@ -187,8 +188,8 @@ struct write_req {
    by xenbus as if sent atomically.  The header is added
    automatically, using type %type, req_id %req_id, and trans_id
    %trans_id. */
-static void xb_write(int type, int req_id, int trans_id,
-        const struct write_req *req, int nr_reqs)
+static void xb_write(int type, int req_id, xenbus_transaction_t trans_id,
+		     const struct write_req *req, int nr_reqs)
 {
     XENSTORE_RING_IDX prod;
     int r;
@@ -266,9 +267,9 @@ static void xb_write(int type, int req_id, int trans_id,
    freed by the caller. */
 static struct xsd_sockmsg *
 xenbus_msg_reply(int type,
-        int trans,
-        struct write_req *io,
-        int nr_reqs)
+		 xenbus_transaction_t trans,
+		 struct write_req *io,
+		 int nr_reqs)
 {
     int id;
     DEFINE_WAIT(w);
@@ -322,14 +323,14 @@ static void xenbus_debug_msg(const char *msg)
 /* List the contents of a directory.  Returns a malloc()ed array of
    pointers to malloc()ed strings.  The array is NULL terminated.  May
    block. */
-char *xenbus_ls(const char *pre, char ***contents)
+char *xenbus_ls(xenbus_transaction_t xbt, const char *pre, char ***contents)
 {
     struct xsd_sockmsg *reply, *repmsg;
     struct write_req req[] = { { pre, strlen(pre)+1 } };
     int nr_elems, x, i;
     char **res;
 
-    repmsg = xenbus_msg_reply(XS_DIRECTORY, 0, req, ARRAY_SIZE(req));
+    repmsg = xenbus_msg_reply(XS_DIRECTORY, xbt, req, ARRAY_SIZE(req));
     char *msg = errmsg(repmsg);
     if (msg) {
 	*contents = NULL;
@@ -351,12 +352,12 @@ char *xenbus_ls(const char *pre, char ***contents)
     return NULL;
 }
 
-char *xenbus_read(const char *path, char **value)
+char *xenbus_read(xenbus_transaction_t xbt, const char *path, char **value)
 {
     struct write_req req[] = { {path, strlen(path) + 1} };
     struct xsd_sockmsg *rep;
     char *res;
-    rep = xenbus_msg_reply(XS_READ, 0, req, ARRAY_SIZE(req));
+    rep = xenbus_msg_reply(XS_READ, xbt, req, ARRAY_SIZE(req));
     char *msg = errmsg(rep);
     if (msg) {
 	*value = NULL;
@@ -370,14 +371,14 @@ char *xenbus_read(const char *path, char **value)
     return NULL;
 }
 
-char *xenbus_write(const char *path, const char *value)
+char *xenbus_write(xenbus_transaction_t xbt, const char *path, const char *value)
 {
     struct write_req req[] = { 
 	{path, strlen(path) + 1},
 	{value, strlen(value) + 1},
     };
     struct xsd_sockmsg *rep;
-    rep = xenbus_msg_reply(XS_WRITE, 0, req, ARRAY_SIZE(req));
+    rep = xenbus_msg_reply(XS_WRITE, xbt, req, ARRAY_SIZE(req));
     char *msg = errmsg(rep);
     if (msg)
 	return msg;
@@ -385,11 +386,11 @@ char *xenbus_write(const char *path, const char *value)
     return NULL;
 }
 
-char *xenbus_rm(const char *path)
+char *xenbus_rm(xenbus_transaction_t xbt, const char *path)
 {
     struct write_req req[] = { {path, strlen(path) + 1} };
     struct xsd_sockmsg *rep;
-    rep = xenbus_msg_reply(XS_RM, 0, req, ARRAY_SIZE(req));
+    rep = xenbus_msg_reply(XS_RM, xbt, req, ARRAY_SIZE(req));
     char *msg = errmsg(rep);
     if (msg)
 	return msg;
@@ -397,12 +398,12 @@ char *xenbus_rm(const char *path)
     return NULL;
 }
 
-char *xenbus_get_perms(const char *path, char **value)
+char *xenbus_get_perms(xenbus_transaction_t xbt, const char *path, char **value)
 {
     struct write_req req[] = { {path, strlen(path) + 1} };
     struct xsd_sockmsg *rep;
     char *res;
-    rep = xenbus_msg_reply(XS_GET_PERMS, 0, req, ARRAY_SIZE(req));
+    rep = xenbus_msg_reply(XS_GET_PERMS, xbt, req, ARRAY_SIZE(req));
     char *msg = errmsg(rep);
     if (msg) {
 	*value = NULL;
@@ -417,7 +418,7 @@ char *xenbus_get_perms(const char *path, char **value)
 }
 
 #define PERM_MAX_SIZE 32
-char *xenbus_set_perms(const char *path, domid_t dom, char perm)
+char *xenbus_set_perms(xenbus_transaction_t xbt, const char *path, domid_t dom, char perm)
 {
     char value[PERM_MAX_SIZE];
     snprintf(value, PERM_MAX_SIZE, "%c%hu", perm, dom);
@@ -426,12 +427,71 @@ char *xenbus_set_perms(const char *path, domid_t dom, char perm)
 	{value, strlen(value) + 1},
     };
     struct xsd_sockmsg *rep;
-    rep = xenbus_msg_reply(XS_SET_PERMS, 0, req, ARRAY_SIZE(req));
+    rep = xenbus_msg_reply(XS_SET_PERMS, xbt, req, ARRAY_SIZE(req));
     char *msg = errmsg(rep);
     if (msg)
 	return msg;
     free(rep);
     return NULL;
+}
+
+char *xenbus_transaction_start(xenbus_transaction_t *xbt)
+{
+    /* xenstored becomes angry if you send a length 0 message, so just
+       shove a nul terminator on the end */
+    struct write_req req = { "", 1};
+    struct xsd_sockmsg *rep;
+    char *err;
+
+    rep = xenbus_msg_reply(XS_TRANSACTION_START, 0, &req, 1);
+    err = errmsg(rep);
+    if (err)
+	return err;
+    sscanf((char *)(rep + 1), "%u", xbt);
+    free(rep);
+    return NULL;
+}
+
+char *
+xenbus_transaction_end(xenbus_transaction_t t, int abort, int *retry)
+{
+    struct xsd_sockmsg *rep;
+    struct write_req req;
+    char *err;
+
+    *retry = 0;
+
+    req.data = abort ? "F" : "T";
+    req.len = 2;
+    rep = xenbus_msg_reply(XS_TRANSACTION_END, t, &req, 1);
+    err = errmsg(rep);
+    if (err) {
+	if (!strcmp(err, "EAGAIN")) {
+	    *retry = 1;
+	    free(err);
+	    return NULL;
+	} else {
+	    return err;
+	}
+    }
+    free(rep);
+    return NULL;
+}
+
+int xenbus_read_integer(char *path)
+{
+    char *res, *buf;
+    int t;
+
+    res = xenbus_read(XBT_NIL, path, &buf);
+    if (res) {
+	printk("Failed to read %s.\n", path);
+	free(res);
+	return -1;
+    }
+    sscanf(buf, "%d", &t);
+    free(buf);
+    return t;
 }
 
 static void do_ls_test(const char *pre)
@@ -440,7 +500,7 @@ static void do_ls_test(const char *pre)
     int x;
 
     DEBUG("ls %s...\n", pre);
-    char *msg = xenbus_ls(pre, &dirs);
+    char *msg = xenbus_ls(XBT_NIL, pre, &dirs);
     if (msg) {
 	DEBUG("Error in xenbus ls: %s\n", msg);
 	free(msg);
@@ -458,7 +518,7 @@ static void do_read_test(const char *path)
 {
     char *res;
     DEBUG("Read %s...\n", path);
-    char *msg = xenbus_read(path, &res);
+    char *msg = xenbus_read(XBT_NIL, path, &res);
     if (msg) {
 	DEBUG("Error in xenbus read: %s\n", msg);
 	free(msg);
@@ -471,7 +531,7 @@ static void do_read_test(const char *path)
 static void do_write_test(const char *path, const char *val)
 {
     DEBUG("Write %s to %s...\n", val, path);
-    char *msg = xenbus_write(path, val);
+    char *msg = xenbus_write(XBT_NIL, path, val);
     if (msg) {
 	DEBUG("Result %s\n", msg);
 	free(msg);
@@ -483,7 +543,7 @@ static void do_write_test(const char *path, const char *val)
 static void do_rm_test(const char *path)
 {
     DEBUG("rm %s...\n", path);
-    char *msg = xenbus_rm(path);
+    char *msg = xenbus_rm(XBT_NIL, path);
     if (msg) {
 	DEBUG("Result %s\n", msg);
 	free(msg);

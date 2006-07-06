@@ -51,7 +51,7 @@ static int validate_hvm_info(struct hvm_info_table *t)
 }
 
 /* xc_vmx_builder wrote hvm info at 0x9F800. Return it. */
-static struct hvm_info_table *
+struct hvm_info_table *
 get_hvm_info_table(void)
 {
 	struct hvm_info_table *t;

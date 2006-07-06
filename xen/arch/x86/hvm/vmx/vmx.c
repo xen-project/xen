@@ -54,34 +54,73 @@ static unsigned long trace_values[NR_CPUS][5];
 static void vmx_ctxt_switch_from(struct vcpu *v);
 static void vmx_ctxt_switch_to(struct vcpu *v);
 
-void vmx_final_setup_guest(struct vcpu *v)
+static int vmx_initialize_guest_resources(struct vcpu *v)
 {
+    struct domain *d = v->domain;
+    struct vcpu *vc;
+    void *io_bitmap_a, *io_bitmap_b;
+    int rc;
+
     v->arch.schedule_tail    = arch_vmx_do_launch;
     v->arch.ctxt_switch_from = vmx_ctxt_switch_from;
     v->arch.ctxt_switch_to   = vmx_ctxt_switch_to;
 
-    if ( v->vcpu_id == 0 )
+    if ( v->vcpu_id != 0 )
+        return 1;
+
+    for_each_vcpu ( d, vc )
     {
-        struct domain *d = v->domain;
-        struct vcpu *vc;
-
         /* Initialize monitor page table */
-        for_each_vcpu(d, vc)
-            vc->arch.monitor_table = pagetable_null();
+        vc->arch.monitor_table = pagetable_null();
 
-        /*
-         * Required to do this once per domain
-         * XXX todo: add a seperate function to do these.
-         */
-        memset(&d->shared_info->evtchn_mask[0], 0xff,
-               sizeof(d->shared_info->evtchn_mask));
+        memset(&vc->arch.hvm_vmx, 0, sizeof(struct arch_vmx_struct));
 
-        /* Put the domain in shadow mode even though we're going to be using
-         * the shared 1:1 page table initially. It shouldn't hurt */
-        shadow_mode_enable(d,
-                           SHM_enable|SHM_refcounts|
-                           SHM_translate|SHM_external|SHM_wr_pt_pte);
+        if ( (rc = vmx_create_vmcs(vc)) != 0 )
+        {
+            DPRINTK("Failed to create VMCS for vcpu %d: err=%d.\n",
+                    vc->vcpu_id, rc);
+            return 0;
+        }
+
+        spin_lock_init(&vc->arch.hvm_vmx.vmcs_lock);
+
+        if ( (io_bitmap_a = alloc_xenheap_pages(IO_BITMAP_ORDER)) == NULL )
+        {
+            DPRINTK("Failed to allocate io bitmap b for vcpu %d.\n",
+                    vc->vcpu_id);
+            return 0;
+        }
+
+        if ( (io_bitmap_b = alloc_xenheap_pages(IO_BITMAP_ORDER)) == NULL )
+        {
+            DPRINTK("Failed to allocate io bitmap b for vcpu %d.\n",
+                    vc->vcpu_id);
+            return 0;
+        }
+
+        memset(io_bitmap_a, 0xff, 0x1000);
+        memset(io_bitmap_b, 0xff, 0x1000);
+
+        /* don't bother debug port access */
+        clear_bit(PC_DEBUG_PORT, io_bitmap_a);
+
+        vc->arch.hvm_vmx.io_bitmap_a = io_bitmap_a;
+        vc->arch.hvm_vmx.io_bitmap_b = io_bitmap_b;
     }
+
+    /*
+     * Required to do this once per domain XXX todo: add a seperate function 
+     * to do these.
+     */
+    memset(&d->shared_info->evtchn_mask[0], 0xff,
+           sizeof(d->shared_info->evtchn_mask));
+
+    /* Put the domain in shadow mode even though we're going to be using
+     * the shared 1:1 page table initially. It shouldn't hurt */
+    shadow_mode_enable(
+        d, SHM_enable|SHM_refcounts|SHM_translate|SHM_external|SHM_wr_pt_pte);
+
+    return 1;
 }
 
 static void vmx_relinquish_guest_resources(struct domain *d)
@@ -90,9 +129,9 @@ static void vmx_relinquish_guest_resources(struct domain *d)
 
     for_each_vcpu ( d, v )
     {
+        vmx_destroy_vmcs(v);
         if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
             continue;
-        vmx_destroy_vmcs(v);
         free_monitor_pagetable(v);
         kill_timer(&v->arch.hvm_vmx.hlt_timer);
         if ( hvm_apic_support(v->domain) && (VLAPIC(v) != NULL) )
@@ -444,12 +483,6 @@ void stop_vmx(void)
         __vmxoff();
 }
 
-int vmx_initialize_guest_resources(struct vcpu *v)
-{
-    vmx_final_setup_guest(v);
-    return 1;
-}
-
 void vmx_migrate_timers(struct vcpu *v)
 {
     struct periodic_time *pt = &(v->domain->arch.hvm_domain.pl_time.periodic_tm);
@@ -638,58 +671,61 @@ static int check_vmx_controls(u32 ctrls, u32 msr)
 
 int start_vmx(void)
 {
-    struct vmcs_struct *vmcs;
-    u32 ecx;
     u32 eax, edx;
-    u64 phys_vmcs;      /* debugging */
+    struct vmcs_struct *vmcs;
 
     /*
      * Xen does not fill x86_capability words except 0.
      */
-    ecx = cpuid_ecx(1);
-    boot_cpu_data.x86_capability[4] = ecx;
+    boot_cpu_data.x86_capability[4] = cpuid_ecx(1);
 
     if (!(test_bit(X86_FEATURE_VMXE, &boot_cpu_data.x86_capability)))
         return 0;
 
     rdmsr(IA32_FEATURE_CONTROL_MSR, eax, edx);
 
-    if (eax & IA32_FEATURE_CONTROL_MSR_LOCK) {
-        if ((eax & IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON) == 0x0) {
+    if ( eax & IA32_FEATURE_CONTROL_MSR_LOCK )
+    {
+        if ( (eax & IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON) == 0x0 )
+        {
             printk("VMX disabled by Feature Control MSR.\n");
             return 0;
         }
     }
-    else {
+    else
+    {
         wrmsr(IA32_FEATURE_CONTROL_MSR,
               IA32_FEATURE_CONTROL_MSR_LOCK |
               IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON, 0);
     }
 
-    if (!check_vmx_controls(MONITOR_PIN_BASED_EXEC_CONTROLS,
-                            MSR_IA32_VMX_PINBASED_CTLS_MSR))
+    if ( !check_vmx_controls(MONITOR_PIN_BASED_EXEC_CONTROLS,
+                             MSR_IA32_VMX_PINBASED_CTLS_MSR) )
         return 0;
-    if (!check_vmx_controls(MONITOR_CPU_BASED_EXEC_CONTROLS,
-                            MSR_IA32_VMX_PROCBASED_CTLS_MSR))
+    if ( !check_vmx_controls(MONITOR_CPU_BASED_EXEC_CONTROLS,
+                             MSR_IA32_VMX_PROCBASED_CTLS_MSR) )
         return 0;
-    if (!check_vmx_controls(MONITOR_VM_EXIT_CONTROLS,
-                            MSR_IA32_VMX_EXIT_CTLS_MSR))
+    if ( !check_vmx_controls(MONITOR_VM_EXIT_CONTROLS,
+                             MSR_IA32_VMX_EXIT_CTLS_MSR) )
         return 0;
-    if (!check_vmx_controls(MONITOR_VM_ENTRY_CONTROLS,
-                            MSR_IA32_VMX_ENTRY_CTLS_MSR))
+    if ( !check_vmx_controls(MONITOR_VM_ENTRY_CONTROLS,
+                             MSR_IA32_VMX_ENTRY_CTLS_MSR) )
         return 0;
 
-    set_in_cr4(X86_CR4_VMXE);   /* Enable VMXE */
+    set_in_cr4(X86_CR4_VMXE);
 
-    if (!(vmcs = vmx_alloc_vmcs())) {
-        printk("Failed to allocate VMCS\n");
+    vmx_init_vmcs_config();
+
+    if ( (vmcs = vmx_alloc_host_vmcs()) == NULL )
+    {
+        printk("Failed to allocate host VMCS\n");
         return 0;
     }
 
-    phys_vmcs = (u64) virt_to_maddr(vmcs);
-
-    if (__vmxon(phys_vmcs)) {
+    if ( __vmxon(virt_to_maddr(vmcs)) )
+    {
         printk("VMXON failed\n");
+        vmx_free_host_vmcs(vmcs);
         return 0;
     }
 
@@ -832,7 +868,7 @@ static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
         cpuid_count(input, count, &eax, &ebx, &ecx, &edx);
         eax &= NUM_CORES_RESET_MASK;  
     }
-    else
+    else if ( !cpuid_hypervisor_leaves(input, &eax, &ebx, &ecx, &edx) )
     {
         cpuid(input, &eax, &ebx, &ecx, &edx);
 
@@ -857,10 +893,14 @@ static void vmx_vmexit_do_cpuid(struct cpu_user_regs *regs)
 #else
             if ( v->domain->arch.ops->guest_paging_levels == PAGING_L2 )
             {
-                if ( !v->domain->arch.hvm_domain.pae_enabled )
+                if ( v->domain->arch.hvm_domain.pae_enabled )
+                    clear_bit(X86_FEATURE_PSE36, &edx);
+                else
+                {
                     clear_bit(X86_FEATURE_PAE, &edx);
-                clear_bit(X86_FEATURE_PSE, &edx);
-                clear_bit(X86_FEATURE_PSE36, &edx);
+                    clear_bit(X86_FEATURE_PSE, &edx);
+                    clear_bit(X86_FEATURE_PSE36, &edx);
+                }
             }
 #endif
 
@@ -2053,8 +2093,26 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
     if ( unlikely(exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) )
     {
-        printk("Failed vm entry (reason 0x%x)\n", exit_reason);
-        printk("*********** VMCS Area **************\n");
+        unsigned int failed_vmentry_reason = exit_reason & 0xFFFF;
+
+        __vmread(EXIT_QUALIFICATION, &exit_qualification);
+        printk("Failed vm entry (exit reason 0x%x) ", exit_reason);
+        switch ( failed_vmentry_reason ) {
+        case EXIT_REASON_INVALID_GUEST_STATE:
+            printk("caused by invalid guest state (%ld).\n", exit_qualification);
+            break;
+        case EXIT_REASON_MSR_LOADING:
+            printk("caused by MSR entry %ld loading.\n", exit_qualification);
+            break;
+        case EXIT_REASON_MACHINE_CHECK:
+            printk("caused by machine check.\n");
+            break;
+        default:
+            printk("reason not known yet!");
+            break;
+        }
+
+        printk("************* VMCS Area **************\n");
         vmcs_dump_vcpu();
         printk("**************************************\n");
         domain_crash_synchronous();

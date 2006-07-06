@@ -22,28 +22,18 @@
 #include<traps.h>
 #include <xen/event_channel.h>
 
-#define NR_EVS 1024
-
-/* ev handler status */
-#define EVS_INPROGRESS	1	/* Event handler active - do not enter! */
-#define EVS_DISABLED	2	/* Event disabled - do not enter! */
-#define EVS_PENDING	    4	/* Event pending - replay on enable */
-#define EVS_REPLAY	    8	/* Event has been replayed but not acked yet */
-
-/* this represents a event handler. Chaining or sharing is not allowed */
-typedef struct _ev_action_t {
-	void (*handler)(int, struct pt_regs *);
-    unsigned int status;		/* IRQ status */
-    u32 count;
-} ev_action_t;
-
 /* prototypes */
 int do_event(u32 port, struct pt_regs *regs);
-int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *) );
-int bind_evtchn( u32 virq, void (*handler)(int, struct pt_regs *) );
+int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *, void *data),
+			   void *data);
+int bind_evtchn( u32 virq, void (*handler)(int, struct pt_regs *, void *data),
+				 void *data );
 void unbind_evtchn( u32 port );
 void init_events(void);
 void unbind_virq( u32 port );
+int evtchn_alloc_unbound(void (*handler)(int, struct pt_regs *regs,
+										 void *data),
+						 void *data);
 
 static inline int notify_remote_via_evtchn(int port)
 {

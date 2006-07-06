@@ -16,6 +16,7 @@ import os.path
 
 config = {"vtpm":"instance=1,backend=0"}
 domain = XmTestDomain(extraConfig=config)
+domName = domain.getName()
 consoleHistory = ""
 
 try:
@@ -23,10 +24,8 @@ try:
 except DomainError, e:
     if verbose:
         print e.extra
-    vtpm_cleanup(domain.getName())
-    FAIL("Unable to create domain")
-
-domName = domain.getName()
+    vtpm_cleanup(domName)
+    FAIL("Unable to create domain (%s)" % domName)
 
 try:
     console.sendInput("input")
@@ -36,11 +35,11 @@ except ConsoleError, e:
     FAIL(str(e))
 
 try:
-    run = console.runCmd("cat /sys/devices/platform/tpm_vtpm/pcrs")
+    run = console.runCmd("cat /sys/devices/xen/vtpm-0/pcrs")
 except ConsoleError, e:
     saveLog(console.getHistory())
     vtpm_cleanup(domName)
-    FAIL(str(e))
+    FAIL("No result from dumping the PCRs")
 
 if re.search("No such file",run["output"]):
     vtpm_cleanup(domName)
@@ -83,11 +82,17 @@ while loop < 3:
         FAIL(str(e))
 
     try:
-        run = console.runCmd("cat /sys/devices/platform/tpm_vtpm/pcrs")
+        run = console.runCmd("cat /sys/devices/xen/vtpm-0/pcrs")
     except ConsoleError, e:
         saveLog(console.getHistory())
         vtpm_cleanup(domName)
-        FAIL(str(e))
+        FAIL("No result from dumping the PCRs")
+
+    if not re.search("PCR-00:",run["output"]):
+        saveLog(console.getHistory())
+        vtpm_cleanup(domName)
+	FAIL("Virtual TPM is not working correctly on /dev/vtpm on backend side")
+
     loop += 1
 
 domain.closeConsole()
@@ -95,6 +100,3 @@ domain.closeConsole()
 domain.stop()
 
 vtpm_cleanup(domName)
-
-if not re.search("PCR-00:",run["output"]):
-	FAIL("Virtual TPM is not working correctly on /dev/vtpm on backend side")

@@ -162,7 +162,7 @@ DEFINE_XEN_GUEST_HANDLE(dom0_settime_t);
 
 struct dom0_getpageframeinfo {
     /* IN variables. */
-    xen_pfn_t mfn;         /* Machine page frame number to query.       */
+    xen_pfn_t gmfn;        /* GMFN to query.                            */
     domid_t domain;        /* To which domain does the frame belong?    */
     /* OUT variables. */
     /* Is the page PINNED to a type? */
@@ -177,9 +177,9 @@ DEFINE_XEN_GUEST_HANDLE(dom0_getpageframeinfo_t);
 #define DOM0_READCONSOLE      19
 struct dom0_readconsole {
     /* IN variables. */
-    uint32_t clear;            /* Non-zero -> clear after reading. */
+    uint32_t clear;                /* Non-zero -> clear after reading. */
+    XEN_GUEST_HANDLE(char) buffer; /* Buffer start */
     /* IN/OUT variables. */
-    XEN_GUEST_HANDLE(char) buffer; /* In: Buffer start; Out: Used buffer start */
     uint32_t count;            /* In: Buffer size;  Out: Used buffer size  */
 };
 typedef struct dom0_readconsole dom0_readconsole_t;
@@ -509,8 +509,8 @@ DEFINE_XEN_GUEST_HANDLE(dom0_iomem_permission_t);
 
 #define DOM0_HYPERCALL_INIT   48
 struct dom0_hypercall_init {
-    domid_t  domain;          /* domain to be affected */
-    xen_pfn_t mfn;            /* machine frame to be initialised */
+    domid_t   domain;          /* domain to be affected */
+    xen_pfn_t gmfn;            /* GMFN to be initialised */
 };
 typedef struct dom0_hypercall_init dom0_hypercall_init_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_hypercall_init_t);
