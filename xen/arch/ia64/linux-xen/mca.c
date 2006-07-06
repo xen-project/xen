@@ -77,6 +77,10 @@
 #include <asm/irq.h>
 #include <asm/hw_irq.h>
 
+#ifdef XEN
+#include <xen/symbols.h>
+#endif
+
 #if defined(IA64_MCA_DEBUG_INFO)
 # define IA64_MCA_DEBUG(fmt...)	printk(fmt)
 #else
@@ -100,6 +104,7 @@ extern void			ia64_slave_init_handler (void);
 
 static ia64_mc_info_t		ia64_mc_info;
 
+#ifndef XEN
 #define MAX_CPE_POLL_INTERVAL (15*60*HZ) /* 15 minutes */
 #define MIN_CPE_POLL_INTERVAL (2*60*HZ)  /* 2 minutes */
 #define CMC_POLL_INTERVAL     (1*60*HZ)  /* 1 minute */
@@ -124,9 +129,11 @@ static int cmc_polling_enabled = 1;
 static int cpe_poll_enabled = 1;
 
 extern void salinfo_log_wakeup(int type, u8 *buffer, u64 size, int irqsafe);
+#endif /* !XEN */
 
 static int mca_init;
 
+#ifndef XEN
 /*
  * IA64_MCA log support
  */
@@ -267,7 +274,9 @@ ia64_mca_log_sal_error_record(int sal_info_type)
 /*
  * platform dependent error handling
  */
+#endif /* !XEN */
 #ifndef PLATFORM_MCA_HANDLERS
+#ifndef XEN
 
 #ifdef CONFIG_ACPI
 
@@ -329,6 +338,7 @@ ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 }
 
 #endif /* CONFIG_ACPI */
+#endif /* !XEN */
 
 static void
 show_min_state (pal_min_state_area_t *minstate)
@@ -486,11 +496,16 @@ init_handler_platform (pal_min_state_area_t *ms,
 	udelay(5*1000000);
 	show_min_state(ms);
 
+#ifndef XEN
 	printk("Backtrace of current task (pid %d, %s)\n", current->pid, current->comm);
+#else
+	printk("Backtrace of current vcpu (vcpu_id %d)\n", current->vcpu_id);
+#endif
 	fetch_min_state(ms, pt, sw);
 	unw_init_from_interruption(&info, current, pt, sw);
 	ia64_do_show_stack(&info, NULL);
 
+#ifndef XEN
 #ifdef CONFIG_SMP
 	/* read_trylock() would be handy... */
 	if (!tasklist_lock.write_lock)
@@ -510,11 +525,13 @@ init_handler_platform (pal_min_state_area_t *ms,
 	if (!tasklist_lock.write_lock)
 		read_unlock(&tasklist_lock);
 #endif
+#endif /* !XEN */
 
 	printk("\nINIT dump complete.  Please reboot now.\n");
 	while (1);			/* hang city if no debugger */
 }
 
+#ifndef XEN
 #ifdef CONFIG_ACPI
 /*
  * ia64_mca_register_cpev
@@ -545,7 +562,9 @@ ia64_mca_register_cpev (int cpev)
 }
 #endif /* CONFIG_ACPI */
 
+#endif /* !XEN */
 #endif /* PLATFORM_MCA_HANDLERS */
+#ifndef XEN
 
 /*
  * ia64_mca_cmc_vector_setup
@@ -1121,6 +1140,7 @@ ia64_mca_cpe_poll (unsigned long dummy)
 }
 
 #endif /* CONFIG_ACPI */
+#endif /* !XEN */
 
 /*
  * C portion of the OS INIT handler
@@ -1139,22 +1159,30 @@ ia64_init_handler (struct pt_regs *pt, struct switch_stack *sw)
 {
 	pal_min_state_area_t *ms;
 
+#ifndef XEN
 	oops_in_progress = 1;	/* avoid deadlock in printk, but it makes recovery dodgy */
 	console_loglevel = 15;	/* make sure printks make it to console */
+#endif
 
 	printk(KERN_INFO "Entered OS INIT handler. PSP=%lx\n",
 		ia64_sal_to_os_handoff_state.proc_state_param);
 
+#ifndef XEN
 	/*
 	 * Address of minstate area provided by PAL is physical,
 	 * uncacheable (bit 63 set). Convert to Linux virtual
 	 * address in region 6.
 	 */
 	ms = (pal_min_state_area_t *)(ia64_sal_to_os_handoff_state.pal_min_state | (6ul<<61));
+#else
+	/* Xen virtual address in region 7. */
+	ms = __va((pal_min_state_area_t *)(ia64_sal_to_os_handoff_state.pal_min_state));
+#endif
 
 	init_handler_platform(ms, pt, sw);	/* call platform specific routines */
 }
 
+#ifndef XEN
 static int __init
 ia64_mca_disable_cpe_polling(char *str)
 {
@@ -1201,6 +1229,7 @@ static struct irqaction mca_cpep_irqaction = {
 	.name =		"cpe_poll"
 };
 #endif /* CONFIG_ACPI */
+#endif /* !XEN */
 
 /* Do per-CPU MCA-related initialization.  */
 
@@ -1213,11 +1242,25 @@ ia64_mca_cpu_init(void *cpu_data)
 		void *mca_data;
 		int cpu;
 
+#ifdef XEN
+		unsigned int pageorder;
+		pageorder  = get_order_from_bytes(sizeof(struct ia64_mca_cpu));
+#else
 		mca_data = alloc_bootmem(sizeof(struct ia64_mca_cpu)
 					 * NR_CPUS);
+#endif
 		for (cpu = 0; cpu < NR_CPUS; cpu++) {
+#ifdef XEN
+			mca_data = alloc_xenheap_pages(pageorder);
+			__per_cpu_mca[cpu] = __pa(mca_data);
+			IA64_MCA_DEBUG("%s: __per_cpu_mca[%d]=%lx"
+			               "(mca_data[%d]=%lx)\n",
+				       __FUNCTION__, cpu, __per_cpu_mca[cpu],
+				       cpu, (u64)mca_data);
+#else
 			__per_cpu_mca[cpu] = __pa(mca_data);
 			mca_data += sizeof(struct ia64_mca_cpu);
+#endif
 		}
 	}
 
@@ -1228,6 +1271,10 @@ ia64_mca_cpu_init(void *cpu_data)
          * variable.
          */
 	__get_cpu_var(ia64_mca_data) = __per_cpu_mca[smp_processor_id()];
+#ifdef XEN
+	IA64_MCA_DEBUG("%s: CPU#%d, ia64_mca_data=%lx\n", __FUNCTION__,
+	               smp_processor_id(),__get_cpu_var(ia64_mca_data));
+#endif
 
 	/*
 	 * Stash away a copy of the PTE needed to map the per-CPU page.
@@ -1275,6 +1322,11 @@ ia64_mca_init(void)
 	ia64_fptr_t *mon_init_ptr = (ia64_fptr_t *)ia64_monarch_init_handler;
 	ia64_fptr_t *slave_init_ptr = (ia64_fptr_t *)ia64_slave_init_handler;
 	ia64_fptr_t *mca_hldlr_ptr = (ia64_fptr_t *)ia64_os_mca_dispatch;
+#ifdef XEN
+	s64 rc;
+
+	IA64_MCA_DEBUG("%s: begin\n", __FUNCTION__);
+#else
 	int i;
 	s64 rc;
 	struct ia64_sal_retval isrv;
@@ -1324,6 +1376,7 @@ ia64_mca_init(void)
 	}
 
 	IA64_MCA_DEBUG("%s: registered MCA rendezvous spinloop and wakeup mech.\n", __FUNCTION__);
+#endif /* !XEN */
 
 	ia64_mc_info.imi_mca_handler        = ia64_tpa(mca_hldlr_ptr->fp);
 	/*
@@ -1375,6 +1428,7 @@ ia64_mca_init(void)
 
 	IA64_MCA_DEBUG("%s: registered OS INIT handler with SAL\n", __FUNCTION__);
 
+#ifndef XEN
 	/*
 	 *  Configure the CMCI/P vector and handler. Interrupts for CMC are
 	 *  per-processor, so AP CMC interrupts are setup in smp_callin() (smpboot.c).
@@ -1402,11 +1456,13 @@ ia64_mca_init(void)
 	ia64_log_init(SAL_INFO_TYPE_INIT);
 	ia64_log_init(SAL_INFO_TYPE_CMC);
 	ia64_log_init(SAL_INFO_TYPE_CPE);
+#endif /* !XEN */
 
 	mca_init = 1;
 	printk(KERN_INFO "MCA related initialization done\n");
 }
 
+#ifndef XEN
 /*
  * ia64_mca_late_init
  *
@@ -1468,3 +1524,4 @@ ia64_mca_late_init(void)
 }
 
 device_initcall(ia64_mca_late_init);
+#endif /* !XEN */
