@@ -48,6 +48,20 @@
  *		5. GR11 = Rendez state
  *		6. GR12 = Return address to location within SAL_CHECK
  */
+#ifdef XEN
+#define SAL_TO_OS_MCA_HANDOFF_STATE_SAVE(_tmp)		\
+	movl	_tmp=THIS_CPU(ia64_sal_to_os_handoff_state_addr);;	\
+	tpa	_tmp=_tmp;;				\
+	ld8	_tmp=[_tmp];;				\
+	st8	[_tmp]=r1,0x08;;			\
+	st8	[_tmp]=r8,0x08;;			\
+	st8	[_tmp]=r9,0x08;;			\
+	st8	[_tmp]=r10,0x08;;			\
+	st8	[_tmp]=r11,0x08;;			\
+	st8	[_tmp]=r12,0x08;;			\
+	st8	[_tmp]=r17,0x08;;			\
+	st8	[_tmp]=r18,0x08
+#else
 #define SAL_TO_OS_MCA_HANDOFF_STATE_SAVE(_tmp)		\
 	LOAD_PHYSICAL(p0, _tmp, ia64_sal_to_os_handoff_state);; \
 	st8	[_tmp]=r1,0x08;;			\
@@ -59,7 +73,6 @@
 	st8	[_tmp]=r17,0x08;;			\
 	st8	[_tmp]=r18,0x08
 
-#ifndef XEN
 /*
  * OS_MCA_TO_SAL_HANDOFF_STATE (SAL 3.0 spec)
  * (p6) is executed if we never entered virtual mode (TLB error)
@@ -107,11 +120,11 @@
 	;;								\
 	ld8 reg=[reg]
 
-#endif /* !XEN */
+#endif /* XEN */
 	.global ia64_os_mca_dispatch
 	.global ia64_os_mca_dispatch_end
-	.global ia64_sal_to_os_handoff_state
 #ifndef XEN
+	.global ia64_sal_to_os_handoff_state
 	.global	ia64_os_to_sal_handoff_state
 	.global ia64_do_tlb_purge
 #endif

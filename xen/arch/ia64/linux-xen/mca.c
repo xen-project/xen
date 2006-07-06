@@ -88,7 +88,12 @@
 #endif
 
 /* Used by mca_asm.S */
+#ifndef XEN
 ia64_mca_sal_to_os_state_t	ia64_sal_to_os_handoff_state;
+#else
+ia64_mca_sal_to_os_state_t	ia64_sal_to_os_handoff_state[NR_CPUS];
+DEFINE_PER_CPU(u64, ia64_sal_to_os_handoff_state_addr); 
+#endif
 ia64_mca_os_to_sal_state_t	ia64_os_to_sal_handoff_state;
 u64				ia64_mca_serialize;
 DEFINE_PER_CPU(u64, ia64_mca_data); /* == __per_cpu_mca[smp_processor_id()] */
@@ -478,6 +483,43 @@ fetch_min_state (pal_min_state_area_t *ms, struct pt_regs *pt, struct switch_sta
 	PUT_NAT_BIT(sw->caller_unat, &pt->r30);	PUT_NAT_BIT(sw->caller_unat, &pt->r31);
 }
 
+#ifdef XEN
+static spinlock_t init_dump_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t show_stack_lock = SPIN_LOCK_UNLOCKED;
+
+static void
+save_ksp (struct unw_frame_info *info, void *arg)
+{
+	current->arch._thread.ksp = (__u64)(info->sw) - 16;
+	wmb();
+}
+
+/* FIXME */
+int try_crashdump(struct pt_regs *a) { return 0; }
+
+#define CPU_FLUSH_RETRY_MAX 5
+static void
+init_cache_flush (void)
+{
+	unsigned long flags;
+	int i;
+	s64 rval = 0;
+	u64 vector, progress = 0;
+
+	for (i = 0; i < CPU_FLUSH_RETRY_MAX; i++) {
+		local_irq_save(flags);
+		rval = ia64_pal_cache_flush(PAL_CACHE_TYPE_INSTRUCTION_DATA,
+		                            0, &progress, &vector);
+		local_irq_restore(flags);
+		if (rval == 0){
+			printk("\nPAL cache flush success\n");
+			return;
+		}
+	}
+	printk("\nPAL cache flush failed. status=%ld\n",rval);
+}
+#endif /* XEN */
+
 static void
 init_handler_platform (pal_min_state_area_t *ms,
 		       struct pt_regs *pt, struct switch_stack *sw)
@@ -494,18 +536,36 @@ init_handler_platform (pal_min_state_area_t *ms,
 	 */
 	printk("Delaying for 5 seconds...\n");
 	udelay(5*1000000);
+#ifdef XEN
+	fetch_min_state(ms, pt, sw);
+	spin_lock(&show_stack_lock);
+#endif
 	show_min_state(ms);
 
-#ifndef XEN
-	printk("Backtrace of current task (pid %d, %s)\n", current->pid, current->comm);
-#else
+#ifdef XEN
 	printk("Backtrace of current vcpu (vcpu_id %d)\n", current->vcpu_id);
-#endif
+#else
+	printk("Backtrace of current task (pid %d, %s)\n", current->pid, current->comm);
 	fetch_min_state(ms, pt, sw);
+#endif
 	unw_init_from_interruption(&info, current, pt, sw);
 	ia64_do_show_stack(&info, NULL);
+#ifdef XEN
+	unw_init_running(save_ksp, NULL);
+	spin_unlock(&show_stack_lock);
+	wmb();
+	init_cache_flush();
 
-#ifndef XEN
+	if (spin_trylock(&init_dump_lock)) {
+#ifdef CONFIG_SMP
+		udelay(5*1000000);
+#endif
+		if (try_crashdump(pt) == 0)
+			printk("\nINIT dump complete.  Please reboot now.\n");
+	}
+	printk("%s: CPU%d init handler done\n",
+	       __FUNCTION__, smp_processor_id());
+#else /* XEN */
 #ifdef CONFIG_SMP
 	/* read_trylock() would be handy... */
 	if (!tasklist_lock.write_lock)
@@ -525,9 +585,9 @@ init_handler_platform (pal_min_state_area_t *ms,
 	if (!tasklist_lock.write_lock)
 		read_unlock(&tasklist_lock);
 #endif
-#endif /* !XEN */
 
 	printk("\nINIT dump complete.  Please reboot now.\n");
+#endif /* XEN */
 	while (1);			/* hang city if no debugger */
 }
 
@@ -1158,16 +1218,20 @@ void
 ia64_init_handler (struct pt_regs *pt, struct switch_stack *sw)
 {
 	pal_min_state_area_t *ms;
+#ifdef XEN
+	int cpu = smp_processor_id();
+
+	printk(KERN_INFO "Entered OS INIT handler. PSP=%lx\n",
+	       ia64_sal_to_os_handoff_state[cpu].proc_state_param);
+#endif
 
 #ifndef XEN
 	oops_in_progress = 1;	/* avoid deadlock in printk, but it makes recovery dodgy */
 	console_loglevel = 15;	/* make sure printks make it to console */
-#endif
 
 	printk(KERN_INFO "Entered OS INIT handler. PSP=%lx\n",
 		ia64_sal_to_os_handoff_state.proc_state_param);
 
-#ifndef XEN
 	/*
 	 * Address of minstate area provided by PAL is physical,
 	 * uncacheable (bit 63 set). Convert to Linux virtual
@@ -1176,7 +1240,7 @@ ia64_init_handler (struct pt_regs *pt, struct switch_stack *sw)
 	ms = (pal_min_state_area_t *)(ia64_sal_to_os_handoff_state.pal_min_state | (6ul<<61));
 #else
 	/* Xen virtual address in region 7. */
-	ms = __va((pal_min_state_area_t *)(ia64_sal_to_os_handoff_state.pal_min_state));
+	ms = __va((pal_min_state_area_t *)(ia64_sal_to_os_handoff_state[cpu].pal_min_state));
 #endif
 
 	init_handler_platform(ms, pt, sw);	/* call platform specific routines */
@@ -1273,7 +1337,14 @@ ia64_mca_cpu_init(void *cpu_data)
 	__get_cpu_var(ia64_mca_data) = __per_cpu_mca[smp_processor_id()];
 #ifdef XEN
 	IA64_MCA_DEBUG("%s: CPU#%d, ia64_mca_data=%lx\n", __FUNCTION__,
-	               smp_processor_id(),__get_cpu_var(ia64_mca_data));
+	               smp_processor_id(), __get_cpu_var(ia64_mca_data));
+
+	/* sal_to_os_handoff for smp support */
+	__get_cpu_var(ia64_sal_to_os_handoff_state_addr) =
+	              __pa(&ia64_sal_to_os_handoff_state[smp_processor_id()]);
+	IA64_MCA_DEBUG("%s: CPU#%d, ia64_sal_to_os=%lx\n", __FUNCTION__,
+	               smp_processor_id(),
+		       __get_cpu_var(ia64_sal_to_os_handoff_state_addr));
 #endif
 
 	/*
@@ -1324,6 +1395,8 @@ ia64_mca_init(void)
 	ia64_fptr_t *mca_hldlr_ptr = (ia64_fptr_t *)ia64_os_mca_dispatch;
 #ifdef XEN
 	s64 rc;
+
+	slave_init_ptr = (ia64_fptr_t *)ia64_monarch_init_handler;
 
 	IA64_MCA_DEBUG("%s: begin\n", __FUNCTION__);
 #else
