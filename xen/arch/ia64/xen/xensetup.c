@@ -15,6 +15,7 @@
 #include <xen/gdbstub.h>
 #include <xen/compile.h>
 #include <xen/console.h>
+#include <xen/domain.h>
 #include <xen/serial.h>
 #include <xen/trace.h>
 #include <asm/meminit.h>
