@@ -59,6 +59,7 @@
 	st8	[_tmp]=r17,0x08;;			\
 	st8	[_tmp]=r18,0x08
 
+#ifndef XEN
 /*
  * OS_MCA_TO_SAL_HANDOFF_STATE (SAL 3.0 spec)
  * (p6) is executed if we never entered virtual mode (TLB error)
@@ -106,15 +107,19 @@
 	;;								\
 	ld8 reg=[reg]
 
+#endif /* !XEN */
 	.global ia64_os_mca_dispatch
 	.global ia64_os_mca_dispatch_end
 	.global ia64_sal_to_os_handoff_state
+#ifndef XEN
 	.global	ia64_os_to_sal_handoff_state
 	.global ia64_do_tlb_purge
+#endif
 
 	.text
 	.align 16
 
+#ifndef XEN
 /*
  * Just the TLB purge part is moved to a separate function
  * so we can re-use the code for cpu hotplug code as well
@@ -856,6 +861,12 @@ end_os_mca_restore:
 	br	ia64_os_mca_done_restore;;
 
 //EndStub//////////////////////////////////////////////////////////////////////
+#else
+ia64_os_mca_dispatch:
+1:
+	br.sptk 1b
+ia64_os_mca_dispatch_end:
+#endif /* !XEN */
 
 
 // ok, the issue here is that we need to save state information so
