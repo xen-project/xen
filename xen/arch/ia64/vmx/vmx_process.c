@@ -190,8 +190,7 @@ void leave_hypervisor_tail(struct pt_regs *regs)
     if (!is_idle_domain(d) ) {	// always comes from guest
         extern void vmx_dorfirfi(void);
         struct pt_regs *user_regs = vcpu_regs(current);
-        if (local_softirq_pending())
-            do_softirq();
+        do_softirq();
         local_irq_disable();
 
         if (user_regs != regs)

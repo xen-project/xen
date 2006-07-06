@@ -217,16 +217,14 @@ void continue_running(struct vcpu *same)
 
 static void default_idle(void)
 {
-	int cpu = smp_processor_id();
 	local_irq_disable();
-	if ( !softirq_pending(cpu))
+	if ( !softirq_pending(smp_processor_id()) )
 	        safe_halt();
 	local_irq_enable();
 }
 
 static void continue_cpu_idle_loop(void)
 {
-	int cpu = smp_processor_id();
 	for ( ; ; )
 	{
 #ifdef IA64
@@ -234,12 +232,10 @@ static void continue_cpu_idle_loop(void)
 #else
 	    irq_stat[cpu].idle_timestamp = jiffies;
 #endif
-	    while ( !softirq_pending(cpu) )
+	    while ( !softirq_pending(smp_processor_id()) )
 	        default_idle();
-	    add_preempt_count(SOFTIRQ_OFFSET);
 	    raise_softirq(SCHEDULE_SOFTIRQ);
 	    do_softirq();
-	    sub_preempt_count(SOFTIRQ_OFFSET);
 	}
 }
 

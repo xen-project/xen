@@ -892,7 +892,7 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 #ifdef XEN
 	;;
 (pUStk) ssm psr.i
-(pUStk)    br.call.sptk.many b0=process_soft_irq
+(pUStk)    br.call.sptk.many b0=do_softirq
 (pUStk) rsm psr.i
     ;;
 	alloc loc0=ar.pfs,0,1,1,0
