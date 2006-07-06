@@ -164,9 +164,10 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
         unsigned long nr_pages = op->u.getmemlist.max_pfns & 0xffffffff;
         unsigned long mfn;
 
-        ret = -EINVAL;
-        if ( d == NULL )
+        if ( d == NULL ) {
+            ret = -EINVAL;
             break;
+        }
         for (i = 0 ; i < nr_pages ; i++) {
             pte_t *pte;
 
