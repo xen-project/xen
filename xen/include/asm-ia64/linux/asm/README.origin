@@ -5,7 +5,6 @@
 # the instructions in the README there.
 
 acpi.h			-> linux/include/asm-ia64/acpi.h
-asmmacro.h		-> linux/include/asm-ia64/asmmacro.h
 atomic.h		-> linux/include/asm-ia64/atomic.h
 bitops.h		-> linux/include/asm-ia64/bitops.h
 break.h			-> linux/include/asm-ia64/break.h
