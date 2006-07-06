@@ -89,6 +89,7 @@
 # define MINSTATE_GET_CURRENT(reg)					\
                movl reg=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;	\
                ld8 reg=[reg]
+# define MINSTATE_GET_CURRENT_VIRT(reg)	MINSTATE_GET_CURRENT(reg)
 #else
 # define MINSTATE_GET_CURRENT(reg)	mov reg=IA64_KR(CURRENT)
 #endif
@@ -97,7 +98,19 @@
 #endif
 
 #ifdef MINSTATE_PHYS
+# ifdef XEN
+# define MINSTATE_GET_CURRENT(reg)					\
+	movl reg=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;		\
+	tpa reg=reg;;							\
+	ld8 reg=[reg];;							\
+	tpa reg=reg;;
+# define MINSTATE_GET_CURRENT_VIRT(reg)					\
+	movl reg=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;		\
+	tpa reg=reg;;							\
+	ld8 reg=[reg];;
+#else
 # define MINSTATE_GET_CURRENT(reg)	mov reg=IA64_KR(CURRENT);; tpa reg=reg
+#endif /* XEN */
 # define MINSTATE_START_SAVE_MIN	MINSTATE_START_SAVE_MIN_PHYS
 # define MINSTATE_END_SAVE_MIN		MINSTATE_END_SAVE_MIN_PHYS
 #endif
@@ -200,8 +213,8 @@
 	;;											\
 .mem.offset 0,0; st8.spill [r16]=r13,16;							\
 .mem.offset 8,0; st8.spill [r17]=r21,16;	/* save ar.fpsr */				\
-	/* XEN mov r13=IA64_KR(CURRENT);*/	/* establish `current' */				\
-	MINSTATE_GET_CURRENT(r13);		/* XEN establish `current' */				\
+	/* XEN mov r13=IA64_KR(CURRENT);*/	/* establish `current' */			\
+	MINSTATE_GET_CURRENT_VIRT(r13);		/* XEN establish `current' */			\
 	;;											\
 .mem.offset 0,0; st8.spill [r16]=r15,16;							\
 .mem.offset 8,0; st8.spill [r17]=r14,16;							\
