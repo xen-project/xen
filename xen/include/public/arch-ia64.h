@@ -276,12 +276,16 @@ struct mapped_regs {
             unsigned long tmp[8]; // temp registers (e.g. for hyperprivops)
         };
     };
+};
+typedef struct mapped_regs mapped_regs_t;
+
+struct vpd {
+    struct mapped_regs vpd_low;
     unsigned long  reserved6[3456];
     unsigned long  vmm_avail[128];
     unsigned long  reserved7[4096];
 };
-typedef struct mapped_regs mapped_regs_t;
-typedef mapped_regs_t vpd_t;
+typedef struct vpd vpd_t;
 
 struct arch_vcpu_info {
 };
@@ -365,13 +369,13 @@ struct xen_ia64_boot_param {
 
 /* Address of shared_info in domain virtual space.
    This is the default address, for compatibility only.  */
-#define XSI_BASE				0xf100000000000000
+#define XSI_BASE			0xf100000000000000
 
 /* Size of the shared_info area (this is not related to page size).  */
-#define XSI_LOG_SIZE			14
-#define XSI_SIZE				(1 << XSI_LOG_SIZE)
+#define XSI_SHIFT			14
+#define XSI_SIZE			(1 << XSI_SHIFT)
 /* Log size of mapped_regs area (64 KB - only 4KB is used).  */
-#define XMAPPEDREGS_LOG_SIZE	16
+#define XMAPPEDREGS_SHIFT		12
 /* Offset of XASI (Xen arch shared info) wrt XSI_BASE.  */
 #define XMAPPEDREGS_OFS			XSI_SIZE
 

@@ -131,7 +131,7 @@ GLOBAL_ENTRY(ia64_new_rr7)
 #endif
 
 	//  Shared info
-	mov r24=PAGE_SHIFT<<2
+	mov r24=XSI_SHIFT<<2
 	movl r25=__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RW)
 	;;
 	ptr.d	in3,r24
@@ -144,7 +144,7 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	
 	// Map mapped_regs
 	mov r22=XMAPPEDREGS_OFS
-	mov r24=PAGE_SHIFT<<2
+	mov r24=XMAPPEDREGS_SHIFT<<2
 	;; 
 	add r22=r22,in3
 	;;

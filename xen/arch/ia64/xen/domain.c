@@ -313,7 +313,8 @@ void free_vcpu_struct(struct vcpu *v)
 		vmx_relinquish_vcpu_resources(v);
 	else {
 		if (v->arch.privregs != NULL)
-			free_xenheap_pages(v->arch.privregs, get_order(sizeof(mapped_regs_t)));
+			free_xenheap_pages(v->arch.privregs,
+			              get_order_from_shift(XMAPPEDREGS_SHIFT));
 	}
 
 	free_xenheap_pages(v, KERNEL_STACK_SIZE_ORDER);
@@ -350,11 +351,13 @@ int arch_domain_create(struct domain *d)
 	if (is_idle_domain(d))
 	    return 0;
 
-	if ((d->shared_info = (void *)alloc_xenheap_page()) == NULL)
+	d->shared_info = alloc_xenheap_pages(get_order_from_shift(XSI_SHIFT));
+	if (d->shared_info == NULL)
 	    goto fail_nomem;
-	memset(d->shared_info, 0, PAGE_SIZE);
-	share_xen_page_with_guest(virt_to_page(d->shared_info),
-	                          d, XENSHARE_writable);
+	memset(d->shared_info, 0, XSI_SIZE);
+	for (i = 0; i < XSI_SIZE; i += PAGE_SIZE)
+	    share_xen_page_with_guest(virt_to_page((char *)d->shared_info + i),
+	                              d, XENSHARE_writable);
 
 	d->max_pages = (128UL*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
 	/* We may also need emulation rid for region4, though it's unlikely
@@ -376,7 +379,7 @@ fail_nomem:
 	if (d->arch.mm.pgd != NULL)
 	    pgd_free(d->arch.mm.pgd);
 	if (d->shared_info != NULL)
-	    free_xenheap_page(d->shared_info);
+	    free_xenheap_pages(d->shared_info, get_order_from_shift(XSI_SHIFT));
 	return -ENOMEM;
 }
 
@@ -384,7 +387,7 @@ void arch_domain_destroy(struct domain *d)
 {
 	BUG_ON(d->arch.mm.pgd != NULL);
 	if (d->shared_info != NULL)
-		free_xenheap_page(d->shared_info);
+	    free_xenheap_pages(d->shared_info, get_order_from_shift(XSI_SHIFT));
 
 	domain_flush_destroy (d);
 

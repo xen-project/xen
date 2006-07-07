@@ -60,6 +60,13 @@ static inline int get_order_from_pages(unsigned long nr_pages)
     return order;
 }
 
+static inline int get_order_from_shift(unsigned long shift)
+{
+    if (shift <= PAGE_SHIFT)
+	return 0;
+    else
+	return shift - PAGE_SHIFT;
+}
 #endif
 
 #undef __pa

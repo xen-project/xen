@@ -26,10 +26,9 @@
 #include <linux/efi.h>
 #include <asm/iosapic.h>
 
-/* Be sure the struct shared_info fits on a page because it is mapped in
-   domain. */
-#if SHARED_INFO_SIZE > PAGE_SIZE
- #error "struct shared_info does not not fit in PAGE_SIZE"
+/* Be sure the struct shared_info size is <= XSI_SIZE.  */
+#if SHARED_INFO_SIZE > XSI_SIZE
+#error "struct shared_info bigger than XSI_SIZE"
 #endif
 
 unsigned long xenheap_phys_end, total_pages;

@@ -591,7 +591,7 @@ GLOBAL_ENTRY(frametable_miss)
 	shladd r24=r19,3,r24	// r24=&pte[pte_offset(addr)]
 	;;
 (p7)	ld8 r24=[r24]		// r24=pte[pte_offset(addr)]
-	mov r25=0x700|(_PAGE_SIZE_16K<<2) // key=7
+	mov r25=0x700|(PAGE_SHIFT<<2) // key=7
 (p6)	br.spnt.few frametable_fault
 	;;
 	mov cr.itir=r25

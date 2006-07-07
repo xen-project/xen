@@ -156,6 +156,7 @@ static vpd_t *alloc_vpd(void)
 	int i;
 	cpuid3_t cpuid3;
 	vpd_t *vpd;
+	mapped_regs_t *mregs;
 
 	vpd = alloc_xenheap_pages(get_order(VPD_SIZE));
 	if (!vpd) {
@@ -165,23 +166,25 @@ static vpd_t *alloc_vpd(void)
 
 	printk("vpd base: 0x%p, vpd size:%ld\n", vpd, sizeof(vpd_t));
 	memset(vpd, 0, VPD_SIZE);
+	mregs = &vpd->vpd_low;
+
 	/* CPUID init */
 	for (i = 0; i < 5; i++)
-		vpd->vcpuid[i] = ia64_get_cpuid(i);
+		mregs->vcpuid[i] = ia64_get_cpuid(i);
 
 	/* Limit the CPUID number to 5 */
-	cpuid3.value = vpd->vcpuid[3];
+	cpuid3.value = mregs->vcpuid[3];
 	cpuid3.number = 4;	/* 5 - 1 */
-	vpd->vcpuid[3] = cpuid3.value;
+	mregs->vcpuid[3] = cpuid3.value;
 
-    vpd->vac.a_from_int_cr = 1;
-    vpd->vac.a_to_int_cr = 1;
-    vpd->vac.a_from_psr = 1;
-    vpd->vac.a_from_cpuid = 1;
-    vpd->vac.a_cover = 1;
-    vpd->vac.a_bsw = 1;
+	mregs->vac.a_from_int_cr = 1;
+	mregs->vac.a_to_int_cr = 1;
+	mregs->vac.a_from_psr = 1;
+	mregs->vac.a_from_cpuid = 1;
+	mregs->vac.a_cover = 1;
+	mregs->vac.a_bsw = 1;
 
-	vpd->vdc.d_vmsw = 1;
+	mregs->vdc.d_vmsw = 1;
 
 	return vpd;
 }
@@ -201,7 +204,7 @@ static void
 vmx_create_vp(struct vcpu *v)
 {
 	u64 ret;
-	vpd_t *vpd = v->arch.privregs;
+	vpd_t *vpd = (vpd_t *)v->arch.privregs;
 	u64 ivt_base;
     extern char vmx_ia64_ivt;
 	/* ia64_ivt is function pointer, so need this tranlation */
@@ -274,8 +277,8 @@ vmx_final_setup_guest(struct vcpu *v)
 	vpd = alloc_vpd();
 	ASSERT(vpd);
 
-	v->arch.privregs = vpd;
-	vpd->virt_env_vaddr = vm_buffer;
+	v->arch.privregs = (mapped_regs_t *)vpd;
+	vpd->vpd_low.virt_env_vaddr = vm_buffer;
 
 	/* Per-domain vTLB and vhpt implementation. Now vmx domain will stick
 	 * to this solution. Maybe it can be deferred until we know created

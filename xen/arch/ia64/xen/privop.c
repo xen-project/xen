@@ -700,10 +700,9 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 	UINT64 val;
 	UINT64 itir, ifa;
 
-// FIXME: Handle faults appropriately for these
 	if (!iim || iim > HYPERPRIVOP_MAX) {
-		panic_domain(regs, "bad hyperprivop ignored; iim=%lx, "
-		             "iip=0x%lx\n", iim, regs->cr_iip);
+		panic_domain(regs, "bad hyperprivop: iim=%lx, iip=0x%lx\n",
+		             iim, regs->cr_iip);
 		return 1;
 	}
 	slow_hyperpriv_cnt[iim]++;
