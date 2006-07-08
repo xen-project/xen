@@ -69,9 +69,6 @@ ref-%/.valid-ref: pristine-%/.valid-pristine
 	touch $@ # update timestamp to avoid rebuild
 endif
 
-%-prep:
-	$(MAKE) -f buildconfigs/mk.$* prep
-
 %-install:
 	$(MAKE) -f buildconfigs/mk.$* build
 
@@ -83,14 +80,19 @@ endif
 %-build: %-dist
 	@: # do nothing
 
+%-prep: DESTDIR=$(DISTDIR)/install
+%-prep:
+	$(MAKE) -f buildconfigs/mk.$* prep
+
+%-config: DESTDIR=$(DISTDIR)/install
+%-config:
+	$(MAKE) -f buildconfigs/mk.$* config
+
 %-delete:
 	$(MAKE) -f buildconfigs/mk.$* delete
 
 %-clean:
 	$(MAKE) -f buildconfigs/mk.$* clean
-
-%-config:
-	$(MAKE) -f buildconfigs/mk.$* config
 
 linux-2.6-xen.patch: ref-linux-$(LINUX_VER)/.valid-ref
 	rm -rf tmp-$@
