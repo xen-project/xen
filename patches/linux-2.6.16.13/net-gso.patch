@@ -104,7 +104,7 @@ index dd41049..6615583 100644
  	if (skb_shinfo(skb)->nr_frags == 0) {
  		struct cp_desc *txd = &cp->tx_ring[entry];
 diff --git a/drivers/net/bnx2.c b/drivers/net/bnx2.c
-index a24200d..b5e39a1 100644
+index a24200d..29d9218 100644
 --- a/drivers/net/bnx2.c
 +++ b/drivers/net/bnx2.c
 @@ -1593,7 +1593,7 @@ bnx2_tx_int(struct bnx2 *bp)
@@ -112,7 +112,7 @@ index a24200d..b5e39a1 100644
  #ifdef BCM_TSO 
  		/* partial BD completions possible with TSO packets */
 -		if (skb_shinfo(skb)->tso_size) {
-+		if (skb_shinfo(skb)->gso_size) {
++		if (skb_is_gso(skb)) {
  			u16 last_idx, last_ring_idx;
  
  			last_idx = sw_cons +
@@ -178,7 +178,7 @@ index bcf9f17..e970921 100644
  	bond_dev->features |= NETIF_F_LLTX;
  
 diff --git a/drivers/net/chelsio/sge.c b/drivers/net/chelsio/sge.c
-index 30ff8ea..7b7d360 100644
+index 30ff8ea..7d72e16 100644
 --- a/drivers/net/chelsio/sge.c
 +++ b/drivers/net/chelsio/sge.c
 @@ -1419,7 +1419,7 @@ int t1_start_xmit(struct sk_buff *skb, s
@@ -186,7 +186,7 @@ index 30ff8ea..7b7d360 100644
  
  #ifdef NETIF_F_TSO
 -	if (skb_shinfo(skb)->tso_size) {
-+	if (skb_shinfo(skb)->gso_size) {
++	if (skb_is_gso(skb)) {
  		int eth_type;
  		struct cpl_tx_pkt_lso *hdr;
  
@@ -200,7 +200,7 @@ index 30ff8ea..7b7d360 100644
  		cpl = (struct cpl_tx_pkt *)hdr;
  		sge->stats.tx_lso_pkts++;
 diff --git a/drivers/net/e1000/e1000_main.c b/drivers/net/e1000/e1000_main.c
-index fa29402..681d284 100644
+index fa29402..96ddc24 100644
 --- a/drivers/net/e1000/e1000_main.c
 +++ b/drivers/net/e1000/e1000_main.c
 @@ -2526,7 +2526,7 @@ #ifdef NETIF_F_TSO
@@ -208,7 +208,7 @@ index fa29402..681d284 100644
  	int err;
  
 -	if (skb_shinfo(skb)->tso_size) {
-+	if (skb_shinfo(skb)->gso_size) {
++	if (skb_is_gso(skb)) {
  		if (skb_header_cloned(skb)) {
  			err = pskb_expand_head(skb, 0, 0, GFP_ATOMIC);
  			if (err)
@@ -226,7 +226,7 @@ index fa29402..681d284 100644
  		 * DMAd to the controller */
  		if (!skb->data_len && tx_ring->last_tx_tso &&
 -				!skb_shinfo(skb)->tso_size) {
-+				!skb_shinfo(skb)->gso_size) {
++		    !skb_is_gso(skb)) {
  			tx_ring->last_tx_tso = 0;
  			size -= 4;
  		}
@@ -239,17 +239,18 @@ index fa29402..681d284 100644
  	/* The controller does a simple calculation to 
  	 * make sure there is enough room in the FIFO before
  	 * initiating the DMA for each buffer.  The calc is:
-@@ -2935,7 +2935,7 @@ #endif
+@@ -2934,8 +2934,7 @@ #endif
+ 
  #ifdef NETIF_F_TSO
  	/* Controller Erratum workaround */
- 	if (!skb->data_len && tx_ring->last_tx_tso &&
+-	if (!skb->data_len && tx_ring->last_tx_tso &&
 -		!skb_shinfo(skb)->tso_size)
-+		!skb_shinfo(skb)->gso_size)
++	if (!skb->data_len && tx_ring->last_tx_tso && !skb_is_gso(skb))
  		count++;
  #endif
  
 diff --git a/drivers/net/forcedeth.c b/drivers/net/forcedeth.c
-index 3682ec6..c35f16e 100644
+index 3682ec6..c6ca459 100644
 --- a/drivers/net/forcedeth.c
 +++ b/drivers/net/forcedeth.c
 @@ -482,9 +482,9 @@ #define LPA_1000HALF	0x0400
@@ -279,7 +280,7 @@ index 3682ec6..c35f16e 100644
  #ifdef NETIF_F_TSO
 -	if (skb_shinfo(skb)->tso_size)
 -		tx_flags_extra = NV_TX2_TSO | (skb_shinfo(skb)->tso_size << NV_TX2_TSO_SHIFT);
-+	if (skb_shinfo(skb)->gso_size)
++	if (skb_is_gso(skb))
 +		tx_flags_extra = NV_TX2_TSO | (skb_shinfo(skb)->gso_size << NV_TX2_TSO_SHIFT);
  	else
  #endif
@@ -450,7 +451,7 @@ index a9f49f0..339d4a7 100644
  	}
  
 diff --git a/drivers/net/ixgb/ixgb_main.c b/drivers/net/ixgb/ixgb_main.c
-index f9f77e4..bdab369 100644
+index f9f77e4..7d187d0 100644
 --- a/drivers/net/ixgb/ixgb_main.c
 +++ b/drivers/net/ixgb/ixgb_main.c
 @@ -1163,7 +1163,7 @@ #ifdef NETIF_F_TSO
@@ -458,7 +459,7 @@ index f9f77e4..bdab369 100644
  	int err;
  
 -	if(likely(skb_shinfo(skb)->tso_size)) {
-+	if(likely(skb_shinfo(skb)->gso_size)) {
++	if (likely(skb_is_gso(skb))) {
  		if (skb_header_cloned(skb)) {
  			err = pskb_expand_head(skb, 0, 0, GFP_ATOMIC);
  			if (err)
@@ -472,7 +473,7 @@ index f9f77e4..bdab369 100644
  		skb->nh.iph->check = 0;
  		skb->h.th->check = ~csum_tcpudp_magic(skb->nh.iph->saddr,
 diff --git a/drivers/net/loopback.c b/drivers/net/loopback.c
-index 690a1aa..9bcaa80 100644
+index 690a1aa..3843e0a 100644
 --- a/drivers/net/loopback.c
 +++ b/drivers/net/loopback.c
 @@ -74,7 +74,7 @@ static void emulate_large_send_offload(s
@@ -489,7 +490,7 @@ index 690a1aa..9bcaa80 100644
  
  #ifdef LOOPBACK_TSO
 -	if (skb_shinfo(skb)->tso_size) {
-+	if (skb_shinfo(skb)->gso_size) {
++	if (skb_is_gso(skb)) {
  		BUG_ON(skb->protocol != htons(ETH_P_IP));
  		BUG_ON(skb->nh.iph->protocol != IPPROTO_TCP);
  
@@ -600,7 +601,7 @@ index b7f00d6..439f45f 100644
  	writeq(val64, &tx_fifo->List_Control);
  
 diff --git a/drivers/net/sky2.c b/drivers/net/sky2.c
-index 0618cd5..2a55eb3 100644
+index 0618cd5..aa06a82 100644
 --- a/drivers/net/sky2.c
 +++ b/drivers/net/sky2.c
 @@ -1125,7 +1125,7 @@ static unsigned tx_le_req(const struct s
@@ -608,7 +609,7 @@ index 0618cd5..2a55eb3 100644
  	count += skb_shinfo(skb)->nr_frags * count;
  
 -	if (skb_shinfo(skb)->tso_size)
-+	if (skb_shinfo(skb)->gso_size)
++	if (skb_is_gso(skb))
  		++count;
  
  	if (skb->ip_summed == CHECKSUM_HW)
@@ -667,7 +668,7 @@ index 5b1af39..11de5af 100644
  		np->stats.rx_missed_errors += ioread32(ioaddr + RxMissed) & 0xffff;
  
 diff --git a/drivers/net/typhoon.c b/drivers/net/typhoon.c
-index 4c76cb7..30c48c9 100644
+index 4c76cb7..3d62abc 100644
 --- a/drivers/net/typhoon.c
 +++ b/drivers/net/typhoon.c
 @@ -340,7 +340,7 @@ #define typhoon_synchronize_irq(x) synch
@@ -679,6 +680,24 @@ index 4c76cb7..30c48c9 100644
  #define TSO_NUM_DESCRIPTORS	2
  #define TSO_OFFLOAD_ON		TYPHOON_OFFLOAD_TCP_SEGMENT
  #else
+@@ -805,7 +805,7 @@ typhoon_start_tx(struct sk_buff *skb, st
+ 	 * If problems develop with TSO, check this first.
+ 	 */
+ 	numDesc = skb_shinfo(skb)->nr_frags + 1;
+-	if(skb_tso_size(skb))
++	if (skb_is_gso(skb))
+ 		numDesc++;
+ 
+ 	/* When checking for free space in the ring, we need to also
+@@ -845,7 +845,7 @@ typhoon_start_tx(struct sk_buff *skb, st
+ 				TYPHOON_TX_PF_VLAN_TAG_SHIFT);
+ 	}
+ 
+-	if(skb_tso_size(skb)) {
++	if (skb_is_gso(skb)) {
+ 		first_txd->processFlags |= TYPHOON_TX_PF_TCP_SEGMENT;
+ 		first_txd->numDesc++;
+ 
 diff --git a/drivers/net/via-velocity.c b/drivers/net/via-velocity.c
 index ed1f837..2eb6b5f 100644
 --- a/drivers/net/via-velocity.c
@@ -769,7 +788,7 @@ index 82cb4af..57cec40 100644
  
  static inline struct qeth_eddp_context *
 diff --git a/drivers/s390/net/qeth_main.c b/drivers/s390/net/qeth_main.c
-index dba7f7f..d9cc997 100644
+index dba7f7f..a3ea8e0 100644
 --- a/drivers/s390/net/qeth_main.c
 +++ b/drivers/s390/net/qeth_main.c
 @@ -4454,7 +4454,7 @@ qeth_send_packet(struct qeth_card *card,
@@ -777,19 +796,20 @@ index dba7f7f..d9cc997 100644
  		[qeth_get_priority_queue(card, skb, ipv, cast_type)];
  
 -	if (skb_shinfo(skb)->tso_size)
-+	if (skb_shinfo(skb)->gso_size)
++	if (skb_is_gso(skb))
  		large_send = card->options.large_send;
  
  	/*are we able to do TSO ? If so ,prepare and send it from here */
-@@ -4501,7 +4501,7 @@ qeth_send_packet(struct qeth_card *card,
+@@ -4501,8 +4501,7 @@ qeth_send_packet(struct qeth_card *card,
  		card->stats.tx_packets++;
  		card->stats.tx_bytes += skb->len;
  #ifdef CONFIG_QETH_PERF_STATS
 -		if (skb_shinfo(skb)->tso_size &&
-+		if (skb_shinfo(skb)->gso_size &&
- 		   !(large_send == QETH_LARGE_SEND_NO)) {
+-		   !(large_send == QETH_LARGE_SEND_NO)) {
++		if (skb_is_gso(skb) && !(large_send == QETH_LARGE_SEND_NO)) {
  			card->perf_stats.large_send_bytes += skb->len;
  			card->perf_stats.large_send_cnt++;
+ 		}
 diff --git a/drivers/s390/net/qeth_tso.h b/drivers/s390/net/qeth_tso.h
 index 1286dde..89cbf34 100644
 --- a/drivers/s390/net/qeth_tso.h
@@ -817,7 +837,7 @@ index 93535f0..9269df7 100644
  /* compatibility with older code */
  #define SPARC_ETH_GSET		ETHTOOL_GSET
 diff --git a/include/linux/netdevice.h b/include/linux/netdevice.h
-index 7fda03d..47b0965 100644
+index 7fda03d..9865736 100644
 --- a/include/linux/netdevice.h
 +++ b/include/linux/netdevice.h
 @@ -230,7 +230,8 @@ enum netdev_state_t
@@ -869,16 +889,17 @@ index 7fda03d..47b0965 100644
  	/* cpu id of processor entered to hard_start_xmit or -1,
  	   if nobody entered there.
  	 */
-@@ -527,6 +539,8 @@ struct packet_type {
+@@ -527,6 +539,9 @@ struct packet_type {
  					 struct net_device *,
  					 struct packet_type *,
  					 struct net_device *);
 +	struct sk_buff		*(*gso_segment)(struct sk_buff *skb,
 +						int features);
++	int			(*gso_send_check)(struct sk_buff *skb);
  	void			*af_packet_priv;
  	struct list_head	list;
  };
-@@ -693,7 +707,8 @@ extern int		dev_change_name(struct net_d
+@@ -693,7 +708,8 @@ extern int		dev_change_name(struct net_d
  extern int		dev_set_mtu(struct net_device *, int);
  extern int		dev_set_mac_address(struct net_device *,
  					    struct sockaddr *);
@@ -888,7 +909,7 @@ index 7fda03d..47b0965 100644
  
  extern void		dev_init(void);
  
-@@ -900,11 +915,43 @@ static inline void __netif_rx_complete(s
+@@ -900,11 +916,43 @@ static inline void __netif_rx_complete(s
  	clear_bit(__LINK_STATE_RX_SCHED, &dev->state);
  }
  
@@ -934,7 +955,7 @@ index 7fda03d..47b0965 100644
  }
  
  /* These functions live elsewhere (drivers/net/net_init.c, but related) */
-@@ -932,6 +979,7 @@ extern int		netdev_max_backlog;
+@@ -932,6 +980,7 @@ extern int		netdev_max_backlog;
  extern int		weight_p;
  extern int		netdev_set_master(struct net_device *dev, struct net_device *master);
  extern int skb_checksum_help(struct sk_buff *skb, int inward);
@@ -942,27 +963,28 @@ index 7fda03d..47b0965 100644
  #ifdef CONFIG_BUG
  extern void netdev_rx_csum_fault(struct net_device *dev);
  #else
-@@ -951,6 +999,18 @@ #endif
+@@ -951,6 +1000,19 @@ #endif
  
  extern void linkwatch_run_queue(void);
  
 +static inline int skb_gso_ok(struct sk_buff *skb, int features)
 +{
-+	int feature = skb_shinfo(skb)->gso_size ?
-+		      skb_shinfo(skb)->gso_type << NETIF_F_GSO_SHIFT : 0;
++	int feature = skb_shinfo(skb)->gso_type << NETIF_F_GSO_SHIFT;
 +	return (features & feature) == feature;
 +}
 +
 +static inline int netif_needs_gso(struct net_device *dev, struct sk_buff *skb)
 +{
-+	return !skb_gso_ok(skb, dev->features);
++	return skb_is_gso(skb) &&
++	       (!skb_gso_ok(skb, dev->features) ||
++		unlikely(skb->ip_summed != CHECKSUM_HW));
 +}
 +
  #endif /* __KERNEL__ */
  
  #endif	/* _LINUX_DEV_H */
 diff --git a/include/linux/skbuff.h b/include/linux/skbuff.h
-index ad7cc22..b19d45d 100644
+index ad7cc22..adfe3a8 100644
 --- a/include/linux/skbuff.h
 +++ b/include/linux/skbuff.h
 @@ -134,9 +134,10 @@ struct skb_frag_struct {
@@ -1041,6 +1063,17 @@ index ad7cc22..b19d45d 100644
  
  static inline void *skb_header_pointer(const struct sk_buff *skb, int offset,
  				       int len, void *buffer)
+@@ -1377,5 +1403,10 @@ #else /* CONFIG_NETFILTER */
+ static inline void nf_reset(struct sk_buff *skb) {}
+ #endif /* CONFIG_NETFILTER */
+ 
++static inline int skb_is_gso(const struct sk_buff *skb)
++{
++	return skb_shinfo(skb)->gso_size;
++}
++
+ #endif	/* __KERNEL__ */
+ #endif	/* _LINUX_SKBUFF_H */
 diff --git a/include/net/pkt_sched.h b/include/net/pkt_sched.h
 index b94d1ad..75b5b93 100644
 --- a/include/net/pkt_sched.h
@@ -1063,13 +1096,14 @@ index b94d1ad..75b5b93 100644
  
  extern int tc_classify(struct sk_buff *skb, struct tcf_proto *tp,
 diff --git a/include/net/protocol.h b/include/net/protocol.h
-index 6dc5970..0d2dcdb 100644
+index 6dc5970..d516c58 100644
 --- a/include/net/protocol.h
 +++ b/include/net/protocol.h
-@@ -37,6 +37,8 @@ #define MAX_INET_PROTOS	256		/* Must be 
+@@ -37,6 +37,9 @@ #define MAX_INET_PROTOS	256		/* Must be 
  struct net_protocol {
  	int			(*handler)(struct sk_buff *skb);
  	void			(*err_handler)(struct sk_buff *skb, u32 info);
++	int			(*gso_send_check)(struct sk_buff *skb);
 +	struct sk_buff	       *(*gso_segment)(struct sk_buff *skb,
 +					       int features);
  	int			no_policy;
@@ -1094,7 +1128,7 @@ index f63d0d5..a8e8d21 100644
  }
  
 diff --git a/include/net/tcp.h b/include/net/tcp.h
-index 77f21c6..70e1d5f 100644
+index 77f21c6..22dbbac 100644
 --- a/include/net/tcp.h
 +++ b/include/net/tcp.h
 @@ -552,13 +552,13 @@ #include <net/tcp_ecn.h>
@@ -1113,10 +1147,11 @@ index 77f21c6..70e1d5f 100644
  }
  
  static inline void tcp_dec_pcount_approx(__u32 *count,
-@@ -1063,6 +1063,8 @@ extern struct request_sock_ops tcp_reque
+@@ -1063,6 +1063,9 @@ extern struct request_sock_ops tcp_reque
  
  extern int tcp_v4_destroy_sock(struct sock *sk);
  
++extern int tcp_v4_gso_send_check(struct sk_buff *skb);
 +extern struct sk_buff *tcp_tso_segment(struct sk_buff *skb, int features);
 +
  #ifdef CONFIG_PROC_FS
@@ -1170,7 +1205,7 @@ index 0b33a7b..180e79b 100644
 + 			NETIF_F_TSO | NETIF_F_NO_CSUM | NETIF_F_GSO_ROBUST;
  }
 diff --git a/net/bridge/br_forward.c b/net/bridge/br_forward.c
-index 2d24fb4..00b1128 100644
+index 2d24fb4..b34e76f 100644
 --- a/net/bridge/br_forward.c
 +++ b/net/bridge/br_forward.c
 @@ -32,7 +32,7 @@ static inline int should_deliver(const s
@@ -1178,7 +1213,7 @@ index 2d24fb4..00b1128 100644
  {
  	/* drop mtu oversized packets except tso */
 -	if (skb->len > skb->dev->mtu && !skb_shinfo(skb)->tso_size)
-+	if (skb->len > skb->dev->mtu && !skb_shinfo(skb)->gso_size)
++	if (skb->len > skb->dev->mtu && !skb_is_gso(skb))
  		kfree_skb(skb);
  	else {
  #ifdef CONFIG_BRIDGE_NETFILTER
@@ -1222,7 +1257,7 @@ index f36b35e..0617146 100644
  
  /* called with RTNL */
 diff --git a/net/bridge/br_netfilter.c b/net/bridge/br_netfilter.c
-index 9e27373..588207f 100644
+index 9e27373..b2dba74 100644
 --- a/net/bridge/br_netfilter.c
 +++ b/net/bridge/br_netfilter.c
 @@ -743,7 +743,7 @@ static int br_nf_dev_queue_xmit(struct s
@@ -1230,12 +1265,12 @@ index 9e27373..588207f 100644
  	if (skb->protocol == htons(ETH_P_IP) &&
  	    skb->len > skb->dev->mtu &&
 -	    !(skb_shinfo(skb)->ufo_size || skb_shinfo(skb)->tso_size))
-+	    !skb_shinfo(skb)->gso_size)
++	    !skb_is_gso(skb))
  		return ip_fragment(skb, br_dev_queue_push_xmit);
  	else
  		return br_dev_queue_push_xmit(skb);
 diff --git a/net/core/dev.c b/net/core/dev.c
-index 12a214c..32e1056 100644
+index 12a214c..e814a89 100644
 --- a/net/core/dev.c
 +++ b/net/core/dev.c
 @@ -115,6 +115,7 @@ #include <linux/wireless.h>		/* Note : w
@@ -1255,7 +1290,35 @@ index 12a214c..32e1056 100644
  {
  	struct packet_type *ptype;
  
-@@ -1106,6 +1107,45 @@ out:	
+@@ -1082,9 +1083,17 @@ int skb_checksum_help(struct sk_buff *sk
+ 	unsigned int csum;
+ 	int ret = 0, offset = skb->h.raw - skb->data;
+ 
+-	if (inward) {
+-		skb->ip_summed = CHECKSUM_NONE;
+-		goto out;
++	if (inward)
++		goto out_set_summed;
++
++	if (unlikely(skb_shinfo(skb)->gso_size)) {
++		static int warned;
++
++		WARN_ON(!warned);
++		warned = 1;
++
++		/* Let GSO fix up the checksum. */
++		goto out_set_summed;
+ 	}
+ 
+ 	if (skb_cloned(skb)) {
+@@ -1101,11 +1110,70 @@ int skb_checksum_help(struct sk_buff *sk
+ 	BUG_ON(skb->csum + 2 > offset);
+ 
+ 	*(u16*)(skb->h.raw + skb->csum) = csum_fold(csum);
++
++out_set_summed:
+ 	skb->ip_summed = CHECKSUM_NONE;
+ out:	
  	return ret;
  }
  
@@ -1274,17 +1337,35 @@ index 12a214c..32e1056 100644
 +	struct sk_buff *segs = ERR_PTR(-EPROTONOSUPPORT);
 +	struct packet_type *ptype;
 +	int type = skb->protocol;
++	int err;
 +
 +	BUG_ON(skb_shinfo(skb)->frag_list);
-+	BUG_ON(skb->ip_summed != CHECKSUM_HW);
 +
 +	skb->mac.raw = skb->data;
 +	skb->mac_len = skb->nh.raw - skb->data;
 +	__skb_pull(skb, skb->mac_len);
 +
++	if (unlikely(skb->ip_summed != CHECKSUM_HW)) {
++		static int warned;
++
++		WARN_ON(!warned);
++		warned = 1;
++
++		if (skb_header_cloned(skb) &&
++		    (err = pskb_expand_head(skb, 0, 0, GFP_ATOMIC)))
++			return ERR_PTR(err);
++	}
++
 +	rcu_read_lock();
 +	list_for_each_entry_rcu(ptype, &ptype_base[ntohs(type) & 15], list) {
 +		if (ptype->type == type && !ptype->dev && ptype->gso_segment) {
++			if (unlikely(skb->ip_summed != CHECKSUM_HW)) {
++				err = ptype->gso_send_check(skb);
++				segs = ERR_PTR(err);
++				if (err || skb_gso_ok(skb, features))
++					break;
++				__skb_push(skb, skb->data - skb->nh.raw);
++			}
 +			segs = ptype->gso_segment(skb, features);
 +			break;
 +		}
@@ -1301,7 +1382,7 @@ index 12a214c..32e1056 100644
  /* Take action when hardware reception checksum errors are detected. */
  #ifdef CONFIG_BUG
  void netdev_rx_csum_fault(struct net_device *dev)
-@@ -1142,75 +1182,108 @@ #else
+@@ -1142,75 +1210,108 @@ #else
  #define illegal_highdma(dev, skb)	(0)
  #endif
  
@@ -1469,7 +1550,7 @@ index 12a214c..32e1056 100644
  	}						\
  }
  
-@@ -1246,9 +1319,13 @@ int dev_queue_xmit(struct sk_buff *skb)
+@@ -1246,9 +1347,13 @@ int dev_queue_xmit(struct sk_buff *skb)
  	struct Qdisc *q;
  	int rc = -ENOMEM;
  
@@ -1484,7 +1565,7 @@ index 12a214c..32e1056 100644
  		goto out_kfree_skb;
  
  	/* Fragmented skb is linearized if device does not support SG,
-@@ -1257,25 +1334,26 @@ int dev_queue_xmit(struct sk_buff *skb)
+@@ -1257,25 +1362,26 @@ int dev_queue_xmit(struct sk_buff *skb)
  	 */
  	if (skb_shinfo(skb)->nr_frags &&
  	    (!(dev->features & NETIF_F_SG) || illegal_highdma(dev, skb)) &&
@@ -1514,7 +1595,7 @@ index 12a214c..32e1056 100644
  
  	/* Updates of qdisc are serialized by queue_lock. 
  	 * The struct Qdisc which is pointed to by qdisc is now a 
-@@ -1309,8 +1387,8 @@ #endif
+@@ -1309,8 +1415,8 @@ #endif
  	/* The device has no queue. Common case for software devices:
  	   loopback, all the sorts of tunnels...
  
@@ -1525,7 +1606,7 @@ index 12a214c..32e1056 100644
  	   counters.)
  	   However, it is possible, that they rely on protection
  	   made by us here.
-@@ -1326,11 +1404,8 @@ #endif
+@@ -1326,11 +1432,8 @@ #endif
  			HARD_TX_LOCK(dev, cpu);
  
  			if (!netif_queue_stopped(dev)) {
@@ -1538,7 +1619,7 @@ index 12a214c..32e1056 100644
  					HARD_TX_UNLOCK(dev);
  					goto out;
  				}
-@@ -1349,13 +1424,13 @@ #endif
+@@ -1349,13 +1452,13 @@ #endif
  	}
  
  	rc = -ENETDOWN;
@@ -1554,7 +1635,7 @@ index 12a214c..32e1056 100644
  	return rc;
  }
  
-@@ -2670,7 +2745,7 @@ int register_netdevice(struct net_device
+@@ -2670,7 +2773,7 @@ int register_netdevice(struct net_device
  	BUG_ON(dev->reg_state != NETREG_UNINITIALIZED);
  
  	spin_lock_init(&dev->queue_lock);
@@ -1563,7 +1644,7 @@ index 12a214c..32e1056 100644
  	dev->xmit_lock_owner = -1;
  #ifdef CONFIG_NET_CLS_ACT
  	spin_lock_init(&dev->ingress_lock);
-@@ -2714,9 +2789,7 @@ #endif
+@@ -2714,9 +2817,7 @@ #endif
  
  	/* Fix illegal SG+CSUM combinations. */
  	if ((dev->features & NETIF_F_SG) &&
@@ -1574,7 +1655,7 @@ index 12a214c..32e1056 100644
  		printk("%s: Dropping NETIF_F_SG since no checksum feature.\n",
  		       dev->name);
  		dev->features &= ~NETIF_F_SG;
-@@ -3268,7 +3341,6 @@ subsys_initcall(net_dev_init);
+@@ -3268,7 +3369,6 @@ subsys_initcall(net_dev_init);
  EXPORT_SYMBOL(__dev_get_by_index);
  EXPORT_SYMBOL(__dev_get_by_name);
  EXPORT_SYMBOL(__dev_remove_pack);
@@ -2042,7 +2123,7 @@ index 3407f19..a0a25e0 100644
  
                  switch(flags & DN_RT_CNTL_MSK) {
 diff --git a/net/ipv4/af_inet.c b/net/ipv4/af_inet.c
-index 97c276f..5ba719e 100644
+index 97c276f..0a8c559 100644
 --- a/net/ipv4/af_inet.c
 +++ b/net/ipv4/af_inet.c
 @@ -68,6 +68,7 @@
@@ -2053,10 +2134,44 @@ index 97c276f..5ba719e 100644
  #include <linux/errno.h>
  #include <linux/types.h>
  #include <linux/socket.h>
-@@ -1084,6 +1085,54 @@ int inet_sk_rebuild_header(struct sock *
+@@ -1084,6 +1085,88 @@ int inet_sk_rebuild_header(struct sock *
  
  EXPORT_SYMBOL(inet_sk_rebuild_header);
  
++static int inet_gso_send_check(struct sk_buff *skb)
++{
++	struct iphdr *iph;
++	struct net_protocol *ops;
++	int proto;
++	int ihl;
++	int err = -EINVAL;
++
++	if (unlikely(!pskb_may_pull(skb, sizeof(*iph))))
++		goto out;
++
++	iph = skb->nh.iph;
++	ihl = iph->ihl * 4;
++	if (ihl < sizeof(*iph))
++		goto out;
++
++	if (unlikely(!pskb_may_pull(skb, ihl)))
++		goto out;
++
++	skb->h.raw = __skb_pull(skb, ihl);
++	iph = skb->nh.iph;
++	proto = iph->protocol & (MAX_INET_PROTOS - 1);
++	err = -EPROTONOSUPPORT;
++
++	rcu_read_lock();
++	ops = rcu_dereference(inet_protos[proto]);
++	if (likely(ops && ops->gso_send_check))
++		err = ops->gso_send_check(skb);
++	rcu_read_unlock();
++
++out:
++	return err;
++}
++
 +static struct sk_buff *inet_gso_segment(struct sk_buff *skb, int features)
 +{
 +	struct sk_buff *segs = ERR_PTR(-EINVAL);
@@ -2108,24 +2223,26 @@ index 97c276f..5ba719e 100644
  #ifdef CONFIG_IP_MULTICAST
  static struct net_protocol igmp_protocol = {
  	.handler =	igmp_rcv,
-@@ -1093,6 +1142,7 @@ #endif
+@@ -1093,6 +1176,8 @@ #endif
  static struct net_protocol tcp_protocol = {
  	.handler =	tcp_v4_rcv,
  	.err_handler =	tcp_v4_err,
++	.gso_send_check = tcp_v4_gso_send_check,
 +	.gso_segment =	tcp_tso_segment,
  	.no_policy =	1,
  };
  
-@@ -1138,6 +1188,7 @@ static int ipv4_proc_init(void);
+@@ -1138,6 +1223,8 @@ static int ipv4_proc_init(void);
  static struct packet_type ip_packet_type = {
  	.type = __constant_htons(ETH_P_IP),
  	.func = ip_rcv,
++	.gso_send_check = inet_gso_send_check,
 +	.gso_segment = inet_gso_segment,
  };
  
  static int __init inet_init(void)
 diff --git a/net/ipv4/ip_output.c b/net/ipv4/ip_output.c
-index 8dcba38..19c3c73 100644
+index 8dcba38..2de887c 100644
 --- a/net/ipv4/ip_output.c
 +++ b/net/ipv4/ip_output.c
 @@ -210,8 +210,7 @@ #if defined(CONFIG_NETFILTER) && defined
@@ -2134,7 +2251,7 @@ index 8dcba38..19c3c73 100644
  #endif
 -	if (skb->len > dst_mtu(skb->dst) &&
 -	    !(skb_shinfo(skb)->ufo_size || skb_shinfo(skb)->tso_size))
-+	if (skb->len > dst_mtu(skb->dst) && !skb_shinfo(skb)->gso_size)
++	if (skb->len > dst_mtu(skb->dst) && !skb_is_gso(skb))
  		return ip_fragment(skb, ip_finish_output2);
  	else
  		return ip_finish_output2(skb);
@@ -2182,7 +2299,7 @@ index 8dcba38..19c3c73 100644
  		int i;
  
 -		if (skb_shinfo(skb)->ufo_size)
-+		if (skb_shinfo(skb)->gso_size)
++		if (skb_is_gso(skb))
  			len = size;
  		else {
  
@@ -2372,6 +2489,35 @@ index e9a54ae..defe77a 100644
  					break;
  				pcount = tcp_skb_pcount(skb);
  			}
+diff --git a/net/ipv4/tcp_ipv4.c b/net/ipv4/tcp_ipv4.c
+index 233bdf2..b4240b4 100644
+--- a/net/ipv4/tcp_ipv4.c
++++ b/net/ipv4/tcp_ipv4.c
+@@ -495,6 +495,24 @@ void tcp_v4_send_check(struct sock *sk, 
+ 	}
+ }
+ 
++int tcp_v4_gso_send_check(struct sk_buff *skb)
++{
++	struct iphdr *iph;
++	struct tcphdr *th;
++
++	if (!pskb_may_pull(skb, sizeof(*th)))
++		return -EINVAL;
++
++	iph = skb->nh.iph;
++	th = skb->h.th;
++
++	th->check = 0;
++	th->check = ~tcp_v4_check(th, skb->len, iph->saddr, iph->daddr, 0);
++	skb->csum = offsetof(struct tcphdr, check);
++	skb->ip_summed = CHECKSUM_HW;
++	return 0;
++}
++
+ /*
+  *	This routine will send an RST to the other tcp.
+  *
 diff --git a/net/ipv4/tcp_output.c b/net/ipv4/tcp_output.c
 index 310f2e6..ee01f69 100644
 --- a/net/ipv4/tcp_output.c
@@ -2492,7 +2638,7 @@ index 310f2e6..ee01f69 100644
  	/* Use a previous sequence.  This should cause the other
  	 * end to send an ack.  Don't queue or clone SKB, just
 diff --git a/net/ipv4/xfrm4_output.c b/net/ipv4/xfrm4_output.c
-index 32ad229..737c1db 100644
+index 32ad229..62ead52 100644
 --- a/net/ipv4/xfrm4_output.c
 +++ b/net/ipv4/xfrm4_output.c
 @@ -9,6 +9,8 @@
@@ -2546,7 +2692,7 @@ index 32ad229..737c1db 100644
 +	}
 +#endif
 +
-+	if (!skb_shinfo(skb)->gso_size)
++	if (!skb_is_gso(skb))
 +		return xfrm4_output_finish2(skb);
 +
 +	skb->protocol = htons(ETH_P_IP);
@@ -2581,7 +2727,7 @@ index 32ad229..737c1db 100644
  {
  	return NF_HOOK_COND(PF_INET, NF_IP_POST_ROUTING, skb, NULL, skb->dst->dev,
 diff --git a/net/ipv6/ip6_output.c b/net/ipv6/ip6_output.c
-index 5bf70b1..cf5d17e 100644
+index 5bf70b1..33a5850 100644
 --- a/net/ipv6/ip6_output.c
 +++ b/net/ipv6/ip6_output.c
 @@ -147,7 +147,7 @@ static int ip6_output2(struct sk_buff *s
@@ -2589,7 +2735,7 @@ index 5bf70b1..cf5d17e 100644
  int ip6_output(struct sk_buff *skb)
  {
 -	if ((skb->len > dst_mtu(skb->dst) && !skb_shinfo(skb)->ufo_size) ||
-+	if ((skb->len > dst_mtu(skb->dst) && !skb_shinfo(skb)->gso_size) ||
++	if ((skb->len > dst_mtu(skb->dst) && !skb_is_gso(skb)) ||
  				dst_allfrag(skb->dst))
  		return ip6_fragment(skb, ip6_output2);
  	else
@@ -2644,7 +2790,7 @@ index d511a88..ef56d5d 100644
  	/* compression */
  	plen = skb->len - hdr_len;
 diff --git a/net/ipv6/xfrm6_output.c b/net/ipv6/xfrm6_output.c
-index 8024217..39bdeec 100644
+index 8024217..e9ea338 100644
 --- a/net/ipv6/xfrm6_output.c
 +++ b/net/ipv6/xfrm6_output.c
 @@ -151,7 +151,7 @@ error_nolock:
@@ -2673,7 +2819,7 @@ index 8024217..39bdeec 100644
 +{
 +	struct sk_buff *segs;
 +
-+	if (!skb_shinfo(skb)->gso_size)
++	if (!skb_is_gso(skb))
 +		return xfrm6_output_finish2(skb);
 +
 +	skb->protocol = htons(ETH_P_IP);
