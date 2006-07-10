@@ -4,9 +4,11 @@
 // TODO: Many (or perhaps most) of these should eventually be
 // static inline functions
 
+#include <asm/delay.h>
 #include <asm/fpu.h>
 #include <asm/tlb.h>
 #include <asm/ia64_int.h>
+#include <asm/time.h>
 #include <public/arch-ia64.h>
 typedef	unsigned long UINT64;
 typedef	unsigned int UINT;
@@ -175,6 +177,12 @@ static inline UINT64
 itir_mask(UINT64 itir)
 {
     return (~((1UL << itir_ps(itir)) - 1));
+}
+
+static inline u64
+vcpu_get_next_timer_ns(VCPU *vcpu)
+{
+    return cycle_to_ns(PSCBX(vcpu, domain_itm) - ia64_get_itc()) + NOW();
 }
 
 #define verbose(a...) do {if (vcpu_verbose) printf(a);} while(0)

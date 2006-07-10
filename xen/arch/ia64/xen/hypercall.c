@@ -220,7 +220,9 @@ fw_hypercall (struct pt_regs *regs)
 			}
 			else {
 				pal_halt_light_count++;
-				do_sched_op_compat(SCHEDOP_yield, 0);
+				set_timer(&v->arch.hlt_timer,
+				          vcpu_get_next_timer_ns(v));
+				do_sched_op_compat(SCHEDOP_block, 0);
 			}
 			regs->r8 = 0;
 			regs->r9 = 0;
