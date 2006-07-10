@@ -28,8 +28,6 @@ unsigned long loops_per_jiffy = (1<<12);	// from linux/init/main.c
 /* FIXME: where these declarations should be there ? */
 extern void show_registers(struct pt_regs *regs);
 
-void ia64_mca_init(void) { printf("ia64_mca_init() skipped (Machine check abort handling)\n"); }
-void ia64_mca_cpu_init(void *x) { }
 void hpsim_setup(char **x)
 {
 #ifdef CONFIG_SMP

@@ -58,7 +58,9 @@
 #endif
 
 #ifdef XEN
-//FIXME LATER
+#define GET_THIS_PADDR(reg, var)		\
+	movl	reg = THIS_CPU(var)		\
+	tpa	reg = reg
 #else
 #define GET_THIS_PADDR(reg, var)		\
 	mov	reg = IA64_KR(PER_CPU_DATA);;	\

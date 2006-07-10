@@ -1,6 +1,8 @@
 obj-y += efi.o
 obj-y += entry.o
 obj-y += irq_ia64.o
+obj-y += mca.o
+obj-y += mca_asm.o
 obj-y += mm_contig.o
 obj-y += pal.o
 obj-y += process-linux-xen.o

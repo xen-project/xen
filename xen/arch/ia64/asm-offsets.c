@@ -8,6 +8,7 @@
 #include <xen/sched.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
+#include <asm/mca.h>
 #include <public/xen.h>
 #include <asm/tlb.h>
 #include <asm/regs.h>
@@ -31,6 +32,9 @@ void foo(void)
 	DEFINE(IA64_CPU_SIZE, sizeof (struct cpuinfo_ia64));
 	DEFINE(UNW_FRAME_INFO_SIZE, sizeof (struct unw_frame_info));
 	DEFINE(SHARED_INFO_SIZE, sizeof (struct shared_info));
+
+	BLANK();
+	DEFINE(IA64_MCA_CPU_INIT_STACK_OFFSET, offsetof (struct ia64_mca_cpu, init_stack));
 
 	BLANK();
 #ifdef   VTI_DEBUG
