@@ -475,8 +475,11 @@ u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__, u64* logps,
 	 * Don't let non-dom0 domains map uncached addresses.  This can
 	 * happen when domU tries to touch i/o port space.  Also prevents
 	 * possible address aliasing issues.
+	 * WB => WB
+	 * UC, UCE, WC => WB
+	 * NaTPage => NaTPage
 	 */
-	if (d != dom0)
+	if (d != dom0 && (pteval2 & _PAGE_MA_MASK) != _PAGE_MA_NAT)
 		pteval2 &= ~_PAGE_MA_MASK;
 
 	return pteval2;
