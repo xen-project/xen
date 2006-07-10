@@ -370,10 +370,15 @@ class XendDomain:
  
     def domain_unpause(self, domid):
         """Unpause domain execution."""
+
+        dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
+
+        if dominfo.getDomid() == PRIV_DOMAIN:
+            raise XendError("Cannot unpause privileged domain %s" % domid)
+
         try:
-            dominfo = self.domain_lookup_by_name_or_id_nr(domid)
-            if not dominfo:
-                raise XendInvalidDomain(str(domid))
             log.info("Domain %s (%d) unpaused.", dominfo.getName(),
                      dominfo.getDomid())
             return dominfo.unpause()
@@ -383,10 +388,15 @@ class XendDomain:
 
     def domain_pause(self, domid):
         """Pause domain execution."""
+
+        dominfo = self.domain_lookup_by_name_or_id_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
+
+        if dominfo.getDomid() == PRIV_DOMAIN:
+            raise XendError("Cannot pause privileged domain %s" % domid)
+
         try:
-            dominfo = self.domain_lookup_by_name_or_id_nr(domid)
-            if not dominfo:
-                raise XendInvalidDomain(str(domid))
             log.info("Domain %s (%d) paused.", dominfo.getName(),
                      dominfo.getDomid())
             return dominfo.pause()
