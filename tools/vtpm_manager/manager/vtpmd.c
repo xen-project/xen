@@ -51,7 +51,6 @@
 #include "log.h"
 #include "vtpm_ipc.h"
 
-
 #define TPM_EMULATOR_PATH "/usr/bin/vtpmd"
 
 #define VTPM_BE_FNAME          "/dev/vtpm"

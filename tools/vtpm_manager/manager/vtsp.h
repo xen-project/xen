@@ -59,6 +59,9 @@ TPM_RESULT VTSP_OSAP(  const TCS_CONTEXT_HANDLE hContext,
                        TPM_SECRET *sharedsecret, 
                        TCS_AUTH *auth);
 
+TPM_RESULT VTSP_TerminateHandle(const TCS_CONTEXT_HANDLE hContext,
+                                const TCS_AUTH *auth);
+
 TPM_RESULT VTSP_ReadPubek(   const TCS_CONTEXT_HANDLE hContext,
                              CRYPTO_INFO *cypto_info);
 

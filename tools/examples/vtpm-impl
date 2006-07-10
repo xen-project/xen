@@ -45,6 +45,8 @@ TPM_SUCCESS=00000000
 TX_VTPM_MANAGER=/var/vtpm/fifos/from_console.fifo
 RX_VTPM_MANAGER=/var/vtpm/fifos/to_console.fifo
 
+VTPM_MIG=/usr/bin/vtpm_migrator
+
 # -------------------- Helpers for binary streams -----------
 
 function str_to_hex32() {
@@ -67,11 +69,17 @@ function vtpm_manager_cmd() {
  local inst=$2;
  local inst_bin=$(hex32_to_bin $inst);
 
+ claim_lock vtpm_mgr
+
  #send cmd to vtpm_manager
  printf "$cmd$inst_bin" > $TX_VTPM_MANAGER
 
  #recv response
+ set +e
  local resp_hex=`dd skip=10 bs=1 count=4 if=$RX_VTPM_MANAGER 2> /dev/null | xxd -ps`
+ set -e
+
+ release_lock vtpm_mgr
 
  #return whether the command was successful
  if [ $resp_hex != $TPM_SUCCESS ]; then
@@ -126,11 +134,55 @@ function vtpm_delete() {
  fi
 }
 
+# Perform a migration step. This function differentiates between migration
+# to the local host or to a remote machine.
+# Parameters:
+# 1st: destination host to migrate to
+# 2nd: name of the domain to migrate
+# 3rd: the migration step to perform
 function vtpm_migrate() {
- echo "Error: vTPM migration accross machines not implemented."
+ local instance res
+
+ instance=$(vtpmdb_find_instance $2)
+ if [ "$instance" == "" ]; then
+  log err "VTPM Migratoin failed. Unable to translation of domain name"
+  echo "Error: VTPM Migration failed while looking up instance number"
+ fi
+
+ case "$3" in
+  0)
+   #Incicate migration supported
+   echo "0" 
+  ;;
+
+  1)
+   # Get Public Key from Destination
+   # Call vtpm_manager's migration part 1
+   claim_lock vtpm_mgr
+   $VTPM_MIG $1 $2 $instance $3
+   release_lock vtpm_mgr
+  ;;
+
+  2)
+   # Call manager's migration step 2 and send result to destination
+   # If successful remove from db
+   claim_lock vtpm_mgr
+   $VTPM_MIG $1 $2 $instance $3
+   release_lock vtpm_mgr
+  ;;
+
+  3)
+   if `ps x | grep "$VTPM_MIG $1"`; then
+    log err "VTPM Migration failed to complete."
+    echo "Error: VTPM Migration failed to complete."
+   fi
+  ;;
+ esac
+ 
 }
 
+
 function vtpm_migrate_recover() {
- true
+ echo "Error: Recovery not supported yet" 
 }
 

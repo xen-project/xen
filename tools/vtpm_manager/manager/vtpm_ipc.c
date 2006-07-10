@@ -135,7 +135,7 @@ void vtpm_ipc_close(vtpm_ipc_handle_t *ipc_h) {
 
   if (ipc_h) {
     close(ipc_h->fh);
+    ipc_h->fh = VTPM_IPC_CLOSED;
   }
-  ipc_h->fh = VTPM_IPC_CLOSED;
 
 }

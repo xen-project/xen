@@ -124,7 +124,20 @@ TPM_RESULT buffer_init_alias (buffer_t * buf, const buffer_t * b,
   
   return TPM_SUCCESS;
 }
-    
+
+// make an alias buffer_t into bytestream, with given length
+TPM_RESULT buffer_init_alias_convert (buffer_t * buf, tpm_size_t size, BYTE* val) {
+
+  buf->size = size;
+  buf->alloc_size = size;
+  buf->bytes = val;
+
+  buf->is_owner = FALSE;
+
+  return TPM_SUCCESS;
+}
+
+ 
 
 // copy into the start of dest
 TPM_RESULT buffer_copy (buffer_t * dest, const buffer_t* src)
@@ -132,8 +145,7 @@ TPM_RESULT buffer_copy (buffer_t * dest, const buffer_t* src)
   TPM_RESULT status = TPM_SUCCESS;
     
   if (dest->alloc_size < src->size) {  
-    status = buffer_priv_realloc (dest, src->size);
-    STATUSCHECK (status);
+    TPMTRYRETURN( buffer_priv_realloc (dest, src->size) );
   }
   
   memcpy (dest->bytes, src->bytes, src->size);
@@ -162,8 +174,7 @@ TPM_RESULT buffer_append_raw (buffer_t * buf, tpm_size_t len, const BYTE* bytes)
   TPM_RESULT status = TPM_SUCCESS;
   
   if (buf->alloc_size < buf->size + len) {
-    status = buffer_priv_realloc (buf, buf->size + len);
-    STATUSCHECK (status);
+    TPMTRYRETURN( buffer_priv_realloc (buf, buf->size + len) );
   }
   
   memcpy (buf->bytes + buf->size, bytes, len);
@@ -187,6 +198,8 @@ TPM_RESULT buffer_free (buffer_t * buf) {
   if (buf && buf->is_owner && buf->bytes != NULL) {
     free (buf->bytes);
     buf->bytes = NULL;
+    buf->size = buf->alloc_size = 0;
+   
   }
   
   return TPM_SUCCESS;

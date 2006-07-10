@@ -69,6 +69,10 @@ TPM_RESULT buffer_init_const (buffer_t * buf, tpm_size_t size, const BYTE* val);
 TPM_RESULT buffer_init_alias (buffer_t * buf, const buffer_t * b,
                               tpm_size_t offset, tpm_size_t);
 
+// make an alias buffer into a bytestream
+TPM_RESULT buffer_init_alias_convert (buffer_t * buf, 
+                                      tpm_size_t size, BYTE* val);
+
 // "copy constructor"
 TPM_RESULT buffer_init_copy (buffer_t * buf, const buffer_t * src);
 

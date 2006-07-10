@@ -466,6 +466,8 @@ typedef struct pack_constbuf_t {
 
 // ---------------------- Functions for checking TPM_RESULTs -----------------
 
+#include <stdio.h>
+
 // FIXME: Review use of these and delete unneeded ones.
 
 // these are really badly dependent on local structure:
@@ -476,25 +478,21 @@ typedef struct pack_constbuf_t {
                          goto abort_egress; } \
                     while (0)
 
-// ASSUME: the return value used after the abort_egress label has been set
-// already (eg. the 'status' local var)
-#define STATUSCHECK(s) if (s != TPM_SUCCESS) { \
-                            fprintf (stderr, "*** ERR in %s at %s:%i\n", __func__, __FILE__, __LINE__); \
-                            goto abort_egress; \
-                        }
-
 // DEPENDS: local var 'status' of type TPM_RESULT
 // DEPENDS: label 'abort_egress' which cleans up and returns the status
-// Try command c. If it fails, set status to s and goto shame.
+// Try command c. If it fails, set status to s and goto abort.
 #define TPMTRY(s,c) if (c != TPM_SUCCESS) { \
                        status = s; \
+                       printf("ERROR in %s at %s:%i code: %s.\n", __func__, __FILE__, __LINE__, tpm_get_error_name(status)); \
                        goto abort_egress; \
+                    } else {\
+                       status = c; \
                     }
 
-// Try command c. If it fails, print error message, set status to actual return code. Goto shame
+// Try command c. If it fails, print error message, set status to actual return code. Goto abort
 #define TPMTRYRETURN(c) do { status = c; \
                              if (status != TPM_SUCCESS) { \
-                               printf("ERROR in %s at %s:%i code: %s.\n", __func__, __FILE__, __LINE__, tpm_get_error_name(status)); \
+                               fprintf(stderr, "ERROR in %s at %s:%i code: %s.\n", __func__, __FILE__, __LINE__, tpm_get_error_name(status)); \
                                goto abort_egress; \
                              } \
                         } while(0)    

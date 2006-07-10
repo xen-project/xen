@@ -55,7 +55,7 @@
 #include "log.h"
 
 TPM_RESULT envelope_encrypt(const buffer_t     *inbuf,
-                            CRYPTO_INFO  *asymkey,
+                            CRYPTO_INFO        *asymkey,
                             buffer_t           *sealed_data) {
   TPM_RESULT status = TPM_SUCCESS;
   symkey_t    symkey;
@@ -114,8 +114,7 @@ TPM_RESULT envelope_encrypt(const buffer_t     *inbuf,
   return status;
 }
 
-TPM_RESULT envelope_decrypt(const long         cipher_size,
-                            const BYTE         *cipher,
+TPM_RESULT envelope_decrypt(const buffer_t     *cipher,
                             TCS_CONTEXT_HANDLE TCSContext,
 			    TPM_HANDLE         keyHandle,
 			    const TPM_AUTHDATA *key_usage_auth,
@@ -131,22 +130,22 @@ TPM_RESULT envelope_decrypt(const long         cipher_size,
 
   memset(&symkey, 0, sizeof(symkey_t));
 
-  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Envelope Decrypt Input[%ld]: 0x", cipher_size);
-  for (i=0; i< cipher_size; i++)
-    vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", cipher[i]);
+  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Envelope Decrypt Input[%d]: 0x", buffer_len(cipher) );
+  for (i=0; i< buffer_len(cipher); i++)
+    vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", cipher->bytes[i]);
   vtpmloginfomore(VTPM_LOG_VTPM_DEEP, "\n");
   
-  BSG_UnpackList(cipher, 2,
+  BSG_UnpackList(cipher->bytes, 2,
 		 BSG_TPM_SIZE32_DATA, &symkey_cipher32,
 		 BSG_TPM_SIZE32_DATA, &data_cipher32);
   
-  TPMTRYRETURN( buffer_init_convert (&symkey_cipher, 
-				     symkey_cipher32.size, 
-				     symkey_cipher32.data) );
+  TPMTRYRETURN( buffer_init_alias_convert (&symkey_cipher, 
+				           symkey_cipher32.size, 
+				           symkey_cipher32.data) );
   
-  TPMTRYRETURN( buffer_init_convert (&data_cipher, 
-				     data_cipher32.size, 
-				     data_cipher32.data) );
+  TPMTRYRETURN( buffer_init_alias_convert (&data_cipher, 
+				           data_cipher32.size, 
+				           data_cipher32.data) );
 
   // Decrypt Symmetric Key
   TPMTRYRETURN( VTSP_Unbind(  TCSContext,
@@ -188,7 +187,7 @@ TPM_RESULT VTPM_Handle_Save_NVM(VTPM_DMI_RESOURCE *myDMI,
   TPM_RESULT status = TPM_SUCCESS;
   int fh;
   long bytes_written;
-  buffer_t sealed_NVM;
+  buffer_t sealed_NVM = NULL_BUF;
   
   vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Saving %d bytes of NVM.\n", buffer_len(inbuf));
 
@@ -221,16 +220,14 @@ TPM_RESULT VTPM_Handle_Save_NVM(VTPM_DMI_RESOURCE *myDMI,
 }
 
 
-/* inbuf = null outbuf = sealed blob size, sealed blob.*/
+/* Expected Params: inbuf = null, outbuf = sealed blob size, sealed blob.*/
 TPM_RESULT VTPM_Handle_Load_NVM(VTPM_DMI_RESOURCE *myDMI, 
-				const buffer_t *inbuf, 
-				buffer_t *outbuf) {
+				const buffer_t    *inbuf, 
+				buffer_t          *outbuf) {
   
   TPM_RESULT status = TPM_SUCCESS;
 
-  
-  UINT32 sealed_NVM_size;
-  BYTE *sealed_NVM = NULL;
+  buffer_t sealed_NVM = NULL_BUF;
   long fh_size;
   int fh, stat_ret, i;
   struct stat file_stat;
@@ -252,17 +249,16 @@ TPM_RESULT VTPM_Handle_Load_NVM(VTPM_DMI_RESOURCE *myDMI,
     goto abort_egress;
   }
   
-  sealed_NVM = (BYTE *) malloc(fh_size);
-  sealed_NVM_size = (UINT32) fh_size;
-  if (read(fh, sealed_NVM, fh_size) != fh_size) {
+  TPMTRYRETURN( buffer_init( &sealed_NVM, fh_size, NULL) );
+  if (read(fh, sealed_NVM.bytes, buffer_len(&sealed_NVM)) != fh_size) {
     status = TPM_IOERROR;
     goto abort_egress;
   }
   close(fh);
   
-  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Load_NVMing[%ld],\n", fh_size);
+  vtpmloginfo(VTPM_LOG_VTPM_DEEP, "Load_NVMing[%d],\n", buffer_len(&sealed_NVM));
   
-  Crypto_SHA1Full(sealed_NVM, sealed_NVM_size, (BYTE *) &sealedNVMHash);    
+  Crypto_SHA1Full(sealed_NVM.bytes, buffer_len(&sealed_NVM), (BYTE *) &sealedNVMHash);    
   
   // Verify measurement of sealed blob.
   if (memcmp(&sealedNVMHash, &myDMI->NVM_measurement, sizeof(TPM_DIGEST)) ) {
@@ -281,8 +277,7 @@ TPM_RESULT VTPM_Handle_Load_NVM(VTPM_DMI_RESOURCE *myDMI,
     goto abort_egress;
   }
   
-    TPMTRYRETURN( envelope_decrypt(fh_size,
-                                 sealed_NVM,
+  TPMTRYRETURN( envelope_decrypt(&sealed_NVM,
                                  myDMI->TCSContext,
 		        	 vtpm_globals->storageKeyHandle,
 			         (const TPM_AUTHDATA*)&vtpm_globals->storage_key_usage_auth,
@@ -293,7 +288,7 @@ TPM_RESULT VTPM_Handle_Load_NVM(VTPM_DMI_RESOURCE *myDMI,
   vtpmlogerror(VTPM_LOG_VTPM, "Failed to load NVM\n.");
   
  egress:
-  free( sealed_NVM );
+  buffer_free( &sealed_NVM );
   
   return status;
 }
@@ -408,12 +403,14 @@ TPM_RESULT VTPM_LoadManagerData(void) {
   int fh, stat_ret, dmis=0;
   long fh_size = 0, step_size;
   BYTE *flat_table=NULL;
-  buffer_t  unsealed_data;
+  buffer_t  unsealed_data, enc_table_abuf;
   struct pack_buf_t storage_key_pack, boot_key_pack;
   UINT32 *dmi_id_key, enc_size;
   BYTE vtpm_manager_gen;
 
   VTPM_DMI_RESOURCE *dmi_res;
+  UINT32 dmi_id;
+  BYTE dmi_type;
   struct stat file_stat;
 
   TPM_HANDLE boot_key_handle;
@@ -442,6 +439,7 @@ TPM_RESULT VTPM_LoadManagerData(void) {
                               BSG_TYPE_UINT32, &enc_size);
 
   TPMTRYRETURN(buffer_init(&vtpm_globals->bootKeyWrap, 0, 0) );
+  TPMTRYRETURN(buffer_init_alias_convert(&enc_table_abuf, enc_size, flat_table + step_size) );
   TPMTRYRETURN(buffer_append_raw(&vtpm_globals->bootKeyWrap, boot_key_pack.size, boot_key_pack.data) );
 
   //Load Boot Key
@@ -454,8 +452,7 @@ TPM_RESULT VTPM_LoadManagerData(void) {
                               &vtpm_globals->bootKey,
                               FALSE) );
 
-  TPMTRYRETURN( envelope_decrypt(enc_size,
-                                 flat_table + step_size,
+  TPMTRYRETURN( envelope_decrypt(&enc_table_abuf,
                                  vtpm_globals->manager_tcs_handle,
                                  boot_key_handle,
                                  (const TPM_AUTHDATA*) &boot_usage_auth,
@@ -483,25 +480,17 @@ TPM_RESULT VTPM_LoadManagerData(void) {
       vtpmlogerror(VTPM_LOG_VTPM, "Encountered %ld extra bytes at end of manager state.\n", fh_size-step_size);
       step_size = fh_size;
     } else {
-      dmi_res = (VTPM_DMI_RESOURCE *) malloc(sizeof(VTPM_DMI_RESOURCE));
+      step_size += BSG_UnpackList(flat_table + step_size, 2,
+                                 BSG_TYPE_UINT32, &dmi_id,
+                                 BSG_TYPE_BYTE, &dmi_type);
+
+      //TODO: Try and gracefully recover from problems.
+      TPMTRYRETURN(init_dmi(dmi_id, dmi_type, &dmi_res) );
       dmis++;
 
-      dmi_res->connected = FALSE;
-
-      step_size += BSG_UnpackList(flat_table + step_size, 4,
-                                 BSG_TYPE_UINT32, &dmi_res->dmi_id,
-                                 BSG_TYPE_BYTE, &dmi_res->dmi_type,
+      step_size += BSG_UnpackList(flat_table + step_size, 2,
                                  BSG_TPM_DIGEST, &dmi_res->NVM_measurement,
                                  BSG_TPM_DIGEST, &dmi_res->DMI_measurement);
-
-      // install into map
-      dmi_id_key = (UINT32 *) malloc (sizeof(UINT32));
-      *dmi_id_key = dmi_res->dmi_id;
-      if (!hashtable_insert(vtpm_globals->dmi_map, dmi_id_key, dmi_res)) {
-        status = TPM_FAIL;
-        goto abort_egress;
-      }
-
     }
 
   }

@@ -301,6 +301,16 @@ TPM_RESULT vtpm_manager_handle_vtpm_cmd(VTPM_DMI_RESOURCE *dmi_res,
                                     command_buf, 
                                     result_buf);
     break;
+
+  case VTPM_ORD_GET_MIG_KEY:
+    status = VTPM_Handle_Get_Migration_key(command_buf, 
+                                           result_buf);
+    break;
+
+  case VTPM_ORD_LOAD_MIG_KEY:
+    status = VTPM_Handle_Load_Migration_key(command_buf, 
+                                           result_buf);
+    break;
    
   default:
     // Privileged handlers can do maintanance
@@ -316,6 +326,14 @@ TPM_RESULT vtpm_manager_handle_vtpm_cmd(VTPM_DMI_RESOURCE *dmi_res,
 
       case VTPM_ORD_DELETE:
         status = VTPM_Handle_Delete_DMI(command_buf);
+        break;
+
+      case VTPM_ORD_MIGRATE_IN:
+        status = VTPM_Handle_Migrate_In(command_buf, result_buf);
+        break;
+
+      case VTPM_ORD_MIGRATE_OUT:
+        status = VTPM_Handle_Migrate_Out(command_buf, result_buf);
         break;
 
       default:

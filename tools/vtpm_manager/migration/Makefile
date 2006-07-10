@@ -1,0 +1,39 @@
+XEN_ROOT = ../../..
+include $(XEN_ROOT)/tools/vtpm_manager/Rules.mk
+
+BIND		= vtpm_migratord
+BINC		= vtpm_migrator
+
+SRCSD    = vtpm_manager_if.c vtpm_migratord.c vtpm_migratord_handler.c vtpm_ipc.c
+SRCSC    = vtpm_manager_if.c vtpm_migrator_if.c vtpm_migratorc.c vtpm_ipc.c
+
+OBJSD    = $(patsubst %.c,%.o,$(SRCSD))
+OBJSC    = $(patsubst %.c,%.o,$(SRCSC))
+
+.PHONY: all
+all: build
+
+.PHONY: build
+build: $(BIND) $(BINC)
+
+.PHONY: install
+install: build
+	$(INSTALL_PROG) $(BIND) $(TOOLS_INSTALL_DIR)
+	$(INSTALL_PROG) $(BINC) $(TOOLS_INSTALL_DIR)
+
+.PHONY: clean
+clean:
+	rm -f *.a *.so *.o *.rpm $(DEP_FILES)
+
+.PHONY: mrproper
+mrproper: clean
+	rm -f $(BINC) $(BIND) *~
+
+$(BIND): $(OBJSD)
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(BINC): $(OBJSC)
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LIBS) -o $@
+
+# libraries
+LIBS += ../util/libTCGUtils.a

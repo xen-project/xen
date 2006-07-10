@@ -79,6 +79,14 @@ typedef struct VTPM_DMI_RESOURCE_T {
   TPM_DIGEST            DMI_measurement;  // Correct measurement of the owning DMI
 } VTPM_DMI_RESOURCE;
 
+typedef struct tdVTPM_MIGKEY_LIST {
+  UINT32                name_size;
+  BYTE                  *name; // Name of destination (IP addr, domain name, etc)
+  CRYPTO_INFO           key;
+  struct tdVTPM_MIGKEY_LIST *next;
+} VTPM_MIGKEY_LIST;
+
+
 typedef struct tdVTPM_GLOBALS {
   // Non-persistent data
 #ifndef VTPM_MULTI_VM
@@ -88,6 +96,11 @@ typedef struct tdVTPM_GLOBALS {
   int                 connected_dmis;     // To close guest_rx when no dmis are connected
 
   struct hashtable    *dmi_map;               // Table of all DMI's known indexed by persistent instance #
+  VTPM_MIGKEY_LIST    *mig_keys;              // Table of migration keys
+                      // Currently keys are loaded at migration time,
+                      // TODO: Make VTPM man store a keys persistently
+                      //       and update script to check if key is needed
+                      //       before fetching it.
 
   TCS_CONTEXT_HANDLE  manager_tcs_handle;     // TCS Handle used by manager
   TPM_HANDLE          storageKeyHandle;       // Key used by persistent store
@@ -109,8 +122,6 @@ typedef struct tdVTPM_GLOBALS {
 extern VTPM_GLOBALS *vtpm_globals;   // Key info and DMI states
 extern const TPM_AUTHDATA SRK_AUTH;  // SRK Well Known Auth Value
 
-// ********************** Command Handler Prototypes ***********************
-
 // ********************** VTPM Functions *************************
 TPM_RESULT VTPM_Init_Manager(); // Start VTPM Service
 void VTPM_Stop_Manager();  // Stop VTPM Service
@@ -121,6 +132,8 @@ TPM_RESULT VTPM_Manager_Handler(vtpm_ipc_handle_t *tx_ipc_h,
                                 vtpm_ipc_handle_t *fw_rx_ipc_h,
                                 BOOL is_priv,
                                 char *client_name);
+
+// ********************** Command Handler Prototypes ***********************
 
 TPM_RESULT VTPM_Handle_Load_NVM(       VTPM_DMI_RESOURCE *myDMI, 
                                         const buffer_t *inbuf, 
@@ -140,6 +153,15 @@ TPM_RESULT VTPM_Handle_Close_DMI(const buffer_t *param_buf);
                                    
 TPM_RESULT VTPM_Handle_Delete_DMI(const buffer_t *param_buf);
 
+TPM_RESULT VTPM_Handle_Migrate_In( const buffer_t *param_buf,
+                                   buffer_t *result_buf);
+
+TPM_RESULT VTPM_Handle_Migrate_Out ( const buffer_t *param_buf,
+                                     buffer_t *result_buf);
+
+TPM_RESULT VTPM_Handle_Get_Migration_key( const buffer_t *param_buf,
+                                          buffer_t *result_buf);
+
 TPM_RESULT VTPM_SaveManagerData(void);
 TPM_RESULT VTPM_LoadManagerData(void);
 
@@ -147,5 +169,18 @@ TPM_RESULT VTPM_New_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res, BYTE startup_mode);
 
 TPM_RESULT VTPM_Close_DMI_Extra(VTPM_DMI_RESOURCE *dmi_res);
 
+// Helper functions
 TPM_RESULT close_dmi(VTPM_DMI_RESOURCE *dmi_res);
+TPM_RESULT init_dmi(UINT32 dmi_id, BYTE type,  VTPM_DMI_RESOURCE **dmi_res);
+
+TPM_RESULT envelope_encrypt(const buffer_t     *inbuf,
+                             CRYPTO_INFO        *asymkey,
+                             buffer_t           *sealed_data);
+
+TPM_RESULT envelope_decrypt(const buffer_t     *cipher,
+                            TCS_CONTEXT_HANDLE TCSContext,
+                            TPM_HANDLE         keyHandle,
+                            const TPM_AUTHDATA *key_usage_auth,
+                            buffer_t           *unsealed_data);
+
 #endif // __VTPMPRIV_H__

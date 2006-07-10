@@ -41,14 +41,6 @@
 #include <unistd.h>
 #include <string.h>
 
-#ifndef VTPM_MUTLI_VM
- #include <sys/types.h>
- #include <sys/stat.h>
- #include <fcntl.h>
- #include <signal.h>
- #include <wait.h>
-#endif
-
 #include "vtpmpriv.h"
 #include "bsg.h"
 #include "buffer.h"
@@ -59,12 +51,61 @@
 
 #define TPM_EMULATOR_PATH "/usr/bin/vtpmd"
 
+// if dmi_res is non-null, then return a pointer to new object.
+// Also, this does not fill in the measurements. They should be filled by
+// design dependent code or saveNVM
+TPM_RESULT init_dmi(UINT32 dmi_id, BYTE type,  VTPM_DMI_RESOURCE **dmi_res) {
+
+  TPM_RESULT status=TPM_SUCCESS;
+  VTPM_DMI_RESOURCE *new_dmi=NULL;
+  UINT32 *dmi_id_key=NULL;
+
+  if ((new_dmi = (VTPM_DMI_RESOURCE *) malloc (sizeof(VTPM_DMI_RESOURCE))) == NULL) {
+      status = TPM_RESOURCES;
+      goto abort_egress;
+  }
+  memset(new_dmi, 0, sizeof(VTPM_DMI_RESOURCE));
+  new_dmi->dmi_id = dmi_id;
+  new_dmi->connected = FALSE;
+  new_dmi->TCSContext = 0;
+
+  new_dmi->NVMLocation = (char *) malloc(11 + strlen(DMI_NVM_FILE));
+  sprintf(new_dmi->NVMLocation, DMI_NVM_FILE, (uint32_t) new_dmi->dmi_id);
+
+  if ((dmi_id_key = (UINT32 *) malloc (sizeof(UINT32))) == NULL) {
+    status = TPM_RESOURCES;
+    goto abort_egress;
+  }
+  *dmi_id_key = new_dmi->dmi_id;
+
+  // install into map
+  if (!hashtable_insert(vtpm_globals->dmi_map, dmi_id_key, new_dmi)){
+    vtpmlogerror(VTPM_LOG_VTPM, "Failed to insert instance into table. Aborting.\n", dmi_id);
+    status = TPM_FAIL;
+    goto abort_egress;
+  }
+
+  if (dmi_res)
+    *dmi_res = new_dmi;
+
+  goto egress;
+
+ abort_egress:
+  if (new_dmi) {
+    free(new_dmi->NVMLocation);
+    free(new_dmi);
+  }
+  free(dmi_id_key);
+
+ egress:
+  return status;
+}
+
 TPM_RESULT close_dmi(VTPM_DMI_RESOURCE *dmi_res) {
   if (dmi_res == NULL) 
     return TPM_SUCCESS;
 
   TCS_CloseContext(dmi_res->TCSContext);
-  free ( dmi_res->NVMLocation );
   dmi_res->connected = FALSE;
 
   vtpm_globals->connected_dmis--;
@@ -77,7 +118,7 @@ TPM_RESULT VTPM_Handle_New_DMI(const buffer_t *param_buf) {
   VTPM_DMI_RESOURCE *new_dmi=NULL;
   TPM_RESULT status=TPM_FAIL;
   BYTE type, startup_mode;
-  UINT32 dmi_id, *dmi_id_key=NULL; 
+  UINT32 dmi_id; 
 
   if (param_buf == NULL) { // Assume creation of Dom 0 control
     type = VTPM_TYPE_NON_MIGRATABLE;
@@ -98,37 +139,17 @@ TPM_RESULT VTPM_Handle_New_DMI(const buffer_t *param_buf) {
   if (new_dmi == NULL) { 
     vtpmloginfo(VTPM_LOG_VTPM, "Creating new DMI instance %d attached.\n", dmi_id );
     // Brand New DMI. Initialize the persistent pieces
-    if ((new_dmi = (VTPM_DMI_RESOURCE *) malloc (sizeof(VTPM_DMI_RESOURCE))) == NULL) {
-      status = TPM_RESOURCES;
-      goto abort_egress;
-    }
-    memset(new_dmi, 0, sizeof(VTPM_DMI_RESOURCE));
-    new_dmi->dmi_id = dmi_id;
-    new_dmi->connected = FALSE;
-
-    if (type != VTPM_TYPE_MIGRATED) {
-      new_dmi->dmi_type = type;
-    } else {
-      vtpmlogerror(VTPM_LOG_VTPM, "Creation of VTPM with illegal type.\n");
-      status = TPM_BAD_PARAMETER;
-      goto free_egress;
-    }
-    
-    if ((dmi_id_key = (UINT32 *) malloc (sizeof(UINT32))) == NULL) {
-      status = TPM_RESOURCES;
-      goto free_egress;
-    }      
-    *dmi_id_key = new_dmi->dmi_id;
-    
-    // install into map
-    if (!hashtable_insert(vtpm_globals->dmi_map, dmi_id_key, new_dmi)){
-      vtpmlogerror(VTPM_LOG_VTPM, "Failed to insert instance into table. Aborting.\n", dmi_id);
-      status = TPM_FAIL;
-      goto free_egress;
-    }
-   
+    TPMTRYRETURN(init_dmi(dmi_id, type, &new_dmi) );  
   } else 
     vtpmloginfo(VTPM_LOG_VTPM, "Re-attaching DMI instance %d.\n", dmi_id);
+
+  if (type != VTPM_TYPE_MIGRATED) {
+    new_dmi->dmi_type = type;
+  } else {
+    vtpmlogerror(VTPM_LOG_VTPM, "Creation of VTPM with illegal type.\n");
+    status = TPM_BAD_PARAMETER;
+    goto abort_egress;
+  }
   
   if (new_dmi->connected) {
     vtpmlogerror(VTPM_LOG_VTPM, "Attempt to re-attach, currently attached instance %d. Ignoring\n", dmi_id);
@@ -143,13 +164,7 @@ TPM_RESULT VTPM_Handle_New_DMI(const buffer_t *param_buf) {
   }
 
   // Initialize the Non-persistent pieces
-  new_dmi->NVMLocation = NULL;
-  
-  new_dmi->TCSContext = 0;
   TPMTRYRETURN( TCS_OpenContext(&new_dmi->TCSContext) );
-  
-  new_dmi->NVMLocation = (char *) malloc(11 + strlen(DMI_NVM_FILE));
-  sprintf(new_dmi->NVMLocation, DMI_NVM_FILE, (uint32_t) new_dmi->dmi_id);
   
   new_dmi->connected = TRUE;  
 
@@ -158,10 +173,6 @@ TPM_RESULT VTPM_Handle_New_DMI(const buffer_t *param_buf) {
   status = VTPM_New_DMI_Extra(new_dmi, startup_mode);
   goto egress;
   
- free_egress:   // Error that requires freeing of newly allocated dmi 
-  free(new_dmi);
-  free(dmi_id_key);
-
  abort_egress:
   vtpmlogerror(VTPM_LOG_VTPM, "Failed to create DMI id=%d due to status=%s. Cleaning.\n", dmi_id, tpm_get_error_name(status));
   close_dmi(new_dmi );
@@ -240,7 +251,7 @@ TPM_RESULT VTPM_Handle_Delete_DMI( const buffer_t *param_buf) {
   
   // Close DMI first
   TPMTRYRETURN(close_dmi( dmi_res ));
-	free ( dmi_res );
+  free ( dmi_res );
 	
   status=TPM_SUCCESS;    
   goto egress;
