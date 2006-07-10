@@ -24,12 +24,9 @@ VTPMDB="/etc/xen/vtpm.db"
 
 #In the vtpm-impl file some commands should be defined:
 #      vtpm_create, vtpm_setup, vtpm_start, etc. (see below)
-#This should be indicated by setting VTPM_IMPL_DEFINED.
 if [ -r "$dir/vtpm-impl" ]; then
 	. "$dir/vtpm-impl"
-fi
-
-if [ -z "$VTPM_IMPL_DEFINED" ]; then
+else
 	function vtpm_create () {
 		true
 	}
@@ -245,6 +242,12 @@ function vtpm_create_instance () {
 
 	claim_lock vtpmdb
 	instance=$(vtpmdb_find_instance $domname)
+
+	if [ "$instance" == "0" -a "$reason" != "create" ]; then
+		release_lock vtpmdb
+		return
+	fi
+
 	if [ "$instance" == "0" ]; then
 		#Try to give the preferred instance to the domain
 		instance=$(xenstore_read "$XENBUS_PATH"/pref_instance)
@@ -317,7 +320,7 @@ function vtpm_delete_instance () {
 #  "-1" : the given machine name is invalid
 #  "0"  : this is not an address of this machine
 #  "1"  : this is an address local to this machine
-function isLocalAddress() {
+function vtpm_isLocalAddress() {
 	local addr res
 	addr=$(ping $1 -c 1 |  \
 	       gawk '{ print substr($3,2,length($3)-2); exit }')
@@ -347,7 +350,7 @@ function isLocalAddress() {
 # 2nd: name of the domain to migrate
 # 3rd: the migration step to perform
 function vtpm_migration_step() {
-	local res=$(isLocalAddress $1)
+	local res=$(vtpm_isLocalAddress $1)
 	if [ "$res" == "0" ]; then
 		vtpm_migrate $1 $2 $3
 	fi
@@ -361,8 +364,39 @@ function vtpm_migration_step() {
 # 3rd: the last successful migration step that was done
 function vtpm_recover() {
 	local res
-	res=$(isLocalAddress $1)
+	res=$(vtpm_isLocalAddress $1)
 	if [ "$res" == "0" ]; then
 		vtpm_migrate_recover $1 $2 $3
+	fi
+}
+
+
+#Determine the domain id given a domain's name.
+#1st parameter: name of the domain
+#return value: domain id  or -1 if domain id could not be determined
+function vtpm_domid_from_name () {
+	local id name ids
+	ids=$(xenstore-list /local/domain)
+	for id in $ids; do
+		name=$(xenstore-read /local/domain/$id/name)
+		if [ "$name" == "$1" ]; then
+			echo "$id"
+			return
+		fi
+	done
+	echo "-1"
+}
+
+
+#Add a virtual TPM instance number and its associated domain name
+#to the VTPMDB file and activate usage of this virtual TPM instance
+#by writing the instance number into the xenstore
+#1st parm: name of virtual machine
+#2nd parm: instance of assoicate virtual TPM
+function vtpm_add_and_activate() {
+	local domid=$(vtpm_domid_from_name $1)
+	if [ "$domid" != "-1" ]; then
+		vtpmdb_add_instance $1 $2
+		xenstore-write backend/vtpm/$domid/0/instance $2
 	fi
 }

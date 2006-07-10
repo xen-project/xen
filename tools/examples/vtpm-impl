@@ -32,8 +32,6 @@
 # OF THE POSSIBILITY OF SUCH DAMAGE.
 # ===================================================================
 
-VTPM_IMPL_DEFINED=1
-
 #            |        SRC        |    TAG  |      CMD SIZE     |        ORD       | type| mode
 TPM_CMD_OPEN=\\x00\\x00\\x00\\x00\\x01\\xc1\\x00\\x00\\x00\\x10\\x01\\x00\\x00\\x01\\x01\\x01
 TPM_CMD_RESM=\\x00\\x00\\x00\\x00\\x01\\xc1\\x00\\x00\\x00\\x10\\x01\\x00\\x00\\x01\\x01\\x02
