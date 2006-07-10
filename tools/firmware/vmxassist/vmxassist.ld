@@ -11,8 +11,7 @@ SECTIONS
 		_btext = .;
 		*(.text)
 		*(.rodata)
-		*(.rodata.str1.1)
-		*(.rodata.str1.4)
+		*(.rodata.*)
 		_etext = .;
 	}
 
