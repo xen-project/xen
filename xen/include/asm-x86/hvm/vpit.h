@@ -64,6 +64,7 @@ struct periodic_time {
     s_time_t scheduled;         /* scheduled timer interrupt */
     u64 last_plt_gtime;         /* platform time when last IRQ is injected */
     struct timer timer;         /* ac_timer */
+    void *priv;                 /* ponit back to platform time source */
 };
 
 typedef struct PITState {
@@ -93,9 +94,10 @@ static __inline__ s_time_t get_scheduled(
 extern void hvm_hooks_assist(struct vcpu *v);
 extern void pickup_deactive_ticks(struct periodic_time *vpit);
 extern u64 hvm_get_guest_time(struct vcpu *v);
-extern struct periodic_time *create_periodic_time(struct vcpu *v, u32 period, char irq, char one_shot);
+extern struct periodic_time *create_periodic_time(PITChannelState *v, u32 period, char irq, char one_shot);
 extern void destroy_periodic_time(struct periodic_time *pt);
 void pit_init(struct vcpu *v, unsigned long cpu_khz);
 void pt_timer_fn(void *data);
+void pit_time_fired(struct vcpu *v, void *priv);
 
 #endif /* __ASM_X86_HVM_VPIT_H__ */
