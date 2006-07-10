@@ -46,6 +46,8 @@ static int nr_recs;
 /* Send virtual interrupt when buffer level reaches this point */
 static int t_buf_highwater;
 
+/* Number of records lost due to per-CPU trace buffer being full. */
+static DEFINE_PER_CPU(unsigned long, lost_records);
 
 /* a flag recording whether initialization has been done */
 /* or more properly, if the tbuf subsystem is enabled right now */
@@ -234,7 +236,7 @@ void trace(u32 event, unsigned long d1, unsigned long d2,
     struct t_buf *buf;
     struct t_rec *rec;
     unsigned long flags;
-
+    
     BUG_ON(!tb_init_done);
 
     if ( (tb_event_mask & event) == 0 )
@@ -259,10 +261,25 @@ void trace(u32 event, unsigned long d1, unsigned long d2,
 
     local_irq_save(flags);
 
-    if ( (buf->prod - buf->cons) >= nr_recs )
+    /* Check if space for two records (we write two if there are lost recs). */
+    if ( (buf->prod - buf->cons) >= (nr_recs - 1) )
     {
+        this_cpu(lost_records)++;
         local_irq_restore(flags);
         return;
+    }
+
+    if ( unlikely(this_cpu(lost_records) != 0) )
+    {
+        rec = &t_recs[smp_processor_id()][buf->prod % nr_recs];
+        memset(rec, 0, sizeof(*rec));
+        rec->cycles  = (u64)get_cycles();
+        rec->event   = TRC_LOST_RECORDS;
+        rec->data[0] = this_cpu(lost_records);
+        this_cpu(lost_records) = 0;
+
+        wmb();
+        buf->prod++;
     }
 
     rec = &t_recs[smp_processor_id()][buf->prod % nr_recs];
