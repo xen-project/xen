@@ -1302,9 +1302,11 @@ class XendDomainInfo:
                     cpu = [ int( cpus[v % len(cpus)] ) ]
                     xc.vcpu_setaffinity(self.domid, v, cpu)
 
+            # set domain maxmem in KiB
+            xc.domain_setmaxmem(self.domid, self.info['maxmem'] * 1024)
+
             m = self.image.getDomainMemory(self.info['memory'] * 1024)
             balloon.free(m)
-            xc.domain_setmaxmem(self.domid, m)
 
             init_reservation = self.info['memory'] * 1024
             if os.uname()[4] == 'ia64':
