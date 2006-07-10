@@ -3773,7 +3773,7 @@ static inline int guest_page_fault(
 #endif
 
 #if CONFIG_PAGING_LEVELS == 4
-    if ( d->arch.ops->guest_paging_levels == PAGING_L4 ) 
+    if ( d->arch.ops->guest_paging_levels == PAGING_L4 )
     {
         __rw_entry(v, va, &gle, GUEST_ENTRY | GET_ENTRY | PAGING_L4);
         if ( unlikely(!(entry_get_flags(gle) & _PAGE_PRESENT)) )
@@ -3795,7 +3795,7 @@ static inline int guest_page_fault(
 #endif
 
 #if CONFIG_PAGING_LEVELS >= 3
-    if ( d->arch.ops->guest_paging_levels == PAGING_L3 ) 
+    if ( d->arch.ops->guest_paging_levels == PAGING_L3 )
     {
         if ( SH_GUEST_32PAE )
             gpfn = (hvm_get_guest_ctrl_reg(v, 3)) >> PAGE_SHIFT;
@@ -3804,7 +3804,7 @@ static inline int guest_page_fault(
     }
 #endif
 
-    for ( i = PAGING_L3; i >= PAGING_L1; i-- ) 
+    for ( i = PAGING_L3; i >= PAGING_L1; i-- )
     {
         pgentry_64_t *lva;
         /*
@@ -3822,11 +3822,12 @@ static inline int guest_page_fault(
         if ( unlikely(!(entry_get_flags(gle) & _PAGE_PRESENT)) )
             return 1;
 
-        if ( i < PAGING_L3 ) 
+        if ( i < PAGING_L3 ||
+             d->arch.ops->guest_paging_levels == PAGING_L4 )
         {
-            if ( error_code & ERROR_W ) 
+            if ( error_code & ERROR_W )
             {
-                if ( unlikely(!(entry_get_flags(gle) & _PAGE_RW)) ) 
+                if ( unlikely(!(entry_get_flags(gle) & _PAGE_RW)) )
                 {
                     if ( i == PAGING_L1 )
                         if ( gpl1e )
@@ -3834,14 +3835,14 @@ static inline int guest_page_fault(
                     return 1;
                 }
             }
-            if ( error_code & ERROR_U ) 
+            if ( error_code & ERROR_U )
             {
                 if ( unlikely(!(entry_get_flags(gle) & _PAGE_USER)) )
                     return 1;
             }
         }
 
-        if ( i == PAGING_L2 ) 
+        if ( i == PAGING_L2 )
         {
             if ( gpl2e )
                 gpl2e->l2 = gle.lo;
