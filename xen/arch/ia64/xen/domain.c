@@ -904,8 +904,6 @@ int construct_dom0(struct domain *d,
 	si->nr_pages     = max_pages;
 	si->flags = SIF_INITDOMAIN|SIF_PRIVILEGED;
 
-	console_endboot();
-
 	printk("Dom0: 0x%lx\n", (u64)dom0);
 
 #ifdef VALIDATE_VT
