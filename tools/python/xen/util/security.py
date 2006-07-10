@@ -14,6 +14,7 @@
 #============================================================================
 # Copyright (C) 2006 International Business Machines Corp.
 # Author: Reiner Sailer
+# Author: Bryan D. Payne <bdpayne@us.ibm.com>
 #============================================================================
 
 import commands
@@ -23,9 +24,12 @@ import traceback
 import shutil
 from xen.lowlevel import acm
 from xen.xend import sxp
+from xen.xend.XendLogging import log
+from xen.util import dictio
 
 #global directories and tools for security management
 policy_dir_prefix = "/etc/xen/acm-security/policies"
+res_label_filename = policy_dir_prefix + "/resource_labels"
 boot_filename = "/boot/grub/menu.lst"
 xensec_xml2bin = "/usr/sbin/xensec_xml2bin"
 xensec_tool = "/usr/sbin/xensec_tool"
@@ -530,3 +534,97 @@ def list_labels(policy_name, condition):
             if label not in labels:
                 labels.append(label)
     return labels
+
+
+def get_res_label(resource):
+    """Returns resource label information (label, policy) if it exists.
+       Otherwise returns null label and policy.
+    """
+    def default_res_label():
+        ssidref = NULL_SSIDREF
+        if on():
+            label = ssidref2label(ssidref)
+        else:
+            label = None
+        return (label, 'NULL')
+
+    (label, policy) = default_res_label()
+
+    # load the resource label file
+    res_label_cache = {}
+    try:
+        res_label_cache = dictio.dict_read("resources", res_label_filename)
+    except:
+        log.info("Resource label file not found.")
+        return default_res_label()
+
+    # find the resource information
+    if res_label_cache.has_key(resource):
+        (policy, label) = res_label_cache[resource]
+
+    return (label, policy)
+
+
+def get_res_security_details(resource):
+    """Returns the (label, ssidref, policy) associated with a given
+       resource from the global resource label file.
+    """
+    def default_security_details():
+        ssidref = NULL_SSIDREF
+        if on():
+            label = ssidref2label(ssidref)
+        else:
+            label = None
+        policy = active_policy
+        return (label, ssidref, policy)
+
+    (label, ssidref, policy) = default_security_details()
+
+    # find the entry associated with this resource
+    (label, policy) = get_res_label(resource)
+    if policy == 'NULL':
+        log.info("Resource label for "+resource+" not in file, using DEFAULT.")
+        return default_security_details()
+
+    # is this resource label for the running policy?
+    if policy == active_policy:
+        ssidref = label2ssidref(label, policy, 'res')
+    else:
+        log.info("Resource label not for active policy, using DEFAULT.")
+        return default_security_details()
+
+    return (label, ssidref, policy)
+
+
+def res_security_check(resource, domain_label):
+    """Checks if the given resource can be used by the given domain
+       label.  Returns 1 if the resource can be used, otherwise 0.
+    """
+    rtnval = 1
+
+    # if security is on, ask the hypervisor for a decision
+    if on():
+        (label, ssidref, policy) = get_res_security_details(resource)
+        domac = ['access_control']
+        domac.append(['policy', active_policy])
+        domac.append(['label', domain_label])
+        domac.append(['type', 'dom'])
+        decision = get_decision(domac, ['ssidref', str(ssidref)])
+
+        # provide descriptive error messages
+        if decision == 'DENIED':
+            if label == ssidref2label(NULL_SSIDREF):
+                raise ACMError("Resource '"+resource+"' is not labeled")
+                rtnval = 0
+            else:
+                raise ACMError("Permission denied for resource '"+resource+"' because label '"+label+"' is not allowed")
+                rtnval = 0
+
+    # security is off, make sure resource isn't labeled
+    else:
+        (label, policy) = get_res_label(resource)
+        if policy != 'NULL':
+            raise ACMError("Security is off, but '"+resource+"' is labeled")
+            rtnval = 0
+
+    return rtnval

@@ -30,6 +30,7 @@ import socket
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
 import xmlrpclib
+import traceback
 
 import xen.xend.XendProtocol
 
@@ -119,7 +120,11 @@ vnet_list_help = "vnet-list [-l|--long]            list vnets"
 vnet_create_help = "vnet-create <config>             create a vnet from a config file"
 vnet_delete_help = "vnet-delete <vnetid>             delete a vnet"
 vtpm_list_help = "vtpm-list <DomId> [--long]       list virtual TPM devices"
-addlabel_help =  "addlabel <ConfigFile> <label>    Add security label to ConfigFile"
+addlabel_help =  "addlabel <label> dom <configfile> Add security label to domain\n            <label> res <resource>   or resource"
+rmlabel_help =  "rmlabel dom <configfile>         Remove security label from domain\n           res <resource>           or resource"
+getlabel_help =  "getlabel dom <configfile>        Show security label for domain\n            res <resource>          or resource"
+dry_run_help =  "dry-run <configfile>             Tests if domain can access its resources"
+resources_help =  "resources                        Show info for each labeled resource"
 cfgbootpolicy_help = "cfgbootpolicy <policy>           Add policy to boot configuration "
 dumppolicy_help = "dumppolicy                       Print hypervisor ACM state information"
 loadpolicy_help = "loadpolicy <policy>              Load binary policy into hypervisor"
@@ -203,6 +208,10 @@ vnet_commands = [
 acm_commands = [
     "labels",
     "addlabel",
+    "rmlabel",
+    "getlabel",
+    "dry-run",
+    "resources",
     "makepolicy",
     "loadpolicy",
     "cfgbootpolicy",
@@ -992,6 +1001,21 @@ def xm_block_attach(args):
     if len(args) == 5:
         vbd.append(['backend', args[4]])
 
+    # verify that policy permits attaching this resource
+    try:
+        if security.on():
+            dominfo = server.xend.domain(dom)
+            label = security.get_security_printlabel(dominfo)
+        else:
+            label = None
+        security.res_security_check(args[1], label)
+    except security.ACMError, e:
+        print e.value
+        sys.exit(1)
+    except:
+        traceback.print_exc(limit=1)
+        sys.exit(1)
+
     server.xend.domain.device_create(dom, vbd)
 
 
@@ -1124,6 +1148,10 @@ subcommands = [
     'shutdown',
     'labels',
     'addlabel',
+    'rmlabel',
+    'getlabel',
+    'dry-run',
+    'resources',
     'cfgbootpolicy',
     'makepolicy',
     'loadpolicy',
