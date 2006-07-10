@@ -167,8 +167,16 @@ static inline int construct_vmcs_controls(struct arch_vmx_struct *arch_vmx)
 
     error |= __vmwrite(VM_ENTRY_CONTROLS, MONITOR_VM_ENTRY_CONTROLS);
 
-    error |= __vmwrite(IO_BITMAP_A, (u64)virt_to_maddr(arch_vmx->io_bitmap_a));
-    error |= __vmwrite(IO_BITMAP_B, (u64)virt_to_maddr(arch_vmx->io_bitmap_b));
+    error |= __vmwrite(IO_BITMAP_A, virt_to_maddr(arch_vmx->io_bitmap_a));
+    error |= __vmwrite(IO_BITMAP_B, virt_to_maddr(arch_vmx->io_bitmap_b));
+
+#ifdef CONFIG_X86_PAE
+    /* On PAE bitmaps may in future be above 4GB. Write high words. */
+    error |= __vmwrite(IO_BITMAP_A_HIGH,
+                       (paddr_t)virt_to_maddr(arch_vmx->io_bitmap_a) >> 32);
+    error |= __vmwrite(IO_BITMAP_B_HIGH,
+                       (paddr_t)virt_to_maddr(arch_vmx->io_bitmap_b) >> 32);
+#endif
 
     return error;
 }
@@ -391,8 +399,10 @@ static inline int construct_init_vmcs_guest(cpu_user_regs_t *regs)
     error |= __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
     __asm__ __volatile__ ("mov %%dr7, %0\n" : "=r" (dr7));
     error |= __vmwrite(GUEST_DR7, dr7);
-    error |= __vmwrite(VMCS_LINK_POINTER, 0xffffffff);
-    error |= __vmwrite(VMCS_LINK_POINTER_HIGH, 0xffffffff);
+    error |= __vmwrite(VMCS_LINK_POINTER, ~0UL);
+#if defined(__i386__)
+    error |= __vmwrite(VMCS_LINK_POINTER_HIGH, ~0UL);
+#endif
 
     return error;
 }
@@ -410,7 +420,7 @@ static inline int construct_vmcs_host(void)
     error |= __vmwrite(HOST_ES_SELECTOR, __HYPERVISOR_DS);
     error |= __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);
     error |= __vmwrite(HOST_DS_SELECTOR, __HYPERVISOR_DS);
-#if defined (__i386__)
+#if defined(__i386__)
     error |= __vmwrite(HOST_FS_SELECTOR, __HYPERVISOR_DS);
     error |= __vmwrite(HOST_GS_SELECTOR, __HYPERVISOR_DS);
     error |= __vmwrite(HOST_FS_BASE, 0);
