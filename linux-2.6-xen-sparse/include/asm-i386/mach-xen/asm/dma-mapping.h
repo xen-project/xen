@@ -120,7 +120,6 @@ dma_set_mask(struct device *dev, u64 mask)
 	return 0;
 }
 
-#ifdef __i386__
 static inline int
 dma_get_cache_alignment(void)
 {
@@ -128,7 +127,6 @@ dma_get_cache_alignment(void)
 	 * maximum possible, to be safe */
 	return (1 << INTERNODE_CACHE_SHIFT);
 }
-#endif
 
 #define dma_is_consistent(d)	(1)
 
