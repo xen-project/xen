@@ -208,8 +208,7 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 		    p2m_entry_retry(&entry)) {
 			/* dtlb has been purged in-between.  This dtlb was
 			   matching.  Undo the work.  */
-			vcpu_flush_tlb_vhpt_range(address & ((1 << logps) - 1),
-			                          logps);
+			vcpu_flush_tlb_vhpt_range(address, logps);
 
 			// the stale entry which we inserted above
 			// may remains in tlb cache.

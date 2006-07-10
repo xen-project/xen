@@ -1906,10 +1906,16 @@ IA64FAULT vcpu_itr_d(VCPU *vcpu, UINT64 slot, UINT64 pte,
 	TR_ENTRY *trp;
 
 	if (slot >= NDTRS) return IA64_RSVDREG_FAULT;
+
+	vcpu_purge_tr_entry(&PSCBX(vcpu, dtlb));
+
 	trp = &PSCBX(vcpu,dtrs[slot]);
 //printf("***** itr.d: setting slot %d: ifa=%p\n",slot,ifa);
 	vcpu_set_tr_entry(trp,pte,itir,ifa);
 	vcpu_quick_region_set(PSCBX(vcpu,dtr_regions),ifa);
+
+	vcpu_flush_tlb_vhpt_range(ifa & itir_mask(itir), itir_ps(itir));
+
 	return IA64_NO_FAULT;
 }
 
@@ -1919,10 +1925,16 @@ IA64FAULT vcpu_itr_i(VCPU *vcpu, UINT64 slot, UINT64 pte,
 	TR_ENTRY *trp;
 
 	if (slot >= NITRS) return IA64_RSVDREG_FAULT;
+
+	vcpu_purge_tr_entry(&PSCBX(vcpu, itlb));
+
 	trp = &PSCBX(vcpu,itrs[slot]);
 //printf("***** itr.i: setting slot %d: ifa=%p\n",slot,ifa);
 	vcpu_set_tr_entry(trp,pte,itir,ifa);
 	vcpu_quick_region_set(PSCBX(vcpu,itr_regions),ifa);
+
+	vcpu_flush_tlb_vhpt_range(ifa & itir_mask(itir), itir_ps(itir));
+
 	return IA64_NO_FAULT;
 }
 
@@ -1990,7 +2002,7 @@ again:
 	vcpu_itc_no_srlz(vcpu,2,ifa,pteval,pte,logps);
 	if (swap_rr0) set_metaphysical_rr0();
 	if (p2m_entry_retry(&entry)) {
-		vcpu_flush_tlb_vhpt_range(ifa & ((1 << logps) - 1), logps);
+		vcpu_flush_tlb_vhpt_range(ifa, logps);
 		goto again;
 	}
 	return IA64_NO_FAULT;
@@ -2013,7 +2025,7 @@ again:
 	vcpu_itc_no_srlz(vcpu, 1,ifa,pteval,pte,logps);
 	if (swap_rr0) set_metaphysical_rr0();
 	if (p2m_entry_retry(&entry)) {
-		vcpu_flush_tlb_vhpt_range(ifa & ((1 << logps) - 1), logps);
+		vcpu_flush_tlb_vhpt_range(ifa, logps);
 		goto again;
 	}
 	return IA64_NO_FAULT;
