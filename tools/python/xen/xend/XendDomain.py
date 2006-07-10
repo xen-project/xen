@@ -347,6 +347,19 @@ class XendDomain:
             self.domains_lock.release()
 
 
+    def domain_lookup_by_uuid_nr(self, uuid):
+        self.domains_lock.acquire()
+        try:
+            matching = filter(lambda d: d.getUuid() == uuid,
+                              self.domains.values())
+            n = len(matching)
+            if n == 1:
+                return matching[0]
+            return None
+        finally:
+            self.domains_lock.release()
+
+
     def privilegedDomain(self):
         self.domains_lock.acquire()
         try:
