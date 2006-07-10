@@ -16,7 +16,7 @@ dist: install
 
 .PHONY: build install clean distclean cscope TAGS tags
 build install debug clean distclean cscope TAGS tags::
-	make -f Rules.mk _$@
+	$(MAKE) -f Rules.mk _$@
 
 .PHONY: _build
 _build: $(TARGET).gz
