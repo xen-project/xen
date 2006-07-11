@@ -795,3 +795,13 @@ direct_remap_pfn_range(struct vm_area_struct *vma,
 	return error;
 }
 
+
+/* Called after suspend, to resume time.  */
+void
+time_resume(void)
+{
+	extern void ia64_cpu_local_tick(void);
+
+	/* Just trigger a tick.  */
+	ia64_cpu_local_tick();
+}

@@ -164,6 +164,11 @@ extern void vcpu_itc_no_srlz(VCPU *vcpu, UINT64, UINT64, UINT64, UINT64, UINT64)
 extern UINT64 vcpu_get_tmp(VCPU *, UINT64);
 extern void vcpu_set_tmp(VCPU *, UINT64, UINT64);
 
+extern IA64FAULT vcpu_set_dtr(VCPU *vcpu, u64 slot,
+                              u64 pte, u64 itir, u64 ifa, u64 rid);
+extern IA64FAULT vcpu_set_itr(VCPU *vcpu, u64 slot,
+                              u64 pte, u64 itir, u64 ifa, u64 rid);
+
 /* Initialize vcpu regs.  */
 extern void vcpu_init_regs (struct vcpu *v);
 

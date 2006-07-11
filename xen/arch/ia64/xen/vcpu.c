@@ -1880,13 +1880,15 @@ IA64FAULT vcpu_set_pkr(VCPU *vcpu, UINT64 reg, UINT64 val)
  VCPU translation register access routines
 **************************************************************************/
 
-static void vcpu_set_tr_entry(TR_ENTRY *trp, UINT64 pte, UINT64 itir, UINT64 ifa)
+static void
+vcpu_set_tr_entry_rid(TR_ENTRY *trp, UINT64 pte,
+                      UINT64 itir, UINT64 ifa, UINT64 rid)
 {
 	UINT64 ps;
 	union pte_flags new_pte;
 
 	trp->itir = itir;
-	trp->rid = VCPU(current,rrs[ifa>>61]) & RR_RID_MASK;
+	trp->rid = rid;
 	ps = trp->ps;
 	new_pte.val = pte;
 	if (new_pte.pl < 2) new_pte.pl = 2;
@@ -1900,8 +1902,15 @@ static void vcpu_set_tr_entry(TR_ENTRY *trp, UINT64 pte, UINT64 itir, UINT64 ifa
 	trp->pte.val = new_pte.val;
 }
 
+static inline void
+vcpu_set_tr_entry(TR_ENTRY *trp, UINT64 pte, UINT64 itir, UINT64 ifa)
+{
+	vcpu_set_tr_entry_rid(trp, pte, itir, ifa,
+			      VCPU(current, rrs[ifa>>61]) & RR_RID_MASK);
+}
+
 IA64FAULT vcpu_itr_d(VCPU *vcpu, UINT64 slot, UINT64 pte,
-		UINT64 itir, UINT64 ifa)
+                     UINT64 itir, UINT64 ifa)
 {
 	TR_ENTRY *trp;
 
@@ -1920,7 +1929,7 @@ IA64FAULT vcpu_itr_d(VCPU *vcpu, UINT64 slot, UINT64 pte,
 }
 
 IA64FAULT vcpu_itr_i(VCPU *vcpu, UINT64 slot, UINT64 pte,
-		UINT64 itir, UINT64 ifa)
+                     UINT64 itir, UINT64 ifa)
 {
 	TR_ENTRY *trp;
 
@@ -1935,6 +1944,44 @@ IA64FAULT vcpu_itr_i(VCPU *vcpu, UINT64 slot, UINT64 pte,
 
 	vcpu_flush_tlb_vhpt_range(ifa & itir_mask(itir), itir_ps(itir));
 
+	return IA64_NO_FAULT;
+}
+
+IA64FAULT vcpu_set_itr(VCPU *vcpu, u64 slot, u64 pte,
+                       u64 itir, u64 ifa, u64 rid)
+{
+	TR_ENTRY *trp;
+
+	if (slot >= NITRS)
+ 		return IA64_RSVDREG_FAULT;
+	trp = &PSCBX(vcpu, itrs[slot]);
+	vcpu_set_tr_entry_rid(trp, pte, itir, ifa, rid);
+
+	/* Recompute the itr_region.  */
+	vcpu->arch.itr_regions = 0;
+	for (trp = vcpu->arch.itrs; trp < &vcpu->arch.itrs[NITRS]; trp++)
+		if (trp->pte.p)
+			vcpu_quick_region_set(vcpu->arch.itr_regions,
+			                      trp->vadr);
+	return IA64_NO_FAULT;
+}
+
+IA64FAULT vcpu_set_dtr(VCPU *vcpu, u64 slot, u64 pte,
+                       u64 itir, u64 ifa, u64 rid)
+{
+	TR_ENTRY *trp;
+
+	if (slot >= NDTRS)
+		return IA64_RSVDREG_FAULT;
+	trp = &PSCBX(vcpu, dtrs[slot]);
+	vcpu_set_tr_entry_rid(trp, pte, itir, ifa, rid);
+
+	/* Recompute the dtr_region.  */
+	vcpu->arch.dtr_regions = 0;
+	for (trp = vcpu->arch.dtrs; trp < &vcpu->arch.dtrs[NDTRS]; trp++)
+		if (trp->pte.p)
+			vcpu_quick_region_set(vcpu->arch.dtr_regions,
+			                      trp->vadr);
 	return IA64_NO_FAULT;
 }
 
@@ -2158,7 +2205,6 @@ IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr,UINT64 log_range)
 		else if (trp->pte.p)
 			vcpu_quick_region_set(vcpu->arch.itr_regions,
 					      trp->vadr);
-
 
 	vcpu_flush_tlb_vhpt_range (vadr, log_range);
 

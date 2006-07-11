@@ -302,23 +302,7 @@ HYPERVISOR_vcpu_op(
     return _hypercall3(int, vcpu_op, cmd, vcpuid, extra_args);
 }
 
-static inline int
-HYPERVISOR_suspend(
-	unsigned long srec)
-{
-	struct sched_shutdown sched_shutdown = {
-		.reason = SHUTDOWN_suspend
-	};
-
-	int rc = _hypercall3(int, sched_op, SCHEDOP_shutdown,
-			     &sched_shutdown, srec);
-
-	if (rc == -ENOSYS)
-		rc = _hypercall3(int, sched_op_compat, SCHEDOP_shutdown,
-				 SHUTDOWN_suspend, srec);
-
-	return rc;
-}
+extern int HYPERVISOR_suspend(unsigned long srec);
 
 static inline int
 HYPERVISOR_callback_op(

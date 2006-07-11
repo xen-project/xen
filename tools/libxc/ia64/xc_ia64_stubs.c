@@ -23,24 +23,6 @@ xc_ia64_fpsr_default(void)
     return FPSR_DEFAULT;
 }
 
-int
-xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
-              uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
-              int (*suspend)(int domid))
-{
-    PERROR("xc_linux_save not implemented\n");
-    return -1;
-}
-
-int
-xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pfns,
-                 unsigned int store_evtchn, unsigned long *store_mfn,
-                 unsigned int console_evtchn, unsigned long *console_mfn)
-{
-    PERROR("xc_linux_restore not implemented\n");
-    return -1;
-}
-
 /*  
     VMM uses put_user to copy pfn_list to guest buffer, this maybe fail,
     VMM doesn't handle this now.

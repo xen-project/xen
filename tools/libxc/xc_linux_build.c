@@ -498,6 +498,7 @@ static int setup_guest(int xc_handle,
     start_info_mpa = (nr_pages - 3) << PAGE_SHIFT;
 
     /* Build firmware.  */
+    memset(&op.u.domain_setup, 0, sizeof(op.u.domain_setup));
     op.u.domain_setup.flags = 0;
     op.u.domain_setup.domain = (domid_t)dom;
     op.u.domain_setup.bp = start_info_mpa + sizeof (start_info_t);

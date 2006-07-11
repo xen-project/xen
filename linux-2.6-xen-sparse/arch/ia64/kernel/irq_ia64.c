@@ -31,6 +31,9 @@
 #include <linux/smp_lock.h>
 #include <linux/threads.h>
 #include <linux/bitops.h>
+#ifdef CONFIG_XEN
+#include <linux/cpu.h>
+#endif
 
 #include <asm/delay.h>
 #include <asm/intrinsics.h>
@@ -235,6 +238,9 @@ static struct irqaction ipi_irqaction = {
 #include <xen/evtchn.h>
 #include <xen/interface/callback.h>
 
+static DEFINE_PER_CPU(int, timer_irq) = -1;
+static DEFINE_PER_CPU(int, ipi_irq) = -1;
+static DEFINE_PER_CPU(int, resched_irq) = -1;
 static char timer_name[NR_CPUS][15];
 static char ipi_name[NR_CPUS][15];
 static char resched_name[NR_CPUS][15];
@@ -294,6 +300,7 @@ xen_register_percpu_irq (unsigned int irq, struct irqaction *action, int save)
 			ret = bind_virq_to_irqhandler(VIRQ_ITC, cpu,
 				action->handler, action->flags,
 				timer_name[cpu], action->dev_id);
+			per_cpu(timer_irq,cpu) = ret;
 			printk(KERN_INFO "register VIRQ_ITC (%s) to xen irq (%d)\n", timer_name[cpu], ret);
 			break;
 		case IA64_IPI_RESCHEDULE:
@@ -301,6 +308,7 @@ xen_register_percpu_irq (unsigned int irq, struct irqaction *action, int save)
 			ret = bind_ipi_to_irqhandler(RESCHEDULE_VECTOR, cpu,
 				action->handler, action->flags,
 				resched_name[cpu], action->dev_id);
+			per_cpu(resched_irq,cpu) = ret;
 			printk(KERN_INFO "register RESCHEDULE_VECTOR (%s) to xen irq (%d)\n", resched_name[cpu], ret);
 			break;
 		case IA64_IPI_VECTOR:
@@ -308,6 +316,7 @@ xen_register_percpu_irq (unsigned int irq, struct irqaction *action, int save)
 			ret = bind_ipi_to_irqhandler(IPI_VECTOR, cpu,
 				action->handler, action->flags,
 				ipi_name[cpu], action->dev_id);
+			per_cpu(ipi_irq,cpu) = ret;
 			printk(KERN_INFO "register IPI_VECTOR (%s) to xen irq (%d)\n", ipi_name[cpu], ret);
 			break;
 		case IA64_SPURIOUS_INT_VECTOR:
@@ -343,7 +352,7 @@ xen_bind_early_percpu_irq (void)
 	 */
 	for (i = 0; i < late_irq_cnt; i++)
 		xen_register_percpu_irq(saved_percpu_irqs[i].irq,
-			saved_percpu_irqs[i].action, 0);
+		                        saved_percpu_irqs[i].action, 0);
 }
 
 /* FIXME: There's no obvious point to check whether slab is ready. So
@@ -352,6 +361,38 @@ xen_bind_early_percpu_irq (void)
 extern void (*late_time_init)(void);
 extern char xen_event_callback;
 extern void xen_init_IRQ(void);
+
+#ifdef CONFIG_HOTPLUG_CPU
+static int __devinit
+unbind_evtchn_callback(struct notifier_block *nfb,
+                       unsigned long action, void *hcpu)
+{
+	unsigned int cpu = (unsigned long)hcpu;
+
+	if (action == CPU_DEAD) {
+		/* Unregister evtchn.  */
+		if (per_cpu(ipi_irq,cpu) >= 0) {
+			unbind_from_irqhandler (per_cpu(ipi_irq, cpu), NULL);
+			per_cpu(ipi_irq, cpu) = -1;
+		}
+		if (per_cpu(resched_irq,cpu) >= 0) {
+			unbind_from_irqhandler (per_cpu(resched_irq, cpu),
+						NULL);
+			per_cpu(resched_irq, cpu) = -1;
+		}
+		if (per_cpu(timer_irq,cpu) >= 0) {
+			unbind_from_irqhandler (per_cpu(timer_irq, cpu), NULL);
+			per_cpu(timer_irq, cpu) = -1;
+		}
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block unbind_evtchn_notifier = {
+	.notifier_call = unbind_evtchn_callback,
+	.priority = 0
+};
+#endif
 
 DECLARE_PER_CPU(int, ipi_to_irq[NR_IPIS]);
 void xen_smp_intr_init(void)
@@ -363,21 +404,22 @@ void xen_smp_intr_init(void)
 		.type = CALLBACKTYPE_event,
 		.address = (unsigned long)&xen_event_callback,
 	};
-	static cpumask_t registered_cpumask;
 
-	if (!cpu)
+	if (cpu == 0) {
+		/* Initialization was already done for boot cpu.  */
+#ifdef CONFIG_HOTPLUG_CPU
+		/* Register the notifier only once.  */
+		register_cpu_notifier(&unbind_evtchn_notifier);
+#endif
 		return;
+	}
 
 	/* This should be piggyback when setup vcpu guest context */
 	BUG_ON(HYPERVISOR_callback_op(CALLBACKOP_register, &event));
 
-	if (!cpu_isset(cpu, registered_cpumask)) {
-		cpu_set(cpu, registered_cpumask);
-		for (i = 0; i < saved_irq_cnt; i++)
-			xen_register_percpu_irq(saved_percpu_irqs[i].irq,
-						saved_percpu_irqs[i].action,
-						0);
-	}
+	for (i = 0; i < saved_irq_cnt; i++)
+		xen_register_percpu_irq(saved_percpu_irqs[i].irq,
+		                        saved_percpu_irqs[i].action, 0);
 #endif /* CONFIG_SMP */
 }
 #endif /* CONFIG_XEN */
@@ -388,12 +430,13 @@ register_percpu_irq (ia64_vector vec, struct irqaction *action)
 	irq_desc_t *desc;
 	unsigned int irq;
 
+#ifdef CONFIG_XEN
+	if (is_running_on_xen())
+		return xen_register_percpu_irq(vec, action, 1);
+#endif
+
 	for (irq = 0; irq < NR_IRQS; ++irq)
 		if (irq_to_vector(irq) == vec) {
-#ifdef CONFIG_XEN
-			if (is_running_on_xen())
-				return xen_register_percpu_irq(vec, action, 1);
-#endif
 			desc = irq_descp(irq);
 			desc->status |= IRQ_PER_CPU;
 			desc->handler = &irq_type_ia64_lsapic;
@@ -406,6 +449,8 @@ void __init
 init_IRQ (void)
 {
 #ifdef CONFIG_XEN
+	printk(KERN_INFO "init_IRQ called from %p\n",
+	       __builtin_return_address (0));
 	/* Maybe put into platform_irq_init later */
 	if (is_running_on_xen()) {
 		struct callback_register event = {

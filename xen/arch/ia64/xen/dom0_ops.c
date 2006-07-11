@@ -224,19 +224,43 @@ long arch_do_dom0_op(dom0_op_t *op, XEN_GUEST_HANDLE(dom0_op_t) u_dom0_op)
             break;
         }
 
-        if (ds->flags & XEN_DOMAINSETUP_hvm_guest) {
-            if (!vmx_enabled) {
-                printk("No VMX hardware feature for vmx domain.\n");
-                ret = -EINVAL;
-                break;
-            }
-            d->arch.is_vti = 1;
-            vmx_setup_platform(d);
+        if (ds->flags & XEN_DOMAINSETUP_query) {
+            /* Set flags.  */
+            if (d->arch.is_vti)
+                ds->flags |= XEN_DOMAINSETUP_hvm_guest;
+            /* Set params.  */
+            ds->bp = 0;		/* unknown.  */
+            ds->maxmem = 0; /* unknown.  */
+            ds->xsi_va = d->arch.shared_info_va;
+            ds->hypercall_imm = d->arch.breakimm;
+            /* Copy back.  */
+            if ( copy_to_guest(u_dom0_op, op, 1) )
+                ret = -EFAULT;
         }
         else {
-            build_physmap_table(d);
-            dom_fw_setup(d, ds->bp, ds->maxmem);
+            if (ds->flags & XEN_DOMAINSETUP_hvm_guest) {
+                if (!vmx_enabled) {
+                    printk("No VMX hardware feature for vmx domain.\n");
+                    ret = -EINVAL;
+                    break;
+                }
+                d->arch.is_vti = 1;
+                vmx_setup_platform(d);
+            }
+            else {
+                build_physmap_table(d);
+                dom_fw_setup(d, ds->bp, ds->maxmem);
+                if (ds->xsi_va)
+                    d->arch.shared_info_va = ds->xsi_va;
+                if (ds->hypercall_imm) {
+                    struct vcpu *v;
+                    d->arch.breakimm = ds->hypercall_imm;
+                    for_each_vcpu (d, v)
+                        v->arch.breakimm = d->arch.breakimm;
+                }
+            }
         }
+
         put_domain(d);
     }
     break;

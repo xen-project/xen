@@ -302,10 +302,27 @@ typedef struct arch_shared_info arch_shared_info_t;
 
 typedef unsigned long xen_callback_t;
 
+struct ia64_tr_entry {
+    unsigned long pte;
+    unsigned long itir;
+    unsigned long vadr;
+    unsigned long rid;
+};
+
+struct vcpu_extra_regs {
+    struct ia64_tr_entry itrs[8];
+    struct ia64_tr_entry dtrs[8];
+    unsigned long iva;
+    unsigned long dcr;
+    unsigned long event_callback_ip;
+};
+
 struct vcpu_guest_context {
+#define VGCF_EXTRA_REGS (1<<1)	/* Get/Set extra regs.  */
     unsigned long flags;       /* VGCF_* flags */
 
     struct cpu_user_regs user_regs;
+    struct vcpu_extra_regs extra_regs;
     unsigned long privregs_pfn;
 };
 typedef struct vcpu_guest_context vcpu_guest_context_t;

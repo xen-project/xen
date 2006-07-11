@@ -407,8 +407,28 @@ void arch_domain_destroy(struct domain *d)
 
 void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
 {
+	int i;
+	struct vcpu_extra_regs *er = &c->extra_regs;
+
 	c->user_regs = *vcpu_regs (v);
  	c->privregs_pfn = virt_to_maddr(v->arch.privregs) >> PAGE_SHIFT;
+
+	/* Fill extra regs.  */
+	for (i = 0; i < 8; i++) {
+		er->itrs[i].pte = v->arch.itrs[i].pte.val;
+		er->itrs[i].itir = v->arch.itrs[i].itir;
+		er->itrs[i].vadr = v->arch.itrs[i].vadr;
+		er->itrs[i].rid = v->arch.itrs[i].rid;
+	}
+	for (i = 0; i < 8; i++) {
+		er->dtrs[i].pte = v->arch.dtrs[i].pte.val;
+		er->dtrs[i].itir = v->arch.dtrs[i].itir;
+		er->dtrs[i].vadr = v->arch.dtrs[i].vadr;
+		er->dtrs[i].rid = v->arch.dtrs[i].rid;
+	}
+	er->event_callback_ip = v->arch.event_callback_ip;
+	er->dcr = v->arch.dcr;
+	er->iva = v->arch.iva;
 }
 
 int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
@@ -423,6 +443,28 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
  		regs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT;
  		regs->ar_rsc |= (2 << 2); /* force PL2/3 */
  	}
+
+	if (c->flags & VGCF_EXTRA_REGS) {
+		int i;
+		struct vcpu_extra_regs *er = &c->extra_regs;
+
+		for (i = 0; i < 8; i++) {
+			vcpu_set_itr(v, i, er->itrs[i].pte,
+			             er->itrs[i].itir,
+			             er->itrs[i].vadr,
+			             er->itrs[i].rid);
+		}
+		for (i = 0; i < 8; i++) {
+			vcpu_set_dtr(v, i,
+			             er->dtrs[i].pte,
+			             er->dtrs[i].itir,
+			             er->dtrs[i].vadr,
+			             er->dtrs[i].rid);
+		}
+		v->arch.event_callback_ip = er->event_callback_ip;
+		v->arch.dcr = er->dcr;
+		v->arch.iva = er->iva;
+  	}
 	
   	if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
  		return 0;

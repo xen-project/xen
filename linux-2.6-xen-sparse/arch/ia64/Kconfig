@@ -518,7 +518,7 @@ config XEN_DEVMEM
 	default n
 
 config XEN_REBOOT
-	default n
+	default y
 
 config XEN_SMPBOOT
 	default n
