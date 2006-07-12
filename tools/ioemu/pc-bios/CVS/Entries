@@ -1,0 +1,15 @@
+/Makefile/1.1/Wed May 17 14:47:01 2006//Trelease_0_8_1
+/README/1.7/Thu May 25 12:38:52 2006//Trelease_0_8_1
+/bios.bin/1.13/Thu May 25 18:22:37 2006/-kb/Trelease_0_8_1
+/bios.diff/1.11/Thu May 25 18:22:37 2006//Trelease_0_8_1
+/linux_boot.S/1.1/Wed May 17 14:47:01 2006//Trelease_0_8_1
+/linux_boot.bin/1.1/Wed May 17 14:47:01 2006/-kb/Trelease_0_8_1
+/ohw.diff/1.2/Thu Jul  7 22:38:00 2005//Trelease_0_8_1
+/ppc_rom.bin/1.6/Thu May 25 12:39:00 2006/-kb/Trelease_0_8_1
+/proll.elf/1.5/Thu May 25 18:22:38 2006/-kb/Trelease_0_8_1
+/proll.patch/1.6/Thu May 25 18:22:38 2006//Trelease_0_8_1
+/vgabios-cirrus.bin/1.6/Thu May 25 18:22:38 2006/-kb/Trelease_0_8_1
+/vgabios.bin/1.5/Thu May 25 18:22:39 2006/-kb/Trelease_0_8_1
+/vgabios.diff/1.2/Thu May 25 18:22:39 2006//Trelease_0_8_1
+/video.x/1.1/Sun Jul  3 14:00:51 2005/-kb/Trelease_0_8_1
+D

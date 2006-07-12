@@ -1,0 +1,93 @@
+diff -r 2b3e57b3e1ec cpu-all.h
+--- a/cpu-all.h	Mon Jun 26 15:16:39 2006 +0100
++++ b/cpu-all.h	Mon Jun 26 15:16:44 2006 +0100
+@@ -822,7 +822,7 @@ int cpu_inl(CPUState *env, int addr);
+ 
+ /* memory API */
+ 
+-extern int phys_ram_size;
++extern uint64_t phys_ram_size;
+ extern int phys_ram_fd;
+ extern uint8_t *phys_ram_base;
+ extern uint8_t *phys_ram_dirty;
+diff -r 2b3e57b3e1ec hw/pc.c
+--- a/hw/pc.c	Mon Jun 26 15:16:39 2006 +0100
++++ b/hw/pc.c	Mon Jun 26 15:16:44 2006 +0100
+@@ -147,7 +147,7 @@ static void cmos_init_hd(int type_ofs, i
+ }
+ 
+ /* hd_table must contain 4 block drivers */
+-static void cmos_init(int ram_size, int boot_device, BlockDriverState **hd_table)
++static void cmos_init(uint64_t ram_size, int boot_device, BlockDriverState **hd_table)
+ {
+     RTCState *s = rtc_state;
+     int val;
+@@ -604,7 +604,7 @@ static void pc_init_ne2k_isa(NICInfo *nd
+ }
+ 
+ /* PC hardware initialisation */
+-static void pc_init1(int ram_size, int vga_ram_size, int boot_device,
++static void pc_init1(uint64_t ram_size, int vga_ram_size, int boot_device,
+                      DisplayState *ds, const char **fd_filename, int snapshot,
+                      const char *kernel_filename, const char *kernel_cmdline,
+                      const char *initrd_filename,
+@@ -853,7 +853,7 @@ static void pc_init1(int ram_size, int v
+     }
+ }
+ 
+-static void pc_init_pci(int ram_size, int vga_ram_size, int boot_device,
++static void pc_init_pci(uint64_t ram_size, int vga_ram_size, int boot_device,
+                         DisplayState *ds, const char **fd_filename, 
+                         int snapshot, 
+                         const char *kernel_filename, 
+@@ -866,7 +866,7 @@ static void pc_init_pci(int ram_size, in
+              initrd_filename, 1);
+ }
+ 
+-static void pc_init_isa(int ram_size, int vga_ram_size, int boot_device,
++static void pc_init_isa(uint64_t ram_size, int vga_ram_size, int boot_device,
+                         DisplayState *ds, const char **fd_filename, 
+                         int snapshot, 
+                         const char *kernel_filename, 
+diff -r 2b3e57b3e1ec vl.c
+--- a/vl.c	Mon Jun 26 15:16:39 2006 +0100
++++ b/vl.c	Mon Jun 26 15:16:44 2006 +0100
+@@ -123,7 +123,7 @@ const char* keyboard_layout = NULL;
+ const char* keyboard_layout = NULL;
+ int64_t ticks_per_sec;
+ int boot_device = 'c';
+-int ram_size;
++uint64_t ram_size;
+ int pit_min_timer_count = 0;
+ int nb_nics;
+ NICInfo nd_table[MAX_NICS];
+@@ -5320,7 +5320,7 @@ int main(int argc, char **argv)
+                 help();
+                 break;
+             case QEMU_OPTION_m:
+-                ram_size = atoi(optarg) * 1024 * 1024;
++                ram_size = atol(optarg) * 1024 * 1024;
+                 if (ram_size <= 0)
+                     help();
+                 if (ram_size > PHYS_RAM_MAX_SIZE) {
+diff -r 2b3e57b3e1ec vl.h
+--- a/vl.h	Mon Jun 26 15:16:39 2006 +0100
++++ b/vl.h	Mon Jun 26 15:16:44 2006 +0100
+@@ -138,7 +138,7 @@ extern int xc_handle;
+ extern int xc_handle;
+ extern int domid;
+ 
+-extern int ram_size;
++extern uint64_t ram_size;
+ extern int bios_size;
+ extern int rtc_utc;
+ extern int cirrus_vga_enabled;
+@@ -542,7 +542,7 @@ int qcow_compress_cluster(BlockDriverSta
+ 
+ #ifndef QEMU_TOOL
+ 
+-typedef void QEMUMachineInitFunc(int ram_size, int vga_ram_size, 
++typedef void QEMUMachineInitFunc(uint64_t ram_size, int vga_ram_size, 
+                                  int boot_device,
+              DisplayState *ds, const char **fd_filename, int snapshot,
+              const char *kernel_filename, const char *kernel_cmdline,

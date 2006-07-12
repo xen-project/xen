@@ -1,0 +1,155 @@
+diff -r d711aa4fa261 hw/ide.c
+--- a/hw/ide.c	Fri Jun 16 10:13:37 2006 +0200
++++ b/hw/ide.c	Fri Jun 16 10:30:28 2006 +0200
+@@ -22,6 +22,7 @@
+  * THE SOFTWARE.
+  */
+ #include "vl.h"
++#include <pthread.h>
+ 
+ /* debug IDE devices */
+ //#define DEBUG_IDE
+@@ -390,6 +391,48 @@ typedef struct PCIIDEState {
+     int type; /* see IDE_TYPE_xxx */
+ } PCIIDEState;
+ 
++#define DMA_MULTI_THREAD
++
++#ifdef DMA_MULTI_THREAD
++
++static int file_pipes[2];
++
++static void ide_dma_loop(BMDMAState *bm);
++static void dma_thread_loop(BMDMAState *bm);
++
++static void *dma_thread_func(void* opaque)
++{
++    BMDMAState* req;
++
++    while (read(file_pipes[0], &req, sizeof(req))) {
++        dma_thread_loop(req);
++    }
++
++    return NULL;
++}
++
++static void dma_create_thread(void)
++{
++    pthread_t tid;
++    int rt;
++
++    if (pipe(file_pipes) != 0) {
++        fprintf(stderr, "create pipe failed\n");
++        exit(1);
++    }
++
++    if ((rt = pthread_create(&tid, NULL, dma_thread_func, NULL))) {
++        fprintf(stderr, "Oops, dma thread creation failed, errno=%d\n", rt);
++        exit(1);
++    }
++
++    if ((rt = pthread_detach(tid))) {
++        fprintf(stderr, "Oops, dma thread detachment failed, errno=%d\n", rt);
++        exit(1);
++    }
++}
++#endif /* DMA_MULTI_THREAD */
++
+ static void ide_dma_start(IDEState *s, IDEDMAFunc *dma_cb);
+ 
+ static void padstr(char *str, const char *src, int len)
+@@ -695,7 +738,9 @@ static int ide_read_dma_cb(IDEState *s,
+     }
+     if (s->io_buffer_index >= s->io_buffer_size && s->nsector == 0) {
+         s->status = READY_STAT | SEEK_STAT;
++#ifndef DMA_MULTI_THREAD
+         ide_set_irq(s);
++#endif /* !DMA_MULTI_THREAD */
+ #ifdef DEBUG_IDE_ATAPI
+         printf("dma status=0x%x\n", s->status);
+ #endif
+@@ -795,7 +840,11 @@ static int ide_write_dma_cb(IDEState *s,
+                             qemu_get_clock(vm_clock) + (ticks_per_sec / 1000));
+                 } else 
+ #endif
++#ifndef DMA_MULTI_THREAD
+                     ide_set_irq(s);
++#else  /* !DMA_MULTI_THREAD */
++                    ;
++#endif /* DMA_MULTI_THREAD */
+                 return 0;
+             }
+             if (n > MAX_MULT_SECTORS)
+@@ -1046,7 +1095,9 @@ static int ide_atapi_cmd_read_dma_cb(IDE
+     if (s->packet_transfer_size <= 0) {
+         s->status = READY_STAT;
+         s->nsector = (s->nsector & ~7) | ATAPI_INT_REASON_IO | ATAPI_INT_REASON_CD;
++#ifndef DMA_MULTI_THREAD
+         ide_set_irq(s);
++#endif /* !DMA_MULTI_THREAD */
+ #ifdef DEBUG_IDE_ATAPI
+         printf("dma status=0x%x\n", s->status);
+ #endif
+@@ -2219,9 +2270,30 @@ static void ide_map(PCIDevice *pci_dev, 
+     }
+ }
+ 
++static void ide_dma_finish(BMDMAState *bm)
++{
++    IDEState *s = bm->ide_if;
++
++    bm->status &= ~BM_STATUS_DMAING;
++    bm->status |= BM_STATUS_INT;
++    bm->dma_cb = NULL;
++    bm->ide_if = NULL;
++#ifdef DMA_MULTI_THREAD
++    ide_set_irq(s);
++#endif /* DMA_MULTI_THREAD */
++}
++
+ /* XXX: full callback usage to prepare non blocking I/Os support -
+    error handling */
++#ifdef DMA_MULTI_THREAD
+ static void ide_dma_loop(BMDMAState *bm)
++{
++    write(file_pipes[1], &bm, sizeof(bm));
++}
++static void dma_thread_loop(BMDMAState *bm)
++#else  /* DMA_MULTI_THREAD */
++static void ide_dma_loop(BMDMAState *bm)
++#endif /* !DMA_MULTI_THREAD */
+ {
+     struct {
+         uint32_t addr;
+@@ -2257,10 +2329,7 @@ static void ide_dma_loop(BMDMAState *bm)
+     }
+     /* end of transfer */
+  the_end:
+-    bm->status &= ~BM_STATUS_DMAING;
+-    bm->status |= BM_STATUS_INT;
+-    bm->dma_cb = NULL;
+-    bm->ide_if = NULL;
++    ide_dma_finish(bm);
+ }
+ 
+ static void ide_dma_start(IDEState *s, IDEDMAFunc *dma_cb)
+@@ -2486,6 +2555,9 @@ void pci_cmd646_ide_init(PCIBus *bus, Bl
+               cmd646_set_irq, d, 0);
+     ide_init2(&d->ide_if[2], hd_table[2], hd_table[3],
+               cmd646_set_irq, d, 1);
++#ifdef DMA_MULTI_THREAD    
++    dma_create_thread();
++#endif /* DMA_MULTI_THREAD */
+ }
+ 
+ /* hd_table must contain 4 block drivers */
+@@ -2521,6 +2593,9 @@ void pci_piix3_ide_init(PCIBus *bus, Blo
+               pic_set_irq_new, isa_pic, 15);
+     ide_init_ioport(&d->ide_if[0], 0x1f0, 0x3f6);
+     ide_init_ioport(&d->ide_if[2], 0x170, 0x376);
++#ifdef DMA_MULTI_THREAD    
++    dma_create_thread();
++#endif //DMA_MULTI_THREAD    
+ }
+ 
+ /***********************************************************/

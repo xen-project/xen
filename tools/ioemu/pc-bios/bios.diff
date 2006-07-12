@@ -1,0 +1,140 @@
+Index: apmbios.S
+===================================================================
+RCS file: /cvsroot/bochs/bochs/bios/apmbios.S,v
+retrieving revision 1.4
+diff -u -w -r1.4 apmbios.S
+--- apmbios.S	26 Dec 2005 10:35:51 -0000	1.4
++++ apmbios.S	28 Apr 2006 22:41:19 -0000
+@@ -225,6 +225,7 @@
+ APMSYM(05):
+   cmp al, #0x05
+   jne APMSYM(07)
++  sti
+   hlt
+   jmp APMSYM(ok)
+ 
+Index: rombios.c
+===================================================================
+RCS file: /cvsroot/bochs/bochs/bios/rombios.c,v
+retrieving revision 1.160
+diff -u -w -r1.160 rombios.c
+--- rombios.c	25 Jan 2006 17:51:49 -0000	1.160
++++ rombios.c	28 Apr 2006 22:41:21 -0000
+@@ -1816,6 +1816,7 @@
+ {
+   printf(BX_APPNAME" BIOS - build: %s\n%s\nOptions: ",
+     BIOS_BUILD_DATE, bios_cvs_version_string);
++#if 0
+   printf(
+ #ifdef BX_APM
+   "apmbios "
+@@ -1827,6 +1828,9 @@
+   "eltorito "
+ #endif
+   "\n\n");
++#else
++  printf("apmbios pcibios eltorito \n\n");
++#endif
+ }
+ 
+ //--------------------------------------------------------------------------
+@@ -8713,6 +8717,7 @@
+   mov al, #0x80
+ bios32_end:
+   popf
++  and dword ptr[esp+4],0xfffffffc ;; reset CS.RPL for kqemu
+   retf
+ 
+ .align 16
+@@ -8823,17 +8828,17 @@
+ pci_pro_fail:
+   pop edi
+   pop esi
+-  sti
+   popf
+   stc
++  and dword ptr[esp+4],0xfffffffc ;; reset CS.RPL for kqemu
+   retf
+ pci_pro_ok:
+   xor ah, ah
+   pop edi
+   pop esi
+-  sti
+   popf
+   clc
++  and dword ptr[esp+4],0xfffffffc ;; reset CS.RPL for kqemu
+   retf
+ 
+ pci_pro_select_reg:
+@@ -8971,7 +8976,7 @@
+   jmp pci_real_ok
+ pci_real_f0d: ;; write configuration dword
+   cmp al, #0x0d
+-  jne pci_real_unknown
++  jne pci_real_f0e
+   call pci_real_select_reg
+   push dx
+   mov dx, #0x0cfc
+@@ -8979,6 +8984,46 @@
+   out dx, eax
+   pop dx
+   jmp pci_real_ok
++pci_real_f0e: ;; get irq routing options
++  cmp al, #0x0e
++  jne pci_real_unknown
++  SEG ES
++  cmp word ptr [di], #pci_routing_table_structure_end - pci_routing_table_structure_start
++  jb pci_real_too_small    
++  SEG ES
++  mov word ptr [di], #pci_routing_table_structure_end - pci_routing_table_structure_start        
++  pushf
++  push ds
++  push es
++  push cx
++  push si
++  push di
++  cld
++  mov si, #pci_routing_table_structure_start
++  push cs
++  pop ds
++  SEG ES
++  mov cx, [di+2]
++  SEG ES
++  mov es, [di+4]
++  mov di, cx
++  mov cx, #pci_routing_table_structure_end - pci_routing_table_structure_start
++  rep 
++      movsb
++  pop di
++  pop si
++  pop cx
++  pop es
++  pop ds
++  popf
++  mov bx, #(1 << 9) | (1 << 11)   ;; irq 9 and 11 are used
++  jmp pci_real_ok
++pci_real_too_small:
++  SEG ES
++  mov word ptr [di], #pci_routing_table_structure_end - pci_routing_table_structure_start        
++  mov ah, #0x89
++  jmp pci_real_fail
++
+ pci_real_unknown:
+   mov ah, #0x81
+ pci_real_fail:
+@@ -9019,6 +9064,7 @@
+   dw 0,0 ;; Miniport data
+   db 0,0,0,0,0,0,0,0,0,0,0 ;; reserved
+   db 0x07 ;; checksum
++pci_routing_table_structure_start:
+   ;; first slot entry PCI-to-ISA (embedded)
+   db 0 ;; pci bus number
+   db 0x08 ;; pci device number (bit 7-3)
+@@ -9097,6 +9143,7 @@
+   dw 0xdef8 ;; IRQ bitmap INTD#
+   db 5 ;; physical slot (0 = embedded)
+   db 0 ;; reserved
++pci_routing_table_structure_end:
+ 
+ pci_irq_list:
+   db 11, 10, 9, 5;

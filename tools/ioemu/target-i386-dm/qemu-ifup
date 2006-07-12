@@ -1,0 +1,10 @@
+#!/bin/sh
+
+#. /etc/rc.d/init.d/functions
+#ulimit -c unlimited
+
+echo -c 'config qemu network with xen bridge for '
+echo $*
+
+ifconfig $1 0.0.0.0 up
+brctl addif $2 $1
