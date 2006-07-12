@@ -54,6 +54,7 @@
 ^extras/mini-os/h/xen-public$
 ^extras/mini-os/mini-os\..*$
 ^install/.*$
+^linux-[^/]*-native/.*$
 ^linux-[^/]*-xen/.*$
 ^linux-[^/]*-xen0/.*$
 ^linux-[^/]*-xenU/.*$

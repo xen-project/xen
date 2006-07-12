@@ -5,6 +5,9 @@ EXTRAVERSION ?= xen
 
 LINUX_DIR    = linux-$(LINUX_VER)-$(EXTRAVERSION)
 
+IMAGE_TARGET ?= vmlinuz
+INSTALL_BOOT_PATH ?= $(DESTDIR)
+
 LINUX_VER3  := $(LINUX_SERIES).$(word 3, $(subst ., ,$(LINUX_VER)))
 
 include buildconfigs/Rules.mk
@@ -16,8 +19,9 @@ build: $(LINUX_DIR)/include/linux/autoconf.h
 	    $(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) modules ; \
 	    $(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_MOD_PATH=$(DESTDIR) modules_install ; \
 	fi
-	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(DESTDIR) vmlinuz
-	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(DESTDIR) install
+	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(DESTDIR) $(IMAGE_TARGET)
+	mkdir -p $(INSTALL_BOOT_PATH)
+	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(INSTALL_BOOT_PATH) install
 
 $(LINUX_DIR)/include/linux/autoconf.h: ref-linux-$(LINUX_VER)/.valid-ref
 	rm -rf $(LINUX_DIR)
@@ -29,8 +33,7 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-linux-$(LINUX_VER)/.valid-ref
 	CONFIG_VERSION=$$(sed -ne 's/^EXTRAVERSION = //p' $(LINUX_DIR)/Makefile); \
 	[ -r $(DESTDIR)/boot/config-$(LINUX_VER3)$$CONFIG_VERSION-$(EXTRAVERSION) ] && \
 	  cp $(DESTDIR)/boot/config-$(LINUX_VER3)$$CONFIG_VERSION-$(EXTRAVERSION) $(LINUX_DIR)/.config \
-	  || cp buildconfigs/linux-defconfig_$(EXTRAVERSION)_$(XEN_TARGET_ARCH)$(XEN_SYSTYPE) \
-		$(LINUX_DIR)/.config
+	  || sh buildconfigs/create_config.sh $(LINUX_DIR)/.config $(EXTRAVERSION) $(XEN_TARGET_ARCH) $(XEN_SYSTYPE)
 	# See if we need to munge config to enable PAE
 	$(MAKE) CONFIG_FILE=$(LINUX_DIR)/.config -f buildconfigs/Rules.mk config-update-pae
 	# Patch kernel Makefile to set EXTRAVERSION
