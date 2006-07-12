@@ -289,7 +289,7 @@ static void update_vhpi(VCPU *vcpu, int vec)
         vhpi = 16;
     }
     else {
-        vhpi = vec / 16;
+        vhpi = vec >> 4;
     }
 
     VCPU(vcpu,vhpi) = vhpi;
@@ -436,7 +436,7 @@ static int highest_inservice_irq(VCPU *vcpu)
  */
 static int is_higher_irq(int pending, int inservice)
 {
-    return ( (pending >> 4) > (inservice>>4) || 
+    return ( (pending > inservice) || 
                 ((pending != NULL_VECTOR) && (inservice == NULL_VECTOR)) );
 }
 
@@ -460,7 +460,6 @@ static int
 _xirq_masked(VCPU *vcpu, int h_pending, int h_inservice)
 {
     tpr_t    vtpr;
-    uint64_t    mmi;
     
     vtpr.val = VCPU(vcpu, tpr);
 
@@ -474,9 +473,9 @@ _xirq_masked(VCPU *vcpu, int h_pending, int h_inservice)
     if ( h_inservice == ExtINT_VECTOR ) {
         return IRQ_MASKED_BY_INSVC;
     }
-    mmi = vtpr.mmi;
+
     if ( h_pending == ExtINT_VECTOR ) {
-        if ( mmi ) {
+        if ( vtpr.mmi ) {
             // mask all external IRQ
             return IRQ_MASKED_BY_VTPR;
         }
@@ -486,7 +485,7 @@ _xirq_masked(VCPU *vcpu, int h_pending, int h_inservice)
     }
 
     if ( is_higher_irq(h_pending, h_inservice) ) {
-        if ( !mmi && is_higher_class(h_pending, vtpr.mic) ) {
+        if ( is_higher_class(h_pending, vtpr.mic + (vtpr.mmi << 4)) ) {
             return IRQ_NO_MASKED;
         }
         else {
@@ -577,6 +576,8 @@ int vmx_check_pending_irq(VCPU *vcpu)
         isr = vpsr.val & IA64_PSR_RI;
         if ( !vpsr.ic )
             panic_domain(regs,"Interrupt when IC=0\n");
+        if (VCPU(vcpu, vhpi))
+            update_vhpi(vcpu, NULL_VECTOR);
         vmx_reflect_interruption(0,isr,0, 12, regs ); // EXT IRQ
     }
     else if ( mask == IRQ_MASKED_BY_INSVC ) {
@@ -612,6 +613,20 @@ void guest_write_eoi(VCPU *vcpu)
 //    vmx_check_pending_irq(vcpu);
 }
 
+int is_unmasked_irq(VCPU *vcpu)
+{
+    int h_pending, h_inservice;
+
+    h_pending = highest_pending_irq(vcpu);
+    h_inservice = highest_inservice_irq(vcpu);
+    if ( h_pending == NULL_VECTOR || 
+        irq_masked(vcpu, h_pending, h_inservice) != IRQ_NO_MASKED ) {
+        return 0;
+    }
+    else
+        return 1;
+}
+
 uint64_t guest_read_vivr(VCPU *vcpu)
 {
     int vec, h_inservice;
@@ -628,7 +643,8 @@ uint64_t guest_read_vivr(VCPU *vcpu)
  
     VLSAPIC_INSVC(vcpu,vec>>6) |= (1UL <<(vec&63));
     VCPU(vcpu, irr[vec>>6]) &= ~(1UL <<(vec&63));
-    update_vhpi(vcpu, NULL_VECTOR);     // clear VHPI till EOI or IRR write
+    if (VCPU(vcpu, vhpi))
+        update_vhpi(vcpu, NULL_VECTOR); // clear VHPI till EOI or IRR write
     local_irq_restore(spsr);
     return (uint64_t)vec;
 }

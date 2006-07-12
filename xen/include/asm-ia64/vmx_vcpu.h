@@ -103,6 +103,7 @@ extern void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm);
 extern void vlsapic_reset(VCPU *vcpu);
 extern int vmx_check_pending_irq(VCPU *vcpu);
 extern void guest_write_eoi(VCPU *vcpu);
+extern int is_unmasked_irq(VCPU *vcpu);
 extern uint64_t guest_read_vivr(VCPU *vcpu);
 extern void vmx_inject_vhpi(VCPU *vcpu, u8 vec);
 extern int vmx_vcpu_pend_interrupt(VCPU *vcpu, uint8_t vector);

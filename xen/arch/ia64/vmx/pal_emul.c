@@ -146,7 +146,7 @@ static struct ia64_pal_retval
 pal_halt_light(VCPU *vcpu) {
 	struct ia64_pal_retval result;
 	
-	if (SPURIOUS_VECTOR == vmx_check_pending_irq(vcpu))
+	if (!is_unmasked_irq(vcpu))
 		do_sched_op_compat(SCHEDOP_block, 0);
 	    
 	INIT_PAL_STATUS_SUCCESS(result);

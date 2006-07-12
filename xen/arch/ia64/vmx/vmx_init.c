@@ -183,7 +183,8 @@ static vpd_t *alloc_vpd(void)
 	mregs->vac.a_from_cpuid = 1;
 	mregs->vac.a_cover = 1;
 	mregs->vac.a_bsw = 1;
-
+	mregs->vac.a_int = 1;
+       
 	mregs->vdc.d_vmsw = 1;
 
 	return vpd;

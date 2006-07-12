@@ -30,7 +30,6 @@
 #include <asm/vmx.h>
 #include <asm/virt_event.h>
 #include <asm/vmx_phy_mode.h>
-extern void vhpi_detection(VCPU *vcpu);//temporarily place here,need a header file.
 
 void
 ia64_priv_decoder(IA64_SLOT_TYPE slot_type, INST64 inst, UINT64  * cause)
@@ -1342,14 +1341,6 @@ IA64FAULT vmx_emul_mov_from_cr(VCPU *vcpu, INST64 inst)
 }
 
 
-static void post_emulation_action(VCPU *vcpu)
-{
-    if ( vcpu->arch.irq_new_condition ) {
-        vcpu->arch.irq_new_condition = 0;
-        vhpi_detection(vcpu);
-    }
-}
-
 //#define  BYPASS_VMAL_OPCODE
 extern IA64_SLOT_TYPE  slot_types[0x20][3];
 IA64_BUNDLE __vmx_get_domain_bundle(u64 iip)
@@ -1552,8 +1543,6 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
     }
 
     recover_if_physical_mode(vcpu);
-    post_emulation_action (vcpu);
-//TODO    set_irq_check(v);
     return;
 
 }

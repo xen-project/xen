@@ -35,7 +35,7 @@
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
-//#include <asm/ldt.h>
+#include <asm/vlsapic.h>
 #include <xen/irq.h>
 #include <xen/event.h>
 #include <asm/regionreg.h>
@@ -188,13 +188,13 @@ void leave_hypervisor_tail(struct pt_regs *regs)
     struct vcpu *v = current;
     // FIXME: Will this work properly if doing an RFI???
     if (!is_idle_domain(d) ) {	// always comes from guest
-        extern void vmx_dorfirfi(void);
-        struct pt_regs *user_regs = vcpu_regs(current);
+//        struct pt_regs *user_regs = vcpu_regs(current);
+        local_irq_enable();
         do_softirq();
         local_irq_disable();
 
-        if (user_regs != regs)
-            printk("WARNING: checking pending interrupt in nested interrupt!!!\n");
+//        if (user_regs != regs)
+//            printk("WARNING: checking pending interrupt in nested interrupt!!!\n");
 
         /* VMX Domain N has other interrupt source, saying DM  */
         if (test_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags))
@@ -215,12 +215,18 @@ void leave_hypervisor_tail(struct pt_regs *regs)
 
         if ( v->arch.irq_new_pending ) {
             v->arch.irq_new_pending = 0;
+            v->arch.irq_new_condition = 0;
             vmx_check_pending_irq(v);
+            return;
         }
-//        if (VCPU(v,vac).a_bsw){
-//            save_banked_regs_to_vpd(v,regs);
-//        }
-
+        if (VCPU(v, vac).a_int) {
+            vhpi_detection(v);
+            return;
+        }
+        if (v->arch.irq_new_condition) {
+            v->arch.irq_new_condition = 0;
+            vhpi_detection(v);
+        }
     }
 }
 
