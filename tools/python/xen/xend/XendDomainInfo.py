@@ -396,10 +396,6 @@ def domain_by_name(name):
     return XendDomain.instance().domain_lookup_by_name_nr(name)
 
 
-def domain_by_uuid(uuid):
-    return XendDomain.instance().domain_lookup_by_uuid_nr(uuid)
-
-
 def shutdown_reason(code):
     """Get a shutdown reason from a code.
 
@@ -585,7 +581,6 @@ class XendDomainInfo:
             defaultInfo('security',     lambda: None)
 
             self.check_name(self.info['name'])
-            self.check_uuid(self.info['uuid'])
 
             if isinstance(self.info['image'], str):
                 self.info['image'] = sxp.from_string(self.info['image'])
@@ -782,9 +777,6 @@ class XendDomainInfo:
 
     def getName(self):
         return self.info['name']
-
-    def getUuid(self):
-        return self.info['uuid']
 
     def getDomainPath(self):
         return self.dompath
@@ -1213,23 +1205,6 @@ class XendDomainInfo:
         if dominfo.domid != self.domid:
             raise VmError("VM name '%s' is used in both domains %d and %d" %
                           (name, self.domid, dominfo.domid))
-
-
-    def check_uuid(self, uuid):
-        """The same uuid cannot be used for more than one vm at the same time.
-
-        @param uuid: uuid
-        @raise: VmError if same uuid is used
-        """
-        dominfo = domain_by_uuid(uuid)
-        if not dominfo:
-            return
-        if self.domid is None:
-            raise VmError("uuid '%s' already in use by domain %d" %
-                          (uuid, dominfo.domid))
-        if dominfo.domid != self.domid:
-            raise VmError("uuid '%s' is used in both domains %d and %d" %
-                          (uuid, self.domid, dominfo.domid))
 
 
     def construct(self):
