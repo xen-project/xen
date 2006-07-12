@@ -1,5 +1,0 @@
-#!/bin/sh
-
-echo $* > /tmp/args
-echo $DISPLAY >> /tmp/args
-exec /usr/lib/xen/bin/qemu-dm $*
