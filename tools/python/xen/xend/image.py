@@ -318,20 +318,16 @@ class HVMImageHandler(ImageHandler):
     def configVNC(self, config):
         # Handle graphics library related options
         vnc = sxp.child_value(config, 'vnc')
+        vncdisplay = sxp.child_value(config, 'vncdisplay',
+                                     int(self.vm.getDomid()))
         sdl = sxp.child_value(config, 'sdl')
         ret = []
         nographic = sxp.child_value(config, 'nographic')
         if nographic:
             ret.append('-nographic')
             return ret
-
-        if vnc and sdl:
-            ret = ret + ['-vnc-and-sdl', '-k', 'en-us']
-        elif vnc:
-            ret = ret + ['-vnc', '-k', 'en-us']
         if vnc:
-            vncport = int(self.vm.getDomid()) + 5900
-            ret = ret + ['-vncport', '%d' % vncport]
+            ret = ret + ['-vnc', '%d' % vncdisplay, '-k', 'en-us']
         return ret
 
     def createDeviceModel(self):

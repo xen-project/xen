@@ -406,6 +406,10 @@ gopts.var('vnc', val='',
           fn=set_value, default=None,
           use="""Should the device model use VNC?""")
 
+gopts.var('vncdisplay', val='',
+          fn=set_value, default=None,
+          use="""VNC display to use""")
+
 gopts.var('sdl', val='',
           fn=set_value, default=None,
           use="""Should the device model use SDL?""")
@@ -615,8 +619,8 @@ def configure_hvm(config_image, vals):
     """
     args = [ 'device_model', 'pae', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'audio',
-             'vnc', 'vncviewer', 'sdl', 'display', 'acpi', 'apic',
-             'xauthority', 'usb', 'usbdevice' ]
+             'vnc', 'vncdisplay', 'vncviewer', 'sdl', 'display',
+             'acpi', 'apic', 'xauthority', 'usb', 'usbdevice' ]
     for a in args:
         if (vals.__dict__[a]):
             config_image.append([a, vals.__dict__[a]])
