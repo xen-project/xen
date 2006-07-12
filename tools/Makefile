@@ -58,10 +58,11 @@ check_clean:
 
 .PHONY: ioemu ioemuinstall ioemuclean
 ifdef CONFIG_IOEMU
+export IOEMU_DIR ?= ioemu
 ioemu ioemuinstall ioemuclean:
-	[ -f ioemu/config-host.h ] || \
-	(cd ioemu; sh ./configure --prefix=usr)
-	$(MAKE) -C ioemu $(patsubst ioemu%,%,$@)
+	[ -f $(IOEMU_DIR)/config-host.h ] || \
+	(cd $(IOEMU_DIR) && sh configure --prefix=/usr)
+	$(MAKE) -C $(IOEMU_DIR) $(patsubst ioemu%,%,$@)
 else
 ioemu ioemuinstall ioemuclean:
 endif
