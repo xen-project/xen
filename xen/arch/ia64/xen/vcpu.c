@@ -1923,7 +1923,14 @@ IA64FAULT vcpu_itr_d(VCPU *vcpu, UINT64 slot, UINT64 pte,
 	vcpu_set_tr_entry(trp,pte,itir,ifa);
 	vcpu_quick_region_set(PSCBX(vcpu,dtr_regions),ifa);
 
-	vcpu_flush_tlb_vhpt_range(ifa & itir_mask(itir), itir_ps(itir));
+	/*
+	 * FIXME According to spec, vhpt should be purged, but this
+	 * incurs considerable performance loss, since it is safe for
+	 * linux not to purge vhpt, vhpt purge is disabled until a
+	 * feasible way is found.
+	 *
+	 * vcpu_flush_tlb_vhpt_range(ifa & itir_mask(itir), itir_ps(itir));
+	 */
 
 	return IA64_NO_FAULT;
 }
@@ -1942,7 +1949,14 @@ IA64FAULT vcpu_itr_i(VCPU *vcpu, UINT64 slot, UINT64 pte,
 	vcpu_set_tr_entry(trp,pte,itir,ifa);
 	vcpu_quick_region_set(PSCBX(vcpu,itr_regions),ifa);
 
-	vcpu_flush_tlb_vhpt_range(ifa & itir_mask(itir), itir_ps(itir));
+	/*
+	 * FIXME According to spec, vhpt should be purged, but this
+	 * incurs considerable performance loss, since it is safe for
+	 * linux not to purge vhpt, vhpt purge is disabled until a
+	 * feasible way is found.
+	 *
+	 * vcpu_flush_tlb_vhpt_range(ifa & itir_mask(itir), itir_ps(itir));
+	 */
 
 	return IA64_NO_FAULT;
 }
