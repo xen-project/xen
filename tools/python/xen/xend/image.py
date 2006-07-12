@@ -248,7 +248,7 @@ class HVMImageHandler(ImageHandler):
     # Return a list of cmd line args to the device models based on the
     # xm config file
     def parseDeviceModelArgs(self, imageConfig, deviceConfig):
-        dmargs = [ 'cdrom', 'boot', 'fda', 'fdb', 'ne2000', 'audio',
+        dmargs = [ 'cdrom', 'boot', 'fda', 'fdb', 'audio',
                    'localtime', 'serial', 'stdvga', 'isa', 'vcpus',
 		   'usb', 'usbdevice']
         ret = []
@@ -257,11 +257,10 @@ class HVMImageHandler(ImageHandler):
 
             # python doesn't allow '-' in variable names
             if a == 'stdvga': a = 'std-vga'
-            if a == 'ne2000': a = 'nic-ne2000'
             if a == 'audio': a = 'enable-audio'
 
             # Handle booleans gracefully
-            if a in ['localtime', 'std-vga', 'isa', 'nic-ne2000', 'enable-audio', 'usb']:
+            if a in ['localtime', 'std-vga', 'isa', 'enable-audio', 'usb']:
                 if v != None: v = int(v)
                 if v: ret.append("-%s" % a)
             else:
@@ -300,24 +299,20 @@ class HVMImageHandler(ImageHandler):
                 if type != 'ioemu':
                     continue
                 nics += 1
-                if mac != None:
-                    continue
                 mac = sxp.child_value(info, 'mac')
-                bridge = sxp.child_value(info, 'bridge')
                 if mac == None:
                     mac = randomMAC()
-                if bridge == None:
-                    bridge = 'xenbr0'
-                ret.append("-macaddr")
-                ret.append("%s" % mac)
-                ret.append("-bridge")
-                ret.append("%s" % bridge)
+                bridge = sxp.child_value(info, 'bridge', 'xenbr0')
+                model = sxp.child_value(info, 'model', 'rtl8139')
+                ret.append("-net")
+                ret.append("nic,vlan=%d,macaddr=%s,model=%s" %
+                           (nics, mac, model))
+                ret.append("-net")
+                ret.append("tap,vlan=%d,bridge=%s" % (nics, bridge))
             if name == 'vtpm':
                 instance = sxp.child_value(info, 'pref_instance')
                 ret.append("-instance")
                 ret.append("%s" % instance)
-        ret.append("-nics")
-        ret.append("%d" % nics)
         return ret
 
     def configVNC(self, config):

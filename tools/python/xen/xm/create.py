@@ -398,10 +398,6 @@ gopts.var('nographic', val='no|yes',
           fn=set_bool, default=0,
           use="Should device models use graphics?")
 
-gopts.var('ne2000', val='no|yes',
-          fn=set_bool, default=0,
-          use="Should device models use ne2000?")
-
 gopts.var('audio', val='no|yes',
           fn=set_bool, default=0,
           use="Should device models enable audio?")
@@ -605,7 +601,7 @@ def configure_vifs(config_devs, vals):
 
         def f(k):
             if k not in ['backend', 'bridge', 'ip', 'mac', 'script', 'type',
-                         'vifname', 'rate']:
+                         'vifname', 'rate', 'model']:
                 err('Invalid vif option: ' + k)
 
             config_vif.append([k, d[k]])
@@ -619,7 +615,7 @@ def configure_hvm(config_image, vals):
     """
     args = [ 'device_model', 'pae', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'audio',
-             'vnc', 'vncviewer', 'sdl', 'display', 'ne2000', 'acpi', 'apic',
+             'vnc', 'vncviewer', 'sdl', 'display', 'acpi', 'apic',
              'xauthority', 'usb', 'usbdevice' ]
     for a in args:
         if (vals.__dict__[a]):
