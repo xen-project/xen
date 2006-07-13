@@ -231,3 +231,12 @@ void xencomm_add_offset(void *handle, unsigned int bytes)
         bytes -= chunk_skip;
     }
 }
+
+int xencomm_handle_is_null(void *ptr)
+{
+    struct xencomm_desc *desc;
+
+    desc = (struct xencomm_desc *)paddr_to_maddr((unsigned long)ptr);
+
+    return (desc->address[0] == XENCOMM_INVALID);
+}

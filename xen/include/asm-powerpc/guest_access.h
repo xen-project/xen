@@ -26,9 +26,12 @@ extern unsigned long xencomm_copy_to_guest(void *to, const void *from,
 extern unsigned long xencomm_copy_from_guest(void *to, const void *from,
         unsigned int len, unsigned int skip); 
 extern void xencomm_add_offset(void *handle, unsigned int bytes);
+extern int xencomm_handle_is_null(void *ptr);
+
 
 /* Is the guest handle a NULL reference? */
-#define guest_handle_is_null(hnd)        ((hnd).p == NULL)
+#define guest_handle_is_null(hnd) \
+    ((hnd).p == NULL || xencomm_handle_is_null((hnd).p))
 
 /* Offset the given guest handle into the array it refers to. */
 #define guest_handle_add_offset(hnd, nr) ({         \
