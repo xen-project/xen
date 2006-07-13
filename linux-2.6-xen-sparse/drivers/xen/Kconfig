@@ -94,6 +94,18 @@ config XEN_XENBUS_DEV
 	depends on PROC_FS
 	default y
 
+config XEN_BLKDEV_TAP
+	tristate "Blockk device tap backend"
+	depends on XEN_BACKEND
+	default XEN_PRIVILEGED_GUEST
+	help
+	  The block tap driver is an alternative to the block back driver 
+          and allows VM block requests to be redirected to userspace through
+          a device interface.  The tap allows user-space development of 
+          high-performance block backends, where disk images may be implemented
+          as files, in memory, or on other hosts across the network.  This 
+	  driver can safely coexist with the existing blockback driver.
+
 config XEN_NETDEV_BACKEND
 	tristate "Network-device backend driver"
         depends on XEN_BACKEND && NET

@@ -16,6 +16,8 @@ SUBDIRS-y += guest-headers
 SUBDIRS-$(VTPM_TOOLS) += vtpm_manager
 SUBDIRS-$(VTPM_TOOLS) += vtpm
 SUBDIRS-y += xenstat
+SUBDIRS-y += libaio
+SUBDIRS-y += blktap
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))

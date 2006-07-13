@@ -1,0 +1,19 @@
+Notes on running this test suite:
+
+To run the test suite, run "make check".  All test cases should pass 
+and there should be 0 fails.
+
+Several of the test cases require a directory on the filesystem under 
+test for the creation of test files, as well as the generation of 
+error conditions.  The test cases assume the directories (or symlinks 
+to directories) are as follows:
+
+	testdir/
+		- used for general read/write test cases.  Must have at 
+		  least as much free space as the machine has RAM (up 
+		  to 768MB).
+	testdir.enospc/
+		- a filesystem that has space for writing 8KB out, but 
+		  fails with -ENOSPC beyond 8KB.
+	testdir.ext2/
+		- must be an ext2 filesystem.

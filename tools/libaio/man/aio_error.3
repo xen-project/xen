@@ -1,0 +1,81 @@
+.TH aio_error 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+aio_error \- Getting the Status of AIO Operations
+.SH SYNOPSYS
+.nf
+.B #include <errno.h>
+.sp
+.br 
+.B #include <aio.h>
+.sp
+.br
+.BI "int aio_error (const struct aiocb *aiocbp)"
+.fi
+.SH DESCRIPTION
+The function
+.IR aio_error
+determines the error state of the request described by the
+.IR "struct aiocb"
+variable pointed to by 
+.I aiocbp
+. 
+
+When the operation is performed truly asynchronously (as with
+.IR "aio_read"
+and 
+.IR "aio_write"
+and with 
+.IR "lio_listio"
+when the mode is 
+.IR "LIO_NOWAIT"
+), one sometimes needs to know whether a
+specific request already terminated and if so, what the result was.
+When the sources are compiled with 
+.IR "_FILE_OFFSET_BITS == 64"
+this function is in fact 
+.IR "aio_error64"
+since the LFS interface transparently replaces the normal implementation.
+.SH "RETURN VALUES"
+If the request has not yet terminated the value returned is always
+.IR "EINPROGRESS"
+.  Once the request has terminated the value
+.IR "aio_error"
+returns is either 
+.I 0
+if the request completed successfully or it returns the value which would be stored in the
+.IR "errno"
+variable if the request would have been done using
+.IR "read"
+, 
+.IR "write"
+, or 
+.IR "fsync"
+.
+.SH ERRORS
+.TP
+.IR "ENOSYS"
+if it is not implemented.  It
+could also return 
+.TP
+.IR "EINVAL"
+if the 
+.I aiocbp
+parameter does not
+refer to an asynchronous operation whose return status is not yet known.
+.SH "SEE ALSO"
+.BR aio(3),
+.BR aio_cancel(3),
+.BR aio_cancel64(3),
+.BR aio_error64(3),
+.BR aio_fsync(3),
+.BR aio_fsync64(3),
+.BR aio_init(3),
+.BR aio_read(3),
+.BR aio_read64(3),
+.BR aio_return(3),
+.BR aio_return64(3),
+.BR aio_suspend(3),
+.BR aio_suspend64(3),
+.BR aio_write(3),
+.BR aio_write64(3),
+.BR errno(3),

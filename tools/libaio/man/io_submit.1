@@ -1,0 +1,109 @@
+.TH io_submit 2 2002-09-02 "Linux 2.4" "Linux AIO"
+.SH NAME
+io_submit \- submit io requests
+.SH SYNOPSIS
+.B #include <errno.h>
+.br
+.B #include <libaio.h>
+.LP
+.BI "int io_submit(io_context_t " ctx ", long " nr ", struct iocb *" iocbs "[]);"
+.SH DESCRIPTION
+.B io_submit
+submits to the io_context
+.I ctx
+up to
+.I nr
+I/O requests pointed to by the vector
+.IR iocbs .
+
+The
+.B iocb
+structure is defined as something like
+.sp
+.RS
+.nf
+struct iocb {
+    void    *data;
+.\"    unsigned    key;
+    short    aio_lio_opcode;
+    short    aio_reqprio;
+    int      aio_fildes;
+};
+.fi
+.RE
+.sp
+.I data
+is a an opaque pointer which will upon completion be returned in the
+.B io_event
+structure by
+.BR io_getevents (2).
+.\" and io_wait(2)
+Callers will typically use this to point directly or indirectly to a
+callback function.
+.sp
+.I aio_lio_opcode
+is the I/O operation requested.  Callers will typically set this and the
+arguments to the I/O operation calling the
+.BR io_prep_ (3)
+function corresponding to the operation.
+.sp
+.I aio_reqprio
+is the priority of the request.  Higher values have more priority; the
+normal priority is 0.
+.sp
+.I aio_fildes
+is the file descriptor for the I/O operation.
+Callers will typically set this and the
+arguments to the I/O operation calling the
+.BR io_prep_ *(3)
+function corresponding to the operation.
+.sp
+The caller may not modify the contents or resubmit a submitted
+.B iocb
+structure until after the operation completes or is canceled.
+The implementation of
+.BR io_submit (2)
+is permitted to modify reserved fields of the
+.B iocb
+structure.
+.SH "RETURN VALUES"
+If able to submit at least one iocb,
+.B io_submit
+returns the number of iocbs submitted successfully.  Otherwise, 
+.RI - error
+is returned, where 
+.I error
+is one of the Exxx values defined in the Errors section.
+.SH ERRORS
+.TP
+.B EFAULT
+.I iocbs
+referenced data outside of the program's accessible address space.
+.TP
+.B EINVAL
+.I nr
+is negative,
+.I ctx
+refers to an uninitialized aio context, the iocb pointed to by 
+.IR iocbs [0]
+is improperly initialized or specifies an unsupported operation.
+.TP
+.B EBADF
+The iocb pointed to by
+.IR iocbs [0]
+contains a file descriptor that does not exist.
+.TP
+.B EAGAIN
+Insufficient resources were available to queue any operations.
+.SH "SEE ALSO"
+.BR io_setup (2),
+.BR io_destroy (2),
+.BR io_getevents (2),
+.\".BR io_wait (2),
+.BR io_prep_pread (3),
+.BR io_prep_pwrite (3),
+.BR io_prep_fsync (3),
+.BR io_prep_fdsync (3),
+.BR io_prep_noop (3),
+.BR io_cancel (2),
+.BR errno (3)

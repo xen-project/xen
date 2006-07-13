@@ -1,0 +1,135 @@
+./"/* sys_io_submit:
+./" *      Queue the nr iocbs pointed to by iocbpp for processing.  Returns
+./" *      the number of iocbs queued.  May return -EINVAL if the aio_context
+./" *      specified by ctx_id is invalid, if nr is < 0, if the iocb at
+./" *      *iocbpp[0] is not properly initialized, if the operation specified
+./" *      is invalid for the file descriptor in the iocb.  May fail with
+./" *      -EFAULT if any of the data structures point to invalid data.  May
+./" *      fail with -EBADF if the file descriptor specified in the first
+./" *      iocb is invalid.  May fail with -EAGAIN if insufficient resources
+./" *      are available to queue any iocbs.  Will return 0 if nr is 0.  Will
+./" *      fail with -ENOSYS if not implemented.
+./" */
+.TH io_submit 2 2002-09-02 "Linux 2.4" "Linux AIO"
+.SH NAME
+io_submit \- Submit io requests
+.SH SYNOPSIS
+.nf
+.B #include <errno.h>
+.br
+.sp
+.B #include <libaio.h>
+.br
+.sp
+.BI "int io_submit(io_context_t " ctx ", long " nr ", struct iocb *" iocbs "[]);"
+.sp
+struct iocb {
+	void		*data;
+	unsigned	key;
+	short		aio_lio_opcode;
+	short		aio_reqprio;
+	int		aio_fildes;
+};
+.fi
+.SH DESCRIPTION
+.B io_submit
+submits
+.I nr
+iocbs for processing for a given io context ctx.
+
+The 
+.IR "io_submit"
+function can be used to enqueue an arbitrary
+number of read and write requests at one time.  The requests can all be
+meant for the same file, all for different files or every solution in
+between.
+
+.IR "io_submit"
+gets the 
+.IR "nr"
+requests from the array pointed to
+by 
+.IR "iocbs"
+.  The operation to be performed is determined by the
+.IR "aio_lio_opcode"
+member in each element of 
+.IR "iocbs"
+.  If this
+field is 
+.B "IO_CMD_PREAD"
+a read operation is enqueued, similar to a call
+of 
+.IR "io_prep_pread"
+for this element of the array (except that the way
+the termination is signalled is different, as we will see below).  If
+the 
+.IR "aio_lio_opcode"
+member is 
+.B "IO_CMD_PWRITE"
+a write operation
+is enqueued.  Otherwise the 
+.IR "aio_lio_opcode"
+must be 
+.B "IO_CMD_NOP"
+in which case this element of 
+.IR "iocbs"
+is simply ignored.  This
+``operation'' is useful in situations where one has a fixed array of
+.IR "struct iocb"
+elements from which only a few need to be handled at
+a time.  Another situation is where the 
+.IR "io_submit"
+call was
+canceled before all requests are processed  and the remaining requests have to be reissued.
+
+The other members of each element of the array pointed to by
+.IR "iocbs"
+must have values suitable for the operation as described in
+the documentation for 
+.IR "io_prep_pread"
+and 
+.IR "io_prep_pwrite"
+above.
+
+The function returns immediately after
+having enqueued all the requests.  
+On success,
+.B io_submit
+returns the number of iocbs submitted successfully.  Otherwise, -error is return, where 
+error is one of the Exxx values defined in the Errors section.
+.PP
+If an error is detected, then the behavior is undefined.
+.PP
+Simultaneous asynchronous operations using the same iocb produce
+undefined results.
+.SH ERRORS
+.TP
+.B EFAULT
+.I iocbs
+referenced data outside of the program's accessible address space.
+.TP
+.B EINVAL
+.I ctx
+refers to an unitialized aio context, the iocb pointed to by 
+.I iocbs
+contains an improperly initialized iocb, 
+.TP
+.B EBADF
+The iocb contains a file descriptor that does not exist.
+.TP
+.B EINVAL
+The file specified in the iocb does not support the given io operation.
+.SH "SEE ALSO"
+.BR io(3),
+.BR io_cancel(3),
+.BR io_fsync(3),
+.BR io_getevents(3),
+.BR io_prep_fsync(3),
+.BR io_prep_pread(3),
+.BR io_prep_pwrite(3),
+.BR io_queue_init(3),
+.BR io_queue_release(3),
+.BR io_queue_run(3),
+.BR io_queue_wait(3),
+.BR io_set_callback(3),
+.BR errno(3)

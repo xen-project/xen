@@ -1,0 +1,229 @@
+.TH  lio_listio 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+lio_listio - List directed I/O
+.SH SYNOPSYS
+.B #include <errno.h>
+.br
+.B #include <libaio.h>
+.LP
+.BI "int lio_listio (int mode, struct aiocb *const list[], int nent, struct sigevent *sig)"
+.nf
+.SH DESCRIPTION
+
+Besides these functions with the more or less traditional interface,
+POSIX.1b also defines a function which can initiate more than one
+operation at a time, and which can handle freely mixed read and write
+operations.  It is therefore similar to a combination of 
+.IR readv
+and
+.IR "writev"
+.
+
+The 
+.IR "lio_listio"
+function can be used to enqueue an arbitrary
+number of read and write requests at one time.  The requests can all be
+meant for the same file, all for different files or every solution in
+between.
+
+.IR "lio_listio"
+gets the 
+.IR "nent"
+requests from the array pointed to
+by 
+.IR "list"
+.  The operation to be performed is determined by the
+.IR "aio_lio_opcode"
+member in each element of 
+.IR "list"
+.  If this
+field is 
+.B "LIO_READ"
+a read operation is enqueued, similar to a call
+of 
+.IR "aio_read"
+for this element of the array (except that the way
+the termination is signalled is different, as we will see below).  If
+the 
+.IR "aio_lio_opcode"
+member is 
+.B "LIO_WRITE"
+a write operation
+is enqueued.  Otherwise the 
+.IR "aio_lio_opcode"
+must be 
+.B "LIO_NOP"
+in which case this element of 
+.IR "list"
+is simply ignored.  This
+``operation'' is useful in situations where one has a fixed array of
+.IR "struct aiocb"
+elements from which only a few need to be handled at
+a time.  Another situation is where the 
+.IR "lio_listio"
+call was
+canceled before all requests are processed  and the remaining requests have to be reissued.
+
+The other members of each element of the array pointed to by
+.IR "list"
+must have values suitable for the operation as described in
+the documentation for 
+.IR "aio_read"
+and 
+.IR "aio_write"
+above.
+
+The 
+.IR "mode"
+argument determines how 
+.IR "lio_listio"
+behaves after
+having enqueued all the requests.  If 
+.IR "mode"
+is 
+.B "LIO_WAIT"
+it
+waits until all requests terminated.  Otherwise 
+.IR "mode"
+must be
+.B "LIO_NOWAIT"
+and in this case the function returns immediately after
+having enqueued all the requests.  In this case the caller gets a
+notification of the termination of all requests according to the
+.IR "sig"
+parameter.  If 
+.IR "sig"
+is 
+.B "NULL"
+no notification is
+send.  Otherwise a signal is sent or a thread is started, just as
+described in the description for 
+.IR "aio_read"
+or 
+.IR "aio_write"
+.
+
+When the sources are compiled with 
+.B "_FILE_OFFSET_BITS == 64"
+, this
+function is in fact 
+.IR "lio_listio64"
+since the LFS interface
+transparently replaces the normal implementation.
+.SH "RETURN VALUES"
+If 
+.IR "mode"
+is 
+.B "LIO_WAIT"
+, the return value of 
+.IR "lio_listio"
+is 
+.IR 0
+when all requests completed successfully.  Otherwise the
+function return 
+.IR 1
+and 
+.IR "errno"
+is set accordingly.  To find
+out which request or requests failed one has to use the 
+.IR "aio_error"
+function on all the elements of the array 
+.IR "list"
+.
+
+In case 
+.IR "mode"
+is 
+.B "LIO_NOWAIT"
+, the function returns 
+.IR 0
+if
+all requests were enqueued correctly.  The current state of the requests
+can be found using 
+.IR "aio_error"
+and 
+.IR "aio_return"
+as described
+above.  If 
+.IR "lio_listio"
+returns 
+.IR -1
+in this mode, the
+global variable 
+.IR "errno"
+is set accordingly.  If a request did not
+yet terminate, a call to 
+.IR "aio_error"
+returns 
+.B "EINPROGRESS"
+.  If
+the value is different, the request is finished and the error value (or
+
+.IR 0
+) is returned and the result of the operation can be retrieved
+using 
+.IR "aio_return"
+.
+.SH ERRORS
+Possible values for 
+.IR "errno"
+are:
+
+.TP
+.B EAGAIN
+The resources necessary to queue all the requests are not available at
+the moment.  The error status for each element of 
+.IR "list"
+must be
+checked to determine which request failed.
+
+Another reason could be that the system wide limit of AIO requests is
+exceeded.  This cannot be the case for the implementation on GNU systems
+since no arbitrary limits exist.
+.TP
+.B EINVAL
+The 
+.IR "mode"
+parameter is invalid or 
+.IR "nent"
+is larger than
+.B "AIO_LISTIO_MAX"
+.
+.TP
+.B EIO
+One or more of the request's I/O operations failed.  The error status of
+each request should be checked to determine which one failed.
+.TP
+.B ENOSYS
+The 
+.IR "lio_listio"
+function is not supported.
+.PP
+
+If the 
+.IR "mode"
+parameter is 
+.B "LIO_NOWAIT"
+and the caller cancels
+a request, the error status for this request returned by
+.IR "aio_error"
+is 
+.B "ECANCELED"
+.
+.SH "SEE ALSO"
+.BR aio(3),
+.BR aio_cancel(3),
+.BR aio_cancel64(3),
+.BR aio_error(3),
+.BR aio_error64(3),
+.BR aio_fsync(3),
+.BR aio_fsync64(3),
+.BR aio_init(3),
+.BR aio_read(3),
+.BR aio_read64(3),
+.BR aio_return(3),
+.BR aio_return64(3),
+.BR aio_suspend(3),
+.BR aio_suspend64(3),
+.BR aio_write(3),
+.BR aio_write64(3)

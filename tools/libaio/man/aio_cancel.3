@@ -1,0 +1,137 @@
+.TH aio_cancel 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+aio_cancel - Cancel asynchronous I/O requests
+.SH SYNOPSYS
+.nf
+.B #include <errno.h>
+.sp
+.br 
+.B #include <aio.h>
+.sp
+.br
+.BI "int aio_cancel (int fildes " , struct aiocb *aiocbp " )"
+.fi
+.SH DESCRIPTION
+When one or more requests are asynchronously processed, it might be
+useful in some situations to cancel a selected operation, e.g., if it
+becomes obvious that the written data is no longer accurate and would
+have to be overwritten soon.  As an example, assume an application, which
+writes data in files in a situation where new incoming data would have
+to be written in a file which will be updated by an enqueued request.
+The POSIX AIO implementation provides such a function, but this function
+is not capable of forcing the cancellation of the request.  It is up to the
+implementation to decide whether it is possible to cancel the operation
+or not.  Therefore using this function is merely a hint.
+.B "The libaio implementation does not implement the cancel operation in the"
+.B "POSIX libraries".
+.PP
+The 
+.IR aio_cancel
+function can be used to cancel one or more
+outstanding requests.  If the 
+.IR aiocbp 
+parameter is 
+.IR NULL
+, the
+function tries to cancel all of the outstanding requests which would process
+the file descriptor 
+.IR fildes 
+(i.e., whose 
+.IR aio_fildes 
+member
+is 
+.IR fildes
+).  If 
+.IR aiocbp is not 
+.IR  NULL
+,
+.IR aio_cancel
+attempts to cancel the specific request pointed to by 
+.IR aiocbp.
+
+For requests which were successfully canceled, the normal notification
+about the termination of the request should take place.  I.e., depending
+on the 
+.IR "struct sigevent" 
+object which controls this, nothing
+happens, a signal is sent or a thread is started.  If the request cannot
+be canceled, it terminates the usual way after performing the operation.
+After a request is successfully canceled, a call to 
+.IR aio_error
+with
+a reference to this request as the parameter will return
+.B ECANCELED
+and a call to 
+.IR aio_return
+will return 
+.IR -1.
+If the request wasn't canceled and is still running the error status is
+still 
+.B EINPROGRESS.
+When the sources are compiled with 
+.IR "_FILE_OFFSET_BITS == 64"
+, this
+function is in fact 
+.IR aio_cancel64
+since the LFS interface
+transparently replaces the normal implementation.
+
+.SH "RETURN VALUES"
+.TP
+.B AIO_CANCELED
+If there were
+requests which haven't terminated and which were successfully canceled.
+.TP
+.B AIO_NOTCANCELED
+If there is one or more requests left which couldn't be canceled,
+.  In this case
+.IR aio_error
+must be used to find out which of the, perhaps multiple, requests (in
+.IR aiocbp
+is 
+.IR NULL
+) weren't successfully canceled.  
+.TP
+.B AIO_ALLDONE
+If all
+requests already terminated at the time 
+.IR aio_cancel 
+is called the
+return value is 
+.
+.SH ERRORS
+If an error occurred during the execution of 
+.IR aio_cancel 
+the
+function returns 
+.IR -1
+and sets 
+.IR errno
+to one of the following
+values.
+.TP
+.B EBADF
+The file descriptor 
+.IR fildes
+is not valid.
+.TP
+.B ENOSYS
+.IR aio_cancel
+is not implemented.
+.SH "SEE ALSO"
+.BR aio(3),
+.BR aio_cancel64(3),
+.BR aio_error(3),
+.BR aio_error64(3),
+.BR aio_fsync(3),
+.BR aio_fsync64(3),
+.BR aio_init(3),
+.BR aio_read(3),
+.BR aio_read64(3),
+.BR aio_return(3),
+.BR aio_return64(3),
+.BR aio_suspend(3),
+.BR aio_suspend64(3),
+.BR aio_write(3),
+.BR aio_write64(3),
+.BR errno(3),

@@ -1,0 +1,82 @@
+./" static inline int io_fsync(io_context_t ctx, struct iocb *iocb, io_callback_t cb, int fd)
+./" {
+./" 	io_prep_fsync(iocb, fd);
+./" 	io_set_callback(iocb, cb);
+./" 	return io_submit(ctx, 1, &iocb);
+./" }
+.TH io_fsync 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+io_fsync \- Synchronize a file's complete in-core state with that on disk
+.SH SYNOPSYS
+.nf
+.B #include <errno.h>
+.sp
+.br
+.B #include <libaio.h>
+.sp
+.br
+.BI "int io_fsync(io_context_t ctx, struct iocb *iocb, io_callback_t cb, int fd)"
+.sp
+struct iocb {
+	void		*data;
+	unsigned	key;
+	short		aio_lio_opcode;
+	short		aio_reqprio;
+	int		aio_fildes;
+};
+.sp
+typedef void (*io_callback_t)(io_context_t ctx, struct iocb *iocb, long res, long res2);
+.sp
+.fi
+.SH DESCRIPTION
+When dealing with asynchronous operations it is sometimes necessary to
+get into a consistent state.  This would mean for AIO that one wants to
+know whether a certain request or a group of request were processed.
+This could be done by waiting for the notification sent by the system
+after the operation terminated, but this sometimes would mean wasting
+resources (mainly computation time). 
+.PP
+Calling this function forces all I/O operations operating queued at the
+time of the function call operating on the file descriptor
+.IR "iocb->io_fildes"
+into the synchronized I/O completion state .  The 
+.IR "io_fsync"
+function returns
+immediately but the notification through the method described in
+.IR "io_callback"
+will happen only after all requests for this
+file descriptor have terminated and the file is synchronized.  This also
+means that requests for this very same file descriptor which are queued
+after the synchronization request are not affected.
+.SH "RETURN VALUES"
+Returns 0, otherwise returns errno.
+.SH ERRORS
+.TP
+.B EFAULT
+.I iocbs
+referenced data outside of the program's accessible address space.
+.TP
+.B EINVAL
+.I ctx
+refers to an unitialized aio context, the iocb pointed to by 
+.I iocbs
+contains an improperly initialized iocb, 
+.TP
+.B EBADF
+The iocb contains a file descriptor that does not exist.
+.TP
+.B EINVAL
+The file specified in the iocb does not support the given io operation.
+.SH "SEE ALSO"
+.BR io(3),
+.BR io_cancel(3),
+.BR io_getevents(3),
+.BR io_prep_pread(3),
+.BR io_prep_pwrite(3),
+.BR io_queue_init(3),
+.BR io_queue_release(3),
+.BR io_queue_run(3),
+.BR io_queue_wait(3),
+.BR io_set_callback(3),
+.BR io_submit(3),
+.BR errno(3)

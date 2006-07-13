@@ -1,0 +1,60 @@
+.TH aio_read64 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+aio_read64 \- Initiate an asynchronous read operation
+.SH SYNOPSYS
+.nf
+.B #include <errno.h>
+.br 
+.B #include <aio.h>
+.sp
+.br
+.BI "int aio_read64 (struct aiocb *aiocbp)"
+.fi
+.SH DESCRIPTION
+This function is similar to the 
+.IR "aio_read"
+function.  The only
+difference is that on 
+.IR "32 bit"
+machines, the file descriptor should
+be opened in the large file mode.  Internally, 
+.IR "aio_read64"
+uses
+functionality equivalent to 
+.IR "lseek64"
+to position the file descriptor correctly for the reading,
+as opposed to 
+.IR "lseek"
+functionality used in 
+.IR "aio_read".
+
+When the sources are compiled with 
+.IR "_FILE_OFFSET_BITS == 64"
+, this
+function is available under the name 
+.IR "aio_read"
+and so transparently
+replaces the interface for small files on 32 bit machines.
+.SH "RETURN VALUES"
+See
+.IR aio_read.
+.SH ERRORS
+See
+.IR aio_read.
+.SH "SEE ALSO"
+.BR aio(3),
+.BR aio_cancel(3),
+.BR aio_cancel64(3),
+.BR aio_error(3),
+.BR aio_error64(3),
+.BR aio_fsync(3),
+.BR aio_fsync64(3),
+.BR aio_init(3),
+.BR aio_read(3),
+.BR aio_return(3),
+.BR aio_return64(3),
+.BR aio_suspend(3),
+.BR aio_suspend64(3),
+.BR aio_write(3),
+.BR aio_write64(3),
+.BR errno(3),

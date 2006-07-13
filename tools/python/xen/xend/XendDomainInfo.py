@@ -1701,6 +1701,7 @@ def addControllerClass(device_class, cls):
 
 
 from xen.xend.server import blkif, netif, tpmif, pciif, iopif, irqif, usbif
+from xen.xend.server.BlktapController import BlktapController
 addControllerClass('vbd',  blkif.BlkifController)
 addControllerClass('vif',  netif.NetifController)
 addControllerClass('vtpm', tpmif.TPMifController)
@@ -1708,3 +1709,4 @@ addControllerClass('pci',  pciif.PciController)
 addControllerClass('ioports', iopif.IOPortsController)
 addControllerClass('irq',  irqif.IRQController)
 addControllerClass('usb',  usbif.UsbifController)
+addControllerClass('tap',  BlktapController)

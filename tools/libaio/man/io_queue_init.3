@@ -1,0 +1,63 @@
+.TH io_queue_init 2 2002-09-03 "Linux 2.4" "Linux AIO"
+.SH NAME
+io_queue_init \- Initialize asynchronous io state machine
+
+.SH SYNOPSIS
+.nf
+.B #include <errno.h>
+.br
+.sp
+.B #include <libaio.h>
+.br
+.sp
+.BI "int io_queue_init(int maxevents, io_context_t  *ctx );"
+.sp
+.fi
+.SH DESCRIPTION
+.B io_queue_init
+Attempts to create an aio context capable of receiving at least 
+.IR maxevents
+events. 
+.IR ctx
+must point to an aio context that already exists and must be initialized
+to 
+.IR 0
+before the call.
+If the operation is successful, *cxtp is filled with the resulting handle.
+.SH "RETURN VALUES"
+On success,
+.B io_queue_init
+returns 0.  Otherwise, -error is return, where
+error is one of the Exxx values defined in the Errors section.
+.SH ERRORS
+.TP
+.B EFAULT
+.I iocbs
+referenced data outside of the program's accessible address space.
+.TP
+.B EINVAL
+.I maxevents
+is <= 0 or 
+.IR ctx
+is an invalid memory locattion.
+.TP
+.B ENOSYS 
+Not implemented
+.TP
+.B EAGAIN
+.IR "maxevents > max_aio_reqs"
+where max_aio_reqs is a tunable value.
+.SH "SEE ALSO"
+.BR io(3),
+.BR io_cancel(3),
+.BR io_fsync(3),
+.BR io_getevents(3),
+.BR io_prep_fsync(3),
+.BR io_prep_pread(3),
+.BR io_prep_pwrite(3),
+.BR io_queue_release(3),
+.BR io_queue_run(3),
+.BR io_queue_wait(3),
+.BR io_set_callback(3),
+.BR io_submit(3),
+.BR errno(3)

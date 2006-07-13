@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# Copyright (c) 2005, XenSource Ltd.
+
+dir=$(dirname "$0")
+. "$dir/xen-hotplug-common.sh"
+
+findCommand "$@"
+
+if [ "$command" == 'add' ]
+then
+  success
+fi
+
+exit 0

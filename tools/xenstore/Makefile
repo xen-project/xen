@@ -35,7 +35,7 @@ XENSTORED_Linux = xenstored_linux.o
 XENSTORED_OBJS += $(XENSTORED_$(OS))
 
 .PHONY: all
-all: libxenstore.so xenstored $(CLIENTS) xs_tdb_dump xenstore-control xenstore-ls
+all: libxenstore.so libxenstore.a xenstored $(CLIENTS) xs_tdb_dump xenstore-control xenstore-ls
 
 test_interleaved_transactions: test_interleaved_transactions.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -L. -lxenstore -o $@
@@ -89,6 +89,9 @@ talloc_test.o: talloc.c
 
 libxenstore.so: xs.opic xs_lib.opic
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenstore.so -shared -o $@ $^ -lpthread
+
+libxenstore.a: libxenstore.so
+	ar rcs libxenstore.a $^
 
 .PHONY: clean
 clean: testsuite-clean
@@ -172,7 +175,7 @@ install: all
 	$(INSTALL_PROG) xenstore-control $(DESTDIR)/usr/bin
 	$(INSTALL_PROG) xenstore-ls $(DESTDIR)/usr/bin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
-	$(INSTALL_LIBS) libxenstore.so $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DATA) libxenstore.* $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) xs.h $(DESTDIR)/usr/include
 	$(INSTALL_DATA) xs_lib.h $(DESTDIR)/usr/include
 

@@ -110,8 +110,7 @@ __gnttab_map_grant_ref(
         return;
     }
 
-    if ( unlikely((rd = find_domain_by_id(op->dom)) == NULL) ||
-         unlikely(ld == rd) )
+    if ( unlikely((rd = find_domain_by_id(op->dom)) == NULL) )
     {
         if ( rd != NULL )
             put_domain(rd);
@@ -350,8 +349,7 @@ __gnttab_unmap_grant_ref(
     ref   = map->ref;
     flags = map->flags;
 
-    if ( unlikely((rd = find_domain_by_id(dom)) == NULL) ||
-         unlikely(ld == rd) )
+    if ( unlikely((rd = find_domain_by_id(dom)) == NULL) )
     {
         if ( rd != NULL )
             put_domain(rd);

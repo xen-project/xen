@@ -1,0 +1,146 @@
+.TH aio_read 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+aio_read \- Initiate an asynchronous read operation
+.SH SYNOPSYS
+.nf
+.B #include <errno.h>
+.sp
+.br 
+.B #include <aio.h>
+.sp
+.br
+.BI "int aio_read (struct aiocb *aiocbp)"
+.fi
+.SH DESCRIPTION
+This function initiates an asynchronous read operation.  It
+immediately returns after the operation was enqueued or when an
+error was encountered.
+
+The first 
+.IR "aiocbp->aio_nbytes"
+bytes of the file for which
+.IR "aiocbp->aio_fildes"
+is a descriptor are written to the buffer
+starting at 
+.IR "aiocbp->aio_buf"
+.  Reading starts at the absolute
+position 
+.IR "aiocbp->aio_offset"
+in the file.
+
+If prioritized I/O is supported by the platform the
+.IR "aiocbp->aio_reqprio"
+value is used to adjust the priority before
+the request is actually enqueued.
+
+The calling process is notified about the termination of the read
+request according to the 
+.IR "aiocbp->aio_sigevent"
+value.
+
+.SH "RETURN VALUES"
+When 
+.IR "aio_read"
+returns, the return value is zero if no error
+occurred that can be found before the process is enqueued.  If such an
+early error is found, the function returns 
+.IR -1
+and sets
+.IR "errno".
+
+.PP
+If 
+.IR "aio_read"
+returns zero, the current status of the request
+can be queried using 
+.IR "aio_error"
+and 
+.IR "aio_return"
+functions.
+As long as the value returned by 
+.IR "aio_error"
+is 
+.IR "EINPROGRESS"
+the operation has not yet completed.  If 
+.IR "aio_error"
+returns zero,
+the operation successfully terminated, otherwise the value is to be
+interpreted as an error code.  If the function terminated, the result of
+the operation can be obtained using a call to 
+.IR "aio_return"
+.  The
+returned value is the same as an equivalent call to 
+.IR "read"
+would
+have returned.  
+When the sources are compiled with 
+.IR "_FILE_OFFSET_BITS == 64"
+this
+function is in fact 
+.IR "aio_read64"
+since the LFS interface transparently
+replaces the normal implementation.
+
+.SH ERRORS
+In the case of an early error:
+.TP
+.B  EAGAIN
+The request was not enqueued due to (temporarily) exceeded resource
+limitations.
+.TP
+.B  ENOSYS
+The 
+.IR "aio_read"
+function is not implemented.
+.TP
+.B  EBADF
+The 
+.IR "aiocbp->aio_fildes"
+descriptor is not valid.  This condition
+need not be recognized before enqueueing the request and so this error
+might also be signaled asynchronously.
+.TP
+.B  EINVAL
+The 
+.IR "aiocbp->aio_offset"
+or 
+.IR "aiocbp->aio_reqpiro"
+value is
+invalid.  This condition need not be recognized before enqueueing the
+request and so this error might also be signaled asynchronously.
+
+.PP
+In the case of a normal return, possible error codes returned by 
+.IR "aio_error"
+are:
+.TP
+.B  EBADF
+The 
+.IR "aiocbp->aio_fildes"
+descriptor is not valid.
+.TP
+.B  ECANCELED
+The operation was canceled before the operation was finished
+.TP
+.B  EINVAL
+The 
+.IR "aiocbp->aio_offset"
+value is invalid.
+.PP
+.SH "SEE ALSO"
+.BR aio(3),
+.BR aio_cancel(3),
+.BR aio_cancel64(3),
+.BR aio_error(3),
+.BR aio_error64(3),
+.BR aio_fsync(3),
+.BR aio_fsync64(3),
+.BR aio_init(3),
+.BR aio_read64(3),
+.BR aio_return(3),
+.BR aio_return64(3),
+.BR aio_suspend(3),
+.BR aio_suspend64(3),
+.BR aio_write(3),
+.BR aio_write64(3),
+.BR errno(3),

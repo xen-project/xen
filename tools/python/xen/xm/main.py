@@ -994,7 +994,13 @@ def xm_block_attach(args):
     arg_check(args, 'block-attach', 4, 5)
 
     dom = args[0]
-    vbd = ['vbd',
+
+    if args[1].startswith('tap:'):
+        cls = 'tap'
+    else:
+        cls = 'vbd'
+        
+    vbd = [cls,
            ['uname', args[1]],
            ['dev',   args[2]],
            ['mode',  args[3]]]

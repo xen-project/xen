@@ -1,0 +1,123 @@
+.TH aio_suspend 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+aio_suspend \- Wait until one or more requests of a specific set terminates.
+.SH SYNOPSYS
+.nf
+.B "#include <errno.h>"
+.sp
+.br 
+.B "#include <aio.h>"
+.sp
+.br
+.BI "int aio_suspend (const struct aiocb *const list[], int nent, const struct timespec *timeout)"
+.fi
+.SH DESCRIPTION
+Another method of synchronization is to wait until one or more requests of a
+specific set terminated.  This could be achieved by the 
+.IR "aio_*"
+functions to notify the initiating process about the termination but in
+some situations this is not the ideal solution.  In a program which
+constantly updates clients somehow connected to the server it is not
+always the best solution to go round robin since some connections might
+be slow.  On the other hand letting the 
+.IR "aio_*"
+function notify the
+caller might also be not the best solution since whenever the process
+works on preparing data for on client it makes no sense to be
+interrupted by a notification since the new client will not be handled
+before the current client is served.  For situations like this
+.IR "aio_suspend"
+should be used.
+.PP
+When calling this function, the calling thread is suspended until at
+least one of the requests pointed to by the 
+.IR "nent"
+elements of the
+array 
+.IR "list"
+has completed.  If any of the requests has already
+completed at the time 
+.IR "aio_suspend"
+is called, the function returns
+immediately.  Whether a request has terminated or not is determined by
+comparing the error status of the request with 
+.IR "EINPROGRESS"
+.  If
+an element of 
+.IR "list"
+is 
+.IR "NULL"
+, the entry is simply ignored.
+
+If no request has finished, the calling process is suspended.  If
+.IR "timeout"
+is 
+.IR "NULL"
+, the process is not woken until a request
+has finished.  If 
+.IR "timeout"
+is not 
+.IR "NULL"
+, the process remains
+suspended at least as long as specified in 
+.IR "timeout"
+.  In this case,
+.IR "aio_suspend"
+returns with an error.
+.PP
+When the sources are compiled with 
+.IR "_FILE_OFFSET_BITS == 64"
+this
+function is in fact 
+.IR "aio_suspend64"
+since the LFS interface
+transparently replaces the normal implementation.
+.SH "RETURN VALUES"
+The return value of the function is 
+.IR 0
+if one or more requests
+from the 
+.IR "list"
+have terminated.  Otherwise the function returns
+.IR -1
+and 
+.IR "errno"
+is set.
+.SH ERRORS
+.TP
+.B EAGAIN
+None of the requests from the 
+.IR "list"
+completed in the time specified
+by 
+.IR "timeout"
+.
+.TP
+.B EINTR
+A signal interrupted the 
+.IR "aio_suspend"
+function.  This signal might
+also be sent by the AIO implementation while signalling the termination
+of one of the requests.
+.TP
+.B ENOSYS
+The 
+.IR "aio_suspend"
+function is not implemented.
+.SH "SEE ALSO"
+.BR aio(3),
+.BR aio_cancel(3),
+.BR aio_cancel64(3),
+.BR aio_error(3),
+.BR aio_error64(3),
+.BR aio_fsync(3),
+.BR aio_fsync64(3),
+.BR aio_init(3),
+.BR aio_read(3),
+.BR aio_read64(3),
+.BR aio_return(3),
+.BR aio_return64(3),
+.BR aio_suspend64(3),
+.BR aio_write(3),
+.BR aio_write64(3),
+.BR errno(3),

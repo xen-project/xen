@@ -1,0 +1,17 @@
+.\"/* sys_io_destroy:
+.\" *      Destroy the aio_context specified.  May cancel any outstanding 
+.\" *      AIOs and block on completion.  Will fail with -ENOSYS if not
+.\" *      implemented.  May fail with -EFAULT if the context pointed to
+.\" *      is invalid.
+.\" */
+.\" libaio provides this as io_queue_release.
+.TH io_destroy 2 2002-09-03 "Linux 2.4" "Linux AIO"
+.SH NAME
+io_destroy \- destroy an io context
+.SH SYNOPSIS
+.B #include <errno.h>
+.br
+.B #include <libaio.h>
+.LP
+.BI "int io_destroy(io_context_t " ctx ");"
+

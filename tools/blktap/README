@@ -1,0 +1,122 @@
+Blktap Userspace Tools + Library
+================================
+
+Andrew Warfield and Julian Chesterfield
+16th June 2006
+
+{firstname.lastname}@cl.cam.ac.uk
+
+The blktap userspace toolkit provides a user-level disk I/O
+interface. The blktap mechanism involves a kernel driver that acts
+similarly to the existing Xen/Linux blkback driver, and a set of
+associated user-level libraries.  Using these tools, blktap allows
+virtual block devices presented to VMs to be implemented in userspace
+and to be backed by raw partitions, files, network, etc.
+
+The key benefit of blktap is that it makes it easy and fast to write
+arbitrary block backends, and that these user-level backends actually
+perform very well.  Specifically:
+
+- Metadata disk formats such as Copy-on-Write, encrypted disks, sparse
+  formats and other compression features can be easily implemented.
+
+- Accessing file-based images from userspace avoids problems related
+  to flushing dirty pages which are present in the Linux loopback
+  driver.  (Specifically, doing a large number of writes to an
+  NFS-backed image don't result in the OOM killer going berserk.)
+
+- Per-disk handler processes enable easier userspace policing of block
+  resources, and process-granularity QoS techniques (disk scheduling
+  and related tools) may be trivially applied to block devices.
+
+- It's very easy to take advantage of userspace facilities such as
+  networking libraries, compression utilities, peer-to-peer
+  file-sharing systems and so on to build more complex block backends.
+
+- Crashes are contained -- incremental development/debugging is very
+  fast.
+
+How it works (in one paragraph):
+
+Working in conjunction with the kernel blktap driver, all disk I/O
+requests from VMs are passed to the userspace deamon (using a shared
+memory interface) through a character device. Each active disk is
+mapped to an individual device node, allowing per-disk processes to
+implement individual block devices where desired.  The userspace
+drivers are implemented using asynchronous (Linux libaio),
+O_DIRECT-based calls to preserve the unbuffered, batched and
+asynchronous request dispatch achieved with the existing blkback
+code.  We provide a simple, asynchronous virtual disk interface that
+makes it quite easy to add new disk implementations.
+
+As of June 2006 the current supported disk formats are:
+
+ - Raw Images (both on partitions and in image files)
+ - File-backed Qcow disks
+ - Standalone sparse Qcow disks
+ - Fast shareable RAM disk between VMs (requires some form of cluster-based 
+   filesystem support e.g. OCFS2 in the guest kernel)
+ - Some VMDK images - your mileage may vary
+
+Raw and QCow images have asynchronous backends and so should perform
+fairly well.  VMDK is based directly on the qemu vmdk driver, which is
+synchronous (a.k.a. slow).
+
+Build and Installation Instructions
+===================================
+
+Make to configure the blktap backend driver in your dom0 kernel.  It
+will cooperate fine with the existing backend driver, so you can
+experiment with tap disks without breaking existing VM configs.
+
+To build the tools separately, "make && make install" in 
+tools/blktap.
+
+
+Using the Tools
+===============
+
+Prepare the image for booting. For qcow files use the qcow utilities
+installed earlier. e.g. qcow-create generates a blank standalone image
+or a file-backed CoW image. img2qcow takes an existing image or
+partition and creates a sparse, standalone qcow-based file.
+
+The userspace disk agent is configured to start automatically via xend
+(alternatively you can start it manually => 'blktapctrl')
+
+Customise the VM config file to use the 'tap' handler, followed by the
+driver type. e.g. for a raw image such as a file or partition:
+
+disk = ['tap:aio:<FILENAME>,sda1,w']
+
+e.g. for a qcow image:
+
+disk = ['tap:qcow:<FILENAME>,sda1,w']
+
+
+Mounting images in Dom0 using the blktap driver
+===============================================
+Tap (and blkback) disks are also mountable in Dom0 without requiring an
+active VM to attach. You will need to build a xenlinux Dom0 kernel that
+includes the blkfront driver (e.g. the default 'make world' or 
+'make kernels' build. Simply use the xm command-line tool to activate
+the backend disks, and blkfront will generate a virtual block device that
+can be accessed in the same way as a loop device or partition:
+
+e.g. for a raw image file <FILENAME> that would normally be mounted using
+the loopback driver (such as 'mount -o loop <FILENAME> /mnt/disk'), do the
+following:
+
+xm block-attach 0 tap:aio:<FILENAME> /dev/xvda1 w 0
+mount /dev/xvda1 /mnt/disk        <--- don't use loop driver
+
+In this way, you can use any of the userspace device-type drivers built
+with the blktap userspace toolkit to open and mount disks such as qcow
+or vmdk images:
+
+xm block-attach 0 tap:qcow:<FILENAME> /dev/xvda1 w 0
+mount /dev/xvda1 /mnt/disk
+
+
+
+ 

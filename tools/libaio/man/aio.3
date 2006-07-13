@@ -1,0 +1,315 @@
+.TH aio 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+aio \- Asynchronous IO
+.SH SYNOPSIS
+.nf
+.B #include <errno.h>
+.sp
+.br 
+.B #include <aio.h>
+.sp
+.fi
+.SH DESCRIPTION
+The POSIX.1b standard defines a new set of I/O operations which can
+significantly reduce the time an application spends waiting at I/O.  The
+new functions allow a program to initiate one or more I/O operations and
+then immediately resume normal work while the I/O operations are
+executed in parallel.  This functionality is available if the
+.IR "unistd.h"
+file defines the symbol 
+.B "_POSIX_ASYNCHRONOUS_IO"
+.
+
+These functions are part of the library with realtime functions named
+.IR "librt"
+.  They are not actually part of the 
+.IR "libc" 
+binary.
+The implementation of these functions can be done using support in the
+kernel (if available) or using an implementation based on threads at
+userlevel.  In the latter case it might be necessary to link applications
+with the thread library 
+.IR "libpthread"
+in addition to 
+.IR "librt"
+and
+.IR "libaio"
+.
+
+All AIO operations operate on files which were opened previously.  There
+might be arbitrarily many operations running for one file.  The
+asynchronous I/O operations are controlled using a data structure named
+.IR "struct aiocb"
+It is defined in
+.IR "aio.h"
+ as follows.
+
+.nf
+struct aiocb
+{
+  int aio_fildes;               /* File desriptor.  */
+  int aio_lio_opcode;           /* Operation to be performed.  */
+  int aio_reqprio;              /* Request priority offset.  */
+  volatile void *aio_buf;       /* Location of buffer.  */
+  size_t aio_nbytes;            /* Length of transfer.  */
+  struct sigevent aio_sigevent; /* Signal number and value.  */
+
+  /* Internal members.  */
+  struct aiocb *__next_prio;
+  int __abs_prio;
+  int __policy;
+  int __error_code;
+  __ssize_t __return_value;
+
+#ifndef __USE_FILE_OFFSET64
+  __off_t aio_offset;           /* File offset.  */
+  char __pad[sizeof (__off64_t) - sizeof (__off_t)];
+#else
+  __off64_t aio_offset;         /* File offset.  */
+#endif
+  char __unused[32];
+};
+
+.fi
+The POSIX.1b standard mandates that the 
+.IR "struct aiocb" 
+structure
+contains at least the members described in the following table.  There
+might be more elements which are used by the implementation, but
+depending upon these elements is not portable and is highly deprecated.
+
+.TP
+.IR "int aio_fildes"
+This element specifies the file descriptor to be used for the
+operation.  It must be a legal descriptor, otherwise the operation will
+fail.
+
+The device on which the file is opened must allow the seek operation.
+I.e., it is not possible to use any of the AIO operations on devices
+like terminals where an 
+.IR "lseek"
+ call would lead to an error.
+.TP
+.IR "off_t aio_offset"
+This element specifies the offset in the file at which the operation (input
+or output) is performed.  Since the operations are carried out in arbitrary
+order and more than one operation for one file descriptor can be
+started, one cannot expect a current read/write position of the file
+descriptor.
+.TP
+.IR "volatile void *aio_buf"
+This is a pointer to the buffer with the data to be written or the place
+where the read data is stored.
+.TP
+.IR "size_t aio_nbytes"
+This element specifies the length of the buffer pointed to by 
+.IR "aio_buf"
+.
+.TP
+.IR "int aio_reqprio"
+If the platform has defined 
+.B "_POSIX_PRIORITIZED_IO"
+and
+.B "_POSIX_PRIORITY_SCHEDULING"
+, the AIO requests are
+processed based on the current scheduling priority.  The
+.IR "aio_reqprio"
+element can then be used to lower the priority of the
+AIO operation.
+.TP
+.IR "struct sigevent aio_sigevent"
+This element specifies how the calling process is notified once the
+operation terminates.  If the 
+.IR "sigev_notify"
+element is
+.B "SIGEV_NONE"
+, no notification is sent.  If it is 
+.B "SIGEV_SIGNAL"
+,
+the signal determined by 
+.IR "sigev_signo"
+is sent.  Otherwise,
+.IR "sigev_notify"
+must be 
+.B "SIGEV_THREAD"
+.  In this case, a thread
+is created which starts executing the function pointed to by
+.IR "sigev_notify_function"
+.
+.TP
+.IR "int aio_lio_opcode"
+This element is only used by the 
+.IR "lio_listio"
+ and
+.IR "lio_listio64"
+ functions.  Since these functions allow an
+arbitrary number of operations to start at once, and each operation can be
+input or output (or nothing), the information must be stored in the
+control block.  The possible values are:
+.TP
+.B "LIO_READ"
+Start a read operation.  Read from the file at position
+.IR "aio_offset"
+ and store the next 
+.IR "aio_nbytes"
+ bytes in the
+buffer pointed to by 
+.IR "aio_buf"
+.
+.TP
+.B "LIO_WRITE"
+Start a write operation.  Write 
+.IR "aio_nbytes" 
+bytes starting at
+.IR "aio_buf"
+into the file starting at position 
+.IR "aio_offset"
+.
+.TP
+.B "LIO_NOP"
+Do nothing for this control block.  This value is useful sometimes when
+an array of 
+.IR "struct aiocb"
+values contains holes, i.e., some of the
+values must not be handled although the whole array is presented to the
+.IR "lio_listio"
+function.
+
+When the sources are compiled using 
+.B "_FILE_OFFSET_BITS == 64"
+on a
+32 bit machine, this type is in fact 
+.IR "struct aiocb64"
+, since the LFS
+interface transparently replaces the 
+.IR "struct aiocb"
+definition.
+.PP
+For use with the AIO functions defined in the LFS, there is a similar type
+defined which replaces the types of the appropriate members with larger
+types but otherwise is equivalent to 
+.IR "struct aiocb"
+.  Particularly,
+all member names are the same.
+
+.nf
+/* The same for the 64bit offsets.  Please note that the members aio_fildes
+   to __return_value have to be the same in aiocb and aiocb64.  */
+#ifdef __USE_LARGEFILE64
+struct aiocb64
+{
+  int aio_fildes;               /* File desriptor.  */
+  int aio_lio_opcode;           /* Operation to be performed.  */
+  int aio_reqprio;              /* Request priority offset.  */
+  volatile void *aio_buf;       /* Location of buffer.  */
+  size_t aio_nbytes;            /* Length of transfer.  */
+  struct sigevent aio_sigevent; /* Signal number and value.  */
+
+  /* Internal members.  */
+  struct aiocb *__next_prio;
+  int __abs_prio;
+  int __policy;
+  int __error_code;
+  __ssize_t __return_value;
+
+  __off64_t aio_offset;         /* File offset.  */
+  char __unused[32];
+};
+
+.fi
+.TP
+.IR "int aio_fildes"
+This element specifies the file descriptor which is used for the
+operation.  It must be a legal descriptor since otherwise the operation
+fails for obvious reasons.
+The device on which the file is opened must allow the seek operation.
+I.e., it is not possible to use any of the AIO operations on devices
+like terminals where an 
+.IR "lseek"
+ call would lead to an error.
+.TP
+.IR "off64_t aio_offset"
+This element specifies at which offset in the file the operation (input
+or output) is performed.  Since the operation are carried in arbitrary
+order and more than one operation for one file descriptor can be
+started, one cannot expect a current read/write position of the file
+descriptor.
+.TP
+.IR "volatile void *aio_buf"
+This is a pointer to the buffer with the data to be written or the place
+where the read data is stored.
+.TP
+.IR "size_t aio_nbytes"
+This element specifies the length of the buffer pointed to by 
+.IR "aio_buf"
+.
+.TP
+.IR "int aio_reqprio"
+If for the platform 
+.B "_POSIX_PRIORITIZED_IO"
+and
+.B "_POSIX_PRIORITY_SCHEDULING"
+are defined the AIO requests are
+processed based on the current scheduling priority.  The
+.IR "aio_reqprio"
+element can then be used to lower the priority of the
+AIO operation.
+.TP
+.IR "struct sigevent aio_sigevent"
+This element specifies how the calling process is notified once the
+operation terminates.  If the 
+.IR "sigev_notify"
+, element is
+.B "SIGEV_NONE"
+no notification is sent.  If it is 
+.B "SIGEV_SIGNAL"
+,
+the signal determined by 
+.IR "sigev_signo"
+is sent.  Otherwise,
+.IR "sigev_notify"
+ must be 
+.B "SIGEV_THREAD"
+in which case a thread
+which starts executing the function pointed to by
+.IR "sigev_notify_function"
+.
+.TP
+.IR "int aio_lio_opcode"
+This element is only used by the 
+.IR "lio_listio"
+and
+.IR "lio_listio64"
+functions.  Since these functions allow an
+arbitrary number of operations to start at once, and since each operation can be
+input or output (or nothing), the information must be stored in the
+control block.  See the description of 
+.IR "struct aiocb"
+for a description
+of the possible values.
+.PP
+When the sources are compiled using 
+.B "_FILE_OFFSET_BITS == 64"
+on a
+32 bit machine, this type is available under the name 
+.IR "struct aiocb64"
+, since the LFS transparently replaces the old interface.
+.SH "RETURN VALUES"
+.SH ERRORS
+.SH "SEE ALSO"
+.BR aio_cancel(3),
+.BR aio_cancel64(3),
+.BR aio_error(3),
+.BR aio_error64(3),
+.BR aio_fsync(3),
+.BR aio_fsync64(3),
+.BR aio_init(3),
+.BR aio_read(3),
+.BR aio_read64(3),
+.BR aio_return(3),
+.BR aio_return64(3),
+.BR aio_suspend(3),
+.BR aio_suspend64(3),
+.BR aio_write(3),
+.BR aio_write64(3),
+.BR errno(3),

@@ -1,0 +1,44 @@
+./"static inline void io_set_callback(struct iocb *iocb, io_callback_t cb)
+.TH io_set_callback 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+io_set_callback \- Set up io completion callback function
+.SH SYNOPSYS
+.nf
+.B #include <errno.h>
+.br
+.sp
+.B #include <libaio.h>
+.br
+.sp
+.BI "static inline void io_set_callback(struct iocb *iocb, io_callback_t cb)"
+.sp
+struct iocb {
+	void		*data;
+	unsigned	key;
+	short		aio_lio_opcode;
+	short		aio_reqprio;
+	int		aio_fildes;
+};
+.sp
+typedef void (*io_callback_t)(io_context_t ctx, struct iocb *iocb, long res, long res2);
+.sp
+.fi
+.SH DESCRIPTION
+The callback is not done if the caller uses raw events from 
+io_getevents, only with the library helpers
+.SH "RETURN VALUES"
+.SH ERRORS
+.SH "SEE ALSO"
+.BR io(3),
+.BR io_cancel(3),
+.BR io_fsync(3),
+.BR io_getevents(3),
+.BR io_prep_fsync(3),
+.BR io_prep_pread(3),
+.BR io_prep_pwrite(3),
+.BR io_queue_init(3),
+.BR io_queue_release(3),
+.BR io_queue_run(3),
+.BR io_queue_wait(3),
+.BR io_submit(3),
+.BR errno(3)

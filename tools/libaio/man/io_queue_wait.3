@@ -1,0 +1,56 @@
+.TH io_queue_wait 2 2002-09-03 "Linux 2.4" "Linux AIO"
+.SH NAME
+io_queue_wait \- Wait for io requests to complete
+.SH SYNOPSIS
+.nf
+.B #include <errno.h>
+.br
+.sp
+.B #include <libaio.h>
+.br
+.sp
+.BI "int io_queue_wait(io_context_t ctx, const struct timespec *timeout);"
+.fi
+.SH DESCRIPTION
+Attempts to read  an event from
+the completion queue for the aio_context specified by ctx_id.
+.SH "RETURN VALUES"
+May return
+0 if no events are available and the timeout specified
+by when has elapsed, where when == NULL specifies an infinite
+timeout.  Note that the timeout pointed to by when is relative and
+will be updated if not NULL and the operation blocks.  Will fail
+with -ENOSYS if not implemented.
+.SH "RETURN VALUES"
+On success,
+.B io_queue_wait
+returns 0.  Otherwise, -error is return, where
+error is one of the Exxx values defined in the Errors section.
+.SH ERRORS
+.TP
+.B EFAULT
+.I iocbs
+referenced data outside of the program's accessible address space.
+.TP
+.B EINVAL
+.I ctx 
+refers to an unitialized aio context, the iocb pointed to by
+.I iocbs 
+contains an improperly initialized iocb,
+.TP
+.B ENOSYS 
+Not implemented
+.SH "SEE ALSO"
+.BR io(3),
+.BR io_cancel(3),
+.BR io_fsync(3),
+.BR io_getevents(3),
+.BR io_prep_fsync(3),
+.BR io_prep_pread(3),
+.BR io_prep_pwrite(3),
+.BR io_queue_init(3),
+.BR io_queue_release(3),
+.BR io_queue_run(3),
+.BR io_set_callback(3),
+.BR io_submit(3),
+.BR errno(3)

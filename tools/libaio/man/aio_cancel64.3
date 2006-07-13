@@ -1,0 +1,50 @@
+.TH aio_cancel64 3 2002-09-12 "Linux 2.4" Linux AIO"
+.SH NAME
+aio_cancel64 \- Cancel asynchronous I/O requests
+.SH SYNOPSYS
+.nf
+.B #include <errno.h>
+.sp
+.br 
+.B #include <aio.h>
+.sp
+.br
+.BI "int aio_cancel64 (int fildes, struct aiocb64 *aiocbp)"
+.fi
+.SH DESCRIPTION
+This function is similar to 
+.IR aio_cancel
+with the only difference
+that the argument is a reference to a variable of type 
+.IR struct aiocb64
+.
+
+When the sources are compiled with 
+.IR _FILE_OFFSET_BITS == 64
+, this
+function is available under the name 
+.IR aio_cancel
+and so
+transparently replaces the interface for small files on 32 bit
+machines.
+.SH "RETURN VALUES"
+See aio_cancel(3).
+.SH ERRORS
+See aio_cancel(3).
+.SH "SEE ALSO"
+.BR aio(3),
+.BR aio_cancel(3),
+.BR aio_error(3),
+.BR aio_error64(3),
+.BR aio_fsync(3),
+.BR aio_fsync64(3),
+.BR aio_init(3),
+.BR aio_read(3),
+.BR aio_read64(3),
+.BR aio_return(3),
+.BR aio_return64(3),
+.BR aio_suspend(3),
+.BR aio_suspend64(3),
+.BR aio_write(3),
+.BR aio_write64(3),
+.BR errno(3),
