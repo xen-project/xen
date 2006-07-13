@@ -1,19 +1,24 @@
-diff -r 15da4d2106fe vl.c
---- a/vl.c	Thu Jul 06 14:27:28 2006 +0100
-+++ b/vl.c	Thu Jul 06 20:19:49 2006 +0100
-@@ -5972,8 +5972,7 @@ int main(int argc, char **argv)
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-07-13 10:09:33.965343475 +0100
++++ ioemu/vl.c	2006-07-13 10:10:11.141134364 +0100
+@@ -5972,8 +5972,10 @@
                    kernel_filename, kernel_cmdline, initrd_filename,
                    timeoffset);
  
 -    gui_timer = qemu_new_timer(rt_clock, gui_update, NULL);
 -    qemu_mod_timer(gui_timer, qemu_get_clock(rt_clock));
-+    display_state.dpy_refresh(&display_state);
++    if (vnc_display == -1) {
++        gui_timer = qemu_new_timer(rt_clock, gui_update, NULL);
++        qemu_mod_timer(gui_timer, qemu_get_clock(rt_clock));
++    }
  
  #ifdef CONFIG_GDBSTUB
      if (use_gdbstub) {
-diff -r 15da4d2106fe vnc.c
---- a/vnc.c	Thu Jul 06 14:27:28 2006 +0100
-+++ b/vnc.c	Thu Jul 06 20:19:49 2006 +0100
+Index: ioemu/vnc.c
+===================================================================
+--- ioemu.orig/vnc.c	2006-07-13 10:09:33.963343701 +0100
++++ ioemu/vnc.c	2006-07-13 10:09:34.025336681 +0100
 @@ -3,6 +3,7 @@
   * 
   * Copyright (C) 2006 Anthony Liguori <anthony@codemonkey.ws>
@@ -22,7 +27,7 @@ diff -r 15da4d2106fe vnc.c
   * 
   * Permission is hereby granted, free of charge, to any person obtaining a copy
   * of this software and associated documentation files (the "Software"), to deal
-@@ -51,7 +52,11 @@ struct VncState
+@@ -51,7 +52,11 @@
      int need_update;
      int width;
      int height;
@@ -35,7 +40,7 @@ diff -r 15da4d2106fe vnc.c
      char *old_data;
      int depth;
      int has_resize;
-@@ -62,13 +67,25 @@ struct VncState
+@@ -62,13 +67,25 @@
  
      VncReadEvent *read_handler;
      size_t read_handler_expect;
@@ -47,13 +52,13 @@ diff -r 15da4d2106fe vnc.c
 +
 +    int slow_client;
  };
-+
+ 
 +#define DIRTY_PIXEL_BITS 64
 +#define X2DP_DOWN(vs, x) ((x) >> (vs)->dirty_pixel_shift)
 +#define X2DP_UP(vs, x) \
 +  (((x) + (1ULL << (vs)->dirty_pixel_shift) - 1) >> (vs)->dirty_pixel_shift)
 +#define DP2X(vs, x) ((x) << (vs)->dirty_pixel_shift)
- 
++
  /* TODO
     1) Get the queue working for IO.
     2) there is some weirdness when using the -S option (the screen is grey
@@ -62,22 +67,20 @@ diff -r 15da4d2106fe vnc.c
  */
  
  static void vnc_write(VncState *vs, const void *data, size_t len);
-@@ -77,22 +94,38 @@ static void vnc_write_u16(VncState *vs, 
+@@ -77,22 +94,38 @@
  static void vnc_write_u16(VncState *vs, uint16_t value);
  static void vnc_write_u8(VncState *vs, uint8_t value);
  static void vnc_flush(VncState *vs);
 +static void _vnc_update_client(void *opaque);
  static void vnc_update_client(void *opaque);
  static void vnc_client_read(void *opaque);
--
--static void vnc_dpy_update(DisplayState *ds, int x, int y, int w, int h)
--{
--    VncState *vs = ds->opaque;
 +static void framebuffer_set_updated(VncState *vs, int x, int y, int w, int h);
-+
+ 
+-static void vnc_dpy_update(DisplayState *ds, int x, int y, int w, int h)
 +static void set_bits_in_row(VncState *vs, uint64_t *row,
 +			    int x, int y, int w, int h)
-+{
+ {
+-    VncState *vs = ds->opaque;
 +    int x1, x2;
      uint64_t mask;
  
@@ -109,7 +112,7 @@ diff -r 15da4d2106fe vnc.c
  }
  
  static void vnc_framebuffer_update(VncState *vs, int x, int y, int w, int h,
-@@ -109,11 +142,15 @@ static void vnc_dpy_resize(DisplayState 
+@@ -109,11 +142,15 @@
  static void vnc_dpy_resize(DisplayState *ds, int w, int h)
  {
      VncState *vs = ds->opaque;
@@ -117,17 +120,16 @@ diff -r 15da4d2106fe vnc.c
  
      ds->data = realloc(ds->data, w * h * vs->depth);
      vs->old_data = realloc(vs->old_data, w * h * vs->depth);
--
--    if (ds->data == NULL || vs->old_data == NULL) {
 +    vs->dirty_row = realloc(vs->dirty_row, h * sizeof(vs->dirty_row[0]));
 +    vs->update_row = realloc(vs->update_row, h * sizeof(vs->dirty_row[0]));
-+
+ 
+-    if (ds->data == NULL || vs->old_data == NULL) {
 +    if (ds->data == NULL || vs->old_data == NULL ||
 +	vs->dirty_row == NULL || vs->update_row == NULL) {
  	fprintf(stderr, "vnc: memory allocation failed\n");
  	exit(1);
      }
-@@ -131,6 +168,10 @@ static void vnc_dpy_resize(DisplayState 
+@@ -131,6 +168,10 @@
  	vs->width = ds->width;
  	vs->height = ds->height;
      }
@@ -138,14 +140,13 @@ diff -r 15da4d2106fe vnc.c
  }
  
  static void send_framebuffer_update_raw(VncState *vs, int x, int y, int w, int h)
-@@ -215,8 +256,20 @@ static void vnc_copy(DisplayState *ds, i
+@@ -215,8 +256,20 @@
      int y = 0;
      int pitch = ds->linesize;
      VncState *vs = ds->opaque;
--
--    vnc_update_client(vs);
 +    int updating_client = !vs->slow_client;
-+
+ 
+-    vnc_update_client(vs);
 +    if (src_x < vs->visible_x || src_y < vs->visible_y ||
 +	dst_x < vs->visible_x || dst_y < vs->visible_y ||
 +	(src_x + w) > (vs->visible_x + vs->visible_w) ||
@@ -161,7 +162,7 @@ diff -r 15da4d2106fe vnc.c
  
      if (dst_y > src_y) {
  	y = h - 1;
-@@ -238,31 +291,34 @@ static void vnc_copy(DisplayState *ds, i
+@@ -238,31 +291,34 @@
  	old_row += pitch;
      }
  
@@ -172,9 +173,6 @@ diff -r 15da4d2106fe vnc.c
 -    vnc_write_u16(vs, src_x);
 -    vnc_write_u16(vs, src_y);
 -    vnc_flush(vs);
--}
--
--static int find_dirty_height(VncState *vs, int y, int last_x, int x)
 +    if (updating_client && vs->csock != -1 && !vs->has_update) {
 +	vnc_write_u8(vs, 0);  /* msg id */
 +	vnc_write_u8(vs, 0);
@@ -185,8 +183,9 @@ diff -r 15da4d2106fe vnc.c
 +	vnc_flush(vs);
 +    } else
 +	framebuffer_set_updated(vs, dst_x, dst_y, w, h);
-+}
-+
+ }
+ 
+-static int find_dirty_height(VncState *vs, int y, int last_x, int x)
 +static int find_update_height(VncState *vs, int y, int maxy, int last_x, int x)
  {
      int h;
@@ -210,25 +209,24 @@ diff -r 15da4d2106fe vnc.c
  {
      VncState *vs = opaque;
      int64_t now = qemu_get_clock(rt_clock);
-@@ -274,11 +330,12 @@ static void vnc_update_client(void *opaq
+@@ -274,11 +330,12 @@
  	uint64_t width_mask;
  	int n_rectangles;
  	int saved_offset;
 -	int has_dirty = 0;
--
++	int maxx, maxy;
++	int tile_bytes = vs->depth * DP2X(vs, 1);
+ 
 -	width_mask = (1ULL << (vs->width / 16)) - 1;
 -
 -	if (vs->width == 1024)
-+	int maxx, maxy;
-+	int tile_bytes = vs->depth * DP2X(vs, 1);
-+
 +	if (vs->width != DP2X(vs, DIRTY_PIXEL_BITS))
 +	    width_mask = (1ULL << X2DP_UP(vs, vs->ds->width)) - 1;
 +	else
  	    width_mask = ~(0ULL);
  
  	/* Walk through the dirty map and eliminate tiles that
-@@ -294,16 +351,18 @@ static void vnc_update_client(void *opaq
+@@ -294,16 +351,18 @@
  		ptr = row;
  		old_ptr = old_row;
  
@@ -255,7 +253,7 @@ diff -r 15da4d2106fe vnc.c
  		}
  	    }
  
-@@ -311,7 +370,8 @@ static void vnc_update_client(void *opaq
+@@ -311,7 +370,8 @@
  	    old_row += vs->ds->linesize;
  	}
  
@@ -265,7 +263,7 @@ diff -r 15da4d2106fe vnc.c
  	    goto out;
  
  	/* Count rectangles */
-@@ -321,38 +381,59 @@ static void vnc_update_client(void *opaq
+@@ -321,40 +381,61 @@
  	saved_offset = vs->output.offset;
  	vnc_write_u16(vs, 0);
  
@@ -314,30 +312,32 @@ diff -r 15da4d2106fe vnc.c
  	}
  	vs->output.buffer[saved_offset] = (n_rectangles >> 8) & 0xFF;
  	vs->output.buffer[saved_offset + 1] = n_rectangles & 0xFF;
-+
+-	vnc_flush(vs);
+ 
+-    }
 +	vs->has_update = 0;
 +	vs->need_update = 0;
- 	vnc_flush(vs);
--
--    }
++	vnc_flush(vs);
 +	vs->slow_client = 0;
 +    } else
 +	vs->slow_client = 1;
  
   out:
      qemu_mod_timer(vs->timer, now + VNC_REFRESH_INTERVAL);
-+}
-+
+ }
+ 
 +static void vnc_update_client(void *opaque)
 +{
 +    VncState *vs = opaque;
 +
 +    vs->ds->dpy_refresh(vs->ds);
 +    _vnc_update_client(vs);
- }
- 
++}
++
  static void vnc_timer_init(VncState *vs)
-@@ -365,8 +446,6 @@ static void vnc_timer_init(VncState *vs)
+ {
+     if (vs->timer == NULL) {
+@@ -365,8 +446,6 @@
  
  static void vnc_dpy_refresh(DisplayState *ds)
  {
@@ -346,7 +346,7 @@ diff -r 15da4d2106fe vnc.c
      vga_hw_update();
  }
  
-@@ -402,7 +481,7 @@ static char *buffer_end(Buffer *buffer)
+@@ -402,7 +481,7 @@
  
  static void buffer_reset(Buffer *buffer)
  {
@@ -355,7 +355,7 @@ diff -r 15da4d2106fe vnc.c
  }
  
  static void buffer_append(Buffer *buffer, const void *data, size_t len)
-@@ -443,12 +522,12 @@ static void vnc_client_write(void *opaqu
+@@ -443,12 +522,12 @@
      if (!ret)
  	return;
  
@@ -371,7 +371,7 @@ diff -r 15da4d2106fe vnc.c
  }
  
  static void vnc_read_when(VncState *vs, VncReadEvent *func, size_t expecting)
-@@ -480,11 +559,11 @@ static void vnc_client_read(void *opaque
+@@ -480,11 +559,11 @@
  	    return;
  
  	if (!ret) {
@@ -386,7 +386,7 @@ diff -r 15da4d2106fe vnc.c
      }
  }
  
-@@ -492,9 +571,9 @@ static void vnc_write(VncState *vs, cons
+@@ -492,9 +571,9 @@
  {
      buffer_reserve(&vs->output, len);
  
@@ -399,7 +399,7 @@ diff -r 15da4d2106fe vnc.c
  
      buffer_append(&vs->output, data, len);
  }
-@@ -616,24 +695,25 @@ static void key_event(VncState *vs, int 
+@@ -616,24 +695,25 @@
      do_key_event(vs, down, sym);
  }
  
@@ -438,7 +438,7 @@ diff -r 15da4d2106fe vnc.c
  }
  
  static void set_encodings(VncState *vs, int32_t *encodings, size_t n_encodings)
-@@ -690,8 +770,6 @@ static void set_pixel_format(VncState *v
+@@ -690,8 +770,6 @@
  	vnc_client_error(vs);
  
      vnc_dpy_resize(vs->ds, vs->ds->width, vs->ds->height);
@@ -447,7 +447,7 @@ diff -r 15da4d2106fe vnc.c
  
      vga_hw_invalidate();
      vga_hw_update();
-@@ -848,11 +926,11 @@ static void vnc_listen_read(void *opaque
+@@ -848,11 +926,11 @@
  	vnc_write(vs, "RFB 003.003\n", 12);
  	vnc_flush(vs);
  	vnc_read_when(vs, protocol_version, 12);
@@ -461,7 +461,7 @@ diff -r 15da4d2106fe vnc.c
      }
  }
  
-@@ -909,17 +987,15 @@ void vnc_display_init(DisplayState *ds, 
+@@ -909,17 +987,15 @@
  	exit(1);
      }
  

@@ -5972,7 +5972,10 @@ int main(int argc, char **argv)
                   kernel_filename, kernel_cmdline, initrd_filename,
                   timeoffset);
 
-    display_state.dpy_refresh(&display_state);
+    if (vnc_display == -1) {
+        gui_timer = qemu_new_timer(rt_clock, gui_update, NULL);
+        qemu_mod_timer(gui_timer, qemu_get_clock(rt_clock));
+    }
 
 #ifdef CONFIG_GDBSTUB
     if (use_gdbstub) {
