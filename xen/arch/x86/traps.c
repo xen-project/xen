@@ -403,16 +403,16 @@ static inline int do_trap(int trapnr, char *str,
     return 0;
 }
 
-#define DO_ERROR_NOCODE(trapnr, str, name) \
-asmlinkage int do_##name(struct cpu_user_regs *regs) \
-{ \
-    return do_trap(trapnr, str, regs, 0); \
+#define DO_ERROR_NOCODE(trapnr, str, name)              \
+asmlinkage int do_##name(struct cpu_user_regs *regs)    \
+{                                                       \
+    return do_trap(trapnr, str, regs, 0);               \
 }
 
-#define DO_ERROR(trapnr, str, name) \
-asmlinkage int do_##name(struct cpu_user_regs *regs) \
-{ \
-    return do_trap(trapnr, str, regs, 1); \
+#define DO_ERROR(trapnr, str, name)                     \
+asmlinkage int do_##name(struct cpu_user_regs *regs)    \
+{                                                       \
+    return do_trap(trapnr, str, regs, 1);               \
 }
 
 DO_ERROR_NOCODE( 0, "divide error", divide_error)
@@ -449,9 +449,9 @@ int cpuid_hypervisor_leaves(
 
 static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
 {
-    char signature[5], instr[2];
+    char sig[5], instr[2];
     uint32_t a, b, c, d;
-    unsigned long eip;
+    unsigned long eip, rc;
 
     a = regs->eax;
     b = regs->ebx;
@@ -460,14 +460,22 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     eip = regs->eip;
 
     /* Check for forced emulation signature: ud2 ; .ascii "xen". */
-    if ( copy_from_user(signature, (char *)eip, sizeof(signature)) ||
-         memcmp(signature, "\xf\xbxen", sizeof(signature)) )
+    if ( (rc = copy_from_user(sig, (char *)eip, sizeof(sig))) != 0 )
+    {
+        propagate_page_fault(eip + sizeof(sig) - rc, 0);
+        return EXCRET_fault_fixed;
+    }
+    if ( memcmp(sig, "\xf\xbxen", sizeof(sig)) )
         return 0;
-    eip += sizeof(signature);
+    eip += sizeof(sig);
 
     /* We only emulate CPUID. */
-    if ( copy_from_user(instr, (char *)eip, sizeof(instr)) ||
-         memcmp(instr, "\xf\xa2", sizeof(instr)) )
+    if ( ( rc = copy_from_user(instr, (char *)eip, sizeof(instr))) != 0 )
+    {
+        propagate_page_fault(eip + sizeof(instr) - rc, 0);
+        return EXCRET_fault_fixed;
+    }
+    if ( memcmp(instr, "\xf\xa2", sizeof(instr)) )
         return 0;
     eip += sizeof(instr);
 
@@ -923,17 +931,14 @@ static inline int admin_io_okay(
 #define outl_user(_v, _p, _d, _r) \
     (admin_io_okay(_p, 4, _d, _r) ? outl(_v, _p) : ((void)0))
 
-/* Propagate a fault back to the guest kernel. */
-#define PAGE_FAULT(_faultaddr, _errcode)        \
-({  propagate_page_fault(_faultaddr, _errcode); \
-    return EXCRET_fault_fixed;                  \
-})
-
-/* Isntruction fetch with error handling. */
-#define insn_fetch(_type, _size, _ptr)          \
-({  unsigned long _x;                           \
-    if ( get_user(_x, (_type *)eip) )           \
-        PAGE_FAULT(eip, 0); /* read fault */    \
+/* Instruction fetch with error handling. */
+#define insn_fetch(_type, _size, _ptr)                                      \
+({  unsigned long _rc, _x;                                                  \
+    if ( (_rc = copy_from_user(&_x, (_type *)eip, sizeof(_type))) != 0 )    \
+    {                                                                       \
+        propagate_page_fault(eip + sizeof(_type) - _rc, 0);                 \
+        return EXCRET_fault_fixed;                                          \
+    }                                                                       \
     eip += _size; (_type)_x; })
 
 static int emulate_privileged_op(struct cpu_user_regs *regs)
@@ -941,7 +946,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     unsigned long *reg, eip = regs->eip, res;
     u8 opcode, modrm_reg = 0, modrm_rm = 0, rep_prefix = 0;
-    unsigned int port, i, op_bytes = 4, data;
+    unsigned int port, i, op_bytes = 4, data, rc;
     u32 l, h;
 
     /* Legacy prefixes. */
@@ -1001,19 +1006,19 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             {
             case 1:
                 data = (u8)inb_user((u16)regs->edx, v, regs);
-                if ( put_user((u8)data, (u8 *)regs->edi) )
-                    PAGE_FAULT(regs->edi, PGERR_write_access);
                 break;
             case 2:
                 data = (u16)inw_user((u16)regs->edx, v, regs);
-                if ( put_user((u16)data, (u16 *)regs->edi) )
-                    PAGE_FAULT(regs->edi, PGERR_write_access);
                 break;
             case 4:
                 data = (u32)inl_user((u16)regs->edx, v, regs);
-                if ( put_user((u32)data, (u32 *)regs->edi) )
-                    PAGE_FAULT(regs->edi, PGERR_write_access);
                 break;
+            }
+            if ( (rc = copy_to_user((void *)regs->edi, &data, op_bytes)) != 0 )
+            {
+                propagate_page_fault(regs->edi + op_bytes - rc,
+                                     PGERR_write_access);
+                return EXCRET_fault_fixed;
             }
             regs->edi += (int)((regs->eflags & EF_DF) ? -op_bytes : op_bytes);
             break;
@@ -1023,21 +1028,21 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 0x6f: /* OUTSW/OUTSL */
             if ( !guest_io_okay((u16)regs->edx, op_bytes, v, regs) )
                 goto fail;
+            rc = copy_from_user(&data, (void *)regs->esi, op_bytes);
+            if ( rc != 0 )
+            {
+                propagate_page_fault(regs->esi + op_bytes - rc, 0);
+                return EXCRET_fault_fixed;
+            }
             switch ( op_bytes )
             {
             case 1:
-                if ( get_user(data, (u8 *)regs->esi) )
-                    PAGE_FAULT(regs->esi, 0); /* read fault */
                 outb_user((u8)data, (u16)regs->edx, v, regs);
                 break;
             case 2:
-                if ( get_user(data, (u16 *)regs->esi) )
-                    PAGE_FAULT(regs->esi, 0); /* read fault */
                 outw_user((u16)data, (u16)regs->edx, v, regs);
                 break;
             case 4:
-                if ( get_user(data, (u32 *)regs->esi) )
-                    PAGE_FAULT(regs->esi, 0); /* read fault */
                 outl_user((u32)data, (u16)regs->edx, v, regs);
                 break;
             }

@@ -1138,12 +1138,16 @@ x86_emulate_read_std(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
+    unsigned int rc;
+
     *val = 0;
-    if ( copy_from_user((void *)val, (void *)addr, bytes) )
+
+    if ( (rc = copy_from_user((void *)val, (void *)addr, bytes)) != 0 )
     {
-        propagate_page_fault(addr, 0); /* read fault */
+        propagate_page_fault(addr + bytes - rc, 0); /* read fault */
         return X86EMUL_PROPAGATE_FAULT;
     }
+
     return X86EMUL_CONTINUE;
 }
 
@@ -1154,11 +1158,14 @@ x86_emulate_write_std(
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt)
 {
-    if ( copy_to_user((void *)addr, (void *)&val, bytes) )
+    unsigned int rc;
+
+    if ( (rc = copy_to_user((void *)addr, (void *)&val, bytes)) != 0 )
     {
-        propagate_page_fault(addr, PGERR_write_access); /* write fault */
+        propagate_page_fault(addr + bytes - rc, PGERR_write_access);
         return X86EMUL_PROPAGATE_FAULT;
     }
+
     return X86EMUL_CONTINUE;
 }
 

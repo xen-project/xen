@@ -3386,13 +3386,13 @@ static int ptwr_emulated_update(
     if ( bytes != sizeof(paddr_t) )
     {
         paddr_t      full;
-        unsigned int offset = addr & (sizeof(paddr_t)-1);
+        unsigned int rc, offset = addr & (sizeof(paddr_t)-1);
 
         /* Align address; read full word. */
         addr &= ~(sizeof(paddr_t)-1);
-        if ( copy_from_user(&full, (void *)addr, sizeof(paddr_t)) )
+        if ( (rc = copy_from_user(&full, (void *)addr, sizeof(paddr_t))) != 0 )
         {
-            propagate_page_fault(addr, 0); /* read fault */
+            propagate_page_fault(addr+sizeof(paddr_t)-rc, 0); /* read fault */
             return X86EMUL_PROPAGATE_FAULT;
         }
         /* Mask out bits provided by caller. */
