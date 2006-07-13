@@ -86,7 +86,8 @@ xencomm_copy_from_guest(void *to, const void *from, unsigned int n,
     /* first we need to access the descriptor */
     desc = (struct xencomm_desc *)paddr_to_maddr((unsigned long)from);
     if (desc->magic != XENCOMM_MAGIC) {
-        printk("xencomm error: %p magic was 0x%x\n", desc, desc->magic);
+        printk("%s: error: %p magic was 0x%x\n",
+               __func__, desc, desc->magic);
         return n;
     }
 
@@ -153,7 +154,7 @@ xencomm_copy_to_guest(void *to, const void *from, unsigned int n,
     /* first we need to access the descriptor */
     desc = (struct xencomm_desc *)paddr_to_maddr((unsigned long)to);
     if (desc->magic != XENCOMM_MAGIC) {
-        printk("xencomm error: %p magic was 0x%x\n", desc, desc->magic);
+        printk("%s error: %p magic was 0x%x\n", __func__, desc, desc->magic);
         return n;
     }
 
@@ -206,7 +207,7 @@ void xencomm_add_offset(void *handle, unsigned int bytes)
     /* first we need to access the descriptor */
     desc = (struct xencomm_desc *)paddr_to_maddr((unsigned long)handle);
     if (desc->magic != XENCOMM_MAGIC) {
-        printk("xencomm error: %p magic was 0x%x\n", desc, desc->magic);
+        printk("%s error: %p magic was 0x%x\n", __func__, desc, desc->magic);
         return;
     }
 
