@@ -346,7 +346,7 @@ class DevController:
         """@return The IDs of each of the devices currently configured for
         this instance's deviceClass.
         """
-        fe = self.frontendRoot()
+        fe = self.backendRoot()
         if transaction:
             return map(lambda x: int(x.split('/')[-1]), transaction.list(fe))
         else:
@@ -439,6 +439,11 @@ class DevController:
     def frontendRoot(self):
         return "%s/device/%s" % (self.vm.getDomainPath(), self.deviceClass)
 
+    def backendRoot(self):
+        import xen.xend.XendDomain
+	from xen.xend.xenstore.xsutil import GetDomainPath
+        backdom = xen.xend.XendDomain.PRIV_DOMAIN
+        return "%s/backend/%s/%s" % (GetDomainPath(backdom), self.deviceClass, self.vm.getDomid())
 
     def frontendMiscPath(self):
         return "%s/device-misc/%s" % (self.vm.getDomainPath(),
