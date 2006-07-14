@@ -41,7 +41,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, PAGE_SIZE)
+#define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, getpagesize())
 
 /* size of the extra VMA area to map in attached pages. */
 #define BLKTAP_VMA_PAGES BLK_RING_SIZE
@@ -206,8 +206,8 @@ int xs_fire_next_watch(struct xs_handle *h);
     (MAX_PENDING_REQS * BLKIF_MAX_SEGMENTS_PER_REQUEST)
 #define MMAP_VADDR(_vstart,_req,_seg)                                   \
     ((_vstart) +                                              \
-     ((_req) * BLKIF_MAX_SEGMENTS_PER_REQUEST * PAGE_SIZE) +    \
-     ((_seg) * PAGE_SIZE))
+     ((_req) * BLKIF_MAX_SEGMENTS_PER_REQUEST * getpagesize()) +    \
+     ((_seg) * getpagesize()))
 
 /* Defines that are only used by library clients */
 

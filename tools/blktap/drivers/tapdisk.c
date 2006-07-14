@@ -83,8 +83,8 @@ static void unmap_disk(struct td_state *s)
 
 	drv->td_close(s);
 
-	if (info != NULL && info->mem > 0) 
-	        munmap(info->mem, PAGE_SIZE * BLKTAP_MMAP_REGION_SIZE);
+	if (info != NULL && info->mem > 0)
+	        munmap(info->mem, getpagesize() * BLKTAP_MMAP_REGION_SIZE);
 
 	ptr = s->fd_entry;
 	prev = ptr->prev;
@@ -219,6 +219,7 @@ static int map_new_dev(struct td_state *s, int minor)
 	tapdev_info_t *info = s->ring_info;
 	char *devname;
 	fd_list_entry_t *ptr;
+	int page_size;
 
 	asprintf(&devname,"%s/%s%d", BLKTAP_DEV_DIR, BLKTAP_DEV_NAME, minor);
 	tap_fd = open(devname, O_RDWR);
@@ -230,7 +231,8 @@ static int map_new_dev(struct td_state *s, int minor)
 	info->fd = tap_fd;
 
 	/*Map the shared memory*/
-	info->mem = mmap(0, PAGE_SIZE * BLKTAP_MMAP_REGION_SIZE, 
+	page_size = getpagesize();
+	info->mem = mmap(0, page_size * BLKTAP_MMAP_REGION_SIZE, 
 			  PROT_READ | PROT_WRITE, MAP_SHARED, info->fd, 0);
 	if ((long int)info->mem == -1) 
 	{
@@ -240,10 +242,10 @@ static int map_new_dev(struct td_state *s, int minor)
 
 	/* assign the rings to the mapped memory */ 
 	info->sring = (blkif_sring_t *)((unsigned long)info->mem);
-	BACK_RING_INIT(&info->fe_ring, info->sring, PAGE_SIZE);
+	BACK_RING_INIT(&info->fe_ring, info->sring, page_size);
 	
 	info->vstart = 
-	        (unsigned long)info->mem + (BLKTAP_RING_PAGES << PAGE_SHIFT);
+	        (unsigned long)info->mem + (BLKTAP_RING_PAGES * page_size);
 
 	ioctl(info->fd, BLKTAP_IOCTL_SENDPID, process );
 	ioctl(info->fd, BLKTAP_IOCTL_SETMODE, BLKTAP_MODE_INTERPOSE );
@@ -481,6 +483,7 @@ static void get_io_request(struct td_state *s)
 	struct tap_disk *drv = s->drv;
 	blkif_t *blkif = s->blkif;
 	tapdev_info_t *info = s->ring_info;
+	int page_size = getpagesize();
 
 	if (!run) return; /*We have received signal to close*/
 
@@ -508,7 +511,7 @@ static void get_io_request(struct td_state *s)
 			nsects = req->seg[i].last_sect - 
 				 req->seg[i].first_sect + 1;
 	
-			if ((req->seg[i].last_sect >= PAGE_SIZE >> 9) ||
+			if ((req->seg[i].last_sect >= page_size >> 9) ||
 			    (nsects <= 0))
 				continue;
 
