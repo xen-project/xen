@@ -1,0 +1,4 @@
+CONFIG_POWERPC := y
+
+CFLAGS += -DELFSIZE=64
+LIBDIR := lib
