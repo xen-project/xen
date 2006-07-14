@@ -67,6 +67,8 @@
 #include <asm/vmx_pal_vsa.h>
 #include <asm/kregs.h>
 //unsigned long last_guest_rsm = 0x0;
+
+#ifdef	VTI_DEBUG
 struct guest_psr_bundle{
     unsigned long ip;
     unsigned long psr;
@@ -74,6 +76,7 @@ struct guest_psr_bundle{
 
 struct guest_psr_bundle guest_psr_buf[100];
 unsigned long guest_psr_index = 0;
+#endif
 
 void
 vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
@@ -82,7 +85,7 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
     UINT64 mask;
     REGS *regs;
     IA64_PSR old_psr, new_psr;
-    old_psr.val=vmx_vcpu_get_psr(vcpu);
+    old_psr.val=VCPU(vcpu, vpsr);
 
     regs=vcpu_regs(vcpu);
     /* We only support guest as:
@@ -108,7 +111,8 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
         // vpsr.i 0->1
         vcpu->arch.irq_new_condition = 1;
     }
-    new_psr.val=vmx_vcpu_get_psr(vcpu);
+    new_psr.val=VCPU(vcpu, vpsr);
+#ifdef	VTI_DEBUG    
     {
     struct pt_regs *regs = vcpu_regs(vcpu);
     guest_psr_buf[guest_psr_index].ip = regs->cr_iip;
@@ -116,6 +120,7 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
     if (++guest_psr_index >= 100)
         guest_psr_index = 0;
     }
+#endif    
 #if 0
     if (old_psr.i != new_psr.i) {
     if (old_psr.i)
@@ -149,24 +154,14 @@ IA64FAULT vmx_vcpu_increment_iip(VCPU *vcpu)
 {
     // TODO: trap_bounce?? Eddie
     REGS *regs = vcpu_regs(vcpu);
-    IA64_PSR vpsr;
     IA64_PSR *ipsr = (IA64_PSR *)&regs->cr_ipsr;
 
-    vpsr.val = vmx_vcpu_get_psr(vcpu);
-    if (vpsr.ri == 2) {
-    vpsr.ri = 0;
-    regs->cr_iip += 16;
+    if (ipsr->ri == 2) {
+        ipsr->ri = 0;
+        regs->cr_iip += 16;
     } else {
-    vpsr.ri++;
+        ipsr->ri++;
     }
-
-    ipsr->ri = vpsr.ri;
-    vpsr.val &=
-            (~ (IA64_PSR_ID |IA64_PSR_DA | IA64_PSR_DD |
-                IA64_PSR_SS | IA64_PSR_ED | IA64_PSR_IA
-            ));
-
-    VCPU(vcpu, vpsr) = vpsr.val;
 
     ipsr->val &=
             (~ (IA64_PSR_ID |IA64_PSR_DA | IA64_PSR_DD |
@@ -181,7 +176,7 @@ IA64FAULT vmx_vcpu_cover(VCPU *vcpu)
 {
     REGS *regs = vcpu_regs(vcpu);
     IA64_PSR vpsr;
-    vpsr.val = vmx_vcpu_get_psr(vcpu);
+    vpsr.val = VCPU(vcpu, vpsr);
 
     if(!vpsr.ic)
         VCPU(vcpu,ifs) = regs->cr_ifs;
@@ -287,12 +282,6 @@ IA64FAULT vmx_vcpu_rfi(VCPU *vcpu)
 }
 
 
-UINT64
-vmx_vcpu_get_psr(VCPU *vcpu)
-{
-    return VCPU(vcpu,vpsr);
-}
-
 #if 0
 IA64FAULT
 vmx_vcpu_get_bgr(VCPU *vcpu, unsigned int reg, UINT64 *val)
@@ -390,6 +379,20 @@ vmx_vcpu_set_gr(VCPU *vcpu, unsigned reg, u64 value, int nat)
 
 #endif
 
+/*
+    VPSR can't keep track of below bits of guest PSR
+    This function gets guest PSR
+ */
+
+UINT64 vmx_vcpu_get_psr(VCPU *vcpu)
+{
+    UINT64 mask;
+    REGS *regs = vcpu_regs(vcpu);
+    mask = IA64_PSR_BE | IA64_PSR_UP | IA64_PSR_AC | IA64_PSR_MFL |
+           IA64_PSR_MFH | IA64_PSR_CPL | IA64_PSR_RI;
+    return (VCPU(vcpu, vpsr) & ~mask) | (regs->cr_ipsr & mask);
+}
+
 IA64FAULT vmx_vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24)
 {
     UINT64 vpsr;
@@ -412,6 +415,7 @@ IA64FAULT vmx_vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm24)
 
 IA64FAULT vmx_vcpu_set_psr_l(VCPU *vcpu, UINT64 val)
 {
+    val = (val & MASK(0, 32)) | (vmx_vcpu_get_psr(vcpu) & MASK(32, 32));
     vmx_vcpu_set_psr(vcpu, val);
     return IA64_NO_FAULT;
 }

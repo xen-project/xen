@@ -381,7 +381,7 @@ set_isr_ei_ni (VCPU *vcpu)
 
     visr.val = 0;
 
-    vpsr.val = vmx_vcpu_get_psr (vcpu);
+    vpsr.val = VCPU(vcpu, vpsr);
 
     if (!vpsr.ic == 1 ) {
         /* Set ISR.ni */

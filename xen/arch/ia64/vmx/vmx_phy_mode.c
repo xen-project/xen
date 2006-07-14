@@ -110,10 +110,8 @@ void
 physical_tlb_miss(VCPU *vcpu, u64 vadr)
 {
     u64 pte;
-    IA64_PSR vpsr;
-    vpsr.val=vmx_vcpu_get_psr(vcpu);
     pte =  vadr& _PAGE_PPN_MASK;
-    pte = pte|(vpsr.cpl<<7)|PHY_PAGE_WB;
+    pte = pte | PHY_PAGE_WB;
     thash_purge_and_insert(vcpu, pte, (PAGE_SHIFT<<2), vadr);
     return;
 }

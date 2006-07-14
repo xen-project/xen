@@ -154,7 +154,6 @@ IA64FAULT vmx_emul_ssm(VCPU *vcpu, INST64 inst)
     return vmx_vcpu_set_psr_sm(vcpu,imm24);
 }
 
-unsigned long last_guest_psr = 0x0;
 IA64FAULT vmx_emul_mov_from_psr(VCPU *vcpu, INST64 inst)
 {
     UINT64 tgt = inst.M33.r1;
@@ -167,7 +166,6 @@ IA64FAULT vmx_emul_mov_from_psr(VCPU *vcpu, INST64 inst)
     */
     val = vmx_vcpu_get_psr(vcpu);
     val = (val & MASK(0, 32)) | (val & MASK(35, 2));
-    last_guest_psr = val;
     return vcpu_set_gr(vcpu, tgt, val, 0);
 }
 
@@ -181,14 +179,7 @@ IA64FAULT vmx_emul_mov_to_psr(VCPU *vcpu, INST64 inst)
     if(vcpu_get_gr_nat(vcpu, inst.M35.r2, &val) != IA64_NO_FAULT)
 	panic_domain(vcpu_regs(vcpu),"get_psr nat bit fault\n");
 
-	val = (val & MASK(0, 32)) | (VCPU(vcpu, vpsr) & MASK(32, 32));
-#if 0
-	if (last_mov_from_psr && (last_guest_psr != (val & MASK(0,32))))
-		while(1);
-	else
-		last_mov_from_psr = 0;
-#endif
-        return vmx_vcpu_set_psr_l(vcpu,val);
+    return vmx_vcpu_set_psr_l(vcpu, val);
 }
 
 
@@ -256,6 +247,7 @@ IA64FAULT vmx_emul_cover(VCPU *vcpu, INST64 inst)
 IA64FAULT vmx_emul_ptc_l(VCPU *vcpu, INST64 inst)
 {
     u64 r2,r3;
+#ifdef  VMAL_NO_FAULT_CHECK
     IA64_PSR  vpsr;
 
     vpsr.val=vmx_vcpu_get_psr(vcpu);
@@ -265,6 +257,7 @@ IA64FAULT vmx_emul_ptc_l(VCPU *vcpu, INST64 inst)
         privilege_op (vcpu);
         return IA64_FAULT;
     }
+#endif // VMAL_NO_FAULT_CHECK
     if(vcpu_get_gr_nat(vcpu,inst.M45.r3,&r3)||vcpu_get_gr_nat(vcpu,inst.M45.r2,&r2)){
 #ifdef  VMAL_NO_FAULT_CHECK
         ISR isr;
@@ -288,10 +281,10 @@ IA64FAULT vmx_emul_ptc_l(VCPU *vcpu, INST64 inst)
 IA64FAULT vmx_emul_ptc_e(VCPU *vcpu, INST64 inst)
 {
     u64 r3;
+#ifdef  VMAL_NO_FAULT_CHECK
     IA64_PSR  vpsr;
 
     vpsr.val=vmx_vcpu_get_psr(vcpu);
-#ifdef  VMAL_NO_FAULT_CHECK
     ISR isr;
     if ( vpsr.cpl != 0) {
         /* Inject Privileged Operation fault into guest */
@@ -574,6 +567,7 @@ IA64FAULT vmx_emul_tak(VCPU *vcpu, INST64 inst)
 IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
 {
     UINT64 itir, ifa, pte, slot;
+#ifdef  VMAL_NO_FAULT_CHECK
     IA64_PSR  vpsr;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
     if ( vpsr.ic ) {
@@ -581,7 +575,6 @@ IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
         illegal_op(vcpu);
         return IA64_FAULT;
     }
-#ifdef  VMAL_NO_FAULT_CHECK
     ISR isr;
     if ( vpsr.cpl != 0) {
         /* Inject Privileged Operation fault into guest */
@@ -633,7 +626,6 @@ IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
     UINT64 itir, ifa, pte, slot;
 #ifdef  VMAL_NO_FAULT_CHECK
     ISR isr;
-#endif
     IA64_PSR  vpsr;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
     if ( vpsr.ic ) {
@@ -641,7 +633,6 @@ IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
         illegal_op(vcpu);
         return IA64_FAULT;
     }
-#ifdef  VMAL_NO_FAULT_CHECK
     if ( vpsr.cpl != 0) {
         /* Inject Privileged Operation fault into guest */
         set_privileged_operation_isr (vcpu, 0);
@@ -689,9 +680,10 @@ IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
 
 IA64FAULT itc_fault_check(VCPU *vcpu, INST64 inst, u64 *itir, u64 *ifa,u64 *pte)
 {
-    IA64_PSR  vpsr;
     IA64FAULT	ret1;
 
+#ifdef  VMAL_NO_FAULT_CHECK
+    IA64_PSR  vpsr;
     vpsr.val=vmx_vcpu_get_psr(vcpu);
     if ( vpsr.ic ) {
         set_illegal_op_isr(vcpu);
@@ -699,7 +691,6 @@ IA64FAULT itc_fault_check(VCPU *vcpu, INST64 inst, u64 *itir, u64 *ifa,u64 *pte)
         return IA64_FAULT;
     }
 
-#ifdef  VMAL_NO_FAULT_CHECK
     UINT64 fault;
     ISR isr;
     if ( vpsr.cpl != 0) {

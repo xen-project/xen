@@ -82,7 +82,7 @@ void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
      UINT64 vector,REGS *regs)
 {
     VCPU *vcpu = current;
-    UINT64 vpsr = vmx_vcpu_get_psr(vcpu);
+    UINT64 vpsr = VCPU(vcpu, vpsr);
     vector=vec2off[vector];
     if(!(vpsr&IA64_PSR_IC)&&(vector!=IA64_DATA_NESTED_TLB_VECTOR)){
         panic_domain(regs, "Guest nested fault vector=%lx!\n", vector);
@@ -156,7 +156,7 @@ void save_banked_regs_to_vpd(VCPU *v, REGS *regs)
     IA64_PSR vpsr;
     src=&regs->r16;
     sunat=&regs->eml_unat;
-    vpsr.val = vmx_vcpu_get_psr(v);
+    vpsr.val = VCPU(v, vpsr);
     if(vpsr.bn){
         dst = &VCPU(v, vgr[0]);
         dunat =&VCPU(v, vnat);
@@ -253,7 +253,7 @@ vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
     check_vtlb_sanity(vtlb);
     dump_vtlb(vtlb);
 #endif
-    vpsr.val = vmx_vcpu_get_psr(v);
+    vpsr.val = VCPU(v, vpsr);
     misr.val=VMX(v,cr_isr);
 
     if(is_physical_mode(v)&&(!(vadr<<1>>62))){

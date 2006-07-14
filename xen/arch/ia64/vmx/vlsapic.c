@@ -570,7 +570,7 @@ int vmx_check_pending_irq(VCPU *vcpu)
     }
     h_inservice = highest_inservice_irq(vcpu);
 
-    vpsr.val = vmx_vcpu_get_psr(vcpu);
+    vpsr.val = VCPU(vcpu, vpsr);
     mask = irq_masked(vcpu, h_pending, h_inservice);
     if (  vpsr.i && IRQ_NO_MASKED == mask ) {
         isr = vpsr.val & IA64_PSR_RI;
@@ -654,7 +654,7 @@ static void generate_exirq(VCPU *vcpu)
     IA64_PSR    vpsr;
     uint64_t    isr;
     REGS *regs=vcpu_regs(vcpu);
-    vpsr.val = vmx_vcpu_get_psr(vcpu);
+    vpsr.val = VCPU(vcpu, vpsr);
     update_vhpi(vcpu, NULL_VECTOR);
     isr = vpsr.val & IA64_PSR_RI;
     if ( !vpsr.ic )
@@ -668,7 +668,7 @@ void vhpi_detection(VCPU *vcpu)
     tpr_t       vtpr;
     IA64_PSR    vpsr;
     
-    vpsr.val = vmx_vcpu_get_psr(vcpu);
+    vpsr.val = VCPU(vcpu, vpsr);
     vtpr.val = VCPU(vcpu, tpr);
 
     threshold = ((!vpsr.i) << 5) | (vtpr.mmi << 4) | vtpr.mic;

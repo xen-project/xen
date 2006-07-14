@@ -268,7 +268,7 @@ int vhpt_enabled(VCPU *vcpu, uint64_t vadr, vhpt_ref_t ref)
     PTA   vpta;
     IA64_PSR  vpsr; 
 
-    vpsr.val = vmx_vcpu_get_psr(vcpu);
+    vpsr.val = VCPU(vcpu, vpsr);
     vcpu_get_rr(vcpu, vadr, &vrr.rrval);
     vmx_vcpu_get_pta(vcpu,&vpta.val);
 
@@ -622,7 +622,7 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
     visr.val=0;
     visr.ei=pt_isr.ei;
     visr.ir=pt_isr.ir;
-    vpsr.val = vmx_vcpu_get_psr(vcpu);
+    vpsr.val = VCPU(vcpu, vpsr);
     if(vpsr.ic==0){
         visr.ni=1;
     }
