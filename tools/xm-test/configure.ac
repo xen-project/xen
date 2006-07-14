@@ -84,6 +84,14 @@ AC_ARG_WITH(driver-dir,
 dnl substitute @DRVDIR@ in all Makefiles
 AC_SUBST(DRVDIR)
 
+NETDRV="8139too.ko"
+AC_ARG_WITH(network-drv,
+	[  --with-network-drv=driver Set network driver to use [[default="8139too.ko"]]],
+	[ NETDRV="$withval" ])
+
+dnl substitute @DRVDIR@ in all Makefiles
+AC_SUBST(NETDRV)
+
 AC_SUBST(TENV)
 AC_SUBST(PACKAGE_VERSION)
 
