@@ -387,16 +387,23 @@ int pirq_acktype(int irq)
     if ( !strcmp(desc->handler->typename, "IO-APIC-edge") )
         return ACKTYPE_NONE;
 
-    /* Legacy PIC interrupts can be acknowledged from any CPU. */
-    if ( !strcmp(desc->handler->typename, "XT-PIC") )
-        return ACKTYPE_UNMASK;
-
     /*
      * Level-triggered IO-APIC interrupts need to be acknowledged on the CPU
      * on which they were received. This is because we tickle the LAPIC to EOI.
      */
     if ( !strcmp(desc->handler->typename, "IO-APIC-level") )
         return ioapic_ack_new ? ACKTYPE_EOI : ACKTYPE_UNMASK;
+
+    /* Legacy PIC interrupts can be acknowledged from any CPU. */
+    if ( !strcmp(desc->handler->typename, "XT-PIC") )
+        return ACKTYPE_UNMASK;
+
+    if ( strstr(desc->handler->typename, "MPIC") )
+    {
+        if ( desc->status & IRQ_LEVEL )
+            return (desc->status & IRQ_PER_CPU) ? ACKTYPE_EOI : ACKTYPE_UNMASK;
+        return ACKTYPE_NONE; /* edge-triggered => no final EOI */
+    }
 
     BUG();
     return 0;
