@@ -28,7 +28,7 @@ from xen.xend.server import params
 __all__ = [ 'log', 'init', 'getLogFilename' ]
 
 
-if not 'TRACE' in logging.__dict__:
+if 'TRACE' not in logging.__dict__:
     logging.TRACE = logging.DEBUG - 1
     logging.addLevelName(logging.TRACE,'TRACE')
     def trace(self, *args, **kwargs):
