@@ -2710,7 +2710,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
         domain_crash_synchronous();
     }
 
-    perfc_incra(vmexits, exit_reason);
+    perfc_incra(svmexits, exit_reason);
     eip = vmcb->rip;
 
 #ifdef SVM_EXTRA_DEBUG
