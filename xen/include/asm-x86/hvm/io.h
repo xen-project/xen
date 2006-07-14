@@ -80,12 +80,12 @@ struct instruction {
 
 #define MAX_INST_LEN      15 /* Maximum instruction length = 15 bytes */
 
-struct mmio_op {
+struct hvm_io_op {
     int                    flags;
     int                    instr;       /* instruction */
     unsigned long          operand[2];  /* operands */
     unsigned long          immediate;   /* immediate portion */
-    struct cpu_user_regs   *inst_decoder_regs; /* current context */
+    struct cpu_user_regs   io_context;  /* current context */
 };
 
 #define MAX_IO_HANDLER              8

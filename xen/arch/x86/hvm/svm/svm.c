@@ -1374,18 +1374,24 @@ static inline int svm_get_io_address(
 }
 
 
-static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs) 
+static void svm_io_instruction(struct vcpu *v)
 {
-    struct mmio_op *mmio_opp;
+    struct cpu_user_regs *regs;
+    struct hvm_io_op *pio_opp;
     unsigned int port;
     unsigned int size, dir;
     ioio_info_t info;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     ASSERT(vmcb);
-    mmio_opp = &current->arch.hvm_vcpu.mmio_op;
-    mmio_opp->instr = INSTR_PIO;
-    mmio_opp->flags = 0;
+    pio_opp = &current->arch.hvm_vcpu.io_op;
+    pio_opp->instr = INSTR_PIO;
+    pio_opp->flags = 0;
+
+    regs = &pio_opp->io_context;
+
+    /* Copy current guest state into io instruction state structure. */
+    memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
 
     info.bytes = vmcb->exitinfo1;
 
@@ -1421,7 +1427,7 @@ static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs)
         /* "rep" prefix */
         if (info.fields.rep) 
         {
-            mmio_opp->flags |= REPZ;
+            pio_opp->flags |= REPZ;
         }
         else 
         {
@@ -1436,7 +1442,7 @@ static void svm_io_instruction(struct vcpu *v, struct cpu_user_regs *regs)
         {
             unsigned long value = 0;
 
-            mmio_opp->flags |= OVERLAP;
+            pio_opp->flags |= OVERLAP;
 
             if (dir == IOREQ_WRITE)
                 hvm_copy(&value, addr, size, HVM_COPY_IN);
@@ -2785,9 +2791,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
                 (unsigned long)regs.ecx, (unsigned long)regs.edx,
                 (unsigned long)regs.esi, (unsigned long)regs.edi);
 
-        v->arch.hvm_vcpu.mmio_op.inst_decoder_regs = &regs;
-
-//printk("PF1\n");
         if (!(error = svm_do_page_fault(va, &regs))) 
         {
             /* Inject #PG using Interruption-Information Fields */
@@ -2936,7 +2939,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs regs)
         break;
 
     case VMEXIT_IOIO:
-        svm_io_instruction(v, &regs);
+        svm_io_instruction(v);
         break;
 
     case VMEXIT_MSR:

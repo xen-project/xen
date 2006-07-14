@@ -1056,17 +1056,23 @@ extern void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
                          unsigned long count, int size, long value,
 			 int dir, int pvalid);
 
-static void vmx_io_instruction(struct cpu_user_regs *regs,
-                               unsigned long exit_qualification, unsigned long inst_len)
+static void vmx_io_instruction(unsigned long exit_qualification,
+                               unsigned long inst_len)
 {
-    struct mmio_op *mmio_opp;
+    struct cpu_user_regs *regs;
+    struct hvm_io_op *pio_opp;
     unsigned long eip, cs, eflags;
     unsigned long port, size, dir;
     int vm86;
 
-    mmio_opp = &current->arch.hvm_vcpu.mmio_op;
-    mmio_opp->instr = INSTR_PIO;
-    mmio_opp->flags = 0;
+    pio_opp = &current->arch.hvm_vcpu.io_op;
+    pio_opp->instr = INSTR_PIO;
+    pio_opp->flags = 0;
+
+    regs = &pio_opp->io_context;
+
+    /* Copy current guest state into io instruction state structure. */
+    memcpy(regs, guest_cpu_user_regs(), HVM_CONTEXT_STACK_BYTES);
 
     __vmread(GUEST_RIP, &eip);
     __vmread(GUEST_CS_SELECTOR, &cs);
@@ -1100,7 +1106,7 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
             addr = dir == IOREQ_WRITE ? regs->esi : regs->edi;
 
         if (test_bit(5, &exit_qualification)) { /* "rep" prefix */
-            mmio_opp->flags |= REPZ;
+            pio_opp->flags |= REPZ;
             count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;
         }
 
@@ -1111,7 +1117,7 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
         if ((addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK)) {
             unsigned long value = 0;
 
-            mmio_opp->flags |= OVERLAP;
+            pio_opp->flags |= OVERLAP;
             if (dir == IOREQ_WRITE)
                 hvm_copy(&value, addr, size, HVM_COPY_IN);
             send_pio_req(regs, port, 1, size, value, dir, 0);
@@ -2206,7 +2212,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
                         (unsigned long)regs.eax, (unsigned long)regs.ebx,
                         (unsigned long)regs.ecx, (unsigned long)regs.edx,
                         (unsigned long)regs.esi, (unsigned long)regs.edi);
-            v->arch.hvm_vcpu.mmio_op.inst_decoder_regs = &regs;
 
             if (!(error = vmx_do_page_fault(va, &regs))) {
                 /*
@@ -2299,7 +2304,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     case EXIT_REASON_IO_INSTRUCTION:
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
         __get_instruction_length(inst_len);
-        vmx_io_instruction(&regs, exit_qualification, inst_len);
+        vmx_io_instruction(exit_qualification, inst_len);
         TRACE_VMEXIT(4,exit_qualification);
         break;
     case EXIT_REASON_MSR_READ:
