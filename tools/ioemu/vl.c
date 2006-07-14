@@ -5715,6 +5715,7 @@ int main(int argc, char **argv)
     socket_init();
 #endif
 
+#ifndef CONFIG_DM
     /* init network clients */
     if (nb_net_clients == 0) {
         /* if no clients, we use a default config */
@@ -5724,6 +5725,7 @@ int main(int argc, char **argv)
                 "user");
         nb_net_clients = 2;
     }
+#endif /* !CONFIG_DM */
 
     for(i = 0;i < nb_net_clients; i++) {
         if (net_client_init(net_clients[i]) < 0)

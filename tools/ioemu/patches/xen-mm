@@ -1,7 +1,8 @@
-diff -r f36cde91babe hw/pc.c
---- a/hw/pc.c	Mon Jun 26 15:16:50 2006 +0100
-+++ b/hw/pc.c	Mon Jun 26 15:18:19 2006 +0100
-@@ -639,7 +639,9 @@ static void pc_init1(uint64_t ram_size, 
+Index: ioemu/hw/pc.c
+===================================================================
+--- ioemu.orig/hw/pc.c	2006-07-14 15:55:59.489503600 +0100
++++ ioemu/hw/pc.c	2006-07-14 15:56:00.354405169 +0100
+@@ -639,7 +639,9 @@
      }
  
      /* allocate RAM */
@@ -11,7 +12,7 @@ diff -r f36cde91babe hw/pc.c
  
      /* BIOS load */
      bios_offset = ram_size + vga_ram_size;
-@@ -671,8 +673,10 @@ static void pc_init1(uint64_t ram_size, 
+@@ -671,8 +673,10 @@
      ret = load_image(buf, phys_ram_base + vga_bios_offset);
      
      /* setup basic memory access */
@@ -22,19 +23,20 @@ diff -r f36cde91babe hw/pc.c
  
      /* map the last 128KB of the BIOS in ISA space */
      isa_bios_size = bios_size;
-diff -r f36cde91babe vl.c
---- a/vl.c	Mon Jun 26 15:16:50 2006 +0100
-+++ b/vl.c	Mon Jun 26 15:18:19 2006 +0100
-@@ -158,6 +158,8 @@ int vnc_display = -1;
- #else
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-07-14 15:56:00.271414614 +0100
++++ ioemu/vl.c	2006-07-14 15:56:00.358404714 +0100
+@@ -159,6 +159,8 @@
  #define MAX_CPUS 1
  #endif
-+
-+int xc_handle;
  
++int xc_handle;
++
  char domain_name[1024] = { 'H','V', 'M', 'X', 'E', 'N', '-'};
  extern int domid;
-@@ -5105,6 +5107,9 @@ int main(int argc, char **argv)
+ 
+@@ -5105,6 +5107,9 @@
      QEMUMachine *machine;
      char usb_devices[MAX_VM_USB_PORTS][128];
      int usb_devices_index;
@@ -44,7 +46,7 @@ diff -r f36cde91babe vl.c
  
      char qemu_dm_logfilename[64];
  
-@@ -5341,11 +5346,13 @@ int main(int argc, char **argv)
+@@ -5341,11 +5346,13 @@
                  ram_size = atol(optarg) * 1024 * 1024;
                  if (ram_size <= 0)
                      help();
@@ -58,7 +60,7 @@ diff -r f36cde91babe vl.c
                  break;
              case QEMU_OPTION_l:
                  {
-@@ -5557,6 +5564,39 @@ int main(int argc, char **argv)
+@@ -5559,6 +5566,39 @@
      /* init the memory */
      phys_ram_size = ram_size + vga_ram_size + bios_size;
  
@@ -98,12 +100,12 @@ diff -r f36cde91babe vl.c
  #ifdef CONFIG_SOFTMMU
      phys_ram_base = qemu_vmalloc(phys_ram_size);
      if (!phys_ram_base) {
-@@ -5596,6 +5636,8 @@ int main(int argc, char **argv)
-         }
+@@ -5599,6 +5639,8 @@
      }
  #endif
-+
-+#endif /* !CONFIG_DM */
  
++#endif /* !CONFIG_DM */
++
      /* we always create the cdrom drive, even if no disk is there */
      bdrv_init();
+     if (cdrom_index >= 0) {

@@ -1,7 +1,7 @@
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-12 11:35:00.955797021 +0100
-+++ ioemu/vl.c	2006-07-12 11:35:01.094779608 +0100
+--- ioemu.orig/vl.c	2006-07-14 15:55:59.491503372 +0100
++++ ioemu/vl.c	2006-07-14 15:55:59.693480386 +0100
 @@ -4697,7 +4697,7 @@
             "-S              freeze CPU at startup (use 'c' to start execution)\n"
             "-s              wait gdb connection to port %d\n"
@@ -59,7 +59,7 @@ Index: ioemu/vl.c
                  {
                      int mask;
                      CPULogItem *item;
-@@ -5698,7 +5705,7 @@
+@@ -5700,7 +5707,7 @@
          stk.ss_flags = 0;
  
          if (sigaltstack(&stk, NULL) < 0) {

@@ -1,7 +1,7 @@
 Index: ioemu/Makefile.target
 ===================================================================
---- ioemu.orig/Makefile.target	2006-07-12 11:35:00.382868802 +0100
-+++ ioemu/Makefile.target	2006-07-12 11:35:00.452860033 +0100
+--- ioemu.orig/Makefile.target	2006-07-14 15:50:41.320748096 +0100
++++ ioemu/Makefile.target	2006-07-14 15:55:04.753733845 +0100
 @@ -285,7 +285,7 @@
  endif
  
@@ -13,8 +13,8 @@ Index: ioemu/Makefile.target
  VL_OBJS+=tap-win32.o
 Index: ioemu/configure
 ===================================================================
---- ioemu.orig/configure	2006-07-12 11:35:00.383868677 +0100
-+++ ioemu/configure	2006-07-12 11:35:00.453859908 +0100
+--- ioemu.orig/configure	2006-07-14 15:50:41.320748096 +0100
++++ ioemu/configure	2006-07-14 15:55:04.753733845 +0100
 @@ -75,8 +75,8 @@
  bigendian="no"
  mingw32="no"
@@ -37,8 +37,8 @@ Index: ioemu/configure
    target_user_only="yes"
 Index: ioemu/cpu-all.h
 ===================================================================
---- ioemu.orig/cpu-all.h	2006-07-12 11:33:54.968071470 +0100
-+++ ioemu/cpu-all.h	2006-07-12 11:35:00.453859908 +0100
+--- ioemu.orig/cpu-all.h	2006-07-14 15:50:30.488983278 +0100
++++ ioemu/cpu-all.h	2006-07-14 15:55:04.544757636 +0100
 @@ -690,7 +690,9 @@
  void page_set_flags(target_ulong start, target_ulong end, int flags);
  void page_unprotect_range(target_ulong data, target_ulong data_size);
@@ -64,8 +64,8 @@ Index: ioemu/cpu-all.h
  void cpu_dump_state(CPUState *env, FILE *f, 
 Index: ioemu/disas.h
 ===================================================================
---- ioemu.orig/disas.h	2006-07-12 11:33:54.968071470 +0100
-+++ ioemu/disas.h	2006-07-12 11:35:00.453859908 +0100
+--- ioemu.orig/disas.h	2006-07-14 15:50:30.489983164 +0100
++++ ioemu/disas.h	2006-07-14 15:50:41.334746500 +0100
 @@ -1,6 +1,7 @@
  #ifndef _QEMU_DISAS_H
  #define _QEMU_DISAS_H
@@ -83,8 +83,8 @@ Index: ioemu/disas.h
  #endif /* _QEMU_DISAS_H */
 Index: ioemu/exec-all.h
 ===================================================================
---- ioemu.orig/exec-all.h	2006-07-12 11:33:54.968071470 +0100
-+++ ioemu/exec-all.h	2006-07-12 11:35:00.454859782 +0100
+--- ioemu.orig/exec-all.h	2006-07-14 15:50:30.490983050 +0100
++++ ioemu/exec-all.h	2006-07-14 15:50:41.335746386 +0100
 @@ -509,7 +509,7 @@
  
  extern int tb_invalidated_flag;
@@ -105,8 +105,8 @@ Index: ioemu/exec-all.h
      return addr;
 Index: ioemu/hw/pc.c
 ===================================================================
---- ioemu.orig/hw/pc.c	2006-07-12 11:33:54.967071596 +0100
-+++ ioemu/hw/pc.c	2006-07-12 11:35:00.455859657 +0100
+--- ioemu.orig/hw/pc.c	2006-07-14 15:50:30.491982936 +0100
++++ ioemu/hw/pc.c	2006-07-14 15:55:04.543757750 +0100
 @@ -65,6 +65,7 @@
      return qemu_get_clock(vm_clock);
  }
@@ -184,8 +184,8 @@ Index: ioemu/hw/pc.c
          if (serial_hds[i]) {
 Index: ioemu/hw/vga_int.h
 ===================================================================
---- ioemu.orig/hw/vga_int.h	2006-07-12 11:33:54.967071596 +0100
-+++ ioemu/hw/vga_int.h	2006-07-12 11:35:00.455859657 +0100
+--- ioemu.orig/hw/vga_int.h	2006-07-14 15:50:30.491982936 +0100
++++ ioemu/hw/vga_int.h	2006-07-14 15:55:02.931941245 +0100
 @@ -28,7 +28,7 @@
  #define ST01_DISP_ENABLE    0x01
  
@@ -197,8 +197,8 @@ Index: ioemu/hw/vga_int.h
  #define VBE_DISPI_MAX_YRES              768
 Index: ioemu/monitor.c
 ===================================================================
---- ioemu.orig/monitor.c	2006-07-12 11:33:54.968071470 +0100
-+++ ioemu/monitor.c	2006-07-12 11:35:00.456859532 +0100
+--- ioemu.orig/monitor.c	2006-07-14 15:50:30.493982708 +0100
++++ ioemu/monitor.c	2006-07-14 15:55:04.754733732 +0100
 @@ -68,6 +68,12 @@
  
  void term_flush(void)
@@ -429,8 +429,8 @@ Index: ioemu/monitor.c
  {
 Index: ioemu/vl.c
 ===================================================================
---- ioemu.orig/vl.c	2006-07-12 11:33:54.967071596 +0100
-+++ ioemu/vl.c	2006-07-12 11:35:00.459859156 +0100
+--- ioemu.orig/vl.c	2006-07-14 15:50:30.496982366 +0100
++++ ioemu/vl.c	2006-07-14 15:55:07.676401124 +0100
 @@ -423,12 +423,15 @@
  void hw_error(const char *fmt, ...)
  {
@@ -489,3 +489,19 @@ Index: ioemu/vl.c
  
  /***********************************************************/
  /* machine registration */
+@@ -5481,6 +5505,7 @@
+     socket_init();
+ #endif
+ 
++#ifndef CONFIG_DM
+     /* init network clients */
+     if (nb_net_clients == 0) {
+         /* if no clients, we use a default config */
+@@ -5490,6 +5515,7 @@
+                 "user");
+         nb_net_clients = 2;
+     }
++#endif /* !CONFIG_DM */
+ 
+     for(i = 0;i < nb_net_clients; i++) {
+         if (net_client_init(net_clients[i]) < 0)
