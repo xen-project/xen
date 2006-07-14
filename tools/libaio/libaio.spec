@@ -1,5 +1,5 @@
 Name: libaio
-Version: 0.3.104
+Version: 0.3.106
 Release: 1
 Summary: Linux-native asynchronous I/O access library
 Copyright: LGPL
@@ -59,6 +59,16 @@ make install prefix=$RPM_BUILD_ROOT/usr \
 %attr(0644,root,root) %{_libdir}/libaio.a
 
 %changelog
+* Tue Jan  3 2006 Jeff Moyer <jmoyer@redhat.com> - 0.3.106-1
+- Add a .proc directive for the ia64_aio_raw_syscall macro.  This sounds a lot
+  like the previous entry, but that one fixed the __ia64_raw_syscall macro,
+  located in syscall-ia64.h.  This macro is in raw_syscall.c, which pretty much
+  only exists for ia64.  This bug prevented the package from building with
+  newer version of gcc.
+
+* Mon Aug  1 2005 Jeff Moyer <jmoyer@redhat.com> - 0.3.105-1
+- Add a .proc directive for the ia64 raw syscall macro.
+
 * Fri Apr  1 2005 Jeff Moyer <jmoyer@redhat.com> - 0.3.104-1
 - Add Alpha architecture support.  (Sergey Tikhonov <tsv@solvo.ru>)
 

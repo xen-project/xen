@@ -7,6 +7,7 @@
 #define __ia64_raw_syscall(fname, sname) \
 	__asm__ (".text\n"						\
 		".globl " SYMSTR(fname) "\n"				\
+		".proc " SYMSTR(fname) "\n"				\
 		SYMSTR(fname) ":\n"					\
 		"	mov r15=" SYMSTR( __NR_ ## sname ) "\n"		\
 		"	break 0x100000\n"				\
