@@ -11,5 +11,5 @@ To compile pygrub, you will need the following packages installed:
 2) Libraries of reiserfs, which is the following package (depend on your Linux distribution):
 	- libreiserfs-dev on Debian based distributions (Debian, Ubuntu, Xandros, Libranet, Xandros, etc...)
 	- progsreiserfs-devel on RedHat
-	- progreiserfs on Gentoo
+	- progsreiserfs on Gentoo
 
