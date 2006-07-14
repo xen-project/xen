@@ -1284,8 +1284,9 @@ class XendDomainInfo:
             balloon.free(m)
 
             init_reservation = self.info['memory'] * 1024
-            if os.uname()[4] == 'ia64':
-                # Workaround until ia64 properly supports ballooning.
+            if os.uname()[4] in ('ia64', 'ppc64'):
+                # Workaround for architectures that don't yet support
+                # ballooning.
                 init_reservation = m
 
             xc.domain_memory_increase_reservation(self.domid, init_reservation,
