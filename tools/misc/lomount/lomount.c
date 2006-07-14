@@ -4,6 +4,9 @@
  * Copyright (c) 2004 Jim Brown
  * Copyright (c) 2004 Brad Watson
  * Copyright (c) 2004 Mulyadi Santosa
+ * Major rewrite by Tristan Gingold:
+ *  - Handle GPT partitions
+ *  - Handle large files 
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -41,6 +44,8 @@ enum
 	ERR_MOUNT		// Other failure of mount command
 };
 
+#define _LARGEFILE_SOURCE
+#define _FILE_OFFSET_BITS 64
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -63,22 +68,179 @@ struct pentry
 	unsigned char end_head;
 	unsigned int  end_cylinder;
 	unsigned char end_sector;
-	unsigned long start_sector_abs;
-	unsigned long no_of_sectors_abs;
+	unsigned long long start_sector_abs;
+	unsigned long long no_of_sectors_abs;
 };
 
-int loadptable(const char *diskimage, struct pentry parttbl[], struct pentry **exttbl, int * valid)
+static void
+disp_entry (struct pentry *p)
+{
+	printf ("%10llu - %10llu: %02x %x\n",
+		SECSIZE * p->start_sector_abs,
+		SECSIZE * (p->start_sector_abs + p->no_of_sectors_abs - 1),
+		p->system,
+		p->bootable);
+}
+
+static unsigned long
+read_le4 (unsigned char *p)
+{
+	return (unsigned long) p[0]
+		| ((unsigned long) p[1] << 8)
+		| ((unsigned long) p[2] << 16)
+		| ((unsigned long) p[3] << 24);
+}
+
+static unsigned long long
+read_le8 (unsigned char *p)
+{
+	return (unsigned long long) p[0]
+		| ((unsigned long long) p[1] << 8)
+		| ((unsigned long long) p[2] << 16)
+		| ((unsigned long long) p[3] << 24)
+		| ((unsigned long long) p[4] << 32)
+		| ((unsigned long long) p[5] << 40)
+		| ((unsigned long long) p[6] << 48)
+		| ((unsigned long long) p[7] << 56);
+}
+
+/* Return true if the partition table is a GPT protective MBR.  */
+static int
+check_gpt (struct pentry *part, int nbr_part)
+{
+	if (nbr_part != 4)
+		return 0;
+	if (part[0].system == 0xee
+	    && part[1].no_of_sectors_abs == 0
+	    && part[2].no_of_sectors_abs == 0
+	    && part[3].no_of_sectors_abs == 0)
+		return 1;
+	return 0;
+}
+
+static int
+load_gpt (const char *diskimage, struct pentry *parttbl[])
 {
 	FILE *fd;
 	size_t size;
-	int fail = 1;
-	int i, total_known_sectors = 0;
+	int fail = -1;
+	unsigned char data[SECSIZE];
+	unsigned long long entries_lba;
+	unsigned long entry_size;
+	struct pentry *part;
+	int nbr_part;
+	unsigned long long off;
+	int i;
+
+	fd = fopen(diskimage, "r");
+	if (fd == NULL)
+	{
+		perror(diskimage);
+		goto done;
+	}
+	fseeko (fd, SECSIZE, SEEK_SET);
+	size = fread (&data, 1, sizeof(data), fd);
+	if (size < (size_t)sizeof(data))
+	{
+		fprintf(stderr, "Could not read the GPT header of %s.\n",
+			diskimage);
+		goto done;
+	}
+
+	if (memcmp (data, "EFI PART", 8) != 0)
+	{
+		fprintf (stderr, "Bad GPT signature\n");
+		goto done;
+	}
+
+	entries_lba = read_le8 (&data[72]);
+	nbr_part = read_le4 (&data[80]);
+	entry_size = read_le4 (&data[84]);
+
+#ifdef DEBUG
+	fprintf(stderr, "lba entries: %lu, nbr_part: %u, entry_size: %lu\n",
+		entries_lba, nbr_part, entry_size);
+#endif
+	part = malloc (nbr_part * sizeof (struct pentry));
+	if (part == NULL)
+	{
+		fprintf(stderr,"Cannot allocate memory\n");
+		goto done;
+	}
+	memset (part, 0, nbr_part * sizeof (struct pentry));
+	*parttbl = part;
+
+	off = entries_lba * SECSIZE;
+	for (i = 0; i < nbr_part; i++)
+	{
+		static const char unused_guid[16] = {0};
+		fseeko (fd, off, SEEK_SET);
+		size = fread (&data, 1, 128, fd);
+		if (size < 128)
+		{
+			fprintf(stderr, "Could not read a GPT entry of %s.\n",
+				diskimage);
+			goto done;
+		}
+		if (memcmp (&data[0], unused_guid, 16) == 0)
+		{
+			part[i].start_sector_abs = 0;
+			part[i].no_of_sectors_abs = 0;
+		}
+		else
+		{
+			part[i].start_sector_abs = read_le8 (&data[32]);
+			part[i].no_of_sectors_abs = read_le8 (&data[40]);
+#ifdef DEBUG
+			fprintf (stderr, "%d: %llu - %llu\n", i,
+				 part[i].start_sector_abs,
+				 part[i].no_of_sectors_abs);
+#endif
+			/* Convert end to a number.  */
+			part[i].no_of_sectors_abs -=
+				part[i].start_sector_abs - 1;
+		}
+		off += entry_size;
+	}
+		
+	fail = nbr_part;
+
+done:
+	if (fd)
+		fclose(fd);
+	return fail;
+}
+
+/* Read an MBR entry.  */
+static void
+read_mbr_record (unsigned char pi[16], struct pentry *res)
+{
+	res->bootable = *pi; 
+	res->start_head  = *(pi + 1); 
+	res->start_cylinder = *(pi + 3) | ((*(pi + 2) << 2) & 0x300);
+	res->start_sector = *(pi + 2) & 0x3f;
+	res->system = *(pi + 4);
+	res->end_head = *(pi + 5);
+	res->end_cylinder = *(pi + 7) | ((*(pi + 6) << 2) & 0x300);
+	res->end_sector = *(pi + 6) & 0x3f;
+	res->start_sector_abs = read_le4 (&pi[8]);
+	res->no_of_sectors_abs = read_le4 (&pi[12]);
+}
+
+/* Returns the number of partitions, -1 in case of failure.  */
+int load_mbr(const char *diskimage, struct pentry *parttbl[])
+{
+	FILE *fd;
+	size_t size;
+	int fail = -1;
+	int nbr_part;
+	int i;
 	unsigned char *pi; 
 	unsigned char data [SECSIZE]; 
-	unsigned long extent = 0, old_extent = 0, e_count = 1;
-	struct pentry exttbls[4];
+	unsigned long long extent;
+	struct pentry *part;
 
-	*valid = 0;
+	nbr_part = 0;
 
 	fd = fopen(diskimage, "r");
 	if (fd == NULL)
@@ -92,102 +254,61 @@ int loadptable(const char *diskimage, struct pentry parttbl[], struct pentry **e
 		fprintf(stderr, "Could not read the entire first sector of %s.\n", diskimage);
 		goto done;
 	}
+
+	if (data [510] != 0x55 || data [511] != 0xaa)
+	{
+		fprintf(stderr,"MBR signature mismatch (invalid partition table?)\n");
+		goto done;
+	}
+
+	/* There is at most 4*4 + 4 = 20 entries, also there should be only
+	   one extended partition.  */
+	part = malloc (20 * sizeof (struct pentry));
+	if (part == NULL)
+	{
+		fprintf(stderr,"Cannot allocate memory\n");
+		goto done;
+	}
+	*parttbl = part;
+
+	/* Read MBR.  */
+	nbr_part = 4;
 	for (i = 0; i < 4; i++)
 	{
 		pi = &data [446 + 16 * i];
-		parttbl [i].bootable = *pi; 
-		parttbl [i].start_head  = *(pi + 1); 
-		parttbl [i].start_cylinder = *(pi + 3) | ((*(pi + 2) << 2) & 0x300);
-		parttbl [i].start_sector = *(pi + 2) & 0x3f;
-		parttbl [i].system = *(pi + 4);
-		parttbl [i].end_head = *(pi + 5);
-		parttbl [i].end_cylinder = *(pi + 7) | ((*(pi + 6) << 2) & 0x300);
-		parttbl [i].end_sector = *(pi + 6) & 0x3f;
-		parttbl [i].start_sector_abs = 
-			(unsigned long) *(pi + 8) | ((unsigned long) *(pi + 9) << 8) | ((unsigned long) *(pi + 10) << 16) | ((unsigned long) *(pi + 11) << 24);
-		parttbl [i].no_of_sectors_abs = 
-			(unsigned long) *(pi + 12) | ((unsigned long) *(pi + 13) << 8) | ((unsigned long) *(pi + 14) << 16) | ((unsigned long) *(pi + 15) << 24);
-		if (parttbl[i].system == 0xF || parttbl[i].system == 0x5)
-		{
-			extent = parttbl[i].start_sector_abs * SECSIZE;
-			/* save the location of the "real" extended partition */
-			old_extent = extent;
-		}
+		read_mbr_record (pi, &part[i]);
 	}
-	*valid = (data [510] == 0x55 && data [511] == 0xaa) ? 1 : 0;
+
+	/* Read extended partitions.  */
 	for (i = 0; i < 4; i++)
 	{
-		total_known_sectors += parttbl[i].no_of_sectors_abs;
-	}
-	/* Extended Partition layout format was obtained from
-	http://wigner.cped.ornl.gov/the-gang/att-0520/03-Partition.htm */
-#ifdef DEBUG
-	if (extent != 0)
-	{
-		printf("extended partition detected at offset %ld\n", extent);
-	}
-#endif
-	while (extent != 0)
-	{
-/* according to realloc(3) passing NULL as pointer is same as calling malloc() */
-		exttbl[0] = realloc(exttbl[0], e_count * sizeof(struct pentry));
-		fseek(fd, extent, SEEK_SET);
-		size = fread (&data, 1, sizeof(data), fd);
-		if (size < (size_t)sizeof(data))
+		if (part[i].system == 0xF || part[i].system == 0x5)
 		{
-			fprintf(stderr, "Could not read extended partition of %s.", diskimage);
-			goto done;
-		}
-	/* only first 2 entrys are used in extented partition tables */
-		for (i = 0; i < 2; i++)
-		{
-			pi = &data [446 + 16 * i];
-			exttbls [i].bootable = *pi; 
-			exttbls [i].start_head  = *(pi + 1); 
-			exttbls [i].start_cylinder = *(pi + 3) | ((*(pi + 2) << 2) & 0x300);
-			exttbls [i].start_sector = *(pi + 2) & 0x3f;
-			exttbls [i].system = *(pi + 4);
-			exttbls [i].end_head = *(pi + 5);
-			exttbls [i].end_cylinder = *(pi + 7) | ((*(pi + 6) << 2) & 0x300);
-			exttbls [i].end_sector = *(pi + 6) & 0x3f;
-			exttbls [i].start_sector_abs = 
-				(unsigned long) *(pi + 8) | ((unsigned long) *(pi + 9) << 8) | ((unsigned long) *(pi + 10) << 16) | ((unsigned long) *(pi + 11) << 24);
-			exttbls [i].no_of_sectors_abs = 
-				(unsigned long) *(pi + 12) | ((unsigned long) *(pi + 13) << 8) | ((unsigned long) *(pi + 14) << 16) | ((unsigned long) *(pi + 15) << 24);
-			if (i == 0)
+			int j;
+
+			extent = part[i].start_sector_abs * SECSIZE;
+
+			fseeko (fd, extent, SEEK_SET);
+			size = fread (&data, 1, sizeof(data), fd);
+			if (size < (size_t)sizeof(data))
 			{
-				//memmove((void *)exttbl[e_count-1], (void *)exttbls[i], sizeof(struct pentry));
-				//memmove() seems broken!
-				exttbl[0][e_count-1].bootable = exttbls [i].bootable;
-				exttbl[0][e_count-1].start_head  = exttbls [i].start_head;
-				exttbl[0][e_count-1].start_cylinder = exttbls [i].start_cylinder;
-				exttbl[0][e_count-1].start_sector = exttbls [i].start_sector;
-				exttbl[0][e_count-1].system = exttbls [i].system;
-				exttbl[0][e_count-1].end_head = exttbls [i].end_head;
-				exttbl[0][e_count-1].end_cylinder = exttbls [i].end_cylinder;
-				exttbl[0][e_count-1].end_sector = exttbls [i].end_sector;
-				exttbl[0][e_count-1].start_sector_abs = exttbls [i].start_sector_abs;
-				exttbl[0][e_count-1].no_of_sectors_abs = exttbls [i].no_of_sectors_abs;
-			/* adjust for start of image instead of start of ext partition */
-				exttbl[0][e_count-1].start_sector_abs += (extent/SECSIZE);
-#ifdef DEBUG
-				printf("extent %ld start_sector_abs %ld\n", extent, exttbl[0][e_count-1].start_sector_abs);
-#endif
-			//else if (parttbl[i].system == 0x5)
+				fprintf(stderr, "Could not read extended partition of %s.", diskimage);
+				goto done;
 			}
-			else if (i == 1)
+
+			for (j = 0; j < 4; j++)
 			{
-				extent = (exttbls[i].start_sector_abs * SECSIZE);
-				if (extent)
-					extent += old_extent;
+				int n;
+				pi = &data [446 + 16 * j];
+				n = nbr_part + j;
+				read_mbr_record (pi, &part[n]);
 			}
+
+			nbr_part += 4;
 		}
-		e_count ++;
 	}
-#ifdef DEBUG
-	printf("e_count = %ld\n", e_count);
-#endif
-	fail = 0;
+
+	fail = nbr_part;
 
 done:
 	if (fd)
@@ -197,8 +318,8 @@ done:
 
 void usage(void)
 {
-	fprintf(stderr, "You must specify at least -diskimage and -partition.\n");
-	fprintf(stderr, "All other arguments are passed through to 'mount'.\n");
+	fprintf(stderr, "Usage: lomount [-verbose] [OPTIONS] -diskimage FILE -partition NUM [OPTIONS]\n");
+	fprintf(stderr, "All OPTIONS are passed through to 'mount'.\n");
 	fprintf(stderr, "ex. lomount -t fs-type -diskimage hda.img -partition 1 /mnt\n");
 	exit(ERR_USAGE);
 }
@@ -206,14 +327,17 @@ void usage(void)
 int main(int argc, char ** argv)
 {
 	int status;
-	struct pentry perttbl [4];
-	struct pentry *exttbl[1], *parttbl;
+	int nbr_part;
+	struct pentry *parttbl;
 	char buf[BUF], argv2[BUF];
-	const char * diskimage = 0;
-	int partition = 0, sec, num = 0, pnum = 0, i, valid;
+	const char * diskimage = NULL;
+	int partition = 0;
+	unsigned long long sec, num, pnum;
+	int i;
 	size_t argv2_len = sizeof(argv2);
+	int verbose = 0;
+
 	argv2[0] = '\0';
-	exttbl[0] = NULL;
 
 	for (i = 1; i < argc; i ++)
 	{
@@ -231,6 +355,10 @@ int main(int argc, char ** argv)
 			i++;
 			partition = atoi(argv[i]);
 		}
+		else if (strcmp(argv[i], "-verbose")==0)
+		{
+			verbose++;
+		}
 		else
 		{
 			size_t len = strlen(argv[i]);
@@ -241,59 +369,65 @@ int main(int argc, char ** argv)
 			len -= (len+1);
 		}
 	}
-	if (! diskimage || partition < 1)
+	if (! diskimage || partition < 0)
 		usage();
 
-	if (loadptable(diskimage, perttbl, exttbl, &valid))
+	nbr_part = load_mbr(diskimage, &parttbl);
+	if (check_gpt (parttbl, nbr_part)) {
+		free (parttbl);
+		nbr_part = load_gpt (diskimage, &parttbl);
+	}
+	if (nbr_part < 0)
 		return ERR_PART_PARSE;
-	if (!valid)
+	if (partition == 0)
 	{
-		fprintf(stderr, "Warning: disk image does not appear to describe a valid partition table.\n");
+		printf("Please specify a partition number.  Table is:\n");
+		printf("Num      Start -        End  OS Bootable\n");
+		for (i = 0; i < nbr_part; i++)
+		{
+			if (parttbl[i].no_of_sectors_abs != 0)
+			{
+				printf ("%2d: ", i + 1);
+				disp_entry (&parttbl[i]);
+			}
+		}
+		if (partition == 0)
+			return 0;
 	}
 	/* NOTE: need to make sure this always rounds down */
 	//sec = total_known_sectors / sizeof_diskimage;
-/* The above doesn't work unless the disk image is completely filled by
-partitions ... unused space will thrown off the sector size. The calculation
-assumes the disk image is completely filled, and that the few sectors used
-to store the partition table/MBR are few enough that the calculated value is
-off by (larger than) a value less than one. */
+	/* The above doesn't work unless the disk image is completely
+	   filled by partitions ... unused space will thrown off the
+	   sector size. The calculation assumes the disk image is
+	   completely filled, and that the few sectors used to store
+	   the partition table/MBR are few enough that the calculated
+	   value is off by (larger than) a value less than one. */
 	sec = 512; /* TODO: calculate real sector size */
 #ifdef DEBUG
 	printf("sec: %d\n", sec);
 #endif
-	if (partition > 4)
+	if (partition > nbr_part)
 	{
-		if (exttbl[0] == NULL)
-		{
-		    fprintf(stderr, "No extended partitions were found in %s.\n", diskimage);
-		    return ERR_NO_EPART;
-		}
-		parttbl = exttbl[0];
-		if (parttbl[partition-5].no_of_sectors_abs == 0)
-		{
-			fprintf(stderr, "Partition %d was not found in %s.\n", partition, diskimage);
-			return ERR_NO_PART;
-		}
-		partition -= 4;
-	}
-	else
-	{
-		parttbl = perttbl;
-		if (parttbl[partition-1].no_of_sectors_abs == 0)
-		{
-			fprintf(stderr, "Partition %d was not found in %s.\n", partition, diskimage);
-			return ERR_NO_PART;
-		}
+		fprintf(stderr, "Bad partition number\n");
+		return ERR_NO_EPART;
 	}
 	num = parttbl[partition-1].start_sector_abs;
+	if (num == 0)
+	{
+		fprintf(stderr, "Partition %d was not found in %s.\n",
+			partition, diskimage);
+		return ERR_NO_PART;
+	}
+
 	pnum = sec * num;
 #ifdef DEBUG
 	printf("offset = %d\n", pnum);
 #endif
-	snprintf(buf, sizeof(buf), "mount -oloop,offset=%d %s %s", pnum, diskimage, argv2);
-#ifdef DEBUG
-	printf("%s\n", buf);
-#endif
+	snprintf(buf, sizeof(buf), "mount -oloop,offset=%lld %s %s",
+		 pnum, diskimage, argv2);
+	if (verbose)
+		printf("%s\n", buf);
+
 	status = system(buf);
 	if (WIFEXITED(status))
 		status = WEXITSTATUS(status);
