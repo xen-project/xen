@@ -260,24 +260,27 @@
     stf.spill [r3]=f9,32;           \
     ;;                  \
     stf.spill [r2]=f10,32;         \
-    stf.spill [r3]=f11,24;         \
+    stf.spill [r3]=f11;         \
+    adds r25=PT(B7)-PT(F11),r3;     \
     ;;                  \
+    st8 [r24]=r18,16;       /* b6 */    \
+    st8 [r25]=r19,16;       /* b7 */    \
+    adds r3=PT(R5)-PT(F11),r3;     \
+    ;;                  \
+    st8 [r24]=r9;           /* ar.csd */    \
+    st8 [r25]=r10;          /* ar.ssd */    \
+    ;;
+
+#define VMX_SAVE_EXTRA               \
 .mem.offset 0,0; st8.spill [r2]=r4,16;     \
 .mem.offset 8,0; st8.spill [r3]=r5,16;     \
     ;;                  \
 .mem.offset 0,0; st8.spill [r2]=r6,16;      \
 .mem.offset 8,0; st8.spill [r3]=r7;      \
-    adds r25=PT(B7)-PT(R7),r3;     \
-    ;;                  \
-    st8 [r24]=r18,16;       /* b6 */    \
-    st8 [r25]=r19,16;       /* b7 */    \
-    ;;                  \
-    st8 [r24]=r9;           /* ar.csd */    \
-    mov r26=ar.unat;            \
-    ;;      \
-    st8 [r25]=r10;          /* ar.ssd */    \
+    ;;			\
+    mov r26=ar.unat;    \
+    ;;			\
     st8 [r2]=r26;       /* eml_unat */ \
-    ;;
 
 #define VMX_SAVE_MIN_WITH_COVER   VMX_DO_SAVE_MIN(cover, mov r30=cr.ifs,)
 #define VMX_SAVE_MIN_WITH_COVER_R19 VMX_DO_SAVE_MIN(cover, mov r30=cr.ifs, mov r15=r19)

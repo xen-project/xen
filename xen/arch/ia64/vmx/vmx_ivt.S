@@ -201,7 +201,7 @@ vmx_itlb_loop:
     ;;
 vmx_itlb_out:
     mov r19 = 1
-    br.sptk vmx_dispatch_tlb_miss
+    br.sptk vmx_dispatch_itlb_miss
     VMX_FAULT(1);
 END(vmx_itlb_miss)
 
@@ -275,7 +275,7 @@ vmx_dtlb_loop:
     ;;
 vmx_dtlb_out:
     mov r19 = 2
-    br.sptk vmx_dispatch_tlb_miss
+    br.sptk vmx_dispatch_dtlb_miss
     VMX_FAULT(2);
 END(vmx_dtlb_miss)
 
@@ -1041,9 +1041,10 @@ ENTRY(vmx_dispatch_virtualization_fault)
     srlz.i                  // guarantee that interruption collection is on
     ;;
     (p15) ssm psr.i               // restore psr.i
-    movl r14=ia64_leave_hypervisor
+    movl r14=ia64_leave_hypervisor_prepare
     ;;
     VMX_SAVE_REST
+    VMX_SAVE_EXTRA
     mov rp=r14
     ;;
     adds out1=16,sp         //regs
@@ -1070,7 +1071,7 @@ ENTRY(vmx_dispatch_vexirq)
     br.call.sptk.many b6=vmx_vexirq
 END(vmx_dispatch_vexirq)
 
-ENTRY(vmx_dispatch_tlb_miss)
+ENTRY(vmx_dispatch_itlb_miss)
     VMX_SAVE_MIN_WITH_COVER_R19
     alloc r14=ar.pfs,0,0,3,0
     mov out0=cr.ifa
@@ -1089,8 +1090,29 @@ ENTRY(vmx_dispatch_tlb_miss)
     ;;
     adds out2=16,r12
     br.call.sptk.many b6=vmx_hpw_miss
-END(vmx_dispatch_tlb_miss)
+END(vmx_dispatch_itlb_miss)
 
+ENTRY(vmx_dispatch_dtlb_miss)
+    VMX_SAVE_MIN_WITH_COVER_R19
+    alloc r14=ar.pfs,0,0,3,0
+    mov out0=cr.ifa
+    mov out1=r15
+    adds r3=8,r2                // set up second base pointer
+    ;;
+    ssm psr.ic
+    ;;
+    srlz.i                  // guarantee that interruption collection is on
+    ;;
+    (p15) ssm psr.i               // restore psr.i
+    movl r14=ia64_leave_hypervisor_prepare
+    ;;
+    VMX_SAVE_REST
+    VMX_SAVE_EXTRA
+    mov rp=r14
+    ;;
+    adds out2=16,r12
+    br.call.sptk.many b6=vmx_hpw_miss
+END(vmx_dispatch_dtlb_miss)
 
 ENTRY(vmx_dispatch_break_fault)
     VMX_SAVE_MIN_WITH_COVER_R19

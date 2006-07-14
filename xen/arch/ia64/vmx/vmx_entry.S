@@ -163,24 +163,39 @@ END(ia64_leave_nested)
 
 
 
-GLOBAL_ENTRY(ia64_leave_hypervisor)
+GLOBAL_ENTRY(ia64_leave_hypervisor_prepare)
     PT_REGS_UNWIND_INFO(0)
     /*
      * work.need_resched etc. mustn't get changed by this CPU before it returns to
     ;;
      * user- or fsys-mode, hence we disable interrupts early on:
      */
+    adds r2 = PT(R4)+16,r12
+    adds r3 = PT(R5)+16,r12
+    adds r8 = PT(EML_UNAT)+16,r12
+    ;;
+    ld8 r8 = [r8]
+    ;;
+    mov ar.unat=r8
+    ;;
+    ld8.fill r4=[r2],16    //load r4
+    ld8.fill r5=[r3],16    //load r5
+    ;;
+    ld8.fill r6=[r2]    //load r6
+    ld8.fill r7=[r3]    //load r7
+    ;;
+END(ia64_leave_hypervisor_prepare)
+//fall through
+GLOBAL_ENTRY(ia64_leave_hypervisor)
+    PT_REGS_UNWIND_INFO(0)
     rsm psr.i
     ;;
     alloc loc0=ar.pfs,0,1,1,0
-    adds out0=16,r12
-    adds r7 = PT(EML_UNAT)+16,r12
     ;;
-    ld8 r7 = [r7]
+    adds out0=16,r12
     br.call.sptk.many b0=leave_hypervisor_tail
     ;;
     mov ar.pfs=loc0
-    mov ar.unat=r7
     adds r20=PT(PR)+16,r12
     ;;
     lfetch [r20],PT(CR_IPSR)-PT(PR)
@@ -244,12 +259,6 @@ GLOBAL_ENTRY(ia64_leave_hypervisor)
     ;;
     ldf.fill f10=[r2],32
     ldf.fill f11=[r3],24
-    ;;
-    ld8.fill r4=[r2],16    //load r4
-    ld8.fill r5=[r3],16    //load r5
-    ;;
-    ld8.fill r6=[r2]    //load r6
-    ld8.fill r7=[r3]    //load r7
     ;;
     srlz.i          // ensure interruption collection is off
     ;;
