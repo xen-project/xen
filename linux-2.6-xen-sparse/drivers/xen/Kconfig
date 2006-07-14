@@ -95,7 +95,7 @@ config XEN_XENBUS_DEV
 	default y
 
 config XEN_BLKDEV_TAP
-	tristate "Blockk device tap backend"
+	tristate "Block device tap backend"
 	depends on XEN_BACKEND
 	default XEN_PRIVILEGED_GUEST
 	help
