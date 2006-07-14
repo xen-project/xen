@@ -1,4 +1,5 @@
 CONFIG_IA64 := y
 CONFIG_IOEMU := y
+CONFIG_XCUTILS := y
 
 LIBDIR := lib
