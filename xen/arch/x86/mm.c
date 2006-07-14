@@ -1008,6 +1008,10 @@ static int alloc_l3_table(struct page_info *page, unsigned long type)
     l3_pgentry_t  *pl3e;
     int            i;
 
+    /* See the code in shadow_promote() to understand why this is here. */
+    if ( (PGT_base_page_table == PGT_l3_page_table) &&
+         shadow_mode_refcounts(d) )
+        return 1;
     ASSERT(!shadow_mode_refcounts(d));
 
 #ifdef CONFIG_X86_PAE
