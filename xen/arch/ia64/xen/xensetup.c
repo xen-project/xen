@@ -66,7 +66,7 @@ integer_param("maxcpus", max_cpus);
    Note: you have to disable 8250 serials in domains (to avoid use of the
    same resource).  */
 static int opt_xencons = 1;
-boolean_param("xencons", opt_xencons);
+integer_param("xencons", opt_xencons);
 
 /* Toggle to allow non-legacy xencons UARTs to run in polling mode */
 static int opt_xencons_poll = 0;
