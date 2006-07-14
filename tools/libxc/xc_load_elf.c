@@ -38,6 +38,10 @@ loadelfsymtab(
 #define ELFCLASS   ELFCLASS64
 #define ELFDATA    ELFDATA2LSB
 #define ELFMACHINE EM_X86_64
+#elif defined(__powerpc__)
+#define ELFCLASS   ELFCLASS64
+#define ELFDATA    ELFDATA2MSB
+#define ELFMACHINE EM_PPC64
 #endif
 
 int probe_elf(const char *image,
