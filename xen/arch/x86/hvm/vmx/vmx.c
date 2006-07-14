@@ -811,6 +811,8 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
             return 1;
         }
         TRACE_VMEXIT (2,2);
+        /* in the case of MMIO, we are more interested in gpa than in va */
+        TRACE_VMEXIT (4,gpa);
         handle_mmio(va, gpa);
         return 1;
     }
