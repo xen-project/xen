@@ -73,9 +73,9 @@ if check_status and status != 0:
 
 # 5) check /proc/cpuinfo for cpu count
 
-# It takes some time for the CPU count to change, on multi-proc systems, so check the number of procs in a loop for 20 seconds. 
+# It takes some time for the CPU count to change, on multi-proc systems, so check the number of procs in a loop for 30 seconds. 
 #Sleep inside the loop for a second each time.
-timeout = 20
+timeout = 30
 starttime = time.time()
 while timeout + starttime > time.time():
 # Check /proc/cpuinfo
@@ -108,8 +108,8 @@ if num_online != enforce_dom0_cpus:
 reset_vcpu_count()
 
 # check restore worked
-# Since this also takes time, we will do it in a loop with a 20 second timeout.
-timeout=20
+# Since this also takes time, we will do it in a loop with a 30 second timeout.
+timeout=30
 starttime=time.time()
 while timeout + starttime > time.time(): 
     num_online = int(getDomInfo("Domain-0", "VCPUs"))
