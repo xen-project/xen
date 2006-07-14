@@ -15,6 +15,8 @@
 #include "arch-x86_64.h"
 #elif defined(__ia64__)
 #include "arch-ia64.h"
+#elif defined(__powerpc__)
+#include "arch-powerpc.h"
 #else
 #error "Unsupported architecture"
 #endif
