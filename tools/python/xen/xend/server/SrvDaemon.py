@@ -136,7 +136,7 @@ class Daemon:
         if not XEND_DAEMONIZE:
             self.tracing(trace)
             self.run(None)
-            return ret;
+            return ret
         
         # we use a pipe to communicate between the parent and the child process
         # this way we know when the child has actually initialized itself so
