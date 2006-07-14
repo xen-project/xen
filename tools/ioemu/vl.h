@@ -732,6 +732,7 @@ void cocoa_display_init(DisplayState *ds, int full_screen);
 
 /* vnc.c */
 void vnc_display_init(DisplayState *ds, int display);
+int vnc_start_viewer(int port);
 
 /* ide.c */
 #define MAX_DISKS 4

@@ -999,3 +999,25 @@ void vnc_display_init(DisplayState *ds, int display)
 
     vnc_dpy_resize(vs->ds, 640, 400);
 }
+
+int vnc_start_viewer(int port)
+{
+    int pid;
+    char s[16];
+
+    sprintf(s, ":%d", port);
+
+    switch (pid = fork()) {
+    case -1:
+	fprintf(stderr, "vncviewer failed fork\n");
+	exit(1);
+
+    case 0:	/* child */
+	execlp("vncviewer", "vncviewer", s, 0);
+	fprintf(stderr, "vncviewer execlp failed\n");
+	exit(1);
+
+    default:
+	return pid;
+    }
+}

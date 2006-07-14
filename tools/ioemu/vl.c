@@ -121,6 +121,7 @@ int vga_ram_size;
 int bios_size;
 static DisplayState display_state;
 int nographic;
+int vncviewer;
 const char* keyboard_layout = NULL;
 int64_t ticks_per_sec;
 int boot_device = 'c';
@@ -4801,6 +4802,7 @@ void help(void)
 #endif
            "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
 	   "-vnc display    start a VNC server on display\n"
+           "-vncviewer      start a vncviewer process for this domain\n"
            "-timeoffset     time offset (in seconds) from local time\n"
            "\n"
            "During emulation, the following keys are useful:\n"
@@ -4889,6 +4891,7 @@ enum {
     QEMU_OPTION_usbdevice,
     QEMU_OPTION_smp,
     QEMU_OPTION_vnc,
+    QEMU_OPTION_vncviewer,
 
     QEMU_OPTION_d,
     QEMU_OPTION_vcpus,
@@ -4964,6 +4967,7 @@ const QEMUOption qemu_options[] = {
     { "usbdevice", HAS_ARG, QEMU_OPTION_usbdevice },
     { "smp", HAS_ARG, QEMU_OPTION_smp },
     { "vnc", HAS_ARG, QEMU_OPTION_vnc },
+    { "vncviewer", 0, QEMU_OPTION_vncviewer },
     
     /* temporary options */
     { "usb", 0, QEMU_OPTION_usb },
@@ -5294,6 +5298,7 @@ int main(int argc, char **argv)
 #endif
     snapshot = 0;
     nographic = 0;
+    vncviewer = 0;
     kernel_filename = NULL;
     kernel_cmdline = "";
 #ifdef TARGET_PPC
@@ -5663,6 +5668,9 @@ int main(int argc, char **argv)
 		    exit(1);
 		}
 		break;
+            case QEMU_OPTION_vncviewer:
+                vncviewer++;
+                break;
             case QEMU_OPTION_domainname:
                 strncat(domain_name, optarg, sizeof(domain_name) - 20);
                 break;
@@ -5881,6 +5889,8 @@ int main(int argc, char **argv)
         dumb_display_init(ds);
     } else if (vnc_display != -1) {
 	vnc_display_init(ds, vnc_display);
+	if (vncviewer)
+	    vnc_start_viewer(vnc_display);
     } else {
 #if defined(CONFIG_SDL)
         sdl_display_init(ds, full_screen);

@@ -112,6 +112,12 @@ gopts.var('vncviewer', val='no|yes',
           Only valid when vnc=1.
           """)
 
+gopts.var('vncconsole', val='no|yes',
+          fn=set_bool, default=None,
+          use="""Spawn a vncviewer process for the domain's graphical console.
+          Only valid when vnc=1.
+          """)
+
 gopts.var('name', val='NAME',
           fn=set_value, default=None,
           use="Domain name. Must be unique.")
@@ -625,7 +631,7 @@ def configure_hvm(config_image, vals):
     """
     args = [ 'device_model', 'pae', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
              'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'audio',
-             'vnc', 'vncdisplay', 'vncviewer', 'sdl', 'display',
+             'vnc', 'vncdisplay', 'vncconsole', 'sdl', 'display',
              'acpi', 'apic', 'xauthority', 'usb', 'usbdevice' ]
     for a in args:
         if (vals.__dict__[a]):
@@ -854,17 +860,18 @@ def preprocess_vnc(vals):
     """If vnc was specified, spawn a vncviewer in listen mode
     and pass its address to the domain on the kernel command line.
     """
-    if not (vals.vnc and vals.vncviewer) or vals.dryrun: return
-    vnc_display = choose_vnc_display()
-    if not vnc_display:
-        warn("No free vnc display")
-        return
-    print 'VNC=', vnc_display
-    vnc_port = spawn_vnc(vnc_display)
-    if vnc_port > 0:
-        vnc_host = get_host_addr()
-        vnc = 'VNC_VIEWER=%s:%d' % (vnc_host, vnc_port)
-        vals.extra = vnc + ' ' + vals.extra
+    if vals.dryrun: return
+    if vals.vncviewer:
+        vnc_display = choose_vnc_display()
+        if not vnc_display:
+            warn("No free vnc display")
+            return
+        print 'VNC=', vnc_display
+        vnc_port = spawn_vnc(vnc_display)
+        if vnc_port > 0:
+            vnc_host = get_host_addr()
+            vnc = 'VNC_VIEWER=%s:%d' % (vnc_host, vnc_port)
+            vals.extra = vnc + ' ' + vals.extra
     
 def preprocess(vals):
     if not vals.kernel and not vals.bootloader:

@@ -1,0 +1,105 @@
+Index: ioemu/vnc.c
+===================================================================
+--- ioemu.orig/vnc.c	2006-07-14 18:29:36.810169908 +0100
++++ ioemu/vnc.c	2006-07-14 18:30:17.437628819 +0100
+@@ -999,3 +999,25 @@
+ 
+     vnc_dpy_resize(vs->ds, 640, 400);
+ }
++
++int vnc_start_viewer(int port)
++{
++    int pid;
++    char s[16];
++
++    sprintf(s, ":%d", port);
++
++    switch (pid = fork()) {
++    case -1:
++	fprintf(stderr, "vncviewer failed fork\n");
++	exit(1);
++
++    case 0:	/* child */
++	execlp("vncviewer", "vncviewer", s, 0);
++	fprintf(stderr, "vncviewer execlp failed\n");
++	exit(1);
++
++    default:
++	return pid;
++    }
++}
+Index: ioemu/vl.c
+===================================================================
+--- ioemu.orig/vl.c	2006-07-14 18:29:36.809170020 +0100
++++ ioemu/vl.c	2006-07-14 18:30:17.435629043 +0100
+@@ -121,6 +121,7 @@
+ int bios_size;
+ static DisplayState display_state;
+ int nographic;
++int vncviewer;
+ const char* keyboard_layout = NULL;
+ int64_t ticks_per_sec;
+ int boot_device = 'c';
+@@ -4801,6 +4802,7 @@
+ #endif
+            "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
+ 	   "-vnc display    start a VNC server on display\n"
++           "-vncviewer      start a vncviewer process for this domain\n"
+            "-timeoffset     time offset (in seconds) from local time\n"
+            "\n"
+            "During emulation, the following keys are useful:\n"
+@@ -4889,6 +4891,7 @@
+     QEMU_OPTION_usbdevice,
+     QEMU_OPTION_smp,
+     QEMU_OPTION_vnc,
++    QEMU_OPTION_vncviewer,
+ 
+     QEMU_OPTION_d,
+     QEMU_OPTION_vcpus,
+@@ -4964,6 +4967,7 @@
+     { "usbdevice", HAS_ARG, QEMU_OPTION_usbdevice },
+     { "smp", HAS_ARG, QEMU_OPTION_smp },
+     { "vnc", HAS_ARG, QEMU_OPTION_vnc },
++    { "vncviewer", 0, QEMU_OPTION_vncviewer },
+     
+     /* temporary options */
+     { "usb", 0, QEMU_OPTION_usb },
+@@ -5294,6 +5298,7 @@
+ #endif
+     snapshot = 0;
+     nographic = 0;
++    vncviewer = 0;
+     kernel_filename = NULL;
+     kernel_cmdline = "";
+ #ifdef TARGET_PPC
+@@ -5663,6 +5668,9 @@
+ 		    exit(1);
+ 		}
+ 		break;
++            case QEMU_OPTION_vncviewer:
++                vncviewer++;
++                break;
+             case QEMU_OPTION_domainname:
+                 strncat(domain_name, optarg, sizeof(domain_name) - 20);
+                 break;
+@@ -5881,6 +5889,8 @@
+         dumb_display_init(ds);
+     } else if (vnc_display != -1) {
+ 	vnc_display_init(ds, vnc_display);
++	if (vncviewer)
++	    vnc_start_viewer(vnc_display);
+     } else {
+ #if defined(CONFIG_SDL)
+         sdl_display_init(ds, full_screen);
+Index: ioemu/vl.h
+===================================================================
+--- ioemu.orig/vl.h	2006-07-14 18:29:36.810169908 +0100
++++ ioemu/vl.h	2006-07-14 18:30:17.436628931 +0100
+@@ -732,6 +732,7 @@
+ 
+ /* vnc.c */
+ void vnc_display_init(DisplayState *ds, int display);
++int vnc_start_viewer(int port);
+ 
+ /* ide.c */
+ #define MAX_DISKS 4

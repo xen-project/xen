@@ -134,8 +134,9 @@ vnc=1
 #vncdisplay=1
 
 #----------------------------------------------------------------------------
-# enable spawning vncviewer(only valid when vnc=1), default = 1
-vncviewer=1
+# enable spawning vncviewer for domain's console
+# (only valid when vnc=1), default = 0
+#vncconsole=0
 
 #----------------------------------------------------------------------------
 # no graphics, use serial port

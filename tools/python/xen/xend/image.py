@@ -208,6 +208,7 @@ class HVMImageHandler(ImageHandler):
             raise VmError("hvm: missing device model")
         self.display = sxp.child_value(imageConfig, 'display')
         self.xauthority = sxp.child_value(imageConfig, 'xauthority')
+        self.vncconsole = sxp.child_value(imageConfig, 'vncconsole')
 
         self.vm.storeVm(("image/dmargs", " ".join(self.dmargs)),
                         ("image/device-model", self.device_model),
@@ -335,11 +336,7 @@ class HVMImageHandler(ImageHandler):
             return
         # Execute device model.
         #todo: Error handling
-        # XXX RN: note that the order of args matter!
         args = [self.device_model]
-        vnc = self.vncParams()
-        if len(vnc):
-            args = args + vnc
         args = args + ([ "-d",  "%d" % self.vm.getDomid(),
                   "-m", "%s" % (self.vm.getMemoryTarget() / 1024)])
         args = args + self.dmargs
@@ -348,23 +345,11 @@ class HVMImageHandler(ImageHandler):
             env['DISPLAY'] = self.display
         if self.xauthority:
             env['XAUTHORITY'] = self.xauthority
+        if self.vncconsole:
+            args = args + ([ "-vncviewer" ])
         log.info("spawning device models: %s %s", self.device_model, args)
         self.pid = os.spawnve(os.P_NOWAIT, self.device_model, args, env)
         log.info("device model pid: %d", self.pid)
-
-    def vncParams(self):
-        # see if a vncviewer was specified
-        # XXX RN: bit of a hack. should unify this, maybe stick in config space
-        vncconnect=[]
-        args = self.cmdline
-        if args:
-            arg_list = string.split(args)
-            for arg in arg_list:
-                al = string.split(arg, '=')
-                if al[0] == "VNC_VIEWER":
-                    vncconnect=["-vncconnect", "%s" % al[1]]
-                    break
-        return vncconnect
 
     def destroy(self):
         self.unregister_shutdown_watch();

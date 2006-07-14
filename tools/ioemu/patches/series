@@ -30,3 +30,4 @@ acpi-timer-support
 acpi-poweroff-support
 vnc-cleanup
 vnc-fixes
+vnc-start-vncviewer
