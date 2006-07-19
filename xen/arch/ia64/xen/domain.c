@@ -248,14 +248,6 @@ void startup_cpu_idle_loop(void)
 	continue_cpu_idle_loop();
 }
 
-void hlt_timer_fn(void *data)
-{
-	struct vcpu *v = data;
-	if (vcpu_timer_expired(v))
-		vcpu_pend_timer(v);
-	vcpu_unblock(v);   
-}
-
 struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 {
 	struct vcpu *v;
@@ -311,8 +303,6 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 	    v->arch.breakimm = d->arch.breakimm;
 	    v->arch.last_processor = INVALID_PROCESSOR;
 	}
-	if (!VMX_DOMAIN(v))
-		init_timer(&v->arch.hlt_timer, hlt_timer_fn, v, v->processor);
 
 	return v;
 }
@@ -325,7 +315,6 @@ void free_vcpu_struct(struct vcpu *v)
 		if (v->arch.privregs != NULL)
 			free_xenheap_pages(v->arch.privregs,
 			              get_order_from_shift(XMAPPEDREGS_SHIFT));
-		kill_timer(&v->arch.hlt_timer);
 	}
 
 	free_xenheap_pages(v, KERNEL_STACK_SIZE_ORDER);

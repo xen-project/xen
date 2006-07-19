@@ -170,7 +170,6 @@ struct arch_vcpu {
     unsigned long old_rsc;
     int mode_flags;
     fpswa_ret_t fpswa_ret;	/* save return values of FPSWA emulation */
-    struct timer hlt_timer;
     struct arch_vmx_struct arch_vmx; /* Virtual Machine Extensions */
 
 #define INVALID_PROCESSOR       INT_MAX

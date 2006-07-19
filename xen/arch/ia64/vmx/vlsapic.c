@@ -165,6 +165,8 @@ void vtm_set_itc(VCPU *vcpu, uint64_t new_itc)
 
 
 #define TIMER_SLOP (50*1000) /* ns */  /* copy from timer.c */
+extern u64 cycle_to_ns(u64 cyle);
+
 
 void vtm_set_itm(VCPU *vcpu, uint64_t val)
 {
