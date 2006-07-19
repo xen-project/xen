@@ -145,9 +145,9 @@ typedef uint32_t grant_handle_t;
  * that must be presented later to destroy the mapping(s). On error, <handle>
  * is a negative status code.
  * NOTES:
- *  1. If GNTPIN_map_for_dev is specified then <dev_bus_addr> is the address
+ *  1. If GNTMAP_device_map is specified then <dev_bus_addr> is the address
  *     via which I/O devices may access the granted frame.
- *  2. If GNTPIN_map_for_host is specified then a mapping will be added at
+ *  2. If GNTMAP_host_map is specified then a mapping will be added at
  *     either a host virtual address in the current address space, or at
  *     a PTE at the specified machine address.  The type of mapping to
  *     perform is selected through the GNTMAP_contains_pte flag, and the 
