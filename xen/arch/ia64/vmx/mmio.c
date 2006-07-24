@@ -421,7 +421,6 @@ static void write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value)
    dir 1: read 0:write
     inst_type 0:integer 1:floating point
  */
-extern IA64_BUNDLE __vmx_get_domain_bundle(u64 iip);
 #define SL_INTEGER  0        // store/load interger
 #define SL_FLOATING    1       // store/load floating
 

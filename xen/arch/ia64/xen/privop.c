@@ -507,7 +507,6 @@ static IA64FAULT
 priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 {
 	IA64_BUNDLE bundle;
-	IA64_BUNDLE __get_domain_bundle(UINT64);
 	int slot;
 	IA64_SLOT_TYPE slot_type;
 	INST64 inst;

@@ -314,7 +314,6 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 {
 	struct vcpu *v = current;
 	IA64_BUNDLE bundle;
-	IA64_BUNDLE __get_domain_bundle(UINT64);
 	unsigned long fault_ip;
 	fpswa_ret_t ret;
 
@@ -325,7 +324,12 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 	 */
 	if (!fp_fault && (ia64_psr(regs)->ri == 0))
 		fault_ip -= 16;
-	bundle = __get_domain_bundle(fault_ip);
+
+	if (VMX_DOMAIN(current))
+		bundle = __vmx_get_domain_bundle(fault_ip);
+	else 
+		bundle = __get_domain_bundle(fault_ip);
+
 	if (!bundle.i64[0] && !bundle.i64[1]) {
 		printk("%s: floating-point bundle at 0x%lx not mapped\n",
 		       __FUNCTION__, fault_ip);
