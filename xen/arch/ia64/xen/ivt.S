@@ -1,19 +1,4 @@
-
 #ifdef XEN
-//#define CONFIG_DISABLE_VHPT	// FIXME: change when VHPT is enabled??
-// these are all hacked out for now as the entire IVT
-// will eventually be replaced... just want to use it
-// for startup code to handle TLB misses
-//#define ia64_leave_kernel 0
-//#define ia64_ret_from_syscall 0
-//#define ia64_handle_irq 0
-//#define ia64_fault 0
-#define ia64_illegal_op_fault 0
-#define ia64_prepare_handle_unaligned 0
-#define ia64_bad_break 0
-#define ia64_trace_syscall 0
-#define sys_call_table 0
-#define sys_ni_syscall 0
 #include <asm/debugger.h>
 #endif
 /*
@@ -95,25 +80,18 @@
 #include "minstate.h"
 
 #define FAULT(n)									\
+	mov r19=n;			/* prepare to save predicates */		\
 	mov r31=pr;									\
-	mov r19=n;;			/* prepare to save predicates */		\
 	br.sptk.many dispatch_to_fault_handler
 
 #define FAULT_OR_REFLECT(n)								\
-	mov r31=pr;	 	 							\
-	mov r20=cr.ipsr;;								\
+	mov r20=cr.ipsr;								\
 	mov r19=n;	/* prepare to save predicates */				\
+	mov r31=pr;;	 	 							\
 	extr.u r20=r20,IA64_PSR_CPL0_BIT,2;;   						\
 	cmp.ne p6,p0=r0,r20; 	/* cpl != 0?*/						\
 (p6)	br.dptk.many dispatch_reflection;						\
 	br.sptk.few dispatch_to_fault_handler
-
-#ifdef XEN
-#define REFLECT(n)									\
-	mov r31=pr;									\
-	mov r19=n;;			/* prepare to save predicates */		\
-	br.sptk.many dispatch_reflection
-#endif
 
 	.section .text.ivt,"ax"
 
@@ -257,8 +235,8 @@ END(vhpt_miss)
 ENTRY(itlb_miss)
 	DBG_FAULT(1)
 #ifdef XEN
-	mov r31 = pr
 	mov r16 = cr.ifa
+	mov r31 = pr
 	;;
 	extr.u r17=r16,59,5
 	;;
@@ -321,8 +299,8 @@ END(itlb_miss)
 ENTRY(dtlb_miss)
 	DBG_FAULT(2)
 #ifdef XEN
-	mov r31=pr
 	mov r16=cr.ifa				// get virtual address
+	mov r31=pr
 	;;
 	extr.u r17=r16,59,5
 	;;
@@ -443,12 +421,12 @@ END(dtlb_miss)
 ENTRY(alt_itlb_miss)
 	DBG_FAULT(3)
 #ifdef XEN
-	mov r31=pr
 	mov r16=cr.ifa		// get address that caused the TLB miss
+	mov r31=pr
 	;;
 late_alt_itlb_miss:
-	movl r17=PAGE_KERNEL
 	mov r21=cr.ipsr
+	movl r17=PAGE_KERNEL
 	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	;;
 #else
@@ -498,14 +476,14 @@ END(alt_itlb_miss)
 ENTRY(alt_dtlb_miss)
 	DBG_FAULT(4)
 #ifdef XEN
-	mov r31=pr
 	mov r16=cr.ifa		// get address that caused the TLB miss
+	mov r31=pr
 	;;
 late_alt_dtlb_miss:
-	movl r17=PAGE_KERNEL
 	mov r20=cr.isr
-	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
+	movl r17=PAGE_KERNEL
 	mov r21=cr.ipsr
+	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	;;
 #endif
 #ifdef CONFIG_DISABLE_VHPT
@@ -621,9 +599,11 @@ ENTRY(frametable_fault)
 	rfi
 END(frametable_fault)
 GLOBAL_ENTRY(ia64_frametable_probe)
+	{
 	probe.r	r8=r32,0	// destination register must be r8
 	nop.f 0x0
 	br.ret.sptk.many b0	// this instruction must be in bundle 2
+	}
 END(ia64_frametable_probe)
 #endif /* CONFIG_VIRTUAL_FRAME_TABLE */
 
@@ -705,8 +685,9 @@ ENTRY(ikey_miss)
 	DBG_FAULT(6)
 #ifdef XEN
 	FAULT_OR_REFLECT(6)
-#endif
+#else
 	FAULT(6)
+#endif
 END(ikey_miss)
 
 	//-----------------------------------------------------------------------------------
@@ -754,8 +735,9 @@ ENTRY(dkey_miss)
 	DBG_FAULT(7)
 #ifdef XEN
 	FAULT_OR_REFLECT(7)
-#endif
+#else
 	FAULT(7)
+#endif
 END(dkey_miss)
 
 	.org ia64_ivt+0x2000
@@ -765,7 +747,7 @@ ENTRY(dirty_bit)
 	DBG_FAULT(8)
 #ifdef XEN
 	FAULT_OR_REFLECT(8)
-#endif
+#else
 	/*
 	 * What we do here is to simply turn on the dirty bit in the PTE.  We need to
 	 * update both the page-table and the TLB entry.  To efficiently access the PTE,
@@ -821,6 +803,7 @@ ENTRY(dirty_bit)
 #endif
 	mov pr=r31,-1				// restore pr
 	rfi
+#endif
 END(dirty_bit)
 
 	.org ia64_ivt+0x2400
@@ -829,13 +812,13 @@ END(dirty_bit)
 ENTRY(iaccess_bit)
 	DBG_FAULT(9)
 #ifdef XEN
-	mov r31=pr;
 	mov r16=cr.isr
 	mov r17=cr.ifa
+	mov r31=pr
 	mov r19=9
-	movl r20=0x2400
+	mov r20=0x2400
 	br.sptk.many fast_access_reflect;;
-#endif
+#else
 	// Like Entry 8, except for instruction access
 	mov r16=cr.ifa				// get the address that caused the fault
 	movl r30=1f				// load continuation point in case of nested fault
@@ -894,6 +877,7 @@ ENTRY(iaccess_bit)
 #endif /* !CONFIG_SMP */
 	mov pr=r31,-1
 	rfi
+#endif
 END(iaccess_bit)
 
 	.org ia64_ivt+0x2800
@@ -902,13 +886,13 @@ END(iaccess_bit)
 ENTRY(daccess_bit)
 	DBG_FAULT(10)
 #ifdef XEN
-	mov r31=pr;
 	mov r16=cr.isr
 	mov r17=cr.ifa
+	mov r31=pr
 	mov r19=10
-	movl r20=0x2800
+	mov r20=0x2800
 	br.sptk.many fast_access_reflect;;
-#endif
+#else
 	// Like Entry 8, except for data access
 	mov r16=cr.ifa				// get the address that caused the fault
 	movl r30=1f				// load continuation point in case of nested fault
@@ -954,6 +938,7 @@ ENTRY(daccess_bit)
 	mov b0=r29				// restore b0
 	mov pr=r31,-1
 	rfi
+#endif
 END(daccess_bit)
 
 	.org ia64_ivt+0x2c00
@@ -1016,7 +1001,7 @@ ENTRY(break_fault)
 	;;
 	br.sptk.many fast_break_reflect
 	;;
-#endif
+#else /* !XEN */
 	movl r16=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
 	ld8 r16=[r16]
 	mov r17=cr.iim
@@ -1096,6 +1081,7 @@ ENTRY(break_fault)
 (p8)	br.call.sptk.many b6=b6			// ignore this return addr
 	br.cond.sptk ia64_trace_syscall
 	// NOT REACHED
+#endif
 END(break_fault)
 
 	.org ia64_ivt+0x3000
@@ -1190,6 +1176,7 @@ END(dispatch_break_fault)
 	DBG_FAULT(14)
 	FAULT(14)
 
+#ifndef XEN
 	/*
 	 * There is no particular reason for this code to be here, other than that
 	 * there happens to be space here that would go unused otherwise.  If this
@@ -1329,13 +1316,15 @@ GLOBAL_ENTRY(ia64_syscall_setup)
 (p10)	mov r8=-EINVAL
 	br.ret.sptk.many b7
 END(ia64_syscall_setup)
-
+#endif /* XEN */
+	
 	.org ia64_ivt+0x3c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3c00 Entry 15 (size 64 bundles) Reserved
 	DBG_FAULT(15)
 	FAULT(15)
 
+#ifndef XEN
 	/*
 	 * Squatting in this space ...
 	 *
@@ -1374,6 +1363,7 @@ ENTRY(dispatch_illegal_op_fault)
 (p6)	br.call.dpnt.many b6=b6		// call returns to ia64_leave_kernel
 	br.sptk.many ia64_leave_kernel
 END(dispatch_illegal_op_fault)
+#endif
 
 	.org ia64_ivt+0x4000
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -1419,6 +1409,7 @@ END(dispatch_privop_fault)
 	DBG_FAULT(17)
 	FAULT(17)
 
+#ifndef XEN
 ENTRY(non_syscall)
 	SAVE_MIN_WITH_COVER
 
@@ -1444,6 +1435,7 @@ ENTRY(non_syscall)
 	;;
 	br.call.sptk.many b6=ia64_bad_break	// avoid WAW on CFM and ignore return addr
 END(non_syscall)
+#endif
 
 	.org ia64_ivt+0x4800
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -1451,13 +1443,13 @@ END(non_syscall)
 	DBG_FAULT(18)
 	FAULT(18)
 
+#ifndef XEN
 	/*
 	 * There is no particular reason for this code to be here, other than that
 	 * there happens to be space here that would go unused otherwise.  If this
 	 * fault ever gets "unreserved", simply moved the following code to a more
 	 * suitable spot...
 	 */
-
 ENTRY(dispatch_unaligned_handler)
 	SAVE_MIN_WITH_COVER
 	;;
@@ -1479,6 +1471,7 @@ ENTRY(dispatch_unaligned_handler)
 //	br.sptk.many ia64_prepare_handle_unaligned
     br.call.sptk.many b6=ia64_handle_unaligned
 END(dispatch_unaligned_handler)
+#endif
 
 	.org ia64_ivt+0x4c00
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -1533,7 +1526,7 @@ ENTRY(page_not_present)
 	DBG_FAULT(20)
 #ifdef XEN
 	FAULT_OR_REFLECT(20)
-#endif
+#else
 	mov r16=cr.ifa
 	rsm psr.dt
 	/*
@@ -1547,6 +1540,7 @@ ENTRY(page_not_present)
 	mov r31=pr
 	srlz.d
 	br.sptk.many page_fault
+#endif
 END(page_not_present)
 
 	.org ia64_ivt+0x5100
@@ -1556,13 +1550,14 @@ ENTRY(key_permission)
 	DBG_FAULT(21)
 #ifdef XEN
 	FAULT_OR_REFLECT(21)
-#endif
+#else
 	mov r16=cr.ifa
 	rsm psr.dt
 	mov r31=pr
 	;;
 	srlz.d
 	br.sptk.many page_fault
+#endif
 END(key_permission)
 
 	.org ia64_ivt+0x5200
@@ -1572,13 +1567,14 @@ ENTRY(iaccess_rights)
 	DBG_FAULT(22)
 #ifdef XEN
 	FAULT_OR_REFLECT(22)
-#endif
+#else
 	mov r16=cr.ifa
 	rsm psr.dt
 	mov r31=pr
 	;;
 	srlz.d
 	br.sptk.many page_fault
+#endif
 END(iaccess_rights)
 
 	.org ia64_ivt+0x5300
@@ -1593,13 +1589,14 @@ ENTRY(daccess_rights)
 	mov r19=23
 	movl r20=0x5300
 	br.sptk.many fast_access_reflect;;
-#endif
+#else
 	mov r16=cr.ifa
 	rsm psr.dt
 	mov r31=pr
 	;;
 	srlz.d
 	br.sptk.many page_fault
+#endif
 END(daccess_rights)
 
 	.org ia64_ivt+0x5400
@@ -1666,8 +1663,9 @@ ENTRY(nat_consumption)
 	DBG_FAULT(26)
 #ifdef XEN
 	FAULT_OR_REFLECT(26)
-#endif
+#else
 	FAULT(26)
+#endif
 END(nat_consumption)
 
 	.org ia64_ivt+0x5700
@@ -1678,7 +1676,7 @@ ENTRY(speculation_vector)
 #ifdef XEN
 	// this probably need not reflect...
 	FAULT_OR_REFLECT(27)
-#endif
+#else
 	/*
 	 * A [f]chk.[as] instruction needs to take the branch to the recovery code but
 	 * this part of the architecture is not implemented in hardware on some CPUs, such
@@ -1709,6 +1707,7 @@ ENTRY(speculation_vector)
 	;;
 
 	rfi				// and go back
+#endif
 END(speculation_vector)
 
 	.org ia64_ivt+0x5800
@@ -1724,8 +1723,9 @@ ENTRY(debug_vector)
 	DBG_FAULT(29)
 #ifdef XEN
 	FAULT_OR_REFLECT(29)
-#endif
+#else
 	FAULT(29)
+#endif
 END(debug_vector)
 
 	.org ia64_ivt+0x5a00
@@ -1735,11 +1735,12 @@ ENTRY(unaligned_access)
 	DBG_FAULT(30)
 #ifdef XEN
 	FAULT_OR_REFLECT(30)
-#endif
+#else
 	mov r16=cr.ipsr
 	mov r31=pr		// prepare to save predicates
 	;;
 	br.sptk.many dispatch_unaligned_handler
+#endif
 END(unaligned_access)
 
 	.org ia64_ivt+0x5b00
@@ -1749,8 +1750,9 @@ ENTRY(unsupported_data_reference)
 	DBG_FAULT(31)
 #ifdef XEN
 	FAULT_OR_REFLECT(31)
-#endif
+#else
 	FAULT(31)
+#endif
 END(unsupported_data_reference)
 
 	.org ia64_ivt+0x5c00
@@ -1760,8 +1762,9 @@ ENTRY(floating_point_fault)
 	DBG_FAULT(32)
 #ifdef XEN
 	FAULT_OR_REFLECT(32)
-#endif
+#else
 	FAULT(32)
+#endif
 END(floating_point_fault)
 
 	.org ia64_ivt+0x5d00
@@ -1771,8 +1774,9 @@ ENTRY(floating_point_trap)
 	DBG_FAULT(33)
 #ifdef XEN
 	FAULT_OR_REFLECT(33)
-#endif
+#else
 	FAULT(33)
+#endif
 END(floating_point_trap)
 
 	.org ia64_ivt+0x5e00
@@ -1782,8 +1786,9 @@ ENTRY(lower_privilege_trap)
 	DBG_FAULT(34)
 #ifdef XEN
 	FAULT_OR_REFLECT(34)
-#endif
+#else
 	FAULT(34)
+#endif
 END(lower_privilege_trap)
 
 	.org ia64_ivt+0x5f00
@@ -1793,8 +1798,9 @@ ENTRY(taken_branch_trap)
 	DBG_FAULT(35)
 #ifdef XEN
 	FAULT_OR_REFLECT(35)
-#endif
+#else
 	FAULT(35)
+#endif
 END(taken_branch_trap)
 
 	.org ia64_ivt+0x6000
@@ -1804,8 +1810,9 @@ ENTRY(single_step_trap)
 	DBG_FAULT(36)
 #ifdef XEN
 	FAULT_OR_REFLECT(36)
-#endif
+#else
 	FAULT(36)
+#endif
 END(single_step_trap)
 
 	.org ia64_ivt+0x6100
@@ -1863,8 +1870,9 @@ ENTRY(ia32_exception)
 	DBG_FAULT(45)
 #ifdef XEN
 	FAULT_OR_REFLECT(45)
-#endif
+#else
 	FAULT(45)
+#endif
 END(ia32_exception)
 
 	.org ia64_ivt+0x6a00
@@ -1874,7 +1882,7 @@ ENTRY(ia32_intercept)
 	DBG_FAULT(46)
 #ifdef XEN
 	FAULT_OR_REFLECT(46)
-#endif
+#else
 #ifdef	CONFIG_IA32_SUPPORT
 	mov r31=pr
 	mov r16=cr.isr
@@ -1898,6 +1906,7 @@ ENTRY(ia32_intercept)
 1:
 #endif	// CONFIG_IA32_SUPPORT
 	FAULT(46)
+#endif
 END(ia32_intercept)
 
 	.org ia64_ivt+0x6b00
@@ -1907,12 +1916,13 @@ ENTRY(ia32_interrupt)
 	DBG_FAULT(47)
 #ifdef XEN
 	FAULT_OR_REFLECT(47)
-#endif
+#else
 #ifdef CONFIG_IA32_SUPPORT
 	mov r31=pr
 	br.sptk.many dispatch_to_ia32_handler
 #else
 	FAULT(47)
+#endif
 #endif
 END(ia32_interrupt)
 
