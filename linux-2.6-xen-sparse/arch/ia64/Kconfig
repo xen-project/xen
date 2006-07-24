@@ -71,6 +71,13 @@ config XEN_IA64_DOM0_NON_VP
 	help
 	  dom0 P=M model
 
+config XEN_IA64_VDSO_PARAVIRT
+	bool
+	depends on XEN && !ITANIUM
+	default y
+	help
+	  vDSO paravirtualization
+
 config SCHED_NO_NO_OMIT_FRAME_POINTER
 	bool
 	default y

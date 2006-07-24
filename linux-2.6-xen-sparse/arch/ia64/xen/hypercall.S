@@ -351,3 +351,59 @@ GLOBAL_ENTRY(xen_send_ipi)
         br.ret.sptk.many rp
         ;;
 END(xen_send_ipi)
+
+#ifdef CONFIG_XEN_IA64_VDSO_PARAVIRT
+// Those are vdso specialized.
+// In fsys mode, call, ret can't be used.
+GLOBAL_ENTRY(xen_rsm_be_i)
+	ld8 r22=[r22]
+	;; 
+	st1 [r22]=r20
+	st4 [r23]=r0
+	XEN_HYPER_RSM_BE
+	st4 [r23]=r20
+	brl.cond.sptk	.vdso_rsm_be_i_ret
+	;; 
+END(xen_rsm_be_i)
+
+GLOBAL_ENTRY(xen_get_psr)
+	mov r31=r8
+	mov r25=IA64_PSR_IC
+	st4 [r23]=r0
+	XEN_HYPER_GET_PSR
+	;; 
+	st4 [r23]=r20
+	or r29=r8,r25 // vpsr.ic was cleared for hyperprivop
+	mov r8=r31
+	brl.cond.sptk	.vdso_get_psr_ret
+	;; 
+END(xen_get_psr)
+
+GLOBAL_ENTRY(xen_ssm_i_0)
+	st4 [r22]=r20
+	ld4 r25=[r24]
+	;;
+	cmp.ne.unc p11,p0=r0, r25
+	;; 
+(p11)	st4 [r22]=r0
+(p11)	st4 [r23]=r0
+(p11)	XEN_HYPER_SSM_I
+	
+	brl.cond.sptk	.vdso_ssm_i_0_ret
+	;; 
+END(xen_ssm_i_0)
+
+GLOBAL_ENTRY(xen_ssm_i_1)
+	st4 [r22]=r20
+	ld4 r25=[r24]
+	;; 
+	cmp.ne.unc p11,p0=r0, r25
+	;; 
+(p11)	st4 [r22]=r0
+(p11)	st4 [r23]=r0
+(p11)	XEN_HYPER_SSM_I
+	;;
+	brl.cond.sptk	.vdso_ssm_i_1_ret
+	;; 
+END(xen_ssm_i_1)
+#endif

@@ -14,6 +14,9 @@
 #include <asm/sigcontext.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
+#ifdef CONFIG_XEN_IA64_VDSO_PARAVIRT
+# include <asm/privop.h>
+#endif
 
 /*
  * We can't easily refer to symbols inside the kernel.  To avoid full runtime relocation,
@@ -32,6 +35,52 @@
 #define BRL_COND_FSYS_BUBBLE_DOWN(pr)			\
 [1:](pr)brl.cond.sptk 0;				\
 	.xdata4 ".data.patch.brl_fsys_bubble_down", 1b-.
+
+#ifdef CONFIG_XEN_IA64_VDSO_PARAVIRT
+	// The page in which hyperprivop lives must be pinned by ITR.
+	// However vDSO area isn't pinned. So issuing hyperprivop
+	// from vDSO page causes trouble that Kevin pointed out.
+	// After clearing vpsr.ic, the vcpu is pre-empted and the itlb
+	// is flushed. Then vcpu get cpu again, tlb miss fault occures.
+	// However it results in nested dtlb fault because vpsr.ic is off.
+	// To avoid such a situation, we jump into the kernel text area
+	// which is pinned, and then issue hyperprivop and return back
+	// to vDSO page.
+	// This is Dan Magenheimer's idea.
+
+	// Currently is_running_on_xen() is defined as running_on_xen.
+	// If is_running_on_xen() is a real function, we must update
+	// according to it.
+	.section ".data.patch.running_on_xen", "a"
+	.previous
+#define LOAD_RUNNING_ON_XEN(reg)			\
+[1:]	movl reg=0;					\
+	.xdata4 ".data.patch.running_on_xen", 1b-.
+
+	.section ".data.patch.brl_xen_rsm_be_i", "a"
+	.previous
+#define BRL_COND_XEN_RSM_BE_I(pr)			\
+[1:](pr)brl.cond.sptk 0;				\
+	.xdata4 ".data.patch.brl_xen_rsm_be_i", 1b-.
+
+	.section ".data.patch.brl_xen_get_psr", "a"
+	.previous
+#define BRL_COND_XEN_GET_PSR(pr)			\
+[1:](pr)brl.cond.sptk 0;				\
+	.xdata4 ".data.patch.brl_xen_get_psr", 1b-.
+
+	.section ".data.patch.brl_xen_ssm_i_0", "a"
+	.previous
+#define BRL_COND_XEN_SSM_I_0(pr)			\
+[1:](pr)brl.cond.sptk 0;				\
+	.xdata4 ".data.patch.brl_xen_ssm_i_0", 1b-.
+
+	.section ".data.patch.brl_xen_ssm_i_1", "a"
+	.previous
+#define BRL_COND_XEN_SSM_I_1(pr)			\
+[1:](pr)brl.cond.sptk 0;				\
+	.xdata4 ".data.patch.brl_xen_ssm_i_1", 1b-.
+#endif
 
 GLOBAL_ENTRY(__kernel_syscall_via_break)
 	.prologue
@@ -77,7 +126,39 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 	epc					// B	causes split-issue
 }
 	;;
+#ifdef CONFIG_XEN_IA64_VDSO_PARAVIRT
+	// r20 = 1
+	// r22 = &vcpu->evtchn_mask
+	// r23 = &vpsr.ic
+	// r24 = vcpu->pending_interruption
+	// r25 = tmp
+	// r28 = &running_on_xen
+	// r30 = running_on_xen
+	// r31 = tmp
+	// p11 = tmp
+	// p12 = running_on_xen
+	// p13 = !running_on_xen
+	// p14 = tmp
+	// p15 = tmp
+#define isXen	p12
+#define isRaw	p13
+	LOAD_RUNNING_ON_XEN(r28)
+	movl r22=XSI_PSR_I_ADDR
+	movl r23=XSI_PSR_IC
+	movl r24=XSI_PSR_I_ADDR+(XSI_PEND_OFS-XSI_PSR_I_ADDR_OFS)
+	mov r20=1
+	;;
+	ld4 r30=[r28]
+	;;
+	cmp.ne isXen,isRaw=r0,r30
+	;;
+(isRaw)	rsm psr.be | psr.i
+	BRL_COND_XEN_RSM_BE_I(isXen)
+	.global .vdso_rsm_be_i_ret
+.vdso_rsm_be_i_ret:
+#else
 	rsm psr.be | psr.i			// M2 (5 cyc to srlz.d)
+#endif
 	LOAD_FSYSCALL_TABLE(r14)		// X
 	;;
 	mov r16=IA64_KR(CURRENT)		// M2 (12 cyc)
@@ -85,7 +166,14 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 	mov r19=NR_syscalls-1			// A
 	;;
 	lfetch [r18]				// M0|1
+#ifdef CONFIG_XEN_IA64_VDSO_PARAVIRT
+(isRaw)	mov r29=psr
+	BRL_COND_XEN_GET_PSR(isXen)
+	.global .vdso_get_psr_ret
+.vdso_get_psr_ret:
+#else
 	mov r29=psr				// M2 (12 cyc)
+#endif
 	// If r17 is a NaT, p6 will be zero
 	cmp.geu p6,p7=r19,r17			// A    (sysnr > 0 && sysnr < 1024+NR_syscalls)?
 	;;
@@ -99,9 +187,21 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 	;;
 	nop.m 0
 (p6)	tbit.z.unc p8,p0=r18,0			// I0 (dual-issues with "mov b7=r18"!)
+#ifdef CONFIG_XEN_IA64_VDSO_PARAVIRT
+	;;
+	// p14 = running_on_xen && p8
+	// p15 = !running_on_xen && p8
+(p8)	cmp.ne.unc p14,p15=r0,r30
+	;;
+(p15)	ssm psr.i
+	BRL_COND_XEN_SSM_I_0(p14)
+	.global .vdso_ssm_i_0_ret
+.vdso_ssm_i_0_ret:
+#else
 	nop.i 0
 	;;
 (p8)	ssm psr.i
+#endif
 (p6)	mov b7=r18				// I0
 (p8)	br.dptk.many b7				// B
 
@@ -122,9 +222,21 @@ GLOBAL_ENTRY(__kernel_syscall_via_epc)
 #else
 	BRL_COND_FSYS_BUBBLE_DOWN(p6)
 #endif
+#ifdef CONFIG_XEN_IA64_VDSO_PARAVIRT
+(isRaw)	ssm psr.i
+	BRL_COND_XEN_SSM_I_1(isXen)
+	.global .vdso_ssm_i_1_ret
+.vdso_ssm_i_1_ret:
+#else
 	ssm psr.i
+#endif
 	mov r10=-1
 (p10)	mov r8=EINVAL
+#ifdef CONFIG_XEN_IA64_VDSO_PARAVIRT
+	dv_serialize_data // shut up gas warning.
+		          // we know xen_hyper_ssm_i_0 or xen_hyper_ssm_i_1
+		          // doesn't change p9 and p10
+#endif
 (p9)	mov r8=ENOSYS
 	FSYS_RETURN
 END(__kernel_syscall_via_epc)
